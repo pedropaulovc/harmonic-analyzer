@@ -1,6 +1,5 @@
 """Offline contract for the magnifier assembly drawing and its stack settings."""
 
-import asyncio
 import json
 import math
 import re
@@ -496,20 +495,20 @@ def test_the_stack_chain_is_authored_on_the_axle_and_driven_from_globals(
         _sketch_entities: dict[str, object] = {}
         currentModel = object()
 
-        async def create_sketch(self, plane):
+        def create_sketch(self, plane):
             assert plane == "Right"
             return ok()
 
-        async def add_line(self, *coords):
+        def add_line(self, *coords):
             name = f"leg{len(lines)}"
             lines.append(coords)
             self._sketch_entities[name] = object()
             return ok(name)
 
-        async def add_sketch_constraint(self, *args):
+        def add_sketch_constraint(self, *args):
             return ok()
 
-        async def exit_sketch(self):
+        def exit_sketch(self):
             return ok()
 
     class Dims:
@@ -531,16 +530,16 @@ def test_the_stack_chain_is_authored_on_the_axle_and_driven_from_globals(
             return entity
         return SimpleNamespace(ConstructionGeometry=False)
 
-    async def set_global(adapter, name, expression):
+    def set_global(adapter, name, expression):
         globals_authored[name] = expression
 
-    async def drive_dimension(adapter, name, expression):
+    def drive_dimension(adapter, name, expression):
         equations[name] = expression
 
-    async def dimension_between(adapter, a, b, kind, value, name):
+    def dimension_between(adapter, a, b, kind, value, name):
         lengths[name] = value
 
-    async def noop(*args, **kwargs):
+    def noop(*args, **kwargs):
         return None
 
     monkeypatch.setattr(builder, "set_global", set_global)
@@ -583,7 +582,7 @@ def test_the_stack_chain_is_authored_on_the_axle_and_driven_from_globals(
         builder, "blank_sketch", lambda adapter, feature: blanked.append(feature)
     )
 
-    asyncio.run(builder._author_axle_stack_reference(Adapter()))
+    builder._author_axle_stack_reference(Adapter())
 
     # Right-plane sketch x is machine -z: the chain runs forward from the bar
     # front face along the axle's height.

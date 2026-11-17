@@ -326,11 +326,11 @@ def _assert_drawing_model_edge_weight(
         )
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open alignment-pinion source", await adapter.open_model(str(SOURCE)))
+    check("open alignment-pinion source", adapter.open_model(str(SOURCE)))
     properties = read_required_properties(
         adapter.currentModel,
         (
@@ -459,7 +459,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     model_edge_width = _set_drawing_model_edge_weight(adapter, iso)
 
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Alignment Pinion Drum Manufacturing Drawing",

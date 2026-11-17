@@ -240,16 +240,16 @@ def _feature_cut3(adapter, sketch_name: str, args: tuple) -> object:
     return feature
 
 
-async def _try_cut(adapter, sketch_name: str, args: tuple) -> str:
+def _try_cut(adapter, sketch_name: str, args: tuple) -> str:
     """Diagnostic: make one cut, report what it removed, and undo it."""
-    pre = await _volume_mm3(adapter)
+    pre = _volume_mm3(adapter)
     try:
         _feature_cut3(adapter, sketch_name, args)
     except Exception as exc:  # noqa: BLE001 - a diagnostic reports, never raises
         result = str(exc)
     else:
         try:
-            removed = pre - await _volume_mm3(adapter)
+            removed = pre - _volume_mm3(adapter)
         finally:  # undo the probe even if the measurement fails
             adapter.currentModel.EditUndo2(1)
         result = f"created, removed {removed:.4f} mm^3"
@@ -257,7 +257,7 @@ async def _try_cut(adapter, sketch_name: str, args: tuple) -> str:
     return result
 
 
-async def _first_v_cut(adapter, sketch_name: str, pre: float, *, depth_mm: float,
+def _first_v_cut(adapter, sketch_name: str, pre: float, *, depth_mm: float,
                        expected: float, allowance: float) -> tuple:
     """Find the form whose ``depth_mm`` V removes ``expected`` mm^3 to within
     ``allowance``; undo the rest. ``pre`` is the volume before the cut."""
@@ -269,13 +269,13 @@ async def _first_v_cut(adapter, sketch_name: str, pre: float, *, depth_mm: float
         except FeatureCutRefused as exc:
             tried.append(f"{label}: {exc}")
             continue
-        removed = pre - await _volume_mm3(adapter)
+        removed = pre - _volume_mm3(adapter)
         if abs(removed - expected) <= allowance:
             _telemetry.info(f"V cut form on {sketch_name}: {label} removed {removed:.4f} mm^3 (pinned {expected:.4f})")
             return args
         tried.append(f"{label}: removed {removed:.4f} mm^3")
         adapter.currentModel.EditUndo2(1)
-        restored = pre - await _volume_mm3(adapter)
+        restored = pre - _volume_mm3(adapter)
         if abs(restored) > 1e-6:
             raise RuntimeError(f"undo of the {label} V cut left {restored:.4f} mm^3 removed; tried {tried}")
     # Discriminate the refusal: undrafted single-ended controls in each
@@ -285,21 +285,21 @@ async def _first_v_cut(adapter, sketch_name: str, pre: float, *, depth_mm: float
         "undrafted default direction": _v_cut_args(False, reverse=False, drafted=False, depth_mm=depth_mm),
     }
     for label, args in probes.items():
-        tried.append(f"probe {label}: {await _try_cut(adapter, sketch_name, args)}")
+        tried.append(f"probe {label}: {_try_cut(adapter, sketch_name, args)}")
     raise RuntimeError(
         f"no FeatureCut3 form removed {sketch_name}'s {expected:.4f} mm^3 V: " + "; ".join(tried)
     )
 
 
 @_telemetry.traced("cut.ms_stick_numerals", label_param="name")
-async def _cut_numerals(adapter, drive_jobs: list[tuple[str, str]], name: str, args: tuple | None,
+def _cut_numerals(adapter, drive_jobs: list[tuple[str, str]], name: str, args: tuple | None,
                         pre: float) -> tuple:
     """Blind V cut of one imported stroke layer, read back at once; returns
     the FeatureCut3 form, found on the first layer (from ``pre``, the volume
     before the cut) and reused after it."""
     sketch = f"{name}Sketch"
     if args is None:
-        args = await _first_v_cut(
+        args = _first_v_cut(
             adapter, sketch, pre, depth_mm=NUMERAL_DEPTH,
             expected=NUMERAL_LAYER_VOLUMES_MM3[0], allowance=NUMERAL_LAYER_ALLOWANCES_MM3[0],
         )
@@ -349,8 +349,8 @@ def _min_limit(adapter, feature: str, name: str) -> None:
     _telemetry.success(f"{name}@{feature}: {float(dimension.SystemValue) * 1000.0:.2f} MIN")
 
 
-async def _volume_mm3(adapter) -> float:
-    mass = await adapter.get_mass_properties()
+def _volume_mm3(adapter) -> float:
+    mass = adapter.get_mass_properties()
     if not mass.is_success:
         raise RuntimeError(f"measuring stick: get_mass_properties failed: {mass.error}")
     volume = float(mass.data.volume)
@@ -377,10 +377,10 @@ def _check_numeral_volume(label: str, removed: float, expected: float, allowance
     )
 
 
-async def _check_volume_unchanged(adapter, label: str, built: float) -> None:
+def _check_volume_unchanged(adapter, label: str, built: float) -> None:
     """The volume still reads ``built`` to half the finished part's least
     stroke, so a rebuild or save that loses one stroke fails here."""
-    volume = await _volume_mm3(adapter)
+    volume = _volume_mm3(adapter)
     _telemetry.info(f"{label}: volume {volume:.4f} mm^3 (as built {built:.4f})")
     if abs(volume - built) > NUMERAL_FINAL_ALLOWANCE_MM3:
         raise RuntimeError(
@@ -484,7 +484,7 @@ def author_dimension_callouts(adapter) -> None:
                     raise RuntimeError(f"{name}@{feature}: callout did not persist (text part {part_id}): {printed!r}")
 
 
-async def _cut_tick(
+def _cut_tick(
     adapter,
     label: str,
     stem: str,
@@ -512,10 +512,10 @@ async def _cut_tick(
     so it drives to that centre minus half the tick width.
     """
     dims = SketchDims()
-    check(f"create_sketch {label}", await adapter.create_sketch("Front"))
+    check(f"create_sketch {label}", adapter.create_sketch("Front"))
     half = TICK_WIDTH / 2.0
     top_y = BODY_WIDTH + TICK_OVERHANG
-    lines = await add_line_chain(
+    lines = add_line_chain(
         adapter,
         [
             (x_center - half, BODY_WIDTH - length),
@@ -533,16 +533,16 @@ async def _cut_tick(
     ):
         check(
             f"{label} constraint {relation}",
-            await adapter.add_sketch_constraint(ent, None, relation),
+            adapter.add_sketch_constraint(ent, None, relation),
         )
     check(
         f"{label} width dim",
-        await adapter.add_sketch_dimension(bottom, None, "linear", TICK_WIDTH),
+        adapter.add_sketch_dimension(bottom, None, "linear", TICK_WIDTH),
     )
     dims.record(f"{stem}Width", '"TickWidth"')
     check(
         f"{label} length dim",
-        await adapter.add_sketch_dimension(
+        adapter.add_sketch_dimension(
             right, None, "linear", length + TICK_OVERHANG
         ),
     )
@@ -550,7 +550,7 @@ async def _cut_tick(
     # Corner anchor at (x_center - half, BODY_WIDTH - length): both non-zero, so
     # two dims (x then z). Both are unsigned distances from the origin and both
     # land positive here, so the drives evaluate positive directly.
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter,
         f"{bottom}.start",
         x_center - half,
@@ -559,8 +559,8 @@ async def _cut_tick(
     )
     dims.record(f"{stem}CornerX", f'{drive_xcenter} - "TickWidth" / 2')
     dims.record(f"{stem}CornerZ", f'"BodyWidth" - ({drive_length})')
-    await ensure_fully_defined(adapter, f"{label} sketch")
-    check(f"exit_sketch {label}", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, f"{label} sketch")
+    check(f"exit_sketch {label}", adapter.exit_sketch())
     name_last_feature(adapter, f"{stem}Profile")
     drive_jobs += dims.apply(adapter, f"{stem}Profile")
     # Single-ended into the bar, so the depth dimension spans face to floor;
@@ -570,7 +570,7 @@ async def _cut_tick(
     if cut_args is None:
         if seed_pre is None:
             raise ValueError(f"{label}: the seed tick needs the bar's volume before it")
-        cut_args = await _first_v_cut(
+        cut_args = _first_v_cut(
             adapter, sketch, seed_pre, depth_mm=TICK_DEPTH,
             expected=tick_v_volume_mm3(length), allowance=TICK_SEED_ALLOWANCE_MM3,
         )
@@ -583,7 +583,7 @@ async def _cut_tick(
 
 
 @_telemetry.traced("sketch.stick_manufacturing_chords")
-async def _manufacturing_chords(adapter, drive_jobs: list[tuple[str, str]]) -> None:
+def _manufacturing_chords(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     """Bind finished engraving sizes to their knobs, excluding profile overhang.
 
     The tracked numeral artwork stays fixed. Its gaps therefore measure from
@@ -631,31 +631,31 @@ async def _manufacturing_chords(adapter, drive_jobs: list[tuple[str, str]]) -> N
     for feature, (name, start, end) in REFERENCE_DIMENSIONS.items():
         dims = SketchDims()
         size_expr, x_expr, y_expr = bindings[feature]
-        check(feature, await adapter.create_sketch("Front"))
+        check(feature, adapter.create_sketch("Front"))
         set_sketch_direct_db(adapter, True)
-        line = check(feature, await adapter.add_line(*start, *end))
+        line = check(feature, adapter.add_line(*start, *end))
         set_sketch_direct_db(adapter, False)
         segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
         segment.ConstructionGeometry = True
         if not bool(segment.ConstructionGeometry):
             raise RuntimeError(f"{feature}: construction flag rejected")
         horizontal = start[1] == end[1]
-        check(feature, await adapter.add_sketch_constraint(
+        check(feature, adapter.add_sketch_constraint(
             line, None, "horizontal" if horizontal else "vertical"))
-        await dimension_between(
+        dimension_between(
             adapter, f"{line}.start", f"{line}.end",
             "horizontal_distance" if horizontal else "vertical_distance",
             abs(end[0] - start[0]) if horizontal else abs(end[1] - start[1]),
             feature,
         )
         dims.record(name, size_expr)
-        await anchor_point_to_origin(adapter, f"{line}.start", *start, feature)
+        anchor_point_to_origin(adapter, f"{line}.start", *start, feature)
         if abs(start[0]) >= 1e-9:
             dims.record(f"{name}AnchorX", x_expr)
         if abs(start[1]) >= 1e-9:
             dims.record(f"{name}AnchorY", y_expr)
-        await ensure_fully_defined(adapter, feature)
-        check(feature, await adapter.exit_sketch())
+        ensure_fully_defined(adapter, feature)
+        check(feature, adapter.exit_sketch())
         name_last_feature(adapter, feature)
         drive_jobs += dims.apply(adapter, feature)
 
@@ -670,14 +670,14 @@ def _hide_manufacturing_chords(adapter) -> None:
         blank_sketch_feature(adapter.currentModel, _early_bound(feature, "IFeature"), feature_name)
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
         ExtrusionParameters,
         ImportDxfDwgParameters,
         LinearPatternParameters,
     )
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     # The registry row's IPS/inch/8-place calculation units, before the first
     # global: the equation manager evaluates every global in them, and the save
     # only proves them.
@@ -690,18 +690,18 @@ async def build(adapter) -> dict[str, str]:
     # referencing the others as an equation string. DivisionSpacing drives the
     # FEATURE parameter -- a knob with nothing in the deferred sketch-dim batch,
     # like an extrude depth (matches the exemplars).
-    await set_global(adapter, "BodyLength", f"{BODY_LENGTH}mm")
-    await set_global(adapter, "BodyWidth", f"{BODY_WIDTH}mm")
-    await set_global(adapter, "BodyThickness", f"{BODY_THICKNESS}mm")
-    await set_global(adapter, "DivisionSpacing", f"{DIVISION_SPACING}mm")
-    await set_global(adapter, "ScaleEndMargin", f"{SCALE_END_MARGIN}mm")
-    await set_global(adapter, "TickWidth", f"{TICK_WIDTH}mm")
-    await set_global(adapter, "TickLength", f"{TICK_LENGTH}mm")
-    await set_global(adapter, "MinorTickLength", f"{MINOR_TICK_LENGTH}mm")
-    await set_global(adapter, "HalfTickLength", f"{HALF_TICK_LENGTH}mm")
-    await set_global(adapter, "TickOverhang", f"{TICK_OVERHANG}mm")
-    await set_global(adapter, "NumeralDepth", f"{NUMERAL_DEPTH}mm")
-    await set_global(
+    set_global(adapter, "BodyLength", f"{BODY_LENGTH}mm")
+    set_global(adapter, "BodyWidth", f"{BODY_WIDTH}mm")
+    set_global(adapter, "BodyThickness", f"{BODY_THICKNESS}mm")
+    set_global(adapter, "DivisionSpacing", f"{DIVISION_SPACING}mm")
+    set_global(adapter, "ScaleEndMargin", f"{SCALE_END_MARGIN}mm")
+    set_global(adapter, "TickWidth", f"{TICK_WIDTH}mm")
+    set_global(adapter, "TickLength", f"{TICK_LENGTH}mm")
+    set_global(adapter, "MinorTickLength", f"{MINOR_TICK_LENGTH}mm")
+    set_global(adapter, "HalfTickLength", f"{HALF_TICK_LENGTH}mm")
+    set_global(adapter, "TickOverhang", f"{TICK_OVERHANG}mm")
+    set_global(adapter, "NumeralDepth", f"{NUMERAL_DEPTH}mm")
+    set_global(
         adapter,
         "ScaleStartX",
         f'"BodyLength" - {DIVISION_COUNT - 1} * "DivisionSpacing" - "ScaleEndMargin"',
@@ -713,8 +713,8 @@ async def build(adapter) -> dict[str, str]:
     # length then width -- recorded as they are added; the (0, 0) corner anchors
     # by a coincident relation (no dim).
     body_dims = SketchDims()
-    check("create_sketch body", await adapter.create_sketch("Front"))
-    body = await add_line_chain(
+    check("create_sketch body", adapter.create_sketch("Front"))
+    body = add_line_chain(
         adapter,
         [(0.0, 0.0), (BODY_LENGTH, 0.0), (BODY_LENGTH, BODY_WIDTH), (0.0, BODY_WIDTH)],
     )
@@ -727,16 +727,16 @@ async def build(adapter) -> dict[str, str]:
     ):
         check(
             f"body constraint {relation}",
-            await adapter.add_sketch_constraint(ent, None, relation),
+            adapter.add_sketch_constraint(ent, None, relation),
         )
     check(
         "body length dim",
-        await adapter.add_sketch_dimension(bottom, None, "linear", BODY_LENGTH),
+        adapter.add_sketch_dimension(bottom, None, "linear", BODY_LENGTH),
     )
     body_dims.record("BodyLength", '"BodyLength"')
     check(
         "body width dim",
-        await adapter.add_sketch_dimension(right, None, "linear", BODY_WIDTH),
+        adapter.add_sketch_dimension(right, None, "linear", BODY_WIDTH),
     )
     body_dims.record("BodyWidth", '"BodyWidth"')
     # Pin the (0, 0) corner to the origin. The h/v relations + the two dims fix
@@ -745,15 +745,15 @@ async def build(adapter) -> dict[str, str]:
     # line draw -- a crutch removed now that add_line_chain suppresses inference.
     check(
         "body corner -> origin",
-        await adapter.add_sketch_constraint(f"{bottom}.start", "origin", "coincident"),
+        adapter.add_sketch_constraint(f"{bottom}.start", "origin", "coincident"),
     )
-    await ensure_fully_defined(adapter, "body sketch")
-    check("exit_sketch body", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "body sketch")
+    check("exit_sketch body", adapter.exit_sketch())
     name_last_feature(adapter, "BodyProfile")
     drive_jobs += body_dims.apply(adapter, "BodyProfile")
     check(
         "extrude body",
-        await adapter.create_extrusion(ExtrusionParameters(depth=BODY_THICKNESS)),
+        adapter.create_extrusion(ExtrusionParameters(depth=BODY_THICKNESS)),
     )
     name_last_feature(adapter, "Body")
     # Drive the body's extrude depth from BodyThickness too (D1 is the blind-
@@ -768,8 +768,8 @@ async def build(adapter) -> dict[str, str]:
     # references). _cut_tick returns the assigned name for exactly this reason.
     # The seed, the bar's first cut, proves the V's draft form by its removed
     # volume; every later tick reuses that form.
-    ticks_pre = await _volume_mm3(adapter)
-    seed_name, tick_form = await _cut_tick(
+    ticks_pre = _volume_mm3(adapter)
+    seed_name, tick_form = _cut_tick(
         adapter,
         "tick 0",
         "Tick0",
@@ -784,7 +784,7 @@ async def build(adapter) -> dict[str, str]:
     _name_depth(adapter, "Tick0Cut", TICK_DEPTH, "TickDepth")
     check(
         "linear pattern ticks 1..10",
-        await adapter.linear_pattern_feature(
+        adapter.linear_pattern_feature(
             LinearPatternParameters(
                 direction_point=[BODY_LENGTH / 2.0, 0.0, 0.0],
                 direction_vector=[1.0, 0.0, 0.0],
@@ -814,7 +814,7 @@ async def build(adapter) -> dict[str, str]:
     # leave the patterned tenths at 14.2 after a GUI DivisionSpacing edit).
     minor_names = []
     for k in range(1, MINOR_PER_DIVISION):
-        name, _form = await _cut_tick(
+        name, _form = _cut_tick(
             adapter,
             f"minor tick 0.{k}",
             f"Minor{k}",
@@ -828,7 +828,7 @@ async def build(adapter) -> dict[str, str]:
         minor_names.append(name)
     check(
         "linear pattern minor ticks across divisions 1..9",
-        await adapter.linear_pattern_feature(
+        adapter.linear_pattern_feature(
             LinearPatternParameters(
                 direction_point=[BODY_LENGTH / 2.0, 0.0, 0.0],
                 direction_vector=[1.0, 0.0, 0.0],
@@ -859,7 +859,7 @@ async def build(adapter) -> dict[str, str]:
 
     # The hand-stamped artefact the book calls out: a longer 0.5 tick (it
     # overcuts the 0.5 tenth above).
-    await _cut_tick(
+    _cut_tick(
         adapter,
         "tick 0.5",
         "TickHalf",
@@ -871,7 +871,7 @@ async def build(adapter) -> dict[str, str]:
         cut_args=tick_form,
     )
     _check_engraving_volume(
-        "all ticks", ticks_pre - await _volume_mm3(adapter), TICK_VOLUME_MM3,
+        "all ticks", ticks_pre - _volume_mm3(adapter), TICK_VOLUME_MM3,
         TICK_VOLUME_ALLOWANCE_MM3, "dropped tick",
     )
 
@@ -883,7 +883,7 @@ async def build(adapter) -> dict[str, str]:
     for path in NUMERAL_LAYER_DXFS:
         if not path.is_file():
             raise RuntimeError(f"numerals DXF not found: {path}")
-    pre = await _volume_mm3(adapter)
+    pre = _volume_mm3(adapter)
     before = pre  # an imported sketch removes nothing, so this carries over
     cut_form = None  # found (and volume-proved) on the first layer
     for path, name, layer_volume, allowance in zip(
@@ -892,7 +892,7 @@ async def build(adapter) -> dict[str, str]:
     ):
         check(
             f"import {path.name}",
-            await adapter.import_dxf_dwg(
+            adapter.import_dxf_dwg(
                 ImportDxfDwgParameters(
                     file_path=str(path),
                     plane="Front",
@@ -907,8 +907,8 @@ async def build(adapter) -> dict[str, str]:
         )
         name_last_feature(adapter, f"{name}Sketch")
         _assert_layer_placement(adapter, f"{name}Sketch", path)
-        cut_form = await _cut_numerals(adapter, drive_jobs, name, cut_form, before)
-        after = await _volume_mm3(adapter)
+        cut_form = _cut_numerals(adapter, drive_jobs, name, cut_form, before)
+        after = _volume_mm3(adapter)
         # Each layer on its own: a stroke dropped from a small later layer
         # hides inside the combined allowance.
         _check_numeral_volume(name, before - after, layer_volume, allowance)
@@ -916,20 +916,20 @@ async def build(adapter) -> dict[str, str]:
     _check_numeral_volume("all numerals", pre - before, NUMERAL_VOLUME_MM3, NUMERAL_VOLUME_ALLOWANCE_MM3)
     numeral_sense = _assert_numeral_cut(adapter)
 
-    await apply_material(adapter, MATERIAL)
+    apply_material(adapter, MATERIAL)
 
     # Capture the as-built volume, then apply the deferred drive equations and
     # re-check: every equation evaluates to the value just built, so the geometry
     # must not move (the neutrality proof). It holds to the tightest numeral
     # allowance, so a stroke that a later rebuild or the save loses still fails.
-    v_built = await _volume_mm3(adapter)
-    await _manufacturing_chords(adapter, drive_jobs)
-    await force_rebuild(adapter)
+    v_built = _volume_mm3(adapter)
+    _manufacturing_chords(adapter, drive_jobs)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
     _assert_numeral_cut(adapter, numeral_sense)
-    await _check_volume_unchanged(adapter, "driven measuring-stick (equations neutral)", v_built)
+    _check_volume_unchanged(adapter, "driven measuring-stick (equations neutral)", v_built)
 
     # Verify the 7.95 in (201.93 mm) length and the untouched front face
     # (the 14.2 mm tick spacing is driven by the linear pattern's spacing).
@@ -937,14 +937,14 @@ async def build(adapter) -> dict[str, str]:
     # screen-projected) — measure the uncut front-bottom edge instead;
     # the ticks only engrave the back face from the top edge down.
     mid_y = BODY_WIDTH / 2.0
-    await measure_check(
+    measure_check(
         adapter,
         "body length (7.95 in)",
         [{"entity_type": "EDGE", "point": [BODY_LENGTH / 2.0, 0.0, BODY_THICKNESS]}],
         "length",
         BODY_LENGTH,
     )
-    await measure_check(
+    measure_check(
         adapter,
         "front face area (ticks cut the back face only)",
         [
@@ -958,7 +958,7 @@ async def build(adapter) -> dict[str, str]:
         tol=1.0,
     )
 
-    await report_mass_properties(adapter)
+    report_mass_properties(adapter)
     for feature, names in DRAWING_DIMENSIONS.items():
         for name in names:
             if name in DRAWING_TOLERANCES:
@@ -989,9 +989,9 @@ async def build(adapter) -> dict[str, str]:
         label=PART_NAME,
     )
     _hide_manufacturing_chords(adapter)
-    outputs = await save_part_and_images(adapter, PART_NAME)
+    outputs = save_part_and_images(adapter, PART_NAME)
     _assert_numeral_cut(adapter, numeral_sense)
-    await _check_volume_unchanged(adapter, "saved measuring-stick", v_built)
+    _check_volume_unchanged(adapter, "saved measuring-stick", v_built)
     return outputs
 
 

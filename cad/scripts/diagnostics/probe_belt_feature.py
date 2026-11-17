@@ -62,16 +62,16 @@ def _bool_array(values: list[bool]):
         return list(values)
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     asm = OUT_SLDASM / "pd-paper-drive.SLDASM"
     if not asm.exists():
         error(f"not built: {asm}")
         return {}
     from _check import check  # noqa: E402
 
-    check("open paper-drive", await adapter.open_model(str(asm)))
+    check("open paper-drive", adapter.open_model(str(asm)))
     try:
-        return await _explore(adapter)
+        return _explore(adapter)
     finally:
         # Close the driven (possibly belt-dirtied) model WITHOUT a save prompt, even
         # on an exception -- a headless run must not hang on the save modal or leave
@@ -81,9 +81,9 @@ async def build(adapter) -> dict[str, str]:
         _discard_open_documents(adapter)
 
 
-async def _explore(adapter) -> dict[str, str]:
+def _explore(adapter) -> dict[str, str]:
     # --- topology dump (before) ---------------------------------------------
-    mates_before = await adapter.list_mates()
+    mates_before = adapter.list_mates()
     n_mates_before = len(mates_before.data or []) if mates_before else 0
     info(f"mates before: {n_mates_before}")
 
@@ -219,7 +219,7 @@ async def _explore(adapter) -> dict[str, str]:
     payload = result.data if result and result.data else {"created": False,
                                                           "reason": str(getattr(result, "error", "?"))}
 
-    mates_after = await adapter.list_mates()
+    mates_after = adapter.list_mates()
     n_mates_after = len(mates_after.data or []) if mates_after else 0
     new_mates = n_mates_after - n_mates_before
     info(f"mates after: {n_mates_after}  (+{new_mates} new)")

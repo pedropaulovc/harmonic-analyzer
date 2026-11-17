@@ -182,7 +182,7 @@ def floor_dia_in(teeth: int) -> float:
 
 
 @_telemetry.traced("part.cone_gear.t012_web_reference")
-async def _author_web_reference(adapter: Any) -> None:
+def _author_web_reference(adapter: Any) -> None:
     """RV-03's accepted T012 web, stated natively (rule 20): a construction
     ray from the axis to the largest printed T012 bore, then the web itself,
     collinear, out to the smallest printed root envelope along a T012 gap
@@ -192,44 +192,44 @@ async def _author_web_reference(adapter: Any) -> None:
     start, web, _band = web_reference_mm()
     angle = math.radians(WEB_REFERENCE_ANGLE_DEG)
     ux, uy = math.cos(angle), math.sin(angle)
-    check("create_sketch web reference", await adapter.create_sketch("Front"))
+    check("create_sketch web reference", adapter.create_sketch("Front"))
     # Direct-to-DB: creation-time inference would snap the ray to the
     # sketch's other references.
     set_sketch_direct_db(adapter, True)
     ray = check(
         "web reference ray",
-        await adapter.add_line(0.0, 0.0, start * ux, start * uy),
+        adapter.add_line(0.0, 0.0, start * ux, start * uy),
     )
     line = check(
         "web reference line",
-        await adapter.add_line(start * ux, start * uy, (start + web) * ux, (start + web) * uy),
+        adapter.add_line(start * ux, start * uy, (start + web) * ux, (start + web) * uy),
     )
     set_sketch_direct_db(adapter, False)
     _as_construction(adapter, ray)
     _as_construction(adapter, line)
-    await anchor_point_to_origin(adapter, f"{ray}.start", 0.0, 0.0, "web reference axis")
-    await anchor_point_to_origin(
+    anchor_point_to_origin(adapter, f"{ray}.start", 0.0, 0.0, "web reference axis")
+    anchor_point_to_origin(
         adapter, f"{ray}.end", start * ux, start * uy, "web reference bore point"
     )
     check(
         "web reference line starts on the bore point",
-        await adapter.add_sketch_constraint(f"{line}.start", f"{ray}.end", "coincident"),
+        adapter.add_sketch_constraint(f"{line}.start", f"{ray}.end", "coincident"),
     )
     check(
         "web reference line on the ray",
-        await adapter.add_sketch_constraint(line, ray, "collinear"),
+        adapter.add_sketch_constraint(line, ray, "collinear"),
     )
-    await dimension_between(
+    dimension_between(
         adapter, f"{line}.start", f"{line}.end", "distance", web, "T012 web"
     )
-    await ensure_fully_defined(adapter, "web reference sketch")
-    check("exit_sketch web reference", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "web reference sketch")
+    check("exit_sketch web reference", adapter.exit_sketch())
     name_last_feature(adapter, WEB_REFERENCE_SKETCH)
     name_dimensions(adapter, WEB_REFERENCE_SKETCH, ["WebBoreX", "WebBoreY", "WebMin"])
 
 
 @_telemetry.traced("part.cone_gear.keyed_bore")
-async def _author_keyed_bore(adapter: Any) -> SketchDims:
+def _author_keyed_bore(adapter: Any) -> SketchDims:
     """The keyed bore of T030..T120 (owner decision 2026-11-09, C1 keyed,
     PR #1992): one closed profile, the round bore with one hub keyway on
     local +X (cone_land_key).
@@ -256,22 +256,22 @@ async def _author_keyed_bore(adapter: Any) -> SketchDims:
     top_x = keyway_top_offset_mm(DEFAULT_TEETH)
     side_x = math.sqrt(radius * radius - half * half)
     keyed_bore = SketchDims()
-    check("create_sketch keyed bore", await adapter.create_sketch("Front"))
+    check("create_sketch keyed bore", adapter.create_sketch("Front"))
     # Direct-to-DB: the round bore's edge lies under this profile, and
     # creation-time inference would snap to it.
     set_sketch_direct_db(adapter, True)
     # CCW from the upper side's inner end round through -X to the lower's.
     arc = check(
-        "keyed bore arc", await adapter.add_arc(0.0, 0.0, side_x, half, side_x, -half)
+        "keyed bore arc", adapter.add_arc(0.0, 0.0, side_x, half, side_x, -half)
     )
     lower = check(
-        "keyway lower side", await adapter.add_line(side_x, -half, top_x, -half)
+        "keyway lower side", adapter.add_line(side_x, -half, top_x, -half)
     )
-    top = check("keyway top", await adapter.add_line(top_x, -half, top_x, half))
-    upper = check("keyway upper side", await adapter.add_line(top_x, half, side_x, half))
+    top = check("keyway top", adapter.add_line(top_x, -half, top_x, half))
+    upper = check("keyway upper side", adapter.add_line(top_x, half, side_x, half))
     clock_line = check(
         "keyway clock centreline",
-        await adapter.add_centerline(-radius, 0.0, top_x, 0.0),
+        adapter.add_centerline(-radius, 0.0, top_x, 0.0),
     )
     set_sketch_direct_db(adapter, False)
     for label, first, second, relation in (
@@ -293,13 +293,13 @@ async def _author_keyed_bore(adapter: Any) -> SketchDims:
         ),
         ("keyway centreline ends mid-top", f"{clock_line}.end", top, "midpoint"),
     ):
-        check(label, await adapter.add_sketch_constraint(first, second, relation))
+        check(label, adapter.add_sketch_constraint(first, second, relation))
     check(
         "keyed bore diameter dim (driving)",
-        await adapter.add_sketch_dimension(arc, None, "diameter", 2.0 * radius),
+        adapter.add_sketch_dimension(arc, None, "diameter", 2.0 * radius),
     )
     keyed_bore.record("KeyedBoreDia", '"BoreDia"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{clock_line}.start",
         f"{clock_line}.end",
@@ -308,7 +308,7 @@ async def _author_keyed_bore(adapter: Any) -> SketchDims:
         "keyway T",
     )
     keyed_bore.record("KeywayT")
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{top}.start",
         f"{top}.end",
@@ -317,8 +317,8 @@ async def _author_keyed_bore(adapter: Any) -> SketchDims:
         "keyway width",
     )
     keyed_bore.record("KeywayWidth")
-    await ensure_fully_defined(adapter, "keyed bore sketch")
-    check("exit_sketch keyed bore", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "keyed bore sketch")
+    check("exit_sketch keyed bore", adapter.exit_sketch())
     return keyed_bore
 
 
@@ -597,7 +597,7 @@ def require_complete_stock_family() -> None:
         raise RuntimeError("cutter-native cone family is unqualified: " + "; ".join(refused))
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
         CircularPatternParameters,
         CreateAxisParameters,
@@ -615,7 +615,7 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs: list[tuple[str, str]] = []
     require_complete_stock_family()
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     # #290: the row's inch calculation units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
     # Configuration-scoped equation updates only work for rows created by
@@ -627,7 +627,7 @@ async def build(adapter) -> dict[str, str]:
     name, teeth = CONFIGS[-1]
     check(
         f"create_configuration {name}",
-        await adapter.create_configuration(
+        adapter.create_configuration(
             CreateConfigurationParameters(
                 name=name, comment=f"{teeth}-tooth cone gear"
             )
@@ -635,13 +635,13 @@ async def build(adapter) -> dict[str, str]:
     )
 
     profile = stock_form_profile(DEFAULT_TEETH)
-    await set_global(adapter, "ToothCount", str(DEFAULT_TEETH), DEFAULT_TEETH)
-    await set_global(adapter, "DP", f"{DIAMETRAL_PITCH:.17g}", DIAMETRAL_PITCH)
+    set_global(adapter, "ToothCount", str(DEFAULT_TEETH), DEFAULT_TEETH)
+    set_global(adapter, "DP", f"{DIAMETRAL_PITCH:.17g}", DIAMETRAL_PITCH)
     for global_name, value in (
         ("Ra", profile.blank_radius_mm / MM_PER_IN),
         ("ToothThickness", profile.pitch_tooth_thickness_mm / MM_PER_IN),
     ):
-        await set_global(adapter, global_name, f"{value:.17g}", value)
+        set_global(adapter, global_name, f"{value:.17g}", value)
 
     # ------------------------------------------------------------------
     # Blank: disc at tip radius Ra -- a circle made coincident with the origin,
@@ -654,11 +654,11 @@ async def build(adapter) -> dict[str, str]:
     # ------------------------------------------------------------------
     ra_default_mm = profile.blank_radius_mm
     blank = SketchDims()
-    check("create_sketch blank", await adapter.create_sketch("Front"))
+    check("create_sketch blank", adapter.create_sketch("Front"))
     # The adapter authors direct-to-DB, so no inference relation ties the
     # centre to the origin; define_circle adds that coincidence explicitly and
     # records the driving diameter as "BlankDia" = 2*Ra for ``drive_jobs``.
-    await define_circle(
+    define_circle(
         adapter,
         0.0,
         0.0,
@@ -668,7 +668,7 @@ async def build(adapter) -> dict[str, str]:
         names=(None, None, "BlankDia"),
         drives=(None, None, '2 * "Ra"'),
     )
-    status = await adapter.check_sketch_fully_defined()
+    status = adapter.check_sketch_fully_defined()
     state = status.data.get("definition_state") if status.is_success else None
     if state != "fully_defined":
         raise RuntimeError(
@@ -676,12 +676,12 @@ async def build(adapter) -> dict[str, str]:
             "a fix would break the Ra configuration link, aborting"
         )
     _telemetry.success("blank sketch fully defined (driving dim, no fix)")
-    check("exit_sketch blank", await adapter.exit_sketch())
+    check("exit_sketch blank", adapter.exit_sketch())
     blank_sketch = name_last_feature(adapter, "BlankProfile")
     drive_jobs += blank.apply(adapter, blank_sketch)
     check(
         "extrude blank",
-        await adapter.create_extrusion(ExtrusionParameters(depth=FACE_WIDTH)),
+        adapter.create_extrusion(ExtrusionParameters(depth=FACE_WIDTH)),
     )
     name_last_feature(adapter, "Blank")
     # The face width is a size the turner sets, so it prints as a NATIVE model
@@ -691,7 +691,7 @@ async def build(adapter) -> dict[str, str]:
     # across all 20 configurations.
     name_dimensions(adapter, "Blank", ["FaceWidth"])
 
-    mass = await adapter.get_mass_properties()
+    mass = adapter.get_mass_properties()
     if not mass.is_success:
         raise RuntimeError(f"blank mass properties failed: {mass.error}")
     com_z = float(mass.data.center_of_mass[2])
@@ -743,10 +743,10 @@ async def build(adapter) -> dict[str, str]:
     # chain -- pre-pattern placement regenerates correctly).
     # ------------------------------------------------------------------
     bore_default_in = bore_dia_in(DEFAULT_TEETH)
-    await set_global(adapter, "BoreDia", f"{bore_default_in:g}", bore_default_in)
+    set_global(adapter, "BoreDia", f"{bore_default_in:g}", bore_default_in)
     bore = SketchDims()
-    check("create_sketch bore", await adapter.create_sketch("Front"))
-    await define_circle(
+    check("create_sketch bore", adapter.create_sketch("Front"))
+    define_circle(
         adapter,
         0.0,
         0.0,
@@ -756,13 +756,13 @@ async def build(adapter) -> dict[str, str]:
         names=(None, None, "BoreCutDia"),
         drives=(None, None, '"BoreDia"'),
     )
-    await ensure_fully_defined(adapter, "round bore sketch")
-    check("exit_sketch bore", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "round bore sketch")
+    check("exit_sketch bore", adapter.exit_sketch())
     bore_sketch = name_last_feature(adapter, BORE_SKETCH)
     drive_jobs += bore.apply(adapter, bore_sketch)
     check(
         "cut bore",
-        await adapter.create_cut_extrude(ExtrusionParameters(depth=FACE_WIDTH + 2.0)),
+        adapter.create_cut_extrude(ExtrusionParameters(depth=FACE_WIDTH + 2.0)),
     )
     name_last_feature(adapter, BORE_CUT)
     bore_dim = f"BoreCutDia@{bore_sketch}"
@@ -777,12 +777,12 @@ async def build(adapter) -> dict[str, str]:
     # union is the keyed bore. ``_restrict_bores`` suppresses the keyed bore
     # on T012..T024; the round bore stays live everywhere
     # (``foreign_bore_features``).
-    keyed_bore = await _author_keyed_bore(adapter)
+    keyed_bore = _author_keyed_bore(adapter)
     keyed_sketch = name_last_feature(adapter, KEYED_BORE_SKETCH)
     drive_jobs += keyed_bore.apply(adapter, keyed_sketch)
     check(
         "cut keyed bore",
-        await adapter.create_cut_extrude(ExtrusionParameters(depth=FACE_WIDTH + 2.0)),
+        adapter.create_cut_extrude(ExtrusionParameters(depth=FACE_WIDTH + 2.0)),
     )
     name_last_feature(adapter, KEYED_BORE_CUT)
     keyed_dia_dim = f"KeyedBoreDia@{keyed_sketch}"
@@ -792,7 +792,7 @@ async def build(adapter) -> dict[str, str]:
         or abs(keyed_dia_before - bore_default_in * 25.4) < 1e-4
     ):
         raise RuntimeError(f"{keyed_dia_dim} reads {keyed_dia_before!r}, not the bore diameter")
-    mass = await adapter.get_mass_properties()
+    mass = adapter.get_mass_properties()
     bored_volume = float(mass.data.volume)
     expected_bored = expected_blank - bore_area_mm2(DEFAULT_TEETH) * FACE_WIDTH
     if abs(bored_volume - expected_bored) > 0.02 * expected_bored:
@@ -803,29 +803,29 @@ async def build(adapter) -> dict[str, str]:
 
     # Model-owned inspection dimensions derive from the installed cutter profile;
     # their construction geometry is volume-neutral and does not drive the flanks.
-    tooth_reference = await _author_tooth_thickness_reference(adapter)
+    tooth_reference = _author_tooth_thickness_reference(adapter)
     tooth_sketch = name_last_feature(adapter, TOOTH_REFERENCE_SKETCH)
     thickness_dim = f"ToothThickness@{tooth_sketch}"
     drive_jobs += tooth_reference.apply(adapter, tooth_sketch)
 
     # Functional MIN/MAX root envelope, not a purported origin-centred BRep floor.
     floor_default_in = floor_dia_in(DEFAULT_TEETH)
-    await set_global(adapter, "FloorDia", f"{floor_default_in:.12g}", floor_default_in)
-    floor_reference = await _author_gap_floor_reference(adapter)
+    set_global(adapter, "FloorDia", f"{floor_default_in:.12g}", floor_default_in)
+    floor_reference = _author_gap_floor_reference(adapter)
     floor_sketch = name_last_feature(adapter, GAP_FLOOR_SKETCH)
     floor_dim = f"FloorDia@{floor_sketch}"
     drive_jobs += floor_reference.apply(adapter, floor_sketch)
-    await _author_web_reference(adapter)
-    blank_reference = await _author_blank_dia_reference(adapter, ra_default_mm)
+    _author_web_reference(adapter)
+    blank_reference = _author_blank_dia_reference(adapter, ra_default_mm)
     drive_jobs += blank_reference.apply(adapter, BLANK_DIA_REFERENCE_SKETCH)
 
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(adapter, "inspection sketches are neutral", expected_bored, 0.01 * expected_bored)
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    volume_check(adapter, "inspection sketches are neutral", expected_bored, 0.01 * expected_bored)
 
-    await apply_material(adapter, MATERIAL)
+    apply_material(adapter, MATERIAL)
 
     # ------------------------------------------------------------------
     # Configuration and regeneration determinism: switch through every
@@ -835,7 +835,7 @@ async def build(adapter) -> dict[str, str]:
     for name, teeth in CONFIGS[:-1]:
         check(
             f"create_configuration {name}",
-            await adapter.create_configuration(
+            adapter.create_configuration(
                 CreateConfigurationParameters(
                     name=name, comment=f"{teeth}-tooth cone gear"
                 )
@@ -844,14 +844,14 @@ async def build(adapter) -> dict[str, str]:
     _restrict_bores(adapter)
     check(
         "activate T120 after the bore restriction",
-        await adapter.set_active_configuration("T120"),
+        adapter.set_active_configuration("T120"),
     )
     from solidworks_mcp.adapters.base import SetGlobalVariableParameters
 
     for name, teeth in CONFIGS:
         check(
             f"ToothCount = {teeth} in {name}",
-            await adapter.set_global_variable(
+            adapter.set_global_variable(
                 SetGlobalVariableParameters(
                     name="ToothCount", expression=str(teeth), configuration=name
                 )
@@ -859,7 +859,7 @@ async def build(adapter) -> dict[str, str]:
         )
         check(
             f"BoreDia = {bore_dia_in(teeth):g} in {name}",
-            await adapter.set_global_variable(
+            adapter.set_global_variable(
                 SetGlobalVariableParameters(
                     name="BoreDia",
                     expression=f"{bore_dia_in(teeth):g}",
@@ -875,7 +875,7 @@ async def build(adapter) -> dict[str, str]:
         ):
             check(
                 f"{global_name} in {name}",
-                await adapter.set_global_variable(
+                adapter.set_global_variable(
                     SetGlobalVariableParameters(
                         name=global_name, expression=f"{number:.17g}", configuration=name
                     )
@@ -885,37 +885,37 @@ async def build(adapter) -> dict[str, str]:
 
     pattern_axis = check(
         "create_axis Z (Top x Right)",
-        await adapter.create_axis(
+        adapter.create_axis(
             CreateAxisParameters(mode="two_planes", planes=["Top Plane", "Right Plane"])
         ),
     ).name
     count_dimensions: dict[int, str] = {}
     for configuration, teeth in CONFIGS:
-        check(f"activate native row {configuration}", await adapter.set_active_configuration(configuration))
+        check(f"activate native row {configuration}", adapter.set_active_configuration(configuration))
         profile = stock_form_profile(teeth)
         bored = (math.pi * profile.blank_radius_mm**2 - bore_area_mm2(teeth)) * FACE_WIDTH
-        await volume_check(adapter, f"{configuration} bored blank", bored, 0.01 * bored)
-        check(f"create {configuration} gap sketch", await adapter.create_sketch("Front"))
+        volume_check(adapter, f"{configuration} bored blank", bored, 0.01 * bored)
+        check(f"create {configuration} gap sketch", adapter.create_sketch("Front"))
         curves = [
-            await equation_curve(adapter, f"{configuration} {label}", x, y)
+            equation_curve(adapter, f"{configuration} {label}", x, y)
             for label, x, y in native_gap_segments(teeth)
         ]
-        await ensure_fully_defined(
+        ensure_fully_defined(
             adapter, f"{configuration} finite gap", fix_entities=curves,
             allow_fix_escalation=True,
         )
-        check(f"exit {configuration} gap sketch", await adapter.exit_sketch())
+        check(f"exit {configuration} gap sketch", adapter.exit_sketch())
         sketch_name, cut_name, pattern_name = tooth_features(teeth)
         name_last_feature(adapter, sketch_name)
         check(
             f"cut {configuration} finite gap",
-            await adapter.create_cut_extrude(ExtrusionParameters(depth=FACE_WIDTH + 1.0)),
+            adapter.create_cut_extrude(ExtrusionParameters(depth=FACE_WIDTH + 1.0)),
         )
         name_last_feature(adapter, cut_name)
         single_cut = bored - profile.gap_area_mm2 * FACE_WIDTH
         removed = profile.gap_area_mm2 * FACE_WIDTH
         area_error = profile.gap_area_error_bound_mm2 * FACE_WIDTH
-        await volume_check(
+        volume_check(
             adapter, f"{configuration} single stock gap", single_cut,
             0.01 * removed - area_error,
         )
@@ -928,7 +928,7 @@ async def build(adapter) -> dict[str, str]:
                 profile.blank_radius_mm * math.sin(angle), FACE_WIDTH / 2.0,
             ])
         for point in candidates:
-            result = await adapter.circular_pattern_feature(CircularPatternParameters(
+            result = adapter.circular_pattern_feature(CircularPatternParameters(
                 axis_point=point, features=[cut_name], count=teeth, geometry_pattern=True,
             ))
             if result.is_success:
@@ -938,13 +938,13 @@ async def build(adapter) -> dict[str, str]:
         name_last_feature(adapter, pattern_name)
         count_dimensions[teeth] = pattern_count_dimension(adapter, pattern_name, teeth)
         expected = _expected_configuration_volume(teeth)
-        await volume_check(
+        volume_check(
             adapter, f"{configuration} complete stock pattern", expected,
             teeth * (0.01 * removed - area_error),
         )
         _restrict_to_configuration(adapter, teeth)
     _suppress_rows_and_hide_references(adapter, pattern_axis)
-    check("activate T120 for the save", await adapter.set_active_configuration("T120"))
+    check("activate T120 for the save", adapter.set_active_configuration("T120"))
 
     # Establish the final path once while T120 is active. The per-configuration
     # sweep can then use IModelDoc2.Save3 directly; the adapter's in-place save
@@ -958,7 +958,7 @@ async def build(adapter) -> dict[str, str]:
     part_path = (OUT_SLDPRT / f"{PART_NAME}.SLDPRT").resolve()
     check(
         f"establish cone-gear part path -> {part_path}",
-        await adapter.save_file(str(part_path)),
+        adapter.save_file(str(part_path)),
     )
 
     png_dir = OUT_PNG / PART_NAME
@@ -970,7 +970,7 @@ async def build(adapter) -> dict[str, str]:
     # and the part is saved with them shown.
     _display_model_annotations(adapter, False)
     for name, teeth in CONFIGS:
-        activation = await adapter.set_active_configuration(name)
+        activation = adapter.set_active_configuration(name)
         check(f"activate {name}", activation)
         if not bool(activation.data.get("rebuilt")):
             raise RuntimeError(
@@ -992,7 +992,7 @@ async def build(adapter) -> dict[str, str]:
             )
         _telemetry.success(f"{name}: pattern count = {count:g}")
 
-        volume, observation, issues = await _configuration_topology(
+        volume, observation, issues = _configuration_topology(
             adapter,
             name,
             teeth,
@@ -1049,7 +1049,7 @@ async def build(adapter) -> dict[str, str]:
         img = (png_dir / f"{PART_NAME}_{name}_isometric.png").resolve()
         check(
             f"export_image {name}",
-            await adapter.export_image(
+            adapter.export_image(
                 {
                     "file_path": str(img),
                     "format_type": "png",
@@ -1069,8 +1069,8 @@ async def build(adapter) -> dict[str, str]:
 
     # Determinism: revisit the first configuration after the full cycle.
     first_name, _ = CONFIGS[0]
-    check(f"re-activate {first_name}", await adapter.set_active_configuration(first_name))
-    mass = await adapter.get_mass_properties()
+    check(f"re-activate {first_name}", adapter.set_active_configuration(first_name))
+    mass = adapter.get_mass_properties()
     if not mass.is_success:
         raise RuntimeError(f"re-check {first_name}: {mass.error}")
     revisit = float(mass.data.volume)
@@ -1081,7 +1081,7 @@ async def build(adapter) -> dict[str, str]:
         )
     _telemetry.success(f"{first_name} volume reproduced on revisit: {revisit:.1f} mm^3")
 
-    check("activate T120 for saved views", await adapter.set_active_configuration("T120"))
+    check("activate T120 for saved views", adapter.set_active_configuration("T120"))
     grouped_spec = _config.parts(PART_NAME)
     part_number = str(grouped_spec.get("number", ""))
     description = str(grouped_spec.get("description", "")).strip()
@@ -1092,7 +1092,7 @@ async def build(adapter) -> dict[str, str]:
         description=description,
     )
     apply_custom_properties(adapter, {"Description": description})
-    await report_mass_properties(adapter)
+    report_mass_properties(adapter)
 
     # Mark the manufacturing model dimensions.  Each carries a band
     # derived above (FloorDia's per-configuration LIMIT was set before the
@@ -1198,14 +1198,14 @@ async def build(adapter) -> dict[str, str]:
             },
         )
     _display_model_annotations(adapter, True)
-    artefacts.update(await save_part_and_images(adapter, PART_NAME, views=()))
+    artefacts.update(save_part_and_images(adapter, PART_NAME, views=()))
     # derive_simplified_on_saved_part closes this document without saving, so
     # the hidden-annotation toggle never reaches the saved part.
     _display_model_annotations(adapter, False)
     image = (png_dir / f"{PART_NAME}_isometric.png").resolve()
     check(
         "export_image isometric (annotations hidden)",
-        await adapter.export_image(
+        adapter.export_image(
             {
                 "file_path": str(image),
                 "format_type": "png",
@@ -1230,12 +1230,12 @@ async def build(adapter) -> dict[str, str]:
     # verbs left the T00x tooth gaps faulted, cg-fx1), marked for
     # rebuild-save, and saved in one Save3.
     placed = [name for name, _teeth in CONFIGS]
-    await derive_simplified_on_saved_part(
+    derive_simplified_on_saved_part(
         adapter, PART_NAME, SIMPLIFIED_FEATURES_BY_CONFIGURATION, part_path, placed
     )
-    check("reopen saved cone-gear", await adapter.open_model(part_path))
+    check("reopen saved cone-gear", adapter.open_model(part_path))
     assert_saved_configurations_regenerate(adapter, PART_NAME)
-    await assert_saved_configuration_topology(adapter, phase="reopened")
+    assert_saved_configuration_topology(adapter, phase="reopened")
     # Hide/show is per configuration: every saved configuration, the derived
     # simplified ones included, is read with itself active.
     assert_reference_geometry_hidden_in_every_configuration(adapter, PART_NAME)

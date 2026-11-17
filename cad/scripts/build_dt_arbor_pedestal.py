@@ -198,29 +198,29 @@ def _as_construction(adapter, entity_id: str) -> None:
         raise RuntimeError(f"{entity_id} did not take the construction flag")
 
 
-async def _reference_line(
+def _reference_line(
     adapter, sketch, plane, dimension, start, end, orientation, value, drives
 ) -> list[tuple[str, str]]:
     """One hidden-reference sketch: a construction line whose driving
     dimension IS ``value``; returns its deferred drive jobs."""
-    check(f"create_sketch {sketch}", await adapter.create_sketch(plane))
+    check(f"create_sketch {sketch}", adapter.create_sketch(plane))
     # Direct-to-DB: the line lies on an outline station and runs along a
     # sketch axis direction, so creation-time inference would snap in the
     # relations added below and over-define the sketch.
     set_sketch_direct_db(adapter, True)
-    line = check(f"{sketch} line", await adapter.add_line(*start, *end))
+    line = check(f"{sketch} line", adapter.add_line(*start, *end))
     set_sketch_direct_db(adapter, False)
     _as_construction(adapter, line)
     check(
         f"{sketch} {orientation}",
-        await adapter.add_sketch_constraint(line, None, orientation),
+        adapter.add_sketch_constraint(line, None, orientation),
     )
-    await dimension_between(
+    dimension_between(
         adapter, f"{line}.start", f"{line}.end", f"{orientation}_distance", value, sketch
     )
-    await anchor_point_to_origin(adapter, f"{line}.start", *start, sketch)
-    await ensure_fully_defined(adapter, f"{sketch} sketch")
-    check(f"exit_sketch {sketch}", await adapter.exit_sketch())
+    anchor_point_to_origin(adapter, f"{line}.start", *start, sketch)
+    ensure_fully_defined(adapter, f"{sketch} sketch")
+    check(f"exit_sketch {sketch}", adapter.exit_sketch())
     name_last_feature(adapter, sketch)
     names = [dimension, *(f"{dimension}Anchor{i}" for i in range(1, len(drives)))]
     full = name_dimensions(adapter, sketch, names)
@@ -253,10 +253,10 @@ def _hide_reference_sketches(adapter) -> None:
     )
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     # #290: the row's inch calculation units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
@@ -266,18 +266,18 @@ async def build(adapter) -> dict[str, str]:
     # BARE numbers in document units (an unsuffixed 54 = 54 in). FootHeight and
     # StrapThickness feed extrude DEPTHS (feature parameters, not sketch dims),
     # so they carry no drive job; they stay declared knobs like the exemplars.
-    await set_global(adapter, "FootWidth", f"{FOOT_WIDTH}mm")
-    await set_global(adapter, "FootDepth", f"{FOOT_DEPTH}mm")
-    await set_global(adapter, "StrapInnerZ", f"{STRAP_INNER_Z}mm")
-    await set_global(adapter, "FootHeight", f"{FOOT_HEIGHT}mm")
-    await set_global(adapter, "StrapThickness", f"{STRAP_T}mm")
-    await set_global(adapter, "TopRadius", f"{TOP_RADIUS}mm")
-    await set_global(adapter, "BoreDia", f"{BORE_DIA}mm")
-    await set_global(adapter, "BoreHeight", f"{BORE_HEIGHT}mm")
-    await set_global(adapter, "TangentX", f"{TAPER_TANGENT_X}mm")
-    await set_global(adapter, "TangentY", f"{TAPER_TANGENT_Y}mm")
-    await set_global(adapter, "ScrewZ", f"{-SCREW_Z}mm")
-    await set_global(adapter, "SetScrewZ", f"{SET_SCREW_Z}mm")
+    set_global(adapter, "FootWidth", f"{FOOT_WIDTH}mm")
+    set_global(adapter, "FootDepth", f"{FOOT_DEPTH}mm")
+    set_global(adapter, "StrapInnerZ", f"{STRAP_INNER_Z}mm")
+    set_global(adapter, "FootHeight", f"{FOOT_HEIGHT}mm")
+    set_global(adapter, "StrapThickness", f"{STRAP_T}mm")
+    set_global(adapter, "TopRadius", f"{TOP_RADIUS}mm")
+    set_global(adapter, "BoreDia", f"{BORE_DIA}mm")
+    set_global(adapter, "BoreHeight", f"{BORE_HEIGHT}mm")
+    set_global(adapter, "TangentX", f"{TAPER_TANGENT_X}mm")
+    set_global(adapter, "TangentY", f"{TAPER_TANGENT_Y}mm")
+    set_global(adapter, "ScrewZ", f"{-SCREW_Z}mm")
+    set_global(adapter, "SetScrewZ", f"{SET_SCREW_Z}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -285,7 +285,7 @@ async def build(adapter) -> dict[str, str]:
     # edge on the strap inner face (z +8) and running FOOT_DEPTH outboard, so
     # the rectangle is anchored at its inner-west corner rather than centred.
     foot = SketchDims()
-    check("create_sketch foot", await adapter.create_sketch("Top"))
+    check("create_sketch foot", adapter.create_sketch("Top"))
     half_width = FOOT_WIDTH / 2.0
     foot_points = [
         (-half_width, -STRAP_INNER_Z),
@@ -293,8 +293,8 @@ async def build(adapter) -> dict[str, str]:
         (half_width, -FOOT_NEAR_Z),
         (-half_width, -FOOT_NEAR_Z),
     ]
-    foot_lines = await add_line_chain(adapter, foot_points)
-    await define_rectilinear_chain(
+    foot_lines = add_line_chain(adapter, foot_points)
+    define_rectilinear_chain(
         adapter,
         foot_lines,
         foot_points,
@@ -303,20 +303,20 @@ async def build(adapter) -> dict[str, str]:
         names=["Width", "Depth", "FootWest", "FootInner"],
         drives=['"FootWidth"', '"FootDepth"', '"FootWidth" / 2', '"StrapInnerZ"'],
     )
-    await ensure_fully_defined(adapter, "foot sketch")
-    check("exit_sketch foot", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "foot sketch")
+    check("exit_sketch foot", adapter.exit_sketch())
     name_last_feature(adapter, "FootProfile")
     drive_jobs += foot.apply(adapter, "FootProfile")
     check(
         "extrude foot",
-        await adapter.create_extrusion(ExtrusionParameters(depth=FOOT_HEIGHT)),
+        adapter.create_extrusion(ExtrusionParameters(depth=FOOT_HEIGHT)),
     )
     name_last_feature(adapter, "Foot")
     # Name the extrude DEPTH so the foot flange height is a markable drawing dim.
     foot_ht_dim = name_dimensions(adapter, "Foot", ["FootHt"])
     drive_jobs += [(foot_ht_dim[0], '"FootHeight"')]
     v_foot = FOOT_WIDTH * FOOT_DEPTH * FOOT_HEIGHT
-    volume = await volume_check(adapter, "foot", v_foot, 0.005 * v_foot)
+    volume = volume_check(adapter, "foot", v_foot, 0.005 * v_foot)
 
     # True tangent strap: the sides start flush with the foot and meet the
     # concentric crown without a tolerance-sized step or visual kink.
@@ -325,61 +325,61 @@ async def build(adapter) -> dict[str, str]:
     tangent_y = TAPER_TANGENT_Y
     strap_rise = tangent_y - FOOT_HEIGHT
     strap = SketchDims()
-    check("create_sketch strap", await adapter.create_sketch("Front"))
+    check("create_sketch strap", adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     bottom = check(
         "strap bottom",
-        await adapter.add_line(-half_root, FOOT_HEIGHT, half_root, FOOT_HEIGHT),
+        adapter.add_line(-half_root, FOOT_HEIGHT, half_root, FOOT_HEIGHT),
     )
     check(
         "strap flank right",
-        await adapter.add_line(half_root, FOOT_HEIGHT, half_tangent, tangent_y),
+        adapter.add_line(half_root, FOOT_HEIGHT, half_tangent, tangent_y),
     )
     top = check(
         "strap tangent chord",
-        await adapter.add_line(half_tangent, tangent_y, -half_tangent, tangent_y),
+        adapter.add_line(half_tangent, tangent_y, -half_tangent, tangent_y),
     )
     check(
         "strap flank left",
-        await adapter.add_line(-half_tangent, tangent_y, -half_root, FOOT_HEIGHT),
+        adapter.add_line(-half_tangent, tangent_y, -half_root, FOOT_HEIGHT),
     )
     set_sketch_direct_db(adapter, False)
     for ent in (bottom, top):
         check(
             "strap horizontal",
-            await adapter.add_sketch_constraint(ent, None, "horizontal"),
+            adapter.add_sketch_constraint(ent, None, "horizontal"),
         )
     check(
         "dimension strap root width",
-        await adapter.add_sketch_dimension(bottom, None, "linear", FOOT_WIDTH),
+        adapter.add_sketch_dimension(bottom, None, "linear", FOOT_WIDTH),
     )
     strap.record("StrapRootWidth", '"FootWidth"')
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{bottom}.start", -half_root, FOOT_HEIGHT, "strap root corner"
     )
     strap.record("RootCornerX", '"FootWidth" / 2')
     strap.record("RootCornerY", '"FootHeight"')
     check(
         "dimension strap tangent chord",
-        await adapter.add_sketch_dimension(top, None, "linear", 2.0 * half_tangent),
+        adapter.add_sketch_dimension(top, None, "linear", 2.0 * half_tangent),
     )
     strap.record("StrapTangentChord", '"TangentX" * 2')
     check(
         "dimension strap rise",
-        await adapter.add_sketch_dimension(
+        adapter.add_sketch_dimension(
             f"{top}.start", f"{bottom}.end", "vertical_distance", strap_rise
         ),
     )
     strap.record("StrapRise", '"TangentY" - "FootHeight"')
     check(
         "dimension tangent point x",
-        await adapter.add_sketch_dimension(
+        adapter.add_sketch_dimension(
             f"{top}.start", "origin", "horizontal_distance", half_tangent
         ),
     )
     strap.record("TangentX", '"TangentX"')
-    await ensure_fully_defined(adapter, "strap sketch")
-    check("exit_sketch strap", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "strap sketch")
+    check("exit_sketch strap", adapter.exit_sketch())
     name_last_feature(adapter, "StrapProfile")
     drive_jobs += strap.apply(adapter, "StrapProfile")
     # L, not T: the strap band hugs the foot's +Z face, so
@@ -388,7 +388,7 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "Strap")
     a_strap = (FOOT_WIDTH + 2.0 * half_tangent) / 2.0 * strap_rise
     v_strap = a_strap * STRAP_T
-    volume = await volume_check(adapter, "strap", volume + v_strap, 0.005 * v_strap)
+    volume = volume_check(adapter, "strap", volume + v_strap, 0.005 * v_strap)
 
     # Dome: a full circle boss centred on the bore station. The tangent strap
     # already contains the circle below its tangent chord, so the union adds
@@ -397,8 +397,8 @@ async def build(adapter) -> dict[str, str]:
     # a diameter the sheet flips radial keeps its value and re-reads it as a
     # radius (v37 MHA-DT-02 printed R22 on an R11 part).
     dome = SketchDims()
-    check("create_sketch dome", await adapter.create_sketch("Front"))
-    await define_circle(
+    check("create_sketch dome", adapter.create_sketch("Front"))
+    define_circle(
         adapter,
         0.0,
         BORE_HEIGHT,
@@ -409,8 +409,8 @@ async def build(adapter) -> dict[str, str]:
         drives=(None, DOME_DRIVES["DomeCy"], DOME_DRIVES["DomeRadius"]),
         size_dimension="radius",
     )
-    await ensure_fully_defined(adapter, "dome sketch")
-    check("exit_sketch dome", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "dome sketch")
+    check("exit_sketch dome", adapter.exit_sketch())
     name_last_feature(adapter, "DomeProfile")
     drive_jobs += dome.apply(adapter, "DomeProfile")
     extrude_at_offset(adapter, STRAP_T, STRAP_ROOT_Z)
@@ -420,14 +420,14 @@ async def build(adapter) -> dict[str, str]:
         chord_offset * math.sqrt(TOP_RADIUS**2 - chord_offset**2)
     )
     v_dome = cap_area * STRAP_T
-    volume = await volume_check(adapter, "dome", volume + v_dome, 0.005 * v_dome)
+    volume = volume_check(adapter, "dome", volume + v_dome, 0.005 * v_dome)
 
     # Arbor clamp bore along Z at the drive height, through the strap. On-axis
     # in X (x 0): only the bore-height centre dim + the diameter are display
     # dims, so the "X" slot is ignored.
     bore = SketchDims()
-    check("create_sketch bore", await adapter.create_sketch("Front"))
-    await define_circle(
+    check("create_sketch bore", adapter.create_sketch("Front"))
+    define_circle(
         adapter,
         0.0,
         BORE_HEIGHT,
@@ -437,13 +437,13 @@ async def build(adapter) -> dict[str, str]:
         names=("BoreX", "BoreHeight", "BoreDia"),
         drives=(None, '"BoreHeight"', '"BoreDia"'),
     )
-    await ensure_fully_defined(adapter, "bore sketch")
-    check("exit_sketch bore", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "bore sketch")
+    check("exit_sketch bore", adapter.exit_sketch())
     name_last_feature(adapter, "BoreProfile")
     drive_jobs += bore.apply(adapter, "BoreProfile")
     check(
         "cut bore",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             # Mid-plane TOTAL about the Front sketch plane: the strap band
             # sits offset from it, so the cut spans generously past it.
             ExtrusionParameters(depth=2.0 * FOOT_DEPTH, both_directions=True)
@@ -451,7 +451,7 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "Bore")
     v_bore = math.pi * BORE_RADIUS**2 * STRAP_T
-    volume = await volume_check(adapter, "bore", volume - v_bore, 0.01 * v_bore)
+    volume = volume_check(adapter, "bore", volume - v_bore, 0.01 * v_bore)
 
     # Flange hold-down screw hole (U34c): ONE native Hole Wizard #8 close
     # clearance feature (through-all along Y) through the exposed -Z ledge at
@@ -477,7 +477,7 @@ async def build(adapter) -> dict[str, str]:
         )
     drive_jobs += screw_cut.placement_drive_jobs
     v_hole = math.pi * (SCREW_HOLE_DIA / 2.0) ** 2 * FOOT_HEIGHT
-    volume = await volume_check(adapter, "screw hole", volume - v_hole, 0.02 * v_hole)
+    volume = volume_check(adapter, "screw hole", volume - v_hole, 0.02 * v_hole)
 
     # Apex set-screw tap (#743, user ruling Q3): ONE native #4-40 tapped hole
     # drilled radially down through the crown at the strap's mid-depth and
@@ -486,7 +486,7 @@ async def build(adapter) -> dict[str, str]:
     # Right Plane clocks it to the apex.
     check(
         "create_plane SetScrewStationPlane",
-        await adapter.create_plane(
+        adapter.create_plane(
             CreatePlaneParameters(
                 mode="offset", base_plane="Front Plane", offset=SET_SCREW_Z
             )
@@ -511,19 +511,19 @@ async def build(adapter) -> dict[str, str]:
         cross_hole_volume_mm3(tap_dia, 2.0 * TOP_RADIUS)
         - cross_hole_volume_mm3(tap_dia, BORE_DIA)
     ) / 2.0
-    volume = await volume_check(adapter, "apex set-screw tap", volume - v_tap, 0.03 * v_tap)
+    volume = volume_check(adapter, "apex set-screw tap", volume - v_tap, 0.03 * v_tap)
     v_final = volume
 
     for row in REFERENCE_LINES:
-        drive_jobs += await _reference_line(adapter, *row)
+        drive_jobs += _reference_line(adapter, *row)
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    volume_check(
         adapter, "driven pedestal (equations neutral)", v_final, 0.01 * v_bore
     )
     _hide_reference_sketches(adapter)
@@ -539,15 +539,15 @@ async def build(adapter) -> dict[str, str]:
         display_unit=UNIT,
     )
 
-    await apply_material(adapter, MATERIAL)
-    await apply_color(adapter, CAD_APPEARANCE)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    apply_color(adapter, CAD_APPEARANCE)
+    report_mass_properties(adapter)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(adapter, PART_NAME)
-    return await save_part_and_images(adapter, PART_NAME)
+    return save_part_and_images(adapter, PART_NAME)
 
 
 if __name__ == "__main__":

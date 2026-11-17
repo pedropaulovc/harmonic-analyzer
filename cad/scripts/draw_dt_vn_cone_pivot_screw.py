@@ -90,7 +90,7 @@ def _move_lanes(adapter: Any, displays: dict[str, Any]) -> None:
             raise RuntimeError(f"91829A560: {name} lane read back at {moved!r}")
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     proofs: list[Callable[[], None]] = []
     callback_count = 0
 
@@ -131,7 +131,7 @@ async def build(adapter: Any) -> dict[str, str]:
         for proof in proofs:
             proof()
 
-    return await build_purchased_fastener_drawing(
+    return build_purchased_fastener_drawing(
         adapter,
         SPEC,
         item=ITEM,

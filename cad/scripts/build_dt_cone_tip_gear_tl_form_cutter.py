@@ -236,14 +236,14 @@ def _line_expression(start: float, end: float) -> str:
     return f"(({_literal(start / INCH)})+({_literal((end - start) / INCH)})*t)"
 
 
-async def _form_prism(
+def _form_prism(
     adapter: Any, side: int, plane: str, sketch: str, feature: str
 ) -> None:
     """Sketch the face form projected onto ``plane`` and cut it both ways."""
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     direction = clearance_direction(side)
-    check(f"create_sketch {sketch}", await adapter.create_sketch(plane))
+    check(f"create_sketch {sketch}", adapter.create_sketch(plane))
     origin, along_x, along_y = _projected_map(adapter, direction)
 
     def mapped(x_expr: str, y_expr: str) -> tuple[str, str]:
@@ -256,7 +256,7 @@ async def _form_prism(
     loop = shoulder_loop_g()
     for index, ((x0, y0), (x1, y1)) in enumerate(zip(loop, loop[1:])):
         curves.append(
-            await equation_curve(
+            equation_curve(
                 adapter,
                 f"{sketch} shoulder {index}",
                 *mapped(_line_expression(x0, x1), _line_expression(y0, y1)),
@@ -264,36 +264,36 @@ async def _form_prism(
         )
     for segment in form_segments(unit_scale=1.0 / INCH):
         curves.append(
-            await equation_curve(
+            equation_curve(
                 adapter, f"{sketch} {segment.name}", *mapped(segment.x, segment.y)
             )
         )
-    await ensure_fully_defined(
+    ensure_fully_defined(
         adapter, f"{sketch} sketch", fix_entities=curves, allow_fix_escalation=True
     )
-    check(f"exit_sketch {sketch}", await adapter.exit_sketch())
+    check(f"exit_sketch {sketch}", adapter.exit_sketch())
     name_last_feature(adapter, sketch)
     check(
         f"cut {feature}",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=FORM_CUT_DEPTH, both_directions=True)
         ),
     )
     name_last_feature(adapter, feature)
 
 
-async def _prism_planes(adapter: Any) -> tuple[str, ...]:
+def _prism_planes(adapter: Any) -> tuple[str, ...]:
     """The two prism planes, each through the origin normal to its prism's
     direction; returns every reference feature made, for blanking."""
     from solidworks_mcp.adapters.base import CreateAxisParameters
 
     z_axis = check(
         "create_axis bit Z (Top x Right)",
-        await adapter.create_axis(
+        adapter.create_axis(
             CreateAxisParameters(mode="two_planes", planes=["Top Plane", "Right Plane"])
         ),
     ).name
-    await _plane_through(
+    _plane_through(
         adapter,
         "FaceReliefPlane",
         base_plane="Top Plane",
@@ -303,7 +303,7 @@ async def _prism_planes(adapter: Any) -> tuple[str, ...]:
     )
     trace = check(
         "create_axis face-relief trace (FaceReliefPlane x Front)",
-        await adapter.create_axis(
+        adapter.create_axis(
             CreateAxisParameters(
                 mode="two_planes", planes=["FaceReliefPlane", "Front Plane"]
             )
@@ -311,7 +311,7 @@ async def _prism_planes(adapter: Any) -> tuple[str, ...]:
     ).name
     angle = _prism_plane_angle_deg()
     for side, plane in ((1, "FormReliefPlanePlus"), (-1, "FormReliefPlaneMinus")):
-        await _plane_through(
+        _plane_through(
             adapter,
             plane,
             base_plane="FaceReliefPlane",
@@ -322,7 +322,7 @@ async def _prism_planes(adapter: Any) -> tuple[str, ...]:
     return z_axis, trace
 
 
-async def _angle_reference(
+def _angle_reference(
     adapter: Any,
     plane: str,
     sketch: str,
@@ -337,7 +337,7 @@ async def _angle_reference(
     mm) the rod's radius, and the clearance trace from the same vertex to
     ``vertex + lean``; the angle between them is the printed clearance."""
     dims = SketchDims()
-    check(f"create_sketch {sketch}", await adapter.create_sketch(plane))
+    check(f"create_sketch {sketch}", adapter.create_sketch(plane))
     raw = _model_to_sketch(adapter)
     top = raw(vertex)[:2]
     plumb = raw(
@@ -347,27 +347,27 @@ async def _angle_reference(
     if abs(plumb[0] - top[0]) > 1e-9:
         raise RuntimeError(f"{sketch}: model -Y is not sketch-vertical on {plane}")
     set_sketch_direct_db(adapter, True)
-    (vertical,) = await add_line_chain(adapter, [top, plumb], close=False)
-    (clearance,) = await add_line_chain(adapter, [top, trace], close=False)
+    (vertical,) = add_line_chain(adapter, [top, plumb], close=False)
+    (clearance,) = add_line_chain(adapter, [top, trace], close=False)
     set_sketch_direct_db(adapter, False)
     check(
         f"{sketch} plumb vertical",
-        await adapter.add_sketch_constraint(vertical, None, "vertical"),
+        adapter.add_sketch_constraint(vertical, None, "vertical"),
     )
     check(
         f"{sketch} shared vertex",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{clearance}.start", f"{vertical}.start", "coincident"
         ),
     )
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{vertical}.start", top[0], top[1], f"{sketch} vertex"
     )
     if abs(top[0]) >= 1e-9:
         dims.record(vertex_name)
     if abs(top[1]) >= 1e-9:
         raise RuntimeError(f"{sketch}: the clearance vertex must lie on the face")
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{vertical}.start",
         f"{vertical}.end",
@@ -376,7 +376,7 @@ async def _angle_reference(
         f"{sketch} plumb length",
     )
     dims.record(None)
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{clearance}.start",
         f"{clearance}.end",
@@ -387,21 +387,21 @@ async def _angle_reference(
     dims.record(None)
     check(
         f"{sketch} {angle_name}",
-        await adapter.add_sketch_dimension(clearance, vertical, "angular", angle_deg),
+        adapter.add_sketch_dimension(clearance, vertical, "angular", angle_deg),
     )
     dims.record(angle_name, f'"{angle_name}"')
-    await ensure_fully_defined(adapter, f"{sketch} sketch")
-    check(f"exit_sketch {sketch}", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, f"{sketch} sketch")
+    check(f"exit_sketch {sketch}", adapter.exit_sketch())
     name_last_feature(adapter, sketch)
     return dims.apply(adapter, sketch)
 
 
-async def _form_envelope(adapter: Any) -> list[tuple[str, str]]:
+def _form_envelope(adapter: Any) -> list[tuple[str, str]]:
     """MHA-DT-37 sheet 2's widths on the face: P2-P2 (the tip), P12-P12 (the
     relief's junction with the involute) and P17-P17 (the blank OD), each a
     line across the form at its table station Y back from P1."""
     dims = SketchDims()
-    check(f"create_sketch {FORM_REFERENCE_SKETCH}", await adapter.create_sketch("Top"))
+    check(f"create_sketch {FORM_REFERENCE_SKETCH}", adapter.create_sketch("Top"))
     raw = _model_to_sketch(adapter)
     rows = (
         ("Tip", TIP_WIDTH, TIP_DEPTH),
@@ -416,15 +416,15 @@ async def _form_envelope(adapter: Any) -> list[tuple[str, str]]:
             raise RuntimeError(
                 f"{FORM_REFERENCE_SKETCH}: model Z is not sketch-vertical"
             )
-        (line,) = await add_line_chain(adapter, ends, close=False)
+        (line,) = add_line_chain(adapter, ends, close=False)
         lines.append((name, line, width, ends))
     set_sketch_direct_db(adapter, False)
     for name, line, width, ends in lines:
         check(
             f"{name} width vertical",
-            await adapter.add_sketch_constraint(line, None, "vertical"),
+            adapter.add_sketch_constraint(line, None, "vertical"),
         )
-        await dimension_between(
+        dimension_between(
             adapter,
             f"{line}.start",
             f"{line}.end",
@@ -433,21 +433,21 @@ async def _form_envelope(adapter: Any) -> list[tuple[str, str]]:
             f"{name} width",
         )
         dims.record(f"{name}Width")
-        await anchor_point_to_origin(
+        anchor_point_to_origin(
             adapter, f"{line}.start", *ends[0], f"{name} station"
         )
         dims.record(f"{name}Depth")
         dims.record(f"{name}Half")
-    await ensure_fully_defined(adapter, f"{FORM_REFERENCE_SKETCH} sketch")
-    check(f"exit_sketch {FORM_REFERENCE_SKETCH}", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, f"{FORM_REFERENCE_SKETCH} sketch")
+    check(f"exit_sketch {FORM_REFERENCE_SKETCH}", adapter.exit_sketch())
     name_last_feature(adapter, FORM_REFERENCE_SKETCH)
     return dims.apply(adapter, FORM_REFERENCE_SKETCH)
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
     # Editable knobs: inch document, so the mm suffix is load-bearing.
     for name, value in (
@@ -458,18 +458,18 @@ async def build(adapter: Any) -> dict[str, str]:
         ("FrontClearance", f"{FRONT_CLEARANCE_DEG}deg"),
         ("SideClearance", f"{SIDE_CLEARANCE_DEG}deg"),
     ):
-        await set_global(adapter, name, value)
+        set_global(adapter, name, value)
     drive_jobs: list[tuple[str, str]] = []
 
     # 1. The rod.
     profile = SketchDims()
-    check("create_sketch bit profile", await adapter.create_sketch("Front"))
+    check("create_sketch bit profile", adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     axis = check(
         "bit axis centerline",
-        await adapter.add_centerline(-BIT_LENGTH, 0.0, TIP_STOCK, 0.0),
+        adapter.add_centerline(-BIT_LENGTH, 0.0, TIP_STOCK, 0.0),
     )
-    lines = await add_line_chain(adapter, PROFILE_POINTS)
+    lines = add_line_chain(adapter, PROFILE_POINTS)
     set_sketch_direct_db(adapter, False)
     for index, line in enumerate(lines):
         v0 = PROFILE_POINTS[index][1]
@@ -477,16 +477,16 @@ async def build(adapter: Any) -> dict[str, str]:
         relation = "horizontal" if v0 == v1 else "vertical"
         check(
             f"bit profile {relation} {line}",
-            await adapter.add_sketch_constraint(line, None, relation),
+            adapter.add_sketch_constraint(line, None, relation),
         )
     shank_end, top, tip_end, tip_axis, shank_axis = lines
     check(
         "P1 on the origin",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{shank_axis}.start", "origin", "coincident"
         ),
     )
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{shank_axis}.end",
         f"{shank_axis}.start",
@@ -495,7 +495,7 @@ async def build(adapter: Any) -> dict[str, str]:
         "bit length",
     )
     profile.record("BitLength", '"BitLength"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{tip_axis}.start",
         f"{tip_axis}.end",
@@ -504,35 +504,35 @@ async def build(adapter: Any) -> dict[str, str]:
         "tip stock",
     )
     profile.record("TipStock")
-    await add_diametric_linear_dimension(
+    add_diametric_linear_dimension(
         adapter, axis, top, (-BIT_LENGTH - 2.0, BIT_RADIUS), "BitDia"
     )
     profile.record("BitDia", '"BitDia"')
-    await ensure_fully_defined(adapter, "bit profile")
-    check("exit_sketch bit profile", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "bit profile")
+    check("exit_sketch bit profile", adapter.exit_sketch())
     name_last_feature(adapter, "BitProfile")
     drive_jobs += profile.apply(adapter, "BitProfile")
-    check("revolve bit", await adapter.create_revolve(RevolveParameters(angle=360.0)))
+    check("revolve bit", adapter.create_revolve(RevolveParameters(angle=360.0)))
     name_last_feature(adapter, "Bit")
-    await volume_check(adapter, "drill rod", bit_volume_mm3("revolve"), VOLUME_TOL_MM3)
-    await bbox_extent_check(adapter, "bit length", "x", BIT_LENGTH + TIP_STOCK)
+    volume_check(adapter, "drill rod", bit_volume_mm3("revolve"), VOLUME_TOL_MM3)
+    bbox_extent_check(adapter, "bit length", "x", BIT_LENGTH + TIP_STOCK)
 
     # 2. The flat to centre.
     flat = SketchDims()
-    check("create_sketch flat", await adapter.create_sketch("Front"))
-    flat_lines = await add_line_chain(adapter, FLAT_POINTS)
+    check("create_sketch flat", adapter.create_sketch("Front"))
+    flat_lines = add_line_chain(adapter, FLAT_POINTS)
     for index, line in enumerate(flat_lines):
         v0 = FLAT_POINTS[index][1]
         v1 = FLAT_POINTS[(index + 1) % len(FLAT_POINTS)][1]
         relation = "horizontal" if v0 == v1 else "vertical"
         check(
             f"flat {relation} {line}",
-            await adapter.add_sketch_constraint(line, None, relation),
+            adapter.add_sketch_constraint(line, None, relation),
         )
     set_sketch_direct_db(adapter, True)
     far_side = check(
         "flat far-side centerline",
-        await adapter.add_centerline(*FAR_SIDE_ENDS[0], *FAR_SIDE_ENDS[1]),
+        adapter.add_centerline(*FAR_SIDE_ENDS[0], *FAR_SIDE_ENDS[1]),
     )
     set_sketch_direct_db(adapter, False)
     for ref1, ref2, relation in (
@@ -542,9 +542,9 @@ async def build(adapter: Any) -> dict[str, str]:
     ):
         check(
             f"flat far side {relation}",
-            await adapter.add_sketch_constraint(ref1, ref2, relation),
+            adapter.add_sketch_constraint(ref1, ref2, relation),
         )
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{flat_lines[0]}.start",
         "origin",
@@ -553,7 +553,7 @@ async def build(adapter: Any) -> dict[str, str]:
         "flat start",
     )
     flat.record("FlatLength", '"FlatLength"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{far_side}.end",
         "origin",
@@ -562,7 +562,7 @@ async def build(adapter: Any) -> dict[str, str]:
         "rod far side",
     )
     flat.record("RodFarSide", '"BitDia"/2')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{far_side}.start",
         f"{flat_lines[0]}.start",
@@ -571,7 +571,7 @@ async def build(adapter: Any) -> dict[str, str]:
         "flat depth",
     )
     flat.record("FlatDepth", '"FlatDepth"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{flat_lines[0]}.start",
         f"{flat_lines[0]}.end",
@@ -580,7 +580,7 @@ async def build(adapter: Any) -> dict[str, str]:
         "flat box height",
     )
     flat.record(None)
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{flat_lines[0]}.start",
         f"{flat_lines[2]}.end",
@@ -589,33 +589,33 @@ async def build(adapter: Any) -> dict[str, str]:
         "flat box length",
     )
     flat.record(None)
-    await ensure_fully_defined(adapter, "flat")
-    check("exit_sketch flat", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "flat")
+    check("exit_sketch flat", adapter.exit_sketch())
     name_last_feature(adapter, "FlatProfile")
     drive_jobs += flat.apply(adapter, "FlatProfile")
     check(
         "cut flat to centre",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=2.0 * _FLAT_TOP, both_directions=True)
         ),
     )
     name_last_feature(adapter, "Flat")
-    await volume_check(
+    volume_check(
         adapter, "flat to centre", bit_volume_mm3("flat"), VOLUME_TOL_MM3
     )
 
     # 3. The face form and its two clearance prisms.
-    axes = await _prism_planes(adapter)
-    await _form_prism(
+    axes = _prism_planes(adapter)
+    _form_prism(
         adapter, 1, "FormReliefPlanePlus", "FormProfilePlus", "FormReliefPlus"
     )
-    await volume_check(
+    volume_check(
         adapter, "form, +Z flank relieved", bit_volume_mm3("form_plus"), VOLUME_TOL_MM3
     )
-    await _form_prism(
+    _form_prism(
         adapter, -1, "FormReliefPlaneMinus", "FormProfileMinus", "FormReliefMinus"
     )
-    await volume_check(
+    volume_check(
         adapter, "form, both flanks relieved", bit_volume_mm3("form"), VOLUME_TOL_MM3
     )
     part = _early_bound(adapter.currentModel, "IPartDoc")
@@ -632,7 +632,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     # 4. The printed references.
-    drive_jobs += await _angle_reference(
+    drive_jobs += _angle_reference(
         adapter,
         "Front",
         FRONT_CLEARANCE_SKETCH,
@@ -642,7 +642,7 @@ async def build(adapter: Any) -> dict[str, str]:
         FRONT_CLEARANCE_DEG,
         vertex_name=None,
     )
-    drive_jobs += await _angle_reference(
+    drive_jobs += _angle_reference(
         adapter,
         "Right",
         SIDE_CLEARANCE_SKETCH,
@@ -652,22 +652,22 @@ async def build(adapter: Any) -> dict[str, str]:
         SIDE_CLEARANCE_DEG,
         vertex_name="SideFlankEndZ",
     )
-    drive_jobs += await _form_envelope(adapter)
+    drive_jobs += _form_envelope(adapter)
     blank_reference_sketches(adapter, REFERENCE_SKETCHES)
 
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    volume_check(
         adapter,
         "driven bit (equations neutral)",
         bit_volume_mm3("form"),
         VOLUME_TOL_MM3,
     )
 
-    await apply_material(adapter, MATERIAL)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    report_mass_properties(adapter)
     # The rod's ground diameter carries the supplier's band (the slip fit in
     # the bar); every other size takes the title block's rows.
     set_dimension_symmetric_tolerance(
@@ -685,7 +685,7 @@ async def build(adapter: Any) -> dict[str, str]:
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     author_part_pmi(adapter, surface_finishes=())
     apply_drawing_properties(adapter, PART_NAME)
-    artefacts = await save_part_and_images(adapter, PART_NAME)
+    artefacts = save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(
         adapter, ("Number", "Material Specification", "Finish", "Quantity")
     )

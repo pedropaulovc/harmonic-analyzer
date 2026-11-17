@@ -732,11 +732,11 @@ def _place_exploded_sheet(
 
 
 @_telemetry.traced("drawing.dt_cone_gear_tl_arbor_assembly")
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source assembly is missing: {SOURCE}")
 
-    check("open arbor-kit drawing source", await adapter.open_model(str(SOURCE)))
+    check("open arbor-kit drawing source", adapter.open_model(str(SOURCE)))
     properties = read_required_properties(
         _early_bound(adapter.currentModel, "IModelDoc2"),
         ("Number", "Revision", "Title", "Material Specification", "Finish", "Quantity"),
@@ -765,7 +765,7 @@ async def build(adapter: Any) -> dict[str, str]:
         sheet_settled()
         exploded_settled()
 
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         layout=SPEC.layout,

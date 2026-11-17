@@ -51,20 +51,19 @@ def test_model_precision_and_functional_bands_have_one_authority() -> None:
 
 
 def test_foot_grip_dimension_sits_on_the_free_end_not_the_upright_face(monkeypatch) -> None:
-    import asyncio
 
     import _sketch
     import _sketch_chains
 
     spans, anchors = [], []
 
-    async def dimension_between(_adapter, ref1, ref2, kind, value, _label):
+    def dimension_between(_adapter, ref1, ref2, kind, value, _label):
         spans.append((ref1, ref2, kind, value))
 
-    async def anchor_point_to_origin(_adapter, ref, x, y, _label):
+    def anchor_point_to_origin(_adapter, ref, x, y, _label):
         anchors.append((ref, x, y))
 
-    async def add_sketch_constraint(*_args):
+    def add_sketch_constraint(*_args):
         return SimpleNamespace(is_success=True, data=None)
 
     monkeypatch.setattr(_sketch_chains, "dimension_between", dimension_between)
@@ -73,10 +72,10 @@ def test_foot_grip_dimension_sits_on_the_free_end_not_the_upright_face(monkeypat
     points = list(part.FOOT_PROFILE)
     lines = [f"L{index}" for index in range(len(points))]
     dims = _sketch.SketchDims()
-    asyncio.run(_sketch_chains.define_rectilinear_chain(
+    _sketch_chains.define_rectilinear_chain(
         SimpleNamespace(add_sketch_constraint=add_sketch_constraint), lines, points,
         anchor=part.FOOT_PROFILE_ANCHOR, label="foot", dims=dims, names=list(part.FOOT_PROFILE_DIMENSIONS),
-    ))
+    )
     names = [name for name, _drive in dims._rows]
     vertex = {f"{line}.start": points[index] for index, line in enumerate(lines)}
     vertex |= {f"{line}.end": points[(index + 1) % len(points)] for index, line in enumerate(lines)}

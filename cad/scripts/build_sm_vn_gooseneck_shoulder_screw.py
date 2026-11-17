@@ -60,61 +60,61 @@ MODEL_VOLUME = math.pi / 4.0 * (
 ) - SLOT_VOLUME
 
 
-async def _ring(adapter, name, od, bore, length, *, offset=0.0, reverse=False):
+def _ring(adapter, name, od, bore, length, *, offset=0.0, reverse=False):
     from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
     plane = "Front"
     if offset:
-        check(name + " plane", await adapter.create_plane(
+        check(name + " plane", adapter.create_plane(
             CreatePlaneParameters(mode="offset", base_plane="Front Plane", offset=offset)
         ))
         plane = "HeadPlane"
         name_last_feature(adapter, "HeadPlane")
         blank_reference_geometry(adapter, (("HeadPlane", "PLANE"),))
-    check(name + " sketch", await adapter.create_sketch(plane))
-    await define_circle(adapter, 0.0, 0.0, od / 2.0, name + " OD")
+    check(name + " sketch", adapter.create_sketch(plane))
+    define_circle(adapter, 0.0, 0.0, od / 2.0, name + " OD")
     if bore:
-        await define_circle(adapter, 0.0, 0.0, bore / 2.0, name + " bore")
-    await ensure_fully_defined(adapter, name)
-    check(name + " exit", await adapter.exit_sketch())
+        define_circle(adapter, 0.0, 0.0, bore / 2.0, name + " bore")
+    ensure_fully_defined(adapter, name)
+    check(name + " exit", adapter.exit_sketch())
     name_last_feature(adapter, name + "Profile")
-    check(name + " extrusion", await adapter.create_extrusion(
+    check(name + " extrusion", adapter.create_extrusion(
         ExtrusionParameters(depth=length, reverse_direction=reverse)
     ))
     name_last_feature(adapter, name)
 
 
-async def _driver_slot(adapter):
+def _driver_slot(adapter):
     """Cut the straight slot down from the head's end face (z = LENGTH)."""
     from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
-    check("slot plane", await adapter.create_plane(
+    check("slot plane", adapter.create_plane(
         CreatePlaneParameters(mode="offset", base_plane="Front Plane", offset=part.LENGTH)
     ))
     name_last_feature(adapter, "SlotPlane")
     blank_reference_geometry(adapter, (("SlotPlane", "PLANE"),))
-    check("slot sketch", await adapter.create_sketch("SlotPlane"))
-    await define_centered_rectangle(adapter, SLOT_SPAN / 2.0, _SLOT_HALF, "driver slot")
-    await ensure_fully_defined(adapter, "driver slot")
-    check("slot exit", await adapter.exit_sketch())
+    check("slot sketch", adapter.create_sketch("SlotPlane"))
+    define_centered_rectangle(adapter, SLOT_SPAN / 2.0, _SLOT_HALF, "driver slot")
+    ensure_fully_defined(adapter, "driver slot")
+    check("slot exit", adapter.exit_sketch())
     name_last_feature(adapter, "SlotProfile")
     # From the head's end face down into the head (-Z); a cut into air
     # removes nothing, and the volume check after it refuses that.
-    check(SLOT_FEATURE, await adapter.create_cut_extrude(
+    check(SLOT_FEATURE, adapter.create_cut_extrude(
         ExtrusionParameters(depth=part.SLOT_DEPTH, reverse_direction=False)
     ))
     name_last_feature(adapter, SLOT_FEATURE)
 
 
-async def _supplier_references(adapter):
+def _supplier_references(adapter):
     """Right-plane construction carriers (sketch x is model -z), marked for drawing."""
     feature = part.REFERENCE_FEATURE
-    check(f"create {feature}", await adapter.create_sketch("Right"))
+    check(f"create {feature}", adapter.create_sketch("Right"))
     recorded = SketchDims()
     for name, value, orientation in part.REFERENCE_DIMENSIONS:
-        await _linear(adapter, recorded, name, value, orientation, part.REFERENCE_STARTS[name])
-    await ensure_fully_defined(adapter, feature)
-    check(f"exit {feature}", await adapter.exit_sketch())
+        _linear(adapter, recorded, name, value, orientation, part.REFERENCE_STARTS[name])
+    ensure_fully_defined(adapter, feature)
+    check(f"exit {feature}", adapter.exit_sketch())
     name_last_feature(adapter, feature)
     recorded.apply(adapter, feature)
     for name, value, _orientation in part.REFERENCE_DIMENSIONS:
@@ -131,29 +131,29 @@ async def _supplier_references(adapter):
     blank_reference_sketches(adapter, (feature,))
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import CreateAxisParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
-    await _ring(adapter, "Shoulder", part.SHOULDER_DIA, 0.0, part.SHOULDER_LENGTH)
-    await _ring(adapter, "Head", part.HEAD_DIA, 0.0, part.HEAD_HEIGHT, offset=part.SHOULDER_LENGTH)
-    await _ring(adapter, THREAD_FEATURE, part.MAJOR_DIA, 0.0, part.THREAD_LENGTH, reverse=True)
-    await _driver_slot(adapter)
-    check("publish axis", await adapter.create_axis(CreateAxisParameters(
+    _ring(adapter, "Shoulder", part.SHOULDER_DIA, 0.0, part.SHOULDER_LENGTH)
+    _ring(adapter, "Head", part.HEAD_DIA, 0.0, part.HEAD_HEIGHT, offset=part.SHOULDER_LENGTH)
+    _ring(adapter, THREAD_FEATURE, part.MAJOR_DIA, 0.0, part.THREAD_LENGTH, reverse=True)
+    _driver_slot(adapter)
+    check("publish axis", adapter.create_axis(CreateAxisParameters(
         mode="two_planes", planes=["Top Plane", "Right Plane"]
     )))
     name_last_feature(adapter, AXIS_NAME)
     blank_reference_geometry(adapter, ((AXIS_NAME, "AXIS"),))
-    await volume_check(adapter, PART_NAME, MODEL_VOLUME, max(0.01, MODEL_VOLUME * 1e-5))
-    await bbox_extent_check(adapter, PART_NAME, "z", part.LENGTH + part.THREAD_LENGTH)
-    await apply_material(adapter, MATERIAL)
+    volume_check(adapter, PART_NAME, MODEL_VOLUME, max(0.01, MODEL_VOLUME * 1e-5))
+    bbox_extent_check(adapter, PART_NAME, "z", part.LENGTH + part.THREAD_LENGTH)
+    apply_material(adapter, MATERIAL)
     # Passivated 18-8 stainless renders as the polished steel tone.
-    await apply_color(adapter, POLISHED_STEEL)
+    apply_color(adapter, POLISHED_STEEL)
     apply_custom_properties(adapter, stock_properties(_config.parts(PART_NAME)))
-    await _supplier_references(adapter)
-    await report_mass_properties(adapter)
-    return await save_part_and_images(adapter, PART_NAME)
+    _supplier_references(adapter)
+    report_mass_properties(adapter)
+    return save_part_and_images(adapter, PART_NAME)
 
 
 if __name__ == "__main__":

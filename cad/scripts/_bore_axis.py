@@ -27,7 +27,7 @@ from _check import check
 _MATE_TOL_MM = 0.5
 
 
-async def name_bore_axis(
+def name_bore_axis(
     adapter: Any,
     plane_a: str,
     offset_a: float,
@@ -75,7 +75,7 @@ async def name_bore_axis(
             continue
         plane_name = check(
             f"plane {label} {tag} ({base} + {off:g})",
-            await adapter.create_plane(
+            adapter.create_plane(
                 CreatePlaneParameters(mode="offset", base_plane=base, offset=off)
             ),
         ).name
@@ -85,7 +85,7 @@ async def name_bore_axis(
             drive_jobs.append((f"D1@{plane_name}", drive))
     axis_name = check(
         f"axis {label} ({planes[0]} ∩ {planes[1]})",
-        await adapter.create_axis(
+        adapter.create_axis(
             CreateAxisParameters(mode="two_planes", planes=planes)
         ),
     ).name

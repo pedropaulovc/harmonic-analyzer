@@ -373,11 +373,11 @@ def _set_spherical_reference(adapter: Any, annotation: Any, *, label: str) -> No
         raise RuntimeError(f"failed to mark {label} as a spherical reference: {applied}")
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open pivot-shaft source", await adapter.open_model(str(SOURCE)))
+    check("open pivot-shaft source", adapter.open_model(str(SOURCE)))
     read_required_properties(
         adapter.currentModel,
         (
@@ -497,7 +497,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.085)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Pivot Shaft Manufacturing Drawing",

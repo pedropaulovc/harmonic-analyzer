@@ -2737,9 +2737,8 @@ def _close_sw_documents() -> None:
         from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter
 
         adapter = PyWin32Adapter({})
-        import asyncio
 
-        asyncio.run(adapter.connect())
+        adapter.connect()
         adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
     except Exception:  # noqa: BLE001 -- pure best-effort
         pass

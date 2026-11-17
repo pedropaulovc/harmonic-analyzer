@@ -83,8 +83,8 @@ MATERIAL = "Plain Carbon Steel"  # see _appearance.apply_material docstring
 THROUGH_CUT_DEPTH = 40.0  # mid-plane total; > any extent it crosses
 
 
-async def _volume(adapter) -> float:
-    res = await adapter.get_mass_properties()
+def _volume(adapter) -> float:
+    res = adapter.get_mass_properties()
     return res.data.volume if res.is_success else float("nan")
 
 
@@ -100,10 +100,10 @@ def _as_construction(adapter, entity_id: str) -> None:
         raise RuntimeError(f"{entity_id} did not take the construction flag")
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations): every module constant above as a named
@@ -112,20 +112,20 @@ async def build(adapter) -> dict[str, str]:
     # document units, so an unsuffixed 66 would be read as 66 inches and blow the
     # part up 25.4x. Both end radii are half the width, so the handle end stays
     # a semicircle about the pivot when either changes.
-    await set_global(adapter, "ArmC2C", f"{ARM_C2C}mm")
-    await set_global(adapter, "ArmWidth", f"{ARM_WIDTH}mm")
-    await set_global(adapter, "ArmThickness", f"{ARM_THICKNESS}mm")
-    await set_global(adapter, "HubSeatDia", f"{HUB_SEAT_DIA}mm")
-    await set_global(adapter, "AxialPinDia", f"{AXIAL_PIN_DIA}mm")
-    await set_global(adapter, "SeamDepth", f"{SEAM_DEPTH}mm")
-    await set_global(adapter, "FiducialDia", f"{FIDUCIAL_MODEL_DIA}mm")
-    await set_global(adapter, "FiducialDepth", f"{FIDUCIAL_MODEL_DEPTH}mm")
+    set_global(adapter, "ArmC2C", f"{ARM_C2C}mm")
+    set_global(adapter, "ArmWidth", f"{ARM_WIDTH}mm")
+    set_global(adapter, "ArmThickness", f"{ARM_THICKNESS}mm")
+    set_global(adapter, "HubSeatDia", f"{HUB_SEAT_DIA}mm")
+    set_global(adapter, "AxialPinDia", f"{AXIAL_PIN_DIA}mm")
+    set_global(adapter, "SeamDepth", f"{SEAM_DEPTH}mm")
+    set_global(adapter, "FiducialDia", f"{FIDUCIAL_MODEL_DIA}mm")
+    set_global(adapter, "FiducialDepth", f"{FIDUCIAL_MODEL_DEPTH}mm")
     # Sketch distance dimensions are unsigned magnitudes; the negative seeded
     # X coordinate below retains the witness's intended quadrant.
-    await set_global(adapter, "FiducialX", f"{abs(FIDUCIAL_X)}mm")
-    await set_global(adapter, "FiducialY", f"{abs(FIDUCIAL_Y)}mm")
-    await set_global(adapter, "AnchorScrewX", f"{ANCHOR_SCREW_X}mm")
-    await set_global(adapter, "AnchorScrewY", f"{ANCHOR_SCREW_Y}mm")
+    set_global(adapter, "FiducialX", f"{abs(FIDUCIAL_X)}mm")
+    set_global(adapter, "FiducialY", f"{abs(FIDUCIAL_Y)}mm")
+    set_global(adapter, "AnchorScrewX", f"{ANCHOR_SCREW_X}mm")
+    set_global(adapter, "AnchorScrewY", f"{ANCHOR_SCREW_Y}mm")
 
     # Each sketch declares its dim names + drive equations as it is built; a
     # per-sketch SketchDims records each dim in emission order, then apply()
@@ -138,80 +138,80 @@ async def build(adapter) -> dict[str, str]:
     # Direct-to-DB so no inferred relation lands on the caps; the edges'
     # endpoints merge with the cap endpoints at creation (build_dt_pinion_bracket).
     outline = SketchDims()
-    check("create_sketch outline", await adapter.create_sketch("Front"))
+    check("create_sketch outline", adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     arc = check(
         "add_arc boss cap",
-        await adapter.add_arc(0.0, 0.0, 0.0, HALF_WIDTH, 0.0, -HALF_WIDTH),
+        adapter.add_arc(0.0, 0.0, 0.0, HALF_WIDTH, 0.0, -HALF_WIDTH),
     )
     bottom = check(
         "add bottom long edge",
-        await adapter.add_line(0.0, -HALF_WIDTH, ARM_C2C, -HALF_WIDTH),
+        adapter.add_line(0.0, -HALF_WIDTH, ARM_C2C, -HALF_WIDTH),
     )
     end_cap = check(
         "add_arc handle-end cap",
-        await adapter.add_arc(ARM_C2C, 0.0, ARM_C2C, -HALF_WIDTH, ARM_C2C, HALF_WIDTH),
+        adapter.add_arc(ARM_C2C, 0.0, ARM_C2C, -HALF_WIDTH, ARM_C2C, HALF_WIDTH),
     )
     check(
         "add top long edge",
-        await adapter.add_line(ARM_C2C, HALF_WIDTH, 0.0, HALF_WIDTH),
+        adapter.add_line(ARM_C2C, HALF_WIDTH, 0.0, HALF_WIDTH),
     )
     set_sketch_direct_db(adapter, False)
-    check("constraint horizontal bottom", await adapter.add_sketch_constraint(bottom, None, "horizontal"))
+    check("constraint horizontal bottom", adapter.add_sketch_constraint(bottom, None, "horizontal"))
     # Manual dims recorded into SketchDims as created (creation order): the
     # bottom edge's run to the pivot, the boss-cap radius, the end-cap radius.
     # The run duplicates the printed PivotStation, so it is never marked.
     check(
         f"dimension long-edge run = {ARM_C2C:g}",
-        await adapter.add_sketch_dimension(bottom, None, "linear", ARM_C2C),
+        adapter.add_sketch_dimension(bottom, None, "linear", ARM_C2C),
     )
     outline.record("EdgeRun", '"ArmC2C"')
     # Boss cap: centre at the origin + radius + both ends on the Y axis
     # fully pin the semicircle.
     check(
         "boss centre -> origin",
-        await adapter.add_sketch_constraint(f"{arc}.center", "origin", "coincident"),
+        adapter.add_sketch_constraint(f"{arc}.center", "origin", "coincident"),
     )
-    check("boss radius", await adapter.add_sketch_dimension(arc, None, "radial", HALF_WIDTH))
+    check("boss radius", adapter.add_sketch_dimension(arc, None, "radial", HALF_WIDTH))
     outline.record("BossRadius", '"ArmWidth" / 2')
     for point in (f"{arc}.start", f"{arc}.end"):
         check(
             f"{point} on Y axis",
-            await adapter.add_sketch_constraint(point, "origin", "vertical_points"),
+            adapter.add_sketch_constraint(point, "origin", "vertical_points"),
         )
     # Handle-end cap: its start rides the bottom edge's end, both ends stand
     # plumb over its centre, and its radius closes it.  The top edge needs no
     # relation of its own: both of its merged ends are already pinned, so a
     # horizontal there would be redundant.
-    check("end cap radius", await adapter.add_sketch_dimension(end_cap, None, "radial", HALF_WIDTH))
+    check("end cap radius", adapter.add_sketch_dimension(end_cap, None, "radial", HALF_WIDTH))
     outline.record("EndRadius", '"ArmWidth" / 2')
     for end in ("start", "end"):
         check(
             f"end cap {end} plumb over its centre",
-            await adapter.add_sketch_constraint(
+            adapter.add_sketch_constraint(
                 f"{end_cap}.{end}", f"{end_cap}.center", "vertical_points"
             ),
         )
-    await ensure_fully_defined(adapter, "arm outline")
-    check("exit_sketch outline", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "arm outline")
+    check("exit_sketch outline", adapter.exit_sketch())
     name_last_feature(adapter, "ArmOutline")
     drive_jobs += outline.apply(adapter, "ArmOutline")
     check(
         "extrude arm",
-        await adapter.create_extrusion(ExtrusionParameters(depth=ARM_THICKNESS)),
+        adapter.create_extrusion(ExtrusionParameters(depth=ARM_THICKNESS)),
     )
     name_last_feature(adapter, "Arm")
     depth_dim = name_dimensions(adapter, "Arm", ["Depth"])
     drive_jobs += [(depth_dim[0], '"ArmThickness"')]
-    vol = await _volume(adapter)
+    vol = _volume(adapter)
     _telemetry.info(f"volume after extrude: {vol:.1f} mm^3")
 
     # Match-fitted through-hub seat.  The assigned actual MHA-DT-31 is lightly
     # arbor-pressed into this nominal bore until its shoulder meets the arm's
     # inboard face; no independent numeric fit band competes with that process.
     hub_seat = SketchDims()
-    check("create_sketch hub seat", await adapter.create_sketch("Front"))
-    await define_circle(
+    check("create_sketch hub seat", adapter.create_sketch("Front"))
+    define_circle(
         adapter,
         0.0,
         0.0,
@@ -221,13 +221,13 @@ async def build(adapter) -> dict[str, str]:
         names=("HubSeatX", "HubSeatY", "HubSeatDia"),
         drives=(None, None, '"HubSeatDia"'),
     )
-    await ensure_fully_defined(adapter, "hub seat sketch")
-    check("exit_sketch hub seat", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "hub seat sketch")
+    check("exit_sketch hub seat", adapter.exit_sketch())
     name_last_feature(adapter, "HubSeatProfile")
     drive_jobs += hub_seat.apply(adapter, "HubSeatProfile")
     check(
         "cut hub seat",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
         ),
     )
@@ -246,13 +246,13 @@ async def build(adapter) -> dict[str, str]:
         placement_dims=[(("PivotBoreX", '"ArmC2C"'), (None, None))],
     )
     drive_jobs += pivot_cut.placement_drive_jobs
-    vol = await _volume(adapter)
+    vol = _volume(adapter)
     _telemetry.info(f"volume after bores: {vol:.1f} mm^3")
 
     # HandleSeat is the arm's outboard/operator face after placement.
     check(
         f"create_plane HandleSeat (Front Plane, +{ARM_THICKNESS})",
-        await adapter.create_plane(
+        adapter.create_plane(
             CreatePlaneParameters(
                 mode="offset", base_plane="Front Plane", offset=ARM_THICKNESS
             )
@@ -264,8 +264,8 @@ async def build(adapter) -> dict[str, str]:
     # the hub-seat axis (FiducialX/FiducialY, marked below); its diameter and
     # depth are only a restrained representation and never print.
     fiducial = SketchDims()
-    check("create_sketch arm fiducial", await adapter.create_sketch("HandleSeat"))
-    await define_circle(
+    check("create_sketch arm fiducial", adapter.create_sketch("HandleSeat"))
+    define_circle(
         adapter,
         FIDUCIAL_X,
         FIDUCIAL_Y,
@@ -275,13 +275,13 @@ async def build(adapter) -> dict[str, str]:
         names=("FiducialX", "FiducialY", "FiducialDia"),
         drives=('"FiducialX"', '"FiducialY"', '"FiducialDia"'),
     )
-    await ensure_fully_defined(adapter, "arm fiducial sketch")
-    check("exit_sketch arm fiducial", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "arm fiducial sketch")
+    check("exit_sketch arm fiducial", adapter.exit_sketch())
     name_last_feature(adapter, "FiducialProfile")
     drive_jobs += fiducial.apply(adapter, "FiducialProfile")
     check(
         "cut arm fiducial",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(
                 depth=2.0 * FIDUCIAL_MODEL_DEPTH,
                 both_directions=True,
@@ -291,7 +291,7 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "PunchedFiducial")
     # Hidden but still selectable by name for the handle-collar mate.
     blank_reference_geometry(adapter, (("HandleSeat", "PLANE"),))
-    vol = await _volume(adapter)
+    vol = _volume(adapter)
     _telemetry.info(f"volume after punch witness: {vol:.1f} mm^3")
 
     # Keeper-chain anchor: a #2-56 tap through the arm (ch11 p.14; owner
@@ -307,17 +307,17 @@ async def build(adapter) -> dict[str, str]:
         placement_dims=[(("AnchorX", '"AnchorScrewX"'), ("AnchorY", '"AnchorScrewY"'))],
     )
     drive_jobs += anchor_cut.placement_drive_jobs
-    vol = await _volume(adapter)
+    vol = _volume(adapter)
     _telemetry.info(f"volume after anchor tap: {vol:.1f} mm^3")
 
     # MHA-DT-VN-59 axial seam groove: a blind cylinder from the outboard face,
     # centred exactly on the nominal MHA-DT-31 seat at six o'clock (toward the
     # hanging handle).  The cut leaves only its arm-side segment here; the
     # complementary segment is match-drilled in the assembled hub.
-    before_axial_groove = await _volume(adapter)
+    before_axial_groove = _volume(adapter)
     axial_groove = SketchDims()
-    check("create_sketch axial seam groove", await adapter.create_sketch("HandleSeat"))
-    await define_circle(
+    check("create_sketch axial seam groove", adapter.create_sketch("HandleSeat"))
+    define_circle(
         adapter,
         AXIAL_PIN_X,
         AXIAL_PIN_Y,
@@ -327,13 +327,13 @@ async def build(adapter) -> dict[str, str]:
         names=("AxialPinX", "AxialPinY", "AxialPinDia"),
         drives=('"HubSeatDia" / 2', None, '"AxialPinDia"'),
     )
-    await ensure_fully_defined(adapter, "axial seam groove sketch")
-    check("exit_sketch axial seam groove", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "axial seam groove sketch")
+    check("exit_sketch axial seam groove", adapter.exit_sketch())
     name_last_feature(adapter, "AxialPinGrooveProfile")
     drive_jobs += axial_groove.apply(adapter, "AxialPinGrooveProfile")
     check(
         "cut axial seam groove",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=SEAM_DEPTH)
         ),
     )
@@ -342,7 +342,7 @@ async def build(adapter) -> dict[str, str]:
     # review of 278bcf933: an unbound cut could diverge from the print).
     groove_depth = name_dimensions(adapter, "AxialPinGroove", ["GrooveDepth"])
     drive_jobs += [(groove_depth[0], '"SeamDepth"')]
-    vol = await _volume(adapter)
+    vol = _volume(adapter)
     expected_arm_groove = (
         math.pi * (AXIAL_PIN_DIA / 2.0) ** 2
         - lens_area(AXIAL_PIN_DIA / 2.0, HUB_SEAT_DIA / 2.0)
@@ -369,19 +369,19 @@ async def build(adapter) -> dict[str, str]:
     # Direct-to-DB avoids creation-time inference duplicating the explicit
     # relations below and over-defining the sketch.
     stations = SketchDims()
-    check("create_sketch station reference", await adapter.create_sketch("Front"))
+    check("create_sketch station reference", adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     pivot_ref = check(
         "pivot station reference line",
-        await adapter.add_line(0.0, 0.0, ARM_C2C, 0.0),
+        adapter.add_line(0.0, 0.0, ARM_C2C, 0.0),
     )
     anchor_ref = check(
         "anchor station reference line",
-        await adapter.add_line(0.0, 0.0, ANCHOR_SCREW_X, 0.0),
+        adapter.add_line(0.0, 0.0, ANCHOR_SCREW_X, 0.0),
     )
     offset_ref = check(
         "anchor offset reference line",
-        await adapter.add_line(
+        adapter.add_line(
             ANCHOR_SCREW_X, HALF_WIDTH, ANCHOR_SCREW_X, ANCHOR_SCREW_Y
         ),
     )
@@ -389,7 +389,7 @@ async def build(adapter) -> dict[str, str]:
     # rounded end has no straight edge left to carry it.
     width_ref = check(
         "arm width reference line",
-        await adapter.add_line(ARM_C2C, -HALF_WIDTH, ARM_C2C, HALF_WIDTH),
+        adapter.add_line(ARM_C2C, -HALF_WIDTH, ARM_C2C, HALF_WIDTH),
     )
     set_sketch_direct_db(adapter, False)
     for line in (pivot_ref, anchor_ref, offset_ref, width_ref):
@@ -397,31 +397,31 @@ async def build(adapter) -> dict[str, str]:
     for line, label in ((pivot_ref, "pivot"), (anchor_ref, "anchor")):
         check(
             f"{label} station reference horizontal",
-            await adapter.add_sketch_constraint(line, None, "horizontal"),
+            adapter.add_sketch_constraint(line, None, "horizontal"),
         )
     for line, label in ((pivot_ref, "pivot"), (anchor_ref, "anchor")):
         check(
             f"{label} station reference starts on the bore axis",
-            await adapter.add_sketch_constraint(
+            adapter.add_sketch_constraint(
                 f"{line}.start", "origin", "coincident"
             ),
         )
     check(
         "anchor offset reference vertical",
-        await adapter.add_sketch_constraint(offset_ref, None, "vertical"),
+        adapter.add_sketch_constraint(offset_ref, None, "vertical"),
     )
     check(
         "anchor offset reference ends above the anchor station",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{offset_ref}.end", f"{anchor_ref}.end", "vertical_points"
         ),
     )
     check(
         "arm width reference vertical",
-        await adapter.add_sketch_constraint(width_ref, None, "vertical"),
+        adapter.add_sketch_constraint(width_ref, None, "vertical"),
     )
     # Dimensions in creation order; SketchDims renames them by that order.
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{pivot_ref}.start",
         f"{pivot_ref}.end",
@@ -430,7 +430,7 @@ async def build(adapter) -> dict[str, str]:
         "pivot station reference",
     )
     stations.record("PivotStation", '"ArmC2C"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{anchor_ref}.start",
         f"{anchor_ref}.end",
@@ -439,7 +439,7 @@ async def build(adapter) -> dict[str, str]:
         "anchor station reference",
     )
     stations.record("AnchorStation", '"AnchorScrewX"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{anchor_ref}.end",
         f"{offset_ref}.end",
@@ -448,7 +448,7 @@ async def build(adapter) -> dict[str, str]:
         "anchor axis height reference",
     )
     stations.record("AnchorY", '"AnchorScrewY"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{offset_ref}.start",
         f"{offset_ref}.end",
@@ -457,7 +457,7 @@ async def build(adapter) -> dict[str, str]:
         "anchor offset reference",
     )
     stations.record("AnchorOffset", '"ArmWidth" / 2 - "AnchorScrewY"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{width_ref}.start",
         f"{width_ref}.end",
@@ -466,7 +466,7 @@ async def build(adapter) -> dict[str, str]:
         "arm width reference",
     )
     stations.record("Width", '"ArmWidth"')
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{width_ref}.start", ARM_C2C, -HALF_WIDTH, "arm width reference"
     )
     stations.record("WidthX", '"ArmC2C"')
@@ -477,7 +477,7 @@ async def build(adapter) -> dict[str, str]:
     set_sketch_direct_db(adapter, True)
     edge_ref = check(
         "axis-from-edge reference line",
-        await adapter.add_line(
+        adapter.add_line(
             AXIS_FROM_EDGE_STATION_X, 0.0, AXIS_FROM_EDGE_STATION_X, HALF_WIDTH
         ),
     )
@@ -485,13 +485,13 @@ async def build(adapter) -> dict[str, str]:
     _as_construction(adapter, edge_ref)
     check(
         "axis-from-edge reference vertical",
-        await adapter.add_sketch_constraint(edge_ref, None, "vertical"),
+        adapter.add_sketch_constraint(edge_ref, None, "vertical"),
     )
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{edge_ref}.start", AXIS_FROM_EDGE_STATION_X, 0.0, "axis-from-edge foot"
     )
     stations.record("AxisFromEdgeX")
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{edge_ref}.start",
         f"{edge_ref}.end",
@@ -500,16 +500,16 @@ async def build(adapter) -> dict[str, str]:
         "axis-from-edge reference",
     )
     stations.record("AxisFromEdge", '"ArmWidth" / 2')
-    await ensure_fully_defined(adapter, "station reference sketch")
-    check("exit_sketch station reference", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "station reference sketch")
+    check("exit_sketch station reference", adapter.exit_sketch())
     name_last_feature(adapter, "StationReference")
     drive_jobs += stations.apply(adapter, "StationReference")
 
 
     # Named axes for semantic assembly mates.  Axis1 is the through-hub seat,
     # Axis2 the handle pivot, Axis3 the six-o'clock axial MHA-DT-VN-59 seam.
-    await name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", 0.0, "hub seat axis")
-    pivot_axis = await name_bore_axis(
+    name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", 0.0, "hub seat axis")
+    pivot_axis = name_bore_axis(
         adapter,
         "Top Plane",
         0.0,
@@ -519,7 +519,7 @@ async def build(adapter) -> dict[str, str]:
         drive_b='"ArmC2C"',
         drive_jobs=drive_jobs,
     )
-    seam_axis = await name_bore_axis(
+    seam_axis = name_bore_axis(
         adapter,
         "Top Plane",
         0.0,
@@ -537,10 +537,10 @@ async def build(adapter) -> dict[str, str]:
     # exists, so every target resolves. Each equation evaluates to the value just
     # built, so the geometry must not move; the as-built volume captured above is
     # the neutrality reference for the re-check below.
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
     assert_signed_circle_center(
         adapter,
         "AxialPinGrooveProfile",
@@ -559,7 +559,7 @@ async def build(adapter) -> dict[str, str]:
     )
     # The assigned actual hub governs the final match-fit bore; no independent
     # local band is authored on MHA-DT-06.
-    await volume_check(adapter, "driven crank arm (equations neutral)", vol, 0.001 * vol)
+    volume_check(adapter, "driven crank arm (equations neutral)", vol, 0.001 * vol)
 
     # HandleSeat datum: the plate face OPPOSITE the origin plane (z =
     # ARM_THICKNESS). The chirality-mirrored drive-train maps part +z to
@@ -579,8 +579,8 @@ async def build(adapter) -> dict[str, str]:
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
 
-    await apply_material(adapter, MATERIAL)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    report_mass_properties(adapter)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,
@@ -594,7 +594,7 @@ async def build(adapter) -> dict[str, str]:
     # no assembly instance renders it (#880).  The drawing shows it per view
     # through _drawing_hidden_sketches to import those dimensions.
     blank_sketch(adapter, "StationReference")
-    return await save_part_and_images(adapter, PART_NAME)
+    return save_part_and_images(adapter, PART_NAME)
 
 
 if __name__ == "__main__":

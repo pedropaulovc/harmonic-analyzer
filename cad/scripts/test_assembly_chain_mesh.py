@@ -592,7 +592,6 @@ def test_soundness_interference_gates_get_the_chain_mounts(monkeypatch, tmp_path
     """PD run 10: verify_soundness:pd_paper_drive read 34 link-on-sprocket mesh
     contacts as interference because verify.py's soundness gates never passed
     the mounts the assembly builds pass (541011de0)."""
-    import asyncio
     from types import SimpleNamespace
 
     import verify
@@ -625,7 +624,7 @@ def test_soundness_interference_gates_get_the_chain_mounts(monkeypatch, tmp_path
     monkeypatch.setattr(verify, "OUT_SLDASM", tmp_path)
     monkeypatch.setattr(verify, "active_configuration_name", lambda _adapter: verify.REST)
 
-    async def ok(*_args):
+    def ok(*_args):
         return SimpleNamespace(is_success=True, data=[verify.REST])
 
     adapter = SimpleNamespace(
@@ -636,7 +635,7 @@ def test_soundness_interference_gates_get_the_chain_mounts(monkeypatch, tmp_path
     for name, expected in (("pd-paper-drive", mounted_wheels()), ("ch-channel", None)):
         (tmp_path / f"{name}.SLDASM").touch()
         report = _Report()
-        asyncio.run(verify._verify_static_one(adapter, name, report))
+        verify._verify_static_one(adapter, name, report)
         report.gates[f"{name}:interference-free"]()
         assert seen.pop("mounts") == expected
 

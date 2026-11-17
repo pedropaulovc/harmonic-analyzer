@@ -6,7 +6,6 @@ the part the assemblies still build.
 
 from __future__ import annotations
 
-import asyncio
 import contextlib
 import math
 import re
@@ -95,24 +94,24 @@ class _Recorder:
     def log(self, name: str, args=(), kwargs=None) -> None:
         self.events.append((name, tuple(args), dict(kwargs or {})))
 
-    async def _async(self, name: str, *args, **kwargs):
+    def _async(self, name: str, *args, **kwargs):
         self.log(name, args, kwargs)
         return "ok"
 
-    async def create_sketch(self, *args):
-        return await self._async("create_sketch", *args)
+    def create_sketch(self, *args):
+        return self._async("create_sketch", *args)
 
-    async def exit_sketch(self, *args):
-        return await self._async("exit_sketch", *args)
+    def exit_sketch(self, *args):
+        return self._async("exit_sketch", *args)
 
-    async def create_revolve(self, *args):
-        return await self._async("create_revolve", *args)
+    def create_revolve(self, *args):
+        return self._async("create_revolve", *args)
 
-    async def create_cut_extrude(self, *args):
-        return await self._async("create_cut_extrude", *args)
+    def create_cut_extrude(self, *args):
+        return self._async("create_cut_extrude", *args)
 
-    async def add_fillet(self, *args):
-        return await self._async("add_fillet", *args)
+    def add_fillet(self, *args):
+        return self._async("add_fillet", *args)
 
 
 def _junction_y() -> float:
@@ -134,10 +133,10 @@ def _record(monkeypatch, *, supplied: bool = False) -> list[tuple]:
 
         return call
 
-    async def add_line_chain(_adapter, points, **kwargs):
+    def add_line_chain(_adapter, points, **kwargs):
         adapter.log("add_line_chain", (tuple(points),), kwargs)
 
-    async def volume_check(_adapter, label, expected, tol):
+    def volume_check(_adapter, label, expected, tol):
         adapter.log("volume_check", (label, expected, tol))
         return expected
 
@@ -171,20 +170,20 @@ def _record(monkeypatch, *, supplied: bool = False) -> list[tuple]:
     )
     monkeypatch.setattr(_telemetry, "info", lambda *a, **k: None)
 
-    async def stock_build(_adapter, **kwargs):
+    def stock_build(_adapter, **kwargs):
         # As build_stock_fastener calls each component's recipe.
         for component in kwargs["components"]:
             if component.parameters is None:
-                await component.author(adapter, None)
+                component.author(adapter, None)
             else:
-                await component.author(adapter, None, **component.parameters)
+                component.author(adapter, None, **component.parameters)
         return {}
 
     if supplied:
-        asyncio.run(entry.build_91790A199(adapter))
+        entry.build_91790A199(adapter)
     else:
         monkeypatch.setattr(part, "build_stock_fastener", stock_build)
-        asyncio.run(part.build(adapter))
+        part.build(adapter)
     return adapter.events
 
 
@@ -361,12 +360,12 @@ def test_stock_build_uses_its_registered_recipe_head_up_on_the_origin(
 
     seen: dict = {}
 
-    async def fake_build(adapter, **kwargs):
+    def fake_build(adapter, **kwargs):
         seen.update(kwargs)
         return {}
 
     monkeypatch.setattr(part, "build_stock_fastener", fake_build)
-    asyncio.run(part.build(None))
+    part.build(None)
     (component,) = seen["components"]
     assert component.sku == screw.SKU
     assert component.author is entry.build_91790A199
@@ -382,12 +381,12 @@ def test_standalone_recipe_run_is_catalog_only(monkeypatch) -> None:
     assert not hasattr(entry, "replica_main")
     seen: list = []
 
-    async def fake_catalog_run(adapter, part_no, builder):
+    def fake_catalog_run(adapter, part_no, builder):
         seen.append((part_no, builder))
         return {}
 
     monkeypatch.setattr(entry, "catalog_run", fake_catalog_run)
-    asyncio.run(entry.build_catalog(None))
+    entry.build_catalog(None)
     assert seen == [(screw.SKU, entry.build_91790A199)]
 
 

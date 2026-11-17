@@ -45,8 +45,8 @@ def list_sketches(model, label: str) -> None:
         feat = _get(feat, "GetNextFeature")
 
 
-async def build(adapter) -> dict[str, str]:
-    check("open", await adapter.open_model(str(ASM)))
+def build(adapter) -> dict[str, str]:
+    check("open", adapter.open_model(str(ASM)))
     model = adapter.currentModel
     _flag(model, "IModelDoc2")
     _flag(model, "IAssemblyDoc")

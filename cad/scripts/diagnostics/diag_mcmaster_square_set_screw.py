@@ -20,7 +20,7 @@ from diagnostics.diag_mcmaster_lib import (  # noqa: E402
 )
 
 
-async def build_square_set_screw(
+def build_square_set_screw(
     adapter, *, sku: str, size: tuple[float, ...]
 ) -> None:
     """The square-head cup-point law harvested from 91410A538, at one length.
@@ -44,37 +44,37 @@ async def build_square_set_screw(
     cham_start_y = -sq_len + (major_r - rim_r)   # 45-deg outer chamfer
 
     # --- shank + cup point ---------------------------------------------------
-    check("create_sketch shank", await adapter.create_sketch("Front"))
+    check("create_sketch shank", adapter.create_sketch("Front"))
     sk = adapter.currentSketchManager
     with no_sketch_inference(adapter):
         if sk.CreateCenterLine(0.0, 0.0, 0.0,
                                0.0, -sq_len / 1000.0, 0.0) is None:
             raise RuntimeError(f"{sku} shank: CreateCenterLine failed")
-        await add_line_chain(adapter, [
+        add_line_chain(adapter, [
             (0.0, 0.0),
             (major_r, 0.0),
             (major_r, cham_start_y),
             (rim_r, -sq_len),
             (0.0, cup_apex_y),
         ])
-    check("exit_sketch shank", await adapter.exit_sketch())
+    check("exit_sketch shank", adapter.exit_sketch())
     name_last_feature(adapter, "ShankProfile")
-    check("revolve shank", await adapter.create_revolve(
+    check("revolve shank", adapter.create_revolve(
         RevolveParameters(angle=360.0, is_cut=False)))
     name_last_feature(adapter, "Shank")
     v_shank = (math.pi * major_r ** 2 * -cham_start_y
                + _rev_frustum(cham_start_y + sq_len, major_r, rim_r)
                - _rev_frustum(cup_apex_y + sq_len, rim_r, 0.0))
-    await volume_check(adapter, "shank revolve", v_shank, 0.005 * v_shank)
+    volume_check(adapter, "shank revolve", v_shank, 0.005 * v_shank)
 
     # --- head revolve (OD cylinder + 75-deg chamfer cones) -------------------
-    check("create_sketch head", await adapter.create_sketch("Front"))
+    check("create_sketch head", adapter.create_sketch("Front"))
     sk = adapter.currentSketchManager
     with no_sketch_inference(adapter):
         if sk.CreateCenterLine(0.0, 0.0, 0.0,
                                0.0, sq_hh / 1000.0, 0.0) is None:
             raise RuntimeError(f"{sku} head: CreateCenterLine failed")
-        await add_line_chain(adapter, [
+        add_line_chain(adapter, [
             (0.0, sq_hh),
             (major_r, sq_hh),
             (od_r, sq_hh - cham),
@@ -82,27 +82,27 @@ async def build_square_set_screw(
             (major_r, 0.0),
             (0.0, 0.0),
         ])
-    check("exit_sketch head", await adapter.exit_sketch())
+    check("exit_sketch head", adapter.exit_sketch())
     name_last_feature(adapter, "HeadProfile")
-    check("revolve head", await adapter.create_revolve(
+    check("revolve head", adapter.create_revolve(
         RevolveParameters(angle=360.0, is_cut=False)))
     name_last_feature(adapter, "Head")
     v_head = (math.pi * od_r ** 2 * (sq_hh - 2.0 * cham)
               + 2.0 * _rev_frustum(cham, od_r, major_r))
-    await volume_check(adapter, "head revolve", v_shank + v_head,
+    volume_check(adapter, "head revolve", v_shank + v_head,
                        0.005 * v_head)
 
     # --- square (ThroughAll cut, remove OUTSIDE the profile) -----------------
     offset_plane(adapter, "HeadTopPlane", sq_hh)
-    check("create_sketch square", await adapter.create_sketch("HeadTopPlane"))
+    check("create_sketch square", adapter.create_sketch("HeadTopPlane"))
     with no_sketch_inference(adapter):
-        await add_line_chain(adapter, [
+        add_line_chain(adapter, [
             (-major_r, -major_r),
             (major_r, -major_r),
             (major_r, major_r),
             (-major_r, major_r),
         ])
-    check("exit_sketch square", await adapter.exit_sketch())
+    check("exit_sketch square", adapter.exit_sketch())
     name_last_feature(adapter, "SquareProfile")
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     model.ClearSelection2(True)
@@ -134,7 +134,7 @@ async def build_square_set_screw(
         acc += w * _seg(major_r + (od_r - major_r) * i / n)
     v_cham_cut = acc * (cham / n) / 3.0
     v_sq_cut = _seg(od_r) * (sq_hh - 2.0 * cham) + 2.0 * v_cham_cut
-    await volume_check(adapter, "square cut",
+    volume_check(adapter, "square cut",
                        v_shank + v_head - v_sq_cut, 0.01 * v_sq_cut)
 
     body_boxes = split_at_plane(adapter, "Top Plane", "HeadSplit")
@@ -149,7 +149,7 @@ async def build_square_set_screw(
 
     # --- tip-seeded ascending helix, L+P (vendor stores start angle 90) -----
     offset_plane(adapter, "TipPlane", -sq_len)
-    check("create_sketch helix seed", await adapter.create_sketch("TipPlane"))
+    check("create_sketch helix seed", adapter.create_sketch("TipPlane"))
     with no_sketch_inference(adapter):
         if adapter.currentSketchManager.CreateCircleByRadius(
                 0.0, 0.0, 0.0, major_r / 1000.0) is None:
@@ -160,36 +160,36 @@ async def build_square_set_screw(
 
     cy = -sq_len - 7.0 * pitch / 16.0
     top_r = major_r + h_sharp / 16.0
-    check("create_sketch cutter", await adapter.create_sketch("Front"))
+    check("create_sketch cutter", adapter.create_sketch("Front"))
     with no_sketch_inference(adapter):
-        await add_line_chain(adapter, [
+        add_line_chain(adapter, [
             (top_r, cy + 15.0 * pitch / 32.0),
             (root_r, cy + pitch / 16.0),
             (root_r, cy - pitch / 16.0),
             (top_r, cy - 15.0 * pitch / 32.0),
         ])
-    check("exit_sketch cutter", await adapter.exit_sketch())
+    check("exit_sketch cutter", adapter.exit_sketch())
     name_last_feature(adapter, "ThreadCutter")
     thread_sweep_cut(adapter, "ThreadCutter", "ThreadHelix", shank_name,
                      "ThreadGroove")
 
     # --- 60-deg runout at the junction (their Boss-Extrude1, draft 60) ------
     taper_h = (major_r - root_r) / math.sqrt(3.0)
-    check("create_sketch runout", await adapter.create_sketch("Front"))
+    check("create_sketch runout", adapter.create_sketch("Front"))
     sk2 = adapter.currentSketchManager
     with no_sketch_inference(adapter):
         if sk2.CreateCenterLine(0.0, 0.0, 0.0,
                                 0.0, -taper_h / 1000.0, 0.0) is None:
             raise RuntimeError("runout: CreateCenterLine failed")
-        await add_line_chain(adapter, [
+        add_line_chain(adapter, [
             (0.0, 0.0),
             (major_r, 0.0),
             (root_r, -taper_h),
             (0.0, -taper_h),
         ])
-    check("exit_sketch runout", await adapter.exit_sketch())
+    check("exit_sketch runout", adapter.exit_sketch())
     name_last_feature(adapter, "RunoutProfile")
-    check("runout cone", await adapter.create_revolve(
+    check("runout cone", adapter.create_revolve(
         RevolveParameters(angle=360.0, is_cut=False)))
     name_last_feature(adapter, "ThreadRunout")
 

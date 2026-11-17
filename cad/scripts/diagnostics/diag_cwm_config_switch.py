@@ -99,26 +99,26 @@ def _switch_configuration(adapter, name: str, cfg: str) -> None:
     comp.ReferencedConfiguration = cfg
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     try:
-        check("create_assembly", await adapter.create_assembly())
-        shaft = await place_component(
+        check("create_assembly", adapter.create_assembly())
+        shaft = place_component(
             adapter, "dt-cone-gear-shaft", [0.0, 0.0, 0.0], [0.0, 0.0, 0.0],
             IDENTITY, ground=False, label="cone-gear-shaft (seed, auto-fixed)")
-        seed = await place_component(
+        seed = place_component(
             adapter, "dt-cone-gear", [0.0, 0.0, -Z0], [0.0, 0.0, 0.0], IDENTITY,
             ground=False, configuration=SEED_CFG,
             label=f"cone-gear {SEED_CFG} seed")
         tgt = [0.0, 0.0, -Z0]
-        await coincident_mate(
+        coincident_mate(
             adapter, named_ref(f"Axis1@{seed}", "AXIS"),
             named_ref(f"Axis1@{shaft}", "AXIS"),
             label="seed coaxial", verify=(seed, tgt))
-        await distance_driver(
+        distance_driver(
             adapter, named_ref(f"Front Plane@{seed}", "PLANE"),
             named_ref(f"Front Plane@{shaft}", "PLANE"), Z0,
             label=f"seed axial seat d={Z0:.2f}", verify=(seed, tgt))
-        await parallel_mate(
+        parallel_mate(
             adapter, named_ref(f"Right Plane@{seed}", "PLANE"),
             named_ref(f"Right Plane@{shaft}", "PLANE"),
             label="seed anti-spin (keyed phase)", verify=(seed, tgt))

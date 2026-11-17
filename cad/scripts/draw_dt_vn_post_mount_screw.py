@@ -260,10 +260,10 @@ def _verify_finished_controls(adapter, front, installed_configuration) -> None:
         raise RuntimeError("finished cut-to-fit reference changed")
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
-    check("open post mount screw", await adapter.open_model(str(SOURCE)))
+    check("open post mount screw", adapter.open_model(str(SOURCE)))
     installed_configuration = str(
         _early_bound(
             _early_bound(
@@ -320,7 +320,7 @@ async def build(adapter: Any) -> dict[str, str]:
     for name, x, y in STOCK_ROWS:
         add_property_linked_note(adapter, name, x, y, char_height=0.003)
     set_hidden_lines_removed(adapter, front)
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title=TITLE,

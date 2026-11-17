@@ -97,26 +97,26 @@ def _supply_length_min_limit(adapter) -> None:
         raise RuntimeError(f"{label}: cannot retain the MIN limit")
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this
     # is an INCH document and the equation manager reads BARE numbers in
     # document units.
-    await set_global(adapter, "LandDia", f"{LAND_DIA}mm")
-    await set_global(adapter, "SupplyBore", f"{SUPPLY_BORE_DIA}mm")
-    await set_global(adapter, "SupplyLength", f"{SUPPLY_LENGTH_MIN}mm")
+    set_global(adapter, "LandDia", f"{LAND_DIA}mm")
+    set_global(adapter, "SupplyBore", f"{SUPPLY_BORE_DIA}mm")
+    set_global(adapter, "SupplyLength", f"{SUPPLY_LENGTH_MIN}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
     # Annulus: land + supply bore in ONE sketch (both on-axis circles -> only
     # the two diameter dims emit), extruded once.
     ring = SketchDims()
-    check("create_sketch hub", await adapter.create_sketch("Front"))
-    await define_circle(
+    check("create_sketch hub", adapter.create_sketch("Front"))
+    define_circle(
         adapter,
         0.0,
         0.0,
@@ -126,7 +126,7 @@ async def build(adapter) -> dict[str, str]:
         names=("LandCx", "LandCz", "LandDia"),
         drives=(None, None, '"LandDia"'),
     )
-    await define_circle(
+    define_circle(
         adapter,
         0.0,
         0.0,
@@ -136,33 +136,33 @@ async def build(adapter) -> dict[str, str]:
         names=("BoreCx", "BoreCz", "SupplyBore"),
         drives=(None, None, '"SupplyBore"'),
     )
-    await ensure_fully_defined(adapter, "hub sketch")
-    check("exit_sketch hub", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "hub sketch")
+    check("exit_sketch hub", adapter.exit_sketch())
     name_last_feature(adapter, "HubProfile")
     drive_jobs += ring.apply(adapter, "HubProfile")
     check(
         "extrude hub",
-        await adapter.create_extrusion(
+        adapter.create_extrusion(
             ExtrusionParameters(depth=SUPPLY_LENGTH_MIN, both_directions=True)
         ),
     )
     name_last_feature(adapter, "Hub")
     hub_depth = name_dimensions(adapter, "Hub", ["SupplyLength"])
     drive_jobs.append((hub_depth[0], '"SupplyLength"'))
-    await volume_check(adapter, "hub", V_HUB, 0.005 * V_HUB)
+    volume_check(adapter, "hub", V_HUB, 0.005 * V_HUB)
 
     # Axis1: the hub axis, model Z (Top Plane x Right Plane).
-    await name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", 0.0, "hub axis")
+    name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", 0.0, "hub axis")
 
     # Deferred drive equations, then re-check neutrality.
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(adapter, "driven hub (equations neutral)", V_HUB, 0.005 * V_HUB)
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    volume_check(adapter, "driven hub (equations neutral)", V_HUB, 0.005 * V_HUB)
 
-    await apply_material(adapter, MATERIAL)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    report_mass_properties(adapter)
     # The land carries its press band natively; the supply bore takes the
     # title block's DRILLED HOLES row; the supply length is a single MIN limit
     # (it only has to leave facing stock, ch_rocker_hub_spec.FACE_STOCK).
@@ -176,7 +176,7 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES})
-    artefacts = await save_part_and_images(adapter, PART_NAME)
+    artefacts = save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
     return artefacts
 

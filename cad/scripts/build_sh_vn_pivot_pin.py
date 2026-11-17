@@ -110,24 +110,24 @@ def _construction(adapter: Any, entity: str) -> None:
         raise RuntimeError(f"{entity}: supplier outline must be construction-only")
 
 
-async def _supplier_outline(adapter: Any) -> tuple[str, ...]:
+def _supplier_outline(adapter: Any) -> tuple[str, ...]:
     """The catalogue pin's side outline, length along x, diameter along y.
 
     Its first vertical side carries the diameter and its first horizontal side
     the length; closure defines the other two.
     """
     dims = SketchDims()
-    check("create supplier pin outline", await adapter.create_sketch("Front"))
+    check("create supplier pin outline", adapter.create_sketch("Front"))
     points = [
         (0.0, 0.0),
         (0.0, pin.PIN_DIA),
         (pin.PIN_LENGTH, pin.PIN_DIA),
         (pin.PIN_LENGTH, 0.0),
     ]
-    lines = await add_line_chain(adapter, points)
+    lines = add_line_chain(adapter, points)
     for line in lines:
         _construction(adapter, line)
-    await define_rectilinear_chain(
+    define_rectilinear_chain(
         adapter,
         lines,
         points,
@@ -135,8 +135,8 @@ async def _supplier_outline(adapter: Any) -> tuple[str, ...]:
         dims=dims,
         names=[pin.DIAMETER_DIMENSION, pin.LENGTH_DIMENSION],
     )
-    await ensure_fully_defined(adapter, pin.SUPPLIER_FEATURE)
-    check("exit supplier pin outline", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, pin.SUPPLIER_FEATURE)
+    check("exit supplier pin outline", adapter.exit_sketch())
     name_last_feature(adapter, pin.SUPPLIER_FEATURE)
     dims.apply(adapter, pin.SUPPLIER_FEATURE)
     mark_dimensions_for_drawing(
@@ -146,16 +146,16 @@ async def _supplier_outline(adapter: Any) -> tuple[str, ...]:
     return (pin.SUPPLIER_FEATURE,)
 
 
-async def _author_pin(adapter: Any) -> list[tuple[str, str]]:
+def _author_pin(adapter: Any) -> list[tuple[str, str]]:
     """Half-profile on the Right plane, revolved: the installed RodPin."""
     from solidworks_mcp.adapters.base import RevolveParameters
 
     half = rod_pin.PIN_INSTALLED_LENGTH / 2.0
     profile = SketchDims()
-    check("create_sketch pin", await adapter.create_sketch("Right"))
+    check("create_sketch pin", adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
-    axis = check("axis centerline", await adapter.add_centerline(-half, 0.0, half, 0.0))
-    lines = await add_line_chain(
+    axis = check("axis centerline", adapter.add_centerline(-half, 0.0, half, 0.0))
+    lines = add_line_chain(
         adapter, [(-half, 0.0), (-half, PIN_R), (half, PIN_R), (half, 0.0)]
     )
     set_sketch_direct_db(adapter, False)
@@ -168,14 +168,14 @@ async def _author_pin(adapter: Any) -> list[tuple[str, str]]:
     ):
         check(
             f"pin {direction} {line}",
-            await adapter.add_sketch_constraint(line, None, direction),
+            adapter.add_sketch_constraint(line, None, direction),
         )
     # Symmetric about the Front Plane: the axis line's midpoint on the origin.
     check(
         "pin axis midpoint -> origin",
-        await adapter.add_sketch_constraint("origin", axis_line, "midpoint"),
+        adapter.add_sketch_constraint("origin", axis_line, "midpoint"),
     )
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{end_a}.end",
         f"{end_b}.start",
@@ -184,61 +184,61 @@ async def _author_pin(adapter: Any) -> list[tuple[str, str]]:
         "pin PinLen",
     )
     profile.record("PinLen", '"PinLen"')
-    await add_diametric_linear_dimension(
+    add_diametric_linear_dimension(
         adapter, axis, journal, (0.0, PIN_R + 4.0), "PinDia"
     )
     profile.record("PinDia", '"PinDia"')
-    await ensure_fully_defined(adapter, "pin sketch")
-    check("exit_sketch pin", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "pin sketch")
+    check("exit_sketch pin", adapter.exit_sketch())
     name_last_feature(adapter, "PinProfile")
     drive_jobs = profile.apply(adapter, "PinProfile")
-    check("revolve pin", await adapter.create_revolve(RevolveParameters(angle=360.0)))
+    check("revolve pin", adapter.create_revolve(RevolveParameters(angle=360.0)))
     name_last_feature(adapter, "Pin")
     volume = math.pi * PIN_R**2 * rod_pin.PIN_INSTALLED_LENGTH
-    await volume_check(adapter, "installed RodPin", volume, 0.005 * volume)
+    volume_check(adapter, "installed RodPin", volume, 0.005 * volume)
     return drive_jobs
 
 
-async def _readback(adapter: Any, configuration: str) -> None:
+def _readback(adapter: Any, configuration: str) -> None:
     """Check native member state without repairing or saving the document."""
     assert_member_suppression(adapter, configuration, MEMBER_FEATURES)
     require_member_bodies(adapter, configuration, 1, ("Axis1",))
     require_member_colour(adapter, configuration, POLISHED_STEEL)
     length = INSTALLED_LENGTHS[configuration]
     volume = math.pi * PIN_R**2 * length
-    await volume_check(adapter, f"{configuration} pin", volume, 0.005 * volume)
-    await bbox_extent_check(adapter, f"{configuration} length", "z", length)
+    volume_check(adapter, f"{configuration} pin", volume, 0.005 * volume)
+    bbox_extent_check(adapter, f"{configuration} length", "z", length)
     assert_member_properties(
         adapter, PART_NAME, configuration, DESCRIPTIONS[configuration], {}
     )
     assert_reference_geometry_hidden(adapter, f"{PART_NAME}--{configuration}")
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     from solidworks_mcp.adapters.base import SetGlobalVariableParameters
 
     require_member_configurations(PART_NAME, CONFIGURATIONS)
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     # The row's inch calculation units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
-    await create_member_configurations(adapter, PART_NAME, CONFIGURATIONS)
-    await activate_member(adapter, rod_pin.CONFIGURATION)
+    create_member_configurations(adapter, PART_NAME, CONFIGURATIONS)
+    activate_member(adapter, rod_pin.CONFIGURATION)
     # All globals are born after the member configurations exist
     # (IEquationMgr.Add3). The mm suffix is load-bearing (INCH document).
-    await set_global(adapter, "PinDia", f"{pin.PIN_DIA}mm")
-    await set_global(adapter, "PinLen", f"{rod_pin.PIN_INSTALLED_LENGTH}mm")
-    drive_jobs = await _author_pin(adapter)
-    await force_rebuild(adapter)
+    set_global(adapter, "PinDia", f"{pin.PIN_DIA}mm")
+    set_global(adapter, "PinLen", f"{rod_pin.PIN_INSTALLED_LENGTH}mm")
+    drive_jobs = _author_pin(adapter)
+    force_rebuild(adapter)
     for dimension, expression in drive_jobs:
-        await drive_dimension(adapter, dimension, expression)
-    await force_rebuild(adapter)
-    await name_bore_axis(adapter, "Right Plane", 0.0, "Top Plane", 0.0, "pin axis")
+        drive_dimension(adapter, dimension, expression)
+    force_rebuild(adapter)
+    name_bore_axis(adapter, "Right Plane", 0.0, "Top Plane", 0.0, "pin axis")
 
     for configuration in CONFIGURATIONS:
-        await select_member_features(adapter, configuration, MEMBER_FEATURES)
+        select_member_features(adapter, configuration, MEMBER_FEATURES)
         check(
             f"PinLen in {configuration}",
-            await adapter.set_global_variable(
+            adapter.set_global_variable(
                 SetGlobalVariableParameters(
                     name="PinLen",
                     expression=f"{INSTALLED_LENGTHS[configuration]}mm",
@@ -246,20 +246,20 @@ async def build(adapter: Any) -> dict[str, str]:
                 )
             ),
         )
-        await force_rebuild(adapter)
+        force_rebuild(adapter)
         blank_sketch(adapter, "PinProfile")
         blank_reference_geometry(adapter, (("Axis1", "AXIS"),))
-        await apply_material(adapter, MATERIAL)
-        await apply_color(adapter, POLISHED_STEEL)
+        apply_material(adapter, MATERIAL)
+        apply_color(adapter, POLISHED_STEEL)
         apply_member_properties(
             adapter, PART_NAME, configuration, DESCRIPTIONS[configuration], {}
         )
-        await report_mass_properties(adapter)
+        report_mass_properties(adapter)
 
     # The model's own sizes are the installed members'; only the supplier
     # outline's two dimensions print.
     clear_dimensions_for_drawing(adapter)
-    await add_supplier_reference_configurations(
+    add_supplier_reference_configurations(
         adapter,
         (
             ReferenceState(
@@ -283,7 +283,7 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
     apply_drawing_properties(adapter, PART_NAME)
-    return await save_member_part(
+    return save_member_part(
         adapter,
         PART_NAME,
         CONFIGURATIONS,

@@ -34,8 +34,8 @@ SUPPLIER_DATA = extension_spring_data(
 )
 
 
-async def build(adapter: Any) -> dict[str, str]:
-    return await build_supplier_spring_drawing(
+def build(adapter: Any) -> dict[str, str]:
+    return build_supplier_spring_drawing(
         adapter, SPEC, item=ITEM, installed_front=True, spring_metadata=True,
         supplier_data=SUPPLIER_DATA, installed_caption="ISOMETRIC",
         unit=part_drawing_unit("ch-vn-channel-spring-installed"),

@@ -450,7 +450,7 @@ def _finish_reference(
 
 
 @_telemetry.traced("part.supplier_washer_source_author")
-async def author_supplier_washer_references(
+def author_supplier_washer_references(
     adapter: Any, *, axis: Literal["y", "z"], bore_mm: float,
     outer_mm: float, thickness_mm: float, units: Literal["in", "mm"],
     sheet_units: Literal["in", "mm"],
@@ -469,32 +469,32 @@ async def author_supplier_washer_references(
     face_labels = tuple(label for label in (OUTER_DIAMETER, BORE_DIAMETER) if label in references)
     if face_labels:
         check("create supplier washer face reference",
-              await adapter.create_sketch("Top" if axis == "y" else "Front"))
+              adapter.create_sketch("Top" if axis == "y" else "Front"))
         dims = SketchDims()
         for label in face_labels:
-            circle = await define_circle(
+            circle = define_circle(
                 adapter, 0.0, 0.0, values[label] / 2.0, label, dims=dims,
                 names=(None, None, SOURCE_DIMENSIONS[label][1]),
             )
             _construction(adapter, circle)
-        await ensure_fully_defined(adapter, "supplier washer face reference")
-        check("exit supplier washer face reference", await adapter.exit_sketch())
+        ensure_fully_defined(adapter, "supplier washer face reference")
+        check("exit supplier washer face reference", adapter.exit_sketch())
         _finish_reference(adapter, dims, FACE_FEATURE, face_labels, values=values, units=units,
                           sheet_units=sheet_units, precision=precision,
                           bore_callout=bore_callout)
     check("create supplier washer thickness reference",
-          await adapter.create_sketch("Front" if axis == "y" else "Top"))
+          adapter.create_sketch("Front" if axis == "y" else "Top"))
     dims = SketchDims()
     end = thickness_mm if axis == "y" else -thickness_mm
-    (line,) = await add_line_chain(adapter, [(outer_mm / 2.0, 0.0), (outer_mm / 2.0, end)], close=False)
+    (line,) = add_line_chain(adapter, [(outer_mm / 2.0, 0.0), (outer_mm / 2.0, end)], close=False)
     _construction(adapter, line)
-    await anchor_point_to_origin(adapter, f"{line}.start", outer_mm / 2.0, 0.0, "supplier OD flank")
+    anchor_point_to_origin(adapter, f"{line}.start", outer_mm / 2.0, 0.0, "supplier OD flank")
     dims.record(None)  # Radial placement is not another printed supplier size.
-    check("orient supplier thickness witness", await adapter.add_sketch_constraint(line, None, "vertical"))
-    await dimension_between(adapter, f"{line}.start", f"{line}.end", "distance", thickness_mm, THICKNESS)
+    check("orient supplier thickness witness", adapter.add_sketch_constraint(line, None, "vertical"))
+    dimension_between(adapter, f"{line}.start", f"{line}.end", "distance", thickness_mm, THICKNESS)
     dims.record("SupplierThickness")
-    await ensure_fully_defined(adapter, "supplier washer thickness reference")
-    check("exit supplier washer thickness reference", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "supplier washer thickness reference")
+    check("exit supplier washer thickness reference", adapter.exit_sketch())
     _finish_reference(adapter, dims, THICKNESS_FEATURE, (THICKNESS,), values=values, units=units,
                       sheet_units=sheet_units, precision=precision,
                       bore_callout=bore_callout)

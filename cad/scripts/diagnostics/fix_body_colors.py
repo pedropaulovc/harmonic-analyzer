@@ -35,12 +35,12 @@ FIXES = {
 }
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     for part, rgb in FIXES.items():
         path = ROOT / "out" / "sldprt" / f"{part}.SLDPRT"
-        check(f"open {part}", await adapter.open_model(str(path)))
-        await apply_color(adapter, rgb)
-        check(f"save {part}", await adapter.save_file())
+        check(f"open {part}", adapter.open_model(str(path)))
+        apply_color(adapter, rgb)
+        check(f"save {part}", adapter.save_file())
         _telemetry.info(f"{part}: body colour {rgb}")
     return {"diag": "done"}
 

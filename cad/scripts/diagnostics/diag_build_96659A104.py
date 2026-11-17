@@ -17,20 +17,20 @@ from diagnostics.diag_mcmaster_lib import no_sketch_inference
 
 
 @stock_recipe("96659A104", threaded=False)
-async def build_96659A104(adapter, truth=None):
+def build_96659A104(adapter, truth=None):
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
-    check("create_sketch washer annulus", await adapter.create_sketch("Top"))
+    check("create_sketch washer annulus", adapter.create_sketch("Top"))
     with no_sketch_inference(adapter):
-        await define_circle(adapter, 0.0, 0.0, DIMS.od / 2, "washer OD")
-        await define_circle(adapter, 0.0, 0.0, DIMS.id / 2, "washer ID")
-    await ensure_fully_defined(adapter, "washer annulus")
-    check("exit_sketch washer annulus", await adapter.exit_sketch())
+        define_circle(adapter, 0.0, 0.0, DIMS.od / 2, "washer OD")
+        define_circle(adapter, 0.0, 0.0, DIMS.id / 2, "washer ID")
+    ensure_fully_defined(adapter, "washer annulus")
+    check("exit_sketch washer annulus", adapter.exit_sketch())
     name_last_feature(adapter, "WasherProfile")
     check(
         "extrude washer annulus",
-        await adapter.create_extrusion(ExtrusionParameters(depth=DIMS.thickness)),
+        adapter.create_extrusion(ExtrusionParameters(depth=DIMS.thickness)),
     )
     name_last_feature(adapter, "WasherBody")
     volume = math.pi / 4 * (DIMS.od**2 - DIMS.id**2) * DIMS.thickness
-    await volume_check(adapter, "washer annulus", volume, 0.005 * volume)
+    volume_check(adapter, "washer annulus", volume, 0.005 * volume)

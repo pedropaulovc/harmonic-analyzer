@@ -2504,14 +2504,14 @@ def _create_sheets(adapter: Any) -> None:
 
 
 @_telemetry.traced("drawing.channel_assembly")
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     require_single_spring_variant(
         SPRING_STEMS, str(_config.machine("amplitude", "preset"))
     )
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source assembly is missing: {SOURCE}")
 
-    check("open assembly drawing source", await adapter.open_model(str(SOURCE)))
+    check("open assembly drawing source", adapter.open_model(str(SOURCE)))
     source_model = _early_bound(adapter.currentModel, "IModelDoc2")
     read_required_properties(
         source_model,
@@ -2543,7 +2543,7 @@ async def build(adapter: Any) -> dict[str, str]:
         balloons_settled()
         settings_settled()
 
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         layout=SPEC.layout,

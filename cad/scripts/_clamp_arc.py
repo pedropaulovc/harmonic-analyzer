@@ -74,7 +74,7 @@ EAR_HEIGHT_DIMENSION = "EarHoleHeight"
 EAR_HEIGHT_LINE = ((-EAR_HOLE_Z, -ARC_HALF_H), (-EAR_HOLE_Z, EAR_HOLE_Y))
 
 
-async def build_arc(
+def build_arc(
     adapter: Any,
     *,
     part_name: str,
@@ -103,20 +103,20 @@ async def build_arc(
         )
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     apply_package_model_units(adapter, part_drawing_unit(part_name), label=part_name)
 
     # Editable knobs (Tools > Equations). mm suffix is load-bearing -- INCH
     # document, the equation manager reads bare numbers in document units.
     # (The old HoleDia knob is gone: the ear holes are now a native Hole Wizard
     # feature whose diameter comes from the ANSI-inch table, not a driven dim.)
-    await set_global(adapter, "ArcDepth", f"{depth}mm")
-    await set_global(adapter, "ArcWidth", f"{ARC_WIDTH}mm")
-    await set_global(adapter, "ArcHalfH", f"{ARC_HALF_H}mm")
-    await set_global(adapter, "ColumnBore", f"{COLUMN_BORE}mm")
-    await set_global(adapter, "EarHoleZ", f"{EAR_HOLE_Z}mm")
+    set_global(adapter, "ArcDepth", f"{depth}mm")
+    set_global(adapter, "ArcWidth", f"{ARC_WIDTH}mm")
+    set_global(adapter, "ArcHalfH", f"{ARC_HALF_H}mm")
+    set_global(adapter, "ColumnBore", f"{COLUMN_BORE}mm")
+    set_global(adapter, "EarHoleZ", f"{EAR_HOLE_Z}mm")
     if not front:
-        await set_global(adapter, "ArcGripOffset", f"{grip_offset}mm")
+        set_global(adapter, "ArcGripOffset", f"{grip_offset}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -130,14 +130,14 @@ async def build_arc(
     # offset from the column axis is one direct dimension (GripOffset), not
     # the difference of two others.
     block = SketchDims()
-    check("create_sketch block", await adapter.create_sketch("Top"))
+    check("create_sketch block", adapter.create_sketch("Top"))
     rect = [
         (x0, -ARC_WIDTH / 2.0),
         (x1, -ARC_WIDTH / 2.0),
         (x1, ARC_WIDTH / 2.0),
         (x0, ARC_WIDTH / 2.0),
     ]
-    lines = await add_line_chain(adapter, rect)
+    lines = add_line_chain(adapter, rect)
     if front:
         anchor = 0
         anchor_names = ["AnchorZ"]
@@ -148,18 +148,18 @@ async def build_arc(
         anchor_names = ["GripOffset", "AnchorZ"]
         anchor_drives = ['"ArcGripOffset"', '"ArcWidth" / 2']
         depth_drive = '"ArcDepth" - "ArcGripOffset"'
-    await define_rectilinear_chain(
+    define_rectilinear_chain(
         adapter, lines, rect, anchor, label="block", dims=block,
         names=["Depth", "Width", *anchor_names],
         drives=[depth_drive, '"ArcWidth"', *anchor_drives],
     )
-    await ensure_fully_defined(adapter, "block sketch")
-    check("exit_sketch block", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "block sketch")
+    check("exit_sketch block", adapter.exit_sketch())
     name_last_feature(adapter, "BlockProfile")
     drive_jobs += block.apply(adapter, "BlockProfile")
     check(
         "extrude block",
-        await adapter.create_extrusion(
+        adapter.create_extrusion(
             ExtrusionParameters(depth=2.0 * ARC_HALF_H, both_directions=True)
         ),
     )
@@ -168,26 +168,26 @@ async def build_arc(
         (name_dimensions(adapter, "Block", ["Height"])[0], '"ArcHalfH" * 2')
     )
     expected = (x1 - x0) * ARC_WIDTH * 2.0 * ARC_HALF_H
-    await volume_check(adapter, "block", expected, 0.005 * expected)
+    volume_check(adapter, "block", expected, 0.005 * expected)
 
     # Column relief: the Ø25.6 cylinder about the origin Y axis cut through.
     # The block sits on one side of the column-axis plane, so the circular
     # segment beyond the mating face leaves it: the half-disc for the front,
     # the segment past the chord grip_offset from the axis for the back.
     bore = SketchDims()
-    check("create_sketch bore", await adapter.create_sketch("Top"))
-    await define_circle(
+    check("create_sketch bore", adapter.create_sketch("Top"))
+    define_circle(
         adapter, 0.0, 0.0, COLUMN_BORE / 2.0, "column bore", dims=bore,
         names=("BoreCx", "BoreCz", "BoreDia"),
         drives=(None, None, '"ColumnBore"'),
     )
-    await ensure_fully_defined(adapter, "bore sketch")
-    check("exit_sketch bore", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "bore sketch")
+    check("exit_sketch bore", adapter.exit_sketch())
     name_last_feature(adapter, "BoreProfile")
     drive_jobs += bore.apply(adapter, "BoreProfile")
     check(
         "cut column relief",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=4.0 * ARC_HALF_H, both_directions=True)
         ),
     )
@@ -199,7 +199,7 @@ async def build_arc(
         bore_r**2 - mating_d**2
     )
     expected -= segment_area * 2.0 * ARC_HALF_H
-    await volume_check(adapter, "column relief", expected, 0.01 * expected)
+    volume_check(adapter, "column relief", expected, 0.01 * expected)
 
     # Ear screw holes: ONE native Hole Wizard feature (2 instances) along the
     # clamp axis (local X) at z +-EAR_HOLE_Z, bar centre height, drilled
@@ -231,7 +231,7 @@ async def build_arc(
     drive_jobs += ears.placement_drive_jobs
     ear_dia = blind_cut_dia_mm(hole_spec)
     expected -= 2.0 * math.pi * (ear_dia / 2.0) ** 2 * (x1 - x0)
-    await volume_check(adapter, "ear holes", expected, 0.01 * expected)
+    volume_check(adapter, "ear holes", expected, 0.01 * expected)
 
     # REFERENCE sketch (drawing-simplicity-policy.md `How the repository
     # implements the guidelines`): both prints locate the ears' height from
@@ -245,22 +245,22 @@ async def build_arc(
     # creation-time inference from adding relations the explicit ones repeat.
     (bottom_x, bottom_y), (top_x, top_y) = EAR_HEIGHT_LINE
     height_ref = SketchDims()
-    check("create_sketch ear height reference", await adapter.create_sketch("Right"))
+    check("create_sketch ear height reference", adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
     height_line = check(
         "ear height reference line",
-        await adapter.add_centerline(bottom_x, bottom_y, top_x, top_y),
+        adapter.add_centerline(bottom_x, bottom_y, top_x, top_y),
     )
     set_sketch_direct_db(adapter, False)
     check(
         "ear height reference vertical",
-        await adapter.add_sketch_constraint(height_line, None, "vertical"),
+        adapter.add_sketch_constraint(height_line, None, "vertical"),
     )
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{height_line}.end", top_x, top_y, "ear 1 centre height"
     )
     height_ref.record("EarHeightStation", '"EarHoleZ"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{height_line}.start",
         f"{height_line}.end",
@@ -269,8 +269,8 @@ async def build_arc(
         "ear hole height",
     )
     height_ref.record(EAR_HEIGHT_DIMENSION, '"ArcHalfH"')
-    await ensure_fully_defined(adapter, "ear height reference sketch")
-    check("exit_sketch ear height reference", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "ear height reference sketch")
+    check("exit_sketch ear height reference", adapter.exit_sketch())
     name_last_feature(adapter, EAR_HEIGHT_REFERENCE)
     drive_jobs += height_ref.apply(adapter, EAR_HEIGHT_REFERENCE)
     # Saved hidden so no part image or assembly renders it (#880); each print
@@ -279,14 +279,14 @@ async def build_arc(
 
     # Deferred drive equations, then re-check neutrality (each evaluates to
     # the as-built value, so the geometry must not move).
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    volume_check(
         adapter, f"driven {part_name} (equations neutral)", expected, 0.01 * expected
     )
 
-    await apply_material(adapter, MATERIAL)
-    await apply_color(adapter, PANEL_BLACK)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    apply_color(adapter, PANEL_BLACK)
+    report_mass_properties(adapter)

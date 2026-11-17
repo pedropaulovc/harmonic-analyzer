@@ -112,32 +112,32 @@ def lock_placement_dims() -> list:
     return dims
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     # #290: the row's inch calculation units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). mm suffix load-bearing (INCH document;
     # the equation manager reads bare numbers in document units).
-    await set_global(adapter, "GuideLength", f"{GUIDE_LENGTH}mm")
-    await set_global(adapter, "GuideHeight", f"{GUIDE_HEIGHT}mm")
-    await set_global(adapter, "GuideDepth", f"{GUIDE_DEPTH}mm")
+    set_global(adapter, "GuideLength", f"{GUIDE_LENGTH}mm")
+    set_global(adapter, "GuideHeight", f"{GUIDE_HEIGHT}mm")
+    set_global(adapter, "GuideDepth", f"{GUIDE_DEPTH}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
     # Rail outline: corner-at-origin rectangle, length along X, height along Y.
     outline = SketchDims()
-    check("create_sketch outline", await adapter.create_sketch("Front"))
+    check("create_sketch outline", adapter.create_sketch("Front"))
     rect = [
         (0.0, 0.0),
         (GUIDE_LENGTH, 0.0),
         (GUIDE_LENGTH, GUIDE_HEIGHT),
         (0.0, GUIDE_HEIGHT),
     ]
-    lines = await add_line_chain(adapter, rect)
-    await define_rectilinear_chain(
+    lines = add_line_chain(adapter, rect)
+    define_rectilinear_chain(
         adapter,
         lines,
         rect,
@@ -146,13 +146,13 @@ async def build(adapter) -> dict[str, str]:
         names=["Length", "Height"],
         drives=['"GuideLength"', '"GuideHeight"'],
     )
-    await ensure_fully_defined(adapter, "bottom guide outline")
-    check("exit_sketch outline", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "bottom guide outline")
+    check("exit_sketch outline", adapter.exit_sketch())
     name_last_feature(adapter, "GuideProfile")
     drive_jobs += outline.apply(adapter, "GuideProfile")
     check(
         "extrude guide",
-        await adapter.create_extrusion(
+        adapter.create_extrusion(
             ExtrusionParameters(depth=GUIDE_DEPTH, reverse_direction=True)
         ),
     )
@@ -160,7 +160,7 @@ async def build(adapter) -> dict[str, str]:
     depth_dim = name_dimensions(adapter, "Guide", ["Depth"])
     drive_jobs += [(depth_dim[0], '"GuideDepth"')]
     v_rail = GUIDE_LENGTH * GUIDE_HEIGHT * GUIDE_DEPTH
-    await volume_check(adapter, "bottom guide rail", v_rail, 0.005 * v_rail)
+    volume_check(adapter, "bottom guide rail", v_rail, 0.005 * v_rail)
 
     # Lock-screw receivers: ONE native Hole Wizard #4-40 tapped THROUGH
     # feature (4 points) from the REAR face (local z=-depth, outward normal
@@ -181,7 +181,7 @@ async def build(adapter) -> dict[str, str]:
         * (blind_cut_dia_mm(LOCK_TAP_SPEC) / 2.0) ** 2
         * GUIDE_DEPTH
     )
-    await volume_check(adapter, "bottom guide with lock taps", v_rail - v_lock, 0.05 * v_lock)
+    volume_check(adapter, "bottom guide with lock taps", v_rail - v_lock, 0.05 * v_lock)
 
     # Platen-screw receivers: ONE native #4-40 tapped THROUGH feature
     # (5 points) from the front face, on MHA-PD-02's lower row as transferred
@@ -201,7 +201,7 @@ async def build(adapter) -> dict[str, str]:
         * GUIDE_DEPTH
     )
     v_taps = v_rail - v_lock - v_platen
-    await volume_check(
+    volume_check(
         adapter, "bottom guide with platen taps", v_taps, 0.05 * (v_lock + v_platen)
     )
 
@@ -221,14 +221,14 @@ async def build(adapter) -> dict[str, str]:
         + SCREW_HOLE_DIA**2 * (GUIDE_HEIGHT - SCREW_CBORE_DEPTH)
     )
     v_final = v_taps - v_screws
-    await volume_check(adapter, "bottom guide with rack-screw holes", v_final, 0.05 * v_screws)
+    volume_check(adapter, "bottom guide with rack-screw holes", v_final, 0.05 * v_screws)
 
     # Deferred drive equations, then re-check neutrality.
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    volume_check(
         adapter, "driven bottom guide (equations neutral)", v_final, 0.02 * v_lock
     )
 
@@ -238,13 +238,13 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
 
-    await apply_material(adapter, MATERIAL)
-    await apply_color(adapter, PANEL_BLACK)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    apply_color(adapter, PANEL_BLACK)
+    report_mass_properties(adapter)
     apply_drawing_properties(
         adapter, PART_NAME, {"Isometric View Note": ISOMETRIC_VIEW_NOTE}
     )
-    return await save_part_and_images(adapter, PART_NAME)
+    return save_part_and_images(adapter, PART_NAME)
 
 
 if __name__ == "__main__":

@@ -30,8 +30,8 @@ RIGHT_CENTER = (0.150, 0.150)
 ISO_CENTER = (0.225, 0.140)
 
 
-async def build(adapter):
-    return await build_simple_three_view_drawing(
+def build(adapter):
+    return build_simple_three_view_drawing(
         adapter,
         source=SOURCE,
         layout=SPEC.layout,

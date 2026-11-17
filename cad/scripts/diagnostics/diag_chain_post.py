@@ -35,11 +35,11 @@ C, S = math.cos(math.radians(INCLINE_DEG)), math.sin(math.radians(INCLINE_DEG))
 ROT_Y_INCLINE = [[C, 0.0, S], [0.0, 1.0, 0.0], [-S, 0.0, C]]
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
 
     # Recover the post's exact placement from the saved drive-train.SLDASM
     # instead of duplicating its derivation: open it and read the comp box.
-    check("open drive-train", await adapter.open_model(
+    check("open drive-train", adapter.open_model(
         str((OUT_SLDPRT.parent / "sldasm" / "dt-drive-train.SLDASM").resolve())))
     asm = adapter.currentModel
     _flag(asm, "IAssemblyDoc")
@@ -54,7 +54,7 @@ async def build(adapter) -> dict[str, str]:
     for n, b in boxes.items():
         _telemetry.info(f"drive-train {n}: x {b[0]}..{b[3]}  y {b[1]}..{b[4]}  z {b[2]}..{b[5]}")
 
-    check("open output", await adapter.open_model(
+    check("open output", adapter.open_model(
         str((OUT_SLDPRT.parent / "sldasm" / "output.SLDASM").resolve())))
     asm = adapter.currentModel
     _flag(asm, "IAssemblyDoc")

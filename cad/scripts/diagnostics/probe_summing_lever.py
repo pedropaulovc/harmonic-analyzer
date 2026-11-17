@@ -60,11 +60,11 @@ def _status(adapter, comp):
     return "??"
 
 
-async def build(adapter):
-    check("create_assembly", await adapter.create_assembly())
-    km = await place_component(adapter, "sm-knife-mount", [KNIFE[0], KNIFE[1], 0.0],
+def build(adapter):
+    check("create_assembly", adapter.create_assembly())
+    km = place_component(adapter, "sm-knife-mount", [KNIFE[0], KNIFE[1], 0.0],
                                [0.0, 0.0, 0.0], IDENTITY)
-    sl = await place_component(adapter, "sm-summing-lever", [KNIFE[0], KNIFE[1], 0.0],
+    sl = place_component(adapter, "sm-summing-lever", [KNIFE[0], KNIFE[1], 0.0],
                                [0.0, 0.0, 0.0], IDENTITY, ground=False)
     sl_o = _org(adapter, sl)
     log(f"after insert: summing-lever {_status(adapter, sl)}  org={sl_o}")
@@ -86,7 +86,7 @@ async def build(adapter):
             feat = adapter._attempt(lambda f=feat: f.GetNextFeature(), default=None)
         break
 
-    await coincident_mate(adapter, named_ref(f"Axis1@{sl}", "AXIS"),
+    coincident_mate(adapter, named_ref(f"Axis1@{sl}", "AXIS"),
                           named_ref(f"Axis1@{km}", "AXIS"),
                           label="knife pivot", verify=(sl, sl_o))
     log(f"after radial coincident(Axis1): summing-lever {_status(adapter, sl)}")
@@ -95,13 +95,13 @@ async def build(adapter):
     p0 = world_point(adapter, sl, [SL_SPIN_REF_X, 0.0, 0.0])  # boss hole, off-axis
     log(f"boss-hole world BEFORE axial/angle = {p0}  (expect ~[-90.5, 990, 0])")
 
-    await distance_driver(adapter, named_ref(f"Front Plane@{sl}", "PLANE"),
+    distance_driver(adapter, named_ref(f"Front Plane@{sl}", "PLANE"),
                           named_ref("Front Plane", "PLANE"), abs(sl_o[2]),
                           label="axial (Front)", verify=(sl, sl_o))
     log(f"after axial(Front): summing-lever {_status(adapter, sl)}")
 
     try:
-        await angle_driver(adapter, named_ref(f"Right Plane@{sl}", "PLANE"),
+        angle_driver(adapter, named_ref(f"Right Plane@{sl}", "PLANE"),
                            named_ref("Right Plane", "PLANE"), 0.0,
                            label="rock via angle(Right)", verify=(sl, sl_o))
         log(f"after angle(Right): summing-lever {_status(adapter, sl)}")

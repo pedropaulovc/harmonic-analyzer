@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from types import SimpleNamespace
 
 import pytest
@@ -222,12 +221,12 @@ def _gravity_adapter(events, *, failure=None):
                 CloseDoc=lambda title: events.append(("close", title))
             )
 
-        async def open_model(self, path):
+        def open_model(self, path):
             events.append(("open", path))
             self.currentModel = Model()
             return SimpleNamespace(is_success=True, data=True)
 
-        async def set_active_configuration(self, configuration):
+        def set_active_configuration(self, configuration):
             events.append(("activate", configuration))
             self.currentModel.active = (
                 "PenWire" if failure == "misdirect" else configuration
@@ -263,11 +262,11 @@ def test_gravity_reads_exact_wire_members_and_closes_after_success_or_failure(
     adapter = _gravity_adapter(events, failure=failure)
     if failure is not None:
         with pytest.raises(RuntimeError):
-            asyncio.run(gravity._native_masses(adapter))
+            gravity._native_masses(adapter)
         if failure == "misdirect":
             assert not any(event[0] == "mass" for event in events)
     else:
-        parts = asyncio.run(gravity._native_masses(adapter))
+        parts = gravity._native_masses(adapter)
         assert set(parts) == {
             "sh-vn-music-wire--LeverWire",
             "sh-vn-music-wire--PenWire",

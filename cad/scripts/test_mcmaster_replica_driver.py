@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from pathlib import Path
 
 import pytest
@@ -33,7 +32,7 @@ def test_replica_driver_skips_missing_parts_under_all(monkeypatch) -> None:
 
     ran: list[str] = []
 
-    async def fake_replica(adapter, part_no, builder):
+    def fake_replica(adapter, part_no, builder):
         ran.append(part_no)
         return {}
 
@@ -42,8 +41,8 @@ def test_replica_driver_skips_missing_parts_under_all(monkeypatch) -> None:
         driver, "_missing_inputs", lambda p: "absent" if p == "90280A108" else None
     )
     monkeypatch.setattr(driver.sys, "argv", ["diag_build_mcmaster.py", "--all"])
-    asyncio.run(driver.build(None))
+    driver.build(None)
     assert "90280A108" not in ran and len(ran) == len(driver.REGISTRY) - 1
     monkeypatch.setattr(driver.sys, "argv", ["diag_build_mcmaster.py", "90280A108"])
     with pytest.raises(SystemExit, match="90280A108: absent"):
-        asyncio.run(driver.build(None))
+        driver.build(None)

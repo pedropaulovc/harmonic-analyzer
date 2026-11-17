@@ -854,12 +854,12 @@ def _doc_level(adapter, model):
     return out
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     if PART is None:
         raise SystemExit(
             "usage: diag_dump_part.py <part.SLDPRT> [out.json] [--no-refs] [--no-faces]"
         )
-    check("open", await adapter.open_model(str(PART)))
+    check("open", adapter.open_model(str(PART)))
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     doc: dict = {"path": str(PART), "title": str(_g(model, "GetTitle"))}
     doc.update(_doc_level(adapter, model))

@@ -23,8 +23,8 @@ from sh_vn_thumb_screw_spec import THUMB_SPEC  # noqa: E402
 
 
 @stock_recipe("91882A221", threaded=True)
-async def build_91882A221(adapter, truth=None):
-    await build_thumb_screw(adapter, THUMB_SPEC)
+def build_91882A221(adapter, truth=None):
+    build_thumb_screw(adapter, THUMB_SPEC)
 
 
 if __name__ == "__main__":

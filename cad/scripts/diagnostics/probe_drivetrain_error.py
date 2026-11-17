@@ -11,7 +11,6 @@ the build scripts.
 
 from __future__ import annotations
 
-import asyncio
 
 import _telemetry
 if __package__:
@@ -71,7 +70,7 @@ def _report(adapter, model, label):
         log(f"    [{kind}] {name!r} code={ec} ({_ERR.get(ec, '?')})")
 
 
-async def main():
+def main():
     from solidworks_mcp.adapters.base import (
         InsertComponentParameters,
         SetComponentSolvingParameters,
@@ -83,11 +82,11 @@ async def main():
 
     adapter = PyWin32Adapter({})
     _telemetry.info("Connecting ...")
-    await adapter.connect()
+    adapter.connect()
 
     # 1) STANDALONE: open drive-train.SLDASM directly, force rebuild, check.
     log("=== STANDALONE ===")
-    await adapter.open_model(str(dt))
+    adapter.open_model(str(dt))
     sub = adapter.currentModel
     _flag(sub, "IModelDoc2")
     adapter._attempt(lambda: sub.ForceRebuild3(False))
@@ -96,25 +95,25 @@ async def main():
     # 2) FLEXIBLE-IN-PARENT: fresh parent, insert, flex, rebuild, check both
     #    the parent and the sub doc.
     log("=== FLEXIBLE-IN-PARENT ===")
-    await adapter.create_assembly()
+    adapter.create_assembly()
     doc = adapter.currentModel
     _flag(doc, "IModelDoc2")
-    res = await adapter.insert_component(
+    res = adapter.insert_component(
         InsertComponentParameters(file_path=str(dt), position=[0, 0, 0], rotation=[0, 0, 0])
     )
     name = res.data["name"]
     log(f"inserted as {name!r}")
     _report(adapter, doc, "parent (drive-train inserted, rigid)")
-    flex = await adapter.set_component_solving(
+    flex = adapter.set_component_solving(
         SetComponentSolvingParameters(name=name, solving="flexible")
     )
     log(f"set flexible: success={flex.is_success} error={flex.error}")
     adapter._attempt(lambda: doc.ForceRebuild3(False))
     _report(adapter, doc, "parent (drive-train FLEXIBLE, after ForceRebuild3)")
 
-    await adapter.disconnect()
+    adapter.disconnect()
     _telemetry.info("Disconnected (docs left open).")
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

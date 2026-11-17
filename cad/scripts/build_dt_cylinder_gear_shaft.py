@@ -86,14 +86,14 @@ def _select_end_face_mark1(adapter, y_mm: float) -> None:
     """Select the flat end face carrying the axis point (0, ``y_mm``, 0) with
     selection mark 1, the mark ``InsertDome`` requires. Only the end face
     contains the axis point; the cylinder is a full radius away."""
-    from solidworks_mcp.adapters import raw_dispatch as _raw
+    import _com
     from solidworks_mcp.adapters.solidworks.features import _all_body_faces
 
     target = (0.0, y_mm / 1000.0, 0.0)
     best, best_d = None, 1e-6
     for face in _all_body_faces(adapter):
         near = adapter._attempt(
-            lambda f=face: list(_raw.invoke(f, "IFace2", "GetClosestPointOn", *target)),
+            lambda f=face: list(_com._com_invoke(f, "IFace2", "GetClosestPointOn", *target)),
             default=None,
         )
         if not near or len(near) < 3:
@@ -104,7 +104,7 @@ def _select_end_face_mark1(adapter, y_mm: float) -> None:
     if best is None:
         raise RuntimeError(f"no arbor end face on the axis at y={y_mm:g} mm")
     adapter.currentModel.ClearSelection2(True)
-    entity = _raw.bind(best, "IEntity")
+    entity = _com._bind(best, "IEntity")
     if not adapter._attempt(lambda e=entity: e.Select2(False, 1), default=False):
         raise RuntimeError(f"cannot select the arbor end face at y={y_mm:g} (mark 1)")
 
@@ -124,27 +124,27 @@ def _dome_end(adapter, y_mm: float, name: str) -> None:
     name_last_feature(adapter, name)
 
 
-async def _dome_reference(adapter) -> list[tuple[str, str]]:
+def _dome_reference(adapter) -> list[tuple[str, str]]:
     """The hidden DomeReference sketch (dt_cylinder_gear_shaft_spec): one
     construction line along the axis over the north dome whose driving
     dimension IS the dome height, and one construction arc over that dome's
     silhouette whose radial dimension IS its sphere radius, both
     equation-bound to the globals the domes are built from."""
     sketch = "DomeReference"
-    check(f"create_sketch {sketch}", await adapter.create_sketch("Front"))
+    check(f"create_sketch {sketch}", adapter.create_sketch("Front"))
     # Direct-to-DB: the line runs along the sketch's own axis, so creation
     # inference would snap in relations that over-define it.
     set_sketch_direct_db(adapter, True)
     line = check(
         f"{sketch} line",
-        await adapter.add_line(0.0, SHAFT_LENGTH, 0.0, SHAFT_LENGTH + DOME_HEIGHT),
+        adapter.add_line(0.0, SHAFT_LENGTH, 0.0, SHAFT_LENGTH + DOME_HEIGHT),
     )
     # Counter-clockwise from the dome's rim on the +X flank (the side the
     # rotated profile prints DOWN) to its apex on the axis, centred on the axis
     # as build_dt_crankshaft's StationReference dome arc.
     arc = check(
         f"{sketch} arc",
-        await adapter.add_arc(
+        adapter.add_arc(
             0.0,
             SHAFT_LENGTH + DOME_HEIGHT - DOME_SPHERE_RADIUS,
             SHAFT_RADIUS,
@@ -161,7 +161,7 @@ async def _dome_reference(adapter) -> list[tuple[str, str]]:
             raise RuntimeError(f"{sketch} {entity} did not take the construction flag")
     check(
         f"{sketch} vertical",
-        await adapter.add_sketch_constraint(line, None, "vertical"),
+        adapter.add_sketch_constraint(line, None, "vertical"),
     )
     for label, first, second, relation in (
         ("arc ends at the apex", f"{arc}.end", f"{line}.end", "coincident"),
@@ -175,10 +175,10 @@ async def _dome_reference(adapter) -> list[tuple[str, str]]:
     ):
         check(
             f"{sketch} {label}",
-            await adapter.add_sketch_constraint(first, second, relation),
+            adapter.add_sketch_constraint(first, second, relation),
         )
     # Dimensions in creation order; name_dimensions renames them by that order.
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{line}.start",
         f"{line}.end",
@@ -186,13 +186,13 @@ async def _dome_reference(adapter) -> list[tuple[str, str]]:
         DOME_HEIGHT,
         sketch,
     )
-    await anchor_point_to_origin(adapter, f"{line}.start", 0.0, SHAFT_LENGTH, sketch)
+    anchor_point_to_origin(adapter, f"{line}.start", 0.0, SHAFT_LENGTH, sketch)
     check(
         f"{sketch} radius",
-        await adapter.add_sketch_dimension(arc, None, "radial", DOME_SPHERE_RADIUS),
+        adapter.add_sketch_dimension(arc, None, "radial", DOME_SPHERE_RADIUS),
     )
-    await ensure_fully_defined(adapter, f"{sketch} sketch")
-    check(f"exit_sketch {sketch}", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, f"{sketch} sketch")
+    check(f"exit_sketch {sketch}", adapter.exit_sketch())
     name_last_feature(adapter, sketch)
     full = name_dimensions(
         adapter, sketch, ["DomeHeight", "DomeHeightAnchor1", "DomeRadius"]
@@ -226,27 +226,27 @@ def _hide_reference_sketches(adapter) -> None:
         raise RuntimeError(f"reference sketches still visible after blanking: {shown}")
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     # #290: the row's inch calculation units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations): the arbor diameter and length. The mm
     # suffix is load-bearing -- this is an INCH document and the equation manager
     # reads BARE numbers in document units (an unsuffixed 176 would be 176 in).
-    await set_global(adapter, "ShaftDia", f"{SHAFT_DIA}mm")
-    await set_global(adapter, "ShaftLength", f"{SHAFT_LENGTH}mm")
-    await set_global(adapter, "DomeHeight", f"{DOME_HEIGHT}mm")
+    set_global(adapter, "ShaftDia", f"{SHAFT_DIA}mm")
+    set_global(adapter, "ShaftLength", f"{SHAFT_LENGTH}mm")
+    set_global(adapter, "DomeHeight", f"{DOME_HEIGHT}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
     # On-axis circle (centre at the origin): define_circle records ONLY the
     # diameter dim (the X/Z centre slots are relations, not display dims).
     shaft = SketchDims()
-    check("create_sketch shaft", await adapter.create_sketch("Top"))
-    await define_circle(
+    check("create_sketch shaft", adapter.create_sketch("Top"))
+    define_circle(
         adapter,
         0.0,
         0.0,
@@ -256,43 +256,43 @@ async def build(adapter) -> dict[str, str]:
         names=("ShaftCx", "ShaftCz", "ShaftDia"),
         drives=(None, None, '"ShaftDia"'),
     )
-    await ensure_fully_defined(adapter, "shaft sketch")
-    check("exit_sketch shaft", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "shaft sketch")
+    check("exit_sketch shaft", adapter.exit_sketch())
     name_last_feature(adapter, "ShaftProfile")
     drive_jobs += shaft.apply(adapter, "ShaftProfile")
     check(
         "extrude shaft",
-        await adapter.create_extrusion(ExtrusionParameters(depth=SHAFT_LENGTH)),
+        adapter.create_extrusion(ExtrusionParameters(depth=SHAFT_LENGTH)),
     )
     name_last_feature(adapter, "Shaft")
     depth_dim = name_dimensions(adapter, "Shaft", ["Depth"])
     drive_jobs += [(depth_dim[0], '"ShaftLength"')]
     v_shaft = math.pi * SHAFT_RADIUS**2 * SHAFT_LENGTH
-    await volume_check(adapter, "shaft", v_shaft, 0.005 * v_shaft)
+    volume_check(adapter, "shaft", v_shaft, 0.005 * v_shaft)
     # Both ends domed into the photographed bright caps (#743).
     _dome_end(adapter, 0.0, "SouthDome")
     _dome_end(adapter, SHAFT_LENGTH, "NorthDome")
     v_shaft += 2.0 * V_DOME
-    await volume_check(adapter, "shaft + domes", v_shaft, 0.005 * v_shaft)
-    drive_jobs += await _dome_reference(adapter)
+    volume_check(adapter, "shaft + domes", v_shaft, 0.005 * v_shaft)
+    drive_jobs += _dome_reference(adapter)
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    volume_check(
         adapter, "driven shaft (equations neutral)", v_shaft, 0.005 * v_shaft
     )
     _hide_reference_sketches(adapter)
 
     # Named central axis (arbor axis along +Y through the origin) so the
     # cylinder gears ride it coincident axis-to-axis in the assembly.
-    await name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0, "shaft axis")
+    name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0, "shaft axis")
 
-    await apply_material(adapter, MATERIAL)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    report_mass_properties(adapter)
     set_dimension_bilateral_tolerance(
         adapter,
         "ShaftProfile",
@@ -317,7 +317,7 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
-    return await save_part_and_images(adapter, PART_NAME)
+    return save_part_and_images(adapter, PART_NAME)
 
 
 if __name__ == "__main__":

@@ -6,7 +6,6 @@ the part the assemblies still build.
 
 from __future__ import annotations
 
-import asyncio
 
 import pytest
 
@@ -67,13 +66,13 @@ def test_builder_preserves_the_supplied_frame(monkeypatch: pytest.MonkeyPatch) -
     adapter = object()
     outputs = {"sldprt": "stock-part"}
 
-    async def capture_stock(actual_adapter, **kwargs):
+    def capture_stock(actual_adapter, **kwargs):
         assert actual_adapter is adapter
         captured.update(kwargs)
         return outputs
 
     monkeypatch.setattr(part, "build_stock_fastener", capture_stock)
-    assert asyncio.run(part.build(adapter)) is outputs
+    assert part.build(adapter) is outputs
     assert captured["part_name"] == STEM
     components = captured["components"]
     assert len(components) == 1

@@ -132,29 +132,29 @@ CASES = [
 ]
 
 
-async def _volume(adapter) -> float:
-    res = await adapter.get_mass_properties()
+def _volume(adapter) -> float:
+    res = adapter.get_mass_properties()
     if not res.is_success:
         raise RuntimeError(f"mass props failed: {res.error}")
     return float(res.data.volume)
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
-    check("create_part", await adapter.create_part())
-    check("create_sketch block", await adapter.create_sketch("Top"))
+    check("create_part", adapter.create_part())
+    check("create_sketch block", adapter.create_sketch("Top"))
     check(
         "rect",
-        await adapter.add_rectangle(-BLOCK / 2, -BLOCK / 2, BLOCK / 2, BLOCK / 2),
+        adapter.add_rectangle(-BLOCK / 2, -BLOCK / 2, BLOCK / 2, BLOCK / 2),
     )
-    check("exit", await adapter.exit_sketch())
+    check("exit", adapter.exit_sketch())
     check(
         "extrude block",
-        await adapter.create_extrusion(ExtrusionParameters(depth=BLOCK_T)),
+        adapter.create_extrusion(ExtrusionParameters(depth=BLOCK_T)),
     )
 
-    vol = await _volume(adapter)
+    vol = _volume(adapter)
     _telemetry.info(f"block volume {vol:.1f} mm^3")
 
     failures: list[str] = []
@@ -176,7 +176,7 @@ async def build(adapter) -> dict[str, str]:
                 expected = (spec.thread_class, expected_end, expected_end)
                 if actual != expected:
                     failures.append(f"{label}: native thread class/thread end/hole end {actual!r} != {expected!r}")
-            after = await _volume(adapter)
+            after = _volume(adapter)
             removed = vol - after
             # The native diameter readback and an independent removed-volume
             # check must both agree with the pinned standard-hole dimensions.
@@ -209,7 +209,7 @@ async def build(adapter) -> dict[str, str]:
         finally:
             # re-measure unconditionally so a failed case cannot pollute the
             # next case's removal delta
-            vol = await _volume(adapter)
+            vol = _volume(adapter)
 
     if failures:
         raise RuntimeError("hole wizard probe failures:\n  " + "\n  ".join(failures))

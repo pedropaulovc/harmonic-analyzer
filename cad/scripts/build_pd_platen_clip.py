@@ -569,7 +569,7 @@ if len(_BOW_JOINS) != len(TANGENT_STATIONS) or any(
     raise AssertionError("platen clip tangent stations must be the bows' arc joins")
 
 
-async def _flat_sheet_outline(adapter) -> SketchDims:
+def _flat_sheet_outline(adapter) -> SketchDims:
     """Screw rail plus middle bridge in the open Front sketch, fully defined.
 
     Drawn counter-clockwise from the outer edge: rounded outer corners, the
@@ -582,37 +582,37 @@ async def _flat_sheet_outline(adapter) -> SketchDims:
     ro, ri, rs = SCREW_RAIL_END_RADIUS, SCREW_RAIL_SLIT_RADIUS, SLIT_END_RADIUS
     y0 = SPRING_RAIL_Y0
     set_sketch_direct_db(adapter, True)
-    bottom = check("outer edge", await adapter.add_line(ro, 0.0, length - ro, 0.0))
+    bottom = check("outer edge", adapter.add_line(ro, 0.0, length - ro, 0.0))
     c_br = check(
         "outer far corner",
-        await adapter.add_arc(length - ro, ro, length - ro, 0.0, length, ro),
+        adapter.add_arc(length - ro, ro, length - ro, 0.0, length, ro),
     )
-    right = check("far end", await adapter.add_line(length, ro, length, rail - ri))
+    right = check("far end", adapter.add_line(length, ro, length, rail - ri))
     c_tr = check(
         "slit far corner",
-        await adapter.add_arc(
+        adapter.add_arc(
             length - ri, rail - ri, length, rail - ri, length - ri, rail
         ),
     )
     top_r = check(
-        "far slit edge", await adapter.add_line(length - ri, rail, BRIDGE_X1, rail)
+        "far slit edge", adapter.add_line(length - ri, rail, BRIDGE_X1, rail)
     )
     slit_r = check(
         "far slit end",
-        await adapter.add_arc(BRIDGE_X1, rail + rs, BRIDGE_X1, y0, BRIDGE_X1, rail),
+        adapter.add_arc(BRIDGE_X1, rail + rs, BRIDGE_X1, y0, BRIDGE_X1, rail),
     )
-    bridge = check("bridge edge", await adapter.add_line(BRIDGE_X1, y0, BRIDGE_X0, y0))
+    bridge = check("bridge edge", adapter.add_line(BRIDGE_X1, y0, BRIDGE_X0, y0))
     slit_l = check(
         "near slit end",
-        await adapter.add_arc(BRIDGE_X0, rail + rs, BRIDGE_X0, rail, BRIDGE_X0, y0),
+        adapter.add_arc(BRIDGE_X0, rail + rs, BRIDGE_X0, rail, BRIDGE_X0, y0),
     )
-    top_l = check("near slit edge", await adapter.add_line(BRIDGE_X0, rail, ri, rail))
+    top_l = check("near slit edge", adapter.add_line(BRIDGE_X0, rail, ri, rail))
     c_tl = check(
         "slit near corner",
-        await adapter.add_arc(ri, rail - ri, ri, rail, 0.0, rail - ri),
+        adapter.add_arc(ri, rail - ri, ri, rail, 0.0, rail - ri),
     )
-    left = check("near end", await adapter.add_line(0.0, rail - ri, 0.0, ro))
-    c_bl = check("outer near corner", await adapter.add_arc(ro, ro, 0.0, ro, ro, 0.0))
+    left = check("near end", adapter.add_line(0.0, rail - ri, 0.0, ro))
+    c_bl = check("outer near corner", adapter.add_arc(ro, ro, 0.0, ro, ro, 0.0))
     set_sketch_direct_db(adapter, False)
 
     for label, first, second, relation in (
@@ -636,14 +636,14 @@ async def _flat_sheet_outline(adapter) -> SketchDims:
         ("outer near corner tangent edge", c_bl, bottom, "tangent"),
         ("slit edges one line", top_l, top_r, "collinear"),
     ):
-        check(label, await adapter.add_sketch_constraint(first, second, relation))
+        check(label, adapter.add_sketch_constraint(first, second, relation))
 
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{bottom}.start", ro, 0.0, "outer edge start"
     )
     dims.record("EdgeStartX", '"ScrewRailEndR"')
     # The overall length, end to end (the print's one length dimension).
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{left}.start",
         f"{right}.start",
@@ -660,10 +660,10 @@ async def _flat_sheet_outline(adapter) -> SketchDims:
     ):
         check(
             f"{name} radius",
-            await adapter.add_sketch_dimension(arc, None, "radial", radius),
+            adapter.add_sketch_dimension(arc, None, "radial", radius),
         )
         dims.record(name, expr)
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{bottom}.start",
         f"{top_l}.end",
@@ -673,7 +673,7 @@ async def _flat_sheet_outline(adapter) -> SketchDims:
     )
     dims.record("RailWidth", '"ScrewRailW"')
     # The slit's own width, across its rounded end at the near bridge end.
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{top_l}.start",
         f"{bridge}.end",
@@ -683,7 +683,7 @@ async def _flat_sheet_outline(adapter) -> SketchDims:
     )
     dims.record("SlitWidth", '"NotchW"')
     # The bridge's two ends (the slits' rounded ends) from the near end.
-    await dimension_between(
+    dimension_between(
         adapter,
         "origin",
         f"{bridge}.end",
@@ -692,7 +692,7 @@ async def _flat_sheet_outline(adapter) -> SketchDims:
         "bridge start",
     )
     dims.record("BridgeX0", '"BridgeX0"')
-    await dimension_between(
+    dimension_between(
         adapter,
         "origin",
         f"{bridge}.start",
@@ -704,7 +704,7 @@ async def _flat_sheet_outline(adapter) -> SketchDims:
     return dims
 
 
-async def _spring_mid_surface(adapter) -> SketchDims:
+def _spring_mid_surface(adapter) -> SketchDims:
     """The spring rail's mid-surface path in the open Top sketch, fully defined.
 
     Top-plane sketch (x, s) is part (X, -Z): the flats lie at s = -SHEET_T/2
@@ -720,22 +720,22 @@ async def _spring_mid_surface(adapter) -> SketchDims:
     far = _bow_points(BRIDGE_X1, s0)
     far_end = CLIP_LENGTH - HOLE_INSET
     set_sketch_direct_db(adapter, True)
-    tip_l = check("near tip flat", await adapter.add_line(tip_x0, s0, HOLE_INSET, s0))
+    tip_l = check("near tip flat", adapter.add_line(tip_x0, s0, HOLE_INSET, s0))
     a1 = check(
         "near lift",
-        await adapter.add_arc(*near["c1"], HOLE_INSET, s0, *near["p1"]),
+        adapter.add_arc(*near["c1"], HOLE_INSET, s0, *near["p1"]),
     )
     a2 = check(
-        "near crown", await adapter.add_arc(*near["c2"], *near["p2"], *near["p1"])
+        "near crown", adapter.add_arc(*near["c2"], *near["p2"], *near["p1"])
     )
     a3 = check(
-        "near return", await adapter.add_arc(*near["c3"], *near["p2"], BRIDGE_X0, s0)
+        "near return", adapter.add_arc(*near["c3"], *near["p2"], BRIDGE_X0, s0)
     )
-    mid = check("bridge flat", await adapter.add_line(BRIDGE_X0, s0, BRIDGE_X1, s0))
-    a4 = check("far lift", await adapter.add_arc(*far["c1"], BRIDGE_X1, s0, *far["p1"]))
-    a5 = check("far crown", await adapter.add_arc(*far["c2"], *far["p2"], *far["p1"]))
-    a6 = check("far return", await adapter.add_arc(*far["c3"], *far["p2"], far_end, s0))
-    tip_r = check("far tip flat", await adapter.add_line(far_end, s0, tip_x1, s0))
+    mid = check("bridge flat", adapter.add_line(BRIDGE_X0, s0, BRIDGE_X1, s0))
+    a4 = check("far lift", adapter.add_arc(*far["c1"], BRIDGE_X1, s0, *far["p1"]))
+    a5 = check("far crown", adapter.add_arc(*far["c2"], *far["p2"], *far["p1"]))
+    a6 = check("far return", adapter.add_arc(*far["c3"], *far["p2"], far_end, s0))
+    tip_r = check("far tip flat", adapter.add_line(far_end, s0, tip_x1, s0))
     set_sketch_direct_db(adapter, False)
 
     for label, first, second, relation in (
@@ -753,14 +753,14 @@ async def _spring_mid_surface(adapter) -> SketchDims:
         ("bridge flat in the sheet plane", mid, tip_l, "collinear"),
         ("far tip in the sheet plane", tip_r, tip_l, "collinear"),
     ):
-        check(label, await adapter.add_sketch_constraint(first, second, relation))
+        check(label, adapter.add_sketch_constraint(first, second, relation))
 
-    await anchor_point_to_origin(adapter, f"{tip_l}.start", tip_x0, s0, "tip start")
+    anchor_point_to_origin(adapter, f"{tip_l}.start", tip_x0, s0, "tip start")
     dims.record("PathStartX", '"SpringEndR"')
     dims.record("PathStartZ", '"SheetT" / 2')
     # The bow's start station from the near end (the tip flat's length is what
     # it leaves past the end round).
-    await dimension_between(
+    dimension_between(
         adapter,
         "origin",
         f"{tip_l}.end",
@@ -772,10 +772,10 @@ async def _spring_mid_surface(adapter) -> SketchDims:
     for index, arc in enumerate((a1, a2, a3, a4, a5, a6), start=1):
         check(
             f"bend {index} radius",
-            await adapter.add_sketch_dimension(arc, None, "radial", BEND_RADIUS),
+            adapter.add_sketch_dimension(arc, None, "radial", BEND_RADIUS),
         )
         dims.record(f"BendR{index}", '"BendR"')
-    await dimension_between(
+    dimension_between(
         adapter,
         "origin",
         f"{mid}.start",
@@ -786,10 +786,10 @@ async def _spring_mid_surface(adapter) -> SketchDims:
     dims.record("BridgeX0", '"BridgeX0"')
     check(
         "bridge flat length",
-        await adapter.add_sketch_dimension(mid, None, "linear", CENTER_BRIDGE_LENGTH),
+        adapter.add_sketch_dimension(mid, None, "linear", CENTER_BRIDGE_LENGTH),
     )
     dims.record("BridgeLength", '"CenterBridgeL"')
-    await dimension_between(
+    dimension_between(
         adapter,
         "origin",
         f"{tip_r}.start",
@@ -800,7 +800,7 @@ async def _spring_mid_surface(adapter) -> SketchDims:
     dims.record("FarBowEndX", '"HoleFarX"')
     check(
         "far tip flat length",
-        await adapter.add_sketch_dimension(tip_r, None, "linear", TIP_FLAT_LENGTH),
+        adapter.add_sketch_dimension(tip_r, None, "linear", TIP_FLAT_LENGTH),
     )
     dims.record("TipFlatL2", '"HoleInset" - "SpringEndR"')
     return dims
@@ -814,7 +814,7 @@ def _construction(adapter, segment: str, label: str) -> None:
         raise RuntimeError(f"{label} did not take the construction flag")
 
 
-async def _plan_reference(adapter) -> SketchDims:
+def _plan_reference(adapter) -> SketchDims:
     """Drawing-only overall width in the open Front sketch, fully defined.
 
     One construction line up the near end's line, from the outer edge's
@@ -826,18 +826,18 @@ async def _plan_reference(adapter) -> SketchDims:
     set_sketch_direct_db(adapter, True)
     line = check(
         "overall width reference line",
-        await adapter.add_line(0.0, 0.0, 0.0, CLIP_WIDTH),
+        adapter.add_line(0.0, 0.0, 0.0, CLIP_WIDTH),
     )
     set_sketch_direct_db(adapter, False)
     _construction(adapter, line, "overall width reference")
     check(
         "overall width reference vertical",
-        await adapter.add_sketch_constraint(line, None, "vertical"),
+        adapter.add_sketch_constraint(line, None, "vertical"),
     )
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{line}.start", 0.0, 0.0, "overall width at the outer edge"
     )
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{line}.start",
         f"{line}.end",
@@ -849,7 +849,7 @@ async def _plan_reference(adapter) -> SketchDims:
     return dims
 
 
-async def _profile_reference(adapter) -> SketchDims:
+def _profile_reference(adapter) -> SketchDims:
     """Drawing-only bow references in the open Top sketch, fully defined.
 
     Top-plane (x, s) is part (X, -Z), as in ``_spring_mid_surface``: the flat
@@ -870,20 +870,20 @@ async def _profile_reference(adapter) -> SketchDims:
     x_prev = 0.0
     for name, x, _drive in DRAWN_TANGENT_STATIONS:
         chain.append(
-            check(f"{name} station line", await adapter.add_line(x_prev, -t, x, -t))
+            check(f"{name} station line", adapter.add_line(x_prev, -t, x, -t))
         )
         x_prev = x
     riser = check(
         "crest rise line",
-        await adapter.add_line(CLIP_LENGTH, 0.0, CLIP_LENGTH, ARCH_RISE),
+        adapter.add_line(CLIP_LENGTH, 0.0, CLIP_LENGTH, ARCH_RISE),
     )
     level = check(
         "crest level line",
-        await adapter.add_line(CLIP_LENGTH, ARCH_RISE, FAR_CREST_X, ARCH_RISE),
+        adapter.add_line(CLIP_LENGTH, ARCH_RISE, FAR_CREST_X, ARCH_RISE),
     )
     finger = check(
         "developed finger line",
-        await adapter.add_line(BRIDGE_X0, 0.0, BRIDGE_X0 - FLAT_FINGER_LENGTH, 0.0),
+        adapter.add_line(BRIDGE_X0, 0.0, BRIDGE_X0 - FLAT_FINGER_LENGTH, 0.0),
     )
     set_sketch_direct_db(adapter, False)
     for segment in (*chain, riser, level, finger):
@@ -896,15 +896,15 @@ async def _profile_reference(adapter) -> SketchDims:
     ):
         check(
             f"bow reference {relation}",
-            await adapter.add_sketch_constraint(segment, None, relation),
+            adapter.add_sketch_constraint(segment, None, relation),
         )
 
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{chain[0]}.start", 0.0, -t, "stations on the back face"
     )
     dims.record(None, '"SheetT"')
     for (name, x, drive), segment in zip(DRAWN_TANGENT_STATIONS, chain):
-        await dimension_between(
+        dimension_between(
             adapter,
             f"{chain[0]}.start",
             f"{segment}.end",
@@ -914,15 +914,15 @@ async def _profile_reference(adapter) -> SketchDims:
         )
         dims.record(name, drive)
 
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{riser}.start", CLIP_LENGTH, 0.0, "rise at the far end"
     )
     dims.record(None, '"ClipLength"')
-    await dimension_between(
+    dimension_between(
         adapter, "origin", f"{level}.end", "horizontal_distance", FAR_CREST_X, "crest"
     )
     dims.record(None, '"HoleFarX" - "BowRun" / 2')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{riser}.start",
         f"{riser}.end",
@@ -932,13 +932,13 @@ async def _profile_reference(adapter) -> SketchDims:
     )
     dims.record("CrestRise", '"ArchRise"')
 
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{finger}.start", BRIDGE_X0, 0.0, "finger from the bridge"
     )
     dims.record(None, '"BridgeX0"')
     # Developed length: no trig in the equation manager (build_ch_rocker_arm),
     # so it is the as-built value, re-derived from the knobs on every build.
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{finger}.start",
         f"{finger}.end",
@@ -1069,33 +1069,33 @@ def _name_spring_rail_dimensions(adapter) -> list[tuple[str, str]]:
     return [(f"{name}@SpringRail", expr) for name, _value, expr in SPRING_RAIL_DRIVES]
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     # #290: the row's inch calculation units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations).  The mm suffix is load-bearing because
     # the template is IPS and bare equation-manager numbers are document units.
-    await set_global(adapter, "ClipLength", f"{CLIP_LENGTH}mm")
-    await set_global(adapter, "ClipWidth", f"{CLIP_WIDTH}mm")
-    await set_global(adapter, "SheetT", f"{SHEET_T}mm")
-    await set_global(adapter, "ScrewRailW", f"{SCREW_RAIL_WIDTH}mm")
-    await set_global(adapter, "NotchW", f"{NOTCH_WIDTH}mm")
-    await set_global(adapter, "SpringRailW", '"ClipWidth" - "ScrewRailW" - "NotchW"')
-    await set_global(adapter, "SpringRailY0", '"ScrewRailW" + "NotchW"')
-    await set_global(adapter, "CenterBridgeL", f"{CENTER_BRIDGE_LENGTH}mm")
-    await set_global(adapter, "BridgeX0", '("ClipLength" - "CenterBridgeL") / 2')
-    await set_global(adapter, "SpringEndR", '"SpringRailW" / 2')
-    await set_global(adapter, "ScrewRailEndR", f"{SCREW_RAIL_END_RADIUS}mm")
-    await set_global(adapter, "ScrewRailSlitR", f"{SCREW_RAIL_SLIT_RADIUS}mm")
-    await set_global(adapter, "HoleInset", f"{HOLE_INSET}mm")
-    await set_global(adapter, "HoleY", f"{HOLE_Y}mm")
-    await set_global(adapter, "HoleFarX", '"ClipLength" - "HoleInset"')
-    await set_global(adapter, "ArchRise", f"{ARCH_RISE}mm")
-    await set_global(adapter, "BowRun", '"BridgeX0" - "HoleInset"')
-    await set_global(
+    set_global(adapter, "ClipLength", f"{CLIP_LENGTH}mm")
+    set_global(adapter, "ClipWidth", f"{CLIP_WIDTH}mm")
+    set_global(adapter, "SheetT", f"{SHEET_T}mm")
+    set_global(adapter, "ScrewRailW", f"{SCREW_RAIL_WIDTH}mm")
+    set_global(adapter, "NotchW", f"{NOTCH_WIDTH}mm")
+    set_global(adapter, "SpringRailW", '"ClipWidth" - "ScrewRailW" - "NotchW"')
+    set_global(adapter, "SpringRailY0", '"ScrewRailW" + "NotchW"')
+    set_global(adapter, "CenterBridgeL", f"{CENTER_BRIDGE_LENGTH}mm")
+    set_global(adapter, "BridgeX0", '("ClipLength" - "CenterBridgeL") / 2')
+    set_global(adapter, "SpringEndR", '"SpringRailW" / 2')
+    set_global(adapter, "ScrewRailEndR", f"{SCREW_RAIL_END_RADIUS}mm")
+    set_global(adapter, "ScrewRailSlitR", f"{SCREW_RAIL_SLIT_RADIUS}mm")
+    set_global(adapter, "HoleInset", f"{HOLE_INSET}mm")
+    set_global(adapter, "HoleY", f"{HOLE_Y}mm")
+    set_global(adapter, "HoleFarX", '"ClipLength" - "HoleInset"')
+    set_global(adapter, "ArchRise", f"{ARCH_RISE}mm")
+    set_global(adapter, "BowRun", '"BridgeX0" - "HoleInset"')
+    set_global(
         adapter, "BendR", '"BowRun" * "BowRun" / (16 * "ArchRise") + "ArchRise" / 4'
     )
 
@@ -1103,42 +1103,42 @@ async def build(adapter) -> dict[str, str]:
 
     # Flat sheet: the screw rail (the only lane drilled for the two retaining
     # screws) and the middle bridge between the two slits' rounded ends.
-    check("create_sketch flat sheet", await adapter.create_sketch("Front"))
-    flat = await _flat_sheet_outline(adapter)
-    await ensure_fully_defined(adapter, "flat sheet outline")
-    check("exit_sketch flat sheet", await adapter.exit_sketch())
+    check("create_sketch flat sheet", adapter.create_sketch("Front"))
+    flat = _flat_sheet_outline(adapter)
+    ensure_fully_defined(adapter, "flat sheet outline")
+    check("exit_sketch flat sheet", adapter.exit_sketch())
     name_last_feature(adapter, "FlatSheetProfile")
     drive_jobs += flat.apply(adapter, "FlatSheetProfile")
     check(
         "extrude flat sheet",
-        await adapter.create_extrusion(ExtrusionParameters(depth=SHEET_T)),
+        adapter.create_extrusion(ExtrusionParameters(depth=SHEET_T)),
     )
     name_last_feature(adapter, "FlatSheet")
     flat_dims = name_dimensions(adapter, "FlatSheet", ["SheetDepth"])
     drive_jobs += [(flat_dims[0], BOSS_DRIVES["FlatSheet"][0])]
     volume = V_FLAT_SHEET
-    await volume_check(adapter, "flat sheet", volume, 0.005 * volume)
+    volume_check(adapter, "flat sheet", volume, 0.005 * volume)
 
     # Spring rail: one smooth mid-surface path thickened SheetT about itself
     # and swept SpringRailW across, starting SpringRailY0 off the Top plane.
     # Its flat middle run lands face-to-face on the bridge's slit-side edge.
-    check("create_sketch spring rail", await adapter.create_sketch("Top"))
-    path = await _spring_mid_surface(adapter)
-    await ensure_fully_defined(adapter, "spring rail mid-surface")
-    check("exit_sketch spring rail", await adapter.exit_sketch())
+    check("create_sketch spring rail", adapter.create_sketch("Top"))
+    path = _spring_mid_surface(adapter)
+    ensure_fully_defined(adapter, "spring rail mid-surface")
+    check("exit_sketch spring rail", adapter.exit_sketch())
     name_last_feature(adapter, "SpringRailPath")
     drive_jobs += path.apply(adapter, "SpringRailPath")
     _thin_extrude_at_offset(adapter, SPRING_RAIL_WIDTH, SPRING_RAIL_Y0, SHEET_T)
     name_last_feature(adapter, "SpringRail")
     drive_jobs += _name_spring_rail_dimensions(adapter)
     volume += V_SPRING_RAIL
-    await volume_check(adapter, "flat sheet and spring rail", volume, 0.005 * volume)
+    volume_check(adapter, "flat sheet and spring rail", volume, 0.005 * volume)
     _check_z_span(adapter, "spring rail", SHEET_T)
 
     # Full circles overlap the flat tip run of the spring rail by one half
     # each.  Their exposed halves give both free ends a rounded planform.
     ends = SketchDims()
-    check("create_sketch rounded spring ends", await adapter.create_sketch("Front"))
+    check("create_sketch rounded spring ends", adapter.create_sketch("Front"))
     spring_y = SPRING_RAIL_Y0 + SPRING_END_RADIUS
     define_jobs = (
         (
@@ -1157,7 +1157,7 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     for x, names, drives in define_jobs:
-        await define_circle(
+        define_circle(
             adapter,
             x,
             spring_y,
@@ -1167,19 +1167,19 @@ async def build(adapter) -> dict[str, str]:
             names=names,
             drives=drives,
         )
-    await ensure_fully_defined(adapter, "rounded spring ends")
-    check("exit_sketch rounded spring ends", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "rounded spring ends")
+    check("exit_sketch rounded spring ends", adapter.exit_sketch())
     name_last_feature(adapter, "SpringEndProfiles")
     drive_jobs += ends.apply(adapter, "SpringEndProfiles")
     check(
         "extrude rounded spring ends",
-        await adapter.create_extrusion(ExtrusionParameters(depth=SHEET_T)),
+        adapter.create_extrusion(ExtrusionParameters(depth=SHEET_T)),
     )
     name_last_feature(adapter, "RoundedSpringEnds")
     end_dims = name_dimensions(adapter, "RoundedSpringEnds", ["SheetDepth"])
     drive_jobs += [(end_dims[0], BOSS_DRIVES["RoundedSpringEnds"][0])]
     volume += V_ROUNDED_ENDS
-    await volume_check(adapter, "rounded spring ends", volume, 0.005 * volume)
+    volume_check(adapter, "rounded spring ends", volume, 0.005 * volume)
 
     # End screw holes: ONE native Hole Wizard #2 clearance feature (2 points)
     # from the screw rail's outer face at local z = 0, where the heads seat.
@@ -1199,7 +1199,7 @@ async def build(adapter) -> dict[str, str]:
         ],
     )
     drive_jobs += hole_cut.placement_drive_jobs
-    await volume_check(adapter, "one-piece clip", V_FINAL, 0.005 * V_FINAL)
+    volume_check(adapter, "one-piece clip", V_FINAL, 0.005 * V_FINAL)
 
     # Drawing-only reference sketches (construction geometry, childless, saved
     # hidden below): each sits on the plane of the view that prints it, the
@@ -1208,20 +1208,20 @@ async def build(adapter) -> dict[str, str]:
         ("Front", "PlanReference", _plan_reference),
         ("Top", "ProfileReference", _profile_reference),
     ):
-        check(f"create_sketch {feature}", await adapter.create_sketch(plane))
-        reference = await define(adapter)
-        await ensure_fully_defined(adapter, f"{feature} sketch")
-        check(f"exit_sketch {feature}", await adapter.exit_sketch())
+        check(f"create_sketch {feature}", adapter.create_sketch(plane))
+        reference = define(adapter)
+        ensure_fully_defined(adapter, f"{feature} sketch")
+        check(f"exit_sketch {feature}", adapter.exit_sketch())
         name_last_feature(adapter, feature)
         drive_jobs += reference.apply(adapter, feature)
 
     # Apply deferred equations after every target exists.  Their initial values
     # are neutral, so the second volume check also catches a mis-bound knob.
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    volume_check(
         adapter, "driven one-piece clip (equations neutral)", V_FINAL, 0.005 * V_FINAL
     )
     # Equation self-test (EQUATION_FLEX): a knob that only reshapes part of
@@ -1230,17 +1230,17 @@ async def build(adapter) -> dict[str, str]:
     for knob, neutral, flexed, knob_arg in EQUATION_FLEX:
         flat, spring, ends, holes = clip_volumes(**{knob_arg: flexed})
         expected = flat + spring + ends - holes
-        await set_global(adapter, knob, f"{flexed}mm")
-        await force_rebuild(adapter)
-        await volume_check(adapter, f"{knob} = {flexed} mm", expected, 0.005 * expected)
+        set_global(adapter, knob, f"{flexed}mm")
+        force_rebuild(adapter)
+        volume_check(adapter, f"{knob} = {flexed} mm", expected, 0.005 * expected)
         span_t = flexed if knob_arg == "sheet_t" else SHEET_T
         _check_z_span(adapter, f"{knob} = {flexed} mm", span_t)
-        await set_global(adapter, knob, f"{neutral}mm")
-        await force_rebuild(adapter)
-        await volume_check(adapter, f"{knob} restored", V_FINAL, 0.005 * V_FINAL)
+        set_global(adapter, knob, f"{neutral}mm")
+        force_rebuild(adapter)
+        volume_check(adapter, f"{knob} restored", V_FINAL, 0.005 * V_FINAL)
         _check_z_span(adapter, f"{knob} restored", SHEET_T)
 
-    await apply_material(adapter, MATERIAL)
+    apply_material(adapter, MATERIAL)
 
     # Manufacturing drawing support: every printed dimension's places live on
     # the model (drawing-simplicity-policy.md `How the repository implements
@@ -1250,7 +1250,7 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
-    await report_mass_properties(adapter)
+    report_mass_properties(adapter)
     apply_drawing_properties(
         adapter, PART_NAME, {"Isometric View Note": ISOMETRIC_VIEW_NOTE}
     )
@@ -1258,7 +1258,7 @@ async def build(adapter) -> dict[str, str]:
     # through _drawing_hidden_sketches to import its dimensions.
     for sketch in REFERENCE_SKETCHES:
         blank_sketch(adapter, sketch)
-    return await save_part_and_images(adapter, PART_NAME)
+    return save_part_and_images(adapter, PART_NAME)
 
 
 if __name__ == "__main__":

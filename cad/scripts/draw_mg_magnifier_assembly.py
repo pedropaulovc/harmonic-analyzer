@@ -2714,11 +2714,11 @@ def _assert_source_identity(
 
 
 @_telemetry.traced("drawing.mg_magnifier_assembly")
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source assembly is missing: {SOURCE}")
     source_sha256 = _source_sha256(SOURCE)
-    check("open assembly drawing source", await adapter.open_model(str(SOURCE)))
+    check("open assembly drawing source", adapter.open_model(str(SOURCE)))
     source_model = _early_bound(adapter.currentModel, "IModelDoc2")
     if bool(source_model.GetSaveFlag()):
         raise RuntimeError(
@@ -2933,7 +2933,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     _assert_source_identity(source_model, source_sha256, phase="before drawing SaveAs")
     try:
-        artifacts = await finalize_drawing(
+        artifacts = finalize_drawing(
             adapter,
             OUTPUTS,
             layout=SPEC.layout,

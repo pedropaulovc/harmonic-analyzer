@@ -1679,11 +1679,11 @@ scripts that `from _check import log, check` are instrumented unchanged.
   inherited stamp (>1 h) records nothing.
 - **Adapter calls are spans without touching a recipe.** 42.9 h of `part.build`'s
   79.4 h (30 days to 2026-09-27) sat in no child span, and log-gap attribution put
-  ~9 h of it on a build script's direct `await adapter.<feature>(...)` calls
+  ~9 h of it on a build script's direct `adapter.<feature>(...)` calls
   (fillet/chamfer 2.7 h, extrude/cut/revolve 1.7 h, sketch open/close 2.3 h, ...).
   `build_session` instruments the already-imported `PyWin32Adapter` class
   (`_telemetry.instrument_adapter`, the OTel instrumentation-library pattern) so
-  each document/feature/reference-geometry coroutine in
+  each document/feature/reference-geometry method in
   `_telemetry.ADAPTER_TRACED_METHODS` runs in an `adapter.<method>` span with its
   leading name/path as `arg` (never `label`: `label` at depth 0 is the farm's leaf
   key). Per-entity sketch calls stay out of the list — that would be the per-item

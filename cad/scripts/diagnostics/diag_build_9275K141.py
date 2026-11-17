@@ -43,10 +43,10 @@ from fr_vn_tube_frame_cap_spec import (  # noqa: E402
 
 
 @stock_recipe("9275K141", threaded=False)
-async def build_9275K141(adapter, truth=None):
+def build_9275K141(adapter, truth=None):
     from solidworks_mcp.adapters.base import RevolveParameters
 
-    check("create cap section", await adapter.create_sketch("Front"))
+    check("create cap section", adapter.create_sketch("Front"))
     sketch = adapter.currentSketchManager
 
     def arc(start, end, center, radius):
@@ -116,7 +116,7 @@ async def build_9275K141(adapter, truth=None):
         # Arc endpoints first, then direct-DB lines, matching the proven
         # fillister recipe. Raw CreateLine with inference off left duplicate
         # unmerged endpoint objects in the failed native CapSection harvest.
-        await add_line_chain(
+        add_line_chain(
             adapter,
             [
                 (TOP_FLAT_RADIUS, TOTAL_HEIGHT),
@@ -126,7 +126,7 @@ async def build_9275K141(adapter, truth=None):
             ],
             close=False,
         )
-        await add_line_chain(
+        add_line_chain(
             adapter,
             [
                 (inner_r, corner_y),
@@ -134,7 +134,7 @@ async def build_9275K141(adapter, truth=None):
             ],
             close=False,
         )
-        await add_line_chain(
+        add_line_chain(
             adapter,
             [
                 (MOUTH_INNER_DIAMETER / 2.0, 0.0),
@@ -142,7 +142,7 @@ async def build_9275K141(adapter, truth=None):
             ],
             close=False,
         )
-        await add_line_chain(
+        add_line_chain(
             adapter,
             [
                 (outer_r, FLARE_HEIGHT),
@@ -150,11 +150,11 @@ async def build_9275K141(adapter, truth=None):
             ],
             close=False,
         )
-    check("exit cap section", await adapter.exit_sketch())
+    check("exit cap section", adapter.exit_sketch())
     name_last_feature(adapter, "CapSection")
     check(
         "revolve cap",
-        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=False)),
+        adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=False)),
     )
     name_last_feature(adapter, "CapRevolve")
     adapter._mcm_com_map = lambda v: [v[0], v[1] + INSIDE_HEIGHT / 2.0, v[2]]

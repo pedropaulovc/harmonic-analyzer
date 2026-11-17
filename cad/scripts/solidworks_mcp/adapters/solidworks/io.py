@@ -127,7 +127,7 @@ class SolidWorksIOMixin:
 
         return "Untitled"
 
-    async def open_model(self, file_path: str) -> AdapterResult[SolidWorksModel]:
+    def open_model(self, file_path: str) -> AdapterResult[SolidWorksModel]:
         """Open a SolidWorks model file and set it as active on the adapter.
 
         Args:
@@ -205,7 +205,7 @@ class SolidWorksIOMixin:
             adapter._handle_com_operation("open_model", _open),
         )
 
-    async def close_model(self, save: bool = False) -> AdapterResult[None]:
+    def close_model(self, save: bool = False) -> AdapterResult[None]:
         """Close the current SolidWorks model and optionally save first.
 
         Args:
@@ -239,7 +239,7 @@ class SolidWorksIOMixin:
             adapter._handle_com_operation("close_model", _close),
         )
 
-    async def create_part(
+    def create_part(
         self, name: str | None = None, units: str | None = None
     ) -> AdapterResult[SolidWorksModel]:
         """Create a new part document and set it as active.
@@ -295,7 +295,7 @@ class SolidWorksIOMixin:
             adapter._handle_com_operation("create_part", _create),
         )
 
-    async def create_assembly(
+    def create_assembly(
         self, name: str | None = None
     ) -> AdapterResult[SolidWorksModel]:
         """Create a new assembly document and set it as active.
@@ -350,7 +350,7 @@ class SolidWorksIOMixin:
             adapter._handle_com_operation("create_assembly", _create),
         )
 
-    async def create_drawing(
+    def create_drawing(
         self, name: str | None = None
     ) -> AdapterResult[SolidWorksModel]:
         """Create a new drawing document and set it as active.
@@ -401,7 +401,7 @@ class SolidWorksIOMixin:
             adapter._handle_com_operation("create_drawing", _create),
         )
 
-    async def import_dxf_dwg(
+    def import_dxf_dwg(
         self, params: ImportDxfDwgParameters
     ) -> AdapterResult[SolidWorksFeature]:
         """Import a DXF/DWG file into the active part as a sketch feature.
@@ -554,7 +554,7 @@ class SolidWorksIOMixin:
             adapter._handle_com_operation("import_dxf_dwg", _import),
         )
 
-    async def get_dimension(self, name: str) -> AdapterResult[float]:
+    def get_dimension(self, name: str) -> AdapterResult[float]:
         """Read a named model dimension in millimetres.
 
         Args:
@@ -592,7 +592,7 @@ class SolidWorksIOMixin:
             adapter._handle_com_operation("get_dimension", _get),
         )
 
-    async def set_dimension(self, name: str, value: float) -> AdapterResult[None]:
+    def set_dimension(self, name: str, value: float) -> AdapterResult[None]:
         """Set a named model dimension in millimetres and rebuild.
 
         Args:
@@ -638,7 +638,7 @@ class SolidWorksIOMixin:
             adapter._handle_com_operation("set_dimension", _set),
         )
 
-    async def save_file(self, file_path: str | None = None) -> AdapterResult[None]:
+    def save_file(self, file_path: str | None = None) -> AdapterResult[None]:
         """Save the active model to its current path or to a new file path.
 
         Args:
@@ -729,7 +729,7 @@ class SolidWorksIOMixin:
             adapter._handle_com_operation("save_file", _save),
         )
 
-    async def rebuild_model(self) -> AdapterResult[None]:
+    def rebuild_model(self) -> AdapterResult[None]:
         """Force a model rebuild.
 
         Returns:
@@ -752,7 +752,7 @@ class SolidWorksIOMixin:
             adapter._handle_com_operation("rebuild_model", _rebuild),
         )
 
-    async def get_model_info(self) -> AdapterResult[dict[str, Any]]:
+    def get_model_info(self) -> AdapterResult[dict[str, Any]]:
         """Collect summary metadata about the active model.
 
         Returns:
@@ -798,7 +798,7 @@ class SolidWorksIOMixin:
             adapter._handle_com_operation("get_model_info", _get_info),
         )
 
-    async def list_configurations(self) -> AdapterResult[list[str]]:
+    def list_configurations(self) -> AdapterResult[list[str]]:
         """List all configuration names on the active model.
 
         Returns:
@@ -839,7 +839,7 @@ class SolidWorksIOMixin:
             adapter._handle_com_operation("list_configurations", _list),
         )
 
-    async def get_mass_properties(self) -> AdapterResult[MassProperties]:
+    def get_mass_properties(self) -> AdapterResult[MassProperties]:
         """Get mass properties for the active model.
 
         Returns:

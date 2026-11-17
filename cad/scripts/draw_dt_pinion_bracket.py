@@ -396,11 +396,11 @@ def _seat_depth_dimension(adapter: Any, section: Any) -> Any:
     return annotation
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open pinion-bracket source", await adapter.open_model(str(SOURCE)))
+    check("open pinion-bracket source", adapter.open_model(str(SOURCE)))
     read_required_properties(
         adapter.currentModel,
         (
@@ -517,7 +517,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _rim_only_bore_callouts(adapter, front_annotations)
 
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Pinion Swing Bracket Manufacturing Drawing",

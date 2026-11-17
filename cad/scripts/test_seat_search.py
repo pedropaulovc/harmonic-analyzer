@@ -273,7 +273,6 @@ def test_write_refuses_presets_that_leave_any_counter_unmeasured(
     the channel-seat rows only they need (channel_seat() matches exactly). The
     driver must refuse before native work -- with no adapter, reaching a build
     is the bug -- and leave no report behind."""
-    import asyncio
 
     from diagnostics import calibrate_spring_seats as driver
 
@@ -282,8 +281,7 @@ def test_write_refuses_presets_that_leave_any_counter_unmeasured(
     report = tmp_path / "report.json"
     for partial in sorted(table):
         with pytest.raises(ValueError, match="re-measure every configured preset"):
-            asyncio.run(
-                driver.calibrate(
+            driver.calibrate(
                     None,
                     [partial],
                     report,
@@ -291,7 +289,6 @@ def test_write_refuses_presets_that_leave_any_counter_unmeasured(
                     source="test",
                     mode=driver.CalibrationMode[mode],
                 )
-            )
     assert not report.exists()
 
 
@@ -338,7 +335,6 @@ def test_output_onto_the_written_table_is_refused(tmp_path, monkeypatch, alias) 
     """The report is written last, even on failure: aimed at the --write PATH
     (by any alias) it would replace the merged table with JSON. Both entry
     points refuse before native work."""
-    import asyncio
 
     from diagnostics import calibrate_spring_seats as driver
 
@@ -350,7 +346,7 @@ def test_output_onto_the_written_table_is_refused(tmp_path, monkeypatch, alias) 
     presets = sorted(_config.machine("springs", "presets"))
     output, write = _aliased_report_and_table(tmp_path, alias)
     with pytest.raises(ValueError, match="report would overwrite it"):
-        asyncio.run(driver.calibrate(None, presets, output, write=write, source="test"))
+        driver.calibrate(None, presets, output, write=write, source="test")
     monkeypatch.setattr(
         sys,
         "argv",
@@ -384,7 +380,6 @@ def test_output_onto_the_source_table_is_refused(
     """With no --write, or a --write elsewhere, the report would still replace
     springs.yaml with JSON (written last, even on failure). Both entry points
     refuse before native work and leave the table untouched."""
-    import asyncio
 
     from diagnostics import calibrate_spring_seats as driver
 
@@ -404,9 +399,7 @@ def test_output_onto_the_source_table_is_refused(
         "default": springs,
     }
     with pytest.raises(ValueError, match="source seat table"):
-        asyncio.run(
-            driver.calibrate(None, presets, output, write=target[write], source="test")
-        )
+        driver.calibrate(None, presets, output, write=target[write], source="test")
     argv = ["calibrate_spring_seats.py", "--presets", *presets, "--output", str(output)]
     if write == "elsewhere":
         argv += ["--write", str(target[write])]
@@ -422,7 +415,6 @@ def test_calibrating_every_preset_passes_the_coverage_guard(
     tmp_path, monkeypatch
 ) -> None:
     """The complete set must NOT be refused; it is how the table is regenerated."""
-    import asyncio
 
     from diagnostics import calibrate_spring_seats as driver
 
@@ -432,8 +424,7 @@ def test_calibrating_every_preset_passes_the_coverage_guard(
     presets = sorted(_config.machine("springs", "presets"))
     for mode in driver.CalibrationMode:
         with pytest.raises(AttributeError):  # reached the build: no adapter to drive
-            asyncio.run(
-                driver.calibrate(
+            driver.calibrate(
                     None,
                     presets,
                     tmp_path / "report.json",
@@ -441,7 +432,6 @@ def test_calibrating_every_preset_passes_the_coverage_guard(
                     source="test",
                     mode=mode,
                 )
-            )
 
 
 def test_counter_support_certificate_refuses_stale_or_unproven_parts(
@@ -541,19 +531,17 @@ def test_driver_imports_against_the_stale_counter_record_it_replaces() -> None:
 def test_counter_mode_measures_no_channel_seat_and_reports_it(
     tmp_path, monkeypatch
 ) -> None:
-    import asyncio
 
     from diagnostics import calibrate_spring_seats as driver
 
-    async def no_channel(*_args):
+    def no_channel(*_args):
         raise AssertionError("counter mode calibrated a channel seat")
 
     monkeypatch.setattr(driver, "_calibrate_channel", no_channel)
     monkeypatch.setattr(driver, "_require_current_support_parts", lambda: None)
     report = tmp_path / "report.json"
     with pytest.raises(AttributeError):  # reached the counter build: no adapter
-        asyncio.run(
-            driver.calibrate(
+        driver.calibrate(
                 None,
                 sorted(_config.machine("springs", "presets")),
                 report,
@@ -561,7 +549,6 @@ def test_counter_mode_measures_no_channel_seat_and_reports_it(
                 source="test",
                 mode=driver.CalibrationMode.COUNTER,
             )
-        )
     recorded = json.loads(report.read_text(encoding="utf-8"))
     assert recorded["mode"] == "counter"
     assert recorded["status"] == "failed"
@@ -702,7 +689,6 @@ def test_a_torn_table_write_leaves_the_previous_table_intact(
 def test_a_torn_report_write_leaves_the_previous_report_intact(
     tmp_path, monkeypatch
 ) -> None:
-    import asyncio
 
     from diagnostics import calibrate_spring_seats as driver
 
@@ -711,15 +697,13 @@ def test_a_torn_report_write_leaves_the_previous_report_intact(
     _tear_writes(monkeypatch)
 
     with pytest.raises(OSError, match="disk full"):  # the failed run's report
-        asyncio.run(
-            driver.calibrate(
+        driver.calibrate(
                 None,
                 sorted(_config.machine("springs", "presets")),
                 report,
                 write=None,
                 source="test",
             )
-        )
 
     assert report.read_bytes() == b'{"status": "previous"}\n'
     assert sorted(tmp_path.iterdir()) == [report]

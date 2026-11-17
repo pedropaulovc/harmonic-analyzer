@@ -43,19 +43,18 @@ class _Adapter:
         self.pattern_params = None
         self.currentModel = _Model()
 
-    async def create_axis(self, _params: object) -> _Result:
+    def create_axis(self, _params: object) -> _Result:
         return _Result(SimpleNamespace(name="Axis17"))
 
-    async def circular_pattern_feature(self, params: object) -> _Result:
+    def circular_pattern_feature(self, params: object) -> _Result:
         self.pattern_params = params
         return _Result(SimpleNamespace(name="CirPattern1"))
 
 
-@pytest.mark.asyncio
-async def test_pattern_selects_created_reference_axis_by_name() -> None:
+def test_pattern_selects_created_reference_axis_by_name() -> None:
     adapter = _Adapter()
 
-    pattern = await pattern_about_z(adapter, "Cut-Extrude1", 120, 31.1, 1.5)
+    pattern = pattern_about_z(adapter, "Cut-Extrude1", 120, 31.1, 1.5)
 
     assert pattern.name == "CirPattern1"
     assert adapter.pattern_params.axis_name == "Axis17"
@@ -170,15 +169,15 @@ class _SketchAdapter:
         self.currentSketchManager = _SketchManager()
         self.fixed: list[str] = []
 
-    async def check_sketch_fully_defined(self) -> _Result:
+    def check_sketch_fully_defined(self) -> _Result:
         state = next(self._states)
         self.sketch._status = {"under_defined": 2, "fully_defined": 3, "over_defined": 4}[state]
         return _Result({"definition_state": state, "raw_status": self.sketch._status})
 
-    async def get_over_defining_relations(self) -> _Result:
+    def get_over_defining_relations(self) -> _Result:
         return _Result({"relations": [{"relation_type": 9}]})
 
-    async def add_sketch_constraint(self, entity: str, other: None, kind: str) -> _Result:
+    def add_sketch_constraint(self, entity: str, other: None, kind: str) -> _Result:
         assert other is None and kind == "fix"
         self.fixed.append(entity)
         return _Result("Constraint_1")
@@ -195,9 +194,8 @@ def sketch_logs(monkeypatch):
     return logs
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize("after_fix", [False, True])
-async def test_over_defined_logs_every_relation_before_raising(after_fix, sketch_logs) -> None:
+def test_over_defined_logs_every_relation_before_raising(after_fix, sketch_logs) -> None:
     # Main's loop: an over-definition after a FIX ends escalation as "not
     # fully defined"; either way the native inventories are logged first.
     states = ["under_defined", "over_defined"] if after_fix else ["over_defined"]
@@ -206,7 +204,7 @@ async def test_over_defined_logs_every_relation_before_raising(after_fix, sketch
     phase = "(not_fully_defined)" if after_fix else "(over_defined)"
 
     with pytest.raises(RuntimeError, match=message):
-        await _sketch.ensure_fully_defined(
+        _sketch.ensure_fully_defined(
             adapter, "stock gap sketch",
             fix_entities=["EquationCurve_1"], allow_fix_escalation=True,
         )
@@ -236,33 +234,30 @@ async def test_over_defined_logs_every_relation_before_raising(after_fix, sketch
     assert adapter.fixed == (["EquationCurve_1"] if after_fix else [])
 
 
-@pytest.mark.asyncio
-async def test_over_defined_keeps_failure_when_diagnostics_refuse(sketch_logs) -> None:
+def test_over_defined_keeps_failure_when_diagnostics_refuse(sketch_logs) -> None:
     adapter = _SketchAdapter(["over_defined"])
     adapter.relations.refuse_all = True
 
     with pytest.raises(RuntimeError, match="stock gap sketch: sketch OVER-defined"):
-        await _sketch.ensure_fully_defined(adapter, "stock gap sketch")
+        _sketch.ensure_fully_defined(adapter, "stock gap sketch")
 
     assert "native GetRelations refused" in sketch_logs["error"][0]
     assert set(adapter.relations.calls) == {0, 1, 2, 6}
 
 
-@pytest.mark.asyncio
-async def test_over_defined_keeps_failure_when_logger_refuses(monkeypatch) -> None:
+def test_over_defined_keeps_failure_when_logger_refuses(monkeypatch) -> None:
     def refuse(*_args, **_kwargs):
         raise RuntimeError("logging refused")
 
     monkeypatch.setattr(_sketch._telemetry, "error", refuse)
     with pytest.raises(RuntimeError, match="sketch OVER-defined"):
-        await _sketch.ensure_fully_defined(_SketchAdapter(["over_defined"]), "gap")
+        _sketch.ensure_fully_defined(_SketchAdapter(["over_defined"]), "gap")
 
 
-@pytest.mark.asyncio
-async def test_nonwhitelisted_sketch_stays_strict(sketch_logs) -> None:
+def test_nonwhitelisted_sketch_stays_strict(sketch_logs) -> None:
     adapter = _SketchAdapter(["under_defined"])
     with pytest.raises(RuntimeError, match="legacy fix escalation disabled"):
-        await _sketch.ensure_fully_defined(adapter, "gap", fix_entities=["EquationCurve_1"])
+        _sketch.ensure_fully_defined(adapter, "gap", fix_entities=["EquationCurve_1"])
     assert adapter.fixed == []
     assert adapter.relations.calls == []
 

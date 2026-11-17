@@ -74,7 +74,7 @@ def socket_volume(d: SocketHeadScrew) -> float:
     return math.sqrt(3.0) / 2.0 * d.socket_af**2 * d.socket_depth
 
 
-async def build_socket_head(adapter, d: SocketHeadScrew) -> None:
+def build_socket_head(adapter, d: SocketHeadScrew) -> None:
     from _com import _early_bound, _read_member
     from _feature_tree import _feature_by_name
     from _sketch import add_line_chain
@@ -91,7 +91,7 @@ async def build_socket_head(adapter, d: SocketHeadScrew) -> None:
     thread_top = d.thread_top_y
 
     # --- revolve profile: cylindrical head and chamfered shank -------------
-    check("create_sketch profile", await adapter.create_sketch("Front"))
+    check("create_sketch profile", adapter.create_sketch("Front"))
     sk_mgr = adapter.currentSketchManager
     with no_sketch_inference(adapter):
         if (
@@ -99,7 +99,7 @@ async def build_socket_head(adapter, d: SocketHeadScrew) -> None:
             is None
         ):
             raise RuntimeError(f"{part_no} profile: CreateCenterLine failed")
-        await add_line_chain(
+        add_line_chain(
             adapter,
             [
                 (0.0, top),
@@ -111,23 +111,23 @@ async def build_socket_head(adapter, d: SocketHeadScrew) -> None:
                 (0.0, tip),
             ],
         )
-    check("exit_sketch profile", await adapter.exit_sketch())
+    check("exit_sketch profile", adapter.exit_sketch())
     name_last_feature(adapter, "BodyProfile")
     check(
         "revolve body",
-        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=False)),
+        adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=False)),
     )
     name_last_feature(adapter, "Body")
     v = revolved_volume(d)
-    v = await volume_check(adapter, "revolved body", v, 0.005 * v)
+    v = volume_check(adapter, "revolved body", v, 0.005 * v)
 
     # --- hex socket: blind cut down from the head top (91255A148 idiom) ----
     offset_plane(adapter, "HeadTopPlane", top)
-    check("create_sketch socket", await adapter.create_sketch("HeadTopPlane"))
+    check("create_sketch socket", adapter.create_sketch("HeadTopPlane"))
     flat = d.socket_af / 2.0
     corner = d.socket_corner_r
     with no_sketch_inference(adapter):
-        await add_line_chain(
+        add_line_chain(
             adapter,
             [
                 (0.0, corner),
@@ -138,7 +138,7 @@ async def build_socket_head(adapter, d: SocketHeadScrew) -> None:
                 (flat, corner / 2.0),
             ],
         )
-    check("exit_sketch socket", await adapter.exit_sketch())
+    check("exit_sketch socket", adapter.exit_sketch())
     name_last_feature(adapter, "SocketProfile")
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     fm = _early_bound(_read_member(model, "FeatureManager"), "IFeatureManager")
@@ -155,7 +155,7 @@ async def build_socket_head(adapter, d: SocketHeadScrew) -> None:
     if feat is None:
         raise RuntimeError(f"{part_no} hex socket cut failed")
     name_last_feature(adapter, "HexSocket")
-    await volume_check(
+    volume_check(
         adapter, "hex socket", v - socket_volume(d), 0.01 * socket_volume(d)
     )
 
@@ -179,7 +179,7 @@ async def build_socket_head(adapter, d: SocketHeadScrew) -> None:
 
     # --- helix: tip-seeded, threaded length + P up, right hand -------------
     offset_plane(adapter, "TipPlane", tip)
-    check("create_sketch helix seed", await adapter.create_sketch("TipPlane"))
+    check("create_sketch helix seed", adapter.create_sketch("TipPlane"))
     with no_sketch_inference(adapter):
         if (
             adapter.currentSketchManager.CreateCircleByRadius(
@@ -202,9 +202,9 @@ async def build_socket_head(adapter, d: SocketHeadScrew) -> None:
     p = d.pitch
     cy = tip - 7.0 * p / 16.0
     crest_r = major_r + d.h_sharp / 16.0
-    check("create_sketch cutter", await adapter.create_sketch("Front"))
+    check("create_sketch cutter", adapter.create_sketch("Front"))
     with no_sketch_inference(adapter):
-        await add_line_chain(
+        add_line_chain(
             adapter,
             [
                 (crest_r, cy + 15.0 * p / 32.0),
@@ -213,14 +213,14 @@ async def build_socket_head(adapter, d: SocketHeadScrew) -> None:
                 (crest_r, cy - 15.0 * p / 32.0),
             ],
         )
-    check("exit_sketch cutter", await adapter.exit_sketch())
+    check("exit_sketch cutter", adapter.exit_sketch())
     name_last_feature(adapter, "ThreadCutter")
     thread_sweep_cut(adapter, "ThreadCutter", "ThreadHelix", shank_name, "ThreadGroove")
 
     # --- 45 deg cone at the thread top: fills the last turns, re-merges ----
     neck_r = d.neck_dia / 2.0
     neck_h = d.neck_h
-    check("create_sketch neck", await adapter.create_sketch("Front"))
+    check("create_sketch neck", adapter.create_sketch("Front"))
     sk2 = adapter.currentSketchManager
     with no_sketch_inference(adapter):
         if (
@@ -230,7 +230,7 @@ async def build_socket_head(adapter, d: SocketHeadScrew) -> None:
             is None
         ):
             raise RuntimeError(f"{part_no} neck: CreateCenterLine failed")
-        await add_line_chain(
+        add_line_chain(
             adapter,
             [
                 (0.0, thread_top),
@@ -239,16 +239,16 @@ async def build_socket_head(adapter, d: SocketHeadScrew) -> None:
                 (0.0, thread_top - neck_h),
             ],
         )
-    check("exit_sketch neck", await adapter.exit_sketch())
+    check("exit_sketch neck", adapter.exit_sketch())
     name_last_feature(adapter, "NeckProfile")
     check(
         "neck cone",
-        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=False)),
+        adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=False)),
     )
     name_last_feature(adapter, "ThreadNeck")
 
 
-async def build_socket_head_catalog(adapter, d: SocketHeadScrew) -> dict[str, str]:
+def build_socket_head_catalog(adapter, d: SocketHeadScrew) -> dict[str, str]:
     """Catalog-only run: build the recipe and save it, no vendor truth."""
     from diagnostics.diag_mcmaster_lib import (
         OUT_DIR,
@@ -260,19 +260,19 @@ async def build_socket_head_catalog(adapter, d: SocketHeadScrew) -> dict[str, st
 
     part_no = d.part_no
     with _telemetry.span("catalog.build", label=part_no):
-        check(f"create_part {part_no}", await adapter.create_part())
+        check(f"create_part {part_no}", adapter.create_part())
         assert_seat_sketch_baseline(adapter, part_no)
-        await build_socket_head(adapter, d)
+        build_socket_head(adapter, d)
         props = mass_properties(adapter)
         if not props["volume_mm3"] > 0.0:
             raise RuntimeError(f"{part_no} catalog build has no solid volume")
         OUT_DIR.mkdir(parents=True, exist_ok=True)
         path = OUT_DIR / f"{part_no}-catalog.SLDPRT"
-        check(f"save -> {path}", await adapter.save_file(str(path.resolve())))
+        check(f"save -> {path}", adapter.save_file(str(path.resolve())))
         artefacts = {"sldprt": str(path)}
-        artefacts.update(await export_views(adapter, f"{part_no}-catalog"))
+        artefacts.update(export_views(adapter, f"{part_no}-catalog"))
         _telemetry.success(
             f"{part_no} catalog build saved: volume {props['volume_mm3']:.4f} mm^3"
         )
-        await close_all(adapter)
+        close_all(adapter)
     return artefacts

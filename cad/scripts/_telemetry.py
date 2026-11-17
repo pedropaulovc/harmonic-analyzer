@@ -16,7 +16,7 @@ What you get, **configured on first use** -- the first log, span or
   with the active span's trace/span id, so logs and traces correlate.
 * **Console tracing.** Every span prints a compact, depth-indented boundary line
   on completion (``⟩ name 1.23s OK``) so the trace tree is visible inline.
-* **No-gap spans.** :func:`span` / :func:`aspan` record exceptions on the active
+* **No-gap spans.** :func:`span` records exceptions on the active
   span and set its status to ERROR before re-raising, so a failure is never a
   silent hole in the trace — and :func:`run_pipeline_span` opens a root span that
   spans an entire process invocation, so every child has a parent.
@@ -45,7 +45,7 @@ import sys
 import threading
 import time
 import urllib.parse
-from collections.abc import AsyncGenerator, Generator, Mapping
+from collections.abc import Generator, Mapping
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import IO, Any, cast
@@ -1578,23 +1578,10 @@ def span(
         _exit_span(handle, None)
 
 
-@contextlib.asynccontextmanager
-async def aspan(name: str, /, **attributes: Any) -> AsyncGenerator[Span, None]:
-    """Async sibling of :func:`span` for ``async with`` build steps."""
-    sp, handle, _ = _enter_span(name, attributes)
-    try:
-        yield sp
-    except BaseException as exc:  # noqa: BLE001 - recorded then re-raised
-        _exit_span(handle, exc)
-        raise
-    else:
-        _exit_span(handle, None)
-
-
 def traced(name: str, *, label_param: str | None = None):
     """Decorator that runs the wrapped function inside a span named ``name``.
 
-    Works on both sync and async functions. ``label_param`` names a parameter
+    ``label_param`` names a parameter
     whose value is copied onto the span as a ``label`` attribute (so e.g.
     ``define_circle(..., label="blank_od")`` traces as ``sketch.circle
     label=blank_od``). This is how the focused per-operation helpers turn a
@@ -1615,15 +1602,6 @@ def traced(name: str, *, label_param: str | None = None):
                 pass
             return {}
 
-        if inspect.iscoroutinefunction(fn):
-
-            @functools.wraps(fn)
-            async def awrap(*args, **kwargs):
-                async with aspan(name, **_attrs(args, kwargs)):
-                    return await fn(*args, **kwargs)
-
-            return awrap
-
         @functools.wraps(fn)
         def wrap(*args, **kwargs):
             with span(name, **_attrs(args, kwargs)):
@@ -1638,7 +1616,7 @@ def traced(name: str, *, label_param: str | None = None):
 # Adapter instrumentation.                                                    #
 # --------------------------------------------------------------------------- #
 # Build scripts call the SolidworksMCP adapter directly
-# (``await adapter.create_cut_extrude(...)``) far more often than through a traced
+# (``adapter.create_cut_extrude(...)``) far more often than through a traced
 # focused helper. 42.9 h of ``part.build``'s 79.4 h in the 30 days to 2026-09-27
 # fell in no child span, and log-gap attribution put ~9 h of that on these direct
 # feature/sketch/document calls.
@@ -1647,7 +1625,7 @@ def traced(name: str, *, label_param: str | None = None):
 _ADAPTER_MODULE = "solidworks_mcp.adapters.pywin32_adapter"
 _ADAPTER_CLASS = "PyWin32Adapter"
 
-# Coroutines that each create, regenerate, load or write a whole feature or
+# Methods that each create, regenerate, load or write a whole feature or
 # document -- one call per modelling STEP, seconds each. Per-entity sketch calls
 # (``add_line``, ``add_sketch_constraint``, ``add_sketch_dimension``, ...) and
 # per-value reads/writes are deliberately absent: they run hundreds of times per
@@ -1656,7 +1634,7 @@ _ADAPTER_CLASS = "PyWin32Adapter"
 # is in: 31 modules outside ``diagnostics/`` call it, most directly rather than
 # through ``check.volume``, and log-gap attribution billed 0.9 h of dark
 # ``part.build`` time to it.
-# ``test_telemetry`` pins every name here to a coroutine on the real class, so an
+# ``test_telemetry`` pins every name here to a method on the real class, so an
 # adapter rename fails loud instead of silently going dark.
 ADAPTER_TRACED_METHODS = frozenset(
     {
@@ -1728,9 +1706,9 @@ def _traced_adapter_method(name: str, method: Any) -> Any:
     span_name = f"adapter.{name}"
 
     @functools.wraps(method)
-    async def traced_call(self: Any, *args: Any, **kwargs: Any) -> Any:
-        async with aspan(span_name, arg=_adapter_arg(args)) as sp:
-            result = await method(self, *args, **kwargs)
+    def traced_call(self: Any, *args: Any, **kwargs: Any) -> Any:
+        with span(span_name, arg=_adapter_arg(args)) as sp:
+            result = method(self, *args, **kwargs)
             # The adapter RETURNS its failures (``AdapterResult`` with an error
             # status) and callers often probe with them -- ``build_dt_cone_gear`` tries
             # several axis candidates for one pattern. The status is an attribute,
@@ -1765,7 +1743,7 @@ def instrument_adapter(cls: type) -> int:
         method = getattr(cls, name, None)
         if (
             method is None
-            or not inspect.iscoroutinefunction(method)
+            or not callable(method)
             or getattr(method, "_harmonic_traced", False)
         ):
             continue

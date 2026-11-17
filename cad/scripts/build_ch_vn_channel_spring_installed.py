@@ -25,16 +25,16 @@ from _supplier_extension_spring import add_extension_spring_references
 PART_NAME = "ch-vn-channel-spring-installed"
 
 
-async def _add_supplier_references(adapter) -> None:
-    await add_extension_spring_references(
+def _add_supplier_references(adapter) -> None:
+    add_extension_spring_references(
         adapter, free_length_mm=spec.FREE_LENGTH_MM, max_length_mm=spec.MAX_LENGTH_MM,
         coil_od_mm=spec.SUPPLIER_COIL_OD_MM, wire_dia_mm=spec.SUPPLIER_WIRE_DIA_MM,
         body_count=1,
     )
 
 
-async def build(adapter) -> dict[str, str]:
-    artefacts = await build_spring(
+def build(adapter) -> dict[str, str]:
+    artefacts = build_spring(
         adapter,
         PART_NAME,
         spec.INSTALLED_LENGTH_MM,

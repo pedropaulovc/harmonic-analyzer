@@ -49,8 +49,8 @@ DIMS = HexHeadScrew(
 
 
 @stock_recipe("93075A199", threaded=True)
-async def build_93075A199(adapter, truth=None):
-    await build_hex_head_screw(adapter, DIMS)
+def build_93075A199(adapter, truth=None):
+    build_hex_head_screw(adapter, DIMS)
 
 
 if __name__ == "__main__":

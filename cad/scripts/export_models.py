@@ -1234,7 +1234,7 @@ def sanitize_glb(path: Path) -> list[dict[str, Any]]:
 
 
 @_telemetry.traced("export.build_png", label_param="stem")
-async def export_build_png(adapter: Any, stem: str) -> None:
+def export_build_png(adapter: Any, stem: str) -> None:
     """Repair the build-owned isometric render from an already-open native doc."""
     output = OUT_PNG / stem / f"{stem}_isometric.png"
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -1242,7 +1242,7 @@ async def export_build_png(adapter: Any, stem: str) -> None:
     set_isometric_view(adapter)
     check(
         f"export_image isometric -> {output.name}",
-        await adapter.export_image({
+        adapter.export_image({
             "file_path": str(output.resolve()),
             "format_type": "png",
             "width": 1600,
@@ -1724,7 +1724,7 @@ def export_feature_bundles(stems: list[str]) -> int:
     if missing:
         raise RuntimeError(f"--features: native part(s) not built: {', '.join(missing)}")
 
-    async def build(adapter: Any) -> dict[str, str]:
+    def build(adapter: Any) -> dict[str, str]:
         enforce_preferences(adapter, EXPORT_PREFERENCES)
         done: dict[str, str] = {}
         for stem in stems:
@@ -1734,7 +1734,7 @@ def export_feature_bundles(stems: list[str]) -> int:
                 step.parent.mkdir(parents=True, exist_ok=True)
                 manifest.unlink(missing_ok=True)
                 native_sha = _file_sha256(native)
-                check(f"open {native.name}", await adapter.open_model(str(native)))
+                check(f"open {native.name}", adapter.open_model(str(native)))
                 doc = adapter.currentModel
                 _save_feature_step(doc, stem, step)
                 log(f"saved {step.name} ({step.stat().st_size / 1e6:.1f} MB)")
@@ -1930,7 +1930,7 @@ def main() -> int:
     # Pure Python over ~80 builder imports: resolved before the seat is held.
     threaded = threaded_stock_parts(part_stems()) if stale_asms else frozenset()
 
-    async def build(adapter: Any) -> dict[str, str]:
+    def build(adapter: Any) -> dict[str, str]:
         enforce_preferences(adapter, EXPORT_PREFERENCES)
         done: dict[str, str] = {}
 
@@ -1947,7 +1947,7 @@ def main() -> int:
             for stem in stale_asms:
                 dashed = stem.replace("_", "-")
                 src = OUT_SLDASM / f"{dashed}.SLDASM"
-                check(f"open {src.name}", await adapter.open_model(str(src)))
+                check(f"open {src.name}", adapter.open_model(str(src)))
                 doc = adapter.currentModel
                 # Assembly STEP is deliberately omitted: native Pack-and-Go plus
                 # the scene graph + glTF cover assembly consumption, while
@@ -1969,7 +1969,7 @@ def main() -> int:
                 pending_scenes[stem] = (boxes, scene, stems)
                 all_scene_stems.update(stems)
                 if stem in missing_asm_png:
-                    await export_build_png(adapter, dashed)
+                    export_build_png(adapter, dashed)
                 # The GLB alone shows threaded stock fasteners unthreaded
                 # (unthread_stock_fasteners). Nothing is saved: discard the
                 # dirtied documents without a save prompt and prove no cad/out
@@ -2013,7 +2013,7 @@ def main() -> int:
             # only unenrolled parts need a fresh SaveAs3 STEP.
             for stem in sorted(default_stale | scene_stale | missing_part_png):
                 src = OUT_SLDPRT / f"{stem}.SLDPRT"
-                check(f"open {src.name}", await adapter.open_model(str(src)))
+                check(f"open {src.name}", adapter.open_model(str(src)))
                 doc = adapter.currentModel
                 render_cfg = _active_configuration(doc)
                 if stem in member_parts:
@@ -2042,7 +2042,7 @@ def main() -> int:
                 assert_configs_distinct(stem, crc_by_mesh)
                 if stem in missing_part_png:
                     _switch_configuration(adapter, doc, stem, render_cfg)
-                    await export_build_png(adapter, stem)
+                    export_build_png(adapter, stem)
 
                 d = src_digest(src) if record else None
                 if d is not None:

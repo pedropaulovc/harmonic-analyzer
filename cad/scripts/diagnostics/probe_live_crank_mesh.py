@@ -59,17 +59,17 @@ GEAR64_CENTRE_STATION = dta.GEAR64_CENTRE_STATION
 X16, Y16 = dta.X_CRANK, dta.Y_CRANK
 
 
-async def build(adapter) -> dict[str, str]:
-    check("create_assembly", await adapter.create_assembly())
+def build(adapter) -> dict[str, str]:
+    check("create_assembly", adapter.create_assembly())
     g0 = dta.cone_station(GEAR64_CENTRE_STATION)
-    await place_component(
+    place_component(
         adapter, "dt-crank-drive-gear",
         [g0[0] - dta.GEAR64_FACE / 2.0 * dta.SIN_I, dta.Y_DRIVE,
          g0[2] - dta.GEAR64_FACE / 2.0 * dta.COS_I],
         [0.0, dta.INCLINE_DEG, 0.0], dta.ROT_Y_INCLINE,
         ground=True, label="64T at design",
     )
-    await place_component(
+    place_component(
         adapter, "dt-crank-pinion",
         [X16, Y16, dta.PINION_TOOTH_Z - dta.PINION_FACE / 2.0],
         [0.0, 0.0, -dta.PINION_SEED_DEG], dta.rot_z_rows(-dta.PINION_SEED_DEG),

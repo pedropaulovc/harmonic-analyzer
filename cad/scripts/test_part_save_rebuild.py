@@ -154,7 +154,7 @@ class _Adapter:
     def _attempt(self, fn, default=None):
         return fn()
 
-    async def set_active_configuration(self, name: str):
+    def set_active_configuration(self, name: str):
         raise AssertionError("the chokepoint switches with ShowConfiguration2 only")
 
 
@@ -485,7 +485,7 @@ def test_configuration_inventory_cannot_pass_after_a_no_match_scan(
 
 
 def _assert_reopened_then_tripwire(source: str) -> None:
-    reopened = source.rindex("await adapter.open_model(")
+    reopened = source.rindex("adapter.open_model(")
     tripwire = TRIPWIRE.search(source, reopened)
     assert tripwire is not None
     between = source[reopened : tripwire.start()]
@@ -500,8 +500,8 @@ def test_every_configuration_builder_proves_its_saved_caches_on_reopen(stem) -> 
     builder that saves through save_simplified_part inherits its reopen."""
     module = importlib.import_module(stem)
     source = inspect.getsource(module.build)
-    if "await adapter.open_model(" not in source:
-        if "await save_simplified_part(" in source:
+    if "adapter.open_model(" not in source:
+        if "save_simplified_part(" in source:
             return
         tree = ast.parse(source)
         callbacks = [
@@ -523,9 +523,9 @@ def test_every_configuration_builder_proves_its_saved_caches_on_reopen(stem) -> 
 @pytest.mark.parametrize(
     "build_source",
     (
-        "async def build(adapter):\n    await build_stock_fastener(adapter)\n",
-        "async def build(adapter):\n"
-        "    await build_stock_fastener(adapter, save_threaded_part=choose_saver())\n",
+        "def build(adapter):\n    build_stock_fastener(adapter)\n",
+        "def build(adapter):\n"
+        "    build_stock_fastener(adapter, save_threaded_part=choose_saver())\n",
     ),
 )
 def test_configuration_author_with_unknown_saver_fails_closed(

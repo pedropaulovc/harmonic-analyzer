@@ -252,11 +252,11 @@ def _set_affixes(adapter: Any, annotations: list[Any]) -> None:
     rebuild_drawing(adapter, label="keyed arbor centre-hole affixes")
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open keyed arbor source", await adapter.open_model(str(SOURCE)))
+    check("open keyed arbor source", adapter.open_model(str(SOURCE)))
     required = (
         "Number",
         "Material Specification",
@@ -314,7 +314,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_text(adapter, annotations, dict(spec.DIMENSION_TEXT))
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Keyed Cone Gear Cutting Arbor Drawing",

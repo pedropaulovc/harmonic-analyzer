@@ -60,16 +60,16 @@ def _construction(adapter: Any, entity: str) -> None:
         raise RuntimeError(f"{entity}: supplier reference is not construction geometry")
 
 
-async def _anchor(
+def _anchor(
     adapter: Any, dimensions: SketchDims, entity: str, start: tuple[float, float], name: str
 ) -> None:
-    await anchor_point_to_origin(adapter, f"{entity}.start", *start, name)
+    anchor_point_to_origin(adapter, f"{entity}.start", *start, name)
     for coordinate, axis in zip(start, ("X", "Y"), strict=True):
         if abs(coordinate) >= 1e-9:
             dimensions.record(f"{name}Start{axis}")
 
 
-async def _linear(
+def _linear(
     adapter: Any,
     dimensions: SketchDims,
     name: str,
@@ -84,15 +84,15 @@ async def _linear(
     )
     set_sketch_direct_db(adapter, True)
     try:
-        line = check(f"create {name} supplier reference", await adapter.add_line(*start, *end))
+        line = check(f"create {name} supplier reference", adapter.add_line(*start, *end))
     finally:
         set_sketch_direct_db(adapter, False)
     _construction(adapter, line)
     check(
         f"orient {name} supplier reference",
-        await adapter.add_sketch_constraint(line, None, orientation),
+        adapter.add_sketch_constraint(line, None, orientation),
     )
-    await dimension_between(
+    dimension_between(
         adapter, f"{line}.start", f"{line}.end", f"{orientation}_distance", abs(value), name
     )
     dimensions.record(name)
@@ -107,11 +107,11 @@ async def _linear(
     if any(not isinstance(state, int) for state in states):
         raise RuntimeError(f"{name}: supplier reference endpoint status is unreadable")
     if states != (3, 3):  # swConstrainedStatus_e.swFullyConstrained
-        await _anchor(adapter, dimensions, line, start, name)
+        _anchor(adapter, dimensions, line, start, name)
     _assert_line_frame(adapter, line, start, end)
 
 
-async def _angle(
+def _angle(
     adapter: Any,
     dimensions: SketchDims,
     name: str,
@@ -125,11 +125,11 @@ async def _angle(
     try:
         baseline = check(
             f"create {name} baseline",
-            await adapter.add_line(*start, start[0] + 1.0, start[1]),
+            adapter.add_line(*start, start[0] + 1.0, start[1]),
         )
         ray = check(
             f"create {name} angle ray",
-            await adapter.add_line(*start, start[0] + math.cos(radians), start[1] + math.sin(radians)),
+            adapter.add_line(*start, start[0] + math.cos(radians), start[1] + math.sin(radians)),
         )
     finally:
         set_sketch_direct_db(adapter, False)
@@ -137,18 +137,18 @@ async def _angle(
         _construction(adapter, entity)
     check(
         f"orient {name} baseline",
-        await adapter.add_sketch_constraint(baseline, None, "horizontal"),
+        adapter.add_sketch_constraint(baseline, None, "horizontal"),
     )
-    await dimension_between(
+    dimension_between(
         adapter, f"{baseline}.start", f"{baseline}.end", "horizontal_distance", 1.0, name
     )
     dimensions.record(f"{name}BaselineLength")
-    await _anchor(adapter, dimensions, baseline, start, name)
+    _anchor(adapter, dimensions, baseline, start, name)
     check(
         f"join {name} rays",
-        await adapter.add_sketch_constraint(f"{baseline}.start", f"{ray}.start", "coincident"),
+        adapter.add_sketch_constraint(f"{baseline}.start", f"{ray}.start", "coincident"),
     )
-    await dimension_between(adapter, f"{ray}.start", f"{ray}.end", "distance", 1.0, name)
+    dimension_between(adapter, f"{ray}.start", f"{ray}.end", "distance", 1.0, name)
     dimensions.record(f"{name}RayLength")
     # The generic SDK angle path selects one segment and a vertex. Here the
     # supplier control must drive the angle BETWEEN these two existing rays.
@@ -216,7 +216,7 @@ async def _angle(
 
 
 @_telemetry.traced("part.supplier_reference_sketch")
-async def add_supplier_reference_sketch(
+def add_supplier_reference_sketch(
     adapter: Any,
     dimensions: Sequence[tuple[str, float, str]],
     *,
@@ -250,16 +250,16 @@ async def add_supplier_reference_sketch(
         rows = [row for row in dimensions if planes.get(row[0], "Front") == plane]
         if not rows:
             continue
-        check(f"create {feature}", await adapter.create_sketch(plane))
+        check(f"create {feature}", adapter.create_sketch(plane))
         recorded = SketchDims()
         for name, value, orientation in rows:
             start = starts.get(name, (0.0, 0.0))
             if orientation == "angle":
-                await _angle(adapter, recorded, name, value, start)
+                _angle(adapter, recorded, name, value, start)
             else:
-                await _linear(adapter, recorded, name, value, orientation, start)
-        await ensure_fully_defined(adapter, feature)
-        check(f"exit {feature}", await adapter.exit_sketch())
+                _linear(adapter, recorded, name, value, orientation, start)
+        ensure_fully_defined(adapter, feature)
+        check(f"exit {feature}", adapter.exit_sketch())
         name_last_feature(adapter, feature)
         recorded.apply(adapter, feature)
         model = _early_bound(adapter.currentModel, "IModelDoc2")

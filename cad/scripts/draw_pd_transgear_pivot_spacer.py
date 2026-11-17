@@ -682,11 +682,11 @@ def _place_datum_a(
     return tag, rebuilt
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open transgear-pivot-spacer source", await adapter.open_model(str(SOURCE)))
+    check("open transgear-pivot-spacer source", adapter.open_model(str(SOURCE)))
     read_required_properties(
         adapter.currentModel,
         (
@@ -870,7 +870,7 @@ async def build(adapter: Any) -> dict[str, str]:
             )
         _assert_datum_a_clear(adapter, datum_a)
 
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Transgear Pivot Spacer Manufacturing Drawing",

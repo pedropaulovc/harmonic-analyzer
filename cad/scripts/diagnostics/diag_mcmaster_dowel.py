@@ -91,7 +91,7 @@ def _dowel_com_map(size: tuple[float, float]):
     return lambda v: [v[1], v[0] + half, v[2]]
 
 
-async def build_dowel(
+def build_dowel(
     adapter, part_no: str, size: tuple[float, float], ends: DowelEnds | None = None
 ) -> None:
     if __package__:
@@ -107,13 +107,13 @@ async def build_dowel(
 
     dia, length = size
     radius = dia / 2.0
-    check("create_sketch pin section", await adapter.create_sketch("Front"))
+    check("create_sketch pin section", adapter.create_sketch("Front"))
     sk_mgr = adapter.currentSketchManager
     with no_sketch_inference(adapter):
         if sk_mgr.CreateCenterLine(0.0, 0.0, 0.0, 0.0, length / 1000.0, 0.0) is None:
             raise RuntimeError(f"{part_no} pin section: CreateCenterLine failed")
         if ends is None:
-            await add_line_chain(
+            add_line_chain(
                 adapter,
                 [(0.0, 0.0), (radius, 0.0), (radius, length), (0.0, length)],
             )
@@ -138,23 +138,23 @@ async def build_dowel(
                 )
                 if arc is None:
                     raise RuntimeError(f"{part_no} pin section: round-end arc failed")
-                await add_line_chain(adapter, dowel_section(size, ends), close=False)
+                add_line_chain(adapter, dowel_section(size, ends), close=False)
             finally:
                 sk_mgr.AddToDB = prev_db
-    check("exit_sketch pin section", await adapter.exit_sketch())
+    check("exit_sketch pin section", adapter.exit_sketch())
     name_last_feature(adapter, "PinProfile")
     check(
         "revolve pin",
-        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=False)),
+        adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=False)),
     )
     name_last_feature(adapter, "PinBody")
     volume = dowel_volume(size, ends)
-    await volume_check(adapter, "dowel pin", volume, 0.005 * volume)
+    volume_check(adapter, "dowel pin", volume, 0.005 * volume)
     if ends is not None:
         adapter._mcm_com_map = _dowel_com_map(size)
 
 
-async def build_catalog(
+def build_catalog(
     adapter, part_no: str, size: tuple[float, float], ends: DowelEnds | None = None
 ) -> dict[str, str]:
     """Catalog-only run: build the recipe and save it, no vendor truth."""
@@ -169,19 +169,19 @@ async def build_catalog(
     )
 
     with _telemetry.span("catalog.build", label=part_no):
-        check(f"create_part {part_no}", await adapter.create_part())
+        check(f"create_part {part_no}", adapter.create_part())
         assert_seat_sketch_baseline(adapter, part_no)
-        await build_dowel(adapter, part_no, size, ends)
+        build_dowel(adapter, part_no, size, ends)
         props = mass_properties(adapter)
         if not props["volume_mm3"] > 0.0:
             raise RuntimeError(f"{part_no} catalog build has no solid volume")
         OUT_DIR.mkdir(parents=True, exist_ok=True)
         path = OUT_DIR / f"{part_no}-catalog.SLDPRT"
-        check(f"save -> {path}", await adapter.save_file(str(path.resolve())))
+        check(f"save -> {path}", adapter.save_file(str(path.resolve())))
         artefacts = {"sldprt": str(path)}
-        artefacts.update(await export_views(adapter, f"{part_no}-catalog"))
+        artefacts.update(export_views(adapter, f"{part_no}-catalog"))
         _telemetry.success(
             f"{part_no} catalog build saved: volume {props['volume_mm3']:.4f} mm^3"
         )
-        await close_all(adapter)
+        close_all(adapter)
     return artefacts

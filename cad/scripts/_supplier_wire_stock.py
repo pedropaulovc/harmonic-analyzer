@@ -22,10 +22,10 @@ from _sketch_circle import define_circle
 from _supplier_spring_reference import ReferenceState, add_supplier_reference_configurations
 
 
-async def _nominal_stock_circle(adapter) -> tuple[str, ...]:
+def _nominal_stock_circle(adapter) -> tuple[str, ...]:
     dims = SketchDims()
-    check("create supplier stock cross-section", await adapter.create_sketch("Top"))
-    circle = await define_circle(
+    check("create supplier stock cross-section", adapter.create_sketch("Top"))
+    circle = define_circle(
         adapter, 0.0, 0.0, DIA / 2.0, "as-supplied nominal wire stock", dims=dims,
         names=(None, None, SUPPLIER_REFERENCE_DIMENSION),
     )
@@ -33,8 +33,8 @@ async def _nominal_stock_circle(adapter) -> tuple[str, ...]:
     segment.ConstructionGeometry = True
     if not bool(segment.ConstructionGeometry):
         raise RuntimeError("supplier stock circle must remain construction-only")
-    await ensure_fully_defined(adapter, "supplier nominal stock cross-section")
-    check("exit supplier stock cross-section", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "supplier nominal stock cross-section")
+    check("exit supplier stock cross-section", adapter.exit_sketch())
     name_last_feature(adapter, SUPPLIER_REFERENCE_FEATURE)
     dims.apply(adapter, SUPPLIER_REFERENCE_FEATURE)
     mark_dimensions_for_drawing(
@@ -44,9 +44,9 @@ async def _nominal_stock_circle(adapter) -> tuple[str, ...]:
     return (SUPPLIER_REFERENCE_FEATURE,)
 
 
-async def author_nominal_stock_cross_section(adapter) -> None:
+def author_nominal_stock_cross_section(adapter) -> None:
     """Preserve LeverWire and PenWire; add only a zero-body reference diagram."""
-    await add_supplier_reference_configurations(
+    add_supplier_reference_configurations(
         adapter,
         (ReferenceState(
             SUPPLIER_REFERENCE_CONFIGURATION, None, _nominal_stock_circle,

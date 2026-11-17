@@ -135,9 +135,9 @@ def _assert_one_body(adapter: Any) -> None:
         raise RuntimeError(f"{PART_NAME}: {len(bodies)} solid bodies, expected 1")
 
 
-async def _centre_of_mass_check(adapter: Any, expected_z: float, label: str) -> None:
+def _centre_of_mass_check(adapter: Any, expected_z: float, label: str) -> None:
     """A stem extruded the wrong way keeps its volume; it moves the centroid."""
-    mass = await adapter.get_mass_properties()
+    mass = adapter.get_mass_properties()
     if not mass.is_success:
         raise RuntimeError(f"{label}: get_mass_properties failed: {mass.error}")
     centre = [float(value) for value in mass.data.center_of_mass]
@@ -153,7 +153,7 @@ async def _centre_of_mass_check(adapter: Any, expected_z: float, label: str) -> 
     _telemetry.success(f"{label}: centre of mass z {centre[2]:.4f} mm")
 
 
-async def _turn_stem(
+def _turn_stem(
     adapter: Any,
     *,
     plane: str,
@@ -169,8 +169,8 @@ async def _turn_stem(
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     dims = SketchDims()
-    check(f"create_sketch {label}", await adapter.create_sketch(plane))
-    await define_circle(
+    check(f"create_sketch {label}", adapter.create_sketch(plane))
+    define_circle(
         adapter,
         0.0,
         0.0,
@@ -179,13 +179,13 @@ async def _turn_stem(
         dims=dims,
         names=(None, None, f"{feature}Dia"),
     )
-    await ensure_fully_defined(adapter, f"{label} sketch")
-    check(f"exit_sketch {label}", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, f"{label} sketch")
+    check(f"exit_sketch {label}", adapter.exit_sketch())
     name_last_feature(adapter, profile)
     dims.apply(adapter, profile)
     check(
         f"extrude {label}",
-        await adapter.create_extrusion(
+        adapter.create_extrusion(
             ExtrusionParameters(depth=length, reverse_direction=reverse)
         ),
     )
@@ -193,24 +193,24 @@ async def _turn_stem(
     name_dimensions(adapter, feature, [f"{feature}Length"])
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
     drive_jobs: list[tuple[str, str]] = []
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     # The row's inch calculation units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
     # The globals the family's inspection sketches drive from (inch document:
     # bare values are inches).
     ra_mm = PROFILE.blank_radius_mm
-    await set_global(adapter, "ToothCount", str(TEETH), TEETH)
-    await set_global(adapter, "DP", f"{DIAMETRAL_PITCH:.17g}", DIAMETRAL_PITCH)
+    set_global(adapter, "ToothCount", str(TEETH), TEETH)
+    set_global(adapter, "DP", f"{DIAMETRAL_PITCH:.17g}", DIAMETRAL_PITCH)
     for name, value in (
         ("Ra", ra_mm / MM_PER_IN),
         ("ToothThickness", PROFILE.pitch_tooth_thickness_mm / MM_PER_IN),
         ("FloorDia", FLOOR_DIA / MM_PER_IN),
     ):
-        await set_global(adapter, name, f"{value:.17g}", value)
+        set_global(adapter, name, f"{value:.17g}", value)
 
     # ------------------------------------------------------------------
     # Leaves. The blank: an origin-snapped circle at the tip radius with a
@@ -218,8 +218,8 @@ async def build(adapter: Any) -> dict[str, str]:
     # face width (the family's recipe, so the Front Plane is the south face).
     # ------------------------------------------------------------------
     blank = SketchDims()
-    check("create_sketch blank", await adapter.create_sketch("Front"))
-    await define_circle(
+    check("create_sketch blank", adapter.create_sketch("Front"))
+    define_circle(
         adapter,
         0.0,
         0.0,
@@ -229,47 +229,47 @@ async def build(adapter: Any) -> dict[str, str]:
         names=(None, None, "BlankDia"),
         drives=(None, None, '2 * "Ra"'),
     )
-    await ensure_fully_defined(adapter, "blank sketch")
-    check("exit_sketch blank", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "blank sketch")
+    check("exit_sketch blank", adapter.exit_sketch())
     name_last_feature(adapter, "BlankProfile")
     drive_jobs += blank.apply(adapter, "BlankProfile")
     check(
         "extrude blank",
-        await adapter.create_extrusion(ExtrusionParameters(depth=FACE_WIDTH)),
+        adapter.create_extrusion(ExtrusionParameters(depth=FACE_WIDTH)),
     )
     name_last_feature(adapter, "Blank")
     name_dimensions(adapter, "Blank", ["FaceWidth"])
     blank_volume = math.pi * ra_mm**2 * FACE_WIDTH
-    await volume_check(adapter, "blank", blank_volume, 0.005 * blank_volume)
-    await _centre_of_mass_check(adapter, FACE_WIDTH / 2.0, "blank faces north")
+    volume_check(adapter, "blank", blank_volume, 0.005 * blank_volume)
+    _centre_of_mass_check(adapter, FACE_WIDTH / 2.0, "blank faces north")
 
     # One finite DT6-FORM1 gap, a through cut, the six-gap pattern.
     gap_sketch, gap_cut, gap_pattern = TOOTH_FEATURES
-    check("create_sketch gap", await adapter.create_sketch("Front"))
+    check("create_sketch gap", adapter.create_sketch("Front"))
     curves = [
-        await equation_curve(adapter, f"T006 {label}", x, y)
+        equation_curve(adapter, f"T006 {label}", x, y)
         for label, x, y in native_gap_segments(TEETH)
     ]
-    await ensure_fully_defined(
+    ensure_fully_defined(
         adapter, "T006 finite gap", fix_entities=curves, allow_fix_escalation=True
     )
-    check("exit_sketch gap", await adapter.exit_sketch())
+    check("exit_sketch gap", adapter.exit_sketch())
     name_last_feature(adapter, gap_sketch)
     check(
         "cut T006 finite gap",
-        await adapter.create_cut_extrude(ExtrusionParameters(depth=FACE_WIDTH + 1.0)),
+        adapter.create_cut_extrude(ExtrusionParameters(depth=FACE_WIDTH + 1.0)),
     )
     name_last_feature(adapter, gap_cut)
     removed = PROFILE.gap_area_mm2 * FACE_WIDTH
     area_error = PROFILE.gap_area_error_bound_mm2 * FACE_WIDTH
-    await volume_check(
+    volume_check(
         adapter, "T006 single gap", blank_volume - removed, 0.01 * removed - area_error
     )
-    await pattern_about_z(adapter, gap_cut, TEETH, ra_mm, FACE_WIDTH / 2.0)
+    pattern_about_z(adapter, gap_cut, TEETH, ra_mm, FACE_WIDTH / 2.0)
     name_last_feature(adapter, gap_pattern)
     # The stems' gates below stand on the measured leaves, not on the gap
     # area's analytic error bound.
-    leaves_volume = await volume_check(
+    leaves_volume = volume_check(
         adapter,
         "T006 six gaps",
         blank_volume - TEETH * removed,
@@ -285,7 +285,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # the drive train seats the MHA-DT-38 bushing on, its offset owned by
     # FaceWidth).
     # ------------------------------------------------------------------
-    await _turn_stem(
+    _turn_stem(
         adapter,
         plane="Front",
         profile="SpigotProfile",
@@ -295,12 +295,12 @@ async def build(adapter: Any) -> dict[str, str]:
         label="spigot",
     )
     stem_volume = _STEM_AREA_MM2 * SPIGOT_LENGTH_MM
-    await volume_check(
+    volume_check(
         adapter, "spigot", leaves_volume + stem_volume, 0.005 * stem_volume
     )
     check(
         f"create_plane {LEAVES_NORTH_PLANE}",
-        await adapter.create_plane(
+        adapter.create_plane(
             CreatePlaneParameters(
                 mode="offset", base_plane="Front Plane", offset=FACE_WIDTH
             )
@@ -309,7 +309,7 @@ async def build(adapter: Any) -> dict[str, str]:
     name_last_feature(adapter, LEAVES_NORTH_PLANE)
     station = name_dimensions(adapter, LEAVES_NORTH_PLANE, ["LeavesNorthStation"])
     drive_jobs += [(station[0], '"FaceWidth@Blank"')]
-    await _turn_stem(
+    _turn_stem(
         adapter,
         plane=LEAVES_NORTH_PLANE,
         profile="PivotProfile",
@@ -323,7 +323,7 @@ async def build(adapter: Any) -> dict[str, str]:
     blank_reference_geometry(adapter, ((LEAVES_NORTH_PLANE, "PLANE"),))
     pivot_volume = _STEM_AREA_MM2 * PIVOT_LENGTH_MM
     volume = leaves_volume + stem_volume + pivot_volume
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "pivot", volume, 0.005 * (stem_volume + pivot_volume)
     )
     _assert_one_body(adapter)
@@ -332,33 +332,33 @@ async def build(adapter: Any) -> dict[str, str]:
         - stem_volume * SPIGOT_LENGTH_MM / 2.0
         + pivot_volume * (FACE_WIDTH + PIVOT_LENGTH_MM / 2.0)
     ) / volume
-    await _centre_of_mass_check(adapter, centroid, "stems on their own sides")
-    await bbox_extent_check(adapter, "spigot end to pivot end", "z", OVERALL_LENGTH_MM)
+    _centre_of_mass_check(adapter, centroid, "stems on their own sides")
+    bbox_extent_check(adapter, "spigot end to pivot end", "z", OVERALL_LENGTH_MM)
 
     # ------------------------------------------------------------------
     # The family's construction-only inspection witnesses, volume-neutral.
     # ------------------------------------------------------------------
-    tooth_reference = await _author_tooth_thickness_reference(adapter, teeth=TEETH)
+    tooth_reference = _author_tooth_thickness_reference(adapter, teeth=TEETH)
     name_last_feature(adapter, TOOTH_REFERENCE_SKETCH)
     drive_jobs += tooth_reference.apply(adapter, TOOTH_REFERENCE_SKETCH)
-    floor_reference = await _author_gap_floor_reference(adapter, teeth=TEETH)
+    floor_reference = _author_gap_floor_reference(adapter, teeth=TEETH)
     name_last_feature(adapter, GAP_FLOOR_SKETCH)
     drive_jobs += floor_reference.apply(adapter, GAP_FLOOR_SKETCH)
-    blank_reference = await _author_blank_dia_reference(adapter, ra_mm)
+    blank_reference = _author_blank_dia_reference(adapter, ra_mm)
     drive_jobs += blank_reference.apply(adapter, BLANK_DIA_REFERENCE_SKETCH)
 
     # Deferred drive equations, then re-check neutrality (each evaluates to
     # the as-built value, so the geometry must not move).
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    volume_check(
         adapter, "driven tip gear (equations neutral)", volume, 0.001 * volume
     )
 
-    await apply_material(adapter, MATERIAL)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    report_mass_properties(adapter)
 
     # Bands on the model dimensions (millimetres; UNIT prints them in decimal
     # inch at the nominal's places), then the part-owned places.
@@ -396,7 +396,7 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
     blank_reference_sketches(adapter, REFERENCE_SKETCHES)
-    return await save_simplified_part(adapter, PART_NAME, SIMPLIFIED_FEATURES)
+    return save_simplified_part(adapter, PART_NAME, SIMPLIFIED_FEATURES)
 
 
 if __name__ == "__main__":

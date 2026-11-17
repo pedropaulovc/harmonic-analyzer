@@ -62,18 +62,18 @@ def _require_one_solid_body(adapter, *, label: str) -> None:
         raise RuntimeError(f"{label}: expected exactly one solid body, found {len(bodies)}")
 
 
-async def build(adapter) -> dict[str, str]:
-    check("create_part", await adapter.create_part())
+def build(adapter) -> dict[str, str]:
+    check("create_part", adapter.create_part())
     # #290: the row's inch calculation units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
-    await set_global(adapter, "RodDia", f"{ROD_DIA}mm")
-    await set_global(adapter, "RodSpan", f"{ROD_SPAN}mm")
-    await set_global(adapter, "RodDown", f"{ROD_DOWN}mm")
+    set_global(adapter, "RodDia", f"{ROD_DIA}mm")
+    set_global(adapter, "RodSpan", f"{ROD_SPAN}mm")
+    set_global(adapter, "RodDown", f"{ROD_DOWN}mm")
 
     rod = SketchDims()
-    check("create_sketch rod", await adapter.create_sketch("Top"))
-    await define_circle(
+    check("create_sketch rod", adapter.create_sketch("Top"))
+    define_circle(
         adapter,
         0.0,
         0.0,
@@ -83,22 +83,22 @@ async def build(adapter) -> dict[str, str]:
         names=("RodCx", "RodCz", "RodDia"),
         drives=(None, None, '"RodDia"'),
     )
-    await ensure_fully_defined(adapter, "grip-crossrod sketch")
-    check("exit_sketch rod", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "grip-crossrod sketch")
+    check("exit_sketch rod", adapter.exit_sketch())
     name_last_feature(adapter, "RodProfile")
     drive_jobs = rod.apply(adapter, "RodProfile")
 
     extrude_at_offset(adapter, ROD_SPAN, -ROD_DOWN)
     name_last_feature(adapter, "Rod")
     drive_jobs.append((name_dimensions(adapter, "Rod", ["RodSpan"])[0], '"RodSpan"'))
-    await volume_check(adapter, "grip crossrod", V_ROD, 0.005 * V_ROD)
+    volume_check(adapter, "grip crossrod", V_ROD, 0.005 * V_ROD)
     _require_one_solid_body(adapter, label="grip crossrod")
 
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dimension_name, expression in drive_jobs:
-        await drive_dimension(adapter, dimension_name, expression)
-    await force_rebuild(adapter)
-    await volume_check(
+        drive_dimension(adapter, dimension_name, expression)
+    force_rebuild(adapter)
+    volume_check(
         adapter, "driven grip crossrod (equations neutral)", V_ROD, 0.005 * V_ROD
     )
     _require_one_solid_body(adapter, label="driven grip crossrod")
@@ -109,9 +109,9 @@ async def build(adapter) -> dict[str, str]:
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
 
-    await apply_material(adapter, MATERIAL)
-    await apply_color(adapter, POLISHED_STEEL)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    apply_color(adapter, POLISHED_STEEL)
+    report_mass_properties(adapter)
     apply_drawing_properties(
         adapter,
         PART_NAME,
@@ -120,7 +120,7 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
-    artefacts = await save_part_and_images(adapter, PART_NAME)
+    artefacts = save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
     return artefacts
 

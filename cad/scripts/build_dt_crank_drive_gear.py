@@ -216,27 +216,27 @@ BORE_DIAMETER = 0.375 * IN
 
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     # #290: the row's inch calculation units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # This INCH document needs explicit mm suffixes in its editable globals.
     # The face width, round bore, keyway and entry chamfer dimensions are
     # equation-driven after the full feature tree exists.
-    await set_global(adapter, "FaceWidth", f"{FACE_WIDTH}mm")
-    await set_global(adapter, "BoreDia", f"{BORE_DIAMETER}mm")
-    await set_global(adapter, "KeywayWidth", f"{KEYWAY_WIDTH}mm")
-    await set_global(adapter, "KeywayT", f"{KEYWAY_T}mm")
-    await set_global(adapter, "BoreSouthChamferSize", f"{BORE_SOUTH_CHAMFER}mm")
+    set_global(adapter, "FaceWidth", f"{FACE_WIDTH}mm")
+    set_global(adapter, "BoreDia", f"{BORE_DIAMETER}mm")
+    set_global(adapter, "KeywayWidth", f"{KEYWAY_WIDTH}mm")
+    set_global(adapter, "KeywayT", f"{KEYWAY_T}mm")
+    set_global(adapter, "BoreSouthChamferSize", f"{BORE_SOUTH_CHAMFER}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
     # The shared helper cuts one straight stock-form tooth space through the
     # full-tip blank, gates its volume and native flanks, then patterns it.
-    disc = await build_straight_gash_gear(
+    disc = build_straight_gash_gear(
         adapter, TOOTH_SPACE_FORM, TOOTH_SPACE, TEETH, flank_bound_mm=NATIVE_FLANK_BOUND_MM
     )
     volume = disc.volume
@@ -262,7 +262,7 @@ async def build(adapter) -> dict[str, str]:
     # B17.1), as the retired D-bore's across-flat witness did, and centres
     # the keyway on +X; the top's length is KeywayWidth.
     bore = SketchDims()
-    check("create_sketch bore", await adapter.create_sketch("Front"))
+    check("create_sketch bore", adapter.create_sketch("Front"))
     radius = BORE_DIAMETER / 2.0
     half_width = KEYWAY_WIDTH / 2.0
     top_x = KEYWAY_T - radius
@@ -270,21 +270,21 @@ async def build(adapter) -> dict[str, str]:
     set_sketch_direct_db(adapter, True)
     arc = check(
         "keyed bore major arc",
-        await adapter.add_arc(0.0, 0.0, side_x, half_width, side_x, -half_width),
+        adapter.add_arc(0.0, 0.0, side_x, half_width, side_x, -half_width),
     )
     lower_side = check(
         "keyway lower side",
-        await adapter.add_line(side_x, -half_width, top_x, -half_width),
+        adapter.add_line(side_x, -half_width, top_x, -half_width),
     )
     top = check(
-        "keyway top", await adapter.add_line(top_x, -half_width, top_x, half_width)
+        "keyway top", adapter.add_line(top_x, -half_width, top_x, half_width)
     )
     upper_side = check(
         "keyway upper side",
-        await adapter.add_line(top_x, half_width, side_x, half_width),
+        adapter.add_line(top_x, half_width, side_x, half_width),
     )
     t_witness = check(
-        "keyway T witness", await adapter.add_line(-radius, 0.0, top_x, 0.0)
+        "keyway T witness", adapter.add_line(-radius, 0.0, top_x, 0.0)
     )
     set_sketch_direct_db(adapter, False)
     _as_construction(adapter, t_witness)
@@ -302,28 +302,28 @@ async def build(adapter) -> dict[str, str]:
         ("witness on bore centre", f"{t_witness}.start", "origin", "horizontal_points"),
         ("witness at keyway top midpoint", f"{t_witness}.end", top, "midpoint"),
     ):
-        check(label, await adapter.add_sketch_constraint(first, second, relation))
+        check(label, adapter.add_sketch_constraint(first, second, relation))
     check(
-        "bore diameter", await adapter.add_sketch_dimension(
+        "bore diameter", adapter.add_sketch_dimension(
             arc, None, "diameter", BORE_DIAMETER
         ),
     )
     bore.record("BoreDia", '"BoreDia"')
     check(
-        "keyway width", await adapter.add_sketch_dimension(
+        "keyway width", adapter.add_sketch_dimension(
             f"{top}.start", f"{top}.end", "vertical_distance", KEYWAY_WIDTH,
         ),
     )
     bore.record("KeywayWidth", '"KeywayWidth"')
     check(
-        "keyway T", await adapter.add_sketch_dimension(
+        "keyway T", adapter.add_sketch_dimension(
             f"{t_witness}.start", f"{t_witness}.end",
             "horizontal_distance", KEYWAY_T,
         ),
     )
     bore.record("KeywayT", '"KeywayT"')
-    await ensure_fully_defined(adapter, "keyed bore sketch")
-    check("exit_sketch bore", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "keyed bore sketch")
+    check("exit_sketch bore", adapter.exit_sketch())
     name_last_feature(adapter, "BoreProfile")
     drive_jobs += bore.apply(adapter, "BoreProfile")
     _verify_named_dimension(adapter, "BoreDia@BoreProfile", BORE_DIAMETER)
@@ -331,12 +331,12 @@ async def build(adapter) -> dict[str, str]:
     _verify_named_dimension(adapter, "KeywayT@BoreProfile", KEYWAY_T)
     check(
         "cut keyed bore",
-        await adapter.create_cut_extrude(ExtrusionParameters(depth=FACE_WIDTH + 2.0)),
+        adapter.create_cut_extrude(ExtrusionParameters(depth=FACE_WIDTH + 2.0)),
     )
     name_last_feature(adapter, "Bore")
     v_bore = _keyed_bore_area(radius, half_width, top_x) * FACE_WIDTH
     expected = volume - v_bore
-    await volume_check(adapter, "keyed bore", expected, 0.01 * v_bore)
+    volume_check(adapter, "keyed bore", expected, 0.01 * v_bore)
 
     # The south (z=0) round bore edge only, picked on -X away from the
     # keyway; the chamfer's cone runs out against the keyway's sides, which
@@ -344,7 +344,7 @@ async def build(adapter) -> dict[str, str]:
     # face seats flat. The north rim stays square against T120.
     check(
         "chamfer south bore entry",
-        await adapter.add_chamfer(BORE_SOUTH_CHAMFER, [[-radius, 0.0, 0.0]]),
+        adapter.add_chamfer(BORE_SOUTH_CHAMFER, [[-radius, 0.0, 0.0]]),
     )
     name_last_feature(adapter, "BoreSouthChamfer")
     chamfer_dim = name_dimensions(
@@ -354,14 +354,14 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs.append((chamfer_dim, '"BoreSouthChamferSize"'))
     v_chamfer = _bore_south_chamfer_volume(radius, half_width, top_x, BORE_SOUTH_CHAMFER)
     expected -= v_chamfer
-    await volume_check(adapter, "south bore chamfer", expected, 0.03 * v_chamfer + 0.15)
+    volume_check(adapter, "south bore chamfer", expected, 0.03 * v_chamfer + 0.15)
 
     # Named bore/central axis for view-independent assembly mate
     # selection (M6 mated-DOF drive train). Renamed BoreAxis: the tooth cut
     # creates its own reference axes first, so the default AxisN ordinal the
     # assembly used to quote (Axis2) now names the tooth space's pivot (farm
     # run 20261110T211638308Z: '64T coaxial' landed 36.75 mm off).
-    bore_axis = await name_bore_axis(
+    bore_axis = name_bore_axis(
         adapter, "Top Plane", 0.0, "Right Plane", 0.0, "bore axis"
     )
     _feature_by_name(adapter, bore_axis).Name = BORE_AXIS
@@ -370,10 +370,10 @@ async def build(adapter) -> dict[str, str]:
     # Apply the deferred drive equations after the whole model + a rebuild exist,
     # then re-check: each equation evaluates to the as-built value, so the
     # geometry must not move.
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
     face_lower, face_upper = deviations(GEAR_FACE_WIDTH_BAND)
     if face_lower != -face_upper:
         raise AssertionError("the 64T face-width band must be symmetric")
@@ -392,7 +392,7 @@ async def build(adapter) -> dict[str, str]:
         display_unit=UNIT,
     )
     _set_keyway_t_limits(adapter)
-    await volume_check(
+    volume_check(
         adapter, "driven crank-drive gear (equations neutral)",
         expected, 0.03 * v_chamfer + 0.15,
     )
@@ -403,13 +403,13 @@ async def build(adapter) -> dict[str, str]:
     # sketch whose one driving dimension IS the value"); this sketch owns its
     # band and callout whatever recipe cuts the teeth. Construction geometry:
     # its dimension imports onto the sheet, the circle itself is never drawn.
-    check("create_sketch tip reference", await adapter.create_sketch("Front"))
-    tip_ref = await define_circle(
+    check("create_sketch tip reference", adapter.create_sketch("Front"))
+    tip_ref = define_circle(
         adapter, 0.0, 0.0, OUTSIDE_DIA / 2.0, "tip circle reference"
     )
     _as_construction(adapter, tip_ref)
-    await ensure_fully_defined(adapter, "tip circle reference sketch")
-    check("exit_sketch tip reference", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "tip circle reference sketch")
+    check("exit_sketch tip reference", adapter.exit_sketch())
     name_last_feature(adapter, "OutsideDiaReference")
     name_dimensions(adapter, "OutsideDiaReference", ["OutsideDia"])
     _verify_named_dimension(adapter, "OutsideDia@OutsideDiaReference", OUTSIDE_DIA)
@@ -423,8 +423,8 @@ async def build(adapter) -> dict[str, str]:
         display_unit=UNIT,
     )
 
-    await apply_material(adapter, MATERIAL)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    report_mass_properties(adapter)
 
     # Mark the five manufacturing dimensions, author their model precision
     # and stamp the drawing's title-block and gear-data properties.
@@ -438,7 +438,7 @@ async def build(adapter) -> dict[str, str]:
     # no assembly instance renders it (#880).  The drawing shows it per view
     # through _drawing_hidden_sketches to import those dimensions.
     blank_sketch(adapter, "OutsideDiaReference")
-    return await save_simplified_part(adapter, PART_NAME, disc.tooth_features)
+    return save_simplified_part(adapter, PART_NAME, disc.tooth_features)
 
 
 if __name__ == "__main__":

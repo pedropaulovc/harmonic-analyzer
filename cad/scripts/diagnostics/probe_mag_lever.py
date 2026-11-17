@@ -53,11 +53,11 @@ def _status(adapter, comp):
     return "??"
 
 
-async def build(adapter):
-    check("create_assembly", await adapter.create_assembly())
-    mb = await place_component(adapter, "mg-magnifying-bracket",
+def build(adapter):
+    check("create_assembly", adapter.create_assembly())
+    mb = place_component(adapter, "mg-magnifying-bracket",
                                [-40.0, LEVER_ROD_Y, LEVER_ROD_Z], [0.0, 0.0, 0.0], IDENTITY)
-    ml = await place_component(adapter, "mg-magnifying-lever",
+    ml = place_component(adapter, "mg-magnifying-lever",
                                [-200.0, LEVER_ROD_Y, LEVER_ROD_Z], [0.0, 0.0, 0.0],
                                IDENTITY, ground=False)
     ml_o = _org(adapter, ml)
@@ -65,18 +65,18 @@ async def build(adapter):
     tip0 = world_point(adapter, ml, [82.5, 3.0, 0.0])  # rod side point (off-axis)
     log(f"rod side point BEFORE = {tip0}")
 
-    await coincident_mate(adapter, named_ref(f"Axis1@{ml}", "AXIS"),
+    coincident_mate(adapter, named_ref(f"Axis1@{ml}", "AXIS"),
                           named_ref(f"Axis1@{mb}", "AXIS"),
                           label="collar pivot", verify=(ml, ml_o))
     log(f"after radial: {_status(adapter, ml)}")
 
-    await distance_driver(adapter, named_ref(f"Right Plane@{ml}", "PLANE"),
+    distance_driver(adapter, named_ref(f"Right Plane@{ml}", "PLANE"),
                           named_ref("Right Plane", "PLANE"), abs(ml_o[0]),
                           label="axial", verify=(ml, ml_o))
     log(f"after axial(Right d={abs(ml_o[0]):.1f}): {_status(adapter, ml)}")
 
     try:
-        await angle_driver(adapter, named_ref(f"Top Plane@{ml}", "PLANE"),
+        angle_driver(adapter, named_ref(f"Top Plane@{ml}", "PLANE"),
                            named_ref("Top Plane", "PLANE"), 0.0,
                            label="rock", verify=(ml, ml_o))
         log(f"after angle(Top): {_status(adapter, ml)}")

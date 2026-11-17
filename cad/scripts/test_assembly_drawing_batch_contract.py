@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import importlib.util
 from pathlib import Path
 from types import SimpleNamespace
@@ -300,13 +299,13 @@ def test_each_simple_recipe_forwards_its_registered_layout(monkeypatch) -> None:
     for drawing in SIMPLE_ASSEMBLY_DRAWINGS:
         forwarded: list[dict[str, object]] = []
 
-        async def build_shared(_adapter, **kwargs):
+        def build_shared(_adapter, **kwargs):
             forwarded.append(kwargs)
             return {"pdf": "forwarded"}
 
         monkeypatch.setattr(drawing, "build_simple_three_view_drawing", build_shared)
 
-        result = asyncio.run(drawing.build(object()))
+        result = drawing.build(object())
 
         assert result == {"pdf": "forwarded"}
         assert len(forwarded) == 1
@@ -339,7 +338,7 @@ def test_shared_builder_places_exactly_front_right_and_isometric(
         open_model=lambda _path: None, currentModel=FakeDrawing(views)
     )
 
-    async def open_model(path: str) -> bool:
+    def open_model(path: str) -> bool:
         calls.append(("open", path))
         return True
 
@@ -368,7 +367,7 @@ def test_shared_builder_places_exactly_front_right_and_isometric(
 
     monkeypatch.setattr(_assembly_drawing, "place_view", place)
 
-    async def finalize(_adapter, actual_outputs, *, layout, pdf_title, scale):
+    def finalize(_adapter, actual_outputs, *, layout, pdf_title, scale):
         calls.append(("finalize", actual_outputs, layout, pdf_title, scale))
         return {"pdf": str(actual_outputs.pdf)}
 
@@ -378,8 +377,7 @@ def test_shared_builder_places_exactly_front_right_and_isometric(
         assert actual_adapter is adapter
         calls.append(("annotations", len(views)))
 
-    result = asyncio.run(
-        _assembly_drawing.build_simple_three_view_drawing(
+    result = _assembly_drawing.build_simple_three_view_drawing(
             adapter,
             source=source,
             outputs=outputs,
@@ -391,7 +389,6 @@ def test_shared_builder_places_exactly_front_right_and_isometric(
             pdf_title="Assembly Drawing",
             annotate=annotate if with_annotations else None,
         )
-    )
 
     view_calls = [call for call in calls if call[0] == "view"]
     assert [call[2] for call in view_calls] == ["*Front", "*Right", "*Isometric"]

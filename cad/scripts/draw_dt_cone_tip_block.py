@@ -1957,11 +1957,11 @@ def _hide_cosmetic_threads(adapter: Any, view: Any, *, label: str) -> int:
 
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open cone-tip-block source", await adapter.open_model(str(SOURCE)))
+    check("open cone-tip-block source", adapter.open_model(str(SOURCE)))
     source_model = adapter.currentModel
     read_required_properties(
         source_model,
@@ -2247,7 +2247,7 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, top, right, left, bottom):
         set_hidden_lines_removed(adapter, view)
 
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Cone Tip Block Manufacturing Drawing",

@@ -87,7 +87,7 @@ class _WitnessAdapter:
             )
         )
 
-    async def add_line(self, x0, y0, x1, y1):
+    def add_line(self, x0, y0, x1, y1):
         name = f"Line{len(self._sketch_entities) + 1}"
         if self.defect == "translated":
             x0, x1 = x0 + 0.1, x1 + 0.1
@@ -100,7 +100,7 @@ class _WitnessAdapter:
         name, endpoint = reference.split(".")
         return self._sketch_entities[name].points[endpoint == "end"]
 
-    async def add_sketch_constraint(self, first, second, kind):
+    def add_sketch_constraint(self, first, second, kind):
         if second == "origin" and kind == "coincident":
             point = self.point(first)
             if point.Status == 3:
@@ -112,7 +112,7 @@ class _WitnessAdapter:
             self.point(first).Status = self.point(second).Status
         return _result("relation")
 
-    async def add_sketch_dimension(self, first, second, kind, value):
+    def add_sketch_dimension(self, first, second, kind, value):
         # The old generic one-ray/vertex route does not create a control between
         # the two rays. The positive test must observe a real native angle.
         if kind == "angular":
@@ -161,11 +161,10 @@ def witnesses(monkeypatch):
     return source
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize("statuses", [(3, 3), (2, 2), (3, 2)])
-async def test_linear_witness_retains_exact_frame_without_redundant_anchor(witnesses, statuses):
+def test_linear_witness_retains_exact_frame_without_redundant_anchor(witnesses, statuses):
     adapter = _WitnessAdapter(statuses=statuses)
-    await witnesses._linear(adapter, witnesses.SketchDims(), "SupplierWidth", 6.35,
+    witnesses._linear(adapter, witnesses.SketchDims(), "SupplierWidth", 6.35,
                             "horizontal", (0.0, 0.0))
     line = adapter._sketch_entities["Line1"]
     assert [(point.X, point.Y, point.Z) for point in line.points] == [
@@ -176,24 +175,22 @@ async def test_linear_witness_retains_exact_frame_without_redundant_anchor(witne
     assert adapter.currentSketchManager.AddToDB is False
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize("statuses,defect,error", [
     ((None, 3), None, "status is unreadable"),
     ((3, 3), "translated", "final-frame coordinates"),
 ])
-async def test_linear_witness_refuses_unknown_status_or_same_length_wrong_frame(
+def test_linear_witness_refuses_unknown_status_or_same_length_wrong_frame(
     witnesses, statuses, defect, error
 ):
     adapter = _WitnessAdapter(statuses=statuses, defect=defect)
     with pytest.raises(RuntimeError, match=error):
-        await witnesses._linear(adapter, witnesses.SketchDims(), "SupplierWidth", 6.35,
+        witnesses._linear(adapter, witnesses.SketchDims(), "SupplierWidth", 6.35,
                                 "horizontal", (0.0, 0.0))
 
 
-@pytest.mark.asyncio
-async def test_supplier_angle_is_driving_between_actual_rays_in_the_owning_plane(witnesses):
+def test_supplier_angle_is_driving_between_actual_rays_in_the_owning_plane(witnesses):
     adapter = _WitnessAdapter()
-    await witnesses._angle(adapter, witnesses.SketchDims(), "SupplierHeadAngle", 82.0, (2.0, -3.0))
+    witnesses._angle(adapter, witnesses.SketchDims(), "SupplierHeadAngle", 82.0, (2.0, -3.0))
     assert adapter.angle is not None
     assert math.degrees(adapter.angle.SystemValue) == pytest.approx(82.0)
     assert adapter.angle.DrivenState == 2
@@ -207,17 +204,16 @@ async def test_supplier_angle_is_driving_between_actual_rays_in_the_owning_plane
     assert adapter.currentSketchManager.AddToDB is False
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize("defect,error", [
     ("constructor-refused", "AddSpecificDimension"),
     ("wrong-type", "not a native angular dimension"),
     ("wrong-angle", "not the specified"),
     ("driven-only", "not an exact driving control"),
 ])
-async def test_supplier_angle_refuses_failed_or_non_driving_native_controls(witnesses, defect, error):
+def test_supplier_angle_refuses_failed_or_non_driving_native_controls(witnesses, defect, error):
     adapter = _WitnessAdapter(defect=defect)
     with pytest.raises(RuntimeError, match=error):
-        await witnesses._angle(adapter, witnesses.SketchDims(), "SupplierHeadAngle", 82.0, (0.0, 0.0))
+        witnesses._angle(adapter, witnesses.SketchDims(), "SupplierHeadAngle", 82.0, (0.0, 0.0))
     assert adapter.selected == []
 
 
@@ -309,27 +305,26 @@ def _spring_pin_source(*, limits=(0.062, 0.065), precision=3):
 
 
 def _author_spring_pin(monkeypatch, source):
-    import asyncio
 
     import _supplier_pin_model as pins
 
     events = []
 
-    async def create_sketch(plane):
+    def create_sketch(plane):
         events.append(("sketch", plane))
         return _result()
 
-    async def define_circle(_adapter, x, y, radius, *_args, **_kwargs):
+    def define_circle(_adapter, x, y, radius, *_args, **_kwargs):
         events.append(("circle", x, y, radius))
         return "circle"
 
-    async def nothing(*_args, **_kwargs):
+    def nothing(*_args, **_kwargs):
         return None
 
-    async def line_chain(*_args, **_kwargs):
+    def line_chain(*_args, **_kwargs):
         return ("wall",)
 
-    async def constraint(*_args, **_kwargs):
+    def constraint(*_args, **_kwargs):
         return _result()
 
     adapter = SimpleNamespace(
@@ -348,7 +343,7 @@ def _author_spring_pin(monkeypatch, source):
                         lambda _adapter, names: events.append(("blank", tuple(names))))
     monkeypatch.setattr(pins, "assert_supplier_spring_pin_references",
                         lambda *_args: events.append(("readback",)))
-    asyncio.run(pins.author_supplier_spring_pin_references(adapter, source))
+    pins.author_supplier_spring_pin_references(adapter, source)
     return events
 
 

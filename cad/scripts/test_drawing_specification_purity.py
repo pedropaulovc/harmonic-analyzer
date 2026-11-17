@@ -421,7 +421,7 @@ requirement(
     requirements=("note",), fields={"note": (DECLARED_NOTE, ("MINIMUM",))},
 )
 
-async def build(adapter):
+def build(adapter):
     add_attached_note(
         adapter, view, text=f"{part_spec.MINIMUM:.1f} min",
         note_xy=(0.1, 0.2), label="native note",

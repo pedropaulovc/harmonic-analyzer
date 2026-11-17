@@ -21,7 +21,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import MagicMock, Mock
 
 import pytest
 
@@ -307,8 +307,8 @@ def test_run_build_cleans_up_when_session_setup_fails(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     adapter = SimpleNamespace(
-        connect=AsyncMock(),
-        disconnect=AsyncMock(),
+        connect=MagicMock(),
+        disconnect=MagicMock(),
         swApp=SimpleNamespace(CloseAllDocuments=Mock()),
     )
     constructor = Mock(return_value=adapter)
@@ -326,11 +326,11 @@ def test_run_build_cleans_up_when_session_setup_fails(
     monkeypatch.setattr(_telemetry, "shutdown", Mock())
     monkeypatch.setattr(sys, "argv", ["build_probe.py"])
     monkeypatch.delenv("TRACEPARENT", raising=False)
-    build = AsyncMock()
+    build = MagicMock()
 
     assert _session.run_build(build) == 1
-    build.assert_not_awaited()
-    adapter.disconnect.assert_awaited_once_with()
+    build.assert_not_called()
+    adapter.disconnect.assert_called_once_with()
     # Setup discarded once and failed on the survivor; teardown still discards
     # (the seat must be left empty even when the session never built).
     assert _session.discard_open_documents.call_args_list == [
@@ -378,8 +378,8 @@ def _seat(
         StartupProcessCompleted=True,
     )
     adapter = SimpleNamespace(
-        connect=AsyncMock(),
-        disconnect=AsyncMock(),
+        connect=MagicMock(),
+        disconnect=MagicMock(),
         swApp=app,
         _attempt=lambda call, default=None: call(),
     )
@@ -419,7 +419,7 @@ def _run_session(
         "success",
         lambda _message, **fields: session.fields.update(fields),
     )
-    assert _session.run_build(AsyncMock(return_value={})) == 0
+    assert _session.run_build(MagicMock(return_value={})) == 0
     return session
 
 
@@ -674,7 +674,7 @@ def test_connect_is_split_into_dispatch_identity_and_discard(
     # startup gate runs inside seat.identity and BEFORE seat.discard, the
     # session's first document operation.
     opened: list[str] = []
-    span, aspan = _telemetry.span, _telemetry.aspan
+    span, span = _telemetry.span, _telemetry.span
 
     def record_span(name, /, **attrs):
         opened.append(name)
@@ -682,10 +682,10 @@ def test_connect_is_split_into_dispatch_identity_and_discard(
 
     def record_aspan(name, /, **attrs):
         opened.append(name)
-        return aspan(name, **attrs)
+        return span(name, **attrs)
 
     monkeypatch.setattr(_telemetry, "span", record_span)
-    monkeypatch.setattr(_telemetry, "aspan", record_aspan)
+    monkeypatch.setattr(_telemetry, "span", record_aspan)
     adapter, _app = _seat(str(_seat_forensics._seat_park_directory()))
 
     _run_session(monkeypatch, adapter)

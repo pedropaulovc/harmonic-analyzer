@@ -45,8 +45,8 @@ SUPPLIER_DATA = (
 )
 
 
-async def build(adapter: Any) -> dict[str, str]:
-    return await build_purchased_fastener_drawing(
+def build(adapter: Any) -> dict[str, str]:
+    return build_purchased_fastener_drawing(
         adapter, SPEC, item=ITEM, supplier_data=SUPPLIER_DATA,
         unit=part_drawing_unit(SPEC.artifact_stem),
     )

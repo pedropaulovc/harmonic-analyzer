@@ -52,15 +52,15 @@ DIMENSIONS_BY_FEATURE = {
 }
 
 
-async def _length_reference(
+def _length_reference(
     adapter: Any, feature: str, name: str, length: float
 ) -> str:
-    check(f"create {feature}", await adapter.create_sketch("Front"))
+    check(f"create {feature}", adapter.create_sketch("Front"))
     dims = SketchDims()
     set_sketch_direct_db(adapter, True)
     try:
         line = check(
-            f"create {name}", await adapter.add_line(-length / 2, 0.0, length / 2, 0.0)
+            f"create {name}", adapter.add_line(-length / 2, 0.0, length / 2, 0.0)
         )
     finally:
         set_sketch_direct_db(adapter, False)
@@ -70,16 +70,16 @@ async def _length_reference(
         raise RuntimeError(f"{name}: source length chord must be construction geometry")
     check(
         f"horizontal {name}",
-        await adapter.add_sketch_constraint(line, None, "horizontal"),
+        adapter.add_sketch_constraint(line, None, "horizontal"),
     )
-    await dimension_between(
+    dimension_between(
         adapter, f"{line}.start", f"{line}.end", "horizontal_distance", length, name
     )
     dims.record(name)
-    await anchor_point_to_origin(adapter, f"{line}.start", -length / 2, 0.0, name)
+    anchor_point_to_origin(adapter, f"{line}.start", -length / 2, 0.0, name)
     dims.record(f"{name}HalfSpan")
-    await ensure_fully_defined(adapter, feature)
-    check(f"exit {feature}", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, feature)
+    check(f"exit {feature}", adapter.exit_sketch())
     name_last_feature(adapter, feature)
     dims.apply(adapter, feature)
     mark_dimensions_for_drawing(adapter, feature, {name})
@@ -87,15 +87,15 @@ async def _length_reference(
     return feature
 
 
-async def _sections(adapter: Any, *, coil_od_mm: float, wire_dia_mm: float) -> str:
-    check("create supplier nominal sections", await adapter.create_sketch("Right"))
+def _sections(adapter: Any, *, coil_od_mm: float, wire_dia_mm: float) -> str:
+    check("create supplier nominal sections", adapter.create_sketch("Right"))
     dims = SketchDims()
     for name, diameter, center in (
         (COIL_OD, coil_od_mm, (0.0, 0.0)),
         # Right-plane sketch X = model -Z: the native coil seed is at +Z.
         (WIRE_DIA, wire_dia_mm, (-(coil_od_mm - wire_dia_mm) / 2, 0.0)),
     ):
-        entity = await define_circle(
+        entity = define_circle(
             adapter,
             *center,
             diameter / 2,
@@ -107,8 +107,8 @@ async def _sections(adapter: Any, *, coil_od_mm: float, wire_dia_mm: float) -> s
         segment.ConstructionGeometry = True
         if not segment.ConstructionGeometry:
             raise RuntimeError(f"{name}: source section is not construction geometry")
-    await ensure_fully_defined(adapter, SECTION_FEATURE)
-    check("exit supplier nominal sections", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, SECTION_FEATURE)
+    check("exit supplier nominal sections", adapter.exit_sketch())
     name_last_feature(adapter, SECTION_FEATURE)
     dims.apply(adapter, SECTION_FEATURE)
     mark_dimensions_for_drawing(adapter, SECTION_FEATURE, {COIL_OD, WIRE_DIA})
@@ -116,7 +116,7 @@ async def _sections(adapter: Any, *, coil_od_mm: float, wire_dia_mm: float) -> s
     return SECTION_FEATURE
 
 
-async def add_extension_spring_references(
+def add_extension_spring_references(
     adapter: Any,
     *,
     free_length_mm: float,
@@ -127,19 +127,19 @@ async def add_extension_spring_references(
 ) -> None:
     """Add nominal source gauges only; never author free/max physical solids."""
 
-    async def free_refs(target: Any) -> tuple[str, ...]:
-        length = await _length_reference(
+    def free_refs(target: Any) -> tuple[str, ...]:
+        length = _length_reference(
             target, FREE_FEATURE, FREE_LENGTH, free_length_mm
         )
-        section = await _sections(target, coil_od_mm=coil_od_mm, wire_dia_mm=wire_dia_mm)
+        section = _sections(target, coil_od_mm=coil_od_mm, wire_dia_mm=wire_dia_mm)
         return length, section
 
-    async def maximum_refs(target: Any) -> tuple[str, ...]:
+    def maximum_refs(target: Any) -> tuple[str, ...]:
         return (
-            await _length_reference(target, MAX_FEATURE, MAX_LENGTH, max_length_mm),
+            _length_reference(target, MAX_FEATURE, MAX_LENGTH, max_length_mm),
         )
 
-    await add_supplier_reference_configurations(
+    add_supplier_reference_configurations(
         adapter,
         (
             ReferenceState(

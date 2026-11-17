@@ -199,7 +199,7 @@ def _add_reference_point(adapter, uv: tuple[float, float], label: str) -> str:
     return adapter._register_sketch_entity("Point", point)
 
 
-async def _author_reference_dimension(
+def _author_reference_dimension(
     adapter,
     *,
     plane: str,
@@ -220,15 +220,15 @@ async def _author_reference_dimension(
     points-only idiom)."""
     check(
         f"create_sketch {feature_name}",
-        await adapter.create_sketch(plane),
+        adapter.create_sketch(plane),
     )
     first = _add_reference_point(adapter, start, f"{feature_name} start")
     second = _add_reference_point(adapter, end, f"{feature_name} end")
     check(
         f"{feature_name} {orientation}",
-        await adapter.add_sketch_constraint(first, second, f"{orientation}_points"),
+        adapter.add_sketch_constraint(first, second, f"{orientation}_points"),
     )
-    await dimension_between(
+    dimension_between(
         adapter,
         first,
         second,
@@ -236,20 +236,20 @@ async def _author_reference_dimension(
         value_mm,
         feature_name,
     )
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter,
         first,
         *start,
         feature_name,
     )
-    await ensure_fully_defined(adapter, f"{feature_name} sketch")
-    check(f"exit_sketch {feature_name}", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, f"{feature_name} sketch")
+    check(f"exit_sketch {feature_name}", adapter.exit_sketch())
     name_last_feature(adapter, feature_name)
     full_name = name_dimensions(
         adapter, feature_name, [dimension_name]
     )[0]
-    await drive_dimension(adapter, full_name, drive_expression)
-    await force_rebuild(adapter)
+    drive_dimension(adapter, full_name, drive_expression)
+    force_rebuild(adapter)
 
 
 def _blank_reference_sketches(adapter, sketches: tuple[str, ...]) -> None:
@@ -267,36 +267,36 @@ def _blank_reference_sketches(adapter, sketches: tuple[str, ...]) -> None:
         if state != 1:  # swVisibilityStateHide
             raise RuntimeError(f"{sketch} still visible after BlankSketch (state {state})")
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this
     # is an INCH document and the equation manager reads BARE numbers in
     # document units (an unsuffixed 14 = 14 in).
-    await set_global(adapter, "BlockX", f"{BLOCK_X}mm")
-    await set_global(adapter, "BlockZ", f"{BLOCK_Z}mm")
-    await set_global(adapter, "BlockHeight", f"{BLOCK_HEIGHT}mm")
-    await set_global(adapter, "AdjusterAxisHeight", f"{ADJUSTER_AXIS_HEIGHT}mm")
+    set_global(adapter, "BlockX", f"{BLOCK_X}mm")
+    set_global(adapter, "BlockZ", f"{BLOCK_Z}mm")
+    set_global(adapter, "BlockHeight", f"{BLOCK_HEIGHT}mm")
+    set_global(adapter, "AdjusterAxisHeight", f"{ADJUSTER_AXIS_HEIGHT}mm")
     # (The old AdjusterBoreDia/PinchBoreDia knobs are gone: both are now native
     # Hole Wizard TAPPED features whose diameters come from the ANSI-inch tap
     # tables, not driven dims.)
-    await set_global(adapter, "SlitW", f"{SLIT_W}mm")
-    await set_global(adapter, "SlitDepth", f"{SLIT_DEPTH}mm")
-    await set_global(adapter, "PinchRise", f"{PINCH_RISE}mm")
-    await set_global(adapter, "PassageCenter", '"BlockX" / 2')
-    await set_global(adapter, "PinchDepthCenter", f"{PINCH_DEPTH_CENTER}mm")
-    await set_global(adapter, "FootTapOffsetX", f"{FOOT_TAP_OFFSET_X}mm")
-    await set_global(adapter, "FootTapX", '"BlockX" / 2 + "FootTapOffsetX"')
-    await set_global(adapter, "FootTapZ", '"BlockZ" / 2')
+    set_global(adapter, "SlitW", f"{SLIT_W}mm")
+    set_global(adapter, "SlitDepth", f"{SLIT_DEPTH}mm")
+    set_global(adapter, "PinchRise", f"{PINCH_RISE}mm")
+    set_global(adapter, "PassageCenter", '"BlockX" / 2')
+    set_global(adapter, "PinchDepthCenter", f"{PINCH_DEPTH_CENTER}mm")
+    set_global(adapter, "FootTapOffsetX", f"{FOOT_TAP_OFFSET_X}mm")
+    set_global(adapter, "FootTapX", '"BlockX" / 2 + "FootTapOffsetX"')
+    set_global(adapter, "FootTapZ", '"BlockZ" / 2')
     # Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR
     # #2248): the locating dowel's station and press ream.
-    await set_global(adapter, "DowelFromTap", f"{DOWEL_FROM_TAP}mm")
-    await set_global(adapter, "DowelHoleDia", f"{DOWEL_HOLE_DIA}mm")
-    await set_global(adapter, "DowelHoleDepth", f"{DOWEL_HOLE_DEPTH}mm")
-    await set_global(
+    set_global(adapter, "DowelFromTap", f"{DOWEL_FROM_TAP}mm")
+    set_global(adapter, "DowelHoleDia", f"{DOWEL_HOLE_DIA}mm")
+    set_global(adapter, "DowelHoleDepth", f"{DOWEL_HOLE_DEPTH}mm")
+    set_global(
         adapter, "PinchBoreY", '"AdjusterAxisHeight" + "PinchRise"'
     )
 
@@ -304,26 +304,26 @@ async def build(adapter) -> dict[str, str]:
 
     # Origin-centred rectangular footprint on the Top plane.
     block = SketchDims()
-    check("create_sketch block", await adapter.create_sketch("Top"))
-    await define_centered_rectangle(
+    check("create_sketch block", adapter.create_sketch("Top"))
+    define_centered_rectangle(
         adapter, BLOCK_X / 2.0, BLOCK_Z / 2.0, "block", dims=block,
         name_width="Width", drive_width='"BlockX"',
         name_depth="Depth", drive_depth='"BlockZ"',
     )
-    await ensure_fully_defined(adapter, "block sketch")
-    check("exit_sketch block", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "block sketch")
+    check("exit_sketch block", adapter.exit_sketch())
     name_last_feature(adapter, "BlockProfile")
     drive_jobs += block.apply(adapter, "BlockProfile")
     check(
         "extrude block",
-        await adapter.create_extrusion(ExtrusionParameters(depth=BLOCK_HEIGHT)),
+        adapter.create_extrusion(ExtrusionParameters(depth=BLOCK_HEIGHT)),
     )
     name_last_feature(adapter, "Block")
     # Name the extrude DEPTH so the block height is a markable drawing dimension.
     block_depth_dim = name_dimensions(adapter, "Block", ["BlockHt"])
     drive_jobs += [(block_depth_dim[0], '"BlockHeight"')]
     v_block = BLOCK_X * BLOCK_Z * BLOCK_HEIGHT
-    volume = await volume_check(adapter, "block", v_block, 0.005 * v_block)
+    volume = volume_check(adapter, "block", v_block, 0.005 * v_block)
 
     # Adjuster interface (v4_t00471 / 7:49; drawing-guidelines.md rule 18 (thread
     # engagement) E11/W1): ONE native Hole Wizard 1/4-28 TAPPED hole THROUGH the
@@ -342,13 +342,13 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += adjuster_cut.placement_drive_jobs
     r_cb = ADJUSTER_BORE_DIA / 2.0
     v_cb = math.pi * r_cb**2 * BLOCK_Z
-    volume = await volume_check(adapter, "adjuster bore", volume - v_cb, 0.03 * v_cb)
+    volume = volume_check(adapter, "adjuster bore", volume - v_cb, 0.03 * v_cb)
 
     # 90-degree countersink on both mouths: a 45-degree break of ADJUSTER_CSK
     # on each tap-drill edge, so the first full thread starts under it.
     check(
         "countersink adjuster mouths",
-        await adapter.add_chamfer(
+        adapter.add_chamfer(
             ADJUSTER_CSK,
             [
                 [r_cb, ADJUSTER_AXIS_HEIGHT, z_face]
@@ -358,35 +358,35 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "AdjusterCountersinks")
     v_csk = 2.0 * math.pi * ADJUSTER_CSK**2 * (r_cb + ADJUSTER_CSK / 3.0)
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "adjuster countersinks", volume - v_csk, 0.03 * v_csk + 0.05
     )
 
     # Top slit + perpendicular pinch screw: the 1.2-wide slit runs below the
     # cross-bore so the exact McMaster 91794A112 #4-40 screw can squeeze the
     # two jaws around the adjuster thread.
-    check("create_plane BlockTop", await adapter.create_plane(
+    check("create_plane BlockTop", adapter.create_plane(
         CreatePlaneParameters(mode="offset", base_plane="Top Plane",
                               offset=BLOCK_HEIGHT)))
     name_last_feature(adapter, "BlockTop")
     slit = SketchDims()
-    check("create_sketch slit", await adapter.create_sketch("BlockTop"))
-    await define_centered_rectangle(
+    check("create_sketch slit", adapter.create_sketch("BlockTop"))
+    define_centered_rectangle(
         adapter, SLIT_W / 2.0, BLOCK_Z / 2.0 + 1.0, "slit", dims=slit,
         name_width="SlitW", drive_width='"SlitW"',
         name_depth="SlitSpan", drive_depth=None,
     )
-    await ensure_fully_defined(adapter, "slit sketch")
-    check("exit_sketch slit", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "slit sketch")
+    check("exit_sketch slit", adapter.exit_sketch())
     name_last_feature(adapter, "SlitProfile")
     drive_jobs += slit.apply(adapter, "SlitProfile")
-    check("cut slit", await adapter.create_cut_extrude(
+    check("cut slit", adapter.create_cut_extrude(
         ExtrusionParameters(depth=SLIT_DEPTH)))  # default cut dir = down into the block
     name_last_feature(adapter, "TopSlit")
     blank_reference_geometry(adapter, (("BlockTop", "PLANE"),))
     slit_depth_dim = name_dimensions(adapter, "TopSlit", ["SlitDepth"])[0]
     drive_jobs.append((slit_depth_dim, '"SlitDepth"'))
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "top slit", volume - _slit_removed(), 0.02 * _slit_removed()
     )
 
@@ -411,7 +411,7 @@ async def build(adapter) -> dict[str, str]:
     )
     drive_jobs += pinch_cut.placement_drive_jobs
     v_pinch = math.pi * (PINCH_BORE_DIA / 2.0) ** 2 * (BLOCK_X - SLIT_W)
-    volume = await volume_check(adapter, "pinch bore", volume - v_pinch, 0.05 * v_pinch)
+    volume = volume_check(adapter, "pinch bore", volume - v_pinch, 0.05 * v_pinch)
 
     pinch_clearance = wizard_holes(
         adapter, PINCH_CLEARANCE_SPEC,
@@ -427,7 +427,7 @@ async def build(adapter) -> dict[str, str]:
     v_clearance = math.pi * (
         (PINCH_CLEARANCE_DIA / 2.0) ** 2 - (PINCH_BORE_DIA / 2.0) ** 2
     ) * near_jaw
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "pinch clearance", volume - v_clearance, 0.08 * v_clearance
     )
 
@@ -449,7 +449,7 @@ async def build(adapter) -> dict[str, str]:
     )
     drive_jobs += foot_cut.placement_drive_jobs
     v_foot = blind_hole_volume_mm3(FOOT_BORE_DIA, FOOT_BORE_SPEC.depth_mm)
-    volume = await volume_check(adapter, "foot tap", volume - v_foot, 0.03 * v_foot)
+    volume = volume_check(adapter, "foot tap", volume - v_foot, 0.03 * v_foot)
 
     # Locating dowel (rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00
     # rubric sample, PR #2248)): a flat-bottomed press
@@ -459,8 +459,8 @@ async def build(adapter) -> dict[str, str]:
     # modelled at its nominal station.  The Top plane IS the foot, so the cut
     # runs up (+Y) into the block.
     dowel = SketchDims()
-    check("create_sketch dowel ream", await adapter.create_sketch("Top"))
-    await define_circle(
+    check("create_sketch dowel ream", adapter.create_sketch("Top"))
+    define_circle(
         adapter,
         FOOT_TAP_OFFSET_X + DOWEL_FROM_TAP,
         0.0,
@@ -470,13 +470,13 @@ async def build(adapter) -> dict[str, str]:
         names=("DowelCx", None, "DowelHoleDia"),
         drives=('"FootTapOffsetX" + "DowelFromTap"', None, '"DowelHoleDia"'),
     )
-    await ensure_fully_defined(adapter, "dowel ream sketch")
-    check("exit_sketch dowel ream", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "dowel ream sketch")
+    check("exit_sketch dowel ream", adapter.exit_sketch())
     name_last_feature(adapter, "DowelProfile")
     drive_jobs += dowel.apply(adapter, "DowelProfile")
     check(
         "cut dowel ream",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=DOWEL_HOLE_DEPTH, reverse_direction=True)
         ),
     )
@@ -484,17 +484,17 @@ async def build(adapter) -> dict[str, str]:
     dowel_depth_dim = name_dimensions(adapter, "DowelHole", ["DowelDepth"])[0]
     drive_jobs.append((dowel_depth_dim, '"DowelHoleDepth"'))
     v_dowel = math.pi * (DOWEL_HOLE_DIA / 2.0) ** 2 * DOWEL_HOLE_DEPTH
-    volume = await volume_check(adapter, "dowel ream", volume - v_dowel, 0.03 * v_dowel)
+    volume = volume_check(adapter, "dowel ream", volume - v_dowel, 0.03 * v_dowel)
 
     # Named bore axis for the view-independent coaxial mate: the shaft tip
     # positions this block (coaxial + axial distance), no face picks.
-    await name_bore_axis(
+    name_bore_axis(
         adapter, "Top Plane", ADJUSTER_AXIS_HEIGHT, "Right Plane", 0.0,
         "adjuster axis", drive_a='"AdjusterAxisHeight"', drive_jobs=drive_jobs,
     )
     # Second named axis (Axis2): the pinch-screw cross-bore, along local X at
     # the slit -- the assembly locates the pinch screw on it.
-    await name_bore_axis(
+    name_bore_axis(
         adapter, "Top Plane", PINCH_BORE_Y, "Front Plane", PINCH_Z, "pinch axis",
         drive_a='"PinchBoreY"', drive_b='"PinchDepthCenter" - "BlockZ" / 2',
         drive_jobs=drive_jobs,
@@ -503,7 +503,7 @@ async def build(adapter) -> dict[str, str]:
     # pattern): the locating dowel's ream, vertical (Front Plane at the tap's
     # mid-depth, Right Plane at its station) -- the assembly mates
     # MHA-DT-VN-69 on it.
-    await name_bore_axis(
+    name_bore_axis(
         adapter, "Front Plane", 0.0, "Right Plane", FOOT_TAP_OFFSET_X + DOWEL_FROM_TAP,
         "dowel axis", drive_b='"FootTapOffsetX" + "DowelFromTap"', drive_jobs=drive_jobs,
     )
@@ -512,17 +512,17 @@ async def build(adapter) -> dict[str, str]:
     # Apply the deferred drive equations after the model + reference axes exist,
     # then re-check: every equation evaluates to the value just built, so geometry
     # must not move.
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(adapter, "driven block (equations neutral)", volume, 0.01 * v_cb)
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    volume_check(adapter, "driven block (equations neutral)", volume, 0.01 * v_cb)
 
     # Model-owned functional interfaces: points-only reference dimensions carry
     # every centre location that a machinist must set from a finished face.
     # r3 (Main, 2026-09-25): the axis locates from the -X face (the far jaw's;
     # PASSAGE_CENTER_DATUM), so the width's band falls on the pinch head's side.
-    await _author_reference_dimension(
+    _author_reference_dimension(
         adapter,
         plane="Front",
         start=(DATUM_FACE_X, ADJUSTER_AXIS_HEIGHT),
@@ -536,7 +536,7 @@ async def build(adapter) -> dict[str, str]:
     )
     # E11/W1: the axis height, from the foot, once the passage sketch that
     # carried it was gone.
-    await _author_reference_dimension(
+    _author_reference_dimension(
         adapter,
         plane="Front",
         start=(-BLOCK_X / 2.0, 0.0),
@@ -548,7 +548,7 @@ async def build(adapter) -> dict[str, str]:
         dimension_name="AxisHeight",
         drive_expression='"AdjusterAxisHeight"',
     )
-    await _author_reference_dimension(
+    _author_reference_dimension(
         adapter,
         plane="Right",
         start=(-BLOCK_Z / 2.0, PINCH_BORE_Y),
@@ -567,7 +567,7 @@ async def build(adapter) -> dict[str, str]:
     # as AxisHeight's do on the -X face.  The r3 diagonal from the south
     # corner to the hole centre printed as a stray line across the view
     # (machinist review of cc7f631ab, clarity).
-    await _author_reference_dimension(
+    _author_reference_dimension(
         adapter,
         plane="Right",
         start=(BLOCK_Z / 2.0, 0.0),
@@ -582,7 +582,7 @@ async def build(adapter) -> dict[str, str]:
     # The foot tap from the -X face (the PassageCenter datum) and from the
     # north face (the face the pivot screw's head gap is measured to).  The
     # Top plane reads the model's +Z (north) as sketch -y.
-    await _author_reference_dimension(
+    _author_reference_dimension(
         adapter,
         plane="Top",
         start=(DATUM_FACE_X, 0.0),
@@ -594,7 +594,7 @@ async def build(adapter) -> dict[str, str]:
         dimension_name="FootTapX",
         drive_expression='"FootTapX"',
     )
-    await _author_reference_dimension(
+    _author_reference_dimension(
         adapter,
         plane="Top",
         start=(FOOT_TAP_OFFSET_X, -BLOCK_Z / 2.0),
@@ -612,7 +612,7 @@ async def build(adapter) -> dict[str, str]:
     # round 6, #9).  The hole is match-drilled from MHA-DT-20, so the drawing
     # prints it as a reference with no band; DOWEL_FROM_TAP stays the
     # relation the cut is placed by.
-    await _author_reference_dimension(
+    _author_reference_dimension(
         adapter,
         plane="Top",
         start=(DATUM_FACE_X, 0.0),
@@ -646,16 +646,16 @@ async def build(adapter) -> dict[str, str]:
     # Model-owned places are applied only after the reference sketches exist.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
 
-    await apply_material(adapter, MATERIAL)
-    await apply_color(adapter, PANEL_BLACK)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    apply_color(adapter, PANEL_BLACK)
+    report_mass_properties(adapter)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     _blank_reference_sketches(adapter, REFERENCE_SKETCHES)
     apply_drawing_properties(adapter, PART_NAME)
-    return await save_part_and_images(adapter, PART_NAME)
+    return save_part_and_images(adapter, PART_NAME)
 
 
 if __name__ == "__main__":

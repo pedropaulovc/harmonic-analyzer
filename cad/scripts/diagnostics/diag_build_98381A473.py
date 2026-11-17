@@ -28,8 +28,8 @@ PART_NO = "98381A473"
 
 
 @stock_recipe("98381A473", threaded=False)
-async def build_98381A473(adapter, truth=None):
-    await build_dowel(adapter, PART_NO, DOWEL_SIZE, ENDS)
+def build_98381A473(adapter, truth=None):
+    build_dowel(adapter, PART_NO, DOWEL_SIZE, ENDS)
 
 
 if __name__ == "__main__":

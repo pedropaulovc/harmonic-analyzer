@@ -40,37 +40,37 @@ DRAWING_DIMENSIONS = spec.PLATE_DRAWING_DIMENSIONS
 DRAWING_PRECISION = spec.PLATE_DRAWING_PRECISION
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
-    check("create stop cover", await adapter.create_part())
+    check("create stop cover", adapter.create_part())
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
     for name, value in (
         ("PlateLength", spec.BLOCK_LENGTH), ("PlateHeight", spec.BLOCK_HEIGHT),
         ("PlateThickness", spec.PLATE_THICKNESS),
         ("RoofChamferSize", spec.ROOF_END_CHAMFER),
     ):
-        await set_global(adapter, name, f"{value}mm")
+        set_global(adapter, name, f"{value}mm")
     dims = SketchDims()
-    check("plate profile", await adapter.create_sketch("Front"))
+    check("plate profile", adapter.create_sketch("Front"))
     points = [(0.0, 0.0), (spec.BLOCK_LENGTH, 0.0),
               (spec.BLOCK_LENGTH, spec.BLOCK_HEIGHT), (0.0, spec.BLOCK_HEIGHT)]
-    lines = await add_line_chain(adapter, points)
-    await define_rectilinear_chain(
+    lines = add_line_chain(adapter, points)
+    define_rectilinear_chain(
         adapter, lines, points, label="cover", dims=dims,
         names=["PlateLength", "PlateHeight"],
         drives=['"PlateLength"', '"PlateHeight"'],
     )
-    await ensure_fully_defined(adapter, "plate profile")
-    check("exit plate profile", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "plate profile")
+    check("exit plate profile", adapter.exit_sketch())
     name_last_feature(adapter, "PlateProfile")
     jobs = dims.apply(adapter, "PlateProfile")
-    check("cover extrusion", await adapter.create_extrusion(
+    check("cover extrusion", adapter.create_extrusion(
         ExtrusionParameters(depth=spec.PLATE_THICKNESS, reverse_direction=True)))
     name_last_feature(adapter, "Plate")
     name_dimensions(adapter, "Plate", ["PlateThickness"])
     jobs.append(("PlateThickness@Plate", '"PlateThickness"'))
-    check("cover roof end chamfers", await adapter.add_chamfer(
+    check("cover roof end chamfers", adapter.add_chamfer(
         spec.ROOF_END_CHAMFER,
         [[0.0, spec.BLOCK_HEIGHT, (spec.PLATE_Z_MIN + spec.PLATE_Z_MAX) / 2.0],
          [spec.BLOCK_LENGTH, spec.BLOCK_HEIGHT, (spec.PLATE_Z_MIN + spec.PLATE_Z_MAX) / 2.0]],
@@ -82,16 +82,16 @@ async def build(adapter) -> dict[str, str]:
                  spec.PLATE_HOLE_NORMAL, "cover clearance holes", name="PlateClearances",
                  expect_dia_mm=spec.PLATE_CLEARANCE_DIA)
     author_hole_precision(adapter, "PlateClearances")
-    await location_reference(
+    location_reference(
         adapter, feature="PlateLocationReference", plane="Front",
         spans=spec.PLATE_HOLE_XS, station=spec.PLATE_HOLE_Y,
         names=("PlateLeftFromEnd", "PlateFromHeadFace", "PlateRightFromEnd"),
     )
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for name, expression in jobs:
-        await drive_dimension(adapter, name, expression)
-    await force_rebuild(adapter)
-    await volume_check(adapter, "finished brass stop cover", spec.PLATE_FINISHED_VOLUME,
+        drive_dimension(adapter, name, expression)
+    force_rebuild(adapter)
+    volume_check(adapter, "finished brass stop cover", spec.PLATE_FINISHED_VOLUME,
                        0.005 * spec.PLATE_FINISHED_VOLUME)
     set_dimension_symmetric_tolerance(
         adapter, "Plate", "PlateThickness", spec.PLATE_THICKNESS_TOLERANCE_MM,
@@ -105,10 +105,10 @@ async def build(adapter) -> dict[str, str]:
         "Isometric View Note": spec.ISOMETRIC_VIEW_NOTE,
     })
     hide_location_references(adapter, ("PlateLocationReference",))
-    await apply_material(adapter, MATERIAL)
-    await apply_color(adapter, PANEL_BLACK)
-    await report_mass_properties(adapter)
-    return await save_part_and_images(adapter, PART_NAME)
+    apply_material(adapter, MATERIAL)
+    apply_color(adapter, PANEL_BLACK)
+    report_mass_properties(adapter)
+    return save_part_and_images(adapter, PART_NAME)
 
 
 if __name__ == "__main__":

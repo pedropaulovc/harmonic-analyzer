@@ -82,8 +82,8 @@ def _pair_volume(adapter, wanted: tuple[str, str]) -> float:
     return volume
 
 
-async def build(adapter) -> dict[str, str]:
-    check("create_assembly", await adapter.create_assembly())
+def build(adapter) -> dict[str, str]:
+    check("create_assembly", adapter.create_assembly())
     teeth = _config.cone_teeth(0)
     # The 6.0 gear keeps the 6.5 reference face's north end (BDT seed placement).
     station = (
@@ -97,7 +97,7 @@ async def build(adapter) -> dict[str, str]:
         dta.Y_DRIVE,
         centre[2] - dta.CONE_FACE / 2.0 * dta.COS_I,
     ]
-    gear = await place_component(
+    gear = place_component(
         adapter,
         "dt-cone-gear",
         gear_position,
@@ -119,7 +119,7 @@ async def build(adapter) -> dict[str, str]:
     )
     knob_x, knob_z = dta._plate_local_to_machine(former_x, former_z)
     knob_position = [knob_x, dta.Y_BASE_TOP + dta.PLAT_T, knob_z]
-    knob = await place_component(
+    knob = place_component(
         adapter,
         "dt-vn-cone-lock-knob",
         knob_position,

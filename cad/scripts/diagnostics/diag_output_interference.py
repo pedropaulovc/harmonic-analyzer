@@ -19,7 +19,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import asyncio
 
 import _telemetry  # noqa: E402
 if __package__:
@@ -42,11 +41,11 @@ def _box_mm(body) -> str:
     )
 
 
-async def main() -> int:
+def main() -> int:
     from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter
 
     adapter = PyWin32Adapter({})
-    await adapter.connect()
+    adapter.connect()
     sw = adapter.swApp
     asm = sw.ActiveDoc
     if asm is None:
@@ -92,4 +91,4 @@ async def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(asyncio.run(main()))
+    sys.exit(main())

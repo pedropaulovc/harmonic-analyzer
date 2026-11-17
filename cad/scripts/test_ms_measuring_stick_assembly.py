@@ -43,11 +43,10 @@ NOTE_LINE_PITCH = 0.0046  # default-format note line pitch, as measured on MHA-M
 
 
 def test_clamped_setting_authors_its_globals_and_drives(monkeypatch) -> None:
-    """Run the builder's setting helper against fakes: every async authoring
-    step must actually execute (an un-awaited coroutine silently drops the
+    """Run the builder's setting helper against fakes: every authoring
+    step must actually execute (a skipped step silently drops the
     globals and equations), and the mm suffix is load-bearing in the equation
     manager, which reads bare numbers in document units."""
-    import asyncio
 
     import build_ms_measuring_stick_assembly as builder
 
@@ -61,16 +60,16 @@ def test_clamped_setting_authors_its_globals_and_drives(monkeypatch) -> None:
     class Adapter:
         _sketch_entities = {"chord": object()}
 
-        async def create_sketch(self, plane):
+        def create_sketch(self, plane):
             return ok()
 
-        async def add_line(self, *args):
+        def add_line(self, *args):
             return ok("chord")
 
-        async def add_sketch_constraint(self, *args):
+        def add_sketch_constraint(self, *args):
             return ok()
 
-        async def exit_sketch(self):
+        def exit_sketch(self):
             return ok()
 
     class Dims:
@@ -83,13 +82,13 @@ def test_clamped_setting_authors_its_globals_and_drives(monkeypatch) -> None:
         def apply(self, adapter, feature):
             return [(f"{name}@{feature}", drive) for name, drive in self.rows if drive]
 
-    async def set_global(adapter, name, expression):
+    def set_global(adapter, name, expression):
         globals_authored[name] = expression
 
-    async def drive_dimension(adapter, name, expression):
+    def drive_dimension(adapter, name, expression):
         equations[name] = expression
 
-    async def noop(*args, **kwargs):
+    def noop(*args, **kwargs):
         return None
 
     monkeypatch.setattr(builder, "set_global", set_global)
@@ -107,7 +106,7 @@ def test_clamped_setting_authors_its_globals_and_drives(monkeypatch) -> None:
                         lambda adapter, feature, name:
                         (display, SimpleNamespace(Tolerance=tolerance)))
 
-    asyncio.run(builder._author_clamped_setting(Adapter()))
+    builder._author_clamped_setting(Adapter())
 
     (left_x, contact_y), (face_x, _) = spec.SETTING_CHORD
     assert globals_authored == {

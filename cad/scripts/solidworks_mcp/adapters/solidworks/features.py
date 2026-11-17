@@ -8,7 +8,8 @@ from datetime import datetime
 from types import SimpleNamespace
 from typing import Any, NamedTuple, cast
 
-from .. import raw_dispatch as _raw
+import _com
+
 from .. import sw_type_info as _sw_type_info
 from ..base import (
     AdapterResult,
@@ -32,32 +33,32 @@ logger = logging.getLogger(__name__)
 class SolidWorksFeaturesMixin:
     """Expose SolidWorks feature methods via mixin-local implementation helpers."""
 
-    async def create_extrusion(
+    def create_extrusion(
         self, params: ExtrusionParameters
     ) -> AdapterResult[SolidWorksFeature]:
         return _create_extrusion_impl(self, params)
 
-    async def create_revolve(
+    def create_revolve(
         self, params: RevolveParameters
     ) -> AdapterResult[SolidWorksFeature]:
         return _create_revolve_impl(self, params)
 
-    async def create_sweep(
+    def create_sweep(
         self, params: SweepParameters
     ) -> AdapterResult[SolidWorksFeature]:
         return _create_sweep_impl(self, params)
 
-    async def create_loft(
+    def create_loft(
         self, params: LoftParameters
     ) -> AdapterResult[SolidWorksFeature]:
         return _create_loft_impl(self, params)
 
-    async def create_cut_extrude(
+    def create_cut_extrude(
         self, params: ExtrusionParameters
     ) -> AdapterResult[SolidWorksFeature]:
         return _create_cut_extrude_impl(self, params)
 
-    async def add_fillet(
+    def add_fillet(
         self,
         radius: float,
         edge_points: list[list[float]],
@@ -65,7 +66,7 @@ class SolidWorksFeaturesMixin:
     ) -> AdapterResult[SolidWorksFeature]:
         return _add_fillet_impl(self, radius, edge_points, propagate)
 
-    async def add_chamfer(
+    def add_chamfer(
         self,
         distance: float,
         edge_points: list[list[float]],
@@ -76,25 +77,25 @@ class SolidWorksFeaturesMixin:
             self, distance, edge_points, face_points, tangent_propagation
         )
 
-    async def mirror_feature(
+    def mirror_feature(
         self, params: MirrorFeatureParameters
     ) -> AdapterResult[SolidWorksFeature]:
         return _mirror_feature_impl(self, params)
 
-    async def circular_pattern_feature(
+    def circular_pattern_feature(
         self, params: CircularPatternParameters
     ) -> AdapterResult[SolidWorksFeature]:
         return _circular_pattern_impl(self, params)
 
-    async def linear_pattern_feature(
+    def linear_pattern_feature(
         self, params: LinearPatternParameters
     ) -> AdapterResult[SolidWorksFeature]:
         return _linear_pattern_impl(self, params)
 
-    async def shell(self, params: ShellParameters) -> AdapterResult[SolidWorksFeature]:
+    def shell(self, params: ShellParameters) -> AdapterResult[SolidWorksFeature]:
         return _shell_impl(self, params)
 
-    async def draft(self, params: DraftParameters) -> AdapterResult[SolidWorksFeature]:
+    def draft(self, params: DraftParameters) -> AdapterResult[SolidWorksFeature]:
         return _draft_impl(self, params)
 
 
@@ -650,25 +651,25 @@ def _report_tree_path(lookup: str, path: str) -> None:
 def _iter_features(adapter: Any):
     """Yield the active doc's top-level features in tree order, RAW.
 
-    ``FirstFeature`` → ``GetNextFeature`` through :func:`raw_dispatch.invoke`:
+    ``FirstFeature`` → ``GetNextFeature`` through :func:`_com._com_invoke`:
     one round trip per step, and each feature stays a bare ``PyIDispatch``.
     The wrapped walk this replaces paid three more round trips per feature it
     stepped over (``GetTypeInfo``/``GetTypeAttr`` when pywin32 wraps the
     returned object, a ``QueryInterface`` when it is bound to ``IFeature``) —
     ~1.2-1.9 s per ``create_plane`` on a 40-feature part, which walks twice.
-    :func:`raw_dispatch.bind` the feature you keep.
+    :func:`_com._bind` the feature you keep.
 
     A walk that cannot finish RAISES — a ``FirstFeature``/``GetNextFeature``
     that fails, or more than ``_TREE_WALK_LIMIT`` features — so no caller can
     mistake a truncated walk for the whole tree. Callers that only want what
     the walk reached (a sketch lookup) catch it themselves.
     """
-    feat = _raw.invoke(adapter.currentModel, "IModelDoc2", "FirstFeature")
+    feat = _com._com_invoke(adapter.currentModel, "IModelDoc2", "FirstFeature")
     for _ in range(_TREE_WALK_LIMIT):
         if not feat:
             return
         yield feat
-        feat = _raw.invoke(feat, "IFeature", "GetNextFeature")
+        feat = _com._com_invoke(feat, "IFeature", "GetNextFeature")
     if feat:
         raise RuntimeError(f"feature tree walk exceeded {_TREE_WALK_LIMIT} features")
 
@@ -686,9 +687,7 @@ def _iter_features_newest_first(adapter: Any):
     model = adapter.currentModel
     for position in range(5000):
         try:
-            feat = _raw.invoke(
-                model, "IModelDoc2", "FeatureByPositionReverse", position
-            )
+            feat = _com._com_invoke(model, "IModelDoc2", "FeatureByPositionReverse", position)
         except Exception:
             return
         if not feat:
@@ -698,7 +697,7 @@ def _iter_features_newest_first(adapter: Any):
 
 def _is_profile(feat: Any) -> bool:
     """Whether a raw feature is a sketch (``GetTypeName2 == "ProfileFeature"``)."""
-    return _raw.invoke(feat, "IFeature", "GetTypeName2") == "ProfileFeature"
+    return _com._com_invoke(feat, "IFeature", "GetTypeName2") == "ProfileFeature"
 
 
 def _profile_feature_names(adapter: Any) -> list[str]:
@@ -721,7 +720,7 @@ def _profile_feature_names(adapter: Any) -> list[str]:
         for feat in _iter_features(adapter):
             try:
                 if _is_profile(feat):
-                    names.append(str(_raw.invoke(feat, "IFeature", "Name")))
+                    names.append(str(_com._com_invoke(feat, "IFeature", "Name")))
             except Exception:
                 pass
     except Exception:
@@ -737,7 +736,7 @@ def _last_profile_feature_name(adapter: Any) -> str | None:
     try:
         for feat in _iter_features_newest_first(adapter):
             if _is_profile(feat):
-                name = str(_raw.invoke(feat, "IFeature", "Name"))
+                name = str(_com._com_invoke(feat, "IFeature", "Name"))
                 _report_tree_path("last_profile", "newest_first")
                 return name
     except Exception:
@@ -788,7 +787,7 @@ def _create_sweep_impl(
         from solidworks_mcp.adapters.base import SweepParameters
 
         params = SweepParameters(path="Sketch2", merge_result=True)
-        result = await adapter.create_sweep(params)
+        result = adapter.create_sweep(params)
         print(result.data.name)  # e.g. "Sweep1"
     """
     if not adapter.currentModel:
@@ -941,7 +940,7 @@ def _create_loft_impl(
         from solidworks_mcp.adapters.base import LoftParameters
 
         params = LoftParameters(profiles=["Sketch1", "Sketch2"])
-        result = await adapter.create_loft(params)
+        result = adapter.create_loft(params)
         print(result.data.name)  # e.g. "Loft1"
     """
     if not adapter.currentModel:
@@ -1415,9 +1414,7 @@ class _TreeSnapshot(NamedTuple):
 def _feature_at_reverse(adapter: Any, position: int) -> Any:
     """``IModelDoc2.FeatureByPositionReverse(position)`` as a RAW dispatch
     (``None`` past the start of the tree)."""
-    return _raw.invoke(
-        adapter.currentModel, "IModelDoc2", "FeatureByPositionReverse", position
-    )
+    return _com._com_invoke(adapter.currentModel, "IModelDoc2", "FeatureByPositionReverse", position)
 
 
 def _tree_snapshot(adapter: Any) -> _TreeSnapshot:
@@ -1446,7 +1443,7 @@ def _tree_snapshot(adapter: Any) -> _TreeSnapshot:
     try:
         for feat in _iter_features(adapter):
             count += 1
-            name = _raw.invoke(feat, "IFeature", "Name")
+            name = _com._com_invoke(feat, "IFeature", "Name")
             if not name:
                 raise RuntimeError(f"feature {count} has no readable Name")
             names.add(str(name))
@@ -1492,7 +1489,7 @@ def _added_features(adapter: Any, before: _TreeSnapshot) -> list[tuple[str, Any]
                 feat = _feature_at_reverse(adapter, position)
                 if not feat:
                     raise RuntimeError("tree ended before every added feature")
-                name = _raw.invoke(feat, "IFeature", "Name")
+                name = _com._com_invoke(feat, "IFeature", "Name")
                 name = str(name) if name else ""
                 if name not in before.names:
                     added.append((name, feat))
@@ -1504,7 +1501,7 @@ def _added_features(adapter: Any, before: _TreeSnapshot) -> list[tuple[str, Any]
             pass
     added = []
     for feat in _iter_features(adapter):
-        name = _raw.invoke(feat, "IFeature", "Name")
+        name = _com._com_invoke(feat, "IFeature", "Name")
         name = str(name) if name else ""
         if name not in before.names:
             added.append((name, feat))
@@ -1564,13 +1561,13 @@ def _resolve_feature(
     if not added:
         return None
     typed = [
-        (name, str(_raw.invoke(feat, "IFeature", "GetTypeName2")), feat)
+        (name, str(_com._com_invoke(feat, "IFeature", "GetTypeName2")), feat)
         for name, feat in added
         if name
     ]
     matches = [feat for _, type_name, feat in typed if type_name in feature_types]
     if len(matches) == 1 or (expect_many and matches):
-        return _raw.bind(matches[-1], "IFeature")
+        return _com._bind(matches[-1], "IFeature")
     wanted = "/".join(sorted(feature_types))
     found = ", ".join(f"{name} ({type_name})" for name, type_name, _ in typed)
     found = found or "unnamed features only"
@@ -1585,7 +1582,7 @@ def _body_entities(adapter: Any, member: str) -> list[Any]:
     """Every ``IBody2.<member>`` entity (``GetEdges``/``GetFaces``) of every
     solid body in the active model, as RAW dispatches in body order.
 
-    Fetched through :func:`raw_dispatch.invoke`, so pywin32 does not wrap each
+    Fetched through :func:`_com._com_invoke`, so pywin32 does not wrap each
     element (``GetTypeInfo``/``GetTypeAttr``) and nothing binds it
     (``QueryInterface``) — the scorers call one ``GetClosestPointOn`` per
     entity, and only the winner is bound, to ``IEntity``, for ``Select2``.
@@ -1596,7 +1593,7 @@ def _body_entities(adapter: Any, member: str) -> list[Any]:
     for body in bodies:
         entities.extend(
             adapter._attempt(
-                lambda b=body: _raw.invoke(b, "IBody2", member), default=None
+                lambda b=body: _com._com_invoke(b, "IBody2", member), default=None
             )
             or []
         )
@@ -1625,7 +1622,7 @@ def _nearest_entity(
     for entity in entities:
         cp = adapter._attempt(
             lambda e=entity: list(
-                _raw.invoke(e, interface, "GetClosestPointOn", px, py, pz)
+                _com._com_invoke(e, interface, "GetClosestPointOn", px, py, pz)
             ),
             default=None,
         )
@@ -1672,7 +1669,7 @@ def _select_edges_geometric(
         best = _nearest_entity(adapter, edges, "IEdge", (px, py, pz), tol_m)
         if best is None:
             return False
-        best = _raw.bind(best, "IEntity")
+        best = _com._bind(best, "IEntity")
         if not adapter._attempt(lambda e=best: e.Select2(True, 0), default=False):
             return False
     return True
@@ -1695,7 +1692,7 @@ def _select_direction_edge(
     the choice deterministic.
 
     The edges are RAW dispatches (:func:`_all_body_edges`), so every per-edge
-    query goes through :func:`raw_dispatch.invoke` and only the winner is bound,
+    query goes through :func:`_com._com_invoke` and only the winner is bound,
     to ``IEntity``, for ``Select2``. A raw dispatch has no named members: a
     by-name call on one raises, and the ``_attempt`` around it would drop every
     edge as "not a line".
@@ -1736,14 +1733,14 @@ def _select_direction_edge(
     for edge in _all_body_edges(adapter):
         # GetCurveParams2 requires GetCurve first (SolidWorks keeps no curve).
         curve = adapter._attempt(
-            lambda e=edge: _raw.invoke(e, "IEdge", "GetCurve"), default=None
+            lambda e=edge: _com._com_invoke(e, "IEdge", "GetCurve"), default=None
         )
         if curve is None or not adapter._attempt(
-            lambda c=curve: bool(_raw.invoke(c, "ICurve", "IsLine")), default=False
+            lambda c=curve: bool(_com._com_invoke(c, "ICurve", "IsLine")), default=False
         ):
             continue  # only a straight edge defines a linear direction
         params = adapter._attempt(
-            lambda e=edge: list(_raw.invoke(e, "IEdge", "GetCurveParams2") or ()),
+            lambda e=edge: list(_com._com_invoke(e, "IEdge", "GetCurveParams2") or ()),
             default=[],
         )
         if len(params) < 6:
@@ -1759,7 +1756,7 @@ def _select_direction_edge(
             continue  # chord not parallel to the requested direction (~0.08 deg)
         cp = adapter._attempt(
             lambda e=edge: list(
-                _raw.invoke(e, "IEdge", "GetClosestPointOn", px, py, pz)
+                _com._com_invoke(e, "IEdge", "GetClosestPointOn", px, py, pz)
             ),
             default=None,
         )
@@ -1772,7 +1769,7 @@ def _select_direction_edge(
         raise Exception(
             f"No straight body edge runs along direction_vector {direction_vector}"
         )
-    picked = _raw.bind(best[1], "IEntity")
+    picked = _com._bind(best[1], "IEntity")
     if not adapter._attempt(lambda: picked.Select2(True, mark), default=False):
         raise Exception(
             f"Failed to select the direction edge nearest {point_mm} (mm) along "
@@ -1822,7 +1819,7 @@ def _select_faces_geometric(
         best = _nearest_entity(adapter, faces, "IFace2", (px, py, pz), tol_m)
         if best is None:
             return False
-        best = _raw.bind(best, "IEntity")
+        best = _com._bind(best, "IEntity")
         keep = append or i > 0
         if not adapter._attempt(lambda f=best, k=keep: f.Select2(k, 0), default=False):
             return False
@@ -1895,7 +1892,7 @@ def _select_entity_geometric(
         return False
     return bool(
         adapter._attempt(
-            lambda: _raw.bind(best, "IEntity").Select2(append, mark), default=False
+            lambda: _com._bind(best, "IEntity").Select2(append, mark), default=False
         )
     )
 

@@ -42,15 +42,15 @@ from diagnostics.diag_mcmaster_lib import no_sketch_inference  # noqa: E402
 
 
 @stock_recipe("98830A511", threaded=False)
-async def build_98830A511(adapter, truth=None):
+def build_98830A511(adapter, truth=None):
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     half = SIZE / 2.0
     dims = SketchDims()
-    check("create_sketch key section", await adapter.create_sketch("Front"))
+    check("create_sketch key section", adapter.create_sketch("Front"))
     with no_sketch_inference(adapter):
         # Front sketch x and y are model +X and +Y: bottom face on x = 0.
-        lines = await add_line_chain(
+        lines = add_line_chain(
             adapter, [(0.0, -half), (SIZE, -half), (SIZE, half), (0.0, half)]
         )
         for line, relation in zip(
@@ -58,13 +58,13 @@ async def build_98830A511(adapter, truth=None):
         ):
             check(
                 f"key section {relation} {line}",
-                await adapter.add_sketch_constraint(line, None, relation),
+                adapter.add_sketch_constraint(line, None, relation),
             )
-        await anchor_point_to_origin(
+        anchor_point_to_origin(
             adapter, f"{lines[0]}.start", 0.0, -half, "key section bottom corner"
         )
         dims.record("KeyHalfWidth")
-        await dimension_between(
+        dimension_between(
             adapter,
             f"{lines[0]}.start",
             f"{lines[0]}.end",
@@ -73,7 +73,7 @@ async def build_98830A511(adapter, truth=None):
             "key height",
         )
         dims.record("KeyHeight")
-        await dimension_between(
+        dimension_between(
             adapter,
             f"{lines[1]}.start",
             f"{lines[1]}.end",
@@ -82,20 +82,20 @@ async def build_98830A511(adapter, truth=None):
             "key width",
         )
         dims.record("KeyWidth")
-        await ensure_fully_defined(adapter, "key section")
-    check("exit_sketch key section", await adapter.exit_sketch())
+        ensure_fully_defined(adapter, "key section")
+    check("exit_sketch key section", adapter.exit_sketch())
     name_last_feature(adapter, "KeyProfile")
     dims.apply(adapter, "KeyProfile")
     check(
         "extrude key stock",
-        await adapter.create_extrusion(ExtrusionParameters(depth=LENGTH)),
+        adapter.create_extrusion(ExtrusionParameters(depth=LENGTH)),
     )
     name_last_feature(adapter, "KeyStock")
     volume = SIZE * SIZE * LENGTH
-    await volume_check(adapter, "key stock", volume, 0.005 * volume)
+    volume_check(adapter, "key stock", volume, 0.005 * volume)
 
 
-async def build_catalog(adapter) -> dict[str, str]:
+def build_catalog(adapter) -> dict[str, str]:
     """Catalog-only run: build the recipe and save it, no vendor truth."""
     import _telemetry
     from diagnostics.diag_mcmaster_lib import (
@@ -107,21 +107,21 @@ async def build_catalog(adapter) -> dict[str, str]:
     )
 
     with _telemetry.span("catalog.build", label=PART_NO):
-        check(f"create_part {PART_NO}", await adapter.create_part())
+        check(f"create_part {PART_NO}", adapter.create_part())
         assert_seat_sketch_baseline(adapter, PART_NO)
-        await build_98830A511(adapter)
+        build_98830A511(adapter)
         props = mass_properties(adapter)
         if not props["volume_mm3"] > 0.0:
             raise RuntimeError(f"{PART_NO} catalog build has no solid volume")
         OUT_DIR.mkdir(parents=True, exist_ok=True)
         path = OUT_DIR / f"{PART_NO}-catalog.SLDPRT"
-        check(f"save -> {path}", await adapter.save_file(str(path.resolve())))
+        check(f"save -> {path}", adapter.save_file(str(path.resolve())))
         artefacts = {"sldprt": str(path)}
-        artefacts.update(await export_views(adapter, f"{PART_NO}-catalog"))
+        artefacts.update(export_views(adapter, f"{PART_NO}-catalog"))
         _telemetry.success(
             f"{PART_NO} catalog build saved: volume {props['volume_mm3']:.4f} mm^3"
         )
-        await close_all(adapter)
+        close_all(adapter)
     return artefacts
 
 

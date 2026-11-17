@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import itertools
 import math
 import runpy
@@ -454,10 +453,10 @@ def test_each_import_phase_proves_the_precision_of_the_dimensions_it_imports(
         guarded.append(({a.name for a in annotations}, dict(precision)))
         _drawing_dimensions.assert_imported_precision(adapter, annotations, precision)
 
-    async def open_model(_path):
+    def open_model(_path):
         return True
 
-    async def finalize(*_args, **_kwargs):
+    def finalize(*_args, **_kwargs):
         return {"drawing": "arm.SLDDRW"}
 
     source = tmp_path / "pd-transgear-arm.SLDPRT"
@@ -503,9 +502,9 @@ def test_each_import_phase_proves_the_precision_of_the_dimensions_it_imports(
 
     if lost is not None:
         with pytest.raises(RuntimeError, match=rf"never reached the sheet: \['{lost}'\]"):
-            asyncio.run(drawing.build(adapter))
+            drawing.build(adapter)
         return
-    assert asyncio.run(drawing.build(adapter)) == {"drawing": "arm.SLDDRW"}
+    assert drawing.build(adapter) == {"drawing": "arm.SLDDRW"}
     assert [set(precision) for _names, precision in guarded] == [
         set(sheet_one_names),
         set(drawing.PIN_SECTION_KEEP),

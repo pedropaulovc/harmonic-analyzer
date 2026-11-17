@@ -278,25 +278,25 @@ class SolidWorksSketchMixin:
             adapter._sketch_geometry.angular_dimension_placement(entity1, entity2),
         )
 
-    async def create_sketch(self, plane: str) -> AdapterResult[str]:
+    def create_sketch(self, plane: str) -> AdapterResult[str]:
         return _create_sketch_impl(self, plane)
 
-    async def add_line(
+    def add_line(
         self, x1: float, y1: float, x2: float, y2: float
     ) -> AdapterResult[str]:
         return _add_line_impl(self, x1, y1, x2, y2)
 
-    async def add_circle(
+    def add_circle(
         self, center_x: float, center_y: float, radius: float
     ) -> AdapterResult[str]:
         return _add_circle_impl(self, center_x, center_y, radius)
 
-    async def add_rectangle(
+    def add_rectangle(
         self, x1: float, y1: float, x2: float, y2: float
     ) -> AdapterResult[str]:
         return _add_rectangle_impl(self, x1, y1, x2, y2)
 
-    async def add_arc(
+    def add_arc(
         self,
         center_x: float,
         center_y: float,
@@ -307,25 +307,25 @@ class SolidWorksSketchMixin:
     ) -> AdapterResult[str]:
         return _add_arc_impl(self, center_x, center_y, start_x, start_y, end_x, end_y)
 
-    async def add_spline(self, points: list[dict[str, float]]) -> AdapterResult[str]:
+    def add_spline(self, points: list[dict[str, float]]) -> AdapterResult[str]:
         return _add_spline_impl(self, points)
 
-    async def add_centerline(
+    def add_centerline(
         self, x1: float, y1: float, x2: float, y2: float
     ) -> AdapterResult[str]:
         return _add_centerline_impl(self, x1, y1, x2, y2)
 
-    async def add_polygon(
+    def add_polygon(
         self, center_x: float, center_y: float, radius: float, sides: int
     ) -> AdapterResult[str]:
         return _add_polygon_impl(self, center_x, center_y, radius, sides)
 
-    async def add_ellipse(
+    def add_ellipse(
         self, center_x: float, center_y: float, major_axis: float, minor_axis: float
     ) -> AdapterResult[str]:
         return _add_ellipse_impl(self, center_x, center_y, major_axis, minor_axis)
 
-    async def add_sketch_constraint(
+    def add_sketch_constraint(
         self,
         entity1: str,
         entity2: str | None,
@@ -336,12 +336,12 @@ class SolidWorksSketchMixin:
             self, entity1, entity2, relation_type, entity3
         )
 
-    async def add_sketch_dimension(
+    def add_sketch_dimension(
         self, entity1: str, entity2: str | None, dimension_type: str, value: float
     ) -> AdapterResult[str]:
         return _add_sketch_dimension_impl(self, entity1, entity2, dimension_type, value)
 
-    async def sketch_linear_pattern(
+    def sketch_linear_pattern(
         self,
         entities: list[str],
         direction_x: float,
@@ -353,7 +353,7 @@ class SolidWorksSketchMixin:
             self, entities, direction_x, direction_y, spacing, count
         )
 
-    async def sketch_circular_pattern(
+    def sketch_circular_pattern(
         self,
         entities: list[str],
         angle: float,
@@ -361,28 +361,28 @@ class SolidWorksSketchMixin:
     ) -> AdapterResult[str]:
         return _sketch_circular_pattern_impl(self, entities, angle, count)
 
-    async def sketch_mirror(
+    def sketch_mirror(
         self, entities: list[str], mirror_line: str
     ) -> AdapterResult[str]:
         return _sketch_mirror_impl(self, entities, mirror_line)
 
-    async def sketch_offset(
+    def sketch_offset(
         self, entities: list[str], offset_distance: float, reverse_direction: bool
     ) -> AdapterResult[str]:
         return _sketch_offset_impl(self, entities, offset_distance, reverse_direction)
 
-    async def exit_sketch(self) -> AdapterResult[None]:
+    def exit_sketch(self) -> AdapterResult[None]:
         return _exit_sketch_impl(self)
 
-    async def blank_sketch(self, sketch: str) -> AdapterResult[None]:
+    def blank_sketch(self, sketch: str) -> AdapterResult[None]:
         return _blank_sketch_impl(self, sketch)
 
-    async def check_sketch_fully_defined(
+    def check_sketch_fully_defined(
         self, sketch_name: str | None = None
     ) -> AdapterResult[dict[str, Any]]:
         return _check_sketch_fully_defined_impl(self, sketch_name)
 
-    async def get_over_defining_relations(self) -> AdapterResult[dict[str, Any]]:
+    def get_over_defining_relations(self) -> AdapterResult[dict[str, Any]]:
         return _get_over_defining_relations_impl(self)
 
 

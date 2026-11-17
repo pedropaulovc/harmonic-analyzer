@@ -310,7 +310,7 @@ def _ref_axis_start_mm(adapter, axis_name: str) -> list[float] | None:
     return None
 
 
-async def _name_lobe_axis(adapter) -> str:
+def _name_lobe_axis(adapter) -> str:
     """Named reference axis through the eccentric cam-lobe centre (part-local
     x 0, y +ECCENTRICITY), along Z, for the motion study's cam->rod coupling.
 
@@ -324,7 +324,7 @@ async def _name_lobe_axis(adapter) -> str:
     lobe side, +ECC), so a flipped SW offset convention fails loudly here rather
     than silently building a wrong-side cam axis.
     """
-    axis_name = await name_bore_axis(
+    axis_name = name_bore_axis(
         adapter, "Right Plane", 0.0, "Top Plane", ECCENTRICITY, "cam lobe axis"
     )
     start = _ref_axis_start_mm(adapter, axis_name)
@@ -339,10 +339,10 @@ async def _name_lobe_axis(adapter) -> str:
     return axis_name
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     # #290: the row's inch calculation units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
@@ -350,15 +350,15 @@ async def build(adapter) -> dict[str, str]:
     # curves remain literal and use the actual finite stock-form gap volume.
     # Each deferred equation is neutral at the as-built value.  The mm suffix
     # is load-bearing in this INCH document.
-    await set_global(adapter, "FaceWidth", f"{FACE_WIDTH}mm")
-    await set_global(adapter, "OutsideDia", f"{OUTSIDE_DIA}mm")
-    await set_global(adapter, "CamDiameter", f"{CAM_DIAMETER}mm")
-    await set_global(adapter, "OverallThickness", f"{OVERALL_THICKNESS}mm")
-    await set_global(adapter, "Eccentricity", f"{ECCENTRICITY}mm")
-    await set_global(adapter, "BoreDiameter", f"{BORE_DIAMETER}mm")
-    await set_global(adapter, "NotchDepth", f"{NOTCH_DEPTH}mm")
-    await set_global(adapter, "NotchWidth", f"{NOTCH_WIDTH}mm")
-    await set_global(adapter, "NotchClearance", f"{NOTCH_CLEARANCE}mm")
+    set_global(adapter, "FaceWidth", f"{FACE_WIDTH}mm")
+    set_global(adapter, "OutsideDia", f"{OUTSIDE_DIA}mm")
+    set_global(adapter, "CamDiameter", f"{CAM_DIAMETER}mm")
+    set_global(adapter, "OverallThickness", f"{OVERALL_THICKNESS}mm")
+    set_global(adapter, "Eccentricity", f"{ECCENTRICITY}mm")
+    set_global(adapter, "BoreDiameter", f"{BORE_DIAMETER}mm")
+    set_global(adapter, "NotchDepth", f"{NOTCH_DEPTH}mm")
+    set_global(adapter, "NotchWidth", f"{NOTCH_WIDTH}mm")
+    set_global(adapter, "NotchClearance", f"{NOTCH_CLEARANCE}mm")
 
     # Drive equations for the auxiliary sketches are collected here and applied in
     # one deferred batch at the end (every target must resolve against the
@@ -367,7 +367,7 @@ async def build(adapter) -> dict[str, str]:
 
     # The native equations and volume oracle both come from the actual finite
     # translated 55-reference stock profile, patterned at the physical 120T.
-    disc = await build_stock_form_gear(adapter, STOCK_FORM, FACE_WIDTH)
+    disc = build_stock_form_gear(adapter, STOCK_FORM, FACE_WIDTH)
     v_teeth = disc.volume
     blank_name = feature_name_by_type(adapter, "Extrusion")
     if not blank_name:
@@ -403,8 +403,8 @@ async def build(adapter) -> dict[str, str]:
     if CAM_ROOT_WEB_MIN_MM <= 0.0:
         raise ValueError("eccentric cam must remain inside the stock-form root web")
     cam = SketchDims()
-    check("create_sketch cam on Front", await adapter.create_sketch("Front"))
-    await define_circle(
+    check("create_sketch cam on Front", adapter.create_sketch("Front"))
+    define_circle(
         adapter,
         0.0,
         ECCENTRICITY,
@@ -414,24 +414,24 @@ async def build(adapter) -> dict[str, str]:
         names=("CamCx", "CamCy", "CamDia"),
         drives=(None, '"Eccentricity"', '"CamDiameter"'),
     )
-    await ensure_fully_defined(adapter, "cam sketch")
-    check("exit_sketch cam", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "cam sketch")
+    check("exit_sketch cam", adapter.exit_sketch())
     name_last_feature(adapter, "CamProfile")
     drive_jobs += cam.apply(adapter, "CamProfile")
     check(
         "extrude cam",
-        await adapter.create_extrusion(ExtrusionParameters(depth=OVERALL_THICKNESS)),
+        adapter.create_extrusion(ExtrusionParameters(depth=OVERALL_THICKNESS)),
     )
     name_last_feature(adapter, "CamBoss")
     cam_depth = name_dimensions(adapter, "CamBoss", ["OverallThickness"])
     drive_jobs += [(cam_depth[0], '"OverallThickness"')]
     # Only the part beyond the blank adds material.
     v_cam = math.pi * (CAM_DIAMETER / 2.0) ** 2 * CAM_THICKNESS
-    volume = await volume_check(adapter, "cam boss", volume + v_cam, 0.005 * v_cam)
+    volume = volume_check(adapter, "cam boss", volume + v_cam, 0.005 * v_cam)
 
     # The extrude direction has an ambiguous sign: assert the cam actually
     # landed at z > FACE_WIDTH, on +Y.
-    mass = await adapter.get_mass_properties()
+    mass = adapter.get_mass_properties()
     if not mass.is_success:
         raise RuntimeError(f"cam COM check failed: {mass.error}")
     com = [float(c) for c in mass.data.center_of_mass]
@@ -454,13 +454,13 @@ async def build(adapter) -> dict[str, str]:
     # x = NOTCH_X (the valley centreline projected onto X).
     # ------------------------------------------------------------------
     notch_dims = SketchDims()
-    check("create_sketch notch", await adapter.create_sketch("Front"))
+    check("create_sketch notch", adapter.create_sketch("Front"))
     # Inference OFF: with it on, the bottom corners snap coincident onto the
     # flank-start vertices at the base circle ~0.5 mm away (live-caught: the
     # rectangle came back 3.32 mm wide with its floor at r = Rb and the width
     # dimension silently driven).
     set_sketch_direct_db(adapter, True)
-    notch = await add_line_chain(
+    notch = add_line_chain(
         adapter,
         [
             (NOTCH_X - NOTCH_WIDTH / 2.0, NOTCH_FLOOR),
@@ -471,7 +471,7 @@ async def build(adapter) -> dict[str, str]:
     )
     depth_witness = check(
         "notch depth construction witness",
-        await adapter.add_centerline(
+        adapter.add_centerline(
             NOTCH_X,
             NOTCH_FLOOR,
             0.0,
@@ -488,16 +488,16 @@ async def build(adapter) -> dict[str, str]:
     ):
         check(
             f"notch {relation}",
-            await adapter.add_sketch_constraint(ent, None, relation),
+            adapter.add_sketch_constraint(ent, None, relation),
         )
     check(
         "dimension notch width",
-        await adapter.add_sketch_dimension(bottom, None, "linear", NOTCH_WIDTH),
+        adapter.add_sketch_dimension(bottom, None, "linear", NOTCH_WIDTH),
     )
     notch_dims.record("NotchWidth", '"NotchWidth"')
     check(
         "dimension notch height",
-        await adapter.add_sketch_dimension(
+        adapter.add_sketch_dimension(
             right, None, "linear", NOTCH_OUTER - NOTCH_FLOOR
         ),
     )
@@ -508,15 +508,15 @@ async def build(adapter) -> dict[str, str]:
     # extension origins and reads 3.0 rather than selecting a nearby involute.
     check(
         "notch witness floor midpoint",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{depth_witness}.start", bottom, "midpoint"
         ),
     )
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{depth_witness}.end", 0.0, RA_MM, "notch tooth crest"
     )
     notch_dims.record("NotchTipRadius", None)
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{depth_witness}.end",
         f"{depth_witness}.start",
@@ -525,7 +525,7 @@ async def build(adapter) -> dict[str, str]:
         "notch root phase",
     )
     notch_dims.record("NotchCenterX", None)
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{depth_witness}.start",
         f"{depth_witness}.end",
@@ -544,11 +544,11 @@ async def build(adapter) -> dict[str, str]:
     set_sketch_direct_db(adapter, True)
     lobe_axis = check(
         "notch lobe-axis construction line",
-        await adapter.add_centerline(0.0, 0.0, 0.0, RA_MM),
+        adapter.add_centerline(0.0, 0.0, 0.0, RA_MM),
     )
     notch_radial = check(
         "notch radial construction line",
-        await adapter.add_centerline(
+        adapter.add_centerline(
             0.0,
             0.0,
             NOTCH_X,
@@ -559,45 +559,45 @@ async def build(adapter) -> dict[str, str]:
     # gap datum. It does not rotate a tooth, cam or kerf, or drive their sketch.
     pattern_ray = check(
         "actual seed-tooth-gap reference ray",
-        await adapter.add_centerline(
+        adapter.add_centerline(
             0.0, 0.0,
             NOTCH_MEAN_RADIUS * math.cos(TOOTH_PATTERN_GAP_RAD),
             NOTCH_MEAN_RADIUS * math.sin(TOOTH_PATTERN_GAP_RAD),
         ),
     )
     set_sketch_direct_db(adapter, False)
-    await anchor_point_to_origin(adapter, f"{lobe_axis}.start", 0.0, 0.0, "lobe axis")
+    anchor_point_to_origin(adapter, f"{lobe_axis}.start", 0.0, 0.0, "lobe axis")
     check(
         "lobe axis ends on the +Y crest",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{lobe_axis}.end", f"{depth_witness}.end", "coincident"
         ),
     )
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{notch_radial}.start", 0.0, 0.0, "notch radial"
     )
     # the radial's tip rides the kerf centreline: same x as the floor midpoint
     check(
         "notch radial ends on the kerf centreline",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{notch_radial}.end", f"{depth_witness}.start", "vertical_points"
         ),
     )
     check(
         "dimension notch mean radius",
-        await adapter.add_sketch_dimension(
+        adapter.add_sketch_dimension(
             notch_radial, None, "linear", NOTCH_MEAN_RADIUS
         ),
     )
     notch_dims.record("NotchMeanRadius", None)
     check(
         "fix canonical stock-pattern reference ray",
-        await adapter.add_sketch_constraint(pattern_ray, None, "fix"),
+        adapter.add_sketch_constraint(pattern_ray, None, "fix"),
     )
     # Text point INSIDE the 1.5 deg sector (SolidWorks picks which of the four
     # angles the text sits in; 0.4 deg off the lobe axis, well clear of the
     # radial at 1.5 deg) -- a point outside it reads the 178.5 supplement.
-    await add_angular_reference_dimension(
+    add_angular_reference_dimension(
         adapter,
         lobe_axis,
         notch_radial,
@@ -606,20 +606,20 @@ async def build(adapter) -> dict[str, str]:
         expected_degrees=NOTCH_PHASE_DEG,
     )
     notch_dims.record("NotchPhase")
-    await add_angular_reference_dimension(
+    add_angular_reference_dimension(
         adapter, pattern_ray, notch_radial,
         (NOTCH_MEAN_RADIUS * .65, NOTCH_MEAN_RADIUS * .70),
         "tooth-pattern to CAM-notch reference angle",
         expected_degrees=PATTERN_NOTCH_REF_ANGLE_DEG,
     )
     notch_dims.record("PatternNotchPhase")
-    await ensure_fully_defined(adapter, "notch sketch")
-    check("exit_sketch notch", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "notch sketch")
+    check("exit_sketch notch", adapter.exit_sketch())
     name_last_feature(adapter, "NotchProfile")
     drive_jobs += notch_dims.apply(adapter, "NotchProfile")
     check(
         "cut notch",
-        await adapter.create_cut_extrude(ExtrusionParameters(depth=FACE_WIDTH + 1.0)),
+        adapter.create_cut_extrude(ExtrusionParameters(depth=FACE_WIDTH + 1.0)),
     )
     name_last_feature(adapter, "NotchKerf")
     v_notch = notch_solid_area() * FACE_WIDTH
@@ -643,7 +643,7 @@ async def build(adapter) -> dict[str, str]:
     _telemetry.success(
         f"notch: {faces}; kerf from walls {kerf:.4f} mm^3 (analytic {v_notch:.4f})"
     )
-    mass = await adapter.get_mass_properties()
+    mass = adapter.get_mass_properties()
     if not mass.is_success:
         raise RuntimeError(f"notch: get_mass_properties failed: {mass.error}")
     volume = float(mass.data.volume)
@@ -656,8 +656,8 @@ async def build(adapter) -> dict[str, str]:
     # Shaft bore: ordinary on-axis circle (origin centre -> no centre dims, just
     # the diameter), driven by the BoreDiameter knob.
     bore = SketchDims()
-    check("create_sketch bore", await adapter.create_sketch("Front"))
-    await define_circle(
+    check("create_sketch bore", adapter.create_sketch("Front"))
+    define_circle(
         adapter,
         0.0,
         0.0,
@@ -667,35 +667,35 @@ async def build(adapter) -> dict[str, str]:
         names=("BoreCx", "BoreCz", "BoreDia"),
         drives=(None, None, '"BoreDiameter"'),
     )
-    await ensure_fully_defined(adapter, "bore sketch")
-    check("exit_sketch bore", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "bore sketch")
+    check("exit_sketch bore", adapter.exit_sketch())
     name_last_feature(adapter, "BoreProfile")
     drive_jobs += bore.apply(adapter, "BoreProfile")
     check(
         "cut bore",
-        await adapter.create_cut_extrude(ExtrusionParameters(depth=THROUGH_ALL)),
+        adapter.create_cut_extrude(ExtrusionParameters(depth=THROUGH_ALL)),
     )
     name_last_feature(adapter, "Bore")
     v_bore = math.pi * BORE_RADIUS**2 * OVERALL_THICKNESS
-    volume = await volume_check(adapter, "bore", volume - v_bore, 0.01 * v_bore)
+    volume = volume_check(adapter, "bore", volume - v_bore, 0.01 * v_bore)
 
     # Named bore axis (gear axis = Z through the origin) for view-independent
     # assembly mate selection: the gear rides the arbor coincident axis-to-axis
     # and meshes its cone gear via a gear mate (M6 mated-DOF drive train).
-    await name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", 0.0, "bore axis")
+    name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", 0.0, "bore axis")
 
     # Axis3: the eccentric cam-lobe centre axis (motion-study cam->rod coupling).
-    await _name_lobe_axis(adapter)
+    _name_lobe_axis(adapter)
 
     # Apply the deferred drive equations now -- after the whole model + a rebuild
     # exists, so every target resolves. Each equation evaluates to the value just
     # built, so the geometry must not move; the re-check is the proof. The
     # blank-width and auxiliary cam/notch/bore dimensions are driven; the tooth
     # profile itself stays literal (volume_check here is the same one used above).
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
     notch_readback = {
         str(row["full_name"]).split("@", 1)[0]: float(row["value_mm"])
         for row in dump_dimensions(adapter, "NotchProfile")
@@ -772,12 +772,12 @@ async def build(adapter) -> dict[str, str]:
         CAM_PHASE_TOLERANCE_DEG,
         require_driven=True,
     )
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "driven cylinder gear (equations neutral)", volume, 0.01 * v_bore
     )
 
-    await apply_material(adapter, MATERIAL)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    report_mass_properties(adapter)
 
     # Mark exactly the blank, fitted bore, functional cam, stacking thickness
     # and phase-kerf dimensions and author their decimal places on the part
@@ -794,7 +794,7 @@ async def build(adapter) -> dict[str, str]:
         PART_NAME,
         {"Gear Data": GEAR_DATA},
     )
-    return await save_simplified_part(adapter, PART_NAME, disc.tooth_features)
+    return save_simplified_part(adapter, PART_NAME, disc.tooth_features)
 
 
 if __name__ == "__main__":

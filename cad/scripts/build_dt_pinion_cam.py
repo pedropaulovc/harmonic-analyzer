@@ -132,19 +132,19 @@ def _tap_drill_removed() -> float:
 V_TAP_DRILL = _tap_drill_removed()
 
 
-async def _thin_wall_reference(adapter) -> list[tuple[str, str]]:
+def _thin_wall_reference(adapter) -> list[tuple[str, str]]:
     """RV-01's accepted wall, stated on the sheet natively (rule 20): a hidden
     construction line up the thin side (+Y) from the bore's top, as long as
     the printed minimum, so its driving dimension prints ".0797 MIN" once
     set_single_limit types it.  Returns the deferred drive jobs (the length,
     then its anchor to the bore's top)."""
-    check("create_sketch thin wall reference", await adapter.create_sketch("Front"))
+    check("create_sketch thin wall reference", adapter.create_sketch("Front"))
     # Direct-to-DB: the line lies on the sketch's vertical axis, where
     # creation-time inference would over-define it.
     set_sketch_direct_db(adapter, True)
     line = check(
         "thin wall reference line",
-        await adapter.add_line(0.0, BORE_R, 0.0, BORE_R + THIN_WALL_MIN_MM),
+        adapter.add_line(0.0, BORE_R, 0.0, BORE_R + THIN_WALL_MIN_MM),
     )
     set_sketch_direct_db(adapter, False)
     segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
@@ -155,9 +155,9 @@ async def _thin_wall_reference(adapter) -> list[tuple[str, str]]:
         )
     check(
         "thin wall reference vertical",
-        await adapter.add_sketch_constraint(line, None, "vertical"),
+        adapter.add_sketch_constraint(line, None, "vertical"),
     )
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{line}.start",
         f"{line}.end",
@@ -165,11 +165,11 @@ async def _thin_wall_reference(adapter) -> list[tuple[str, str]]:
         THIN_WALL_MIN_MM,
         "thin wall reference",
     )
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{line}.start", 0.0, BORE_R, "thin wall reference"
     )
-    await ensure_fully_defined(adapter, "thin-wall reference sketch")
-    check("exit_sketch thin wall reference", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "thin-wall reference sketch")
+    check("exit_sketch thin wall reference", adapter.exit_sketch())
     name_last_feature(adapter, "ThinWallReference")
     full = name_dimensions(
         adapter, "ThinWallReference", ["ThinWallMin", "ThinWallBore"]
@@ -177,31 +177,31 @@ async def _thin_wall_reference(adapter) -> list[tuple[str, str]]:
     return list(zip(full, ('"ThinWallMin"', '"BoreDia" / 2'), strict=True))
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     # #290: the row's inch calculation units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing (INCH
     # document; the equation manager reads bare numbers in document units).
-    await set_global(adapter, "CamOd", f"{CAM_OD}mm")
-    await set_global(adapter, "CamLen", f"{CAM_LEN}mm")
-    await set_global(adapter, "Ecc", f"{ECC}mm")
-    await set_global(adapter, "BoreDia", f"{BORE}mm")
-    await set_global(adapter, "SetScrewZ", f"{SET_SCREW_Z}mm")
-    await set_global(adapter, "TapDrillDia", f"{TAP_DRILL_DIA}mm")
+    set_global(adapter, "CamOd", f"{CAM_OD}mm")
+    set_global(adapter, "CamLen", f"{CAM_LEN}mm")
+    set_global(adapter, "Ecc", f"{ECC}mm")
+    set_global(adapter, "BoreDia", f"{BORE}mm")
+    set_global(adapter, "SetScrewZ", f"{SET_SCREW_Z}mm")
+    set_global(adapter, "TapDrillDia", f"{TAP_DRILL_DIA}mm")
     # RV-01's printed thin-side wall minimum: a limit, not geometry, so only
     # the hidden reference line carries it.
-    await set_global(adapter, "ThinWallMin", f"{THIN_WALL_MIN_MM}mm")
+    set_global(adapter, "ThinWallMin", f"{THIN_WALL_MIN_MM}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
     # Collar: circle centred ECC below the bore/origin, extruded z 0..CAM_LEN.
     collar = SketchDims()
-    check("create_sketch collar", await adapter.create_sketch("Front"))
-    await define_circle(
+    check("create_sketch collar", adapter.create_sketch("Front"))
+    define_circle(
         adapter,
         0.0,
         -ECC,
@@ -211,25 +211,25 @@ async def build(adapter) -> dict[str, str]:
         names=("CollarCx", "CollarCy", "CollarOd"),
         drives=(None, '"Ecc"', '"CamOd"'),
     )
-    await ensure_fully_defined(adapter, "collar sketch")
-    check("exit_sketch collar", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "collar sketch")
+    check("exit_sketch collar", adapter.exit_sketch())
     name_last_feature(adapter, "CollarProfile")
     drive_jobs += collar.apply(adapter, "CollarProfile")
     check(
         "extrude collar",
-        await adapter.create_extrusion(ExtrusionParameters(depth=CAM_LEN)),
+        adapter.create_extrusion(ExtrusionParameters(depth=CAM_LEN)),
     )
     name_last_feature(adapter, "Collar")
     depth_dim = name_dimensions(adapter, "Collar", ["Depth"])
     drive_jobs += [(depth_dim[0], '"CamLen"')]
     v_solid = math.pi * CAM_R**2 * CAM_LEN
-    volume = await volume_check(adapter, "collar", v_solid, 0.005 * v_solid)
+    volume = volume_check(adapter, "collar", v_solid, 0.005 * v_solid)
 
     # Rod bore on the origin axis (fully inside the collar: ECC + BORE_R =
     # 5.188 < CAM_R).
     bore = SketchDims()
-    check("create_sketch bore", await adapter.create_sketch("Front"))
-    await define_circle(
+    check("create_sketch bore", adapter.create_sketch("Front"))
+    define_circle(
         adapter,
         0.0,
         0.0,
@@ -239,25 +239,25 @@ async def build(adapter) -> dict[str, str]:
         names=("BoreCx", "BoreCy", "BoreDia"),
         drives=(None, None, '"BoreDia"'),
     )
-    await ensure_fully_defined(adapter, "bore sketch")
-    check("exit_sketch bore", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "bore sketch")
+    check("exit_sketch bore", adapter.exit_sketch())
     name_last_feature(adapter, "BoreProfile")
     drive_jobs += bore.apply(adapter, "BoreProfile")
     check(
         "cut bore",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=2.5 * CAM_LEN, both_directions=True)
         ),
     )
     name_last_feature(adapter, "Bore")
-    volume = await volume_check(adapter, "bore", V_COLLAR, 0.005 * V_COLLAR)
+    volume = volume_check(adapter, "bore", V_COLLAR, 0.005 * V_COLLAR)
 
     # Retain the drawing-owned tap-drill diameter and axial station in a
     # hidden, construction-only reference sketch. Top (u, v) -> (X, -Z).
     # The native radial Hole Wizard below, not this circle, cuts the tap.
     check(
         "create_plane tap drill at OD tangent",
-        await adapter.create_plane(
+        adapter.create_plane(
             CreatePlaneParameters(
                 mode="offset",
                 base_plane="Top Plane",
@@ -269,9 +269,9 @@ async def build(adapter) -> dict[str, str]:
     tap = SketchDims()
     check(
         "create_sketch tap drill",
-        await adapter.create_sketch(tap_plane_name),
+        adapter.create_sketch(tap_plane_name),
     )
-    tap_circle = await define_circle(
+    tap_circle = define_circle(
         adapter,
         0.0,
         -SET_SCREW_Z,
@@ -287,11 +287,11 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError(
             "tap-drill reference circle did not take the construction flag"
         )
-    await ensure_fully_defined(adapter, "tap-drill sketch")
-    check("exit_sketch tap drill", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "tap-drill sketch")
+    check("exit_sketch tap drill", adapter.exit_sketch())
     name_last_feature(adapter, "TapDrillProfile")
     drive_jobs += tap.apply(adapter, "TapDrillProfile")
-    drive_jobs += await _thin_wall_reference(adapter)
+    drive_jobs += _thin_wall_reference(adapter)
     blank_reference_sketches(adapter, ("TapDrillProfile", "ThinWallReference"))
 
     # One native #2-56 UNC-2B tap, radially inward from the heavy-side OD
@@ -299,7 +299,7 @@ async def build(adapter) -> dict[str, str]:
     # Front-offset station plane fixes Z; Right Plane clocks the mouth to -Y.
     check(
         "create_plane SetScrewStationPlane",
-        await adapter.create_plane(
+        adapter.create_plane(
             CreatePlaneParameters(
                 mode="offset", base_plane="Front Plane", offset=SET_SCREW_Z
             )
@@ -317,20 +317,20 @@ async def build(adapter) -> dict[str, str]:
         point_planes=("SetScrewStationPlane", "Right Plane"),
     )
     volume -= V_TAP_DRILL
-    await volume_check(adapter, "#2-56 radial tap", volume, 0.05 * V_TAP_DRILL)
+    volume_check(adapter, "#2-56 radial tap", volume, 0.05 * V_TAP_DRILL)
 
     # Named bore axis for the rod mate (Axis1).
-    cam_bore_axis = await name_bore_axis(
+    cam_bore_axis = name_bore_axis(
         adapter, "Top Plane", 0.0, "Right Plane", 0.0, "cam bore axis"
     )
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    volume_check(
         adapter, "driven cam (equations neutral)", volume, 0.01 * V_COLLAR
     )
 
@@ -370,9 +370,9 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
 
-    await apply_material(adapter, MATERIAL)
-    await apply_color(adapter, POLISHED_STEEL)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    apply_color(adapter, POLISHED_STEEL)
+    report_mass_properties(adapter)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,
@@ -390,7 +390,7 @@ async def build(adapter) -> dict[str, str]:
             (cam_bore_axis, "AXIS"),
         ),
     )
-    artefacts = await save_part_and_images(adapter, PART_NAME)
+    artefacts = save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
     return artefacts
 

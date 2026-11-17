@@ -193,7 +193,7 @@ def _require_one_solid_body(adapter, *, label: str) -> None:
         raise RuntimeError(f"{label}: expected exactly one solid body, found {len(bodies)}")
 
 
-async def _add_axial_reference(
+def _add_axial_reference(
     adapter,
     *,
     feature_name: str,
@@ -209,17 +209,17 @@ async def _add_axial_reference(
     witness that far off the axis (on the flank), not the axis point itself.
     """
     dims = SketchDims()
-    check(f"create sketch {feature_name}", await adapter.create_sketch("Top"))
+    check(f"create sketch {feature_name}", adapter.create_sketch("Top"))
     set_sketch_direct_db(adapter, True)
     line = check(
         f"add {feature_name} witness",
-        await adapter.add_centerline(0.0, start_v, 0.0, end_v),
+        adapter.add_centerline(0.0, start_v, 0.0, end_v),
     )
     flank = None
     if end_on_flank is not None:
         flank = check(
             f"add {feature_name} flank witness",
-            await adapter.add_line(
+            adapter.add_line(
                 end_on_flank, end_v, end_on_flank, end_v + DRUM_STATION_POINT_LEN
             ),
         )
@@ -231,16 +231,16 @@ async def _add_axial_reference(
             raise RuntimeError(f"{flank}: failed to become construction geometry")
     check(
         f"{feature_name} vertical",
-        await adapter.add_sketch_constraint(line, None, "vertical"),
+        adapter.add_sketch_constraint(line, None, "vertical"),
     )
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{line}.start", 0.0, start_v, f"{feature_name} start"
     )
     dims.record(None, None)
     far_end = f"{line}.end" if flank is None else f"{flank}.start"
     check(
         f"dimension {dimension_name}",
-        await adapter.add_sketch_dimension(
+        adapter.add_sketch_dimension(
             f"{line}.start", far_end, "vertical_distance", abs(end_v - start_v)
         ),
     )
@@ -252,24 +252,24 @@ async def _add_axial_reference(
         ):
             check(
                 f"{feature_name} {first} {relation}",
-                await adapter.add_sketch_constraint(first, second, relation),
+                adapter.add_sketch_constraint(first, second, relation),
             )
         check(
             f"{feature_name} flank offset",
-            await adapter.add_sketch_dimension(
+            adapter.add_sketch_dimension(
                 f"{line}.end", f"{flank}.start", "horizontal_distance", end_on_flank
             ),
         )
         dims.record(None, None)
         check(
             f"{feature_name} flank witness length",
-            await adapter.add_sketch_dimension(
+            adapter.add_sketch_dimension(
                 f"{flank}.start", f"{flank}.end", "vertical_distance", DRUM_STATION_POINT_LEN
             ),
         )
         dims.record(None, None)
-    await ensure_fully_defined(adapter, feature_name)
-    check(f"exit sketch {feature_name}", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, feature_name)
+    check(f"exit sketch {feature_name}", adapter.exit_sketch())
     name_last_feature(adapter, feature_name)
     return dims.apply(adapter, feature_name)
 
@@ -294,7 +294,7 @@ def _journal_face(adapter, prefix: str, journal_z: float) -> object:
     return resolve_faces(adapter.currentModel, {label: spec})[label]
 
 
-async def _add_journal_land(
+def _add_journal_land(
     adapter,
     *,
     prefix: str,
@@ -319,30 +319,30 @@ async def _add_journal_land(
     end_v = -(journal_z + JOURNAL_LEN)
     reach = SHAFT_R + SPLIT_OVERHANG
     dims = SketchDims()
-    check(f"create sketch {feature_name}", await adapter.create_sketch("Top"))
+    check(f"create sketch {feature_name}", adapter.create_sketch("Top"))
     set_sketch_direct_db(adapter, True)
     axis = check(
         f"{feature_name} axis",
-        await adapter.add_centerline(0.0, -HEAD_REAR_Z, 0.0, end_v),
+        adapter.add_centerline(0.0, -HEAD_REAR_Z, 0.0, end_v),
     )
     near = check(
         f"{feature_name} head-side split",
-        await adapter.add_line(-reach, start_v, reach, start_v),
+        adapter.add_line(-reach, start_v, reach, start_v),
     )
     far = check(
         f"{feature_name} crown-side split",
-        await adapter.add_line(-reach, end_v, reach, end_v),
+        adapter.add_line(-reach, end_v, reach, end_v),
     )
     witness = check(
         f"{feature_name} flank witness",
-        await adapter.add_line(SHAFT_R, start_v, SHAFT_R, end_v),
+        adapter.add_line(SHAFT_R, start_v, SHAFT_R, end_v),
     )
     constructions = [witness]
     if diameter:
         dia_v = end_v + JOURNAL_DIA_POINT_FROM_CROWN_END
         dia_witness = check(
             f"{feature_name} diameter witness",
-            await adapter.add_line(
+            adapter.add_line(
                 SHAFT_R, dia_v, SHAFT_R, dia_v + JOURNAL_DIA_POINT_LEN
             ),
         )
@@ -361,7 +361,7 @@ async def _add_journal_land(
     ):
         check(
             f"{feature_name} {line} {relation}",
-            await adapter.add_sketch_constraint(line, None, relation),
+            adapter.add_sketch_constraint(line, None, relation),
         )
     for first, second, relation in (
         (f"{axis}.end", far, "midpoint"),
@@ -372,22 +372,22 @@ async def _add_journal_land(
     ):
         check(
             f"{feature_name} {first} {relation} {second}",
-            await adapter.add_sketch_constraint(first, second, relation),
+            adapter.add_sketch_constraint(first, second, relation),
         )
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{axis}.start", 0.0, -HEAD_REAR_Z, f"{feature_name} shoulder"
     )
     dims.record(None, None)
     check(
         f"{feature_name} split reach",
-        await adapter.add_sketch_dimension(
+        adapter.add_sketch_dimension(
             f"{far}.start", f"{far}.end", "horizontal_distance", 2.0 * reach
         ),
     )
     dims.record(None, None)
     check(
         f"{feature_name} station",
-        await adapter.add_sketch_dimension(
+        adapter.add_sketch_dimension(
             f"{axis}.start",
             f"{witness}.start",
             "vertical_distance",
@@ -397,7 +397,7 @@ async def _add_journal_land(
     dims.record(f"{prefix}FromHeadRear", station_expression)
     check(
         f"{feature_name} end station",
-        await adapter.add_sketch_dimension(
+        adapter.add_sketch_dimension(
             f"{axis}.start",
             f"{witness}.end",
             "vertical_distance",
@@ -408,11 +408,11 @@ async def _add_journal_land(
     if diameter:
         check(
             f"{feature_name} diameter witness on the flank",
-            await adapter.add_sketch_constraint(dia_witness, witness, "collinear"),
+            adapter.add_sketch_constraint(dia_witness, witness, "collinear"),
         )
         check(
             f"{feature_name} diameter witness station",
-            await adapter.add_sketch_dimension(
+            adapter.add_sketch_dimension(
                 f"{witness}.end",
                 f"{dia_witness}.start",
                 "vertical_distance",
@@ -422,7 +422,7 @@ async def _add_journal_land(
         dims.record(None, None)
         check(
             f"{feature_name} diameter witness length",
-            await adapter.add_sketch_dimension(
+            adapter.add_sketch_dimension(
                 f"{dia_witness}.start",
                 f"{dia_witness}.end",
                 "vertical_distance",
@@ -430,7 +430,7 @@ async def _add_journal_land(
             ),
         )
         dims.record(None, None)
-        await add_diametric_linear_dimension(
+        add_diametric_linear_dimension(
             adapter,
             axis,
             f"{dia_witness}.start",
@@ -443,13 +443,13 @@ async def _add_journal_land(
         # axis (farm r7, 4a51a72: FrontJournalReference under-defined).
         check(
             f"{feature_name} flank witness off the axis",
-            await adapter.add_sketch_dimension(
+            adapter.add_sketch_dimension(
                 f"{axis}.end", f"{witness}.end", "horizontal_distance", SHAFT_R
             ),
         )
         dims.record(f"{prefix}FlankR", '"ShaftDia" / 2')
-    await ensure_fully_defined(adapter, feature_name)
-    check(f"exit sketch {feature_name}", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, feature_name)
+    check(f"exit sketch {feature_name}", adapter.exit_sketch())
     name_last_feature(adapter, feature_name)
     drive_jobs = dims.apply(adapter, feature_name)
 
@@ -495,7 +495,7 @@ async def _add_journal_land(
     return drive_jobs
 
 
-async def _add_span_reference(
+def _add_span_reference(
     adapter, *, feature_name: str, dimension_name: str, station: float, witness_len: float
 ) -> list[tuple[str, str]]:
     """Dimension a plain Ø5/16 span on its own flank, like a journal land.
@@ -509,15 +509,15 @@ async def _add_span_reference(
     start_v = -HEAD_REAR_Z
     end_v = -(HEAD_REAR_Z + station)
     dims = SketchDims()
-    check(f"create sketch {feature_name}", await adapter.create_sketch("Top"))
+    check(f"create sketch {feature_name}", adapter.create_sketch("Top"))
     set_sketch_direct_db(adapter, True)
     axis = check(
         f"{feature_name} axis",
-        await adapter.add_centerline(0.0, start_v, 0.0, end_v),
+        adapter.add_centerline(0.0, start_v, 0.0, end_v),
     )
     witness = check(
         f"{feature_name} flank witness",
-        await adapter.add_line(SHAFT_R, end_v, SHAFT_R, end_v - witness_len),
+        adapter.add_line(SHAFT_R, end_v, SHAFT_R, end_v - witness_len),
     )
     set_sketch_direct_db(adapter, False)
     segment = _early_bound(adapter._sketch_entities[witness], "ISketchSegment")
@@ -527,33 +527,33 @@ async def _add_span_reference(
     for line in (axis, witness):
         check(
             f"{feature_name} {line} vertical",
-            await adapter.add_sketch_constraint(line, None, "vertical"),
+            adapter.add_sketch_constraint(line, None, "vertical"),
         )
     check(
         f"{feature_name} witness level with the axis end",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{witness}.start", f"{axis}.end", "horizontal_points"
         ),
     )
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{axis}.start", 0.0, start_v, f"{feature_name} shoulder"
     )
     dims.record(None, None)
     check(
         f"{feature_name} station",
-        await adapter.add_sketch_dimension(
+        adapter.add_sketch_dimension(
             f"{axis}.start", f"{axis}.end", "vertical_distance", station
         ),
     )
     dims.record(None, None)
     check(
         f"{feature_name} witness length",
-        await adapter.add_sketch_dimension(
+        adapter.add_sketch_dimension(
             f"{witness}.start", f"{witness}.end", "vertical_distance", witness_len
         ),
     )
     dims.record(None, None)
-    await add_diametric_linear_dimension(
+    add_diametric_linear_dimension(
         adapter,
         axis,
         f"{witness}.start",
@@ -561,13 +561,13 @@ async def _add_span_reference(
         dimension_name,
     )
     dims.record(dimension_name, '"ShaftDia"')
-    await ensure_fully_defined(adapter, feature_name)
-    check(f"exit sketch {feature_name}", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, feature_name)
+    check(f"exit sketch {feature_name}", adapter.exit_sketch())
     name_last_feature(adapter, feature_name)
     return dims.apply(adapter, feature_name)
 
 
-async def _add_bond_relief(adapter) -> list[tuple[str, str]]:
+def _add_bond_relief(adapter) -> list[tuple[str, str]]:
     """Turn the relief between the MHA-DT-01 bond lands (#2360).
 
     One Top-plane profile, revolved as a cut about its own axis line: a
@@ -585,14 +585,14 @@ async def _add_bond_relief(adapter) -> list[tuple[str, str]]:
     back_v = -(BOND_RELIEF_Z + BOND_RELIEF_LEN)
     reach = SHAFT_R + SPLIT_OVERHANG
     dims = SketchDims()
-    check(f"create sketch {feature_name}", await adapter.create_sketch("Top"))
+    check(f"create sketch {feature_name}", adapter.create_sketch("Top"))
     set_sketch_direct_db(adapter, True)
     axis = check(
         f"{feature_name} axis",
-        await adapter.add_centerline(0.0, datum_v, 0.0, back_v),
+        adapter.add_centerline(0.0, datum_v, 0.0, back_v),
     )
     set_sketch_direct_db(adapter, False)
-    inner, back, outer, front = await add_line_chain(
+    inner, back, outer, front = add_line_chain(
         adapter,
         [
             (-BOND_RELIEF_R, front_v),
@@ -608,7 +608,7 @@ async def _add_bond_relief(adapter) -> list[tuple[str, str]]:
     set_sketch_direct_db(adapter, True)
     witness = check(
         f"{feature_name} station witness",
-        await adapter.add_line(BOND_RELIEF_R, front_v, BOND_RELIEF_R, back_v),
+        adapter.add_line(BOND_RELIEF_R, front_v, BOND_RELIEF_R, back_v),
     )
     set_sketch_direct_db(adapter, False)
     segment = _early_bound(adapter._sketch_entities[witness], "ISketchSegment")
@@ -625,7 +625,7 @@ async def _add_bond_relief(adapter) -> list[tuple[str, str]]:
     ):
         check(
             f"{feature_name} {line} {relation}",
-            await adapter.add_sketch_constraint(line, None, relation),
+            adapter.add_sketch_constraint(line, None, relation),
         )
     for first, second, relation in (
         (f"{axis}.end", f"{inner}.end", "horizontal_points"),
@@ -634,15 +634,15 @@ async def _add_bond_relief(adapter) -> list[tuple[str, str]]:
     ):
         check(
             f"{feature_name} {first} {relation} {second}",
-            await adapter.add_sketch_constraint(first, second, relation),
+            adapter.add_sketch_constraint(first, second, relation),
         )
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{axis}.start", 0.0, datum_v, f"{feature_name} head rear face"
     )
     dims.record(None, None)
     check(
         f"{feature_name} front shoulder station",
-        await adapter.add_sketch_dimension(
+        adapter.add_sketch_dimension(
             f"{axis}.start",
             f"{witness}.start",
             "vertical_distance",
@@ -652,7 +652,7 @@ async def _add_bond_relief(adapter) -> list[tuple[str, str]]:
     dims.record("BondReliefFromHeadRear", '"BondReliefFromHeadRear"')
     check(
         f"{feature_name} back shoulder station",
-        await adapter.add_sketch_dimension(
+        adapter.add_sketch_dimension(
             f"{axis}.start",
             f"{witness}.end",
             "vertical_distance",
@@ -662,14 +662,14 @@ async def _add_bond_relief(adapter) -> list[tuple[str, str]]:
     dims.record("BondReliefBackFromHeadRear", '"BondReliefBackFromHeadRear"')
     check(
         f"{feature_name} outer reach",
-        await adapter.add_sketch_dimension(
+        adapter.add_sketch_dimension(
             f"{axis}.end", f"{outer}.start", "horizontal_distance", reach
         ),
     )
     dims.record(None, None)
     check(
         f"{feature_name} relief floor",
-        await adapter.add_sketch_dimension(
+        adapter.add_sketch_dimension(
             f"{axis}.end", f"{inner}.end", "horizontal_distance", BOND_RELIEF_R
         ),
     )
@@ -678,7 +678,7 @@ async def _add_bond_relief(adapter) -> list[tuple[str, str]]:
     # shoulder point on the lower floor, so its extension comes from the
     # shoulder side and the sheet hangs its text away from it (as the
     # journals' diameters do), clear of the station's shoulder witness.
-    await add_diametric_linear_dimension(
+    add_diametric_linear_dimension(
         adapter,
         axis,
         f"{witness}.start",
@@ -686,23 +686,23 @@ async def _add_bond_relief(adapter) -> list[tuple[str, str]]:
         "BondReliefDia",
     )
     dims.record("BondReliefDia", '"BondReliefDia"')
-    await ensure_fully_defined(adapter, feature_name)
-    check(f"exit sketch {feature_name}", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, feature_name)
+    check(f"exit sketch {feature_name}", adapter.exit_sketch())
     name_last_feature(adapter, feature_name)
     drive_jobs = dims.apply(adapter, feature_name)
     check(
         "revolve-cut bond relief",
-        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
+        adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
     )
     name_last_feature(adapter, "BondRelief")
     return drive_jobs
 
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     # #290: the row's inch calculation units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
@@ -734,13 +734,13 @@ async def build(adapter) -> dict[str, str]:
         "BondReliefDia": BOND_RELIEF_DIA,
     }
     for name, value in globals_mm.items():
-        await set_global(adapter, name, f"{value}mm")
+        set_global(adapter, name, f"{value}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
     neck = SketchDims()
-    check("create_sketch neck", await adapter.create_sketch("Front"))
-    await define_circle(
+    check("create_sketch neck", adapter.create_sketch("Front"))
+    define_circle(
         adapter,
         0.0,
         0.0,
@@ -750,19 +750,19 @@ async def build(adapter) -> dict[str, str]:
         names=("NeckCx", "NeckCz", "NeckDia"),
         drives=(None, None, '"NeckDia"'),
     )
-    await ensure_fully_defined(adapter, "integral-neck sketch")
-    check("exit_sketch neck", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "integral-neck sketch")
+    check("exit_sketch neck", adapter.exit_sketch())
     name_last_feature(adapter, "NeckProfile")
     drive_jobs += neck.apply(adapter, "NeckProfile")
     extrude_at_offset(adapter, NECK_LEN, HEAD_REAR_Z)
     name_last_feature(adapter, "Neck")
     drive_jobs.append((name_dimensions(adapter, "Neck", ["NeckLen"])[0], '"NeckLen"'))
     expected = V_NECK
-    await volume_check(adapter, "integral neck", expected, 0.005 * V_NECK)
+    volume_check(adapter, "integral neck", expected, 0.005 * V_NECK)
 
     shaft = SketchDims()
-    check("create_sketch shaft", await adapter.create_sketch("Front"))
-    await define_circle(
+    check("create_sketch shaft", adapter.create_sketch("Front"))
+    define_circle(
         adapter,
         0.0,
         0.0,
@@ -772,8 +772,8 @@ async def build(adapter) -> dict[str, str]:
         names=("ShaftCx", "ShaftCz", "ShaftDia"),
         drives=(None, None, '"ShaftDia"'),
     )
-    await ensure_fully_defined(adapter, "exposed-shaft sketch")
-    check("exit_sketch shaft", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "exposed-shaft sketch")
+    check("exit_sketch shaft", adapter.exit_sketch())
     name_last_feature(adapter, "ShaftProfile")
     drive_jobs += shaft.apply(adapter, "ShaftProfile")
     extrude_at_offset(adapter, EXPOSED_SHAFT_LEN, NECK_END_Z)
@@ -782,11 +782,11 @@ async def build(adapter) -> dict[str, str]:
         (name_dimensions(adapter, "Shaft", ["ExposedShaftLen"])[0], '"ExposedShaftLen"')
     )
     expected += V_SHAFT
-    await volume_check(adapter, "neck and exposed shaft", expected, 0.005 * V_SHAFT)
+    volume_check(adapter, "neck and exposed shaft", expected, 0.005 * V_SHAFT)
 
     head = SketchDims()
-    check("create_sketch head", await adapter.create_sketch("Front"))
-    await define_circle(
+    check("create_sketch head", adapter.create_sketch("Front"))
+    define_circle(
         adapter,
         0.0,
         0.0,
@@ -796,15 +796,15 @@ async def build(adapter) -> dict[str, str]:
         names=("HeadCx", "HeadCz", "HeadDia"),
         drives=(None, None, '"HeadDia"'),
     )
-    await ensure_fully_defined(adapter, "integral-head sketch")
-    check("exit_sketch head", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "integral-head sketch")
+    check("exit_sketch head", adapter.exit_sketch())
     name_last_feature(adapter, "HeadProfile")
     drive_jobs += head.apply(adapter, "HeadProfile")
     extrude_at_offset(adapter, HEAD_LEN, HEAD_FRONT_Z)
     name_last_feature(adapter, "Head")
     drive_jobs.append((name_dimensions(adapter, "Head", ["HeadLen"])[0], '"HeadLen"'))
     expected += V_HEAD
-    await volume_check(adapter, "integral head", expected, 0.005 * V_HEAD)
+    volume_check(adapter, "integral head", expected, 0.005 * V_HEAD)
 
     # Front crown: Top-plane sketch coordinates map v=-Z, so the negative-Z
     # head end appears at positive v.  Rim-to-apex is the minor CCW arc.
@@ -812,37 +812,37 @@ async def build(adapter) -> dict[str, str]:
     front_v_apex = front_v_base + HEAD_CAP_SAG
     front_v_center = front_v_apex - HEAD_CAP_R
     front_cap = SketchDims()
-    check("create_sketch front cap", await adapter.create_sketch("Top"))
+    check("create_sketch front cap", adapter.create_sketch("Top"))
     set_sketch_direct_db(adapter, True)
     check(
         "front cap centerline",
-        await adapter.add_centerline(0.0, front_v_base, 0.0, front_v_apex),
+        adapter.add_centerline(0.0, front_v_base, 0.0, front_v_apex),
     )
     front_base = check(
-        "front cap base", await adapter.add_line(0.0, front_v_base, HEAD_R, front_v_base)
+        "front cap base", adapter.add_line(0.0, front_v_base, HEAD_R, front_v_base)
     )
     front_arc = check(
         "front cap arc",
-        await adapter.add_arc(
+        adapter.add_arc(
             0.0, front_v_center, HEAD_R, front_v_base, 0.0, front_v_apex
         ),
     )
     front_close = check(
-        "front cap close", await adapter.add_line(0.0, front_v_apex, 0.0, front_v_base)
+        "front cap close", adapter.add_line(0.0, front_v_apex, 0.0, front_v_base)
     )
     set_sketch_direct_db(adapter, False)
-    check("front cap base horizontal", await adapter.add_sketch_constraint(front_base, None, "horizontal"))
-    check("front cap close vertical", await adapter.add_sketch_constraint(front_close, None, "vertical"))
+    check("front cap base horizontal", adapter.add_sketch_constraint(front_base, None, "horizontal"))
+    check("front cap close vertical", adapter.add_sketch_constraint(front_close, None, "vertical"))
     check(
         "front cap rim reach",
-        await adapter.add_sketch_dimension(
+        adapter.add_sketch_dimension(
             f"{front_base}.end", "origin", "horizontal_distance", HEAD_R
         ),
     )
     front_cap.record("HeadCapRim", '"HeadDia" / 2')
     check(
         "front cap sagitta",
-        await adapter.add_sketch_dimension(
+        adapter.add_sketch_dimension(
             f"{front_close}.start",
             f"{front_close}.end",
             "vertical_distance",
@@ -852,37 +852,37 @@ async def build(adapter) -> dict[str, str]:
     front_cap.record("HeadCapSagDim", '"HeadCapSag"')
     check(
         "front cap on axis",
-        await adapter.add_sketch_constraint(f"{front_base}.start", "origin", "vertical_points"),
+        adapter.add_sketch_constraint(f"{front_base}.start", "origin", "vertical_points"),
     )
     check(
         "front cap station",
-        await adapter.add_sketch_dimension(
+        adapter.add_sketch_dimension(
             f"{front_base}.start", "origin", "vertical_distance", front_v_base
         ),
     )
     front_cap.record("HeadFrontZDim", '-"HeadFrontZ"')
     check(
         "front cap radius",
-        await adapter.add_sketch_dimension(front_arc, None, "radial", HEAD_CAP_R),
+        adapter.add_sketch_dimension(front_arc, None, "radial", HEAD_CAP_R),
     )
     front_cap.record(
         "HeadCapR",
         '("HeadDia" / 2 * "HeadDia" / 2 + "HeadCapSag" * "HeadCapSag") / (2 * "HeadCapSag")',
     )
-    await ensure_fully_defined(adapter, "front-cap sketch")
-    check("exit_sketch front cap", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "front-cap sketch")
+    check("exit_sketch front cap", adapter.exit_sketch())
     name_last_feature(adapter, "FrontCapProfile")
     drive_jobs += front_cap.apply(adapter, "FrontCapProfile")
     check(
-        "revolve front cap", await adapter.create_revolve(RevolveParameters(angle=360.0))
+        "revolve front cap", adapter.create_revolve(RevolveParameters(angle=360.0))
     )
     name_last_feature(adapter, "FrontCap")
     expected += V_FRONT_CAP
-    await volume_check(adapter, "front crown", expected, 0.03 * V_FRONT_CAP)
+    volume_check(adapter, "front crown", expected, 0.03 * V_FRONT_CAP)
 
     cross_hole = SketchDims()
-    check("create_sketch cross hole", await adapter.create_sketch("Top"))
-    await define_circle(
+    check("create_sketch cross hole", adapter.create_sketch("Top"))
+    define_circle(
         adapter,
         0.0,
         -HEAD_CENTER_Z,
@@ -896,55 +896,55 @@ async def build(adapter) -> dict[str, str]:
             '"CrossHoleDia"',
         ),
     )
-    await ensure_fully_defined(adapter, "grip-cross-hole sketch")
-    check("exit_sketch cross hole", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "grip-cross-hole sketch")
+    check("exit_sketch cross hole", adapter.exit_sketch())
     name_last_feature(adapter, "CrossHoleProfile")
     drive_jobs += cross_hole.apply(adapter, "CrossHoleProfile")
     check(
         "cut grip cross-hole",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=HEAD_DIA + 2.0, both_directions=True)
         ),
     )
     name_last_feature(adapter, "CrossHole")
     expected -= V_CROSS_HOLE
-    await volume_check(adapter, "grip cross-hole", expected, 0.02 * V_CROSS_HOLE)
+    volume_check(adapter, "grip cross-hole", expected, 0.02 * V_CROSS_HOLE)
 
     back_v_base = -SHAFT_LEN
     back_v_apex = -(SHAFT_LEN + BACK_CAP_SAG)
     back_v_center = -(SHAFT_LEN + BACK_CAP_SAG - BACK_CAP_R)
     back_cap = SketchDims()
-    check("create_sketch back cap", await adapter.create_sketch("Top"))
+    check("create_sketch back cap", adapter.create_sketch("Top"))
     set_sketch_direct_db(adapter, True)
     check(
         "back cap centerline",
-        await adapter.add_centerline(0.0, back_v_base, 0.0, back_v_apex),
+        adapter.add_centerline(0.0, back_v_base, 0.0, back_v_apex),
     )
     back_base = check(
-        "back cap base", await adapter.add_line(0.0, back_v_base, SHAFT_R, back_v_base)
+        "back cap base", adapter.add_line(0.0, back_v_base, SHAFT_R, back_v_base)
     )
     back_arc = check(
         "back cap arc",
-        await adapter.add_arc(
+        adapter.add_arc(
             0.0, back_v_center, 0.0, back_v_apex, SHAFT_R, back_v_base
         ),
     )
     back_close = check(
-        "back cap close", await adapter.add_line(0.0, back_v_apex, 0.0, back_v_base)
+        "back cap close", adapter.add_line(0.0, back_v_apex, 0.0, back_v_base)
     )
     set_sketch_direct_db(adapter, False)
-    check("back cap base horizontal", await adapter.add_sketch_constraint(back_base, None, "horizontal"))
-    check("back cap close vertical", await adapter.add_sketch_constraint(back_close, None, "vertical"))
+    check("back cap base horizontal", adapter.add_sketch_constraint(back_base, None, "horizontal"))
+    check("back cap close vertical", adapter.add_sketch_constraint(back_close, None, "vertical"))
     check(
         "back cap rim reach",
-        await adapter.add_sketch_dimension(
+        adapter.add_sketch_dimension(
             f"{back_base}.end", "origin", "horizontal_distance", SHAFT_R
         ),
     )
     back_cap.record("BackCapRim", '"ShaftDia" / 2')
     check(
         "back cap sagitta",
-        await adapter.add_sketch_dimension(
+        adapter.add_sketch_dimension(
             f"{back_close}.start",
             f"{back_close}.end",
             "vertical_distance",
@@ -954,39 +954,39 @@ async def build(adapter) -> dict[str, str]:
     back_cap.record("BackCapSagDim", '"BackCapSag"')
     check(
         "back cap on axis",
-        await adapter.add_sketch_constraint(f"{back_base}.start", "origin", "vertical_points"),
+        adapter.add_sketch_constraint(f"{back_base}.start", "origin", "vertical_points"),
     )
     check(
         "back cap station",
-        await adapter.add_sketch_dimension(
+        adapter.add_sketch_dimension(
             f"{back_base}.start", "origin", "vertical_distance", SHAFT_LEN
         ),
     )
     back_cap.record("BackCapZ", '"ShaftLen"')
     check(
         "back cap radius",
-        await adapter.add_sketch_dimension(back_arc, None, "radial", BACK_CAP_R),
+        adapter.add_sketch_dimension(back_arc, None, "radial", BACK_CAP_R),
     )
     back_cap.record(
         "BackCapR",
         '("ShaftDia" / 2 * "ShaftDia" / 2 + "BackCapSag" * "BackCapSag") / (2 * "BackCapSag")',
     )
-    await ensure_fully_defined(adapter, "back-cap sketch")
-    check("exit_sketch back cap", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "back-cap sketch")
+    check("exit_sketch back cap", adapter.exit_sketch())
     name_last_feature(adapter, "BackCapProfile")
     drive_jobs += back_cap.apply(adapter, "BackCapProfile")
     check(
-        "revolve back cap", await adapter.create_revolve(RevolveParameters(angle=360.0))
+        "revolve back cap", adapter.create_revolve(RevolveParameters(angle=360.0))
     )
     name_last_feature(adapter, "BackCap")
     expected += V_BACK_CAP
-    await volume_check(adapter, "back crown", expected, 0.03 * V_BACK_CAP)
+    volume_check(adapter, "back crown", expected, 0.03 * V_BACK_CAP)
 
     # R1a: the MHA-DT-33 collar's 1/16 in spring-pin hole, through the Ø5/16 on
     # the crossrod's local Y (one V-block setup drills both cross holes).
     pin_hole = SketchDims()
-    check("create_sketch collar pin hole", await adapter.create_sketch("Top"))
-    await define_circle(
+    check("create_sketch collar pin hole", adapter.create_sketch("Top"))
+    define_circle(
         adapter,
         0.0,
         -PIN_Z,
@@ -1000,26 +1000,26 @@ async def build(adapter) -> dict[str, str]:
             '"PinHoleDia"',
         ),
     )
-    await ensure_fully_defined(adapter, "collar-pin-hole sketch")
-    check("exit_sketch collar pin hole", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "collar-pin-hole sketch")
+    check("exit_sketch collar pin hole", adapter.exit_sketch())
     name_last_feature(adapter, "PinHoleProfile")
     drive_jobs += pin_hole.apply(adapter, "PinHoleProfile")
     check(
         "cut collar pin hole",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=SHAFT_DIA + 2.0, both_directions=True)
         ),
     )
     name_last_feature(adapter, "PinHole")
     expected -= V_PIN_HOLE
-    await volume_check(adapter, "collar pin hole", expected, 0.05 * V_PIN_HOLE)
-    drive_jobs += await _add_bond_relief(adapter)
+    volume_check(adapter, "collar pin hole", expected, 0.05 * V_PIN_HOLE)
+    drive_jobs += _add_bond_relief(adapter)
     expected -= V_BOND_RELIEF
-    await volume_check(adapter, "bond relief", expected, 0.01 * V_BOND_RELIEF)
+    volume_check(adapter, "bond relief", expected, 0.01 * V_BOND_RELIEF)
     _require_one_solid_body(adapter, label="integral pinion arbor")
 
-    await name_bore_axis(adapter, "Right Plane", 0.0, "Top Plane", 0.0, "arbor axis")
-    drive_jobs += await _add_axial_reference(
+    name_bore_axis(adapter, "Right Plane", 0.0, "Top Plane", 0.0, "arbor axis")
+    drive_jobs += _add_axial_reference(
         adapter,
         feature_name="BackRimReference",
         dimension_name="BackRimFromHeadRear",
@@ -1027,7 +1027,7 @@ async def build(adapter) -> dict[str, str]:
         end_v=-SHAFT_LEN,
         drive_expression='"BackRimFromHeadRear"',
     )
-    drive_jobs += await _add_axial_reference(
+    drive_jobs += _add_axial_reference(
         adapter,
         feature_name="DrumStationReference",
         dimension_name="DrumStationFromHeadRear",
@@ -1038,7 +1038,7 @@ async def build(adapter) -> dict[str, str]:
     )
     # The pin station ends on the axis at the hole's centre: the sheet's
     # witness rises from the hole's own centre mark.
-    drive_jobs += await _add_axial_reference(
+    drive_jobs += _add_axial_reference(
         adapter,
         feature_name="PinStationReference",
         dimension_name="PinStationFromHeadRear",
@@ -1048,7 +1048,7 @@ async def build(adapter) -> dict[str, str]:
     )
     # Machinist review r1/r3/r5 of #1685: the cross hole's station from the
     # same face, printed at .XX.
-    drive_jobs += await _add_axial_reference(
+    drive_jobs += _add_axial_reference(
         adapter,
         feature_name="CrossHoleStationReference",
         dimension_name="CrossHoleFromHeadRear",
@@ -1056,7 +1056,7 @@ async def build(adapter) -> dict[str, str]:
         end_v=-HEAD_CENTER_Z,
         drive_expression='"CrossHoleStation"',
     )
-    drive_jobs += await _add_axial_reference(
+    drive_jobs += _add_axial_reference(
         adapter,
         feature_name="OverallReference",
         dimension_name="OverallLen",
@@ -1064,7 +1064,7 @@ async def build(adapter) -> dict[str, str]:
         end_v=-(SHAFT_LEN + BACK_CAP_SAG),
         drive_expression='"OverallLen"',
     )
-    drive_jobs += await _add_journal_land(
+    drive_jobs += _add_journal_land(
         adapter,
         prefix="FrontJournal",
         journal_z=FRONT_JOURNAL_Z,
@@ -1072,7 +1072,7 @@ async def build(adapter) -> dict[str, str]:
         end_station_expression='"FrontJournalEndFromHeadRear"',
         diameter=False,
     )
-    drive_jobs += await _add_journal_land(
+    drive_jobs += _add_journal_land(
         adapter,
         prefix="BackJournal",
         journal_z=BACK_JOURNAL_Z,
@@ -1086,7 +1086,7 @@ async def build(adapter) -> dict[str, str]:
             "(the collar's, two bond lands either side of the relief, the back stub)"
         )
     for feature_name, dimension_name, station, witness_len in SPAN_REFERENCES:
-        drive_jobs += await _add_span_reference(
+        drive_jobs += _add_span_reference(
             adapter,
             feature_name=feature_name,
             dimension_name=dimension_name,
@@ -1094,11 +1094,11 @@ async def build(adapter) -> dict[str, str]:
             witness_len=witness_len,
         )
 
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dimension_name, expression in drive_jobs:
-        await drive_dimension(adapter, dimension_name, expression)
-    await force_rebuild(adapter)
-    await volume_check(
+        drive_dimension(adapter, dimension_name, expression)
+    force_rebuild(adapter)
+    volume_check(
         adapter, "driven integral arbor (equations neutral)", V_TOTAL, 0.005 * V_SHAFT
     )
     _require_one_solid_body(adapter, label="driven integral pinion arbor")
@@ -1158,9 +1158,9 @@ async def build(adapter) -> dict[str, str]:
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
 
-    await apply_material(adapter, MATERIAL)
-    await apply_color(adapter, POLISHED_STEEL)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    apply_color(adapter, POLISHED_STEEL)
+    report_mass_properties(adapter)
     apply_drawing_properties(
         adapter,
         PART_NAME,
@@ -1170,7 +1170,7 @@ async def build(adapter) -> dict[str, str]:
         },
     )
     blank_reference_sketches(adapter, REFERENCE_SKETCHES)
-    artefacts = await save_part_and_images(adapter, PART_NAME)
+    artefacts = save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
     return artefacts
 

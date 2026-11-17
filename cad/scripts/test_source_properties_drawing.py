@@ -464,8 +464,8 @@ def test_supplier_requirements_follow_the_actual_consuming_branch(
     drawing = tmp_path / "draw_supplier.py"
     drawing.write_text(
         "from _supplier_spring_drawing import build_supplier_spring_drawing\n"
-        "async def build(adapter):\n"
-        "    await build_supplier_spring_drawing("
+        "def build(adapter):\n"
+        "    build_supplier_spring_drawing("
         f"adapter, spring_metadata={spring_metadata!r})\n",
         encoding="utf-8",
     )
@@ -479,8 +479,8 @@ def test_unknown_supplier_metadata_selection_fails_closed(tmp_path) -> None:
     drawing = tmp_path / "draw_supplier.py"
     drawing.write_text(
         "from _supplier_spring_drawing import build_supplier_spring_drawing\n"
-        "async def build(adapter):\n"
-        "    await build_supplier_spring_drawing(adapter, spring_metadata=choose())\n",
+        "def build(adapter):\n"
+        "    build_supplier_spring_drawing(adapter, spring_metadata=choose())\n",
         encoding="utf-8",
     )
     with pytest.raises(AssertionError, match="literal"):

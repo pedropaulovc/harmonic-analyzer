@@ -1911,7 +1911,7 @@ def capture_rebuild_failure(adapter: Any, message: str) -> NoReturn:
     )
 
 
-async def teardown_seat(adapter: Any) -> None:
+def teardown_seat(adapter: Any) -> None:
     """Leave the seat holding no ``cad/out`` document and no checkout directory,
     then disconnect. Runs after the build, whether it succeeded or not.
 
@@ -1961,7 +1961,7 @@ async def teardown_seat(adapter: Any) -> None:
     except Exception as exc:  # noqa: BLE001
         _telemetry.warn(f"seat working directory re-point failed: {exc}")
     try:
-        await adapter.disconnect()
+        adapter.disconnect()
         _telemetry.success("disconnected")
     except Exception as exc:  # noqa: BLE001
         _telemetry.warn(f"disconnect failed: {exc}")

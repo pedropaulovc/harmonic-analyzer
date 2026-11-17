@@ -21,7 +21,7 @@ from diagnostics.diag_mcmaster_lib import (  # noqa: E402
 )
 
 
-async def build_hex_screw(adapter, *, sku: str, size: tuple[float, ...]) -> None:
+def build_hex_screw(adapter, *, sku: str, size: tuple[float, ...]) -> None:
     """The hex-screw law harvested from 92240A539, at one under-head length.
 
     92240A540 matches 92240A539 in every catalog field but the under-head
@@ -62,7 +62,7 @@ async def build_hex_screw(adapter, *, sku: str, size: tuple[float, ...]) -> None
     # Shank profile: Front sketch X is radius; Y is vendor axial Z.  Folding
     # the separately-authored vendor chamfer into this revolve preserves its
     # exact final cylinder, cone, and tip-plane faces deterministically.
-    check("create_sketch shank", await adapter.create_sketch("Front"))
+    check("create_sketch shank", adapter.create_sketch("Front"))
     sketch = adapter.currentSketchManager
     with no_sketch_inference(adapter):
         if (
@@ -77,7 +77,7 @@ async def build_hex_screw(adapter, *, sku: str, size: tuple[float, ...]) -> None
             is None
         ):
             raise RuntimeError(f"{sku} shank: CreateCenterLine failed")
-        await add_line_chain(
+        add_line_chain(
             adapter,
             [
                 (0.0, UNDERSIDE_MM),
@@ -87,22 +87,22 @@ async def build_hex_screw(adapter, *, sku: str, size: tuple[float, ...]) -> None
                 (0.0, tip_mm),
             ],
         )
-    check("exit_sketch shank", await adapter.exit_sketch())
+    check("exit_sketch shank", adapter.exit_sketch())
     name_last_feature(adapter, "ShankProfile")
     check(
         "revolve shank",
-        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=False)),
+        adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=False)),
     )
     name_last_feature(adapter, "Shank")
     shank_volume = math.pi * major_r**2 * (length_mm - tip_chamfer) + _rev_frustum(
         tip_chamfer, major_r, tip_flat_r
     )
-    await volume_check(adapter, "shank revolve", shank_volume, 0.005 * shank_volume)
+    volume_check(adapter, "shank revolve", shank_volume, 0.005 * shank_volume)
 
     # The Top plane is exactly vendor Z=0: head goes +Y, washer face goes -Y.
-    check("create_sketch hex", await adapter.create_sketch("Top"))
+    check("create_sketch hex", adapter.create_sketch("Top"))
     with no_sketch_inference(adapter):
-        await add_line_chain(
+        add_line_chain(
             adapter,
             [
                 (0.0, hex_r),
@@ -113,15 +113,15 @@ async def build_hex_screw(adapter, *, sku: str, size: tuple[float, ...]) -> None
                 (flat_r, hex_r / 2.0),
             ],
         )
-    check("exit_sketch hex", await adapter.exit_sketch())
+    check("exit_sketch hex", adapter.exit_sketch())
     name_last_feature(adapter, "HexProfile")
     check(
         "extrude hex",
-        await adapter.create_extrusion(ExtrusionParameters(depth=HEX_HEIGHT_MM)),
+        adapter.create_extrusion(ExtrusionParameters(depth=HEX_HEIGHT_MM)),
     )
     name_last_feature(adapter, "HexHead")
     hex_volume = HEX_WIDTH_MM**2 * math.sqrt(3.0) / 2.0 * HEX_HEIGHT_MM
-    await volume_check(
+    volume_check(
         adapter,
         "hex head",
         shank_volume + hex_volume,
@@ -130,7 +130,7 @@ async def build_hex_screw(adapter, *, sku: str, size: tuple[float, ...]) -> None
 
     # Circular washer boss below the hex.  Its core overlaps the shank, so the
     # observable added volume is the annulus rather than the complete disk.
-    check("create_sketch washer", await adapter.create_sketch("Top"))
+    check("create_sketch washer", adapter.create_sketch("Top"))
     with no_sketch_inference(adapter):
         if (
             adapter.currentSketchManager.CreateCircleByRadius(
@@ -139,17 +139,17 @@ async def build_hex_screw(adapter, *, sku: str, size: tuple[float, ...]) -> None
             is None
         ):
             raise RuntimeError("washer circle failed")
-    check("exit_sketch washer", await adapter.exit_sketch())
+    check("exit_sketch washer", adapter.exit_sketch())
     name_last_feature(adapter, "WasherProfile")
     check(
         "washer face",
-        await adapter.create_extrusion(
+        adapter.create_extrusion(
             ExtrusionParameters(depth=washer_depth, reverse_direction=True)
         ),
     )
     name_last_feature(adapter, "WasherFace")
     washer_volume = math.pi * (washer_r**2 - major_r**2) * washer_depth
-    await volume_check(
+    volume_check(
         adapter,
         "washer face",
         shank_volume + hex_volume + washer_volume,
@@ -159,7 +159,7 @@ async def build_hex_screw(adapter, *, sku: str, size: tuple[float, ...]) -> None
     # At +HH, retain the r=HW/2 circle and cut the six corner regions.  The
     # 60-degree draft is measured from the screw axis, matching Cut-Extrude1.
     offset_plane(adapter, "HeadTopPlane", HEAD_TOP_MM)
-    check("create_sketch trim", await adapter.create_sketch("HeadTopPlane"))
+    check("create_sketch trim", adapter.create_sketch("HeadTopPlane"))
     with no_sketch_inference(adapter):
         if (
             adapter.currentSketchManager.CreateCircleByRadius(
@@ -168,7 +168,7 @@ async def build_hex_screw(adapter, *, sku: str, size: tuple[float, ...]) -> None
             is None
         ):
             raise RuntimeError("head trim circle failed")
-    check("exit_sketch trim", await adapter.exit_sketch())
+    check("exit_sketch trim", adapter.exit_sketch())
     name_last_feature(adapter, "TrimProfile")
 
     model = _early_bound(adapter.currentModel, "IModelDoc2")
@@ -227,7 +227,7 @@ async def build_hex_screw(adapter, *, sku: str, size: tuple[float, ...]) -> None
     # helper plane's orientation represents the vendor's clockwise+reversed
     # read-back as the equivalent false+false pair while growing toward +Y.
     offset_plane(adapter, "TipPlane", tip_mm)
-    check("create_sketch helix seed", await adapter.create_sketch("TipPlane"))
+    check("create_sketch helix seed", adapter.create_sketch("TipPlane"))
     with no_sketch_inference(adapter):
         if (
             adapter.currentSketchManager.CreateCircleByRadius(
@@ -251,9 +251,9 @@ async def build_hex_screw(adapter, *, sku: str, size: tuple[float, ...]) -> None
     # axial ends; body scoping clips the sweep to the split shank.
     cutter_center = tip_mm - 7.0 * PITCH_MM / 16.0
     cutter_outer_r = major_r + sharp_thread_h / 16.0
-    check("create_sketch cutter", await adapter.create_sketch("Front"))
+    check("create_sketch cutter", adapter.create_sketch("Front"))
     with no_sketch_inference(adapter):
-        await add_line_chain(
+        add_line_chain(
             adapter,
             [
                 (cutter_outer_r, cutter_center + 15.0 * PITCH_MM / 32.0),
@@ -262,7 +262,7 @@ async def build_hex_screw(adapter, *, sku: str, size: tuple[float, ...]) -> None
                 (cutter_outer_r, cutter_center - 15.0 * PITCH_MM / 32.0),
             ],
         )
-    check("exit_sketch cutter", await adapter.exit_sketch())
+    check("exit_sketch cutter", adapter.exit_sketch())
     name_last_feature(adapter, "ThreadCutter")
     thread_sweep_cut(
         adapter,

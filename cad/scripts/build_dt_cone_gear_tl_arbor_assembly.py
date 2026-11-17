@@ -38,10 +38,10 @@ if ASM_NAME != spec.ASM_NAME:
     raise AssertionError("the builder's contract and the kit spec disagree")
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     # Free-DOF contract: cad/config/assemblies/<ASM_NAME>.yaml.
     activate_assembly_contract(ASM_NAME)
-    check("create_assembly", await adapter.create_assembly())
+    check("create_assembly", adapter.create_assembly())
     apply_package_model_units(
         adapter, assembly_contract(ASM_NAME).drawing_unit, label=ASM_NAME
     )
@@ -50,7 +50,7 @@ async def build(adapter) -> dict[str, str]:
     rows = [list(row) for row in spec.IDENTITY_ROWS]
     euler = euler_from_rows(rows)
     collars = spec.collar.CONFIGURATIONS
-    await place_component(
+    place_component(
         adapter,
         "dt-cone-gear-tl-keyed-arbor",
         list(spec.POSITIONS[spec.ARBOR]),
@@ -58,7 +58,7 @@ async def build(adapter) -> dict[str, str]:
         rows,
     )
     for configuration in collars:
-        await place_component(
+        place_component(
             adapter,
             "dt-cone-gear-tl-arbor-collar",
             list(spec.POSITIONS[spec.member(configuration)]),
@@ -67,14 +67,14 @@ async def build(adapter) -> dict[str, str]:
             configuration=configuration,
             label=spec.member(configuration),
         )
-    await place_component(
+    place_component(
         adapter,
         "dt-cone-gear-tl-arbor-key",
         list(spec.POSITIONS[spec.KEY]),
         euler,
         rows,
     )
-    await place_component(
+    place_component(
         adapter,
         "dt-cone-gear-tl-vn-arbor-nut",
         list(spec.POSITIONS[spec.NUT]),
@@ -98,7 +98,7 @@ async def build(adapter) -> dict[str, str]:
             "Drawn By": DRAWN_BY,
         },
     )
-    return await save_assembly_and_images(adapter, ASM_NAME)
+    return save_assembly_and_images(adapter, ASM_NAME)
 
 
 if __name__ == "__main__":

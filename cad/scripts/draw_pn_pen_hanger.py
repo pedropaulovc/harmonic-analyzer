@@ -625,11 +625,11 @@ def _set_screw_hole_callout_text(display: Any) -> None:
     _telemetry.info(f"hanger screw-hole callout: {resolved!r}")
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open pen-hanger source", await adapter.open_model(str(SOURCE)))
+    check("open pen-hanger source", adapter.open_model(str(SOURCE)))
     read_required_properties(
         adapter.currentModel,
         (
@@ -751,7 +751,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Pen Hanger Manufacturing Drawing",

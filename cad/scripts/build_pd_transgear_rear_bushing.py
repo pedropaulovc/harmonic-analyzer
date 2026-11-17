@@ -70,27 +70,27 @@ _SAVED_DRAWING_PROPERTIES = (
 V_RING = math.pi * ((OD / 2.0) ** 2 - (BORE_DIA / 2.0) ** 2) * LENGTH
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     # #290: the row's inch calculation units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this
     # is an INCH document and the equation manager reads BARE numbers in
     # document units.
-    await set_global(adapter, "RingOd", f"{OD}mm")
-    await set_global(adapter, "RingLength", f"{LENGTH}mm")
-    await set_global(adapter, "BoreDia", f"{BORE_DIA}mm")
+    set_global(adapter, "RingOd", f"{OD}mm")
+    set_global(adapter, "RingLength", f"{LENGTH}mm")
+    set_global(adapter, "BoreDia", f"{BORE_DIA}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
     # Annulus: O.D. + bore in ONE Front-plane sketch (both on-axis circles ->
     # only the two diameter dims emit), extruded once along +Z.
     ring = SketchDims()
-    check("create_sketch ring", await adapter.create_sketch("Front"))
-    await define_circle(
+    check("create_sketch ring", adapter.create_sketch("Front"))
+    define_circle(
         adapter,
         0.0,
         0.0,
@@ -100,7 +100,7 @@ async def build(adapter) -> dict[str, str]:
         names=("OdCx", "OdCy", "RingOd"),
         drives=(None, None, '"RingOd"'),
     )
-    await define_circle(
+    define_circle(
         adapter,
         0.0,
         0.0,
@@ -110,31 +110,31 @@ async def build(adapter) -> dict[str, str]:
         names=("BoreCx", "BoreCy", "BoreDia"),
         drives=(None, None, '"BoreDia"'),
     )
-    await ensure_fully_defined(adapter, "bushing sketch")
-    check("exit_sketch ring", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "bushing sketch")
+    check("exit_sketch ring", adapter.exit_sketch())
     name_last_feature(adapter, "RingProfile")
     drive_jobs += ring.apply(adapter, "RingProfile")
     check(
         "extrude ring",
-        await adapter.create_extrusion(ExtrusionParameters(depth=LENGTH)),
+        adapter.create_extrusion(ExtrusionParameters(depth=LENGTH)),
     )
     name_last_feature(adapter, "Ring")
     ring_depth = name_dimensions(adapter, "Ring", ["RingLength"])
     drive_jobs.append((ring_depth[0], '"RingLength"'))
-    await volume_check(adapter, "bushing", V_RING, 0.005 * V_RING)
-    await bbox_extent_check(adapter, "bushing length", "z", LENGTH)
-    await bbox_extent_check(adapter, "bushing O.D.", "x", OD)
+    volume_check(adapter, "bushing", V_RING, 0.005 * V_RING)
+    bbox_extent_check(adapter, "bushing length", "z", LENGTH)
+    bbox_extent_check(adapter, "bushing O.D.", "x", OD)
 
     # The mate datums: the bore axis first, so it is Axis1; then the sleeve
     # face, driven by the length so it tracks a length edit.
-    axis = await name_bore_axis(
+    axis = name_bore_axis(
         adapter, "Top Plane", 0.0, "Right Plane", 0.0, "bushing bore axis"
     )
     if axis != "Axis1":
         raise RuntimeError(f"bushing bore axis came back {axis!r}, not Axis1")
     check(
         "create_plane SleeveFace (Front Plane + RingLength)",
-        await adapter.create_plane(
+        adapter.create_plane(
             CreatePlaneParameters(
                 mode="offset", base_plane="Front Plane", offset=LENGTH
             )
@@ -146,16 +146,16 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs.append((sleeve_offset[0], '"RingLength"'))
 
     # Deferred drive equations, then re-check neutrality.
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    volume_check(
         adapter, "driven bushing (equations neutral)", V_RING, 0.005 * V_RING
     )
 
-    await apply_material(adapter, MATERIAL)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    report_mass_properties(adapter)
     # The bore runs on the pin: its reamed band lives on the model dimension.
     # The length prints at the title block; the shims take up its band.
     set_dimension_bilateral_tolerance(
@@ -175,7 +175,7 @@ async def build(adapter) -> dict[str, str]:
     apply_drawing_properties(
         adapter, PART_NAME, {"Isometric View Note": ISOMETRIC_VIEW_NOTE}
     )
-    artefacts = await save_part_and_images(adapter, PART_NAME)
+    artefacts = save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
     return artefacts
 

@@ -10,7 +10,6 @@ the real save options.
 
 from __future__ import annotations
 
-import asyncio
 import sys
 from pathlib import Path
 
@@ -34,14 +33,14 @@ def _nr(model) -> int:
     return int(v) if v is not None else -999
 
 
-async def _fresh(adapter, path):
+def _fresh(adapter, path):
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
-    await adapter.open_model(str(path))
+    adapter.open_model(str(path))
     return _early_bound(adapter.currentModel, "IModelDoc2")
 
 
-async def _trial(adapter, src, rebuild_name):
-    model = await _fresh(adapter, src)
+def _trial(adapter, src, rebuild_name):
+    model = _fresh(adapter, src)
     before = _nr(model)
     if rebuild_name == "ForceRebuild3":
         adapter._attempt(lambda: model.ForceRebuild3(False), default=None)
@@ -55,7 +54,7 @@ async def _trial(adapter, src, rebuild_name):
         adapter._attempt(lambda: adapter.swApp.CloseDoc(str(tmp)), default=None)
         tmp.unlink()
     rc = adapter._attempt(lambda: model.SaveAs3(str(tmp), 0, SAVE_OPTS), default=None)
-    reopened = await _fresh(adapter, tmp)
+    reopened = _fresh(adapter, tmp)
     after = _nr(reopened)
     msg = (f"[{rebuild_name}] open={before} -> SaveAs3(Copy|AvoidRebuild) rc={rc!r} -> reopen={after}"
            + ("   <-- CLEAN" if after == 0 else "   (dirty)"))
@@ -65,16 +64,16 @@ async def _trial(adapter, src, rebuild_name):
         tmp.unlink()
 
 
-async def main() -> None:
+def main() -> None:
     arg = sys.argv[1] if len(sys.argv) > 1 else "fr-frame"
     src = Path(arg) if arg.lower().endswith(".sldasm") else OUT / f"{arg}.SLDASM"
     adapter = PyWin32Adapter({})
     with _telemetry.span("probe.editrebuild_saveas", target=str(src), stem=src.stem):
-        await adapter.connect()
-        await _trial(adapter, src, "ForceRebuild3")
-        await _trial(adapter, src, "EditRebuild3")
-        await _trial(adapter, src, "ForceThenEdit")
+        adapter.connect()
+        _trial(adapter, src, "ForceRebuild3")
+        _trial(adapter, src, "EditRebuild3")
+        _trial(adapter, src, "ForceThenEdit")
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

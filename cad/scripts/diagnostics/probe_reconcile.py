@@ -11,7 +11,6 @@ to prove no part was rewritten.
 
 from __future__ import annotations
 
-import asyncio
 import hashlib
 import sys
 from pathlib import Path
@@ -37,9 +36,9 @@ def _nr(model) -> int:
     return int(v) if v is not None else -999
 
 
-async def _open(adapter, path):
+def _open(adapter, path):
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
-    await adapter.open_model(str(path))
+    adapter.open_model(str(path))
     return _early_bound(adapter.currentModel, "IModelDoc2")
 
 
@@ -50,24 +49,24 @@ def _child_md5s() -> dict[str, str]:
     }
 
 
-async def main() -> None:
+def main() -> None:
     arg = sys.argv[1] if len(sys.argv) > 1 else "fr-frame"
     path = Path(arg) if arg.lower().endswith(".sldasm") else OUT / f"{arg}.SLDASM"
     stem = path.stem
 
     adapter = PyWin32Adapter({})
     with _telemetry.span("probe.reconcile", target=str(path), stem=stem):
-        await adapter.connect()
+        adapter.connect()
 
-        before_open = await _open(adapter, path)
+        before_open = _open(adapter, path)
         _telemetry.info(f"[{stem}] NeedsRebuild2 BEFORE reconcile = {_nr(before_open)}")
         parts_before = _child_md5s()
 
         # Production helper (opens fresh itself, reconciles, leaves doc open).
-        await _assembly.reconcile_saved_rebuild_state(adapter, stem, path)
+        _assembly.reconcile_saved_rebuild_state(adapter, stem, path)
 
         # Independent fresh reopen -> did the clean mark persist to disk?
-        after_open = await _open(adapter, path)
+        after_open = _open(adapter, path)
         persisted = _nr(after_open)
         msg = (f"[{stem}] NeedsRebuild2 AFTER reconcile (independent reopen) = {persisted}"
                f"  {'<-- CLEAN' if persisted == 0 else '(STILL DIRTY)'}")
@@ -82,4 +81,4 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

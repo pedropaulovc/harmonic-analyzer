@@ -53,7 +53,7 @@ def _docstrings(tree: ast.Module) -> set[int]:
         id(node.body[0].value)
         for node in ast.walk(tree)
         if isinstance(
-            node, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+            node, (ast.Module, ast.FunctionDef, ast.ClassDef)
         )
         and node.body
         and isinstance(node.body[0], ast.Expr)

@@ -151,7 +151,7 @@ def _cut_end_y_mm(adapter) -> float:
     return lowest
 
 
-async def _author_reference_dimension(
+def _author_reference_dimension(
     adapter,
     *,
     sketch: str,
@@ -165,16 +165,16 @@ async def _author_reference_dimension(
     model-owned drawing dimension.  The line is dimensioned first, so
     name_dimensions' creation order finds it before the origin-anchor
     dimensions."""
-    check(f"create_sketch {sketch}", await adapter.create_sketch("Front"))
+    check(f"create_sketch {sketch}", adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
-    line = check(f"{sketch} line", await adapter.add_line(*start, *end))
+    line = check(f"{sketch} line", adapter.add_line(*start, *end))
     set_sketch_direct_db(adapter, False)
     _as_construction(adapter, line)
     check(
         f"{sketch} {orientation}",
-        await adapter.add_sketch_constraint(line, None, orientation),
+        adapter.add_sketch_constraint(line, None, orientation),
     )
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{line}.start",
         f"{line}.end",
@@ -182,19 +182,19 @@ async def _author_reference_dimension(
         value_mm,
         sketch,
     )
-    await anchor_point_to_origin(adapter, f"{line}.start", *start, sketch)
-    await ensure_fully_defined(adapter, f"{sketch} sketch")
-    check(f"exit_sketch {sketch}", await adapter.exit_sketch())
+    anchor_point_to_origin(adapter, f"{line}.start", *start, sketch)
+    ensure_fully_defined(adapter, f"{sketch} sketch")
+    check(f"exit_sketch {sketch}", adapter.exit_sketch())
     name_last_feature(adapter, sketch)
     name_dimensions(adapter, sketch, [dimension])
 
 
-async def _author_cut_controls(adapter) -> None:
+def _author_cut_controls(adapter) -> None:
     """The cut length runs along the shank's left silhouette, under-head face
     to cut end: the print dimensions between faces the shop measures, not
     along the axis through the part."""
     x = -SHANK_DIA / 2.0
-    await _author_reference_dimension(
+    _author_reference_dimension(
         adapter,
         sketch=CUT_LENGTH_SKETCH,
         dimension=CUT_LENGTH_DIMENSION,
@@ -205,8 +205,8 @@ async def _author_cut_controls(adapter) -> None:
     )
 
 
-async def _volume_mm3(adapter) -> float:
-    mass = await adapter.get_mass_properties()
+def _volume_mm3(adapter) -> float:
+    mass = adapter.get_mass_properties()
     if not mass.is_success:
         raise RuntimeError(f"get_mass_properties failed: {mass.error}")
     return float(mass.data.volume)
@@ -224,7 +224,7 @@ def _check_removed(label: str, before: float, after: float, expected: float) -> 
     )
 
 
-async def _trim_to_cut_length(adapter) -> None:
+def _trim_to_cut_length(adapter) -> None:
     """Remove the factory tip: everything below the cut plane."""
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
@@ -232,8 +232,8 @@ async def _trim_to_cut_length(adapter) -> None:
     top, bottom = -CUT_LENGTH_MM, -(STOCK_LENGTH_MM + TRIM_OVERRUN_MM)
     dims = SketchDims()
     with no_sketch_inference(adapter):
-        check(f"create_sketch {TRIM_PROFILE}", await adapter.create_sketch("Front"))
-        lines = await add_line_chain(
+        check(f"create_sketch {TRIM_PROFILE}", adapter.create_sketch("Front"))
+        lines = add_line_chain(
             adapter, [(-half, top), (half, top), (half, bottom), (-half, bottom)]
         )
         for line, direction in zip(
@@ -241,14 +241,14 @@ async def _trim_to_cut_length(adapter) -> None:
         ):
             check(
                 f"{TRIM_PROFILE} {direction}",
-                await adapter.add_sketch_constraint(line, None, direction),
+                adapter.add_sketch_constraint(line, None, direction),
             )
-        await anchor_point_to_origin(
+        anchor_point_to_origin(
             adapter, f"{lines[0]}.start", -half, top, TRIM_PROFILE
         )
         dims.record("CutterLeft")
         dims.record("TrimAt", TRIM_DRIVES["TrimAt"])
-        await dimension_between(
+        dimension_between(
             adapter,
             f"{lines[0]}.start",
             f"{lines[0]}.end",
@@ -257,7 +257,7 @@ async def _trim_to_cut_length(adapter) -> None:
             f"{TRIM_PROFILE} width",
         )
         dims.record("CutterWidth")
-        await dimension_between(
+        dimension_between(
             adapter,
             f"{lines[1]}.start",
             f"{lines[1]}.end",
@@ -266,27 +266,27 @@ async def _trim_to_cut_length(adapter) -> None:
             f"{TRIM_PROFILE} depth",
         )
         dims.record("CutterDepth")
-        await ensure_fully_defined(adapter, f"{TRIM_PROFILE} sketch")
-        check(f"exit_sketch {TRIM_PROFILE}", await adapter.exit_sketch())
+        ensure_fully_defined(adapter, f"{TRIM_PROFILE} sketch")
+        check(f"exit_sketch {TRIM_PROFILE}", adapter.exit_sketch())
     name_last_feature(adapter, TRIM_PROFILE)
     drives = dims.apply(adapter, TRIM_PROFILE)
     check(
         TRIM_FEATURE,
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=4.0 * SHANK_DIA, both_directions=True)
         ),
     )
     name_last_feature(adapter, TRIM_FEATURE)
     for dimension, expression in drives:
-        await drive_dimension(adapter, dimension, expression)
+        drive_dimension(adapter, dimension, expression)
 
 
-async def _modify_stock(adapter) -> None:
+def _modify_stock(adapter) -> None:
     """Trim the supplied screw at CutLength."""
-    stock = await _volume_mm3(adapter)
-    await _trim_to_cut_length(adapter)
-    await force_rebuild(adapter)
-    trimmed = await _volume_mm3(adapter)
+    stock = _volume_mm3(adapter)
+    _trim_to_cut_length(adapter)
+    force_rebuild(adapter)
+    trimmed = _volume_mm3(adapter)
     _check_removed("trim to cut length", stock, trimmed, TRIM_REMOVED_MM3)
 
 
@@ -315,31 +315,31 @@ def _manufacturing_controls(adapter) -> None:
 
 
 @_telemetry.traced("part.post_mount_screw.plain_shank")
-async def _restore_plain_shank(adapter) -> None:
+def _restore_plain_shank(adapter) -> None:
     """The shared recipe threads the whole shank, but MSC threads only the
     last 1.500 in: a major-diameter boss from the under-head face (the Top
     plane) down to the factory thread start fills the groove above it."""
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
-    before = await _volume_mm3(adapter)
+    before = _volume_mm3(adapter)
     dims = SketchDims()
-    check(f"create_sketch {PLAIN_SHANK_PROFILE}", await adapter.create_sketch("Top"))
-    await define_circle(
+    check(f"create_sketch {PLAIN_SHANK_PROFILE}", adapter.create_sketch("Top"))
+    define_circle(
         adapter, 0.0, 0.0, MAJOR_RADIUS_MM, PLAIN_SHANK_PROFILE, dims=dims
     )
-    await ensure_fully_defined(adapter, f"{PLAIN_SHANK_PROFILE} sketch")
-    check(f"exit_sketch {PLAIN_SHANK_PROFILE}", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, f"{PLAIN_SHANK_PROFILE} sketch")
+    check(f"exit_sketch {PLAIN_SHANK_PROFILE}", adapter.exit_sketch())
     name_last_feature(adapter, PLAIN_SHANK_PROFILE)
     dims.apply(adapter, PLAIN_SHANK_PROFILE)
     check(
         PLAIN_SHANK_FEATURE,
-        await adapter.create_extrusion(
+        adapter.create_extrusion(
             ExtrusionParameters(depth=FACTORY_THREAD_START_MM, reverse_direction=True)
         ),
     )
     name_last_feature(adapter, PLAIN_SHANK_FEATURE)
-    await force_rebuild(adapter)
-    filled = await _volume_mm3(adapter) - before
+    force_rebuild(adapter)
+    filled = _volume_mm3(adapter) - before
     # Only groove metal comes back: a boss run up through the head instead
     # would add a whole Ø.250 stub, over twice this bound.
     if not 0.0 < filled < PLAIN_SHANK_FILL_MAX_MM3:
@@ -351,12 +351,12 @@ async def _restore_plain_shank(adapter) -> None:
 
 
 @wraps(build_40923906)
-async def _cut_to_length(adapter, truth=None, **parameters):
+def _cut_to_length(adapter, truth=None, **parameters):
     # The shared recipe builds the supplied screw; the trim cuts it to fit.
-    receipt = await build_40923906(adapter, truth, **parameters)
-    await _restore_plain_shank(adapter)
-    await _author_cut_controls(adapter)
-    await _modify_stock(adapter)
+    receipt = build_40923906(adapter, truth, **parameters)
+    _restore_plain_shank(adapter)
+    _author_cut_controls(adapter)
+    _modify_stock(adapter)
     _manufacturing_controls(adapter)
     return receipt
 
@@ -407,36 +407,36 @@ def _supplier_profile_dimension(adapter, row, lines, dims) -> None:
     dims.record(row.name)
 
 
-async def _supplier_stock_envelope(adapter) -> None:
+def _supplier_stock_envelope(adapter) -> None:
     """Construction-only source envelope, NOT a replacement for the current solid."""
-    before_volume = await _volume_mm3(adapter)
-    check("create supplier max-limit profile", await adapter.create_sketch("Front"))
+    before_volume = _volume_mm3(adapter)
+    check("create supplier max-limit profile", adapter.create_sketch("Front"))
     points = list(SUPPLIER_PROFILE_MM)
-    lines = await add_line_chain(adapter, points)
+    lines = add_line_chain(adapter, points)
     for entity in lines:
         _as_construction(adapter, entity)
     dims = SketchDims()
-    await define_rectilinear_chain(
+    define_rectilinear_chain(
         adapter, lines, points, label=SUPPLIER_STOCK_FEATURE, dims=dims,
     )
     # Genuine skirt/crown and factory-thread boundaries join the same profile.
     for first, last in SUPPLIER_PROFILE_SECTIONS:
-        section = (await add_line_chain(adapter, [points[first], points[last]], close=False))[0]
+        section = (add_line_chain(adapter, [points[first], points[last]], close=False))[0]
         _as_construction(adapter, section)
     for row in SUPPLIER_REFERENCE_DIMENSIONS:
         _supplier_profile_dimension(adapter, row, lines, dims)
-    await ensure_fully_defined(adapter, SUPPLIER_STOCK_FEATURE)
-    check("close supplier max-limit profile", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, SUPPLIER_STOCK_FEATURE)
+    check("close supplier max-limit profile", adapter.exit_sketch())
     name_last_feature(adapter, SUPPLIER_STOCK_FEATURE)
     dims.apply(adapter, SUPPLIER_STOCK_FEATURE)
     mark_dimensions_for_drawing(
         adapter, SUPPLIER_STOCK_FEATURE, SUPPLIER_STOCK_DIMENSIONS[SUPPLIER_STOCK_FEATURE]
     )
     blank_reference_sketches(adapter, REFERENCE_SKETCHES)
-    await _add_supplier_stock_configuration(adapter, before_volume)
+    _add_supplier_stock_configuration(adapter, before_volume)
 
 
-async def _add_supplier_stock_configuration(adapter, before_volume) -> None:
+def _add_supplier_stock_configuration(adapter, before_volume) -> None:
     """Suppress the actual old recipe only in a zero-body source-diagram child."""
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     native_part = _early_bound(model, "IPartDoc")
@@ -465,7 +465,7 @@ async def _add_supplier_stock_configuration(adapter, before_volume) -> None:
             if tuple(feature.IsSuppressed2(1, null_variant()) or ()) != (True,):
                 if feature.SetSuppression2(0, 1, null_variant()) is not True:
                     raise RuntimeError(f"cannot suppress {name} in supplier envelope")
-        await force_rebuild(adapter)
+        force_rebuild(adapter)
         for name in SUPPLIER_SOLID_FEATURES:
             if tuple(_feature_by_name(adapter, name).IsSuppressed2(1, null_variant()) or ()) != (True,):
                 raise RuntimeError(f"{name}: source-only suppression did not persist")
@@ -489,7 +489,7 @@ async def _add_supplier_stock_configuration(adapter, before_volume) -> None:
                 if tuple(feature.IsSuppressed2(1, null_variant()) or ()) != state:
                     if feature.SetSuppression2(0 if state[0] else 1, 1, null_variant()) is not True:
                         raise RuntimeError(f"{name}: cannot restore installed suppression")
-            await force_rebuild(adapter)
+            force_rebuild(adapter)
             for name, state in before.items():
                 if tuple(_feature_by_name(adapter, name).IsSuppressed2(1, null_variant()) or ()) != state:
                     raise RuntimeError(f"{name}: installed suppression changed")
@@ -498,7 +498,7 @@ async def _add_supplier_stock_configuration(adapter, before_volume) -> None:
                 raise RuntimeError(f"restored catalogue solid has hard faults: {faults}")
             if len(tuple(native_part.GetBodies2(0, False) or ())) != 1:
                 raise RuntimeError("installed catalogue part did not retain its one solid")
-            if not math.isclose(await _volume_mm3(adapter), before_volume, rel_tol=0.0, abs_tol=1e-6):
+            if not math.isclose(_volume_mm3(adapter), before_volume, rel_tol=0.0, abs_tol=1e-6):
                 raise RuntimeError("supplier source configuration changed the installed volume")
         except Exception as restore_error:
             if primary is None:
@@ -506,18 +506,18 @@ async def _add_supplier_stock_configuration(adapter, before_volume) -> None:
             primary.add_note(f"also failed to restore installed catalogue solid: {restore_error}")
 
 
-async def _save_screw(adapter, part_name, suppressed_features):
+def _save_screw(adapter, part_name, suppressed_features):
     """Create source references after material, then simplify only installed stock."""
-    await _supplier_stock_envelope(adapter)
+    _supplier_stock_envelope(adapter)
     installed = active_configuration_name(adapter, adapter.currentModel)
     if installed == SUPPLIER_STOCK_CONFIGURATION:
         raise RuntimeError("cannot save post mount screw with source envelope active")
     parents = (installed,)
-    artefacts = await save_part_and_images(adapter, part_name)
-    await derive_simplified_on_saved_part(
+    artefacts = save_part_and_images(adapter, part_name)
+    derive_simplified_on_saved_part(
         adapter, part_name, suppressed_features, artefacts["part"], parents=parents,
     )
-    check(f"reopen saved {part_name}", await adapter.open_model(artefacts["part"]))
+    check(f"reopen saved {part_name}", adapter.open_model(artefacts["part"]))
     assert_saved_configurations_regenerate(adapter, part_name)
     assert_simplified_configurations(
         adapter, part_name, suppressed_features, parents=parents,
@@ -525,8 +525,8 @@ async def _save_screw(adapter, part_name, suppressed_features):
     return artefacts
 
 
-async def build(adapter) -> dict[str, str]:
-    return await build_stock_fastener(
+def build(adapter) -> dict[str, str]:
+    return build_stock_fastener(
         adapter,
         part_name=PART_NAME,
         components=(

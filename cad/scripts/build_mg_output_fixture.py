@@ -173,14 +173,14 @@ V_TAP = _tap_volume()
 V_TOTAL = V_HEX + V_SPIGOT + V_FILLET - V_GROOVE - V_BORE - V_TAP
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
         CreatePlaneParameters,
         ExtrusionParameters,
         RevolveParameters,
     )
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     # #290: the registry row's inch calculation units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
@@ -199,14 +199,14 @@ async def build(adapter) -> dict[str, str]:
         ("ShoulderRadius", SHOULDER_FILLET_R),
         ("RodBoreDia", ROD_BORE_DIA),
     ):
-        await set_global(adapter, name, f"{value}mm")
+        set_global(adapter, name, f"{value}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
     # --- Hex: the free end's plane, the bar's section, extruded to the shoulder
     check(
         "create_plane FreeEnd",
-        await adapter.create_plane(
+        adapter.create_plane(
             CreatePlaneParameters(
                 mode="offset", base_plane="Right Plane", offset=FREE_END_X
             )
@@ -216,38 +216,38 @@ async def build(adapter) -> dict[str, str]:
     blank_reference_geometry(adapter, (("FreeEnd", "PLANE"),))
     free_end_offset = name_dimensions(adapter, "FreeEnd", ["FreeEndOffset"])[0]
     drive_jobs.append((free_end_offset, '"RodStation"'))
-    drive_jobs += await _hex_profile(adapter)
+    drive_jobs += _hex_profile(adapter)
     # The negative-offset Right plane keeps the +X normal (build_fr_top_frame's
     # set pocket), so the boss runs from the free end to the shoulder.
     check(
         "extrude hex",
-        await adapter.create_extrusion(ExtrusionParameters(depth=HEX_LENGTH)),
+        adapter.create_extrusion(ExtrusionParameters(depth=HEX_LENGTH)),
     )
     name_last_feature(adapter, "Hex")
     drive_jobs.append(("D1@Hex", '"RodStation" + "BoreStation" - "SpigotLength"'))
-    volume = await volume_check(adapter, "hex", V_HEX, 0.005 * V_HEX)
-    await _centroid_x_check(adapter, "hex", (FREE_END_X + SHOULDER_X) / 2.0)
-    await bbox_extent_check(adapter, "hex length", "x", HEX_LENGTH)
-    await bbox_extent_check(adapter, "hex across the flats", "z", HEX_AF)
-    await bbox_extent_check(
+    volume = volume_check(adapter, "hex", V_HEX, 0.005 * V_HEX)
+    _centroid_x_check(adapter, "hex", (FREE_END_X + SHOULDER_X) / 2.0)
+    bbox_extent_check(adapter, "hex length", "x", HEX_LENGTH)
+    bbox_extent_check(adapter, "hex across the flats", "z", HEX_AF)
+    bbox_extent_check(
         adapter, "hex across the corners", "y", 2.0 * HEX_CORNER_RADIUS
     )
 
     # --- Spigot: turned from the free end, revolved about local X ---------------
-    drive_jobs += await _turned_profile(adapter)
-    check("revolve spigot", await adapter.create_revolve(RevolveParameters(angle=360.0)))
+    drive_jobs += _turned_profile(adapter)
+    check("revolve spigot", adapter.create_revolve(RevolveParameters(angle=360.0)))
     name_last_feature(adapter, "Spigot")
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "hex and spigot", volume + V_SPIGOT, 0.005 * (volume + V_SPIGOT)
     )
-    await bbox_extent_check(adapter, "overall length", "x", OVERALL_LENGTH)
+    bbox_extent_check(adapter, "overall length", "x", OVERALL_LENGTH)
 
     # --- Shoulder corner: a tool-nose radius inside the INSIDE CORNERS row --------
     # Picked on the circular shoulder edge at model -Z: the only edge through
     # that point.
     check(
         "fillet shoulder corner",
-        await adapter.add_fillet(SHOULDER_FILLET_R, [[SHOULDER_X, 0.0, -SPIGOT_R]]),
+        adapter.add_fillet(SHOULDER_FILLET_R, [[SHOULDER_X, 0.0, -SPIGOT_R]]),
     )
     name_last_feature(adapter, "ShoulderFillet")
     drive_jobs.append(
@@ -257,25 +257,25 @@ async def build(adapter) -> dict[str, str]:
         )
     )
     # Half the fillet's own ~0.28 mm^3: a missing or half-size corner still fails.
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "shoulder corner fillet", volume + V_FILLET, 0.5 * V_FILLET
     )
 
     # --- Full-radius wire groove -------------------------------------------------
-    drive_jobs += await _groove_profile(adapter)
+    drive_jobs += _groove_profile(adapter)
     check(
         "revolve groove",
-        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
+        adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
     )
     name_last_feature(adapter, "Groove")
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "wire groove", volume - V_GROOVE, 0.02 * V_GROOVE
     )
 
     # --- Rod bore across the corners (along local Y) ----------------------------
     rod = SketchDims()
-    check("create_sketch rod bore", await adapter.create_sketch("Top"))
-    await define_circle(
+    check("create_sketch rod bore", adapter.create_sketch("Top"))
+    define_circle(
         adapter,
         0.0,
         0.0,
@@ -285,18 +285,18 @@ async def build(adapter) -> dict[str, str]:
         names=(None, None, "RodBoreDia"),
         drives=(None, None, '"RodBoreDia"'),
     )
-    await ensure_fully_defined(adapter, "rod bore sketch")
-    check("exit_sketch rod bore", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "rod bore sketch")
+    check("exit_sketch rod bore", adapter.exit_sketch())
     name_last_feature(adapter, "RodBoreProfile")
     drive_jobs += rod.apply(adapter, "RodBoreProfile")
     check(
         "cut rod bore",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=BORE_CUT_DEPTH, both_directions=True)
         ),
     )
     name_last_feature(adapter, "RodBore")
-    volume = await volume_check(adapter, "rod bore", volume - V_BORE, 0.01 * V_BORE)
+    volume = volume_check(adapter, "rod bore", volume - V_BORE, 0.01 * V_BORE)
 
     # --- Thumb-screw tap: from the spigot face into the rod bore ----------------
     tap = wizard_holes(
@@ -310,23 +310,23 @@ async def build(adapter) -> dict[str, str]:
         placement_dims=[((None, None), (None, None))],
     )
     drive_jobs += tap.placement_drive_jobs
-    volume = await volume_check(adapter, "axial tap", volume - V_TAP, 0.03 * V_TAP)
+    volume = volume_check(adapter, "axial tap", volume - V_TAP, 0.03 * V_TAP)
 
     # --- The lever wire's hook ---------------------------------------------------
-    await _make_hook_point(adapter)
+    _make_hook_point(adapter)
 
     # Deferred drive equations, then re-check neutrality.
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    volume_check(
         adapter, "driven output fixture (equations neutral)", V_TOTAL, 0.005 * V_TOTAL
     )
     _assert_hook_point(adapter)
 
-    await apply_material(adapter, MATERIAL)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    report_mass_properties(adapter)
     # Places are the tolerance statement (drawing-guidelines.md rule 3 (decimal places carry the tolerance)): the part carries
     # them and the groove radius's LIMIT band; the drawing reads them back.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
@@ -334,16 +334,16 @@ async def build(adapter) -> dict[str, str]:
         _limit_band(adapter, feature_name, dimension_name, limits)
     # The last dimension edit is behind us: the saved geometry must still be
     # the analytic part.
-    await force_rebuild(adapter)
-    await volume_check(adapter, "output fixture as saved", V_TOTAL, 0.005 * V_TOTAL)
+    force_rebuild(adapter)
+    volume_check(adapter, "output fixture as saved", V_TOTAL, 0.005 * V_TOTAL)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_properties(adapter, PART_NAME)
-    return await save_part_and_images(adapter, PART_NAME)
+    return save_part_and_images(adapter, PART_NAME)
 
 
-async def _hex_profile(adapter: Any) -> list[tuple[str, str]]:
+def _hex_profile(adapter: Any) -> list[tuple[str, str]]:
     """The 7/16 hex on ``FreeEnd``, corners on the sketch's vertical axis.
 
     On the negative-offset Right plane sketch x is model -Z (build_fr_top_frame
@@ -365,31 +365,31 @@ async def _hex_profile(adapter: Any) -> list[tuple[str, str]]:
         (-half_af, corner / 2.0),
     ]
     hexd = SketchDims()
-    check("create_sketch hex", await adapter.create_sketch("FreeEnd"))
+    check("create_sketch hex", adapter.create_sketch("FreeEnd"))
     set_sketch_direct_db(adapter, True)
-    lines = await add_line_chain(adapter, points)
+    lines = add_line_chain(adapter, points)
     set_sketch_direct_db(adapter, False)
     for flat in (lines[1], lines[4]):
         check(
             f"hex flat {flat} vertical",
-            await adapter.add_sketch_constraint(flat, None, "vertical"),
+            adapter.add_sketch_constraint(flat, None, "vertical"),
         )
     for first, second in ((0, 1), (1, 2), (3, 4), (4, 5)):
         check(
             f"hex sides {first}={second}",
-            await adapter.add_sketch_constraint(lines[first], lines[second], "equal"),
+            adapter.add_sketch_constraint(lines[first], lines[second], "equal"),
         )
     # Equal flats, equal halves: the bore axis centred between the flats.
     check(
         "hex flats equal (bore centred)",
-        await adapter.add_sketch_constraint(lines[1], lines[4], "equal"),
+        adapter.add_sketch_constraint(lines[1], lines[4], "equal"),
     )
     corner_drive = f'"HexAf" * {_CORNER_PER_AF!r}'
-    await anchor_point_to_origin(adapter, f"{lines[0]}.start", 0.0, corner, "hex top corner")
+    anchor_point_to_origin(adapter, f"{lines[0]}.start", 0.0, corner, "hex top corner")
     hexd.record("HexCornerTop", corner_drive)
-    await anchor_point_to_origin(adapter, f"{lines[3]}.start", 0.0, -corner, "hex bottom corner")
+    anchor_point_to_origin(adapter, f"{lines[3]}.start", 0.0, -corner, "hex bottom corner")
     hexd.record("HexCornerBottom", corner_drive)
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{lines[1]}.start",
         f"{lines[4]}.start",
@@ -398,13 +398,13 @@ async def _hex_profile(adapter: Any) -> list[tuple[str, str]]:
         "hex across the flats",
     )
     hexd.record("HexAf", '"HexAf"')
-    await ensure_fully_defined(adapter, "hex profile")
-    check("exit_sketch hex", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "hex profile")
+    check("exit_sketch hex", adapter.exit_sketch())
     name_last_feature(adapter, "HexProfile")
     return hexd.apply(adapter, "HexProfile")
 
 
-async def _turned_profile(adapter: Any) -> list[tuple[str, str]]:
+def _turned_profile(adapter: Any) -> list[tuple[str, str]]:
     """The spigot's Ø from the free end to the spigot face (Top plane: sketch
     (x, y) is model (X, -Z)), split at the shoulder.  The rod bore (the sketch
     origin) is the axial datum: the free end and the spigot face each carry
@@ -426,29 +426,29 @@ async def _turned_profile(adapter: Any) -> list[tuple[str, str]]:
         (SPIGOT_FACE_X, 0.0),
     ]
     turned = SketchDims()
-    check("create_sketch turned profile", await adapter.create_sketch("Top"))
+    check("create_sketch turned profile", adapter.create_sketch("Top"))
     set_sketch_direct_db(adapter, True)
     axis = check(
-        "turned axis", await adapter.add_centerline(FREE_END_X, 0.0, SPIGOT_FACE_X, 0.0)
+        "turned axis", adapter.add_centerline(FREE_END_X, 0.0, SPIGOT_FACE_X, 0.0)
     )
-    lines = await add_line_chain(adapter, points)
+    lines = add_line_chain(adapter, points)
     set_sketch_direct_db(adapter, False)
     for line, relation in zip(
         lines, ("vertical", "horizontal", "horizontal", "vertical", "horizontal")
     ):
         check(
             f"turned profile {relation} {line}",
-            await adapter.add_sketch_constraint(line, None, relation),
+            adapter.add_sketch_constraint(line, None, relation),
         )
     free_end = f"{lines[0]}.start"
     face_on_axis = f"{lines[3]}.end"
-    await anchor_point_to_origin(adapter, free_end, FREE_END_X, 0.0, "free end on the axis")
+    anchor_point_to_origin(adapter, free_end, FREE_END_X, 0.0, "free end on the axis")
     turned.record("RodStation", '"RodStation"')
-    await add_diametric_linear_dimension(
+    add_diametric_linear_dimension(
         adapter, axis, lines[2], (GROOVE_X, -(SPIGOT_R + 4.0)), "SpigotDia"
     )
     turned.record("SpigotDia", '"SpigotDia"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{lines[1]}.end",
         f"{lines[2]}.end",
@@ -457,7 +457,7 @@ async def _turned_profile(adapter: Any) -> list[tuple[str, str]]:
         "shoulder from the spigot face",
     )
     turned.record("SpigotLength", '"SpigotLength"')
-    overall = await dimension_between(
+    overall = dimension_between(
         adapter,
         free_end,
         face_on_axis,
@@ -467,7 +467,7 @@ async def _turned_profile(adapter: Any) -> list[tuple[str, str]]:
     )
     _make_driven(adapter, overall, "overall length")
     turned.record("OverallLength")
-    await dimension_between(
+    dimension_between(
         adapter,
         face_on_axis,
         "origin",
@@ -476,13 +476,13 @@ async def _turned_profile(adapter: Any) -> list[tuple[str, str]]:
         "spigot face from the bore axis",
     )
     turned.record("BoreStation", '"BoreStation"')
-    await ensure_fully_defined(adapter, "turned profile")
-    check("exit_sketch turned profile", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "turned profile")
+    check("exit_sketch turned profile", adapter.exit_sketch())
     name_last_feature(adapter, "TurnedProfile")
     return turned.apply(adapter, "TurnedProfile")
 
 
-async def _groove_profile(adapter: Any) -> list[tuple[str, str]]:
+def _groove_profile(adapter: Any) -> list[tuple[str, str]]:
     """The groove circle on the Top plane, stationed from the spigot face.
 
     The revolve axis runs from the bore axis to the spigot face, so its end is
@@ -496,28 +496,28 @@ async def _groove_profile(adapter: Any) -> list[tuple[str, str]]:
     groove = SketchDims()
     root_v = GROOVE_CENTRE_R - GROOVE_RADIUS  # sketch v of the root
     crown_v = GROOVE_CENTRE_R + GROOVE_RADIUS
-    check("create_sketch groove", await adapter.create_sketch("Top"))
+    check("create_sketch groove", adapter.create_sketch("Top"))
     set_sketch_direct_db(adapter, True)
     axis = check(
-        "groove axis", await adapter.add_centerline(0.0, 0.0, SPIGOT_FACE_X, 0.0)
+        "groove axis", adapter.add_centerline(0.0, 0.0, SPIGOT_FACE_X, 0.0)
     )
     # add_arc sweeps CCW p1 -> p2: crown -> root bulges to the free end,
     # root -> crown to the spigot face; the shared ends merge at creation.
     toward_free_end = check(
         "groove arc toward the free end",
-        await adapter.add_arc(
+        adapter.add_arc(
             GROOVE_X, GROOVE_CENTRE_R, GROOVE_X, crown_v, GROOVE_X, root_v
         ),
     )
     toward_face = check(
         "groove arc toward the spigot face",
-        await adapter.add_arc(
+        adapter.add_arc(
             GROOVE_X, GROOVE_CENTRE_R, GROOVE_X, root_v, GROOVE_X, crown_v
         ),
     )
     set_sketch_direct_db(adapter, False)
-    await anchor_point_to_origin(adapter, f"{axis}.start", 0.0, 0.0, "groove axis at the bore")
-    await anchor_point_to_origin(
+    anchor_point_to_origin(adapter, f"{axis}.start", 0.0, 0.0, "groove axis at the bore")
+    anchor_point_to_origin(
         adapter, f"{axis}.end", SPIGOT_FACE_X, 0.0, "groove axis to the spigot face"
     )
     groove.record("GrooveDatum", '"BoreStation"')
@@ -530,9 +530,9 @@ async def _groove_profile(adapter: Any) -> list[tuple[str, str]]:
     ):
         check(
             f"groove {point} plumb over its centre",
-            await adapter.add_sketch_constraint(point, centre, "vertical_points"),
+            adapter.add_sketch_constraint(point, centre, "vertical_points"),
         )
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{axis}.end",
         f"{toward_free_end}.center",
@@ -543,10 +543,10 @@ async def _groove_profile(adapter: Any) -> list[tuple[str, str]]:
     groove.record("GrooveStation", '"GrooveStation"')
     check(
         "groove radius",
-        await adapter.add_sketch_dimension(toward_face, None, "radial", GROOVE_RADIUS),
+        adapter.add_sketch_dimension(toward_face, None, "radial", GROOVE_RADIUS),
     )
     groove.record("GrooveRadius", '"GrooveRadius"')
-    await add_diametric_linear_dimension(
+    add_diametric_linear_dimension(
         adapter,
         axis,
         f"{toward_face}.start",
@@ -554,8 +554,8 @@ async def _groove_profile(adapter: Any) -> list[tuple[str, str]]:
         "GrooveRootDia",
     )
     groove.record("GrooveRootDia", '"GrooveRootDia"')
-    await ensure_fully_defined(adapter, "groove profile")
-    check("exit_sketch groove", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "groove profile")
+    check("exit_sketch groove", adapter.exit_sketch())
     name_last_feature(adapter, "GrooveProfile")
     return groove.apply(adapter, "GrooveProfile")
 
@@ -609,9 +609,9 @@ def _limit_band(
 
 
 
-async def _centroid_x_check(adapter: Any, label: str, expected_x: float) -> None:
+def _centroid_x_check(adapter: Any, label: str, expected_x: float) -> None:
     """Fail if the body grew to the wrong side of its sketch plane."""
-    mass = await adapter.get_mass_properties()
+    mass = adapter.get_mass_properties()
     if not mass.is_success:
         raise RuntimeError(f"{label}: get_mass_properties failed: {mass.error}")
     com_x = float(mass.data.center_of_mass[0])
@@ -623,7 +623,7 @@ async def _centroid_x_check(adapter: Any, label: str, expected_x: float) -> None
     _telemetry.success(f"{label}: centre of mass x {com_x:.4f} mm")
 
 
-async def _make_hook_point(adapter: Any) -> None:
+def _make_hook_point(adapter: Any) -> None:
     """``HookAnchorPoint``, the lever-wire ball joint's fixture-side anchor.
 
     No adapter writer exists for a free-XYZ reference point, so: a hidden
@@ -631,14 +631,14 @@ async def _make_hook_point(adapter: Any) -> None:
     ``InsertReferencePoint(swRefPointSketchPoint = 7)`` and renamed -- the
     build_mg_magnifying_wheel WireYokePoint recipe."""
     x, y = _hook_sketch_xy()
-    check("create_sketch hook anchor", await adapter.create_sketch("Top"))
+    check("create_sketch hook anchor", adapter.create_sketch("Top"))
     set_sketch_direct_db(adapter, True)
     sketches = adapter.currentModel.SketchManager
     sk_point = sketches.CreatePoint(x / 1000.0, y / 1000.0, 0.0)
     set_sketch_direct_db(adapter, False)
     if sk_point is None:
         raise RuntimeError("hook anchor sketch point creation failed")
-    check("exit_sketch hook anchor", await adapter.exit_sketch())
+    check("exit_sketch hook anchor", adapter.exit_sketch())
     name_last_feature(adapter, "HookAnchorSketch")
     blank_sketch(adapter, "HookAnchorSketch")
     _make_hook_ref_point(adapter)

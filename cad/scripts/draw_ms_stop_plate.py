@@ -154,10 +154,10 @@ def _label_locating_edges(adapter: Any, front: Any) -> None:
                           note_xy=note_xy, label=text.lower())
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source stop cover missing: {SOURCE}")
-    check("open stop cover", await adapter.open_model(str(SOURCE)))
+    check("open stop cover", adapter.open_model(str(SOURCE)))
     properties = ("Number", "Revision", "Title", "Material Specification", "Finish", "Quantity")
     read_required_properties(adapter.currentModel, properties,
                              required=("Number", "Material Specification", "Finish", "Quantity"))
@@ -212,7 +212,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(adapter, "Isometric View Note", ISO_CENTER[0] - 0.030, 0.124)
     if add_note(adapter, MATCHED_PAIR_NOTE, *MATCHED_PAIR_NOTE_XY) is None:
         raise RuntimeError("failed to add the stop plate matched-pair note")
-    return await finalize_drawing(adapter, OUTPUTS,
+    return finalize_drawing(adapter, OUTPUTS,
                                   pdf_title="Measuring Stick Stop Plate Manufacturing Drawing",
                                   scale=SHEET_SCALE, layout=SPEC.layout)
 

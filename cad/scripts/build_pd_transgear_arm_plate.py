@@ -179,8 +179,8 @@ V_HOLES = len(SCREW_HOLES) * math.pi * _R_HOLE**2 * THICKNESS_OVER_ARM
 V_CSK = _csk_removed()
 
 
-async def _mass(adapter: Any) -> tuple[float, list[float]]:
-    res = await adapter.get_mass_properties()
+def _mass(adapter: Any) -> tuple[float, list[float]]:
+    res = adapter.get_mass_properties()
     if not res.is_success:
         raise RuntimeError(f"arm-plate mass properties failed: {res.error}")
     return float(res.data.volume), [float(c) for c in res.data.center_of_mass]
@@ -247,7 +247,7 @@ def _sketch_mapper(
     return to_sketch
 
 
-async def _outline(
+def _outline(
     adapter: Any,
     dims: SketchDims,
     upper_left: tuple[float, float],
@@ -264,21 +264,21 @@ async def _outline(
     when one is given."""
     set_sketch_direct_db(adapter, True)
     upper = check(
-        f"{label} upper edge", await adapter.add_line(*upper_left, *upper_right)
+        f"{label} upper edge", adapter.add_line(*upper_left, *upper_right)
     )
-    right = check(f"{label} +X edge", await adapter.add_line(*upper_right, *KINK_RIGHT))
+    right = check(f"{label} +X edge", adapter.add_line(*upper_right, *KINK_RIGHT))
     kink_right = check(
         f"{label} +X kink line",
-        await adapter.add_line(*KINK_RIGHT, *KINK_TANGENT_RIGHT),
+        adapter.add_line(*KINK_RIGHT, *KINK_TANGENT_RIGHT),
     )
     round_ = check(
         f"{label} end round",
-        await adapter.add_arc(0.0, 0.0, *KINK_TANGENT, *KINK_TANGENT_RIGHT),
+        adapter.add_arc(0.0, 0.0, *KINK_TANGENT, *KINK_TANGENT_RIGHT),
     )
-    kink = check(f"{label} kink line", await adapter.add_line(*KINK_TANGENT, *KINK))
-    left = check(f"{label} -X edge", await adapter.add_line(*KINK, *upper_left))
+    kink = check(f"{label} kink line", adapter.add_line(*KINK_TANGENT, *KINK))
+    left = check(f"{label} -X edge", adapter.add_line(*KINK, *upper_left))
     set_sketch_direct_db(adapter, False)
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{round_}.center", 0.0, 0.0, f"{label} end round on K"
     )
     # The loop's corners: separate entities, so each joint is explicit.
@@ -292,7 +292,7 @@ async def _outline(
     ):
         check(
             f"{label} corner {p1}-{p2}",
-            await adapter.add_sketch_constraint(p1, p2, "coincident"),
+            adapter.add_sketch_constraint(p1, p2, "coincident"),
         )
     for relation_label, e1, e2, relation in (
         ("+X kink line tangent", kink_right, round_, "tangent"),
@@ -300,16 +300,16 @@ async def _outline(
     ):
         check(
             f"{label} {relation_label}",
-            await adapter.add_sketch_constraint(e1, e2, relation),
+            adapter.add_sketch_constraint(e1, e2, relation),
         )
     for edge_label, edge in (("+X edge", right), ("-X edge", left)):
         check(
             f"{label} {edge_label} vertical",
-            await adapter.add_sketch_constraint(edge, None, "vertical"),
+            adapter.add_sketch_constraint(edge, None, "vertical"),
         )
     check(
         f"{label} end radius",
-        await adapter.add_sketch_dimension(round_, None, "radial", END_R),
+        adapter.add_sketch_dimension(round_, None, "radial", END_R),
     )
     dims.record(names["EndR"], '"EndR"')
     # The bar stands centred on K: each side edge half the width from it.
@@ -317,7 +317,7 @@ async def _outline(
         ("EdgeLeftX", f"{kink}.end", KINK[0]),
         ("EdgeRightX", f"{kink_right}.start", KINK_RIGHT[0]),
     ):
-        await dimension_between(
+        dimension_between(
             adapter,
             f"{round_}.center",
             ref,
@@ -332,7 +332,7 @@ async def _outline(
         ("KinkY", f"{kink}.end", KINK[1]),
         ("KinkRightY", f"{kink_right}.start", KINK_RIGHT[1]),
     ):
-        await dimension_between(
+        dimension_between(
             adapter,
             f"{round_}.center",
             ref,
@@ -341,17 +341,17 @@ async def _outline(
             f"{label} {role} from K",
         )
         dims.record(names[role], names.get(f"{role}Drive"))
-    await ensure_fully_defined(adapter, label)
+    ensure_fully_defined(adapter, label)
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
         CreatePlaneParameters,
         ExtrusionParameters,
         RevolveParameters,
     )
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     # #290: the row's inch calculation units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
@@ -383,14 +383,14 @@ async def build(adapter: Any) -> dict[str, str]:
         ("LocatorY2", abs(LOCATOR_SITES_MM[1][1])),
         ("LocatorDia", LOCATOR_HOLE_DIA_MM),
     ):
-        await set_global(adapter, name, f"{value}mm")
+        set_global(adapter, name, f"{value}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
     # --- Over-arm section: the whole outline, 5 toward +Z --------------------
     outline = SketchDims()
-    check("create_sketch plate outline", await adapter.create_sketch("Front"))
-    await _outline(
+    check("create_sketch plate outline", adapter.create_sketch("Front"))
+    _outline(
         adapter,
         outline,
         TOP_LEFT,
@@ -410,12 +410,12 @@ async def build(adapter: Any) -> dict[str, str]:
         },
         "plate outline",
     )
-    check("exit_sketch plate outline", await adapter.exit_sketch())
+    check("exit_sketch plate outline", adapter.exit_sketch())
     name_last_feature(adapter, "PlateOutline")
     drive_jobs += outline.apply(adapter, "PlateOutline")
     check(
         "extrude over-arm section",
-        await adapter.create_extrusion(ExtrusionParameters(depth=THICKNESS_OVER_ARM)),
+        adapter.create_extrusion(ExtrusionParameters(depth=THICKNESS_OVER_ARM)),
     )
     name_last_feature(adapter, "Plate")
     drive_jobs += [
@@ -425,8 +425,8 @@ async def build(adapter: Any) -> dict[str, str]:
         )
     ]
     expected = V_PLATE
-    await volume_check(adapter, "over-arm section", expected, 0.002 * expected)
-    _, com = await _mass(adapter)
+    volume_check(adapter, "over-arm section", expected, 0.002 * expected)
+    _, com = _mass(adapter)
     if abs(com[2] - THICKNESS_OVER_ARM / 2.0) > 0.01:
         raise RuntimeError(
             f"over-arm section centre of mass z = {com[2]:.3f}: the extrusion "
@@ -435,8 +435,8 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # --- Section below the arm: under the notch line, 8 toward -Z ------------
     lower = SketchDims()
-    check("create_sketch lower outline", await adapter.create_sketch("Front"))
-    await _outline(
+    check("create_sketch lower outline", adapter.create_sketch("Front"))
+    _outline(
         adapter,
         lower,
         NOTCH_LEFT,
@@ -456,12 +456,12 @@ async def build(adapter: Any) -> dict[str, str]:
         },
         "lower outline",
     )
-    check("exit_sketch lower outline", await adapter.exit_sketch())
+    check("exit_sketch lower outline", adapter.exit_sketch())
     name_last_feature(adapter, "LowerOutline")
     drive_jobs += lower.apply(adapter, "LowerOutline")
     check(
         "extrude section below the arm",
-        await adapter.create_extrusion(
+        adapter.create_extrusion(
             ExtrusionParameters(depth=NOTCH_DEPTH, reverse_direction=True)
         ),
     )
@@ -470,8 +470,8 @@ async def build(adapter: Any) -> dict[str, str]:
         (name_dimensions(adapter, "LowerSection", ["NotchDepth"])[0], '"NotchDepth"')
     ]
     expected += V_LOWER
-    await volume_check(adapter, "plate with lower section", expected, 0.002 * expected)
-    _, com = await _mass(adapter)
+    volume_check(adapter, "plate with lower section", expected, 0.002 * expected)
+    _, com = _mass(adapter)
     want_z = (V_PLATE * THICKNESS_OVER_ARM / 2.0 - V_LOWER * NOTCH_DEPTH / 2.0) / (
         V_PLATE + V_LOWER
     )
@@ -483,7 +483,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # --- Hub and boss: revolved in the section plane through K ---------------
     bearing = SketchDims()
-    check("create_sketch bearing profile", await adapter.create_sketch("Right"))
+    check("create_sketch bearing profile", adapter.create_sketch("Right"))
     to_sketch = _sketch_mapper(adapter, u_axis=2, v_axis=1, label="bearing profile")
     corners = [
         to_sketch((0.0, 0.0, HUB_FACE_Z)),
@@ -495,11 +495,11 @@ async def build(adapter: Any) -> dict[str, str]:
     ]
     notch_corner = to_sketch((0.0, _NOTCH_CORNER_Y, 0.0))
     set_sketch_direct_db(adapter, True)
-    axis = check("bearing axis", await adapter.add_centerline(0.0, 0.0, *corners[0]))
+    axis = check("bearing axis", adapter.add_centerline(0.0, 0.0, *corners[0]))
     reference = check(
-        "mounting-face reference", await adapter.add_line(0.0, 0.0, *notch_corner)
+        "mounting-face reference", adapter.add_line(0.0, 0.0, *notch_corner)
     )
-    bearing_lines = await add_line_chain(adapter, corners)
+    bearing_lines = add_line_chain(adapter, corners)
     set_sketch_direct_db(adapter, False)
     _as_construction(adapter, reference)
     # Along Z (sketch u) the lines read horizontal, along Y vertical.
@@ -507,32 +507,32 @@ async def build(adapter: Any) -> dict[str, str]:
         relation = "vertical" if index % 2 == 0 else "horizontal"
         check(
             f"bearing profile {relation} {line}",
-            await adapter.add_sketch_constraint(line, None, relation),
+            adapter.add_sketch_constraint(line, None, relation),
         )
     check(
         "bearing axis horizontal",
-        await adapter.add_sketch_constraint(axis, None, "horizontal"),
+        adapter.add_sketch_constraint(axis, None, "horizontal"),
     )
     check(
         "bearing axis ends on the hub face",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{axis}.end", f"{bearing_lines[0]}.start", "coincident"
         ),
     )
     check(
         "mounting-face reference vertical",
-        await adapter.add_sketch_constraint(reference, None, "vertical"),
+        adapter.add_sketch_constraint(reference, None, "vertical"),
     )
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{axis}.start", 0.0, 0.0, "bearing axis on K"
     )
     check(
         "mounting-face reference on K",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{reference}.start", "origin", "coincident"
         ),
     )
-    await add_diametric_linear_dimension(
+    add_diametric_linear_dimension(
         adapter,
         axis,
         bearing_lines[1],
@@ -540,7 +540,7 @@ async def build(adapter: Any) -> dict[str, str]:
         "HubDia",
     )
     bearing.record("HubDia", '"HubDia"')
-    await add_diametric_linear_dimension(
+    add_diametric_linear_dimension(
         adapter,
         axis,
         bearing_lines[3],
@@ -548,7 +548,7 @@ async def build(adapter: Any) -> dict[str, str]:
         "BossDia",
     )
     bearing.record("BossDia", '"BossDia"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{reference}.end",
         f"{bearing_lines[0]}.end",
@@ -557,7 +557,7 @@ async def build(adapter: Any) -> dict[str, str]:
         "hub face from the mounting face",
     )
     bearing.record("HubFaceToMounting", '"HubFaceToMounting"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{bearing_lines[0]}.end",
         f"{bearing_lines[4]}.start",
@@ -568,7 +568,7 @@ async def build(adapter: Any) -> dict[str, str]:
     bearing.record("HubToBoss", '"HubToBoss"')
     # The boss seats on the rear face: its step follows the over-arm
     # thickness (not printed; the three dimensions above fix the boss face).
-    await dimension_between(
+    dimension_between(
         adapter,
         "origin",
         f"{bearing_lines[2]}.start",
@@ -578,7 +578,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     bearing.record("BossSeat", '"ThicknessOverArm"')
     # Where the reference meets the notch face (not printed).
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{reference}.start",
         f"{reference}.end",
@@ -587,23 +587,23 @@ async def build(adapter: Any) -> dict[str, str]:
         "mounting-face reference to the notch corner",
     )
     bearing.record("NotchCornerY")
-    await ensure_fully_defined(adapter, "bearing profile")
-    check("exit_sketch bearing profile", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "bearing profile")
+    check("exit_sketch bearing profile", adapter.exit_sketch())
     name_last_feature(adapter, "BearingProfile")
     drive_jobs += bearing.apply(adapter, "BearingProfile")
     check(
         "revolve hub and boss",
-        await adapter.create_revolve(RevolveParameters(angle=360.0)),
+        adapter.create_revolve(RevolveParameters(angle=360.0)),
     )
     name_last_feature(adapter, "Bearing")
     expected += V_HUB + V_BOSS
-    await volume_check(adapter, "plate with hub and boss", expected, 0.002 * expected)
-    await bbox_extent_check(adapter, "hub face to boss face", "z", HUB_TO_BOSS)
+    volume_check(adapter, "plate with hub and boss", expected, 0.002 * expected)
+    bbox_extent_check(adapter, "hub face to boss face", "z", HUB_TO_BOSS)
 
     # --- Running bore through on K --------------------------------------------
     bore = SketchDims()
-    check("create_sketch bore", await adapter.create_sketch("Front"))
-    await define_circle(
+    check("create_sketch bore", adapter.create_sketch("Front"))
+    define_circle(
         adapter,
         0.0,
         0.0,
@@ -613,23 +613,23 @@ async def build(adapter: Any) -> dict[str, str]:
         names=(None, None, "BoreDia"),
         drives=(None, None, '"BoreDia"'),
     )
-    await ensure_fully_defined(adapter, "bore sketch")
-    check("exit_sketch bore", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "bore sketch")
+    check("exit_sketch bore", adapter.exit_sketch())
     name_last_feature(adapter, "BoreProfile")
     drive_jobs += bore.apply(adapter, "BoreProfile")
     check(
         "cut bore",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
         ),
     )
     name_last_feature(adapter, "Bore")
     expected -= V_BORE
-    await volume_check(adapter, "plate with bore", expected, 0.01 * V_BORE)
+    volume_check(adapter, "plate with bore", expected, 0.01 * V_BORE)
 
     # --- Screw holes through the over-arm section -----------------------------
     holes = SketchDims()
-    check("create_sketch screw holes", await adapter.create_sketch("Front"))
+    check("create_sketch screw holes", adapter.create_sketch("Front"))
     for index, ((x, y), names, drives) in enumerate(
         zip(
             SCREW_HOLES,
@@ -645,7 +645,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
         start=1,
     ):
-        await define_circle(
+        define_circle(
             adapter,
             x,
             y,
@@ -655,19 +655,19 @@ async def build(adapter: Any) -> dict[str, str]:
             names=names,
             drives=drives,
         )
-    await ensure_fully_defined(adapter, "screw-hole sketch")
-    check("exit_sketch screw holes", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "screw-hole sketch")
+    check("exit_sketch screw holes", adapter.exit_sketch())
     name_last_feature(adapter, "ScrewHoleProfile")
     drive_jobs += holes.apply(adapter, "ScrewHoleProfile")
     check(
         "cut screw holes",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
         ),
     )
     name_last_feature(adapter, "ScrewHoles")
     expected -= V_HOLES
-    await volume_check(adapter, "plate with screw holes", expected, 0.01 * V_HOLES)
+    volume_check(adapter, "plate with screw holes", expected, 0.01 * V_HOLES)
 
     # --- Named planes -----------------------------------------------------------
     for plane, base, offset, drive in (
@@ -679,7 +679,7 @@ async def build(adapter: Any) -> dict[str, str]:
     ):
         check(
             f"create_plane {plane}",
-            await adapter.create_plane(
+            adapter.create_plane(
                 CreatePlaneParameters(mode="offset", base_plane=base, offset=offset)
             ),
         )
@@ -707,7 +707,7 @@ async def build(adapter: Any) -> dict[str, str]:
         csk = SketchDims()
         check(
             f"create_sketch countersink {index}",
-            await adapter.create_sketch("ScrewHolePlane"),
+            adapter.create_sketch("ScrewHolePlane"),
         )
         to_sketch = _sketch_mapper(
             adapter, u_axis=0, v_axis=2, label=f"countersink {index}"
@@ -725,11 +725,11 @@ async def build(adapter: Any) -> dict[str, str]:
         set_sketch_direct_db(adapter, True)
         csk_axis = check(
             f"countersink {index} axis",
-            await adapter.add_centerline(
+            adapter.add_centerline(
                 *profile[3], *to_sketch((x, SCREW_HOLE_Y, top + CSK_OVERRUN))
             ),
         )
-        csk_lines = await add_line_chain(adapter, profile)
+        csk_lines = add_line_chain(adapter, profile)
         set_sketch_direct_db(adapter, False)
         # cone, outer wall (vertical), top (horizontal), axis side (vertical)
         for line, relation in zip(
@@ -737,24 +737,24 @@ async def build(adapter: Any) -> dict[str, str]:
         ):
             check(
                 f"countersink {index} {relation} {line}",
-                await adapter.add_sketch_constraint(line, None, relation),
+                adapter.add_sketch_constraint(line, None, relation),
             )
         check(
             f"countersink {index} axis vertical",
-            await adapter.add_sketch_constraint(csk_axis, None, "vertical"),
+            adapter.add_sketch_constraint(csk_axis, None, "vertical"),
         )
         check(
             f"countersink {index} axis on the profile",
-            await adapter.add_sketch_constraint(
+            adapter.add_sketch_constraint(
                 f"{csk_axis}.start", f"{csk_lines[3]}.start", "coincident"
             ),
         )
         check(
             f"countersink {index} axis length",
-            await adapter.add_sketch_dimension(csk_axis, None, "linear", CSK_OVERRUN),
+            adapter.add_sketch_dimension(csk_axis, None, "linear", CSK_OVERRUN),
         )
         csk.record(f"Csk{index}AxisLength")
-        await dimension_between(
+        dimension_between(
             adapter,
             "origin",
             f"{csk_lines[3]}.start",
@@ -763,7 +763,7 @@ async def build(adapter: Any) -> dict[str, str]:
             f"countersink {index} station",
         )
         csk.record(f"Csk{index}X", x_drive)
-        await dimension_between(
+        dimension_between(
             adapter,
             "origin",
             f"{csk_lines[1]}.start",
@@ -772,7 +772,7 @@ async def build(adapter: Any) -> dict[str, str]:
             f"countersink {index} on the rear face",
         )
         csk.record(f"Csk{index}Seat", '"ThicknessOverArm"')
-        await add_diametric_linear_dimension(
+        add_diametric_linear_dimension(
             adapter,
             csk_axis,
             csk_lines[1],
@@ -786,7 +786,7 @@ async def build(adapter: Any) -> dict[str, str]:
         # past the rim into a self-crossing profile.  The revolve failed right
         # after the angular form (run 20261001T011714683Z, countersink 1).  The
         # drive keeps the angle when CskDia moves.
-        await dimension_between(
+        dimension_between(
             adapter,
             f"{csk_lines[0]}.start",
             f"{csk_lines[1]}.start",
@@ -795,7 +795,7 @@ async def build(adapter: Any) -> dict[str, str]:
             f"countersink {index} apex depth",
         )
         csk.record(f"Csk{index}ApexDepth", f'"CskDia" / 2 / tan({_CSK_HALF_ANGLE:g})')
-        await dimension_between(
+        dimension_between(
             adapter,
             f"{csk_lines[1]}.start",
             f"{csk_lines[1]}.end",
@@ -804,26 +804,26 @@ async def build(adapter: Any) -> dict[str, str]:
             f"countersink {index} overrun",
         )
         csk.record(f"Csk{index}Overrun")
-        await ensure_fully_defined(adapter, f"countersink {index} profile")
-        check(f"exit_sketch countersink {index}", await adapter.exit_sketch())
+        ensure_fully_defined(adapter, f"countersink {index} profile")
+        check(f"exit_sketch countersink {index}", adapter.exit_sketch())
         name_last_feature(adapter, f"CountersinkProfile{index}")
         drive_jobs += csk.apply(adapter, f"CountersinkProfile{index}")
         check(
             f"revolve-cut countersink {index}",
-            await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
+            adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
         )
         name_last_feature(adapter, f"Countersink{index}")
         expected -= V_CSK
-        await volume_check(
+        volume_check(
             adapter, f"countersink {index}", expected, 0.03 * V_CSK + 0.05
         )
 
     # --- REFERENCE sketch: the printed countersink Ø on the rear face --------
     csk_ref = SketchDims()
     check(
-        "create_sketch countersink reference", await adapter.create_sketch("RearFace")
+        "create_sketch countersink reference", adapter.create_sketch("RearFace")
     )
-    await define_circle(
+    define_circle(
         adapter,
         *SCREW_HOLES[CSK_REFERENCE_HOLE],
         _R_CSK,
@@ -832,8 +832,8 @@ async def build(adapter: Any) -> dict[str, str]:
         names=("CskRefX", "CskRefY", "CskDia"),
         drives=(f'"ScrewHoleX{CSK_REFERENCE_HOLE + 1}"', '"ScrewHoleY"', '"CskDia"'),
     )
-    await ensure_fully_defined(adapter, "countersink reference sketch")
-    check("exit_sketch countersink reference", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "countersink reference sketch")
+    check("exit_sketch countersink reference", adapter.exit_sketch())
     name_last_feature(adapter, "CountersinkReference")
     drive_jobs += csk_ref.apply(adapter, "CountersinkReference")
 
@@ -855,7 +855,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Axis3",
         ),
     ):
-        named = await name_bore_axis(
+        named = name_bore_axis(
             adapter,
             plane_a,
             0.0,
@@ -872,43 +872,43 @@ async def build(adapter: Any) -> dict[str, str]:
     # The female sockets are THROUGH: separately finished while the datum
     # carriers retain the common pilot setup; never slip-ream the arm.
     locators = SketchDims()
-    check("create_sketch locating bores", await adapter.create_sketch("Front"))
+    check("create_sketch locating bores", adapter.create_sketch("Front"))
     for index, (x, y) in enumerate(LOCATOR_SITES_MM, 1):
-        await define_circle(
+        define_circle(
             adapter, x, y, LOCATOR_HOLE_DIA_MM / 2.0, f"locator {index}",
             dims=locators,
             names=(f"LocatorX{index}", f"LocatorY{index}", f"LocatorDia{index}"),
             drives=('"LocatorX"', f'"LocatorY{index}"', '"LocatorDia"'),
         )
-    await ensure_fully_defined(adapter, "matched locating bore sketch")
-    check("exit_sketch locating bores", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "matched locating bore sketch")
+    check("exit_sketch locating bores", adapter.exit_sketch())
     name_last_feature(adapter, "LocatorProfile")
     drive_jobs += locators.apply(adapter, "LocatorProfile")
     check(
         "cut through locating bores",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
         ),
     )
     name_last_feature(adapter, "LocatorHoles")
     expected -= len(LOCATOR_SITES_MM) * math.pi * (LOCATOR_HOLE_DIA_MM / 2.0)**2 * THICKNESS_OVER_ARM
-    await volume_check(adapter, "matched through locating bores", expected, 0.001 * expected)
+    volume_check(adapter, "matched through locating bores", expected, 0.001 * expected)
     for index, (x, y) in enumerate(LOCATOR_SITES_MM, 1):
-        axis = await name_bore_axis(
+        axis = name_bore_axis(
             adapter, "Top Plane", y, "Right Plane", x, f"locator {index}",
             drive_a=f'"LocatorY{index}"', drive_b='"LocatorX"', drive_jobs=drive_jobs,
         )
         if axis != f"Axis{index + 3}":
             raise RuntimeError(f"locator {index} native axis is {axis!r}")
     # Deferred drive equations; each evaluates to the value just built.
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    volume_check(
         adapter, "driven plate (equations neutral)", expected, 0.001 * expected
     )
-    await bbox_extent_check(adapter, "bar width", "x", WIDTH)
+    bbox_extent_check(adapter, "bar width", "x", WIDTH)
 
     # Size/axial fit bands are separate from the locating-hole circular
     # position controls. Their coordinates are BASIC, never +/- substitutes.
@@ -935,9 +935,9 @@ async def build(adapter: Any) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
 
-    await apply_material(adapter, MATERIAL)
-    await apply_color(adapter, POLISHED_STEEL)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    apply_color(adapter, POLISHED_STEEL)
+    report_mass_properties(adapter)
     # The sourced H7 running bore and the hub and boss thrust faces, resolved
     # on its exact native face (the HubFace and BossFace stations are unique).
     author_part_pmi(
@@ -952,7 +952,7 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
     blank_reference_sketches(adapter, ("CountersinkReference",))
-    artefacts = await save_part_and_images(adapter, PART_NAME)
+    artefacts = save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
     return artefacts
 

@@ -19,7 +19,6 @@ Run (SolidWorks open)::
 
 from __future__ import annotations
 
-import asyncio
 import math
 import os
 import shutil
@@ -100,17 +99,17 @@ def _sheet_items(draw):
 
 
 @_telemetry.traced("diagnostic.pmi_plain_annotations")
-async def main() -> int:
+def main() -> int:
     _telemetry.set_service("diagnostics")
     adapter = PyWin32Adapter({})
     _watchdog.start()
     try:
-        await adapter.connect()
+        adapter.connect()
         adapter.swApp.CloseAllDocuments(True)
         shutil.copy2(SOURCE, SCRATCH_PRT)
         SCRATCH_DRW.unlink(missing_ok=True)
 
-        check = await adapter.open_model(str(SCRATCH_PRT))
+        check = adapter.open_model(str(SCRATCH_PRT))
         if not check.is_success:
             raise RuntimeError(f"part open failed: {check.error}")
         model = adapter.currentModel
@@ -138,7 +137,7 @@ async def main() -> int:
         model.SaveAs3(os.path.abspath(SCRATCH_PRT), 0, 0)
         adapter.swApp.CloseAllDocuments(True)
 
-        check = await adapter.open_model(str(SCRATCH_PRT))
+        check = adapter.open_model(str(SCRATCH_PRT))
         if not check.is_success:
             raise RuntimeError(f"part reopen failed: {check.error}")
         model = adapter.currentModel
@@ -211,7 +210,7 @@ async def main() -> int:
         draw.SaveAs3(os.path.abspath(SCRATCH_DRW), 0, 0)
         adapter.swApp.CloseAllDocuments(True)
 
-        check = await adapter.open_model(str(SCRATCH_DRW))
+        check = adapter.open_model(str(SCRATCH_DRW))
         if not check.is_success:
             raise RuntimeError(f"drawing reopen failed: {check.error}")
         for label, item in _sheet_items(adapter.currentModel).items():
@@ -231,9 +230,9 @@ async def main() -> int:
         _telemetry.success(f"plain-annotation probe complete: {OUT_PDF}")
         return 0
     finally:
-        await adapter.disconnect()
+        adapter.disconnect()
         _watchdog.stop()
 
 
 if __name__ == "__main__":
-    sys.exit(asyncio.run(main()))
+    sys.exit(main())

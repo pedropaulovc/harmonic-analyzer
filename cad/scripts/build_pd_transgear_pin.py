@@ -150,7 +150,7 @@ def author_dimension_callouts(adapter) -> None:
                     )
 
 
-async def _dome(
+def _dome(
     adapter,
     *,
     prefix: str,
@@ -172,49 +172,49 @@ async def _dome(
     toward_minus_z = u_apex > u_base
     u_centre = u_apex - sphere_r if toward_minus_z else u_apex + sphere_r
     dims = SketchDims()
-    check(f"create_sketch {prefix} dome", await adapter.create_sketch("Right"))
+    check(f"create_sketch {prefix} dome", adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
     check(
         f"{prefix} dome centerline",
-        await adapter.add_centerline(u_base, 0.0, u_apex, 0.0),
+        adapter.add_centerline(u_base, 0.0, u_apex, 0.0),
     )
     base = check(
-        f"{prefix} dome base", await adapter.add_line(u_base, 0.0, u_base, rim_r)
+        f"{prefix} dome base", adapter.add_line(u_base, 0.0, u_base, rim_r)
     )
     if toward_minus_z:
         arc_points = (u_apex, 0.0, u_base, rim_r)
     else:
         arc_points = (u_base, rim_r, u_apex, 0.0)
-    arc = check(f"{prefix} dome arc", await adapter.add_arc(u_centre, 0.0, *arc_points))
+    arc = check(f"{prefix} dome arc", adapter.add_arc(u_centre, 0.0, *arc_points))
     close = check(
-        f"{prefix} dome close", await adapter.add_line(u_apex, 0.0, u_base, 0.0)
+        f"{prefix} dome close", adapter.add_line(u_apex, 0.0, u_base, 0.0)
     )
     set_sketch_direct_db(adapter, False)
     check(
         f"{prefix} dome base vertical",
-        await adapter.add_sketch_constraint(base, None, "vertical"),
+        adapter.add_sketch_constraint(base, None, "vertical"),
     )
     check(
         f"{prefix} dome close horizontal",
-        await adapter.add_sketch_constraint(close, None, "horizontal"),
+        adapter.add_sketch_constraint(close, None, "horizontal"),
     )
     check(
         f"{prefix} dome rim reach",
-        await adapter.add_sketch_dimension(
+        adapter.add_sketch_dimension(
             f"{base}.end", "origin", "vertical_distance", rim_r
         ),
     )
     dims.record(f"{prefix}DomeRim", rim_drive)
     check(
         f"{prefix} dome sagitta",
-        await adapter.add_sketch_dimension(
+        adapter.add_sketch_dimension(
             f"{close}.start", f"{close}.end", "horizontal_distance", sag
         ),
     )
     dims.record(f"{prefix}DomeSagDim", f'"{prefix}DomeSag"')
     check(
         f"{prefix} dome on axis",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{base}.start", "origin", "horizontal_points"
         ),
     )
@@ -224,14 +224,14 @@ async def _dome(
     }[station_anchor]
     check(
         f"{prefix} dome station",
-        await adapter.add_sketch_dimension(
+        adapter.add_sketch_dimension(
             station_point, "origin", "horizontal_distance", abs(station_u)
         ),
     )
     dims.record(f"{prefix}DomeZ", station_drive)
     check(
         f"{prefix} dome radius",
-        await adapter.add_sketch_dimension(arc, None, "radial", sphere_r),
+        adapter.add_sketch_dimension(arc, None, "radial", sphere_r),
     )
     sag_name = f'"{prefix}DomeSag"'
     dims.record(
@@ -241,10 +241,10 @@ async def _dome(
     return dims
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import CreatePlaneParameters, RevolveParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     # #290: the row's inch calculation units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
     # The mm suffix is load-bearing: the equation manager reads bare numbers in
@@ -263,7 +263,7 @@ async def build(adapter) -> dict[str, str]:
         ("TipDomeSag", TIP_DOME_SAG),
         ("SeatRadius", SEAT_FILLET_R),
     ):
-        await set_global(adapter, name, f"{value}mm")
+        set_global(adapter, name, f"{value}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -276,10 +276,10 @@ async def build(adapter) -> dict[str, str]:
     u_rear = HEAD_LAND
     u_front = -FRONT_END_STATION
     profile = SketchDims()
-    check("create_sketch pin profile", await adapter.create_sketch("Right"))
+    check("create_sketch pin profile", adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
     axis = check(
-        "pin axis centerline", await adapter.add_centerline(u_rear, 0.0, u_front, 0.0)
+        "pin axis centerline", adapter.add_centerline(u_rear, 0.0, u_front, 0.0)
     )
     points = [
         (u_rear, 0.0),
@@ -295,7 +295,7 @@ async def build(adapter) -> dict[str, str]:
         (u_front, R_SHANK),
         (u_front, 0.0),
     ]
-    lines = await add_line_chain(adapter, points)
+    lines = add_line_chain(adapter, points)
     set_sketch_direct_db(adapter, False)
     # The land in front of the groove is the same Ø3.900 cylinder as the
     # shank: collinear with it (one turned diameter, one dimension), not a
@@ -308,7 +308,7 @@ async def build(adapter) -> dict[str, str]:
         relation = "horizontal" if v0 == v1 else "vertical"
         check(
             f"pin profile {relation} {line}",
-            await adapter.add_sketch_constraint(line, None, relation),
+            adapter.add_sketch_constraint(line, None, relation),
         )
     (
         _head_back,
@@ -326,19 +326,19 @@ async def build(adapter) -> dict[str, str]:
     ) = lines
     check(
         "pin axis on the origin",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{axis_edge}.end", "origin", "horizontal_points"
         ),
     )
     check(
         "seat on the origin",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{seat_face}.start", "origin", "vertical_points"
         ),
     )
     check(
         "front land on the shank cylinder",
-        await adapter.add_sketch_constraint(front_land, shank, "collinear"),
+        adapter.add_sketch_constraint(front_land, shank, "collinear"),
     )
     for name, start, end, value in (
         ("HeadLand", f"{head_rim}.start", f"{head_rim}.end", HEAD_LAND),
@@ -347,7 +347,7 @@ async def build(adapter) -> dict[str, str]:
         ("GrooveWidth", f"{groove_floor}.start", f"{groove_floor}.end", GROOVE_WIDTH),
         ("FrontLand", f"{front_land}.start", f"{front_land}.end", FRONT_LAND),
     ):
-        await dimension_between(
+        dimension_between(
             adapter, start, end, "horizontal_distance", value, f"pin {name}"
         )
         profile.record(name, f'"{name}"')
@@ -362,17 +362,17 @@ async def build(adapter) -> dict[str, str]:
             R_GROOVE,
         ),
     ):
-        await add_diametric_linear_dimension(
+        add_diametric_linear_dimension(
             adapter, axis, line, (u_mid, radius + 4.0), name
         )
         profile.record(name, f'"{name}"')
-    await ensure_fully_defined(adapter, "pin profile sketch")
-    check("exit_sketch pin profile", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "pin profile sketch")
+    check("exit_sketch pin profile", adapter.exit_sketch())
     name_last_feature(adapter, "PinProfile")
     drive_jobs += profile.apply(adapter, "PinProfile")
-    check("revolve pin", await adapter.create_revolve(RevolveParameters(angle=360.0)))
+    check("revolve pin", adapter.create_revolve(RevolveParameters(angle=360.0)))
     name_last_feature(adapter, "Pin")
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "stepped pin with its groove", V_PROFILE, 0.005 * V_PROFILE
     )
 
@@ -381,12 +381,12 @@ async def build(adapter) -> dict[str, str]:
     # z = 0: the only edge through that point.
     check(
         "fillet seat root",
-        await adapter.add_fillet(SEAT_FILLET_R, [[R_LAND, 0.0, 0.0]]),
+        adapter.add_fillet(SEAT_FILLET_R, [[R_LAND, 0.0, 0.0]]),
     )
     name_last_feature(adapter, "SeatFillet")
     fillet_dim = name_dimensions(adapter, "SeatFillet", ["SeatRadius"])
     drive_jobs.append((fillet_dim[0], '"SeatRadius"'))
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "seat root fillet", volume + V_SEAT_FILLET, 0.005 * V_PROFILE
     )
 
@@ -428,7 +428,7 @@ async def build(adapter) -> dict[str, str]:
             V_TIP_DOME,
         ),
     ):
-        dims = await _dome(
+        dims = _dome(
             adapter,
             prefix=prefix,
             u_base=u_base,
@@ -441,23 +441,23 @@ async def build(adapter) -> dict[str, str]:
             station_anchor=station_anchor,
         )
         feature = f"{prefix}DomeProfile"
-        await ensure_fully_defined(adapter, f"{prefix.lower()} dome sketch")
-        check(f"exit_sketch {prefix} dome", await adapter.exit_sketch())
+        ensure_fully_defined(adapter, f"{prefix.lower()} dome sketch")
+        check(f"exit_sketch {prefix} dome", adapter.exit_sketch())
         name_last_feature(adapter, feature)
         drive_jobs += dims.apply(adapter, feature)
         check(
             f"revolve {prefix} dome",
-            await adapter.create_revolve(RevolveParameters(angle=360.0)),
+            adapter.create_revolve(RevolveParameters(angle=360.0)),
         )
         name_last_feature(adapter, f"{prefix}Dome")
-        volume = await volume_check(
+        volume = volume_check(
             adapter, f"{prefix.lower()} dome", volume + v_dome, 0.03 * v_dome
         )
 
     # --- Named station for the assembly mates -----------------------------------
     check(
         "create_plane GrooveLoadWall",
-        await adapter.create_plane(
+        adapter.create_plane(
             CreatePlaneParameters(
                 mode="offset", base_plane="Front Plane", offset=GROOVE_STATION
             )
@@ -467,20 +467,20 @@ async def build(adapter) -> dict[str, str]:
     plane_offset = name_dimensions(adapter, "GrooveLoadWall", ["GrooveLoadWallOffset"])
     drive_jobs.append((plane_offset[0], '"GrooveStation"'))
     blank_reference_geometry(adapter, (("GrooveLoadWall", "PLANE"),))
-    await name_bore_axis(adapter, "Right Plane", 0.0, "Top Plane", 0.0, "pin axis")
+    name_bore_axis(adapter, "Right Plane", 0.0, "Top Plane", 0.0, "pin axis")
 
     # Deferred drive equations, then re-check neutrality.
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dimension, expression in drive_jobs:
-        await drive_dimension(adapter, dimension, expression)
-    await force_rebuild(adapter)
-    await volume_check(
+        drive_dimension(adapter, dimension, expression)
+    force_rebuild(adapter)
+    volume_check(
         adapter, "driven pin (equations neutral)", V_TOTAL, 0.005 * V_TOTAL
     )
     # The envelope: apex to tip along the axis, the head across it.
-    await bbox_extent_check(adapter, "pin apex to tip", "z", OVERALL_LENGTH, 0.01)
-    await bbox_extent_check(adapter, "head Ø (x)", "x", HEAD_DIA, 0.01)
-    await bbox_extent_check(adapter, "head Ø (y)", "y", HEAD_DIA, 0.01)
+    bbox_extent_check(adapter, "pin apex to tip", "z", OVERALL_LENGTH, 0.01)
+    bbox_extent_check(adapter, "head Ø (x)", "x", HEAD_DIA, 0.01)
+    bbox_extent_check(adapter, "head Ø (y)", "y", HEAD_DIA, 0.01)
 
     # Model-owned bands (drawing-simplicity-policy.md `How the repository implements the guidelines`): the turned shank (the running fit), the
     # ring groove's catalogue Ø and width, and the groove station, a
@@ -512,9 +512,9 @@ async def build(adapter) -> dict[str, str]:
         display_unit=UNIT,
     )
 
-    await apply_material(adapter, MATERIAL)
-    await apply_color(adapter, POLISHED_STEEL)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    apply_color(adapter, POLISHED_STEEL)
+    report_mass_properties(adapter)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
@@ -529,7 +529,7 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
-    return await save_part_and_images(adapter, PART_NAME)
+    return save_part_and_images(adapter, PART_NAME)
 
 
 if __name__ == "__main__":

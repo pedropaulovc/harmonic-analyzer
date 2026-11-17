@@ -152,53 +152,53 @@ _MOTION_METHODS = (
 class SolidWorksMotionMixin:
     """Expose SolidWorks Motion-study methods via mixin-local helpers."""
 
-    async def create_motion_study(
+    def create_motion_study(
         self, params: MotionStudyParameters
     ) -> AdapterResult[dict[str, Any]]:
         return _create_motion_study_impl(self, params)
 
-    async def ensure_motion_addin(self) -> AdapterResult[dict[str, Any]]:
+    def ensure_motion_addin(self) -> AdapterResult[dict[str, Any]]:
         return _ensure_motion_addin_impl(self)
 
-    async def add_motor(
+    def add_motor(
         self, params: MotionMotorParameters
     ) -> AdapterResult[dict[str, Any]]:
         return _add_motor_impl(self, params)
 
-    async def add_gravity(
+    def add_gravity(
         self, params: MotionGravityParameters
     ) -> AdapterResult[dict[str, Any]]:
         return _add_gravity_impl(self, params)
 
-    async def calculate_motion(
+    def calculate_motion(
         self, params: MotionStudyRefParameters
     ) -> AdapterResult[dict[str, Any]]:
         return _calculate_motion_impl(self, params)
 
-    async def set_motion_time(
+    def set_motion_time(
         self, params: MotionTimeParameters
     ) -> AdapterResult[dict[str, Any]]:
         return _set_motion_time_impl(self, params)
 
-    async def export_motion_video(
+    def export_motion_video(
         self, params: MotionExportParameters
     ) -> AdapterResult[dict[str, Any]]:
         return _export_motion_video_impl(self, params)
 
-    async def list_motion_studies(self) -> AdapterResult[list[dict[str, Any]]]:
+    def list_motion_studies(self) -> AdapterResult[list[dict[str, Any]]]:
         return _list_motion_studies_impl(self)
 
-    async def add_motion_spring(
+    def add_motion_spring(
         self, params: MotionSpringParameters
     ) -> AdapterResult[dict[str, Any]]:
         return _add_motion_spring_impl(self, params)
 
-    async def add_motion_damper(
+    def add_motion_damper(
         self, params: MotionDamperParameters
     ) -> AdapterResult[dict[str, Any]]:
         return _add_motion_damper_impl(self, params)
 
-    async def add_motion_force(
+    def add_motion_force(
         self, params: MotionForceParameters
     ) -> AdapterResult[dict[str, Any]]:
         return _add_motion_force_impl(self, params)

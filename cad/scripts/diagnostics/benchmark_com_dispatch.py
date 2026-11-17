@@ -9,7 +9,6 @@ accidental standalone run from bypassing the machine-global SolidWorks seat lock
 from __future__ import annotations
 
 import argparse
-import asyncio
 import json
 import os
 import sys
@@ -41,7 +40,7 @@ def _args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-async def _run(
+def _run(
     model_path: Path,
     repo: Path,
     workload: str,
@@ -127,17 +126,17 @@ async def _run(
             workload=workload,
         ):
             with _telemetry.span("benchmark.connect"):
-                await adapter.connect()
+                adapter.connect()
             with _telemetry.span("benchmark.open"):
                 adapter.swApp.CloseAllDocuments(True)
-                opened = await adapter.open_model(str(model_path.resolve()))
+                opened = adapter.open_model(str(model_path.resolve()))
             if not opened.is_success:
                 raise RuntimeError(f"failed to open benchmark model: {opened.error}")
 
             with _telemetry.span("benchmark.collect"):
                 started = time.perf_counter()
                 if workload == "features":
-                    result = await adapter.list_features(include_suppressed=True)
+                    result = adapter.list_features(include_suppressed=True)
                     if not result.is_success:
                         raise RuntimeError(f"feature walk failed: {result.error}")
                     rows = result.data or []
@@ -153,7 +152,7 @@ async def _run(
                     item_count = len(rows)
                     workload_data = {}
                 else:
-                    result = await adapter.list_mates()
+                    result = adapter.list_mates()
                     if not result.is_success:
                         raise RuntimeError(f"mate walk failed: {result.error}")
                     rows = result.data or []
@@ -200,14 +199,12 @@ async def _run(
             sw_type_info.early_bound = original_early_bound
         sw_type_info.early_bound_or_flag = original_early_bound_or_flag
         with _telemetry.span("benchmark.disconnect"):
-            await adapter.disconnect()
+            adapter.disconnect()
 
 
 def main() -> int:
     args = _args()
-    result = asyncio.run(
-        _run(args.model, args.repo, args.workload, args.mode)
-    )
+    result = _run(args.model, args.repo, args.workload, args.mode)
     print(json.dumps(result, sort_keys=True))
     return 0
 

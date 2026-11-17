@@ -113,7 +113,7 @@ def configure_reference_views(
             )
 
 
-async def build_purchased_variant_drawing(
+def build_purchased_variant_drawing(
     adapter: Any,
     spec: DrawingSpec,
     *,
@@ -264,7 +264,7 @@ async def build_purchased_variant_drawing(
                         elapsed_s=time.perf_counter() - started,
                     )
             assert_source("before view creation")
-            return await _draw_purchased_variants(
+            return _draw_purchased_variants(
                 adapter,
                 spec,
                 model,
@@ -350,7 +350,7 @@ def require_source_state(
         )
 
 
-async def _draw_purchased_variants(
+def _draw_purchased_variants(
     adapter: Any,
     spec: DrawingSpec,
     model: Any,
@@ -657,7 +657,7 @@ async def _draw_purchased_variants(
         if stage != "after_drawing_close":
             assert_source(stage)
 
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         DrawingOutputs(**spec.outputs),
         layout=spec.layout,

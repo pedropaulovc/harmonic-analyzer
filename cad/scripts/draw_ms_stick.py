@@ -423,10 +423,10 @@ def _station_table(adapter: Any) -> None:
             raise RuntimeError(f"failed to add station table note {text.splitlines()[0]!r}")
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source measuring stick missing: {SOURCE}")
-    check("open measuring stick", await adapter.open_model(str(SOURCE)))
+    check("open measuring stick", adapter.open_model(str(SOURCE)))
     source_model = adapter.currentModel
     properties = ("Number", "Revision", "Title", "Material Specification", "Finish",
                   "Quantity", "Manufacturing Notes", "Isometric View Note", "Parent View Note",
@@ -572,7 +572,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _assert_dimension_contract(adapter, annotations)
     for view in (parent, detail, depth_parent, depth):
         set_hidden_lines_removed(adapter, view)
-    return await finalize_drawing(adapter, OUTPUTS, pdf_title="Measuring Stick Manufacturing Drawing",
+    return finalize_drawing(adapter, OUTPUTS, pdf_title="Measuring Stick Manufacturing Drawing",
                                   scale=SHEET_SCALE, layout=SPEC.layout,
                                   expected_sheet_names=SHEET_NAMES,
                                   sheet_layouts={name: SPEC.layout for name in SHEET_NAMES},

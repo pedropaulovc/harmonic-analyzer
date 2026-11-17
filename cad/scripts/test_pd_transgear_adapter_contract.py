@@ -26,7 +26,7 @@ RECIPES = (
     "build_pd_transgear_feed_pinion.py",
 )
 ClassRef = tuple[Path, str]
-Function = ast.FunctionDef | ast.AsyncFunctionDef
+Function = ast.FunctionDef | ast.FunctionDef
 
 
 @cache
@@ -103,7 +103,7 @@ def _adapter_methods() -> dict[str, tuple[Path, Function]]:
     seen = set()
     for owner in _mro(ref):
         for node in _class(owner).body:
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            if isinstance(node, (ast.FunctionDef,)):
                 if node.name in seen:
                     continue
                 seen.add(node.name)

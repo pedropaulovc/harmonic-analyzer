@@ -89,7 +89,7 @@ def _require_one_solid_body(adapter: Any, *, label: str) -> None:
         )
 
 
-async def _sheet_profile(adapter: Any) -> list[tuple[str, str]]:
+def _sheet_profile(adapter: Any) -> list[tuple[str, str]]:
     """The closed U (``profile_points_mm``): every segment horizontal or
     vertical, the near arm's seat corner on the origin, each driving
     dimension of ``SKETCH_DIMENSIONS`` between its two points.  The spring
@@ -100,10 +100,10 @@ async def _sheet_profile(adapter: Any) -> list[tuple[str, str]]:
     round, tangent to both slot sides; ``lines`` maps each other segment's
     index to its line."""
     points = profile_points_mm()
-    check("create_sketch sheet profile", await adapter.create_sketch("Front"))
+    check("create_sketch sheet profile", adapter.create_sketch("Front"))
     count = len(points)
     order = [(SLOT_POINT + 1 + k) % count for k in range(count)]
-    chain = await add_line_chain(adapter, [points[i] for i in order], close=False)
+    chain = add_line_chain(adapter, [points[i] for i in order], close=False)
     lines = dict(zip(order[:-1], chain, strict=True))
     (top_x, top_y), (low_x, low_y) = points[SLOT_POINT], points[SLOT_POINT + 1]
     set_sketch_direct_db(adapter, True)
@@ -111,7 +111,7 @@ async def _sheet_profile(adapter: Any) -> list[tuple[str, str]]:
         # Counter-clockwise from the spring arm's side round to the near arm's.
         arc = check(
             "sheet profile slot end",
-            await adapter.add_arc(
+            adapter.add_arc(
                 top_x, top_y - SLOT_END_RADIUS_MM, low_x, low_y, top_x, top_y
             ),
         )
@@ -120,13 +120,13 @@ async def _sheet_profile(adapter: Any) -> list[tuple[str, str]]:
     for side in (SLOT_POINT - 1, SLOT_POINT + 1):
         check(
             f"sheet profile slot end tangent to line {side}",
-            await adapter.add_sketch_constraint(arc, lines[side], "tangent"),
+            adapter.add_sketch_constraint(arc, lines[side], "tangent"),
         )
     collinear = {GRIP_POINT: 0, RETURN_POINT: 1}
     for index, other in collinear.items():
         check(
             f"sheet profile line {index} on line {other}",
-            await adapter.add_sketch_constraint(
+            adapter.add_sketch_constraint(
                 lines[index], lines[other], "collinear"
             ),
         )
@@ -139,11 +139,11 @@ async def _sheet_profile(adapter: Any) -> list[tuple[str, str]]:
             raise ValueError(f"sheet profile segment {index} is not axis-parallel")
         check(
             f"sheet profile {direction} {line}",
-            await adapter.add_sketch_constraint(line, None, direction),
+            adapter.add_sketch_constraint(line, None, direction),
         )
     check(
         "sheet profile seat corner -> origin",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{lines[1]}.start", "origin", "coincident"
         ),
     )
@@ -157,43 +157,43 @@ async def _sheet_profile(adapter: Any) -> list[tuple[str, str]]:
 
     dims = SketchDims()
     for name, start, end, kind in SKETCH_DIMENSIONS:
-        await dimension_between(
+        dimension_between(
             adapter, ref(start), ref(end), kind, GLOBALS[name], name
         )
         dims.record(name, f'"{name}"')
-    await ensure_fully_defined(adapter, "sheet profile")
-    check("exit_sketch sheet profile", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "sheet profile")
+    check("exit_sketch sheet profile", adapter.exit_sketch())
     name_last_feature(adapter, PROFILE_SKETCH)
     return dims.apply(adapter, PROFILE_SKETCH)
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
     # The mm suffix is load-bearing: the equation manager reads bare numbers
     # in document units, and this is an inch document.
     for name, value in GLOBALS.items():
-        await set_global(adapter, name, f"{value}mm")
+        set_global(adapter, name, f"{value}mm")
 
-    drive_jobs = await _sheet_profile(adapter)
+    drive_jobs = _sheet_profile(adapter)
     check(
         "extrude sheet",
-        await adapter.create_extrusion(ExtrusionParameters(depth=SHEET_THICK)),
+        adapter.create_extrusion(ExtrusionParameters(depth=SHEET_THICK)),
     )
     name_last_feature(adapter, SHEET_FEATURE)
     drive_jobs.append(
         (name_dimensions(adapter, SHEET_FEATURE, ["SheetThick"])[0], '"SheetThick"')
     )
-    await volume_check(adapter, "sheet", SHEET_VOLUME, 0.002 * SHEET_VOLUME)
+    volume_check(adapter, "sheet", SHEET_VOLUME, 0.002 * SHEET_VOLUME)
     _require_one_solid_body(adapter, label="phasing comb")
 
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dimension_name, expression in drive_jobs:
-        await drive_dimension(adapter, dimension_name, expression)
-    await force_rebuild(adapter)
-    await volume_check(
+        drive_dimension(adapter, dimension_name, expression)
+    force_rebuild(adapter)
+    volume_check(
         adapter,
         "driven phasing comb (equations neutral)",
         SHEET_VOLUME,
@@ -201,8 +201,8 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _require_one_solid_body(adapter, label="driven phasing comb")
 
-    await apply_material(adapter, MATERIAL)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    report_mass_properties(adapter)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
@@ -210,7 +210,7 @@ async def build(adapter: Any) -> dict[str, str]:
     apply_drawing_properties(
         adapter, PART_NAME, {"Isometric View Note": ISOMETRIC_VIEW_NOTE}
     )
-    artefacts = await save_part_and_images(adapter, PART_NAME)
+    artefacts = save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
     return artefacts
 

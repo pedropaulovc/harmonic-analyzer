@@ -241,11 +241,11 @@ def _set_spherical_reference(adapter: Any, annotation: Any, *, label: str) -> No
         )
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open cylinder-gear-shaft source", await adapter.open_model(str(SOURCE)))
+    check("open cylinder-gear-shaft source", adapter.open_model(str(SOURCE)))
     read_required_properties(
         adapter.currentModel,
         (
@@ -397,7 +397,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.085)
     add_property_linked_note(adapter, "Isometric View Note", 0.298, 0.118)
 
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Cylinder Gear Shaft Manufacturing Drawing",

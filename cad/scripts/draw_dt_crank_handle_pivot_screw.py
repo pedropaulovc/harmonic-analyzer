@@ -627,11 +627,11 @@ def _side_detail(adapter: Any, side: Any, spec: SideDetail) -> Any:
     return detail
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open crank-handle-pivot-screw source", await adapter.open_model(str(SOURCE)))
+    check("open crank-handle-pivot-screw source", adapter.open_model(str(SOURCE)))
     read_required_properties(
         adapter.currentModel,
         (
@@ -798,7 +798,7 @@ async def build(adapter: Any) -> dict[str, str]:
     if add_note(adapter, SHOULDER_LENGTH_NOTE, *NOTES_XY) is None:
         raise RuntimeError("failed to add the pivot screw's numbered note")
 
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Crank Handle Pivot Screw Manufacturing Drawing",

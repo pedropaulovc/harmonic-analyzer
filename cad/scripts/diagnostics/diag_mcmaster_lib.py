@@ -124,13 +124,13 @@ def face_areas(adapter) -> list[float]:
     return sorted(areas)
 
 
-async def export_views(adapter, stem: str) -> dict[str, str]:
+def export_views(adapter, stem: str) -> dict[str, str]:
     out = {}
     for view in ("front", "isometric"):
         img = (OUT_DIR / f"{stem}_{view}.png").resolve()
         check(
             f"export_image {stem} {view}",
-            await adapter.export_image(
+            adapter.export_image(
                 {
                     "file_path": str(img),
                     "format_type": "png",
@@ -482,7 +482,7 @@ def assert_profile_closed(
 
 
 
-async def draw_closed_profile(
+def draw_closed_profile(
     adapter, segments: tuple[Segment, ...], *, label: str, loops: int
 ) -> list[str]:
     """Author ``segments`` as EXPLICITLY closed loops, whatever the seat thinks.
@@ -569,12 +569,12 @@ async def draw_closed_profile(
         try:
             for index, segment in enumerate(segments):
                 if isinstance(segment, Line):
-                    result = await adapter.add_line(
+                    result = adapter.add_line(
                         segment.start[0], segment.start[1],
                         segment.end[0], segment.end[1],
                     )
                 else:
-                    result = await adapter.add_arc(
+                    result = adapter.add_arc(
                         segment.center[0], segment.center[1],
                         segment.start[0], segment.start[1],
                         segment.end[0], segment.end[1],
@@ -823,7 +823,7 @@ def _sketch_manager(adapter):
 
 
 @_telemetry.traced("stock.shank.trim")
-async def trim_factory_shank(adapter, a, cut) -> None:
+def trim_factory_shank(adapter, a, cut) -> None:
     """Cut the finished shank end into a COMPLETE stock anchor, then deburr it.
 
     The production trim of both routing eyebolts (``StockAnchor`` ``a``, its
@@ -848,8 +848,8 @@ async def trim_factory_shank(adapter, a, cut) -> None:
     radius, chamfer = a.thread_major_radius_mm, a.end_chamfer_mm
     y = cut.shank_end_y_mm
     with no_sketch_inference(adapter):
-        check("create trim sketch", await adapter.create_sketch("Front"))
-        lines = await add_line_chain(
+        check("create trim sketch", adapter.create_sketch("Front"))
+        lines = add_line_chain(
             adapter,
             [
                 [-2 * radius, a.shank_end_y_mm - a.thread_major_dia_mm],
@@ -864,9 +864,9 @@ async def trim_factory_shank(adapter, a, cut) -> None:
         ):
             check(
                 "trim profile relation",
-                await adapter.add_sketch_constraint(line, None, direction),
+                adapter.add_sketch_constraint(line, None, direction),
             )
-        await anchor_point_to_origin(
+        anchor_point_to_origin(
             adapter,
             f"{lines[0]}.start",
             -2 * radius,
@@ -875,7 +875,7 @@ async def trim_factory_shank(adapter, a, cut) -> None:
         )
         dims.record("CutterLeft")
         dims.record("CutterBottom")
-        await dimension_between(
+        dimension_between(
             adapter,
             f"{lines[0]}.start",
             f"{lines[0]}.end",
@@ -890,11 +890,11 @@ async def trim_factory_shank(adapter, a, cut) -> None:
         if eye_top is None:
             raise RuntimeError("cannot create stock eye-top datum point")
         datum = adapter._register_sketch_entity("Point", eye_top)
-        await anchor_point_to_origin(
+        anchor_point_to_origin(
             adapter, datum, 0, a.eye_od_mm / 2, "stock eye top"
         )
         dims.record("StockEyeTop")
-        await dimension_between(
+        dimension_between(
             adapter,
             datum,
             f"{lines[2]}.start",
@@ -903,20 +903,20 @@ async def trim_factory_shank(adapter, a, cut) -> None:
             "finished overall",
         )
         dims.record("FinishedOverall")
-        check("close trim sketch", await adapter.exit_sketch())
+        check("close trim sketch", adapter.exit_sketch())
         name_last_feature(adapter, "StockTrimProfile")
         dims.apply(adapter, "StockTrimProfile")
         check(
             "trim stock shank",
-            await adapter.create_cut_extrude(
+            adapter.create_cut_extrude(
                 ExtrusionParameters(
                     depth=4 * a.thread_major_dia_mm, both_directions=True
                 )
             ),
         )
         name_last_feature(adapter, "StockTrim")
-        check("create deburr sketch", await adapter.create_sketch("Front"))
-        lines = await add_line_chain(
+        check("create deburr sketch", adapter.create_sketch("Front"))
+        lines = add_line_chain(
             adapter,
             [
                 [radius - chamfer, y],
@@ -931,9 +931,9 @@ async def trim_factory_shank(adapter, a, cut) -> None:
         ):
             check(
                 "deburr profile relation",
-                await adapter.add_sketch_constraint(line, None, direction),
+                adapter.add_sketch_constraint(line, None, direction),
             )
-        await anchor_point_to_origin(
+        anchor_point_to_origin(
             adapter,
             f"{lines[1]}.start",
             radius + chamfer,
@@ -942,7 +942,7 @@ async def trim_factory_shank(adapter, a, cut) -> None:
         )
         dims.record("CutterRadius")
         dims.record("CutEnd")
-        await dimension_between(
+        dimension_between(
             adapter,
             f"{lines[3]}.start",
             "origin",
@@ -951,7 +951,7 @@ async def trim_factory_shank(adapter, a, cut) -> None:
             "stock major radius",
         )
         dims.record("StockMajorRadius")
-        await dimension_between(
+        dimension_between(
             adapter,
             f"{lines[3]}.start",
             f"{lines[3]}.end",
@@ -1004,22 +1004,22 @@ async def trim_factory_shank(adapter, a, cut) -> None:
         axis_id = adapter._register_sketch_entity("Line", axis)
         check(
             "fix supplier shank axis",
-            await adapter.add_sketch_constraint(axis_id, None, "fix"),
+            adapter.add_sketch_constraint(axis_id, None, "fix"),
         )
-        check("close deburr sketch", await adapter.exit_sketch())
+        check("close deburr sketch", adapter.exit_sketch())
         name_last_feature(adapter, "StockDeburrProfile")
         dims.apply(adapter, "StockDeburrProfile")
         check(
             "deburr trimmed stock",
-            await adapter.create_revolve(RevolveParameters(angle=360, is_cut=True)),
+            adapter.create_revolve(RevolveParameters(angle=360, is_cut=True)),
         )
         name_last_feature(adapter, "StockDeburr")
-        await drive_dimension(
+        drive_dimension(
             adapter,
             "CutEnd@StockDeburrProfile",
             '"FinishedOverall@StockTrimProfile" - "StockEyeTop@StockTrimProfile"',
         )
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     solid_bodies = bodies(adapter)
     if len(solid_bodies) != 1:
         raise RuntimeError("stock trim must leave one solid anchor")
@@ -1035,7 +1035,7 @@ async def trim_factory_shank(adapter, a, cut) -> None:
     )
 
 
-async def gate_and_save(adapter, part_no: str, truth: dict) -> dict:
+def gate_and_save(adapter, part_no: str, truth: dict) -> dict:
     """Run the vendor ground-truth gates, save the replica + report + renders,
     then render the vendor part beside it.  Raises on any gate failure
     (after saving, so the failed model is on disk to inspect)."""
@@ -1123,9 +1123,9 @@ async def gate_and_save(adapter, part_no: str, truth: dict) -> dict:
         problems.append(f"COM {com} != expected {exp_com}")
 
     # Save FIRST so a gate failure still leaves the model on disk to inspect.
-    check(f"save -> {replica}", await adapter.save_file(str(replica.resolve())))
+    check(f"save -> {replica}", adapter.save_file(str(replica.resolve())))
     artefacts = {"part": str(replica), "report": str(report_path)}
-    artefacts.update(await export_views(adapter, f"{part_no}-replica"))
+    artefacts.update(export_views(adapter, f"{part_no}-replica"))
 
     # Some vendor bodies carry an IMassProperty integration artifact: their
     # stored mass numbers disagree with their OWN face-area sum (92865A585:
@@ -1151,17 +1151,17 @@ async def gate_and_save(adapter, part_no: str, truth: dict) -> dict:
         ven_stl = OUT_DIR / f"{part_no}-vendor.stl"
         # export each from a FRESH open -- exporting the live session doc
         # produced a truncated mesh (stale selection state)
-        await close_all(adapter)
+        close_all(adapter)
         for src, dst in (
             (replica, rep_stl),
             (MCMASTER_DIR / f"{part_no}.SLDPRT", ven_stl),
         ):
-            check(f"open for STL {src.name}", await adapter.open_model(str(src)))
+            check(f"open for STL {src.name}", adapter.open_model(str(src)))
             m = _early_bound(adapter.currentModel, "IModelDoc2")
             m.ClearSelection2(True)
             if m.SaveAs3(str(dst), 0, 2) not in (0, True):
                 _telemetry.warn(f"STL export returned non-zero for {src.name}")
-            await close_all(adapter)
+            close_all(adapter)
         mr = trimesh.load(str(rep_stl))
         mv = trimesh.load(str(ven_stl))
         stl_dv = float(mr.volume - mv.volume)
@@ -1197,7 +1197,7 @@ async def gate_and_save(adapter, part_no: str, truth: dict) -> dict:
     return artefacts
 
 
-async def close_all(adapter):
+def close_all(adapter):
     """Discard every open document (the vendor part is NEVER saved)."""
     closed = adapter._attempt(
         lambda: adapter.swApp.CloseAllDocuments(True), default=False
@@ -1207,29 +1207,29 @@ async def close_all(adapter):
     adapter.currentModel = None
 
 
-async def render_vendor(adapter, part_no: str) -> dict[str, str]:
+def render_vendor(adapter, part_no: str) -> dict[str, str]:
     """Open the vendor part read-only for the eyeball pair, render, close."""
     vendor = MCMASTER_DIR / f"{part_no}.SLDPRT"
-    check(f"open vendor {part_no}", await adapter.open_model(str(vendor)))
+    check(f"open vendor {part_no}", adapter.open_model(str(vendor)))
     out = {
         f"vendor_{k}": p
-        for k, p in (await export_views(adapter, f"{part_no}-vendor")).items()
+        for k, p in (export_views(adapter, f"{part_no}-vendor")).items()
     }
-    await close_all(adapter)
+    close_all(adapter)
     return out
 
 
-async def run_replica(adapter, part_no: str, builder) -> dict[str, str]:
+def run_replica(adapter, part_no: str, builder) -> dict[str, str]:
     """One part end to end: create -> build -> gate/save -> render pair."""
     truth = vendor_truth(part_no)
     artefacts: dict[str, str] = {}
     with _telemetry.span("replica.build", label=part_no):
-        check(f"create_part {part_no}", await adapter.create_part())
+        check(f"create_part {part_no}", adapter.create_part())
         assert_seat_sketch_baseline(adapter, part_no)
-        await builder(adapter, truth)
-        artefacts.update(await gate_and_save(adapter, part_no, truth))
-        await close_all(adapter)
-        artefacts.update(await render_vendor(adapter, part_no))
+        builder(adapter, truth)
+        artefacts.update(gate_and_save(adapter, part_no, truth))
+        close_all(adapter)
+        artefacts.update(render_vendor(adapter, part_no))
     return artefacts
 
 
@@ -1237,7 +1237,7 @@ def replica_main(part_no: str, builder) -> int:
     """`__main__` body for a single-part replica script."""
     from _session import run_build
 
-    async def build(adapter) -> dict[str, str]:
-        return await run_replica(adapter, part_no, builder)
+    def build(adapter) -> dict[str, str]:
+        return run_replica(adapter, part_no, builder)
 
     return run_build(build)

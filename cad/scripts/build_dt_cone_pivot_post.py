@@ -310,25 +310,25 @@ def _name_cone_axis_view(adapter: Any) -> None:
     )
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
         CreatePlaneParameters,
         ExtrusionParameters,
     )
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     # IPS before any global, sketch or feature (#290).
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Retain the harvested reference topology, but give the vertical axis the
     # semantic name the assembly consumes instead of relying on Axis<N> order.
-    await name_bore_axis(
+    name_bore_axis(
         adapter, "Front Plane", 0.0, "Right Plane", 0.0, "swing pivot"
     )
     name_last_feature(adapter, "swing pivot")
     check(
         "create ConeShaftNormal",
-        await adapter.create_plane(
+        adapter.create_plane(
             CreatePlaneParameters(
                 mode="angle",
                 base_plane="Front Plane",
@@ -368,19 +368,19 @@ async def build(adapter: Any) -> dict[str, str]:
         "ConeBossLength": CONE_BOSS_LENGTH,
     }
     for name, value in globals_mm.items():
-        await set_global(adapter, name, f"{value}mm")
-    await set_global(adapter, "ConeIncline", f"{INCLINE_DEG}deg")
+        set_global(adapter, name, f"{value}mm")
+    set_global(adapter, "ConeIncline", f"{INCLINE_DEG}deg")
     # The crank axis is located FROM THE CONE AXIS (U31): the 16T:64T mesh
     # closes on that spacing, so it is the independent value and the height
     # above the foot only follows it.
-    await set_global(adapter, "CrankAxisY", '"JournalAxisY" + "CrankAboveCone"')
+    set_global(adapter, "CrankAxisY", '"JournalAxisY" + "CrankAboveCone"')
 
     drive_jobs: list[tuple[str, str]] = []
 
     # 1. Main BLOCK_DIA body, from the unchanged foot to BLOCK_HEIGHT.
     main = SketchDims()
-    check("create sketch MainBodyProfile", await adapter.create_sketch("Top"))
-    await define_circle(
+    check("create sketch MainBodyProfile", adapter.create_sketch("Top"))
+    define_circle(
         adapter,
         0.0,
         0.0,
@@ -390,24 +390,24 @@ async def build(adapter: Any) -> dict[str, str]:
         names=("MainBodyCx", "MainBodyCz", "MainBodyDia"),
         drives=(None, None, '"MainBodyDia"'),
     )
-    await ensure_fully_defined(adapter, "MainBodyProfile")
-    check("exit sketch MainBodyProfile", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "MainBodyProfile")
+    check("exit sketch MainBodyProfile", adapter.exit_sketch())
     name_last_feature(adapter, "MainBodyProfile")
     drive_jobs += main.apply(adapter, "MainBodyProfile")
     check(
         "extrude MainBody",
-        await adapter.create_extrusion(ExtrusionParameters(depth=BLOCK_HEIGHT)),
+        adapter.create_extrusion(ExtrusionParameters(depth=BLOCK_HEIGHT)),
     )
     name_last_feature(adapter, "MainBody")
     main_depth = name_dimensions(adapter, "MainBody", ["MainBodyHt"])
     drive_jobs.append((main_depth[0], '"MainBodyHeight"'))
     body_volume = MAIN_BODY_MM3
-    await volume_check(adapter, "v2 main body", body_volume, 0.001 * body_volume)
+    volume_check(adapter, "v2 main body", body_volume, 0.001 * body_volume)
 
     # 2. HEAD_DIA head (dt_cone_pivot_post_spec) over HEAD_BASE_Y..BLOCK_HEIGHT.
     check(
         "create HeadBasePlane",
-        await adapter.create_plane(
+        adapter.create_plane(
             CreatePlaneParameters(
                 mode="offset", base_plane="Top Plane", offset=HEAD_BASE_Y
             )
@@ -417,9 +417,9 @@ async def build(adapter: Any) -> dict[str, str]:
     drive_jobs.append(("D1@HeadBasePlane", '"MainBodyHeight" - "HeadHeight"'))
     head = SketchDims()
     check(
-        "create sketch HeadProfile", await adapter.create_sketch("HeadBasePlane")
+        "create sketch HeadProfile", adapter.create_sketch("HeadBasePlane")
     )
-    await define_circle(
+    define_circle(
         adapter,
         0.0,
         0.0,
@@ -429,26 +429,26 @@ async def build(adapter: Any) -> dict[str, str]:
         names=("HeadCx", "HeadCz", "HeadDia"),
         drives=(None, None, '"HeadDia"'),
     )
-    await ensure_fully_defined(adapter, "HeadProfile")
-    check("exit sketch HeadProfile", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "HeadProfile")
+    check("exit sketch HeadProfile", adapter.exit_sketch())
     name_last_feature(adapter, "HeadProfile")
     drive_jobs += head.apply(adapter, "HeadProfile")
     check(
         "extrude Head",
-        await adapter.create_extrusion(ExtrusionParameters(depth=HEAD_HEIGHT)),
+        adapter.create_extrusion(ExtrusionParameters(depth=HEAD_HEIGHT)),
     )
     name_last_feature(adapter, "Head")
     head_depth = name_dimensions(adapter, "Head", ["HeadHt"])
     drive_jobs.append((head_depth[0], '"HeadHeight"'))
     head_volume = body_volume + HEAD_SHELL_MM3
-    await volume_check(adapter, "v2 head", head_volume, 0.001 * head_volume)
+    volume_check(adapter, "v2 head", head_volume, 0.001 * head_volume)
 
     # 3. Straight crank boss along +Z from the head's tangent plane (the
     # north-face station), then the bore.  The boss sketch sits ON the
     # station plane and the blind extrude runs along the plane normal (+Z).
     check(
         "create CrankInterfacePlane",
-        await adapter.create_plane(
+        adapter.create_plane(
             CreatePlaneParameters(
                 mode="offset",
                 base_plane="Front Plane",
@@ -464,9 +464,9 @@ async def build(adapter: Any) -> dict[str, str]:
     crank_boss = SketchDims()
     check(
         "create sketch CrankBossProfile",
-        await adapter.create_sketch("CrankInterfacePlane"),
+        adapter.create_sketch("CrankInterfacePlane"),
     )
-    await define_circle(
+    define_circle(
         adapter,
         0.0,
         CRANK_BORE_HEIGHT,
@@ -476,18 +476,18 @@ async def build(adapter: Any) -> dict[str, str]:
         names=("CrankBossX", "CrankAxisY", "CrankBossDia"),
         drives=(None, '"CrankAxisY"', '"CrankBossDia"'),
     )
-    await ensure_fully_defined(adapter, "CrankBossProfile")
-    check("exit sketch CrankBossProfile", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "CrankBossProfile")
+    check("exit sketch CrankBossProfile", adapter.exit_sketch())
     name_last_feature(adapter, "CrankBossProfile")
     drive_jobs += crank_boss.apply(adapter, "CrankBossProfile")
     check(
         "extrude CrankSprocketBoss",
-        await adapter.create_extrusion(ExtrusionParameters(depth=CRANK_BOSS_LENGTH)),
+        adapter.create_extrusion(ExtrusionParameters(depth=CRANK_BOSS_LENGTH)),
     )
     name_last_feature(adapter, "CrankSprocketBoss")
     name_dimensions(adapter, "CrankSprocketBoss", ["CrankBossLen"])
     volume = head_volume + CRANK_BOSS_OUTSIDE_HEAD_MM3
-    await volume_check(adapter, "v2 crank boss", volume, 0.001 * volume)
+    volume_check(adapter, "v2 crank boss", volume, 0.001 * volume)
 
     # The bore runs INTO the boss (+Z), i.e. against the cut default, so it is
     # reversed explicitly (build_fr_top_frame's SetScrewPocket precedent).  Do
@@ -497,9 +497,9 @@ async def build(adapter: Any) -> dict[str, str]:
     crank_bore = SketchDims()
     check(
         "create sketch CrankBoreProfile",
-        await adapter.create_sketch("CrankInterfacePlane"),
+        adapter.create_sketch("CrankInterfacePlane"),
     )
-    await define_circle(
+    define_circle(
         adapter,
         0.0,
         CRANK_BORE_HEIGHT,
@@ -509,19 +509,19 @@ async def build(adapter: Any) -> dict[str, str]:
         names=("CrankBoreX", "CrankBoreY", "CrankBoreDia"),
         drives=(None, '"CrankAxisY"', '"CrankBoreDia"'),
     )
-    await ensure_fully_defined(adapter, "CrankBoreProfile")
-    check("exit sketch CrankBoreProfile", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "CrankBoreProfile")
+    check("exit sketch CrankBoreProfile", adapter.exit_sketch())
     name_last_feature(adapter, "CrankBoreProfile")
     drive_jobs += crank_bore.apply(adapter, "CrankBoreProfile")
     check(
         "cut CrankBore",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=CRANK_BOSS_LENGTH, reverse_direction=True)
         ),
     )
     name_last_feature(adapter, "CrankBore")
     volume -= CRANK_BORE_MM3
-    await volume_check(adapter, "v2 crank bore", volume, 0.001 * volume)
+    volume_check(adapter, "v2 crank bore", volume, 0.001 * volume)
 
     # 4. O17.2 pads and O12.2808 journal on the inclined v2 axis.  Both
     # are mid-plane extrusions from the harvested ConeShaftNormal reference
@@ -531,9 +531,9 @@ async def build(adapter: Any) -> dict[str, str]:
     cone_boss = SketchDims()
     check(
         "create sketch ConeBossProfile",
-        await adapter.create_sketch("ConeShaftNormal"),
+        adapter.create_sketch("ConeShaftNormal"),
     )
-    await define_circle(
+    define_circle(
         adapter,
         -BORE_HEIGHT,
         0.0,
@@ -546,13 +546,13 @@ async def build(adapter: Any) -> dict[str, str]:
         # negative side that places the bore at world Y=+JournalAxisY.
         drives=('"JournalAxisY"', None, '"ConeBossDia"'),
     )
-    await ensure_fully_defined(adapter, "ConeBossProfile")
-    check("exit sketch ConeBossProfile", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "ConeBossProfile")
+    check("exit sketch ConeBossProfile", adapter.exit_sketch())
     name_last_feature(adapter, "ConeBossProfile")
     drive_jobs += cone_boss.apply(adapter, "ConeBossProfile")
     check(
         "extrude ConeShaftBoss",
-        await adapter.create_extrusion(
+        adapter.create_extrusion(
             ExtrusionParameters(depth=CONE_BOSS_LENGTH, both_directions=True)
         ),
     )
@@ -560,14 +560,14 @@ async def build(adapter: Any) -> dict[str, str]:
     boss_length = name_dimensions(adapter, "ConeShaftBoss", ["ConeBossLen"])
     drive_jobs.append((boss_length[0], '"ConeBossLength"'))
     volume += CONE_PADS_OUTSIDE_BODY_MM3
-    await volume_check(adapter, "v2 cone pads", volume, 0.001 * volume)
+    volume_check(adapter, "v2 cone pads", volume, 0.001 * volume)
 
     journal_bore = SketchDims()
     check(
         "create sketch JournalBoreProfile",
-        await adapter.create_sketch("ConeShaftNormal"),
+        adapter.create_sketch("ConeShaftNormal"),
     )
-    await define_circle(
+    define_circle(
         adapter,
         -BORE_HEIGHT,
         0.0,
@@ -577,13 +577,13 @@ async def build(adapter: Any) -> dict[str, str]:
         names=("JournalAxisY", "JournalBoreY", "JournalBoreDia"),
         drives=('"JournalAxisY"', None, '"JournalBoreDia"'),
     )
-    await ensure_fully_defined(adapter, "JournalBoreProfile")
-    check("exit sketch JournalBoreProfile", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "JournalBoreProfile")
+    check("exit sketch JournalBoreProfile", adapter.exit_sketch())
     name_last_feature(adapter, "JournalBoreProfile")
     drive_jobs += journal_bore.apply(adapter, "JournalBoreProfile")
     check(
         "cut ConeShaftBore",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=CONE_BOSS_LENGTH, both_directions=True)
         ),
     )
@@ -594,7 +594,7 @@ async def build(adapter: Any) -> dict[str, str]:
     bore_length = name_dimensions(adapter, "ConeShaftBore", ["ConeBoreLen"])
     drive_jobs.append((bore_length[0], '"ConeBossLength"'))
     volume -= CONE_BORE_MM3
-    await volume_check(adapter, "v2 cone bore", volume, 0.001 * volume)
+    volume_check(adapter, "v2 cone bore", volume, 0.001 * volume)
 
     # 5. Two vertical ANSI-inch 1/4 Fillister Head Screw counterbores in the
     # top face, ONE native Hole Wizard feature with two driven placement
@@ -624,7 +624,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     drive_jobs += attachment_cut.placement_drive_jobs
     volume -= ATTACHMENT_HOLES_MM3
-    await volume_check(adapter, "v2 mounting holes", volume, 0.001 * volume)
+    volume_check(adapter, "v2 mounting holes", volume, 0.001 * volume)
 
     # 6. Journal-plan reference sketch.  The configured plan angle between
     # the crank axis and the cone-journal axis is the casting's defining
@@ -639,7 +639,7 @@ async def build(adapter: Any) -> dict[str, str]:
     plan = SketchDims()
     check(
         "create sketch JournalPlanReference",
-        await adapter.create_sketch("Top"),
+        adapter.create_sketch("Top"),
     )
     set_sketch_direct_db(adapter, True)
     # Top-plane sketch X is model +X; sketch Y is model -Z, so the crank boss
@@ -655,18 +655,18 @@ async def build(adapter: Any) -> dict[str, str]:
     # sketch cannot steer the quadrant through it at all).
     crank_axis_line = check(
         "crank axis reference ray",
-        await adapter.add_centerline(0.0, 0.0, 0.0, -CRANK_BOSS_END_Z),
+        adapter.add_centerline(0.0, 0.0, 0.0, -CRANK_BOSS_END_Z),
     )
     journal_axis_line = check(
         "journal axis reference ray",
-        await adapter.add_centerline(
+        adapter.add_centerline(
             0.0, 0.0, JOURNAL_REFERENCE_X, -JOURNAL_REFERENCE_Z
         ),
     )
     set_sketch_direct_db(adapter, False)
     check(
         "crank axis ray vertical",
-        await adapter.add_sketch_constraint(crank_axis_line, None, "vertical"),
+        adapter.add_sketch_constraint(crank_axis_line, None, "vertical"),
     )
     for line, label in (
         (crank_axis_line, "crank axis ray"),
@@ -674,20 +674,20 @@ async def build(adapter: Any) -> dict[str, str]:
     ):
         check(
             f"{label} rooted on the post axis",
-            await adapter.add_sketch_constraint(
+            adapter.add_sketch_constraint(
                 f"{line}.start", "origin", "coincident"
             ),
         )
     check(
         "crank boss far face station",
-        await adapter.add_sketch_dimension(
+        adapter.add_sketch_dimension(
             f"{crank_axis_line}.end", "origin", "vertical_distance", CRANK_BOSS_END_Z
         ),
     )
     plan.record("CrankBossFarZ")
     check(
         "journal reference ray length",
-        await adapter.add_sketch_dimension(
+        adapter.add_sketch_dimension(
             journal_axis_line, None, "linear", JOURNAL_REFERENCE_LENGTH
         ),
     )
@@ -712,8 +712,8 @@ async def build(adapter: Any) -> dict[str, str]:
         expected_degrees=INCLINE_DEG,
     )
     plan.record("InclineAngle", '"ConeIncline"')
-    await ensure_fully_defined(adapter, "JournalPlanReference")
-    check("exit sketch JournalPlanReference", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "JournalPlanReference")
+    check("exit sketch JournalPlanReference", adapter.exit_sketch())
     name_last_feature(adapter, "JournalPlanReference")
     drive_jobs += plan.apply(adapter, "JournalPlanReference")
 
@@ -727,29 +727,29 @@ async def build(adapter: Any) -> dict[str, str]:
     station = SketchDims()
     check(
         "create sketch CrankBossStationReference",
-        await adapter.create_sketch("Top"),
+        adapter.create_sketch("Top"),
     )
     # Authored without inference, as the plan rays are, so the explicit
     # relations below are the only ones.
     set_sketch_direct_db(adapter, True)
     station_line = check(
         "crank boss north face reference ray",
-        await adapter.add_centerline(0.0, 0.0, 0.0, CRANK_BOSS_NEAR_Z),
+        adapter.add_centerline(0.0, 0.0, 0.0, CRANK_BOSS_NEAR_Z),
     )
     set_sketch_direct_db(adapter, False)
     check(
         "station ray vertical",
-        await adapter.add_sketch_constraint(station_line, None, "vertical"),
+        adapter.add_sketch_constraint(station_line, None, "vertical"),
     )
     check(
         "station ray rooted on the post axis",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{station_line}.start", "origin", "coincident"
         ),
     )
     check(
         "crank boss near face station",
-        await adapter.add_sketch_dimension(
+        adapter.add_sketch_dimension(
             f"{station_line}.end",
             "origin",
             "vertical_distance",
@@ -757,8 +757,8 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     station.record("CrankBossStartZ", '"CrankBossNearZ"')
-    await ensure_fully_defined(adapter, "CrankBossStationReference")
-    check("exit sketch CrankBossStationReference", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "CrankBossStationReference")
+    check("exit sketch CrankBossStationReference", adapter.exit_sketch())
     name_last_feature(adapter, "CrankBossStationReference")
     drive_jobs += station.apply(adapter, "CrankBossStationReference")
 
@@ -772,7 +772,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # wedge).  The part saves it hidden; the drawing shows it per view.
     check(
         "create ConeAxisPlane",
-        await adapter.create_plane(
+        adapter.create_plane(
             CreatePlaneParameters(
                 mode="offset", base_plane="Top Plane", offset=BORE_HEIGHT
             )
@@ -783,7 +783,7 @@ async def build(adapter: Any) -> dict[str, str]:
     cone_station = SketchDims()
     check(
         "create sketch ConeBossStationReference",
-        await adapter.create_sketch("ConeAxisPlane"),
+        adapter.create_sketch("ConeAxisPlane"),
     )
     incline = math.radians(INCLINE_DEG)
     set_sketch_direct_db(adapter, True)
@@ -791,7 +791,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # centre is at model (-sin i, -cos i) * L/2 in (X, Z).
     cone_station_line = check(
         "cone boss north face reference ray",
-        await adapter.add_centerline(
+        adapter.add_centerline(
             0.0,
             0.0,
             -CONE_BOSS_NORTH_STATION * math.sin(incline),
@@ -800,12 +800,12 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     north_line = check(
         "cone station north reference ray",
-        await adapter.add_centerline(0.0, 0.0, 0.0, CONE_STATION_REFERENCE_LENGTH),
+        adapter.add_centerline(0.0, 0.0, 0.0, CONE_STATION_REFERENCE_LENGTH),
     )
     set_sketch_direct_db(adapter, False)
     check(
         "cone station north ray vertical",
-        await adapter.add_sketch_constraint(north_line, None, "vertical"),
+        adapter.add_sketch_constraint(north_line, None, "vertical"),
     )
     for line, label in (
         (cone_station_line, "cone boss station ray"),
@@ -813,20 +813,20 @@ async def build(adapter: Any) -> dict[str, str]:
     ):
         check(
             f"{label} rooted on the post axis",
-            await adapter.add_sketch_constraint(
+            adapter.add_sketch_constraint(
                 f"{line}.start", "origin", "coincident"
             ),
         )
     check(
         "cone station north ray length",
-        await adapter.add_sketch_dimension(
+        adapter.add_sketch_dimension(
             north_line, None, "linear", CONE_STATION_REFERENCE_LENGTH
         ),
     )
     cone_station.record("ConeStationRefLen")
     check(
         "cone boss north face station",
-        await adapter.add_sketch_dimension(
+        adapter.add_sketch_dimension(
             cone_station_line, None, "linear", CONE_BOSS_NORTH_STATION
         ),
     )
@@ -840,8 +840,8 @@ async def build(adapter: Any) -> dict[str, str]:
         toward_north=True,
     )
     cone_station.record("ConeStationIncline", '"ConeIncline"')
-    await ensure_fully_defined(adapter, "ConeBossStationReference")
-    check("exit sketch ConeBossStationReference", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "ConeBossStationReference")
+    check("exit sketch ConeBossStationReference", adapter.exit_sketch())
     name_last_feature(adapter, "ConeBossStationReference")
     drive_jobs += cone_station.apply(adapter, "ConeBossStationReference")
 
@@ -855,52 +855,52 @@ async def build(adapter: Any) -> dict[str, str]:
     spacing = SketchDims()
     check(
         "create sketch BoreSpacingReference",
-        await adapter.create_sketch("ConeShaftNormal"),
+        adapter.create_sketch("ConeShaftNormal"),
     )
     set_sketch_direct_db(adapter, True)
     spacing_line = check(
         "cone-to-crank bore spacing centreline",
-        await adapter.add_centerline(-BORE_HEIGHT, 0.0, -CRANK_BORE_HEIGHT, 0.0),
+        adapter.add_centerline(-BORE_HEIGHT, 0.0, -CRANK_BORE_HEIGHT, 0.0),
     )
     set_sketch_direct_db(adapter, False)
     check(
         "bore spacing line along the post axis",
-        await adapter.add_sketch_constraint(spacing_line, None, "horizontal"),
+        adapter.add_sketch_constraint(spacing_line, None, "horizontal"),
     )
     # A point pair takes HORIZPOINTS: swConstraintType_HORIZONTAL applies only
     # to lines, and on a point and the origin it was accepted without holding
     # the point (r6 farm: the sketch stayed under-defined).
     check(
         "bore spacing line rooted on the post axis",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{spacing_line}.start", "origin", "horizontal_points"
         ),
     )
     check(
         "cone bore centre height",
-        await adapter.add_sketch_dimension(
+        adapter.add_sketch_dimension(
             f"{spacing_line}.start", "origin", "horizontal_distance", BORE_HEIGHT
         ),
     )
     spacing.record("SpacingConeY", '"JournalAxisY"')
     check(
         "crank above cone spacing",
-        await adapter.add_sketch_dimension(
+        adapter.add_sketch_dimension(
             spacing_line, None, "linear", CRANK_ABOVE_CONE
         ),
     )
     spacing.record("CrankAboveCone", '"CrankAboveCone"')
-    await ensure_fully_defined(adapter, "BoreSpacingReference")
-    check("exit sketch BoreSpacingReference", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "BoreSpacingReference")
+    check("exit sketch BoreSpacingReference", adapter.exit_sketch())
     name_last_feature(adapter, "BoreSpacingReference")
     drive_jobs += spacing.apply(adapter, "BoreSpacingReference")
 
     # Apply all neutral equations only after every referenced dimension exists.
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dimension, expression in drive_jobs:
-        await drive_dimension(adapter, dimension, expression)
-    await force_rebuild(adapter)
-    await volume_check(
+        drive_dimension(adapter, dimension, expression)
+    force_rebuild(adapter)
+    volume_check(
         adapter,
         "v2 harvested final",
         HARVESTED_VOLUME_MM3,
@@ -966,7 +966,7 @@ async def build(adapter: Any) -> dict[str, str]:
         "journal axis",
     )
     for label, x in (("mount west", ATTACHMENT_X), ("mount east", -ATTACHMENT_X)):
-        await name_bore_axis(
+        name_bore_axis(
             adapter, "Front Plane", 0.0, "Right Plane", x, label
         )
         name_last_feature(adapter, label)
@@ -978,10 +978,10 @@ async def build(adapter: Any) -> dict[str, str]:
         "BossNorth",
     )
 
-    await apply_material(adapter, MATERIAL)
-    await apply_color(adapter, CASTING_GREEN)
+    apply_material(adapter, MATERIAL)
+    apply_color(adapter, CASTING_GREEN)
     _name_cone_axis_view(adapter)
-    await report_mass_properties(adapter)
+    report_mass_properties(adapter)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
@@ -1019,7 +1019,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     blank_reference_sketches(adapter, REFERENCE_SKETCHES)
-    return await save_part_and_images(adapter, PART_NAME)
+    return save_part_and_images(adapter, PART_NAME)
 
 
 @_telemetry.traced("dim.driving_plan_incline", label_param="label")

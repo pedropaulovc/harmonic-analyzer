@@ -470,11 +470,11 @@ def _add_section_axis(adapter: Any, section: Any) -> None:
         )
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open thumbnut source", await adapter.open_model(str(SOURCE)))
+    check("open thumbnut source", adapter.open_model(str(SOURCE)))
     read_required_properties(
         adapter.currentModel,
         (
@@ -585,7 +585,7 @@ async def build(adapter: Any) -> dict[str, str]:
         thread_callout, {"hw-thrutapdrldia": 3}, label=f"{THREAD} through thread"
     )
 
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Transgear Thumbnut Manufacturing Drawing",

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from types import SimpleNamespace
 
 import pytest
@@ -86,7 +85,7 @@ class MemberFeature:
 
 
 def _adapter(part):
-    async def set_active_configuration(configuration):
+    def set_active_configuration(configuration):
         part.active = configuration
         return SimpleNamespace(is_success=True, data=None)
 
@@ -140,7 +139,7 @@ class FreshPart:
 def _fresh_adapter(part, *, persist_creation=True, extra_configuration=None):
     adapter = _adapter(part)
 
-    async def create_configuration(parameters):
+    def create_configuration(parameters):
         if persist_creation:
             part.add_configuration(parameters.name)
             part.active = parameters.name
@@ -167,19 +166,19 @@ def test_a_successful_switch_that_keeps_the_wrong_member_is_rejected():
     part = MemberPart()
     adapter = _adapter(part)
 
-    async def refused_switch(_configuration):
+    def refused_switch(_configuration):
         return SimpleNamespace(is_success=True, data=None)
 
     adapter.set_active_configuration = refused_switch
     with pytest.raises(RuntimeError, match="active member is 'InnerLink'"):
-        asyncio.run(variants.activate_member(adapter, "OuterLink"))
+        variants.activate_member(adapter, "OuterLink")
     assert part.active == "InnerLink"
 
 
 def test_a_requested_member_cannot_be_replaced_by_an_existing_different_one():
     part = MemberPart()
     with pytest.raises(RuntimeError, match="does not exist"):
-        asyncio.run(variants.activate_member(_adapter(part), "PenWire"))
+        variants.activate_member(_adapter(part), "PenWire")
     assert part.active == "InnerLink"
 
 
@@ -327,12 +326,12 @@ def test_selecting_each_member_corrects_foreign_features_without_changing_the_ot
     for feature in part.features.values():
         feature.states = {"InnerLink": False, "OuterLink": False}
 
-    asyncio.run(variants.select_member_features(adapter, "OuterLink", members))
+    variants.select_member_features(adapter, "OuterLink", members)
     assert part.active == "OuterLink"
     assert part.features["InnerBody"].states == {"InnerLink": False, "OuterLink": True}
     assert part.features["OuterBody"].states == {"InnerLink": False, "OuterLink": False}
 
-    asyncio.run(variants.select_member_features(adapter, "InnerLink", members))
+    variants.select_member_features(adapter, "InnerLink", members)
     assert part.active == "InnerLink"
     assert part.features["InnerBody"].states == {"InnerLink": False, "OuterLink": True}
     assert part.features["OuterBody"].states == {"InnerLink": True, "OuterLink": False}
@@ -361,11 +360,9 @@ def test_new_part_uses_registry_default_as_a_real_member(member_registry, defaul
     )
     part = FreshPart()
 
-    asyncio.run(
-        variants.create_member_configurations(
+    variants.create_member_configurations(
             _fresh_adapter(part), "sh-vn-chain-link", names
         )
-    )
 
     assert part.GetConfigurationNames() == names
     assert part.active == default
@@ -376,13 +373,11 @@ def test_new_part_uses_registry_default_as_a_real_member(member_registry, defaul
 def test_bad_member_order_is_rejected_before_initial_native_rename(member_registry):
     part = FreshPart()
     with pytest.raises(ValueError, match="differ from registry order"):
-        asyncio.run(
-            variants.create_member_configurations(
+        variants.create_member_configurations(
                 _fresh_adapter(part),
                 "sh-vn-chain-link",
                 ("OuterLink", "InnerLink"),
             )
-        )
     assert part.GetConfigurationNames() == ("Default",)
     assert part.active == "Default"
 
@@ -390,13 +385,11 @@ def test_bad_member_order_is_rejected_before_initial_native_rename(member_regist
 def test_initial_native_configuration_rename_must_persist(member_registry):
     part = FreshPart(accept_rename=False)
     with pytest.raises(RuntimeError, match="initial configuration did not rename"):
-        asyncio.run(
-            variants.create_member_configurations(
+        variants.create_member_configurations(
                 _fresh_adapter(part),
                 "sh-vn-chain-link",
                 ("InnerLink", "OuterLink"),
             )
-        )
     assert part.GetConfigurationNames() == ("Default",)
     assert part.active == "Default"
 
@@ -421,13 +414,11 @@ def test_successful_configuration_creation_must_leave_exact_native_inventory(
         extra_configuration=extra_configuration,
     )
     with pytest.raises(RuntimeError, match="differ from requested"):
-        asyncio.run(
-            variants.create_member_configurations(
+        variants.create_member_configurations(
                 adapter,
                 "sh-vn-chain-link",
                 ("InnerLink", "OuterLink"),
             )
-        )
     assert part.GetConfigurationNames() == remaining
 
 
@@ -437,13 +428,11 @@ def test_member_authoring_refuses_a_nonfresh_native_without_renaming_it(
     part = FreshPart()
     part.add_configuration("ExistingMember")
     with pytest.raises(RuntimeError, match="fresh single-configuration part"):
-        asyncio.run(
-            variants.create_member_configurations(
+        variants.create_member_configurations(
                 _fresh_adapter(part),
                 "sh-vn-chain-link",
                 ("InnerLink", "OuterLink"),
             )
-        )
     assert part.GetConfigurationNames() == ("Default", "ExistingMember")
     assert part.active == "Default"
 

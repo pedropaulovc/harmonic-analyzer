@@ -2,7 +2,6 @@ r"""Throwaway: validate assert_model_healthy / whats_wrong against the live doc.
 
 from __future__ import annotations
 
-import asyncio
 
 if __package__:
     from . import _script_paths  # noqa: F401
@@ -16,11 +15,11 @@ from _assembly import (
 )
 
 
-async def main():
+def main():
     from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter
 
     adapter = PyWin32Adapter({})
-    await adapter.connect()
+    adapter.connect()
     doc = adapter._attempt(lambda: adapter.swApp.ActiveDoc, default=None)
     if doc is None:
         log("no ActiveDoc")
@@ -34,8 +33,8 @@ async def main():
         log("assert_model_healthy: PASSED (no raise)")
     except RuntimeError as exc:
         log(f"assert_model_healthy RAISED: {exc}")
-    await adapter.disconnect()
+    adapter.disconnect()
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

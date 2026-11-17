@@ -70,10 +70,10 @@ def _author_reference_dimensions(adapter) -> None:
             raise RuntimeError(f"{name}: model reference-only display did not persist")
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
-    check("create stop block", await adapter.create_part())
+    check("create stop block", adapter.create_part())
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
     for name, value in (
         ("BlockLength", spec.BLOCK_LENGTH), ("BlockHeight", spec.BLOCK_HEIGHT),
@@ -82,57 +82,57 @@ async def build(adapter) -> dict[str, str]:
         ("RoofChamferSize", spec.ROOF_END_CHAMFER),
         ("ReliefDepth", spec.RELIEF_DEPTH), ("ReliefHeight", spec.RELIEF_HEIGHT),
     ):
-        await set_global(adapter, name, f"{value}mm")
+        set_global(adapter, name, f"{value}mm")
     jobs: list[tuple[str, str]] = []
     dims = SketchDims()
-    check("block profile", await adapter.create_sketch("Front"))
+    check("block profile", adapter.create_sketch("Front"))
     points = [(0.0, 0.0), (spec.BLOCK_LENGTH, 0.0),
               (spec.BLOCK_LENGTH, spec.BLOCK_HEIGHT), (0.0, spec.BLOCK_HEIGHT)]
-    lines = await add_line_chain(adapter, points)
-    await define_rectilinear_chain(
+    lines = add_line_chain(adapter, points)
+    define_rectilinear_chain(
         adapter, lines, points, label="block", dims=dims,
         names=["BlockLength", "BlockHeight"],
         drives=['"BlockLength"', '"BlockHeight"'],
     )
-    await ensure_fully_defined(adapter, "block profile")
-    check("exit block profile", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "block profile")
+    check("exit block profile", adapter.exit_sketch())
     name_last_feature(adapter, "BlockProfile")
     jobs += dims.apply(adapter, "BlockProfile")
-    check("block extrusion", await adapter.create_extrusion(ExtrusionParameters(depth=spec.BLOCK_DEPTH)))
+    check("block extrusion", adapter.create_extrusion(ExtrusionParameters(depth=spec.BLOCK_DEPTH)))
     name_last_feature(adapter, "Block")
     name_dimensions(adapter, "Block", ["BlockDepth"])
     jobs.append(("BlockDepth@Block", '"BlockDepth"'))
-    await volume_check(adapter, "block stock", spec.BLOCK_VOLUME, 0.005 * spec.BLOCK_VOLUME)
+    volume_check(adapter, "block stock", spec.BLOCK_VOLUME, 0.005 * spec.BLOCK_VOLUME)
 
     dims = SketchDims()
-    await rebate_profile(adapter, dims)
+    rebate_profile(adapter, dims)
     name_last_feature(adapter, "WindowProfile")
     jobs += dims.apply(adapter, "WindowProfile")
     # Mid-plane from the X=0 end plane: total depth twice the block plus
     # overhang, so the rebate runs out through both ends.
-    check("open rebate", await adapter.create_cut_extrude(ExtrusionParameters(
+    check("open rebate", adapter.create_cut_extrude(ExtrusionParameters(
         depth=2.0 * (spec.BLOCK_LENGTH + spec.CUT_OVERHANG), both_directions=True,
     )))
     name_last_feature(adapter, "Window")
     name_dimensions(adapter, "Window", ["WindowCutDepth"])
     jobs.append(("WindowCutDepth@Window", f'2 * ("BlockLength" + {spec.CUT_OVERHANG})'))
-    await volume_check(adapter, "open rebate", spec.BLOCK_VOLUME - spec.WINDOW_VOLUME, 0.005 * spec.BLOCK_VOLUME)
+    volume_check(adapter, "open rebate", spec.BLOCK_VOLUME - spec.WINDOW_VOLUME, 0.005 * spec.BLOCK_VOLUME)
 
     dims = SketchDims()
-    await relief_profile(adapter, dims)
+    relief_profile(adapter, dims)
     name_last_feature(adapter, "ReliefProfile")
     jobs += dims.apply(adapter, "ReliefProfile")
-    check("corner relief", await adapter.create_cut_extrude(ExtrusionParameters(
+    check("corner relief", adapter.create_cut_extrude(ExtrusionParameters(
         depth=2.0 * (spec.BLOCK_LENGTH + spec.CUT_OVERHANG), both_directions=True,
     )))
     name_last_feature(adapter, "CornerRelief")
     name_dimensions(adapter, "CornerRelief", ["ReliefCutDepth"])
     jobs.append(("ReliefCutDepth@CornerRelief", f'2 * ("BlockLength" + {spec.CUT_OVERHANG})'))
-    await volume_check(adapter, "corner relief",
+    volume_check(adapter, "corner relief",
                        spec.BLOCK_VOLUME - spec.WINDOW_VOLUME - spec.RELIEF_VOLUME,
                        0.005 * spec.BLOCK_VOLUME)
 
-    check("roof end chamfers", await adapter.add_chamfer(
+    check("roof end chamfers", adapter.add_chamfer(
         spec.ROOF_END_CHAMFER,
         [[0.0, spec.BLOCK_HEIGHT, spec.BLOCK_DEPTH / 2.0],
          [spec.BLOCK_LENGTH, spec.BLOCK_HEIGHT, spec.BLOCK_DEPTH / 2.0]],
@@ -149,22 +149,22 @@ async def build(adapter) -> dict[str, str]:
                  expect_dia_mm=spec.PLATE_TAP_DRILL_DIA)
     author_hole_precision(adapter, "ThumbTap")
     author_hole_precision(adapter, "PlateTaps")
-    await location_reference(
+    location_reference(
         adapter, feature="ThumbLocationReference", plane="Top",
         spans=(spec.THUMB_AXIS_X,), station=-spec.THUMB_AXIS_Z,
         names=("ThumbFromEnd", "ThumbFromPlate"),
     )
-    await location_reference(
+    location_reference(
         adapter, feature="PlateLocationReference", plane="Front",
         spans=spec.PLATE_HOLE_XS, station=spec.PLATE_HOLE_Y,
         names=("PlateLeftFromEnd", "PlateFromHeadFace", "PlateRightFromEnd"),
     )
-    jobs += await roof_reference(adapter)
-    await force_rebuild(adapter)
+    jobs += roof_reference(adapter)
+    force_rebuild(adapter)
     for name, expression in jobs:
-        await drive_dimension(adapter, name, expression)
-    await force_rebuild(adapter)
-    await volume_check(adapter, "finished brass stop block", spec.BLOCK_FINISHED_VOLUME,
+        drive_dimension(adapter, name, expression)
+    force_rebuild(adapter)
+    volume_check(adapter, "finished brass stop block", spec.BLOCK_FINISHED_VOLUME,
                        0.005 * spec.BLOCK_FINISHED_VOLUME)
     lower, upper = spec.WINDOW_SIZE_TOLERANCE_MM
     for name in ("WindowHeight", "WindowWidth"):
@@ -183,14 +183,14 @@ async def build(adapter) -> dict[str, str]:
         "ThumbLocationReference", "PlateLocationReference", "RoofThicknessReference",
     ))
     author_part_pmi(adapter, surface_finishes=spec.BLOCK_SURFACE_FINISHES)
-    await apply_material(adapter, MATERIAL)
-    await apply_color(adapter, PANEL_BLACK)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    apply_color(adapter, PANEL_BLACK)
+    report_mass_properties(adapter)
     name_octant_views(
         adapter, octants={octant_key(*spec.BLOCK_ISOMETRIC_OCTANT): spec.BLOCK_ISOMETRIC_OCTANT},
         label=PART_NAME,
     )
-    return await save_part_and_images(adapter, PART_NAME)
+    return save_part_and_images(adapter, PART_NAME)
 
 
 if __name__ == "__main__":

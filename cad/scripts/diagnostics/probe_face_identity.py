@@ -426,12 +426,12 @@ def _face_geometry(face, what: str) -> dict:
     }
 
 
-async def capture_census(adapter, part_path: Path) -> dict:
+def capture_census(adapter, part_path: Path) -> dict:
     """Read one saved part's face census.  Opens the document; changes nothing."""
     from _check import check
     from _com import _early_bound, _read_member
 
-    check(f"open {part_path.name}", await adapter.open_model(str(part_path)))
+    check(f"open {part_path.name}", adapter.open_model(str(part_path)))
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     extension = _early_bound(_read_member(model, "Extension"), "IModelDocExtension")
     part = _early_bound(model, "IPartDoc")
@@ -470,7 +470,7 @@ async def capture_census(adapter, part_path: Path) -> dict:
     return {"part": part_path.name, "bodies": bodies}
 
 
-async def resolve_census(adapter, census: dict, part_path: Path) -> list[dict]:
+def resolve_census(adapter, census: dict, part_path: Path) -> list[dict]:
     """Replay every reference captured from the old part against ``part_path``.
 
     One row per stored face, in canonical order, recording the state
@@ -481,7 +481,7 @@ async def resolve_census(adapter, census: dict, part_path: Path) -> list[dict]:
     from _check import check
     from _com import _early_bound, _read_member
 
-    check(f"open {part_path.name}", await adapter.open_model(str(part_path)))
+    check(f"open {part_path.name}", adapter.open_model(str(part_path)))
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     extension = _early_bound(_read_member(model, "Extension"), "IModelDocExtension")
     rows: list[dict] = []
@@ -526,9 +526,9 @@ def _seat(label: str, work) -> int:
     import dodo
     from _session import discard_open_documents, run_build
 
-    async def build(adapter):
+    def build(adapter):
         try:
-            return await work(adapter)
+            return work(adapter)
         finally:
             # A replica left resident holds a document lock, and the next leaf
             # to open the same part on this seat would fail on it.
@@ -582,8 +582,8 @@ def main() -> int:
             parser.error("--capture needs --output")
         part, output = args.capture, args.output
 
-        async def capture(adapter):
-            _write(output, await capture_census(adapter, part))
+        def capture(adapter):
+            _write(output, capture_census(adapter, part))
             return {"census": str(output)}
 
         return _seat(f"face-identity-{part.stem}", capture)
@@ -593,8 +593,8 @@ def main() -> int:
         census = json.loads(args.resolve.read_text(encoding="utf-8"))
         part, output = args.into, args.output
 
-        async def replay(adapter):
-            rows = await resolve_census(adapter, census, part)
+        def replay(adapter):
+            rows = resolve_census(adapter, census, part)
             _write(output, rows)
             problems = diff_resolution(rows)
             for problem in problems:

@@ -146,8 +146,8 @@ class OwnedAssembly:
             raise RuntimeError("native document inventory changed during stationary trial")
         return found
 
-    async def open(self):
-        check("open saved assembly for health comparison", await self.adapter.open_model(str(self.source)))
+    def open(self):
+        check("open saved assembly for health comparison", self.adapter.open_model(str(self.source)))
         self.handles = self.inventory(phase="claim")
         self.root = self.handles.get(self.source)
         if self.root is None or int(self.root.GetType()) != 2:
@@ -172,7 +172,7 @@ class OwnedAssembly:
             raise RuntimeError("health gate returned an unowned/replaced native document")
         return str(path), int(document.GetType())
 
-    async def close(self):
+    def close(self):
         # On failed open, do not infer ownership from whichever document is active.
         if self.root is None:
             if self.app.GetDocuments():
@@ -323,14 +323,14 @@ def stationary_state(owner):
     return {"configuration": configuration, "needs_rebuild": _assembly.saved_rebuild_status(owner.adapter), "components": sorted(rows)}
 
 
-async def measure_assembly(adapter, source, report, report_path, blocks):
+def measure_assembly(adapter, source, report, report_path, blocks):
     owner = OwnedAssembly(adapter, source)
     assembly = {"source": str(source), "input_hashes": owner.hashes, "trials": [], "witnesses": []}
     report["assemblies"].append(assembly)
     checkpoint(report_path, report)
     errors = []
     try:
-        await owner.open()
+        owner.open()
         _assembly.assert_saved_rebuild_clean(adapter, source.stem)
         with _telemetry.span("probe.health_shared_rebuild", assembly=source.stem):
             rebuilt = adapter.currentModel.ForceRebuild3(False)
@@ -386,7 +386,7 @@ async def measure_assembly(adapter, source, report, report_path, blocks):
         errors.append(error)
     finally:
         try:
-            await owner.close()
+            owner.close()
         except Exception as error:
             assembly["cleanup_error"] = repr(error)
             errors.append(error)
@@ -401,7 +401,7 @@ async def measure_assembly(adapter, source, report, report_path, blocks):
         raise ExceptionGroup("health measurement failed; original, cleanup and input failures retained", errors)
 
 
-async def probe(adapter, stems, directory, blocks):
+def probe(adapter, stems, directory, blocks):
     import solidworks_mcp.adapters.pywin32_adapter as imported_adapter
 
     if not Path(imported_adapter.__file__).resolve().is_relative_to(ROOT / "cad" / "scripts" / "solidworks_mcp"):
@@ -422,7 +422,7 @@ async def probe(adapter, stems, directory, blocks):
     checkpoint(report_path, report)
     try:
         for stem in stems:
-            await measure_assembly(adapter, (ROOT / "cad/out/sldasm" / f"{stem}.SLDASM").resolve(strict=True), report, report_path, blocks)
+            measure_assembly(adapter, (ROOT / "cad/out/sldasm" / f"{stem}.SLDASM").resolve(strict=True), report, report_path, blocks)
         report["status"] = "passed"
     except Exception as error:
         report.update(status="failed", error=repr(error))

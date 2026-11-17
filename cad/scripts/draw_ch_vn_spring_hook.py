@@ -257,10 +257,10 @@ def _verify_source_state(adapter, source_model, finished_configuration):
             raise RuntimeError(f"{name}: supplier drawing changed saved-hidden source visibility")
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
-    check("open modified anchor", await adapter.open_model(str(SOURCE)))
+    check("open modified anchor", adapter.open_model(str(SOURCE)))
     source_model = _early_bound(adapter.currentModel, "IModelDoc2")
     finished_configuration = active_configuration_name(adapter, source_model)
     if not finished_configuration or finished_configuration == SUPPLIER_STOCK_CONFIGURATION:
@@ -328,7 +328,7 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, iso):
         set_hidden_lines_removed(adapter, view)
     view_names = (view_name(adapter, front), view_name(adapter, iso))
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Channel Spring Anchor — Modified Stock Drawing",

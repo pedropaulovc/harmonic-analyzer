@@ -3019,25 +3019,25 @@ def _as_construction(adapter, entity_id: str) -> None:
         raise RuntimeError(f"{entity_id} did not take the construction flag")
 
 
-async def _carrier(adapter, start, end) -> str:
+def _carrier(adapter, start, end) -> str:
     """One construction line for a printed dimension to stand on.  Its ends
     are drawn clear of every profile vertex, so relations place them."""
-    (line,) = await add_line_chain(adapter, [start, end], close=False)
+    (line,) = add_line_chain(adapter, [start, end], close=False)
     _as_construction(adapter, line)
     return line
 
 
-async def _relate(adapter, label: str, first: str, second: str | None, relation: str):
-    check(label, await adapter.add_sketch_constraint(first, second, relation))
+def _relate(adapter, label: str, first: str, second: str | None, relation: str):
+    check(label, adapter.add_sketch_constraint(first, second, relation))
 
 
-async def _plain_rectangle(adapter, points, label: str) -> list[str]:
+def _plain_rectangle(adapter, points, label: str) -> list[str]:
     """A closed axis-parallel chain with its horizontal/vertical relations
     and no dimension: line i runs points[i] -> points[i + 1]."""
-    lines = await add_line_chain(adapter, points)
+    lines = add_line_chain(adapter, points)
     for i, line in enumerate(lines):
         (_x1, y1), (_x2, y2) = points[i], points[(i + 1) % len(points)]
-        await _relate(
+        _relate(
             adapter,
             f"{label} {line}",
             line,
@@ -3047,7 +3047,7 @@ async def _plain_rectangle(adapter, points, label: str) -> list[str]:
     return lines
 
 
-async def _centred_rectangle(adapter, half_x: float, half_z: float, label: str):
+def _centred_rectangle(adapter, half_x: float, half_z: float, label: str):
     """An origin-centred rectangle left for its caller to size (the
     ``define_centered_rectangle`` recipe without its two dimensions): lines
     0..3 are the rear (+Z), west (+X), front and east edges under the Top
@@ -3058,12 +3058,12 @@ async def _centred_rectangle(adapter, half_x: float, half_z: float, label: str):
         (half_x, half_z),
         (-half_x, half_z),
     ]
-    lines = await _plain_rectangle(adapter, points, label)
+    lines = _plain_rectangle(adapter, points, label)
     # Corner to corner: the diagonal's ends merge with the corners they are
     # drawn on, so its midpoint centres the rectangle.
-    (diagonal,) = await add_line_chain(adapter, [points[0], points[2]], close=False)
+    (diagonal,) = add_line_chain(adapter, [points[0], points[2]], close=False)
     _as_construction(adapter, diagonal)
-    await _relate(adapter, f"{label} centre -> origin", "origin", diagonal, "midpoint")
+    _relate(adapter, f"{label} centre -> origin", "origin", diagonal, "midpoint")
     return lines
 
 
@@ -3102,42 +3102,42 @@ def _assert_station(
     _telemetry.success(f"{label}: furthest point along {direction} at {point}")
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs: named equation-manager globals (mm) drive the primary
     # envelope sketches. A GUI fine-tune edits THESE -- e.g. RailWSide or
     # BossDia -- never an auto "D7@Sketch3". Explicit `mm`: inch document,
     # bare equation numbers evaluate in document units.
-    await set_global(adapter, "ColumnX", f"{COLUMN_X}mm")
-    await set_global(adapter, "ColumnZ", f"{abs(FRONT_COLUMN_Z)}mm")
-    await set_global(adapter, "RailWSide", f"{RAIL_W_SIDE}mm")
-    await set_global(adapter, "RailWFR", f"{RAIL_W_FR}mm")
-    await set_global(adapter, "BossDia", f"{BOSS_DIA}mm")
-    await set_global(
+    set_global(adapter, "ColumnX", f"{COLUMN_X}mm")
+    set_global(adapter, "ColumnZ", f"{abs(FRONT_COLUMN_Z)}mm")
+    set_global(adapter, "RailWSide", f"{RAIL_W_SIDE}mm")
+    set_global(adapter, "RailWFR", f"{RAIL_W_FR}mm")
+    set_global(adapter, "BossDia", f"{BOSS_DIA}mm")
+    set_global(
         adapter, "KeeperReliefFromSocket", f"{KEEPER_BOSS_RELIEF_FROM_SOCKET}mm"
     )
-    await set_global(adapter, "BoreDia", f"{BORE_DIA}mm")
-    await set_global(adapter, "CapRecessDia", f"{CAP_RECESS_DIAMETER}mm")
-    await set_global(adapter, "CapRecessDepth", f"{CAP_RECESS_DEPTH}mm")
-    await set_global(adapter, "GooseneckZ", f"{GOOSENECK_Z}mm")
-    await set_global(adapter, "GooseneckBoreDia", f"{GOOSENECK_BORE_DIA}mm")
-    await set_global(adapter, "RingHeight", f"{RING_HEIGHT}mm")
-    await set_global(adapter, "BossAbove", f"{BOSS_ABOVE}mm")
-    await set_global(adapter, "BossBelowTop", f"{RING_HEIGHT + BOSS_BELOW}mm")
-    await set_global(adapter, "HubBossDrop", f"{HUB_BOSS_DROP}mm")
-    await set_global(adapter, "HubBossDia", f"{HUB_BOSS_DIA}mm")
-    await set_global(adapter, "WebT", f"{WEB_T}mm")
-    await set_global(adapter, "Flange", f"{FLANGE}mm")
-    await set_global(adapter, "HangerPinHoleDia", f"{HANGER_PIN_HOLE_DIA}mm")
-    await set_global(adapter, "HangerPinHoleDepth", f"{HANGER_PIN_HOLE_DEPTH}mm")
-    await set_global(adapter, "OuterX", '"ColumnX" + "RailWSide" / 2')
-    await set_global(adapter, "OuterZ", '"ColumnZ" + "RailWFR" / 2')
-    await set_global(adapter, "InnerX", '"ColumnX" - "RailWSide" / 2')
-    await set_global(adapter, "InnerZ", '"ColumnZ" - "RailWFR" / 2')
+    set_global(adapter, "BoreDia", f"{BORE_DIA}mm")
+    set_global(adapter, "CapRecessDia", f"{CAP_RECESS_DIAMETER}mm")
+    set_global(adapter, "CapRecessDepth", f"{CAP_RECESS_DEPTH}mm")
+    set_global(adapter, "GooseneckZ", f"{GOOSENECK_Z}mm")
+    set_global(adapter, "GooseneckBoreDia", f"{GOOSENECK_BORE_DIA}mm")
+    set_global(adapter, "RingHeight", f"{RING_HEIGHT}mm")
+    set_global(adapter, "BossAbove", f"{BOSS_ABOVE}mm")
+    set_global(adapter, "BossBelowTop", f"{RING_HEIGHT + BOSS_BELOW}mm")
+    set_global(adapter, "HubBossDrop", f"{HUB_BOSS_DROP}mm")
+    set_global(adapter, "HubBossDia", f"{HUB_BOSS_DIA}mm")
+    set_global(adapter, "WebT", f"{WEB_T}mm")
+    set_global(adapter, "Flange", f"{FLANGE}mm")
+    set_global(adapter, "HangerPinHoleDia", f"{HANGER_PIN_HOLE_DIA}mm")
+    set_global(adapter, "HangerPinHoleDepth", f"{HANGER_PIN_HOLE_DEPTH}mm")
+    set_global(adapter, "OuterX", '"ColumnX" + "RailWSide" / 2')
+    set_global(adapter, "OuterZ", '"ColumnZ" + "RailWFR" / 2')
+    set_global(adapter, "InnerX", '"ColumnX" - "RailWSide" / 2')
+    set_global(adapter, "InnerZ", '"ColumnZ" - "RailWFR" / 2')
 
     drive_jobs: list[tuple[str, str]] = []
     ref_planes: list[str] = []  # created offset planes, blanked before save
@@ -3157,7 +3157,7 @@ async def build(adapter) -> dict[str, str]:
             " proves that sense only"
         )
 
-    async def drafted(
+    def drafted(
         sketch: str,
         feature: str,
         label: str,
@@ -3172,7 +3172,7 @@ async def build(adapter) -> dict[str, str]:
         cut: bool = False,
     ) -> None:
         nonlocal volume
-        volume = await drafted_extrude(
+        volume = drafted_extrude(
             adapter,
             sketch,
             feature,
@@ -3195,7 +3195,7 @@ async def build(adapter) -> dict[str, str]:
             angles={f"{feature}Draft": DRAFT_DEG},
         )
 
-    async def across(
+    def across(
         sketch_dims: SketchDims,
         label: str,
         first: str,
@@ -3205,7 +3205,7 @@ async def build(adapter) -> dict[str, str]:
         name: str,
         drive: str | None = None,
     ) -> None:
-        await dimension_between(adapter, first, second, kind, value, label)
+        dimension_between(adapter, first, second, kind, value, label)
         sketch_dims.record(name, drive)
 
     # 1. Web ring: the full-height THIN section (T-rail web) as one annular
@@ -3216,11 +3216,11 @@ async def build(adapter) -> dict[str, str]:
     #    construction line across its web at the station its section cuts.
     #    Sketch z flipped: (x, y) -> (X, -Z).
     web = SketchDims()
-    check("create_sketch web ring", await adapter.create_sketch("Top"))
-    web_outer = await _centred_rectangle(
+    check("create_sketch web ring", adapter.create_sketch("Top"))
+    web_outer = _centred_rectangle(
         adapter, WEB_OUT_X, WEB_OUT_Z, "web outer rectangle"
     )
-    await across(
+    across(
         web,
         "web outer width",
         f"{web_outer[0]}.start",
@@ -3230,7 +3230,7 @@ async def build(adapter) -> dict[str, str]:
         "WebOuterWidth",
         '2 * "ColumnX" + "WebT"',
     )
-    await across(
+    across(
         web,
         "web outer depth",
         f"{web_outer[1]}.start",
@@ -3240,28 +3240,28 @@ async def build(adapter) -> dict[str, str]:
         "WebOuterDepth",
         '2 * "ColumnZ" + "WebT"',
     )
-    web_inner = await _centred_rectangle(
+    web_inner = _centred_rectangle(
         adapter, WEB_IN_X, WEB_IN_Z, "web inner rectangle"
     )
-    side_web = await _carrier(
+    side_web = _carrier(
         adapter, (-WEB_OUT_X, -SIDE_SECTION_Z), (-WEB_IN_X, -SIDE_SECTION_Z)
     )
-    await _relate(adapter, "side web line level", side_web, None, "horizontal")
-    await _relate(
+    _relate(adapter, "side web line level", side_web, None, "horizontal")
+    _relate(
         adapter,
         "side web line on the outer face",
         f"{side_web}.start",
         f"{web_outer[3]}.start",
         "vertical_points",
     )
-    await _relate(
+    _relate(
         adapter,
         "side web line on the inner face",
         f"{side_web}.end",
         f"{web_inner[3]}.start",
         "vertical_points",
     )
-    await across(
+    across(
         web,
         "side web station",
         f"{side_web}.start",
@@ -3270,7 +3270,7 @@ async def build(adapter) -> dict[str, str]:
         abs(SIDE_SECTION_Z),
         "SideWebStation",
     )
-    await across(
+    across(
         web,
         "side web thickness",
         f"{side_web}.start",
@@ -3280,25 +3280,25 @@ async def build(adapter) -> dict[str, str]:
         "SideWebT",
         '"WebT"',
     )
-    fr_web = await _carrier(
+    fr_web = _carrier(
         adapter, (RAIL_SECTION_X, -WEB_IN_Z), (RAIL_SECTION_X, -WEB_OUT_Z)
     )
-    await _relate(adapter, "rear web line plumb", fr_web, None, "vertical")
-    await _relate(
+    _relate(adapter, "rear web line plumb", fr_web, None, "vertical")
+    _relate(
         adapter,
         "rear web line on the inner face",
         f"{fr_web}.start",
         f"{web_inner[0]}.start",
         "horizontal_points",
     )
-    await _relate(
+    _relate(
         adapter,
         "rear web line on the outer face",
         f"{fr_web}.end",
         f"{web_outer[0]}.start",
         "horizontal_points",
     )
-    await across(
+    across(
         web,
         "rear web station",
         f"{fr_web}.start",
@@ -3307,7 +3307,7 @@ async def build(adapter) -> dict[str, str]:
         RAIL_SECTION_X,
         "FrWebStation",
     )
-    await across(
+    across(
         web,
         "rear web thickness",
         f"{fr_web}.start",
@@ -3317,12 +3317,12 @@ async def build(adapter) -> dict[str, str]:
         "FrWebT",
         '"WebT"',
     )
-    await ensure_fully_defined(adapter, "web ring sketch")
-    check("exit_sketch web ring", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "web ring sketch")
+    check("exit_sketch web ring", adapter.exit_sketch())
     name_last_feature(adapter, "WebProfile")
     drive_jobs += web.apply(adapter, "WebProfile")
     v_web = _web_ring_volume()
-    await drafted(
+    drafted(
         "WebProfile",
         "WebRing",
         "web ring",
@@ -3350,9 +3350,9 @@ async def build(adapter) -> dict[str, str]:
     #    the window is sized by the two printed flange widths, each on a
     #    construction line across its rail.
     outer = SketchDims()
-    check("create_sketch flange ring", await adapter.create_sketch("Top"))
-    rim = await _centred_rectangle(adapter, OUTER_X, OUTER_Z, "flange outer rectangle")
-    await across(
+    check("create_sketch flange ring", adapter.create_sketch("Top"))
+    rim = _centred_rectangle(adapter, OUTER_X, OUTER_Z, "flange outer rectangle")
+    across(
         outer,
         "flange width",
         f"{rim[0]}.start",
@@ -3362,7 +3362,7 @@ async def build(adapter) -> dict[str, str]:
         "Width",
         '2 * "OuterX"',
     )
-    await across(
+    across(
         outer,
         "flange depth",
         f"{rim[1]}.start",
@@ -3372,26 +3372,26 @@ async def build(adapter) -> dict[str, str]:
         "Depth",
         '2 * "OuterZ"',
     )
-    window = await _centred_rectangle(
+    window = _centred_rectangle(
         adapter, INNER_X, INNER_Z, "flange window rectangle"
     )
-    side_flange = await _carrier(adapter, (INNER_X, 0.0), (OUTER_X, 0.0))
+    side_flange = _carrier(adapter, (INNER_X, 0.0), (OUTER_X, 0.0))
     for end, edge, face in (("start", window[1], "window"), ("end", rim[1], "outer")):
-        await _relate(
+        _relate(
             adapter,
             f"side flange line on the rail centre ({face})",
             f"{side_flange}.{end}",
             "origin",
             "horizontal_points",
         )
-        await _relate(
+        _relate(
             adapter,
             f"side flange line on the {face} rim",
             f"{side_flange}.{end}",
             f"{edge}.start",
             "vertical_points",
         )
-    await across(
+    across(
         outer,
         "side flange width",
         f"{side_flange}.start",
@@ -3401,25 +3401,25 @@ async def build(adapter) -> dict[str, str]:
         "SideFlangeWidth",
         '"RailWSide"',
     )
-    fr_flange = await _carrier(
+    fr_flange = _carrier(
         adapter, (RAIL_SECTION_X, -INNER_Z), (RAIL_SECTION_X, -OUTER_Z)
     )
-    await _relate(adapter, "rear flange line plumb", fr_flange, None, "vertical")
-    await _relate(
+    _relate(adapter, "rear flange line plumb", fr_flange, None, "vertical")
+    _relate(
         adapter,
         "rear flange line on the window rim",
         f"{fr_flange}.start",
         f"{window[0]}.start",
         "horizontal_points",
     )
-    await _relate(
+    _relate(
         adapter,
         "rear flange line on the outer rim",
         f"{fr_flange}.end",
         f"{rim[0]}.start",
         "horizontal_points",
     )
-    await across(
+    across(
         outer,
         "rear flange station",
         f"{fr_flange}.start",
@@ -3428,7 +3428,7 @@ async def build(adapter) -> dict[str, str]:
         RAIL_SECTION_X,
         "FrFlangeStation",
     )
-    await across(
+    across(
         outer,
         "rear flange width",
         f"{fr_flange}.start",
@@ -3438,12 +3438,12 @@ async def build(adapter) -> dict[str, str]:
         "FrFlangeWidth",
         '"RailWFR"',
     )
-    await ensure_fully_defined(adapter, "flange ring sketch")
-    check("exit_sketch flange ring", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "flange ring sketch")
+    check("exit_sketch flange ring", adapter.exit_sketch())
     name_last_feature(adapter, "OuterProfile")
     drive_jobs += outer.apply(adapter, "OuterProfile")
     # New material only where the flange band is not already web solid.
-    await drafted(
+    drafted(
         "OuterProfile",
         "TopFlange",
         "top flange",
@@ -3468,15 +3468,15 @@ async def build(adapter) -> dict[str, str]:
     #    comes back).  Its faces continue the rims' planes down, so it starts
     #    RIM_RECEDE inside them on the underside.
     rib = SketchDims()
-    check("create_sketch hub rib", await adapter.create_sketch("Top"))
+    check("create_sketch hub rib", adapter.create_sketch("Top"))
     rib_pts = [
         (-RIB_OUT_X0, -(GOOSENECK_Z + HUB_RIB_W / 2.0)),
         (-RIB_IN_X0, -(GOOSENECK_Z + HUB_RIB_W / 2.0)),
         (-RIB_IN_X0, -(GOOSENECK_Z - HUB_RIB_W / 2.0)),
         (-RIB_OUT_X0, -(GOOSENECK_Z - HUB_RIB_W / 2.0)),
     ]
-    rib_lines = await add_line_chain(adapter, rib_pts)
-    await define_rectilinear_chain(
+    rib_lines = add_line_chain(adapter, rib_pts)
+    define_rectilinear_chain(
         adapter,
         rib_lines,
         rib_pts,
@@ -3484,11 +3484,11 @@ async def build(adapter) -> dict[str, str]:
         dims=rib,
         names=["RibRun", "RibWidth", "RibOffX", "RibOffZ"],
     )
-    await ensure_fully_defined(adapter, "hub rib sketch")
-    check("exit_sketch hub rib", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "hub rib sketch")
+    check("exit_sketch hub rib", adapter.exit_sketch())
     name_last_feature(adapter, "RibProfile")
     drive_jobs += rib.apply(adapter, "RibProfile")
-    await drafted(
+    drafted(
         "RibProfile",
         "HubRib",
         "hub rib",
@@ -3528,8 +3528,8 @@ async def build(adapter) -> dict[str, str]:
     ]
     bar_pts = [(x, -z) for x, z in bar_pts_part]
     bar = SketchDims()
-    check("create_sketch crossbar", await adapter.create_sketch("Top"))
-    bar_lines = await add_line_chain(adapter, bar_pts)
+    check("create_sketch crossbar", adapter.create_sketch("Top"))
+    bar_lines = add_line_chain(adapter, bar_pts)
     at = [f"{line}.start" for line in bar_lines]  # at[i] is vertex i
     for i, relation in (
         (1, "horizontal"),
@@ -3545,7 +3545,7 @@ async def build(adapter) -> dict[str, str]:
         (13, "horizontal"),
         (15, "vertical"),
     ):
-        await _relate(
+        _relate(
             adapter, f"crossbar {bar_lines[i]} {relation}", bar_lines[i], None, relation
         )
     for label, first, second, kind, value, name in (
@@ -3556,42 +3556,42 @@ async def build(adapter) -> dict[str, str]:
         ("land end", at[0], at[2], "horizontal_distance", BAR_X0 - LAND_X0, "LandEnd"),
         ("west land end", at[7], at[5], "horizontal_distance", LAND_X1 - BAR_X1, "LandEndW"),
     ):
-        await across(bar, label, first, second, kind, value, name)
+        across(bar, label, first, second, kind, value, name)
     for label, first, second in (
         ("rear west foot over the front one", at[9], at[6]),
         ("rear land west end over the front one", at[10], at[5]),
         ("rear land east end over the front one", at[13], at[2]),
         ("rear east foot over the front one", at[14], at[1]),
     ):
-        await _relate(adapter, f"crossbar {label}", first, second, "vertical_points")
-    await across(
+        _relate(adapter, f"crossbar {label}", first, second, "vertical_points")
+    across(
         bar, "front land face", at[1], "origin", "vertical_distance", z_land, "LandFaceZ"
     )
-    await _relate(
+    _relate(
         adapter, "crossbar front land ends level", at[5], at[2], "horizontal_points"
     )
-    await across(
+    across(
         bar, "gusset rise", at[0], at[1], "vertical_distance", GUSSET, "GussetRise"
     )
-    await _relate(
+    _relate(
         adapter, "crossbar front gusset heads level", at[7], at[0], "horizontal_points"
     )
-    await across(
+    across(
         bar, "land depth", at[2], at[3], "vertical_distance", z_bury - z_land, "LandDepth"
     )
-    await across(
+    across(
         bar, "rear land face", at[14], "origin", "vertical_distance", z_land, "LandFaceZRear"
     )
-    await _relate(
+    _relate(
         adapter, "crossbar rear feet level", at[9], at[14], "horizontal_points"
     )
-    await across(
+    across(
         bar, "rear gusset rise", at[15], at[14], "vertical_distance", GUSSET, "GussetRiseRear"
     )
-    await _relate(
+    _relate(
         adapter, "crossbar rear gusset heads level", at[8], at[15], "horizontal_points"
     )
-    await across(
+    across(
         bar,
         "rear land depth",
         at[13],
@@ -3607,49 +3607,49 @@ async def build(adapter) -> dict[str, str]:
     # in front of the front bosses, so the dimension's extension lines start
     # clear of the casting.
     span_y, station_y = -(D_STATION_LINE_Z - D_STATION_SPAN_STEP), -D_STATION_LINE_Z
-    half_east, half_west = await add_line_chain(
+    half_east, half_west = add_line_chain(
         adapter, [(BAR_X0, span_y), (HANGER_X, span_y), (BAR_X1, span_y)], close=False
     )
     for half in (half_east, half_west):
         _as_construction(adapter, half)
-        await _relate(adapter, f"crossbar span {half} level", half, None, "horizontal")
-    await _relate(
+        _relate(adapter, f"crossbar span {half} level", half, None, "horizontal")
+    _relate(
         adapter, "crossbar span on the east side", f"{half_east}.start", at[0],
         "vertical_points",
     )
-    await _relate(
+    _relate(
         adapter, "crossbar span on the west side", f"{half_west}.end", at[7],
         "vertical_points",
     )
-    await _relate(adapter, "crossbar span halves equal", half_east, half_west, "equal")
-    await across(
+    _relate(adapter, "crossbar span halves equal", half_east, half_west, "equal")
+    across(
         bar, "crossbar span level", f"{half_east}.start", "origin",
         "vertical_distance", abs(span_y), "DSpanLevel",
     )
-    station = await _carrier(
+    station = _carrier(
         adapter, (CAST_DATUM_ORIGIN_XZ[0], station_y), (HANGER_X, station_y)
     )
-    await _relate(adapter, "datum D station line level", station, None, "horizontal")
-    await _relate(
+    _relate(adapter, "datum D station line level", station, None, "horizontal")
+    _relate(
         adapter, "datum D station line on the median", f"{station}.end",
         f"{half_east}.end", "vertical_points",
     )
-    await across(
+    across(
         bar, "datum D station level", f"{station}.start", "origin",
         "vertical_distance", abs(station_y), "DStationLevel",
     )
-    await across(
+    across(
         bar, "datum D station from G", f"{station}.start", f"{station}.end",
         "horizontal_distance", D_STATION, "DStation",
     )
-    await ensure_fully_defined(adapter, "crossbar sketch")
-    check("exit_sketch crossbar", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "crossbar sketch")
+    check("exit_sketch crossbar", adapter.exit_sketch())
     name_last_feature(adapter, "BarProfile")
     drive_jobs += bar.apply(adapter, "BarProfile")
     v_bar = _crossbar_add_volume()
     # The full-height extrude depth is the finished top-to-underside grip at
     # the hanger holes; RingHeight drives it with the ring.
-    await drafted(
+    drafted(
         "BarProfile",
         "Crossbar",
         "crossbar",
@@ -3684,10 +3684,10 @@ async def build(adapter) -> dict[str, str]:
         (BAR_WEB_X1, y_front),
     ]
     bar_pockets = SketchDims()
-    check("create_sketch crossbar pockets", await adapter.create_sketch("Top"))
-    east = await _plain_rectangle(adapter, pocket_east, "crossbar pocket east")
-    west = await _plain_rectangle(adapter, pocket_west, "crossbar pocket west")
-    await across(
+    check("create_sketch crossbar pockets", adapter.create_sketch("Top"))
+    east = _plain_rectangle(adapter, pocket_east, "crossbar pocket east")
+    west = _plain_rectangle(adapter, pocket_west, "crossbar pocket west")
+    across(
         bar_pockets,
         "east pocket run",
         f"{east[0]}.start",
@@ -3696,7 +3696,7 @@ async def build(adapter) -> dict[str, str]:
         BAR_WEB_X0 - BAR_X0 + BAR_POCKET_OVERRUN,
         "BP0Run",
     )
-    await across(
+    across(
         bar_pockets,
         "pocket length",
         f"{east[1]}.start",
@@ -3705,7 +3705,7 @@ async def build(adapter) -> dict[str, str]:
         2.0 * BAR_POCKET_Z,
         "PocketLength",
     )
-    await across(
+    across(
         bar_pockets,
         "east web face",
         f"{east[1]}.start",
@@ -3714,18 +3714,18 @@ async def build(adapter) -> dict[str, str]:
         abs(BAR_WEB_X0),
         "BP0WebX",
     )
-    socket_line = await _carrier(
+    socket_line = _carrier(
         adapter, (HANGER_X, y_front), (HANGER_X, abs(FRONT_COLUMN_Z))
     )
-    await _relate(adapter, "pocket station line plumb", socket_line, None, "vertical")
-    await _relate(
+    _relate(adapter, "pocket station line plumb", socket_line, None, "vertical")
+    _relate(
         adapter,
         "pocket station line on the pockets' front end",
         f"{socket_line}.start",
         f"{east[2]}.start",
         "horizontal_points",
     )
-    await across(
+    across(
         bar_pockets,
         "pocket station",
         f"{socket_line}.start",
@@ -3734,7 +3734,7 @@ async def build(adapter) -> dict[str, str]:
         abs(HANGER_X),
         "PocketStationX",
     )
-    await across(
+    across(
         bar_pockets,
         "front socket axis",
         f"{socket_line}.end",
@@ -3744,7 +3744,7 @@ async def build(adapter) -> dict[str, str]:
         "PocketSocketZ",
         '"ColumnZ"',
     )
-    await across(
+    across(
         bar_pockets,
         "pocket from front socket",
         f"{socket_line}.start",
@@ -3753,7 +3753,7 @@ async def build(adapter) -> dict[str, str]:
         abs(FRONT_COLUMN_Z) - BAR_POCKET_Z,
         "PocketFromSocket",
     )
-    await across(
+    across(
         bar_pockets,
         "crossbar web",
         f"{east[1]}.start",
@@ -3763,7 +3763,7 @@ async def build(adapter) -> dict[str, str]:
         "CrossbarWebT",
         '"WebT"',
     )
-    await across(
+    across(
         bar_pockets,
         "west pocket run",
         f"{west[0]}.start",
@@ -3772,25 +3772,25 @@ async def build(adapter) -> dict[str, str]:
         BAR_X1 + BAR_POCKET_OVERRUN - BAR_WEB_X1,
         "BP1Run",
     )
-    await _relate(
+    _relate(
         adapter,
         "pockets' rear ends level",
         f"{west[0]}.start",
         f"{east[1]}.start",
         "horizontal_points",
     )
-    await _relate(
+    _relate(
         adapter,
         "pockets' front ends level",
         f"{west[2]}.start",
         f"{east[2]}.start",
         "horizontal_points",
     )
-    await ensure_fully_defined(adapter, "crossbar pockets sketch")
-    check("exit_sketch crossbar pockets", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "crossbar pockets sketch")
+    check("exit_sketch crossbar pockets", adapter.exit_sketch())
     name_last_feature(adapter, "BarPocketProfile")
     drive_jobs += bar_pockets.apply(adapter, "BarPocketProfile")
-    await drafted(
+    drafted(
         "BarPocketProfile",
         "BarPockets",
         "crossbar pockets",
@@ -3810,14 +3810,14 @@ async def build(adapter) -> dict[str, str]:
     #     its barrel, so the cut's plumb walls are buried.  Sketch z flipped:
     #     (x, y) -> (X, -Z).
     crops = SketchDims()
-    check("create_sketch corner crops", await adapter.create_sketch("Top"))
+    check("create_sketch corner crops", adapter.create_sketch("Top"))
     for k, (sx, sz) in enumerate(((1.0, 1.0), (1.0, -1.0), (-1.0, -1.0), (-1.0, 1.0))):
         crop_pts = [
             (sx * (COLUMN_X + px), -sz * (abs(FRONT_COLUMN_Z) + pz))
             for px, pz in CORNER_CROP_TRIANGLE
         ]
-        crop_lines = await add_line_chain(adapter, crop_pts)
-        await define_polygon_chain(
+        crop_lines = add_line_chain(adapter, crop_pts)
+        define_polygon_chain(
             adapter,
             crop_lines,
             crop_pts,
@@ -3832,19 +3832,19 @@ async def build(adapter) -> dict[str, str]:
                 f"CC{k}ChordRise",
             ],
         )
-    await ensure_fully_defined(adapter, "corner crops sketch")
-    check("exit_sketch corner crops", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "corner crops sketch")
+    check("exit_sketch corner crops", adapter.exit_sketch())
     name_last_feature(adapter, "CornerCropProfile")
     drive_jobs += crops.apply(adapter, "CornerCropProfile")
     check(
         "cut corner crops",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
         ),
     )
     name_last_feature(adapter, "CornerCrop")
     v_crops = _corner_crop_removal()  # 666.5
-    volume = await volume_check(adapter, "flange corner crops", volume - v_crops, 1.0)
+    volume = volume_check(adapter, "flange corner crops", volume - v_crops, 1.0)
 
     # 6. Corner bosses: one circle set drafted in UP from the faced top to
     #    the boss top, a second identical set drafted in DOWN from it to the
@@ -3857,11 +3857,11 @@ async def build(adapter) -> dict[str, str]:
         ("down", RING_HEIGHT + BOSS_BELOW, "BossBelowTop", "BossesLower", v_boss_down),
     ):
         bosses = SketchDims()
-        check(f"create_sketch bosses {updown}", await adapter.create_sketch("Top"))
+        check(f"create_sketch bosses {updown}", adapter.create_sketch("Top"))
         n = 0
         for sx in (-1.0, 1.0):
             for z_world in (FRONT_COLUMN_Z, REAR_COLUMN_Z):
-                await define_circle(
+                define_circle(
                     adapter,
                     sx * COLUMN_X,
                     -z_world,
@@ -3872,13 +3872,13 @@ async def build(adapter) -> dict[str, str]:
                     drives=('"ColumnX"', '"ColumnZ"', '"BossDia"'),
                 )
                 n += 1
-        await ensure_fully_defined(adapter, f"bosses {updown} sketch")
-        check(f"exit_sketch bosses {updown}", await adapter.exit_sketch())
+        ensure_fully_defined(adapter, f"bosses {updown} sketch")
+        check(f"exit_sketch bosses {updown}", adapter.exit_sketch())
         profile = f"Boss{updown.capitalize()}Profile"
         name_last_feature(adapter, profile)
         drive_jobs += bosses.apply(adapter, profile)
         v_add = 4.0 * v_one
-        await drafted(
+        drafted(
             profile,
             feat,
             f"bosses {updown}",
@@ -3911,9 +3911,9 @@ async def build(adapter) -> dict[str, str]:
         (GOOSENECK_X - half_t, -(GOOSENECK_Z - HUB_GUSSET_PLATE_HALF)),
     ]
     plate = SketchDims()
-    check("create_sketch hub gusset plate", await adapter.create_sketch("Top"))
-    plate_lines = await add_line_chain(adapter, plate_pts)
-    await define_rectilinear_chain(
+    check("create_sketch hub gusset plate", adapter.create_sketch("Top"))
+    plate_lines = add_line_chain(adapter, plate_pts)
+    define_rectilinear_chain(
         adapter,
         plate_lines,
         plate_pts,
@@ -3921,12 +3921,12 @@ async def build(adapter) -> dict[str, str]:
         dims=plate,
         names=["GussetT", "GusPlateSpan", "GusPlateX", "GusPlateZ"],
     )
-    await ensure_fully_defined(adapter, "hub gusset plate sketch")
-    check("exit_sketch hub gusset plate", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "hub gusset plate sketch")
+    check("exit_sketch hub gusset plate", adapter.exit_sketch())
     name_last_feature(adapter, "HubGussetPlateProfile")
     plate.apply(adapter, "HubGussetPlateProfile")
     v_plate, v_ramps = _hub_gusset_volumes()
-    await drafted(
+    drafted(
         "HubGussetPlateProfile",
         "HubGussetPlate",
         "hub gusset plate",
@@ -3950,7 +3950,7 @@ async def build(adapter) -> dict[str, str]:
     ramp_reach = half_t + HUB_BOSS_DROP * DRAFT_T + 1.0
     gusset_plane = check(
         "create_plane hub gusset ramps",
-        await adapter.create_plane(
+        adapter.create_plane(
             CreatePlaneParameters(
                 mode="offset",
                 base_plane="Right Plane",
@@ -3976,10 +3976,10 @@ async def build(adapter) -> dict[str, str]:
         ]
 
     gus = SketchDims()
-    check("create_sketch hub gusset ramps", await adapter.create_sketch(gusset_plane_name))
+    check("create_sketch hub gusset ramps", adapter.create_sketch(gusset_plane_name))
     rear_pts = ramp_polygon(1.0)
-    rear_ramp = await add_line_chain(adapter, rear_pts)
-    await define_polygon_chain(
+    rear_ramp = add_line_chain(adapter, rear_pts)
+    define_polygon_chain(
         adapter,
         rear_ramp,
         rear_pts,
@@ -3996,15 +3996,15 @@ async def build(adapter) -> dict[str, str]:
         ],
     )
     front_pts = ramp_polygon(-1.0)
-    front_ramp = await add_line_chain(adapter, front_pts)
-    await _relate(
+    front_ramp = add_line_chain(adapter, front_pts)
+    _relate(
         adapter,
         "hub gusset feather points level",
         f"{front_ramp[0]}.start",
         f"{rear_ramp[0]}.start",
         "horizontal_points",
     )
-    await across(
+    across(
         gus,
         "hub gusset feather span",
         f"{rear_ramp[0]}.start",
@@ -4020,7 +4020,7 @@ async def build(adapter) -> dict[str, str]:
         (("GusRampRunF", "GusRampRiseF"), ("GusCutRunF",), ("GusCutRiseF",)),
         strict=True,
     ):
-        await anchor_point_to_point(
+        anchor_point_to_point(
             adapter,
             f"{line}.start",
             f"{line}.end",
@@ -4030,24 +4030,24 @@ async def build(adapter) -> dict[str, str]:
         )
         for name in names:
             gus.record(name)
-    await ensure_fully_defined(adapter, "hub gusset ramps sketch")
-    check("exit_sketch hub gusset ramps", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "hub gusset ramps sketch")
+    check("exit_sketch hub gusset ramps", adapter.exit_sketch())
     name_last_feature(adapter, "HubGussetProfile")
     gus.apply(adapter, "HubGussetProfile")
     check(
         "cut hub gusset ramps",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=2.0 * ramp_reach, reverse_direction=True)
         ),
     )
     name_last_feature(adapter, "HubGussetRamps")
-    volume = await volume_check(adapter, "hub gusset ramps", volume - v_ramps, 15.0)
+    volume = volume_check(adapter, "hub gusset ramps", volume - v_ramps, 15.0)
 
     #    ... then the underside boss through them, drafted in DOWN from the
     #    underside, where its Ø1.18 stands.
     hub = SketchDims()
-    check("create_sketch hub boss", await adapter.create_sketch("Top"))
-    await define_circle(
+    check("create_sketch hub boss", adapter.create_sketch("Top"))
+    define_circle(
         adapter,
         GOOSENECK_X,
         -GOOSENECK_Z,
@@ -4057,11 +4057,11 @@ async def build(adapter) -> dict[str, str]:
         names=("HubX", "HubZ", "HubDia"),
         drives=('"ColumnX"', '"GooseneckZ"', '"HubBossDia"'),
     )
-    await ensure_fully_defined(adapter, "hub boss sketch")
-    check("exit_sketch hub boss", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "hub boss sketch")
+    check("exit_sketch hub boss", adapter.exit_sketch())
     name_last_feature(adapter, "HubBossProfile")
     drive_jobs += hub.apply(adapter, "HubBossProfile")
-    await drafted(
+    drafted(
         "HubBossProfile",
         "HubBoss",
         "hub boss",
@@ -4090,12 +4090,12 @@ async def build(adapter) -> dict[str, str]:
         (SET_BOSS_FACE_X0, -(GOOSENECK_Z + half_w)),
     ]
     set_boss = SketchDims()
-    check("create_sketch set boss", await adapter.create_sketch("Top"))
-    sb_lines = await _plain_rectangle(adapter, sb_pts, "set boss")
-    face_line = await _carrier(
+    check("create_sketch set boss", adapter.create_sketch("Top"))
+    sb_lines = _plain_rectangle(adapter, sb_pts, "set boss")
+    face_line = _carrier(
         adapter, (GOOSENECK_X, -GOOSENECK_Z), (SET_BOSS_FACE_X, -GOOSENECK_Z)
     )
-    await _relate(adapter, "set boss face line level", face_line, None, "horizontal")
+    _relate(adapter, "set boss face line level", face_line, None, "horizontal")
     for label, first, second, kind, value, name, drive in (
         ("hub axis x", f"{face_line}.start", "origin", "horizontal_distance",
          COLUMN_X, "SetBossAxisX", '"ColumnX"'),
@@ -4112,12 +4112,12 @@ async def build(adapter) -> dict[str, str]:
         ("set boss half width", f"{face_line}.start", f"{sb_lines[0]}.start",
          "vertical_distance", half_w, "SetBossHalfWidth", None),
     ):
-        await across(set_boss, label, first, second, kind, value, name, drive)
-    await ensure_fully_defined(adapter, "set boss sketch")
-    check("exit_sketch set boss", await adapter.exit_sketch())
+        across(set_boss, label, first, second, kind, value, name, drive)
+    ensure_fully_defined(adapter, "set boss sketch")
+    check("exit_sketch set boss", adapter.exit_sketch())
     name_last_feature(adapter, "SetBossProfile")
     drive_jobs += set_boss.apply(adapter, "SetBossProfile")
-    await drafted(
+    drafted(
         "SetBossProfile",
         "SetBoss",
         "set boss",
@@ -4140,7 +4140,7 @@ async def build(adapter) -> dict[str, str]:
     # +X), in to its floor.
     boss_plane = check(
         "create_plane set spot face",
-        await adapter.create_plane(
+        adapter.create_plane(
             CreatePlaneParameters(
                 mode="offset", base_plane="Right Plane", offset=SET_BOSS_FACE_X
             )
@@ -4149,8 +4149,8 @@ async def build(adapter) -> dict[str, str]:
     boss_plane_name = getattr(boss_plane, "name", boss_plane)
     ref_planes.append(str(boss_plane_name))
     spot = SketchDims()
-    check("create_sketch set spot face", await adapter.create_sketch(boss_plane_name))
-    await define_circle(
+    check("create_sketch set spot face", adapter.create_sketch(boss_plane_name))
+    define_circle(
         adapter,
         -GOOSENECK_Z,
         SCREW_AXIS_Y,
@@ -4159,20 +4159,20 @@ async def build(adapter) -> dict[str, str]:
         dims=spot,
         names=("SetSpotZ", "SetSpotY", "SetSpotDia"),
     )
-    await ensure_fully_defined(adapter, "set spot face sketch")
-    check("exit_sketch set spot face", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "set spot face sketch")
+    check("exit_sketch set spot face", adapter.exit_sketch())
     name_last_feature(adapter, "SetSpotProfile")
     spot.apply(adapter, "SetSpotProfile")
     check(
         "cut set spot face",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(
                 depth=SET_SPOT_FACE_X - SET_BOSS_FACE_X, reverse_direction=True
             )
         ),
     )
     name_last_feature(adapter, "SetSpotFace")
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "set spot face", volume - _set_spot_removal(), 5.0
     )
 
@@ -4183,7 +4183,7 @@ async def build(adapter) -> dict[str, str]:
     for side, sign, reverse in SIDE_SCREW_FACES:
         cb_plane = check(
             f"create_plane counterbore {side}",
-            await adapter.create_plane(
+            adapter.create_plane(
                 CreatePlaneParameters(
                     mode="offset",
                     base_plane="Front Plane",
@@ -4194,11 +4194,11 @@ async def build(adapter) -> dict[str, str]:
         cbore = SketchDims()
         check(
             f"create_sketch counterbore {side}",
-            await adapter.create_sketch(getattr(cb_plane, "name", cb_plane)),
+            adapter.create_sketch(getattr(cb_plane, "name", cb_plane)),
         )
         ref_planes.append(str(getattr(cb_plane, "name", cb_plane)))
         for k, x in enumerate(SIDE_SCREW_XS):
-            await define_circle(
+            define_circle(
                 adapter,
                 x,
                 SCREW_AXIS_Y,
@@ -4207,13 +4207,13 @@ async def build(adapter) -> dict[str, str]:
                 dims=cbore,
                 names=(f"CB{k}X", f"CB{k}Y", f"CB{k}Dia"),
             )
-        await ensure_fully_defined(adapter, f"counterbore {side} sketch")
-        check(f"exit_sketch counterbore {side}", await adapter.exit_sketch())
+        ensure_fully_defined(adapter, f"counterbore {side} sketch")
+        check(f"exit_sketch counterbore {side}", adapter.exit_sketch())
         name_last_feature(adapter, f"Counterbore{side.capitalize()}Profile")
         cbore.apply(adapter, f"Counterbore{side.capitalize()}Profile")
         check(
             f"cut counterbore {side}",
-            await adapter.create_cut_extrude(
+            adapter.create_cut_extrude(
                 ExtrusionParameters(
                     depth=COUNTERBORE_PLANE - COUNTERBORE_FLOOR,
                     reverse_direction=reverse,
@@ -4221,7 +4221,7 @@ async def build(adapter) -> dict[str, str]:
             ),
         )
         name_last_feature(adapter, f"Counterbore{side.capitalize()}")
-        volume = await volume_check(
+        volume = volume_check(
             adapter,
             f"counterbore {side}",
             volume - len(SIDE_SCREW_XS) * v_cbore,
@@ -4230,11 +4230,11 @@ async def build(adapter) -> dict[str, str]:
 
     # 10. Column bores (through the boss stacks).
     bores = SketchDims()
-    check("create_sketch bores", await adapter.create_sketch("Top"))
+    check("create_sketch bores", adapter.create_sketch("Top"))
     n = 0
     for sx in (-1.0, 1.0):
         for z_world in (FRONT_COLUMN_Z, REAR_COLUMN_Z):
-            await define_circle(
+            define_circle(
                 adapter,
                 sx * COLUMN_X,
                 -z_world,
@@ -4245,27 +4245,27 @@ async def build(adapter) -> dict[str, str]:
                 drives=('"ColumnX"', '"ColumnZ"', '"BoreDia"'),
             )
             n += 1
-    await ensure_fully_defined(adapter, "bores sketch")
-    check("exit_sketch bores", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "bores sketch")
+    check("exit_sketch bores", adapter.exit_sketch())
     name_last_feature(adapter, "BoreProfile")
     drive_jobs += bores.apply(adapter, "BoreProfile")
     check(
         "cut bores",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
         ),
     )
     name_last_feature(adapter, "ColumnBores")
     boss_h = RING_HEIGHT + BOSS_ABOVE + BOSS_BELOW
     v_bores = 4.0 * math.pi * (BORE_DIA / 2.0) ** 2 * boss_h
-    volume = await volume_check(adapter, "column bores", volume - v_bores, 100.0)
+    volume = volume_check(adapter, "column bores", volume - v_bores, 100.0)
 
     # Four recessed seats hide the purchased cap skirts while leaving the
     # cross-screw station intact below. The positive-offset Top plane's default
     # cut direction is toward the casting, opposite its +Y sketch normal.
     recess_plane = check(
         "create_plane cap recess mouths",
-        await adapter.create_plane(
+        adapter.create_plane(
             CreatePlaneParameters(
                 mode="offset",
                 base_plane="Top Plane",
@@ -4276,11 +4276,11 @@ async def build(adapter) -> dict[str, str]:
     recess_plane_name = str(getattr(recess_plane, "name", recess_plane))
     ref_planes.append(recess_plane_name)
     recesses = SketchDims()
-    check("create_sketch cap recesses", await adapter.create_sketch(recess_plane_name))
+    check("create_sketch cap recesses", adapter.create_sketch(recess_plane_name))
     n = 0
     for sx in (-1.0, 1.0):
         for z_world in (FRONT_COLUMN_Z, REAR_COLUMN_Z):
-            await define_circle(
+            define_circle(
                 adapter,
                 sx * COLUMN_X,
                 -z_world,
@@ -4295,13 +4295,13 @@ async def build(adapter) -> dict[str, str]:
                 drives=('"ColumnX"', '"ColumnZ"', '"CapRecessDia"'),
             )
             n += 1
-    await ensure_fully_defined(adapter, "cap recess sketch")
-    check("exit_sketch cap recesses", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "cap recess sketch")
+    check("exit_sketch cap recesses", adapter.exit_sketch())
     name_last_feature(adapter, "CapRecessProfile")
     drive_jobs += recesses.apply(adapter, "CapRecessProfile")
     check(
         "cut cap recesses",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(
                 depth=CAP_RECESS_DEPTH,
                 reverse_direction=False,
@@ -4317,14 +4317,14 @@ async def build(adapter) -> dict[str, str]:
         * ((CAP_RECESS_DIAMETER / 2.0) ** 2 - (BORE_DIA / 2.0) ** 2)
         * CAP_RECESS_DEPTH
     )
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "cap recesses", volume - v_recess, 0.005 * v_recess + 5.0
     )
 
     # 11. Gooseneck clearance bore (through the rib + hub boss).
     gneck = SketchDims()
-    check("create_sketch gooseneck bore", await adapter.create_sketch("Top"))
-    await define_circle(
+    check("create_sketch gooseneck bore", adapter.create_sketch("Top"))
+    define_circle(
         adapter,
         GOOSENECK_X,
         -GOOSENECK_Z,
@@ -4334,19 +4334,19 @@ async def build(adapter) -> dict[str, str]:
         names=("GnX", "GnZ", "GnDia"),
         drives=('"ColumnX"', '"GooseneckZ"', '"GooseneckBoreDia"'),
     )
-    await ensure_fully_defined(adapter, "gooseneck bore sketch")
-    check("exit_sketch gooseneck bore", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "gooseneck bore sketch")
+    check("exit_sketch gooseneck bore", adapter.exit_sketch())
     name_last_feature(adapter, "GooseneckProfile")
     drive_jobs += gneck.apply(adapter, "GooseneckProfile")
     check(
         "cut gooseneck bore",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
         ),
     )
     name_last_feature(adapter, "GooseneckBore")
     v_gn = math.pi * (GOOSENECK_BORE_DIA / 2.0) ** 2 * (RING_HEIGHT + HUB_BOSS_DROP)
-    volume = await volume_check(adapter, "gooseneck bore", volume - v_gn, 60.0)
+    volume = volume_check(adapter, "gooseneck bore", volume - v_gn, 60.0)
 
     # 12. Native #10 plain clearance holes pinned to the C drill, both stations in one
     #     underside-entry wizard feature (the shop drills them from the
@@ -4366,7 +4366,7 @@ async def build(adapter) -> dict[str, str]:
         ],
     )
     v_hangers = 2.0 * math.pi * (HANGER_CLEARANCE_DIA / 2.0) ** 2 * RING_HEIGHT
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "knife-hanger clearance holes", volume - v_hangers, 10.0
     )
 
@@ -4388,7 +4388,7 @@ async def build(adapter) -> dict[str, str]:
     )
     for (u, v), (station, _x, _z) in zip(sketch_centres, pin_stations, strict=True):
         x_name, z_name = f"Pin{station}X", f"Pin{station}Z"
-        await define_circle(
+        define_circle(
             adapter,
             u,
             v,
@@ -4402,14 +4402,14 @@ async def build(adapter) -> dict[str, str]:
             ),
             drives=(None, None, '"HangerPinHoleDia"'),
         )
-    await ensure_fully_defined(adapter, "dowel ream sketch")
-    check("exit_sketch dowel reams", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "dowel ream sketch")
+    check("exit_sketch dowel reams", adapter.exit_sketch())
     name_last_feature(adapter, "HangerPinProfile")
     drive_jobs += pins.apply(adapter, "HangerPinProfile")
     # A cut runs opposite the sketch normal unless reversed.
     check(
         "cut dowel reams",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(
                 depth=HANGER_PIN_HOLE_DEPTH, reverse_direction=not normal_out
             )
@@ -4429,7 +4429,7 @@ async def build(adapter) -> dict[str, str]:
         * (HANGER_PIN_HOLE_DIA / 2.0) ** 2
         * HANGER_PIN_HOLE_DEPTH
     )
-    volume = await volume_check(adapter, "dowel reams", volume - v_pins, 0.01 * v_pins)
+    volume = volume_check(adapter, "dowel reams", volume - v_pins, 0.01 * v_pins)
 
     # 12c. The reams' knockouts (fr_top_frame_spec.HANGER_KNOCKOUT_SPEC): ONE
     #      native #51 Hole Wizard feature through-all on each ream's axis
@@ -4460,7 +4460,7 @@ async def build(adapter) -> dict[str, str]:
         * (HANGER_KNOCKOUT_DIA / 2.0) ** 2
         * HANGER_KNOCKOUT_LENGTH
     )
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "dowel ream knockouts", volume - v_knockouts, 0.02 * v_knockouts
     )
 
@@ -4489,7 +4489,7 @@ async def build(adapter) -> dict[str, str]:
             name=feat,
             expect_dia_mm=SIDE_TAP_DRILL_DIA,
         )
-        volume = await volume_check(
+        volume = volume_check(
             adapter,
             f"side taps {feat}",
             volume - len(tap_points) * v_side_tap,
@@ -4505,7 +4505,7 @@ async def build(adapter) -> dict[str, str]:
             name=clearance,
             expect_dia_mm=NEAR_WALL_CLEARANCE_DIAMETER,
         )
-        volume = await volume_check(
+        volume = volume_check(
             adapter,
             f"side near-wall clearance {clearance}",
             volume - len(tap_points) * v_side_clear,
@@ -4522,7 +4522,7 @@ async def build(adapter) -> dict[str, str]:
         name="GooseneckTap",
         placement_dims=[(("SetTapZ", None), ("SetTapY", None))],
     )
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "gooseneck set tap", volume - v_set_tap, 0.1 * v_set_tap + 10.0
     )
 
@@ -4545,7 +4545,7 @@ async def build(adapter) -> dict[str, str]:
     v_keeper = 2.0 * blind_hole_volume_mm3(
         TAP_DRILL_MM[KEEPER_TAP_SPEC.size], KEEPER_TAP_SPEC.depth_mm
     )
-    volume = await volume_check(adapter, "keeper taps", volume - v_keeper, 10.0)
+    volume = volume_check(adapter, "keeper taps", volume - v_keeper, 10.0)
 
     # 16. Internal T-root fillets: R3 along the reentrant junction where
     #     each recessed web face meets the flange underside (y +10.12) --
@@ -4577,7 +4577,7 @@ async def build(adapter) -> dict[str, str]:
     land_mid_e = (LAND_X1 + root_lean + COLUMN_X - root_cut) / 2.0
     check(
         "fillet T-roots",
-        await adapter.add_fillet(
+        adapter.add_fillet(
             ROOT_FILLET_R,
             [
                 # the +Z rail's window shelf east of the land: RootR's edge
@@ -4607,7 +4607,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, "TRootFillets", lengths={"RootR": ROOT_FILLET_R}, angles={}
     )
     v_root = _t_root_add()
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "T-root fillets", volume + v_root, 0.03 * v_root + 80.0
     )
 
@@ -4628,7 +4628,7 @@ async def build(adapter) -> dict[str, str]:
     bar_top_e, bar_top_w = BAR_X0 - RIM_RECEDE, BAR_X1 + RIM_RECEDE
     check(
         "chamfer top rims",
-        await adapter.add_chamfer(
+        adapter.add_chamfer(
             EDGE_CHAMFER,
             [
                 [OUTER_X, HALF_H, 0.0],
@@ -4655,7 +4655,7 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "TopRimBreaks")
     v_rims = v_outer + v_window
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "top rim breaks", volume - v_rims, 0.03 * v_rims + 100.0
     )
 
@@ -4665,7 +4665,7 @@ async def build(adapter) -> dict[str, str]:
     r_gn = GOOSENECK_BORE_DIA / 2.0
     check(
         "chamfer bore tops",
-        await adapter.add_chamfer(
+        adapter.add_chamfer(
             BORE_CHAMFER,
             [
                 [sx * COLUMN_X, boss_top_y, z_world + CAP_RECESS_DIAMETER / 2.0]
@@ -4677,7 +4677,7 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "BoreTopBreaks")
     v_breaks = _bore_chamfer_removal()
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "bore top breaks", volume - v_breaks, 0.02 * v_breaks + 10.0
     )
 
@@ -4689,9 +4689,9 @@ async def build(adapter) -> dict[str, str]:
     #      Each pair of breaks meeting at a vertex adds half a c^3 corner
     #      patch to the tolerance; barrel-end error sits inside the 3%.
     for feature, (picks, v_chain, shared) in EXTERNAL_EDGE_BREAKS.items():
-        check(f"chamfer {feature}", await adapter.add_chamfer(EDGE_CHAMFER, picks))
+        check(f"chamfer {feature}", adapter.add_chamfer(EDGE_CHAMFER, picks))
         name_last_feature(adapter, feature)
-        volume = await volume_check(
+        volume = volume_check(
             adapter,
             f"external edge breaks {feature}",
             volume - v_chain,
@@ -4710,7 +4710,7 @@ async def build(adapter) -> dict[str, str]:
     step_y = abs(FRONT_COLUMN_Z) - KEEPER_BOSS_RELIEF_FROM_SOCKET
     reliefs = SketchDims()
     check(
-        "create_sketch keeper reliefs", await adapter.create_sketch(recess_plane_name)
+        "create_sketch keeper reliefs", adapter.create_sketch(recess_plane_name)
     )
     # Sketch z flipped: (x, y) -> (X, -Z); the front barrel's step is its
     # rectangle's upper edge, the rear barrel's its lower.
@@ -4720,7 +4720,7 @@ async def build(adapter) -> dict[str, str]:
             (-step_y, -step_y + relief_reach, 0),
         )
     ):
-        lines = await _plain_rectangle(
+        lines = _plain_rectangle(
             adapter,
             [
                 (COLUMN_X - relief_half, y_lo),
@@ -4730,7 +4730,7 @@ async def build(adapter) -> dict[str, str]:
             ],
             f"keeper relief {n}",
         )
-        await across(
+        across(
             reliefs,
             f"keeper relief {n} run",
             f"{lines[0]}.start",
@@ -4739,7 +4739,7 @@ async def build(adapter) -> dict[str, str]:
             2.0 * relief_half,
             f"KR{n}Run",
         )
-        await across(
+        across(
             reliefs,
             f"keeper relief {n} reach",
             f"{lines[1]}.start",
@@ -4748,7 +4748,7 @@ async def build(adapter) -> dict[str, str]:
             relief_reach,
             f"KR{n}Reach",
         )
-        await across(
+        across(
             reliefs,
             f"keeper relief {n} outer end",
             f"{lines[1]}.start",
@@ -4757,7 +4757,7 @@ async def build(adapter) -> dict[str, str]:
             COLUMN_X + relief_half,
             f"KR{n}X",
         )
-        await across(
+        across(
             reliefs,
             f"keeper relief {n} step",
             f"{lines[step_line]}.start",
@@ -4767,13 +4767,13 @@ async def build(adapter) -> dict[str, str]:
             f"KR{n}StepZ",
             '"ColumnZ" - "KeeperReliefFromSocket"',
         )
-    await ensure_fully_defined(adapter, "keeper relief sketch")
-    check("exit_sketch keeper reliefs", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "keeper relief sketch")
+    check("exit_sketch keeper reliefs", adapter.exit_sketch())
     name_last_feature(adapter, "KeeperBossReliefProfile")
     drive_jobs += reliefs.apply(adapter, "KeeperBossReliefProfile")
     check(
         "cut keeper reliefs",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=BOSS_ABOVE, reverse_direction=False)
         ),
     )
@@ -4783,16 +4783,16 @@ async def build(adapter) -> dict[str, str]:
     )
     drive_jobs.append((relief_depth_dim[0], '"BossAbove"'))
     v_relief = _keeper_relief_removal()  # 911
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "keeper reliefs", volume - v_relief, 0.05 * v_relief + 10.0
     )
 
     # Deferred drive equations: after the whole model + a rebuild exist so
     # every target resolves; the re-check proves the equations are neutral.
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
     # Every drafted feature still reads its depth and its draft once the
     # equations drive it.  Then the model carries the bands the sheet prints:
     # owner ruling D4's on each draft angle, B2's on each as-cast dimension.
@@ -4838,7 +4838,7 @@ async def build(adapter) -> dict[str, str]:
             places=HANGER_PIN_HOLE_DIA_PLACES,
             display_unit=UNIT,
         )
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "driven casting (equations neutral)", volume, 200.0
     )
     _assert_flange_corners_cropped(adapter)
@@ -4847,9 +4847,9 @@ async def build(adapter) -> dict[str, str]:
     # in the part PNG and every assembly instance (fix_shown_sketches idiom).
     blank_reference_geometry(adapter, tuple((name, "PLANE") for name in ref_planes))
 
-    await apply_material(adapter, MATERIAL)
-    await apply_color(adapter, CASTING_GREEN)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    apply_color(adapter, CASTING_GREEN)
+    report_mass_properties(adapter)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
@@ -4872,7 +4872,7 @@ async def build(adapter) -> dict[str, str]:
     # right) to prime the reader before the orthographic sheets; all eight are
     # named here so any print of this part can place any of them by name.
     name_octant_views(adapter, label=PART_NAME)
-    return await save_part_and_images(adapter, PART_NAME)
+    return save_part_and_images(adapter, PART_NAME)
 
 
 if __name__ == "__main__":

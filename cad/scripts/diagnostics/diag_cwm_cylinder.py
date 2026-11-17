@@ -191,18 +191,18 @@ def _copy_one(adapter: Any, seed: str, n: int, dist_slot: int,
     return new[0], dt
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     check("open drive-train",
-          await adapter.open_model(str(OUT_SLDASM / "dt-drive-train.SLDASM")))
+          adapter.open_model(str(OUT_SLDASM / "dt-drive-train.SLDASM")))
     try:
-        return await _probe(adapter)
+        return _probe(adapter)
     finally:
         # Discard the mutated model WITHOUT saving, even on a raise -- the
         # built artefact must stay byte-identical (verify reopens it).
         discard_open_documents(adapter)
 
 
-async def _probe(adapter: Any) -> dict[str, str]:
+def _probe(adapter: Any) -> dict[str, str]:
     results: dict[str, str] = {}
     comps = component_names(adapter)
     cyls = sorted((c for c in comps if _stem(c) == "dt-cylinder-gear"),
@@ -362,7 +362,7 @@ async def _probe(adapter: Any) -> dict[str, str]:
         log(f"  copy C put -> spin {spin_deg:.4f}deg"
             f" ({time.monotonic() - t0:.2f}s)")
     t0 = time.monotonic()
-    await gear_mate(
+    gear_mate(
         adapter,
         named_ref(f"Axis1@{cone_c}", "AXIS"),
         named_ref(f"Axis2@{copy_c}", "AXIS"),

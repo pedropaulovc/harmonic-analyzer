@@ -1006,11 +1006,11 @@ def _add_sheet_note(
         raise RuntimeError(f"{label} reads back {got!r}")
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open transgear-feed-pinion source", await adapter.open_model(str(SOURCE)))
+    check("open transgear-feed-pinion source", adapter.open_model(str(SOURCE)))
     source_properties = read_required_properties(
         adapter.currentModel,
         (
@@ -1191,7 +1191,7 @@ async def build(adapter: Any) -> dict[str, str]:
         property_name=TOOTH_SPACE_CALLOUT_PROPERTY, note_xy=TOOTH_SPACE_CALLOUT_XY,
     )
     _assert_note_inside_border(toothspace_callout, "toothspace inspection callout")
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Transgear Pinion Sleeve Manufacturing Drawing",

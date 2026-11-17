@@ -6,7 +6,6 @@ the part the assemblies still build.
 
 from __future__ import annotations
 
-import asyncio
 import contextlib
 import dataclasses
 import re
@@ -91,21 +90,21 @@ class _Recorder:
     def log(self, name: str, args=(), kwargs=None) -> None:
         self.events.append((name, _norm(args), _norm(kwargs or {})))
 
-    async def _async(self, name: str, *args, **kwargs):
+    def _async(self, name: str, *args, **kwargs):
         self.log(name, args, kwargs)
         return "ok"
 
-    async def create_sketch(self, *args):
-        return await self._async("create_sketch", *args)
+    def create_sketch(self, *args):
+        return self._async("create_sketch", *args)
 
-    async def exit_sketch(self, *args):
-        return await self._async("exit_sketch", *args)
+    def exit_sketch(self, *args):
+        return self._async("exit_sketch", *args)
 
-    async def create_revolve(self, *args):
-        return await self._async("create_revolve", *args)
+    def create_revolve(self, *args):
+        return self._async("create_revolve", *args)
 
-    async def create_extrusion(self, *args):
-        return await self._async("create_extrusion", *args)
+    def create_extrusion(self, *args):
+        return self._async("create_extrusion", *args)
 
 
 def _norm(value):
@@ -150,7 +149,7 @@ def _record(monkeypatch, author) -> list[tuple]:
         return call
 
     def async_logger(name):
-        async def call(*args, **kwargs):
+        def call(*args, **kwargs):
             adapter.log(name, args, kwargs)
 
         return call
@@ -164,7 +163,7 @@ def _record(monkeypatch, author) -> list[tuple]:
     monkeypatch.setattr(socket_head, "check", logger("check", True))
     monkeypatch.setattr(socket_head, "name_last_feature", logger("name_last_feature"))
 
-    async def volume_check(_adapter, label, expected, tol):
+    def volume_check(_adapter, label, expected, tol):
         adapter.log("volume_check", (label, expected, tol))
         return expected
 
@@ -229,7 +228,7 @@ def _record(monkeypatch, author) -> list[tuple]:
         )[1],
     )
     monkeypatch.setattr(_telemetry, "info", lambda *a, **k: None)
-    asyncio.run(author(adapter))
+    author(adapter)
     return adapter.events
 
 
@@ -260,12 +259,12 @@ def test_stock_build_uses_its_registered_recipe_head_up_on_the_origin(
 
     seen: dict = {}
 
-    async def fake_build(adapter, **kwargs):
+    def fake_build(adapter, **kwargs):
         seen.update(kwargs)
         return {}
 
     monkeypatch.setattr(part, "build_stock_fastener", fake_build)
-    asyncio.run(part.build(None))
+    part.build(None)
     (component,) = seen["components"]
     assert component.sku == "91251A108"
     assert component.author is recipe.build_91251A108

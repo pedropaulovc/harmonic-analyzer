@@ -248,7 +248,7 @@ def _sketch_manager(adapter):
 # --------------------------------------------------------------------------
 # features
 # --------------------------------------------------------------------------
-async def _wire_path(adapter, feature_name: str) -> None:
+def _wire_path(adapter, feature_name: str) -> None:
     """Vendor Sketch8: eye arc -> bend arc -> straight neck, on Front.
 
     Front-plane sketch coordinates ARE model (x, y) here, so the vendor's
@@ -257,7 +257,7 @@ async def _wire_path(adapter, feature_name: str) -> None:
     direction flag (+1 CCW, -1 CW) -- and needs ``AddToDB`` while the arcs are
     drawn, exactly like the other McMaster profile sketches.
     """
-    check("create_sketch wire path", await adapter.create_sketch("Front"))
+    check("create_sketch wire path", adapter.create_sketch("Front"))
     sk = _sketch_manager(adapter)
     prev_db = bool(sk.AddToDB)
     sk.AddToDB = True
@@ -282,19 +282,19 @@ async def _wire_path(adapter, feature_name: str) -> None:
                         f"{segment.end_mm}"
                     )
             else:
-                await add_line_chain(
+                add_line_chain(
                     adapter, [segment.start_mm, segment.end_mm], close=False
                 )
     finally:
         sk.AddToDB = prev_db
-    check("exit_sketch wire path", await adapter.exit_sketch())
+    check("exit_sketch wire path", adapter.exit_sketch())
     name_last_feature(adapter, feature_name)
 
 
-async def _thread(adapter) -> None:
+def _thread(adapter) -> None:
     """Vendor Helix/Spiral1 + Sketch4 + Cut-Sweep1."""
     offset_plane(adapter, "ThreadDatum", A.shank_end_y_mm)
-    check("create_sketch helix seed", await adapter.create_sketch("ThreadDatum"))
+    check("create_sketch helix seed", adapter.create_sketch("ThreadDatum"))
     with no_sketch_inference(adapter):
         seed = _sketch_manager(adapter).CreateCircleByRadius(
             0.0, 0.0, 0.0, A.thread_major_radius_mm / 1000.0
@@ -316,9 +316,9 @@ async def _thread(adapter) -> None:
         feature_name="ThreadHelix",
     )
 
-    check("create_sketch cutter", await adapter.create_sketch("Front"))
-    await add_line_chain(adapter, [list(p) for p in thread_cutter_profile_mm(A)])
-    check("exit_sketch cutter", await adapter.exit_sketch())
+    check("create_sketch cutter", adapter.create_sketch("Front"))
+    add_line_chain(adapter, [list(p) for p in thread_cutter_profile_mm(A)])
+    check("exit_sketch cutter", adapter.exit_sketch())
     name_last_feature(adapter, "ThreadCutter")
     _thread_sweep_cut(adapter, "ThreadCutter", "ThreadHelix", "ThreadGroove")
 
@@ -331,7 +331,7 @@ def _face_counts(adapter) -> list[int]:
     ]
 
 
-async def _hex_nut(adapter, bolt_volume: float) -> float:
+def _hex_nut(adapter, bolt_volume: float) -> float:
     """Vendor Sketch9 + Boss-Extrude2 + Sketch10 + Cut-Revolve1.
 
     Built last and unmerged (see the module docstring): the ring's bore is
@@ -343,10 +343,10 @@ async def _hex_nut(adapter, bolt_volume: float) -> float:
     from solidworks_mcp.adapters.base import RevolveParameters
 
     nut = A.nut
-    check("create_sketch nut", await adapter.create_sketch("Top"))
-    await add_line_chain(adapter, [list(p) for p in nut_hex_profile_mm(nut)])
-    await define_circle(adapter, 0.0, 0.0, nut.bore_radius_mm, "nut bore")
-    check("exit_sketch nut", await adapter.exit_sketch())
+    check("create_sketch nut", adapter.create_sketch("Top"))
+    add_line_chain(adapter, [list(p) for p in nut_hex_profile_mm(nut)])
+    define_circle(adapter, 0.0, 0.0, nut.bore_radius_mm, "nut bore")
+    check("exit_sketch nut", adapter.exit_sketch())
     name_last_feature(adapter, "NutProfile")
     extrude_at_offset(adapter, nut.height_mm, nut.seat_y_mm, merge_result=False)
     name_last_feature(adapter, "NutRing")
@@ -357,11 +357,11 @@ async def _hex_nut(adapter, bolt_volume: float) -> float:
     ring = (
         1.5 * math.sqrt(3.0) * nut.corner_radius_mm**2 - math.pi * nut.bore_radius_mm**2
     ) * nut.height_mm
-    await volume_check(adapter, "nut ring", bolt_volume + ring, 0.002 * ring)
+    volume_check(adapter, "nut ring", bolt_volume + ring, 0.002 * ring)
 
     # Corner chamfers: Sketch10's outer contour verbatim (radius >= 2.6289,
     # where the bolt does not exist), revolved 360 deg about the shank axis.
-    check("create_sketch nut corners", await adapter.create_sketch("Front"))
+    check("create_sketch nut corners", adapter.create_sketch("Front"))
     sk = _sketch_manager(adapter)
     with no_sketch_inference(adapter):
         axis = sk.CreateCenterLine(
@@ -369,18 +369,18 @@ async def _hex_nut(adapter, bolt_volume: float) -> float:
         )
         if axis is None:
             raise RuntimeError("nut corners: CreateCenterLine failed")
-    await add_line_chain(adapter, [list(p) for p in nut_corner_chamfer_contour_mm(nut)])
-    check("exit_sketch nut corners", await adapter.exit_sketch())
+    add_line_chain(adapter, [list(p) for p in nut_corner_chamfer_contour_mm(nut)])
+    check("exit_sketch nut corners", adapter.exit_sketch())
     name_last_feature(adapter, "NutCornerProfile")
     check(
         "revolve-cut nut corners",
-        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
+        adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
     )
     name_last_feature(adapter, "NutCornerChamfers")
 
     check(
         "chamfer nut bore",
-        await adapter.add_chamfer(
+        adapter.add_chamfer(
             nut.bore_chamfer_mm,
             [
                 [nut.bore_radius_mm, nut.seat_y_mm, 0.0],
@@ -393,7 +393,7 @@ async def _hex_nut(adapter, bolt_volume: float) -> float:
     # The nut's own delta at the fleet gate's tolerance (0.02 %): hex ring
     # 43.83141 less the two 60 deg corner cones (0.315560) less the two 45 deg
     # bore chamfers (0.110450) = 43.405397 against the vendor's 43.405400.
-    return await volume_check(
+    return volume_check(
         adapter,
         "nut (vendor body)",
         bolt_volume + nut.truth.volume_mm3,
@@ -405,7 +405,7 @@ async def _hex_nut(adapter, bolt_volume: float) -> float:
 # builder
 # --------------------------------------------------------------------------
 @stock_recipe("9489T111", threaded=True)
-async def build_9489T111(
+def build_9489T111(
     adapter,
     truth=None,
     *,
@@ -445,17 +445,17 @@ async def build_9489T111(
 
     with no_sketch_inference(adapter):
         # --- shank (vendor Boss-Extrude1) ----------------------------------
-        check("create_sketch shank", await adapter.create_sketch("Top"))
-        await define_circle(adapter, 0.0, 0.0, A.thread_major_radius_mm, "shank")
-        check("exit_sketch shank", await adapter.exit_sketch())
+        check("create_sketch shank", adapter.create_sketch("Top"))
+        define_circle(adapter, 0.0, 0.0, A.thread_major_radius_mm, "shank")
+        check("exit_sketch shank", adapter.exit_sketch())
         name_last_feature(adapter, "ShankProfile")
         extrude_at_offset(adapter, A.thread_length_mm, A.shank_end_y_mm)
         name_last_feature(adapter, "Shank")
         shank_v = math.pi * A.thread_major_radius_mm**2 * A.thread_length_mm
-        volume = await volume_check(adapter, "shank", shank_v, 0.002 * shank_v)
+        volume = volume_check(adapter, "shank", shank_v, 0.002 * shank_v)
 
         # --- wire (vendor Sketch8 + Sweep1) --------------------------------
-        await _wire_path(adapter, "WirePath")
+        _wire_path(adapter, "WirePath")
 
     _sweep_wire(adapter, "WirePath", "Wire")
     if len(bodies(adapter)) != 1:
@@ -471,14 +471,14 @@ async def build_9489T111(
         for segment in eye_path_mm(A)
     )
     wire_v = math.pi * A.wire_radius_mm**2 * path_len
-    volume = await volume_check(adapter, "wire", volume + wire_v, 0.003 * wire_v)
+    volume = volume_check(adapter, "wire", volume + wire_v, 0.003 * wire_v)
 
     # --- tip round + end chamfer (vendor Fillet1, Chamfer1) ----------------
     # The tip cap is normal to the path, so its rim runs through the cap
     # centre offset by the wire radius along the eye axis (+Z).
     check(
         "fillet wire tip",
-        await adapter.add_fillet(
+        adapter.add_fillet(
             A.tip_fillet_mm,
             [[A.eye_open_tip_mm[0], A.eye_open_tip_mm[1], A.wire_radius_mm]],
         ),
@@ -494,13 +494,13 @@ async def build_9489T111(
             - (math.pi * r_f * r_f / 4.0) * ((r_w - r_f) + 4.0 * r_f / (3.0 * math.pi))
         )
     )
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "tip fillet", volume - fillet_v, 0.05 * fillet_v
     )
 
     check(
         "chamfer shank end",
-        await adapter.add_chamfer(
+        adapter.add_chamfer(
             A.end_chamfer_mm,
             [[A.thread_major_radius_mm, A.shank_end_y_mm, 0.0]],
         ),
@@ -511,13 +511,13 @@ async def build_9489T111(
         * A.end_chamfer_mm**2
         * (A.thread_major_radius_mm - A.end_chamfer_mm / 3.0)
     )
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "end chamfer", volume - chamfer_v, 0.02 * chamfer_v
     )
 
     # --- thread (vendor Helix/Spiral1 + Sketch4 + Cut-Sweep1) --------------
     with no_sketch_inference(adapter):
-        await _thread(adapter)
+        _thread(adapter)
     # The groove crosses the neck: below y=-9.525 it is bounded by the thread
     # major, above it by the thinner wire.  The end chamfer, already cut, took
     # 0.6939 of it.  What is left over is the runout, where the cutter climbs
@@ -530,13 +530,13 @@ async def build_9489T111(
         * thread_groove_volume_per_mm_mm3(A, clip_radius_mm=A.wire_radius_mm)
         - end_chamfer_groove_overlap_mm3(A)
     )
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "thread groove", volume - groove_v, 0.03 * groove_v
     )
 
     # The vendor's own bolt body, at the fleet gate's tolerance (0.02 %).
     bolt_truth = A.body_truth[0][1]
-    volume = await volume_check(
+    volume = volume_check(
         adapter,
         "bolt (vendor body)",
         bolt_truth.volume_mm3,
@@ -552,7 +552,7 @@ async def build_9489T111(
     # --- captive hex nut (vendor Sketch9..Cut-Revolve1, built last) --------
     if nut == "included":
         with no_sketch_inference(adapter):
-            await _hex_nut(adapter, volume)
+            _hex_nut(adapter, volume)
         counts = sorted(_face_counts(adapter))
         if counts != sorted((BOLT_FACES, NUT_FACES)):
             raise RuntimeError(
@@ -560,7 +560,7 @@ async def build_9489T111(
                 f"{sorted((BOLT_FACES, NUT_FACES))} (bolt + 6 flats, 2 end "
                 "rings, 12 corner cones, bore, 2 bore cones)"
             )
-        await volume_check(
+        volume_check(
             adapter,
             "9489T111 (vendor part)",
             A.truth.volume_mm3,
@@ -580,7 +580,7 @@ async def build_9489T111(
     # vendor helix leaves at its free end, so the stock 13-face topology is not
     # a contract of the trimmed part (9490T1's trim asserts nothing either).
     if requested_cut.removed_length_mm:
-        await trim_factory_shank(adapter, A, requested_cut)
+        trim_factory_shank(adapter, A, requested_cut)
 
     # The replica is authored in the vendor's own frame: no COM remap.
     adapter._mcm_com_map = None

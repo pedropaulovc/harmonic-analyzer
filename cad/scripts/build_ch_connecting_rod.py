@@ -212,10 +212,10 @@ def finished_volume() -> float:
     )
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     # #290: the row's inch calculation units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
@@ -225,24 +225,24 @@ async def build(adapter) -> dict[str, str]:
     # mm suffix is load-bearing -- this is an INCH document and the equation
     # manager reads BARE numbers in document units (an unsuffixed 127 = 127 in,
     # blowing the part up 25.4x).
-    await set_global(adapter, "CenterDistance", f"{CENTER_DISTANCE}mm")
-    await set_global(adapter, "RingBoreDia", f"{RING_BORE_DIA}mm")
-    await set_global(adapter, "RingWall", f"{RING_WALL}mm")
-    await set_global(adapter, "RingThickness", f"{RING_THICKNESS}mm")
-    await set_global(adapter, "ShankWidth", f"{SHANK_WIDTH}mm")
-    await set_global(adapter, "ShankThickness", f"{SHANK_THICKNESS}mm")
-    await set_global(adapter, "ForkWidth", f"{FORK_WIDTH}mm")
-    await set_global(adapter, "ForkTine", f"{TINE_THICKNESS}mm")
-    await set_global(adapter, "ForkSlotWidth", f"{FORK_SLOT_WIDTH}mm")
-    await set_global(adapter, "ForkThickness", '2 * "ForkTine" + "ForkSlotWidth"')
-    await set_global(adapter, "ForkCrotchBelowPin", f"{FORK_CROTCH_BELOW_PIN}mm")
-    await set_global(adapter, "ForkBaseBelowPin", f"{FORK_BASE_BELOW_PIN}mm")
-    await set_global(adapter, "SlotRunout", f"{SLOT_RUNOUT}mm")
-    await set_global(adapter, "PinHoleDia", f"{PIN_HOLE_DIA}mm")
-    await set_global(adapter, "InsideCornerR", f"{INSIDE_CORNER_R}mm")
-    await set_global(adapter, "RingOuterRadius", '"RingBoreDia" / 2 + "RingWall"')
-    await set_global(adapter, "ForkBaseY", '"CenterDistance" - "ForkBaseBelowPin"')
-    await set_global(
+    set_global(adapter, "CenterDistance", f"{CENTER_DISTANCE}mm")
+    set_global(adapter, "RingBoreDia", f"{RING_BORE_DIA}mm")
+    set_global(adapter, "RingWall", f"{RING_WALL}mm")
+    set_global(adapter, "RingThickness", f"{RING_THICKNESS}mm")
+    set_global(adapter, "ShankWidth", f"{SHANK_WIDTH}mm")
+    set_global(adapter, "ShankThickness", f"{SHANK_THICKNESS}mm")
+    set_global(adapter, "ForkWidth", f"{FORK_WIDTH}mm")
+    set_global(adapter, "ForkTine", f"{TINE_THICKNESS}mm")
+    set_global(adapter, "ForkSlotWidth", f"{FORK_SLOT_WIDTH}mm")
+    set_global(adapter, "ForkThickness", '2 * "ForkTine" + "ForkSlotWidth"')
+    set_global(adapter, "ForkCrotchBelowPin", f"{FORK_CROTCH_BELOW_PIN}mm")
+    set_global(adapter, "ForkBaseBelowPin", f"{FORK_BASE_BELOW_PIN}mm")
+    set_global(adapter, "SlotRunout", f"{SLOT_RUNOUT}mm")
+    set_global(adapter, "PinHoleDia", f"{PIN_HOLE_DIA}mm")
+    set_global(adapter, "InsideCornerR", f"{INSIDE_CORNER_R}mm")
+    set_global(adapter, "RingOuterRadius", '"RingBoreDia" / 2 + "RingWall"')
+    set_global(adapter, "ForkBaseY", '"CenterDistance" - "ForkBaseBelowPin"')
+    set_global(
         adapter, "RingFaceNear", '("ForkThickness" - "RingThickness") / 2'
     )
 
@@ -263,15 +263,15 @@ async def build(adapter) -> dict[str, str]:
     # corners 4) = 3 relations + 4 dims + the centre's 2, the flanks' feet
     # held to the arc's ends by coincident relations.
     plate = SketchDims()
-    check("create_sketch plate", await adapter.create_sketch("Front"))
+    check("create_sketch plate", adapter.create_sketch("Front"))
     shank_x = SHANK_WIDTH / 2.0
     junction_y = math.sqrt(RING_OUTER_RADIUS**2 - shank_x**2)
     set_sketch_direct_db(adapter, True)
     ring_arc = check(
         "ring OD major arc",
-        await adapter.add_arc(0.0, 0.0, -shank_x, junction_y, shank_x, junction_y),
+        adapter.add_arc(0.0, 0.0, -shank_x, junction_y, shank_x, junction_y),
     )
-    flank_r, root, flank_l = await add_line_chain(
+    flank_r, root, flank_l = add_line_chain(
         adapter,
         [
             (shank_x, junction_y),
@@ -290,36 +290,36 @@ async def build(adapter) -> dict[str, str]:
         ("left flank", flank_l, None, "vertical"),
         ("shank root", root, None, "horizontal"),
     ):
-        check(f"plate {label}", await adapter.add_sketch_constraint(first, second, relation))
+        check(f"plate {label}", adapter.add_sketch_constraint(first, second, relation))
     check(
         "ring outer diameter",
-        await adapter.add_sketch_dimension(
+        adapter.add_sketch_dimension(
             ring_arc, None, "diameter", 2.0 * RING_OUTER_RADIUS
         ),
     )
     plate.record("RingOuterDia", '2 * "RingOuterRadius"')
     check(
         "shank width",
-        await adapter.add_sketch_dimension(root, None, "linear", SHANK_WIDTH),
+        adapter.add_sketch_dimension(root, None, "linear", SHANK_WIDTH),
     )
     plate.record("ShankWidthDim", '"ShankWidth"')
-    await dimension_between(
+    dimension_between(
         adapter, f"{root}.start", "origin", "vertical_distance", FORK_BASE_Y,
         "shank root height",
     )
     plate.record("ShankRootY", '"ForkBaseY"')
-    await dimension_between(
+    dimension_between(
         adapter, f"{flank_r}.start", "origin", "horizontal_distance", shank_x,
         "shank right flank x",
     )
     plate.record("ShankSideX", '"ShankWidth" / 2')
-    await ensure_fully_defined(adapter, "plate sketch")
-    check("exit_sketch plate", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "plate sketch")
+    check("exit_sketch plate", adapter.exit_sketch())
     name_last_feature(adapter, "PlateProfile")
     drive_jobs += plate.apply(adapter, "PlateProfile")
     check(
         "extrude plate",
-        await adapter.create_extrusion(
+        adapter.create_extrusion(
             ExtrusionParameters(depth=RING_THICKNESS, both_directions=True)
         ),
     )
@@ -343,26 +343,26 @@ async def build(adapter) -> dict[str, str]:
     # the centre, less the arc's equal radius) = 3 relations + the on-axis
     # alignment + 5 dims, no redundancy.
     fork_sd = SketchDims()
-    check("create_sketch fork", await adapter.create_sketch("Front"))
+    check("create_sketch fork", adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     fw = FORK_WIDTH / 2.0
     fork_root = check(
         "fork root",
-        await adapter.add_line(-fw, FORK_BASE_Y, fw, FORK_BASE_Y),
+        adapter.add_line(-fw, FORK_BASE_Y, fw, FORK_BASE_Y),
     )
     fork_side_r = check(
         "fork side right",
-        await adapter.add_line(fw, FORK_BASE_Y, fw, CENTER_DISTANCE),
+        adapter.add_line(fw, FORK_BASE_Y, fw, CENTER_DISTANCE),
     )
     fork_crown = check(
         "fork crown",
-        await adapter.add_arc(
+        adapter.add_arc(
             0.0, CENTER_DISTANCE, fw, CENTER_DISTANCE, -fw, CENTER_DISTANCE
         ),
     )
     fork_side_l = check(
         "fork side left",
-        await adapter.add_line(-fw, CENTER_DISTANCE, -fw, FORK_BASE_Y),
+        adapter.add_line(-fw, CENTER_DISTANCE, -fw, FORK_BASE_Y),
     )
     set_sketch_direct_db(adapter, False)
     for ent, relation in (
@@ -370,22 +370,22 @@ async def build(adapter) -> dict[str, str]:
         (fork_side_r, "vertical"),
         (fork_side_l, "vertical"),
     ):
-        check(f"fork {relation}", await adapter.add_sketch_constraint(ent, None, relation))
+        check(f"fork {relation}", adapter.add_sketch_constraint(ent, None, relation))
     check(
         "dimension fork width",
-        await adapter.add_sketch_dimension(fork_root, None, "linear", FORK_WIDTH),
+        adapter.add_sketch_dimension(fork_root, None, "linear", FORK_WIDTH),
     )
     fork_sd.record("ForkWidthDim", '"ForkWidth"')
     check(
         "dimension fork crown radius",
-        await adapter.add_sketch_dimension(fork_crown, None, "radial", fw),
+        adapter.add_sketch_dimension(fork_crown, None, "radial", fw),
     )
     fork_sd.record("ForkCrownR", '"ForkWidth" / 2')
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{fork_crown}.center", 0.0, CENTER_DISTANCE, "fork crown centre"
     )
     fork_sd.record("ForkPinY", '"CenterDistance"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{fork_side_r}.start",
         f"{fork_side_r}.end",
@@ -394,18 +394,18 @@ async def build(adapter) -> dict[str, str]:
         "fork side length",
     )
     fork_sd.record("ForkSideLength", '"ForkBaseBelowPin"')
-    await dimension_between(
+    dimension_between(
         adapter, f"{fork_side_r}.start", "origin", "horizontal_distance", fw,
         "fork side x",
     )
     fork_sd.record("ForkSideX", '"ForkWidth" / 2')
-    await ensure_fully_defined(adapter, "fork sketch")
-    check("exit_sketch fork", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "fork sketch")
+    check("exit_sketch fork", adapter.exit_sketch())
     name_last_feature(adapter, "ForkProfile")
     drive_jobs += fork_sd.apply(adapter, "ForkProfile")
     check(
         "extrude fork",
-        await adapter.create_extrusion(
+        adapter.create_extrusion(
             ExtrusionParameters(depth=FORK_THICKNESS, both_directions=True)
         ),
     )
@@ -416,7 +416,7 @@ async def build(adapter) -> dict[str, str]:
     fork_thickness_dim = name_dimensions(adapter, "ForkBoss", ["ForkThick"])
     drive_jobs.append((fork_thickness_dim[0], '"ForkThickness"'))
     v_expected = boss_volume()
-    await volume_check(adapter, "ring, shank and fork bosses", v_expected, 0.002 * v_expected)
+    volume_check(adapter, "ring, shank and fork bosses", v_expected, 0.002 * v_expected)
 
     # Fork slot: a Right-plane rectangle (sketch x = model -Z) centred on the
     # rod mid-plane, from the crotch up past the crown, cut through the fork's
@@ -436,12 +436,12 @@ async def build(adapter) -> dict[str, str]:
     # four relations + 4 dims; the near-face line: vertical + level with the
     # face line's root end + ordinate + run.
     slot_sd = SketchDims()
-    check("create_sketch fork slot", await adapter.create_sketch("Right"))
+    check("create_sketch fork slot", adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
     face_x = FORK_THICKNESS / 2.0
     face_ref = check(
         "fork face reference",
-        await adapter.add_centerline(face_x, FORK_BASE_Y, face_x, FORK_TOP_Y),
+        adapter.add_centerline(face_x, FORK_BASE_Y, face_x, FORK_TOP_Y),
     )
     sh = FORK_SLOT_WIDTH / 2.0
     slot_rect = [
@@ -450,10 +450,10 @@ async def build(adapter) -> dict[str, str]:
         (sh, FORK_CROTCH_Y + SLOT_CUT_HEIGHT),
         (-sh, FORK_CROTCH_Y + SLOT_CUT_HEIGHT),
     ]
-    slot = await add_line_chain(adapter, slot_rect)
+    slot = add_line_chain(adapter, slot_rect)
     ring_face = check(
         "ring face reference",
-        await adapter.add_centerline(
+        adapter.add_centerline(
             RING_THICKNESS / 2.0,
             FORK_BASE_Y,
             RING_THICKNESS / 2.0,
@@ -463,14 +463,14 @@ async def build(adapter) -> dict[str, str]:
     set_sketch_direct_db(adapter, False)
     check(
         "fork face reference vertical",
-        await adapter.add_sketch_constraint(face_ref, None, "vertical"),
+        adapter.add_sketch_constraint(face_ref, None, "vertical"),
     )
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{face_ref}.start", face_x, FORK_BASE_Y, "fork face reference"
     )
     slot_sd.record("ForkFaceX", '"ForkThickness" / 2')
     slot_sd.record("ForkRootY", '"ForkBaseY"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{face_ref}.start",
         f"{face_ref}.end",
@@ -485,14 +485,14 @@ async def build(adapter) -> dict[str, str]:
         direction = "horizontal" if y1 == y2 else "vertical"
         check(
             f"slot {direction} {line}",
-            await adapter.add_sketch_constraint(line, None, direction),
+            adapter.add_sketch_constraint(line, None, direction),
         )
-    await dimension_between(
+    dimension_between(
         adapter, f"{slot[0]}.start", f"{slot[0]}.end", "horizontal_distance",
         FORK_SLOT_WIDTH, "slot width",
     )
     slot_sd.record("SlotWidth", '"ForkSlotWidth"')
-    await dimension_between(
+    dimension_between(
         adapter, f"{slot[1]}.start", f"{slot[1]}.end", "vertical_distance",
         SLOT_CUT_HEIGHT, "slot cut height",
     )
@@ -500,49 +500,49 @@ async def build(adapter) -> dict[str, str]:
         "SlotCutHeight", '"ForkWidth" / 2 + "ForkCrotchBelowPin" + "SlotRunout"'
     )
     # The near tine: the datum face to the slot's near wall, at the tine top.
-    await dimension_between(
+    dimension_between(
         adapter, f"{face_ref}.end", f"{slot[0]}.end", "horizontal_distance",
         TINE_THICKNESS, "near tine",
     )
     slot_sd.record("TineNear", '"ForkTine"')
-    await dimension_between(
+    dimension_between(
         adapter, f"{slot[0]}.start", f"{face_ref}.end", "vertical_distance",
         SLOT_DEPTH, "slot depth",
     )
     slot_sd.record("SlotDepth", '"ForkWidth" / 2 + "ForkCrotchBelowPin"')
     check(
         "RingFaceNear reference vertical",
-        await adapter.add_sketch_constraint(ring_face, None, "vertical"),
+        adapter.add_sketch_constraint(ring_face, None, "vertical"),
     )
     check(
         "RingFaceNear reference level with the fork root",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{ring_face}.start", f"{face_ref}.start", "horizontal_points"
         ),
     )
-    await dimension_between(
+    dimension_between(
         adapter, f"{face_ref}.start", f"{ring_face}.end", "horizontal_distance",
         RING_FACE_NEAR, "RingFaceNear",
     )
     slot_sd.record("RingFaceNear", '"RingFaceNear"')
-    await dimension_between(
+    dimension_between(
         adapter, f"{ring_face}.start", f"{ring_face}.end", "vertical_distance",
         RING_FACE_REF_RUN, "RingFaceNear reference run",
     )
     slot_sd.record("RingFaceNearRun")
-    await ensure_fully_defined(adapter, "fork slot sketch")
-    check("exit_sketch fork slot", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "fork slot sketch")
+    check("exit_sketch fork slot", adapter.exit_sketch())
     name_last_feature(adapter, "ForkSlotProfile")
     drive_jobs += slot_sd.apply(adapter, "ForkSlotProfile")
     check(
         "cut fork slot",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
         ),
     )
     name_last_feature(adapter, "ForkSlot")
     v_expected -= slot_volume()
-    await volume_check(adapter, "fork slot", v_expected, 0.01 * slot_volume() + 0.05)
+    volume_check(adapter, "fork slot", v_expected, 0.01 * slot_volume() + 0.05)
 
     # Every inside corner gets the one modelled radius, inside the title
     # block's INSIDE CORNERS R1.0 MAX, which governs it on the print
@@ -564,44 +564,44 @@ async def build(adapter) -> dict[str, str]:
     ]
     check(
         "fillet inside corners",
-        await adapter.add_fillet(INSIDE_CORNER_R, corner_edges, propagate=False),
+        adapter.add_fillet(INSIDE_CORNER_R, corner_edges, propagate=False),
     )
     name_last_feature(adapter, "InsideCorners")
     corner_dim = name_dimensions(adapter, "InsideCorners", ["InsideCornerR"])
     drive_jobs.append((corner_dim[0], '"InsideCornerR"'))
     v_corners = inside_corner_volume()
     v_expected += v_corners
-    await volume_check(adapter, "inside corner fillets", v_expected, 0.1 * v_corners + 0.05)
+    volume_check(adapter, "inside corner fillets", v_expected, 0.1 * v_corners + 0.05)
 
     # Strap bore - rides the eccentric cam. On-axis circle: diameter only.
     bore_sd = SketchDims()
-    check("create_sketch bore", await adapter.create_sketch("Front"))
-    await define_circle(
+    check("create_sketch bore", adapter.create_sketch("Front"))
+    define_circle(
         adapter, 0.0, 0.0, RING_BORE_DIA / 2.0, "strap bore", dims=bore_sd,
         names=("StrapBoreCx", "StrapBoreCz", "StrapBoreDia"),
         drives=(None, None, '"RingBoreDia"'),
     )
-    await ensure_fully_defined(adapter, "bore sketch")
-    check("exit_sketch bore", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "bore sketch")
+    check("exit_sketch bore", adapter.exit_sketch())
     name_last_feature(adapter, "StrapBoreProfile")
     drive_jobs += bore_sd.apply(adapter, "StrapBoreProfile")
     check(
         "cut strap bore",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
         ),
     )
     name_last_feature(adapter, "StrapBore")
     v_expected -= strap_bore_volume()
-    await volume_check(adapter, "strap bore", v_expected, 0.002 * v_expected)
+    volume_check(adapter, "strap bore", v_expected, 0.002 * v_expected)
 
     # Pivot pin hole on the rod axis, reamed through both tines (the slot
     # between them is air). The pin RUNS in the arm's #47 hole and is PRESSED
     # here, its ends dressed flush (sh_vn_pivot_pin_rod_spec). No countersink: the
     # hole runs straight through each tine, so the pin bears on the whole tine.
     pin_hole = SketchDims()
-    check("create_sketch rocker pin hole", await adapter.create_sketch("Front"))
-    await define_circle(
+    check("create_sketch rocker pin hole", adapter.create_sketch("Front"))
+    define_circle(
         adapter,
         0.0,
         CENTER_DISTANCE,
@@ -611,27 +611,27 @@ async def build(adapter) -> dict[str, str]:
         names=(None, "PinHoleY", "PinHoleDia"),
         drives=(None, '"CenterDistance"', '"PinHoleDia"'),
     )
-    await ensure_fully_defined(adapter, "rocker pin hole sketch")
-    check("exit_sketch rocker pin hole", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "rocker pin hole sketch")
+    check("exit_sketch rocker pin hole", adapter.exit_sketch())
     name_last_feature(adapter, "PinHoleProfile")
     drive_jobs += pin_hole.apply(adapter, "PinHoleProfile")
     check(
         "cut rocker pin hole",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
         ),
     )
     name_last_feature(adapter, "PinHole")
     v_pin = pin_hole_volume()
     v_expected -= v_pin
-    v_built = await volume_check(
+    v_built = volume_check(
         adapter, "pin hole through both tines", v_expected, 0.03 * v_pin + 0.05
     )
 
     # Named bore axes for assembly mates (view-independent name selection):
     # Axis1 = strap bore on the cam (origin), Axis2 = pivot pin bore (0, CD).
-    await name_bore_axis(adapter, "Right Plane", 0.0, "Top Plane", 0.0, "strap bore")
-    await name_bore_axis(
+    name_bore_axis(adapter, "Right Plane", 0.0, "Top Plane", 0.0, "strap bore")
+    name_bore_axis(
         adapter,
         "Right Plane",
         0.0,
@@ -646,11 +646,11 @@ async def build(adapter) -> dict[str, str]:
     # so every target resolves. Each equation evaluates to the as-built value, so
     # the neutrality gate asserts the post-drive volume equals the as-built
     # volume: geometry must not move.
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    volume_check(
         adapter, "driven connecting rod (equations neutral)", v_built, 0.001 * v_built
     )
     # The bands are millimetres; UNIT prints them in inches.
@@ -700,8 +700,8 @@ async def build(adapter) -> dict[str, str]:
     )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
 
-    await apply_material(adapter, MATERIAL)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    report_mass_properties(adapter)
 
     # Manufacturing drawing support: mark exactly the print's dimensions and
     # stamp the make-critical title-block properties.
@@ -717,7 +717,7 @@ async def build(adapter) -> dict[str, str]:
             "Manufacturing Notes": DRAWING_NOTES,
         },
     )
-    artefacts = await save_part_and_images(adapter, PART_NAME)
+    artefacts = save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(
         adapter,
         (

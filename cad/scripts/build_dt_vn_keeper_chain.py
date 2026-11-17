@@ -137,12 +137,12 @@ def _body_count(adapter) -> int:
     return len(_early_bound(adapter.currentModel, "IPartDoc").GetBodies2(0, True) or ())
 
 
-async def _catalogue_reference(adapter) -> None:
+def _catalogue_reference(adapter) -> None:
     """The neck's section at the origin, carrying the catalogue wire size."""
-    check(f"create_sketch {CATALOGUE_REFERENCE}", await adapter.create_sketch("Right"))
-    await define_circle(adapter, 0.0, 0.0, WIRE_R, "catalogue wire")
-    await ensure_fully_defined(adapter, CATALOGUE_REFERENCE)
-    check(f"exit_sketch {CATALOGUE_REFERENCE}", await adapter.exit_sketch())
+    check(f"create_sketch {CATALOGUE_REFERENCE}", adapter.create_sketch("Right"))
+    define_circle(adapter, 0.0, 0.0, WIRE_R, "catalogue wire")
+    ensure_fully_defined(adapter, CATALOGUE_REFERENCE)
+    check(f"exit_sketch {CATALOGUE_REFERENCE}", adapter.exit_sketch())
     name_last_feature(adapter, CATALOGUE_REFERENCE)
     name_dimensions(adapter, CATALOGUE_REFERENCE, [CATALOGUE_WIRE_DIMENSION])
     mark_dimensions_for_drawing(
@@ -176,16 +176,16 @@ def _sweep_link(adapter, index: int, link) -> None:
         )
 
 
-async def build(adapter) -> dict[str, str]:
-    check("create_part", await adapter.create_part())
-    await _catalogue_reference(adapter)
+def build(adapter) -> dict[str, str]:
+    check("create_part", adapter.create_part())
+    _catalogue_reference(adapter)
     for index, link in enumerate(CHAIN_PART_LINKS):
         _sweep_link(adapter, index, link)
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     if _body_count(adapter) != BODY_COUNT:
         raise RuntimeError(f"keeper chain has {_body_count(adapter)} bodies, expected {BODY_COUNT}")
-    await volume_check(adapter, "keeper chain", V_CHAIN, 0.005 * V_CHAIN)
-    mass = await adapter.get_mass_properties()
+    volume_check(adapter, "keeper chain", V_CHAIN, 0.005 * V_CHAIN)
+    mass = adapter.get_mass_properties()
     if not mass.is_success:
         raise RuntimeError(f"keeper chain: get_mass_properties failed: {mass.error}")
     got = [float(c) for c in mass.data.center_of_mass]
@@ -196,11 +196,11 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError(f"keeper chain centre of mass {got} != analytic {want}")
     _telemetry.success(f"keeper chain: centre of mass {got} matches {want}")
     blank_reference_sketches(adapter, (CATALOGUE_REFERENCE,))
-    await apply_material(adapter, MATERIAL)
+    apply_material(adapter, MATERIAL)
     apply_custom_properties(adapter, STOCK_PROPERTIES)
     apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": CHAIN_DRAWING_NOTES})
-    await report_mass_properties(adapter)
-    artefacts = await save_part_and_images(adapter, PART_NAME)
+    report_mass_properties(adapter)
+    artefacts = save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(
         adapter,
         (

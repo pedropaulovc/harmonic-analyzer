@@ -6,7 +6,6 @@ sheet's machinist review own that.
 
 from __future__ import annotations
 
-import asyncio
 import contextlib
 import math
 from pathlib import Path
@@ -178,27 +177,27 @@ class _Recorder:
     def log(self, name: str, args=(), kwargs=None) -> None:
         self.events.append((name, tuple(args), dict(kwargs or {})))
 
-    async def _async(self, name: str, *args, **kwargs):
+    def _async(self, name: str, *args, **kwargs):
         self.log(name, args, kwargs)
         return "ok"
 
-    async def create_sketch(self, *args):
-        return await self._async("create_sketch", *args)
+    def create_sketch(self, *args):
+        return self._async("create_sketch", *args)
 
-    async def exit_sketch(self, *args):
-        return await self._async("exit_sketch", *args)
+    def exit_sketch(self, *args):
+        return self._async("exit_sketch", *args)
 
-    async def create_extrusion(self, *args):
-        return await self._async("create_extrusion", *args)
+    def create_extrusion(self, *args):
+        return self._async("create_extrusion", *args)
 
-    async def create_cut_extrude(self, *args):
-        return await self._async("create_cut_extrude", *args)
+    def create_cut_extrude(self, *args):
+        return self._async("create_cut_extrude", *args)
 
-    async def create_revolve(self, *args):
-        return await self._async("create_revolve", *args)
+    def create_revolve(self, *args):
+        return self._async("create_revolve", *args)
 
-    async def add_chamfer(self, *args):
-        return await self._async("add_chamfer", *args)
+    def add_chamfer(self, *args):
+        return self._async("add_chamfer", *args)
 
 
 # Two bodies after the split at the neck's land bottom: the head-and-shoulder
@@ -229,12 +228,12 @@ def _record(monkeypatch, bodies=_SPLIT_BODIES) -> _Recorder:
         return call
 
     def async_logger(name):
-        async def call(_adapter, *args, **kwargs):
+        def call(_adapter, *args, **kwargs):
             adapter.log(name, args, kwargs)
 
         return call
 
-    async def volume_check(_adapter, label, expected, tol):
+    def volume_check(_adapter, label, expected, tol):
         adapter.log("volume_check", (label, expected, tol))
         return expected
 
@@ -259,7 +258,7 @@ def _record(monkeypatch, bodies=_SPLIT_BODIES) -> _Recorder:
     monkeypatch.setattr(entry, "split_at_plane", split)
     monkeypatch.setattr(entry, "no_sketch_inference", no_inference)
     monkeypatch.setattr(_telemetry, "info", lambda *a, **k: None)
-    asyncio.run(entry.build_90325A174(adapter))
+    entry.build_90325A174(adapter)
     return adapter
 
 

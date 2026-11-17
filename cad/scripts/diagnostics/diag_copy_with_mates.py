@@ -77,20 +77,20 @@ SEED_MATES = 3  # concentric + Front-plane distance + Top-plane parallel
 DIST_IDX = 1  # the distance mate's position in the seed's mate order
 
 
-async def _mate_count(adapter) -> int:
-    res = await adapter.list_mates()
+def _mate_count(adapter) -> int:
+    res = adapter.list_mates()
     return len(res.data or []) if res.is_success else -1
 
 
-async def _seat_baseline(adapter, gap: int) -> tuple[str, float]:
+def _seat_baseline(adapter, gap: int) -> tuple[str, float]:
     """Production path: place + 3 mates. Returns (name, seconds)."""
     z = GAP_Z[gap]
     t0 = time.perf_counter()
-    comp = await place_component(
+    comp = place_component(
         adapter, "pivot-bushing", [PIVOT[0], PIVOT[1], z],
         [0.0, 0.0, 0.0], IDENTITY, ground=False, label=f"baseline bushing gap{gap}",
     )
-    await _seat_bushing_on_shaft(
+    _seat_bushing_on_shaft(
         adapter, comp, PIVOT_OD_PT, (PIVOT[0], PIVOT[1]), PIVOT_BUSHING_OD / 2.0,
     )
     return comp, time.perf_counter() - t0
@@ -188,19 +188,19 @@ def _bushing_zs(adapter) -> list[float]:
     )
 
 
-async def build(adapter) -> dict[str, str]:
-    check("create_assembly", await adapter.create_assembly())
-    await place_component(
+def build(adapter) -> dict[str, str]:
+    check("create_assembly", adapter.create_assembly())
+    place_component(
         adapter, "ch-pivot-shaft", [PIVOT[0], PIVOT[1], PIVOT_SHAFT_Z],
         [0.0, 0.0, 0.0], IDENTITY, ground=True, label="pivot-shaft (grounded)",
     )
 
-    seed, t_seed = await _seat_baseline(adapter, 0)
-    _, t_base2 = await _seat_baseline(adapter, 1)
+    seed, t_seed = _seat_baseline(adapter, 0)
+    _, t_base2 = _seat_baseline(adapter, 1)
     log(f"baseline production seat: {t_seed:.2f}s / {t_base2:.2f}s per bushing")
-    mates_before = await _mate_count(adapter)
+    mates_before = _mate_count(adapter)
     pre_copy_names = {m["name"]
-                      for m in ((await adapter.list_mates()).data or [])}
+                      for m in ((adapter.list_mates()).data or [])}
 
     # Q1: marshaling. The 'native' shape is the proven contract; 'list' and
     # 'variant' stay as regression probes for the two known-broken encodings.
@@ -249,7 +249,7 @@ async def build(adapter) -> dict[str, str]:
     # legitimately lands mirrored. Production must therefore anchor
     # re-valued distances so every station shares the seed's side (e.g.
     # the neighbour-bushing anchor, PITCH/2 + k*PITCH).
-    mates_after = await _mate_count(adapter)
+    mates_after = _mate_count(adapter)
     zs = _bushing_zs(adapter)
     expected = sorted([GAP_Z[0], GAP_Z[1]]
                       + [-abs(GAP_Z[k]) for k in range(2, 2 + N_COPIES)])
@@ -289,7 +289,7 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError(
             "closing EditRebuild3 failed -- end state unproven")
     # (1) Mate count: ladder copies + the two Q5 copies, all real.
-    mates_final = await _mate_count(adapter)
+    mates_final = _mate_count(adapter)
     want_final = mates_before + SEED_MATES * (N_COPIES + 2)
     if mates_final != want_final:
         raise RuntimeError(
@@ -309,7 +309,7 @@ async def build(adapter) -> dict[str, str]:
     # error-free -- count/stations can hold while a mate sits suppressed or
     # hard-errored with its bushing parked at the inserted transform.
     unhealthy = []
-    for m in ((await adapter.list_mates()).data or []):
+    for m in ((adapter.list_mates()).data or []):
         if m["name"] in pre_copy_names:
             continue
         code = _mate_hard_error(adapter, m["name"])

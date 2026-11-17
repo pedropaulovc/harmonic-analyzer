@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import hashlib
 import json
 from pathlib import Path
@@ -126,7 +125,7 @@ class _Adapter:
     def _zoom_to_fit(self, _model):
         pass
 
-    async def export_image(self, request):
+    def export_image(self, request):
         doc = self.currentModel
         fault = self.png_fault if doc.active == doc.fault_member else None
         if fault == "raise":
@@ -192,9 +191,7 @@ def native_export(tmp_path, monkeypatch):
 
 
 def _produce(case):
-    asyncio.run(
-        exports.export_member_configurations(case.adapter, case.stem, case.members)
-    )
+    exports.export_member_configurations(case.adapter, case.stem, case.members)
 
 
 def _stamp_execution(case):
@@ -580,9 +577,9 @@ def _watch_annotation_display(case, monkeypatch):
     monkeypatch.setattr(exports, "_set_model_annotations_displayed", set_displayed)
     render = case.adapter.export_image
 
-    async def export_image(request):
+    def export_image(request):
         state["rendered"].append(state["shown"])
-        return await render(request)
+        return render(request)
 
     case.adapter.export_image = export_image
     return state
@@ -594,11 +591,9 @@ def test_member_pngs_hide_model_annotations_only_when_asked(native_export, monke
     # restores the display; the native bytes never change (no save).
     case = native_export()
     state = _watch_annotation_display(case, monkeypatch)
-    asyncio.run(
-        exports.export_member_configurations(
+    exports.export_member_configurations(
             case.adapter, case.stem, case.members, hide_model_annotations=True
         )
-    )
     assert state["rendered"] == [False] * len(case.members)
     assert state["sets"] == [False, True] and state["shown"] is True
     assert case.certificate.exists()
@@ -616,10 +611,8 @@ def test_hidden_annotation_display_is_restored_when_a_png_fails(
     state = _watch_annotation_display(case, monkeypatch)
     case.adapter.png_fault = "raise"
     with pytest.raises(RuntimeError, match="fake image writer failed"):
-        asyncio.run(
-            exports.export_member_configurations(
+        exports.export_member_configurations(
                 case.adapter, case.stem, case.members, hide_model_annotations=True
             )
-        )
     assert state["sets"] == [False, True] and state["shown"] is True
     assert not case.certificate.exists()

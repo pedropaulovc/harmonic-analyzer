@@ -25,8 +25,8 @@ SPEC = DRAWINGS_BY_NAME["sm_vn_counter_spring"]
 PART_STEM = SPEC.artifact_stem
 
 
-async def build(adapter: Any) -> dict[str, str]:
-    return await build_supplier_spring_drawing(
+def build(adapter: Any) -> dict[str, str]:
+    return build_supplier_spring_drawing(
         adapter, SPEC, item=ITEM, installed_front=True, spring_metadata=True,
         supplier_data=SUPPLIER_DATA, installed_caption="ISOMETRIC",
         unit=part_drawing_unit(PART_STEM),

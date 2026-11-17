@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import importlib
 import itertools
 import math
@@ -1228,7 +1227,7 @@ def test_flat_reference_sketch_carries_the_printed_flat_on_the_front_plane(
     seat.check.side_effect = lambda _label, result: result
     adapter = offline_adapter()
     adapter.add_centerline.return_value = "Line1"
-    asyncio.run(part._flat_end_view_reference(adapter))
+    part._flat_end_view_reference(adapter)
 
     assert seat._create_sketch.call_args.args[1] == "Front"
     h, station = spec.CORE_FLAT_FROM_AXIS, part.FLAT_WITNESS_STATION
@@ -1236,14 +1235,14 @@ def test_flat_reference_sketch_carries_the_printed_flat_on_the_front_plane(
     # witness on model -X: the tip-end view mirrors X, so it shows right,
     # toward the dimension line.  The witness lies on the flat inside the
     # core circle and outside the thread blank's.
-    assert adapter.add_centerline.await_args.args == (-station, -h, 0.0, -h)
+    assert adapter.add_centerline.call_args.args == (-station, -h, 0.0, -h)
     assert spec.THREAD_BLANK_DIA / 2.0 < math.hypot(station, h) < spec.CORE_DIA / 2.0
-    constraints = [call.args for call in adapter.add_sketch_constraint.await_args_list]
+    constraints = [call.args for call in adapter.add_sketch_constraint.call_args_list]
     assert constraints == [
         ("Line1", None, "horizontal"),
         ("Line1.end", "origin", "vertical_points"),
     ]
-    dimensions = [call.args[1:5] for call in seat.dimension_between.await_args_list]
+    dimensions = [call.args[1:5] for call in seat.dimension_between.call_args_list]
     assert dimensions == [
         ("Line1.start", "origin", "horizontal_distance", station),
         ("Line1.start", "origin", "vertical_distance", h),
@@ -1264,12 +1263,12 @@ def test_root_profile_is_a_hidden_front_plane_circle_at_the_printed_min(
     seat.check.side_effect = lambda _label, result: result
     seat.define_circle.return_value = "Circle1"
     adapter = offline_adapter()
-    asyncio.run(part._root_profile(adapter))
+    part._root_profile(adapter)
 
     # On F, where the straight gaps' floors show in the view from the tip;
     # construction only, driven by its own RootDia global.
     assert seat._create_sketch.call_args.args[1] == "Front"
-    circle = seat.define_circle.await_args
+    circle = seat.define_circle.call_args
     assert circle.args[1:4] == (0.0, 0.0, spec.ROOT_DIA_MIN / 2.0)
     assert circle.kwargs["names"] == (None, None, "RootDia")
     assert circle.kwargs["drives"] == (None, None, '"RootDia"')
@@ -1411,7 +1410,7 @@ class _BuildRecorder:
 
         return record
 
-    async def _open(self, _path):
+    def _open(self, _path):
         return True
 
     def _place(self, _adapter, _source, orientation, _x, _y, *, scale):
@@ -1436,7 +1435,7 @@ class _BuildRecorder:
         self.keeps[view_label] = keep
         return list(keep)
 
-    async def _finalize(self, *_args, **_kwargs):
+    def _finalize(self, *_args, **_kwargs):
         self.calls.append(("finalize_drawing", None))
         return {}
 
@@ -1450,10 +1449,9 @@ class _BuildRecorder:
 def test_build_takes_its_controls_and_callouts_from_the_spec(monkeypatch, tmp_path) -> None:
     # Run 10: a silhouette hit-test on the 0.3 mm neck floor took a
     # neighbour; each frame now lands on its resolved source FACE.
-    import asyncio
 
     seat = _BuildRecorder(monkeypatch, tmp_path)
-    asyncio.run(drawing.build(seat.adapter))
+    drawing.build(seat.adapter)
     for (_args, kwargs) in seat.made["add_feature_control_frame"]:
         key = kwargs["label"]
         assert kwargs["entity_type"] == "FACE" and kwargs["entity"] == key
@@ -1544,7 +1542,7 @@ def test_straight_stock_pass_bosses_the_blank_then_cuts_one_patterned_gap(
     adapter = offline_adapter()
     seat.attach_mock(adapter, "adapter")
     jobs: list[tuple[object, str]] = []
-    asyncio.run(module._straight_stock_gaps(adapter, jobs))
+    module._straight_stock_gaps(adapter, jobs)
 
     watched = {
         "ensure_fully_defined", "adapter.exit_sketch", "adapter.create_extrusion",
@@ -1571,8 +1569,8 @@ def test_straight_stock_pass_bosses_the_blank_then_cuts_one_patterned_gap(
     # A blind boss of the face width, then a blind cut (the knob's through
     # the whole face, #2034; the feed pinion's to its full depth), both from
     # the sketch plane (F): one direction, solid, merged, each result checked.
-    boss = adapter.create_extrusion.await_args.args[0]
-    cut = adapter.create_cut_extrude.await_args.args[0]
+    boss = adapter.create_extrusion.call_args.args[0]
+    cut = adapter.create_cut_extrude.call_args.args[0]
     assert (boss.depth, cut.depth) == (module.FACE_WIDTH, getattr(module, cut_depth))
     assert jobs[-1][1] == cut_drive
     for feature in (boss, cut):
@@ -1607,7 +1605,7 @@ def test_neck_corners_are_equal_tangent_quarter_arcs_with_a_radial_size(
 
     seat._native_arc.side_effect = native_arc
     adapter = offline_adapter()
-    asyncio.run(part._stud_profile(adapter))
+    part._stud_profile(adapter)
 
     radius = part.FRONT_CORNER_RADIUS
     assert len(arcs) == 2
@@ -1617,11 +1615,11 @@ def test_neck_corners_are_equal_tangent_quarter_arcs_with_a_radial_size(
         assert math.dist((sx, sy), (ex, ey)) == pytest.approx(radius * math.sqrt(2.0))
         assert min(sy, ey) == pytest.approx(part._R_NECK)
     front, core = (name for name, _points in arcs)
-    constraints = [call.args for call in adapter.add_sketch_constraint.await_args_list]
+    constraints = [call.args for call in adapter.add_sketch_constraint.call_args_list]
     for arc in (front, core):
         assert sum(1 for c in constraints if arc in c[:2] and c[2] == "tangent") == 2
     assert (front, core, "equal") in constraints
     # The overall witness hangs off the tip face's top corner.
     assert any(c[2] == "coincident" and str(c[1]).endswith(".end") for c in constraints)
-    dimensions = [call.args for call in adapter.add_sketch_dimension.await_args_list]
+    dimensions = [call.args for call in adapter.add_sketch_dimension.call_args_list]
     assert (front, None, "radial", radius) in dimensions

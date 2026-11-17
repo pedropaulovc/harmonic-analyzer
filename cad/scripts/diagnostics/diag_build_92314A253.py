@@ -24,7 +24,7 @@ class _PositionedHexScrew(HexHeadScrew):
 
 
 @stock_recipe("92314A253", threaded=True)
-async def build_92314A253(adapter, truth=None, *, bearing_y_mm: float = 0.0):
+def build_92314A253(adapter, truth=None, *, bearing_y_mm: float = 0.0):
     dims = _PositionedHexScrew(
         part_no=DIMS.part_no,
         major_dia=DIMS.major_dia,
@@ -34,4 +34,4 @@ async def build_92314A253(adapter, truth=None, *, bearing_y_mm: float = 0.0):
         head_h=DIMS.head_h,
         bearing_y_mm=bearing_y_mm,
     )
-    await build_hex_head_screw(adapter, dims)
+    build_hex_head_screw(adapter, dims)

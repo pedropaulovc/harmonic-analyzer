@@ -219,23 +219,23 @@ def _as_construction(adapter, entity_id: str) -> None:
         raise RuntimeError(f"{entity_id} did not take the construction flag")
 
 
-async def _reference_line(
+def _reference_line(
     adapter, sketch, plane, dimension, start, end, orientation, value, drives
 ) -> list[tuple[str, str]]:
     """One hidden-reference sketch: a construction line whose driving
     dimension IS ``value``; returns its deferred drive jobs."""
-    check(f"create_sketch {sketch}", await adapter.create_sketch(plane))
+    check(f"create_sketch {sketch}", adapter.create_sketch(plane))
     # Direct-to-DB: the line lies on an outline station along a sketch axis
     # direction, so creation-time inference would over-define the sketch.
     set_sketch_direct_db(adapter, True)
-    line = check(f"{sketch} line", await adapter.add_line(*start, *end))
+    line = check(f"{sketch} line", adapter.add_line(*start, *end))
     set_sketch_direct_db(adapter, False)
     _as_construction(adapter, line)
     check(
         f"{sketch} {orientation}",
-        await adapter.add_sketch_constraint(line, None, orientation),
+        adapter.add_sketch_constraint(line, None, orientation),
     )
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{line}.start",
         f"{line}.end",
@@ -243,10 +243,10 @@ async def _reference_line(
         value,
         sketch,
     )
-    await anchor_point_to_origin(adapter, f"{line}.start", *start, sketch)
+    anchor_point_to_origin(adapter, f"{line}.start", *start, sketch)
     names = [dimension, *(f"{dimension}Anchor{i}" for i in range(1, len(drives)))]
-    await ensure_fully_defined(adapter, f"{sketch} sketch")
-    check(f"exit_sketch {sketch}", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, f"{sketch} sketch")
+    check(f"exit_sketch {sketch}", adapter.exit_sketch())
     name_last_feature(adapter, sketch)
     full = name_dimensions(adapter, sketch, names)
     measured = (
@@ -278,31 +278,31 @@ def _hide_reference_sketches(adapter) -> None:
         raise RuntimeError(f"reference sketches still visible after blanking: {shown}")
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     # #290: the row's inch calculation units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). mm suffix load-bearing (INCH
     # document; the equation manager reads bare numbers in document units).
-    await set_global(adapter, "FootL", f"{FOOT_L}mm")
-    await set_global(adapter, "FootH", f"{FOOT_H}mm")
-    await set_global(adapter, "KeeperWidth", f"{KEEPER_WIDTH}mm")
-    await set_global(adapter, "LugT", f"{LUG_T}mm")
-    await set_global(adapter, "ShaftAxisH", f"{SHAFT_AXIS_H}mm")
-    await set_global(adapter, "CrownR", f"{CROWN_R}mm")
-    await set_global(adapter, "BoreDia", f"{BORE_DIA}mm")
-    await set_global(adapter, "CornerR", f"{CORNER_R}mm")
-    await set_global(adapter, "FootScrewFromTip", f"{SCREW_FROM_TIP}mm")
+    set_global(adapter, "FootL", f"{FOOT_L}mm")
+    set_global(adapter, "FootH", f"{FOOT_H}mm")
+    set_global(adapter, "KeeperWidth", f"{KEEPER_WIDTH}mm")
+    set_global(adapter, "LugT", f"{LUG_T}mm")
+    set_global(adapter, "ShaftAxisH", f"{SHAFT_AXIS_H}mm")
+    set_global(adapter, "CrownR", f"{CROWN_R}mm")
+    set_global(adapter, "BoreDia", f"{BORE_DIA}mm")
+    set_global(adapter, "CornerR", f"{CORNER_R}mm")
+    set_global(adapter, "FootScrewFromTip", f"{SCREW_FROM_TIP}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
     # --- Lug: end-profile rectangle on Right (ZY), extruded +-X -----------
     # From the seat up to the shaft axis; the crown rounds it off above.
     lug = SketchDims()
-    check("create_sketch lug", await adapter.create_sketch("Right"))
+    check("create_sketch lug", adapter.create_sketch("Right"))
     half_w = KEEPER_WIDTH / 2.0
     lug_pts = [
         (-half_w, 0.0),
@@ -310,8 +310,8 @@ async def build(adapter) -> dict[str, str]:
         (half_w, SHAFT_AXIS_H),
         (-half_w, SHAFT_AXIS_H),
     ]
-    lug_lines = await add_line_chain(adapter, lug_pts)
-    await define_rectilinear_chain(
+    lug_lines = add_line_chain(adapter, lug_pts)
+    define_rectilinear_chain(
         adapter,
         lug_lines,
         lug_pts,
@@ -320,13 +320,13 @@ async def build(adapter) -> dict[str, str]:
         names=["LugWidth", "LugRise", "LugAnchorZ"],
         drives=['"KeeperWidth"', '"ShaftAxisH"', '"KeeperWidth" / 2'],
     )
-    await ensure_fully_defined(adapter, "lug profile")
-    check("exit_sketch lug", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "lug profile")
+    check("exit_sketch lug", adapter.exit_sketch())
     name_last_feature(adapter, "LugProfile")
     drive_jobs += lug.apply(adapter, "LugProfile")
     check(
         "extrude lug",
-        await adapter.create_extrusion(
+        adapter.create_extrusion(
             ExtrusionParameters(depth=LUG_T, both_directions=True)
         ),
     )
@@ -334,21 +334,21 @@ async def build(adapter) -> dict[str, str]:
     lug_depth = name_dimensions(adapter, "LugBody", ["LugThickness"])
     drive_jobs += [(lug_depth[0], '"LugT"')]
     v_lug = KEEPER_WIDTH * SHAFT_AXIS_H * LUG_T
-    volume = await volume_check(adapter, "lug", v_lug, 0.005 * v_lug)
+    volume = volume_check(adapter, "lug", v_lug, 0.005 * v_lug)
 
     # --- Foot: side-profile rectangle on Front (XY), extruded +-Z ---------
     # Outboard of the lug's outer face, x +4..+12.5, y 0..8; its underside
     # is coplanar with the lug's, so the two make one flat seat.
     foot = SketchDims()
-    check("create_sketch foot", await adapter.create_sketch("Front"))
+    check("create_sketch foot", adapter.create_sketch("Front"))
     pts = [
         (LUG_HALF_T, 0.0),
         (FOOT_TIP_X, 0.0),
         (FOOT_TIP_X, FOOT_H),
         (LUG_HALF_T, FOOT_H),
     ]
-    lines = await add_line_chain(adapter, pts)
-    await define_rectilinear_chain(
+    lines = add_line_chain(adapter, pts)
+    define_rectilinear_chain(
         adapter,
         lines,
         pts,
@@ -357,13 +357,13 @@ async def build(adapter) -> dict[str, str]:
         names=["FootLength", "FootRise", "FootAnchorX"],
         drives=['"FootL"', '"FootH"', '"LugT" / 2'],
     )
-    await ensure_fully_defined(adapter, "foot profile")
-    check("exit_sketch foot", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "foot profile")
+    check("exit_sketch foot", adapter.exit_sketch())
     name_last_feature(adapter, "FootProfile")
     drive_jobs += foot.apply(adapter, "FootProfile")
     check(
         "extrude foot",
-        await adapter.create_extrusion(
+        adapter.create_extrusion(
             ExtrusionParameters(depth=KEEPER_WIDTH, both_directions=True)
         ),
     )
@@ -371,7 +371,7 @@ async def build(adapter) -> dict[str, str]:
     depth_dim = name_dimensions(adapter, "Foot", ["Depth"])
     drive_jobs += [(depth_dim[0], '"KeeperWidth"')]
     v_foot = FOOT_L * FOOT_H * KEEPER_WIDTH
-    volume = await volume_check(adapter, "foot", volume + v_foot, 0.005 * v_foot)
+    volume = volume_check(adapter, "foot", volume + v_foot, 0.005 * v_foot)
 
     # Foot-to-lug inside corner (drawing-guidelines.md rule 16): the edge where
     # the foot top meets the lug's outer face, filleted at the title block's
@@ -379,21 +379,21 @@ async def build(adapter) -> dict[str, str]:
     # counterbore; the sheet prints no local limit.
     check(
         "fillet foot-to-lug corner",
-        await adapter.add_fillet(
+        adapter.add_fillet(
             CORNER_R, [[LUG_HALF_T, FOOT_H, 0.0]], propagate=False
         ),
     )
     name_last_feature(adapter, "CornerFillet")
     corner_dim = name_dimensions(adapter, "CornerFillet", ["CornerRadius"])
     drive_jobs.append((corner_dim[0], '"CornerR"'))
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "foot-to-lug corner fillet", volume + V_CORNER, 0.1 * V_CORNER
     )
 
     # --- Crown: full-round lug top, concentric with the shaft axis --------
     crown = SketchDims()
-    check("create_sketch crown", await adapter.create_sketch("Right"))
-    await define_circle(
+    check("create_sketch crown", adapter.create_sketch("Right"))
+    define_circle(
         adapter,
         0.0,
         SHAFT_AXIS_H,
@@ -404,13 +404,13 @@ async def build(adapter) -> dict[str, str]:
         drives=(None, '"ShaftAxisH"', '"CrownR"'),
         size_dimension="radius",
     )
-    await ensure_fully_defined(adapter, "lug crown sketch")
-    check("exit_sketch crown", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "lug crown sketch")
+    check("exit_sketch crown", adapter.exit_sketch())
     name_last_feature(adapter, "LugCrownProfile")
     drive_jobs += crown.apply(adapter, "LugCrownProfile")
     check(
         "extrude crown",
-        await adapter.create_extrusion(
+        adapter.create_extrusion(
             ExtrusionParameters(depth=LUG_T, both_directions=True)
         ),
     )
@@ -422,12 +422,12 @@ async def build(adapter) -> dict[str, str]:
     # sits ON the lug top edge and its bottom, y 18.2, is inside the lug), so
     # only the upper half adds metal.
     v_crown = 0.5 * math.pi * r_c * r_c * LUG_T
-    volume = await volume_check(adapter, "lug crown", volume + v_crown, 0.01 * v_crown)
+    volume = volume_check(adapter, "lug crown", volume + v_crown, 0.01 * v_crown)
 
     # --- Shaft bore: plain reamed Ø.2550 through the lug on the axis ------
     bore = SketchDims()
-    check("create_sketch bore", await adapter.create_sketch("Right"))
-    await define_circle(
+    check("create_sketch bore", adapter.create_sketch("Right"))
+    define_circle(
         adapter,
         0.0,
         SHAFT_AXIS_H,
@@ -437,13 +437,13 @@ async def build(adapter) -> dict[str, str]:
         names=("BoreCz", "BoreH", "BoreDia"),
         drives=(None, '"ShaftAxisH"', '"BoreDia"'),
     )
-    await ensure_fully_defined(adapter, "shaft bore sketch")
-    check("exit_sketch bore", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "shaft bore sketch")
+    check("exit_sketch bore", adapter.exit_sketch())
     name_last_feature(adapter, "ShaftBoreProfile")
     drive_jobs += bore.apply(adapter, "ShaftBoreProfile")
     check(
         "cut bore",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=BORE_CUT_DEPTH, both_directions=True)
         ),
     )
@@ -451,7 +451,7 @@ async def build(adapter) -> dict[str, str]:
     # Coaxial cylinder through the 8.0 lug only: the bore (y 22.0..28.4)
     # lies wholly inside the lug + crown and well above the foot (y <= 8).
     v_bore = math.pi * (BORE_DIA / 2.0) ** 2 * LUG_T
-    volume = await volume_check(adapter, "shaft bore", volume - v_bore, 0.01 * v_bore)
+    volume = volume_check(adapter, "shaft bore", volume - v_bore, 0.01 * v_bore)
 
     # --- Foot screw hole: fillister counterbore SCREW_FROM_TIP off the tip --
     screw_hole = wizard_holes(
@@ -469,7 +469,7 @@ async def build(adapter) -> dict[str, str]:
         * (screw_hole.hole_dia_mm / 2.0) ** 2
         * (FOOT_H - screw_hole.cbore_depth_mm)
     )
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "foot screw hole", volume - v_cb - v_thru, 0.01 * (v_cb + v_thru)
     )
 
@@ -496,21 +496,21 @@ async def build(adapter) -> dict[str, str]:
         cross_hole_volume_mm3(tap_dia, 2.0 * CROWN_R)
         - cross_hole_volume_mm3(tap_dia, BORE_DIA)
     ) / 2.0
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "crown set-screw tap", volume - v_tap, 0.03 * v_tap
     )
 
     # The tap station's drawing-reference line (no metal).
     for row in REFERENCE_LINES:
-        drive_jobs += await _reference_line(adapter, *row)
+        drive_jobs += _reference_line(adapter, *row)
 
     # Deferred drive equations, then re-check neutrality (each evaluates to
     # the as-built value, so the geometry must not move).
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    volume_check(
         adapter, "driven keeper (equations neutral)", volume, 0.005 * volume
     )
     _hide_reference_sketches(adapter)
@@ -534,9 +534,9 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
 
-    await apply_material(adapter, MATERIAL)
-    await apply_color(adapter, PANEL_BLACK)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    apply_color(adapter, PANEL_BLACK)
+    report_mass_properties(adapter)
     apply_drawing_properties(
         adapter,
         PART_NAME,
@@ -545,7 +545,7 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
-    return await save_part_and_images(adapter, PART_NAME)
+    return save_part_and_images(adapter, PART_NAME)
 
 
 if __name__ == "__main__":

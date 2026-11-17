@@ -928,11 +928,11 @@ def _draw_form_plot(adapter: Any) -> None:
         cone_sheet.set_note_height(note, FORM_TEXT_HEIGHT, label=f"DETAIL B {text}")
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open cone tip gear source", await adapter.open_model(str(SOURCE)))
+    check("open cone tip gear source", adapter.open_model(str(SOURCE)))
     read_required_properties(
         adapter.currentModel,
         (
@@ -1092,7 +1092,7 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to pin the DT6-FORM1 sheet scale")
     rebuild_drawing(adapter, label="DT6-FORM1 sheet")
 
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Cone Tip Gear Manufacturing Drawing",

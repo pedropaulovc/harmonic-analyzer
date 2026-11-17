@@ -14,9 +14,7 @@ cylinder-gear lobe-face walk measured 612 s/part, untenable x20).
 
 from __future__ import annotations
 
-import asyncio
 
-from solidworks_mcp.adapters.com_variant import null_callout
 
 import _telemetry
 if __package__:
@@ -68,7 +66,7 @@ def _map_select(adapter, doc, comp, feat, mark, label):
     return bool(ok)
 
 
-async def main():
+def main():
     from solidworks_mcp.adapters.base import (
         InsertComponentParameters,
         SetComponentSolvingParameters,
@@ -77,16 +75,16 @@ async def main():
 
     adapter = PyWin32Adapter({})
     _telemetry.info("Connecting ...")
-    await adapter.connect()
+    adapter.connect()
 
-    await adapter.create_assembly()
+    adapter.create_assembly()
     doc = adapter.currentModel
     _flag(doc, "IModelDoc2")
     log("created throwaway parent")
 
     # --- channel: rod Axis1, rigid then flexible ---
     ch = (OUT_SLDASM / "ch-channel.SLDASM").resolve()
-    res = await adapter.insert_component(
+    res = adapter.insert_component(
         InsertComponentParameters(file_path=str(ch), position=[0, 0, 0], rotation=[0, 0, 0])
     )
     sub = res.data["name"]
@@ -98,7 +96,7 @@ async def main():
     log(f"rod={rname!r} Axis1-feature={'found' if ax1 else 'MISSING'}")
     if ax1 is not None:
         _map_select(adapter, doc, rod, ax1, 1, "RIGID rod Axis1")
-        await adapter.set_component_solving(
+        adapter.set_component_solving(
             SetComponentSolvingParameters(name=sub, solving="flexible")
         )
         adapter._attempt(lambda: doc.EditRebuild3())
@@ -106,12 +104,12 @@ async def main():
 
     # --- drive-train: gear Axis3 (cam lobe), flexible ---
     dt = (OUT_SLDASM / "dt-drive-train.SLDASM").resolve()
-    res2 = await adapter.insert_component(
+    res2 = adapter.insert_component(
         InsertComponentParameters(file_path=str(dt), position=[0, 0, 0], rotation=[0, 0, 0])
     )
     if res2.is_success:
         dtsub = res2.data["name"]
-        await adapter.set_component_solving(
+        adapter.set_component_solving(
             SetComponentSolvingParameters(name=dtsub, solving="flexible")
         )
         adapter._attempt(lambda: doc.EditRebuild3())
@@ -142,9 +140,9 @@ async def main():
                     f"rod={bool(s1)} gear={bool(s3)} count={cnt} "
                     f"-> {'READY for AddMate5' if cnt == 2 else 'NOT ready'}")
 
-    await adapter.disconnect()
+    adapter.disconnect()
     _telemetry.info("Disconnected.")
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

@@ -560,10 +560,10 @@ def _add_foot_finish(adapter: Any, front: Any, annotations: list[Any]) -> None:
     })
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(SOURCE)
-    check("open threaded bracket source", await adapter.open_model(str(SOURCE)))
+    check("open threaded bracket source", adapter.open_model(str(SOURCE)))
     properties = read_required_properties(adapter.currentModel, ("Number", "Revision", "Title", "Material Specification", "Finish", "Quantity", "Isometric View Note"), required=("Number", "Material Specification", "Finish", "Quantity", "Isometric View Note"))
     drawing, _sheet = new_project_drawing(adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout, unit=part_drawing_unit("mg-magnifying-bracket"))
     stamp_drawing_summary(adapter, drawing, {0: "Magnifying Bracket Manufacturing Drawing", 1: "Harmonic Analyzer hobby-machinist book drawing", 2: "Harmonic Analyzer Project", 3: "blued low-carbon-steel L bracket; quarter-inch through thread", 4: "Generated from the project-owned ASME B drawing standard"})
@@ -635,7 +635,7 @@ async def build(adapter: Any) -> dict[str, str]:
         overall_reference=overall_reference, tap_callout=tap_annotation,
     )
     _add_foot_finish(adapter, front, [*linear_annotations, overall_reference, tap_annotation])
-    return await finalize_drawing(adapter, OUTPUTS, pdf_title="Magnifying Bracket Manufacturing Drawing", scale=SHEET_SCALE, layout=SPEC.layout)
+    return finalize_drawing(adapter, OUTPUTS, pdf_title="Magnifying Bracket Manufacturing Drawing", scale=SHEET_SCALE, layout=SPEC.layout)
 
 
 if __name__ == "__main__":

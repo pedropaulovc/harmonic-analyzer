@@ -33,8 +33,8 @@ V_PIN = spring_pin_volume(SPRING_PIN_SIZE, WALL_T)
 
 
 @stock_recipe("98296A031", threaded=False)
-async def build_98296A031(adapter, truth=None):
-    await build_spring_pin(adapter, SPRING_PIN_SIZE, WALL_T)
+def build_98296A031(adapter, truth=None):
+    build_spring_pin(adapter, SPRING_PIN_SIZE, WALL_T)
 
 
 if __name__ == "__main__":

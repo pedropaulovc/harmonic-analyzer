@@ -416,10 +416,10 @@ def test_the_knife_edge_prints_its_ridge_and_flanks_to_the_sides() -> None:
     assert round(180.0 - spec.RIDGE_ANGLE_DEG / 2.0, 1) == spec.KNIFE_FLANK_TO_SIDE_DEG
 
 
-def _builder_function(name: str) -> ast.FunctionDef | ast.AsyncFunctionDef:
+def _builder_function(name: str) -> ast.FunctionDef | ast.FunctionDef:
     tree = ast.parse(Path(lever_build.__file__).read_text(encoding="utf-8"))
     for node in tree.body:
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == name:
+        if isinstance(node, (ast.FunctionDef,)) and node.name == name:
             return node
     raise AssertionError(f"build_sm_summing_lever has no {name}()")
 

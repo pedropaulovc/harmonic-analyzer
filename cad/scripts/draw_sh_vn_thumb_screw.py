@@ -1163,7 +1163,7 @@ def _capture_supplier_failure(adapter: Any, phase: str, error: Exception) -> Non
             error.add_note(f"thumb supplier forensic capture failed: {capture_error!r}")
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     checks = []
 
     def annotate(current_adapter: Any, views: dict[str, Any]) -> None:
@@ -1182,7 +1182,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
         checks.append(settled)
 
-    return await build_purchased_fastener_drawing(
+    return build_purchased_fastener_drawing(
         adapter,
         SPEC,
         item=ITEM,

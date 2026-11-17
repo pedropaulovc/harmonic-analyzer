@@ -90,7 +90,6 @@ binding; see probe_dimxpert_gtol.py Q1 notes).
 
 from __future__ import annotations
 
-import asyncio
 import shutil
 import sys
 import tempfile
@@ -153,12 +152,12 @@ def _faces_of_type(model: object, surface_kind: int) -> list:
     return faces
 
 
-async def _open_scratch(adapter: PyWin32Adapter, stage: str) -> tuple[object, object]:
+def _open_scratch(adapter: PyWin32Adapter, stage: str) -> tuple[object, object]:
     """Copy the source part to a scratch path, open it, return (model, dim_part)."""
     scratch = Path(tempfile.gettempdir()) / f"probe_dimxpert_authoring_{stage}.SLDPRT"
     _close_if_open(adapter, scratch.name)
     shutil.copy2(SOURCE_PART, scratch)
-    opened = await adapter.open_model(str(scratch))
+    opened = adapter.open_model(str(scratch))
     if not opened.is_success:
         raise RuntimeError(f"open failed: {opened.error}")
     model = adapter.currentModel
@@ -274,7 +273,7 @@ def _stage_datum(model: object, dim_part: object, *, set_length: bool) -> bool:
     return ok and annotations > 0
 
 
-async def _stage_import(adapter: PyWin32Adapter, model: object, dim_part: object) -> bool:
+def _stage_import(adapter: PyWin32Adapter, model: object, dim_part: object) -> bool:
     """Author datum + filled gtol, save the scratch part, import onto a sheet."""
     from _gtol_frame import gtol_frame_xml as _gtol_frame_xml
 
@@ -304,7 +303,7 @@ async def _stage_import(adapter: PyWin32Adapter, model: object, dim_part: object
         raise RuntimeError("gtol XML fill failed -- nothing meaningful to import")
 
     scratch = Path(str(_read_member(model, "GetPathName")))
-    saved = await adapter.save_file(str(scratch))
+    saved = adapter.save_file(str(scratch))
     if not saved.is_success:
         raise RuntimeError(f"save failed: {saved.error}")
     adapter.swApp.QuitDoc(str(_read_member(model, "GetTitle")))
@@ -394,7 +393,7 @@ def _stage_gtol(model: object, dim_part: object) -> bool:
     return annotation is not None
 
 
-async def main() -> int:
+def main() -> int:
     _telemetry.set_service("diagnostics")
     if len(sys.argv) != 2 or sys.argv[1] not in STAGES:
         _telemetry.error(
@@ -409,18 +408,18 @@ async def main() -> int:
             "(uv run python -m doit part:pd_transgear_pin)"
         )
 
-    async with _telemetry.aspan(f"probe.dimxpert_authoring.{stage}"):
+    with _telemetry.span(f"probe.dimxpert_authoring.{stage}"):
         adapter = PyWin32Adapter({})
         # The wedge this probe exists to study blocks the COM call itself, so
         # without the watchdog neither the finally block nor a timeout could
         # ever run -- arm the same crash/idle guard run_build uses.
         _watchdog.start()
         try:
-            await adapter.connect()
-            model, dim_part = await _open_scratch(adapter, stage)
+            adapter.connect()
+            model, dim_part = _open_scratch(adapter, stage)
             if stage == "import":
                 # closes its own documents (the part is saved + reopened in a view)
-                passed = bool(await _stage_import(adapter, model, dim_part))
+                passed = bool(_stage_import(adapter, model, dim_part))
                 _report(f"stage {stage}", passed)
                 return 0 if passed and not _failed_checks() else 1
             runner = {
@@ -437,9 +436,9 @@ async def main() -> int:
             _telemetry.success(f"scratch part closed without saving: {title}")
             return 0 if passed and not _failed_checks() else 1
         finally:
-            await adapter.disconnect()
+            adapter.disconnect()
             _watchdog.stop()
 
 
 if __name__ == "__main__":
-    raise SystemExit(asyncio.run(main()))
+    raise SystemExit(main())

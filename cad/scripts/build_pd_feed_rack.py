@@ -109,7 +109,7 @@ PART_NAME = "pd-feed-rack"
 MATERIAL = PURCHASED_RACK_MATERIAL
 
 
-async def _tap_station_witness(adapter: Any) -> list[tuple[str, str]]:
+def _tap_station_witness(adapter: Any) -> list[tuple[str, str]]:
     """The taps' stations as native sizes; the sketch adds no solid geometry.
 
     Top-plane sketch X is model X, sketch Y is model -Z. The line runs
@@ -117,10 +117,10 @@ async def _tap_station_witness(adapter: Any) -> list[tuple[str, str]]:
     from the left cut end and the front face, and the others from it.
     """
     stations = SketchDims()
-    check("create tap station witness", await adapter.create_sketch("Top"))
+    check("create tap station witness", adapter.create_sketch("Top"))
     points = [(x, -TAP_Z) for x in TAP_X]
-    lines = await add_line_chain(adapter, points, close=False)
-    await anchor_point_to_origin(
+    lines = add_line_chain(adapter, points, close=False)
+    anchor_point_to_origin(
         adapter, f"{lines[0]}.start", points[0][0], points[0][1], "first tap"
     )
     stations.record("TapStart")
@@ -128,10 +128,10 @@ async def _tap_station_witness(adapter: Any) -> list[tuple[str, str]]:
     for line in lines:
         check(
             f"tap station witness {line} horizontal",
-            await adapter.add_sketch_constraint(line, None, "horizontal"),
+            adapter.add_sketch_constraint(line, None, "horizontal"),
         )
     for index, line in enumerate(lines, start=2):
-        await dimension_between(
+        dimension_between(
             adapter,
             f"{lines[0]}.start",
             f"{line}.end",
@@ -140,8 +140,8 @@ async def _tap_station_witness(adapter: Any) -> list[tuple[str, str]]:
             f"tap {index} from tap 1",
         )
         stations.record(f"TapStation{index}")
-    await ensure_fully_defined(adapter, "tap station witness")
-    check("exit tap station witness", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "tap station witness")
+    check("exit tap station witness", adapter.exit_sketch())
     name_last_feature(adapter, "TapStations")
     drives = stations.apply(adapter, "TapStations")
     # BlankSketch, read back, hides it in the part and every assembly render;
@@ -150,13 +150,13 @@ async def _tap_station_witness(adapter: Any) -> list[tuple[str, str]]:
     return drives
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
         ExtrusionParameters,
         LinearPatternParameters,
     )
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     # #290: the row's inch calculation units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
@@ -164,50 +164,50 @@ async def build(adapter) -> dict[str, str]:
     # pure-data spec. mm suffix is load-bearing -- this is an INCH document and
     # the equation manager reads BARE numbers in document units (an unsuffixed
     # 269.64 is inches, blowing the part up 25.4x).
-    await set_global(adapter, "BarLength", f"{BAR_LENGTH}mm")
-    await set_global(adapter, "RackHeight", f"{RACK_HEIGHT}mm")
-    await set_global(adapter, "RackThickness", f"{RACK_THICKNESS}mm")
+    set_global(adapter, "BarLength", f"{BAR_LENGTH}mm")
+    set_global(adapter, "RackHeight", f"{RACK_HEIGHT}mm")
+    set_global(adapter, "RackThickness", f"{RACK_THICKNESS}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
     # Catalog-sized square strip: origin-cornered rectangle, the flat top on
     # Y=0 (the ORDINARY sketch -- fully driven).
     bar = SketchDims()
-    check("create_sketch bar", await adapter.create_sketch("Front"))
+    check("create_sketch bar", adapter.create_sketch("Front"))
     bar_rect = [
         (0.0, 0.0),
         (BAR_LENGTH, 0.0),
         (BAR_LENGTH, RACK_HEIGHT),
         (0.0, RACK_HEIGHT),
     ]
-    bar_lines = await add_line_chain(adapter, bar_rect)
+    bar_lines = add_line_chain(adapter, bar_rect)
     # Emission order (anchor vertex 0 at origin = 0 anchor dims; then the kept
     # per-segment distance dims in line order, skipping the last of each
     # direction): line0 horizontal span = BarLength, line1 vertical span =
     # RackHeight; lines 2/3 close.
-    await define_rectilinear_chain(
+    define_rectilinear_chain(
         adapter, bar_lines, bar_rect, label="bar", dims=bar,
         names=["Length", "RackHeight"],
         drives=['"BarLength"', '"RackHeight"'],
     )
-    await ensure_fully_defined(adapter, "bar sketch")
-    check("exit_sketch bar", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "bar sketch")
+    check("exit_sketch bar", adapter.exit_sketch())
     name_last_feature(adapter, "BarProfile")
     drive_jobs += bar.apply(adapter, "BarProfile")
     check(
         "extrude bar",
-        await adapter.create_extrusion(ExtrusionParameters(depth=RACK_THICKNESS)),
+        adapter.create_extrusion(ExtrusionParameters(depth=RACK_THICKNESS)),
     )
     name_last_feature(adapter, "Bar")
     rack_depth = name_dimensions(adapter, "Bar", ["RackDepth"])[0]
     drive_jobs.append((rack_depth, '"RackThickness"'))
     v_bar = BAR_LENGTH * RACK_HEIGHT * RACK_THICKNESS
-    volume = await volume_check(adapter, "rack stock", v_bar, 0.005 * v_bar)
+    volume = volume_check(adapter, "rack stock", v_bar, 0.005 * v_bar)
 
     # Seed tooth gap at the left end (AddToDB: corners sit near the top edge,
     # where inferencing would snap them onto model vertices -- see the
     # cylinder-gear notch finding).
-    check("create_sketch gap", await adapter.create_sketch("Front"))
+    check("create_sketch gap", adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     gap_pts = [
         (FIRST_GAP_X - half_width(ROOT_Y), ROOT_Y),
@@ -215,21 +215,21 @@ async def build(adapter) -> dict[str, str]:
         (FIRST_GAP_X + half_width(CUT_TOP_Y), CUT_TOP_Y),
         (FIRST_GAP_X + half_width(ROOT_Y), ROOT_Y),
     ]
-    gap = await add_line_chain(adapter, gap_pts)
+    gap = add_line_chain(adapter, gap_pts)
     set_sketch_direct_db(adapter, False)
     # Nominal representation of the purchased rack's standard straight flanks,
     # not a tooth-cutting operation or a separate shop-editable form.
-    await define_polygon_chain(adapter, gap, gap_pts, label="gap")
-    await ensure_fully_defined(adapter, "gap sketch")
-    check("exit_sketch gap", await adapter.exit_sketch())
+    define_polygon_chain(adapter, gap, gap_pts, label="gap")
+    ensure_fully_defined(adapter, "gap sketch")
+    check("exit_sketch gap", adapter.exit_sketch())
     name_last_feature(adapter, "GapProfile")
-    gap_cut = await adapter.create_cut_extrude(
+    gap_cut = adapter.create_cut_extrude(
         ExtrusionParameters(depth=RACK_THICKNESS + 1.0)
     )
     check("cut seed gap", gap_cut)
     gap_cut_name = name_last_feature(adapter, "SeedGap")
     v_gap = GAP_AREA * RACK_THICKNESS
-    volume = await volume_check(adapter, "seed gap", volume - v_gap, 0.02 * v_gap)
+    volume = volume_check(adapter, "seed gap", volume - v_gap, 0.02 * v_gap)
 
     # Pattern along +X from the seed at the left end. The direction edge is
     # resolved geometrically (the straight bar edge along +X nearest the
@@ -238,7 +238,7 @@ async def build(adapter) -> dict[str, str]:
     # isometric one the back face, sending every gap off the bar. A pattern
     # whose instances all miss now fails loudly in the adapter; the volume
     # check below still catches a partial miss.
-    res = await adapter.linear_pattern_feature(
+    res = adapter.linear_pattern_feature(
         LinearPatternParameters(
             direction_point=[BAR_LENGTH / 2.0, 0.0, 0.0],
             direction_vector=[1.0, 0.0, 0.0],
@@ -250,7 +250,7 @@ async def build(adapter) -> dict[str, str]:
     check("linear pattern gaps", res)
     tooth_pattern_name = name_last_feature(adapter, "ToothPattern")
     v_rack = v_bar - GAP_COUNT * v_gap
-    await volume_check(adapter, "toothed rack", v_rack, 0.01 * GAP_COUNT * v_gap)
+    volume_check(adapter, "toothed rack", v_rack, 0.01 * GAP_COUNT * v_gap)
 
     # Rack-screw taps: ONE native Hole Wizard #0-80 bottoming-tap feature
     # (4 points) into the flat top (local y=0, outward normal -Y), each on a
@@ -266,27 +266,27 @@ async def build(adapter) -> dict[str, str]:
     )
     v_taps = len(TAP_X) * blind_hole_volume_mm3(taps.hole_dia_mm, TAP_DRILL_DEPTH)
     v_rack -= v_taps
-    await volume_check(adapter, "tapped rack", v_rack, 0.05 * v_taps)
-    drive_jobs += await _tap_station_witness(adapter)
+    volume_check(adapter, "tapped rack", v_rack, 0.05 * v_taps)
+    drive_jobs += _tap_station_witness(adapter)
 
     # Apply the deferred drive equations after the whole model + a rebuild
     # exists, then re-check: each equation evaluates to the value just built, so
     # the geometry (including the patterned mesh) must not move. The drawing
     # witnesses are neutral too; the gap is intentionally undriven.
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    volume_check(
         adapter, "driven rack (equations neutral)", v_rack, 0.01 * GAP_COUNT * v_gap
     )
 
-    await apply_material(adapter, MATERIAL)
+    apply_material(adapter, MATERIAL)
 
     # Named pitch-line axis (local X at y = pitch line, mid-thickness) so the
     # assembly's rack-pinion mate references the RACK's own engagement line --
     # not the platen it happens to be locked to (2026-07-07 field report).
-    await name_bore_axis(
+    name_bore_axis(
         adapter, "Front Plane", RACK_THICKNESS / 2.0,
         "Top Plane", PITCH_LINE_Y, "pitch axis",
     )
@@ -330,10 +330,10 @@ async def build(adapter) -> dict[str, str]:
         },
     )
 
-    await report_mass_properties(adapter)
+    report_mass_properties(adapter)
     # Assembly views at 1:2 or smaller print the rack's "<cfg> Simplified":
     # the seed gap and its pattern suppressed, a tapped plain bar.
-    return await save_simplified_part(adapter, PART_NAME, (gap_cut_name, tooth_pattern_name))
+    return save_simplified_part(adapter, PART_NAME, (gap_cut_name, tooth_pattern_name))
 
 
 if __name__ == "__main__":

@@ -230,10 +230,10 @@ def _label_locating_edges(adapter: Any, front: Any) -> None:
                           note_xy=note_xy, label=text.lower())
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source stop block missing: {SOURCE}")
-    check("open stop block", await adapter.open_model(str(SOURCE)))
+    check("open stop block", adapter.open_model(str(SOURCE)))
     properties = ("Number", "Revision", "Title", "Material Specification", "Finish", "Quantity")
     read_required_properties(adapter.currentModel, properties,
                              required=("Number", "Material Specification", "Finish", "Quantity"))
@@ -312,7 +312,7 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, right, bottom):
         set_hidden_lines_removed(adapter, view)
     add_property_linked_note(adapter, "Isometric View Note", ISO_CENTER[0] - 0.030, 0.085)
-    return await finalize_drawing(adapter, OUTPUTS,
+    return finalize_drawing(adapter, OUTPUTS,
                                   pdf_title="Measuring Stick Stop Block Manufacturing Drawing",
                                   scale=SHEET_SCALE, layout=SPEC.layout,
                                   redundant_note_substrings=FINAL_SHEET_REMOVED_NOTES,

@@ -160,32 +160,32 @@ def fillet_edge_points() -> tuple[list[list[float]], list[list[float]]]:
 
 
 @stock_recipe("97431A240", threaded=False)
-async def build_97431A240(adapter, truth=None):
+def build_97431A240(adapter, truth=None):
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
-    check("create_sketch outline", await adapter.create_sketch("Top"))
-    await draw_closed_profile(adapter, outline(), label="ring outline", loops=1)
-    check("exit_sketch outline", await adapter.exit_sketch())
+    check("create_sketch outline", adapter.create_sketch("Top"))
+    draw_closed_profile(adapter, outline(), label="ring outline", loops=1)
+    check("exit_sketch outline", adapter.exit_sketch())
     name_last_feature(adapter, "RingOutline")
     assert_profile_closed(adapter, "ring outline", loops=1, feature="RingOutline")
     check(
         "extrude ring",
-        await adapter.create_extrusion(
+        adapter.create_extrusion(
             ExtrusionParameters(depth=THICKNESS, both_directions=True)
         ),
     )
     name_last_feature(adapter, "RingBody")
     v = outline_area() * THICKNESS
-    await volume_check(adapter, "ring outline", v, 0.005 * v)
+    volume_check(adapter, "ring outline", v, 0.005 * v)
 
     gap_edges, prong_edges = fillet_edge_points()
     check(
         "gap and window fillets",
-        await adapter.add_fillet(GAP_CORNER_FILLET_R, gap_edges),
+        adapter.add_fillet(GAP_CORNER_FILLET_R, gap_edges),
     )
     name_last_feature(adapter, "GapFillet")
     check(
         "prong fillets",
-        await adapter.add_fillet(PRONG_CORNER_FILLET_R, prong_edges),
+        adapter.add_fillet(PRONG_CORNER_FILLET_R, prong_edges),
     )
     name_last_feature(adapter, "ProngFillet")

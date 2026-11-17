@@ -159,7 +159,7 @@ def revolved_volume(
 
 
 @stock_recipe("91794A055", threaded=True)
-async def build_91794A055(
+def build_91794A055(
     adapter,
     truth=None,
     *,
@@ -170,7 +170,7 @@ async def build_91794A055(
 
     length, end_ch = shank_end(cut_length, cut_end_break)
     # --- Revolve1 --------------------------------------------------------------
-    check("create_sketch profile", await adapter.create_sketch("Front"))
+    check("create_sketch profile", adapter.create_sketch("Front"))
     sk_mgr = adapter.currentSketchManager
     with no_sketch_inference(adapter):
         if (
@@ -197,7 +197,7 @@ async def build_91794A055(
         )
         if arc is None:
             raise RuntimeError(f"{PART_NO} profile: dome arc failed")
-        await add_line_chain(
+        add_line_chain(
             adapter,
             [
                 (HEAD_R, HEAD_BAND),
@@ -212,20 +212,20 @@ async def build_91794A055(
             ],
             close=False,
         )
-    check("exit_sketch profile", await adapter.exit_sketch())
+    check("exit_sketch profile", adapter.exit_sketch())
     name_last_feature(adapter, "BodyProfile")
     check(
         "revolve body",
-        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=False)),
+        adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=False)),
     )
     name_last_feature(adapter, "Body")
     v = revolved_volume(cut_length, cut_end_break)
-    await volume_check(adapter, "revolved body", v, 0.005 * v)
+    volume_check(adapter, "revolved body", v, 0.005 * v)
 
     # --- Cut-Extrude1: driver slot ---------------------------------------------
-    check("create_sketch slot", await adapter.create_sketch("Front"))
+    check("create_sketch slot", adapter.create_sketch("Front"))
     with no_sketch_inference(adapter):
-        await add_line_chain(
+        add_line_chain(
             adapter,
             [
                 (-SLOT_WIDTH / 2.0, HEAD_H + 0.5),
@@ -234,11 +234,11 @@ async def build_91794A055(
                 (-SLOT_WIDTH / 2.0, SLOT_FLOOR_Y),
             ],
         )
-    check("exit_sketch slot", await adapter.exit_sketch())
+    check("exit_sketch slot", adapter.exit_sketch())
     name_last_feature(adapter, "SlotProfile")
     check(
         "cut slot",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=2.0 * HEAD_DIA, both_directions=True)
         ),
     )
@@ -247,7 +247,7 @@ async def build_91794A055(
     # --- Fillet1 / Fillet2 ---------------------------------------------------------
     check(
         "slot floor fillets",
-        await adapter.add_fillet(
+        adapter.add_fillet(
             SLOT_FILLET_R,
             [
                 [SLOT_WIDTH / 2.0, SLOT_FLOOR_Y, 0.0],
@@ -258,7 +258,7 @@ async def build_91794A055(
     name_last_feature(adapter, "SlotFillet")
     check(
         "head fillets",
-        await adapter.add_fillet(
+        adapter.add_fillet(
             HEAD_FILLET_R,
             [
                 [UNDER_HEAD_R, 0.0, 0.0],
@@ -274,7 +274,7 @@ async def build_91794A055(
     # +y, so both flags invert (91255A148 / 93075A194 proved the handedness);
     # start azimuth on the Front plane's +x cutter.
     offset_plane(adapter, "TipPlane", -SHANK_LEN)
-    check("create_sketch helix seed", await adapter.create_sketch("TipPlane"))
+    check("create_sketch helix seed", adapter.create_sketch("TipPlane"))
     with no_sketch_inference(adapter):
         if (
             adapter.currentSketchManager.CreateCircleByRadius(
@@ -295,9 +295,9 @@ async def build_91794A055(
 
     # --- Cut-Sweep1: thread groove ---------------------------------------------
     cy = -SHANK_LEN - CUTTER_CENTRE_PAST_TIP
-    check("create_sketch cutter", await adapter.create_sketch("Front"))
+    check("create_sketch cutter", adapter.create_sketch("Front"))
     with no_sketch_inference(adapter):
-        await add_line_chain(
+        add_line_chain(
             adapter,
             [
                 (MAJOR_R, cy + CUTTER_TOP_W / 2.0),
@@ -306,14 +306,14 @@ async def build_91794A055(
                 (ROOT_R, cy + ROOT_FLAT / 2.0),
             ],
         )
-    check("exit_sketch cutter", await adapter.exit_sketch())
+    check("exit_sketch cutter", adapter.exit_sketch())
     name_last_feature(adapter, "ThreadCutter")
     thread_sweep_cut(
         adapter, "ThreadCutter", "ThreadHelix", None, "ThreadGroove", tangency=(0, 0)
     )
 
     # --- Boss-Extrude1: runout -------------------------------------------------
-    check("create_sketch runout", await adapter.create_sketch("Front"))
+    check("create_sketch runout", adapter.create_sketch("Front"))
     sk2 = adapter.currentSketchManager
     with no_sketch_inference(adapter):
         if (
@@ -323,7 +323,7 @@ async def build_91794A055(
             is None
         ):
             raise RuntimeError(f"{PART_NO} runout: CreateCenterLine failed")
-        await add_line_chain(
+        add_line_chain(
             adapter,
             [
                 (0.0, 0.0),
@@ -333,11 +333,11 @@ async def build_91794A055(
                 (0.0, -NECK_LEN - RUNOUT_TAPER_H),
             ],
         )
-    check("exit_sketch runout", await adapter.exit_sketch())
+    check("exit_sketch runout", adapter.exit_sketch())
     name_last_feature(adapter, "RunoutProfile")
     check(
         "runout",
-        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=False)),
+        adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=False)),
     )
     name_last_feature(adapter, "ThreadRunout")
 

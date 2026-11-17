@@ -46,19 +46,19 @@ PAPER_THICKNESS = 0.25  # front face stays 0.5 proud (assembly plants it at
 # face never coincides with the platen front face (render z-fight)
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
 
     # Editable knobs (Tools > Equations): the sheet width, height, and the proud
     # thickness (an extrude depth -- a knob, but a feature parameter, so nothing
     # drives it). The mm suffix is load-bearing -- this is an INCH document and
     # the equation manager reads BARE numbers in document units (an unsuffixed
     # 233.2386 = 233.2386 in).
-    await set_global(adapter, "PaperWidth", f"{RECORDING_PAPER_WIDTH_MM}mm")
-    await set_global(adapter, "PaperHeight", f"{RECORDING_PAPER_HEIGHT_MM}mm")
-    await set_global(adapter, "PaperThickness", f"{PAPER_THICKNESS}mm")
+    set_global(adapter, "PaperWidth", f"{RECORDING_PAPER_WIDTH_MM}mm")
+    set_global(adapter, "PaperHeight", f"{RECORDING_PAPER_HEIGHT_MM}mm")
+    set_global(adapter, "PaperThickness", f"{PAPER_THICKNESS}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -68,44 +68,44 @@ async def build(adapter) -> dict[str, str]:
     # bottom edge) then height (segment 1, right edge) -- then the anchor dims,
     # of which there are none (the anchor vertex is the origin).
     paper = SketchDims()
-    check("create_sketch outline", await adapter.create_sketch("Front"))
+    check("create_sketch outline", adapter.create_sketch("Front"))
     paper_rect = [
         (0.0, 0.0),
         (RECORDING_PAPER_WIDTH_MM, 0.0),
         (RECORDING_PAPER_WIDTH_MM, RECORDING_PAPER_HEIGHT_MM),
         (0.0, RECORDING_PAPER_HEIGHT_MM),
     ]
-    lines = await add_line_chain(adapter, paper_rect)
-    await define_rectilinear_chain(
+    lines = add_line_chain(adapter, paper_rect)
+    define_rectilinear_chain(
         adapter, lines, paper_rect, label="paper", dims=paper,
         names=["Width", "Height"],
         drives=['"PaperWidth"', '"PaperHeight"'],
     )
-    await ensure_fully_defined(adapter, "paper outline")
-    check("exit_sketch outline", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "paper outline")
+    check("exit_sketch outline", adapter.exit_sketch())
     name_last_feature(adapter, "PaperProfile")
     drive_jobs += paper.apply(adapter, "PaperProfile")
     check(
         "extrude paper",
-        await adapter.create_extrusion(ExtrusionParameters(depth=PAPER_THICKNESS)),
+        adapter.create_extrusion(ExtrusionParameters(depth=PAPER_THICKNESS)),
     )
     name_last_feature(adapter, "Paper")
 
     expected = RECORDING_PAPER_WIDTH_MM * RECORDING_PAPER_HEIGHT_MM * PAPER_THICKNESS
-    await volume_check(adapter, "paper", expected, 0.005 * expected)
+    volume_check(adapter, "paper", expected, 0.005 * expected)
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(adapter, "driven paper (equations neutral)", expected, 0.005 * expected)
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    volume_check(adapter, "driven paper (equations neutral)", expected, 0.005 * expected)
 
-    await apply_material(adapter, MATERIAL)
-    await apply_color(adapter, PAPER_WHITE)
-    await report_mass_properties(adapter)
-    return await save_part_and_images(adapter, PART_NAME)
+    apply_material(adapter, MATERIAL)
+    apply_color(adapter, PAPER_WHITE)
+    report_mass_properties(adapter)
+    return save_part_and_images(adapter, PART_NAME)
 
 
 if __name__ == "__main__":

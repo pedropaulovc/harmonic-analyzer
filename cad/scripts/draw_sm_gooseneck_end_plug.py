@@ -220,11 +220,11 @@ def _set_tap_callout_below(display: Any, text: str) -> None:
         )
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open end plug source", await adapter.open_model(str(SOURCE)))
+    check("open end plug source", adapter.open_model(str(SOURCE)))
     _require_saved_tap(adapter.currentModel)
     read_required_properties(
         adapter.currentModel,
@@ -321,7 +321,7 @@ async def build(adapter: Any) -> dict[str, str]:
     removed_tap_labels = remove_notes_matching(adapter, TAPPED_HOLE_NOTE)
     _telemetry.info(f"removed {removed_tap_labels} automatic tapped-hole label(s)")
 
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Gooseneck End Plug Manufacturing Drawing",

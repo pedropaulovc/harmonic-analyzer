@@ -122,15 +122,15 @@ def _finite(label: str, volume: float) -> float:
     return volume
 
 
-async def _volume(adapter) -> float:
-    res = await adapter.get_mass_properties()
+def _volume(adapter) -> float:
+    res = adapter.get_mass_properties()
     if not res.is_success:
         raise RuntimeError(f"mass properties: {res.error}")
     return _finite("volume", float(res.data.volume))
 
 
-async def _volume_check(adapter, label: str, expected: float, tol: float) -> float:
-    return _finite(label, await volume_check(adapter, label, expected, tol))
+def _volume_check(adapter, label: str, expected: float, tol: float) -> float:
+    return _finite(label, volume_check(adapter, label, expected, tol))
 
 
 @_telemetry.traced("part.dimension_callouts")
@@ -181,10 +181,10 @@ def _author_reference_dimensions(adapter) -> None:
                 )
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import RevolveParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     # #290: the row's inch calculation units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
@@ -198,8 +198,8 @@ async def build(adapter) -> dict[str, str]:
         ("PlugShankLength", PLUG_SHANK_LENGTH),
         ("PlugShankDia", PLUG_SHANK_DIA),
     ):
-        await set_global(adapter, name, f"{value}mm")
-    await set_global(adapter, "PlugLength", '"PlugHeadLength" + "PlugShankLength"')
+        set_global(adapter, name, f"{value}mm")
+    set_global(adapter, "PlugLength", '"PlugHeadLength" + "PlugShankLength"')
 
     # Per-sketch dim names + drive equations are declared inline at each
     # record call; their drive jobs apply in one deferred batch after the
@@ -219,14 +219,14 @@ async def build(adapter) -> dict[str, str]:
         (0.0, PLUG_R),
         (0.0, 0.0),
     ]
-    check("create_sketch end plug", await adapter.create_sketch("Front"))
+    check("create_sketch end plug", adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     try:
         axis = check(
             "end plug axis centerline",
-            await adapter.add_centerline(0.0, 0.0, PLUG_LENGTH, 0.0),
+            adapter.add_centerline(0.0, 0.0, PLUG_LENGTH, 0.0),
         )
-        lines = await add_line_chain(adapter, points)
+        lines = add_line_chain(adapter, points)
     finally:
         # Session state on the seat: a failed segment must not leave sketch
         # inference off for the next leaf.
@@ -242,11 +242,11 @@ async def build(adapter) -> dict[str, str]:
     ):
         check(
             f"end plug {relation} {line}",
-            await adapter.add_sketch_constraint(line, None, relation),
+            adapter.add_sketch_constraint(line, None, relation),
         )
     # The end face's centre IS the origin: a coincident relation, no dim.
-    await anchor_point_to_origin(adapter, f"{end_face}.end", 0.0, 0.0, "end face centre")
-    await dimension_between(
+    anchor_point_to_origin(adapter, f"{end_face}.end", 0.0, 0.0, "end face centre")
+    dimension_between(
         adapter,
         f"{head_side}.start",
         f"{head_side}.end",
@@ -257,7 +257,7 @@ async def build(adapter) -> dict[str, str]:
     profile.record("PlugHeadLength", '"PlugHeadLength"')
     # The overall length runs between the two top corners, so its extension
     # lines rise from the part's outline, not from the axis.
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{head_side}.end",
         f"{spigot_side}.start",
@@ -270,20 +270,20 @@ async def build(adapter) -> dict[str, str]:
         ("PlugDia", head_side, PLUG_HEAD_LENGTH / 2.0, PLUG_R),
         ("PlugShankDia", spigot_side, PLUG_HEAD_LENGTH + PLUG_SHANK_LENGTH / 2.0, SHANK_R),
     ):
-        await add_diametric_linear_dimension(
+        add_diametric_linear_dimension(
             adapter, axis, line, (u_mid, radius + 4.0), name
         )
         profile.record(name, f'"{name}"')
-    await ensure_fully_defined(adapter, "end plug sketch")
-    check("exit_sketch end plug", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "end plug sketch")
+    check("exit_sketch end plug", adapter.exit_sketch())
     name_last_feature(adapter, PROFILE)
     drive_jobs += profile.apply(adapter, PROFILE)
     check(
         "revolve end plug",
-        await adapter.create_revolve(RevolveParameters(angle=360.0)),
+        adapter.create_revolve(RevolveParameters(angle=360.0)),
     )
     name_last_feature(adapter, "EndPlug")
-    vol = await _volume_check(adapter, "solid end plug", V_PLUG, 0.005 * V_PLUG)
+    vol = _volume_check(adapter, "solid end plug", V_PLUG, 0.005 * V_PLUG)
 
     # 2. The native blind bottoming tap, started on the end face (facing -X)
     # at its centre, both depths from it (sm_gooseneck_spring_joint; owner
@@ -306,11 +306,11 @@ async def build(adapter) -> dict[str, str]:
             f"{TAP_DRILL_DEPTH:.3f} mm"
         )
     drive_jobs += tap.placement_drive_jobs
-    vol = await _volume_check(adapter, "end plug blind tap", vol - V_TAP, 0.02 * V_TAP)
+    vol = _volume_check(adapter, "end plug blind tap", vol - V_TAP, 0.02 * V_TAP)
 
     # 3. The plug's axis, model X: hidden, selectable by name for the
     # assembly's screw.
-    await name_bore_axis(
+    name_bore_axis(
         adapter, "Front Plane", 0.0, "Top Plane", 0.0, "spring screw"
     )
     name_last_feature(adapter, "SpringScrewAxis")
@@ -319,11 +319,11 @@ async def build(adapter) -> dict[str, str]:
     # rebuild exists, so every target resolves.  Each equation evaluates to
     # the value just built, so the geometry must not move; the re-check below
     # is the proof.
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    final_vol = await _volume_check(
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    final_vol = _volume_check(
         adapter, "driven end plug (equations neutral)", vol, 0.001 * vol
     )
     _telemetry.info(f"end plug volume {final_vol:.1f} mm^3 (analytic {V_FINAL:.1f})")
@@ -335,8 +335,8 @@ async def build(adapter) -> dict[str, str]:
     if len(bodies) != 1:
         raise RuntimeError(f"end plug: expected one solid body, found {len(bodies)}")
 
-    await apply_material(adapter, MATERIAL)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    report_mass_properties(adapter)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
@@ -351,7 +351,7 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
-    artefacts = await save_part_and_images(adapter, PART_NAME)
+    artefacts = save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
     return artefacts
 

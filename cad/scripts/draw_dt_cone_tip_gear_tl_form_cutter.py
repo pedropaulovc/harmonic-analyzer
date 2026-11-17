@@ -160,10 +160,10 @@ def _place_point(
         raise RuntimeError(f"{label}: point sits at {here!r}, not {target!r}")
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source fly-cutter bit missing: {SOURCE}")
-    check("open fly-cutter bit", await adapter.open_model(str(SOURCE)))
+    check("open fly-cutter bit", adapter.open_model(str(SOURCE)))
     required = ("Number", "Material Specification", "Finish", "Quantity")
     read_required_properties(
         adapter.currentModel, ("Revision", "Title", *required), required=required
@@ -235,7 +235,7 @@ async def build(adapter: Any) -> dict[str, str]:
     ):
         if add_note(adapter, text, *xy) is None:
             raise RuntimeError(f"failed to add the fly-cutter bit's {label}")
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Cone Tip Gear Fly Cutter Bit Drawing",

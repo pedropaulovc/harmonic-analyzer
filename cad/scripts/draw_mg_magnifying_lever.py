@@ -616,10 +616,10 @@ def _hide_other_thread_callouts(adapter: Any, view: Any) -> None:
 
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(SOURCE)
-    check("open quarter-inch lever source", await adapter.open_model(str(SOURCE)))
+    check("open quarter-inch lever source", adapter.open_model(str(SOURCE)))
     read_required_properties(adapter.currentModel, ("Number", "Revision", "Title", "Material Specification", "Finish", "Quantity", "Iso View Note"), required=("Number", "Material Specification", "Finish", "Quantity", "Iso View Note"))
     drawing, _sheet = new_project_drawing(adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout, unit=part_drawing_unit("mg-magnifying-lever"))
     stamp_drawing_summary(adapter, drawing, {0: "Magnifying Lever Rod Manufacturing Drawing", 1: "Harmonic Analyzer hobby-machinist book drawing", 2: "Harmonic Analyzer Project", 3: "quarter-inch brass lever; flat UNC-2A end; external thread runout", 4: "Generated from the project-owned ASME B drawing standard"})
@@ -667,7 +667,7 @@ async def build(adapter: Any) -> dict[str, str]:
         _hide_other_thread_callouts(adapter, view)
     if thread_note.Visible != 1:
         raise RuntimeError("hiding other lever callouts hid the native detail authority")
-    return await finalize_drawing(adapter, OUTPUTS, pdf_title="Magnifying Lever Rod Manufacturing Drawing", scale=SHEET_SCALE, layout=SPEC.layout)
+    return finalize_drawing(adapter, OUTPUTS, pdf_title="Magnifying Lever Rod Manufacturing Drawing", scale=SHEET_SCALE, layout=SPEC.layout)
 
 
 if __name__ == "__main__":

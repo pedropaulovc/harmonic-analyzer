@@ -115,11 +115,11 @@ JOINT_TIP = (TOP_CENTER[0] + BUTT_GAP / 2.0 * _S, TOP_CENTER[1] - HALF_OD)
 JOINT_FLAG_XY = (TOP_CENTER[0] + 0.018, TOP_CENTER[1] - HALF_OD - 0.0075)
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open keeper-ring source", await adapter.open_model(str(SOURCE)))
+    check("open keeper-ring source", adapter.open_model(str(SOURCE)))
     read_required_properties(
         adapter.currentModel,
         (
@@ -200,7 +200,7 @@ async def build(adapter: Any) -> dict[str, str]:
         view=top,
     )
 
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Crank Pin Keeper Ring Manufacturing Drawing",

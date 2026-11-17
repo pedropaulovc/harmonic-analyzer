@@ -101,7 +101,7 @@ def _try_save3(model: Any, options: int, label: str, path: str) -> bool:
     return changed
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SRC.exists():
         raise RuntimeError(f"{SRC} missing -- build the drive-train first")
     shutil.copy2(SRC, COPY)
@@ -109,7 +109,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     try:
         path = str(COPY)
-        check("open copy", await adapter.open_model(path))
+        check("open copy", adapter.open_model(path))
         model = adapter.currentModel
         log(f"opened copy: GetSaveFlag={_save_flag(model)} (expect False=clean)")
         log(f"dirty referenced docs at open: {_dirty_refs(model)}")
@@ -118,7 +118,7 @@ async def build(adapter: Any) -> dict[str, str]:
         # config (no part-doc change). This is the exact state that supposedly
         # needs the watchdog.
         from solidworks_mcp.adapters.base import CreateConfigurationParameters
-        check("create _repro_cfg", await adapter.create_configuration(
+        check("create _repro_cfg", adapter.create_configuration(
             CreateConfigurationParameters(
                 name="_repro_cfg", parent="Default",
                 comment="repro dirtier", description="repro")))
@@ -136,8 +136,8 @@ async def build(adapter: Any) -> dict[str, str]:
         # Confirm persistence: reopen and check the config survived.
         if ok:
             adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
-            check("reopen copy", await adapter.open_model(path))
-            cfgs = check("list configs", await adapter.list_configurations())
+            check("reopen copy", adapter.open_model(path))
+            cfgs = check("list configs", adapter.list_configurations())
             persisted = "_repro_cfg" in cfgs
             log(f"reopened: configs={cfgs} -- _repro_cfg persisted={persisted}")
             return {"silent_save_works": str(ok), "persisted": str(persisted)}

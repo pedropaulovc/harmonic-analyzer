@@ -164,11 +164,11 @@ def gap_area_in_disc(
     return abs(area) / 2.0
 
 
-async def set_global_read(adapter: Any, name: str, expression: str) -> float:
+def set_global_read(adapter: Any, name: str, expression: str) -> float:
     """Upsert a global variable and return the value SolidWorks evaluated."""
     from solidworks_mcp.adapters.base import SetGlobalVariableParameters
 
-    res = await adapter.set_global_variable(
+    res = adapter.set_global_variable(
         SetGlobalVariableParameters(name=name, expression=expression)
     )
     data = check(f"global {name} = {expression}", res)
@@ -178,7 +178,7 @@ async def set_global_read(adapter: Any, name: str, expression: str) -> float:
     return float(value)
 
 
-async def set_global(adapter: Any, name: str, expression: str, expected: float) -> None:
+def set_global(adapter: Any, name: str, expression: str, expected: float) -> None:
     """Upsert a global variable and assert SolidWorks evaluated it correctly.
 
     The value round-trip is the live test of the equation parser (trig in
@@ -186,7 +186,7 @@ async def set_global(adapter: Any, name: str, expression: str, expected: float) 
     arithmetic); a mismatch means the expression dialect is wrong and every
     downstream curve would be silently bogus.
     """
-    value = await set_global_read(adapter, name, expression)
+    value = set_global_read(adapter, name, expression)
     tol = max(1e-9, abs(expected) * 1e-6)
     if abs(value - expected) > tol:
         raise RuntimeError(

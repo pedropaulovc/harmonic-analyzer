@@ -1092,11 +1092,11 @@ def _place_package(adapter: Any) -> Callable[[], None]:
 
 
 @_telemetry.traced("drawing.ha_harmonic_analyzer_assembly")
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source assembly is missing: {SOURCE}")
 
-    check("open complete-machine drawing source", await adapter.open_model(str(SOURCE)))
+    check("open complete-machine drawing source", adapter.open_model(str(SOURCE)))
     source_model = _early_bound(adapter.currentModel, "IModelDoc2")
     properties = read_required_properties(
         source_model,
@@ -1111,7 +1111,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _validate_source(source_model)
 
     settled = _place_package(adapter)
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         layout=SPEC.layout,

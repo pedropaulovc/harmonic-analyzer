@@ -57,8 +57,8 @@ def _cross_hole_volume(r_hole: float, r_shaft: float, n: int = 20001) -> float:
     return total * dx
 
 
-async def _volume(adapter) -> float:
-    res = await adapter.get_mass_properties()
+def _volume(adapter) -> float:
+    res = adapter.get_mass_properties()
     if not res.is_success:
         raise RuntimeError(f"mass props failed: {res.error}")
     return float(res.data.volume)
@@ -80,16 +80,16 @@ def _cyl_face(model):
     return best
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
-    check("create_part", await adapter.create_part())
-    check("create_sketch base", await adapter.create_sketch("Top"))
-    check("circle", await adapter.add_circle(0.0, 0.0, R_SHAFT))
-    check("exit", await adapter.exit_sketch())
-    check("extrude shaft", await adapter.create_extrusion(
+    check("create_part", adapter.create_part())
+    check("create_sketch base", adapter.create_sketch("Top"))
+    check("circle", adapter.add_circle(0.0, 0.0, R_SHAFT))
+    check("exit", adapter.exit_sketch())
+    check("extrude shaft", adapter.create_extrusion(
         ExtrusionParameters(depth=H_SHAFT)))
-    v0 = await _volume(adapter)
+    v0 = _volume(adapter)
     _telemetry.info(f"shaft volume {v0:.1f} mm^3")
 
     model = adapter.currentModel
@@ -173,7 +173,7 @@ async def build(adapter) -> dict[str, str]:
     model.EditSketch()
     model.EditRebuild3()
 
-    v1 = await _volume(adapter)
+    v1 = _volume(adapter)
     expect = _cross_hole_volume(DIA / 2.0, R_SHAFT)
     removed = v0 - v1
     _telemetry.info(

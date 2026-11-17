@@ -24,7 +24,6 @@ second Edit trial would go dirty.
 
 from __future__ import annotations
 
-import asyncio
 import hashlib
 import shutil
 import sys
@@ -75,9 +74,9 @@ def _cfg_state(adapter, model) -> str:
     return " | ".join(bits)
 
 
-async def _open_fresh(adapter, path: Path):
+def _open_fresh(adapter, path: Path):
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
-    await adapter.open_model(str(path))
+    adapter.open_model(str(path))
     return _early_bound(adapter.currentModel, "IModelDoc2")
 
 
@@ -138,7 +137,7 @@ def _apply_verb(adapter, model, verb: str) -> list:
 RESULTS = []
 
 
-async def _trial(adapter, src: Path, idx: int, verb: str, mode: str, opts: int):
+def _trial(adapter, src: Path, idx: int, verb: str, mode: str, opts: int):
     tag = f"{idx:02d} {mode:<6} verb={verb:<15} opts={opts}"
     t0 = time.time()
     tmp_files = []
@@ -148,9 +147,9 @@ async def _trial(adapter, src: Path, idx: int, verb: str, mode: str, opts: int):
             shutil.copy2(src, work)
             tmp_files.append(work)
             target = work
-            model = await _open_fresh(adapter, work)
+            model = _open_fresh(adapter, work)
         else:
-            model = await _open_fresh(adapter, src)
+            model = _open_fresh(adapter, src)
             target = src.with_name(f"_mx{idx:02d}_{verb}.SLDASM")
             tmp_files.append(target)
 
@@ -166,7 +165,7 @@ async def _trial(adapter, src: Path, idx: int, verb: str, mode: str, opts: int):
                 target.unlink()
             rc = adapter._attempt(lambda: model.SaveAs3(str(target), 0, opts), default="EXC")
 
-        reopened_model = await _open_fresh(adapter, target)
+        reopened_model = _open_fresh(adapter, target)
         reopen = _nr(reopened_model)
         cfg = _cfg_state(adapter, reopened_model)
         adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
@@ -188,7 +187,7 @@ async def _trial(adapter, src: Path, idx: int, verb: str, mode: str, opts: int):
                     time.sleep(1)
 
 
-async def main() -> None:
+def main() -> None:
     arg = sys.argv[1] if len(sys.argv) > 1 else "fr-frame"
     src = Path(arg) if arg.lower().endswith(".sldasm") else OUT / f"{arg}.SLDASM"
     src_md5 = _md5(src)
@@ -196,10 +195,10 @@ async def main() -> None:
 
     adapter = PyWin32Adapter({})
     with _telemetry.span("probe.rebuild_matrix", target=str(src), stem=src.stem):
-        await adapter.connect()
+        adapter.connect()
 
         # Baseline: open the source, dump state, close WITHOUT saving.
-        model = await _open_fresh(adapter, src)
+        model = _open_fresh(adapter, src)
         _telemetry.info(f"[baseline] source opens NeedsRebuild2={_nr(model)}  "
                         f"cfg[{_cfg_state(adapter, model)}]")
         adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
@@ -235,7 +234,7 @@ async def main() -> None:
             wanted = sys.argv[2].split(",")
             trials = [(v, "saveas", B) for v in wanted]
         for i, (verb, mode, opts) in enumerate(trials, 1):
-            await _trial(adapter, src, i, verb, mode, opts)
+            _trial(adapter, src, i, verb, mode, opts)
 
     end_md5 = _md5(src)
     mutated = end_md5 != src_md5
@@ -248,4 +247,4 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

@@ -21,7 +21,7 @@ from _sketch_chains import define_polygon_chain
 from _visibility import blank_reference_geometry
 
 
-async def revolve_profile(
+def revolve_profile(
     adapter: Any,
     plane: str,
     label: str,
@@ -41,41 +41,41 @@ async def revolve_profile(
     """
     from solidworks_mcp.adapters.base import RevolveParameters
 
-    check(f"create_sketch {label}", await adapter.create_sketch(plane))
+    check(f"create_sketch {label}", adapter.create_sketch(plane))
     set_sketch_direct_db(adapter, True)
     if free_axis_length is None:
         axis = (*points[-1], *points[0])
     else:
         axis = (0.0, 0.0, 0.0, free_axis_length)
-    centerline = check(f"{label} axis", await adapter.add_centerline(*axis))
-    lines = await add_line_chain(adapter, points)
+    centerline = check(f"{label} axis", adapter.add_centerline(*axis))
+    lines = add_line_chain(adapter, points)
     set_sketch_direct_db(adapter, False)
     if free_axis_length is not None:
         check(
             f"{label} axis vertical",
-            await adapter.add_sketch_constraint(centerline, None, "vertical"),
+            adapter.add_sketch_constraint(centerline, None, "vertical"),
         )
-        await anchor_point_to_origin(
+        anchor_point_to_origin(
             adapter, f"{centerline}.start", 0.0, 0.0, f"{label} axis"
         )
         check(
             f"{label} axis length",
-            await adapter.add_sketch_dimension(
+            adapter.add_sketch_dimension(
                 centerline, None, "linear", free_axis_length
             ),
         )
-    await define_polygon_chain(adapter, lines, points, label=label)
-    await ensure_fully_defined(adapter, f"{label} profile")
-    check(f"exit_sketch {label}", await adapter.exit_sketch())
+    define_polygon_chain(adapter, lines, points, label=label)
+    ensure_fully_defined(adapter, f"{label} profile")
+    check(f"exit_sketch {label}", adapter.exit_sketch())
     name_last_feature(adapter, names[0])
     check(
         f"revolve {label}",
-        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=is_cut)),
+        adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=is_cut)),
     )
     name_last_feature(adapter, names[1])
 
 
-async def fillet_edge(
+def fillet_edge(
     adapter: Any,
     label: str,
     radius: float,
@@ -85,18 +85,18 @@ async def fillet_edge(
     """Round the one (circular) edge through model ``point``."""
     check(
         f"fillet {label}",
-        await adapter.add_fillet(radius, [list(point)], propagate=False),
+        adapter.add_fillet(radius, [list(point)], propagate=False),
     )
     name_last_feature(adapter, name)
 
 
-async def publish_screw_axis(adapter: Any) -> None:
+def publish_screw_axis(adapter: Any) -> None:
     """The stock-part mate contract: ``ScrewAxis`` at Front ∩ Right, hidden."""
     from solidworks_mcp.adapters.base import CreateAxisParameters
 
     check(
         "create_axis ScrewAxis (Front ∩ Right)",
-        await adapter.create_axis(
+        adapter.create_axis(
             CreateAxisParameters(
                 mode="two_planes", planes=["Front Plane", "Right Plane"]
             )

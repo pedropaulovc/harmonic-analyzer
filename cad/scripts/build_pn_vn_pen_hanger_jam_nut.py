@@ -42,18 +42,18 @@ MATERIAL = SPEC.material
 TRANSFORM = RigidTransform(rotation_radians=(math.pi / 2.0, 0.0, 0.0))
 
 
-async def _save_supplier_part(adapter, part_name) -> dict[str, str]:
+def _save_supplier_part(adapter, part_name) -> dict[str, str]:
     # Construction only, authored in the final +Z stock frame before saving.
-    await add_supplier_reference_sketch(
+    add_supplier_reference_sketch(
         adapter,
         SUPPLIER_REFERENCE_DIMENSIONS,
         starts=SUPPLIER_REFERENCE_STARTS,
     )
-    return await save_part_and_images(adapter, part_name)
+    return save_part_and_images(adapter, part_name)
 
 
-async def build(adapter) -> dict[str, str]:
-    return await build_stock_fastener(
+def build(adapter) -> dict[str, str]:
+    return build_stock_fastener(
         adapter,
         part_name=PART_NAME,
         components=(

@@ -638,11 +638,11 @@ def _dress_corner_radius(adapter: Any, annotations: list[Any]) -> None:
     _telemetry.info(f"corner radius: text {display.GetText(1)!r}, MAX type")
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open pivot-bracket source", await adapter.open_model(str(SOURCE)))
+    check("open pivot-bracket source", adapter.open_model(str(SOURCE)))
     read_required_properties(
         adapter.currentModel,
         (
@@ -792,7 +792,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # The part authored every imported dimension's decimal places; prove the
     # import kept them instead of falling back to the sheet's default.
     assert_imported_precision(adapter, imported_annotations, DRAWING_PRECISION_BY_NAME)
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Rocker Pivot Bracket Manufacturing Drawing",

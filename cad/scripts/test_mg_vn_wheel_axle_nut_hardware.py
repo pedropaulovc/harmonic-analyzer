@@ -6,7 +6,6 @@ the part the assemblies still build.
 
 from __future__ import annotations
 
-import asyncio
 import contextlib
 import math
 from pathlib import Path
@@ -66,15 +65,15 @@ class _Recorder:
     def log(self, name: str, args=(), kwargs=None) -> None:
         self.events.append((name, tuple(args), dict(kwargs or {})))
 
-    async def create_sketch(self, *args):
+    def create_sketch(self, *args):
         self.log("create_sketch", args)
         return "ok"
 
-    async def exit_sketch(self, *args):
+    def exit_sketch(self, *args):
         self.log("exit_sketch", args)
         return "ok"
 
-    async def create_extrusion(self, *args):
+    def create_extrusion(self, *args):
         self.log("create_extrusion", args)
         return "ok"
 
@@ -82,11 +81,11 @@ class _Recorder:
 def _record(monkeypatch) -> list[tuple]:
     adapter = _Recorder()
 
-    async def define_circle(_adapter, x, y, radius, label, **kwargs):
+    def define_circle(_adapter, x, y, radius, label, **kwargs):
         adapter.log("circle", (x, y, radius, label))
         return label
 
-    async def volume_check(_adapter, label, expected, tol):
+    def volume_check(_adapter, label, expected, tol):
         adapter.log("volume_check", (label, expected, tol))
         return expected
 
@@ -104,12 +103,12 @@ def _record(monkeypatch) -> list[tuple]:
     monkeypatch.setattr(recipe, "define_circle", define_circle)
     monkeypatch.setattr(recipe, "no_sketch_inference", no_inference)
 
-    async def add_line_chain(_adapter, points, close=True):
+    def add_line_chain(_adapter, points, close=True):
         adapter.log("lines", (tuple(points),))
         return [f"L{i}" for i in range(len(points))]
 
     monkeypatch.setattr(recipe, "add_line_chain", add_line_chain)
-    asyncio.run(getattr(recipe, BUILD)(adapter))
+    getattr(recipe, BUILD)(adapter)
     return adapter.events
 
 
@@ -145,12 +144,12 @@ def test_recipe_is_the_hex_with_a_plain_major_bore(monkeypatch) -> None:
 def test_stock_build_turns_the_recipe_axis_onto_part_z(monkeypatch) -> None:
     seen: dict = {}
 
-    async def fake_build(adapter, **kwargs):
+    def fake_build(adapter, **kwargs):
         seen.update(kwargs)
         return {}
 
     monkeypatch.setattr(part, "build_stock_fastener", fake_build)
-    asyncio.run(part.build(None))
+    part.build(None)
     (component,) = seen["components"]
     assert component.sku == spec.SKU
     assert component.author is getattr(recipe, BUILD)
@@ -171,20 +170,20 @@ def test_standalone_recipe_run_is_catalog_only(monkeypatch, tmp_path) -> None:
     built: list = []
 
     class _Adapter:
-        async def create_part(self):
+        def create_part(self):
             return "ok"
 
-        async def save_file(self, path):
+        def save_file(self, path):
             saved.append(path)
             return "ok"
 
-    async def fake_recipe(adapter, truth=None):
+    def fake_recipe(adapter, truth=None):
         built.append(adapter)
 
-    async def no_views(_adapter, _stem):
+    def no_views(_adapter, _stem):
         return {}
 
-    async def no_close(_adapter):
+    def no_close(_adapter):
         return None
 
     monkeypatch.setattr(recipe, "check", lambda *a, **k: True)
@@ -195,7 +194,7 @@ def test_standalone_recipe_run_is_catalog_only(monkeypatch, tmp_path) -> None:
     monkeypatch.setattr(lib, "export_views", no_views)
     monkeypatch.setattr(lib, "close_all", no_close)
     adapter = _Adapter()
-    artefacts = asyncio.run(recipe.build_catalog(adapter))
+    artefacts = recipe.build_catalog(adapter)
     assert built == [adapter]
     assert saved == [str((tmp_path / f"{spec.SKU}-catalog.SLDPRT").resolve())]
     assert artefacts["sldprt"] == str(tmp_path / f"{spec.SKU}-catalog.SLDPRT")

@@ -4432,10 +4432,10 @@ def _cast_datum_sheet(adapter: Any, ddoc: Any) -> list[Any]:
     return [*dimensions, *draft_dimensions]
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
-    check("open top-frame source", await adapter.open_model(str(SOURCE)))
+    check("open top-frame source", adapter.open_model(str(SOURCE)))
     read_required_properties(
         adapter.currentModel,
         (
@@ -5899,7 +5899,7 @@ async def build(adapter: Any) -> dict[str, str]:
         imported_annotations,
         DRAWING_PRECISION_BY_NAME,
     )
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Top Frame Ring Manufacturing Drawing",

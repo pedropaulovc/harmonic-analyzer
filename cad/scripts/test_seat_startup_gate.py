@@ -40,7 +40,7 @@ import time
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import MagicMock, Mock
 
 import pytest
 from opentelemetry.sdk.trace import TracerProvider as SdkTracerProvider
@@ -591,8 +591,8 @@ def test_exit_89_flushes_its_telemetry_and_names_itself(monkeypatch):
     seat.GetCurrentWorkingDirectory = Mock(return_value="C:\\")
     seat.SetCurrentWorkingDirectory = Mock(return_value=True)
     adapter = _Adapter(seat)
-    adapter.connect = AsyncMock()
-    adapter.disconnect = AsyncMock()
+    adapter.connect = MagicMock()
+    adapter.disconnect = MagicMock()
     monkeypatch.setitem(
         sys.modules,
         "solidworks_mcp.adapters.pywin32_adapter",
@@ -608,14 +608,14 @@ def test_exit_89_flushes_its_telemetry_and_names_itself(monkeypatch):
     monkeypatch.setattr(_telemetry, "shutdown", shutdown)
     errors: list[str] = []
     monkeypatch.setattr(_telemetry, "error", lambda message, **_f: errors.append(message))
-    build = AsyncMock(return_value={})
+    build = MagicMock(return_value={})
 
     with pytest.raises(SystemExit) as caught:
         _session.run_build(build)
 
     assert caught.value.code == 89
-    build.assert_not_awaited()
-    adapter.disconnect.assert_awaited_once_with()
+    build.assert_not_called()
+    adapter.disconnect.assert_called_once_with()
     shutdown.assert_called_once_with()
     assert any("exit 89" in m and "StartupProcessCompleted=False" in m for m in errors), errors
 

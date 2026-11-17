@@ -111,32 +111,32 @@ if not (
     raise AssertionError("tube cross-hole stations do not leave intact end walls")
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs: tube OD, wall, cut length, cross-hole size/stations, and
     # the top-only cap-entry chamfer. Explicit mm is load-bearing in this inch
     # document. InnerDia remains derived from OD minus two walls.
-    await set_global(adapter, "OuterDia", f"{OUTER_DIA}mm")
-    await set_global(adapter, "WallThickness", f"{WALL_THICKNESS}mm")
-    await set_global(adapter, "ColumnLength", f"{COLUMN_LENGTH}mm")
-    await set_global(adapter, "InnerDia", '"OuterDia" - 2 * "WallThickness"')
-    await set_global(adapter, "TopChamfer", f"{TOP_END_CHAMFER}mm")
-    await set_global(adapter, "CrossHoleDia", f"{CROSS_HOLE_DIAMETER}mm")
-    await set_global(adapter, "LowerCrossHoleY", f"{LOWER_CROSS_HOLE_Y}mm")
-    await set_global(adapter, "UpperCrossHoleY", f"{UPPER_CROSS_HOLE_Y}mm")
+    set_global(adapter, "OuterDia", f"{OUTER_DIA}mm")
+    set_global(adapter, "WallThickness", f"{WALL_THICKNESS}mm")
+    set_global(adapter, "ColumnLength", f"{COLUMN_LENGTH}mm")
+    set_global(adapter, "InnerDia", '"OuterDia" - 2 * "WallThickness"')
+    set_global(adapter, "TopChamfer", f"{TOP_END_CHAMFER}mm")
+    set_global(adapter, "CrossHoleDia", f"{CROSS_HOLE_DIAMETER}mm")
+    set_global(adapter, "LowerCrossHoleY", f"{LOWER_CROSS_HOLE_Y}mm")
+    set_global(adapter, "UpperCrossHoleY", f"{UPPER_CROSS_HOLE_Y}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
     # Annulus: concentric outer + bore circles on the Top plane, both on-axis
     # (origin centre) so each records ONLY its diameter dim.
     annulus = SketchDims()
-    check("create_sketch annulus", await adapter.create_sketch("Top"))
+    check("create_sketch annulus", adapter.create_sketch("Top"))
     set_sketch_direct_db(adapter, True)
-    await define_circle(
+    define_circle(
         adapter,
         0.0,
         0.0,
@@ -146,7 +146,7 @@ async def build(adapter) -> dict[str, str]:
         names=("OuterCx", "OuterCz", "OuterDia"),
         drives=(None, None, '"OuterDia"'),
     )
-    await define_circle(
+    define_circle(
         adapter,
         0.0,
         0.0,
@@ -157,13 +157,13 @@ async def build(adapter) -> dict[str, str]:
         drives=(None, None, '"InnerDia"'),
     )
     set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(adapter, "annulus sketch")
-    check("exit_sketch annulus", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "annulus sketch")
+    check("exit_sketch annulus", adapter.exit_sketch())
     name_last_feature(adapter, "AnnulusProfile")
     drive_jobs += annulus.apply(adapter, "AnnulusProfile")
     check(
         "extrude open tube",
-        await adapter.create_extrusion(ExtrusionParameters(depth=COLUMN_LENGTH)),
+        adapter.create_extrusion(ExtrusionParameters(depth=COLUMN_LENGTH)),
     )
     name_last_feature(adapter, "Column")
     depth_dim = name_dimensions(adapter, "Column", ["Length"])
@@ -171,18 +171,18 @@ async def build(adapter) -> dict[str, str]:
     v_annulus = (
         math.pi * ((OUTER_DIA / 2.0) ** 2 - (INNER_DIA / 2.0) ** 2) * COLUMN_LENGTH
     )
-    await volume_check(adapter, "open tube", v_annulus, 0.001 * v_annulus)
+    volume_check(adapter, "open tube", v_annulus, 0.001 * v_annulus)
 
     # Two matched clearance stations through both Z walls. One physical column
     # can rotate 180 degrees about Y between front/rear corners because each
     # drilling is diametrically through, not a one-wall set-screw clearance.
     cross = SketchDims()
-    check("create_sketch tube cross holes", await adapter.create_sketch("Front"))
+    check("create_sketch tube cross holes", adapter.create_sketch("Front"))
     for label, station, dia_name in (
         ("lower", LOWER_CROSS_HOLE_Y, "CrossHoleDia"),
         ("upper", UPPER_CROSS_HOLE_Y, "UpperCrossHoleDia"),
     ):
-        await define_circle(
+        define_circle(
             adapter,
             0.0,
             station,
@@ -192,26 +192,26 @@ async def build(adapter) -> dict[str, str]:
             names=(None, f"{label.capitalize()}HoleY", dia_name),
             drives=(None, f'"{label.capitalize()}CrossHoleY"', '"CrossHoleDia"'),
         )
-    await ensure_fully_defined(adapter, "tube cross-hole sketch")
-    check("exit_sketch tube cross holes", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "tube cross-hole sketch")
+    check("exit_sketch tube cross holes", adapter.exit_sketch())
     name_last_feature(adapter, "CrossHoleProfile")
     drive_jobs += cross.apply(adapter, "CrossHoleProfile")
     check(
         "cut tube cross holes through both walls",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=2.0 * OUTER_DIA, both_directions=True)
         ),
     )
     name_last_feature(adapter, "CrossHoles")
     v_cross = _transverse_hole_removal(CROSS_HOLE_DIAMETER, OUTER_DIA, INNER_DIA)
     v_column = v_annulus - 2.0 * v_cross
-    await volume_check(adapter, "cross-drilled column", v_column, 0.005 * v_cross + 1.0)
+    volume_check(adapter, "cross-drilled column", v_column, 0.005 * v_cross + 1.0)
 
     # Top-only nominal C0.50 x 45 break provides the cap lead-in. Full seating
     # by hand is the drawing acceptance; the lower socketed end remains square.
     check(
         "chamfer tube top",
-        await adapter.add_chamfer(
+        adapter.add_chamfer(
             TOP_END_CHAMFER,
             [[OUTER_DIA / 2.0, COLUMN_LENGTH, 0.0]],
         ),
@@ -221,26 +221,26 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs.append((chamfer_dim[0], '"TopChamfer"'))
     v_chamfer = math.pi * TOP_END_CHAMFER**2 * (OUTER_DIA / 2.0 - TOP_END_CHAMFER / 3.0)
     v_total = v_column - v_chamfer
-    await volume_check(adapter, "finished open tube", v_total, 0.002 * v_total)
+    volume_check(adapter, "finished open tube", v_total, 0.002 * v_total)
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    volume_check(
         adapter, "driven open tube (equations neutral)", v_total, 0.001 * v_total
     )
 
-    await apply_material(adapter, MATERIAL)
-    await apply_color(adapter, POLISHED_STEEL)  # ch30 plates: see _appearance palette
+    apply_material(adapter, MATERIAL)
+    apply_color(adapter, POLISHED_STEEL)  # ch30 plates: see _appearance palette
 
     # Verify the regular tube's cut length; the separate cap establishes the
     # preserved finished assembly top.
-    await bbox_extent_check(adapter, "tube cut length", "y", COLUMN_LENGTH)
+    bbox_extent_check(adapter, "tube cut length", "y", COLUMN_LENGTH)
 
-    await report_mass_properties(adapter)
+    report_mass_properties(adapter)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
@@ -257,7 +257,7 @@ async def build(adapter) -> dict[str, str]:
             "Top End Callout": TOP_END_CALLOUT,
         },
     )
-    return await save_part_and_images(adapter, PART_NAME)
+    return save_part_and_images(adapter, PART_NAME)
 
 
 if __name__ == "__main__":

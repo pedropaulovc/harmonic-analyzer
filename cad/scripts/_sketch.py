@@ -191,7 +191,7 @@ def _log_sketch_relations(adapter: Any, label: str, phase: str, severity: str) -
 
 
 @_telemetry.traced("sketch.ensure_defined", label_param="label")
-async def ensure_fully_defined(
+def ensure_fully_defined(
     adapter: Any,
     label: str,
     fix_entities: Iterable[str] = (),
@@ -213,8 +213,8 @@ async def ensure_fully_defined(
     points to the origin with semantic relations/dims.
     """
 
-    async def _state() -> str | None:
-        res = await adapter.check_sketch_fully_defined()
+    def _state() -> str | None:
+        res = adapter.check_sketch_fully_defined()
         if res.is_success and res.data:
             state = res.data.get("definition_state")
             if state not in ("fully_defined", "under_defined", "over_defined"):
@@ -222,14 +222,14 @@ async def ensure_fully_defined(
             return state
         return None
 
-    state = await _state()
+    state = _state()
     if state == "fully_defined":
         _telemetry.success(f"fully defined: {label}")
         return
 
     if state == "over_defined":
         _log_sketch_relations(adapter, label, "over_defined", "error")
-        over = await adapter.get_over_defining_relations()
+        over = adapter.get_over_defining_relations()
         detail = over.data if over.is_success else over.error
         raise RuntimeError(
             f"{label}: sketch OVER-defined; over-defining relations: {detail!r}"
@@ -257,10 +257,10 @@ async def ensure_fully_defined(
     for entity_id in fix_entities:
         if state not in ("under_defined", "unknown"):
             break
-        fixed = await adapter.add_sketch_constraint(entity_id, None, "fix")
+        fixed = adapter.add_sketch_constraint(entity_id, None, "fix")
         if not fixed.is_success:
             raise RuntimeError(f"{label}: fix {entity_id} failed: {fixed.error}")
-        state = await _state()
+        state = _state()
         _telemetry.debug(f"fixed {entity_id} -> {state}")
         if state == "fully_defined":
             _telemetry.success(f"fully defined after fixing {entity_id}: {label}")
@@ -270,16 +270,16 @@ async def ensure_fully_defined(
     raise RuntimeError(f"{label}: sketch not fully defined (state={state!r})")
 
 
-async def dimension_between(
+def dimension_between(
     adapter: Any, ref1: str, ref2: str, kind: str, value: float, label: str
 ) -> str:
     """Driving dimension between two point refs (``horizontal_distance``,
     ``vertical_distance``, or aligned ``distance``); value in mm."""
-    result = await adapter.add_sketch_dimension(ref1, ref2, kind, value)
+    result = adapter.add_sketch_dimension(ref1, ref2, kind, value)
     return check(f"{kind} {label} = {value:g}", result)
 
 
-async def anchor_point_to_origin(
+def anchor_point_to_origin(
     adapter: Any, point_ref: str, x: float, y: float, label: str
 ) -> None:
     """Fully anchor a sketch point at (x, y) relative to the sketch origin.
@@ -302,38 +302,38 @@ async def anchor_point_to_origin(
     if x == 0.0 and y == 0.0:
         check(
             f"coincident {label} -> origin",
-            await adapter.add_sketch_constraint(point_ref, "origin", "coincident"),
+            adapter.add_sketch_constraint(point_ref, "origin", "coincident"),
         )
         return
     if y == 0.0:
         check(
             f"horizontal_points {label} -> origin",
-            await adapter.add_sketch_constraint(
+            adapter.add_sketch_constraint(
                 point_ref, "origin", "horizontal_points"
             ),
         )
-        await dimension_between(
+        dimension_between(
             adapter, point_ref, "origin", "horizontal_distance", abs(x), label
         )
         return
     if x == 0.0:
         check(
             f"vertical_points {label} -> origin",
-            await adapter.add_sketch_constraint(point_ref, "origin", "vertical_points"),
+            adapter.add_sketch_constraint(point_ref, "origin", "vertical_points"),
         )
-        await dimension_between(
+        dimension_between(
             adapter, point_ref, "origin", "vertical_distance", abs(y), label
         )
         return
-    await dimension_between(
+    dimension_between(
         adapter, point_ref, "origin", "horizontal_distance", abs(x), label
     )
-    await dimension_between(
+    dimension_between(
         adapter, point_ref, "origin", "vertical_distance", abs(y), label
     )
 
 
-async def anchor_point_to_point(
+def anchor_point_to_point(
     adapter: Any, ref1: str, ref2: str, dx: float, dy: float, label: str
 ) -> None:
     """Pin ``ref2`` at offset (dx, dy) from ``ref1``: an alignment relation
@@ -351,23 +351,23 @@ async def anchor_point_to_point(
     if dx == 0.0:
         check(
             f"vertical_points {label}",
-            await adapter.add_sketch_constraint(ref1, ref2, "vertical_points"),
+            adapter.add_sketch_constraint(ref1, ref2, "vertical_points"),
         )
-        await dimension_between(
+        dimension_between(
             adapter, ref1, ref2, "vertical_distance", abs(dy), label
         )
         return
     if dy == 0.0:
         check(
             f"horizontal_points {label}",
-            await adapter.add_sketch_constraint(ref1, ref2, "horizontal_points"),
+            adapter.add_sketch_constraint(ref1, ref2, "horizontal_points"),
         )
-        await dimension_between(
+        dimension_between(
             adapter, ref1, ref2, "horizontal_distance", abs(dx), label
         )
         return
-    await dimension_between(adapter, ref1, ref2, "horizontal_distance", abs(dx), label)
-    await dimension_between(adapter, ref1, ref2, "vertical_distance", abs(dy), label)
+    dimension_between(adapter, ref1, ref2, "horizontal_distance", abs(dx), label)
+    dimension_between(adapter, ref1, ref2, "vertical_distance", abs(dy), label)
 
 
 class SketchDims:
@@ -455,7 +455,7 @@ def _record_origin_anchor(
         dims.record(name_y, drive_y)
 
 
-async def add_line_chain(
+def add_line_chain(
     adapter: Any, points: list[tuple[float, float]], close: bool = True
 ) -> list[str]:
     """Draw consecutive lines through ``points`` and return their entity IDs.
@@ -480,7 +480,7 @@ async def add_line_chain(
     ids: list[str] = []
     try:
         for (x1, y1), (x2, y2) in zip(vertices, vertices[1:], strict=False):
-            result = await adapter.add_line(x1, y1, x2, y2)
+            result = adapter.add_line(x1, y1, x2, y2)
             ids.append(check(f"add_line ({x1:g},{y1:g})->({x2:g},{y2:g})", result))
     finally:
         sketch_mgr.AddToDB = prev_add_to_db

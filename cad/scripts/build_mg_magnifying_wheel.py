@@ -264,14 +264,14 @@ def _tie2_profile() -> list[tuple[float, float]]:
     return [p_in, p_out, q_out, q_in]
 
 
-async def _relate(adapter, rows) -> None:
+def _relate(adapter, rows) -> None:
     """Apply ``(label, first, second, relation)`` sketch relations."""
     for label, first, second, relation in rows:
-        check(label, await adapter.add_sketch_constraint(first, second, relation))
+        check(label, adapter.add_sketch_constraint(first, second, relation))
 
 
-async def _fillet(adapter, radius: float, picks, name: str, dim: str) -> None:
-    check(f"fillet {name}", await adapter.add_fillet(radius, picks, propagate=False))
+def _fillet(adapter, radius: float, picks, name: str, dim: str) -> None:
+    check(f"fillet {name}", adapter.add_fillet(radius, picks, propagate=False))
     name_last_feature(adapter, name)
     name_dimensions(adapter, name, [dim])
 
@@ -420,7 +420,7 @@ def _profile_mapper(
 _CENTRELINE_OVERRUN = 2.0
 
 
-async def _diameter_reference(adapter) -> list[tuple[str, str]]:
+def _diameter_reference(adapter) -> list[tuple[str, str]]:
     """Section A-A's rim diameters and the spokes' back face
     (mg_magnifying_wheel_spec.DIAMETER_REFERENCE).
 
@@ -437,7 +437,7 @@ async def _diameter_reference(adapter) -> list[tuple[str, str]]:
     """
     feature = DIAMETER_REFERENCE
     _section_plane(adapter)
-    check(f"create_sketch {feature}", await adapter.create_sketch(SECTION_PLANE))
+    check(f"create_sketch {feature}", adapter.create_sketch(SECTION_PLANE))
     to_sketch = _sketch_mapper(adapter, u_axis=0, v_axis=2, label=feature)
     axis_start = to_sketch((0.0, 0.0, HUB_BACK_Z + _CENTRELINE_OVERRUN))
     axis_end = to_sketch((0.0, 0.0, HUB_FRONT_Z - _CENTRELINE_OVERRUN))
@@ -449,21 +449,21 @@ async def _diameter_reference(adapter) -> list[tuple[str, str]]:
     )
     set_sketch_direct_db(adapter, True)
     axis = check(
-        f"{feature} axis", await adapter.add_centerline(*axis_start, *axis_end)
+        f"{feature} axis", adapter.add_centerline(*axis_start, *axis_end)
     )
     lines = []
     for name, _drive, radius, z in witnesses:
         start = to_sketch((radius, 0.0, z))
         end = to_sketch((radius, 0.0, z - REFERENCE_WITNESS_LEN))
         lines.append(
-            check(f"{feature} {name} witness", await adapter.add_line(*start, *end))
+            check(f"{feature} {name} witness", adapter.add_line(*start, *end))
         )
     face_z = SPOKE_AXIAL / 2.0
     face_start = to_sketch((_RIM_IN_R, 0.0, face_z))
     face_end = to_sketch((_RIM_IN_R, 0.0, face_z - REFERENCE_WITNESS_LEN))
     face = check(
         f"{feature} SpokeFaceOffset witness",
-        await adapter.add_line(*face_start, *face_end),
+        adapter.add_line(*face_start, *face_end),
     )
     set_sketch_direct_db(adapter, False)
     for line in (*lines, face):
@@ -474,22 +474,22 @@ async def _diameter_reference(adapter) -> list[tuple[str, str]]:
     for line in (axis, *lines, face):
         check(
             f"{feature} {line} axial",
-            await adapter.add_sketch_constraint(line, None, _AXIAL),
+            adapter.add_sketch_constraint(line, None, _AXIAL),
         )
     dims = SketchDims()
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{axis}.start", *axis_start, f"{feature} axis start"
     )
     dims.record(None)
     check(
         f"{feature} axis length",
-        await adapter.add_sketch_dimension(
+        adapter.add_sketch_dimension(
             axis, None, "linear", HUB_LEN + 2.0 * _CENTRELINE_OVERRUN
         ),
     )
     dims.record(None)
     for line, (name, _drive, _radius, z) in zip(lines, witnesses, strict=True):
-        await dimension_between(
+        dimension_between(
             adapter,
             f"{line}.start",
             "origin",
@@ -500,13 +500,13 @@ async def _diameter_reference(adapter) -> list[tuple[str, str]]:
         dims.record(None)
         check(
             f"{feature} {name} witness length",
-            await adapter.add_sketch_dimension(
+            adapter.add_sketch_dimension(
                 line, None, "linear", REFERENCE_WITNESS_LEN
             ),
         )
         dims.record(None)
     for line, (name, drive, radius, _z) in zip(lines, witnesses, strict=True):
-        await add_diametric_linear_dimension(
+        add_diametric_linear_dimension(
             adapter,
             axis,
             f"{line}.start",
@@ -516,7 +516,7 @@ async def _diameter_reference(adapter) -> list[tuple[str, str]]:
         dims.record(name, drive)
     # The spokes' back-face witness: on the rim bore's radius, its length,
     # and located from the OD witness's start (the rim's back face).
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{face}.start",
         "origin",
@@ -527,12 +527,12 @@ async def _diameter_reference(adapter) -> list[tuple[str, str]]:
     dims.record(None)
     check(
         f"{feature} SpokeFaceOffset witness length",
-        await adapter.add_sketch_dimension(
+        adapter.add_sketch_dimension(
             face, None, "linear", REFERENCE_WITNESS_LEN
         ),
     )
     dims.record(None)
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{lines[0]}.start",
         f"{face}.start",
@@ -541,14 +541,14 @@ async def _diameter_reference(adapter) -> list[tuple[str, str]]:
         "SpokeFaceOffset",
     )
     dims.record("SpokeFaceOffset")
-    await ensure_fully_defined(adapter, feature)
-    check(f"exit_sketch {feature}", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, feature)
+    check(f"exit_sketch {feature}", adapter.exit_sketch())
     name_last_feature(adapter, feature)
     _require_on_section_plane(adapter, feature)
     return dims.apply(adapter, feature)
 
 
-async def _spoke_reference(adapter) -> list[tuple[str, str]]:
+def _spoke_reference(adapter) -> list[tuple[str, str]]:
     """The spoke pattern's pitch and TIE 2's clock
     (mg_magnifying_wheel_spec.SPOKE_REFERENCE).
 
@@ -559,7 +559,7 @@ async def _spoke_reference(adapter) -> list[tuple[str, str]]:
     and the hole's clock without driving either.  It adds no volume.
     """
     feature = SPOKE_REFERENCE
-    check(f"create_sketch {feature}", await adapter.create_sketch("Front"))
+    check(f"create_sketch {feature}", adapter.create_sketch("Front"))
     clock_spoke = TIE2_CLOCK_SPOKE * SPOKE_PITCH_DEG
     pairs = (
         (
@@ -583,20 +583,20 @@ async def _spoke_reference(adapter) -> list[tuple[str, str]]:
             ends = [(r * math.cos(a), r * math.sin(a)) for r in SPOKE_STUB_R]
             line = check(
                 f"{feature} {label} {bearing:g} deg centreline",
-                await adapter.add_centerline(*ends[0], *ends[1]),
+                adapter.add_centerline(*ends[0], *ends[1]),
             )
             stubs.append((line, ends))
     set_sketch_direct_db(adapter, False)
     dims = SketchDims()
     for line, ends in stubs:
         for end_ref, point in zip((f"{line}.start", f"{line}.end"), ends, strict=True):
-            await anchor_point_to_origin(
+            anchor_point_to_origin(
                 adapter, end_ref, *point, f"{feature} {end_ref}"
             )
             _record_origin_anchor(dims, *point, None, None, None, None)
     for index, (name, label, bearings, degrees) in enumerate(pairs):
         between = math.radians(sum(bearings) / 2.0)
-        await add_angular_reference_dimension(
+        add_angular_reference_dimension(
             adapter,
             stubs[2 * index][0],
             stubs[2 * index + 1][0],
@@ -605,20 +605,20 @@ async def _spoke_reference(adapter) -> list[tuple[str, str]]:
             expected_degrees=degrees,
         )
         dims.record(name)
-    await ensure_fully_defined(adapter, feature)
-    check(f"exit_sketch {feature}", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, feature)
+    check(f"exit_sketch {feature}", adapter.exit_sketch())
     name_last_feature(adapter, feature)
     return dims.apply(adapter, feature)
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
         CircularPatternParameters,
         ExtrusionParameters,
         RevolveParameters,
     )
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     # #290: the row's inch calculation units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
@@ -626,34 +626,34 @@ async def build(adapter) -> dict[str, str]:
     # is an INCH document and the equation manager reads BARE numbers in
     # document units (an unsuffixed 100 = 100 in). SPOKE_COUNT is a pattern
     # instance count, not a sketch length, so it stays a Python constant.
-    await set_global(adapter, "RimOuterDia", f"{RIM_OUTER_DIA}mm")
-    await set_global(adapter, "RimRingRadial", f"{RIM_RING_RADIAL}mm")
-    await set_global(adapter, "RimInnerDia", '"RimOuterDia" - 2 * "RimRingRadial"')
-    await set_global(adapter, "HubDia", f"{HUB_DIA}mm")
-    await set_global(adapter, "HubLength", f"{HUB_LEN}mm")
-    await set_global(adapter, "HubFrontZ", f"{-HUB_FRONT_Z}mm")
-    await set_global(adapter, "SpigotDia", f"{SPIGOT_DIA}mm")
-    await set_global(adapter, "SpigotLength", f"{SPIGOT_LEN}mm")
-    await set_global(adapter, "BoreDia", f"{BORE_DIA}mm")
-    await set_global(adapter, "SpokeAxial", f"{SPOKE_AXIAL}mm")
-    await set_global(adapter, "SpokeOverlap", f"{SPOKE_OVERLAP}mm")
-    await set_global(adapter, "SpokeRootWidth", f"{SPOKE_ROOT_WIDTH}mm")
-    await set_global(adapter, "SpokeTipWidth", f"{SPOKE_TIP_WIDTH}mm")
-    await set_global(adapter, "SpokeX0", '"HubDia" / 2 - "SpokeOverlap"')
-    await set_global(adapter, "SpokeX1", '"RimInnerDia" / 2 + "SpokeOverlap"')
-    await set_global(adapter, "GrooveR", f"{GROOVE_R}mm")
-    await set_global(adapter, "GrooveBottomDia", f"{GROOVE_BOTTOM_DIA}mm")
-    await set_global(adapter, "TieHoleDia", f"{TIE_HOLE_DIA}mm")
-    await set_global(adapter, "Tie1X", f"{TIE1_X}mm")
-    await set_global(adapter, "Tie1Y", f"{-TIE1_Y}mm")
+    set_global(adapter, "RimOuterDia", f"{RIM_OUTER_DIA}mm")
+    set_global(adapter, "RimRingRadial", f"{RIM_RING_RADIAL}mm")
+    set_global(adapter, "RimInnerDia", '"RimOuterDia" - 2 * "RimRingRadial"')
+    set_global(adapter, "HubDia", f"{HUB_DIA}mm")
+    set_global(adapter, "HubLength", f"{HUB_LEN}mm")
+    set_global(adapter, "HubFrontZ", f"{-HUB_FRONT_Z}mm")
+    set_global(adapter, "SpigotDia", f"{SPIGOT_DIA}mm")
+    set_global(adapter, "SpigotLength", f"{SPIGOT_LEN}mm")
+    set_global(adapter, "BoreDia", f"{BORE_DIA}mm")
+    set_global(adapter, "SpokeAxial", f"{SPOKE_AXIAL}mm")
+    set_global(adapter, "SpokeOverlap", f"{SPOKE_OVERLAP}mm")
+    set_global(adapter, "SpokeRootWidth", f"{SPOKE_ROOT_WIDTH}mm")
+    set_global(adapter, "SpokeTipWidth", f"{SPOKE_TIP_WIDTH}mm")
+    set_global(adapter, "SpokeX0", '"HubDia" / 2 - "SpokeOverlap"')
+    set_global(adapter, "SpokeX1", '"RimInnerDia" / 2 + "SpokeOverlap"')
+    set_global(adapter, "GrooveR", f"{GROOVE_R}mm")
+    set_global(adapter, "GrooveBottomDia", f"{GROOVE_BOTTOM_DIA}mm")
+    set_global(adapter, "TieHoleDia", f"{TIE_HOLE_DIA}mm")
+    set_global(adapter, "Tie1X", f"{TIE1_X}mm")
+    set_global(adapter, "Tie1Y", f"{-TIE1_Y}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
     # Rim ring (annulus, mid-plane symmetric). Two on-axis circles: each emits
     # only its diameter dim.
     rim_sd = SketchDims()
-    check("create_sketch rim", await adapter.create_sketch("Front"))
-    await define_circle(
+    check("create_sketch rim", adapter.create_sketch("Front"))
+    define_circle(
         adapter,
         0.0,
         0.0,
@@ -663,7 +663,7 @@ async def build(adapter) -> dict[str, str]:
         names=("RimOdCx", "RimOdCz", "RimOdCircleDia"),
         drives=(None, None, '"RimOuterDia"'),
     )
-    await define_circle(
+    define_circle(
         adapter,
         0.0,
         0.0,
@@ -673,23 +673,23 @@ async def build(adapter) -> dict[str, str]:
         names=("RimIdCx", "RimIdCz", "RimIdCircleDia"),
         drives=(None, None, '"RimInnerDia"'),
     )
-    await ensure_fully_defined(adapter, "rim sketch")
-    check("exit_sketch rim", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "rim sketch")
+    check("exit_sketch rim", adapter.exit_sketch())
     name_last_feature(adapter, "RimProfile")
     drive_jobs += rim_sd.apply(adapter, "RimProfile")
     check(
         "extrude rim",
-        await adapter.create_extrusion(
+        adapter.create_extrusion(
             ExtrusionParameters(depth=RIM_AXIAL, both_directions=True)
         ),
     )
     name_last_feature(adapter, "Rim")
-    volume = await volume_check(adapter, "rim", V_RIM, 0.002 * V_RIM)
+    volume = volume_check(adapter, "rim", V_RIM, 0.002 * V_RIM)
 
     # Named wheel axis (local Z = Top x Right): the spoke pattern rotates about
     # it, and the M6 assembly mates the wheel on the axle by it. Created before
     # the pattern so the pattern selects it by name.
-    wheel_axis = await name_bore_axis(
+    wheel_axis = name_bore_axis(
         adapter, "Top Plane", 0.0, "Right Plane", 0.0, "wheel axis"
     )
 
@@ -697,13 +697,13 @@ async def build(adapter) -> dict[str, str]:
     # the tip (inside the rim). Record each display dim in CREATION order: the
     # two end widths, then the root and tip corner anchors (x, then y).
     spoke_sd = SketchDims()
-    check("create_sketch spoke", await adapter.create_sketch("Front"))
+    check("create_sketch spoke", adapter.create_sketch("Front"))
     h0 = SPOKE_ROOT_WIDTH / 2.0
     h1 = SPOKE_TIP_WIDTH / 2.0
-    bottom, tip, _top, root = await add_line_chain(
+    bottom, tip, _top, root = add_line_chain(
         adapter, [(SPOKE_X0, -h0), (SPOKE_X1, -h1), (SPOKE_X1, h1), (SPOKE_X0, h0)]
     )
-    await _relate(
+    _relate(
         adapter,
         (
             ("spoke root vertical", root, None, "vertical"),
@@ -712,29 +712,29 @@ async def build(adapter) -> dict[str, str]:
     )
     check(
         "spoke root width",
-        await adapter.add_sketch_dimension(root, None, "linear", SPOKE_ROOT_WIDTH),
+        adapter.add_sketch_dimension(root, None, "linear", SPOKE_ROOT_WIDTH),
     )
     spoke_sd.record("SpokeRootWidth", '"SpokeRootWidth"')
     check(
         "spoke tip width",
-        await adapter.add_sketch_dimension(tip, None, "linear", SPOKE_TIP_WIDTH),
+        adapter.add_sketch_dimension(tip, None, "linear", SPOKE_TIP_WIDTH),
     )
     spoke_sd.record("SpokeTipWidth", '"SpokeTipWidth"')
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{bottom}.start", SPOKE_X0, -h0, "spoke root"
     )
     spoke_sd.record("SpokeX0", '"SpokeX0"')
     spoke_sd.record("SpokeRootY", '"SpokeRootWidth" / 2')  # unsigned half-width
-    await anchor_point_to_origin(adapter, f"{tip}.start", SPOKE_X1, -h1, "spoke tip")
+    anchor_point_to_origin(adapter, f"{tip}.start", SPOKE_X1, -h1, "spoke tip")
     spoke_sd.record("SpokeX1", '"SpokeX1"')
     spoke_sd.record("SpokeTipY", '"SpokeTipWidth" / 2')
-    await ensure_fully_defined(adapter, "spoke sketch")
-    check("exit_sketch spoke", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "spoke sketch")
+    check("exit_sketch spoke", adapter.exit_sketch())
     name_last_feature(adapter, "SpokeProfile")
     drive_jobs += spoke_sd.apply(adapter, "SpokeProfile")
     check(
         "extrude spoke",
-        await adapter.create_extrusion(
+        adapter.create_extrusion(
             ExtrusionParameters(depth=SPOKE_AXIAL, both_directions=True)
         ),
     )
@@ -748,7 +748,7 @@ async def build(adapter) -> dict[str, str]:
     # rim, so the pattern is one body.
     check(
         f"circular pattern {SPOKE_COUNT} spokes",
-        await adapter.circular_pattern_feature(
+        adapter.circular_pattern_feature(
             CircularPatternParameters(
                 axis_name=wheel_axis,
                 features=["Spoke"],
@@ -757,7 +757,7 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "SpokePattern")
-    volume = await volume_check(
+    volume = volume_check(
         adapter,
         "rim + spokes",
         volume + SPOKE_COUNT * V_SPOKE_FREE,
@@ -769,14 +769,14 @@ async def build(adapter) -> dict[str, str]:
     # the Ø.499 spigot to its front face, revolved about the axis line.
     hub_sd = SketchDims()
     back_x, step_x, front_x = -HUB_BACK_Z, -HUB_STEP_Z, -HUB_FRONT_Z
-    check("create_sketch hub", await adapter.create_sketch("Top"))
+    check("create_sketch hub", adapter.create_sketch("Top"))
     hub_point, _ = _profile_mapper(adapter, label="hub sketch")
     set_sketch_direct_db(adapter, True)
     hub_axis = check(
         "hub axis centerline",
-        await adapter.add_centerline(*hub_point(back_x, 0.0), *hub_point(front_x, 0.0)),
+        adapter.add_centerline(*hub_point(back_x, 0.0), *hub_point(front_x, 0.0)),
     )
-    back, boss, step, spigot, front, axis_line = await add_line_chain(
+    back, boss, step, spigot, front, axis_line = add_line_chain(
         adapter,
         [
             hub_point(back_x, 0.0),
@@ -798,16 +798,16 @@ async def build(adapter) -> dict[str, str]:
     ):
         check(
             f"hub {direction} {line}",
-            await adapter.add_sketch_constraint(line, None, direction),
+            adapter.add_sketch_constraint(line, None, direction),
         )
     # The spigot's front face sits HUB_FRONT_Z below the spokes' mid-plane
     # (the origin): every axial size reads from that one faced end
     # (drawing-guidelines.md rule 11 (turned parts read like the lathe)), the spigot length the drum's recess needs among them.
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{front}.end", *hub_point(front_x, 0.0), "hub spigot front face"
     )
     hub_sd.record("HubFrontZ", '"HubFrontZ"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{back}.start",
         f"{front}.end",
@@ -816,7 +816,7 @@ async def build(adapter) -> dict[str, str]:
         "HubLength",
     )
     hub_sd.record("HubLength", '"HubLength"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{step}.start",
         f"{front}.end",
@@ -825,11 +825,11 @@ async def build(adapter) -> dict[str, str]:
         "SpigotLength",
     )
     hub_sd.record("SpigotLength", '"SpigotLength"')
-    await add_diametric_linear_dimension(
+    add_diametric_linear_dimension(
         adapter, hub_axis, boss, hub_point(back_x + 3.0, _HUB_R + 4.0), "HubDia"
     )
     hub_sd.record("HubDia", '"HubDia"')
-    await add_diametric_linear_dimension(
+    add_diametric_linear_dimension(
         adapter,
         hub_axis,
         spigot,
@@ -837,21 +837,21 @@ async def build(adapter) -> dict[str, str]:
         "SpigotDia",
     )
     hub_sd.record("SpigotDia", '"SpigotDia"')
-    await ensure_fully_defined(adapter, "hub sketch")
-    check("exit_sketch hub", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "hub sketch")
+    check("exit_sketch hub", adapter.exit_sketch())
     name_last_feature(adapter, "HubProfile")
     drive_jobs += hub_sd.apply(adapter, "HubProfile")
-    check("revolve hub", await adapter.create_revolve(RevolveParameters(angle=360.0)))
+    check("revolve hub", adapter.create_revolve(RevolveParameters(angle=360.0)))
     name_last_feature(adapter, "HubBody")
     v_spoke_in_hub = SPOKE_COUNT * (V_SPOKE_FREE - V_SPOKE_WEB)
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "hub", volume + V_HUB - v_spoke_in_hub, 0.002 * V_HUB
     )
 
     # Axle bore through the boss and spigot. On-axis circle: diameter only.
     bore_sd = SketchDims()
-    check("create_sketch bore", await adapter.create_sketch("Front"))
-    await define_circle(
+    check("create_sketch bore", adapter.create_sketch("Front"))
+    define_circle(
         adapter,
         0.0,
         0.0,
@@ -861,58 +861,58 @@ async def build(adapter) -> dict[str, str]:
         names=("BoreCx", "BoreCz", "BoreDiaDim"),
         drives=(None, None, '"BoreDia"'),
     )
-    await ensure_fully_defined(adapter, "bore sketch")
-    check("exit_sketch bore", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "bore sketch")
+    check("exit_sketch bore", adapter.exit_sketch())
     name_last_feature(adapter, "BoreProfile")
     drive_jobs += bore_sd.apply(adapter, "BoreProfile")
     check(
         "cut bore",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=2.0 * -HUB_FRONT_Z + 2.0, both_directions=True)
         ),
     )
     name_last_feature(adapter, "Bore")
-    volume = await volume_check(adapter, "bore", volume - V_BORE, 0.02 * V_BORE)
+    volume = volume_check(adapter, "bore", volume - V_BORE, 0.02 * V_BORE)
 
     # Section A-A's rim diameters, restated on a hidden sketch in its cut, and
     # the spoke pattern's pitch on a hidden Front-plane sketch.
-    drive_jobs += await _diameter_reference(adapter)
-    drive_jobs += await _spoke_reference(adapter)
+    drive_jobs += _diameter_reference(adapter)
+    drive_jobs += _spoke_reference(adapter)
 
     # Cast fillets where each spoke side meets the boss (R.12) and the rim
     # (R.16), picked mid-height on every junction edge, the edge the face view
     # prints first; then the R.03 rounds on the rim bore's two edges, picked between
     # the 0 and 60 deg spokes.
-    await _fillet(
+    _fillet(
         adapter,
         HUB_FILLET_R,
         _spoke_edge_picks(_HUB_R, HUB_FILLET_PRINTED),
         "HubFillets",
         "HubFilletR",
     )
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "hub fillets", volume + V_HUB_FILLETS, 0.02 * V_HUB_FILLETS
     )
-    await _fillet(
+    _fillet(
         adapter,
         RIM_FILLET_R,
         _spoke_edge_picks(_RIM_IN_R, RIM_FILLET_PRINTED),
         "RimFillets",
         "RimFilletR",
     )
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "rim fillets", volume + V_RIM_FILLETS, 0.02 * V_RIM_FILLETS
     )
     between = math.radians(180.0 / SPOKE_COUNT)
     round_xy = [_RIM_IN_R * math.cos(between), _RIM_IN_R * math.sin(between)]
-    await _fillet(
+    _fillet(
         adapter,
         CAST_ROUND_R,
         [[*round_xy, RIM_AXIAL / 2.0], [*round_xy, -RIM_AXIAL / 2.0]],
         "RimRounds",
         "CastRoundR",
     )
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "rim rounds", volume - V_ROUNDS, 0.02 * V_ROUNDS
     )
 
@@ -923,12 +923,12 @@ async def build(adapter) -> dict[str, str]:
     # ends: a mirrored sketch frame draws it from its far end, so "start" and
     # "end" swap.
     groove_sd = SketchDims()
-    check("create_sketch groove", await adapter.create_sketch("Top"))
+    check("create_sketch groove", adapter.create_sketch("Top"))
     groove_point, mirrored = _profile_mapper(adapter, label="groove sketch")
     set_sketch_direct_db(adapter, True)
     groove_axis = check(
         "groove axis",
-        await adapter.add_centerline(*groove_point(0.0, 0.0), *groove_point(1.0, 0.0)),
+        adapter.add_centerline(*groove_point(0.0, 0.0), *groove_point(1.0, 0.0)),
     )
     bottom_r = GROOVE_BOTTOM_DIA / 2.0
     centre = groove_point(0.0, _GROOVE_CENTRE_R)
@@ -940,15 +940,15 @@ async def build(adapter) -> dict[str, str]:
     right_ends = (right_foot, bottom) if mirrored else (bottom, right_foot)
     left_arc = check(
         "groove left arc",
-        await adapter.add_arc(*centre, *left_ends[0], *left_ends[1]),
+        adapter.add_arc(*centre, *left_ends[0], *left_ends[1]),
     )
     right_arc = check(
         "groove right arc",
-        await adapter.add_arc(*centre, *right_ends[0], *right_ends[1]),
+        adapter.add_arc(*centre, *right_ends[0], *right_ends[1]),
     )
     groove_bottom = f"{right_arc}.{first}"
     set_sketch_direct_db(adapter, False)
-    _right_wall, groove_top, _left_wall = await add_line_chain(
+    _right_wall, groove_top, _left_wall = add_line_chain(
         adapter,
         [
             right_foot,
@@ -960,17 +960,17 @@ async def build(adapter) -> dict[str, str]:
     )
     check(
         "groove axis along the wheel axis",
-        await adapter.add_sketch_constraint(groove_axis, None, _AXIAL),
+        adapter.add_sketch_constraint(groove_axis, None, _AXIAL),
     )
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{groove_axis}.start", 0.0, 0.0, "groove axis"
     )
     check(
         "groove axis length",
-        await adapter.add_sketch_dimension(groove_axis, None, "linear", 1.0),
+        adapter.add_sketch_dimension(groove_axis, None, "linear", 1.0),
     )
     groove_sd.record(None)
-    await _relate(
+    _relate(
         adapter,
         (
             (
@@ -1010,10 +1010,10 @@ async def build(adapter) -> dict[str, str]:
     )
     check(
         "groove radius",
-        await adapter.add_sketch_dimension(right_arc, None, "radial", GROOVE_R),
+        adapter.add_sketch_dimension(right_arc, None, "radial", GROOVE_R),
     )
     groove_sd.record("GrooveR", '"GrooveR"')
-    await add_diametric_linear_dimension(
+    add_diametric_linear_dimension(
         adapter,
         groove_axis,
         groove_bottom,
@@ -1021,7 +1021,7 @@ async def build(adapter) -> dict[str, str]:
         "GrooveBottomDia",
     )
     groove_sd.record("GrooveBottomDia", '"GrooveBottomDia"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{groove_top}.start",
         "origin",
@@ -1030,22 +1030,22 @@ async def build(adapter) -> dict[str, str]:
         "groove overrun",
     )
     groove_sd.record(None)
-    await ensure_fully_defined(adapter, "groove sketch")
-    check("exit_sketch groove", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "groove sketch")
+    check("exit_sketch groove", adapter.exit_sketch())
     name_last_feature(adapter, "GrooveProfile")
     drive_jobs += groove_sd.apply(adapter, "GrooveProfile")
     check(
         "revolve-cut groove",
-        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
+        adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
     )
     name_last_feature(adapter, "Groove")
-    volume = await volume_check(adapter, "groove", volume - V_GROOVE, 0.02 * V_GROOVE)
+    volume = volume_check(adapter, "groove", volume - V_GROOVE, 0.02 * V_GROOVE)
 
     # TIE 1: the lever-wire tie hole, axial through the boss just outboard of
     # the drum's O.D., located from the bore centre by two coordinates.
     tie1_sd = SketchDims()
-    check("create_sketch tie 1", await adapter.create_sketch("Front"))
-    await define_circle(
+    check("create_sketch tie 1", adapter.create_sketch("Front"))
+    define_circle(
         adapter,
         TIE1_X,
         TIE1_Y,
@@ -1055,15 +1055,15 @@ async def build(adapter) -> dict[str, str]:
         names=("Tie1X", "Tie1Y", "Tie1HoleDia"),
         drives=('"Tie1X"', '"Tie1Y"', '"TieHoleDia"'),
     )
-    await ensure_fully_defined(adapter, "tie 1 sketch")
-    check("exit_sketch tie 1", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "tie 1 sketch")
+    check("exit_sketch tie 1", adapter.exit_sketch())
     name_last_feature(adapter, "Tie1Profile")
     drive_jobs += tie1_sd.apply(adapter, "Tie1Profile")
     # Mid-plane cut on the spokes' plane: it must reach past both boss faces
     # (back HUB_BACK_Z, front HUB_STEP_Z), which sit off-centre on it.
     check(
         "cut tie 1",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(
                 depth=2.0 * (max(HUB_BACK_Z, -HUB_STEP_Z) + 1.0),
                 both_directions=True,
@@ -1071,7 +1071,7 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "Tie1")
-    volume = await volume_check(adapter, "tie 1", volume - V_TIE1, 0.02 * V_TIE1)
+    volume = volume_check(adapter, "tie 1", volume - V_TIE1, 0.02 * V_TIE1)
 
     # TIE 2: the pen-wire tie hole, radial from the groove bottom to the rim
     # bore at TIE2_CLOCK_DEG -- a half rectangle beside its radial axis,
@@ -1088,14 +1088,14 @@ async def build(adapter) -> dict[str, str]:
     # coincidences + square + parallel + inner end horizontal + diameter.
     tie2_sd = SketchDims()
     profile = _tie2_profile()
-    check("create_sketch tie 2", await adapter.create_sketch("Front"))
+    check("create_sketch tie 2", adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     tie2_axis = check(
-        "tie 2 axis", await adapter.add_centerline(*profile[0], *profile[1])
+        "tie 2 axis", adapter.add_centerline(*profile[0], *profile[1])
     )
     set_sketch_direct_db(adapter, False)
-    on_axis, outer_end, wall, inner_end = await add_line_chain(adapter, profile)
-    await _relate(
+    on_axis, outer_end, wall, inner_end = add_line_chain(adapter, profile)
+    _relate(
         adapter,
         (
             (
@@ -1119,39 +1119,39 @@ async def build(adapter) -> dict[str, str]:
         (f"{tie2_axis}.start", profile[0], "tie 2 axis inner end"),
         (f"{tie2_axis}.end", profile[1], "tie 2 axis outer end"),
     ):
-        await anchor_point_to_origin(adapter, end_ref, *point, label)
+        anchor_point_to_origin(adapter, end_ref, *point, label)
         tie2_sd.record(None)
         tie2_sd.record(None)
     text = (
         profile[2][0] + 3.0 * _TIE2_W[0] + 3.0 * _TIE2_U[0],
         profile[2][1] + 3.0 * _TIE2_W[1] + 3.0 * _TIE2_U[1],
     )
-    await add_diametric_linear_dimension(adapter, tie2_axis, wall, text, "Tie2HoleDia")
+    add_diametric_linear_dimension(adapter, tie2_axis, wall, text, "Tie2HoleDia")
     tie2_sd.record("Tie2HoleDia", '"TieHoleDia"')
-    await ensure_fully_defined(adapter, "tie 2 sketch")
-    check("exit_sketch tie 2", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "tie 2 sketch")
+    check("exit_sketch tie 2", adapter.exit_sketch())
     name_last_feature(adapter, "Tie2Profile")
     drive_jobs += tie2_sd.apply(adapter, "Tie2Profile")
     check(
         "revolve-cut tie 2",
-        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
+        adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
     )
     name_last_feature(adapter, "Tie2")
-    volume = await volume_check(adapter, "tie 2", volume - V_TIE2, 0.05 * V_TIE2)
+    volume = volume_check(adapter, "tie 2", volume - V_TIE2, 0.05 * V_TIE2)
 
-    await apply_material(adapter, MATERIAL)
+    apply_material(adapter, MATERIAL)
     # Black-painted casting (p.51 photo); the brass drum is its own part.
-    await apply_color(adapter, PANEL_BLACK)
+    apply_color(adapter, PANEL_BLACK)
 
     # The rim OD (book-annotated Ø100) and the boss Ø at its back face.
-    await measure_check(
+    measure_check(
         adapter,
         "rim OD (annotated 100)",
         [{"entity_type": "EDGE", "point": [_RIM_R, 0.0, RIM_AXIAL / 2.0]}],
         "diameter",
         RIM_OUTER_DIA,
     )
-    await measure_check(
+    measure_check(
         adapter,
         "boss dia",
         [{"entity_type": "EDGE", "point": [_HUB_R, 0.0, HUB_BACK_Z]}],
@@ -1165,7 +1165,7 @@ async def build(adapter) -> dict[str, str]:
     # selects. The carrier sketch is blanked (unabsorbed sketches render SHOWN
     # in every assembly instance); the point's coords are re-read and asserted
     # after the final rebuild -- it is undimensioned, so drift must fail loud.
-    check("create_sketch yoke", await adapter.create_sketch("Front"))
+    check("create_sketch yoke", adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     model = adapter.currentModel
     sk_point = model.SketchManager.CreatePoint(
@@ -1173,7 +1173,7 @@ async def build(adapter) -> dict[str, str]:
     if sk_point is None:
         raise RuntimeError("yoke sketch point creation failed")
     set_sketch_direct_db(adapter, False)
-    check("exit_sketch yoke", await adapter.exit_sketch())
+    check("exit_sketch yoke", adapter.exit_sketch())
     name_last_feature(adapter, "WireYokeSketch")
     blank_sketch(adapter, "WireYokeSketch")
     _make_yoke_ref_point(adapter)
@@ -1181,16 +1181,16 @@ async def build(adapter) -> dict[str, str]:
     # Apply the deferred drive equations after the whole model + a rebuild exists,
     # so every target resolves. Each equation evaluates to the as-built value:
     # the geometry must not move.
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    volume_check(
         adapter, "driven magnifying wheel (equations neutral)", volume, 0.001 * volume
     )
 
     _assert_yoke_point(adapter)
-    await report_mass_properties(adapter)
+    report_mass_properties(adapter)
 
     # drawing-simplicity-policy.md `How the repository implements the guidelines`: the tight bands sit on the model dimensions,
     # the places on every marked one.  The spigot and the bore are matched
@@ -1233,7 +1233,7 @@ async def build(adapter) -> dict[str, str]:
     # import, hidden so they print in no assembly (_drawing_hidden_sketches
     # shows the diameter reference in A-A, the spoke reference on the face).
     blank_reference_sketches(adapter, REFERENCE_SKETCHES)
-    return await save_part_and_images(adapter, PART_NAME)
+    return save_part_and_images(adapter, PART_NAME)
 
 
 def _yoke_sketch_points(adapter):

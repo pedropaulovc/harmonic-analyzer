@@ -93,7 +93,7 @@ def main():
     import _telemetry
     from diagnostics._owned_native_session import run_owned_diagnostic
 
-    async def probe(adapter):
+    def probe(adapter):
         app = adapter.swApp
         if app.GetDocuments() or app.ActiveDoc is not None:
             raise RuntimeError("probe requires an empty inventory; no documents closed")
@@ -151,7 +151,7 @@ def main():
         try:
             with _telemetry.span("datum.probe.prepare", part=args.part):
                 try:
-                    await recipe.build(adapter)
+                    recipe.build(adapter)
                 except DatumBoundary:
                     pass
                 else:

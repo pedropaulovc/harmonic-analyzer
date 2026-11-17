@@ -22,7 +22,7 @@ class SolidWorksSelectionMixin:
             self, operation_name: str, operation: Callable[..., Any], *args: Any
         ) -> AdapterResult[Any]: ...
 
-    async def list_features(
+    def list_features(
         self, include_suppressed: bool = False
     ) -> AdapterResult[list[dict[str, Any]]]:
         if not self.currentModel:
@@ -75,7 +75,7 @@ class SolidWorksSelectionMixin:
             target_doc, feature_name, candidate_names
         )
 
-    async def select_feature(self, feature_name: str) -> AdapterResult[dict[str, Any]]:
+    def select_feature(self, feature_name: str) -> AdapterResult[dict[str, Any]]:
         if not self.currentModel:
             return AdapterResult(
                 status=AdapterResultStatus.ERROR, error="No active model"

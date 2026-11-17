@@ -57,26 +57,26 @@ def _construction(adapter: Any, entity: str) -> None:
 
 
 @_telemetry.traced("part.supplier_chain_front")
-async def _reference_front(adapter: Any) -> str:
+def _reference_front(adapter: Any) -> str:
     """Two nominal section circles; origin-to-centre dimension is their pitch.
 
     The circles are the pin and roller outlines. The origin is the first
     section centre, so the second centre's driving station is also the native
     centre-to-centre pitch. No duplicate carrier is needed.
     """
-    check("create supplier chain nominal front", await adapter.create_sketch("Front"))
+    check("create supplier chain nominal front", adapter.create_sketch("Front"))
     dims = SketchDims()
     for name, diameter, x in (
         (PIN_DIMENSION, PIN_DIAMETER, 0.0),
         (ROLLER_DIMENSION, ROLLER_DIAMETER, PITCH),
     ):
-        circle = await define_circle(
+        circle = define_circle(
             adapter, x, 0.0, diameter / 2.0, name, dims=dims,
             names=(PITCH_DIMENSION if x else None, None, name),
         )
         _construction(adapter, circle)
-    await ensure_fully_defined(adapter, FRONT_FEATURE)
-    check("exit supplier chain nominal front", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, FRONT_FEATURE)
+    check("exit supplier chain nominal front", adapter.exit_sketch())
     name_last_feature(adapter, FRONT_FEATURE)
     dims.apply(adapter, FRONT_FEATURE)
     mark_dimensions_for_drawing(adapter, FRONT_FEATURE, DIMENSIONS_BY_FEATURE[FRONT_FEATURE])
@@ -85,25 +85,25 @@ async def _reference_front(adapter: Any) -> str:
 
 
 @_telemetry.traced("part.supplier_chain_sections")
-async def _reference_sections(adapter: Any) -> str:
+def _reference_sections(adapter: Any) -> str:
     """The roller's nominal section, not a dimension on the installed stand-in.
 
     The dimensioned span is one side of the roller's section outline (its
     diameter wide), so the extension lines start on printed edges.
     """
-    check("create supplier chain nominal sections", await adapter.create_sketch("Top"))
+    check("create supplier chain nominal sections", adapter.create_sketch("Top"))
     dims = SketchDims()
     y0, y1 = -ROLLER_WIDTH / 2.0, ROLLER_WIDTH / 2.0
     points = [(0.0, y0), (0.0, y1), (ROLLER_DIAMETER, y1), (ROLLER_DIAMETER, y0)]
-    lines = await add_line_chain(adapter, points)
+    lines = add_line_chain(adapter, points)
     for line in lines:
         _construction(adapter, line)
-    await define_rectilinear_chain(
+    define_rectilinear_chain(
         adapter, lines, points, label=WIDTH_DIMENSION, dims=dims,
         names=[WIDTH_DIMENSION, f"{WIDTH_DIMENSION}Outline", f"{WIDTH_DIMENSION}StartY"],
     )
-    await ensure_fully_defined(adapter, SECTION_FEATURE)
-    check("exit supplier chain nominal sections", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, SECTION_FEATURE)
+    check("exit supplier chain nominal sections", adapter.exit_sketch())
     name_last_feature(adapter, SECTION_FEATURE)
     dims.apply(adapter, SECTION_FEATURE)
     mark_dimensions_for_drawing(adapter, SECTION_FEATURE, DIMENSIONS_BY_FEATURE[SECTION_FEATURE])
@@ -111,12 +111,12 @@ async def _reference_sections(adapter: Any) -> str:
     return SECTION_FEATURE
 
 
-async def add_chain_stock_references(adapter: Any) -> None:
+def add_chain_stock_references(adapter: Any) -> None:
     """Add a zero-body reference state while preserving every original member."""
-    async def references(target: Any) -> tuple[str, ...]:
-        return await _reference_front(target), await _reference_sections(target)
+    def references(target: Any) -> tuple[str, ...]:
+        return _reference_front(target), _reference_sections(target)
 
-    await add_supplier_reference_configurations(
+    add_supplier_reference_configurations(
         adapter,
         (ReferenceState(
             SUPPLIER_REFERENCE_CONFIGURATION, None, references,

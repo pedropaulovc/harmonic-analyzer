@@ -80,7 +80,7 @@ def _assert_diameter_texts_clear(adapter: Any, displays: dict[str, Any]) -> None
         raise RuntimeError("pen set screw diameter texts are not clear of the collar")
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     supplier_checks = []
     callback_count = 0
     settled = False
@@ -113,7 +113,7 @@ async def build(adapter: Any) -> dict[str, str]:
         _assert_diameter_texts_clear(adapter, displays)
         settled = True
 
-    return await build_purchased_fastener_drawing(
+    return build_purchased_fastener_drawing(
         adapter, SPEC, item=ITEM,
         supplier_margins=supplier_screw_margins(
             SUPPLIER_REFERENCE_DIMENSIONS, planes=SUPPLIER_REFERENCE_PLANES,

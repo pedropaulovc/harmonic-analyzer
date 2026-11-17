@@ -80,10 +80,10 @@ if HOLE_DIA < LOCK_SCREW_SHANK_DIA:
     raise AssertionError("stock guide-lock screw shank does not clear the guide lock")
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     # #290: the row's inch calculation units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
@@ -91,26 +91,26 @@ async def build(adapter) -> dict[str, str]:
     # the equation manager reads bare numbers in document units). (The old
     # HoleDia knob is gone: the screw holes are now a native Hole Wizard feature
     # whose diameter comes from the fractional drill table, not a driven dim.)
-    await set_global(adapter, "LockWidth", f"{LOCK_WIDTH}mm")
-    await set_global(adapter, "LockHeight", f"{LOCK_HEIGHT}mm")
-    await set_global(adapter, "LockThick", f"{LOCK_THICK}mm")
-    await set_global(adapter, "LockHoleX1", f"{HOLE_XY[0][0]}mm")
-    await set_global(adapter, "LockHoleX2", f"{HOLE_XY[1][0]}mm")
-    await set_global(adapter, "LockHoleY", f"{HOLE_XY[0][1]}mm")
-    await set_global(adapter, "LockCornerR", f"{CORNER_R}mm")
+    set_global(adapter, "LockWidth", f"{LOCK_WIDTH}mm")
+    set_global(adapter, "LockHeight", f"{LOCK_HEIGHT}mm")
+    set_global(adapter, "LockThick", f"{LOCK_THICK}mm")
+    set_global(adapter, "LockHoleX1", f"{HOLE_XY[0][0]}mm")
+    set_global(adapter, "LockHoleX2", f"{HOLE_XY[1][0]}mm")
+    set_global(adapter, "LockHoleY", f"{HOLE_XY[0][1]}mm")
+    set_global(adapter, "LockCornerR", f"{CORNER_R}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
     outline = SketchDims()
-    check("create_sketch outline", await adapter.create_sketch("Front"))
+    check("create_sketch outline", adapter.create_sketch("Front"))
     rect = [
         (0.0, 0.0),
         (LOCK_WIDTH, 0.0),
         (LOCK_WIDTH, LOCK_HEIGHT),
         (0.0, LOCK_HEIGHT),
     ]
-    lines = await add_line_chain(adapter, rect)
-    await define_rectilinear_chain(
+    lines = add_line_chain(adapter, rect)
+    define_rectilinear_chain(
         adapter,
         lines,
         rect,
@@ -119,19 +119,19 @@ async def build(adapter) -> dict[str, str]:
         names=["Width", "Height"],
         drives=['"LockWidth"', '"LockHeight"'],
     )
-    await ensure_fully_defined(adapter, "lock outline")
-    check("exit_sketch outline", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "lock outline")
+    check("exit_sketch outline", adapter.exit_sketch())
     name_last_feature(adapter, "LockProfile")
     drive_jobs += outline.apply(adapter, "LockProfile")
     check(
         "extrude lock",
-        await adapter.create_extrusion(ExtrusionParameters(depth=LOCK_THICK)),
+        adapter.create_extrusion(ExtrusionParameters(depth=LOCK_THICK)),
     )
     name_last_feature(adapter, "Lock")
     depth_dim = name_dimensions(adapter, "Lock", ["Depth"])
     drive_jobs += [(depth_dim[0], '"LockThick"')]
     v_plate = LOCK_WIDTH * LOCK_HEIGHT * LOCK_THICK
-    await volume_check(adapter, "lock plate", v_plate, 0.005 * v_plate)
+    volume_check(adapter, "lock plate", v_plate, 0.005 * v_plate)
 
     # Screw holes on the guide-side band: ONE native Hole Wizard 1/8 drill
     # feature (2 through-all instances) drilled from the front face (z=0), while
@@ -156,7 +156,7 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += holes.placement_drive_jobs
     v_holes = len(HOLE_XY) * math.pi * (hole_dia / 2.0) ** 2 * LOCK_THICK
     v_final = v_plate - v_holes
-    await volume_check(adapter, "lock with holes", v_final, 0.005 * v_plate)
+    volume_check(adapter, "lock with holes", v_final, 0.005 * v_plate)
 
     # Rounded plan corners LAST (the photo's plates, pd_guide_lock_spec
     # .CORNER_R), each giving up the square R x R less its quarter disc. The
@@ -176,7 +176,7 @@ async def build(adapter) -> dict[str, str]:
     )
     for feature, dimension, corners in corner_features:
         edges = [[x, y, LOCK_THICK / 2.0] for x, y in corners]
-        check(f"fillet {feature}", await adapter.add_fillet(CORNER_R, edges))
+        check(f"fillet {feature}", adapter.add_fillet(CORNER_R, edges))
         name_last_feature(adapter, feature)
         corner_dim = name_dimensions(adapter, feature, [dimension])
         drive_jobs.append((corner_dim[0], '"LockCornerR"'))
@@ -184,15 +184,15 @@ async def build(adapter) -> dict[str, str]:
             len(corners) * (CORNER_R**2 - math.pi * CORNER_R**2 / 4.0) * LOCK_THICK
         )
         v_final -= v_corners
-        await volume_check(adapter, f"lock with {feature}", v_final, 0.1 * v_corners)
+        volume_check(adapter, f"lock with {feature}", v_final, 0.1 * v_corners)
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    volume_check(
         adapter, "driven lock (equations neutral)", v_final, 0.005 * v_plate
     )
 
@@ -210,13 +210,13 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
 
-    await apply_material(adapter, MATERIAL)
-    await apply_color(adapter, PANEL_BLACK)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    apply_color(adapter, PANEL_BLACK)
+    report_mass_properties(adapter)
     apply_drawing_properties(
         adapter, PART_NAME, {"Isometric View Note": ISOMETRIC_VIEW_NOTE}
     )
-    return await save_part_and_images(adapter, PART_NAME)
+    return save_part_and_images(adapter, PART_NAME)
 
 
 if __name__ == "__main__":

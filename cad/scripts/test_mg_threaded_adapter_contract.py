@@ -92,7 +92,7 @@ def _native_declaration(interface):
 
 def _undeclared_bound_calls(tree):
     failures = []
-    for function in (node for node in tree.body if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))):
+    for function in (node for node in tree.body if isinstance(node, (ast.FunctionDef,))):
         bindings = {}
         for node in ast.walk(function):
             if isinstance(node, ast.Assign) and isinstance(node.value, ast.Call) and isinstance(node.value.func, ast.Name) and node.value.func.id == "_early_bound":

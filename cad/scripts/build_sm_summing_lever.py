@@ -334,7 +334,7 @@ SPRING_PITCH_EXPR = '"ChannelPitch"'
 SPIN_REF_X = TIP_X  # local X of the summation-anchor tap = counter-spring ref
 
 
-async def _three_point_arc(
+def _three_point_arc(
     adapter,
     start: tuple[float, float],
     end: tuple[float, float],
@@ -358,7 +358,7 @@ async def _three_point_arc(
         s, e = start, end
     else:
         s, e = end, start
-    arc = await adapter.add_arc(cx, cy, s[0], s[1], e[0], e[1])
+    arc = adapter.add_arc(cx, cy, s[0], s[1], e[0], e[1])
     return check(f"add_arc {label}", arc), (cx, cy), radius
 
 
@@ -462,7 +462,7 @@ def _assert_boss_face_graph(adapter) -> None:
     )
 
 
-async def _coefficients_plate(adapter, drive_jobs: list[tuple[str, str]]) -> None:
+def _coefficients_plate(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     """Feature 1: uniform coefficient slab centred on Y0, with faces Y±3.50.
 
     The HOLE_COUNT spring holes are ONE seed cut at station j=HOLE_COUNT-1
@@ -481,7 +481,7 @@ async def _coefficients_plate(adapter, drive_jobs: list[tuple[str, str]]) -> Non
     from solidworks_mcp.adapters.base import LinearPatternParameters
 
     plate = SketchDims()
-    check("create_sketch plate", await adapter.create_sketch("Front"))
+    check("create_sketch plate", adapter.create_sketch("Front"))
     # The actual +X end's vertical line owns the 7 mm native dimension, so
     # VIEW F can import real top/bottom witnesses rather than an extrusion
     # depth whose automatic attachment may sit behind the pivot body.
@@ -492,9 +492,9 @@ async def _coefficients_plate(adapter, drive_jobs: list[tuple[str, str]]) -> Non
         (0.0, COEFFICIENT_BOTTOM_Y),
     ]
     set_sketch_direct_db(adapter, True)
-    outline = await add_line_chain(adapter, rect)
+    outline = add_line_chain(adapter, rect)
     set_sketch_direct_db(adapter, False)
-    await define_rectilinear_chain(
+    define_rectilinear_chain(
         adapter,
         outline,
         rect,
@@ -503,8 +503,8 @@ async def _coefficients_plate(adapter, drive_jobs: list[tuple[str, str]]) -> Non
         names=["PlateWidth", "PlateThickness", "PlateTopY"],
         drives=['"PlateW"', '"CoefficientT"', '"CoefficientTopY"'],
     )
-    await ensure_fully_defined(adapter, "coefficients plate sketch")
-    check("exit_sketch plate", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "coefficients plate sketch")
+    check("exit_sketch plate", adapter.exit_sketch())
     name_last_feature(adapter, "PlateProfile")
     drive_jobs += plate.apply(adapter, "PlateProfile")
     # One blind boss from the -Z body end to datum B: a negative start offset
@@ -517,7 +517,7 @@ async def _coefficients_plate(adapter, drive_jobs: list[tuple[str, str]]) -> Non
     drive_jobs.append((length, '"PlateL"'))
     _assert_coefficient_slab(adapter)
     v_plate = PLATE_W * PLATE_L * COEFFICIENT_T
-    await volume_check(adapter, "coefficients plate", v_plate, 1e-3 * v_plate)
+    volume_check(adapter, "coefficients plate", v_plate, 1e-3 * v_plate)
 
     # Spring-hole field: ONE seed hole at station j=HOLE_COUNT-1 + a native
     # linear pattern marching the remaining stations down world -Z at
@@ -551,10 +551,10 @@ async def _coefficients_plate(adapter, drive_jobs: list[tuple[str, str]]) -> Non
     drive_jobs += seed_result.placement_drive_jobs
     seed_cut = seed_result.name
     v_hole = math.pi * (seed_dia / 2.0) ** 2 * COEFFICIENT_T
-    await volume_check(adapter, "spring hole seed", v_plate - v_hole, 0.02 * v_hole)
+    volume_check(adapter, "spring hole seed", v_plate - v_hole, 0.02 * v_hole)
     check(
         "linear pattern spring holes",
-        await adapter.linear_pattern_feature(
+        adapter.linear_pattern_feature(
             LinearPatternParameters(
                 direction_point=[PLATE_W, COEFFICIENT_TOP_Y, 0.0],
                 direction_vector=[0.0, 0.0, -1.0],
@@ -570,7 +570,7 @@ async def _coefficients_plate(adapter, drive_jobs: list[tuple[str, str]]) -> Non
     # is D3 (D1 is the pattern's direction-reference length, NOT the pitch);
     # D3 == as-built CHANNEL_PITCH, so it stays neutral.
     drive_jobs.append(("D3@SpringHolePattern", SPRING_PITCH_EXPR))
-    await volume_check(
+    volume_check(
         adapter,
         "spring-hole field",
         v_plate - HOLE_COUNT * v_hole,
@@ -578,15 +578,15 @@ async def _coefficients_plate(adapter, drive_jobs: list[tuple[str, str]]) -> Non
     )
 
 
-async def _pivot_cylinder(adapter, drive_jobs: list[tuple[str, str]]) -> None:
+def _pivot_cylinder(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     """Feature 2: Front-plane solid circle at origin, extruded between the body
     ends along the long edge -- the pivot/rock axis (local Z). NO bore."""
 
     # Origin circle: only the diameter is a dim (the centre is a coincident
     # relation), so define_circle records just that one slot.
     cyl = SketchDims()
-    check("create_sketch cylinder", await adapter.create_sketch("Front"))
-    await define_circle(
+    check("create_sketch cylinder", adapter.create_sketch("Front"))
+    define_circle(
         adapter,
         0.0,
         0.0,
@@ -596,8 +596,8 @@ async def _pivot_cylinder(adapter, drive_jobs: list[tuple[str, str]]) -> None:
         names=("CylCx", "CylCz", "CylDia"),
         drives=(None, None, '"CylR" * 2'),
     )
-    await ensure_fully_defined(adapter, "pivot cylinder sketch")
-    check("exit_sketch cylinder", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "pivot cylinder sketch")
+    check("exit_sketch cylinder", adapter.exit_sketch())
     name_last_feature(adapter, "CylinderProfile")
     drive_jobs += cyl.apply(adapter, "CylinderProfile")
     extrude_at_offset(adapter, PLATE_L, PLATE_Z_MINUS)
@@ -607,7 +607,7 @@ async def _pivot_cylinder(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     )
 
 
-async def _hex_knife(adapter, drive_jobs: list[tuple[str, str]]) -> None:
+def _hex_knife(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     """Both hexagonal knife-edge trunnion stubs as ONE prism: a Front-plane
     vertex-up hexagon (HEX_W x HEX_H bounding box) centred on the pivot axis,
     a vertex at the top (the knife edge runs along Z at that top vertex
@@ -621,7 +621,7 @@ async def _hex_knife(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     ridges to each other (``sm_summing_lever_spec.KNIFE_STUB_RIDGE_OFFSET_MAX``).
     ``_assert_knife_sides_coplanar`` reads that back."""
     hexd = SketchDims()
-    check("create_sketch hex knife", await adapter.create_sketch("Front"))
+    check("create_sketch hex knife", adapter.create_sketch("Front"))
     # Vertex-up hexagon fit to the measured box: top/bottom vertices on the
     # y-axis, shoulders at +-W/2 and +-H/4 (CCW from the top vertex).
     w2, h2, h4 = HEX_W / 2.0, HEX_H / 2.0, HEX_H / 4.0
@@ -634,7 +634,7 @@ async def _hex_knife(adapter, drive_jobs: list[tuple[str, str]]) -> None:
         (w2, h4),  # upper-right shoulder
     ]
     set_sketch_direct_db(adapter, True)
-    lines = await add_line_chain(adapter, verts)
+    lines = add_line_chain(adapter, verts)
     set_sketch_direct_db(adapter, False)
     # Emission order (polygon, anchor=v0 at (0, +h2)): anchor dims first (x=0
     # drops, y=h2 is one) THEN each kept segment's offsets in line order; the
@@ -644,7 +644,7 @@ async def _hex_knife(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     _hh2 = '"HexH" / 2'
     _hh4 = '"HexH" / 4'
     stem = "HexKnife"
-    await define_polygon_chain(
+    define_polygon_chain(
         adapter,
         lines,
         verts,
@@ -663,8 +663,8 @@ async def _hex_knife(adapter, drive_jobs: list[tuple[str, str]]) -> None:
         ],
         drives=[_hh2, _hw, _hh4, _hh2, _hw, _hh4, _hw, _hh4, _hh2],
     )
-    await ensure_fully_defined(adapter, "hex knife sketch")
-    check("exit_sketch hex knife", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "hex knife sketch")
+    check("exit_sketch hex knife", adapter.exit_sketch())
     name_last_feature(adapter, f"{stem}Profile")
     drive_jobs += hexd.apply(adapter, f"{stem}Profile")
     extrude_at_offset(adapter, PLATE_L + 2.0 * HEX_DEPTH, HEX_Z_OUTER_MINUS)
@@ -752,7 +752,7 @@ def _assert_knife_sides_coplanar(adapter) -> None:
     )
 
 
-async def _knife_ridge_fillet(adapter, drive_jobs: list[tuple[str, str]]) -> None:
+def _knife_ridge_fillet(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     """Round both trunnions' top-vertex ridges at KNIFE_RIDGE_R (rule 16: a
     knife edge is truncated by a small stated radius, here the print's R MAX
     limit).  Picked mid-stub on each ridge line, the only edge through that
@@ -760,10 +760,10 @@ async def _knife_ridge_fillet(adapter, drive_jobs: list[tuple[str, str]]) -> Non
     picks = [
         [0.0, HEX_H / 2.0, seat_z] for seat_z in (KNIFE_SEAT_Z_PLUS, KNIFE_SEAT_Z_MINUS)
     ]
-    v_before = await _measured_volume(adapter, "before the knife-ridge round")
+    v_before = _measured_volume(adapter, "before the knife-ridge round")
     check(
         "fillet knife-edge ridges",
-        await adapter.add_fillet(KNIFE_RIDGE_R, picks, propagate=False),
+        adapter.add_fillet(KNIFE_RIDGE_R, picks, propagate=False),
     )
     name_last_feature(adapter, "KnifeRidgeFillet")
     [radius] = name_dimensions(adapter, "KnifeRidgeFillet", ["KnifeRidgeRadius"])
@@ -776,14 +776,14 @@ async def _knife_ridge_fillet(adapter, drive_jobs: list[tuple[str, str]]) -> Non
     # A ~0.01 mm^3 cut on the whole body is below the mass-property noise, so
     # this only proves the round took nothing else; the drawing's scan of the
     # round's tangent lines proves it is there.
-    await volume_check(
+    volume_check(
         adapter, "knife-edge ridge rounds", v_before - v_round, 1e-4 * v_before
     )
 
 
-async def _measured_volume(adapter, label: str) -> float:
-    await force_rebuild(adapter)
-    mass = await adapter.get_mass_properties()
+def _measured_volume(adapter, label: str) -> float:
+    force_rebuild(adapter)
+    mass = adapter.get_mass_properties()
     if not mass.is_success:
         raise RuntimeError(f"mass props {label} failed: {mass.error}")
     return float(mass.data.volume)
@@ -914,7 +914,7 @@ def _add_driving_counter_angle(adapter, flank: str, baseline: str) -> None:
         raise RuntimeError("counter angle: native dimension did not become driving")
 
 
-async def _rib_profile_sketch(
+def _rib_profile_sketch(
     adapter, stem: str, drive_jobs: list[tuple[str, str]], *, middle: bool = False
 ) -> None:
     """One G1 positive-X profile; the middle's negative-X tangents are unchanged.
@@ -925,71 +925,71 @@ async def _rib_profile_sketch(
     no vertical rib-tip face in the merged solid.
     """
     rib = SketchDims()
-    check(f"{stem} sketch", await adapter.create_sketch("Front"))
+    check(f"{stem} sketch", adapter.create_sketch("Front"))
 
-    async def line(a, b, label):
+    def line(a, b, label):
         return check(
-            f"{stem} {label}", await adapter.add_line(a[0], a[1], b[0], b[1])
+            f"{stem} {label}", adapter.add_line(a[0], a[1], b[0], b[1])
         )
 
-    async def arc(center, a, b, label):
+    def arc(center, a, b, label):
         return check(
             f"{stem} {label}",
-            await adapter.add_arc(
+            adapter.add_arc(
                 center[0], center[1], a[0], a[1], b[0], b[1]
             ),
         )
 
     set_sketch_direct_db(adapter, True)
-    upper_blend = await arc(
+    upper_blend = arc(
         UPPER.center_xy, UPPER.flank_xy, UPPER.end_xy, "upper R.040 blend"
     )
-    end = await line(UPPER.end_xy, LOWER.end_xy, "buried closing line")
-    lower_blend = await arc(
+    end = line(UPPER.end_xy, LOWER.end_xy, "buried closing line")
+    lower_blend = arc(
         LOWER.center_xy, LOWER.end_xy, LOWER.flank_xy, "lower R.040 blend"
     )
-    upper_flank = await line(UPPER.wrap_xy, UPPER.flank_xy, "upper tangent flank")
-    lower_flank = await line(LOWER.flank_xy, LOWER.wrap_xy, "lower tangent flank")
+    upper_flank = line(UPPER.wrap_xy, UPPER.flank_xy, "upper tangent flank")
+    lower_flank = line(LOWER.flank_xy, LOWER.wrap_xy, "lower tangent flank")
     negative_top = negative_bottom = None
     if middle:
         tangent_x = ARC_R**2 / TIP_X
         tangent_y = ARC_R * math.sqrt(1.0 - ARC_R**2 / TIP_X**2)
         top, bottom = (tangent_x, tangent_y), (tangent_x, -tangent_y)
-        wrap = await arc((0.0, 0.0), UPPER.wrap_xy, top, "upper wrap")
-        negative_top = await line(top, (TIP_X, 0.0), "counter upper tangent")
-        negative_bottom = await line((TIP_X, 0.0), bottom, "counter lower tangent")
-        lower_wrap = await arc((0.0, 0.0), bottom, LOWER.wrap_xy, "lower wrap")
-        counter_axis = await line((TIP_X, 0.0), (0.0, 0.0), "counter axis")
+        wrap = arc((0.0, 0.0), UPPER.wrap_xy, top, "upper wrap")
+        negative_top = line(top, (TIP_X, 0.0), "counter upper tangent")
+        negative_bottom = line((TIP_X, 0.0), bottom, "counter lower tangent")
+        lower_wrap = arc((0.0, 0.0), bottom, LOWER.wrap_xy, "lower wrap")
+        counter_axis = line((TIP_X, 0.0), (0.0, 0.0), "counter axis")
         _as_construction(adapter, counter_axis)
     else:
-        wrap = await arc((0.0, 0.0), UPPER.wrap_xy, LOWER.wrap_xy, "pivot wrap")
+        wrap = arc((0.0, 0.0), UPPER.wrap_xy, LOWER.wrap_xy, "pivot wrap")
         lower_wrap = wrap
     set_sketch_direct_db(adapter, False)
 
     check(
         f"{stem} wrap origin",
-        await adapter.add_sketch_constraint(f"{wrap}.center", "origin", "coincident"),
+        adapter.add_sketch_constraint(f"{wrap}.center", "origin", "coincident"),
     )
     check(
         f"{stem} wrap radius",
-        await adapter.add_sketch_dimension(wrap, None, "radial", ARC_R),
+        adapter.add_sketch_dimension(wrap, None, "radial", ARC_R),
     )
     rib.record(f"{stem}ArcR", '"ArcR"')
     if middle:
         check(
             f"{stem} common wrap circle",
-            await adapter.add_sketch_constraint(wrap, lower_wrap, "coradial"),
+            adapter.add_sketch_constraint(wrap, lower_wrap, "coradial"),
         )
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{end}.start", *UPPER.end_xy, f"{stem} actual upper end"
     )
     rib.record("RibReach" if stem == "EdgeRibFront" else f"{stem}Reach", '"RibReach"')
     rib.record(f"{stem}TopY", '"CoefficientTopY"')
     check(
         f"{stem} closing line vertical",
-        await adapter.add_sketch_constraint(end, None, "vertical"),
+        adapter.add_sketch_constraint(end, None, "vertical"),
     )
-    await dimension_between(
+    dimension_between(
         adapter, f"{end}.start", f"{end}.end", "vertical_distance",
         COEFFICIENT_T, f"{stem} plate thickness",
     )
@@ -1000,12 +1000,12 @@ async def _rib_profile_sketch(
     ):
         check(
             f"{stem} {suffix} blend radius",
-            await adapter.add_sketch_dimension(blend, None, "radial", RIB_BLEND_R),
+            adapter.add_sketch_dimension(blend, None, "radial", RIB_BLEND_R),
         )
         rib.record(f"{stem}{suffix}BlendR", '"RibBlendR"')
         check(
             f"{stem} {suffix} blend flat tangency",
-            await adapter.add_sketch_constraint(
+            adapter.add_sketch_constraint(
                 f"{blend}.center", endpoint, "vertical_points"
             ),
         )
@@ -1017,21 +1017,21 @@ async def _rib_profile_sketch(
         pairs += [(wrap, negative_top), (lower_wrap, negative_bottom)]
         check(
             f"{stem} counter axis origin",
-            await adapter.add_sketch_constraint(f"{counter_axis}.end", "origin", "coincident"),
+            adapter.add_sketch_constraint(f"{counter_axis}.end", "origin", "coincident"),
         )
         check(
             f"{stem} counter axis horizontal",
-            await adapter.add_sketch_constraint(counter_axis, None, "horizontal"),
+            adapter.add_sketch_constraint(counter_axis, None, "horizontal"),
         )
         _add_driving_counter_angle(adapter, negative_top, counter_axis)
         rib.record(f"{stem}CounterAngle", '"CounterFlankAngle"')
     for index, (first, second) in enumerate(pairs):
         check(
             f"{stem} tangent {index}",
-            await adapter.add_sketch_constraint(first, second, "tangent"),
+            adapter.add_sketch_constraint(first, second, "tangent"),
         )
-    await ensure_fully_defined(adapter, f"{stem} common tangent profile")
-    check(f"{stem} exit sketch", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, f"{stem} common tangent profile")
+    check(f"{stem} exit sketch", adapter.exit_sketch())
     name_last_feature(adapter, f"{stem}Profile")
     drive_jobs += rib.apply(adapter, f"{stem}Profile")
 
@@ -1114,19 +1114,19 @@ def _assert_native_rib_profile(adapter, stem: str, *, equation_bound: bool = Fal
     _telemetry.success(f"{stem}: both native tangent flanks and R.040 profile blends")
 
 
-async def _edge_rib(
+def _edge_rib(
     adapter, flip: bool, name: str, stem: str, drive_jobs: list[tuple[str, str]]
 ) -> None:
     """The common tangent profile and uniform thickness at either fixed end:
     ``flip`` builds the -Z rib, mirrored about the Front plane."""
-    v_before = await _measured_volume(adapter, f"before {stem}")
-    await _rib_profile_sketch(adapter, stem, drive_jobs)
+    v_before = _measured_volume(adapter, f"before {stem}")
+    _rib_profile_sketch(adapter, stem, drive_jobs)
     offset = -RIB_INNER_Z_MINUS if flip else RIB_INNER_Z_PLUS
     extrude_at_offset(adapter, RIB_T, offset, flip=flip)
     name_last_feature(adapter, stem)
     added_volume = edge_rib_added_area_mm2() * RIB_T
-    await force_rebuild(adapter)
-    await volume_check(
+    force_rebuild(adapter)
+    volume_check(
         adapter, f"{stem} net rib addition", v_before + added_volume, 1e-4 * added_volume
     )
     [thickness] = name_dimensions(adapter, stem, ["EdgeRibThickness"])
@@ -1134,14 +1134,14 @@ async def _edge_rib(
     _assert_native_rib_profile(adapter, stem)
 
 
-async def _summation_plate(adapter, drive_jobs: list[tuple[str, str]]) -> None:
+def _summation_plate(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     """Feature 5: Top-plane leaf on the -X arm -- vertical base edge (x=0)
     between the body ends, two curved sides of one radius, short tip edge at
     the anchor (x=TIP_X).  The Top-plane sketch maps world Z to -sketchY."""
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     sd = SketchDims()
-    check("create_sketch summation plate", await adapter.create_sketch("Top"))
+    check("create_sketch summation plate", adapter.create_sketch("Top"))
     p1 = (0.0, -PLATE_Z_PLUS)
     p2 = (0.0, -PLATE_Z_MINUS)
     p3 = (TIP_X, ANCHOR_R)
@@ -1152,12 +1152,12 @@ async def _summation_plate(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     )
 
     set_sketch_direct_db(adapter, True)
-    base = check("summation base edge", await adapter.add_line(*p1, *p2))
-    top_arc, _top_c, top_r = await _three_point_arc(
+    base = check("summation base edge", adapter.add_line(*p1, *p2))
+    top_arc, _top_c, top_r = _three_point_arc(
         adapter, p2, p3, top_int, "summation top"
     )
-    tip = check("summation tip edge", await adapter.add_line(*p3, *p4))
-    bot_arc, bot_c, _ = await _three_point_arc(
+    tip = check("summation tip edge", adapter.add_line(*p3, *p4))
+    bot_arc, bot_c, _ = _three_point_arc(
         adapter, p4, p1, bot_int, "summation bottom"
     )
     set_sketch_direct_db(adapter, False)
@@ -1169,11 +1169,11 @@ async def _summation_plate(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     # two arc centres are circumcentre-derived (no clean global), left None.
     check(
         "summation base vertical",
-        await adapter.add_sketch_constraint(base, None, "vertical"),
+        adapter.add_sketch_constraint(base, None, "vertical"),
     )
-    await anchor_point_to_origin(adapter, f"{base}.start", *p1, "summation base start")
+    anchor_point_to_origin(adapter, f"{base}.start", *p1, "summation base start")
     sd.record("SumBaseStartZ", '"PlateZPlus"')  # vertical_distance = PLATE_Z_PLUS
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{base}.start",
         f"{base}.end",
@@ -1184,12 +1184,12 @@ async def _summation_plate(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     sd.record("SumBaseLength", '"PlateL"')
     check(
         "summation tip vertical",
-        await adapter.add_sketch_constraint(tip, None, "vertical"),
+        adapter.add_sketch_constraint(tip, None, "vertical"),
     )
-    await anchor_point_to_origin(adapter, f"{tip}.end", *p4, "summation tip end")
+    anchor_point_to_origin(adapter, f"{tip}.end", *p4, "summation tip end")
     sd.record("SumTipX", '"SumH"')  # horizontal_distance = |TIP_X| = SUM_H
     sd.record("SumTipZ", '"AnchorR"')  # vertical_distance = ANCHOR_R
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{tip}.start",
         f"{tip}.end",
@@ -1206,21 +1206,21 @@ async def _summation_plate(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     # profile does not move.
     check(
         "summation side profile radius",
-        await adapter.add_sketch_dimension(top_arc, None, "radial", top_r),
+        adapter.add_sketch_dimension(top_arc, None, "radial", top_r),
     )
     sd.record("SummationArcRadius")
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{bot_arc}.center", *bot_c, "summation bottom centre"
     )
     sd.record(None, None)
     sd.record(None, None)
-    await ensure_fully_defined(adapter, "summation plate sketch")
-    check("exit_sketch summation plate", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "summation plate sketch")
+    check("exit_sketch summation plate", adapter.exit_sketch())
     name_last_feature(adapter, "SummationPlateProfile")
     drive_jobs += sd.apply(adapter, "SummationPlateProfile")
     check(
         "extrude summation plate",
-        await adapter.create_extrusion(
+        adapter.create_extrusion(
             ExtrusionParameters(depth=COUNTER_WEB_T, both_directions=True)
         ),
     )
@@ -1229,7 +1229,7 @@ async def _summation_plate(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     drive_jobs.append((web, '"CounterWebT"'))
 
 
-async def _summation_anchor(adapter, drive_jobs: list[tuple[str, str]]) -> None:
+def _summation_anchor(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     """Feature 6: Top-plane disc (ANCHOR_R) at the -X tip, extruded ANCHOR_H --
     the SOLID boss the counter-spring anchor is tapped into. The seat itself is
     a native tap (``_counter_anchor_tap``), authored after the ribs, so nothing
@@ -1239,9 +1239,9 @@ async def _summation_anchor(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     # Centre (TIP_X, 0): centre-X is a dim (driven to "SumH", |TIP_X|),
     # centre-Z (=0) is a relation (slot ignored), plus the diameter.
     sd = SketchDims()
-    check("create_sketch summation anchor", await adapter.create_sketch("Top"))
+    check("create_sketch summation anchor", adapter.create_sketch("Top"))
     set_sketch_direct_db(adapter, True)
-    await define_circle(
+    define_circle(
         adapter,
         TIP_X,
         0.0,
@@ -1252,13 +1252,13 @@ async def _summation_anchor(adapter, drive_jobs: list[tuple[str, str]]) -> None:
         drives=('"SumH"', None, '2 * "AnchorR"'),
     )
     set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(adapter, "summation anchor sketch")
-    check("exit_sketch summation anchor", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "summation anchor sketch")
+    check("exit_sketch summation anchor", adapter.exit_sketch())
     name_last_feature(adapter, "SummationAnchorProfile")
     drive_jobs += sd.apply(adapter, "SummationAnchorProfile")
     check(
         "extrude summation anchor",
-        await adapter.create_extrusion(
+        adapter.create_extrusion(
             ExtrusionParameters(depth=ANCHOR_H, both_directions=True)
         ),
     )
@@ -1267,14 +1267,14 @@ async def _summation_anchor(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     drive_jobs.append((height, '"AnchorH"'))
 
 
-async def _middle_rib(adapter, drive_jobs: list[tuple[str, str]]) -> None:
+def _middle_rib(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     """Shared positive branches; unchanged negative counter-arm tangent profile."""
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
-    await _rib_profile_sketch(adapter, "MiddleRib", drive_jobs, middle=True)
+    _rib_profile_sketch(adapter, "MiddleRib", drive_jobs, middle=True)
     check(
         "extrude middle rib",
-        await adapter.create_extrusion(
+        adapter.create_extrusion(
             ExtrusionParameters(depth=RIB_T, both_directions=True)
         ),
     )
@@ -1779,19 +1779,19 @@ def _assert_root_feature_bounds(adapter, name: str, minimum_faces: int) -> None:
         )
 
 
-async def _rib_root_fillets(adapter, drive_jobs: list[tuple[str, str]]) -> None:
+def _rib_root_fillets(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     """Bounded R.040 roots with no tangent propagation or geometry fallback."""
     for name, picks, edge_length_bound in rib_root_edge_families():
-        before = await _measured_volume(adapter, f"before {name}")
+        before = _measured_volume(adapter, f"before {name}")
         check(
             f"{name}: selected concave roots R{RIB_BLEND_R}, reach {RIB_REACH}",
-            await adapter.add_fillet(RIB_BLEND_R, picks, propagate=False),
+            adapter.add_fillet(RIB_BLEND_R, picks, propagate=False),
         )
         name_last_feature(adapter, name)
         dimension_name = "RibRootRadius" if name == "RibRootFillets" else f"{name}Radius"
         [radius] = name_dimensions(adapter, name, [dimension_name])
         drive_jobs.append((radius, '"RibBlendR"'))
-        after = await _measured_volume(adapter, f"after {name}")
+        after = _measured_volume(adapter, f"after {name}")
         addition = after - before
         upper_bound = 2.0 * RIB_BLEND_R**2 * edge_length_bound
         if not 0.0 < addition <= upper_bound:
@@ -1839,7 +1839,7 @@ def _rib_radius_max_limits(adapter) -> None:
         set_dimension_display_precision(adapter, feature, name, RIB_BLEND_R_PLACES)
 
 
-async def _counter_anchor_tap(adapter, drive_jobs: list[tuple[str, str]]) -> None:
+def _counter_anchor_tap(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     """Feature 8: the native through tap down the summation-anchor boss -- the
     seat the purchased sm-vn-counter-spring anchor (McMaster 9490T1, ``sm-vn-boss-hook``)
     threads straight into. NO NUT: this tap is the nut, so its size is the
@@ -1853,7 +1853,7 @@ async def _counter_anchor_tap(adapter, drive_jobs: list[tuple[str, str]]) -> Non
     material sits WITHIN the boss's own +-ANCHOR_H/2 Y span, so the cut removes
     boss height and nothing else.
     """
-    mass = await adapter.get_mass_properties()
+    mass = adapter.get_mass_properties()
     if not mass.is_success:
         raise RuntimeError(f"pre-tap mass props failed: {mass.error}")
     v_before = float(mass.data.volume)
@@ -1873,7 +1873,7 @@ async def _counter_anchor_tap(adapter, drive_jobs: list[tuple[str, str]]) -> Non
     )
     drive_jobs += result.placement_drive_jobs
     v_tap = math.pi * (tap_dia / 2.0) ** 2 * ANCHOR_H
-    await volume_check(
+    volume_check(
         adapter, "counter-spring anchor tap", v_before - v_tap, 0.02 * v_tap
     )
 
@@ -2038,7 +2038,7 @@ def _driven_hex_width(adapter, width: str) -> None:
         raise RuntimeError(f"knife-envelope width reads {measured:.6f}, not {HEX_W}")
 
 
-async def _knife_envelope_reference(adapter, drive_jobs: list[tuple[str, str]]) -> None:
+def _knife_envelope_reference(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     """Hidden Front-plane reference: the trunnion's knife-edge controls.
 
     The hexagon sketch is driven by halves and quarters of HexW/HexH, so no
@@ -2054,33 +2054,33 @@ async def _knife_envelope_reference(adapter, drive_jobs: list[tuple[str, str]]) 
     from solidworks_mcp.adapters.pywin32_adapter import null_callout
 
     knife = SketchDims()
-    check("create knife-envelope reference", await adapter.create_sketch("Front"))
+    check("create knife-envelope reference", adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     width = check(
         "knife-envelope shoulder line",
-        await adapter.add_line(-HEX_W / 2.0, HEX_H / 4.0, HEX_W / 2.0, HEX_H / 4.0),
+        adapter.add_line(-HEX_W / 2.0, HEX_H / 4.0, HEX_W / 2.0, HEX_H / 4.0),
     )
     height = check(
         "knife-envelope height reference",
-        await adapter.add_line(0.0, -HEX_H / 2.0, 0.0, HEX_H / 2.0),
+        adapter.add_line(0.0, -HEX_H / 2.0, 0.0, HEX_H / 2.0),
     )
     flank = check(
         "knife-envelope +X upper flank",
-        await adapter.add_line(0.0, HEX_H / 2.0, HEX_W / 2.0, HEX_H / 4.0),
+        adapter.add_line(0.0, HEX_H / 2.0, HEX_W / 2.0, HEX_H / 4.0),
     )
     side = check(
         "knife-envelope +X side face",
-        await adapter.add_line(HEX_W / 2.0, HEX_H / 4.0, HEX_W / 2.0, 0.0),
+        adapter.add_line(HEX_W / 2.0, HEX_H / 4.0, HEX_W / 2.0, 0.0),
     )
     # The lower half: the side face's other half and the +X lower flank to
     # the bottom vertex, so the lower corner's angle can print.
     lower_side = check(
         "knife-envelope +X lower side face",
-        await adapter.add_line(HEX_W / 2.0, 0.0, HEX_W / 2.0, -HEX_H / 4.0),
+        adapter.add_line(HEX_W / 2.0, 0.0, HEX_W / 2.0, -HEX_H / 4.0),
     )
     lower_flank = check(
         "knife-envelope +X lower flank",
-        await adapter.add_line(HEX_W / 2.0, -HEX_H / 4.0, 0.0, -HEX_H / 2.0),
+        adapter.add_line(HEX_W / 2.0, -HEX_H / 4.0, 0.0, -HEX_H / 2.0),
     )
     set_sketch_direct_db(adapter, False)
     for entity in (width, height, flank, side, lower_side, lower_flank):
@@ -2093,7 +2093,7 @@ async def _knife_envelope_reference(adapter, drive_jobs: list[tuple[str, str]]) 
     ):
         check(
             f"knife-envelope {entity} {relation}",
-            await adapter.add_sketch_constraint(entity, None, relation),
+            adapter.add_sketch_constraint(entity, None, relation),
         )
     for first, second in (
         (f"{flank}.start", f"{height}.end"),
@@ -2105,19 +2105,19 @@ async def _knife_envelope_reference(adapter, drive_jobs: list[tuple[str, str]]) 
     ):
         check(
             f"knife-envelope {first} on {second}",
-            await adapter.add_sketch_constraint(first, second, "coincident"),
+            adapter.add_sketch_constraint(first, second, "coincident"),
         )
     check(
         "knife-envelope side halves equal",
-        await adapter.add_sketch_constraint(lower_side, side, "equal"),
+        adapter.add_sketch_constraint(lower_side, side, "equal"),
     )
     check(
         "knife-envelope side foot level with the origin",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{side}.end", "origin", "horizontal_points"
         ),
     )
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{height}.end",
         f"{width}.start",
@@ -2126,7 +2126,7 @@ async def _knife_envelope_reference(adapter, drive_jobs: list[tuple[str, str]]) 
         "knife ridge from the -X side",
     )
     knife.record("RidgeFromLeft", '"HexW" / 2')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{height}.end",
         f"{width}.end",
@@ -2135,7 +2135,7 @@ async def _knife_envelope_reference(adapter, drive_jobs: list[tuple[str, str]]) 
         "knife ridge from the +X side",
     )
     knife.record("RidgeFromRight", '"HexW" / 2')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{width}.start",
         f"{height}.end",
@@ -2144,7 +2144,7 @@ async def _knife_envelope_reference(adapter, drive_jobs: list[tuple[str, str]]) 
         "knife shoulder below the ridge",
     )
     knife.record("ShoulderDrop", '"HexH" / 4')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{height}.start",
         f"{height}.end",
@@ -2153,7 +2153,7 @@ async def _knife_envelope_reference(adapter, drive_jobs: list[tuple[str, str]]) 
         "knife-envelope height",
     )
     knife.record("HexHeight", '"HexH"')
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{height}.start", 0.0, -HEX_H / 2.0, "knife-envelope height start"
     )
     knife.record("HexHeightHalf", '"HexH" / 2')
@@ -2161,7 +2161,7 @@ async def _knife_envelope_reference(adapter, drive_jobs: list[tuple[str, str]]) 
     knife.record("HexWidth")
     # In the Front-plane model, put text up-right of the +X shoulder in
     # the exterior wedge. Back-derived Detail D mirrors this upper-left.
-    await add_angular_reference_dimension(
+    add_angular_reference_dimension(
         adapter,
         flank,
         side,
@@ -2172,7 +2172,7 @@ async def _knife_envelope_reference(adapter, drive_jobs: list[tuple[str, str]]) 
     knife.record("FlankToSide")
     # The lower corner at the title block's angular tolerance; its text in
     # the exterior wedge below the +X lower shoulder.
-    await add_angular_reference_dimension(
+    add_angular_reference_dimension(
         adapter,
         lower_flank,
         lower_side,
@@ -2181,8 +2181,8 @@ async def _knife_envelope_reference(adapter, drive_jobs: list[tuple[str, str]]) 
         expected_degrees=180.0 - RIDGE_ANGLE_DEG / 2.0,
     )
     knife.record("LowerFlankToSide")
-    await ensure_fully_defined(adapter, "knife-envelope reference sketch")
-    check("exit knife-envelope reference", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "knife-envelope reference sketch")
+    check("exit knife-envelope reference", adapter.exit_sketch())
     name_last_feature(adapter, "KnifeEnvelopeReference")
     drive_jobs += knife.apply(adapter, "KnifeEnvelopeReference")
     model = adapter.currentModel
@@ -2195,7 +2195,7 @@ async def _knife_envelope_reference(adapter, drive_jobs: list[tuple[str, str]]) 
     model.ClearSelection2(True)
 
 
-async def _cylinder_reference(adapter, drive_jobs: list[tuple[str, str]]) -> None:
+def _cylinder_reference(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     """Hidden Top-plane reference: the pivot cylinder's diameter for the plan.
 
     Both plates join the cylinder at its mid-plane, so its silhouettes lie
@@ -2206,20 +2206,20 @@ async def _cylinder_reference(adapter, drive_jobs: list[tuple[str, str]]) -> Non
     shows it in the plan only (``_drawing_hidden_sketches``).  The Top-plane
     sketch maps world Z to -sketchY."""
     reference = SketchDims()
-    check("create cylinder reference", await adapter.create_sketch("Top"))
+    check("create cylinder reference", adapter.create_sketch("Top"))
     start = (-CYL_R, -CYLINDER_REFERENCE_Z)
     set_sketch_direct_db(adapter, True)
     diameter = check(
         "cylinder diameter reference",
-        await adapter.add_line(*start, CYL_R, start[1]),
+        adapter.add_line(*start, CYL_R, start[1]),
     )
     set_sketch_direct_db(adapter, False)
     _as_construction(adapter, diameter)
     check(
         "cylinder diameter reference horizontal",
-        await adapter.add_sketch_constraint(diameter, None, "horizontal"),
+        adapter.add_sketch_constraint(diameter, None, "horizontal"),
     )
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{diameter}.start",
         f"{diameter}.end",
@@ -2228,19 +2228,19 @@ async def _cylinder_reference(adapter, drive_jobs: list[tuple[str, str]]) -> Non
         "cylinder diameter reference",
     )
     reference.record("CylinderDia", '"CylR" * 2')
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{diameter}.start", *start, "cylinder diameter reference start"
     )
     reference.record("CylinderRefX", '"CylR"')
     reference.record("CylinderRefZ", None)
-    await ensure_fully_defined(adapter, "cylinder reference sketch")
-    check("exit cylinder reference", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "cylinder reference sketch")
+    check("exit cylinder reference", adapter.exit_sketch())
     name_last_feature(adapter, "CylinderReference")
     drive_jobs += reference.apply(adapter, "CylinderReference")
     blank_reference_sketches(adapter, ("CylinderReference",))
 
 
-async def _knife_stub_reference(adapter, drive_jobs: list[tuple[str, str]]) -> None:
+def _knife_stub_reference(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     """Hidden Top-plane reference: one trunnion stub's length for the plan.
 
     Both stubs are one prism through the body (``_hex_knife``), so no feature
@@ -2250,20 +2250,20 @@ async def _knife_stub_reference(adapter, drive_jobs: list[tuple[str, str]]) -> N
     saves the sketch hidden and the plan shows it as the stubs' "2X".  The
     Top-plane sketch maps world Z to -sketchY."""
     reference = SketchDims()
-    check("create knife-stub reference", await adapter.create_sketch("Top"))
+    check("create knife-stub reference", adapter.create_sketch("Top"))
     start = (-HEX_W / 2.0, -PLATE_Z_MINUS)
     set_sketch_direct_db(adapter, True)
     length = check(
         "knife-stub length reference",
-        await adapter.add_line(*start, start[0], -HEX_Z_OUTER_MINUS),
+        adapter.add_line(*start, start[0], -HEX_Z_OUTER_MINUS),
     )
     set_sketch_direct_db(adapter, False)
     _as_construction(adapter, length)
     check(
         "knife-stub length reference vertical",
-        await adapter.add_sketch_constraint(length, None, "vertical"),
+        adapter.add_sketch_constraint(length, None, "vertical"),
     )
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{length}.start",
         f"{length}.end",
@@ -2272,13 +2272,13 @@ async def _knife_stub_reference(adapter, drive_jobs: list[tuple[str, str]]) -> N
         "knife-stub length reference",
     )
     reference.record("KnifeStubLength", '"HexDepth"')
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{length}.start", *start, "knife-stub length reference start"
     )
     reference.record("KnifeStubRefX", '"HexW" / 2')
     reference.record("KnifeStubRefZ", '"PlateL" - "PlateZPlus"')
-    await ensure_fully_defined(adapter, "knife-stub reference sketch")
-    check("exit knife-stub reference", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "knife-stub reference sketch")
+    check("exit knife-stub reference", adapter.exit_sketch())
     name_last_feature(adapter, "KnifeStubReference")
     drive_jobs += reference.apply(adapter, "KnifeStubReference")
     blank_reference_sketches(adapter, ("KnifeStubReference",))
@@ -2333,22 +2333,22 @@ def _drawing_dimension_contract(adapter) -> None:
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
 
 
-async def _receiver_coordinate_dimensions(adapter) -> None:
+def _receiver_coordinate_dimensions(adapter) -> None:
     """Native coordinates from the real free edge and actual plate top."""
     from solidworks_mcp.adapters.pywin32_adapter import null_callout
 
-    check("receiver coordinate sketch", await adapter.create_sketch("Front"))
+    check("receiver coordinate sketch", adapter.create_sketch("Front"))
     dimensions = SketchDims()
     corner = (PLATE_W, COEFFICIENT_TOP_Y)
     edge_end = (PLATE_W, corner[1] - RECEIVER_EDGE_MARK)
     set_sketch_direct_db(adapter, True)
     edge_mark = check(
-        "receiver free-edge mark", await adapter.add_line(*corner, *edge_end)
+        "receiver free-edge mark", adapter.add_line(*corner, *edge_end)
     )
     tap_marks = [
         check(
             f"receiver tap {index} mark",
-            await adapter.add_line(*point[:2], point[0] + RECEIVER_TAP_MARK, point[1]),
+            adapter.add_line(*point[:2], point[0] + RECEIVER_TAP_MARK, point[1]),
         )
         for index, point in enumerate(LEVER_HOLE_POINTS)
     ]
@@ -2356,14 +2356,14 @@ async def _receiver_coordinate_dimensions(adapter) -> None:
     for mark in (edge_mark, *tap_marks):
         _as_construction(adapter, mark)
     origin_corner = f"{edge_mark}.start"
-    await anchor_point_to_origin(adapter, origin_corner, *corner, "receiver free edge")
+    anchor_point_to_origin(adapter, origin_corner, *corner, "receiver free edge")
     dimensions.record("ReceiverOriginX", None)
     dimensions.record("ReceiverOriginY", None)
     check(
         "receiver free-edge mark vertical",
-        await adapter.add_sketch_constraint(edge_mark, None, "vertical"),
+        adapter.add_sketch_constraint(edge_mark, None, "vertical"),
     )
-    await dimension_between(
+    dimension_between(
         adapter,
         origin_corner,
         f"{edge_mark}.end",
@@ -2375,9 +2375,9 @@ async def _receiver_coordinate_dimensions(adapter) -> None:
     for index, (mark, point) in enumerate(zip(tap_marks, LEVER_HOLE_POINTS)):
         check(
             f"receiver tap {index} mark horizontal",
-            await adapter.add_sketch_constraint(mark, None, "horizontal"),
+            adapter.add_sketch_constraint(mark, None, "horizontal"),
         )
-        await dimension_between(
+        dimension_between(
             adapter,
             f"{mark}.start",
             f"{mark}.end",
@@ -2386,7 +2386,7 @@ async def _receiver_coordinate_dimensions(adapter) -> None:
             f"receiver tap {index} mark length",
         )
         dimensions.record(f"ReceiverTapMark{index}", None)
-        await dimension_between(
+        dimension_between(
             adapter,
             origin_corner,
             f"{mark}.start",
@@ -2395,7 +2395,7 @@ async def _receiver_coordinate_dimensions(adapter) -> None:
             "receiver X station",
         )
         dimensions.record(f"ReceiverX{index}", None)
-        await dimension_between(
+        dimension_between(
             adapter,
             origin_corner,
             f"{mark}.start",
@@ -2404,8 +2404,8 @@ async def _receiver_coordinate_dimensions(adapter) -> None:
             "receiver row",
         )
         dimensions.record(f"ReceiverY{index}", None)
-    await ensure_fully_defined(adapter, "receiver coordinate sketch")
-    check("exit receiver coordinate sketch", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "receiver coordinate sketch")
+    check("exit receiver coordinate sketch", adapter.exit_sketch())
     name_last_feature(adapter, "ReceiverCoordinates")
     dimensions.apply(adapter, "ReceiverCoordinates")
     # Reference stations (owner ruling 2026-11-08 (#2144 item 11.1), Pedro;
@@ -2507,7 +2507,7 @@ def _assert_spring_row_equations(adapter, drives: list[tuple[str, str]]) -> None
 
 
 @_telemetry.traced("part.spring_row_coordinates")
-async def _spring_row_coordinates(adapter) -> None:
+def _spring_row_coordinates(adapter) -> None:
     """Native BASIC locators of the 20X spring-tap pattern for the plan.
 
     Row X runs from datum A's -Z ridge axis, start Z from the +Z plate end
@@ -2523,7 +2523,7 @@ async def _spring_row_coordinates(adapter) -> None:
     together.  The Top-plane sketch maps world Z to -sketchY."""
     from solidworks_mcp.adapters.pywin32_adapter import null_callout
 
-    check("spring-row coordinate sketch", await adapter.create_sketch("Top"))
+    check("spring-row coordinate sketch", adapter.create_sketch("Top"))
     dimensions = SketchDims()
     ridge = (0.0, -PLATE_Z_MINUS + 0.3 * HEX_DEPTH)
     end = (SPRING_ROW_END_MARK_X, -PLATE_Z_PLUS)
@@ -2533,19 +2533,19 @@ async def _spring_row_coordinates(adapter) -> None:
     try:
         ridge_mark = check(
             "spring-row ridge mark",
-            await adapter.add_line(*ridge, ridge[0], ridge[1] + SPRING_ROW_MARK),
+            adapter.add_line(*ridge, ridge[0], ridge[1] + SPRING_ROW_MARK),
         )
         end_mark = check(
             "spring-row end mark",
-            await adapter.add_line(*end, end[0] + SPRING_ROW_MARK, end[1]),
+            adapter.add_line(*end, end[0] + SPRING_ROW_MARK, end[1]),
         )
         seed_mark = check(
             "spring-row seed mark",
-            await adapter.add_line(*seed, seed[0] + SPRING_ROW_TAP_MARK, seed[1]),
+            adapter.add_line(*seed, seed[0] + SPRING_ROW_TAP_MARK, seed[1]),
         )
         second_mark = check(
             "spring-row second mark",
-            await adapter.add_line(
+            adapter.add_line(
                 *second, second[0] + SPRING_ROW_TAP_MARK, second[1]
             ),
         )
@@ -2555,14 +2555,14 @@ async def _spring_row_coordinates(adapter) -> None:
         _as_construction(adapter, mark)
     check(
         "spring-row ridge mark vertical",
-        await adapter.add_sketch_constraint(ridge_mark, None, "vertical"),
+        adapter.add_sketch_constraint(ridge_mark, None, "vertical"),
     )
-    await dimension_between(
+    dimension_between(
         adapter, f"{ridge_mark}.start", f"{ridge_mark}.end", "vertical_distance",
         SPRING_ROW_MARK, "spring-row ridge mark length",
     )
     dimensions.record("SpringRowRidgeMark", None)
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{ridge_mark}.start", *ridge, "spring-row ridge station"
     )
     dimensions.record(
@@ -2570,14 +2570,14 @@ async def _spring_row_coordinates(adapter) -> None:
     )
     check(
         "spring-row end mark horizontal",
-        await adapter.add_sketch_constraint(end_mark, None, "horizontal"),
+        adapter.add_sketch_constraint(end_mark, None, "horizontal"),
     )
-    await dimension_between(
+    dimension_between(
         adapter, f"{end_mark}.start", f"{end_mark}.end", "horizontal_distance",
         SPRING_ROW_MARK, "spring-row end mark length",
     )
     dimensions.record("SpringRowEndMark", None)
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{end_mark}.start", *end, "spring-row plate end"
     )
     dimensions.record("SpringRowEndX", None)
@@ -2585,41 +2585,41 @@ async def _spring_row_coordinates(adapter) -> None:
     for label, mark in (("seed", seed_mark), ("second", second_mark)):
         check(
             f"spring-row {label} mark horizontal",
-            await adapter.add_sketch_constraint(mark, None, "horizontal"),
+            adapter.add_sketch_constraint(mark, None, "horizontal"),
         )
-        await dimension_between(
+        dimension_between(
             adapter, f"{mark}.start", f"{mark}.end", "horizontal_distance",
             SPRING_ROW_TAP_MARK, f"spring-row {label} mark length",
         )
         dimensions.record(f"SpringRow{label.title()}Mark", None)
-    await dimension_between(
+    dimension_between(
         adapter, f"{ridge_mark}.start", f"{seed_mark}.start", "horizontal_distance",
         HOLE_X, "spring-hole row X",
     )
     dimensions.record("SpringRowX", SPRING_ROW_X_EXPR)
-    await dimension_between(
+    dimension_between(
         adapter, f"{end_mark}.start", f"{seed_mark}.start", "vertical_distance",
         HOLE_END_OFFSET_LAST, "spring-hole start Z",
     )
     dimensions.record("SpringStartZ", f'"PlateZPlus" - ({SPRING_SEED_STATION_EXPR})')
     check(
         "spring-row second station on the row",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{seed_mark}.start", f"{second_mark}.start", "vertical_points"
         ),
     )
-    await dimension_between(
+    dimension_between(
         adapter, f"{seed_mark}.start", f"{second_mark}.start", "vertical_distance",
         CHANNEL_PITCH, "spring-hole pitch",
     )
     dimensions.record("SpringPitch", SPRING_PITCH_EXPR)
-    await ensure_fully_defined(adapter, "spring-row coordinate sketch")
-    check("exit spring-row coordinate sketch", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "spring-row coordinate sketch")
+    check("exit spring-row coordinate sketch", adapter.exit_sketch())
     name_last_feature(adapter, "SpringRowCoordinates")
     drives = dimensions.apply(adapter, "SpringRowCoordinates")
     for dim_name, expr in drives:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
     _assert_spring_row_equations(adapter, drives)
     for name in SPRING_ROW_LOCATORS:
         set_dimension_basic_tolerance(adapter, "SpringRowCoordinates", name)
@@ -2641,9 +2641,9 @@ async def _spring_row_coordinates(adapter) -> None:
     model.ClearSelection2(True)
 
 
-async def _bracket_mounting_taps(adapter) -> None:
+def _bracket_mounting_taps(adapter) -> None:
     """Cut the two blind front-face taps after all structural additions."""
-    mass = await adapter.get_mass_properties()
+    mass = adapter.get_mass_properties()
     if not mass.is_success:
         raise RuntimeError(f"pre-bracket-tap mass props failed: {mass.error}")
     wizard_holes(
@@ -2661,7 +2661,7 @@ async def _bracket_mounting_taps(adapter) -> None:
         * (TAP_DRILL_DIA / 2.0) ** 2
         * (DRILL_DEPTH + DRILL_POINT_DEPTH / 3.0)
     )
-    await volume_check(
+    volume_check(
         adapter,
         "magnifying bracket blind taps",
         float(mass.data.volume) - cut_volume,
@@ -2669,8 +2669,8 @@ async def _bracket_mounting_taps(adapter) -> None:
     )
 
 
-async def build(adapter) -> dict[str, str]:
-    check("create_part", await adapter.create_part())
+def build(adapter) -> dict[str, str]:
+    check("create_part", adapter.create_part())
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs: named globals in the equation manager that drive every
@@ -2681,60 +2681,60 @@ async def build(adapter) -> dict[str, str]:
     # up 25.4x. Derived globals reference defining dimensions so a primitive
     # edit propagates through tangent constraints and feature depth equations.
     # HexDepth drives the knife prism's length and the stub reference.
-    await set_global(adapter, "PlateW", f"{PLATE_W}mm")
-    await set_global(adapter, "PlateL", f"{PLATE_L}mm")
-    await set_global(adapter, "PlateZPlus", f"{PLATE_Z_PLUS}mm")
-    await set_global(adapter, "CounterWebT", f"{COUNTER_WEB_T}mm")
-    await set_global(adapter, "CoefficientT", f"{COEFFICIENT_T}mm")
-    await set_global(adapter, "CoefficientTopY", f"{COEFFICIENT_TOP_Y}mm")
-    await set_global(adapter, "CylR", f"{CYL_R}mm")
-    await set_global(adapter, "RibT", f"{RIB_T}mm")
-    await set_global(adapter, "RibBlendR", f"{RIB_BLEND_R}mm")
-    await set_global(adapter, "RibPad", f"{RIB_PAD}mm")
-    await set_global(adapter, "SumH", f"{SUM_H}mm")
-    await set_global(adapter, "AnchorR", f"{ANCHOR_R}mm")
-    await set_global(adapter, "AnchorH", f"{ANCHOR_H}mm")
+    set_global(adapter, "PlateW", f"{PLATE_W}mm")
+    set_global(adapter, "PlateL", f"{PLATE_L}mm")
+    set_global(adapter, "PlateZPlus", f"{PLATE_Z_PLUS}mm")
+    set_global(adapter, "CounterWebT", f"{COUNTER_WEB_T}mm")
+    set_global(adapter, "CoefficientT", f"{COEFFICIENT_T}mm")
+    set_global(adapter, "CoefficientTopY", f"{COEFFICIENT_TOP_Y}mm")
+    set_global(adapter, "CylR", f"{CYL_R}mm")
+    set_global(adapter, "RibT", f"{RIB_T}mm")
+    set_global(adapter, "RibBlendR", f"{RIB_BLEND_R}mm")
+    set_global(adapter, "RibPad", f"{RIB_PAD}mm")
+    set_global(adapter, "SumH", f"{SUM_H}mm")
+    set_global(adapter, "AnchorR", f"{ANCHOR_R}mm")
+    set_global(adapter, "AnchorH", f"{ANCHOR_H}mm")
     # (The old HoleDia/AnchorBoreR knobs are gone: both anchor seats are native
     # Hole Wizard taps -- a #6-32 seed + linear pattern on the plate and one
     # #10-24 through the boss -- sized by the tap standard from the purchased
     # anchors' own threads, so a diameter knob would be a second, lying source.
     # HoleX stays -- it places the seed -- and the three station globals
     # drive the seed while ChannelPitch also drives the pattern spacing.)
-    await set_global(adapter, "HoleX", f"{HOLE_X}mm")
-    await set_global(adapter, "ChannelZ0", f"{CHANNEL_Z0}mm")
-    await set_global(adapter, "ChannelPitch", f"{CHANNEL_PITCH}mm")
-    await set_global(adapter, "HoleZOffset", f"{HOLE_Z_OFFSET}mm")
-    await set_global(adapter, "HexW", f"{HEX_W}mm")
-    await set_global(adapter, "HexH", f"{HEX_H}mm")
-    await set_global(adapter, "HexDepth", f"{HEX_DEPTH}mm")
-    await set_global(adapter, "KnifeRidgeR", f"{KNIFE_RIDGE_R}mm")
-    await set_global(adapter, "ArcR", '"CylR" + "RibPad"')
+    set_global(adapter, "HoleX", f"{HOLE_X}mm")
+    set_global(adapter, "ChannelZ0", f"{CHANNEL_Z0}mm")
+    set_global(adapter, "ChannelPitch", f"{CHANNEL_PITCH}mm")
+    set_global(adapter, "HoleZOffset", f"{HOLE_Z_OFFSET}mm")
+    set_global(adapter, "HexW", f"{HEX_W}mm")
+    set_global(adapter, "HexH", f"{HEX_H}mm")
+    set_global(adapter, "HexDepth", f"{HEX_DEPTH}mm")
+    set_global(adapter, "KnifeRidgeR", f"{KNIFE_RIDGE_R}mm")
+    set_global(adapter, "ArcR", '"CylR" + "RibPad"')
     # Keep the derivation native: a degree literal was rounded to angular places.
-    await set_global(
+    set_global(
         adapter, "CounterFlankAngle",
         'atn("ArcR" / sqr("SumH" * "SumH" - "ArcR" * "ArcR"))',
     )
     # On its printed 1.41 grid (rule 3), not offset from the hole column.
-    await set_global(adapter, "RibReach", f"{RIB_REACH}mm")
-    await set_global(adapter, "CoefficientBottomY", '"CoefficientTopY" - "CoefficientT"')
+    set_global(adapter, "RibReach", f"{RIB_REACH}mm")
+    set_global(adapter, "CoefficientBottomY", '"CoefficientTopY" - "CoefficientT"')
 
     # Per-sketch SketchDims record each dim in the helper's emission order; their
     # drive equations are collected here and applied in one deferred batch at the
     # end (every equation target must resolve against the finished model).
     drive_jobs: list[tuple[str, str]] = []
 
-    await _coefficients_plate(adapter, drive_jobs)
-    await _pivot_cylinder(adapter, drive_jobs)
-    await _hex_knife(adapter, drive_jobs)
-    await _knife_ridge_fillet(adapter, drive_jobs)
-    await _edge_rib(
+    _coefficients_plate(adapter, drive_jobs)
+    _pivot_cylinder(adapter, drive_jobs)
+    _hex_knife(adapter, drive_jobs)
+    _knife_ridge_fillet(adapter, drive_jobs)
+    _edge_rib(
         adapter,
         flip=False,
         name="edge rib front",
         stem="EdgeRibFront",
         drive_jobs=drive_jobs,
     )
-    await _edge_rib(
+    _edge_rib(
         adapter,
         flip=True,
         name="edge rib back",
@@ -2742,30 +2742,30 @@ async def build(adapter) -> dict[str, str]:
         drive_jobs=drive_jobs,
     )
     _assert_receiver_profile_walls(adapter)
-    await _summation_plate(adapter, drive_jobs)
-    await _summation_anchor(adapter, drive_jobs)
-    await _middle_rib(adapter, drive_jobs)
-    await _rib_root_fillets(adapter, drive_jobs)
-    await _counter_anchor_tap(adapter, drive_jobs)
-    await _bracket_mounting_taps(adapter)
-    await _knife_envelope_reference(adapter, drive_jobs)
-    await _cylinder_reference(adapter, drive_jobs)
-    await _knife_stub_reference(adapter, drive_jobs)
+    _summation_plate(adapter, drive_jobs)
+    _summation_anchor(adapter, drive_jobs)
+    _middle_rib(adapter, drive_jobs)
+    _rib_root_fillets(adapter, drive_jobs)
+    _counter_anchor_tap(adapter, drive_jobs)
+    _bracket_mounting_taps(adapter)
+    _knife_envelope_reference(adapter, drive_jobs)
+    _cylinder_reference(adapter, drive_jobs)
+    _knife_stub_reference(adapter, drive_jobs)
 
     # Apply the deferred drive equations now -- after the whole model + a rebuild
     # exists, so every target resolves. Each equation evaluates to the value just
     # built, so the geometry must not move; the neutrality re-check is the proof.
     # Component increments have analytic gates; the complete organic solid
     # including native corner patches uses measured as-built neutrality.
-    await force_rebuild(adapter)
-    _mass = await adapter.get_mass_properties()
+    force_rebuild(adapter)
+    _mass = adapter.get_mass_properties()
     if not _mass.is_success:
         raise RuntimeError(f"as-built mass props failed: {_mass.error}")
     v_built = float(_mass.data.volume)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    volume_check(
         adapter, "driven summing lever (equations neutral)", v_built, 1e-3 * v_built
     )
     _assert_knife_sides_coplanar(adapter)
@@ -2782,17 +2782,17 @@ async def build(adapter) -> dict[str, str]:
     # knife axis (Axis3) = the hex top-vertex ridge (local y +HEX_H/2) = the true
     # rock/suspension line the lever hangs from; the pivot revolute moves here
     # once the top-plate bearing supports are modeled.
-    await name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", 0.0, "pivot axis")
-    await name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", TIP_X, "anchor axis")
-    await name_bore_axis(
+    name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", 0.0, "pivot axis")
+    name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", TIP_X, "anchor axis")
+    name_bore_axis(
         adapter, "Top Plane", HEX_H / 2.0, "Right Plane", 0.0, "knife axis"
     )
 
-    await apply_material(adapter, MATERIAL)
+    apply_material(adapter, MATERIAL)
     # Green-painted casting on the machine (ch17/ch18 macros show the same
     # paint as the frame), not bare cast iron.
-    await apply_color(adapter, CASTING_GREEN)
-    await report_mass_properties(adapter)
+    apply_color(adapter, CASTING_GREEN)
+    report_mass_properties(adapter)
 
     # Manufacturing drawing support: mark exactly the print's dimensions and
     # stamp the make-critical title-block properties.
@@ -2801,8 +2801,8 @@ async def build(adapter) -> dict[str, str]:
     _knife_ridge_max_limit(adapter)
     _rib_radius_max_limits(adapter)
     _receiver_model_bands(adapter)
-    await _receiver_coordinate_dimensions(adapter)
-    await _spring_row_coordinates(adapter)
+    _receiver_coordinate_dimensions(adapter)
+    _spring_row_coordinates(adapter)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,
@@ -2816,8 +2816,8 @@ async def build(adapter) -> dict[str, str]:
         },
     )
     # Native dimension metadata must not erase the already-verified blind taps.
-    await force_rebuild(adapter)
-    await volume_check(
+    force_rebuild(adapter)
+    volume_check(
         adapter, "summing lever after native receiver bands", v_built, 1e-5 * v_built
     )
     _assert_edge_rib_end_planes(adapter)
@@ -2828,7 +2828,7 @@ async def build(adapter) -> dict[str, str]:
         octants={"REAR-BOTTOM-RIGHT": RECEIVER_ISOMETRIC_OCTANT},
         label=PART_NAME,
     )
-    artefacts = await save_part_and_images(adapter, PART_NAME)
+    artefacts = save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(
         adapter,
         (

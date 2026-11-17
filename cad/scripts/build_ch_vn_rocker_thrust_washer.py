@@ -37,9 +37,9 @@ TRANSFORM = RigidTransform(rotation_radians=(math.pi / 2.0, 0.0, 0.0))
 
 
 @wraps(build_3088A429)
-async def _build_with_supplier_references(adapter, truth=None):
-    await build_3088A429(adapter, truth)
-    await author_supplier_washer_references(
+def _build_with_supplier_references(adapter, truth=None):
+    build_3088A429(adapter, truth)
+    author_supplier_washer_references(
         adapter, axis="z", bore_mm=part.ID, outer_mm=part.OD,
         thickness_mm=part.THICKNESS, units=part.SUPPLIER_UNITS,
         sheet_units=part_drawing_unit(PART_NAME),
@@ -48,8 +48,8 @@ async def _build_with_supplier_references(adapter, truth=None):
     blank_reference_sketches(adapter, REFERENCE_SKETCHES)
 
 
-async def build(adapter) -> dict[str, str]:
-    return await build_stock_fastener(
+def build(adapter) -> dict[str, str]:
+    return build_stock_fastener(
         adapter,
         part_name=PART_NAME,
         components=(

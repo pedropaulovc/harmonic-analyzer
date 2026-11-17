@@ -163,7 +163,7 @@ for _part_no, _row in OVAL_SIZES.items():
         raise ValueError(f"{_part_no}: the driver slot falls through the oval head")
 
 
-async def build_oval(
+def build_oval(
     adapter,
     part_no: str,
     *,
@@ -194,7 +194,7 @@ async def build_oval(
     cap_R = (head_r**2 + crown_h**2) / (2.0 * crown_h)
 
     # --- revolve profile ----------------------------------------------------
-    check("create_sketch profile", await adapter.create_sketch("Front"))
+    check("create_sketch profile", adapter.create_sketch("Front"))
     sk_mgr = adapter.currentSketchManager
     with no_sketch_inference(adapter):
         if (
@@ -222,7 +222,7 @@ async def build_oval(
         )
         if arc is None:
             raise RuntimeError(f"{part_no} profile: crown arc failed")
-        await add_line_chain(
+        add_line_chain(
             adapter,
             [
                 (head_r, 0.0),
@@ -234,20 +234,20 @@ async def build_oval(
             ],
             close=False,
         )
-    check("exit_sketch profile", await adapter.exit_sketch())
+    check("exit_sketch profile", adapter.exit_sketch())
     name_last_feature(adapter, "BodyProfile")
     check(
         "revolve body",
-        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=False)),
+        adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=False)),
     )
     name_last_feature(adapter, "Body")
     v = revolved_volume(part_no, cut_length, cut_end_break)
-    await volume_check(adapter, "revolved body", v, 0.005 * v)
+    volume_check(adapter, "revolved body", v, 0.005 * v)
 
     # --- driver slot (from the crown apex) ----------------------------------
-    check("create_sketch slot", await adapter.create_sketch("Front"))
+    check("create_sketch slot", adapter.create_sketch("Front"))
     with no_sketch_inference(adapter):
-        await add_line_chain(
+        add_line_chain(
             adapter,
             [
                 (-slot_w / 2.0, apex_y + 0.5),
@@ -256,11 +256,11 @@ async def build_oval(
                 (-slot_w / 2.0, apex_y - slot_d),
             ],
         )
-    check("exit_sketch slot", await adapter.exit_sketch())
+    check("exit_sketch slot", adapter.exit_sketch())
     name_last_feature(adapter, "SlotProfile")
     check(
         "cut slot",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=2.0 * hd, both_directions=True)
         ),
     )
@@ -281,7 +281,7 @@ async def build_oval(
     # --- helix (top of the bevel -> P past the tip) -------------------------
     # Seeded on the Top Plane like the pan's; the turns above the junction
     # run through the head body, which the scoped sweep never touches.
-    check("create_sketch helix seed", await adapter.create_sketch("Top"))
+    check("create_sketch helix seed", adapter.create_sketch("Top"))
     with no_sketch_inference(adapter):
         seed = adapter.currentSketchManager.CreateCircleByRadius(
             0.0, 0.0, 0.0, major_r / 1000.0
@@ -299,9 +299,9 @@ async def build_oval(
     )
 
     # --- thread groove -------------------------------------------------------
-    check("create_sketch cutter", await adapter.create_sketch("Front"))
+    check("create_sketch cutter", adapter.create_sketch("Front"))
     with no_sketch_inference(adapter):
-        await add_line_chain(
+        add_line_chain(
             adapter,
             [
                 (root_r + (7.0 * pitch / 16.0) * math.sqrt(3.0), 15.0 * pitch / 16.0),
@@ -310,7 +310,7 @@ async def build_oval(
                 (root_r, pitch / 2.0),
             ],
         )
-    check("exit_sketch cutter", await adapter.exit_sketch())
+    check("exit_sketch cutter", adapter.exit_sketch())
     name_last_feature(adapter, "ThreadCutter")
     thread_sweep_cut(adapter, "ThreadCutter", "ThreadHelix", shank_name, "ThreadGroove")
 
@@ -319,7 +319,7 @@ async def build_oval(
     # then the 30 deg taper to the thread root, fully submerged.
     fill_y = junction_y - pitch / 2.0
     taper_h = (major_r - root_r) * math.sqrt(3.0)  # 30 deg from the axis
-    check("create_sketch runout", await adapter.create_sketch("Front"))
+    check("create_sketch runout", adapter.create_sketch("Front"))
     sk2 = adapter.currentSketchManager
     with no_sketch_inference(adapter):
         if (
@@ -334,7 +334,7 @@ async def build_oval(
             is None
         ):
             raise RuntimeError(f"{part_no} runout: CreateCenterLine failed")
-        await add_line_chain(
+        add_line_chain(
             adapter,
             [
                 (0.0, junction_y),
@@ -344,22 +344,22 @@ async def build_oval(
                 (0.0, fill_y - taper_h),
             ],
         )
-    check("exit_sketch runout", await adapter.exit_sketch())
+    check("exit_sketch runout", adapter.exit_sketch())
     name_last_feature(adapter, "RunoutProfile")
     check(
         "runout fill",
-        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=False)),
+        adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=False)),
     )
     name_last_feature(adapter, "RunoutFill")
 
     check(
         "junction fillet",
-        await adapter.add_fillet(pitch / 10.0, [[major_r, junction_y, 0.0]]),
+        adapter.add_fillet(pitch / 10.0, [[major_r, junction_y, 0.0]]),
     )
     name_last_feature(adapter, "JunctionFillet")
 
 
-async def catalog_run(adapter, part_no: str, builder) -> dict[str, str]:
+def catalog_run(adapter, part_no: str, builder) -> dict[str, str]:
     """Catalog-only run: build the recipe and save it, no vendor truth."""
     from diagnostics.diag_mcmaster_lib import (
         OUT_DIR,
@@ -370,19 +370,19 @@ async def catalog_run(adapter, part_no: str, builder) -> dict[str, str]:
     )
 
     with _telemetry.span("catalog.build", label=part_no):
-        check(f"create_part {part_no}", await adapter.create_part())
+        check(f"create_part {part_no}", adapter.create_part())
         assert_seat_sketch_baseline(adapter, part_no)
-        await builder(adapter)
+        builder(adapter)
         props = mass_properties(adapter)
         if not props["volume_mm3"] > 0.0:
             raise RuntimeError(f"{part_no} catalog build has no solid volume")
         OUT_DIR.mkdir(parents=True, exist_ok=True)
         path = OUT_DIR / f"{part_no}-catalog.SLDPRT"
-        check(f"save -> {path}", await adapter.save_file(str(path.resolve())))
+        check(f"save -> {path}", adapter.save_file(str(path.resolve())))
         artefacts = {"sldprt": str(path)}
-        artefacts.update(await export_views(adapter, f"{part_no}-catalog"))
+        artefacts.update(export_views(adapter, f"{part_no}-catalog"))
         _telemetry.success(
             f"{part_no} catalog build saved: volume {props['volume_mm3']:.4f} mm^3"
         )
-        await close_all(adapter)
+        close_all(adapter)
     return artefacts

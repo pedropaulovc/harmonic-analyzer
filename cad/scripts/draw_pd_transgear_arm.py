@@ -818,11 +818,11 @@ def _section_caption_settled(adapter: Any, section: Any, *, label: str) -> None:
     _telemetry.info(f"section {label} caption at {extent}")
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open transgear-arm source", await adapter.open_model(str(SOURCE)))
+    check("open transgear-arm source", adapter.open_model(str(SOURCE)))
     read_required_properties(
         adapter.currentModel,
         (
@@ -1047,7 +1047,7 @@ async def build(adapter: Any) -> dict[str, str]:
     if not ddoc.ActivateSheet(SHEET_NAMES[0]):
         raise RuntimeError("cannot return to the arm sheet")
 
-    artefacts = await finalize_drawing(
+    artefacts = finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Transgear Arm Manufacturing Drawing",

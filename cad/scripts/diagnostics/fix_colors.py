@@ -40,13 +40,13 @@ JOBS = {
 }
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     results: dict[str, str] = {}
     for stem, rgb in JOBS.items():
         path = ROOT / "out" / "sldprt" / f"{stem}.SLDPRT"
-        check(f"open {stem}", await adapter.open_model(str(path)))
-        await apply_color(adapter, rgb)
-        check(f"save {stem}", await adapter.save_file())
+        check(f"open {stem}", adapter.open_model(str(path)))
+        apply_color(adapter, rgb)
+        check(f"save {stem}", adapter.save_file())
         _telemetry.info(f"{stem}: {rgb}")
         results[stem] = str(rgb)
     return results

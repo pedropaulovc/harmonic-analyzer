@@ -198,10 +198,10 @@ def author_dimension_callouts(adapter) -> None:
                     )
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import AddThreadParameters, RevolveParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     # #290: the row's inch calculation units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
@@ -220,7 +220,7 @@ async def build(adapter) -> dict[str, str]:
         ("ReliefDia", RELIEF_DIA),
         ("ReliefRootR", RELIEF_ROOT_R),
     ):
-        await set_global(adapter, name, f"{value}mm")
+        set_global(adapter, name, f"{value}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -228,9 +228,9 @@ async def build(adapter) -> dict[str, str]:
     # end, shank, step down to the relief floor, the relief's flank up to the
     # thread at the basic major, spherical dome to the tip.
     profile = SketchDims()
-    check("create_sketch pin profile", await adapter.create_sketch("Front"))
+    check("create_sketch pin profile", adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
-    axis = check("pin axis", await adapter.add_centerline(0.0, BACK_Y, 0.0, TIP_Y))
+    axis = check("pin axis", adapter.add_centerline(0.0, BACK_Y, 0.0, TIP_Y))
     points = [
         (0.0, BACK_Y),
         (PIN_R, BACK_Y),
@@ -240,14 +240,14 @@ async def build(adapter) -> dict[str, str]:
         (THREAD_R, RELIEF_END_Y),
         (THREAD_R, THREAD_END_Y),
     ]
-    back_end, shank, step, relief, flank, thread = await add_line_chain(
+    back_end, shank, step, relief, flank, thread = add_line_chain(
         adapter, points, close=False
     )
     dome = check(
         "dome arc",
-        await adapter.add_arc(0.0, TIP_Y - DOME_R, THREAD_R, THREAD_END_Y, 0.0, TIP_Y),
+        adapter.add_arc(0.0, TIP_Y - DOME_R, THREAD_R, THREAD_END_Y, 0.0, TIP_Y),
     )
-    closure = check("pin closure", await adapter.add_line(0.0, TIP_Y, 0.0, BACK_Y))
+    closure = check("pin closure", adapter.add_line(0.0, TIP_Y, 0.0, BACK_Y))
     set_sketch_direct_db(adapter, False)
     for label, first, second in (
         ("thread-dome", f"{thread}.end", f"{dome}.start"),
@@ -256,7 +256,7 @@ async def build(adapter) -> dict[str, str]:
         ("axis start", f"{axis}.start", f"{back_end}.start"),
         ("axis end", f"{axis}.end", f"{dome}.end"),
     ):
-        check(label, await adapter.add_sketch_constraint(first, second, "coincident"))
+        check(label, adapter.add_sketch_constraint(first, second, "coincident"))
     for label, entity, relation in (
         ("back end", back_end, "horizontal"),
         ("shank", shank, "vertical"),
@@ -267,21 +267,21 @@ async def build(adapter) -> dict[str, str]:
         ("closure", closure, "vertical"),
         ("axis", axis, "vertical"),
     ):
-        check(label, await adapter.add_sketch_constraint(entity, None, relation))
-    await anchor_point_to_origin(
+        check(label, adapter.add_sketch_constraint(entity, None, relation))
+    anchor_point_to_origin(
         adapter, f"{back_end}.start", 0.0, BACK_Y, "pin back end"
     )
     profile.record("BackEnd", '"ShankLength" - "PressGauge"')
-    await add_diametric_linear_dimension(
+    add_diametric_linear_dimension(
         adapter, axis, shank, (PIN_R + 4.0, (BACK_Y + STEP_Y) / 2.0), "PinDia"
     )
     profile.record("PinDia", '"PinDia"')
     check(
         "shank length",
-        await adapter.add_sketch_dimension(shank, None, "linear", SHANK_LEN),
+        adapter.add_sketch_dimension(shank, None, "linear", SHANK_LEN),
     )
     profile.record("ShankLength", '"ShankLength"')
-    await add_diametric_linear_dimension(
+    add_diametric_linear_dimension(
         adapter,
         axis,
         thread,
@@ -292,7 +292,7 @@ async def build(adapter) -> dict[str, str]:
     # The thread from the step: the gauged face the nut stack hangs off
     # (drawing-guidelines.md rule 10 (dimension from a real feature)'s functional datum, mg_wheel_axle_spec.THREAD_LEN),
     # to the thread end at the dome's tangent.
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{step}.end",
         f"{thread}.end",
@@ -304,16 +304,16 @@ async def build(adapter) -> dict[str, str]:
     # The relief: its width along the floor from the step, its Ø MAX.
     check(
         "relief width",
-        await adapter.add_sketch_dimension(relief, None, "linear", RELIEF_WIDTH),
+        adapter.add_sketch_dimension(relief, None, "linear", RELIEF_WIDTH),
     )
     profile.record("ReliefWidth", '"ReliefWidth"')
-    await add_diametric_linear_dimension(
+    add_diametric_linear_dimension(
         adapter, axis, relief, (RELIEF_R + 4.0, STEP_Y - 3.0), "ReliefDia"
     )
     profile.record("ReliefDia", '"ReliefDia"')
     # Overall from the back end's outer corner (where the drawing's extension
     # lines rise).
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{shank}.start",
         f"{closure}.start",
@@ -324,20 +324,20 @@ async def build(adapter) -> dict[str, str]:
     profile.record("PinLength", '"ShankLength" + "ThreadLength" + "DomeHeight"')
     check(
         "dome radius",
-        await adapter.add_sketch_dimension(dome, None, "radial", DOME_R),
+        adapter.add_sketch_dimension(dome, None, "radial", DOME_R),
     )
     profile.record(
         "DomeR",
         '("ThreadDia" / 2 * "ThreadDia" / 2 + "DomeHeight" * "DomeHeight") '
         '/ (2 * "DomeHeight")',
     )
-    await ensure_fully_defined(adapter, "pin profile")
-    check("exit_sketch pin profile", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "pin profile")
+    check("exit_sketch pin profile", adapter.exit_sketch())
     name_last_feature(adapter, "PinProfile")
     drive_jobs += profile.apply(adapter, "PinProfile")
-    check("revolve pin", await adapter.create_revolve(RevolveParameters(angle=360.0)))
+    check("revolve pin", adapter.create_revolve(RevolveParameters(angle=360.0)))
     name_last_feature(adapter, "Pin")
-    pin_volume = await volume_check(adapter, "pin", V_PROFILE, PIN_VOLUME_TOL)
+    pin_volume = volume_check(adapter, "pin", V_PROFILE, PIN_VOLUME_TOL)
 
     # The relief's two internal corners (drawing-guidelines.md rule 16), ONE fillet over both
     # circular edges, each picked on the floor's radius at its corner: the
@@ -345,7 +345,7 @@ async def build(adapter) -> dict[str, str]:
     # edge), then the thread flank's.
     check(
         "fillet relief roots",
-        await adapter.add_fillet(
+        adapter.add_fillet(
             RELIEF_ROOT_R,
             [[RELIEF_R, STEP_Y, 0.0], [RELIEF_R, RELIEF_END_Y, 0.0]],
             propagate=False,
@@ -355,17 +355,17 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs.append(
         (name_dimensions(adapter, "ReliefRoots", ["ReliefRootR"])[0], '"ReliefRootR"')
     )
-    rooted = await volume_check(
+    rooted = volume_check(
         adapter, "relief roots", pin_volume + V_RELIEF_ROOTS, ROOTS_VOLUME_TOL
     )
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    driven = await volume_check(
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    driven = volume_check(
         adapter, "driven pin (equations neutral)", rooted, NEUTRAL_VOLUME_TOL
     )
 
@@ -374,7 +374,7 @@ async def build(adapter) -> dict[str, str]:
     adapter._zoom_to_fit(adapter.currentModel)
     check(
         f"cosmetic thread {THREAD}",
-        await adapter.add_thread(
+        adapter.add_thread(
             AddThreadParameters(
                 edge_point=[THREAD_MAJOR / 2.0, THREAD_END_Y, 0.0],
                 standard="ansi_inch",
@@ -384,14 +384,14 @@ async def build(adapter) -> dict[str, str]:
             )
         ),
     )
-    await volume_check(adapter, "cosmetic thread cuts nothing", driven, 1e-6)
+    volume_check(adapter, "cosmetic thread cuts nothing", driven, 1e-6)
 
     # Named pin axis (local Y through the origin) so the magnifying wheel
     # revolves on it in the mated-DOF assembly (Axis1).
-    await name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0, "pin axis")
+    name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0, "pin axis")
 
-    await apply_material(adapter, MATERIAL)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    report_mass_properties(adapter)
     # Equal deviations print as one symmetric +/- band.
     set_dimension_symmetric_tolerance(
         adapter,
@@ -410,7 +410,7 @@ async def build(adapter) -> dict[str, str]:
     author_dimension_callouts(adapter)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(adapter, PART_NAME)
-    return await save_part_and_images(adapter, PART_NAME)
+    return save_part_and_images(adapter, PART_NAME)
 
 
 if __name__ == "__main__":

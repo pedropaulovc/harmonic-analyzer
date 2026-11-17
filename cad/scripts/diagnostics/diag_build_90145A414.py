@@ -27,12 +27,12 @@ PART_NO = "90145A414"
 
 
 @stock_recipe("90145A414", threaded=False)
-async def build_90145A414(adapter, truth=None):
-    await build_dowel(adapter, PART_NO, DOWEL_SIZE, ENDS)
+def build_90145A414(adapter, truth=None):
+    build_dowel(adapter, PART_NO, DOWEL_SIZE, ENDS)
 
 
-async def _catalog(adapter) -> dict[str, str]:
-    return await build_catalog(adapter, PART_NO, DOWEL_SIZE, ENDS)
+def _catalog(adapter) -> dict[str, str]:
+    return build_catalog(adapter, PART_NO, DOWEL_SIZE, ENDS)
 
 
 if __name__ == "__main__":

@@ -29,13 +29,13 @@ ITEM = "JACK CHAIN, TRADE SIZE 18"
 PART_STEM = SPEC.artifact_stem
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     settled_checks: list[Callable[[], None]] = []
 
     def add_dimensions(target: Any, views: dict[str, Any]) -> None:
         settled_checks.append(annotate_keeper_wire(target, views))
 
-    return await build_purchased_part_drawing(
+    return build_purchased_part_drawing(
         adapter, SPEC, item=ITEM, cut_to_suit=True,
         supplier_dimensions=add_dimensions,
         # The catalogue wire size stands right of the right view

@@ -93,7 +93,7 @@ PEN_STEMS = (
 REPORT = ROOT / "cad/out/reports/stock-spring-gravity.json"
 
 
-async def _native_masses(adapter):
+def _native_masses(adapter):
     """Measure each requested file/member without conflating same-file members."""
     parts = {}
     for result_key, (stem, configuration) in PART_IDENTITIES.items():
@@ -101,12 +101,12 @@ async def _native_masses(adapter):
         with _telemetry.span(
             "gravity.native_mass", part=stem, configuration=configuration
         ):
-            check(f"open built part {stem}", await adapter.open_model(str(path)))
+            check(f"open built part {stem}", adapter.open_model(str(path)))
             model = _early_bound(adapter.currentModel, "IModelDoc2")
             try:
                 if model is None:
                     raise RuntimeError(f"opened part has no native document: {stem}")
-                await activate_member(adapter, configuration)
+                activate_member(adapter, configuration)
                 model.EditRebuild3()
                 require_active_member(adapter, configuration)
                 model.ClearSelection2(True)
@@ -163,8 +163,8 @@ async def _native_masses(adapter):
     return parts
 
 
-async def build(adapter):
-    parts = await _native_masses(adapter)
+def build(adapter):
+    parts = _native_masses(adapter)
 
     with _telemetry.span("gravity.counter_force_interval"):
         rows = []

@@ -138,7 +138,7 @@ def _missing_inputs(part_no: str) -> str | None:
     return None
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     selected = _selected_parts()
     missing = {p: why for p in selected if (why := _missing_inputs(p))}
     if missing and "--all" not in sys.argv[1:]:
@@ -149,7 +149,7 @@ async def build(adapter) -> dict[str, str]:
     for part_no in selected:
         if part_no in missing:
             continue
-        artefacts.update(await run_replica(adapter, part_no, REGISTRY[part_no]))
+        artefacts.update(run_replica(adapter, part_no, REGISTRY[part_no]))
     return artefacts
 
 

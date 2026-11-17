@@ -26,7 +26,6 @@ Run: ``uv run python -m pytest cad/scripts/test_assembly_save_solved_gates.py -q
 
 from __future__ import annotations
 
-import asyncio
 import sys
 from collections import Counter
 from pathlib import Path
@@ -168,7 +167,7 @@ def _stub_pipeline(save_steps, monkeypatch):
 
         return step
 
-    async def arecord(name, result):
+    def arecord(name, result):
         save_steps.append(name)
         return result
 
@@ -208,11 +207,9 @@ def _free_dof_gate(adapter):
 
 
 def _save(adapter, gates):
-    return asyncio.run(
-        _assembly.save_assembly_and_images(
+    return _assembly.save_assembly_and_images(
             adapter, ASM, [], solved_gates=gates, dof_manifest=True
         )
-    )
 
 
 def test_gates_read_the_final_rebuild_and_the_save_pays_one_rebuild(save_steps):
@@ -354,7 +351,7 @@ def test_dirty_configuration_publication_uses_one_preventive_save(
     file.proof = _assembly.OUT_SLDASM / f".{ASM}.massprops.sha"
     file.proof.write_text("stale-proof\n", encoding="utf-8")
 
-    async def open_saved(_path):
+    def open_saved(_path):
         adapter.currentModel = FakeOpenAssembly(file)
         file.opens.append(adapter.currentModel)
         file.events.append(("open", adapter.currentModel.NeedsRebuild2))

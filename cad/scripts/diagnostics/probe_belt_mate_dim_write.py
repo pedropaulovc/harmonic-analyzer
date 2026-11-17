@@ -77,9 +77,9 @@ def _write_mate_dims(adapter: Any) -> dict:
     return result.data
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     asm = OUT_SLDASM / "pd-paper-drive.SLDASM"
-    check("open paper-drive", await adapter.open_model(str(asm)))
+    check("open paper-drive", adapter.open_model(str(asm)))
     try:
         roles = _removables_by_role(adapter)
         crank_wheel, knob_wheel = roles["crank"], roles["knob"]
@@ -88,7 +88,7 @@ async def build(adapter: Any) -> dict[str, str]:
         dims = _write_mate_dims(adapter)
         info(f"mate dims written: {dims}")
 
-        ratio = await _measure_ratio(adapter, crank_wheel, knob_wheel, "D-mate-dims")
+        ratio = _measure_ratio(adapter, crank_wheel, knob_wheel, "D-mate-dims")
         if abs(ratio - 0.5) <= 0.01:
             success(f"RATIO FIXED via mate dimensions -- {ratio:+.4f} (same-sense)"
                     if ratio > 0 else f"ratio magnitude OK but sense flipped: {ratio:+.4f}")

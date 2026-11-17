@@ -142,12 +142,12 @@ def _timed_mate(adapter, params: AddMateParameters, comp: str,
     return t
 
 
-async def _probe_batch(adapter, tag: str, rebuild_each: bool) -> list[dict[str, float]]:
+def _probe_batch(adapter, tag: str, rebuild_each: bool) -> list[dict[str, float]]:
     """Insert N_PROBE bushings on the shaft and add the instrumented mates."""
     rows = []
     for i in range(N_PROBE):
         z = -80.0 - i * PITCH  # below the shaft midline, clear of fillers
-        comp = await place_component(
+        comp = place_component(
             adapter, "pivot-bushing", [PIVOT[0], PIVOT[1], z],
             [0.0, 0.0, 0.0], IDENTITY, ground=False,
             label=f"probe bushing {tag}-{i}",
@@ -167,56 +167,56 @@ async def _probe_batch(adapter, tag: str, rebuild_each: bool) -> list[dict[str, 
     return rows
 
 
-async def _grow_grounded(adapter, count: int) -> None:
+def _grow_grounded(adapter, count: int) -> None:
     specs = [{
         "part": "pivot-bushing",
         "position": [PIVOT[0], PIVOT[1], Z_FAR + k * PITCH],
         "rotation": [0.0, 0.0, 0.0], "rows": IDENTITY, "ground": True,
         "label": f"filler grounded {k}",
     } for k in range(count)]
-    await place_components_batch(adapter, specs, label=f"{count} grounded fillers")
+    place_components_batch(adapter, specs, label=f"{count} grounded fillers")
 
 
-async def _grow_seated(adapter, count: int) -> None:
+def _grow_seated(adapter, count: int) -> None:
     for k in range(count):
         z = 100.0 + k * PITCH
-        comp = await place_component(
+        comp = place_component(
             adapter, "pivot-bushing", [PIVOT[0], PIVOT[1], z],
             [0.0, 0.0, 0.0], IDENTITY, ground=False, label=f"filler seated {k}",
         )
-        await _seat_bushing_on_shaft(
+        _seat_bushing_on_shaft(
             adapter, comp, [PIVOT[0] + SHAFT_R, PIVOT[1], 0.0],
             (PIVOT[0], PIVOT[1]), PIVOT_BUSHING_OD / 2.0,
         )
 
 
-async def build(adapter) -> dict[str, str]:
-    check("create_assembly", await adapter.create_assembly())
-    await place_component(
+def build(adapter) -> dict[str, str]:
+    check("create_assembly", adapter.create_assembly())
+    place_component(
         adapter, "ch-pivot-shaft", [PIVOT[0], PIVOT[1], PIVOT_SHAFT_Z],
         [0.0, 0.0, 0.0], IDENTITY, ground=True, label="pivot-shaft (grounded)",
     )
 
     # Rung 1: near-empty assembly (baseline).
     log("== rung 1: baseline (shaft only) ==")
-    r1 = await _probe_batch(adapter, "base", rebuild_each=True)
+    r1 = _probe_batch(adapter, "base", rebuild_each=True)
 
     # Rung 2: + grounded fillers (components, no mates). If per-mate cost
     # jumps here, COMPONENT count drives it; if flat, mates do.
     log(f"== rung 2: +{FILLER_GROUNDED} grounded fillers ==")
-    await _grow_grounded(adapter, FILLER_GROUNDED)
-    r2 = await _probe_batch(adapter, "grounded", rebuild_each=True)
+    _grow_grounded(adapter, FILLER_GROUNDED)
+    r2 = _probe_batch(adapter, "grounded", rebuild_each=True)
 
     # Rung 3: + seated fillers (grows the MATE system).
     log(f"== rung 3: +{FILLER_SEATED} seated fillers ({FILLER_SEATED * 3} mates) ==")
-    await _grow_seated(adapter, FILLER_SEATED)
-    r3 = await _probe_batch(adapter, "seated", rebuild_each=True)
+    _grow_seated(adapter, FILLER_SEATED)
+    r3 = _probe_batch(adapter, "seated", rebuild_each=True)
 
     # H4: deferral batch on the now-heavy assembly, then verify equivalence:
     # the mated bushings must land on their planes and read fully-defined
     # exactly as the rebuild-each batch did.
     log("== deferral: same mates, NO per-mate rebuild, ONE closing rebuild ==")
-    r4 = await _probe_batch(adapter, "defer", rebuild_each=False)
+    r4 = _probe_batch(adapter, "defer", rebuild_each=False)
     worst = 0.0
     for row in r4:
         z_final = component_transform(adapter, row["comp"])[11] * 1000.0

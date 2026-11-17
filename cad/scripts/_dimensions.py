@@ -112,7 +112,7 @@ def _rename_dimensions(
 
 
 @_telemetry.traced("param.global", label_param="name")
-async def set_global(adapter: Any, name: str, expr: str | float) -> float:
+def set_global(adapter: Any, name: str, expr: str | float) -> float:
     """Add or update an equation-manager global variable; returns its value.
 
     Centralises the pen-driver pattern. ``expr`` is the equation-manager
@@ -121,7 +121,7 @@ async def set_global(adapter: Any, name: str, expr: str | float) -> float:
     square root (see SetGlobalVariableParameters)."""
     from solidworks_mcp.adapters.base import SetGlobalVariableParameters
 
-    res = await adapter.set_global_variable(
+    res = adapter.set_global_variable(
         SetGlobalVariableParameters(name=name, expression=str(expr))
     )
     if not res.is_success:
@@ -132,17 +132,17 @@ async def set_global(adapter: Any, name: str, expr: str | float) -> float:
 
 
 @_telemetry.traced("param.dimension", label_param="dim_name")
-async def drive_dimension(adapter: Any, dim_name: str, expr: str | float) -> None:
+def drive_dimension(adapter: Any, dim_name: str, expr: str | float) -> None:
     """Bind a (named) dimension to an equation expression, e.g.::
 
-        await drive_dimension(adapter, "OuterWidth@OuterProfile", '2 * "OuterX"')
+        drive_dimension(adapter, "OuterWidth@OuterProfile", '2 * "OuterX"')
 
     so editing the ``OuterX`` global reshapes the part. ``dim_name`` is the
     ``leaf@feature`` form returned by :func:`name_dimensions`."""
     from solidworks_mcp.adapters.base import CreateEquationParameters
 
     equation = f'"{dim_name}" = {expr}'
-    res = await adapter.create_equation(CreateEquationParameters(equation=equation))
+    res = adapter.create_equation(CreateEquationParameters(equation=equation))
     if not res.is_success:
         raise RuntimeError(f"drive_dimension {equation!r}: {res.error}")
     _telemetry.success(f"equation {equation}")

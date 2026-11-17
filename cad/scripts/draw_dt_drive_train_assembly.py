@@ -5562,11 +5562,11 @@ def _place_package(
     return package_sheet_scales(cluster_scales, full_detail), landings, settings_settled
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source assembly is missing: {SOURCE}")
     fingerprint = _source_fingerprint(SOURCE)
-    check("open drive-train drawing source", await adapter.open_model(str(SOURCE)))
+    check("open drive-train drawing source", adapter.open_model(str(SOURCE)))
     source_model = _early_bound(adapter.currentModel, "IModelDoc2")
     if bool(source_model.GetSaveFlag()):
         raise RuntimeError("drive-train source assembly is already dirty; refusing to discard changes")
@@ -5597,7 +5597,7 @@ async def build(adapter: Any) -> dict[str, str]:
                     )
 
             assert_source_clean("package placement")
-            artifacts = await finalize_drawing(
+            artifacts = finalize_drawing(
                 adapter,
                 OUTPUTS,
                 layout=SPEC.layout,

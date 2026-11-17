@@ -245,7 +245,7 @@ def _select_face_mark1(adapter, point_mm: list[float], tol_mm: float = 0.05) -> 
     nearest rival (the eye torus the cap is cut from) is a full wire radius
     away -- a 0.05 mm window cannot pick the wrong one.
     """
-    from solidworks_mcp.adapters import raw_dispatch as _raw
+    import _com
     from solidworks_mcp.adapters.solidworks.features import _all_body_faces
 
     px, py, pz = (c / 1000.0 for c in point_mm)
@@ -254,7 +254,7 @@ def _select_face_mark1(adapter, point_mm: list[float], tol_mm: float = 0.05) -> 
     for face in _all_body_faces(adapter):
         near = adapter._attempt(
             lambda f=face: list(
-                _raw.invoke(f, "IFace2", "GetClosestPointOn", px, py, pz)
+                _com._com_invoke(f, "IFace2", "GetClosestPointOn", px, py, pz)
             ),
             default=None,
         )
@@ -268,7 +268,7 @@ def _select_face_mark1(adapter, point_mm: list[float], tol_mm: float = 0.05) -> 
             f"no face within {tol_mm} mm of {point_mm} to put the dome on"
         )
     adapter.currentModel.ClearSelection2(True)
-    entity = _raw.bind(best, "IEntity")
+    entity = _com._bind(best, "IEntity")
     if not adapter._attempt(lambda e=entity: e.Select2(False, 1), default=False):
         raise RuntimeError(f"cannot select dome face at {point_mm} (mark 1)")
 
@@ -276,7 +276,7 @@ def _select_face_mark1(adapter, point_mm: list[float], tol_mm: float = 0.05) -> 
 # --------------------------------------------------------------------------
 # features
 # --------------------------------------------------------------------------
-async def _wire_path(adapter, feature_name: str) -> None:
+def _wire_path(adapter, feature_name: str) -> None:
     """Vendor Sketch7: eye arc R6.38175 -> bend arc R2.869189, on Front.
 
     Front-plane sketch coordinates ARE model (x, y) here (Sketch7 harvests
@@ -288,7 +288,7 @@ async def _wire_path(adapter, feature_name: str) -> None:
     points in metres, each with its own z, then the direction flag (+1 CCW,
     -1 CW) -- and needs ``AddToDB`` while the arcs are drawn.
     """
-    check("create_sketch wire path", await adapter.create_sketch("Front"))
+    check("create_sketch wire path", adapter.create_sketch("Front"))
     sk = _sketch_manager(adapter)
     prev_db = bool(sk.AddToDB)
     sk.AddToDB = True
@@ -315,18 +315,18 @@ async def _wire_path(adapter, feature_name: str) -> None:
                 )
     finally:
         sk.AddToDB = prev_db
-    check("exit_sketch wire path", await adapter.exit_sketch())
+    check("exit_sketch wire path", adapter.exit_sketch())
     name_last_feature(adapter, feature_name)
 
 
-async def _thread(adapter) -> None:
+def _thread(adapter) -> None:
     """Build the factory Sketch3 + Helix/Spiral1 + Sketch4 + Cut-Sweep1.
 
     The datum, helix and cutter use only the stock anchor's dimensions.
     Production shortening happens later as a physical cut of this solid.
     """
     offset_plane(adapter, "ThreadDatum", A.shank_end_y_mm)
-    check("create_sketch helix seed", await adapter.create_sketch("ThreadDatum"))
+    check("create_sketch helix seed", adapter.create_sketch("ThreadDatum"))
     with no_sketch_inference(adapter):
         seed = _sketch_manager(adapter).CreateCircleByRadius(
             0.0, 0.0, 0.0, A.thread_major_radius_mm / 1000.0
@@ -347,9 +347,9 @@ async def _thread(adapter) -> None:
         feature_name="ThreadHelix",
     )
 
-    check("create_sketch cutter", await adapter.create_sketch("Front"))
-    await add_line_chain(adapter, [list(p) for p in thread_cutter_profile_mm(A)])
-    check("exit_sketch cutter", await adapter.exit_sketch())
+    check("create_sketch cutter", adapter.create_sketch("Front"))
+    add_line_chain(adapter, [list(p) for p in thread_cutter_profile_mm(A)])
+    check("exit_sketch cutter", adapter.exit_sketch())
     name_last_feature(adapter, "ThreadCutter")
     _thread_sweep_cut(adapter, "ThreadCutter", "ThreadHelix", "ThreadGroove")
 
@@ -366,7 +366,7 @@ def _face_counts(adapter) -> list[int]:
 # builder
 # --------------------------------------------------------------------------
 @stock_recipe("9490T1", threaded=True)
-async def build_9490T1(adapter, truth=None, *, shank_length_mm: float | None = None):
+def build_9490T1(adapter, truth=None, *, shank_length_mm: float | None = None):
     """Build 9490T1 into the current (empty) part.  Never opens or saves.
 
     ``shank_length_mm=None`` reproduces the vendor part exactly (58.7375 mm).
@@ -384,19 +384,19 @@ async def build_9490T1(adapter, truth=None, *, shank_length_mm: float | None = N
 
     with no_sketch_inference(adapter):
         # --- shank (vendor Sketch2 + Boss-Extrude1) ------------------------
-        check("create_sketch shank", await adapter.create_sketch("Top"))
-        await define_circle(adapter, 0.0, 0.0, A.thread_major_radius_mm, "shank")
-        check("exit_sketch shank", await adapter.exit_sketch())
+        check("create_sketch shank", adapter.create_sketch("Top"))
+        define_circle(adapter, 0.0, 0.0, A.thread_major_radius_mm, "shank")
+        check("exit_sketch shank", adapter.exit_sketch())
         name_last_feature(adapter, "ShankProfile")
         extrude_at_offset(adapter, A.shank_length_mm, A.shank_end_y_mm)
         name_last_feature(adapter, "Shank")
         shank_v = math.pi * A.thread_major_radius_mm**2 * A.shank_length_mm
-        volume = await volume_check(adapter, "shank", shank_v, 0.002 * shank_v)
+        volume = volume_check(adapter, "shank", shank_v, 0.002 * shank_v)
 
     # --- deburr (vendor Sketch5 + Cut-Extrude1, brought forward) -----------
     check(
         "chamfer shank end",
-        await adapter.add_chamfer(
+        adapter.add_chamfer(
             A.end_chamfer_mm,
             [[A.thread_major_radius_mm, A.shank_end_y_mm, 0.0]],
         ),
@@ -407,26 +407,26 @@ async def build_9490T1(adapter, truth=None, *, shank_length_mm: float | None = N
         * A.end_chamfer_mm**2
         * (A.thread_major_radius_mm - A.end_chamfer_mm / 3.0)
     )
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "end chamfer", volume - chamfer_v, 0.02 * chamfer_v
     )
 
     # --- thread (vendor Helix/Spiral1 + Sketch4 + Cut-Sweep1) --------------
     with no_sketch_inference(adapter):
-        await _thread(adapter)
+        _thread(adapter)
     # Analytic check of the factory groove, net of the chamfer overlap.
     # The final stock gate below uses supplier truth; this estimate does not
     # supply mass properties for a physically trimmed production anchor.
     groove_v = A.shank_length_mm * thread_groove_volume_per_mm_mm3(
         A
     ) - end_chamfer_groove_overlap_mm3(A)
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "thread groove", volume - groove_v, 0.005 * groove_v
     )
 
     # --- wire (vendor Sketch7 + Sweep1 + Combine1) -------------------------
     with no_sketch_inference(adapter):
-        await _wire_path(adapter, "WirePath")
+        _wire_path(adapter, "WirePath")
     _sweep_wire(adapter, "WirePath", "Wire")
     if len(bodies(adapter)) != 1:
         raise RuntimeError(
@@ -444,7 +444,7 @@ async def build_9490T1(adapter, truth=None, *, shank_length_mm: float | None = N
         for segment in eye_path_mm(A)
     )
     wire_v = math.pi * A.wire_radius_mm**2 * path_len
-    volume = await volume_check(adapter, "wire", volume + wire_v, 0.003 * wire_v)
+    volume = volume_check(adapter, "wire", volume + wire_v, 0.003 * wire_v)
     if _face_counts(adapter) != [PART_FACES]:
         raise RuntimeError(
             f"pre-dome bodies/faces {_face_counts(adapter)}, expected "
@@ -466,10 +466,10 @@ async def build_9490T1(adapter, truth=None, *, shank_length_mm: float | None = N
     adapter.currentModel.ClearSelection2(True)
     name_last_feature(adapter, "Dome1")
     dome_v = (2.0 / 3.0) * math.pi * A.dome_height_mm**3
-    await volume_check(adapter, "dome", volume + dome_v, 0.01 * dome_v)
+    volume_check(adapter, "dome", volume + dome_v, 0.01 * dome_v)
 
     # Prove the complete stock solid before applying a production modification.
-    await volume_check(
+    volume_check(
         adapter, "9490T1 (vendor part)", A.truth.volume_mm3, 0.0002 * A.truth.volume_mm3
     )
     if _face_counts(adapter) != [PART_FACES]:
@@ -479,7 +479,7 @@ async def build_9490T1(adapter, truth=None, *, shank_length_mm: float | None = N
             "disc, shank-top seam, eye, bend, dome)"
         )
     if requested_cut.removed_length_mm:
-        await trim_factory_shank(adapter, A, requested_cut)
+        trim_factory_shank(adapter, A, requested_cut)
 
     # The replica is authored in the vendor's own frame: no COM remap.
     adapter._mcm_com_map = None

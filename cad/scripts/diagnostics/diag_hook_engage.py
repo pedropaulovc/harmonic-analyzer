@@ -27,24 +27,24 @@ from _assembly import _flag, _read_member
 KEEP = ("sm-summing-lever", "ch-vn-spring-hook", "ch-vn-channel-spring-installed")
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
         ComponentRefParameters,
         InsertComponentParameters,
     )
 
-    check("create_assembly", await adapter.create_assembly())
+    check("create_assembly", adapter.create_assembly())
     for name in ("ch-channel", "sm-summing"):
         path = str((OUT_SLDASM / f"{name}.SLDASM").resolve())
         data = check(
             f"insert {name}",
-            await adapter.insert_component(
+            adapter.insert_component(
                 InsertComponentParameters(file_path=path, position=[0, 0, 0], rotation=[0, 0, 0])
             ),
         )
         comp = data["name"]
         if not data.get("fixed"):
-            check(f"fix {name}", await adapter.fix_component(ComponentRefParameters(name=comp)))
+            check(f"fix {name}", adapter.fix_component(ComponentRefParameters(name=comp)))
 
     asm = adapter.currentModel
     model = adapter.currentModel
@@ -82,7 +82,7 @@ async def build(adapter) -> dict[str, str]:
     for view in ("right", "front", "isometric", "top"):
         p = (png_dir / f"engage_{view}.png").resolve()
         adapter._attempt(lambda: model.ShowNamedView2("", -1), default=None)
-        await adapter.export_image({
+        adapter.export_image({
             "file_path": str(p), "format_type": "png",
             "width": 2000, "height": 1400, "view_orientation": view,
         })

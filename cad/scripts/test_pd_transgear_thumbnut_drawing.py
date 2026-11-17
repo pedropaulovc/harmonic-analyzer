@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import importlib.util
 import math
 from pathlib import Path
@@ -582,7 +581,7 @@ def test_build_pins_the_sheet_before_the_section_and_writes_affixes_after_callou
     seat.curate_view_dimensions.side_effect = (
         lambda _adapter, _view, *, view_label, **_kwargs: [f"{view_label} dimension"]
     )
-    asyncio.run(drawing.build(offline_adapter()))
+    drawing.build(offline_adapter())
 
     (written,) = seat._set_dimension_affixes.call_args_list
     assert written.args[1] == ["axial section dimension"]

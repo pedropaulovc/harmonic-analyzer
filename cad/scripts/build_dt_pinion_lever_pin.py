@@ -84,20 +84,20 @@ V_PIN = math.pi * PIN_R**2 * PIN_LEN
 V_INSTALLED = math.pi * PIN_R**2 * INSTALLED_LEN
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
         CreateConfigurationParameters,
         RevolveParameters,
         SetGlobalVariableParameters,
     )
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing (INCH
     # document; the equation manager reads bare numbers in document units).
-    await set_global(adapter, "PinDia", f"{PIN_DIA}mm")
-    await set_global(adapter, "PinLen", f"{PIN_LEN}mm")
+    set_global(adapter, "PinDia", f"{PIN_DIA}mm")
+    set_global(adapter, "PinLen", f"{PIN_LEN}mm")
 
     # Half-profile on the Front Plane (sketch x -> model X, y -> model Y): the
     # axis centerline along X through the origin and the rectangle above it,
@@ -106,11 +106,11 @@ async def build(adapter) -> dict[str, str]:
     # diameter as a doubled centerline-to-outline dim.
     half = PIN_LEN / 2.0
     pin = SketchDims()
-    check("create_sketch pin", await adapter.create_sketch("Front"))
+    check("create_sketch pin", adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
-    axis = check("axis centerline", await adapter.add_centerline(-half, 0.0, half, 0.0))
+    axis = check("axis centerline", adapter.add_centerline(-half, 0.0, half, 0.0))
     profile_pts = [(-half, 0.0), (-half, PIN_R), (half, PIN_R), (half, 0.0)]
-    profile_lines = await add_line_chain(adapter, profile_pts)
+    profile_lines = add_line_chain(adapter, profile_pts)
     set_sketch_direct_db(adapter, False)
     n = len(profile_lines)
     for i, line in enumerate(profile_lines):
@@ -118,10 +118,10 @@ async def build(adapter) -> dict[str, str]:
         direction = "horizontal" if y1 == y2 else "vertical"
         check(
             f"pin {direction} {line}",
-            await adapter.add_sketch_constraint(line, None, direction),
+            adapter.add_sketch_constraint(line, None, direction),
         )
     outline = profile_lines[1]
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{outline}.start",
         f"{outline}.end",
@@ -130,41 +130,41 @@ async def build(adapter) -> dict[str, str]:
         "pin PinLen",
     )
     pin.record("PinLen", '"PinLen"')
-    await add_diametric_linear_dimension(
+    add_diametric_linear_dimension(
         adapter, axis, outline, (-half / 2.0, PIN_R + 4.0), "PinDia"
     )
     pin.record("PinDia", '"PinDia"')
     start = f"{profile_lines[0]}.start"
     check(
         "pin end on the axis",
-        await adapter.add_sketch_constraint(start, "origin", "horizontal_points"),
+        adapter.add_sketch_constraint(start, "origin", "horizontal_points"),
     )
-    await dimension_between(
+    dimension_between(
         adapter, start, "origin", "horizontal_distance", half, "pin centred on origin"
     )
     pin.record("PinHalfLen", '"PinLen" / 2')
-    await ensure_fully_defined(adapter, "pin sketch")
-    check("exit_sketch pin", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "pin sketch")
+    check("exit_sketch pin", adapter.exit_sketch())
     name_last_feature(adapter, "PinProfile")
     drive_jobs = pin.apply(adapter, "PinProfile")
-    check("revolve pin", await adapter.create_revolve(RevolveParameters(angle=360.0)))
+    check("revolve pin", adapter.create_revolve(RevolveParameters(angle=360.0)))
     name_last_feature(adapter, "Pin")
-    volume = await volume_check(adapter, "pin", V_PIN, 0.005 * V_PIN)
-    res = await adapter.get_mass_properties()
+    volume = volume_check(adapter, "pin", V_PIN, 0.005 * V_PIN)
+    res = adapter.get_mass_properties()
     com = res.data.center_of_mass
     if com is None or any(abs(c) > 1e-6 for c in com):
         raise RuntimeError(f"lever pin is not centred on its origin (COM {com})")
 
     # Named pin axis (Axis1, along X): coaxial with the lift rod's "lever pin"
     # cross-hole axis in the assembly.
-    await name_bore_axis(adapter, "Top Plane", 0.0, "Front Plane", 0.0, "pin axis")
+    name_bore_axis(adapter, "Top Plane", 0.0, "Front Plane", 0.0, "pin axis")
 
     # Deferred drive equations, then re-check neutrality.
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(adapter, "driven pin (equations neutral)", volume, 0.005 * V_PIN)
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    volume_check(adapter, "driven pin (equations neutral)", volume, 0.005 * V_PIN)
 
     # Every edit to the model -- the drawing support (the stock band, the
     # marked set, the model-owned decimal places), the material and the
@@ -184,8 +184,8 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    await apply_material(adapter, MATERIAL)
-    await apply_color(adapter, POLISHED_STEEL)
+    apply_material(adapter, MATERIAL)
+    apply_color(adapter, POLISHED_STEEL)
 
     # Installed configuration (Codex #858 P2): the drive train places the pin
     # trimmed and peened flush with the MHA-DT-16 hub.  The default stays the
@@ -195,7 +195,7 @@ async def build(adapter) -> dict[str, str]:
     default_config = active_configuration_name(adapter)
     check(
         f"create_configuration {INSTALLED_CONFIG}",
-        await adapter.create_configuration(
+        adapter.create_configuration(
             CreateConfigurationParameters(
                 name=INSTALLED_CONFIG, comment="trimmed and peened flush with the hub"
             )
@@ -204,7 +204,7 @@ async def build(adapter) -> dict[str, str]:
     for name, length in ((default_config, PIN_LEN), (INSTALLED_CONFIG, INSTALLED_LEN)):
         check(
             f"PinLen = {length} in {name}",
-            await adapter.set_global_variable(
+            adapter.set_global_variable(
                 SetGlobalVariableParameters(
                     name="PinLen", expression=f"{length}mm", configuration=name
                 )
@@ -212,16 +212,16 @@ async def build(adapter) -> dict[str, str]:
         )
     check(
         f"activate {INSTALLED_CONFIG}",
-        await adapter.set_active_configuration(INSTALLED_CONFIG),
+        adapter.set_active_configuration(INSTALLED_CONFIG),
     )
-    await force_rebuild(adapter)
-    await volume_check(adapter, "installed pin", V_INSTALLED, 0.005 * V_INSTALLED)
+    force_rebuild(adapter)
+    volume_check(adapter, "installed pin", V_INSTALLED, 0.005 * V_INSTALLED)
     check(
         f"re-activate {default_config}",
-        await adapter.set_active_configuration(default_config),
+        adapter.set_active_configuration(default_config),
     )
-    await force_rebuild(adapter)
-    await volume_check(adapter, "manufactured pin (default)", volume, 0.005 * V_PIN)
+    force_rebuild(adapter)
+    volume_check(adapter, "manufactured pin (default)", volume, 0.005 * V_PIN)
     # The configuration description wins over the drive-train BOM's written
     # cell, so it is the text that BOM prints (cascade-2, 2026-09-27).
     grouped_spec = _config.parts(PART_NAME)
@@ -231,7 +231,7 @@ async def build(adapter) -> dict[str, str]:
         part_number=str(grouped_spec["number"]),
         description=str(grouped_spec["description"]),
     )
-    await report_mass_properties(adapter)
+    report_mass_properties(adapter)
     require_material_in_every_configuration(
         adapter, PART_NAME, MATERIAL, (default_config, INSTALLED_CONFIG)
     )
@@ -242,7 +242,7 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
-    artefacts = await save_part_and_images(adapter, PART_NAME)
+    artefacts = save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
     # The drive train places the Installed configuration while the part saves
     # on its default, so Installed's saved cache is what it rebuilds.  Reopen
@@ -250,7 +250,7 @@ async def build(adapter) -> dict[str, str]:
     part_title = str(_early_bound(adapter.currentModel, "IModelDoc2").GetTitle())
     adapter.swApp.CloseDoc(part_title)
     adapter.currentModel = None
-    check("reopen saved pinion-lever-pin", await adapter.open_model(artefacts["part"]))
+    check("reopen saved pinion-lever-pin", adapter.open_model(artefacts["part"]))
     assert_saved_configurations_regenerate(adapter, PART_NAME)
     return artefacts
 

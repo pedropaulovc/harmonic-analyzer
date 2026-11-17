@@ -1319,9 +1319,8 @@ def test_each_chucking_measures_from_its_own_collar_face() -> None:
 def test_the_64t_straight_tooth_space_keeps_its_material_and_flank_gates(monkeypatch) -> None:
     """Record the helper's real recipe, without native CAD (owner ruling
     2026-11-10 on #2332: straight teeth inclined to the axis)."""
-    import asyncio
     from types import SimpleNamespace
-    from unittest.mock import AsyncMock
+    from unittest.mock import MagicMock
 
     import _straight_gash_gear as _gear
     import dt_crank_drive_gear_spec as gear
@@ -1335,18 +1334,18 @@ def test_the_64t_straight_tooth_space_keeps_its_material_and_flank_gates(monkeyp
     curves = []
     expressions = []
 
-    async def record_volume(_adapter, label, expected, tolerance):
+    def record_volume(_adapter, label, expected, tolerance):
         volumes[label] = (expected, tolerance)
         events.append(label)
         return expected
 
-    async def record_plane(_adapter, name, **kwargs):
+    def record_plane(_adapter, name, **kwargs):
         planes.append((name, kwargs))
 
-    async def record_crossing(_adapter, name, z_mm):
+    def record_crossing(_adapter, name, z_mm):
         planes.append((name, {"z_mm": z_mm}))
 
-    async def record_curve(_adapter, name, x, y):
+    def record_curve(_adapter, name, x, y):
         curves.append(name)
         expressions.append((x, y))
         return name
@@ -1355,7 +1354,7 @@ def test_the_64t_straight_tooth_space_keeps_its_material_and_flank_gates(monkeyp
         assert (section, actual, tolerance_mm) == (form, gash, gear.NATIVE_FLANK_BOUND_MM)
         events.append("flank gate")
 
-    async def record_pattern(_adapter, seed, teeth, radius, station):
+    def record_pattern(_adapter, seed, teeth, radius, station):
         assert (seed, teeth, radius, station) == (
             "ToothSpaceCut", gear.TEETH, gash.blank_radius_mm, face / 2.0
         )
@@ -1364,7 +1363,7 @@ def test_the_64t_straight_tooth_space_keeps_its_material_and_flank_gates(monkeyp
 
     monkeypatch.setattr(_gear, "check", lambda _label, value: value)
     for name in ("define_circle", "ensure_fully_defined"):
-        monkeypatch.setattr(_gear, name, AsyncMock())
+        monkeypatch.setattr(_gear, name, MagicMock())
     monkeypatch.setattr(_gear, "name_last_feature", lambda *_args: None)
     monkeypatch.setattr(_gear, "blank_reference_geometry", lambda *_args: None)
     monkeypatch.setattr(_gear, "volume_check", record_volume)
@@ -1383,21 +1382,19 @@ def test_the_64t_straight_tooth_space_keeps_its_material_and_flank_gates(monkeyp
     monkeypatch.setattr(_gear, "equation_curve", record_curve)
     monkeypatch.setattr(_gear, "assert_straight_gash_flanks", record_flanks)
     monkeypatch.setattr(_gear, "pattern_about_z", record_pattern)
-    adapter = AsyncMock()
-    adapter.create_axis = AsyncMock(
+    adapter = MagicMock()
+    adapter.create_axis = MagicMock(
         side_effect=[SimpleNamespace(name="GearAxis"), SimpleNamespace(name="PivotAxis")]
     )
-    adapter.create_cut_extrude = AsyncMock(return_value=SimpleNamespace(name="ToothSpaceCut"))
-    disc = asyncio.run(
-        _gear.build_straight_gash_gear(
+    adapter.create_cut_extrude = MagicMock(return_value=SimpleNamespace(name="ToothSpaceCut"))
+    disc = _gear.build_straight_gash_gear(
             adapter, form, gash, gear.TEETH, flank_bound_mm=gear.NATIVE_FLANK_BOUND_MM
         )
-    )
 
-    assert adapter.create_sketch.await_args_list[0].args == ("Front",)
-    assert adapter.create_sketch.await_args_list[1].args == ("ToothSpaceCutterPlane",)
-    assert adapter.create_extrusion.await_args.args[0].depth == face
-    cut = adapter.create_cut_extrude.await_args.args[0]
+    assert adapter.create_sketch.call_args_list[0].args == ("Front",)
+    assert adapter.create_sketch.call_args_list[1].args == ("ToothSpaceCutterPlane",)
+    assert adapter.create_extrusion.call_args.args[0].depth == face
+    cut = adapter.create_cut_extrude.call_args.args[0]
     assert cut.both_directions and cut.depth == pytest.approx(2.0 * (face + 2.0))
     assert planes == [
         ("ToothSpaceRadialPlane", {
@@ -1433,9 +1430,7 @@ def test_the_64t_straight_tooth_space_keeps_its_material_and_flank_gates(monkeyp
     assert disc.tooth_features == ("ToothSpaceCut", "ToothSpacePattern")
     # The screw-section model is the printed data's, never the cut's.
     with pytest.raises(ValueError, match="own"):
-        asyncio.run(
-            _gear.build_straight_gash_gear(
+        _gear.build_straight_gash_gear(
                 adapter, gear.STOCK_PROFILE, gash, gear.TEETH,
                 flank_bound_mm=gear.NATIVE_FLANK_BOUND_MM,
             )
-        )

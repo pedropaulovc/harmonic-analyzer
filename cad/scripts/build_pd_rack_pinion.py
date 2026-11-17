@@ -148,24 +148,24 @@ def _rename_gear_blank(adapter) -> None:
         raise RuntimeError("rack-pinion gear blank feature names did not persist")
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import CreateAxisParameters, ExtrusionParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this
     # is an INCH document and the equation manager reads BARE numbers in
     # document units. The complete axial disc's finite tooth geometry is
     # authored by StockFormProfile through the shared native stock helper.
-    await set_global(adapter, "FaceWidth", f"{FACE_WIDTH}mm")
-    await set_global(adapter, "BoreDia", f"{BORE_DIAMETER}mm")
-    await set_global(adapter, "BoreFrontChamferSize", f"{BORE_FRONT_CHAMFER}mm")
-    await set_global(adapter, "BoltCircleDia", f"{BOLT_CIRCLE_DIA}mm")
+    set_global(adapter, "FaceWidth", f"{FACE_WIDTH}mm")
+    set_global(adapter, "BoreDia", f"{BORE_DIAMETER}mm")
+    set_global(adapter, "BoreFrontChamferSize", f"{BORE_FRONT_CHAMFER}mm")
+    set_global(adapter, "BoltCircleDia", f"{BOLT_CIRCLE_DIA}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
-    disc = await build_stock_form_gear(adapter, STOCK_PROFILE, FACE_WIDTH)
+    disc = build_stock_form_gear(adapter, STOCK_PROFILE, FACE_WIDTH)
     _rename_gear_blank(adapter)
     drive_jobs += [
         (name_dimensions(adapter, "GearBlank", ["FaceWidth"])[0], '"FaceWidth"')
@@ -176,8 +176,8 @@ async def build(adapter) -> dict[str, str]:
     # Shaft bore (on-axis circle at the origin: only the diameter is a dim, so
     # define_circle records just that -- the centre X/Z slots are ignored).
     bore = SketchDims()
-    check("create_sketch bore", await adapter.create_sketch("Front"))
-    await define_circle(
+    check("create_sketch bore", adapter.create_sketch("Front"))
+    define_circle(
         adapter,
         0.0,
         0.0,
@@ -187,30 +187,30 @@ async def build(adapter) -> dict[str, str]:
         names=("BoreCx", "BoreCz", "BoreDia"),
         drives=(None, None, '"BoreDia"'),
     )
-    await ensure_fully_defined(adapter, "bore sketch")
-    check("exit_sketch bore", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "bore sketch")
+    check("exit_sketch bore", adapter.exit_sketch())
     name_last_feature(adapter, "BoreProfile")
     drive_jobs += bore.apply(adapter, "BoreProfile")
     check(
         "cut bore",
-        await adapter.create_cut_extrude(ExtrusionParameters(depth=FACE_WIDTH + 2.0)),
+        adapter.create_cut_extrude(ExtrusionParameters(depth=FACE_WIDTH + 2.0)),
     )
     name_last_feature(adapter, "Bore")
     expected -= V_BORE
-    await volume_check(adapter, "bore", expected, 0.01 * V_BORE)
+    volume_check(adapter, "bore", expected, 0.01 * V_BORE)
 
     # The front (z = 0) bore edge, picked on the x = 0 plane: the drawing's
     # section A-A cuts there, and a chamfer's size imports into the section
     # whose plane holds its picked edge point (draw_dt_crank_drive_gear).
     check(
         "chamfer bore front edge",
-        await adapter.add_chamfer(BORE_FRONT_CHAMFER, [[0.0, BORE_DIAMETER / 2.0, 0.0]]),
+        adapter.add_chamfer(BORE_FRONT_CHAMFER, [[0.0, BORE_DIAMETER / 2.0, 0.0]]),
     )
     name_last_feature(adapter, "BoreFrontChamfer")
     chamfer_dim = name_dimensions(adapter, "BoreFrontChamfer", ["BoreFrontChamferSize"])[0]
     drive_jobs.append((chamfer_dim, '"BoreFrontChamferSize"'))
     expected -= V_BORE_FRONT_CHAMFER
-    await volume_check(
+    volume_check(
         adapter, "bore front chamfer", expected, 0.03 * V_BORE_FRONT_CHAMFER + 0.15
     )
 
@@ -229,16 +229,16 @@ async def build(adapter) -> dict[str, str]:
     )
     drive_jobs += taps.placement_drive_jobs
     expected -= V_TAPS
-    await volume_check(adapter, "disc with taps", expected, 0.03 * V_TAPS + 0.05)
+    volume_check(adapter, "disc with taps", expected, 0.03 * V_TAPS + 0.05)
 
     # Apply the deferred drive equations after the whole model + a rebuild exist,
     # then re-check: each equation evaluates to the as-built value, so the
     # geometry must not move.
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    volume_check(
         adapter, "driven rack pinion (equations neutral)", expected, 0.01 * V_BORE
     )
 
@@ -247,17 +247,17 @@ async def build(adapter) -> dict[str, str]:
     # mates it on the stud. A reference feature -- no volume, geometry unchanged.
     gear_axis = check(
         "create_axis Z (Top x Right)",
-        await adapter.create_axis(
+        adapter.create_axis(
             CreateAxisParameters(mode="two_planes", planes=["Top Plane", "Right Plane"])
         ),
     ).name
     # Hidden but still selectable by name for the assembly's mates.
     blank_reference_geometry(adapter, ((gear_axis, "AXIS"),))
-    await author_span(adapter, STOCK_PROFILE, SPAN_TEETH, places=SPAN_PLACES, unit=UNIT)
-    await volume_check(adapter, "inspection sketches neutral", expected, 0.01 * V_BORE)
+    author_span(adapter, STOCK_PROFILE, SPAN_TEETH, places=SPAN_PLACES, unit=UNIT)
+    volume_check(adapter, "inspection sketches neutral", expected, 0.01 * V_BORE)
 
-    await apply_material(adapter, MATERIAL)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    report_mass_properties(adapter)
     _telemetry.info(
         f"disc screw engagement {ENGAGEMENT_WORST_D:.2f} D worst;"
         f" tap to bore wall {TAP_TO_BORE_WALL_WORST:.2f} worst"
@@ -293,7 +293,7 @@ async def build(adapter) -> dict[str, str]:
         PART_NAME,
         {TOOTH_SPACE_CALLOUT_PROPERTY: TOOTH_SPACE_CALLOUT},
     )
-    return await save_simplified_part(adapter, PART_NAME, disc.tooth_features)
+    return save_simplified_part(adapter, PART_NAME, disc.tooth_features)
 
 
 if __name__ == "__main__":

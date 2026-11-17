@@ -190,7 +190,7 @@ def _manufacturing_controls(adapter) -> None:
 
 
 @_telemetry.traced("stock.shank.lead_in")
-async def _size_lead_in(adapter) -> None:
+def _size_lead_in(adapter) -> None:
     """Drive the restored factory deburr's leg to the tap-clearing lead-in.
 
     The shared trim recipe restores the vendor's 0.80 leg; the counter anchor's
@@ -204,7 +204,7 @@ async def _size_lead_in(adapter) -> None:
         raise RuntimeError(
             f"ChamferWidth@StockDeburrProfile: lead-in rejected ({status})"
         )
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     faults = _hard_faults(adapter, adapter.currentModel)
     if faults:
         raise RuntimeError(f"lead-in deburr rebuilt with faults {faults}")
@@ -244,33 +244,33 @@ def _stock_overall_reference(adapter, first, last, dims):
     dims.record("SupplierStockOverall")
 
 
-async def _supplier_nominal_stock_profile(adapter) -> None:
+def _supplier_nominal_stock_profile(adapter) -> None:
     """One associative source eye, shank envelope and wire section."""
     dims = SketchDims()
-    check("create nominal supplier stock diagram", await adapter.create_sketch("Front"))
+    check("create nominal supplier stock diagram", adapter.create_sketch("Front"))
     circles = {}
     for name, center, diameter in (
         ("SupplierNominalEyeOD", (0.0, 0.0), SUPPLIER_NOMINAL_EYE_OD_MM),
         ("SupplierNominalEyeID", (0.0, 0.0), SUPPLIER_EYE_ID_MM),
         ("SupplierNominalWire", SUPPLIER_STOCK_WIRE_CENTER_MM, SUPPLIER_NOMINAL_WIRE_MM),
     ):
-        circle = await define_circle(
+        circle = define_circle(
             adapter, *center, diameter / 2.0, name,
             dims=dims, names=(None, None, name),
         )
         _stock_construction(adapter, circle)
         circles[name] = circle
-    outline = await add_line_chain(adapter, list(SUPPLIER_STOCK_SHANK_OUTLINE_MM))
+    outline = add_line_chain(adapter, list(SUPPLIER_STOCK_SHANK_OUTLINE_MM))
     for entity in outline:
         _stock_construction(adapter, entity)
     for index, entity in enumerate(outline):
         check(
             "rectilinear source shank",
-            await adapter.add_sketch_constraint(
+            adapter.add_sketch_constraint(
                 entity, None, "horizontal" if index % 2 == 0 else "vertical"
             ),
         )
-    await dimension_between(
+    dimension_between(
         adapter, f"{outline[0]}.start", f"{outline[0]}.end",
         "horizontal_distance", SUPPLIER_NOMINAL_WIRE_MM, "source shank width",
     )
@@ -281,18 +281,18 @@ async def _supplier_nominal_stock_profile(adapter) -> None:
     # Actual circle/edge relations make this a source envelope rather than
     # independent equal-valued witness lines. The lower axis is already
     # vertical through its two rectangle-edge midpoint relations.
-    axis = await add_line_chain(adapter, list(SUPPLIER_STOCK_AXIS_MM), close=False)
+    axis = add_line_chain(adapter, list(SUPPLIER_STOCK_AXIS_MM), close=False)
     for entity in axis:
         _stock_construction(adapter, entity)
-    check("vertical stock eye axis", await adapter.add_sketch_constraint(axis[0], None, "vertical"))
+    check("vertical stock eye axis", adapter.add_sketch_constraint(axis[0], None, "vertical"))
     for ref in (f"{axis[0]}.start", f"{axis[0]}.end"):
         check(
             "source axis endpoint on nominal eye",
-            await adapter.add_sketch_constraint(ref, circles["SupplierNominalEyeOD"], "coincident"),
+            adapter.add_sketch_constraint(ref, circles["SupplierNominalEyeOD"], "coincident"),
         )
     check(
         "source eye axis through origin",
-        await adapter.add_sketch_constraint(f"{axis[0]}.start", "origin", "vertical_points"),
+        adapter.add_sketch_constraint(f"{axis[0]}.start", "origin", "vertical_points"),
     )
     for ref, edge in (
         (f"{axis[0]}.end", outline[0]),
@@ -300,36 +300,36 @@ async def _supplier_nominal_stock_profile(adapter) -> None:
     ):
         check(
             "source axis endpoint on shank midpoint",
-            await adapter.add_sketch_constraint(ref, edge, "midpoint"),
+            adapter.add_sketch_constraint(ref, edge, "midpoint"),
         )
-    await dimension_between(
+    dimension_between(
         adapter, f"{axis[1]}.start", f"{axis[1]}.end", "vertical_distance",
         SUPPLIER_STOCK_SHANK_MM, "as-supplied shank",
     )
     dims.record("SupplierStockShank")
     _stock_overall_reference(adapter, f"{axis[0]}.start", f"{axis[-1]}.end", dims)
-    await ensure_fully_defined(adapter, SUPPLIER_STOCK_FEATURE)
-    check("close nominal supplier stock diagram", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, SUPPLIER_STOCK_FEATURE)
+    check("close nominal supplier stock diagram", adapter.exit_sketch())
     name_last_feature(adapter, SUPPLIER_STOCK_FEATURE)
     drive_jobs = dims.apply(adapter, SUPPLIER_STOCK_FEATURE)
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dimension, expression in drive_jobs:
-        await drive_dimension(adapter, dimension, expression)
-    await force_rebuild(adapter)
+        drive_dimension(adapter, dimension, expression)
+    force_rebuild(adapter)
     mark_dimensions_for_drawing(
         adapter, SUPPLIER_STOCK_FEATURE, SUPPLIER_STOCK_DIMENSIONS[SUPPLIER_STOCK_FEATURE]
     )
     blank_reference_sketches(adapter, REFERENCE_SKETCHES)
 
 
-async def _supplier_nominal_stock(adapter) -> None:
+def _supplier_nominal_stock(adapter) -> None:
     """Isolate nominal source geometry without changing the installed solid."""
-    await add_supplier_reference_sketch(
+    add_supplier_reference_sketch(
         adapter,
         (("SupplierThreadMajor", SUPPLIER_THREAD_MAJOR_MM, "horizontal"),),
         starts={"SupplierThreadMajor": SUPPLIER_THREAD_START_MM},
     )
-    await _supplier_nominal_stock_profile(adapter)
+    _supplier_nominal_stock_profile(adapter)
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     part = _early_bound(model, "IPartDoc")
     manager = _early_bound(model.ConfigurationManager, "IConfigurationManager")
@@ -363,7 +363,7 @@ async def _supplier_nominal_stock(adapter) -> None:
             feature = _feature_by_name(adapter, feature_name)
             if feature.SetSuppression2(0, 1, null_variant()) is not True:
                 raise RuntimeError(f"cannot suppress {feature_name} in stock diagram")
-        await force_rebuild(adapter)
+        force_rebuild(adapter)
         for feature_name in FINISHED_FEATURES:
             state = _feature_by_name(adapter, feature_name).IsSuppressed2(1, null_variant())
             if tuple(state or ()) != (True,):
@@ -391,7 +391,7 @@ async def _supplier_nominal_stock(adapter) -> None:
                 if tuple(feature.IsSuppressed2(1, null_variant()) or ()) != expected:
                     if feature.SetSuppression2(1, 1, null_variant()) is not True:
                         raise RuntimeError(f"cannot restore finished {name}")
-            await force_rebuild(adapter)
+            force_rebuild(adapter)
             for name, expected in original_states.items():
                 state = _feature_by_name(adapter, name).IsSuppressed2(1, null_variant())
                 if tuple(state or ()) != expected:
@@ -407,19 +407,19 @@ async def _supplier_nominal_stock(adapter) -> None:
     )
 
 
-async def _save_anchor(adapter, part_name, suppressed_features):
+def _save_anchor(adapter, part_name, suppressed_features):
     """Simplify only the finished parent, never the zero-body source diagram."""
     # The stock saver runs after normalized geometry and material assignment.
-    await _supplier_nominal_stock(adapter)
+    _supplier_nominal_stock(adapter)
     finished = active_configuration_name(adapter, adapter.currentModel)
     if not finished or finished == SUPPLIER_STOCK_CONFIGURATION:
         raise RuntimeError("cannot save counter anchor without its finished configuration")
     parents = (finished,)
-    artefacts = await save_part_and_images(adapter, part_name)
-    await derive_simplified_on_saved_part(
+    artefacts = save_part_and_images(adapter, part_name)
+    derive_simplified_on_saved_part(
         adapter, part_name, suppressed_features, artefacts["part"], parents=parents
     )
-    check(f"reopen saved {part_name}", await adapter.open_model(artefacts["part"]))
+    check(f"reopen saved {part_name}", adapter.open_model(artefacts["part"]))
     assert_saved_configurations_regenerate(adapter, part_name)
     assert_simplified_configurations(
         adapter, part_name, suppressed_features, parents=parents
@@ -430,15 +430,15 @@ async def _save_anchor(adapter, part_name, suppressed_features):
 
 
 @wraps(build_9490T1)
-async def _modified_anchor(adapter, truth=None, **parameters):
-    receipt = await build_9490T1(adapter, truth, **parameters)
-    await _size_lead_in(adapter)
+def _modified_anchor(adapter, truth=None, **parameters):
+    receipt = build_9490T1(adapter, truth, **parameters)
+    _size_lead_in(adapter)
     _manufacturing_controls(adapter)
     return receipt
 
 
-async def build(adapter) -> dict[str, str]:
-    return await build_stock_fastener(
+def build(adapter) -> dict[str, str]:
+    return build_stock_fastener(
         adapter,
         part_name=PART_NAME,
         components=(

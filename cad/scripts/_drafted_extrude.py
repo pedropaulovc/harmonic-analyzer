@@ -122,12 +122,12 @@ def _create(adapter: Any, sketch_name: str, cut: bool, arguments: tuple) -> Any:
     return feature, ""
 
 
-async def _solid_volume(adapter: Any, label: str) -> float:
+def _solid_volume(adapter: Any, label: str) -> float:
     """The part's volume (mm^3); zero before the first solid exists."""
     part = _early_bound(adapter.currentModel, "IPartDoc")
     if not tuple(part.GetBodies2(0, False) or ()):  # swBodyType_e.swSolidBody
         return 0.0
-    mass = await adapter.get_mass_properties()
+    mass = adapter.get_mass_properties()
     if not mass.is_success:
         raise RuntimeError(f"{label}: get_mass_properties failed: {mass.error}")
     return float(mass.data.volume)
@@ -161,7 +161,7 @@ def assert_drafted(
 
 
 @_telemetry.traced("feature.drafted_extrude", label_param="label")
-async def drafted_extrude(
+def drafted_extrude(
     adapter: Any,
     sketch_name: str,
     feature_name: str,
@@ -191,7 +191,7 @@ async def drafted_extrude(
         if feature is None:
             tried.append(f"[{form}] refused ({error})")
             continue
-        after = await _solid_volume(adapter, label)
+        after = _solid_volume(adapter, label)
         if abs(after - volume - change) <= tol:
             name_last_feature(adapter, feature_name)
             outward = assert_drafted(adapter, feature_name, depth, angle_deg)
@@ -203,7 +203,7 @@ async def drafted_extrude(
             return after
         tried.append(f"[{form}] changed the solid by {after - volume:+.1f} mm^3")
         adapter.currentModel.EditUndo2(1)
-        restored = await _solid_volume(adapter, label)
+        restored = _solid_volume(adapter, label)
         if abs(restored - volume) > _UNDO_VOLUME_TOL:
             raise RuntimeError(
                 f"{label}: undoing [{form}] left {restored - volume:+.4f} mm^3;"

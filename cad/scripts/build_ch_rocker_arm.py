@@ -189,7 +189,7 @@ def _as_construction(adapter, entity_id: str) -> None:
         raise RuntimeError(f"{entity_id} did not take the construction flag")
 
 
-async def _tip_land_angle_reference(adapter, rod_tip_line: str, dims: SketchDims) -> None:
+def _tip_land_angle_reference(adapter, rod_tip_line: str, dims: SketchDims) -> None:
     """Measure the real +X radial land from vertical in StrapProfile.
 
     The land is already constrained through the common arc centre. Only a
@@ -201,7 +201,7 @@ async def _tip_land_angle_reference(adapter, rod_tip_line: str, dims: SketchDims
     set_sketch_direct_db(adapter, True)
     vertical = check(
         "tip land vertical reference",
-        await adapter.add_line(
+        adapter.add_line(
             TOP_END_X, TOP_END_Y, TOP_END_X, TOP_END_Y - TIP_FACE
         ),
     )
@@ -209,15 +209,15 @@ async def _tip_land_angle_reference(adapter, rod_tip_line: str, dims: SketchDims
     _as_construction(adapter, vertical)
     check(
         "tip land vertical reference root",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{vertical}.start", f"{rod_tip_line}.start", "coincident"
         ),
     )
     check(
         "tip land vertical reference direction",
-        await adapter.add_sketch_constraint(vertical, None, "vertical"),
+        adapter.add_sketch_constraint(vertical, None, "vertical"),
     )
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{vertical}.start",
         f"{vertical}.end",
@@ -228,7 +228,7 @@ async def _tip_land_angle_reference(adapter, rod_tip_line: str, dims: SketchDims
     dims.record("TipLandVerticalLength", '"TipFaceLen"')
     # Place text in the acute downward wedge; AddSpecificDimension measures
     # the selected real land and reference ray, never a numeric text override.
-    await add_angular_reference_dimension(
+    add_angular_reference_dimension(
         adapter,
         vertical,
         rod_tip_line,
@@ -307,10 +307,10 @@ def _strap_area() -> float:
     return abs(area) / 2.0
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs: named globals in the equation manager that drive every
@@ -329,31 +329,31 @@ async def build(adapter) -> dict[str, str]:
     # (radians-vs-degrees + length/length dimensionality), so the arc length is a
     # Python constant (TOP_ARC_LEN / BOT_ARC_LEN, = 11.5" / 10.5") folded into the
     # tip x here. To re-cut to a different arc length, edit those constants.
-    await set_global(adapter, "CurveRadius", f"{CURVE_RADIUS}mm")
-    await set_global(adapter, "ArmDepth", f"{ARM_DEPTH}mm")
-    await set_global(adapter, "ArmThickness", f"{ARM_THICKNESS}mm")
-    await set_global(adapter, "TipFaceLen", f"{TIP_FACE}mm")
-    await set_global(adapter, "PivotHoleDia", f"{PIVOT_HOLE_DIA}mm")
-    await set_global(adapter, "HubDia", f"{HUB_DIA}mm")
-    await set_global(adapter, "HubLength", f"{HUB_LENGTH}mm")
-    await set_global(adapter, "HubRootR", f"{HUB_ROOT_RADIUS_MAX}mm")
-    await set_global(adapter, "RodHoleX", f"{ROD_HOLE_X}mm")
+    set_global(adapter, "CurveRadius", f"{CURVE_RADIUS}mm")
+    set_global(adapter, "ArmDepth", f"{ARM_DEPTH}mm")
+    set_global(adapter, "ArmThickness", f"{ARM_THICKNESS}mm")
+    set_global(adapter, "TipFaceLen", f"{TIP_FACE}mm")
+    set_global(adapter, "PivotHoleDia", f"{PIVOT_HOLE_DIA}mm")
+    set_global(adapter, "HubDia", f"{HUB_DIA}mm")
+    set_global(adapter, "HubLength", f"{HUB_LENGTH}mm")
+    set_global(adapter, "HubRootR", f"{HUB_ROOT_RADIUS_MAX}mm")
+    set_global(adapter, "RodHoleX", f"{ROD_HOLE_X}mm")
     # (The old RodHoleDia/RodHoleX knobs are gone: the rod pin hole is now a native
     # Hole Wizard #47 feature whose diameter comes from the drill standard; its
     # location rides the ROD_HOLE_X/ROD_HOLE_Y module constants that the channel
     # assembly imports.)
-    await set_global(adapter, "ThroughCutDepth", f"{THROUGH_CUT_DEPTH}mm")
+    set_global(adapter, "ThroughCutDepth", f"{THROUGH_CUT_DEPTH}mm")
     # The top edge's height over the pivot axis is the print's controlled
     # value (ch_rocker_arm_spec.TOP_EDGE_BAND), so the arcs' shared centre is
     # derived from it: the pivot (ArmDepth / 2), up to the top edge, up RTop.
-    await set_global(adapter, "TopAbovePivot", f"{TOP_EDGE_ABOVE_PIVOT}mm")
-    await set_global(adapter, "RTop", '"CurveRadius"')
-    await set_global(adapter, "RBottom", '"CurveRadius" + "ArmDepth"')
-    await set_global(
+    set_global(adapter, "TopAbovePivot", f"{TOP_EDGE_ABOVE_PIVOT}mm")
+    set_global(adapter, "RTop", '"CurveRadius"')
+    set_global(adapter, "RBottom", '"CurveRadius" + "ArmDepth"')
+    set_global(
         adapter, "CenterY", '"ArmDepth" / 2 + "TopAbovePivot" + "CurveRadius"'
     )
-    await set_global(adapter, "TopEndX", f"{TOP_END_X}mm")
-    await set_global(adapter, "BottomEndX", f"{BOT_END_X}mm")
+    set_global(adapter, "TopEndX", f"{TOP_END_X}mm")
+    set_global(adapter, "BottomEndX", f"{BOT_END_X}mm")
 
     # Each sketch DECLARES its dim names + drive equations as it records them; the
     # drive equations are collected here and applied in one deferred batch at the
@@ -368,23 +368,23 @@ async def build(adapter) -> dict[str, str]:
     tail_tip = (-ROD_TIP_X, ROD_TIP_Y)
 
     strap = SketchDims()
-    check("create_sketch strap", await adapter.create_sketch("Front"))
+    check("create_sketch strap", adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     entities = [
         check(
             "strap bottom arc",
-            await adapter.add_arc(0.0, CENTER_Y, *tail_b, *rod_b),
+            adapter.add_arc(0.0, CENTER_Y, *tail_b, *rod_b),
         ),
         check(
             "strap top arc",
-            await adapter.add_arc(0.0, CENTER_Y, *tail_t, *rod_t),
+            adapter.add_arc(0.0, CENTER_Y, *tail_t, *rod_t),
         ),
         # Rod tip: a short radial face (rod_t -> rod_tip) square to the top edge,
         # then the tapered end face down to the bottom arc (rod_tip -> rod_b).
-        check("strap rod tip", await adapter.add_line(*rod_t, *rod_tip)),
-        check("strap rod end", await adapter.add_line(*rod_tip, *rod_b)),
-        check("strap tail tip", await adapter.add_line(*tail_t, *tail_tip)),
-        check("strap tail end", await adapter.add_line(*tail_tip, *tail_b)),
+        check("strap rod tip", adapter.add_line(*rod_t, *rod_tip)),
+        check("strap rod end", adapter.add_line(*rod_tip, *rod_b)),
+        check("strap tail tip", adapter.add_line(*tail_t, *tail_tip)),
+        check("strap tail end", adapter.add_line(*tail_tip, *tail_b)),
     ]
     set_sketch_direct_db(adapter, False)
     bottom_arc, top_arc, rod_tip_line, _rod_end, tail_tip_line, _tail_end = entities
@@ -401,25 +401,25 @@ async def build(adapter) -> dict[str, str]:
     # top-rod x, rod-tip length, tail-tip length -- NINE outline display dims.
     # The vertical construction ray and its driven angle follow those dims.
     # The ``coincident`` concentric + the two radial relations are not dims.
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{bottom_arc}.center", 0.0, CENTER_Y, "arc centre"
     )
     # CenterY is at +y, so the unsigned vertical_distance drives positive.
     strap.record("CenterY", '"CenterY"')
     check(
         "concentric arcs",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{top_arc}.center", f"{bottom_arc}.center", "coincident"
         ),
     )
     check(
         "bottom radius",
-        await adapter.add_sketch_dimension(bottom_arc, None, "radial", R_BOTTOM),
+        adapter.add_sketch_dimension(bottom_arc, None, "radial", R_BOTTOM),
     )
     strap.record("BottomRadius", '"RBottom"')
     check(
         "top radius",
-        await adapter.add_sketch_dimension(top_arc, None, "radial", R_TOP),
+        adapter.add_sketch_dimension(top_arc, None, "radial", R_TOP),
     )
     strap.record("TopRadius", '"RTop"')
     # Endpoint x dims: horizontal_distance shows the MAGNITUDE, so each drives
@@ -427,28 +427,28 @@ async def build(adapter) -> dict[str, str]:
     # symmetric seesaw).
     check(
         "bottom tail x",
-        await adapter.add_sketch_dimension(
+        adapter.add_sketch_dimension(
             f"{bottom_arc}.start", "origin", "horizontal_distance", BOT_END_X
         ),
     )
     strap.record("BottomTailX", '"BottomEndX"')
     check(
         "bottom rod x",
-        await adapter.add_sketch_dimension(
+        adapter.add_sketch_dimension(
             f"{bottom_arc}.end", "origin", "horizontal_distance", BOT_END_X
         ),
     )
     strap.record("BottomRodX", '"BottomEndX"')
     check(
         "top tail x",
-        await adapter.add_sketch_dimension(
+        adapter.add_sketch_dimension(
             f"{top_arc}.start", "origin", "horizontal_distance", TOP_END_X
         ),
     )
     strap.record("TopTailX", '"TopEndX"')
     check(
         "top rod x",
-        await adapter.add_sketch_dimension(
+        adapter.add_sketch_dimension(
             f"{top_arc}.end", "origin", "horizontal_distance", TOP_END_X
         ),
     )
@@ -457,34 +457,34 @@ async def build(adapter) -> dict[str, str]:
     # line (=> the line is radial => perpendicular to the arc), then a length dim.
     check(
         "rod tip radial",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{top_arc}.center", rod_tip_line, "coincident"
         ),
     )
     check(
         "rod tip length",
-        await adapter.add_sketch_dimension(rod_tip_line, None, "linear", TIP_FACE),
+        adapter.add_sketch_dimension(rod_tip_line, None, "linear", TIP_FACE),
     )
     strap.record("RodTipLen", '"TipFaceLen"')
     check(
         "tail tip radial",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{top_arc}.center", tail_tip_line, "coincident"
         ),
     )
     check(
         "tail tip length",
-        await adapter.add_sketch_dimension(tail_tip_line, None, "linear", TIP_FACE),
+        adapter.add_sketch_dimension(tail_tip_line, None, "linear", TIP_FACE),
     )
     strap.record("TailTipLen", '"TipFaceLen"')
-    await _tip_land_angle_reference(adapter, rod_tip_line, strap)
-    await ensure_fully_defined(adapter, "strap sketch")
-    check("exit_sketch strap", await adapter.exit_sketch())
+    _tip_land_angle_reference(adapter, rod_tip_line, strap)
+    ensure_fully_defined(adapter, "strap sketch")
+    check("exit_sketch strap", adapter.exit_sketch())
     name_last_feature(adapter, "StrapProfile")
     drive_jobs += strap.apply(adapter, "StrapProfile")
     check(
         "extrude strap",
-        await adapter.create_extrusion(
+        adapter.create_extrusion(
             ExtrusionParameters(depth=ARM_THICKNESS, both_directions=True)
         ),
     )
@@ -495,7 +495,7 @@ async def build(adapter) -> dict[str, str]:
     strap_thickness_dim = name_dimensions(adapter, "Strap", ["StrapThickness"])
     drive_jobs.append((strap_thickness_dim[0], '"ArmThickness"'))
     v_strap = _strap_area() * ARM_THICKNESS
-    await volume_check(adapter, "strap", v_strap, 0.01 * v_strap)
+    volume_check(adapter, "strap", v_strap, 0.01 * v_strap)
 
     # Integral pivot hub (2026-09-02, ch14 p.28): a Ø.400 boss coaxial with the
     # pivot bore, HUB_LENGTH long mid-plane (= the station pitch), so it stands
@@ -504,20 +504,20 @@ async def build(adapter) -> dict[str, str]:
     # boss only ADDS the two proud discs. Cut BEFORE the pivot hole so the bore
     # runs through hub + strap.
     hub = SketchDims()
-    check("create_sketch hub", await adapter.create_sketch("Front"))
-    await define_circle(
+    check("create_sketch hub", adapter.create_sketch("Front"))
+    define_circle(
         adapter, 0.0, PIVOT_MID_Y, HUB_DIA / 2.0, "hub",
         dims=hub,
         names=("HubX", "HubZ", "HubDia"),
         drives=(None, '"ArmDepth" / 2', '"HubDia"'),
     )
-    await ensure_fully_defined(adapter, "hub sketch")
-    check("exit_sketch hub", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "hub sketch")
+    check("exit_sketch hub", adapter.exit_sketch())
     name_last_feature(adapter, "HubProfile")
     drive_jobs += hub.apply(adapter, "HubProfile")
     check(
         "extrude hub",
-        await adapter.create_extrusion(
+        adapter.create_extrusion(
             ExtrusionParameters(depth=HUB_LENGTH, both_directions=True)
         ),
     )
@@ -525,7 +525,7 @@ async def build(adapter) -> dict[str, str]:
     hub_length_dim = name_dimensions(adapter, "Hub", ["HubLength"])
     drive_jobs.append((hub_length_dim[0], '"HubLength"'))
     v_hub = math.pi * (HUB_DIA / 2.0) ** 2 * (HUB_LENGTH - ARM_THICKNESS)
-    v_hub_measured = await volume_check(
+    v_hub_measured = volume_check(
         adapter, "strap + hub", v_strap + v_hub, 0.01 * v_strap
     )
 
@@ -535,7 +535,7 @@ async def build(adapter) -> dict[str, str]:
     # radius the print gives as a single MAX limit.
     check(
         "fillet hub roots",
-        await adapter.add_fillet(
+        adapter.add_fillet(
             HUB_ROOT_RADIUS_MAX,
             [
                 [HUB_DIA / 2.0, PIVOT_MID_Y, ARM_THICKNESS / 2.0],
@@ -548,7 +548,7 @@ async def build(adapter) -> dict[str, str]:
     hub_root_dim = name_dimensions(adapter, "HubRoot", ["HubRootRadius"])
     drive_jobs.append((hub_root_dim[0], '"HubRootR"'))
     v_hub += V_HUB_ROOT
-    await volume_check(
+    volume_check(
         adapter, "hub root fillets", v_hub_measured + V_HUB_ROOT, 0.1 * V_HUB_ROOT
     )
 
@@ -557,20 +557,20 @@ async def build(adapter) -> dict[str, str]:
     # dims, so the "X" name/drive slot is ignored. The centre sits at
     # PIVOT_MID_Y = ArmDepth/2 (positive), so its unsigned dim drives positive.
     pivot = SketchDims()
-    check("create_sketch pivot hole", await adapter.create_sketch("Front"))
-    await define_circle(
+    check("create_sketch pivot hole", adapter.create_sketch("Front"))
+    define_circle(
         adapter, 0.0, PIVOT_MID_Y, PIVOT_HOLE_DIA / 2.0, "pivot hole",
         dims=pivot,
         names=("PivotX", "PivotZ", "PivotDia"),
         drives=(None, '"ArmDepth" / 2', '"PivotHoleDia"'),
     )
-    await ensure_fully_defined(adapter, "pivot hole sketch")
-    check("exit_sketch pivot hole", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "pivot hole sketch")
+    check("exit_sketch pivot hole", adapter.exit_sketch())
     name_last_feature(adapter, "PivotHoleProfile")
     drive_jobs += pivot.apply(adapter, "PivotHoleProfile")
     check(
         "cut pivot hole",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
         ),
     )
@@ -578,7 +578,7 @@ async def build(adapter) -> dict[str, str]:
     # Named axis through the pivot bore (Axis1): assembly mates select it by
     # NAME (Right ∩ Top+8), view-independent -- an internal bore wall never
     # selects by screen-projected point. See _bore_axis.name_bore_axis.
-    await name_bore_axis(
+    name_bore_axis(
         adapter, "Right Plane", 0.0, "Top Plane", PIVOT_MID_Y, "pivot bore"
     )
 
@@ -591,11 +591,11 @@ async def build(adapter) -> dict[str, str]:
     # Direct-to-DB keeps inference from adding relations the explicit ones
     # below would over-define.
     top_ref = SketchDims()
-    check("create_sketch top edge reference", await adapter.create_sketch("Front"))
+    check("create_sketch top edge reference", adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     top_line = check(
         "top edge reference line",
-        await adapter.add_line(
+        adapter.add_line(
             0.0, PIVOT_MID_Y, 0.0, PIVOT_MID_Y + TOP_EDGE_ABOVE_PIVOT
         ),
     )
@@ -603,14 +603,14 @@ async def build(adapter) -> dict[str, str]:
     _as_construction(adapter, top_line)
     check(
         "top edge reference vertical",
-        await adapter.add_sketch_constraint(top_line, None, "vertical"),
+        adapter.add_sketch_constraint(top_line, None, "vertical"),
     )
     # Dimensions in creation order; SketchDims renames them by that order.
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{top_line}.start", 0.0, PIVOT_MID_Y, "top edge reference foot"
     )
     top_ref.record("PivotY", '"ArmDepth" / 2')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{top_line}.start",
         f"{top_line}.end",
@@ -619,8 +619,8 @@ async def build(adapter) -> dict[str, str]:
         "top edge above the pivot",
     )
     top_ref.record("TopAbovePivot", '"TopAbovePivot"')
-    await ensure_fully_defined(adapter, "top edge reference sketch")
-    check("exit_sketch top edge reference", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "top edge reference sketch")
+    check("exit_sketch top edge reference", adapter.exit_sketch())
     name_last_feature(adapter, "TopEdgeReference")
     drive_jobs += top_ref.apply(adapter, "TopEdgeReference")
 
@@ -630,23 +630,23 @@ async def build(adapter) -> dict[str, str]:
     # "concentric" prose. A construction line from the pivot centre down to
     # the lower arc's midpoint, .254 above the frame origin.
     bottom_ref = SketchDims()
-    check("create_sketch bottom edge reference", await adapter.create_sketch("Front"))
+    check("create_sketch bottom edge reference", adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     bottom_line = check(
         "bottom edge reference line",
-        await adapter.add_line(0.0, PIVOT_MID_Y, 0.0, PIVOT_MID_Y - BOTTOM_EDGE_BELOW_PIVOT),
+        adapter.add_line(0.0, PIVOT_MID_Y, 0.0, PIVOT_MID_Y - BOTTOM_EDGE_BELOW_PIVOT),
     )
     set_sketch_direct_db(adapter, False)
     _as_construction(adapter, bottom_line)
     check(
         "bottom edge reference vertical",
-        await adapter.add_sketch_constraint(bottom_line, None, "vertical"),
+        adapter.add_sketch_constraint(bottom_line, None, "vertical"),
     )
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{bottom_line}.start", 0.0, PIVOT_MID_Y, "bottom edge reference foot"
     )
     bottom_ref.record("PivotY", '"ArmDepth" / 2')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{bottom_line}.start",
         f"{bottom_line}.end",
@@ -656,8 +656,8 @@ async def build(adapter) -> dict[str, str]:
     )
     # The lower arc's midpoint sits ArmDepth below the top edge.
     bottom_ref.record("BottomBelowPivot", '"ArmDepth" - "TopAbovePivot"')
-    await ensure_fully_defined(adapter, "bottom edge reference sketch")
-    check("exit_sketch bottom edge reference", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "bottom edge reference sketch")
+    check("exit_sketch bottom edge reference", adapter.exit_sketch())
     name_last_feature(adapter, "BottomEdgeReference")
     drive_jobs += bottom_ref.apply(adapter, "BottomEdgeReference")
 
@@ -674,7 +674,7 @@ async def build(adapter) -> dict[str, str]:
     )
     drive_jobs += rod_cut.placement_drive_jobs
     # Named axis through the rod-pin bore (Axis2 = (Right+ROD_HOLE_X) ∩ (Top+hole_y)).
-    await name_bore_axis(
+    name_bore_axis(
         adapter,
         "Right Plane",
         ROD_HOLE_X,
@@ -690,7 +690,7 @@ async def build(adapter) -> dict[str, str]:
     # radius from this line (the J5 foot-on-arc coupling), so swinging the
     # rocker drives the bar + channel lever. Tied to "CenterY" so a GUI edit
     # of the arc radius/depth moves the coupling with it.
-    await name_bore_axis(
+    name_bore_axis(
         adapter, "Right Plane", 0.0, "Top Plane", CENTER_Y, "arc centre",
         drive_b='"CenterY"', drive_jobs=drive_jobs,
     )
@@ -701,7 +701,7 @@ async def build(adapter) -> dict[str, str]:
     v_rod = math.pi * (rod_dia / 2.0) ** 2 * ARM_THICKNESS
     # The tip faces are cut into the SKETCH profile (not a 3D chamfer feature), so
     # _strap_area already accounts for them: the bored-strap volume is tight.
-    v_measured = await volume_check(
+    v_measured = volume_check(
         adapter, "bored strap + hub", v_strap + v_hub - v_pivot - v_rod, 0.01 * v_strap
     )
 
@@ -709,16 +709,16 @@ async def build(adapter) -> dict[str, str]:
     # exists, so every target resolves. Each equation evaluates to the value just
     # built, so the geometry must not move -- the re-check below (tight, vs the
     # MEASURED pre-drive volume) is the proof.
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    volume_check(
         adapter, "driven rocker-arm (equations neutral)", v_measured, 0.005 * v_strap
     )
 
-    await apply_material(adapter, MATERIAL)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    report_mass_properties(adapter)
 
     # Manufacturing drawing support: mark exactly the print's dimensions (the
     # drawing recipe imports the marked set and must find every one of these),
@@ -768,7 +768,7 @@ async def build(adapter) -> dict[str, str]:
     # view through _drawing_hidden_sketches to import its dimension.
     blank_sketch(adapter, "TopEdgeReference")
     blank_sketch(adapter, "BottomEdgeReference")
-    artefacts = await save_part_and_images(adapter, PART_NAME)
+    artefacts = save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(
         adapter,
         (

@@ -158,10 +158,10 @@ def verify_cut_length_reference(adapter: Any, annotations: list[Any]) -> list[An
     return controls
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
-    check("open modified knife-hanger bolt", await adapter.open_model(str(SOURCE)))
+    check("open modified knife-hanger bolt", adapter.open_model(str(SOURCE)))
     required = (
         "Number",
         "Material Specification",
@@ -244,7 +244,7 @@ async def build(adapter: Any) -> dict[str, str]:
             raise RuntimeError("Purchased Screw Note: linked head note did not persist")
 
     settled_controls()
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Knife-Hanger Bolt — Altered Item Drawing",

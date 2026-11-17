@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import ast
-import asyncio
 import importlib.util
 import hashlib
 import json
@@ -380,7 +379,7 @@ class _MemberAdapter:
     swApp = SimpleNamespace(CloseAllDocuments=lambda _unsaved: None)
     currentModel = None
 
-    async def open_model(self, filename):
+    def open_model(self, filename):
         self.currentModel = _MemberDoc(Path(filename))
         return SimpleNamespace(is_success=True, data=None)
 
@@ -396,12 +395,12 @@ def test_forced_full_export_preserves_part_owned_member_bytes(
         path: path.read_bytes() for path in (root / "reports/part-neutral").glob("*.json")
     }
 
-    async def forbid_render(*_args):
+    def forbid_render(*_args):
         raise AssertionError("full exporter must not regenerate part-owned member PNG")
 
     monkeypatch.setattr(export_models, "export_build_png", forbid_render)
     monkeypatch.setattr(
-        export_models, "run_build", lambda build: (asyncio.run(build(_MemberAdapter())), 0)[1],
+        export_models, "run_build", lambda build: (build(_MemberAdapter()), 0)[1],
     )
     monkeypatch.setattr(sys, "argv", ["export_models.py", "--force"])
 
@@ -680,7 +679,7 @@ def test_saved_active_and_configuration_exports_preserve_geometry_and_native_sta
         swApp = _Sw()
         currentModel = None
 
-        async def open_model(self, path: str):
+        def open_model(self, path: str):
             self.currentModel = _Doc(Path(path))
             return SimpleNamespace(is_success=True, data=None)
 
@@ -733,14 +732,14 @@ def test_saved_active_and_configuration_exports_preserve_geometry_and_native_sta
     monkeypatch.setattr(export_models, "refresh_comparison_gallery", _no_gallery)
     rendered_extent = None
 
-    async def _repair_png(seat, _stem: str) -> None:
+    def _repair_png(seat, _stem: str) -> None:
         nonlocal rendered_extent
         rendered_extent = max(vertex[0] for vertex in seat.currentModel.vertices)
 
     monkeypatch.setattr(export_models, "export_build_png", _repair_png)
     monkeypatch.setattr(
         export_models, "run_build",
-        lambda build: (asyncio.run(build(adapter)), 0)[1],
+        lambda build: (build(adapter), 0)[1],
     )
     monkeypatch.setattr(sys, "argv", ["export_models.py"])
 
@@ -1392,7 +1391,7 @@ def test_features_cli_writes_only_one_requested_part_using_public_bundle_paths(
         currentModel = None
         swApp = SimpleNamespace(CloseAllDocuments=lambda unsaved: closed.append(unsaved))
 
-        async def open_model(self, path):
+        def open_model(self, path):
             opened.append(Path(path))
             self.currentModel = Path(path)
             return SimpleNamespace(is_success=True, data=None)
@@ -1421,7 +1420,7 @@ def test_features_cli_writes_only_one_requested_part_using_public_bundle_paths(
     monkeypatch.setattr(export_models, "_save_feature_step", save_step)
     monkeypatch.setattr(export_models._config, "release_revision", lambda: "v38")
     monkeypatch.setattr(
-        export_models, "run_build", lambda build: (asyncio.run(build(Adapter())), 0)[1],
+        export_models, "run_build", lambda build: (build(Adapter()), 0)[1],
     )
     monkeypatch.setattr(sys, "argv", ["export_models.py", "--features", stem.replace("_", "-")])
 
@@ -1484,7 +1483,7 @@ def test_features_cli_exports_and_stages_one_step_per_declared_configuration(
         currentModel = None
         swApp = SimpleNamespace(CloseAllDocuments=lambda _unsaved: None)
 
-        async def open_model(self, path):
+        def open_model(self, path):
             self.currentModel = Doc()
             return SimpleNamespace(is_success=True, data=None)
 
@@ -1513,7 +1512,7 @@ def test_features_cli_exports_and_stages_one_step_per_declared_configuration(
     monkeypatch.setattr(export_models, "_save_feature_step", save_step)
     monkeypatch.setattr(export_models._config, "release_revision", lambda: "v38")
     monkeypatch.setattr(
-        export_models, "run_build", lambda build: (asyncio.run(build(Adapter())), 0)[1],
+        export_models, "run_build", lambda build: (build(Adapter()), 0)[1],
     )
     monkeypatch.setattr(sys, "argv", ["export_models.py", "--features", dashed])
 
@@ -1689,7 +1688,7 @@ def test_forced_full_export_regenerates_native_outputs_but_keeps_bundle_step_byt
         swApp = SimpleNamespace(CloseAllDocuments=lambda _unsaved: None)
         currentModel = None
 
-        async def open_model(self, path):
+        def open_model(self, path):
             self.currentModel = Path(path)
             return SimpleNamespace(is_success=True, data=None)
 
@@ -1702,7 +1701,7 @@ def test_forced_full_export_regenerates_native_outputs_but_keeps_bundle_step_byt
         saved.append(path.name)
         return 1
 
-    async def render(_adapter, stem):
+    def render(_adapter, stem):
         path = root / "png" / stem / f"{stem}_isometric.png"
         path.write_bytes(b"forced native render")
 
@@ -1712,7 +1711,7 @@ def test_forced_full_export_regenerates_native_outputs_but_keeps_bundle_step_byt
     monkeypatch.setattr(export_models, "doc_rgb", lambda _doc: (1, 1, 1))
     monkeypatch.setattr(
         export_models, "run_build",
-        lambda build: (asyncio.run(build(Adapter())), 0)[1],
+        lambda build: (build(Adapter()), 0)[1],
     )
     monkeypatch.setattr(sys, "argv", ["export_models.py", "--force"])
     assert export_models.main() == 0

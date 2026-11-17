@@ -1521,7 +1521,7 @@ def add_purchased_footer(
     return placed
 
 
-async def build_purchased_fastener_drawing(
+def build_purchased_fastener_drawing(
     adapter: Any,
     spec: DrawingSpec,
     *,
@@ -1604,7 +1604,7 @@ async def build_purchased_fastener_drawing(
                         f"{stock.part_name}: stale source {name} {properties[name]!r} != {value!r}"
                     )
 
-        return await _build_reference_sheet(
+        return _build_reference_sheet(
             adapter,
             spec,
             properties=properties,
@@ -1659,7 +1659,7 @@ async def build_purchased_fastener_drawing(
             _retain_supplier_source_failure(spec, primary, source_evidence)
 
 
-async def build_purchased_spring_drawing(
+def build_purchased_spring_drawing(
     adapter: Any,
     spec: DrawingSpec,
     *,
@@ -1693,7 +1693,7 @@ async def build_purchased_spring_drawing(
             "Manufacturing Notes",
         )
         properties = read_required_properties(model, names, required=names)
-        return await _build_reference_sheet(
+        return _build_reference_sheet(
             adapter,
             spec,
             properties=properties,
@@ -1740,7 +1740,7 @@ async def build_purchased_spring_drawing(
             _retain_supplier_source_failure(spec, primary, source_evidence)
 
 
-async def _build_reference_sheet(
+def _build_reference_sheet(
     adapter: Any,
     spec: DrawingSpec,
     *,
@@ -2114,7 +2114,7 @@ async def _build_reference_sheet(
     if source_checkpoint is not None:
         final_checks = (*final_checks, lambda: source_checkpoint("last_settled"))
     paths = spec.outputs
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         DrawingOutputs(slddrw=paths["slddrw"], pdf=paths["pdf"], png=paths["png"]),
         layout=spec.layout,

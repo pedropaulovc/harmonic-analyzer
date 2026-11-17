@@ -274,10 +274,10 @@ def _set_shaded_with_edges(view: Any) -> None:
         raise RuntimeError(f"feed rack isometric did not go Shaded With Edges ({mode})")
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
-    check("open feed rack source", await adapter.open_model(str(SOURCE)))
+    check("open feed rack source", adapter.open_model(str(SOURCE)))
     _require_saved_taps(adapter.currentModel)
     read_required_properties(
         adapter.currentModel,
@@ -395,7 +395,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _telemetry.info(f"removed {removed} automatic tapped-hole label(s)")
     if not bool(_early_bound(iso, "IView").GetCThreadQuality()):
         raise RuntimeError("feed rack isometric: cosmetic threads still draft quality")
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Feed Rack Manufacturing Drawing",

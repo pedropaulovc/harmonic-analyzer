@@ -165,11 +165,11 @@ def _draw_member_sheet(adapter: Any, configuration: str) -> None:
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open arbor collar source", await adapter.open_model(str(SOURCE)))
+    check("open arbor collar source", adapter.open_model(str(SOURCE)))
     required = ("Number", "Material Specification", "Finish", "Quantity")
     read_required_properties(
         adapter.currentModel,
@@ -200,7 +200,7 @@ async def build(adapter: Any) -> dict[str, str]:
         if not ddoc.ActivateSheet(sheet_name):
             raise RuntimeError(f"cannot activate the collar sheet {sheet_name!r}")
         _draw_member_sheet(adapter, configuration)
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Keyed Cutting Arbor Backing Collar Drawing",

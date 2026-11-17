@@ -140,17 +140,17 @@ _PLATE_OFFSET_START = (HUB_DIA / 2.0, HUB_LENGTH / 2.0)
 _PLATE_OFFSET_END = (HUB_DIA / 2.0, LEVER_THICKNESS / 2.0)
 
 
-async def plate_offset_reference(adapter) -> list[tuple[str, str]]:
+def plate_offset_reference(adapter) -> list[tuple[str, str]]:
     """Sketch the hub-face -> plate-face reference line; return its drives."""
     check(
-        f"create_sketch {PLATE_OFFSET_SKETCH}", await adapter.create_sketch("Top")
+        f"create_sketch {PLATE_OFFSET_SKETCH}", adapter.create_sketch("Top")
     )
     # Direct-to-DB: the line lies on the hub silhouette along the sketch's v
     # axis, so creation-time inference would over-define the sketch.
     set_sketch_direct_db(adapter, True)
     line = check(
         f"{PLATE_OFFSET_SKETCH} line",
-        await adapter.add_line(*_PLATE_OFFSET_START, *_PLATE_OFFSET_END),
+        adapter.add_line(*_PLATE_OFFSET_START, *_PLATE_OFFSET_END),
     )
     set_sketch_direct_db(adapter, False)
     # ConstructionGeometry is declared on ISketchSegment, not the ISketchLine
@@ -161,9 +161,9 @@ async def plate_offset_reference(adapter) -> list[tuple[str, str]]:
         raise RuntimeError(f"{line} did not take the construction flag")
     check(
         f"{PLATE_OFFSET_SKETCH} vertical",
-        await adapter.add_sketch_constraint(line, None, "vertical"),
+        adapter.add_sketch_constraint(line, None, "vertical"),
     )
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{line}.start",
         f"{line}.end",
@@ -171,11 +171,11 @@ async def plate_offset_reference(adapter) -> list[tuple[str, str]]:
         PLATE_OFFSET,
         PLATE_OFFSET_SKETCH,
     )
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{line}.start", *_PLATE_OFFSET_START, PLATE_OFFSET_SKETCH
     )
-    await ensure_fully_defined(adapter, f"{PLATE_OFFSET_SKETCH} sketch")
-    check(f"exit_sketch {PLATE_OFFSET_SKETCH}", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, f"{PLATE_OFFSET_SKETCH} sketch")
+    check(f"exit_sketch {PLATE_OFFSET_SKETCH}", adapter.exit_sketch())
     name_last_feature(adapter, PLATE_OFFSET_SKETCH)
     full = name_dimensions(
         adapter,
@@ -223,10 +223,10 @@ def tolerance_at_value_places(adapter, feature_name: str, dimension_name: str) -
     return places
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     # #290: the row's inch calculation units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
@@ -236,11 +236,11 @@ async def build(adapter) -> dict[str, str]:
     # BARE numbers in document units (an unsuffixed 175.05 = 175.05 in, blowing
     # the part up 25.4x). The tip centre is driven by "LeverSpringX" itself, so
     # the full-round end stays concentric with the spring hole.
-    await set_global(adapter, "LeverSpringX", f"{LEVER_SPRING_X}mm")
-    await set_global(adapter, "BarTall", f"{BAR_TALL}mm")
-    await set_global(adapter, "LeverThickness", f"{LEVER_THICKNESS}mm")
-    await set_global(adapter, "PivotHoleDia", f"{PIVOT_HOLE_DIA}mm")
-    await set_global(adapter, "BarPinX", f"{BAR_PIN_X}mm")
+    set_global(adapter, "LeverSpringX", f"{LEVER_SPRING_X}mm")
+    set_global(adapter, "BarTall", f"{BAR_TALL}mm")
+    set_global(adapter, "LeverThickness", f"{LEVER_THICKNESS}mm")
+    set_global(adapter, "PivotHoleDia", f"{PIVOT_HOLE_DIA}mm")
+    set_global(adapter, "BarPinX", f"{BAR_PIN_X}mm")
     # (The old BarPinHoleDia/SpringHoleDia/BarPinX knobs are gone: the bar-pin and
     # spring holes are now native Hole Wizard features whose diameters come from
     # the #47/#21 drill standard, not equation-driven sketch dims.)
@@ -256,22 +256,22 @@ async def build(adapter) -> dict[str, str]:
     # define the sketch; each driving dim is record()ed into ``outline`` in the
     # exact order it is added so naming/driving land structurally.
     outline = SketchDims()
-    check("create_sketch outline", await adapter.create_sketch("Front"))
+    check("create_sketch outline", adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     nose = check(
         "add_arc fulcrum nose",
-        await adapter.add_arc(0.0, 0.0, 0.0, HALF_BAR, 0.0, -HALF_BAR),
+        adapter.add_arc(0.0, 0.0, 0.0, HALF_BAR, 0.0, -HALF_BAR),
     )
-    (lower_bar,) = await add_line_chain(
+    (lower_bar,) = add_line_chain(
         adapter, [(0.0, -HALF_BAR), (TIP_ARC_CX, -HALF_BAR)], close=False
     )
     tip = check(
         "add_arc full-round tip",
-        await adapter.add_arc(
+        adapter.add_arc(
             TIP_ARC_CX, 0.0, TIP_ARC_CX, -HALF_BAR, TIP_ARC_CX, HALF_BAR
         ),
     )
-    await add_line_chain(adapter, [(TIP_ARC_CX, HALF_BAR), (0.0, HALF_BAR)], close=False)
+    add_line_chain(adapter, [(TIP_ARC_CX, HALF_BAR), (0.0, HALF_BAR)], close=False)
     set_sketch_direct_db(adapter, False)
     # Semantic scheme: the nose semicircle is pinned by its centre at the
     # origin and both ends on the Y axis; the tip arc by its centre on the X
@@ -281,39 +281,39 @@ async def build(adapter) -> dict[str, str]:
     # bar height spans the tip's ends.
     check(
         f"horizontal {lower_bar}",
-        await adapter.add_sketch_constraint(lower_bar, None, "horizontal"),
+        adapter.add_sketch_constraint(lower_bar, None, "horizontal"),
     )
     check(
         "nose centre -> origin",
-        await adapter.add_sketch_constraint(f"{nose}.center", "origin", "coincident"),
+        adapter.add_sketch_constraint(f"{nose}.center", "origin", "coincident"),
     )
     for point in (f"{nose}.start", f"{nose}.end"):
         check(
             f"{point} on Y axis",
-            await adapter.add_sketch_constraint(point, "origin", "vertical_points"),
+            adapter.add_sketch_constraint(point, "origin", "vertical_points"),
         )
     # Dim 1 (emission order): tip-centre X (on the X axis, +TIP_ARC_CX, so an
     # unsigned distance that already evaluates positive). Driven by the spring
     # hole's own global: the tip stays concentric with the hole.
-    await anchor_point_to_origin(adapter, f"{tip}.center", TIP_ARC_CX, 0.0, "tip centre")
+    anchor_point_to_origin(adapter, f"{tip}.center", TIP_ARC_CX, 0.0, "tip centre")
     outline.record("TipCentreX", '"LeverSpringX"')
     for point in (f"{tip}.start", f"{tip}.end"):
         check(
             f"{point} above/below tip centre",
-            await adapter.add_sketch_constraint(point, f"{tip}.center", "vertical_points"),
+            adapter.add_sketch_constraint(point, f"{tip}.center", "vertical_points"),
         )
     # Dim 2: bar height, across the tip's two ends.
-    await dimension_between(
+    dimension_between(
         adapter, f"{tip}.start", f"{tip}.end", "vertical_distance", BAR_TALL, "bar height"
     )
     outline.record("BarHeight", '"BarTall"')
-    await ensure_fully_defined(adapter, "lever outline")
-    check("exit_sketch outline", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "lever outline")
+    check("exit_sketch outline", adapter.exit_sketch())
     name_last_feature(adapter, "LeverOutline")
     drive_jobs += outline.apply(adapter, "LeverOutline")
     check(
         "extrude lever",
-        await adapter.create_extrusion(
+        adapter.create_extrusion(
             ExtrusionParameters(depth=LEVER_THICKNESS, both_directions=True)
         ),
     )
@@ -323,7 +323,7 @@ async def build(adapter) -> dict[str, str]:
     # Bar plus the two half-discs: the nose and the full-round tip.
     area = TIP_ARC_CX * BAR_TALL + math.pi * HALF_BAR**2
     expected = area * LEVER_THICKNESS
-    await volume_check(adapter, "lever outline", expected, 0.005 * expected)
+    volume_check(adapter, "lever outline", expected, 0.005 * expected)
 
     # Integral fulcrum hub (2026-09-02, ch17 p.40): O12 boss on the origin,
     # HUB_LENGTH long mid-plane (= the station pitch). r 6 > the 5.50 half-bar,
@@ -331,22 +331,22 @@ async def build(adapter) -> dict[str, str]:
     # volume is the full cylinder minus its overlap with the body (the r 5.50
     # nose half-disc on x < 0, the strip |y| < 5.50 clipped by the circle on
     # x >= 0).
-    await set_global(adapter, "HubDia", f"{HUB_DIA}mm")
-    await set_global(adapter, "HubLength", f"{HUB_LENGTH}mm")
+    set_global(adapter, "HubDia", f"{HUB_DIA}mm")
+    set_global(adapter, "HubLength", f"{HUB_LENGTH}mm")
     hub = SketchDims()
-    check("create_sketch hub", await adapter.create_sketch("Front"))
-    await define_circle(
+    check("create_sketch hub", adapter.create_sketch("Front"))
+    define_circle(
         adapter, 0.0, 0.0, HUB_DIA / 2.0, "hub", dims=hub,
         names=("HubCx", "HubCz", "HubDia"),
         drives=(None, None, '"HubDia"'),
     )
-    await ensure_fully_defined(adapter, "hub sketch")
-    check("exit_sketch hub", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "hub sketch")
+    check("exit_sketch hub", adapter.exit_sketch())
     name_last_feature(adapter, "HubProfile")
     drive_jobs += hub.apply(adapter, "HubProfile")
     check(
         "extrude hub",
-        await adapter.create_extrusion(
+        adapter.create_extrusion(
             ExtrusionParameters(depth=HUB_LENGTH, both_directions=True)
         ),
     )
@@ -358,31 +358,31 @@ async def build(adapter) -> dict[str, str]:
     _overlap = _half_strip + math.pi * _h**2 / 2.0
     v_hub = math.pi * _r**2 * HUB_LENGTH - _overlap * LEVER_THICKNESS
     expected += v_hub
-    await volume_check(adapter, "lever + hub", expected, 0.005 * expected)
+    volume_check(adapter, "lever + hub", expected, 0.005 * expected)
 
     # Fulcrum hole (Ø.256 reamed, rides the fulcrum shaft): a bearing bore, kept
     # a plain circle cut. On the origin, so only its diameter is a dim.
     fulcrum = SketchDims()
-    check("create_sketch fulcrum hole", await adapter.create_sketch("Front"))
-    await define_circle(
+    check("create_sketch fulcrum hole", adapter.create_sketch("Front"))
+    define_circle(
         adapter, 0.0, 0.0, PIVOT_HOLE_DIA / 2.0, "fulcrum hole", dims=fulcrum,
         names=("FulcrumCx", "FulcrumCz", "FulcrumDia"),
         drives=(None, None, '"PivotHoleDia"'),
     )
-    await ensure_fully_defined(adapter, "fulcrum hole sketch")
-    check("exit_sketch fulcrum hole", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "fulcrum hole sketch")
+    check("exit_sketch fulcrum hole", adapter.exit_sketch())
     name_last_feature(adapter, "FulcrumProfile")
     drive_jobs += fulcrum.apply(adapter, "FulcrumProfile")
     check(
         "cut fulcrum hole",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
         ),
     )
     name_last_feature(adapter, "FulcrumHole")
     v_fulcrum = math.pi * (PIVOT_HOLE_DIA / 2.0) ** 2 * HUB_LENGTH  # through the hub
     expected -= v_fulcrum
-    await volume_check(adapter, "fulcrum hole", expected, 0.005 * expected)
+    volume_check(adapter, "fulcrum hole", expected, 0.005 * expected)
 
     # Native Hole Wizard through-holes drilled +Z through the lever.
     bar_dia = blind_cut_dia_mm(BAR_PIN_HOLE_SPEC)
@@ -398,7 +398,7 @@ async def build(adapter) -> dict[str, str]:
     )
     drive_jobs += bar_pin_cut.placement_drive_jobs
     expected -= math.pi * (bar_dia / 2.0) ** 2 * LEVER_THICKNESS
-    await volume_check(adapter, "bar-pin hole", expected, 0.005 * expected)
+    volume_check(adapter, "bar-pin hole", expected, 0.005 * expected)
 
     spring_dia = blind_cut_dia_mm(SPRING_EYE_HOLE_SPEC)
     spring_cut = wizard_holes(
@@ -413,15 +413,15 @@ async def build(adapter) -> dict[str, str]:
     )
     drive_jobs += spring_cut.placement_drive_jobs
     expected -= math.pi * (spring_dia / 2.0) ** 2 * LEVER_THICKNESS
-    await volume_check(adapter, "spring-eye hole", expected, 0.005 * expected)
+    volume_check(adapter, "spring-eye hole", expected, 0.005 * expected)
 
-    drive_jobs += await plate_offset_reference(adapter)
+    drive_jobs += plate_offset_reference(adapter)
 
     # Named bore axes for assembly mates (view-independent name selection):
     # Axis1 = fulcrum bore (origin, rides the fulcrum shaft), Axis2 = bar-pin
     # bore (127, 0, the amplitude bar's top pin).
-    await name_bore_axis(adapter, "Right Plane", 0.0, "Top Plane", 0.0, "fulcrum bore")
-    await name_bore_axis(
+    name_bore_axis(adapter, "Right Plane", 0.0, "Top Plane", 0.0, "fulcrum bore")
+    name_bore_axis(
         adapter,
         "Right Plane",
         BAR_PIN_X,
@@ -435,11 +435,11 @@ async def build(adapter) -> dict[str, str]:
     # Apply the deferred drive equations now -- after the whole model + a rebuild
     # exists, so every target resolves. Each equation evaluates to the value just
     # built, so the geometry must not move -- the re-check below is the proof.
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(adapter, "driven channel lever (equations neutral)", expected, 0.005 * expected)
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    volume_check(adapter, "driven channel lever (equations neutral)", expected, 0.005 * expected)
     # Saved shown, the reference line would print in every assembly render.
     blank_reference_sketches(adapter, ("PlateOffsetReference",))
 
@@ -471,8 +471,8 @@ async def build(adapter) -> dict[str, str]:
     ):
         tolerance_at_value_places(adapter, feature_name, dimension_name)
 
-    await apply_material(adapter, MATERIAL)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    report_mass_properties(adapter)
 
     # Manufacturing drawing support: mark exactly the print's dimensions and
     # stamp the make-critical title-block properties.
@@ -483,7 +483,7 @@ async def build(adapter) -> dict[str, str]:
     apply_drawing_properties(
         adapter, PART_NAME, {"Isometric View Note": ISOMETRIC_VIEW_NOTE}
     )
-    artefacts = await save_part_and_images(adapter, PART_NAME)
+    artefacts = save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(
         adapter,
         ("Number", "Material Specification", "Finish", "Quantity", "Isometric View Note"),

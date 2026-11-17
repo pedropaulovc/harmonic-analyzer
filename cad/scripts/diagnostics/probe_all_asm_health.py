@@ -4,7 +4,6 @@ errors surface."""
 
 from __future__ import annotations
 
-import asyncio
 
 if __package__:
     from . import _script_paths  # noqa: F401
@@ -18,11 +17,11 @@ from _assembly import whats_wrong
 ORDER = ["fr-frame", "ch-channel", "dt-drive-train", "output", "ha-harmonic-analyzer"]
 
 
-async def main():
+def main():
     from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter
 
     adapter = PyWin32Adapter({})
-    await adapter.connect()
+    adapter.connect()
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True))
 
     for name in ORDER:
@@ -30,7 +29,7 @@ async def main():
         if not path.exists():
             log(f"{name}: MISSING")
             continue
-        await adapter.open_model(str(path))
+        adapter.open_model(str(path))
         doc = adapter.currentModel
         _flag(doc, "IModelDoc2")
         adapter._attempt(lambda: doc.ForceRebuild3(False))
@@ -57,8 +56,8 @@ async def main():
             log(f"      {e}")
         adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True))
 
-    await adapter.disconnect()
+    adapter.disconnect()
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

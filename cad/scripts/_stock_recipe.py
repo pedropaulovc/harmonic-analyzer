@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
+from collections.abc import Callable
 from dataclasses import dataclass
 
 
-type RecipeAuthor = Callable[..., Awaitable[None]]
+type RecipeAuthor = Callable[..., None]
 
 
 @dataclass(frozen=True, slots=True)

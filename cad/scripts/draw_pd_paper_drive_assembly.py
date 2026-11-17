@@ -4849,12 +4849,12 @@ def _place_fitup_sheets(adapter: Any, step_notes: StepNotes) -> None:
 
 
 @_telemetry.traced("drawing.paper_drive_assembly")
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     notes = require_step_notes()
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source assembly is missing: {SOURCE}")
 
-    check("open assembly drawing source", await adapter.open_model(str(SOURCE)))
+    check("open assembly drawing source", adapter.open_model(str(SOURCE)))
     properties = read_required_properties(
         adapter.currentModel,
         (
@@ -4892,7 +4892,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _place_cluster_float_view(adapter)
     assert_full_detail_view(adapter, label="paper-drive assembly")
 
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         layout=SPEC.layout,

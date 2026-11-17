@@ -26,8 +26,8 @@ from diagnostics.diag_mcmaster_lib import replica_main  # noqa: E402
 
 
 @stock_recipe("91794A558", threaded=True)
-async def build_91794A558(adapter, truth=None):
-    await build_fillister(adapter, "91794A558", FILLISTER_SIZE)
+def build_91794A558(adapter, truth=None):
+    build_fillister(adapter, "91794A558", FILLISTER_SIZE)
 
 
 if __name__ == "__main__":

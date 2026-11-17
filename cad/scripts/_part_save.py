@@ -39,7 +39,7 @@ _ROUTINE_PART_VIEWS = frozenset(
 
 
 @_telemetry.traced("export.stl")
-async def export_part_stl(adapter: Any, out_path: Path) -> None:
+def export_part_stl(adapter: Any, out_path: Path) -> None:
     """Write the active part's fine binary STL (mm, model origin) to ``out_path``.
 
     The assembly build reads these via ``stl_bbox_mm`` to place each
@@ -78,7 +78,7 @@ async def export_part_stl(adapter: Any, out_path: Path) -> None:
 
 
 @_telemetry.traced("export.part_images", label_param="part_name")
-async def save_part_and_images(
+def save_part_and_images(
     adapter: Any,
     part_name: str,
     views: Iterable[str] = DEFAULT_VIEWS,
@@ -97,7 +97,7 @@ async def save_part_and_images(
     OUT_SLDPRT.mkdir(parents=True, exist_ok=True)
     part_path = (OUT_SLDPRT / f"{part_name}.SLDPRT").resolve()
     set_isometric_view(adapter)  # save on isometric so the .SLDPRT opens isometric
-    check(f"save_file -> {part_path}", await adapter.save_file(str(part_path)))
+    check(f"save_file -> {part_path}", adapter.save_file(str(part_path)))
 
     png_dir = OUT_PNG / part_name
     png_dir.mkdir(parents=True, exist_ok=True)
@@ -113,18 +113,18 @@ async def save_part_and_images(
     rebuild_stale_configurations(adapter, part_name)
     check(
         f"re-save with properties -> {part_path}",
-        await adapter.save_file(str(part_path)),
+        adapter.save_file(str(part_path)),
     )
 
     stl_path = (OUT_STL / f"{part_name}.STL").resolve()
-    await export_part_stl(adapter, stl_path)
+    export_part_stl(adapter, stl_path)
 
     artefacts = {"part": str(part_path), "stl": str(stl_path)}
     for view in views:
         img_path = (png_dir / f"{part_name}_{view}.png").resolve()
         check(
             f"export_image {view}",
-            await adapter.export_image(
+            adapter.export_image(
                 {
                     "file_path": str(img_path),
                     "format_type": "png",

@@ -86,35 +86,35 @@ def _rel_z_angle_deg(after: list[float], before: list[float]) -> float:
     return math.degrees(math.atan2(m[3] - m[1], m[0] + m[4]))
 
 
-async def _revolute(adapter: Any, name: str, x: float, label: str) -> None:
+def _revolute(adapter: Any, name: str, x: float, label: str) -> None:
     """Pin Axis1 in XY + the axial z, leaving the Z spin free (paper-drive's
     ``_sprocket_revolute`` pattern, standalone)."""
-    await distance_driver(adapter, named_ref(f"Axis1@{name}", "AXIS"),
+    distance_driver(adapter, named_ref(f"Axis1@{name}", "AXIS"),
                           named_ref("Top Plane", "PLANE"), 0.0,
                           label=f"{label} axis height", verify=(name, [x, 0.0, 0.0]))
-    await distance_driver(adapter, named_ref(f"Axis1@{name}", "AXIS"),
+    distance_driver(adapter, named_ref(f"Axis1@{name}", "AXIS"),
                           named_ref("Right Plane", "PLANE"), x,
                           label=f"{label} axis lateral", verify=(name, [x, 0.0, 0.0]))
-    await distance_driver(adapter, named_ref(f"Front Plane@{name}", "PLANE"),
+    distance_driver(adapter, named_ref(f"Front Plane@{name}", "PLANE"),
                           named_ref("Front Plane", "PLANE"), 0.0,
                           label=f"{label} axial", verify=(name, [x, 0.0, 0.0]))
 
 
-async def _drive_and_measure(adapter: Any, t12: str, t24: str, tag: str) -> tuple[float, float]:
+def _drive_and_measure(adapter: Any, t12: str, t24: str, tag: str) -> tuple[float, float]:
     """Temp angle mate drives T12 +DRIVE_DEG; returns (signed dT12, signed dT24)."""
     from solidworks_mcp.adapters.base import MateRefParameters
 
     base12, base24 = _rot(adapter, t12), _rot(adapter, t24)
     a = component_transform(adapter, t12)
     rest = math.degrees(math.acos(max(-1.0, min(1.0, a[0]))))
-    res = await angle_driver(adapter, named_ref(f"Right Plane@{t12}", "PLANE"),
+    res = angle_driver(adapter, named_ref(f"Right Plane@{t12}", "PLANE"),
                              named_ref("Right Plane", "PLANE"), rest + DRIVE_DEG,
                              label=f"[{tag}] drive T12 +{DRIVE_DEG:.0f}", verify=None)
     adapter._attempt(lambda: adapter.currentModel.ForceRebuild3(False), default=None)
     d12 = _rel_z_angle_deg(_rot(adapter, t12), base12)
     d24 = _rel_z_angle_deg(_rot(adapter, t24), base24)
     check(f"[{tag}] delete temp driver",
-          await adapter.delete_mate(MateRefParameters(name=res.get("name", ""))))
+          adapter.delete_mate(MateRefParameters(name=res.get("name", ""))))
     ratio = (d24 / d12) if d12 else 0.0
     info(f"[{tag}] T12 {d12:+.2f} deg -> T24 {d24:+.2f} deg  ratio {ratio:+.4f}"
          f"  (pitch {PITCH_RATIO:+.3f}, tip {TIP_RATIO:.3f})")
@@ -177,47 +177,47 @@ def _read_and_fix_diameters(adapter: Any, feat_name: str) -> dict:
     return result.data
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     from solidworks_mcp.adapters.base import BeltChainParameters
 
-    check("create scratch assembly", await adapter.create_assembly())
+    check("create scratch assembly", adapter.create_assembly())
     try:
         # Seed T12 at Rz(15): a plane-plane ANGLE mate has NO first-order
         # authority at the 0/180 apex (park-driver-singularities class 1), so a
         # temp driver authored FROM an exactly-parallel rest pose fails in place
         # with hard error 1, both flips -- seen live twice. 15 deg puts the rest
         # dihedral safely off the apex (a spur sprocket's spin pose is cosmetic).
-        t12 = await place_component(adapter, "pd-transgear-removable", [T12_POS, 0.0, 0.0],
+        t12 = place_component(adapter, "pd-transgear-removable", [T12_POS, 0.0, 0.0],
                                     [0.0, 0.0, 15.0], rot_z_rows(15.0),
                                     ground=False, configuration="T12",
                                     label="probe T12")
-        t24 = await place_component(adapter, "pd-transgear-removable", [T24_POS, 0.0, 0.0],
+        t24 = place_component(adapter, "pd-transgear-removable", [T24_POS, 0.0, 0.0],
                                     [0.0, 0.0, 0.0], IDENTITY,
                                     ground=False, configuration="T24",
                                     label="probe T24")
-        await _revolute(adapter, t12, T12_POS, "T12")
-        await _revolute(adapter, t24, T24_POS, "T24")
+        _revolute(adapter, t12, T12_POS, "T12")
+        _revolute(adapter, t24, T24_POS, "T24")
 
         belt = check("belt feature (EngageBelt, pitch diams requested)",
-                     await adapter.insert_belt_chain(BeltChainParameters(
+                     adapter.insert_belt_chain(BeltChainParameters(
                          pulley_components=[t12, t24],
                          pulley_diameters=PITCH_DIAMS_MM,
                          location_plane="Front Plane",
                          engage_belt=True, create_belt_part=False)))
         feat_name = belt.name
         info(f"belt feature created: {feat_name!r}")
-        mates = await adapter.list_mates()
+        mates = adapter.list_mates()
         for m in (mates.data or []):
             info(f"  mate: {m}")
 
-        d12_a, d24_a = await _drive_and_measure(adapter, t12, t24, "as-created")
+        d12_a, d24_a = _drive_and_measure(adapter, t12, t24, "as-created")
 
         states = _read_and_fix_diameters(adapter, feat_name)
         info(f"PulleyDiameters mm: created={states['created_mm']}"
              f" set={states['set_mm']} final={states['final_mm']}"
              f" (access={states['access']} modify={states['modify']})")
 
-        d12_b, d24_b = await _drive_and_measure(adapter, t12, t24, "post-modify")
+        d12_b, d24_b = _drive_and_measure(adapter, t12, t24, "post-modify")
 
         ratio_a = d24_a / d12_a if d12_a else 0.0
         ratio_b = d24_b / d12_b if d12_b else 0.0

@@ -260,7 +260,7 @@ def _build_activation(script: Path) -> tuple[str | None, str | None]:
         ):
             asm_name = node.value.value
     build = next(
-        n for n in tree.body if isinstance(n, ast.AsyncFunctionDef) and n.name == "build"
+        n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "build"
     )
     first = build.body[0]
     call = first.value if isinstance(first, ast.Expr) else None

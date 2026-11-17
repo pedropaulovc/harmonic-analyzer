@@ -879,7 +879,7 @@ def is_pictorial_orientation(orientation: str) -> bool:
 
 
 @_telemetry.traced("drawing.finalize")
-async def finalize_drawing(
+def finalize_drawing(
     adapter: Any,
     outputs: DrawingOutputs,
     *,

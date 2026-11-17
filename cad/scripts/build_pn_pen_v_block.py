@@ -204,7 +204,7 @@ V_TOTAL = (
 )
 
 
-async def _outline(adapter, dims: SketchDims) -> None:
+def _outline(adapter, dims: SketchDims) -> None:
     """The plan outline on the Top plane, sketch (u, v) = model (X, -Z).
 
     Lines L0..L7 run from the origin round the neck and the body: (0,0) ->
@@ -236,15 +236,15 @@ async def _outline(adapter, dims: SketchDims) -> None:
         (step, -NECK_DEPTH),
         (0.0, -NECK_DEPTH),
     ]
-    lines = await add_line_chain(adapter, points)
-    await anchor_point_to_origin(
+    lines = add_line_chain(adapter, points)
+    anchor_point_to_origin(
         adapter, f"{lines[0]}.start", 0.0, 0.0, "outline origin corner"
     )
     for index, line in enumerate(lines):
         relation = "vertical" if index % 2 else "horizontal"
         check(
             f"outline L{index} {relation}",
-            await adapter.add_sketch_constraint(line, None, relation),
+            adapter.add_sketch_constraint(line, None, relation),
         )
     paper_front, step_front = f"{lines[0]}.start", f"{lines[0]}.end"
     datum = f"{lines[2]}.start"  # the body's front face, at the step
@@ -307,7 +307,7 @@ async def _outline(adapter, dims: SketchDims) -> None:
             "body back face from the body's front face",
         ),
     ):
-        await dimension_between(adapter, first, second, kind, value, label)
+        dimension_between(adapter, first, second, kind, value, label)
         dims.record(name, drive)
 
 
@@ -382,7 +382,7 @@ def _make_driven(adapter, dimension_id: str, label: str) -> None:
         raise RuntimeError(f"{label}: dimension did not become driven")
 
 
-async def _v_groove(adapter, dims: SketchDims) -> None:
+def _v_groove(adapter, dims: SketchDims) -> None:
     """The V on the Right plane, sketch (u, v) = model (-Z, Y).
 
     A construction stub stands on the body's front face (the depth datum,
@@ -403,18 +403,18 @@ async def _v_groove(adapter, dims: SketchDims) -> None:
     before the angles exist, so the sketch is never over-defined.  The stub
     is construction geometry: the cut takes only the trapezoid.
     """
-    datum = await _construction_chord(
+    datum = _construction_chord(
         adapter, "VGrooveProfile", (_DATUM_U, 0.0), (_DATUM_U, _STUB)
     )
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{datum}.start", _DATUM_U, 0.0, "V datum foot on the front face"
     )
     dims.record("VDatumZ", '"NeckFrontZ"')
     check(
         "V datum stub vertical",
-        await adapter.add_sketch_constraint(datum, None, "vertical"),
+        adapter.add_sketch_constraint(datum, None, "vertical"),
     )
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{datum}.start",
         f"{datum}.end",
@@ -430,22 +430,22 @@ async def _v_groove(adapter, dims: SketchDims) -> None:
         (-(_Z_MID + flat_half), V_FLAT_Y),
         (-V_MOUTH_Z1, 0.0),
     ]
-    flank_a, flat, flank_b, mouth = await add_line_chain(adapter, points)
+    flank_a, flat, flank_b, mouth = add_line_chain(adapter, points)
     check(
         "V mouth horizontal",
-        await adapter.add_sketch_constraint(mouth, None, "horizontal"),
+        adapter.add_sketch_constraint(mouth, None, "horizontal"),
     )
     check(
         "V apex flat horizontal",
-        await adapter.add_sketch_constraint(flat, None, "horizontal"),
+        adapter.add_sketch_constraint(flat, None, "horizontal"),
     )
     check(
         "V mouth on the bottom face",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{flank_a}.start", "origin", "horizontal_points"
         ),
     )
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{datum}.start",
         f"{flank_a}.start",
@@ -454,7 +454,7 @@ async def _v_groove(adapter, dims: SketchDims) -> None:
         "V front mouth edge from the front face",
     )
     dims.record("VMouthZ0", '"VMouthFrontZ"')
-    flat_height = await dimension_between(
+    flat_height = dimension_between(
         adapter,
         f"{flat}.end",
         "origin",
@@ -464,7 +464,7 @@ async def _v_groove(adapter, dims: SketchDims) -> None:
     )
     _make_driven(adapter, flat_height, "V apex flat height")
     dims.record("VFlatY")
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{datum}.start",
         f"{flank_b}.end",
@@ -473,7 +473,7 @@ async def _v_groove(adapter, dims: SketchDims) -> None:
         "V back mouth edge from the front face",
     )
     dims.record("VMouthZ1", '"VMouthBackZ"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{flat}.start",
         f"{flat}.end",
@@ -493,12 +493,12 @@ async def _v_groove(adapter, dims: SketchDims) -> None:
     dims.record("VFlankAngle", '"VFlankAngle"')
 
 
-async def _construction_chord(
+def _construction_chord(
     adapter, feature: str, start: tuple[float, float], end: tuple[float, float]
 ) -> str:
     """One construction line, placed with inference off (ms_stop_geom recipe)."""
     set_sketch_direct_db(adapter, True)
-    line = check(feature, await adapter.add_line(*start, *end))
+    line = check(feature, adapter.add_line(*start, *end))
     set_sketch_direct_db(adapter, False)
     segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
     segment.ConstructionGeometry = True
@@ -519,7 +519,7 @@ def _plane_frame(adapter, name: str) -> tuple[tuple[float, ...], tuple[float, ..
     return tuple(data[0:9]), tuple(v * 1000.0 for v in data[9:12])
 
 
-async def _section_plane(adapter) -> None:
+def _section_plane(adapter) -> None:
     """Section A-A's cutting plane: the Right plane carried +X to the pivot-bore
     axis.  Read back against the Right plane: the same rotation (so a sketch on
     it keeps the Right plane's (u, v) = model (-Z, Y)) and an origin shifted by
@@ -529,7 +529,7 @@ async def _section_plane(adapter) -> None:
 
     check(
         f"create plane {SECTION_PLANE}",
-        await adapter.create_plane(
+        adapter.create_plane(
             CreatePlaneParameters(
                 mode="offset", base_plane="Right Plane", offset=PIVOT_BORE_X
             )
@@ -561,7 +561,7 @@ def _require_on_section_plane(adapter, sketch: str) -> None:
         raise RuntimeError(f"{sketch} is not on {SECTION_PLANE}: parents {parents}")
 
 
-async def _relief_reference(adapter) -> list[tuple[str, str]]:
+def _relief_reference(adapter) -> list[tuple[str, str]]:
     """The relief's depth-wise walls and height in section A-A.
 
     On SECTION_PLANE, sketch (u, v) = model (-Z, Y), construction only and
@@ -580,15 +580,15 @@ async def _relief_reference(adapter) -> list[tuple[str, str]]:
     """
     feature = "ReliefReference"
     z0, z1 = RELIEF_Z0, RELIEF_Z1
-    check(f"create sketch {feature}", await adapter.create_sketch(SECTION_PLANE))
-    front = await _construction_chord(
+    check(f"create sketch {feature}", adapter.create_sketch(SECTION_PLANE))
+    front = _construction_chord(
         adapter, feature, (_DATUM_U, 0.0), (_DATUM_U, _STUB)
     )
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{front}.start", _DATUM_U, 0.0, f"{feature} front face foot"
     )
-    check(feature, await adapter.add_sketch_constraint(front, None, "vertical"))
-    await dimension_between(
+    check(feature, adapter.add_sketch_constraint(front, None, "vertical"))
+    dimension_between(
         adapter,
         f"{front}.start",
         f"{front}.end",
@@ -596,14 +596,14 @@ async def _relief_reference(adapter) -> list[tuple[str, str]]:
         _STUB,
         f"{feature} front stub",
     )
-    near = await _construction_chord(adapter, feature, (-z0, 0.0), (-z0, RELIEF_HEIGHT))
+    near = _construction_chord(adapter, feature, (-z0, 0.0), (-z0, RELIEF_HEIGHT))
     check(
         feature,
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{near}.start", f"{front}.start", "horizontal_points"
         ),
     )
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{front}.start",
         f"{near}.start",
@@ -611,8 +611,8 @@ async def _relief_reference(adapter) -> list[tuple[str, str]]:
         depth_station(z0),
         f"{feature} near wall from the front face",
     )
-    check(feature, await adapter.add_sketch_constraint(near, None, "vertical"))
-    await dimension_between(
+    check(feature, adapter.add_sketch_constraint(near, None, "vertical"))
+    dimension_between(
         adapter,
         f"{near}.start",
         f"{near}.end",
@@ -620,14 +620,14 @@ async def _relief_reference(adapter) -> list[tuple[str, str]]:
         RELIEF_HEIGHT,
         f"{feature} height",
     )
-    far = await _construction_chord(adapter, feature, (-z1, 0.0), (-z1, RELIEF_HEIGHT))
+    far = _construction_chord(adapter, feature, (-z1, 0.0), (-z1, RELIEF_HEIGHT))
     check(
         feature,
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{far}.start", f"{front}.start", "horizontal_points"
         ),
     )
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{front}.start",
         f"{far}.start",
@@ -635,8 +635,8 @@ async def _relief_reference(adapter) -> list[tuple[str, str]]:
         depth_station(z1),
         f"{feature} far wall from the front face",
     )
-    check(feature, await adapter.add_sketch_constraint(far, None, "vertical"))
-    await dimension_between(
+    check(feature, adapter.add_sketch_constraint(far, None, "vertical"))
+    dimension_between(
         adapter,
         f"{far}.start",
         f"{far}.end",
@@ -644,8 +644,8 @@ async def _relief_reference(adapter) -> list[tuple[str, str]]:
         RELIEF_HEIGHT,
         f"{feature} far wall",
     )
-    await ensure_fully_defined(adapter, feature)
-    check(f"exit sketch {feature}", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, feature)
+    check(f"exit sketch {feature}", adapter.exit_sketch())
     name_last_feature(adapter, feature)
     _require_on_section_plane(adapter, feature)
     # The stub's length is fixed: nothing in the part sets it.
@@ -670,7 +670,7 @@ async def _relief_reference(adapter) -> list[tuple[str, str]]:
     ]
 
 
-async def _pivot_reference(adapter) -> list[tuple[str, str]]:
+def _pivot_reference(adapter) -> list[tuple[str, str]]:
     """The pivot bore's depth-wise station and top chamfer, in section A-A.
 
     On SECTION_PLANE, sketch (u, v) = model (-Z, Y), construction only and
@@ -690,15 +690,15 @@ async def _pivot_reference(adapter) -> list[tuple[str, str]]:
     radius = PIVOT_BORE_DIA / 2.0
     chamfer = PIVOT_BORE_TOP_CHAMFER
     top = BLOCK_HEIGHT
-    check(f"create sketch {feature}", await adapter.create_sketch(SECTION_PLANE))
-    front = await _construction_chord(
+    check(f"create sketch {feature}", adapter.create_sketch(SECTION_PLANE))
+    front = _construction_chord(
         adapter, feature, (_DATUM_U, top), (_DATUM_U, top - _STUB)
     )
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{front}.start", _DATUM_U, top, f"{feature} front face top edge"
     )
-    check(feature, await adapter.add_sketch_constraint(front, None, "vertical"))
-    await dimension_between(
+    check(feature, adapter.add_sketch_constraint(front, None, "vertical"))
+    dimension_between(
         adapter,
         f"{front}.start",
         f"{front}.end",
@@ -706,16 +706,16 @@ async def _pivot_reference(adapter) -> list[tuple[str, str]]:
         _STUB,
         f"{feature} front stub",
     )
-    axis = await _construction_chord(
+    axis = _construction_chord(
         adapter, feature, (-_Z_MID, top), (-_Z_MID, top - _STUB)
     )
     check(
         feature,
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{axis}.start", f"{front}.start", "horizontal_points"
         ),
     )
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{front}.start",
         f"{axis}.start",
@@ -723,8 +723,8 @@ async def _pivot_reference(adapter) -> list[tuple[str, str]]:
         depth_station(_Z_MID),
         f"{feature} bore axis from the front face",
     )
-    check(feature, await adapter.add_sketch_constraint(axis, None, "vertical"))
-    await dimension_between(
+    check(feature, adapter.add_sketch_constraint(axis, None, "vertical"))
+    dimension_between(
         adapter,
         f"{axis}.start",
         f"{axis}.end",
@@ -732,7 +732,7 @@ async def _pivot_reference(adapter) -> list[tuple[str, str]]:
         _STUB,
         f"{feature} axis stub",
     )
-    leg = await _construction_chord(
+    leg = _construction_chord(
         adapter,
         feature,
         (-(_Z_MID + radius + chamfer), top),
@@ -740,11 +740,11 @@ async def _pivot_reference(adapter) -> list[tuple[str, str]]:
     )
     check(
         feature,
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{leg}.start", f"{front}.start", "horizontal_points"
         ),
     )
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{leg}.end",
         f"{axis}.start",
@@ -752,7 +752,7 @@ async def _pivot_reference(adapter) -> list[tuple[str, str]]:
         radius,
         f"{feature} chamfer foot on the bore wall",
     )
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{leg}.start",
         f"{leg}.end",
@@ -760,7 +760,7 @@ async def _pivot_reference(adapter) -> list[tuple[str, str]]:
         chamfer,
         f"{feature} chamfer run",
     )
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{leg}.start",
         f"{leg}.end",
@@ -768,8 +768,8 @@ async def _pivot_reference(adapter) -> list[tuple[str, str]]:
         chamfer,
         f"{feature} chamfer drop",
     )
-    await ensure_fully_defined(adapter, feature)
-    check(f"exit sketch {feature}", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, feature)
+    check(f"exit sketch {feature}", adapter.exit_sketch())
     name_last_feature(adapter, feature)
     _require_on_section_plane(adapter, feature)
     # The stubs' lengths are fixed: nothing in the part sets them.
@@ -798,20 +798,20 @@ async def _pivot_reference(adapter) -> list[tuple[str, str]]:
 
 
 @_telemetry.traced("sketch.pn_pen_v_block_tap_wall_reference")
-async def _tap_wall_reference(adapter) -> None:
+def _tap_wall_reference(adapter) -> None:
     """RV-01's accepted wall from the set-screw tap to the step face, stated
     natively: a hidden construction line on the Front plane at the tap's
     height, running -X toward the step from the thread's major diameter, as
     long as the printed minimum, so its driving dimension prints ".064 MIN"
     once _single_limits types it (build_pn_pen_frame's recipe)."""
     feature = "TapWallReference"
-    check(f"create sketch {feature}", await adapter.create_sketch("Front"))
+    check(f"create sketch {feature}", adapter.create_sketch("Front"))
     start = (TAP_WALL_START_X, SET_SCREW_Y)
-    line = await _construction_chord(
+    line = _construction_chord(
         adapter, feature, start, (start[0] - TAP_WALL_MIN_MM, start[1])
     )
-    check(feature, await adapter.add_sketch_constraint(line, None, "horizontal"))
-    await dimension_between(
+    check(feature, adapter.add_sketch_constraint(line, None, "horizontal"))
+    dimension_between(
         adapter,
         f"{line}.start",
         f"{line}.end",
@@ -819,9 +819,9 @@ async def _tap_wall_reference(adapter) -> None:
         TAP_WALL_MIN_MM,
         feature,
     )
-    await anchor_point_to_origin(adapter, f"{line}.start", *start, feature)
-    await ensure_fully_defined(adapter, feature)
-    check(f"exit sketch {feature}", await adapter.exit_sketch())
+    anchor_point_to_origin(adapter, f"{line}.start", *start, feature)
+    ensure_fully_defined(adapter, feature)
+    check(f"exit sketch {feature}", adapter.exit_sketch())
     name_last_feature(adapter, feature)
     name_dimensions(adapter, feature, ["TapWallMin", "TapWallX", "TapWallY"])
 
@@ -910,10 +910,10 @@ def _author_reference_dimensions(adapter) -> None:
             raise RuntimeError(f"{label}: reference display did not persist")
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     # #290: the row's inch calculation units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
@@ -941,9 +941,9 @@ async def build(adapter) -> dict[str, str]:
         ("VApexFilletR", V_APEX_FILLET_R),
         ("SetScrewY", SET_SCREW_Y),
     ):
-        await set_global(adapter, name, f"{value}mm")
+        set_global(adapter, name, f"{value}mm")
     # Both flanks' angle to the bottom face drives its sketch (degrees, not mm).
-    await set_global(adapter, "VFlankAngle", f"{V_FLANK_ANGLE_DEG}deg")
+    set_global(adapter, "VFlankAngle", f"{V_FLANK_ANGLE_DEG}deg")
 
     # Each sketch records its dim names + drive equations in emission order;
     # the equations are applied in one deferred batch once the model exists.
@@ -952,33 +952,33 @@ async def build(adapter) -> dict[str, str]:
     # 1. The plan outline, neck and body, extruded +Y (the Top plane's normal)
     # by the height.
     outline = SketchDims()
-    check("create_sketch outline", await adapter.create_sketch("Top"))
-    await _outline(adapter, outline)
-    await ensure_fully_defined(adapter, "block outline")
-    check("exit_sketch outline", await adapter.exit_sketch())
+    check("create_sketch outline", adapter.create_sketch("Top"))
+    _outline(adapter, outline)
+    ensure_fully_defined(adapter, "block outline")
+    check("exit_sketch outline", adapter.exit_sketch())
     name_last_feature(adapter, "OutlineProfile")
     drive_jobs += outline.apply(adapter, "OutlineProfile")
     check(
         "extrude block",
-        await adapter.create_extrusion(ExtrusionParameters(depth=BLOCK_HEIGHT)),
+        adapter.create_extrusion(ExtrusionParameters(depth=BLOCK_HEIGHT)),
     )
     name_last_feature(adapter, "Block")
     drive_jobs += [(name_dimensions(adapter, "Block", ["Height"])[0], '"BlockHeight"')]
-    volume = await volume_check(adapter, "block", V_BLOCK, 0.001 * V_BLOCK)
+    volume = volume_check(adapter, "block", V_BLOCK, 0.001 * V_BLOCK)
 
     # 2. The grip's V-groove, cut +X (the Right plane's normal) from the paper
     # end face one corner radius past the relief's start, so the step face
     # never ends in a sliver under a flank (review final2's mouth triangles).
     groove = SketchDims()
-    check("create_sketch V-groove", await adapter.create_sketch("Right"))
-    await _v_groove(adapter, groove)
-    await ensure_fully_defined(adapter, "V-groove sketch")
-    check("exit_sketch V-groove", await adapter.exit_sketch())
+    check("create_sketch V-groove", adapter.create_sketch("Right"))
+    _v_groove(adapter, groove)
+    ensure_fully_defined(adapter, "V-groove sketch")
+    check("exit_sketch V-groove", adapter.exit_sketch())
     name_last_feature(adapter, "VGrooveProfile")
     drive_jobs += groove.apply(adapter, "VGrooveProfile")
     check(
         "cut V-groove",
-        await adapter.create_cut_extrude(ExtrusionParameters(depth=V_CUT_LENGTH)),
+        adapter.create_cut_extrude(ExtrusionParameters(depth=V_CUT_LENGTH)),
     )
     name_last_feature(adapter, "VGroove")
     drive_jobs += [
@@ -987,7 +987,7 @@ async def build(adapter) -> dict[str, str]:
             '"ReliefX0" + "ReliefCornerR"',
         )
     ]
-    volume = await volume_check(adapter, "V-groove", volume - V_GROOVE, 0.01 * V_GROOVE)
+    volume = volume_check(adapter, "V-groove", volume - V_GROOVE, 0.01 * V_GROOVE)
 
     # 2b. The rounds where the apex flat meets the flanks, a chamfer mill's
     # tip (the title block's inside-corner row governs): each edge picked
@@ -996,7 +996,7 @@ async def build(adapter) -> dict[str, str]:
     # round ate nothing else.
     check(
         "fillet V apex flat corners",
-        await adapter.add_fillet(
+        adapter.add_fillet(
             V_APEX_FILLET_R,
             [
                 [RELIEF_X0 / 2.0, V_FLAT_Y, _Z_MID - V_FLAT_WIDTH / 2.0],
@@ -1007,7 +1007,7 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "VApexFillets")
     fillet_dim = name_dimensions(adapter, "VApexFillets", ["VApexFilletR"])
     drive_jobs += [(fillet_dim[0], '"VApexFilletR"')]
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "V apex fillets", volume + V_APEX_FILLETS, 0.01 * V_GROOVE
     )
 
@@ -1022,34 +1022,34 @@ async def build(adapter) -> dict[str, str]:
     # walls' unprinted stations run from the origin (the neck's front face);
     # the print's, from the body's front face, are ReliefReference's.
     relief = SketchDims()
-    check("create_sketch relief", await adapter.create_sketch("Top"))
+    check("create_sketch relief", adapter.create_sketch("Top"))
     z0, z1 = RELIEF_Z0, RELIEF_Z1
     corner_r = RELIEF_CORNER_R
     x1 = RELIEF_X0 + corner_r
     set_sketch_direct_db(adapter, True)
-    back = check("relief back wall", await adapter.add_line(x1, -z1, BLOCK_LENGTH, -z1))
+    back = check("relief back wall", adapter.add_line(x1, -z1, BLOCK_LENGTH, -z1))
     free_end = check(
         "relief free end",
-        await adapter.add_line(BLOCK_LENGTH, -z1, BLOCK_LENGTH, -z0),
+        adapter.add_line(BLOCK_LENGTH, -z1, BLOCK_LENGTH, -z0),
     )
     front = check(
-        "relief front wall", await adapter.add_line(BLOCK_LENGTH, -z0, x1, -z0)
+        "relief front wall", adapter.add_line(BLOCK_LENGTH, -z0, x1, -z0)
     )
     front_corner = check(
         "relief front corner",
-        await adapter.add_arc(
+        adapter.add_arc(
             x1, -(z0 + corner_r), x1, -z0, RELIEF_X0, -(z0 + corner_r)
         ),
     )
     step = check(
         "relief step",
-        await adapter.add_line(
+        adapter.add_line(
             RELIEF_X0, -(z0 + corner_r), RELIEF_X0, -(z1 - corner_r)
         ),
     )
     back_corner = check(
         "relief back corner",
-        await adapter.add_arc(
+        adapter.add_arc(
             x1, -(z1 - corner_r), RELIEF_X0, -(z1 - corner_r), x1, -z1
         ),
     )
@@ -1064,8 +1064,8 @@ async def build(adapter) -> dict[str, str]:
         ("relief back corner tangent step", back_corner, step, "tangent"),
         ("relief back corner tangent wall", back_corner, back, "tangent"),
     ):
-        check(label, await adapter.add_sketch_constraint(first, second, relation))
-    await dimension_between(
+        check(label, adapter.add_sketch_constraint(first, second, relation))
+    dimension_between(
         adapter,
         f"{step}.start",
         f"{free_end}.start",
@@ -1074,7 +1074,7 @@ async def build(adapter) -> dict[str, str]:
         "relief length",
     )
     relief.record("ReliefLength", '"BlockLength" - "ReliefX0"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{back}.start",
         "origin",
@@ -1085,7 +1085,7 @@ async def build(adapter) -> dict[str, str]:
     relief.record("ReliefZ1", '"ReliefBackZ" - "NeckFrontZ"')
     # The station runs from the paper end to the step's far (z 16) end, so
     # its extension line leaves the step's own edge, not the corner arc.
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{step}.end",
         "origin",
@@ -1094,7 +1094,7 @@ async def build(adapter) -> dict[str, str]:
         "relief start station",
     )
     relief.record("ReliefX0", '"ReliefX0"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{front}.start",
         "origin",
@@ -1109,30 +1109,30 @@ async def build(adapter) -> dict[str, str]:
     ):
         check(
             f"{name} radius",
-            await adapter.add_sketch_dimension(arc, None, "radial", corner_r),
+            adapter.add_sketch_dimension(arc, None, "radial", corner_r),
         )
         relief.record(name, '"ReliefCornerR"')
-    await ensure_fully_defined(adapter, "relief sketch")
-    check("exit_sketch relief", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "relief sketch")
+    check("exit_sketch relief", adapter.exit_sketch())
     name_last_feature(adapter, "ReliefProfile")
     drive_jobs += relief.apply(adapter, "ReliefProfile")
     check(
         "cut relief",
-        await adapter.create_cut_extrude(ExtrusionParameters(depth=RELIEF_HEIGHT)),
+        adapter.create_cut_extrude(ExtrusionParameters(depth=RELIEF_HEIGHT)),
     )
     name_last_feature(adapter, "Relief")
     drive_jobs += [
         (name_dimensions(adapter, "Relief", ["ReliefHeight"])[0], '"ReliefHeight"')
     ]
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "relief slot", volume - V_RELIEF, 0.01 * V_RELIEF
     )
 
     # 4. The rod's reamed pivot bore: a Top-plane circle cut mid-plane through
     # everything; below the roof it crosses only the relief's void.
     pivot = SketchDims()
-    check("create_sketch pivot bore", await adapter.create_sketch("Top"))
-    await define_circle(
+    check("create_sketch pivot bore", adapter.create_sketch("Top"))
+    define_circle(
         adapter,
         PIVOT_BORE_X,
         -_Z_MID,
@@ -1142,18 +1142,18 @@ async def build(adapter) -> dict[str, str]:
         names=("PivotX", "PivotZ", "PivotDia"),
         drives=('"PivotBoreX"', '"BlockDepth" / 2 - "NeckFrontZ"', '"PivotBoreDia"'),
     )
-    await ensure_fully_defined(adapter, "pivot bore sketch")
-    check("exit_sketch pivot bore", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "pivot bore sketch")
+    check("exit_sketch pivot bore", adapter.exit_sketch())
     name_last_feature(adapter, "PivotBoreProfile")
     drive_jobs += pivot.apply(adapter, "PivotBoreProfile")
     check(
         "cut pivot bore",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
         ),
     )
     name_last_feature(adapter, "PivotBore")
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "pivot bore", volume - V_PIVOT_BORE, 0.01 * V_PIVOT_BORE
     )
 
@@ -1162,7 +1162,7 @@ async def build(adapter) -> dict[str, str]:
     # circular edge at +X, the only edge through that point.
     check(
         "chamfer pivot bore top edge",
-        await adapter.add_chamfer(
+        adapter.add_chamfer(
             PIVOT_BORE_TOP_CHAMFER,
             [[PIVOT_BORE_X + PIVOT_BORE_DIA / 2.0, BLOCK_HEIGHT, _Z_MID]],
         ),
@@ -1172,7 +1172,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, "PivotBoreChamfer", ["PivotChamferDistance", "PivotChamferAngle"]
     )
     drive_jobs.append((chamfer_dims[0], '"PivotChamfer"'))
-    volume = await volume_check(
+    volume = volume_check(
         adapter,
         "pivot-bore chamfer",
         volume - V_PIVOT_CHAMFER,
@@ -1193,31 +1193,31 @@ async def build(adapter) -> dict[str, str]:
         placement_dims=[(("SetScrewX", '"PivotBoreX"'), ("SetScrewY", '"SetScrewY"'))],
     )
     drive_jobs += tap.placement_drive_jobs
-    await volume_check(
+    volume_check(
         adapter, "set-screw tap", volume - V_SET_SCREW_TAP, 0.03 * V_SET_SCREW_TAP
     )
 
     # 6. The hidden depth-wise references the sheet prints (no solid change).
-    await _section_plane(adapter)
-    drive_jobs += await _relief_reference(adapter)
-    drive_jobs += await _pivot_reference(adapter)
-    await _tap_wall_reference(adapter)
+    _section_plane(adapter)
+    drive_jobs += _relief_reference(adapter)
+    drive_jobs += _pivot_reference(adapter)
+    _tap_wall_reference(adapter)
 
     # Apply the deferred drive equations now -- after the whole model + a rebuild
     # exists, so every target resolves. Each equation evaluates to the value just
     # built, so the geometry must not move -- the re-check below is the proof.
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    volume_check(
         adapter, "driven pen v-block (equations neutral)", V_TOTAL, 0.002 * V_TOTAL
     )
 
     # Bright brass in every photo: no colour override, the material appearance
     # is the finish.
-    await apply_material(adapter, MATERIAL)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    report_mass_properties(adapter)
 
     # Manufacturing drawing support: the pivot band, the authored places, and
     # exactly the print's dimensions marked (the drawing must find every one).
@@ -1239,7 +1239,7 @@ async def build(adapter) -> dict[str, str]:
     apply_drawing_properties(
         adapter, PART_NAME, {"Isometric View Note": ISOMETRIC_VIEW_NOTE}
     )
-    artefacts = await save_part_and_images(adapter, PART_NAME)
+    artefacts = save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(
         adapter,
         (

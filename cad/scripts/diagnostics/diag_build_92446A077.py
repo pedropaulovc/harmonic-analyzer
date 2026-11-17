@@ -38,15 +38,15 @@ from diagnostics.diag_mcmaster_fillister import build_fillister  # noqa: E402
 
 
 @stock_recipe("92446A077", threaded=True)
-async def build_92446A077(adapter, truth=None):
-    await build_fillister(adapter, PART_NO, PAN_HEAD_SIZE)
+def build_92446A077(adapter, truth=None):
+    build_fillister(adapter, PART_NO, PAN_HEAD_SIZE)
 
 
-async def build_catalog(adapter) -> dict[str, str]:
+def build_catalog(adapter) -> dict[str, str]:
     # The oval family's catalog-only driver is SKU-agnostic.
     from diagnostics.diag_mcmaster_oval import catalog_run
 
-    return await catalog_run(adapter, PART_NO, build_92446A077)
+    return catalog_run(adapter, PART_NO, build_92446A077)
 
 
 if __name__ == "__main__":

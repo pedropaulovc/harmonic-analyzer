@@ -39,13 +39,13 @@ MATERIAL = SPEC.material
 TRANSFORM = RigidTransform(rotation_radians=(math.pi / 2.0, 0.0, 0.0))
 
 
-async def _save_supplier_reference_part(adapter, part_name: str) -> dict[str, str]:
-    await add_supplier_disc_diagram(adapter, spec=supplier_spec)
-    return await save_part_and_images(adapter, part_name)
+def _save_supplier_reference_part(adapter, part_name: str) -> dict[str, str]:
+    add_supplier_disc_diagram(adapter, spec=supplier_spec)
+    return save_part_and_images(adapter, part_name)
 
 
-async def build(adapter) -> dict[str, str]:
-    return await build_stock_fastener(
+def build(adapter) -> dict[str, str]:
+    return build_stock_fastener(
         adapter,
         part_name=PART_NAME,
         components=(

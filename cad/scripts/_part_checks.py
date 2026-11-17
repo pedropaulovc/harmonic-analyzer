@@ -12,9 +12,9 @@ from _com import _early_bound
 
 
 @_telemetry.traced("check.volume", label_param="label")
-async def volume_check(adapter: Any, label: str, expected: float, tol: float) -> float:
+def volume_check(adapter: Any, label: str, expected: float, tol: float) -> float:
     """Assert the part volume (mm^3) and return it."""
-    mass = await adapter.get_mass_properties()
+    mass = adapter.get_mass_properties()
     if not mass.is_success:
         raise RuntimeError(f"{label}: get_mass_properties failed: {mass.error}")
     volume = float(mass.data.volume)
@@ -28,7 +28,7 @@ async def volume_check(adapter: Any, label: str, expected: float, tol: float) ->
 
 
 @_telemetry.traced("check.measure", label_param="label")
-async def measure_check(
+def measure_check(
     adapter: Any,
     label: str,
     entities: list[dict[str, Any]],
@@ -51,7 +51,7 @@ async def measure_check(
     adapter._zoom_to_fit(adapter.currentModel)
 
     refs = [MeasureEntityRef(**entity) for entity in entities]
-    res = await adapter.measure(MeasureParameters(entities=refs))
+    res = adapter.measure(MeasureParameters(entities=refs))
     if not res.is_success:
         raise RuntimeError(f"measure {label} failed: {res.error}")
     value = res.data.get(key)
@@ -65,7 +65,7 @@ async def measure_check(
 
 
 @_telemetry.traced("check.bbox", label_param="label")
-async def bbox_extent_check(
+def bbox_extent_check(
     adapter: Any,
     label: str,
     axis: str,
@@ -129,9 +129,9 @@ async def bbox_extent_check(
     )
 
 
-async def report_mass_properties(adapter: Any) -> None:
+def report_mass_properties(adapter: Any) -> None:
     """Print volume/bounding data for the eyeball-vs-DIMENSIONS.md check."""
-    res = await adapter.get_mass_properties()
+    res = adapter.get_mass_properties()
     if res.is_success:
         _telemetry.debug(f"mass properties: {res.data!r}")
         return

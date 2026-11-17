@@ -8,7 +8,7 @@ canonical installed part and the assembly's no-render length variants.
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from typing import Any
 
 import _config
@@ -35,14 +35,14 @@ STOCK_PROPERTIES = {
 
 
 @_telemetry.traced("spring.build_variant", label_param="part_name")
-async def build_spring(
+def build_spring(
     adapter: Any,
     part_name: str,
     length_mm: float,
     *,
     views: Iterable[str] | None = None,
     drawing_properties: Mapping[str, str] | None = None,
-    before_save: Callable[[Any], Awaitable[None]] | None = None,
+    before_save: Callable[[Any], None] | None = None,
 ) -> dict[str, str]:
     """Build and save one 9432K31 at a catalogue inside-hook length.
 
@@ -51,17 +51,17 @@ async def build_spring(
     passes ``drawing_properties`` so its purchased-reference-sheet properties
     are applied before the single save/export operation.
     """
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     try:
-        await build_9432K31(adapter, None, length_mm=length_mm)
+        build_9432K31(adapter, None, length_mm=length_mm)
     finally:
         if hasattr(adapter, "_mcm_com_map"):
             delattr(adapter, "_mcm_com_map")
 
     _blank_recipe_references(adapter)
-    await force_rebuild(adapter)
-    await apply_material(adapter, MATERIAL)
-    await apply_color(adapter, POLISHED_STEEL)
+    force_rebuild(adapter)
+    apply_material(adapter, MATERIAL)
+    apply_color(adapter, POLISHED_STEEL)
     apply_custom_properties(adapter, STOCK_PROPERTIES)
 
     if drawing_properties is not None:
@@ -71,12 +71,12 @@ async def build_spring(
     if before_save is not None:
         model = _early_bound(adapter.currentModel, "IModelDoc2")
         configuration = active_configuration_name(adapter, model)
-        await before_save(adapter)
+        before_save(adapter)
         if (int(adapter.swApp.IsSame(adapter.currentModel, model)) != 1
                 or active_configuration_name(adapter, model) != configuration):
             raise RuntimeError(f"{part_name}: before_save changed the installed document/configuration")
 
-    await report_mass_properties(adapter)
+    report_mass_properties(adapter)
     if views is None:
-        return await save_part_and_images(adapter, part_name)
-    return await save_part_and_images(adapter, part_name, views)
+        return save_part_and_images(adapter, part_name)
+    return save_part_and_images(adapter, part_name, views)

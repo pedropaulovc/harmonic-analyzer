@@ -46,13 +46,13 @@ HIDE_TYPES = {
 }
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.pywin32_adapter import null_callout
 
     results: dict[str, str] = {}
     for stem in PARTS:
         path = ROOT / "out" / "sldprt" / f"{stem}.SLDPRT"
-        check(f"open {stem}", await adapter.open_model(str(path)))
+        check(f"open {stem}", adapter.open_model(str(path)))
         model = adapter.currentModel
         _flag(model, "IModelDoc2")
 
@@ -84,7 +84,7 @@ async def build(adapter) -> dict[str, str]:
             feat = _read_member(feat, "GetNextFeature")
 
         if hidden:
-            check(f"save {stem}", await adapter.save_file())
+            check(f"save {stem}", adapter.save_file())
         _telemetry.info(f"{stem}: hid {hidden or 'nothing'}")
         results[stem] = ",".join(hidden) or "none"
     return results

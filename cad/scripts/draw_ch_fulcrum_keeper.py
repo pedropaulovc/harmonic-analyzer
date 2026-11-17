@@ -496,11 +496,11 @@ def _set_foot_hole_process(display: Any) -> None:
     _telemetry.info(f"foot-hole callout: {resolved!r}")
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open fulcrum-keeper source", await adapter.open_model(str(SOURCE)))
+    check("open fulcrum-keeper source", adapter.open_model(str(SOURCE)))
     read_required_properties(
         adapter.currentModel,
         (
@@ -621,7 +621,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # Just under the pictorial (its bottom ~0.172), not 20 mm below it.
     add_property_linked_note(adapter, "Isometric View Note", 0.310, 0.163)
 
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Fulcrum Keeper Manufacturing Drawing",

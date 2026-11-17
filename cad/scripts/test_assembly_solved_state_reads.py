@@ -12,7 +12,6 @@ Run: ``uv run python -m pytest cad/scripts/test_assembly_solved_state_reads.py -
 
 from __future__ import annotations
 
-import asyncio
 import sys
 from pathlib import Path
 from types import SimpleNamespace as NS
@@ -147,7 +146,7 @@ def _mass_adapter(needs_rebuild, **native_overrides):
         )
     )
 
-    async def get_mass_properties():
+    def get_mass_properties():
         calls.append("adapter")
         return AdapterResult(
             status=AdapterResultStatus.SUCCESS,
@@ -162,7 +161,7 @@ def _mass_adapter(needs_rebuild, **native_overrides):
 
 def test_solved_model_reads_mass_properties_in_adapter_units():
     adapter, calls = _mass_adapter(needs_rebuild=0)
-    data = asyncio.run(_assembly._solved_mass_properties(adapter, Span())).data
+    data = _assembly._solved_mass_properties(adapter, Span()).data
     assert calls == ["native"]
     assert data.volume == pytest.approx(1250.0)  # m^3 -> mm^3
     assert data.surface_area == pytest.approx(3500.0)  # m^2 -> mm^2
@@ -175,7 +174,7 @@ def test_solved_model_reads_mass_properties_in_adapter_units():
 
 def test_dirty_model_uses_the_rebuilding_adapter_read():
     adapter, calls = _mass_adapter(needs_rebuild=1)
-    asyncio.run(_assembly._solved_mass_properties(adapter, Span()))
+    _assembly._solved_mass_properties(adapter, Span())
     assert calls == ["adapter"]
 
 
@@ -201,5 +200,5 @@ def test_incomplete_fast_read_refuses_rather_than_fingerprinting_zeros(override)
     # reads, so neither a SUCCESS nor a fallback is acceptable.
     adapter, calls = _mass_adapter(needs_rebuild=0, **override)
     with pytest.raises(RuntimeError, match="incomplete mass-property read"):
-        asyncio.run(_assembly._solved_mass_properties(adapter, Span()))
+        _assembly._solved_mass_properties(adapter, Span())
     assert calls == ["native"]

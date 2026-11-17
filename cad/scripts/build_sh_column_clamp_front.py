@@ -47,8 +47,8 @@ DEPTH = ARC_DEPTH  # bar back face to the column-axis plane
 # #8 clearance (normal fit Ø.196; nearest UNC to the ~Ø4 screw).
 
 
-async def build(adapter) -> dict[str, str]:
-    await build_arc(
+def build(adapter) -> dict[str, str]:
+    build_arc(
         adapter,
         part_name=PART_NAME,
         depth=DEPTH,
@@ -93,7 +93,7 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
-    return await save_part_and_images(adapter, PART_NAME)
+    return save_part_and_images(adapter, PART_NAME)
 
 
 if __name__ == "__main__":

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from copy import copy
 from dataclasses import replace
 import hashlib
@@ -1298,8 +1297,7 @@ def test_supplier_builder_hashes_before_readonly_open_and_stops_if_open_refuses(
     monkeypatch.setattr(supplier_drawing, "read_required_properties", forbidden)
     spec = SimpleNamespace(source=source, source_kind="part", artifact_stem="supplier")
     with pytest.raises(RuntimeError, match="already-open source is writable"):
-        asyncio.run(
-            supplier_drawing.build_supplier_spring_drawing(
+        supplier_drawing.build_supplier_spring_drawing(
                 SimpleNamespace(),
                 spec,
                 item="1",
@@ -1307,7 +1305,6 @@ def test_supplier_builder_hashes_before_readonly_open_and_stops_if_open_refuses(
                 supplier_margins={},
                 supplier_reference_features={},
             )
-        )
     assert calls == ["hash", "readonly-open"]
     assert source.read_bytes() == b"offline supplier source"
 
@@ -1409,8 +1406,7 @@ def test_supplier_builder_rejects_nonclean_opened_source_before_metadata_or_prep
     monkeypatch.setattr(supplier_drawing, "new_project_drawing", forbidden)
     spec = SimpleNamespace(source=source, source_kind="part", artifact_stem="supplier")
     with pytest.raises(RuntimeError, match="clean"):
-        asyncio.run(
-            supplier_drawing.build_supplier_spring_drawing(
+        supplier_drawing.build_supplier_spring_drawing(
                 harness.adapter,
                 spec,
                 item="1",
@@ -1419,7 +1415,6 @@ def test_supplier_builder_rejects_nonclean_opened_source_before_metadata_or_prep
                 supplier_margins={},
                 supplier_reference_features={},
             )
-        )
     assert calls == ["readonly-open"]
     assert harness.model.dirty is dirty
     assert harness.model.events == []
@@ -1563,8 +1558,7 @@ def test_supplier_builder_enables_dirty_allowance_only_at_annotation_callback(
         PresentationReached if dirty_stage == "presentation" else RuntimeError
     )
     with pytest.raises(expected_error):
-        asyncio.run(
-            supplier_drawing.build_supplier_spring_drawing(
+        supplier_drawing.build_supplier_spring_drawing(
                 harness.adapter,
                 spec,
                 item="1",
@@ -1577,7 +1571,6 @@ def test_supplier_builder_enables_dirty_allowance_only_at_annotation_callback(
                 include_top=False,
                 spring_metadata=True,
             )
-        )
     assert events[:3] == ["open", "drawing", "prepare"]
     assert ("dimensions" in events) is (dirty_stage == "presentation")
     assert ("prepared-check" in events) is (dirty_stage != "prepare")

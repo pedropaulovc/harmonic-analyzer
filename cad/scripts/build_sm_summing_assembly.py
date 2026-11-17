@@ -668,11 +668,11 @@ if not (
     raise AssertionError("summing setting drives assume x < 0 < y, screw left of knife")
 
 
-async def _construction_line(
+def _construction_line(
     adapter, start: tuple[float, float], end: tuple[float, float], label: str
 ) -> str:
     set_sketch_direct_db(adapter, True)
-    line = check(label, await adapter.add_line(start[0], start[1], end[0], end[1]))
+    line = check(label, adapter.add_line(start[0], start[1], end[0], end[1]))
     set_sketch_direct_db(adapter, False)
     segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
     segment.ConstructionGeometry = True
@@ -681,23 +681,23 @@ async def _construction_line(
     return line
 
 
-async def _finish_setting(
+def _finish_setting(
     adapter, feature: str, dims: SketchDims, marked: str
 ) -> None:
-    await ensure_fully_defined(adapter, feature)
-    check(f"exit {feature} sketch", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, feature)
+    check(f"exit {feature} sketch", adapter.exit_sketch())
     name_last_feature(adapter, feature)
     for name, expression in dims.apply(adapter, feature):
-        await drive_dimension(adapter, name, expression)
+        drive_dimension(adapter, name, expression)
     mark_dimensions_for_drawing(adapter, feature, {marked})
 
 
-async def _author_settings(adapter) -> None:
+def _author_settings(adapter) -> None:
     """CounterSetting: the MHA-SM-VN-56 axis above the knife contact level (the
     gooseneck height the level setting finds). KnifeRockGauge: the boss face's
     minimum travel at the free-rock floor, up the boss-hook axis."""
     for name, value in _SETTING_GLOBALS.items():
-        await set_global(adapter, name, f"{value}mm")
+        set_global(adapter, name, f"{value}mm")
 
     # The setting line runs up the counter spring's axis, from the knife
     # contact level to the screw axis, so the only printed construction lies
@@ -705,39 +705,39 @@ async def _author_settings(adapter) -> None:
     knife, screw = spec.KNIFE_POINT, spec.COUNTER_SCREW_POINT
     base = (screw[0], knife[1])
     dims = SketchDims()
-    check("create counter setting sketch", await adapter.create_sketch("Front"))
-    line = await _construction_line(adapter, base, screw, "counter setting line")
+    check("create counter setting sketch", adapter.create_sketch("Front"))
+    line = _construction_line(adapter, base, screw, "counter setting line")
     check(
         "counter setting vertical",
-        await adapter.add_sketch_constraint(line, None, "vertical"),
+        adapter.add_sketch_constraint(line, None, "vertical"),
     )
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{line}.start", *base, "spring axis at knife level"
     )
     dims.record("CounterScrewX", '-"SmCounterScrewX"')
     dims.record("KnifeY", '"SmKnifeY"')
-    await dimension_between(
+    dimension_between(
         adapter, f"{line}.start", f"{line}.end", "vertical_distance",
         spec.COUNTER_SCREW_RISE, "counter screw rise",
     )
     dims.record(spec.COUNTER_DIMENSION, '"SmCounterScrewY" - "SmKnifeY"')
-    await _finish_setting(adapter, spec.COUNTER_FEATURE, dims, spec.COUNTER_DIMENSION)
+    _finish_setting(adapter, spec.COUNTER_FEATURE, dims, spec.COUNTER_DIMENSION)
 
     face = spec.BOSS_FACE_POINT
     top = (face[0], face[1] + spec.BOSS_ROCK_TRAVEL)
     dims = SketchDims()
-    check("create knife rock gauge sketch", await adapter.create_sketch("Front"))
-    line = await _construction_line(adapter, face, top, "boss rock gauge line")
-    check("rock gauge vertical", await adapter.add_sketch_constraint(line, None, "vertical"))
-    await anchor_point_to_origin(adapter, f"{line}.start", *face, "boss face")
+    check("create knife rock gauge sketch", adapter.create_sketch("Front"))
+    line = _construction_line(adapter, face, top, "boss rock gauge line")
+    check("rock gauge vertical", adapter.add_sketch_constraint(line, None, "vertical"))
+    anchor_point_to_origin(adapter, f"{line}.start", *face, "boss face")
     dims.record("BossX", '-"SmBossX"')
     dims.record("BossFaceY", '"SmBossFaceY"')
-    await dimension_between(
+    dimension_between(
         adapter, f"{line}.start", f"{line}.end", "vertical_distance",
         spec.BOSS_ROCK_TRAVEL, "boss rock travel",
     )
     dims.record(spec.ROCK_DIMENSION, '"SmBossRockTravel"')
-    await _finish_setting(adapter, spec.ROCK_FEATURE, dims, spec.ROCK_DIMENSION)
+    _finish_setting(adapter, spec.ROCK_FEATURE, dims, spec.ROCK_DIMENSION)
 
     apply_drawing_precision(adapter, spec.DRAWING_PRECISION)
     for feature in spec.SETTING_FEATURES:
@@ -777,7 +777,7 @@ def _assert_counter_spring_hang(pose: spring_mounts.SpringPose) -> None:
     )
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     # Flip seeds + free-DOF contract: cad/config/assemblies/<ASM_NAME>.yaml.
     activate_assembly_contract(ASM_NAME)
     counter_seat, gooseneck_origin_y = settled_spring_seats.counter_seat()
@@ -793,7 +793,7 @@ async def build(adapter) -> dict[str, str]:
     # Reset the free-DOF manifest buffer before any *_driver(free_dof_key=...)
     # call: each freed DOF is recorded (never authored) and persisted below.
     reset_dof_manifest()
-    check("create_assembly", await adapter.create_assembly())
+    check("create_assembly", adapter.create_assembly())
     apply_package_model_units(adapter, assembly_contract(ASM_NAME).drawing_unit, label=ASM_NAME)
 
     # Two knife bearing supports, one per hex trunnion (overhanging the lever
@@ -802,7 +802,7 @@ async def build(adapter) -> dict[str, str]:
     # bore is much larger than the hex, so only the trunnion's top vertex line
     # (the knife edge) nears the upper inner wall. The named "knife axis" is that
     # contact ridge line; the lever's Axis3 (hex ridge) mates coincident to it.
-    km = await place_component(
+    km = place_component(
         adapter,
         "sm-knife-mount",
         [KNIFE[0], KNIFE_CONTACT_Y, KNIFE_MOUNT_Z_PLUS],
@@ -810,7 +810,7 @@ async def build(adapter) -> dict[str, str]:
         IDENTITY,
         label="knife-mount (front)",
     )
-    await place_component(
+    place_component(
         adapter,
         "sm-knife-mount",
         [KNIFE[0], KNIFE_CONTACT_Y, KNIFE_MOUNT_Z_MINUS],
@@ -832,7 +832,7 @@ async def build(adapter) -> dict[str, str]:
         ("back", KNIFE_MOUNT_Z_MINUS),
     ):
         hanger_washers.append(
-            await place_component(
+            place_component(
                 adapter,
                 "sm-vn-knife-hanger-washer",
                 [KNIFE[0], HANGER_WASHER_Y, station_z],
@@ -843,7 +843,7 @@ async def build(adapter) -> dict[str, str]:
             )
         )
         hanger_screws.append(
-            await place_component(
+            place_component(
                 adapter,
                 "sm-vn-knife-hanger-stud",
                 [KNIFE[0], HANGER_STUD_Y, station_z],
@@ -855,7 +855,7 @@ async def build(adapter) -> dict[str, str]:
         )
         for x_offset in KNIFE_DOWEL_X_OFFSETS:
             knife_dowels.append(
-                await place_component(
+                place_component(
                     adapter,
                     "sm-vn-knife-mount-dowel",
                     [KNIFE[0] + x_offset, KNIFE_DOWEL_Y, station_z],
@@ -926,7 +926,7 @@ async def build(adapter) -> dict[str, str]:
     # leaving the rock DOF -- the sub's freed operational DOF (its drive spec
     # recorded into the DOF manifest, never authored). This is the part the
     # counter spring + channel springs drive in the M6 Motion study.
-    sl = await place_component(
+    sl = place_component(
         adapter,
         "sm-summing-lever",
         [KNIFE[0], KNIFE[1], SUMMING_Z],
@@ -941,7 +941,7 @@ async def build(adapter) -> dict[str, str]:
     # ("knife axis" = Axis1@knife-mount). Same pose as the cylinder-centre mate
     # (ridge is 5.13 above the centre, both collinear along Z), but the freed
     # rock DOF is now about the knife edge, per the bearing-support design.
-    await coincident_mate(
+    coincident_mate(
         adapter,
         named_ref(f"Axis3@{sl}", "AXIS"),
         named_ref(f"Axis1@{km}", "AXIS"),
@@ -954,7 +954,7 @@ async def build(adapter) -> dict[str, str]:
     # off-axis spin_driver: the boss "spin ref" sits directly -X of the pivot
     # (Δy=0), so its distance-to-Top is degenerate and over-defines, whereas the
     # angle is well-conditioned and (inserted on-solution) holds without a flip.
-    await distance_driver(
+    distance_driver(
         adapter,
         named_ref(f"Front Plane@{sl}", "PLANE"),
         named_ref("Front Plane", "PLANE"),
@@ -967,7 +967,7 @@ async def build(adapter) -> dict[str, str]:
     # distance-to-Top is degenerate here, see above) is recorded into the DOF
     # manifest, never authored -- drag the lever and it rocks on the knife
     # edge, per the magnifier lever_rock idiom.
-    await angle_driver(
+    angle_driver(
         adapter,
         named_ref(f"Right Plane@{sl}", "PLANE"),
         named_ref("Right Plane", "PLANE"),
@@ -978,7 +978,7 @@ async def build(adapter) -> dict[str, str]:
     )
     # The purchased, trimmed open eye threads directly into the lever's boss.
     # Locking records that rigid threaded connection while preserving lever rock.
-    bh = await place_component(
+    bh = place_component(
         adapter,
         "sm-vn-boss-hook",
         list(BOSS_HOOK_POS),
@@ -986,7 +986,7 @@ async def build(adapter) -> dict[str, str]:
         IDENTITY,
         ground=False,
     )
-    await lock_mate(
+    lock_mate(
         adapter,
         named_ref(f"ScrewAxis@{bh}", "AXIS"),
         named_ref(f"Axis2@{sl}", "AXIS"),
@@ -994,7 +994,7 @@ async def build(adapter) -> dict[str, str]:
     )
     # Preserve the vendor +X coil frame and required half-turn clocking at the
     # complete fixed measured pose; no seed placement or corrective move follows.
-    await place_component(
+    place_component(
         adapter,
         "sm-vn-counter-spring",
         [*counter_pose.centre_xy, SUMMING_Z],
@@ -1004,7 +1004,7 @@ async def build(adapter) -> dict[str, str]:
     # Ry(180): the gooseneck's overhang arm reaches from the east column toward
     # the machine centre. Its measured origin Y is inserted directly; its
     # bare leg is held in the top-frame rail-hub bore by its 1/4-20 set screw.
-    await place_component(
+    place_component(
         adapter,
         "sm-gooseneck",
         [COLUMN_X, gooseneck_origin_y, SUMMING_Z],
@@ -1019,7 +1019,7 @@ async def build(adapter) -> dict[str, str]:
     end_axis_y = gooseneck_origin_y + sm_gooseneck_geom.ARM_Y
     # Literal stems, one call each: _buildgraph's source-expression contract
     # and the hanger-stack recipe count read them.
-    await place_component(
+    place_component(
         adapter,
         "sm-gooseneck-end-plug",
         [spring_mounts.GOOSENECK_END_X, end_axis_y, SUMMING_Z],
@@ -1032,7 +1032,7 @@ async def build(adapter) -> dict[str, str]:
     # seated pose; the eye rides free on the shoulder (#2144 item 11.4) and
     # adds no operational DOF.
     screw_rows = ROT_Y_POS90
-    await place_component(
+    place_component(
         adapter,
         "sm-vn-gooseneck-shoulder-screw",
         [spring_mounts.GOOSENECK_END_X, end_axis_y, SUMMING_Z],
@@ -1057,7 +1057,7 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         allowed_pairs=ALLOWED_PAIRS,
     )
-    await _author_settings(adapter)
+    _author_settings(adapter)
     # Title-block identity for the assembly drawing (draw_sm_summing_assembly.py):
     # assembly_title_properties supplies the Title/Generator and TOL_* cells
     # finalize_drawing requires without consulting the part registry.
@@ -1080,7 +1080,7 @@ async def build(adapter) -> dict[str, str]:
     author_in_drawing_configurations(
         adapter, ASM_NAME, lambda configuration: create_summing_explode(adapter, configuration)
     )
-    return await save_assembly_and_images(
+    return save_assembly_and_images(
         adapter,
         ASM_NAME,
         native_contact_check=assert_assembly_spring_contacts,

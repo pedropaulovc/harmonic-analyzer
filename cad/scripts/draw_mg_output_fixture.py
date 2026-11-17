@@ -1328,11 +1328,11 @@ def _enforce_fixture_text_on_line(report: Path) -> None:
         )
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open output-fixture source", await adapter.open_model(str(SOURCE)))
+    check("open output-fixture source", adapter.open_model(str(SOURCE)))
     read_required_properties(
         adapter.currentModel,
         (
@@ -1456,7 +1456,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _prove_groove_root_diameter(side_by_name["GrooveRootDia"])
 
-    artifacts = await finalize_drawing(
+    artifacts = finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Output Fixture Manufacturing Drawing",

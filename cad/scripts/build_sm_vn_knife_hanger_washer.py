@@ -21,9 +21,9 @@ MATERIAL = SPEC.material
 
 
 @wraps(build_96659A104)
-async def _build_with_supplier_references(adapter, truth=None):
-    await build_96659A104(adapter, truth)
-    await author_supplier_washer_references(
+def _build_with_supplier_references(adapter, truth=None):
+    build_96659A104(adapter, truth)
+    author_supplier_washer_references(
         adapter, axis="y", bore_mm=part.ID, outer_mm=part.OD,
         thickness_mm=part.THICKNESS, units=part.SUPPLIER_UNITS,
         sheet_units=part_drawing_unit(PART_NAME),
@@ -33,8 +33,8 @@ async def _build_with_supplier_references(adapter, truth=None):
     blank_reference_sketches(adapter, REFERENCE_SKETCHES)
 
 
-async def build(adapter) -> dict[str, str]:
-    return await build_stock_fastener(
+def build(adapter) -> dict[str, str]:
+    return build_stock_fastener(
         adapter,
         part_name=PART_NAME,
         components=(StockComponent(sku=SKU, author=_build_with_supplier_references),),

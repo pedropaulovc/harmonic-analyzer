@@ -6,7 +6,6 @@ the part the assemblies still build.
 
 from __future__ import annotations
 
-import asyncio
 import contextlib
 
 import pytest
@@ -85,27 +84,27 @@ class _Recorder:
     def log(self, name: str, args=(), kwargs=None) -> None:
         self.events.append((name, tuple(args), dict(kwargs or {})))
 
-    async def _async(self, name: str, *args):
+    def _async(self, name: str, *args):
         self.log(name, args)
         return "ok"
 
-    async def create_sketch(self, *args):
-        return await self._async("create_sketch", *args)
+    def create_sketch(self, *args):
+        return self._async("create_sketch", *args)
 
-    async def exit_sketch(self, *args):
-        return await self._async("exit_sketch", *args)
+    def exit_sketch(self, *args):
+        return self._async("exit_sketch", *args)
 
-    async def create_revolve(self, *args):
-        return await self._async("create_revolve", *args)
+    def create_revolve(self, *args):
+        return self._async("create_revolve", *args)
 
-    async def create_cut_extrude(self, *args):
-        return await self._async("create_cut_extrude", *args)
+    def create_cut_extrude(self, *args):
+        return self._async("create_cut_extrude", *args)
 
-    async def create_extrusion(self, *args):
-        return await self._async("create_extrusion", *args)
+    def create_extrusion(self, *args):
+        return self._async("create_extrusion", *args)
 
-    async def add_fillet(self, *args):
-        return await self._async("add_fillet", *args)
+    def add_fillet(self, *args):
+        return self._async("add_fillet", *args)
 
 
 def _record(monkeypatch) -> list[tuple]:
@@ -118,10 +117,10 @@ def _record(monkeypatch) -> list[tuple]:
 
         return call
 
-    async def add_line_chain(_adapter, points, **kwargs):
+    def add_line_chain(_adapter, points, **kwargs):
         adapter.log("add_line_chain", (tuple(points),), kwargs)
 
-    async def volume_check(_adapter, label, expected, tol):
+    def volume_check(_adapter, label, expected, tol):
         adapter.log("volume_check", (label, expected, tol))
         return expected
 
@@ -145,7 +144,7 @@ def _record(monkeypatch) -> list[tuple]:
         )[1],
     )
     monkeypatch.setattr(_telemetry, "info", lambda *a, **k: None)
-    asyncio.run(sku_recipe.build_91792A108(adapter))
+    sku_recipe.build_91792A108(adapter)
     return adapter.events
 
 

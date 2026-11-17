@@ -227,11 +227,11 @@ def _center_outline(view: Any, name: str, center: tuple[float, float]) -> None:
         raise RuntimeError(f"{name}: failed to position the view")
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     source = SPEC.source
     if SPEC.source_kind != "part" or not source.is_file():
         raise FileNotFoundError(f"source purchased part is missing: {source}")
-    check(f"open {PART_STEM} source", await adapter.open_model(str(source)))
+    check(f"open {PART_STEM} source", adapter.open_model(str(source)))
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     if Path(model.GetPathName()).resolve() != source.resolve():
         raise RuntimeError(f"opened purchased part is not {source}")
@@ -370,7 +370,7 @@ async def build(adapter: Any) -> dict[str, str]:
         _assert_grip_leader(grip)
 
     paths = SPEC.outputs
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         DrawingOutputs(slddrw=paths["slddrw"], pdf=paths["pdf"], png=paths["png"]),
         layout=SPEC.layout,

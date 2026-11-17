@@ -99,7 +99,6 @@ not a prerequisite.
 
 from __future__ import annotations
 
-import asyncio
 import shutil
 import sys
 import tempfile
@@ -242,13 +241,13 @@ def _faces_of_type(adapter: object, model: object, surface_kind: int) -> list:
     return faces
 
 
-async def main() -> int:
+def main() -> int:
     _telemetry.set_service("diagnostics")
-    async with _telemetry.aspan("probe.dimxpert_gtol"):
-        return await _probe()
+    with _telemetry.span("probe.dimxpert_gtol"):
+        return _probe()
 
 
-async def _probe() -> int:
+def _probe() -> int:
     gtol_types = _gtol_type_map()
     _telemetry.info(
         f"swDimXpertGtolType_e recovered from {_swdimxpert_tlb().name}: "
@@ -274,14 +273,14 @@ async def _probe() -> int:
     # run -- arm the same crash/idle guard run_build uses.
     _watchdog.start()
     try:
-        await adapter.connect()
+        adapter.connect()
         # A previous run that raised mid-probe left the scratch part OPEN, and
         # SolidWorks holds a write lock on an open document -- the copy below
         # then dies with WinError 32. Close it first so the probe is rerunnable
         # without hand-clearing the session.
         _close_if_open(adapter, scratch.name)
         shutil.copy2(SOURCE_PART, scratch)
-        opened = await adapter.open_model(str(scratch))
+        opened = adapter.open_model(str(scratch))
         if not opened.is_success:
             raise RuntimeError(f"open failed: {opened.error}")
         model = adapter.currentModel
@@ -444,7 +443,7 @@ async def _probe() -> int:
         )
 
         # --- Q5: does part PMI reach a sheet? ---
-        saved = await adapter.save_file(str(scratch))
+        saved = adapter.save_file(str(scratch))
         _report("Q5 save part carrying DimXpert annotations", saved.is_success)
         _telemetry.warn(
             "Q5 drawing-side import is NOT exercised here: it needs a drawing "
@@ -465,9 +464,9 @@ async def _probe() -> int:
             return 1
         return 0
     finally:
-        await adapter.disconnect()
+        adapter.disconnect()
         _watchdog.stop()
 
 
 if __name__ == "__main__":
-    raise SystemExit(asyncio.run(main()))
+    raise SystemExit(main())

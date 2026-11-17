@@ -1077,7 +1077,7 @@ def test_settled_callouts_refuse_a_bare_dimension(monkeypatch: pytest.MonkeyPatc
     drawing._assert_settled_callouts(adapter, sheet)
     source = inspect.getsource(drawing.build)
     assert source.index("_rewrite_callouts(adapter, sheet_callouts)") < source.index(
-        "return await finalize_drawing("
+        "return finalize_drawing("
     )
     assert "_assert_settled_callouts(adapter, sheet_callouts)" in source
 
@@ -1203,17 +1203,16 @@ def test_the_reopened_audit_reads_each_band_with_its_own_configuration_active(
     """The reopened audit reads every configuration's bands with that
     configuration active, and a failure names the call that raised (a raw
     COM error carries no member name, f68549253)."""
-    import asyncio
     from types import SimpleNamespace
 
     active: list[str] = []
     banded: list[tuple[str, str, int]] = []
 
-    async def activate(configuration: str) -> SimpleNamespace:
+    def activate(configuration: str) -> SimpleNamespace:
         active.append(configuration)
         return SimpleNamespace(is_success=True, data={"rebuilt": True}, error=None)
 
-    async def topology(_adapter, configuration, teeth, *, phase, measure_roots):
+    def topology(_adapter, configuration, teeth, *, phase, measure_roots):
         assert measure_roots and active[-1] == configuration
         return float(teeth), configuration, ()
 
@@ -1226,7 +1225,7 @@ def test_the_reopened_audit_reads_each_band_with_its_own_configuration_active(
     monkeypatch.setattr(readback, "_assert_configuration_bands", bands)
     adapter = SimpleNamespace(set_active_configuration=activate)
     with pytest.raises(RuntimeError) as failure:
-        asyncio.run(readback.assert_saved_configuration_topology(adapter))
+        readback.assert_saved_configuration_topology(adapter)
     assert sorted(banded) == sorted((c, c, t) for c, t in spec.CONFIGS)
     message = str(failure.value)
     assert f"{spec.CONFIGS[0][0]}: AttributeError at line" in message

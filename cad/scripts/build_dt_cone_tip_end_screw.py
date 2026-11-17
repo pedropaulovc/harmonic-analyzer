@@ -78,8 +78,8 @@ V_HOLE = math.pi * HOLE_R**2 * END_HOLE_DEPTH
 HOLE_VOLUME_TOL_MM3 = 0.005 * V_HOLE
 
 
-async def _volume_mm3(adapter) -> float:
-    mass = await adapter.get_mass_properties()
+def _volume_mm3(adapter) -> float:
+    mass = adapter.get_mass_properties()
     if not mass.is_success:
         raise RuntimeError(f"get_mass_properties failed: {mass.error}")
     return float(mass.data.volume)
@@ -106,14 +106,14 @@ def _sketch_normal_along_model_y(adapter) -> float:
     return math.copysign(1.0, dz)
 
 
-async def _cut_end_hole(adapter) -> None:
+def _cut_end_hole(adapter) -> None:
     """Cut-extrude the reamed hole from the threaded end face toward the head:
     an on-axis EndHoleDia circle on TipFace, cut EndHoleDepth blind."""
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     hole = SketchDims()
-    check(f"create_sketch {HOLE_FEATURE}", await adapter.create_sketch(TIP_FACE))
-    await define_circle(
+    check(f"create_sketch {HOLE_FEATURE}", adapter.create_sketch(TIP_FACE))
+    define_circle(
         adapter,
         0.0,
         0.0,
@@ -128,31 +128,31 @@ async def _cut_end_hole(adapter) -> None:
     # unreversed from an end plane facing out of its land); the volume check
     # below proves the side either way.
     reverse = _sketch_normal_along_model_y(adapter) > 0.0
-    await ensure_fully_defined(adapter, f"{HOLE_FEATURE} sketch")
-    check(f"exit_sketch {HOLE_FEATURE}", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, f"{HOLE_FEATURE} sketch")
+    check(f"exit_sketch {HOLE_FEATURE}", adapter.exit_sketch())
     name_last_feature(adapter, HOLE_FEATURE)
     drives = hole.apply(adapter, HOLE_FEATURE)
     check(
         "cut pivot hole",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=END_HOLE_DEPTH, reverse_direction=reverse)
         ),
     )
     name_last_feature(adapter, HOLE_CUT)
     depth = name_dimensions(adapter, HOLE_CUT, ["EndHoleDepth"])
     drives += [(depth[0], '"EndHoleDepth"')]
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dimension, expression in drives:
-        await drive_dimension(adapter, dimension, expression)
+        drive_dimension(adapter, dimension, expression)
 
 
-async def _tip_face(adapter) -> None:
+def _tip_face(adapter) -> None:
     """The threaded end face as a named mate datum."""
     from solidworks_mcp.adapters.base import CreatePlaneParameters
 
     check(
         f"create_plane {TIP_FACE} (Top Plane - SHANK_LEN)",
-        await adapter.create_plane(
+        adapter.create_plane(
             CreatePlaneParameters(
                 mode="offset", base_plane="Top Plane", offset=-SHANK_LEN
             )
@@ -182,17 +182,17 @@ def _manufacturing_controls(adapter) -> None:
 
 
 @wraps(build_91794A558)
-async def _drill_and_ream(adapter, truth=None, **parameters):
+def _drill_and_ream(adapter, truth=None, **parameters):
     # The shared recipe builds the supplied screw; the hole is this part's.
-    receipt = await build_91794A558(adapter, truth, **parameters)
+    receipt = build_91794A558(adapter, truth, **parameters)
     for name, value in (("EndHoleDia", END_HOLE_DIA), ("EndHoleDepth", END_HOLE_DEPTH)):
-        await set_global(adapter, name, f"{value}mm")
+        set_global(adapter, name, f"{value}mm")
     # TipFace, the assembly's mate datum, is also the hole's sketch plane.
-    await _tip_face(adapter)
-    stock = await _volume_mm3(adapter)
-    await _cut_end_hole(adapter)
-    await force_rebuild(adapter)
-    removed = stock - await _volume_mm3(adapter)
+    _tip_face(adapter)
+    stock = _volume_mm3(adapter)
+    _cut_end_hole(adapter)
+    force_rebuild(adapter)
+    removed = stock - _volume_mm3(adapter)
     if abs(removed - V_HOLE) > HOLE_VOLUME_TOL_MM3:
         raise RuntimeError(
             f"pivot hole removed {removed:.4f} mm^3, analytic {V_HOLE:.4f} "
@@ -205,8 +205,8 @@ async def _drill_and_ream(adapter, truth=None, **parameters):
     return receipt
 
 
-async def build(adapter) -> dict[str, str]:
-    return await build_stock_fastener(
+def build(adapter) -> dict[str, str]:
+    return build_stock_fastener(
         adapter,
         part_name=PART_NAME,
         components=(

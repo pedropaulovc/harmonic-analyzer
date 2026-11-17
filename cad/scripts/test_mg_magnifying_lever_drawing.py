@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import itertools
 import math
 from types import SimpleNamespace
@@ -374,10 +373,10 @@ def test_real_recipe_selects_and_verifies_the_visible_free_hemisphere_face(monke
     source.touch()
     monkeypatch.setattr(drawing, "SOURCE", source)
 
-    async def open_model(_path):
+    def open_model(_path):
         return SimpleNamespace(is_success=True, data=None)
 
-    async def finalize(*_args, **kwargs):
+    def finalize(*_args, **kwargs):
         captured["finalize"] = kwargs
         return {"slddrw": "lever.SLDDRW"}
 
@@ -461,9 +460,9 @@ def test_real_recipe_selects_and_verifies_the_visible_free_hemisphere_face(monke
         message = ("native detail authority" if fault == "shared_native_note" else
                    "failed to select free end hemisphere face by entity" if fault == "selection_rejected" else "lost its face attachment")
         with pytest.raises(RuntimeError, match=message):
-            asyncio.run(drawing.build(adapter))
+            drawing.build(adapter)
     else:
-        assert asyncio.run(drawing.build(adapter)) == {"slddrw": "lever.SLDDRW"}
+        assert drawing.build(adapter) == {"slddrw": "lever.SLDDRW"}
         assert len(document.notes) == 1
         annotation = document.notes[0].GetAnnotation()
         assert annotation.GetAttachedEntities3() == (hemisphere,)

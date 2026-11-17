@@ -118,7 +118,7 @@ def supplier_diagram_extents(spec: Any) -> dict[str, tuple[float, float]]:
     return extents
 
 
-async def _application_line(
+def _application_line(
     adapter: Any,
     start: tuple[float, float],
     end: tuple[float, float],
@@ -128,9 +128,9 @@ async def _application_line(
     anchored: bool = False,
 ) -> str:
     """Dimension one axis-aligned application-gauge segment."""
-    line, = await add_line_chain(adapter, [start, end], close=False)
+    line, = add_line_chain(adapter, [start, end], close=False)
     if not anchored:
-        await anchor_point_to_origin(adapter, f"{line}.start", *start, "supplier gauge datum")
+        anchor_point_to_origin(adapter, f"{line}.start", *start, "supplier gauge datum")
         _record_origin_anchor(dims, *start, None, None, None, None)
     dx, dy = end[0] - start[0], end[1] - start[1]
     if dx != 0.0 and dy != 0.0:
@@ -138,17 +138,17 @@ async def _application_line(
     relation = "vertical_points" if dx == 0.0 else "horizontal_points"
     check(
         "align supplier application gauge",
-        await adapter.add_sketch_constraint(f"{line}.start", f"{line}.end", relation),
+        adapter.add_sketch_constraint(f"{line}.start", f"{line}.end", relation),
     )
     check(
         "dimension supplier application gauge",
-        await adapter.add_sketch_dimension(line, None, "linear", math.hypot(dx, dy)),
+        adapter.add_sketch_dimension(line, None, "linear", math.hypot(dx, dy)),
     )
     dims.record(name)
     return line
 
 
-async def _nominal_rectangle(
+def _nominal_rectangle(
     adapter: Any,
     lower_left: tuple[float, float],
     upper_right: tuple[float, float],
@@ -160,14 +160,14 @@ async def _nominal_rectangle(
     left, low = lower_left
     right, high = upper_right
     points = [(left, low), (left, high), (right, high), (right, low)]
-    lines = await add_line_chain(adapter, points)
-    await define_rectilinear_chain(
+    lines = add_line_chain(adapter, points)
+    define_rectilinear_chain(
         adapter, lines, points, label="supplier nominal dimension diagram",
         dims=dims, names=[height_name, None],
     )
 
 
-async def _finish_reference(
+def _finish_reference(
     adapter: Any, feature: str, dims: SketchDims, semantics: tuple[str, ...], *,
     spec: Any, segment_lengths_mm: tuple[float, ...], circles: bool = False,
 ) -> None:
@@ -186,14 +186,14 @@ async def _finish_reference(
         segment.ConstructionGeometry = True
         if not segment.ConstructionGeometry:
             raise RuntimeError(f"{feature}: nominal diagram must use construction geometry")
-    await ensure_fully_defined(adapter, feature)
+    ensure_fully_defined(adapter, feature)
     lengths = sorted(float(segment.GetLength()) * 1000.0 for segment in segments)
     if not all(
         math.isclose(actual, expected, rel_tol=0.0, abs_tol=1e-8)
         for actual, expected in zip(lengths, sorted(segment_lengths_mm), strict=True)
     ):
         raise RuntimeError(f"{feature}: native nominal diagram segment lengths changed")
-    check(f"exit {feature}", await adapter.exit_sketch())
+    check(f"exit {feature}", adapter.exit_sketch())
     name_last_feature(adapter, feature)
     dims.apply(adapter, feature)
     names = {SUPPLIER_DIMENSION_NAMES[key] for key in semantics}
@@ -209,18 +209,18 @@ async def _finish_reference(
             raise RuntimeError(f"{feature}: exact supplier dimension {key} did not persist")
 
 
-async def author_supplier_references(adapter: Any, *, spec: Any) -> tuple[str, ...]:
+def author_supplier_references(adapter: Any, *, spec: Any) -> tuple[str, ...]:
     """Author hidden native nominal diagrams and explicitly separate gauges."""
     features = []
     dims = SketchDims()
-    check("create supplier nominal plan diagram", await adapter.create_sketch("Top"))
+    check("create supplier nominal plan diagram", adapter.create_sketch("Top"))
     for key in ("ID", "OD"):
-        await define_circle(
+        define_circle(
             adapter, 0.0, 0.0, getattr(spec, key) / 2.0,
             f"{spec.SKU} nominal {key}", dims=dims,
             names=(None, None, SUPPLIER_DIMENSION_NAMES[key]),
         )
-    await _finish_reference(
+    _finish_reference(
         adapter, "DiscSupplierPlan", dims, ("ID", "OD"), spec=spec,
         segment_lengths_mm=(math.pi * spec.ID, math.pi * spec.OD), circles=True,
     )
@@ -228,25 +228,25 @@ async def author_supplier_references(adapter: Any, *, spec: Any) -> tuple[str, .
     envelope, strip = _nominal_side_profiles(spec)
     # A closed rectangle conveys only OD x free height, never the spring shape.
     dims = SketchDims()
-    check("create supplier nominal size envelope", await adapter.create_sketch("Front"))
-    await _nominal_rectangle(
+    check("create supplier nominal size envelope", adapter.create_sketch("Front"))
+    _nominal_rectangle(
         adapter, *envelope,
         height_name=SUPPLIER_DIMENSION_NAMES["FREE_HEIGHT"], dims=dims,
     )
-    await _finish_reference(
+    _finish_reference(
         adapter, "DiscSupplierHeight", dims, ("FREE_HEIGHT",), spec=spec,
         segment_lengths_mm=(spec.OD, spec.OD, spec.FREE_HEIGHT, spec.FREE_HEIGHT),
     )
     features.append("DiscSupplierHeight")
 
     dims = SketchDims()
-    check("create supplier nominal strip diagram", await adapter.create_sketch("Front"))
-    await _nominal_rectangle(
+    check("create supplier nominal strip diagram", adapter.create_sketch("Front"))
+    _nominal_rectangle(
         adapter, *strip,
         height_name=SUPPLIER_DIMENSION_NAMES["THICKNESS"], dims=dims,
     )
     strip_width = strip[1][0] - strip[0][0]
-    await _finish_reference(
+    _finish_reference(
         adapter, "DiscSupplierStrip", dims, ("THICKNESS",), spec=spec,
         segment_lengths_mm=(strip_width, strip_width, spec.THICKNESS, spec.THICKNESS),
     )
@@ -257,9 +257,9 @@ async def author_supplier_references(adapter: Any, *, spec: Any) -> tuple[str, .
         baseline, compressed, free_upper = supplier_application_planes(spec)
         left, right = -spec.OD / 2.0, spec.OD / 2.0
         dims = SketchDims()
-        check("create supplier application planes", await adapter.create_sketch("Right"))
-        await _application_line(adapter, (left, baseline), (right, baseline), name=None, dims=dims)
-        await _application_line(
+        check("create supplier application planes", adapter.create_sketch("Right"))
+        _application_line(adapter, (left, baseline), (right, baseline), name=None, dims=dims)
+        _application_line(
             adapter, (left, baseline), (left, compressed),
             name=(
                 SUPPLIER_DIMENSION_NAMES["WORKING_HEIGHT"]
@@ -267,35 +267,35 @@ async def author_supplier_references(adapter: Any, *, spec: Any) -> tuple[str, .
             ),
             dims=dims, anchored=True,
         )
-        await _application_line(
+        _application_line(
             adapter, (left, compressed), (right, compressed), name=None, dims=dims, anchored=True
         )
         height_semantics = ("WORKING_HEIGHT",) if "WORKING_HEIGHT" in application else ()
         if "WORKING_DEFLECTION" in application:
-            await _application_line(
+            _application_line(
                 adapter, (left, compressed), (left, free_upper),
                 name=SUPPLIER_DIMENSION_NAMES["WORKING_DEFLECTION"], dims=dims, anchored=True,
             )
-            await _application_line(
+            _application_line(
                 adapter, (left, free_upper), (right, free_upper), name=None, dims=dims, anchored=True
             )
             height_semantics += ("WORKING_DEFLECTION",)
         gauge_lengths = (spec.OD, spec.OD, spec.WORKING_HEIGHT)
         if "WORKING_DEFLECTION" in application:
             gauge_lengths += (spec.OD, spec.WORKING_DEFLECTION)
-        await _finish_reference(
+        _finish_reference(
             adapter, "DiscSupplierApplication", dims, height_semantics, spec=spec,
             segment_lengths_mm=gauge_lengths,
         )
         features.append("DiscSupplierApplication")
     if "SHAFT_DIA" in application:
         dims = SketchDims()
-        check("create supplier mating-shaft gauge", await adapter.create_sketch("Top"))
-        await define_circle(
+        check("create supplier mating-shaft gauge", adapter.create_sketch("Top"))
+        define_circle(
             adapter, 0.0, 0.0, spec.SHAFT_DIA / 2.0, "nominal mating shaft, not spring bore",
             dims=dims, names=(None, None, SUPPLIER_DIMENSION_NAMES["SHAFT_DIA"]),
         )
-        await _finish_reference(
+        _finish_reference(
             adapter, "DiscSupplierShaft", dims, ("SHAFT_DIA",), spec=spec,
             segment_lengths_mm=(math.pi * spec.SHAFT_DIA,), circles=True,
         )
@@ -304,9 +304,9 @@ async def author_supplier_references(adapter: Any, *, spec: Any) -> tuple[str, .
     return tuple(features)
 
 
-async def add_supplier_disc_diagram(adapter: Any, *, spec: Any) -> None:
+def add_supplier_disc_diagram(adapter: Any, *, spec: Any) -> None:
     """Add zero-solid nominal diagrams without altering an installed state."""
-    await add_supplier_reference_configurations(
+    add_supplier_reference_configurations(
         adapter,
         (ReferenceState(
             name=SUPPLIER_DIAGRAM_CONFIGURATION,

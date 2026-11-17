@@ -88,10 +88,10 @@ V_SCREW_HOLE = math.pi * (SET_SCREW_TAP_DRILL_DIA / 2.0) ** 2 * RAIL_END
 V_FINAL = V_RING + 4.0 * V_WINDOW_CORNER - V_SCREW_HOLE
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations): the outer envelope, the two rail
@@ -99,12 +99,12 @@ async def build(adapter) -> dict[str, str]:
     # load-bearing -- this is an INCH document and the equation manager reads
     # BARE numbers in document units (an unsuffixed 28 = 28 in, blowing the
     # part up 25.4x in-plane).
-    await set_global(adapter, "OuterWidth", f"{OUTER_WIDTH}mm")
-    await set_global(adapter, "OuterHeight", f"{OUTER_HEIGHT}mm")
-    await set_global(adapter, "RailSide", f"{RAIL_SIDE}mm")
-    await set_global(adapter, "RailEnd", f"{RAIL_END}mm")
-    await set_global(adapter, "FrameDepth", f"{FRAME_DEPTH}mm")
-    await set_global(adapter, "WindowCornerR", f"{WINDOW_CORNER_R}mm")
+    set_global(adapter, "OuterWidth", f"{OUTER_WIDTH}mm")
+    set_global(adapter, "OuterHeight", f"{OUTER_HEIGHT}mm")
+    set_global(adapter, "RailSide", f"{RAIL_SIDE}mm")
+    set_global(adapter, "RailEnd", f"{RAIL_END}mm")
+    set_global(adapter, "FrameDepth", f"{FRAME_DEPTH}mm")
+    set_global(adapter, "WindowCornerR", f"{WINDOW_CORNER_R}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -119,22 +119,22 @@ async def build(adapter) -> dict[str, str]:
     # bottom wall, each from a real outer face (drawing-guidelines.md rule 10).
     # Six dims fully define both rectangles; the right and top walls follow.
     ring = SketchDims()
-    check("create_sketch ring", await adapter.create_sketch("Front"))
+    check("create_sketch ring", adapter.create_sketch("Front"))
     outer_rect = [
         (0.0, 0.0),
         (OUTER_WIDTH, 0.0),
         (OUTER_WIDTH, OUTER_HEIGHT),
         (0.0, OUTER_HEIGHT),
     ]
-    outer = await add_line_chain(adapter, outer_rect)
+    outer = add_line_chain(adapter, outer_rect)
     inner_rect = [
         (RAIL_SIDE, OUTER_HEIGHT - RAIL_END),
         (RAIL_SIDE, RAIL_END),
         (OUTER_WIDTH - RAIL_SIDE, RAIL_END),
         (OUTER_WIDTH - RAIL_SIDE, OUTER_HEIGHT - RAIL_END),
     ]
-    inner = await add_line_chain(adapter, inner_rect)
-    await define_rectilinear_chain(
+    inner = add_line_chain(adapter, inner_rect)
+    define_rectilinear_chain(
         adapter,
         outer,
         outer_rect,
@@ -143,7 +143,7 @@ async def build(adapter) -> dict[str, str]:
         names=["OuterSpanX", "OuterHeightDim"],
         drives=['"OuterWidth"', '"OuterHeight"'],
     )
-    await define_rectilinear_chain(
+    define_rectilinear_chain(
         adapter,
         inner,
         inner_rect,
@@ -158,18 +158,18 @@ async def build(adapter) -> dict[str, str]:
             '"RailEnd"',
         ],
     )
-    await ensure_fully_defined(adapter, "ring sketch")
-    check("exit_sketch ring", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "ring sketch")
+    check("exit_sketch ring", adapter.exit_sketch())
     name_last_feature(adapter, "RingProfile")
     drive_jobs += ring.apply(adapter, "RingProfile")
     check(
         "extrude ring",
-        await adapter.create_extrusion(ExtrusionParameters(depth=FRAME_DEPTH)),
+        adapter.create_extrusion(ExtrusionParameters(depth=FRAME_DEPTH)),
     )
     name_last_feature(adapter, "Ring")
     depth_dim = name_dimensions(adapter, "Ring", ["Depth"])
     drive_jobs += [(depth_dim[0], '"FrameDepth"')]
-    await volume_check(adapter, "ring", V_RING, 0.005 * V_RING)
+    volume_check(adapter, "ring", V_RING, 0.005 * V_RING)
 
     # Window internal corners (pn_pen_frame_spec.WINDOW_CORNER_R), one fillet
     # on all four, each concave corner adding back its R x R square less the
@@ -178,12 +178,12 @@ async def build(adapter) -> dict[str, str]:
     window_x = (RAIL_SIDE, OUTER_WIDTH - RAIL_SIDE)
     window_y = (RAIL_END, OUTER_HEIGHT - RAIL_END)
     edges = [[x, y, FRAME_DEPTH / 2.0] for x in window_x for y in window_y]
-    check("fillet WindowCorners", await adapter.add_fillet(WINDOW_CORNER_R, edges))
+    check("fillet WindowCorners", adapter.add_fillet(WINDOW_CORNER_R, edges))
     name_last_feature(adapter, "WindowCorners")
     corner_dim = name_dimensions(adapter, "WindowCorners", ["WindowCornerR"])
     drive_jobs.append((corner_dim[0], '"WindowCornerR"'))
     v_corners = 4.0 * V_WINDOW_CORNER
-    await volume_check(
+    volume_check(
         adapter, "ring with WindowCorners", V_RING + v_corners, 0.1 * v_corners
     )
 
@@ -208,9 +208,9 @@ async def build(adapter) -> dict[str, str]:
     )
     drive_jobs += screw_cut.placement_drive_jobs
     # Loose tol for the rounding / mesh at the cut walls.
-    await volume_check(adapter, "screw hole", V_FINAL, 15.0)
+    volume_check(adapter, "screw hole", V_FINAL, 15.0)
 
-    await name_bore_axis(
+    name_bore_axis(
         adapter,
         "Right Plane",
         OUTER_WIDTH / 2.0,
@@ -223,14 +223,14 @@ async def build(adapter) -> dict[str, str]:
     # Apply the deferred drive equations after the whole model + a rebuild
     # exists, then re-check neutrality (each equation evaluates to the as-built
     # value, so the geometry must not move).
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(adapter, "driven pen frame (equations neutral)", V_FINAL, 15.0)
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    volume_check(adapter, "driven pen frame (equations neutral)", V_FINAL, 15.0)
 
-    await apply_material(adapter, MATERIAL)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    report_mass_properties(adapter)
     # Printed places live on the model (the sheet only reads them back); then
     # mark exactly the print's dimensions and stamp the title-block properties.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
@@ -240,7 +240,7 @@ async def build(adapter) -> dict[str, str]:
     apply_drawing_properties(
         adapter, PART_NAME, {"Isometric View Note": ISOMETRIC_VIEW_NOTE}
     )
-    artefacts = await save_part_and_images(adapter, PART_NAME)
+    artefacts = save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
     return artefacts
 

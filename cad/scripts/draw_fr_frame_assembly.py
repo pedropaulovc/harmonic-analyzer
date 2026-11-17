@@ -2420,11 +2420,11 @@ def _assert_inset_dimension_settled(
     )
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source assembly is missing: {SOURCE}")
     fingerprint = _source_fingerprint(SOURCE)
-    check("open frame drawing source", await adapter.open_model(str(SOURCE)))
+    check("open frame drawing source", adapter.open_model(str(SOURCE)))
     source_model = _early_bound(adapter.currentModel, "IModelDoc2")
     if bool(source_model.GetSaveFlag()):
         raise RuntimeError(
@@ -2456,7 +2456,7 @@ async def build(adapter: Any) -> dict[str, str]:
     try:
         _validate_persisted_explode(source_model)
         settled = _place_package(adapter)
-        artifacts = await finalize_drawing(
+        artifacts = finalize_drawing(
             adapter,
             OUTPUTS,
             layout=SPEC.layout,

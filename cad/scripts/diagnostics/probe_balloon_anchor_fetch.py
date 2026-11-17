@@ -85,11 +85,11 @@ def _walk_leaves(adapter: Any, view: Any, stem: str) -> tuple[int, Any]:
     return visited, None
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not os.environ.get("HARMONIC_COM_SEAT"):
         raise RuntimeError("probe must run inside dodo._com_seat")
     results: dict[str, Any] = {"stem": STEM}
-    check("open frame assembly", await adapter.open_model(str(frame.SOURCE)))
+    check("open frame assembly", adapter.open_model(str(frame.SOURCE)))
     new_drawing(adapter, width=0.4318, height=0.2794)
     view = place_view(
         adapter, str(frame.SOURCE), "*Isometric", 0.20, 0.14, scale=frame.EXPLODED_ISO_SCALE

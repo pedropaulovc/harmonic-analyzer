@@ -282,11 +282,11 @@ def _set_hole_callout(display: Any) -> None:
         )
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open guide-lock source", await adapter.open_model(str(SOURCE)))
+    check("open guide-lock source", adapter.open_model(str(SOURCE)))
     read_required_properties(
         adapter.currentModel,
         (
@@ -374,7 +374,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Guide Lock Manufacturing Drawing",

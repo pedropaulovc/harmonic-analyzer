@@ -53,9 +53,9 @@ def _mate_value(adapter, mate, mtype):
     return adapter._attempt(lambda: dim.Value, default=None)
 
 
-async def build(adapter):
+def build(adapter):
     path = str((OUT_SLDASM / "dt-drive-train.SLDASM").resolve())
-    res = await adapter.open_model(path)
+    res = adapter.open_model(path)
     if not res.is_success:
         log(f"open failed: {res.error}")
         return {}

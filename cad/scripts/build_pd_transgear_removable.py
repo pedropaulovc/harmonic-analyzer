@@ -189,7 +189,7 @@ def _plate_limits(adapter) -> None:
     )
 
 
-async def assert_bands_in_every_configuration(adapter) -> None:
+def assert_bands_in_every_configuration(adapter) -> None:
     """Read the family's bands back in each configuration.
 
     ``SetValues`` writes them with the default configuration active and names
@@ -200,7 +200,7 @@ async def assert_bands_in_every_configuration(adapter) -> None:
     for name, _teeth in spec.CONFIGS:
         check(
             f"activate {name} for the band readback",
-            await adapter.set_active_configuration(name),
+            adapter.set_active_configuration(name),
         )
         for (feature, dimension_name), (kind, lower, upper) in expected.items():
             _display, dimension = _named_dimension(adapter, feature, dimension_name)
@@ -222,7 +222,7 @@ async def assert_bands_in_every_configuration(adapter) -> None:
                 )
     check(
         f"re-activate {spec.DEFAULT_CONFIG} after the band readback",
-        await adapter.set_active_configuration(spec.DEFAULT_CONFIG),
+        adapter.set_active_configuration(spec.DEFAULT_CONFIG),
     )
     _telemetry.success(
         f"plate and pin-location bands read back in {len(spec.CONFIGS)} configurations"
@@ -496,7 +496,7 @@ def gap_dimension_value(
     }[kind]
 
 
-async def draw_gap_sketch(adapter, teeth: int, dims: SketchDims) -> None:
+def draw_gap_sketch(adapter, teeth: int, dims: SketchDims) -> None:
     """Draw, relate and dimension the seed gap in the active sketch at
     ``teeth``, recording each dimension's name and drive in ``dims``."""
     points = gap_points(teeth)
@@ -504,11 +504,11 @@ async def draw_gap_sketch(adapter, teeth: int, dims: SketchDims) -> None:
     set_sketch_direct_db(adapter, True)
     for name, (centre, start, end) in GAP_ENTITIES.items():
         if name == GAP_AXIS:
-            res = await adapter.add_centerline(*points[start], *points[end])
+            res = adapter.add_centerline(*points[start], *points[end])
         elif centre is None:
-            res = await adapter.add_line(*points[start], *points[end])
+            res = adapter.add_line(*points[start], *points[end])
         else:
-            res = await adapter.add_arc(*points[centre], *points[start], *points[end])
+            res = adapter.add_arc(*points[centre], *points[start], *points[end])
         ids[name] = check(f"gap {name}", res)
     set_sketch_direct_db(adapter, False)
 
@@ -519,7 +519,7 @@ async def draw_gap_sketch(adapter, teeth: int, dims: SketchDims) -> None:
     for relation, ref, other in GAP_RELATIONS:
         check(
             f"gap {relation} {ref} / {other}",
-            await adapter.add_sketch_constraint(
+            adapter.add_sketch_constraint(
                 entity_ref(ref), entity_ref(other), relation
             ),
         )
@@ -527,7 +527,7 @@ async def draw_gap_sketch(adapter, teeth: int, dims: SketchDims) -> None:
         value = gap_dimension_value(points, kind, ref, other)
         check(
             f"gap {name} = {value:.4f}",
-            await adapter.add_sketch_dimension(
+            adapter.add_sketch_dimension(
                 entity_ref(ref), entity_ref(other) if other else None, kind, value
             ),
         )
@@ -645,16 +645,16 @@ def chamfer_point(points: dict[str, Point], ref: str) -> Point:
     return points[CHAMFER_ENTITIES[entity][{"start": 0, "end": 1}[suffix]]]
 
 
-async def draw_chamfer_sketch(adapter, teeth: int, dims: SketchDims) -> None:
+def draw_chamfer_sketch(adapter, teeth: int, dims: SketchDims) -> None:
     """Two closed, fully dimensioned triangles and one Z rotation axis."""
     points = chamfer_points(teeth)
     ids: dict[str, str] = {}
     set_sketch_direct_db(adapter, True)
     for name, (start, end) in CHAMFER_ENTITIES.items():
         if name == "ChamferAxis":
-            result = await adapter.add_centerline(*points[start], *points[end])
+            result = adapter.add_centerline(*points[start], *points[end])
         else:
-            result = await adapter.add_line(*points[start], *points[end])
+            result = adapter.add_line(*points[start], *points[end])
         ids[name] = check(f"tooth chamfer {name}", result)
     set_sketch_direct_db(adapter, False)
 
@@ -671,7 +671,7 @@ async def draw_chamfer_sketch(adapter, teeth: int, dims: SketchDims) -> None:
     ):
         check(
             f"tooth chamfer {name} {relation}",
-            await adapter.add_sketch_constraint(ids[name], None, relation),
+            adapter.add_sketch_constraint(ids[name], None, relation),
         )
     for ref, relation in (
         ("ChamferAxis.start", "coincident"),
@@ -679,7 +679,7 @@ async def draw_chamfer_sketch(adapter, teeth: int, dims: SketchDims) -> None:
     ):
         check(
             f"tooth chamfer {ref} -> origin",
-            await adapter.add_sketch_constraint(entity_ref(ref), "origin", relation),
+            adapter.add_sketch_constraint(entity_ref(ref), "origin", relation),
         )
     # Identical endpoints merge at creation with inference off, as in the gap
     # sketch; no fixed entities or configuration-specific coordinates survive.
@@ -689,7 +689,7 @@ async def draw_chamfer_sketch(adapter, teeth: int, dims: SketchDims) -> None:
         value = abs(first[coordinate] - second[coordinate])
         check(
             f"tooth chamfer {name} = {value:.4f}",
-            await adapter.add_sketch_dimension(
+            adapter.add_sketch_dimension(
                 entity_ref(ref), entity_ref(other), kind, value
             ),
         )
@@ -701,7 +701,7 @@ def chamfer_volume_tolerance(teeth: int, expected: float) -> float:
     return min(0.01 * expected, spec.chamfer_volume(teeth) / 4.0)
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
         CircularPatternParameters,
         CreateAxisParameters,
@@ -713,28 +713,28 @@ async def build(adapter) -> dict[str, str]:
         SetGlobalVariableParameters,
     )
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     # #290: the row's inch calculation units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # ------------------------------------------------------------------
     # Equation-manager globals (trig dialect probe first -- see build_dt_cone_gear).
     # ------------------------------------------------------------------
-    await set_global(adapter, "TrigProbe", "cos(60)", 0.5)
+    set_global(adapter, "TrigProbe", "cos(60)", 0.5)
     for name, expression, expected in gap_globals(DEFAULT_TEETH):
-        await set_global(adapter, name, expression, expected)
+        set_global(adapter, name, expression, expected)
     for name, expression, expected in chamfer_globals():
-        await set_global(adapter, name, expression, expected)
+        set_global(adapter, name, expression, expected)
 
     # Plain length knobs for the config-independent geometry (plate + the
     # mounting interface). mm suffix is load-bearing -- this is an INCH
     # document, so a bare number would be read as inches and blow the part up
     # 25.4x. The blank's outside diameter is NOT a knob here: it is
     # config-driven by the "Ra" equation link below.
-    await set_global_mm(adapter, "Plate", f"{seat_geometry.PLATE}mm")
-    await set_global_mm(adapter, "BoreDia", f"{spec.BORE_DIA}mm")
-    await set_global_mm(adapter, "PinHoleDia", f"{spec.PIN_HOLE_DIA}mm")
-    await set_global_mm(adapter, "PinCircleRadius", f"{seat_geometry.PIN_CIRCLE_RADIUS}mm")
+    set_global_mm(adapter, "Plate", f"{seat_geometry.PLATE}mm")
+    set_global_mm(adapter, "BoreDia", f"{spec.BORE_DIA}mm")
+    set_global_mm(adapter, "PinHoleDia", f"{spec.PIN_HOLE_DIA}mm")
+    set_global_mm(adapter, "PinCircleRadius", f"{seat_geometry.PIN_CIRCLE_RADIUS}mm")
 
     # Drive equations are recorded per sketch as the dims are created and applied
     # in one deferred batch once the whole single-config model exists (every
@@ -747,16 +747,16 @@ async def build(adapter) -> dict[str, str]:
     # ------------------------------------------------------------------
     ra_default_mm = spec.outside_dia(DEFAULT_TEETH) / 2.0
     blank = SketchDims()
-    check("create_sketch blank", await adapter.create_sketch("Top"))
+    check("create_sketch blank", adapter.create_sketch("Top"))
     # The axis centerline spans the on-axis edge exactly, so its endpoints merge
     # into the (0, 0) / (0, -PLATE) corners and the chain's own relations define
     # it (the build_dt_vn_crank_hub_pin pattern); the diameter is measured from it.
     set_sketch_direct_db(adapter, True)
     axis = check(
         "add_centerline axis",
-        await adapter.add_centerline(0.0, 0.0, 0.0, -seat_geometry.PLATE),
+        adapter.add_centerline(0.0, 0.0, 0.0, -seat_geometry.PLATE),
     )
-    blank_lines = await add_line_chain(
+    blank_lines = add_line_chain(
         adapter,
         [
             (0.0, 0.0),
@@ -773,10 +773,10 @@ async def build(adapter) -> dict[str, str]:
         (_inner_line, "horizontal"),
         (axis_edge, "vertical"),
     ):
-        check(f"blank {relation}", await adapter.add_sketch_constraint(ent, None, relation))
+        check(f"blank {relation}", adapter.add_sketch_constraint(ent, None, relation))
     # The supplied outside diameter, doubled off the axis so the model owns
     # the diameter a drawing prints (not a radius a sheet would have to double).
-    await add_diametric_linear_dimension(
+    add_diametric_linear_dimension(
         adapter, axis, side_line, (ra_default_mm / 2.0, 4.0), "BlankDia"
     )
     # Record in creation order. The diameter is left UNDRIVEN here (drive None):
@@ -785,26 +785,26 @@ async def build(adapter) -> dict[str, str]:
     blank.record("BlankDia", None)
     check(
         "blank width dim",
-        await adapter.add_sketch_dimension(side_line, None, "linear", seat_geometry.PLATE),
+        adapter.add_sketch_dimension(side_line, None, "linear", seat_geometry.PLATE),
     )
     blank.record("BlankWidth", '"Plate"')
     # Pin the (0, 0) corner to the origin explicitly: the h/v relations + the
     # two dims fix the rectangle's shape but not its position.
     check(
         "blank corner -> origin",
-        await adapter.add_sketch_constraint(f"{radial_line}.start", "origin", "coincident"),
+        adapter.add_sketch_constraint(f"{radial_line}.start", "origin", "coincident"),
     )
-    await ensure_fully_defined(adapter, "blank sketch")
-    check("exit_sketch blank", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "blank sketch")
+    check("exit_sketch blank", adapter.exit_sketch())
     blank_sketch = name_last_feature(adapter, "BlankProfile")
     drive_jobs += blank.apply(adapter, blank_sketch)
     check(
         "revolve blank",
-        await adapter.create_revolve(RevolveParameters(angle=360.0)),
+        adapter.create_revolve(RevolveParameters(angle=360.0)),
     )
     name_last_feature(adapter, "Blank")
 
-    mass = await adapter.get_mass_properties()
+    mass = adapter.get_mass_properties()
     if not mass.is_success:
         raise RuntimeError(f"blank mass properties failed: {mass.error}")
     com_z = float(mass.data.center_of_mass[2])
@@ -834,7 +834,7 @@ async def build(adapter) -> dict[str, str]:
     _telemetry.debug(f"{od_dim} reads {before:g} (unit factor {dim_unit:g})")
     check(
         f"link {od_dim} to 2 * Ra",
-        await adapter.create_equation(
+        adapter.create_equation(
             CreateEquationParameters(equation=f'"{od_dim}" = 2 * "Ra"')
         ),
     )
@@ -844,15 +844,15 @@ async def build(adapter) -> dict[str, str]:
     # globals, so each configuration re-solves it from its own ToothCount.
     # ------------------------------------------------------------------
     gap_dims = SketchDims()
-    check("create_sketch gap", await adapter.create_sketch("Front"))
-    await draw_gap_sketch(adapter, DEFAULT_TEETH, gap_dims)
-    await ensure_fully_defined(adapter, "gap sketch")
-    check("exit_sketch gap", await adapter.exit_sketch())
+    check("create_sketch gap", adapter.create_sketch("Front"))
+    draw_gap_sketch(adapter, DEFAULT_TEETH, gap_dims)
+    ensure_fully_defined(adapter, "gap sketch")
+    check("exit_sketch gap", adapter.exit_sketch())
     gap_profile = name_last_feature(adapter, "ToothGapProfile")
     drive_jobs += gap_dims.apply(adapter, gap_profile)
     check(
         "cut tooth gap",
-        await adapter.create_cut_extrude(ExtrusionParameters(depth=seat_geometry.PLATE + 1.0)),
+        adapter.create_cut_extrude(ExtrusionParameters(depth=seat_geometry.PLATE + 1.0)),
     )
     gap_cut = name_last_feature(adapter, "ToothGap")
 
@@ -861,7 +861,7 @@ async def build(adapter) -> dict[str, str]:
     # ------------------------------------------------------------------
     pattern_axis = check(
         "create_axis Z (Top x Right)",
-        await adapter.create_axis(
+        adapter.create_axis(
             CreateAxisParameters(mode="two_planes", planes=["Top Plane", "Right Plane"])
         ),
     ).name
@@ -879,7 +879,7 @@ async def build(adapter) -> dict[str, str]:
         # geometry_pattern: per-instance re-solve of the global-driven gap
         # profile produced corrupt sliver cuts (live SW 2026 finding, this
         # part's equation-curve form); verbatim geometry copies are exact.
-        res = await adapter.circular_pattern_feature(
+        res = adapter.circular_pattern_feature(
             CircularPatternParameters(
                 axis_point=point,
                 features=[gap_cut],
@@ -901,7 +901,7 @@ async def build(adapter) -> dict[str, str]:
     count_dim = pattern_count_dimension(adapter, gap_pattern, DEFAULT_TEETH)
     check(
         f"link {count_dim} to ToothCount",
-        await adapter.create_equation(
+        adapter.create_equation(
             CreateEquationParameters(equation=f'"{count_dim}" = "ToothCount"')
         ),
     )
@@ -912,21 +912,21 @@ async def build(adapter) -> dict[str, str]:
     # intersected with the actual teeth, not a full-disc ring subtraction.
     # ------------------------------------------------------------------
     chamfer_dims = SketchDims()
-    check("create_sketch tooth chamfers", await adapter.create_sketch("Top"))
-    await draw_chamfer_sketch(adapter, DEFAULT_TEETH, chamfer_dims)
-    await ensure_fully_defined(adapter, "tooth chamfer sketch")
-    check("exit_sketch tooth chamfers", await adapter.exit_sketch())
+    check("create_sketch tooth chamfers", adapter.create_sketch("Top"))
+    draw_chamfer_sketch(adapter, DEFAULT_TEETH, chamfer_dims)
+    ensure_fully_defined(adapter, "tooth chamfer sketch")
+    check("exit_sketch tooth chamfers", adapter.exit_sketch())
     chamfer_profile = name_last_feature(adapter, "ToothChamferProfile")
     drive_jobs += chamfer_dims.apply(adapter, chamfer_profile)
     check(
         "revolve both tooth chamfers",
-        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
+        adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
     )
     tooth_chamfers = name_last_feature(adapter, "ToothSideChamfers")
 
     # Fail fast: validate supplied teeth AND both chamfers at the default
     # count before configuration work (localises tooth-feature failures).
-    mass = await adapter.get_mass_properties()
+    mass = adapter.get_mass_properties()
     if not mass.is_success:
         raise RuntimeError(f"post-chamfer mass properties failed: {mass.error}")
     toothed = float(mass.data.volume)
@@ -945,7 +945,7 @@ async def build(adapter) -> dict[str, str]:
     # two drive-pin holes on the +/-Y axis.
     # ------------------------------------------------------------------
     bore_pins = SketchDims()
-    check("create_sketch bore+pins", await adapter.create_sketch("Front"))
+    check("create_sketch bore+pins", adapter.create_sketch("Front"))
     # Direct-to-DB: creation-time inference must not snap the circles to the
     # blank's edges on this face -- the auto-relation then makes every driving
     # point-pair dim fail (diag_onaxis_pin.py scenarios G/H vs I).
@@ -954,7 +954,7 @@ async def build(adapter) -> dict[str, str]:
     # Bore is on-origin -> diameter only. Both pins sit on the +/-Y axis
     # (x = 0) -> one centre-Y dim each, then diameter. The -Y pin's centre dim
     # is an UNSIGNED distance, so it drives to the POSITIVE "PinCircleRadius".
-    await define_circle(
+    define_circle(
         adapter,
         0.0,
         0.0,
@@ -966,7 +966,7 @@ async def build(adapter) -> dict[str, str]:
     )
     pin_labels = ("PinPos", "PinNeg")
     for label, (x, y) in zip(pin_labels, PIN_HOLE_CENTRES, strict=True):
-        await define_circle(
+        define_circle(
             adapter,
             x,
             y,
@@ -977,13 +977,13 @@ async def build(adapter) -> dict[str, str]:
             drives=(None, '"PinCircleRadius"', '"PinHoleDia"'),
         )
     set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(adapter, "bore+pins sketch")
-    check("exit_sketch bore+pins", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "bore+pins sketch")
+    check("exit_sketch bore+pins", adapter.exit_sketch())
     name_last_feature(adapter, "BorePinsProfile")
     drive_jobs += bore_pins.apply(adapter, "BorePinsProfile")
     check(
         "cut bore+pins",
-        await adapter.create_cut_extrude(ExtrusionParameters(depth=seat_geometry.PLATE + 2.0)),
+        adapter.create_cut_extrude(ExtrusionParameters(depth=seat_geometry.PLATE + 2.0)),
     )
     name_last_feature(adapter, "BorePinsCut")
 
@@ -993,7 +993,7 @@ async def build(adapter) -> dict[str, str]:
     # ------------------------------------------------------------------
     check(
         "create_plane RearFace (Front Plane + Plate)",
-        await adapter.create_plane(
+        adapter.create_plane(
             CreatePlaneParameters(
                 mode="offset", base_plane="Front Plane", offset=seat_geometry.PLATE
             )
@@ -1006,7 +1006,7 @@ async def build(adapter) -> dict[str, str]:
     for axis_name, (_x, y) in zip(
         ("PinHoleAxis1", "PinHoleAxis2"), PIN_HOLE_CENTRES, strict=True
     ):
-        await name_bore_axis(
+        name_bore_axis(
             adapter,
             "Right Plane",
             0.0,
@@ -1024,11 +1024,11 @@ async def build(adapter) -> dict[str, str]:
     # the single-config geometry did not move (each equation evaluates to its
     # as-built value).
     # ------------------------------------------------------------------
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    mass = await adapter.get_mass_properties()
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    mass = adapter.get_mass_properties()
     if not mass.is_success:
         raise RuntimeError(f"post-drive mass properties failed: {mass.error}")
     driven = float(mass.data.volume)
@@ -1042,7 +1042,7 @@ async def build(adapter) -> dict[str, str]:
         )
     _telemetry.success(f"driven part volume {driven:.1f} (equations neutral, analytic {expected_driven:.1f})")
 
-    await apply_material(adapter, MATERIAL)
+    apply_material(adapter, MATERIAL)
 
     # ------------------------------------------------------------------
     # Configurations + regeneration checks (cone-gear validation recipe).
@@ -1050,7 +1050,7 @@ async def build(adapter) -> dict[str, str]:
     for name, teeth in spec.CONFIGS:
         check(
             f"create_configuration {name}",
-            await adapter.create_configuration(
+            adapter.create_configuration(
                 CreateConfigurationParameters(
                     name=name, comment=f"{teeth}-tooth ANSI #25 sprocket"
                 )
@@ -1059,7 +1059,7 @@ async def build(adapter) -> dict[str, str]:
     for name, teeth in spec.CONFIGS:
         check(
             f"ToothCount = {teeth} in {name}",
-            await adapter.set_global_variable(
+            adapter.set_global_variable(
                 SetGlobalVariableParameters(
                     name="ToothCount", expression=str(teeth), configuration=name
                 )
@@ -1071,7 +1071,7 @@ async def build(adapter) -> dict[str, str]:
     artefacts: dict[str, str] = {}
     volumes: dict[str, float] = {}
     for name, teeth in spec.CONFIGS:
-        check(f"activate {name}", await adapter.set_active_configuration(name))
+        check(f"activate {name}", adapter.set_active_configuration(name))
         log_gap_state(
             adapter, name, gap_profile, (gap_cut, gap_pattern, tooth_chamfers)
         )
@@ -1081,7 +1081,7 @@ async def build(adapter) -> dict[str, str]:
             raise RuntimeError(
                 f"{name}: pattern instance count reads {count:g}, expected {teeth}"
             )
-        mass = await adapter.get_mass_properties()
+        mass = adapter.get_mass_properties()
         if not mass.is_success:
             raise RuntimeError(f"{name}: get_mass_properties failed: {mass.error}")
         volume = float(mass.data.volume)
@@ -1104,7 +1104,7 @@ async def build(adapter) -> dict[str, str]:
         img = (png_dir / f"{PART_NAME}_{name}_isometric.png").resolve()
         check(
             f"export_image {name}",
-            await adapter.export_image(
+            adapter.export_image(
                 {
                     "file_path": str(img),
                     "format_type": "png",
@@ -1121,8 +1121,8 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError(f"volumes not monotonically increasing: {volumes}")
 
     first_name, _ = spec.CONFIGS[0]
-    check(f"re-activate {first_name}", await adapter.set_active_configuration(first_name))
-    mass = await adapter.get_mass_properties()
+    check(f"re-activate {first_name}", adapter.set_active_configuration(first_name))
+    mass = adapter.get_mass_properties()
     if not mass.is_success:
         raise RuntimeError(f"re-check {first_name}: {mass.error}")
     revisit = float(mass.data.volume)
@@ -1141,9 +1141,9 @@ async def build(adapter) -> dict[str, str]:
     )
     check(
         f"activate {spec.DEFAULT_CONFIG} for saved views",
-        await adapter.set_active_configuration(spec.DEFAULT_CONFIG),
+        adapter.set_active_configuration(spec.DEFAULT_CONFIG),
     )
-    await report_mass_properties(adapter)
+    report_mass_properties(adapter)
     # Manufacturing drawing support: supplied plate thickness stays within
     # its printed band and each machined pin centre holds its location band.
     # Bore and pin-hole sizes are drilled (the title block's DRILLED HOLES
@@ -1154,7 +1154,7 @@ async def build(adapter) -> dict[str, str]:
             adapter, "BorePinsProfile", name, spec.PIN_LOCATION_TOL,
             display_unit=spec.UNIT,
         )
-    await assert_bands_in_every_configuration(adapter)
+    assert_bands_in_every_configuration(adapter)
     apply_drawing_precision(adapter, spec.DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
@@ -1170,7 +1170,7 @@ async def build(adapter) -> dict[str, str]:
     # and proves every configuration the way it loads them (cg-fx1: the same
     # equation-driven recipe saved cone-gear's inactive caches faulted).
     artefacts.update(
-        await save_simplified_part(adapter, PART_NAME, (gap_cut, gap_pattern))
+        save_simplified_part(adapter, PART_NAME, (gap_cut, gap_pattern))
     )
     return artefacts
 

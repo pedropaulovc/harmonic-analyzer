@@ -24,8 +24,8 @@ PART_NAME = "pd-vn-chain-connecting-link"
 MATERIAL = "Plain Carbon Steel"
 
 
-async def build(adapter) -> dict[str, str]:
-    return await build_link(
+def build(adapter) -> dict[str, str]:
+    return build_link(
         adapter, part_name=PART_NAME, material=MATERIAL,
         **CONNECTING_LINK,
     )

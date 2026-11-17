@@ -6,7 +6,6 @@ the part the assemblies still build.
 
 from __future__ import annotations
 
-import asyncio
 import re
 from fractions import Fraction
 from pathlib import Path
@@ -48,12 +47,12 @@ def test_standalone_recipe_run_is_catalog_only(monkeypatch) -> None:
     assert not hasattr(recipe, "replica_main")
     seen: list = []
 
-    async def fake_catalog(adapter, part_no, size, ends):
+    def fake_catalog(adapter, part_no, size, ends):
         seen.append((part_no, size, ends))
         return {}
 
     monkeypatch.setattr(recipe, "build_catalog", fake_catalog)
-    asyncio.run(recipe._catalog(None))
+    recipe._catalog(None)
     assert seen == [(spec.SKU, (spec.DIA, spec.LENGTH), spec.ENDS)]
 
 

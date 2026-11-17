@@ -56,11 +56,11 @@ def _status(adapter, comp):
     return "??"
 
 
-async def build(adapter):
-    check("create_assembly", await adapter.create_assembly())
-    ax = await place_component(adapter, "mg-wheel-axle", [WHEEL_X, WHEEL_BAR_Y, BAR_FRONT_Z],
+def build(adapter):
+    check("create_assembly", adapter.create_assembly())
+    ax = place_component(adapter, "mg-wheel-axle", [WHEEL_X, WHEEL_BAR_Y, BAR_FRONT_Z],
                                [-90.0, 0.0, 0.0], ROT_X_NEG90)
-    wh = await place_component(adapter, "mg-magnifying-wheel",
+    wh = place_component(adapter, "mg-magnifying-wheel",
                                [WHEEL_X, WHEEL_BAR_Y, WHEEL_MID_Z], [0.0, 0.0, 0.0],
                                IDENTITY, ground=False)
     wh_o = _org(adapter, wh)
@@ -68,25 +68,25 @@ async def build(adapter):
     rim0 = world_point(adapter, wh, [50.0, 0.0, 0.0])  # rim point (off-axis)
     log(f"rim point BEFORE = {rim0}")
 
-    await coincident_mate(adapter, named_ref(f"Axis1@{wh}", "AXIS"),
+    coincident_mate(adapter, named_ref(f"Axis1@{wh}", "AXIS"),
                           named_ref(f"Axis1@{ax}", "AXIS"),
                           label="wheel pivot", verify=(wh, wh_o))
     log(f"after radial: {_status(adapter, wh)}")
 
-    await distance_driver(adapter, named_ref(f"Front Plane@{wh}", "PLANE"),
+    distance_driver(adapter, named_ref(f"Front Plane@{wh}", "PLANE"),
                           named_ref("Front Plane", "PLANE"), abs(wh_o[2]),
                           label="axial", verify=(wh, wh_o))
     log(f"after axial(Front d={abs(wh_o[2]):.1f}): {_status(adapter, wh)}")
 
     try:
-        await angle_driver(adapter, named_ref(f"Right Plane@{wh}", "PLANE"),
+        angle_driver(adapter, named_ref(f"Right Plane@{wh}", "PLANE"),
                            named_ref("Right Plane", "PLANE"), 0.0,
                            label="spin", verify=(wh, wh_o))
         log(f"after angle(Right): {_status(adapter, wh)}")
     except Exception as exc:  # noqa: BLE001
         log(f"ANGLE(Right) FAILED: {exc}; trying Top")
         try:
-            await angle_driver(adapter, named_ref(f"Top Plane@{wh}", "PLANE"),
+            angle_driver(adapter, named_ref(f"Top Plane@{wh}", "PLANE"),
                                named_ref("Top Plane", "PLANE"), 0.0,
                                label="spin-top", verify=(wh, wh_o))
             log(f"after angle(Top): {_status(adapter, wh)}")

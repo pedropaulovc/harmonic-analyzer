@@ -164,24 +164,24 @@ def _drag_to(adapter, name: str, array16: list[float]) -> bool:
     return bool(moved)
 
 
-async def _seed_slice(adapter, mode: str) -> dict[str, str]:
+def _seed_slice(adapter, mode: str) -> dict[str, str]:
     """Author the seed: rocker on the shaft (spin free); ``chain``/``loop``
     add the rod on the rocker pin (swing free); ``loop`` also closes the
     kinematic loop with a root-plane distance pinning the ring bore's X
     (the production J3 loop-closer idiom). Every part lands on-solution."""
-    check("create_assembly", await adapter.create_assembly())
-    await place_component(
+    check("create_assembly", adapter.create_assembly())
+    place_component(
         adapter, "ch-pivot-shaft", [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], IDENTITY,
         ground=False, label="pivot-shaft (seed, auto-fixed)")
-    rocker = await place_component(
+    rocker = place_component(
         adapter, "ch-rocker-arm", [0.0, -PIVOT_Y, -Z0], [0.0, 0.0, 0.0], IDENTITY,
         ground=False, label="rocker-arm seed")
     tgt = [0.0, -PIVOT_Y, -Z0]
-    await concentric_mate(
+    concentric_mate(
         adapter, bore_axis_ref([SHAFT_R, 0.0, 0.0]),
         named_ref(f"Axis1@{rocker}", "AXIS"),
         label="J1 rocker radial", verify=(rocker, tgt))
-    await distance_driver(
+    distance_driver(
         adapter, named_ref(f"Front Plane@{rocker}", "PLANE"),
         named_ref("Front Plane", "PLANE"), Z0,
         label=f"J1 rocker axial d={Z0:.2f}", verify=(rocker, tgt))
@@ -190,17 +190,17 @@ async def _seed_slice(adapter, mode: str) -> dict[str, str]:
         # Rod hanging plumb below the rocker's rod pin (local (127.37, 15.30)
         # -> world (127.37, 7.30)); ring centre = rod origin, pin at local +Y.
         pin = [ROD_HOLE_X, ROD_HOLE_Y - PIVOT_Y]
-        rod = await place_component(
+        rod = place_component(
             adapter, "ch-connecting-rod",
             [pin[0], pin[1] - ROD_C2C, -Z0 - ROD_DZ],
             [0.0, 0.0, 0.0], IDENTITY,
             ground=False, label="connecting-rod seed")
         rod_tgt = [pin[0], pin[1] - ROD_C2C, -Z0 - ROD_DZ]
-        await coincident_mate(
+        coincident_mate(
             adapter, named_ref(f"Axis2@{rocker}", "AXIS"),
             named_ref(f"Axis2@{rod}", "AXIS"),
             label="J2 rod coaxial pin", verify=(rod, rod_tgt))
-        await distance_driver(
+        distance_driver(
             adapter, named_ref(f"Front Plane@{rod}", "PLANE"),
             named_ref(f"Front Plane@{rocker}", "PLANE"), ROD_DZ,
             label=f"J2 rod axial d={ROD_DZ:.2f}", verify=(rod, rod_tgt))
@@ -209,7 +209,7 @@ async def _seed_slice(adapter, mode: str) -> dict[str, str]:
             # Loop closer: the ring bore held at its as-solved X off the root
             # Right Plane (production J3 idiom) -- closes ground-rocker-rod-
             # ground, leaving 1 net free DOF.
-            await distance_driver(
+            distance_driver(
                 adapter, named_ref(f"Axis1@{rod}", "AXIS"),
                 named_ref("Right Plane", "PLANE"), pin[0],
                 label=f"J6 ring X={pin[0]:.2f} (loop closer)",
@@ -264,31 +264,31 @@ def _targets(seed_arrays: dict[str, list[float]],
     return out
 
 
-async def _land_put(adapter, comps, targets) -> None:
+def _land_put(adapter, comps, targets) -> None:
     for part, name in comps.items():
         put_component_pose(adapter, name, targets[part])
 
 
-async def _land_drivers(adapter, comps, targets) -> None:
+def _land_drivers(adapter, comps, targets) -> None:
     """The shipped fix: puts + transient drive mates + delete (see
     build_channel_assembly's copy dispatch)."""
     from build_ch_channel_assembly import _delete_feature
-    await _land_put(adapter, comps, targets)
+    _land_put(adapter, comps, targets)
     rocker = comps["ch-rocker-arm"]
     drives = []
-    mate = await spin_driver(
+    mate = spin_driver(
         adapter, named_ref(f"Axis2@{rocker}", "AXIS"), (0.0, 0.0),
         (ROD_HOLE_X, ROD_HOLE_Y - PIVOT_Y),
         label=f"repro rocker spin -> {ROD_HOLE_X:.1f},{ROD_HOLE_Y - PIVOT_Y:.1f}",
         verify=(rocker, [v * 1000.0 for v in targets["ch-rocker-arm"][9:12]]))
     drives.append(mate["name"])
     if "ch-connecting-rod" in comps:
-        await _land_put(adapter, comps, targets)
+        _land_put(adapter, comps, targets)
         rod = comps["ch-connecting-rod"]
         t = targets["ch-connecting-rod"]
         pin = (ROD_HOLE_X, ROD_HOLE_Y - PIVOT_Y)
         ring = (t[9] * 1000.0, t[10] * 1000.0)
-        mate = await spin_driver(
+        mate = spin_driver(
             adapter, named_ref(f"Axis1@{rod}", "AXIS"), pin, ring,
             label=f"repro rod swing -> ring {ring[0]:.1f},{ring[1]:.1f}",
             verify=(rod, [v * 1000.0 for v in t[9:12]]))
@@ -297,7 +297,7 @@ async def _land_drivers(adapter, comps, targets) -> None:
         _delete_feature(adapter, name)
 
 
-async def _land_drag(adapter, comps, targets) -> None:
+def _land_drag(adapter, comps, targets) -> None:
     for part, name in comps.items():
         moved = _drag_to(adapter, name, targets[part])
         log(f"  drag {name}: moved={moved}")
@@ -310,13 +310,13 @@ _PHASE_LABELS = {
 }
 
 
-async def _phase(adapter, mode: str) -> dict[str, bool]:
+def _phase(adapter, mode: str) -> dict[str, bool]:
     log(f"=== phase: {_PHASE_LABELS[mode]} ===")
     # Repo idiom for dropping a dirty transient model -- CloseAllDocuments
     # on an unsaved assembly can raise the Save Modified Documents modal
     # and hang a headless run.
     discard_open_documents(adapter)
-    seed = await _seed_slice(adapter, mode)
+    seed = _seed_slice(adapter, mode)
     n, slot_values, dim_slot = _slice_slots(adapter, seed)
     log(f"seed slice: {n} mates, ext dims {slot_values}, ladder slot {dim_slot}")
     # Snapshot the seed BEFORE any copy: as-authored transforms (the target
@@ -340,7 +340,7 @@ async def _phase(adapter, mode: str) -> dict[str, bool]:
         log(f"--- copy {tag} at station {station} ---")
         for part, name in comps.items():
             _report(adapter, "post-copy (parked)", name, targets[part])
-        await land(adapter, comps, targets)
+        land(adapter, comps, targets)
         for part, name in comps.items():
             _report(adapter, "post-landing", name, targets[part])
         _rebuild(adapter)
@@ -368,11 +368,11 @@ async def _phase(adapter, mode: str) -> dict[str, bool]:
     return verdicts
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     try:
         out: dict[str, str] = {}
         for mode in ("single", "chain", "loop"):
-            verdicts = await _phase(adapter, mode)
+            verdicts = _phase(adapter, mode)
             out[mode] = ", ".join(
                 f"{t}={'HOLD' if v else 'WANDER'}" for t, v in verdicts.items())
         log("=== SUMMARY ===")

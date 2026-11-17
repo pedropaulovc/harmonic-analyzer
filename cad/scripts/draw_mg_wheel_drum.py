@@ -116,11 +116,11 @@ DIMENSION_CALLOUTS = {
 }
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open wheel-drum source", await adapter.open_model(str(SOURCE)))
+    check("open wheel-drum source", adapter.open_model(str(SOURCE)))
     read_required_properties(
         adapter.currentModel,
         (
@@ -192,7 +192,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # no roughness symbol (drawing-guidelines.md rule 6): it neither runs nor
     # slides, and the ream and the stated interference control the fit.
 
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Magnifying Wheel Drum Manufacturing Drawing",

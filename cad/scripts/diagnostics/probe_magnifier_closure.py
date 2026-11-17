@@ -10,7 +10,6 @@ for which replayed driver conflicts (code 46/47) instead of theorizing.
 
 from __future__ import annotations
 
-import asyncio
 
 import _telemetry
 if __package__:
@@ -68,15 +67,15 @@ def _statuses(adapter, model):
         log(f"    {name}: status {st} ({_STATUS.get(st, '?')})")
 
 
-async def main():
+def main():
     from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter
 
     adapter = PyWin32Adapter({})
     _telemetry.info("Connecting ...")
-    await adapter.connect()
+    adapter.connect()
 
     path = (OUT_SLDASM / "mg-magnifier.SLDASM").resolve()
-    await adapter.open_model(str(path))
+    adapter.open_model(str(path))
     model = adapter.currentModel
     _flag(model, "IModelDoc2")
 
@@ -87,7 +86,7 @@ async def main():
 
     specs = load_dof_manifest("mg-magnifier")
     log(f"replaying {len(specs)} DOF manifest spec(s) ...")
-    names = await author_dof_drives(adapter, specs)
+    names = author_dof_drives(adapter, specs)
     log(f"replayed: {names}")
 
     log("=== AFTER replay ===")
@@ -111,20 +110,20 @@ async def main():
     # Isolate: suppress each wire driver in turn and re-check.
     from solidworks_mcp.adapters.base import SuppressMateParameters
     for suppress_name in ("DRIVE_wire_spin", "DRIVE_wire_swing"):
-        await adapter.suppress_mate(
+        adapter.suppress_mate(
             SuppressMateParameters(name=suppress_name, suppress=True))
         adapter._attempt(lambda: model.ForceRebuild3(False))
         log(f"=== with {suppress_name} SUPPRESSED ===")
         for n, ec, wn in _whats_wrong(adapter, model):
             log(f"    [{'WARN' if wn else 'ERROR'}] {n!r} code={ec} ({_ERR.get(ec, ec)})")
         _statuses(adapter, model)
-        await adapter.suppress_mate(
+        adapter.suppress_mate(
             SuppressMateParameters(name=suppress_name, suppress=False))
 
     # Discard unsaved (the transient-replay idiom) so the artefact stays pristine.
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
-    await adapter.disconnect()
+    adapter.disconnect()
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

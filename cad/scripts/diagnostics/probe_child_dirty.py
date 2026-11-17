@@ -9,7 +9,6 @@ then ForceRebuild3(True) on a fresh open -> re-read. Never saves anything.
 
 from __future__ import annotations
 
-import asyncio
 import sys
 from pathlib import Path
 
@@ -57,20 +56,20 @@ def _dump(adapter, model, label):
                     f"child dirty {len(dirty)}/{len(flags)}: {dirty}")
 
 
-async def _fresh(adapter, path):
+def _fresh(adapter, path):
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
-    await adapter.open_model(str(path))
+    adapter.open_model(str(path))
     return _early_bound(adapter.currentModel, "IModelDoc2")
 
 
-async def main() -> None:
+def main() -> None:
     arg = sys.argv[1] if len(sys.argv) > 1 else "fr-frame"
     path = Path(arg) if arg.lower().endswith(".sldasm") else OUT / f"{arg}.SLDASM"
     adapter = PyWin32Adapter({})
     with _telemetry.span("probe.child_dirty", target=str(path), stem=path.stem):
-        await adapter.connect()
+        adapter.connect()
 
-        model = await _fresh(adapter, path)
+        model = _fresh(adapter, path)
         _dump(adapter, model, "open")
         adapter._attempt(lambda: model.EditRebuild3(), default=None)
         _dump(adapter, model, "after EditRebuild3")
@@ -79,7 +78,7 @@ async def main() -> None:
         adapter._attempt(lambda: model.EditRebuild3(), default=None)
         _dump(adapter, model, "after Edit (post-force)")
 
-        model = await _fresh(adapter, path)
+        model = _fresh(adapter, path)
         _dump(adapter, model, "reopen")
         adapter._attempt(lambda: model.ForceRebuild3(True), default=None)
         _dump(adapter, model, "after ForceRebuild3(True)")
@@ -87,4 +86,4 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
