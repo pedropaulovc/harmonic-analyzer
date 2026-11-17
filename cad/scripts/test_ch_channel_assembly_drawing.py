@@ -83,7 +83,7 @@ def test_every_cross_sheet_step_pointer_lands_on_the_step_it_names() -> None:
     does what it cites, and every pointer is its registry's, never a typed
     number."""
     import draw_dt_drive_train_assembly as drive_train
-    import draw_fr_frame_assembly as frame
+    import fr_frame_assembly_sheet as frame
     import fr_frame_assembly_steps as frame_steps
     import ha_harmonic_analyzer_assembly_steps as ha_steps
 
@@ -110,7 +110,10 @@ def test_every_cross_sheet_step_pointer_lands_on_the_step_it_names() -> None:
                 )
             )
         ),
-        frame_number: _sequence_steps(frame.ASSEMBLY_STEPS),
+        # The frame's steps print in ASSEMBLY.md, one section per group (#2889).
+        frame_number: _sequence_steps(
+            "\n".join(step for _title, group in frame.STEP_SECTIONS for step in group)
+        ),
     }
     # What each pointer's target must name, keyed by (citing sheet, pointer).
     expected = {

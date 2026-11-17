@@ -127,6 +127,8 @@ def _step(key: str) -> str:
 
 
 _BASE, _COLUMN, _SUPPORT = _item(BASE), _item(COLUMN), _item(SUPPORT)
+# A literal row read, so the drawing's config dependency keeps this row.
+_BASE_NUMBER = _config.parts("fr-harmonic-base")["number"]
 _SUPPORT_SCREW, _TOP, _CAP = _item(SUPPORT_SCREW), _item(TOP_FRAME), _item(CAP)
 _PLATE, _PLATE_SCREW = _item(NAMEPLATE), _item(NAMEPLATE_SCREW)
 _CROSS, _SET = _item(CROSS_SCREW), _item(SET_SCREW)
@@ -154,7 +156,7 @@ STEP_TEXT = {
     "nameplate-lifted": f"UNCLAMP AND LIFT OFF {_PLATE}.",
     steps.NAMEPLATE_SEATS_TAPPED_KEY: (
         f"WITH {_BASE} ON THE MILL, DRILL AND TAP EACH SPOT PER THE TRANSFER "
-        f"CALLOUT ON DRAWING {_config.parts(BASE)['number']}."
+        f"CALLOUT ON DRAWING {_BASE_NUMBER}."
     ),
     steps.NAMEPLATE_SCREWED_KEY: (
         f"SCREW {_PLATE} DOWN WITH THE FOUR {_PLATE_SCREW} SCREWS UNTIL EVERY HEAD "

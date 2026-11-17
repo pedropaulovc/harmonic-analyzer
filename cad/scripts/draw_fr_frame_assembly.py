@@ -213,11 +213,13 @@ EXPLODED_ISO_CENTER = (0.140, 0.198)
 # left, and the caption and title block sit 7 mm under the lowest balloons, so
 # the view cannot drop. 1:8 pulls the ring apex in by ~15 mm at both ends.
 EXPLODED_ISO_SCALE = (1.0, 8.0)
-ASSEMBLY_ISO_CENTER = (0.345, 0.172)
+# Sheet 3 holds only the finished isometric: centred across the landscape
+# sheet (0.4318 m), its height unchanged (rule 15).
+ASSEMBLY_ISO_CENTER = (0.216, 0.172)
 ASSEMBLY_ISO_SCALE = (1.0, 7.0)
 # The isometric's caption: the sheet's title block prints its scale.
 ASSEMBLY_ISO_CAPTION = "FINISHED ASSEMBLY"
-ASSEMBLY_ISO_CAPTION_XY = (0.300, 0.074)
+ASSEMBLY_ISO_CAPTION_XY = (0.171, 0.074)
 SHEET_SCALES = {
     SHEET_NAMES[0]: SHEET_SCALE,
     SHEET_NAMES[1]: EXPLODED_ISO_SCALE,
