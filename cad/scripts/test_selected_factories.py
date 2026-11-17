@@ -395,6 +395,8 @@ def _case_selected_check_does_not_construct_other_check_specs(dodo, monkeypatch)
         str((dodo.SCRIPTS_DIR / "_config.py").resolve()),
         *dodo._CONFIG_YAMLS,
         str(Path(dodo._local_check.__file__).resolve()),
+        # A gate's tests read source text, so it folds its recipe code's text.
+        str((dodo.CAD_OUT / ".source-text" / "check-math.digest").resolve()),
     }
     assert selected.targets == [str(dodo.REPORTS / "check-math.ok")]
     assert selected.uptodate == []
