@@ -142,11 +142,12 @@ def _bore_south_chamfer_volume(
 
 
 def _set_keyway_t_limits(adapter) -> None:
-    """Print KeywayT as stacked limits, .4065 over .3995: the envelope of
-    cone_land_key.KEYWAY_T_BAND (#2519; T MAX and the web unchanged).  As
-    +/-.0035 the band read as a converted value, not an inch step (v49
-    machinist review, 2 of 2 runs); the cone gear's _set_keyway_t_limits
-    answered the same finding on MHA-DT-03."""
+    """Print KeywayT as stacked limits, .4055 over .3995: the envelope of
+    cone_land_key.KEYWAY_T_BAND, .4025 +/-.003 (a plain inch step; T MAX
+    .001 shallower, so the web is thicker).  As +/-.0035 (.4065/.3995,
+    #2519) the band read as a converted value, not an inch step (v49
+    machinist review, 2 of 2 runs, and main R5 on MHA-DT-03's limits); the
+    cone gear's _set_keyway_t_limits prints the same band on MHA-DT-03."""
     lower, upper = deviations(KEYWAY_T_BAND)
     display, dimension = _named_dimension(adapter, "BoreProfile", "KeywayT")
     tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")

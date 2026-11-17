@@ -142,7 +142,7 @@ def test_one_broach_pass_lands_in_t_and_the_keyseat_clears_the_key_under_it() ->
 def test_every_keyed_web_is_proved_at_the_keyway_corner() -> None:
     # Rule 17 at the keyway's top corner (T at its most, bore at its least,
     # keyway at its widest), under the printed root envelope MIN: T030 is
-    # the recorded minor (RV-07, .0621 in), above the .060 floor; every
+    # the recorded minor (RV-07, .0631 in), above the .060 floor; every
     # other keyed gear keeps the .080 target.
     t_max = _limits(cone_land_key.KEYWAY_T_MM, cone_land_key.KEYWAY_T_BAND)[1]
     width_max = _limits(cone_land_key.KEYWAY_WIDTH_MM, cone_land_key.KEYWAY_WIDTH_BAND)[
