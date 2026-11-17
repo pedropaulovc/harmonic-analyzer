@@ -234,9 +234,12 @@ _ECC_TEXT = f"{ECC / 25.4:.{ECC_PLACES}f}".removeprefix("0")
 # the assembly step gives the method); the part sheet gives only the tap.
 # The thick-side wall is deeper than the longest screw
 # (SET_SCREW_SUBFLUSH_MIN_MM), so the tightened screw sits wholly inside the
-# tap; a third line saying so ("SET SCREW SEATS BELOW OD") was confirmed as
-# an assembly-state statement by all three reviewers of farm run
-# 20261117T202838704Z (rule 7), so the sheet does not say it.
+# tap.  One reviewer of three (r3 of review 908ab60c50d2, first seen in farm
+# run 20261117T111407559Z) read that as a screw too short to reach the bore;
+# the owner's ruling that it is intended is this part's machinist exception
+# RV-02.  A third callout line saying so ("SET SCREW SEATS BELOW OD") was
+# confirmed as an assembly-state statement by all three reviewers of farm
+# run 20261117T202838704Z (rule 7), so the sheet does not say it.
 TAP_DRILL_CALLOUT = "TAP DRILL THRU TO BORE\n#2-56 UNC"
 
 # drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): the roughness goes on the surface that runs.  The follower pin rides
