@@ -359,19 +359,19 @@ flute_length_mm = 12.7
 description = "1/2 in centre-cutting end mill, flutes ≥1.00 in"
 diameter_mm = 12.7
 
-# Both 1/2 in end mills (blind review 2026-11-14): 1800 rpm = 236 ft/min;
-# 8 in/min / (1800 × 2) = .0022 in/tooth, a chip that cuts rather than rubs
-# in 6061.
+# Both 1/2 in end mills: 1800 rpm = 236 ft/min (blind review 2026-11-14);
+# 7 in/min (owner ruling 2026-11-16, Pedro: both block end-mill settings at
+# 7 in/min), 7 / (1800 × 2) = .0019 in/tooth.
 [settings.block-em-half-long-6061-t6511]
 tool = "block-em-half-long"
 material = "6061-t6511"
 rpm = 1800
-feed = "8 in/min"
+feed = "7 in/min"
 [settings.block-em-half-6061-t6511]
 tool = "jig-em-half"
 material = "6061-t6511"
 rpm = 1800
-feed = "8 in/min"
+feed = "7 in/min"
 
 # --- MHA-CH-06-TL-VN-84 leadscrew kit rework ---
 # Plan: cad/process/ch_rocker_arm_tl_vn_oblique_leadscrew_kit/plan.toml.

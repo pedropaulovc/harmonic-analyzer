@@ -18,7 +18,7 @@
   <g class="dims">
     <line x1="{{view.width_ext_x}}" y1="{{view.top}}" x2="20" y2="{{view.top}}"/>
     <line x1="{{view.width_ext_x}}" y1="{{view.bottom}}" x2="20" y2="{{view.bottom}}"/>
-    <line x1="26" y1="{{view.width_dim_top}}" x2="26" y2="{{view.width_dim_bottom}}" marker-start="url(#arr)" marker-end="url(#arr)"/>
+    <line x1="26" y1="{{view.width_dim_top}}" x2="26" y2="{{view.width_dim_bottom}}" marker-start="url(#prechips-arr)" marker-end="url(#prechips-arr)"/>
   </g>
   <text transform="translate(17 {{view.mid}}) rotate(-90)" text-anchor="middle">{{process.blank_width_in:fraction}} in</text>
 

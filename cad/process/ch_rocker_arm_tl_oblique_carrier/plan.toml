@@ -84,17 +84,25 @@ block_tolerance_in = 0.06
 # 1 × 3. Setup 5 sets it lengthwise on two parallels behind the plate, from
 # about Y 5.4, its hole on its centre at X 10.25, Y 5.9, between the back
 # straps. The adapter refuses a coupon reaching the plate or a back strap
-# block, and a coupon_hole_y_mm that disagrees with coupon_hole_y_in.
+# block, and binds the hole's Y in mm (cad.coupon_hole_y_mm) and the parallel
+# height (cad.coupon_parallel_height_in, level with the 1-2-3 blocks, so the
+# coupon's underside sits at the plate's and the reamer breaks through it at
+# the plate's depth).
 coupon_width_in = 1.0
 coupon_length_in = 3.0
 coupon_hole_x_in = 10.25
 coupon_hole_y_in = 5.9
-coupon_hole_y_mm = 149.86        # coupon_hole_y_in for the envelope.
-# 1 in parallels from the owned LMS 6745 1/2-1 in set (harmonic-analyzer
-# cad/config/shop-equipment.toml fixtures.parallels-lms-6745): level with the
-# 1-2-3 blocks, so the coupon's underside sits at the plate's and the reamer
-# breaks through it at the plate's depth. The adapter refuses any other height.
-coupon_parallel_height_in = 1.0
+# The 1 in parallels of the owned LMS 6745 set (harmonic-analyzer
+# cad/config/shop-equipment.toml fixtures.parallels-lms-6745) are 1/8 in thick
+# (https://littlemachineshop.com/products/thin-parallels-4-long-11-pairs-sized-by-16ths).
+# The adapter refuses unless one fits between each coupon end and one hole
+# diameter from the hole centre.
+coupon_parallel_width_in = 0.125
+# The coupon's strap, the 3/8-16 stud step clamp above (TE-CO 30801,
+# 3.250 long, https://catalog.te-co.com/viewitems/machined-clamps/step-clamps),
+# runs along +X from a toe at the coupon's right end; the adapter refuses its
+# body reaching the right-hand back strap block.
+strap_length_in = 3.25
 # TL-VN-78 (AS62-18-40) OD .625 -.005: the adapter checks the broken underside
 # edge stays inside its seat; the setup 6 picture draws it.
 spacer_seat_dia_in = 0.62
@@ -319,15 +327,15 @@ title = "Holes: spot, drill, ream, tap"
 machine = "PM-30MV, vise off; inch DRO"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "Plate stays on the blocks, TOP up, ZERO END left, ZERO EDGE front: block centres at X {{cad.block_stations}} ±{{process.block_tolerance_in:.2dot}}. ZERO EDGE indicated along X within .002 over its length. One strap over each block, alternating front/back from the front at the left end block (back straps over blocks 2 and 4), heel step slightly high, toe down, toe {{process.strap_toe_in:.2f}} in from the edge on the block: blocks and toes sit between hole columns. Before the first drill, sight under A1, B1, CL and CR: each clears its block by about 1/8. The {{process.coupon_width_in:g}} × {{process.coupon_length_in:g}} coupon lengthwise on two {{process.coupon_parallel_height_in:g}} in parallels (level with the blocks) behind the plate, centred at X {{process.coupon_hole_x_in:.2f}} between the back straps, under its own strap; its test hole at X {{process.coupon_hole_x_in:.2f}}, Y {{process.coupon_hole_y_in:.1f}}, between the parallels."
+holding = "Plate stays on the blocks, TOP up, ZERO END left, ZERO EDGE front: block centres at X {{cad.block_stations}} ±{{process.block_tolerance_in:.2dot}}. ZERO EDGE indicated along X within .002 over its length. One strap over each block, alternating front/back from the front at the left end block (back straps over blocks 2 and 4), heel step slightly high, toe down, toe {{process.strap_toe_in:.2f}} in from the edge on the block: blocks and toes sit between hole columns. Before the first drill, sight under A1, B1, CL and CR: each clears its block by about 1/8. The {{process.coupon_width_in:g}} × {{process.coupon_length_in:g}} coupon lengthwise on two {{cad.coupon_parallel_height_in:g}} in parallels (level with the blocks) behind the plate, centred at X {{process.coupon_hole_x_in:.2f}} between the back straps, under its own strap; its test hole at X {{process.coupon_hole_x_in:.2f}}, Y {{process.coupon_hole_y_in:.1f}}, between the parallels."
 datum = "X0 ZERO END, Y0 ZERO EDGE (edge finder); +X right, +Y away. HUB is not drilled here."
 diagram = { file = "diagrams/carrier/holes.svg", alt = "Plate TOP up on the blocks with one strap over each; all twelve tabled holes from X0 Y0 at the lower-left corner; HUB shown dashed, made at assembly; the test coupon on two parallels behind the plate" }
 # X: the plate's hole centres. Y reaches the reamer coupon's test hole behind
-# the plate (coupon_hole_y_mm). Work top: the coupon's raw bar on parallels
+# the plate (cad.coupon_hole_y_mm). Work top: the coupon's raw bar on parallels
 # level with the blocks, at least the faced plate's height. Longest: the
 # chucking reamer in the drill chuck; shortest: the centre drill. The reamer's
 # lead runs deepest, under the plate and the coupon alike.
-envelope = { x_span_mm = "{{cad.length_mm}}", y_span_mm = "{{process.coupon_hole_y_mm}}", work_top_mm = ["{{process.block_height_mm}}", "{{cad.coupon_thickness_mm}}"], deepest_cut_mm = ["{{process.block_height_mm}}", "{{process.ream_tip_z_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.reamer_oal_mm}}"], shortest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.spot_projection_mm}}"] }
+envelope = { x_span_mm = "{{cad.length_mm}}", y_span_mm = "{{cad.coupon_hole_y_mm}}", work_top_mm = ["{{process.block_height_mm}}", "{{cad.blank_thickness_mm}}"], deepest_cut_mm = ["{{process.block_height_mm}}", "{{process.ream_tip_z_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.reamer_oal_mm}}"], shortest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.spot_projection_mm}}"] }
 vise_hold = "other"
 # milling_deflection: a strap over each block clamps the plate both ways there;
 # every hole is over air between blocks. The check takes two supports per

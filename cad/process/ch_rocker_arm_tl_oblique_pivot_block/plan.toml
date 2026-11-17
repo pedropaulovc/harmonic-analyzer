@@ -12,8 +12,8 @@
 # Speeds: the jig sheets' LittleMachineShop 6061-T6 row, 165 ft/min:
 # rpm = 12 × 165 / (π × D in), rounded down to 50, capped at the PM-30MV's
 # 2800 (owner 2026-11-16; #15 3501 → 2800; F 2452 → 2450; 5/16 2017 → 2000; 3/8 1680 → 1650).
-# The 1/2 in end mill faces at block-em-half-6061-t6511 (1800 rpm, 8 in/min,
-# .0022 in/tooth). Every speed is on the low belt, 100–2800 rpm; no belt
+# The 1/2 in end mill faces at block-em-half-6061-t6511 (1800 rpm, 7 in/min,
+# .0019 in/tooth). Every speed is on the low belt, 100–2800 rpm; no belt
 # change.
 title = "Oblique trammel pivot block"
 part = "{{cad.drawing_number}}"
@@ -69,8 +69,8 @@ tap_tip_z_mm = -8.0
 # Milling deflection (prechips milling_deflection). A part standing in the
 # vise on the 1/2 in parallels is gripped only up to the jaw tops:
 # jaw_grip_mm = vise_jaw_height_mm − edge_parallel_height_mm (44.9453 − 12.7).
-# The 1/2 in cutter faces at block-em-half-6061-t6511 (1800 rpm, 8 in/min =
-# 203.2 mm/min) in .40 in (10.16 mm) steps across a face, a full 12.7 mm
+# The 1/2 in cutter faces at block-em-half-6061-t6511 (1800 rpm, 7 in/min =
+# 177.8 mm/min) in .40 in (10.16 mm) steps across a face, a full 12.7 mm
 # width across a .96 end or edge. Hand-fed drills and plunges are declared
 # at .001 in/tooth (.002 in/rev).
 jaw_grip_mm = 32.2453
@@ -155,7 +155,7 @@ tool = "em-face"
 drilling = "none"
 sizing = "other"
 instruction = "Face the up side just clean (≤{{process.cleanup_in:.2dot}}), four .40 steps. Mark it SEAT."
-milling_cuts = [{ name = "SEAT clean-up", kind = "end", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 203.2, phase = "finish", axial_doc_mm = 0.508, radial_woc_mm = 10.16, traverse_mm = [0, "{{cad.blank_length_mm}}"] }]
+milling_cuts = [{ name = "SEAT clean-up", kind = "end", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 177.8, phase = "finish", axial_doc_mm = 0.508, radial_woc_mm = 10.16, traverse_mm = [0, "{{cad.blank_length_mm}}"] }]
 settings = "block-em-half-6061-t6511"
 
 [[setups.operations]]
@@ -166,8 +166,8 @@ sizing = "other"
 instruction = "SEAT down; face TOP to height {{cad.height_min_in:.3dot}}–{{cad.height_max_in:.3dot}}: one rough pass, then a .005–.010 finish pass."
 instruction_detailed = "Turn the blank over, SEAT down on the parallels, and tap it down until both parallels are pinned. Touch TOP and take one rough pass to about .010 over size, then measure and take the .005–.010 finish pass to {{cad.height_min_in:.3dot}}–{{cad.height_max_in:.3dot}} over SEAT; each pass is four .40 steps across the face."
 milling_cuts = [
-  { name = "TOP rough", kind = "end", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 203.2, phase = "rough", axial_doc_mm = 1.016, radial_woc_mm = 10.16, traverse_mm = [0, "{{cad.blank_length_mm}}"] },
-  { name = "TOP finish", kind = "end", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 203.2, phase = "finish", axial_doc_mm = 0.254, radial_woc_mm = 10.16, traverse_mm = [0, "{{cad.blank_length_mm}}"] },
+  { name = "TOP rough", kind = "end", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 177.8, phase = "rough", axial_doc_mm = 1.016, radial_woc_mm = 10.16, traverse_mm = [0, "{{cad.blank_length_mm}}"] },
+  { name = "TOP finish", kind = "end", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 177.8, phase = "finish", axial_doc_mm = 0.254, radial_woc_mm = 10.16, traverse_mm = [0, "{{cad.blank_length_mm}}"] },
 ]
 settings = "block-em-half-6061-t6511"
 inspection = "Height {{cad.height_min_in:.3dot}}–{{cad.height_max_in:.3dot}}."
@@ -192,7 +192,7 @@ tool = "em-face"
 drilling = "none"
 sizing = "other"
 instruction = "Face the up end just clean (≤{{process.cleanup_in:.2dot}}), two passes across the .96. Mark it SPINDLE END."
-milling_cuts = [{ name = "SPINDLE END clean-up", kind = "end", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 203.2, phase = "finish", axial_doc_mm = 0.508, radial_woc_mm = 12.7, stations_mm = "{{cad.blank_width_mm}}" }]
+milling_cuts = [{ name = "SPINDLE END clean-up", kind = "end", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 177.8, phase = "finish", axial_doc_mm = 0.508, radial_woc_mm = 12.7, stations_mm = "{{cad.blank_width_mm}}" }]
 settings = "block-em-half-6061-t6511"
 
 [[setups.operations]]
@@ -203,8 +203,8 @@ sizing = "other"
 instruction = "SPINDLE END down; face OUTER END in ≤{{process.layer_in:.2dot}} layers, the last .005–.010, to {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}}."
 instruction_detailed = "Turn the blank over, SPINDLE END down on the 1/2 in parallels, and tap it down. Face OUTER END in layers no deeper than {{process.layer_in:.2dot}}, two passes per layer across the .96 end. Measure from SPINDLE END before the last layer; take it .005–.010 deep to {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}}."
 milling_cuts = [
-  { name = "OUTER END layers", kind = "end", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 203.2, phase = "rough", axial_doc_mm = 1.27, radial_woc_mm = 12.7, stations_mm = "{{cad.blank_width_mm}}" },
-  { name = "OUTER END last layer", kind = "end", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 203.2, phase = "finish", axial_doc_mm = 0.254, radial_woc_mm = 12.7, stations_mm = "{{cad.length_mm}}" },
+  { name = "OUTER END layers", kind = "end", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 177.8, phase = "rough", axial_doc_mm = 1.27, radial_woc_mm = 12.7, stations_mm = "{{cad.blank_width_mm}}" },
+  { name = "OUTER END last layer", kind = "end", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 177.8, phase = "finish", axial_doc_mm = 0.254, radial_woc_mm = 12.7, stations_mm = "{{cad.length_mm}}" },
 ]
 settings = "block-em-half-6061-t6511"
 inspection = "SPINDLE END to OUTER END {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}}."
@@ -230,7 +230,7 @@ drilling = "none"
 sizing = "other"
 instruction = "Square SPINDLE END to the jaw tops; face the up end just clean (≤{{process.cleanup_in:.2dot}}). Mark it ROW SIDE."
 instruction_detailed = "Stand the blank on a sawn end, SEAT and TOP in the jaws. Before tightening, rest the combination square's head across both jaw tops and bring its blade down against SPINDLE END; push SPINDLE END plumb to the blade. Face the up end just clean (≤{{process.cleanup_in:.2dot}}), two passes across the .96, and mark it ROW SIDE: the hole rows measure from it."
-milling_cuts = [{ name = "ROW SIDE clean-up", kind = "end", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 203.2, phase = "finish", axial_doc_mm = 0.508, radial_woc_mm = 12.7, stations_mm = "{{cad.blank_length_mm}}" }]
+milling_cuts = [{ name = "ROW SIDE clean-up", kind = "end", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 177.8, phase = "finish", axial_doc_mm = 0.508, radial_woc_mm = 12.7, stations_mm = "{{cad.blank_length_mm}}" }]
 settings = "block-em-half-6061-t6511"
 
 [[setups.operations]]
@@ -240,8 +240,8 @@ drilling = "none"
 sizing = "other"
 instruction = "ROW SIDE down, SPINDLE END square; face FAR SIDE in ≤{{process.layer_in:.2dot}} layers, the last .005–.010, to {{cad.width_min_in:.3dot}}–{{cad.width_max_in:.3dot}}."
 milling_cuts = [
-  { name = "FAR SIDE layers", kind = "end", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 203.2, phase = "rough", axial_doc_mm = 1.27, radial_woc_mm = 12.7, stations_mm = "{{cad.blank_length_mm}}" },
-  { name = "FAR SIDE last layer", kind = "end", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 203.2, phase = "finish", axial_doc_mm = 0.254, radial_woc_mm = 12.7, stations_mm = "{{cad.y_length_mm}}" },
+  { name = "FAR SIDE layers", kind = "end", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 177.8, phase = "rough", axial_doc_mm = 1.27, radial_woc_mm = 12.7, stations_mm = "{{cad.blank_length_mm}}" },
+  { name = "FAR SIDE last layer", kind = "end", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 177.8, phase = "finish", axial_doc_mm = 0.254, radial_woc_mm = 12.7, stations_mm = "{{cad.y_length_mm}}" },
 ]
 settings = "block-em-half-6061-t6511"
 inspection = "ROW SIDE to FAR SIDE {{cad.width_min_in:.3dot}}–{{cad.width_max_in:.3dot}}."

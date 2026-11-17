@@ -50,7 +50,7 @@
   <g class="dims">
     <line x1="88" y1="{{view.finish}}" x2="22" y2="{{view.finish}}"/>
     <line x1="88" y1="{{view.front}}" x2="22" y2="{{view.front}}"/>
-    <line x1="28" y1="{{view.dim_top}}" x2="28" y2="{{view.dim_bottom}}" marker-start="url(#arr)" marker-end="url(#arr)"/>
+    <line x1="28" y1="{{view.dim_top}}" x2="28" y2="{{view.dim_bottom}}" marker-start="url(#prechips-arr)" marker-end="url(#prechips-arr)"/>
   </g>
   <text transform="translate(22 {{view.dim_mid}}) rotate(-90)" text-anchor="middle">{{cad.width_in:.2f}} finished</text>
 
@@ -67,7 +67,7 @@
   <line class="leader" x1="{{view.datum_leader_x1}}" y1="{{view.datum_leader_y1}}" x2="{{view.datum_leader_x2}}" y2="{{view.datum_leader_y2}}"/>
 
   <!-- axes -->
-  <g class="arrow">
+  <g class="axis">
     <line x1="610" y1="325" x2="655" y2="325"/>
     <line x1="610" y1="325" x2="610" y2="290"/>
   </g>

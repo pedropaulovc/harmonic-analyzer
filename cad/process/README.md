@@ -180,8 +180,7 @@ milling-deflection stations (base bar `cad.jack_*_x_mm`, `cad.strap_*_x_mm`
 from `strap_inset_mm`, `cad.blank_centred_*`, `cad.vise_centred_jaw_right_mm`,
 `cad.rail_left_x_mm`/`rail_right_x_mm`, `cad.bracket_x1_mm`/`bracket_x2_mm`,
 `cad.slot_x_mm`, `cad.slot_entry_x_mm`; lever `cad.hole_x_mm`,
-`cad.jaw_right_x_mm`, `cad.grip_jaw_*_x_mm`, `cad.end_square_in`,
-`cad.angular_tol_deg` (from `square_probe_near_y_in`/`square_probe_far_y_in`, prechips#441); bracket `cad.row_mm`, `cad.parallel_near_mm`/
+`cad.jaw_right_x_mm`, `cad.grip_jaw_*_x_mm`; bracket `cad.row_mm`, `cad.parallel_near_mm`/
 `parallel_far_mm`), its tap-flag refusal (`tap_flag_tol_in`) and the restored
 `jig-lever-hold` grip-end picture. Every plan (base bar, end bracket, feed
 lever, riser, carrier, pivot and feed blocks, leadscrew kit) carries
@@ -227,6 +226,23 @@ below the underside), so they rough at dechatter's 4.1 mm width again (owner
 ruling 2026-11-16). No shop tool states `helix_deg` or `axial_ratio`: no
 vendor page for the owned cutters (the LMS 6784 set) publishes a helix, so the
 configured 1.0 applies.
+
+prechips 0.11.4 also needs these plan and template changes. The base bar's
+Setup 3 slot and spot cantilevers declare `vise_left = "start"` and clamp at
+the blank-centred grip (`cad.blank_centred_overhang_mm`..
+`cad.blank_centred_jaw_right_mm`; pedropaulovc/prechips#446). The carrier's
+coupon declares `coupon_parallel_width_in` (the LMS 6745 parallels' 1/8 in
+thickness) and `strap_length_in` (the TE-CO 30801 step clamp's 3.250 in;
+pedropaulovc/prechips#448), and reads `cad.coupon_hole_y_mm`,
+`cad.coupon_parallel_height_in` and `cad.blank_thickness_mm` in place of plan
+copies. The riser's Setup 2 beams and envelope span the longest blank
+(`cad.blank_max_length_mm`), which the adapter's strap traverses now take
+(pedropaulovc/prechips#445). Both block end-mill settings run 7 in/min (owner
+ruling 2026-11-16, Pedro), so the pivot- and feed-block cuts feed 177.8
+mm/min. The base-bar picture templates draw by palette role: an authored
+dimension arrow names the palette's `url(#prechips-arr)` marker, and the
+`width.svg` axes and `inspect.svg` section arrows take the `axis` role
+(pedropaulovc/prechips#444).
 
 prechips 0.10 adds the `vise_holding` check: every non-lathe setup declares
 `vise_hold` (`"other"` for table clamps, saw or bench), and each milling-vise
@@ -307,9 +323,10 @@ What the 0.10 port and the 2026-11-13 v49 reassessment changed on the sheets:
   corners' R.2 and its R.1–R.3 band come from the manifest's `grip_corners`
   fillet, not an authored radius. Both ends are milled, as the manifest's
   process note says ("saw and face to length"): ZERO END in the hole setup,
-  then the grip end to length in the hand sheet's slid-left hold, with its
-  length and ±1° squareness (two edge-finder X readings at Y .2 and .8 from ZERO EDGE, the allowed spread their span × tan 1°)
-  read on the DRO. The end mill runs at `jig-em-half-6061-t6511` (1800 rpm, 7 in/min); the
+  then the grip end to length in the hand sheet's slid-left hold, its length
+  read on the DRO by touching the edge finder on the grip end, the hand
+  sheet's method (owner ruling 2026-11-16, Pedro; no squareness probe
+  stations). The end mill runs at `jig-em-half-6061-t6511` (1800 rpm, 7 in/min); the
   final inspection calipers the as-bought section and runs two 5/16-18
   screws through both holes at once.
 

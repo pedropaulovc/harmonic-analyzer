@@ -297,7 +297,10 @@ gauge_checks = [
   { gauge = "mill-x-dro", band_mm = "{{cad.slot2_x_band_mm}}" },
 ]
 # The bar is squared to length here: slot stations sit in the finished frame.
-beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.length_mm}}"], clamp_mm = ["{{cad.vise_centred_overhang_mm}}", "{{cad.vise_centred_jaw_right_mm}}"], section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
+# The jaws still grip where the blank was centred; X0 (ZERO END) is taken as
+# the blank's left end with no clean-up, the longest arm left of the jaws and
+# so the worst case for S1.
+beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.length_mm}}"], clamp_mm = ["{{cad.blank_centred_overhang_mm}}", "{{cad.blank_centred_jaw_right_mm}}"], section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" }, vise_left = "start" }
 milling_cuts = [
   { name = "S1–S2 depth steps", kind = "slot", phase = "finish", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = "{{cad.slot_step_mm}}", radial_woc_mm = "{{process.half_cutter_dia_mm}}", rpm = 1250, feed_mm_min = 127.0, stations_mm = "{{cad.slot_x_mm}}" },
 ]
@@ -318,7 +321,7 @@ instruction = "Spot all holes Ø.125: R1–R8 on the CNC by program BB05 (cam:ch
 rpm = 2800
 feed = "BB05 program (R1–R8); hand (B1–B4)"
 # Spotting cones are drilled away later; the jaws alone carry them.
-beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.length_mm}}"], clamp_mm = ["{{cad.vise_centred_overhang_mm}}", "{{cad.vise_centred_jaw_right_mm}}"], section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
+beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.length_mm}}"], clamp_mm = ["{{cad.blank_centred_overhang_mm}}", "{{cad.blank_centred_jaw_right_mm}}"], section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" }, vise_left = "start" }
 milling_cuts = [
   { name = "spot R1–R4", kind = "drill", phase = "rough", cutter_dia_mm = 3.175, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = "{{cad.rail_left_x_mm}}" },
   { name = "spot B1–B2", kind = "drill", phase = "rough", cutter_dia_mm = 3.175, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = "{{cad.bracket_x1_mm}}" },
