@@ -10,17 +10,18 @@
 
 The core physical deliverable is a quantity-one, hand-cranked (~1 rpm, zero-power) hobby-shop reconstruction of Albert Michelson’s 1898 20-element Fourier harmonic analyzer (**100 fabricated machine parts** and **9 machine assemblies**, built on a manual mill and lathe with DROs).
 
-Around those ~109 core CAD models, the repository currently carries **~1.12M lines of code and structured configuration** (excluding `cad/docs/`’s 332k lines of Markdown and `web/content/`’s ~450 MB of tracking JSON):
+Around those ~109 core CAD models, the repository currently carries **~1.21M lines of code and structured configuration** plus **586.4 MB of committed JSON/gzip video-sync evidence under `web/content/`** (excluding `cad/docs/`’s 332k lines of Markdown):
 
 | Layer | Files | Lines (LOC) | Share | Primary Driver |
 |---|---:|---:|---:|---|
-| `cad/scripts/test_*.py` + `tests/*.py` | 426 | 326,586 | 29.2% | 206 drawing tests (175.2k LOC), AST/source cops, cache/replay/farm mocks |
-| `SolidworksMCP-python/` (`src` + `tests`) | 267 | 227,219 | 20.3% | 102.4k makepy + 23.0k active adapter + **94.9k unused MCP/UI/agent/test weight** |
-| `cad/scripts/draw_*.py` + drawing/layout helpers | 352 | 190,043 | 17.0% | Hand-coded sheet coordinates, cold-reopen COM readbacks, 84 COTS vendor sheets |
-| `cad/scripts/build_*.py` + `*_spec.py` + `*geom*.py` | 504 | 170,003 | 15.2% | 196 part builders, 13 assembly monoliths, 244 spec modules |
-| `cad/scripts/_*.py` + pipeline/review/gate infra | 246 | 124,780 | 11.2% | AST buildgraph, blob cache, COM shadow replay, LLM review, verify/forensics |
-| `cad/scripts/diagnostics/*.py` | 254 | 48,568 | 4.3% | 82 McMaster SKU B-rep reverse-engineering scripts + COM diagnostic probes |
-| `cad/config/**` + `cad/process/**` + `dodo.py` + `build.py` + `scripts/` | 306 | 36,158 | 3.2% | 239 micro-YAMLs, 8 jig `plan.toml`s, 6.5k `dodo.py`, 2.3k `farm-run.ps1` |
+| `cad/scripts/test_*.py` + `tests/*.py` | 426 | 326,586 | 27.0% | 206 drawing tests (175.2k LOC), AST/source cops, cache/replay/farm mocks |
+| `SolidworksMCP-python/` (`src` + `tests`) | 267 | 227,219 | 18.8% | 102.4k makepy + 23.0k active adapter + **94.9k unused MCP/UI/agent/test weight** |
+| `cad/scripts/draw_*.py` + drawing/layout helpers | 352 | 190,043 | 15.7% | Hand-coded sheet coordinates, cold-reopen COM readbacks, 84 COTS vendor sheets |
+| `cad/scripts/build_*.py` + `*_spec.py` + `*geom*.py` | 504 | 170,003 | 14.0% | 196 part builders, 13 assembly monoliths, 244 spec modules |
+| `cad/scripts/_*.py` + pipeline/review/gate infra | 246 | 124,780 | 10.3% | AST buildgraph, blob cache, COM shadow replay, LLM review, verify/forensics |
+| `web/` (`src` + `scripts` + root `.mjs` + `historical-code`) | 134 | 87,983 | 7.3% | Provenance/SHA-256 seals, 3-epoch identity mappers, GPU Float32 readback, **586.4 MB JSON** |
+| `cad/scripts/diagnostics/*.py` | 254 | 48,568 | 4.0% | 82 McMaster SKU B-rep reverse-engineering scripts + COM diagnostic probes |
+| `cad/config/**` + `cad/process/**` + `dodo.py` + `build.py` + `scripts/` | 306 | 36,158 | 3.0% | 239 micro-YAMLs, 8 jig `plan.toml`s, 6.5k `dodo.py`, 2.3k `farm-run.ps1` |
 
 A single self-reinforcing feedback loop accounts for most of the accidental complexity across both software and CAD:
 
@@ -229,7 +230,7 @@ Even holding the manual-mill + EL400 rule fixed (making the inscribed-angle virt
 ### B4. Aerospace/Foundry Rigor & Nanometer Calibration on a 1-RPM Demonstrator
 
 - **`fr-top-frame` (`20,076` LOC across 5 files for 1 sand-cast gray-iron ring)**: Defines 6 ASME Y14.5 cast datum targets (`E1–E3`, `F1–F2`, `G1`), stacked position frames, **400-panel Simpson’s-rule volume integrals**, and a 434-LOC analytic edge-break classifier (`build_fr_top_frame.py:1837-2837`), accumulating 11 `machinist_exceptions` instead of widening cramped webs by `1/16"`.
-- **Stale shop-inventory flags & missing-gauge callouts**: First, `cad/config/shop-equipment.toml:138-154` has **stale `present = false` records** for `gauges.surface-plate` and `gauges.feeler-gauges` (both are **owned** by Pedro; only `depth-micrometer` is unowned)—causing `ASSEMBLY.md` and DFM checks to misreport owned gauges. Second, several callouts still exceed actual bench metrology or over-constrain static joints: depth-micrometer-class checks (`depth-micrometer.present = false`), simultaneous 3-indicator **`5 µm` (`0.0002 in`)** deflection checks (`stock_form_quality.yaml`, `dial-indicators-extra.present = false`), and **`⊥ Ø.001 in` (`25.4 µm`)** perpendicularity on dual blind dowel reams (`fr-top-frame.yaml`, `sm-knife-mount.yaml`) where classic home-shop practice uses 1 round + 1 diamond pin or match-reaming at assembly.
+- **Stale shop-inventory flags & over-constrained static-joint callouts**: First, `cad/config/shop-equipment.toml:120-154` and `cad/process/shop.toml:74-79` carry **stale `present = false` / placeholder records** for gauges Pedro already owns: **granite surface plate**, **feeler gauges**, **two `0.001 in` dial indicators**, **one `1 µm` lever indicator (DTI)**, and **one digital `0.000''` (`0.0001 in`) indicator** (only `depth-micrometer` is unowned)—causing `ASSEMBLY.md` and DFM checks to misreport owned metrology. Second, even with those four indicators on hand, several callouts over-constrain static bolted joints where classic home-shop practice avoids tight GD&T altogether: depth-micrometer-class checks (`depth-micrometer.present = false`) and **`⊥ Ø.001 in` (`25.4 µm`)** perpendicularity on dual blind dowel reams (`fr-top-frame.yaml`, `sm-knife-mount.yaml`), where 1 round + 1 diamond pin or match-reaming at assembly eliminates bind risk without sub-thou perpendicularity inspection.
 - **221 `machinist_exceptions` across 40.3% of parts (`79/196`) and `10/13` assemblies**: Encoding 221 YAML legal waivers (`#2144` precedent dockets) instead of relaxing over-tightened non-gain walls, `<1.5D` threads, and extra GD&T frames.
 - **Nanometer spring-seat calibration (`4,172` LOC) & B-rep slicing (`2,568` LOC)**: `_seat_search.py` bisects rigid cosmetic spring hooks to **`1e-6 mm` (`1 nm`)** to dodge Parasolid boolean status `1058`, re-certified 3× per build by 40 boolean intersections (`_native_spring_contact.py`); `_native_cone_tip_air.py` boolean-slices 20 gears into 40 temporary B-rep bodies on every build; `stock_form_cutter.py` (`14,931` LOC ecosystem) bisects B&S cutter curves to `1e-16` even though cone engagement is set by hand feel (`cone_drum_oblique_mesh.yaml:2-8`) and the real $1.5^\circ$ cam-phase accuracy error (`#749`) sits waived in `error_budget.yaml:60-72`.
 
@@ -247,7 +248,80 @@ Even holding the manual-mill + EL400 rule fixed (making the inscribed-angle virt
 
 ---
 
-## 4. Simplification Roadmap & Target Footprint (For Inline Review)
+## 4. Track C — `web/` Simulator, Provenance Certificates & Video-Sync Overengineering
+
+### C1. Scale vs. Intended Purpose (`586.4 MB` in Git + `88.0k` LOC for a Video Companion)
+
+`web/AGENTS.md:30-35` states the actual product goal cleanly:
+> *"Two audiences: someone who watched the videos and wants to poke at the machine, and someone deciding whether to back the Kickstarter. Both want to understand the mechanism, so favour clarity over spectacle — a slow crank with a visible cam and a visible trace beats a cinematic fly-through."*
+
+The core code that actually delivers that interactive 3D simulator is **~2,800 LOC** (`kinematics.ts` `115`, `mechanics.ts` `620`, `magnifier.ts` `168`, `bindings.ts` `130`, `youtube-player.ts` `351`, `video-catalog.ts` `40`, `style.css` `175`, plus ~1,200 LOC of Three.js PMREM/mesh/UI glue in `scene.ts` and `main.ts`). Around that ~2,800-LOC core grew **~85,000 LOC of provenance/verification machinery** and **586.44 MB (`91` files) of Git-tracked JSON/gzip blobs**:
+
+| Slice in `web/` | Files | Size / LOC | Shipped to Browser? | What It Actually Is |
+|---|---:|---|---:|---|
+| `web/content/*.{observations,track,source-seeds}.json` + `analysis-recovery-*` | 34 | **368.15 MB** | No | Superseded pre-v39 (`bfde892a5` / `1268c23d`) plaintext capture ledgers & `interior-cap-check-ledger.json` (`17.6 MB`) |
+| `web/content/canonical-native/**` (incl. `historical-code/<sha256>/*`) | 46 | **121.02 MB** *(+22.8k LOC)* | No | Regex-renamed copies of the obsolete JSONs above + **16 committed copies of old `.py`/`.ts` files** unpacked and `exec()`ed by tests |
+| `web/content/*.source-track.json` (6 videos) | 6 | **104.65 MB** | **Yes** | Vite-bundled playback tracks (`NAsM30MAHLg` alone is **45.57 MB**), where **~95% (~99.6 MB)** of bytes are unused witness/landmark/provenance strings |
+| `web/content/v39-source/*.observations.json.gz` + metadata | 10 | **12.53 MB** | Metadata only | Authored inputs pinned to **Python 3.13.9 + stock zlib 1.3.1** exact compressed gzip bytes (`web/README.md:292-295`) |
+| `web/src/` (`21` files) + root `.mjs` (`10` files) | 31 | **30,853 LOC** | Yes | Includes `mechanics-data.ts` (`16,287` LOC), `scene.ts` (`3,711` LOC), `source-assembly.ts` (`2,418` LOC), `native-target-shader-feedback.ts` (`1,338` LOC), `native-primitive-snapshot.ts` (`1,177` LOC) |
+| `web/scripts/` (`29` `.py` + `41` `.mjs` + `2` schemas) | 75 | **33,046 LOC** | No | Offline producers, AST math extractors, `canonical-native-evidence.py` (`733` LOC), `verify-sync.mjs` (`1,523` LOC), `verify-reference.mjs` (`1,105` LOC) |
+
+---
+
+### C2. Missing the Forest for the Trees: Sub-Micron / Float32 Ceremony vs. Unmatched Video Footage
+
+Across the **4 main EngineerGuy series videos** (`1,511.8 s` / `25m 12s` total), integrating the runtime track states (`web/src/source-track.ts:274-359`) and the repo’s own stage-50 verification table (`web/README.md:595-609`) confirms the exact mismatch between microscopic precision and macroscopic sync:
+
+| Video (`id` / `slug`) | Length | No Match / Held | Rendered **Frozen Static** *(pose & camera still)* | Camera Move Only *(pose frozen)* | **Active 3D Mechanism Motion** | Direct PnP `source-fit` Camera | Stage-50 Checkpoints Passed (`README.md:601-609`) |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| `(1/4)` Intro (`NAsM30MAHLg`) | 218.4 s | 36.8 s (16.9%) | **170.9 s (78.3%)** | 0.8 s (0.4%) | **9.9 s (4.5%)** | 4.5 s (2.1%) | **0 / 1,212 (0.0%)** |
+| `(2/4)` Synthesis (`8KmVDxkia_w`) | 341.9 s | 35.0 s (10.2%) | **189.2 s (55.4%)** | 60.5 s (17.7%) | **57.2 s (16.7%)** | 23.0 s (6.7%) | **9 / 629 (1.4%)** |
+| `(3/4)` Analysis (`6dW6VYXp9HM`) | 244.5 s | 84.2 s (34.4%) | **140.2 s (57.3%)** | 6.0 s (2.4%) | **14.2 s (5.8%)** | 14.7 s (6.0%) | **78 / 365 (21.4%)** |
+| `(4/4)` Operation (`jfH-NbsmvD4`) | 707.1 s | 39.7 s (5.6%) | **478.0 s (67.6%)** | 64.0 s (9.0%) | **125.3 s (17.7%)** | **0.0 s (0.0%)** | **2 / 1,019 (0.2%)** |
+| **4 Main Videos Subtotal** | **1,511.8 s** | **195.7 s (12.9%)** | **978.3 s (64.7%)** | **131.2 s (8.7%)** | **206.6 s (13.7%)** | **42.2 s (2.8%)** | **89 / 3,225 (2.8%)** |
+| Bonus: Spin (`XPQwKRt4Y2k`) | 173.7 s | 31.7 s (18.3%) | 2.8 s (1.6%) | 139.3 s (80.2%) | **0.0 s (0.0%)** | 0.0 s (0.0%) | **2 / 186 (1.1%)** |
+| Bonus: Rocker (`4mBuyixt22U`) | 1,048.4 s | 32.6 s (3.1%) | 9.6 s (0.9%) | 0.0 s (0.0%) | **1,006.1 s (96.0%)** *(1 locked camera)* | 1,006.0 s (96.0%) | **984 / 1,153 (85.3%)** |
+
+- **64.7% (`978 s` out of `1,512 s`) of the 4 main videos renders a completely frozen static pose and static camera**—including **`310+ s` where the real machine is visibly cranking or moving on screen** while the 3D twin sits motionless, and **64.4% (`973 s`)** uses guessed `source-informed-framing` cameras (`0.0 s` direct fit in the 11m 47s Operation video).
+- Meanwhile, instead of roughing in clean camera presets and crank turns across those 25 minutes, engineering effort went into **nanometer and bit-exact GPU certification**:
+  - `web/src/native-landmark-eligibility.ts:8,22-33` classifies `1e-7 m` (`100 nm`) `exactStoredF32Class` vertex residuals, explicitly checking `-0` signed-zero Float32 preservation.
+  - `web/src/native-target-shader-feedback.ts` (`1,338` LOC) and `native-primitive-snapshot.ts` (`1,177` LOC) dump all 460 drawables’ GPU Float32 vertex buffers and shader feedback to verify `actual-completed-draw-Float32-marker-geometry-vertex-transformed-by-sampled-matrixWorld`.
+  - `web/scripts/generate-analysis-synthesis-source-tracks.py:144-1980` carries **1,837 LOC (91.6% of the file)** of `_HistoricalReceiptAssembly` / `HistoricalReceiptRevalidator` whose own docstring notes it is unreachable in ordinary generation and exists only to unpack dead Python files from `content/canonical-native/historical-code/<sha256>/` into a temp dir and `exec()` them!
+
+---
+
+### C3. Why `web/` Is Frozen & Unmaintainable: The Multi-Epoch Hash-Chain Trap
+
+`web/` is currently stuck on **CAD v39 (`81539e53f5`)**: inside `web/src/mechanics-data.ts:36-1540`, **226 of 252 (89.7%)** SHA-sealed CAD files already report `"workingTreeMatchesRelease": false`. Updating `web/` to current `cad/` is prohibitive because every layer hashes the exact bytes of every other layer:
+
+1. **Three-epoch runtime name projection instead of updating the GLB (`current-native-identity.mjs`, `native-identity-map.mjs`)**:
+   - Rather than re-exporting a GLB when CAD renamed parts twice, `web/` kept `mechanics-data.ts`, `native-inventory.json`, and `*.source-track.json` in archived naming, checks **5 chained SHA-256s** in `model-representation.json`, hashes the **41.1 MB** GLB via `crypto.subtle.digest('SHA-256')` in the browser *before* parsing (`scene.ts:2392-2415`), and mutates all 459 glTF nodes + clones `MECHANISM_DATA` + rewrites 45 MB track JSONs in memory at page load (`current-native-identity.mjs:26-31`, `scene.ts:2408-2415`).
+   - Even without touching `web/`’s GLB, retiring a single vendor YAML in `cad/config/parts/` breaks `web/scripts/current-native-identity-inputs.mjs:19-31,130-140` unless that retired stem is hardcoded into `archivedOnly` and re-sealed across 5 files!
+2. **`canonical-native/manifest.json` seals 80 live source & test files (`manifest.json:403-804`)**:
+   - `canonical-native-evidence.py` (`733` LOC) computes `originalNumericLexemeSha256` (regex-hashing ASCII number spelling without JSON reserialization) AND seals the exact SHA-256 of **80 live files**—including `web/package.json`, `web/src/main.ts`, `web/src/scene.ts`, and `verify-sync.test.mjs`. Editing one line in `main.ts` or `package.json` breaks `verify:identity-evidence` until re-sealed under Python 3.13.9 (`zlib 1.3.1`).
+3. **Updating the 3D GLB invalidates all 6 video tracks & AST-parses both Python and TypeScript**:
+   - `CompactVideoReference` (`src/source-track.ts:239`) throws `'Compact track targets a different native CAD export'` if `model.sha256` or `sourceCommit` moves by a single cosmetic chamfer or screw change.
+   - `export-mechanics.py:43-168` AST-parses archived CAD `build_*.py` scripts for literal variable names (`MARKER_POS`, `_block_to_machine`), while `native-math-compatibility.mjs:19-258` runs the TypeScript compiler AST on `magnifier.ts` / `scene.ts` and rejects a model refresh if spring Bezier control points drift by `1e-6 mm`.
+
+---
+
+### C4. How to Simplify `web/` (~88k LOC & 586 MB $\to$ ~3.5k LOC & <1 MB Track JSON)
+
+1. **Decouple `web/` from CAD B-rep/commit SHA-256s (bind by semantic stem names only)**:
+   - Delete `model-representation.json` byte-hash blocking in the browser, `current-native-identity.mjs`, `native-identity-map.mjs`, `canonical-native-evidence.py`, `native-math-compatibility.mjs`, and all 252 per-file CAD SHA-256 seals in `mechanics-data.ts`.
+   - Export current `Default Simplified` (unthreaded) `ha-harmonic-analyzer.glb` directly with current CAD stem names, match joints via `bindings.ts` regexes (`AGENTS.md` Rule 3: *"An unresolved binding must warn and degrade, never throw"*), and export only a ~150-line JSON of pure kinematic constants (gear tooth counts, lever lengths, station pitch) from `cad/config/`. Now **any non-kinematic CAD tweak or COTS swap works in `web/` with zero track/code breakage**.
+2. **Delete 585+ MB of Git-tracked provenance/observation/historical-code JSONs**:
+   - Remove `content/*.observations.json`, `content/*.track.json`, `content/*.source-seeds.json`, `content/canonical-native/**` (including all 16 committed `historical-code/` source snapshots), `content/analysis-recovery-*`, and `content/v39-source/**` from Git (archive out-of-repo if ever wanted for historical curiosity).
+   - Delete `native-target-shader-feedback.ts`, `native-primitive-snapshot.ts`, `native-landmark-eligibility.ts`, `source-assembly.ts`, and `source-witness.ts`.
+3. **Replace pixel-PnP / Float32 certification with lightweight, human-editable Beat/Shot Keyframe Tracks (~50–150 KB total for all 6 videos)**:
+   - Prior empirical findings (`2026-10-09` camera-fitting spike) already proved automated silhouette/chamfer/PnP camera fitting is ill-posed on shiny brass/cast-iron footage (`0/20` old cameras right; human eye confirmation required anyway).
+   - Define **~12–20 named reusable camera presets** (`front-full`, `back-oblique`, `cone-gear-closeup`, `rocker-bank`, `summing-wire`, `platen-trace`, `overhead-setup`, `turntable-orbit`) in one `cameras.json` (~150 lines) — independent of GLB byte hashes!
+   - Represent each video’s companion timeline as a tiny, readable **shot/keyframe table (`content/tracks/<slug>.json`, ~100–250 rows / ~15 KB per video)** specifying `{ start, end, mode: "follow" | "explore-hint", camera: "cone-gear-closeup" | {orbit...}, crankTurns: [0, 4], preset: "square-wave-5", setup?: {...}, caption?: "..." }`.
+   - With a 300-LOC in-browser `?edit=1` keyframe scrubber (scrub YouTube video $\to$ orbit/pick camera preset $\to$ set crank start/end rate $\to$ press `S` to save shot JSON), **100% of all 6 videos can be visually matched and maintained in an afternoon**, instead of 65% sitting frozen behind 586 MB of SHA-256 provenance seals.
+
+---
+
+## 5. Simplification Roadmap & Target Footprint (For Inline Review)
 
 | Workstream | Current Footprint (LOC) | Proposed Direction | Est. Target (LOC) |
 |---|---:|---|---:|
@@ -256,5 +330,6 @@ Even holding the manual-mill + EL400 rule fixed (making the inscribed-angle virt
 | **3. Buildgraph, Configs & Farm CLI (`A2`, `A4`)** | ~28,000 *(+~500 micro-files)* | Consolidate YAMLs/micro-modules; replace `_buildgraph` AST dataflow + env-var traps with evaluated input-dict hashing; replace `farm-run.ps1` + `build.py` + `_selected_execution.py` with one ~700-LOC Python Temporal CLI writing `.status.json` | ~3,500 |
 | **4. SolidWorks Adapter & Forensics (`A1`, `A6`)** | 227,219 *(+6.3k forensics/OTel)* | Extract synchronous typed `pywin32` SolidWorks-only package (~8k LOC + `sldworks_2026.py`); drop MCP/UI/agents/pool, `AdapterResult`, fake `async`, success-path preference polling, `_sketch_closure.py`, and `test_recipe_inert.py` | ~111,000 *(102.4k generated)* |
 | **5. Machinist-Review Plumbing & Gates (`A5`, `A6`)** | 22,696 *(+6.5k data/docs)* | **Keep the 3-blind-reviewer + 1-judge tribunal**, rubric prompts & `_pdf_ink_digest`; replace DACL/OMP-RPC/MCP/rollout-forensic plumbing with direct SDK calls over static `pypdfium2` crops (~600 LOC); decouple `uv.lock` from review keys; move evals/viewer out-of-repo; drop `preflight_release.py`, `joint_retention.py` (to docs), and redundant `verify_soundness` re-opens | ~1,600 |
-| **6. Manual-Mill Policy, Tooling & Travelers (`B1`, `B5`)** | ~72,000 | Document `CNCjs` + simulated `EL400` manual-mill rule in `cad/docs/` & `shop-equipment.toml` (and fix stale `surface-plate` / `feeler-gauges` `present = true`); remove `TL-20` CNC G-code / `±0.02 mm` ballscrew stack dependency; right-size oblique-jig specs/drawings/travelers; delete 4 stale `hand-travelers/*.html`; drop AST-span STEP bindings | ~5,000 |
+| **6. Manual-Mill Policy, Tooling & Travelers (`B1`, `B5`)** | ~72,000 | Document `CNCjs` + simulated `EL400` manual-mill rule in `cad/docs/` & `shop-equipment.toml` (and update owned metrology: surface plate, feeler gauges, 2× `0.001"` dial + `1 µm` lever + digital `0.000''` indicators); remove `TL-20` CNC G-code / `±0.02 mm` ballscrew stack dependency; right-size oblique-jig specs/drawings/travelers; delete 4 stale `hand-travelers/*.html`; drop AST-span STEP bindings | ~5,000 |
 | **7. Assemblies, Drawings & Test Suite (`A7`, `B3`, `B4`, `B5`)** | ~570,000 | **Keep free operational DOFs & `CopyWithMates2`** on moving slices while grounding 0-DOF static parts via `place_components_batch` (`CreateFastenersFolder=True`, 1 explode helper); finish `_layout_audit` cutover & delete legacy `_drawing_layout_check`; move prose manuals to Markdown; delete fake-COM emulators & AST statement-order locks while keeping math/stack tests + exported-PDF gates | ~80,000 |
+| **8. `web/` Simulator & Video Sync (`C1`–`C4`)** | ~88,000 *(+586.4 MB JSON)* | Decouple `web/` from GLB/CAD SHA-256 seals & 3-epoch identity mappers; delete `585+ MB` of `observations`/`canonical-native`/`historical-code` blobs and GPU Float32 shader-feedback auditors; replace fragile PnP tracks (65% frozen on main videos) with ~15 named camera presets + compact human-editable shot/keyframe JSONs (~100 KB total) + simple `?edit=1` scrubber | ~3,500 *(+<0.2 MB JSON)* |
