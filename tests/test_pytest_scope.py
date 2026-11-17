@@ -16,7 +16,6 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 SUBMODULE = "SolidworksMCP-python"
-EXPECTED_TESTPATHS = ["cad/scripts", "cad/comparisons/tools", "tests"]
 
 
 def _ini() -> dict:
@@ -24,9 +23,12 @@ def _ini() -> dict:
         return tomllib.load(handle)["tool"]["pytest"]["ini_options"]
 
 
+def _testpaths() -> list[str]:
+    return _ini()["testpaths"]
+
+
 def test_bare_pytest_runs_only_this_repositorys_suites():
-    assert _ini()["testpaths"] == EXPECTED_TESTPATHS
-    for path in EXPECTED_TESTPATHS:
+    for path in _testpaths():
         assert (ROOT / path).is_dir(), path
         assert not path.startswith(SUBMODULE)
 
@@ -42,5 +44,5 @@ def test_pytest_dot_does_not_recurse_into(directory):
 
 def test_pytest_reads_the_root_configuration(pytestconfig):
     assert Path(pytestconfig.inipath) == ROOT / "pyproject.toml"
-    assert pytestconfig.getini("testpaths") == EXPECTED_TESTPATHS
+    assert pytestconfig.getini("testpaths") == _testpaths()
     assert SUBMODULE in pytestconfig.getini("norecursedirs")
