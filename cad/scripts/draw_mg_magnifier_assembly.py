@@ -897,22 +897,45 @@ def boundary_letter_xy(
 
 
 # The gauge's dimension line runs above the bar, inside the circle, a bare
-# reference; the plain end's limits stand left of the bar's far face at the
-# same height, clear of the gauge's extension line on the front face. The
-# endshake's text stands right of the stack, above the nuts and past the
-# crop, with its callout below; the drum recess's and the thread end's stand
-# below the axle, left of the drum and right of the nuts respectively, so
-# no two of DETAIL B's three dimension lines share a side of a face.
+# reference; the plain end's limits stand left of the bar's far face, their
+# line level with the gauge's, clear of the bar's top face. The endshake's
+# text stands right of the stack, above the nuts and past the crop, with its
+# callout below; the drum recess's and the thread end's lines run below the
+# axle, under the nuts' corners and over DETAIL B's label, their texts left of
+# the drum and right of the nuts respectively, so no two of DETAIL B's three
+# dimension lines share a side of a face.
+# SOLIDWORKS centres a dimension's text block on the requested position and
+# runs the dimension line along the block's bottom: run
+# 20261117T130535982Z measured 2.55 mm of sheet per printed line (value lines
+# plus callout lines) from the position down to the line (its limit texts at
+# y 90 mm drew their lines at 77-80 mm, through DETAIL B's label).
+DIM_TEXT_HALF_LINE = 0.00255
 GAUGE_RISE = 12.0
 BACK_END_SUNK_RUN = 0.019
 ENDSHAKE_RISE = 5.5
+STACK_LINE_DROP = 5.25
 STACK_SIDE_RUN = 0.055
-DRUM_RECESS_RUN = 0.049
+DRUM_RECESS_RUN = 0.050
+
+
+def text_over_line(name: str, line_y: float) -> float:
+    """The text position whose block's bottom, and so its dimension line,
+    lands at sheet ``line_y``: two value lines for a limit pair, one for the
+    rest, plus the native callout's lines."""
+    values = 2 if name in stack.LIMIT_DIMENSIONS else 1
+    callout = stack.SETTING_CALLOUTS[stack.FEATURE].get(name, (0, ""))[1]
+    lines = values + (len(callout.splitlines()) if callout else 0)
+    return line_y + lines * DIM_TEXT_HALF_LINE
+
+
+_GAUGE_XY = PRESSED.sheet_xy(stack.PRESS_GAUGE / 2.0, GAUGE_RISE)
+GAUGE_LINE_Y = _GAUGE_XY[1] - DIM_TEXT_HALF_LINE
+STACK_LINE_Y = ENDSHAKE.sheet_xy(stack.HUB_FRONT_D, -STACK_LINE_DROP)[1]
 PRESSED_KEEP = {
-    stack.PRESS_GAUGE_DIMENSION: PRESSED.sheet_xy(stack.PRESS_GAUGE / 2.0, GAUGE_RISE),
+    stack.PRESS_GAUGE_DIMENSION: _GAUGE_XY,
     stack.BACK_END_SUNK_DIMENSION: (
         PRESSED.sheet_xy(stack.BAR_FAR_D)[0] - BACK_END_SUNK_RUN,
-        PRESSED.sheet_xy(stack.BAR_FAR_D, GAUGE_RISE)[1],
+        text_over_line(stack.BACK_END_SUNK_DIMENSION, GAUGE_LINE_Y),
     ),
 }
 ENDSHAKE_KEEP = {
@@ -922,11 +945,11 @@ ENDSHAKE_KEEP = {
     ),
     stack.DRUM_RECESS_DIMENSION: (
         ENDSHAKE.centre[0] - DRUM_RECESS_RUN,
-        ENDSHAKE.sheet_xy(stack.HUB_FRONT_D, -ENDSHAKE_RISE)[1],
+        text_over_line(stack.DRUM_RECESS_DIMENSION, STACK_LINE_Y),
     ),
     stack.THREAD_PAST_LOCKNUT_DIMENSION: (
         ENDSHAKE.centre[0] + STACK_SIDE_RUN,
-        ENDSHAKE.sheet_xy(stack.LOCKNUT_FACE_D, -ENDSHAKE_RISE)[1],
+        text_over_line(stack.THREAD_PAST_LOCKNUT_DIMENSION, STACK_LINE_Y),
     ),
 }
 if set(PRESSED_KEEP) != notes.PRESS_DETAIL_DIMENSIONS or set(ENDSHAKE_KEEP) != (

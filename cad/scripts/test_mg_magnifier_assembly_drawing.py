@@ -496,31 +496,46 @@ def test_each_detail_frames_both_ends_of_its_dimensions() -> None:
 def test_the_limit_texts_stand_outside_the_parts_clear_of_their_neighbours() -> None:
     import mg_vn_wheel_axle_nut_spec as nut
 
-    # A limit pair and its callout lines, about 4.5 mm each; the callouts'
-    # longest line, "PLAIN END BELOW", prints about 36 mm wide.
+    # The callouts' longest line, "PLAIN END BELOW", prints about 36 mm wide;
+    # an extension line overshoots its dimension line by about 1.5 mm.
     half_width = 0.018
-
-    def text_bottom(name, y):
-        lines = 2 + len(stack.SETTING_CALLOUTS[stack.FEATURE][name][1].splitlines())
-        return y - 0.0045 * lines
-
-    # DETAIL A: left of the bar's far face, above the bar, clear of the
-    # isometric and of the bar's far-face extension line.
+    overshoot = 0.0015
+    # The text position sits half its block above the dimension line.
+    assert drawing.text_over_line(stack.ENDSHAKE_DIMENSION, 0.0) == pytest.approx(
+        2 * drawing.DIM_TEXT_HALF_LINE
+    )
+    assert drawing.text_over_line(stack.THREAD_PAST_LOCKNUT_DIMENSION, 0.0) == pytest.approx(
+        5 * drawing.DIM_TEXT_HALF_LINE
+    )
+    # DETAIL A: left of the bar's far face, its line level with the gauge's,
+    # clear of the isometric and of the bar's far-face extension line.
     x, y = drawing.PRESSED_KEEP[stack.BACK_END_SUNK_DIMENSION]
     far_x = drawing.PRESSED.sheet_xy(stack.BAR_FAR_D)[0]
     assert ISO_RIGHT < x - half_width and x + half_width < far_x
-    assert y == drawing.PRESSED_KEEP[stack.PRESS_GAUGE_DIMENSION][1]
-    # DETAIL B: below the axle, past the nuts' corners; the drum recess left
-    # of the circle, the thread end right of it, both over the title block.
+    assert y == pytest.approx(
+        drawing.text_over_line(stack.BACK_END_SUNK_DIMENSION, drawing.GAUGE_LINE_Y)
+    )
+    assert y + drawing.text_over_line(stack.BACK_END_SUNK_DIMENSION, 0.0) < SHEET_TOP
+    # DETAIL B: both lines run under the nuts' corners and over the detail's
+    # label, extension overshoot included; the drum recess's text left of
+    # the circle, the thread end's right of it, both under the endshake's
+    # dimension line.
+    line_y = drawing.STACK_LINE_Y
+    centre_y = drawing.ENDSHAKE.centre[1]
+    assert centre_y - line_y > nut.ACROSS_CORNERS / 2.0 * drawing.ENDSHAKE.mm
+    assert line_y - overshoot > drawing.ENDSHAKE.label_xy[1] + 0.002
+    endshake_line = drawing.ENDSHAKE_KEEP[stack.ENDSHAKE_DIMENSION][1] - drawing.text_over_line(
+        stack.ENDSHAKE_DIMENSION, 0.0
+    )
+    box = _circle_box(drawing.ENDSHAKE)
     for name, side in (
         (stack.DRUM_RECESS_DIMENSION, -1),
         (stack.THREAD_PAST_LOCKNUT_DIMENSION, 1),
     ):
         x, y = drawing.ENDSHAKE_KEEP[name]
-        box = _circle_box(drawing.ENDSHAKE)
+        assert y == pytest.approx(drawing.text_over_line(name, line_y))
         assert (x < box[0]) if side < 0 else (x > box[2])
-        assert drawing.ENDSHAKE.centre[1] - y > nut.ACROSS_CORNERS / 2.0 * drawing.ENDSHAKE.mm
-        assert text_bottom(name, y) > TITLE_BLOCK_TOP
+        assert y + drawing.text_over_line(name, 0.0) < endshake_line - 0.004
     assert drawing.ENDSHAKE_KEEP[stack.DRUM_RECESS_DIMENSION][0] - half_width > ISO_RIGHT
     assert drawing.ENDSHAKE_KEEP[stack.THREAD_PAST_LOCKNUT_DIMENSION][0] + half_width < SHEET_RIGHT
 
