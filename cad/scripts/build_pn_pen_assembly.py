@@ -119,22 +119,15 @@ from _assembly import (
 from _transforms import IDENTITY, euler_from_rows
 from _pn_pen_interference import ALLOWED_PAIRS
 from pn_vn_hanger_screw_spec import SHANK_LEN as HANGER_SHANK_LEN
-from pn_vn_hanger_screw_spec import THREAD_PITCH as HANGER_THREAD_PITCH
 from pn_vn_hanger_screw_spec import TIP_CHAMFER as HANGER_TIP_CHAMFER
-from pn_vn_pen_hanger_jam_nut_spec import (
-    THREAD_PAST_MIN_PITCHES as HANGER_THREAD_PAST_PITCHES,
-)
 from pn_vn_pen_hanger_jam_nut_spec import THICKNESS as HANGER_JAM_NUT_T
 from pn_vn_pen_hanger_nut_spec import ACROSS_CORNERS as HANGER_NUT_ACROSS_CORNERS
 from pn_vn_pen_hanger_nut_spec import THICKNESS as HANGER_NUT_T
 from _mg_wheel_rim_geometry import RIM_AXIAL as WHEEL_RIM_AXIAL
 from _mg_wheel_rim_geometry import RIM_OUTER_DIA as WHEEL_RIM_OUTER_DIA
 from _column_clamp_interface import BAR_DEPTH as WHEEL_BAR_DEPTH
-from mg_wheel_bar_geom import HANGER_SCREW_MACHINE_X
 from mg_wheel_bar_geom import WHEEL_BAR_Y, WHEEL_X
 from pn_pen_hanger_spec import (
-    GUIDE_ENGAGE_MARGIN,
-    GUIDE_SPAN_Y,
     HANGER_POS,
     SCREW_HOLE_XY as HANGER_HOLE_XY,
     STRAP_Z as HANGER_STRAP_Z,
@@ -143,11 +136,9 @@ from sh_vn_music_wire_pen_geom import (
     CONFIGURATION as PEN_WIRE_CONFIGURATION,
     WHEEL_MID_Z,
     WIRE_BOTTOM as PEN_WIRE_BOTTOM,
-    WIRE_LEN as PEN_WIRE_LEN,
 )
 from pn_pen_carriage_geom import (
     BLOCK_ROWS,
-    CARRIAGE_TOP_Y,
     FRAME_POS,
     FRAME_ROWS,
     MARKER_POS,
@@ -157,8 +148,6 @@ from pn_pen_carriage_geom import (
     ROD_POS as PEN_ROD_POS,
     ROD_SET_SCREW_POS,
     ROD_SET_SCREW_ROWS,
-    ROD_SQUARE_TOP_Y,
-    STUD_HEAD_TOP_Y,
     STUD_POS,
     THUMB_SCREW_POS,
     THUMB_SCREW_ROWS,
@@ -166,30 +155,9 @@ from pn_pen_carriage_geom import (
 )
 
 ASM_NAME = "pn-pen"
-assert ASM_NAME == spec.ASM_NAME, (ASM_NAME, spec.ASM_NAME)
-
-# --- hanger guides: the rod square stays in both U guides over the full travel,
-# and nothing riding the rod reaches the lower guide --------------------------------
-if ROD_SQUARE_TOP_Y[0] < GUIDE_SPAN_Y[1] + GUIDE_ENGAGE_MARGIN:
-    raise AssertionError(
-        "pen-rod square leaves the upper U guide at the bottom of travel"
-    )
-if CARRIAGE_TOP_Y[1] > GUIDE_SPAN_Y[0] - GUIDE_ENGAGE_MARGIN:
-    raise AssertionError("pen carriage reaches the lower U guide at the top of travel")
 
 # --- amplification wire 2 (rim -> stud eye) ---------------------------------------
-# The run's top rides the rim groove's tangent at the wheel-axis height; it hangs
-# plumb onto the stud's eye head, which stays below the rim at the top of travel.
-if not math.isclose(PEN_WIRE_BOTTOM[1] + PEN_WIRE_LEN, WHEEL_BAR_Y, abs_tol=1e-9):
-    raise AssertionError("pen-wire top drifted from the wheel-axis tangent height")
 _RIM_R = WHEEL_RIM_OUTER_DIA / 2.0
-_RIM_LOW_Y_AT_WIRE = WHEEL_BAR_Y - math.sqrt(
-    _RIM_R**2 - (WHEEL_X - PEN_WIRE_BOTTOM[0]) ** 2
-)
-if STUD_HEAD_TOP_Y[1] > _RIM_LOW_Y_AT_WIRE - 2.0:
-    raise AssertionError(
-        "adjuster stud eye reaches the magnifying-wheel rim at the top of travel"
-    )
 
 # --- M6.10 fastener ----------------------------------------------------------
 # Pen-hanger screw from BEHIND the bar. Its under-head frame follows the shared
@@ -202,8 +170,6 @@ HANGER_SCREW_POS = (
     HANGER_POS[1] + HANGER_HOLE_XY[1],
     BAR_BACK_Z,
 )
-assert math.isclose(HANGER_SCREW_POS[0], HANGER_SCREW_MACHINE_X, abs_tol=1e-9)
-assert math.isclose(HANGER_SCREW_POS[1], WHEEL_BAR_Y, abs_tol=1e-9)
 HANGER_SCREW_TIP_Z = HANGER_SCREW_POS[2] - HANGER_SHANK_LEN
 HANGER_STRAP_FRONT_Z = HANGER_POS[2] + min(HANGER_STRAP_Z)
 # Both nuts' frames span local z 0..T (pn_vn_pen_hanger_nut_spec,
@@ -230,14 +196,6 @@ HANGER_NUT_RIM_RADIAL = (
     - HANGER_NUT_ACROSS_CORNERS / 2.0
     - _RIM_R
 )
-if HANGER_THREAD_PAST_NUT < HANGER_THREAD_PAST_PITCHES * HANGER_THREAD_PITCH:
-    raise AssertionError(
-        "stock hanger screw stands under two full pitches past the jam nut"
-    )
-if HANGER_TIP_TO_RIM <= 0.0:
-    raise AssertionError("stock hanger screw tip reaches the magnifying-wheel rim")
-if HANGER_NUT_RIM_RADIAL <= 0.0:
-    raise AssertionError("hanger nut corners reach the magnifying-wheel rim")
 
 # Every part that rides the rod: (stem, position, rows). Each is placed at its
 # exact pose and LOCKED to the rod (a Lock mate freezes the full relative

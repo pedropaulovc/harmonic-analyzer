@@ -175,7 +175,7 @@ def test_assembly_keeps_common_face_and_established_inboard_stations() -> None:
     import dt_crank_pinion_spec
     import dt_crankshaft_spec
 
-    shaft_end = drive.CRANKSHAFT_Z0 + drive.CRANKSHAFT_LENGTH
+    shaft_end = drive.CRANKSHAFT_Z0 + dt_crankshaft_spec.SHAFT_LENGTH
     proud = shaft_end - (drive.PINION_Z0 + drive.PINION_OVERALL_LENGTH)
     least, most = dt_crankshaft_spec.SHAFT_END_PROUD_RANGE
     assert 0.0 <= least <= proud <= most

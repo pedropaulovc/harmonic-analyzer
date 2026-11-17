@@ -39,7 +39,9 @@ def test_hanger_screw_hole_lands_on_the_bar_screw_axis() -> None:
     assert spec.STRAP_Z[1] - spec.STRAP_Z[0] == pytest.approx(0.125 * 25.4)
     assert spec.SCREW_HOLE_SPEC.kind == "clearance"
     assert spec.SCREW_HOLE_DIA > spec.HANGER_SCREW_DIA
-    assert pen.HANGER_THREAD_PAST_NUT >= 2.0 * pen.HANGER_THREAD_PITCH
+    import pn_vn_hanger_screw_spec
+
+    assert pen.HANGER_THREAD_PAST_NUT >= 2.0 * pn_vn_hanger_screw_spec.THREAD_PITCH
 
 
 def test_screw_hole_and_nut_fit_all_four_tapered_strap_edges() -> None:

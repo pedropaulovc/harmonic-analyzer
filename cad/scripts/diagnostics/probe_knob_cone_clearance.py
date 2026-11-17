@@ -28,6 +28,8 @@ from _session import run_build  # noqa: E402
 from _assembly import place_component  # noqa: E402
 from _transforms import compose_rows, rot_z_rows  # noqa: E402
 import build_dt_drive_train_assembly as dta  # noqa: E402
+import dt_cone_swing_platform_geometry as platform  # noqa: E402
+import dt_vn_cone_lock_knob_spec as knob_spec  # noqa: E402
 
 
 def _transform(rows: list[list[float]], position_mm: list[float]) -> list[float]:
@@ -108,9 +110,9 @@ async def build(adapter) -> dict[str, str]:
     former_x = 27.5
     former_z = dta._POST_LOCAL_Z + math.sqrt(
         (
-            dta.KNOB_HEAD_DIA / 2.0
+            knob_spec.HEAD_DIA / 2.0
             + dta.POST_BLOCK_DIA / 2.0
-            + dta.PLAT_LOCK_HEAD_POST_CLEARANCE
+            + platform.LOCK_HEAD_POST_CLEARANCE
         )
         ** 2
         - former_x**2
@@ -130,7 +132,7 @@ async def build(adapter) -> dict[str, str]:
     pitch = 360.0 / teeth
     candidates = {
         "former northern station": (former_x, former_z),
-        "production southern station": (dta.PLAT_SLOT_E_X, dta.PLAT_SLOT_E_Z),
+        "production southern station": (platform.SLOT_E_X, platform.SLOT_E_Z),
     }
     worst_by_station: dict[str, float] = {}
     for label, (local_x, local_z) in candidates.items():

@@ -1709,15 +1709,17 @@ def test_the_64t_stands_on_the_collar_and_bears_on_t120() -> None:
     layout face's, the collar grows by exactly that, and the 64T's north face
     touches T120's south face (the stack is solid from the collar on)."""
     spec = dt_cone_gear_shaft_spec
+    import dt_crank_drive_gear_spec as gear64
+
     south = (
         drive.GEAR64_STATION
         + drive.GEAR_AXIS_SHIFT
-        - drive.GEAR64_LAYOUT_FACE / 2.0
-        + drive.GEAR64_SOUTH_FACE_SHIFT_NORTH
+        - gear64.LAYOUT_FACE_WIDTH / 2.0
+        + gear64.SOUTH_FACE_SHIFT_NORTH
     )
     assert spec.GEAR64_SOUTH_FACE_STATION == pytest.approx(south, abs=1e-9)
-    assert drive.GEAR64_SOUTH_FACE_SHIFT_NORTH == 1.5
-    web_under_8 = spec.COLLAR_THICKNESS - drive.GEAR64_SOUTH_FACE_SHIFT_NORTH
+    assert gear64.SOUTH_FACE_SHIFT_NORTH == 1.5
+    web_under_8 = spec.COLLAR_THICKNESS - gear64.SOUTH_FACE_SHIFT_NORTH
     assert web_under_8 == pytest.approx(1.681, abs=5e-4)
     assert spec.COLLAR_THICKNESS == pytest.approx(3.181, abs=5e-4)
     north = drive.GEAR64_CENTRE_STATION + drive.GEAR64_FACE / 2.0

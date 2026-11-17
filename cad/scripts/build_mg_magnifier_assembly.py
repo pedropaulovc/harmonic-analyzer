@@ -136,14 +136,12 @@ from _transforms import (
     rot_z_rows,
     rows_from_euler,
 )
-from _cone_axis_constants import FRAME_FRONT_COLUMN_Z, SUMMING_Z
+from _cone_axis_constants import FRAME_FRONT_COLUMN_Z
 from frame_column_stations import COLUMN_X  # the WEST column (machine +x is west; the crank side -x is east)
-from sm_summing_lever_spec import PLATE_Z_MINUS
 from mg_wheel_bar_geom import WHEEL_BAR_Y
 from magnifying_bracket_joint_layout import (
     BRACKET_ORIGIN,
     SCREW_POSITIONS,
-    SEAT_PLANE_Z,
 )
 
 ASM_NAME = "mg-magnifier"
@@ -165,19 +163,12 @@ from _column_clamp_interface import (  # noqa: E402
     BAR_DEPTH as WHEEL_BAR_DEPTH,
 )
 from mg_wheel_bar_geom import (  # noqa: E402
-    BAR_FRONT_Z as WHEEL_BAR_FRONT_Z,
-    CLAMP_HOLE_X as BAR_CLAMP_HOLE_LOCAL_X,
     WHEEL_BAR_X0,
 )
 
 BAR_BACK_Z = COLUMN_Z - ARC_FRONT_DEPTH  # -129.4
 BAR_FRONT_Z = BAR_BACK_Z - WHEEL_BAR_DEPTH  # -138.9: bar front = platen-back plane
 BAR_Z = (BAR_FRONT_Z + BAR_BACK_Z) / 2.0  # -134.15 bar centre
-# The wheel stack (mg_wheel_group) and the axle's gauge read the bar's front
-# face from mg_wheel_bar_geom: it must be the clamp chain's.
-assert math.isclose(BAR_FRONT_Z, WHEEL_BAR_FRONT_Z, abs_tol=1e-9), (
-    "wheel-bar front face drifted from mg_wheel_bar_geom.BAR_FRONT_Z"
-)
 
 # --- magnifying group --------------------------------------------------------
 # Rod at the plate centreline, the summing knife line (top_frame_plane
@@ -190,21 +181,17 @@ LEVER_ROD_Y = 979.6932
 # lever rod, the clamp's thumb screw, the vertical rod, the fixture's wire hook
 # and the drum's wire lane all lie in one plane, so WIRE 1 runs straight down
 # it with no depth lean. LEVER_ROD_Z is therefore the drum lane
-# (sh_vn_music_wire_lever_geom.DRUM_END_Z, asserted below). It stays a module-level
+# (sh_vn_music_wire_lever_geom.DRUM_END_Z, checked offline). It stays a module-level
 # literal: web/scripts/native_identity_source.py reads LEVER_ROD_Y,
 # LEVER_ROD_Z and VROD_TOP_Y from this file by AST. The one-piece top-frame
 # casting's front rail imposes no depth bound (the exact-stock thumb-screw
-# reach, asserted below, keeps its head under the rail), and the quarter-inch lever's
+# reach, checked offline, keeps its head under the rail), and the quarter-inch lever's
 # clearance to the front column surface (-124.7) is now ~45.8 -- trivially
 # large. The drum route's rim/spoke/boss clearance is proved in XY by
 # sh_vn_music_wire_lever_geom.RUN_GAPS; the bracket arm reaches back to the unchanged
 # plate flange (magnifying_bracket_joint_layout).
 LEVER_ROD_Z = -173.5192
-from sh_vn_music_wire_lever_geom import DRUM_END_Z as LEVER_WIRE_DRUM_Z  # noqa: E402
 
-assert math.isclose(LEVER_ROD_Z, LEVER_WIRE_DRUM_Z, abs_tol=1e-9), (
-    f"magnifying group plane {LEVER_ROD_Z} left the drum wire lane {LEVER_WIRE_DRUM_Z}"
-)
 LEVER_X0 = 200.0  # lever part origin (free dome tip; rod spans +32.5..+200,
 # placed Ry(180) so the part's local +x runs east toward the summing knife)
 
@@ -217,19 +204,9 @@ from mg_lever_thread_joint import ROD_DIA as LEVER_ROD_DIA  # noqa: E402
 from mg_magnifying_lever_geom import (  # noqa: E402
     CLAMP_LOCAL_X,
     BRACKET_LOCAL_X,
-    KNIFE_LOCAL_X,
-    KNIFE_LOCAL_Y,
 )
 from spring_mount_geom import KNIFE, KNIFE_CONTACT_Y  # noqa: E402
 
-# The lever is placed Ry(180) (local +x -> machine -x), so the knife lands at
-# LEVER_X0 - KNIFE_LOCAL_X.
-assert math.isclose(LEVER_X0 - KNIFE_LOCAL_X, KNIFE[0], abs_tol=1e-9), (
-    "magnifying-lever KnifeAxis x drifted from the summing knife line"
-)
-assert math.isclose(LEVER_ROD_Y + KNIFE_LOCAL_Y, KNIFE_CONTACT_Y, abs_tol=1e-9), (
-    "magnifying-lever KnifeAxis y drifted from the knife-edge contact ridge"
-)
 from sh_vn_thumb_screw_spec import (  # noqa: E402
     HEAD_DIA as THUMB_HEAD_DIA,
     HEAD_STACK_LEN as THUMB_HEAD_STACK_LEN,
@@ -240,7 +217,6 @@ from mg_magnifying_clamp_geom import THUMB_CONTACT_ANGLE_MAX  # noqa: E402
 from top_frame_plane import TOP_FRAME_UNDERSIDE_Y  # noqa: E402
 
 TOP_FRAME_RAIL_UNDERSIDE_Y = TOP_FRAME_UNDERSIDE_Y
-_MIN_THUMB_RAIL_CLEARANCE = 0.25
 THUMB_SCREW_TIP_Y = LEVER_ROD_Y + LEVER_ROD_DIA / 2.0
 THUMB_SCREW_OUTER_FACE_Y = THUMB_SCREW_TIP_Y + THUMB_SHANK_LEN + THUMB_HEAD_STACK_LEN
 THUMB_SCREW_RAIL_CLEARANCE = TOP_FRAME_RAIL_UNDERSIDE_Y - THUMB_SCREW_OUTER_FACE_Y
@@ -248,24 +224,11 @@ THUMB_SCREW_RAIL_CLEARANCE = TOP_FRAME_RAIL_UNDERSIDE_Y - THUMB_SCREW_OUTER_FACE
 # excursions at the conservative manufactured clamp/screw angle. Dropping the
 # axial cos(angle) shortening makes this a lower bound, not just nominal CAD.
 THUMB_SCREW_RAIL_CLEARANCE_WORST = THUMB_SCREW_RAIL_CLEARANCE - (THUMB_TIP_FLAT_R + THUMB_HEAD_DIA / 2.0) * math.sin(THUMB_CONTACT_ANGLE_MAX)
-assert THUMB_SCREW_RAIL_CLEARANCE_WORST >= _MIN_THUMB_RAIL_CLEARANCE, (
-    f"thumb-screw head clears the top-frame rail by only "
-    f"{THUMB_SCREW_RAIL_CLEARANCE_WORST:.4f} mm at the contact/head angle bound"
-)
 # Sliding clamp default position (p.46/48 insets) and the threaded bracket, both
 # derived from the lever-local stations error_budget.py reads for the
 # magnification range (Ry(180): machine x = LEVER_X0 - local x).
 CLAMP_X = LEVER_X0 - CLAMP_LOCAL_X  # 150
 BRACKET_X = LEVER_X0 - BRACKET_LOCAL_X  # 40
-assert math.isclose(SEAT_PLANE_Z, SUMMING_Z + PLATE_Z_MINUS, abs_tol=1e-9), (
-    "magnifying-bracket seat drifted from the summing-lever front face"
-)
-assert all(
-    math.isclose(actual, expected, abs_tol=1e-9)
-    for actual, expected in zip(
-        BRACKET_ORIGIN, (BRACKET_X, LEVER_ROD_Y, LEVER_ROD_Z), strict=True
-    )
-), "magnifying-bracket joint origin drifted from its live placement"
 # The clamp is a vertical length of 1/2 hex: placed UNROTATED (hex
 # axis = machine +Y, lever bore along X through the corners), its bottom-face
 # origin LEVER_BORE_Y under the lever axis. The vertical rod screws into the
@@ -274,42 +237,24 @@ assert all(
 # worst-case asserts (engagement, tap depth) gate this assembly.
 import mg_rod_clamp_joint  # noqa: E402, F401
 from mg_magnifying_clamp_geom import LEVER_BORE_Y as CLAMP_BORE_Y  # noqa: E402
-from mg_magnifying_vertical_rod_geom import SHOULDER_X as VROD_SHOULDER_X  # noqa: E402
 
 CLAMP_POS = (CLAMP_X, LEVER_ROD_Y - CLAMP_BORE_Y, LEVER_ROD_Z)
 VROD_Z = LEVER_ROD_Z  # coaxial with the clamp and its thumb screw
 # Thread tip: the shoulder seats on the clamp's bottom face. A literal for the
 # same AST reader as LEVER_ROD_Z, asserted against its derivation.
 VROD_TOP_Y = 967.2432
-assert math.isclose(
-    VROD_TOP_Y, LEVER_ROD_Y - CLAMP_BORE_Y + VROD_SHOULDER_X, abs_tol=1e-9
-), "vertical-rod thread tip drifted from the clamp's bottom face + SHOULDER_X"
 from mg_output_fixture_geom import (  # noqa: E402
     FIXTURE_AXIS_Y,
     FIXTURE_YAW_DEG,
     HOOK_LOCAL,
     SPIGOT_FACE_X,
-    VROD_Z as FIXTURE_VROD_Z,
 )
 from mg_magnifying_vertical_rod_geom import ROD_DIA as VROD_DIA  # noqa: E402
-
-assert math.isclose(
-    VROD_Z, FIXTURE_VROD_Z, rel_tol=0.0, abs_tol=1e-9
-), f"fixture vertical-rod Z datum {FIXTURE_VROD_Z} drifted from clamp datum {VROD_Z}"
 
 # Local +X runs through the spigot toward the bracket, slightly back (+Z);
 # local +Z is the machine-front groove tangent. No chirality shim is applied.
 FIXTURE_ROWS = rows_from_euler([0.0, 180.0 + FIXTURE_YAW_DEG, 0.0])
 FIXTURE_POSITION = (CLAMP_X, FIXTURE_AXIS_Y, VROD_Z)
-assert all(
-    math.isclose(actual, expected, abs_tol=1e-9)
-    for actual, expected in (
-        (stack_spec.LEVER_TIP_X, LEVER_X0),
-        (stack_spec.LEVER_AXIS_Y, LEVER_ROD_Y),
-        (stack_spec.CLAMP_CENTRE_X, CLAMP_X),
-        (stack_spec.FIXTURE_AXIS_Y, FIXTURE_POSITION[1]),
-    )
-), "mg_magnifier_assembly_spec's lever settings drifted from the placed lever group"
 FIXTURE_SCREW_ROWS = compose_rows(ROT_Y_180, FIXTURE_ROWS)
 FIXTURE_SCREW_TIP_X = VROD_DIA / 2.0
 FIXTURE_SCREW_COLLAR_X = FIXTURE_SCREW_TIP_X + THUMB_SHANK_LEN
@@ -319,7 +264,6 @@ FIXTURE_SCREW_POSITION = tuple(
     origin + FIXTURE_SCREW_OUTER_X * FIXTURE_ROWS[0][axis]
     for axis, origin in enumerate(FIXTURE_POSITION)
 )
-assert FIXTURE_SCREW_STANDOFF > 0.0, "fixture screw collar must stand off the spigot"
 
 # --- wheel -------------------------------------------------------------------
 WHEEL_X = 53.0
@@ -328,11 +272,6 @@ WHEEL_X = 53.0
 # (west screw first -- keeps the component instance order of the mirrored-era
 # build, so the pose-equivalence diff matches instances by name)
 CLAMP_SCREW_X = (COLUMN_X + CLAMP_EAR_DX, COLUMN_X - CLAMP_EAR_DX)
-# The bar's clamp holes must land on those screw lines: the bar is placed at
-# IDENTITY, so book hole x = centre + local station.
-assert sorted(round(WHEEL_BAR_X0 + lx, 6) for lx in BAR_CLAMP_HOLE_LOCAL_X) == sorted(
-    round(x, 6) for x in CLAMP_SCREW_X
-), "wheel-bar clamp holes drifted off the column clamp-screw lines"
 # The axial stack on the pin (bar front face -> spacer -> back washer -> wheel
 # hub -> endshake -> front washer -> nut -> locknut) lives in mg_wheel_group,
 # asserted there at import (the spacer's length lands the wheel's mid-plane on
@@ -346,28 +285,20 @@ from mg_wheel_group import (  # noqa: E402
     WHEEL_MID_Z,
 )
 
-assert (stack_spec.AXLE_X, stack_spec.AXLE_Y, stack_spec.BAR_FRONT_Z) == (
-    WHEEL_X,
-    WHEEL_BAR_Y,
-    BAR_FRONT_Z,
-), "mg_magnifier_assembly_spec's axle line drifted from the placed axle"
 # --- amplification wire 1 (fixture -> drum) ----------------------------------
 # Endpoints + length live in sh_vn_music_wire_lever_geom (the part's length IS the run);
-# re-derive the anchors from THIS script's layout and fail loud on drift, so a
-# layout move can never leave a floating wire.
+# test_mg_magnifier_assembly_stack re-derives the anchors from THIS script's
+# layout, so a layout move can never leave a floating wire.
 from sh_vn_music_wire_lever_geom import (  # noqa: E402
     CLEARANCE as WIRE_CLEARANCE,
     CONFIGURATION as LEVER_WIRE_CONFIGURATION,
     DRUM_DIA,
-    RUN_GAPS,
     WIRE_DIA as HUB_WIRE_DIA,
     WIRE_END as HUB_WIRE_END,
     WIRE_START as HUB_WIRE_START,
 )
 from mg_magnifying_wheel_geom import (  # noqa: E402
     DRUM_SEATED_MID_Z,
-    HUB_FRONT_Z,
-    HUB_STEP_Z,
 )
 
 # The lever wire, the pen wire and the wheel stack all take the wheel plane
@@ -380,25 +311,6 @@ _HOOK_EXPECTED = tuple(
     origin + sum(HOOK_LOCAL[i] * FIXTURE_ROWS[i][axis] for i in range(3))
     for axis, origin in enumerate(FIXTURE_POSITION)
 )
-assert all(
-    math.isclose(a, b, abs_tol=1e-9)
-    for a, b in zip(HUB_WIRE_START, _HOOK_EXPECTED, strict=True)
-), f"lever-wire hook {HUB_WIRE_START} drifted from the fixture anchor {_HOOK_EXPECTED}"
-# The run grazes the brass drum at the 0.25 stand-off tangent ...
-assert math.isclose(
-    math.hypot(HUB_WIRE_END[0] - WHEEL_X, HUB_WIRE_END[1] - WHEEL_BAR_Y),
-    DRUM_DIA / 2.0 + HUB_WIRE_DIA / 2.0 + WIRE_CLEARANCE,
-    abs_tol=1e-9,
-), "lever-wire end is not tangent to the drum"
-# ... inside the drum's axial span (boss front face .. spigot front end, wire
-# r inside each), and the slanted run clears the rim, spokes and boss pen-side
-# faces it passes (RUN_GAPS, asserted >= CLEARANCE in sh_vn_music_wire_lever_geom).
-assert (
-    WHEEL_MID_Z + HUB_STEP_Z - HUB_WIRE_DIA / 2.0
-    > HUB_WIRE_END[2]
-    > WHEEL_MID_Z + HUB_FRONT_Z + HUB_WIRE_DIA / 2.0
-), "lever-wire end z outside the drum span"
-assert min(RUN_GAPS.values()) >= WIRE_CLEARANCE, f"lever-wire run gaps {RUN_GAPS}"
 
 
 def _lever_wire_rows() -> list[list[float]]:

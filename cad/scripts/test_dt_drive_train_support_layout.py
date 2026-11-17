@@ -11,6 +11,7 @@ import _config
 import _sprocket_seat_geometry as seat_geometry
 import build_dt_drive_train_assembly as drive
 import cone_pitch
+import dt_pinion_cam_geometry
 import pinion_rig_fitup as FITUP
 import pinion_rig_layout as RIG
 import pinion_rig_park_geometry
@@ -25,7 +26,7 @@ def test_alignment_pinion_mesh_gap_stays_at_the_proven_axis() -> None:
     assert drive.APINION_Y == drive.Y_DRIVE
     assert math.isclose(
         drive.APINION_X - drive.X_DRUM,
-        drive.TIP_DRUM120 + drive.TIP_APINION + drive.APINION_GAP,
+        pinion_rig_park_geometry.TIP_DRUM120 + drive.TIP_APINION + drive.APINION_GAP,
         abs_tol=1e-9,
     )
     # U28's parked tip-circle air remains 2.2425 mm.  The standard-depth
@@ -59,7 +60,7 @@ def test_support_rig_keeps_its_proven_outboard_topology() -> None:
     # asymmetric (BLOCK_EAST 14 toward the drum, BLOCK_WEST 26), so the near
     # edge is the east end, not BLOCK_X - BLOCK_WIDTH / 2.
     block_near_edge = drive.BLOCK_X - BLOCK_EAST
-    cylinder_outboard_tip = drive.X_DRUM + drive.TIP_DRUM120
+    cylinder_outboard_tip = drive.X_DRUM + pinion_rig_park_geometry.TIP_DRUM120
     assert block_near_edge - cylinder_outboard_tip >= 0.25
 
 
@@ -90,7 +91,7 @@ def test_rederived_cam_and_return_leaf_clearances_are_positive() -> None:
             drive.Y_DRIVE - drive.SPRING_CREST[1],
         )
         - drive.SPRING_T
-        >= drive.TIP_DRUM120 + 0.25
+        >= pinion_rig_park_geometry.TIP_DRUM120 + 0.25
     )
     assert drive._FPIN_TIP_S - drive._S_CAM >= 2.0
 
@@ -813,9 +814,17 @@ def test_chain_shift_moves_the_crank_seat_hub_and_knob_seat_together(
     with pytest.raises(AssertionError, match="SeatCollar datum"):
         _drive_with(monkeypatch, removable, "SEAT_FACE_Z", -152.5)
     monkeypatch.undo()
-    # Negative control: the first hub (27.0) leaves the T12 only -1.1 air.
-    with pytest.raises(AssertionError, match="contracted"):
+    # Negative control: the first hub (27.0) leaves the T12 only -1.1 air; the
+    # builder's own chain/hub relief gate refuses it before the offline stacks.
+    with pytest.raises(AssertionError, match="relief shoulder air"):
         _drive_with(monkeypatch, hub, "HUB_LENGTH", 27.0)
+    monkeypatch.undo()
+    # Negative control: the hub/sprocket air off its 0.754 contract.
+    from test_dt_drive_train_assembly_stack import _crank_hub_and_sprocket_seat
+
+    monkeypatch.setattr(drive, "CRANK_HUB_SPROCKET_AIR", drive.CRANK_HUB_SPROCKET_AIR + 0.1)
+    with pytest.raises(AssertionError, match="contracted"):
+        _crank_hub_and_sprocket_seat(drive)
 
 
 def _follower_stations() -> tuple[list[float], list[float]]:
@@ -841,7 +850,7 @@ def _follower_stations() -> tuple[list[float], list[float]]:
         gap = _back_collar_gap(e)
         assert gap >= RIG.BACK_COLLAR_MIN_GAP + RIG.RIG_MARGIN_SPARE - 1e-9, e
         c_max = c_set + min(_hub_gap(), gap)
-        set_station = drive.CAM_LEN + gap - t / 2.0
+        set_station = dt_pinion_cam_geometry.CAM_LEN + gap - t / 2.0
         for c in (0.0, c_max):
             front.append(g_f + t / 2.0 - c)
             back.append(set_station - g_b - (c - c_set))
@@ -853,21 +862,21 @@ def test_follower_pins_stay_on_their_collars_at_the_worst_stack() -> None:
     assert math.isclose(drive.CAM_PIN_STATION[0], drive.STRAP_T / 2.0)
     for stations in (front, back):
         assert min(stations) >= 1.0, stations
-        assert max(stations) <= drive.CAM_LEN - 1.0, stations
+        assert max(stations) <= dt_pinion_cam_geometry.CAM_LEN - 1.0, stations
     # User ruling P1-1: on its leaf the back collar's gap -- the rod's north
     # float -- is F + e at most 1.00, so both pins keep >= 3.09 of collar on
     # either side (the by-eye set it replaced left 1.90 and 2.75; #290's .XX
     # strap band set the rest).
     assert math.isclose(min(front), 3.095, abs_tol=5e-3)
     assert math.isclose(min(back), 3.951, abs_tol=5e-3)
-    assert math.isclose(max(back), drive.CAM_LEN - 3.095, abs_tol=5e-3)
+    assert math.isclose(max(back), dt_pinion_cam_geometry.CAM_LEN - 3.095, abs_tol=5e-3)
     # North float at the widest setting: the back collar lands first.
     assert _back_collar_gap(_LEAF_ERR) < _hub_gap() - RIG.HUB_STOP_MARGIN
     # The model's back collar sits on its leaf, its pin BACK_CAM_PIN_STATION
     # into it at the nominal strap, and the collar lands on the block only as
     # the rod's north stop.
     assert math.isclose(
-        drive.BLOCK_BACK_Z0 - (drive.CAM_Z0[1] + drive.CAM_LEN),
+        drive.BLOCK_BACK_Z0 - (drive.CAM_Z0[1] + dt_pinion_cam_geometry.CAM_LEN),
         RIG.BACK_COLLAR_LEAF_F,
         abs_tol=1e-9,
     )
@@ -1163,7 +1172,7 @@ def test_short_lift_rod_keeps_its_back_collar_and_bearing() -> None:
     # Shortest rod, hard south (front collar on the front block, set at the
     # widest feeler): the back end's retreat from the back block's outer face.
     rod_end = rig.BACK_BLOCK_OUTER_Z - _ROD_LEN_BAND - (rig.FRONT_BLOCK_FEELER + 0.10)
-    collar_back = drive.CAM_Z0[1] + drive.CAM_LEN - (rig.FRONT_BLOCK_FEELER + 0.10)
+    collar_back = drive.CAM_Z0[1] + dt_pinion_cam_geometry.CAM_LEN - (rig.FRONT_BLOCK_FEELER + 0.10)
     assert rod_end - collar_back >= 1.0
     # The rod still bears across most of the back block's bore.
     assert rod_end - drive.BLOCK_BACK_Z0 >= 2.0 / 3.0 * drive.BLOCK_DEPTH
@@ -1648,13 +1657,18 @@ def test_spring_blade_on_flank_books_every_primitive_term() -> None:
 
 def _drive_with(monkeypatch, module, name: str, value):
     """A fresh execution of the drive-train module with one upstream value
-    patched: the gate's own reaction is observed, not re-derived here."""
+    patched, then its offline stacks: the gate's own reaction is observed,
+    not re-derived here."""
     import importlib.util
+
+    from test_dt_drive_train_assembly_stack import STACKS
 
     monkeypatch.setattr(module, name, value)
     spec = importlib.util.spec_from_file_location("_drive_perturbed", drive.__file__)
     fresh = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(fresh)
+    for stack in STACKS:
+        stack(fresh)
     return fresh
 
 

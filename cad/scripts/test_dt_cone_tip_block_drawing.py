@@ -980,13 +980,10 @@ def test_drive_train_screw_keeps_1_5d_past_the_far_wall() -> None:
     """The drive train's own check read the NEAR jaw at nominal (12.7 -
     (15 - 1.2)/2 >= 1.5 mm).  The placed screw keeps 1.5D past the printed
     worst far wall, and is the screw the block was sized for."""
-    import build_dt_drive_train_assembly as drive_train
+    import _mcmaster_91794a112 as pinch_screw
 
-    engagement = drive_train.PINCH_SHANK_LEN - _worst_far_wall_from_head()
+    engagement = pinch_screw.SHANK_LEN - _worst_far_wall_from_head()
     assert engagement >= 1.5 * _PINCH_MAJOR_MM, engagement
-    source = Path(drive_train.__file__).read_text(encoding="utf-8")
-    assert "_PINCH_NEAR_JAW" not in source
-    assert "PINCH_SHANK_LEN - TIP_WORST_PINCH_FAR_WALL_MM" in source
 
 
 def test_pinch_screw_is_the_5_8_stainless_fillister() -> None:

@@ -33,6 +33,7 @@ import dt_pinion_bracket_geometry as strap
 from dt_pinion_arbor_spec import SHAFT_LEN as ARBOR_LEN
 import dt_pinion_spring_geometry as spring
 import gen_dimensions
+import pinion_rig_park_geometry
 import dt_vn_post_mount_screw_spec as post_screw
 import dt_vn_cone_pivot_screw_spec as pivot_screw
 import dt_swing_stop_screw_spec as stop_screw
@@ -102,7 +103,7 @@ def _expected_fragments() -> list[str]:
         # Layout summary.
         f"U28 {dt.APINION_GAP} mm parked tip gap",
         f"axis ({_mm(dt.APINION_X)}, {dt.APINION_Y:g})",
-        f"drum radius {dt.TIP_DRUM120:.3f}, pinion radius {dt.TIP_APINION:.3f} "
+        f"drum radius {pinion_rig_park_geometry.TIP_DRUM120:.3f}, pinion radius {dt.TIP_APINION:.3f} "
         f"and parked gap {dt.APINION_GAP}",
         f"Drum z {_mm(dt.APINION_Z_FRONT)}..+{dt.APINION_Z_BACK:.3f}",
         f"({dt.APINION_Z_BACK - dt.APINION_Z_FRONT:.3f} face",

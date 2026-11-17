@@ -453,6 +453,7 @@ def test_native_bom_requires_the_combined_screw_quantity(
 @pytest.mark.parametrize("proud", [0.0, 1.75])
 def test_shared_stop_frame_preserves_world_geometry(proud: float) -> None:
     import build_dt_drive_train_assembly as assembly
+    import dt_swing_stop_screw_spec as stop
 
     tree = ast.parse(BUILDER.read_text(encoding="utf-8"))
     by_reference = {
@@ -479,7 +480,7 @@ def test_shared_stop_frame_preserves_world_geometry(proud: float) -> None:
     assert position == [assembly.STOP_X, assembly.Y_BASE_TOP + proud, assembly.STOP_Z]
     # Canonical stock's tip and under-head plane equal the former translated
     # stop body's points, including a nonzero proud-length regression.
-    for local_y in (-assembly.STOP_SHANK_LEN, 0.0, assembly.STOP_HEAD_DIA / 2.0):
+    for local_y in (-stop.SHANK_LEN, 0.0, stop.HEAD_DIA / 2.0):
         assert position[1] + local_y == pytest.approx(
             assembly.Y_BASE_TOP + (local_y + proud)
         )

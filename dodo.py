@@ -4487,9 +4487,14 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         # Native-STL gravity seam welding remains strict about holes and winding.
         SCRIPTS_DIR / "test_dt_swing_gravity_collector.py",
         # The cone tip block's hold-down, end-screw embed and cone-tip air contracts
-        # (I20/I22/I24/I31; prism ruling 2026-09-29) that
-        # build_drive_train_assembly asserts at import.
+        # (I20/I22/I24/I31; prism ruling 2026-09-29).
         SCRIPTS_DIR / "test_drive_train_cone_tip_holddown.py",
+        # The four assemblies' layout/tolerance stacks (formerly import-time
+        # guards in their builders, #2887).
+        SCRIPTS_DIR / "test_dt_drive_train_assembly_stack.py",
+        SCRIPTS_DIR / "test_pd_paper_drive_assembly_stack.py",
+        SCRIPTS_DIR / "test_mg_magnifier_assembly_stack.py",
+        SCRIPTS_DIR / "test_pn_pen_assembly_stack.py",
         # dimensions.yaml is read by no part, so only this test keeps its
         # alignment-pinion record pinned to the CAD constants (#814).
         SCRIPTS_DIR / "test_dimensions_alignment_pinion_layout.py",
