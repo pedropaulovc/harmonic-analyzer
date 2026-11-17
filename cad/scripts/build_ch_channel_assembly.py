@@ -1734,12 +1734,8 @@ async def build(adapter) -> dict[str, str]:
         # (±88 mm seesaw, ch.15). The swing is a freed DOF whose drive spec —
         # a distance from the foot axis (Axis2@bar) to the assembly Right
         # Plane, i.e. the foot's X = the amplitude position — is recorded into
-        # the DOF manifest at today's solved contact, so a transient replay
-        # reproduces `rest` bit-exact. The spec MUST stay a part↔root-plane
-        # distance (NOT part↔part): the motion study's driver classifier only
-        # recognises dims that reference one real part + the sub root. This is
-        # the explicit form of the generic foot-X spin_driver the other
-        # revolutes use.
+        # the DOF manifest at today's solved contact. This is the explicit
+        # form of the generic foot-X spin_driver the other revolutes use.
         bar_tgt = _org(adapter, bar)
         foot = world_point(adapter, bar, BAR_FOOT_LOCAL)
         amplitude = foot[0] - pivot_w[0]  # foot X relative to the rocker pivot
@@ -1763,10 +1759,8 @@ async def build(adapter) -> dict[str, str]:
         )
         # The foot-X driver is a freed operational DOF (``free_dof_key``): the
         # bar swings about its top pin = slides the foot along the rocker arc,
-        # the amplitude DOF (request #1). It stays a part<->root-plane distance
-        # (the motion study's driver classifier only recognises one real part +
-        # the sub root), so it is NOT chained off a neighbour like the rocker
-        # axial.
+        # the amplitude DOF (request #1), recorded as a part<->root-plane
+        # distance.
         await distance_driver(
             adapter,
             named_ref(f"Axis2@{bar}", "AXIS"),
