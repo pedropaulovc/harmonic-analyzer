@@ -629,7 +629,10 @@ def test_break_out_plain_end_cuts_one_window_and_picks_the_end(monkeypatch) -> N
 
 
 @pytest.mark.parametrize("detail", [drawing.PRESSED, drawing.ENDSHAKE])
-def test_only_detail_a_is_broken_out_before_its_chain_shows(monkeypatch, detail) -> None:
+def test_only_detail_a_is_broken_out_after_its_chain_and_import(monkeypatch, detail) -> None:
+    """Run 20261117T152043680Z: a view holding a broken-out section no
+    longer selects its chain sketch to show it, so the breakout follows the
+    import."""
     order = []
     keep = drawing.PRESSED_KEEP if detail is drawing.PRESSED else drawing.ENDSHAKE_KEEP
     annotations = [SimpleNamespace(name=name) for name in keep]
@@ -650,8 +653,8 @@ def test_only_detail_a_is_broken_out_before_its_chain_shows(monkeypatch, detail)
     monkeypatch.setattr(drawing, "_activate", lambda *_a, **_k: None)
     monkeypatch.setattr(drawing, "add_note", lambda *_a: order.append("label") or object())
     assert drawing._dimensioned_detail(object(), detail, keep) == annotations
-    head = ["place", "break out"] if detail.break_out else ["place"]
-    assert order == [*head, "chain", "import", "crop", "label"]
+    cut = ["break out"] if detail.break_out else []
+    assert order == ["place", "chain", "import", *cut, "crop", "label"]
 
 
 def test_the_gauge_detail_shows_only_the_bar_and_the_axle() -> None:

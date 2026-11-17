@@ -1176,11 +1176,13 @@ def _dimensioned_detail(
     detail: StackDetail,
     keep: dict[str, tuple[float, float]],
 ) -> list[Any]:
-    """Place ``detail``, break it out if it asks, show the stack chain in it,
-    import ``keep``, crop it and prove the kept dimensions survived the crop."""
+    """Place ``detail``, show the stack chain in it, import ``keep``, break
+    it out if it asks, crop it and prove the kept dimensions survived.
+
+    The breakout follows the import: once a view holds a broken-out section,
+    its chain sketch no longer selects to be shown (run
+    20261117T152043680Z: "cannot select sketch 'AxleStackReference'")."""
     view = _placed_detail(adapter, detail)
-    if detail.break_out:
-        _break_out_plain_end(adapter, view, detail)
     _show_base_view_sketches(adapter, view, (stack.FEATURE,), label=detail.title)
     annotations = curate_view_dimensions(
         adapter,
@@ -1189,6 +1191,8 @@ def _dimensioned_detail(
         view_label=detail.title,
         dimensions_by_feature=notes.DRAWING_DIMENSIONS,
     )
+    if detail.break_out:
+        _break_out_plain_end(adapter, view, detail)
     _crop(adapter, view, detail)
     kept = {
         dimension_name(adapter, _early_bound(annotation, "IAnnotation"))
@@ -1197,7 +1201,7 @@ def _dimensioned_detail(
     lost = sorted(set(keep) - kept)
     if lost:
         raise RuntimeError(
-            f"{detail.title} lost {lost} to its crop; kept {sorted(kept)}"
+            f"{detail.title} lost {lost} to its breakout or crop; kept {sorted(kept)}"
         )
     _activate(adapter, view, label=detail.title)
     if add_note(adapter, detail.label_text, *detail.label_xy) is None:
