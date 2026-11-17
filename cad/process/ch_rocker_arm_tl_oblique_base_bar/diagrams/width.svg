@@ -1,63 +1,56 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- Styles: prechips.palette roles (class); the traveler prints the legend once. Arrows show the cutter's path over the bar. -->
 <svg xmlns="http://www.w3.org/2000/svg" data-cad-template="width" viewBox="0 0 720 340" width="720" height="340" font-family="Arial, Helvetica, sans-serif" font-size="15">
-  <defs>
-    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M0 0L10 5L0 10z" fill="#111"/>
-    </marker>
-    <pattern id="cut" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-      <line x1="0" y1="0" x2="0" y2="6" stroke="#a33" stroke-width="1.5"/>
-    </pattern>
-  </defs>
-  <rect width="720" height="340" fill="#fff"/>
+  <rect class="paper" width="720" height="340"/>
 
-  <!-- mill table, top view -->
-  <rect x="10" y="60" width="640" height="226" fill="#f1f2f3" stroke="#999"/>
-  <g fill="#d6d8db">
+  <!-- mill table, top view, with two T-slots -->
+  <rect class="fixture-table" x="10" y="60" width="640" height="226"/>
+  <g class="fixture-table">
     <rect x="10" y="114" width="640" height="8"/>
     <rect x="10" y="224" width="640" height="8"/>
   </g>
 
   <!-- authored blank; stock beyond CAD width (hatched) and front cleanup -->
-  <rect id="bar" x="{{view.x0}}" y="{{view.top}}" width="{{view.lpx}}" height="{{view.hpx}}" fill="#dfe6ee" stroke="#111" stroke-width="1.5"/>
-  <rect x="{{view.x0}}" y="{{view.top}}" width="{{view.lpx}}" height="{{view.top_stock}}" fill="url(#cut)"/>
-  <line x1="{{view.x0}}" y1="{{view.finish}}" x2="{{view.x1}}" y2="{{view.finish}}" stroke="#a33" stroke-width="1.5" stroke-dasharray="6 3"/>
-  <rect x="{{view.x0}}" y="{{view.front}}" width="{{view.lpx}}" height="{{view.cleanup}}" fill="url(#cut)"/>
-  <line x1="{{view.x0}}" y1="{{view.front}}" x2="{{view.x1}}" y2="{{view.front}}" stroke="#a33" stroke-width="3"/>
+  <rect id="bar" class="part-kept" x="{{view.x0}}" y="{{view.top}}" width="{{view.lpx}}" height="{{view.hpx}}" stroke-width="1.5"/>
+  <rect class="part-removed" x="{{view.x0}}" y="{{view.top}}" width="{{view.lpx}}" height="{{view.top_stock}}"/>
+  <line class="active-face" x1="{{view.x0}}" y1="{{view.finish}}" x2="{{view.x1}}" y2="{{view.finish}}" stroke-width="1.5" stroke-dasharray="6 3"/>
+  <rect class="part-removed" x="{{view.x0}}" y="{{view.front}}" width="{{view.lpx}}" height="{{view.cleanup}}"/>
+  <line class="datum" x1="{{view.x0}}" y1="{{view.front}}" x2="{{view.x1}}" y2="{{view.front}}" stroke-width="3"/>
 
   <!-- three inboard 1-2-3 blocks (1 in up, 3 in across the width) and an end strap at mid-width of each end -->
-  <g fill="none" stroke="#333" stroke-width="1.3" stroke-dasharray="4 3">
+  <g class="fixture-support">
     <rect x="{{view.block1_x}}" y="{{view.block_y}}" width="{{view.block_w}}" height="{{view.block_h}}"/>
     <rect x="{{view.block2_x}}" y="{{view.block_y}}" width="{{view.block_w}}" height="{{view.block_h}}"/>
     <rect x="{{view.block3_x}}" y="{{view.block_y}}" width="{{view.block_w}}" height="{{view.block_h}}"/>
   </g>
   <g transform="translate({{view.x0}} {{view.cy}})">
-    <rect x="-54" y="-15" width="16" height="30" fill="#8a9099" stroke="#111" stroke-width="1.2"/>
-    <rect x="-46" y="-11" width="104" height="22" fill="#6b7178" stroke="#111" stroke-width="1.2"/>
-    <circle cx="-14" cy="0" r="6" fill="#ddd" stroke="#111"/>
+    <rect class="fixture-support" x="-54" y="-15" width="16" height="30"/>
+    <rect class="clamp" x="-46" y="-11" width="104" height="22"/>
+    <circle class="holes" cx="-14" cy="0" r="6"/>
   </g>
   <g transform="translate({{view.x1}} {{view.cy}})">
-    <rect x="38" y="-15" width="16" height="30" fill="#8a9099" stroke="#111" stroke-width="1.2"/>
-    <rect x="-58" y="-11" width="104" height="22" fill="#6b7178" stroke="#111" stroke-width="1.2"/>
-    <circle cx="14" cy="0" r="6" fill="#ddd" stroke="#111"/>
+    <rect class="fixture-support" x="38" y="-15" width="16" height="30"/>
+    <rect class="clamp" x="-58" y="-11" width="104" height="22"/>
+    <circle class="holes" cx="14" cy="0" r="6"/>
   </g>
 
-  <!-- pass 1: front edge, +X -->
-  <circle cx="{{view.cutter1_x}}" cy="{{view.cutter1_y}}" r="7" fill="#c9a227" stroke="#111" stroke-width="1.2"/>
-  <line x1="{{view.pass1_x1}}" y1="{{view.pass1_y}}" x2="{{view.pass1_x2}}" y2="{{view.pass1_y}}" stroke="#111" stroke-width="1.5" marker-end="url(#arr)"/>
-  <text x="{{view.pass1_label_x}}" y="{{view.pass1_label_y}}">+X</text>
-  <text x="20" y="{{view.step1_y}}">1  Front edge, +X: finish .005–.010 → A / ZERO EDGE</text>
+  <!-- pass 1: front edge, cutter path +X -->
+  <circle class="cutter" cx="{{view.cutter1_x}}" cy="{{view.cutter1_y}}" r="7"/>
+  <line class="arrow" x1="{{view.pass1_x1}}" y1="{{view.pass1_y}}" x2="{{view.pass1_x2}}" y2="{{view.pass1_y}}"/>
+  <text x="{{view.pass1_label_x}}" y="{{view.pass1_label_y}}">cutter path +X</text>
+  <text x="20" y="{{view.step1_y}}">1  Front edge, cutter +X: finish .005–.010 → A / ZERO EDGE</text>
 
-  <!-- pass 2: opposite edge, -X -->
-  <circle cx="{{view.cutter2_x}}" cy="{{view.cutter2_y}}" r="7" fill="#c9a227" stroke="#111" stroke-width="1.2"/>
-  <line x1="{{view.pass2_x1}}" y1="{{view.pass2_y}}" x2="{{view.pass2_x2}}" y2="{{view.pass2_y}}" stroke="#111" stroke-width="1.5" marker-end="url(#arr)"/>
-  <text x="{{view.pass2_label_x}}" y="{{view.pass2_label_y}}">−X</text>
-  <text x="20" y="40">2  Opposite edge, −X: rough {{cad.width_rough_in:.3f}}, finish {{cad.width_in:.3f}}</text>
+  <!-- pass 2: opposite edge, cutter path -X -->
+  <circle class="cutter" cx="{{view.cutter2_x}}" cy="{{view.cutter2_y}}" r="7"/>
+  <line class="arrow" x1="{{view.pass2_x1}}" y1="{{view.pass2_y}}" x2="{{view.pass2_x2}}" y2="{{view.pass2_y}}"/>
+  <text x="{{view.pass2_label_x}}" y="{{view.pass2_label_y}}" text-anchor="end">cutter path −X</text>
+  <text x="20" y="40">2  Opposite edge, cutter −X: rough {{cad.width_rough_in:.3f}}, finish {{cad.width_in:.3f}}</text>
 
   <!-- CAD width from ZERO EDGE -->
-  <g stroke="#111" stroke-width="1">
+  <g class="dims">
     <line x1="88" y1="{{view.finish}}" x2="22" y2="{{view.finish}}"/>
     <line x1="88" y1="{{view.front}}" x2="22" y2="{{view.front}}"/>
-    <line x1="28" y1="{{view.dim_top}}" x2="28" y2="{{view.dim_bottom}}" marker-start="url(#arr)" marker-end="url(#arr)"/>
+    <line x1="28" y1="{{view.dim_top}}" x2="28" y2="{{view.dim_bottom}}" marker-start="url(#prechips-arr)" marker-end="url(#prechips-arr)"/>
   </g>
   <text transform="translate(22 {{view.dim_mid}}) rotate(-90)" text-anchor="middle">{{cad.width_in:.2f}} finished</text>
 
@@ -71,12 +64,12 @@
     <text x="{{view.gap_right_x}}" y="{{view.label3_y}}">edges clear</text>
   </g>
   <text x="{{view.x1}}" y="{{view.datum_label_y}}" text-anchor="end">A / ZERO EDGE</text>
-  <line x1="{{view.datum_leader_x1}}" y1="{{view.datum_leader_y1}}" x2="{{view.datum_leader_x2}}" y2="{{view.datum_leader_y2}}" stroke="#111" stroke-width="1"/>
+  <line class="leader" x1="{{view.datum_leader_x1}}" y1="{{view.datum_leader_y1}}" x2="{{view.datum_leader_x2}}" y2="{{view.datum_leader_y2}}"/>
 
   <!-- axes -->
-  <g stroke="#111" stroke-width="1.5">
-    <line x1="610" y1="325" x2="655" y2="325" marker-end="url(#arr)"/>
-    <line x1="610" y1="325" x2="610" y2="290" marker-end="url(#arr)"/>
+  <g class="axis">
+    <line x1="610" y1="325" x2="655" y2="325"/>
+    <line x1="610" y1="325" x2="610" y2="290"/>
   </g>
   <text x="660" y="330">+X</text>
   <text x="618" y="300">+Y</text>

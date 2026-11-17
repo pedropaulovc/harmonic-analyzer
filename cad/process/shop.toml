@@ -61,6 +61,14 @@ bed_height_mm = 73.3044
 range_mm = [0.0, 152.4]
 resolution_mm = 0.0127
 
+# The owned 0-1, 1-2 and 2-3 in outside micrometer set
+# (cad/config/shop-equipment.toml gauges.micrometers): 0-3 in = 76.2 mm.
+# Resolution: the set reads .0001 in = .00254 mm (owner ruling 2026-11-16,
+# Pedro, asked directly for the owned set's graduation).
+[gauges.micrometers]
+range_mm = [0.0, 76.2]
+resolution_mm = 0.00254
+
 # Pin-gauge set range, 0.011-0.500 in by 0.001 in; its grade note is
 # cad/config/shop-equipment.toml gauges.pin-gauges. 0.011 in = 0.2794 mm exactly.
 [gauges.pin-gauges]
@@ -207,8 +215,7 @@ feed = "30 in/min"
 # Source: end-bracket.toml and feed-lever.toml; hand travelers dated
 # 2026-11-02 (MHA-CH-06-TL-28/TL-26 v47), the v48 manifest notes (#29 tap
 # drill, plug-start then bottoming-finish taps) and the archived
-# taps-unc-hand 8-32 plug/bottoming records. Speeds are the hand sheets'
-# LittleMachineShop 6061-T6 row: 165 ft/min milling -> 1250 rpm.
+# taps-unc-hand 8-32 plug/bottoming records.
 [tools.jig-saw]
 description = "Miter saw or bandsaw"
 [tools.jig-em-half]
@@ -231,11 +238,18 @@ diameter_mm = 8.73125
 [tools.jig-files]
 description = "10 in mill second-cut and 8 in smooth files; bench vise with soft jaws"
 
+# The 1/2 in end mill on TL-26/TL-28, the riser's (TL-24) Setups 3-4 and the
+# blocks' faces (TL-22/TL-32) (owner ruling 2026-11-16, prechips #436): the speed and
+# feed the owner ran a 1/2 in 2-flute HSS end mill at on the PM-30MV, facing
+# the base bar's long edge (harmonic-analyzer
+# logbook/entries/2026-11-05-base-bar-on-the-table.md, op 3: 1800 rpm,
+# 7 in/min), on the low belt. 1800 rpm = 236 ft/min; 7 / (1800 x 2) =
+# .0019 in/tooth.
 [settings.jig-em-half-6061-t6511]
 tool = "jig-em-half"
 material = "6061-t6511"
-rpm = 1250
-feed = "3 in/min"
+rpm = 1800
+feed = "7 in/min"
 
 # HA: the rocker arm's strap profile cutter on its low-carbon steel (the oblique
 # trammel jig's normal cutting force reads this chip load:
@@ -323,15 +337,6 @@ diameter_mm = 12.0
 [tools.riser-countersink]
 description = "3/8 in 82° countersink"
 
-# Riser Setups 3-4 (blind machinist review of the riser traveler, items S4/S5,
-# coordinator plan fix batch 2026-11-14 UTC): the 1/2 in 2-flute HSS end mill
-# at 1800 rpm = 236 ft/min; 8 in/min / (1800 x 2) = .0022 in/tooth.
-[settings.riser-em-half-6061-t6511]
-tool = "jig-em-half"
-material = "6061-t6511"
-rpm = 1800
-feed = "8 in/min"
-
 # Source: ch_rocker_arm_tl_oblique_{pivot,feed}_block/plan.toml (MHA-CH-06-TL-22
 # and TL-32, v50). The blocks also use saw-evolution-14, jig-em-half (the LMS
 # 6784 set's 1/2 in: every facing cut), jig-spot and basebar-counterbore (the
@@ -342,7 +347,8 @@ feed = "8 in/min"
 # block-em-3-8 is the LMS 6784 set's 3/8 in cutter (shop-equipment
 # endmills-lms-6784): plunged, it cuts the seat (squaring its floor) and
 # TL-32's leadscrew clearance to the title block's DRILLED HOLES band (owner
-# ruling 2026-11-13).
+# ruling 2026-11-13), the clearance from both ends so only its flutes enter
+# the hole (its flute_length_mm below).
 # block-em-half-long is the owner's 1/2 in end mill with at least 1.00 in of
 # flute (owner 2026-11-13), which reaches the .87 depth of TL-32's lug notch.
 [tools.block-drill-15]
@@ -360,23 +366,22 @@ tap_drill_mm = 6.5278
 [tools.block-em-3-8]
 description = "3/8 in centre-cutting 2-flute end mill (LMS 6784 set)"
 diameter_mm = 9.525
+# LOC .50 in: stub-length floor (typical catalogue: stub 1/2, regular 3/4);
+# LMS 6784 page states no LOC; owner ruling 2026-11-16.
+flute_length_mm = 12.7
 [tools.block-em-half-long]
 description = "1/2 in centre-cutting end mill, flutes ≥1.00 in"
 diameter_mm = 12.7
 
-# Both 1/2 in end mills (blind review 2026-11-14): 1800 rpm = 236 ft/min;
-# 8 in/min / (1800 × 2) = .0022 in/tooth, a chip that cuts rather than rubs
-# in 6061.
+# The long 1/2 in end mill: 1800 rpm = 236 ft/min (blind review 2026-11-14);
+# 7 in/min (owner ruling 2026-11-16, Pedro: both block end-mill settings at
+# 7 in/min), 7 / (1800 × 2) = .0019 in/tooth. The blocks' standard 1/2 in end
+# mill runs at jig-em-half-6061-t6511, the same 1800 rpm and 7 in/min.
 [settings.block-em-half-long-6061-t6511]
 tool = "block-em-half-long"
 material = "6061-t6511"
 rpm = 1800
-feed = "8 in/min"
-[settings.block-em-half-6061-t6511]
-tool = "jig-em-half"
-material = "6061-t6511"
-rpm = 1800
-feed = "8 in/min"
+feed = "7 in/min"
 
 # --- MHA-CH-06-TL-VN-84 leadscrew kit rework ---
 # Plan: cad/process/ch_rocker_arm_tl_vn_oblique_leadscrew_kit/plan.toml.
@@ -388,6 +393,12 @@ kind = "dividing_head"
 worm_ratio = 40
 direct_index_positions = 24
 plate_holes = { A = [15, 16, 17, 18, 19, 20], B = [21, 23, 27, 29, 31, 33], C = [37, 39, 41, 43, 47, 49] }
+
+# HA: the BS-0's own 5 in 3-jaw (45952b66bc inventory machines.BS-0.included,
+# chuck_3jaw_5in_inside_outside_jaws), which the kit's flats setups grip in.
+# No source gives its grip range or body size, so none is declared.
+[workholding.chuck-3jaw-5-bs0]
+kind = "chuck"
 
 # HA: fixtures.chuck-3jaw-6-d1-4, the PM-1127's standard 6 in 3-jaw (45952b66bc
 # inventory: body Ø158 x 72, #1413 placeholders). Grip range: prechips v0.10

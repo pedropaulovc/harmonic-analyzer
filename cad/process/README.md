@@ -158,7 +158,9 @@ every one and ships each hobby sheet as
 travelers from the same plan: `traveler.html` (`pro`, concise) and
 `traveler-hobby.html` (`hobby`, with the setup pictures in `<stem>/diagrams/`),
 then prints the hobby sheet to `<slug>-traveler.pdf` with a headless Edge or
-Chrome. A plan that prechips refuses therefore blocks the release. Under prechips 0.10.1 the base bar and
+Chrome. A plan that prechips refuses therefore blocks the release. Every plan
+needs prechips 0.11.4, released on PyPI; the wrapper's `prechips@latest` runs
+it. The version history below says which release brought each binding. Under prechips 0.10.1 the base bar and
 end bracket pass both on the v49 manifests. The base-bar and feed-lever plans
 need 0.10.1: they read its adapter bindings `cad.vise_centred_overhang_mm`
 (centred overhang from the CAD length and `vise_jaw_width_mm`) and
@@ -172,21 +174,84 @@ and `cad.rail_last_band_mm`. The feed-lever plan needs 0.11.0, which binds the l
 grip-corner fillet (`cad.corner_radius_in` and its limits). All three plans
 carry 0.11.0's `milling_deflection` data (a `beam` per non-lathe setup or
 operation, `milling_cuts` per spindle operation) and pass that check enforced;
-the end-bracket plan's tap flags and the dropped feed-lever grip-end setup
-need the 0.11.0 jig pictures, so they pass under `@latest` from 0.11.0 (released). The riser plan needs 0.11.0 too
-(its `harmonic_riser` adapter).
+the end-bracket plan's tap flags need the 0.11.0 jig pictures. The riser plan needs 0.11.4
+(its `riser` adapter's Setup 2 stations and Setup 4 guards). The base-bar, end-bracket and
+feed-lever plans need prechips 0.11.4, which carries
+pedropaulovc/prechips#436: they read that release's adapter-bound
+milling-deflection stations (base bar `cad.jack_*_x_mm`, `cad.strap_*_x_mm`
+from `strap_inset_mm`, `cad.blank_centred_*`, `cad.vise_centred_jaw_right_mm`,
+`cad.rail_left_x_mm`/`rail_right_x_mm`, `cad.bracket_x1_mm`/`bracket_x2_mm`,
+`cad.slot_x_mm`, `cad.slot_entry_x_mm`; lever `cad.hole_x_mm`,
+`cad.jaw_right_x_mm`, `cad.grip_jaw_*_x_mm`; bracket `cad.row_mm`, `cad.parallel_near_mm`/
+`parallel_far_mm`), its tap-flag refusal (`tap_flag_tol_in`) and the restored
+`jig-lever-hold` grip-end picture. Every plan (base bar, end bracket, feed
+lever, riser, carrier, pivot and feed blocks, leadscrew kit) carries
+`drill_pecking` data and so needs prechips 0.11.4 (pedropaulovc/prechips#403):
+every operation with a tool declares `drilling` (`"twist_drill"`, or `"none"`
+for spots, countersinks, reamers, end mills, taps, saws and files), and each
+twist-drilled hole declares `peck` (`"none"` or `{ step_mm, retract }`) and
+`hole_depth_mm`. Each step is one mm process parameter (`*_peck_mm`, one
+drill Ø) bound into both `step_mm` and the instruction
+(`{{process.<name>:in.3dot}}`), and the feed-block pilot depth is the process
+parameter `lug_bore_depth_mm`, printed the same way; earlier releases refuse
+those fields and bindings.
 
-The riser plan (TL-24) needs prechips 0.11.0, which adds its `harmonic_riser`
-adapter and the `milling_deflection` check. It passes both profiles, with every
-check enforced, on the v49 manifest. Setups 1–4 make the bar
-and drill the stop-pin holes P1/P2 at their printed stations. Setup 1 calipers
-the bar: Setup 2 faces it only when it is over the .25 thickness limit, from three
-straps then four, because a single strap span along the bar's length bends the
-thin bar ~.23 mm under the cutter. The other seven
-holes print X/Y LOC REF: Setup 5 runs after TL-00 step 11C has spotted them
-from the carrier and drills each at its own mark, so its table gives the REF
-X/Y only to find the marks. The 12 mm HUB drill and the 82° countersink are
+The riser plan (TL-24) needs prechips 0.11.4: 0.11.0 added its riser
+adapter and the `milling_deflection` check; 0.11.4 derives the Setup 2 strap
+stations and faced spans from the authored strap layout (refusing a strap off
+faced metal or in a cut), binds the .230 minimum thickness the Setup 3–5 beams
+take, and refuses a stop hole over a jaw with the longest (14.05) blank or a Y0
+touch the .200 edge finder cannot make clear of hold 1's jaws. It passes both
+profiles, with every check enforced, on the v49 manifest. Setups 1–4 make the
+bar and drill the stop-pin holes P1/P2 at their printed stations. Setup 1
+calipers the bar: under .230 anywhere rejects it, and Setup 2 faces it only when
+it is over the .25 thickness limit, from three straps then four, because a
+single strap span along the bar's length bends the thin bar ~.23 mm under the
+cutter. The 1/2 in end mill runs at the logbook's 1800 rpm, 7 in/min. The other
+seven holes print X/Y LOC REF: Setup 5 runs after TL-00 step 11C has spotted
+them from the carrier and drills each at its own mark, so its table gives the
+REF X/Y only to find the marks. The 12 mm HUB drill and the 82° countersink are
 recorded as not owned in `cad/config/shop-equipment.toml`.
+
+Every plan needs prechips 0.11.4 (pedropaulovc/prechips#437,
+owner rulings 2026-11-16 on #407–#410, #429 and #430). Each vise setup's
+cantilever `beam` declares `vise_left` (`"start"`/`"end"`: the beam end at
+the hold's left overhang; the grip is measured from the end whose overhang
+the hold declares, so a finished-length beam such as the riser's ends links
+to its blank-length hold; `"other"` for an upright part or a beam across the
+jaws), with `vise_hold = N` where the setup
+re-grips. Single-material plans set `milling_material` once instead of a
+`material` per cut (the leadscrew kit keeps per-cut keys). The base-bar edge
+roughs name their finish pass (`finish_cut`) and its stock per loaded axis
+(`finish_stock_mm = { y = 0.254, z = "through" }`: the cutter tip runs
+below the underside), so they rough at dechatter's 4.1 mm width again (owner
+ruling 2026-11-16). No shop tool states `helix_deg` or `axial_ratio`: no
+vendor page for the owned cutters (the LMS 6784 set) publishes a helix, so the
+configured 1.0 applies.
+
+prechips 0.11.4 also needs these plan and template changes. Each plan's
+`[cad]` table names a neutral adapter (`base_bar`, `end_bracket`,
+`feed_lever`, `riser`, `carrier`, `pivot_block`, `feed_block`,
+`leadscrew_kit`) and the manifest's `part` id, which the adapter checks
+(pedropaulovc/prechips#452). The base bar's
+Setup 3 slot and spot cantilevers declare `vise_left = "start"` and clamp at
+the blank-centred grip (`cad.blank_centred_overhang_mm`..
+`cad.blank_centred_jaw_right_mm`; pedropaulovc/prechips#446). The carrier's
+coupon declares `coupon_parallel_width_in` (the LMS 6745 parallels' 1/8 in
+thickness) and `coupon_strap_length_in` (the TE-CO 30801 step clamp's 3.250
+in; pedropaulovc/prechips#448, #449), and reads `cad.coupon_hole_y_mm`,
+`cad.coupon_parallel_height_in` and `cad.blank_thickness_mm` in place of plan
+copies. The riser's Setup 2 beams and envelope span the longest blank
+(`cad.blank_max_length_mm`), which the adapter's strap traverses now take
+(pedropaulovc/prechips#445). Both block end-mill settings run 7 in/min (owner
+ruling 2026-11-16, Pedro), so the pivot- and feed-block cuts feed 177.8
+mm/min; the standard 1/2 in end mill's setting is the jig's
+`jig-em-half-6061-t6511` (the same 1800 rpm and 7 in/min), and only the long
+end mill keeps its own `block-em-half-long-6061-t6511`. The base-bar picture
+templates draw by palette role: an authored
+dimension arrow names the palette's `url(#prechips-arr)` marker, and the
+`width.svg` axes and `inspect.svg` section arrows take the `axis` role
+(pedropaulovc/prechips#444).
 
 prechips 0.10 adds the `vise_holding` check: every non-lathe setup declares
 `vise_hold` (`"other"` for table clamps, saw or bench), and each milling-vise
@@ -266,8 +331,14 @@ What the 0.10 port and the 2026-11-13 v49 reassessment changed on the sheets:
   sheet's FRONT FACE is the plan's KP08 SIDE and its BACK FACE the BAR SIDE.
   The #29 drill runs to 1.06 below BAR SIDE so the KP08-side exit is full
   size; each face's plug and bottoming taps carry one flag (BAR .45, KP08 .51
-  from the tip, in the low half of the drawing's tip windows) so the two
-  bottoming taps never meet; Setup 4 lines up on the drilled holes instead of
+  from the tip at the end of the chamfered teeth, not a centre point, which
+  the spec's full-thread-plus-lead tip windows assume; in the low half of the
+  tip windows) so the two bottoming taps never meet: prechips
+  refuses a flag that, ± `tap_flag_tol_in`, leaves its window, or a pair whose
+  deepest tips reach the minimum width. The end mill runs at `jig-em-half-6061-t6511`
+  (owner ruling 2026-11-16: the 2026-11-05 logbook's 1800 rpm, 7 in/min, on
+  the low belt), and the final
+  inspection calipers the as-bought section; Setup 4 lines up on the drilled holes instead of
   re-finding datums. The final screw check runs a flagged screw only to its
   own face's full-thread depth, never on into the opposite face's thread.
 - Feed lever: the 2X bolt holes are the 11/32 drill, `2X Ø.3438 11/32 DRILL
@@ -275,13 +346,18 @@ What the 0.10 port and the 2026-11-13 v49 reassessment changed on the sheets:
   post-v49 drawing; the former 5/16 normal-fit clearance, Ø.344, put the
   plan's 11/32 drill under its minimum), inspected with pin gauges. The grip
   corners' R.2 and its R.1–R.3 band come from the manifest's `grip_corners`
-  fillet, not an authored radius. The saw cut at 11.85 is the finished grip
-  end (11.8 ±.1 after the ZERO END clean-up, checked on the DRO), so the plan
-  has no second vise setup.
+  fillet, not an authored radius. Both ends are milled, as the manifest's
+  process note says ("saw and face to length"): ZERO END in the hole setup,
+  then the grip end to length in the hand sheet's slid-left hold, its length
+  read on the DRO by touching the edge finder on the grip end, the hand
+  sheet's method (owner ruling 2026-11-16, Pedro; no squareness probe
+  stations). The end mill runs at `jig-em-half-6061-t6511` (1800 rpm, 7 in/min); the
+  final inspection calipers the as-bought section and runs two 5/16-18
+  screws through both holes at once.
 
 The carrier (`ch_rocker_arm_tl_oblique_carrier/plan.toml`, MHA-CH-06-TL-21)
-is enrolled. It needs prechips 0.11.1 (the `harmonic_carrier` adapter with
-its `block_tolerance_in` refusal, and the `jig-carrier-*` pictures), and passes
+is enrolled. It needs prechips 0.11.4 (0.11.1 brought the carrier adapter with
+its `block_tolerance_in` refusal and the `jig-carrier-*` pictures), and passes
 both profiles under `@latest` with every check enforced. The 20.5 in plate is made flat on the table, vise off,
 on four 1-2-3 blocks under the LMS 1268 strap clamps (both owned, logbook
 2026-11-05/06), placed between hole columns, as the registry note now says
@@ -311,13 +387,13 @@ lug face and leaves a square inside corner, and the Ø.375 leadscrew clearance,
 piloted and plunged in .25 full-retract pecks with the same 3/8 end mill with
 the block standing on SPINDLE END; the KP08 axis-height check moves to the TL-00 assembly (#2184),
 and its four #4-40 nut taps stay with the TL-00 transfer. Their adapters
-(`harmonic_pivot_block`, `harmonic_feed_block`) ship in prechips 0.11.0 (released). No
+(`pivot_block`, `feed_block`) ship in prechips 0.11.0 (released). No
 boring head is needed; the F drill and 5/16-18 plug tap share the carrier's
 records (`jig-drill-f`, `jig-tap-5-16-18-plug`).
 
 The leadscrew kit's plan (`ch_rocker_arm_tl_vn_oblique_leadscrew_kit/plan.toml`,
-MHA-CH-06-TL-VN-84) is enrolled and needs prechips 0.11.0 (released): its
-`harmonic_leadscrew_kit` adapter binds the two-member manifest (the LeadScrew's
+MHA-CH-06-TL-VN-84) is enrolled and needs prechips 0.11.4 (its saw lay binds the adapter's rounded-up 1/16 in step): its
+`leadscrew_kit` adapter binds the two-member manifest (the LeadScrew's
 cut end and five flats, the FeedNut member's faced seat, countersinks and
 receipt limits), and its `kit-*` setup pictures are prechips layouts. The route
 is authored (no hand traveler): receive and check the kit, hacksaw the screw
@@ -360,7 +436,7 @@ three files; exit 2 is
 a refusal, either bad input or a failed enforced check (`stock_fit`,
 `turning_deflection`, `milling_deflection`, `cutting_speeds`, `tool_sizing`,
 `indexing`, `gauge_capability`, `lathe_holding`, `vise_holding`,
-`machine_capacity`, or
+`machine_capacity`, `drill_pecking`, or
 `hobby`'s missing setup picture). A missing plan fails only that part's task.
 A refusal is a finding about the plan or shop data; correct the source, not
 the check.

@@ -374,16 +374,16 @@ pipeline and per-profile spans carry the resolved `prechips.version`.
 A missing plan, an unresolved version, a nonzero exit or a failed print marks the pipeline span
 as failed.
 
-Current state: under prechips 0.10.1 the base bar and end bracket pass both
-profiles on the v49 manifests, including the new `vise_holding` check against
-`cad/process/shop.toml` `workholding.vise-pm-6`. The feed lever follows the
-post-v49 drawing: its 2X bolt holes are the 11/32 drill (`2X Ø.3438 11/32 DRILL
-THRU ALL`, +.004/0, owner ruling 2026-11-13), so its plan's drill passes
-`tool_sizing`; its plan reads the grip-corner fillet the manifest now exports
-and so needs prechips 0.11.0 (released). The riser's plan needs prechips 0.11.0 (its
-`harmonic_riser` adapter) and passes both profiles on its v49 manifest.
-The carrier's plan needs prechips 0.11.1 (`harmonic_carrier`, released) and
-passes both profiles on its v50 manifest.
+Current state: under prechips 0.11.4 (released) all eight enrolled plans pass
+both profiles with every check enforced: the base bar, carrier, feed lever and
+leadscrew kit on their v50 manifests, the pivot and feed blocks on theirs, and
+the end bracket and riser on their v49 release manifests. The v49 release
+manifests of the base bar, feed lever and carrier predate their v50 drawings
+and are refused (the rail-hole stations, grip-corner fillets and the
+carrier's pin-gauge band). Each plan's `[cad]` table names a neutral adapter
+(`base_bar`, `end_bracket`, `feed_lever`, `riser`, `carrier`, `pivot_block`,
+`feed_block`, `leadscrew_kit`) and the manifest's `part` id;
+`cad/process/README.md` lists which release brought each binding.
 prechips adapters are tied to the
 manifest's contents: a drawing change that alters a part's manifest
 requirements needs a prechips adapter release before its traveler passes again.

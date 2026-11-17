@@ -538,12 +538,10 @@ nominal), not prechips example values. Only exit 0 from both profiles and a prin
 PDF passes; exit 2 from either profile is a prechips refusal (bad input or a failed
 enforced check) and leaves no traveler file nor a stamp. The task is not cache-keyed and always runs when asked
 (`uptodate: [False]`), because its generator version floats. A stem without a
-plan fails only its own task. Under prechips 0.10.1 (the base-bar and feed-lever
-plans read its new adapter bindings) the base bar and end bracket
-pass both profiles, including `vise_holding`, on the v48 manifests. The feed
-lever and riser plans need prechips 0.11.0 (the riser's `harmonic_riser`
-adapter) and the carrier's needs 0.11.1 (its `harmonic_carrier` block
-tolerance); see `cad/process/README.md`. prechips adapters are tied to the manifest's
+plan fails only its own task. Every plan needs prechips 0.11.4 (released):
+each plan's `[cad]` table names a neutral adapter (`base_bar`, `riser`,
+`carrier`, …) and the manifest's `part` id; see `cad/process/README.md` for
+which release brought each binding. prechips adapters are tied to the manifest's
 contents, so a drawing change that alters a part's manifest requirements needs
 a prechips adapter release before that part's traveler passes again.
 A generated traveler is not machining approval.

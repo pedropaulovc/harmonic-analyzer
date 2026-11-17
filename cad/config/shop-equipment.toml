@@ -111,6 +111,7 @@ pieces = 1
 # recorded the shop owning it, so it is to buy (or to record, if the shop has
 # one). No vendor or SKU is asserted for a tool to buy.
 
+# Make only; its range and resolution are cad/process/shop.toml gauges.micrometers.
 [gauges.micrometers]
 name = "Outside micrometers, 0-1, 1-2 and 2-3 in (archived inventory)"
 kind = "micrometer_set"
