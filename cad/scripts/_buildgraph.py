@@ -1320,7 +1320,7 @@ def module_deps_of(script: Path) -> list[str]:
     discovered package modules.  This replaces the old blanket "every ``_*.py``
     is a dep of every build" rule: a leaf importing only the focused helpers it
     uses no longer rebuilds for unrelated helpers, while dotted imports such as
-    ``diagnostics.diag_build_90280A194`` retain their exact recipe chain.
+    ``diagnostics.diag_build_90280A196`` retain their exact recipe chain.
     Following real imports transitively prevents under-invalidation so long as a
     script imports what it uses, which Python enforces at run time.  The BFS is
     cycle-safe (``build_motion_study`` <-> ``build_motion_study_springs``).

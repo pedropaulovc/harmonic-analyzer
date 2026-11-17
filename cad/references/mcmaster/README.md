@@ -1182,16 +1182,15 @@ Catalog specifications checked on September 10, 2026:
   head hex drive screw, #4-40 UNC class 3A, right hand, 1/4 in under the
   head, fully threaded, flat tip, standard-profile head Ø0.213 in x 0.059 in,
   1/16 in hex drive, 140 ksi, Rockwell C39, ASME B18.3 / ASTM F835. The page
-  gives nothing else, so `diagnostics/diag_mcmaster_button_head.py` (removed 2026-11-16, #2886) and
-  `_button_head_dimensions.py` carried the 91255A148 vendor-measured laws over
-  in proportion: flat top 7/5 of the hex, band 0.15 of the head height at
-  10 deg, fillets 0.05, socket floor 0.55, the 60 deg countersink.
-  `_mcmaster_91255a106.py` holds its SKU dimensions. It is catalogue-only: no
-  vendor model is downloaded or kept here, so it has no replica gate, and its
-  standalone diagnostic is a catalog-only run. Lost: 91255A105 (3/16 in;
+  gives nothing else, so its button-head family builder carried the
+  91255A148 vendor-measured laws over in proportion: flat top 7/5 of the hex,
+  band 0.15 of the head height at 10 deg, fillets 0.05, socket floor 0.55, the
+  60 deg countersink. The SKU recipe, its `_mcmaster_91255a106.py` dimensions,
+  the family builder and `_button_head_dimensions.py` were removed with the
+  orphaned replicas on 2026-11-16 (#2886). Lost: 91255A105 (3/16 in;
   shortens the lock stack) and
   18-8 stainless 92949A106 (same head and length, 70 ksi, Rockwell B55;
-  the alloy screw matches the 91255A148 family whose laws the recipe uses).
+  the alloy screw matches the 91255A148 family whose laws the recipe used).
 - 91255A108 (`pd-vn-guide-lock-screw` from ruling R9-48 until October 11, 2026)
   replaced 91255A106: the 1/4 in screw engaged only 1.26D of the guide's
   blind tap at the worst case, so the guide's lock receivers became through

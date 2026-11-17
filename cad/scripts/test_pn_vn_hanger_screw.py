@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import dataclasses
 import math
 
 import pytest
@@ -101,7 +100,7 @@ class _Recorder:
         self.currentModel.__dict__["FeatureManager"] = _Obj("fm")
 
     def log(self, name: str, args=(), kwargs=None) -> None:
-        self.events.append((name, _norm(args), _norm(kwargs or {})))
+        self.events.append((name, tuple(args), dict(kwargs or {})))
 
     async def _async(self, name: str, *args, **kwargs):
         self.log(name, args, kwargs)
@@ -118,38 +117,6 @@ class _Recorder:
 
     async def create_extrusion(self, *args):
         return await self._async("create_extrusion", *args)
-
-
-def _norm(value):
-    if isinstance(value, float):
-        return _Float(value)
-    if dataclasses.is_dataclass(value) and not isinstance(value, type):
-        return (type(value).__name__, _norm(dataclasses.asdict(value)))
-    if isinstance(value, dict):
-        return tuple(sorted((k, _norm(v)) for k, v in value.items()))
-    if isinstance(value, (list, tuple)):
-        return tuple(_norm(v) for v in value)
-    if isinstance(value, _Recorder):
-        return "adapter"
-    return (
-        value if isinstance(value, (int, str, bool, type(None))) else repr(type(value))
-    )
-
-
-class _Float(float):
-    """Compares equal within 1e-12 relative: 93075A194 types its frame
-    (4.953) where the family computes it ((12.7 - 2.794) / 2)."""
-
-    def __eq__(self, other) -> bool:
-        if not isinstance(other, float):
-            return NotImplemented
-        return abs(self - other) <= 1e-12 * max(1.0, abs(self), abs(other))
-
-    def __ne__(self, other) -> bool:
-        equal = self.__eq__(other)
-        return equal if equal is NotImplemented else not equal
-
-    __hash__ = float.__hash__
 
 
 def _record(monkeypatch, author) -> list[tuple]:
@@ -174,13 +141,12 @@ def _record(monkeypatch, author) -> list[tuple]:
         yield
         adapter.log("no_sketch_inference.exit")
 
-    for module in (family,):
-        monkeypatch.setattr(module, "check", logger("check", True))
-        monkeypatch.setattr(module, "name_last_feature", logger("name_last_feature"))
-        monkeypatch.setattr(module, "volume_check", async_logger("volume_check"))
-        monkeypatch.setattr(module, "insert_helix", logger("insert_helix"))
-        monkeypatch.setattr(module, "offset_plane", logger("offset_plane"))
-        monkeypatch.setattr(module, "thread_sweep_cut", logger("thread_sweep_cut"))
+    monkeypatch.setattr(family, "check", logger("check", True))
+    monkeypatch.setattr(family, "name_last_feature", logger("name_last_feature"))
+    monkeypatch.setattr(family, "volume_check", async_logger("volume_check"))
+    monkeypatch.setattr(family, "insert_helix", logger("insert_helix"))
+    monkeypatch.setattr(family, "offset_plane", logger("offset_plane"))
+    monkeypatch.setattr(family, "thread_sweep_cut", logger("thread_sweep_cut"))
     monkeypatch.setattr(_sketch, "add_line_chain", async_logger("add_line_chain"))
     monkeypatch.setattr(_com, "_early_bound", lambda obj, _iface: obj)
     monkeypatch.setattr(_com, "_read_member", lambda obj, name: getattr(obj, name))
