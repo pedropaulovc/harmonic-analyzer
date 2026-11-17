@@ -607,21 +607,31 @@ def _assert_finish_ink_routes(annotations, finish, seat_note_xy, project, front)
         label="parent A", kind="note", owner="front",
         text_boxes=(Box(0.203362, 0.1324876, 0.2065895, 0.1358896),), exact=True,
     )
-    # The free-end SR: its text envelope covers a left- or centre-anchored
-    # "SR.125" at the measured glyph pitch, and its radial leader lands on
-    # the dome along the line from the sphere centre toward the text.
+    # The free-end SR, from its first native ink (run 20261117T122606274Z,
+    # "SR.125" at text centre (0.021, 0.134)): 3.44 mm glyphs, 13.9 mm for six
+    # of them; the shelf sits 2.6 mm under the text centre, runs 1 mm past
+    # its left end and bends 3 mm past its right; the radial leader runs from
+    # that bend toward the sphere centre and its arrow stops on the dome.
     sx, sy, _z = annotations["DomeR"].GetPosition()
-    glyph = 0.0868955 / 34
-    width, half_height = glyph * len("SR.125"), 0.0018
+    width, half_height = 0.0139 * len("SR.13") / len("SR.125"), 0.00172
+    shelf_y, shelf_left, bend_x = sy - 0.0026, sx - width / 2.0 - 0.001, sx + width / 2.0 + 0.003
     sphere_x, sphere_y = project(None, front, (diameter / 2.0, 0.0, 0.0))
-    reach = math.hypot(sx - sphere_x, sy - sphere_y)
-    arrow = (sphere_x + (sx - sphere_x) * diameter / 2.0 / reach, sphere_y + (sy - sphere_y) * diameter / 2.0 / reach)
+    reach = math.hypot(bend_x - sphere_x, shelf_y - sphere_y)
+    arrow = (
+        sphere_x + (bend_x - sphere_x) * diameter / 2.0 / reach,
+        sphere_y + (shelf_y - sphere_y) * diameter / 2.0 / reach,
+    )
     free_end = AnnotationGeometry(
         label="free hemisphere SR", kind="dim", owner="front",
-        text_boxes=(Box(sx - width / 2.0, sy - half_height, sx + width, sy + half_height),),
-        segments=(Segment(*arrow, sx, sy - half_height, "leader"),),
+        text_boxes=(Box(sx - width / 2.0, sy - half_height, sx + width / 2.0, sy + half_height),),
+        segments=(
+            Segment(*arrow, bend_x, shelf_y, "leader"),
+            Segment(bend_x, shelf_y, shelf_left, shelf_y, "leader"),
+        ),
     )
-    # On the sphere, clear of its tangent junction with the rod, not on it.
+    # That run's shelf ended on the border (clarity); now it stands clear.
+    assert shelf_left - region.xmin > 0.002
+    # The arrow lands on the sphere, clear of its tangent junction with the rod.
     assert arrow[0] < sphere_x - 0.001 and arrow[1] > sphere_y
     after = sheet(rod_dia, new_finish, seat_label, thread_note, parent_a, free_end)
     assert find_leader_across_lines(after) == []
