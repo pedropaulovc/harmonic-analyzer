@@ -30,6 +30,8 @@ from _package_units import drawing_unit
 from _printed_tolerance import (
     angular_band_deg,
     drilled_oversize_mm,
+    edge_break_chamfer_mm,
+    edge_break_radius_mm,
     printed_band_mm,
     printed_deviations,
 )
@@ -110,14 +112,22 @@ CONE_BOSS_DIA = 17.272  # .68
 BORE_DIA = 12.2682  # .483 in
 # The harvested 1.654 face-to-face: MHA-DT-04's bearing length, which the
 # cone shaft's stations and the gear stack close on.  It is its own value, not
-# the body's Ø: the Ø1.65 body (dt_cone_post_envelope.BLOCK_DIA) sits on the
-# .XX grid, so each boss end stands ~.002 proud of the body's tangent line.
+# the body's Ø.
 CONE_BOSS_LENGTH = 42.011
-# #2756 (machinist review of #2725, run 20261114T024302494Z): at the title
-# block's +/-.01 the body's upper limit (radius .830) swallowed the boss ends
-# (.825 at their least).  The body's band is one-sided, down from the envelope
-# diameter the platform is laid out on, so no boss end ever lies inside it.
-MAIN_BODY_DIA_BAND = (0.0, -0.508)  # +.00/-.02
+# The cast body below the head.  #2756 (machinist reviews of #2725 and of the
+# R5 rolling-main build): on the Ø1.65 envelope the boss ends stood .002 proud
+# of the body and lay flush or inside it at the printed limits, so no route
+# could make the pads drawn.  Delegated low-impact choice (MainBuild,
+# 2026-11-17, pending the owner on #2756): the body is cast Ø1.60 at the title
+# block's .XX band, so both cone bosses stand clear of it as real cast pads,
+# as on the original casting and like the integral crank boss.  It stays
+# inside the Ø1.65 envelope the swing platform, the base and the drive-train
+# foot containment are laid out on (dt_cone_post_envelope.BLOCK_DIA), so
+# nothing outside the post moves; the bearing length and the collar face's
+# station are unchanged.
+BODY_DIA = 40.64  # 1.60
+if _printed_limits(BODY_DIA, 2)[1] > post_envelope.BLOCK_DIA:
+    raise AssertionError("the post body's printed limit passes the platform's envelope")
 
 # Two vertical ANSI-inch 1/4 Fillister Head Screw counterbores in the top face.
 # Ry(180) maps part-local +X to machine -X, so the assembly intentionally mates
@@ -179,15 +189,36 @@ _CONE_BOSS_HALF_BAND = printed_band_mm(3, unit=UNIT) / 2.0  # ConeBossLen .XXX
 CONE_BOSS_NORTH_STATION_TOLERANCE_MM = (
     math.floor(_CONE_BOSS_HALF_BAND / MM_PER_IN * 1000.0 + 1e-9) / 1000.0 * MM_PER_IN
 )  # +/-.002
-# At the printed values the body's largest radius (.825) meets the boss ends'
-# least station (.827 - .002): flush on the post's axial line at worst, and the
-# boss still stands off the round everywhere else round its rim.
-BODY_RADIUS_MAX_IN = round((post_envelope.BLOCK_DIA + MAIN_BODY_DIA_BAND[0]) / 2.0 / MM_PER_IN, 3)
-CONE_BOSS_END_MIN_IN = round(
-    (CONE_BOSS_NORTH_STATION - CONE_BOSS_NORTH_STATION_TOLERANCE_MM) / MM_PER_IN, 3
+# Both cone bosses stand clear of the body at every printed limit (#2756):
+# the north face at its station's least, the far face at the face-to-face's
+# least less the north station's greatest, each against the body's largest
+# radius.  Each pad stands at least the title block's edge break proud, so
+# breaking its rim never reaches the body.
+_BODY_RADIUS_MAX = _printed_limits(BODY_DIA, 2)[1] / 2.0
+_NORTH_STATION_LIMITS = tuple(
+    CONE_BOSS_NORTH_STATION + deviation
+    for deviation in printed_deviations(
+        CONE_BOSS_NORTH_STATION,
+        3,
+        (-CONE_BOSS_NORTH_STATION_TOLERANCE_MM, CONE_BOSS_NORTH_STATION_TOLERANCE_MM),
+        unit=UNIT,
+    )
 )
-if BODY_RADIUS_MAX_IN > CONE_BOSS_END_MIN_IN:
-    raise AssertionError("the body's largest radius swallows a cone boss end")
+CONE_BOSS_STANDOFF_WORST_MM = {
+    "north": _NORTH_STATION_LIMITS[0] - _BODY_RADIUS_MAX,
+    "far": _printed_limits(CONE_BOSS_LENGTH, 3)[0]
+    - _NORTH_STATION_LIMITS[1]
+    - _BODY_RADIUS_MAX,
+}
+CONE_BOSS_STANDOFF_FLOOR_MM = max(
+    edge_break_radius_mm(unit=UNIT), edge_break_chamfer_mm(unit=UNIT)
+)
+for _name, _standoff in CONE_BOSS_STANDOFF_WORST_MM.items():
+    if _standoff < CONE_BOSS_STANDOFF_FLOOR_MM:
+        raise AssertionError(
+            f"the {_name} cone boss stands {_standoff:.3f} mm off the body at the "
+            f"printed limits, under the {CONE_BOSS_STANDOFF_FLOOR_MM:.3f} mm edge break"
+        )
 if CONE_BOSS_NORTH_STATION_TOLERANCE_MM > _CONE_BOSS_HALF_BAND:
     raise AssertionError(
         "north cone-boss face station band exceeds the stacks' half band"
@@ -197,8 +228,8 @@ if CONE_BOSS_NORTH_STATION_TOLERANCE_MM > _CONE_BOSS_HALF_BAND:
 # checks natively one feature at a time (build_dt_cone_pivot_post.py asserts
 # the sum at import):
 #
-#   body      pi*(BLOCK_DIA/2)^2*BLOCK_HEIGHT
-#   head      pi*((HEAD_DIA/2)^2 - (BLOCK_DIA/2)^2)*HEAD_HEIGHT
+#   body      pi*(BODY_DIA/2)^2*BLOCK_HEIGHT
+#   head      pi*((HEAD_DIA/2)^2 - (BODY_DIA/2)^2)*HEAD_HEIGHT
 #   crank boss outside the head cylinder
 #   crank bore pi*(CRANK_BORE_DIA/2)^2*CRANK_BOSS_LENGTH
 #   cone pads outside the body cylinder
@@ -218,10 +249,11 @@ if CONE_BOSS_NORTH_STATION_TOLERANCE_MM > _CONE_BOSS_HALF_BAND:
 # two through drills.  The head shell's height and the contained boss/pad/bore
 # intersections are unchanged; the builder independently recomputes them.
 # The constant is that sum at the 86 mm reference for the inch sizes (#290)
-# and the Ø41.91 body (112 123.5736 at the harvested Ø42.011), with the letter M
-# through drills of #2697 (111 752.8114 at 9/32).
-HARVESTED_VOLUME_MM3 = 111_108.31256 + math.pi * (
-    (post_envelope.BLOCK_DIA / 2.0) ** 2 - 2.0 * (ATTACHMENT_THRU_DIA / 2.0) ** 2
+# and the Ø40.64 body of #2756 (111 108.3126 on the Ø41.91 envelope, 112 123.5736
+# at the harvested Ø42.011), with the letter M through drills of #2697
+# (111 752.8114 at 9/32 on the Ø41.91 body).
+HARVESTED_VOLUME_MM3 = 106_527.63207 + math.pi * (
+    (BODY_DIA / 2.0) ** 2 - 2.0 * (ATTACHMENT_THRU_DIA / 2.0) ** 2
 ) * (BLOCK_HEIGHT - 86.0)
 HARVESTED_MASS_KG = HARVESTED_VOLUME_MM3 * 7.20e-6
 
@@ -237,9 +269,7 @@ HARVESTED_MASS_KG = HARVESTED_VOLUME_MM3 * 7.20e-6
 #
 # Apart from these two, the spacing between them and the cone-axis height (both
 # below), nothing else on this casting is an accuracy feature: the title
-# block's general grades govern.  The body's diameter keeps that grade's width,
-# one-sided (MAIN_BODY_DIA_BAND, #2756); crank_boss_rim still sweeps the
-# symmetric growth, which over-books it.
+# block's general grades govern, the body's diameter included (#2756).
 RUNNING_BORE_BAND = REAM_H7  # the crank bore
 JOURNAL_BORE_BAND = (0.0254, 0.0127)  # the cone journal bore
 
@@ -321,7 +351,7 @@ for _name, _web in CRANK_BORE_WEBS_WORST.items():
 # the loosest title-block angular row on the cone axis; its BASIC angle and
 # angularity frame are tighter, so this overbounds the printed corner.
 MOUNT_OTHER_WEBS_WORST = {
-    "body foot OD": (post_envelope.BLOCK_DIA + MAIN_BODY_DIA_BAND[1]) / 2.0
+    "body foot OD": _printed_limits(BODY_DIA, 2)[0] / 2.0
     - _printed_limits(ATTACHMENT_X, 2)[1]
     - (ATTACHMENT_THRU_DIA + _DRILL_OVERSIZE) / 2.0,
     "inclined cone bore": _HOLE_X_MIN
@@ -423,9 +453,10 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # Nothing prints .X: every size below feeds a wall, web or stack check.  The
 # body and head diameters, the body height, the boss diameters, the
 # mounting-hole stations and the cone-axis height (its own band) take two:
-# the body's Ø1.65 is a cast size whose .XX band still leaves the mounting
-# holes' outer wall over the floor (MOUNT_OTHER_WEBS_WORST), so rule 17
-# gives it no tighter band.  The cone boss length is the harvested 1.654
+# the body's Ø1.60 is a cast size whose .XX band still leaves the mounting
+# holes' outer wall over the floor (MOUNT_OTHER_WEBS_WORST) and both cone
+# bosses proud of it (CONE_BOSS_STANDOFF_WORST_MM), so rule 17 gives it no
+# tighter band.  The cone boss length is the harvested 1.654
 # MHA-DT-04 bearing length, three places; the shaft collar bears on the
 # boss's north face, half the length's band off the post centre, and that
 # half lands on the cone-tip adjuster's engagement

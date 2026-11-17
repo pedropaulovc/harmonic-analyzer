@@ -288,7 +288,8 @@ def test_current_drive_train_record_matches_the_selected_production_specs() -> N
     post_row = gen_dimensions.find_row(record, "Chapter 13", "`dt-cone-pivot-post`")
     assert post_row is not None
     for fragment in (
-        f"Current body Ø{BLOCK_DIA:g} ×{post.BLOCK_HEIGHT:g} high",
+        f"Current body Ø{post.BODY_DIA:g} ×{post.BLOCK_HEIGHT:g} high",
+        f"inside the Ø{BLOCK_DIA:g} / 1.65 in envelope",
         f"head Ø{post.HEAD_DIA:g} ×{post.HEAD_HEIGHT:g}",
         f"running bore at {post.CRANK_BORE_HEIGHT:.12f} above platform",
     ):

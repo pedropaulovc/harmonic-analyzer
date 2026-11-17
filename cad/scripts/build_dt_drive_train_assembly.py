@@ -1148,7 +1148,9 @@ def _plat_round_foot_containment_mm(station: float, radius: float) -> float:
 PLATFORM_CONTAINMENT_FLOOR_MM = 0.25
 # The pivot post's foot is round: held as the circle it is against every
 # outline edge, the south-east chamfer included (#2611), not as a square
-# span of its radius (which the chamfered corner cannot hold).
+# span of its radius (which the chamfered corner cannot hold).  The circle is
+# the envelope the platform is laid out on; the cast body stands inside it
+# (dt_cone_pivot_post_spec.BODY_DIA, #2756).
 POST_PLATFORM_CONTAINMENT_MM = _plat_round_foot_containment_mm(
     POST_STATION, POST_BLOCK_DIA / 2.0
 )

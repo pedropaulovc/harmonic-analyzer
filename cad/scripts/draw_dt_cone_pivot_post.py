@@ -13,7 +13,7 @@ about the vertical body axis. The part persists a view looking exactly down the
 cone axis.  That view retains the boss end face and shows its Ø17.2 OD and
 Ø12.281 bore as separate true-shape circles.  A native section in the
 horizontal cone-bore plane removes the head from the projection and exposes
-the raised boss corners beyond the Ø42 body, together with the boss's axial
+the boss pads standing proud of the Ø40.6 body, together with the boss's axial
 length, in a hatched solid-line profile; the elevation keeps the crank
 journal, whose own sketch plane is parallel to it.
 
@@ -43,7 +43,6 @@ import _surface_finish
 import dt_cone_gear_shaft_spec as cone_shaft
 import dt_cone_pivot_post_spec as cone
 import dt_crankshaft_spec as crankshaft
-from dt_cone_post_envelope import BLOCK_DIA
 from _feature_requirements import part_metadata, requirement
 from _printed_limits import drilled_limits as _drilled_band
 from _printed_limits import limits as _band
@@ -100,6 +99,7 @@ from dt_cone_pivot_post_spec import (
     ATTACHMENT_X,
     BASIC_DIMENSIONS,
     BLOCK_HEIGHT,
+    BODY_DIA,
     BORE_DIA,
     BORE_HEIGHT,
     CONE_AXIS_VIEW,
@@ -225,7 +225,7 @@ def _top_y(model_z: float) -> float:
 # The A-A cutting plane is horizontal at the cone bore's model-Y station.  It
 # therefore contains the inclined cone axis, while removing the head that
 # hides the boss in the ordinary Top projection.  Its section shows the angled
-# 42 x 17.2 boss strip extending past the Ø42 body circle at all four corners.
+# 42 x 17.2 boss strip standing proud of the Ø40.6 body circle at both ends.
 _CONE_SECTION_HALF_SPAN_MM = 25.0
 CONE_SECTION_LINE = (
     (
@@ -336,10 +336,10 @@ CONE_AXIS_LABEL_TIP_RADIUS_MM = 16.0
 CONE_AXIS_LABEL_XY = (0.122, 0.2095)
 
 BODY = requirement(
-    "body", faces=(CylinderFace(BLOCK_DIA),),
+    "body", faces=(CylinderFace(BODY_DIA),),
     kind="boss", requirements=("dia", "height"), fields={
-        "dia": (_band(BLOCK_DIA, _P["MainBodyDia"], cone.MAIN_BODY_DIA_BAND, unit=cone.UNIT), (("dt_cone_post_envelope", "BLOCK_DIA"), "MAIN_BODY_DIA_BAND", "UNIT")),
-        "dia_nominal": (BLOCK_DIA, (("dt_cone_post_envelope", "BLOCK_DIA"),)),
+        "dia": (_band(BODY_DIA, _P["MainBodyDia"], unit=cone.UNIT), ("BODY_DIA", "UNIT")),
+        "dia_nominal": (BODY_DIA, ("BODY_DIA",)),
         "height": (_band(cone.BLOCK_HEIGHT, _P["MainBodyHt"], unit=cone.UNIT), ("BLOCK_HEIGHT", "UNIT")),
         "height_nominal": (cone.BLOCK_HEIGHT, ("BLOCK_HEIGHT",)),
         "frame": ("body_axis", (*_HEAD_SOURCES, ("draw_dt_cone_pivot_post", "_cone_source_frames"), ("draw_dt_cone_pivot_post", "build"))),
@@ -481,12 +481,14 @@ JOURNAL_KEEP = {
     "HeadDia": (0.200, 0.2135),
     # The bore's block is two rows since its words went to numbered note 2
     # (screen of the novice rubric: the boss OD and the bore read as one
-    # six-line callout), so its top stands ~11 mm under the boss OD's row and
-    # the two read as separate callouts.  Its widest row, "REAM THRU, SEE
-    # NOTE 2", is about the boss OD row's width and stays inside 265.5..319.2;
-    # the rim break's shorter row sits under it (fan-out r1: a short
-    # requirement goes at its leader, not behind a note).
-    "JournalBoreDia": (0.292, 0.1525),
+    # six-line callout), so its top stands under the boss OD's row and the
+    # two read as separate callouts.  Its widest row, "REAM THRU, SEE NOTE
+    # 2", is about the boss OD row's width and stays inside 265.5..319.2;
+    # the rim break's shorter row and its reason sit under it (fan-out r1: a
+    # short requirement goes at its leader, not behind a note).  The block is
+    # centred on this y, so the reason's row moved it 1.5 mm up, keeping its
+    # leader shelf clear of the bore's Ra symbol below.
+    "JournalBoreDia": (0.292, 0.154),
 }
 
 CONE_BOSS = requirement(
@@ -537,8 +539,9 @@ JOURNAL_TEXT_OFFSETS = {
 # The cone bore's rims bound the thrust ring the shaft collar bears on, with
 # the collar's OD edge (cone_gear_shaft_spec: ring - 2 x break >= 1.5), so the
 # bore prints the same break as the collar instead of the title block's 0.25,
-# with its reason (r16 machinist review, rules 4 and 7: a break tighter than
-# the title block's needs its reason at the callout).
+# with its reason on the row under it (r16 and R5 machinist reviews, rules 4
+# and 7: a break tighter than the title block's needs its reason at the
+# callout).
 # The values the drive train closes on print three places (MHA-DT-05 inch
 # machinist review): the crank boss's north face sets the 16T's feeler seat
 # and its length the crankshaft collar's seat on the south face; the cone
@@ -591,7 +594,7 @@ SHEET_NOTES = "\n".join(
         f"{fit_clearance_text(crankshaft.JOURNAL_DIAMETRAL_CLEARANCE_MM)}).",
         f"{CONE_BORE_NOTE}. RUNNING FIT ON CONE SHAFT MHA-DT-04 (CLEARANCE "
         f"{fit_clearance_text(cone_shaft.JOURNAL_DIAMETRAL_CLEARANCE_MM)});",
-        f"   ITS COLLAR RUNS ON THE {_printed(cone.CONE_BOSS_NORTH_STATION, 'ConeBossNorthZ')} "
+        f"   COLLAR RUNS ON {_printed(cone.CONE_BOSS_NORTH_STATION, 'ConeBossNorthZ')} "
         "FACE.",
         f"{MESH_NOTE}. {_printed(cone.CRANK_ABOVE_CONE, 'CrankAboveCone')} AND "
         f"{_printed(cone.CRANK_BOSS_NORTH_FACE, 'CrankBossStartZ')} SET MESH "
@@ -601,11 +604,17 @@ SHEET_NOTES = "\n".join(
 # The notes' top-left corner: under the elevation's datum B frame (its
 # bottom at 57 mm) and left of the title block (x 216 mm).
 NOTES_XY = (0.020, 0.048)
+# Why the bore's rims take a break under the title block's: the collar's land
+# between the rim and its OD is narrow (rule 7: one reason, at the callout).
+JOURNAL_RIM_BREAK_REASON = "NARROW COLLAR LAND"
 DIMENSION_CALLOUTS = {
     "CrankBossDia": "CRANK BOSS",
     "CrankBossLen": "SEATS\nMHA-DT-11 COLLAR",
     "CrankBoreDia": f"REAM THRU, SEE NOTE {CRANK_BORE_NOTE}",
-    "JournalBoreDia": f"REAM THRU, SEE NOTE {CONE_BORE_NOTE}\n{POST_JOURNAL_RIM_BREAK}",
+    "JournalBoreDia": (
+        f"REAM THRU, SEE NOTE {CONE_BORE_NOTE}\n{POST_JOURNAL_RIM_BREAK}\n"
+        f"{JOURNAL_RIM_BREAK_REASON}"
+    ),
     # Machinist review of ecc864e1f (2 of 3 runs): "MHA-DT-04 BEARING LENGTH"
     # named again the mate note 2 names once for the bore and the .827 face.
     "ConeBossLen": f"SEE NOTE {CONE_BORE_NOTE}",
@@ -1909,7 +1918,7 @@ def build(adapter: Any) -> dict[str, str]:
         mount_callout, MOUNT_HOLE_PRECISION, label="mounting counterbores"
     )
 
-    # The seat is the elevation's bottom line: the O42.011 foot rim seen
+    # The seat is the elevation's bottom line: the Ø40.64 foot rim seen
     # edge-on.  A coordinate pick on that line failed on the farm (the two
     # mounting-hole exit rims project onto the same line, so the hit-test has
     # nothing unambiguous to return), so the rim is found by its geometry --
@@ -1919,7 +1928,7 @@ def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         front,
-        edge_entity=_circular_edge(front, radius_mm=BLOCK_DIA / 2.0, center_y_mm=0.0),
+        edge_entity=_circular_edge(front, radius_mm=BODY_DIA / 2.0, center_y_mm=0.0),
         symbol_xy=(_front_x(30.0), _front_y(-6.0)),
         leader_attach_xy=(_front_x(-10.0), _front_y(0.0)),
         control=surface_finish_by_key(SURFACE_FINISHES, "foot_seat"),
@@ -2025,7 +2034,7 @@ def build(adapter: Any) -> dict[str, str]:
                 view=front,
                 position=DATUM_B_TAG_XY,
                 edge_entity=_circular_edge(
-                    front, radius_mm=BLOCK_DIA / 2.0, center_y_mm=0.0
+                    front, radius_mm=BODY_DIA / 2.0, center_y_mm=0.0
                 ),
             ),
             # The frame sits right of the head between HeadHt's extension
