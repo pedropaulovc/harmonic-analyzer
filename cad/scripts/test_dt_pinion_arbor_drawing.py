@@ -133,8 +133,12 @@ def test_integral_head_owns_the_crossrod_interface() -> None:
     assert spec.NECK_LEN == pytest.approx(spec.NECK_END_Z - spec.HEAD_REAR_Z)
     callout = drawing.DIMENSION_CALLOUTS["CrossHoleDia"]
     assert callout is drawing.CROSS_HOLE_CALLOUT
-    # Rule 4: a bonded fit names its mate by number and its LOCTITE grade.
-    assert callout == "REAM THRU, BONDED FIT ON\nMHA-DT-15, LOCTITE 638"
+    # Rule 4: a bonded fit names its mate by number and its LOCTITE grade;
+    # rule 23: with the clearance its limits give, in two rows (rule 7).
+    assert (
+        callout
+        == "REAM THRU, BONDED FIT ON MHA-DT-15,\nLOCTITE 638 (CLEARANCE .0010-.0070)"
+    )
     # Machinist review r1 of #1685 (blocker): the band names its mate, and
     # every mate a callout names is the registry's part number.
     import _config
@@ -179,9 +183,9 @@ def test_crossrod_is_a_bonded_slip_fit_not_a_press() -> None:
         <= reamer
         <= spec.CROSS_HOLE_DIA + spec.CROSS_HOLE_DIA_BAND[0]
     )
-    # The callout names the function, the mate and the compound, never the
-    # numbers.
-    assert drawing.CROSS_HOLE_CALLOUT == "REAM THRU, BONDED FIT ON\nMHA-DT-15, LOCTITE 638"
+    # The callout names the function, the mate, the compound and the
+    # clearance the limits give (rule 23).
+    assert drawing.CROSS_HOLE_CALLOUT.endswith("(CLEARANCE .0010-.0070)")
     assert "INTO MHA-DT-22 HEAD WITH LOCTITE 638" in crossrod.ASSEMBLY_STEP
     for retired in ("MATCH-REAM", "PRESS", "INTERNAL SHOULDERS SHARP"):
         assert retired not in spec.DRAWING_NOTES
@@ -503,12 +507,16 @@ def test_back_bond_land_carries_its_own_diameter_under_the_shaft() -> None:
     line under the shaft, between the 6.80 and 8.25 station witnesses and
     over the 8.25 row."""
     # #1038 r11 machinist review (rule 26, all 3 runs): both lands carry the
-    # same fit name with its LOCTITE grade, through note 3.
+    # same fit name with its LOCTITE grade, through note 3; farm run
+    # 20261117T130901535Z r2 (rule 23): with the clearance the drum's
+    # REAM_SLIDE bore and the land band give.
     assert drawing.DIMENSION_CALLOUTS["BackBondDia"] == drawing.BOND_CALLOUT
     assert drawing.DIMENSION_CALLOUTS["BondZoneDia"] == drawing.BOND_CALLOUT
     assert drawing.BOND_CALLOUT == "SEE NOTE 3"
     note_3 = drawing.SHEET_NOTES.split("\n3. ")[1]
-    assert note_3 == "BOND LANDS (2X): BONDED IN MHA-DT-01, LOCTITE 638."
+    assert note_3 == "LANDS BONDED IN MHA-DT-01, LOCTITE 638 (CLEARANCE .0014-.0053)."
+    assert max(drawing.BOND_CLEARANCE) <= spec.RETAINING_COMPOUND_MAX_GAP_MM
+    assert min(drawing.BOND_CLEARANCE) > 0.0
     assert sheet.DRAWING_PRECISION_BY_NAME["BackBondDia"] == 4
     assert "BackBondDia" in drawing.ARROWS_INSIDE
     x, y = drawing.PRINCIPAL_KEEP["BackBondDia"]
@@ -913,7 +921,7 @@ def test_bond_zone_diameter_is_a_flank_dimension_on_the_drum() -> None:
     # The bonded fit, its mate and its grade print once, on note 3, which
     # both bond lands' callouts link (#1038 r11 machinist review, rule 26).
     words = drawing.SHEET_NOTES.split("\n3. ")[1].split()
-    assert "BONDED" in words and "MHA-DT-01," in words and "638." in words
+    assert "BONDED" in words and "MHA-DT-01," in words and "638" in words
     assert drawing.SHEET_NOTES.count("MHA-DT-01") == 1
     import _config
 
@@ -1397,8 +1405,25 @@ def test_collar_pin_dimensions_stand_above_the_shaft_clear_of_the_front_ra() -> 
     assert dia_x < pin_x
     assert dia_y > station_y + 0.010
     ra_top = drawing.FRONT_RA_XY[1] + drawing.RA_SYMBOL_EXTENT[2]
-    assert dia_y + PIN_CALLOUT_UNDERLINE_FROM_POSITION > ra_top + 0.025
+    assert dia_y + _underline_from_position(PIN_CALLOUT_ROWS) > ra_top + 0.025
     assert min(station_y, dia_y) > axis_y
+
+
+def test_collar_pin_hole_callout_names_the_press_fit_and_its_interference() -> None:
+    """R5 machinist review (blocker, rule 4): '.0625 +.0025/.0000 ... PRESS FIT
+    ON MHA-DT-VN-63' read as a clearance fit on a 1/16 pin.  The slotted pin
+    is .066-.069 before it is driven (ASME B18.8.2), so the callout prints
+    the interference the hole band gives it as a reference."""
+    assert drawing.DIMENSION_CALLOUTS["PinHoleDia"].splitlines() == [
+        "1/16 DRILL THRU",
+        "PRESS FIT ON MHA-DT-VN-63",
+        "(INTERFERENCE .0010-.0065)",
+    ]
+    low, high = drawing.PIN_HOLE_INTERFERENCE
+    assert low > 0.0
+    assert (low, high) == pytest.approx(
+        ((0.066 - 0.065) * 25.4, (0.069 - 0.0625) * 25.4)
+    )
 
 
 # pc-r10 (37495ac47) layout audit, sheet mm: the three-line collar-pin
@@ -1406,29 +1431,48 @@ def test_collar_pin_dimensions_stand_above_the_shaft_clear_of_the_front_ra() -> 
 # (269.1,170.8) -> (280.1,211.9); the station text set at (0.288, 0.207)
 # boxed [274.5,201.4]..[301.7,204.9].
 PC_R10_PIN_CALLOUT_XY = (0.250, 0.222)
-PIN_CALLOUT_UNDERLINE_FROM_POSITION = -0.0101
+# A two-row callout's underline sits 10.1 mm under its position (pc-r10
+# above; R5, set at 0.2255, 215.5).  The block centres on its position, so
+# each further row lowers it half the 5.5 mm row pitch: the three-row
+# callout at 0.2272 underlined at 214.4 (run 20261117T135248809Z).
+TWO_ROW_UNDERLINE_FROM_POSITION = -0.0101
+ROW_PITCH = 0.0055
+PIN_CALLOUT_ROWS = len(drawing.PIN_HOLE_CALLOUT.splitlines())
 PIN_LEADER_START_Y_FROM_AXIS = 0.0008
 STATION_TEXT_BOX_FROM_POSITION = (-0.0135, 0.0137, -0.0056, -0.0021)
 LEADER_TEXT_CLEARANCE = 0.0015
 
 
-def _pin_leader_elbow(dia_xy: tuple[float, float]) -> tuple[float, float]:
+def _underline_from_position(rows: int) -> float:
+    return TWO_ROW_UNDERLINE_FROM_POSITION - (rows - 2) * ROW_PITCH / 2.0
+
+
+def test_underline_model_replays_the_measured_renders() -> None:
+    assert 0.222 + _underline_from_position(2) == pytest.approx(0.2119)
+    assert 0.2272 + _underline_from_position(3) == pytest.approx(0.2144, abs=1e-4)
+
+
+def _pin_leader_elbow(
+    dia_xy: tuple[float, float], rows: int = PIN_CALLOUT_ROWS
+) -> tuple[float, float]:
     """Where the collar-pin callout's underline bends into its leader."""
     return (
         dia_xy[0]
         + drawing.PIN_HOLE_CALLOUT_CENTRE_DX
         + drawing.PIN_HOLE_CALLOUT_WIDTH / 2.0,
-        dia_xy[1] + PIN_CALLOUT_UNDERLINE_FROM_POSITION,
+        dia_xy[1] + _underline_from_position(rows),
     )
 
 
-def _pin_leader_x_at(dia_xy: tuple[float, float], y: float) -> float:
+def _pin_leader_x_at(
+    dia_xy: tuple[float, float], y: float, rows: int = PIN_CALLOUT_ROWS
+) -> float:
     """Sheet x of the collar-pin hole's leader at height ``y``."""
     start = (
         drawing._sheet_x(spec.PIN_Z) + drawing.PIN_HOLE_LEADER_ARROW_DX,
         drawing.PRINCIPAL_CENTER[1] + PIN_LEADER_START_Y_FROM_AXIS,
     )
-    elbow = _pin_leader_elbow(dia_xy)
+    elbow = _pin_leader_elbow(dia_xy, rows)
     return start[0] + (elbow[0] - start[0]) * (y - start[1]) / (elbow[1] - start[1])
 
 
@@ -1458,7 +1502,9 @@ def test_collar_pin_leader_slopes_clear_of_the_station_witnesses() -> None:
 # pc-r11 (0c5636eab) render, sheet mm: detail A's "(3.0)" text set at
 # (0.205, 0.210) boxed [200.3,207.9]..[209.6,211.2]; the collar-pin underline
 # at 211.9 began at 210.4, so the (3.0) read as the callout's first word.
-CROWN_SAG_TEXT_TOP_FROM_POSITION = 0.0012
+# Run 20261117T135248809Z's PDF boxes the same text, now "(.12)", to 211.8
+# with its parentheses.
+CROWN_SAG_TEXT_TOP_FROM_POSITION = 0.0018
 UNDERLINE_OVER_TEXT_CLEARANCE = 0.003
 
 
@@ -1468,9 +1514,14 @@ def test_collar_pin_underline_stands_clear_above_the_crown_sag_text() -> None:
     )
     underline = _pin_leader_elbow(drawing.PRINCIPAL_KEEP["PinHoleDia"])[1]
     assert underline - sag_top >= UNDERLINE_OVER_TEXT_CLEARANCE
-    # Positive control: pc-r11's y 0.222 sat 0.7 mm over the text.
-    pc_r11 = _pin_leader_elbow((drawing.PRINCIPAL_KEEP["PinHoleDia"][0], 0.222))[1]
-    assert pc_r11 - sag_top < UNDERLINE_OVER_TEXT_CLEARANCE
+    # Positive controls: pc-r11's two-row callout at y 0.222 sat 0.7 mm over
+    # the text, and run 20261117T135248809Z's three rows at 0.2272 2.6 mm.
+    x = drawing.PRINCIPAL_KEEP["PinHoleDia"][0]
+    assert (
+        _pin_leader_elbow((x, 0.222), rows=2)[1] - sag_top
+        < UNDERLINE_OVER_TEXT_CLEARANCE
+    )
+    assert _pin_leader_elbow((x, 0.2272))[1] - sag_top < UNDERLINE_OVER_TEXT_CLEARANCE
 
 
 def test_collar_pin_leader_drops_clear_of_the_station_text() -> None:
@@ -1484,7 +1535,7 @@ def test_collar_pin_leader_drops_clear_of_the_station_text() -> None:
         x = _pin_leader_x_at(drawing.PRINCIPAL_KEEP["PinHoleDia"], y)
         assert x <= text_left - LEADER_TEXT_CLEARANCE, (y, x, text_left)
     # Positive control: the pc-r10 position crosses the text, as the audit saw.
-    assert _pin_leader_x_at(PC_R10_PIN_CALLOUT_XY, station[1] + top) > text_left
+    assert _pin_leader_x_at(PC_R10_PIN_CALLOUT_XY, station[1] + top, rows=2) > text_left
 
 
 # Measured witness overshoot past a dimension line: c486b6e1's NeckDia line
