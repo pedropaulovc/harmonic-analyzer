@@ -2565,8 +2565,8 @@ def _step_text(
             "WITH A DIAL INDICATOR ON A "
             f"\u00d8{steps.inch_text(disc.TOOTH_SPACE_GAUGE_PIN_DIA_MM, 3)} GAUGE PIN "
             f"IN EACH {n['pd-rack-pinion']} TOOTH SPACE IN TURN, TAP THE DISC "
-            f"CENTRAL AND SQUARE UNTIL THE READINGS SPAN {tir} TIR MAX "
-            f"{row_cite('disc-tir')}.",
+            f"CENTRAL AND SQUARE UNTIL THE READINGS {row_cite('disc-tir')} SPAN "
+            f"{tir} TIR MAX.",
             # The flange holes are off the axis, so the spots are taken off the
             # lathe; the trued disc is clamped to the flange first, or the
             # spigot's centring clearance lets it shift before it is spotted
@@ -2585,7 +2585,7 @@ def _step_text(
             "REMOVE THE CLAMPS.",
             "REFIT THE SLEEVE, HUB AND DISC ON MANDREL AND TAILSTOCK AS "
             f"{s('disc-taps-transferred', 1)}.",
-            f"CHECK: ALL {disc.TEETH} SPACES READ {tir} TIR MAX {row_cite('disc-tir')}.",
+            f"CHECK {row_cite('disc-tir')}: ALL {disc.TEETH} SPACES READ {tir} TIR MAX.",
             f"IF NOT, SLACKEN THE {n[explode.DISC_SCREW]} SCREWS AND REPEAT "
             f"{s('disc-taps-transferred', 2)}, {s('disc-taps-transferred', 9)}, "
             f"{s('disc-taps-transferred', 12)}.",
@@ -3145,7 +3145,7 @@ def setting_table_rows(
             f"{s('arm-plate-located', 13)}, {s('arm-plate-fitted', 20)}, "
             f"{s('fitup-pose-set', 9)}",
             f"DISC SHAKE AT THE TOOTH TIP NEXT TO THE {KNOB_TEETH}T",
-            f"VISIBLY, {steps.inch_text(REDUCER_SHAKE_MAX_MM, 3)} MAX",
+            f"VISIBLY, AT MOST {steps.inch_text(REDUCER_SHAKE_MAX_MM, 3)}",
             f"DIAL INDICATOR, {REDUCER_DIAL_STATIONS} PLACES",
         ),
         "plate-screw-tips": (
