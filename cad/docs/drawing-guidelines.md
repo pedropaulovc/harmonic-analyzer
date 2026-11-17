@@ -645,34 +645,38 @@ sub-assembly, never on part fabrication.
   which face mates to which. Every part the view balloons is visible in it,
   and its balloon lands on a visible face of that part; a part left hidden
   behind its mate, ballooned on a sliver or a hidden face, does not show its
-  order or face. Parts may stay seated together where the steps make the
-  order plain; exploding every stepwise part is not required.
+  order or face. Parts may stay seated together where the order is plain;
+  exploding every stepwise part is not required.
 - A parts list with item number, part number, description and quantity, and
   balloons tying every visible part to it. Every row is ballooned somewhere;
   every balloon has a row.
 - The few assembly-level dimensions and settings that exist only once the
-  parts are together (positions, gaps, clearances, travels, alignments,
-  preloads), each printed on a view as its native dimension, with a setting
-  diagram or setting table (reference, target, range and check in columns)
-  where a view alone cannot carry it. A setting finer than `.XXX` names the
-  indicator or gauge that reads it. A fit made at assembly (match-drill, ream
-  in place, shim, adjust) names the mating parts as rule 4 requires; an item
-  reference is enough when the BOM supplies the item's name and number
-  unambiguously.
+  parts are together (positions, gaps, clearances, endshake, travels,
+  alignments, preloads, press depths and stops), each printed on a view as
+  its native dimension, with a setting diagram or setting table (reference,
+  target, range and check in columns) where a view alone cannot carry it.
+  A retention or fit acceptance that is a measurable value (a check with a
+  number) is such a setting and prints here. A setting finer than `.XXX`
+  names the indicator or gauge that reads it. A fit made at assembly
+  (match-drill, ream in place, shim, adjust) names the mating parts as rule 4
+  requires; an item reference is enough when the BOM supplies the item's name
+  and number unambiguously.
 
-**The steps live in ASSEMBLY.md, not on the sheets** (owner ruling
-2026-11-17). The ordered assembly steps, their checks and remedies, setup
-and adjustment procedures, and the consumables and loose items (lubricant,
+**The steps live in ASSEMBLY.md, not on the sheets.** The ordered assembly
+steps, the wording of their non-numeric checks and remedies, setup and
+adjustment procedures, and the consumables and loose items (lubricant,
 thread locker, loose pins, shims) print in the release's generated
 `ASSEMBLY.md`, from the same sources as the sheets, under the package's
-drawing number. They cite the sheets' item numbers, view and detail letters
-and sheet numbers. A sheet review never reports a step, check, setup
-procedure or consumable as missing from the sheets; where rules 23 and 25
-refer to an assembly step, its step in `ASSEMBLY.md` satisfies them. A sheet
-that still prints steps is judged as steps: each does one thing in at most
-six printed lines, a check and its remedy are separate steps, parts are
-named by item number and directions by view names (rule 26), and a code is
-defined in a labelled key on that sheet or one it points to by sheet number.
+drawing number. They cite the sheets' item numbers, view and detail letters,
+sheet numbers and settings. A sheet review never reports a step, its
+non-numeric check wording, a setup procedure or a consumable as missing from
+the sheets; where rules 23 and 25 refer to an assembly step, its step in
+`ASSEMBLY.md` satisfies them. A measurable setting or acceptance missing
+from the sheets is still missing. A sheet that still prints steps is judged
+as steps: each does one thing in at most six printed lines, a check and its
+remedy are separate steps, parts are named by item number and directions by
+view names (rule 26), and a code is defined in a labelled key on that sheet
+or one it points to by sheet number.
 
 A three-view orientation sheet without the views, parts list and balloons
 above is a placeholder, not a package.
