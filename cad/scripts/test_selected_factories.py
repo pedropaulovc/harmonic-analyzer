@@ -573,10 +573,18 @@ def _case_enrolled_traveler_keeps_normal_loader_conversion(dodo, monkeypatch, tm
         assert owners[_path_identity(_workspace_path(REPO_ROOT, target))] == f"prechips:{stem}"
 
 
-def _case_enrolled_cam_keeps_normal_loader_conversion(dodo, ordinary):
+def _case_enrolled_cam_keeps_normal_loader_conversion(dodo, ordinary, monkeypatch, tmp_path):
     import _cam_programs
 
-    stem = _cam_programs.CAM_STEMS[0]
+    # No part is enrolled since 2026-11-17; enrol a synthetic recipe.
+    stem = "ch_rocker_arm"
+    recipe = tmp_path / stem / "cam.py"
+    recipe.parent.mkdir()
+    recipe.write_text(
+        f'STEM = "{stem}"\nPROGRAMS = [("OP1", ()), ("OP2", ())]\n', encoding="utf-8"
+    )
+    monkeypatch.setattr(_cam_programs, "CAM_STEMS", (stem,))
+    monkeypatch.setattr(_cam_programs, "PROCESS_ROOT", tmp_path)
     normal = {task.name: task for task in generate_tasks("cam", dodo.task_cam(), dodo.task_cam.__doc__)}
     selected = {task.name: task for task in dodo.canonical_tasks(["cam", f"cam:{stem}"])}
     assert set(selected) == set(normal)

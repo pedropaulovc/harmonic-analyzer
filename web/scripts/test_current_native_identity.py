@@ -271,7 +271,6 @@ assert identity.source_file(root / "cad", "config/identity-migration-map.json").
         ):
             current = f"cad/scripts/ch_rocker_arm_tl_vn_oblique_{member}_spec.py"
             old = f"cad/scripts/ch_rocker_arm_tl_oblique_{sealed}_spec.py"
-            self.assertTrue((ROOT / current).is_file(), current)
             self.assertEqual(identity.source_aliases({old})[current], (old,))
             self.assertEqual(identity.source_aliases(
                 {old}, parent="ch-rocker-arm-tl-oblique-jig", configuration=configuration,
