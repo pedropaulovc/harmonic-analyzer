@@ -52,7 +52,8 @@ printed manufacturing and set tolerances (INDEPENDENT_TOLERANCES, RSS); an
 unclassified source is refused.  The whole sweep is worst-case arithmetic
 over every source when that closes everywhere; otherwise the clearances
 arithmetic plus the RSS of the tolerances, everywhere (machining-dfm.md).
-Either way the build fails if the governing air closes.
+Either way ``check:recipe`` (test_drive_train_cone_tip_holddown) fails if the
+governing air closes.
 """
 
 from __future__ import annotations
