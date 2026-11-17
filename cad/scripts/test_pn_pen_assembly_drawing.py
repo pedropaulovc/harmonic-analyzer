@@ -13,6 +13,7 @@ import pn_pen_assembly_spec as spec
 import pn_pen_explode_spec as explode
 import pn_pen_carriage_geom as carriage
 import pn_pen_frame_spec as frame
+import pn_pen_hanger_spec as hanger
 import pn_pen_rod_spec as rod
 import pn_pen_v_block_spec as v_block
 import pn_vn_pen_marker_spec as marker
@@ -296,8 +297,6 @@ def test_wire_explodes_up_then_to_the_sheet_left() -> None:
 def test_hanger_balloon_lands_mid_strap_clear_of_the_hanger_screw() -> None:
     """Machinist gate 2026-10-17: walked, the hanger's leader ran along screw
     11's shank to the strap's top corner, beside balloon 11's arrow."""
-    import pn_pen_hanger_spec as hanger
-
     x, y, z = drawing.BALLOON_ANCHORS[spec.HANGER].point_mm
     right = spec.EXPLODED_VIEW_AXES[0]
     # On the strap's sheet-rightmost long edge: the -x side's straight line
@@ -400,7 +399,7 @@ def test_block_and_marker_balloons_land_off_the_rod_set_screw() -> None:
 def test_every_setting_is_printed_with_a_callout_beside_its_detail() -> None:
     printed = {
         name for points in drawing.DIMENSION_TEXT_POINTS.values() for name in points
-    }
+    } | set(drawing.RIGHT_TEXT_POINTS)
     marked = {name for names in spec.DRAWING_DIMENSIONS.values() for name in names}
     assert printed == marked == set(notes.DIMENSION_CALLOUTS)
     details = {detail.key: detail for detail in drawing.DETAILS}
@@ -414,6 +413,29 @@ def test_every_setting_is_printed_with_a_callout_beside_its_detail() -> None:
             axes = (0, 2) if detail.orientation == "*Top" else (0, 1)
             offset = [xyz[axis] - detail.model_centre[axis] for axis in axes]
             assert sum(value * value for value in offset) ** 0.5 < 2 * detail.radius_mm
+
+
+def test_rod_travel_prints_on_right_and_the_check_cites_it() -> None:
+    """Machinist review R5 (rule 22): the rod's travel acceptance printed only
+    in ASSEMBLY.md. RIGHT carries it natively, a band about the block top's
+    rest station below the upper guide top, the same stroke the check cites."""
+    assert drawing.RIGHT_TEXT_POINTS == {spec.TRAVEL_DIMENSION: notes.TRAVEL_TEXT_POINT}
+    assert spec.TRAVEL_REFERENCE == pytest.approx(
+        hanger.GUIDE_SPAN_Y[1] - carriage.BLOCK_TOP_Y
+    )
+    assert notes.DIMENSION_TOLERANCES[spec.TRAVEL_DIMENSION] == pytest.approx(
+        carriage.PEN_TRAVEL_HALF_MM, abs=0.005 * 25.4
+    )
+    # The text stands sheet-right of the rod (machine -Z in a Right view),
+    # level with the span, clear of the U guides' noses.
+    _x, y, z = notes.TRAVEL_TEXT_POINT
+    (_u, top), (_u2, bottom) = spec.TRAVEL_LINE
+    assert bottom < y < top
+    nose = carriage.PEN_Z_MID - hanger.GUIDE_NOSE
+    assert z < nose
+    check = notes.ASSEMBLY_CHECKS[0]
+    assert "OVER ITS ±.59 TRAVEL" in check
+    assert "(RIGHT VIEW: BLOCK TOP 2.74 ±.59 BELOW THE UPPER GUIDE TOP)" in check
 
 
 def test_each_detail_title_carries_its_letter_and_any_other_direction() -> None:
