@@ -114,7 +114,8 @@ from _part_configuration_exports import (  # noqa: E402
     step_export_preferences,
     validate_member_exports,
 )
-from _session import run_build  # noqa: E402
+from _session import _resident_output_documents, discard_open_documents, run_build  # noqa: E402
+from _stock_recipe import StockRecipeDeclaration  # noqa: E402
 from _buildgraph import ASSEMBLY_ORDER, part_stems  # noqa: E402
 import _config  # noqa: E402
 from _export_feature_faces import FeatureFaceError, name_feature_faces, step_face_sets  # noqa: E402
@@ -1036,10 +1037,11 @@ def threaded_stock_parts(stems: Iterable[str]) -> frozenset[str]:
         if "build_stock_fastener" not in (scripts / f"{name}.py").read_text(encoding="utf-8"):
             continue
         declarations = [
-            getattr(value, "__stock_recipe__", None)
+            value.__stock_recipe__
             for value in vars(importlib.import_module(name)).values()
+            if isinstance(getattr(value, "__stock_recipe__", None), StockRecipeDeclaration)
         ]
-        if any(d is not None and d.threaded for d in declarations):
+        if any(d.threaded for d in declarations):
             threaded.add(stem.replace("_", "-"))
     return frozenset(threaded)
 
@@ -1058,46 +1060,54 @@ def unthread_stock_fasteners(top: Any, threaded: frozenset[str]) -> int:
     subassembly document, so each loaded subassembly document is edited in the
     configuration its parent references."""
     top = _early_bound(top, "IModelDoc2")
-    documents = [("<top>", top, _active_configuration(top))]
-    seen = {str(top.GetPathName()).lower()}
-    for name, component in by_name(_early_bound(top, "IAssemblyDoc").GetComponents(False)):
-        path = str(component.GetPathName())
-        if Path(path).suffix.lower() != ".sldasm" or path.lower() in seen:
-            continue
-        doc = component.GetModelDoc2()
-        if doc is None:
-            raise RuntimeError(f"GLB swap: subassembly {name} is not loaded")
-        seen.add(path.lower())
-        documents.append((name, _early_bound(doc, "IModelDoc2"), str(component.ReferencedConfiguration)))
-    swapped = 0
-    for label, doc, referenced in documents:
-        if _active_configuration(doc) != referenced:
-            raise RuntimeError(f"GLB swap: {label} is not loaded in {referenced!r}")
-        refused: list[str] = []
-        for name, component in by_name(_early_bound(doc, "IAssemblyDoc").GetComponents(True)):
-            current = str(component.ReferencedConfiguration)
-            if _component_part_stem(component) not in threaded or is_simplified(current):
+    with _telemetry.span("export.glb_unthread", asm=str(top.GetTitle())) as sp:
+        assembly = _early_bound(top, "IAssemblyDoc")
+        assembly.ResolveAllLightweightComponents(False)
+        documents = [("<top>", top, _active_configuration(top))]
+        seen = {str(top.GetPathName()).lower()}
+        for name, component in by_name(assembly.GetComponents(False)):
+            path = str(component.GetPathName())
+            if Path(path).suffix.lower() != ".sldasm" or path.lower() in seen:
                 continue
-            component.ReferencedConfiguration = simplified_name(current)
-            if str(component.ReferencedConfiguration) != simplified_name(current):
-                refused.append(f"{name}: {current!r}")
+            if bool(component.IsSuppressed()):
                 continue
-            swapped += 1
-        if refused:
-            raise RuntimeError(f"GLB swap: {label} refused simplified fasteners {refused}")
-        if doc is not top and not bool(doc.EditRebuild3()):
-            raise RuntimeError(f"GLB swap: {label} EditRebuild3 failed")
-    if not bool(top.ForceRebuild3(False)):
-        raise RuntimeError("GLB swap: ForceRebuild3 failed")
-    wrong = [
-        f"{name}: {component.ReferencedConfiguration!r}"
-        for name, component in by_name(_early_bound(top, "IAssemblyDoc").GetComponents(False))
-        if (stem := _component_part_stem(component)) is not None
-        and not bool(component.IsSuppressed())
-        and is_simplified(str(component.ReferencedConfiguration)) != (stem in threaded)
-    ]
-    if wrong:
-        raise RuntimeError(f"GLB swap did not reach exactly the threaded fasteners: {wrong}")
+            doc = component.GetModelDoc2()
+            if doc is None:
+                raise RuntimeError(f"GLB swap: subassembly {name} is not loaded")
+            seen.add(path.lower())
+            documents.append(
+                (name, _early_bound(doc, "IModelDoc2"), str(component.ReferencedConfiguration))
+            )
+        swapped = 0
+        for label, doc, referenced in documents:
+            if _active_configuration(doc) != referenced:
+                raise RuntimeError(f"GLB swap: {label} is not loaded in {referenced!r}")
+            refused: list[str] = []
+            for name, component in by_name(_early_bound(doc, "IAssemblyDoc").GetComponents(True)):
+                current = str(component.ReferencedConfiguration)
+                if _component_part_stem(component) not in threaded or is_simplified(current):
+                    continue
+                component.ReferencedConfiguration = simplified_name(current)
+                if str(component.ReferencedConfiguration) != simplified_name(current):
+                    refused.append(f"{name}: {current!r}")
+                    continue
+                swapped += 1
+            if refused:
+                raise RuntimeError(f"GLB swap: {label} refused simplified fasteners {refused}")
+        # TopOnly=False rebuilds every subassembly document edited above.
+        if not bool(top.ForceRebuild3(False)):
+            raise RuntimeError("GLB swap: ForceRebuild3 failed")
+        wrong = [
+            f"{name}: {component.ReferencedConfiguration!r}"
+            for name, component in by_name(assembly.GetComponents(False))
+            if (stem := _component_part_stem(component)) is not None
+            and not bool(component.IsSuppressed())
+            and is_simplified(str(component.ReferencedConfiguration)) != (stem in threaded)
+        ]
+        if wrong:
+            raise RuntimeError(f"GLB swap did not reach exactly the threaded fasteners: {wrong}")
+        sp.set_attribute("documents", len(documents))
+        sp.set_attribute("swapped", swapped)
     log(f"  GLB: {swapped} threaded stock fastener component(s) unthreaded")
     return swapped
 
@@ -1921,6 +1931,9 @@ def main() -> int:
     for d in (OUT_STL, OUT_STEP, OUT_BOXES, OUT_GLTF):
         d.mkdir(parents=True, exist_ok=True)
 
+    # Pure Python over ~80 builder imports: resolved before the seat is held.
+    threaded = threaded_stock_parts(part_stems()) if stale_asms else frozenset()
+
     async def build(adapter: Any) -> dict[str, str]:
         enforce_preferences(adapter, EXPORT_PREFERENCES)
         done: dict[str, str] = {}
@@ -1935,7 +1948,6 @@ def main() -> int:
         try:
             pending_scenes: dict[str, tuple[list, list, set[tuple[str, str, str]]]] = {}
             all_scene_stems: set[tuple[str, str, str]] = set()
-            threaded = threaded_stock_parts(part_stems()) if stale_asms else frozenset()
             for stem in stale_asms:
                 dashed = stem.replace("_", "-")
                 src = OUT_SLDASM / f"{dashed}.SLDASM"
@@ -1963,15 +1975,16 @@ def main() -> int:
                 if stem in missing_asm_png:
                     await export_build_png(adapter, dashed)
                 # The GLB alone shows threaded stock fasteners unthreaded
-                # (_glb_unthreaded); nothing is saved, so close without saving
-                # and prove no swapped document survives into the next open.
+                # (unthread_stock_fasteners). Nothing is saved: discard the
+                # dirtied documents without a save prompt and prove no cad/out
+                # document survives into the next open.
                 unthread_stock_fasteners(doc, threaded)
                 glb = OUT_GLTF / f"{dashed}.glb"
                 _save_as(doc, glb)
                 log(f"saved {glb.name} ({glb.stat().st_size / 1e6:.1f} MB)")
-                adapter.swApp.CloseAllDocuments(True)
-                if int(adapter.swApp.GetDocumentCount()):
-                    raise RuntimeError(f"{dashed}: documents stayed open after the GLB swap")
+                discard_open_documents(adapter)
+                if left := _resident_output_documents(adapter):
+                    raise RuntimeError(f"{dashed}: {left} stayed open after the GLB swap")
                 done[stem] = "exported"
 
             for stem in sorted(scene_assemblies - set(pending_scenes)):
