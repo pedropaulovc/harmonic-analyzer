@@ -590,11 +590,14 @@ PRINCIPAL_KEEP = {
     # (3.0) read as the callout's first word.  At 0.2255 (r1 of #1685) the
     # two-row callout split the air between that text and the three-line Ø6
     # callout above; the R5 render measured the underline 10.0 mm under the
-    # position, its top 10.1 mm over it and a 5.5 mm row pitch.  The third
-    # row (interference) lowers the underline a row, so the position rises
-    # 4.5 mm: about 2.5 mm of air above the (3.0) and under the Ø6's underline.
+    # position, its top 10.1 mm over it and a 5.5 mm row pitch.  The block
+    # centres on its position, so the third row (interference) adds half a
+    # row at each end: set at 0.2300 its top rose to 242.8, 0.2 mm under the
+    # Ø6's shoulder (layout audit, farm run 20261117T125119461Z).  At 0.2272
+    # it spans about 214.4-240.1: 2.3 mm under that shoulder, 2.6 mm over the
+    # (3.0)'s top.
     "PinStationFromHeadRear": (0.288, 0.207),
-    "PinHoleDia": (PIN_HOLE_CALLOUT_X, 0.2300),
+    "PinHoleDia": (PIN_HOLE_CALLOUT_X, 0.2272),
 }
 # In detail A the neck runs from the fence (x ~0.137 at its edges) to the
 # head rear face (x 0.1545), its Ø10.5 at y 0.2245-0.2455.  Its end-on

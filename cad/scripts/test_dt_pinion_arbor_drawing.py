@@ -1421,9 +1421,10 @@ def test_collar_pin_hole_callout_names_the_press_fit_and_its_interference() -> N
 # (269.1,170.8) -> (280.1,211.9); the station text set at (0.288, 0.207)
 # boxed [274.5,201.4]..[301.7,204.9].
 PC_R10_PIN_CALLOUT_XY = (0.250, 0.222)
-# The two-row callout's underline sat 10.1 mm under its position; the
-# interference row adds the R5 render's 5.5 mm row pitch.
-PIN_CALLOUT_UNDERLINE_FROM_POSITION = -0.0101 - 0.0055
+# The two-row callout's underline sat 10.1 mm under its position; the block
+# centres on its position, so the interference row lowers it half of the R5
+# render's 5.5 mm row pitch.
+PIN_CALLOUT_UNDERLINE_FROM_POSITION = -0.0101 - 0.00275
 PIN_LEADER_START_Y_FROM_AXIS = 0.0008
 STATION_TEXT_BOX_FROM_POSITION = (-0.0135, 0.0137, -0.0056, -0.0021)
 LEADER_TEXT_CLEARANCE = 0.0015
