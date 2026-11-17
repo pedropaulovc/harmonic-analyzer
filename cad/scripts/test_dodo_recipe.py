@@ -2469,11 +2469,9 @@ def vendor_warning_capture(monkeypatch):
             capture_patch.setenv("HARMONIC_VERBOSITY", "warn")
             _telemetry.configure(force=True)
             logs = InMemoryLogRecordExporter()
-            processor = SimpleLogRecordProcessor(logs)
-            get_logger_provider().add_log_record_processor(processor)
-            # Task-stage logger providers share these processors, as in test_telemetry.
-            _telemetry._log_processors.append(processor)
-            _telemetry._aux_logger_providers.clear()
+            get_logger_provider().add_log_record_processor(
+                SimpleLogRecordProcessor(logs)
+            )
             yield logs
     finally:
         _telemetry.configure(force=True)

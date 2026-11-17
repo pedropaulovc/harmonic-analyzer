@@ -34,7 +34,7 @@ from opentelemetry.sdk._logs.export import (
     SimpleLogRecordProcessor,
 )
 from opentelemetry.sdk.trace import TracerProvider as SdkTracerProvider
-from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export import BatchSpanProcessor, SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.sdk.trace.sampling import ALWAYS_OFF
 from opentelemetry.trace import NonRecordingSpan
@@ -109,37 +109,22 @@ def deterministic_otlp_environment(monkeypatch):
 def capture():
     """Attach in-memory exporters to the spine's live providers.
 
-    The providers are the process-global ones installed at import (OTel forbids
-    replacing a set provider, so we add to the same ones the handlers emit to);
-    each test reads a fresh exporter, so it only sees its own records.
+    A processor added to the global provider is added to the one processor set
+    every provider of this process shares, so spans and records routed to another
+    resource (build-infra, a relabelled stage) are captured too. The autouse
+    reconfigure above retires it after the test.
     """
     _telemetry.configure()
 
     spans = InMemorySpanExporter()
-    processor = SimpleSpanProcessor(spans)
     cast(SdkTracerProvider, _telemetry.trace.get_tracer_provider()).add_span_processor(
-        processor
+        SimpleSpanProcessor(spans)
     )
-    # Auxiliary per-resource providers (build-infra) are built lazily from
-    # ``_span_processors``, so register there too -- and drop any already built -- or
-    # a test would see nothing from spans emitted under another resource.
-    _telemetry._span_processors.append(processor)
-    _telemetry._aux_providers.clear()
-
     logs = InMemoryLogRecordExporter()
-    log_processor = SimpleLogRecordProcessor(logs)
     cast(SdkLoggerProvider, get_logger_provider()).add_log_record_processor(
-        log_processor
+        SimpleLogRecordProcessor(logs)
     )
-    # Likewise for the per-resource logger providers a routed record lands on.
-    _telemetry._log_processors.append(log_processor)
-    _telemetry._aux_logger_providers.clear()
     yield spans, logs
-
-    _telemetry._span_processors.remove(processor)
-    _telemetry._aux_providers.clear()
-    _telemetry._log_processors.remove(log_processor)
-    _telemetry._aux_logger_providers.clear()
 
 
 def test_logs_split_into_severity_levels(capture):
@@ -172,13 +157,13 @@ def test_console_verbosity_configures_handler_and_spans(monkeypatch):
     _telemetry.configure(force=True)
     (handler,) = console_handlers()
     assert handler.level == logging.WARNING
-    assert _telemetry._span_processors == []
+    assert _telemetry._span_processors == ()
 
     monkeypatch.setenv("HARMONIC_VERBOSITY", "success")
     _telemetry.configure(force=True)
     (handler,) = console_handlers()
     assert handler.level == _telemetry.SUCCESS
-    assert _telemetry._span_processors == []
+    assert _telemetry._span_processors == ()
 
 
 def test_span_records_exception_and_sets_error_status(capture):
@@ -1267,8 +1252,10 @@ def test_export_save_as_is_visible_during_long_com_call(capture, tmp_path):
 
 def test_set_service_relabels_resource_fallback_only():
     """``set_service`` swaps this process's resource ``service.name`` (the Aspire
-    "resource" column) -- fallback-only by default (won't clobber a non-default
-    label), overridable with force -- and stamps the shared namespace."""
+    "resource" column) for its spans AND log records -- fallback-only by default
+    (won't clobber a non-default label), overridable with force -- and stamps the
+    shared namespace. The relabelled records still ride the batched exporters that
+    ``shutdown()`` flushes."""
     original = _telemetry._service_name
     try:
         # Hermetic precondition: force back to the default label first, so the
@@ -1281,16 +1268,33 @@ def test_set_service_relabels_resource_fallback_only():
         # default -> stage: fallback takes effect and the LIVE resource swaps.
         _telemetry.set_service("assembly-build")
         exp = InMemorySpanExporter()
-        cast(
-            SdkTracerProvider, _telemetry.trace.get_tracer_provider()
-        ).add_span_processor(SimpleSpanProcessor(exp))
+        batched = InMemorySpanExporter()
+        logs = InMemoryLogRecordExporter()
+        provider = cast(SdkTracerProvider, _telemetry.trace.get_tracer_provider())
+        provider.add_span_processor(SimpleSpanProcessor(exp))
+        # Like the OTLP processor: nothing leaves the queue before shutdown().
+        provider.add_span_processor(
+            BatchSpanProcessor(batched, schedule_delay_millis=600_000)
+        )
+        cast(SdkLoggerProvider, get_logger_provider()).add_log_record_processor(
+            SimpleLogRecordProcessor(logs)
+        )
         with _telemetry.span("op"):
-            pass
+            _telemetry.info("relabelled line")
         (sp,) = [s for s in exp.get_finished_spans() if s.name == "op"]
         assert sp.resource.attributes["service.name"] == "assembly-build"
         assert (
             sp.resource.attributes["service.namespace"] == _telemetry._SERVICE_NAMESPACE
         )
+        (rec,) = [
+            r
+            for r in logs.get_finished_logs()
+            if r.log_record.body == "relabelled line"
+        ]
+        assert rec.resource.attributes["service.name"] == "assembly-build"
+        assert not batched.get_finished_spans()
+        _telemetry.shutdown()
+        assert [s.name for s in batched.get_finished_spans()] == ["op"]
         # fallback-only: a non-forced call does NOT override an already-set label.
         _telemetry.set_service("part-build")
         assert _telemetry._service_name == "assembly-build"

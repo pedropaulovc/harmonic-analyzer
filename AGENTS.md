@@ -1587,8 +1587,9 @@ changes. `cad/out/` is gitignored.
 ## Observability — OpenTelemetry (do not `print`)
 
 The pipeline is instrumented with **OpenTelemetry**, not `print()`. `cad/scripts/
-_telemetry.py` is the spine; it is **preconfigured on import** (console logging +
-tracing, zero env, no collector) and wrapped by `_check`, so the ~170
+_telemetry.py` is the spine; it **configures itself on first use** (the first log,
+span or `inject_env`; importing it has no side effects) with console logging +
+tracing, zero env, no collector, and is wrapped by `_check`, so the ~170
 scripts that `from _check import log, check` are instrumented unchanged.
 
 - **Log, don't print.** Use the severity helpers — `_telemetry.debug` (`..`),
@@ -1659,9 +1660,11 @@ scripts that `from _check import log, check` are instrumented unchanged.
   `OTEL_SERVICE_NAME` (the standard OTel var, from `_stage_name`) into each
   subprocess env, so the child is labelled the moment it imports `_telemetry`; a
   standalone script self-labels via `_telemetry.set_service(...)` (fallback-only —
-  it never clobbers an inherited label; `force=True` overrides; it rebuilds the
-  providers, resetting OTel's one-shot provider guard, since the resource is fixed
-  at provider creation). Add a new stage to `_stage_name` when a new task family
+  it never clobbers an inherited label; `force=True` overrides). The resource is
+  fixed at provider creation, so a relabel just routes the process's later spans
+  and logs to the provider for the new resource (`_provider_for_service`); the OTel
+  global provider pair is installed once and never replaced. Add a new stage to
+  `_stage_name` when a new task family
   appears. The doit PARENT's `task <label>` span uses `_stage_name` too (via
   `service=` on `_telemetry.span`), so a task and the subprocess it spawns share one
   resource — `task part:dt_cone_gear` reads `part-build`, `task assembly:pn_pen` reads
@@ -1677,16 +1680,16 @@ scripts that `from _check import log, check` are instrumented unchanged.
       every span now names either the stage doing the work or the infrastructure
       serving it. A resource is fixed per
       provider, so this is a SECOND `TracerProvider` in the same process
-      (`_provider_for_service`), sharing the primary's span processors — one console
-      stream, one `traces.jsonl`, one OTLP exporter. Pass `service=` to
+      (`_provider_for_service`); every provider emits through ONE shared
+      processor set — one console stream, one `traces.jsonl`, one OTLP exporter.
+      Pass `service=` to
       `_telemetry.span` to put a span there; it changes only the resource, never the
-      parent/child shape. (Aux providers are built with `shutdown_on_exit=False` and
-      skipped by `shutdown()`: they don't own their processors, and double-shutting
-      them just re-closes every exporter.)
+      parent/child shape. (No provider has an exit hook: `shutdown()` closes the
+      shared processors directly, and `configure` registers it at exit once.)
       Logs follow their span: the logging bridge (`_ResourceRoutedLoggingHandler`)
       files a record under the resource of the span it is written under (a
       `[cache]` line inside `cache.probe` lands on `build-infra`, beside its span),
-      through per-resource `LoggerProvider`s sharing the primary's log processors.
+      through per-resource `LoggerProvider`s sharing the same log processors.
       A line written after its span closed names its resource explicitly:
       `_telemetry.info(..., service=_telemetry.BUILD_INFRA_SERVICE)`.
       The cache's own phases are child spans of `cache.probe`/`cache.store` on the

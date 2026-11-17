@@ -135,18 +135,15 @@ def _seat_age(monkeypatch, seconds: float | None) -> None:
 
 
 @pytest.fixture
-def spans():
+def spans(monkeypatch):
     _telemetry.configure()
+    # The test's exporter is the only processor; teardown restores the real set.
+    monkeypatch.setattr(_telemetry, "_span_processors", ())
     exporter = InMemorySpanExporter()
-    processor = SimpleSpanProcessor(exporter)
     cast(SdkTracerProvider, _telemetry.trace.get_tracer_provider()).add_span_processor(
-        processor
+        SimpleSpanProcessor(exporter)
     )
-    _telemetry._span_processors.append(processor)
-    _telemetry._aux_providers.clear()
     yield exporter
-    _telemetry._span_processors.remove(processor)
-    _telemetry._aux_providers.clear()
 
 
 def _gate_span(exporter: InMemorySpanExporter):

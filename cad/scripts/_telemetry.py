@@ -5,7 +5,8 @@ to thread through every build script (``  OK  `` / ``  ..  `` / ``  -- `` /
 ``  !! WARN`` / ``FAIL``) with structured OpenTelemetry signals, while keeping
 the console output just as readable as before.
 
-What you get, **preconfigured on import** (zero env, no collector):
+What you get, **configured on first use** -- the first log, span or
+:func:`inject_env`; importing the module has no side effects (zero env, no collector):
 
 * **Console logging, split by severity.** A human-friendly stream handler prints
   one line per log record to stderr, the severity rendered as the old glyph
@@ -31,6 +32,7 @@ instrumented without touching their call sites.
 
 from __future__ import annotations
 
+import atexit
 import contextlib
 import contextvars
 import functools
@@ -49,16 +51,16 @@ from typing import IO, Any, cast
 
 from opentelemetry import context as otel_context
 from opentelemetry import trace
-from opentelemetry._logs import get_logger_provider, set_logger_provider
+from opentelemetry._logs import set_logger_provider
 from opentelemetry.propagate import extract, inject
-from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
+from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler, LogRecordProcessor
 from opentelemetry.sdk._logs.export import (
     BatchLogRecordProcessor,
     ConsoleLogRecordExporter,
     SimpleLogRecordProcessor,
 )
 from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
+from opentelemetry.sdk.trace import ReadableSpan, SpanProcessor, TracerProvider
 from opentelemetry.sdk.trace.export import (
     BatchSpanProcessor,
     ConsoleSpanExporter,
@@ -434,15 +436,23 @@ _depth: contextvars.ContextVar[int] = contextvars.ContextVar(
 )
 
 _configured = False
-# Span processors of the CURRENT configuration, shared with every auxiliary provider
-# (one per extra resource this process emits under) so they all land on the same
-# console stream / traces.jsonl / OTLP exporter instead of duplicating handles.
-_span_processors: list[Any] = []
+# The processors of the CURRENT configuration: ONE set per process, which every
+# provider below emits through (:class:`_SharedSpanProcessors` /
+# :class:`_SharedLogProcessors`), so every resource lands on the same console
+# stream / traces.jsonl / logs.jsonl / OTLP exporter instead of duplicating handles,
+# and a forced reconfigure that replaces them reaches every provider at once.
+# Immutable, replaced on add, like the SDK's own multi-processors.
+_span_processors: tuple[Any, ...] = ()
+_log_processors: tuple[Any, ...] = ()
+# The OTel global provider pair, installed ONCE (OTel refuses to replace a set
+# provider, and nothing needs it replaced).
+_tracer_provider: TracerProvider | None = None
+_logger_provider: LoggerProvider | None = None
+# One provider per ``service.name`` this process emits under -- its stage (the
+# global pair above), a :func:`set_service` relabel, ``build-infra`` -- since a
+# resource is fixed at provider creation. A log record belongs to the resource of
+# the span it is written under (see :class:`_ResourceRoutedLoggingHandler`).
 _aux_providers: dict[str, Any] = {}
-# The log side of the same arrangement: a log record belongs to the resource of
-# the span it is written under (see :class:`_ResourceRoutedLoggingHandler`), so
-# each extra resource also gets a ``LoggerProvider`` sharing these processors.
-_log_processors: list[Any] = []
 _aux_logger_providers: dict[str, Any] = {}
 # LogRecord attribute naming an explicit resource for a record written OUTSIDE any
 # span of that resource (``info(..., service=...)``); consumed by the routing
@@ -923,35 +933,93 @@ def _otlp_log_processor(*, pending_warnings: list[str] | None = None):
         return None
 
 
+class _SharedSpanProcessors(SpanProcessor):
+    """Every provider's active span processor: forwards to :data:`_span_processors`.
+
+    A provider's resource is fixed but its processors are this one indirection, so
+    a relabelled process, ``build-infra`` and the global provider all ride the same
+    exporters, and a forced reconfigure reaches every one of them without
+    replacing a provider. ``add_span_processor`` on any provider registers with
+    all of them."""
+
+    def add_span_processor(self, span_processor: SpanProcessor) -> None:
+        global _span_processors
+        _span_processors = (*_span_processors, span_processor)
+
+    def on_start(self, span: Any, parent_context: Any = None) -> None:
+        for processor in _span_processors:
+            processor.on_start(span, parent_context=parent_context)
+
+    def on_end(self, span: ReadableSpan) -> None:
+        for processor in _span_processors:
+            processor.on_end(span)
+
+    def shutdown(self) -> None:
+        for processor in _span_processors:
+            processor.shutdown()
+
+    def force_flush(self, timeout_millis: int = 30000) -> bool:
+        return all(p.force_flush(timeout_millis) for p in _span_processors)
+
+
+class _SharedLogProcessors(LogRecordProcessor):
+    """The log counterpart of :class:`_SharedSpanProcessors`, over
+    :data:`_log_processors`."""
+
+    def add_log_record_processor(
+        self, log_record_processor: LogRecordProcessor
+    ) -> None:
+        global _log_processors
+        _log_processors = (*_log_processors, log_record_processor)
+
+    def on_emit(self, log_record: Any) -> None:
+        for processor in _log_processors:
+            processor.on_emit(log_record)
+
+    def shutdown(self) -> None:
+        for processor in _log_processors:
+            processor.shutdown()
+
+    def force_flush(self, timeout_millis: int = 30000) -> bool:
+        return all(p.force_flush(timeout_millis) for p in _log_processors)
+
+
+def _new_tracer_provider(service: str) -> TracerProvider:
+    """A ``TracerProvider`` whose resource names ``service``, emitting through the
+    shared processors. None registers an exit hook: :func:`configure` registers
+    :func:`shutdown` once instead, which outlives any later reconfigure."""
+    return TracerProvider(
+        resource=Resource.create(_resource_attributes(service)),
+        shutdown_on_exit=False,
+        # Typed as the SDK's own multi-processor; ours keeps the same contract.
+        active_span_processor=cast(Any, _SharedSpanProcessors()),
+    )
+
+
+def _new_logger_provider(service: str) -> LoggerProvider:
+    """The ``LoggerProvider`` counterpart of :func:`_new_tracer_provider`."""
+    return LoggerProvider(
+        resource=Resource.create(_resource_attributes(service)),
+        shutdown_on_exit=False,
+        multi_log_record_processor=cast(Any, _SharedLogProcessors()),
+    )
+
+
 def configure(*, console: bool = True, force: bool = False) -> None:
-    """Wire up the trace + log providers. Idempotent; safe to call from import.
+    """Wire up the trace + log providers. Idempotent; every public entry point that
+    emits calls it, so the first log, span or :func:`inject_env` configures.
 
     ``console`` toggles the human-readable stderr stream (and the compact span
     tracer). File capture under ``cad/out/reports/telemetry`` is always attempted
-    (best-effort).
+    (best-effort). ``force`` re-reads the environment (verbosity, OTLP endpoints)
+    and replaces the shared processors, shutting the previous ones down; the
+    installed providers, and their resources, stay.
     """
-    global _configured
+    global _configured, _span_processors, _log_processors
+    global _tracer_provider, _logger_provider
     if _configured and not force:
         return
     _configured = True
-
-    if force:
-        # OTel installs the global trace/log providers behind a one-shot ``Once``
-        # guard: a second ``set_*_provider`` merely warns ("Overriding ... not
-        # allowed") and keeps the FIRST provider. A forced reconfigure exists to
-        # SWAP the resource (``set_service`` relabelling this process's stage after
-        # import), so reset those guards or the rebuilt providers would be installed
-        # nowhere and the relabel would silently no-op. Private-API + best-effort: if
-        # OTel's internals move we simply keep the existing resource (telemetry must
-        # never break a build), and the primary path -- dodo setting OTEL_SERVICE_NAME
-        # in the child env BEFORE import, so the FIRST configure is already correct --
-        # never needs this at all.
-        with contextlib.suppress(Exception):
-            trace._TRACER_PROVIDER_SET_ONCE._done = False  # type: ignore[attr-defined]
-        with contextlib.suppress(Exception):
-            from opentelemetry._logs import _internal as _logs_internal
-
-            _logs_internal._LOGGER_PROVIDER_SET_ONCE._done = False  # type: ignore[attr-defined]
 
     want_console = console
     console_level = _console_level()
@@ -981,19 +1049,13 @@ def configure(*, console: bool = True, force: bool = False) -> None:
         ]
         os.environ[f"OTEL_EXPORTER_OTLP_{signal.upper()}_PROTOCOL"] = protocol
 
-    resource = Resource.create(_resource_attributes(_service_name))
-
     # ---- traces -------------------------------------------------------- #
-    # Built ONCE and kept, because the build-infra provider (a second resource in this
-    # same process) reuses these exact processor objects rather than opening its own
-    # console stream and traces.jsonl handle.
-    global _span_processors
-    _span_processors = []
+    span_processors: list[Any] = []
     # Span boundaries are deliberately debug-only: spans have no severity field,
     # so warning-and-above console modes suppress the whole compact trace tree
     # while structured span capture remains complete.
     if want_console and console_level <= logging.DEBUG:
-        _span_processors.append(
+        span_processors.append(
             SimpleSpanProcessor(
                 ConsoleSpanExporter(
                     # _LiveStderr is a write/flush proxy (duck-typed IO) that
@@ -1007,7 +1069,7 @@ def configure(*, console: bool = True, force: bool = False) -> None:
     if tdir is not None:
         with contextlib.suppress(Exception):
             traces = _jsonl_stream(tdir / "traces.jsonl")
-            _span_processors.append(
+            span_processors.append(
                 SimpleSpanProcessor(
                     _JsonlSpanExporter(
                         out=traces, formatter=lambda s: s.to_json(indent=None) + "\n"
@@ -1017,26 +1079,14 @@ def configure(*, console: bool = True, force: bool = False) -> None:
     if otlp_endpoints["traces"]:
         processor = _otlp_span_processor(pending_warnings=pending_otlp_warnings)
         if processor is not None:
-            _span_processors.append(processor)
-
-    tracer_provider = TracerProvider(resource=resource)
-    for processor in _span_processors:
-        tracer_provider.add_span_processor(processor)
-    trace.set_tracer_provider(tracer_provider)
-    # A relabelled process must not keep serving spans from providers built on the OLD
-    # resource, so the auxiliary ones are rebuilt lazily against the new processors.
-    _aux_providers.clear()
+            span_processors.append(processor)
 
     # ---- logs ---------------------------------------------------------- #
-    # Kept, like the span processors, so the per-resource logger providers of
-    # :func:`_logger_provider_for_service` share this one logs.jsonl handle and
-    # OTLP exporter.
-    global _log_processors
-    _log_processors = []
+    log_processors: list[Any] = []
     if tdir is not None:
         with contextlib.suppress(Exception):
             logs = _jsonl_stream(tdir / "logs.jsonl")
-            _log_processors.append(
+            log_processors.append(
                 SimpleLogRecordProcessor(
                     _JsonlLogRecordExporter(
                         out=logs, formatter=lambda r: r.to_json(indent=None) + "\n"
@@ -1046,12 +1096,20 @@ def configure(*, console: bool = True, force: bool = False) -> None:
     if otlp_endpoints["logs"]:
         processor = _otlp_log_processor(pending_warnings=pending_otlp_warnings)
         if processor is not None:
-            _log_processors.append(processor)
-    logger_provider = LoggerProvider(resource=resource)
-    for processor in _log_processors:
-        logger_provider.add_log_record_processor(processor)
-    set_logger_provider(logger_provider)
-    _aux_logger_providers.clear()
+            log_processors.append(processor)
+
+    # Every provider emits through these, so swapping them reconfigures them all;
+    # the previous set is flushed and closed, since nothing references it now.
+    shutdown()
+    _span_processors, _log_processors = tuple(span_processors), tuple(log_processors)
+    if _tracer_provider is None:
+        _tracer_provider = _new_tracer_provider(_service_name)
+        _logger_provider = _new_logger_provider(_service_name)
+        _aux_providers[_service_name] = _tracer_provider
+        _aux_logger_providers[_service_name] = _logger_provider
+        trace.set_tracer_provider(_tracer_provider)
+        set_logger_provider(_logger_provider)
+        atexit.register(shutdown)
 
     pylog = logging.getLogger(_LOGGER_NAME)
     pylog.setLevel(logging.DEBUG)
@@ -1063,7 +1121,9 @@ def configure(*, console: bool = True, force: bool = False) -> None:
     # trace/span id onto every record, so logs and traces correlate -- and files
     # each record under the resource of that span.
     pylog.addHandler(
-        _ResourceRoutedLoggingHandler(level=logging.DEBUG, logger_provider=logger_provider)
+        _ResourceRoutedLoggingHandler(
+            level=logging.DEBUG, logger_provider=_logger_provider
+        )
     )
     if want_console:
         stream = logging.StreamHandler(stream=_LiveStderr())
@@ -1151,44 +1211,28 @@ def get_logger() -> logging.Logger:
 
 
 def _provider_for_service(service: str):
-    """A ``TracerProvider`` whose resource names ``service``, built lazily and cached.
+    """The ``TracerProvider`` whose resource names ``service``, built lazily and cached.
 
-    An OTel resource is fixed at provider creation, so a process that wants to emit
-    some spans under a DIFFERENT ``service.name`` than its own stage needs a second
-    provider -- there is no per-span resource. It shares this process's span
-    processors (:data:`_span_processors`), so its spans ride the same console stream,
+    An OTel resource is fixed at provider creation and there is no per-span
+    resource, so each ``service.name`` this process emits under -- its own stage,
+    a stage relabelled by :func:`set_service`, ``build-infra`` -- gets a provider
+    of its own. All of them emit through the shared processors (see
+    :class:`_SharedSpanProcessors`), so their spans ride the same console stream,
     ``traces.jsonl`` and OTLP exporter; only the resource differs. Context
     propagation is provider-independent, so a span from here still parents/nests
     exactly as usual."""
     configure()
     provider = _aux_providers.get(service)
     if provider is None:
-        provider = TracerProvider(
-            # No atexit hook: this provider does not OWN its processors (they are the
-            # primary provider's), and letting it shut them down at exit would re-close
-            # every exporter -- one "Exporter already shutdown" per extra resource.
-            shutdown_on_exit=False,
-            resource=Resource.create(_resource_attributes(service)),
-        )
-        for processor in _span_processors:
-            provider.add_span_processor(processor)
-        _aux_providers[service] = provider
+        provider = _aux_providers[service] = _new_tracer_provider(service)
     return provider
 
 
 def _logger_provider_for_service(service: str):
-    """The ``LoggerProvider`` counterpart of :func:`_provider_for_service`: a
-    resource naming ``service``, sharing :data:`_log_processors`, built lazily."""
+    """The ``LoggerProvider`` counterpart of :func:`_provider_for_service`."""
     provider = _aux_logger_providers.get(service)
     if provider is None:
-        provider = LoggerProvider(
-            # Not the owner of the shared processors; see _provider_for_service.
-            shutdown_on_exit=False,
-            resource=Resource.create(_resource_attributes(service)),
-        )
-        for processor in _log_processors:
-            provider.add_log_record_processor(processor)
-        _aux_logger_providers[service] = provider
+        provider = _aux_logger_providers[service] = _new_logger_provider(service)
     return provider
 
 
@@ -1213,35 +1257,29 @@ class _ResourceRoutedLoggingHandler(LoggingHandler):
             resource = getattr(trace.get_current_span(), "resource", None)
             if resource is not None:
                 service = resource.attributes.get("service.name")
-        if not service or service == _service_name:
-            super().emit(record)
-            return
-        provider = _logger_provider_for_service(str(service))
+        provider = _logger_provider_for_service(str(service or _service_name))
         provider.get_logger(record.name).emit(self._translate(record))
 
 
 def get_tracer(name: str = _SERVICE_NAME, *, service: str | None = None):
     """Tracer for this process's own resource, or for ``service`` (see
     :func:`_provider_for_service`) when spans must be attributed elsewhere."""
-    configure()
-    if service is None or service == _service_name:
-        return trace.get_tracer(name)
-    return _provider_for_service(service).get_tracer(name)
+    return _provider_for_service(service or _service_name).get_tracer(name)
 
 
 def set_service(name: str, *, force: bool = False) -> None:
     """Relabel this process's telemetry resource (``service.name``) to ``name``.
 
-    The OTel ``Resource`` is fixed when the providers are created, so changing the
-    service name REBUILDS them (``configure(force=True)``). Call it BEFORE the first
-    span so every span in the process carries the new resource.
+    Every later span and log record of this process's own is served by the
+    provider of the new resource (:func:`_provider_for_service`), and children
+    inherit the label through ``OTEL_SERVICE_NAME``. Call it BEFORE the first span
+    so every span in the process carries the new resource.
 
     FALLBACK-ONLY by default: it does nothing once the process already carries a
     NON-default label -- so a child that inherited a precise ``OTEL_SERVICE_NAME``
     from dodo (``_stage_name``) keeps it, and a coarse self-derived fallback from
     ``run_build`` never clobbers it. Pass ``force=True`` to relabel unconditionally.
-    No-op when ``name`` is empty or already active. Best-effort: a reconfigure
-    failure never propagates (telemetry must not break a build)."""
+    No-op when ``name`` is empty or already active."""
     global _service_name
     if not name or name == _service_name:
         return
@@ -1249,8 +1287,6 @@ def set_service(name: str, *, force: bool = False) -> None:
         return
     _service_name = name
     os.environ["OTEL_SERVICE_NAME"] = name
-    with contextlib.suppress(Exception):
-        configure(force=True)
 
 
 # --------------------------------------------------------------------------- #
@@ -1877,6 +1913,9 @@ def inject_env(env: Mapping[str, str] | None = None) -> dict[str, str]:
     own spawn + import cost to the trace (:func:`record_process_startup`) instead of
     leaving a dark gap before its first span. Stamped HERE, the one chokepoint every
     subprocess launch already goes through, so a new launcher gets it for free."""
+    # Configure first: it pins the resolved OTLP endpoints into os.environ, so the
+    # child inherits that decision instead of probing the collector again.
+    configure()
     out = dict(env if env is not None else os.environ)
     out[SPAWN_ENV] = str(time.time_ns())
     with contextlib.suppress(Exception):
@@ -1931,25 +1970,20 @@ def run_pipeline_span(stage: str, /, **attributes: Any) -> Generator[Span, None,
 
 
 def shutdown() -> None:
-    """Flush + close providers (force-flush exporters). Best-effort.
+    """Flush + close the shared processors (force-flush exporters). Best-effort.
 
     Covers BOTH signals: OTLP export is batched (see the block above
     :func:`_otlp_span_processor`), so anything still queued -- spans AND log records
     -- is only delivered because this runs. It is the reason the batch trade is safe:
-    ``_session.run_build`` calls this after the build session closes, and the watchdog
-    calls it before ``os._exit``.
-
-    The auxiliary per-resource providers (build-infra) are deliberately NOT shut down:
-    they hold the primary provider's processors, not their own, so this one call
-    already closes every exporter -- and shutting them down too would just re-close
-    each exporter and log "Exporter already shutdown" for every extra resource."""
-    with contextlib.suppress(Exception):
-        trace.get_tracer_provider().shutdown()  # type: ignore[attr-defined]
-    with contextlib.suppress(Exception):
-        get_logger_provider().shutdown()  # type: ignore[attr-defined]
-
-
-# Preconfigure on import: a script that merely ``import _telemetry`` (directly
-# or transitively through ``_check``) gets console logging + tracing with no
-# setup call. Mirrors "preconfigure console logging".
-configure()
+    ``_session.run_build`` calls this after the build session closes, the watchdog
+    calls it before ``os._exit``, and :func:`configure` registers it at exit. Every
+    provider emits through these processors, so no provider needs shutting down;
+    they are retired, so a later record goes nowhere instead of into a closed
+    exporter, and the exit hook never closes them twice. A process that never
+    configured has nothing to flush."""
+    global _span_processors, _log_processors
+    retired = (*_span_processors, *_log_processors)
+    _span_processors = _log_processors = ()
+    for processor in retired:
+        with contextlib.suppress(Exception):
+            processor.shutdown()
