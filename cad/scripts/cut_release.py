@@ -1046,8 +1046,9 @@ cite** -- never to the project's own artefacts:
 
 def stage_readout_procedure(stage: Path, tag: str) -> list[str]:
     """Write the operating/readout procedure (error_budget.readout_procedure)
-    into the bundle root as ``READOUT.md``, the master build sequence and
-    assembly tool list (ha_assembly_package) as ``ASSEMBLY.md``, plus the
+    into the bundle root as ``READOUT.md``, the master build sequence, the
+    packages' fit-up steps and the assembly tool list (ha_assembly_package)
+    as ``ASSEMBLY.md``, plus the
     repository ``LICENSE``,
     ``NOTICE`` (what is MIT, and the permitted use of each third-party source the
     staged pages quote) and ``operating_docs()`` under

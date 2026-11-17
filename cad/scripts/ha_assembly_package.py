@@ -582,7 +582,8 @@ def markdown() -> str:
     lines += [
         "## Assembly tools, gauges and consumables",
         "",
-        "Every tool the assembly sheets name, reconciled with cad/process/shop.toml "
+        "Every tool the assembly sheets or the fit-up steps above name (Named on: "
+        "the package whose sheets or steps name it), reconciled with cad/process/shop.toml "
         "and cad/config/shop-equipment.toml. OWNED: its shop record says so. "
         "TO BUY: its record has `present = false`. TO MAKE: a drawn shop tool, "
         "made in the step that names it, or its record says `shop_made`. Drills, "
