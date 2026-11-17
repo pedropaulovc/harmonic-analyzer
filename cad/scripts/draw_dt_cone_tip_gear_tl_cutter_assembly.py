@@ -3,10 +3,10 @@ r"""Create the T006 fly cutter's fitter sheets (MHA-DT-37-TL-00).
 Issue #2358: the bar (item 1, MHA-DT-37-TL-02), the DT6-FORM1 bit (item 2,
 MHA-DT-37-TL-01) and the bought set screw (item 3, MHA-SH-VN-54) as set up.
 Sheet 1: the front view (the bit's face toward the viewer, so the face leads
-with the spindle in forward) with items 1 and 2 ballooned and the stick-out
-and swing radius as references, the assembly's own settings dimensions
-(its hidden CutterSettingsReference sketch); the bottom view (the cutting
-end, end-on) with item 3 ballooned; the shaded isometric; the BOM; the
+with the spindle in forward) with items 1 and 2 ballooned, the stick-out as
+its window and the swing radius as a reference, the assembly's own settings
+dimensions (its hidden CutterSettingsReference sketch); the bottom view (the
+cutting end, end-on) with item 3 ballooned; the shaded isometric; the BOM; the
 fitting steps.  Sheet 2: the exploded front view (rule 22), one view per
 item, item 2 drawn out along item 1's cross hole and item 3 down out of its
 cutting end, each labelled.  Poses, the settings, the stick-out window and
@@ -60,6 +60,7 @@ from _drawing_view_configuration import (
     assert_full_detail_view,
 )
 from _drawing_view_display import set_hidden_lines_removed
+from _limit_tolerance import SW_TOL_LIMIT
 from _machinist_review_mode import MachinistReviewMode
 from _session import run_build
 from solidworks_mcp.adapters.com_variant import double_array
@@ -409,7 +410,9 @@ def _settings(adapter: Any, view: Any) -> None:
     """The stick-out and swing radius: the assembly's own settings dimensions
     (``CutterSettingsReference``, build_dt_cone_tip_gear_tl_cutter_assembly),
     shown in ``view``, imported at their text points, proved against the
-    spec at the assembly-authored places, parenthesized, named above.
+    spec at the assembly-authored places, named above.  The stick-out is the
+    fitter's setting and prints its assembly-authored LIMIT pair (the window);
+    the swing radius is parenthesized as a reference.
 
     Two drawing-authored dimensions to the bit's tip failed on the farm
     because the tip is equation-curve topology (no circular root arc, run
@@ -436,18 +439,41 @@ def _settings(adapter: Any, view: Any) -> None:
     )
     for annotation in annotations:
         name = dimension_name(adapter, annotation)
-        display = _early_bound(
-            set_reference_dimension(adapter, annotation, label=f"{label} {name}"),
-            "IDisplayDimension",
-        )
-        measured = 1000.0 * abs(
-            float(_early_bound(display.GetDimension2(0), "IDimension").SystemValue)
-        )
+        if name == fixture.STICK_OUT_DIMENSION:
+            display = _early_bound(
+                _early_bound(annotation, "IAnnotation").GetSpecificAnnotation(),
+                "IDisplayDimension",
+            )
+        else:
+            display = _early_bound(
+                set_reference_dimension(adapter, annotation, label=f"{label} {name}"),
+                "IDisplayDimension",
+            )
+        dimension = _early_bound(display.GetDimension2(0), "IDimension")
+        measured = 1000.0 * abs(float(dimension.SystemValue))
         if abs(measured - SETTINGS_EXPECTED_MM[name]) > 1e-4:
             raise RuntimeError(
                 f"{label} {name} reads {measured:.4f} mm, "
                 f"expected {SETTINGS_EXPECTED_MM[name]:.4f}"
             )
+        if name == fixture.STICK_OUT_DIMENSION:
+            _assert_stick_out_limits(dimension, label=f"{label} {name}")
+
+
+def _assert_stick_out_limits(dimension: Any, *, label: str) -> None:
+    """The imported stick-out reads the assembly's LIMIT pair: the window."""
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    if int(tolerance.Type) != SW_TOL_LIMIT:
+        raise RuntimeError(f"{label} reads tolerance type {int(tolerance.Type)}")
+    nominal = fixture.STICK_OUT
+    observed = (
+        nominal + float(tolerance.GetMinValue()) * 1000.0,
+        nominal + float(tolerance.GetMaxValue()) * 1000.0,
+    )
+    if any(abs(o - e) > 1e-6 for o, e in zip(observed, fixture.STICK_OUT_WINDOW)):
+        raise RuntimeError(
+            f"{label} limits read {observed} mm, expected {fixture.STICK_OUT_WINDOW}"
+        )
 
 
 def _place_sheet(adapter: Any) -> Any:

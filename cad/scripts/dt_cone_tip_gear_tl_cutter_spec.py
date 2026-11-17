@@ -15,8 +15,10 @@ bit's shank.
 
 The setting the fitter makes is the stick-out, the tip's reach beyond the
 bar's surface; the swing radius is the tip's radius about the bar axis.
-Neither changes the tooth space (the face form makes it at any radius); both
-are references, and the stick-out window is what the fixture's proofs need.
+Neither changes the tooth space (the face form makes it at any radius).  The
+stick-out prints as its window, the limits the fixture's proofs need, read
+with a caliper (rule 22: a setting prints on a view as its native
+dimension); the swing radius is a reference.
 """
 
 from __future__ import annotations
@@ -44,11 +46,12 @@ QUANTITIES = {BAR: 1, BIT: 1, SET_SCREW: 1}
 STICK_OUT = 2.54  # .100 nominal: P1 beyond the bar's surface
 STICK_OUT_WINDOW = (2.032, 3.048)  # .080-.120, read with a caliper
 SWING_RADIUS = bar.BAR_RADIUS + STICK_OUT
-# Both print as references: the assembly's own model dimensions on its hidden
-# settings sketch (build_dt_cone_tip_gear_tl_cutter_assembly), one
-# construction chain along the bit's axis at the cross-hole station from the
-# bar's axis through the bar's surface to P1.  Neither depends on how the
-# bit's form edges are built.
+# Both are the assembly's own model dimensions on its hidden settings sketch
+# (build_dt_cone_tip_gear_tl_cutter_assembly), one construction chain along
+# the bit's axis at the cross-hole station from the bar's axis through the
+# bar's surface to P1.  Neither depends on how the bit's form edges are built.
+# The stick-out carries STICK_OUT_WINDOW as its native LIMIT tolerance; the
+# swing radius prints in parentheses as REF.
 SETTINGS_SKETCH = "CutterSettingsReference"
 STICK_OUT_DIMENSION = "StickOut"
 SWING_RADIUS_DIMENSION = "SwingRadius"
@@ -173,32 +176,33 @@ BOM_COMPONENTS = (BAR, BIT, SET_SCREW)
 BOM_ITEMS = {BAR: "1", BIT: "2", SET_SCREW: "3"}
 
 
-def _window_text() -> str:
-    low, high = (tip.inch_text(value, 3) for value in STICK_OUT_WINDOW)
-    return f"{low}-{high}"
-
-
-# Item 3's cup bears on item 2's plain round: the stick-out is an adjustable
-# clamp setting (drawing-guidelines rule 23), so the steps set it, then prove
-# the clamp holds it.  Ends and faces go by view names (rule 22): item 1's
-# cutting end is its bottom end in the front view.
+# Item 3's cup bears on item 2's plain round: rule 23's adjustable-clamp row
+# (a member clamped at a setting along a bore that must stay adjustable,
+# light load; a flat would fix the face's setting, which that row never
+# counts), so the steps set it, then prove the clamp holds it (MainBuild
+# ruling 2026-11-17 on run 20261117T111407559Z's blocker).  Steps 2 and 6
+# set and check the stick-out to its dimension on the front view.  Ends and
+# faces go by view names (rule 22): item 1's cutting end is its bottom end in
+# the front view.
 ASSEMBLY_STEPS = "\n".join(
     (
         "FITTING",
         "1. SLIDE ITEM 2 INTO ITEM 1'S CROSS HOLE, FORM END RIGHT, FACE",
         "   TOWARD THE VIEWER (FRONT VIEW).",
-        f"2. SET THE STICK-OUT {_window_text()} (CALIPER).",
+        "2. SET THE STICK-OUT TO ITS LIMITS ON THE FRONT VIEW (CALIPER).",
         "3. TURN ITEM 2 UNTIL ITS FACE IS PARALLEL TO ITEM 1'S AXIS: A",
         "   SQUARE ON ITEM 1'S BOTTOM END (FRONT VIEW) SHOWS NO LIGHT",
         "   BETWEEN ITS BLADE AND THE FACE.",
         "4. TIGHTEN ITEM 3, CUP END FIRST, UP THROUGH ITEM 1'S BOTTOM END",
-        "   (FRONT VIEW) ONTO ITEM 2'S ROUND SHANK.",
+        "   (FRONT VIEW) ONTO ITEM 2'S ROUND SHANK: A LIGHT-LOAD ADJUSTABLE",
+        "   CLAMP HOLDING THE STEP 2 AND 3 SETTINGS.",
         "5. CHECK: ITEM 2 DOES NOT TURN OR SLIDE BY HAND.",
-        f"6. CHECK: THE STICK-OUT STILL READS {_window_text()} (CALIPER).",
+        "6. CHECK: THE STICK-OUT IS STILL INSIDE ITS LIMITS ON THE FRONT",
+        "   VIEW (CALIPER).",
         "7. IF STEP 5 OR 6 FAILS, LOOSEN ITEM 3 AND REPEAT FROM STEP 2.",
     )
 )
-# Named above each value; steps 2 and 6 name the stick-out's window.
+# Named above each value; steps 2 and 6 cite the stick-out's dimension.
 DIMENSION_CALLOUTS: dict[str, str] = {
     STICK_OUT_DIMENSION: "STICK-OUT",
     SWING_RADIUS_DIMENSION: "SWING RADIUS",
