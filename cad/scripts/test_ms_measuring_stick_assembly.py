@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import ast
 import sys
+import textwrap
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -38,6 +39,8 @@ from _named_views import octant_axes
 
 SCRIPTS = Path(__file__).resolve().parent
 BUILDER = SCRIPTS / "build_ms_measuring_stick_assembly.py"
+NOTE_LINE_PITCH = 0.0046  # default-format note line pitch, as measured on MHA-MG-00
+
 
 def test_clamped_setting_authors_its_globals_and_drives(monkeypatch) -> None:
     """Run the builder's setting helper against fakes: every async authoring
@@ -364,7 +367,7 @@ def test_fitter_package_covers_rule_9() -> None:
     assert drawing.SHEET_NAMES == (
         "ASSEMBLED + CLAMPED SETUP",
         "EXPLODED VIEW + BOM",
-        "ASSEMBLY STEPS",
+        "FINISHED ASSEMBLY",
     )
     assert drawing.SPEC.layout is drawing.DrawingLayout.LANDSCAPE
     assert tuple(drawing.SHEET_LAYOUTS[name] for name in drawing.SHEET_NAMES) == (
@@ -379,13 +382,11 @@ def test_fitter_package_covers_rule_9() -> None:
     assert drawing.BOM_PART_NUMBERS[spec.PLATE_SCREW] == "MHA-MS-VN-51"
     for stem in spec.QUANTITIES:
         assert drawing.BOM_PART_NUMBERS[stem] == _config.parts(stem)["number"]
-    for text in (drawing.ASSEMBLY_STEPS, drawing.ASSEMBLY_CHECKS):
-        assert all(len(line) <= drawing.STEPS_LINE_WIDTH for line in text.splitlines())
-    assert drawing.ASSEMBLY_STEPS.count("\n") >= len(sheet.ASSEMBLY_STEPS)
-    # Rule 22: one action a step, at most six printed lines, parts by item.
+    # Rule 22: parts by item, at most six lines a step at a 100-character
+    # line as ASSEMBLY.md is read (#2889).
     for step in sheet.ASSEMBLY_STEPS:
-        assert len(drawing._wrapped((step,), width=drawing.STEPS_LINE_WIDTH).splitlines()) <= 6
         assert "ITEM " in step
+        assert len(textwrap.wrap(step, width=100, subsequent_indent="   ")) <= 6, step
     # Owner ruling 2026-11-06 (option C): no as-shipped setting. The clamp
     # step sets no position, and sheet 1 labels its drawn pose an example.
     clamp = sheet.ASSEMBLY_STEPS[-1]
@@ -396,7 +397,8 @@ def test_fitter_package_covers_rule_9() -> None:
     for text in (*sheet.ASSEMBLY_STEPS, *sheet.ASSEMBLY_CHECKS):
         assert "GRADUATION" not in text and "±" not in text
     assert "EXAMPLE POSITION" in sheet.EXAMPLE_POSE_NOTE
-    assert "SHEET 3, STEP 10" in sheet.EXAMPLE_POSE_NOTE
+    assert "(ASSEMBLY.MD STEP 10)" in sheet.EXAMPLE_POSE_NOTE
+    assert "CLAMP" in sheet.ASSEMBLY_STEPS[9] and sheet.ASSEMBLY_STEPS[9].startswith("10. ")
     assert all(
         len(line) <= drawing.EXAMPLE_NOTE_WIDTH for line in drawing.EXAMPLE_NOTE.splitlines()
     )
@@ -416,7 +418,7 @@ def test_fitter_package_covers_rule_9() -> None:
         for phrase in ("NEAR-FACE", "SAVED POSE", "PLATE IS MASTER", "DIA "):
             assert phrase not in text
     assert drawing.EXPLODED_CAPTION == sheet.EXPLODED_CAPTION == (
-        "EXPLODED VIEW - ASSEMBLY SEQUENCE ON SHEET 3"
+        "EXPLODED VIEW - FIT-UP STEPS IN ASSEMBLY.MD"
     )
     # drawing-guidelines.md rule 2 (the title block is the general specification) and drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the component Finish fields, not fitter notes or steps, own finish.
     assert not any("BLACKEN" in step or "FINISH" in step for step in sheet.ASSEMBLY_STEPS)
@@ -882,30 +884,17 @@ def test_fitter_text_tracks_mutated_setting_and_depth_specs(
 def _assert_fitter_text_spacing(fitter) -> None:
     """Offline text envelopes at the measured note pitch; the parent owns
     native ink review."""
-    line_pitch = drawing.NOTE_LINE_PITCH
-    steps = drawing._wrapped(
-        fitter.ASSEMBLY_STEPS, width=drawing.STEPS_LINE_WIDTH,
-        heading="ASSEMBLY SEQUENCE",
-    )
-    checks = drawing._wrapped(fitter.ASSEMBLY_CHECKS, width=drawing.STEPS_LINE_WIDTH)
-    assert all(len(line) <= drawing.STEPS_LINE_WIDTH for line in steps.splitlines())
-    assert drawing.STEPS_XY[1] - len(steps.splitlines()) * line_pitch >= (
-        drawing.CHECKS_XY[1] + line_pitch - 1e-9
-    )
-    assert (
-        drawing.CHECKS_XY[1] - len(checks.splitlines()) * line_pitch
-        > drawing.SHEET_INNER_BORDER[1] + line_pitch
-    )
-    # The left text column stays left of the title block.
-    assert drawing.STEPS_XY[0] + drawing.STEPS_LINE_WIDTH * 0.00276 < drawing.TITLE_BLOCK[0]
+    line_pitch = NOTE_LINE_PITCH
     # Sheet 1's example-pose note sits under the bottom view, above the
     # border and left of the title block.
-    example = drawing._wrapped(
-        (fitter.EXAMPLE_POSE_NOTE,), width=drawing.EXAMPLE_NOTE_WIDTH
+    example = textwrap.wrap(
+        fitter.EXAMPLE_POSE_NOTE,
+        width=drawing.EXAMPLE_NOTE_WIDTH,
+        subsequent_indent="   ",
     )
     assert drawing.EXAMPLE_NOTE_XY[1] < drawing.UNDERSIDE_CENTER[1] - 0.020
     assert (
-        drawing.EXAMPLE_NOTE_XY[1] - len(example.splitlines()) * line_pitch
+        drawing.EXAMPLE_NOTE_XY[1] - len(example) * line_pitch
         > drawing.SHEET_INNER_BORDER[1] + line_pitch
     )
     assert (

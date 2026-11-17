@@ -6,9 +6,9 @@ overall and the near-face setting dimension, and an upright clamp section;
 sheet 2 the builder-owned ``MS_EXPLODED``
 presentation with
 the BOM (numbers, descriptions, vendor SKU, quantity) and a balloon on every
-component, both plate screws included; sheet 3 the finished isometric beside
-the assembly order and
-checks. Every text, pose and reference value comes from
+component, both plate screws included; sheet 3 the finished isometric. The
+fit-up steps and checks print in the release's ASSEMBLY.md (#2889). Every
+text, pose and reference value comes from
 ``ms_measuring_stick_assembly_spec``, ``ms_measuring_stick_assembly_sheet``,
 ``ms_measuring_stick_explode_spec`` or the part registry; this recipe only
 lays the sheets out. It never edits the source assembly or its explodes.
@@ -93,7 +93,7 @@ PNG = OUTPUTS.png
 SHEET_NAMES = (
     "ASSEMBLED + CLAMPED SETUP",
     "EXPLODED VIEW + BOM",
-    "ASSEMBLY STEPS",
+    "FINISHED ASSEMBLY",
 )
 if SPEC.layout is not DrawingLayout.LANDSCAPE:
     raise AssertionError("the measuring-stick primary sheet must remain landscape")
@@ -135,7 +135,6 @@ STOP_POSITION_TEXT_Y = 0.220
 # callout clears the section-A label standing over the block's near face.
 STOP_POSITION_TEXT_FRACTION = 0.42
 OVERALL_LENGTH_TEXT_Y = 0.257
-NOTE_LINE_PITCH = 0.0046  # default-format note line pitch, as measured on MHA-MG-00
 # Owner ruling 2026-11-06 (option C): the drawn stop position is an example.
 # The note sits under the bottom view, where the deleted setup note stood.
 EXAMPLE_NOTE_XY = (0.030, 0.100)
@@ -184,10 +183,9 @@ EXPLODED_CAPTION = sheet.EXPLODED_CAPTION
 # Preserve the measured caption/table air; centre the narrower five-column BOM.
 EXPLODED_CAPTION_XY = (BOM_ANCHOR[0], 0.415 + EXPLODED_GROUP_SHIFT_Y)
 
-# Sheet 3: the order and checks down the left; the finished isometric right.
-ASSEMBLY_ISO_CENTER = (0.315, 0.170)
-STEPS_XY = (0.018, 0.258)
-STEPS_LINE_WIDTH = 58  # characters; default-format note text
+# Sheet 3: the finished isometric, centred on the sheet. The fit-up
+# steps and checks print in the release's ASSEMBLY.md (#2889).
+ASSEMBLY_ISO_CENTER = ((SHEET_INNER_BORDER[0] + SHEET_INNER_BORDER[2]) / 2.0, 0.170)
 
 BOM_QUANTITIES = {stem: spec.QUANTITIES[stem] for stem in sheet.BOM_ORDER}
 BOM_COMPONENTS = tuple(BOM_QUANTITIES)
@@ -254,43 +252,9 @@ if explode.SOURCE_CONFIGURATION != ASSEMBLY_VIEW_CONFIGURATION:
     raise AssertionError("the measuring-stick explode is authored in Default")
 
 
-def _wrapped(lines: tuple[str, ...], *, width: int, heading: str | None = None) -> str:
-    """Wrap each numbered line under its own number; one note per block. One
-    blank line separates consecutive numbered steps."""
-    out = [heading] if heading else []
-    numbered = False
-    for line in lines:
-        number, sep, rest = line.partition(". ")
-        if sep and number.isdigit():
-            if numbered:
-                out.append("")
-            numbered = True
-            out += textwrap.wrap(
-                rest,
-                width=width,
-                initial_indent=f"{number}. ",
-                subsequent_indent=" " * (len(number) + 2),
-            )
-        else:
-            out += textwrap.wrap(line, width=width, subsequent_indent="   ")
-    return "\n".join(out)
-
-
-ASSEMBLY_STEPS = _wrapped(
-    sheet.ASSEMBLY_STEPS, width=STEPS_LINE_WIDTH, heading="ASSEMBLY SEQUENCE"
+EXAMPLE_NOTE = "\n".join(
+    textwrap.wrap(sheet.EXAMPLE_POSE_NOTE, width=EXAMPLE_NOTE_WIDTH, subsequent_indent="   ")
 )
-ASSEMBLY_CHECKS = _wrapped(sheet.ASSEMBLY_CHECKS, width=STEPS_LINE_WIDTH)
-# The checks follow the sequence down the left column, one blank line below
-# it, and must end above the bottom border.
-CHECKS_XY = (
-    STEPS_XY[0],
-    STEPS_XY[1] - (ASSEMBLY_STEPS.count("\n") + 2) * NOTE_LINE_PITCH,
-)
-if CHECKS_XY[1] - (ASSEMBLY_CHECKS.count("\n") + 1) * NOTE_LINE_PITCH < (
-    SHEET_INNER_BORDER[1] + NOTE_LINE_PITCH
-):
-    raise AssertionError("the assembly checks run past the bottom border")
-EXAMPLE_NOTE = _wrapped((sheet.EXAMPLE_POSE_NOTE,), width=EXAMPLE_NOTE_WIDTH)
 
 
 def _activate_sheet(adapter: Any, name: str) -> Any:
@@ -1029,8 +993,8 @@ def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
     return lambda: assert_balloon_landings(adapter, landings)
 
 
-def _place_steps_sheet(adapter: Any) -> None:
-    """The finished assembly in full detail beside the order and checks."""
+def _place_finished_sheet(adapter: Any) -> None:
+    """The finished assembly in full detail."""
     _activate_sheet(adapter, SHEET_NAMES[2])
     finished = place_view(
         adapter, str(SOURCE), "*Isometric", *ASSEMBLY_ISO_CENTER, scale=SHEET_SCALE
@@ -1048,12 +1012,6 @@ def _place_steps_sheet(adapter: Any) -> None:
     )
     _assert_view_on_sheet(finished, label="measuring-stick finished")
     assert_full_detail_view(adapter, label="measuring-stick assembly")
-    _add_note_block(
-        adapter, SHEET_NAMES[2], ASSEMBLY_STEPS, STEPS_XY, label="assembly sequence"
-    )
-    _add_note_block(
-        adapter, SHEET_NAMES[2], ASSEMBLY_CHECKS, CHECKS_XY, label="assembly checks"
-    )
 
 
 def _activate_package(adapter: Any, target: Any) -> None:
@@ -1148,7 +1106,7 @@ def _place_package(adapter: Any) -> Callable[[], None]:
             raise RuntimeError(f"failed to set measuring-stick sheet scale: {sheet_name}")
     clamped_settled = _place_clamped_sheet(adapter)
     exploded_settled = _place_exploded_sheet(adapter)
-    _place_steps_sheet(adapter)
+    _place_finished_sheet(adapter)
 
     def settled() -> None:
         clamped_settled()

@@ -1,5 +1,8 @@
 """MHA-MS-00 fitter-drawing data: the BOM, the captions and the assembly text.
 
+The fit-up steps and checks print in the release's ASSEMBLY.md
+(ha_assembly_package, #2889), not on the sheets.
+
 Drawing-only: nothing here reaches ms-measuring-stick.SLDASM, so no assembly
 builder imports this module (``test_assembly_sheet_isolation`` pins it) and a
 wording edit rebuilds the drawing alone. Printed dimensions interpolate a
@@ -92,7 +95,7 @@ BOM_DESCRIPTIONS = {
     ),
 }
 
-EXPLODED_CAPTION = "EXPLODED VIEW - ASSEMBLY SEQUENCE ON SHEET 3"
+EXPLODED_CAPTION = "EXPLODED VIEW - FIT-UP STEPS IN ASSEMBLY.MD"
 DRAWING_DIMENSIONS = {spec.SETTING_FEATURE: {spec.SETTING_DIMENSION}}
 # Components own material and finish; no assembly coating operation is required.
 # The fitter's order, one action a step; the explode
@@ -129,6 +132,7 @@ ASSEMBLY_STEPS = (
     f"TURN THE {_THUMB} IN BY HAND UNTIL ITS TIP CLAMPS THE TOP FACE OF "
     f"{_ref(spec.STICK)}.",
 )
+STEP_SECTIONS = (("ASSEMBLY SEQUENCE", ASSEMBLY_STEPS),)
 ASSEMBLY_CHECKS = (
     f"CHECK: WITH {_ref(spec.THUMB_SCREW)} BACKED OFF, {_STICK} SLIDES FREELY "
     "IN THE WINDOW.",
@@ -140,7 +144,7 @@ ASSEMBLY_CHECKS = (
 # Sheet 1: the pose drawn (and its near-face reference) is one example.
 EXAMPLE_POSE_NOTE = (
     f"STOP SHOWN CLAMPED AT AN EXAMPLE POSITION. {_ref(spec.BLOCK)} CLAMPS "
-    f"AT ANY POSITION ALONG {_ref(spec.STICK)} (SHEET 3, STEP 10)."
+    f"AT ANY POSITION ALONG {_ref(spec.STICK)} (ASSEMBLY.MD STEP 10)."
 )
 
 # Both dimensions are reference: the assembly pose, not component sizes.
