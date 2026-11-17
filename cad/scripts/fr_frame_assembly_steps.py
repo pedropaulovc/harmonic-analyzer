@@ -2,10 +2,10 @@
 
 The ch_channel_assembly_steps pattern: a step's number is its position in
 SEQUENCE, so inserting a step renumbers every later one and every pointer
-that cites a step by key follows. The sheet prints the step text
-(draw_fr_frame_assembly.STEP_TEXT); this module holds only the order, so the
-joint table (joint_retention) and other sheets cite a step without importing
-the sheet. Pure data: no SolidWorks, no config reads.
+that cites a step by key follows. The release's ASSEMBLY.md prints the step
+text (fr_frame_assembly_sheet.STEP_TEXT, #2889); this module holds only the
+order, so the joint table (joint_retention) and other sheets cite a step
+without importing the text. Pure data: no SolidWorks, no config reads.
 
 Each step does one thing (drawing-guidelines.md rule 22): a check and its
 remedy are their own steps, each check right after the action it checks.

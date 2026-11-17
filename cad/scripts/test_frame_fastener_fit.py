@@ -143,7 +143,6 @@ def test_assembly_accepts_every_cross_screw_on_a_bench_measurable_thread_length(
     # past the print-worst far-wall start of either casting by the 1.5D floor.
     # The base governs, and the printed limit rounds up, so any screw that
     # passes engages at least 1.5D whatever its tip chamfer.
-    import draw_fr_frame_assembly as assembly_sheet
     import fr_frame_assembly_sheet as frame_sheet
 
     starts = [
@@ -157,10 +156,10 @@ def test_assembly_accepts_every_cross_screw_on_a_bench_measurable_thread_length(
     assert 0.0 <= limit_mm - (governing + joint.FAR_WALL_ENGAGEMENT_FLOOR_MM) < 0.001 * 25.4
     # A stock screw at its shortest still passes at the nominal tip.
     assert limit_mm <= cross_screw.SHANK_LEN - joint.CROSS_SCREW_LENGTH_SHORT_ALLOWANCE_MM
-    measured = assembly_sheet.STEP_TEXT["cross-screws-measured"]
+    measured = frame_sheet.STEP_TEXT["cross-screws-measured"]
     assert f"{frame_sheet.CROSS_SCREW_FULL_THREAD_MIN_TEXT} MIN" in measured
     assert "CALIPER" in measured
-    steps = assembly_sheet.steps
+    steps = frame_sheet.steps
     # Measured before the screws go in; a separate step replaces a short one.
     assert (
         steps.step_number("cross-screws-measured")
@@ -168,7 +167,9 @@ def test_assembly_accepts_every_cross_screw_on_a_bench_measurable_thread_length(
         < steps.step_number(steps.CROSS_SCREWS_DRIVEN_KEY)
         < steps.step_number("cross-screw-heads-checked")
     )
-    assert "SCREW DIAMETERS" not in assembly_sheet.ASSEMBLY_STEPS
+    assert "SCREW DIAMETERS" not in "\n".join(
+        step for _title, group in frame_sheet.STEP_SECTIONS for step in group
+    )
 
 
 def test_stock_caps_seat_on_tube_ends_and_preserve_finished_height() -> None:
