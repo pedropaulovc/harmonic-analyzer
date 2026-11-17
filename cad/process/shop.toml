@@ -97,8 +97,8 @@ resolution_mm = 0.0254
 [gauges.digital-indicator]
 resolution_mm = 0.0254
 
-# PM-30MV X DRO scale read as a length gauge (feed-lever length, TL-26
-# Setup B). Range: machines.pm-30mv X travel; resolution: archive
+# PM-30MV X DRO scale read as a length gauge (feed-lever length, TL-26 plan,
+# "Grip end to length" setup). Range: machines.pm-30mv X travel; resolution: archive
 # installed MagXact MX-100M DRO, 5 um scales (owner-confirmed 2026-10-27).
 [gauges.mill-x-dro]
 range_mm = [0.0, 584.2]
@@ -230,8 +230,8 @@ material = "6061-t6511"
 rpm = 2500
 feed = "30 in/min"
 
-# Source: end-bracket.toml and feed-lever.toml; Pedro's routes dated
-# 2026-11-02 (MHA-CH-06-TL-28/TL-26 v47), the v48 manifest notes (#29 tap
+# Source: end-bracket.toml and feed-lever.toml; the 2026-11-02 interim
+# routes (MHA-CH-06-TL-28/TL-26 v47), the v48 manifest notes (#29 tap
 # drill, plug-start then bottoming-finish taps) and the archived
 # taps-unc-hand 8-32 plug/bottoming records.
 [tools.jig-saw]
