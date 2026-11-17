@@ -1103,11 +1103,11 @@ FEELER_LEAF_PLACES = 3
 # (#2337: the spring covers all but .004 of the washer face, so no feeler leaf
 # can bear on it beside the spring). The washer, the hub stack, the ear and
 # the left ear all cancel: the gap's set error is the two indicator nulls on
-# that one face, half a division each (the shop indicator's placeholder
-# resolution, as MHA-PD-00 step 10 charges it), and the DRO over the move,
+# that one face, half a division each of the shop's 1 um lever indicator
+# (shop.toml gauges.dti, owner 2026-11-17), and the DRO over the move,
 # which must stay inside the detail A band (the band, at the spring-back
 # check, is the acceptance).
-INDICATOR_DIVISION_MM = 0.0127  # .0005: the shop's dial test indicator
+INDICATOR_DIVISION_MM = 0.001  # the shop's dial test indicator
 DRO_ACCURACY_MM = 0.00508  # .0002: the PM-30MV DRO, vendor-stated (shop inventory)
 SPRING_SET_ERROR_MM = 2.0 * INDICATOR_DIVISION_MM / 2.0 + DRO_ACCURACY_MM
 if SPRING_SET_ERROR_MM > ROCKER_SPRING_SET_BAND:

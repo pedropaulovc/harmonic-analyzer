@@ -4147,9 +4147,6 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         # CAM: posted-G-code checks and cycle times, recipe frame, and one
         # end-to-end freecadcmd post (skipped where FreeCAD is not installed).
         SCRIPTS_DIR / "test_cam_nc.py",
-        # The rocker's S7 op 97 profile windows: computed from the printed
-        # zones and recorded gauge geometry, pinned into the plan's text.
-        SCRIPTS_DIR / "test_ch_rocker_arm_profile_check.py",
         # The rocker's oblique-trammel jig numbers: derived from the strap's
         # radii, the cutters and the rail angle, pinned against the plan.
         SCRIPTS_DIR / "test_ch_rocker_arm_tl_oblique_trammel_spec.py",

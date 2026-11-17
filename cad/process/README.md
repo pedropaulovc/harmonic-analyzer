@@ -57,8 +57,10 @@ field it repeats, and the two must be changed together.
 `shop.toml` is the prechips shop file: machines, workholding, gauges, limits,
 tools and cutting settings, in prechips' schema and units. It holds only records
 an HA plan or an HA spec/test reads (no example tooling from other projects); a
-fact that schema can express lives here. Its records include the rocker DTI's
-range and resolution (`gauges.dti`), read by `ch_rocker_arm_profile_check.py`;
+fact that schema can express lives here. Its records include the shop's
+indicators' ranges and resolutions (`gauges.dti`, `gauges.dial-indicators`,
+`gauges.digital-indicator`, owner inventory 2026-11-17), the DTI's read by the
+channel and paper-drive drawing tests;
 the PM-30MV X DRO scale (`gauges.mill-x-dro`), whose resolution the paper-drive
 tests read; the rocker profile cutter (`tools.rocker-profile-cutter`) with its
 HSS cutting setting (`settings.rocker-profile-hss-low-carbon-steel`); and the
@@ -76,9 +78,9 @@ one-third of the half jaw width (Pedro's house rule). Each is cited beside it.
 Facts prechips has no field for, but which CAD specs and tests read, live in
 [`cad/config/shop-equipment.toml`](../config/shop-equipment.toml):
 
-- gauges: the DTI's kind and make, the pin-gauge note, the Mitutoyo gauge-block
-  set (read by `ch_rocker_arm_tl_oblique_jig_assembly_spec.py`), the arm-outline
-  template and the Vermont class X 2558-minus pin;
+- gauges: the DTI's kind, the pin-gauge note, the Mitutoyo gauge-block set
+  (read by `ch_rocker_arm_tl_oblique_jig_assembly_spec.py`), and the
+  indicators' ownership;
 - the PM-30MV DRO's make and cited accuracy (read by the paper-drive tests);
 - the LMS 6784 end-mill set and its sizes, the 8-32 plug hand tap's flute
   length, and the shop-made rocker trammel's R800/R816 lengths;

@@ -248,19 +248,18 @@ def test_setup_must_hold_the_drawn_centre_distance_band_along_s_k() -> None:
 
 def test_a_full_division_setting_lands_k_in_the_band_and_the_circle() -> None:
     """Owner ruling 2026-11-08 (Pedro), #2144 item 5.3: MHA-PD-00 reads S and K
-    true on a full division of the shop's test indicator. Signed worst case
-    (the PD-00 DETAIL K budget): the DRO, zeroed on S, errs once on the S-to-K
-    move; the indicator centres S and K within half a division each; the
-    pivot-and-pin tram turns K about S by its lever. Along S-K, the dialled
-    mid-band aim plus that error stays inside the mesh's set band; in all,
-    K stays inside its setting circle."""
+    true to a sweep under .0005 (draw_pd_paper_drive_assembly
+    KNOB_SETTING_SWEEP_IN). Signed worst case (the PD-00 DETAIL K budget): the
+    DRO, zeroed on S, errs once on the S-to-K move; the indicator centres S
+    and K within half that sweep each; the pivot-and-pin tram turns K about S
+    by its lever. Along S-K, the dialled mid-band aim plus that error stays
+    inside the mesh's set band; in all, K stays inside its setting circle."""
     import tomllib
 
     from _paths import CAD_ROOT
     import pd_paper_drive_knob_setting_spec as knob_setting
     import pd_rack_pinion_spec as disc
 
-    shop = tomllib.loads((CAD_ROOT / "process" / "shop.toml").read_text(encoding="utf-8"))
     equipment = tomllib.loads(
         (CAD_ROOT / "config" / "shop-equipment.toml").read_text(encoding="utf-8")
     )
@@ -269,8 +268,7 @@ def test_a_full_division_setting_lands_k_in_the_band_and_the_circle() -> None:
         cite.startswith("DRO accuracy") and ".0002” Accuracy" in cite
         for cite in equipment["dro"]["pm-30mv"]["cite"]
     )
-    division = shop["gauges"]["dti"]["resolution_mm"]
-    centring = division / 2.0
+    centring = 0.0005 * 25.4 / 2.0
     ux, uy = registration.S_TO_K_UNIT
     dro = dro_accuracy * (abs(ux) + abs(uy))
     lever = knob_setting.K_SET_CENTRE_DISTANCE_MM / arm.PIN_STATION

@@ -734,16 +734,13 @@ def test_the_jig_bored_k_lands_in_the_set_band_with_margin_at_both_ends() -> Non
     ]
     accuracy = stated * 25.4
     # Centring is a null reading against the step's stated acceptance, not a
-    # measured size: under one division of sweep (the TIR) puts each centre
-    # within half a division of the spindle (owner ruling 2026-11-08 (Pedro),
-    # #2144 item 5.3). The indicator's unknown accuracy over its range scales
-    # that reading only; the bound holds while the indicator repeats to its
-    # stated sweep at null.
-    division_in = shop["gauges"]["dti"]["resolution_mm"] / 25.4
-    # The printed sweep is a value on the shop's own test indicator.
-    assert drawing.KNOB_SETTING_INDICATOR_DIVISION_IN == pytest.approx(division_in)
-    division = division_in * 25.4
-    centring = drawing.KNOB_SETTING_TRUE_SWEEP_DIVISIONS * division / 2.0
+    # measured size: a sweep (the TIR) under the printed value puts each
+    # centre within half of it of the spindle (owner ruling 2026-11-08
+    # (Pedro), #2144 item 5.3). The bound holds while the indicator repeats
+    # to its stated sweep at null; the shop's test indicator must read it.
+    sweep = drawing.KNOB_SETTING_SWEEP_IN * 25.4
+    assert shop["gauges"]["dti"]["resolution_mm"] < sweep
+    centring = sweep / 2.0
     # Signed worst case, every bound adding the same way: the DRO is zeroed
     # on S, so its two axes' errors enter once, on the S-to-K move, both
     # along any direction; the indicator centres S and K; the pivot-and-pin
@@ -752,7 +749,7 @@ def test_the_jig_bored_k_lands_in_the_set_band_with_margin_at_both_ends() -> Non
     radial_err = dro + 2.0 * centring
     lever = knob_setting.K_SET_CENTRE_DISTANCE_MM / steps_arm.PIN_STATION
     tangential_err = dro + 2.0 * centring + 2.0 * centring * lever
-    assert centring == pytest.approx(division / 2.0)
+    assert centring == pytest.approx(0.0005 * 25.4 / 2.0)
     assert radial_err == pytest.approx(0.0199, abs=1e-4)
     # The printed values are the display's own counts: the operator dials
     # exactly what DETAIL K prints.
@@ -2769,7 +2766,7 @@ def test_the_reducer_is_clocked_once_with_an_ordinary_limit() -> None:
     assert "TEST INDICATOR" in body
     # The reducer is accepted on an indicator, not on feelers in the mesh.
     assert (
-        drawing.reducer_dial_check("KNOB", "A TEST INDICATOR ON A MAGNETIC BASE") in body
+        drawing.reducer_dial_check("KNOB") in body
     )
     assert "FEELER ENTERS" not in body
     for method in ("UNCERTAINTY", "RE-ZERO", "RE-CLOCK", "ABSOLUTE", "REJECT"):
@@ -2798,15 +2795,14 @@ def test_the_reducer_dial_window_is_what_a_build_inside_its_drawings_reads() -> 
         for backlash in drawing.mesh_check.reducer_mesh(centre - closure).backlash_mm
         for tip in tips
     ]
-    low, high = drawing.REDUCER_BACKLASH_DIAL_MM
-    division = drawing.KNOB_SETTING_INDICATOR_DIVISION_IN * 25.4
-    assert low <= min(readings) < low + division
-    assert high - division < max(readings) <= high
-    for bound in (low, high):
-        assert bound / division == pytest.approx(round(bound / division))
-    assert low >= division - 1e-9
+    step = drawing.REDUCER_DIAL_STEP_MM
+    high = drawing.REDUCER_SHAKE_MAX_MM
+    assert high - step < max(readings) <= high
+    assert high / step == pytest.approx(round(high / step))
+    # "Visibly": the tightest shake moves the dial at least half a division.
+    assert min(readings) >= step / 2.0
     assert drawing.REDUCER_BACKLASH_DIAL_TEXT == (
-        f"{disc.inch_text(low, 4)} TO {disc.inch_text(high, 4)}"
+        f"VISIBLY, AT MOST {disc.inch_text(high, 3)},"
     )
 
 
@@ -2915,7 +2911,7 @@ def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
     # seat, a clean, a knob stack and a disc first; the arm is rebuilt only
     # for a fault that is the same all round, the last branch.
     pose = _step_body("fitup-mesh-remedied")
-    assert drawing.reducer_dial_check("KNOB", "A TEST INDICATOR ON A MAGNETIC BASE") in _step_body(
+    assert drawing.reducer_dial_check("KNOB") in _step_body(
         "fitup-pose-set"
     )
     assert len(drawing._step_text(operating_domain=_unit_operating_domain())["fitup-pose-set"]) == 10
