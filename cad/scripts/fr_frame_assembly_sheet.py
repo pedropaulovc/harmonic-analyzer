@@ -204,11 +204,12 @@ STEP_TEXT = {
     "nameplate-heads-checked": f"CHECK EVERY {_PLATE_SCREW} HEAD BEARS ON {_PLATE}.",
     # The rough cut is the column's own supply length (fr_tube_frame_spec,
     # printed on its sheet as SUPPLY n.nn MIN, and in the setting table):
-    # round 1 review, "LONG" gave no length to cut to.
+    # round 1 review, "LONG" gave no length to cut to. The final length is
+    # COLUMNS_CUT_KEY's alone (rule 22 proof review: a step that cuts "to the
+    # length" and defers "to length" reads as two cuts).
     steps.COLUMNS_ROUGH_CUT_KEY: (
-        f"CUT FOUR {_COLUMN} COLUMNS TO THE LENGTH OF "
-        f"{setting_row(steps.COLUMNS_ROUGH_CUT_KEY)}; "
-        f"{_step(steps.COLUMNS_CUT_KEY)} CUTS THEM TO LENGTH."
+        f"ROUGH-CUT FOUR {_COLUMN} COLUMNS TO "
+        f"{setting_row(steps.COLUMNS_ROUGH_CUT_KEY)}."
     ),
     "base-sockets-fitted": (
         f"WITH {_BASE} TOP FACE UP, FIT EACH OF ITS SOCKETS TO ITS OWN {_COLUMN}: "
@@ -243,8 +244,9 @@ STEP_TEXT = {
         "STARTS BY HAND IN THE TAPPED SOCKET WALL."
     ),
     "lower-holes-reworked": (
-        "IF IT DOES NOT START, FILE THE TUBE HOLE ITS THREAD MARKED WITH A ROUND "
-        f"FILE, THAT COLUMN OUT, UNTIL {_step(steps.LOWER_HOLES_CHECKED_KEY)} PASSES."
+        f"IF IT DOES NOT START, TAKE THAT {_COLUMN} OUT OF {_BASE} AND ROUND-FILE "
+        f"THE TUBE HOLE THE {_CROSS} THREAD MARKED, UNTIL "
+        f"{_step(steps.LOWER_HOLES_CHECKED_KEY)} PASSES."
     ),
     "lower-tap-chased": (
         "IF NEITHER TUBE HOLE IS MARKED, CHASE THE TAPPED SOCKET WALL WITH A "
