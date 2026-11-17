@@ -3856,8 +3856,7 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
             str(review_bench.resolve()),
             *module_deps_of(review_bench),
             *scanned_by_binding_gate,
-            # Supplier native regressions read captured paint and shelf facts.
-            str((SCRIPTS_DIR / "test_supplier_washer_native_paint.json").resolve()),
+            # Supplier native regressions read captured shelf facts.
             str((SCRIPTS_DIR / "testdata" / "supplier_top_r44.json").resolve()),
             # Carry-forward tests compare real build PDFs read at runtime.
             *(
