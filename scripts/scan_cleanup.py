@@ -234,14 +234,14 @@ def main() -> int:
     roots = [*(checkout.parent for checkout in checkout_roots),
              Path("C:/"), Path("C:/tmp"), *args.root]
     exact = [(Path("C:/farm-build"), "requested exact farm-build path")]
-    exact.append((Path("C:/farm-runs"), "farm-run snapshot and run-record root; contents not inspected for ownership"))
+    exact.append((Path("C:/farm-runs"), "retired farm-run.ps1 snapshot and run-record root; contents not inspected for ownership"))
     exact.extend((path, "known project-local generated output") for path in project_outputs)
     local = os.environ.get("LOCALAPPDATA")
     if local:
         local_path = Path(local)
         roots.extend((local_path, local_path / "Temp"))
-        exact.append((local_path / "ha-farm", "farm-run.ps1 fallback log/snapshot home"))
-        exact.append((local_path / "ha-farm" / "runs", "farm-run run-record directory; contents not inspected for ownership"))
+        exact.append((local_path / "ha-farm", "farm_build.py runs, snapshots and environments home"))
+        exact.append((local_path / "ha-farm" / "runs", "farm_build.py run records, snapshots and environments; contents not inspected for ownership"))
         exact.append((local_path / "harmonic-analyzer", "project buildgraph and archive caches"))
         exact.append((local_path / "harmonic-analyzer-agent-scratchpad", "project review evaluation scratchpad"))
         for checkout in checkout_roots:
@@ -265,11 +265,11 @@ def main() -> int:
     ))
     if scratch := os.environ.get("HARMONIC_AGENT_SCRATCHPAD"):
         exact.extend((
-            (Path(scratch) / "harmonic-analyzer/farm-runs", "farm-run.ps1 scratchpad override"),
+            (Path(scratch) / "harmonic-analyzer/farm-runs", "retired farm-run.ps1 scratchpad override"),
             (Path(scratch) / "harmonic-analyzer/machinist-review-evals", "machinist review evaluation scratchpad override"),
         ))
     elif os.environ.get("OMPCODE") == "1" and Path.cwd().name == "local":
-        exact.append((Path.cwd() / "harmonic-analyzer/farm-runs", "farm-run.ps1 OMP local working-directory default"))
+        exact.append((Path.cwd() / "harmonic-analyzer/farm-runs", "retired farm-run.ps1 OMP local working-directory default"))
     for path, reason in exact:
         add(path, reason, "project-specific location; contents not inspected for ownership")
     for path in args.path:

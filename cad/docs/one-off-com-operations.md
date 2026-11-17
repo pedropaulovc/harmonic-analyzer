@@ -5,13 +5,13 @@
 Mid-incident playbook for the question *"I need SolidWorks to do ONE thing —
 how do I run it from here?"*. This checkout has **no local seat**: every
 SolidWorks-touching task runs on the farm
-(`build.py --executor farm`, [`../../build.py`](../../build.py)).
+(`farm_build.py run`, [`../../farm_build.py`](../../farm_build.py)).
 
 Read the surrounding rules once, not here: task groups and the seat contract in
 [`../../AGENTS.md`](../../AGENTS.md) ("Task groups", "The COM seat lock", "COM
-watchdog"), cache roles, miss-debugging and the supervised farm-launch contract
+watchdog"), cache roles, miss-debugging and the farm-build contract
 in [`../../DEVELOPING.md`](../../DEVELOPING.md)
-("[Supervised farm launches](../../DEVELOPING.md#supervised-farm-launches)"),
+("[Farm builds](../../DEVELOPING.md#farm-builds-farm_buildpy)"),
 the doit entry points in
 [`BUILDING.md`](BUILDING.md), and drawing-specific session hygiene in
 [`solidworks-drawing-layout-tuning.md`](solidworks-drawing-layout-tuning.md)
@@ -30,7 +30,7 @@ If it needs a seat, pick ONE of four:
 
 | route | when | how |
 |---|---|---|
-| **A — dispatch the existing task** | the thing you want IS a doit task, or its artefact is a task's output | `.\build.cmd --display-name "Owner/session - Reason" <task>` (`./build` on a POSIX shell) = `uv run python build.py --executor farm --display-name "Owner/session - Reason" <task>` |
+| **A — dispatch the existing task** | the thing you want IS a doit task, or its artefact is a task's output | `uv run python farm_build.py run <task> --display-name "Owner/session - Reason" --leaf-timeout 90` |
 | **B — throwaway-branch leaf** | you need ad-hoc COM code, not an existing task | add ONE `_cached_com_action` task on a throwaway branch, push it, dispatch it as in A |
 | **C — attach-only diagnostics probe** | interactive investigation on a machine that HAS a licensed running seat | `dodo._com_seat` + `run_owned_diagnostic` ([`../scripts/diagnostics/_owned_native_session.py`](../scripts/diagnostics/_owned_native_session.py)) |
 | **D — don't** | you only want to *look* at a model or drawing | audit the artefact offline; never launch a build to inspect one |
@@ -44,47 +44,36 @@ a `solidworks-pool` operation, not a harmonic-analyzer one. Its invariants
 
 ### Route A — dispatch an existing task
 
-Those forms are the **attended-terminal** shape: you watch the console to the
-end. An agent must not dispatch that way — a farm build outlives any tool
-deadline — so agent-driven submissions go through `scripts/farm-run.ps1` under
-a persistent `hub` process
-([supervised farm launches](../../DEVELOPING.md#supervised-farm-launches)). It
-runs the same `build.py` invocation from a private snapshot of the pushed HEAD,
-so nothing done in your worktree mid-run can move a key, and records the run so
-a successor can pick it up instead of re-inventing a command. The same script
-follows the recorded run: `-Watch -RunId <id>` streams leaf changes and task
-errors and exits 0/20/21/22 for succeeded/failed/launcher-died/cancelled.
+`run` builds the pushed, clean HEAD from a private snapshot, so nothing done in
+your worktree mid-run can move a key, and records the run so a successor can
+pick it up instead of re-inventing a command. It returns once the build is
+registered with the farm; `watch <run-id>` streams leaf changes and task errors
+and exits 0/20/21/22 for succeeded/failed/launcher-died/cancelled.
 
 ```powershell
-.\build.cmd --help                    # wrapper options + farm defaults, then doit's commands
-.\build.cmd --display-name "InchPD - Build cone gear" part:dt_cone_gear
-.\build.cmd --display-name "InchPD - Full build" --leaf-timeout 90 build
+uv run python farm_build.py --help
+uv run python farm_build.py run part:dt_cone_gear --display-name "InchPD - Build cone gear" --leaf-timeout 90
+uv run python farm_build.py run build --display-name "InchPD - Full build" --leaf-timeout 90 --watch
 ```
 
-Nothing reaches the fleet until the requested task names are known-good.
-`build.py` loads the doit graph, resolves your selection against it, and exits
-3 naming the offending target when a name is unknown — dashed spellings such as
+Nothing reaches the fleet until the requested task names are known-good: the
+build loads the doit graph, resolves your selection against it, and exits 3
+naming the offending target when a name is unknown — dashed spellings such as
 `part:dt-arbor-pedestal` included, because it never normalizes a dash into an
 underscore. No fleet query, no workflow and no action happen on that path.
 
-Then, once per run and still before the first action, `build.py`'s farm
-preflight refuses to start unless:
+Then, still before the first action, the farm preflight refuses to start
+unless:
 
-- the local project inputs are clean, **including submodules** (`git status
-  --porcelain=v1 --untracked-files=all` plus `git submodule status
-  --recursive`), because the submitter's doit graph and cache keys come from
-  those local files;
-- the remote cache is `ro` or `rw` (`_artifact_cache.enabled()`) — the farm
-  hands results back **through the cache**, so `off` cannot work;
+- would-be leaves pass the selected pool's `agent.protocol.leaf_admitted`;
+- the `check:undefined_names` scan passes;
 - `farm.py agents --json` reports the client's required farm protocol (currently
-  7) and no known worker reports an incompatible or unreadable protocol;
-- would-be leaves pass the selected pool's `agent.protocol.leaf_admitted`.
+  7) and no known worker reports an incompatible or unreadable protocol.
 
+(`run` itself has already refused a dirty worktree or a HEAD not on origin.)
 Mixed agent versions are expected during rolling upgrades and are not checked;
-the protocol version is.
-
-A preflight failure prints `farm: <reason>` and exits 2, also before any action
-runs.
+the protocol version is. A preflight failure prints `farm: <reason>` and exits
+2, also before any action runs.
 
 After preflight, protocol 7 registers a fresh build with
 `solidworks-build-fifo-7` and starts the scheduler as soon as registration is
@@ -117,34 +106,30 @@ or replaying it. Do not invoke an old coordinator with new tools. This check
 also protects direct API callers, but does not replace CLI preflight or the
 coordinated idle-fleet cutover.
 
-Old-protocol native logs are unsupported by the new launcher. Finish or cancel
-their runs with matched old tools **before** that coordinated idle-fleet
-cutover; the protocol-7 launcher provides no runtime legacy support.
+Old-protocol native logs are unsupported. Finish or cancel their runs with
+matched old tools **before** that coordinated idle-fleet cutover; there is no
+runtime legacy support.
 
-The preflight stamps only the committed local `HEAD`; it does not fetch or
-update a shared `origin/*` ref and does not publish source files. Each worker
+The build stamps the launch commit (`HARMONIC_FARM_COMMIT`); it does not fetch
+or update a shared `origin/*` ref and does not publish source files. Each worker
 fetches that exact SHA with depth one from the fixed approved repository,
 checks it out detached, runs `reset --hard` and `clean -ffdx`, and checks out
 required submodules at their pinned gitlinks. The second force removes untracked
 nested Git repositories; `-x` covers ignored files. It is used only inside an
 ownership-validated disposable worker root. Source availability is therefore
 proved by the worker's exact fetch, not by mutating a submitter-side shared ref.
-Dirty local project inputs are refused; they are not silently replaced with
-committed versions.
 
 The worker synchronizes `uv.lock` into a source-root `environment/` outside the
 cleaned checkout and sets `UV_PROJECT_ENVIRONMENT` for preparation and build
 descendants, so `workspace/.venv` is never created or erased by `clean -ffdx`.
-The wrapper sets `HARMONIC_SW_AUTOSTART=0` locally (no local SolidWorks is
-touched) and, unless you passed `-n`/`--process` yourself, adds `-n 8`
-(`HARMONIC_FARM_PARALLELISM`) so leaves overlap.
+The submitter sets `HARMONIC_SW_AUTOSTART=0` (no local SolidWorks is touched)
+and runs doit with `-n 8` (`HARMONIC_FARM_PARALLELISM`) so leaves overlap.
 
-Leaf budget: 15 min per attempt by default, clamped to 60 s–3 h
-(`_farm.clamp_leaf_timeout_s`). A cold leaf measured 61.5 min, so pass
-`--leaf-timeout <minutes>` for anything cold; the default costs one retry and
-then a failure per slow leaf.
+Leaf budget: `--leaf-timeout` minutes per attempt (required, 1–180; the farm
+clamps to 60 s–3 h). A cold leaf measured 61.5 min, so give anything cold 90;
+too small a budget costs one retry and then a failure per slow leaf.
 
-`check:*` tasks stay LOCAL even under `--executor farm`: farm dispatch happens
+`check:*` tasks stay LOCAL even on the farm: farm dispatch happens
 only inside `_cached_com_action`, and `check:*` tasks go through `_run`, which
 has no seat and no farm path. (The farm protocol admits `check:` leaves with
 no cache key, but nothing in this repo submits one.)
@@ -158,8 +143,8 @@ throw away afterwards. Non-negotiable shape:
 1. **Route it through `_cached_com_action(label, cmd, file_deps, outputs,
    log_stem, stamp=None)`.** It is the only way in (§2).
 2. **Choose a name admitted by the selected pool's
-   `agent.protocol.leaf_admitted`.** That function in the `-PoolHome` checkout
-   is authoritative; do not copy its prefix list here or into a dispatch guard.
+   `agent.protocol.leaf_admitted`.** That function in the selected pool
+   checkout is authoritative; do not copy its prefix list here or into a dispatch guard.
    Preflight refuses an unadmitted leaf with exit 2 before FIFO registration.
    Mixed agent versions are expected during rolling upgrades and are not checked;
    the protocol version is.
@@ -179,8 +164,8 @@ throw away afterwards. Non-negotiable shape:
    that stamp IS the cached artefact. A leaf that stores nothing under its key
    fails `cache_missing` even when the COM work succeeded.
 5. Commit, push the commit to the approved repository, dispatch it the same way
-   as route A (`./build --display-name "Owner/session - Reason" <your:task>` at an attended terminal, the supervised
-   launcher from an agent), then delete the branch. A fixup means a new commit;
+   as route A (`farm_build.py run <your:task> …`), then delete the branch. A
+   fixup means a new commit;
    every worker fetches exactly the SHA the new leaf request names.
 
 ## 2. Invariants an ad-hoc COM operation must not break
@@ -240,17 +225,11 @@ throw away afterwards. Non-negotiable shape:
   helper's probe for YOUR key comes back absent. The worker spends a second
   full run with `--always-execute` first (that is the `attempts: 2` you see),
   then fails `cache_missing` — which is non-retryable, so it kills the build.
-  Same trap with `HARMONIC_REMOTE_CACHE_MODE=off`, except the farm preflight
-  catches that one up front.
-- **Never change the submitter's checkout mid-run.** The submitter computes
-  every key from its local files while the workers build the launch commit; a
-  commit or edit in that worktree during a direct `./build` run makes the two
-  disagree, and the leaf that follows would fail `cache_missing` (#1114).
-  `build.py` refuses each dispatch whose key such a change can move (anything
-  under `cad/`, the graph and environment files, submodules, the task's own
-  inputs) and names it (`submitter checkout changed since launch: HEAD A ->
-  B; changed: …`); on an absent key it names every tracked change. The
-  supervised launcher builds from its own snapshot, so it is immune.
+  Same trap with `HARMONIC_REMOTE_CACHE_MODE=off`.
+- **Never build from a checkout that changes mid-run.** The submitter computes
+  every key from its files while the workers build the launch commit; if they
+  differed the leaf would fail `cache_missing` (#1114). `farm_build.py` builds
+  from its own snapshot of the commit, so edits in your worktree cannot reach it.
 - **Reading a moved key** (full detail in `DEVELOPING.md`, "Debugging a miss"):
   `uv run python -m doit cache_status -- <substring>` (from a checkout at the
   run's commit) for `HIT`/`MISS` + the `(digest, relpath)` list behind a miss
@@ -267,16 +246,14 @@ throw away afterwards. Non-negotiable shape:
 
 ## 4. Getting evidence when it fails
 
-**Local half** (the submitter, even in farm mode). Its outputs live in `<out>`:
-`cad/out` of the checkout for a direct attended build, but for a supervised
-launch the `outputs` field of `farm-run.ps1 -Status -RunId <id>` —
-`<LogDirectory>\<run-id>.out` once the run ends, the snapshot's own `cad\out`
-while it is still running or when the move failed. The caller's `cad/out`
-holds nothing from a supervised run.
+**Local half** (the submitter). Its outputs live in `<out>`: the `outputs`
+field of `farm_build.py status <run-id>` — the run's `out\` once it ends, the
+snapshot's own `cad\out` while it is still running or when the move failed.
+The caller's `cad/out` holds nothing from a farm run.
 
 - `<out>/logs/<log_stem>.log` — the per-task console tee (only for tasks that
   pass a `log_stem`; otherwise output is inherited straight to the terminal,
-  which for a supervised launch is the run's `.log`).
+  which for a farm run is the run's `build.log`).
 - `<out>/reports/telemetry/traces.jsonl` and `logs.jsonl` — every span and
   log record as JSON; query them with `rg`/`jq` instead of scraping the console
   (`AGENTS.md`, "Observability"). What matters for an ad-hoc operation: the
@@ -298,7 +275,7 @@ category, exit code and log blob. The workflow id is
 (`_farm.workflow_id(build_id, task, cache_key, commit, timeout_s)`; for a keyless
 `check:` leaf the key slot is the first 16 characters of the requested commit).
 Protocol 6 scopes executions to the owning `build_id`
-(`YYYYMMDDTHHMMSS.ffffffZ-32hex`), distinct from a supervised launch's `farm_run`.
+(`YYYYMMDDTHHMMSS.ffffffZ-32hex`), distinct from a `farm_build.py` run id (`farm_run`).
 Equal task/cache/budget inputs in another build reuse artifacts, not the workflow
 execution. The native ID describes its build scope directly, but only the
 coordinator's immutable exact-run binding authorizes inspection or cancellation;
@@ -312,8 +289,9 @@ uv run --frozen --project ../solidworks-pool python ../solidworks-pool/farm.py l
 
 The submitter logs each ID twice, with `build_id`: `Farm workflow requested:
 <id>` before submitting the coordinator reservation, and `Farm workflow attached:
-<id>` after obtaining its exact run binding. It also durably records requests
-before submission. A requested ID with no attached line may already be accepted
+<id>` after obtaining its exact run binding. It also durably records each
+request (`leaves/*.json` in the run directory) before submission. A requested
+ID with no attached line may already be accepted
 but still unbound; workflow `NOT_FOUND` does not settle that reservation.
 Reconcile it through `leaf-status`, including after an uncertain submission
 response. Authentication, network or CLI failures never prove absence.
@@ -328,8 +306,8 @@ cancelling an exact bound run, never merely the workflow ID. Cancellation or
 Temporal closure does not free occupied capacity: the exact worker attempts must
 acknowledge native execution and cleanup physically drained. Unknown attempts
 remain fenced until independently verified operator drain evidence is supplied.
-Successful launcher cancellation proves local stop, producer close and exact-run
-reconciliation, not physical drain; its `.done` and local snapshot cleanup can
+Successful `farm_build.py cancel` proves local stop, producer close and exact-run
+reconciliation, not physical drain; its `status.json` and local snapshot cleanup can
 precede release of remote attempt fences. Recovering an interrupted run means
 accounting for *every* recorded reservation. Before relaunch, `leaf-status` must
 report `drained` or authoritative `missing_closed` with empty
@@ -337,8 +315,8 @@ report `drained` or authoritative `missing_closed` with empty
 `NOT_FOUND` does not prove drain.
 Every new invocation creates a fresh build ID and distinct native executions:
 it can restore published cache artifacts, but cannot rejoin old running work.
-Retain the commit, targets, leaf budget and cache environment from the supervised
-run record, not the caller's current worktree. The budget remains part of the
+Retain the commit, targets, leaf budget and cache environment from the run's
+`run.json`, not the caller's current worktree. The budget remains part of the
 canonical workflow ID. Follow
 [the handoff recovery procedure](../../DEVELOPING.md#recovering-a-run-across-a-handoff).
 

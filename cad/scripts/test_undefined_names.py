@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import importlib.util
 from pathlib import Path
 
 import pytest
@@ -18,7 +17,7 @@ def test_tracked_build_sources_have_no_undefined_names() -> None:
 
 
 def test_farm_preflight_refuses_undefined_name_before_fleet_query(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     scripts = tmp_path / "cad" / "scripts"
     scripts.mkdir(parents=True)
@@ -30,20 +29,25 @@ def test_farm_preflight_refuses_undefined_name_before_fleet_query(
     (tmp_path / "dodo.py").write_text("", encoding="utf-8")
     (tmp_path / "build.py").write_text("", encoding="utf-8")
 
-    spec = importlib.util.spec_from_file_location("build", REPO_ROOT / "build.py")
-    assert spec is not None and spec.loader is not None
-    build = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(build)
-    monkeypatch.setattr(build, "REPO_ROOT", tmp_path)
-    monkeypatch.setattr(
-        build, "_git", lambda *args: "" if args[0] == "status" else "a" * 40
-    )
-    monkeypatch.setattr(build, "_dirty_submodules", lambda: [])
+    monkeypatch.syspath_prepend(str(REPO_ROOT / "cad" / "scripts"))
+    monkeypatch.syspath_prepend(str(REPO_ROOT))
+    import farm_build
+
+    monkeypatch.setattr(farm_build, "REPO_ROOT", tmp_path)
 
     def no_fleet_query(*args: object) -> None:
         pytest.fail("farm preflight queried the fleet before checking undefined names")
 
-    monkeypatch.setattr(build, "_require_fleet_protocol", no_fleet_query)
-    with pytest.raises(build.FarmPreflightError, match="F821") as refusal:
-        build._farm_preflight()
-    assert "undefined_names_gate_negative_control" in str(refusal.value)
+    monkeypatch.setattr(farm_build, "require_fleet_protocol", no_fleet_query)
+    record = {
+        "targets": ["local"],
+        "pool_home": str(tmp_path / "no-pool"),
+        "display_name": "Undefined-names negative control",
+        "force_cache_refresh": [],
+        "force_cache_refresh_reason": None,
+    }
+    namespace = {"task_local": lambda: {"actions": [lambda: pytest.fail("ran")]}}
+    assert farm_build.run_farm_build(record, namespace) == 2
+    error = capsys.readouterr().err
+    assert "F821" in error
+    assert "undefined_names_gate_negative_control" in error

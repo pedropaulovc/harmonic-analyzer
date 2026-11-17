@@ -61,7 +61,7 @@ Drawing registry lookups use the underscore task name, for example
 (`dt-crankshaft`) names exported files; it is not a registry key or alias.
 
 
-Follow [BUILDING.md](BUILDING.md) and [the supervised farm-launch contract](../../DEVELOPING.md#supervised-farm-launches) for executor and launch requirements. Geometric API names, features, sketches, dimensions, mate labels and machine-configuration concepts are unchanged by this naming policy.
+Follow [BUILDING.md](BUILDING.md) and [the farm-build contract](../../DEVELOPING.md#farm-builds-farm_buildpy) for executor and launch requirements. Geometric API names, features, sketches, dimensions, mate labels and machine-configuration concepts are unchanged by this naming policy.
 
 Assembly saves and refreshes stamp the Number from the assembly's own YAML
 contract. Each part's frozen registry row, selected by canonical `part_name`,

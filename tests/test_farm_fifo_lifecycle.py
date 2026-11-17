@@ -20,7 +20,6 @@ from types import SimpleNamespace
 
 import doit.cmd_base as _doit_cmd_base
 import pytest
-from doit.cmd_base import ModuleTaskLoader
 from doit.dependency import JsonDB
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -28,9 +27,8 @@ sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "cad" / "scripts"))
 
 import _farm  # noqa: E402
-import build  # noqa: E402
+import farm_build  # noqa: E402
 
-_RealFarmDoitMain = build._FarmDoitMain
 DISPLAY_NAME = "FIFO lifecycle test"
 INHERITED_BUILD_ID = "20261010T190000.000000Z-" + "a" * 32
 FARM_RUN = "launcher-run-is-not-the-build-id"
@@ -249,7 +247,7 @@ def _guarded_process(tmp_path, monkeypatch):
 
     requests = tmp_path / "requests"
     requests.mkdir()
-    monkeypatch.setenv("HARMONIC_FARM_REQUESTS", str(requests))
+    monkeypatch.setenv("HARMONIC_FARM_RUN_DIR", str(requests))
     monkeypatch.setenv("HARMONIC_FARM_RUN", FARM_RUN)
     monkeypatch.setenv("HARMONIC_FARM_DISPLAY_NAME", DISPLAY_NAME)
     monkeypatch.setenv("HARMONIC_FARM_BUILD_ID", INHERITED_BUILD_ID)
@@ -935,7 +933,7 @@ def test_terminal_coordinator_start_rejection_fails_closed_without_new_registrat
 def test_build_that_cannot_be_recorded_never_connects_or_registers(
     control, monkeypatch, tmp_path
 ):
-    monkeypatch.setenv("HARMONIC_FARM_REQUESTS", str(tmp_path / "missing"))
+    monkeypatch.setenv("HARMONIC_FARM_RUN_DIR", str(tmp_path / "missing"))
     ownership = _farm.producer_build(DISPLAY_NAME)
     with pytest.raises(FileNotFoundError):
         with ownership:
@@ -947,8 +945,12 @@ def test_build_that_cannot_be_recorded_never_connects_or_registers(
     assert os.environ["HARMONIC_FARM_BUILD_ID"] == INHERITED_BUILD_ID
 
 
-def _install_serial_build(monkeypatch, action, *, uptodate=None):
-    """Keep the real build/main/doit wrapper, but never a real graph or DB."""
+def _install_serial_build(monkeypatch, action, *, uptodate=None, preflight=None):
+    """The real farm_build preflight/doit/producer path, but no real graph or DB.
+
+    ``preflight`` stands in for the fleet protocol check; the returned callable
+    runs ``farm_build.run_farm_build`` serially for the given targets and label.
+    """
 
     class MemoryJsonDB(JsonDB):
         def __init__(self, name, codec, *, module_name=None):
@@ -960,6 +962,18 @@ def _install_serial_build(monkeypatch, action, *, uptodate=None):
             pass
 
     monkeypatch.setattr(_doit_cmd_base, "JsonDB", MemoryJsonDB)
+    monkeypatch.setattr(
+        farm_build, "require_fleet_protocol",
+        lambda _pool, _protocol: (preflight or (lambda: None))(),
+    )
+    import _undefined_names
+    monkeypatch.setattr(
+        _undefined_names, "scan_undefined_names",
+        lambda _root: subprocess.CompletedProcess([], 0, "", ""),
+    )
+    for key in ("HARMONIC_FARM_ADMITTED_LEAVES", "HARMONIC_CACHE_REFRESH"):
+        monkeypatch.delenv(key, raising=False)
+
     def task_local_gap():
         # doit annotates each loaded dictionary; every invocation needs a fresh
         # top-level task, not the previous load's synthesized ``name`` field.
@@ -971,19 +985,17 @@ def _install_serial_build(monkeypatch, action, *, uptodate=None):
     namespace = {"task_local_gap": task_local_gap}
     config = {"GLOBAL": {"backend": "json", "dep_file": ":memory:"}}
 
-    class FixtureFarmDoit(_RealFarmDoitMain):
-        def __init__(self):
-            super().__init__(task_loader=ModuleTaskLoader(namespace), extra_config=config)
+    def run(targets=("local_gap",), display_name=DISPLAY_NAME):
+        record = {
+            "targets": list(targets), "pool_home": str(REPO_ROOT),
+            "display_name": display_name,
+            "force_cache_refresh": [], "force_cache_refresh_reason": None,
+        }
+        return farm_build.run_farm_build(
+            record, namespace, extra_config=config, parallelism="0"
+        )
 
-        def run(self, args):
-            serial = list(args)
-            for index in range(len(serial) - 1):
-                if serial[index:index + 2] == ["-n", "8"]:
-                    serial[index + 1] = "0"
-                    break
-            return super().run(serial)
-
-    monkeypatch.setattr(build, "_FarmDoitMain", FixtureFarmDoit)
+    return run
 
 
 def test_cache_only_zero_capacity_build_closes_safely_without_native_dispatch(
@@ -994,15 +1006,12 @@ def test_cache_only_zero_capacity_build_closes_safely_without_native_dispatch(
     control.occupied_capacity = 0
     control.outstanding_leaf_count = 0
     control.unconfirmed_attempt_count = 0
-    monkeypatch.setattr(build, "_farm_preflight", lambda: None)
 
     def refuse_native_work():
         raise AssertionError("cache-only task executed native work")
 
-    _install_serial_build(monkeypatch, refuse_native_work, uptodate=True)
-    assert build.main(
-        ["--executor", "farm", "--display-name", DISPLAY_NAME, "local_gap"]
-    ) == 0
+    run = _install_serial_build(monkeypatch, refuse_native_work, uptodate=True)
+    assert run() == 0
 
     [(registration, _options)] = control.calls("register_build")
     _assert_close(control, registration.build_id, "finished")
@@ -1015,7 +1024,7 @@ def test_cache_only_zero_capacity_build_closes_safely_without_native_dispatch(
     assert os.environ["HARMONIC_FARM_BUILD_ID"] == INHERITED_BUILD_ID
 
 
-def test_real_build_wrapper_mints_fresh_ids_only_after_successful_preflight(
+def test_real_build_mints_fresh_ids_only_after_successful_preflight(
     control, monkeypatch
 ):
     events = []
@@ -1038,11 +1047,10 @@ def test_real_build_wrapper_mints_fresh_ids_only_after_successful_preflight(
         events.append("action")
         observed.append(os.environ["HARMONIC_FARM_BUILD_ID"])
 
-    monkeypatch.setattr(build, "_farm_preflight", preflight)
     monkeypatch.setattr(_farm, "_build_id", mint)
-    _install_serial_build(monkeypatch, action)
+    run = _install_serial_build(monkeypatch, action, preflight=preflight)
     for _ in range(2):
-        assert build.main(["--executor", "farm", "--display-name", DISPLAY_NAME, "local_gap"]) == 0
+        assert run() == 0
         assert os.environ["HARMONIC_FARM_BUILD_ID"] == INHERITED_BUILD_ID
 
     assert events == ["preflight", "mint", "action", "preflight", "mint", "action"]
@@ -1059,19 +1067,17 @@ def test_real_build_wrapper_mints_fresh_ids_only_after_successful_preflight(
 
 
 @pytest.mark.parametrize("action_succeeds", [True, False])
-def test_real_build_wrapper_preserves_command_exit_on_unacknowledged_close(
+def test_real_build_preserves_command_exit_on_unacknowledged_close(
     control, monkeypatch, action_succeeds
 ):
-    monkeypatch.setattr(build, "_farm_preflight", lambda: None)
     executed = []
 
     def action():
         executed.append(os.environ["HARMONIC_FARM_BUILD_ID"])
         return action_succeeds
 
-    _install_serial_build(monkeypatch, action)
-    arguments = ["--executor", "farm", "--display-name", DISPLAY_NAME, "local_gap"]
-    baseline = build.main(arguments)
+    run = _install_serial_build(monkeypatch, action)
+    baseline = run()
     assert (baseline == 0) is action_succeeds
     [(baseline_registration, _options)] = control.calls("register_build")
     reason = "finished" if action_succeeds else "failed"
@@ -1080,7 +1086,7 @@ def test_real_build_wrapper_preserves_command_exit_on_unacknowledged_close(
     assert os.environ["HARMONIC_FARM_BUILD_ID"] == INHERITED_BUILD_ID
 
     control.close_response = TimeoutError("close reply lost")
-    result = build.main(arguments)
+    result = run()
 
     assert result == baseline, "an unacknowledged close replaced the runner's actual exit"
     registrations = [registration for registration, _options in control.calls("register_build")]
@@ -1098,15 +1104,15 @@ def test_real_build_wrapper_preserves_command_exit_on_unacknowledged_close(
 
 
 @pytest.mark.parametrize(
-    ("refusal", "argv", "exit_code", "preflight_count"),
+    ("refusal", "targets", "label", "exit_code", "preflight_count"),
     [
-        ("selection", ["local_typo"], 3, 0),
-        ("label", ["--display-name=bad\nlabel", "local_gap"], 2, 0),
-        ("preflight", ["local_gap"], 2, 1),
+        ("selection", ["local_typo"], DISPLAY_NAME, 3, 0),
+        ("label", ["local_gap"], "bad\nlabel", 2, 0),
+        ("preflight", ["local_gap"], DISPLAY_NAME, 2, 1),
     ],
 )
-def test_real_wrapper_refusal_never_mints_records_registers_or_executes(
-    control, monkeypatch, refusal, argv, exit_code, preflight_count
+def test_real_build_refusal_never_mints_records_registers_or_executes(
+    control, monkeypatch, refusal, targets, label, exit_code, preflight_count
 ):
     preflights = []
     executed = []
@@ -1114,16 +1120,15 @@ def test_real_wrapper_refusal_never_mints_records_registers_or_executes(
 
     def preflight():
         preflights.append(1)
-        raise build.FarmPreflightError("preflight rejected before ownership")
+        raise farm_build.FarmPreflightError("preflight rejected before ownership")
 
     def mint():
         minted.append(1)
         raise AssertionError(f"{refusal} refusal minted a build ID")
 
-    monkeypatch.setattr(build, "_farm_preflight", preflight)
     monkeypatch.setattr(_farm, "_build_id", mint)
-    _install_serial_build(monkeypatch, lambda: executed.append(1))
-    assert build.main(["--executor", "farm", *argv]) == exit_code
+    run = _install_serial_build(monkeypatch, lambda: executed.append(1), preflight=preflight)
+    assert run(targets, label) == exit_code
     assert len(preflights) == preflight_count
     assert minted == []
     assert executed == []
@@ -1216,11 +1221,14 @@ class _LeafControl:
             f"submit:{self.key.build_id}:{self.key.workflow_id}".encode()
         ).hexdigest()
         self.updates.append((name, arg, options))
-        records = [json.loads(path.read_text("utf-8")) for path in self.requests.iterdir()]
+        records = [
+            json.loads(path.read_text("utf-8"))
+            for path in (self.requests / "leaves").iterdir()
+        ]
         assert records == [{
             "task": self.request.task, "workflow_id": self.workflow_id,
             "build_id": self.request.build_id, "farm_run": FARM_RUN,
-            "refresh_reason": None,
+            "refresh_reason": None, "state": "requested",
         }]
         return self.reserved
 

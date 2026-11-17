@@ -23,6 +23,7 @@ def scan_undefined_names(repo_root: Path) -> subprocess.CompletedProcess[str]:
             "cad/scripts",
             "dodo.py",
             "build.py",
+            "farm_build.py",
         ],
         cwd=repo_root,
         capture_output=True,

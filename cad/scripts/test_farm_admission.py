@@ -1,14 +1,14 @@
 """Selected-pool leaf admission, with real doit parsing but no farm or COM.
 
 The pool fixture deliberately admits exact task names, not production prefixes.
-Only its stdlib protocol runs in a child Python; uv, the fleet and ownership are
-intercepted before they can contact a service or write a production request.
+``farm_build.run_farm_build`` loads its stdlib protocol in-process; the fleet
+check and ownership are intercepted before they can contact a service or write
+a production record.
 """
 
 import ast
 import json
 import os
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -16,7 +16,7 @@ from types import SimpleNamespace
 
 import pytest
 import doit.cmd_base as _doit_cmd_base
-from doit.cmd_base import ModuleTaskLoader
+from doit.cmd_base import tasks_and_deps_iter
 from doit.control import TaskControl
 from doit.dependency import JsonDB
 from doit.task import Task
@@ -26,10 +26,11 @@ sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "cad" / "scripts"))
 
 import _farm  # noqa: E402
+import _undefined_names  # noqa: E402
 import build  # noqa: E402
+import farm_build  # noqa: E402
 
 _REAL_RUN = subprocess.run
-_REAL_FARM_DOIT = build._FarmDoitMain
 _REAL_RUN_LEAF = _farm.run_leaf
 _LABEL = "Offline selected-pool admission regression"
 
@@ -37,29 +38,33 @@ _LABEL = "Offline selected-pool admission regression"
 @pytest.fixture
 def admission(tmp_path, monkeypatch):
     events = []
-    calls = []
-    monkeypatch.setenv("HARMONIC_FARM_DISPLAY_NAME", _LABEL)
-    monkeypatch.setenv("HARMONIC_FARM_REQUESTS", str(tmp_path / "requests"))
+    selected = {"pool": tmp_path / "no-pool-selected"}
+    (tmp_path / "run").mkdir()
+    monkeypatch.setenv("HARMONIC_FARM_RUN_DIR", str(tmp_path / "run"))
     for key in (
-        "HARMONIC_EXECUTOR",
-        "HARMONIC_FARM_COMMIT",
         "HARMONIC_FARM_BUILD_ID",
-        "HARMONIC_FARM_PARALLELISM",
-        "HARMONIC_FARM_LEAF_TIMEOUT_S",
-        "HARMONIC_VERBOSITY",
         "HARMONIC_FARM_ADMITTED_LEAVES",
+        "HARMONIC_CACHE_REFRESH",
     ):
-        # Track originally absent keys too: build.main writes executor state
-        # directly, so a plain delenv on an absent key would not restore it.
+        # Track originally absent keys too: run_farm_build writes admission
+        # state directly, so a plain delenv on an absent key would not restore it.
         monkeypatch.setenv(key, "fixture-clear")
         monkeypatch.delenv(key, raising=False)
 
     def forbidden(*_args, **_kwargs):
-        pytest.fail("admission contacted the fleet or dispatched a farm leaf")
+        pytest.fail("admission dispatched a farm leaf")
 
-    monkeypatch.setattr(build, "_pool_farm", forbidden)
     monkeypatch.setattr(_farm, "run_leaf", forbidden)
-    monkeypatch.setattr(build, "_farm_preflight", lambda: events.append("preflight"))
+    monkeypatch.setattr(
+        farm_build,
+        "require_fleet_protocol",
+        lambda _pool, _protocol: events.append("preflight"),
+    )
+    monkeypatch.setattr(
+        _undefined_names,
+        "scan_undefined_names",
+        lambda _root: subprocess.CompletedProcess([], 0, "", ""),
+    )
     monkeypatch.setattr(
         _farm, "_build_id", lambda: events.append("mint") or "fixture-id"
     )
@@ -101,11 +106,6 @@ def admission(tmp_path, monkeypatch):
         package = home / "agent"
         package.mkdir(parents=True)
         (home / "rule.json").write_text(json.dumps(list(accepted)), encoding="utf-8")
-        (home / "pyproject.toml").write_text(
-            '[project]\nname = "admission-fixture-pool"\nversion = "0.0.0"\n'
-            'requires-python = ">=3.12,<3.15"\n[tool.uv]\npackage = false\n',
-            encoding="utf-8",
-        )
         if protocol is None:
             protocol = (
                 "import json\n"
@@ -117,26 +117,8 @@ def admission(tmp_path, monkeypatch):
                 "    return task in json.loads((HOME / 'rule.json').read_text(encoding='utf-8'))\n"
             )
         (package / "protocol.py").write_text(protocol, encoding="utf-8")
-        monkeypatch.setenv("SOLIDWORKS_POOL_HOME", str(home))
+        selected["pool"] = home
         return home
-
-    def intercept(argv, **kwargs):
-        argv = list(argv)
-        candidates = json.loads(kwargs["input"])
-        assert isinstance(candidates, list)
-        assert all(isinstance(task, str) for task in candidates)
-        assert len(candidates) == len(set(candidates))
-        calls.append((argv, candidates))
-        # Execute the actual production -c program, not a duplicated protocol
-        # query. The fixture protocol needs no pool dependencies or installation.
-        child_kwargs = dict(kwargs)
-        # A hang bound, not a speed budget: interpreter start-up on a loaded
-        # Windows host under check:recipe's parallel workers exceeded 10 s.
-        child_kwargs["timeout"] = 60
-        code_index = argv.index("-c")
-        return _REAL_RUN([sys.executable, *argv[code_index:]], **child_kwargs)
-
-    monkeypatch.setattr(build.subprocess, "run", intercept)
 
     def action(name, marked=True):
         def record(*_args, **_kwargs):
@@ -145,8 +127,8 @@ def admission(tmp_path, monkeypatch):
 
         return _farm.leaf_action(record) if marked else record
 
-    def install(specs, defaults=("build",)):
-        namespace = {"DOIT_CONFIG": {"default_tasks": list(defaults)}}
+    def install(specs):
+        namespace = {}
         groups = {}
         for name, definition in specs.items():
             prefix, separator, suffix = name.partition(":")
@@ -164,25 +146,24 @@ def admission(tmp_path, monkeypatch):
                 yield from (definition.copy() for definition in definitions)
 
             namespace["task_" + prefix] = task
-
-        class FixtureFarmDoit(_REAL_FARM_DOIT):
-            def __init__(self):
-                super().__init__(
-                    task_loader=ModuleTaskLoader(namespace),
-                    extra_config={
-                        "GLOBAL": {"backend": "json", "dep_file": ":memory:"}
-                    },
-                )
-
-            def run(self, args):
-                # Explicit serial execution keeps the fake action observations
-                # in this process and avoids workers, subprocesses and a DB.
-                return super().run(args)
-
-        monkeypatch.setattr(build, "_FarmDoitMain", FixtureFarmDoit)
+        selected["namespace"] = namespace
 
     def run(*selectors):
-        return build.main(["--executor", "farm", "-n", "0", *selectors])
+        record = {
+            "targets": list(selectors),
+            "pool_home": str(selected["pool"]),
+            "display_name": _LABEL,
+            "force_cache_refresh": [],
+            "force_cache_refresh_reason": None,
+        }
+        # Explicit serial execution keeps the fake action observations in this
+        # process and avoids workers, subprocesses and a DB.
+        return farm_build.run_farm_build(
+            record,
+            selected["namespace"],
+            extra_config={"GLOBAL": {"backend": "json", "dep_file": ":memory:"}},
+            parallelism="0",
+        )
 
     def queried(home):
         log = home / "queried.jsonl"
@@ -192,7 +173,6 @@ def admission(tmp_path, monkeypatch):
 
     return SimpleNamespace(
         events=events,
-        calls=calls,
         pool=pool,
         action=action,
         install=install,
@@ -206,9 +186,15 @@ def _assert_no_ownership_or_actions(admission):
     assert admission.events == [], (
         "refused admission ran preflight, ownership or an action"
     )
-    assert not (admission.tmp_path / "requests").exists()
+    assert list((admission.tmp_path / "run").iterdir()) == []
     assert os.environ.get("HARMONIC_FARM_BUILD_ID") is None
-    assert os.environ.get("HARMONIC_FARM_COMMIT") is None
+    assert os.environ.get("HARMONIC_FARM_ADMITTED_LEAVES") is None
+
+
+def _closure(tasks, selection):
+    control = build._validate_farm_selection(tasks, selection)
+    assert isinstance(control, TaskControl)
+    return list(tasks_and_deps_iter(control.tasks, control.selected_tasks))
 
 
 @pytest.mark.parametrize("selector", ["features:probe", "novel:probe", "part:probe"])
@@ -283,7 +269,6 @@ def test_requested_closure_reports_every_refused_prefix_and_skips_unselected_lea
         "novel:probe",
         "unusual:fixture-ok",
     }
-    assert len(admission.calls) == 1
     _assert_no_ownership_or_actions(admission)
     # The focused -s invocation doubles as an offline refusal demonstration.
     # capsys otherwise captures even with -s, so release it only for that mode.
@@ -292,12 +277,7 @@ def test_requested_closure_reports_every_refused_prefix_and_skips_unselected_lea
             print(error, end="")
 
 
-@pytest.mark.parametrize(
-    "selectors", [("features:*",), ()], ids=["wildcard", "defaults"]
-)
-def test_wildcard_and_default_selections_check_all_selected_leaves(
-    admission, capsys, selectors
-):
+def test_wildcard_selection_checks_all_selected_leaves(admission, capsys):
     home = admission.pool()
     admission.install(
         {
@@ -308,7 +288,7 @@ def test_wildcard_and_default_selections_check_all_selected_leaves(
         }
     )
 
-    assert admission.run(*selectors) == 2
+    assert admission.run("features:*") == 2
     error = capsys.readouterr().err
     assert "features:first" in error
     assert "features:second" in error
@@ -390,9 +370,8 @@ def test_selected_pool_protocol_overrides_an_inherited_import_path(
     assert not (decoy / "queried.jsonl").exists()
 
 
-def test_only_aggregate_and_local_actions_skip_pool_lookup_and_query(
-    admission, monkeypatch
-):
+def test_only_aggregate_and_local_actions_skip_pool_lookup_and_query(admission):
+    # No pool is selected at all: the fixture's default home does not exist.
     admission.install(
         {
             "features:local": {"actions": [admission.action("local", marked=False)]},
@@ -402,12 +381,8 @@ def test_only_aggregate_and_local_actions_skip_pool_lookup_and_query(
             "build": {"actions": [], "task_dep": ["features:local"]},
         }
     )
-    monkeypatch.setattr(
-        build, "_pool_home", lambda: pytest.fail("no leaf needs a pool")
-    )
 
     assert admission.run("build") == 0
-    assert admission.calls == []
     assert ("action", "local") in admission.events
     assert ("action", "features:unselected") not in admission.events
 
@@ -427,9 +402,7 @@ def test_selection_and_admission_leave_original_dependencies_and_actions_intact(
     before = {task.name: list(task.task_dep) for task in tasks}
     original_actions = [first.actions[0], second.actions[0]]
 
-    control = build._validate_farm_selection(tasks, ["build", "consumer"])
-    assert isinstance(control, TaskControl)
-    build._require_leaf_admission(control)
+    farm_build.require_leaf_admission(_closure(tasks, ["build", "consumer"]), home)
 
     assert {task.name: task.task_dep for task in tasks} == before
     assert first.actions[0] is original_actions[0]
@@ -457,156 +430,21 @@ def test_pool_import_or_rule_failure_is_fail_closed(admission, capsys, protocol)
     error = capsys.readouterr().err
     assert error.startswith("farm:")
     assert "admission" in error
-    assert "exit" in error
+    assert "could not be read" in error
     _assert_no_ownership_or_actions(admission)
 
 
-@pytest.mark.parametrize(
-    "stdout",
-    [
-        "",
-        "not JSON",
-        "{}",
-        "null",
-        "[true]",
-        "[17]",
-        '["unselected:probe"]',
-        "noise\n[]",
-        '{"refused":["unselected:probe"]}',
-    ],
-    ids=[
-        "empty",
-        "non-json",
-        "object",
-        "null",
-        "bool",
-        "number",
-        "noncandidate",
-        "noise",
-        "foreign-task",
-    ],
-)
-def test_invalid_pool_response_is_fail_closed(admission, monkeypatch, capsys, stdout):
-    admission.pool()
-    admission.install(
-        {"features:probe": {"actions": [admission.action("features:probe")]}}
-    )
-    monkeypatch.setattr(
-        build.subprocess,
-        "run",
-        lambda argv, **_kwargs: subprocess.CompletedProcess(argv, 0, stdout, ""),
-    )
-
-    assert admission.run("features:probe") == 2
-    assert "invalid response" in capsys.readouterr().err
-    _assert_no_ownership_or_actions(admission)
-
-
-def test_admission_subprocess_unavailable_is_fail_closed(
-    admission, monkeypatch, capsys
-):
-    admission.pool()
-    admission.install(
-        {"features:probe": {"actions": [admission.action("features:probe")]}}
-    )
-
-    def unavailable(*_args, **_kwargs):
-        raise FileNotFoundError(2, "fixture uv unavailable", "uv")
-
-    monkeypatch.setattr(build.subprocess, "run", unavailable)
-    assert admission.run("features:probe") == 2
-    error = capsys.readouterr().err
-    assert "admission" in error
-    assert "could not start" in error
-    assert "fixture uv unavailable" in error
-    _assert_no_ownership_or_actions(admission)
-
-
-def test_nonzero_admission_exit_does_not_trust_successful_looking_stdout(
-    admission, monkeypatch, capsys
-):
-    admission.pool()
-    admission.install(
-        {"features:probe": {"actions": [admission.action("features:probe")]}}
-    )
-    monkeypatch.setattr(
-        build.subprocess,
-        "run",
-        lambda argv, **_kwargs: subprocess.CompletedProcess(
-            argv, 19, "[]", "fixture protocol unavailable"
-        ),
-    )
-
-    assert admission.run("features:probe") == 2
-    error = capsys.readouterr().err
-    assert "exit 19" in error
-    assert "fixture protocol unavailable" in error
-    _assert_no_ownership_or_actions(admission)
-
-
-@pytest.mark.parametrize("missing", ["pyproject.toml", "agent/protocol.py"])
-def test_missing_pool_admission_files_are_refused_before_starting_uv(
-    admission, monkeypatch, capsys, missing
-):
+def test_missing_pool_protocol_is_refused(admission, capsys):
     home = admission.pool(accepted=["features:probe"])
-    (home / missing).unlink()
+    (home / "agent" / "protocol.py").unlink()
     admission.install(
         {"features:probe": {"actions": [admission.action("features:probe")]}}
     )
-    monkeypatch.setattr(
-        build.subprocess,
-        "run",
-        lambda *_args, **_kwargs: pytest.fail("missing files started uv"),
-    )
     assert admission.run("features:probe") == 2
     error = capsys.readouterr().err
-    assert "missing required admission files" in error
+    assert "agent/protocol.py" in error
     assert str(home) in error
-    assert str(Path(missing)) in error
     _assert_no_ownership_or_actions(admission)
-
-
-@pytest.mark.skipif(shutil.which("uv") is None, reason="uv is not available")
-def test_real_uv_uses_the_selected_pool_project_and_environment(admission, monkeypatch):
-    protocol = """
-import json, os, sys
-from pathlib import Path
-def leaf_admitted(task):
-    Path('runtime.json').write_text(json.dumps({
-        'prefix': sys.prefix, 'cwd': os.getcwd(),
-        'virtual_env': os.environ.get('VIRTUAL_ENV'),
-    }), encoding='utf-8')
-    return task == 'features:fixture-ok'
-"""
-    home = admission.pool(accepted=["features:fixture-ok"], protocol=protocol)
-    monkeypatch.setenv("UV_PYTHON", sys.executable)
-    monkeypatch.setenv("UV_PYTHON_DOWNLOADS", "never")
-    monkeypatch.setenv("UV_OFFLINE", "1")
-    inherited = str(admission.tmp_path / "unrelated-outer-venv")
-    monkeypatch.setenv("VIRTUAL_ENV", inherited)
-    env = {key: value for key, value in os.environ.items() if key != "VIRTUAL_ENV"}
-    locked = _REAL_RUN(
-        ["uv", "lock", "--offline", "--project", str(home)],
-        cwd=home,
-        env=env,
-        capture_output=True,
-        text=True,
-        timeout=60,
-    )
-    assert locked.returncode == 0, locked.stdout + locked.stderr
-    monkeypatch.setattr(build.subprocess, "run", _REAL_RUN)
-    control = build._validate_farm_selection(
-        [Task("features:fixture-ok", [admission.action("features:fixture-ok")])],
-        ["features:fixture-ok"],
-    )
-    labels = build._require_leaf_admission(control)
-    assert labels == ["features:fixture-ok"]
-    runtime = json.loads((home / "runtime.json").read_text(encoding="utf-8"))
-    assert Path(runtime["cwd"]).resolve() == home.resolve()
-    assert Path(runtime["prefix"]).resolve() == (home / ".venv").resolve()
-    assert Path(runtime["virtual_env"]).resolve() == (home / ".venv").resolve()
-    assert runtime["virtual_env"] != inherited
-    assert admission.events == []
 
 
 @pytest.mark.parametrize(
@@ -653,7 +491,6 @@ def test_actual_dispatch_label_requires_scoped_admission(
     assert len(errors) == 1
     assert dispatched_label in errors[0]
     assert "lacks preflight admission" in errors[0]
-    assert os.environ.get("HARMONIC_FARM_ADMITTED_LEAVES") == inherited
     assert admission.events[-2:] == [("finish", False), "close"]
 
 

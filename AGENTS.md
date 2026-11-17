@@ -263,9 +263,8 @@ gate to force it.
 ### Rolling main and daily releases
 
 The release manager continuously runs the full `build` pipeline on `main`,
-including every part, assembly and check. On the farm, use the supervised
-launcher with no `-n`: `build.py --executor farm` keeps 8 leaves in flight,
-while a hand-passed `-n 4` leaves the fifth worker idle.
+including every part, assembly and check. On the farm, run it through
+`farm_build.py`, which keeps 8 leaves in flight (`HARMONIC_FARM_PARALLELISM`).
 
 When rolling-main validation fails, the release manager attributes the failure.
 If the repair is simple and bounded, delegate it immediately for a prompt
@@ -317,18 +316,17 @@ the COM tasks):
 ```
 uv run python -m doit             # = `build`: everything + every gate
 uv run python -m doit -n 4        # local seat only: check:* fanned out in parallel
-                                  # (farm: pass no -n; build.py defaults to 8)
 uv run python -m doit build_bare  # quick: parts + assemblies only
 uv run python -m doit check:math  # one SolidWorks-free gate (no SW needed)
-uv run python build.py --help     # the wrapper's options (--executor, --leaf-timeout,
-                                  # --verbosity), the farm defaults, then doit's commands
+uv run python build.py --help     # the local wrapper's options, then doit's commands
+uv run python farm_build.py --help  # the farm CLI: run / watch / status / list / cancel
 ```
 
 The SolidWorks-free `check:*` gates and the comparison/diff tooling run from this
 `.venv` with nothing else installed; the COM tasks (`part:`/`assembly:`/`drawing:`/
 `verify_soundness:`/`verify:`/`preflight`/`export`/`package:release`) need a
-SolidWorks seat — either open on this machine (`--executor local`) or on the build
-farm (`--executor farm`, which is how a seatless machine runs them).
+SolidWorks seat — either open on this machine (`build.py`, always local) or on the
+build farm (`farm_build.py`, which is how a seatless machine runs them).
 
 `check:graph` includes the SolidWorks-free part-coverage contract
 (`cad/scripts/test_part_coverage.py`). Every non-tooling part must be reachable
@@ -348,89 +346,49 @@ Bands used only by indexed inspection/stack calculations belong in
 Keep names passed to `blank_reference_geometry` literal at their authoring site
 so the offline stale-feature check can see that the builder creates them.
 
-**An agent-driven farm build runs under the supervised launcher, never under a
-harness deadline.** `scripts/farm-run.ps1` started with `hub` (`persist: true`)
-is the only sanctioned way for an agent to submit `--executor farm` work; the
-full contract, parameters, run records and recovery procedure live in
-[`DEVELOPING.md`](DEVELOPING.md#supervised-farm-launches). Seven rules bind every
-such build:
+**Every farm build goes through `farm_build.py`** (the full contract lives in
+[`DEVELOPING.md`](DEVELOPING.md#farm-builds-farm_buildpy)):
 
-- No finite local timer. A cold leaf has measured 61.5 min and a full closure
-  runs for hours, so a Bash job or a 300 s tool deadline kills a still-valid
-  build and leaves the remote workflow running.
-- Every launch requires `-DisplayName`: a short owner/session plus the reason,
-  for example `'InchPD - Add new drawing detail view to pd_transgear_stub v3'`.
-  Use a nonblank single-line label without control characters, at most 160
-  characters, and include it in
-  the handoff. Temporal memo `display_name` identifies the workflow's creator;
-  attaching with `USE_EXISTING` retains that creator's label and `farm_run`,
-  rather than transferring ownership to the attaching session. The label does
-  not change the leaf request, workflow ID or cache key.
-- Task names use prefixed underscores (`part:pn_pen_rod`). An unknown or dashed
-  target is refused with doit's invalid-command exit 3, naming the target,
-  before any fleet query or workflow submission; a failed farm preflight
-  exits 2. Neither runs an action.
-  Farm preflight also runs the same `check:undefined_names` Ruff scan before
-  querying the fleet, so an undefined CAD/build-script name cannot dispatch a
-  COM leaf even when the stamped checks would run later in the doit graph.
-  It also checks every would-be leaf in the entire requested closure with
-  `-PoolHome`'s authoritative `agent.protocol.leaf_admitted`, naming refused
-  tasks/prefixes before FIFO registration (exit 2). Mixed agent versions are
-  expected during rolling upgrades and are not checked; the protocol version is.
-  This deliberately over-refuses for doit `-s`/`--single` and cache hits: the
-  entire requested closure is prechecked, even if some leaves would not run.
-  After successful preflight, the parent exports the admitted label set as
-  `HARMONIC_FARM_ADMITTED_LEAVES` only while executing the doit command in its
-  producer context, then restores the previous value; workers inherit it.
-  Actual `run_leaf(task, cache_key)` dispatch checks that set before any
-  request, span/config/identity lookup or reservation. A missing or invalid set,
-  or a task absent from it, raises a local `RuntimeError` naming the task and
-  its lack of preflight admission; never copy a prefix list into this guard.
-  Independently, the worker's exported graph is limited to the build/release
-  closure. Preflight admission does not enforce that worker restriction.
-  Forced overwrites use `-ForceCacheRefresh 'part:pn_pen_rod'` together with
-  `-ForceCacheRefreshReason 'Owner - Explain why the cached result is being replaced'`
-  on the launcher (or the matching `build.py --force-cache-refresh` /
-  `--force-cache-refresh-reason` flags). Reasons follow the display-name rules;
-  a reason without refresh labels is refused.
-  Invalid reasons, labels outside the selected closure and non-cache-keyed tasks
-  exit 2 before fleet queries or actions. Farm clients and workers must both
-  advertise protocol **7**; protocol 6 is refused, with no compatibility shim.
-- The build runs from a private snapshot of the pushed HEAD under
-  `-LogDirectory` (which must sit outside every Git worktree). The default root
-  is `$env:HARMONIC_AGENT_SCRATCHPAD` when set; otherwise, an OMP persistent
-  process with `OMPCODE=1` and working-directory basename `local` uses the
-  resolved session-local path. It stores logs, run records, snapshots, shared
-  environments and final output under
-  `<root>\harmonic-analyzer\farm-runs`; without an OMP local working directory,
-  it falls back to `%LOCALAPPDATA%\ha-farm\runs`. Set the service `cwd` to the
-  output of OMP's outer-shell `realpath local://`; the PowerShell launcher
-  cannot resolve that URI. Explicit `-LogDirectory` overrides the default.
-  Outputs land in the run record's `outputs` (`<LogDirectory>\<run-id>.out`),
-  not the worktree's `cad/out`, and recovery works from the recorded commit,
-  not the worktree. A direct `build.py --executor farm` has no snapshot: it
-  refuses to dispatch a leaf whose key a checkout change since launch can
-  move, naming the files, so never commit or edit in that worktree mid-run.
-- Prove one real remote leaf on the launcher, protocol and pool configuration
-  you are about to use before fanning parallel agents out over the farm. A green
-  `check:math` is local-only and a submitter cache hit dispatches nothing;
-  neither is evidence of dispatch.
-- Never submit `-Targets "build"` inside a dev/test loop. A cache miss on any
-  part, drawing or shared helper cascades through its assemblies into
-  `assembly:ha_harmonic_analyzer`, `drawing:ha_harmonic_analyzer_assembly` and
-  `verify_soundness:ha_harmonic_analyzer`, the slowest leaves on the farm, so
-  every iteration pays for them. While iterating, launch only the leaves the
-  change touches (`-Targets "drawing:dt_cone_gear,drawing:pd_transgear_arm"`;
-  doit pulls in their real dependencies). The release manager runs the full
-  `build` continuously on main; it is not an individual PR merge gate.
-- Hand off the run id and `-LogDirectory` — plus the hub name, worktree,
-  pushed HEAD, pool, exact targets and leaf budget — rather than letting a
-  successor recreate the command. The successor tracks the run with the same
-  script that launched it: `farm-run.ps1 -Watch -RunId <id> -LogDirectory <dir>`
-  is the required watcher (exit 0 succeeded, 20 failed, 21 launcher-died,
-  22 cancelled), `-Status` reports it once, `-Cancel -Why …` is the only way to
-  stop it. Never wait for `.done` or parse the records by hand. `launcher-died`
-  means the local outcome is unknown, never that the remote work was cancelled.
+```
+uv run python farm_build.py run part:pn_pen_rod --display-name "Owner - Why" --leaf-timeout 90
+uv run python farm_build.py watch <run-id | tag>     # exit 0 succeeded, 20 failed, 21 launcher-died, 22 cancelled
+uv run python farm_build.py status <run-id | tag>    # one JSON status
+uv run python farm_build.py list [--tag T] [--state S]
+uv run python farm_build.py cancel <run-id | tag> --why "superseded by <sha>"
+```
+
+- `run` builds the **pushed, clean HEAD** of this worktree (`--worktree` picks
+  another). It refuses before writing anything (exit 2) on a dirty tree, a HEAD
+  not on origin, `release`, a `name=value` or empty target, a missing/invalid
+  `--display-name` (nonblank, single-line, ≤160 characters; owner/session plus
+  reason, e.g. `'InchPD - Add detail view to pd_transgear_stub v3'`) or a
+  `--leaf-timeout` outside 1–180 minutes. It then starts a detached supervisor
+  and returns once the build has passed its preflight and registered with the
+  FIFO coordinator (exit 0), or with the build's own exit code if it stopped
+  first. The supervisor survives the caller and every harness deadline, so no
+  OMP service or `persist` is needed to launch; `watch` is the long-running part
+  (run it with no timeout, or poll `status`).
+- Preflight (inside the build, before any farm side effect): doit parses the
+  targets (unknown target → exit 3); every would-be leaf in the requested closure
+  is checked against the pool's `agent/protocol.py` `leaf_admitted`; forced
+  refreshes must name cache-keyed leaves in the closure; the
+  `check:undefined_names` Ruff scan must pass; the fleet must advertise protocol
+  **7** (`farm.py agents --json`). Any refusal exits 2.
+- Forced overwrites: `--force-cache-refresh 'part:pn_pen_rod'
+  --force-cache-refresh-reason 'Owner - Why the cached result is replaced'`.
+- Records live under `%LOCALAPPDATA%\ha-farm\runs\<run-id>\` (override with
+  `--runs-dir`/`HARMONIC_FARM_RUNS`; must be outside every worktree): `run.json`,
+  `build.log`, `build.json`, one `leaves/*.json` per farm workflow, `status.json`
+  and the build's `out/` (its `cad/out`). The worktree's own `cad/out` is untouched.
+- Prove one real remote leaf before fanning agents out over the farm; a green
+  `check:math` or a submitter cache hit dispatches nothing.
+- Never target `build` inside a dev/test loop: a miss cascades into
+  `assembly:ha_harmonic_analyzer` and the other slowest leaves. Launch only the
+  leaves the change touches (`run drawing:dt_cone_gear drawing:pd_transgear_arm`;
+  doit pulls in their real dependencies).
+- Hand off the run id (or `--tag`). `launcher-died` means the local outcome is
+  unknown and remote leaves may still run, never that they were cancelled; only
+  `cancel` stops them, and it exits 1 (retry it) while any leaf is unaccounted for.
 
 ## Task groups — the prefix tells you if SolidWorks is needed
 
@@ -576,16 +534,16 @@ approval.
 - `build` is the **one** fully-safe entry: every part + assembly + every gate.
   (`verify.py` has no `--suite all` anymore — `build` replaced it.) It offers the
   SAME closure under both executors: every COM task, gates included, is a
-  cache-keyed leaf, so `--executor farm` (`./build`) runs the whole thing without a
+  cache-keyed leaf, so `farm_build.py run build` runs the whole thing without a
   local seat.
-- Under `--executor farm` each leaf gets 15 min on the worker by default. A cold
+- On the farm each leaf gets the `--leaf-timeout` budget `farm_build.py run`
+  requires (1–180 min). A cold
   run (nothing in the remote cache, workers that must shallow-fetch the exact
   commit and synchronize the locked external environment, and a cold SolidWorks
   start) needs more — the slowest measured pre-migration leaf was `part:fulcrum_keeper` at
-  61.5 min — so pass `--leaf-timeout <minutes>` (or set
-  `HARMONIC_FARM_LEAF_TIMEOUT_S`); the farm clamps the request to 60 s–3 h.
-  Leaving it at the default on a cold run costs one retry and then a
-  `platform`-style failure per slow leaf.
+  61.5 min — so give a cold run a generous budget (90); the farm clamps the
+  request to 60 s–3 h. Too small a budget on a cold run costs one retry and then
+  a `platform`-style failure per slow leaf.
 - `build_bare` = parts + assemblies only (fast, no gates, no export).
 - `release` is opt-in: `doit release` defaults to the next `vNN`; pass an
   explicit tag/options after `--` (for example, `doit release -- v22 --draft`).
@@ -597,17 +555,16 @@ approval.
   README image files. It may merge immediately. Plan or shop changes, code,
   prose, docs, README markup/layout or any other change stays in an ordinary PR
   and MUST satisfy the ordinary PR requirements.
-- For a supervised farm release, launch only
-  `-Targets "build,export,package:release,preflight"` through
-  `scripts/farm-run.ps1` (`build` supplies drawing and check gates). On recorded
-  success restore the complete `cad/out` from `.done`'s `outputs` path to the
-  owning worktree, then run `uv run --frozen python -m doit -s gallery`,
+- For a farm release, run only `build export package:release preflight` through
+  `farm_build.py run` (`build` supplies drawing and check gates). On success copy
+  the run's complete `out/` (`status` → `outputs`) over the owning worktree's
+  `cad/out`, then run `uv run --frozen python -m doit -s gallery`,
   `uv run --frozen python -m doit -s prechips` (every enrolled traveler, from the
   restored feature bundles) and `uv run --frozen python -m doit -s release -- vNN`
   there. This avoids
   postpublish changes being discarded with the snapshot and prevents local COM
   redispatch. See
-  [`DEVELOPING.md`](DEVELOPING.md#supervised-farm-releases).
+  [`DEVELOPING.md`](DEVELOPING.md#farm-releases).
 - The tracked `cad/config/release.yaml` value is the Revision on every
   `.SLDPRT`, `.SLDASM`, and linked drawing title block. Process plans carry no
   revision literal: they bind it from the exported manifest. The publisher
@@ -1076,15 +1033,15 @@ fail a build):
   reads a file. On a HIT under a key this seat never published — the
   store-skip-on-hit drift that bit v0.9.0 — `restore` emits a `WARN` and a
   `restore_hit_drift` event. A process that *structurally cannot* publish (a
-  `--executor farm` submitter, which dispatches every leaf and never reaches
+  farm submitter, which dispatches every leaf and never reaches
   `store`; a `ro` seat) hits foreign keys as its normal path, so there the same
   event is recorded with `drift_expected: true` + a `drift_reason` and logged at
   debug — the `WARN` keeps meaning "a publishing seat drifted".
 
 **Reasoned, per-leaf refresh.** To deliberately replace an unchanged leaf's cached
-result, use `build.py --executor local --force-cache-refresh part:pn_pen_rod
+result, use `build.py --force-cache-refresh part:pn_pen_rod
 --force-cache-refresh-reason "Owner - Investigate unchanged-input result" part:pn_pen_rod`.
-The same flags work with `--executor farm` through the supervised launcher above.
+The same flags work on `farm_build.py run`.
 The label option is repeatable and accepts comma-separated exact task names.
 Only remote-cache-keyed leaves in the selected dependency closure qualify; ordinary
 stamped `check:*` tasks, aggregators, `prechips` and `gallery` do not. New cached
@@ -1449,7 +1406,7 @@ instead of reopening anything; the public `verify:soundness` task is a
 SolidWorks-free aggregator over those child stamps (it keeps the CLI and the
 release edge). `verify:kinematics` is one leaf. A gate's stamp IS its cached
 artefact — identical inputs imply an identical verdict — which is what lets a
-machine with no seat run the full gate set through `--executor farm`.
+machine with no seat run the full gate set through `farm_build.py`.
 
 `soundness` opens EVERY built (sub)assembly standalone and runs the shared health
 battery on each: **one shared re-solve** (`verify.rebuild`) after open, then DOF /

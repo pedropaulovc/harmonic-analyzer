@@ -21,19 +21,17 @@ import hashlib
 import json
 import os
 import socket
-import subprocess
 import threading
 import time
 import unicodedata
-from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from uuid import uuid4
 
-import _telemetry
+from doit.reporter import ConsoleReporter
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+import _telemetry
 
 FARM_PROTOCOL_VERSION = 7
 
@@ -187,139 +185,17 @@ def enabled() -> bool:
     return os.environ.get("HARMONIC_EXECUTOR", "local") == "farm"
 
 
-# A drift report names at most this many paths; a checkout moved to another
-# branch can differ in thousands, and the first few already say what happened.
-_DRIFT_PATHS_SHOWN = 10
-
 # Why a worker can build the leaf, exit 0 and still not publish the key this
-# submitter waits on, once checkout drift has been ruled out. The worker keys
-# the task from the launch commit; the submitter keyed it from this checkout
-# and this process's environment, so the causes are the ways those differ.
+# submitter waits on. The submitter builds from a private snapshot of the
+# launch commit (farm_build.py), so the causes are the ways its keying
+# environment differs from the worker's.
 CACHE_MISSING_CAUSES = (
     "the worker built the launch commit but did not publish the key this "
-    "submitter computed. Likely causes: an input this checkout keyed differently "
-    "from the commit (an artefact left by a local COM build whose .execution "
-    "token no worker can reproduce -- e.g. a HARMONIC_REMOTE_CACHE_MODE=ro local "
-    "build; `doit forget` the task and its dependents so they re-probe -- or a "
-    "checkout edit that was reverted before this check), HARMONIC_CACHE_SALT / "
+    "submitter computed. Likely causes: HARMONIC_CACHE_SALT / "
     "HARMONIC_CACHE_ACCOUNT / HARMONIC_CACHE_CONTAINER differing from the "
     "workers', or a publish that failed on the worker (see its task.log). Compare "
     "this task's row in cad/out/reports/cache.jsonl with the worker's"
 )
-
-# Tracked paths outside cad/ that can still move a key or the graph itself:
-# the graph and its runner, the environment every recipe runs in, and what
-# decides which submodules a worker checks out.
-_KEY_AFFECTING_FILES = frozenset(
-    {
-        "dodo.py",
-        "build.py",
-        "pyproject.toml",
-        "uv.lock",
-        ".python-version",
-        ".farm-sources.json",
-        ".gitmodules",
-    }
-)
-_GITLINK_MODE = "160000"
-
-
-def _can_move_a_key(path: str, gitlink: bool, task_inputs: frozenset[str]) -> bool:
-    """Whether a changed tracked ``path`` can change some cache key or the graph.
-
-    Conservative by construction -- refusing a harmless edit costs a relaunch,
-    missing a real re-key costs the build. Every recipe input lives under
-    ``cad/`` (scripts, config, templates, references), a key folds its
-    dependencies' recipes transitively (a drawing keys its part's whole recipe
-    through the ``.SLDPRT`` dep), and a ``.gitattributes`` rewrites checked-out
-    bytes; so all of those count for every task, alongside the task's own
-    recorded key inputs and any submodule.
-    """
-    return (
-        gitlink
-        or path.startswith("cad/")
-        or path in _KEY_AFFECTING_FILES
-        or path.rsplit("/", 1)[-1] == ".gitattributes"
-        or path in task_inputs
-    )
-
-
-def checkout_drift(
-    repo: Path = REPO_ROOT,
-    commit: str | None = None,
-    task_inputs: Iterable[str] | None = None,
-) -> str | None:
-    """Why this checkout no longer matches the launch commit, or ``None``.
-
-    The submitter keys each task from the live files when it reaches the task,
-    while every worker builds ``HARMONIC_FARM_COMMIT``. The farm preflight
-    refused a dirty tree, so at launch the checkout WAS that commit's tree, and
-    the commit's tree -- tracked files plus submodule gitlinks -- is the launch
-    fingerprint. ``git diff <commit>`` compares the working tree (and the
-    checked-out submodules, dirty ones included) against it without writing the
-    index, so concurrent doit workers can run it side by side. A HEAD that moved
-    to an identical tree is no drift: every key is unchanged.
-
-    With ``task_inputs`` (the repo-relative paths a task's key was computed
-    from) only a change that can move a key counts -- see ``_can_move_a_key``
-    -- so a README edit mid-run does not stop a valid dispatch. Without it,
-    any tracked difference counts: that is the explanation after a key has
-    already gone missing, where every difference is a lead.
-    """
-    launched = commit or os.environ["HARMONIC_FARM_COMMIT"]
-    raw = _git(
-        repo,
-        "diff",
-        "--raw",
-        "-z",
-        "--no-renames",
-        "--ignore-submodules=none",
-        launched,
-        "--",
-    ).split("\0")
-    # -z --raw: ":<old mode> <new mode> <old sha> <new sha> <status>", then the path.
-    changed = [
-        (path, _GITLINK_MODE in status.split()[:2])
-        for status, path in zip(raw[0::2], raw[1::2])
-        if status.startswith(":")
-    ]
-    if task_inputs is not None:
-        inputs = frozenset(task_inputs)
-        changed = [c for c in changed if _can_move_a_key(*c, inputs)]
-    if not changed:
-        return None
-    paths = [path for path, _ in changed]
-    head = _git(repo, "rev-parse", "HEAD").strip()
-    moved = (
-        f"HEAD {launched[:12]} (unchanged)"
-        if head == launched
-        else f"HEAD {launched[:12]} -> {head[:12]}"
-    )
-    shown = ", ".join(paths[:_DRIFT_PATHS_SHOWN])
-    if len(paths) > _DRIFT_PATHS_SHOWN:
-        shown += f" and {len(paths) - _DRIFT_PATHS_SHOWN} more"
-    return (
-        f"submitter checkout changed since launch: {moved}; changed: {shown}; "
-        f"the farm builds {launched[:12]}, so keys would not match. Launch from "
-        "an untouched worktree (scripts/farm-run.ps1 does this)."
-    )
-
-
-def _git(repo: Path, *args: str) -> str:
-    done = subprocess.run(
-        ["git", *args],
-        cwd=repo,
-        capture_output=True,
-        encoding="utf-8",
-        errors="replace",
-        check=False,
-    )
-    if done.returncode != 0:
-        raise RuntimeError(
-            f"checkout drift check: git {' '.join(args)} failed "
-            f"(exit {done.returncode}): {done.stderr.strip()}"
-        )
-    return done.stdout
 
 
 def config_path() -> Path:
@@ -824,12 +700,20 @@ def run_leaf(task: str, cache_key: str | None) -> LeafResult:
         return result
 
 
-def _record_json(name: str, value: dict) -> None:
-    directory = os.environ.get("HARMONIC_FARM_REQUESTS")
+def _record_json(relative: str, value: object) -> None:
+    """Atomically write one record of the farm run in ``HARMONIC_FARM_RUN_DIR``.
+
+    ``farm_build.py`` reads these records for status, watch and cancel; one
+    file per writer keeps parallel action processes independent.
+    """
+    directory = os.environ.get("HARMONIC_FARM_RUN_DIR")
     if not directory:
         return
-    path = Path(directory) / f"{name}.json"
-    staging = path.with_name(f"{name}.{os.getpid()}.tmp")
+    run_dir = Path(directory)
+    path = run_dir / relative
+    if path.parent != run_dir:
+        path.parent.mkdir(exist_ok=True)  # never the run directory itself
+    staging = path.with_name(f".{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
     staging.write_text(json.dumps(value), encoding="utf-8")
     os.replace(staging, path)
 
@@ -837,7 +721,8 @@ def _record_json(name: str, value: dict) -> None:
 def _record_build(build_id: str) -> None:
     # Before registration: even an accepted RPC whose response is lost is named.
     _record_json(
-        "build", {"build_id": build_id, "farm_run": os.environ.get("HARMONIC_FARM_RUN")}
+        "build.json",
+        {"build_id": build_id, "farm_run": os.environ.get("HARMONIC_FARM_RUN")},
     )
 
 
@@ -848,24 +733,36 @@ def _required_build_id() -> str:
     return build_id
 
 
-def _record_request(task: str, wf_id: str, refresh_reason: str | None = None) -> None:
-    """Name a reservation before acceptance, even if launcher output is lost.
+def _record_leaf(record: dict, *, best_effort: bool = False) -> None:
+    """Record a leaf's lifecycle state: ``requested`` before submission, then
+    ``bound`` (with the exact run) and finally the worker's result.
 
-    One atomic file per canonical workflow keeps parallel action processes
-    independent. A failed write fails dispatch: an unnamed reservation could
-    otherwise outlive explicit launcher cancellation.
+    The ``requested`` write must succeed: an unnamed reservation could outlive
+    an explicit cancel. Later writes are best-effort, because by then the
+    coordinator holds the accepted work and the record already names it.
     """
-    name = hashlib.sha256(wf_id.encode("utf-8")).hexdigest()[:32]
-    _record_json(
-        name,
-        {
-            "task": task,
-            "workflow_id": wf_id,
-            "build_id": _required_build_id(),
-            "farm_run": os.environ.get("HARMONIC_FARM_RUN"),
-            "refresh_reason": refresh_reason,
-        },
-    )
+    name = hashlib.sha256(record["workflow_id"].encode("utf-8")).hexdigest()[:32]
+    try:
+        _record_json(f"leaves/{name}.json", record)
+    except OSError as exc:
+        if not best_effort:
+            raise
+        _telemetry.warn(f"farm leaf record not updated: {record['workflow_id']}: {exc}")
+
+
+class FarmReporter(ConsoleReporter):
+    """doit's console reporter, also recording each failed task for the run."""
+
+    def add_failure(self, task, fail):
+        super().add_failure(task, fail)
+        lines = [line for line in fail.get_msg().splitlines() if line.strip()]
+        self._errors = [*getattr(self, "_errors", []), {
+            "task": task.name, "error": lines[-1][:500] if lines else "",
+        }]
+        try:
+            _record_json("task-errors.json", self._errors)
+        except OSError as exc:  # a diagnostics record never aborts the build
+            _telemetry.warn(f"farm task-errors record not updated: {exc}")
 
 
 def _display_name(label: str | None = None) -> str:
@@ -913,7 +810,15 @@ async def _dispatch(request: LeafRequest, wf_id: str) -> LeafResult:
         "build_id": request.build_id,
     }
     _telemetry.info(f"Farm workflow requested: {wf_id}", **identity)
-    _record_request(request.task, wf_id, request.refresh_reason)
+    record = {
+        "task": request.task,
+        "workflow_id": wf_id,
+        "build_id": request.build_id,
+        "farm_run": os.environ.get("HARMONIC_FARM_RUN"),
+        "refresh_reason": request.refresh_reason,
+        "state": "requested",
+    }
+    _record_leaf(record)
     # Only the coordinator can reserve and start a leaf. Creator metadata stays
     # on the run it starts; attaching to a canonical ID never rewrites the memo.
     key = LeafKey(request.build_id, wf_id)
@@ -955,12 +860,14 @@ async def _dispatch(request: LeafRequest, wf_id: str) -> LeafResult:
     )
     _telemetry.info(f"Farm workflow attached: {wf_id}", **identity)
     _telemetry.event("farm.attached", **identity)
+    record.update(state="bound", run_id=binding.run_id)
+    _record_leaf(record, best_effort=True)
     try:
-        return await handle.result(follow_runs=False)
+        result = await handle.result(follow_runs=False)
     except WorkflowFailureError as exc:
         if not isinstance(exc.cause, CancelledError):
             raise
-        return LeafResult(
+        result = LeafResult(
             state="failed",
             exit_code=None,
             worker_id="",
@@ -970,3 +877,14 @@ async def _dispatch(request: LeafRequest, wf_id: str) -> LeafResult:
             failure_category="cancelled",
             failure_message="cancelled via farm.py cancel",
         )
+    record.update(
+        state=result.state,
+        worker_id=result.worker_id,
+        attempt=result.attempt,
+        exit_code=result.exit_code,
+        failure_category=result.failure_category,
+        failure_message=result.failure_message,
+        log_blob=result.log_blob,
+    )
+    _record_leaf(record, best_effort=True)
+    return result

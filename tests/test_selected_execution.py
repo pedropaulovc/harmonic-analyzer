@@ -535,16 +535,11 @@ def test_build_cli_uses_selected_loader_without_full_fallback(case, monkeypatch,
     assert '"phase":"build_import"' in capsys.readouterr().out
 
 
-def test_partial_internal_cli_and_farm_executor_fail_without_running_doit(case, monkeypatch):
+def test_partial_internal_cli_fails_without_running_doit(case, monkeypatch):
     def forbidden_doit(*args, **kwargs):
         pytest.fail("invalid selected mode must not instantiate DoitMain")
     monkeypatch.setattr(build, "DoitMain", forbidden_doit)
     assert build.main(["--farm-execution-task", _ROOT, "run", "-n", "0", _ROOT]) == 2
-    assert build.main([
-        "--executor", "farm", "--farm-execution-graph", str(case.graph_path),
-        "--farm-execution-task", _ROOT, "--farm-execution-identity", case.identity,
-        "run", "-n", "0", _ROOT,
-    ]) == 2
 
 
 def test_declared_capability_validation_failure_never_falls_back(case, monkeypatch):

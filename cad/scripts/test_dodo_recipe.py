@@ -28,7 +28,7 @@ def local_executor(monkeypatch):
 
     These tests drive ``dodo``'s cached-action internals directly and stub the local
     path (``_exec_com``, ``_com_seat``, ``_cache``). ``HARMONIC_EXECUTOR`` is process
-    environment, so a farm-mode parent (``build.py --executor farm`` runs the
+    environment, so a farm-mode parent (a ``farm_build.py`` build runs the
     ``check:recipe`` pytest as a subprocess) leaked ``farm`` in here and sent the
     stubbed leaves to the REAL farm: the fake ``"k" * 64`` cache key came back as
     ``invalid_request: cache key must be a lowercase 64-hex digest`` and three tests
@@ -2830,7 +2830,7 @@ def test_every_cache_phase_span_names_its_cache_key(monkeypatch):
 
 
 def test_farm_restore_span_names_its_cache_key(monkeypatch):
-    """Under ``--executor farm`` the submitter's phases are ``cache.probe`` then
+    """Under the farm executor the submitter's phases are ``cache.probe`` then
     ``cache.restore`` (the worker publishes, this side downloads). The restore is
     the span that proves the leaf landed, so it names the key like the rest."""
     dodo = _load_dodo()
@@ -2863,7 +2863,6 @@ def test_farm_restore_span_names_its_cache_key(monkeypatch):
     monkeypatch.setattr(dodo, "_cache_key", lambda file_deps, label: key)
     monkeypatch.setattr(dodo._cache, "restore", lambda *args: next(restores))
     monkeypatch.setattr(dodo._farm, "enabled", lambda: True)
-    monkeypatch.setattr(dodo._farm, "checkout_drift", lambda task_inputs=None: None)
     monkeypatch.setattr(dodo._farm, "run_leaf", lambda label, k: succeeded)
 
     dodo._cached_com_action("part:x", ["build"], [], [], "part-x")

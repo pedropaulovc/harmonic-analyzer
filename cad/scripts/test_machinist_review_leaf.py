@@ -1706,6 +1706,8 @@ def test_only_opted_in_drawings_are_submitter_only_build_and_release_leaves(
     monkeypatch,
 ):
     import build
+    import farm_build
+    from doit.cmd_base import tasks_and_deps_iter
 
     stems = list(dodo.DRAWINGS_BY_NAME)
     declared = {
@@ -1729,31 +1731,24 @@ def test_only_opted_in_drawings_are_submitter_only_build_and_release_leaves(
     assert f"check:machinist_review:{stems[2]}" not in dodo.task_release()["task_dep"]
     tasks = list(load_tasks(vars(dodo), [], allow_delayed=False))
     control = build._validate_farm_selection(tasks, ["build"])
+    closure = list(tasks_and_deps_iter(control.tasks, control.selected_tasks))
     (tmp_path / "agent").mkdir()
-    (tmp_path / "agent" / "protocol.py").write_text("# intercepted protocol")
-    (tmp_path / "pyproject.toml").write_text("# intercepted project")
-    queried = []
-
-    def protocol_query(_argv, **kwargs):
-        queried.extend(json.loads(kwargs["input"]))
-        return SimpleNamespace(
-            returncode=0,
-            stderr="",
-            stdout=json.dumps(
-                {
-                    "refused": [
-                        task
-                        for task in queried
-                        if task.startswith("check:machinist_review:")
-                    ],
-                }
-            ),
-        )
-
-    monkeypatch.setattr(build.subprocess, "run", protocol_query)
-    monkeypatch.setattr(build, "_pool_home", lambda: tmp_path)
-    dispatchable = build._require_leaf_admission(control)
-    assert queried == dispatchable
+    (tmp_path / "agent" / "protocol.py").write_text(
+        "import json\n"
+        "from pathlib import Path\n"
+        "def leaf_admitted(task):\n"
+        "    log = Path(__file__).resolve().parents[1] / 'queried.jsonl'\n"
+        "    with log.open('a', encoding='utf-8') as out:\n"
+        "        out.write(json.dumps(task) + '\\n')\n"
+        "    return not task.startswith('check:machinist_review:')\n",
+        encoding="utf-8",
+    )
+    dispatchable = farm_build.require_leaf_admission(closure, tmp_path)
+    queried = [
+        json.loads(line)
+        for line in (tmp_path / "queried.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    assert sorted(queried) == dispatchable
     assert dispatchable
     assert not {f"check:{name}" for name in leaves} & set(dispatchable)
     for name, task in leaves.items():
