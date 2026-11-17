@@ -492,15 +492,16 @@ def test_shared_stop_frame_preserves_world_geometry(proud: float) -> None:
     assert foot_position == [
         namespace["sx"], assembly.Y_BASE_TOP + assembly.SPRING_T, namespace["sz"],
     ]
+    # The swing-stop placement binds no name, so nothing can recolour it; the
+    # foot screw is the one 90280A108 instance painted.
     calls = [node for node in ast.walk(tree) if isinstance(node, ast.Call)]
     appearances = [
         call for call in calls
         if isinstance(call.func, ast.Name) and call.func.id == "apply_component_color"
         and len(call.args) >= 3
-        and getattr(call.args[1], "id", None) in {"stop_screw", "spring_foot_screw"}
+        and getattr(call.args[1], "id", None) == "spring_foot_screw"
     ]
     assert len(appearances) == 1
-    assert appearances[0].args[1].id == "spring_foot_screw"
     color = eval(compile(ast.Expression(appearances[0].args[2]), str(BUILDER), "eval"), namespace)
     assert color == pytest.approx((0.08, 0.08, 0.09))
 
