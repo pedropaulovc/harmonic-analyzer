@@ -1131,6 +1131,15 @@ callable, and `_stock_fastener` validates that callable's declaration and identi
 Only threaded builders import `_simplified_part.save_simplified_part` and pass it
 as `save_threaded_part`; the shared stock save still checks the declared thread
 against the actual `ThreadGroove` feature before either save path runs.
+New purchased SKUs (#2886) model visible head and body features from the
+catalogue table on the shared family helper, with a plain shank at the thread
+major diameter: declare `threaded=False` and sweep no `ThreadGroove`, and do not
+clone the vendor B-rep through the `diag_mcmaster_lib` replica gate. Existing
+threaded SKUs keep their grooves, because assembly `ALLOWED_PAIRS` overlap
+budgets and `_stock_fastener`'s declared-thread check are calibrated against
+them. Give every new purchased part its COTS tier in `hardware_schedule.TIERS`;
+a tier-1 (standard) part also takes a `SCHEDULE` row, which the release prints
+as `HARDWARE.md`.
 
 Simplified configuration helpers are separated by their real consumers:
 `_simplified_names` is naming only, `_simplified_identity` fingerprints assembly
