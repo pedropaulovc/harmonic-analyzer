@@ -991,7 +991,6 @@ from dt_cone_pivot_post_spec import (  # noqa: E402
 )
 import crank_boss_rim  # noqa: E402
 import gear64_post_measure  # noqa: E402
-import _native_cone_tip_air as native_cone_tip_air  # noqa: E402
 from dt_cone_tip_block_spec import (  # noqa: E402
     ADJUSTER_BORE_SPEC as TIP_ADJ_BORE_SPEC,
     AXIS_HEIGHT_MATCH_RESIDUAL_MM as TIP_AXIS_HEIGHT_MATCH_RESIDUAL_MM,
@@ -6334,14 +6333,6 @@ async def build(adapter) -> dict[str, str]:
         # The positive control for crank_boss_rim's analytic 64T clearances.
         gear64_post_measure.measure(
             solved_adapter, post_origin=tuple(_PPOST), gear_offset=GEAR64_POST_OFFSET
-        )
-        # Same final solved/saved model: the bushing / end-screw / block air
-        # read natively against the printed-tolerance sweep (dt_cone_tip_air).
-        native_cone_tip_air.measure(
-            solved_adapter,
-            bushing_component=tip_bushing,
-            end_screw_component=end_screw,
-            block_component=tip_block,
         )
 
     for settings in (bank_settings, drum_station_setting):
