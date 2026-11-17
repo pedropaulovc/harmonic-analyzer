@@ -110,6 +110,19 @@ CONE_AXIS_VIEW = "CONE JOURNAL"
 BORE_HEIGHT = cone_axis.CONE_AXIS_HEIGHT_MM
 CONE_BOSS_DIA = 17.272  # .68
 BORE_DIA = 12.2682  # .483 in
+# The journal bore's two rims bound the cone shaft MHA-DT-04's bearing on
+# this post: the north rim is the inner edge of its collar's thrust ring on
+# the .827 face, and both rims end the journal's supported length
+# (dt_cone_gear_shaft_spec: THRUST_RING_MIN less two breaks keeps the .060
+# floor, and JOURNAL_SUPPORT_SPAN_MIN_MM takes a break off each end).  The
+# cone-shaft spec derives that largest break (THRUST_EDGE_BREAK_MAX); it
+# imports this spec, so the value is restated here and the post's sheet
+# asserts the two agree.  The model breaks both rims AT the maximum, a
+# 45-degree chamfer, and prints its leg as the single limit .004 MAX on a
+# dimension whose extension lines touch the rim (the title block's .010
+# would take the ring under its floor).
+JOURNAL_RIM_BREAK = 0.1016  # .004 MAX
+JOURNAL_RIM_BREAK_BAND = (0.0, -JOURNAL_RIM_BREAK)
 # The harvested 1.654 face-to-face: MHA-DT-04's bearing length, which the
 # cone shaft's stations and the gear stack close on.  It is its own value, not
 # the body's Ø.
@@ -237,6 +250,8 @@ if CONE_BOSS_NORTH_STATION_TOLERANCE_MM > _CONE_BOSS_HALF_BAND:
 #   cone bore pi*(BORE_DIA/2)^2*CONE_BOSS_LENGTH
 #   2x (thru pi*(ATTACHMENT_THRU_DIA/2)^2*(BLOCK_HEIGHT-cbore_depth)
 #       + cbore pi*(ATTACHMENT_CBORE_DIA/2)^2*cbore_depth)
+#   2x journal rim break pi*JOURNAL_RIM_BREAK^2*(BORE_DIA/2 + JOURNAL_RIM_BREAK/3)
+#       (its triangle, legs JOURNAL_RIM_BREAK, revolved about the bore axis)
 #
 # The old v36 constant, harvested from v2's B-rep rather
 # than summed, read 112 302.9406: 2.05 mm^3 (0.002%) apart.  The feature sum
@@ -252,10 +267,15 @@ if CONE_BOSS_NORTH_STATION_TOLERANCE_MM > _CONE_BOSS_HALF_BAND:
 # The constant is that sum at the 86 mm reference for the inch sizes (#290)
 # and the Ø40.64 body of #2756 (111 108.3126 on the Ø41.91 envelope, 112 123.5736
 # at the harvested Ø42.011), with the letter M through drills of #2697
-# (111 752.8114 at 9/32 on the Ø41.91 body).
-HARVESTED_VOLUME_MM3 = 106_527.63207 + math.pi * (
-    (BODY_DIA / 2.0) ** 2 - 2.0 * (ATTACHMENT_THRU_DIA / 2.0) ** 2
-) * (BLOCK_HEIGHT - 86.0)
+# (111 752.8114 at 9/32 on the Ø41.91 body).  The two journal rim breaks
+# come off it.
+HARVESTED_VOLUME_MM3 = (
+    106_527.63207
+    + math.pi
+    * ((BODY_DIA / 2.0) ** 2 - 2.0 * (ATTACHMENT_THRU_DIA / 2.0) ** 2)
+    * (BLOCK_HEIGHT - 86.0)
+    - 2.0 * math.pi * JOURNAL_RIM_BREAK**2 * (BORE_DIA / 2.0 + JOURNAL_RIM_BREAK / 3.0)
+)
 HARVESTED_MASS_KG = HARVESTED_VOLUME_MM3 * 7.20e-6
 
 # Both bores are running journals reamed with owned decimal reamers, each
@@ -446,6 +466,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "CrankBossStationReference": {"CrankBossStartZ"},
     "ConeBossStationReference": {"ConeBossNorthZ"},
     "BoreSpacingReference": {"CrankAboveCone"},
+    "JournalRimBreakReference": {"JournalRimBreak"},
 }
 
 # Decimal places are product definition: they select the title-block general
@@ -468,7 +489,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # printed to .001.  The basic plan angle feeds the retained crank-bore angularity frame;
 # its four places spell the configured geometry, not a tighter general
 # angular band.  The two reamed running bores take four, the places their
-# size limits are written in.
+# size limits are written in.  The journal rims' break prints its .004 MAX
+# to three places.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "MainBodyProfile": {"MainBodyDia": 2},
     "MainBody": {"MainBodyHt": 2},
@@ -487,6 +509,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "CrankBossStationReference": {"CrankBossStartZ": 3},
     "ConeBossStationReference": {"ConeBossNorthZ": 3},
     "BoreSpacingReference": {"CrankAboveCone": 3},
+    "JournalRimBreakReference": {"JournalRimBreak": 3},
 }
 
 _PRECISION_NAMES = [

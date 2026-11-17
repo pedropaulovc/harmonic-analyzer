@@ -43,9 +43,11 @@ from _session import run_build
 from _sketch import (
     SketchDims,
     blank_reference_sketches,
+    dimension_between,
     ensure_fully_defined,
     set_sketch_direct_db,
 )
+from _single_limit_tolerance import SW_TOL_MAX, set_single_limit
 from _sketch_circle import define_circle
 from _drawing_precision import apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
@@ -93,6 +95,8 @@ from dt_cone_pivot_post_spec import (
     JOURNAL_REFERENCE_Z,
     PART_DATUMS,
     JOURNAL_BORE_BAND,
+    JOURNAL_RIM_BREAK,
+    JOURNAL_RIM_BREAK_BAND,
     RUNNING_BORE_BAND,
     SURFACE_FINISHES,
     UNIT,
@@ -108,6 +112,7 @@ REFERENCE_SKETCHES = (
     "CrankBossStationReference",
     "ConeBossStationReference",
     "BoreSpacingReference",
+    "JournalRimBreakReference",
 )
 # The short north-pointing ray ConeBossStationReference measures its incline
 # from: it stays inside the cone bore's gap in Section A-A.
@@ -128,14 +133,16 @@ ATTACHMENT_HOLE_SPEC = HoleSpec(
 # in the PART frame: the journal axis runs through (0, BORE_HEIGHT, 0) along
 # (sin I, 0, cos I), and the mid-plane pads end CONE_BOSS_LENGTH/2 either side
 # of ConeShaftNormal, so the north end faces -(sin I, 0, cos I).  The whole
-# face is the annulus between the pad and the journal bore.
+# face is the annulus between the pad and the journal rim's break.
 _INCLINE_RAD = math.radians(INCLINE_DEG)
 BOSS_NORTH_NORMAL = (-math.sin(_INCLINE_RAD), 0.0, -math.cos(_INCLINE_RAD))
 BOSS_NORTH_CENTRE = tuple(
     base + CONE_BOSS_LENGTH / 2.0 * n
     for base, n in zip((0.0, BORE_HEIGHT, 0.0), BOSS_NORTH_NORMAL)
 )
-BOSS_NORTH_AREA = math.pi / 4.0 * (CONE_BOSS_DIA**2 - BORE_DIA**2)
+BOSS_NORTH_AREA = (
+    math.pi / 4.0 * (CONE_BOSS_DIA**2 - (BORE_DIA + 2.0 * JOURNAL_RIM_BREAK) ** 2)
+)
 # The found face must be this square to the axis and this close to the end
 # station: float noise through the angle plane sits far below both, and the
 # nearest other planar face (the crank boss's north face, normal to z) is
@@ -212,6 +219,35 @@ CONE_PADS_OUTSIDE_BODY_MM3 = (
     )
 )
 CONE_BORE_MM3 = math.pi * BORE_RADIUS**2 * CONE_BOSS_LENGTH
+# Journal rim breaks: a 45-degree chamfer of JOURNAL_RIM_BREAK legs on each
+# rim, its triangle (centroid BORE_RADIUS + leg/3 off the axis) revolved
+# about the bore axis.  Each rim is picked by the point straight above the
+# axis at its boss end.
+JOURNAL_RIM_BREAKS_MM3 = (
+    2.0 * math.pi * JOURNAL_RIM_BREAK**2 * (BORE_RADIUS + JOURNAL_RIM_BREAK / 3.0)
+)
+_CONE_AXIS_DIR = (-BOSS_NORTH_NORMAL[0], 0.0, -BOSS_NORTH_NORMAL[2])
+JOURNAL_RIM_POINTS = tuple(
+    [
+        side * CONE_BOSS_LENGTH / 2.0 * _CONE_AXIS_DIR[0],
+        BORE_HEIGHT + BORE_RADIUS,
+        side * CONE_BOSS_LENGTH / 2.0 * _CONE_AXIS_DIR[2],
+    ]
+    for side in (-1.0, 1.0)
+)
+# JournalRimBreakReference carries the printed leg on ConeAxisPlane, Section
+# A-A's cutting plane (sketch X = model X, sketch Y = model -Z): along the far
+# (+axis) end face from its rim's virtual sharp on the bore's +X side,
+# outward, so the sheet's detail of that corner imports it.
+_RIM_SIDE_DIR = (_CONE_AXIS_DIR[2], 0.0, -_CONE_AXIS_DIR[0])
+JOURNAL_RIM_CORNER_MM = tuple(
+    base + CONE_BOSS_LENGTH / 2.0 * axis + BORE_RADIUS * side
+    for base, axis, side in zip((0.0, BORE_HEIGHT, 0.0), _CONE_AXIS_DIR, _RIM_SIDE_DIR)
+)
+JOURNAL_RIM_BREAK_END_MM = tuple(
+    corner + JOURNAL_RIM_BREAK * side
+    for corner, side in zip(JOURNAL_RIM_CORNER_MM, _RIM_SIDE_DIR)
+)
 # Mounting holes: two through drills plus two counterbores; they clear the
 # crank bore (|x| <= 5.72 against a hole edge at 9.87) and, drilled last, are
 # not re-filled by any boss.
@@ -226,6 +262,7 @@ _ANALYTIC_FINAL_MM3 = (
     - CRANK_BORE_MM3
     + CONE_PADS_OUTSIDE_BODY_MM3
     - CONE_BORE_MM3
+    - JOURNAL_RIM_BREAKS_MM3
     - ATTACHMENT_HOLES_MM3
 )
 if abs(_ANALYTIC_FINAL_MM3 - HARVESTED_VOLUME_MM3) > 0.01:
@@ -365,6 +402,9 @@ def build(adapter: Any) -> dict[str, str]:
         # The cone boss face-to-face: one global drives the boss extrusion
         # and the north-face station ray (half of it) Section A-A prints.
         "ConeBossLength": CONE_BOSS_LENGTH,
+        # The journal rims' break: one global drives the chamfer on both rims
+        # and the reference leg the sheet prints.
+        "JournalRimBreak": JOURNAL_RIM_BREAK,
     }
     for name, value in globals_mm.items():
         set_global(adapter, name, f"{value}mm")
@@ -594,6 +634,25 @@ def build(adapter: Any) -> dict[str, str]:
     drive_jobs.append((bore_length[0], '"ConeBossLength"'))
     volume -= CONE_BORE_MM3
     volume_check(adapter, "v2 cone bore", volume, 0.001 * volume)
+
+    # 4b. Both journal rims broken at the cone shaft's maximum (each rim
+    # bounds MHA-DT-04's bearing: the north one its collar's thrust ring, both
+    # the journal's supported length; dt_cone_pivot_post_spec.
+    # JOURNAL_RIM_BREAK).  The chamfer's leg follows the global the printed
+    # reference leg (6d) follows.
+    check(
+        "chamfer journal rims",
+        adapter.add_chamfer(
+            JOURNAL_RIM_BREAK, [list(point) for point in JOURNAL_RIM_POINTS]
+        ),
+    )
+    name_last_feature(adapter, "JournalRimChamfer")
+    rim_chamfer = name_dimensions(
+        adapter, "JournalRimChamfer", ["JournalRimChamferLeg"]
+    )
+    drive_jobs.append((rim_chamfer[0], '"JournalRimBreak"'))
+    volume -= JOURNAL_RIM_BREAKS_MM3
+    volume_check(adapter, "v2 journal rim breaks", volume, 0.001 * volume)
 
     # 5. Two vertical ANSI-inch 1/4 Fillister Head Screw counterbores in the
     # top face, ONE native Hole Wizard feature with two driven placement
@@ -844,6 +903,63 @@ def build(adapter: Any) -> dict[str, str]:
     name_last_feature(adapter, "ConeBossStationReference")
     drive_jobs += cone_station.apply(adapter, "ConeBossStationReference")
 
+    # 6d. Journal rim break reference sketch.  The print gives the chamfer's
+    # leg (4b) as .004 MAX in a detail of Section A-A, so the leg is a
+    # driving dimension in A-A's cutting plane, as the station ray above is:
+    # one construction line along the far end face from its rim's virtual
+    # sharp on the bore's +X side, outward (JOURNAL_RIM_CORNER_MM).  The sharp
+    # is held by its two distances from the post axis and the line's far end
+    # by its height, so the sketch draws nothing else into the section.
+    rim = SketchDims()
+    check(
+        "create sketch JournalRimBreakReference",
+        adapter.create_sketch("ConeAxisPlane"),
+    )
+    rim_sharp = (JOURNAL_RIM_CORNER_MM[0], -JOURNAL_RIM_CORNER_MM[2])
+    rim_leg_end = (JOURNAL_RIM_BREAK_END_MM[0], -JOURNAL_RIM_BREAK_END_MM[2])
+    set_sketch_direct_db(adapter, True)
+    rim_leg = check(
+        "journal rim break leg line",
+        adapter.add_centerline(*rim_sharp, *rim_leg_end),
+    )
+    set_sketch_direct_db(adapter, False)
+    dimension_between(
+        adapter,
+        "origin",
+        f"{rim_leg}.start",
+        "horizontal_distance",
+        abs(rim_sharp[0]),
+        "journal rim sharp across the post axis",
+    )
+    rim.record("JournalRimSharpX")
+    dimension_between(
+        adapter,
+        "origin",
+        f"{rim_leg}.start",
+        "vertical_distance",
+        abs(rim_sharp[1]),
+        "journal rim sharp along the post axis",
+    )
+    rim.record("JournalRimSharpY")
+    check(
+        "journal rim break leg",
+        adapter.add_sketch_dimension(rim_leg, None, "linear", JOURNAL_RIM_BREAK),
+    )
+    rim.record("JournalRimBreak", '"JournalRimBreak"')
+    dimension_between(
+        adapter,
+        "origin",
+        f"{rim_leg}.end",
+        "vertical_distance",
+        abs(rim_leg_end[1]),
+        "journal rim break leg end",
+    )
+    rim.record("JournalRimLegEndY")
+    ensure_fully_defined(adapter, "JournalRimBreakReference")
+    check("exit sketch JournalRimBreakReference", adapter.exit_sketch())
+    name_last_feature(adapter, "JournalRimBreakReference")
+    drive_jobs += rim.apply(adapter, "JournalRimBreakReference")
+
     # 7. Bore-spacing reference sketch.  Both bore axes cross the post axis,
     # which is ConeShaftNormal's local X axis (pointing down model -Y), so one
     # construction centreline on it runs from the cone-bore centre to the
@@ -944,6 +1060,16 @@ def build(adapter: Any) -> dict[str, str]:
         "ConeBossNorthZ",
         CONE_BOSS_NORTH_STATION_TOLERANCE_MM,
         display_unit=UNIT,
+    )
+    # The journal rims' break prints as its single MAX limit: the leg is
+    # modelled at the maximum, sharp up to it (JOURNAL_RIM_BREAK_BAND).
+    set_single_limit(
+        adapter,
+        "JournalRimBreakReference",
+        "JournalRimBreak",
+        limit=JOURNAL_RIM_BREAK,
+        band=JOURNAL_RIM_BREAK_BAND,
+        tol_type=SW_TOL_MAX,
     )
 
     # Semantic, name-selected assembly references.  The journal axis is taken

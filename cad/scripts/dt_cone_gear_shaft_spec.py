@@ -137,8 +137,9 @@ COLLAR_DIA = STOCK_DIA
 # rim.  The title block's .010 break would take the .070 ring to .050, so both
 # edges print a smaller break, derived from ring - 2 x break >= floor and
 # rounded DOWN to the printed .001 in grid: the collar under its stock
-# callout, the post's journal rims in the post sheet's journal note
-# (draw_dt_cone_pivot_post.JOURNAL_NOTE).  Sizing the ring for two .010
+# callout, the post's journal rims as the post's modelled chamfer, printed
+# .004 MAX in the post sheet's detail D (dt_cone_pivot_post_spec.
+# JOURNAL_RIM_BREAK restates this value).  Sizing the ring for two .010
 # breaks instead needs a larger bar, which the user's ruling (5/8 bar as
 # supplied) rules out.
 THRUST_RING_FLOOR = WALL_FLOOR_MM
@@ -179,8 +180,8 @@ COLLAR_STOCK_CALLOUT = "\n".join(
         f"ROOTS R{inch_text(COLLAR_ROOT_RADIUS_MAX, 3)} MAX",
     )
 )
-# The same break on the post's journal rims, the ring's other bounding edge;
-# the post sheet prints it in the note its journal size flags.
+# The same break on the post's journal rims, the ring's other bounding edge,
+# as text for the post sheet's journal-bore requirement record.
 POST_JOURNAL_RIM_BREAK = f"RIMS BREAK {inch_text(THRUST_EDGE_BREAK_MAX, 3)} MAX"
 def _gear(teeth: int) -> str:
     return f"T{teeth:03d}"
