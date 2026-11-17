@@ -44,7 +44,10 @@ _REQUIRED_RECIPE_INPUTS = _ROOT_REGRESSIONS | {
 }
 
 # Test files that deliberately run in no check:* gate, each with its reason.
-EXEMPT: dict[str, str] = {}
+EXEMPT: dict[str, str] = {
+    "test_cam_nc_freecad.py": "runs the local FreeCAD install, which no build dependency tracks;"
+    " run by hand after changing cam_nc.py, _freecad_cam_runtime.py or FreeCAD",
+}
 
 # Pre-existing orphans found when this guard landed (all on main before #844).
 # Main assigns their triage (enroll, or move to EXEMPT with a reason); until

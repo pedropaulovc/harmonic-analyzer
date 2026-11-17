@@ -1,16 +1,17 @@
-"""Fusion CAM driver, recipe frame and posted-G-code checks, without Fusion.
+"""CAM driver, recipe frame, posted-G-code checks and cycle times, without
+FreeCAD (the end-to-end post through FreeCAD is ``test_cam_nc_freecad.py``).
 
-The G-code cases are the errors Fusion produced with valid-looking toolpaths
+The G-code cases are the errors CAM produced with valid-looking toolpaths
 while the base-bar programs were first written (2026-11-16): a spot drill
 measured from the counterbore floor, a feed height below the stock top, a slot
-cut from the outside, and an oversized radial step.
+cut from the outside, and an oversized radial step; and the speed losses the
+FreeCAD cutover removed: feed moves through the air above the stock, one-way
+edge passes with full-length returns, one-way facing.
 """
 
 from __future__ import annotations
 
-import base64
-import json
-import re
+import math
 import tomllib
 from pathlib import Path
 
@@ -19,8 +20,7 @@ import pytest
 import _cam_programs
 import _gcode
 import _process_plans
-import fusion_cam
-from _fusion_mcp import FusionError
+import cam_nc
 
 STEM = "ch_rocker_arm_tl_oblique_base_bar"
 
@@ -31,23 +31,13 @@ def _program(tmp_path: Path, text: str) -> _gcode.Program:
     return _gcode.read_program(path)
 
 
-def test_long_source_lines_reach_fusion_as_short_lines(tmp_path):
-    # Fusion skips a script with a >4096-character line and still reports success.
-    recipe = tmp_path / "cam.py"
-    source = f"TABLE = {'x' * 10_000!r}\n"
-    recipe.write_text(source, encoding="utf-8")
-    script = fusion_cam.compose_script(recipe, {"post": "Grbl"}, [("P1", ["a"])], tmp_path)
-    assert max(len(line) for line in script.splitlines()) <= fusion_cam.MAX_SCRIPT_LINE
-    encoded = "".join(re.findall(r'^    "([A-Za-z0-9+/=]+)",?$', script, re.MULTILINE))
-    payload = json.loads(base64.b64decode(encoded))
-    assert payload["recipe"] == source
-    assert payload["programs"] == [["P1", ["a"]]]
-
-
-def test_silent_fusion_output_is_a_failure():
-    with pytest.raises(FusionError):
-        fusion_cam.parse_result("")
-    assert fusion_cam.parse_result(f"noise\n{fusion_cam.RESULT_MARKER}{{\"files\": []}}\n") == {"files": []}
+def test_silent_freecad_output_is_a_failure():
+    # freecadcmd exits 0 even when its script raised: only the marker line counts.
+    with pytest.raises(cam_nc.FreeCadError):
+        cam_nc.parse_result("FreeCAD 1.1.4\n")
+    with pytest.raises(cam_nc.FreeCadError, match="boom"):
+        cam_nc.parse_result(f"{cam_nc.RESULT_MARKER}{{\"error\": \"Traceback: boom\"}}\n")
+    assert cam_nc.parse_result(f"noise\n{cam_nc.RESULT_MARKER}{{\"files\": []}}\n") == {"files": []}
 
 
 def _features(rail_requirements=("thread", "dia", "station", "height", "thru")) -> dict:
@@ -98,7 +88,41 @@ def test_recipe_maps_features_into_the_drawing_frame():
     recipe = _cam_programs.load_recipe(STEM)
     slots = [kw for program, check, kw in recipe.expectations(ctx) if check == "bounds"]
     assert [s["x"] for s in slots] == [pytest.approx((21.703, 22.465)), pytest.approx((389.509, 390.271))]
-    assert slots[0]["y"] == pytest.approx((-53.34, -49.276))
+    # The envelope's ends are the cutter-centre arcs' apexes, e = 0.381 past the arc centres.
+    assert slots[0]["y"] == pytest.approx((-53.721, -48.895))
+
+
+def test_slots_plunge_at_the_corner_nearest_their_jack():
+    # Plan S3: largest X (S1 .885 in, S2 15.365 in), and the Y end nearer the
+    # slot's jack (left jack Y -4.4 in, right jack Y -1.8 in).
+    items = _context()["slots"]["items"]
+    assert [s["plunge"] for s in items] == [pytest.approx([22.465, -53.34]), pytest.approx([390.271, -124.46])]
+
+
+def test_side_passes_step_evenly_without_air_passes():
+    ctx = _context()
+    edge, ends = ctx["edge"], ctx["ends"]
+    # Edges: equal roughing steps within .100 in down to the .010 finish, then
+    # the finish pass; the first step starts at the raw face, so none cuts air.
+    offsets = edge["offsets"]
+    steps = [a - b for a, b in zip([ctx["y_trim"], *offsets], offsets)]
+    assert offsets[-2:] == pytest.approx([edge["finish"], 0.0])
+    assert max(steps[:-1]) <= edge["step"] + 1e-9 and steps[-1] == pytest.approx(edge["finish"])
+    assert min(steps) > 0
+    # Two equal depth levels no deeper than 7.62 (plan): edges 7.366, ends 6.477.
+    assert edge["levels"] == pytest.approx([-7.366, -14.732])
+    assert ends["levels"] == pytest.approx([-6.477, -12.954])
+    for side, step in (("left", ends["left_step"]), ("right", ends["right_step"])):
+        stations = ends[side]
+        assert stations[-1] == 0.0 and stations[0] < ctx["x_trim"]
+        assert max(a - b for a, b in zip([ctx["x_trim"], *stations], stations)) <= step + 1e-9
+
+
+def test_every_program_names_its_stock_top_for_the_air_check():
+    ctx = _context()
+    recipe = _cam_programs.load_recipe(STEM)
+    tops = [program for program, check, _kw in recipe.expectations(ctx) if check == "air_feed"]
+    assert sorted(tops) == sorted(name for name, _ops in recipe.PROGRAMS)
 
 
 def test_spot_depth_measured_from_the_counterbore_floor_is_caught(tmp_path):
@@ -133,11 +157,22 @@ def test_side_step_over_the_plan_limit_is_caught(tmp_path):
 
 def test_finish_pass_heavier_than_the_finish_step_is_caught(tmp_path):
     # Roughing steps within 2.032, but the last pass takes 0.5 where 0.254 is planned.
-    program = _program(tmp_path, "G0 X0 Y-12.7 Z5\nG1 Z-14 F100\nG1 X400\nG1 Y-6.85\nG1 X0\nG1 Y-6.35\nG1 X400\nG0 Z5\n")
+    program = _program(tmp_path, (
+        "G0 X0 Y-12.7 Z5\nG1 Z-14 F100\nG1 X400\nG0 Z5\nG0 X0 Y-6.85\nG1 Z-14\nG1 X400\nG0 Z5\n"
+        "G0 X0 Y-6.35\nG1 Z-14\nG1 X400\nG0 Z5\n"
+    ))
     kwargs = {"axis": "Y", "raw": -12.7, "span": 200.0, "below_z": 0.0, "max_step": 6.0, "direction": 1.0}
     assert _gcode.check_side_passes(program, final=-6.35, **kwargs) == []
     findings = _gcode.check_side_passes(program, final=-6.35, finish=0.254, **kwargs)
     assert [f.detail for f in findings] == ["Y -6.350 removes 0.500 > 0.254"]
+
+
+def test_a_climb_roughing_pass_is_caught(tmp_path):
+    # The edge settings were measured conventional: a roughing pass cut the
+    # other way (a zigzag edge) fails even when the final pass is right.
+    program = _program(tmp_path, "G0 X0 Y-8 Z5\nG1 Z-7 F100\nG1 X400\nG1 Y-6.35\nG1 X0\nG0 Z5\nG0 X0\nG1 Z-7\nG1 X400\nG0 Z5\n")
+    kwargs = {"axis": "Y", "final": -6.35, "raw": -9.0, "max_step": 2.0, "direction": 1.0, "span": 200.0, "below_z": 0.0}
+    assert [f.detail for f in _gcode.check_side_passes(program, **kwargs)] == ["Y -6.350 Z -7.000: pass does not run +X"]
 
 
 def test_side_pass_deeper_than_the_measured_stepdown_is_caught(tmp_path):
@@ -161,9 +196,9 @@ def test_side_pass_deeper_than_the_measured_stepdown_is_caught(tmp_path):
 
 def test_rapid_after_a_machine_retract_keeps_its_motion(tmp_path):
     # A G0 set on a machine-coordinate retract (G53) stays modal after a G1 cut,
-    # and the Grbl post's G28 G91 Z0 / G90 pair leaves absolute mode. A rapid
-    # straight into the stock from that unknown start, in one block or split
-    # over several, is still caught.
+    # and a G28 G91 Z0 / G90 pair leaves absolute mode. A rapid straight into
+    # the stock from that unknown start, in one block or split over several,
+    # is still caught.
     for descent in ("X30 Y5 Z-2", "X30 Y5\nZ5\nZ-2"):
         text = f"G0 X10 Y5 Z5\nG1 Z-1 F100\nG90 G53 G0 Z0\nG28 G91 Z0\nG90\n{descent}\n"
         findings = _gcode.check_rapids_clear(_program(tmp_path, text), 0.0)
@@ -177,18 +212,11 @@ def test_bare_home_forgets_every_axis(tmp_path):
     assert _gcode.check_rapids_clear(program, 0.0, [(10.0, 5.0)]) == []
 
 
-def test_incremental_part_moves_are_refused(tmp_path):
+def test_incremental_moves_and_radius_arcs_are_refused(tmp_path):
     with pytest.raises(ValueError, match="G91"):
         _program(tmp_path, "G0 X0 Y0 Z5\nG91\nG1 X10 F100\n")
-
-
-def test_event_stream_replies_decode_to_their_response():
-    from _fusion_mcp import _decode
-
-    body = 'event: message\ndata: {"jsonrpc": "2.0", "method": "notifications/progress"}\n\nevent: message\ndata: {"jsonrpc": "2.0", "id": 3, "result": {"ok": 1}}\n\n'
-    assert _decode(body, "text/event-stream") == {"jsonrpc": "2.0", "id": 3, "result": {"ok": 1}}
-    with pytest.raises(FusionError):
-        _decode("event: ping\n\n", "text/event-stream")
+    with pytest.raises(ValueError, match="R-form"):
+        _program(tmp_path, "G0 X0 Y0 Z5\nG1 Z-1 F100\nG2 X10 Y0 R5\n")
 
 
 def test_lateral_feed_below_the_stock_top_is_caught(tmp_path):
@@ -198,3 +226,70 @@ def test_lateral_feed_below_the_stock_top_is_caught(tmp_path):
     program = _program(tmp_path, text)
     assert _gcode.check_rapids_clear(program, 0.0, [(10.0, 5.0), (40.0, 5.0)]) == []
     assert [f.check for f in _gcode.check_vertical_below_top(program, 0.0)] == ["lateral"]
+
+
+def test_arcs_measure_their_true_length_in_every_plane(tmp_path):
+    # A clockwise quarter in XY, Fusion's G18 ramp-in quarter (from the base-bar
+    # face program), a full circle and a helix.
+    program = _program(tmp_path, (
+        "G0 X0 Y10 Z5\nG1 Z0 F100\nG2 X10 Y0 I0 J-10\n"
+        "G0 X-13.875 Z14.224\nG18 G2 X-11.97 Z12.319 I1.905 K0\n"
+        "G17 G0 X10 Y0 Z0\nG3 X10 Y0 I-10 J0\n"
+        "G2 X10 Y0 Z-3 I-10 J0\n"
+    ))
+    arcs = [m.length for m in program.cutting if m.centre is not None]
+    assert arcs == pytest.approx([5 * math.pi, 1.905 * math.pi / 2, 20 * math.pi, math.hypot(20 * math.pi, 3)])
+
+
+def test_cycle_time_splits_cutting_air_and_rapid(tmp_path):
+    # 10 mm rapid; a 10 mm plunge from Z5 to Z-5 at 100 mm/min, half above the
+    # top; a 100 mm cut at 200; a 50 mm feed move at Z5 (air) at 200.
+    program = _program(tmp_path, "G0 X0 Y0 Z5\nG0 X10\nG1 Z-5 F100\nG1 X110 F200\nG1 Z5\nG1 X60\n")
+    t = _gcode.cycle_time(program, rapid_mm_min=1000.0, z_top=0.0)
+    assert t.rapid == pytest.approx(10 / 1000)
+    assert t.cutting == pytest.approx(5 / 100 + 100 / 200 + 5 / 200)
+    assert t.air == pytest.approx(5 / 100 + 5 / 200 + 50 / 200)
+    assert t.total == pytest.approx(t.cutting + t.air + t.rapid)
+
+
+def test_feed_through_the_air_above_the_stock_is_caught(tmp_path):
+    # Fusion Personal's S2 links: a 444 mm G1 return at Z5 above the blank.
+    program = _program(tmp_path, "G0 X0 Y0 Z5\nG1 Z-7 F400\nG1 X444\nG1 Z5\nG1 X0\nG1 Z-7\n")
+    findings = _gcode.check_air_feed(program, 0.0)
+    assert [f.check for f in findings] == ["air_feed"]
+    assert "444.000 mm" in findings[0].detail
+    # A plunge that crosses the top is never wholly above it.
+    assert _gcode.check_air_feed(_program(tmp_path, "G0 X0 Y0 Z3\nG1 Z-7 F60\nG1 X444 F400\nG0 Z60\n"), 0.0) == []
+
+
+def test_full_length_return_is_caught(tmp_path):
+    one_way = _program(tmp_path, "G0 X0 Y-8 Z5\nG1 Z-7 F400\nG1 X444\nG0 Z60\nG0 X0\nG0 Z5\nG1 Z-7\nG1 X444\nG0 Z60\n")
+    assert [f.check for f in _gcode.check_no_return(one_way, "X", 220.0)] == ["return"]
+    alternating = _program(tmp_path, "G0 X0 Y-8 Z5\nG1 Z-7 F400\nG1 X444\nG0 Z60\nG0 Y148\nG0 Z5\nG1 Z-7\nG1 X0\nG0 Z60\n")
+    assert _gcode.check_no_return(alternating, "X", 220.0) == []
+
+
+def test_face_passes_must_zigzag_within_the_stepover_and_cover_the_face(tmp_path):
+    kwargs = {"z": 12.0, "y": (-140.0, 0.0), "max_stepover": 15.24, "radius": 9.525, "span": 200.0}
+    rows = [f"{-130.475 + 120.95 * i / 8:.4f}" for i in range(9)]  # cutter covers -140 .. 0 exactly
+    zigzag = "G0 X-30 Y-130.5 Z20\nG1 Z12 F100\n" + "".join(
+        f"G1 X{470 if i % 2 == 0 else -30}\nG1 Y{rows[i + 1]}\n" for i in range(8)) + "G1 X470\nG0 Z20\n"
+    assert _gcode.check_face_passes(_program(tmp_path, zigzag), **kwargs) == []
+    one_way = "G0 X-30 Y-130.5 Z20\nG1 Z12 F100\nG1 X470\nG0 Z20\nG0 X-30 Y-115.5\nG1 Z12\nG1 X470\nG0 Z20\n"
+    details = [f.detail for f in _gcode.check_face_passes(_program(tmp_path, one_way), **kwargs)]
+    assert details[0] == "passes at Y -130.500 and Y -115.500 run the same way"
+    assert details[1].startswith("cutter covers")
+    wide = "G0 X-30 Y-130.5 Z20\nG1 Z12 F100\nG1 X470\nG1 Y-110\nG1 X-30\nG0 Z20\n"
+    assert any(f.detail.startswith("stepover 20.500") for f in _gcode.check_face_passes(_program(tmp_path, wide), **kwargs))
+
+
+def test_freecad_older_than_1_1_is_refused(tmp_path, monkeypatch):
+    exe = tmp_path / "freecadcmd.exe"
+    exe.write_text("", encoding="utf-8")
+    monkeypatch.setenv(cam_nc.FREECAD_ENV, str(exe))
+    monkeypatch.setattr(cam_nc, "freecad_version", lambda _path: (1, 0))
+    with pytest.raises(cam_nc.FreeCadError, match="needs 1.1"):
+        cam_nc.resolve_freecadcmd()
+    monkeypatch.setattr(cam_nc, "freecad_version", lambda _path: (1, 1))
+    assert cam_nc.resolve_freecadcmd() == exe
+

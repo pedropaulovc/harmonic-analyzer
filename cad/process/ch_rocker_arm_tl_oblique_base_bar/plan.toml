@@ -213,7 +213,7 @@ beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.blank_length_mm
 speed_kind = "spindle"
 tool = "em-face"
 sizing = "other"
-instruction = "Face full length, +X passes, .60 stepover. Side 1: one pass, ~half the allowance. Flip end-for-end, ZERO EDGE at fixed jaw; side 2: one pass to {{cad.thickness_in:.4f}}."
+instruction = "Face full length by programs BB02/BB03: zigzag passes along X (climb on alternate passes: ball screws, owner ruling 2026-11-16), .60 stepover, .02 past each edge. Side 1: one level, ~half the allowance. Flip end-for-end, ZERO EDGE at fixed jaw; side 2: one level to {{cad.thickness_in:.4f}}."
 # TODO(#2850): facing is ~107 min of the two bars' cutting at these chart
 # speeds (850 rpm, .002 in/tooth); measure the 3/4 in face mill with dechatter
 # and move to a measured record as the edges did (#2846).
@@ -327,7 +327,7 @@ rows = "{{cad.hole_rows}}"
 speed_kind = "spindle"
 tool = "rail-drill"
 sizing = { kind = "tap_drill", tap = "tap" }
-instruction = "R1–R8 through on the CNC by program BB07 (cam:ch_rocker_arm_tl_oblique_base_bar), R1–R4 over the left jack; chip-break pecks after .27 deep (L/D 4)."
+instruction = "R1–R8 through on the CNC by program BB07 (cam:ch_rocker_arm_tl_oblique_base_bar), R1–R4 over the left jack; full-retract pecks of one drill diameter (L/D 4)."
 rpm = 2800
 feed = "BB07 program"
 beam = { axis = "x", hold = "between", extent_mm = [0, "{{cad.length_mm}}"], supports_mm = ["{{process.jack_left_x_mm}}", "{{cad.vise_centred_overhang_mm}}"], section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
