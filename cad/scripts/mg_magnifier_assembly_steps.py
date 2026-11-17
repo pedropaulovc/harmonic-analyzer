@@ -2,8 +2,9 @@
 
 The ch_channel_assembly_steps pattern: a step's number is its position in
 STEPS, so inserting a step renumbers every later one and every pointer that
-cites a step by key follows. The sheet prints the step text
-(mg_magnifier_assembly_sheet.STEP_TEXT); this module holds only the order.
+cites a step by key follows. The release's ASSEMBLY.md prints the step text
+(mg_magnifier_assembly_sheet.STEP_TEXT, ha_assembly_package); this module
+holds only the order.
 Pure data: no SolidWorks, no config reads.
 
 Each step does one thing (drawing-guidelines.md rule 22). A numbered step

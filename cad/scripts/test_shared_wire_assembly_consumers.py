@@ -10,6 +10,7 @@ import _component_references
 import _drawing_tables
 import draw_mg_magnifier_assembly as magnifier
 import draw_pn_pen_assembly as pen
+import mg_magnifier_assembly_steps as magnifier_steps
 from sh_vn_music_wire_lever_spec import BOM_DESCRIPTION as LEVER_WIRE_DESCRIPTION
 from sh_vn_music_wire_pen_spec import BOM_DESCRIPTION as PEN_WIRE_DESCRIPTION
 from _assembly_contract import assembly_contract
@@ -831,6 +832,6 @@ def test_wire_application_instructions_stay_with_the_assembly_consumers():
     wire, fixture, drum = (
         f"ITEM {notes.ITEM_NUMBERS[stem]}" for stem in (notes.WIRE, notes.FIXTURE, notes.DRUM)
     )
-    hooked = notes.STEP_TEXT[magnifier.steps.WIRE_HOOKED_KEY]
+    hooked = notes.STEP_TEXT[magnifier_steps.WIRE_HOOKED_KEY]
     assert f" {wire} " in hooked and "SPIGOT GROOVE" in hooked and fixture in hooked
     assert f" ROUND {drum} " in notes.STEP_TEXT["lever-wire-wrapped"]

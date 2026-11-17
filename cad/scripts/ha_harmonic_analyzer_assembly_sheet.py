@@ -13,6 +13,7 @@ import _config
 import fr_frame_assembly_steps as fr_steps
 import ha_build_sequence as build
 import ha_harmonic_analyzer_assembly_steps as steps
+import mg_magnifier_assembly_steps as mg_steps
 import pd_paper_drive_assembly_steps as pd_steps
 import pd_transgear_removable_spec as removable
 import _sprocket_seat_geometry as seat_geometry
@@ -279,7 +280,13 @@ _STEP_TEXT: dict[str, tuple[str, ...]] = {
         "IF IT MOVES, SLACKEN BOTH SCREWS AND REPEAT "
         f"{_n('magnifier-bracket-screwed')}C-{_n('magnifier-bracket-screwed')}D.",
     ),
-    "lever-wire-fitted": ("LEVER WIRE: FIT IT PER MHA-MG-00 SHEET 5.",),
+    # MHA-MG-00's fit-up steps print in the release's ASSEMBLY.md, not on its
+    # sheets (#2889): cite them by number.
+    "lever-wire-fitted": (
+        f"LEVER WIRE: FIT IT PER {mg_steps.DRAWING_NUMBER} STEPS "
+        f"{mg_steps.step_number(mg_steps.WIRE_HOOKED_KEY)}-"
+        f"{mg_steps.step_number(mg_steps.WIRE_TIED_KEY)}.",
+    ),
     "pen-hung": (
         "PEN: HANG MHA-PN-00 FROM THE MHA-MG-08 BAR.",
         "LOCK ITS MHA-PN-VN-50 HANGER SCREW WITH THE MHA-PN-VN-54 NUT AND "

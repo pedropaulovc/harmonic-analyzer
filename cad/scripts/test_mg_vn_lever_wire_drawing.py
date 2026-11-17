@@ -36,6 +36,7 @@ def test_package_notes_carry_no_dimension_text() -> None:
         assert not _DIMENSION_TEXT.search(text), text
 
 
+
 def test_end_view_and_isometric_labels_sit_inside_their_fields() -> None:
     assert section.STOCK_SCALE == (75, 1)
     field = section.STOCK_FIELD

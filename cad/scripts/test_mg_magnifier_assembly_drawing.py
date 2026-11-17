@@ -328,15 +328,15 @@ def test_every_printed_step_is_one_short_action_by_the_shared_lint() -> None:
     word is one the sheet defines. No step is allowlisted."""
     from _test_assembly_steps import step_structure_violations
 
-    continued = " ".join(drawing.ASSEMBLY_STEPS_CONTINUED.split())
-    # The direction words the sheet uses, each with its definition as printed:
+    printed = "\n".join(notes.ASSEMBLY_STEPS)
+    # The direction words the steps use, each with its definition as printed:
     # a standard view name and a sense seen in a lettered view (rule 26).
     direction_key = "\n".join(
         phrase for phrase in ("RIGHT SIDE VIEW ON SHEET 1", "CLOCKWISE AS SEEN IN VIEW D")
-        if phrase in continued
+        if phrase in " ".join(printed.split())
     )
     violations = step_structure_violations(
-        {"STEP": (drawing.ASSEMBLY_STEPS, drawing.ASSEMBLY_STEPS_CONTINUED)},
+        {"STEP": (printed,)},
         reference_kinds={"STEP": "STEP"},
         direction_key=direction_key,
     )
@@ -618,32 +618,18 @@ def test_the_stack_chain_is_authored_on_the_axle_and_driven_from_globals(
     assert stack.REFERENCE_DIMENSIONS <= {name for _f, name in references}
 
 
-def test_the_package_has_five_landscape_sheets_with_the_wire_steps_on_sheet_5() -> None:
-    assert drawing.SHEET_NAMES[3] == "ASSEMBLY STEPS"
-    assert drawing.SHEET_NAMES[-1] == "LEVER + WIRE STEPS"
+def test_the_package_has_five_landscape_sheets_with_view_d_on_sheet_5() -> None:
+    assert drawing.SHEET_NAMES[3] == "FINISHED ASSEMBLY"
+    assert drawing.SHEET_NAMES[-1] == "WHEEL AT REST"
     assert len(drawing.SHEET_NAMES) == 5
     assert set(drawing.SHEET_LAYOUTS.values()) == {DrawingLayout.LANDSCAPE}
     assert set(drawing.SHEET_SCALES) == set(drawing.SHEET_NAMES)
-    # MHA-HA-00 prints "LEVER WIRE: PER MHA-MG-00 SHEET 5." and MHA-SH-VN-56
-    # cites the wire steps there: the lever group and the wire, and only
-    # they, continue on sheet 5.
-    continued = notes.ASSEMBLY_STEPS[drawing.STEPS_SPLIT:]
-    first = steps.SEQUENCE.index(steps.LEVER_THREADED_KEY)
-    assert [step.split(". ", 1)[0] for step in continued] == [
-        steps.step_number(key) for key in steps.SEQUENCE[first:]
-    ]
-    assert steps.step_number(steps.LEVER_THREADED_KEY).isdigit()
-    assert all(
-        " ".join(step.split()) in " ".join(drawing.ASSEMBLY_STEPS_CONTINUED.split())
-        for step in continued
-    )
-    assert steps.WIRE_HOOKED_KEY == "lever-wire-hooked"
-    assert steps.WIRE_TIED_KEY == "lever-wire-tied"
-    assert steps.SEQUENCE.index(steps.WIRE_HOOKED_KEY) >= drawing.STEPS_SPLIT
-    assert steps.SEQUENCE[-1] == steps.WIRE_TIED_KEY
-    # VIEW D, which the wire steps cite, prints on this sheet at its scale.
+    # The fit-up steps print in the release's ASSEMBLY.md (#2889), not on a
+    # sheet; VIEW D, which the wire steps cite, prints alone on sheet 5 at
+    # its own scale.
     assert notes.WHEEL_REST_VIEW_SHEET == len(drawing.SHEET_NAMES)
     assert drawing.SHEET_SCALES[drawing.SHEET_NAMES[-1]] == drawing.WHEEL_REST_SCALE
+    assert steps.SEQUENCE[-1] == steps.WIRE_TIED_KEY
 
 
 def test_the_drawing_key_reads_only_the_package_parts_config() -> None:
@@ -955,7 +941,6 @@ def test_the_package_fields_stay_inside_the_border_and_off_the_title_block() -> 
     assert not _overlap(drawing.WHEEL_FIELD, drawing.TITLE_BLOCK)
     assert not _overlap(drawing.BOM_REFERENCE_FIELD, bom)
     assert drawing.BOM_REFERENCE_FIELD[3] < drawing.BOM_BOTTOM
-    assert drawing.FINISHED_FIELD[0] > drawing.STEPS_RIGHT
 
 
 def test_the_finished_caption_centres_over_its_view() -> None:
@@ -966,7 +951,7 @@ def test_the_finished_caption_centres_over_its_view() -> None:
     left, top = drawing.caption_over(outline, text)
     width = len(text) * drawing.CAPTION_CHAR_WIDTH
     assert left + width / 2.0 == pytest.approx((outline[0] + outline[2]) / 2.0)
-    assert left > drawing.STEPS_RIGHT
+    assert left > drawing.FINISHED_FIELD[0]
     assert top - drawing.NOTE_LINE_PITCH > outline[3]
     assert top < drawing.INNER_BORDER[3]
 
@@ -990,72 +975,6 @@ def test_the_wire_balloon_stands_right_of_the_view_on_its_rising_leader() -> Non
     assert drawing.TITLE_BLOCK[3] < y < drawing.FINISHED_FIELD[3]
 
 
-def test_the_steps_and_checks_fit_their_column() -> None:
-    for block, width in (
-        (drawing.ASSEMBLY_STEPS, drawing.STEPS_LINE_WIDTH),
-        (drawing.ASSEMBLY_STEPS_CONTINUED, drawing.CONTINUED_LINE_WIDTH),
-        (drawing.ASSEMBLY_CHECKS, drawing.CONTINUED_LINE_WIDTH),
-    ):
-        assert max(len(line) for line in block.splitlines()) <= width
-    # Sheet 5's column at the native note pitch ends left of VIEW D's ink.
-    assert drawing.CONTINUED_RIGHT + drawing._PAD < drawing.REST_INK_LEFT
-    # Sheet 4's column ends a pad short of the title block's left edge, so it
-    # may run down beside the title block to the bottom border; sheet 5's
-    # blocks run right of that edge, so each must end above the title block.
-    # Final native whole-note/layout checks establish clearance for this
-    # exact text.
-    assert drawing.BESIDE_TITLE_BLOCK
-    continued_bottom = drawing.STEPS_XY[1] - len(
-        drawing.ASSEMBLY_STEPS_CONTINUED.splitlines()
-    ) * drawing.NOTE_LINE_PITCH
-    assert continued_bottom - drawing.CHECKS_XY[1] == pytest.approx(2 * drawing._PAD)
-    for block, top, floor in (
-        (drawing.ASSEMBLY_STEPS, drawing.STEPS_XY[1], drawing.INNER_BORDER[1]),
-        (drawing.ASSEMBLY_STEPS_CONTINUED, drawing.STEPS_XY[1], drawing.TITLE_BLOCK[3]),
-        (drawing.ASSEMBLY_CHECKS, drawing.CHECKS_XY[1], drawing.TITLE_BLOCK[3]),
-    ):
-        bottom = top - len(block.splitlines()) * drawing.NOTE_LINE_PITCH
-        assert bottom > floor + drawing._PAD
-    assert drawing.STEPS_XY[0] > drawing.INNER_BORDER[0]
-    assert drawing.STEPS_XY[1] < drawing.INNER_BORDER[3]
-    assert drawing.STEPS_RIGHT + drawing._PAD <= drawing.FINISHED_FIELD[0]
-    assert drawing.STEPS_RIGHT < drawing.TITLE_BLOCK[0]
-    titles = [title for title, _key in notes.STEP_GROUPS]
-    assert (
-        drawing.ASSEMBLY_STEPS + " " + drawing.ASSEMBLY_STEPS_CONTINUED
-    ).split() == " ".join(
-        (
-            "ASSEMBLY SEQUENCE",
-            titles[0],
-            *notes.ASSEMBLY_STEPS[: drawing.STEPS_SPLIT],
-            drawing.CONTINUED_HEADING,
-            titles[1],
-            *notes.ASSEMBLY_STEPS[drawing.STEPS_SPLIT : drawing._GROUP_STARTS[2]],
-            titles[2],
-            *notes.ASSEMBLY_STEPS[drawing._GROUP_STARTS[2] :],
-        )
-    ).split()
-    assert drawing.ASSEMBLY_CHECKS.split() == " ".join(notes.ASSEMBLY_CHECKS).split()
-
-
-def test_steps_stay_tight_and_a_blank_line_opens_each_later_group() -> None:
-    numbered = 0
-    titles = [title for title, _key in notes.STEP_GROUPS]
-    for block in (drawing.ASSEMBLY_STEPS, drawing.ASSEMBLY_STEPS_CONTINUED):
-        rows = block.splitlines()
-        starts = [i for i, row in enumerate(rows) if re.match(r"\d+[A-Z]?\. ", row)]
-        numbered += len(starts)
-        # The heading, then the first group's title, sit directly over the
-        # block's first step.
-        assert rows[1].startswith(titles[0 if block is drawing.ASSEMBLY_STEPS else 1][:20])
-        assert starts[0] == 2
-        blanks = [i for i, row in enumerate(rows) if not row.strip()]
-        group_rows = [i for i, row in enumerate(rows) if any(row == t[: len(row)] and len(row) > 20 for t in titles)]
-        # One blank row before each later group's title; none between steps.
-        assert blanks == [row - 1 for row in group_rows[1:]]
-    assert numbered == len(notes.ASSEMBLY_STEPS)
-    # The unnumbered checks stay tight.
-    assert "" not in drawing.ASSEMBLY_CHECKS.splitlines()
 
 
 def test_the_exploded_ladders_keep_the_simplified_configuration() -> None:
@@ -1745,3 +1664,4 @@ def test_mg_settings_only_read_inherited_native_callouts(
     text_parts[name][part] = ""
     with pytest.raises(RuntimeError, match="callout reads ''"):
         settled()
+
