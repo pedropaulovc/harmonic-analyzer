@@ -5,11 +5,13 @@
 > Tier-1 parts — *can the machinist actually cut this, in what stock, in how many setups, and where
 > will it fight back.* Generic DFM checklists ("radius internal corners", "minimize setups") are
 > useless as bare bullets; every row below is attached to a **named feature with a real number** from
-> the build script. Audience + toolchain per §1/§11: period **brass + steel**, on a **manual** shop
-> (`cad/process/shop/inventory.toml`): the **PM-30MV mill, handwheels on all three axes read on a DRO**
-> (`operation_mode = "manual_with_digital_positioning"`), the **PM-1127VF-LB lathe** and the **BS-0
-> dividing head**. There is no CNC: the repeat parts get their repeatability from fixtures, stops and
-> indexing.
+> the build script. Audience + toolchain per §1/§11: period **brass + steel**. The shop's machines
+> are in `cad/process/shop.toml` (`machines.*`) and `cad/config/shop-equipment.toml`: the **PM-30MV
+> mill**, CNC-converted (`cnc.pm-30mv`, `cnc.pm-30mv-controller`: FluidNC, sent from CNCjs, jogged
+> from a WHB04B pendant), the **PM-1127VF-LB lathe** and the **BS-0 dividing head**. The rows below
+> were written for manual work, where the repeat parts get their repeatability from fixtures, stops
+> and indexing; a part runs from CNC programs only where its process plan says so
+> (`cad/process/README.md`).
 
 All numbers are from the `cad/scripts/build_*.py` sources (mm). Where a part is modeled as a
 **casting** but you intend to cut it from bar, that is a *substitution* — flagged, because the
@@ -1117,8 +1119,8 @@ steps instead of one big engagement.
   cannot cut, plus the thin T006 **root-to-bore web** (0.621 mm in the model they checked). Their rule sets are tuned for
   moulding / sheet / generic 3-axis and don't flag manual-machining hazards. **A green from these
   means little — trust it for nothing on the corners or walls.**
-- **Fusion 360 CAM verify/simulate — a desk check only, with a known edge.** The shop has no CNC, so
-  no program runs on the manual PM-30MV; but because it
+- **Fusion 360 CAM verify/simulate — a desk check only, with a known edge.** The PM-30MV's
+  programs are posted from FreeCAD (`cad/process/README.md`), so no Fusion program runs on it; but because it
   simulates the *actual tool against the actual solid*, it **surfaces the class DFMPro missed**: an
   internal corner smaller than the smallest endmill shows up as **un-cut stock** (you can't program a
   sharp internal corner), and tool-reach / gouge / holder-collision are caught. Banking on Fusion for
@@ -1131,7 +1133,7 @@ steps instead of one big engagement.
   by CAM sim. **A clean Fusion sim is not a substitute for a first cut on the fragile parts.**
 
 **Order that actually de-risks the build:**
-1. **Fusion CAM verify** (desk check, no CNC behind it) — cheap; catches the tool-access/gouge/reach majority, incl. the sharp corners
+1. **Fusion CAM verify** (desk check) — cheap; catches the tool-access/gouge/reach majority, incl. the sharp corners
    (as uncut stock).
 2. **First-article cut** — cut **one** of each fragile/hard part (a T006 gear, a cam-gear, a rocker arm,
    the thin shaft) and inspect **before** committing to 20×. The only check that catches
