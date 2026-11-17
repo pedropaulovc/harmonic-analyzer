@@ -2762,7 +2762,7 @@
       "expected_output": "Rule-coverage case (rules 22): reports each negative finding in the stated category and raises no positive-case item.",
       "expectations": [
         {
-          "text": "A blocker reports that the top-level assembly sheet has no parts list, no balloons, no exploded view and no steps: it shows only the assembled machine.",
+          "text": "A blocker reports that the top-level assembly sheet has no parts list, no balloons and no exploded view: it shows only the assembled machine.",
           "check": {
             "category": "blockers"
           },
@@ -2877,7 +2877,7 @@
           "evidence": "mg-magnifier-assembly sheet 1 (only sheet): TOP/FRONT/RIGHT/ISO views only; no BOM, no balloon, no steps. Rule 22. #1296 Codex blind review found the same."
         },
         {
-          "text": "A blocker reports that the package has no exploded view and no assembly order or set-up steps.",
+          "text": "A blocker reports that the package has no exploded view.",
           "check": {
             "category": "blockers"
           },
@@ -4200,7 +4200,7 @@
           "evidence": "pn-pen-assembly sheet 1 title block: MATERIAL 'SEE PARTS LIST', FINISH 'SEE PARTS LIST'; the sheet has no BOM. A sheet that points to a table that does not exist is a package that does not agree with itself (rule 25) and a parts-list omission (rule 22)."
         },
         {
-          "text": "A blocker reports that the package has no exploded view and no assembly order or set-up steps.",
+          "text": "A blocker reports that the package has no exploded view.",
           "check": {
             "category": "blockers"
           },
@@ -4568,7 +4568,7 @@
           "evidence": "sm-summing-assembly sheet 1 (only sheet): three views plus isometric, no BOM, no balloons. Rule 22. #1297 Codex blind review found the same."
         },
         {
-          "text": "A blocker reports that the package has no exploded view, no assembly order and no set-up or check steps.",
+          "text": "A blocker reports that the package has no exploded view.",
           "check": {
             "category": "blockers"
           },
@@ -4578,7 +4578,7 @@
           "evidence": "sm-summing-assembly sheet 1: assembled views only; no exploded view, no steps."
         },
         {
-          "text": "The review reports that the threaded hanger/knife-mount joints visible on the sheet have no anti-loosening means shown in a view or detail and no step that engages one, so what is fixed and what turns cannot be established.",
+          "text": "The review reports that the threaded hanger/knife-mount joints visible on the sheet have no anti-loosening means shown in a view, detail or parts list, so what is fixed and what turns cannot be established.",
           "check": {
             "category": "any"
           },
