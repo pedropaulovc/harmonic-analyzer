@@ -219,11 +219,13 @@ def test_bar_turn_sets_its_heading_against_the_platen_not_level() -> None:
     # review run 20261115T044005360Z, r1/r2).
     acceptance = notes.sub_step("nib-on-paper", check)
     assert f"FIRST SETTING; {acceptance} IS ITS ACCEPTANCE" in turn
-    remedy = nib[check + 1].split(". ", 1)[1]
+    # The remedy is three steps, one action each (rule 22; machinist review
+    # of main 67ba11bf1a, R5): slacken, turn, repeat.
+    slacken, turn_away, repeat = (line.split(". ", 1)[1] for line in nib[check + 1 :])
     bar = steps.step_number("magnifier-bar-clamped")
-    assert remedy.startswith("IF ")
-    assert "TURN THE MHA-MG-08 BAR AWAY FROM THE PAPER" in remedy
-    assert f"REPEAT {bar}B, {bar}D-{bar}E AND " in remedy
+    assert slacken.startswith("IF ") and slacken.endswith("CLAMP SCREWS.")
+    assert turn_away.startswith("TURN THE MHA-MG-08 BAR AWAY FROM THE PAPER")
+    assert repeat.startswith(f"REPEAT {bar}B, {bar}D-{bar}E AND ")
     assert "PEN ROD" not in " ".join(notes.ASSEMBLY_STEPS)
 
 
@@ -350,3 +352,29 @@ def test_channel_sheet_cites_the_anchor_step_by_its_number() -> None:
     assert ch_channel_assembly_steps.HA_ANCHORS_SET_REF == steps.step_ref(
         "channel-anchors-set"
     )
+
+
+def test_the_plate_level_prints_in_the_sheet_1_setting_table() -> None:
+    """Rule 22 (machinist review of main 67ba11bf1a, R5): the level reading
+    step 6D sets and check 4 accepts prints on sheet 1, in the setting table,
+    from the constants the step prints, and both cite the table."""
+    (row,) = notes.SETTING_TABLE_ROWS
+    assert len(row) == len(notes.SETTING_TABLE_HEADER)
+    step, setting, condition, accept, instrument = row
+    lines = notes.step_lines("summing-levelled")
+    (line,) = (line for line in lines if notes.SETTING_TABLE_REF in line)
+    assert line.startswith(f"{step}. ")
+    assert f"{setting} READS {notes.LEVEL_ACCEPTANCE}" in line
+    assert instrument in line
+    assert accept == f"LEVEL \u00b1{notes.LEVEL_TOLERANCE_DEG:g}\u00b0"
+    bar = condition.removeprefix("EVERY ").removesuffix(" BAR AT 0")
+    assert f"SET EVERY {bar} AMPLITUDE BAR TO ZERO" in lines[lines.index(line) - 1]
+    (check,) = (c for c in notes.ASSEMBLY_CHECKS if notes.SETTING_TABLE_REF in c)
+    assert f"READS {notes.LEVEL_ACCEPTANCE} ({notes.SETTING_TABLE_REF})" in check
+
+
+def test_the_setting_table_fits_over_the_views() -> None:
+    box = drawing.planned_setting_table_box()
+    assert drawing.setting_table_box_violations(box) == []
+    # R5 printed the views' ink no higher than 387.6 mm.
+    assert drawing.SETTING_TABLE_FLOOR > 0.3876
