@@ -1,12 +1,12 @@
-"""Import-time contracts for the cone tip block's hold-down stack in the drive train.
+"""Contracts for the cone tip block's hold-down stack in the drive train.
 
 The block (MHA-DT-21) stands straight on the swing platform, held by one socket
 head cap screw (MHA-DT-VN-60) rising through the plate's counterbored hold-down
 hole into a blind tap in its foot (user ruling 2026-09-29).  The drive-train
-builder asserts, when it is imported, that the block, the platform, the post
-and the shaft agree and that every stack the hold-down fixes still closes at
-the printed limits.  These tests read those asserts and the values they
-produce, and show each tolerance the stacks rely on is load-bearing.  The
+stacks (test_dt_drive_train_assembly_stack) check that the block, the platform,
+the post and the shaft agree and that every stack the hold-down fixes still
+closes at the printed limits.  These tests read the values they
+check, and show each tolerance the stacks rely on is load-bearing.  The
 cone tip's air to G19 (dt_cone_tip_air: the bushing, the end screw and the
 block, owner decision C1 keyed 2026-11-09, PR #1992) is proved here too.
 """
@@ -138,12 +138,13 @@ def test_hold_down_hole_stands_under_the_block_foot_tap() -> None:
     line and the adjuster axis, so in the machine the screw rises into the
     tap and the block body stands centred on the cone line."""
     import build_dt_drive_train_assembly as bdt
+    import dt_cone_swing_platform_spec as platform
     import dt_cone_tip_block_spec as block
 
     assert bdt.PLAT_HOLDDOWN_LOCAL_X == pytest.approx(block.FOOT_TAP_OFFSET_X)
     assert bdt.PLAT_HOLDDOWN_LOCAL_X != 0.0  # a real, dimensionable station
     hole = bdt._plate_local_to_machine(
-        bdt.PLAT_HOLDDOWN_LOCAL_X, bdt.PLAT_HOLDDOWN_LOCAL_Z
+        bdt.PLAT_HOLDDOWN_LOCAL_X, platform.HOLDDOWN_LOCAL_Z
     )
     origin = bdt.cone_station(bdt.TIP_BLOCK_STATION)
     tap = (

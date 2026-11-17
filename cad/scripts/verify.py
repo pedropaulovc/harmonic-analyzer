@@ -1907,6 +1907,7 @@ def verify_base_footprint(report: Report) -> None:
         import build_dt_drive_train_assembly as train
         import fr_harmonic_base_spec as base
         import dt_swing_stop_screw_spec as sscrew
+        import dt_vn_cone_lock_knob_spec as knob
 
         half_len = base.TOP_LENGTH / 2.0
         front_z, rear_z = base.TOP_FRONT_Z, base.TOP_REAR_Z
@@ -1937,8 +1938,8 @@ def verify_base_footprint(report: Report) -> None:
                 "dt-vn-cone-lock-knob",
                 train.KNOB_X,
                 train.KNOB_Z,
-                train.KNOB_HEAD_DIA / 2.0,
-                train.KNOB_HEAD_DIA / 2.0,
+                knob.HEAD_DIA / 2.0,
+                knob.HEAD_DIA / 2.0,
             ),
             (
                 "dt-vn-cone-pivot-screw",

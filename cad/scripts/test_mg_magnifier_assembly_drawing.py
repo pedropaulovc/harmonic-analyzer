@@ -17,6 +17,7 @@ import mg_magnifier_assembly_sheet as notes
 import mg_magnifier_assembly_spec as stack
 import mg_magnifier_assembly_steps as steps
 import mg_magnifier_explode_spec as explode
+import mg_magnifying_vertical_rod_geom
 import mg_magnifying_wheel_geom
 import mg_wheel_axle_spacer_spec
 import mg_wheel_axle_spec
@@ -3173,7 +3174,7 @@ def test_wire_balloon_requires_its_logical_bom_row(magnifier_bom, replacement_ro
             # The shoulder's Ø5 edge (#1559): the old x = R station now falls
             # on the turned-down thread, so a point at radius R is off the rod.
             "mg-magnifying-vertical-rod",
-            assembly.VROD_SHOULDER_X,
+            mg_magnifying_vertical_rod_geom.SHOULDER_X,
             assembly.VROD_DIA / 2.0,
             _transforms.compose_rows(
                 _transforms.rot_z_rows(-90.0), _transforms.ROT_Y_180

@@ -77,10 +77,10 @@ from build_pd_paper_drive_assembly import (
     DISC_TEETH,
     FEED_PD,
     KNOB_SHAFT_XY,
-    NET_RACK_TRAVEL_PER_CRANK_REV,
     SPARE_GEAR_POS,
     THIRD_TEETH,
 )
+from paper_drive_geom import NET_RACK_TRAVEL_PER_CRANK_REV
 
 DRIVE_DEG = 30.0    # crank test rotation
 CRANK_TOL = 2.0     # deg: the temporary driver must hit DRIVE_DEG on BOTH sides
