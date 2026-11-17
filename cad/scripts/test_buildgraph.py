@@ -243,12 +243,15 @@ def test_retired_front_pin_is_not_allocated_but_rear_cup_pin_is() -> None:
     from _drawing_registry import DRAWINGS_BY_NAME
     from _fastener_catalog import FASTENERS
     from _test_stock_recipes import discovered_recipes
+    from hardware_schedule import SCHEDULE
 
     obsolete = "vn_transgear_collar_cross_pin"
     retained = "pd_vn_transgear_knob_cup_pin"
     parts = set(part_stems())
     assert retained in parts
-    assert retained in DRAWINGS_BY_NAME
+    # Standard hardware: delivered as its HARDWARE.md row, not a sheet (#2886).
+    assert retained.replace("_", "-") in SCHEDULE
+    assert retained not in DRAWINGS_BY_NAME
     assert FASTENERS[retained.replace("_", "-")].skus == ("98296A031",)
     assert "98296A031" in discovered_recipes()
     assert obsolete not in parts
