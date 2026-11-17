@@ -1513,7 +1513,11 @@ and the adapter's process-global center-mark observer registration. Specialized
 authoring lives in `_drawing_notes`, `_drawing_leader_notes`, `_drawing_gdt`,
 `_drawing_finish`, `_drawing_sections`, `_drawing_centerline`,
 `_drawing_hole_callout`, `_drawing_dimension_import`, `_drawing_dimensions`,
-`_drawing_edge_dimensions`, `_drawing_tables` and `_drawing_balloons`.
+`_drawing_edge_dimensions`, `_drawing_tables` and `_drawing_balloons`. A titled
+native general (setting) table on an assembly sheet goes through
+`_general_table.insert_general_table`, the one helper for it (one-line title,
+2.8 mm a character); the dt_cone_gear_tl_arbor setup table, measured at 3.2 mm a
+character under a two-line title, keeps its own placer.
 `move_model_dimension` belongs to `_drawing_dimensions`; drawing scripts import
 dimension-transfer helpers there, never from another part's drawing module.
 Hole-callout selection probes live in `_drawing_hole_callout`; annotation style

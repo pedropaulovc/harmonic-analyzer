@@ -10,6 +10,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import _config
+import _general_table as general_table
 import cone_line
 import cylinder_bank_layout as bank_layout
 import dt_cone_gear_spec as cone_spec
@@ -640,7 +641,7 @@ def test_an_out_pedestal_has_a_remedy_that_fits_its_sheet() -> None:
     assert "GEAR 0 " in remedies["FRONT MHA-DT-02, X"]
     assert f"GEAR {gears - 1} " in remedies["BACK MHA-DT-02, X"]
     assert "INDICATOR" in remedies["FRONT MHA-DT-02, Y"]
-    widths = drawing.table_column_widths(
+    widths = general_table.table_column_widths(
         drawing.PEDESTAL_RECHECK_HEADER, drawing.PEDESTAL_RECHECK_ROWS
     )
     assert drawing.SETTING_TABLE_LEFT + sum(widths) <= drawing.NOTE_FIELD_RIGHT[2]
@@ -908,7 +909,9 @@ def test_every_set_feeler_the_steps_and_checks_print_has_a_leaf_row() -> None:
     assert not any("CHECK 4" in cited for cited in rows.values())
     checks = " ".join(drawing.CHECKS.split())
     assert "RADIAL SHIMS" not in checks and "FEELER LEAVES" not in checks
-    widths = drawing.table_column_widths(drawing.FEELER_STACK_HEADER, drawing.FEELER_STACK_ROWS)
+    widths = general_table.table_column_widths(
+        drawing.FEELER_STACK_HEADER, drawing.FEELER_STACK_ROWS
+    )
     assert drawing.SETTING_TABLE_LEFT + sum(widths) <= drawing.STATION_TABLE_FIELD[0]
 
 
@@ -953,18 +956,18 @@ def test_sheet_15_tables_stack_clear_of_the_station_field_on_any_seat(
     table hangs off its title's requested top, so a title box read a pixel
     or two off moves no table, and the stack ends 2 mm clear of the station
     table field and the interface notes."""
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(general_table, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(drawing, "_activate_sheet", lambda *_args: None)
     monkeypatch.setattr(drawing, "_heading", lambda *_args: None)
     monkeypatch.setattr(drawing, "_reference_iso", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(drawing, "_stack_sheet_note_fields", lambda *_args: [])
-    monkeypatch.setattr(drawing, "_add_note_block", lambda *_args, **_kwargs: object())
+    monkeypatch.setattr(general_table, "add_note_block", lambda *_args, **_kwargs: object())
     monkeypatch.setattr(
-        drawing,
-        "_anchor_note",
+        general_table,
+        "anchor_note",
         lambda _adapter, _note, corner, **_kwargs: (
             corner[0],
-            corner[1] - drawing.NOTE_LINE_PITCH + title_read_error,
+            corner[1] - general_table.NOTE_LINE_PITCH + title_read_error,
             corner[0] + 0.08,
             corner[1] + title_read_error,
         ),
@@ -981,12 +984,12 @@ def test_sheet_15_tables_stack_clear_of_the_station_field_on_any_seat(
 
     setting, recheck, feeler = tables
     assert setting.anchor[1] == pytest.approx(
-        drawing.NOTE_FIELD_LEFT[1] - drawing.TABLE_TITLE_DROP
+        drawing.NOTE_FIELD_LEFT[1] - general_table.TABLE_TITLE_DROP
     )
     bottoms = [table.anchor[1] - table.RowCount * table.ROW_HEIGHT for table in tables]
     for above, below in zip(bottoms, (recheck, feeler)):
         assert above - below.anchor[1] == pytest.approx(
-            drawing.SETTING_TABLE_GAP + drawing.TABLE_TITLE_DROP
+            drawing.SETTING_TABLE_GAP + general_table.TABLE_TITLE_DROP
         )
     assert bottoms[1] - drawing.STATION_TABLE_FIELD[1] >= 0.002
     assert bottoms[2] - drawing.INTERFACE_FIELD[1] >= 0.002
@@ -1390,7 +1393,7 @@ def test_bom_budget_refuses_the_title_block_and_sheet_edges() -> None:
 def test_bank_setting_caption_accepts_native_r4_extent_not_exact_anchor_target() -> None:
     # Native R4, source 957dc7b2fc79, 20261020T223233Z failure capture:
     # Its rendered readback differed harmlessly from the requested corner.
-    # That point is not _anchor_note's postcondition; actual air is 4.1845 mm.
+    # That point is not anchor_note's postcondition; actual air is 4.1845 mm.
     target = (0.25288663532950506, 0.1265405874866539)
     extent = (
         0.25307234782608695, 0.12206696321070235,
