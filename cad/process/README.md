@@ -232,14 +232,17 @@ Setup 3 slot and spot cantilevers declare `vise_left = "start"` and clamp at
 the blank-centred grip (`cad.blank_centred_overhang_mm`..
 `cad.blank_centred_jaw_right_mm`; pedropaulovc/prechips#446). The carrier's
 coupon declares `coupon_parallel_width_in` (the LMS 6745 parallels' 1/8 in
-thickness) and `strap_length_in` (the TE-CO 30801 step clamp's 3.250 in;
-pedropaulovc/prechips#448), and reads `cad.coupon_hole_y_mm`,
+thickness) and `coupon_strap_length_in` (the TE-CO 30801 step clamp's 3.250
+in; pedropaulovc/prechips#448, #449), and reads `cad.coupon_hole_y_mm`,
 `cad.coupon_parallel_height_in` and `cad.blank_thickness_mm` in place of plan
 copies. The riser's Setup 2 beams and envelope span the longest blank
 (`cad.blank_max_length_mm`), which the adapter's strap traverses now take
 (pedropaulovc/prechips#445). Both block end-mill settings run 7 in/min (owner
 ruling 2026-11-16, Pedro), so the pivot- and feed-block cuts feed 177.8
-mm/min. The base-bar picture templates draw by palette role: an authored
+mm/min; the standard 1/2 in end mill's setting is the jig's
+`jig-em-half-6061-t6511` (the same 1800 rpm and 7 in/min), and only the long
+end mill keeps its own `block-em-half-long-6061-t6511`. The base-bar picture
+templates draw by palette role: an authored
 dimension arrow names the palette's `url(#prechips-arr)` marker, and the
 `width.svg` axes and `inspect.svg` section arrows take the `axis` role
 (pedropaulovc/prechips#444).

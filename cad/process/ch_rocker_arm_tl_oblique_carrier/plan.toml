@@ -99,10 +99,10 @@ coupon_hole_y_in = 5.9
 # diameter from the hole centre.
 coupon_parallel_width_in = 0.125
 # The coupon's strap, the 3/8-16 stud step clamp above (TE-CO 30801,
-# 3.250 long, https://catalog.te-co.com/viewitems/machined-clamps/step-clamps),
-# runs along +X from a toe at the coupon's right end; the adapter refuses its
-# body reaching the right-hand back strap block.
-strap_length_in = 3.25
+# 3.250 long, https://catalog.te-co.com/viewitems/machined-clamps/step-clamps):
+# toe down on the coupon over its right-hand parallel, heel toward +X; the
+# adapter refuses its body reaching the right-hand back strap block.
+coupon_strap_length_in = 3.25
 # TL-VN-78 (AS62-18-40) OD .625 -.005: the adapter checks the broken underside
 # edge stays inside its seat; the setup 6 picture draws it.
 spacer_seat_dia_in = 0.62
@@ -327,7 +327,7 @@ title = "Holes: spot, drill, ream, tap"
 machine = "PM-30MV, vise off; inch DRO"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "Plate stays on the blocks, TOP up, ZERO END left, ZERO EDGE front: block centres at X {{cad.block_stations}} ±{{process.block_tolerance_in:.2dot}}. ZERO EDGE indicated along X within .002 over its length. One strap over each block, alternating front/back from the front at the left end block (back straps over blocks 2 and 4), heel step slightly high, toe down, toe {{process.strap_toe_in:.2f}} in from the edge on the block: blocks and toes sit between hole columns. Before the first drill, sight under A1, B1, CL and CR: each clears its block by about 1/8. The {{process.coupon_width_in:g}} × {{process.coupon_length_in:g}} coupon lengthwise on two {{cad.coupon_parallel_height_in:g}} in parallels (level with the blocks) behind the plate, centred at X {{process.coupon_hole_x_in:.2f}} between the back straps, under its own strap; its test hole at X {{process.coupon_hole_x_in:.2f}}, Y {{process.coupon_hole_y_in:.1f}}, between the parallels."
+holding = "Plate stays on the blocks, TOP up, ZERO END left, ZERO EDGE front: block centres at X {{cad.block_stations}} ±{{process.block_tolerance_in:.2dot}}. ZERO EDGE indicated along X within .002 over its length. One strap over each block, alternating front/back from the front at the left end block (back straps over blocks 2 and 4), heel step slightly high, toe down, toe {{process.strap_toe_in:.2f}} in from the edge on the block: blocks and toes sit between hole columns. Before the first drill, sight under A1, B1, CL and CR: each clears its block by about 1/8. The {{process.coupon_width_in:g}} × {{process.coupon_length_in:g}} coupon lengthwise on two {{cad.coupon_parallel_height_in:g}} in parallels (level with the blocks) behind the plate, centred at X {{process.coupon_hole_x_in:.2f}} between the back straps, under its own strap: toe on the coupon over the right-hand parallel, heel toward +X. Its test hole at X {{process.coupon_hole_x_in:.2f}}, Y {{process.coupon_hole_y_in:.1f}}, between the parallels."
 datum = "X0 ZERO END, Y0 ZERO EDGE (edge finder); +X right, +Y away. HUB is not drilled here."
 diagram = { file = "diagrams/carrier/holes.svg", alt = "Plate TOP up on the blocks with one strap over each; all twelve tabled holes from X0 Y0 at the lower-left corner; HUB shown dashed, made at assembly; the test coupon on two parallels behind the plate" }
 # X: the plate's hole centres. Y reaches the reamer coupon's test hole behind

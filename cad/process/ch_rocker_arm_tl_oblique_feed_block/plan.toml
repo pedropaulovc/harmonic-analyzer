@@ -201,7 +201,7 @@ drilling = "none"
 sizing = "other"
 instruction = "Face the up side just clean (≤{{process.cleanup_in:.2dot}}), .40 steps along the blank. Mark it SEAT."
 milling_cuts = [{ name = "SEAT clean-up", kind = "end", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 177.8, phase = "finish", axial_doc_mm = 0.508, radial_woc_mm = 10.16, traverse_mm = [0, "{{cad.blank_length_mm}}"] }]
-settings = "block-em-half-6061-t6511"
+settings = "jig-em-half-6061-t6511"
 
 [[setups.operations]]
 speed_kind = "spindle"
@@ -214,7 +214,7 @@ milling_cuts = [
   { name = "TOP rough", kind = "end", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 177.8, phase = "rough", axial_doc_mm = 1.016, radial_woc_mm = 10.16, traverse_mm = [0, "{{cad.blank_length_mm}}"] },
   { name = "TOP finish", kind = "end", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 177.8, phase = "finish", axial_doc_mm = 0.254, radial_woc_mm = 10.16, traverse_mm = [0, "{{cad.blank_length_mm}}"] },
 ]
-settings = "block-em-half-6061-t6511"
+settings = "jig-em-half-6061-t6511"
 inspection = "Height {{cad.height_min_in:.3dot}}–{{cad.height_max_in:.3dot}}."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.height_band_mm}}" }]
 
@@ -229,7 +229,7 @@ milling_cuts = [
   { name = "spacer rough", kind = "end", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 177.8, phase = "rough", axial_doc_mm = 1.016, radial_woc_mm = 10.16, traverse_mm = [0, "{{cad.offcut_length_mm}}"] },
   { name = "spacer finish", kind = "end", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 177.8, phase = "finish", axial_doc_mm = 0.254, radial_woc_mm = 10.16, traverse_mm = [0, "{{cad.offcut_length_mm}}"] },
 ]
-settings = "block-em-half-6061-t6511"
+settings = "jig-em-half-6061-t6511"
 # The spacer stands in the vise alone: its own section and grip.
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.offcut_length_mm}}"], clamp_mm = [0, "{{cad.offcut_length_mm}}"], section_mm = { y = "{{cad.blank_width_mm}}", z = "{{cad.height_mm}}" }, vise_left = "start", vise_hold = 2 }
 # The block alone keeps its drawing band; the spacer is a comparison, spacer
@@ -258,7 +258,7 @@ drilling = "none"
 sizing = "other"
 instruction = "Face the up edge just clean (≤{{process.cleanup_in:.2dot}}), two passes across the .96. Mark it SPINDLE END."
 milling_cuts = [{ name = "SPINDLE END clean-up", kind = "end", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 177.8, phase = "finish", axial_doc_mm = 0.508, radial_woc_mm = 12.7, stations_mm = "{{cad.blank_width_mm}}" }]
-settings = "block-em-half-6061-t6511"
+settings = "jig-em-half-6061-t6511"
 
 [[setups.operations]]
 speed_kind = "spindle"
@@ -271,7 +271,7 @@ milling_cuts = [
   { name = "OUTER END layers", kind = "end", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 177.8, phase = "rough", axial_doc_mm = 2.54, radial_woc_mm = 12.7, stations_mm = "{{cad.blank_width_mm}}" },
   { name = "OUTER END last layer", kind = "end", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 177.8, phase = "finish", axial_doc_mm = 0.254, radial_woc_mm = 12.7, stations_mm = "{{cad.length_mm}}" },
 ]
-settings = "block-em-half-6061-t6511"
+settings = "jig-em-half-6061-t6511"
 inspection = "SPINDLE END to OUTER END {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}}."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.length_band_mm}}" }]
 
@@ -296,7 +296,7 @@ sizing = "other"
 instruction = "Square SPINDLE END to the jaw tops; face the up end just clean (≤{{process.cleanup_in:.2dot}}). Mark it ROW SIDE."
 instruction_detailed = "Stand the blank on a sawn end, SEAT and TOP in the jaws: it stands about 2.4 above the jaws, so keep to the light layers below. Before tightening, rest the combination square's head across both jaw tops and bring its blade down against SPINDLE END; push SPINDLE END plumb to the blade. Face the up end just clean (≤{{process.cleanup_in:.2dot}}), two passes across the .96, and mark it ROW SIDE: the hole rows measure from it."
 milling_cuts = [{ name = "ROW SIDE clean-up", kind = "end", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 177.8, phase = "finish", axial_doc_mm = 0.508, radial_woc_mm = 12.7, stations_mm = "{{cad.blank_length_mm}}" }]
-settings = "block-em-half-6061-t6511"
+settings = "jig-em-half-6061-t6511"
 
 [[setups.operations]]
 speed_kind = "spindle"
@@ -308,7 +308,7 @@ milling_cuts = [
   { name = "LUG END layers", kind = "end", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 177.8, phase = "rough", axial_doc_mm = 1.27, radial_woc_mm = 12.7, stations_mm = "{{cad.blank_length_mm}}" },
   { name = "LUG END last layer", kind = "end", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 177.8, phase = "finish", axial_doc_mm = 0.254, radial_woc_mm = 12.7, stations_mm = "{{cad.overall_y_mm}}" },
 ]
-settings = "block-em-half-6061-t6511"
+settings = "jig-em-half-6061-t6511"
 inspection = "Overall {{cad.overall_y_min_in:.3dot}}–{{cad.overall_y_max_in:.3dot}}."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.overall_y_band_mm}}" }]
 
