@@ -61,6 +61,13 @@ bed_height_mm = 73.3044
 range_mm = [0.0, 152.4]
 resolution_mm = 0.0127
 
+# The owned 0-1, 1-2 and 2-3 in outside micrometer set
+# (cad/config/shop-equipment.toml gauges.micrometers): 0-3 in = 76.2 mm;
+# .0001 in = .00254 mm resolution as prechips examples/shop.toml records it.
+[gauges.micrometers]
+range_mm = [0.0, 76.2]
+resolution_mm = 0.00254
+
 # Pin-gauge set range, 0.011-0.500 in by 0.001 in; its grade note is
 # cad/config/shop-equipment.toml gauges.pin-gauges. 0.011 in = 0.2794 mm exactly.
 [gauges.pin-gauges]
@@ -326,7 +333,8 @@ feed = "7 in/min"
 # block-em-3-8 is the LMS 6784 set's 3/8 in cutter (shop-equipment
 # endmills-lms-6784): plunged, it cuts the seat (squaring its floor) and
 # TL-32's leadscrew clearance to the title block's DRILLED HOLES band (owner
-# ruling 2026-11-13).
+# ruling 2026-11-13), the clearance from both ends so only its flutes enter
+# the hole (its flute_length_mm below).
 # block-em-half-long is the owner's 1/2 in end mill with at least 1.00 in of
 # flute (owner 2026-11-13), which reaches the .87 depth of TL-32's lug notch.
 [tools.block-drill-15]
@@ -344,6 +352,9 @@ tap_drill_mm = 6.5278
 [tools.block-em-3-8]
 description = "3/8 in centre-cutting 2-flute end mill (LMS 6784 set)"
 diameter_mm = 9.525
+# LOC .50 in: stub-length floor (typical catalogue: stub 1/2, regular 3/4);
+# LMS 6784 page states no LOC; owner ruling 2026-11-16.
+flute_length_mm = 12.7
 [tools.block-em-half-long]
 description = "1/2 in centre-cutting end mill, flutes ≥1.00 in"
 diameter_mm = 12.7
