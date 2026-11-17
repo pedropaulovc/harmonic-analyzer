@@ -17,7 +17,7 @@
           }
         },
         {
-          "text": "A blocker says the MHA-VN-014 cone-platform pivot shoulder screw has no mechanical lock (rule 23)",
+          "text": "A blocker says the MHA-VN-014 cone-platform pivot shoulder screw has no mechanical lock or locking step (rule 23)",
           "check": {
             "category": "blockers"
           }
@@ -113,6 +113,16 @@
           "polarity": "positive",
           "confidence": "high",
           "evidence": "Sheet 6 steps 2 and 3 as quoted. Rule 20 stated shortfall → minor (matches existing eval 1)."
+        },
+        {
+          "text": "A blocker reports that no step fits the MHA-DT-020 cone swing platform to the base or sets the cone-to-cylinder mesh: step 9 leaves the 'CONE SET NOT FITTED', step 23 only points to sheet 9, and sheet 9 merely lists MHA-VN-014, MHA-VN-013 and MHA-VN-015 as external interfaces with no procedure, mesh target or acceptance.",
+          "check": {
+            "category": "blockers"
+          },
+          "rule": 22,
+          "polarity": "negative",
+          "confidence": "medium",
+          "evidence": "dt-drive-train-assembly sheet 7 step 9 '(CONE SET MHA-DT-020 NOT FITTED)', sheet 8 step 23 'OTHER BASE MOUNTING: SEE SHEET 9, EXTERNAL INTERFACES', sheet 9 'BASE MHA-FR-001 ... RECEIVES MHA-VN-014, MHA-VN-013, MHA-VN-015 ...'; check 4 then swings the platform as if mounted. Rule 22: an assembly fit with no mate/procedure/acceptance is a blocker. Flagged independently by 4 prior reviewers and in #994."
         },
         {
           "text": "The review reports that step 10 installs MHA-CH-008 and MHA-FR-005, parts in neither the BOM nor the external-interface list, and cites 'VIEW B', which does not exist in the package.",
@@ -2752,7 +2762,7 @@
       "expected_output": "Rule-coverage case (rules 22): reports each negative finding in the stated category and raises no positive-case item.",
       "expectations": [
         {
-          "text": "A blocker reports that the top-level assembly sheet has no parts list, no balloons and no exploded view: it shows only the assembled machine.",
+          "text": "A blocker reports that the top-level assembly sheet has no parts list, no balloons, no exploded view and no steps: it shows only the assembled machine.",
           "check": {
             "category": "blockers"
           },
@@ -2867,7 +2877,7 @@
           "evidence": "mg-magnifier-assembly sheet 1 (only sheet): TOP/FRONT/RIGHT/ISO views only; no BOM, no balloon, no steps. Rule 22. #1296 Codex blind review found the same."
         },
         {
-          "text": "A blocker reports that the package has no exploded view.",
+          "text": "A blocker reports that the package has no exploded view and no assembly order or set-up steps.",
           "check": {
             "category": "blockers"
           },
@@ -3374,6 +3384,16 @@
           "polarity": "negative",
           "confidence": "medium",
           "evidence": "pd-paper-drive-assembly sheet 2: view titled 'INNER PARTS, RIGHT SIDE 1:3' with ~28 balloons converging on the knob-shaft cluster; no exploded transgear view on sheets 1-6. Rule 22 wants the exploded view to show assembly order; prompt lists 'an exploded view that does not read' as clarity."
+        },
+        {
+          "text": "The review reports that step 18 'OIL THE PIN' names no lubricant (and step 2's solder is unnamed), so the consumables are not identified.",
+          "check": {
+            "category": "any"
+          },
+          "rule": 22,
+          "polarity": "negative",
+          "confidence": "medium",
+          "evidence": "pd-paper-drive-assembly sheet 4 step 18 reads 'OIL THE PIN' with no oil grade; sheet 3 step 2 says solder with no alloy named. Rule 22: the fitter needs every consumable named; compare dt-drive-train which names ISO VG 32, Loctite 222 and Loctite 638."
         },
         {
           "text": "A blocker reports that the MHA-VN-041 #8-32 shoulder screw the transgear arm swings on is held only by low-strength threadlocker: step 12 seats it in the MHA-PD-007 bar's blind tap 'WITH LOW-STRENGTH THREADLOCKER; THE ARM FALLS FREELY', with no jam nut, cross pin, castle nut or other mechanical lock shown or stepped.",
@@ -4180,7 +4200,7 @@
           "evidence": "pn-pen-assembly sheet 1 title block: MATERIAL 'SEE PARTS LIST', FINISH 'SEE PARTS LIST'; the sheet has no BOM. A sheet that points to a table that does not exist is a package that does not agree with itself (rule 25) and a parts-list omission (rule 22)."
         },
         {
-          "text": "A blocker reports that the package has no exploded view.",
+          "text": "A blocker reports that the package has no exploded view and no assembly order or set-up steps.",
           "check": {
             "category": "blockers"
           },
@@ -4548,7 +4568,7 @@
           "evidence": "sm-summing-assembly sheet 1 (only sheet): three views plus isometric, no BOM, no balloons. Rule 22. #1297 Codex blind review found the same."
         },
         {
-          "text": "A blocker reports that the package has no exploded view.",
+          "text": "A blocker reports that the package has no exploded view, no assembly order and no set-up or check steps.",
           "check": {
             "category": "blockers"
           },
@@ -4558,7 +4578,7 @@
           "evidence": "sm-summing-assembly sheet 1: assembled views only; no exploded view, no steps."
         },
         {
-          "text": "The review reports that the threaded hanger/knife-mount joints visible on the sheet have no anti-loosening means shown in a view, detail or parts list, so what is fixed and what turns cannot be established.",
+          "text": "The review reports that the threaded hanger/knife-mount joints visible on the sheet have no anti-loosening means shown in a view or detail and no step that engages one, so what is fixed and what turns cannot be established.",
           "check": {
             "category": "any"
           },
