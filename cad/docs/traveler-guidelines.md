@@ -34,11 +34,13 @@ drawings"), plus the shop's process equipment:
 - **Manual lathe:** a PM-1127VF-LB lathe (`70–380` and `380–2000 rpm`) with a
   two-axis DRO, chucks, live/dead centres and lathe boring bars; there is no
   milling boring head and no CNC lathe.
-- **Bench and bore transfer:** a metal-cutting miter saw or bandsaw, files,
-  abrasive rolls and stones, a bench vise with soft jaws, a spring-loaded
-  spindle tap guide, telescoping gauges and small-hole gauges read on the
-  `.0001 in` outside micrometers, feeler leaves, and torque wrenches / torque
-  screwdriver.
+- **Bench, hand tools and bore transfer:** assume a well-equipped home shop —
+  most ordinary hand tools (files, stones, abrasive rolls, scrapers, blades,
+  squares, clamps, hex keys, wrenches, torque wrenches / torque screwdriver,
+  soft-jaw bench vise, miter saw or bandsaw, spring-loaded spindle tap guide,
+  telescoping and small-hole gauges read on the `.0001 in` outside micrometers,
+  feeler leaves) are available even when not itemized on the Tools table; a
+  CMM, optical comparator, air gauge or production metrology lab is not.
 
 How `drawing-guidelines.md` applies to a traveler review:
 
@@ -78,10 +80,12 @@ verified:
   probe `G38.2` / `G10 L20 P1` sequences.
 
 Do not re-derive cutting forces, chatter, deflection, bond stress, spindle
-power, chip load or machine-envelope math to second-guess gated numbers. Flag
-physics or clearance only when **arithmetic on printed numbers** shows a
-collision, an uncut web, an impossible measurement, or a direct contradiction
-between two printed statements.
+power, chip load, machine-envelope or declared Z/breakthrough math to
+second-guess gated numbers (`prechips` and `cam.py` own parametric clearance,
+drill-tip floor/breakthrough and requirement-coverage checks). Judge physical
+sequence only for **qualitative or printed-text contradictions** the schema
+cannot see, and show arithmetic from printed numbers whenever claiming two
+printed values collide or fail to clean up.
 
 ---
 
@@ -107,13 +111,17 @@ between two printed statements.
   operation on the traveler, unless the drawing or traveler explicitly defers
   it to assembly or a joined parent part (`finished after joining MHA-CH-06`,
   `drilled at assembly`).
-- Every toleranced requirement on the drawing has either:
-  - a **printed check** naming the feature, reference, instrument (where not
-    obvious) and acceptance limits matching the drawing, or
-  - an explicit **process-held statement** (`Not gauged, the program's
-    interpolated path: …`) for CNC-interpolated contours or angles, accompanied
-    by at least one gauged registration/size check that proves the setup and
-    cutter offset landed in band.
+- **Inspect what matters, not every dimension on the print.** This is a hobby
+  machining process, not aerospace part manufacture: a CNC program or fixed
+  tooling already holds interpolated contours, routine clearance-hole pitches
+  and `.X` / `.XX` non-critical features once setup registration and cutter
+  size are verified. Require explicit per-piece checks only where scrap risk or
+  fit demands them (tight fit bores/journals, press or sliding thicknesses,
+  critical stack datums, incoming stock gates); cover CNC-interpolated shapes
+  and routine geometry with **First article only** checks or a brief
+  process-held statement (`Not gauged, the program's interpolated path: …`)
+  paired with one registration check. Never demand 100% dimensional inspection
+  of a 20-piece hobby lot (see rule T10 and rule T15).
 - Every `SHARP`, `NO BURR`, local edge-break override and surface-finish
   requirement on the drawing is carried into the traveler's cutting and
   deburring operations, never rounded over by a blanket edge break.
@@ -239,71 +247,73 @@ between two printed statements.
   (for example, single-block / air pass with `Z` offset above the work and a
   physical check that installed clamp/fence heights sit below the lowest cut).
 
-### Rule T9 — Sequence physics: drill points, skins, stress and burrs
+### Rule T9 — Sequence and handling traps that code gates do not model
 
-Judge the physical sequence for traps that scrap parts or break cutters:
+Parametric depth, breakthrough, clamp/flange clearance, deflection and bond
+capacity belong to `prechips` and `_gcode`, not to manual re-calculation here.
+Focus sequence review on qualitative shop-floor traps in the written steps:
 
-- **Drill and reamer point length:** a twist drill's `118°` point adds `≈ 0.3D`
-  past full diameter (and a reamer has its chamfer lead). Through-holes and
-  chain-drilled reliefs must put the **full diameter** past the finished plane
-  or part underside into a stated relief/counterbore without bottoming on the
-  fixture floor or parallels.
-- **Stress release on thin cold-finished stock:** removing stock heavily from
-  one side of cold-finished bar bows thin parts. Roughing both faces, releasing
-  clamps to let internal stress relax, reseating, and taking light finish passes
-  (followed by surface-plate check/straightening after release if needed) is
-  good shop practice; hogging one side to final size on a thin strip without
-  relief is a defect when flatness or thickness depends on it.
-- **Slivers, skins and waste pinch:** thin waste strips trapped against a fence,
-  or loose waste pushed by live edge clamps once an outline cuts through, snap
-  small carbide end mills. Milling thin slivers away first, leaving an onion
-  skin until the wall is finished, and backing off side clamps on a taped
-  through-cut are valid protections; cutting free a loose piece under live side
-  clamping or cutting deeper than the tape into a precision sub-plate (unless a
-  sacrificial spoilboard is intended) is a defect.
-- **Deburring before datum seating and preserving sharp features:** sawn or
-  milled burrs on an edge or face that seats on a precision plate/fence must be
-  deburred before clamping; final deburring must remove any onion-skin or tab
-  witness without undercutting a finished band and must explicitly spare edges
-  marked `SHARP`.
-
-**Arithmetic requirement:** every claim that a tool collides, fails to clean
-up, leaves an uncut web, bottoms out, or cuts into a fixture must show its
-arithmetic from printed numbers on the traveler or drawing. Work every ordinary
-configuration first; if any ordinary configuration works, there is no finding.
+- **Thin-bar distortion and stress release:** hogging one side of cold-finished
+  bar bows thin parts; roughing both faces, releasing clamps to let stress
+  relax, reseating, and taking light finish passes is good practice, whereas
+  one-sided heavy removal on a thin strip without stress release or a
+  straightening step is a defect when flatness or thickness governs.
+- **Live clamping on parted waste and fragile release:** live side/edge clamps
+  left engaged across a through-cut pinch freed waste into small end mills, and
+  levering a thin taped part up from one end bends it; backing clamps off once
+  bonded/screwed and working a thin blade along the length are valid
+  protections, whereas prying or pinching freed pieces is a defect.
+- **Unmodelled setup collisions or incomplete cuts visible in the text:** if
+  two printed instructions directly contradict each other (for example, leaving
+  a locating plug in a counterbore during the setup that drills through into
+  that counterbore, or a printed drill/cut depth visibly shorter than the
+  printed part thickness plus `0.3D` drill point when no relief is used), show
+  the arithmetic from printed numbers. Work every ordinary configuration first;
+  if any ordinary configuration works, there is no finding.
+- **Deburring vs. datum seats and `SHARP` features:** sawn or milled burrs on a
+  seating face/edge must come off before clamping on a precision datum, and
+  final deburring must remove skin/tab witnesses while sparing any edge the
+  drawing marks `SHARP`.
 
 ---
 
 ## Inspection, legibility and mode-specific work
 
-### Rule T10 — Every check can be done as written
+### Rule T10 — Every check is doable, and travelers avoid over-inspection
 
-- Every in-process or final check states **what** is measured, **from what
-  reference and in what direction** (where geometry makes point-to-point vs.
-  projected distance differ), **with which declared shop instrument**, and the
-  **acceptance criterion** (numeric limits or a concrete functional check such
-  as `lies flat on the surface plate without rocking`, `both edges sharp, no
-  burr`).
+This is a hobby shop making one machine (or a small 20-piece channel set), not
+an aerospace supplier writing AS9102 inspection sheets. **Over-inspection is a
+defect** (`over_specification`, rule T15) just as a broken check is:
+
+- **Flag over-inspection:**
+  - requiring per-piece inspection across a multi-piece lot (`quantity > 1`) on
+    CNC-repeated contours, angles, `.X`/`.XX` profile features or routine hole
+    locations that cannot drift independently once the setup and first article
+    are proved (those belong at most under **First article only** or
+    `Not gauged, the program's path`);
+  - repeating the same measurement in multiple ops/setups without an
+    intervening cut or stress release that could change it;
+  - multi-step surface-plate / sine-bar / gauge-block metrology setups on loose
+    title-block bands where calipers, a rule, a mating part or the CNC program
+    itself suffices;
+  - checking un-toleranced or reference `(REF)` dimensions as pass/fail gates.
+- **Every kept check is doable as written:** each in-process or final check
+  states **what** is measured, **from what reference and in what direction**
+  (where slant vs. projected distance differs), **with which declared shop
+  instrument**, and the **acceptance criterion** (numeric limits or plain
+  functional check such as `lies flat on the surface plate without rocking`,
+  `both edges sharp, no burr`).
 - **Geometric measurability (caliper/gauge geometry):** verify with arithmetic
   that the named instrument's physical reading measures the toleranced
-  quantity! In particular, calipers spanning from a bore or centre to an
-  elevated or angled corner measure **slant (point-to-point) distance** (plus or
-  minus half the bore diameter unless zeroed via a gauge pin), NOT horizontal
-  `X` projection from a centreline. When slant vs. projected geometry shifts
-  the reading by a meaningful fraction of (or more than) the tolerance band,
-  asking the builder to read the projected drawing band directly with calipers
-  will reject a nominal part; the traveler must either print a workable surface-plate
-  / pin / height-gauge route or inspect a directly measurable span (such as
-  symmetric tip-to-tip chord).
+  quantity. Calipers spanning from a bore or centre to an elevated or angled
+  corner measure **slant (point-to-point) distance**, not horizontal `X`
+  projection from a centreline; when that slant shifts the reading across or
+  outside the band on a nominal part, either print a workable route or gauge a
+  directly measurable span (such as symmetric tip-to-tip length).
 - **In-process gate remedies:** an in-process check happens while the part can
-  still be saved or stopped before wasting downstream setups. It states what to
-  do if out of band (`stop`, `scrap`, or a concrete rework action naming which
-  setup/offset/pass skims it — never a vague "goes back for a skim" when the
-  program cuts at a fixed Z). A check and its remedy are distinct sentences or
-  sub-steps.
-- **Lot frequency:** on multi-piece lots (`quantity > 1`), distinguish
-  **First article only** checks (such as slot-pin waste-shift checks or pre/post
-  unclamping spring checks) from per-blank gates and final acceptance.
+  still be saved or stopped before wasting downstream setups, and states a
+  concrete fail action (`stop`, `scrap`, or how to re-skim — never a vague
+  `goes back for a skim` on a fixed-Z file). Keep check and remedy distinct.
 
 ### Rule T11 — Instruments stay within the declared shop
 
@@ -374,11 +384,15 @@ paperwork and **not** a second engineering drawing:
   a novice *why* a step prevents scrap or crash (`the rough passes' stress is
   let go before the finish cuts`, `no rapid leaves the bore`, `a tight slot
   means a waste piece has moved`).
-- **Over-specification (defect):**
+- **Over-specification and over-inspection (defect):**
+  - **over-inspection (rule T10):** per-piece lot gauging of CNC-repeated
+    `.X`/`.XX` features that first-article prove-out already locks in, duplicate
+    checks with no intervening cut/release, or surface-plate metrology rituals
+    on loose bands;
   - final inspection bands tighter than the part drawing's bands;
-  - treating un-toleranced/reference features as pass/fail final acceptance
+  - treating un-toleranced or `(REF)` features as pass/fail final acceptance
     rather than labelled in-process or diagnostic checks;
-  - fixtures or inspection setups wildly disproportionate to a loose band;
+  - fixtures wildly disproportionate to a loose band;
   - multi-sentence design-history or physics essays inside an op row;
   - production QA paperwork (FAI / AS9102 forms, operator sign-off blocks, lot
     traceability, SPC/Cpk, calibration logs, PPE boilerplate).

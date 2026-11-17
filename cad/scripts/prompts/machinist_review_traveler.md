@@ -55,18 +55,22 @@ Pass 1 — detection. Find every candidate item; classify nothing yet.
    - **Operator handoffs & prove-out (rule T8, T16, T17):** Check every `M6`
      and `M0` for tool number, stickout (where critical), manual RPM setting,
      hands-in safety, and `Cycle Start`, plus a first-article NC prove-out step.
-   - **Sequence physics (rule T9):** Check drill/reamer `0.3D` point clearance
-     into reliefs, clamp/fence/washer height below cuts, thin-stock stress
-     release, sliver/waste pinch when cutting through, tape breakthrough depth
-     vs. tape thickness, deburring before datum seating, and sparing `SHARP`
-     edges during deburring.
-   - **Checks & measurability (rules T10, T11):** Check every in-process and
-     final inspection for reference, direction, declared shop instrument,
-     remedy on failure (concrete action, not a vague "goes back for a skim" on
-     a fixed-Z file), flatness/straightening acceptance, and **geometric
-     measurability** (e.g., whether a caliper point-to-point slant distance
-     from a bore centre to an elevated corner differs from the drawing's
-     horizontal offset enough to reject a nominal part!).
+   - **Sequence & handling traps (rule T9):** Focus on qualitative shop traps
+     that `prechips` / `_gcode` do not model: thin-bar hogging without stress
+     release, live edge clamps pinching parted waste into small end mills,
+     prying a thin taped part from one end, deburring before datum seating,
+     sparing `SHARP` edges, or printed text contradictions (such as leaving a
+     plug in a relief bore while drilling through into it).
+   - **Checks, measurability & over-inspection (rules T10, T11, T15):** Flag
+     **over-inspection** (this is a hobby shop, not aerospace QA: per-piece
+     gauging across a multi-piece lot on CNC-repeated `.X`/`.XX` features that
+     first-article prove-out already locks in, duplicate measurements with no
+     intervening cut/release, or surface-plate metrology rituals on loose
+     bands). For every kept check, verify reference, direction, home-shop
+     instrument (assume a well-equipped home shop with ordinary hand tools, no
+     CMM), concrete rework action on failure, flatness/straightening
+     acceptance, and **geometric measurability** (e.g., caliper point-to-point
+     slant distance vs. horizontal projection from a bore centre).
    - **Op readability & setup diagrams (rules T12, T13):** Count printed lines
      per op cell on `view_sheet` (max 6 printed lines per op), check double-meaning
      words (`strap` part vs. `strap` clamp in legend), and `crop` every setup
@@ -89,20 +93,23 @@ DO NOT ASK FOR
   ("geometry, not method") or rule 24 against a traveler, and do not flag brief
   one-clause shop explanations on an op (`the rough passes' stress is let go`,
   `no rapid leaves the bore`) as narration.
-- **Deterministic-gated numbers:** do not recompute or second-guess spindle
-  RPM, surface speed, feed rate, chip load, axial/radial DOC, tool deflection,
-  vise jaw grip, adhesive bond shear/peel capacity, machine axis travel, pecking
-  or declared gauge resolution (`prechips` and `_gcode` verify these), UNLESS
-  two printed values directly contradict each other.
+- **Deterministic-gated numbers & clearances:** do not recompute or
+  second-guess spindle RPM, surface speed, feed rate, chip load, axial/radial
+  DOC, tool deflection, vise jaw grip, adhesive bond shear/peel capacity,
+  machine axis travel, pecking, parametric clamp/flange/relief-floor/breakthrough
+  clearances or declared gauge resolution (`prechips` and `_gcode` verify
+  these), UNLESS two printed statements directly contradict each other.
 - **Posted G-code internals:** do not ask for raw G-code listings, line
   numbers, lead-in/ramp coordinates, zigzag pass counts, safe-Z numbers or CAM
   simulations on the sheet.
 - **Alternative routes or throughput:** when the printed route works, do not
   propose a different process (tabs instead of tape, batching multiple blanks,
   vise jaws instead of a sub-plate) or critique cycle/dwell time.
-- **Production QA paperwork:** no FAI / AS9102 forms, operator sign-offs, lot
-  or heat numbers, material certs, SPC/Cpk, calibration stickers or PPE
-  boilerplate.
+- **Aerospace / 100% inspection or QA paperwork:** never ask for per-piece
+  inspection of CNC-repeated `.X`/`.XX` contours/holes across a multi-piece
+  hobby lot, itemizing ordinary home-shop hand tools on the Tools table, FAI /
+  AS9102 forms, operator sign-offs, lot/heat numbers, material certs, SPC/Cpk,
+  calibration stickers or PPE boilerplate.
 - **Part-drawing defects or ASME orthographic rules on schematics:** do not
   critique the companion part drawing's own tolerances/views/notes, do not
   apply rules 8–15 (isometric, third-angle alignment, hidden lines) to
