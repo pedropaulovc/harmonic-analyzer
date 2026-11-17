@@ -1062,7 +1062,7 @@ def unthread_stock_fasteners(top: Any, threaded: frozenset[str]) -> int:
     top = _early_bound(top, "IModelDoc2")
     with _telemetry.span("export.glb_unthread", asm=str(top.GetTitle())) as sp:
         assembly = _early_bound(top, "IAssemblyDoc")
-        assembly.ResolveAllLightweightComponents(False)
+        assembly.ResolveAllLightWeightComponents(False)
         documents = [("<top>", top, _active_configuration(top))]
         seen = {str(top.GetPathName()).lower()}
         for name, component in by_name(assembly.GetComponents(False)):
