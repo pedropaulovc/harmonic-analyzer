@@ -723,6 +723,9 @@ stores the result. `_run`/`_run_stamped` have NO `com` parameter (and no seat
 access), so a new COM task cannot race the STA seat or silently skip the cache:
 route it through `_cached_com_action` (a part/assembly/drawing keeps its
 `_cached_part_action`/`_cached_assembly_action`/`_cached_drawing_action` wrapper).
+The one sanctioned exception is the assembly leaf's in-leaf soundness proof
+(`_prove_soundness_in_leaf`): it runs inside the assembly's own seat, probes the
+`verify_soundness:<stem>` key first and stores under it (see "Verify suites").
 A cache-keyed COM task must therefore declare its inputs as machine-stable
 `file_dep`s and its outputs under `cad/out/`; a gate whose only output is a
 verdict passes its stamp path as `stamp=` and that stamp IS the cached artefact.

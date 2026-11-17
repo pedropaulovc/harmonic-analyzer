@@ -4228,6 +4228,7 @@ def _assembly_subprocess_envs(dodo, monkeypatch, tmp_path, stem, *, mode):
     monkeypatch.setattr(dodo, "_cache_key", lambda _deps, _label: "k" * 64)
     monkeypatch.setattr(dodo._cache, "restore", lambda *_a: False)
     monkeypatch.setattr(dodo._cache, "store", lambda *_a, **_kw: "stored")
+    monkeypatch.setattr(dodo._cache, "writable", lambda: True)
     monkeypatch.setattr(dodo._farm, "enabled", lambda: False)
     monkeypatch.setattr(dodo, "_com_seat", free_seat)
     monkeypatch.setattr(dodo, "_reprobe_under_seat", lambda *_a: False)
@@ -4270,6 +4271,50 @@ def test_every_assembly_subprocess_is_guarded_by_its_rows(monkeypatch, tmp_path,
         assert env.get("HARMONIC_FASTENER_ROWS") == "pn-vn-pen-set-screw", name
         assert env.get("HARMONIC_FIT_GROUPS") == fit_groups, name
 
+
+@pytest.mark.parametrize(
+    "case", ["proved", "failed", "key_moved", "published", "forced", "read_only"]
+)
+def test_in_leaf_soundness_publishes_only_a_proof_of_the_saved_bytes(
+    monkeypatch, tmp_path, case
+):
+    """A published soundness stamp is restored fleet-wide in place of the gate,
+    so the in-leaf proof may store it only after the battery passed on bytes
+    whose soundness key is still the one it proved."""
+    dodo = _load_dodo()
+    stem, label = "ms_measuring_stick", "verify_soundness:ms_measuring_stick"
+    stamp = tmp_path / "verify-soundness-ms-measuring-stick.ok"
+    keys = iter(["k1", "k2" if case == "key_moved" else "k1"])
+    ran, stored = [], []
+
+    def exec_com(_cmd, task_label, **_kw):
+        ran.append(task_label)
+        if case == "failed":
+            raise RuntimeError("GATE FAILED")
+
+    monkeypatch.setattr(dodo, "_soundness_stamp", lambda _stem: str(stamp))
+    monkeypatch.setattr(dodo, "_soundness_file_deps", lambda _stem: [])
+    monkeypatch.setattr(dodo, "_cache_key", lambda _deps, _label: next(keys))
+    monkeypatch.setattr(dodo._cache, "writable", lambda: case != "read_only")
+    monkeypatch.setattr(
+        dodo._cache, "forced_refresh", lambda _label: {} if case == "forced" else None
+    )
+    monkeypatch.setattr(
+        dodo, "_probe_cache", lambda *_a: "hit" if case == "published" else "miss"
+    )
+    monkeypatch.setattr(dodo, "_exec_com", exec_com)
+    monkeypatch.setattr(dodo, "_store_outputs", lambda *args: stored.append(args))
+
+    proved = dodo._prove_soundness_in_leaf(stem)
+    if proved is not None:
+        dodo._publish_soundness(stem, proved)
+
+    assert ran == ([label] if case in ("proved", "failed", "key_moved") else [])
+    if case == "proved":
+        assert stored == [(label, "k1", [stamp])]
+        assert stamp.read_text(encoding="utf-8") == f"{label}\n"
+    else:
+        assert stored == [] and not stamp.exists()
 
 
 @pytest.mark.parametrize(

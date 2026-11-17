@@ -3272,8 +3272,12 @@ def task_drawing():
         yield _drawing_task(stem)
 
 
+def _soundness_log_stem(stem: str) -> str:
+    return f"verify-soundness-{stem.replace('_', '-')}"
+
+
 def _soundness_stamp(stem: str) -> str:
-    return str(REPORTS / f"verify-soundness-{stem.replace('_', '-')}.ok")
+    return str(REPORTS / f"{_soundness_log_stem(stem)}.ok")
 
 
 def _soundness_command(stem: str) -> list[str]:
@@ -3284,15 +3288,23 @@ def _prove_soundness_in_leaf(stem: str) -> str | None:
     """Run ``verify_soundness:<stem>``'s battery on the assembly this leaf just
     saved, holding the same seat, and return the soundness key it proved.
 
-    None when it did not prove one: a forced soundness refresh (that leaf must
-    probe its own key first) or a failed gate. A failure is a WARN here, never an
-    assembly failure: the assembly still publishes, and the standalone leaf
-    misses, re-runs the battery and reports the failure exactly as before."""
+    None when it did not prove one: the cache cannot publish (``ro``/off: the
+    standalone leaf runs it as before), a forced soundness refresh (that leaf
+    must probe its own key first), the key is already published (a no-op
+    refresh that kept the token; the probe restored the stamp), or a gate
+    failed. A failure is a WARN here, never an assembly failure: the assembly
+    still publishes, and the standalone leaf misses, re-runs the battery and
+    reports the failure exactly as before."""
     label = f"verify_soundness:{stem}"
-    if _cache.forced_refresh(label) is not None:
+    if not _cache.writable() or _cache.forced_refresh(label) is not None:
         return None
     key = _cache_key(_soundness_file_deps(stem), label)
     stamp = _soundness_stamp(stem)
+    with _telemetry.span(
+        f"cache.probe {label}", label=label, service=_telemetry.BUILD_INFRA_SERVICE
+    ) as probe:
+        if _probe_cache(key, [Path(stamp)], label, probe) == "hit":
+            return None
     Path(stamp).unlink(missing_ok=True)
     with _telemetry.span(f"task {label}", label=label, service=_stage_name(label)) as sp:
         sp.set_attribute("cache", "in_leaf")
@@ -3301,7 +3313,7 @@ def _prove_soundness_in_leaf(stem: str) -> str | None:
             _exec_com(
                 _soundness_command(stem),
                 label,
-                log_stem=f"verify-soundness-{stem.replace('_', '-')}",
+                log_stem=_soundness_log_stem(stem),
                 task=label,
             )
         except RuntimeError as failed:
@@ -3328,7 +3340,6 @@ def _publish_soundness(stem: str, key: str) -> None:
 
 
 def _verify_soundness_task(stem: str) -> dict[str, Any]:
-    name = stem.replace("_", "-")
     deps = _soundness_file_deps(stem)
     stamp = _soundness_stamp(stem)
     cmd = _soundness_command(stem)
@@ -3345,7 +3356,7 @@ def _verify_soundness_task(stem: str) -> dict[str, Any]:
                     cmd,
                     deps,
                     [Path(stamp)],
-                    f"verify-soundness-{name}",
+                    _soundness_log_stem(stem),
                     stamp,
                 ],
             )
@@ -3371,7 +3382,7 @@ def task_verify_soundness():
 def _verify_task(name: str) -> dict[str, Any]:
     if name == "soundness":
         child_stamps = [
-            str(REPORTS / f"verify-soundness-{stem.replace('_', '-')}.ok")
+            _soundness_stamp(stem)
             for stem in ASSEMBLY_ORDER
         ]
         soundness_stamp = str(REPORTS / "verify-soundness.ok")
@@ -5522,7 +5533,7 @@ def _canonical_targets(name: str) -> list[str]:
     if family == "drawing":
         return [str(path) for path in _drawing_cache_outputs(subname)]
     if family == "verify_soundness":
-        return [str(REPORTS / f"verify-soundness-{subname.replace('_', '-')}.ok")]
+        return [_soundness_stamp(subname)]
     if family == "verify":
         return [str(REPORTS / f"verify-{subname}.ok")]
     if family == "check":
