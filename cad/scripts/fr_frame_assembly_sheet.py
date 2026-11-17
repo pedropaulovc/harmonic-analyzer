@@ -332,6 +332,14 @@ STEP_TEXT = {
         f"CHECK EACH {_CAP} SITS ON ITS INSIDE SEAT, ITS SKIRT CLEAR OF THE RECESS "
         "FLOOR."
     ),
+    # The cap's push-on grip is its only axial retention (rule 23, R7
+    # machinist review): accepted by hand at the bench, and a loose stock cap
+    # is replaced, not bonded.
+    "caps-retained-checked": f"CHECK EACH {_CAP} DOES NOT PULL OFF OR TURN BY HAND.",
+    "caps-replaced": (
+        f"IF ONE PULLS OFF OR TURNS BY HAND, REPLACE IT WITH A NEW {_CAP}, PUSHED ON AS "
+        f"{_step('caps-pushed-on')}, UNTIL {_step('caps-retained-checked')} PASSES."
+    ),
     "column-ends-checked": f"CHECK NO {_COLUMN} END IS DISTORTED BY ITS CAP.",
     "support-seated": (
         f"SEAT {_SUPPORT} ON THE TOP FACE OF {_BASE}, ITS WINDOWS FACING THE SHORT "

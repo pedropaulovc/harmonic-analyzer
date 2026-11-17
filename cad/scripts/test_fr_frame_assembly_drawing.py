@@ -230,6 +230,29 @@ def test_each_check_and_remedy_is_its_own_step() -> None:
             assert "CHECK " not in text, key
 
 
+def test_each_push_on_cap_has_a_bench_retention_check_and_a_remedy() -> None:
+    # R7 machinist review (rule 23): the cap's push-on grip is its only axial
+    # retention, so it is accepted by hand right after seating, and a loose
+    # cap is replaced and re-pushed until that check passes.
+    steps = notes.steps
+    order = [
+        steps.step_number(key)
+        for key in (
+            "caps-pushed-on",
+            "caps-checked",
+            "caps-retained-checked",
+            "caps-replaced",
+        )
+    ]
+    assert order == list(range(order[0], order[0] + 4))
+    check = _step("caps-retained-checked")
+    assert check.startswith("CHECK") and "PULL OFF OR TURN BY HAND" in check
+    remedy = _step("caps-replaced")
+    assert remedy.startswith("IF ") and "REPLACE" in remedy
+    assert f"STEP {steps.step_number('caps-pushed-on')}" in remedy
+    assert f"STEP {steps.step_number('caps-retained-checked')} PASSES" in remedy
+
+
 def test_no_view_label_repeats_its_sheet_scale() -> None:
     # Over-specification: the title block prints each sheet's scale.
     for caption in (drawing.EXPLODED_CAPTION, drawing.ASSEMBLY_ISO_CAPTION):

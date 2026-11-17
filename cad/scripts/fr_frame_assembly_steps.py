@@ -98,6 +98,8 @@ SEQUENCE: tuple[str, ...] = (
     "cap-recesses-checked",
     "caps-pushed-on",
     "caps-checked",
+    "caps-retained-checked",
+    "caps-replaced",
     "column-ends-checked",
     # The support on the deck.
     "support-seated",
