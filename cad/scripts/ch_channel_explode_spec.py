@@ -4,11 +4,11 @@ Pure data, no SolidWorks: ``_ch_channel_explode`` authors the named explode
 from it and draw_ch_channel_assembly reads the same names back. Every channel
 alike, end hardware out along z on its own side, fasteners up out of their
 taps, the rods down off the arms, the bars (with the pins pressed in them) up
-off the rocker straps, the spring anchors down and the fulcrum shaft
-withdrawn south; the north-most channel (the one the balloons pin) is pulled
-out north of the bank whole, its rod pin north and its bar pin south out of
-their bores; the pivot shaft and the other channels' rockers, levers and
-springs stay put.
+off the rocker straps, the spring anchors down, the fulcrum shaft withdrawn
+south and the pivot shaft drawn north out of the rocker hubs; the
+north-most channel (the one the balloons pin) is pulled out north of the bank
+whole, its rod pin north and its bar pin south out of their bores; the other
+channels' rockers, levers and springs stay put.
 """
 
 from __future__ import annotations
@@ -27,6 +27,7 @@ BANK_MID_Z = STACK_MID_Z
 
 KEEPER = "ch-fulcrum-keeper"
 FULCRUM_SHAFT = "ch-fulcrum-shaft"
+PIVOT_SHAFT = "ch-pivot-shaft"
 KEEPER_SET_SCREW = "ch-vn-fulcrum-set-screw"
 KEEPER_FOOT_SCREW = "ch-vn-frame-side-screw"
 BRACKET = "ch-pivot-bracket"
@@ -156,6 +157,14 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     # south end (-189.5) is 14 north of where 120 left the 166.6 shaft, and
     # its north end (-11.5) still sits inside the lever bank.
     ExplodeStep("fulcrum shaft out south", (FULCRUM_SHAFT,), "z", -100.0),
+    # Drawn north, the way the fit-up pushes it in (left ear, washer, hubs):
+    # left in the hubs only a stub showed, and balloon 1 landed on that sliver
+    # beside the washers (machinist reviews of R5 and farm run
+    # 20261117T130021685Z, rule 22). 200
+    # carries its south end 38 past hub 19, its north half past the hanging
+    # rods onto open paper, its north end 82 short of the pulled channel's hub
+    # and inside the box (the rod pin's ~400 north).
+    ExplodeStep("pivot shaft out north", (PIVOT_SHAFT,), "z", 200.0),
     ExplodeStep("north-most channel out", _CHANNEL_GROUP, "z", 300.0, "north-most"),
     ExplodeStep("its rod pin out", (ROD_PIN,), "z", 25.0, "north-most"),
     # South, not north: 25 north put the bar pin on the lever's lower edge

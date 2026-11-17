@@ -437,10 +437,11 @@ def test_each_step_column_fits_its_field() -> None:
     lever = headings.index("LEVER BANK FIT-UP")
     assert all(h == "ROCKER BANK FIT-UP (CONT.)" for h in headings[1:lever])
     assert all(h == "LEVER BANK FIT-UP (CONT.)" for h in headings[lever + 1 :])
-    # Round 1 review: no near-empty step column beside an empty half sheet.
+    # Round 1 review: no near-empty step column beside an empty half sheet
+    # (every column is full height or beside a view; sheet 6's right half
+    # holds view G and the setting table, not steps).
     for column, block in drawing.FITUP_NOTES:
-        if column is not drawing.LEVER_COLUMNS[-1]:
-            assert len(block.splitlines()) > column.capacity // 2, column
+        assert len(block.splitlines()) > column.capacity // 2, column
     # Each 1:1 bank's right-hand end (the keeper and ear outer faces) clears
     # the right column.
     for view, south_z in (
@@ -460,7 +461,7 @@ def test_each_step_column_fits_its_field() -> None:
     assert y1 < template.height_m - drawing.BORDER
     assert y0 == pytest.approx(drawing.HOOKUP_BOTTOM_Y)
     label_lines = len(hookup.label_text.splitlines())
-    assert y0 - 0.004 - label_lines * NOTE_LINE_PITCH > drawing.LEVER_COLUMNS[-1].xy[1]
+    assert y0 - 0.004 - label_lines * NOTE_LINE_PITCH > drawing.SETTING_TABLE_XY[1]
 
 
 def test_a_column_never_splits_a_step_and_overflow_is_refused() -> None:
@@ -496,17 +497,19 @@ def test_the_package_sheets_and_settings_contract() -> None:
     explode = drawing.explode
     kept = {
         **drawing.STACK_KEEP,
+        **drawing.TIP_KEEP,
         **drawing.SPRING_KEEP,
         **drawing.LUG_KEEP,
         **drawing.PLAN_KEEP,
     }
+    assert drawing.ROCKER_KEEP == {**drawing.STACK_KEEP, **drawing.TIP_KEEP}
     assert sorted(kept) == sorted(asm.DIMENSION_FEATURE)
     # Each bank view shows only its own axis's sketch.
     assert {asm.DIMENSION_FEATURE[name] for name in drawing.LUG_KEEP} == {
         asm.FULCRUM_FEATURE
     }
     assert {
-        asm.DIMENSION_FEATURE[name] for name in (*drawing.STACK_KEEP, *drawing.SPRING_KEEP)
+        asm.DIMENSION_FEATURE[name] for name in (*drawing.ROCKER_KEEP, *drawing.SPRING_KEEP)
     } == {asm.PIVOT_FEATURE}
     assert {asm.DIMENSION_FEATURE[name] for name in drawing.PLAN_KEEP} == {
         asm.KEEPER_PLAN_FEATURE
@@ -803,31 +806,30 @@ def test_the_north_keeper_balloons_on_detail_c_right_of_its_lifted_screws() -> N
     assert ring_top + 0.004 < bracket_label_bottom
 
 
-def test_the_pivot_shaft_balloon_lands_on_its_bare_south_stub() -> None:
-    """#1895 machinist review (r2, r3): leader 1 climbed through the black
-    rocker-arm fan to a landing it hid. It lands on the south flat's
-    eye-side edge, on the stub between hub 0 and the exploded south ear,
-    whose line of sight (eye on +x +y +z) clears hub 0 and arm 0's top edge,
-    and its balloon stands off the ring, above and east of that landing."""
+def test_the_pivot_shaft_is_drawn_north_and_ballooned_on_its_bare_run() -> None:
+    """#1895, R5 and farm run 20261117T130021685Z machinist reviews: left in
+    the hubs, only a stub of the shaft showed and balloon 1 landed on that
+    sliver. The explode draws it north, the way the fit-up pushes it in,
+    wholly out of the hubs and short of the pulled channel's hub; balloon 1
+    lands on its north flat's eye-side edge and stands straight above it."""
     import ch_pivot_shaft_spec as shaft
-    import ch_rocker_arm_spec as arm
 
+    explode = drawing.explode
+    offset = drawing.exploded_offset(explode.PIVOT_SHAFT, "north")
+    assert offset == drawing.exploded_offset(explode.PIVOT_SHAFT, "south")
+    assert offset[:2] == (0.0, 0.0) and offset[2] > 0.0
+    south_end = bank.PIVOT_SHAFT_SOUTH_Z + offset[2]
+    north_tip = bank.PIVOT_SHAFT_NORTH_Z + shaft.DOME_HEIGHT + offset[2]
+    assert south_end > bank.HUB19_NORTH_FACE_Z + 20.0
+    pulled = drawing.exploded_offset(explode.ARM, "north-most")[2]
+    assert north_tip + 50.0 < bank.HUB19_NORTH_FACE_Z - HUB_LENGTH + pulled
     x, y, z = drawing.BALLOON_POINTS_MM[drawing.PIVOT_SHAFT_STEM]
     radius = shaft.SHAFT_DIA / 2.0
     assert y == pytest.approx(radius - shaft.FLAT_DEPTH)
     assert x > 0.0 and math.hypot(x, y) == pytest.approx(radius)
-    point_z = bank.PIVOT_SHAFT_NORTH_Z + z
-    assert point_z == pytest.approx(bank.PIVOT_BRACKET_Z[0] + bank.SOUTH_END_INSET)
-    assert bank.SOUTH_EAR_OUTER_Z < point_z < bank.HUB0_SOUTH_FACE_Z
-    assert drawing.exploded_offset(drawing.explode.BRACKET, "south")[2] < 0.0
-    hub_t = bank.HUB0_SOUTH_FACE_Z - point_z
-    assert math.hypot(x + hub_t, y + hub_t) > arm.HUB_DIA / 2.0 + 5.0
-    arm_t = bank.hub_mid_z(0) - arm.ARM_THICKNESS / 2.0 - point_z
-    reach = x + arm_t
-    top_edge = arm.TOP_EDGE_ABOVE_PIVOT + arm.R_TOP - math.sqrt(arm.R_TOP**2 - reach**2)
-    assert y + arm_t - top_edge > 1.5
+    assert z == pytest.approx(-bank.PIVOT_SHAFT_FLAT_STATIONS[1])
     dx, dy = drawing.PIVOT_SHAFT_BALLOON_OFFSET
-    assert dy > 0.04 and 0.0 < dx < dy / 3.0
+    assert dx == 0.0 and dy > drawing.BALLOON_MAX_RADIUS + 0.008
 
 
 def test_the_fulcrum_shaft_balloon_lands_on_its_bare_run_past_the_south_keeper() -> None:
@@ -960,7 +962,8 @@ def test_the_explode_plan_moves_every_family_and_only_them() -> None:
     spring = drawing.exploded_offset(drawing.SPRING_STEM, "north-most")
     assert spring == (0.0, 0.0, 300.0)
     assert drawing.exploded_offset(explode.ARM, "north") == (0.0, 0.0, 0.0)
-    assert {"ch-pivot-shaft", explode.ARM, explode.LEVER}.isdisjoint(explode.FULLY_EXPLODED_STEMS)
+    assert {explode.ARM, explode.LEVER}.isdisjoint(explode.FULLY_EXPLODED_STEMS)
+    assert explode.PIVOT_SHAFT in explode.FULLY_EXPLODED_STEMS
     assert explode.FULCRUM_SHAFT in explode.EXPLODED_STEMS
 
 
@@ -1145,7 +1148,31 @@ def test_the_finished_shaft_is_set_by_its_tip_before_the_screws() -> None:
         for sign in (-1.0, 1.0)
     )
     assert (low, high) == (".050", ".070")
-    assert f"{low} TO {high}" in _step_body(key)
+    # R5 machinist review (rule 22): the band prints on view D's native tip
+    # dimension, the dome's height off the left (north) ear's outer face; the
+    # step names the view and carries no number.
+    asm = drawing.asm
+    nominal = asm.PIVOT_CHAIN_Z[5] - asm.PIVOT_CHAIN_Z[4]
+    assert nominal == pytest.approx(shaft.DOME_HEIGHT)
+    assert asm.PIVOT_CHAIN_Z[4] == pytest.approx(bank.NORTH_EAR_OUTER_Z)
+    lower, upper = asm.DIMENSION_TOLERANCES[asm.TIP_PROUD_DIMENSION]
+    assert (lower, upper) == (-bank.SHAFT_TIP_SET_BAND, bank.SHAFT_TIP_SET_BAND)
+    assert asm.TOLERANCE_PRECISION[asm.TIP_PROUD_DIMENSION] == 3
+    body = _step_body(key)
+    assert f"{drawing.ROCKER_BANK.title} TIP PROUD DIMENSION" in body
+    assert drawing.notes.DIMENSION_CALLOUTS[asm.TIP_PROUD_DIMENSION] == "TIP PROUD"
+    assert low not in body and high not in body
+    # The text stands wholly right of the ear-face extension line (centred on
+    # the 1.5 mm gap both lines struck its digits, rule 14), inside the
+    # border, and over the stack's callout line.
+    ((x, y),) = drawing.TIP_KEEP.values()
+    half = len(".060 ±.010") * NOTE_CHAR_WIDTH / 2.0
+    ear_x, _ = drawing.ROCKER_BANK.sheet_xy(asm.PIVOT_CHAIN_Z[4], 0.0)
+    tip_x, _ = drawing.ROCKER_BANK.sheet_xy(asm.PIVOT_CHAIN_Z[5], 0.0)
+    assert tip_x < ear_x < x - half - 0.003
+    assert x - half > drawing.BORDER + 0.003
+    ((_, stack_y),) = drawing.STACK_KEEP.values()
+    assert y > stack_y + 3 * NOTE_LINE_PITCH
     # Positive control: no other step sets the tip.
     for other in steps.SEQUENCE:
         if other != key:
@@ -1245,8 +1272,10 @@ def test_a_feeler_leaf_passes_between_every_pair_of_bars() -> None:
     assert pin.RUNNING_FLOOR <= leaf <= least
     assert leaf == pytest.approx(0.005 * 25.4)
     body = _step_body("bars-gapped")
-    assert "A .005 FEELER GAUGE LEAF" in body
+    assert f"THE FEELER LEAF OF {drawing.setting_row('bars-gapped')} PASSES" in body
     assert "EVERY ADJACENT PAIR" in body and "TOP TO BOTTOM" in body
+    assert ".005" not in body
+    assert _setting_table_row("bars-gapped")[4:] == (".005 MIN", "FEELER LEAF")
 
 
 def test_each_bar_is_proved_straight_before_it_is_pinned() -> None:
@@ -1263,10 +1292,61 @@ def test_each_bar_is_proved_straight_before_it_is_pinned() -> None:
     assert asm.BAR_GAP["mid_span_bowed"] >= asm._BAR_RUNNING_FLOOR
     body = _step_body("bars-straight")
     assert "SURFACE PLATE ON EACH SIDE FACE" in body
-    assert "A .005 FEELER GAUGE LEAF MUST NOT ENTER" in body
+    assert f"THE FEELER LEAF OF {drawing.setting_row('bars-straight')} MUST NOT" in body
+    assert _setting_table_row("bars-straight")[4:] == (".005 MAX", "FEELER LEAF")
     # Rule 22: the remedy is its own step and loops back to the check.
     assert "STRAIGHTEN" not in body
     assert steps.step_number("bar-straightened") == straight + 1
     remedy = _step_body("bar-straightened")
     assert "STRAIGHTEN BY HAND, OR EXCHANGE" in remedy
     assert f"RETURN TO STEP {straight}." in remedy
+
+
+def _setting_table_row(key: str) -> tuple[str, ...]:
+    (row,) = (
+        row
+        for row in drawing.SETTING_TABLE_ROWS
+        if row[1] == str(steps.step_number(key))
+    )
+    return row
+
+
+def test_the_feeler_acceptances_are_setting_table_rows_their_steps_cite() -> None:
+    """R5 machinist review (rule 22): the lever bank's three feeler
+    acceptances printed only in their steps. Each is a setting table row on
+    sheet 6, cited by its step, which carries no number; the end-play leaf is
+    the worst case floored to .01 in."""
+    import ch_fulcrum_keeper_spec as keeper
+    from ch_channel_lever_spec import HUB_LENGTH as LEVER_HUB, HUB_LENGTH_BAND
+
+    assert drawing.SETTING_TABLE_HEADER == (
+        "ROW",
+        "STEP",
+        "SETTING",
+        "MEASURE FIRST",
+        "SET TO / ACCEPT",
+        "CHECK WITH",
+    )
+    keys = ("bars-straight", "bars-gapped", "lever-bank-slides")
+    assert [row[0] for row in drawing.SETTING_TABLE_ROWS] == ["1", "2", "3"]
+    assert [row[1] for row in drawing.SETTING_TABLE_ROWS] == [
+        str(steps.step_number(key)) for key in keys
+    ]
+    for key in keys:
+        assert drawing.setting_row(key) in _step_body(key)
+        assert "SHEET 6" in drawing.setting_row(key)
+    span_min = (
+        keeper.KEEPER_INNER_FACE_SPAN_MM - 2 * keeper.KEEPER_FITUP_LOCATION_BAND_MM
+    )
+    play_min_in = (span_min - drawing.COUNT * (LEVER_HUB + HUB_LENGTH_BAND[0])) / 25.4
+    leaf_in = math.floor(play_min_in * 100.0) / 100.0
+    assert 0.0 < leaf_in <= play_min_in
+    assert _setting_table_row("lever-bank-slides")[2:] == (
+        "LEVER END PLAY",
+        "-",
+        f"{leaf_in:.3f}".removeprefix("0") + " MIN",
+        "FEELER LEAF",
+    )
+    body = _step_body("lever-bank-slides")
+    assert f"{leaf_in:.3f}".removeprefix("0") not in body
+    assert drawing.SETTING_TABLE_SHEET == drawing.SHEET_NAMES[5]
