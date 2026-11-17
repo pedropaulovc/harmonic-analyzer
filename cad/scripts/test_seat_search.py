@@ -449,32 +449,40 @@ def test_counter_support_certificate_refuses_stale_or_unproven_parts(
 ) -> None:
     """upper_support labels the CURRENT recipe, so the driver refuses to measure
     support parts doit would rebuild, and refuses when it cannot tell."""
-    import verify
+    from doit.dependency import Dependency, JsonDB
+    from doit.task import Task
     from diagnostics import calibrate_spring_seats as driver
 
+    dodo = driver.dodo
     ledger = tmp_path / ".doit.db"
-    monkeypatch.setitem(driver.dodo.DOIT_CONFIG, "dep_file", str(ledger))
-    seen: list[list[str]] = []
-
-    def fake_stale(db, producers):
-        seen.append([task for task, _, _ in producers])
-        return db.get("stale", [])
-
-    monkeypatch.setattr(verify, "_stale_in_db", fake_stale)
+    monkeypatch.setitem(dodo.DOIT_CONFIG, "dep_file", str(ledger))
+    sources = {}
+    for stem in driver._SUPPORT_PART_STEMS:
+        source = tmp_path / f"build_{stem}.py"
+        source.write_text("A = 1\n", encoding="utf-8")
+        (tmp_path / f"{stem}.SLDPRT").write_bytes(b"part")
+        sources[stem] = source
+    monkeypatch.setattr(dodo, "_part_file_deps", lambda _script, stem: [str(sources[stem])])
+    monkeypatch.setattr(dodo, "_sldprt", lambda stem: str(tmp_path / f"{stem}.SLDPRT"))
     with pytest.raises(RuntimeError, match="cannot prove the counter support"):
         driver._require_current_support_parts()
 
-    ledger.write_text('{"stale": ["part:sm_vn_gooseneck_shoulder_screw: x changed"]}')
+    ledger.write_text("{}")  # never built through doit
     with pytest.raises(RuntimeError, match="refusing to certify .* stale"):
         driver._require_current_support_parts()
 
-    ledger.write_text("{}")
+    recorded = Dependency(JsonDB, str(ledger), checker_cls=dodo.ContentChecker)
+    for stem in driver._SUPPORT_PART_STEMS:
+        recorded.save_success(
+            Task(f"part:{stem}", None, file_dep=[str(sources[stem])],
+                 targets=[dodo._sldprt(stem)])
+        )
+    recorded.close()
     driver._require_current_support_parts()
-    assert seen[-1] == [
-        "part:sm_gooseneck",
-        "part:sm_gooseneck_end_plug",
-        "part:sm_vn_gooseneck_shoulder_screw",
-    ]
+
+    sources["sm_vn_gooseneck_shoulder_screw"].write_text("A = 2\n", encoding="utf-8")
+    with pytest.raises(RuntimeError, match="part:sm_vn_gooseneck_shoulder_screw"):
+        driver._require_current_support_parts()
 
 
 def test_driver_imports_against_the_stale_counter_record_it_replaces() -> None:

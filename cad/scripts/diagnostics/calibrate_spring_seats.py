@@ -346,31 +346,36 @@ def _require_current_support_parts() -> None:
 
     ``counter_upper_support_geometry()`` is computed from the CURRENT source,
     so it may only label a measurement of parts built from that source.
-    ``place_components_batch`` only checks that the SLDPRTs exist; this reuses
-    verify.py's freshness guard (doit's own ledger and ContentChecker, the
-    same verdict ``doit`` would rebuild on) but fails closed: a missing ledger
-    or a guard error refuses instead of warning.
+    ``place_components_batch`` only checks that the SLDPRTs exist; this asks
+    doit's own ledger (``Dependency.get_status`` with the build's
+    ContentChecker, the same verdict ``doit`` would rebuild on) and fails
+    closed: a missing or unreadable ledger refuses.
     """
-    from verify import _stale_in_db
+    from doit.dependency import DatabaseException, Dependency, JsonDB
+    from doit.task import Task
 
     ledger = Path(dodo.DOIT_CONFIG["dep_file"])
     try:
-        db = json.loads(ledger.read_text(encoding="utf-8"))
-    except (OSError, ValueError) as exc:
+        if not ledger.is_file():
+            raise FileNotFoundError(ledger)
+        dependency = Dependency(JsonDB, str(ledger), checker_cls=dodo.ContentChecker)
+    except (OSError, DatabaseException) as exc:
         raise RuntimeError(
             f"cannot prove the counter support parts are current ({ledger}: {exc}); "
             "build sm-gooseneck, sm-gooseneck-end-plug and "
             "sm-vn-gooseneck-shoulder-screw through doit first"
         ) from exc
-    producers = [
-        (
+    stale = []
+    for stem in _SUPPORT_PART_STEMS:
+        task = Task(
             f"part:{stem}",
-            dodo._part_file_deps(dodo.SCRIPTS_DIR / f"build_{stem}.py", stem),
-            dodo._sldprt(stem),
+            None,
+            file_dep=dodo._part_file_deps(dodo.SCRIPTS_DIR / f"build_{stem}.py", stem),
+            targets=[dodo._sldprt(stem)],
         )
-        for stem in _SUPPORT_PART_STEMS
-    ]
-    stale = _stale_in_db(db, producers)
+        status = dependency.get_status(task, {}, get_log=True)
+        if status.status != "up-to-date":
+            stale.append(f"{task.name}: {status.reasons}")
     if stale:
         raise RuntimeError(
             "refusing to certify the counter upper support from stale saved parts "

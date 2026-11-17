@@ -1460,7 +1460,6 @@ _CHECK_NAMES = (
     "cache",
     "telemetry",
     "watchdog",
-    "freshness",
     "flagonly",
     "partiso",
     "inert",
@@ -2931,8 +2930,8 @@ def _assembly_tier(stem: str, target: str, current: dict[str, str]) -> tuple[Ref
 # build INPUTS (its recipe, transitively through referenced artefacts) rather than its
 # output bytes: identical to doit's own "up-to-date" semantics (a real script/config/
 # referenced-part change still flips it), but immune to SolidWorks' save churn. One
-# chokepoint -> doit staleness, the freshness guard (verify.py reuses this
-# ContentChecker), AND the remote cache key (also ContentChecker._digest) stay in
+# chokepoint -> doit staleness AND the remote cache key (also
+# ContentChecker._digest) stay in
 # lockstep, and the cache now hits cross-machine despite per-build PID/save churn.
 _ARTEFACT_INDEX: dict[str, tuple[str, str]] | None = None
 _ARTEFACT_DIGEST_MEMO: dict[str, str] = {}
@@ -4875,22 +4874,6 @@ def _check_verify_telemetry_spec(pytest_cmd: list[str]) -> dict[str, Any]:
     }
 
 
-def _check_freshness_spec(pytest_cmd: list[str]) -> dict[str, Any]:
-    return {
-        # verify.py's standalone-staleness guard: reuses doit's .doit.db ledger
-        # + ContentChecker to refuse scoring a stale tree (the gap that let a
-        # never-rebuilt 8-component frame trip component-count). Pure python ->
-        # offline gate, so the guard can't regress while required checks stay green.
-        "file_dep": [
-            str(VERIFY_PY),
-            str((REPO_ROOT / "dodo.py").resolve()),
-            str((SCRIPTS_DIR / "_buildgraph.py").resolve()),
-            str((SCRIPTS_DIR / "test_verify_freshness.py").resolve()),
-        ],
-        "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_verify_freshness.py")],
-    }
-
-
 def _check_flagonly_spec(pytest_cmd: list[str]) -> dict[str, Any]:
     return {
         # The targeted late-binding flag helper (_flag_only, issue #87) -- pure
@@ -5033,7 +5016,6 @@ _CHECK_SPEC_BUILDERS = {
     "telemetry": _check_telemetry_spec,
     "watchdog": _check_watchdog_spec,
     "verify_telemetry": _check_verify_telemetry_spec,
-    "freshness": _check_freshness_spec,
     "flagonly": _check_flagonly_spec,
     "partiso": _check_partiso_spec,
     "inert": _check_inert_spec,

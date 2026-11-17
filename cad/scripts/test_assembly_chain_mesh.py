@@ -623,7 +623,6 @@ def test_soundness_interference_gates_get_the_chain_mounts(monkeypatch, tmp_path
         assert seen.pop("mounts") == expected
     # The static suite's own copy of the gate passes the same mounts.
     monkeypatch.setattr(verify, "OUT_SLDASM", tmp_path)
-    monkeypatch.setattr(verify, "_assert_fresh", lambda _name, _report: True)
     monkeypatch.setattr(verify, "active_configuration_name", lambda _adapter: verify.REST)
 
     async def ok(*_args):

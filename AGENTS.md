@@ -987,8 +987,8 @@ closure + config it reads, folded transitively through referenced artefacts), no
 its output bytes — see `_stable_artefact_digest` in `dodo.py`. A real
 script/config/referenced-part change still flips the digest; pure save-churn does
 not, so a no-change `doit build` is now a true no-op (no phantom refreshes). It is
-one chokepoint, so doit staleness, the verify freshness guard (which reuses this
-`ContentChecker`), and the remote cache key (also `_digest`) stay in lockstep — and
+one chokepoint, so doit staleness and the remote cache key (also `_digest`) stay
+in lockstep — and
 the cache now hits cross-machine despite per-build PID/save churn. (The recipe digest
 is built from **repo-relative** path tags via `_rel_tag`, so it is identical across
 checkout roots — an absolute tag would shift every assembly's key per seat and
