@@ -2663,6 +2663,27 @@ def test_review_prompt_allows_reserved_token_in_sheet_text(
     assert sheet_text in prompt
 
 
+def test_assembly_review_reads_its_assembly_md_steps(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Rule 22: a package whose steps print in ASSEMBLY.md is reviewed with
+    that section; a part, or a package whose sheets print its steps, is not."""
+    import ha_assembly_package
+
+    monkeypatch.setattr(ha_assembly_package, "STEPS_IN_DOCUMENT", ("mg-magnifier",))
+    monkeypatch.setattr(
+        ha_assembly_package,
+        "fitup_lines",
+        lambda stem: ["## MHA-MG-00 fit-up steps", "", f"- **1.** STEP OF {stem}.", ""],
+    )
+    listed = mr._review_prompt(mr.ReviewPackage("mg_magnifier_assembly", "assembly", ()), 1)
+    assert "\nASSEMBLY.MD FIT-UP STEPS\n" in listed
+    assert "- **1.** STEP OF mg-magnifier." in listed
+    for package in (
+        mr.ReviewPackage("mg_magnifier", "part", ()),
+        mr.ReviewPackage("pn_pen_assembly", "assembly", ()),
+    ):
+        assert "STEP OF" not in mr._review_prompt(package, 1)
+
+
 def test_prompts_share_the_static_load_prompt_prefix_for_every_package() -> None:
     packages = [
         (mr.ReviewPackage("crank_arm", "part", ()), 1),

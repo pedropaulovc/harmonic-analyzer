@@ -137,7 +137,13 @@ def _local_import_closure(entry: Path) -> set[str]:
                 # Registry is only used by interactive name/--all selectors.
                 # The leaf supplies PDF/kind/name and always passes --force,
                 # so the lazy _drawing_diff precheck import is unreachable too.
-                if local.is_file() and name not in {"_drawing_registry", "_drawing_diff"}:
+                # The ASSEMBLY.md generator is keyed per package instead, by
+                # ha_assembly_package.fitup_sources (rule 22).
+                if local.is_file() and name not in {
+                    "_drawing_registry",
+                    "_drawing_diff",
+                    "ha_assembly_package",
+                }:
                     pending.append(local)
     return found
 
