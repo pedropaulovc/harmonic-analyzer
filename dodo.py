@@ -41,7 +41,6 @@ COM failure no longer skips unrelated downstream COM tasks as a spine side effec
 
 Install (this repo is a uv project -- pyproject.toml + uv.lock at the root)::
 
-    git submodule update --init  # ./SolidworksMCP-python (COM adapter, branch personal)
     uv sync                      # core deps + pytest, from the lockfile
 
 Run through uv (SolidWorks already open for the COM tasks)::
@@ -185,14 +184,6 @@ RELEASE_VERSION_FILE = (CONFIG_DIR / "release.yaml").resolve()
 # deliberately; importing _buildgraph from _paths would drag graph tooling
 # into every part's dep closure). A runtime input of every part build.
 PART_TEMPLATE = REPO_ROOT / "cad" / "templates" / "harmonic-analyzer.PRTDOT"
-# The vendored COM adapter (``solidworks_mcp``) lives in this submodule and is
-# imported AT RUNTIME by _com/_assembly (e.g. the mate/plane creation glue), so
-# its source is a genuine build input of every COM task -- yet it is an installed
-# package, not a repo-local ``_*.py`` helper, so ``module_deps_of`` never walks it.
-# Its tracked source content is folded into every COM task's recipe (see
-# ``_submodule_dep``) so a submodule bump -- committed pin OR a dirty local edit --
-# busts the cache key and forces a rebuild (issue #144).
-SUBMODULE_SRC = REPO_ROOT / "SolidworksMCP-python" / "src" / "solidworks_mcp"
 
 
 # --- COM seat: serialize SolidWorks at RUNTIME with a cross-process file lock.
@@ -349,8 +340,8 @@ def _tag_seat_wait(span, waited: float | None) -> None:
 
 
 # Drawing tasks declare only their source model as CAD input, while their code
-# recipe follows the exporter's complete repo-local import closure and the full
-# SolidWorks adapter submodule digest.
+# recipe follows the exporter's complete repo-local import closure (the vendored
+# SolidWorks adapter included).
 # Their order is derived from the source part producer for stable scheduling;
 # the runtime COM-seat lock provides serialization without adding false DAG edges.
 def _drawing_order() -> list[str]:
@@ -1488,193 +1479,6 @@ def _digest_files(files: list[str]) -> str:
     return h.hexdigest()
 
 
-# --- SolidworksMCP-python submodule: a runtime build input of EVERY COM task.
-#
-# ``_com``/``_assembly`` import ``solidworks_mcp`` (the vendored COM adapter) at
-# runtime for the mate/plane/feature creation glue, so its source is as much a part
-# of a .SLDPRT/.SLDASM's recipe as the shared helper closure -- but it is an INSTALLED package,
-# not a repo-local ``_*.py`` helper, so ``module_deps_of`` (which walks only local
-# ``_*.py`` imports) never included it. That left BOTH the local staleness digest
-# AND the remote cache key blind to a submodule bump: bumping it left every COM
-# task "up-to-date" and served stale cross-machine cache hits (issue #144).
-#
-# Fix: fold the submodule's tracked SOURCE content into every COM task's recipe via a
-# synthetic file_dep whose CONTENT is a content-hash of the src tree. Hashing the tree
-# (not just ``git rev-parse HEAD``) also catches a dirty/uncommitted submodule edit.
-# One synthetic dep -- instead of the ~100 source files -- keeps the per-task dep set
-# (and thus every cache-key / _digest_files fold) O(1), not a hundred md5s per COM
-# task. The dep is added ONLY in the COM dep builders (``_part_file_deps`` /
-# ``_recipe_files``), so the SolidWorks-free ``check:*`` tasks -- which never touch
-# COM -- stay off it.
-#
-# THREE tiers (the over-rebuild fix): DRAWING tasks fold the WHOLE tree
-# (``_submodule_dep`` -> ``_submodule_digest``); ASSEMBLY, export and features recipes
-# fold the tree MINUS drawing.py (``_submodule_assembly_dep``); PART
-# recipes fold the tree MINUS {assembly.py, motion.py, drawing.py}
-# (``_submodule_part_dep`` -> ``_submodule_part_digest``). So a bump touching only
-# assembly.py/motion.py rebuilds the 8 assemblies but leaves all ~100 parts cached, and
-# a bump touching only drawing.py rebuilds just the (few) drawing tasks. Every exclusion
-# is SAFE because the excluded module is never CALLED by that tier's runtime.
-# Native build exclusions are enforced by ``check:partiso``; see the exclusion
-# sets below and the feature-producer rationale in the drawing.py entry.
-_SUBMODULE_DIGEST_FILE = REPORTS / ".solidworks-mcp-submodule.digest"
-_SUBMODULE_ASSEMBLY_DIGEST_FILE = REPORTS / ".solidworks-mcp-submodule-assembly.digest"
-_SUBMODULE_PART_DIGEST_FILE = REPORTS / ".solidworks-mcp-submodule-part.digest"
-_SUBMODULE_DIGEST: str | None = None
-_SUBMODULE_ASSEMBLY_DIGEST: str | None = None
-_SUBMODULE_PART_DIGEST: str | None = None
-_SUBMODULE_DEP_PATH: str | None = None
-_SUBMODULE_ASSEMBLY_DEP_PATH: str | None = None
-_SUBMODULE_PART_DEP_PATH: str | None = None
-
-# THREE recipe-digest tiers over the submodule tree, so a bump to a module only some
-# COM tasks reach doesn't rebuild the ones that can't. Each exclusion is proven from
-# repo-local code and ENFORCED by test_part_isolation.py (``check:partiso``), which
-# fails loud if a build script ever imports a module its tier excludes:
-#
-#   * DRAWING tasks fold the WHOLE tree (``_submodule_digest``).
-#   * ASSEMBLY/export/features recipes fold the tree MINUS ``drawing.py``
-#     (``_submodule_assembly_digest``) -- see ``_ASSEMBLY_DIGEST_EXCLUDE_FILES``.
-#   * PART recipes fold the tree MINUS {assembly.py, motion.py, drawing.py}
-#     (``_submodule_part_digest``) -- see ``_PART_DIGEST_EXCLUDE_FILES``.
-#
-# Why each file drops out of a tier:
-#   * assembly.py / motion.py -- the assembly+motion COM path. Excluded from the PART
-#     digest only. They ARE loaded transitively (PyWin32Adapter mixes them in), but a
-#     part only ever CALLS sketch/feature/export methods -- never an assembly/motion
-#     method -- so their content can't change a part's geometry. Assemblies DO call
-#     them, so they stay in the ASSEMBLY (and drawing) digest.
-#   * drawing.py -- the ``IDrawingDoc`` helper set. Excluded from BOTH the part AND
-#     assembly digests, because it is a stronger case than assembly/motion: it is NOT
-#     even mixed into PyWin32Adapter (it is standalone module-level functions), so
-#     nothing in a part OR assembly build graph imports it -- ONLY a ``draw_*`` drawing
-#     script does. A drawing.py edit therefore rebuilds only the (few) drawing tasks,
-#     never the ~100 parts or ~8 assemblies. This matches the module's own docstring
-#     claim ("excluded from every part *and* assembly cache key"). Drawing tasks keep
-#     folding it via the full ``_submodule_dep`` (task_drawing), so their recipe still
-#     tracks it.
-#     Features import draw modules for their declarations and so LOAD drawing.py,
-#     but do not use its constants or call its helpers. Its module-level setup
-#     defines drawing-only state; _drawing_common sets only CENTER_MARK_OBSERVER,
-#     consulted by auto_center_marks, never by IPartDoc face naming or SaveAs3.
-#
-# CONSERVATIVE elsewhere: everything NOT named here (base, com_variant, sketch, feature,
-# sw_type_info, pywin32_adapter, factory, AND the MCP-server surface tools/agents/ui/
-# server*.py) stays in every digest -- a real shared-helper change still rebuilds parts.
-# The MCP-server surface is deliberately KEPT (codex #191): excluding it would rest on a
-# "not-REACHED through the package's own import graph" claim the repo-local guard cannot
-# verify (base.py could start importing solidworks_mcp.tools), so we accept a rare
-# over-rebuild rather than risk a stale part. drawing.py is different: its exclusion
-# rests on "not-IMPORTED by any part/assembly build script", which IS repo-local
-# checkable (check:partiso scans the transitive import closure of every part AND
-# assembly script).
-#
-# Tags are PACKAGE-relative (relative to ``solidworks_mcp/``), so the module name is
-# just ``solidworks_mcp.`` + the dotted tag -- ``test_part_isolation.py`` derives its
-# forbidden-import sets straight from these.
-#
-# NOTE: adding drawing.py here shifts every PART and ASSEMBLY recipe/cache key once
-# (a one-time migration); the build self-heals over one run, or ``doit reset-dep``
-# migrates the ``.doit.db`` in place without a rebuild.
-_ASSEMBLY_DIGEST_EXCLUDE_FILES = frozenset(
-    {
-        "adapters/solidworks/drawing.py",
-    }
-)
-_PART_DIGEST_EXCLUDE_FILES = _ASSEMBLY_DIGEST_EXCLUDE_FILES | frozenset(
-    {
-        "adapters/solidworks/assembly.py",
-        "adapters/solidworks/motion.py",
-    }
-)
-
-
-def _submodule_src_files() -> list[Path]:
-    """Every ``.py`` under the submodule's ``src/solidworks_mcp`` tree (sorted).
-    Empty when the submodule isn't checked out -- the digest degrades to a stable
-    empty-tree hash rather than crashing the build graph."""
-    if not SUBMODULE_SRC.is_dir():
-        return []
-    return sorted(SUBMODULE_SRC.rglob("*.py"))
-
-
-def _submodule_rel_tag(f: Path) -> str | None:
-    """The PACKAGE-relative path tag (relative to ``solidworks_mcp/``) used to test a
-    file against the exclusion sets, or None if it's outside the package tree. Matching
-    on this tag keeps the classification identical across checkout roots / REPO_ROOT."""
-    try:
-        return _resolved(f).relative_to(_resolved(SUBMODULE_SRC)).as_posix()
-    except ValueError:
-        return None
-
-
-def _is_part_relevant_submodule_file(f: Path) -> bool:
-    """False for the assembly/motion COM modules AND drawing.py (all dropped from the
-    PART recipe digest); every other submodule file stays in."""
-    rel = _submodule_rel_tag(f)
-    if rel is None:
-        return True  # outside the package tree (defensive) -> keep it in the digest
-    return rel not in _PART_DIGEST_EXCLUDE_FILES
-
-
-def _is_assembly_relevant_submodule_file(f: Path) -> bool:
-    """False only for drawing.py (dropped from the ASSEMBLY recipe digest -- no
-    assembly build script imports it); assembly.py/motion.py and everything else stay
-    in, since assemblies DO call the assembly/motion COM path."""
-    rel = _submodule_rel_tag(f)
-    if rel is None:
-        return True
-    return rel not in _ASSEMBLY_DIGEST_EXCLUDE_FILES
-
-
-def _digest_submodule_files(files: list[Path]) -> str:
-    """Fold a list of submodule files into one md5, each keyed by its REPO-RELATIVE
-    tag (``_rel_tag``) + Git-EOL-canonical content md5 -- identical across checkout
-    roots and Windows checkout materialisations, exactly like ``_digest_files``, so
-    the derived cache key is cross-machine stable."""
-    h = hashlib.md5()
-    for f in files:
-        h.update(_rel_tag(str(f)).encode())
-        h.update(_canonical_file_md5(str(f)).encode())
-    return h.hexdigest()
-
-
-def _submodule_digest() -> str:
-    """Content fingerprint of the WHOLE submodule source tree (DRAWING-task digest --
-    the only tier that folds drawing.py), memoized (the tree is static within a run)."""
-    global _SUBMODULE_DIGEST
-    if _SUBMODULE_DIGEST is None:
-        _SUBMODULE_DIGEST = _digest_submodule_files(_submodule_src_files())
-    return _SUBMODULE_DIGEST
-
-
-def _submodule_assembly_digest() -> str:
-    """Content fingerprint of the ASSEMBLY-relevant submodule files (the whole tree
-    MINUS drawing.py, which no assembly build imports), memoized. So a drawing.py edit
-    leaves this digest -- and thus every assembly's recipe -- unchanged."""
-    global _SUBMODULE_ASSEMBLY_DIGEST
-    if _SUBMODULE_ASSEMBLY_DIGEST is None:
-        files = [
-            f for f in _submodule_src_files() if _is_assembly_relevant_submodule_file(f)
-        ]
-        _SUBMODULE_ASSEMBLY_DIGEST = _digest_submodule_files(files)
-    return _SUBMODULE_ASSEMBLY_DIGEST
-
-
-def _submodule_part_digest() -> str:
-    """Content fingerprint of the PART-RELEVANT submodule files only (drops the
-    assembly/motion + MCP-server modules parts never reach), memoized. So an
-    assembly-only submodule bump leaves this digest -- and thus every part's recipe
-    -- unchanged, instead of rebuilding all ~100 parts."""
-    global _SUBMODULE_PART_DIGEST
-    if _SUBMODULE_PART_DIGEST is None:
-        files = [
-            f for f in _submodule_src_files() if _is_part_relevant_submodule_file(f)
-        ]
-        _SUBMODULE_PART_DIGEST = _digest_submodule_files(files)
-    return _SUBMODULE_PART_DIGEST
-
-
 def _write_digest_sidecar(path: Path, digest: str) -> str:
     """Write ``digest`` to ``path`` write-only-if-changed (so its mtime -- and doit's
     stat fast-path -- stays stable across no-op runs; a bump flips the content, hence
@@ -1687,49 +1491,6 @@ def _write_digest_sidecar(path: Path, digest: str) -> str:
     if current != digest:
         path.write_text(digest + "\n", encoding="utf-8")
     return str(path.resolve())
-
-
-def _submodule_dep() -> str:
-    """Path to the synthetic file_dep tracking the WHOLE submodule for DRAWING tasks
-    (``task_drawing``): a generated sidecar whose CONTENT is ``_submodule_digest()``.
-    This is the only tier that folds drawing.py, so a drawing.py edit rebuilds drawings
-    but nothing else. Its repo-relative path tag + machine-independent content make the
-    resulting cache key identical across machines. Memoized to one write-check per
-    process (called on every staleness probe)."""
-    global _SUBMODULE_DEP_PATH
-    if _SUBMODULE_DEP_PATH is None:
-        _SUBMODULE_DEP_PATH = _write_digest_sidecar(
-            _SUBMODULE_DIGEST_FILE, _submodule_digest()
-        )
-    return _SUBMODULE_DEP_PATH
-
-
-def _submodule_assembly_dep() -> str:
-    """Synthetic file_dep for the assembly/neutral-export/features submodule slice
-    (whole tree MINUS drawing.py): a separate sidecar whose CONTENT is
-    ``_submodule_assembly_digest()``. Distinct from ``_submodule_dep`` so a drawing.py
-    edit flips the drawing-task sidecar but leaves these COM consumers untouched.
-    Memoized to one write-check per process."""
-    global _SUBMODULE_ASSEMBLY_DEP_PATH
-    if _SUBMODULE_ASSEMBLY_DEP_PATH is None:
-        _SUBMODULE_ASSEMBLY_DEP_PATH = _write_digest_sidecar(
-            _SUBMODULE_ASSEMBLY_DIGEST_FILE, _submodule_assembly_digest()
-        )
-    return _SUBMODULE_ASSEMBLY_DEP_PATH
-
-
-def _submodule_part_dep() -> str:
-    """Path to the synthetic file_dep tracking the PART-RELEVANT submodule slice for
-    PART recipes (``_part_file_deps``): a separate sidecar whose CONTENT is
-    ``_submodule_part_digest()``. Distinct from ``_submodule_dep`` so an assembly-only
-    submodule change flips the assembly sidecar (rebuilds assemblies) but leaves this
-    one untouched (parts stay cached). Memoized to one write-check per process."""
-    global _SUBMODULE_PART_DEP_PATH
-    if _SUBMODULE_PART_DEP_PATH is None:
-        _SUBMODULE_PART_DEP_PATH = _write_digest_sidecar(
-            _SUBMODULE_PART_DIGEST_FILE, _submodule_part_digest()
-        )
-    return _SUBMODULE_PART_DEP_PATH
 
 
 # --- Remote artefact cache (opt-in, off by default; see _artifact_cache.py).
@@ -1972,7 +1733,6 @@ def _drawing_file_deps(stem: str) -> list[str]:
         ):
             runtime = [path for path in runtime if _resolved(Path(path)) != registry]
             runtime.append(_drawing_registry_dep(stem, registry))
-    runtime.append(_submodule_dep())
     if spec.source_kind == "assembly":
         # Assembly-sourced drawings need the same exact-identity signal as
         # part-sourced drawings. The recipe-stable .SLDASM digest preserves
@@ -2140,7 +1900,6 @@ def _export_requirement_deps() -> list[str]:
     """Generic export runtime/config only; declarations belong to feature leaves."""
     return sorted({
         *_executed_closure([str(EXPORT_PY)]),
-        _submodule_assembly_dep(),
     })
 
 
@@ -2149,7 +1908,6 @@ def _feature_export_file_deps(stem: str) -> list[str]:
     return sorted({
         *_feature_requirement_deps(stem),
         str(RELEASE_VERSION_FILE),
-        _submodule_assembly_dep(),
         _sldprt(stem),
         _part_execution_token(stem),
     })
@@ -2450,7 +2208,6 @@ def _part_file_deps(script: Path, stem: str) -> list[str]:
         *_config_deps(script, stem, "part"),
         *data_deps_of(script),
         str(PART_TEMPLATE.resolve()),
-        _submodule_part_dep(),
     ]
     return _narrow_fastener_catalog(f"part:{stem}", deps, stem.replace("_", "-"))
 
@@ -2636,7 +2393,6 @@ def _recipe_files(stem: str) -> list[str]:
         *_helper_deps(asm_script),
         *_config_deps(asm_script, stem, "assembly"),
         *template,
-        _submodule_assembly_dep(),
     ]
     return _narrow_fastener_catalog(f"assembly:{stem}", deps, None)
 
@@ -4057,14 +3813,6 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         # allowlist edits must rerun its frame-ownership contract.
         SCRIPTS_DIR.parent / "docs" / "drawing-simplicity-policy.md",
     ]
-    # test_adapter_feature_resolution exercises the vendored adapter, which
-    # module_deps_of never walks (an installed package, see SUBMODULE_SRC). Its
-    # real import closure (package __init__s, transitive helpers) is wider than
-    # any hand-picked list, so depend on EVERY submodule source file the digest
-    # tiers hash: any submodule bump re-runs the gate (codex #1101). The files,
-    # not a digest sidecar -- the sidecars are COM cache-key inputs, which no
-    # check:* task may carry (test_com_deps_include_submodule_and_checks_do_not).
-    adapter_contract_deps = [str(path) for path in _submodule_src_files()]
     # test_out_param_binding SCANS sources instead of importing them (it reads
     # every top-level build script and every diagnostics/*.py looking for
     # VT_BYREF), so module_deps_of cannot see them -- an import graph does not
@@ -4107,7 +3855,6 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
             # out-of-tree benchmark harness its test imports, and its imports.
             str(review_bench.resolve()),
             *module_deps_of(review_bench),
-            *adapter_contract_deps,
             *scanned_by_binding_gate,
             # Supplier native regressions read captured paint and shelf facts.
             str((SCRIPTS_DIR / "test_supplier_washer_native_paint.json").resolve()),
@@ -4205,9 +3952,6 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         "uptodate": [
             config_changed(
                 {
-                    "submodule_sources": [
-                        _rel_tag(path) for path in adapter_contract_deps
-                    ],
                     "recipe_tests": [_rel_tag(str(path)) for path in recipe_tests],
                     "recipe_scanned_sources": [
                         _rel_tag(path) for path in sorted(scanned_by_binding_gate)
@@ -4458,37 +4202,16 @@ def _check_flagonly_spec(pytest_cmd: list[str]) -> dict[str, Any]:
 def _check_partiso_spec(pytest_cmd: list[str]) -> dict[str, Any]:
     part_script_deps = [str(p.resolve()) for p in part_scripts()]
     return {
-        # Guards the three-tier submodule digest: parts must never import the
-        # assembly/motion + drawing modules the PART recipe excludes, AND assemblies
-        # must never import the drawing module the ASSEMBLY recipe excludes
-        # (_submodule_part_digest / _submodule_assembly_digest), else that exclusion
-        # could silently skip a real rebuild. Derives its forbidden sets from dodo's
-        # exclude lists, so it depends on dodo.py + every part AND assembly script
-        # AND the transitive repo-local helper closure the test actually scans
-        # (module_deps_of): a helper like _gear.py gaining a forbidden import while
-        # no build script changes must still re-run this gate, else the invariant
-        # goes stale unnoticed (codex #191). The entry point of any new forbidden
-        # import is always in this set -- a part/assembly script (caught) or a helper
-        # already in its closure (caught) -- so it is self-healing. Pure python ->
-        # offline.
+        # Parts must never reach the core or specialized assembly helpers, nor
+        # the assembly step registry; the test scans every part script's
+        # transitive repo-local closure (module_deps_of), so a helper gaining
+        # such an import re-runs this gate. Pure python -> offline.
         "file_dep": sorted(
             {
-                str((REPO_ROOT / "dodo.py").resolve()),
                 str((SCRIPTS_DIR / "_buildgraph.py").resolve()),
                 str((SCRIPTS_DIR / "test_part_isolation.py").resolve()),
                 *part_script_deps,
                 *(dep for p in part_scripts() for dep in module_deps_of(p)),
-                *(
-                    str((SCRIPTS_DIR / f"build_{s}_assembly.py").resolve())
-                    for s in ASSEMBLY_ORDER
-                ),
-                *(
-                    dep
-                    for s in ASSEMBLY_ORDER
-                    for dep in module_deps_of(
-                        SCRIPTS_DIR / f"build_{s}_assembly.py"
-                    )
-                ),
             }
         ),
         "cmd": [*pytest_cmd, *_gate_tests("partiso")],

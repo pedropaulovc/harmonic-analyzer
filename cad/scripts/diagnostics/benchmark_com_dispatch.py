@@ -51,7 +51,6 @@ async def _run(
         raise RuntimeError("benchmark must run inside dodo._com_seat")
 
     repo = repo.resolve()
-    sys.path.insert(0, str(repo / "SolidworksMCP-python" / "src"))
     sys.path.insert(0, str(repo / "cad" / "scripts"))
 
     import _telemetry

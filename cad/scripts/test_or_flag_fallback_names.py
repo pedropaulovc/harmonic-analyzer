@@ -15,7 +15,7 @@ were misclassified (fixed via ``concrete_sketch_segment``; this gate keeps
 the class of bug from coming back).
 
 The scan parses every ``early_bound_or_flag`` / ``_early_bound`` call site
-(``ast``, not regex) across ``cad/scripts`` and ``SolidworksMCP-python/src``
+(``ast``, not regex) across ``cad/scripts`` (the vendored adapter included)
 and asserts each string-literal fallback name resolves on the string-literal
 interface in the checked-in wrapper — as a declared method
 (``sw_type_info.interface_method_names``) or a declared property
@@ -43,7 +43,6 @@ from solidworks_mcp.adapters import sw_type_info  # noqa: E402
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCAN_ROOTS = (
     REPO_ROOT / "cad" / "scripts",
-    REPO_ROOT / "SolidworksMCP-python" / "src",
 )
 # The wrapper itself and virtualenvs are not call sites.
 EXCLUDE_PARTS = {"_generated", ".venv", "__pycache__"}

@@ -651,11 +651,12 @@ def test_every_reference_creator_hides_what_it_creates() -> None:
     """Nothing hides at save any more, so each builder hides its own planes,
     axes, points and curves.  ``diagnostics/`` is out of scope: its purchased-part
     recipes are blanked by their caller (``_stock_fastener._blank_recipe_references``)
-    and the rest are hand-run probes that never ship an artefact."""
+    and the rest are hand-run probes that never ship an artefact.  The vendored
+    adapter (``solidworks_mcp/``) implements the creators; its callers hide."""
     offenders = sorted(
         path.name
         for path in SCRIPTS.rglob("*.py")
-        if "diagnostics" not in path.relative_to(SCRIPTS).parts
+        if not {"diagnostics", "solidworks_mcp"} & set(path.relative_to(SCRIPTS).parts)
         and not path.name.startswith("test_")
         and _creates_without_hiding(path.read_text(encoding="utf-8"))
     )

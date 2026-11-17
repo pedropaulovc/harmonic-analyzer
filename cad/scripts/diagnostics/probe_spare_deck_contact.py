@@ -506,7 +506,7 @@ async def probe(adapter, directory, expected_sha):
     if (
         not Path(runtime_adapter.__file__)
         .resolve()
-        .is_relative_to(ROOT / "SolidworksMCP-python")
+        .is_relative_to(ROOT / "cad" / "scripts" / "solidworks_mcp")
         or Path(sys.prefix).resolve() != ROOT / ".venv"
     ):
         raise RuntimeError(
@@ -519,9 +519,6 @@ async def probe(adapter, directory, expected_sha):
         "python": sys.executable,
         "root_commit": subprocess.check_output(
             ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
-        ).strip(),
-        "adapter_commit": subprocess.check_output(
-            ["git", "rev-parse", "HEAD"], cwd=ROOT / "SolidworksMCP-python", text=True
         ).strip(),
         "diagnostic_sha256": digest(Path(__file__)),
         "expected_top_sha256": expected_sha,

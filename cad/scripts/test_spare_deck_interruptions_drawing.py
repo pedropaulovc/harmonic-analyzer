@@ -33,7 +33,9 @@ def context(monkeypatch, tmp_path):
     monkeypatch.setattr(probe, "contact", Mock())
     monkeypatch.setattr(probe.sys, "prefix", str(tmp_path / ".venv"))
     monkeypatch.setattr(
-        pywin32_adapter, "__file__", str(tmp_path / "SolidworksMCP-python/adapter.py")
+        pywin32_adapter,
+        "__file__",
+        str(tmp_path / "cad/scripts/solidworks_mcp/adapter.py"),
     )
     monkeypatch.setattr(probe.subprocess, "check_output", Mock(return_value="f" * 40))
     monkeypatch.setattr(probe, "time", NS(perf_counter=Mock(side_effect=[1.0, 2.0])))

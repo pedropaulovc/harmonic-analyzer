@@ -78,7 +78,7 @@ def test_census_catches_missing_method_and_invalid_keyword_mutations(recipe) -> 
 
 @functools.cache
 def _native_declaration(interface):
-    wrapper = SCRIPTS.parent.parent / "SolidworksMCP-python" / "src" / "solidworks_mcp" / "adapters" / "_generated" / "sldworks_2026.py"
+    wrapper = SCRIPTS / "solidworks_mcp" / "adapters" / "_generated" / "sldworks_2026.py"
     declaration = next(node for node in _tree(wrapper).body if isinstance(node, ast.ClassDef) and node.name == interface)
     methods = {node.name: node for node in declaration.body if isinstance(node, ast.FunctionDef)}
     maps = {}
@@ -463,7 +463,7 @@ def test_witness_native_mutators_are_declared_read_write_properties(interface, m
 def test_definition_capability_uses_pinned_interface_iids_not_coclass_ids(interface, iid, classifier_script, classifier_name) -> None:
     # Parse only: importing the generated module here would load pywin32.
     # Neither point-key agreement nor native QI is proven by this offline census.
-    wrapper = SCRIPTS.parent.parent / "SolidworksMCP-python" / "src" / "solidworks_mcp" / "adapters" / "_generated" / "sldworks_2026.py"
+    wrapper = SCRIPTS / "solidworks_mcp" / "adapters" / "_generated" / "sldworks_2026.py"
     declaration = next(node for node in _tree(wrapper).body if isinstance(node, ast.ClassDef) and node.name == interface)
     assert any(isinstance(base, ast.Name) and base.id == "DispatchBaseClass" for base in declaration.bases)
     identifiers = {}
@@ -540,7 +540,7 @@ def test_thread_detail_geometry_properties_have_native_result_shapes(interface, 
     assert member not in methods
     assert member in maps["_prop_map_get_"]
     assert (member in maps["_prop_map_put_"]) is writable
-    wrapper = SCRIPTS.parent.parent / "SolidworksMCP-python" / "src" / "solidworks_mcp" / "adapters" / "_generated" / "sldworks_2026.py"
+    wrapper = SCRIPTS / "solidworks_mcp" / "adapters" / "_generated" / "sldworks_2026.py"
     declaration = next(node for node in _tree(wrapper).body if isinstance(node, ast.ClassDef) and node.name == interface)
     getter_map = next(
         node.value for node in declaration.body

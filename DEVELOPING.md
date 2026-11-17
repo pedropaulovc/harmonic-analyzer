@@ -399,8 +399,7 @@ tests that start SolidWorks by mistake, through the APIs that code uses and
 their obvious neighbours. Deliberate evasion is out of scope: a native binary,
 raw ole32 activation through ctypes, a shell verb built at runtime, or a child
 run with `-I`, `-E` or `-S`, or with an environment that drops `PYTHONPATH`,
-which skips the child guard. The vendored `SolidworksMCP-python` tests are
-excluded because they can take the farm's SolidWorks licence.
+which skips the child guard.
 
 Reuse source facts only within an unchanged-source scan, or immutable baseline
 bytes for private mutation fixtures. Keep each case's writable checkout, task
@@ -1547,22 +1546,10 @@ revive the retired MHA-VN-026
 washer. These inputs remain file-granular rather than depending on the
 obsolete production socket-head hanger route.
 
-The `file_dep` set for a COM task also folds the **`SolidworksMCP-python`
-submodule** — the vendored COM adapter (`solidworks_mcp`) is imported at runtime
-by `_session`/`_com`/`_assembly` (session access, COM binding, mate/plane/feature creation), so its source is a genuine
-build input, yet it is an installed package, not a repo-local `_*.py` helper, so
-`module_deps_of` never walked it (issue #144). The submodule digest helpers fold
-repo-relative-tagged source content into gitignored synthetic dependencies under
-`cad/out/reports/`. Parts exclude `assembly.py`, `motion.py` and `drawing.py`;
-assemblies exclude `drawing.py`; drawing tasks include the whole tree. A pin
-bump or dirty local edit changes only the tiers that include the affected source,
-while SolidWorks-free `check:*` tasks stay off these digests. See
-[the three-tier source rules](AGENTS.md#three-tier-submodule-digest-part-vs-assembly-vs-drawing).
-`check:recipe` (`test_dodo_recipe.py`) guards the dependency construction.
-Scoped `package:features:<stem>` and full neutral export use the assembly tier (whole
-submodule minus `drawing.py`): face naming and `SaveAs3` do not call drawing-doc
-helpers. This excludes only submodule drawing code, not the feature source
-key's entire main-repo draw-module closure.
+The vendored COM adapter (`cad/scripts/solidworks_mcp/`) is an ordinary local
+package, so a COM task's `file_dep` carries exactly the adapter files its import
+closure reaches, like any other helper. See
+[the vendored adapter notes](AGENTS.md#vendored-solidworks-adapter-cadscriptssolidworks_mcp).
 
 Private/experimental work is cached too, with no namespacing: a unique input set
 yields a unique key, so an experiment is stored under its own key and never

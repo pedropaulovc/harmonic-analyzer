@@ -1481,7 +1481,7 @@ def test_no_document_the_build_opens_is_opened_view_only():
     the latter (``OpenDoc6`` option 0x4, ``OpenDoc7``'s ``ViewOnly``). So every
     ``OpenDoc6`` in cad/scripts and solidworks_mcp must pass options that fold
     to a constant without 0x4, and none may use ``OpenDoc7`` or set ``ViewOnly``."""
-    roots = [REPO_ROOT / "cad" / "scripts", REPO_ROOT / "SolidworksMCP-python" / "src"]
+    roots = [REPO_ROOT / "cad" / "scripts"]
     violations: list[str] = []
     checked: set[str] = set()
     for root in roots:

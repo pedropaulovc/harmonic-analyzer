@@ -11,7 +11,7 @@ The existing `_chain.py` shim still supports archived chain imports. Run a
 diagnostic standalone from the repo root, e.g.:
 
 ```
-C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\diagnostics\audit_unanchored_sketches.py
+uv run python cad\scripts\diagnostics\audit_unanchored_sketches.py
 ```
 
 Reusable knowledge from these has been distilled into the build scripts,

@@ -143,18 +143,15 @@ git submodule update --init --recursive
 
 1. Invoke `/developing-solidworks` first (see the note at the top of this file).
 2. Python tooling: always use `uv`.
-3. Never run the `SolidworksMCP-python` test suite on amet. It can launch
-   SolidWorks, which takes the licence farm worker w15 shares. A bare `pytest` or
-   `pytest .` at the root skips it (`testpaths`/`norecursedirs` in
-   `pyproject.toml`); run it on a farm worker or in its own CI.
-4. Ground recipe calls in the vendored `PyWin32Adapter` implementation, including
-   its inherited mixins and delegated helpers; never infer an adapter method name
-   from a SolidWorks operation. Check that every changed call exists and binds
-   with a cheap source-only AST census against the SDK, without importing
-   recipes or constructing an adapter. The knob-shaft and
-   feed-pinion census is `cad/scripts/test_pd_transgear_adapter_contract.py`;
-   it checks every direct `adapter.<method>(...)` call, not an API allowlist.
-   Offline contracts do not replace final-source native geometry/readback proof.
+3. Ground recipe calls in the vendored `PyWin32Adapter` implementation
+   (`cad/scripts/solidworks_mcp/`), including its inherited mixins and delegated
+   helpers; never infer an adapter method name from a SolidWorks operation.
+   Check that every changed call exists and binds with a cheap source-only AST
+   census against the adapter, without importing recipes or constructing an
+   adapter. The knob-shaft and feed-pinion census is
+   `cad/scripts/test_pd_transgear_adapter_contract.py`; it checks every direct
+   `adapter.<method>(...)` call, not an API allowlist. Offline contracts do not
+   replace final-source native geometry/readback proof.
 
 ## Minimum merge gate (every PR)
 
@@ -280,18 +277,13 @@ This repo is a **uv project** (`pyproject.toml` + `uv.lock` at the root). One
 command builds the environment from the lockfile — no manual `pip install`:
 
 ```
-git submodule update --init   # fetch ./SolidworksMCP-python (the COM adapter, branch `personal`)
+git submodule update --init   # optional: ./references (the comparison gallery)
 uv sync                       # core deps + the dev group (pytest) — everything the pipeline needs
 ```
 
 `uv sync` creates `.venv/` (gitignored) and installs everything pinned in
 `uv.lock`: `doit`, `pyyaml`, `pillow`, `numpy`, `trimesh`, `matplotlib`,
-`pytest`, plus the Windows COM bindings (`pywin32`, `comtypes`) and the
-**`solidworks-mcp-python`** package — wired in as an *editable path source*
-(`[tool.uv.sources]` → `./SolidworksMCP-python`), since `verify.py` /
-`_session.py` / `_com.py` / `_assembly.py` all `from solidworks_mcp …`. That package is
-vendored as a **git submodule** (tracking branch `personal`), so
-`git submodule update --init` must run before the first `uv sync`. After editing
+`pytest`, plus the Windows COM bindings (`pywin32`, `comtypes`). After editing
 `pyproject.toml`, re-run `uv sync`; commit `pyproject.toml` **and** `uv.lock`
 (never `.venv/`).
 
@@ -1281,57 +1273,16 @@ top table imports the magnifier/summing limits it shares), their drawings and
 soundness gates. A subassembly table never imports a sibling's.
 `check:recipe` (`test_assembly_interference_modules.py`) pins this.
 
-## Three-tier submodule digest (part vs assembly vs drawing)
+## Vendored SolidWorks adapter (`cad/scripts/solidworks_mcp/`)
 
-The vendored `SolidworksMCP-python` submodule is a runtime input of every COM task,
-so its source content is folded into each task's recipe/cache key (issue #144 —
-`_submodule_digest` in `dodo.py`). But it is NOT one blob — three tiers, each dropping
-the modules that tier's build scripts never call:
-
-- **drawing tasks fold the WHOLE tree** (`_submodule_digest` — the only tier with
-  `drawing.py`);
-- **assemblies, `package:features:<stem>` and full `export` fold the tree MINUS `drawing.py`**
-  (`_submodule_assembly_digest` — see `_ASSEMBLY_DIGEST_EXCLUDE_FILES`);
-- **parts fold the tree MINUS `{assembly.py, motion.py, drawing.py}`**
-  (`_submodule_part_digest` — see `_PART_DIGEST_EXCLUDE_FILES`).
-
-Net: a bump touching only `assembly.py`/`motion.py` changes assembly/export-tier
-keys but leaves all ~100 part keys cached; a bump touching only submodule
-`drawing.py` changes drawing-task keys, not part, assembly or export keys.
-This does not narrow the feature leaves' main-repo draw-module closures:
-shared local drawing-helper edits still re-key all feature leaves.
-The three sidecars are distinct files
-(`.solidworks-mcp-submodule.digest` / `-assembly.digest` / `-part.digest`).
-
-Each exclusion is SAFE because the dropped module is never **CALLED** by that tier's
-build scripts:
-- `assembly.py`/`motion.py` — a part only ever calls sketch/feature/export methods, so
-  their content can't change a part's geometry (they ARE loaded, via the PyWin32Adapter
-  mixin, but loading ≠ calling). Assemblies DO call them, so they stay in the assembly +
-  drawing tiers.
-- `drawing.py` — a stronger case: it is NOT even mixed into the adapter (standalone
-  module-level `IDrawingDoc` helpers), so nothing in a part OR assembly build graph
-  imports it; only a `draw_*` drawing script does. Hence it drops from both the part and
-  assembly digests (matching `drawing.py`'s own docstring).
-  Feature naming and `SaveAs3` export do not call `IDrawingDoc` helpers, so scoped
-  feature and full neutral exports use the assembly tier too, even though static
-  feature source keys conservatively include main-repo draw-module closures.
-
-`check:partiso` (`test_part_isolation.py`) ENFORCES both directions loud: it derives its
-forbidden sets straight from `dodo._PART_DIGEST_EXCLUDE_FILES` /
-`_ASSEMBLY_DIGEST_EXCLUDE_FILES` and fails if any part script imports an
-assembly/motion/drawing module (or the main-repo `_assembly` helper), or any assembly
-script imports the drawing module — each checked across the full `module_deps_of`
-closure.
-
-Only assembly/motion/drawing are excluded — **the MCP-server surface (`tools/`/`agents/`/
-`ui/`/`server*.py`) deliberately stays IN every digest** (codex #191). Excluding it would
-rest on a "not-REACHED through the submodule's own import graph" claim (a part-relevant
-module like `base.py` could start importing `solidworks_mcp.tools`), which the
-repo-local guard cannot see — so those modules are kept, accepting an over-rebuild on a
-rare MCP-tooling bump rather than risking a stale part. (drawing.py's exclusion instead
-rests on "not-IMPORTED by any part/assembly build script", which IS repo-local
-checkable.)
+The COM adapter (`PyWin32Adapter`, the `adapters/solidworks/*` mixins, the
+checked-in makepy bindings `adapters/_generated/sldworks_2026.py`) is vendored
+from the `pedropaulovc/SolidworksMCP-python` fork (see the directory's `README.md`
+and `LICENSE`). It is an ordinary local package, so `module_deps_of` follows its
+imports file by file: an adapter edit re-keys exactly the leaves whose import
+closure reaches the edited file. `PyWin32Adapter` mixes in the assembly and
+motion mixins, so every part closure includes them; `drawing.py` is standalone
+and only drawing closures reach it.
 
 ## Recipe-inert modules (`check:inert`)
 
@@ -1737,7 +1688,7 @@ scripts that `from _check import log, check` are instrumented unchanged.
   flood above. A returned `AdapterResult` failure is an `adapter.status` +
   `error.message` attribute, not an ERROR span (callers probe with failures). The
   wrapper lives in recipe-inert `_telemetry`, so extending the list re-keys no
-  leaf; the vendored submodule would re-key them all.
+  leaf; a span in the vendored adapter would re-key every leaf importing it.
 - **A log record names its caller, and a failed span names its cause.** App
   Insights maps a dark gap to code through the `code.function.name` /
   `code.file.path` of the record that ends it; `_telemetry`'s helpers pass a

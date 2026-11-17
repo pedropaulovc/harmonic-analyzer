@@ -127,6 +127,8 @@ READS: dict[str, frozenset[str]] = {
     "_sketch_closure": frozenset({"_sketch_state"}),
     "_telemetry": frozenset(),  # skipped from recipes itself; any use is fine
     "_watchdog": frozenset(),
+    # The vendored adapter's process scan (``_seat_forensics._sldworks_pids``).
+    "solidworks_mcp.adapters.sw_recovery": frozenset({"pids_of_image"}),
 }
 OPEN_READS = {"_telemetry", "_watchdog"}
 

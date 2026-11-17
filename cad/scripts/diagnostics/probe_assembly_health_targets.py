@@ -404,8 +404,8 @@ async def measure_assembly(adapter, source, report, report_path, blocks):
 async def probe(adapter, stems, directory, blocks):
     import solidworks_mcp.adapters.pywin32_adapter as imported_adapter
 
-    if not Path(imported_adapter.__file__).resolve().is_relative_to(ROOT / "SolidworksMCP-python"):
-        raise RuntimeError("adapter import is not from this checkout's pinned submodule")
+    if not Path(imported_adapter.__file__).resolve().is_relative_to(ROOT / "cad" / "scripts" / "solidworks_mcp"):
+        raise RuntimeError("adapter import is not from this checkout's vendored adapter")
     if Path(sys.prefix).resolve() != ROOT / ".venv":
         raise RuntimeError("health measurement requires this checkout's own virtual environment")
     report_path = directory / "measurements.json"
@@ -413,7 +413,6 @@ async def probe(adapter, stems, directory, blocks):
         "start_unix_ns": time.time_ns(), "status": "running",
         "host": platform.node(), "root": str(ROOT), "python": sys.executable,
         "root_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
-        "adapter_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT / "SolidworksMCP-python", text=True).strip(),
         "adapter_path": imported_adapter.__file__, "solidworks_pid": int(adapter.swApp.GetProcessID()),
         "solidworks_revision": str(adapter.swApp.RevisionNumber()), "cache_mode": os.environ["HARMONIC_REMOTE_CACHE_MODE"],
         "production_gate_sha256": hashlib.sha256(inspect.getsource(_assembly.assert_model_healthy).encode()).hexdigest(),

@@ -79,8 +79,8 @@ def _control_view(control):
 
 
 @pytest.fixture(scope="module")
-def dodo(tmp_path_factory):
-    """Real source discovery; synthetic adapter sidecars stay outside the checkout."""
+def dodo():
+    """Real source discovery."""
     with pytest.MonkeyPatch.context() as patch:
         patch.setenv("HARMONIC_EXECUTOR", "local")
         patch.delenv("HARMONIC_CACHE_REFRESH", raising=False)
@@ -88,15 +88,6 @@ def dodo(tmp_path_factory):
         assert spec is not None and spec.loader is not None
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
-        scratch = tmp_path_factory.mktemp("selected-factory-inputs")
-        for helper, name in (
-            ("_submodule_dep", "drawing"),
-            ("_submodule_assembly_dep", "assembly"),
-            ("_submodule_part_dep", "part"),
-        ):
-            sidecar = scratch / f"{name}.digest"
-            sidecar.write_text(f"fixture {name}\n", encoding="utf-8")
-            patch.setattr(module, helper, lambda path=sidecar: str(path))
         yield module
 
 

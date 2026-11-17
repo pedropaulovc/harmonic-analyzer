@@ -290,9 +290,9 @@ def _process_session_id(pid: int) -> int | None:
 
 def _sldworks_pids() -> set[int]:
     """Pids of every running ``sldworks.exe`` (the lifecycle library's scan)."""
-    from solidworks_mcp.adapters import sw_recovery
+    import solidworks_mcp.adapters.sw_recovery
 
-    return set(sw_recovery.pids_of_image("sldworks.exe"))
+    return set(solidworks_mcp.adapters.sw_recovery.pids_of_image("sldworks.exe"))
 
 
 # Seats already running when this process began connecting, so a seat THIS build

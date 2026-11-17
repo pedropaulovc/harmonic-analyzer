@@ -8,7 +8,7 @@ flowchart TD
     subgraph ENV["② Environment"]
         SW["SolidWorks 3DEXPERIENCE R2026x<br/>(running, STA COM seat)"]
         VENV[".venv python + doit + pillow"]
-        MCP["SolidworksMCP-python<br/>PyWin32Adapter (COM bridge)"]
+        MCP["cad/scripts/solidworks_mcp (vendored)<br/>PyWin32Adapter (COM bridge)"]
     end
 
     DOIT{{"③ dodo.py — doit entrypoint<br/>content-hash DAG; COM serialized by the seat lock,<br/>check:* fan out under -n N<br/>(cad/out/.doit.db)"}}

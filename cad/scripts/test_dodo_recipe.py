@@ -847,9 +847,6 @@ def isolated_drawing_keys(tmp_path, monkeypatch):
             "RELEASE_VERSION_FILE",
             root / release_relative,
         )
-        adapter = root / ".adapter.digest"
-        adapter.write_bytes(b"fixed drawing adapter\n")
-        monkeypatch.setattr(dodo, "_submodule_dep", lambda: str(adapter))
         native_recipe = root / "native-recipe.py"
         native_recipe.write_bytes(b"MODEL_DIMENSION = 1\n")
         monkeypatch.setattr(
@@ -1454,12 +1451,6 @@ def isolated_assembly_helper_keys(tmp_path, monkeypatch):
     fixture_root.mkdir()
     monkeypatch.setattr(dodo, "CAD_OUT", fixture_root / "cad" / "out")
     monkeypatch.setattr(_buildgraph, "CAD_OUT", dodo.CAD_OUT)
-    for tier in ("part", "assembly"):
-        sidecar = fixture_root / f".adapter-{tier}.digest"
-        sidecar.write_text(f"fixed {tier} adapter input\n", encoding="utf-8")
-        monkeypatch.setattr(
-            dodo, f"_submodule_{tier}_dep", lambda path=str(sidecar): path
-        )
 
     assembly_recipes = {stem: dodo._recipe_files(stem) for stem in dodo.ASSEMBLY_ORDER}
     part_tasks = {task["name"]: task for task in dodo.task_part()}
@@ -3317,244 +3308,6 @@ def test_recipe_digest_ignores_yaml_comments(tmp_path):
     assert dodo._digest_files(files) != base, "assembly-script change must FULL-rebuild"
 
 
-# --- Issue #144: the SolidworksMCP-python submodule is a runtime build input of every
-# COM task, so its source content must fold into every part/assembly recipe + cache
-# key (a submodule bump busts the key) -- while the SolidWorks-free check:* tasks,
-# which never touch COM, must stay off it.
-def _redirect_submodule(dodo, root: Path):
-    """Point dodo's submodule source + ALL THREE synthetic sidecars (full / assembly /
-    part-relevant) into a temp sandbox and reset the per-process memoization, so a test
-    controls the tree content and never writes into the real cad/out."""
-    src = root / "src" / "solidworks_mcp"
-    src.mkdir(parents=True, exist_ok=True)
-    dodo.SUBMODULE_SRC = src
-    dodo._SUBMODULE_DIGEST_FILE = root / ".submodule.digest"
-    dodo._SUBMODULE_ASSEMBLY_DIGEST_FILE = root / ".submodule-assembly.digest"
-    dodo._SUBMODULE_PART_DIGEST_FILE = root / ".submodule-part.digest"
-    _reset_submodule_memo(dodo)
-    return src
-
-
-def _reset_submodule_memo(dodo):
-    """Force all three digests to re-read the (redirected) tree on the next call."""
-    dodo._SUBMODULE_DIGEST = None
-    dodo._SUBMODULE_ASSEMBLY_DIGEST = None
-    dodo._SUBMODULE_PART_DIGEST = None
-    dodo._SUBMODULE_DEP_PATH = None
-    dodo._SUBMODULE_ASSEMBLY_DEP_PATH = None
-    dodo._SUBMODULE_PART_DEP_PATH = None
-
-
-def test_com_deps_include_submodule_and_checks_do_not(tmp_path):
-    """The synthetic submodule dep is present in EVERY COM task's dep set and absent
-    from EVERY check:* file_dep. THREE tiers: PARTS fold the part-relevant slice
-    (``_submodule_part_dep``), ASSEMBLIES fold the tree minus drawing.py
-    (``_submodule_assembly_dep``), DRAWINGS fold the whole tree (``_submodule_dep``);
-    the three sidecars are distinct files."""
-    dodo = _load_dodo()
-    src = _redirect_submodule(dodo, tmp_path)
-    (src / "adapters.py").write_text("def mate(): return 1\n")
-    full_dep = dodo._submodule_dep()
-    asm_dep = dodo._submodule_assembly_dep()
-    part_dep = dodo._submodule_part_dep()
-    assert Path(full_dep) == (tmp_path / ".submodule.digest").resolve()
-    assert Path(asm_dep) == (tmp_path / ".submodule-assembly.digest").resolve()
-    assert Path(part_dep) == (tmp_path / ".submodule-part.digest").resolve()
-    assert len({full_dep, asm_dep, part_dep}) == 3, (
-        "part / assembly / drawing must track SEPARATE sidecars"
-    )
-
-    stem = dodo.part_stems()[0]
-    part_deps = dodo._part_file_deps(dodo.SCRIPTS_DIR / f"build_{stem}.py", stem)
-    assert part_dep in part_deps, "every part must depend on the part-slice digest"
-    assert full_dep not in part_deps, "a part must NOT fold the whole-tree digest"
-    assert asm_dep not in part_deps, "a part must NOT fold the assembly-slice digest"
-
-    asm = dodo.ASSEMBLY_ORDER[0]
-    assert asm_dep in dodo._recipe_files(asm), (
-        "assembly recipe must fold the assembly slice"
-    )
-    assert asm_dep in dodo._assembly_file_deps(asm), "assembly file_dep must include it"
-    assert full_dep not in dodo._assembly_file_deps(asm), (
-        "an assembly must NOT fold the whole-tree (drawing-inclusive) digest"
-    )
-
-    drawing_stems = dodo._drawing_order()
-    if drawing_stems:
-        d_task = next(t for t in dodo.task_drawing() if t["name"] == drawing_stems[0])
-        assert full_dep in d_task["file_dep"], (
-            "a drawing task must fold the whole-tree digest"
-        )
-
-    # check:* tasks never touch COM -> no submodule sidecar may enter their dep set,
-    # or an offline gate would spuriously re-run on a submodule bump.
-    for task in dodo.task_check():
-        deps = task["file_dep"]
-        assert not ({full_dep, asm_dep, part_dep} & set(deps)), (
-            f"check:{task['name']} must not depend on the submodule"
-        )
-
-
-def test_deleting_a_submodule_source_reruns_check_recipe(tmp_path):
-    """check:recipe runs the adapter contract against the vendored package, so a
-    submodule bump must re-run it. file_dep catches an edited or added module,
-    but a DELETED one just leaves the dep list -- doit never compares it -- so
-    the gate also carries the manifest of source paths (codex #1101)."""
-    dodo = _load_dodo()
-    src = _redirect_submodule(dodo, tmp_path)
-    (src / "adapter.py").write_text("A = 1\n")
-    (src / "headers.py").write_text("H = 1\n")
-
-    def recipe_is_current(saved: dict) -> tuple[bool, dict]:
-        task = next(t for t in dodo.task_check() if t["name"] == "recipe")
-        (checker,) = task["uptodate"]
-        current = checker(None, saved)
-        return current, {"_config_changed": checker.config_digest}
-
-    _, saved = recipe_is_current({})
-    assert recipe_is_current(saved)[0], "an unchanged tree must stay up to date"
-
-    (src / "headers.py").unlink()
-    assert not recipe_is_current(saved)[0], "a deleted source must re-run the gate"
-
-
-def test_part_relevant_submodule_change_flips_part_cache_key(tmp_path):
-    """A PART-RELEVANT submodule source change -- a committed pin bump OR a dirty
-    local edit -- flips every part's COM cache key; a no-op recompute leaves it stable
-    (idempotent). Exercised through the REAL cache_key path (_cache_key ->
-    _artifact_cache), so it proves the fix reaches the cross-machine key."""
-    dodo = _load_dodo()
-    src = _redirect_submodule(dodo, tmp_path)
-    (src / "adapters.py").write_text("def mate(): return 1\n")
-
-    stem = dodo.part_stems()[0]
-    script = dodo.SCRIPTS_DIR / f"build_{stem}.py"
-
-    def key():
-        _reset_submodule_memo(dodo)  # re-read the tree on each call
-        return dodo._cache_key(dodo._part_file_deps(script, stem), f"part:{stem}")
-
-    k1 = key()
-    assert key() == k1, "recompute with no change must be stable (idempotent)"
-
-    (src / "adapters.py").write_text("def mate(): return 2\n")  # dirty edit
-    k2 = key()
-    assert k2 != k1, "a part-relevant submodule edit must bust the part cache key"
-
-    (src / "planes.py").write_text("PLANE = 3\n")  # new source file
-    k3 = key()
-    assert k3 != k2, "an added part-relevant submodule source file must bust it too"
-
-
-def test_assembly_only_submodule_change_spares_parts(tmp_path):
-    """The #144-followup guarantee: editing an EXCLUDED (assembly/motion/MCP-server)
-    submodule module flips the ASSEMBLY cache key but leaves the PART key untouched,
-    so an assembly-only submodule bump no longer rebuilds the ~100 parts."""
-    dodo = _load_dodo()
-    src = _redirect_submodule(dodo, tmp_path)
-    (src / "adapters.py").write_text("def mate(): return 1\n")  # a part-relevant file
-    excluded = src / "adapters" / "solidworks" / "assembly.py"
-    excluded.parent.mkdir(parents=True, exist_ok=True)
-    excluded.write_text("def add_mate(): return 1\n")
-
-    stem = dodo.part_stems()[0]
-    part_script = dodo.SCRIPTS_DIR / f"build_{stem}.py"
-    asm = dodo.ASSEMBLY_ORDER[0]
-
-    def part_key():
-        _reset_submodule_memo(dodo)
-        return dodo._cache_key(dodo._part_file_deps(part_script, stem), f"part:{stem}")
-
-    def asm_key():
-        _reset_submodule_memo(dodo)
-        return dodo._cache_key(dodo._assembly_file_deps(asm), f"assembly:{asm}")
-
-    p1, a1 = part_key(), asm_key()
-    excluded.write_text("def add_mate(): return 2\n")  # assembly-only edit
-    p2, a2 = part_key(), asm_key()
-
-    assert p2 == p1, "an assembly-only submodule edit must NOT bust the part key"
-    assert a2 != a1, "an assembly-only submodule edit MUST bust the assembly key"
-
-
-def test_part_digest_excludes_assembly_level_modules():
-    """Unit-level: the PART classifier drops the assembly/motion COM modules AND
-    drawing.py from the part slice while keeping the shared helpers AND the MCP-server
-    surface (codex #191: tools/server stay in the part digest), and the digest of the
-    REAL tree genuinely differs from the whole-tree digest (so it isn't a no-op)."""
-    dodo = _load_dodo()
-    src = dodo.SUBMODULE_SRC
-    excl = dodo._is_part_relevant_submodule_file
-    assert excl(src / "adapters" / "solidworks" / "assembly.py") is False
-    assert excl(src / "adapters" / "solidworks" / "motion.py") is False
-    assert excl(src / "adapters" / "solidworks" / "drawing.py") is False
-    # MCP-server surface stays IN the part digest (kept, not excluded):
-    assert excl(src / "server.py") is True
-    assert excl(src / "tools" / "modeling.py") is True
-    assert excl(src / "adapters" / "base.py") is True
-    assert excl(src / "adapters" / "com_variant.py") is True
-    assert dodo._submodule_part_digest() != dodo._submodule_digest(), (
-        "part slice must exclude real content, else the split is a no-op"
-    )
-
-
-def test_assembly_digest_excludes_only_drawing():
-    """Unit-level: the ASSEMBLY classifier drops ONLY drawing.py (assemblies DO call
-    the assembly/motion COM path, so those stay in), and the assembly-slice digest of
-    the REAL tree differs from BOTH the whole-tree and part-slice digests."""
-    dodo = _load_dodo()
-    src = dodo.SUBMODULE_SRC
-    excl = dodo._is_assembly_relevant_submodule_file
-    assert excl(src / "adapters" / "solidworks" / "drawing.py") is False
-    assert excl(src / "adapters" / "solidworks" / "assembly.py") is True
-    assert excl(src / "adapters" / "solidworks" / "motion.py") is True
-    assert excl(src / "adapters" / "base.py") is True
-    assert dodo._submodule_assembly_digest() != dodo._submodule_digest(), (
-        "assembly slice must exclude drawing.py, else the split is a no-op"
-    )
-    assert dodo._submodule_assembly_digest() != dodo._submodule_part_digest(), (
-        "assembly slice keeps assembly/motion the part slice drops -> must differ"
-    )
-
-
-def test_drawing_only_submodule_change_spares_parts_and_assemblies(tmp_path):
-    """A drawing.py edit flips ONLY the drawing-task (whole-tree) cache key, leaving both
-    the PART and ASSEMBLY keys untouched -- so a drawing helper tweak rebuilds only the
-    (few) drawing tasks, never the ~100 parts or ~8 assemblies."""
-    dodo = _load_dodo()
-    src = _redirect_submodule(dodo, tmp_path)
-    (src / "adapters.py").write_text(
-        "def mate(): return 1\n"
-    )  # a shared, in-all-tiers file
-    drawing = src / "adapters" / "solidworks" / "drawing.py"
-    drawing.parent.mkdir(parents=True, exist_ok=True)
-    drawing.write_text("def new_view(): return 1\n")
-
-    stem = dodo.part_stems()[0]
-    part_script = dodo.SCRIPTS_DIR / f"build_{stem}.py"
-    asm = dodo.ASSEMBLY_ORDER[0]
-
-    def part_key():
-        _reset_submodule_memo(dodo)
-        return dodo._cache_key(dodo._part_file_deps(part_script, stem), f"part:{stem}")
-
-    def asm_key():
-        _reset_submodule_memo(dodo)
-        return dodo._cache_key(dodo._assembly_file_deps(asm), f"assembly:{asm}")
-
-    def full_digest():
-        _reset_submodule_memo(dodo)
-        return dodo._submodule_digest()
-
-    p1, a1, d1 = part_key(), asm_key(), full_digest()
-    drawing.write_text("def new_view(): return 2\n")  # drawing-only edit
-    p2, a2, d2 = part_key(), asm_key(), full_digest()
-
-    assert p2 == p1, "a drawing.py edit must NOT bust the part key"
-    assert a2 == a1, "a drawing.py edit must NOT bust the assembly key"
-    assert d2 != d1, "a drawing.py edit MUST bust the whole-tree (drawing) digest"
-
-
 def test_kinematics_verify_depends_on_pen_driver_and_truth_model():
     """Post-#221 (park-driver machinery removed): build_pen_assembly no longer
     imports pen_driver/truth_model, so those modules ride no assembly's .SLDASM
@@ -3578,31 +3331,6 @@ def test_kinematics_verify_depends_on_pen_driver_and_truth_model():
     cfg_rel = _rel(kinematics["file_dep"], cfg)
     assert "machine/output.yaml" in cfg_rel, cfg_rel
     assert "channels.yaml" in cfg_rel, cfg_rel
-
-
-def test_submodule_digest_is_location_independent(tmp_path):
-    """The submodule digest folds each file by its REPO-RELATIVE tag, so identical
-    submodule content under different checkout roots hashes the same -- required for
-    cross-machine cache hits (mirrors test_digest_files_is_location_independent)."""
-    dodo = _load_dodo()
-
-    def digest_under(root: Path) -> str:
-        sub = root / "SolidworksMCP-python" / "src" / "solidworks_mcp"
-        sub.mkdir(parents=True)
-        (sub / "adapters.py").write_text("def mate(): return 1\n")
-        orig_repo, orig_src = dodo.REPO_ROOT, dodo.SUBMODULE_SRC
-        try:
-            dodo.REPO_ROOT = root
-            dodo.SUBMODULE_SRC = sub
-            dodo._SUBMODULE_DIGEST = None
-            return dodo._submodule_digest()
-        finally:
-            dodo.REPO_ROOT, dodo.SUBMODULE_SRC = orig_repo, orig_src
-            dodo._SUBMODULE_DIGEST = None
-
-    assert digest_under(tmp_path / "A") == digest_under(tmp_path / "B"), (
-        "identical submodule content must hash equally across checkout roots"
-    )
 
 
 def test_recipe_gate_tracks_sources_imported_by_its_tests():
@@ -3660,19 +3388,6 @@ def test_recipe_gate_tracks_machinist_prompt_and_schema_contract() -> None:
         str(prompt_dir / "machinist_review_schema.json"),
     }
     assert expected <= set(recipe["file_dep"])
-
-
-def test_submodule_digest_is_checkout_eol_independent(tmp_path):
-    """Issue #255 also covers the synthetic submodule sidecars: raw hashing here
-    would move every COM key when core.autocrlf rematerialises vendored Python."""
-    dodo = _load_dodo()
-    src = _redirect_submodule(dodo, tmp_path)
-    module = src / "adapters.py"
-    module.write_bytes(b"def mate():\n    return 1\n")
-    lf = dodo._submodule_digest()
-    module.write_bytes(b"def mate():\r\n    return 1\r\n")
-    _reset_submodule_memo(dodo)
-    assert dodo._submodule_digest() == lf
 
 
 def test_retry_waits_out_a_cold_start_instead_of_spending_an_attempt(monkeypatch):
@@ -4597,9 +4312,6 @@ def isolated_feature_keys(isolated_assembly_helper_keys, monkeypatch):
     import export_features
 
     dodo, root, native_snapshot = isolated_assembly_helper_keys
-    adapter = root / ".adapter-features.digest"
-    adapter.write_bytes(b"fixed feature exporter adapter\n")
-    monkeypatch.setattr(dodo, "_submodule_assembly_dep", lambda: str(adapter))
     sources = {
         stem: dodo._feature_requirement_deps(stem)
         for stem in export_features.SUPPORTED_PARTS
@@ -4679,7 +4391,8 @@ def test_one_draw_edit_rekeys_only_its_features_leaf_not_native_closures(
     [
         "cad/scripts/export_models.py", "cad/scripts/_export_feature_faces.py",
         "cad/scripts/_feature_requirements.py", "cad/config/release.yaml",
-        ".adapter-features.digest", "cad/config/parts/ch-rocker-arm.yaml",
+        "cad/scripts/solidworks_mcp/adapters/solidworks/features.py",
+        "cad/config/parts/ch-rocker-arm.yaml",
         "cad/config/title_block.yaml",
         "cad/out/sldprt/.ch-rocker-arm.execution",
     ],
