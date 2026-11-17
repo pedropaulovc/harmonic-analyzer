@@ -1450,10 +1450,11 @@ def _fitup_text() -> dict[str, str]:
             f"SPRING HOLE OF ITS {lever} ({hookup_view})."
         ),
         # The anchors thread into the summing plate at MHA-HA-00, which owns
-        # that joint and its setting (cited by its step).
+        # that joint and its setting (cited by its step, which the release's
+        # ASSEMBLY.md prints, #2889).
         "spring-bottom-loops-left": (
-            f"LEAVE EACH BOTTOM LOOP FREE: {steps.HA_ANCHORS_SET_REF} THREADS "
-            f"EACH {anchor} ANCHOR AND HOOKS THE LOOP INTO IT."
+            f"LEAVE EACH BOTTOM LOOP FREE: {steps.HA_ANCHORS_SET_REF} (ASSEMBLY.MD) "
+            f"THREADS EACH {anchor} ANCHOR AND HOOKS THE LOOP INTO IT."
         ),
     }
 

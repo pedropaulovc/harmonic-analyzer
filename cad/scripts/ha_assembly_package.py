@@ -62,6 +62,7 @@ STEPS_IN_DOCUMENT: tuple[str, ...] = (
     "ms-measuring-stick",
     "pn-pen",
     "sm-summing",
+    "ha-harmonic-analyzer",
 )
 _TEXT_MODULE_SUFFIXES = ("_assembly_sheet", "_steps", "_fitup")
 _PACKAGE_PREFIXES = tuple(sorted({f"{stem.split('-')[0]}_" for stem in PACKAGES}))
