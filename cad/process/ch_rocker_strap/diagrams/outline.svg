@@ -1,3 +1,3 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Setup 4: last face, hub hole and outline on tabs (RS03_finish_face_2_hub_outline). Shell: prechips.strap_diagrams; styles: prechips.palette. -->
+<!-- Setup 5: outline with the blank bonded to the plate and screwed down at the hub (RS04_outline). Shell: prechips.strap_diagrams; styles: prechips.palette. -->
 <svg xmlns="http://www.w3.org/2000/svg" data-cad-template="plate-strap" data-step="outline"/>

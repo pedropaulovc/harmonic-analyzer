@@ -327,27 +327,36 @@ def tags(op, positions, width, height):
     return dressup
 
 
+def custom(target_job, tc, label, lines):
+    """An operation posting ``lines`` of G-code as written, after formatting
+    ``{feed}`` and ``{plunge}`` in them to the controller's feeds (mm/s,
+    FreeCAD's internal feed unit, which the post converts). Arc centres
+    (``I``/``J``) are relative to the arc's start, as FreeCAD and GRBL read
+    them. For a path the recipe computes itself."""
+    op = _operation(PathCustom, target_job, tc, label)
+    op.Source = "Text"
+    feeds = {"feed": tc.HorizFeed.Value, "plunge": tc.VertFeed.Value}
+    op.Gcode = [line.format(**feeds) for line in lines]
+    return op
+
+
 def bore(target_job, tc, label, centres, final, retract, clearance):
     """Feed in and out of each hole at ``centres``: G0 to ``retract`` (the R
     plane), G1 down to ``final`` and back up to ``retract`` at the
     controller's plunge feed, G0 to ``clearance`` between holes. For a
     reamer, which a rapid retract can score; GRBL has no G85 and the grbl
     post leaves it unexpanded."""
-    op = _operation(PathCustom, target_job, tc, label)
-    op.Source = "Text"
-    feed = tc.VertFeed.Value  # mm/s, FreeCAD's internal feed unit
     lines = []
     for x, y in centres:
         lines += [
             f"G0 Z{clearance}",
             f"G0 X{x} Y{y}",
             f"G0 Z{retract}",
-            f"G1 Z{final} F{feed}",
-            f"G1 Z{retract} F{feed}",
+            f"G1 Z{final} F{{plunge}}",
+            f"G1 Z{retract} F{{plunge}}",
             f"G0 Z{clearance}",
         ]
-    op.Gcode = lines
-    return op
+    return custom(target_job, tc, label, lines)
 
 
 def generate(doc):

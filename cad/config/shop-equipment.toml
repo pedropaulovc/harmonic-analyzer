@@ -1417,8 +1417,8 @@ name = "Rocker-strap sub-plate with fence, 6061, 13 x 3 x 1/2 in"
 kind = "fixture_plate"
 present = false
 status = "not made: shop-made from owned stock"
-purchase = "Make from the owned 1/2 x 6 in 6061-T6511 flat (OnlineMetals 1173, bought for the oblique trammel jig and freed, owner 2026-11-17): saw one 13 in length and mill a 3.00 in wide strip off it (the rest, about 2.8 x 13 in, stays as fixture stock). Mill both long edges for the vise jaws; in the vise, face the top in place (the plan's Z0); a fence strip along the back edge, its front face milled in place (Y0) and its top under the strap's finished thickness; a through relief hole under the hub hole; four Pitbull clamp slots and 4-40 holes along the front at the plan's clamp stations (fixtures.edge-clamps-low-profile)."
-use = "MHA-CH-13 Setups 2-4: seats the 1/8 x 1-1/2 in blank for facing, the hub hole and the outline"
+purchase = "Make from the owned 1/2 x 6 in 6061-T6511 flat (OnlineMetals 1173, bought for the oblique trammel jig and freed, owner 2026-11-17): saw one 13 in length and mill a 3.00 in wide strip off it (the rest, about 2.8 x 13 in, stays as fixture stock). Mill both long edges for the vise jaws; in the vise, face the top in place (the plan's Z0); a fence strip along the back edge, its front face milled in place (Y0) and its top under the strap's finished thickness; an end stop at the blank's left end, its face milled in place (X0) and its top at most .079 in (2.0 mm) above the plate top; under the hub hole, at X 6.000 from the stop face and Y 1.000 in front of the fence face, a counterbore .500 dia x .185 deep (4.7 mm) with a 5/16-18 tapped hole through its floor: the drill and reamer run into it, and for the outline it takes the hub plug (fixtures.strap-hub-plug); the fence notched down to the plate top, at least .157 in (4.0 mm) back from its face, over X .094-.843 and X 11.157-11.906 (2.4-21.4 and 283.4-302.4 mm), where the outline cutter mills away the strip of blank under the strap's tips; four Pitbull clamp slots and 4-40 holes along the front at the plan's clamp stations (fixtures.edge-clamps-low-profile)."
+use = "MHA-CH-13 Setups 2-5: seats the 1/8 x 1-1/2 in blank for facing and the hub hole (edge clamps), and for the outline (bonded with consumables.tape-3m-vhb-5906, screwed down at the hub)"
 
 # Model picked from Mitee-Bite's Pitbull table (read 2026-11-17): the 4-40 size
 # is the only one whose minimum clamped height D (.075 in) is under the
@@ -1456,3 +1456,41 @@ kind = "reamer"
 present = false
 purchase = "One .4000 in (decimal size) HSS straight-flute straight-shank chucking reamer; ANSI B94.2 cutting band .4001-.4005."
 note = "Cuts the MHA-CH-13 hub hole in 1018 after a 25/64 drill, 400 rpm, cutting oil, fed in and out. Checked with the owned telescoping gauges (gauges.telescoping-gauges-starrett-s579gz) read on the micrometer: the pin-gauge set's .001 in steps cannot resolve the .0005 in band."
+
+# Outline hold-down for MHA-CH-13 (owner decision 2026-11-17: no tabs; tape
+# under the strap and a screw through the reamed hub hole). Sizes follow the
+# hub hole's .4000-.4005 band and the sub-plate's .500 x .185 counterbore.
+[fixtures.strap-hub-plug]
+name = "Rocker-strap hub plug and washer, shop-made"
+kind = "locating_plug"
+present = false
+status = "not made: shop-made on the lathe"
+purchase = "Turn from round bar on hand, 9/16 in or over (no stock is allocated here). Plug: body .499 dia x .177 long (4.5 mm), a slip fit in the sub-plate's counterbore as made; pilot .3990-.3995 dia standing .087 (2.2 mm) above the plate top, under the strap's .098 plus tape; bore .328 (8.3 mm) through for the screw. Washer: .547 dia (13.9 mm, no larger: the outline cutter passes .021 in from it) x .079 thick (2.0 mm), bore .328. Screw: fixtures.strap-hub-screw."
+use = "MHA-CH-13 Setup 5: the pilot locates the reamed hub hole over the counterbore; washer and screw hold the strap down at the hub while the outline is cut. Out of the plate for Setup 4, where the drill and reamer run into the counterbore."
+
+[fixtures.strap-hub-screw]
+name = "5/16-18 x 5/8 in button-head socket cap screw"
+kind = "fastener"
+present = false
+status = "not owned: to buy"
+purchase = "One (a box is the usual pack). Button head: .547 in head diameter, .166 in head height (ASME B18.3 nominal for 5/16; confirm on the screw bought). 5/8 long: through the .079 washer, the strap and tape and the .185 counterbore it reaches .26 in into the plate's .315 in of 5/16-18 thread."
+use = "MHA-CH-13 Setup 5: hub hold-down through fixtures.strap-hub-plug"
+
+# Tape for the MHA-CH-13 outline hold. Chosen because its data sheet states
+# both a normal tensile and a shear strength; the thin transfer tapes read
+# (3M 468MP, Nitto P-02) state peel and, for 468MP, lap shear only. It is a
+# permanent tape: freeing the strap and cleaning both faces is part of the
+# route (plan Setup 6).
+[consumables.tape-3m-vhb-5906]
+name = "3M VHB tape 5906, .006 in (0.15 mm), black"
+kind = "double_sided_tape"
+make = "3M"
+sku = "5906"
+present = false
+status = "not owned: to buy"
+thickness_mm = 0.15
+normal_tensile_kpa = 690
+dynamic_shear_kpa = 690
+purchase = "One roll, 1-1/2 in wide or two 3/4 in strips side by side: 12 in per strap, 20 ft for the lot of 20. No price or stock read."
+use = "MHA-CH-13 Setup 5: bonds the faced blank to the sub-plate under its whole face while the outline is cut"
+cite = ["3M VHB Tapes Technical Data, November 2015, Typical Performance Characteristics, 5906: thickness .006 in (0.15 mm); 90 degree peel 9 lb/in (16 N/cm); normal tensile (ASTM D-897, to aluminium, 72 h dwell) 100 lb/in2 (690 kPa); dynamic overlap shear (ASTM D-1002, to stainless steel, 72 h dwell) 100 lb/in2 (690 kPa); Application Techniques: clean with 50:50 isopropyl alcohol and water, about 15 psi application pressure, about 50% of ultimate bond strength after 20 minutes, 90% after 24 hours, 100% after 72 hours. Read 2026-11-17 from a distributor's copy (3M's own link refused the fetch): https://www.tspinc.com/pdf/3M-VHB-Tapes-Technical-Data.pdf"]

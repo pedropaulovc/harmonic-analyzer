@@ -843,13 +843,15 @@ def _element_samples(element: dict, step: float) -> list[tuple[float, float]]:
     return [(c[0] + radius * math.cos(a), c[1] + radius * math.sin(a)) for a in angles]
 
 
-def _report(findings: list[Finding], name: str, what: str, items: list[str]) -> None:
-    """One outline finding listing the first offending ``items``."""
+def _report(
+    findings: list[Finding], name: str, what: str, items: list[str], check="outline"
+) -> None:
+    """One finding listing the first offending ``items``."""
     if items:
         shown = "; ".join(items[:_SHOWN])
         more = f" (+{len(items) - _SHOWN} more)" if len(items) > _SHOWN else ""
         detail = f"{len(items)} {what}: {shown}{more}"
-        findings.append(Finding(name, "outline", detail))
+        findings.append(Finding(name, check, detail))
 
 
 def _where(p: Point) -> str:
@@ -864,23 +866,32 @@ def check_outline(
     tabs: Sequence[Point] = (),
     tab_clear: float = 0.0,
     tab_top: float | None = None,
+    clearing: Sequence[dict] = (),
 ) -> list[Finding]:
     """Profile passes round a closed part outline. ``elements`` are its lines
     and minor arcs (``start``, ``end``, optional ``centre``) in the order and
     direction the cutter runs, each with a ``name`` and the ``tol`` the cutter
-    centre may stray from its offset there; each of ``passes`` is a
-    cutter-centre ``offset`` from the outline and its depth ``levels``. Below
-    the stock top ``z_top`` every feed move that moves in XY runs level at one
-    of those levels (or ``tab_top``, riding over a tab), every point of it
-    lies at a pass's offset from the nearest element (no gouge, no stray) and
-    runs the element's way (anticlockwise elements: conventional outside the
-    part with a clockwise spindle). Each pass covers the whole outline at each
-    of its levels, except near a tab (within ``tab_clear`` plus the pass
+    centre may stray from its offset there; ``passes``, in the order they are
+    cut, are each a cutter-centre ``offset`` from the outline and its depth
+    ``levels``. Below the stock top ``z_top`` every feed move that moves in XY
+    runs level, every point of it lies at a pass's offset from the nearest
+    element at one of that pass's levels (or ``tab_top``, riding over a tab:
+    no gouge, no stray), no pass's point comes after a later pass's, and every
+    point runs the element's way (anticlockwise elements: conventional outside
+    the part with a clockwise spindle). Each pass covers the whole outline at
+    each of its levels, except near a tab (within ``tab_clear`` plus the pass
     offset of a tab's cutter-centre point in ``tabs``) at levels below
-    ``tab_top``; :func:`check_tabs` checks the tabs themselves."""
+    ``tab_top``; :func:`check_tabs` checks the tabs themselves.
+
+    Each of ``clearing`` is waste cleared before the passes, an ``x`` range
+    and its ``levels``: there a point farther from the outline than every
+    pass offset (plus the element's ``tol``) at one of those levels is
+    clearing, not a stray; :func:`check_cleared` checks what it clears and
+    :func:`check_keep_out` what it must miss."""
     name = program.name
     findings: list[Finding] = []
     levels = {round(z, 3) for p in passes for z in p["levels"]}
+    levels |= {round(z, 3) for c in clearing for z in c["levels"]}
     if tab_top is not None:
         levels.add(round(tab_top, 3))
     moves = [
@@ -898,12 +909,18 @@ def check_outline(
         or not any(_close(m.end[2], z) for z in levels)
     ]
     _report(findings, name, f"XY feed moves off the levels {sorted(levels)}", off_level)
+
+    def at(z: float, zs: Iterable[float]) -> bool:
+        return any(_close(z, v) for v in zs)
+
     # (pass index, level) -> grid cell -> that pass's cutter-centre points
     grids: dict[tuple[int, float], dict[tuple[int, int], list[Point]]] = {}
     stray: list[str] = []
     backward: list[str] = []
-    widest = max(p["offset"] for p in passes) + max(e["tol"] for e in elements)
-    cell = widest + _SAMPLE_MM
+    late: list[str] = []
+    stage = 0  # 0 clearing, k + 1 pass k: the latest cut so far
+    farthest = max(p["offset"] for p in passes)
+    cell = farthest + max(e["tol"] for e in elements) + _SAMPLE_MM
     for m in moves:
         previous = m.start
         for point in _xy_points(m):
@@ -914,21 +931,38 @@ def check_outline(
                 if step[0] * tangent[0] + step[1] * tangent[1] < 0:
                     backward.append(_where(point))
             previous = point
-            matched = [
-                k
-                for k, p in enumerate(passes)
-                if abs(distance - p["offset"]) <= element["tol"]
-            ]
-            if not matched:
-                where = f"{_where(point)} is {distance:.3f}"
-                stray.append(f"{where} from {element['name']}")
             level = next((z for z in levels if _close(point[2], z)), None)
+            waste = distance > farthest + element["tol"]
+            if waste and any(
+                c["x"][0] <= point[0] <= c["x"][1] and at(point[2], c["levels"])
+                for c in clearing
+            ):
+                stages = [0]
+            else:
+                riding = tab_top is not None and _close(point[2], tab_top)
+                stages = [
+                    k + 1
+                    for k, p in enumerate(passes)
+                    if abs(distance - p["offset"]) <= element["tol"]
+                    and (riding or at(point[2], p["levels"]))
+                ]
+                if not stages:
+                    where = f"{_where(point)} is {distance:.3f}"
+                    stray.append(f"{where} from {element['name']}")
+                    continue
+            # A point two passes could own goes to the earliest not yet done.
+            chosen = min((s for s in stages if s >= stage), default=min(stages))
+            if chosen < stage:
+                late.append(_where(point))
+            stage = max(stage, chosen)
             key = (int(point[0] // cell), int(point[1] // cell))
-            for k in matched if level is not None else ():
+            for k in (s - 1 for s in stages if s and level is not None):
                 grid = grids.setdefault((k, level), {})
                 grid.setdefault(key, []).append(point[:2])
-    _report(findings, name, "cutter-centre points off every pass offset", stray)
+    what = "cutter-centre points off every pass offset or its levels"
+    _report(findings, name, what, stray)
     _report(findings, name, "points running against the outline's way", backward)
+    _report(findings, name, "points of a pass cut after a later pass", late)
     samples = [(e, s) for e in elements for s in _element_samples(e, 1.0)]
     for k, p in enumerate(passes):
         reach = p["offset"]
@@ -947,6 +981,59 @@ def check_outline(
                     uncovered.append(f"{element['name']} at X{s[0]:.3f} Y{s[1]:.3f}")
             what = f"outline points the offset-{reach:.3f} pass leaves uncut at"
             _report(findings, name, f"{what} Z{z:.3f}", uncovered)
+    return findings
+
+
+def check_cleared(
+    program: Program, points: Sequence[Point], radius: float, z: float
+) -> list[Finding]:
+    """Waste cleared to depth: a level feed move at ``z`` passes within the
+    cutter ``radius`` of every XY point in ``points``."""
+    cutting = program.cutting
+    level = [m for m in cutting if _close(m.start[2], z) and _close(m.end[2], z)]
+    uncut = [
+        f"X{p[0]:.3f} Y{p[1]:.3f}"
+        for p in points
+        if not any(_move_distance(m, p) <= radius + _TOL_MM for m in level)
+    ]
+    findings: list[Finding] = []
+    what = f"points no cut at Z{z:.3f} clears"
+    _report(findings, program.name, what, uncut, "cleared")
+    return findings
+
+
+def _box_distance(box: dict, p: Point) -> float:
+    (x0, x1), (y0, y1) = box["x"], box["y"]
+    dx = max(x0 - p[0], 0.0, p[0] - x1)
+    dy = max(y0 - p[1], 0.0, p[1] - y1)
+    return math.hypot(dx, dy)
+
+
+def check_keep_out(
+    program: Program,
+    radius: float,
+    boxes: Sequence[dict] = (),
+    circles: Sequence[dict] = (),
+) -> list[Finding]:
+    """No move, rapid or feed, brings the cutter (``radius``) into a fixture
+    shape below its top: each of ``boxes`` an ``x`` × ``y`` rectangle, each of
+    ``circles`` a ``centre`` and ``radius``, each with a ``name`` and a
+    ``z_top`` below which the cutter must miss it."""
+    shapes = [(b, lambda p, b=b: _box_distance(b, p)) for b in boxes]
+    shapes += [
+        (c, lambda p, c=c: math.dist(c["centre"], p[:2]) - c["radius"]) for c in circles
+    ]
+    hits: dict[str, list[str]] = {}
+    for m in program.moves:
+        for point in (m.start, *_xy_points(m)):
+            for shape, distance in shapes:
+                if point[2] < shape["z_top"] - _TOL_MM:
+                    if distance(point) < radius - _TOL_MM:
+                        hits.setdefault(shape["name"], []).append(_where(point))
+    findings: list[Finding] = []
+    for shape, items in hits.items():
+        what = f"cutter points into {shape}"
+        _report(findings, program.name, what, items, "keep_out")
     return findings
 
 

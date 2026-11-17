@@ -6,45 +6,52 @@ part's exported ``features.toml`` and the plan/shop TOML, then runs
 checks the posted G-code against :func:`expectations`. No part dimension is
 typed here: the thickness, hub hole and outline come from the manifest (and
 its STEP, which FreeCAD profiles); the blank, the part's place in it, the
-face stock split, depth levels, tab and clamp stations from ``plan.toml``
-``[parameters]`` and ``milling_cuts``; cutter diameters, speeds and feeds
-from ``shop.toml``. Typed here, because neither record carries them: the #2
-centre drill's catalogue geometry (it sets the spot depth), the approach
-clearance, the blank's placement allowance before the probe, the face
+face stock split, the tape, skin and depth levels, the plate's relief, fence
+notches and the bushing from ``plan.toml`` ``[parameters]`` and
+``milling_cuts``; cutter diameters, speeds and feeds from ``shop.toml``.
+Typed here, because neither record carries them: the #2 centre drill's
+catalogue geometry (it sets the spot depth), the approach clearance, the face
 overhang past the blank's edges, the face-1 least skin, the safe and
-clearance heights, the flip's lift, the probe feeds and the share of a
-printed band the posted outline may use.
+clearance heights, the flip's lift and the share of a printed band the posted
+outline may use.
 
-Route (owner, 2026-11-17; process text in the manifest's notes): the 12 x
+Route (owner, 2026-11-17, no tabs; process text in the plan): the 12 x
 1-1/2 x 1/8 in 1018 CF flat lies on a shop-made 6061 sub-plate gripped in the
-vise, pushed against the plate's fixed fence by four low-profile edge clamps
-that stand below the faced top. Work frame (G54), one for every file: X0 the
-blank's left end (set by the touch probe in RS03; before it, the blank sits at
-the plate's X0 mark by eye), Y0 the fence face with the blank at -Y, Z0 the
-faced plate top, so Z is thickness. The strap lies with its top arc (concave
-side) toward the fence and its bottom arc toward the clamps, its hub at the
-plan's ``hub_x_mm``, ``-hub_y_mm``.
+vise, against the plate's fence and end stop. One work frame (G54), set once
+per vise setup with no blank in and fixed to the plate: X0 the end stop's
+face (the blank's left end), Y0 the fence face with the blank at -Y, Z0 the
+faced plate top. The strap lies with its top arc (concave side) toward the
+fence and its bottom arc away from it, its hub always at the plan's
+``hub_x_mm``, ``-hub_y_mm``: over the centre of the plate's counterbored
+relief.
 
-- RS01: rough face 1 at a fixed Z, stop for the flip (end for end, the same
-  edge on the fence), rough face 2. Release, turn over (face 1 up), reseat.
+- RS01 (edge clamps on): rough face 1 at a fixed Z, stop for the flip (end
+  for end, the same edge on the fence), rough face 2. Release, turn over
+  (face 1 up), reseat.
 - RS02: finish face 1. Release, turn over (face 2 up) and reseat.
-- RS03: finish face 2 to the finished thickness, probe X0 on the blank's left
-  end, spot, drill and ream the hub hole (into the plate's relief hole), then
-  mill the outline with the 1/8 in end mill in three cuts: rough at the
-  plan's finish stock outside the part down to the tab height, through the
-  rest of the thickness into the plate skipping the clamp-side tabs, finish at
-  the part edge over the full depth lifting over the tabs. The tabs are filed
-  off by hand.
+- RS03: finish face 2 to the finished thickness, spot, drill and ream the hub
+  hole into the relief, the tips above the relief's floor. The file ends
+  after the ream.
+- RS04 (edge clamps off): the blank on double-sided tape, so Z is the plate
+  top with the tape under the part; a stepped plug in the relief locates the
+  reamed hub, a screw and shouldered bushing hold it, the edge on the fence
+  sets its rotation. With the 1/8 in end mill: clear the waste between the
+  outline and the fence under both tips (the fence is notched there), rough
+  the outline at the finish stock down to the onion skin, finish the wall at
+  size down to the skin, then cut through the skin at size into the tape.
+  Every move keeps the cutter off the un-notched fence and the bushing.
 
 Toolpath rules (owner rulings 2026-11-16): faces zigzag (ball screws), plunges
 beside the stock at the cutting feed, plunges into metal (the outline levels)
 at the plan's plunge feed, real G0 above the stock. The outline runs
-anticlockwise round the part: conventional with a clockwise spindle. The
-reamer feeds in and out (a rapid retract can score the press-fit bore).
+anticlockwise round the part: conventional with a clockwise spindle; the
+waste clearing runs the same way along the top arc. The reamer feeds in and
+out (a rapid retract can score the press-fit bore).
 """
 
 from __future__ import annotations
 
+import itertools
 import math
 import re
 from typing import Any
@@ -53,26 +60,20 @@ STEM = "ch_rocker_strap"
 COMMENT = "MHA-CH-13 rocker strap"
 # Programs in order, each listing its operation keys. A program whose keys are
 # grouped in tuples is one section per group (a FreeCAD Job, or a manual
-# section: the flip stop, the probe), joined at M6 tool changes and M0 stops;
+# section: the flip stop), joined at M6 tool changes and M0 stops;
 # it starts with its first section's tool loaded.
 PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (
     ("RS01_rough_faces", (("face_1_rough",), ("flip",), ("face_2_rough",))),
     ("RS02_finish_face_1", ("face_1_finish",)),
+    ("RS03_finish_face_2_hub", (("face_2_finish",), ("spot",), ("drill",), ("ream",))),
     (
-        "RS03_finish_face_2_hub_outline",
-        (
-            ("face_2_finish",),
-            ("probe_x0",),
-            ("spot",),
-            ("drill",),
-            ("ream",),
-            ("outline_rough", "outline_through", "outline_finish"),
-        ),
+        "RS04_outline",
+        ("fence_sliver", "outline_rough", "outline_finish", "outline_through"),
     ),
 )
 # The plan's tools the mill runs, numbered by their places in the plan's tool
 # list among these (tools off the mill, the saw and the files, are not).
-CAM_TOOLS = ("em-half", "em-eighth", "probe", "spot", "hub-drill", "hub-reamer")
+CAM_TOOLS = ("em-half", "em-eighth", "spot", "hub-drill", "hub-reamer")
 IN = 25.4
 # ANSI #2 combined drill and countersink, 60° included: the shop record names
 # the tool, not its geometry.
@@ -85,12 +86,9 @@ CENTRE_DRILL = {
 # Face passes start and finish with the cutter this far clear of the blank's
 # ends, so every plunge and stepover link is in the air beside it.
 APPROACH_MM = 2.54
-# Until the probe sets X0 (RS03), the blank's left end sits at the plate's X0
-# mark by eye; the faces run this much farther past each end, and the probe
-# searches this far either side of it.
-END_ALLOWANCE_MM = 10.0
 # Faces reach at least this far past the blank's fence and clamp edges, over
-# the fence and clamps, which stand below the faced top (the context checks).
+# the fence, clamps and end stop, which stand below the faced top (the
+# context checks).
 FACE_OVERHANG_MM = 0.5
 # Face 1 roughs at a fixed Z; the thinnest blank the plan allows must still
 # lose at least this skin (.004 in) there, so the mill-finish face comes off.
@@ -99,16 +97,11 @@ FACE_SKIN_MIN_MM = 0.1016
 # brings the tool down to it, so only this much of each plunge is above the
 # stock. FreeCAD measures each G83 peck from the R plane.
 SAFE_MM = 1.0
-# Moves between holes, outline passes and the probe's moves run this far above
-# the stock top.
+# Moves between holes run this far above the stock top.
 CLEAR_MM = 5.0
 # The flip stop lifts the 1/2 in end mill this far above the plate, room to
 # release the clamps and turn the blank over beneath it.
 FLIP_LIFT_MM = 50.0
-# Probe feeds (mm/min): the seek, and the slow second touch the zero is set
-# at, within the TP05 listing's 50-200 mm/min probing feed.
-PROBE_SEEK_FEED = 150.0
-PROBE_TOUCH_FEED = 50.0
 # The posted outline's cutter centre may stray from its offset by this share
 # of the tightest printed band locating that edge; the rest is the machine's.
 BAND_FRACTION = 0.1
@@ -184,6 +177,12 @@ def _levels(top: float, bottom: float, max_step: float) -> tuple[float, list[flo
     return step, [top - step * (k + 1) for k in range(n - 1)] + [bottom]
 
 
+def _steps(lo: float, hi: float, step: float) -> list[float]:
+    """``lo`` to ``hi``, both included, in equal steps no longer than ``step``."""
+    n = max(1, math.ceil((hi - lo) / step))
+    return [lo + (hi - lo) * k / n for k in range(n + 1)]
+
+
 def _face_layout(width: float, dia: float, woc: float, name: str) -> dict[str, Any]:
     """Zigzag face passes over a blank ``width`` wide at Y -width..0, each pass
     taking ``woc`` (the plan cut's radial width) of stock no earlier pass cut,
@@ -248,9 +247,9 @@ def context(
             f"process.blank_thickness_min_in: face 1 roughs at Z {z1:.3f}, so a {b_min:.3f} mm blank "
             f"loses only {b_min - z1:.3f} mm there (< {FACE_SKIN_MIN_MM} mm): it may not clean up"
         )
-    # The faces overhang the fence and the clamps: both must stand below the
-    # lowest faced top.
-    for name in ("fence_height_mm", "clamp_height_mm"):
+    # The faces overhang the fence, the clamps and the end stop: all must
+    # stand below the lowest faced top.
+    for name in ("fence_height_mm", "clamp_height_mm", "end_stop_height_mm"):
         if p[name] >= thick:
             raise ValueError(
                 f"process.{name} {p[name]:.3f} is not below the faced top {thick:.3f}: the face overhang would cut it"
@@ -331,13 +330,27 @@ def context(
         raise ValueError(
             "'outline finish' radial_woc_mm is not process.outline_finish_stock_mm"
         )
-    # The rough and through slot reaches 2r + finish stock outside the part:
-    # it must stay inside the blank (its strips keep the fence and clamp edges).
+    # RS04 frame: the part's underside on the tape, so every part Z rises by
+    # its thickness. Rough and finish stop at the onion skin; the through
+    # pass cuts the skin and into the tape, never the plate.
+    tape = p["tape_thickness_mm"]
+    top4 = tape + thick
+    skin = tape + p["outline_skin_mm"]
+    through = tape - p["outline_breakthrough_mm"]
+    if not 0 < through < tape < skin < top4:
+        raise ValueError(
+            f"tape {tape:.3f}, skin Z {skin:.3f}, through Z {through:.3f}: not plate < through < tape < skin < top {top4:.3f}"
+        )
+    origin4 = [origin[0], origin[1], z_under - tape]
+
+    # The rough slot reaches 2r + finish stock outside the part: it must stay
+    # inside the blank at the far edge and the ends (the waste frame stays
+    # whole on the tape). On the fence side the notches and the clearing
+    # below take over.
     samples = [pt for e in elements for pt in _outline_samples(e)]
     reach = em_eighth + finish_stock
     margins = {
-        "fence": -max(y for _x, y in samples) - reach,
-        "clamps": min(y for _x, y in samples) + bw - reach,
+        "far edge": min(y for _x, y in samples) + bw - reach,
         "left end": min(x for x, _y in samples) - reach,
         "right end": bl - max(x for x, _y in samples) - reach,
     }
@@ -345,46 +358,8 @@ def context(
     if broken:
         raise ValueError(f"the outline slot breaks out of the blank at {broken} mm")
 
-    # Tabs: one at each clamp station (clamp_1_x_mm, clamp_2_x_mm, ...), on the
-    # clamp side (bottom arc): a cutter-centre point on the through and on the
-    # finish path, both on the arc's normal through the station's edge point.
-    stations = [
-        p[f"clamp_{k}_x_mm"]
-        for k in range(
-            1, 1 + sum(1 for key in p if re.fullmatch(r"clamp_\d+_x_mm", key))
-        )
-    ]
-    if not stations:
-        raise ValueError("the plan declares no clamp_<n>_x_mm stations")
-    centre, radius = xy(bottom["arc_centre"]), bottom["radius_nominal"]
-    foot = [xy(bottom["ends"][0])[0], xy(bottom["ends"][1])[0]]
-    tab_top, through = p["tab_height_mm"], -p["outline_breakthrough_mm"]
-    width, clear = p["tab_width_mm"], p["tab_width_mm"] / 2 + r
-    for x in stations:
-        if not foot[0] + clear <= x <= foot[1] - clear:
-            raise ValueError(
-                f"tab at X {x:.3f} is not on the bottom arc between its feet {foot}"
-            )
-    if not through < tab_top < thick:
-        raise ValueError(
-            f"tab height {tab_top:.3f} is not between the outline bottom {through:.3f} and the top {thick:.3f}"
-        )
-
-    def tab_points(offset):
-        points = []
-        for x in stations:
-            edge = (x, centre[1] - math.sqrt(radius**2 - (x - centre[0]) ** 2))
-            scale = (radius + offset) / radius
-            points.append(
-                [
-                    centre[0] + (edge[0] - centre[0]) * scale,
-                    centre[1] + (edge[1] - centre[1]) * scale,
-                ]
-            )
-        return points
-
     outline_rpm, outline_feed, outline_flutes = _setting(plan, shop, "outline rough")
-    for name in ("outline through", "outline finish"):
+    for name in ("outline finish", "outline through", "fence sliver"):
         if _setting(plan, shop, name) != (outline_rpm, outline_feed, outline_flutes):
             raise ValueError(
                 f"'{name}' runs at another setting than 'outline rough': one job, one speed"
@@ -395,14 +370,144 @@ def context(
             f"'outline plunge' at {plunge_rpm:g} rpm, the outline at {outline_rpm:g}"
         )
     rough_step, rough_levels = _levels(
-        thick, tab_top, _cut(plan, "outline rough", "axial_doc_mm")
+        top4, skin, _cut(plan, "outline rough", "axial_doc_mm")
     )
+    # The finish takes the whole wall, top to skin, in one level (the plan's
+    # cut binds that depth to its prechips adapter, cad.outline_wall_depth_mm).
+    finish_step, finish_levels = top4 - skin, [skin]
     through_step, through_levels = _levels(
-        tab_top, through, _cut(plan, "outline through", "axial_doc_mm")
+        skin, through, _cut(plan, "outline through", "axial_doc_mm")
     )
-    finish_step, finish_levels = _levels(
-        thick, through, _cut(plan, "outline finish", "axial_doc_mm")
+
+    # The bushing's flange stands on the part round the hub: the cutter's
+    # edge on the finish pass (the part edge) must keep the plan's clearance.
+    hub_xy = (hub_x, hub_y)
+    keep = p["bushing_flange_dia_mm"] / 2 + p["bushing_clearance_mm"]
+    nearest = min(math.dist(hub_xy, pt) for pt in samples)
+    if nearest < keep:
+        raise ValueError(
+            f"the outline passes {nearest:.3f} from the hub, inside the bushing flange's {keep:.3f}"
+        )
+    flange_top = top4 + p["bushing_stack_height_mm"]
+    clear4 = flange_top + SAFE_MM
+
+    # Fence sliver: under each tip the rough slot leaves a strip of blank
+    # against the fence narrower than the plan's sliver_width_min_mm. In each
+    # notch (hub_x -/+ the plan's inner..outer, the cutter centre a radius
+    # inside it) rings concentric with the top arc, each a radial step
+    # farther out, clear it from the through slot's edge (2r off the part;
+    # the first ring's inner edge one step off it, clear of the finish stock)
+    # out past the fence face, every level down to the through depth. The
+    # cutter crosses Y0 only inside a notch, which is at least a cutter
+    # diameter deep. Fence-side ring first, so each later ring has the waste
+    # on its part side only; each runs the top arc's way (+X to -X).
+    notch_depth, notch_floor = p["fence_notch_depth_mm"], p["fence_notch_floor_z_mm"]
+    if notch_depth < em_eighth or notch_floor >= through:
+        raise ValueError(
+            f"fence notch {notch_depth:.3f} deep with its floor at Z {notch_floor:.3f}: needs >= {em_eighth:.3f} deep, floor below Z {through:.3f}"
+        )
+    woc = _cut(plan, "fence sliver", "radial_woc_mm")
+    if not finish_stock < woc <= em_eighth:
+        raise ValueError(
+            f"'fence sliver' radial_woc_mm {woc} is not between the finish stock and the cutter"
+        )
+    _sliver_step, sliver_levels = _levels(
+        top4, through, _cut(plan, "fence sliver", "axial_doc_mm")
     )
+    cx, cy = xy(top["arc_centre"])
+    top_radius = math.dist((cx, cy), xy(top["ends"][0]))
+    if cy <= 0:
+        raise ValueError("the top arc's centre is not on the fence side")
+    inner, outer = p["fence_notch_inner_mm"], p["fence_notch_outer_mm"]
+    notches = [[hub_x - outer, hub_x - inner], [hub_x + inner, hub_x + outer]]
+    # Outside the notches the strip the rough slot leaves against the fence
+    # stays at least sliver_width_min_mm wide: no thin sliver left in place.
+    strip_min = p["sliver_width_min_mm"]
+    for x in _steps(0.0, bl, 0.5):
+        if any(a <= x <= b for a, b in notches):
+            continue
+        edge = max(
+            (
+                y + math.sqrt(reach**2 - (sx - x) ** 2)
+                for sx, y in samples
+                if abs(sx - x) < reach
+            ),
+            default=-bw,
+        )
+        if -edge < strip_min:
+            raise ValueError(
+                f"at X {x:.2f}, outside the fence notches, the rough slot leaves a {-edge:.3f} mm strip against the fence (< sliver_width_min_mm {strip_min})"
+            )
+    sliver_gcode: list[str] = []
+    clearing, cleared = [], []
+    for a, b in notches:
+        lo, hi = a + r, b - r
+        if not 0 <= a < lo < hi < b <= bl:
+            raise ValueError(
+                f"fence notch X [{a}, {b}] is not inside the blank, a cutter wide"
+            )
+        low_x = min(max(cx, lo), hi)  # where the rings lie farthest from the fence
+        rings = []
+        for k in itertools.count(1):
+            rho = top_radius - (r + k * woc)
+            if k * woc > bw:
+                raise ValueError(f"the rings in notch [{a}, {b}] never reach the fence")
+            half = math.sqrt(rho**2 - (cy - r) ** 2)  # the disk leaves the blank
+            x0, x1 = max(lo, cx - half), min(hi, cx + half)
+            if x0 < x1:
+                rings.append((rho, x0, x1))
+            if cy - math.sqrt(rho**2 - (low_x - cx) ** 2) + r >= 0:
+                break
+        for z in sliver_levels:
+            for rho, x0, x1 in reversed(rings):
+                y0 = cy - math.sqrt(rho**2 - (x0 - cx) ** 2)
+                y1 = cy - math.sqrt(rho**2 - (x1 - cx) ** 2)
+                sliver_gcode += [
+                    f"G0 Z{clear4:.4f}",
+                    f"G0 X{x1:.4f} Y{y1:.4f}",
+                    f"G0 Z{top4 + SAFE_MM:.4f}",
+                    f"G1 Z{z:.4f} F{{plunge}}",
+                    f"G2 X{x0:.4f} Y{y0:.4f} I{cx - x1:.4f} J{cy - y1:.4f} F{{feed}}",
+                ]
+        sliver_gcode.append(f"G0 Z{clear4:.4f}")
+        clearing.append({"x": [lo, hi], "levels": sliver_levels})
+        # The blank between the through slot (2r off the top arc) and the
+        # fence, over the X the cutter centre reaches.
+        cleared += [
+            [x, y]
+            for x in _steps(lo, hi, 0.5)
+            for y in _steps(-bw, 0.0, 0.25)
+            if math.dist((cx, cy), (x, y)) < top_radius - em_eighth - 0.01
+        ]
+
+    # Keep-outs: the fence (Y0 to its width, up to its height) but for the
+    # notches, the notches' back walls and floors, and the bushing.
+    fence_y, fence_top = [0.0, p["fence_width_mm"]], p["fence_height_mm"]
+    plate_x = [p["plate_start_x_mm"], p["plate_start_x_mm"] + p["plate_length_mm"]]
+    edges = [plate_x[0], *[x for n in notches for x in n], plate_x[1]]
+    fixtures = [
+        {"name": "fence", "x": [x0, x1], "y": fence_y, "z_top": fence_top}
+        for x0, x1 in zip(edges[::2], edges[1::2])
+    ]
+    for a, b in notches:
+        fixtures.append(
+            {
+                "name": "notch floor",
+                "x": [a, b],
+                "y": [0.0, notch_depth],
+                "z_top": notch_floor,
+            }
+        )
+        if notch_depth < fence_y[1]:
+            fixtures.append(
+                {
+                    "name": "notch wall",
+                    "x": [a, b],
+                    "y": [notch_depth, fence_y[1]],
+                    "z_top": fence_top,
+                }
+            )
+    bushing = {"name": "bushing", "centre": hub_xy, "radius": keep, "z_top": flange_top}
 
     # Hub hole: spot (#2 centre drill), drill and ream through into the plate's
     # relief hole.
@@ -433,6 +538,14 @@ def context(
         raise ValueError(
             f"drill tip Z {drill_tip:.3f} / reamer tip Z {ream_tip:.3f}: the full diameter does not pass the strap's underside"
         )
+    # The relief is a counterbore with the bushing screw's tapped hole in its
+    # floor: both tips stop the plan's clearance above that floor.
+    relief_floor = -p["hub_relief_depth_mm"]
+    lowest_tip = relief_floor + p["relief_floor_clearance_mm"]
+    if min(drill_tip, ream_tip) < lowest_tip:
+        raise ValueError(
+            f"drill tip Z {drill_tip:.3f} / reamer tip Z {ream_tip:.3f} below Z {lowest_tip:.3f}, the relief floor {relief_floor:.3f} plus its clearance"
+        )
     spot_rpm, spot_feed = _cut_feed(plan, "hub spot")
     drill_rpm, drill_feed = _cut_feed(plan, "hub drill")
     ream_rpm, ream_feed = _cut_feed(plan, "hub ream")
@@ -461,35 +574,8 @@ def context(
         f"G0 Z{FLIP_LIFT_MM:.3f}",
         "M5",
         "%msg PAUSE: SPINDLE STOPPED. RELEASE THE EDGE CLAMPS, TURN THE BLANK OVER END FOR END, SAME EDGE ON THE FENCE,"
-        " LEFT END AT THE X0 MARK, PLATE WIPED CLEAN, RE-CLAMP, THEN CYCLE START",
+        " LEFT END ON THE END STOP, PLATE WIPED CLEAN, RE-CLAMP, THEN CYCLE START",
         "M0",
-    ]
-    # X0 by the touch probe on the blank's left end at mid-thickness: from
-    # beside it, seek it in +X, back off, touch again slowly and set X0 at the
-    # end. The probe descends by G38.3, which stops on a blank that is not
-    # where expected; the G38.2 after it then alarms on the tripped probe
-    # (FluidNC 3.7.8 MotionControl.cpp mc_probe_cycle, ProbeFailInitial). The
-    # ball's bottom must stay above the plate there.
-    ball = p["probe_ball_radius_mm"]
-    if ball >= thick / 2:
-        raise ValueError(
-            f"probe ball radius {ball} would touch the plate at mid-thickness {thick / 2:.3f}"
-        )
-    probe_clear, probe_x0 = thick + CLEAR_MM, -ball
-    x_from, x_to = (
-        -ball - END_ALLOWANCE_MM - APPROACH_MM,
-        END_ALLOWANCE_MM + APPROACH_MM,
-    )
-    probe_gcode = [
-        f"G0 Z{probe_clear:.3f}",
-        f"G0 X{x_from:.3f} Y{-bw / 2:.3f}",
-        f"G38.3 Z{thick / 2:.3f} F{PROBE_SEEK_FEED:g}",
-        f"G38.2 X{x_to:.3f} F{PROBE_SEEK_FEED:g}",
-        f"G38.4 X{x_from:.3f} F{PROBE_SEEK_FEED:g}",
-        f"G38.2 X{x_to:.3f} F{PROBE_TOUCH_FEED:g}",
-        f"G10 L20 P1 X{probe_x0:.3f}",
-        f"G38.4 X{x_from:.3f} F{PROBE_SEEK_FEED:g}",
-        f"G0 Z{probe_clear:.3f}",
     ]
     return {
         "stem": STEM,
@@ -503,10 +589,7 @@ def context(
         "hub_dia": hub["nominal_dia"],
         "names": names,
         "numbers": numbers,
-        "tool_changes": [
-            numbers[t]
-            for t in ("probe", "spot", "hub-drill", "hub-reamer", "em-eighth")
-        ],
+        "tool_changes": [numbers[t] for t in ("spot", "hub-drill", "hub-reamer")],
         "face": {
             "rpm": face_rpm,
             "feed": face_feed,
@@ -528,18 +611,19 @@ def context(
             "dia": em_eighth,
             "elements": elements,
             "stock": finish_stock,
-            "start": xy(top["edge_on_axis"]),
-            "rough": {"step": rough_step, "levels": rough_levels},
-            "through": {"step": through_step, "levels": through_levels},
-            "finish": {"step": finish_step, "levels": finish_levels},
+            # Away from the hub and its bushing: the -X foot of the bottom arc.
+            "start": xy(bottom["ends"][0]),
+            "origin": origin4,
+            "top": top4,
+            "skin": skin,
             "bottom": through,
-        },
-        "tabs": {
-            "top": tab_top,
-            "width": width,
-            "clear": clear,
-            "through": tab_points(r + finish_stock),
-            "finish": tab_points(r),
+            "clearance": clear4,
+            "rough": {"step": rough_step, "levels": rough_levels},
+            "finish": {"step": finish_step, "levels": finish_levels},
+            "through": {"step": through_step, "levels": through_levels},
+            "sliver": {"gcode": sliver_gcode, "clearing": clearing, "cleared": cleared},
+            "fixtures": fixtures,
+            "bushing": bushing,
         },
         "spot": {
             "rpm": spot_rpm,
@@ -559,13 +643,6 @@ def context(
             "label": names["em-half"],
             "setting": "SPINDLE STAYS OFF",
             "gcode": flip_gcode,
-        },
-        "probe": {
-            "tool": numbers["probe"],
-            "label": names["probe"],
-            "setting": "SPINDLE OFF - PROBE IN",
-            "gcode": probe_gcode,
-            "x0": probe_x0,
         },
     }
 
@@ -618,7 +695,7 @@ def expectations(ctx: dict[str, Any]) -> list[tuple[str, str, dict[str, Any]]]:
         )
 
     b_max = ctx["blank_max"]
-    rs1, rs2, rs3 = (name for name, _ops in PROGRAMS)
+    rs1, rs2, rs3, rs4 = (name for name, _ops in PROGRAMS)
     out: list[tuple[str, str, dict[str, Any]]] = [
         # RS01: both rough faces, one tool, the flip stop between them. Face 2
         # starts from Z1 + SAFE_MM, above the thickest blank's top, so the
@@ -650,8 +727,6 @@ def expectations(ctx: dict[str, Any]) -> list[tuple[str, str, dict[str, Any]]]:
             *([("feed_out", {"z_top": T})] if feed_out else []),
         ]
 
-    ol, tabs = ctx["outline"], ctx["tabs"]
-    r = ol["dia"] / 2
     sections = [
         (
             [face["rpm"]],
@@ -662,53 +737,9 @@ def expectations(ctx: dict[str, Any]) -> list[tuple[str, str, dict[str, Any]]]:
                 faced("face_2_finish"),
             ],
         ),
-        (
-            [],
-            [
-                ("probe_zero", {"axis": "X", "value": ctx["probe"]["x0"], "z_top": T}),
-                ("rapids_clear", {"z_top": T}),
-                ("air_feed", {"z_top": T}),
-            ],
-        ),
         ([ctx["spot"]["rpm"]], hole("spot")),
         ([ctx["drill"]["rpm"]], hole("drill")),
         ([ctx["ream"]["rpm"]], hole("ream", feed_out=True)),
-        (
-            [ol["rpm"]],
-            [
-                ("depth", {"z_min": ol["bottom"]}),
-                ("rapids_clear", {"z_top": T}),
-                ("air_feed", {"z_top": T}),
-                # Rough and through at the finish stock outside the part, finish
-                # at the part edge; anticlockwise, in the elements' order.
-                (
-                    "outline",
-                    {
-                        "elements": ol["elements"],
-                        "z_top": T,
-                        "passes": [
-                            {
-                                "offset": r + ol["stock"],
-                                "levels": ol["rough"]["levels"]
-                                + ol["through"]["levels"],
-                            },
-                            {"offset": r, "levels": ol["finish"]["levels"]},
-                        ],
-                        "tabs": [tuple(t) for t in tabs["through"] + tabs["finish"]],
-                        "tab_clear": tabs["clear"],
-                        "tab_top": tabs["top"],
-                    },
-                ),
-                (
-                    "tabs",
-                    {
-                        "centres": [tuple(t) for t in tabs["through"] + tabs["finish"]],
-                        "clear": tabs["clear"],
-                        "top": tabs["top"],
-                    },
-                ),
-            ],
-        ),
     ]
     out += [
         (rs3, "tool_changes", {"z_top": T, "tools": ctx["tool_changes"]}),
@@ -717,6 +748,46 @@ def expectations(ctx: dict[str, Any]) -> list[tuple[str, str, dict[str, Any]]]:
     ]
     for k, (_speeds, checks) in enumerate(sections):
         out += [(f"{rs3}@{k}", check, kw) for check, kw in checks]
+
+    # RS04: one tool, one speed. The fence-sliver rings first, then rough at
+    # the finish stock outside the part and finish at the part edge, both to
+    # the skin, then through at the part edge: anticlockwise, in the
+    # elements' order, no tabs. The cutter misses the un-notched fence, the
+    # notches' walls and floors and the bushing; nothing cuts the plate.
+    ol = ctx["outline"]
+    r, top4 = ol["dia"] / 2, ol["top"]
+    out += [
+        (rs4, "spindle", {"rpm": ol["rpm"]}),
+        (rs4, "tool_changes", {"z_top": top4, "tools": []}),
+        (rs4, "pauses", {"z_top": top4, "count": 0}),
+        (rs4, "depth", {"z_min": ol["bottom"]}),
+        (rs4, "rapids_clear", {"z_top": top4}),
+        (rs4, "air_feed", {"z_top": top4}),
+        (
+            rs4,
+            "outline",
+            {
+                "elements": ol["elements"],
+                "z_top": top4,
+                "passes": [
+                    {"offset": r + ol["stock"], "levels": ol["rough"]["levels"]},
+                    {"offset": r, "levels": ol["finish"]["levels"]},
+                    {"offset": r, "levels": ol["through"]["levels"]},
+                ],
+                "clearing": ol["sliver"]["clearing"],
+            },
+        ),
+        (
+            rs4,
+            "cleared",
+            {"points": ol["sliver"]["cleared"], "radius": r, "z": ol["bottom"]},
+        ),
+        (
+            rs4,
+            "keep_out",
+            {"radius": r, "boxes": ol["fixtures"], "circles": [ol["bushing"]]},
+        ),
+    ]
     return out
 
 
@@ -746,11 +817,11 @@ def build(ctx: dict[str, Any], rt: Any) -> dict[str, Any]:
         )
 
     ops: dict[str, Any] = {}
-    # Faces: zigzag along X; each face model runs past both blank ends by the
-    # placement allowance, a cutter diameter and the approach, so every plunge
-    # and stepover link is clear of the blank, wherever its end sits by eye.
+    # Faces: zigzag along X; each face model runs past both blank ends by a
+    # cutter diameter and the approach, so every plunge and stepover link is
+    # in the air beside the blank (over the end stop, below the faced top).
     fc = ctx["face"]
-    run = END_ALLOWANCE_MM + fc["dia"] + APPROACH_MM
+    run = fc["dia"] + APPROACH_MM
     for key, layout_key, height, stock_top in fc["passes"]:
         layout = fc["layouts"][layout_key]
         label = key.replace("_", " ")
@@ -829,63 +900,46 @@ def build(ctx: dict[str, Any], rt: Any) -> dict[str, Any]:
     ops["ream"] = rt.bore(
         ream_job, ream_tc, "ream hub", hub, re_["z"], T + SAFE_MM, T + CLEAR_MM
     )
-    # Outline: the strap's top face's perimeter, outside, anticlockwise
-    # (conventional), entered on the top arc at the hub's X (fence side, far
-    # from the clamp-side tabs).
-    ol, tb = ctx["outline"], ctx["tabs"]
-    outline_job = rt.job(doc, "outline", [strap], stock)
+    # RS04: the strap on the tape (its own model, raised by the tape). The
+    # fence-sliver rings (written by context()), then the top face's perimeter
+    # outside, anticlockwise (conventional), entered at the bottom arc's -X
+    # foot, away from the bushing; links clear the bushing's top.
+    ol = ctx["outline"]
+    top4 = ol["top"]
+    strap4 = rt.import_step(
+        doc, "Strap on tape", ctx["step"], ol["origin"], ctx["model"]["axes"]
+    )
+    stock4 = ((0, bl), (-bw, 0), (top4 - T, top4))  # the tape under the part
+    outline_job = rt.job(doc, "outline", [strap4], stock4)
     otc = tool("em-eighth", ol["rpm"], ol["feed"], ol["plunge"], ol["dia"], flutes=3)
-    perimeter = rt.top_face(rt.model(outline_job), T)
+    ops["fence_sliver"] = rt.custom(
+        outline_job, otc, "fence sliver", ol["sliver"]["gcode"]
+    )
+    perimeter = rt.top_face(rt.model(outline_job), top4)
     heights = {
-        "clearance": T + CLEAR_MM,
-        "safe": T + SAFE_MM,
+        "clearance": ol["clearance"],
+        "safe": top4 + SAFE_MM,
         "start_point": ol["start"],
     }
-    ops["outline_rough"] = rt.profile(
-        outline_job,
-        otc,
-        "outline rough",
-        perimeter,
-        "Outside",
-        "CCW",
-        T,
-        tb["top"],
-        ol["rough"]["step"],
-        offset=ol["stock"],
-        **heights,
-    )
-    through = rt.profile(
-        outline_job,
-        otc,
-        "outline through",
-        perimeter,
-        "Outside",
-        "CCW",
-        tb["top"],
-        ol["bottom"],
-        ol["through"]["step"],
-        offset=ol["stock"],
-        **heights,
-    )
-    ops["outline_through"] = rt.tags(
-        through, tb["through"], tb["width"], tb["top"] - ol["bottom"]
-    )
-    finish = rt.profile(
-        outline_job,
-        otc,
-        "outline finish",
-        perimeter,
-        "Outside",
-        "CCW",
-        T,
-        ol["bottom"],
-        ol["finish"]["step"],
-        **heights,
-    )
-    ops["outline_finish"] = rt.tags(
-        finish, tb["finish"], tb["width"], tb["top"] - ol["bottom"]
-    )
-    # Manual sections, their G-code written by context(): the flip stop and the probe's X0.
-    ops["flip"], ops["probe_x0"] = ctx["flip"], ctx["probe"]
+    for key, start, final, offset in (
+        ("rough", top4, ol["skin"], ol["stock"]),
+        ("finish", top4, ol["skin"], 0.0),
+        ("through", ol["skin"], ol["bottom"], 0.0),
+    ):
+        ops[f"outline_{key}"] = rt.profile(
+            outline_job,
+            otc,
+            f"outline {key}",
+            perimeter,
+            "Outside",
+            "CCW",
+            start,
+            final,
+            ol[key]["step"],
+            offset=offset,
+            **heights,
+        )
+    # The manual section, its G-code written by context(): the flip stop.
+    ops["flip"] = ctx["flip"]
     rt.generate(doc)
     return {"ops": ops}

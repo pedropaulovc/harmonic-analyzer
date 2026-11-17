@@ -362,6 +362,59 @@ def test_outline_coverage_excuses_only_the_tabs(tmp_path):
     assert details == ["3 outline points the offset-1.000 pass leaves uncut at Z-2.000"]
 
 
+def test_outline_passes_run_in_order_after_the_clearing(tmp_path):
+    passes = [{"offset": 1.0, "levels": [-1.0]}, {"offset": 1.0, "levels": [-2.0]}]
+    # Waste 4 from the bottom edge, cleared +X (the bottom's way) at Z-2.
+    clear = "G0 X2 Y-4 Z5\nG1 Z-2 F100\nG1 X8\nG0 Z5\n"
+    zone = [{"x": (1.0, 9.0), "levels": [-2.0]}]
+
+    def check(text, clearing=zone):
+        program = _program(tmp_path, text + "G0 Z5\n")
+        found = _gcode.check_outline(
+            program, _OUTLINE, passes, 0.0, clearing=clearing
+        )
+        return [f.detail for f in found]
+
+    laps = "G0 X5 Y-1 Z5\n" + _loop(-1.0) + _loop(-2.0)
+    assert check(clear + laps) == []
+    assert any("off every pass offset" in d for d in check(clear + laps, ()))
+    late = check(laps + clear)
+    assert len(late) == 1 and "cut after a later pass" in late[0]
+    swapped = check("G0 X5 Y-1 Z5\n" + _loop(-2.0) + _loop(-1.0))
+    assert len(swapped) == 1 and "cut after a later pass" in swapped[0]
+
+
+def test_cleared_waste_is_swept_at_depth(tmp_path):
+    program = _program(tmp_path, "G0 X0 Y-4 Z5\nG1 Z-2 F100\nG1 X10\nG0 Z5\n")
+    assert _gcode.check_cleared(program, [(5.0, -4.5), (10.0, -3.0)], 1.0, -2.0) == []
+    found = _gcode.check_cleared(program, [(5.0, -5.5), (5.0, -4.0)], 1.0, -2.0)
+    assert [f.detail for f in found] == [
+        "1 points no cut at Z-2.000 clears: X5.000 Y-5.500"
+    ]
+    assert _gcode.check_cleared(program, [(5.0, -4.0)], 1.0, -1.0) != []
+
+
+def test_keep_out_catches_the_cutter_entering_a_fixture_below_its_top(tmp_path):
+    fence = {"name": "fence", "x": (0.0, 10.0), "y": (0.0, 5.0), "z_top": 2.0}
+    flange = {"name": "flange", "centre": (20.0, -5.0), "radius": 3.0, "z_top": 6.0}
+
+    def hits(text):
+        found = _gcode.check_keep_out(
+            _program(tmp_path, text), 1.0, boxes=[fence], circles=[flange]
+        )
+        return [f.detail.split(" into ")[1].split(":")[0] for f in found]
+
+    # Beside the fence and the flange by more than the cutter radius, then
+    # over both above their tops.
+    clear = (
+        "G0 X5 Y-2 Z5\nG1 Z1 F100\nG1 X12\nG0 Z7\nG0 X15 Y-9.5\nG1 Z1\nG1 X25\n"
+        "G0 Z7\nG0 X20 Y-5\nG0 X5 Y2\n"
+    )
+    assert hits(clear) == []
+    assert hits("G0 X5 Y-0.5 Z5\nG0 Z1\nG1 X6 F100\n") == ["fence"]
+    assert hits("G0 X20 Y-1.5 Z7\nG0 Z5\n") == ["flange"]
+
+
 def test_tabs_keep_their_width_and_are_cut_to_their_top(tmp_path):
     def tabs(left, right, lift):
         text = f"G0 X0 Y-1 Z5\nG1 Z-1 F100\nG1 X{left}\nG1 Z{lift}\nG1 X{right}\nG1 Z-1\nG1 X20\nG0 Z5\n"
