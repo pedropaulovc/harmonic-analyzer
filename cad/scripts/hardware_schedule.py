@@ -21,6 +21,7 @@ it. Reads source and YAML only: no SolidWorks.
 from __future__ import annotations
 
 import importlib
+import math
 import re
 from dataclasses import dataclass
 from enum import IntEnum
@@ -35,7 +36,7 @@ MM_PER_IN = 25.4
 
 
 class Tier(IntEnum):
-    STANDARD = 1  # schedule row, no drawing
+    STANDARD = 1  # schedule row in HARDWARE.md
     SPEC_CONTROL = 2  # specification-control sheet: interface + performance only
     ALTERED = 3  # altered-item sheet: MAKE FROM blank + shop cuts
 
@@ -223,7 +224,7 @@ TIERS: dict[str, tuple[Tier, str]] = {
     ),
     "sm-vn-knife-hanger-washer": (
         Tier.STANDARD,
-        "ASME B18.22.1 SAE plain washer, used as supplied",
+        "ASME B18.21.1 SAE plain washer, used as supplied",
     ),
     "sm-vn-knife-mount-dowel": (
         Tier.STANDARD,
@@ -322,10 +323,15 @@ class Row:
 
 
 def _head(
-    module: str, width: str = "SupplierHeadDiameter"
+    module: str, width: str = "SupplierHeadDiameter", corners: int = 0
 ) -> tuple[tuple[str, str, str], ...]:
-    label = "head W" if width == "SupplierHeadWidth" else "head Ø"
-    return ((label, module, width), ("head H", module, "SupplierHeadHeight"))
+    """Head envelope: its diameter, or across the corners of a ``corners``-sided
+    head given across flats."""
+    if corners:
+        across = ("head AC", module, f"{1 / math.cos(math.pi / corners)!r}*{width}")
+    else:
+        across = ("head Ø", module, width)
+    return (across, ("head H", module, "SupplierHeadHeight"))
 
 
 def _pin(module: str, size: str = "DOWEL_SIZE") -> tuple[tuple[str, str, str], ...]:
@@ -333,7 +339,8 @@ def _pin(module: str, size: str = "DOWEL_SIZE") -> tuple[tuple[str, str, str], .
 
 
 def _nut(module: str) -> tuple[tuple[str, str, str], ...]:
-    return (("AF", module, "ACROSS_FLATS"), ("T", module, "THICKNESS"))
+    hex_corners = f"{1 / math.cos(math.pi / 6)!r}*ACROSS_FLATS"
+    return (("AC", module, hex_corners), ("T", module, "THICKNESS"))
 
 
 SCHEDULE: dict[str, Row] = {
@@ -413,12 +420,12 @@ SCHEDULE: dict[str, Row] = {
     "fr-vn-gooseneck-set-screw": Row(
         "1/4-20 UNC-2A x 3/4 square head set screw, cup point, steel",
         "ASME B18.6.2",
-        _head("_mcmaster_91410a540", "SupplierHeadWidth"),
+        _head("_mcmaster_91410a540", "SupplierHeadWidth", corners=4),
     ),
     "fr-vn-lag-screw": Row(
         "1/4-20 UNC-2A x 3/4 hex head screw, fully threaded, 18-8 stainless",
         "ASME B18.2.1",
-        _head("_mcmaster_92240a540", "SupplierHeadWidth"),
+        _head("_mcmaster_92240a540", "SupplierHeadWidth", corners=6),
     ),
     "mg-vn-magnifying-bracket-screw": Row(
         "#2-56 UNC-2A x 1/4 slotted fillister head machine screw, 18-8 stainless",
@@ -519,7 +526,7 @@ SCHEDULE: dict[str, Row] = {
     "pn-vn-hanger-screw": Row(
         "#8-32 UNC-2A x 1 hex head machine screw, fully threaded, zinc-plated steel",
         "ASME B18.6.3",
-        _head("_mcmaster_93075a199", "SupplierHeadWidth"),
+        _head("_mcmaster_93075a199", "SupplierHeadWidth", corners=6),
     ),
     "pn-vn-pen-adjust-nut": Row(
         "#0-80 UNF-2B hex machine screw nut, brass",
@@ -551,7 +558,7 @@ SCHEDULE: dict[str, Row] = {
         "No. 25 single-strand roller chain, 1/4 pitch, steel",
         "ASME B29.1",
         (
-            ("roller Ø", "sh_vn_chain_link_spec", "2*ROLLER_R"),
+            ("plate H", "_chain", "PLATE_HEIGHT"),
             ("over pins", "sh_vn_chain_link_spec", "2*PIN_HALF_LEN"),
         ),
     ),
@@ -591,7 +598,7 @@ SCHEDULE: dict[str, Row] = {
     ),
     "sm-vn-knife-hanger-washer": Row(
         "#10 SAE plain washer, 18-8 stainless",
-        "ASME B18.22.1",
+        "ASME B18.21.1",
         (
             ("OD", "_mcmaster_96659a104", "DIMS.od_max"),
             ("T", "_mcmaster_96659a104", "DIMS.thickness_max"),
@@ -610,16 +617,16 @@ _PATH = re.compile(r"(\w+)|\[(\d+)\]")
 def envelope_mm(module: str, expr: str) -> float:
     """One envelope value from its pure provider, in millimetres."""
     provider = importlib.import_module(module)
-    if expr.startswith("Supplier"):
+    factor, _, path = expr.rpartition("*")
+    if path.startswith("Supplier"):
         found = [
             abs(value)
             for name, value, *_ in provider.SUPPLIER_REFERENCE_DIMENSIONS
-            if name == expr
+            if name == path
         ]
         if len(found) != 1:
-            raise KeyError(f"{module}: no single {expr} supplier reference dimension")
-        return float(found[0])
-    factor, _, path = expr.rpartition("*")
+            raise KeyError(f"{module}: no single {path} supplier reference dimension")
+        return float(found[0]) * float(factor or 1)
     value: Any = provider
     for name, index in _PATH.findall(path):
         value = getattr(value, name) if name else value[int(index)]
@@ -632,17 +639,20 @@ def _envelope_text(row: Row) -> str:
     if not row.envelope:
         return f"per {row.standard}"
     return " x ".join(
-        f"{label} {envelope_mm(module, expr) / MM_PER_IN:.3f}"
+        f"{label} {math.ceil(envelope_mm(module, expr) / MM_PER_IN * 1000 - 1e-6) / 1000:.3f}"
         for label, module, expr in row.envelope
     )
 
 
 @cache
 def used_in() -> dict[str, tuple[str, ...]]:
-    """Dashed part stem -> dashed assemblies whose builder references it."""
+    """Dashed part stem -> dashed assemblies whose builder references it. A
+    machine part lists machine assemblies only; tooling lists its fixture."""
     found: dict[str, list[str]] = {}
     for assembly in bg.ASSEMBLY_ORDER:
         for stem in bg.references_of(assembly):
+            if bg.is_shop_fixture(assembly) and not bg.is_shop_fixture(stem):
+                continue
             found.setdefault(stem.replace("_", "-"), []).append(
                 assembly.replace("_", "-")
             )
@@ -673,10 +683,11 @@ def markdown() -> str:
         "Standard hardware the machine uses as supplied (ASME Y14.24 tier 1). "
         "Buy to the generic designation; the example SKU is the part the CAD "
         "models. Fits (thread, pin diameter) come from the designation and its "
-        "standard. The seat envelope bounds the space the part may occupy: the "
-        "catalogue maximum where its dimension provider records one, otherwise "
-        "the modelled catalogue size the assembly clearance checks use; a "
-        "substitute must not exceed it. Inches.",
+        "standard. The seat envelope bounds the space the part may occupy "
+        "(heads and nuts across corners): the catalogue maximum where its "
+        "dimension provider records one, otherwise the modelled catalogue size "
+        "the assembly clearance checks use, rounded up to 0.001 in; a substitute "
+        "must not exceed it. Inches.",
         "",
         "| Number | Part | Designation | Standard | Seat envelope (in) | Qty | Used in | Example SKU |",
         "|---|---|---|---|---|---:|---|---|",
@@ -706,11 +717,11 @@ def markdown() -> str:
         )
     lines += [
         "",
-        "Qty is the machine total from the part registry; a shared (`SH`) part "
-        "lists every assembly that uses it.",
+        "Qty is the registry total. Used in lists the machine assemblies that "
+        "use the part; a shop-tooling (`TL`) part lists its fixture instead.",
         "",
         "Non-standard purchased items (tier 2) and shop-altered purchased items "
-        "(tier 3) keep their own drawing sheets in `slddrw/`:",
+        "(tier 3) have their own drawing sheets in `slddrw/`:",
         "",
         "| Part | Tier | Why |",
         "|---|---:|---|",
