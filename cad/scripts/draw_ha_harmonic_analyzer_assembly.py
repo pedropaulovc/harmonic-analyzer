@@ -2,7 +2,8 @@ r"""Create the three-sheet complete-machine fitter package (MHA-HA-00).
 
 Sheet 1 shows the assembled machine (front and crank-side views at 1:5) with
 the two settings only the complete machine makes, imported as the builder's
-driving dimensions; sheet 2 the finished machine in full detail; sheet 3 the
+driving dimensions, and the setting table for the plate's level and the
+parked nib's feeler gap; sheet 2 the finished machine in full detail; sheet 3 the
 builder-owned ``HA_EXPLODED`` presentation with the top-level BOM (one row per
 subassembly) and a balloon on every row. The integration sequence and the
 checks before running print in the release's ASSEMBLY.md (#2889). Every pose
@@ -30,6 +31,7 @@ from _com import _early_bound
 from _component_order import by_name
 from _drawing_balloon_display import rendered_balloon_circle
 from _session import run_build
+from _general_table import TABLE_TITLE_DROP, insert_general_table, table_column_widths
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -161,6 +163,17 @@ BAR_COLUMN_PICK_M = (
 )
 ASSEMBLED_NOTE_XY = (0.020, 0.100)
 ASSEMBLED_NOTE_WIDTH = 84  # characters; default-format note text
+# Sheet 1's setting table (notes.SETTING_TABLE_*): its title and native
+# general table (_general_table) in the band over the views. R5 of main
+# 67ba11bf1a printed the views' ink no higher than 387.6 mm (the gooseneck and
+# the crank-side rod), the inner border at 419.1 mm. Rows print 5.5 mm apart
+# (the one-row proof, run 20261117T133205408Z: title text 411.7-415.3 mm under
+# a 416 mm top, header text from 408.5 mm, row text from 403.0 mm); the
+# read-back box must stay inside the border and above SETTING_TABLE_FLOOR,
+# 2.4 mm over that ink.
+SETTING_TABLE_XY = (0.020, 0.4175)
+SETTING_TABLE_ROW_PITCH = 0.0055
+SETTING_TABLE_FLOOR = 0.390
 
 # Sheet 2: the finished machine, full detail, centred in the usable area.
 FINISHED_CENTER = (_PORTRAIT.width_m / 2.0, sum(_PORTRAIT_USABLE_Y) / 2.0)
@@ -835,7 +848,8 @@ def _add_bar_column_axis(adapter: Any, front: Any) -> None:
 
 
 def _place_assembled_sheet(adapter: Any) -> Callable[[], None]:
-    """Front and crank-side views at 1:5, the settings and the note."""
+    """Front and crank-side views at 1:5, the settings, the note and the
+    setting table."""
     name = SHEET_NAMES[0]
     layout = SHEET_LAYOUTS[name]
     _activate_sheet(adapter, name)
@@ -870,7 +884,54 @@ def _place_assembled_sheet(adapter: Any) -> Callable[[], None]:
     _add_note_block(
         adapter, name, ASSEMBLED_NOTE, ASSEMBLED_NOTE_XY, label="assembled note"
     )
+    _place_setting_table(adapter, name)
     return settled
+
+
+def setting_table_box_violations(box: tuple[float, float, float, float]) -> list[str]:
+    """The setting table stays inside the inner border, over the views' ink."""
+    x0, y0, x1, y1 = box
+    findings = []
+    if x0 < _BORDER or x1 > _PORTRAIT.width_m - _BORDER:
+        findings.append(
+            f"runs outside the inner border ({x0 * 1000.0:.1f}-{x1 * 1000.0:.1f} mm)"
+        )
+    if y1 > _PORTRAIT.height_m - _BORDER:
+        findings.append(f"tops the inner border at {y1 * 1000.0:.1f} mm")
+    if y0 < SETTING_TABLE_FLOOR:
+        findings.append(
+            f"runs {(SETTING_TABLE_FLOOR - y0) * 1000.0:.1f} mm below its floor"
+        )
+    return findings
+
+
+def planned_setting_table_box() -> tuple[float, float, float, float]:
+    """The setting table's box (x0, y0, x1, y1) as planned: its columns as
+    _general_table cuts them, its rows SETTING_TABLE_ROW_PITCH apart."""
+    x, top = SETTING_TABLE_XY
+    table_top = top - TABLE_TITLE_DROP
+    rows = len(notes.SETTING_TABLE_ROWS) + 1
+    width = sum(
+        table_column_widths(notes.SETTING_TABLE_HEADER, notes.SETTING_TABLE_ROWS)
+    )
+    return (x, table_top - rows * SETTING_TABLE_ROW_PITCH, x + width, table_top)
+
+
+def _place_setting_table(adapter: Any, sheet_name: str) -> None:
+    """Sheet 1's setting table, sheet-owned, its read-back box held to its
+    band."""
+    _activate_sheet(adapter, sheet_name)
+    box = insert_general_table(
+        adapter,
+        title=notes.SETTING_TABLE_TITLE,
+        header=notes.SETTING_TABLE_HEADER,
+        rows=notes.SETTING_TABLE_ROWS,
+        top_left=SETTING_TABLE_XY,
+        label="setting table",
+    )
+    findings = setting_table_box_violations(box)
+    if findings:
+        raise RuntimeError(f"setting table at {box!r}: " + "; ".join(findings))
 
 
 def _place_finished_sheet(adapter: Any) -> None:

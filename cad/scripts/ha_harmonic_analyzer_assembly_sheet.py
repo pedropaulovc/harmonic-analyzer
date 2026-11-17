@@ -1,6 +1,6 @@
 """Drawing-only text of the complete-machine fitter package (MHA-HA-00).
 
-The BOM descriptions, balloon targets and setting callouts the sheets print,
+The BOM descriptions, balloon targets, setting callouts and setting table the sheets print,
 and the integration steps and checks the release's ASSEMBLY.md prints
 (ha_assembly_package, #2889). Only draw_ha_harmonic_analyzer_assembly,
 ha_assembly_package (and their tests) import this module; no assembly
@@ -137,6 +137,17 @@ _AMPLITUDE_BAR = str(_config.parts("ch-amplitude-bar")["number"])
 _ANCHOR = str(_config.parts("ch-vn-spring-hook")["number"])
 _SUMMING_PLATE = str(_config.parts("sm-summing-lever")["number"])
 
+# Rule 22: the plate's level and the parked nib's feeler gap are measurable
+# settings, so they print on sheet 1 though their steps and check print in
+# ASSEMBLY.md (machinist review of main 67ba11bf1a, R5, and of the first
+# proof of this table, which found the .010 in a prose note only). An
+# angle-gauge reading and a feeler leaf are no model dimension, so each prints
+# as a row of a native setting table (_general_table), from the constants its
+# step prints, and the step (and check 4) cites the table.
+SETTING_TABLE_TITLE = "SETTING TABLE"
+SETTING_TABLE_REF = "SETTING TABLE, SHEET 1"
+SETTING_TABLE_HEADER = ("STEP", "SETTING", "CONDITION", "ACCEPT", "CHECK WITH")
+
 
 def _n(key: str) -> int:
     return steps.step_number(key)
@@ -212,7 +223,7 @@ _STEP_TEXT: dict[str, tuple[str, ...]] = {
         f"SET EVERY {_AMPLITUDE_BAR} AMPLITUDE BAR TO ZERO ON THE MHA-MS-00 "
         "STICK'S SCALE.",
         "SLIDE THE POST IN ITS HUB UNTIL A DIGITAL ANGLE GAUGE ACROSS THE "
-        f"MHA-SM-03 PLATE TOP READS {LEVEL_ACCEPTANCE}.",
+        f"MHA-SM-03 PLATE TOP READS {LEVEL_ACCEPTANCE} ({SETTING_TABLE_REF}).",
         # One printed line (the columns are full): the bare leg's set-screw
         # limit (owner rulings 2026-11-08 (Pedro), #2315).
         "TIGHTEN MHA-FR-VN-52 SNUG ON THE POST, "
@@ -318,7 +329,7 @@ _STEP_TEXT: dict[str, tuple[str, ...]] = {
         "NIB PARKED, WITH PAPER CLIPPED ON THE PLATEN: SLACKEN THE MHA-PN-VN-51 "
         "THUMB SCREW.",
         f"SLIDE THE MHA-PN-VN-56 MARKER UNTIL A {NIB_CLEARANCE_TEXT} FEELER JUST "
-        "DRAGS BETWEEN NIB AND PAPER.",
+        f"DRAGS BETWEEN NIB AND PAPER ({SETTING_TABLE_REF}).",
         "TIGHTEN THE THUMB SCREW FINGER-TIGHT.",
         "CHECK: PUSHED LIGHTLY ALONG ITS AXIS, THE MARKER DOES NOT SLIDE.",
     ),
@@ -329,9 +340,16 @@ _STEP_TEXT: dict[str, tuple[str, ...]] = {
         "TIGHTEN THE THUMB SCREW FINGER-TIGHT.",
         "CHECK: PUSHED LIGHTLY ALONG ITS AXIS, THE MARKER DOES NOT SLIDE.",
         "CHECK: ONLY THE NIB TOUCHES THE PAPER.",
-        "IF ANY OTHER PART OF MHA-PN-00 TOUCHES, SLACKEN BOTH MHA-SH-VN-53 "
-        "CLAMP SCREWS, TURN THE MHA-MG-08 BAR AWAY FROM THE PAPER UNTIL IT "
-        f"CLEARS, AND REPEAT {_n('magnifier-bar-clamped')}B, "
+        # Rule 22: one action a step (machinist review of main 67ba11bf1a,
+        # R5: the remedy slackened, turned and repeated in one step). The
+        # branch is its own step, so the remedy steps after it run only when
+        # the check fails (codjiflo on #3034: split, they read unconditional).
+        "IF ONLY THE NIB TOUCHES, GO ON TO STEP "
+        f"{_n(steps.SEQUENCE[steps.SEQUENCE.index('nib-on-paper') + 1])}.",
+        "OTHERWISE SLACKEN BOTH MHA-SH-VN-53 CLAMP SCREWS.",
+        "TURN THE MHA-MG-08 BAR AWAY FROM THE PAPER UNTIL NO OTHER PART OF "
+        "MHA-PN-00 TOUCHES.",
+        f"REPEAT {_n('magnifier-bar-clamped')}B, "
         f"{_n('magnifier-bar-clamped')}D-{_n('magnifier-bar-clamped')}E AND "
         f"{_n('nib-set')}A-{_n('nib-on-paper')}E.",
     ),
@@ -346,6 +364,34 @@ if set(_STEP_TEXT) != set(steps.SEQUENCE):
     raise AssertionError("every integration step needs exactly one text")
 if max(map(len, _STEP_TEXT.values())) > len(SUB_STEP_LETTERS):
     raise AssertionError("a step outgrows its sub-step letters")
+
+
+def _table_sub_step(key: str) -> str:
+    """The one sub-step of ``key`` that cites the setting table."""
+    (index,) = (
+        index for index, text in enumerate(_STEP_TEXT[key]) if SETTING_TABLE_REF in text
+    )
+    return sub_step(key, index)
+
+
+# The setting table's rows: the plate-level step and the parked nib's feeler
+# step, each from the constants its step prints.
+SETTING_TABLE_ROWS: tuple[tuple[str, ...], ...] = (
+    (
+        _table_sub_step("summing-levelled"),
+        f"{_SUMMING_PLATE} PLATE TOP",
+        f"EVERY {_AMPLITUDE_BAR} BAR AT 0",
+        f"LEVEL \u00b1{LEVEL_TOLERANCE_DEG:g}\u00b0",
+        "DIGITAL ANGLE GAUGE",
+    ),
+    (
+        _table_sub_step("nib-set"),
+        "NIB TO PAPER",
+        "PARKED, PAPER ON PLATEN",
+        NIB_CLEARANCE_TEXT,
+        "FEELER JUST DRAGS",
+    ),
+)
 
 
 def _printed(key: str) -> tuple[str, ...]:
@@ -376,7 +422,7 @@ ASSEMBLY_CHECKS: tuple[str, ...] = (
     "2. THE MHA-PN-07 STUD DROP READS AS SHEET 1.",
     "3. THE NIB TOUCHES THE PAPER.",
     f"4. WITH EVERY {_AMPLITUDE_BAR} AMPLITUDE BAR AT ZERO, THE MHA-SM-03 PLATE "
-    f"TOP READS {LEVEL_ACCEPTANCE}.",
+    f"TOP READS {LEVEL_ACCEPTANCE} ({SETTING_TABLE_REF}).",
     f"5. WITH EVERY {_AMPLITUDE_BAR} AMPLITUDE BAR AT ZERO, TWO CRANK TURNS DRAW "
     "A STRAIGHT LINE ALONG THE PAPER.",
     "6. THROUGH TWO CRANK TURNS NOTHING BINDS OR RUBS.",
@@ -387,10 +433,10 @@ ASSEMBLY_CHECKS: tuple[str, ...] = (
 EXPLODED_CAPTION = "EXPLODED VIEW - INTEGRATION STEPS IN ASSEMBLY.MD"
 ORIENTATION_NOTE = "FRONT VIEW: THE PAPER SIDE. THE CRANK IS AT THE RIGHT."
 # The model holds the pen parked (step "nib-set"); running needs it on the
-# paper (step "nib-on-paper").
+# paper (step "nib-on-paper"). The parked gap prints in the setting table.
 NIB_PARKED_NOTE = (
-    f"VIEWS SHOW THE NIB PARKED {NIB_CLEARANCE_TEXT} OFF THE PAPER (STEP "
-    f"{_n('nib-set')}); STEP {_n('nib-on-paper')} SETS IT ON."
+    f"VIEWS SHOW THE NIB PARKED OFF THE PAPER (STEP {_n('nib-set')}); "
+    f"STEP {_n('nib-on-paper')} SETS IT ON."
 )
 # Sheet 3's label on the spare, beside item 7's group (its leader ends on the
 # spare's plate face).

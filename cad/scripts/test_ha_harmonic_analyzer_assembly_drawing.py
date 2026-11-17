@@ -219,11 +219,18 @@ def test_bar_turn_sets_its_heading_against_the_platen_not_level() -> None:
     # review run 20261115T044005360Z, r1/r2).
     acceptance = notes.sub_step("nib-on-paper", check)
     assert f"FIRST SETTING; {acceptance} IS ITS ACCEPTANCE" in turn
-    remedy = nib[check + 1].split(". ", 1)[1]
+    # The remedy is a branch, then one action a step (rule 22; machinist
+    # review of main 67ba11bf1a, R5): a passing check skips to the next step,
+    # so slacken, turn and repeat run only when it fails (codjiflo on #3034).
+    branch, slacken, turn_away, repeat = (
+        line.split(". ", 1)[1] for line in nib[check + 1 :]
+    )
+    after = steps.step_number(steps.SEQUENCE[steps.SEQUENCE.index("nib-on-paper") + 1])
     bar = steps.step_number("magnifier-bar-clamped")
-    assert remedy.startswith("IF ")
-    assert "TURN THE MHA-MG-08 BAR AWAY FROM THE PAPER" in remedy
-    assert f"REPEAT {bar}B, {bar}D-{bar}E AND " in remedy
+    assert branch == f"IF ONLY THE NIB TOUCHES, GO ON TO STEP {after}."
+    assert slacken.startswith("OTHERWISE ") and slacken.endswith("CLAMP SCREWS.")
+    assert turn_away.startswith("TURN THE MHA-MG-08 BAR AWAY FROM THE PAPER")
+    assert repeat.startswith(f"REPEAT {bar}B, {bar}D-{bar}E AND ")
     assert "PEN ROD" not in " ".join(notes.ASSEMBLY_STEPS)
 
 
@@ -331,10 +338,12 @@ def test_the_parked_nib_is_set_on_the_paper_before_the_line_check() -> None:
     line = next(i for i, c in enumerate(notes.ASSEMBLY_CHECKS) if "DRAW A STRAIGHT LINE" in c)
     assert nib < line
     assert notes.NIB_PARKED_NOTE in drawing.ASSEMBLED_NOTE.replace("\n", " ")
+    # The note names the parked state; the gap itself prints in the setting
+    # table (rule 22: a prose note is no view, diagram or table).
     assert (
-        f"PARKED {notes.NIB_CLEARANCE_TEXT} OFF THE PAPER (STEP {parked}); "
-        f"STEP {contact} SETS IT ON."
+        f"PARKED OFF THE PAPER (STEP {parked}); STEP {contact} SETS IT ON."
     ) in notes.NIB_PARKED_NOTE
+    assert notes.NIB_CLEARANCE_TEXT not in drawing.ASSEMBLED_NOTE
     lines = drawing.ASSEMBLED_NOTE.count("\n") + 1
     portrait = DRAWING_TEMPLATES[DrawingLayout.PORTRAIT]
     bottom = drawing.ASSEMBLED_NOTE_XY[1] - lines * drawing.NOTE_LINE_PITCH
@@ -350,3 +359,39 @@ def test_channel_sheet_cites_the_anchor_step_by_its_number() -> None:
     assert ch_channel_assembly_steps.HA_ANCHORS_SET_REF == steps.step_ref(
         "channel-anchors-set"
     )
+
+
+def test_the_plate_level_and_nib_gap_print_in_the_sheet_1_setting_table() -> None:
+    """Rule 22 (machinist review of main 67ba11bf1a, R5, and of this table's
+    first proof): the level reading step 6D sets and check 4 accepts, and the
+    parked nib's feeler gap step 13B sets, print on sheet 1 in the setting
+    table, from the constants their steps print, and the steps cite it."""
+    level, nib = notes.SETTING_TABLE_ROWS
+    assert {len(row) for row in notes.SETTING_TABLE_ROWS} == {
+        len(notes.SETTING_TABLE_HEADER)
+    }
+    step, setting, condition, accept, instrument = level
+    lines = notes.step_lines("summing-levelled")
+    (line,) = (line for line in lines if notes.SETTING_TABLE_REF in line)
+    assert line.startswith(f"{step}. ")
+    assert f"{setting} READS {notes.LEVEL_ACCEPTANCE}" in line
+    assert instrument in line
+    assert accept == f"LEVEL \u00b1{notes.LEVEL_TOLERANCE_DEG:g}\u00b0"
+    bar = condition.removeprefix("EVERY ").removesuffix(" BAR AT 0")
+    assert f"SET EVERY {bar} AMPLITUDE BAR TO ZERO" in lines[lines.index(line) - 1]
+    (check,) = (c for c in notes.ASSEMBLY_CHECKS if notes.SETTING_TABLE_REF in c)
+    assert f"READS {notes.LEVEL_ACCEPTANCE} ({notes.SETTING_TABLE_REF})" in check
+    step, _setting, _condition, accept, instrument = nib
+    (line,) = (
+        line for line in notes.step_lines("nib-set") if notes.SETTING_TABLE_REF in line
+    )
+    assert line.startswith(f"{step}. ")
+    assert accept == notes.NIB_CLEARANCE_TEXT
+    assert f"A {accept} {instrument}" in line
+
+
+def test_the_setting_table_fits_over_the_views() -> None:
+    # A pre-flight on the planned columns and rows; the build holds the box
+    # SolidWorks reads back to the same limits.
+    box = drawing.planned_setting_table_box()
+    assert drawing.setting_table_box_violations(box) == []
