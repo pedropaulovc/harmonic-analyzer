@@ -218,6 +218,7 @@ def test_successful_check_keeps_top_level_span_depth(tmp_path, check_env, monkey
         "from opentelemetry.sdk.trace.export import SimpleSpanProcessor\n"
         "from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter\n"
         "import _telemetry\n"
+        "_telemetry.configure()\n"
         "exporter = InMemorySpanExporter()\n"
         "trace.get_tracer_provider().add_span_processor(SimpleSpanProcessor(exporter))\n"
         "with _telemetry.span('operation'):\n"
