@@ -45,6 +45,7 @@ from _drawing_layout_audit import annotation_display
 from _drawing_projection import model_point_in_view
 from _drawing_types import DRAWING_TEMPLATES, DrawingSpec
 from _drawing_sheet_region import sheet_drawable_region
+from _drawing_tolerances import _tolerance_places
 from _drawing_view_display import set_hidden_lines_removed
 from _layout_audit import display_box
 from _purchased_fastener_drawing import (
@@ -59,6 +60,7 @@ from _purchased_fastener_drawing import (
     _open_supplier_source_read_only,
     _purchased_title_block,
     _rebuild,
+    _supplier_data_lines,
     _source_file_sha256,
     add_purchased_footer,
     assert_supplier_annotations_fit,
@@ -70,7 +72,7 @@ from _purchased_fastener_drawing import (
 )
 from _purchased_part_variants import _suppressed
 from _rebuild import active_configuration_name
-from _supplier_extension_spring import FREE_LENGTH, MAX_LENGTH, WIRE_DIA
+from _supplier_extension_spring import COIL_OD, FREE_LENGTH, MAX_LENGTH, WIRE_DIA
 from _supplier_spring_reference import SUPPLIER_FREE_CONFIGURATION
 from _reference_source_lifecycle import (
     _activate_reference_document,
@@ -180,10 +182,10 @@ def assert_supplier_configuration_value(
 
 
 # A tier-2 specification-control sheet's footer heading (#2886; owner ruling
-# 2026-11-17: accept on the supplier catalogue's tolerances). Toleranced
-# values are acceptance limits; a parenthesized value is one the supplier
-# states no tolerance on, printed as reference.
-SPEC_CONTROL_HEADING = "SUPPLIER CATALOGUE TOLERANCES; ( ) = REF, NONE STATED:"
+# 2026-11-17: accept on the supplier catalogue's tolerances). Its toleranced
+# values are acceptance limits; a parenthesized value is ordinary REF, one
+# the supplier states no tolerance on (drawing-simplicity-policy.md).
+SPEC_CONTROL_HEADING = "SUPPLIER CATALOGUE TOLERANCES (ACCEPT):"
 _MM_PER_IN = 25.4
 _N_PER_LBF = 4.4482216152605
 
@@ -213,21 +215,26 @@ def extension_spring_spec_control_data(
     Rate, initial tension and coil OD carry the supplier's stated
     tolerances; the lengths and wire, which it states none on, print as
     parenthesized reference at the catalogue's own places (``precision`` is
-    keyed by the source dimension names). The free and maximum lengths are
-    inside-hook/inside-loop measurements of states the sheet does not draw.
+    keyed by the source dimension names). The coil OD prints at its own
+    places or the tolerance's, whichever is finer. The free and maximum
+    lengths are inside-hook/inside-loop measurements of states the sheet
+    does not draw.
     """
 
     def inch(value_mm: float, name: str) -> str:
         return _inch_text(value_mm / _MM_PER_IN, precision[name])
 
+    od_places = max(
+        precision[COIL_OD], _tolerance_places(coil_od_tolerance_mm, display_unit="in")
+    )
     rate = rate_n_per_mm * _MM_PER_IN / _N_PER_LBF
     lbf = 1.0 / _N_PER_LBF
     return (
         f"RATE {_inch_text(rate, 2)} ±{_inch_text(rate * rate_tolerance_fraction, 2)}"
         f" LBF/IN, INITIAL TENSION {_inch_text(initial_tension_n * lbf, 2)}"
         f" ±{_inch_text(initial_tension_tolerance_n * lbf, 2)} LBF",
-        f"COIL OD Ø{_inch_text(coil_od_mm / _MM_PER_IN, 3)}"
-        f" ±{_inch_text(coil_od_tolerance_mm / _MM_PER_IN, 3)},"
+        f"COIL OD Ø{_inch_text(coil_od_mm / _MM_PER_IN, od_places)}"
+        f" ±{_inch_text(coil_od_tolerance_mm / _MM_PER_IN, od_places)},"
         f" WIRE (Ø{inch(wire_dia_mm, WIRE_DIA)})",
         f"FREE ({inch(free_length_mm, FREE_LENGTH)}), MAX EXTENDED"
         f" ({inch(max_length_mm, MAX_LENGTH)}) INSIDE {ends}",
@@ -852,6 +859,10 @@ def build_supplier_spring_drawing(
     footer lines (:func:`extension_spring_spec_control_data`). A
     specification-control sheet passes ``SPEC_CONTROL_HEADING``.
     """
+    # Footer data and its heading fail here, before the seat opens anything.
+    _supplier_data_lines(
+        supplier_data, label=spec.artifact_stem, heading=supplier_data_heading
+    )
     supplier_margins = supplier_margins or {}
     supplier_reference_features = supplier_reference_features or {}
     if installed_front and (

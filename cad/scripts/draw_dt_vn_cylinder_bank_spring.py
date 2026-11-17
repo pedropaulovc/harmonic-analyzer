@@ -1,6 +1,6 @@
 """Supplier nominal dimension diagrams beside the installed 9714K392 envelope.
 
-The sheet prints only replacement sizes: ID, OD and free height. The strip
+The sheet's views print only replacement sizes: ID, OD and free height. The strip
 thickness is not one: SKU 9714K392 defines it, and its 0.127 mm strip
 printed as a doubled hairline through the FRONT envelope (machinist review of
 4e46b502). The part keeps its strip and catalogue load-point gauge sketches,

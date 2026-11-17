@@ -138,7 +138,14 @@ their sheet re-keys for another reason.
   reads stays in the spec, and the native dimension that prints is refused if
   it gains a tolerance (`_supplier_unbanded`). Supplier application ranges,
   such as a spring pin's mating-hole range, are application data, not part
-  sizes, and may print. Reference sketches are authored in
+  sizes, and may print. Tier-2 specification-control sheets (#2886; owner
+  ruling 2026-11-17: accept on the supplier catalogue's tolerances) are the
+  one place a catalogue band prints: once, as acceptance limits in the footer
+  under `SUPPLIER CATALOGUE TOLERANCES (ACCEPT):`, formatted from the spec
+  constants by `_supplier_spring_drawing`'s `*_spec_control_data` helpers.
+  Forces such as a spring's rate and initial tension have no model dimension
+  to carry them; the native diagram sizes stay untoleranced REF. A value the
+  supplier states no tolerance on prints parenthesized as REF. Reference sketches are authored in
   the final transformed stock frame by `_supplier_screw_reference`; only
   threaded builders import the separate `_supplier_screw_save` saver.
   Connected linear witnesses reuse an existing anchor only after both native
