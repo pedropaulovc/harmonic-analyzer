@@ -43,8 +43,8 @@ Parting off to a length tolerance comes early because thirty-eight bushings
 whose lengths set the channel pitch come early. The mill is CNC-converted and
 milled parts run from G-code posted with FreeCAD's CAM (owner ruling
 2026-11-17), so the mill track teaches workholding, zeroing, proving a program
-in air and checking the part. The rocker strap is the first part trialled end
-to end on the CNC mill. The lathe stays manual.
+in air and checking the part. The rocker strap is the first part routed for
+the CNC mill. The lathe stays manual.
 
 Every module also makes its common mistakes on purpose first: on scrap, with a
 small cut, one change at a time, before doing the job right. You only recognize
