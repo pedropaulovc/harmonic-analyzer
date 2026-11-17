@@ -7,7 +7,6 @@ cad/process/
   shop.toml                 prechips shop file, shared by every plan
   <stem>/plan.toml          one prechips plan per part
   <stem>/diagrams/*.svg     optional setup diagrams the plan names
-  hand-travelers/           interim handwritten sheets (see its README)
 ```
 
 [prechips](https://github.com/pedropaulovc/prechips) is a stdlib-only PyPI
@@ -93,6 +92,7 @@ Facts prechips has no field for, but which CAD specs and tests read, live in
   `test_ms_stick_drawing.py` reads both against the printed groove limits
   (#2433);
 - the PM 6-in vise's make, SKU and source;
+
 - three `[[stock]]` rows: OnlineMetals 4807 strap and 1173 bar, and McMaster
   8663K55 acetal;
 - the MHA-FR-02 top-frame casting to buy (owner ruling 2026-11-10 (Pedro),
