@@ -1897,7 +1897,7 @@ def test_retry_capture_does_not_erase_the_first_failure(tmp_path):
 
 def test_authoring_context_is_recorded_on_the_success_path(tmp_path, capture_telemetry):
     """A failure-only capture cannot answer "what was different about the run
-    that worked?", so the same state bags are recorded per part build."""
+    that worked?", so the screen-space bags are recorded per part build."""
     spans, logs = capture_telemetry
     context = _seat_forensics.record_authoring_context(_unmerged_profile(tmp_path), "logo_ring")
 
@@ -3003,17 +3003,21 @@ def test_a_service_session_is_not_labelled_as_a_disconnected_interactive_desktop
     monkeypatch.setattr(_seat_forensics, "_process_session_id", lambda pid: session_id)
     monkeypatch.setattr(_seat_forensics, "_session_connect_state", lambda session: "disconnected")
     monkeypatch.setattr(_seat_forensics, "_frame_geometry", lambda adapter: {})
-    with _telemetry.span("drawing.new_from_template"):
-        _seat_forensics.record_drawing_display(
-            _Adapter(sw=_Seat(), model=_PickDrawing()), "session comparison"
+    with _telemetry.span("drawing.pick"), pytest.raises(RuntimeError):
+        _seat_forensics.capture_pick_miss(
+            _Adapter(sw=_Seat(), model=_PickDrawing()),
+            "missed",
+            view="v",
+            entity_type="EDGE",
+            sheet_xy=(0.1, 0.2),
         )
     (event,) = [
-        e for s in spans.get_finished_spans() for e in s.events if e.name == "seat.drawing_display"
+        e for s in spans.get_finished_spans() for e in s.events if e.name == "drawing.pick_miss"
     ]
     assert event.attributes["seat_session_id"] == session_id
     assert event.attributes["seat_session_state"] == "disconnected"
     (record,) = [r.log_record for r in logs.get_finished_logs()]
-    seat = json.loads(record.attributes["seat"])
+    seat = json.loads(record.attributes["capture"])["seat"]
     assert seat["seat_session_id"] == session_id
     assert seat["seat_session_state"] == "disconnected"
     if session_id == 0:
@@ -3127,9 +3131,8 @@ def test_a_pick_miss_writes_its_capture_under_failures(
     )
 
 
-@pytest.mark.parametrize("pick_miss", [False, True], ids=["drawing_display", "pick_miss"])
 def test_failed_window_and_seat_probes_preserve_both_causes_and_still_emit(
-    capture_telemetry, monkeypatch, pick_miss
+    capture_telemetry, monkeypatch
 ):
     spans, logs = capture_telemetry
 
@@ -3142,49 +3145,21 @@ def test_failed_window_and_seat_probes_preserve_both_causes_and_still_emit(
     monkeypatch.setattr(_seat_forensics, "display_geometry", unreadable_display)
     monkeypatch.setattr(_seat_forensics, "seat_provenance", unreadable_seat)
     message = "failed to select x edge at sheet (0.1, 0.2)"
-    with _telemetry.span("drawing.window_probe"):
-        if pick_miss:
-            with pytest.raises(RuntimeError) as raised:
-                _seat_forensics.capture_pick_miss(
-                    object(), message, view="v", entity_type="EDGE", sheet_xy=(0.1, 0.2)
-                )
-            assert type(raised.value) is RuntimeError and str(raised.value) == message
-        else:
-            _seat_forensics.record_drawing_display(object(), "unreadable drawing")
-    event_name = "drawing.pick_miss" if pick_miss else "seat.drawing_display"
+    with _telemetry.span("drawing.window_probe"), pytest.raises(RuntimeError) as raised:
+        _seat_forensics.capture_pick_miss(
+            object(), message, view="v", entity_type="EDGE", sheet_xy=(0.1, 0.2)
+        )
+    assert type(raised.value) is RuntimeError and str(raised.value) == message
     (event,) = [
-        e for s in spans.get_finished_spans() for e in s.events if e.name == event_name
+        e for s in spans.get_finished_spans() for e in s.events if e.name == "drawing.pick_miss"
     ]
     assert event.attributes["display_capture_error"] == "OSError: graphics window unavailable"
     assert event.attributes["seat_capture_error"] == "RuntimeError: seat identity unavailable"
     (record,) = [r.log_record for r in logs.get_finished_logs()]
-    assert record.severity_text == ("WARN" if pick_miss else "INFO")
-    if pick_miss:
-        capture = json.loads(record.attributes["capture"])
-    else:
-        capture = {
-            "display": json.loads(record.attributes["display"]),
-            "seat": json.loads(record.attributes["seat"]),
-        }
+    assert record.severity_text == "WARN"
+    capture = json.loads(record.attributes["capture"])
     assert capture["display"]["display_capture_error"] == "OSError: graphics window unavailable"
     assert capture["seat"]["seat_capture_error"] == "RuntimeError: seat identity unavailable"
-
-
-def test_every_drawing_records_the_window_its_picks_hit_test_in(capture_telemetry, monkeypatch):
-    """The success-side half: the leaf that passed says what window it had."""
-    spans, logs = capture_telemetry
-    monkeypatch.setattr(_seat_forensics, "_frame_geometry", lambda adapter: {})
-    with _telemetry.span("drawing.new_from_template"):
-        _seat_forensics.record_drawing_display(
-            _Adapter(sw=_Seat(), model=_PickDrawing()), "new landscape drawing"
-        )
-    (event,) = [
-        e for s in spans.get_finished_spans() for e in s.events if e.name == "seat.drawing_display"
-    ]
-    assert event.attributes["view_visible_height_px"] == 1160
-    assert event.attributes["seat_session_state"] == "active"
-    bodies = [str(r.log_record.body) for r in logs.get_finished_logs()]
-    assert any(b.startswith("drawing display new landscape drawing: session=active") for b in bodies)
 
 
 def test_a_retried_pivot_bore_pick_can_succeed_without_an_error_log(

@@ -1307,10 +1307,12 @@ def record_authoring_context(adapter: Any, label: str) -> dict[str, Any]:
 
     A failure-only capture cannot answer "what was different about the run that
     worked?", which is the question that identifies a seat-state cause. Sketch
-    inference is still live on most sketch paths (the adapter's
-    ``create_line``/``create_circle``/``create_arc`` do not set ``AddToDB``;
-    only the call sites that wrap :func:`_sketch.set_sketch_direct_db` author
-    direct-to-DB), and a screen-space snap rebuilds a wrong but valid shape that
+    inference is still live on many sketch paths: the adapter's
+    ``add_line``/``add_circle``/``add_arc`` (``CreateLine``/
+    ``CreateCircleByRadius``/``CreateArc``) do not set ``AddToDB``; only sites
+    that set ``ISketchManager.AddToDB`` (inline, or through
+    :func:`_sketch.set_sketch_direct_db`) author direct-to-DB. A screen-space
+    snap rebuilds a wrong but valid shape that
     raises nothing, so this record is the only evidence such a build leaves.
     It holds the two bags that diagnosis needs: the screen-space geometry
     (frame rect, view scale, measured px/mm) and ``ISketchManager``'s sticky
@@ -1393,32 +1395,19 @@ def _display_bags(adapter: Any) -> tuple[dict[str, Any], dict[str, Any]]:
 
 
 def record_drawing_display(adapter: Any, label: str) -> None:
-    """Record, on the success path, the window a drawing's coordinate picks
-    hit-test in.
+    """No-op; it only remains as a pinned call site.
 
-    ``SelectByID2`` at a sheet point runs SolidWorks' interactive pick in the
-    document's graphics window, at a pixel tolerance mapped through the zoom.
-    ``new_project_drawing`` fits the sheet to that window, so its pixel size is
-    the one input a coordinate pick has that the model does not decide. Part
-    builds record it (:func:`record_authoring_context`); drawings did not, so
-    when ``drawing:pinion_arbor``'s journal pick missed on swmaker00000a@10 and
-    hit on swmaker000004@4 with the same key, neither leaf said what window it
-    picked in. Reads only; never raises.
+    It recorded the drawing's pick window on every successful drawing, for
+    ``com_replay``'s ``seat_display`` judgement (retired, #2880) and as the
+    passing half of a pick-miss comparison. A pick miss now captures its own
+    window (:func:`capture_pick_miss`), and the pool's seat check records the
+    frame size on every seat.
+
+    TODO(#2883): delete this and its call in
+    ``_drawing_common.new_project_drawing`` with the next change that re-keys
+    every drawing anyway (the adapter's direct-to-DB sketch wave). Removing the
+    tracked call alone would re-key all drawings for nothing.
     """
-    display, seat = _display_bags(adapter)
-    with contextlib.suppress(Exception):
-        _telemetry.event(
-            "seat.drawing_display",
-            label=label,
-            **_session._attributes_of(display),
-            **_session._attributes_of(seat),
-        )
-        _telemetry.info(
-            f"drawing display {label}: {_display_summary(display, seat)}",
-            label=label,
-            display=json.dumps(display, default=str, sort_keys=True),
-            seat=json.dumps(seat, default=str, sort_keys=True),
-        )
 
 
 def capture_pick_miss(
@@ -1436,8 +1425,7 @@ def capture_pick_miss(
     point may be off the drawn entity, or the seat's hit test may not see an
     entity that is there. The second is seat state (the graphics window's pixel
     size and zoom, the session's display), which the model cannot show and the
-    leaf log did not record. Paired with :func:`record_drawing_display` on the
-    leaves that passed, this is the comparison a worker-dependent miss needs.
+    leaf log did not record; this capture records it at the miss.
     Every probe is guarded; the caller's message always survives. This capture
     never returns, but a caller can catch the RuntimeError and retry another
     pick. The forensic line is therefore WARN, not a terminal-failure verdict.
