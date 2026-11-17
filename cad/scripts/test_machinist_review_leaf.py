@@ -136,8 +136,8 @@ def _local_import_closure(entry: Path) -> set[str]:
                 local = scripts / f"{name}.py"
                 # Registry is only used by interactive name/--all selectors;
                 # the leaf supplies PDF, kind and name. The ASSEMBLY.md
-                # generator is keyed per package instead, by
-                # dodo._machinist_review_fitup_deps (rule 22).
+                # generator keys a review by the section it renders, through
+                # dodo._machinist_review_fitup_text (rule 22).
                 if local.is_file() and name not in {"_drawing_registry", "ha_assembly_package"}:
                     pending.append(local)
     return found
@@ -149,20 +149,25 @@ def test_declared_review_modules_equal_the_real_import_closure(dodo):
     )
 
 
-def test_assembly_review_keys_on_its_assembly_md_sources(dodo, monkeypatch):
-    """Rule 22: a package whose steps print in ASSEMBLY.md is reviewed with
-    that section, so its sources key the review; the list is read statically."""
+def test_assembly_review_keys_on_its_rendered_fitup_section(dodo, monkeypatch, tmp_path):
+    """Rule 22: the review reads its package's ASSEMBLY.md section, so the
+    rendered text keys it, not the code and config that print it."""
     import ha_assembly_package
 
     assert dodo._steps_in_document() == ha_assembly_package.STEPS_IN_DOCUMENT
-
-    def names() -> set[str]:
-        return {Path(p).name for p in dodo._machinist_review_file_deps("mg_magnifier_assembly")}
-
+    monkeypatch.setattr(dodo, "REPORTS", tmp_path)
+    stem = "mg_magnifier_assembly"
     monkeypatch.setattr(dodo, "_steps_in_document", lambda: ())
-    assert "mg_magnifier_assembly_sheet.py" not in names()
+    assert dodo._machinist_review_fitup_text(stem) is None
+
     monkeypatch.setattr(dodo, "_steps_in_document", lambda: ("mg-magnifier",))
-    assert {"ha_assembly_package.py", "mg_magnifier_assembly_sheet.py"} <= names()
+    deps = dodo._machinist_review_key_deps(stem)
+    fitup = dodo._machinist_review_fitup_text(stem)
+    assert str(fitup) in deps
+    assert fitup.read_text(encoding="utf-8") == "\n".join(
+        ha_assembly_package.fitup_lines("mg-magnifier")
+    ).strip()
+    assert not {"mg_magnifier_assembly_sheet.py", "_config.py"} & {Path(d).name for d in deps}
 
 
 def test_leaf_command_runs_three_blind_reviews(inputs, monkeypatch):
