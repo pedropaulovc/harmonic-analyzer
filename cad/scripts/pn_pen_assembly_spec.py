@@ -81,7 +81,7 @@ QUANTITIES = {stem: 1 for stem in BOM_ORDER}
 
 # --- exploded view -------------------------------------------------------------
 # The named explode and its steps live in pn_pen_explode_spec, which only the
-# builder's explode module and the drawing read (the EXPLODE refresh tier).
+# builder's explode module and the drawing read.
 # The exploded view's camera stays here: the builder names it in the
 # operational model. The rod set screw's tap opens on the yawed block's front
 # face, whose normal is machine (-X, -Z); the built-in *Isometric (+X+Y+Z)

@@ -19,7 +19,7 @@ from _assembly_contract import assembly_contract
 from _paths import CAD_ROOT
 from _buildgraph import module_deps_of
 from _drawing_registry import DRAWINGS_BY_NAME
-from _sm_summing_explode import station_of, summing_exploded_view_name
+from _sm_summing_explode import station_of
 from _cone_axis_constants import SUMMING_Z
 import sm_summing_lever_spec
 from stock_anchor_geom import ANCHOR_9490T1
@@ -119,8 +119,6 @@ def test_explode_moves_only_contracted_families_with_split_stations() -> None:
     assert station_of(builder.KNIFE_MOUNT_Z_MINUS) == "back"
     with pytest.raises(ValueError):
         station_of(SUMMING_Z)
-    assert summing_exploded_view_name("Default") == explode.EXPLODED_VIEW_NAME
-    assert summing_exploded_view_name("Default Simplified") == "SM_EXPLODED Simplified"
 
 
 def test_station_slide_clears_the_hex_trunnion() -> None:

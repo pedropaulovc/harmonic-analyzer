@@ -1,13 +1,10 @@
 """Pure explode contract of pn-pen.SLDASM (MHA-PN-00): the builder's named
 ``PN_EXPLODED`` presentation and the ordered native steps that open it.
 
-Only ``_pn_pen_explode`` (through the builder's canonical
-``author_in_drawing_configurations`` call) and the drawing read this module,
-so an explode-only edit takes the EXPLODE refresh tier (``_refresh_tier``):
-the saved model is reopened and its named explodes are re-authored, with no
-insert/mate loop. Distances are presentation offsets, not dimensions;
-directions come from the carriage's own axes (``pn_pen_carriage_geom``) or
-the assembly's global axes. No SolidWorks imports.
+Read by ``_pn_pen_explode`` and the drawing. Distances are presentation
+offsets, not dimensions; directions come from the carriage's own axes
+(``pn_pen_carriage_geom``) or the assembly's global axes. No SolidWorks
+imports.
 
 The disassembly order, the sheet's ASSEMBLY_STEPS read back to front: the
 hanger's loose fastening off, the wire off the eye, the carriage out of the

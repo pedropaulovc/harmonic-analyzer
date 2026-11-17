@@ -1188,7 +1188,7 @@ def forced_refresh(label: str) -> str | None:
 
 
 def capture_refresh(label: str, key: str) -> None:
-    """Capture a root/alias CAS once, before intentional refresh work begins."""
+    """Capture a key's CAS once, before intentional refresh work begins."""
     if forced_refresh(label) is None or (label, key) in _REFRESH_ETAGS:
         return
     backend = _backend()
@@ -1976,20 +1976,14 @@ def restore(key: str, outputs: list[Path], label: str) -> bool:
             blob.close()
 
 
-def store(
-    key: str, outputs: list[Path], label: str, *, refresh_label: str | None = None
-) -> str:
-    """Publish canonical outputs, or CAS a previously snapshotted root/alias."""
-    authority = refresh_label or label
-    refreshing = forced_refresh(authority) is not None
+def store(key: str, outputs: list[Path], label: str) -> str:
+    """Publish canonical outputs, or CAS a previously snapshotted key."""
     replace_etag = None
-    if refreshing:
-        if (authority, key) not in _REFRESH_ETAGS:
-            raise RuntimeError(f"{authority}: forced cache refresh was not probed before work")
-        replace_etag = _REFRESH_ETAGS[(authority, key)]
-    return require_refresh_store(
-        authority, _store(key, outputs, label, replace_etag=replace_etag)
-    )
+    if forced_refresh(label) is not None:
+        if (label, key) not in _REFRESH_ETAGS:
+            raise RuntimeError(f"{label}: forced cache refresh was not probed before work")
+        replace_etag = _REFRESH_ETAGS[(label, key)]
+    return require_refresh_store(label, _store(key, outputs, label, replace_etag=replace_etag))
 
 
 def _store(

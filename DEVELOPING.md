@@ -1820,9 +1820,8 @@ re-stamped; assembly input ledgers are rewritten. Drawing/generic COM bundles
 adopt all archived outputs, and machinist review re-reads the winning aggregate
 before enforcing/stamping it. LEARN softens machinist verdicts, not adoption
 failures: inability to clean/restore/read winning evidence is fatal even in LEARN.
-Ordinary explode-base alias loss is ignored without adopting it over the current
-full-key outputs. An ordinary upload failure with no canonical entry remains
-fail-soft; `ro` and `off` contracts are unchanged.
+An ordinary upload failure with no canonical entry remains fail-soft; `ro` and
+`off` contracts are unchanged.
 
 A gate produces no CAD artefact, so **its stamp is its cached output**
 (`cad/out/reports/verify-*.ok`, `preflight.ok`): identical inputs imply an

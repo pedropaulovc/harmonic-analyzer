@@ -998,7 +998,7 @@ def test_one_registry_row_change_rekeys_only_that_drawing():
 _WHOLE_CONTRACT_FAMILY_DRAWINGS = {
     # BOM_PART_NUMBERS reads every BOM component's contract number in a loop.
     "ha_harmonic_analyzer_assembly",
-    # _pd_paper_drive_explode -> _assembly_patterns -> _assembly, whose
+    # _pd_paper_drive_explode -> _explode_steps -> _assembly_patterns -> _assembly, whose
     # title/number/free-stem helpers take the stem as a parameter.
     "pd_paper_drive_assembly",
 }
@@ -3063,6 +3063,7 @@ def test_a_channel_archive_without_the_spring_stl_still_restores(tmp_path, monke
     assert not stale.exists()
 
 
+
 def test_digest_files_is_location_independent(tmp_path):
     """P2 #1 (PR #103 review): the recipe digest must be IDENTICAL across checkout
     roots, because it now feeds the cross-machine remote-cache key via
@@ -4261,9 +4262,7 @@ def test_every_assembly_subprocess_is_guarded_by_its_rows(monkeypatch, tmp_path,
     keying the guard on the label dropped it for every assembly build. The guard
     is keyed on the doit task instead, whatever the display label says."""
     dodo = _load_dodo()
-    # Exercise a narrowed assembly's guard plumbing on an assembly with no
-    # explode-tier plan (the pen's explode qualifies since #1603, so its FULL
-    # path first probes an explode base); the row is a stand-in.
+    # Exercise a narrowed assembly's guard plumbing; the row is a stand-in.
     monkeypatch.setitem(
         dodo._FASTENER_ROWS, "assembly:ms_measuring_stick", frozenset({"pn-vn-pen-set-screw"})
     )
@@ -4280,147 +4279,6 @@ def test_every_assembly_subprocess_is_guarded_by_its_rows(monkeypatch, tmp_path,
     for name, env in launched:
         assert env.get("HARMONIC_FASTENER_ROWS") == "pn-vn-pen-set-screw", name
         assert env.get("HARMONIC_FIT_GROUPS") == fit_groups, name
-
-
-PD_EXPLODE_SPEC = "cad/scripts/pd_paper_drive_explode_spec.py"
-
-
-def _pd_clean_leaf(dodo, monkeypatch, tmp_path, *, base_inputs, refresh_rc=0):
-    """Run ``build_or_refresh("pd_paper_drive")`` on a clean workspace whose full
-    cache key misses. ``base_inputs`` is the ledger of the cached explode base,
-    or None when the cache holds no base; ``refresh_rc`` is the exit code of
-    ``refresh_assembly.py``. Returns ``(commands, restores, stores)`` as
-    ``(script, args)`` and ``(key, label)`` rows."""
-    launched, restores, stores = [], [], []
-
-    class FakePopen:
-        def __init__(self, cmd, cwd, env, **_kw):
-            self.script = Path(cmd[1]).name
-            launched.append((self.script, list(cmd[2:])))
-            self.stdout = iter(())
-
-        def wait(self):
-            return refresh_rc if self.script == "refresh_assembly.py" else 0
-
-    @contextlib.contextmanager
-    def free_seat(label):
-        yield 0.0
-
-    target = tmp_path / "pd-paper-drive.SLDASM"
-    ledger = tmp_path / ".pd-paper-drive.inputs.json"
-
-    def restore(key, _outputs, label):
-        restores.append((key, label))
-        if base_inputs is None or not label.endswith("explode-base"):
-            return False
-        target.write_bytes(b"base")
-        (tmp_path / ".pd-paper-drive.massprops.sha").write_text("proof\n", encoding="utf-8")
-        dodo._write_input_ledger(ledger, base_inputs)
-        return True
-
-    deps = dodo._recipe_files("pd_paper_drive")
-    monkeypatch.setattr(dodo, "_assembly_file_deps", lambda _stem: deps)
-    monkeypatch.setattr(dodo, "_input_ledger", lambda _stem: ledger)
-    monkeypatch.setattr(dodo, "LOGS", tmp_path / "logs")
-    monkeypatch.setattr(dodo._cache, "restore", restore)
-    monkeypatch.setattr(
-        dodo._cache,
-        "store",
-        lambda key, _o, label, **_kw: stores.append((key, label)) or "stored",
-    )
-    monkeypatch.setattr(dodo._farm, "enabled", lambda: False)
-    monkeypatch.setattr(dodo, "_com_seat", free_seat)
-    monkeypatch.setattr(dodo, "_reprobe_under_seat", lambda *_a: False)
-    monkeypatch.setattr(dodo, "_sw_ensure_once", lambda: None)
-    monkeypatch.setattr(dodo, "_sw_autostart_enabled", lambda: False)
-    monkeypatch.setattr(dodo, "_assembly_cache_outputs", lambda _stem: [])
-    monkeypatch.setattr(dodo, "_stamp_assembly_execution", lambda _stem: None)
-    monkeypatch.setattr(dodo.subprocess, "Popen", FakePopen)
-
-    dodo.build_or_refresh("pd_paper_drive", [], [], [str(target)])
-
-    assert dodo._read_input_ledger(ledger) == dodo._ledger_inputs(deps)
-    return launched, restores, stores
-
-
-def test_clean_leaf_with_an_explode_base_takes_the_explode_tier(monkeypatch, tmp_path):
-    dodo = _load_dodo()
-    current = dodo._ledger_inputs(dodo._recipe_files("pd_paper_drive"))
-    assert PD_EXPLODE_SPEC in current
-    base = {**current, PD_EXPLODE_SPEC: "0" * 32}
-
-    launched, restores, stores = _pd_clean_leaf(
-        dodo, monkeypatch, tmp_path, base_inputs=base
-    )
-
-    assert launched == [("refresh_assembly.py", ["pd_paper_drive", "explode"])]
-    assert [label for _key, label in restores] == [
-        "assembly:pd_paper_drive",
-        "assembly:pd_paper_drive explode-base",
-    ]
-    # The base it started from is already cached; only the full key is new.
-    assert stores == [restores[0]]
-
-
-def test_failed_explode_tier_falls_back_to_full_in_the_same_task(monkeypatch, tmp_path):
-    """A pre-save EXPLODE failure leaves the base's bytes, proof and ledger as
-    they were, so the next leaf restoring that base would pick EXPLODE and fail
-    the same way again (coderabbit on #1575). The task builds FULL instead."""
-    dodo = _load_dodo()
-    current = dodo._ledger_inputs(dodo._recipe_files("pd_paper_drive"))
-    base = {**current, PD_EXPLODE_SPEC: "0" * 32}
-
-    launched, restores, stores = _pd_clean_leaf(
-        dodo, monkeypatch, tmp_path, base_inputs=base, refresh_rc=1
-    )
-
-    assert launched == [
-        ("refresh_assembly.py", ["pd_paper_drive", "explode"]),
-        ("build_pd_paper_drive_assembly.py", []),
-    ]
-    # The FULL result is a fresh base for this operational model: publish both.
-    assert stores == restores
-
-
-def test_clean_leaf_without_a_base_builds_full_and_publishes_the_base(
-    monkeypatch, tmp_path
-):
-    dodo = _load_dodo()
-
-    launched, restores, stores = _pd_clean_leaf(
-        dodo, monkeypatch, tmp_path, base_inputs=None
-    )
-
-    assert launched == [("build_pd_paper_drive_assembly.py", [])]
-    assert stores == restores
-    assert stores[0][0] != stores[1][0]
-
-
-def test_explode_base_key_ignores_only_the_explode_closure(monkeypatch):
-    dodo = _load_dodo()
-    deps = dodo._recipe_files("pd_paper_drive")
-    plan = dodo.explode_plan("pd_paper_drive")
-    digest = dodo.ContentChecker._digest
-    keys = {}
-    for edited in (
-        None,
-        PD_EXPLODE_SPEC,
-        "cad/scripts/build_pd_paper_drive_assembly.py",
-    ):
-        monkeypatch.setattr(
-            dodo.ContentChecker,
-            "_digest",
-            staticmethod(
-                lambda path, edited=edited: "edited"
-                if edited and dodo._rel_tag(path) == edited
-                else digest(path)
-            ),
-        )
-        keys[edited] = (dodo._cache_key(deps), dodo._explode_base_key(deps, plan))
-    full, base = keys[None]
-    assert keys[PD_EXPLODE_SPEC][0] != full and keys[PD_EXPLODE_SPEC][1] == base
-    builder = keys["cad/scripts/build_pd_paper_drive_assembly.py"]
-    assert builder[0] != full and builder[1] != base
 
 
 @pytest.mark.parametrize(
@@ -4987,7 +4845,7 @@ def test_prechips_empty_enrollment_has_no_tasks(monkeypatch):
     assert list(dodo.task_prechips()) == []
 
 
-@pytest.mark.parametrize("kind", ["part", "assembly", "explode_assembly", "gate"])
+@pytest.mark.parametrize("kind", ["part", "assembly", "gate"])
 @pytest.mark.parametrize("outcome", ["stored", "lost", "skip", "empty", "error", "off"])
 def test_forced_refresh_never_restores_and_requires_a_stored_result(
     monkeypatch, tmp_path, kind, outcome
@@ -5001,7 +4859,6 @@ def test_forced_refresh_never_restores_and_requires_a_stored_result(
     labels = {
         "part": "part:pn_pen_rod",
         "assembly": "assembly:ms_measuring_stick",
-        "explode_assembly": "assembly:pd_paper_drive",
         "gate": "verify:kinematics",
     }
     label = labels[kind]
@@ -5038,10 +4895,9 @@ def test_forced_refresh_never_restores_and_requires_a_stored_result(
     monkeypatch.setattr(dodo, "_assembly_cache_outputs", lambda *_a: [output])
     monkeypatch.setattr(dodo, "_stamp_assembly_execution", lambda *_a: None)
     monkeypatch.setattr(dodo, "_input_ledger", lambda *_a: ledger)
-    if kind.endswith("assembly"):
+    if kind == "assembly":
         # A matching local target and ledger must not launder the old cached
-        # assembly by taking a cheap reload tier (PARTS/EXPLODE) or restoring an
-        # explode base instead of rerunning its recipe.
+        # assembly by taking a cheap reload tier instead of rerunning its recipe.
         output.write_bytes(b"old cached assembly")
         (tmp_path / ".result.massprops.sha").write_text("proof\n", encoding="utf-8")
         dodo._write_input_ledger(ledger, {})
@@ -5049,7 +4905,7 @@ def test_forced_refresh_never_restores_and_requires_a_stored_result(
     def run():
         if kind == "part":
             dodo._cached_part_action("pn_pen_rod", tmp_path / "build.py")
-        elif kind.endswith("assembly"):
+        elif kind == "assembly":
             dodo.build_or_refresh(label.split(":")[1], [], [], [str(output)])
         else:
             dodo._cached_com_action(label, ["gate"], [], [output], "gate")
@@ -5062,15 +4918,7 @@ def test_forced_refresh_never_restores_and_requires_a_stored_result(
     assert builds == [label]
     if kind == "assembly":
         assert Path(commands[0][1]).name == "build_ms_measuring_stick_assembly.py"
-    if kind == "explode_assembly":
-        assert Path(commands[0][1]).name == "build_pd_paper_drive_assembly.py"
     expected = [("a" * 64, [output], label)]
-    if kind == "explode_assembly" and outcome == "stored":
-        # The recomputed result also replaces the explode base it would share.
-        assert [(o, lab) for _key, o, lab in stores[1:]] == [
-            ([output], f"{label} explode-base")
-        ]
-        stores = stores[:1]
     assert stores == expected
     # Both the first probe and under-seat re-probe bypassed restore.
     assert refreshes == [(label, "a" * 64, "Owner - Re-evaluate unchanged inputs")] * 2
@@ -5179,7 +5027,6 @@ def canonical_publication(tmp_path, monkeypatch):
     monkeypatch.setattr(dodo, "_input_ledger", lambda stem: dodo.CAD_OUT / "sldasm" / f".{stem}.inputs.json")
     monkeypatch.setattr(dodo, "_recipe_files", lambda stem: [str(script(stem, True))])
     monkeypatch.setattr(dodo, "POST_ASSEMBLY", {})
-    monkeypatch.setattr(dodo, "explode_plan", lambda _stem: SimpleNamespace(closure=frozenset()))
     monkeypatch.setattr(dodo, "_assembly_tier", lambda *_a: (dodo.RefreshTier.FULL, "test missing"))
     monkeypatch.setattr(dodo, "_drawing_file_deps", lambda _stem: [str(script("leaf"))])
     monkeypatch.setattr(dodo, "_drawing_cache_outputs", lambda _stem: outputs("drawing"))
@@ -5513,186 +5360,6 @@ def test_hash_invalid_canonical_adoption_is_fatal(canonical_publication, monkeyp
         )
 
 
-def _enable_test_explode_alias(f, monkeypatch):
-    from types import SimpleNamespace
-
-    base_key = f.cache.key_inputs([], f.dodo.ContentChecker._digest)[0]
-    monkeypatch.setattr(
-        f.dodo, "explode_plan", lambda _stem: SimpleNamespace(closure=frozenset({"explode.py"}))
-    )
-    monkeypatch.setattr(f.dodo, "_explode_base_key", lambda *_args: base_key)
-    return base_key
-
-
-def test_ordinary_alias_conflict_never_adopts_over_full_key(
-    canonical_publication, monkeypatch
-):
-    import json
-    from test_artifact_cache import _get_bytes
-
-    f = canonical_publication
-    base_key = _enable_test_explode_alias(f, monkeypatch)
-    with f.at("A"):
-        f.emit("assembly", b"alias-A")
-        f.dodo._write_input_ledger(f.dodo._input_ledger("leaf"), {})
-        assert f.cache.store(base_key, f.outputs("assembly"), "assembly:leaf explode-base") == "stored"
-    old_alias = _get_bytes(f.backend, base_key)
-    monkeypatch.setattr(f.dodo, "_exec_com", lambda *_a, **_kw: f.emit("assembly", b"full-B"))
-    with f.at("B"):
-        f.run("assembly")
-        assert Path(f.dodo._sldasm("leaf")).read_bytes().startswith(b"full-B:")
-        full_key = f.dodo._cache_key(f.dodo._assembly_file_deps("leaf"))
-        assert _get_bytes(f.backend, full_key) != old_alias
-        assert _get_bytes(f.backend, base_key) == old_alias
-        events = [
-            json.loads(line)["event"]
-            for line in f.cache._EVENTS_LOG.read_text(encoding="utf-8").splitlines()
-        ]
-        assert events[-1] == "store_lost"
-
-
-@pytest.mark.parametrize("initially_present", [False, True])
-@pytest.mark.parametrize("conflict", [None, "root", "alias"])
-def test_forced_root_and_alias_cas_snapshot_before_seat_and_work(
-    canonical_publication, monkeypatch, initially_present, conflict
-):
-    import json
-    from test_artifact_cache import _get_bytes, _put_bytes
-
-    f = canonical_publication
-    base_key = _enable_test_explode_alias(f, monkeypatch)
-    with f.at("A"):
-        root_key = f.dodo._cache_key(f.dodo._assembly_file_deps("leaf"))
-        if initially_present:
-            f.emit("assembly", b"old-A")
-            f.dodo._write_input_ledger(f.dodo._input_ledger("leaf"), {})
-            with f.cache._pack(f.outputs("assembly")) as archive:
-                f.backend.put(root_key, archive)
-                f.backend.put(base_key, archive)
-    monkeypatch.setenv("HARMONIC_CACHE_REFRESH", json.dumps({
-        "labels": ["assembly:leaf"], "reason": "Owner - Refresh root and alias",
-    }))
-    initial_etags = dict(f.service.etags)
-    seat = f.dodo._com_seat
-    snapshots = []
-
-    @contextlib.contextmanager
-    def before_seat(label):
-        heads = [call[1] for call in f.service.calls if call[0] == "etag"]
-        assert sorted(heads) == sorted([f.backend._name(root_key), f.backend._name(base_key)])
-        snapshots.extend(heads)
-        if conflict is not None:
-            key = root_key if conflict == "root" else base_key
-            _put_bytes(
-                f.backend, key, b"concurrent canonical",
-                replace_etag=initial_etags.get(f.backend._name(key)),
-            )
-        with seat(label) as waited:
-            yield waited
-
-    def execute(*_args, **_kwargs):
-        assert len(snapshots) == 2
-        f.emit("assembly", b"refresh-B")
-
-    monkeypatch.setattr(f.dodo, "_com_seat", before_seat)
-    monkeypatch.setattr(f.dodo, "_exec_com", execute)
-    with f.at("B"):
-        if conflict is None:
-            f.run("assembly")
-        else:
-            with pytest.raises(RuntimeError, match="did not store outputs \\(lost\\)"):
-                f.run("assembly")
-    heads = [call[1] for call in f.service.calls if call[0] == "etag"]
-    assert heads == snapshots  # no under-seat or pre-upload recapture
-    if conflict == "root":
-        assert _get_bytes(f.backend, root_key) == b"concurrent canonical"
-        if not initially_present:
-            assert _get_bytes(f.backend, base_key) is None
-    elif conflict == "alias":
-        assert _get_bytes(f.backend, base_key) == b"concurrent canonical"
-        # The pair is deliberately non-atomic: the root has already advanced.
-        assert f.service.etags[f.backend._name(root_key)] != initial_etags.get(f.backend._name(root_key))
-    else:
-        import tarfile
-
-        def members(key):
-            archive = f.backend.get(key)
-            assert archive is not None
-            with archive, tarfile.open(fileobj=archive, mode="r:gz") as tar:
-                return {
-                    member.name: tar.extractfile(member).read()
-                    for member in tar.getmembers() if member.isreg()
-                }
-
-        assert members(root_key) == members(base_key)
-
-
-@pytest.mark.parametrize("which", ["root", "alias"])
-def test_refresh_snapshot_head_error_is_fatal_before_work(
-    canonical_publication, monkeypatch, which
-):
-    import json
-
-    f = canonical_publication
-    base_key = _enable_test_explode_alias(f, monkeypatch)
-    etag = f.backend.etag
-
-    def fail(key):
-        if (key == base_key) == (which == "alias"):
-            raise OSError("HEAD unavailable, not absence")
-        return etag(key)
-
-    monkeypatch.setattr(f.backend, "etag", fail)
-    monkeypatch.setenv("HARMONIC_CACHE_REFRESH", json.dumps({
-        "labels": ["assembly:leaf"], "reason": "Owner - Snapshot failure",
-    }))
-    monkeypatch.setattr(f.dodo, "_com_seat", lambda *_a: pytest.fail("waited for seat after failed HEAD"))
-    monkeypatch.setattr(f.dodo, "_exec_com", lambda *_a, **_kw: pytest.fail("built after failed HEAD"))
-    with f.at("B"), pytest.raises(OSError, match="HEAD unavailable"):
-        f.run("assembly")
-    assert not f.publications
-
-
-@pytest.mark.parametrize("which", ["root", "alias"])
-@pytest.mark.parametrize("initially_present", [False, True])
-def test_root_or_alias_refresh_upload_failure_is_fatal(
-    canonical_publication, monkeypatch, which, initially_present
-):
-    import json
-
-    f = canonical_publication
-    base_key = _enable_test_explode_alias(f, monkeypatch)
-    with f.at("A"):
-        root_key = f.dodo._cache_key(f.dodo._assembly_file_deps("leaf"))
-        if initially_present:
-            f.emit("assembly", b"old-A")
-            f.dodo._write_input_ledger(f.dodo._input_ledger("leaf"), {})
-            with f.cache._pack(f.outputs("assembly")) as archive:
-                f.backend.put(root_key, archive)
-                f.backend.put(base_key, archive)
-    initial_etags = dict(f.service.etags)
-    put = f.backend.put
-
-    def upload(key, blob, *, replace_etag=None):
-        if (key == base_key) == (which == "alias"):
-            raise OSError("upload unavailable")
-        return put(key, blob, replace_etag=replace_etag)
-
-    monkeypatch.setattr(f.backend, "put", upload)
-    monkeypatch.setattr(f.dodo, "_exec_com", lambda *_a, **_kw: f.emit("assembly", b"refresh-B"))
-    monkeypatch.setenv("HARMONIC_CACHE_REFRESH", json.dumps({
-        "labels": ["assembly:leaf"], "reason": "Owner - Publish failure",
-    }))
-    outcome = "lost" if initially_present else "error"
-    with f.at("B"), pytest.raises(RuntimeError, match=f"did not store outputs \\({outcome}\\)"):
-        f.run("assembly")
-    if which == "alias":
-        assert f.service.etags[f.backend._name(root_key)] != initial_etags.get(f.backend._name(root_key))
-        assert f.service.etags.get(f.backend._name(base_key)) == initial_etags.get(f.backend._name(base_key))
-    else:
-        assert f.service.etags == initial_etags
-
-
 def test_refresh_bypasses_each_cached_task_family_freshness(monkeypatch):
     import json
     import _artifact_cache
@@ -5726,33 +5393,6 @@ def test_refresh_bypasses_each_cached_task_family_freshness(monkeypatch):
     for task in tasks:
         assert False in task["uptodate"]
         assert all(getattr(action[0], "_remote_cache_action", False) for action in task["actions"])
-
-
-@pytest.mark.parametrize("shortcut", ["hit", "farm"])
-def test_ordinary_assembly_shortcut_does_not_walk_explode_closure(
-    canonical_publication, monkeypatch, shortcut
-):
-    f = canonical_publication
-    with f.at("A"):
-        key = f.dodo._cache_key(f.dodo._assembly_file_deps("leaf"))
-        if shortcut == "hit":
-            f.emit("assembly", b"canonical-A")
-            f.dodo._write_input_ledger(f.dodo._input_ledger("leaf"), {})
-            with f.cache._pack(f.outputs("assembly")) as archive:
-                f.backend.put(key, archive)
-
-    def remote(label, requested, outputs):
-        assert (label, requested) == ("assembly:leaf", key)
-        f.emit("assembly", b"remote-canonical")
-
-    monkeypatch.setattr(f.dodo._farm, "enabled", lambda: shortcut == "farm")
-    monkeypatch.setattr(f.dodo, "_farm_build", remote)
-    monkeypatch.setattr(f.dodo, "explode_plan", lambda *_a: pytest.fail("eager explode walk"))
-    monkeypatch.setattr(f.dodo, "_explode_base_key", lambda *_a: pytest.fail("eager base key"))
-    monkeypatch.setattr(f.dodo, "_exec_com", lambda *_a, **_kw: pytest.fail("shortcut built locally"))
-    with f.at("B"):
-        f.run("assembly")
-        f.identity("assembly")
 
 
 _SHARED_MEMBER_STEMS = (
