@@ -697,18 +697,20 @@ STATION_TABLE_FIELD = (0.158, 0.172, 0.350, 0.1055)
 # R16 print's pitch) take the table bottom from ~120 to ~109 mm.
 INTERFACE_FIELD = (NOTE_FIELD_LEFT[0], 0.101, NOTE_FIELD_LEFT[2], NOTE_FIELD_LEFT[3])
 SETTING_TABLE_LEFT = NOTE_FIELD_LEFT[0]
-# The stack's first title top.  _general_table's title gap grew 1.26 mm a
-# table (its title ink's air, 2026-11-17), which put the pedestal recheck
-# table 0.36 mm into the station table field; starting the stack 2.5 mm over
-# NOTE_FIELD_LEFT's top keeps that table where it was (2.1 mm over the field)
-# and its title's ink ~5 mm under the heading's (run 20261117T130750991Z:
-# heading extent bottom 258.8 mm).
+# The stack's first title top.  _general_table's TABLE_TITLE_GAP grew
+# 1.2625 mm (1.5 -> 2.7625 mm, its title ink's air, 2026-11-17), which put the
+# pedestal recheck table, two drops down, 0.36 mm into the station table
+# field; starting the stack 2.5 mm over NOTE_FIELD_LEFT's top (the two drops'
+# growth) keeps that table where it was and its title's ink ~5 mm under the
+# heading's (run 20261117T130750991Z: heading extent bottom 258.8 mm).
+# Retuning TABLE_TITLE_GAP moves this stack: redo this offset with it
+# (test_sheet_15_tables_stack_clear_of_the_station_field_on_any_seat).
 SETTING_TABLE_TOP = NOTE_FIELD_LEFT[1] + 0.0025
 # Between one table's last row and the next table's title
 # (draw_ch_rocker_arm_tl_oblique_jig_assembly.TABLE_GAP).  At NOTE_BLOCK_GAP
 # the pedestal recheck table, four rows since PR #2640, ended 0.2 mm over the
-# station table field; at this gap it ends 2.2 mm over it and the feeler
-# stack table 12.9 mm over the interface notes.
+# station table field; at this gap it ends 2.15 mm over it and the feeler
+# stack table 11.6 mm over the interface notes.
 SETTING_TABLE_GAP = 0.004
 # With 27 data rows the first piece ends near y=80 mm (the historical header
 # measured 10.2 mm). The 1:8 reference view is wholly below that piece; its
