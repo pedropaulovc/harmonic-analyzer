@@ -396,8 +396,12 @@ the bundle's `travelers/<slug>-traveler.pdf` and every `cam:<stem>` output to
 file, and names both directories in the release notes. A missing or empty PDF,
 or one older than its part's `features/<stem>/features.toml`, fails the cut
 before anything is zipped; the HTML sheets do not ship. So does a missing or
-empty NC output, a program whose SHA-256 differs from the CAM manifest, or a
-CAM manifest recording a different `features.toml`; `freecadcmd.log` does not
+empty NC output, a program or `cycle_times.json` whose SHA-256 differs from
+the CAM manifest, or a CAM manifest recording any input other than the
+current one (`features.toml`, the STEP, `plan.toml`, `shop.toml`, the recipe
+or the FreeCAD runtime; the refusal names the file), so programs posted from
+an older plan never ship beside a traveler rendered from the newer one;
+`freecadcmd.log` does not
 ship. A prechips refusal, an unreachable PyPI, a missing browser or a failed
 post therefore blocks the release, like any other release gate. The farm
 release runs `doit -s prechips` on the submitter after restoring the farm

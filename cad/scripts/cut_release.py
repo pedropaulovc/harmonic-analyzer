@@ -797,12 +797,14 @@ def stage_nc_programs(stage: Path) -> list[str]:
     program's ``.nc``, ``cycle_times.json`` and the CAM ``manifest.json``.
 
     A full ``doit release`` runs those tasks first, but ``doit -s release`` does
-    not, so a missing or empty output fails the cut, and so does a stale set: the
-    CAM manifest must record the part's current ``features/<stem>/features.toml``
-    as its ``features`` input and each program's current bytes.
+    not, so a missing or empty output fails the cut, and so does a stale set:
+    the CAM manifest must record exactly the current SHA-256 of every input
+    ``_cam_programs.cam_inputs`` names (the feature bundle's ``features.toml``
+    and STEP, the part's ``plan.toml``, ``shop.toml``, the recipe and the
+    FreeCAD runtime), each program's current bytes and the current
+    ``cycle_times.json``. A plan or shop edit since the post would otherwise
+    ship programs beside a traveler rendered from the newer plan.
     """
-    from export_features import bundle_paths
-
     out = CAD_ROOT / "out"
     staged: list[str] = []
     for stem in _cam_programs.CAM_STEMS:
@@ -813,18 +815,27 @@ def stage_nc_programs(stage: Path) -> list[str]:
                 raise RuntimeError(f"required NC output is missing: {source} ({rerun})")
         manifest_path = _cam_programs.nc_dir(stem, out) / _cam_programs.MANIFEST_NAME
         recorded = json.loads(manifest_path.read_text(encoding="utf-8"))
-        features, _step = bundle_paths(stem, out)
-        if not features.is_file():
-            raise RuntimeError(f"NC programs for {stem} have no feature manifest at {features}")
-        if recorded["inputs"]["features"]["sha256"] != _sha256(features):
+        inputs = _cam_programs.cam_inputs(stem, out)
+        if sorted(recorded["inputs"]) != sorted(inputs):
             raise RuntimeError(
-                f"NC programs are stale: {manifest_path} records another {features} ({rerun})"
+                f"NC programs are stale: {manifest_path} records inputs {sorted(recorded['inputs'])}, "
+                f"expected {sorted(inputs)} ({rerun})"
             )
+        for name, path in inputs.items():
+            if not path.is_file():
+                raise RuntimeError(f"NC programs for {stem} have no {name} input at {path}")
+            if recorded["inputs"][name]["sha256"] != _sha256(path):
+                raise RuntimeError(
+                    f"NC programs are stale: {manifest_path} records another {path} ({rerun})"
+                )
         for source in outputs:
             if source.suffix == ".nc" and recorded["programs"].get(source.name) != _sha256(source):
                 raise RuntimeError(
                     f"NC program {source} differs from its manifest {manifest_path} ({rerun})"
                 )
+        times = _cam_programs.nc_dir(stem, out) / _cam_programs.CYCLE_TIMES_NAME
+        if recorded["cycle_times"] != _sha256(times):
+            raise RuntimeError(f"{times} differs from its manifest {manifest_path} ({rerun})")
         destination_dir = stage / "nc" / stem
         destination_dir.mkdir(parents=True, exist_ok=True)
         for source in outputs:

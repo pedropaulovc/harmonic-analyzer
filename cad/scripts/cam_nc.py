@@ -45,9 +45,7 @@ from typing import Any
 
 import _cam_programs
 import _gcode
-import _process_plans
 import _telemetry
-from export_features import bundle_paths
 
 FREECAD_ENV = "HARMONIC_FREECAD"
 RESULT_MARKER = "FREECAD_CAM_RESULT "
@@ -244,13 +242,9 @@ def main(argv: list[str] | None = None) -> int:
         shutil.rmtree(staging_root, ignore_errors=True)
         staging = staging_root / uuid.uuid4().hex
         staging.mkdir(parents=True)
-        recipe_path = _cam_programs.recipe_path(stem)
-        features_path, step_path = bundle_paths(stem, args.out)
-        plan_path = _process_plans.plan_path(stem)
-        inputs = {
-            "features": features_path, "step": step_path, "plan": plan_path,
-            "shop": _process_plans.SHOP_PATH, "recipe": recipe_path, "runtime": _cam_programs.RUNTIME_PATH,
-        }
+        inputs = _cam_programs.cam_inputs(stem, args.out)
+        recipe_path, plan_path = inputs["recipe"], inputs["plan"]
+        features_path, step_path = inputs["features"], inputs["step"]
         try:
             recipe = _cam_programs.load_recipe(stem)
             programs = [directory / f"{name}.nc" for name, _ops in recipe.PROGRAMS]
@@ -263,7 +257,7 @@ def main(argv: list[str] | None = None) -> int:
             if features["step_sha256"] != sha256(step_path):
                 raise ValueError(f"{step_path.name} does not match features.toml step_sha256")
             with _telemetry.span("cam.context", stem=stem):
-                ctx = recipe.context(features, _load_toml(plan_path), _load_toml(_process_plans.SHOP_PATH), str(step_path.resolve()))
+                ctx = recipe.context(features, _load_toml(plan_path), _load_toml(inputs["shop"]), str(step_path.resolve()))
             with _telemetry.span("cam.freecad", stem=stem) as span:
                 freecadcmd = resolve_freecadcmd()
                 result = run_freecad(recipe_path, ctx, recipe.PROGRAMS, staging, freecadcmd, directory / LOG_NAME)

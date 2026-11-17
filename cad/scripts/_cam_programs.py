@@ -17,7 +17,8 @@ import importlib.util
 from pathlib import Path
 from types import ModuleType
 
-from export_features import OUT as CAD_OUT
+import _process_plans
+from export_features import OUT as CAD_OUT, bundle_paths
 
 # The parts milled on the CNC mill, enrolled by the CNC migration; each one's
 # programs are posted by every build and shipped by every release.
@@ -34,6 +35,22 @@ MANIFEST_NAME = "manifest.json"
 
 def recipe_path(stem: str) -> Path:
     return PROCESS_ROOT / stem / "cam.py"
+
+
+def cam_inputs(stem: str, out: Path = CAD_OUT) -> dict[str, Path]:
+    """Every file a posted set depends on, by the name ``manifest.json``
+    records its SHA-256 under: the scoped feature bundle (``features``,
+    ``step``), the part's ``plan``, the ``shop`` record, the ``recipe`` and the
+    FreeCAD ``runtime``."""
+    features, step = bundle_paths(stem, out)
+    return {
+        "features": features,
+        "step": step,
+        "plan": _process_plans.plan_path(stem),
+        "shop": _process_plans.SHOP_PATH,
+        "recipe": recipe_path(stem),
+        "runtime": RUNTIME_PATH,
+    }
 
 
 def load_recipe(stem: str) -> ModuleType:

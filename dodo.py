@@ -4485,8 +4485,6 @@ def task_prechips():
 
 def _cam_task(stem: str) -> dict[str, Any]:
     import _cam_programs
-    import _process_plans
-    from export_features import bundle_paths
 
     label = f"cam:{stem}"
     targets = _canonical_targets(label)
@@ -4494,15 +4492,10 @@ def _cam_task(stem: str) -> dict[str, Any]:
         sys.executable, str(SCRIPTS_DIR / "cam_nc.py"),
         stem, "--out", str(CAD_OUT),
     ]
-    manifest, step = bundle_paths(stem, CAD_OUT)
     runtime = str(_cam_programs.RUNTIME_PATH.resolve())
+    # The inputs manifest.json records, which a release re-checks.
     deps = {
-        str(_cam_programs.recipe_path(stem).resolve()),
-        runtime,
-        str(_process_plans.plan_path(stem).resolve()),
-        str(_process_plans.SHOP_PATH.resolve()),
-        str(manifest.resolve()),
-        str(step.resolve()),
+        *(str(p.resolve()) for p in _cam_programs.cam_inputs(stem, CAD_OUT).values()),
         *_executed_closure(cmd),
     }
     return {

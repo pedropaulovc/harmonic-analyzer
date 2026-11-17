@@ -232,8 +232,10 @@ post and output SHA-256s, FreeCAD version, the post file FreeCAD loaded) to
 minutes, and leaves freecadcmd's console output in `freecadcmd.log` there.
 Its only task dependency is its own `package:features:<stem>` leaf. A release
 ships the programs, `cycle_times.json` and `manifest.json` (not the log) under
-the bundle's `nc/<stem>/`; a missing output, a program that differs from the
-manifest, or a manifest recording another `features.toml` fails the cut.
+the bundle's `nc/<stem>/`; a missing output, a program or `cycle_times.json`
+that differs from the manifest, or a manifest recording any input other than
+the current one (the feature bundle, `plan.toml`, `shop.toml`, the recipe or
+the runtime: `_cam_programs.cam_inputs`) fails the cut.
 
 A recipe has four parts:
 
