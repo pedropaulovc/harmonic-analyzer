@@ -287,7 +287,7 @@ def late_bound_drawing_view():
 @pytest.mark.parametrize(
     "stem, member, reference, other_member, other_reference",
     [
-        ("sh-vn-clamping-kit-hardware", "FlangeNut", "FlangeNut:4", "TNut", "TNut:4"),
+        ("sh-vn-chain-link", "OuterLink", "OuterLink:4", "InnerLink", "InnerLink:4"),
         (SCREW, "Default", "FootScrew:1", "Default", "SwingStopScrew:1"),
     ],
 )
@@ -348,12 +348,12 @@ def test_drawing_isolation_and_anchors_read_bound_native_identity(
     "fault", ["wrong-file", "wrong-member", "empty-path", "unreadable-path"]
 )
 def test_bound_drawing_identity_refuses_bad_authority(late_bound_drawing_view, fault):
-    stem = "sh-vn-clamping-kit-hardware"
+    stem = "sh-vn-chain-link"
     component = _component(
         stem + "-12",
         stem=stem + "-copy" if fault == "wrong-file" else stem,
-        configuration="TNut" if fault == "wrong-member" else "FlangeNut",
-        reference="FlangeNut:4",
+        configuration="InnerLink" if fault == "wrong-member" else "OuterLink",
+        reference="OuterLink:4",
     )
     if fault == "empty-path":
         component.GetPathName = lambda: ""
@@ -374,7 +374,7 @@ def test_bound_drawing_identity_refuses_bad_authority(late_bound_drawing_view, f
         balloons.isolate_drawing_view_components(
             adapter,
             view,
-            visible_stems=frozenset({"@FlangeNut:4"}),
+            visible_stems=frozenset({"@OuterLink:4"}),
             label="bad native identity",
         )
     assert rebuilds == []
@@ -386,9 +386,9 @@ def test_nested_reference_without_native_name_cannot_bind_an_unscoped_selector(
 ):
     component = _component(
         "parent-17/allocator-picked-412",
-        stem="sh-vn-clamping-kit-hardware",
-        configuration="FlangeNut",
-        reference="FlangeNut:4",
+        stem="sh-vn-chain-link",
+        configuration="OuterLink",
+        reference="OuterLink:4",
     )
     adapter, view, drawings, rebuilds = late_bound_drawing_view(component)
     drawings[0].Visible = False
@@ -398,7 +398,7 @@ def test_nested_reference_without_native_name_cannot_bind_an_unscoped_selector(
 
     # The drawing still knows this is nested, but only IComponent2.Name2 may
     # establish the native parent scope. A failed read must not turn it into
-    # the top-level @FlangeNut:4 requested below.
+    # the top-level @OuterLink:4 requested below.
     name_dispid = _com._com_header("IComponent2", "Name2")[0]
     drawings[0].Component._oleobj_.values[name_dispid] = (
         unreadable if fault == "unreadable-name" else ""
@@ -413,7 +413,7 @@ def test_nested_reference_without_native_name_cannot_bind_an_unscoped_selector(
         balloons.isolate_drawing_view_components(
             adapter,
             view,
-            visible_stems=frozenset({"@FlangeNut:4"}),
+            visible_stems=frozenset({"@OuterLink:4"}),
             label="unknown native scope",
         )
     assert drawings[0].Visible is False
@@ -2146,7 +2146,7 @@ def test_batch_rebinds_four_reordered_studs_and_ordinary_row_after_rebuild(
     monkeypatch.setattr(
         assembly, "assert_component_placed", _adapter.native_assert_component_placed
     )
-    stem = "sh-vn-clamping-kit-hardware"
+    stem = "sh-vn-chain-link"
     (tmp_path / f"{stem}.SLDPRT").touch()
     positions = [[float(i * 41), float(i * 13), float(i * 7)] for i in range(5)]
     indices = [83, 12, 207, 41, 119]
@@ -2171,9 +2171,9 @@ def test_batch_rebinds_four_reordered_studs_and_ordinary_row_after_rebuild(
         for component, name in zip(components, expected_names, strict=True):
             component._name = name
         if fault == "duplicate":
-            components[1]._reference = "HoldDownStud:1"
+            components[1]._reference = "InnerLink:1"
         elif fault == "wrong-member":
-            components[1].ReferencedConfiguration = "TNut"
+            components[1].ReferencedConfiguration = "OuterLink"
         elif fault == "pose-drift":
             components[1].Transform2.ArrayData[9] += 0.01
         elif fault == "ledger-collision":
@@ -2200,8 +2200,8 @@ def test_batch_rebinds_four_reordered_studs_and_ordinary_row_after_rebuild(
             "ground": False,
             **(
                 {
-                    "configuration": "HoldDownStud",
-                    "component_reference": f"HoldDownStud:{i + 1}",
+                    "configuration": "InnerLink",
+                    "component_reference": f"InnerLink:{i + 1}",
                 }
                 if i < 4
                 else {}
@@ -2211,10 +2211,10 @@ def test_batch_rebinds_four_reordered_studs_and_ordinary_row_after_rebuild(
     ]
     if fault != "none":
         expected_error = {
-            "duplicate": "component reference '@HoldDownStud:1' is duplicated by ",
+            "duplicate": "component reference '@InnerLink:1' is duplicated by ",
             "wrong-member": (
-                "component reference '@HoldDownStud:2' on 'rebuilt-native-part-12' "
-                f"selects {(stem, 'TNut')!r}, expected {(stem, 'HoldDownStud')!r}"
+                "component reference '@InnerLink:2' on 'rebuilt-native-part-12' "
+                f"selects {(stem, 'OuterLink')!r}, expected {(stem, 'InnerLink')!r}"
             ),
             "pose-drift": "rebuilt-native-part-12: origin ",
             "ledger-collision": (
@@ -2248,14 +2248,14 @@ def test_batch_rebinds_four_reordered_studs_and_ordinary_row_after_rebuild(
     )
     assert actual == expected_names
     assert [c.Name2 for c in components] == expected_names
-    assert [c.ReferencedConfiguration for c in components] == ["HoldDownStud"] * 4 + [
+    assert [c.ReferencedConfiguration for c in components] == ["InnerLink"] * 4 + [
         "Default"
     ]
     assert [c.ComponentReference for c in components] == [
-        f"HoldDownStud:{ordinal}" for ordinal in range(1, 5)
+        f"InnerLink:{ordinal}" for ordinal in range(1, 5)
     ] + [""]
     assert scene.registry == {
-        f"HoldDownStud:{ordinal}": component
+        f"InnerLink:{ordinal}": component
         for ordinal, component in enumerate(components[:4], 1)
     }
     for component, transform, array, old_name, name, entry in zip(
@@ -2272,7 +2272,7 @@ def test_batch_rebinds_four_reordered_studs_and_ordinary_row_after_rebuild(
         assert old_name not in assembly._POSE_LEDGER
         assert assembly._POSE_LEDGER[name] is entry
     assert scene.events == [
-        ("reference", components[i], f"HoldDownStud:{i + 1}") for i in (2, 0, 3, 1)
+        ("reference", components[i], f"InnerLink:{i + 1}") for i in (2, 0, 3, 1)
     ]
     assert scene.rebuilds == [False]
 

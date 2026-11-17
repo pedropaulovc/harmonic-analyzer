@@ -465,8 +465,11 @@ def test_export_failure_stays_primary_when_cleanup_also_fails(
         _produce(case)
 
     assert str(caught.value) == message
-    notes = "\n".join(caught.value.__notes__)
-    if cleanup_fault in {"restore", "both"}:
+    notes = "\n".join(getattr(caught.value, "__notes__", ()))
+    # Refusing the second of two members leaves the default active, so no
+    # restore runs; every surviving configured SKU has two members.
+    left_default = export_fault != "activation" or len(case.members) > 2
+    if cleanup_fault in {"restore", "both"} and left_default:
         assert "Default member restoration failed" in notes
         assert f"could not activate export member {case.members[0]!r}" in notes
         assert case.doc.active != case.members[0]

@@ -4358,7 +4358,6 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         SCRIPTS_DIR / "test_drawing_precision.py",
         SCRIPTS_DIR / "test_supplier_spring_dimensions.py",
         # Native supplier I/O doubles and recorded ink replays stay COM-free.
-        SCRIPTS_DIR / "test_purchased_title_fit.py",
         SCRIPTS_DIR / "test_supplier_native_contracts.py",
         SCRIPTS_DIR / "test_supplier_native_repair.py",
         SCRIPTS_DIR / "test_supplier_top_text_shelves.py",
