@@ -66,8 +66,10 @@ the per-assembly files pin each registry row, output mapping, scale, and centers
 portrait exploded view with native BOM and balloons, and a landscape
 finished-assembly isometric. The keyed single-action fit-up steps
 (`fr_frame_assembly_steps`, text in `fr_frame_assembly_sheet`) print in the
-release's ASSEMBLY.md. The registry includes both orientation templates as
-dependencies.
+release's ASSEMBLY.md. Sheet 1 keeps every measurable setting: the native
+height and inset dimensions, and a native setting table (`_general_table`) for
+the values no model dimension carries, whose rows the steps cite. The
+registry includes both orientation templates as dependencies.
 Finalization checks each native sheet and each exported PDF page against its
 declared layout.
 

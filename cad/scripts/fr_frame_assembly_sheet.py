@@ -1,11 +1,11 @@
-"""MHA-FR-00's printed settings, bench acceptances and fit-up steps.
+"""MHA-FR-00's printed settings, setting table, bench acceptances and fit-up steps.
 
 The values are the parts' and the frame's (fr_frame_attachment_spec,
 fr_frame_setting_bands, the castings' far-wall stacks, fr_tube_frame_spec);
-this drawing-only module composes the text from them: the settings the
-fitter sheets print (draw_fr_frame_assembly places them and owns none of
-it, test_drawing_specification_purity) and the fit-up steps the release's
-ASSEMBLY.md prints (ha_assembly_package, #2889).
+this drawing-only module composes the text from them: the settings and the
+setting table the fitter sheets print (draw_fr_frame_assembly places them and
+owns none of it, test_drawing_specification_purity) and the fit-up steps the
+release's ASSEMBLY.md prints (ha_assembly_package, #2889).
 """
 
 from __future__ import annotations
@@ -134,6 +134,44 @@ _PLATE, _PLATE_SCREW = _item(NAMEPLATE), _item(NAMEPLATE_SCREW)
 _CROSS, _SET = _item(CROSS_SCREW), _item(SET_SCREW)
 _POST_BORE = f"THE {GOOSENECK_POST_NUMBER} POST BORE OF {_TOP}"
 _LIFT_OFF = f"TAKE {_TOP} AND THE COLUMNS OFF {_BASE}."
+# --- sheet 1: the setting table ----------------------------------------------
+# R5 machinist review (rule 22): the columns' rough-cut length and the cross
+# screws' full-thread acceptance printed only in their ASSEMBLY.md steps.
+# Neither is one model dimension (a stock minimum the modeled cut length does
+# not carry; a far-wall stack bound checked on a purchased screw), so each is
+# a row of a native general table (draw_dt_drive_train_assembly's SETTING
+# TABLE columns, less MEASURE FIRST: nothing here is measured first) and its
+# step cites the row. Sheet 1 also carries the native setting dimensions.
+SETTING_TABLE_SHEET_NUMBER = 1
+SETTING_TABLE_TITLE = "SETTING TABLE"
+SETTING_TABLE_HEADER = ("ROW", "STEP", "SETTING", "SET TO / ACCEPT", "CHECK WITH")
+_SETTINGS = (
+    # (step key, setting, accept, instrument)
+    (
+        steps.COLUMNS_ROUGH_CUT_KEY,
+        f"{_COLUMN} ROUGH-CUT LENGTH",
+        COLUMN_ROUGH_CUT_LENGTH_TEXT,
+        "STEEL RULE",
+    ),
+    (
+        "cross-screws-measured",
+        f"{_CROSS} FULL THREAD UNDER HEAD",
+        CROSS_SCREW_FULL_THREAD_LIMIT_TEXT,
+        "CALIPER",
+    ),
+)
+SETTING_TABLE_ROWS = tuple(
+    (str(row), str(steps.step_number(key)), setting, accept, instrument)
+    for row, (key, setting, accept, instrument) in enumerate(_SETTINGS, start=1)
+)
+_SETTING_ROW = {key: row for row, (key, *_rest) in enumerate(_SETTINGS, start=1)}
+
+
+def setting_row(key: str) -> str:
+    """How a step cites its setting table row."""
+    return f"SETTING TABLE ROW {_SETTING_ROW[key]} (SHEET {SETTING_TABLE_SHEET_NUMBER})"
+
+
 # One entry per step key (fr_frame_assembly_steps.SEQUENCE). Only what exists
 # at assembly: matched socket fits, tube cross holes spotted through each
 # casting's clearance hole and drilled on the mill (only the casting wall
@@ -165,10 +203,11 @@ STEP_TEXT = {
     "nameplate-flat-checked": f"CHECK {_PLATE} LIES FLAT ON {_BASE}.",
     "nameplate-heads-checked": f"CHECK EVERY {_PLATE_SCREW} HEAD BEARS ON {_PLATE}.",
     # The rough cut is the column's own supply length (fr_tube_frame_spec,
-    # printed on its sheet as SUPPLY n.nn MIN): round 1 review, "LONG" gave
-    # no length to cut to.
+    # printed on its sheet as SUPPLY n.nn MIN, and in the setting table):
+    # round 1 review, "LONG" gave no length to cut to.
     steps.COLUMNS_ROUGH_CUT_KEY: (
-        f"CUT FOUR {_COLUMN} COLUMNS TO {COLUMN_ROUGH_CUT_LENGTH_TEXT}; "
+        f"CUT FOUR {_COLUMN} COLUMNS TO THE LENGTH OF "
+        f"{setting_row(steps.COLUMNS_ROUGH_CUT_KEY)}; "
         f"{_step(steps.COLUMNS_CUT_KEY)} CUTS THEM TO LENGTH."
     ),
     "base-sockets-fitted": (
@@ -262,10 +301,11 @@ STEP_TEXT = {
         f"{_BASE}, UNTIL {_step(steps.UPPER_HOLES_CHECKED_KEY)} PASSES."
     ),
     # The far-wall engagement accepted at the bench, before the screw goes in
-    # (CROSS_SCREW_FULL_THREAD_MIN_IN): the installed thread is out of sight.
+    # (CROSS_SCREW_FULL_THREAD_MIN_IN, its setting table row): the installed
+    # thread is out of sight.
     "cross-screws-measured": (
-        f"CHECK EACH {_CROSS} WITH A CALIPER: ITS FULL THREAD RUNS "
-        f"{CROSS_SCREW_FULL_THREAD_LIMIT_TEXT} FROM UNDER THE HEAD."
+        f"CHECK EACH {_CROSS} WITH A CALIPER: ITS FULL THREAD FROM UNDER THE HEAD "
+        f"MEETS {setting_row('cross-screws-measured')}."
     ),
     "cross-screws-replaced": f"REPLACE ANY {_CROSS} THAT READS SHORT.",
     steps.CROSS_SCREWS_DRIVEN_KEY: (

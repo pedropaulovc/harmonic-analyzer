@@ -156,9 +156,16 @@ def test_assembly_accepts_every_cross_screw_on_a_bench_measurable_thread_length(
     assert 0.0 <= limit_mm - (governing + joint.FAR_WALL_ENGAGEMENT_FLOOR_MM) < 0.001 * 25.4
     # A stock screw at its shortest still passes at the nominal tip.
     assert limit_mm <= cross_screw.SHANK_LEN - joint.CROSS_SCREW_LENGTH_SHORT_ALLOWANCE_MM
+    # The limit prints in sheet 1's setting table (rule 22); the step cites it.
     measured = frame_sheet.STEP_TEXT["cross-screws-measured"]
-    assert f"{frame_sheet.CROSS_SCREW_FULL_THREAD_MIN_TEXT} MIN" in measured
+    assert frame_sheet.setting_row("cross-screws-measured") in measured
     assert "CALIPER" in measured
+    (row,) = [
+        row
+        for row in frame_sheet.SETTING_TABLE_ROWS
+        if row[1] == str(frame_sheet.steps.step_number("cross-screws-measured"))
+    ]
+    assert row[3:] == (f"{frame_sheet.CROSS_SCREW_FULL_THREAD_MIN_TEXT} MIN", "CALIPER")
     steps = frame_sheet.steps
     # Measured before the screws go in; a separate step replaces a short one.
     assert (
