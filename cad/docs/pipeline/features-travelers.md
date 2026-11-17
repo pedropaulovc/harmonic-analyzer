@@ -109,12 +109,12 @@ native recipes when only feature requirements change. `_feature_requirements.py`
 neither reads title-block configuration nor belongs in native part or assembly
 source closures; `_printed_limits.py` also stays out of every native closure.
 
-Every sourced value carries `file:start-end` citations for Python and
+Every sourced value carries `file.py#symbol` citations for Python and
 `file:dotted.key.path` citations for YAML, for example
-`cad/config/title_block.yaml:linear_2pl.band_mm`. Python spans are resolved from
-the current AST: a field cites its requirement call site and every named
-spec/notes symbol it reads. Cross-script citations use symbol names, never
-hand-maintained line ranges; missing symbols fail export. YAML paths resolve to
+`cad/config/title_block.yaml:linear_2pl.band_mm`. A field cites its requirement
+call (`draw_<stem>.py#requirement:<name>`; part metadata `#part_metadata:<n>`)
+and every named spec/notes symbol it reads (`#__doc__` for a module docstring).
+Citations carry no line numbers; missing symbols fail export. YAML paths resolve to
 scalar values in the named file, not a synthetic merged registry;
 material-family citations name both the part's family selection and the
 family's actual values.
@@ -171,8 +171,8 @@ the +X radial tip land; those domains are disjoint from the remaining faces.
 declaration; `built_up_permitted` requires an explicit permission note included
 there. A process plan cannot approve its own assembled substitute. Offline
 citation checks resolve every emitted YAML key path, including dynamic
-part-registry and material-family citations, and require Python spans to match
-current AST declarations or call sites in existing source files.
+part-registry and material-family citations, and require Python symbols to name
+current top-level declarations or registered requirement/metadata calls.
 
 ## Face identity and native hygiene
 

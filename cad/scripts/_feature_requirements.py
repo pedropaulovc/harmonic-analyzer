@@ -5,7 +5,7 @@ fields=..., precision=...)`` calls beside the drawing's dimension/callout helper
 ``requirements_for(draw_module)`` returns their registered, named declarations.
 Each field is ``(value, sources)``: a string names a declaration in the part's
 ``<stem>_spec``; ``(module, NAME)`` names a declaration in another module.
-The exporter cites both the requirement call's AST span and every named source,
+The exporter cites the requirement call and every named source as ``<file>.py#<symbol>``,
 failing loudly if a source disappeared. Discovery scans these calls without
 importing drawings or connecting to SolidWorks.
 
@@ -53,7 +53,6 @@ class Requirement:
     fields: dict[str, tuple[Any, tuple[Source, ...]]]
     precision: dict[str, int | str]
     path: Path
-    call_span: tuple[int, int]
     configuration: str | None = None
 
     def __post_init__(self) -> None:
@@ -73,7 +72,6 @@ class PartMetadata:
     model_sources: tuple[Source, ...] = ()
     precision_sources: tuple[Source, ...] = ()
     path: Path | None = None
-    call_span: tuple[int, int] | None = None
 
 
 def _require_sources(fields: dict[str, tuple[Any, tuple[Source, ...]]]) -> None:
@@ -303,19 +301,15 @@ def member_configurations(tree: ast.Module) -> tuple[str, ...]:
     return tuple(names)
 
 
-def _call_site(frame: Any, api: str) -> tuple[Path, tuple[int, int]]:
+def _call_site(frame: Any, api: str) -> Path:
     if frame.f_code.co_name != "<module>":
         raise ValueError(f"{api} must be called at drawing module level")
     path = Path(frame.f_code.co_filename).resolve()
     if not path.stem.startswith("draw_"):
         raise ValueError(f"{api} must be declared in a draw_<stem> module")
-    calls = [
-        call for call in declaration_calls(source_tree(path), api)
-        if call.lineno <= frame.f_lineno <= call.end_lineno
-    ]
-    if len(calls) != 1:
+    if not any(call.lineno <= frame.f_lineno <= call.end_lineno for call in declaration_calls(source_tree(path), api)):
         raise ValueError(f"cannot resolve {api} call at {path}:{frame.f_lineno}")
-    return path, (calls[0].lineno, calls[0].end_lineno)
+    return path
 
 
 def requirement(
@@ -333,10 +327,10 @@ def requirement(
     """
     frame = inspect.currentframe().f_back
     try:
-        path, span = _call_site(frame, "requirement")
+        path = _call_site(frame, "requirement")
         declared = Requirement(
             name, kind, tuple(faces), tuple(requirements), fields,
-            dict(precision or {}), path, span, configuration,
+            dict(precision or {}), path, configuration,
         )
         registry = frame.f_globals.setdefault("_FEATURE_REQUIREMENTS", {})
         if name in registry:
@@ -364,10 +358,10 @@ def part_metadata(
     """Register sourced part facts beside the drawing helpers that expose them."""
     frame = inspect.currentframe().f_back
     try:
-        path, span = _call_site(frame, "part_metadata")
+        path = _call_site(frame, "part_metadata")
         declared = PartMetadata(
             fields or {}, frames or {}, datums or {},
-            model_sources, precision_sources, path, span,
+            model_sources, precision_sources, path,
         )
         for values in (declared.fields, declared.frames, declared.datums):
             _require_sources(values)
