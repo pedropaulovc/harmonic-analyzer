@@ -1428,6 +1428,22 @@ own the individual fit classes. Geometry imports numerical helpers, and a
 fit-class edit reaches only consumers that import that class. Drawing tolerances
 come from the model/spec, not separate text renderers.
 
+**Shop records — `_shop_records.shop_record(file, table, key)`.**
+`cad/config/shop-equipment.toml` and `cad/process/shop.toml` are read in build
+closures only through this accessor, with literal (or literal-constant)
+arguments. `_buildgraph.shop_records_selected` finds the records a closure
+names, and `dodo._fold_shop_records` adds a `cad/out/.shop-records/` digest of
+exactly those records' parsed values to the part, assembly, drawing,
+`verify_soundness` (plus its assembly's records: verify.py lazily imports the
+assembly's specs) and `package:features` leaf. A record edit re-keys only its
+consumers; another record, a new table or a comment re-keys none. A runtime
+table or key keeps that file whole; a runtime file or an unclassified use keeps
+both. `HARMONIC_SHOP_RECORDS` carries the selection to the subprocess and
+`shop_record` refuses any other record, so a hidden read fails the build.
+`check:recipe` (`test_shop_records.py`) fails on a new direct read of either
+file outside the accessor, `ha_assembly_package.py` and `_process_plans.py`
+(both outside every COM leaf).
+
 **Per-assembly contracts — `cad/config/assemblies/<dashed-stem>.yaml`.** Data
 that belongs to ONE assembly (its learned `flip_invert` seeds and its free-DOF
 contract: `free_dof`/`free_dof_per_active_channel`, `required_free_stems`,

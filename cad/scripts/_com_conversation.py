@@ -124,8 +124,14 @@ EXIT_REPLAY_NOT_NOOP = 91
 # (dodo never imports this engine) and pinned equal by test_replay_shadow.
 EXIT_RECORD_FAULT = 92
 # The only process inputs read inside part closures besides files: the hash
-# seed and the per-task read guards dodo sets (fastener rows, fit groups).
-ENVIRONMENT_KEYS = ("PYTHONHASHSEED", "HARMONIC_FASTENER_ROWS", "HARMONIC_FIT_GROUPS")
+# seed and the per-task read guards dodo sets (fastener rows, fit groups,
+# shop records).
+ENVIRONMENT_KEYS = (
+    "PYTHONHASHSEED",
+    "HARMONIC_FASTENER_ROWS",
+    "HARMONIC_FIT_GROUPS",
+    "HARMONIC_SHOP_RECORDS",
+)
 # Leading arguments of each pywin32 dispatch op that identify the member
 # (dispid, lcid, flags, return type[, arg types]); interned once per log.
 _HEADER_WIDTH = {"InvokeTypes": 5, "Invoke": 4}

@@ -6,9 +6,10 @@
 # and no field here repeats one there. An object may appear in both files with
 # disjoint fields (gauges.dti, gauges.pin-gauges).
 #
-# TOML read directly by its consumers, deliberately not YAML: a *.yaml file in
-# cad/config joins _buildgraph.all_config_files() and would re-key every
-# whole-config consumer.
+# TOML, deliberately not YAML: a *.yaml file in cad/config joins
+# _buildgraph.all_config_files() and would re-key every whole-config consumer.
+# Build closures read it only through _shop_records.shop_record(file, table,
+# key), which keys each COM leaf on exactly the records it reads (#2852).
 #
 # Records moved verbatim from cad/process/shop/inventory.toml (last at
 # 45952b66bc); "#1413 placeholder" values are realistic estimates still to be

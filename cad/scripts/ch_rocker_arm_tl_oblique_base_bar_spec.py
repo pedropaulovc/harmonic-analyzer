@@ -153,15 +153,14 @@ slip (``BRACKET_SCREW_FLOAT_MAX``; leadscrew LOAD_CASES, owner ruling Main
 from __future__ import annotations
 
 import math
-import tomllib
 
 import _config
 from _gtol_planar import PlanarFace
 from _hole_spec import NUMBER_DRILL_MM, THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _package_units import drawing_unit
-from _paths import CAD_ROOT
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm, printed_deviations
+from _shop_records import shop_record
 from _surface_finish import SEAT_UM, SurfaceFinishControl
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 
@@ -230,16 +229,13 @@ RAIL_HOLE_POSITION_RADIUS = max(
 # band moves the whole row with the rail; only the CNC's positioning
 # repeatability scatters one hole off the row the others share. The PM-30MV
 # is CNC-converted (owner 2026-11-16): shop-equipment.toml cnc.pm-30mv.
-_SHOP_EQUIPMENT = tomllib.loads(
-    (CAD_ROOT / "config" / "shop-equipment.toml").read_text(encoding="utf-8")
-)
-RAIL_CNC = _SHOP_EQUIPMENT["cnc"]["pm-30mv"]
+RAIL_CNC = shop_record("shop-equipment.toml", "cnc", "pm-30mv")
 RAIL_HOLE_ROW_SCATTER = RAIL_CNC["repeatability_mm"]  # 0.02
 # The rail taps are cut in the spring tap guide, squared to the quill (owner
 # ruling 2026-11-16, "Require a spring tap guide in the spindle (tap squared
 # to the quill), and add a squareness term to the stack"): its tilt moves the
 # screw at its seat on the rail, whichever way it leans.
-RAIL_TAP_GUIDE = _SHOP_EQUIPMENT["tools"]["spring-tap-guide"]
+RAIL_TAP_GUIDE = shop_record("shop-equipment.toml", "tools", "spring-tap-guide")
 RAIL_TAP_TILT_OFFSET = trammel.RAIL_SCREW_SEAT_ABOVE_BASE * math.tan(
     math.radians(RAIL_TAP_GUIDE["squareness_deg"])
 )  # 9.7 x tan 0.05° = 0.0085
