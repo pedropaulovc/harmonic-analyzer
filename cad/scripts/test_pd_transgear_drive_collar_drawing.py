@@ -92,7 +92,13 @@ def test_turned_diameters_and_lengths_print_on_the_side_view() -> None:
         "<HOLE-DEPTH>", "D"
     )
     rows = [size_row, *drawing.DIMENSION_CALLOUTS_BELOW["FlatPinDia"].splitlines()]
-    assert dia_x - max(map(len, rows)) * DIM_CHAR_WIDTH > END_VIEW_RIGHT + 0.002
+    # Its widest rows, measured on run 20261117T123054105Z: the size row
+    # 63.9 mm (Ø to ")"), "PRESS FIT, PIN MHA-PD-VN-70" 63.6 mm.  Longer rows
+    # need a new measurement.  The two spaces of ink air ending every row
+    # print 1.3 mm each, and the block's widest row ends at the line.
+    assert max(len(r.rstrip()) for r in rows) <= 27
+    block = 0.0639 + 2 * 0.0013
+    assert dia_x - block > END_VIEW_RIGHT + 0.002
     # The block centres on its text point; the stacked size row's top prints
     # 5.6 mm above it (run 20261117T122426763Z) and stands clear under the
     # ream's lower witness, which struck "(.163)" there.
@@ -413,15 +419,20 @@ def test_every_tight_band_names_its_registered_mate_at_its_callout() -> None:
     # rule 16: the package declares the pin permanent, in the part notes.
     assert f"PERMANENT PIN {spec.FLAT_PIN_NUMBER}" in spec.DRAWING_NOTES
     shaft_number = _config.parts("pd-transgear-knob-shaft")["number"]
-    assert pin_rows[1] == f"CREST DRIVES {shaft_number}"
+    assert pin_rows[1] == f"CREST DRIVES {shaft_number}  "
     # Rule 26: size, process, depth.  The ream's process follows the value on
     # its line, as the sheet's other reams read, then its depth: a REF from the
     # section's nominal fitted rear face, the .XX floor controlling.  The depth
     # symbol marks it blind.
     depth = spec.LENGTH - spec.FLAT_PIN_FLOOR
     assert depth == pytest.approx(0.163 * 25.4)
-    assert drawing.DIMENSION_SUFFIXES["FlatPinDia"] == " REAM <HOLE-DEPTH> (.163)"
+    assert drawing.DIMENSION_SUFFIXES["FlatPinDia"] == " REAM <HOLE-DEPTH> (.163)  "
     assert all("REAM" not in row for row in pin_rows)
+    # The block hangs left of its own dimension line, whose arrowhead the
+    # widest row's last glyph met (run 20261117T123054105Z): every printed row
+    # ends in two spaces of ink air.
+    printed = (*pin_rows, drawing.DIMENSION_SUFFIXES["FlatPinDia"])
+    assert all(row.endswith("  ") for row in printed)
     # The bore's clearance range reads as its reference third row.
     bore_rows = drawing.DIMENSION_CALLOUTS_BELOW["BoreDia"].splitlines()
     assert bore_rows[-1].startswith("(CLEARANCE ") and bore_rows[-1].endswith(")")

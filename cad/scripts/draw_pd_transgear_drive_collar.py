@@ -230,6 +230,15 @@ FIT_NOTES = "\n".join(
 )
 # The #25 chain the O.D. clears, by its drawing number (rule 4).
 CHAIN_NUMBER = _config.parts("sh-vn-chain-link")["number"]
+# The flat pin's block hangs left of its own dimension line and SOLIDWORKS
+# sets the widest row's last glyph against that line: run
+# 20261117T123054105Z put the ")" of "(.163)" on its arrowhead.  Two trailing
+# spaces on every row stop the ink short of it, as draw_ch_fulcrum_shaft and
+# draw_dt_crank_drive_gear do.
+_INK_AIR = "  "
+_FLAT_PIN_ROWS = "\n".join(
+    f"{row}{_INK_AIR}" for row in FLAT_PIN_HOLE_CALLOUT.splitlines()
+)
 # Rule 7: a callout carries its size and process lines plus at most two lines
 # of words, and a location dimension carries only its value and band.  The
 # dowel pattern names the dowel and the sprocket its pins locate once, on its
@@ -244,10 +253,13 @@ DIMENSION_CALLOUTS_BELOW = {
     "CollarDia": f"CLEARS CHAIN {CHAIN_NUMBER}\nON 12-TOOTH {SPROCKET_NUMBER}",
     "PilotLength": f"SEE NOTE {PILOT_NOTE}",
     "CollarLength": f"SEE NOTE {BODY_NOTE}",
-    "FlatPinDia": FLAT_PIN_HOLE_CALLOUT,
+    "FlatPinDia": _FLAT_PIN_ROWS,
     "RearBreak": REAR_BREAK_CALLOUT,
 }
-DIMENSION_SUFFIXES = {"RearBreak": REAR_BREAK_SUFFIX, "FlatPinDia": FLAT_PIN_HOLE_SUFFIX}
+DIMENSION_SUFFIXES = {
+    "RearBreak": REAR_BREAK_SUFFIX,
+    "FlatPinDia": f"{FLAT_PIN_HOLE_SUFFIX}{_INK_AIR}",
+}
 
 ISO_NOTE_XY = (ISO_CENTER[0] - 0.030, ISO_CENTER[1] - 0.040)
 # The part's note, then the drawing's two fitted-length notes, in one
