@@ -3359,6 +3359,7 @@ def test_mg_owned_offsets_refuse_same_count_contract_mutations(monkeypatch, muta
 
 def _native_mg_author(monkeypatch, configuration_name, mismatch=None):
     """Native readbacks are fixed independently of the recipe being authored."""
+    import _explode_steps as steps
     import _mg_magnifier_explode as author
     import _component_references as references
     from solidworks_mcp.adapters import com_variant
@@ -3525,17 +3526,18 @@ def _native_mg_author(monkeypatch, configuration_name, mismatch=None):
         state.published.append(properties)
 
     monkeypatch.setattr(author, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(steps, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(references, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(com_variant, "null_callout", lambda: None)
     monkeypatch.setattr(
-        author, "_global_directions",
+        steps, "global_directions",
         lambda _adapter, _assembly: {
-            "x": author._Direction("X", True, (1.0, 0.0, 0.0)),
-            "y": author._Direction("Y", True, (0.0, 1.0, 0.0)),
-            "z": author._Direction("Z", True, (0.0, 0.0, 1.0)),
+            "x": steps.Direction("X", True, (1.0, 0.0, 0.0)),
+            "y": steps.Direction("Y", True, (0.0, 1.0, 0.0)),
+            "z": steps.Direction("Z", True, (0.0, 0.0, 1.0)),
         },
     )
-    monkeypatch.setattr(author, "_create_named_view", create_named_view)
+    monkeypatch.setattr(steps, "_create_named_view", create_named_view)
     monkeypatch.setattr(author, "apply_custom_properties", publish)
     return author, adapter, state
 

@@ -823,23 +823,6 @@ def test_wire_explodes_up_then_to_the_sheet_left() -> None:
     assert drawing.BALLOON_ANCHORS[drawing.WIRE_ROW].point_mm is not None
 
 
-def test_explode_module_qualifies_for_the_explode_tier() -> None:
-    from _refresh_tier import explode_plan
-
-    plan = explode_plan("pn_pen")
-    assert (plan.decline, plan.module, plan.function) == (
-        "",
-        "_pn_pen_explode",
-        "create_pn_explode",
-    )
-    # The global explode axes' helper is the explode's alone, as in pd.
-    assert {Path(path).name for path in plan.closure} == {
-        "_pn_pen_explode.py",
-        "pn_pen_explode_spec.py",
-        "_assembly_patterns.py",
-    }
-
-
 def test_hanger_balloon_lands_mid_strap_clear_of_the_hanger_screw() -> None:
     """Machinist gate 2026-10-17: walked, the hanger's leader ran along screw
     11's shank to the strap's top corner, beside balloon 11's arrow."""

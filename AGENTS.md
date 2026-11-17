@@ -953,28 +953,11 @@ hooks) when the assembly script / a shared CAD helper in its recipe closure / a 
 missing. Force a full rebuild of one assembly by deleting its `.SLDASM` target,
 then `doit assembly:<stem>`.
 
-**Explode tier.** `build_or_refresh` picks the tier (`_refresh_tier.RefreshTier`)
-from the per-input digests the saved `.SLDASM` was keyed from, recorded beside it in
-`.<stem>.inputs.json` (never mtimes or git): a change confined to the assembly's
-*explode closure* — `_<stem>_explode.py` plus its own local imports, minus everything
-the rest of the builder reaches — reopens the model, deletes its named explodes and
-re-authors them with the builder's own function (`refresh_assembly.py <stem>
-explode`), with no insert/mate loop. The reopened model must reproduce its saved
-geometry proof, stay collapsed, and keep every top-level component pose
-numerically unchanged after re-authoring and in the re-saved model; a failed
-EXPLODE falls back to a FULL build in the same task, since a failure before the
-save leaves the proof and ledger that chose EXPLODE in place. The proof is
-republished from the re-saved model, and the saved renders and `.dof.json` are
-kept. Only a builder whose sole use of that module is
-`author_in_drawing_configurations(adapter, ASM_NAME, lambda configuration:
-<fn>(adapter, configuration))` qualifies (on main: `pd_paper_drive`); an explode
-that takes other build state (`dt_drive_train`'s collar-pin roles) or lives inline
-(`fr_frame`, `ms_measuring_stick`) declines to FULL, as does any explode change
-that lands together with a recipe or referenced-part change. Each build of a
-qualifying stem also publishes its archive under an *explode base* key (the cache
-key without the explode closure), so a clean farm leaf restores that base and
-takes the EXPLODE tier. To qualify, move the explode and its data into
-`_<stem>_explode.py` / an explode-only spec.
+**Named explodes.** A builder authors its drawing explode with
+`_explode_steps.author_explode_steps` (in Default and Default Simplified via
+`author_in_drawing_configurations`), passing only a plan of steps (instances,
+axis, signed mm); the helper owns the native authoring and its world-space
+readback, collapse and saved-pose proofs. Never copy the authoring loop.
 
 **Focused helper imports.** Import helpers directly from their owning modules:
 `_session` for build sessions, `_paths` for paths/constants, `_com` for COM access,
@@ -1043,8 +1026,7 @@ Part/assembly execution tokens are re-stamped from the restored native bytes,
 assembly ledgers are rewritten for current inputs, and machinist verdicts are
 re-read from winning reports. Machinist canonical-adoption failure is fatal even
 in LEARN mode; LEARN softens review verdicts, never failure to adopt winning evidence.
-Ordinary explode-base alias conflicts are publish-only: never adopt the alias
-over full-key outputs. Missing-entry ordinary
+Missing-entry ordinary
 push failures remain soft; `ro`/`off` roles are unchanged. Archive SHA-256, byte
 size and epoch are committed atomically with both small and staged uploads and
 verified from download response properties before unpacking. Epoch 4 isolates old
@@ -1117,10 +1099,7 @@ previous local assembly, even when its recipe sidecar is unchanged.
 The farm submitter still restores the newly published bytes after success.
 Refresh is the sole explicit same-key replacement: the first refresh probe captures
 the ETag (or absence) **before work/seat wait**, and publication compares against
-that unchanged snapshot. A conflict or upload failure is fatal. Forced assembly
-refresh also snapshots the explode-base alias before work and CAS-publishes it
-after the root. This pair is **not atomic**: an alias failure can leave the root
-replaced while the alias is old. Existing explode-variant full keys are not replaced.
+that unchanged snapshot. A conflict or upload failure is fatal.
 Concurrent consumers may fail strict `cache_missing`; never accept a different key.
 Each new process/redispatch snapshots independently before work. An overlapping
 stale/zombie attempt whose precondition changed fails CAS loudly, not last-writer-wins.

@@ -1,27 +1,21 @@
 r"""Incremental assembly refresh: update a saved assembly in place (no re-insert/re-mate).
 
-Two tiers (``_refresh_tier.RefreshTier``), chosen by ``dodo.build_or_refresh``
-from the recorded per-input digests:
-
-* ``parts`` -- a ``.SLDASM`` is a thin reference layer over its part files, so
-  when only a referenced ``.SLDPRT``/sub-``.SLDASM`` changed, reopening the
-  assembly and force-rebuilding every configuration loads the new geometry
-  WITHOUT the ~500 s from-scratch ``create_assembly`` insert/mate loop. The
-  heavy lifting (per-config rebuild, health/DOF/interference gates, in-place
-  ``Save3``, PNG export) lives in :func:`_assembly.refresh_assembly`.
-* ``explode`` -- only the assembly's explode closure changed: delete the saved
-  named explodes and re-author them with the builder's own function
-  (:func:`_explode_refresh.refresh_explode`).
+The ``parts`` tier (``_refresh_tier.RefreshTier.PARTS``), chosen by
+``dodo.build_or_refresh`` from the recorded per-input digests: a ``.SLDASM`` is
+a thin reference layer over its part files, so when only a referenced
+``.SLDPRT``/sub-``.SLDASM`` changed, reopening the assembly and force-rebuilding
+every configuration loads the new geometry WITHOUT the ~500 s from-scratch
+``create_assembly`` insert/mate loop. The heavy lifting (per-config rebuild,
+health/DOF/interference gates, in-place ``Save3``, PNG export) lives in
+:func:`_assembly.refresh_assembly`.
 
 Fail loud: any dangling mate, free DOF, interference or geometry drift halts the
 refresh with a non-zero exit and leaves the ``.SLDASM`` unsaved. A failed
-``parts`` refresh needs the full escape (delete the target + ``doit
-assembly:<stem>``); ``dodo.build_or_refresh`` follows a failed ``explode``
-refresh with a FULL build in the same task.
+refresh needs the full escape (delete the target + ``doit assembly:<stem>``).
 
 Run (SolidWorks already open)::
 
-    uv run python cad\scripts\refresh_assembly.py <stem> <parts|explode>
+    uv run python cad\scripts\refresh_assembly.py <stem> parts
 
 where ``<stem>`` is an assembly stem (``pd_paper_drive``, ``dt_drive_train``,
 ``ha_harmonic_analyzer``, ...); ``_`` and ``-`` are interchangeable.
@@ -35,12 +29,9 @@ import sys
 from _buildgraph import interference_module
 from _session import run_build
 from _assembly import refresh_assembly
-from _refresh_tier import RefreshTier, explode_plan
+from _refresh_tier import RefreshTier
 
-USAGE = (
-    "usage: refresh_assembly.py <assembly-stem> <parts|explode>  "
-    "(e.g. pd-paper-drive explode)"
-)
+USAGE = "usage: refresh_assembly.py <assembly-stem> parts  (e.g. pd-paper-drive parts)"
 
 
 def _allowed_pairs(asm_name: str):
@@ -74,25 +65,8 @@ async def _refresh_parts(adapter, asm_name: str) -> dict[str, str]:
     return artefacts
 
 
-async def _refresh_explode(adapter, asm_name: str) -> dict[str, str]:
-    from _explode_refresh import refresh_explode
-
-    # The same static analysis that admitted the tier names the function, so
-    # the refresh authors through exactly what the FULL build calls.
-    plan = explode_plan(asm_name.replace("-", "_"))
-    if not plan.closure:
-        raise RuntimeError(f"{asm_name}: no explode refresh: {plan.decline}")
-    create = getattr(importlib.import_module(plan.module), plan.function)
-    return await refresh_explode(
-        adapter, asm_name, lambda configuration: create(adapter, configuration)
-    )
-
-
 def main() -> int:
-    tiers = {
-        RefreshTier.PARTS.value: _refresh_parts,
-        RefreshTier.EXPLODE.value: _refresh_explode,
-    }
+    tiers = {RefreshTier.PARTS.value: _refresh_parts}
     if len(sys.argv) != 3 or sys.argv[2] not in tiers:
         print(USAGE, file=sys.stderr)
         return 2
