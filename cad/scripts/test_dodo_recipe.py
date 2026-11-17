@@ -1567,7 +1567,7 @@ def test_assembly_helper_edits_change_only_real_recipe_and_cache_consumers(
     copied_helper = root / "cad" / "scripts" / f"{helper}.py"
     assert copied_helper.is_file(), f"missing real helper input: {helper}"
     copied_helper.write_bytes(
-        copied_helper.read_bytes() + b"\n# isolated key mutation\n"
+        copied_helper.read_bytes() + b"\nISOLATED_KEY_MUTATION = 1\n"
     )
     after = snapshot()
 
