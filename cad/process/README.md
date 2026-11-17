@@ -181,7 +181,7 @@ from `strap_inset_mm`, `cad.blank_centred_*`, `cad.vise_centred_jaw_right_mm`,
 `cad.rail_left_x_mm`/`rail_right_x_mm`, `cad.bracket_x1_mm`/`bracket_x2_mm`,
 `cad.slot_x_mm`, `cad.slot_entry_x_mm`; lever `cad.hole_x_mm`,
 `cad.jaw_right_x_mm`, `cad.grip_jaw_*_x_mm`, `cad.end_square_in`,
-`cad.angular_tol_deg`; bracket `cad.row_mm`, `cad.parallel_near_mm`/
+`cad.angular_tol_deg` (from `square_probe_near_y_in`/`square_probe_far_y_in`, prechips#441); bracket `cad.row_mm`, `cad.parallel_near_mm`/
 `parallel_far_mm`), its tap-flag refusal (`tap_flag_tol_in`) and the restored
 `jig-lever-hold` grip-end picture. Every plan (base bar, end bracket, feed
 lever, riser, carrier, pivot and feed blocks, leadscrew kit) carries
@@ -292,7 +292,7 @@ What the 0.10 port and the 2026-11-13 v49 reassessment changed on the sheets:
   fillet, not an authored radius. Both ends are milled, as the manifest's
   process note says ("saw and face to length"): ZERO END in the hole setup,
   then the grip end to length in the hand sheet's slid-left hold, with its
-  length and ±1° squareness (two edge-finder X readings at the two edges)
+  length and ±1° squareness (two edge-finder X readings at Y .2 and .8 from ZERO EDGE, the allowed spread their span × tan 1°)
   read on the DRO. The end mill runs at `jig-em-half-6061-t6511` (1800 rpm, 7 in/min); the
   final inspection calipers the as-bought section and runs two 5/16-18
   screws through both holes at once.
