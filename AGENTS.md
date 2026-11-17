@@ -1588,7 +1588,7 @@ changes. `cad/out/` is gitignored.
 
 The pipeline is instrumented with **OpenTelemetry**, not `print()`. `cad/scripts/
 _telemetry.py` is the spine; it **configures itself on first use** (the first log,
-span or `inject_env`; importing it has no side effects) with console logging +
+span or `inject_env`; importing it only registers its exit flush) with console logging +
 tracing, zero env, no collector, and is wrapped by `_check`, so the ~170
 scripts that `from _check import log, check` are instrumented unchanged.
 
@@ -1685,7 +1685,8 @@ scripts that `from _check import log, check` are instrumented unchanged.
       Pass `service=` to
       `_telemetry.span` to put a span there; it changes only the resource, never the
       parent/child shape. (No provider has an exit hook: `shutdown()` closes the
-      shared processors directly, and `configure` registers it at exit once.)
+      shared processors directly, and importing `_telemetry` registers it at exit, so it
+      runs after any exit hook registered later, e.g. `_artifact_cache._join_prewarm`.)
       Logs follow their span: the logging bridge (`_ResourceRoutedLoggingHandler`)
       files a record under the resource of the span it is written under (a
       `[cache]` line inside `cache.probe` lands on `build-infra`, beside its span),

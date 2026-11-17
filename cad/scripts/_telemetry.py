@@ -6,7 +6,7 @@ to thread through every build script (``  OK  `` / ``  ..  `` / ``  -- `` /
 the console output just as readable as before.
 
 What you get, **configured on first use** -- the first log, span or
-:func:`inject_env`; importing the module has no side effects (zero env, no collector):
+:func:`inject_env`; importing the module only registers its exit flush (zero env, no collector):
 
 * **Console logging, split by severity.** A human-friendly stream handler prints
   one line per log record to stderr, the severity rendered as the old glyph
@@ -42,6 +42,7 @@ import logging
 import os
 import socket
 import sys
+import threading
 import time
 import urllib.parse
 from collections.abc import AsyncGenerator, Generator, Mapping
@@ -1006,6 +1007,22 @@ def _new_logger_provider(service: str) -> LoggerProvider:
 
 
 def configure(*, console: bool = True, force: bool = False) -> None:
+    """Configure once, under a lock: a second thread's first telemetry call
+    waits until processors and handlers are installed (see :func:`_configure`)."""
+    if _configured and not force:
+        return
+    with _CONFIGURE_LOCK:
+        if _configured and not force:
+            return
+        _configure(console=console)
+
+
+# Reentrant: the first configure logs, and a log record may route to a provider
+# that calls configure() again on the same thread.
+_CONFIGURE_LOCK = threading.RLock()
+
+
+def _configure(*, console: bool) -> None:
     """Wire up the trace + log providers. Idempotent; every public entry point that
     emits calls it, so the first log, span or :func:`inject_env` configures.
 
@@ -1017,8 +1034,6 @@ def configure(*, console: bool = True, force: bool = False) -> None:
     """
     global _configured, _span_processors, _log_processors
     global _tracer_provider, _logger_provider
-    if _configured and not force:
-        return
     _configured = True
 
     want_console = console
@@ -1109,7 +1124,6 @@ def configure(*, console: bool = True, force: bool = False) -> None:
         _aux_logger_providers[_service_name] = _logger_provider
         trace.set_tracer_provider(_tracer_provider)
         set_logger_provider(_logger_provider)
-        atexit.register(shutdown)
 
     pylog = logging.getLogger(_LOGGER_NAME)
     pylog.setLevel(logging.DEBUG)
@@ -1976,14 +1990,19 @@ def shutdown() -> None:
     :func:`_otlp_span_processor`), so anything still queued -- spans AND log records
     -- is only delivered because this runs. It is the reason the batch trade is safe:
     ``_session.run_build`` calls this after the build session closes, the watchdog
-    calls it before ``os._exit``, and :func:`configure` registers it at exit. Every
-    provider emits through these processors, so no provider needs shutting down;
-    they are retired, so a later record goes nowhere instead of into a closed
-    exporter, and the exit hook never closes them twice. A process that never
-    configured has nothing to flush."""
+    calls it before ``os._exit``, and it is registered at exit on import (before any
+    other module's exit hook, so it runs after them). Every provider emits through
+    these processors, so no provider needs shutting down; they are retired, so a
+    later record goes nowhere instead of into a closed exporter, and the exit hook
+    never closes them twice. A process that never configured has nothing to flush."""
     global _span_processors, _log_processors
     retired = (*_span_processors, *_log_processors)
     _span_processors = _log_processors = ()
     for processor in retired:
         with contextlib.suppress(Exception):
             processor.shutdown()
+
+
+# Registered on import so it runs AFTER exit hooks registered later, such as
+# ``_artifact_cache._join_prewarm``, which still emit telemetry.
+atexit.register(shutdown)
