@@ -392,6 +392,15 @@ flutes = [2, 4]
 [tools.endmills-lms-6784.sizes_in]
 2_and_4_flute = ["3/16", "1/4", "5/16", "3/8", "7/16", "1/2", "9/16", "5/8", "11/16", "3/4"]
 
+# Owner-reported 2026-11-16 (Pedro): "already own Fly Cutter Set 2.5 2 1.5
+# size body for 5/16" tool bits". Make, shank and bit grind are not recorded.
+# A candidate for the base bar's facing (#2850): three passes per face on the
+# 2.5 in body instead of the 3/4 in end mill's ten.
+[tools.fly-cutter-set]
+kind = "fly_cutter_set"
+body_dia_in = [1.5, 2.0, 2.5]
+tool_bit_in = 0.3125
+
 # Thread length only; the tap's description and tap drill are cad/process/shop.toml
 # tools.basebar-tap. Tap America T/A54278 (drillsandcutters.com).
 [tools.taps-unc-hand.members.8-32-plug]
