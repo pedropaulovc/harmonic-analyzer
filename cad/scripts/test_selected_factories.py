@@ -566,7 +566,7 @@ def _case_enrolled_traveler_keeps_normal_loader_conversion(dodo, monkeypatch, tm
         assert owners[_path_identity(_workspace_path(REPO_ROOT, target))] == f"prechips:{stem}"
 
 
-def _case_enrolled_cam_keeps_normal_loader_conversion(dodo, ordinary, monkeypatch, tmp_path):
+def _case_enrolled_cam_keeps_normal_loader_conversion(dodo, monkeypatch, tmp_path):
     import _cam_programs
 
     # No part is enrolled since 2026-11-17; enrol a synthetic recipe.
@@ -593,9 +593,15 @@ def _case_enrolled_cam_keeps_normal_loader_conversion(dodo, ordinary, monkeypatc
     owners = dodo.canonical_target_owners()
     for target in task.targets:
         assert owners[_path_identity(_workspace_path(REPO_ROOT, target))] == f"cam:{stem}"
-    # FreeCAD is a local desktop install: neither build nor release may require it.
-    for name in ("build", "release"):
-        assert not any(dep.startswith("cam") for dep in ordinary.tasks[name].task_dep), name
+    # Submitter-only like prechips: never a farm leaf or a remote-cache-keyed action.
+    assert not any(
+        getattr(getattr(action, "py_callable", None), flag, False)
+        for action in task.actions
+        for flag in ("_farm_leaf_action", "_remote_cache_action")
+    )
+    for name, definition in (("build", dodo.task_build()), ("release", dodo.task_release())):
+        assert f"cam:{stem}" in definition["task_dep"], name
+    assert not any(dep.startswith("cam:") for dep in dodo.task_build_bare()["task_dep"])
 
 
 def _case_requested_order_and_iterable_are_preserved_without_dependency_expansion(dodo, ordinary):

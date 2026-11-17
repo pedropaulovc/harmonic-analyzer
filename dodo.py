@@ -23,7 +23,7 @@ Task groups (the prefix says whether SolidWorks is required):
   check:<name>       math/config/graph/nameplate/recipe gates (NO SolidWorks)
   check:machinist_review:<stem> cached blind reviews + judge (NO SolidWorks)
   prechips:<stem>    pro + hobby HTML travelers + hobby PDF, latest PyPI prechips (in build + release, not build_bare; NO SolidWorks)
-  cam:<stem>         NC programs posted by headless FreeCAD CAM (freecadcmd) with cycle times (opt-in; NO SolidWorks)
+  cam:<stem>         NC programs posted by headless FreeCAD CAM (freecadcmd) with cycle times (in build + release, not build_bare; NO SolidWorks; FreeCAD 1.1+ on the submitter)
   export             neutral STEP/STL/glTF/scene export (COM)
   release            cut a tagged GitHub release (COM + gh; opt-in)
   build              EVERY part + assembly + EVERY gate -- the one safe entry
@@ -4529,9 +4529,11 @@ def _cam_task(stem: str) -> dict[str, Any]:
 def task_cam():
     """NC programs for enrolled parts, posted by headless FreeCAD CAM
     (``freecadcmd``) from ``cad/process/<stem>/cam.py`` and checked against the
-    part's feature bundle, with each program's cycle time. Opt-in: neither
-    ``build`` nor ``release`` runs it, because no farm worker or CI runner has
-    FreeCAD."""
+    part's feature bundle, with each program's cycle time. ``build`` and
+    ``release`` run every one (release ships the programs under ``nc/<stem>/``);
+    ``build_bare`` runs none. Submitter-only, like ``prechips``: no farm worker
+    has FreeCAD, so the submitter needs FreeCAD 1.1+ and the task fails loud
+    without it."""
     import _cam_programs
 
     for stem in _cam_programs.CAM_STEMS:
@@ -4747,8 +4749,11 @@ def task_release():
     ``check:*`` -- so a release cannot publish past a stale/failing gate or
     package a missing/stale drawing. It also renders every enrolled
     ``prechips:<stem>`` traveler, whose hobby PDF the bundle ships under
-    ``travelers/`` (owner ruling 2026-11-14).
+    ``travelers/`` (owner ruling 2026-11-14), and posts every enrolled
+    ``cam:<stem>`` part's NC programs, which the bundle ships under
+    ``nc/<stem>/`` (owner ruling 2026-11-17).
     """
+    import _cam_programs
     import _process_plans
 
     return {
@@ -4762,6 +4767,7 @@ def task_release():
             *(f"verify:{s}" for s in _VERIFY_NAMES),
             *(f"check:{c}" for c in _CHECK_NAMES),
             *(f"prechips:{s}" for s in _process_plans.TRAVELER_STEMS),
+            *(f"cam:{s}" for s in _cam_programs.CAM_STEMS),
         ],
         "uptodate": [False],
         "pos_arg": "relargs",
@@ -4774,7 +4780,8 @@ def task_build():
     """THE fully-safe entry point (also ``default_tasks``): every part + assembly
     + every gate (SolidWorks ``verify:*``, offline ``check:*``) + every drawing,
     and beside the drawing PDFs every enrolled ``prechips:<stem>`` traveler
-    (HTML + hobby ``<slug>-traveler.pdf``). ``build_bare`` renders none.
+    (HTML + hobby ``<slug>-traveler.pdf``) and every enrolled ``cam:<stem>``
+    part's NC programs. ``build_bare`` renders and posts none.
 
     Use ``doit -n N`` to fan out SolidWorks-free work alongside the COM stream
     (serialized by the seat lock, not a spine).
@@ -4785,8 +4792,10 @@ def task_build():
     per-seat order so two cold builders diverge and split the fleet cache.
 
     Every COM gate is farm-dispatchable: under the farm executor each cache-missing
-    gate runs on a worker. Offline checks and travelers run on the submitter.
+    gate runs on a worker. Offline checks, travelers and NC programs run on the
+    submitter.
     """
+    import _cam_programs
     import _process_plans
 
     return {
@@ -4799,6 +4808,7 @@ def task_build():
             + [f"check:machinist_review:{s}" for s, _mode in _reviewed_drawings()]
             + [f"verify:{s}" for s in _VERIFY_NAMES]
             + [f"prechips:{s}" for s in _process_plans.TRAVELER_STEMS]
+            + [f"cam:{s}" for s in _cam_programs.CAM_STEMS]
         ),
     }
 

@@ -4,9 +4,10 @@ Each enrolled part has a recipe at ``cad/process/<stem>/cam.py`` beside its
 ``plan.toml``. ``cam_nc.py`` runs it in headless FreeCAD (``freecadcmd``,
 FreeCAD's CAM workbench) and writes one G-code file per recipe program, their
 estimated cycle times (``cycle_times.json``) and a ``manifest.json`` binding
-them to their inputs, under ``cad/out/nc/<stem>/``. FreeCAD is not part of the
-build: only an opt-in ``cam:<stem>`` task on a machine with FreeCAD installed
-produces these files.
+them to their inputs, under ``cad/out/nc/<stem>/``. FreeCAD is part of the
+build on the submitter: ``build`` and ``release`` run every enrolled part's
+``cam:<stem>`` task there (no farm worker has FreeCAD), and a release ships the
+files under ``nc/<stem>/``.
 """
 
 from __future__ import annotations
@@ -18,8 +19,8 @@ from types import ModuleType
 
 from export_features import OUT as CAD_OUT
 
-# No part is enrolled since the oblique trammel jig's base bar was deleted
-# (2026-11-17); the CNC migration enrols machine parts here.
+# The parts milled on the CNC mill, enrolled by the CNC migration; each one's
+# programs are posted by every build and shipped by every release.
 CAM_STEMS: tuple[str, ...] = ()
 PROCESS_ROOT = Path(__file__).resolve().parents[1] / "process"
 SCRIPTS_DIR = Path(__file__).resolve().parent
