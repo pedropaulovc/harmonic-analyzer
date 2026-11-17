@@ -325,34 +325,50 @@ V_FINISHED = (
 # HubTap. The faced top is the reference plane FacedTopPlane, FENCE_HEIGHT
 # above the Front Plane (Z0).
 FACED_TOP_PLANE = "FacedTopPlane"
+# A section imports no extrusion depth (farm run 20261117T234245842Z: section
+# A-A delivered none of FenceHeight, PlateThickness, PocketDepth), so the
+# heights the sections print are owned by hidden construction-only reference
+# sketches lying in each cutting plane (build_pd_platen's
+# CboreFloorReference): every line runs along Z, so the top view they are cut
+# from sees each end-on. Section A-A cuts on the clamp taps' line through
+# pocket 1 and the stop; section B-B on the hub's line through the counterbore.
+SECTION_A_PLANE = "SectionAPlane"
+SECTION_A_Y = CLAMP_SCREW_Y
+SECTION_A_REFERENCE = "SectionAReference"
+SECTION_B_PLANE = "SectionBPlane"
+SECTION_B_Y = HUB_Y
+SECTION_B_REFERENCE = "SectionBReference"
+# Where each reference line stands along X: the fence height on the stop
+# face, the thickness on the plate's left end, the pocket depth on pocket 1's
+# right end, the counterbore depth on its left wall.
+FENCE_HEIGHT_REFERENCE_X = 0.0
+THICKNESS_REFERENCE_X = LEFT_END_X
+POCKET_DEPTH_REFERENCE_X = CLAMP_STATIONS[0] + POCKET_LENGTH / 2.0
+CBORE_DEPTH_REFERENCE_X = HUB_X - HUB_CBORE_DIA / 2.0
 CLAMP_TAP_X_NAMES: tuple[str, ...] = tuple(
     f"ClampTapX{index}" for index in range(1, len(CLAMP_STATIONS) + 1)
 )
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PlateProfile": {"LeftEnd", "PlateLength", "FenceWidth", "PlateWidth"},
-    "Plate": {"PlateThickness"},
-    "PlateTop": {"FenceHeight"},
     "NotchProfile": {"NotchLeftEnd", "NotchRightStart", "NotchDepth"},
     "NotchCorners": {"NotchCornerR"},
     "PocketProfile": {"PocketLength", "PocketNearWallY", "PocketBackWallY"},
-    "ClampPockets": {"PocketDepth"},
     "PocketCorners": {"PocketCornerR"},
     "HubCboreProfile": {"HubX", "HubY", "HubCboreDia"},
-    "HubCbore": {"HubCboreDepth"},
     "ClampTaps": {*CLAMP_TAP_X_NAMES, "ClampTapY"},
+    SECTION_A_REFERENCE: {"FenceHeight", "PlateThickness", "PocketDepth"},
+    SECTION_B_REFERENCE: {"HubCboreDepth"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PlateProfile": {"LeftEnd": 1, "PlateLength": 1, "FenceWidth": 2, "PlateWidth": 2},
-    "Plate": {"PlateThickness": 2},
-    "PlateTop": {"FenceHeight": 3},
     "NotchProfile": {"NotchLeftEnd": 2, "NotchRightStart": 2, "NotchDepth": 2},
     "NotchCorners": {"NotchCornerR": 2},
     "PocketProfile": {"PocketLength": 2, "PocketNearWallY": 2, "PocketBackWallY": 3},
-    "ClampPockets": {"PocketDepth": 3},
     "PocketCorners": {"PocketCornerR": 2},
     "HubCboreProfile": {"HubX": 3, "HubY": 3, "HubCboreDia": 3},
-    "HubCbore": {"HubCboreDepth": 3},
     "ClampTaps": {**{name: 3 for name in CLAMP_TAP_X_NAMES}, "ClampTapY": 3},
+    SECTION_A_REFERENCE: {"FenceHeight": 3, "PlateThickness": 2, "PocketDepth": 3},
+    SECTION_B_REFERENCE: {"HubCboreDepth": 3},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places for dims in DRAWING_PRECISION.values() for name, places in dims.items()
@@ -410,7 +426,7 @@ POCKET_COUNT = len(CLAMP_STATIONS)
 NOTCH_CORNER_COUNT = 3
 DIMENSION_PREFIXES: dict[tuple[str, str], str] = {
     ("PocketProfile", "PocketLength"): f"{POCKET_COUNT}X ",
-    ("ClampPockets", "PocketDepth"): f"{POCKET_COUNT}X ",
+    (SECTION_A_REFERENCE, "PocketDepth"): f"{POCKET_COUNT}X ",
     ("PocketCorners", "PocketCornerR"): f"{4 * POCKET_COUNT}X ",
     ("NotchCorners", "NotchCornerR"): f"{NOTCH_CORNER_COUNT}X ",
 }

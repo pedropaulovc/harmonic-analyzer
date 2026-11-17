@@ -215,6 +215,48 @@ def test_every_drive_expression_names_a_global() -> None:
         assert f"ClampStation{index}" in part.GLOBALS
 
 
+def test_section_heights_live_in_hidden_reference_sketches_on_each_cut() -> None:
+    """A section imports no extrusion depth (farm run 20261117T234245842Z),
+    so each printed height is a reference line in its cutting plane, standing
+    on a section edge inside the cut's span, and saved hidden."""
+    assert spec.DRAWING_DIMENSIONS[spec.SECTION_A_REFERENCE] == set(
+        drawing.SECTION_A_KEEP
+    )
+    assert spec.DRAWING_DIMENSIONS[spec.SECTION_B_REFERENCE] == set(
+        drawing.SECTION_B_KEEP
+    )
+    for feature in ("Plate", "PlateTop", "ClampPockets", "HubCbore"):
+        assert feature not in spec.DRAWING_DIMENSIONS, feature
+    assert spec.SECTION_A_Y == drawing.SECTION_A_ANCHOR[1] == spec.CLAMP_SCREW_Y
+    assert spec.SECTION_B_Y == drawing.SECTION_B_ANCHOR[1] == spec.HUB_Y
+    lo, hi = drawing.SECTION_A_SPAN
+    for x in (
+        spec.FENCE_HEIGHT_REFERENCE_X,
+        spec.THICKNESS_REFERENCE_X,
+        spec.POCKET_DEPTH_REFERENCE_X,
+    ):
+        assert lo < x < hi, x
+    assert spec.FENCE_HEIGHT_REFERENCE_X == 0.0  # the stop face
+    assert spec.THICKNESS_REFERENCE_X == spec.LEFT_END_X
+    assert spec.POCKET_DEPTH_REFERENCE_X == pytest.approx(
+        spec.CLAMP_STATIONS[0] + spec.POCKET_LENGTH / 2.0
+    )
+    lo, hi = drawing.SECTION_B_SPAN
+    assert lo < spec.CBORE_DEPTH_REFERENCE_X < hi
+    assert spec.CBORE_DEPTH_REFERENCE_X == pytest.approx(
+        spec.HUB_X - spec.HUB_CBORE_DIA / 2.0
+    )
+    tree = ast.parse(Path(part.__file__).read_text(encoding="utf-8"))
+    blanked = [
+        ast.unparse(node.args[1])
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "blank_reference_sketches"
+    ]
+    assert blanked == ["(spec.SECTION_A_REFERENCE, spec.SECTION_B_REFERENCE)"]
+
+
 def test_every_marked_dimension_prints_once_on_the_sheet_in_bounds() -> None:
     keeps = (drawing.TOP_KEEP, drawing.SECTION_A_KEEP, drawing.SECTION_B_KEEP)
     names = [name for keep in keeps for name in keep]

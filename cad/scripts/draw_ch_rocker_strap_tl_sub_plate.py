@@ -41,7 +41,7 @@ from _drawing_common import (
 )
 from _drawing_dimension_import import import_cosmetic_threads
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
-from _drawing_hidden_sketches import curate_view_dimensions
+from _drawing_hidden_sketches import curate_view_dimensions, part_sketches_shown
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view, model_points_in_view
@@ -154,12 +154,14 @@ TOP_KEEP: dict[str, tuple[float, float]] = {
     "NotchCornerR": (_RIGHT_X + 0.014, _BACK_Y + 0.004),
     "HubCboreDia": (top_xy(spec.HUB_X, 0.0)[0] + 0.025, _FRONT_Y - 0.004),
 }
-# Section A-A: the fence height and the overall thickness left of the stop,
-# the pocket depth right of the pocket.
+# Section A-A: the fence height right of the stop face over the floor, the
+# overall thickness left of the plate's end, the pocket depth right of the
+# pocket. Each prints from its hidden reference line in the cutting plane
+# (ch_rocker_strap_tl_sub_plate_spec.SECTION_A_REFERENCE).
 SECTION_A_KEEP: dict[str, tuple[float, float]] = {
     "FenceHeight": (
-        section_a_xy(spec.LEFT_END_X, 0.0)[0] - 0.008,
-        section_a_xy(0.0, spec.FENCE_HEIGHT / 2.0)[1],
+        section_a_xy(spec.FENCE_HEIGHT_REFERENCE_X + 6.0, 0.0)[0],
+        section_a_xy(0.0, spec.FENCE_HEIGHT + 3.0)[1],
     ),
     "PlateThickness": (
         section_a_xy(spec.LEFT_END_X, 0.0)[0] - 0.020,
@@ -634,16 +636,28 @@ def _orient_section(
 
 def _section(
     adapter: Any,
+    source_model: Any,
     top: Any,
     *,
     letter: str,
     anchor_mm: tuple[float, float, float],
     span_mm: tuple[float, float],
     origin: tuple[float, float],
+    reference: str,
+    keep: dict[str, tuple[float, float]],
     label: str,
-) -> Any:
+) -> tuple[Any, list[Any]]:
     """A partial section on the cutting line through ``anchor_mm`` along X
-    across ``span_mm``, oriented and placed with its anchor on ``origin``."""
+    across ``span_mm``, oriented and placed with its anchor on ``origin``,
+    and its heights imported from ``reference``.
+
+    A section imports no extrusion depth (farm run 20261117T234245842Z), so
+    each height is owned by a hidden reference sketch lying in the cutting
+    plane. A derived view takes that sketch as the part shows it when cut and
+    selects it through its base view, so the section is cut and curated while
+    the part shows it (draw_pd_platen's ``_floor_section``). The sketch's
+    lines run along Z, so the top view, which keeps it shown, sees each one
+    end-on."""
     _, y, z = anchor_mm
     start = model_point_in_view(
         adapter, top, _metres((span_mm[0], y, z)), label=f"{label} start"
@@ -651,20 +665,31 @@ def _section(
     end = model_point_in_view(
         adapter, top, _metres((span_mm[1], y, z)), label=f"{label} end"
     )
-    section = create_section_view(
-        adapter,
-        top,
-        line_start=(float(start[0]), float(start[1])),
-        line_end=(float(end[0]), float(end[1])),
-        view_xy=origin,
-        section_label=letter,
-        scale=SECTION_SCALE,
-        partial=True,
-        label=label,
-    )
-    _orient_section(adapter, section, anchor_mm, label=label)
-    _place_point(adapter, section, anchor_mm, origin, label=label)
-    return section
+    with part_sketches_shown(
+        adapter, source_model, (reference,), label=f"{label} reference", base_view=top
+    ):
+        section = create_section_view(
+            adapter,
+            top,
+            line_start=(float(start[0]), float(start[1])),
+            line_end=(float(end[0]), float(end[1])),
+            view_xy=origin,
+            section_label=letter,
+            scale=SECTION_SCALE,
+            partial=True,
+            label=label,
+        )
+        _orient_section(adapter, section, anchor_mm, label=label)
+        _place_point(adapter, section, anchor_mm, origin, label=label)
+        set_hidden_lines_removed(adapter, section)
+        annotations = curate_view_dimensions(
+            adapter,
+            section,
+            keep=keep,
+            view_label=label,
+            dimensions_by_feature=spec.DRAWING_DIMENSIONS,
+        )
+    return section, annotations
 
 
 def _rewrite_callout_definitions(
@@ -722,6 +747,7 @@ def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source sub-plate missing: {SOURCE}")
     check("open sub-plate", adapter.open_model(str(SOURCE)))
+    source_model = adapter.currentModel
     required = ("Number", "Material Specification", "Finish", "Quantity")
     read_required_properties(
         adapter.currentModel,
@@ -749,43 +775,43 @@ def build(adapter: Any) -> dict[str, str]:
     top = place_view(adapter, str(SOURCE), "*Front", *TOP_ORIGIN, scale=TOP_SCALE)
     _check_top_view(adapter, top)
     _place_point(adapter, top, (0.0, 0.0, 0.0), TOP_ORIGIN, label="top view")
-    section_a = _section(
+    set_hidden_lines_removed(adapter, top)
+    annotations: list[Any] = curate_view_dimensions(
         adapter,
+        top,
+        keep=TOP_KEEP,
+        view_label="top view",
+        dimensions_by_feature=spec.DRAWING_DIMENSIONS,
+    )
+    section_a, section_a_dims = _section(
+        adapter,
+        source_model,
         top,
         letter="A",
         anchor_mm=SECTION_A_ANCHOR,
         span_mm=SECTION_A_SPAN,
         origin=SECTION_A_ORIGIN,
+        reference=spec.SECTION_A_REFERENCE,
+        keep=SECTION_A_KEEP,
         label="section A-A",
     )
-    section_b = _section(
+    section_b, section_b_dims = _section(
         adapter,
+        source_model,
         top,
         letter="B",
         anchor_mm=SECTION_B_ANCHOR,
         span_mm=SECTION_B_SPAN,
         origin=SECTION_B_ORIGIN,
+        reference=spec.SECTION_B_REFERENCE,
+        keep=SECTION_B_KEEP,
         label="section B-B",
     )
+    annotations += section_a_dims + section_b_dims
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
     # The iso too (draw_dt_cone_tip_gear_tl_cutter_bar): from HLR the shaded
     # display really changes and the taps' cosmetic threads take precision.
-    for view in (top, section_a, section_b, iso):
-        set_hidden_lines_removed(adapter, view)
-
-    annotations: list[Any] = []
-    for view, keep, label in (
-        (top, TOP_KEEP, "top view"),
-        (section_a, SECTION_A_KEEP, "section A-A"),
-        (section_b, SECTION_B_KEEP, "section B-B"),
-    ):
-        annotations += curate_view_dimensions(
-            adapter,
-            view,
-            keep=keep,
-            view_label=label,
-            dimensions_by_feature=spec.DRAWING_DIMENSIONS,
-        )
+    set_hidden_lines_removed(adapter, iso)
     printed = sorted(dimension_name(adapter, annotation) for annotation in annotations)
     if printed != sorted(sheet_dimension_names()):
         raise RuntimeError(

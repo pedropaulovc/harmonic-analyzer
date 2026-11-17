@@ -23,6 +23,11 @@ model dimension located from X0, Y0 or Z0:
 * ``ClampTaps``: one native #4-40 THRU wizard feature, four instances on the
   pocket floors; ``HubTap``: the native 1/4-20 THRU from the counterbore
   floor.
+* ``SectionAPlane`` / ``SectionAReference`` and ``SectionBPlane`` /
+  ``SectionBReference``: hidden construction-only sketches in the two
+  sections' cutting planes, owning the heights the sections print
+  (FenceHeight, PlateThickness, PocketDepth; HubCboreDepth), each driven by
+  the same global as the feature depth it states.
 
 Run (SolidWorks already open)::
 
@@ -37,6 +42,7 @@ from typing import Any
 import ch_rocker_strap_tl_sub_plate_spec as spec
 from _appearance import apply_material
 from _check import check
+from _com import _early_bound, _read_member
 from _dimensions import drive_dimension, name_dimensions, set_global
 from _document_units import apply_package_model_units
 from _drawing_marks import (
@@ -47,7 +53,7 @@ from _drawing_marks import (
 from _drawing_precision import apply_drawing_precision
 from _drawing_prefix import set_dimension_prefix
 from _drawing_tolerances import set_dimension_symmetric_tolerance
-from _feature_tree import name_last_feature
+from _feature_tree import _feature_by_name, name_last_feature
 from _holes import SharedCoordinate, wizard_holes
 from _part_checks import bbox_extent_check, report_mass_properties, volume_check
 from _part_properties import part_drawing_unit
@@ -56,7 +62,15 @@ from _rebuild import force_rebuild
 from _saved_part_guard import require_saved_drawing_properties
 from _session import run_build
 from _single_limit_tolerance import SW_TOL_MAX, set_single_limit
-from _sketch import SketchDims, add_line_chain, dimension_between, ensure_fully_defined
+from _sketch import (
+    SketchDims,
+    add_line_chain,
+    anchor_point_to_origin,
+    blank_reference_sketches,
+    dimension_between,
+    ensure_fully_defined,
+    set_sketch_direct_db,
+)
 from _sketch_circle import define_circle
 from _visibility import blank_reference_geometry
 
@@ -203,7 +217,7 @@ def _plate(adapter: Any, drive_jobs: list[tuple[str, str]]) -> None:
         ),
     )
     name_last_feature(adapter, "Plate")
-    (thickness,) = name_dimensions(adapter, "Plate", ["PlateThickness"])
+    (thickness,) = name_dimensions(adapter, "Plate", ["BlankThickness"])
     drive_jobs.append((thickness, '"PlateThickness"'))
     volume_check(adapter, "plate blank", spec.V_PLATE, 0.001 * spec.V_PLATE)
     bbox_extent_check(adapter, "plate length", "x", spec.PLATE_LENGTH)
@@ -246,7 +260,7 @@ def _floor(adapter: Any, drive_jobs: list[tuple[str, str]], volume: float) -> fl
         adapter.create_cut_extrude(ExtrusionParameters(depth=spec.FENCE_HEIGHT)),
     )
     name_last_feature(adapter, "PlateTop")
-    (height,) = name_dimensions(adapter, "PlateTop", ["FenceHeight"])
+    (height,) = name_dimensions(adapter, "PlateTop", ["FloorDepth"])
     drive_jobs.append((height, '"FenceHeight"'))
     volume -= spec.V_FLOOR_CUT
     return volume_check(adapter, "Z0 floor", volume, _V_TOL)
@@ -470,7 +484,7 @@ def _pockets(adapter: Any, drive_jobs: list[tuple[str, str]], volume: float) -> 
         adapter.create_cut_extrude(ExtrusionParameters(depth=spec.POCKET_DEPTH)),
     )
     name_last_feature(adapter, "ClampPockets")
-    (depth,) = name_dimensions(adapter, "ClampPockets", ["PocketDepth"])
+    (depth,) = name_dimensions(adapter, "ClampPockets", ["PocketCutDepth"])
     drive_jobs.append((depth, '"PocketDepth"'))
     volume -= spec.V_POCKETS
     volume = volume_check(adapter, "clamp pockets", volume, _V_TOL)
@@ -521,7 +535,7 @@ def _hub(adapter: Any, drive_jobs: list[tuple[str, str]], volume: float) -> floa
         adapter.create_cut_extrude(ExtrusionParameters(depth=spec.HUB_CBORE_DEPTH)),
     )
     name_last_feature(adapter, "HubCbore")
-    (depth,) = name_dimensions(adapter, "HubCbore", ["HubCboreDepth"])
+    (depth,) = name_dimensions(adapter, "HubCbore", ["CboreCutDepth"])
     drive_jobs.append((depth, '"HubCboreDepth"'))
     volume -= spec.V_HUB_CBORE
     return volume_check(adapter, "hub counterbore", volume, _V_TOL)
@@ -564,6 +578,182 @@ def _taps(adapter: Any, drive_jobs: list[tuple[str, str]], volume: float) -> flo
     return volume_check(adapter, "hub tap", volume, _V_TOL)
 
 
+def _section_plane(adapter: Any, name: str, y_mm: float) -> None:
+    """A cutting plane parallel to the Top Plane at model Y ``y_mm``, read back
+    against it (build_pd_platen._cbore_section_plane): the same rotation, so
+    a sketch on it keeps Top's (u, v) = model (X, -Z), and an origin shifted
+    by exactly ``y_mm`` along Y. A negative offset lies on Top's -Y side."""
+    from solidworks_mcp.adapters.base import CreatePlaneParameters
+
+    check(
+        f"create plane {name}",
+        adapter.create_plane(
+            CreatePlaneParameters(mode="offset", base_plane="Top Plane", offset=y_mm)
+        ),
+    )
+    name_last_feature(adapter, name)
+    top_rotation, top_origin = _plane_frame(adapter, "Top Plane")
+    rotation, origin = _plane_frame(adapter, name)
+    shift = tuple(o - t for o, t in zip(origin, top_origin, strict=True))
+    if any(
+        abs(a - b) > 1e-9 for a, b in zip(rotation, top_rotation, strict=True)
+    ) or any(abs(s - e) > 1e-6 for s, e in zip(shift, (0.0, y_mm, 0.0), strict=True)):
+        raise RuntimeError(
+            f"{name}: rotation {rotation} / origin shift {shift} mm, expected the "
+            f"Top plane's {top_rotation} shifted (0, {y_mm}, 0)"
+        )
+
+
+def _plane_frame(
+    adapter: Any, name: str
+) -> tuple[tuple[float, ...], tuple[float, ...]]:
+    """(rotation, origin mm) of a reference plane, from ``IRefPlane.Transform``."""
+    feature = _early_bound(_feature_by_name(adapter, name), "IFeature")
+    plane = _early_bound(feature.GetSpecificFeature2(), "IRefPlane")
+    data = [
+        float(v) for v in _read_member(_read_member(plane, "Transform"), "ArrayData")
+    ]
+    return tuple(data[0:9]), tuple(v * 1000.0 for v in data[9:12])
+
+
+def _reference_line(
+    adapter: Any,
+    dims: SketchDims,
+    *,
+    x_mm: float,
+    z_from_mm: float,
+    z_to_mm: float,
+    x_drive: str | None,
+    z_from_drive: str | None,
+    name: str,
+    drive: str,
+) -> None:
+    """One construction line along Z in a Top-parallel sketch, from model Z
+    ``z_from_mm`` to ``z_to_mm`` at model X ``x_mm``; its length is the named
+    printed dimension, its start located from the origin by driven
+    (unprinted) dimensions. Top's sketch v is model -Z."""
+    start = (x_mm, -z_from_mm)
+    set_sketch_direct_db(adapter, True)
+    line = check(
+        f"{name} reference line",
+        adapter.add_line(start[0], start[1], x_mm, -z_to_mm),
+    )
+    set_sketch_direct_db(adapter, False)
+    segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError(f"{name} reference line did not take the construction flag")
+    check(
+        f"{name} reference vertical",
+        adapter.add_sketch_constraint(line, None, "vertical"),
+    )
+    anchor_point_to_origin(
+        adapter, f"{line}.start", start[0], start[1], f"{name} start"
+    )
+    # anchor_point_to_origin emits the horizontal distance first, then the
+    # vertical, and none for a zero coordinate.
+    if abs(start[0]) >= 1e-9:
+        dims.record(f"{name}RefX", x_drive)
+    if abs(start[1]) >= 1e-9:
+        dims.record(f"{name}RefZ", z_from_drive)
+    dimension_between(
+        adapter,
+        f"{line}.start",
+        f"{line}.end",
+        "vertical_distance",
+        abs(z_to_mm - z_from_mm),
+        name,
+    )
+    dims.record(name, drive)
+
+
+def _section_references(adapter: Any, drive_jobs: list[tuple[str, str]]) -> None:
+    """The heights the sections print, in hidden construction-only sketches
+    on each cutting plane (a section imports no extrusion depth): A-A the
+    fence height on the stop face, the overall thickness on the left end and
+    the pocket depth on pocket 1's right end; B-B the counterbore depth on
+    its left wall. Every line runs along Z, so the top view sees it end-on."""
+    _section_plane(adapter, spec.SECTION_A_PLANE, spec.SECTION_A_Y)
+    dims = SketchDims()
+    check(
+        "create_sketch section A-A reference",
+        adapter.create_sketch(spec.SECTION_A_PLANE),
+    )
+    _reference_line(
+        adapter,
+        dims,
+        x_mm=spec.FENCE_HEIGHT_REFERENCE_X,
+        z_from_mm=spec.PLATE_TOP_Z,
+        z_to_mm=spec.FENCE_HEIGHT,
+        x_drive=None,
+        z_from_drive=None,
+        name="FenceHeight",
+        drive='"FenceHeight"',
+    )
+    _reference_line(
+        adapter,
+        dims,
+        x_mm=spec.THICKNESS_REFERENCE_X,
+        z_from_mm=spec.FENCE_HEIGHT,
+        z_to_mm=spec.UNDERSIDE_Z,
+        x_drive='"LeftEnd"',
+        z_from_drive='"FenceHeight"',
+        name="PlateThickness",
+        drive='"PlateThickness"',
+    )
+    _reference_line(
+        adapter,
+        dims,
+        x_mm=spec.POCKET_DEPTH_REFERENCE_X,
+        z_from_mm=spec.PLATE_TOP_Z,
+        z_to_mm=spec.POCKET_FLOOR_Z,
+        x_drive='"ClampStation1" + "PocketLength" / 2',
+        z_from_drive=None,
+        name="PocketDepth",
+        drive='"PocketDepth"',
+    )
+    ensure_fully_defined(adapter, "section A-A reference sketch")
+    check("exit_sketch section A-A reference", adapter.exit_sketch())
+    name_last_feature(adapter, spec.SECTION_A_REFERENCE)
+    _require_parent(adapter, spec.SECTION_A_REFERENCE, spec.SECTION_A_PLANE)
+    drive_jobs += dims.apply(adapter, spec.SECTION_A_REFERENCE)
+
+    _section_plane(adapter, spec.SECTION_B_PLANE, spec.SECTION_B_Y)
+    dims = SketchDims()
+    check(
+        "create_sketch section B-B reference",
+        adapter.create_sketch(spec.SECTION_B_PLANE),
+    )
+    _reference_line(
+        adapter,
+        dims,
+        x_mm=spec.CBORE_DEPTH_REFERENCE_X,
+        z_from_mm=spec.PLATE_TOP_Z,
+        z_to_mm=spec.COUNTERBORE_FLOOR_Z,
+        x_drive='"HubX" - "HubCboreDia" / 2',
+        z_from_drive=None,
+        name="HubCboreDepth",
+        drive='"HubCboreDepth"',
+    )
+    ensure_fully_defined(adapter, "section B-B reference sketch")
+    check("exit_sketch section B-B reference", adapter.exit_sketch())
+    name_last_feature(adapter, spec.SECTION_B_REFERENCE)
+    _require_parent(adapter, spec.SECTION_B_REFERENCE, spec.SECTION_B_PLANE)
+    drive_jobs += dims.apply(adapter, spec.SECTION_B_REFERENCE)
+
+
+def _require_parent(adapter: Any, sketch: str, plane: str) -> None:
+    """create_sketch falls back to a standard plane when a named one fails to
+    select (build_pd_platen._require_on_section_plane)."""
+    feature = _early_bound(_feature_by_name(adapter, sketch), "IFeature")
+    parents = [
+        str(_early_bound(parent, "IFeature").Name)
+        for parent in (feature.GetParents() or ())
+    ]
+    if plane not in parents:
+        raise RuntimeError(f"{sketch} is not on {plane}: parents {parents}")
+
+
 def build(adapter: Any) -> dict[str, str]:
     check("create_part", adapter.create_part())
     # #290: the row's inch calculation units, before the first global.
@@ -579,7 +769,15 @@ def build(adapter: Any) -> dict[str, str]:
     volume = _hub(adapter, drive_jobs, volume)
     volume = _taps(adapter, drive_jobs, volume)
     volume_check(adapter, "sub-plate (analytic)", spec.V_FINISHED, _V_TOL)
-    blank_reference_geometry(adapter, ((spec.FACED_TOP_PLANE, "PLANE"),))
+    _section_references(adapter, drive_jobs)
+    blank_reference_geometry(
+        adapter,
+        (
+            (spec.FACED_TOP_PLANE, "PLANE"),
+            (spec.SECTION_A_PLANE, "PLANE"),
+            (spec.SECTION_B_PLANE, "PLANE"),
+        ),
+    )
 
     # Deferred drive equations; each evaluates to the value just built, so the
     # volume must not move.
@@ -640,6 +838,11 @@ def build(adapter: Any) -> dict[str, str]:
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_properties(
         adapter, PART_NAME, {"Isometric View Note": spec.ISOMETRIC_VIEW_NOTE}
+    )
+    # Construction-only: saved hidden so no assembly renders them; the
+    # drawing shows each in its section (build_pd_platen's CboreFloorReference).
+    blank_reference_sketches(
+        adapter, (spec.SECTION_A_REFERENCE, spec.SECTION_B_REFERENCE)
     )
     artefacts = save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
