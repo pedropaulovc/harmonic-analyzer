@@ -31,10 +31,12 @@ def test_required_drawing_paths() -> None:
 
 
 def test_post_preserves_harvested_sizes_and_follows_the_configured_axes() -> None:
-    # The cast body sits on the .XX grid (1.65 in, machinist review: rule 17
-    # gives it no band tighter than the title block's); the cone boss keeps
-    # the harvested 1.654 face-to-face the cone shaft and gear stack close on.
+    # The cast body sits on the .XX grid (1.60 in, machinist review: rule 17
+    # gives it no band tighter than the title block's) inside the 1.65 in
+    # envelope the platform is laid out on (#2756); the cone boss keeps the
+    # harvested 1.654 face-to-face the cone shaft and gear stack close on.
     assert BLOCK_DIA == 41.91
+    assert spec.BODY_DIA == 40.64
     assert spec.CONE_BOSS_LENGTH == 42.011
     assert (spec.HEAD_DIA, spec.HEAD_HEIGHT) == (42.672, 26.67)
     assert spec.HEAD_BASE_Y == pytest.approx(spec.BLOCK_HEIGHT - spec.HEAD_HEIGHT)
@@ -99,11 +101,11 @@ def test_post_preserves_harvested_sizes_and_follows_the_configured_axes() -> Non
         )
     )
     assert part.MAIN_BODY_MM3 == pytest.approx(
-        math.pi * (BLOCK_DIA / 2.0) ** 2 * spec.BLOCK_HEIGHT
+        math.pi * (spec.BODY_DIA / 2.0) ** 2 * spec.BLOCK_HEIGHT
     )
     assert part.HEAD_SHELL_MM3 == pytest.approx(
         math.pi
-        * ((spec.HEAD_DIA / 2.0) ** 2 - (BLOCK_DIA / 2.0) ** 2)
+        * ((spec.HEAD_DIA / 2.0) ** 2 - (spec.BODY_DIA / 2.0) ** 2)
         * spec.HEAD_HEIGHT
     )
 
@@ -320,15 +322,15 @@ def test_running_bores_close_the_configured_fit_class() -> None:
 def test_nothing_else_on_the_casting_carries_a_band() -> None:
     """Each band named once, applied to the features whose fit needs it.
 
-    The cast head and boss diameters and the mounting-hole stations are not
-    accuracy features (cad/docs/tolerance-policy.md, "Result"), so the part
-    must not author a tolerance on them at all: the title block's general
-    grade is the whole specification.  The body's band is the same width,
-    one-sided so it stays under the cone boss ends (#2756).  The one
-    symmetric band is the collar thrust face's station; the cone-axis
-    height's capture band is the title block's .XX (machinist review: an
-    explicit ±.01 repeated it).
+    The cast body, head and boss diameters and the mounting-hole stations
+    are not accuracy features (cad/docs/tolerance-policy.md, "Result"), so the
+    part must not author a tolerance on them at all: the title block's general
+    grade is the whole specification (#2756 retired the body's one-sided
+    band for a smaller nominal).  The one symmetric band is the collar thrust
+    face's station; the cone-axis height's capture band is the title block's
+    .XX (machinist review: an explicit ±.01 repeated it).
     """
+    assert not hasattr(spec, "MAIN_BODY_DIA_BAND")
     assert spec.JOURNAL_AXIS_HEIGHT_TOLERANCE_MM == pytest.approx(0.254)
     assert not hasattr(spec, "TURNED_DIAMETER_TOLERANCE_MM")
     assert not hasattr(spec, "CRANK_BORE_TOLERANCE_MM")
@@ -496,12 +498,18 @@ def test_journal_rims_print_the_thrust_ring_break() -> None:
     # r16 (rules 4 and 7) gave the tighter break its reason at the callout;
     # the novice rubric's two-line callout moved the collar's part into
     # numbered note 2, which the bore's callout flags, and fan-out r1 put the
-    # short break back at the bore's leader (rule 7).
-    assert drawing.DIMENSION_CALLOUTS["JournalBoreDia"] == (
-        f"REAM THRU, SEE NOTE 2\n{shaft.POST_JOURNAL_RIM_BREAK}"
+    # short break back at the bore's leader (rule 7).  R5's machinist review
+    # read the break without its reason as over-specification, and the R5
+    # fix's first attempt, with the reason as a row under the break, read
+    # three lines of words on the callout (rule 7).  So the break and its
+    # reason ride linked note 2, after the collar they protect, by number.
+    assert drawing.DIMENSION_CALLOUTS["JournalBoreDia"] == "REAM THRU, SEE NOTE 2"
+    assert _note(2).endswith(
+        f"MHA-DT-04 COLLAR ON .827 FACE: {drawing.JOURNAL_RIM_BREAK_REASON}, "
+        f"{shaft.POST_JOURNAL_RIM_BREAK}."
     )
-    assert shaft.POST_JOURNAL_RIM_BREAK not in drawing.SHEET_NOTES
-    assert "CONE SHAFT MHA-DT-04" in _note(2) and "ITS COLLAR" in _note(2)
+    assert drawing.SHEET_NOTES.count(shaft.POST_JOURNAL_RIM_BREAK) == 1
+    assert "CONE SHAFT MHA-DT-04" in _note(2)
     assert f"EDGE BREAK {shaft.inch_text(break_max, 3)} MAX" in shaft.COLLAR_STOCK_CALLOUT
     ring = shaft.THRUST_RING_MIN
     assert ring - 2.0 * break_max >= shaft.THRUST_RING_FLOOR
@@ -575,26 +583,53 @@ def test_body_diameter_claims_no_unmeasurable_flushness() -> None:
 
 def test_body_diameter_takes_the_title_block_band() -> None:
     """MHA-DT-05 machinist review (gating, rule 17): Ø1.654 printed three
-    places only because the harvested 42.011 sat off the .XX grid, and its
-    suffix said the band protected the mounting holes' wall.  The cast body
-    is Ø1.65 at .XX; the wall still clears the floor at that band's minimum.
-    #2756: the band is one-sided, down, so the body's largest radius never
-    passes the cone boss ends' least station (at +/-.01 it did)."""
+    places only because the harvested 42.011 sat off the .XX grid.  #2756 (R5
+    machinist review, blocker): on the Ø1.65 envelope the cone boss ends
+    stood .002 proud and fell flush or inside the body at its printed limits.
+    The cast body is Ø1.60 at the title block's .XX band, inside the
+    envelope, so both pads stand at least the title block's edge break proud
+    at every printed limit and the mounting holes' outer wall still clears
+    its floor."""
     assert spec.DRAWING_PRECISION_BY_NAME["MainBodyDia"] == 2
-    assert round(BLOCK_DIA / 25.4, 2) == pytest.approx(BLOCK_DIA / 25.4, abs=1e-9)
+    assert round(spec.BODY_DIA / 25.4, 2) == pytest.approx(
+        spec.BODY_DIA / 25.4, abs=1e-9
+    )
+    assert spec._printed_limits(spec.BODY_DIA, 2)[1] <= BLOCK_DIA
     assert "MainBodyDia" not in drawing.DIMENSION_SUFFIXES
     assert drawing.FRONT_KEEP["MainBodyDia"][0] == 0.150
     assert spec.MOUNT_OTHER_WEBS_WORST["body foot OD"] == pytest.approx(
-        (BLOCK_DIA + spec.MAIN_BODY_DIA_BAND[1]) / 2.0
+        spec._printed_limits(spec.BODY_DIA, 2)[0] / 2.0
         - spec._printed_limits(spec.ATTACHMENT_X, 2)[1]
         - (spec.ATTACHMENT_THRU_DIA + spec._DRILL_OVERSIZE) / 2.0
     )
-    assert spec.MOUNT_OTHER_WEBS_WORST["body foot OD"] >= spec.WEB_FLOOR_MM
-    assert spec.BODY_RADIUS_MAX_IN <= spec.CONE_BOSS_END_MIN_IN
-    assert round(spec._printed_limits(BLOCK_DIA, 2)[1] / 2.0 / 25.4, 3) > spec.CONE_BOSS_END_MIN_IN
+    assert spec.MOUNT_OTHER_WEBS_WORST["body foot OD"] >= spec.WALL_TARGET_MM
     assert drawing.BODY.fields["dia"][0] == pytest.approx(
-        [BLOCK_DIA + spec.MAIN_BODY_DIA_BAND[1], BLOCK_DIA]
+        [spec.BODY_DIA - 0.254, spec.BODY_DIA + 0.254]
     )
+
+
+def test_both_cone_bosses_stand_proud_of_the_body_at_every_limit() -> None:
+    """#2756: the north face's least station (.827 - .002) and the far face's
+    (1.654's least less the north face's greatest) each clear the body's
+    largest radius by at least the title block's edge break, so the pads are
+    real cast bosses a shop can face, never flush with or inside the round."""
+    inch = 25.4
+    body_r_max = (round(spec.BODY_DIA / inch, 2) + 0.01) / 2.0
+    north_min = 0.827 - 0.002
+    far_min = (1.654 - 0.005) - (0.827 + 0.002)
+    assert spec.CONE_BOSS_STANDOFF_WORST_MM["north"] == pytest.approx(
+        (north_min - body_r_max) * inch
+    )
+    assert spec.CONE_BOSS_STANDOFF_WORST_MM["far"] == pytest.approx(
+        (far_min - body_r_max) * inch
+    )
+    assert spec.CONE_BOSS_STANDOFF_FLOOR_MM == pytest.approx(0.010 * inch)
+    assert (
+        min(spec.CONE_BOSS_STANDOFF_WORST_MM.values())
+        >= spec.CONE_BOSS_STANDOFF_FLOOR_MM
+    )
+    # On the envelope the north face sat flush at the limits (#2756).
+    assert (BLOCK_DIA / inch) / 2.0 >= north_min
 
 
 def test_one_cone_boss_diameter_counts_both_bosses() -> None:
@@ -737,7 +772,12 @@ def test_thrust_face_station_flags_note_2_which_names_the_collar() -> None:
     assert face.production_method == ""
     assert drawing._NORTH_BOSS_FINISH_OFFSET == (-0.006, 0.008)
     assert "MHA-DT-04" in _note(2)
-    assert "ITS COLLAR RUNS ON THE .827 FACE." in _note(2)
+    # R5 fix attempt 1 (blocker): a bare COLLAR named no mate, so the collar
+    # is named by number; its place and the break's reason keep to six words.
+    line = drawing.SHEET_NOTES.splitlines()[2]
+    assert line.startswith("   MHA-DT-04 COLLAR ON .827 FACE:")
+    reason = line.split(":")[0].split() + drawing.JOURNAL_RIM_BREAK_REASON.split()
+    assert len([word for word in reason if word != "MHA-DT-04"]) <= 6
     # Above the upper extension line, below the sheet border.
     assert drawing.SECTION_KEEP["ConeBossNorthZ"][1] > 0.250
 
@@ -761,7 +801,7 @@ def test_removed_view_letter_is_not_a_datum_letter() -> None:
 def test_datum_a_and_journal_finish_stand_off_the_body() -> None:
     """r5: datum A sat on Ø12.281's leader and the Ra landed on its triangle.
     r13 (rule 14): both stood inside View C's body outline."""
-    right_of_body = drawing.JOURNAL_CENTER[0] + BLOCK_DIA / 2000.0
+    right_of_body = drawing.JOURNAL_CENTER[0] + spec.BODY_DIA / 2000.0
     # Both right of the view, below the size's text; each leader lands
     # further round the rim than the one above it (the size's at about
     # -24 degrees), so none crosses another.
@@ -920,7 +960,7 @@ def test_numbered_notes_state_each_bores_fit_and_its_locations_mates() -> None:
         (
             "1. RUNNING FIT ON CRANKSHAFT MHA-DT-11 (CLEARANCE .0010-.0023).",
             "2. RUNNING FIT ON CONE SHAFT MHA-DT-04 (CLEARANCE .0010-.0023);",
-            "   ITS COLLAR RUNS ON THE .827 FACE.",
+            "   MHA-DT-04 COLLAR ON .827 FACE: NARROW LAND, RIMS BREAK .004 MAX.",
             "3. 1.694 AND .842 SET MESH OF PINION MHA-DT-10 WITH GEAR MHA-DT-07.",
         )
     )
@@ -972,7 +1012,7 @@ def test_locations_print_their_value_band_and_note_flag_only() -> None:
     for name, flag in flagged.items():
         assert callouts[name] == flag
     assert set(drawing.DIMENSION_CALLOUTS_ABOVE) == {"CrankAboveCone"}
-    assert _note(2).endswith("ITS COLLAR RUNS ON THE .827 FACE.")
+    assert "MHA-DT-04 COLLAR ON .827 FACE:" in _note(2)
     assert _note(3).startswith("3. 1.694 AND .842 SET MESH")
     for name in ("JournalAxisY", "CrankAxisY", "MountWestX", "MountEastX"):
         assert name not in callouts
@@ -983,9 +1023,12 @@ def test_locations_print_their_value_band_and_note_flag_only() -> None:
 
 def test_every_callout_keeps_at_most_two_lines_of_words() -> None:
     """Rule 7: size and process lines plus at most two lines of words; the
-    crank boss length keeps one reason, the mate its south face seats."""
+    crank boss length keeps one reason, the mate its south face seats.  A
+    bore's REAM THRU row (with its note flag) is its process line."""
     for text in drawing.DIMENSION_CALLOUTS.values():
-        assert len(text.splitlines()) <= 2
+        lines = text.splitlines()
+        words = lines[1:] if lines[0].startswith("REAM THRU") else lines
+        assert len(words) <= 2
     assert drawing.DIMENSION_CALLOUTS["CrankBossLen"] == "SEATS\nMHA-DT-11 COLLAR"
 
 

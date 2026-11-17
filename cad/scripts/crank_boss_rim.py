@@ -3,7 +3,7 @@ r"""The 64T against MHA-DT-05's north side, at print-worst.
 SolidWorks-free.  The 64T (MHA-DT-07) turns on the inclined cone shaft just
 north of MHA-DT-05, and its south face and tip sweep past everything on the
 post's north side: the crank boss's north face and rim, the Ø42.75 head,
-the turned Ø42 body and the cone boss's north end face.  The post retains
+the cast Ø40.64 body and the cone boss's north end face.  The post retains
 the v36 datums (user ruling 2026-09-28), with its body/head raised for the
 normal-24DP crank. The crank boss starts on the head's tangent plane, uncut,
 and the crank bore carries no bushing. The 64T
@@ -36,7 +36,6 @@ from dataclasses import dataclass
 
 import dt_cone_gear_shaft_spec as shaft
 import dt_cone_pivot_post_spec as post
-from dt_cone_post_envelope import BLOCK_DIA
 import dt_crank_drive_gear_spec as gear64
 import _config
 from _package_units import drawing_unit
@@ -78,7 +77,7 @@ HEAD_EDGE_LOW = (
     + printed_band_mm(post.DRAWING_PRECISION_BY_NAME["HeadHt"], unit=POST_UNIT)
     + post.JOURNAL_AXIS_HEIGHT_TOLERANCE_MM
 )
-#   the head, HeadDia at .X; the turned body, MainBodyDia at .X
+#   the head, HeadDia, and the cast body, MainBodyDia, each at its printed .XX
 HEAD_GROWTH = printed_band_mm(post.DRAWING_PRECISION_BY_NAME["HeadDia"], unit=POST_UNIT) / 2.0
 BODY_GROWTH = printed_band_mm(post.DRAWING_PRECISION_BY_NAME["MainBodyDia"], unit=POST_UNIT) / 2.0
 #   the cone boss's end faces, ConeBossLen at .XX, symmetric about the post
@@ -199,7 +198,7 @@ def clearances(
     axes = CRANK_AXIS_Y_BAND if worst else (CRANK_AXIS_Y,)
     head_r = post.HEAD_DIA / 2.0 + grow * HEAD_GROWTH
     head_low = HEAD_Y[0] - grow * HEAD_EDGE_LOW
-    body_r = BLOCK_DIA / 2.0 + grow * BODY_GROWTH
+    body_r = post.BODY_DIA / 2.0 + grow * BODY_GROWTH
     boss_end = gear.south - (collar_thickness - grow * COLLAR_WIDTH_SHORT)
     cone_r = post.CONE_BOSS_DIA / 2.0 + grow * CONE_BOSS_GROWTH
     measures: dict[str, Callable[[Point], float]] = {

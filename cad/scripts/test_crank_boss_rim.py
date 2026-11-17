@@ -15,7 +15,6 @@ import pytest
 
 import dt_cone_gear_shaft_spec as shaft
 import dt_cone_pivot_post_spec as post
-from dt_cone_post_envelope import BLOCK_DIA
 import crank_boss_rim as rim
 import dt_crank_drive_gear_spec as gear64
 import gear64_post_measure
@@ -96,14 +95,14 @@ def test_the_coupled_cone_boss_end_is_the_collar_at_its_low_limit(monkeypatch) -
 
 def test_the_body_is_a_normal_distance_behind_the_cone_boss_end() -> None:
     """Where the tilted south face is the near surface the body reads the
-    face's distance from the Ø41.91 body's tangent line.  The boss keeps the
+    face's distance from the Ø40.64 body's tangent line.  The boss keeps the
     harvested 42.011 face-to-face, so its end stands half the difference
-    proud of that line and the body reads that much farther."""
+    proud of that line (#2756) and the body reads that much farther."""
     nominal = rim.clearances(gear_offset=SEATED, worst=False)
     south = SEATED - gear64.FACE_WIDTH / 2.0
-    proud = (post.CONE_BOSS_LENGTH - BLOCK_DIA) / 2.0
-    assert proud == pytest.approx(0.0505)
-    assert nominal["body"] == pytest.approx(south - BLOCK_DIA / 2.0, abs=1e-3)
+    proud = (post.CONE_BOSS_LENGTH - post.BODY_DIA) / 2.0
+    assert proud == pytest.approx(0.6855)
+    assert nominal["body"] == pytest.approx(south - post.BODY_DIA / 2.0, abs=1e-3)
     assert nominal["body"] == pytest.approx(nominal["cone boss end"] + proud, abs=1e-3)
 
 
@@ -152,14 +151,14 @@ def test_the_cross_check_names_the_feature_it_lands_on(monkeypatch) -> None:
 
 
 def test_the_proud_cone_boss_end_does_not_tie_with_the_body() -> None:
-    """The boss end stands (CONE_BOSS_LENGTH - BLOCK_DIA)/2 beyond the body's
+    """The boss end stands (CONE_BOSS_LENGTH - BODY_DIA)/2 beyond the body's
     tangent line, more than the on-surface tolerance, so its rim is the boss
     end alone; the body's own tangent line just above the pad is the body."""
     end = post.CONE_BOSS_LENGTH / 2.0
-    assert end - BLOCK_DIA / 2.0 > gear64_post_measure.ON_SURFACE_MM
+    assert end - post.BODY_DIA / 2.0 > gear64_post_measure.ON_SURFACE_MM
     on_pad_rim = (end * rim.SIN_I, post.CONE_BOSS_DIA / 2.0, end * rim.COS_I)
     assert gear64_post_measure.post_features_at(on_pad_rim) == ("cone boss end",)
-    body_r = BLOCK_DIA / 2.0
+    body_r = post.BODY_DIA / 2.0
     above_pad = (body_r * rim.SIN_I, post.CONE_BOSS_DIA / 2.0 + 1.0, body_r * rim.COS_I)
     assert gear64_post_measure.post_features_at(above_pad) == ("body",)
 

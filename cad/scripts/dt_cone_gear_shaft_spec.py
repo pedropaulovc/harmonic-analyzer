@@ -180,7 +180,7 @@ COLLAR_STOCK_CALLOUT = "\n".join(
     )
 )
 # The same break on the post's journal rims, the ring's other bounding edge;
-# the post sheet prints it with the journal size.
+# the post sheet prints it in the note its journal size flags.
 POST_JOURNAL_RIM_BREAK = f"RIMS BREAK {inch_text(THRUST_EDGE_BREAK_MAX, 3)} MAX"
 def _gear(teeth: int) -> str:
     return f"T{teeth:03d}"

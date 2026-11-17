@@ -55,7 +55,6 @@ from _holes import HoleSpec, wizard_holes
 from _named_views import octant_rotation
 from _part_pmi import author_part_pmi
 from solidworks_mcp.adapters.com_variant import double_array
-from dt_cone_post_envelope import BLOCK_DIA
 from dt_cone_pivot_post_spec import (
     ATTACHMENT_CBORE_DEPTH,
     ATTACHMENT_CBORE_DIA,
@@ -63,6 +62,7 @@ from dt_cone_pivot_post_spec import (
     ATTACHMENT_THRU_DIA,
     ATTACHMENT_X,
     BLOCK_HEIGHT,
+    BODY_DIA,
     BORE_DIA,
     BORE_HEIGHT,
     CONE_AXIS_VIEW,
@@ -93,7 +93,6 @@ from dt_cone_pivot_post_spec import (
     JOURNAL_REFERENCE_Z,
     PART_DATUMS,
     JOURNAL_BORE_BAND,
-    MAIN_BODY_DIA_BAND,
     RUNNING_BORE_BAND,
     SURFACE_FINISHES,
     UNIT,
@@ -146,7 +145,7 @@ _FACE_SQUARE_TOL = 1e-9
 _FACE_PLANE_TOL_MM = 1e-3
 _FACE_AREA_TOL_MM2 = 0.01
 
-BLOCK_RADIUS = BLOCK_DIA / 2.0
+BODY_RADIUS = BODY_DIA / 2.0
 HEAD_RADIUS = HEAD_DIA / 2.0
 BORE_RADIUS = BORE_DIA / 2.0
 CRANK_BORE_RADIUS = CRANK_BORE_DIA / 2.0
@@ -184,8 +183,8 @@ def _head_surface_z(x: float) -> float:
 # a time, so a cut that ran the wrong way is caught at THAT feature instead of
 # as an unexplained final gap.  Their sum is HARVESTED_VOLUME_MM3 (asserted at
 # import below).
-MAIN_BODY_MM3 = math.pi * BLOCK_RADIUS**2 * BLOCK_HEIGHT
-HEAD_SHELL_MM3 = math.pi * (HEAD_RADIUS**2 - BLOCK_RADIUS**2) * HEAD_HEIGHT
+MAIN_BODY_MM3 = math.pi * BODY_RADIUS**2 * BLOCK_HEIGHT
+HEAD_SHELL_MM3 = math.pi * (HEAD_RADIUS**2 - BODY_RADIUS**2) * HEAD_HEIGHT
 #
 # Crank boss: a CRANK_BOSS_DIA cylinder from the head's tangent plane
 # (z = -CRANK_BOSS_NORTH_FACE) to CRANK_BOSS_END_Z minus the part of it already inside
@@ -209,7 +208,7 @@ CRANK_BORE_MM3 = math.pi * CRANK_BORE_RADIUS**2 * CRANK_BOSS_LENGTH
 CONE_PADS_OUTSIDE_BODY_MM3 = (
     math.pi * CONE_BOSS_RADIUS** 2 * CONE_BOSS_LENGTH
     - _disc_column_integral(
-        CONE_BOSS_RADIUS, lambda p: 2.0 * math.sqrt(BLOCK_RADIUS**2 - p * p)
+        CONE_BOSS_RADIUS, lambda p: 2.0 * math.sqrt(BODY_RADIUS**2 - p * p)
     )
 )
 CONE_BORE_MM3 = math.pi * BORE_RADIUS**2 * CONE_BOSS_LENGTH
@@ -345,7 +344,7 @@ def build(adapter: Any) -> dict[str, str]:
     # GUI-editable dimensional contract.  Explicit mm is load-bearing because
     # the project part template uses inch document units.
     globals_mm = {
-        "MainBodyDia": BLOCK_DIA,
+        "MainBodyDia": BODY_DIA,
         "MainBodyHeight": BLOCK_HEIGHT,
         "HeadDia": HEAD_DIA,
         "HeadHeight": HEAD_HEIGHT,
@@ -377,14 +376,14 @@ def build(adapter: Any) -> dict[str, str]:
 
     drive_jobs: list[tuple[str, str]] = []
 
-    # 1. Main BLOCK_DIA body, from the unchanged foot to BLOCK_HEIGHT.
+    # 1. Main BODY_DIA body, from the unchanged foot to BLOCK_HEIGHT.
     main = SketchDims()
     check("create sketch MainBodyProfile", adapter.create_sketch("Top"))
     define_circle(
         adapter,
         0.0,
         0.0,
-        BLOCK_RADIUS,
+        BODY_RADIUS,
         "main body",
         dims=main,
         names=("MainBodyCx", "MainBodyCz", "MainBodyDia"),
@@ -925,15 +924,6 @@ def build(adapter: Any) -> dict[str, str]:
         "JournalBoreProfile",
         "JournalBoreDia",
         *deviations(JOURNAL_BORE_BAND),
-        display_unit=UNIT,
-    )
-    # The body's one-sided band keeps it under the cone boss ends
-    # (dt_cone_pivot_post_spec.MAIN_BODY_DIA_BAND, #2756).
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "MainBodyProfile",
-        "MainBodyDia",
-        *deviations(MAIN_BODY_DIA_BAND),
         display_unit=UNIT,
     )
     # The mesh band on the bore-to-bore spacing (derivation in
