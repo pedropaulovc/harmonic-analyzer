@@ -10,9 +10,10 @@ so the length prints as a REFERENCE at CUT_LENGTH_MM, with no band and
 'SEE NOTE 1' beneath it (rule 7): note 1 (CUT_LENGTH_NOTE) gives the cut end's
 acceptance, flush to the spec band's allowance short of the MHA-DT-20
 underside, and the engagement minimum as a plain fact (rule 20). The cut
-end's break is the title block's general edge break. The other note says the
-undimensioned purchased geometry is reference; the stock rows name what it is
-made from.
+end's break is the title block's general edge break; the sheet carries no
+part-local break limit (Main's ruling on the run-7 sheet). The other note
+says the undimensioned purchased geometry is reference; the stock rows name
+what it is made from.
 
 Run with SolidWorks open::
 
