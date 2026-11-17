@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import math
 from pathlib import Path
 from types import SimpleNamespace
@@ -792,7 +791,7 @@ def test_relief_profile_notches_the_back_wall_under_the_roof(monkeypatch) -> Non
 
 def test_roof_reference_lies_on_the_lip_face_not_through_the_lip(monkeypatch) -> None:
     adapter = _window_reference_seat(monkeypatch)
-    monkeypatch.setattr(stop_geom, "ensure_fully_defined", lambda *a: asyncio.sleep(0))
+    monkeypatch.setattr(stop_geom, "ensure_fully_defined", lambda *a: None)
     equations = dict(stop_geom.roof_reference(adapter))
     assert adapter.lines == {"line": ((0.0, spec.WINDOW_Y_MAX), (0.0, spec.BLOCK_HEIGHT))}
     assert adapter._sketch_entities["line"].ConstructionGeometry

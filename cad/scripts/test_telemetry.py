@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import builtins
 import importlib.util
-import inspect
 import json
 import logging
 import os
@@ -1127,7 +1126,7 @@ def test_sequential_root_spans_do_not_nest(capture):
     )
 
 
-def test_every_traced_adapter_method_is_a_coroutine_on_the_real_adapter():
+def test_every_traced_adapter_method_exists_on_the_real_adapter():
     """A renamed or removed adapter method would silently fall out of the trace
     (``instrument_adapter`` skips names it cannot find), re-opening the dark time
     the list exists to close."""
@@ -1136,7 +1135,7 @@ def test_every_traced_adapter_method_is_a_coroutine_on_the_real_adapter():
     missing = sorted(
         name
         for name in _telemetry.ADAPTER_TRACED_METHODS
-        if not inspect.iscoroutinefunction(getattr(PyWin32Adapter, name, None))
+        if not callable(getattr(PyWin32Adapter, name, None))
     )
     assert missing == []
 

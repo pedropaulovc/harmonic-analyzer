@@ -288,25 +288,6 @@ class Report:
             self.passed.append(label)
             _telemetry.success(f"GATE PASSED [{label}]")
 
-    def agate(self, label: str, fn: Callable[[], Any]) -> None:
-        """Async sibling of :meth:`gate`: ``await`` the coroutine ``fn()`` returns.
-
-        Used by gates that drive async adapter mate-ops (suppress/unsuppress for the
-        free-DOF closure check) rather than only sync COM reads. Same record-don't-
-        propagate contract and span shape as :meth:`gate`.
-        """
-        with _telemetry.span("gate", label=label) as sp:
-            try:
-                fn()
-            except Exception as exc:  # noqa: BLE001 -- a gate failure is data, not a crash
-                self.failed.append((label, str(exc)))
-                sp.record_exception(exc)
-                sp.set_status(_telemetry.Status(_telemetry.StatusCode.ERROR, str(exc)))
-                _telemetry.error(f"GATE FAILED [{label}]: {exc}")
-                return
-            self.passed.append(label)
-            _telemetry.success(f"GATE PASSED [{label}]")
-
     def merge(self, other: "Report") -> None:
         self.passed += other.passed
         self.failed += other.failed
@@ -1028,7 +1009,7 @@ def _verify_static_one(
         reconcile_order = sorted(repaired_documents, key=lambda item: item[0] == name)
         for repaired_name, _stale_model in reconcile_order:
             failures_before_reconcile = len(report.failed)
-            report.agate(
+            report.gate(
                 f"{repaired_name}:auto-repair-reconcile",
                 lambda n=repaired_name: reconcile_saved_rebuild_state(
                     adapter, n, OUT_SLDASM / f"{n}.SLDASM"
@@ -1056,7 +1037,7 @@ def _verify_static_one(
         render_names = [n for n in repaired_names if n != name] + [name]
         for render_name in render_names:
             render_failures_before = len(report.failed)
-            report.agate(
+            report.gate(
                 f"{render_name}:auto-repair-render-reopen",
                 lambda n=render_name: _reopen_assembly_rest_pose(
                     adapter, n, OUT_SLDASM / f"{n}.SLDASM"
@@ -1064,7 +1045,7 @@ def _verify_static_one(
             )
             if len(report.failed) != render_failures_before:
                 continue
-            report.agate(
+            report.gate(
                 f"{render_name}:auto-repair-renders",
                 lambda n=render_name: _export_assembly_images(
                     adapter, n, ("front", "top", "isometric")
@@ -1273,7 +1254,7 @@ def _verify_paper_feed_one(adapter: Any, report: Report) -> None:
     from build_kinematic_probe import _drive_and_measure  # noqa: E402
 
     try:
-        report.agate(f"{name}:crank-feed", lambda: _drive_and_measure(adapter))
+        report.gate(f"{name}:crank-feed", lambda: _drive_and_measure(adapter))
     finally:
         discard_open_documents(adapter)
 

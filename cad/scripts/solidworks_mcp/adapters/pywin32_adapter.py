@@ -4,7 +4,6 @@ This adapter uses pywin32 to communicate with SolidWorks via COM, providing real
 SolidWorks automation capabilities on Windows platforms.
 """
 
-import asyncio
 import contextlib
 import os
 import platform
@@ -282,7 +281,7 @@ class _ComSessionCoordinator:
             except pywintypes.com_error as dispatch_error:
                 last_error = dispatch_error
 
-            asyncio.sleep(1.0)
+            time.sleep(1.0)
 
         if last_error is not None:
             raise SolidWorksMCPError(str(last_error))
@@ -352,7 +351,7 @@ class _ComSessionCoordinator:
             ``adapter.swApp`` on success.
         """
         for _ in range(attempts):
-            asyncio.sleep(1.0)
+            time.sleep(1.0)
             app = self._attach_to_running_application()
             if app is not None:
                 self._adapter.swApp = app
@@ -384,7 +383,7 @@ class _ComSessionCoordinator:
             )
             if revision is not None:
                 return
-            asyncio.sleep(0.5)
+            time.sleep(0.5)
 
         raise SolidWorksMCPError(
             "SolidWorks COM server did not become ready in time. "
@@ -1589,7 +1588,7 @@ class PyWin32Adapter(
     Example:
                         ```python
                         adapter = PyWin32Adapter({'timeout': 30})
-                        result = await adapter.connect()
+                        result = adapter.connect()
                         if result.status == AdapterResultStatus.SUCCESS:
                             print("Connected to SolidWorks successfully")
                         ```
@@ -1755,10 +1754,10 @@ class PyWin32Adapter(
         Example:
                             ```python
                             try:
-                                await adapter.connect()
+                                adapter.connect()
                                 # ... do work ...
                             finally:
-                                await adapter.disconnect()
+                                adapter.disconnect()
                             ```
         """
         self._session_coordinator.disconnect()
@@ -1774,7 +1773,7 @@ class PyWin32Adapter(
                             if adapter.is_connected():
                                 print("Ready to automate SolidWorks")
                             else:
-                                await adapter.connect()
+                                adapter.connect()
                             ```
         """
         return self.swApp is not None
@@ -1790,7 +1789,7 @@ class PyWin32Adapter(
 
         Example:
                             ```python
-                            health = await adapter.health_check()
+                            health = adapter.health_check()
                             if health.healthy:
                                 print(f"Adapter healthy, {health.success_count} operations completed")
                             else:

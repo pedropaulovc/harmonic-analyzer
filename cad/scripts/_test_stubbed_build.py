@@ -1,7 +1,7 @@
 """Test-only: run a real PD ``build`` offline with its seat helpers stubbed.
 
-Every helper a module imports from a seat-touching module, its own coroutines
-and COM-first functions, and a pure module's coroutines and adapter-first
+Every helper a module imports from a seat-touching module, its own seat-first
+functions, and a pure module's adapter-first
 functions are replaced by recording mocks attached to one parent, so
 ``seat.mock_calls`` is the build's seat traffic in order.  Pure modules
 (specs, geometry, gear maths, adapter parameter types) otherwise stay real,
@@ -75,18 +75,17 @@ def stub_seat(
             continue
         if not (inspect.isfunction(value) or inspect.isclass(value)):
             continue
-        mock = MagicMock if inspect.iscoroutinefunction(value) else MagicMock
         if name in spied:
-            stub = mock(side_effect=value)
+            stub = MagicMock(side_effect=value)
         else:
             local = getattr(value, "__module__", "") == module.__name__
             if local or not _pure(value):
-                seat_shaped = not local or inspect.iscoroutinefunction(value) or _takes_seat(value)
+                seat_shaped = not local or _takes_seat(value)
             else:  # a pure module's own seat helpers (``_gear.pattern_about_z``)
-                seat_shaped = inspect.iscoroutinefunction(value) or _takes_seat(value, frozenset({"adapter"}))
+                seat_shaped = _takes_seat(value, frozenset({"adapter"}))
             if not seat_shaped:
                 continue
-            stub = mock()
+            stub = MagicMock()
             stubbed.add(name)
         monkeypatch.setattr(module, name, stub)
         seat.attach_mock(stub, name)
@@ -104,14 +103,8 @@ def stub_seat(
 
 
 def offline_adapter() -> MagicMock:
-    """An adapter whose coroutine methods are awaitable recording mocks."""
-    from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter
-
-    adapter = MagicMock()
-    for name in dir(PyWin32Adapter):
-        if inspect.iscoroutinefunction(getattr(PyWin32Adapter, name, None)):
-            setattr(adapter, name, MagicMock())
-    return adapter
+    """An adapter whose methods are recording mocks."""
+    return MagicMock()
 
 
 def keyed_artefacts() -> MagicMock:

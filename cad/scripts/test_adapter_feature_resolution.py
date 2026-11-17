@@ -2,7 +2,7 @@ r"""SolidWorks-free contract for the adapter's raw feature-tree reads.
 
 ``solidworks_mcp`` finds the feature a creation call made by diffing the
 top-level tree before and after the call, and scores body edges/faces with
-``GetClosestPointOn``, all through ``raw_dispatch.invoke``: one ``InvokeTypes``
+``GetClosestPointOn``, all through ``_com._com_invoke``: one ``InvokeTypes``
 per member on a bare ``PyIDispatch``, dispid and signature taken from the
 checked-in wrapper. Every build leaf runs these calls, so this pins them:
 
@@ -14,7 +14,7 @@ checked-in wrapper. Every build leaf runs these calls, so this pins them:
   expected ``GetTypeName2`` picks the created feature, and a missing or
   ambiguous match raises -- unless the call declares it creates several
   (evenly distributed reference points), when the newest is returned;
-* a raw body edge is only ever queried through ``raw_dispatch.invoke`` -- a
+* a raw body edge is only ever queried through ``_com._com_invoke`` -- a
   by-name call on it raises inside ``_attempt`` and silently drops the edge --
   so a linear pattern's direction edge and a measure's edge are found.
 
@@ -23,11 +23,11 @@ asserts the whole header. Every header is read as DATA from the checked-in
 wrapper source (``_generated/sldworks_2026.py``: each generated method's
 ``InvokeTypes`` call and each ``_prop_map_get_`` entry), so the contract runs on
 any host, pywin32 or not. The checks that bind ``IEntity`` need pywin32 itself
--- that ``raw_dispatch`` records exactly those headers from the imported
+-- that ``_com`` records exactly those headers from the imported
 wrapper, and the end-to-end edge selections, which bind the winner through it
 -- so they run on Windows only, where a missing wrapper FAILS instead of
 skipping. The diff tests use plain Python doubles, which
-``raw_dispatch.invoke`` answers through ``getattr``.
+``_com._com_invoke`` answers through ``getattr``.
 
 Run: ``uv run python -m pytest cad/scripts/test_adapter_feature_resolution.py -q``
 """
@@ -43,7 +43,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from solidworks_mcp.adapters import raw_dispatch, sw_type_info
+import _com
+from solidworks_mcp.adapters import sw_type_info
 from solidworks_mcp.adapters.base import (
     CreateReferencePointParameters,
     MeasureEntityRef,
@@ -148,10 +149,10 @@ def test_pinned_header_is_the_checked_in_wrappers(interface, member):
 
 @pytest.fixture
 def raw_headers(monkeypatch):
-    """``raw_dispatch``'s header cache, filled from the wrapper SOURCE, so the
+    """``_com``'s header cache, filled from the wrapper SOURCE, so the
     raw path runs without importing the wrapper."""
     for key, header in wrapper_headers().items():
-        monkeypatch.setitem(raw_dispatch._HEADERS, key, header)
+        monkeypatch.setitem(_com._COM_HEADERS, key, header)
 
 
 windows_only = pytest.mark.skipif(
@@ -229,7 +230,7 @@ def test_invoke_sends_the_wrappers_header(interface, member, args):
     header = PINNED[(interface, member)]
     raw = RawDispatch({header[0]: (header, "answer")})
 
-    assert raw_dispatch.invoke(raw, interface, member, *args) == "answer"
+    assert _com._com_invoke(raw, interface, member, *args) == "answer"
     assert raw.calls == [(header, args)]
 
 
@@ -239,10 +240,10 @@ def test_invoke_sends_the_wrappers_header(interface, member, args):
 def test_recorded_header_is_the_generated_members_call(
     monkeypatch, interface, member, args
 ):
-    monkeypatch.delitem(raw_dispatch._HEADERS, (interface, member), raising=False)
+    monkeypatch.delitem(_com._COM_HEADERS, (interface, member), raising=False)
     header = PINNED[(interface, member)]
     raw = RawDispatch({header[0]: (header, "answer")})
-    raw_dispatch.invoke(raw, interface, member, *args)
+    _com._com_invoke(raw, interface, member, *args)
     generated = RawDispatch({header[0]: (header, None)})
     wrapper = sw_type_info.early_bound(SimpleNamespace(_oleobj_=generated), interface)
     value = getattr(wrapper, member)
@@ -255,18 +256,18 @@ def test_recorded_header_is_the_generated_members_call(
 def test_invoke_returns_object_results_unwrapped():
     first = RawDispatch({})
     model = RawDispatch({FIRST_FEATURE[0]: (FIRST_FEATURE, first)})
-    assert raw_dispatch.invoke(model, "IModelDoc2", "FirstFeature") is first
+    assert _com._com_invoke(model, "IModelDoc2", "FirstFeature") is first
 
     edges = (RawDispatch({}), RawDispatch({}))
     body = RawDispatch({BODY_GET_EDGES[0]: (BODY_GET_EDGES, edges)})
-    assert raw_dispatch.invoke(body, "IBody2", "GetEdges") is edges
+    assert _com._com_invoke(body, "IBody2", "GetEdges") is edges
 
     point = (0.25, 0.5, 0.75, 1.0, 0.0, 0.0)
     edge = RawDispatch(
         {EDGE_GET_CLOSEST_POINT_ON[0]: (EDGE_GET_CLOSEST_POINT_ON, point)}
     )
     assert (
-        raw_dispatch.invoke(edge, "IEdge", "GetClosestPointOn", 0.2, 0.5, 0.8) == point
+        _com._com_invoke(edge, "IEdge", "GetClosestPointOn", 0.2, 0.5, 0.8) == point
     )
 
 
@@ -460,7 +461,7 @@ def test_raw_tree_diff_resolves_the_created_feature():
         features.set_tree_path_observer(None)
 
     assert getattr(found, "_oleobj_", found) is tree[-2]
-    assert raw_dispatch.invoke(found, "IFeature", "Name") == "Plane1"
+    assert _com._com_invoke(found, "IFeature", "Name") == "Plane1"
     assert paths == [("diff", "positional")]
 
 
@@ -468,7 +469,7 @@ def test_raw_tree_diff_resolves_the_created_feature():
 
 
 class Feature:
-    """A top-level feature, read through ``getattr`` by ``raw_dispatch.invoke``."""
+    """A top-level feature, read through ``getattr`` by ``_com._com_invoke``."""
 
     def __init__(self, tree, name, type_name):
         self.tree = tree

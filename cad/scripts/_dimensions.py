@@ -135,7 +135,7 @@ def set_global(adapter: Any, name: str, expr: str | float) -> float:
 def drive_dimension(adapter: Any, dim_name: str, expr: str | float) -> None:
     """Bind a (named) dimension to an equation expression, e.g.::
 
-        await drive_dimension(adapter, "OuterWidth@OuterProfile", '2 * "OuterX"')
+        drive_dimension(adapter, "OuterWidth@OuterProfile", '2 * "OuterX"')
 
     so editing the ``OuterX`` global reshapes the part. ``dim_name`` is the
     ``leaf@feature`` form returned by :func:`name_dimensions`."""

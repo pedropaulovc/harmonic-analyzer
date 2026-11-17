@@ -43,8 +43,8 @@ NOTE_LINE_PITCH = 0.0046  # default-format note line pitch, as measured on MHA-M
 
 
 def test_clamped_setting_authors_its_globals_and_drives(monkeypatch) -> None:
-    """Run the builder's setting helper against fakes: every async authoring
-    step must actually execute (an un-awaited coroutine silently drops the
+    """Run the builder's setting helper against fakes: every authoring
+    step must actually execute (a skipped step silently drops the
     globals and equations), and the mm suffix is load-bearing in the equation
     manager, which reads bare numbers in document units."""
 
