@@ -3652,6 +3652,10 @@ def test_check_gates_depend_on_everything_they_execute():
     dodo = _load_dodo()
     gaps: dict[str, list[str]] = {}
     for task in dodo.task_check():
+        if task["actions"][0][0] is dodo._render_machinist_review_fitup:
+            # Renders in-process and runs every time: its output, not its
+            # code, keys the review it feeds (test_machinist_review_leaf).
+            continue
         if task["actions"][0][0] is dodo._cached_machinist_review_action:
             # This leaf's explicit PDF/name/kind path excludes registry lookup;
             # test_machinist_review_leaf pins its complete local-import closure

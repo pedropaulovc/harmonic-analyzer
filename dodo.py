@@ -3055,20 +3055,41 @@ def _steps_in_document() -> tuple[str, ...]:
     raise AssertionError("ha_assembly_package declares no STEPS_IN_DOCUMENT")
 
 
-def _machinist_review_fitup_deps(stem: str) -> list[Path]:
-    """A package whose steps print in ASSEMBLY.md is reviewed with that
-    section (rule 22), and its sheets no longer print it: the generator, the
-    package's sheet module, that module's imports and the config they read
-    key the review."""
-    if stem.removesuffix("_assembly").replace("_", "-") not in _steps_in_document():
-        return []
-    sheet = SCRIPTS_DIR / f"{stem}_sheet.py"
-    return [
-        _ASSEMBLY_DOCUMENT,
-        sheet,
-        *map(Path, module_deps_of(sheet)),
-        *map(Path, _config_deps(sheet)),
-    ]
+def _machinist_review_fitup_text(stem: str) -> Path | None:
+    """The rendered ASSEMBLY.md fit-up section that an assembly review reads
+    (rule 22, ``machinist_review._fitup_section``). None for a part, or a
+    package whose steps still print on its sheets."""
+    dashed = stem.removesuffix("_assembly").replace("_", "-")
+    if (
+        DRAWINGS_BY_NAME[stem].source_kind != "assembly"
+        or dashed not in _steps_in_document()
+    ):
+        return None
+    return Path(_canonical_targets(f"check:machinist_review_fitup:{stem}")[0]).resolve()
+
+
+def _render_machinist_review_fitup(stem: str, target: Path) -> None:
+    import ha_assembly_package
+
+    dashed = stem.removesuffix("_assembly").replace("_", "-")
+    text = "\n".join(ha_assembly_package.fitup_lines(dashed)).strip()
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if not target.is_file() or target.read_text(encoding="utf-8") != text:
+        target.write_text(text, encoding="utf-8")
+
+
+def _machinist_review_fitup_task(stem: str, target: Path) -> dict[str, Any]:
+    """Render the section the review reads, on every run: it is cheap, and
+    rendering it is the only exact dependency. The review is keyed on these
+    bytes, not on the generator's code closure and config, so an edit that
+    leaves the printed steps unchanged keeps the verdict."""
+    return {
+        "name": f"machinist_review_fitup:{stem}",
+        "targets": _canonical_targets(f"check:machinist_review_fitup:{stem}"),
+        "actions": [(_render_machinist_review_fitup, [stem, target])],
+        "uptodate": [False],
+        "clean": True,
+    }
 
 
 def _machinist_review_file_deps(stem: str) -> list[str]:
@@ -3091,9 +3112,7 @@ def _machinist_review_file_deps(stem: str) -> list[str]:
         path for path in (SCRIPTS_DIR / "prompts").iterdir()
         if path.is_file() and path.name not in excluded_prompts
     ]
-    fitup = (
-        _machinist_review_fitup_deps(stem) if spec.source_kind == "assembly" else []
-    )
+    fitup = _machinist_review_fitup_text(stem)
     return sorted({
         str(path.resolve())
         for path in (
@@ -3109,9 +3128,19 @@ def _machinist_review_file_deps(stem: str) -> list[str]:
             *prompts,
             SCRIPTS_DIR.parent / "docs" / "drawing-guidelines.md",
             *([exceptions] if exceptions.is_file() else []),
-            *fitup,
+            *([fitup] if fitup else []),
         )
     })
+
+
+def _machinist_review_key_deps(stem: str) -> list[str]:
+    """``_machinist_review_file_deps`` once the fit-up section they name is
+    rendered: a key computed outside the doit graph (the sweep, cache_status)
+    hashes the text this tree prints, never a stale or missing file."""
+    fitup = _machinist_review_fitup_text(stem)
+    if fitup is not None:
+        _render_machinist_review_fitup(stem, fitup)
+    return _machinist_review_file_deps(stem)
 
 
 def _machinist_review_dir(stem: str) -> Path:
@@ -3162,7 +3191,7 @@ def _machinist_review_cache_key(
     stem: str, profile: ReviewProfile, label: str | None = None
 ) -> str:
     return _cache.cache_key(
-        _machinist_review_file_deps(stem), _machinist_review_digest(profile), label
+        _machinist_review_key_deps(stem), _machinist_review_digest(profile), label
     )
 
 
@@ -3208,7 +3237,7 @@ def _machinist_review_context(stem: str, profile: ReviewProfile) -> str:
     reviewed PDF's verdict may be carried to another sheet (_review_carry)."""
     pdf = str(Path(DRAWINGS_BY_NAME[stem].outputs["pdf"]).resolve())
     return _cache.cache_key(
-        [dep for dep in _machinist_review_file_deps(stem) if dep != pdf],
+        [dep for dep in _machinist_review_key_deps(stem) if dep != pdf],
         _machinist_review_digest(profile),
     )
 
@@ -3481,8 +3510,13 @@ def _machinist_review_task(
 
 def _machinist_review_tasks():
     profile = _machinist_review_profile()
-    for stem, mode in _reviewed_drawings():
+    reviewed = list(_reviewed_drawings())
+    for stem, mode in reviewed:
         yield _machinist_review_task(stem, mode, profile)
+    for stem, _mode in reviewed:
+        fitup = _machinist_review_fitup_text(stem)
+        if fitup is not None:
+            yield _machinist_review_fitup_task(stem, fitup)
 
 
 # --- Non-blocking machinist-review sweep (#2714) ---------------------------
@@ -4805,6 +4839,11 @@ def _canonical_subtask_names(family: str) -> list[str]:
         return [
             *_check_task_names(),
             *(f"machinist_review:{stem}" for stem, _mode in _reviewed_drawings()),
+            *(
+                f"machinist_review_fitup:{stem}"
+                for stem, _mode in _reviewed_drawings()
+                if _machinist_review_fitup_text(stem) is not None
+            ),
         ]
     if family == "prechips":
         import _process_plans
@@ -4852,6 +4891,9 @@ def _canonical_targets(name: str) -> list[str]:
                     for run in range(1, 4)
                 ),
             ]
+        if subname.startswith("machinist_review_fitup:"):
+            stem = subname.removeprefix("machinist_review_fitup:")
+            return [str(REPORTS / "machinist-review-fitup" / f"{stem}.md")]
         return [str(REPORTS / f"check-{subname}.ok")]
     if family == "prechips":
         import _process_plans
@@ -4903,6 +4945,12 @@ def _canonical_subtask_definition(family: str, subname: str) -> dict[str, Any]:
             return _machinist_review_task(
                 stem, dict(_reviewed_drawings())[stem], _machinist_review_profile(),
             )
+        if subname.startswith("machinist_review_fitup:"):
+            stem = subname.removeprefix("machinist_review_fitup:")
+            fitup = _machinist_review_fitup_text(stem)
+            if fitup is None:
+                raise ValueError(f"unknown canonical task: check:{subname}")
+            return _machinist_review_fitup_task(stem, fitup)
         return _check_task(subname)
     if family == "prechips":
         return _prechips_task(subname)
@@ -5066,12 +5114,18 @@ def canonical_target_owners(paths: Iterable[str] | None = None) -> dict[str, str
     for stem in DRAWINGS_BY_NAME:
         name = f"check:machinist_review:{stem}"
         targets = _canonical_targets(name)
-        if requested is not None and not any(normalized(target) in requested for target in targets):
+        fitup_name = f"check:machinist_review_fitup:{stem}"
+        fitup_targets = _canonical_targets(fitup_name)
+        if requested is not None and not any(
+            normalized(target) in requested for target in (*targets, *fitup_targets)
+        ):
             continue
         if reviewed is None:
             reviewed = dict(_reviewed_drawings())
         if stem in reviewed:
             include(name, targets)
+            if _machinist_review_fitup_text(stem) is not None:
+                include(fitup_name, fitup_targets)
 
     feature_root = CAD_OUT / "features"
     if queried_namespace(feature_root) or _ownership_namespace_has_aliases(
@@ -5141,7 +5195,7 @@ def _cache_rows() -> list[tuple[str, list[str]]]:
         rows.append((f"drawing:{stem}", _drawing_file_deps(stem)))
     for stem, _mode in _reviewed_drawings():
         rows.append((
-            f"check:machinist_review:{stem}", _machinist_review_file_deps(stem),
+            f"check:machinist_review:{stem}", _machinist_review_key_deps(stem),
         ))
     for stem in ASSEMBLY_ORDER:
         rows.append((f"verify_soundness:{stem}", _soundness_file_deps(stem)))
