@@ -1,8 +1,8 @@
 r"""Offline invariants for the profiles whose closure the sketch DB welds.
 
-These tests pin the two profiles that were rewritten after the 2026-09-17
-``logo ring extrude failed`` leaf on ``swmaker000005@5``: the 91247A720 logo
-ring and the 99607A213 flare lens.  They run without SolidWorks, against the
+These tests pin the production profile rewritten after the 2026-09-17
+``logo ring extrude failed`` leaf on ``swmaker000005@5``: the 99607A213 flare
+lens.  They run without SolidWorks, against the
 real production geometry functions -- not a reimplementation of them -- so a
 coordinate edit that opens a profile fails here, in seconds, instead of on a
 farm worker twenty minutes into a release build.
@@ -38,13 +38,6 @@ import math
 import pytest
 
 from _mcmaster_99607a213 import TS_SH_R
-from diagnostics.diag_build_91247A720 import (
-    LOGO_APEX_CENTRE,
-    LOGO_BOTTOM_LEFT_CENTRE,
-    LOGO_BOTTOM_RIGHT_CENTRE,
-    LOGO_OUTER_R,
-    logo_ring_profile,
-)
 from diagnostics.diag_build_99607A213 import (
     TS_FLARE_CENTRE,
     TS_FLARE_Z0,
@@ -61,81 +54,6 @@ from diagnostics.sketch_profile import (
     endpoint_merges,
     minor_arc,
 )
-
-
-def test_logo_ring_vertices_are_bit_identical_across_segments() -> None:
-    """Every shared vertex is the SAME double in both segments that meet there.
-
-    This is the property the sketch-DB weld rests on: the database coalesces
-    two segment ends only when they arrive at bit-identical coordinates, and
-    ``endpoint_merges`` groups endpoints on ``==``, so a vertex written as
-    ``ct[0] + r * nx`` in one segment and ``ct[0] + r * 0.866...`` in its
-    neighbour would be two different vertices -- two unwelded points, an open
-    contour -- even though both "are" the same point.
-    """
-    segments = logo_ring_profile()
-    merges = endpoint_merges(segments)
-
-    assert len(segments) == 9
-    assert len(merges) == 9  # nine vertices, each shared by exactly two ends
-    for (first, first_end), (second, second_end) in merges:
-        a = getattr(segments[first], first_end)
-        b = getattr(segments[second], second_end)
-        assert a == b, f"segment {first}.{first_end} vs {second}.{second_end}"
-        # Not merely close: identical, in both coordinates.
-        assert a[0] == b[0] and a[1] == b[1]
-
-
-def test_logo_ring_forms_a_ring_of_exactly_two_loops() -> None:
-    """Outer boundary plus inner core, which is what ``loops=2`` asserts live."""
-    segments = logo_ring_profile()
-    loops = closed_loops(segments)
-
-    assert len(loops) == 2
-    assert sorted(len(loop) for loop in loops) == [3, 6]
-    # The 3-segment loop is the sharp inner triangle; the 6-segment loop is the
-    # offset outer boundary (3 lines + 3 corner arcs).
-    inner = next(loop for loop in loops if len(loop) == 3)
-    assert all(isinstance(segments[i], Line) for i in inner)
-    outer = next(loop for loop in loops if len(loop) == 6)
-    assert sum(isinstance(segments[i], Arc) for i in outer) == 3
-
-
-def test_logo_inner_vertices_are_the_outer_corner_arc_centres() -> None:
-    """The 0.400 mm snap competitor, pinned as intentional.
-
-    Each inner-triangle vertex IS an outer corner arc's centre point, so it
-    sits exactly ``LOGO_OUTER_R`` from four distinct outer-loop points.  That
-    is the cluster that made inference authoring a coin flip at low px/mm, and
-    it is why this profile must never be drawn through inference again.  The
-    geometry is correct and stays; the authoring path is what changed.
-    """
-    segments = logo_ring_profile()
-    arcs = [s for s in segments if isinstance(s, Arc)]
-    centres = {s.center for s in arcs}
-
-    assert centres == {
-        LOGO_APEX_CENTRE,
-        LOGO_BOTTOM_RIGHT_CENTRE,
-        LOGO_BOTTOM_LEFT_CENTRE,
-    }
-    for arc in arcs:
-        start_r, end_r = arc_radii_mm(arc)
-        assert start_r == pytest.approx(LOGO_OUTER_R, abs=1e-12)
-        assert end_r == pytest.approx(LOGO_OUTER_R, abs=1e-12)
-
-
-def test_logo_corner_arcs_sweep_120_degrees_counter_clockwise() -> None:
-    """``add_arc`` passes CCW; ``minor_arc`` must have reordered every corner.
-
-    The profile is authored clockwise, so each corner arc's authored endpoint
-    order is the reverse of the one ``SketchManager.CreateArc`` needs.  If
-    ``minor_arc`` stopped reordering, every corner would be drawn as its 240
-    degree complement and the ring would self-intersect.
-    """
-    segments = logo_ring_profile()
-    for arc in (s for s in segments if isinstance(s, Arc)):
-        assert arc_sweep_deg(arc) == pytest.approx(120.0, abs=1e-9)
 
 
 def test_flare_lens_is_one_closed_loop_with_a_minor_arc() -> None:
@@ -177,12 +95,12 @@ def test_flare_arc_dips_to_the_vendor_minimum_radius() -> None:
 
 def test_a_one_ulp_gap_is_rejected_rather_than_left_to_the_seat() -> None:
     """The failure mode this suite exists to catch, injected deliberately."""
-    segments = list(logo_ring_profile())
-    line = segments[0]
-    assert isinstance(line, Line)
+    segments = list(flare_profile())
+    index = next(i for i, s in enumerate(segments) if isinstance(s, Line))
+    line = segments[index]
     nudged = (math.nextafter(line.start[0], math.inf), line.start[1])
     assert nudged != line.start
-    segments[0] = Line(nudged, line.end)
+    segments[index] = Line(nudged, line.end)
 
     with pytest.raises(OpenProfileError) as raised:
         endpoint_merges(tuple(segments))
@@ -221,16 +139,16 @@ def test_an_endpoint_that_reached_the_arc_centre_is_refused() -> None:
 
     This is one of the two OFFLINE gates, and it is where a collapsed corner is
     actually caught -- NOT at the closure read-back, which raises only on a
-    measured zero-contour sketch.  In the logo ring the
-    nearest wrong snap target for an outer arc's endpoint is that arc's own
-    centre, 0.400 mm away, so "endpoint == centre" is the realised failure and
-    it must be named, not inferred from a zero sweep.
+    measured zero-contour sketch.  For a corner arc the nearest wrong snap
+    target for an endpoint is that arc's own centre, so "endpoint == centre"
+    is the realised failure and it must be named, not inferred from a zero
+    sweep.
     """
-    centre = LOGO_BOTTOM_RIGHT_CENTRE
+    centre, radius = (1.0, 2.0), 0.4
     with pytest.raises(OpenProfileError, match="IS the centre"):
-        minor_arc(centre, centre, (centre[0] + LOGO_OUTER_R, centre[1]))
+        minor_arc(centre, centre, (centre[0] + radius, centre[1]))
     with pytest.raises(OpenProfileError, match="IS the centre"):
-        minor_arc(centre, (centre[0] + LOGO_OUTER_R, centre[1]), centre)
+        minor_arc(centre, (centre[0] + radius, centre[1]), centre)
 
 
 def test_a_collapsed_segment_is_refused_instead_of_pairing_with_itself() -> None:

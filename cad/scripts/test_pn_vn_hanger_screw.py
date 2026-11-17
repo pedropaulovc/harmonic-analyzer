@@ -19,7 +19,6 @@ import pn_vn_hanger_screw_spec as spec
 from _fastener_catalog import FASTENERS
 from _hole_spec import THREAD_MAJOR_MM
 from _test_stock_recipes import discovered_recipes
-from diagnostics import diag_build_93075A194 as family_source
 from diagnostics import diag_build_93075A199 as recipe
 from diagnostics import diag_mcmaster_hex_head as family
 from diagnostics import diag_mcmaster_lib
@@ -175,7 +174,7 @@ def _record(monkeypatch, author) -> list[tuple]:
         yield
         adapter.log("no_sketch_inference.exit")
 
-    for module in (family_source, family):
+    for module in (family,):
         monkeypatch.setattr(module, "check", logger("check", True))
         monkeypatch.setattr(module, "name_last_feature", logger("name_last_feature"))
         monkeypatch.setattr(module, "volume_check", async_logger("volume_check"))
@@ -203,25 +202,6 @@ def _record(monkeypatch, author) -> list[tuple]:
     asyncio.run(author(adapter))
     adapter.log("_mcm_com_map", tuple(adapter._mcm_com_map(["x", "y", "z"])))
     return adapter.events
-
-
-def test_family_builder_replays_93075A194_call_for_call(monkeypatch) -> None:
-    """The proof the family laws are 93075A194's: at that screw's dimensions
-    the shared builder issues exactly the calls its replica-gated recipe does."""
-    dims = family.HexHeadScrew(
-        part_no="93075A194",
-        major_dia=2.0 * family_source.HX_MAJOR_R,
-        pitch=family_source.HX_PITCH,
-        length=family_source.HX_LEN,
-        head_af=family_source.HX_HW,
-        head_h=family_source.HX_HH,
-    )
-    source_calls = _record(monkeypatch, family_source.build_93075A194)
-    family_calls = _record(
-        monkeypatch, lambda adapter: family.build_hex_head_screw(adapter, dims)
-    )
-    assert len(source_calls) > 40
-    assert family_calls == source_calls
 
 
 def test_93075A199_is_the_family_at_its_catalogue_dimensions(monkeypatch) -> None:

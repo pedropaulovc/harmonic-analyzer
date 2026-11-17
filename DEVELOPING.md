@@ -1949,9 +1949,9 @@ Simplified naming, assembly-component fingerprints, shared pure BOM identity and
 part-side configuration saves live in separate helpers. Vendor dimensions are
 pure per-SKU inputs shared by the recipe and its specs, rather than dimensions
 imported through recipe code or a family-wide table.
-The catalogue-only 91251A108 and former-hanger 91251A157 socket-head diagnostic
-recipes share the pure `_socket_head_dimensions` record; each SKU still owns
-its `DIMS` declaration. The current knife-hanger hex-bolt, #10 washer and
+Socket-head recipes such as the catalogue-only 91251A108 share the pure
+`_socket_head_dimensions` record; each SKU still owns its `DIMS` declaration.
+The current knife-hanger hex-bolt, #10 washer and
 knife-mount-dowel specs import their own pure per-SKU `DIMS`, not a socket-head,
 washer or dowel COM recipe. Production replays 92314A253 as modified stock:
 retain the hex head, cut the under-head length to 46.70 ±0.15 mm and apply

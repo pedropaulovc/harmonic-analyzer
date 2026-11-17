@@ -379,7 +379,6 @@ def test_retired_front_pin_is_not_allocated_but_rear_cup_pin_is() -> None:
     assert obsolete not in parts
     assert obsolete not in DRAWINGS_BY_NAME
     assert obsolete.replace("_", "-") not in FASTENERS
-    assert "98296A026" not in discovered_recipes()
     assert not (
         bg.CONFIG_DIR / "parts" / f"{obsolete.replace('_', '-')}.yaml"
     ).exists()

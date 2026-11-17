@@ -624,12 +624,6 @@ def test_modified_stock_route_is_complete_not_the_old_socket_recipe() -> None:
     assert "COUNTERBORE" not in row["installation_notes"]
     assert "SPOTFACE" not in row["installation_notes"]
     assert "FACED TOP" in row["installation_notes"]
-    for module in ("build_sm_vn_knife_hanger_stud", "draw_sm_vn_knife_hanger_stud"):
-        tree = ast.parse((SCRIPTS / f"{module}.py").read_text(encoding="utf-8"))
-        imports = {
-            node.module for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)
-        }
-        assert "diagnostics.diag_build_91251A157" not in imports
     assert FASTENERS["dt-vn-cone-tip-block-screw"].skus == ("91251A108",)
 
 

@@ -17,7 +17,7 @@ driver just fans the fleet out.
 
 Run (SolidWorks already open)::
 
-    uv run python cad\scripts\diagnostics\diag_build_mcmaster.py 90126A211
+    uv run python cad\scripts\diagnostics\diag_build_mcmaster.py 90280A108
     uv run python cad\scripts\diagnostics\diag_build_mcmaster.py --all
 
 Output (replica .SLDPRT + report JSON + render pairs) goes to the gitignored
@@ -44,16 +44,12 @@ from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     run_replica,
 )
 from diagnostics.diag_build_90114A511 import build_90114A511  # noqa: E402
-from diagnostics.diag_build_90126A211 import build_90126A211  # noqa: E402
 from diagnostics.diag_build_90280A108 import build_90280A108  # noqa: E402
-from diagnostics.diag_build_90280A194 import build_90280A194  # noqa: E402
 from diagnostics.diag_build_90280A196 import build_90280A196  # noqa: E402
 from diagnostics.diag_build_90280A197 import build_90280A197  # noqa: E402
-from diagnostics.diag_build_90280A199 import build_90280A199  # noqa: E402
 from diagnostics.diag_build_90280A201 import build_90280A201  # noqa: E402
 from diagnostics.diag_build_90280A203 import build_90280A203  # noqa: E402
 from diagnostics.diag_build_90280A837 import build_90280A837  # noqa: E402
-from diagnostics.diag_build_91247A720 import build_91247A720  # noqa: E402
 from diagnostics.diag_build_91251A108 import build_91251A108  # noqa: E402
 from diagnostics.diag_build_91251A196 import build_91251A196  # noqa: E402
 from diagnostics.diag_build_91251A197 import build_91251A197  # noqa: E402
@@ -61,8 +57,6 @@ from diagnostics.diag_build_91251A583 import build_91251A583  # noqa: E402
 from diagnostics.diag_build_91290A168 import build_91290A168  # noqa: E402
 from diagnostics.diag_build_91375A106 import build_91375A106  # noqa: E402
 from diagnostics.diag_build_91375A942 import build_91375A942  # noqa: E402
-from diagnostics.diag_build_91255A148 import build_91255A148  # noqa: E402
-from diagnostics.diag_build_91410A538 import build_91410A538  # noqa: E402
 from diagnostics.diag_build_91410A540 import build_91410A540  # noqa: E402
 from diagnostics.diag_build_91771A112 import build_91771A112  # noqa: E402
 from diagnostics.diag_build_90325A174 import build_90325A174  # noqa: E402
@@ -70,16 +64,11 @@ from diagnostics.diag_build_91794A080 import build_91794A080  # noqa: E402
 from diagnostics.diag_build_91794A112 import build_91794A112  # noqa: E402
 from diagnostics.diag_build_91794A558 import build_91794A558  # noqa: E402
 from diagnostics.diag_build_91794A055 import build_91794A055  # noqa: E402
-from diagnostics.diag_build_92240A539 import build_92240A539  # noqa: E402
 from diagnostics.diag_build_92240A540 import build_92240A540  # noqa: E402
 from diagnostics.diag_build_91882A221 import build_91882A221  # noqa: E402
-from diagnostics.diag_build_91882A425 import build_91882A425  # noqa: E402
 from diagnostics.diag_build_9275K141 import build_9275K141  # noqa: E402
-from diagnostics.diag_build_92865A585 import build_92865A585  # noqa: E402
-from diagnostics.diag_build_93075A194 import build_93075A194  # noqa: E402
 from diagnostics.diag_build_93075A199 import build_93075A199  # noqa: E402
 from diagnostics.diag_build_93585A190 import build_93585A190  # noqa: E402
-from diagnostics.diag_build_94025A150 import build_94025A150  # noqa: E402
 from diagnostics.diag_build_98296A027 import build_98296A027  # noqa: E402
 from diagnostics.diag_build_98296A031 import build_98296A031  # noqa: E402
 from diagnostics.diag_build_98381A435 import build_98381A435  # noqa: E402
@@ -88,29 +77,18 @@ from diagnostics.diag_build_99607A213 import build_99607A213  # noqa: E402
 from diagnostics.diag_build_97431A240 import build_97431A240  # noqa: E402
 
 REGISTRY = {
-    "90126A211": build_90126A211,
-    "94025A150": build_94025A150,
     "90114A511": build_90114A511,
-    "92240A539": build_92240A539,
     "92240A540": build_92240A540,
-    "91410A538": build_91410A538,
     "91410A540": build_91410A540,
-    "93075A194": build_93075A194,
     "93075A199": build_93075A199,
-    "92865A585": build_92865A585,
-    "91247A720": build_91247A720,
     "91375A106": build_91375A106,
     "91375A942": build_91375A942,
-    "91255A148": build_91255A148,
     "99607A213": build_99607A213,
     "91882A221": build_91882A221,
-    "91882A425": build_91882A425,
     "93585A190": build_93585A190,
     "90280A108": build_90280A108,
-    "90280A194": build_90280A194,
     "90280A196": build_90280A196,
     "90280A197": build_90280A197,
-    "90280A199": build_90280A199,
     "90280A201": build_90280A201,
     "90280A203": build_90280A203,
     "90280A837": build_90280A837,
