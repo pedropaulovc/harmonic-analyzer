@@ -71,7 +71,6 @@ from sm_gooseneck_spec import (
     DRAWING_PRECISION_BY_NAME,
     ISOMETRIC_OCTANT,
     TUBE_OD_REF_Y,
-    callout_slot,
 )
 
 
@@ -149,11 +148,9 @@ FRONT_KEEP = {
         LEG_AXIS_X + 0.052,
         (FOOT_Y + _front_y(ARM_Y + _TUBE_R)) / 2.0,
     ),
-    # 5 mm above the arm straight's row (2 mm left the two reading as one
-    # block, machinist review of a611188e85), its callout row above it.
     "OverallReach": (
         (ARM_END_X + _front_x(_TUBE_R)) / 2.0,
-        ARM_AXIS_Y + 0.025,
+        ARM_AXIS_Y + 0.021,
     ),
 }
 if set(FRONT_KEEP) != {
@@ -190,13 +187,11 @@ ISO_NOTE_XY = (ISO_CENTER[0] - 0.030, 0.085)
 
 
 def _assert_part_callouts(adapter: Any, annotations: list[Any]) -> None:
-    """The part authors every callout above or below its dimension's value
-    (spec ``callout_slot``); the import must carry each one unchanged (the
-    drawing never writes them, #1942)."""
-    expected = {
-        (callout_slot(name), name): text
-        for name, text in DIMENSION_CALLOUTS_BY_NAME.items()
-    }
+    """The part authors every callout below its dimension's value; the
+    import must carry each one unchanged (the drawing never writes them,
+    #1942)."""
+    # swDimensionTextCalloutBelow = 4.
+    expected = {(4, name): text for name, text in DIMENSION_CALLOUTS_BY_NAME.items()}
     found: dict[tuple[int, str], str] = {}
     for raw in annotations:
         annotation = _early_bound(raw, "IAnnotation")

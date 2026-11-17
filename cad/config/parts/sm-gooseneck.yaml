@@ -10,3 +10,9 @@ sm-gooseneck:
   tolerance_class: machined_block
   process: "1/2 in tube bent by hand on a simple shop-made grooved form with a tail; then both ends sawn and faced, the arm end to the reach and the foot to the overall height"
   drawing_unit: in
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "accept"
+      where: "sheet 1, front view, 3.72 overall reach (faced arm end to the leg's outer side) at the title block's .XX"
+      finding: "over_specification: two-place reach on a hand bend with no band of its own and no mate named on the sheet"
+      reason: "Owner ruling 2026-11-17 (Pedro): \"3.72 at .XX stays; it plumbs the vertical spring\". The reach sets the faced arm end under MHA-SM-05's end face, where MHA-SM-VN-51's upper eye hangs plumb over its MHA-SM-03 anchor (test_vertical_spring_anchors)."

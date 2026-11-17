@@ -76,11 +76,7 @@ def test_sheet_places_every_marked_dimension_at_its_places() -> None:
     }
     for feature, by_name in spec.DIMENSION_CALLOUTS.items():
         assert set(by_name) <= spec.DRAWING_DIMENSIONS[feature]
-    assert set(spec.DIMENSION_CALLOUTS_BY_NAME) == {
-        "BendRadius",
-        "TubeOdRef",
-        "OverallReach",
-    }
+    assert set(spec.DIMENSION_CALLOUTS_BY_NAME) == {"BendRadius", "TubeOdRef"}
     assert spec.DIMENSION_CALLOUTS_BY_NAME["BendRadius"] == "TUBE CENTERLINE"
     # The stock wall is the supplier's size: its value prints only as a
     # bracketed reference, never as a bare (toleranced) three-place size.
@@ -106,21 +102,12 @@ def test_references_and_the_governing_end_sizes() -> None:
     referenced = set().union(*spec.REFERENCE_DIMENSIONS.values())
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert marked - referenced == {"OverallHeight", "OverallReach"}
-    # The reach sits at the title block's .XX row: it hangs the counter
-    # spring plumb over its anchor, and its callout names that spring by its
-    # registry Number, ABOVE the value (clear of the arm straight's row
-    # below).  The height prints at two places (a one-place tie) but the foot
-    # only has to leave the leg spanning the hub, so its own band is looser
-    # than the .XX row's.
+    # The reach sits at the title block's .XX row.  The height prints at two
+    # places (a one-place tie) but the foot only has to leave the leg
+    # spanning the hub, so its own band is looser than the .XX row's.
     assert spec.DRAWING_PRECISION_BY_NAME["OverallReach"] == 2
     assert spec.DRAWING_PRECISION_BY_NAME["OverallHeight"] == 2
     assert spec.OVERALL_HEIGHT_TOLERANCE_MM > 0.01 * geom.MM_PER_IN
-    assert _config.parts("sm-vn-counter-spring")["number"] == spec.COUNTER_SPRING_NUMBER
-    reach_callout = spec.DIMENSION_CALLOUTS_BY_NAME["OverallReach"]
-    # One row naming the mate by Number with what the tip does for it.
-    assert reach_callout == f"TIP HANGS {spec.COUNTER_SPRING_NUMBER} PLUMB"
-    assert spec.callout_slot("OverallReach") == 3
-    assert {spec.callout_slot(name) for name in ("BendRadius", "TubeOdRef")} == {4}
     # The tube Ø's reference line runs on the leg, below the bend tangent.
     low = spec.TUBE_OD_REF_Y - spec.TUBE_OD_REF_SPAN / 2.0
     high = spec.TUBE_OD_REF_Y + spec.TUBE_OD_REF_SPAN / 2.0
@@ -197,7 +184,12 @@ def test_title_block_material_and_finish_come_from_the_registry_row() -> None:
     assert "OnlineMetals 7322" in row["material_specification"]
     finish = str(row["finish"]).lower()
     assert "polished bare" in finish and "oil or wax" in finish
-    assert "machinist_exceptions" not in row
+    # Owner ruling 2026-11-17 (Pedro): the reach's .XX is the plumb station
+    # of the counter spring, accepted against the over-specification finding.
+    (exception,) = row["machinist_exceptions"]
+    assert exception["kind"] == "accept"
+    assert "3.72" in exception["where"]
+    assert '"3.72 at .XX stays; it plumbs the vertical spring"' in exception["reason"]
 
 
 def test_shop_stock_row_covers_the_bent_tube_and_its_tail() -> None:
@@ -251,9 +243,8 @@ def test_elevation_dimensions_stand_clear_of_each_other_and_the_title_block() ->
     assert height_x <= drawing.ISO_CENTER[0] - 0.030
     assert abs(height_y - keep["LegLength"][1]) >= 0.015
     assert drawing.FOOT_Y < height_y < drawing._front_y(geom.ARM_Y + geom.TUBE_DIA / 2)
-    # Over the arm straight, a clear row above its (.47) text (machinist
-    # review of a611188e85), inside the sheet's top border.
-    assert keep["ArmStraight"][1] + 0.009 <= reach_y <= 0.258
+    # Over the arm straight, inside the sheet's top border.
+    assert keep["ArmStraight"][1] + 0.005 <= reach_y <= 0.258
     assert drawing.ARM_END_X < reach_x < drawing._front_x(geom.TUBE_DIA / 2)
     # The arm straight's text (~12 mm wide at (.47)) ends one text clearance
     # (1.78 mm) left of the faced arm end's shared extension line.

@@ -19,11 +19,10 @@ tube's two ends finish matters".  Every size is a native model dimension on
 the elevation.  The two that govern are where the ends finish, both to real
 faces: the overall height (foot face to the arm's top, ±.10: the leg slides
 in its hub, so the foot needs little) and the overall reach (faced arm end
-to the leg's outer side, the title block's .XX: it hangs the counter spring
-plumb over its summing-lever anchor, so its callout names that spring); the
-leg and arm stay square to each other at the title block's implied 90°.  The
-bend's centreline radius, the leg length and arm straight (each to a bend
-tangent), and the tube's stock Ø are references.  The one note is the bend's
+to the leg's outer side, the title block's .XX); the leg and arm stay square
+to each other at the title block's implied 90°.  The bend's
+centreline radius, the leg length and arm straight (each to a bend tangent),
+and the tube's stock Ø are references.  The one note is the bend's
 acceptance, NO KINKS.
 
 Decimal-inch sheet (#290): every size prints at the places its band needs
@@ -67,10 +66,9 @@ for _name, _mm, _inches in (
 if not math.isclose(geom.BEND_R, 3.000 * geom.MM_PER_IN, abs_tol=1e-9):
     raise AssertionError("gooseneck bend radius is no longer the ruled R3.0")
 
-# Callouts the PART authors on its dimensions, below the value unless
-# CALLOUTS_ABOVE names it (the drawing imports and reads them back; a
-# drawing-side SetText can write through to the part, #1942).  A callout
-# carries at most two lines of words (rule 7).
+# Callouts the PART authors on its dimensions, below the value (the drawing
+# imports and reads them back; a drawing-side SetText can write through to
+# the part, #1942).  A callout carries at most two lines of words (rule 7).
 # The bend radius is the tube's centreline radius; the arrowhead lands on the
 # outer arc, so the value says which in plain words (machinist review of
 # e487a1bb4; "CLR" read as clearance, novice-rubric screen).  One short row
@@ -83,29 +81,10 @@ BEND_RADIUS_CALLOUT = "TUBE CENTERLINE"
 # at three places it read as a .XXX-toleranced wall (machinist review of the
 # v49 release, PR #2677, over_specification).
 TUBE_OD_CALLOUT = f"({_inch(geom.WALL_T, 3)}) WALL STOCK"
-# The reach's .XX holds the counter spring plumb (below): its callout names
-# that spring by its frozen Number (cad/docs/subsystem-identities.md; the
-# drawing test checks it against the registry row) and says what the tip
-# does for it, in one row ABOVE the value, clear of the arm straight's (.47)
-# row under the reach's dimension line (machinist review of main
-# 67ba11bf1a: an unmated .XX reach on a bend; of a611188e85: the bare
-# "MHA-SM-VN-51 SPRING PLUMB" carried no relationship word).
-COUNTER_SPRING_NUMBER = "MHA-SM-VN-51"
-OVERALL_REACH_CALLOUT = f"TIP HANGS {COUNTER_SPRING_NUMBER} PLUMB"
 DIMENSION_CALLOUTS: dict[str, dict[str, str]] = {
     "BendPath": {"BendRadius": BEND_RADIUS_CALLOUT},
     "TubeOdReference": {"TubeOdRef": TUBE_OD_CALLOUT},
-    "OverallReference": {"OverallReach": OVERALL_REACH_CALLOUT},
 }
-CALLOUTS_ABOVE = frozenset({"OverallReach"})
-
-
-def callout_slot(name: str) -> int:
-    """``IDisplayDimension`` text part holding ``name``'s callout:
-    swDimensionTextCalloutAbove (3) or swDimensionTextCalloutBelow (4)."""
-    return 3 if name in CALLOUTS_ABOVE else 4
-
-
 DIMENSION_CALLOUTS_BY_NAME: dict[str, str] = {
     name: text
     for callouts in DIMENSION_CALLOUTS.values()
@@ -153,17 +132,13 @@ TUBE_OD_REF_Y = round(geom.LEG_TOP - geom.LEG_LENGTH / 4.0, 1)
 TUBE_OD_REF_SPAN = 20.0
 # Inch places (#290).  The leg length and bend radius are references at
 # their one-place sizes.  The overall reach sets the faced arm end, the
-# spring eye's station less the end plug's head: the title block's .XX.  It
-# hangs the counter spring plumb over the summing lever's anchor
-# (spring_mount_geom.COUNTER_UPPER_EYE_X; test_vertical_spring_anchors: "A
-# lean feeds a horizontal component into the knife load that no tension
-# setting removes"; the channel lever's spring reach was moved to cure a
-# 2.75 mm lean, ch_channel_lever_spec.LEVER_SPRING_X), so a ±.10 reach
-# (2.5 mm) would not do (codjiflo on PR #3010).  The overall height prints at
-# two places only because the snapped leg puts it at 19.650, a one-place tie;
-# its band is OVERALL_HEIGHT_TOLERANCE_MM, not the .XX row's.  The arm
-# straight (REF) prints at two places, the stock Ø (REF) at its three-place
-# size.
+# spring eye's station less the end plug's head: the title block's .XX, which
+# holds the counter spring plumb (test_vertical_spring_anchors; owner ruling
+# 2026-11-17 (Pedro), the registry row's machinist_exceptions RV-01).  The
+# overall height prints at two places only because the snapped leg puts it
+# at 19.650, a one-place tie; its band is OVERALL_HEIGHT_TOLERANCE_MM, not the
+# .XX row's.  The arm straight (REF) prints at two places, the stock Ø (REF)
+# at its three-place size.
 ONE_PLACE_DIMENSIONS = frozenset({"LegLength", "BendRadius"})
 THREE_PLACE_DIMENSIONS = frozenset({"TubeOdRef"})
 # The foot only has to leave the straight leg spanning MHA-FR-02's hub bore

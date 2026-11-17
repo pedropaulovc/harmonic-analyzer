@@ -86,7 +86,6 @@ from sm_gooseneck_spec import (
     REFERENCE_DIMENSIONS,
     TUBE_OD_REF_SPAN,
     TUBE_OD_REF_Y,
-    callout_slot,
 )
 
 # The form nominals live in sm_gooseneck_geom -- the prose-free module the
@@ -155,16 +154,15 @@ def _construction(adapter, line: str, label: str) -> None:
 
 @_telemetry.traced("part.dimension_callouts")
 def _author_dimension_callouts(adapter) -> None:
-    """Persist each printed callout above or below its source dimension (spec
-    ``callout_slot``): the drawing imports and reads them back, never writing
-    them itself."""
+    """Persist each printed callout below its source dimension: the drawing
+    imports and reads them back, never writing them itself."""
+    # swDimensionTextCalloutBelow = 4.
     for feature, callouts in DIMENSION_CALLOUTS.items():
         resolved = _named_dimensions(adapter, feature, set(callouts))
         for name, text in callouts.items():
             display, _dimension = resolved[name]
-            slot = callout_slot(name)
-            display.SetText(slot, text)
-            if str(display.GetText(slot) or "").replace("\r\n", "\n") != text:
+            display.SetText(4, text)
+            if str(display.GetText(4) or "").replace("\r\n", "\n") != text:
                 raise RuntimeError(f"{name}@{feature}: callout did not persist")
 
 
