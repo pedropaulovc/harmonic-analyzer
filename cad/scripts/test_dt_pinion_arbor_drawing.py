@@ -1401,12 +1401,29 @@ def test_collar_pin_dimensions_stand_above_the_shaft_clear_of_the_front_ra() -> 
     assert min(station_y, dia_y) > axis_y
 
 
+def test_collar_pin_hole_callout_names_the_press_fit_and_its_interference() -> None:
+    """R5 machinist review (blocker, rule 4): '.0625 +.0025/.0000 ... PRESS FIT
+    ON MHA-DT-VN-63' read as a clearance fit on a 1/16 pin.  The slotted pin
+    is .066-.069 before it is driven (ASME B18.8.2), so the callout prints
+    the interference the hole band gives it as a reference."""
+    assert drawing.DIMENSION_CALLOUTS["PinHoleDia"].splitlines() == [
+        "1/16 DRILL THRU",
+        "PRESS FIT ON MHA-DT-VN-63",
+        "(INTERFERENCE .0010-.0065)",
+    ]
+    low, high = drawing.PIN_HOLE_INTERFERENCE_IN
+    assert low > 0.0
+    assert (low, high) == pytest.approx((0.066 - 0.065, 0.069 - 0.0625))
+
+
 # pc-r10 (37495ac47) layout audit, sheet mm: the three-line collar-pin
 # callout set at (0.250, 0.222) underlined at y 211.9, its leader ran
 # (269.1,170.8) -> (280.1,211.9); the station text set at (0.288, 0.207)
 # boxed [274.5,201.4]..[301.7,204.9].
 PC_R10_PIN_CALLOUT_XY = (0.250, 0.222)
-PIN_CALLOUT_UNDERLINE_FROM_POSITION = -0.0101
+# The two-row callout's underline sat 10.1 mm under its position; the
+# interference row adds the R5 render's 5.5 mm row pitch.
+PIN_CALLOUT_UNDERLINE_FROM_POSITION = -0.0101 - 0.0055
 PIN_LEADER_START_Y_FROM_AXIS = 0.0008
 STATION_TEXT_BOX_FROM_POSITION = (-0.0135, 0.0137, -0.0056, -0.0021)
 LEADER_TEXT_CLEARANCE = 0.0015

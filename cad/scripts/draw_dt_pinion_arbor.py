@@ -54,7 +54,11 @@ from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
 from diagnostics.drawing_layout_audit import collect_document
-from dt_pinion_arbor_pin_spec import PIN_NUMBER as _PIN_NUMBER
+from dt_pinion_arbor_pin_spec import (
+    PIN_HOLE_DIA as _PIN_HOLE_DIA,
+    PIN_HOLE_DIA_MAX as _PIN_HOLE_DIA_MAX,
+    PIN_NUMBER as _PIN_NUMBER,
+)
 from dt_vn_pinion_strap_pin_spec import DRILL_THRU_CALLOUT as _PIN_DRILL_THRU_CALLOUT
 from dt_pinion_arbor_spec import (
     BACK_JOURNAL_Z,
@@ -466,25 +470,42 @@ DIAMETER_BLOCK_SIZE = (0.027, 0.014)
 # it, crossing the 38.0 line 6 mm inside that witness and passing 5 mm
 # right of the 19.0's head-end witness; the underline still starts right of
 # detail A's view box (x 0.1928).
-# Two rows preserve the measured underline height between the crown-sag and
-# cross-hole text.  The band is ASME B18.8.2's recommended hole for the 1/16
-# slotted spring pin (.062-.065; the title block's DRILLED HOLES row would
-# open it to .0665), which the pin grips by compressing into: the press fit
-# the MHA-DT-33 collar and MHA-DT-19 sheets name for the same pin.  The
-# second row names that fit and the mate (rule 4; integration proof
-# 20261109T105251629Z, 3 of 3 runs: the pin's number alone named no fit).
-# A third row would run into the MHA-DT-15 bore callout above, so the row
-# drops "SPRING PIN" (the number names the pin) and, 25 characters wide,
-# moves the bend half a millimetre nearer the hole to keep the underline
-# right of detail A's view box.
-PIN_HOLE_CALLOUT = f"{_PIN_DRILL_THRU_CALLOUT}\nPRESS FIT ON {_PIN_NUMBER}"
+# The band is ASME B18.8.2's recommended hole for the 1/16 slotted spring
+# pin (.062-.065; the title block's DRILLED HOLES row would open it to
+# .0665), which the pin grips by compressing into: the press fit the
+# MHA-DT-33 collar and MHA-DT-19 sheets name for the same pin.  The second
+# row names that fit and the mate (rule 4; integration proof
+# 20261109T105251629Z, 3 of 3 runs: the pin's number alone named no fit),
+# dropping "SPRING PIN" (the number names the pin) to stay 25 characters.
+# The third row prints the interference the band gives as a reference, the
+# MHA-DT-36 bushing's and MHA-PD-20 spacer's pattern: R5 machinist review
+# (run 20261117T111407559Z) read the .0625-.0650 hole as a clearance fit on
+# a 1/16 pin, as no row said the pin is driven oversize.
+# B18.8.2 makes the 1/16 pin .066-.069 across before it is driven.
+PIN_FREE_DIA_IN = (0.066, 0.069)
+PIN_HOLE_INTERFERENCE_IN = (
+    PIN_FREE_DIA_IN[0] - _PIN_HOLE_DIA_MAX / 25.4,
+    PIN_FREE_DIA_IN[1] - _PIN_HOLE_DIA / 25.4,
+)
+PIN_HOLE_FIT_ROW = f"PRESS FIT ON {_PIN_NUMBER}"
+PIN_HOLE_CALLOUT = "\n".join(
+    (
+        _PIN_DRILL_THRU_CALLOUT,
+        PIN_HOLE_FIT_ROW,
+        "(INTERFERENCE "
+        + "-".join(f"{value:.4f}".lstrip("0") for value in PIN_HOLE_INTERFERENCE_IN)
+        + ")",
+    )
+)
 PIN_HOLE_CALLOUT_ADVANCE = 0.00267
 PIN_HOLE_CALLOUT_CENTRE_DX = 0.00075
 PIN_HOLE_LEADER_ARROW_DX = -0.0004
 PIN_HOLE_LEADER_RUN = 0.0085
-PIN_HOLE_CALLOUT_WIDTH = PIN_HOLE_CALLOUT_ADVANCE * max(
-    len(line) for line in PIN_HOLE_CALLOUT.split("\n")
-)
+# The fit row sets the underline: the interference row has one character
+# more, but its stops, digits and parentheses print narrower (Century
+# Gothic advances 13121 against the fit row's 13366 units), so measuring it
+# by characters would move the underline left onto detail A's view box.
+PIN_HOLE_CALLOUT_WIDTH = PIN_HOLE_CALLOUT_ADVANCE * len(PIN_HOLE_FIT_ROW)
 PIN_HOLE_CALLOUT_X = (
     _sheet_x(PIN_Z)
     + PIN_HOLE_LEADER_ARROW_DX
@@ -566,10 +587,14 @@ PRINCIPAL_KEEP = {
     # The hole's
     # underline stands clear above detail A's (3.0): at y 0.222 (pc-r11) it
     # ran 0.7 mm over that text's top and began 0.9 mm right of it, so the
-    # (3.0) read as the callout's first word.  At 0.2255 (r1 of #1685) it
-    # splits the air between that text and the three-line Ø6 callout above.
+    # (3.0) read as the callout's first word.  At 0.2255 (r1 of #1685) the
+    # two-row callout split the air between that text and the three-line Ø6
+    # callout above; the R5 render measured the underline 10.0 mm under the
+    # position, its top 10.1 mm over it and a 5.5 mm row pitch.  The third
+    # row (interference) lowers the underline a row, so the position rises
+    # 4.5 mm: about 2.5 mm of air above the (3.0) and under the Ø6's underline.
     "PinStationFromHeadRear": (0.288, 0.207),
-    "PinHoleDia": (PIN_HOLE_CALLOUT_X, 0.2255),
+    "PinHoleDia": (PIN_HOLE_CALLOUT_X, 0.2300),
 }
 # In detail A the neck runs from the fence (x ~0.137 at its edges) to the
 # head rear face (x 0.1545), its Ø10.5 at y 0.2245-0.2455.  Its end-on
