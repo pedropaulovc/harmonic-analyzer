@@ -1010,6 +1010,7 @@ def _assert_detail_thread_ink_routes(annotations, native_note, project, detail):
     wrapped = AnnotationGeometry(label=unwrapped.label, kind="note", owner="detail", text_boxes=rows)
     after = SheetGeometry("Sheet1", template.width_m, template.height_m, region, annotations=(length, incomplete, wrapped))
     assert find_text_on_line(after) == []
+    assert find_text_clearance(after) == []
     assert find_border_breaches(after) == []
     # The rows sit wholly under the rod: the leader rises to its near edge.
     assert max(row.ymax for row in rows) < project(None, detail, (0.0, bottom, 0.0))[1]
@@ -1125,6 +1126,7 @@ def _assert_finish_ink_routes(annotations, finish, seat_note_xy, project, front)
     after = sheet(rod_dia, new_finish, seat_label, thread_note, parent_a, free_end)
     assert find_leader_across_lines(after) == []
     assert find_text_on_line(after) == []
+    assert find_text_clearance(after) == []
     assert find_leader_through_text(after) == []
     assert find_border_breaches(after) == []
     moved = {rod_dia.label, new_finish.label, seat_label.label}

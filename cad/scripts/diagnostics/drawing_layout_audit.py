@@ -142,11 +142,9 @@ _OWNER_DRAWING_SHEET = 1
 def _attempt(adapter: Any, call, default=None):
     """Adapter ``_attempt`` when present, else a local equivalent.
 
-    ``audit_document`` is called both from a recipe (which has the project
-    adapter) and from this CLI (which attaches a bare ``ISldWorks``).  Most
-    SolidWorks accessors return None / raise for "not applicable to this
-    annotation type" rather than answering, so a tolerant call is required
-    either way -- the project convention is ``adapter._attempt``.
+    Most SolidWorks accessors return None / raise for "not applicable to this
+    annotation type" rather than answering, so a tolerant call is required --
+    the project convention is ``adapter._attempt``.
     """
     helper = getattr(adapter, "_attempt", None)
     if helper is not None:
@@ -736,7 +734,7 @@ def collect_sheet(
     )
 
 
-def collect_document(adapter: Any, document: Any = None) -> list[SheetGeometry]:
+def collect_document(adapter: Any) -> list[SheetGeometry]:
     """Every sheet of the drawing, without activating any of them.
 
     ``IDrawingDoc::GetViews`` returns one array per sheet whose first entry is
@@ -744,7 +742,7 @@ def collect_document(adapter: Any, document: Any = None) -> list[SheetGeometry]:
     undetermined, so sheets are reported in the order returned and identified
     by ``ISheet::GetName``.
     """
-    model = document if document is not None else getattr(adapter, "currentModel", None)
+    model = getattr(adapter, "currentModel", None)
     if model is None:
         raise RuntimeError("no drawing document to audit")
     if int(_get(adapter, model, "GetType", 0) or 0) != _SW_DOC_DRAWING:

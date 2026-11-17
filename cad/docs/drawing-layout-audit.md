@@ -250,10 +250,11 @@ datum-origin case replay from the calibration run's dumps.
    its 5 findings. The X axis prints between its "0" and "X" labels, and one
    row box spanning both read the axis as a leader through its own text. But
    a balloon's short leader has started inside its printed ring
-   (drive-train-assembly), and the kind also fires on harmonic-base,
+   (drive-train-assembly), and the kind also fired on harmonic-base,
    platen-guide, pinion-pivot-shaft and rocker-arm-support (7 days to
-   2026-09-28). frame-assembly alone enforces it now (`STEM_ENFORCED_KINDS`):
-   its short-leader balloons check their leader start only right after
+   2026-09-28). frame-assembly and harmonic-base enforce it now
+   (`STEM_ENFORCED_KINDS`); frame-assembly's short-leader balloons check
+   their leader start only right after
    SetPosition, since after the rebuild COM reports the start the fit render
    left, so the printed leader is their check.
    `view-edges-missing` is
@@ -262,7 +263,10 @@ datum-origin case replay from the calibration run's dumps.
    sheet-local `audit_sheet` gates and `draw_fr_harmonic_base`'s callout
    checks are gone. Each sheet that ran one enforces, via
    `STEM_ENFORCED_KINDS`, the shared kinds covering what it gated (all at
-   zero on its latest span). REPORT stays the fleet mode; an allow-list entry
+   zero on its latest span). Three kinds fire today and are only reported:
+   `text-clearance` on rocker-arm and drive-train-assembly (one finding
+   each), and cone-pivot-post's former view-crowding gate
+   (`text-separation`). REPORT stays the fleet mode; an allow-list entry
    needs a cited ruling.
 
 Not checked:

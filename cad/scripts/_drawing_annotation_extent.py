@@ -217,7 +217,7 @@ def gdt_box(adapter: Any, annotation: Any, *, label: str) -> Box:
     the sheet.
     """
     annotation = _sw_type_info.early_bound_or_flag(
-        annotation, "IAnnotation", "GetType", "GetName", "GetPosition"
+        annotation, "IAnnotation", "GetType", "GetName", "GetPosition", "GetAttachedEntityTypes"
     )
     kind = int(annotation.GetType())
     if kind not in _GDT_TYPES:

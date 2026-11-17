@@ -3921,8 +3921,9 @@ GATING_KINDS = frozenset(
 # boxing removed 4 of its 5 findings. A balloon leader now starts where the PDF
 # prints it (BALLOON_LEADER_RING_M), which cleared frame-assembly's balloon 5
 # (0.47 mm inside its ring at 20260928T124727673Z) on replay, but it still
-# fires on harmonic-base, platen-guide, pinion-pivot-shaft and
-# rocker-arm-support (7 days to 2026-09-28). "leader-ink-ambiguous" read zero
+# fired on harmonic-base, platen-guide, pinion-pivot-shaft and
+# rocker-arm-support (7 days to 2026-09-28; harmonic-base reads zero on every
+# span of the 14 days to 2026-11-17 and now enforces it). "leader-ink-ambiguous" read zero
 # on all 14,046 layout.audit spans of the 30 days to 2026-11-17 (every stem,
 # every branch), so it joined.
 ENFORCED_KINDS: frozenset[str] = frozenset(
@@ -3961,11 +3962,16 @@ ENFORCED_KINDS: frozenset[str] = frozenset(
 # notes and tables against each other, the zone border and the title block;
 # leader-vs-view), the sheet-local audit_sheet gates and harmonic-base's
 # callout check. Each listed kind read zero on the stem's latest layout.audit
-# span (2026-11-13..15) and on every span of the 14 days before, except
-# harmonic-base's text-clearance/tall-block and cone-pivot-post's
-# text-clearance (fixed before 2026-11-13, zero on every span since).
-# "view-overlap" has no fleet count yet: it is the one class only the
-# retired element audit saw.
+# span (2026-11-13..15). The element audit's note/table overlaps map to
+# text-clearance and text-on-line; harmonic-base's own-row leader and
+# own-view strike-through to leader-through-own-text and text-on-line.
+# Not carried, because they fire today (REPORT records them): text-clearance
+# on ch-rocker-arm and dt-drive-train-assembly (one finding each), and
+# cone-pivot-post's view-crowding (text-separation, one finding).
+# "view-overlap" is the one class only the retired element audit saw; replay
+# of every stem's latest stored layout report finds it only on
+# dt-cone-tip-gear-tl-cutter-assembly and dt-vn-post-mount-screw, so it is
+# zero on all of these stems and on sm-knife-mount.
 _RETIRED_ELEMENT_AUDIT = frozenset(
     {"outside-border", "keep-out", "text-on-view", "leader-crosses-view", "view-overlap"}
 )
@@ -3974,8 +3980,11 @@ STEM_ENFORCED_KINDS: Mapping[str, frozenset[str]] = MappingProxyType(
         "fr-frame-assembly": frozenset({"leader-through-own-text"}),
         "sm-knife-mount": GATING_KINDS - {"view-edges-missing"},
         **dict.fromkeys(
+            ("ch-rocker-arm", "dt-drive-train-assembly"),
+            _RETIRED_ELEMENT_AUDIT | {"text-on-line"},
+        ),
+        **dict.fromkeys(
             (
-                "ch-rocker-arm",
                 "dt-cone-gear",
                 "dt-cone-swing-platform",
                 "dt-cone-tip-bushing",
@@ -3984,11 +3993,10 @@ STEM_ENFORCED_KINDS: Mapping[str, frozenset[str]] = MappingProxyType(
                 "dt-crank-handle-butt-cup",
                 "dt-crank-handle-ferrule",
                 "dt-crank-pinion",
-                "dt-drive-train-assembly",
                 "dt-pinion-bracket",
                 "pd-transgear-feed-pinion",
             ),
-            _RETIRED_ELEMENT_AUDIT,
+            _RETIRED_ELEMENT_AUDIT | {"text-clearance", "text-on-line"},
         ),
         "dt-cone-pivot-post": frozenset(
             {"text-on-line", "text-clearance", "outside-border", "keep-out", "leader-crosses-view"}
@@ -4002,7 +4010,8 @@ STEM_ENFORCED_KINDS: Mapping[str, frozenset[str]] = MappingProxyType(
                 {"text-on-line", "text-clearance", "extension-through-own-text", "duplicate-annotation"}
             ),
         ),
-        "fr-harmonic-base": _RETIRED_ELEMENT_AUDIT | {"text-clearance", "tall-block"},
+        "fr-harmonic-base": _RETIRED_ELEMENT_AUDIT
+        | {"text-clearance", "tall-block", "leader-through-own-text", "text-on-line"},
     }
 )
 

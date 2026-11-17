@@ -3575,7 +3575,7 @@ def _balloon_attachment(annotation: Any, name: str) -> tuple[float, float]:
 def _placed_balloon_leaders(
     adapter: Any, annotations: dict[str, Any]
 ) -> dict[str, list[LeaderSegment]]:
-    """Each balloon's leader through the layout audit's own reader."""
+    """Each balloon's registered leader, read off COM (``GetLeaderPointsAtIndex``)."""
     leaders = {}
     for name, annotation in annotations.items():
         segments = leader_segments_of(annotation, label=name, kind="note", owner="")
@@ -3600,8 +3600,8 @@ def _sheet_balloon_segments(
 def _audit_balloon_leaders(
     segments: list[LeaderSegment], annotations: dict[str, Any]
 ) -> dict[str, list[LeaderSegment]]:
-    """The balloons' leaders out of a leader read, keyed by balloon name
-    (a label may carry the balloon text after the name: ``DetailItemN '11'``)."""
+    """The given balloons' leaders out of a flat leader read, keyed by balloon
+    name; any other leader in the read is dropped."""
     leaders: dict[str, list[LeaderSegment]] = {}
     for segment in segments:
         name = segment.label.split(" ", 1)[0]
