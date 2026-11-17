@@ -125,6 +125,30 @@ def test_every_program_names_its_stock_top_for_the_air_check():
     assert sorted(tops) == sorted(name for name, _ops in recipe.PROGRAMS)
 
 
+def test_ends_then_slots_in_one_program_at_their_own_speeds():
+    # Owner rulings 2026-11-16: the ends take the measured 2250 rpm, the slots
+    # stay at 1250; one program with an M0 stop to set the knob between them.
+    ctx = _context()
+    recipe = _cam_programs.load_recipe(STEM)
+    expected = {(program, check): kw for program, check, kw in recipe.expectations(ctx)}
+    assert expected[("BB04_S3_ends_slots_T1", "spindle")]["rpm"] == [2250, 1250]
+    assert expected[("BB04_S3_ends_slots_T1", "pauses")]["count"] == 1
+    assert ctx["ends"]["feed"] == pytest.approx(400.05)
+
+
+def test_m0_stops_need_a_retract_and_an_operator_comment(tmp_path):
+    good = "M3 S2250\nG0 X0 Y0 Z5\nG1 Z-1 F100\nG0 Z5\n(PAUSE: SET SPINDLE TO 1250 RPM, THEN CYCLE START)\nM0\nM3 S1250\nG1 Z-1\n"
+    program = _program(tmp_path, good)
+    assert _gcode.check_pauses(program, 0.0, 1) == []
+    assert _gcode.check_spindle(program, [2250, 1250]) == []
+    assert [f.check for f in _gcode.check_spindle(program, 2250)] == ["spindle"]
+    low = good.replace("G0 Z5\n(PAUSE", "(PAUSE")
+    assert any("not retracted" in f.detail for f in _gcode.check_pauses(_program(tmp_path, low), 0.0, 1))
+    silent = good.replace("(PAUSE: SET SPINDLE TO 1250 RPM, THEN CYCLE START)\n", "")
+    assert any("operator comment" in f.detail for f in _gcode.check_pauses(_program(tmp_path, silent), 0.0, 1))
+    assert [f.detail for f in _gcode.check_pauses(program, 0.0, 0)] == ["1 M0 stops, expected 0"]
+
+
 def test_spot_depth_measured_from_the_counterbore_floor_is_caught(tmp_path):
     program = _program(tmp_path, "G0 X10 Y5 Z5\nG1 Z-8.095 F100\nG0 Z5\n")
     findings = _gcode.check_holes(program, [(10.0, 5.0)], z_bottom=-3.015)

@@ -24,7 +24,7 @@ import re
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Sequence
 
 _COMMENT = re.compile(r"\(.*?\)|;.*")
 _WORD = re.compile(r"([A-Z])\s*(-?\d*\.?\d+)")
@@ -104,10 +104,27 @@ class Move:
 
 
 @dataclass(frozen=True)
+class Pause:
+    """An ``M0`` program stop: its line, the comment line just before it (the
+    operator's instruction; ``None`` when the previous line is not a comment)
+    and the tool position there (``None`` per axis while unknown)."""
+
+    line: int
+    comment: str | None
+    position: tuple[float | None, float | None, float | None]
+
+
+@dataclass(frozen=True)
 class Program:
     path: Path
     moves: tuple[Move, ...]
-    spindle_rpm: frozenset[float]
+    # The S words of each section; an M0 starts a new section.
+    spindle_sections: tuple[frozenset[float], ...]
+    pauses: tuple[Pause, ...] = ()
+
+    @property
+    def spindle_rpm(self) -> frozenset[float]:
+        return frozenset().union(*self.spindle_sections)
 
     @property
     def cutting(self) -> tuple[Move, ...]:
@@ -122,7 +139,8 @@ def read_program(path: Path) -> Program:
     its ``G90``. Its axis words are skipped because they are not part
     coordinates, and the axes it moves are unknown until a later block sets
     them. A part move made in incremental mode (G91), and an R-form arc, are
-    refused, not modelled.
+    refused, not modelled. ``M0`` records a :class:`Pause` and starts a new
+    spindle section.
     """
     position: list[float | None] = [None, None, None]
     motion: Motion | None = None
@@ -130,11 +148,19 @@ def read_program(path: Path) -> Program:
     plane = 17
     feed: float | None = None
     moves: list[Move] = []
-    spindle: set[float] = set()
+    sections: list[set[float]] = [set()]
+    pauses: list[Pause] = []
+    previous = ""
     for number, raw in enumerate(Path(path).read_text(encoding="utf-8").splitlines(), 1):
         line = _COMMENT.sub("", raw).strip().upper()
         words = [(letter, float(value)) for letter, value in _WORD.findall(line)]
         codes = {value for letter, value in words if letter == "G"}
+        if any(letter == "M" and value == 0 for letter, value in words):
+            comment = previous[1:-1].strip() if previous.startswith("(") and previous.endswith(")") else None
+            pauses.append(Pause(number, comment, (position[0], position[1], position[2])))
+            sections.append(set())
+        if raw.strip():
+            previous = raw.strip()
         for letter, value in words:
             if letter == "G" and value in (0, 1, 2, 3):
                 motion = Motion(int(value))
@@ -143,7 +169,7 @@ def read_program(path: Path) -> Program:
             elif letter == "G" and value in (17, 18, 19):
                 plane = int(value)
             elif letter == "S":
-                spindle.add(value)
+                sections[-1].add(value)
             elif letter == "F":
                 feed = value
         axes = {letter: value for letter, value in words if letter in "XYZ"}
@@ -176,7 +202,7 @@ def read_program(path: Path) -> Program:
                 feed=None if motion is Motion.RAPID else feed, centre=centre, plane=plane,
             ))
         position = target
-    return Program(Path(path), tuple(moves), frozenset(spindle))
+    return Program(Path(path), tuple(moves), tuple(frozenset(s) for s in sections), tuple(pauses))
 
 
 @dataclass(frozen=True)
@@ -243,10 +269,29 @@ def check_depth(program: Program, z_min: float) -> list[Finding]:
     return [Finding(program.path.name, "depth", f"deepest Z {lowest:.3f}, expected {z_min:.3f}")]
 
 
-def check_spindle(program: Program, rpm: float) -> list[Finding]:
-    if program.spindle_rpm == {rpm}:
+def check_spindle(program: Program, rpm: float | Sequence[float]) -> list[Finding]:
+    """Each section (the program, split at its M0 stops) sets one spindle
+    speed: ``rpm`` alone for a program without stops, else one per section."""
+    expected = [rpm] if isinstance(rpm, (int, float)) else list(rpm)
+    actual = [sorted(s) for s in program.spindle_sections]
+    if actual == [[float(r)] for r in expected]:
         return []
-    return [Finding(program.path.name, "spindle", f"S words {sorted(program.spindle_rpm)}, expected {rpm:g}")]
+    return [Finding(program.path.name, "spindle", f"S words per section {actual}, expected {[float(r) for r in expected]}")]
+
+
+def check_pauses(program: Program, z_top: float, count: int) -> list[Finding]:
+    """``count`` M0 stops, each with the tool retracted above the stock top
+    and an operator comment on the line before it."""
+    findings = []
+    if len(program.pauses) != count:
+        findings.append(Finding(program.path.name, "pauses", f"{len(program.pauses)} M0 stops, expected {count}"))
+    for pause in program.pauses:
+        z = pause.position[2]
+        if z is None or z <= z_top + _TOL_MM:
+            findings.append(Finding(program.path.name, "pauses", f"line {pause.line}: M0 with Z {z}, not retracted above {z_top:.3f}"))
+        if not pause.comment:
+            findings.append(Finding(program.path.name, "pauses", f"line {pause.line}: M0 without an operator comment before it"))
+    return findings
 
 
 def check_holes(program: Program, centres: Iterable[tuple[float, float]], z_bottom: float) -> list[Finding]:

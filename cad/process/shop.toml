@@ -20,6 +20,8 @@
 [machines.pm-30mv]
 kind = "mill"
 # Owner (Pedro, 2026-11-16): spindle 100 rpm minimum, 2800 rpm maximum.
+# Owner (Pedro, 2026-11-16), "2800 max with low belty": the low belt alone
+# covers 100–2800 rpm, so no job on this mill needs a belt change.
 rpm_ranges = [[100, 2800]]
 travel_mm = { x = 584.2, y = 222.25, z = 355.6 }
 # HA: envelope spindle_to_table_min_in 2.46 (62.484 mm), max 17 in (431.8 mm).
@@ -151,20 +153,21 @@ feed = "6 in/min"
 # full depth in one level.
 # Wide: 2250 rpm was stable to 4.7 mm wide (chatter at 5.0); 1830 rpm
 # chattered at 2.2 mm, so keep off that band. 2250 * 2 * .0035 = 15.75 in/min
-# (the report's 400 mm/min). High belt range.
+# (the report's 400 mm/min).
 [settings.em-half-hss-6061-v11-wide]
 tool = "basebar-em-half"
 material = "6061-t6511"
 rpm = 2250
 feed = "15.75 in/min"
 # Narrow (≤ 0.6 mm wide): 0.6 mm was stable at every speed tested, 570 to
-# 2250 rpm, so 1250 (the slot speed, low belt range) is inside that column.
-# 1250 * 2 * .0035 = 8.75 in/min.
+# 2250 rpm. The ends ran at 1250 only to share the slots' belt range; the low
+# belt covers 100–2800 rpm, so they take the measured 2250 (owner ruling
+# 2026-11-16). 2250 * 2 * .0035 = 15.75 in/min.
 [settings.em-half-hss-6061-v11-narrow]
 tool = "basebar-em-half"
 material = "6061-t6511"
-rpm = 1250
-feed = "8.75 in/min"
+rpm = 2250
+feed = "15.75 in/min"
 [settings.basebar-slot-rough-6061-t6511]
 tool = "basebar-em-half"
 material = "6061-t6511"
@@ -300,8 +303,7 @@ description = "3/8 in 82° countersink"
 
 # Riser Setups 3-4 (blind machinist review of the riser traveler, items S4/S5,
 # coordinator plan fix batch 2026-11-14 UTC): the 1/2 in 2-flute HSS end mill
-# in the PM-30MV high belt range (1400-2800 rpm) with Setups 4-5's drills, so
-# no belt change: 1800 rpm = 236 ft/min; 8 in/min / (1800 x 2) = .0022 in/tooth.
+# at 1800 rpm = 236 ft/min; 8 in/min / (1800 x 2) = .0022 in/tooth.
 [settings.riser-em-half-6061-t6511]
 tool = "jig-em-half"
 material = "6061-t6511"
@@ -340,9 +342,9 @@ diameter_mm = 9.525
 description = "1/2 in centre-cutting end mill, flutes ≥1.00 in"
 diameter_mm = 12.7
 
-# Both 1/2 in end mills (blind review 2026-11-14): 1800 rpm = 236 ft/min in
-# the PM-30MV high belt range with the drills, so no belt change; 8 in/min /
-# (1800 × 2) = .0022 in/tooth, a chip that cuts rather than rubs in 6061.
+# Both 1/2 in end mills (blind review 2026-11-14): 1800 rpm = 236 ft/min;
+# 8 in/min / (1800 × 2) = .0022 in/tooth, a chip that cuts rather than rubs
+# in 6061.
 [settings.block-em-half-long-6061-t6511]
 tool = "block-em-half-long"
 material = "6061-t6511"

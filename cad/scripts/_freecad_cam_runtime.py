@@ -307,27 +307,61 @@ def _flatten(items):
             yield item
 
 
-def post(ops, path, name, comment):
-    """Post ``ops`` (one Job's operations, all of them, in order) to ``path`` with
-    a header naming the program and its tools. Returns the path and the file of
-    the post the factory loaded: FreeCAD searches user post directories before
-    its own, so the name alone does not say which file posted."""
+def _job_of(ops, name):
     jobs = {PathUtils.findParentJob(op).Name: PathUtils.findParentJob(op) for op in ops}
     if len(jobs) != 1:
-        raise RuntimeError(f"{name}: operations from jobs {sorted(jobs)}; a program is one job")
-    (target_job,) = jobs.values()
-    if [op.Name for op in target_job.Operations.Group] != [op.Name for op in ops]:
-        raise RuntimeError(f"{name}: job {target_job.Label} holds operations the program does not list")
-    processor = PostProcessorFactory.get_post_processor(target_job, POST)
-    source = getattr(processor, "script_path", None) or inspect.getfile(type(processor))
-    sections = processor.export()
-    if len(sections) != 1:
-        raise RuntimeError(f"{name}: post returned {len(sections)} sections")
-    tools = sorted({(tc.ToolNumber, float(tc.Tool.Diameter), tc.Tool.Label) for tc in target_job.Tools.Group})
-    header = [f"({name})", f"({comment})"] + [f"(T{n} D={d:.3f} {label})" for n, d, label in tools]
+        raise RuntimeError(f"{name}: operations from jobs {sorted(jobs)}; a program section is one job")
+    (job,) = jobs.values()
+    if [op.Name for op in job.Operations.Group] != [op.Name for op in ops]:
+        raise RuntimeError(f"{name}: job {job.Label} holds operations the program does not list")
+    return job
+
+
+def _postamble(lines, name):
+    if "(Begin postamble)" not in lines:
+        raise RuntimeError(f"{name}: post output has no postamble marker")
+    return lines.index("(Begin postamble)")
+
+
+def post(sections, path, name, comment):
+    """Post ``sections`` (each one Job's operations, all of them, in order) to
+    ``path`` as one program with a header naming it and its tool. Sections
+    share the tool and zeros and differ only in spindle speed, which the
+    PM-30MV sets by hand: each later section is joined at an operator comment
+    and ``M0``, then its own ``M3 S`` word, without the earlier section's
+    postamble or the later one's preamble. Returns the path and the file of
+    the post the factory loaded: FreeCAD searches user post directories before
+    its own, so the name alone does not say which file posted."""
+    jobs = [_job_of(ops, name) for ops in sections]
+    controllers = [tc for job in jobs for tc in job.Tools.Group]
+    if len({(tc.ToolNumber, round(float(tc.Tool.Diameter), 6)) for tc in controllers}) != 1:
+        raise RuntimeError(f"{name}: one tool per program; a tool change is a separate program")
+    sources, body = set(), []
+    for index, job in enumerate(jobs):
+        processor = PostProcessorFactory.get_post_processor(job, POST)
+        sources.add(getattr(processor, "script_path", None) or inspect.getfile(type(processor)))
+        exported = processor.export()
+        if len(exported) != 1:
+            raise RuntimeError(f"{name}: post returned {len(exported)} sections")
+        lines = exported[0][1].splitlines()
+        if index > 0:
+            # Drop the previous section's postamble and this one's preamble,
+            # fixture and tool-change comments; keep from its M3 S word on.
+            body = body[:_postamble(body, name)]
+            start = next((i for i, line in enumerate(lines) if line.startswith("M3 ")), None)
+            if start is None:
+                raise RuntimeError(f"{name}: section {index + 1} posted no M3 spindle start")
+            (tc,) = job.Tools.Group
+            body += [f"(PAUSE: SET SPINDLE TO {float(tc.SpindleSpeed):g} RPM, THEN CYCLE START)", "M0"]
+            lines = lines[start:]
+        body += lines
+    if len(sources) != 1:
+        raise RuntimeError(f"{name}: sections posted by several post files: {sorted(sources)}")
+    tc = controllers[0]
+    header = [f"({name})", f"({comment})", f"(T{tc.ToolNumber} D={float(tc.Tool.Diameter):.3f} {tc.Tool.Label})"]
     with open(path, "w", encoding="utf-8", newline="\n") as handle:
-        handle.write("\n".join(header) + "\n" + sections[0][1])
-    return path, os.path.abspath(source)
+        handle.write("\n".join(header + body) + "\n")
+    return path, os.path.abspath(sources.pop())
 
 
 def _load_recipe(path):
@@ -344,10 +378,13 @@ def main():
         rt = types.ModuleType("_freecad_cam_runtime")
         rt.__dict__.update({k: v for k, v in globals().items() if not k.startswith("__")})
         built = _load_recipe(spec["recipe"]).build(spec["ctx"], rt)
-        posted = [
-            post(list(_flatten(built["ops"][key] for key in keys)), os.path.join(spec["out_dir"], f"{name}.nc"), name, spec["ctx"]["comment"])
-            for name, keys in spec["programs"]
-        ]
+        posted = []
+        for name, keys in spec["programs"]:
+            # A program lists operation keys (one section), or lists of them
+            # (sections joined at an M0 spindle-speed stop).
+            sections = [keys] if all(isinstance(key, str) for key in keys) else keys
+            ops = [list(_flatten(built["ops"][key] for key in section)) for section in sections]
+            posted.append(post(ops, os.path.join(spec["out_dir"], f"{name}.nc"), name, spec["ctx"]["comment"]))
         sources = sorted({source for _path, source in posted})
         if len(sources) != 1:
             raise RuntimeError(f"programs posted by several post files: {sources}")

@@ -12,12 +12,13 @@ manifest. Typed here, because neither record carries them: the #2 centre
 drill's catalogue geometry (it sets the spot depth), the S2 strap clearance,
 the approach clearance, the drilling R plane and the facing plunge feed.
 
-Setups follow ``plan.toml``: S2 edges on 1-2-3 blocks; S3 face (two
-clampings), square the ends and mill the slots in the vise; S4 spot, drill and
-counterbore. In S3 and S4 both bars sit ZERO END left, ZERO EDGE (the model's
-low side) at the back jaw, model Z0 face up (bar 1 C'BORE SIDE, bar 2 RAIL
-SIDE), so every through feature is shared and only the bracket programs are
-bar 1 only. Tapping, sawing and deburring stay manual.
+Setups follow ``plan.toml``: S2 edges on 1-2-3 blocks; S3 one vise clamping
+per bar (owner ruling 2026-11-16, "merge"): face side 1, flip, face side 2,
+then without unclamping square the ends, mill the slots, spot, drill and
+counterbore. After the side-2 face both bars sit ZERO END left, ZERO EDGE (the
+model's low side) at the back jaw, model Z0 face up (bar 1 C'BORE SIDE, bar 2
+RAIL SIDE), so every through feature is shared and only the bracket programs
+are bar 1 only. Tapping, sawing and deburring stay manual.
 
 Toolpath rules (owner rulings 2026-11-16, Pedro):
 
@@ -32,10 +33,16 @@ Toolpath rules (owner rulings 2026-11-16, Pedro):
 - Ends, slots, spot, drill and counterbore keep their plan strategy: ends
   one-way conventional, slots conventional inside from the plunge corner the
   plan names, holes plunged from the stock top.
+- Ends at the measured 2250 rpm (owner ruling 2026-11-16), slots at 1250.
+  The PM-30MV's speed is set by hand on the knob and the tool and zeros do
+  not change, so BB04 stays one program: the slots follow an operator
+  comment and ``M0`` to reset the knob (owner: "why not single program with
+  m0 for spindle/tool change"). A tool change stays a separate program.
 
-Each program is one FreeCAD Job: one setup, one tool (GRBL has no tool
-changer). The CAM model frame is the setup WCS (G54): for S3c and S4,
-``x' = x - x0``, ``y' = -(y - y_low)``, ``z' = -(z - z_underside)``.
+Each program is one tool (GRBL has no tool changer) and one FreeCAD Job per
+spindle speed. The CAM model frame is the setup WCS (G54): for S3c (S3 after
+the side-2 face), ``x' = x - x0``, ``y' = -(y - y_low)``,
+``z' = -(z - z_underside)``.
 """
 
 from __future__ import annotations
@@ -46,18 +53,20 @@ from typing import Any
 
 STEM = "ch_rocker_arm_tl_oblique_base_bar"
 COMMENT = "MHA-CH-06-TL-20 oblique base bar"
-# One FreeCAD Job per program, operations in order. A key may name a list of
-# operations (the edges' interleaved passes).
-PROGRAMS: tuple[tuple[str, tuple[str, ...]], ...] = (
+# Programs in order, each listing its operation keys; a key may name a list of
+# operations (the edges' interleaved passes). A program whose keys are grouped
+# in tuples is one section per group, each its own FreeCAD Job, joined at an
+# M0 spindle-speed stop.
+PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (
     ("BB01_S2_edges_T1", ("edges",)),
     ("BB02_S3_face_side1_T2", ("face_side1",)),
     ("BB03_S3_face_side2_T2", ("face_side2",)),
-    ("BB04_S3_ends_slots_T1", ("left_end", "right_end", "slot_near", "slot_far")),
-    ("BB05_S4_spot_rail_T3_both", ("spot_rail",)),
-    ("BB06_S4_spot_bracket_T3_bar1", ("spot_bracket",)),
-    ("BB07_S4_drill29_rail_T4_both", ("drill_rail",)),
-    ("BB08_S4_drill12_bracket_T5_bar1", ("drill_bracket",)),
-    ("BB09_S4_cbore_T6_bar1", ("counterbore",)),
+    ("BB04_S3_ends_slots_T1", (("left_end", "right_end"), ("slot_near", "slot_far"))),
+    ("BB05_S3_spot_rail_T3_both", ("spot_rail",)),
+    ("BB06_S3_spot_bracket_T3_bar1", ("spot_bracket",)),
+    ("BB07_S3_drill29_rail_T4_both", ("drill_rail",)),
+    ("BB08_S3_drill12_bracket_T5_bar1", ("drill_bracket",)),
+    ("BB09_S3_cbore_T6_bar1", ("counterbore",)),
 )
 IN = 25.4
 # ANSI #2 combined drill and countersink, 60° included: the shop record names
@@ -162,7 +171,7 @@ def context(features: dict[str, Any], plan: dict[str, Any], shop: dict[str, Any]
         raise ValueError(f"faced top {p['parallel_height_mm'] + thick:.3f} mm above the vise bed is not above the "
                          f"{p['vise_jaw_height_mm']:.3f} mm jaws; the face overhang would cut them")
 
-    def frame(point):  # model mm -> S3c/S4 WCS mm
+    def frame(point):  # model mm -> S3c WCS mm
         return (point[0] - x0, -(point[1] - y_low), -(point[2] - z_under))
 
     rail = sorted((v for v in f.values() if v["kind"] == "threaded_hole"), key=lambda v: v["at"][0])
@@ -288,8 +297,10 @@ def expectations(ctx: dict[str, Any]) -> list[tuple[str, str, dict[str, Any]]]:
         ("BB03_S3_face_side2_T2", "air_feed", {"z_top": ctx["side1"]}),
         ("BB03_S3_face_side2_T2", "face_passes", {"z": T, "y": (-W - FACE_OVERHANG_MM, FACE_OVERHANG_MM), "max_stepover": ctx["face"]["stepover"],
                                                    "radius": ctx["tools"]["em_face"] / 2, "span": L / 2}),
-        # One hand-set spindle speed per program: the ends and slots share it.
-        ("BB04_S3_ends_slots_T1", "spindle", {"rpm": ends["rpm"]}),
+        # Ends at 2250, then an M0 stop to set the knob to the slots' 1250:
+        # one S word per section, the tool retracted with an operator comment.
+        ("BB04_S3_ends_slots_T1", "spindle", {"rpm": [ends["rpm"], slots["rpm"]]}),
+        ("BB04_S3_ends_slots_T1", "pauses", {"z_top": 0.0, "count": 1}),
         ("BB04_S3_ends_slots_T1", "depth", {"z_min": -T + ends["tip"]}),
         ("BB04_S3_ends_slots_T1", "rapids_clear", {"z_top": 0.0}),
         ("BB04_S3_ends_slots_T1", "air_feed", {"z_top": 0.0}),
@@ -313,11 +324,11 @@ def expectations(ctx: dict[str, Any]) -> list[tuple[str, str, dict[str, Any]]]:
     rail, bracket = ctx["rail"]["centres"], ctx["bracket"]["centres"]
     through = -T + ctx["drill_tip"]
     for program, rpm, centres, z in (
-        ("BB05_S4_spot_rail_T3_both", ctx["spot"]["rpm"], rail, -ctx["spot"]["depth"]),
-        ("BB06_S4_spot_bracket_T3_bar1", ctx["spot"]["rpm"], bracket, -ctx["spot"]["depth"]),
-        ("BB07_S4_drill29_rail_T4_both", ctx["rail"]["rpm"], rail, through),
-        ("BB08_S4_drill12_bracket_T5_bar1", ctx["bracket"]["rpm"], bracket, through),
-        ("BB09_S4_cbore_T6_bar1", ctx["cbore"]["rpm"], bracket, -ctx["cbore"]["depth"]),
+        ("BB05_S3_spot_rail_T3_both", ctx["spot"]["rpm"], rail, -ctx["spot"]["depth"]),
+        ("BB06_S3_spot_bracket_T3_bar1", ctx["spot"]["rpm"], bracket, -ctx["spot"]["depth"]),
+        ("BB07_S3_drill29_rail_T4_both", ctx["rail"]["rpm"], rail, through),
+        ("BB08_S3_drill12_bracket_T5_bar1", ctx["bracket"]["rpm"], bracket, through),
+        ("BB09_S3_cbore_T6_bar1", ctx["cbore"]["rpm"], bracket, -ctx["cbore"]["depth"]),
     ):
         out += [
             (program, "spindle", {"rpm": rpm}),
@@ -378,42 +389,44 @@ def build(ctx: dict[str, Any], rt: Any) -> dict[str, Any]:
         tc = rt.tool_controller(doc, "3/4 in 4FL flat end mill", 2, "endmill", tl["em_face"], fc["rpm"], fc["feed"], fc["feed"] / 2, flutes=4)
         ops[key] = rt.face(target, tc, label, rt.top_face(rt.model(target), height), stock_top, height, fc["stepover"],
                            safe=stock_top + SAFE_MM)
-    # S3c (X0 ZERO END, Y0 ZERO EDGE, bar at -Y, Z0 top). The ends cut along a
-    # helper box as long as the bar is wide plus the approach each side; the
-    # slots follow the bar's own loops.
+    # S3c (S3 after the side-2 face: X0 ZERO END, Y0 ZERO EDGE, bar at -Y, Z0
+    # top). The ends cut along a helper box as long as the bar is wide plus the
+    # approach each side; the slots follow the bar's own loops. Ends and slots
+    # are separate jobs, one per spindle speed, joined in BB04 at an M0 stop.
     en, sl = ctx["ends"], ctx["slots"]
-    s3c = rt.job(doc, "BB04 S3 ends and slots, vise", [bar, rt.box(doc, "S3c_ends", (0, L), (-W - clear, clear), (-T, 0))],
-                 ((-xt, L + xt), (-W, 0), (-T, 0)))
+    ends_job = rt.job(doc, "BB04 S3 ends, vise", [bar, rt.box(doc, "S3c_ends", (0, L), (-W - clear, clear), (-T, 0))],
+                      ((-xt, L + xt), (-W, 0), (-T, 0)))
     ends_tc = half_inch(en, en["feed"])
-    helper = rt.model(s3c, 1)
+    helper = rt.model(ends_job, 1)
     for key, x, stations in (("left_end", 0.0, en["left"]), ("right_end", L, en["right"])):
         edge = rt.straight_edge(helper, x=x, z=0)
         stepover = stations[0] / (len(stations) - 1) if len(stations) > 1 else 0.0
         group, top = [], 0.0
         for level in en["levels"]:
-            group.append(rt.profile(s3c, ends_tc, f"{key} Z{level:.3f}", edge, "Outside", "CCW", top, level, top - level,
+            group.append(rt.profile(ends_job, ends_tc, f"{key} Z{level:.3f}", edge, "Outside", "CCW", top, level, top - level,
                                     safe=SAFE_MM, passes=len(stations), stepover=stepover))
             top = level
         ops[key] = group
+    s3c_stock = ((0, L), (-W, 0), (-T, 0))  # squared to length from here on
+    slots_job = rt.job(doc, "BB04 S3 slots after M0, vise", [bar], s3c_stock)
     slot_tc = half_inch(sl, sl["plunge"])
     for key, slot in zip(("slot_near", "slot_far"), sl["items"]):
-        loop = rt.inner_loop(rt.model(s3c, 0), 0.0, slot["x"], sum(slot["y"]) / 2)
+        loop = rt.inner_loop(rt.model(slots_job, 0), 0.0, slot["x"], sum(slot["y"]) / 2)
         # Inside the slot, clockwise: conventional with a clockwise spindle.
-        ops[key] = rt.profile(s3c, slot_tc, f"Slot X{slot['x']:.2f}", loop, "Inside", "CW", 0.0, -T - sl["breakthrough"],
+        ops[key] = rt.profile(slots_job, slot_tc, f"Slot X{slot['x']:.2f}", loop, "Inside", "CW", 0.0, -T - sl["breakthrough"],
                               sl["step"], safe=SAFE_MM, start_point=slot["plunge"])
-    # S4 (S3c's frame): one job per program, each over the bar.
-    s4_stock = ((0, L), (-W, 0), (-T, 0))
+    # Holes, same clamping and frame: one job per program, each over the bar.
     sp, ra, br, cb = ctx["spot"], ctx["rail"], ctx["bracket"], ctx["cbore"]
     through = -T + ctx["drill_tip"]
     for key, label, tool, holes, final, peck in (
-        ("spot_rail", "BB05 S4 spot rail holes (both bars)", (3, "#2 centre drill", "drill", cd["body_mm"], sp, 60), (ra["dia"], ra["centres"]), -sp["depth"], None),
-        ("spot_bracket", "BB06 S4 spot bracket holes (bar 1)", (3, "#2 centre drill", "drill", cd["body_mm"], sp, 60), (br["dia"], br["centres"]), -sp["depth"], None),
-        ("drill_rail", "BB07 S4 drill #29 rail holes thru (both bars)", (4, "#29 drill", "drill", tl["rail_drill"], ra, 118), (ra["dia"], ra["centres"]), through, tl["rail_drill"]),
-        ("drill_bracket", "BB08 S4 drill #12 bracket holes thru (bar 1)", (5, "#12 drill", "drill", tl["bracket_drill"], br, 118), (br["dia"], br["centres"]), through, tl["bracket_drill"]),
-        ("counterbore", "BB09 S4 counterbore bracket holes (bar 1)", (6, "5/16 in 2FL flat end mill (counterbore)", "endmill", tl["cbore"], cb, None), (cb["dia"], br["centres"]), -cb["depth"], None),
+        ("spot_rail", "BB05 S3 spot rail holes (both bars)", (3, "#2 centre drill", "drill", cd["body_mm"], sp, 60), (ra["dia"], ra["centres"]), -sp["depth"], None),
+        ("spot_bracket", "BB06 S3 spot bracket holes (bar 1)", (3, "#2 centre drill", "drill", cd["body_mm"], sp, 60), (br["dia"], br["centres"]), -sp["depth"], None),
+        ("drill_rail", "BB07 S3 drill #29 rail holes thru (both bars)", (4, "#29 drill", "drill", tl["rail_drill"], ra, 118), (ra["dia"], ra["centres"]), through, tl["rail_drill"]),
+        ("drill_bracket", "BB08 S3 drill #12 bracket holes thru (bar 1)", (5, "#12 drill", "drill", tl["bracket_drill"], br, 118), (br["dia"], br["centres"]), through, tl["bracket_drill"]),
+        ("counterbore", "BB09 S3 counterbore bracket holes (bar 1)", (6, "5/16 in 2FL flat end mill (counterbore)", "endmill", tl["cbore"], cb, None), (cb["dia"], br["centres"]), -cb["depth"], None),
     ):
         number, name, shape, dia, cut, tip_angle = tool
-        target = rt.job(doc, label, [bar], s4_stock)
+        target = rt.job(doc, label, [bar], s3c_stock)
         tc = rt.tool_controller(doc, name, number, shape, dia, cut["rpm"], cut["feed"], cut["feed"], tip_angle=tip_angle)
         ops[key] = rt.drill(target, tc, label, rt.holes(rt.model(target), *holes), 0.0, final, SAFE_MM, peck=peck)
     rt.generate(doc)
