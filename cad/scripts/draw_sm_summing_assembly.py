@@ -106,11 +106,16 @@ if SPEC.layout is not DrawingLayout.LANDSCAPE:
 SHEET_LAYOUTS = {name: DrawingLayout.LANDSCAPE for name in SHEET_NAMES}
 ASSEMBLED_SCALE = (1.0, 5.0)
 EXPLODED_SCALE = (1.0, 4.0)
-# The finished isometric fills the sheet left of the title block (machinist
-# review of farm run 20261117T143446475Z-fdea6028: at 1:5 it sat small in an
-# empty sheet, its washers, dowels and bolts not identifiable). Its 1:5
-# outline, 71.8 x 127.7 mm, prints 119.6 x 212.8 at 1:3.
-FINISHED_SCALE = (1.0, 3.0)
+# The finished isometric is centred over the usable field above the title
+# block at the largest standard scale whose native outline fits it with
+# FINISHED_CLEARANCE all round (machinist review of farm runs
+# 20261117T143446475Z-fdea6028 and 20261117T150253462Z-123d40fd: at 1:5 it
+# sat small in an empty sheet; at 1:3 left of the title block it was bunched
+# against one edge). Its native outline, 113.7 x 206.2 mm at 1:3 (run
+# 20261117T150253462Z-123d40fd's layout report), overfills the 200.7 mm
+# field at 1:3; at 1:4 it is 85.3 x 154.7.
+FINISHED_SCALE = (1.0, 4.0)
+FINISHED_CLEARANCE = 0.010
 SHEET_SCALES = dict(zip(SHEET_NAMES, (ASSEMBLED_SCALE, EXPLODED_SCALE, FINISHED_SCALE)))
 
 # Sheet geometry, metres: the template's inner border and the title block in
@@ -190,11 +195,17 @@ EXPLODED_CAPTION_OFFSET = 0.006
 EXPLODED_CAPTION_MIN_GAP = 0.004
 
 # --- Sheet 3 ------------------------------------------------------------------
-# The finished isometric, centred in the full-height field left of the title
-# block; the fit-up steps and checks print in the release's ASSEMBLY.md (#2889).
+# The finished isometric, centred over the field above the title block; the
+# fit-up steps and checks print in the release's ASSEMBLY.md (#2889).
+FINISHED_FIELD = (
+    SHEET_INNER_BORDER[0],
+    TITLE_BLOCK[3],
+    SHEET_INNER_BORDER[2],
+    SHEET_INNER_BORDER[3],
+)
 ASSEMBLY_ISO_CENTER = (
-    (SHEET_INNER_BORDER[0] + TITLE_BLOCK[0]) / 2.0,
-    (SHEET_INNER_BORDER[1] + SHEET_INNER_BORDER[3]) / 2.0,
+    (FINISHED_FIELD[0] + FINISHED_FIELD[2]) / 2.0,
+    (FINISHED_FIELD[1] + FINISHED_FIELD[3]) / 2.0,
 )
 
 BOM_QUANTITIES = {stem: spec.QUANTITIES[stem] for stem in notes.BOM_ORDER}
@@ -968,7 +979,7 @@ def _place_finished_sheet(adapter: Any) -> None:
         adapter, finished, False, configuration=configuration, label=label
     )
     _center_view_outline(adapter, finished, ASSEMBLY_ISO_CENTER, label=label)
-    _assert_view_on_sheet(finished, label=label)
+    _assert_view_on_sheet(finished, margin=FINISHED_CLEARANCE, label=label)
     assert_full_detail_view(adapter, label="summing assembly")
 
 

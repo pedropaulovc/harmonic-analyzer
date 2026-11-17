@@ -274,21 +274,40 @@ def test_setting_table_fits_the_top_border() -> None:
     assert left + drawing.SETTING_TABLE_INSET + sum(widths) < right - 0.005
 
 
-def test_finished_isometric_fills_the_field_left_of_the_title_block() -> None:
-    # Machinist review of farm run 20261117T143446475Z-fdea6028: the 1:5
-    # isometric was too small. Its captured 1:5 outline (71.8 x 127.7 mm),
-    # scaled to the sheet's own scale, stays inside the border and clear of
-    # the title block.
-    assert drawing.SHEET_SCALES[drawing.SHEET_NAMES[2]] == drawing.FINISHED_SCALE
-    grow = (drawing.ASSEMBLED_SCALE[1] / drawing.ASSEMBLED_SCALE[0]) / (
-        drawing.FINISHED_SCALE[1] / drawing.FINISHED_SCALE[0]
-    )
-    assert grow > 1.6
-    half_w, half_h = 0.0718 * grow / 2.0, 0.1277 * grow / 2.0
+# The finished isometric's native outline at 1:3 (run
+# 20261117T150253462Z-123d40fd's layout report), metres.
+_FINISHED_OUTLINE_1_3 = (0.1137, 0.2062)
+_STANDARD_SCALES = ((1.0, 2.0), (1.0, 2.5), (1.0, 3.0), (1.0, 4.0), (1.0, 5.0))
+
+
+def _finished_box(scale: tuple[float, float]) -> tuple[float, float, float, float]:
+    grow = 3.0 * scale[0] / scale[1]
+    half_w = _FINISHED_OUTLINE_1_3[0] * grow / 2.0 + drawing.FINISHED_CLEARANCE
+    half_h = _FINISHED_OUTLINE_1_3[1] * grow / 2.0 + drawing.FINISHED_CLEARANCE
     cx, cy = drawing.ASSEMBLY_ISO_CENTER
-    drawing._assert_box_on_sheet(
-        (cx - half_w, cy - half_h, cx + half_w, cy + half_h), label="finished iso"
-    )
+    return (cx - half_w, cy - half_h, cx + half_w, cy + half_h)
+
+
+def test_finished_isometric_is_centred_at_the_largest_scale_that_fits() -> None:
+    # Machinist review of farm runs 20261117T143446475Z-fdea6028 (1:5: too
+    # small) and 20261117T150253462Z-123d40fd (1:3 left of the title block:
+    # bunched against one edge): centred over the field above the title
+    # block, at the largest standard scale whose outline, grown by the
+    # clearance, stays inside the border and clear of the title block.
+    assert drawing.SHEET_SCALES[drawing.SHEET_NAMES[2]] == drawing.FINISHED_SCALE
+    x0, y0, x1, y1 = drawing.FINISHED_FIELD
+    assert drawing.ASSEMBLY_ISO_CENTER == pytest.approx(((x0 + x1) / 2, (y0 + y1) / 2))
+    assert y0 == drawing.TITLE_BLOCK[3]
+
+    def fits(scale: tuple[float, float]) -> bool:
+        try:
+            drawing._assert_box_on_sheet(_finished_box(scale), label="finished iso")
+        except RuntimeError:
+            return False
+        return True
+
+    fitting = [scale for scale in _STANDARD_SCALES if fits(scale)]
+    assert fitting and fitting[0] == drawing.FINISHED_SCALE
 
 
 def test_layout_constants_stay_on_the_sheet() -> None:
