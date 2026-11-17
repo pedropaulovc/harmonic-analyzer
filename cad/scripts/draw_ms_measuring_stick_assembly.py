@@ -135,7 +135,6 @@ STOP_POSITION_TEXT_Y = 0.220
 # callout clears the section-A label standing over the block's near face.
 STOP_POSITION_TEXT_FRACTION = 0.42
 OVERALL_LENGTH_TEXT_Y = 0.257
-NOTE_LINE_PITCH = 0.0046  # default-format note line pitch, as measured on MHA-MG-00
 # Owner ruling 2026-11-06 (option C): the drawn stop position is an example.
 # The note sits under the bottom view, where the deleted setup note stood.
 EXAMPLE_NOTE_XY = (0.030, 0.100)
@@ -184,7 +183,7 @@ EXPLODED_CAPTION = sheet.EXPLODED_CAPTION
 # Preserve the measured caption/table air; centre the narrower five-column BOM.
 EXPLODED_CAPTION_XY = (BOM_ANCHOR[0], 0.415 + EXPLODED_GROUP_SHIFT_Y)
 
-# Sheet 3: the finished isometric, centred above the title block. The fit-up
+# Sheet 3: the finished isometric, centred on the sheet. The fit-up
 # steps and checks print in the release's ASSEMBLY.md (#2889).
 ASSEMBLY_ISO_CENTER = ((SHEET_INNER_BORDER[0] + SHEET_INNER_BORDER[2]) / 2.0, 0.170)
 

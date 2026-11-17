@@ -144,7 +144,7 @@ ASSEMBLY_CHECKS = (
 # Sheet 1: the pose drawn (and its near-face reference) is one example.
 EXAMPLE_POSE_NOTE = (
     f"STOP SHOWN CLAMPED AT AN EXAMPLE POSITION. {_ref(spec.BLOCK)} CLAMPS "
-    f"AT ANY POSITION ALONG {_ref(spec.STICK)} (STEP 10)."
+    f"AT ANY POSITION ALONG {_ref(spec.STICK)} (ASSEMBLY.MD STEP 10)."
 )
 
 # Both dimensions are reference: the assembly pose, not component sizes.

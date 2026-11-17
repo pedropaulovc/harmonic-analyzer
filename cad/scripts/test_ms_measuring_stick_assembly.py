@@ -39,6 +39,8 @@ from _named_views import octant_axes
 
 SCRIPTS = Path(__file__).resolve().parent
 BUILDER = SCRIPTS / "build_ms_measuring_stick_assembly.py"
+NOTE_LINE_PITCH = 0.0046  # default-format note line pitch, as measured on MHA-MG-00
+
 
 def test_clamped_setting_authors_its_globals_and_drives(monkeypatch) -> None:
     """Run the builder's setting helper against fakes: every async authoring
@@ -380,9 +382,11 @@ def test_fitter_package_covers_rule_9() -> None:
     assert drawing.BOM_PART_NUMBERS[spec.PLATE_SCREW] == "MHA-MS-VN-51"
     for stem in spec.QUANTITIES:
         assert drawing.BOM_PART_NUMBERS[stem] == _config.parts(stem)["number"]
-    # Rule 22: parts by item; the steps print in ASSEMBLY.md (#2889).
+    # Rule 22: parts by item, at most six lines a step at a 100-character
+    # line as ASSEMBLY.md is read (#2889).
     for step in sheet.ASSEMBLY_STEPS:
         assert "ITEM " in step
+        assert len(textwrap.wrap(step, width=100, subsequent_indent="   ")) <= 6, step
     # Owner ruling 2026-11-06 (option C): no as-shipped setting. The clamp
     # step sets no position, and sheet 1 labels its drawn pose an example.
     clamp = sheet.ASSEMBLY_STEPS[-1]
@@ -393,7 +397,8 @@ def test_fitter_package_covers_rule_9() -> None:
     for text in (*sheet.ASSEMBLY_STEPS, *sheet.ASSEMBLY_CHECKS):
         assert "GRADUATION" not in text and "±" not in text
     assert "EXAMPLE POSITION" in sheet.EXAMPLE_POSE_NOTE
-    assert "(STEP 10)" in sheet.EXAMPLE_POSE_NOTE
+    assert "(ASSEMBLY.MD STEP 10)" in sheet.EXAMPLE_POSE_NOTE
+    assert "CLAMP" in sheet.ASSEMBLY_STEPS[9] and sheet.ASSEMBLY_STEPS[9].startswith("10. ")
     assert all(
         len(line) <= drawing.EXAMPLE_NOTE_WIDTH for line in drawing.EXAMPLE_NOTE.splitlines()
     )
@@ -879,10 +884,14 @@ def test_fitter_text_tracks_mutated_setting_and_depth_specs(
 def _assert_fitter_text_spacing(fitter) -> None:
     """Offline text envelopes at the measured note pitch; the parent owns
     native ink review."""
-    line_pitch = drawing.NOTE_LINE_PITCH
+    line_pitch = NOTE_LINE_PITCH
     # Sheet 1's example-pose note sits under the bottom view, above the
     # border and left of the title block.
-    example = textwrap.wrap(fitter.EXAMPLE_POSE_NOTE, width=drawing.EXAMPLE_NOTE_WIDTH)
+    example = textwrap.wrap(
+        fitter.EXAMPLE_POSE_NOTE,
+        width=drawing.EXAMPLE_NOTE_WIDTH,
+        subsequent_indent="   ",
+    )
     assert drawing.EXAMPLE_NOTE_XY[1] < drawing.UNDERSIDE_CENTER[1] - 0.020
     assert (
         drawing.EXAMPLE_NOTE_XY[1] - len(example) * line_pitch
