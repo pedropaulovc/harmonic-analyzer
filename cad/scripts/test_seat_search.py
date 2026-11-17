@@ -462,8 +462,11 @@ def test_counter_support_certificate_refuses_stale_or_unproven_parts(
         source.write_text("A = 1\n", encoding="utf-8")
         (tmp_path / f"{stem}.SLDPRT").write_bytes(b"part")
         sources[stem] = source
-    monkeypatch.setattr(dodo, "_part_file_deps", lambda _script, stem: [str(sources[stem])])
-    monkeypatch.setattr(dodo, "_sldprt", lambda stem: str(tmp_path / f"{stem}.SLDPRT"))
+    monkeypatch.setattr(dodo, "_part_task", lambda stem: {
+        "file_dep": [str(sources[stem])],
+        "targets": [str(tmp_path / f"{stem}.SLDPRT")],
+        "uptodate": [True],
+    })
     with pytest.raises(RuntimeError, match="cannot prove the counter support"):
         driver._require_current_support_parts()
 
@@ -474,8 +477,7 @@ def test_counter_support_certificate_refuses_stale_or_unproven_parts(
     recorded = Dependency(JsonDB, str(ledger), checker_cls=dodo.ContentChecker)
     for stem in driver._SUPPORT_PART_STEMS:
         recorded.save_success(
-            Task(f"part:{stem}", None, file_dep=[str(sources[stem])],
-                 targets=[dodo._sldprt(stem)])
+            Task(f"part:{stem}", None, **dodo._part_task(stem))
         )
     recorded.close()
     driver._require_current_support_parts()

@@ -367,11 +367,13 @@ def _require_current_support_parts() -> None:
         ) from exc
     stale = []
     for stem in _SUPPORT_PART_STEMS:
+        spec = dodo._part_task(stem)
         task = Task(
             f"part:{stem}",
             None,
-            file_dep=dodo._part_file_deps(dodo.SCRIPTS_DIR / f"build_{stem}.py", stem),
-            targets=[dodo._sldprt(stem)],
+            file_dep=spec["file_dep"],
+            targets=spec["targets"],
+            uptodate=spec["uptodate"],
         )
         status = dependency.get_status(task, {}, get_log=True)
         if status.status != "up-to-date":

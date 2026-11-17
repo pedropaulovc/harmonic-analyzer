@@ -8,7 +8,7 @@ metadata:
 Taking the LARGER, more-correct fix is the right call, not scope creep — don't
 retreat to the minimal "reported-bug-sized" patch to dodge review comments.
 (PR #199: rewrote export staleness from mtime to churn-immune recipe digests,
-matching what doit / the remote cache / verify's freshness guard already do.
+matching what doit / the remote cache already do.
 A mtime-only fix would've left export the lone holdout and kept the
 cross-machine cache-restore re-export bug unfixed.)
 

@@ -17,11 +17,10 @@ assembly fast, bypass doit:
    (the `__main__` → `run_build(build)` path; reopens the on-disk parts, runs the
    build's own `assert_components_fully_defined` + `check_no_interference`).
 3. Run the full soundness battery on JUST that assembly:
-   `HARMONIC_VERIFY_ALLOW_STALE=1 uv run python cad/scripts/verify.py <stem> --suite soundness`
+   `uv run python cad/scripts/verify.py <stem> --suite soundness`
    (`verify.py [name ...]` targets one assembly; default = all built).
 
-The `HARMONIC_VERIFY_ALLOW_STALE=1` is REQUIRED here: standalone builds don't update
-`.doit.db`, so the freshness guard (the freshness-guard feature, PR #101/#103) sees
-the stored digest ≠ current recipe and refuses to verify — a false positive when you
-KNOW you just rebuilt with current scripts. Drop the flag (and run through doit) for the
-real, DB-recorded build before merge/CI.
+A bare `verify.py` scores whatever `.SLDASM`/`.SLDPRT` is on disk: it no longer
+checks `.doit.db` freshness (the guard and `HARMONIC_VERIFY_ALLOW_STALE` were
+removed in #2903). After a `git pull` or branch switch, rebuild first or run the
+gate through doit (`verify_soundness:<stem>`), which re-runs on any changed input.
