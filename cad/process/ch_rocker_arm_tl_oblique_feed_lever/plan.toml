@@ -7,15 +7,15 @@
 # bolt holes are the 11/32 drill, 2X Ø.3438 11/32 DRILL THRU ALL, +.004/0
 # (owner ruling 2026-11-13, Pedro, post-v49; the hand sheet's Ø.344 5/16
 # clearance put the drill under its minimum). 2026-11-14 blind traveler
-# review: drill tip .2 past the bottom face. The end mill keeps the hand
-# sheets' shared setting (shop jig-em-half-6061-t6511, low belt range); no
-# source gives a high-range speed.
+# review: drill tip .2 past the bottom face. The end mill runs at the shop's
+# jig-em-half-6061-t6511 (owner ruling 2026-11-16: the 2026-11-05 logbook's
+# 1800 rpm, 7 in/min), so all spindle work is in the high belt range.
 title = "Oblique trammel feed lever"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "6061-T6511 aluminium"
 stock = "{{process.blank_thickness_in:fraction}} × {{process.blank_width_in:fraction}} × 24 in bar (OnlineMetals 1165, shared with TL-28); {{process.quantity:d}} × {{process.blank_length_in:.2f}} in blank."
-note = "Inches. Only the ends, two holes and two grip-end corners are machined; 1/2 and 1 in faces as bought. End mill in the low belt range, spot and drill in the high range."
+note = "Inches. Only the ends, two holes and two grip-end corners are machined; 1/2 and 1 in faces as bought. All spindle work in the high belt range."
 shop = "../shop.toml"
 material_key = "6061-t6511"
 
@@ -120,7 +120,7 @@ instruction = "Cutter .04 below bar. Left end, conventional (table moves away fr
 instruction_detailed = "Touch the cutter on the top, then down .54 (cutter .04 below the bar). Left end, conventional: the table moves away from you (cutter toward you). Skim .02–.04 in .02 X steps until clean all over. Mark ZERO END and ZERO EDGE."
 settings = "jig-em-half-6061-t6511"
 milling_cuts = [
-  { name = "ZERO END clean-up", kind = "side", phase = "finish", material = "aluminum_6061", cutter_dia_mm = "{{process.cutter_dia_mm}}", flutes = 2, axial_doc_mm = "{{cad.blank_thickness_mm}}", radial_woc_mm = 0.508, rpm = 1250, feed_mm_min = 76.2, stations_mm = 0 },
+  { name = "ZERO END clean-up", kind = "side", phase = "finish", material = "aluminum_6061", cutter_dia_mm = "{{process.cutter_dia_mm}}", flutes = 2, axial_doc_mm = "{{cad.blank_thickness_mm}}", radial_woc_mm = 0.508, rpm = 1800, feed_mm_min = 177.8, stations_mm = 0 },
 ]
 
 [[setups.operations]]
@@ -177,7 +177,7 @@ settings = "jig-em-half-6061-t6511"
 inspection = "Length {{cad.length_min_in:.1f}}–{{cad.length_max_in:.1f}} on the DRO from ZERO END: edge finder on the grip end at both edges, the two X readings within {{cad.end_square_in:.3dot}} (square ±{{cad.angular_tol_deg:g}}°)."
 gauge_checks = [{ gauge = "mill-x-dro", band_mm = "{{cad.length_band_mm}}" }]
 milling_cuts = [
-  { name = "grip end to length", kind = "side", phase = "finish", material = "aluminum_6061", cutter_dia_mm = "{{process.cutter_dia_mm}}", flutes = 2, axial_doc_mm = "{{cad.blank_thickness_mm}}", radial_woc_mm = 0.508, rpm = 1250, feed_mm_min = 76.2, stations_mm = "{{cad.blank_length_mm}}" },
+  { name = "grip end to length", kind = "side", phase = "finish", material = "aluminum_6061", cutter_dia_mm = "{{process.cutter_dia_mm}}", flutes = 2, axial_doc_mm = "{{cad.blank_thickness_mm}}", radial_woc_mm = 0.508, rpm = 1800, feed_mm_min = 177.8, stations_mm = "{{cad.blank_length_mm}}" },
 ]
 
 [[setups]]

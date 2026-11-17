@@ -11,14 +11,15 @@
 # FACE (the base bar's, BAR SIDE). 2026-11-14 blind traveler review: drill
 # fully through before tapping from the exit, one tap flag per face so the two
 # bottoming taps never meet, 1/8 in parallels, conventional cuts named by
-# table motion. The end mill keeps the hand sheets' shared setting (shop
-# jig-em-half-6061-t6511, low belt range); no source gives a high-range speed.
+# table motion. The end mill runs at the shop's
+# jig-em-half-6061-t6511 (owner ruling 2026-11-16: the 2026-11-05 logbook's
+# 1800 rpm, 7 in/min), so all spindle work is in the high belt range.
 title = "Oblique trammel end bracket — {{process.quantity:d}} identical"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "6061-T6511 aluminium"
 stock = "{{process.blank_thickness_in:fraction}} × {{process.blank_width_in:fraction}} in bar (OnlineMetals 1165, shared with TL-26); {{process.quantity:d}} × {{process.blank_length_in:.2f}} in blanks."
-note = "Inches unless mm. Finished length {{cad.length_min_in:.3f}}–{{cad.length_max_in:.3f}}; 1/2 and 1 in faces as bought. Both pieces in the vise together, one at each jaw end; each op on both before the next tool. End mill in the low belt range, drills in the high range."
+note = "Inches unless mm. Finished length {{cad.length_min_in:.3f}}–{{cad.length_max_in:.3f}}; 1/2 and 1 in faces as bought. Both pieces in the vise together, one at each jaw end; each op on both before the next tool. All spindle work in the high belt range."
 shop = "../shop.toml"
 material_key = "6061-t6511"
 
@@ -144,7 +145,7 @@ instruction = "Cutter .04 below parts. Clean up both outboard ends, .02 X steps,
 instruction_detailed = "Touch the cutter on a part top, then down .54 (cutter .04 below the parts). Clean up both outboard ends, .02 X steps, ≤ half the allowance, conventional cuts: left end with the table moving away from you (cutter toward you), right end with the table moving toward you. Steady feed. Mark INNER END on each."
 settings = "jig-em-half-6061-t6511"
 milling_cuts = [
-  { name = "outboard end clean-up", kind = "side", phase = "finish", material = "aluminum_6061", cutter_dia_mm = "{{process.cutter_dia_mm}}", flutes = 2, axial_doc_mm = "{{cad.blank_thickness_mm}}", radial_woc_mm = 0.508, rpm = 1250, feed_mm_min = 76.2, stations_mm = 0 },
+  { name = "outboard end clean-up", kind = "side", phase = "finish", material = "aluminum_6061", cutter_dia_mm = "{{process.cutter_dia_mm}}", flutes = 2, axial_doc_mm = "{{cad.blank_thickness_mm}}", radial_woc_mm = 0.508, rpm = 1800, feed_mm_min = 177.8, stations_mm = 0 },
 ]
 
 [[setups.operations]]
@@ -157,7 +158,7 @@ settings = "jig-em-half-6061-t6511"
 inspection = "Length {{cad.length_min_in:.3f}}–{{cad.length_max_in:.3f}}."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.length_band_mm}}" }]
 milling_cuts = [
-  { name = "raw end to length", kind = "side", phase = "finish", material = "aluminum_6061", cutter_dia_mm = "{{process.cutter_dia_mm}}", flutes = 2, axial_doc_mm = "{{cad.blank_thickness_mm}}", radial_woc_mm = 0.508, rpm = 1250, feed_mm_min = 76.2, stations_mm = 0 },
+  { name = "raw end to length", kind = "side", phase = "finish", material = "aluminum_6061", cutter_dia_mm = "{{process.cutter_dia_mm}}", flutes = 2, axial_doc_mm = "{{cad.blank_thickness_mm}}", radial_woc_mm = 0.508, rpm = 1800, feed_mm_min = 177.8, stations_mm = 0 },
 ]
 
 [[setups.operations]]

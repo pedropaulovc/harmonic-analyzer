@@ -257,8 +257,9 @@ What the 0.10 port and the 2026-11-13 v49 reassessment changed on the sheets:
   from the physical tip, as the drawing measures the tip marks, in the low
   half of the tip windows) so the two bottoming taps never meet: prechips
   refuses a flag that, ± `tap_flag_tol_in`, leaves its window, or a pair whose
-  deepest tips reach the minimum width. The end mill runs at the hand sheets'
-  shared setting (`jig-em-half-6061-t6511`, low belt range), and the final
+  deepest tips reach the minimum width. The end mill runs at `jig-em-half-6061-t6511`
+  (owner ruling 2026-11-16: the 2026-11-05 logbook's 1800 rpm, 7 in/min, high
+  belt range), and the final
   inspection calipers the as-bought section; Setup 4 lines up on the drilled holes instead of
   re-finding datums. The final screw check runs a flagged screw only to its
   own face's full-thread depth, never on into the opposite face's thread.
@@ -271,7 +272,7 @@ What the 0.10 port and the 2026-11-13 v49 reassessment changed on the sheets:
   process note says ("saw and face to length"): ZERO END in the hole setup,
   then the grip end to length in the hand sheet's slid-left hold, with its
   length and ±1° squareness (two edge-finder X readings at the two edges)
-  read on the DRO. The end mill runs at the shared hand-sheet setting; the
+  read on the DRO. The end mill runs at `jig-em-half-6061-t6511` (1800 rpm, 7 in/min); the
   final inspection calipers the as-bought section and runs two 5/16-18
   screws through both holes at once.
 
