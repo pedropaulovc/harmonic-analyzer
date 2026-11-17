@@ -304,7 +304,6 @@ description = "3/8 in 82° countersink"
 # Riser Setups 3-4 (blind machinist review of the riser traveler, items S4/S5,
 # coordinator plan fix batch 2026-11-14 UTC): the 1/2 in 2-flute HSS end mill
 # at 1800 rpm = 236 ft/min; 8 in/min / (1800 x 2) = .0022 in/tooth.
-# The carriage blocks (TL-22, TL-32) face at this setting too.
 [settings.riser-em-half-6061-t6511]
 tool = "jig-em-half"
 material = "6061-t6511"
@@ -313,8 +312,7 @@ feed = "8 in/min"
 
 # Source: ch_rocker_arm_tl_oblique_{pivot,feed}_block/plan.toml (MHA-CH-06-TL-22
 # and TL-32, v50). The blocks also use saw-evolution-14, jig-em-half (the LMS
-# 6784 set's 1/2 in: every facing cut, at riser-em-half-6061-t6511), jig-spot
-# and basebar-counterbore (the
+# 6784 set's 1/2 in: every facing cut), jig-spot and basebar-counterbore (the
 # set's 5/16 in end mill: the counterbores). The drills are the 115-piece index
 # sizes the sheets print (#15 .180, F .257 tap drill); the 5/16 drill pilots
 # the Ø.375 leadscrew clearance. jig-drill-f and jig-tap-5-16-18-plug are the
@@ -353,6 +351,11 @@ diameter_mm = 12.7
 # in 6061.
 [settings.block-em-half-long-6061-t6511]
 tool = "block-em-half-long"
+material = "6061-t6511"
+rpm = 1800
+feed = "8 in/min"
+[settings.block-em-half-6061-t6511]
+tool = "jig-em-half"
 material = "6061-t6511"
 rpm = 1800
 feed = "8 in/min"
