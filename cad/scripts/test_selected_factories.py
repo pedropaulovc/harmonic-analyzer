@@ -584,15 +584,15 @@ def _case_enrolled_cam_keeps_normal_loader_conversion(dodo, ordinary):
         assert _record(selected[name]) == _record(normal[name])
     task = selected[f"cam:{stem}"]
     assert task.task_dep == [f"package:features:{stem}"]
-    # The runtime is sent to Fusion as text, so no import closure can find it.
+    # freecadcmd executes the runtime as a script, so no import closure can find it.
     assert str(_cam_programs.RUNTIME_PATH.resolve()) in task.file_dep
     assert str(_cam_programs.recipe_path(stem).resolve()) in task.file_dep
     programs = [f"{name}.nc" for name, _ops in _cam_programs.load_recipe(stem).PROGRAMS]
-    assert [Path(target).name for target in task.targets] == [f"cam-{stem}.ok", *programs, "manifest.json"]
+    assert [Path(target).name for target in task.targets] == [f"cam-{stem}.ok", *programs, "cycle_times.json", "manifest.json"]
     owners = dodo.canonical_target_owners()
     for target in task.targets:
         assert owners[_path_identity(_workspace_path(REPO_ROOT, target))] == f"cam:{stem}"
-    # Fusion is a local desktop seat: neither build nor release may require it.
+    # FreeCAD is a local desktop install: neither build nor release may require it.
     for name in ("build", "release"):
         assert not any(dep.startswith("cam") for dep in ordinary.tasks[name].task_dep), name
 

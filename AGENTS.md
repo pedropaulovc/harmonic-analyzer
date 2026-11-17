@@ -446,7 +446,7 @@ such build:
 | `check:verify_telemetry` | **no** | no (opt-in — NOT in build/release) | no |
 | `check:machinist_review:<stem>` (one cached aggregate per drawing; opt-in enforcement) | **no** | no (parallel) | no (submitter-only) |
 | `prechips:<stem>` (enrolled process travelers; in `build` and `release`, NOT in `build_bare`) | **no** (latest PyPI prechips via `uv tool run`; headless Edge/Chrome prints the hobby PDF) | no (parallel; needs its own scoped `features.toml`) | no (submitter-only) |
-| `cam:<stem>` (enrolled NC programs; opt-in — NOT in build/release) | **no** (needs a running Autodesk Fusion with its MCP server enabled) | no (needs its own scoped `features.toml`) | no (submitter-only; no worker has Fusion) |
+| `cam:<stem>` (enrolled NC programs; opt-in — NOT in build/release) | **no** (needs FreeCAD 1.1+: `$HARMONIC_FREECAD` or a discovered `freecadcmd`) | no (needs its own scoped `features.toml`) | no (submitter-only; no worker has FreeCAD) |
 | `check:features_bound` | **no** | no (release only; validates scoped face refs and identical full STEP copy) | no |
 | `gallery` | **no** (Blender + GPU) | no | no (submitter-only; no worker has Blender) |
 | `cache_status` | **no** | no (diagnostic) | no |
@@ -550,20 +550,21 @@ A generated traveler is not machining approval.
 See [feature exports and travelers](cad/docs/pipeline/features-travelers.md).
 
 Each part in `_cam_programs.CAM_STEMS` (the oblique-trammel base bar) has an
-opt-in `cam:<stem>` task, run by `cad/scripts/fusion_cam.py`. Its recipe,
+opt-in `cam:<stem>` task, run by `cad/scripts/cam_nc.py`. Its recipe,
 `cad/process/<stem>/cam.py`, derives every part dimension, cut step, cutter
 diameter, speed and feed from the part's `features.toml`, its `plan.toml` and
 `cad/process/shop.toml`; constants that neither record carries are named in
-the recipe. The driver sends the recipe and
-`_fusion_cam_runtime.py` to a local Fusion through its MCP server
-(`http://127.0.0.1:27182/mcp`, override `HARMONIC_FUSION_MCP_URL`). Fusion
-builds the toolpaths in an unsaved document, posts one file per program with
-the library post the recipe names, and closes the document. The driver then
-checks every file against the recipe's `expectations` (`_gcode`) and writes
-`cad/out/nc/<stem>/manifest.json`. Any failed check removes every output. The
-task's file deps include the feature bundle, so a CAD change re-posts the
-programs; the Fusion version and post hash are recorded, not keyed. The
-generated NC is never committed. Like a traveler, it is not machining approval.
+the recipe. The driver writes the recipe's context to a JSON job spec and runs
+headless FreeCAD (`freecadcmd`, from `$HARMONIC_FREECAD` or the newest
+discovered `FreeCAD <version>` install; it fails loud when there is none) on
+`_freecad_cam_runtime.py`, which builds one CAM Job per program and posts it
+with FreeCAD's `grbl` post. The driver then checks every file against the
+recipe's `expectations` (`_gcode`), prints each program's cutting /
+air-at-feed / rapid minutes, and writes `cad/out/nc/<stem>/cycle_times.json`
+and `manifest.json`. Any failed check removes every output. The task's file
+deps include the feature bundle, so a CAD change re-posts the programs; the
+FreeCAD version and post hash are recorded, not keyed. The generated NC is
+never committed. Like a traveler, it is not machining approval.
 
 - `build` is the **one** fully-safe entry: every part + assembly + every gate.
   (`verify.py` has no `--suite all` anymore — `build` replaced it.) It offers the

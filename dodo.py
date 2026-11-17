@@ -23,7 +23,7 @@ Task groups (the prefix says whether SolidWorks is required):
   check:<name>       math/config/graph/nameplate/recipe gates (NO SolidWorks)
   check:machinist_review:<stem> cached blind reviews + judge (NO SolidWorks)
   prechips:<stem>    pro + hobby HTML travelers + hobby PDF, latest PyPI prechips (in build + release, not build_bare; NO SolidWorks)
-  cam:<stem>         NC programs posted by a running Autodesk Fusion via its MCP server (opt-in; NO SolidWorks)
+  cam:<stem>         NC programs posted by headless FreeCAD CAM (freecadcmd) with cycle times (opt-in; NO SolidWorks)
   export             neutral STEP/STL/glTF/scene export (COM)
   release            cut a tagged GitHub release (COM + gh; opt-in)
   build              EVERY part + assembly + EVERY gate -- the one safe entry
@@ -656,7 +656,7 @@ def _stage_name(label: str) -> str:
     if label.startswith("verify "):
         return "verify-" + label.split(None, 2)[1]
     if label.startswith("cam:"):
-        return "fusion-cam"
+        return "cam-nc"
     if label.startswith("prechips:"):
         return "prechips-traveler"
     if label.startswith(("check:machinist_review:", "review_sweep:")):
@@ -4638,8 +4638,9 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         # Shared native gear-gap authoring/status contracts use bounded fakes.
         SCRIPTS_DIR / "test_gear.py",
         SCRIPTS_DIR / "test_prechips_traveler.py",
-        # Fusion CAM: posted-G-code checks, recipe frame, Fusion script transport.
-        SCRIPTS_DIR / "test_fusion_cam.py",
+        # CAM: posted-G-code checks and cycle times, recipe frame, and one
+        # end-to-end freecadcmd post (skipped where FreeCAD is not installed).
+        SCRIPTS_DIR / "test_cam_nc.py",
         # The rocker's S7 op 97 profile windows: computed from the printed
         # zones and recorded gauge geometry, pinned into the plan's text.
         SCRIPTS_DIR / "test_ch_rocker_arm_profile_check.py",
@@ -5046,13 +5047,15 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
             # Shop-equipment contracts read the tracked shop records at runtime.
             str((REPO_ROOT / "cad" / "process" / "shop.toml").resolve()),
             str((REPO_ROOT / "cad" / "config" / "shop-equipment.toml").resolve()),
-            # test_fusion_cam loads each CAM recipe by path (importlib, outside
-            # cad/scripts) and reads its plan's milling cuts at runtime.
+            # test_cam_nc loads each CAM recipe by path (importlib, outside
+            # cad/scripts), reads its plan's milling cuts at runtime, and runs
+            # the FreeCAD-side runtime, which freecadcmd executes (no import).
             *(
                 str(path.resolve())
                 for stem in _cam_programs.CAM_STEMS
                 for path in (_cam_programs.recipe_path(stem), _cam_programs.PROCESS_ROOT / stem / "plan.toml")
             ),
+            str(_cam_programs.RUNTIME_PATH.resolve()),
             # module_deps_of only walks cad/scripts; comparison tests import
             # sibling tools (and load render_diff via importlib) outside it.
             *(
@@ -5697,14 +5700,14 @@ def _cam_task(stem: str) -> dict[str, Any]:
     label = f"cam:{stem}"
     targets = _canonical_targets(label)
     cmd = [
-        sys.executable, str(SCRIPTS_DIR / "fusion_cam.py"),
+        sys.executable, str(SCRIPTS_DIR / "cam_nc.py"),
         stem, "--out", str(CAD_OUT),
     ]
     manifest, step = bundle_paths(stem, CAD_OUT)
     return {
         "name": stem,
         # Freshness is content: a CAD change re-exports the feature bundle and
-        # re-posts every program. Fusion itself (and its library post) is not an
+        # re-posts every program. FreeCAD itself (and its post script) is not an
         # input; its version and the post's hash are recorded in manifest.json.
         "file_dep": sorted({
             str(_cam_programs.recipe_path(stem).resolve()),
@@ -5729,10 +5732,11 @@ def _cam_task(stem: str) -> dict[str, Any]:
 
 
 def task_cam():
-    """NC programs for enrolled parts, posted by a running Autodesk Fusion through
-    its local MCP server from ``cad/process/<stem>/cam.py`` and checked against
-    the part's feature bundle. Opt-in: neither ``build`` nor ``release`` runs it,
-    because no farm worker or CI runner has Fusion."""
+    """NC programs for enrolled parts, posted by headless FreeCAD CAM
+    (``freecadcmd``) from ``cad/process/<stem>/cam.py`` and checked against the
+    part's feature bundle, with each program's cycle time. Opt-in: neither
+    ``build`` nor ``release`` runs it, because no farm worker or CI runner has
+    FreeCAD."""
     import _cam_programs
 
     for stem in _cam_programs.CAM_STEMS:

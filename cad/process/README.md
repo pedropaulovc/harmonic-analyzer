@@ -348,37 +348,43 @@ A traveler that passes is not permission to machine: shop measurements,
 physical setup verification and machining approval are still required. See the
 [feature/traveler contract](../docs/pipeline/features-travelers.md).
 
-## NC programs (Fusion CAM)
+## NC programs (FreeCAD CAM)
 
 A part listed in `cad/scripts/_cam_programs.py:CAM_STEMS` also has
-`<stem>/cam.py`, a Fusion CAM recipe that turns the plan's machining setups
-into G-code. `uv run --frozen python -m doit cam:<stem>` (opt-in; not in
-`build` or `release`) needs a running Autodesk Fusion with Preferences >
-General > API > Fusion MCP Server enabled and no command dialog open. It writes
-one `.nc` per recipe program and `manifest.json` (input, post and output
-SHA-256s, Fusion version) to `cad/out/nc/<stem>/`.
+`<stem>/cam.py`, a CAM recipe that turns the plan's machining setups into
+G-code with FreeCAD's CAM workbench, run headless. `uv run --frozen python -m
+doit cam:<stem>` (opt-in; not in `build` or `release`) needs FreeCAD 1.1 or
+later: `$HARMONIC_FREECAD` names `freecadcmd`, otherwise the newest
+`FreeCAD <version>` install under the Windows program directories is used, and
+the task fails when there is none. It writes one `.nc` per recipe program,
+`cycle_times.json` and `manifest.json` (input, post and output SHA-256s,
+FreeCAD version) to `cad/out/nc/<stem>/`, and prints each program's cutting,
+air-at-feed and rapid minutes.
 
 A recipe has four parts:
 
-- `PROGRAMS`: the file names, each listing its operations. Each program uses
-  one tool, because GRBL has no tool changer and Fusion Personal refuses
-  tool-change posts.
+- `PROGRAMS`: the file names, each listing its operations. Each program is one
+  FreeCAD Job with one tool, because GRBL has no tool changer.
 - `context(features, plan, shop, step)`: a pure function. It reads every part
-  dimension from the part's `features.toml`. Blank size, cutter tip depths and
-  radial steps come from the part's `plan.toml` (`[parameters]`,
-  `milling_cuts`), and cutter diameters, speeds and feeds from `shop.toml`.
-  It also places the part in each setup's work frame. Values neither record
-  carries are recipe constants with a stated source: catalogue tool lengths
-  (Fusion's collision model only), the centre drill's geometry, the S2 strap
-  clearance and the facing plunge feed. A part dimension typed into the
-  recipe would let the NC drift from the CAD.
-- `build(ctx, rt)`: runs inside Fusion with the `_fusion_cam_runtime.py`
-  helpers.
+  dimension from the part's `features.toml`. Blank size, cutter tip depths,
+  radial steps and jack positions come from the part's `plan.toml`
+  (`[parameters]`, `milling_cuts`), and cutter diameters, speeds and feeds from
+  `shop.toml`. It also places the part in each setup's work frame and lays out
+  the pass stations and depth levels. Values neither record carries are
+  recipe constants with a stated source: the centre drill's geometry, the S2
+  strap clearance, the approach clearance, the safe height above the stock
+  and the facing plunge feed. A part dimension typed into the recipe would let
+  the NC drift from the CAD.
+- `build(ctx, rt)`: runs inside `freecadcmd` with the
+  `_freecad_cam_runtime.py` helpers (Jobs, tool controllers, Profile, MillFace
+  and Drilling operations, the `grbl` post).
 - `expectations(ctx)`: the `_gcode` checks every posted file must pass, such
-  as depths, hole centres, slot cutter-centre bounds, pass positions and
-  directions, spindle speeds, and no rapid below the stock top.
+  as depths, hole centres, slot cutter-centre envelopes and plunge corners,
+  pass positions and directions, zigzag face passes, spindle speeds, no rapid
+  below the stock top and no feed move above it. Each program's `air_feed`
+  expectation also names the stock top its cycle time is split at.
 
-Fusion produced toolpaths that looked valid while the base-bar programs were
+CAM produced toolpaths that looked valid while the base-bar programs were
 being written, yet these checks caught a spot depth measured from the
 counterbore floor, a feed height below the stock top, a slot cut from the
 outside and an oversized radial step. A failed check removes every output.
@@ -386,6 +392,22 @@ Fix the recipe, not the expectation.
 The base-bar recipe refuses to post when the manifest's rail stations are REF
 (no `station` requirement): such holes are transferred from each bar's own
 rail, and posting at the nominal would drill off the real rail.
+
+Milling speed rules (owner rulings 2026-11-16): "replace fusion with oss
+cam" moved the task from Autodesk Fusion Personal, which posted rapids at
+feed, to FreeCAD, whose posts use real G0 above the stock. The PM-30MV
+conversion has ball screws, so faces zigzag (climb on alternate passes).
+"Cut edge 1 in +X and edge 2 in −X": both edges stay conventional (the
+dechatter edge settings were measured conventional) and BB01 alternates
+between them, so no pass returns through the air. Ends, slots and holes keep
+the plan's strategy. With the rapid rate assumed at 100 in/min
+(`_gcode.RAPID_MM_MIN`, until the controller's `$110`/`$111` are read), one
+bar's nine programs fell from about 207 to 96 minutes.
+
+FreeCAD's `grbl` post expands G81/G82/G83 into G0/G1 but not G73, so the
+drilled holes peck with full retracts (G83) where the plan's text says
+chip-break pecks; FreeCAD measures each peck from the R plane, which is why
+the R plane sits just above the stock.
 
 For the base bar, S3 and S4 put X0 at ZERO END and Y0 at ZERO EDGE, against the
 back jaw. The bar lies at −Y, so drawing Y becomes −Y, and Z0 is the top face.

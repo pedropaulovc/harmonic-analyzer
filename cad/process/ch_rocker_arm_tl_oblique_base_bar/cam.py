@@ -1,17 +1,16 @@
-"""Fusion CAM recipe for MHA-CH-06-TL-20, the oblique trammel base bar (bars 1 and 2).
+"""FreeCAD CAM recipe for MHA-CH-06-TL-20, the oblique trammel base bar (bars 1 and 2).
 
-``fusion_cam.py`` loads this module on the host, calls :func:`context` with the
-part's exported ``features.toml`` and the plan/shop TOML, then sends
-:func:`build` to Fusion with that context and checks the posted G-code against
-:func:`expectations`. No part dimension is typed here: lengths, hole and slot
-positions come from the manifest; blank size, cutter tip depths and radial
-steps from ``plan.toml`` ``[parameters]`` and ``milling_cuts``; cutter
-diameters, speeds and feeds from ``shop.toml``. A CAD change reaches the
-programs through the re-exported manifest. Typed here, because neither record
-carries them: the #2 centre drill's catalogue geometry (it sets the spot
-depth), cutter flute and body lengths (used only by Fusion's holder and
-collision model, not the posted coordinates), the S2 strap clearance and the
-facing plunge feed.
+``cam_nc.py`` loads this module on the host, calls :func:`context` with the
+part's exported ``features.toml`` and the plan/shop TOML, then runs
+:func:`build` inside headless FreeCAD (``freecadcmd``) with that context and
+checks the posted G-code against :func:`expectations`. No part dimension is
+typed here: lengths, hole and slot positions come from the manifest; blank
+size, cutter tip depths, radial steps and jack positions from ``plan.toml``
+``[parameters]`` and ``milling_cuts``; cutter diameters, speeds and feeds from
+``shop.toml``. A CAD change reaches the programs through the re-exported
+manifest. Typed here, because neither record carries them: the #2 centre
+drill's catalogue geometry (it sets the spot depth), the S2 strap clearance,
+the approach clearance, the drilling R plane and the facing plunge feed.
 
 Setups follow ``plan.toml``: S2 edges on 1-2-3 blocks; S3 face (two
 clampings), square the ends and mill the slots in the vise; S4 spot, drill and
@@ -20,7 +19,22 @@ low side) at the back jaw, model Z0 face up (bar 1 C'BORE SIDE, bar 2 RAIL
 SIDE), so every through feature is shared and only the bracket programs are
 bar 1 only. Tapping, sawing and deburring stay manual.
 
-The CAM model frame is the setup WCS (G54): for S3c and S4,
+Toolpath rules (owner rulings 2026-11-16, Pedro):
+
+- "replace fusion with oss cam": FreeCAD's CAM workbench builds and posts
+  every program, with real G0 rapids above the stock.
+- Edges: "Cut edge 1 in +X and edge 2 in −X", so both stay conventional (the
+  dechatter edge settings were measured conventional) and neither returns
+  through the air: each pass on the front edge ends where the next pass on the
+  back edge starts, level by level.
+- Faces: the PM-30MV conversion has ball screws, so face passes zigzag
+  (climb on alternate passes).
+- Ends, slots, spot, drill and counterbore keep their plan strategy: ends
+  one-way conventional, slots conventional inside from the plunge corner the
+  plan names, holes plunged from the stock top.
+
+Each program is one FreeCAD Job: one setup, one tool (GRBL has no tool
+changer). The CAM model frame is the setup WCS (G54): for S3c and S4,
 ``x' = x - x0``, ``y' = -(y - y_low)``, ``z' = -(z - z_underside)``.
 """
 
@@ -31,11 +45,11 @@ import re
 from typing import Any
 
 STEM = "ch_rocker_arm_tl_oblique_base_bar"
-POST = "Grbl"  # Fusion library post description; GRBL has no tool changer anyway.
 COMMENT = "MHA-CH-06-TL-20 oblique base bar"
-# Each program holds one tool: Fusion Personal refuses to post a tool change.
+# One FreeCAD Job per program, operations in order. A key may name a list of
+# operations (the edges' interleaved passes).
 PROGRAMS: tuple[tuple[str, tuple[str, ...]], ...] = (
-    ("BB01_S2_edges_T1", ("front_edge", "back_edge")),
+    ("BB01_S2_edges_T1", ("edges",)),
     ("BB02_S3_face_side1_T2", ("face_side1",)),
     ("BB03_S3_face_side2_T2", ("face_side2",)),
     ("BB04_S3_ends_slots_T1", ("left_end", "right_end", "slot_near", "slot_far")),
@@ -52,11 +66,14 @@ CENTRE_DRILL = {"body_mm": 3 / 16 * IN, "pilot_mm": 5 / 64 * IN, "pilot_length_m
 # Strap studs and nuts stand above the bar in S2; their height is not recorded,
 # so moves between the two edges clear the stock top by this much.
 STRAP_CLEARANCE_MM = 60.0
-# Fusion spreads end roughing over the pass count it is given: ceil(trim/step) + 1
-# left the right end's first step at 0.264 where the plan allows 0.254
-# (2026-11-16). One more pass keeps every step within the plan; a pass beyond
-# the raw face cuts air.
-EXTRA_ROUGHING_STEPS = 2
+# Side and face passes start and finish with the cutter this far clear of the
+# stock, so every plunge enters air beside it, never the material.
+APPROACH_MM = 2.54
+# Plunges and drill pecks start this far above the stock top: real G0 brings
+# the tool down to it, so only this much of each plunge feeds through air.
+# FreeCAD measures each G83 peck from this R plane, so a higher one would
+# also make the first peck feed through air.
+SAFE_MM = 1.0
 
 
 def _feed_mm_min(text: str) -> float:
@@ -98,6 +115,22 @@ def _shop_tool(plan: dict[str, Any], shop: dict[str, Any], tool: str) -> dict[st
 def _setting(shop: dict[str, Any], name: str) -> tuple[float, float]:
     record = shop["settings"][name]
     return float(record["rpm"]), _feed_mm_min(record["feed"])
+
+
+def _levels(depth: float, max_step: float) -> list[float]:
+    """Equal depth levels from the stock top (Z0) down to ``-depth``, as few as
+    keep each no deeper than ``max_step``."""
+    n = math.ceil(depth / max_step - 1e-9)
+    return [-depth * (k + 1) / n for k in range(n)]
+
+
+def _stations(trim: float, max_step: float, finish: float = 0.0) -> list[float]:
+    """Cutter offsets beyond the final position, raw face inward: equal steps of
+    at most ``max_step`` from ``trim`` (the raw face) to ``finish``, then, when
+    ``finish`` is set, the finishing pass at 0. No pass cuts air."""
+    n = math.ceil((trim - finish) / max_step - 1e-9)
+    rough = [finish + (trim - finish) * (n - k) / n for k in range(1, n + 1)]
+    return [*rough, 0.0] if finish else rough
 
 
 def context(features: dict[str, Any], plan: dict[str, Any], shop: dict[str, Any], step_path: str) -> dict[str, Any]:
@@ -154,19 +187,33 @@ def context(features: dict[str, Any], plan: dict[str, Any], shop: dict[str, Any]
     left_step = _cut(plan, "left end to ZERO END")["radial_woc_mm"]
     right_step = _cut(plan, "right end to length")["radial_woc_mm"]
     face_stepover = _cut(plan, "side 1 face")["radial_woc_mm"]
+    # Equal slot depth steps, none deeper than the plan's. FreeCAD steps down by
+    # a fixed amount, so the equal step is rounded up at 1 µm: the last step
+    # then lands on the final depth instead of adding a sliver level.
+    slot_depth = thick + p["slot_breakthrough_in"] * IN
+    slot_count = math.ceil(slot_depth / (p["slot_step_in"] * IN) - 1e-9)
+    slot_step = math.ceil(slot_depth / slot_count * 1e6) / 1e6
+
+    # Each slot depth step starts with a plunge at the cutter-centre corner
+    # nearest that slot's jack (largest X, plan S3): the jacks carry the push.
+    jacks = [(p[f"jack_{side}_x_in"] * IN, p[f"jack_{side}_y_in"] * IN) for side in ("left", "right")]
 
     def slot_geometry(slot):
         separation = sum(slot["separation"]) / 2
         a = frame(slot["at"])
         b = frame((slot["at"][0], slot["at"][1] + separation, slot["at"][2]))
-        return {"x": a[0], "y": (min(a[1], b[1]), max(a[1], b[1])), "width": slot["width_nominal"]}
+        y = (min(a[1], b[1]), max(a[1], b[1]))
+        jack = min(jacks, key=lambda j: abs(j[0] - a[0]))
+        e = (slot["width_nominal"] - em_half) / 2  # cutter-centre offset inside the slot
+        return {"x": a[0], "y": y, "width": slot["width_nominal"],
+                "plunge": [a[0] + e, min(y, key=lambda v: abs(v - jack[1]))]}
 
     def holes(items):
         return [list(frame(v["at"])[:2]) for v in items]
 
     cbore = counterbores[0]
     return {
-        "stem": STEM, "step": step_path, "post": POST, "comment": COMMENT,
+        "stem": STEM, "step": step_path, "comment": COMMENT,
         "model": {"origin": [x0, y_low, z_under], "axes": [[1, 0, 0], [0, -1, 0], [0, 0, -1]]},
         "length": length, "width": width, "thick": thick, "side1": side1,
         "blank": list(blank), "x_trim": x_trim, "y_trim": y_trim,
@@ -175,15 +222,16 @@ def context(features: dict[str, Any], plan: dict[str, Any], shop: dict[str, Any]
             "rail_drill": rail_drill, "bracket_drill": bracket_drill, "centre_drill": CENTRE_DRILL,
         },
         "edge": {"rpm": edge_rpm, "feed": edge_feed, "plunge": slot_plunge, "step": edge_step, "finish": edge_finish,
-                 "steps": math.ceil((y_trim - edge_finish) / edge_step) + 1, "tip": p["edge_cut_tip_z_mm"],
-                 "stepdown": p["side_max_stepdown_mm"]},
+                 "tip": p["edge_cut_tip_z_mm"], "stepdown": p["side_max_stepdown_mm"],
+                 "offsets": _stations(y_trim, edge_step, edge_finish),
+                 "levels": _levels(blank[2] - p["edge_cut_tip_z_mm"], p["side_max_stepdown_mm"])},
         "face": {"rpm": face_rpm, "feed": face_feed, "stepover": face_stepover},
         "ends": {"rpm": end_rpm, "feed": end_feed, "plunge": slot_plunge, "tip": p["end_cut_tip_z_mm"],
-                 "stepdown": p["side_max_stepdown_mm"],
-                 "left_step": left_step, "left_steps": math.ceil(x_trim / left_step) + EXTRA_ROUGHING_STEPS,
-                 "right_step": right_step, "right_steps": math.ceil(x_trim / right_step) + EXTRA_ROUGHING_STEPS},
+                 "stepdown": p["side_max_stepdown_mm"], "left_step": left_step, "right_step": right_step,
+                 "left": _stations(x_trim, left_step), "right": _stations(x_trim, right_step),
+                 "levels": _levels(thick - p["end_cut_tip_z_mm"], p["side_max_stepdown_mm"])},
         "slots": {"rpm": slot_rpm, "feed": slot_feed, "plunge": slot_plunge,
-                  "step": p["slot_step_in"] * IN, "breakthrough": p["slot_breakthrough_in"] * IN,
+                  "step": slot_step, "breakthrough": p["slot_breakthrough_in"] * IN,
                   "items": [slot_geometry(s) for s in slots]},
         "spot": {"rpm": spot_rpm, "feed": spot_feed, "depth": spot_depth},
         "rail": {"rpm": rail_rpm, "feed": rail_feed, "dia": rail[0]["nominal_dia"], "centres": holes(rail)},
@@ -203,6 +251,9 @@ def expectations(ctx: dict[str, Any]) -> list[tuple[str, str, dict[str, Any]]]:
         ("BB01_S2_edges_T1", "spindle", {"rpm": edge["rpm"]}),
         ("BB01_S2_edges_T1", "depth", {"z_min": -bt + edge["tip"]}),
         ("BB01_S2_edges_T1", "rapids_clear", {"z_top": 0.0}),
+        ("BB01_S2_edges_T1", "air_feed", {"z_top": 0.0}),
+        # Owner ruling 2026-11-16: edge 1 +X, edge 2 -X, so no pass returns.
+        ("BB01_S2_edges_T1", "no_return", {"axis": "X", "span": L / 2}),
         # Front edge becomes ZERO EDGE: conventional, cutter +X (plan S2).
         ("BB01_S2_edges_T1", "side_passes", {"axis": "Y", "final": -r, "raw": -ctx["y_trim"] - r,
                                               "max_step": edge["step"], "finish": edge["finish"], "direction": 1.0,
@@ -213,13 +264,20 @@ def expectations(ctx: dict[str, Any]) -> list[tuple[str, str, dict[str, Any]]]:
         ("BB02_S3_face_side1_T2", "spindle", {"rpm": ctx["face"]["rpm"]}),
         ("BB02_S3_face_side1_T2", "depth", {"z_min": ctx["side1"]}),
         ("BB02_S3_face_side1_T2", "rapids_clear", {"z_top": bt}),
+        ("BB02_S3_face_side1_T2", "air_feed", {"z_top": bt}),
+        ("BB02_S3_face_side1_T2", "face_passes", {"z": ctx["side1"], "y": (-W, 0.0), "max_stepover": ctx["face"]["stepover"],
+                                                   "radius": ctx["tools"]["em_face"] / 2, "span": L / 2}),
         ("BB03_S3_face_side2_T2", "spindle", {"rpm": ctx["face"]["rpm"]}),
         ("BB03_S3_face_side2_T2", "depth", {"z_min": T}),
         ("BB03_S3_face_side2_T2", "rapids_clear", {"z_top": ctx["side1"]}),
+        ("BB03_S3_face_side2_T2", "air_feed", {"z_top": ctx["side1"]}),
+        ("BB03_S3_face_side2_T2", "face_passes", {"z": T, "y": (-W, 0.0), "max_stepover": ctx["face"]["stepover"],
+                                                   "radius": ctx["tools"]["em_face"] / 2, "span": L / 2}),
         # One hand-set spindle speed per program: the ends and slots share it.
         ("BB04_S3_ends_slots_T1", "spindle", {"rpm": ends["rpm"]}),
         ("BB04_S3_ends_slots_T1", "depth", {"z_min": -T + ends["tip"]}),
         ("BB04_S3_ends_slots_T1", "rapids_clear", {"z_top": 0.0}),
+        ("BB04_S3_ends_slots_T1", "air_feed", {"z_top": 0.0}),
         # Left end becomes ZERO END, cutter -Y; right end to length, cutter +Y.
         ("BB04_S3_ends_slots_T1", "side_passes", {"axis": "X", "final": -r, "raw": -ctx["x_trim"] - r,
                                                    "max_step": ends["left_step"], "direction": -1.0,
@@ -229,11 +287,13 @@ def expectations(ctx: dict[str, Any]) -> list[tuple[str, str, dict[str, Any]]]:
                                                    "span": W / 2, "below_z": 0.0, "max_stepdown": ends["stepdown"]}),
     ]
     for slot in slots["items"]:
-        e = (slot["width"] - 2 * r) / 2  # cutter-centre offset inside the slot
+        # Cutter-centre envelope inside the slot: the arc-centre line widened by
+        # e each side, its ends rounded by e about the arc centres.
+        e = (slot["width"] - 2 * r) / 2
         out.append(("BB04_S3_ends_slots_T1", "bounds", {
             "window": ((slot["x"] - 3 * r, slot["x"] + 3 * r), (slot["y"][0] - 3 * r, slot["y"][1] + 3 * r)),
-            "x": (slot["x"] - e, slot["x"] + e), "y": slot["y"],
-            "z_min": -T - slots["breakthrough"], "arc": "G2",
+            "x": (slot["x"] - e, slot["x"] + e), "y": (slot["y"][0] - e, slot["y"][1] + e),
+            "z_min": -T - slots["breakthrough"], "arc": "G2", "entry": tuple(slot["plunge"]),
         }))
     rail, bracket = ctx["rail"]["centres"], ctx["bracket"]["centres"]
     through = -T + ctx["drill_tip"]
@@ -249,111 +309,96 @@ def expectations(ctx: dict[str, Any]) -> list[tuple[str, str, dict[str, Any]]]:
             (program, "holes", {"centres": [tuple(c) for c in centres], "z_bottom": z}),
             (program, "rapids_clear", {"z_top": 0.0, "open_holes": [tuple(c) for c in centres]}),
             (program, "vertical_below_top", {"z_top": 0.0}),
+            (program, "air_feed", {"z_top": 0.0}),
         ]
     return out
 
 
 def build(ctx: dict[str, Any], rt: Any) -> dict[str, Any]:
-    """Runs inside Fusion. Returns {operation key: operation}, plus the CAM object."""
+    """Runs inside freecadcmd with ``rt`` = ``_freecad_cam_runtime``. One Job per
+    program; returns {"ops": {operation key: operation or list of operations}}."""
     L, W, T = ctx["length"], ctx["width"], ctx["thick"]
     bl, _width, bt = ctx["blank"]
     xt, yt, side1 = ctx["x_trim"], ctx["y_trim"], ctx["side1"]
-    doc, design = rt.new_design()
-    part = rt.import_step(design, ctx["step"])
-    bar = rt.in_frame(part, ctx["model"]["origin"], ctx["model"]["axes"])
-    bodies = {
-        "S2_model": rt.box((0, bl), (0, W), (-bt, 0)),
-        "S2_stock": rt.box((0, bl), (-yt, W + yt), (-bt, 0)),
-        "S3a_model": rt.box((-xt, L + xt), (-W, 0), (0, side1)),
-        "S3a_stock": rt.box((-xt, L + xt), (-W, 0), (0, bt)),
-        "S3b_model": rt.box((-xt, L + xt), (-W, 0), (0, T)),
-        "S3b_stock": rt.box((-xt, L + xt), (-W, 0), (0, side1)),
-        "S3c_model": bar,
-        "S3c_stock": rt.box((-xt, L + xt), (-W, 0), (-T, 0)),
-        "S4_model": rt.in_frame(part, ctx["model"]["origin"], ctx["model"]["axes"]),
-        "S4_stock": rt.box((0, L), (-W, 0), (-T, 0)),
-    }
-    b = {name: rt.add_body(design, name, body) for name, body in bodies.items()}
-    cam = rt.cam_product(doc)
-    s = {
-        key: rt.setup(cam, title, b[f"{key}_model"], b[f"{key}_stock"])
-        for key, title in (
-            ("S2", "S2 edges, 1-2-3 blocks + straps (X0 blank left end, Y0 finished front edge, Z0 blank top)"),
-            ("S3a", "S3 face side 1, vise (Z0 underside)"),
-            ("S3b", "S3 face side 2 after end-for-end flip (Z0 underside)"),
-            ("S3c", "S3 ends + slots, vise (X0 ZERO END, Y0 ZERO EDGE, Z0 top)"),
-            ("S4", "S4 holes, vise (X0 ZERO END, Y0 ZERO EDGE, Z0 top)"),
-        )
-    }
     tl = ctx["tools"]
     cd = tl["centre_drill"]
-    em_half = rt.tool("flat end mill", 1, "1/2 in 2FL flat end mill", {"tool_diameter": tl["em_half"], "tool_shaftDiameter": tl["em_half"], "tool_fluteLength": 25.4, "tool_shoulderLength": 25.4, "tool_bodyLength": 31.75, "tool_overallLength": 76.2}, {"tool_numberOfFlutes": "2"})
-    em_face = rt.tool("flat end mill", 2, "3/4 in 4FL flat end mill", {"tool_diameter": tl["em_face"], "tool_shaftDiameter": tl["em_face"], "tool_fluteLength": 25.4, "tool_shoulderLength": 25.4, "tool_bodyLength": 38.1, "tool_overallLength": 82.55}, {"tool_numberOfFlutes": "4"})
-    centre = rt.tool("center drill", 3, "#2 centre drill", {"tool_diameter": cd["body_mm"], "tool_tipDiameter": cd["pilot_mm"], "tool_tipLength": cd["pilot_length_mm"], "tool_fluteLength": 5.08, "tool_bodyLength": 10.16, "tool_overallLength": 47.625})
-    d_rail = rt.tool("drill", 4, "#29 drill", {"tool_diameter": tl["rail_drill"], "tool_fluteLength": 34.925, "tool_bodyLength": 40.64, "tool_overallLength": 63.5}, {"tool_tipAngle": "118"})
-    d_bracket = rt.tool("drill", 5, "#12 drill", {"tool_diameter": tl["bracket_drill"], "tool_fluteLength": 44.45, "tool_bodyLength": 50.8, "tool_overallLength": 73.025}, {"tool_tipAngle": "118"})
-    em_cbore = rt.tool("flat end mill", 6, "5/16 in 2FL flat end mill (counterbore)", {"tool_diameter": tl["cbore"], "tool_shaftDiameter": tl["cbore"], "tool_fluteLength": 19.05, "tool_shoulderLength": 19.05, "tool_bodyLength": 25.4, "tool_overallLength": 63.5}, {"tool_numberOfFlutes": "2"})
+    r = tl["em_half"] / 2
+    clear = r + APPROACH_MM  # side passes run this far past the stock's ends
+    doc = rt.document()
+    bar = rt.import_step(doc, "Bar", ctx["step"], ctx["model"]["origin"], ctx["model"]["axes"])
 
-    ops = {}
+    def half_inch(cut):
+        return rt.tool_controller(doc, "1/2 in 2FL flat end mill", 1, "endmill", tl["em_half"], cut["rpm"], cut["feed"], cut["plunge"], flutes=2)
+
+    ops: dict[str, Any] = {}
+    # S2 (X0 blank left end, Y0 finished front edge, bar at +Y, Z0 blank top).
+    # The model is the finished bar lengthened past both blank ends, so each pass
+    # plunges and leaves beside the blank. Level by level and station by
+    # station, the front edge runs +X (Direction CCW round the model) and the
+    # back edge -X: both conventional, each pass starting where the last ended.
     e = ctx["edge"]
-    for key, name, y in (("front_edge", "Front edge -> ZERO EDGE", 0.0), ("back_edge", "Back edge to width", W)):
-        op = rt.operation(s["S2"], "contour2d", em_half, name, e["rpm"], e["feed"], e["plunge"])
-        rt.chain(op, [rt.straight_edge(b["S2_model"], y=y, z=-bt)], is_open=True)
-        rt.set_params(op, {
-            "compensation": "'right'",  # conventional: cutter +X on the front edge
-            "doRoughingPasses": "true", "maximumStepover": f"{e['step']} mm", "maximumRoughingSteps": str(e["steps"]),
-            "doMultipleFinishingPasses": "true", "numberOfFinishingStepovers": "1", "finishingStepover": f"{e['finish']} mm",
-            "bottomHeight_offset": f"{e['tip']} mm", "doRamp": "false",
-            "doMultipleDepths": "true", "maximumStepdown": f"{e['stepdown']} mm", "useEvenStepdowns": "true",
-            "clearanceHeight_mode": "'from stock top'", "clearanceHeight_offset": f"{STRAP_CLEARANCE_MM} mm",
-        })
-        ops[key] = op
+    s2 = rt.job(doc, "BB01 S2 edges, 1-2-3 blocks + straps", [rt.box(doc, "S2_model", (-clear, bl + clear), (0, W), (-bt, 0))],
+                ((0, bl), (-yt, W + yt), (-bt, 0)))
+    em = half_inch(e)
+    m2 = rt.model(s2)
+    edges = (("front", rt.straight_edge(m2, y=0, z=0)), ("back", rt.straight_edge(m2, y=W, z=0)))
+    passes, top = [], 0.0
+    for level in e["levels"]:
+        for offset in e["offsets"]:
+            for side, edge in edges:
+                passes.append(rt.profile(s2, em, f"{side} edge Z{level:.3f} +{offset:.3f}", edge, "Outside", "CCW",
+                                         top, level, top - level, clearance=STRAP_CLEARANCE_MM, safe=SAFE_MM, offset=offset))
+        top = level
+    ops["edges"] = passes
+    # S3a/S3b (Z0 underside): zigzag along X. The face model runs a cutter
+    # diameter plus the approach past each blank end, so every plunge and every
+    # stepover link is clear of the stock.
     fc = ctx["face"]
-    for key, setup_key, name in (("face_side1", "S3a", "Face side 1"), ("face_side2", "S3b", "Face side 2 to thickness")):
+    run = tl["em_face"] + APPROACH_MM
+    for key, label, height, stock_top in (("face_side1", "BB02 S3 face side 1", side1, bt), ("face_side2", "BB03 S3 face side 2", T, side1)):
+        target = rt.job(doc, label, [rt.box(doc, f"{key}_model", (-xt - run, L + xt + run), (-W, 0), (0, height))],
+                        ((-xt, L + xt), (-W, 0), (0, stock_top)))
         # Face plunge at half the cutting feed: a shop habit, not a plan or shop record.
-        op = rt.operation(s[setup_key], "face", em_face, name, fc["rpm"], fc["feed"], fc["feed"] / 2)
-        rt.set_params(op, {"stepover": f"{fc['stepover']} mm", "direction": "'conventional'", "passAngle": "0 deg"})
-        ops[key] = op
-    en = ctx["ends"]
-    for key, name, x, step, steps in (
-        ("left_end", "Left end -> ZERO END", 0.0, en["left_step"], en["left_steps"]),
-        ("right_end", "Right end to length", L, en["right_step"], en["right_steps"]),
-    ):
-        op = rt.operation(s["S3c"], "contour2d", em_half, name, en["rpm"], en["feed"], en["plunge"])
-        rt.chain(op, [rt.straight_edge(b["S3c_model"], x=x, z=-T)], is_open=True)
-        rt.set_params(op, {
-            "compensation": "'right'", "doRoughingPasses": "true", "maximumStepover": f"{step} mm",
-            "maximumRoughingSteps": str(steps), "bottomHeight_offset": f"{en['tip']} mm", "doRamp": "false",
-            "doMultipleDepths": "true", "maximumStepdown": f"{en['stepdown']} mm", "useEvenStepdowns": "true",
-        })
-        ops[key] = op
-    sl = ctx["slots"]
+        tc = rt.tool_controller(doc, "3/4 in 4FL flat end mill", 2, "endmill", tl["em_face"], fc["rpm"], fc["feed"], fc["feed"] / 2, flutes=4)
+        ops[key] = rt.face(target, tc, label, rt.top_face(rt.model(target), height), stock_top, height, fc["stepover"],
+                           safe=stock_top + SAFE_MM)
+    # S3c (X0 ZERO END, Y0 ZERO EDGE, bar at -Y, Z0 top). The ends cut along a
+    # helper box as long as the bar is wide plus the approach each side; the
+    # slots follow the bar's own loops.
+    en, sl = ctx["ends"], ctx["slots"]
+    s3c = rt.job(doc, "BB04 S3 ends and slots, vise", [bar, rt.box(doc, "S3c_ends", (0, L), (-W - clear, clear), (-T, 0))],
+                 ((-xt, L + xt), (-W, 0), (-T, 0)))
+    ends_tc = half_inch(en)
+    helper = rt.model(s3c, 1)
+    for key, x, stations in (("left_end", 0.0, en["left"]), ("right_end", L, en["right"])):
+        edge = rt.straight_edge(helper, x=x, z=0)
+        stepover = stations[0] / (len(stations) - 1) if len(stations) > 1 else 0.0
+        group, top = [], 0.0
+        for level in en["levels"]:
+            group.append(rt.profile(s3c, ends_tc, f"{key} Z{level:.3f}", edge, "Outside", "CCW", top, level, top - level,
+                                    safe=SAFE_MM, passes=len(stations), stepover=stepover))
+            top = level
+        ops[key] = group
+    slot_tc = half_inch(sl)
     for key, slot in zip(("slot_near", "slot_far"), sl["items"]):
-        op = rt.operation(s["S3c"], "contour2d", em_half, f"Slot X{slot['x']:.2f}", sl["rpm"], sl["feed"], sl["plunge"])
-        loop = rt.inner_loop_at(b["S3c_model"], -T, slot["x"], sum(slot["y"]) / 2)
-        # Reverted chain + right compensation: cutter inside the slot, clockwise.
-        rt.chain(op, loop, is_open=False, reverted=True)
-        rt.set_params(op, {
-            "compensation": "'right'", "doMultipleDepths": "true", "maximumStepdown": f"{sl['step']} mm",
-            "useEvenStepdowns": "true", "bottomHeight_offset": f"{-sl['breakthrough']} mm",
-            "doRamp": "false", "doLeadIn": "false", "doLeadOut": "false",
-        })
-        ops[key] = op
-    m4 = b["S4_model"]
-    rail = rt.holes(m4, ctx["rail"]["dia"], ctx["rail"]["centres"])
-    bracket = rt.holes(m4, ctx["bracket"]["dia"], ctx["bracket"]["centres"])
-    cbores = rt.holes(m4, ctx["cbore"]["dia"], ctx["bracket"]["centres"])
-    sp = ctx["spot"]
-    spot = {"cycleType": "'drilling'", "bottomHeight_mode": "'from top'", "bottomHeight_offset": f"{-sp['depth']} mm"}
-    ops["spot_rail"] = rt.drill(s["S4"], centre, "Spot rail holes (both bars)", sp["rpm"], sp["feed"], rail, spot)
-    ops["spot_bracket"] = rt.drill(s["S4"], centre, "Spot bracket holes (bar 1)", sp["rpm"], sp["feed"], bracket, spot)
-    tip = f"{ctx['drill_tip']} mm"
-    ra, br, cb = ctx["rail"], ctx["bracket"], ctx["cbore"]
-    ops["drill_rail"] = rt.drill(s["S4"], d_rail, "Drill #29 rail holes thru (both bars)", ra["rpm"], ra["feed"], rail,
-                                 {"cycleType": "'chip-breaking'", "peckingDepth": f"{tl['rail_drill']} mm", "bottomHeight_offset": tip})
-    ops["drill_bracket"] = rt.drill(s["S4"], d_bracket, "Drill #12 bracket holes thru (bar 1)", br["rpm"], br["feed"], bracket,
-                                    {"cycleType": "'chip-breaking'", "peckingDepth": f"{tl['bracket_drill']} mm", "bottomHeight_offset": tip})
-    ops["counterbore"] = rt.drill(s["S4"], em_cbore, "Counterbore bracket holes (bar 1)", cb["rpm"], cb["feed"], cbores,
-                                  {"cycleType": "'drilling'"})
-    rt.generate(cam)
-    return {"cam": cam, "ops": ops}
+        loop = rt.inner_loop(rt.model(s3c, 0), 0.0, slot["x"], sum(slot["y"]) / 2)
+        # Inside the slot, clockwise: conventional with a clockwise spindle.
+        ops[key] = rt.profile(s3c, slot_tc, f"Slot X{slot['x']:.2f}", loop, "Inside", "CW", 0.0, -T - sl["breakthrough"],
+                              sl["step"], safe=SAFE_MM, start_point=slot["plunge"])
+    # S4 (S3c's frame): one job per program, each over the bar.
+    s4_stock = ((0, L), (-W, 0), (-T, 0))
+    sp, ra, br, cb = ctx["spot"], ctx["rail"], ctx["bracket"], ctx["cbore"]
+    through = -T + ctx["drill_tip"]
+    for key, label, tool, holes, final, peck in (
+        ("spot_rail", "BB05 S4 spot rail holes (both bars)", (3, "#2 centre drill", "drill", cd["body_mm"], sp, 60), (ra["dia"], ra["centres"]), -sp["depth"], None),
+        ("spot_bracket", "BB06 S4 spot bracket holes (bar 1)", (3, "#2 centre drill", "drill", cd["body_mm"], sp, 60), (br["dia"], br["centres"]), -sp["depth"], None),
+        ("drill_rail", "BB07 S4 drill #29 rail holes thru (both bars)", (4, "#29 drill", "drill", tl["rail_drill"], ra, 118), (ra["dia"], ra["centres"]), through, tl["rail_drill"]),
+        ("drill_bracket", "BB08 S4 drill #12 bracket holes thru (bar 1)", (5, "#12 drill", "drill", tl["bracket_drill"], br, 118), (br["dia"], br["centres"]), through, tl["bracket_drill"]),
+        ("counterbore", "BB09 S4 counterbore bracket holes (bar 1)", (6, "5/16 in 2FL flat end mill (counterbore)", "endmill", tl["cbore"], cb, None), (cb["dia"], br["centres"]), -cb["depth"], None),
+    ):
+        number, name, shape, dia, cut, tip_angle = tool
+        target = rt.job(doc, label, [bar], s4_stock)
+        tc = rt.tool_controller(doc, name, number, shape, dia, cut["rpm"], cut["feed"], cut["feed"], tip_angle=tip_angle)
+        ops[key] = rt.drill(target, tc, label, rt.holes(rt.model(target), *holes), 0.0, final, SAFE_MM, peck=peck)
+    rt.generate(doc)
+    return {"ops": ops}
