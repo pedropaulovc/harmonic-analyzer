@@ -62,7 +62,7 @@ from _supplier_screw_reference import add_supplier_reference_sketch
 from diagnostics.diag_build_91794A055 import build_91794A055, shank_end
 from diagnostics.diag_mcmaster_lib import no_sketch_inference
 
-PART_NAME = shared.PART_STEM
+PART_NAME = "sh-vn-fillister-screw-91794a055"
 SPEC = fastener(PART_NAME)
 MATERIAL = SPEC.material
 SKU = supplier.SKU
