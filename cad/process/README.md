@@ -301,7 +301,7 @@ boring head is needed; the F drill and 5/16-18 plug tap share the carrier's
 records (`jig-drill-f`, `jig-tap-5-16-18-plug`).
 
 The leadscrew kit's plan (`ch_rocker_arm_tl_vn_oblique_leadscrew_kit/plan.toml`,
-MHA-CH-06-TL-VN-84) is enrolled and needs prechips 0.11.0 (released): its
+MHA-CH-06-TL-VN-84) is enrolled and needs prechips 0.11.4 (its saw lay binds the adapter's rounded-up 1/16 in step): its
 `harmonic_leadscrew_kit` adapter binds the two-member manifest (the LeadScrew's
 cut end and five flats, the FeedNut member's faced seat, countersinks and
 receipt limits), and its `kit-*` setup pictures are prechips layouts. The route

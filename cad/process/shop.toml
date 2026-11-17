@@ -367,6 +367,12 @@ worm_ratio = 40
 direct_index_positions = 24
 plate_holes = { A = [15, 16, 17, 18, 19, 20], B = [21, 23, 27, 29, 31, 33], C = [37, 39, 41, 43, 47, 49] }
 
+# HA: the BS-0's own 5 in 3-jaw (45952b66bc inventory machines.BS-0.included,
+# chuck_3jaw_5in_inside_outside_jaws), which the kit's flats setups grip in.
+# No source gives its grip range or body size, so none is declared.
+[workholding.chuck-3jaw-5-bs0]
+kind = "chuck"
+
 # HA: fixtures.chuck-3jaw-6-d1-4, the PM-1127's standard 6 in 3-jaw (45952b66bc
 # inventory: body Ø158 x 72, #1413 placeholders). Grip range: prechips v0.10
 # examples/shop.toml workholding.chuck-3jaw-6.
