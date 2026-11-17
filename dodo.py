@@ -4779,9 +4779,10 @@ def _cam_task(stem: str) -> dict[str, Any]:
         stem, "--out", str(CAD_OUT),
     ]
     manifest, step = bundle_paths(stem, CAD_OUT)
+    runtime = str(_cam_programs.RUNTIME_PATH.resolve())
     deps = {
         str(_cam_programs.recipe_path(stem).resolve()),
-        str(_cam_programs.RUNTIME_PATH.resolve()),
+        runtime,
         str(_process_plans.plan_path(stem).resolve()),
         str(_process_plans.SHOP_PATH.resolve()),
         str(manifest.resolve()),
@@ -4793,8 +4794,9 @@ def _cam_task(stem: str) -> dict[str, Any]:
         # Freshness is content: a CAD change re-exports the feature bundle and
         # re-posts every program. FreeCAD itself (and its post script) is not an
         # input; its version and the post's hash are recorded in manifest.json,
-        # as are the recipe's and the runtime's own hashes, so their text is.
-        "file_dep": sorted({*deps, _source_text_dep(label, deps)}),
+        # as is the runtime's own hash, so the runtime's text is an input too
+        # (the recipe, outside cad/scripts, is already keyed by bytes).
+        "file_dep": sorted({*deps, _source_text_dep(label, [runtime])}),
         "task_dep": [f"package:features:{stem}"],
         "targets": targets,
         # A failed post or check must not leave a previous success's stamp; the
