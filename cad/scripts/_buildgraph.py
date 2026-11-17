@@ -1257,7 +1257,23 @@ def _direct_local_imports(path: Path) -> frozenset[str]:
     Absolute and package-relative imports are supported; site/external packages
     cannot enter the closure because no filesystem/import-system lookup occurs.
     """
-    mods = _local_modules()
+    return _resolve_imports(
+        _module_syntax(read_source(path)),
+        _module_by_path().get(_resolved(path)),
+        path.name == "__init__.py",
+        _local_modules(),
+    )
+
+
+def _resolve_imports(
+    syntax: _ModuleSyntax,
+    current_module: str | None,
+    is_package: bool,
+    mods: dict[str, Path],
+) -> frozenset[str]:
+    """The names in ``mods`` that ``syntax``'s imports execute, resolved as
+    :func:`_direct_local_imports` documents. ``current_module`` anchors
+    package-relative imports; without it they are skipped."""
     found: set[str] = set()
 
     def resolve(name: str) -> str | None:
@@ -1280,8 +1296,6 @@ def _direct_local_imports(path: Path) -> frozenset[str]:
                 found.add(parent)
             parent = parent.rpartition(".")[0]
 
-    current_module = _module_by_path().get(_resolved(path))
-    syntax = _module_syntax(read_source(path))
     for name, _asname in syntax.imports:
         add(name)
     for level, module, names in syntax.from_imports:
@@ -1290,7 +1304,7 @@ def _direct_local_imports(path: Path) -> frozenset[str]:
         elif current_module is not None:
             package = (
                 current_module.split(".")
-                if path.name == "__init__.py"
+                if is_package
                 else current_module.split(".")[:-1]
             )
             keep = len(package) - level + 1
@@ -1310,6 +1324,55 @@ def _direct_local_imports(path: Path) -> frozenset[str]:
             if name != "*":
                 add(f"{base}.{name}")
     return frozenset(found)
+
+
+def package_closure(package_dir: Path) -> tuple[Path, ...]:
+    """The files of the installed package rooted at ``package_dir`` that code
+    under :data:`SCRIPTS_DIR` can execute, sorted.
+
+    Entries are every import of the package anywhere in a ``.py`` file below
+    :data:`SCRIPTS_DIR` (tests and recipe-skip modules included, so the set is a
+    superset of what any build or check reaches); the closure then follows the
+    package's own imports, top-level or lazy, with the same resolution as
+    :func:`module_deps_of`, including package ``__init__.py`` ancestors. A
+    package file outside the closure cannot run in a build process unless code
+    imports it dynamically, and a new import edge pulls it back in. Read fresh on
+    every call: callers memoize per process.
+    """
+    if not package_dir.is_dir():
+        return ()
+    root = package_dir.parent
+    mods: dict[str, Path] = {}
+    for path in sorted(package_dir.rglob("*.py")):
+        relative = path.relative_to(root)
+        directories = relative.parts[:-1]
+        if any(
+            not (root.joinpath(*directories[:depth]) / "__init__.py").is_file()
+            for depth in range(1, len(directories) + 1)
+        ):
+            continue
+        parts = (
+            relative.parent.parts
+            if path.name == "__init__.py"
+            else relative.with_suffix("").parts
+        )
+        mods[".".join(parts)] = path
+
+    frontier: set[str] = set()
+    for path in SCRIPTS_DIR.rglob("*.py"):
+        if "__pycache__" not in path.parts:
+            frontier |= _resolve_imports(_module_syntax(read_source(path)), None, False, mods)
+    closure: set[str] = set()
+    while frontier:
+        module = frontier.pop()
+        if module in closure:
+            continue
+        closure.add(module)
+        path = mods[module]
+        frontier |= _resolve_imports(
+            _module_syntax(read_source(path)), module, path.name == "__init__.py", mods
+        ) - closure
+    return tuple(sorted(mods[module] for module in closure))
 
 
 def module_deps_of(script: Path) -> list[str]:

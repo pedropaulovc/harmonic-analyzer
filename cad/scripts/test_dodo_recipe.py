@@ -3395,6 +3395,7 @@ def _redirect_submodule(dodo, root: Path):
     controls the tree content and never writes into the real cad/out."""
     src = root / "src" / "solidworks_mcp"
     src.mkdir(parents=True, exist_ok=True)
+    (src / "__init__.py").write_text("")
     dodo.SUBMODULE_SRC = src
     dodo._SUBMODULE_DIGEST_FILE = root / ".submodule.digest"
     dodo._SUBMODULE_ASSEMBLY_DIGEST_FILE = root / ".submodule-assembly.digest"
@@ -3403,8 +3404,23 @@ def _redirect_submodule(dodo, root: Path):
     return src
 
 
+def _write_module(src: Path, rel: str, text: str) -> Path:
+    """Write ``src/rel`` and the package ``__init__.py`` files above it, so the
+    module is importable -- and reachable when cad/scripts imports it."""
+    path = src / rel
+    path.parent.mkdir(parents=True, exist_ok=True)
+    rel_dir = path.parent.relative_to(src)
+    for package in (rel_dir, *rel_dir.parents):
+        init = src / package / "__init__.py"
+        if init != path and not init.exists():
+            init.write_text("")
+    path.write_text(text)
+    return path
+
+
 def _reset_submodule_memo(dodo):
     """Force all three digests to re-read the (redirected) tree on the next call."""
+    dodo._SUBMODULE_FILES = None
     dodo._SUBMODULE_DIGEST = None
     dodo._SUBMODULE_ASSEMBLY_DIGEST = None
     dodo._SUBMODULE_PART_DIGEST = None
@@ -3421,7 +3437,7 @@ def test_com_deps_include_submodule_and_checks_do_not(tmp_path):
     the three sidecars are distinct files."""
     dodo = _load_dodo()
     src = _redirect_submodule(dodo, tmp_path)
-    (src / "adapters.py").write_text("def mate(): return 1\n")
+    _write_module(src, "adapters/__init__.py", "def mate(): return 1\n")
     full_dep = dodo._submodule_dep()
     asm_dep = dodo._submodule_assembly_dep()
     part_dep = dodo._submodule_part_dep()
@@ -3470,10 +3486,11 @@ def test_deleting_a_submodule_source_reruns_check_recipe(tmp_path):
     the gate also carries the manifest of source paths (codex #1101)."""
     dodo = _load_dodo()
     src = _redirect_submodule(dodo, tmp_path)
-    (src / "adapter.py").write_text("A = 1\n")
-    (src / "headers.py").write_text("H = 1\n")
+    _write_module(src, "adapters/__init__.py", "from . import headers\n")
+    _write_module(src, "adapters/headers.py", "H = 1\n")
 
     def recipe_is_current(saved: dict) -> tuple[bool, dict]:
+        _reset_submodule_memo(dodo)  # each graph load re-reads the tree
         task = next(t for t in dodo.task_check() if t["name"] == "recipe")
         (checker,) = task["uptodate"]
         current = checker(None, saved)
@@ -3482,7 +3499,7 @@ def test_deleting_a_submodule_source_reruns_check_recipe(tmp_path):
     _, saved = recipe_is_current({})
     assert recipe_is_current(saved)[0], "an unchanged tree must stay up to date"
 
-    (src / "headers.py").unlink()
+    (src / "adapters" / "headers.py").unlink()
     assert not recipe_is_current(saved)[0], "a deleted source must re-run the gate"
 
 
@@ -3490,10 +3507,11 @@ def test_part_relevant_submodule_change_flips_part_cache_key(tmp_path):
     """A PART-RELEVANT submodule source change -- a committed pin bump OR a dirty
     local edit -- flips every part's COM cache key; a no-op recompute leaves it stable
     (idempotent). Exercised through the REAL cache_key path (_cache_key ->
-    _artifact_cache), so it proves the fix reaches the cross-machine key."""
+    _artifact_cache), so it proves the fix reaches the cross-machine key. A new file
+    enters the key exactly when an import edge reaches it."""
     dodo = _load_dodo()
     src = _redirect_submodule(dodo, tmp_path)
-    (src / "adapters.py").write_text("def mate(): return 1\n")
+    adapters = _write_module(src, "adapters/__init__.py", "def mate(): return 1\n")
 
     stem = dodo.part_stems()[0]
     script = dodo.SCRIPTS_DIR / f"build_{stem}.py"
@@ -3505,25 +3523,31 @@ def test_part_relevant_submodule_change_flips_part_cache_key(tmp_path):
     k1 = key()
     assert key() == k1, "recompute with no change must be stable (idempotent)"
 
-    (src / "adapters.py").write_text("def mate(): return 2\n")  # dirty edit
+    adapters.write_text("def mate(): return 2\n")  # dirty edit
     k2 = key()
     assert k2 != k1, "a part-relevant submodule edit must bust the part cache key"
 
-    (src / "planes.py").write_text("PLANE = 3\n")  # new source file
+    planes = _write_module(src, "planes.py", "PLANE = 3\n")  # new, unimported
+    assert key() == k2, "a source file nothing imports must not enter the key"
+
+    adapters.write_text("def lazy():\n    from .. import planes\n")
     k3 = key()
-    assert k3 != k2, "an added part-relevant submodule source file must bust it too"
+    assert k3 != k2, "a new (even lazy) import edge must pull the file into the key"
+
+    planes.write_text("PLANE = 4\n")
+    assert key() != k3, "an edit to the newly reached file must bust the key"
 
 
 def test_assembly_only_submodule_change_spares_parts(tmp_path):
-    """The #144-followup guarantee: editing an EXCLUDED (assembly/motion/MCP-server)
-    submodule module flips the ASSEMBLY cache key but leaves the PART key untouched,
+    """The #144-followup guarantee: editing an EXCLUDED (assembly/motion) submodule
+    module flips the ASSEMBLY cache key but leaves the PART key untouched,
     so an assembly-only submodule bump no longer rebuilds the ~100 parts."""
     dodo = _load_dodo()
     src = _redirect_submodule(dodo, tmp_path)
-    (src / "adapters.py").write_text("def mate(): return 1\n")  # a part-relevant file
-    excluded = src / "adapters" / "solidworks" / "assembly.py"
-    excluded.parent.mkdir(parents=True, exist_ok=True)
-    excluded.write_text("def add_mate(): return 1\n")
+    _write_module(src, "adapters/__init__.py", "def mate(): return 1\n")  # part-relevant
+    excluded = _write_module(
+        src, "adapters/solidworks/assembly.py", "def add_mate(): return 1\n"
+    )
 
     stem = dodo.part_stems()[0]
     part_script = dodo.SCRIPTS_DIR / f"build_{stem}.py"
@@ -3547,18 +3571,16 @@ def test_assembly_only_submodule_change_spares_parts(tmp_path):
 
 def test_part_digest_excludes_assembly_level_modules():
     """Unit-level: the PART classifier drops the assembly/motion COM modules AND
-    drawing.py from the part slice while keeping the shared helpers AND the MCP-server
-    surface (codex #191: tools/server stay in the part digest), and the digest of the
-    REAL tree genuinely differs from the whole-tree digest (so it isn't a no-op)."""
+    drawing.py from the part slice while keeping the shared helpers, and the digest
+    of the REAL tree genuinely differs from the whole-closure digest (so it isn't a
+    no-op)."""
     dodo = _load_dodo()
     src = dodo.SUBMODULE_SRC
     excl = dodo._is_part_relevant_submodule_file
     assert excl(src / "adapters" / "solidworks" / "assembly.py") is False
     assert excl(src / "adapters" / "solidworks" / "motion.py") is False
     assert excl(src / "adapters" / "solidworks" / "drawing.py") is False
-    # MCP-server surface stays IN the part digest (kept, not excluded):
-    assert excl(src / "server.py") is True
-    assert excl(src / "tools" / "modeling.py") is True
+    assert excl(src / "adapters" / "pywin32_adapter.py") is True
     assert excl(src / "adapters" / "base.py") is True
     assert excl(src / "adapters" / "com_variant.py") is True
     assert dodo._submodule_part_digest() != dodo._submodule_digest(), (
@@ -3591,12 +3613,10 @@ def test_drawing_only_submodule_change_spares_parts_and_assemblies(tmp_path):
     (few) drawing tasks, never the ~100 parts or ~8 assemblies."""
     dodo = _load_dodo()
     src = _redirect_submodule(dodo, tmp_path)
-    (src / "adapters.py").write_text(
-        "def mate(): return 1\n"
-    )  # a shared, in-all-tiers file
-    drawing = src / "adapters" / "solidworks" / "drawing.py"
-    drawing.parent.mkdir(parents=True, exist_ok=True)
-    drawing.write_text("def new_view(): return 1\n")
+    _write_module(src, "adapters/__init__.py", "def mate(): return 1\n")  # in all tiers
+    drawing = _write_module(
+        src, "adapters/solidworks/drawing.py", "def new_view(): return 1\n"
+    )
 
     stem = dodo.part_stems()[0]
     part_script = dodo.SCRIPTS_DIR / f"build_{stem}.py"

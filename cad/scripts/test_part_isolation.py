@@ -29,11 +29,11 @@ geometry). drawing.py is NOT even mixed in (standalone module-level functions), 
 is not loaded by any adapter at all. This guard checks for a DIRECT import in build
 code, which is the signal that a build started actually depending on that behaviour.
 
-Scope note (codex #191): the MCP-server tree (``tools/``/``agents/``/``ui/``/
-``server*``) is NOT excluded from any digest; excluding it would rest on "not-REACHED
-through the submodule's own import graph", which this repo-local scan cannot verify.
-assembly/motion/drawing exclusions rest on "not-IMPORTED by that tier's build scripts",
-which IS checkable here.
+Scope note: every tier starts from the submodule files reachable through the import
+closure of cad/scripts' ``solidworks_mcp`` imports (``_buildgraph.package_closure``),
+so the unimported MCP-server tree is in no digest without any exclusion to guard. The
+assembly/motion/drawing exclusions rest on "not-IMPORTED by that tier's build
+scripts", which this scan checks.
 
     python cad/scripts/test_part_isolation.py     # or: pytest cad/scripts/test_part_isolation.py
 """

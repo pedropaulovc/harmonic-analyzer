@@ -135,6 +135,7 @@ from _buildgraph import (  # noqa: E402
     machine_family_files,
     tolerance_family_files,
     module_deps_of,
+    package_closure,
     part_row_files,
     part_scripts,
     part_stems,
@@ -1563,9 +1564,10 @@ def _digest_files(files: list[str]) -> str:
 # AND the remote cache key blind to a submodule bump: bumping it left every COM
 # task "up-to-date" and served stale cross-machine cache hits (issue #144).
 #
-# Fix: fold the submodule's tracked SOURCE content into every COM task's recipe via a
-# synthetic file_dep whose CONTENT is a content-hash of the src tree. Hashing the tree
-# (not just ``git rev-parse HEAD``) also catches a dirty/uncommitted submodule edit.
+# Fix: fold the submodule's SOURCE content into every COM task's recipe via a
+# synthetic file_dep whose CONTENT is a content-hash of the package files the
+# build scripts can execute (``_submodule_src_files``). Hashing content (not just
+# ``git rev-parse HEAD``) also catches a dirty/uncommitted submodule edit.
 # One synthetic dep -- instead of the ~100 source files -- keeps the per-task dep set
 # (and thus every cache-key / _digest_files fold) O(1), not a hundred md5s per COM
 # task. The dep is added ONLY in the COM dep builders (``_part_file_deps`` /
@@ -1591,16 +1593,17 @@ _SUBMODULE_PART_DIGEST: str | None = None
 _SUBMODULE_DEP_PATH: str | None = None
 _SUBMODULE_ASSEMBLY_DEP_PATH: str | None = None
 _SUBMODULE_PART_DEP_PATH: str | None = None
+_SUBMODULE_FILES: list[Path] | None = None
 
 # THREE recipe-digest tiers over the submodule tree, so a bump to a module only some
 # COM tasks reach doesn't rebuild the ones that can't. Each exclusion is proven from
 # repo-local code and ENFORCED by test_part_isolation.py (``check:partiso``), which
 # fails loud if a build script ever imports a module its tier excludes:
 #
-#   * DRAWING tasks fold the WHOLE tree (``_submodule_digest``).
-#   * ASSEMBLY/export/features recipes fold the tree MINUS ``drawing.py``
+#   * DRAWING tasks fold the WHOLE closure (``_submodule_digest``).
+#   * ASSEMBLY/export/features recipes fold the closure MINUS ``drawing.py``
 #     (``_submodule_assembly_digest``) -- see ``_ASSEMBLY_DIGEST_EXCLUDE_FILES``.
-#   * PART recipes fold the tree MINUS {assembly.py, motion.py, drawing.py}
+#   * PART recipes fold the closure MINUS {assembly.py, motion.py, drawing.py}
 #     (``_submodule_part_digest``) -- see ``_PART_DIGEST_EXCLUDE_FILES``.
 #
 # Why each file drops out of a tier:
@@ -1623,16 +1626,15 @@ _SUBMODULE_PART_DEP_PATH: str | None = None
 #     defines drawing-only state; _drawing_common sets only CENTER_MARK_OBSERVER,
 #     consulted by auto_center_marks, never by IPartDoc face naming or SaveAs3.
 #
-# CONSERVATIVE elsewhere: everything NOT named here (base, com_variant, sketch, feature,
-# sw_type_info, pywin32_adapter, factory, AND the MCP-server surface tools/agents/ui/
-# server*.py) stays in every digest -- a real shared-helper change still rebuilds parts.
-# The MCP-server surface is deliberately KEPT (codex #191): excluding it would rest on a
-# "not-REACHED through the package's own import graph" claim the repo-local guard cannot
-# verify (base.py could start importing solidworks_mcp.tools), so we accept a rare
-# over-rebuild rather than risk a stale part. drawing.py is different: its exclusion
-# rests on "not-IMPORTED by any part/assembly build script", which IS repo-local
-# checkable (check:partiso scans the transitive import closure of every part AND
-# assembly script).
+# Every tier starts from the same file set: the package files reachable through the
+# import closure of every ``solidworks_mcp`` import under cad/scripts
+# (``_buildgraph.package_closure``). The MCP server, UI, agents and the unused adapter
+# wrappers are imported by nothing a build runs, so they are in no key; a new import
+# edge -- from cad/scripts or inside the package, top-level or lazy -- pulls a file
+# back in on the next graph load, so the set needs no hand-kept allowlist. This
+# replaced hashing the whole tree (codex #191 kept the MCP surface in every digest
+# because an allowlist exclusion rested on an unverifiable not-reached claim; the
+# derived closure is that claim, recomputed from source each run).
 #
 # Tags are PACKAGE-relative (relative to ``solidworks_mcp/``), so the module name is
 # just ``solidworks_mcp.`` + the dotted tag -- ``test_part_isolation.py`` derives its
@@ -1655,12 +1657,13 @@ _PART_DIGEST_EXCLUDE_FILES = _ASSEMBLY_DIGEST_EXCLUDE_FILES | frozenset(
 
 
 def _submodule_src_files() -> list[Path]:
-    """Every ``.py`` under the submodule's ``src/solidworks_mcp`` tree (sorted).
+    """The submodule package files cad/scripts can execute (sorted), memoized.
     Empty when the submodule isn't checked out -- the digest degrades to a stable
-    empty-tree hash rather than crashing the build graph."""
-    if not SUBMODULE_SRC.is_dir():
-        return []
-    return sorted(SUBMODULE_SRC.rglob("*.py"))
+    empty-set hash rather than crashing the build graph."""
+    global _SUBMODULE_FILES
+    if _SUBMODULE_FILES is None:
+        _SUBMODULE_FILES = list(package_closure(SUBMODULE_SRC))
+    return _SUBMODULE_FILES
 
 
 def _submodule_rel_tag(f: Path) -> str | None:
@@ -1705,8 +1708,8 @@ def _digest_submodule_files(files: list[Path]) -> str:
 
 
 def _submodule_digest() -> str:
-    """Content fingerprint of the WHOLE submodule source tree (DRAWING-task digest --
-    the only tier that folds drawing.py), memoized (the tree is static within a run)."""
+    """Content fingerprint of the WHOLE executable submodule closure (DRAWING-task
+    digest -- the only tier that folds drawing.py), memoized."""
     global _SUBMODULE_DIGEST
     if _SUBMODULE_DIGEST is None:
         _SUBMODULE_DIGEST = _digest_submodule_files(_submodule_src_files())
@@ -1714,7 +1717,7 @@ def _submodule_digest() -> str:
 
 
 def _submodule_assembly_digest() -> str:
-    """Content fingerprint of the ASSEMBLY-relevant submodule files (the whole tree
+    """Content fingerprint of the ASSEMBLY-relevant submodule files (the closure
     MINUS drawing.py, which no assembly build imports), memoized. So a drawing.py edit
     leaves this digest -- and thus every assembly's recipe -- unchanged."""
     global _SUBMODULE_ASSEMBLY_DIGEST
@@ -1727,8 +1730,8 @@ def _submodule_assembly_digest() -> str:
 
 
 def _submodule_part_digest() -> str:
-    """Content fingerprint of the PART-RELEVANT submodule files only (drops the
-    assembly/motion + MCP-server modules parts never reach), memoized. So an
+    """Content fingerprint of the PART-RELEVANT submodule files only (the closure
+    minus the assembly/motion/drawing modules parts never call), memoized. So an
     assembly-only submodule bump leaves this digest -- and thus every part's recipe
     -- unchanged, instead of rebuilding all ~100 parts."""
     global _SUBMODULE_PART_DIGEST
@@ -1771,7 +1774,7 @@ def _submodule_dep() -> str:
 
 def _submodule_assembly_dep() -> str:
     """Synthetic file_dep for the assembly/neutral-export/features submodule slice
-    (whole tree MINUS drawing.py): a separate sidecar whose CONTENT is
+    (closure MINUS drawing.py): a separate sidecar whose CONTENT is
     ``_submodule_assembly_digest()``. Distinct from ``_submodule_dep`` so a drawing.py
     edit flips the drawing-task sidecar but leaves these COM consumers untouched.
     Memoized to one write-check per process."""

@@ -1494,14 +1494,17 @@ soundness gates. A subassembly table never imports a sibling's.
 
 The vendored `SolidworksMCP-python` submodule is a runtime input of every COM task,
 so its source content is folded into each task's recipe/cache key (issue #144 —
-`_submodule_digest` in `dodo.py`). But it is NOT one blob — three tiers, each dropping
-the modules that tier's build scripts never call:
+`_submodule_digest` in `dodo.py`). The hashed files are the package files reachable
+through the import closure of every `solidworks_mcp` import under `cad/scripts/`
+(`_buildgraph.package_closure`, same resolution as `module_deps_of`, lazy imports
+included). That closure is NOT one blob — three tiers, each dropping the modules that
+tier's build scripts never call:
 
-- **drawing tasks fold the WHOLE tree** (`_submodule_digest` — the only tier with
+- **drawing tasks fold the whole closure** (`_submodule_digest` — the only tier with
   `drawing.py`);
-- **assemblies, `package:features:<stem>` and full `export` fold the tree MINUS `drawing.py`**
+- **assemblies, `package:features:<stem>` and full `export` fold the closure MINUS `drawing.py`**
   (`_submodule_assembly_digest` — see `_ASSEMBLY_DIGEST_EXCLUDE_FILES`);
-- **parts fold the tree MINUS `{assembly.py, motion.py, drawing.py}`**
+- **parts fold the closure MINUS `{assembly.py, motion.py, drawing.py}`**
   (`_submodule_part_digest` — see `_PART_DIGEST_EXCLUDE_FILES`).
 
 Net: a bump touching only `assembly.py`/`motion.py` changes assembly/export-tier
@@ -1533,14 +1536,12 @@ assembly/motion/drawing module (or the main-repo `_assembly` helper), or any ass
 script imports the drawing module — each checked across the full `module_deps_of`
 closure.
 
-Only assembly/motion/drawing are excluded — **the MCP-server surface (`tools/`/`agents/`/
-`ui/`/`server*.py`) deliberately stays IN every digest** (codex #191). Excluding it would
-rest on a "not-REACHED through the submodule's own import graph" claim (a part-relevant
-module like `base.py` could start importing `solidworks_mcp.tools`), which the
-repo-local guard cannot see — so those modules are kept, accepting an over-rebuild on a
-rare MCP-tooling bump rather than risking a stale part. (drawing.py's exclusion instead
-rests on "not-IMPORTED by any part/assembly build script", which IS repo-local
-checkable.)
+The MCP-server surface (`tools/`/`agents/`/`ui/`/`server*.py`, the factory, mock,
+circuit-breaker, connection-pool and router wrappers) is in no digest because nothing
+under `cad/scripts/` reaches it, not because of an exclusion: a new import edge,
+from a build script or inside the package, pulls the file back in on the next graph
+load. Keep the package `__init__.py` files free of eager imports of that surface;
+one such line puts the whole server stack back into every COM key.
 
 ## Recipe-inert modules (`check:inert`)
 

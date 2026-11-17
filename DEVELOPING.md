@@ -1969,14 +1969,17 @@ by `_session`/`_com`/`_assembly` (session access, COM binding, mate/plane/featur
 build input, yet it is an installed package, not a repo-local `_*.py` helper, so
 `module_deps_of` never walked it (issue #144). The submodule digest helpers fold
 repo-relative-tagged source content into gitignored synthetic dependencies under
-`cad/out/reports/`. Parts exclude `assembly.py`, `motion.py` and `drawing.py`;
-assemblies exclude `drawing.py`; drawing tasks include the whole tree. A pin
+`cad/out/reports/`. The hashed files are the package files reachable through the
+import closure of every `solidworks_mcp` import under `cad/scripts/`, so the MCP
+server, UI and agents code is in no key. Parts exclude `assembly.py`, `motion.py`
+and `drawing.py`; assemblies exclude `drawing.py`; drawing tasks include the whole
+closure. A pin
 bump or dirty local edit changes only the tiers that include the affected source,
 while SolidWorks-free `check:*` tasks stay off these digests. See
 [the three-tier source rules](AGENTS.md#three-tier-submodule-digest-part-vs-assembly-vs-drawing).
 `check:recipe` (`test_dodo_recipe.py`) guards the dependency construction.
-Scoped `package:features:<stem>` and full neutral export use the assembly tier (whole
-submodule minus `drawing.py`): face naming and `SaveAs3` do not call drawing-doc
+Scoped `package:features:<stem>` and full neutral export use the assembly tier (the
+closure minus `drawing.py`): face naming and `SaveAs3` do not call drawing-doc
 helpers. This excludes only submodule drawing code, not the feature source
 key's entire main-repo draw-module closure.
 
