@@ -1234,7 +1234,10 @@ come from the model/spec, not separate text renderers.
 **Shop TOML files.** `cad/config/shop-equipment.toml` and
 `cad/process/shop.toml` are in no COM leaf's cache key, so no part, assembly or
 drawing closure may read them. Their readers (`ha_assembly_package.py`,
-`_process_plans.py`, `cam_nc.py`) run outside every COM leaf.
+`_process_plans.py`, `cam_nc.py`) run outside every COM leaf, and `check:recipe`
+fails if one joins a part, assembly, drawing, soundness, feature or export closure
+(`test_shop_file_readers_stay_outside_every_com_leaf`). A read by path from any
+other module is not caught: add the file to that leaf's deps.
 
 **Per-assembly contracts — `cad/config/assemblies/<dashed-stem>.yaml`.** Data
 that belongs to ONE assembly (its learned `flip_invert` seeds and its free-DOF
