@@ -44,3 +44,7 @@ SUPPLIER_PRECISION = {
 }
 SUPPLIER_COIL_OD_MM = stock.COIL_OD_MM
 SUPPLIER_WIRE_DIA_MM = stock.WIRE_DIA_MM
+# Supplier coil OD tolerance, +/-0.008 in: "OD Tolerance -0.008" to 0.008"",
+# https://www.mcmaster.com/9432K31/ (read live 2026-11-17 with the Scrapfly
+# CLI). The page states no free-length, maximum-length or wire tolerance.
+SUPPLIER_COIL_OD_TOLERANCE_MM = 0.008 * 25.4

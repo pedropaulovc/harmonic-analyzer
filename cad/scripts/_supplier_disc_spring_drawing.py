@@ -381,7 +381,8 @@ def supplier_disc_spring_dimensions(
                 arguments["expected_mm"],
                 label=name,
             )
-            # Supplier sizes print as untoleranced REF; the catalogue governs.
+            # Diagram sizes print as untoleranced REF; the catalogue band
+            # prints once, as the footer's spec-control acceptance limits.
             dimension = _early_bound(display.GetDimension2(0), "IDimension")
             tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
             if int(tolerance.Type) != 0:

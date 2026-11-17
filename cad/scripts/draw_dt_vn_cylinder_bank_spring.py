@@ -3,9 +3,12 @@
 The sheet prints only replacement sizes: ID, OD and free height. The strip
 thickness is not one: SKU 9714K392 defines it, and its 0.127 mm strip
 printed as a doubled hairline through the FRONT envelope (machinist review of
-4e46b502). The part keeps its strip and catalogue load-point gauge sketches
-(compressed height and deflection at 1.5 lb), which this sheet neither
-shows nor dimensions; the 0.95 mm set gap governs the installed preload.
+4e46b502). The part keeps its strip and catalogue load-point gauge sketches,
+which this sheet neither shows nor dimensions; the 0.95 mm set gap governs
+the installed preload. As a tier-2 specification-control sheet (#2886, owner
+ruling 2026-11-17) the footer prints the catalogue's ID/OD tolerances as
+acceptance limits (spec ``ID_BAND``/``OD_BAND``) and the 1.5 lb working load
+as REF; the diagram sizes stay REF.
 
 The shared disc diagram shows and dimensions all four sizes, so this sheet
 shows only the envelope and plan sketches (``SHEET_FEATURES``) and imports
@@ -50,8 +53,10 @@ from _supplier_dimensions import (
     supplier_reference_dimension,
 )
 from _supplier_spring_drawing import (
+    SPEC_CONTROL_HEADING,
     assert_supplier_configuration_value,
     build_supplier_spring_drawing,
+    disc_spring_spec_control_data,
     reacquire_supplier_dimensions,
 )
 from _supplier_spring_reference import SUPPLIER_DIAGRAM_CONFIGURATION
@@ -391,8 +396,8 @@ def _import_sizes(
 
 
 def _assert_unbanded(display: Any, field: str) -> None:
-    """Supplier sizes print as untoleranced REF: the catalogue band stays in
-    the spec for the fit math and never reaches the native dimension."""
+    """Diagram sizes print as untoleranced REF: the catalogue band prints
+    once, in the footer's acceptance limits, never on the native dimension."""
     dimension = _early_bound(display.GetDimension2(0), "IDimension")
     if int(_early_bound(dimension.Tolerance, "IDimensionTolerance").Type) != 0:
         raise RuntimeError(f"{supplier_spec.SKU} {field}: supplier REF gained a band")
@@ -459,6 +464,8 @@ def build(adapter: Any) -> dict[str, str]:
     settled_checks = []
     return build_supplier_spring_drawing(
         adapter, SPEC, item=ITEM,
+        supplier_data=disc_spring_spec_control_data(supplier_spec),
+        supplier_data_heading=SPEC_CONTROL_HEADING,
         stock_configuration=SUPPLIER_DIAGRAM_CONFIGURATION,
         prepare_views=prepare_diagrams,
         supplier_reference_features=SHEET_FEATURES,

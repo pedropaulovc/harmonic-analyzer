@@ -571,8 +571,17 @@ def check_item(item: str, *, label: str) -> str:
     return text
 
 
-def _supplier_data_lines(data: Sequence[str], *, label: str) -> tuple[str, ...]:
-    """Source operating/suitability data, not free-text fabrication dimensions."""
+SUPPLIER_DATA_HEADING = "SUPPLIER OPERATING DATA (REFERENCE):"
+
+
+def _supplier_data_lines(
+    data: Sequence[str], *, label: str, heading: str = SUPPLIER_DATA_HEADING
+) -> tuple[str, ...]:
+    """Source operating/suitability data, not free-text fabrication dimensions.
+
+    ``heading`` names what the lines are: reference data by default, or a
+    tier-2 specification-control sheet's supplier tolerances (#2886).
+    """
     if isinstance(data, str):
         raise ValueError(f"{label}: supplier_data must contain separate lines")
     lines = tuple(data)
@@ -582,12 +591,12 @@ def _supplier_data_lines(data: Sequence[str], *, label: str) -> tuple[str, ...]:
         or "\n" in line
         or "\r" in line
         or len(line) > MAX_ITEM_CHARS
-        for line in lines
+        for line in (*lines, heading)
     ):
         raise ValueError(
             f"{label}: supplier operating data must fit single footer lines"
         )
-    return ("SUPPLIER OPERATING DATA (REFERENCE):", *lines) if lines else ()
+    return (heading, *lines) if lines else ()
 
 
 def footer_top(notes: str, *, label: str, supplier_data: Sequence[str] = ()) -> float:
@@ -1453,6 +1462,7 @@ def add_purchased_footer(
     general_text: str | None = None,
     label: str,
     supplier_data: Sequence[str] = (),
+    supplier_data_heading: str = SUPPLIER_DATA_HEADING,
 ) -> list[tuple[Any, str, str, tuple[float, float, float, float]]]:
     """Notes, general line, ITEM, SUPPLIER and SKU rows, bottom-left of the sheet.
 
@@ -1464,7 +1474,9 @@ def add_purchased_footer(
     """
     item = check_item(item, label=label)
     lines = note_lines(notes, label=label)
-    data = _supplier_data_lines(supplier_data, label=label)
+    data = _supplier_data_lines(
+        supplier_data, label=label, heading=supplier_data_heading
+    )
     placed = []
     if lines:
         # The part's own requirements are drawing-local, like purchased

@@ -511,47 +511,50 @@ def test_disc_preparation_defers_capture_then_reuses_it_for_fitted_annotations(
     )
 
 
-@pytest.mark.parametrize(
-    "spec,ends,expected",
-    [
-        (
-            counter,
-            "LOOPS",
-            (
-                "FREE LENGTH INSIDE LOOPS (10.00)",
-                "MAXIMUM EXTENDED LENGTH INSIDE LOOPS (16.60)",
-                "COIL OD (Ø.500), WIRE (Ø.063)",
-            ),
-        ),
-        (
-            channel,
-            "HOOKS",
-            (
-                "FREE LENGTH INSIDE HOOKS (1.948)",
-                "MAXIMUM EXTENDED LENGTH INSIDE HOOKS (5.448)",
-                "COIL OD (Ø.25), WIRE (Ø.026)",
-            ),
-        ),
-    ],
-    ids=["1330K524", "9432K31"],
-)
-def test_extension_supplier_sizes_print_as_ref_data_at_catalogue_places(
-    spec, ends, expected
-):
-    # No gauge view draws a dimension over no spring: the catalogue sizes are
-    # parenthesized inch REF data lines beside the ITEM row.
-    lines = layout.extension_spring_data(
-        free_length_mm=spec.FREE_LENGTH_MM,
-        max_length_mm=spec.MAX_LENGTH_MM,
-        coil_od_mm=spec.SUPPLIER_COIL_OD_MM,
-        wire_dia_mm=spec.SUPPLIER_WIRE_DIA_MM,
-        precision=spec.SUPPLIER_PRECISION,
-        ends=ends,
-    )
-    assert lines == expected
+@pytest.mark.parametrize("spec", [counter, channel], ids=["1330K524", "9432K31"])
+def test_extension_supplier_precision_keys_are_the_source_dimensions(spec):
     assert set(spec.SUPPLIER_PRECISION) == {
         extension.FREE_LENGTH,
         extension.MAX_LENGTH,
         extension.COIL_OD,
         extension.WIRE_DIA,
     }
+
+
+def test_channel_spring_prints_catalogue_tolerances_as_spec_control_limits():
+    # mcmaster.com/9432K31 (read 2026-11-17): rate 1 +/-0.1 lbf/in, minimum
+    # load 0.4 +/-0.06 lb, OD .25 +/-.008; no length or wire tolerance, so
+    # those stay parenthesized REF.
+    lines = layout.extension_spring_spec_control_data(
+        free_length_mm=channel.FREE_LENGTH_MM,
+        max_length_mm=channel.MAX_LENGTH_MM,
+        coil_od_mm=channel.SUPPLIER_COIL_OD_MM,
+        coil_od_tolerance_mm=channel.SUPPLIER_COIL_OD_TOLERANCE_MM,
+        wire_dia_mm=channel.SUPPLIER_WIRE_DIA_MM,
+        rate_n_per_mm=channel.SPRING_RATE_N_PER_MM,
+        rate_tolerance_fraction=channel.SPRING_RATE_TOLERANCE_FRACTION,
+        initial_tension_n=channel.INITIAL_TENSION_N,
+        initial_tension_tolerance_n=channel.INITIAL_TENSION_TOLERANCE_N,
+        precision=channel.SUPPLIER_PRECISION,
+        ends="HOOKS",
+    )
+    assert lines == (
+        "RATE 1.00 ±.10 LBF/IN, INITIAL TENSION .40 ±.06 LBF",
+        "COIL OD Ø.250 ±.008, WIRE (Ø.026)",
+        "FREE (1.948), MAX EXTENDED (5.448) INSIDE HOOKS",
+    )
+
+
+@pytest.mark.parametrize(
+    "spec,expected",
+    [
+        (rocker, ("ID Ø.245-.275, OD Ø.347-.377", "WORKING LOAD (3 LB AT .015 HEIGHT)")),
+        (
+            cylinder,
+            ("ID Ø.375-.395, OD Ø.490-.510", "WORKING LOAD (1.5 LB AT .024 HEIGHT)"),
+        ),
+    ],
+    ids=["9714K24", "9714K392"],
+)
+def test_wave_springs_print_catalogue_id_od_limits(spec, expected):
+    assert layout.disc_spring_spec_control_data(spec) == expected
