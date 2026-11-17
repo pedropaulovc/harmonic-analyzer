@@ -36,7 +36,7 @@ SolidWorks and releases it after, so at most one COM task touches the seat at a
 time even under ``doit -n N``. Local ``check:*`` subprocesses share a separate
 host-wide CPU-worker budget; remote leaves remain concurrent. The graph carries only
 REAL dependency edges (an assembly's file_dep on its parts, verify/export on the
-built ``.SLDASM``, release on export+verify+preflight), so the DAG reads true and a
+built ``.SLDASM``, release on export+verify), so the DAG reads true and a
 COM failure no longer skips unrelated downstream COM tasks as a spine side effect.
 
 Install (this repo is a uv project -- pyproject.toml + uv.lock at the root)::
@@ -662,8 +662,6 @@ def _stage_name(label: str) -> str:
         return "check-" + label.split(None, 2)[1]
     if label.startswith("cut release") or label in ("release", "package:release"):
         return "release"
-    if label == "preflight":
-        return "preflight"
     if label == "gallery":
         return "gallery"
     if label.startswith(("export", "package:features:")):
@@ -1432,13 +1430,12 @@ def _failure_artefact_hint(log_blob: str | None) -> str:
 
 
 VERIFY_PY = (SCRIPTS_DIR / "verify.py").resolve()
-# Verify/preflight gate logic that is NOT on any assembly's build closure (so it
-# does not ride a .SLDASM digest) -> a direct file_dep of verify:/preflight tasks.
+# Verify gate logic that is NOT on any assembly's build closure (so it
+# does not ride a .SLDASM digest) -> a direct file_dep of verify: tasks.
 POSTBUILD_PY = (SCRIPTS_DIR / "_assembly_postbuild.py").resolve()
 BANK_RETENTION_PY = (SCRIPTS_DIR / "_native_bank_retention.py").resolve()
 EXPORT_PY = (SCRIPTS_DIR / "export_models.py").resolve()
 RELEASE_PY = (SCRIPTS_DIR / "cut_release.py").resolve()
-PREFLIGHT_PY = (SCRIPTS_DIR / "preflight_release.py").resolve()
 # COM half of a release: SolidWorks Pack-and-Go of the top assembly and of every
 # drawing, merged into cad/out/release/native/ (the `package:release` leaf). Split
 # out of cut_release.py so the publisher itself needs no seat.
@@ -1473,7 +1470,7 @@ _OPTIONAL_CHECK_NAMES = ("verify_telemetry", "features_bound")
 def _run_stamped(cmd: list[str], label: str, stamp: str, task: str) -> None:
     """Run a SolidWorks-free gate subprocess; on success write its stamp target.
     _run raises on non-zero, so a failed gate never writes a stamp (stays stale ->
-    re-runs). The COM gates (``verify:*``/``preflight``) do NOT come here: they are
+    re-runs). The COM gates (``verify:*``) do NOT come here: they are
     cache-keyed leaves whose stamp is written by :func:`_cached_com_action`."""
     if task.startswith("check:"):
         cmd = _local_check.command(cmd, task)
@@ -2166,7 +2163,7 @@ def _drawing_cache_outputs(stem: str) -> list[Path]:
     return [_resolved(path) for path in (*spec.outputs.values(), spec.layout_report)]
 
 
-# --- Inputs of the whole-machine COM stages (verify gates, preflight, neutral
+# --- Inputs of the whole-machine COM stages (verify gates, neutral
 # export, release packaging).
 #
 # Each is a cache-keyed COM leaf exactly like a part or an assembly, so ONE list is
@@ -2282,22 +2279,6 @@ def _kinematics_file_deps() -> list[str]:
         str((SCRIPTS_DIR / "pen_driver.py").resolve()),
         str((SCRIPTS_DIR / "truth_model.py").resolve()),
         *_config_deps(SCRIPTS_DIR / "pen_driver.py"),
-    ]
-
-
-def _preflight_file_deps() -> list[str]:
-    """Release-preflight inputs: the gear-ratios proof reopens drive-train +
-    channel (the only assemblies carrying real gear meshes)."""
-    return [
-        str(PREFLIGHT_PY),
-        str(VERIFY_PY),
-        str((SCRIPTS_DIR / "_assembly.py").resolve()),
-        str(POSTBUILD_PY),
-        *_bank_retention_file_deps(),
-        _sldasm("dt_drive_train"),
-        _assembly_execution_token("dt_drive_train"),
-        _sldasm("ch_channel"),
-        _assembly_execution_token("ch_channel"),
     ]
 
 
@@ -2554,7 +2535,7 @@ def _cached_com_action(
 ) -> None:
     """THE one way a COM subprocess runs: remote-cache probe, farm dispatch, or the
     local seat -- for every SolidWorks-touching task (parts, assemblies, drawings,
-    the verify gates, preflight, the neutral export and the release Pack-and-Go).
+    the verify gates, the neutral export and the release Pack-and-Go).
 
     A HIT always skips the COM work. A MISS under the farm executor dispatches ONE
     leaf: the worker runs this same doit task with the cache in ``rw`` mode and
@@ -5248,41 +5229,6 @@ def _refresh_gallery() -> None:
     )
 
 
-def task_preflight():
-    """Release preflight (OPT-IN): the gear-ratios proof on the reopened
-    drive-train + channel (the only assemblies carrying real gear meshes), WITHOUT
-    saving. A cache-keyed COM leaf (farm-dispatchable) that gates `release`.
-
-    NOT in `build`/`default_tasks` -- gear-ratios re-proves a property the
-    tooth-count config fixes (check:math validates it analytically), so it runs at
-    release time only. Its file_dep on the two .SLDASM orders it after them.
-    Always run, so a stale stamp can never let release skip the proof; stamps
-    `cad/out/reports/preflight.ok`.
-    """
-    deps = _preflight_file_deps()
-    stamp = str(REPORTS / "preflight.ok")
-    return {
-        "file_dep": deps,
-        "targets": _canonical_targets("preflight"),
-        "uptodate": [False],
-        "actions": [
-            (
-                _cached_com_action,
-                [
-                    "preflight",
-                    [sys.executable, str(PREFLIGHT_PY)],
-                    deps,
-                    [Path(stamp)],
-                    "preflight",
-                    stamp,
-                ],
-            )
-        ],
-        "clean": True,
-        "verbosity": 2,
-    }
-
-
 def _package_feature_task(stem: str) -> dict[str, Any]:
     deps = _feature_export_file_deps(stem)
     outputs = _feature_export_outputs(stem)
@@ -5393,7 +5339,7 @@ def task_release():
     Gated on EVERY gate via REAL task_dep edges: ``export`` (which itself pulls the
     parts/assemblies + the ``verify:*`` gates), ``gallery``, ``package:release``
     (the Pack-and-Go tree it stages), every registered ``drawing:*`` artifact,
-    ``preflight`` (gear-ratios), the ``verify:*`` suites, and every offline
+    the ``verify:*`` suites, and every offline
     ``check:*`` -- so a release cannot publish past a stale/failing gate or
     package a missing/stale drawing. It also renders every enrolled
     ``prechips:<stem>`` traveler, whose hobby PDF the bundle ships under
@@ -5406,7 +5352,6 @@ def task_release():
             "export",
             "gallery",
             "package:release",
-            "preflight",
             "check:features_bound",
             *(f"drawing:{s}" for s in _drawing_order()),
             *(f"check:machinist_review:{s}" for s, _mode in _reviewed_drawings()),
@@ -5564,8 +5509,6 @@ def _canonical_targets(name: str) -> list[str]:
         ]
     if name == "gallery":
         return [str((REPORTS / "comparison-gallery.json").resolve())]
-    if name == "preflight":
-        return [str(REPORTS / "preflight.ok")]
     raise ValueError(f"unknown canonical target definition: {name}")
 
 
@@ -5617,7 +5560,7 @@ def canonical_tasks(names: Iterable[str]) -> list[Task]:
     if len(set(requested)) != len(requested):
         raise ValueError("duplicate canonical task name")
     singletons = {
-        "export": task_export, "gallery": task_gallery, "preflight": task_preflight,
+        "export": task_export, "gallery": task_gallery,
         "release": task_release, "build": task_build, "build_bare": task_build_bare,
         "cache_status": task_cache_status,
     }
@@ -5740,7 +5683,7 @@ def canonical_target_owners(paths: Iterable[str] | None = None) -> dict[str, str
         include(f"verify:{name}")
     for name in _check_task_names():
         include(f"check:{name}")
-    for name in ("export", "gallery", "preflight", "package:release"):
+    for name in ("export", "gallery", "package:release"):
         include(name)
 
     # Potential review paths are entirely determined by loaded drawing metadata.
@@ -5829,7 +5772,6 @@ def _cache_rows() -> list[tuple[str, list[str]]]:
     for stem in ASSEMBLY_ORDER:
         rows.append((f"verify_soundness:{stem}", _soundness_file_deps(stem)))
     rows.append(("verify:kinematics", _kinematics_file_deps()))
-    rows.append(("preflight", _preflight_file_deps()))
     rows.append(("export", _export_file_deps()))
     from export_features import SUPPORTED_PARTS
 

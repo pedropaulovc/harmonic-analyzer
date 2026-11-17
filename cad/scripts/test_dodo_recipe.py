@@ -2235,7 +2235,7 @@ def test_verify_gate_logic_off_build_closure_is_a_file_dep():
     ] + [
         (f"verify_soundness:{task['name']}", task)
         for task in dodo.task_verify_soundness()
-    ] + [("preflight", dodo.task_preflight())]
+    ]
     verify_entry_seen = False
     for label, task in tasks:
         entries = set()
@@ -2912,7 +2912,6 @@ def test_com_tasks_carry_no_inter_com_task_dep():
         assert t.get("task_dep", []) == aggregated.get(t["name"], []), (
             f"verify:{t['name']} carries an unexpected task_dep"
         )
-    assert not dodo.task_preflight().get("task_dep"), "preflight has a stray task_dep"
 
 
 def test_export_is_gated_on_the_sw_verify_suites():
@@ -2930,7 +2929,6 @@ def test_release_is_gated_on_every_gate_and_staged_drawing():
     deps = set(dodo.task_release()["task_dep"])
     expected = {
         "export",
-        "preflight",
         "verify:soundness",
         "verify:kinematics",
         *(f"check:{c}" for c in dodo._CHECK_NAMES),

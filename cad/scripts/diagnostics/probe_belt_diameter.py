@@ -56,7 +56,7 @@ from _assembly import (  # noqa: E402
 # (cad/config/assemblies/pd-paper-drive.yaml), the assembly this probe mirrors.
 activate_assembly_contract("pd-paper-drive")
 from _transforms import IDENTITY, rot_z_rows  # noqa: E402
-from preflight_release import _discard_open_documents  # noqa: E402
+from _session import discard_open_documents as _discard_open_documents  # noqa: E402
 
 # Scratch layout: T12 at x -60, T24 at x +60 (free tangent span), both spinning
 # about Z. OFF the global Right Plane on purpose: a component whose Right Plane

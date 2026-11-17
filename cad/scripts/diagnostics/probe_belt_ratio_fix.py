@@ -38,7 +38,7 @@ from _session import run_build  # noqa: E402
 from _telemetry import info, success, warn  # noqa: E402
 from _assembly import angle_driver, component_transform, named_ref  # noqa: E402
 from build_kinematic_probe import _removables_by_role, _rel_z_angle_deg  # noqa: E402
-from preflight_release import _discard_open_documents  # noqa: E402
+from _session import discard_open_documents as _discard_open_documents  # noqa: E402
 
 PITCH_DIAMS_M = [0.024, 0.048]  # T12 / T24 pitch diameters
 DRIVE_DEG = 30.0

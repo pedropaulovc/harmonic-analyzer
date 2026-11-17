@@ -300,7 +300,7 @@ def _case_only_requested_closure_constructs_tasks(
     preferred = {"verify": "verify:soundness", "check": "check:math", "package": "package:features"}
     if family in preferred:
         root = preferred[family]
-    elif family in ("export", "preflight"):
+    elif family == "export":
         root = family
     else:
         root = next(name for name in ordinary.tasks if name.startswith(f"{family}:"))
@@ -498,7 +498,7 @@ def _case_target_ownership_never_builds_tasks_or_dependency_closures(dodo, monke
         "_canonical_subtask_definition", "_part_file_deps", "_assembly_file_deps",
         "_drawing_file_deps", "_soundness_file_deps", "_kinematics_file_deps",
         "_bank_retention_file_deps", "_feature_export_file_deps", "_export_file_deps",
-        "_preflight_file_deps", "_package_file_deps", "_check_spec", "_recipe_files",
+        "_package_file_deps", "_check_spec", "_recipe_files",
         "_executed_closure",
     ):
         monkeypatch.setattr(dodo, helper, forbidden)
@@ -531,7 +531,7 @@ def _case_cache_access_mode_does_not_change_factory_records(
     names = [
         next(name for name in ordinary.tasks if name.startswith(prefix))
         for prefix in ("part:", "assembly:", "drawing:", "verify_soundness:", "package:features:")
-    ] + ["verify:kinematics", "check:math", "export", "preflight"]
+    ] + ["verify:kinematics", "check:math", "export"]
     for selected in dodo.canonical_tasks(names):
         expected = dict(ordinary_records[selected.name])
         assert selected.task_dep == ordinary_definitions[selected.name].get("task_dep", [])
@@ -697,7 +697,7 @@ def _case_queried_ownership_matches_complete_normal_oracle(dodo, ordinary, targe
     assert dodo.canonical_target_owners(queries) == target_owners
     for family in (
         "part", "assembly", "drawing", "verify_soundness", "verify", "check",
-        "package", "prechips", "cam", "export", "preflight", "gallery", "build", "release",
+        "package", "prechips", "cam", "export", "gallery", "build", "release",
     ):
         selected_paths = {
             path
@@ -987,7 +987,6 @@ def test_selected_factories_portfolio(
         (_case_every_family_matches_normal_loader_after_taskcontrol, {'family': 'prechips'}),
         (_case_every_family_matches_normal_loader_after_taskcontrol, {'family': 'cam'}),
         (_case_every_family_matches_normal_loader_after_taskcontrol, {'family': 'export'}),
-        (_case_every_family_matches_normal_loader_after_taskcontrol, {'family': 'preflight'}),
         (_case_every_family_matches_normal_loader_after_taskcontrol, {'family': 'gallery'}),
         (_case_every_family_matches_normal_loader_after_taskcontrol, {'family': 'release'}),
         (_case_every_family_matches_normal_loader_after_taskcontrol, {'family': 'build'}),
@@ -1010,7 +1009,6 @@ def test_selected_factories_portfolio(
         (_case_only_requested_closure_constructs_tasks, {'family': 'check'}),
         (_case_only_requested_closure_constructs_tasks, {'family': 'package'}),
         (_case_only_requested_closure_constructs_tasks, {'family': 'export'}),
-        (_case_only_requested_closure_constructs_tasks, {'family': 'preflight'}),
         (_case_real_small_closure_constructs_only_requested_tasks, {}),
         (_case_replayed_definitions_are_deep_independent, {}),
         (_case_invalid_or_duplicate_names_fail_before_task_construction, {'names': ['not-a-task']}),

@@ -170,7 +170,7 @@ class SelectedTaskLoader(TaskLoader2):
             raise SelectedExecutionError("internal graph identity must be 64 lowercase hexadecimal characters")
         prefix, separator, _ = task_name.partition(":")
         if not _TASK_NAME.fullmatch(task_name) or not (
-            (separator and prefix in _LEAF_PREFIXES) or task_name in {"export", "preflight"}
+            (separator and prefix in _LEAF_PREFIXES) or task_name == "export"
         ):
             raise SelectedExecutionError(f"unsupported internal leaf {task_name!r}")
         try:
