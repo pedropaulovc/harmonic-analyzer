@@ -41,7 +41,7 @@ flange depth -- the 27.45 cm pad is set by the column stations, not the ch. 6
   rocker seesaw's mid-span (ch30 GT arm-end triangulation midpoint +72.5; the
   reclosed rod-pin hole 125.890 out reaches the cam centre at -52.990, rods plumb; the old
   "arbor 47.5 + 25.4 rod lever" chain died with the ch30 re-anchor).
-  Inserted at its exact authored transform and locked to the fixed base.
+  Inserted at its exact authored transform and fixed (``ground=True``).
 * top-frame x1: the green one-piece casting at mid-plane Y = 1017.9431 (side
   rails 34.2 wide / front-rear rails 38 wide x 1.437 tall, band
   y 999.6932..1036.193 = 39.358..40.795; corner bosses Ø45 rise to 1040.765),
@@ -52,16 +52,16 @@ flange depth -- the 27.45 cm pad is set by the column stations, not the ch. 6
 * frame-cross-screw x8 + gooseneck-set-screw x1: four lower and four upper
   casting-to-column retainers plus the top-frame hub fastener (3/4 in, through
   the hub boss's spot face, head standing proud), each placed at its shared
-  physical station and locked to the fixed base.
+  physical station and fixed.
 * nameplate x1: the maker's plate (book ch. 26; user ruling 2026-10-09), laid
   FLAT on the WEST (+X) end of the black deck, decorated side up and read by
   an operator west of the machine. Cosmetic; constrained at its shared
-  transform and locked to the fixed base (see fr_nameplate_spec.MOUNT_POS).
+  transform and fixed (see fr_nameplate_spec.MOUNT_POS).
 * fillister-screw x4 (2026-09-02 ch26 p.71 re-derive): the brass slotted
   round-head screws at the plate's four corners, heads seated on the
   decorated face, shanks down through the plate's #4 clearance holes into the
   base's through #4-40 taps (fr_harmonic_base_fasteners NAMEPLATE_SCREW_XZ -- the same
-  fr_nameplate_spec derivation). Same single-mate fix-all treatment.
+  fr_nameplate_spec derivation). Fixed like every rigid frame member.
 
 Hold-down: four stock 1/4-20 UNC-2A hex-head screws install from the top,
 through the support foot's 5/16 clearance drills, into through 1/4-20 UNC-2B
@@ -70,11 +70,13 @@ Z +/-.687 to machine x 2.183/3.557, z -2.375/+2.375 in (the base's shared
 SUPPORT_HOLD_DOWN_XZ contract). Each McMaster 92240A540 screw bears on the
 bottom of its exact vendor-modeled 0.277813 mm under-head washer transition,
 crosses the 6.35 mm foot, and inserts 12.422187 mm into the base receiver.
-The screws are inserted at exact authored transforms and locked to the fixed base;
-they do not constrain the support. Every rigid frame member uses this
-same single-mate strategy; transform readback remains the fail-loud placement
-tripwire. Final asserts: every component fixed or ``swFullyConstrained`` and no
-uncontracted interference.
+The screws are inserted at exact authored transforms and fixed; they do not
+constrain the support. Every rigid frame member is fixed at its authored
+transform: the frame has no operational DOF, and a lock mate to the fixed base
+would hold only the same pose (it references no part face, so a part edit can
+neither re-pose nor dangle it). Transform readback and the save-time pose
+ledger remain the fail-loud placement tripwires. Final asserts: every
+component fixed or ``swFullyConstrained`` and no uncontracted interference.
 
 The 20-channel pitch stations live in the channel subassembly.
 
@@ -121,12 +123,9 @@ from _sketch import (
 from _assembly import (
     activate_assembly_contract,
     assembly_title_properties,
-    assert_component_placed,
     assert_components_fully_defined,
     author_in_drawing_configurations,
     check_no_interference,
-    lock_mate,
-    named_ref,
     place_component,
     save_assembly_and_images,
 )
@@ -744,14 +743,14 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import InsertComponentParameters
 
     base_path = _part("fr-harmonic-base")
-    column_path = _part("fr-tube-frame")
+    _part("fr-tube-frame")  # column seed; placed via place_component below
     _part("fr-rocker-arm-support")  # placed via place_component below; assert it exists
     _part("fr-vn-lag-screw")  # support hold-down; placed via place_component below
     _part("fr-vn-frame-cross-screw")  # eight casting/column retainers
     _part("fr-vn-gooseneck-set-screw")  # west-hub set screw; placed via place_component
     _part("sh-vn-brass-fillister-screw")  # nameplate corner screws; placed via place_component
     _part("fr-vn-tube-frame-cap")  # four intact stock push-on caps
-    top_frame_path = _part("fr-top-frame")
+    _part("fr-top-frame")  # placed via place_component below
 
     check("create_assembly", await adapter.create_assembly())
     apply_package_model_units(adapter, assembly_contract(ASM_NAME).drawing_unit, label=ASM_NAME)
@@ -759,7 +758,6 @@ async def build(adapter) -> dict[str, str]:
     # Base: first insert is auto-fixed by SolidWorks.
     res = await adapter.insert_component(InsertComponentParameters(file_path=base_path))
     check("insert_component harmonic-base (auto-fixed)", res)
-    base_name = res.data["name"]
     if not res.data.get("fixed"):
         raise RuntimeError("base component was not auto-fixed")
 
@@ -768,18 +766,14 @@ async def build(adapter) -> dict[str, str]:
     # socket floor) preserves the exposed span and every upper attachment
     # station.
     column_target = [COLUMN_X, COLUMN_BOTTOM_Y, REAR_COLUMN_Z]
-    res = await adapter.insert_component(
-        InsertComponentParameters(file_path=column_path, position=column_target)
-    )
-    check(f"insert_component tube-frame @ {column_target}", res)
-    column_name = res.data["name"]
-    await lock_mate(
+    column_name = await place_component(
         adapter,
-        named_ref(f"Right Plane@{column_name}", "PLANE"),
-        named_ref(f"Right Plane@{base_name}", "PLANE"),
-        label=f"column {column_name} fixed to base",
+        "fr-tube-frame",
+        column_target,
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+        label="tube-frame column seed",
     )
-    assert_component_placed(adapter, column_name, column_target, IDENTITY)
     column_instances = await grid_component_pattern(
         adapter,
         [column_name],
@@ -813,55 +807,35 @@ async def build(adapter) -> dict[str, str]:
     # width) -> machine Z and the foot on the base top. Its origin is the casting
     # centre.
     #
-    # Inserted on-solution (a single machine-handed casting) and locked to the
-    # fixed base. Its authored transform places the physical foot on the base top.
-    support_target = [SUPPORT_X, SUPPORT_SEAT_Y, SUPPORT_Z]
-    support_name = await place_component(
+    # Inserted on-solution (a single machine-handed casting) and fixed. Its
+    # authored transform places the physical foot on the base top.
+    await place_component(
         adapter,
         "fr-rocker-arm-support",
-        support_target,
+        [SUPPORT_X, SUPPORT_SEAT_Y, SUPPORT_Z],
         SUPPORT_EULER,
         SUPPORT_ROWS,
-        ground=False,
         label="rocker-arm-support",
     )
-    await lock_mate(
-        adapter,
-        named_ref(f"Front Plane@{support_name}", "PLANE"),
-        named_ref(f"Right Plane@{base_name}", "PLANE"),
-        label="rocker-arm-support fixed to base",
-    )
-    assert_component_placed(adapter, support_name, support_target, SUPPORT_ROWS)
 
     # Hold-down: four stock 1/4-20 hex-head screws install top-down through the
     # support foot's 5/16 clearance drills into the base's through UNC-2B seats.
     # The authored support pose seats its foot exactly on the base top at the
     # derived machine stations. IDENTITY keeps each screw head above the foot,
     # its shank along -Y, and its vendor-modeled washer face on the support;
-    # there is no underside counterbore. Each ungrounded seed uses one lock mate
-    # to the fixed base; its exact transform carries physical coaxiality and head-seat
-    # position, and the readback assertion proves the mate did not move it. One
-    # real-mated seed and one native two-direction grid populate the other three
-    # holes; both spacings derive from the same foot-pattern constants as the
-    # base hole grid.
+    # there is no underside counterbore. The fixed seed's exact transform carries
+    # physical coaxiality and head-seat position. One seed and one native
+    # two-direction grid populate the other three holes; both spacings derive
+    # from the same foot-pattern constants as the base hole grid.
     bx, bz = LAG_SCREW_XZ[0]
-    screw_target = [bx, LAG_SCREW_UNDER_HEAD_Y, bz]
     screw_name = await place_component(
         adapter,
         "fr-vn-lag-screw",
-        screw_target,
+        [bx, LAG_SCREW_UNDER_HEAD_Y, bz],
         [0.0, 0.0, 0.0],
         IDENTITY,
-        ground=False,
         label=f"lag-screw hold-down ({bx:.2f}, {bz:+.2f})",
     )
-    await lock_mate(
-        adapter,
-        named_ref(f"Right Plane@{screw_name}", "PLANE"),
-        named_ref(f"Right Plane@{base_name}", "PLANE"),
-        label="lag-screw seed fixed to base",
-    )
-    assert_component_placed(adapter, screw_name, screw_target, IDENTITY)
     pattern_instances = await grid_component_pattern(
         adapter,
         [screw_name],
@@ -884,19 +858,14 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # Top-frame casting clamped around the four columns, at its insert plane.
-    target = [0.0, TOP_FRAME_MID_Y, 0.0]
-    res = await adapter.insert_component(
-        InsertComponentParameters(file_path=top_frame_path, position=target)
-    )
-    check(f"insert_component top-frame @ {target}", res)
-    name = res.data["name"]
-    await lock_mate(
+    await place_component(
         adapter,
-        named_ref(f"Right Plane@{name}", "PLANE"),
-        named_ref(f"Right Plane@{base_name}", "PLANE"),
-        label="top-frame fixed to base",
+        "fr-top-frame",
+        [0.0, TOP_FRAME_MID_Y, 0.0],
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+        label="top-frame",
     )
-    assert_component_placed(adapter, name, target, IDENTITY)
 
     # Four intact stock caps, opening at CAP_MOUTH_Y and crown toward +Y.
     # Their internal shoulders seat on the square tube ends; the top-frame
@@ -907,70 +876,44 @@ async def build(adapter) -> dict[str, str]:
         ("front west", -COLUMN_X, FRONT_COLUMN_Z),
         ("front east", COLUMN_X, FRONT_COLUMN_Z),
     ):
-        cap_target = [cx, CAP_MOUTH_Y, cz]
-        cap_name = await place_component(
+        await place_component(
             adapter,
             "fr-vn-tube-frame-cap",
-            cap_target,
+            [cx, CAP_MOUTH_Y, cz],
             [0.0, 0.0, 0.0],
             IDENTITY,
-            ground=False,
             label=f"tube-frame-cap ({tag})",
         )
-        await lock_mate(
-            adapter,
-            named_ref(f"Right Plane@{cap_name}", "PLANE"),
-            named_ref(f"Right Plane@{base_name}", "PLANE"),
-            label=f"tube-frame-cap ({tag}) fixed to base",
-        )
-        assert_component_placed(adapter, cap_name, cap_target, IDENTITY)
 
     # Maker's nameplate: flat on the WEST end of the black base deck, decorated
     # face up, centred front-back (see NAMEPLATE_POS / NAMEPLATE_ROWS).
-    # Cosmetic + rigid -> locked to the base.
-    nameplate_name = await place_component(
+    # Cosmetic + rigid -> fixed.
+    await place_component(
         adapter,
         "fr-nameplate",
         NAMEPLATE_POS,
         NAMEPLATE_EULER,
         NAMEPLATE_ROWS,
-        ground=False,
         label="nameplate",
     )
-    await lock_mate(
-        adapter,
-        named_ref(f"Top Plane@{nameplate_name}", "PLANE"),
-        named_ref(f"Right Plane@{base_name}", "PLANE"),
-        label="nameplate fixed to base",
-    )
-    assert_component_placed(adapter, nameplate_name, NAMEPLATE_POS, NAMEPLATE_ROWS)
 
     # Nameplate corner screws: one #4-40 brass fillister per corner, under-head
     # plane flush on the decorated face, shank down into the base tap (see
-    # NAMEPLATE_SCREW_* constants). Rigid fasteners -> the same single-mate
-    # fix-all treatment as the frame-side screws below.
+    # NAMEPLATE_SCREW_* constants). Rigid fasteners -> fixed, like the
+    # frame-side screws below.
     for nx, nz in NAMEPLATE_SCREW_STATIONS:
         tag = (
             f"{'rear' if nz > 0 else 'front'} "
             f"{'west' if nx > NAMEPLATE_POS[0] - NAMEPLATE_HEIGHT / 2.0 else 'east'}"
         )
-        np_target = [nx, NAMEPLATE_FRONT_Y, nz]
-        np_screw = await place_component(
+        await place_component(
             adapter,
             "sh-vn-brass-fillister-screw",
-            np_target,
+            [nx, NAMEPLATE_FRONT_Y, nz],
             NAMEPLATE_SCREW_EULER,
             NAMEPLATE_SCREW_ROWS,
-            ground=False,
             label=f"fillister-screw (nameplate {tag})",
         )
-        await lock_mate(
-            adapter,
-            named_ref(f"Right Plane@{np_screw}", "PLANE"),
-            named_ref(f"Right Plane@{base_name}", "PLANE"),
-            label=f"fillister-screw (nameplate {tag}) fixed to base",
-        )
-        assert_component_placed(adapter, np_screw, np_target, NAMEPLATE_SCREW_ROWS)
 
     # Eight stock cross screws: four at the lower base sockets and four at the
     # top-frame bosses. Each under-head plane seats on its Ø9 floor: a spotface
@@ -987,45 +930,26 @@ async def build(adapter) -> dict[str, str]:
             ("rear west", -COLUMN_X, seat_z, [90.0, 0.0, 0.0], ROT_X_POS90),
             ("rear east", COLUMN_X, seat_z, [90.0, 0.0, 0.0], ROT_X_POS90),
         ):
-            cross_target = [sx, screw_y, sz]
-            cross_screw = await place_component(
+            await place_component(
                 adapter,
                 "fr-vn-frame-cross-screw",
-                cross_target,
+                [sx, screw_y, sz],
                 s_euler,
                 s_rows,
-                ground=False,
                 label=f"frame-cross-screw ({joint} {tag})",
             )
-            await lock_mate(
-                adapter,
-                named_ref(f"Right Plane@{cross_screw}", "PLANE"),
-                named_ref(f"Right Plane@{base_name}", "PLANE"),
-                label=f"frame-cross-screw ({joint} {tag}) fixed to base",
-            )
-            assert_component_placed(adapter, cross_screw, cross_target, s_rows)
 
     # Gooseneck set screw: 1/4-20 x 3/4 square head through the hub boss's tap
     # hole along +X at the hub centreline; tip 0.21 clear of the Ø12.70 tube
-    # (see SET_SCREW_* constants). Same fix-all treatment.
-    set_target = [SET_SCREW_UNDER_HEAD_X, TOP_SCREW_Y, GOOSENECK_HUB_Z]
-    set_rows = rot_z_rows(90.0)
-    set_screw = await place_component(
+    # (see SET_SCREW_* constants). Fixed likewise.
+    await place_component(
         adapter,
         "fr-vn-gooseneck-set-screw",
-        set_target,
+        [SET_SCREW_UNDER_HEAD_X, TOP_SCREW_Y, GOOSENECK_HUB_Z],
         [0.0, 0.0, 90.0],
-        set_rows,
-        ground=False,
+        rot_z_rows(90.0),
         label="gooseneck-set-screw (west hub)",
     )
-    await lock_mate(
-        adapter,
-        named_ref(f"Front Plane@{set_screw}", "PLANE"),
-        named_ref(f"Right Plane@{base_name}", "PLANE"),
-        label="gooseneck-set-screw fixed to base",
-    )
-    assert_component_placed(adapter, set_screw, set_target, set_rows)
 
     assert_components_fully_defined(adapter)
     check_no_interference(
