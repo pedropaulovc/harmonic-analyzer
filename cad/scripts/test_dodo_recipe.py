@@ -1290,7 +1290,7 @@ def test_shared_drawing_inputs_invalidate_freshness_and_cache_keys(
             "transitive_helper": scripts / "_drawing_common.py",
             "template": next(iter(dodo.DRAWINGS_BY_NAME["pd_platen_guide"].assets)),
         }[member]
-        path.write_bytes(path.read_bytes() + b"\n# changed shared input\n")
+        path.write_bytes(path.read_bytes() + b"\nCHANGED_SHARED_INPUT = 1\n")
     after = snapshot()
     for stem in before:
         assert all(a != b for a, b in zip(before[stem], after[stem])), stem
@@ -4865,6 +4865,25 @@ def test_prechips_rejects_unexported_enrollment(monkeypatch):
     monkeypatch.setattr(_process_plans, "TRAVELER_STEMS", ("synthetic_not_exported",))
     with pytest.raises(AssertionError, match="synthetic_not_exported"):
         list(dodo.task_prechips())
+
+
+def test_comment_edit_moves_no_leaf_key(isolated_feature_keys, monkeypatch):
+    import _buildgraph
+
+    dodo, root, snapshot = isolated_feature_keys
+    scripts = root / "cad" / "scripts"
+    copies = {path.resolve(): path.stem for path in scripts.rglob("*.py")}
+    monkeypatch.setattr(_buildgraph, "_module_by_path", lambda: copies)
+    source = scripts / "_rocker_interface.py"
+    before = snapshot()
+
+    source.write_bytes(b"# shifts every declaration down a line\n" + source.read_bytes())
+    assert snapshot() == before
+
+    source.write_bytes(source.read_bytes() + b"\nRECIPE_REVISION = 2\n")
+    after = snapshot()
+    assert after["parts"] != before["parts"]
+    assert after["features"] != before["features"]
 
 
 def test_prechips_empty_enrollment_has_no_tasks(monkeypatch):

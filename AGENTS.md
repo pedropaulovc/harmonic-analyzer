@@ -1115,6 +1115,15 @@ retain that provenance rather than claiming SDK and OMP are identical harnesses.
 moving an import into a function does not narrow a recipe's cache key. Keep
 unrelated recipe data and save machinery in separate, statically imported files.
 
+Each imported file enters the key as its **syntax tree**, not its bytes
+(`_buildgraph.syntax_digest`): comments, docstrings, blank lines and layout
+re-key nothing, and any change to the program re-keys every leaf that imports
+the file. A module that names `__doc__` keeps its docstrings. Never read a
+recipe's source text, docstrings or line numbers into a saved artefact; a leaf
+whose output holds them (the `cam` manifest) lists `dodo._source_text_dep`, as
+every `check:*` gate does, and `check:machinist_review` keys its code by bytes.
+DEVELOPING.md, "How keys work".
+
 Stock fasteners declare their SKU and modeled-thread contract beside each
 `diagnostics/diag_build_<SKU>.py` callable with `_stock_recipe.stock_recipe`.
 There is no shared SKU-to-recipe registry: a production builder imports its own

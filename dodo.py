@@ -148,6 +148,8 @@ from _buildgraph import (  # noqa: E402
     shop_records_selected,
     stamps_part_properties,
     stamps_title_block_properties,
+    source_text_digest,
+    syntax_digest,
 )
 
 from machinist_review_config import (  # noqa: E402
@@ -444,12 +446,13 @@ def _canonical_file_md5(file_path: str) -> str:
 
 
 class ContentChecker(MD5Checker):
-    """MD5Checker with two churn-immunities: it digests the PARSED form of YAML
-    configs (comment-/whitespace-insensitive), and keys ``.SLDPRT``/``.SLDASM``
-    artefacts on their producing task's build-input recipe rather than SolidWorks'
-    volatile output bytes (build idempotency -- see ``_stable_artefact_digest``).
-    Text deps are Git-EOL-canonical; binary deps remain byte-identical to
-    MD5Checker."""
+    """MD5Checker with three churn-immunities: it digests the PARSED form of YAML
+    configs (comment-/whitespace-insensitive), the SYNTAX TREE of recipe code
+    (comment-, docstring- and layout-insensitive -- ``_buildgraph.syntax_digest``),
+    and keys ``.SLDPRT``/``.SLDASM`` artefacts on their producing task's
+    build-input recipe rather than SolidWorks' volatile output bytes (build
+    idempotency -- see ``_stable_artefact_digest``). Other text deps are
+    Git-EOL-canonical; binary deps remain byte-identical to MD5Checker."""
 
     @staticmethod
     def _digest(file_path: str) -> str:
@@ -466,6 +469,11 @@ class ContentChecker(MD5Checker):
             # channel stretch-spring variants) -> stock byte md5.
             recipe = _stable_artefact_digest(file_path)
             return recipe if recipe is not None else _canonical_file_md5(file_path)
+        if file_path.endswith(".py"):
+            # A task whose output holds source lines or bytes also folds the
+            # text itself: see _source_text_dep.
+            syntax = syntax_digest(Path(file_path))
+            return syntax if syntax is not None else _canonical_file_md5(file_path)
         if not file_path.endswith((".yaml", ".yml")):
             return _canonical_file_md5(file_path)
         with open(file_path, "rb") as fh:
@@ -1886,6 +1894,25 @@ def _drawing_registry_dep(stem: str, registry: Path) -> str:
     return _write_digest_sidecar(
         CAD_OUT / ".drawing-registry" / f"{stem}.digest",
         hashlib.md5(recipe.encode("utf-8")).hexdigest(),
+    )
+
+
+def _source_text_dep(label: str, deps: Iterable[str]) -> str:
+    """A sidecar digest of the TEXT of the recipe code among ``deps``.
+
+    ``ContentChecker`` folds recipe code by its syntax tree: all that a task
+    which only RUNS the code can see. A task whose result also holds the text
+    lists this sidecar beside its deps, so a comment, docstring or layout edit
+    still moves it: recorded source hashes (``cam``), tests that read sources
+    (``check:*``)."""
+    h = hashlib.md5()
+    sources = (dep for dep in set(deps) if dep.endswith(".py"))
+    for tag, dep in sorted((_rel_tag(dep), dep) for dep in sources):
+        text = source_text_digest(Path(dep))
+        if text is not None:
+            h.update(f"{tag}\0{text}\0".encode())
+    return _write_digest_sidecar(
+        CAD_OUT / ".source-text" / f"{label.replace(':', '-')}.digest", h.hexdigest()
     )
 
 
@@ -3556,7 +3583,12 @@ def _machinist_review_digest(profile: ReviewProfile):
                 return pdf_ink_digest(path)
             except PdfInkError:
                 pass
-        source = ContentChecker._digest(path)
+        # Review code keeps its byte digest: a verdict is keyed by the exact
+        # reviewer program, and this key must not move with the recipes'.
+        source = (
+            _canonical_file_md5(path) if path.endswith(".py")
+            else ContentChecker._digest(path)
+        )
         if Path(path).resolve() == config_path:
             return hashlib.sha256(f"{source}\0{effective}".encode()).hexdigest()
         return source
@@ -3864,7 +3896,10 @@ def _machinist_review_task(
     deps = _machinist_review_file_deps(stem)
     return {
         "name": f"machinist_review:{stem}",
-        "file_dep": deps,
+        # The key folds the review code by bytes (_machinist_review_digest),
+        # doit by syntax tree: the text sidecar, one for every sheet since they
+        # share the code, keeps doit's freshness agreeing with the key.
+        "file_dep": [*deps, _source_text_dep("check:machinist_review", deps)],
         # The real producer edge is the PDF file_dep. Repeating it in the
         # packaged task closure keeps a selected review's drawing admitted.
         "task_dep": [f"drawing:{stem}"],
@@ -4771,12 +4806,16 @@ def _check_task(name: str) -> dict[str, Any]:
     # (2026-09-23). The hand-listed deps above stay for what an import graph
     # cannot see: runtime-read data, scanned sources, dodo.py, and the tooling
     # modules module_deps_of excludes. test_dodo_recipe pins the invariant.
-    executed = _executed_closure(spec["cmd"])
+    # Tests read source text as well as running it (noqa markers, comments,
+    # layout), so a gate also folds the text of the recipe code among its deps.
+    deps = {
+        *spec["file_dep"],
+        *_executed_closure(spec["cmd"]),
+        str(Path(_local_check.__file__).resolve()),
+    }
     return {
         "name": name,
-        "file_dep": sorted({
-            *spec["file_dep"], *executed, str(Path(_local_check.__file__).resolve()),
-        }),
+        "file_dep": sorted({*deps, _source_text_dep(f"check:{name}", deps)}),
         "task_dep": spec.get("task_dep", []),
         "uptodate": spec.get("uptodate", []),
         "targets": _canonical_targets(f"check:{name}"),
@@ -4892,20 +4931,22 @@ def _cam_task(stem: str) -> dict[str, Any]:
         stem, "--out", str(CAD_OUT),
     ]
     manifest, step = bundle_paths(stem, CAD_OUT)
+    deps = {
+        str(_cam_programs.recipe_path(stem).resolve()),
+        str(_cam_programs.RUNTIME_PATH.resolve()),
+        str(_process_plans.plan_path(stem).resolve()),
+        str(_process_plans.SHOP_PATH.resolve()),
+        str(manifest.resolve()),
+        str(step.resolve()),
+        *_executed_closure(cmd),
+    }
     return {
         "name": stem,
         # Freshness is content: a CAD change re-exports the feature bundle and
         # re-posts every program. FreeCAD itself (and its post script) is not an
-        # input; its version and the post's hash are recorded in manifest.json.
-        "file_dep": sorted({
-            str(_cam_programs.recipe_path(stem).resolve()),
-            str(_cam_programs.RUNTIME_PATH.resolve()),
-            str(_process_plans.plan_path(stem).resolve()),
-            str(_process_plans.SHOP_PATH.resolve()),
-            str(manifest.resolve()),
-            str(step.resolve()),
-            *_executed_closure(cmd),
-        }),
+        # input; its version and the post's hash are recorded in manifest.json,
+        # as are the recipe's and the runtime's own hashes, so their text is.
+        "file_dep": sorted({*deps, _source_text_dep(label, deps)}),
         "task_dep": [f"package:features:{stem}"],
         "targets": targets,
         # A failed post or check must not leave a previous success's stamp; the

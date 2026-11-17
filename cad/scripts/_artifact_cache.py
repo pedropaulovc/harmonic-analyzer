@@ -343,7 +343,8 @@ def key_inputs(
     provenance that produced it, sorted by repo-relative path.
 
     ``digest_one(path) -> hex`` is dodo's per-file content digest
-    (``ContentChecker._digest``: raw md5 for binaries, PARSED-yaml md5 for configs),
+    (``ContentChecker._digest``: raw md5 for binaries, PARSED-yaml md5 for configs,
+    the syntax tree for recipe code),
     passed in so the cache and the doit staleness check fold each file identically
     -- a comment-only YAML edit must not change the key, exactly as it must not
     invalidate the file_dep. Each file is tagged by its REPO-RELATIVE path (not

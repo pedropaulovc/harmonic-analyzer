@@ -1408,9 +1408,34 @@ SolidWorks upgrade.
 
 Each task is keyed by a SHA-256 of its `file_dep` set, folded **exactly** like
 doit's staleness check (`ContentChecker._digest`: raw bytes for binaries,
-parsed-YAML for configs), so a cache hit and "doit up-to-date" always agree and a
-comment-only YAML edit busts neither. Paths are tagged **repo-relative**, so the
-key is identical across machines and worktrees.
+parsed-YAML for configs, the syntax tree for recipe code), so a cache hit and
+"doit up-to-date" always agree and a comment-only YAML or Python edit busts
+neither. Paths are tagged **repo-relative**, so the key is identical across
+machines and worktrees.
+
+**Recipe code is keyed by its syntax tree** (`_buildgraph.syntax_digest`):
+every module a recipe can import (`_local_modules`: the non-test Python under
+`cad/scripts`) is digested as `ast.dump` of its parsed text, without positions.
+Comments, blank lines, line breaks, quoting, number spelling and docstrings
+move no COM leaf key; any change to the program does. A module whose text
+names `__doc__` keeps its docstrings, since it can read them. Tests, the
+skipped tooling modules, files outside `cad/scripts` and the
+`SolidworksMCP-python` digest tiers keep their byte digests. The digest names
+its scheme (`SOURCE_DIGEST_SCHEME`): change what the tree keeps and bump it,
+which moves every COM leaf key once without touching the cache epoch (the
+epoch also keys every machinist review and its carry index).
+
+A build that only runs its code cannot see what the tree drops. A task whose
+result holds source text lists `dodo._source_text_dep` beside its deps, a
+`cad/out/.source-text/` digest of the text of the recipe code among them:
+`cam:<stem>` (its manifest records the runtime's hash) and every `check:*` gate
+(tests read sources). `check:machinist_review:<stem>` keys its review code by
+bytes, so no verdict moved with this. Do not make a COM recipe read its own
+source, docstrings or line numbers into a saved artefact (`inspect.getsource`,
+`obj.__doc__`, frame line numbers); if one must, give its leaf the text dep.
+The syntax tree depends on the interpreter's grammar: submitter and workers
+run the Python that `.python-version` pins, as they already had to for the
+`ast.dump`-based registry and catalog digests below.
 
 Each `key_inputs` call resolves each dependency's path tag once and reuses it
 for sorting and provenance, while digesting the original path. Equal tags retain

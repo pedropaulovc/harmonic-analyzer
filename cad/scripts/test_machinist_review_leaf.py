@@ -1190,7 +1190,7 @@ def test_effective_profile_invalidates_real_freshness_and_cached_action(
     effective = json.dumps(
         action.profile._asdict(), sort_keys=True, separators=(",", ":")
     )
-    source = dodo.ContentChecker._digest(config_path)
+    source = dodo._canonical_file_md5(config_path)
     assert first_inputs[config_tag] == dodo.hashlib.sha256(
         f"{source}\0{effective}".encode()
     ).hexdigest()
