@@ -31,8 +31,8 @@ full neutral inventory instead of loading draw declarations or re-deriving
 manifests. It waits for `package:features`; the scoped leaves never overwrite
 full-export paths, STL/PNG outputs, colors or source-digest ledgers.
 
-Run COM leaves through the
-[supervised farm launcher](../../../DEVELOPING.md#supervised-farm-launches),
+Run COM leaves through
+[`farm_build.py`](../../../DEVELOPING.md#farm-builds-farm_buildpy),
 never through a local SolidWorks session or finite build timer.
 
 ## Drawing authority
@@ -379,10 +379,10 @@ other staged file, and names the directory in the release notes. A missing or
 empty PDF, or one older than its part's `features/<stem>/features.toml`, fails
 the cut before anything is zipped; the HTML sheets do not ship. A prechips
 refusal, an unreachable PyPI or a missing browser therefore blocks the
-release, like any other release gate. The supervised farm release runs
+release, like any other release gate. The farm release runs
 `doit -s prechips` on the submitter after restoring the farm outputs, before
 `doit -s release`
-([`DEVELOPING.md`](../../../DEVELOPING.md#supervised-farm-releases)).
+([`DEVELOPING.md`](../../../DEVELOPING.md#farm-releases)).
 
 The publisher's only tracked-source update is `cad/config/release.yaml`
 `next_revision`; it does not edit process plans. The generated-only follow-up

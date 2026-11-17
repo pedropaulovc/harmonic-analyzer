@@ -2556,7 +2556,7 @@ def _cached_com_action(
     local seat -- for every SolidWorks-touching task (parts, assemblies, drawings,
     the verify gates, preflight, the neutral export and the release Pack-and-Go).
 
-    A HIT always skips the COM work. A MISS under ``--executor farm`` dispatches ONE
+    A HIT always skips the COM work. A MISS under the farm executor dispatches ONE
     leaf: the worker runs this same doit task with the cache in ``rw`` mode and
     publishes ``key``, which this side then restores -- so a machine with no
     SolidWorks seat can drive every stage of a release. A MISS locally takes the
@@ -2688,16 +2688,9 @@ def _farm_build(label: str, key: str, outputs: list[Path]) -> None:
     in the message); a success whose key is still absent is an infrastructure
     fault and fails just as loud.
 
-    ``key`` came from this checkout's live files, but the worker builds the
-    launch commit. So a checkout whose drift since launch can move ``key`` is
-    refused before the dispatch -- the worker could never publish it -- and a
-    leaf that exits 0 without the key is re-checked against every tracked
-    difference before blaming the cache (#1114).
+    ``farm_build.py`` runs this submitter from a private snapshot of the launch
+    commit, so the key it computes is the one the worker publishes (#1114).
     """
-    # Inputs this process never recorded mean every tracked change counts.
-    drift = _farm.checkout_drift(task_inputs=_cache.key_input_paths(label, key))
-    if drift is not None:
-        raise RuntimeError(f"{label}: not dispatched: {drift}")
     result = _farm.run_leaf(label, key)
     if result.state != "succeeded":
         failure = (
@@ -2706,9 +2699,6 @@ def _farm_build(label: str, key: str, outputs: list[Path]) -> None:
             f"(log: {result.log_blob}) -- "
         )
         if result.failure_category == "cache_missing":
-            drift = _farm.checkout_drift()
-            if drift is not None:
-                raise RuntimeError(failure + drift)
             failure += _farm.CACHE_MISSING_CAUSES + " -- "
         raise RuntimeError(
             failure
@@ -2723,14 +2713,10 @@ def _farm_build(label: str, key: str, outputs: list[Path]) -> None:
     ) as restore:
         _tag_cache_key(restore, key)
         if not _cache.restore(key, outputs, label):
-            absent = (
+            raise RuntimeError(
                 f"{label}: farm reported success but cache key {key[:12]} is "
-                "absent or failed integrity/restore"
+                f"absent or failed integrity/restore -- {_farm.CACHE_MISSING_CAUSES}"
             )
-            drift = _farm.checkout_drift()
-            if drift is not None:
-                raise RuntimeError(f"{absent}: {drift}")
-            raise RuntimeError(f"{absent} -- {_farm.CACHE_MISSING_CAUSES}")
         restore.set_attribute("cache", "hit")
 
 
@@ -3404,7 +3390,7 @@ def _verify_task(name: str) -> dict[str, Any]:
 
 def task_verify():
     """SolidWorks verification suites -- cache-keyed COM leaves: the seat lock
-    serializes them locally, and under ``--executor farm`` each dispatches ONE leaf
+    serializes them locally, and under the farm executor each dispatches ONE leaf
     to a worker (the submitter needs no seat). Each stamps
     ``cad/out/reports/verify-<x>.ok`` on success, and that stamp is the cached
     output. The ``verify:`` prefix marks them SolidWorks-dependent (vs the
@@ -5171,7 +5157,7 @@ def task_export():
     release-neutral manifest, from every built model.
 
     A cache-keyed COM leaf like a part: a HIT downloads the neutral set, and a MISS
-    under ``--executor farm`` runs ONE leaf on a worker -- which is what lets a
+    under the farm executor runs ONE leaf on a worker -- which is what lets a
     seatless machine cut a release. The comparison gallery is NOT here: it needs
     Blender and a GPU (which no farm worker has), so it is the separate,
     SolidWorks-free ``gallery`` task that ``release`` depends on.
@@ -5448,7 +5434,7 @@ def task_build():
     SolidWorks-free work before piling onto the COM seat, and the parts are in
     per-seat order so two cold builders diverge and split the fleet cache.
 
-    Every COM gate is farm-dispatchable: under ``--executor farm`` each cache-missing
+    Every COM gate is farm-dispatchable: under the farm executor each cache-missing
     gate runs on a worker. Offline checks and travelers run on the submitter.
     """
     import _process_plans

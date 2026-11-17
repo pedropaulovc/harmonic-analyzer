@@ -8,19 +8,17 @@ drives COM needs a SolidWorks seat, and there are two ways to have one:
 - **A local licensed seat.** SolidWorks installed and running on this machine,
   launched via the 3DEXPERIENCE desktop shortcut rather than `sldworks.exe`
   directly. This is what the `uv run python -m doit` examples below assume.
-- **A seatless submitter.** No SolidWorks here at all: `build.py --executor
-  farm` dispatches each cache-missing COM task as a farm leaf and restores what
-  the worker published. An agent-driven farm build has its own launch contract —
-  started and tracked (`-Status`, `-Watch`, `-List`, `-Cancel`) through
-  `scripts/farm-run.ps1`; see
-  [supervised farm launches](../../DEVELOPING.md#supervised-farm-launches).
+- **A seatless submitter.** No SolidWorks here at all: `farm_build.py run`
+  dispatches each cache-missing COM task as a farm leaf and restores what the
+  worker published, and `watch`/`status`/`list`/`cancel` track the run; see
+  [farm builds](../../DEVELOPING.md#farm-builds-farm_buildpy).
 
 The SolidWorks-free `check:*` gates, `gallery` and the comparison tooling need
 no seat under either arrangement.
 
 For orientation on how the code is organized, read
 [`../../AGENTS.md`](../../AGENTS.md); for machine-local workflow (the remote
-build cache, auth, provisioning) and the supervised farm-launch contract read
+build cache, auth, provisioning) and the farm-build contract read
 [`../../DEVELOPING.md`](../../DEVELOPING.md).
 
 ## One-off setup
@@ -64,8 +62,9 @@ glance:
 | `build_bare` | yes | either executor | parts + assemblies only — a quick rebuild |
 
 These examples run on a **local seat**. For the farm, replace
-`uv run python -m doit` with `uv run python build.py --executor farm --display-name "Owner/session - Reason"` and follow
-[supervised farm launches](../../DEVELOPING.md#supervised-farm-launches) —
+`uv run python -m doit <tasks>` with
+`uv run python farm_build.py run <tasks> --display-name "Owner/session - Reason" --leaf-timeout 90`
+(see [farm builds](../../DEVELOPING.md#farm-builds-farm_buildpy)) —
 the same task names select the same closure.
 
 The `verify_soundness:dt_drive_train` and
@@ -97,8 +96,8 @@ uv run python -m doit
 
 # Local seat only: fan the SolidWorks-free check:* gates out across 4 workers while
 # the COM build/verify stream stays serial (safe — see "Parallelism" below).
-# Farm (`build.py --executor farm`): pass no -n; build.py keeps 8 leaves in flight
-# so all five workers stay busy, and a hand-passed -n 4 leaves one idle.
+# Farm (`farm_build.py`): no -n; it keeps 8 leaves in flight so all five
+# workers stay busy, and a hand-passed -n 4 would leave one idle.
 uv run python -m doit -n 4
 
 # Quick rebuild — parts + assemblies only, no gates or export
@@ -221,7 +220,7 @@ The first release shows all drawings as additions. A release with no effective
 drawing changes still has an index and summary, but no PNGs. Page additions,
 removals and size changes remain changes even when blank. Baseline download or
 PDF-rendering errors stop publication before tagging. See the
-[drawing comparison details](../../DEVELOPING.md#supervised-farm-releases).
+[drawing comparison details](../../DEVELOPING.md#farm-releases).
 
 Submit that post-release refresh in a follow-up PR whose only changes are the
 `cad/config/release.yaml` `next_revision` bump and the regenerated README image
@@ -234,15 +233,14 @@ native/review proof; an individual PR or stack does not need a full build to
 merge. The release manager continuously full-builds main, and daily releases
 still require green main and successful release checks for the released commit.
 
-For a supervised farm release, never launch the `release` target in the
-disposable snapshot. Use `farm-run.ps1` with
-`-Targets "build,export,package:release,preflight"` (`build` supplies the
-drawing and check gates), then restore the successful run's complete `cad/out`
-from its recorded `.done` `outputs` path to the owning worktree. There, run
-`uv run --frozen python -m doit -s gallery` followed by
+For a farm release, never run the `release` target in the disposable snapshot
+(`farm_build.py` refuses it). Run `build export package:release preflight`
+(`build` supplies the drawing and check gates), then copy the successful run's
+complete `out/` (`status` → `outputs`) over the owning worktree's `cad/out`.
+There, run `uv run --frozen python -m doit -s gallery` followed by
 `uv run --frozen python -m doit -s release -- vNN`. This keeps the gallery and
 publish in the owning checkout and avoids local COM redispatch; see
-[`DEVELOPING.md`](../../DEVELOPING.md#supervised-farm-releases).
+[`DEVELOPING.md`](../../DEVELOPING.md#farm-releases).
 
 ## Parallelism
 
@@ -259,9 +257,7 @@ so it also serializes COM across worktrees on the seat. Outputs land in
 The same lock is what bounds a farm worker: it serializes that worker's own COM
 session, not the fleet. Different workers hold different seats and run different
 leaves at the same time, which is why a farm submitter keeps several leaves in
-flight. `build.py --executor farm` adds `-n 8` (`HARMONIC_FARM_PARALLELISM`)
-unless you pass `-n`/`--process`. The supervised launcher passes neither, so a
-supervised run also keeps eight in flight.
+flight: `farm_build.py` runs doit with `-n 8` (`HARMONIC_FARM_PARALLELISM`).
 
 ## Forcing a full rebuild of one assembly
 

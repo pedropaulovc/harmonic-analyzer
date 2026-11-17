@@ -5,7 +5,6 @@ import asyncio
 import getpass
 import hashlib
 import importlib.util
-import inspect
 import json
 import os
 import subprocess
@@ -29,7 +28,7 @@ sys.path.insert(0, str(REPO_ROOT / "cad" / "scripts"))
 import _farm  # noqa: E402
 import build  # noqa: E402
 
-_RealFarmDoitMain = build._FarmDoitMain
+PROTOCOL = 7
 _RealRefreshDoitMain = build._RefreshDoitMain
 
 SHA = "c" * 40
@@ -101,13 +100,8 @@ def _refuse_local_build(dodo, monkeypatch, calls):
 
 
 @pytest.fixture(autouse=True)
-def _undrifted_checkout(monkeypatch):
-    """Every dispatch below sees an untouched checkout unless a test says not.
-
-    The real check runs git against the live checkout; these tests exercise the
-    dispatch around it (tests/test_farm_checkout_drift.py covers git itself).
-    """
-    monkeypatch.setattr(_farm, "checkout_drift", lambda task_inputs=None: None)
+def _farm_identity(monkeypatch):
+    """Every dispatch below runs under a named build owned by this parent."""
     monkeypatch.setenv("HARMONIC_FARM_DISPLAY_NAME", DISPLAY_NAME)
     monkeypatch.setenv("HARMONIC_FARM_BUILD_ID", BUILD_ID)
     monkeypatch.setattr(_farm, "STATUS_POLL_INTERVAL_S", 0)
@@ -153,13 +147,6 @@ def farm_part(tmp_path, monkeypatch):
     monkeypatch.setattr(dodo, "_part_file_deps", lambda _script, _stem: [str(script)])
     monkeypatch.setattr(dodo, "_part_cache_outputs", lambda _stem: [output])
     monkeypatch.setattr(dodo, "_cache_key", lambda _deps, _label: "k" * 64)
-    monkeypatch.setattr(
-        dodo._cache,
-        "key_input_paths",
-        lambda label, key: (
-            list(KEY_INPUTS) if (label, key) == ("part:pen_rod", "k" * 64) else None
-        ),
-    )
     monkeypatch.setattr(
         dodo, "_stamp_part_execution", lambda stem: calls["stamp"].append(stem)
     )
@@ -225,76 +212,9 @@ def test_success_restores_the_leaf_key_and_stamps_without_publishing(
     assert calls["store"] == [], "the worker publishes; the submitter never does"
 
 
-DRIFT = (
-    "submitter checkout changed since launch: HEAD aaaaaaaaaaaa -> bbbbbbbbbbbb; "
-    "changed: cad/scripts/_drawing_common.py; the farm builds aaaaaaaaaaaa, so "
-    "keys would not match. Launch from an untouched worktree "
-    "(scripts/farm-run.ps1 does this)."
-)
-KEY_INPUTS = ("cad/config/release.yaml", "cad/scripts/build_pen_rod.py")
-
-
-def _drift_after(monkeypatch, checks: int) -> list[list[str] | None]:
-    """``checkout_drift`` clean for the first ``checks`` calls, drifted after;
-    returns the ``task_inputs`` each call was scoped to."""
-    seen: list[list[str] | None] = []
-
-    def drift(task_inputs=None):
-        seen.append(None if task_inputs is None else list(task_inputs))
-        return DRIFT if len(seen) > checks else None
-
-    monkeypatch.setattr(_farm, "checkout_drift", drift)
-    return seen
-
-
-def test_a_drifted_checkout_is_refused_before_any_dispatch(farm_part, monkeypatch):
+def test_cache_missing_names_the_likely_causes(farm_part, monkeypatch):
     dodo, script, calls, restore = farm_part
     restore((False,))
-    checks = _drift_after(monkeypatch, 0)
-    monkeypatch.setattr(
-        dodo._farm, "run_leaf", lambda label, key: pytest.fail("dispatched on drift")
-    )
-
-    with pytest.raises(RuntimeError) as failure:
-        dodo._cached_part_action("pen_rod", script)
-
-    assert str(failure.value) == f"part:pen_rod: not dispatched: {DRIFT}"
-    assert calls["stamp"] == []
-    # Before dispatch only a change that can move THIS key counts.
-    assert checks == [list(KEY_INPUTS)]
-
-
-def test_cache_missing_on_a_drifted_checkout_names_the_drift(farm_part, monkeypatch):
-    """Drift that lands while the leaf runs is re-checked when the key is absent."""
-    dodo, script, calls, restore = farm_part
-    restore((False,))
-    checks = _drift_after(monkeypatch, 1)
-    monkeypatch.setattr(
-        dodo._farm,
-        "run_leaf",
-        lambda label, key: _leaf_result(
-            state="failed",
-            cache_present=False,
-            failure_category="cache_missing",
-            failure_message=f"{label} exited 0 but cache key {key[:12]} is absent",
-        ),
-    )
-
-    with pytest.raises(RuntimeError) as failure:
-        dodo._cached_part_action("pen_rod", script)
-
-    message = str(failure.value)
-    assert message.startswith("part:pen_rod failed on sw-01@3 [cache_missing] exit 0:")
-    assert message.endswith(DRIFT)
-    assert _farm.CACHE_MISSING_CAUSES not in message
-    # After the key went missing, every tracked difference is a lead.
-    assert checks == [list(KEY_INPUTS), None]
-
-
-def test_cache_missing_without_drift_names_the_likely_causes(farm_part, monkeypatch):
-    dodo, script, calls, restore = farm_part
-    restore((False,))
-    checks = _drift_after(monkeypatch, 2)
     monkeypatch.setattr(
         dodo._farm,
         "run_leaf",
@@ -313,26 +233,6 @@ def test_cache_missing_without_drift_names_the_likely_causes(farm_part, monkeypa
     assert message.startswith("part:pen_rod failed on sw-01@3 [cache_missing] exit 0:")
     assert _farm.CACHE_MISSING_CAUSES in message
     assert "failures/*" in message
-    assert checks == [list(KEY_INPUTS), None]
-
-
-def test_absent_key_after_success_on_a_drifted_checkout_names_the_drift(
-    farm_part, monkeypatch
-):
-    dodo, script, calls, restore = farm_part
-    restore((False, False))
-    _drift_after(monkeypatch, 1)
-    monkeypatch.setattr(dodo._farm, "run_leaf", lambda label, key: _leaf_result())
-
-    with pytest.raises(RuntimeError) as failure:
-        dodo._cached_part_action("pen_rod", script)
-
-    assert str(failure.value) == (
-        f"part:pen_rod: farm reported success but cache key {'k' * 12} is "
-        "absent or failed integrity/restore: "
-        f"{DRIFT}"
-    )
-    assert calls["stamp"] == []
 
 
 ASM_BYTES = b"SLDASM restored from the farm"
@@ -558,16 +458,7 @@ def test_a_cached_gate_never_dispatches_a_leaf(farm_gate, monkeypatch):
     assert stamp.read_text(encoding="utf-8") == "verify_soundness:pen\n"
 
 
-# --- build.py: farm preflight and argv handling ------------------------------
-
-
-def _git(repo: Path, *args: str) -> None:
-    subprocess.run(
-        ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", *args],
-        cwd=repo,
-        check=True,
-        capture_output=True,
-    )
+# --- build.py: the local entry point -----------------------------------------
 
 
 def _fixture_namespace(executed):
@@ -577,10 +468,7 @@ def _fixture_namespace(executed):
     def task_part():
         yield {"name": "x", "actions": [record]}
 
-    def task_assembly():
-        yield {"name": "x", "actions": [record]}
-
-    return {"task_part": task_part, "task_assembly": task_assembly}
+    return {"task_part": task_part}
 
 
 def _install_real_doit(monkeypatch, namespace=None):
@@ -601,23 +489,6 @@ def _install_real_doit(monkeypatch, namespace=None):
     monkeypatch.setattr(_doit_cmd_base, "JsonDB", MemoryJsonDB)
     config = {"GLOBAL": {"backend": "json", "dep_file": ":memory:"}}
 
-    class FixtureFarmDoit(_RealFarmDoitMain):
-        def __init__(self):
-            super().__init__(
-                task_loader=ModuleTaskLoader(task_namespace), extra_config=config
-            )
-
-        def run(self, args):
-            seen.append(list(args))
-            # Exercise the real serial runner in-process while retaining the
-            # wrapper's injected farm argv in ``seen``.
-            serial = list(args)
-            for index in range(len(serial) - 1):
-                if serial[index : index + 2] == ["-n", "8"]:
-                    serial[index + 1] = "0"
-                    break
-            return super().run(serial)
-
     class FixtureLocalDoit(_RealRefreshDoitMain):
         def __init__(self):
             super().__init__(
@@ -628,353 +499,16 @@ def _install_real_doit(monkeypatch, namespace=None):
             seen.append(list(args))
             return super().run(args)
 
-    monkeypatch.setattr(build, "_FarmDoitMain", FixtureFarmDoit)
     monkeypatch.setattr(build, "DoitMain", FixtureLocalDoit)
     monkeypatch.setattr(build, "_RefreshDoitMain", FixtureLocalDoit)
     return seen, executed
 
 
-@pytest.mark.parametrize("label", [None, "", " \t", "x" * 161,
-    pytest.param("\U0001f680" * 161, id="supplementary161"),
-    pytest.param("\u03a9" * 80 + "\U0001f680" * 81, id="mixed161"),
-    "a\tb", "a\0b", "a\x01b", "a\x1fb", "a\x7fb", "a\rb", "a\nb", "a\u0085b", "a\u2028b", "a\u2029b", "a\u202eb", "a\ud800b", "a\udfffb"])
-@pytest.mark.parametrize("command", [["part:x"], ["run", "part:x"], ["strace", "part:x"]])
-def test_farm_execution_requires_a_valid_display_name(label, command, monkeypatch, capsys):
-    if label is None:
-        monkeypatch.delenv("HARMONIC_FARM_DISPLAY_NAME", raising=False)
-    elif "\0" in label or any(0xD800 <= ord(char) <= 0xDFFF for char in label):
-        # Inject labels that OS environment encoding may reject at the read
-        # boundary so the validator itself must reject them.
-        get = os.environ.get
-        monkeypatch.setattr(os.environ, "get", lambda key, default=None: label if key == "HARMONIC_FARM_DISPLAY_NAME" else get(key, default))
-    else:
-        monkeypatch.setenv("HARMONIC_FARM_DISPLAY_NAME", label)
-    monkeypatch.setattr(build, "_farm_preflight", lambda: pytest.fail("preflight before valid label"))
-    _seen, executed = _install_real_doit(monkeypatch)
-    assert build.main(["--executor", "farm", *command]) == 2
-    assert executed == []
-    captured = capsys.readouterr()
-    assert "--display-name" in captured.out + captured.err
-
-
-@pytest.mark.parametrize("label", ["a\0b", "a\ud800b", "a\udfffb"])
-@pytest.mark.parametrize("command", [["part:x"], ["run", "part:x"], ["strace", "part:x"]])
-def test_explicit_untransportable_display_name_is_rejected_before_actions(
-    label, command, monkeypatch, capsys
-):
-    monkeypatch.setenv("HARMONIC_FARM_DISPLAY_NAME", DISPLAY_NAME)
-    monkeypatch.setattr(
-        build, "_farm_preflight", lambda: pytest.fail("preflight before valid label")
-    )
-    _seen, executed = _install_real_doit(monkeypatch)
-
-    assert build.main(["--executor", "farm", f"--display-name={label}", *command]) == 2
-    assert executed == []
-    assert os.environ["HARMONIC_FARM_DISPLAY_NAME"] == DISPLAY_NAME
-    captured = capsys.readouterr()
-    assert "--display-name" in captured.out + captured.err
-
-
-@pytest.mark.parametrize("flag", [None, "--display-name", "-DisplayName"])
-@pytest.mark.parametrize("label", ["x", "x" * 160,
-    pytest.param("\U0001f680" * 160, id="supplementary160"),
-    pytest.param("\u03a9" * 80 + "\U0001f680" * 80, id="mixed160"),
-    "  Review Ω: gear train  ", "Review \U0001f680: gear train", "مراجعة שלום", "Review 👩\u200d🔧: gear\u200ctrain", "-review", "--executor", "-DisplayName"])
-def test_display_name_reaches_the_task_boundary(flag, label, monkeypatch):
-    _preflight_fakes(monkeypatch)
-    monkeypatch.setenv("HARMONIC_FARM_DISPLAY_NAME", label if flag is None else "Inherited label")
-    observed = []
-    namespace = {"task_part": lambda: {
-        "actions": [lambda: observed.append(os.environ.get("HARMONIC_FARM_DISPLAY_NAME"))]
-    }}
-    seen, _executed = _install_real_doit(monkeypatch, namespace)
-    options = [] if flag is None else (
-        [f"{flag}={label}"] if label.startswith("-") else [flag, label]
-    )
-    assert build.main(["--executor", "farm", *options, "part"]) == 0
-    assert seen == [["-n", "8", "part"]]
-    assert observed == [label]
-
-
-@pytest.mark.parametrize("option", ["--display", "--display-n"])
-def test_display_name_abbreviations_are_rejected_by_doit(option, monkeypatch):
-    monkeypatch.setenv("HARMONIC_FARM_DISPLAY_NAME", DISPLAY_NAME)
-    monkeypatch.setattr(build, "_farm_preflight", lambda: pytest.fail("preflight before valid options"))
-    _seen, executed = _install_real_doit(monkeypatch)
-    assert build.main(["--executor", "farm", f"{option}=other", "part:x"]) == 3
-    assert executed == []
-    assert os.environ["HARMONIC_FARM_DISPLAY_NAME"] == DISPLAY_NAME
-
-
-def test_farm_build_refuses_a_dirty_tree_before_contacting_the_fleet(
-    tmp_path, monkeypatch, capsys
-):
-    repo = tmp_path / "repo"
-    repo.mkdir()
-    _git(repo, "init", "-q")
-    (repo / "tracked.txt").write_text("v1\n", encoding="utf-8")
-    _git(repo, "add", "tracked.txt")
-    _git(repo, "commit", "-q", "-m", "init")
-    (repo / "scratch.txt").write_text("wip\n", encoding="utf-8")
-    monkeypatch.setattr(build, "REPO_ROOT", repo)
-    _seen, executed = _install_real_doit(monkeypatch)
-
-    launched = []
-    real_run = build.subprocess.run
-
-    def spy(argv, **kwargs):
-        launched.append(argv)
-        return real_run(argv, **kwargs)
-
-    monkeypatch.setattr(build.subprocess, "run", spy)
-
-    assert build.main(["--executor", "farm", "part:x"]) == 2
-    assert capsys.readouterr().err == "farm: working tree is dirty:\n  scratch.txt\n"
-    assert all(argv[0] == "git" for argv in launched)
-    assert executed == []
-
-
-PROTOCOL = 7
-AGENT_TAG = "7" * 16
-
-
-def _worker(*, protocol=PROTOCOL, fresh=True, age_s=30, worker_id="swmaker000004@4"):
-    return {
-        "worker_id": worker_id,
-        "farm_protocol_version": protocol,
-        "agent_version": AGENT_TAG,
-        "observed_at": "2026-09-18T10:39:07Z",
-        "age_s": age_s,
-        "written_age_s": None,
-        "fresh": fresh,
-    }
-
-
-def _agents_summary(**overrides):
-    """``farm.py agents --json``: one worker freshly reporting protocol 7."""
-    summary = {
-        "farm_protocol_version": PROTOCOL,
-        "verdict": "matched",
-        "report": None,
-        "fresh_within_s": 120,
-        "evidence_horizon_s": 1209600,
-        "listed": 1,
-        "workers": [_worker()],
-        "ignored": [],
-        "unreadable": [],
-        "mismatch": [],
-    }
-    summary.update(overrides)
-    return json.dumps(summary) + "\n"
-
-
-_UNREPORTED_BLOCK = _agents_summary(
-    verdict="mismatch",
-    mismatch=[{"farm_protocol_version": 3, "workers": ["swmaker000004@4"]}],
-    report=None,
-)
-
-
-def _preflight_fakes(monkeypatch, *, agents=None, git=None):
-    """Fake a clean local project and the pool's protocol report."""
-    stdout = {
-        "status": "",
-        "submodule": "",
-        "rev-parse": SHA + "\n",
-    }
-    stdout.update(git or {})
-    if agents is None:
-        agents = _agents_summary()
-    launched = []
-
-    def fake_run(argv, **kwargs):
-        launched.append(argv)
-        if argv[0] == "git":
-            out = stdout[argv[1]]
-        else:
-            assert argv[-2:] == ["agents", "--json"]
-            out = agents
-        if isinstance(out, BaseException):
-            raise out
-        return subprocess.CompletedProcess(argv, 0, out, "")
-
-    monkeypatch.setattr(build.subprocess, "run", fake_run)
-    # Farm-mode protocol tests stub external commands; the real lint scan is
-    # covered by test_undefined_names without inheriting this fake subprocess.
-    monkeypatch.setattr(
-        build,
-        "scan_undefined_names",
-        lambda root: subprocess.CompletedProcess([], 0, "", ""),
-    )
-    # The fake project has no parts, so it carries no visibility debt; the
-    # real repo's release gate is test_reference_visibility's.
-    monkeypatch.setattr(build, "_visibility_debt", lambda: None)
-    monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", "ro")
-    monkeypatch.delenv("HARMONIC_FARM_PARALLELISM", raising=False)
-    for key in FARM_ENV:
-        monkeypatch.delenv(key, raising=False)
-    return launched
-
-
-def test_successful_preflight_stamps_only_committed_head_without_mutating_refs(
-    monkeypatch, capsys
-):
-    launched = _preflight_fakes(monkeypatch)
-    seen, executed = _install_real_doit(monkeypatch)
-
-    assert build.main(["--executor", "farm", "assembly:x"]) == 0
-
-    assert seen == [["-n", "8", "assembly:x"]]
-    assert executed == [
-        {
-            "HARMONIC_FARM_COMMIT": SHA,
-            "HARMONIC_EXECUTOR": "farm",
-            "HARMONIC_SW_AUTOSTART": "0",
-        }
-    ]
-    git_commands = [argv[1] for argv in launched if argv[0] == "git"]
-    assert git_commands == ["status", "submodule", "rev-parse"]
-    assert [argv[-2:] for argv in launched if argv[0] != "git"] == [
-        ["agents", "--json"]
-    ]
-    assert capsys.readouterr().out.splitlines()[:2] == [
-        "farm: protocol 7 on 1 worker(s)",
-        "farm: every SolidWorks task runs on the farm (parts, assemblies, "
-        "drawings, verify:*, preflight, export, package:release)",
-    ]
-
-
-def _sources_root(tmp_path, monkeypatch, exclude):
-    """A repo root whose ``.farm-sources.json`` declares ``exclude``."""
-    root = tmp_path / "root"
-    root.mkdir()
-    if exclude is not None:
-        (root / ".farm-sources.json").write_text(
-            json.dumps({"exclude_submodules": exclude}), encoding="utf-8"
-        )
-    monkeypatch.setattr(build, "REPO_ROOT", root)
-    return root
-
-
-def test_an_uninitialized_excluded_submodule_does_not_block_a_dispatch(
-    tmp_path, monkeypatch
-):
-    _sources_root(tmp_path, monkeypatch, ["references"])
-    launched = _preflight_fakes(
-        monkeypatch, git={"submodule": "-" + "b" * 40 + " references\n"}
-    )
-    _install_real_doit(monkeypatch)
-
-    assert build.main(["--executor", "farm", "part:x"]) == 0
-    assert [argv[-2:] for argv in launched if argv[0] != "git"] == [
-        ["agents", "--json"]
-    ]
-
-
-def test_an_uninitialized_submodule_the_local_graph_reads_still_blocks(
-    tmp_path, monkeypatch, capsys
-):
-    _sources_root(tmp_path, monkeypatch, ["references"])
-    launched = _preflight_fakes(
-        monkeypatch,
-        git={"submodule": "-" + "b" * 40 + " SolidworksMCP-python\n"},
-    )
-    _seen, executed = _install_real_doit(monkeypatch)
-
-    assert build.main(["--executor", "farm", "part:x"]) == 2
-    assert "SolidworksMCP-python" in capsys.readouterr().err
-    assert all(argv[0] == "git" for argv in launched)
-    assert executed == []
-
-
-def test_a_modified_excluded_submodule_still_blocks(tmp_path, monkeypatch, capsys):
-    _sources_root(tmp_path, monkeypatch, ["references"])
-    _preflight_fakes(
-        monkeypatch,
-        git={"submodule": "+" + "b" * 40 + " references (heads/main)\n"},
-    )
-    _seen, executed = _install_real_doit(monkeypatch)
-
-    assert build.main(["--executor", "farm", "part:x"]) == 2
-    assert capsys.readouterr().err == "farm: working tree is dirty:\n  references\n"
-    assert executed == []
-
-
-def test_the_exemption_follows_the_declaration_not_the_submodule(
-    tmp_path, monkeypatch, capsys
-):
-    _sources_root(tmp_path, monkeypatch, ["SolidworksMCP-python"])
-    launched = _preflight_fakes(
-        monkeypatch, git={"submodule": "-" + "b" * 40 + " references\n"}
-    )
-    _seen, executed = _install_real_doit(monkeypatch)
-
-    assert build.main(["--executor", "farm", "part:x"]) == 2
-    assert "references" in capsys.readouterr().err
-    assert all(argv[0] == "git" for argv in launched)
-    assert executed == []
-
-
-def test_a_trailing_slash_declares_the_same_submodule(tmp_path, monkeypatch):
-    _sources_root(tmp_path, monkeypatch, ["references/"])
-    _preflight_fakes(
-        monkeypatch, git={"submodule": "-" + "b" * 40 + " references\n"}
-    )
-    _install_real_doit(monkeypatch)
-
-    assert build.main(["--executor", "farm", "part:x"]) == 0
-
-
-@pytest.mark.parametrize(
-    "content",
-    [
-        "{not json",
-        '["references"]',
-        '{"exclude_submodules": "references"}',
-        '{"exclude_submodules": [3]}',
-    ],
-)
-def test_a_malformed_declaration_stops_the_run_here(
-    tmp_path, monkeypatch, capsys, content
-):
-    root = _sources_root(tmp_path, monkeypatch, [])
-    (root / ".farm-sources.json").write_text(content, encoding="utf-8")
-    launched = _preflight_fakes(monkeypatch)
-    _seen, executed = _install_real_doit(monkeypatch)
-
-    assert build.main(["--executor", "farm", "part:x"]) == 2
-    assert ".farm-sources.json" in capsys.readouterr().err
-    assert all(argv[0] == "git" for argv in launched)
-    assert executed == []
-
-
-def test_a_repo_declaring_no_exclusions_keeps_refusing_every_submodule(
-    tmp_path, monkeypatch, capsys
-):
-    _sources_root(tmp_path, monkeypatch, None)
-    _preflight_fakes(
-        monkeypatch, git={"submodule": "-" + "b" * 40 + " references\n"}
-    )
-    _seen, executed = _install_real_doit(monkeypatch)
-
-    assert build.main(["--executor", "farm", "part:x"]) == 2
-    assert "references" in capsys.readouterr().err
-    assert executed == []
-
-
-@pytest.mark.parametrize("label", [None, "", "invalid\nlabel"])
-def test_explicit_local_executor_overrides_an_inherited_farm_environment(monkeypatch, label):
+def test_build_py_is_local_whatever_the_environment_says(monkeypatch):
     monkeypatch.setenv("HARMONIC_EXECUTOR", "farm")
-    if label is None:
-        monkeypatch.delenv("HARMONIC_FARM_DISPLAY_NAME", raising=False)
-    else:
-        monkeypatch.setenv("HARMONIC_FARM_DISPLAY_NAME", label)
-    monkeypatch.setattr(
-        build, "_farm_preflight", lambda: pytest.fail("preflight ran in local mode")
-    )
     seen, executed = _install_real_doit(monkeypatch)
 
-    assert build.main(["--executor", "local", "part:x"]) == 0
+    assert build.main(["part:x"]) == 0
     assert seen == [["part:x"]]
     assert len(executed) == 1
     assert executed[0]["HARMONIC_EXECUTOR"] == "local"
@@ -999,559 +533,40 @@ def test_default_build_target_carries_the_verify_gates_under_every_executor(
 
 
 @pytest.mark.parametrize(
-    ("agents", "message"),
+    ("given", "runs"),
     [
-        (
-            FileNotFoundError(2, "No such file", "uv"),
-            "farm: agents could not start (uv): [Errno 2] No such file: 'uv'",
-        ),
-        (
-            "reading seat reports\nnot json at all\n",
-            "farm: agents printed no JSON summary; last line: not json at all",
-        ),
-        (
-            _agents_summary(farm_protocol_version="6"),
-            "farm: agents summary farm_protocol_version is not an integer: '6'",
-        ),
-        (
-            _agents_summary(farm_protocol_version=3),
-            "farm: pool CLI supports farm protocol 3, but this client requires 7",
-        ),
-        (
-            _agents_summary(workers={"swmaker000004@4": "ready"}),
-            "farm: agents summary workers is not a list: "
-            + _agents_summary(workers={"swmaker000004@4": "ready"}).strip()[:200],
-        ),
-        (
-            _agents_summary(fresh_within_s="120"),
-            "farm: agents summary fresh_within_s is not an integer: '120'",
-        ),
-        (
-            _agents_summary(evidence_horizon_s=1209600.0),
-            "farm: agents summary evidence_horizon_s is not an integer: 1209600.0",
-        ),
-        (
-            _agents_summary(ignored=None),
-            "farm: agents summary ignored is not a list: "
-            + _agents_summary(ignored=None).strip()[:200],
-        ),
-        (
-            _UNREPORTED_BLOCK,
-            "farm: agents returned verdict 'mismatch' without a report: "
-            + _UNREPORTED_BLOCK.strip()[:200],
-        ),
+        (["assembly:x"], True),
+        (["run", "assembly:x"], True),
+        (["list"], False),
+        ([], True),
+        (["--help"], False),
+        (["-h"], False),
+        (["--version"], False),
+        (["-f", "dodo.py", "list"], False),
+        (["-kf", "dodo.py", "part:x"], True),
+        (["profile=ci", "list"], False),
+        (["profile=ci", "run", "x"], True),
+        (["strace", "part:x"], True),
+        # doit has no per-command help: its parser rejects these and exits 3.
+        (["run", "--help"], False),
+        (["-n", "abc", "x"], False),
+        (["run", "--", "--help"], True),
     ],
 )
-def test_preflight_protocol_faults_exit_2(agents, message, monkeypatch, capsys):
-    _preflight_fakes(monkeypatch, agents=agents)
-    _seen, executed = _install_real_doit(monkeypatch)
-
-    assert build.main(["--executor", "farm", "assembly:x"]) == 2
-    assert capsys.readouterr().err == message + "\n"
-    assert executed == []
-    assert os.environ["HARMONIC_EXECUTOR"] == "farm"
-    assert os.environ.get("HARMONIC_FARM_COMMIT") is None
-    assert os.environ.get("HARMONIC_SW_AUTOSTART") is None
+def test_only_task_executing_commands_count_as_executing(given, runs):
+    assert (build._executing_command(list(given), _RealDoitMain()) is not None) is runs
 
 
-def test_an_unknown_fleet_verdict_blocks_with_the_invalid_token(
-    monkeypatch, capsys
-):
-    _preflight_fakes(
-        monkeypatch, agents=_agents_summary(verdict="probably-fine")
-    )
-    _seen, executed = _install_real_doit(monkeypatch)
-
-    assert build.main(["--executor", "farm", "assembly:x"]) == 2
-    error = capsys.readouterr().err
-    assert error.startswith("farm:")
-    assert "verdict" in error
-    assert "probably-fine" in error
-    assert executed == []
-    assert os.environ["HARMONIC_EXECUTOR"] == "farm"
-    assert os.environ.get("HARMONIC_FARM_COMMIT") is None
-    assert os.environ.get("HARMONIC_SW_AUTOSTART") is None
-
-
-def test_an_incompatible_fleet_stops_before_actions(monkeypatch, capsys):
-    report = (
-        "farm protocol 7 is required, but the fleet reports:\n"
-        "  protocol 3: swmaker000004@4 (3h 0m ago)\n"
-        "Deploy a protocol-compatible agent."
-    )
-    launched = _preflight_fakes(
-        monkeypatch,
-        agents=_agents_summary(
-            verdict="mismatch",
-            workers=[_worker(protocol=3, fresh=False, age_s=10800)],
-            mismatch=[
-                {
-                    "farm_protocol_version": 3,
-                    "workers": ["swmaker000004@4"],
-                }
-            ],
-            report=report,
-        ),
-    )
-    _seen, executed = _install_real_doit(monkeypatch)
-
-    assert build.main(["--executor", "farm", "assembly:x"]) == 2
-    assert capsys.readouterr().err == f"farm: {report}\n"
-    assert [argv[-2:] for argv in launched if argv[0] != "git"] == [
-        ["agents", "--json"]
-    ]
-    assert executed == []
-    assert os.environ["HARMONIC_EXECUTOR"] == "farm"
-    assert os.environ.get("HARMONIC_FARM_COMMIT") is None
-    assert os.environ.get("HARMONIC_SW_AUTOSTART") is None
-
-
-def test_an_unreadable_fleet_stops_like_a_protocol_mismatch(monkeypatch, capsys):
-    report = (
-        "1 worker(s) published a seat report without a readable farm protocol:\n"
-        "  swmaker000004@4: invalid_report:seat report fields are wrong\n"
-        "Deploy a protocol-compatible agent."
-    )
-    _preflight_fakes(
-        monkeypatch,
-        agents=_agents_summary(
-            verdict="unreadable",
-            workers=[],
-            listed=1,
-            unreadable=[
-                {
-                    "worker_id": "swmaker000004@4",
-                    "evidence": "invalid_report:seat report fields are wrong",
-                }
-            ],
-            report=report,
-        ),
-    )
-    _seen, executed = _install_real_doit(monkeypatch)
-
-    assert build.main(["--executor", "farm", "assembly:x"]) == 2
-    assert capsys.readouterr().err == f"farm: {report}\n"
-    assert executed == []
-
-
-def test_current_compatible_worker_allows_an_aged_retired_unreadable_report(
-    monkeypatch, capsys
-):
-    _preflight_fakes(
-        monkeypatch,
-        agents=_agents_summary(
-            ignored=[
-                {
-                    "worker_id": "retired@1",
-                    "farm_protocol_version": None,
-                    "evidence": "invalid_report:missing farm_protocol_version",
-                    "written_age_s": 1555200,
-                    "fresh": False,
-                }
-            ]
-        ),
-    )
-    _seen, executed = _install_real_doit(monkeypatch)
-
-    assert build.main(["--executor", "farm", "assembly:x"]) == 0
-    assert executed
-    assert "protocol 7" in capsys.readouterr().out.splitlines()[0]
-
-
-def test_a_sleeping_compatible_fleet_says_so(monkeypatch, capsys):
-    _preflight_fakes(
-        monkeypatch,
-        agents=_agents_summary(
-            workers=[_worker(fresh=False, age_s=21600)],
-        ),
-    )
-    _install_real_doit(monkeypatch)
-
-    assert build.main(["--executor", "farm", "assembly:x"]) == 0
-    status = capsys.readouterr().out.splitlines()[0]
-    assert "protocol 7" in status
-    assert "no worker has reported within 120s" in status
-    assert "last report of 1 worker(s)" in status
-    assert "supports it" in status
-
-
-def test_a_fleet_that_never_reported_says_compatibility_is_unconfirmed(
-    monkeypatch, capsys
-):
-    _preflight_fakes(
-        monkeypatch, agents=_agents_summary(verdict="unverified", workers=[], listed=0)
-    )
-    _install_real_doit(monkeypatch)
-
-    assert build.main(["--executor", "farm", "assembly:x"]) == 0
-    status = capsys.readouterr().out.splitlines()[0]
-    assert "protocol 7" in status
-    assert "no worker has ever reported" in status
-    assert "unconfirmed" in status
-
-
-def test_aged_out_compatible_reports_are_not_called_silence(monkeypatch, capsys):
-    _preflight_fakes(
-        monkeypatch,
-        agents=_agents_summary(
-            verdict="unverified",
-            workers=[],
-            listed=2,
-            ignored=[
-                _worker(
-                    fresh=False,
-                    age_s=1555200,
-                    worker_id=f"swmaker00000{instance}@{instance}",
-                )
-                for instance in (4, 5)
-            ],
-        ),
-    )
-    _install_real_doit(monkeypatch)
-
-    assert build.main(["--executor", "farm", "assembly:x"]) == 0
-    status = capsys.readouterr().out.splitlines()[0]
-    assert "protocol 7" in status
-    assert "2 worker(s)" in status
-    assert "more than 14d ago" in status
-    assert "too old to prove the fleet is up" in status
-    assert "never reported" not in status
-
-
-@pytest.mark.parametrize(
-    ("advertised", "omit_protocol", "diagnostic"),
-    [
-        (3, False, "protocol 3"),
-        (None, True, "protocol unreadable"),
-        (None, False, "protocol unreadable"),
-        ("6", False, "protocol unreadable"),
-        (True, False, "protocol unreadable"),
-    ],
-)
-def test_an_aged_out_incompatible_or_unreadable_report_stops_the_run(
-    advertised, omit_protocol, diagnostic, monkeypatch, capsys
-):
-    stale_report = _worker(
-        protocol=advertised,
-        fresh=False,
-        age_s=1555200,
-        worker_id="swmaker000004@4",
-    )
-    if omit_protocol:
-        stale_report.pop("farm_protocol_version")
-    _preflight_fakes(
-        monkeypatch,
-        agents=_agents_summary(
-            verdict="unverified",
-            workers=[],
-            listed=2,
-            ignored=[
-                stale_report,
-                _worker(
-                    fresh=False,
-                    age_s=1555200,
-                    worker_id="swmaker000005@5",
-                ),
-            ],
-        ),
-    )
-    _seen, executed = _install_real_doit(monkeypatch)
-
-    assert build.main(["--executor", "farm", "assembly:x"]) == 2
-    assert executed == []
-    error = capsys.readouterr().err
-    assert "swmaker000004@4" in error
-    assert diagnostic in error
-
-
-@pytest.mark.parametrize(
-    "selection",
-    [
-        ["part:arbor-pedestal"],
-        ["part:x", "part:arbor-pedestal"],
-    ],
-)
-def test_invalid_farm_selection_stops_before_preflight_or_actions(
-    selection, monkeypatch, capsys
-):
-    from doit.dependency import Dependency
-    monkeypatch.setattr(
-        _farm, "producer_build",
-        lambda _label: pytest.fail("invalid selection acquired FIFO ownership"),
-    )
-
-    monkeypatch.delenv("HARMONIC_FARM_DISPLAY_NAME", raising=False)
-    preflights = []
-    closes = []
-    close = Dependency.close
-
-    def record_close(manager):
-        closes.append(manager)
-        close(manager)
-
-    monkeypatch.setattr(Dependency, "close", record_close)
-    monkeypatch.setattr(build, "_farm_preflight", lambda: preflights.append(1))
-    _seen, executed = _install_real_doit(monkeypatch)
-
-    assert build.main(["--executor", "farm", *selection]) == 3
-
-    assert "part:arbor-pedestal" in capsys.readouterr().err
-    assert preflights == []
-    assert executed == []
-    assert len(closes) == 1
-
-
-@pytest.mark.parametrize("label", ["", "invalid\nlabel", "a\0b", "a\ud800b", "a\udfffb"])
-@pytest.mark.parametrize("command", [[], ["run"], ["strace"]])
-def test_invalid_selection_precedes_explicit_display_name_validation(
-    label, command, monkeypatch, capsys
-):
-    monkeypatch.setenv("HARMONIC_FARM_DISPLAY_NAME", DISPLAY_NAME)
-    monkeypatch.setattr(
-        build, "_farm_preflight", lambda: pytest.fail("preflight before valid selection")
-    )
-    _seen, executed = _install_real_doit(monkeypatch)
-
-    assert build.main([
-        "--executor", "farm", f"--display-name={label}",
-        *command, "part:arbor-pedestal",
-    ]) == 3
-    assert executed == []
-    assert os.environ["HARMONIC_FARM_DISPLAY_NAME"] == DISPLAY_NAME
-    error = capsys.readouterr().err
-    assert "part:arbor-pedestal" in error
-    assert "--display-name" not in error
-
-
-def test_selection_validation_preserves_named_defaults_and_positional_args(
-    monkeypatch
-):
-    observed = []
-
-    def capture_configured(value):
-        observed.append(("configured", value))
-
-    def capture_release(channel, relargs):
-        observed.append(("release", channel, relargs))
-
-    def task_configured():
-        return {
-            "actions": [capture_configured],
-            "params": [
-                {
-                    "name": "value",
-                    "long": "value",
-                    "default": "default-value",
-                }
-            ],
-        }
-
-    def task_release():
-        return {
-            "actions": [capture_release],
-            "params": [
-                {
-                    "name": "channel",
-                    "long": "channel",
-                    "default": "stable",
-                }
-            ],
-            "pos_arg": "relargs",
-        }
-
-    _preflight_fakes(monkeypatch)
-    _install_real_doit(
-        monkeypatch,
-        {"task_configured": task_configured, "task_release": task_release},
-    )
-
-    assert (
-        build.main(
-            [
-                "--executor",
-                "farm",
-                "configured",
-                "--value",
-                "requested",
-                "release",
-                "--",
-                "v22",
-                "--draft",
-            ]
-        )
-        == 0
-    )
-    assert observed == [
-        ("configured", "requested"),
-        ("release", "stable", ["v22", "--draft"]),
-    ]
-
-
-def test_farm_selection_accepts_a_target_path_without_mutating_the_real_task(
-    tmp_path, monkeypatch
-):
-    target = tmp_path / "out" / "artifact.bin"
-    observed = []
-
-    def task_artifact():
-        return {
-            "actions": [lambda: observed.append("artifact")],
-            "targets": [str(target)],
-        }
-
-    _preflight_fakes(monkeypatch)
-    _install_real_doit(monkeypatch, {"task_artifact": task_artifact})
-
-    assert build.main(["--executor", "farm", str(target)]) == 0
-    assert observed == ["artifact"]
-
-
-def test_invalid_strace_selection_never_reaches_preflight(monkeypatch, capsys):
-    preflights = []
-    monkeypatch.setattr(build, "_farm_preflight", lambda: preflights.append(1))
-    _seen, executed = _install_real_doit(monkeypatch)
-
-    assert (
-        build.main(["--executor", "farm", "strace", "part:arbor-pedestal"]) == 3
-    )
-    assert "part:arbor-pedestal" in capsys.readouterr().err
-    assert preflights == []
-    assert executed == []
-
-
-def test_farm_command_wrappers_preserve_native_execute_signatures():
-    from doit.cmd_run import Run
-    from doit.cmd_strace import Strace
-
-    for command_class in (Run, Strace):
-        wrapped = build._farm_command(command_class)
-        assert wrapped.get_name() == command_class.get_name()
-        assert inspect.signature(wrapped._execute) == inspect.signature(
-            command_class._execute
-        )
-
-
-@pytest.mark.parametrize(
-    ("given", "expected", "runs"),
-    [
-        (["assembly:x"], ["-n", "8", "assembly:x"], True),
-        (["run", "assembly:x"], ["run", "-n", "8", "assembly:x"], True),
-        (["-n", "2", "assembly:x"], ["-n", "2", "assembly:x"], True),
-        (["run", "-n", "2", "x"], ["run", "-n", "2", "x"], True),
-        (["run", "--process=3", "part:y"], ["run", "--process=3", "part:y"], True),
-        (["list"], ["list"], False),
-        ([], ["-n", "8"], True),
-        (["--help"], ["--help"], False),
-        (["-h"], ["-h"], False),
-        (["--version"], ["--version"], False),
-        (["-f", "dodo.py", "list"], ["-f", "dodo.py", "list"], False),
-        (["-f", "dodo.py", "part:x"], ["-f", "dodo.py", "-n", "8", "part:x"], True),
-        (["-fdodo.py", "run", "part:x"], ["-fdodo.py", "run", "-n", "8", "part:x"], True),
-        (["--file=dodo.py", "-k", "--help"], ["--file=dodo.py", "-k", "--help"], False),
-        (["-d", ".", "clean"], ["-d", ".", "clean"], False),
-        # doit's loader options are getopt: grouped shorts, unique long prefixes
-        (["-kf", "dodo.py", "-h"], ["-kf", "dodo.py", "-h"], False),
-        (["-kf", "dodo.py", "part:x"], ["-kf", "dodo.py", "-n", "8", "part:x"], True),
-        (["--fi=dodo.py", "list"], ["--fi=dodo.py", "list"], False),
-        # a loader parse error hands the whole argv to run, as doit does
-        (["-f", "dodo.py", "-a", "x"], ["-n", "8", "-f", "dodo.py", "-a", "x"], True),
-        # ``name=value`` command-line variables are dropped before the subcommand
-        (["profile=ci", "list"], ["profile=ci", "list"], False),
-        (["profile=ci", "run", "x"], ["profile=ci", "run", "-n", "8", "x"], True),
-        (["profile=ci", "part:x"], ["-n", "8", "profile=ci", "part:x"], True),
-        (["profile=ci", "-h"], ["profile=ci", "-h"], False),
-        # a ``--`` the loader getopt swallowed still has to follow ``-n``
-        (["--", "part:x"], ["-n", "8", "--", "part:x"], True),
-        (["-f", "--", "x"], ["-f", "--", "-n", "8", "x"], True),
-        # doit has no per-command help: its parser rejects these and exits 3
-        # before any task, so no preflight and the argv passes untouched
-        (["run", "--help"], ["run", "--help"], False),
-        (["run", "-h"], ["run", "-h"], False),
-        (["strace", "--help"], ["strace", "--help"], False),
-        (["-f", "dodo.py", "--version"], ["-f", "dodo.py", "--version"], False),
-        (["-n", "abc", "x"], ["-n", "abc", "x"], False),
-        # ...and only its parser knows a help-looking token from an option
-        # value (``-r --help`` is an unknown reporter; ``-o --help`` a file
-        # name) or a task name after ``--``
-        (["run", "-r", "--help", "x"], ["run", "-r", "--help", "x"], False),
-        (["run", "-o", "--help", "x"], ["run", "-n", "8", "-o", "--help", "x"], True),
-        (["run", "--", "--help"], ["run", "-n", "8", "--", "--help"], True),
-    ],
-)
-def test_farm_runs_fan_out_unless_the_caller_chose(given, expected, runs, monkeypatch):
-    monkeypatch.delenv("HARMONIC_FARM_PARALLELISM", raising=False)
-    executing = build._executing_command(list(given), _RealDoitMain())
-    assert (executing is not None) is runs
-    result = (
-        given
-        if executing is None
-        else build._with_farm_parallelism(list(given), *executing)
-    )
-    assert result == expected
-
-
-def test_every_task_executing_command_gets_the_preflight_and_only_run_fans_out(
-    monkeypatch,
-):
-    """``strace`` is a ``Run`` subclass (``execute_tasks``): its task action runs,
-    so farm preflight still precedes it. It traces one task and has no ``-n``,
-    so the fan-out stays run-only. ``list`` executes nothing."""
-    preflights = []
-    monkeypatch.setattr(build, "_farm_preflight", lambda: preflights.append(1))
-    monkeypatch.delenv("HARMONIC_FARM_PARALLELISM", raising=False)
-    seen, _executed = _install_real_doit(monkeypatch)
-
-    assert build.main(["--executor", "farm", "strace", "part:x"]) == 0
-    assert len(preflights) == 1
-    assert build.main(["--executor", "farm", "list"]) == 0
-    assert len(preflights) == 1
-    assert build.main(["--executor", "farm", "run", "part:x"]) == 0
-    assert len(preflights) == 2
-
-    assert seen == [
-        ["strace", "part:x"],
-        ["list"],
-        ["run", "-n", "8", "part:x"],
-    ]
-
-
-def test_help_and_non_run_commands_skip_the_preflight(monkeypatch, capsys):
-    monkeypatch.delenv("HARMONIC_FARM_DISPLAY_NAME", raising=False)
-    monkeypatch.setattr(
-        _farm, "producer_build",
-        lambda _label: pytest.fail("non-executing command acquired FIFO ownership"),
-    )
-    def no_git(argv, **kwargs):
-        pytest.fail(f"preflight launched {argv}")
-
-    monkeypatch.setattr(build.subprocess, "run", no_git)
+def test_help_names_the_wrapper_options_then_doit_commands(monkeypatch, capsys):
     seen, executed = _install_real_doit(monkeypatch)
 
-    assert build.main(["--executor", "farm", "--help"]) == 0
-    assert build.main(["--executor", "farm", "-kf", "dodo.py", "-h"]) == 0
-    assert build.main(["--executor", "farm", "help", "run"]) == 0
-    assert build.main(["--executor", "farm", "profile=ci", "list"]) == 0
-    assert build.main(["--executor", "farm", "run", "--help"]) == 3
-
-    # A leading --help/-h, grouped loader options included, is the wrapper's
-    # (doit itself rejects ``-h``): its own options and the farm defaults, then
-    # doit's command list. The doit-owned routes (``help run``, ``list``, with
-    # or without a command-line variable) pass through unchanged, and so does
-    # ``run --help``, which doit's own parser rejects before any task.
-    assert seen == [
-        ["--help"],
-        ["--help"],
-        ["help", "run"],
-        ["profile=ci", "list"],
-        ["run", "--help"],
-    ]
+    assert build.main(["--help"]) == 0
+    assert build.main(["help", "run"]) == 0
+    assert seen == [["--help"], ["help", "run"]]
     assert executed == []
     out = capsys.readouterr().out
-    for flag in ("--verbosity", "--executor", "--leaf-timeout"):
-        assert flag in out
-    # Both knobs a no-flag farm run would silently inherit are named.
-    assert "HARMONIC_FARM_PARALLELISM" in out
-    assert "HARMONIC_FARM_LEAF_TIMEOUT_S" in out
+    assert "--verbosity" in out
+    assert "farm_build.py" in out
 
 
 # --- _farm: config and the Temporal boundary ---------------------------------
@@ -1670,7 +685,7 @@ def test_run_leaf_without_exact_preflight_admission_is_locally_refused(
 
     for name in (
         "_dispatch",
-        "_record_request",
+        "_record_leaf",
         "_record_json",
         "_rpc_update",
         "_connect_client",
@@ -1732,7 +747,7 @@ def temporal_boundary(tmp_path, monkeypatch):
         json.dumps(["part:pen_rod", "check:math"]),
     )
     monkeypatch.delenv("HARMONIC_FARM_RUN", raising=False)
-    monkeypatch.delenv("HARMONIC_FARM_REQUESTS", raising=False)
+    monkeypatch.delenv("HARMONIC_FARM_RUN_DIR", raising=False)
     calls = {"connect": [], "start": [], "submit": [], "handles": [], "queries": []}
     calls["workflow_type"] = _farm.WORKFLOW_BUILD_FIFO
     outcome = {}
@@ -1791,9 +806,9 @@ def test_run_leaf_rejects_wrong_type_before_submission_or_request_record(
     # A usable protocol-7 result cannot make an old coordinator type safe.
     resolve(_leaf_result())
     calls["workflow_type"] = "BuildFifo"
-    requests = tmp_path / "run.requests"
-    requests.mkdir()
-    monkeypatch.setenv("HARMONIC_FARM_REQUESTS", str(requests))
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    monkeypatch.setenv("HARMONIC_FARM_RUN_DIR", str(run_dir))
 
     with pytest.raises(RuntimeError) as failure:
         _farm.run_leaf("part:pen_rod", "k" * 64)
@@ -1804,7 +819,7 @@ def test_run_leaf_rejects_wrong_type_before_submission_or_request_record(
     assert "coordinated producer/pool/worker cutover" in message
     assert calls["submit"] == []
     assert calls["queries"] == []
-    assert list(requests.iterdir()) == []
+    assert list(run_dir.iterdir()) == []
 
 
 def test_workflow_id_is_logged_before_acceptance_and_attachment_before_wait(
@@ -2127,15 +1142,15 @@ def test_invalid_dispatch_display_name_has_no_side_effects(
         monkeypatch.setattr(os.environ, "get", lambda key, default=None: label if key == "HARMONIC_FARM_DISPLAY_NAME" else get(key, default))
     else:
         monkeypatch.setenv("HARMONIC_FARM_DISPLAY_NAME", label)
-    requests = tmp_path / "requests"
-    requests.mkdir()
-    monkeypatch.setenv("HARMONIC_FARM_REQUESTS", str(requests))
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    monkeypatch.setenv("HARMONIC_FARM_RUN_DIR", str(run_dir))
     monkeypatch.setattr(_farm, "load_config", lambda *args, **kwargs: pytest.fail("config before valid label"))
     with pytest.raises(RuntimeError, match="HARMONIC_FARM_DISPLAY_NAME"):
         _farm.run_leaf("part:pen_rod", "k" * 64)
     assert calls["connect"] == []
     assert calls["start"] == []
-    assert list(requests.iterdir()) == []
+    assert list(run_dir.iterdir()) == []
 
 
 @pytest.mark.parametrize("label", ["x", "x" * 160,
@@ -2156,15 +1171,14 @@ def test_dispatch_preserves_valid_display_name(temporal_boundary, monkeypatch, l
 def test_a_launcher_run_names_each_workflow_before_creating_it(
     temporal_boundary, tmp_path, monkeypatch
 ):
-    # farm-run.ps1 -Cancel reads these when the launcher it stopped never
-    # copied a `Farm workflow requested` line into the run log.
+    # farm_build.py cancel reads these to reconcile every reservation.
     from temporalio.client import Client
 
     calls, resolve = temporal_boundary
     resolve(_leaf_result())
-    requests = tmp_path / "run.requests"
-    requests.mkdir()
-    monkeypatch.setenv("HARMONIC_FARM_REQUESTS", str(requests))
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    monkeypatch.setenv("HARMONIC_FARM_RUN_DIR", str(run_dir))
     fake_connect = Client.connect
     named_at_start = []
 
@@ -2176,7 +1190,7 @@ def test_a_launcher_run_names_each_workflow_before_creating_it(
         async def execute_update(*update_args, **update_options):
             named_at_start.extend(
                 json.loads(path.read_text(encoding="utf-8"))
-                for path in sorted(requests.iterdir())
+                for path in sorted((run_dir / "leaves").iterdir())
             )
             return await submit(*update_args, **update_options)
 
@@ -2195,7 +1209,7 @@ def test_a_launcher_run_names_each_workflow_before_creating_it(
     assert named_at_start == [{
         "task": "part:pen_rod", "workflow_id": wf_id,
         "build_id": BUILD_ID, "farm_run": None,
-        "refresh_reason": None,
+        "refresh_reason": None, "state": "requested",
     }]
     assert len(calls["submit"]) == 1
 
@@ -2203,10 +1217,10 @@ def test_a_launcher_run_names_each_workflow_before_creating_it(
 def test_a_request_that_cannot_be_named_is_never_dispatched(
     temporal_boundary, tmp_path, monkeypatch
 ):
-    # An unnamed workflow could outlive farm-run.ps1 -Cancel.
+    # An unnamed workflow could outlive farm_build.py cancel.
     calls, resolve = temporal_boundary
     resolve(_leaf_result())
-    monkeypatch.setenv("HARMONIC_FARM_REQUESTS", str(tmp_path / "absent"))
+    monkeypatch.setenv("HARMONIC_FARM_RUN_DIR", str(tmp_path / "absent"))
 
     with pytest.raises(FileNotFoundError):
         _farm.run_leaf("part:pen_rod", "k" * 64)
@@ -2244,9 +1258,9 @@ def test_uncertain_submission_preserves_request_for_reconciliation(
     temporal_boundary, tmp_path, monkeypatch
 ):
     calls, _resolve = temporal_boundary
-    requests = tmp_path / "requests"
-    requests.mkdir()
-    monkeypatch.setenv("HARMONIC_FARM_REQUESTS", str(requests))
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    monkeypatch.setenv("HARMONIC_FARM_RUN_DIR", str(run_dir))
     original = _farm._rpc_update
 
     async def uncertain(handle, name, arg, result_type, operation):
@@ -2257,13 +1271,17 @@ def test_uncertain_submission_preserves_request_for_reconciliation(
     monkeypatch.setattr(_farm, "_rpc_update", uncertain)
     with pytest.raises(TimeoutError, match="possible acceptance"):
         _farm.run_leaf("part:pen_rod", "k" * 64)
-    records = [json.loads(path.read_text(encoding="utf-8")) for path in requests.iterdir()]
+    records = [
+        json.loads(path.read_text(encoding="utf-8"))
+        for path in (run_dir / "leaves").iterdir()
+    ]
     assert records == [{
         "task": "part:pen_rod",
         "workflow_id": f"leaf:{BUILD_ID}:part:pen_rod:" + "k" * 64 + ":900s",
         "build_id": BUILD_ID,
         "farm_run": None,
         "refresh_reason": None,
+        "state": "requested",
     }]
     assert calls["handles"][-1] == ("solidworks-build-fifo-7", {})
 
@@ -2289,16 +1307,6 @@ def test_an_unreadable_budget_stops_the_run_instead_of_dispatching(
 
     assert "HARMONIC_FARM_LEAF_TIMEOUT_S" in str(failure.value)
     assert calls["start"] == []
-
-
-def test_the_build_wrapper_turns_minutes_into_the_leaf_budget(monkeypatch):
-    monkeypatch.delenv("HARMONIC_FARM_LEAF_TIMEOUT_S", raising=False)
-    _preflight_fakes(monkeypatch)
-    _install_real_doit(monkeypatch)
-
-    assert build.main(["--executor", "farm", "--leaf-timeout", "90", "part:x"]) == 0
-    assert os.environ["HARMONIC_FARM_LEAF_TIMEOUT_S"] == "5400"
-    assert _farm.leaf_timeout_s() == 5400
 
 
 def test_only_a_cancelled_workflow_becomes_a_cancelled_result(temporal_boundary):
@@ -2401,35 +1409,28 @@ def test_settled_unbound_reply_cannot_be_used_as_a_leaf_result(
     assert calls["handles"] == [("solidworks-build-fifo-7", {})]
 
 
-@pytest.mark.parametrize("executor", ["local", "farm"])
 @pytest.mark.parametrize("reason", [
     None, "", " \t", "x" * 161, "a\nb", "a\tb", "a\0b", "a\u0085b",
     "a\u2028b", "a\u2029b", "a\u061cb", "a\u200eb", "a\u202eb", "a\u2066b",
     "a\ud800b",
 ])
-def test_refresh_reason_is_required_before_any_graph_or_fleet_work(
-    monkeypatch, capsys, executor, reason
-):
+def test_refresh_reason_is_required_before_any_graph_work(monkeypatch, capsys, reason):
     monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", "rw")
     monkeypatch.setattr(
         build, "_executing_command", lambda *_a: pytest.fail("parsed command before reason")
     )
-    args = ["--executor", executor, "--force-cache-refresh", "part:x", "part:x"]
+    args = ["--force-cache-refresh", "part:x", "part:x"]
     if reason is not None:
         args.append(f"--force-cache-refresh-reason={reason}")
     assert build.main(args) == 2
     assert "--force-cache-refresh-reason" in capsys.readouterr().err
 
 
-@pytest.mark.parametrize("executor", ["local", "farm"])
-def test_refresh_reason_without_labels_is_rejected_before_graph_or_fleet_work(
-    monkeypatch, capsys, executor
-):
+def test_refresh_reason_without_labels_is_rejected_before_graph_work(monkeypatch, capsys):
     monkeypatch.setattr(
         build, "_executing_command", lambda *_a: pytest.fail("parsed command before labels")
     )
     assert build.main([
-        "--executor", executor,
         "--force-cache-refresh-reason", "Re-evaluate cached output", "part:x",
     ]) == 2
     assert "--force-cache-refresh-reason requires --force-cache-refresh labels" in (
@@ -2438,13 +1439,13 @@ def test_refresh_reason_without_labels_is_rejected_before_graph_or_fleet_work(
 
 
 @pytest.mark.parametrize("mode", ["ro", "off"])
-def test_refresh_refuses_nonwritable_cache_before_fleet_work(monkeypatch, capsys, mode):
+def test_refresh_refuses_nonwritable_cache_before_graph_work(monkeypatch, capsys, mode):
     monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", mode)
     monkeypatch.setattr(
         build, "_executing_command", lambda *_a: pytest.fail("parsed command before mode")
     )
     assert build.main([
-        "--executor", "farm", "--force-cache-refresh", "part:x",
+        "--force-cache-refresh", "part:x",
         "--force-cache-refresh-reason", "Re-evaluate", "part:x",
     ]) == 2
     assert "requires HARMONIC_REMOTE_CACHE_MODE=rw" in capsys.readouterr().err
@@ -2472,7 +1473,6 @@ def _refresh_namespace(monkeypatch, observed, target=None):
     }
 
 
-@pytest.mark.parametrize("executor", ["local", "farm"])
 @pytest.mark.parametrize(("label", "selector", "diagnostic"), [
     ("missing", "missing", "unknown task 'missing'"),
     ("check", "check", "not a remote-cache-keyed leaf"),
@@ -2480,16 +1480,14 @@ def _refresh_namespace(monkeypatch, observed, target=None):
     ("leaf:other", "leaf:x", "not in the selected task closure"),
 ])
 def test_refresh_refuses_unknown_uncached_and_unselected_labels(
-    monkeypatch, capsys, executor, label, selector, diagnostic
+    monkeypatch, capsys, label, selector, diagnostic
 ):
     observed = []
     namespace = _refresh_namespace(monkeypatch, observed)
     _install_real_doit(monkeypatch, namespace)
     monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", "rw")
-    monkeypatch.setattr(build, "_farm_preflight", lambda: pytest.fail("fleet before selection"))
-    monkeypatch.setattr(build, "_require_leaf_admission", lambda *_a: pytest.fail("pool before selection"))
     assert build.main([
-        "--executor", executor, "--force-cache-refresh", label,
+        "--force-cache-refresh", label,
         "--force-cache-refresh-reason", "Re-evaluate unchanged inputs", selector,
     ]) == 2
     assert diagnostic in capsys.readouterr().err
@@ -2497,7 +1495,6 @@ def test_refresh_refuses_unknown_uncached_and_unselected_labels(
     assert "HARMONIC_CACHE_REFRESH" not in os.environ
 
 
-@pytest.mark.parametrize("executor", ["local", "farm"])
 @pytest.mark.parametrize("single", ["-s", "--single"])
 @pytest.mark.parametrize(("selection", "expected_exit"), [
     (["group"], 2),
@@ -2508,19 +1505,14 @@ def test_refresh_refuses_unknown_uncached_and_unselected_labels(
     (["leaf:*", "group"], 0),
 ])
 def test_refresh_single_only_admits_explicitly_selected_tasks(
-    monkeypatch, capsys, executor, single, selection, expected_exit
+    monkeypatch, capsys, single, selection, expected_exit
 ):
     observed = []
     _install_real_doit(monkeypatch, _refresh_namespace(monkeypatch, observed))
     monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", "rw")
-    if expected_exit:
-        monkeypatch.setattr(build, "_farm_preflight", lambda: pytest.fail("fleet before selection"))
-        monkeypatch.setattr(build, "_require_leaf_admission", lambda *_a: pytest.fail("pool before selection"))
-    else:
-        monkeypatch.setattr(build, "_farm_preflight", lambda: None)
     reason = "Re-evaluate explicitly selected leaf"
     assert build.main([
-        "--executor", executor, "--force-cache-refresh", "leaf:x",
+        "--force-cache-refresh", "leaf:x",
         "--force-cache-refresh-reason", reason, single, *selection,
     ]) == expected_exit
     if expected_exit:
@@ -2531,10 +1523,9 @@ def test_refresh_single_only_admits_explicitly_selected_tasks(
     assert "HARMONIC_CACHE_REFRESH" not in os.environ
 
 
-@pytest.mark.parametrize("executor", ["local", "farm"])
 @pytest.mark.parametrize("inherited", [None, "previous carrier"])
 def test_refresh_runs_fresh_targets_with_scoped_deduplicated_carrier(
-    monkeypatch, tmp_path, executor, inherited
+    monkeypatch, tmp_path, inherited
 ):
     observed = []
     target = tmp_path / "fresh.out"
@@ -2544,10 +1535,9 @@ def test_refresh_runs_fresh_targets_with_scoped_deduplicated_carrier(
     monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", "rw")
     if inherited is not None:
         monkeypatch.setenv("HARMONIC_CACHE_REFRESH", inherited)
-    monkeypatch.setattr(build, "_farm_preflight", lambda: None)
     reason = "  Owner - Re-evaluate Ω 👩\u200d🔧  "
     args = [
-        "--executor", executor, "--force-cache-refresh", "leaf:x,leaf:other",
+        "--force-cache-refresh", "leaf:x,leaf:other",
         "--force-cache-refresh", "leaf:x", f"--force-cache-refresh-reason={reason}",
         "group", "leaf:other",
     ]
@@ -2591,9 +1581,9 @@ def test_leaf_refresh_wire_and_durable_record_are_scoped_to_the_listed_task(
 
     calls, resolve = temporal_boundary
     resolve(_leaf_result())
-    requests = tmp_path / "requests"
-    requests.mkdir()
-    monkeypatch.setenv("HARMONIC_FARM_REQUESTS", str(requests))
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    monkeypatch.setenv("HARMONIC_FARM_RUN_DIR", str(run_dir))
     monkeypatch.setenv("HARMONIC_FARM_LEAF_TIMEOUT_S", "900")
     monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", "rw")
     monkeypatch.setenv("HARMONIC_CACHE_REFRESH", json.dumps({
@@ -2608,7 +1598,7 @@ def test_leaf_refresh_wire_and_durable_record_are_scoped_to_the_listed_task(
     ]
     records = {
         record["task"]: record
-        for path in requests.iterdir()
+        for path in (run_dir / "leaves").iterdir()
         for record in [json.loads(path.read_text(encoding="utf-8"))]
     }
     assert records["part:pen_rod"]["refresh_reason"] == wire[0]["refresh_reason"]

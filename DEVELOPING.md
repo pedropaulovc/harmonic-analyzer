@@ -51,12 +51,12 @@ names containing `harmonic`; these are name-only leads, not ownership proof.
 It does **not** recursively search the drive, AppData, or Temp.
 Default exact entries include `C:/farm-build`, the main and script checkouts'
 `wip`, `logs`, `build.log`, and `cad/out`, plus `LOCALAPPDATA/ha-farm` (the
-farm launcher's fallback home), project cache/review-scratchpad directories,
+`farm_build.py` runs home), project cache/review-scratchpad directories,
 and checkout-specific Claude directories under `LOCALAPPDATA`.
-`HARMONIC_AGENT_SCRATCHPAD` adds both `harmonic-analyzer/farm-runs` and
-`harmonic-analyzer/machinist-review-evals`. Without that override, running from
-an OMP `local` working directory (`OMPCODE=1`) adds its
-`harmonic-analyzer/farm-runs`, matching the launcher. Other sessions' OMP local
+`HARMONIC_AGENT_SCRATCHPAD` adds both `harmonic-analyzer/farm-runs` (retired
+launcher runs) and `harmonic-analyzer/machinist-review-evals`. Without that
+override, running from an OMP `local` working directory (`OMPCODE=1`) adds its
+`harmonic-analyzer/farm-runs`. Other sessions' OMP local
 directories are not globally discovered; supply their paths with `--path`.
 Known temporary Codex homes, `PROGRAMDATA/harmonic-analyzer`, and the **shared**
 `PROGRAMDATA/solidworks-pool/archive-cache` are exact entries too. Their presence
@@ -204,17 +204,15 @@ $env:HARMONIC_MACHINIST_JUDGE_EFFORT = 'high'
 uv run --frozen python -m doit check:machinist_review:sm_summing_lever
 
 # Or the complete farm build, from a clean, pushed worktree:
-./scripts/farm-run.ps1 -Worktree (Get-Location).Path `
-    -PoolHome C:/src/solidworks-pool -Targets build -LeafTimeout 90 `
-    -DisplayName 'Summing lever - Codex high review' -Tag summing-lever-codex-high
+uv run python farm_build.py run build --leaf-timeout 90 `
+    --display-name 'Summing lever - Codex high review' --tag summing-lever-codex-high
 ```
 
-`farm-run.ps1` preserves these inherited process variables when it invokes `uv`
-from the private snapshot; the reviews execute on that submitter, not on the
-SolidWorks workers. Set them in the shell/process that launches the script
-(including the supervised launch process), not in a different terminal after
-launch. No tracked config edit, `HARMONIC_CACHE_SALT`, or forced cache refresh is
-needed. The standalone `cad/scripts/machinist_review.py` continues to use its
+`farm_build.py` passes these inherited process variables through to the build
+in its private snapshot; the reviews execute on that submitter, not on the
+SolidWorks workers. Set them in the shell that runs `farm_build.py run`, not in
+a different terminal after launch. No tracked config edit, `HARMONIC_CACHE_SALT`,
+or forced cache refresh is needed. The standalone `cad/scripts/machinist_review.py` continues to use its
 explicit `--reviewer/--model/--effort` and `--judge-reviewer/--judge-model/--judge-effort`
 options, not these build-gate environment variables.
 
@@ -248,9 +246,8 @@ a cached verdict:
 
 ```powershell
 $env:HARMONIC_REVIEW_SWEEP_DAYS = '30'   # default; a whole number of days, or 'all'
-pwsh -NoProfile -File scripts/farm-run.ps1 -PoolHome C:/src/solidworks-pool `
-  -DisplayName 'review sweep' -LeafTimeout 150 `
-  -Targets 'review_sweep:dt_pinion_cam,review_sweep:sm_summing_assembly'
+uv run python farm_build.py run review_sweep:dt_pinion_cam review_sweep:sm_summing_assembly `
+  --display-name 'review sweep' --leaf-timeout 150
 ```
 
 `review_sweep` sweeps every drawing that opts in; `review_sweep:<stem>` sweeps
@@ -656,13 +653,12 @@ the production fix.
 
 Reproduce the original causal matrix only from an isolated checkout at
 `f4927b968cb93cb46da933b1d011ebded120cede`, which retains the probe and builder
-hook. Under [the persistent supervisor](#starting-one-under-the-supervisor), use
-the existing `farm-run.ps1` launch shape with `"-Worktree", "<checkpoint checkout>"`,
-`"-PoolHome", "C:/src/solidworks-pool"`, `"-Targets", "assembly:pn_pen"`,
-`"-LeafTimeout", "90"`, `"-DisplayName", "DisplayData - Reproduce pinned pn matrix"`
-and a unique `"-Tag", "display-data-repro"` / supervisor process name. Keep logs
-outside worktrees, retain the recorded run and use the protocol-compatible pool;
-do not invoke the probe locally or transplant its hook into production.
+hook. That commit predates `farm_build.py` (which refuses such commits), so
+launch it with the checkpoint's own `scripts/farm-run.ps1`: target
+`assembly:pn_pen`, leaf timeout 90, display name
+`DisplayData - Reproduce pinned pn matrix`, tag `display-data-repro`.
+Retain the recorded run and use the protocol-compatible pool; do not invoke the
+probe locally or transplant its hook into production.
 The observed protocol-6 run was
 `20261012T071150070Z-5c47034df7644314b3136e88072c9fd6`.
 
@@ -698,77 +694,102 @@ the unchanged production builder on SOLIDWORKS 2026
 This proves the preventive mark for that assembly and fixture; other assemblies
 await the full-farm build and native eDrawings visibility review.
 
-## Supervised farm launches
+## Farm builds (`farm_build.py`)
 
 A farm build outlives every agent turn and every harness deadline: a cold
-`build` closure runs for hours, and one leaf alone has measured 61.5 min. So an
-agent never runs `build.py --executor farm` under a Bash job, a 300 s tool
-deadline or any other finite local timer. It starts the tracked launcher
-[`scripts/farm-run.ps1`](scripts/farm-run.ps1) under a persistent `hub`
-process and hands the recorded run to whoever comes next. An attended terminal
-may still run `build.py` directly (its drift guard is below, under
-[the build snapshot](#the-build-snapshot)); everything else here is the
-contract for an agent-driven launch.
+`build` closure runs for hours, and one leaf alone has measured 61.5 min.
+[`farm_build.py`](farm_build.py) is the one entry point for it, for agents and
+attended terminals alike (`build.py` is local-only):
 
-The launcher is a foreground runner, not a second scheduler: it validates its
-inputs, writes a startup record, builds a private snapshot of the pushed HEAD,
-runs exactly one `uv run … build.py` child from that snapshot, tees its output
-to a log outside the worktree, keeps the snapshot's outputs, removes the
-snapshot, and writes a terminal record carrying the child's own exit code. A
-launch never retries, never cancels a remote workflow, never detaches and never
-imposes a local deadline. The same script tracks what it launched, from the same
-records under the same `-LogDirectory`: `-Status`, `-Watch`, `-List` and the one
-explicit way to stop a run, `-Cancel` (see
-[tracking a run](#tracking-a-run-status-watch-list-cancel)).
+```
+uv run python farm_build.py run TARGET... --display-name "Owner - Why" --leaf-timeout MIN
+        [--force-cache-refresh LABELS --force-cache-refresh-reason TEXT]
+        [--tag T] [--worktree PATH] [--pool-home PATH] [--watch] [--runs-dir DIR]
+uv run python farm_build.py watch  <run-id | tag> [--poll-seconds S]
+uv run python farm_build.py status <run-id | tag>
+uv run python farm_build.py list   [--tag T] [--state S] [--max-age-hours H]
+uv run python farm_build.py cancel <run-id | tag> --why TEXT [--binding-wait-seconds S]
+```
 
-### Prerequisites
+`run` validates its arguments and the worktree, writes `run.json`, starts a
+detached supervisor (through a short-lived trampoline, breaking away from the
+caller's job when Windows allows it, so no parent chain or harness tree-kill
+reaches it) and waits only until the build has passed its preflight and
+recorded its FIFO `build_id` (exit 0), or has stopped (that exit code). It never
+retries, never cancels remote work and imposes no deadline. The supervisor:
 
-- **PowerShell 7.3 or newer** (`#requires -Version 7.3`). The launcher clears
-  `$PSNativeCommandUseErrorActionPreference` for itself so a caller's preference
-  cannot turn a native exit 23 into a PowerShell exception.
-- **The worktree's HEAD is pushed.** Every leaf fetches that exact SHA from the
-  approved repository, so the launcher refuses a HEAD that no locally known
-  `origin/*` ref reaches: `HEAD is not known on origin; fetch and push before
-  launching`. Fetch and push first; the launcher does neither for you.
-- **A clean worktree.** The launcher builds the pushed HEAD only, so it refuses
-  any uncommitted change, untracked file or moved submodule in `-Worktree`
-  (`Worktree has uncommitted changes; …`, listing the paths) rather than
-  silently leave it out of the build.
-- **A protocol- and identity-compatible pool checkout** at `-PoolHome`, holding
-  `farm.py`, `pyproject.toml` and `agent/protocol.py`, plus Azure credentials for
-  the cache (`az login`; `off` is refused).
-  Preflight checks every would-be leaf in the entire requested closure with
-  that checkout's authoritative `agent.protocol.leaf_admitted`; refused tasks
-  and prefixes exit 2 before joining the FIFO. Mixed agent versions are expected
-  during rolling upgrades and are not checked; the protocol version is.
-  This is deliberately conservative for doit `-s`/`--single` and cache hits:
-  the entire requested closure is prechecked, even when some leaves would not
-  execute.
-  After successful preflight, the parent exports the admitted label set as
-  `HARMONIC_FARM_ADMITTED_LEAVES` only while executing the doit command in its
-  producer context, restores the prior value afterward, and lets workers
-  inherit it. Actual `run_leaf(task, cache_key)` dispatch checks that set before
-  any request, span/config/identity lookup or reservation. A missing or invalid
-  set, or a task absent from it, raises a local `RuntimeError` naming the task
-  and its lack of preflight admission; the guard uses no copied prefix list.
-  The worker independently limits its exported graph to the build/release
-  closure; preflight admission does not enforce that restriction.
-- **A log directory outside every Git worktree.** An explicit
-  `HARMONIC_AGENT_SCRATCHPAD` uses
-  `<root>\harmonic-analyzer\farm-runs`. For an OMP persistent process, when
-  `OMPCODE=1` and its working-directory basename is `local`, the launcher uses
-  `<working-directory>\harmonic-analyzer\farm-runs`. Otherwise it falls back to
-  `%LOCALAPPDATA%\ha-farm\runs`. Pass `-LogDirectory` to override the default.
-  In OMP, run `realpath local://` in the outer shell and set the persistent
-  process working directory to that host path; the PowerShell process cannot
-  resolve the OMP-only URI itself. The directory holds run records, logs,
-  snapshots, shared environments and outputs. The launcher enables
-  `core.longpaths=true` only for itself and its child processes, without
-  changing the user's Git configuration.
-  A snapshot inside some worktree would show up there as an untracked nested
-  checkout, so a `-LogDirectory` inside any Git work tree is refused before
-  anything is created. A new path under the drive root, such as
-  `C:/farm-runs/knife-hanger`, is valid even if only `C:/` exists yet.
+1. joins a named kill-on-close Windows job (`job` in `run.json`) before it
+   starts anything, so every process of the run dies with the supervisor and
+   nothing can keep dispatching after it;
+2. prepares a private snapshot of the commit and the shared environment
+   ([the build snapshot](#the-build-snapshot));
+3. runs `farm_build.py _build <run-dir>` from the snapshot, in that
+   environment, with `HARMONIC_REMOTE_CACHE_MODE=rw` and
+   `SOLIDWORKS_POOL_HOME`; its output goes to `build.log`;
+4. moves the snapshot's `cad/out` to `<run-dir>/out`, removes the snapshot and
+   writes `status.json`.
+
+The `_build` child is the commit's own farm client: it loads the commit's
+`dodo.py`, runs the preflight below, then runs doit as
+`run -n 8 --continue <targets>` inside the FIFO producer (`HARMONIC_FARM_PARALLELISM`
+overrides 8). doit stays the local scheduler (freshness, cache restore, the
+SolidWorks-free `check:*` tasks); every cache-missing COM leaf runs on the farm
+(`dodo._cached_com_action` → `dodo._farm_build`). Eight leaves in flight keep
+every worker busy; a hard-coded `-n 4` against five workers kept one idle for
+88% of a cold build (2026-09-28, build `20260928T150817352Z`). `--continue`
+collects later failures; any failed task still leaves the run nonzero.
+
+### Prerequisites and refusals
+
+`run` refuses with exit 2, before writing anything, when:
+
+- the worktree has any uncommitted change or untracked file, or its HEAD is not
+  reachable from a locally known `origin/*` ref (every leaf fetches that exact
+  SHA; fetch and push first);
+- a target is empty, starts with `-`, contains `=` (doit would take it as a
+  command-line variable and build the default closure instead) or is `release`
+  (see [farm releases](#farm-releases)); targets may also be comma-separated;
+- `--display-name` or `--force-cache-refresh-reason` breaks the label rules
+  below, a reason comes without refresh labels, or `--leaf-timeout` is outside
+  1–180 minutes;
+- the pool home (`--pool-home`, else `SOLIDWORKS_POOL_HOME`, else
+  `../solidworks-pool`) lacks `farm.py` or `agent/protocol.py`;
+- the runs directory is inside a Git worktree (snapshots are created under it).
+
+The build's preflight runs before any producer registration, build ID or leaf
+request. An unknown task exits 3 (doit's invalid-command code, naming it). Exit 2
+follows, with a `farm:` diagnostic, when: the display name is invalid; a
+would-be leaf anywhere in the requested closure is refused by the pool's
+`agent/protocol.py` `leaf_admitted` (loaded in-process from that file, so no
+installed `agent` package can answer for it; deliberately conservative for
+`-s` and cache hits); a forced-refresh label is unknown, outside the selected
+closure or not cache-keyed; the `check:undefined_names` Ruff scan fails; or the
+fleet does not support farm protocol **7** (`farm.py agents --json`: a
+`mismatch`/`unreadable` verdict, or only aged-out reports that are incompatible).
+After preflight, `HARMONIC_FARM_ADMITTED_LEAVES` carries the admitted labels
+to every action process; `run_leaf(task, cache_key)` refuses any task absent
+from it before any request, span or reservation. The worker independently
+limits its exported graph to the build/release closure.
+Mixed agent versions are expected during rolling upgrades and are not checked;
+the protocol version is. Azure credentials for the cache are required (`az login`).
+
+Labels (`--display-name`, `--force-cache-refresh-reason`) are nonblank,
+single-line, valid Unicode, at most 160 code points, with no control
+characters (`Cc`), line/paragraph separators (`Zl`, `Zp`) or `Bidi_Control`
+characters, so a label cannot spoof adjacent dashboard text; Arabic/Hebrew text
+and emoji (including joiners) are fine. Use owner/session plus reason, e.g.
+`--display-name 'InchPD - Add new drawing detail view to pd_transgear_stub v3'`;
+a label starting with `-` needs `--display-name=-…`. The label becomes the
+coordinator-authored Temporal memo `display_name`; the run id is the separate
+`farm_run` metadata. Neither enters the workflow ID or cache key: protocol 7's
+build-scoped workflow ID is `leaf:<build_id>:<task>:<cache key or
+commit[:16]>:<timeout_s>s`, bound to one exact run. Builds reuse cache
+artifacts but never attach to another build's execution.
+
+Task names use prefixed underscores (`part:pn_pen_rod`), never dashes.
+Canonical stems and drawing Numbers are defined in the
+[subsystem identity guide](cad/docs/subsystem-identities.md); its migration
+table translates identifiers recorded in older runs.
 
 ### Validated selective worker execution
 
@@ -848,96 +869,6 @@ For file-only comparison runs, pass explicit empty strings for
 re-enable default discovery; use a launcher that preserves empty child values.
 Existing COM-free `check:math` component measurements do not establish native
 output equivalence or the whole-farm **25% overhead-reduction target**.
-
-### Parameters
-
-| parameter | required | meaning |
-|---|:---:|---|
-| `-Worktree` | yes | absolute path to the checkout whose pushed HEAD is built; the build runs from a private snapshot of that commit, never from here |
-| `-PoolHome` | yes | absolute path to the `solidworks-pool` checkout; exported as `SOLIDWORKS_POOL_HOME` |
-| `-LogDirectory` | no | optional absolute path for run files and outputs; defaults under the agent scratchpad and must resolve outside every Git worktree |
-| `-Targets` | yes | doit task names as ONE comma-separated string (`part:pn_pen_rod,part:dt_cone_gear`) |
-| `-LeafTimeout` | yes | per-attempt remote leaf budget in minutes, 1–180 |
-| `-DisplayName` | yes, Launch only | short owner/session plus reason; nonblank, single-line, no control characters, at most 160 characters; tracking commands such as `-Watch` do not require it |
-| `-ForceCacheRefresh` | no, Launch only | string array of exact remote-cache leaf task names; each string may also be comma-separated |
-| `-ForceCacheRefreshReason` | with refresh labels only | why these cached outputs must be overwritten; same text/Unicode rules as `-DisplayName` |
-| `-Tag` | no | label recorded with the run (letters, digits, `_`, `-`); defaults to `run` |
-
-An explicit `HARMONIC_AGENT_SCRATCHPAD` always wins. Otherwise, an OMP
-persistent process automatically uses its resolved `local` working directory
-when `OMPCODE=1`; a direct PowerShell launch falls back to
-`%LOCALAPPDATA%\ha-farm\runs`. Pass the resulting absolute path when handing a
-run to an agent on another host.
-
-For example, use `-DisplayName 'InchPD - Add new drawing detail view to pd_transgear_stub v3'`.
-The launcher records it as `display_name`, passes one `--display-name=<label>` argument,
-and exports `HARMONIC_FARM_DISPLAY_NAME` to the build. An attended direct farm
-build must supply `--display-name` (also accepted as `-DisplayName`) or that
-environment variable; local builds and non-executing commands such as `--help`
-and `list` do not need it. An explicit option overrides the inherited value.
-Labels retain surrounding whitespace and must be valid Unicode encodable as
-UTF-8; malformed surrogate text, Unicode control characters (`Cc`) and
-line/paragraph separators (`Zl`, `Zp`) are rejected. Unicode `Bidi_Control`
-characters are also refused so a label cannot spoof adjacent dashboard text.
-Ordinary Arabic/Hebrew text and valid emoji, including joiners, are allowed.
-The 160-character limit counts Unicode scalar values (code points), not
-UTF-16 code units or grapheme clusters: each supplementary-plane emoji counts
-once, while each combining mark and joiner counts separately.
-Invalid labels are refused before contacting the farm, after doit has rejected
-any invalid task selection.
-For a direct label beginning with `-`, use `--display-name="-Owner - Reason"`
-so it is not parsed as an option. Wrapper options are never abbreviated.
-For the native `pwsh -File` launcher, attach a dash-leading label with a colon,
-for example `-DisplayName:'-DisplayName'`; a separate value matching a known
-PowerShell parameter name would otherwise be parsed as another parameter.
-Launcher stdout JSON and its logs use UTF-8, including detached Windows launches.
-
-Every new leaf execution has coordinator-authored Temporal memo `display_name`,
-separate from optional launcher metadata `farm_run`. Neither label enters the
-workflow ID or cache key. Protocol 7 retains the build-scoped workflow ID,
-`leaf:<build_id>:<task>:<cache key or commit[:16]>:<timeout_s>s`, and binds each
-accepted reservation to an exact workflow run. Builds can reuse cache artifacts,
-but never attach to another build's execution. The display label identifies
-the build that owns the execution.
-
-Old native workflow-ID formats are unsupported by the launcher, including
-status inspection and remote cancellation. Finish or cancel those runs with
-their matched old tools **before** the coordinated cutover to an idle,
-physically drained fleet; there is no runtime legacy fallback. Cancellation
-still stops safely attributed local processes before rejecting invalid remote
-identities (exit 2), without remote commands or output/snapshot cleanup.
-
-Targets are *selections*, not variables, and they arrive as one string. `pwsh
--File` binds a single token per parameter, so a repeated `-Targets` or a
-space-separated list is rejected before the script runs: pass
-`"part:pn_pen_rod,part:dt_cone_gear"`. The launcher splits that string on commas,
-trims each component, and rejects an empty set, an empty component, a token
-starting with `-`, and a token containing `=`. That last rule matters: doit
-removes a `name=value` argument as a command-line variable, so a mistyped
-target would leave no selection at all and silently launch the full default
-build. Task names use prefixed underscores (`part:pn_pen_rod`), never dashes — a dashed
-name is rejected by `build.py` before the fleet is contacted.
-Canonical stems and drawing Numbers are defined in the
-[subsystem identity guide](cad/docs/subsystem-identities.md); its migration
-table translates identifiers recorded in older runs.
-
-The launcher sets `SOLIDWORKS_POOL_HOME`, `HARMONIC_REMOTE_CACHE_MODE=rw`,
-`PYTHONUNBUFFERED=1` and `VIRTUAL_ENV=<shared environment>`, then runs, from the
-snapshot:
-
-```
-uv run --frozen --no-sync --active python build.py --executor farm \
-  --display-name "InchPD - Build pen rod" --leaf-timeout <minutes> \
-  --verbosity info --continue <targets...>
-```
-
-The launcher passes no `-n`, so `build.py` inserts `-n 8`
-(`HARMONIC_FARM_PARALLELISM`): more leaves in flight than the fleet has workers,
-so no worker idles between leaves. A hard-coded `-n 4` against five workers kept
-exactly four leaves running 88% of a cold build and one worker idle throughout
-(2026-09-28, build `20260928T150817352Z`).
-`--continue` collects later failures instead of stopping at the first; any failed
-task still leaves the run nonzero.
 
 ### FIFO capacity reservations
 
@@ -1072,77 +1003,48 @@ a separately reviewed replay/migration plan.
 
 ### The build snapshot
 
-A farm key is computed on the submitter from the local files, while every
-worker builds the commit `_farm_preflight` recorded at launch. If the tree the
-submitter reads changes mid-run — another agent commits or edits in the same
-worktree — the two diverge: the worker publishes the key for the launch commit
-and the submitter looks for a different one. That is issue #1114, where it
-surfaced as `[cache_missing] exit 0`. The launcher therefore never runs
-`build.py` in `-Worktree`:
+A farm key is computed on the submitter from its files, while every worker
+builds the launch commit. If the submitter's tree changed mid-run (another
+agent committing in the same worktree) the two would diverge: the worker
+publishes the key for the launch commit and the submitter looks for another,
+surfacing as `[cache_missing] exit 0` (#1114). So no build ever runs in the
+caller's worktree:
 
-1. `git worktree add --detach <LogDirectory>\snapshots\<12 hex> <commit>` —
-   a private checkout of the launch commit, short-named to keep the deepest
-   tracked path under `MAX_PATH`.
+1. `git worktree add --detach <runs>\snapshots\<12 hex> <commit>`, short-named
+   to keep the deepest tracked path under `MAX_PATH`, with `core.longpaths`
+   enabled for the run's own Git commands only.
 2. `git submodule update --init --recursive` for every gitlink in the commit
-   except those its `.farm-sources.json` `exclude_submodules` lists (the same
-   set the workers skip).
-3. A shared environment at `<LogDirectory>\envs\<key>`, where `<key>` hashes
-   the commit's `uv.lock`, `pyproject.toml`, `.python-version` and required
-   gitlinks, reused by every launch with the same dependencies. The first
-   launch for a key creates it in a staging directory of its own
-   (`<key>.staging-<12 hex>`: `uv venv --relocatable`, then
-   `uv sync --frozen --no-editable --active`), writes the
-   `.farm-run-environment.json` marker, and only after uv has exited renames
-   it to `<key>`. No launcher ever syncs into or deletes a directory another
-   one may be using, even when a killed launcher's uv outlives it; two
-   launchers racing on one key both sync, one rename wins, and the other
-   discards its copy and adopts the winner's. `--no-editable` keeps the
-   environment free of pointers into any snapshot, so snapshots come and go
-   while it is in use, and `--relocatable` keeps its entry points valid
-   across the rename.
-4. The build runs from the snapshot with `VIRTUAL_ENV` set to that environment
-   and `--no-sync --active`, so neither `uv` nor `build.py` touches `-Worktree`
-   again. Commit, edit or check out anything there mid-run; this run cannot
-   see it.
+   except those its `.farm-sources.json` `exclude_submodules` lists (the set the
+   workers skip; possibly none). A commit without `farm_build.py` is refused.
+3. A shared environment at `<runs>\envs\<key>`, where `<key>` hashes the
+   commit's `uv.lock`, `pyproject.toml`, `.python-version` and required gitlinks.
+   The first run for a key syncs a private staging directory
+   (`uv venv --relocatable`, then `uv sync --frozen --no-editable --active`),
+   writes the `.farm-run-environment.json` marker and only then renames it into
+   place; a racing run discards its copy and adopts the winner's. No run ever
+   syncs into or deletes a directory another may use; `--no-editable` keeps it
+   free of pointers into any snapshot.
+4. The build runs from the snapshot with `VIRTUAL_ENV`,
+   `UV_PROJECT_ENVIRONMENT` and `UV_NO_SYNC=1` naming that environment, so
+   nothing touches the caller's worktree again. Commit or edit there freely.
 
-Measured on this workstation (2047 tracked files, one required submodule):
-`worktree add` ≈ 1.9 s, submodule init ≈ 1.7–3.2 s, a first `uv sync` of a new
-environment ≈ 7 s, a reused environment 0 s — so ≈ 12–13 s on a new dependency
-set and ≈ 4–5 s otherwise, against leaves measured in minutes. Each launch
-records its own figure as `launch_overhead_s`.
+Each run records its preparation time as `launch_overhead_s` (≈ 4–5 s with a
+reused environment, ≈ 12–13 s for a new dependency set). Every snapshot starts
+with an empty `cad/out`, so `.doit.db` is fresh and each task first looks for
+its key in the remote cache. Afterwards, whatever the outcome, the snapshot's
+`cad/out` (restored artefacts, `.doit.db`, `reports/cache.jsonl`,
+`reports/telemetry`) moves to `<run-dir>/out` and the snapshot is removed. If the
+move fails the snapshot holds the only copy and is kept, `outputs` points into
+it, `cleanup_errors` says why and the run is `failed`. Delete an `envs\<key>`
+(or a killed run's `<key>.staging-*`) only when no run is active.
 
-Every snapshot starts with an empty `cad/out`, so `.doit.db` is fresh and each
-task first looks for its key in the remote cache; nothing from the caller's
-`cad/out` is read or written. When the child exits, whatever the outcome, the
-launcher moves the snapshot's `cad/out` (restored artefacts, `.doit.db`,
-`reports/cache.jsonl`, `reports/telemetry`, logs) to
-`<LogDirectory>\<run-id>.out` and runs `git worktree remove --force` on the
-snapshot. `.done`'s `outputs` is where they actually are. If the move fails,
-the snapshot holds the only copy, so it is kept, `outputs` points into it,
-the reason is in `cleanup_errors`, and the run ends `failed` with a nonzero
-exit even when the build itself exited 0 — its outputs are not where a
-finished run's are. The shared environments stay; delete an `envs\<key>`
-directory, or a `<key>.staging-*` left by a killed launcher, only when no
-launcher is running.
+When a leaf reports `cache_missing`, or succeeds without its key, the
+diagnostic names the remaining causes (`_farm.CACHE_MISSING_CAUSES`): a
+differing `HARMONIC_CACHE_SALT`/account/container, or a recipe whose key is not
+reproducible across machines.
 
-A direct `build.py --executor farm` in an attended terminal has no snapshot. It
-guards the same hazard instead. Before each leaf dispatch it runs
-`git diff --raw --ignore-submodules=none <launch commit>` (plus a
-`git rev-parse HEAD` only once something differs) and refuses the dispatch if
-a change can move that leaf's key: any path under `cad/` (every recipe input
-lives there, and a key folds its dependencies' recipes), `dodo.py`,
-`build.py`, `pyproject.toml`, `uv.lock`, `.python-version`,
-`.farm-sources.json`, `.gitmodules`, any `.gitattributes`, any submodule, or
-one of the task's own recorded key inputs. The task stops with
-`submitter checkout changed since launch: HEAD A -> B; changed: <files>; the
-farm builds A, so keys would not match. Launch from an untouched worktree
-(scripts/farm-run.ps1 does this).` A README or test edit dispatches normally;
-untracked files and a new commit with an identical tree never count. When a
-leaf then reports `cache_missing`, or succeeds without its key, every tracked
-difference is reported the same way, since each is a lead; without any, the
-failure names its other likely causes instead.
 
-### Supervised farm releases
+### Farm releases
 
 During the rolling-main trial, the release manager continuously full-builds
 `main`. Individual PRs and stacks may merge after their authors provide focused
@@ -1159,13 +1061,12 @@ successful full build and all release checks for the exact source commit
 and artifacts being released. The trial does not change the task graph,
 executors, cache contracts or release checks.
 
-Never launch the `release` target through `farm-run.ps1`: it runs in a
-disposable snapshot, and cleanup would discard the publisher's post-release
-tracked image and `release.yaml` updates. Launch
-with `-Targets "build,export,package:release,preflight"` (`build` supplies drawing
-and check gates). Once successful, restore the complete `cad/out` from the
-recorded `.done` `outputs` path (normally `<LogDirectory>\<run-id>.out`) into
-the owning worktree. Then run `uv run --frozen python -m doit -s gallery`,
+`farm_build.py run` refuses the `release` target: it would run in a disposable
+snapshot, and cleanup would discard the publisher's post-release tracked image
+and `release.yaml` updates. Run `build export package:release preflight`
+(`build` supplies drawing and check gates). Once successful, copy the run's
+complete `out/` (`status` → `outputs`) over the owning worktree's `cad/out`.
+Then run `uv run --frozen python -m doit -s gallery`,
 `uv run --frozen python -m doit -s prechips` (every enrolled traveler, rendered
 from the restored feature bundles) and
 `uv run --frozen python -m doit -s release -- vNN` there. This keeps the
@@ -1216,386 +1117,112 @@ the main bundle's provenance/integrity contract unchanged. `--no-publish`
 prepares the same drawing ZIP and reports its path and notes without uploading
 anything.
 
-### Starting one under the supervisor
+### Tracking a run
 
-Start it with `hub` `op: "start"`, never with Bash. `persist: true` is what lets
-the run survive the launching agent's turn and a session handoff; `detached`
-would lose live monitoring, so it is not used.
+Every command selects a run by id, or by `--tag` (its newest run), under the
+runs root (`--runs-dir`, else `HARMONIC_FARM_RUNS`, else
+`%LOCALAPPDATA%\ha-farm\runs`); a selection that matches nothing exits 2.
+A run's state is derived, never trusted from one file: `status.json`'s `state`
+when it exists (`succeeded`, `failed`, `cancelled`), else `running` while the
+recorded supervisor (pid plus process creation time, so a reused PID never
+counts) is alive, else **`launcher-died`**. Inability to read a process's
+identity is an error, never evidence of death. Because the supervisor's job is
+kill-on-close, `launcher-died` means its whole local tree is gone too; remote
+leaves may still run.
 
-```jsonc
-{
-  "op": "start",
-  "name": "farm-pen-rod-smoke",            // unique; record it in the brief
-  "cwd": "<host path returned by realpath local://>",
-  "application": "pwsh.exe",
-  "args": [
-    "-NoProfile", "-NonInteractive",
-    "-File", "C:/src/harmonic-analyzer/scripts/farm-run.ps1",
-    "-Worktree", "C:/src/harmonic-smoke",
-    "-PoolHome", "C:/src/solidworks-pool",
-    "-Targets", "part:pn_pen_rod",
-    "-LeafTimeout", "90",
-    "-DisplayName", "InchPD - Build pen rod",
-    "-Tag", "smoke"
-  ],
-  "pty": false,
-  "persist": true,
-  "progress": "wake",
-  "ready": { "log": "farm-launch started", "timeout": 120 }
-}
-```
+- **`status`** prints one JSON object: `state`, `exit_code`, `build_id`,
+  `commit`, `targets`, `display_name`, `leaf_timeout_minutes`, refresh labels,
+  `cache_environment`, `supervisor` (`pid`, `created`, `alive`), `elapsed_s`,
+  `log_idle_s`, `outputs` (the snapshot's `cad/out` while running, `out/`
+  after; read `cache.jsonl` and `telemetry/traces.jsonl` from here), `counts`
+  (cache `hits`, farm leaves `requested`/`succeeded`/`failed`/`in_flight`),
+  every farm leaf, `unsettled_workflows` and `task_errors`.
+- **`watch`** prints a line per leaf state change and per failed task, polling
+  every `--poll-seconds` (15), and ends with the final status: exit **0**
+  succeeded, **20** failed, **21** launcher-died (`LAUNCHER DIED` on the summary
+  line), **22** cancelled. `run --watch` launches and then watches. Follow one
+  leaf with the pool's `farm.py watch <workflow-id>`.
+- **`list`** prints one JSON line per run, newest first.
+- **`cancel --why`** terminates the run's job (every process at once, so the
+  supervisor cannot record a `failed` outcome for its killed child) and the
+  supervisor. If the build registered, it then closes producer ownership
+  (`close_build … cancelled`: no new admissions; accepted reservations stay) and
+  reconciles every `requested`/`bound` leaf through the coordinator: a recorded
+  exact run is used directly, otherwise `leaf_status` is polled for at most
+  `--binding-wait-seconds` (30). Only that exact bound run is cancelled, and
+  only while `RUNNING` (`cancelled`, else `already-closed`); a typed
+  `missing_closed` reply is `settled-untracked` and an operator-confirmed
+  unbound `drained` reservation is `already-closed`. Anything else (pending
+  reservation, `recovery_required`, a failed query) is unresolved: `cancel`
+  exits 1 and changes nothing else, so retry the same command. Otherwise it
+  preserves outputs, removes the snapshot and writes `status.json` with
+  `state: "cancelled"`, `exit_code: null` and a `cancel` block (who, why, the
+  supervisor's prior state, each workflow's outcome). On a finished run it only
+  settles leaves still unsettled and keeps the run's own record. A successful
+  remote cancellation does not prove native worker cleanup: capacity
+  reassignment waits for the worker's physical-drain acknowledgement.
 
-The full closure is the same call with `"-Targets", "build"` and
-`"-Tag", "full-build"`. The release manager uses it for rolling-main validation
-and release qualification. A miss on any changed part or drawing cascades into
-the top assembly, its drawing and its soundness gate, the slowest leaves on the
-farm, so authors iterate on the touched leaves only. An individual PR or stack
-does not need this full closure to merge. Do not `hub stop` a live launcher to
-quiet the console;
-retune it with `op: "monitor"`, `progress: "ambient"` or `"off"`. The watcher is
-[`-Watch`](#tracking-a-run-status-watch-list-cancel), not the hub's console and
-not a loop waiting for `.done`. To hand off, pass the run id from the readiness
-line and the effective `-LogDirectory` (the default when omitted, or the
-explicit override); a successor tracks the run with the same command, whether
-or not the hub is still around.
+### Run records
 
-### Tracking a run: status, watch, list, cancel
+Each run is one directory `<runs>\<run-id>\` (`yyyyMMddTHHmmssfffZ-<32 hex>`),
+each file written atomically by the code that knows its contents:
 
-Every operation selects one run by `-RunId <run-id>` or `-Tag <tag>` (the newest
-run with that tag). The default `-LogDirectory` is recomputed from the current
-process environment and working directory. Omit it only when that computed
-default resolves to the launch's effective `-LogDirectory`. Without a matching
-`HARMONIC_AGENT_SCRATCHPAD` or an explicit `-LogDirectory`, an OMP launch
-requires the tracking process to use the same resolved `local` `cwd`. If the
-launch used an explicit override, or the computed defaults differ, pass the
-launch's effective `-LogDirectory`: it is the parent directory of the
-`.run.json` path printed on the `farm-launch started` readiness line. This also
-applies to the `hub` process used for `-Watch`. If the computed default does
-not match, tracking searches that other directory instead of the launch
-directory. A selection that matches nothing, or both selectors at once, exits 2.
+| file | written by | contents |
+|---|---|---|
+| `run.json` | `run`, before anything starts | schema, `run_id`, `tag`, `display_name`, `targets`, `leaf_timeout_minutes`, refresh labels and reason, `worktree`, `git_common_dir`, `pool_home`, `commit`, `required_submodules`, `cache_environment`, `started_at`, `snapshot`, `environment`, `job` |
+| `supervisor.json` | the trampoline | supervisor `pid` and `created` (FILETIME) |
+| `build.log` | supervisor and build | Git, uv and doit output |
+| `build.json` | the producer, before FIFO registration | `build_id`, `farm_run` |
+| `leaves/<hash>.json` | `_farm._dispatch` | `task`, `workflow_id`, `build_id`, `farm_run`, `refresh_reason`, `state` (`requested` before submission — a failed write fails the leaf — then `bound` with `run_id`, then the result with `worker_id`, `attempt`, `exit_code`, `failure_category`, `failure_message`, `log_blob`) |
+| `task-errors.json` | doit's reporter | each failed task and its last error line |
+| `status.json` | supervisor or `cancel` | `state`, `exit_code`, `finished_at`, `elapsed_s`, `outputs`, `outputs_preserved`, `snapshot_removed`, `cleanup_errors`, `launch_overhead_s`, `environment_reused`, `cancel` |
+| `out/` | supervisor or `cancel` | the snapshot's `cad/out` |
 
-```powershell
-$launcher = 'C:/src/harmonic-analyzer/scripts/farm-run.ps1'
-$runRecordPath = '<absolute .run.json path from the farm-launch started line>'
-$logDirectory = Split-Path -Path $runRecordPath -Parent
-pwsh -NoProfile -File $launcher -LogDirectory $logDirectory -Status -RunId <run-id>
-pwsh -NoProfile -File $launcher -LogDirectory $logDirectory -Watch  -Tag full-build
-pwsh -NoProfile -File $launcher -LogDirectory $logDirectory -List   -State running -MaxAgeHours 24
-pwsh -NoProfile -File $launcher -LogDirectory $logDirectory -Cancel -RunId <run-id> -Why 'superseded by <sha>'
-```
+Only exit 0 with outputs preserved is `succeeded`. `cache_environment` is
+recorded because `HARMONIC_CACHE_ACCOUNT`, `HARMONIC_CACHE_CONTAINER` and
+`HARMONIC_CACHE_SALT` move cache keys and workflow identity: an unchanged commit
+is not by itself an unchanged key.
 
-The run's state is derived, never trusted from one file: `.done`'s `state` when
-it exists (`succeeded`, `failed` or `cancelled`), otherwise `running` while the
-recorded `pid` is alive (a PID reused by a process that started after the run is
-not the launcher), otherwise **`launcher-died`** — the launcher is gone and wrote
-no `.done`. Liveness uses native `System.Diagnostics.Process` PID lookup and
-`StartTime`, not WMI. An absent PID or a creation time at or after the recorded
-run start is not the launcher; inability to read the process identity remains
-an error (exit 2), never evidence of launcher death. Thus `-Status`, `-Watch`
-and `-List` keep working for a live launcher during WMI query failures when
-native identity is readable. A process that exits between PID lookup and
-creation-time inspection is treated as absent.
+### Proof of a remote build
 
-`-Cancel` and a dead launcher's orphan reporting still use `Win32_Process`
-CIM queries for descendant ownership. A transient WMI fault (`Call cancelled`,
-shutting down, transport or RPC failure, quota violation, retry later) is
-retried up to four times over about 4 s, each retry a `WARNING:` line on stderr.
-A persistent or other query fault ends that operation with exit 2 and the
-CIM error, not a successful outcome.
-
-The Windows launcher tests separate hermetic retry contracts from real
-process-tree integration: `test_win32_process_preserves_cim_retry_contract`
-executes the parsed production wrapper against synthetic transient failures,
-then deterministic rows/empty success or persistent failure; a separate synthetic
-dead-launcher status test preserves the full exit-2 fail-closed contract. Orphan
-fixtures record their parent's own PID and wait for an explicit socket release;
-they do not need a CIM lookup or expire during slow test startup. Cleanup waits
-on a handle whose creation time matches the one the spawning parent read from its
-own child handle; only that pinned handle is ever terminated, never a PID Windows
-may have reused. Ownership and
-cancellation integration (including some setup) still queries the real WMI
-provider. Persistent provider failures remain test failures, not skips or proof
-that ownership is empty (see
-[#1617](https://github.com/pedropaulovc/harmonic-analyzer/issues/1617)).
-
-If the final run-record refresh fails, the launcher still writes `.done` with
-the actual build outcome and reports the refresh error in `cleanup_errors`.
-It keeps the snapshot and records its output path instead of authorizing cleanup
-from stale identity data. Corrupt or conflicting metadata may still make
-`-Status` refuse the record; repair that metadata before using it for cancellation.
-
-- **`-Status`** prints one JSON object: `state`, `exit_code`, `launcher`
-  (`pid`, `alive`, and for a dead launcher the `orphaned_processes` it left —
-  a build child outlives a killed launcher and keeps dispatching), `commit`,
-  `targets`, `leaf_timeout_minutes`, `display_name`, `cache_environment`, `counts` (cache
-  `hits`, farm leaves `requested`/`succeeded`/`failed`/`in_flight`), every farm
-  leaf with its `workflow_id` and state, `in_flight_workflows`,
-  `unsettled_workflows` (every leaf with a workflow id and no result: the
-  in-flight ones plus those the build saw fail, since a local Temporal or
-  protocol fault fails the task while its workflow may still run), `task_errors`,
-  `log_idle_s` and `outputs` (the snapshot's `cad\out` while running,
-  `.done`'s `outputs` after). Tools that only need a run's `cad/out` —
-  `cache.jsonl`, `telemetry/traces.jsonl` — read `outputs` from here.
-  Leaves come from the log plus `<run-id>.requests\`: the launcher sets
-  `HARMONIC_FARM_REQUESTS` to that directory. The parent writes `build.json`
-  with `{build_id, farm_run}`; `_farm._dispatch` atomically writes one
-  `{task, workflow_id, build_id, farm_run, refresh_reason}` file before submitting a reservation
-  (a failed write fails the leaf before submission). Status also reports
-  `build_id`, recovered from durable registration metadata or the registration
-  log and persisted in the run record. Native IDs encode their exact build
-  scope and task directly; task parsing never needs registration metadata.
-  Before registration, a run has no `build_id` or native leaves and remains
-  inspectable. Stopping the launcher can drop a logged request line but cannot
-  erase the durable request.
-- **`-Watch`** is the required watcher for an agent-launched build. It prints a
-  line per leaf state change (`requested`, `attached`, `succeeded`, `failed`,
-  each with its workflow id — follow one leaf with `farm.py watch <id>`) and per
-  new `TaskError` with the exception that ended it, polling every
-  `-PollSeconds` (15). It exits when the run is terminal, ending with the
-  final `-Status` object: **0** succeeded, **20** failed, **21** launcher-died
-  (`LAUNCHER DIED` on the summary line), **22** cancelled. Run it under the
-  same kind of persistent supervisor as the launch, with `progress: "wake"`.
-- **`-List`** prints one JSON line per run, newest first, filtered by `-Tag`,
-  `-State` and `-MaxAgeHours`.
-- **`-Cancel -Why <reason>`** stops the launcher and every process it started,
-  including a build a dead launcher left behind. The launcher joins a named
-  Windows job object (`job` in the run record) before it starts anything, so
-  every descendant is a member whichever of its ancestors died: `uv run` does
-  not take its python with it, and a build whose launcher and uv are both gone
-  has no parent chain back to the run. The job's name lives while a process
-  holds a handle to it; the launcher's handle is inheritable, so uv, the venv
-  python and the build each hold one. A process under a dead launcher's PID
-  counts only if its command line names the run: the recorded build command,
-  the run's snapshot — git worktree add/remove, submodule update, uv sync —
-  or its private uv staging environment.
-  It rescans until a scan finds no process started since the last (at most
-  10 rounds, else an error). Each process is stopped through a handle whose
-  start time matches the scan's, so a PID reused after the scan is never
-  killed, and a stopped process still running 60 s later is an error, since it
-  may still be dispatching. It then closes registered producer ownership
-  with `farm.py close-build <build_id> --reason cancelled`, blocking new
-  admissions while retaining accepted reservations. It reconciles each request
-  with `farm.py leaf-status --build-id <id> --workflow-id <wf> --json`.
-  Reserved work is polled for at most `-BindingWaitSeconds` (30 by default;
-  0 performs one query). A still-pending accepted reservation is `unresolved`,
-  not absent; the request and snapshot remain for a later `-Cancel`, and the
-  reservation's physical-drain obligation remains fenced. A typed `recovery_required` or `error_code` response
-  stops reconciliation immediately and calls for operator recovery.
-  Status and cancellation of a bound leaf use `--run-id <run>` so a later
-  execution with the same canonical workflow ID cannot be cancelled by mistake.
-
-  Cancellation trusts the validated coordinator binding for the owning build
-  and cancels only that exact run; `farm_run` is launcher metadata, never an
-  ownership or shared-execution gate. There is no legacy shared-ID cancellation
-  path. A run stopped before registration has no native work to reconcile.
-
-  The typed `missing_closed` coordinator reply is `settled-untracked`: producer
-  ownership is fenced closed and no retained reservation remains to reconcile.
-  This includes both never-accepted requests and accepted, physically drained
-  history later pruned; it does not establish whether a leaf was ever submitted
-  or executed. No workflow status or cancellation is inferred from the canonical
-  ID. An operator-confirmed, unbound `drained` reservation is
-  `already-closed`. A fresh unknown reservation, failed query, exhausted binding
-  wait or missing exact bound execution remains `unresolved`: cancellation exits
-  1 without writing `.done` or cleaning the snapshot. Retry the same command; do
-  not erase the request or infer drain from error text.
-  A successful remote cancellation still does not prove native worker cleanup:
-  capacity reassignment waits for the worker's physical-drain acknowledgement.
-  If any leaf cannot be accounted for (`farm.py` failed on
-  authentication, network or CLI), `-Cancel` exits 1 and changes nothing
-  else: no `.done`, the snapshot kept, the run still `launcher-died`. Retry the
-  same command. Otherwise it does the cleanup the launcher never ran —
-  outputs moved to `<run-id>.out`, snapshot removed — and writes `.done` with
-  `state: "cancelled"`, `exit_code: null` and a `cancel` block recording who,
-  why, the stopped PIDs and each workflow's outcome (`cancelled`,
-  `already-closed`, `settled-untracked`). An unresolved or failed reconciliation
-  is reported without authorizing cleanup. A cleanup
-  failure still writes `.done` (with `cleanup_errors`) and exits 1.
-  On a run that already finished, `-Cancel` stops nothing and leaves `.done`
-  as the launcher wrote it; it only cancels that run's leaves still
-  `RUNNING` (a failed run's leaf may be) and prints each outcome, exiting 1
-  if one could not be accounted for.
-
-### The two records
-
-Before the child starts, the launcher prints its readiness line and writes
-`<run-id>.run.json`:
-
-The timestamped record example below preserves its pre-migration target and
-commit. Current selections use `part:pn_pen_rod`; consult the
-[migration table](cad/docs/subsystem-identities.md#identity-migration-table)
-when reading older run records.
-
-```
-farm-launch started 20260920T173011482Z-3f7b1c9a2d5e4081b6c3a9f0d4e27516 C:\src\dt-logs\farm-runs\20260920T173011482Z-3f7b1c9a2d5e4081b6c3a9f0d4e27516.run.json
-```
-
-```json
-{
-  "run_id": "20260920T173011482Z-3f7b1c9a2d5e4081b6c3a9f0d4e27516",
-  "state": "running",
-  "worktree": "C:\\src\\harmonic-smoke",
-  "pool_home": "C:\\src\\solidworks-pool",
-  "commit": "4101ff0fa54988a9f1464a9a0c5833b79a918975",
-  "targets": ["part:pen_rod"],
-  "leaf_timeout_minutes": 90,
-  "display_name": "InchPD - Build pen rod",
-  "started_at": "2026-09-20T17:30:11.4820000Z",
-  "pid": 24680,
-  "log": "C:\\src\\dt-logs\\farm-runs\\20260920T173011482Z-3f7b1c9a2d5e4081b6c3a9f0d4e27516.log",
-  "done": "C:\\src\\dt-logs\\farm-runs\\20260920T173011482Z-3f7b1c9a2d5e4081b6c3a9f0d4e27516.done",
-  "cache_environment": {
-    "HARMONIC_CACHE_ACCOUNT": null,
-    "HARMONIC_CACHE_CONTAINER": null,
-    "HARMONIC_CACHE_SALT": null
-  },
-  "tag": "smoke",
-  "argv": ["uv", "run", "--frozen", "--no-sync", "--active", "python", "build.py",
-           "--executor", "farm", "--display-name=InchPD - Build pen rod",
-           "--leaf-timeout", "90", "--verbosity", "info",
-           "--continue", "part:pen_rod"],
-  "snapshot": "C:\\src\\dt-logs\\farm-runs\\snapshots\\3f7b1c9a2d5e",
-  "outputs": "C:\\src\\dt-logs\\farm-runs\\20260920T173011482Z-3f7b1c9a2d5e4081b6c3a9f0d4e27516.out",
-  "environment": "C:\\src\\dt-logs\\farm-runs\\envs\\9c41d07a2be35f18",
-  "requests": "C:\\src\\dt-logs\\farm-runs\\20260920T173011482Z-3f7b1c9a2d5e4081b6c3a9f0d4e27516.requests",
-  "job": "Local\\harmonic-farm-run-20260920T173011482Z-3f7b1c9a2d5e4081b6c3a9f0d4e27516"
-}
-```
-
-Validation failures happen *before* that record: they print a diagnostic and
-exit nonzero without claiming a build started. Once the startup record exists,
-every catchable outcome writes `<run-id>.done`, which repeats every field above
-and adds the result (the launcher also echoes the finished record to stdout as
-one compressed JSON line):
-
-```json
-{
-  "run_id": "20260920T173011482Z-3f7b1c9a2d5e4081b6c3a9f0d4e27516",
-  "state": "succeeded",
-  "...": "the identity fields from the startup record, unchanged, except outputs",
-  "exit_code": 0,
-  "elapsed_s": 1487.216,
-  "finished_at": "2026-09-20T17:54:58.6980000Z",
-  "launch_overhead_s": 4.412,
-  "environment_reused": true,
-  "outputs": "C:\\src\\dt-logs\\farm-runs\\20260920T173011482Z-3f7b1c9a2d5e4081b6c3a9f0d4e27516.out",
-  "outputs_preserved": true,
-  "snapshot_removed": true,
-  "cleanup_errors": []
-}
-```
-
-`.done`'s `outputs` is where the run's `cad/out` actually is: the planned
-`<run-id>.out`, the kept snapshot's `cad\out` when moving it failed (then
-`outputs_preserved` is false and the run is `failed`), or `null` when the
-build produced none. Only exit 0 with its outputs preserved is `succeeded`; a
-wrapper exception is `failed` with exit 1 and its diagnostic in the log. A run
-ID is
-`yyyyMMddTHHmmssfffZ-<32 lowercase hex GUID characters>`, so it is
-collision-resistant, and the launcher never overwrites an existing record, log,
-marker, outputs or requests directory, or snapshot: the files for one run are
-`<run-id>.run.json`, `<run-id>.log`, `<run-id>.done` and the `<run-id>.out`
-and `<run-id>.requests` directories, with `-Tag` recorded inside them rather
-than in their names.
-
-`cache_environment` is in the record because `HARMONIC_CACHE_ACCOUNT`,
-`HARMONIC_CACHE_CONTAINER` and `HARMONIC_CACHE_SALT` move cache keys and
-workflow identity. An unchanged Git commit does not by itself mean an unchanged
-key; compare these before reusing or resuming a run.
-
-### Readiness is not proof of a build
-
-`farm-launch started` means the wrapper initialized its log and startup record.
-It is emitted before the child invocation, so it does not prove that `uv` started
-or that the launcher is still running. Check the supervisor and terminal record
-before handing off. Neither a green `check:math` (a local, SolidWorks-free gate)
-nor a submitter cache hit proves dispatch. A launch is proven remote only by all
-of: a `.done` with `state: "succeeded"` and `exit_code: 0`, an attached workflow
-ID in the log, a completed `farm.run <task>` span naming a real worker, a
-cache-miss followed by a restored artifact, and the artifact plus its
-`.execution` token in `<run-id>.out`.
+A `run` exit 0 means the build passed preflight; it does not prove any leaf
+ran remotely. Neither a green `check:math` (local) nor a submitter cache hit
+proves dispatch. A launch is proven remote only by all of: `status.json` with
+`succeeded`/exit 0, a leaf record with a `run_id` and a real `worker_id`, a
+completed `farm.run <task>` span naming that worker, a cache miss followed by a
+restored artifact, and the artifact plus its `.execution` token in `out/`.
 
 ### Recovering a run across a handoff
 
-Use `-Status -RunId <run-id>` or `-Watch -RunId <run-id>` on the recorded
-protocol-7 run:
+Use `status` or `watch` on the recorded run:
 
 1. **`running`.** Keep watching. Do not start another submitter for this work.
-2. **`succeeded`, `failed` or `cancelled`.** This is the local launcher's
-   outcome. Diagnose failures from `task_errors` and the log. A failed or
-   cancelled submitter can still have accepted remote reservations to settle.
-3. **`launcher-died`** (watch exit 21). The launcher wrote no `.done`, so its
-   local outcome is unknown. Accepted remote work is not cancelled by losing
-   the submitter, and `launcher.orphaned_processes` may name local children
-   that can still dispatch. This is not permission to relaunch.
+2. **`succeeded`, `failed` or `cancelled`.** The local outcome. Diagnose from
+   `task_errors` and `build.log`. A failed or cancelled submitter can still have
+   accepted remote reservations to settle.
+3. **`launcher-died`** (watch exit 21). The local outcome is unknown and
+   accepted remote work is not cancelled by losing the submitter. Not
+   permission to relaunch: run `cancel` first.
 
-Before recovery, stop any record-attributed local producer/orphans and close
-its producer lease so no new reservations can appear. The supervised
-`-Cancel -RunId <run-id> -Why …` path does this and reconciles recorded native
-reservations through the coordinator's exact-run bindings. Its success proves
-local stop, producer close and exact-run reconciliation, **not physical drain**.
-It can write `.done` and remove the local snapshot while remote attempt fences
-persist. Invalid identities or unresolved bindings can block that cleanup;
-unconfirmed physical attempts always block relaunch, not necessarily cleanup.
-
-Account for **every recorded native reservation**, not one representative and
-not only the `unsettled_workflows` subset. Use the run's `build_id` and each
-workflow ID from `leaves` and the durable request records. Resolve the
-reservation before querying its execution:
+`cancel` proves local stop, producer close and exact-run reconciliation, **not
+physical drain**. Account for every recorded reservation before relaunching:
 
 ```powershell
-# After stopping the record-attributed local producer, close its lease:
-uv run --frozen --project C:/src/solidworks-pool C:/src/solidworks-pool/farm.py close-build "<build-id>" --reason cancelled
 uv run --frozen --project C:/src/solidworks-pool C:/src/solidworks-pool/farm.py leaf-status --build-id "<build-id>" --workflow-id "<workflow-id>" --json
 # Only after leaf-status supplies the immutable binding.run_id:
 uv run --frozen --project C:/src/solidworks-pool C:/src/solidworks-pool/farm.py status --run-id "<bound-run-id>" "<workflow-id>" --json
-# Optional progress monitor; watch has no --run-id option:
-uv run --frozen --project C:/src/solidworks-pool C:/src/solidworks-pool/farm.py watch "<workflow-id>"
 ```
 
-Follow each exact bound execution under a supervised monitor until terminal,
-then query `leaf-status` again for coordinator-confirmed physical settlement.
-Neither terminal workflow status nor a successful `-Cancel` proves drain.
-For **every recorded reservation**, require `state: "drained"` or the
-authoritative `state: "missing_closed"`, with **empty `unconfirmed_attempts`**
-in either case (`missing_closed` also has no binding). Any unknown binding,
-recovery-required state, unconfirmed physical
-attempt, unreadable record, or authentication/network/CLI failure remains
-unresolved. `NOT_FOUND` is **never** proof of absence or drain, whether the log
-says requested or attached; there is no relaunch exception for that result.
-
-Only after all recorded reservations are settled may you launch again.
-Every relaunch registers a **new build ID** and therefore creates distinct
-native workflow executions, even with the same commit, task, cache key and
-timeout. It reuses published cache artifacts, **not running executions**.
-There is no cross-build rejoin or sibling-sharing guarantee.
-
-Recover inputs from the *run record*, not the caller's current worktree: its
-recorded `commit`, `targets`, `leaf_timeout_minutes` and `cache_environment`
-describe what was launched. Point `-Worktree` at a clean checkout of that
-commit (the retained snapshot or a fresh checkout), use the recorded targets
-and leaf budget, and set or unset `HARMONIC_CACHE_ACCOUNT`/`CONTAINER`/`SALT`
-to match. Supply `-DisplayName` for the recovering session's owner and reason.
-Unchanged inputs permit cache restores; a miss executes under the new build's
-identity, not an old workflow's binding.
-
-A dead launcher's outputs may still be in `<snapshot>\cad\out`, named by
-`status.outputs`. Preserve required artifacts before local cleanup. A successful
-`-Cancel` can perform the recorded cleanup before remote fences clear, so keep
-checking coordinator settlement before relaunch. If manual cleanup is needed,
-especially after an invalid remote identity makes `-Cancel` exit 2 without
-automatic cleanup, first confirm **all** recorded reservations settled as
-above and copy any required `cad\out` artifacts. Then, from another checkout:
-
-```powershell
-git worktree remove --force <snapshot>
-git worktree prune
-```
-
-Old native workflow-ID formats are unsupported by this launcher: finish or cancel
-those runs with matching old tools before changing tools. Protocol 6 to 7 keeps
-the ID format, but deployment still requires the coordinated, idle, physically
-drained wire-protocol cutover described above.
+Require `state: "drained"` or `state: "missing_closed"` with **empty
+`unconfirmed_attempts`** for every recorded reservation. Any unknown binding,
+recovery-required state, unconfirmed attempt or CLI failure remains unresolved;
+`NOT_FOUND` is never proof of absence or drain. Only then launch again: a
+relaunch registers a new build ID and new native executions, reusing published
+cache artifacts, never running executions. Take its inputs from `run.json`
+(`commit`, `targets`, `leaf_timeout_minutes`, `cache_environment`), not from
+the caller's current worktree, with a `--display-name` for the recovering
+session. A dead run's outputs may still be in its snapshot's `cad/out`
+(`status` → `outputs`); `cancel` moves them to `out/` before removing it.
 
 ### Finite form-cut gear profiles
 
@@ -1774,7 +1401,7 @@ An ordinary upload failure with no canonical entry remains fail-soft; `ro` and
 A gate produces no CAD artefact, so **its stamp is its cached output**
 (`cad/out/reports/verify-*.ok`, `preflight.ok`): identical inputs imply an
 identical verdict, so restoring the stamp is restoring the proof. This is also
-the mechanism behind `--executor farm`: a cache-missing COM task dispatches one
+the mechanism behind farm builds: a cache-missing COM task dispatches one
 farm leaf and then restores what the worker published, which is how a machine
 with no SolidWorks seat runs a whole release.
 
@@ -2054,7 +1681,7 @@ seat published; on a later HIT under a *different* key, `restore` logs a `WARN` 
 a `restore_hit_drift` event — and `cache_status` shows the `DRIFT(...)` flag.
 
 The `WARN` is for a seat that **publishes what it builds**, because only there does
-a foreign key mean something went wrong. A submitter under `--executor farm` never
+a foreign key mean something went wrong. A farm submitter never
 reaches `store` (the worker builds and publishes every cache-missing leaf), and a
 `ro` seat declines to publish, so for those *every* hit is under a key they could
 not have published: warning would fire on the correct path and teach you to ignore
@@ -2267,20 +1894,16 @@ build validation is a separately authorized operation.
 ### Refreshing one unchanged leaf
 
 Use a forced refresh when the input key must stay unchanged but its cached result
-must be deliberately replaced. It works under either executor:
+must be deliberately replaced. It works locally and on the farm:
 
 ```powershell
-uv run --frozen python build.py --executor local `
+uv run --frozen python build.py `
   --force-cache-refresh part:pn_pen_rod `
   --force-cache-refresh-reason 'Owner - Re-evaluate unchanged-input result' `
   part:pn_pen_rod
 ```
 
-For agent farm launches, pass `-ForceCacheRefresh @('part:pn_pen_rod')` and
-`-ForceCacheRefreshReason 'Owner - Re-evaluate unchanged-input result'` to the
-supervised launcher with the normal worktree, targets, display name and budget.
-The launcher records `force_cache_refresh` and `force_cache_refresh_reason`.
-Direct attended `build.py --executor farm` uses the same wrapper flags.
+`farm_build.py run` takes the same two flags and records them in `run.json`.
 `--force-cache-refresh` is repeatable and accepts comma-separated labels; each
 must be an exact remote-cache-keyed leaf in the selected task closure. A plain
 stamped check, aggregator, traveler or gallery task is refused. The declaration
