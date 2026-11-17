@@ -179,8 +179,8 @@ BOND_NOTE_B = (
 # 2026-11-08 (Pedro), #2144 item 11.4: the upper eye rides free on the
 # shoulder screw (step 8B, check 3), superseding #1951's clamped eye.
 # Owner rulings 2026-11-08 (Pedro), #2315: step 8 bonds the MHA-SM-05 end
-# plug into MHA-SM-01 with LOCTITE 638 (note 5; it may be done before step
-# 1 and cures before the shoulder screw goes in at 8A-8B); step 10A
+# plug into MHA-SM-01 with LOCTITE 638 (BOND NOTE B; it may be done before
+# step 1 and cures before the shoulder screw goes in at 8A-8B); step 10A
 # tightens the hub set screw on the bare leg, to its limit, on its own.
 ASSEMBLY_STEPS = (
     "1. ON THE TOP FRAME MHA-FR-02, AT EACH HANGER HOLE PRESS ONE MHA-SM-VN-53 "

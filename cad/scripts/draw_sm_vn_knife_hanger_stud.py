@@ -99,7 +99,7 @@ FRONT_KEEP = {
 CHAMFER_TEXT_XY = (0.157, TIP_SHEET_Y - 0.014)
 # Words under each control, at most two lines (rule 7).
 DIMENSION_CALLOUTS = {
-    "CutLength": "UNDER HEAD TO TIP\nCUT AT MHA-SM-00 STEP 4 (ASSEMBLY.MD)",
+    "CutLength": "UNDER HEAD TO TIP, CUT AT\nMHA-SM-00 STEP 4 (ASSEMBLY.MD)",
     "ChamferWidth": "CUT END",
     "ThreadLengthMin": f"{THREAD} UNC FULL THREAD FROM TIP\nEXCEPT 1 PITCH MAX AT CUT END",
 }
