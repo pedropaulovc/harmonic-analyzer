@@ -1303,14 +1303,26 @@ def _session_connect_state(session_id: int) -> str | None:
 
 
 def record_authoring_context(adapter: Any, label: str) -> dict[str, Any]:
-    """Publish the authoring-time seat state for a SUCCESSFUL build too.
+    """Publish the authoring-time screen-space state for a SUCCESSFUL build too.
 
     A failure-only capture cannot answer "what was different about the run that
-    worked?", which is the question that actually identifies a seat-state cause.
-    So the same state bags a failure captures -- the screen-space geometry,
-    ``ISketchManager``'s sticky session state, and the sketch-authoring
-    preferences -- are recorded once per part build, on the success path, as a
-    span event plus one INFO record carrying the whole snapshot as JSON.
+    worked?", which is the question that identifies a seat-state cause. Sketch
+    inference is still live on most sketch paths (the adapter's
+    ``create_line``/``create_circle``/``create_arc`` do not set ``AddToDB``;
+    only the call sites that wrap :func:`_sketch.set_sketch_direct_db` author
+    direct-to-DB), and a screen-space snap rebuilds a wrong but valid shape that
+    raises nothing, so this record is the only evidence such a build leaves.
+    It holds the two bags that diagnosis needs: the screen-space geometry
+    (frame rect, view scale, measured px/mm) and ``ISketchManager``'s sticky
+    session state. Recorded once per part build, as a span event plus one INFO
+    record carrying the snapshot as JSON.
+
+    The ~30 sketch-authoring preferences are NOT read here: the 2026-09-17
+    root cause refuted preference drift by measurement (zero differences
+    across workers), the pool's ``SeatSettings`` audits and pins them on the
+    seat, and :func:`capture_com_failure` still reads them at failure time.
+    Seat provenance is published once at connect
+    (:func:`record_seat_provenance`).
 
     EVERY probe is guarded individually, because this runs on the path where
     nothing is wrong: ``save_part_and_images`` calls it before ``save_file``, and
@@ -1320,10 +1332,8 @@ def record_authoring_context(adapter: Any, label: str) -> dict[str, Any]:
     string and the build continues.
     """
     bags: dict[str, Callable[[], Any]] = {
-        "seat": lambda: seat_provenance(adapter),
         "display": lambda: display_geometry(adapter),
         "sketch_manager": lambda: sketch_manager_state(adapter),
-        "preferences": lambda: sketch_authoring_preferences(adapter),
     }
     context: dict[str, Any] = {"label": label}
     for name, probe in bags.items():
