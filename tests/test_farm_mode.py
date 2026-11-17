@@ -1656,7 +1656,9 @@ def test_check_pytest_process_does_not_apply_its_builds_refresh_carrier(tmp_path
                 env=environment,
                 stdout=stdout,
                 stderr=stderr,
-                timeout=30,
+                # A deadline against a recursive prune, not a speed bound: the
+                # parent runs inside check:recipe's worker pool.
+                timeout=120,
             )
         except subprocess.TimeoutExpired as exc:
             exc.add_note(f"Retained child output: {stdout_path}; {stderr_path}")

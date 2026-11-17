@@ -16,7 +16,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 SUBMODULE = "SolidworksMCP-python"
-EXPECTED_TESTPATHS = ["cad/scripts", "cad/comparisons/tools", "tests"]
+EXPECTED_TESTPATHS = ["cad/scripts", "cad/comparisons/tools", "tests", "tools/machinist-review-evals"]
 
 
 def _ini() -> dict:

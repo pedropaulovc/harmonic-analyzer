@@ -2,7 +2,7 @@
 conventional edge passes from the CAM runtime and the ``grbl`` post, and
 sections joined into one file at an M0 speed stop and at M6 tool changes.
 
-Not in any ``check:*`` gate (see ``test_check_gate_enrollment.EXEMPT``): it
+Not in any ``check:*`` gate (see ``dodo._UNGATED``): it
 runs the local FreeCAD install, which no build dependency tracks, and the
 build must not pay for a FreeCAD run. Run it by hand after changing
 ``cam_nc.py`` or ``_freecad_cam_runtime.py``, or after upgrading FreeCAD:

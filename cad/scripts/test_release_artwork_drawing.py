@@ -1,8 +1,7 @@
 """Artwork a drawing note names ships in the release bundle at the printed path.
 
 Exercises ``cut_release``'s real note scan and staging against a temporary
-stage: no network, no SolidWorks. Named ``test_*_drawing.py`` so the drawing
-glob in ``dodo.task_check`` enrols it in ``check:recipe``.
+stage: no network, no SolidWorks.
 """
 
 from __future__ import annotations

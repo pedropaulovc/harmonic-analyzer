@@ -4143,373 +4143,68 @@ def _executed_closure(cmd: list[str]) -> set[str]:
     }
 
 
+# Offline tests are selected by collection, not enrollment: every ``test_*.py``
+# that a bare ``pytest`` collects from pyproject's ``testpaths`` runs in exactly
+# one gate. The gates below own the files they name; ``check:recipe`` runs the
+# rest, so a new test file is gated by existing. A test file no gate may run
+# goes in ``_UNGATED`` with its reason.
+_UNGATED = frozenset(
+    {
+        # Runs the local FreeCAD install, which no build dependency tracks.
+        "cad/scripts/test_cam_nc_freecad.py",
+    }
+)
+_GATE_TESTS: dict[str, tuple[str, ...]] = {
+    "undefined_names": ("test_undefined_names.py",),
+    "graph": (
+        "test_buildgraph.py",
+        "test_part_coverage.py",
+        "test_assembly_sheet_isolation.py",
+        "test_package_unit_declarations.py",
+    ),
+    "nameplate": ("test_fr_nameplate_geometry.py",),
+    "numerals": ("test_dxf_text.py",),
+    "cache": ("test_artifact_cache.py",),
+    "telemetry": ("test_telemetry.py", "test_cut_release_telemetry.py"),
+    "watchdog": ("test_watchdog.py",),
+    "verify_telemetry": ("test_verify_telemetry.py",),
+    "flagonly": ("test_flag_only.py",),
+    "partiso": ("test_part_isolation.py",),
+    "inert": ("test_recipe_inert.py",),
+    "budget": ("test_error_budget.py",),
+}
+
+
+def _gate_tests(name: str) -> list[str]:
+    return [str(SCRIPTS_DIR / test) for test in _GATE_TESTS[name]]
+
+
+def _collected_tests() -> list[Path]:
+    """Every gated test module a bare ``pytest`` collects (pyproject's
+    ``testpaths`` minus ``norecursedirs``), less ``_UNGATED``."""
+    import tomllib
+    from fnmatch import fnmatch
+
+    with (REPO_ROOT / "pyproject.toml").open("rb") as handle:
+        ini = tomllib.load(handle)["tool"]["pytest"]["ini_options"]
+    collected = []
+    for root in ini["testpaths"]:
+        for path in (REPO_ROOT / root).rglob("test_*.py"):
+            dirs = path.relative_to(REPO_ROOT / root).parts[:-1]
+            if path.relative_to(REPO_ROOT).as_posix() in _UNGATED or any(
+                fnmatch(part, pattern) for part in dirs for pattern in ini["norecursedirs"]
+            ):
+                continue
+            collected.append(path)
+    return sorted(collected)
+
+
 def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
     import _cam_programs
 
     review_bench = REPO_ROOT / "tools" / "machinist-review-evals" / "machinist_review_bench.py"
-    recipe_tests = [
-        SCRIPTS_DIR / "test_dodo_recipe.py",
-        SCRIPTS_DIR / "test_selected_factories.py",
-        # Source-only, per-hub part recipe boundaries (issue #1638).
-        SCRIPTS_DIR / "test_recipe_subsystem_isolation.py",
-        SCRIPTS_DIR / "test_local_check.py",
-        SCRIPTS_DIR / "test_farm_admission.py",
-        SCRIPTS_DIR / "test_machinist_review_leaf.py",
-        # The selected execution loader is an offline, fenced root-level regression.
-        REPO_ROOT / "tests" / "test_selected_execution.py",
-        # Which recorded-input changes may skip the insert/mate loop.
-        SCRIPTS_DIR / "test_refresh_tier.py",
-        # Per-assembly contracts stay per-assembly (no stem-keyed tables in
-        # _assembly.py; each recipe carries its own contract only).
-        SCRIPTS_DIR / "test_assembly_contract.py",
-        # Per-assembly allowed-interference tables re-key only their own
-        # assembly, its containers, their drawings and soundness gates.
-        SCRIPTS_DIR / "test_assembly_interference_modules.py",
-        # Shop TOML records key exactly their consumers; no direct reads (#2852).
-        SCRIPTS_DIR / "test_shop_records.py",
-        SCRIPTS_DIR / "test_cut_release_version.py",
-        SCRIPTS_DIR / "test_drawing_diff.py",
-        SCRIPTS_DIR / "test_release_drawing_diff.py",
-        SCRIPTS_DIR / "test_trim_renders.py",
-        SCRIPTS_DIR / "test_export_models.py",
-        SCRIPTS_DIR / "test_part_configuration_exports.py",
-        SCRIPTS_DIR / "test_purchased_part_variants.py",
-        # Configured purchased drawings keep their source guards out of the
-        # spring drawing modules, so a spring change never re-keys a kit.
-        SCRIPTS_DIR / "test_reference_source_lifecycle.py",
-        SCRIPTS_DIR / "test_shared_vendor_consumers.py",
-        SCRIPTS_DIR / "test_shared_wire_assembly_consumers.py",
-        SCRIPTS_DIR / "test_shared_vendor_selector_consumers.py",
-        SCRIPTS_DIR / "test_export_features.py",
-        SCRIPTS_DIR / "test_export_feature_faces.py",
-        SCRIPTS_DIR / "test_features_bound.py",
-        # Shared native gear-gap authoring/status contracts use bounded fakes.
-        SCRIPTS_DIR / "test_gear.py",
-        SCRIPTS_DIR / "test_prechips_traveler.py",
-        # CAM: posted-G-code checks and cycle times, recipe frame, and one
-        # end-to-end freecadcmd post (skipped where FreeCAD is not installed).
-        SCRIPTS_DIR / "test_cam_nc.py",
-        SCRIPTS_DIR / "test_pose_manifest.py",
-        SCRIPTS_DIR / "test_render_offline.py",
-        SCRIPTS_DIR / "test_release_diff.py",
-        SCRIPTS_DIR / "test_verify_auto_repair.py",
-        # Builder gates handed to save's final deep rebuild (drive-train) must
-        # read AFTER it, cost no second rebuild, and still block the save.
-        SCRIPTS_DIR / "test_assembly_save_solved_gates.py",
-        # Persisted display data must fail closed before assembly publication.
-        SCRIPTS_DIR / "test_assembly_save.py",
-        REPO_ROOT / "tests" / "test_saved_display_data.py",
-        # Worker/child guard isolation and fake-runner safety under xdist.
-        REPO_ROOT / "tests" / "test_solidworks_launch_guard.py",
-        # The copied-mate safeguard must keep failing CLOSED: an unreadable
-        # GetErrorCode2 or a truncated MateGroup scan has to raise/re-walk, never
-        # read as "this copy is clean".
-        SCRIPTS_DIR / "test_cwm_mate_guard.py",
-        # The DOF gate and geometry digest skip a re-solve on a solved model;
-        # a failed enumeration or a dirty model must still re-solve first, and
-        # the fast mass-property read must keep the adapter's units.
-        SCRIPTS_DIR / "test_assembly_solved_state_reads.py",
-        # A missing assembly-manager pair must not certify an overlapping spring.
-        SCRIPTS_DIR / "test_native_spring_contact.py",
-        SCRIPTS_DIR / "test_settled_spring_seats.py",
-        # The two anchor parts are dimensioned so both stock springs hang plumb
-        # (channel_lever_spec.LEVER_SPRING_X, gooseneck_geom.ARM_END_X); the
-        # recalibration search that re-measures their seats must converge and
-        # certify only through native evaluations, whatever ClosestDistance says.
-        SCRIPTS_DIR / "test_vertical_spring_anchors.py",
-        SCRIPTS_DIR / "test_seat_search.py",
-        # The [out]-param binding rule is ENFORCED, not just documented: no
-        # VT_BYREF on the (uniformly early-bound) build path, late-bound probes
-        # declare themselves, and _early_bound never falls back to a raw
-        # dispatch. Mixing the two conventions returns a wrong answer that looks
-        # like a clean result, so a comment alone decays into folklore.
-        SCRIPTS_DIR / "test_out_param_binding.py",
-        # COM failure forensics: a null COM return must still raise its own
-        # message (forensics can never mask the failure), and every capture step
-        # must survive its own failure. Both are pure-Python contracts of
-        # _seat_forensics.capture_com_failure, so they gate offline.
-        SCRIPTS_DIR / "test_failure_forensics.py",
-        # Release packaging's fail-loud document cleanup (#1713): offline
-        # contracts against fake documents, no COM.
-        SCRIPTS_DIR / "test_package_native_cleanup.py",
-        # The connect-time seat startup gate (a fresh seat is held until
-        # StartupProcessCompleted, bounded, and exits 89 for recover + retry)
-        # and the missing-source-property census (2026-09-28 crank_hub).
-        SCRIPTS_DIR / "test_seat_startup_gate.py",
-        # Shared drawing helpers: balloons, crops, notes, ray picks, GD&T boxes.
-        SCRIPTS_DIR / "test_drawing_helpers.py",
-        # The split simplified helpers' shared policy (1:2 boundary, roles,
-        # BOM identity, part derivation and simplified re-save fingerprint).
-        SCRIPTS_DIR / "test_simplified_helpers.py",
-        # Assembly and drawing loops visit components by name, never in the
-        # seat's enumeration order (#2686), so every seat asks the same.
-        SCRIPTS_DIR / "test_component_order.py",
-        # Recipe-local stock declarations; a missing groove fails loud.
-        SCRIPTS_DIR / "test_stock_fastener.py",
-        # The shared layout audit's own contract (_layout_audit.py finders + ink model).
-        SCRIPTS_DIR / "test_layout_audit.py",
-        # Drawing infrastructure and cross-sheet contracts do not follow the
-        # per-sheet test_*_drawing.py suffix, so enroll them explicitly.
-        SCRIPTS_DIR / "test_drawing_marks.py",
-        SCRIPTS_DIR / "test_drawing_visibility.py",
-        # Viewing arrows square on a zoomed readback, alike on every seat
-        # window (#2708).
-        SCRIPTS_DIR / "test_drawing_view_arrow.py",
-        SCRIPTS_DIR / "test_cone_drawing_batch_contract.py",
-        # The two cone tip screws' supplier reference lines lie under their
-        # own extension lines (one file for both sheets' shared builders).
-        SCRIPTS_DIR / "test_dt_vn_cone_tip_screw_reference_lines.py",
-        # The title block's unit-explicit general tolerances: one reader that
-        # returns mm bands, one renderer for the TOL_* text (#290).
-        SCRIPTS_DIR / "test_printed_tolerance.py",
-        # One drawing_unit declaration per package (#290 transition switch).
-        SCRIPTS_DIR / "test_package_units.py",
-        # A fresh detail view's projection is read behind the view barrier
-        # and settled within a time budget, not a read count (#1336).
-        SCRIPTS_DIR / "test_drawing_detail_projection.py",
-        # The PDF export's shaded-raster DPI override: applied, read back,
-        # and the seat put back to its declared baseline however it ends.
-        SCRIPTS_DIR / "test_drawing_pdf_raster.py",
-        SCRIPTS_DIR / "test_fastener_catalog.py",
-        SCRIPTS_DIR / "test_grouped_bom_properties.py",
-        # The shared catalogue inch-fraction printer behind the BOM and ITEM
-        # screw lengths: exact 1/64 fractions print, anything else refuses.
-        SCRIPTS_DIR / "test_inch_fraction.py",
-        # The keeper chain's rest-pose solve: whole pitches, clearances, and a
-        # length that lets the taper pin come fully out.
-        SCRIPTS_DIR / "test_dt_vn_keeper_chain.py",
-        # The removable sprocket's seat interface: its recorded web/rim
-        # shortfalls and the #25 plates' clearance over the shared seat.
-        SCRIPTS_DIR / "test_pd_transgear_removable_seat.py",
-        # The supplied tooth-side cones must match their native sections and
-        # the finished-part volume gate in every bought-blank configuration.
-        SCRIPTS_DIR / "test_pd_transgear_removable_chamfer.py",
-        # Unchanged ANSI #25 chain: paid wrap/sag/strand-order premise;
-        # the inherited native continuous-arc guide is not a seating certificate.
-        SCRIPTS_DIR / "test_paper_drive_chain_fit.py",
-        # The transgear hanger's screwed joints, pivot head play and the latch
-        # pin's press, judged at the printed bands (transgear_hanger_joints).
-        SCRIPTS_DIR / "test_transgear_hanger_joints.py",
-        # Matched stock-dowel registration and paid loaded plate motion.
-        SCRIPTS_DIR / "test_paper_drive_arm_registration.py",
-        # The arm and plate's shared projected-zone line core: Modify-dialog
-        # suppression restored, font and endpoint read-back.
-        SCRIPTS_DIR / "test_transgear_zone_line.py",
-        # The cut #10-24 hex hanger's tap web, washer/spotface reach and dowel
-        # stack at the printed bands, and the retired 1/2-13 tap's failed web.
-        SCRIPTS_DIR / "test_knife_hanger_worst_case.py",
-        SCRIPTS_DIR / "test_summing_hanger_stack.py",
-        SCRIPTS_DIR / "test_sm_vn_knife_hanger_hardware.py",
-        # The paper-drive interference rows re-derived from their owner specs
-        # (_pd_paper_drive_interference writes them as literals).
-        SCRIPTS_DIR / "test_pd_paper_drive_interference_contracts.py",
-        # Closed-form AGMA-style gates for the 12T:120T reducer and the feed
-        # pinion on the rack, plus one numeric flank-stepping cross-check.
-        SCRIPTS_DIR / "test_paper_drive_mesh_check.py",
-        # The disc cluster's printed stack (#2038): end float, recess, and the
-        # collar and platen air stacks in the statistical style.
-        SCRIPTS_DIR / "test_transgear_cluster_air.py",
-        # The integral pinion's finite cutter, running fits and retained bearings.
-        SCRIPTS_DIR / "test_pd48_knob_mechanics.py",
-        # Source-only adapter member/signature census; no SDK or native import.
-        SCRIPTS_DIR / "test_pd_transgear_adapter_contract.py",
-        # Finite purchased-rack ends and the complete recording-paper sweep.
-        SCRIPTS_DIR / "test_paper_drive_rack_travel.py",
-        SCRIPTS_DIR / "test_pd_platen_refit.py",
-        # The kinematic probe's chain-ratio band separates the 12:24 tooth
-        # ratio from the OD and pitch-circle couplings (verify:kinematics).
-        SCRIPTS_DIR / "test_kinematic_probe_ratio.py",
-        # No part or assembly saves construction geometry shown, and the
-        # per-part sketch allowances only shrink (#880).
-        SCRIPTS_DIR / "test_reference_visibility.py",
-        # Fleet-wide manufacturing ownership/validation contracts are standalone
-        # tests rather than one-file-per-drawing tests, so the glob below cannot
-        # discover them.  They must execute under the required recipe gate: these
-        # tests reject drawing-owned tolerances/finishes and validate the typed
-        # model-PMI controls that drawings consume.
-        SCRIPTS_DIR / "test_drawing_specification_purity.py",
-        SCRIPTS_DIR / "test_drawing_surface_finish_validation.py",
-        SCRIPTS_DIR / "test_gtol_contracts.py",
-        SCRIPTS_DIR / "test_native_projected_zone.py",
-        SCRIPTS_DIR / "test_part_owned_geometric_tolerances.py",
-        SCRIPTS_DIR / "test_probe_surface_finish_pmi_telemetry.py",
-        SCRIPTS_DIR / "test_surface_finish.py",
-        SCRIPTS_DIR / "test_surface_finish_ownership_a.py",
-        SCRIPTS_DIR / "test_component_patterns.py",
-        # One offline contract file per manufacturing drawing (test_*_drawing.py),
-        # so registering a drawing auto-enrolls its contracts here.
-        *sorted(SCRIPTS_DIR.glob("test_*_drawing.py")),
-        SCRIPTS_DIR / "test_sm_summing_lever_profile.py",
-        SCRIPTS_DIR / "test_sm_summing_lever_adapter_contract.py",
-        # Cross-sheet ownership checks whose filenames intentionally do not match
-        # the one-file-per-drawing discovery pattern above.
-        SCRIPTS_DIR / "test_assembly_drawing_batch_contract.py",
-        # The master build order across MHA-FR/DT/CH-00 (#2391) and the one
-        # assembly tool list reconciled with the shop files (#2392).
-        SCRIPTS_DIR / "test_ha_build_sequence.py",
-        SCRIPTS_DIR / "test_ha_assembly_package.py",
-        # Exact native and rigidly transformed assembly inspection cameras.
-        SCRIPTS_DIR / "test_assembly_named_views.py",
-        # Intended chain mesh follows the actual mounted instance pose, not
-        # configuration labels that may also name the loose spare.
-        SCRIPTS_DIR / "test_assembly_chain_mesh.py",
-        # The ms-measuring-stick sub-assembly contract (2026-10-09): parked
-        # pose, retention pairs, BOM numbers and the fully-fixed contract file.
-        # Its YAML reads ride the gate's _CONFIG_YAMLS deps; its module imports
-        # ride module_deps_of.
-        SCRIPTS_DIR / "test_ms_measuring_stick_assembly.py",
-        # The pen carriage's CG-on-rod-axis balance, paper stand-off and rider
-        # layout (pn_pen_carriage_geom) that build_pn_pen_assembly places from.
-        SCRIPTS_DIR / "test_pn_pen_carriage_geom.py",
-        # Same failure shape: never enrolled, so the U28 re-lay (997f3534) left
-        # its three drive-train support pins red with every gate green.
-        SCRIPTS_DIR / "test_dt_drive_train_support_layout.py",
-        # Native-STL gravity seam welding remains strict about holes and winding.
-        SCRIPTS_DIR / "test_dt_swing_gravity_collector.py",
-        # The cone tip block's hold-down, end-screw embed and cone-tip air contracts
-        # (I20/I22/I24/I31; prism ruling 2026-09-29).
-        SCRIPTS_DIR / "test_drive_train_cone_tip_holddown.py",
-        # The four assemblies' layout/tolerance stacks (formerly import-time
-        # guards in their builders, #2887).
-        SCRIPTS_DIR / "test_dt_drive_train_assembly_stack.py",
-        SCRIPTS_DIR / "test_pd_paper_drive_assembly_stack.py",
-        SCRIPTS_DIR / "test_mg_magnifier_assembly_stack.py",
-        SCRIPTS_DIR / "test_pn_pen_assembly_stack.py",
-        # dimensions.yaml is read by no part, so only this test keeps its
-        # alignment-pinion record pinned to the CAD constants (#814).
-        SCRIPTS_DIR / "test_dimensions_alignment_pinion_layout.py",
-        # Every cad/config YAML parses: prose-only records move no cache key,
-        # so a row that breaks the file is otherwise invisible (caf03f2b7).
-        SCRIPTS_DIR / "test_config_yaml_parses.py",
-        # The mirror-retirement diagnostic's drive-train rows equal the rows the
-        # assembly places with (Codex on #814 and #844).
-        SCRIPTS_DIR / "test_mirror_retirement_expectations.py",
-        # Every offline test in cad/scripts runs in some
-        # check:* gate or is exempted with a reason (Codex on #844).
-        SCRIPTS_DIR / "test_check_gate_enrollment.py",
-        # No module assigns an UPPERCASE name twice at top level: a merge that
-        # kept both sides of a rewritten block shadowed seven BDT constants
-        # (cascade -> integ merge, Main's restricted review).
-        SCRIPTS_DIR / "test_module_constants_assigned_once.py",
-        # Integ-branch tests that guard caught un-enrolled at #877 round 4.
-        SCRIPTS_DIR / "test_standard_mesh_checks.py",
-        SCRIPTS_DIR / "test_dt_cone_gear_seat_fit.py",
-        # Finite stock-cutter geometry is a production design contract.
-        SCRIPTS_DIR / "test_stock_form_cutter.py",
-        # The gear-cutting kit records cover the cutters, arbors, broach and
-        # keyseat end mill the gear specs and the key module name (#2356).
-        SCRIPTS_DIR / "test_gear_cutting_kit.py",
-        # The 64T's straight inclined tooth space (#2332 option A).
-        SCRIPTS_DIR / "test_straight_gash.py",
-        SCRIPTS_DIR / "test_drawing_hidden_sketches.py",
-        # Supplier configuration isolation, exact source inventory and final
-        # native readback; layout contracts use test_*_drawing.py discovery.
-        SCRIPTS_DIR / "test_supplier_configured_references.py",
-        SCRIPTS_DIR / "test_supplier_spring_reference.py",
-        SCRIPTS_DIR / "test_supplier_reference_geometry.py",
-        SCRIPTS_DIR / "test_supplier_reference_text.py",
-        SCRIPTS_DIR / "test_drawing_physical_axial_dimension.py",
-        SCRIPTS_DIR / "test_drawing_serialized_note_identity.py",
-        # Named-dimension lookups bind in sorted name order (#2514).
-        SCRIPTS_DIR / "test_drawing_precision.py",
-        SCRIPTS_DIR / "test_supplier_spring_dimensions.py",
-        # Native supplier I/O doubles and recorded ink replays stay COM-free.
-        SCRIPTS_DIR / "test_supplier_native_contracts.py",
-        SCRIPTS_DIR / "test_supplier_native_repair.py",
-        SCRIPTS_DIR / "test_supplier_top_text_shelves.py",
-        SCRIPTS_DIR / "test_dt_drive_train_steps.py",
-        # The shared rule-22 step-structure lint's positive controls.
-        SCRIPTS_DIR / "test_assembly_step_lint.py",
-        # Supplier pose facts must stay independent of native replica recipes.
-        SCRIPTS_DIR / "test_dt_vn_cone_pose_specs.py",
-        SCRIPTS_DIR / "test_fit_bands.py",
-        # The shared single MAX/MIN limit setter's state and rejection paths.
-        SCRIPTS_DIR / "test_single_limit_tolerance.py",
-        # The shared two-limit (LIMIT) setter's state and rejection paths.
-        SCRIPTS_DIR / "test_limit_tolerance.py",
-        # Fixture pose, hook transform and conservative swept-wire clearance.
-        SCRIPTS_DIR / "test_mg_fixture_installation.py",
-        SCRIPTS_DIR / "test_printed_text_rulings.py",
-        # ... and the #857 re-merge: its leader-geometry and replica-driver pins.
-        SCRIPTS_DIR / "test_drawing_leaders.py",
-        SCRIPTS_DIR / "test_mcmaster_replica_driver.py",
-        # ... and #906: the crank native-acceptance record pins.
-        SCRIPTS_DIR / "test_crank_native_acceptance.py",
-        SCRIPTS_DIR / "test_crank_boss_rim.py",
-        # Shared supplier models retain the role-specific fit checks.
-        SCRIPTS_DIR / "test_ch_vn_arbor_set_screw.py",
-        SCRIPTS_DIR / "test_dt_vn_fillister_screw.py",
-        SCRIPTS_DIR / "test_mg_vn_clamp_screw.py",
-        SCRIPTS_DIR / "test_mg_vn_thumb_screw.py",
-        SCRIPTS_DIR / "test_cylinder_bank_layout.py",
-        # ... and MHA-CH-VN-55, the fulcrum keepers' #1-72 cup-point set screw.
-        SCRIPTS_DIR / "test_ch_vn_fulcrum_set_screw.py",
-        # ... and MHA-PN-VN-50, the pen hanger's #8-32 screw (McMaster 93075A199).
-        SCRIPTS_DIR / "test_pn_vn_hanger_screw.py",
-        # ... and #936: the rocker-bank stack, the support's bracket seats, the
-        # channel's cross-bank axial budget and the hole-callout process line.
-        SCRIPTS_DIR / "test_channel_axial_budget.py",
-        SCRIPTS_DIR / "test_hole_callout_prefix.py",
-        # ... and #1075: a radial wizard tap commits its thread class and
-        # termination, and define_circle can dimension a circle by its radius.
-        SCRIPTS_DIR / "test_holes_thread_metadata.py",
-        SCRIPTS_DIR / "test_define_circle.py",
-        SCRIPTS_DIR / "test_rocker_bank_layout.py",
-        # #1038: every restated station pitch / station-0 copy equals the
-        # channel config (the lever hub literal had no offline guard).
-        SCRIPTS_DIR / "test_station_pitch_lockstep.py",
-        SCRIPTS_DIR / "test_rocker_bracket_seat_layout.py",
-        SCRIPTS_DIR / "test_ch_pivot_bracket_spec.py",
-        SCRIPTS_DIR / "test_magnifying_bracket_joint_layout.py",
-        SCRIPTS_DIR / "test_sm_gooseneck_spring_joint.py",
-        # #1559: the MHA-MG-04 rod's threaded seat in the MHA-MG-02 hex clamp.
-        SCRIPTS_DIR / "test_mg_rod_clamp_joint.py",
-        # ... and the A1 bracket arm's stiffness/joint check (the arm grew to
-        # reach the plumb plane at the drum wire lane).
-        SCRIPTS_DIR / "test_mg_magnifying_bracket_arm_check.py",
-        # #2398: the thin wire's bending strain, strength, fit and the
-        # clamp travel that takes up its wheel ratio.
-        SCRIPTS_DIR / "test_sh_vn_thin_wire.py",
-        # Threaded MG cutover: all direct adapter calls bind to the pinned SDK,
-        # without importing or executing a recipe, SDK implementation or COM.
-        SCRIPTS_DIR / "test_mg_threaded_adapter_contract.py",
-        # The pressed MHA-SH-VN-58 pivot pin's two joints (bar cheeks, rod
-        # fork): worst-case press, running fit and dressing-stock budgets,
-        # pinned to their sources.
-        SCRIPTS_DIR / "test_sh_vn_pivot_pin_bar_fit.py",
-        SCRIPTS_DIR / "test_sh_vn_pivot_pin_rod_fit.py",
-        # The blind machinist-review runner (cad/docs/drawing-guidelines.md):
-        # prompt calibration, strict output schema, neutral-workdir command, pass
-        # logic and the blind-review tool-event detector are pinned offline.
-        SCRIPTS_DIR / "test_machinist_review.py",
-        # Release-package prompt benchmarks: deterministic grading and workspace
-        # contracts run offline, without reviewer/model or SolidWorks activity.
-        review_bench.with_name("test_machinist_review_bench.py"),
-        # The settings-independence contracts this PR adds.  All three are
-        # pure Python (no COM), and unenrolled they would be exactly the
-        # "green gate that checks nothing" the comments above warn about: the
-        # offline closure invariant (endpoint_merges/minor_arc refusing the
-        # shapes an inference snap produces), the seat-preference contract
-        # (declared baseline vs observed restore, depth counting, refused
-        # writes), and the authoring contract (a profile must close against a
-        # seat that refuses every merge -- the 2026-09-18 farm failure) are
-        # the whole mechanism by which a recipe stops depending on a seat's
-        # inference settings, so they must fail a gate, not just a local run.
-        SCRIPTS_DIR / "test_logo_profile_closure.py",
-        SCRIPTS_DIR / "test_sketch_preference_baseline.py",
-        SCRIPTS_DIR / "test_diag_mcmaster_lib.py",
-        # Every configuration of a saved part is rebuilt and read back clean
-        # (pc-p1r: MHA-DT-30 INSTALLED saved stale failed saved-rebuild-clean).
-        SCRIPTS_DIR / "test_part_save_rebuild.py",
-        # Assembly mates select by name, never by a view-dependent point pick
-        # (#916: the collar pick selected the shaft collar's OD on one seat).
-        SCRIPTS_DIR / "test_assembly_named_selection.py",
-        # The adapter's raw feature-tree diff and edge scoring (solidworks_mcp
-        # features.py over raw_dispatch): raw calls match the generated
-        # members, an incomplete before-walk refuses to diff, and the created
-        # feature is picked by type, never an auxiliary one beside it.
-        SCRIPTS_DIR / "test_adapter_feature_resolution.py",
-    ]
+    owned = {SCRIPTS_DIR / test for tests in _GATE_TESTS.values() for test in tests}
+    recipe_tests = [path for path in _collected_tests() if path not in owned]
     # These are runtime-read rather than imported, so module_deps_of cannot
     # discover them. A prompt/schema edit must invalidate check:recipe and rerun
     # the offline machinist-review contract.
@@ -4551,6 +4246,21 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
             str((REPO_ROOT / "conftest.py").resolve()),
             *(str(path.resolve()) for path in recipe_tests),
             *(dep for path in recipe_tests for dep in module_deps_of(path)),
+            # Reference DXFs a test reads through its imports (test_base_serial).
+            # Tests also quote fake DXF names, so keep only committed files.
+            *(
+                dep
+                for path in recipe_tests
+                for dep in data_deps_of(path)
+                if Path(dep).is_file()
+            ),
+            # The vm2 datum tests pin their committed probe receipts.
+            *(
+                str(path.resolve())
+                for path in (
+                    REPO_ROOT / "cad" / "docs" / "pipeline" / "evidence" / "vm2-datum-placement" / "probes"
+                ).glob("*/receipt.json")
+            ),
             *(str(path.resolve()) for path in machinist_review_contract_deps),
             # module_deps_of resolves only cad/scripts modules: name the
             # out-of-tree benchmark harness its test imports, and its imports.
@@ -4586,8 +4296,14 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
                     "render_offline.py",
                     "release_diff.py",
                     "render_diff.py",
+                    "pose_to_meshprobe.py",
+                    "seed_manifest.py",
                 )
             ),
+            # test_pytest_scope reads pytest's own configuration.
+            str((REPO_ROOT / "pyproject.toml").resolve()),
+            # Root farm tests import farm_build.py, outside module_deps_of.
+            str((REPO_ROOT / "farm_build.py").resolve()),
             # Release pairing tests compose the current and sealed identity maps.
             str(
                 (REPO_ROOT / "cad" / "config" / "identity-migration-map.json").resolve()
@@ -4651,6 +4367,7 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
                     "submodule_sources": [
                         _rel_tag(path) for path in adapter_contract_deps
                     ],
+                    "recipe_tests": [_rel_tag(str(path)) for path in recipe_tests],
                     "recipe_scanned_sources": [
                         _rel_tag(path) for path in sorted(scanned_by_binding_gate)
                     ],
@@ -4691,7 +4408,7 @@ def _check_undefined_names_spec(pytest_cmd: list[str]) -> dict[str, Any]:
                 str((SCRIPTS_DIR / "test_undefined_names.py").resolve()),
             }
         ),
-        "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_undefined_names.py")],
+        "cmd": [*pytest_cmd, *_gate_tests("undefined_names")],
     }
 
 
@@ -4757,13 +4474,7 @@ def _check_graph_spec(pytest_cmd: list[str]) -> dict[str, Any]:
             *parts_registry_files(),
             *assembly_contract_files(),
         ],
-        "cmd": [
-            *pytest_cmd,
-            str(SCRIPTS_DIR / "test_buildgraph.py"),
-            str(SCRIPTS_DIR / "test_part_coverage.py"),
-            str(SCRIPTS_DIR / "test_assembly_sheet_isolation.py"),
-            str(SCRIPTS_DIR / "test_package_unit_declarations.py"),
-        ],
+        "cmd": [*pytest_cmd, *_gate_tests("graph")],
     }
 
 
@@ -4792,7 +4503,7 @@ def _check_nameplate_spec(pytest_cmd: list[str]) -> dict[str, Any]:
                 ).resolve()
             ),
         ],
-        "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_fr_nameplate_geometry.py")],
+        "cmd": [*pytest_cmd, *_gate_tests("nameplate")],
     }
 
 
@@ -4814,7 +4525,7 @@ def _check_numerals_spec(pytest_cmd: list[str]) -> dict[str, Any]:
             *_config_deps(SCRIPTS_DIR / "test_dxf_text.py"),
             *data_deps_of(SCRIPTS_DIR / "test_dxf_text.py"),
         ],
-        "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_dxf_text.py")],
+        "cmd": [*pytest_cmd, *_gate_tests("numerals")],
     }
 
 
@@ -4826,7 +4537,7 @@ def _check_cache_spec(pytest_cmd: list[str]) -> dict[str, Any]:
             str((SCRIPTS_DIR / "_artifact_cache.py").resolve()),
             str((SCRIPTS_DIR / "test_artifact_cache.py").resolve()),
         ],
-        "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_artifact_cache.py")],
+        "cmd": [*pytest_cmd, *_gate_tests("cache")],
     }
 
 
@@ -4844,11 +4555,7 @@ def _check_telemetry_spec(pytest_cmd: list[str]) -> dict[str, Any]:
             str((SCRIPTS_DIR / "test_telemetry.py").resolve()),
             str((SCRIPTS_DIR / "test_cut_release_telemetry.py").resolve()),
         ],
-        "cmd": [
-            *pytest_cmd,
-            str(SCRIPTS_DIR / "test_telemetry.py"),
-            str(SCRIPTS_DIR / "test_cut_release_telemetry.py"),
-        ],
+        "cmd": [*pytest_cmd, *_gate_tests("telemetry")],
     }
 
 
@@ -4872,7 +4579,7 @@ def _check_watchdog_spec(pytest_cmd: list[str]) -> dict[str, Any]:
             str((SCRIPTS_DIR / "_seat_forensics.py").resolve()),
             str((SCRIPTS_DIR / "test_watchdog.py").resolve()),
         ],
-        "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_watchdog.py")],
+        "cmd": [*pytest_cmd, *_gate_tests("watchdog")],
     }
 
 
@@ -4890,7 +4597,7 @@ def _check_verify_telemetry_spec(pytest_cmd: list[str]) -> dict[str, Any]:
             str((SCRIPTS_DIR / "verify.py").resolve()),
             str((SCRIPTS_DIR / "test_verify_telemetry.py").resolve()),
         ],
-        "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_verify_telemetry.py")],
+        "cmd": [*pytest_cmd, *_gate_tests("verify_telemetry")],
     }
 
 
@@ -4903,7 +4610,7 @@ def _check_flagonly_spec(pytest_cmd: list[str]) -> dict[str, Any]:
             str((SCRIPTS_DIR / "_com.py").resolve()),
             str((SCRIPTS_DIR / "test_flag_only.py").resolve()),
         ],
-        "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_flag_only.py")],
+        "cmd": [*pytest_cmd, *_gate_tests("flagonly")],
     }
 
 
@@ -4943,7 +4650,7 @@ def _check_partiso_spec(pytest_cmd: list[str]) -> dict[str, Any]:
                 ),
             }
         ),
-        "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_part_isolation.py")],
+        "cmd": [*pytest_cmd, *_gate_tests("partiso")],
     }
 
 
@@ -4966,7 +4673,7 @@ def _check_inert_spec(pytest_cmd: list[str]) -> dict[str, Any]:
                 *scanned_by_binding_gate,
             }
         ),
-        "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_recipe_inert.py")],
+        "cmd": [*pytest_cmd, *_gate_tests("inert")],
     }
 
 
@@ -5006,7 +4713,7 @@ def _check_budget_spec(pytest_cmd: list[str]) -> dict[str, Any]:
                 *module_deps_of(SCRIPTS_DIR / "test_error_budget.py"),
             }
         ),
-        "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_error_budget.py")],
+        "cmd": [*pytest_cmd, *_gate_tests("budget")],
     }
 
 

@@ -94,7 +94,7 @@ directly, so they are dynamic and genuinely DO need byrefs — which is exactly 
 a probe that works standalone can come back empty in-build. Root-cause fix
 (analysed 2026-07-25, IMPLEMENTED on `fix/out-param-trap`): `_early_bound` now
 RAISES instead of falling back, its `*method_names` param is gone, and
-`test_out_param_binding.py` (in `recipe_tests`) bans `VT_BYREF` on the build
+`test_out_param_binding.py` (gated in `check:recipe`) bans `VT_BYREF` on the build
 path and forces every late-bound diagnostic to carry a `LATE-BOUND PROBE`
 marker. Do NOT write a dual-mode `call_outs()` helper — that makes the broken
 mode permanent. See [[no-untested-failure-assumptions]].
