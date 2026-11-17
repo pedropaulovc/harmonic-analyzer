@@ -1,5 +1,6 @@
-"""The release's ASSEMBLY.md: the master build sequence and the one assembly
-tool and gauge list, reconciled with the shop files (#2391, #2392).
+"""The release's ASSEMBLY.md: the master build sequence, the fit-up steps of
+the packages that print them here, and the one assembly tool and gauge list,
+reconciled with the shop files (#2391, #2392, #2889).
 
 Nothing here is copied from a sheet. The sequence table is ha_build_sequence's
 runs, printed with the numbers the sub-assembly sheets print. The tool list is
@@ -14,6 +15,11 @@ record in cad/process/shop.toml or cad/config/shop-equipment.toml, so the
 list carries only tools some sheet still names, says where, and marks each
 OWNED, TO BUY or TO MAKE from the record. test_ha_assembly_package fails when
 a sheet names an instrument, gauge or consumable no row covers.
+
+A package in ``STEPS_IN_DOCUMENT`` prints its numbered fit-up steps and checks
+here instead of on its sheets: its ``*_assembly_sheet`` module's
+``STEP_SECTIONS`` and ``ASSEMBLY_CHECKS``, as evaluated, so every size, item
+and step number is the one the module derives.
 
 cut_release stages the document beside READOUT.md; run this module to print
 it. Reads source and TOML only: no SolidWorks.
@@ -47,6 +53,9 @@ DOCUMENT_NAME = "ASSEMBLY.md"
 # The machine's assembly packages: every row of the complete machine's BOM,
 # then the complete machine itself.
 PACKAGES: tuple[str, ...] = (*BOM_ORDER, ASM_NAME)
+# The packages whose fit-up steps and checks print in this document, not on
+# their sheets (#2889).
+STEPS_IN_DOCUMENT: tuple[str, ...] = ("mg-magnifier",)
 _TEXT_MODULE_SUFFIXES = ("_assembly_sheet", "_steps", "_fitup")
 _PACKAGE_PREFIXES = tuple(sorted({f"{stem.split('-')[0]}_" for stem in PACKAGES}))
 
@@ -494,6 +503,30 @@ def _cell(values: tuple[str, ...]) -> str:
     return ", ".join(values) if values else "-"
 
 
+def fitup_lines(stem: str) -> list[str]:
+    """Package ``stem``'s fit-up section: each titled step group, then its
+    checks and notes, every step under the head its sheets cite."""
+    sheet = importlib.import_module(f"{stem.replace('-', '_')}_assembly_sheet")
+    number = drawing_number(stem)
+    lines = [
+        f"## {number} fit-up steps",
+        "",
+        f"Drawing {number} carries the views, settings, parts list and balloons "
+        "these steps use; SHEET, VIEW, DETAIL and ITEM references are that "
+        "drawing's.",
+        "",
+    ]
+    for title, steps in sheet.STEP_SECTIONS:
+        lines += [f"### {title}", ""]
+        for step in steps:
+            head, body = step.split(". ", 1)
+            lines.append(f"- **{head}.** {body}")
+        lines.append("")
+    lines += ["### Checks and notes", ""]
+    lines += [f"- {line}" for line in sheet.ASSEMBLY_CHECKS]
+    return [*lines, ""]
+
+
 def markdown() -> str:
     ha_steps = build.ha_steps
     printed_at = sorted(
@@ -507,7 +540,7 @@ def markdown() -> str:
         i for i, phase in enumerate(build.PHASES, start=1) if phase.frame == "APART"
     ]
     lines = [
-        "# MHA-HA-00 build sequence and assembly tools",
+        "# MHA-HA-00 build sequence, fit-up steps and assembly tools",
         "",
         "Generated from the assembly packages' own steps and the shop files at "
         "this release (cad/scripts/ha_assembly_package.py); a change to a sheet "
@@ -536,6 +569,10 @@ def markdown() -> str:
         "part already located on another; those on MHA-FR-01 and MHA-FR-02 are "
         f"why the frame is apart for phases {apart[0]}-{apart[-1]}.",
         "",
+    ]
+    for stem in STEPS_IN_DOCUMENT:
+        lines += fitup_lines(stem)
+    lines += [
         "## Assembly tools, gauges and consumables",
         "",
         "Every tool the assembly sheets name, reconciled with cad/process/shop.toml "

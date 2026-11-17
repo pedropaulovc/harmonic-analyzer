@@ -52,6 +52,27 @@ def test_release_ships_the_sequence_and_tool_list(tmp_path, monkeypatch):
         assert use.tool.name in text
 
 
+def test_release_prints_the_steps_moved_off_their_sheets():
+    import importlib
+
+    import mg_magnifier_assembly_sheet as mg
+
+    text = package.markdown()
+    for stem in package.STEPS_IN_DOCUMENT:
+        sheet = importlib.import_module(f"{stem.replace('-', '_')}_assembly_sheet")
+        assert f"## {package.drawing_number(stem)} fit-up steps" in text
+        for title, steps in sheet.STEP_SECTIONS:
+            assert f"### {title}\n" in text
+            for step in steps:
+                head, body = step.split(". ", 1)
+                assert f"- **{head}.** {body}\n" in text
+        for line in sheet.ASSEMBLY_CHECKS:
+            assert f"- {line}\n" in text
+    # The printed values are the ones the spec derives, not pasted text.
+    assert f"{mg.ENDSHAKE_GO_TEXT} ENTERS, {mg.ENDSHAKE_NO_GO_TEXT} DOES NOT." in text
+    assert f"{mg.BACK_END_SUNK_TEXT} BELOW THE FAR FACE OF ITEM" in text
+
+
 def test_summing_lever_step_stops_before_its_final_assembly_step():
     import ha_harmonic_analyzer_assembly_sheet as ha_sheet
     import sm_summing_assembly_sheet as sm_sheet
