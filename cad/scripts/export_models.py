@@ -18,7 +18,9 @@ offline-render feed consumed by render_offline.py —
 * assemblies: cad/out/gltf/<dashed>.glb — SolidWorks' own glTF exporter
   (SaveAs3, format inferred from the .glb extension; SW2023+), which carries
   metre units, per-component nodes named after the components, and the
-  appearance colours as glTF materials — plus cad/out/boxes/<dashed>.json with
+  appearance colours as glTF materials; threaded stock fasteners appear
+  unthreaded (``unthread_stock_fasteners``), gears keep their teeth — plus
+  cad/out/boxes/<dashed>.json with
   per-component bounding boxes (framing) and a scene graph: one entry per
   visible leaf component with its part stem, assembly-space transform
   (IMathTransform.ArrayData, row-vector convention, translation in
@@ -79,6 +81,7 @@ from __future__ import annotations
 import argparse
 import copy
 import hashlib
+import importlib
 import json
 import os
 import shutil
@@ -87,6 +90,7 @@ import subprocess
 import sys
 import time
 import zlib
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Any, Callable
 
@@ -94,6 +98,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _check import check, log  # noqa: E402
 from _com import _early_bound, _read_member  # noqa: E402
 from _component_order import by_name  # noqa: E402
+from _simplified_names import is_simplified, simplified_name  # noqa: E402
 from _part_save import set_isometric_view  # noqa: E402
 from _paths import CAD_ROOT  # noqa: E402
 from _preferences import (
@@ -109,7 +114,8 @@ from _part_configuration_exports import (  # noqa: E402
     step_export_preferences,
     validate_member_exports,
 )
-from _session import run_build  # noqa: E402
+from _session import _resident_output_documents, discard_open_documents, run_build  # noqa: E402
+from _stock_recipe import StockRecipeDeclaration  # noqa: E402
 from _buildgraph import ASSEMBLY_ORDER, part_stems  # noqa: E402
 import _config  # noqa: E402
 from _export_feature_faces import FeatureFaceError, name_feature_faces, step_face_sets  # noqa: E402
@@ -1013,6 +1019,99 @@ def _switch_configuration(adapter: Any, doc: Any, stem: str, cfg: str) -> bool:
     return True
 
 
+# The GLB alone shows threaded stock fasteners unthreaded (#2886): their swept
+# ThreadGroove is invisible in the simulator but dominates the GLB. Each such part
+# carries a ``<cfg> Simplified`` child suppressing that groove alone
+# (_stock_fastener._save_stock_part passes (THREAD_FEATURE,)). The assembly
+# ``Default Simplified`` cannot be exported instead: it also strips gear teeth.
+# So after the scene, PNG and every neutral export have read Default, only those
+# components are re-pointed in the open, never-saved assembly and every loaded
+# subassembly document, and the leaf closes without saving.
+def threaded_stock_parts(stems: Iterable[str]) -> frozenset[str]:
+    """Dashed stems whose builder imports a ``stock_recipe(..., threaded=True)``
+    recipe -- the declaration ``_stock_fastener`` validates before saving."""
+    scripts = Path(__file__).resolve().parent
+    threaded: set[str] = set()
+    for stem in stems:
+        name = f"build_{stem.replace('-', '_')}"
+        if "build_stock_fastener" not in (scripts / f"{name}.py").read_text(encoding="utf-8"):
+            continue
+        declarations = [
+            value.__stock_recipe__
+            for value in vars(importlib.import_module(name)).values()
+            if isinstance(getattr(value, "__stock_recipe__", None), StockRecipeDeclaration)
+        ]
+        if any(d.threaded for d in declarations):
+            threaded.add(stem.replace("_", "-"))
+    return frozenset(threaded)
+
+
+def _component_part_stem(component: Any) -> str | None:
+    path = Path(str(component.GetPathName()))
+    return path.stem.lower() if path.suffix.lower() == ".sldprt" else None
+
+
+def unthread_stock_fasteners(top: Any, threaded: frozenset[str]) -> int:
+    """Re-point every threaded stock fastener under the open ``top`` at its
+    ``<cfg> Simplified`` child, rebuild, and prove the whole tree reads
+    simplified for exactly those parts. Returns the components re-pointed.
+
+    A component of a rigid subassembly takes its configuration from the
+    subassembly document, so each loaded subassembly document is edited in the
+    configuration its parent references."""
+    top = _early_bound(top, "IModelDoc2")
+    with _telemetry.span("export.glb_unthread", asm=str(top.GetTitle())) as sp:
+        assembly = _early_bound(top, "IAssemblyDoc")
+        assembly.ResolveAllLightWeightComponents(False)
+        documents = [("<top>", top, _active_configuration(top))]
+        seen = {str(top.GetPathName()).lower()}
+        for name, component in by_name(assembly.GetComponents(False)):
+            path = str(component.GetPathName())
+            if Path(path).suffix.lower() != ".sldasm" or path.lower() in seen:
+                continue
+            if bool(component.IsSuppressed()):
+                continue
+            doc = component.GetModelDoc2()
+            if doc is None:
+                raise RuntimeError(f"GLB swap: subassembly {name} is not loaded")
+            seen.add(path.lower())
+            documents.append(
+                (name, _early_bound(doc, "IModelDoc2"), str(component.ReferencedConfiguration))
+            )
+        swapped = 0
+        for label, doc, referenced in documents:
+            if _active_configuration(doc) != referenced:
+                raise RuntimeError(f"GLB swap: {label} is not loaded in {referenced!r}")
+            refused: list[str] = []
+            for name, component in by_name(_early_bound(doc, "IAssemblyDoc").GetComponents(True)):
+                current = str(component.ReferencedConfiguration)
+                if _component_part_stem(component) not in threaded or is_simplified(current):
+                    continue
+                component.ReferencedConfiguration = simplified_name(current)
+                if str(component.ReferencedConfiguration) != simplified_name(current):
+                    refused.append(f"{name}: {current!r}")
+                    continue
+                swapped += 1
+            if refused:
+                raise RuntimeError(f"GLB swap: {label} refused simplified fasteners {refused}")
+        # TopOnly=False rebuilds every subassembly document edited above.
+        if not bool(top.ForceRebuild3(False)):
+            raise RuntimeError("GLB swap: ForceRebuild3 failed")
+        wrong = [
+            f"{name}: {component.ReferencedConfiguration!r}"
+            for name, component in by_name(assembly.GetComponents(False))
+            if (stem := _component_part_stem(component)) is not None
+            and not bool(component.IsSuppressed())
+            and is_simplified(str(component.ReferencedConfiguration)) != (stem in threaded)
+        ]
+        if wrong:
+            raise RuntimeError(f"GLB swap did not reach exactly the threaded fasteners: {wrong}")
+        sp.set_attribute("documents", len(documents))
+        sp.set_attribute("swapped", swapped)
+    log(f"  GLB: {swapped} threaded stock fastener component(s) unthreaded")
+    return swapped
+
+
 def _require_native_unchanged(native: Path, before: str) -> None:
     if _file_sha256(native) != before:
         raise RuntimeError(
@@ -1832,6 +1931,9 @@ def main() -> int:
     for d in (OUT_STL, OUT_STEP, OUT_BOXES, OUT_GLTF):
         d.mkdir(parents=True, exist_ok=True)
 
+    # Pure Python over ~80 builder imports: resolved before the seat is held.
+    threaded = threaded_stock_parts(part_stems()) if stale_asms else frozenset()
+
     async def build(adapter: Any) -> dict[str, str]:
         enforce_preferences(adapter, EXPORT_PREFERENCES)
         done: dict[str, str] = {}
@@ -1862,11 +1964,9 @@ def main() -> int:
                 # quirk), appearance materials.
                 (OUT_STEP / f"{dashed}.STEP").unlink(missing_ok=True)
                 (OUT_STL / f"{dashed}.STL").unlink(missing_ok=True)
-                glb = OUT_GLTF / f"{dashed}.glb"
-                _save_as(doc, glb)
-                log(f"saved {glb.name} ({glb.stat().st_size / 1e6:.1f} MB)")
                 # Fresh cache: only resolved-component doc reads land in
                 # scan_colors, so a lightweight scan never masks a stale colour.
+                # The scene and PNG read Default, before the GLB-only swap.
                 scan_colors: dict = {}
                 boxes, scene, stems = scan_assembly(adapter, scan_colors)
                 colors.update(scan_colors)
@@ -1874,7 +1974,17 @@ def main() -> int:
                 all_scene_stems.update(stems)
                 if stem in missing_asm_png:
                     await export_build_png(adapter, dashed)
-                adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
+                # The GLB alone shows threaded stock fasteners unthreaded
+                # (unthread_stock_fasteners). Nothing is saved: discard the
+                # dirtied documents without a save prompt and prove no cad/out
+                # document survives into the next open.
+                unthread_stock_fasteners(doc, threaded)
+                glb = OUT_GLTF / f"{dashed}.glb"
+                _save_as(doc, glb)
+                log(f"saved {glb.name} ({glb.stat().st_size / 1e6:.1f} MB)")
+                discard_open_documents(adapter)
+                if left := _resident_output_documents(adapter):
+                    raise RuntimeError(f"{dashed}: {left} stayed open after the GLB swap")
                 done[stem] = "exported"
 
             for stem in sorted(scene_assemblies - set(pending_scenes)):
