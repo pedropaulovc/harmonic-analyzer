@@ -37,6 +37,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     dimension_name,
     place_view,
+    view_name,
 )
 
 import _surface_finish
@@ -49,7 +50,7 @@ from _printed_limits import limits as _band
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from _check import check
-from _com import _early_bound
+from _com import _early_bound, _read_member
 from _drawing_centerline import add_view_centerline
 from _drawing_common import (
     DrawingOutputs,
@@ -77,7 +78,6 @@ from _drawing_hidden_sketches import (
 )
 from _drawing_hole_callout import (
     add_native_hole_callout,
-    compose_hole_callout_prefix,
     set_hole_callout_precision,
 )
 from _drawing_leader_notes import add_leader_note
@@ -90,10 +90,10 @@ from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 import _seat_forensics
+from _single_limit_tolerance import SW_TOL_MAX
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
-from dt_cone_gear_shaft_spec import POST_JOURNAL_RIM_BREAK
 from dt_cone_pivot_post_spec import (
     ATTACHMENT_CBORE_DIA,
     ATTACHMENT_X,
@@ -113,6 +113,7 @@ from dt_cone_pivot_post_spec import (
     DRAWING_PRECISION_BY_NAME,
     GEOMETRIC_CONTROLS,
     INCLINE_DEG,
+    JOURNAL_RIM_BREAK,
     PART_DATUMS,
     SURFACE_FINISHES,
 )
@@ -479,14 +480,13 @@ JOURNAL_KEEP = {
     # the head, text out left of the head and below the A-A thrust-face
     # station's lower extension line (y ~217-222 over the head).
     "HeadDia": (0.200, 0.2135),
-    # The bore's block is two rows since its words went to numbered note 2
-    # (screen of the novice rubric: the boss OD and the bore read as one
-    # six-line callout), so its top stands under the boss OD's row and the
-    # two read as separate callouts.  Its widest row, "REAM THRU, SEE NOTE
-    # 2", is about the boss OD row's width and stays inside 265.5..319.2.
-    # The block is centred on this y: attempt 1 of the R5 fix printed five
-    # rows about it with the leader shelf clear of the bore's Ra symbol and
-    # the top under the boss OD's row, and three rows stand inside that box.
+    # The bore's block is its stacked size and limits over one row, "REAM
+    # THRU, SEE NOTE 2" (its fit went to numbered note 2, its rims' break to
+    # detail D), so its top stands under the boss OD's row and the two read
+    # as separate callouts.  That row is about the boss OD row's width and
+    # stays inside 265.5..319.2.  The block is centred on this y: R5 fix
+    # attempt 1 printed a taller block about it with its leader shelf clear
+    # of the bore's Ra symbol and its top under the boss OD's row.
     "JournalBoreDia": (0.292, 0.154),
 }
 
@@ -507,7 +507,8 @@ JOURNAL_BORE = requirement(
         "finish_ra": (_surface_finish.MACHINED_UM, ("SURFACE_FINISHES",)),
         "height": (_band(cone.BORE_HEIGHT, _P["JournalAxisY"], (cone.JOURNAL_AXIS_HEIGHT_TOLERANCE_MM, -cone.JOURNAL_AXIS_HEIGHT_TOLERANCE_MM), unit=cone.UNIT), ("BORE_HEIGHT", "JOURNAL_AXIS_HEIGHT_TOLERANCE_MM")),
         "height_from": ("foot_seat", ("BORE_HEIGHT",)), "datum": ("A", ("PART_DATUMS",)),
-        # No rim-break field exists: keep the sourced note and unknown inspection.
+        # The rims' break prints on its own dimension (detail D); no rim-break
+        # field exists here, so the sourced note and unknown inspection stay.
         "note": (cone_shaft.POST_JOURNAL_RIM_BREAK, (("dt_cone_gear_shaft_spec", "POST_JOURNAL_RIM_BREAK"), ("dt_cone_gear_shaft_spec", "THRUST_EDGE_BREAK_MAX"))),
     }, precision={"dia": _P["JournalBoreDia"], "finish_ra": 1, "height": _P["JournalAxisY"]},
 )
@@ -536,11 +537,13 @@ JOURNAL_TEXT_OFFSETS = {
 # that station in words; the novice rubric's rule 7 prints a location bare
 # and names its mate in note 1 instead.
 # The cone bore's rims bound the thrust ring the shaft collar bears on, with
-# the collar's OD edge (cone_gear_shaft_spec: ring - 2 x break >= 1.5), so the
-# bore prints the same break as the collar instead of the title block's 0.25,
-# with its reason on the row under it (r16 and R5 machinist reviews, rules 4
-# and 7: a break tighter than the title block's needs its reason at the
-# callout).
+# the collar's OD edge (cone_gear_shaft_spec: ring - 2 x break >= 1.5), and
+# each rim ends the journal's supported length, so both rims take the
+# collar's break instead of the title block's .010.  It is the post's own
+# edge, so it prints on a dimension of that edge, not in a note: the leg of
+# the modelled break in detail D, with which rims and its one reason under
+# the value (rules 4 and 7; R5 fix attempts 1 and 2 read the break in the
+# bore's callout and in note 2 as unplaced).
 # The values the drive train closes on print three places (MHA-DT-05 inch
 # machinist review): the crank boss's north face sets the 16T's feeler seat
 # and its length the crankshaft collar's seat on the south face; the cone
@@ -586,23 +589,16 @@ def _printed(value_mm: float, name: str) -> str:
 
 
 # The sheet's numbered notes, one block (rule 7: at most four lines).  The
-# rim break and its reason ride note 2, which the bore's callout flags: on
-# the callout they made three lines of words (R5 fix attempt 1, all three
-# runs; rule 7 moves the overflow to the linked note, where it counts as
-# being at the callout).  The collar on the .827 face is named by its
-# drawing number, not by "ITS" or a bare COLLAR (same review, blocker).
-# Why the bore's rims take a break under the title block's: the collar's
-# land between the rim and its OD is narrow (rule 7: one reason, at most six
-# words with the collar's place).
-JOURNAL_RIM_BREAK_REASON = "NARROW LAND"
+# collar on the .827 face is named by its drawing number, not by "ITS" or a
+# bare COLLAR (R5 fix attempt 1, blocker).
 SHEET_NOTES = "\n".join(
     (
         f"{CRANK_BORE_NOTE}. RUNNING FIT ON CRANKSHAFT MHA-DT-11 (CLEARANCE "
         f"{fit_clearance_text(crankshaft.JOURNAL_DIAMETRAL_CLEARANCE_MM)}).",
         f"{CONE_BORE_NOTE}. RUNNING FIT ON CONE SHAFT MHA-DT-04 (CLEARANCE "
         f"{fit_clearance_text(cone_shaft.JOURNAL_DIAMETRAL_CLEARANCE_MM)});",
-        f"   MHA-DT-04 COLLAR ON {_printed(cone.CONE_BOSS_NORTH_STATION, 'ConeBossNorthZ')} "
-        f"FACE: {JOURNAL_RIM_BREAK_REASON}, {POST_JOURNAL_RIM_BREAK}.",
+        f"   MHA-DT-04 COLLAR RUNS ON "
+        f"{_printed(cone.CONE_BOSS_NORTH_STATION, 'ConeBossNorthZ')} FACE.",
         f"{MESH_NOTE}. {_printed(cone.CRANK_ABOVE_CONE, 'CrankAboveCone')} AND "
         f"{_printed(cone.CRANK_BOSS_NORTH_FACE, 'CrankBossStartZ')} SET MESH "
         "OF PINION MHA-DT-10 WITH GEAR MHA-DT-07.",
@@ -611,6 +607,9 @@ SHEET_NOTES = "\n".join(
 # The notes' top-left corner: under the elevation's datum B frame (its
 # bottom at 57 mm) and left of the title block (x 216 mm).
 NOTES_XY = (0.020, 0.048)
+# The journal rims' break (detail D) says which rims under its value, then its
+# one reason: each rim bounds the shaft's bearing on the post (rule 7).
+JOURNAL_RIM_BREAK_CALLOUT = "BOTH BORE RIMS\nKEEPS MHA-DT-04 BEARING AREA"
 DIMENSION_CALLOUTS = {
     "CrankBossDia": "CRANK BOSS",
     "CrankBossLen": "SEATS\nMHA-DT-11 COLLAR",
@@ -621,6 +620,7 @@ DIMENSION_CALLOUTS = {
     "ConeBossLen": f"SEE NOTE {CONE_BORE_NOTE}",
     "ConeBossNorthZ": f"SEE NOTE {CONE_BORE_NOTE}",
     "CrankBossStartZ": f"SEE NOTE {MESH_NOTE}",
+    "JournalRimBreak": JOURNAL_RIM_BREAK_CALLOUT,
 }
 # Over the value: under it, the flag row would stand beside the crank bore's
 # block (test_crank_bore_mate_line_stands_clear_of_the_head_height_extension);
@@ -794,6 +794,237 @@ def _north_boss_finish_anchor(
             f"centre {centre!r}; the symbol offset assumes it is"
         )
     return (anchor[0], anchor[1])
+
+
+# The break the part models on both journal rims is the cone shaft's largest
+# (dt_cone_gear_shaft_spec.THRUST_EDGE_BREAK_MAX): its thrust ring and journal
+# span were sized with it.
+if not math.isclose(JOURNAL_RIM_BREAK, cone_shaft.THRUST_EDGE_BREAK_MAX, abs_tol=1e-9):
+    raise AssertionError(
+        f"journal rim break {JOURNAL_RIM_BREAK} mm is not the cone shaft's "
+        f"THRUST_EDGE_BREAK_MAX {cone_shaft.THRUST_EDGE_BREAK_MAX} mm"
+    )
+
+
+# DETAIL D: the journal rims' break, a .004 leg, spans 0.1 mm of Section A-A
+# at 1:1, so a 20:1 native detail of the section carries its model dimension
+# (draw_dt_crank_handle_butt_cup's detail B).  It takes the far (south) rim's
+# corner on the bore's sheet-right side, where the part's
+# JournalRimBreakReference leg lies (build_dt_cone_pivot_post.
+# JOURNAL_RIM_CORNER_MM): the dimension's extension lines run down out of the
+# boss into open sheet over the title block, clear of View C's arrow on the
+# left wall.  A and B are datums, A also the section, C the journal view.
+RIM_DETAIL_LETTER = "D"
+RIM_DETAIL_SCALE = (20, 1)
+_RDS = RIM_DETAIL_SCALE[0] / RIM_DETAIL_SCALE[1] / 1000.0
+_BORE_AXIS = (-_NORMAL[0], 0.0, -_NORMAL[2])  # toward the far (south) face
+_BORE_SIDE = (_BORE_AXIS[2], 0.0, -_BORE_AXIS[0])  # level; sheet right in A-A
+RIM_CORNER_MM = tuple(
+    base + CONE_BOSS_LENGTH / 2.0 * axis + BORE_DIA / 2.0 * side
+    for base, axis, side in zip((0.0, BORE_HEIGHT, 0.0), _BORE_AXIS, _BORE_SIDE)
+)
+# The break's two ends: up the bore wall and out along the face.
+RIM_BREAK_ENDS_MM = (
+    tuple(c - JOURNAL_RIM_BREAK * a for c, a in zip(RIM_CORNER_MM, _BORE_AXIS)),
+    tuple(c + JOURNAL_RIM_BREAK * s for c, s in zip(RIM_CORNER_MM, _BORE_SIDE)),
+)
+# The fence's centre, into the boss from the virtual sharp, so the sharp and
+# both ends of the break sit well inside.
+RIM_DETAIL_FOCUS_MM = tuple(
+    c - 0.05 * a + 0.05 * s for c, a, s in zip(RIM_CORNER_MM, _BORE_AXIS, _BORE_SIDE)
+)
+RIM_DETAIL_RADIUS_MM = 0.6
+_RIM_FENCE_MARGIN_MM = 0.2
+if any(
+    math.dist(RIM_DETAIL_FOCUS_MM, point) > RIM_DETAIL_RADIUS_MM - _RIM_FENCE_MARGIN_MM
+    for point in (RIM_CORNER_MM, *RIM_BREAK_ENDS_MM)
+):
+    raise AssertionError("detail D's fence must take in the whole rim break")
+# Under View C's right and Section A-A, left of the isometric, over the title
+# block (its top at y=0.066): the circle spans x 0.288..0.312 and y
+# 0.078..0.102.  The native label's position is its top; its two rows hang
+# about 13.5 mm, so it stands 3 mm over the circle.
+RIM_DETAIL_CENTER = (0.300, 0.090)
+RIM_DETAIL_CROP_RADIUS = RIM_DETAIL_RADIUS_MM * _RDS
+RIM_DETAIL_LABEL_XY = (
+    RIM_DETAIL_CENTER[0],
+    RIM_DETAIL_CENTER[1] + RIM_DETAIL_CROP_RADIUS + 0.0165,
+)
+# The circle's letter on Section A-A stands outside the far face, right of
+# the bore: its centre 7.5 mm out from the face and 2.5 mm along it from the
+# sharp, so its 6.4 mm glyph clears the 1.654's extension line along that
+# face (R5 fix attempt 3: 4.5 mm out, the glyph's top touched it) and stays
+# right of the axis's centreline and View C's letter (sheet metres from the
+# sharp; A-A prints model X right and model -Z up).
+RIM_DETAIL_LETTER_OFFSET = (
+    (7.5 * _BORE_AXIS[0] + 2.5 * _BORE_SIDE[0]) * _S,
+    -(7.5 * _BORE_AXIS[2] + 2.5 * _BORE_SIDE[2]) * _S,
+)
+# The break's leg runs along the far face, 12 degrees off level, so its
+# dimension is aligned: SolidWorks centres level text on the line and breaks
+# the line there (Section A-A's 1.654), so the block stands right of the
+# circle, 4 mm clear of it, and the line falls from the block to the
+# extension lines about 13 mm under the leg, over the title block.  Its
+# widest row runs 28 characters (72 mm at 2.55 mm a character).
+JOURNAL_RIM_BREAK_TEXT_WIDTH = 0.072
+DETAIL_KEEP = {
+    "JournalRimBreak": (
+        RIM_DETAIL_CENTER[0]
+        + RIM_DETAIL_CROP_RADIUS
+        + 0.004
+        + JOURNAL_RIM_BREAK_TEXT_WIDTH / 2.0,
+        RIM_DETAIL_CENTER[1] - 0.004,
+    ),
+}
+
+
+def _assert_rim_break_dimension(annotation: Any) -> None:
+    """Prove detail D's break prints the model's single MAX limit."""
+    label = "MHA-DT-05 JournalRimBreak"
+    annotation = _early_bound(annotation, "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    if (
+        not math.isclose(
+            float(dimension.SystemValue), JOURNAL_RIM_BREAK / 1000.0, abs_tol=1e-9
+        )
+        or int(tolerance.Type) != SW_TOL_MAX
+        or not math.isclose(
+            float(tolerance.GetMinValue()), -JOURNAL_RIM_BREAK / 1000.0, abs_tol=1e-12
+        )
+        or not math.isclose(float(tolerance.GetMaxValue()), 0.0, abs_tol=1e-12)
+        or bool(dimension.IsReference())
+    ):
+        raise RuntimeError(f"{label}: imported break lost its model MAX limit")
+
+
+@_telemetry.traced("cone_pivot_post.rim_break_detail")
+def _rim_break_detail(adapter: Any, section: Any) -> Any:
+    """Native 20:1 detail D of the far journal rim in Section A-A
+    (draw_dt_crank_handle_butt_cup._mouth_break_detail): fence, scale,
+    outline, label and letter each read back."""
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    parent = _early_bound(section, "IView")
+    if not drawing.ActivateView(view_name(adapter, section)):
+        raise RuntimeError("failed to activate detail D's parent section")
+    draw.ClearSelection2(True)
+    center = model_point_in_view(
+        adapter,
+        section,
+        tuple(value / 1000.0 for value in RIM_DETAIL_FOCUS_MM),
+        label="detail D fence centre",
+    )
+    sharp = model_point_in_view(
+        adapter,
+        section,
+        tuple(value / 1000.0 for value in RIM_CORNER_MM),
+        label="far journal rim sharp",
+    )
+    sheet_xy = [center[:2], (center[0] + RIM_DETAIL_RADIUS_MM * _S, center[1])]
+    sketch = _early_bound(parent.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for x, y in sheet_xy:
+        point = _early_bound(
+            utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
+        )
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        points.append(tuple(float(value) for value in projected.ArrayData))
+    # Straight to the database: an inferred circle snaps onto nearby section
+    # edges (draw_dt_pinion_lever r2), so the fence is read back before use.
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    previous_add_to_db = bool(manager.AddToDB)
+    manager.AddToDB = True
+    try:
+        fence = manager.CreateCircle(*points[0], *points[1])
+    finally:
+        manager.AddToDB = previous_add_to_db
+    if fence is None:
+        raise RuntimeError("failed to create detail D's fence")
+    arc = _early_bound(fence, "ISketchArc")
+    placed = _early_bound(arc.GetCenterPoint2(), "ISketchPoint")
+    placed_centre = [float(adapter._get_attr_or_call(placed, axis)) for axis in "XY"]
+    if math.dist(placed_centre, points[0][:2]) > 1e-9 or not math.isclose(
+        float(arc.GetRadius()), math.dist(points[0][:2], points[1][:2]), abs_tol=1e-9
+    ):
+        raise RuntimeError("detail D's fence moved from where it was placed")
+    draw.ClearSelection2(True)
+    if not _early_bound(fence, "ISketchSegment").Select4(False, None):
+        raise RuntimeError("failed to select detail D's fence")
+    detail = drawing.CreateDetailViewAt4(
+        *RIM_DETAIL_CENTER,
+        0.0,
+        0,  # swDetViewSTANDARD
+        *RIM_DETAIL_SCALE,
+        RIM_DETAIL_LETTER,
+        1,  # swDetCircleCIRCLE
+        True,
+        False,
+        False,
+        5,
+    )
+    if detail is None:
+        raise RuntimeError("CreateDetailViewAt4 returned no detail D")
+    detail = _early_bound(detail, "IView")
+    detail.ScaleRatio = double_array([float(value) for value in RIM_DETAIL_SCALE])
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    ratio = tuple(float(value) for value in detail.ScaleRatio)
+    if len(ratio) != 2 or not math.isclose(
+        ratio[0] / ratio[1], RIM_DETAIL_SCALE[0] / RIM_DETAIL_SCALE[1]
+    ):
+        raise RuntimeError(f"detail D scale {ratio!r}, expected {RIM_DETAIL_SCALE!r}")
+    outline = tuple(float(value) for value in detail.GetOutline())
+    position = tuple(float(value) for value in detail.Position)
+    if len(outline) != 4 or len(position) != 2:
+        raise RuntimeError("detail D has invalid bounds")
+    span = 2.0 * RIM_DETAIL_CROP_RADIUS
+    _telemetry.info(
+        f"detail D outline {outline[2] - outline[0]:.5f} x "
+        f"{outline[3] - outline[1]:.5f} m (fence {span:.5f})"
+    )
+    if min(outline[2] - outline[0], outline[3] - outline[1]) < 0.95 * span:
+        raise RuntimeError(f"detail D is smaller than its fence: {outline}")
+    target = [
+        position[axis]
+        + RIM_DETAIL_CENTER[axis]
+        - (outline[axis] + outline[axis + 2]) / 2.0
+        for axis in range(2)
+    ]
+    if not detail.SetViewPosition(double_array(target), False):
+        raise RuntimeError("failed to position detail D")
+    draw.EditRebuild3()
+    notes = tuple(_read_member(detail, "GetNotes") or ())
+    if len(notes) != 1:
+        raise RuntimeError(f"expected one native detail D label, found {len(notes)}")
+    note = _early_bound(notes[0], "INote")
+    annotation = _early_bound(_read_member(note, "GetAnnotation"), "IAnnotation")
+    label_xyz = (*RIM_DETAIL_LABEL_XY, 0.0)
+    if not annotation.SetPosition2(*label_xyz):
+        raise RuntimeError("failed to position detail D's label")
+    draw.EditRebuild3()
+    actual = tuple(float(value) for value in _read_member(annotation, "GetPosition"))
+    if math.dist(actual, label_xyz) > 1e-8:
+        raise RuntimeError(f"detail D's label position did not persist: {actual}")
+    circles = tuple(_read_member(parent, "GetDetailCircles") or ())
+    if len(circles) != 1:
+        raise RuntimeError(
+            f"expected one detail circle on section A-A, found {len(circles)}"
+        )
+    circle = _early_bound(circles[0], "IDetailCircle")
+    letter_xy = (
+        sharp[0] + RIM_DETAIL_LETTER_OFFSET[0],
+        sharp[1] + RIM_DETAIL_LETTER_OFFSET[1],
+    )
+    circle.SetLabelPosition(*letter_xy)
+    draw.EditRebuild3()
+    letter = tuple(float(value) for value in circle.GetLabelPosition())
+    if len(letter) != 2 or math.dist(letter, letter_xy) > 1e-8:
+        raise RuntimeError(f"detail D's letter did not persist: {letter}")
+    return detail
 
 
 # #848: View B looks down the cone axis at the SOUTH boss end face, so it is
@@ -1408,10 +1639,13 @@ def _set_dimension_prefixes(adapter: Any, annotations: list[Any]) -> None:
         )
 
 
-# The mounting holes' process, on its own row above the native through row
-# (rule 12: "2X Ø7.14 THRU ALL" left drill against ream unsaid, r5 machinist
-# review; draw_ch_fulcrum_keeper's foot-hole recipe).
-MOUNT_HOLE_PROCESS = "DRILL\n"
+# The mounting holes' process, written into the native through row after the
+# size and ahead of THRU: "2X Ø.295 DRILL THRU ALL" (rule 12: "2X Ø7.14 THRU
+# ALL" left drill against ream unsaid, r5 machinist review; rule 26: size,
+# then process, then depth -- R5 fix attempt 3 read DRILL on its own row
+# above the size as process first).
+MOUNT_HOLE_PROCESS = "DRILL"
+_HOLE_THRU_TOKEN = "<hw-thru>"
 # IDisplayDimension text definitions (5..8) and the parts SetText writes them
 # through (1..4).
 _HOLE_CALLOUT_DEFINITION_PARTS = ((5, 1), (6, 2), (7, 3), (8, 4))
@@ -1425,12 +1659,13 @@ MOUNT_HOLE_PRECISION = {
 
 
 def mount_hole_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
-    """Put MOUNT_HOLE_PROCESS ahead of the one definition holding THRU.
+    """Write MOUNT_HOLE_PROCESS into the one definition holding THRU, just
+    ahead of its THRU token, so the row reads size, process, THRU.
 
     The counterbored callout's through row and its counterbore row live in
     different parts, so ``add_native_hole_callout(process=...)`` -- which
     writes the Prefix part whichever row that is -- could put DRILL ahead of
-    the counterbore; ahead of the THRU part it stands on its own row first.
+    the counterbore, and a prefix reads process before size anyway.
     """
     if set(definitions) != {part for part, _ in _HOLE_CALLOUT_DEFINITION_PARTS}:
         raise RuntimeError(f"unexpected mounting-hole callout parts: {definitions!r}")
@@ -1440,14 +1675,21 @@ def mount_hole_callout_definitions(definitions: dict[int, str]) -> dict[int, str
             f"mounting-hole THRU row is not in one part: {definitions!r}"
         )
     part = thru_parts[0]
+    if definitions[part].count(_HOLE_THRU_TOKEN) != 1:
+        raise RuntimeError(
+            f"mounting-hole THRU row has no single {_HOLE_THRU_TOKEN}: {definitions!r}"
+        )
     return {
         **definitions,
-        part: compose_hole_callout_prefix(MOUNT_HOLE_PROCESS, definitions[part]),
+        part: definitions[part].replace(
+            _HOLE_THRU_TOKEN, f"{MOUNT_HOLE_PROCESS} {_HOLE_THRU_TOKEN}"
+        ),
     }
 
 
 def _set_mount_hole_process(display: Any) -> None:
-    """Write the mounting holes' process row and prove it persisted first."""
+    """Write the mounting holes' process into the through row and prove it
+    persisted between the size and THRU."""
     native = _early_bound(display, "IDisplayDimension")
     parts = [part for part, _ in _HOLE_CALLOUT_DEFINITION_PARTS]
     definitions = {part: str(native.GetText(part) or "") for part in parts}
@@ -1460,11 +1702,18 @@ def _set_mount_hole_process(display: Any) -> None:
         part: str(native.GetText(part) or "")
         for _, part in _HOLE_CALLOUT_DEFINITION_PARTS
     }
-    # The CalloutAbove part (3) prints ahead of the Prefix part (1).
-    first = resolved[3] or resolved[1]
-    if persisted != updated or not first.startswith(MOUNT_HOLE_PROCESS):
+    process_rows = [
+        text for text in resolved.values() if MOUNT_HOLE_PROCESS in text.upper()
+    ]
+    if (
+        persisted != updated
+        or not process_rows
+        or any(
+            row.lstrip().upper().startswith(MOUNT_HOLE_PROCESS) for row in process_rows
+        )
+    ):
         raise RuntimeError(
-            "mounting-hole process row did not persist first: "
+            "mounting-hole process did not persist after the size: "
             f"definitions={persisted!r}, resolved={resolved!r}"
         )
     _telemetry.info(f"mounting-hole callout: {resolved!r}")
@@ -1579,11 +1828,17 @@ def _assert_native_layout(
         raise RuntimeError("cone pivot post view placement failed:\n" + "\n".join(placement))
     # Hiding a sketch in a view hides the dimensions imported from it
     # (rim-aba9 lost the crank boss station that way), so the plan's two
-    # hidden-owner dimensions and Section A-A's must each still print, once.
+    # hidden-owner dimensions, Section A-A's and detail D's must each still
+    # print, once.
     labels = [annotation.label for annotation in sheet.annotations]
     missing = [
         name
-        for name in ("CrankBossStartZ", "InclineAngle", "ConeBossNorthZ")
+        for name in (
+            "CrankBossStartZ",
+            "InclineAngle",
+            "ConeBossNorthZ",
+            "JournalRimBreak",
+        )
         if labels.count(name) != 1
     ]
     if missing:
@@ -1757,16 +2012,17 @@ def build(adapter: Any) -> dict[str, str]:
     )
     _configure_section_caption(drawing_model)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
-    # ConeBossStationReference lies in A-A's cutting plane, saved hidden: a
-    # derived view takes it from the part as it stands when it is cut and
-    # selects it through its base view, so the section is cut and curated
-    # while the part shows it (draw_fr_rocker_arm_support's recipe).  In the
-    # elevation the ray lies on the A-A line itself.
+    # ConeBossStationReference and JournalRimBreakReference lie in A-A's
+    # cutting plane, saved hidden: a derived view takes them from the part as
+    # it stands when it is cut and selects them through its base view, so the
+    # section and its detail D are cut and curated while the part shows them
+    # (draw_fr_rocker_arm_support's and draw_dt_pinion_lever's recipe).  In
+    # the elevation both lie on the A-A line itself.
     with part_sketches_shown(
         adapter,
         source_model,
-        ("ConeBossStationReference",),
-        label="section A-A cone boss station",
+        ("ConeBossStationReference", "JournalRimBreakReference"),
+        label="section A-A cone boss station and rim break",
         base_view=front,
     ):
         section = create_section_view(
@@ -1781,6 +2037,17 @@ def build(adapter: Any) -> dict[str, str]:
         )
         _prepare_cone_section(adapter, section)
         set_hidden_lines_removed(adapter, section)
+        # Detail D first (draw_dt_crank_handle_butt_cup): a native detail
+        # imports nothing after its parent's import and deletions.
+        detail = _rim_break_detail(adapter, section)
+        set_hidden_lines_removed(adapter, detail)
+        detail_annotations = curate_hidden_owner_dimensions(
+            adapter,
+            detail,
+            keep=DETAIL_KEEP,
+            view_label="journal rim break detail",
+            dimensions_by_feature=DRAWING_DIMENSIONS,
+        )
         section_annotations = curate_hidden_owner_dimensions(
             adapter,
             section,
@@ -1837,6 +2104,7 @@ def build(adapter: Any) -> dict[str, str]:
         *top_annotations,
         *journal_annotations,
         *section_annotations,
+        *detail_annotations,
     ]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     set_dimension_callouts(
@@ -1871,6 +2139,16 @@ def build(adapter: Any) -> dict[str, str]:
     # the drawing document's two places would print the running bores without
     # the third place their fit band is written in.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    rim_breaks = [
+        annotation
+        for annotation in detail_annotations
+        if dimension_name(adapter, annotation) == "JournalRimBreak"
+    ]
+    if len(rim_breaks) != 1:
+        raise RuntimeError(
+            f"expected one JournalRimBreak in detail D, found {len(rim_breaks)}"
+        )
+    _assert_rim_break_dimension(rim_breaks[0])
 
     offset_dimension_text(
         adapter,
@@ -1904,10 +2182,12 @@ def build(adapter: Any) -> dict[str, str]:
             center_y_mm=BLOCK_HEIGHT,
             center_x_mm=ATTACHMENT_X,
         ),
-        # Its three rows (DRILL on its own) run 61 mm wide; at x=0.160 they
-        # stood 10 mm from the section's thrust-face station, under one text
-        # height (r6 view-crowding).
-        callout_xy=(0.155, 0.250),
+        # Two rows, the widest "2X Ø.295 DRILL THRU ALL" (about 59 mm), centred
+        # here: its left end stands 7 mm clear of the plan's .51 text and its
+        # right end about 28 mm short of the section's .827 station text (at
+        # x=0.160 a wider block stood 10 mm from that station, under one text
+        # height: r6 view-crowding).
+        callout_xy=(0.161, 0.250),
         label="mounting counterbores",
     )
     _set_mount_hole_process(mount_callout)
