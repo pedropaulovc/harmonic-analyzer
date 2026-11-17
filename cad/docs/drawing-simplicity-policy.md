@@ -714,7 +714,7 @@ both verdicts and the finding diff.
 - A review counts as a merge gate's visual check only on the exact drawing
   version being merged.
 
-Use `uv run cad/scripts/machinist_review_bench.py run --workspace <outside-git-root>
+Use `uv run tools/machinist-review-evals/machinist_review_bench.py run --workspace <outside-git-root>
 --evals <id-or-name>... --reviewer claude --baseline-ref origin/main` to compare
 release-package reviews with the working-tree skill (`with_skill`) and the
 baseline skill (`old_skill`); `--ref <git-ref>` pins `with_skill` instead.
@@ -742,8 +742,8 @@ release drawing sheets, with links to full-size sheet images. Omit
 `--workspace` to use `$HARMONIC_AGENT_SCRATCHPAD/harmonic-analyzer/machinist-review-evals`,
 or, when unset,
 `%LOCALAPPDATA%/harmonic-analyzer-agent-scratchpad/harmonic-analyzer/machinist-review-evals`.
-The benchmark measures release-package/LLM review regressions; the separate
-`machinist_review_eval.py` remains the frozen-PNG/human calibration tool.
+The benchmark measures release-package/LLM review regressions; its cases are
+`tools/machinist-review-evals/evals.json`.
 A case whose drawing was renamed after its release names the current registry
 package and the release's PDF basename in `release_pdf`; run and import read
 that PDF.
