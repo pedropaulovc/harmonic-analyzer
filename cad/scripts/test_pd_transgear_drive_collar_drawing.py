@@ -93,7 +93,10 @@ def test_turned_diameters_and_lengths_print_on_the_side_view() -> None:
     )
     rows = [size_row, *drawing.DIMENSION_CALLOUTS_BELOW["FlatPinDia"].splitlines()]
     assert dia_x - max(map(len, rows)) * DIM_CHAR_WIDTH > END_VIEW_RIGHT + 0.002
-    assert dia_y < drawing._FLAT_PIN_Y - hole_r
+    # The block centres on its text point; the stacked size row's top prints
+    # 5.6 mm above it (run 20261117T122426763Z) and stands clear under the
+    # ream's lower witness, which struck "(.163)" there.
+    assert dia_y + 0.0056 < drawing._FLAT_PIN_Y - hole_r - 0.0005
     assert dia_y - len(rows) * NOTE_LINE_PITCH > row + NOTE_LINE_PITCH
     # The centre's span crosses the size's: its dimension line stands between
     # the rear face and where the size's witnesses start, so neither crosses

@@ -188,7 +188,10 @@ SIDE_KEEP = {
     "PilotDia": (_PILOT_X + 0.022, SIDE_CENTER[1]),
     "FlatPinFloor": ((_REAR_X + _FLAT_PIN_FLOOR_X) / 2.0, SIDE_CENTER[1] - HALF_OD - 0.005),
     "FlatPinCentre": (_REAR_X - 0.0025, SIDE_CENTER[1] + 0.006),
-    "FlatPinDia": (_REAR_X - 0.007, _FLAT_PIN_Y - 0.006),
+    # The block centres on its text point: its size row stands under the
+    # ream's lower witness (run 20261117T122426763Z, centred 3.5 mm higher
+    # with no row over the value: that witness struck "(.163)").
+    "FlatPinDia": (_REAR_X - 0.007, _FLAT_PIN_Y - 0.0095),
     "RearBreak": (_REAR_X - 0.029, _BORE_EDGE_Y + 0.015),
 }
 OVERALL_TEXT_XY = ((_REAR_X + _SEAT_X) / 2.0, SIDE_CENTER[1] + HALF_OD + 0.010)
