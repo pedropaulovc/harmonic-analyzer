@@ -4261,13 +4261,15 @@ def test_every_assembly_subprocess_is_guarded_by_its_rows(monkeypatch, tmp_path,
     )
 
     scripts = [name for name, _env in launched]
+    # The in-leaf soundness battery follows every seat build of the leaf.
     if mode == "full":
-        assert scripts == ["build_ms_measuring_stick_assembly.py", "hook_probe.py"]
+        assert scripts == ["build_ms_measuring_stick_assembly.py", "hook_probe.py", "verify.py"]
     else:
-        assert scripts == ["refresh_assembly.py"]
-    for name, env in launched:
+        assert scripts == ["refresh_assembly.py", "verify.py"]
+    for name, env in launched[:-1]:
         assert env.get("HARMONIC_FASTENER_ROWS") == "pn-vn-pen-set-screw", name
         assert env.get("HARMONIC_FIT_GROUPS") == fit_groups, name
+
 
 
 @pytest.mark.parametrize(
@@ -4881,6 +4883,7 @@ def test_forced_refresh_never_restores_and_requires_a_stored_result(
     monkeypatch.setattr(dodo, "_assembly_file_deps", lambda *_a: [])
     monkeypatch.setattr(dodo, "_assembly_cache_outputs", lambda *_a: [output])
     monkeypatch.setattr(dodo, "_stamp_assembly_execution", lambda *_a: None)
+    monkeypatch.setattr(dodo, "_prove_soundness_in_leaf", lambda _stem: None)
     monkeypatch.setattr(dodo, "_input_ledger", lambda *_a: ledger)
     if kind == "assembly":
         # A matching local target and ledger must not launder the old cached

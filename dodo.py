@@ -3120,8 +3120,13 @@ def build_or_refresh(stem, dependencies, changed, targets):
             # this build's inputs for the next run's tier decision.
             _stamp_assembly_execution(stem)
             _write_input_ledger(ledger, current)
+        # Same seat, saved model: the leaf proves its own soundness so the
+        # verify_soundness:<stem> leaf restores the stamp instead of reopening.
+        proved = _prove_soundness_in_leaf(stem)
 
     _publish_assembly(stem, cache_key, file_deps)
+    if proved is not None:
+        _publish_soundness(stem, proved)
 
 
 def _publish_assembly(stem: str, key: str, file_deps: list[str]) -> None:
@@ -3267,11 +3272,66 @@ def task_drawing():
         yield _drawing_task(stem)
 
 
+def _soundness_stamp(stem: str) -> str:
+    return str(REPORTS / f"verify-soundness-{stem.replace('_', '-')}.ok")
+
+
+def _soundness_command(stem: str) -> list[str]:
+    return [sys.executable, str(VERIFY_PY), stem.replace("_", "-"), "--suite", "soundness"]
+
+
+def _prove_soundness_in_leaf(stem: str) -> str | None:
+    """Run ``verify_soundness:<stem>``'s battery on the assembly this leaf just
+    saved, holding the same seat, and return the soundness key it proved.
+
+    None when it did not prove one: a forced soundness refresh (that leaf must
+    probe its own key first) or a failed gate. A failure is a WARN here, never an
+    assembly failure: the assembly still publishes, and the standalone leaf
+    misses, re-runs the battery and reports the failure exactly as before."""
+    label = f"verify_soundness:{stem}"
+    if _cache.forced_refresh(label) is not None:
+        return None
+    key = _cache_key(_soundness_file_deps(stem), label)
+    stamp = _soundness_stamp(stem)
+    Path(stamp).unlink(missing_ok=True)
+    with _telemetry.span(f"task {label}", label=label, service=_stage_name(label)) as sp:
+        sp.set_attribute("cache", "in_leaf")
+        _tag_cache_key(sp, key)
+        try:
+            _exec_com(
+                _soundness_command(stem),
+                label,
+                log_stem=f"verify-soundness-{stem.replace('_', '-')}",
+                task=label,
+            )
+        except RuntimeError as failed:
+            sp.set_attribute("in_leaf", "failed")
+            _telemetry.warn(
+                f"{label}: in-leaf soundness failed ({failed}); the standalone "
+                "leaf re-runs and reports it"
+            )
+            return None
+    _write_stamp(label, stamp)
+    return key
+
+
+def _publish_soundness(stem: str, key: str) -> None:
+    """Publish the in-leaf soundness stamp under ``key`` when it still describes
+    the assembly on disk: a lost assembly publication that adopted another
+    writer's different bytes re-stamped the execution token, so the soundness
+    key moved and that proof is left to the standalone leaf."""
+    label = f"verify_soundness:{stem}"
+    if _cache_key(_soundness_file_deps(stem), label) != key:
+        Path(_soundness_stamp(stem)).unlink(missing_ok=True)
+        return
+    _store_outputs(label, key, [Path(_soundness_stamp(stem))])
+
+
 def _verify_soundness_task(stem: str) -> dict[str, Any]:
     name = stem.replace("_", "-")
     deps = _soundness_file_deps(stem)
-    stamp = str(REPORTS / f"verify-soundness-{name}.ok")
-    cmd = [sys.executable, str(VERIFY_PY), name, "--suite", "soundness"]
+    stamp = _soundness_stamp(stem)
+    cmd = _soundness_command(stem)
     return {
         "name": stem,
         "file_dep": deps,

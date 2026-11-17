@@ -930,8 +930,8 @@ exits non-zero and leaves the `.SLDASM` untouched — never a stale artefact.
 A refresh whose mass-properties fingerprint is IDENTICAL to the last gated
 save (and that auto-repaired nothing) skips the three health/DOF/interference
 gates — they would re-prove what that save already proved (measured 274 s of
-a 780 s no-op top-assembly refresh) — while `verify:soundness` independently
-re-proves every saved assembly on each build.
+a 780 s no-op top-assembly refresh) — because the same leaf then runs the full
+soundness battery on the saved file (see "Verify suites").
 
 **Idempotent — artefact bytes don't drive rebuilds.** Saving an assembly makes
 SolidWorks rewrite volatile save metadata into every nested `.SLDPRT`/`.SLDASM`
@@ -1407,6 +1407,18 @@ SolidWorks-free aggregator over those child stamps (it keeps the CLI and the
 release edge). `verify:kinematics` is one leaf. A gate's stamp IS its cached
 artefact — identical inputs imply an identical verdict — which is what lets a
 machine with no seat run the full gate set through `farm_build.py`.
+
+**The assembly leaf proves its own soundness.** Every `assembly:<stem>` leaf that
+builds or refreshes on a seat (FULL or PARTS, including a no-op refresh
+that skipped its broad gates) runs `verify.py <stem> --suite soundness` on the
+saved file under the same seat, then publishes the stamp under the
+`verify_soundness:<stem>` key, so that leaf restores instead of reopening. The
+standalone leaf still runs when: only a soundness input changed (`verify.py`,
+the contract, the interference table); the assembly was a cache HIT or a COM-free
+replay reuse; the assembly publication was lost to another writer (new token,
+new key); the soundness label is force-refreshed; the in-leaf battery failed
+(WARN in the assembly leaf, which still publishes; the standalone leaf re-runs
+and fails the build); or the cache mode cannot publish (`ro`/off locally).
 
 `soundness` opens EVERY built (sub)assembly standalone and runs the shared health
 battery on each: **one shared re-solve** (`verify.rebuild`) after open, then DOF /
