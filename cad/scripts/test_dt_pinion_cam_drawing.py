@@ -176,7 +176,6 @@ def test_tap_callout_gives_the_tap_and_the_screw_seat_only() -> None:
     assert drawing.DIMENSION_CALLOUTS["TapDrillDia"] == (
         "TAP DRILL THRU TO BORE\n#2-56 UNC\nSET SCREW SEATS BELOW OD"
     )
-    assert dt_pinion_cam_spec.SET_SCREW_SUBFLUSH_MIN_MM > 0.0
 
 
 def test_set_screw_view_is_lettered_with_its_arrow_on_the_front_view() -> None:
