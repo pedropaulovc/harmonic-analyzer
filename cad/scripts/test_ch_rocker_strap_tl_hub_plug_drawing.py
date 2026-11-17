@@ -248,26 +248,143 @@ def test_the_isometric_is_in_the_hidden_line_loop() -> None:
     assert {ast.unparse(e) for e in loops[0].iter.elts} == {"end", "side", "iso"}
 
 
-def test_the_views_and_blocks_stand_on_the_sheet() -> None:
-    """B landscape 0.4318 x 0.2794 with a 0.0127 border; title block top
-    0.066, left edge 0.216."""
-    top, title_top = 0.2667, 0.066
+Box = tuple[float, float, float, float]  # x0, x1, y0, y1 (sheet metres)
+
+
+def _overlap(a: Box, b: Box) -> bool:
+    return a[0] < b[1] and b[0] < a[1] and a[2] < b[3] and b[2] < a[3]
+
+
+def _block(xy: tuple[float, float], x0: float, x1: float) -> Box:
+    return (x0, x1, xy[1] - drawing.BLOCK_BELOW, xy[1] + drawing.BLOCK_ABOVE)
+
+
+def _sheet_boxes() -> dict[str, Box]:
+    """Every view and text block, sized from farm r1's layout audit
+    (``draw_ch_rocker_strap_tl_hub_plug``'s block constants)."""
     s = drawing._S
     body_half = spec.BODY_DIA / 2.0 * s
-    assert drawing.END_CENTER[0] - body_half > 0.0127
-    assert drawing.END_CENTER[0] + body_half < drawing.TOP_X - 0.02
-    assert drawing.PILOT_ON_SIDE[1] + 0.006 < top
-    assert drawing.PILOT_ON_SIDE[1] - 3 * 0.0056 > drawing.SIDE_CENTER[1] + body_half
-    assert drawing.SIDE_KEEP["OverallLength"][1] - 0.0056 > title_top
-    assert drawing.BOTTOM_X > drawing.TOP_X
-    assert drawing.BOTTOM_X - drawing.TOP_X == pytest.approx(spec.OVERALL_LENGTH * s)
     iso_half = spec.BODY_DIA / 2000.0 * drawing.ISO_SCALE[0] * 1.25
-    assert drawing.ISO_CENTER[1] - iso_half > drawing.ISO_NOTE_XY[1]
-    assert drawing.ISO_NOTE_XY[1] - 0.005 > title_top
-    # The body's three-row block (~110 mm at its clearance row) hangs right
-    # of the body, above the isometric.
-    assert drawing.BODY_ON_SIDE[1] - 3 * 0.0056 > drawing.ISO_CENTER[1] + iso_half
-    assert drawing.BODY_ON_SIDE[0] + 0.115 < 0.4191
+    end, side, iso = drawing.END_CENTER, drawing.SIDE_CENTER, drawing.ISO_CENTER
+    keep = {**drawing.END_KEEP, **drawing.SIDE_KEEP, **drawing.MOVED}
+    half = drawing.LENGTH_BLOCK_HALF_WIDTH
+    body = keep["BodyDia"]
+    pilot = keep["PilotDia"]
+    return {
+        "end view": (
+            end[0] - body_half,
+            end[0] + body_half,
+            end[1] - body_half,
+            end[1] + body_half,
+        ),
+        "side view": (
+            drawing.TOP_X,
+            drawing.BOTTOM_X,
+            side[1] - body_half,
+            side[1] + body_half,
+        ),
+        "isometric": (
+            iso[0] - iso_half,
+            iso[0] + iso_half,
+            iso[1] - iso_half,
+            iso[1] + iso_half,
+        ),
+        "iso note": (
+            drawing.ISO_NOTE_XY[0],
+            drawing.ISO_NOTE_XY[0] + 0.060,
+            drawing.ISO_NOTE_XY[1],
+            drawing.ISO_NOTE_XY[1] + 0.005,
+        ),
+        # WALL .064 MIN, ~25 mm wide, centred on its keep.
+        "bore": _block(
+            keep["BoreDia"], keep["BoreDia"][0] - 0.013, keep["BoreDia"][0] + 0.013
+        ),
+        "pilot": _block(pilot, pilot[0] - drawing.PILOT_BLOCK_WIDTH, pilot[0]),
+        "body": _block(
+            body,
+            body[0] - drawing.BODY_BLOCK_HALF_WIDTH,
+            body[0] + drawing.BODY_BLOCK_HALF_WIDTH,
+        ),
+        "body length": _block(
+            keep["BodyLength"],
+            keep["BodyLength"][0] - half,
+            keep["BodyLength"][0] + half,
+        ),
+        "overall": _block(
+            keep["OverallLength"],
+            keep["OverallLength"][0] - half,
+            keep["OverallLength"][0] + half,
+        ),
+        # .02 / X 45°, ~15 mm wide.
+        "chamfer": _block(
+            keep["ChamferSize"],
+            keep["ChamferSize"][0] - 0.008,
+            keep["ChamferSize"][0] + 0.008,
+        ),
+    }
+
+
+def test_no_two_blocks_or_views_overlap_and_all_stand_on_the_sheet() -> None:
+    """Farm r1 defects 1-3: the body's block on the side view, the .170 on
+    the .272, the pilot's block on the bore's. B landscape 0.4318 x 0.2794,
+    border 0.0127; title block x >= 0.216 below y 0.066."""
+    boxes = _sheet_boxes()
+    names = sorted(boxes)
+    for i, a in enumerate(names):
+        for b in names[i + 1 :]:
+            assert not _overlap(boxes[a], boxes[b]), (a, b)
+    title = (0.216, 0.4191, 0.0127, 0.066)
+    for name, box in boxes.items():
+        assert 0.0127 < box[0] and box[1] < 0.4191, name
+        assert 0.0127 < box[2] and box[3] < 0.2667, name
+        assert not _overlap(box, title), name
+
+
+def test_each_dimension_line_reaches_its_block_without_crossing_another() -> None:
+    """The diameters' lines run vertically from the part to their blocks; the
+    lengths' blocks stand outside their extension lines (r1: two extension
+    lines ran through their own text)."""
+    boxes = _sheet_boxes()
+    s = drawing._S
+    side = drawing.SIDE_CENTER
+    body_half = spec.BODY_DIA / 2.0 * s
+    pilot_half = spec.PILOT_DIA / 2.0 * s
+    lines = {
+        # The pilot's: just left of the pilot, from its lower edge up.
+        "pilot": (
+            drawing.PILOT_ON_SIDE[0],
+            side[1] - pilot_half,
+            drawing.PILOT_ON_SIDE[1],
+        ),
+        # The body's: right of the body, from its lower edge up.
+        "body": (drawing.BODY_ON_SIDE[0], side[1] - body_half, drawing.BODY_ON_SIDE[1]),
+        # The two length extension lines that drop furthest: the pilot's top
+        # face (the overall) and the body's bottom face (both lengths).
+        "overall": (drawing.TOP_X, drawing.SIDE_KEEP["OverallLength"][1], side[1]),
+        "body length": (
+            drawing.BOTTOM_X,
+            drawing.SIDE_KEEP["OverallLength"][1],
+            side[1],
+        ),
+    }
+    assert drawing.PILOT_ON_SIDE[0] < drawing.TOP_X
+    assert drawing.BODY_ON_SIDE[0] > drawing.BOTTOM_X
+    for owner, (x, y0, y1) in lines.items():
+        for name, box in boxes.items():
+            if name in (owner, "side view"):
+                continue
+            assert not (box[0] < x < box[1] and box[2] < y1 and y0 < box[3]), (
+                owner,
+                name,
+            )
+    # The body's block stands above its upper extension line; the body
+    # length's block below its lower one.
+    assert boxes["body"][2] > side[1] + body_half
+    assert boxes["body length"][3] < side[1] - body_half
+    # Each length's block stands outside its own extension lines.
+    assert boxes["body length"][0] > drawing.BOTTOM_X
+    assert boxes["overall"][1] < drawing.TOP_X
+    assert drawing.BOTTOM_X - drawing.TOP_X == pytest.approx(spec.OVERALL_LENGTH * s)
 
 
 @pytest.mark.parametrize(

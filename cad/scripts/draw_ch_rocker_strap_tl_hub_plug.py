@@ -69,10 +69,13 @@ ISO_SCALE = spec.ISOMETRIC_VIEW_SCALE
 if tuple(ISO_SCALE) == VIEW_SCALE:
     raise AssertionError("the isometric's label would repeat the sheet scale")
 _S = VIEW_SCALE[0] / VIEW_SCALE[1] / 1000.0  # sheet metres per model mm
-END_CENTER = (0.065, 0.190)
-SIDE_CENTER = (0.165, 0.190)
-ISO_CENTER = (0.370, 0.140)
-ISO_NOTE_XY = (0.335, 0.105)
+# Farm r1 (20261117T234245842Z, layout audit): the end view moves down-left
+# so the pilot's block owns the top-left corner alone, the side view right
+# of it with room under it for the two lengths.
+END_CENTER = (0.060, 0.120)
+SIDE_CENTER = (0.200, 0.170)
+ISO_CENTER = (0.370, 0.135)
+ISO_NOTE_XY = (0.335, 0.095)
 BODY_HALF = spec.BODY_DIA / 2.0 * _S
 PILOT_HALF = spec.PILOT_DIA / 2.0 * _S
 HALF_LENGTH = spec.OVERALL_LENGTH / 2.0 * _S
@@ -89,25 +92,53 @@ TOP_X = side_x(spec.OVERALL_LENGTH)  # the pilot's top, its left edge
 PILOT_MID_X = side_x((spec.BODY_LENGTH + spec.OVERALL_LENGTH) / 2.0)
 BODY_MID_X = side_x(spec.BODY_LENGTH / 2.0)
 
-# The end view keeps the bore, its two rows up and right of the circles; the
-# two diameters import there too and are parked below it until they move.
+# Measured on farm r1's layout audit (rows about 5.6 mm apart, ~3.6 mm tall):
+# a block placed between or beside its dimension's extension lines centres
+# on the keep point, rows from about 8 mm above to 7 mm below it; a diameter
+# block placed off its dimension line hangs left of the line on a shelf.
+# Row widths: the body's clearance row ~128 mm, the pilot's fit row ~87 mm,
+# the shoulder row ~40 mm.
+BODY_BLOCK_HALF_WIDTH = 0.065
+PILOT_BLOCK_WIDTH = 0.088
+LENGTH_BLOCK_HALF_WIDTH = 0.021
+BLOCK_BELOW = 0.008
+BLOCK_ABOVE = 0.009
+
+# The end view keeps the bore, its rows up and right of the circles; the two
+# diameters import there too and are parked below it until they move.
 END_KEEP = {
-    "BoreDia": (END_CENTER[0] + BODY_HALF + 0.010, END_CENTER[1] + BODY_HALF + 0.012),
+    "BoreDia": (END_CENTER[0] + BODY_HALF + 0.020, END_CENTER[1] + BODY_HALF + 0.015),
     "BodyDia": (END_CENTER[0] - 0.020, END_CENTER[1] - BODY_HALF - 0.012),
     "PilotDia": (END_CENTER[0] + 0.020, END_CENTER[1] - BODY_HALF - 0.012),
 }
-# The side view: both lengths stacked under the plug (the body length
-# nearer), the chamfer's leg below-left of the pilot's top corner.
+# The side view (r1: the .170 block sat on the .272 and both extension lines
+# ran through their own text). Each length's block stands OUTSIDE its
+# extension lines with its dimension line carried out to it: the body length
+# right of the body's bottom face, under the body Ø's lower extension line;
+# the overall length further down, left of the pilot's top. The chamfer's
+# leg stays below-left of the pilot's top corner, above the overall block.
 SIDE_KEEP = {
-    "BodyLength": (BODY_MID_X, SIDE_CENTER[1] - BODY_HALF - 0.012),
-    "OverallLength": (SIDE_CENTER[0], SIDE_CENTER[1] - BODY_HALF - 0.026),
+    "BodyLength": (
+        BOTTOM_X + LENGTH_BLOCK_HALF_WIDTH + 0.007,
+        SIDE_CENTER[1] - BODY_HALF - 0.012,
+    ),
+    "OverallLength": (
+        TOP_X - LENGTH_BLOCK_HALF_WIDTH - 0.007,
+        SIDE_CENTER[1] - BODY_HALF - 0.034,
+    ),
     "ChamferSize": (TOP_X - 0.018, SIDE_CENTER[1] - PILOT_HALF - 0.010),
 }
-# The moved diameters: the pilot's three-row block (two limits, fit, REF
-# clearance) above the plug clear of the body's top, the body's three-row
-# block right of the body's bottom face.
-PILOT_ON_SIDE = (PILOT_MID_X, SIDE_CENTER[1] + BODY_HALF + 0.030)
-BODY_ON_SIDE = (BOTTOM_X + 0.015, SIDE_CENTER[1])
+# The moved diameters (r1: the body's block sat on the side view's outline;
+# the pilot's stacked on the bore's). The pilot's dimension line runs just
+# left of the pilot, up to its block in the top-left corner, which hangs left
+# of the line clear above the bore's block. The body's block stands above the
+# body's upper extension line, right of the body, so its dimension line runs
+# up to the block instead of through it (draw_ch_rocker_hub's LAND_ON_SIDE).
+PILOT_ON_SIDE = (TOP_X - 0.006, SIDE_CENTER[1] + BODY_HALF + 0.045)
+BODY_ON_SIDE = (
+    BOTTOM_X + BODY_BLOCK_HALF_WIDTH + 0.006,
+    SIDE_CENTER[1] + BODY_HALF + 0.022,
+)
 MOVED = {"BodyDia": BODY_ON_SIDE, "PilotDia": PILOT_ON_SIDE}
 if set(END_KEEP) | set(SIDE_KEEP) != set().union(*spec.DRAWING_DIMENSIONS.values()):
     raise AssertionError("the hub plug sheet does not place every marked dimension")
