@@ -89,6 +89,7 @@ diagram = { file = "diagrams/feed-lever/saw.svg", alt = "The lever blank from th
 [[setups.operations]]
 speed_kind = "other"
 tool = "saw"
+drilling = "none"
 sizing = "other"
 instruction = "Cut this lever {{process.blank_length_in:.2f}} ±.03 first from the squared end of the 1165 bar, ~{{process.kerf_in:fraction}} kerf; the rest goes to TL-28. Waste side of the line; lever blank ≥{{process.blank_min_length_in:.2f}}. The saw cut is the finished grip end."
 feed = "hand"
@@ -114,6 +115,7 @@ beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.blank_length_mm
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-half"
+drilling = "none"
 sizing = "other"
 instruction = "Cutter .04 below bar. Left end, conventional (table moves away from you): skim .02–.04 in .02 X steps until clean. Mark ZERO END and ZERO EDGE."
 instruction_detailed = "Touch the cutter on the top, then down .54 (cutter .04 below the bar). Left end, conventional: the table moves away from you (cutter toward you). Skim .02–.04 in .02 X steps until clean all over. Mark ZERO END and ZERO EDGE."
@@ -128,6 +130,7 @@ milling_cuts = [
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "spot"
+drilling = "none"
 sizing = "other"
 instruction = "Spot H1–H{{cad.hole_count:d}}, cone ~3/16 across. X ±{{cad.station_tol_in:.2f}}; Y {{cad.row_min_in:.2f}}–{{cad.row_max_in:.2f}}."
 rpm = 2800
@@ -144,12 +147,15 @@ rows = "{{cad.hole_rows}}"
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "drill"
+drilling = "twist_drill"
 sizing = { kind = "band", band_mm = "{{cad.hole_dia_band_mm}}" }
-instruction = "H1–H{{cad.hole_count:d}} through between the parallels, tip ~.2 below the bottom face; no peck (L/D 1.5). H1 leaves a ~.11 web to the end."
+instruction = "H1–H{{cad.hole_count:d}} through between the parallels, tip ~.2 below the bottom face; no peck. H1 leaves a ~.11 web to the end."
 rpm = 2000
 feed = "hand"
 inspection = "Ø{{cad.hole_dia_min_in:.4dot}}–{{cad.hole_dia_max_in:.4dot}}; stations {{cad.hole_stations_in}} ±{{cad.station_tol_in:.2f}} from ZERO END; row {{cad.row_min_in:.2f}}–{{cad.row_max_in:.2f}} from ZERO EDGE."
 gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.hole_dia_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.hole_1_station_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.hole_2_station_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.row_band_mm}}" }]
+hole_depth_mm = "{{cad.thickness_mm}}"
+peck = "none"
 milling_cuts = [
   { name = "H1–H2", kind = "drill", phase = "finish", material = "aluminum_6061", cutter_dia_mm = 8.7313, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = [7.112, 23.114] },
 ]
@@ -167,6 +173,7 @@ diagram = { file = "diagrams/feed-lever/corners.svg", alt = "Finished lever and 
 [[setups.operations]]
 speed_kind = "other"
 tool = "files"
+drilling = "none"
 sizing = "other"
 instruction = "Scribe lines {{cad.corner_radius_in:.2dot}} from the grip end and from each side on the top face. Lever upright, clamped at the end of the bench-vise jaws, grip end just above them: file both vertical grip-end corners to R{{cad.corner_radius_in:.1dot}}, arcs ending where the lines meet the edges."
 instruction_detailed = "Dykem the grip end; scribe lines {{cad.corner_radius_in:.2dot}} from the grip end and from each side on the top face, ~1/2 in back. Clamp the lever upright at the end of the bench-vise jaws, grip end just above them, the rest hanging clear of the vise screw and past the bench edge. File each vertical grip-end corner flat at 45° only until the flat is about .12 from the corner along each edge, well short of the lines; then roll the file round into an arc that ends where each line meets the edge (R{{cad.corner_radius_in:.1dot}})."

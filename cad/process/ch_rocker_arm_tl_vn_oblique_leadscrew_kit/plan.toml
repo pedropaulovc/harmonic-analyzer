@@ -111,6 +111,7 @@ diagram = { file = "diagrams/leadscrew-kit/saw.svg", alt = "The screw from the N
 [[setups.operations]]
 speed_kind = "other"
 tool = "saw"
+drilling = "none"
 sizing = "other"
 instruction = "Mark {{cad.saw_piece_mm:.1f}} from the NEAR END; saw on the offcut side. Keep the offcut."
 instruction_detailed = "Step {{cad.saw_piece_mm:.1f}} (±{{process.saw_mark_tolerance_mm:g}}) from the NEAR END with the 12 in rule of the combination square: lay it from the NEAR END and mark its 12 in end ({{process.rule_mm:.1f}}), then lay it from that mark and mark {{cad.saw_rule_step_in:fraction}} in more ({{cad.saw_rule_step_mm:.1f}} mm), round the screw with marker. Hold the screw in the bench vise between wood strips, mark just clear of the jaws, and saw on the offcut side with light strokes; the mill brings the piece to length. Keep the offcut: it is the nut's mandrel in the lathe."
@@ -133,6 +134,7 @@ beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.saw_piece_mm}}"
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-half"
+drilling = "none"
 sizing = "other"
 instruction = "Touch the NEAR END with the cutter's side: X = −D/2. Mill the sawn end conventional (table toward you), 0.5 mm X steps, then a 0.2 mm finish pass at X = {{cad.length_mm:.1f}} + D/2. Write L on the screw."
 instruction_detailed = "Run the cutter, bring its side to the NEAR END on a paper strip and set X = −D/2 (D: the measured cutter). Lower the cutter 1 mm below the screw past the right jaw, clear of the parallels. Feed the table toward you across the sawn end (conventional; fed the other way the cutter climbs), steady hand feed, stepping X 0.5 mm a pass, then a 0.2 mm finish pass at X = {{cad.length_mm:.1f}} + D/2. Write the measured length L on the screw: the cut-end flats use it."
@@ -148,6 +150,7 @@ gauge_checks = [{ gauge = "mill-x-dro", band_mm = "{{cad.length_band_mm}}" }]
 [[setups.operations]]
 speed_kind = "other"
 tool = "files"
+drilling = "none"
 sizing = "other"
 instruction = "Break the cut end ≤{{cad.end_chamfer_mm:g}}; run the nut over it."
 instruction_detailed = "File a light chamfer, no more than {{cad.end_chamfer_mm:g}}, round the cut end until the first thread is clean, then run the nut on and off the cut end by hand. The thread stays as supplied (sheet 2: {{cad.thread}})."
@@ -170,6 +173,7 @@ beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.length_mm}}"], 
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-flat"
+drilling = "none"
 sizing = { kind = "band", band_mm = "{{cad.flat_length_band_mm}}" }
 instruction = "X = +D/2 on the NEAR END, then X −{{cad.near_kp08_centre_mm:.2f}}; touch the crest, Z0; cross in Y to Z −{{cad.flat_depth_mm:.2f}} in two passes."
 instruction_detailed = "Touch the NEAR END face with the cutter's side on a paper strip and set X = +D/2 (D: the measured cutter). Jog once: moving the cutter from the end face over the screw must read minus. Move to X −{{cad.near_kp08_centre_mm:.2f}}: the cutter's edge sits on the flat's start, {{cad.near_kp08_station_mm:g}} from the end. Touch the thread crest on top with paper and set Z0. Cross the screw in Y at Z −0.40, then Z −{{cad.flat_depth_mm:.2f}}, with a steady feed and no dwell at depth."
@@ -184,6 +188,7 @@ gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.near_kp08_station_band_mm
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-flat"
+drilling = "none"
 sizing = { kind = "band", band_mm = "{{cad.flat_length_band_mm}}" }
 instruction = "Index {{cad.clock_deg:g}}° by the setup's index setting; touch the crest, Z0; second flat at the same X and depth."
 instruction_detailed = "Disengage the worm, pull the plunger and advance it, either way, the number of holes the setup's index setting gives on the direct plate (do not count the hole it starts in); let it drop in and lock the spindle. The jaws are back at {{cad.bs0_jaw_clocks}} o'clock. Touch the crest on top again with paper and set Z0: the chuck does not hold the screw exactly on the spindle axis, so the crest height moves with the index, and the depth is set from the screw's own crest. Cut the second flat at the same X, Z −0.40 then Z −{{cad.flat_depth_mm:.2f}}."
@@ -212,6 +217,7 @@ beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.length_mm}}"], 
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-flat"
+drilling = "none"
 sizing = "other"
 instruction = "X = +D/2 on the cut end; cross at X −(L − {{cad.handwheel_centre_mm:.2f}}), then at X 0, each at Z −0.40 then Z −{{cad.flat_depth_mm:.2f}}."
 instruction_detailed = "Touch the cut end face with the cutter's side on a paper strip and set X = +D/2 (D: the measured cutter); moving the cutter from the end face over the screw must read minus. Touch the crest, set Z0. With a steady hand feed and no dwell at depth, cross at X −(L − {{cad.handwheel_centre_mm:.2f}}) (X −{{cad.handwheel_from_cut_mm:.2f}} when L is {{cad.length_mm:.1f}}) at both depths, then at X 0 at both depths, so the flat runs out through the end."
@@ -240,6 +246,7 @@ beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.length_mm}}"], 
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-flat"
+drilling = "none"
 sizing = { kind = "band", band_mm = "{{cad.flat_length_band_mm}}" }
 instruction = "X = +D/2 on the cut end, then X −(L − {{cad.far_kp08_centre_mm:.2f}}); touch the crest, Z0; cross to Z −{{cad.flat_depth_mm:.2f}} in two passes."
 instruction_detailed = "Touch the cut end face with the cutter's side on a paper strip and set X = +D/2 (D: the measured cutter); moving the cutter from the end face over the screw must read minus. Move to X −(L − {{cad.far_kp08_centre_mm:.2f}}) (X −{{cad.far_kp08_from_cut_mm:.2f}} when L is {{cad.length_mm:.1f}}): the cutter's edge sits on the flat's start, {{cad.far_kp08_station_mm:.1f}} from the NEAR END. Touch the crest, set Z0, and cross in Y at Z −0.40 then Z −{{cad.flat_depth_mm:.2f}}, steady feed, no dwell at depth."
@@ -254,6 +261,7 @@ gauge_checks = [{ gauge = "mill-x-dro", band_mm = "{{cad.far_kp08_station_band_m
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-flat"
+drilling = "none"
 sizing = { kind = "band", band_mm = "{{cad.flat_length_band_mm}}" }
 instruction = "Index {{cad.clock_deg:g}}° by the setup's index setting; touch the crest, Z0; second flat at the same X and depth. Deburr all flats."
 instruction_detailed = "Disengage the worm, pull the plunger and advance it, either way, the number of holes the setup's index setting gives on the direct plate (do not count the hole it starts in); let it drop in and lock the spindle. The jaws are back at {{cad.bs0_jaw_clocks}} o'clock. Touch the crest on top again with paper and set Z0. Cut the second flat at the same X, Z −0.40 then Z −{{cad.flat_depth_mm:.2f}}. File the thread burrs off every flat's edges and run the nut over each flat."
@@ -280,6 +288,7 @@ lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.major_dia_mm}}"
 cut_kind = "other"
 speed_kind = "spindle"
 tool = "ar"
+drilling = "none"
 sizing = "other"
 instruction = "Face the spigot off flush with the seat face, light cuts. Full thread {{cad.nut_full_thread_min_mm:g}} min remains."
 instruction_detailed = "Touch the spigot end and face it off in light cuts until the cut just reaches the flange seat face (sheet 3: {{cad.nut_note}}). Lift the bore-mouth burr with a file corner, then unscrew the nut from the offcut: it must run freely. The nut keeps at least {{cad.nut_full_thread_min_mm:g}} of full thread (sheet 3)."
@@ -304,6 +313,7 @@ diagram = { file = "diagrams/leadscrew-kit/nut-csk.svg", alt = "The flange's bod
 [[setups.operations]]
 speed_kind = "other"
 tool = "csk"
+drilling = "none"
 sizing = { kind = "band", band_mm = "{{cad.csk_cutter_band_mm}}" }
 instruction = "{{cad.csk_count:d}}× countersink on the flange's body side by hand to Ø{{cad.csk_dia_mm:.2f}}; keep off the body."
 instruction_detailed = "Hold the nut by its flange O.D. in soft jaws, body up. Turn the {{cad.csk_angle_deg:g}}° countersink by hand in each hole, checking the mouth with calipers every few turns, to Ø{{cad.csk_dia_min_mm:.2f}}–{{cad.csk_dia_max_mm:.2f}} (sheet 3: {{cad.csk_wall_note}})."

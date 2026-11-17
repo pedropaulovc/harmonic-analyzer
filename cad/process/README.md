@@ -174,7 +174,17 @@ carry 0.11.0's `milling_deflection` data (a `beam` per non-lathe setup or
 operation, `milling_cuts` per spindle operation) and pass that check enforced;
 the end-bracket plan's tap flags and the dropped feed-lever grip-end setup
 need the 0.11.0 jig pictures, so they pass under `@latest` from 0.11.0 (released). The riser plan needs 0.11.4
-(its `harmonic_riser` adapter's Setup 2 stations and Setup 4 guards).
+(its `harmonic_riser` adapter's Setup 2 stations and Setup 4 guards). Every plan (base bar, end bracket, feed
+lever, riser, carrier, pivot and feed blocks, leadscrew kit) carries
+`drill_pecking` data and so needs prechips 0.11.4 (pedropaulovc/prechips#403):
+every operation with a tool declares `drilling` (`"twist_drill"`, or `"none"`
+for spots, countersinks, reamers, end mills, taps, saws and files), and each
+twist-drilled hole declares `peck` (`"none"` or `{ step_mm, retract }`) and
+`hole_depth_mm`. Each step is one mm process parameter (`*_peck_mm`, one
+drill Ø) bound into both `step_mm` and the instruction
+(`{{process.<name>:in.3dot}}`), and the feed-block pilot depth is the process
+parameter `lug_bore_depth_mm`, printed the same way; earlier releases refuse
+those fields and bindings.
 
 The riser plan (TL-24) needs prechips 0.11.4: 0.11.0 added its `harmonic_riser`
 adapter and the `milling_deflection` check; 0.11.4 derives the Setup 2 strap
@@ -350,7 +360,7 @@ three files; exit 2 is
 a refusal, either bad input or a failed enforced check (`stock_fit`,
 `turning_deflection`, `milling_deflection`, `cutting_speeds`, `tool_sizing`,
 `indexing`, `gauge_capability`, `lathe_holding`, `vise_holding`,
-`machine_capacity`, or
+`machine_capacity`, `drill_pecking`, or
 `hobby`'s missing setup picture). A missing plan fails only that part's task.
 A refusal is a finding about the plan or shop data; correct the source, not
 the check.

@@ -29,6 +29,9 @@ file = "../../out/features/ch_rocker_arm_tl_oblique_pivot_block/features.toml"
 adapter = "harmonic_pivot_block"
 
 [parameters]
+# drill_pecking steps, one drill Ø each: #15 (.180 in), F (.257 in).
+hole_peck_mm = 4.572
+tap_drill_peck_mm = 6.5278
 bar_width_in = 3.0               # 1187 bar width.
 blank_length_in = 1.70           # Along the bar: Y 1.58 + two clean-ups + saw allowance.
 blank_min_length_in = 1.66
@@ -117,6 +120,7 @@ beam = "other"
 [[setups.operations]]
 speed_kind = "other"
 tool = "saw"
+drilling = "none"
 sizing = "other"
 instruction = "From the 1187 bar end: one {{process.blank_length_in:.2f}} strip, waste side of the line; ≥{{process.blank_min_length_in:.2f}}."
 instruction_detailed = "Square the 1187 bar end first if it is rough. Mark {{process.blank_length_in:.2f}} from the end and saw on the waste side of the line (~{{process.kerf_in:fraction}} kerf); the strip must be at least {{process.blank_min_length_in:.2f}} long. The rest of the bar goes to TL-32."
@@ -125,6 +129,7 @@ feed = "hand"
 [[setups.operations]]
 speed_kind = "other"
 tool = "saw"
+drilling = "none"
 sizing = "other"
 instruction = "Cut the strip across to {{process.blank_width_in:.2f}}, waste side of the line; ≥{{process.blank_min_width_in:.2f}}."
 instruction_detailed = "Clamp the {{process.bar_width_in:fraction}} in strip in the saw vise with the short offcut on the free side, mark {{process.blank_width_in:.2f}} from one as-bought edge and saw on the waste side of the line; the blank must be at least {{process.blank_min_width_in:.2f}} across."
@@ -146,6 +151,7 @@ beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.blank_length_mm
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-face"
+drilling = "none"
 sizing = "other"
 instruction = "Face the up side just clean (≤{{process.cleanup_in:.2dot}}), four .40 steps. Mark it SEAT."
 milling_cuts = [{ name = "SEAT clean-up", kind = "end", material = "aluminum_6061", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 203.2, phase = "finish", axial_doc_mm = 0.508, radial_woc_mm = 10.16, traverse_mm = [0, "{{cad.blank_length_mm}}"] }]
@@ -154,6 +160,7 @@ settings = "block-em-half-6061-t6511"
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-face"
+drilling = "none"
 sizing = "other"
 instruction = "SEAT down; face TOP to height {{cad.height_min_in:.3dot}}–{{cad.height_max_in:.3dot}}: one rough pass, then a .005–.010 finish pass."
 instruction_detailed = "Turn the blank over, SEAT down on the parallels, and tap it down until both parallels are pinned. Touch TOP and take one rough pass to about .010 over size, then measure and take the .005–.010 finish pass to {{cad.height_min_in:.3dot}}–{{cad.height_max_in:.3dot}} over SEAT; each pass is four .40 steps across the face."
@@ -181,6 +188,7 @@ beam = { axis = "z", hold = "cantilever", extent_mm = [0, "{{cad.blank_width_mm}
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-face"
+drilling = "none"
 sizing = "other"
 instruction = "Face the up end just clean (≤{{process.cleanup_in:.2dot}}), two passes across the .96. Mark it SPINDLE END."
 milling_cuts = [{ name = "SPINDLE END clean-up", kind = "end", material = "aluminum_6061", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 203.2, phase = "finish", axial_doc_mm = 0.508, radial_woc_mm = 12.7, stations_mm = "{{cad.blank_width_mm}}" }]
@@ -189,6 +197,7 @@ settings = "block-em-half-6061-t6511"
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-face"
+drilling = "none"
 sizing = "other"
 instruction = "SPINDLE END down; face OUTER END in ≤{{process.layer_in:.2dot}} layers, the last .005–.010, to {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}}."
 instruction_detailed = "Turn the blank over, SPINDLE END down on the 1/2 in parallels, and tap it down. Face OUTER END in layers no deeper than {{process.layer_in:.2dot}}, two passes per layer across the .96 end. Measure from SPINDLE END before the last layer; take it .005–.010 deep to {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}}."
@@ -216,6 +225,7 @@ beam = { axis = "z", hold = "cantilever", extent_mm = [0, "{{cad.blank_length_mm
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-face"
+drilling = "none"
 sizing = "other"
 instruction = "Square SPINDLE END to the jaw tops; face the up end just clean (≤{{process.cleanup_in:.2dot}}). Mark it ROW SIDE."
 instruction_detailed = "Stand the blank on a sawn end, SEAT and TOP in the jaws. Before tightening, rest the combination square's head across both jaw tops and bring its blade down against SPINDLE END; push SPINDLE END plumb to the blade. Face the up end just clean (≤{{process.cleanup_in:.2dot}}), two passes across the .96, and mark it ROW SIDE: the hole rows measure from it."
@@ -225,6 +235,7 @@ settings = "block-em-half-6061-t6511"
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-face"
+drilling = "none"
 sizing = "other"
 instruction = "ROW SIDE down, SPINDLE END square; face FAR SIDE in ≤{{process.layer_in:.2dot}} layers, the last .005–.010, to {{cad.width_min_in:.3dot}}–{{cad.width_max_in:.3dot}}."
 milling_cuts = [
@@ -254,6 +265,7 @@ beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.y_length_mm}}"]
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "spot"
+drilling = "none"
 sizing = "other"
 instruction = "Spot B and H1–H4 from the table. H1–H4 X, Y ±{{cad.hole_x_tol_in:.3dot}}; B ±.01."
 instruction_detailed = "Touch ROW SIDE and zero X; the fixed jaw face is SPINDLE END, so touch it and zero Y. Spot B and H1–H4 at the table positions, each X to the left of ROW SIDE (−X on the DRO) (H1–H4 ±{{cad.hole_x_tol_in:.3dot}}, B ±.01), cone a little under each drill."
@@ -269,8 +281,11 @@ rows = "{{cad.hole_rows}}"
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "drill-15"
+drilling = "twist_drill"
 sizing = { kind = "band", band_mm = "{{cad.hole_dia_band_mm}}" }
-instruction = "H1–H4 through, full-retract pecks every .18."
+instruction = "H1–H4 through, full-retract pecks every {{process.hole_peck_mm:in.3dot}}."
+hole_depth_mm = "{{cad.height_mm}}"
+peck = { step_mm = "{{process.hole_peck_mm}}", retract = "full" }
 milling_cuts = [{ name = "H1–H4", kind = "drill", phase = "finish", material = "aluminum_6061", flutes = 2, feed_per_tooth_mm = 0.0254, cutter_dia_mm = 4.572, stations_mm = ["{{cad.hole_y1_mm}}", "{{cad.hole_y2_mm}}"] }]
 rpm = 2800
 feed = "hand"
@@ -280,6 +295,7 @@ gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.hole_x1_band_mm}}" }, { g
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-5-16"
+drilling = "none"
 sizing = { kind = "band", band_mm = "{{cad.cbore_dia_band_mm}}" }
 instruction = "Counterbore H1–H4: touch TOP, zero Z; measure H; plunge to Z −(H − {{cad.cbore_floor_nominal_in:.3dot}}), floors {{cad.cbore_floor_min_in:.3dot}}–{{cad.cbore_floor_max_in:.3dot}} above SEAT."
 instruction_detailed = "Measure the block's height H. Touch TOP with the 5/16 end mill (paper shim, then subtract its thickness) and zero Z. Plunge on each of H1–H4 to Z = −(H − {{cad.cbore_floor_nominal_in:.3dot}}), about {{cad.cbore_depth_in:.3dot}} deep, so each floor stands {{cad.cbore_floor_min_in:.3dot}}–{{cad.cbore_floor_max_in:.3dot}} above SEAT. Check with the depth rod from TOP: it reads (H − {{cad.cbore_floor_max_in:.3dot}}) to (H − {{cad.cbore_floor_min_in:.3dot}})."
@@ -292,8 +308,11 @@ gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.cbore_floor_band_mm}}" }]
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "drill-f"
+drilling = "twist_drill"
 sizing = { kind = "band", band_mm = "{{cad.tap_drill_band_mm}}" }
-instruction = "B through (tap drill); chip-break pecks after the first .5."
+instruction = "B through (tap drill); chip-break pecks every {{process.tap_drill_peck_mm:in.3dot}}."
+hole_depth_mm = "{{cad.height_mm}}"
+peck = { step_mm = "{{process.tap_drill_peck_mm}}", retract = "chip_break" }
 milling_cuts = [{ name = "B tap drill", kind = "drill", phase = "finish", material = "aluminum_6061", flutes = 2, feed_per_tooth_mm = 0.0254, cutter_dia_mm = 6.5278, stations_mm = "{{cad.bore_y_mm}}" }]
 rpm = 2450
 feed = "hand"
@@ -303,6 +322,7 @@ gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.bore_y_band_mm}}" }, { ga
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-3-8"
+drilling = "none"
 sizing = { kind = "band", band_mm = "{{cad.bore_dia_band_mm}}" }
 instruction = "Seat B: 3/8 end mill miked ≥.3750; touch TOP, zero Z; plunge to Z −{{cad.bore_depth_nominal_in:.3dot}}, flat floor."
 instruction_detailed = "Mike the 3/8 end mill across its flutes first: it must read .3750 or more, or take another 3/8 from the set. Touch TOP with it (paper shim, then subtract its thickness) and zero Z. Still on B, plunge over the F hole to Z −{{cad.bore_depth_nominal_in:.3dot}} and dwell a moment at depth so the floor cleans up flat. The cutter sizes the seat: the .375 pin from the pin-gauge set enters full depth, the .379 does not."
@@ -315,6 +335,7 @@ gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.bore_dia_band_mm}}" }, 
 [[setups.operations]]
 speed_kind = "other"
 tool = "tap"
+drilling = "none"
 sizing = "other"
 instruction = "Tap B {{cad.pivot_thread}} through."
 instruction_detailed = "Start the 5/16-18 plug tap in B square from the drill chuck, spindle off, about 3 turns; finish through with the T-handle, backing off each half turn to break the chip."

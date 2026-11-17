@@ -26,6 +26,8 @@ file = "../../out/features/ch_rocker_arm_tl_oblique_end_bracket/features.toml"
 adapter = "harmonic_end_bracket"
 
 [parameters]
+# drill_pecking: full-retract pecks of one #29 Ø (.136 in).
+peck_mm = 3.4544
 blank_length_in = 2.85
 blank_min_length_in = 2.75
 blank_thickness_in = 0.5
@@ -109,6 +111,7 @@ diagram = { file = "diagrams/end-bracket/saw.svg", alt = "Both bracket blanks fr
 [[setups.operations]]
 speed_kind = "other"
 tool = "saw"
+drilling = "none"
 sizing = "other"
 instruction = "From the 1165 bar end left after the TL-26 lever blank: saw {{process.quantity:d}} × {{process.blank_length_in:.2f}} adjacent blanks, waste side of the line; each ≥{{process.blank_min_length_in:.2f}} long."
 instruction_detailed = "From the 1165 bar end left after the TL-26 lever blank: saw {{process.quantity:d}} × {{process.blank_length_in:.2f}} blanks, waste side of the line; each ≥{{process.blank_min_length_in:.2f}} long. Take both from this one bar, next to each other: the vise clamps the pair together, so their as-bought widths must match in the jaws."
@@ -136,6 +139,7 @@ beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.blank_length_mm
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-half"
+drilling = "none"
 sizing = "other"
 instruction = "Cutter .04 below parts. Clean up both outboard ends, .02 X steps, ≤ half the allowance, conventional: left end table moves away, right end table moves toward you. Mark INNER END on each."
 instruction_detailed = "Touch the cutter on a part top, then down .54 (cutter .04 below the parts). Clean up both outboard ends, .02 X steps, ≤ half the allowance, conventional cuts: left end with the table moving away from you (cutter toward you), right end with the table moving toward you. Steady feed. Mark INNER END on each."
@@ -148,6 +152,7 @@ milling_cuts = [
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-half"
+drilling = "none"
 sizing = "other"
 instruction = "Turn both end-for-end, raw end ~.2 out. X0 on left INNER END; touch right INNER END, note XR. Measure cutter D; .02 passes, conventional: left end table away, last X = −({{cad.length_in:.3f}} + D/2); right end table toward you, last X = XR + {{cad.length_in:.3f}} + D/2."
 instruction_detailed = "Turn each part end-for-end in place, INNER END inboard, raw end ~.2 past its jaw side. Touch both INNER ENDs from the gap between the parts: X0 on the left part's, then read the right part's as XR. Measure cutter D; .02 passes, conventional: left end with the table moving away from you, last pass X = −({{cad.length_in:.3f}} + D/2); right end with the table moving toward you, last pass X = XR + {{cad.length_in:.3f}} + D/2."
@@ -185,6 +190,7 @@ beam = { axis = "y", hold = "between", extent_mm = [0, "{{cad.thickness_mm}}"], 
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "spot"
+drilling = "none"
 sizing = "other"
 instruction = "Spot H1–H{{cad.hole_count:d}} on both parts (right part at XR + X), cone ~5/32 across. X ±{{cad.station_tol_in:.3f}} ({{cad.station_tol_mm:.2f}} mm); Y {{cad.row_min_in:.3f}}–{{cad.row_max_in:.3f}}."
 instruction_detailed = "Y0: ROW EDGE is on the fixed jaw, so touch the jaw face from your side at ~X {{process.y_touch_x_in:g}}, in the gap between the parts, and zero Y there. X0 on the left INNER END; touch the right part's INNER END from the gap and note XR. Spot H1–H{{cad.hole_count:d}} on both parts (right part at XR + X), cone ~5/32 across. X ±{{cad.station_tol_in:.3f}} ({{cad.station_tol_mm:.2f}} mm); Y {{cad.row_min_in:.3f}}–{{cad.row_max_in:.3f}}."
@@ -201,12 +207,16 @@ rows = "{{cad.hole_rows}}"
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "drill"
+drilling = "twist_drill"
 sizing = { kind = "band", band_mm = "{{cad.tap_drill_band_mm}}" }
-instruction = "H1–H{{cad.hole_count:d}} through on both parts to Z −1.06 below BAR SIDE (exit full size); full-retract pecks every .14 (L/D 8; a parabolic-flute #29 helps)."
+instruction = "H1–H{{cad.hole_count:d}} through on both parts to Z −1.06 below BAR SIDE (exit full size); full-retract pecks every {{process.peck_mm:in.3dot}} (a parabolic-flute #29 helps)."
 rpm = 2800
 feed = "hand"
 inspection = "Each part from its INNER END: stations as tabled ±{{cad.station_tol_in:.3f}} ({{cad.hole_stations_mm}} mm ±{{cad.station_tol_mm:.2f}}); row {{cad.row_min_in:.3f}}–{{cad.row_max_in:.3f}} from ROW EDGE."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.hole_1_station_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.hole_2_station_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.row_band_mm}}" }]
+# Through the 1 in width (BAR SIDE to KP08 SIDE); one drill Ø per peck.
+hole_depth_mm = "{{cad.width_mm}}"
+peck = { step_mm = "{{process.peck_mm}}", retract = "full" }
 milling_cuts = [
   { name = "H1–H2", kind = "drill", phase = "finish", material = "aluminum_6061", cutter_dia_mm = 3.4544, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = 6.35 },
 ]
@@ -214,6 +224,7 @@ milling_cuts = [
 [[setups.operations]]
 speed_kind = "other"
 tool = "plug"
+drilling = "none"
 sizing = "other"
 instruction = "Start H1–H{{cad.hole_count:d}} on both parts square from the chuck, spindle off; tap fluid. Flag the plug tap {{process.bar_tap_flag_in:.2dot}} from its tip; stop at the flag."
 instruction_detailed = "Tape a flag on the plug tap {{process.bar_tap_flag_in:.2dot}} from its tip (the end of the chamfered teeth, not a centre point). Start H1–H{{cad.hole_count:d}} on both parts square from the drill chuck, spindle off, about 3 turns, with tap fluid; finish with the T-handle, backing off every half turn to clear chips, and stop when the flag reaches BAR SIDE."
@@ -222,6 +233,7 @@ feed = "hand"
 [[setups.operations]]
 speed_kind = "other"
 tool = "bottoming"
+drilling = "none"
 sizing = "other"
 instruction = "Finish H1–H{{cad.hole_count:d}} on both parts with the bottoming tap flagged {{process.bar_tap_flag_in:.2dot}} from its tip (end of chamfered teeth); stop at the flag."
 instruction_detailed = "Tape a flag on the bottoming tap {{process.bar_tap_flag_in:.2dot}} from its tip (the end of the chamfered teeth, not a centre point). Finish H1–H{{cad.hole_count:d}} on both parts with tap fluid, backing off every half turn, until the flag reaches BAR SIDE. The flag sits in the drawing's tip window ({{cad.bar_tip_min_in:.3f}}–{{cad.bar_tip_max_in:.3f}}), low enough that the KP08-side tap never meets this thread."
@@ -251,6 +263,7 @@ instruction = "Break each KP08-side drill exit with a hand countersink to about 
 [[setups.operations]]
 speed_kind = "other"
 tool = "plug"
+drilling = "none"
 sizing = "other"
 instruction = "Start H1–H{{cad.hole_count:d}} on both parts square from the chuck, spindle off; tap fluid. Flag the plug tap {{process.kp08_tap_flag_in:.2dot}} from its tip; stop at the flag."
 instruction_detailed = "Tape a flag on the plug tap {{process.kp08_tap_flag_in:.2dot}} from its tip (the end of the chamfered teeth). Start H1–H{{cad.hole_count:d}} on both parts square from the drill chuck, spindle off, about 3 turns, with tap fluid; finish with the T-handle, backing off every half turn, and stop when the flag reaches KP08 SIDE."
@@ -259,6 +272,7 @@ feed = "hand"
 [[setups.operations]]
 speed_kind = "other"
 tool = "bottoming"
+drilling = "none"
 sizing = "other"
 instruction = "Finish H1–H{{cad.hole_count:d}} on both parts with the bottoming tap flagged {{process.kp08_tap_flag_in:.2dot}} from its tip; stop at the flag."
 instruction_detailed = "Move the flag on the bottoming tap to {{process.kp08_tap_flag_in:.2dot}} from its tip (the end of the chamfered teeth). Finish H1–H{{cad.hole_count:d}} on both parts with tap fluid, backing off every half turn, until the flag reaches KP08 SIDE. The flag sits in the drawing's tip window ({{cad.kp08_tip_min_in:.3f}}–{{cad.kp08_tip_max_in:.3f}}), short of the BAR-side thread."
