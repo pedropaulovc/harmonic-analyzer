@@ -1491,9 +1491,6 @@ _CHECK_NAMES = (
     "partiso",
     "inert",
     "budget",
-    # Threaded-joint retention (drawing-guidelines.md rule 23 (lock threaded joints exposed to operating loads)). Audit-only
-    # while joint_retention.ENFORCEMENT is AUDIT: it reports, never fails.
-    "joint_retention",
 )
 # Checks outside the every-build set. verify_telemetry is opt-in;
 # features_bound is required only by release. Union must match the specs.
@@ -4989,9 +4986,6 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         # members, an incomplete before-walk refuses to diff, and the created
         # feature is picked by type, never an auxiliary one beside it.
         SCRIPTS_DIR / "test_adapter_feature_resolution.py",
-        # The threaded-joint retention audit's logic, and the joint table's
-        # coverage of every threaded part the assemblies reference.
-        SCRIPTS_DIR / "test_joint_retention.py",
     ]
     # These are runtime-read rather than imported, so module_deps_of cannot
     # discover them. A prompt/schema edit must invalidate check:recipe and rerun
@@ -5508,28 +5502,6 @@ def _check_budget_spec(pytest_cmd: list[str]) -> dict[str, Any]:
     }
 
 
-def _check_joint_retention_spec(pytest_cmd: list[str]) -> dict[str, Any]:
-    return {
-        # Writes cad/out/reports/joint-retention.{json,md}. The joint table
-        # is checked against the parts each assembly script references
-        # (_buildgraph.references_of reads the scripts as TEXT, so the
-        # import graph cannot see them).
-        "file_dep": sorted(
-            {
-                str((REPO_ROOT / "dodo.py").resolve()),
-                # references_of runs here, but module_deps_of skips
-                # _buildgraph itself, so name it.
-                str((SCRIPTS_DIR / "_buildgraph.py").resolve()),
-                *(
-                    str((SCRIPTS_DIR / f"build_{s}_assembly.py").resolve())
-                    for s in ASSEMBLY_ORDER
-                ),
-            }
-        ),
-        "cmd": [sys.executable, str(SCRIPTS_DIR / "joint_retention.py")],
-    }
-
-
 def _check_features_bound_spec(pytest_cmd: list[str]) -> dict[str, Any]:
     return {
         "file_dep": [
@@ -5561,7 +5533,6 @@ _CHECK_SPEC_BUILDERS = {
     "partiso": _check_partiso_spec,
     "inert": _check_inert_spec,
     "budget": _check_budget_spec,
-    "joint_retention": _check_joint_retention_spec,
     "features_bound": _check_features_bound_spec,
 }
 
@@ -6126,13 +6097,7 @@ def _canonical_targets(name: str) -> list[str]:
                     for run in range(1, 4)
                 ),
             ]
-        targets = [str(REPORTS / f"check-{subname}.ok")]
-        if subname == "joint_retention":
-            targets.extend([
-                str(REPORTS / "joint-retention.json"),
-                str(REPORTS / "joint-retention.md"),
-            ])
-        return targets
+        return [str(REPORTS / f"check-{subname}.ok")]
     if family == "prechips":
         import _process_plans
 

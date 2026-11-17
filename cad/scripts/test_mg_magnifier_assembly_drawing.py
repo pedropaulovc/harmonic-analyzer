@@ -13,7 +13,6 @@ import pytest
 import _transforms
 import build_mg_magnifier_assembly as assembly
 import draw_mg_magnifier_assembly as drawing
-import joint_retention
 import mg_magnifier_assembly_sheet as notes
 import mg_magnifier_assembly_spec as stack
 import mg_magnifier_assembly_steps as steps
@@ -3159,11 +3158,6 @@ def test_wire_balloon_requires_its_logical_bom_row(magnifier_bom, replacement_ro
     with pytest.raises(KeyError) as error:
         drawing.balloon_items(items, frozenset({explode.WIRE_STEM}))
     assert error.value.args == ("sh-vn-music-wire--LeverWire",)
-
-
-def test_the_joint_retention_rows_point_at_magnifier_steps() -> None:
-    assert joint_retention.STEP_LISTS["mg_magnifier"] == steps.SEQUENCE
-    assert DRAWINGS_BY_NAME["mg_magnifier_assembly"].part == "mg_magnifier"
 
 
 @pytest.mark.parametrize(

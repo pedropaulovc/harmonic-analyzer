@@ -1918,7 +1918,7 @@ def test_the_disc_is_centred_to_its_running_bore_before_transfer_and_match_mark(
     locations = [transferred.index(action) for action in ordered_actions]
     assert locations == sorted(locations)
     assert "OD RUNOUT" not in transferred
-    # joint_retention: pd-paper-drive/disc-screws is a static clamp, Lock.NONE.
+    # threaded-joint-retention.md: pd-paper-drive/disc-screws is a static clamp, no lock.
     assert "LOCK" not in transferred
 
 

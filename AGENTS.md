@@ -442,7 +442,7 @@ such build:
 | `package:features:<stem>` (one isolated STEP/requirements bundle) | yes | yes | yes |
 | `package:features` | no (aggregator) | no | — (its leaves are) |
 | `verify:soundness` | no (aggregator) | no | — (its leaves are) |
-| `check:math`, `check:config`, `check:graph`, `check:undefined_names`, `check:nameplate`, `check:numerals`, `check:recipe`, `check:cache`, `check:partiso`, `check:inert`, `check:budget`, `check:joint_retention` (audit-only: reports, never fails) | **no** | no (parallel) | no (runs locally) |
+| `check:math`, `check:config`, `check:graph`, `check:undefined_names`, `check:nameplate`, `check:numerals`, `check:recipe`, `check:cache`, `check:partiso`, `check:inert`, `check:budget` | **no** | no (parallel) | no (runs locally) |
 | `check:verify_telemetry` | **no** | no (opt-in — NOT in build/release) | no |
 | `check:machinist_review:<stem>` (one cached aggregate per drawing; opt-in enforcement) | **no** | no (parallel) | no (submitter-only) |
 | `prechips:<stem>` (enrolled process travelers; in `build` and `release`, NOT in `build_bare`) | **no** (latest PyPI prechips via `uv tool run`; headless Edge/Chrome prints the hobby PDF) | no (parallel; needs its own scoped `features.toml`) | no (submitter-only) |

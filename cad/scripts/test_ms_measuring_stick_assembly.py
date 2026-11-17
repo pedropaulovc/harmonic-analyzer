@@ -26,7 +26,6 @@ import _hole_spec
 import _ms_measuring_stick_interference as contracts
 import build_ha_harmonic_analyzer_assembly as top
 import draw_ms_measuring_stick_assembly as drawing
-import joint_retention
 import ms_measuring_stick_assembly_sheet as sheet
 import ms_measuring_stick_assembly_spec as spec
 import ms_measuring_stick_explode_spec as explode
@@ -359,27 +358,6 @@ def test_native_standalone_final_guard_reads_solved_screw_transform(monkeypatch,
     else:
         with pytest.raises(RuntimeError, match="thumbscrew head must be above"):
             builder._assert_working_pose(adapter, "native-thumb-1")
-
-
-def test_joint_rows_name_printed_steps() -> None:
-    joints = {
-        joint.id: joint
-        for joint in joint_retention.JOINTS
-        if joint.assembly == "ms_measuring_stick"
-    }
-    assert set(joints) == {
-        "ms-measuring-stick/stop-thumbscrew",
-        "ms-measuring-stick/plate-screws",
-    }
-    printed = {line.split(". ", 1)[0]: line for line in sheet.ASSEMBLY_STEPS}
-    for joint, word in (
-        (joints["ms-measuring-stick/stop-thumbscrew"], "THUMBSCREW"),
-        (joints["ms-measuring-stick/plate-screws"], "FILLISTER SCREWS"),
-    ):
-        prefix = f"{sheet.DRAWING_NUMBER} STEP "
-        assert joint.installed_at.startswith(prefix)
-        assert word in printed[joint.installed_at.removeprefix(prefix)]
-    assert joints["ms-measuring-stick/plate-screws"].quantity == spec.QUANTITIES[spec.PLATE_SCREW]
 
 
 def test_fitter_package_covers_rule_9() -> None:
