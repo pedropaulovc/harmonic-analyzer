@@ -133,7 +133,7 @@ BEND_TANGENT_Y = _front_y(LEG_TOP)
 # run 20261101T004958072Z) and short of the title block's left edge, so its
 # foot extension line stays off the title block; its text at the view's
 # mid-height, 21 mm below the leg length's.  The overall reach (faced arm end
-# to the leg's outer side) runs over the arm straight.  Machinist review r5 of
+# to the leg's outer side, ±.10) runs over the arm straight.  Machinist review r5 of
 # that run.  The arm straight's text stands outside its short span, left of
 # the faced arm end: centred over the span it straddled the end's extension
 # line, which the reach shares (text-on-line, farm run 20261101T022045634Z).

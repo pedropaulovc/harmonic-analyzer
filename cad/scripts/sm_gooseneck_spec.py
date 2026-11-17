@@ -19,7 +19,8 @@ tube's two ends finish matters".  Every size is a native model dimension on
 the elevation.  The two that govern are where the ends finish, both to real
 faces: the overall height (foot face to the arm's top, ±.10: the leg slides
 in its hub, so the foot needs little) and the overall reach (faced arm end
-to the leg's outer side, the title block's .XX); the leg and arm stay square
+to the leg's outer side, ±.10: the post's level setting takes up the spring
+eye's small lean); the leg and arm stay square
 to each other at the title block's implied 90°.  The bend's
 centreline radius, the leg length and arm straight (each to a bend tangent),
 and the tube's stock Ø are references.  The one note is the bend's
@@ -132,11 +133,11 @@ TUBE_OD_REF_Y = round(geom.LEG_TOP - geom.LEG_LENGTH / 4.0, 1)
 TUBE_OD_REF_SPAN = 20.0
 # Inch places (#290).  The leg length and bend radius are references at
 # their one-place sizes.  The overall reach sets the faced arm end, the
-# spring eye's station less the end plug's head: the title block's .XX.  The
-# overall height prints at two places only because the snapped leg puts it
-# at 19.650, a one-place tie; its band is OVERALL_HEIGHT_TOLERANCE_MM, not the
-# .XX row's.  The arm straight (REF) prints at two places, the stock Ø (REF)
-# at its three-place size.
+# spring eye's station less the end plug's head, and the overall height the
+# foot; both print at two places only because their sizes (3.72, and the
+# snapped leg's 19.650, a one-place tie) round there.  Each carries its own
+# band (below), not the .XX row's.  The arm straight (REF) prints at two
+# places, the stock Ø (REF) at its three-place size.
 ONE_PLACE_DIMENSIONS = frozenset({"LegLength", "BendRadius"})
 THREE_PLACE_DIMENSIONS = frozenset({"TubeOdRef"})
 # The foot only has to leave the straight leg spanning MHA-FR-02's hub bore
@@ -146,6 +147,15 @@ THREE_PLACE_DIMENSIONS = frozenset({"TubeOdRef"})
 # comes near it.  The foot is held to ±.10, the band the leg's .X length
 # carried before #2401 (codjiflo on PR #2809: .XX ±.01 served no function).
 OVERALL_HEIGHT_TOLERANCE_MM = 0.10 * geom.MM_PER_IN
+# The reach puts the spring eye over the summing lever's counter anchor
+# (spring_mount_geom.COUNTER_UPPER_EYE_X).  ±.10 moves the eye 2.5 mm off the
+# anchor's plumb line over the settled 345 mm hang: a 0.4° lean whose
+# sideways pull, on the anchor's 22 mm rise above the knife, is 0.2% of the
+# spring's moment about it, which the post's level setting (CounterSetting,
+# MHA-SM-00) takes up with the rest of the counter balance.  .XX ±.01 on a
+# hand bend served no function (machinist review of main 67ba11bf1a; owner
+# ruling 2026-11-14 (Pedro), #2401: "Loosen first").
+OVERALL_REACH_TOLERANCE_MM = 0.10 * geom.MM_PER_IN
 
 
 def places(name: str) -> int:

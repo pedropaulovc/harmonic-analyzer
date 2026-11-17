@@ -81,6 +81,7 @@ from sm_gooseneck_spec import (
     DRAWING_PRECISION,
     ISOMETRIC_VIEW_NOTE,
     OVERALL_HEIGHT_TOLERANCE_MM,
+    OVERALL_REACH_TOLERANCE_MM,
     REFERENCE_DIMENSIONS,
     TUBE_OD_REF_SPAN,
     TUBE_OD_REF_Y,
@@ -733,16 +734,21 @@ def build(adapter) -> dict[str, str]:
     # its wall callout, so _author_reference_dimensions writes its
     # "(<MOD-DIAM>" prefix.
     _author_reference_dimensions(adapter)
-    # The foot's loose band (spec OVERALL_HEIGHT_TOLERANCE_MM), native on the
-    # overall height's source dimension; the .XX row would hold it to ±.01.
-    set_dimension_symmetric_tolerance(
-        adapter,
-        "OverallReference",
-        "OverallHeight",
-        OVERALL_HEIGHT_TOLERANCE_MM,
-        places=DRAWING_PRECISION["OverallReference"]["OverallHeight"],
-        display_unit=part_drawing_unit(PART_NAME),
-    )
+    # The two governing sizes' loose bands (spec OVERALL_HEIGHT_TOLERANCE_MM,
+    # OVERALL_REACH_TOLERANCE_MM), native on their source dimensions; the .XX
+    # row would hold each to ±.01.
+    for name, tolerance_mm in (
+        ("OverallHeight", OVERALL_HEIGHT_TOLERANCE_MM),
+        ("OverallReach", OVERALL_REACH_TOLERANCE_MM),
+    ):
+        set_dimension_symmetric_tolerance(
+            adapter,
+            "OverallReference",
+            name,
+            tolerance_mm,
+            places=DRAWING_PRECISION["OverallReference"][name],
+            display_unit=part_drawing_unit(PART_NAME),
+        )
     # The reference sketches own printed dimensions and only reference lines:
     # hide them so no assembly instance renders them (#880).  The drawing shows
     # them per view through _drawing_hidden_sketches to import those dimensions.
