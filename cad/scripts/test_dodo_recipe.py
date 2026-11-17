@@ -2205,6 +2205,30 @@ def test_artefact_digest_is_recipe_not_bytes():
     assert not os.path.exists(art) or dodo.ContentChecker._digest(art) == recipe
 
 
+def test_shop_file_readers_stay_outside_every_com_leaf():
+    """Neither shop TOML is in a COM leaf's key, so the modules that read them
+    may never join a part, assembly, drawing, soundness or feature closure."""
+    dodo = _load_dodo()
+    readers = {
+        str((dodo.SCRIPTS_DIR / name).resolve())
+        for name in ("_process_plans.py", "cam_nc.py", "ha_assembly_package.py")
+    }
+    roots = [
+        *dodo.part_scripts(),
+        *(dodo.script_for(stem) for stem in dodo.ASSEMBLY_ORDER),
+        *(spec.script for spec in dodo.DRAWINGS_BY_NAME.values()),
+        dodo.VERIFY_PY,
+        dodo.SCRIPTS_DIR / "export_features.py",
+    ]
+    reached = {
+        str(root): sorted(
+            readers & {str(Path(dep).resolve()) for dep in dodo.module_deps_of(Path(root))}
+        )
+        for root in roots
+    }
+    assert {root: hits for root, hits in reached.items() if hits} == {}
+
+
 def test_verify_gate_logic_off_build_closure_is_a_file_dep():
     """A verify gate whose LOGIC lives in a module on NO assembly's build
     closure (so it rides no .SLDASM digest) MUST list that module as a direct
