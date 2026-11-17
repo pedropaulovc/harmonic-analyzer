@@ -766,10 +766,8 @@ use = "MHA-FR-01 and MHA-FR-02 on edge for the cross-screw paths"
 
 # Base-bar (MHA-CH-06-TL-20) vise workholding the base-bar plan's face and hole
 # setups name (plan text and diagrams; prechips has no parallel or jack record).
-# Source and status: Pedro's 2026-11-05 hand traveler
-# ch-rocker-arm-tl-oblique-base-bar-traveler-2026-11-05.html, tool list (open
-# PR #2218, branch process/basebar-traveler-logbook-advice). Status is as that
-# sheet states it on 2026-11-05; no dimension beyond the sheet's is recorded.
+# Source and status: Pedro (2026-11-05, PR #2218 tool list). Status is as he
+# stated it on 2026-11-05; no dimension beyond that is recorded.
 [fixtures.parallels-1-3-8in]
 name = "1-3/8 in parallels, matched pair"
 present = false

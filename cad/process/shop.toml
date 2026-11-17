@@ -97,8 +97,8 @@ resolution_mm = 0.0254
 [gauges.digital-indicator]
 resolution_mm = 0.0254
 
-# PM-30MV X DRO scale read as a length gauge (feed-lever length, hand sheet
-# TL-26 Setup B). Range: machines.pm-30mv X travel; resolution: archive
+# PM-30MV X DRO scale read as a length gauge (feed-lever length, TL-26 plan,
+# "Grip end to length" setup). Range: machines.pm-30mv X travel; resolution: archive
 # installed MagXact MX-100M DRO, 5 um scales (owner-confirmed 2026-10-27).
 [gauges.mill-x-dro]
 range_mm = [0.0, 584.2]
@@ -125,7 +125,7 @@ vise_grip_fraction_min = 0.3333
 # says only that work held at the end of the vise needs a spacing block.
 vise_centre_fraction_max = 0.3333
 
-# Source: base-bar.toml; source hand traveler dated 2026-11-05 and
+# Source: base-bar.toml; Pedro's route dated 2026-11-05 and
 # table-clamped squaring sequence dated 2026-11-07 (see plan provenance).
 # diameter_mm: standard nominal size stated in each description, × 25.4 (HA's
 # per-tool diameter readings are not used; cad/process/README.md).
@@ -230,8 +230,8 @@ material = "6061-t6511"
 rpm = 2500
 feed = "30 in/min"
 
-# Source: end-bracket.toml and feed-lever.toml; hand travelers dated
-# 2026-11-02 (MHA-CH-06-TL-28/TL-26 v47), the v48 manifest notes (#29 tap
+# Source: end-bracket.toml and feed-lever.toml; the 2026-11-02 interim
+# routes (MHA-CH-06-TL-28/TL-26 v47), the v48 manifest notes (#29 tap
 # drill, plug-start then bottoming-finish taps) and the archived
 # taps-unc-hand 8-32 plug/bottoming records.
 [tools.jig-saw]

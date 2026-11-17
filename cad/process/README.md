@@ -7,7 +7,6 @@ cad/process/
   shop.toml                 prechips shop file, shared by every plan
   <stem>/plan.toml          one prechips plan per part
   <stem>/diagrams/*.svg     optional setup diagrams the plan names
-  hand-travelers/           interim handwritten sheets (see its README)
 ```
 
 [prechips](https://github.com/pedropaulovc/prechips) is a stdlib-only PyPI
