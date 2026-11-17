@@ -2150,6 +2150,7 @@ def aggregate_package(
         snapshot = ReviewPackage(package.name, package.kind, tuple(sources))
         source_sha = [_sha256(source) for source in sources]
 
+
         def run(run_id: str, on_first_response: Callable[[], None] | None = None) -> Review:
             directory = report_dir / package.name / "runs" / run_id
             with _telemetry.span(

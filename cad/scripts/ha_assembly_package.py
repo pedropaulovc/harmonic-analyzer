@@ -537,18 +537,6 @@ def fitup_lines(stem: str) -> list[str]:
     return lines
 
 
-def fitup_sources(stem: str) -> tuple[str, ...]:
-    """The files package ``stem``'s fit-up section is generated from (this
-    module and its sheet module's import closure), which key its machinist
-    review beside the sheets (rule 22); none while its sheets print its steps."""
-    if stem not in STEPS_IN_DOCUMENT:
-        return ()
-    sheet = Path(__file__).with_name(f"{stem.replace('-', '_')}_assembly_sheet.py")
-    return tuple(
-        sorted({str(Path(__file__).resolve()), str(sheet.resolve()), *module_deps_of(sheet)})
-    )
-
-
 def markdown() -> str:
     ha_steps = build.ha_steps
     printed_at = sorted(
