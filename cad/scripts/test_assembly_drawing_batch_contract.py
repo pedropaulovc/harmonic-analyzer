@@ -19,7 +19,6 @@ from _drawing_view_configuration import (
 )
 import draw_ch_channel_assembly
 import draw_dt_drive_train_assembly
-import draw_dt_cone_gear_tl_indexing_assembly
 import draw_dt_cone_tip_gear_tl_cutter_assembly
 import draw_dt_cone_gear_tl_arbor_assembly
 import draw_fr_frame_assembly
@@ -52,7 +51,6 @@ ASSEMBLY_DRAWINGS = (
     draw_pd_paper_drive_assembly,
     draw_sm_summing_assembly,
     draw_ms_measuring_stick_assembly,
-    draw_dt_cone_gear_tl_indexing_assembly,
     draw_dt_cone_tip_gear_tl_cutter_assembly,
     draw_dt_cone_gear_tl_arbor_assembly,
     draw_ha_harmonic_analyzer_assembly,
@@ -65,8 +63,7 @@ SIMPLE_ASSEMBLY_DRAWINGS = tuple(
     # bank's fit-up steps (#743, Codex PRRT_kwDOPHDy386mRSOK); the paper-drive
     # sheet left it when it became three sheets with its own fit-up steps; the
     # measuring-stick sheet is a full fitter package (BOM, explode, steps), as
-    # is the cone gear's one-sheet indexing kit (TL-00: BOM, balloon, steps),
-    # as is the cone tip gear's one-sheet fly cutter (TL-00: BOM, balloons,
+    # is the cone tip gear's one-sheet fly cutter (TL-00: BOM, balloons,
     # references, steps) and the cone gear's keyed arbor kit (TL-05: BOM,
     # balloons, settings, steps); the
     # magnifier left it with the axle-stack details (Codex PR #1330) and is
@@ -82,7 +79,6 @@ SIMPLE_ASSEMBLY_DRAWINGS = tuple(
         draw_ch_channel_assembly,
         draw_pd_paper_drive_assembly,
         draw_ms_measuring_stick_assembly,
-        draw_dt_cone_gear_tl_indexing_assembly,
         draw_dt_cone_tip_gear_tl_cutter_assembly,
         draw_dt_cone_gear_tl_arbor_assembly,
         draw_mg_magnifier_assembly,
@@ -251,11 +247,6 @@ def test_registry_task_names_outputs_and_assembly_dependencies_are_preserved() -
                     "pn_pen_carriage_geom.py",
                 )
             } <= set(deps)
-            assert str(Path(_assembly_drawing.__file__).resolve()) not in deps
-        elif drawing is draw_dt_cone_gear_tl_indexing_assembly:
-            scripts_dir = Path(drawing.__file__).resolve().parent
-            # The plate spec whose hole-circle counts the indexing table prints.
-            assert str(scripts_dir / "dt_cone_gear_tl_index_plate_spec.py") in deps
             assert str(Path(_assembly_drawing.__file__).resolve()) not in deps
         elif drawing is draw_dt_cone_tip_gear_tl_cutter_assembly:
             scripts_dir = Path(drawing.__file__).resolve().parent

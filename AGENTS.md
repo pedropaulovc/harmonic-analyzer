@@ -331,9 +331,10 @@ build farm (`farm_build.py`, which is how a seatless machine runs them).
 `check:graph` includes the SolidWorks-free part-coverage contract
 (`cad/scripts/test_part_coverage.py`). Every non-tooling part must be reachable
 from the final assembly in `ASSEMBLY_ORDER`; shop fixtures (`*_tl_*`) must never
-appear in machine assembly references or BOMs (#1239). A fixture kit may have
-its own `*_tl_*` assembly, referencing only fixture parts and outside the top
-assembly's tree (`_buildgraph.MACHINE_ASSEMBLIES`). Every part and assembly needs a
+appear in machine assembly references or BOMs (#1239). A shop tool may stand
+alone or belong to its own `*_tl_*` kit assembly, which references only fixture
+parts and stays outside the top assembly's tree (`_buildgraph.MACHINE_ASSEMBLIES`)
+(owner ruling 2026-11-17, #2885). Every part and assembly needs a
 drawing sourced from its own model kind. The named `PART_DRAWING_EXEMPTIONS`
 mapping exempts only consumable `pd_platen_paper`, and rejects exemptions for
 missing parts or parts that already have drawings.

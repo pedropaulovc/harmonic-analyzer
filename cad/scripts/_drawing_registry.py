@@ -1291,14 +1291,6 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
-        name="dt_cone_gear_tl_indexing_assembly",
-        part="dt_cone_gear_tl_indexing",
-        artifact_stem="dt-cone-gear-tl-indexing-assembly",
-        script_name="draw_dt_cone_gear_tl_indexing_assembly.py",
-        source_kind="assembly",
-        layout=DrawingLayout.LANDSCAPE,
-    ),
-    DrawingSpec(
         name="dt_cone_tip_gear_tl_cutter_assembly",
         part="dt_cone_tip_gear_tl_cutter",
         artifact_stem="dt-cone-tip-gear-tl-cutter-assembly",

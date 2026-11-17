@@ -360,31 +360,3 @@ def test_sheet_text_stands_apart_inside_the_border_and_off_the_title_block() -> 
     # The isometric's label sits left of the title block, under it.
     assert drawing.ISO_NOTE_XY[0] + len(spec.ISOMETRIC_VIEW_NOTE) * 0.0026 < title[0]
     assert drawing.ISO_NOTE_XY[1] < drawing.ISO_CENTER[1]
-
-
-def test_the_shop_kit_holds_the_comb() -> None:
-    import _buildgraph as bg
-    import build_dt_cone_gear_tl_indexing_assembly as kit_build
-    import draw_dt_cone_gear_tl_indexing_assembly as kit
-
-    assert "dt_cone_gear_tl_phasing_comb" in bg.references_of(
-        "dt_cone_gear_tl_indexing"
-    )
-    assert bg.is_shop_fixture("dt_cone_gear_tl_phasing_comb")
-    assert kit.BOM_COMPONENTS == (kit.PLATE, spec.PART_NAME)
-    assert kit.BOM_ITEMS[spec.PART_NAME] == "2"
-    assert "KIT_POSITION_MM" in inspect.getsource(kit_build)
-    # No view of its own: item 2 shows under item 1 in the plate's face view
-    # at its kit pose, a balloon's room below the rim and above the
-    # isometric (1:2, plate radius half size); the steps say where it fits.
-    assert kit.BOM_DESCRIPTIONS[spec.PART_NAME] == "CONE TIP GEAR PHASING COMB"
-    assert not any(name.startswith("COMB_VIEW") for name in vars(kit))
-    assert kit.COMB_FITTING_LINE in kit.ASSEMBLY_STEPS.splitlines()
-    points = spec.profile_points_mm()
-    top = spec.KIT_POSITION_MM[1] + max(y for _, y in points)
-    bottom = spec.KIT_POSITION_MM[1] + min(y for _, y in points)
-    rim = kit.plate.PLATE_DIA / 2.0
-    # Clear of the rim; its balloon lands beside it, past the isometric.
-    assert -rim - top >= 7.0
-    iso_top = kit.ISO_CENTER[1] + rim / 2000.0
-    assert kit.FRONT_CENTER[1] + bottom / 1000.0 > iso_top + 0.005
