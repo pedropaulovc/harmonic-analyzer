@@ -1881,8 +1881,8 @@ authoring lives in `_drawing_notes`, `_drawing_leader_notes`, `_drawing_gdt`,
 `move_model_dimension` belongs to `_drawing_dimensions`; drawing scripts import
 dimension-transfer helpers there, never from another part's drawing module.
 Hole-callout selection probes live in `_drawing_hole_callout`; annotation style
-and attachment assertions in `_drawing_attachment`; GD&T layout and element
-collection in `_drawing_layout_collect`. Selection, projection, visible edges,
+and attachment assertions in `_drawing_attachment`; GD&T and leader extents in
+`_drawing_annotation_extent`. Selection, projection, visible edges,
 view configurations and sheet creation have separate helpers too. Hidden-line
 policy lives in `_drawing_view_display`. Import the concern that owns the
 operation, never an aggregate facade.

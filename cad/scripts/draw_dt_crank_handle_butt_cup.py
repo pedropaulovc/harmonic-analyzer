@@ -54,7 +54,6 @@ from _drawing_dimensions import (
     set_dimension_callouts,
     set_reference_dimension,
 )
-from _drawing_layout_collect import check_drawing_layout
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -600,8 +599,6 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_POS)
     if add_note(adapter, NOTES_TEXT, *POCKET_NOTE_POS) is None:
         raise RuntimeError("failed to add the pocket and body flag notes")
-    rebuild_drawing(adapter, label="crank-handle-butt-cup layout audit")
-    check_drawing_layout(adapter, layout=SPEC.layout, stem=PART_STEM)
     return await finalize_drawing(
         adapter,
         OUTPUTS,

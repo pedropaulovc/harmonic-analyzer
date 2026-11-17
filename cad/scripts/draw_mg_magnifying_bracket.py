@@ -32,7 +32,6 @@ from _drawing_finish import add_surface_finish
 from _drawing_hidden_sketches import curate_view_dimensions as curate_hidden_dimensions
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_layout_audit import annotation_display
-from _drawing_layout_check import LeaderSegment
 from _drawing_leaders import set_near_side_diameter
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
@@ -42,7 +41,7 @@ from _drawing_view_display import set_hidden_lines_removed
 from _part_properties import part_drawing_unit
 from _hole_callout_thread_class import omit_title_block_thread_class
 from _layout_audit import _display_segments
-from _layout_geometry import Box, Segment, estimate_text_box, segment_box_overlap_length, union_boxes
+from _layout_geometry import Box, LeaderSegment, Segment, estimate_text_box, segment_box_overlap_length, union_boxes
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _surface_finish import surface_finish_by_key

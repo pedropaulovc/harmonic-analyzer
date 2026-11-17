@@ -23,13 +23,7 @@ def _args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("model", type=Path)
     parser.add_argument(
-        "--workload", choices=("layout", "features", "mates"), default="layout"
-    )
-    parser.add_argument(
-        "--layout",
-        choices=("landscape", "portrait"),
-        default="landscape",
-        help="drawing orientation used by the layout workload",
+        "--workload", choices=("features", "mates"), default="features"
     )
     parser.add_argument(
         "--mode",
@@ -52,7 +46,6 @@ async def _run(
     repo: Path,
     workload: str,
     mode: str = "early",
-    layout_name: str = "landscape",
 ) -> dict[str, Any]:
     if not os.environ.get("HARMONIC_COM_SEAT"):
         raise RuntimeError("benchmark must run inside dodo._com_seat")
@@ -133,7 +126,6 @@ async def _run(
             "benchmark.com_dispatch",
             model=str(model_path),
             workload=workload,
-            layout=layout_name,
         ):
             with _telemetry.span("benchmark.connect"):
                 await adapter.connect()
@@ -145,35 +137,7 @@ async def _run(
 
             with _telemetry.span("benchmark.collect"):
                 started = time.perf_counter()
-                if workload == "layout":
-                    import _drawing_layout_collect
-                    from _drawing_types import DRAWING_TEMPLATES, DrawingLayout
-
-                    layout = DrawingLayout(layout_name)
-                    elements, _leaders, _region = (
-                        _drawing_layout_collect.collect_layout_elements(
-                            adapter, layout=layout
-                        )
-                    )
-                    signature = [
-                        [
-                            element.label,
-                            element.kind,
-                            round(element.xmin, 9),
-                            round(element.ymin, 9),
-                            round(element.xmax, 9),
-                            round(element.ymax, 9),
-                            element.scope.value,
-                            element.owner,
-                        ]
-                        for element in elements
-                    ]
-                    item_count = len(elements)
-                    template = DRAWING_TEMPLATES[layout]
-                    workload_data: dict[str, Any] = {
-                        "sheet": [template.width_m, template.height_m]
-                    }
-                elif workload == "features":
+                if workload == "features":
                     result = await adapter.list_features(include_suppressed=True)
                     if not result.is_success:
                         raise RuntimeError(f"feature walk failed: {result.error}")
@@ -243,7 +207,7 @@ async def _run(
 def main() -> int:
     args = _args()
     result = asyncio.run(
-        _run(args.model, args.repo, args.workload, args.mode, args.layout)
+        _run(args.model, args.repo, args.workload, args.mode)
     )
     print(json.dumps(result, sort_keys=True))
     return 0

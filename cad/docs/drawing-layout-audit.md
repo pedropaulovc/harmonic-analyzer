@@ -21,9 +21,10 @@ audits that existed missed real collisions:
 | `_layout_geometry` + `diagnostics/drawing_layout_audit` | 3 drawings | touching text (0.3 mm penetration test); widths counted `<MOD-DIAM>` as ten glyphs; text vs geometry |
 | `draw_harmonic_base` locals | harmonic base sheet 2 | everything off that sheet |
 
-The element audit's 8 mm `NONE`-scope square for every dimension and hole
-callout is gone: `collect_layout_elements` now gives dimensions no box, only
-their leaders, and this audit boxes their text from display data.
+Those partial audits are gone (#2889): this audit is the only one. The element
+audit's single gap, two views printed over each other, is ported as
+`view-overlap`, and the sheets that ran the retired checks enforce the kinds
+those checks gated (`STEM_ENFORCED_KINDS`).
 
 `check_drawing_layout` left `finalize_drawing` in ab28f4e49 (2026-07-24); a
 post-build gate (46e2f8550) was reverted the same day it landed (8cc8040e6).
@@ -166,7 +167,8 @@ only for a dump with no PDF text, i.e. the offline fixtures.
 | `arrow-near-text` | gating | an arrowhead, or an outside arrow's tail (the first 6.35 mm from its tip, the stand-alone tail length on every calibration sheet), within 2 mm (`ARROW_TEXT_CLEARANCE_M`, the fleet's arrow-to-text rule) of another annotation's text. An arrow through the text is `text-on-line` instead, reported once |
 | `extension-near-text` | advisory | an extension line within 2 mm of another annotation's text without running through it: witnesses routinely pass close to neighbouring text (Main's ruling) |
 | `dim-line-crosses-extension-at-text` / `dim-line-crosses-extension` | gating / advisory | a dimension line crossing another dimension's extension line. ASME allows it when unavoidable, so it gates only within 0.5 × text height of either dimension's text (Main's ruling b) |
-| `leader-crosses-view` / `leader-crosses-leader` | gating | as in `_drawing_layout_check` |
+| `leader-crosses-view` / `leader-crosses-leader` | gating | a leader runs through a foreign view's outline (inset 2 mm for `GetOutline` padding; pictorial views exempt), or two annotations' leaders cross transversally (not at a shared terminus) |
+| `view-overlap` | gating | two views' printed footprints (printed edges, else the outline) interpenetrate by more than 1.5 mm on both axes; pictorial views exempt |
 | `outside-border` / `keep-out` | gating | past the zone frame, or inside the title block |
 | `merged-blocks` | gating | two callouts (hole callouts or leadered notes) stacked in one column, x spans overlapping, less than a row pitch (1.59 h, 5.556 mm at 3.5 mm text) apart; supports' `find_merged_blocks` |
 | `tall-block` | gating | a callout (hole callout or leadered note) over four rows (Main's hb-render-4 ruling); supports' `find_tall_callouts`. A free general note is a text block by design |
@@ -237,9 +239,10 @@ datum-origin case replay from the calibration run's dumps.
    The count takes each stem's latest `layout.audit` span on the branch's
    lineage. The set now holds `com-read-errors`, `duplicate-thread-callout`,
    `leader-crosses-leader`, `leader-crosses-section-line`,
-   `leader-through-text`, `line-on-dimension-line`, `line-through-own-text`,
-   `merged-blocks` and `shoulder-crosses-line`. The leader kinds reached zero
-   when #1105 re-placed the callouts.
+   `leader-ink-ambiguous`, `leader-through-text`, `line-on-dimension-line`,
+   `line-through-own-text`, `merged-blocks` and `shoulder-crosses-line`.
+   The leader kinds reached zero when #1105 re-placed the callouts;
+   `leader-ink-ambiguous` read zero on every span for 30 days (#2889).
    The kinds that still fire are held out. `leader-crosses-line` is one:
    amplitude-bar's notch-floor Ra stands under ruling B, and arbor-pedestal's
    tap callout crosses Width, both accepted. `leader-through-own-text` is
@@ -249,17 +252,17 @@ datum-origin case replay from the calibration run's dumps.
    a balloon's short leader has started inside its printed ring
    (drive-train-assembly), and the kind also fires on harmonic-base,
    platen-guide, pinion-pivot-shaft and rocker-arm-support (7 days to
-   2026-09-28). frame-assembly alone enforces it now, with
-   `leader-ink-ambiguous` (`STEM_ENFORCED_KINDS`): its short-leader balloons
-   check their leader start only right after SetPosition, since after the
-   rebuild COM reports the start the fit render left, so the printed leader
-   is their check.
+   2026-09-28). frame-assembly alone enforces it now (`STEM_ENFORCED_KINDS`):
+   its short-leader balloons check their leader start only right after
+   SetPosition, since after the rebuild COM reports the start the fit render
+   left, so the printed leader is their check.
    `view-edges-missing` is
    zero here, but not with the lighter line weights (c45096c90).
-2. **GATE**: one commit, landed before the release cut. It flips the mode and
-   removes the superseded audits: the 6 explicit `check_drawing_layout`
-   calls, the 3 `audit_sheet` calls, `diagnostics/drawing_layout_audit`'s own
-   collector, and `draw_fr_harmonic_base`'s local checks. An allow-list entry
+2. **Retired audits** (#2889): the explicit `check_drawing_layout` calls, the
+   sheet-local `audit_sheet` gates and `draw_fr_harmonic_base`'s callout
+   checks are gone. Each sheet that ran one enforces, via
+   `STEM_ENFORCED_KINDS`, the shared kinds covering what it gated (all at
+   zero on its latest span). REPORT stays the fleet mode; an allow-list entry
    needs a cited ruling.
 
 Not checked:

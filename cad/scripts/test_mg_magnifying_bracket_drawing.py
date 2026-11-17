@@ -16,8 +16,7 @@ import magnifying_bracket_joint_layout as mounting
 import mg_lever_thread_joint as joint
 import mg_magnifying_bracket_spec as spec
 from _drawing_edges import ViewEdge, ViewEdges
-from _drawing_layout_check import DrawableRegion
-from _layout_geometry import Box, Segment, segment_box_overlap_length
+from _layout_geometry import Box, DrawableRegion, Segment, segment_box_overlap_length
 from _inch_wall_limits import WALL_TARGET_MM
 from _printed_tolerance import printed_band_mm
 

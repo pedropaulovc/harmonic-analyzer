@@ -732,7 +732,7 @@ def test_slot_callout_refuses_section_or_station_crowding(
     monkeypatch, collision
 ) -> None:
     from _drawing_annotation_extent import CalloutInk
-    from _drawing_layout_check import LeaderSegment
+    from _layout_geometry import LeaderSegment
 
     section_box = (0.0485, 0.034, 0.0575, 0.062)
     text = (0.073, 0.056, 0.107, 0.080)

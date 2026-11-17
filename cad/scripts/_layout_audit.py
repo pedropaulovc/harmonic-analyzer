@@ -1,19 +1,13 @@
 """The unified drawing layout audit: one sheet's COM dump in, findings out.
 
 Every manufacturing drawing runs this from ``_drawing_common.finalize_drawing``
-on every sheet. It replaces three partial audits that each missed real
-collisions (2026-09-25: MHA-DT-21's "20.8"/"8.42" and "Ø3.26 ⊽ 6.9"/"6.0" text
-runs, ADJUSTER ENTRY crossed by a view edge; MHA-FR-01's datum-origin axis
-through a callout and a leader through "TOP VIEW SCALE 1:4"):
-
-* ``_drawing_layout_check`` boxed every dimension as a +/-4 mm square with no
-  collision scope, so dimension text never met other text;
-* ``_layout_geometry`` + ``diagnostics/drawing_layout_audit`` estimated text
-  WIDTH from character counts (``<MOD-DIAM>`` counted ten glyphs) and only
-  reported text PENETRATING other text by 0.3 mm, so touching text passed;
-* ``draw_harmonic_base``'s local checks were calibrated but ran on one sheet.
-
-None of them compared text with the part's own drawn edges.
+on every sheet. It replaced partial audits that each missed real collisions
+(2026-09-25: MHA-DT-21's "20.8"/"8.42" and "Ø3.26 ⊽ 6.9"/"6.0" text runs,
+ADJUSTER ENTRY crossed by a view edge; MHA-FR-01's datum-origin axis through a
+callout and a leader through "TOP VIEW SCALE 1:4"): an element audit that
+boxed every dimension as a +/-4 mm square, a text audit that estimated text
+WIDTH from character counts, and sheet-local checks. None of them compared
+text with the part's own drawn edges.
 
 This module is SolidWorks-free. The live collector
 (``_drawing_layout_audit.collect_sheet_dumps``) turns each sheet into a plain
@@ -50,21 +44,19 @@ from statistics import median
 from types import MappingProxyType
 from typing import Any, Iterable, Iterator, Mapping, Sequence
 
-from _drawing_layout_check import (
-    DEFAULT_CROSSING_INSET_M,
-    DrawableRegion,
-    LeaderSegment,
-    _proper_crossing,
-)
 from _layout_geometry import (
     ARROW_TEXT_CLEARANCE_M,
     DEFAULT_ADVANCE_RATIO,
+    DEFAULT_CROSSING_INSET_M,
     DEFAULT_TEXT_TOUCH_TOL_M,
     MM,
+    VIEW_OVERLAP_TOL_M,
     AnnotationGeometry,
     Box,
+    DrawableRegion,
     Finding,
     LeaderInkAmbiguity,
+    LeaderSegment,
     Segment,
     SegmentGrid,
     SheetGeometry,
@@ -73,6 +65,7 @@ from _layout_geometry import (
     find_leader_crossings,
     find_text_on_line,
     point_segment_distance,
+    proper_crossing,
     segment_box_distance,
     segment_circle_distance,
     text_overlap,
@@ -2807,7 +2800,7 @@ def find_leader_across_lines(sheet: SheetGeometry) -> list[Finding]:
     leader's last run under the text: MHA-DT-21's 5.56 heel-height line crossed
     the ADJUSTER callout's shoulder (swing's gap diff, class d). Touches (a
     leader landing ON a line) are not crossings -- see
-    ``_drawing_layout_check._proper_crossing``.
+    ``_layout_geometry.proper_crossing``.
 
     Targets are dimension, extension and frame lines (Main's ruling a) and
     section cutting lines (``leader-crosses-section-line``, gating: the MHA-DT-10
@@ -2843,7 +2836,7 @@ def find_leader_across_lines(sheet: SheetGeometry) -> list[Finding]:
             key = (source.label, target.label, (line.x0, line.y0, line.x1, line.y1))
             if target.label == source.label or key in seen:
                 continue
-            point = _proper_crossing(
+            point = proper_crossing(
                 LeaderSegment(source.label, source.kind, leader.x0, leader.y0, leader.x1, leader.y1),
                 LeaderSegment(target.label, target.kind, line.x0, line.y0, line.x1, line.y1),
                 tol=1e-4,
@@ -3381,7 +3374,7 @@ def find_dimension_line_crossings(
             worst = None
             for line in lines:
                 for extension in extensions:
-                    point = _proper_crossing(
+                    point = proper_crossing(
                         LeaderSegment(source.label, source.kind, line.x0, line.y0, line.x1, line.y1),
                         LeaderSegment(target.label, target.kind, extension.x0, extension.y0, extension.x1, extension.y1),
                         tol=1e-4,
@@ -3632,22 +3625,14 @@ def find_lines_on_dimension_lines(sheet: SheetGeometry) -> list[Finding]:
     return findings
 
 
-def find_text_on_view(
-    sheet: SheetGeometry, *, inset: float = DEFAULT_CROSSING_INSET_M
-) -> list[Finding]:
-    """Text printed over a view its annotation does not belong to.
+def _view_footprints(sheet: SheetGeometry, *, inset: float) -> list[tuple[str, Box]]:
+    """Each orthographic view's printed extent: its model edges read from the
+    PDF, or ``GetOutline``'s padded box inset by ``inset`` when none printed.
+    Pictorial views are skipped: their box is mostly empty diagonal space.
 
-    MHA-DT-21's adjuster callout, owned by the front view, printed across the
-    right view's face (swing's gap diff). Text-on-line only sees text that
-    touches an edge; text sitting INSIDE a foreign view, between its edges, is
-    just as wrong (drawing-guidelines.md rule 14 (keep text off the part)). The outline is ``GetOutline``'s padded box,
-    inset like the leader-crossing check; pictorial views are skipped because
-    their box is mostly empty diagonal space.
-
-    A view whose model edges were read from the PDF is bounded by those
-    edges: ``GetOutline`` pads the part by a few millimetres, so a symbol
-    parked beside a view read as over it (knife-mount's Ra 0.8, 2 mm into
-    the outline, 1.5 mm clear of the first edge).
+    ``GetOutline`` pads the part by a few millimetres, so a symbol parked
+    beside a view read as over it (knife-mount's Ra 0.8, 2 mm into the
+    outline, 1.5 mm clear of the first edge); the printed edges do not.
     """
     printed = {
         annotation.owner: list(annotation.segments)
@@ -3660,25 +3645,67 @@ def find_text_on_view(
             continue
         edges = printed.get(view.name)
         if edges:
-            views.append((view.name, Box.from_points([p for s in edges for p in ((s.x0, s.y0), (s.x1, s.y1))])))
+            box = Box.from_points([p for s in edges for p in ((s.x0, s.y0), (s.x1, s.y1))])
+        else:
+            box = Box(
+                view.outline.xmin + inset,
+                view.outline.ymin + inset,
+                view.outline.xmax - inset,
+                view.outline.ymax - inset,
+            )
+        if box.xmin < box.xmax and box.ymin < box.ymax:
+            views.append((view.name, box))
+    return views
+
+
+def find_view_overlaps(
+    sheet: SheetGeometry, *, inset: float = DEFAULT_CROSSING_INSET_M
+) -> list[Finding]:
+    """Two views whose printed extents interpenetrate past VIEW_OVERLAP_TOL_M on
+    both axes: one view dropped onto another. Ported from the retired element
+    audit, the one class no other finder sees: text-on-view and text-on-line
+    judge text, not bare geometry."""
+    findings = []
+    for (name_a, a), (name_b, b) in combinations(_view_footprints(sheet, inset=inset), 2):
+        depth = a.overlaps(b, tol=VIEW_OVERLAP_TOL_M)
+        if depth is None:
             continue
-        views.append(
-            (
-                view.name,
-                Box(
-                    view.outline.xmin + inset,
-                    view.outline.ymin + inset,
-                    view.outline.xmax - inset,
-                    view.outline.ymax - inset,
+        findings.append(
+            Finding(
+                kind="view-overlap",
+                sheet=sheet.name,
+                a=f"view {name_a}",
+                b=f"view {name_b}",
+                detail=(
+                    f"view {name_a!r} {a.format_mm()} overlaps view {name_b!r} "
+                    f"{b.format_mm()} by {depth[0] * MM:.2f}x{depth[1] * MM:.2f}mm"
                 ),
+                at_mm=tuple(value * MM for value in a.center()),
+                move_target_mm=_move_mm(a, b),
+                extra={"depth_x_mm": depth[0] * MM, "depth_y_mm": depth[1] * MM},
             )
         )
+    return findings
+
+
+def find_text_on_view(
+    sheet: SheetGeometry, *, inset: float = DEFAULT_CROSSING_INSET_M
+) -> list[Finding]:
+    """Text printed over a view its annotation does not belong to.
+
+    MHA-DT-21's adjuster callout, owned by the front view, printed across the
+    right view's face (swing's gap diff). Text-on-line only sees text that
+    touches an edge; text sitting INSIDE a foreign view, between its edges, is
+    just as wrong (drawing-guidelines.md rule 14 (keep text off the part)). A
+    view is its printed footprint (``_view_footprints``).
+    """
+    views = _view_footprints(sheet, inset=inset)
     findings = []
     for annotation in sheet.annotations:
         if annotation.kind == "geometry":
             continue
         for name, inner in views:
-            if name == annotation.owner or inner.xmin >= inner.xmax or inner.ymin >= inner.ymax:
+            if name == annotation.owner:
                 continue
             for box in annotation.text_boxes:
                 depth = box.overlaps(inner, tol=0.0)
@@ -3873,6 +3900,7 @@ GATING_KINDS = frozenset(
         "merged-blocks",
         "tall-block",
         "text-on-view",
+        "view-overlap",
     }
 )
 
@@ -3894,14 +3922,16 @@ GATING_KINDS = frozenset(
 # prints it (BALLOON_LEADER_RING_M), which cleared frame-assembly's balloon 5
 # (0.47 mm inside its ring at 20260928T124727673Z) on replay, but it still
 # fires on harmonic-base, platen-guide, pinion-pivot-shaft and
-# rocker-arm-support (7 days to 2026-09-28). "leader-ink-ambiguous" is new and
-# has no fleet count yet.
+# rocker-arm-support (7 days to 2026-09-28). "leader-ink-ambiguous" read zero
+# on all 14,046 layout.audit spans of the 30 days to 2026-11-17 (every stem,
+# every branch), so it joined.
 ENFORCED_KINDS: frozenset[str] = frozenset(
     {
         "com-read-errors",
         "duplicate-thread-callout",
         "leader-crosses-leader",
         "leader-crosses-section-line",
+        "leader-ink-ambiguous",
         "leader-through-text",
         "line-on-dimension-line",
         "line-through-own-text",
@@ -3925,10 +3955,54 @@ ENFORCED_KINDS: frozenset[str] = frozenset(
 # "view-edges-missing": the recorded front/right PDFs used the ambiguous
 # 0.18 mm family, outside the retained calibration and selected template
 # edge bands. Keep this exemption until fleet evidence supports enforcement.
+#
+# The other entries hold each drawing to the checks its recipe ran itself
+# before #2889 retired them: check_drawing_layout's element audit (views,
+# notes and tables against each other, the zone border and the title block;
+# leader-vs-view), the sheet-local audit_sheet gates and harmonic-base's
+# callout check. Each listed kind read zero on the stem's latest layout.audit
+# span (2026-11-13..15) and on every span of the 14 days before, except
+# harmonic-base's text-clearance/tall-block and cone-pivot-post's
+# text-clearance (fixed before 2026-11-13, zero on every span since).
+# "view-overlap" has no fleet count yet: it is the one class only the
+# retired element audit saw.
+_RETIRED_ELEMENT_AUDIT = frozenset(
+    {"outside-border", "keep-out", "text-on-view", "leader-crosses-view", "view-overlap"}
+)
 STEM_ENFORCED_KINDS: Mapping[str, frozenset[str]] = MappingProxyType(
     {
-        "fr-frame-assembly": frozenset({"leader-through-own-text", "leader-ink-ambiguous"}),
+        "fr-frame-assembly": frozenset({"leader-through-own-text"}),
         "sm-knife-mount": GATING_KINDS - {"view-edges-missing"},
+        **dict.fromkeys(
+            (
+                "ch-rocker-arm",
+                "dt-cone-gear",
+                "dt-cone-swing-platform",
+                "dt-cone-tip-bushing",
+                "dt-cone-tip-end-screw",
+                "dt-cone-tip-gear",
+                "dt-crank-handle-butt-cup",
+                "dt-crank-handle-ferrule",
+                "dt-crank-pinion",
+                "dt-drive-train-assembly",
+                "dt-pinion-bracket",
+                "pd-transgear-feed-pinion",
+            ),
+            _RETIRED_ELEMENT_AUDIT,
+        ),
+        "dt-cone-pivot-post": frozenset(
+            {"text-on-line", "text-clearance", "outside-border", "keep-out", "leader-crosses-view"}
+        ),
+        "dt-pinion-arbor": frozenset({"text-on-line", "text-clearance"}),
+        "dt-pinion-arbor-collar": frozenset({"text-on-line", "text-clearance", "duplicate-annotation"}),
+        "pd-transgear-pivot-spacer": frozenset({"text-on-line", "text-clearance"}),
+        **dict.fromkeys(
+            ("pd-transgear-front-bushing", "pd-transgear-rear-bushing"),
+            frozenset(
+                {"text-on-line", "text-clearance", "extension-through-own-text", "duplicate-annotation"}
+            ),
+        ),
+        "fr-harmonic-base": _RETIRED_ELEMENT_AUDIT | {"text-clearance", "tall-block"},
     }
 )
 
@@ -3974,6 +4048,7 @@ def audit_dump(dump: Mapping[str, Any]) -> list[Finding]:
         *find_tall_blocks(dump),
         *on_line,
         *find_text_on_view(sheet),
+        *find_view_overlaps(sheet),
         *find_leader_through_text(sheet),
         *find_ambiguous_leader_ink(sheet),
         *find_lines_through_own_text(sheet),

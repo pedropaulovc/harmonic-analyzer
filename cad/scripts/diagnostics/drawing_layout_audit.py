@@ -1,4 +1,4 @@
-r"""Native SolidWorks-side layout audit for a manufacturing drawing.
+r"""Live sheet-geometry collector for drawing recipes that place annotations.
 
 WHY THIS EXISTS
 ---------------
@@ -54,56 +54,20 @@ Two deliberate non-uses, both documented:
 * ``IView::GetFirstDisplayDimension5`` needs the sheet active;
   ``GetFirstDisplayDimension6`` "obsoletes IView::GetFirstDisplayDimension5 by
   supporting inactive sheets" (``types/IView/GetFirstDisplayDimension6.md``).
-  ``IView::GetAnnotations`` covers dimensions, notes and GD&T in one pass and is
-  already the project's convention (``_drawing_layout_collect._iter_view_annotations``).
+  ``IView::GetAnnotations`` covers dimensions, notes and GD&T in one pass.
 
-WHAT IT REPORTS
----------------
-The five findings in ``_layout_geometry.audit_sheet``: text crossed by a
-foreign line segment, text over text, an annotation outside the inner border or
-inside the title-block keep-out, a leader crossing a foreign view outline or
-another leader, and two views whose callouts are squeezed within one text
-height of each other (the "add a sheet" symptom named by
-``cad/docs/drawing-guidelines.md`` rule 15 (balance the sheet; add a sheet before cramming)).
-
-HOW TO RUN IT
--------------
-Attach-only against the running seat; it never launches SolidWorks, never
-saves, and closes only the document it opened, by path::
-
-    uv run cad/scripts/diagnostics/drawing_layout_audit.py \
-        C:/src/harmonic-analyzer/cad/out/slddrw/fr-tube-frame.SLDDRW \
-        [--json out.json] [--sheet 1]
-
-It takes the machine-global COM seat lock itself (``dodo._com_seat``, the same
-lock every ``doit`` COM task holds) for the whole open-audit-close, so it QUEUES
-behind a running build instead of landing inside it. That is not hygiene: an
-attach-only ``OpenDoc6`` changes the seat's active document, and a sibling part
-build mid-sketch then fails in a plain selection call (``hole wizard hanger stud
-holes: face Select failed`` -- three ``part:fr_top_frame`` builds lost this way on
-2026-09-16 to an unlocked probe opening a drawing every minute or two).
-
-Exit status is 1 when any finding is reported, 0 when the layout is clean.
-
-IN A RECIPE
------------
-The operational win is not the CLI -- it is failing loud BEFORE the export::
-
-    from diagnostics.drawing_layout_audit import audit_document
-
-    findings = audit_document(adapter)
-    if findings:
-        raise RuntimeError(format_findings(findings))
-
-``audit_document`` reads the adapter's already-open drawing, so it costs ten
-seconds instead of a 5-13 minute export round trip.
+WHAT IT IS FOR
+--------------
+``collect_document`` reads the adapter's open drawing into
+``_layout_geometry.SheetGeometry`` objects, which a few recipes measure to
+place text clear of dimension lines before export (cone pivot post, cone
+swing platform, pinion arbor). Layout AUDITING is not done here: every
+drawing's sheets are judged on the exported PDF by ``_layout_audit`` from
+``finalize_drawing`` (cad/docs/drawing-layout-audit.md).
 """
 
 from __future__ import annotations
 
-import argparse
-import json
-import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -112,23 +76,19 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 from _drawing_common import is_pictorial_orientation  # noqa: E402
-from _drawing_layout_check import DrawableRegion  # noqa: E402
 from _drawing_types import DRAWING_TEMPLATES  # noqa: E402
 from _layout_audit import (
     classify_segments as classify_callout_segments,  # noqa: E402
-    replace_text,  # noqa: E402
 )
 from _layout_geometry import (  # noqa: E402
     AnnotationGeometry,
     Box,
-    Finding,
+    DrawableRegion,
     Segment,
     SheetGeometry,
     ViewGeometry,
-    audit_sheet,
     calibrate_advance_ratio,
     estimate_text_box,
-    format_findings,
 )
 import _telemetry  # noqa: E402
 
@@ -172,14 +132,10 @@ _LINE_ROLE = "line"
 
 # swDocumentTypes_e.swDocDRAWING
 _SW_DOC_DRAWING = 3
-# swOpenDocOptions_e: Silent | ReadOnly
-_SW_OPEN_SILENT = 1
-_SW_OPEN_READ_ONLY = 2
 
 # swAnnotationOwner_e.swAnnotationOwner_DrawingSheet -- excludes the sheet
 # format's own frame / zone labels / title-block notes, which are template ink
-# and not the author's to move (same test as
-# ``_drawing_layout_collect.collect_layout_elements``).
+# and not the author's to move.
 _OWNER_DRAWING_SHEET = 1
 
 
@@ -338,7 +294,7 @@ def _display_text_boxes(
     of this display data" (``types/IDisplayData/GetTextPositionAtIndex.md``).
     On drawing annotations that origin is the sheet origin -- the sibling line
     primitives come back in sheet space (measured on this project's hole
-    callouts: ``_drawing_layout_collect._display_dimension_leader_segments``), and a
+    callouts), and a
     text offset expressed against a different origin than the lines it labels
     would make the two unusable together.  The audit asserts the consequence
     rather than the claim: a text box that lands outside the sheet is dropped
@@ -494,7 +450,7 @@ def _note_box(adapter: Any, annotation: Any) -> Box | None:
 def _table_geometry(adapter: Any, table: Any) -> AnnotationGeometry | None:
     """Box a table from its anchor plus its column widths and row heights.
 
-    Same route as ``_drawing_layout_collect._table_element``: the project's tables are
+    The project's tables are
     inserted top-left anchored, so ``IAnnotation::GetPosition`` on the table's
     underlying annotation is the top-left corner and the box grows right and
     DOWN.  A horizontally split table still reports the source table's total
@@ -655,8 +611,7 @@ def _sheet_region(adapter: Any, sheet: Any, *, width: float, height: float):
 def _keep_outs(width: float, height: float) -> tuple[tuple[str, Box], ...]:
     """The title-block keep-out for whichever checked-in template this sheet is.
 
-    Matched by sheet size against ``_drawing_types.DRAWING_TEMPLATES`` -- the
-    same template data ``_drawing_layout_collect.collect_layout_elements`` reserves --
+    Matched by sheet size against ``_drawing_types.DRAWING_TEMPLATES``,
     so a sheet from a foreign template simply gets no keep-out instead of a
     fabricated one.
     """
@@ -808,237 +763,3 @@ def collect_document(adapter: Any, document: Any = None) -> list[SheetGeometry]:
         sheets.append(collect_sheet(adapter, drawing, entries[0], entries[1:]))
     return sheets
 
-
-def audit_document(adapter: Any, document: Any = None) -> list[Finding]:
-    """Every layout finding on every sheet of the adapter's open drawing.
-
-    This is the function a ``draw_*.py`` recipe calls after annotating and
-    BEFORE ``finalize_drawing``: it turns a defect that used to cost a
-    5-13 minute PDF export into a one-second failure with sheet-millimetre
-    coordinates for the fix.  Returns an empty list on a clean layout, and on a
-    drawing with zero annotations.
-    """
-    findings: list[Finding] = []
-    for sheet in collect_document(adapter, document):
-        _telemetry.info(
-            f"sheet {sheet.name!r}: {sheet.width * 1000:.1f} x "
-            f"{sheet.height * 1000:.1f} mm, {len(sheet.views)} view(s), "
-            f"{len(sheet.annotations)} annotation(s), "
-            f"glyph advance {sheet.advance_ratio:.3f}"
-        )
-        findings.extend(audit_sheet(sheet))
-    return findings
-
-
-def describe_sheet(sheet: SheetGeometry) -> str:
-    """The full dump: sheet, border, every view, every annotation box and segment."""
-    lines = [
-        f"sheet {sheet.name!r}: {sheet.width * 1000:.1f} x {sheet.height * 1000:.1f} mm",
-        f"  inner border (zone margins): "
-        f"[{sheet.region.xmin * 1000:.1f},{sheet.region.ymin * 1000:.1f}]..["
-        f"{sheet.region.xmax * 1000:.1f},{sheet.region.ymax * 1000:.1f}]mm",
-        f"  glyph advance ratio: {sheet.advance_ratio:.3f}",
-    ]
-    for name, box in sheet.keep_outs:
-        lines.append(f"  keep-out {name}: {box.format_mm()}")
-    for view in sheet.views:
-        outline = view.outline.format_mm() if view.outline else "(no outline)"
-        lines.append(
-            f"  view {view.name!r}: {outline} scale "
-            f"{view.scale[0]:g}:{view.scale[1]:g} mode {view.display_mode} "
-            f"parent-display={view.uses_parent_display} "
-            f"faceted-hlr={view.faceted_hlr} type={view.view_type}"
-        )
-    for annotation in sheet.annotations:
-        boxes = " ".join(box.format_mm() for box in annotation.text_boxes) or "(no text)"
-        flag = "exact" if annotation.exact else "estimated"
-        lines.append(
-            f"  {annotation.kind} {annotation.label!r} owner={annotation.owner!r} "
-            f"text[{flag}]={boxes}"
-        )
-        if annotation.position is not None:
-            lines.append(
-                f"      GetPosition=({annotation.position[0] * 1000:.2f},"
-                f"{annotation.position[1] * 1000:.2f})mm"
-            )
-        for segment in annotation.segments:
-            lines.append(f"      {segment.role}: {segment.format_mm()}")
-    return "\n".join(lines)
-
-
-def _sheet_to_dict(sheet: SheetGeometry) -> dict[str, object]:
-    return {
-        "name": sheet.name,
-        "size_mm": [sheet.width * 1000, sheet.height * 1000],
-        "border_mm": [
-            sheet.region.xmin * 1000,
-            sheet.region.ymin * 1000,
-            sheet.region.xmax * 1000,
-            sheet.region.ymax * 1000,
-        ],
-        "advance_ratio": sheet.advance_ratio,
-        "keep_outs": [
-            {"name": name, "box_mm": list(box.mm())} for name, box in sheet.keep_outs
-        ],
-        "views": [
-            {
-                "name": view.name,
-                "outline_mm": list(view.outline.mm()) if view.outline else None,
-                "scale": list(view.scale),
-                "display_mode": view.display_mode,
-                "uses_parent_display": view.uses_parent_display,
-                "faceted_hlr": view.faceted_hlr,
-                "type": view.view_type,
-            }
-            for view in sheet.views
-        ],
-        "annotations": [
-            {
-                "label": annotation.label,
-                "kind": annotation.kind,
-                "owner": annotation.owner,
-                "exact_text_box": annotation.exact,
-                "text_boxes_mm": [list(box.mm()) for box in annotation.text_boxes],
-                "position_mm": (
-                    [value * 1000 for value in annotation.position]
-                    if annotation.position
-                    else None
-                ),
-                "segments_mm": [
-                    {
-                        "role": segment.role,
-                        "start_mm": [segment.x0 * 1000, segment.y0 * 1000],
-                        "end_mm": [segment.x1 * 1000, segment.y1 * 1000],
-                    }
-                    for segment in annotation.segments
-                ],
-            }
-            for annotation in sheet.annotations
-        ],
-    }
-
-
-def _attach(adapter: Any, path: Path) -> Any:
-    """Attach to the running seat and open ``path`` read-only and silent.
-
-    Never launches SolidWorks (the seat belongs to whoever is building) and
-    never touches documents it did not open.
-    """
-    import win32com.client
-
-    if __package__:
-        from . import _script_paths  # noqa: F401
-    else:
-        import _script_paths  # noqa: F401
-    from _com import _early_bound
-
-    import pythoncom
-    pythoncom.CoInitialize()
-    app = _early_bound(
-        win32com.client.GetActiveObject("SldWorks.Application"), "ISldWorks"
-    )
-    _telemetry.info(
-        f"attached to SolidWorks pid {int(app.GetProcessID())} "
-        f"revision {app.RevisionNumber()}"
-    )
-    # ``OpenDoc6``'s Errors/Warnings are [out] parameters, and pywin32 returns
-    # them appended to the retval: the call hands back
-    # ``(IModelDoc2, errors, warnings)``, not a document.  Unpacking is not
-    # optional -- a tuple answers every accessor with AttributeError, which
-    # reads exactly like "the drawing has no views".
-    opened = app.OpenDoc6(
-        str(path),
-        _SW_DOC_DRAWING,
-        _SW_OPEN_SILENT | _SW_OPEN_READ_ONLY,
-        "",
-        0,
-        0,
-    )
-    document, errors, warnings = (
-        opened if isinstance(opened, tuple) else (opened, 0, 0)
-    )
-    if document is None:
-        raise RuntimeError(
-            f"failed to open {path} read-only "
-            f"(swFileLoadError_e={errors}, swFileLoadWarning_e={warnings})"
-        )
-    if errors:
-        _telemetry.warn(f"opened {path.name} with swFileLoadError_e={errors}")
-    return app, _early_bound(document, "IModelDoc2")
-
-
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("drawing", type=Path, help="path to a built .SLDDRW")
-    parser.add_argument("--json", type=Path, help="write the full dump as JSON here")
-    parser.add_argument(
-        "--sheet",
-        type=int,
-        help="audit only the Nth sheet (1-based, in GetViews order)",
-    )
-    parser.add_argument(
-        "--quiet",
-        action="store_true",
-        help="report findings only, without the geometry dump",
-    )
-    arguments = parser.parse_args(argv)
-
-    path = arguments.drawing.resolve()
-    if not path.is_file():
-        raise SystemExit(f"no such drawing: {path}")
-    # Attach to the running seat, never launch or recover one.
-    os.environ["HARMONIC_SW_AUTOSTART"] = "0"
-    # Hold the seat for the whole open-audit-close: ``_com_seat`` queues behind any
-    # running doit COM task (and makes them queue behind us), and sets
-    # HARMONIC_COM_SEAT so the adapter's seat guard sees a claimed seat.
-    # dodo is imported here, not at module level: a draw_*.py recipe that calls
-    # audit_document runs inside a doit task that already holds the seat, and
-    # needs none of the task graph.
-    import dodo
-
-    with dodo._com_seat(f"audit:layout {path.stem}"):
-        return _audit_under_seat(arguments, path)
-
-
-def _audit_under_seat(arguments: argparse.Namespace, path: Path) -> int:
-    if arguments.json:
-        # A run that fails must not leave the previous run's dump behind.
-        arguments.json.unlink(missing_ok=True)
-    app, document = _attach(None, path)
-    try:
-        sheets = collect_document(None, document)
-        if arguments.sheet is not None:
-            if not 1 <= arguments.sheet <= len(sheets):
-                raise SystemExit(
-                    f"--sheet {arguments.sheet} out of range (1..{len(sheets)})"
-                )
-            sheets = [sheets[arguments.sheet - 1]]
-        findings: list[Finding] = []
-        for sheet in sheets:
-            if not arguments.quiet:
-                print(describe_sheet(sheet))
-            findings.extend(audit_sheet(sheet))
-        print(f"\n{len(findings)} finding(s):")
-        print(format_findings(findings))
-        if arguments.json:
-            replace_text(
-                arguments.json,
-                json.dumps(
-                    {
-                        "drawing": str(path),
-                        "sheets": [_sheet_to_dict(sheet) for sheet in sheets],
-                        "findings": [finding.to_dict() for finding in findings],
-                    },
-                    indent=2,
-                ),
-            )
-            print(f"wrote {arguments.json}")
-        return 1 if findings else 0
-    finally:
-        # Close ONLY what we opened, by path.  CloseAllDocuments would destroy a
-        # sibling agent's open model in the shared seat.
-        app.CloseDoc(str(path))
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

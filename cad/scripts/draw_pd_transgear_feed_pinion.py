@@ -57,7 +57,6 @@ from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_dimensions import assert_imported_precision
 from _drawing_finish import add_surface_finish
 from _drawing_gdt import add_feature_control_frame
-from _drawing_layout_collect import check_drawing_layout
 from _drawing_leader_notes import add_leader_note
 from _drawing_view_arrow import square_view_arrow
 from _drawing_notes import add_property_linked_note
@@ -1192,8 +1191,6 @@ async def build(adapter: Any) -> dict[str, str]:
         property_name=TOOTH_SPACE_CALLOUT_PROPERTY, note_xy=TOOTH_SPACE_CALLOUT_XY,
     )
     _assert_note_inside_border(toothspace_callout, "toothspace inspection callout")
-    rebuild_drawing(adapter, label="pinion sleeve layout audit")
-    check_drawing_layout(adapter, layout=SPEC.layout, stem=PART_STEM)
     return await finalize_drawing(
         adapter,
         OUTPUTS,

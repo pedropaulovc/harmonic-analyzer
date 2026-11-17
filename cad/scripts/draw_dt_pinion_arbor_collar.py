@@ -35,7 +35,6 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
-    rebuild_drawing,
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
@@ -43,13 +42,11 @@ from _drawing_dimensions import assert_imported_precision, set_dimension_callout
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
-from _layout_geometry import audit_sheet, format_findings
 from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
-from diagnostics.drawing_layout_audit import collect_document
 import dt_vn_pinion_strap_pin_spec as _pin
 from dt_pinion_arbor_collar_spec import (
     ARBOR_NUMBER,
@@ -117,11 +114,6 @@ DIMENSION_CALLOUTS = {
     "BoreDia": f"DRILL THRU\nSLIDES ON {ARBOR_NUMBER}",
     "PinHoleDia": f"{_pin.DRILL_THRU_CALLOUT}\nPRESS FIT ON {PIN_NUMBER} SPRING PIN",
 }
-# Text on a line, text on text and a mark printed twice over itself are
-# defects; leader crossings stay logged.
-BLOCKING_LAYOUT_FINDINGS = frozenset(
-    {"text-on-line", "text-on-text", "duplicate-annotation"}
-)
 # swAnnotationType_e.swCenterMarkSym.  The template centre-marks a view's
 # circles as it is placed; an unconditional auto_center_marks printed a second
 # identical mark over the end view's (layout audit duplicate-annotation,
@@ -183,24 +175,6 @@ def _move_dimension(
     if len(matches) != 1:
         raise RuntimeError(f"{name}: native dimension did not move into target view")
     return matches[0]
-
-
-def _assert_layout_clean(findings: list[Any]) -> None:
-    """Fail the sheet on text over ink; log every other audit finding."""
-    blocking = [f for f in findings if f.kind in BLOCKING_LAYOUT_FINDINGS]
-    advisory = [f for f in findings if f.kind not in BLOCKING_LAYOUT_FINDINGS]
-    if advisory:
-        _telemetry.warn(
-            f"pinion-arbor-collar layout audit: {len(advisory)} advisory finding(s)\n"
-            + format_findings(advisory),
-            advisory=len(advisory),
-        )
-    if blocking:
-        raise RuntimeError(
-            f"pinion-arbor-collar layout audit: {len(blocking)} blocking finding(s)\n"
-            + format_findings(blocking)
-        )
-    _telemetry.success("pinion-arbor-collar layout audit: no text over ink")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -303,11 +277,6 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     add_property_linked_note(adapter, "Isometric View Note", 0.320, 0.160)
-    rebuild_drawing(adapter, label="pinion arbor collar layout audit")
-    _assert_layout_clean(
-        [finding for sheet in collect_document(adapter) for finding in audit_sheet(sheet)]
-    )
-
     return await finalize_drawing(
         adapter,
         OUTPUTS,

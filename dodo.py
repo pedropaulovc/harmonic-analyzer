@@ -4178,9 +4178,7 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         # StartupProcessCompleted, bounded, and exits 89 for recover + retry)
         # and the missing-source-property census (2026-09-28 crank_hub).
         SCRIPTS_DIR / "test_seat_startup_gate.py",
-        # The SolidWorks-free geometry contract for the drawing layout audit
-        # (collision / sheet-overflow logic run before every drawing saves).
-        SCRIPTS_DIR / "test_drawing_layout_check.py",
+
         # The split simplified helpers' shared policy (1:2 boundary, roles,
         # BOM identity, part derivation and simplified re-save fingerprint).
         SCRIPTS_DIR / "test_simplified_helpers.py",

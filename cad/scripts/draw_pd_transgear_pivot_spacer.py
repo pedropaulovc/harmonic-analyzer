@@ -66,13 +66,7 @@ from _layout_audit import (
     polygon_segments,
     polyline_segments,
 )
-from _layout_geometry import (
-    Box,
-    Segment,
-    audit_sheet,
-    format_findings,
-    point_segment_distance,
-)
+from _layout_geometry import Box, Segment, point_segment_distance
 from _machinist_review_mode import MachinistReviewMode
 from _native_axis_datum import _readback as read_native_datum
 from _native_axis_datum import _validate_source_edge as validate_source_axis_edge
@@ -81,7 +75,6 @@ from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
-from diagnostics.drawing_layout_audit import collect_document
 import pd_transgear_pivot_spacer_callouts as callouts
 from pd_transgear_pivot_spacer_spec import (
     BORE_DATUM,
@@ -195,8 +188,6 @@ DATUM_A_LEADER_TOL = 0.0005
 DATUM_A_TRIANGLE_SPAN = 0.005
 # Two leader primitives join where their ends meet within this.
 _JOIN_TOL_M = 1e-5
-# Text on a line and text on text are defects; leader crossings stay logged.
-BLOCKING_LAYOUT_FINDINGS = frozenset({"text-on-line", "text-on-text"})
 
 # Datum A is the bore's axis, put on the end view's bore circle by
 # SolidWorks' native placement, as the disc hub's is.  Each end face's
@@ -691,24 +682,6 @@ def _place_datum_a(
     return tag, rebuilt
 
 
-def _assert_layout_clean(findings: list[Any]) -> None:
-    """Fail the sheet on text over ink; log every other audit finding."""
-    blocking = [f for f in findings if f.kind in BLOCKING_LAYOUT_FINDINGS]
-    advisory = [f for f in findings if f.kind not in BLOCKING_LAYOUT_FINDINGS]
-    if advisory:
-        _telemetry.warn(
-            f"transgear-pivot-spacer layout audit: {len(advisory)} advisory "
-            "finding(s)\n" + format_findings(advisory),
-            advisory=len(advisory),
-        )
-    if blocking:
-        raise RuntimeError(
-            f"transgear-pivot-spacer layout audit: {len(blocking)} blocking "
-            "finding(s)\n" + format_findings(blocking)
-        )
-    _telemetry.success("transgear-pivot-spacer layout audit: no text over ink")
-
-
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -885,14 +858,6 @@ async def build(adapter: Any) -> dict[str, str]:
         set_hidden_lines_removed(adapter, view)
 
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
-    rebuild_drawing(adapter, label="pivot spacer layout audit")
-    _assert_layout_clean(
-        [
-            finding
-            for sheet in collect_document(adapter)
-            for finding in audit_sheet(sheet)
-        ]
-    )
 
     def datum_a_settled() -> None:
         """After the export's last rebuild datum A is still the view's live,

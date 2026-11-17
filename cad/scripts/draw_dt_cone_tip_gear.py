@@ -59,7 +59,6 @@ from _drawing_dimensions import (
 from _drawing_edge_dimensions import add_edge_dimension
 from _drawing_edges import visible_view_entities
 from _drawing_finish import add_surface_finish
-from _drawing_layout_collect import check_drawing_layout
 from _drawing_leader_notes import add_leader_note
 from _drawing_leaders import set_near_side_diameter
 from _drawing_notes import add_property_linked_note
@@ -1056,8 +1055,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(
         adapter, "Manufacturing Notes", *NUMBERED_NOTES_POS, char_height=NOTE_HEIGHT
     )
-    rebuild_drawing(adapter, label="T006 layout audit")
-    check_drawing_layout(adapter, layout=SPEC.layout, stem="cone tip gear T006")
+    rebuild_drawing(adapter, label="T006 sheet")
 
     if not ddoc.ActivateSheet(CUTTER_DETAIL_SHEET):
         raise RuntimeError("failed to activate the T006 tooth-space sheet")
@@ -1092,8 +1090,7 @@ async def build(adapter: Any) -> dict[str, str]:
     sheet = _early_bound(ddoc.GetCurrentSheet(), "ISheet")
     if not sheet.SetScale(*SHEET_SCALES[CUTTER_DETAIL_SHEET], False, False):
         raise RuntimeError("failed to pin the DT6-FORM1 sheet scale")
-    rebuild_drawing(adapter, label="DT6-FORM1 layout audit")
-    check_drawing_layout(adapter, layout=SPEC.layout, stem="cone tip gear DT6-FORM1")
+    rebuild_drawing(adapter, label="DT6-FORM1 sheet")
 
     return await finalize_drawing(
         adapter,

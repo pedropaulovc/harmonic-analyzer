@@ -47,7 +47,6 @@ from _drawing_selection import _select_view_entity
 from _drawing_view_display import set_hidden_lines_removed
 from _gtol_cylinder import CylinderFace
 from _gtol_face_resolve import resolve_faces
-from _layout_geometry import audit_sheet, format_findings
 from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
@@ -1557,9 +1556,8 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to add the pinion arbor's numbered notes")
     add_property_linked_note(adapter, "Isometric View Note", 0.335, 0.255)
     _label_detail(adapter, detail, principal, mark_center)
-    rebuild_drawing(adapter, label="pinion arbor layout audit")
+    rebuild_drawing(adapter, label="pinion arbor detail fence")
     sheets = collect_document(adapter)
-    _assert_no_text_on_line([f for sheet in sheets for f in audit_sheet(sheet)])
     fence_center = model_point_in_view(
         adapter,
         principal,
@@ -1643,46 +1641,6 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _assert_outline_unbroken(PNG, witness_spans, sheet_size)
     return outputs
-
-
-# Text on text joined the gate with the bond-zone callout's move above the
-# shaft, beside the DETAIL A label (63468ee9 read 0 advisory findings).
-# Leader on leader joined with the back Ra symbol's move above the shaft: at
-# c6eb7f6f its shoulder crossed the back land's 19.0 witness (Main).
-BLOCKING_LAYOUT_FINDINGS = frozenset(
-    {"text-on-line", "text-on-text", "leader-crosses-leader"}
-)
-
-
-def _assert_no_text_on_line(findings: list[Any]) -> None:
-    """Fail the sheet when any annotation's text sits on another's line or text.
-
-    Main's eye-pass of 30620a85 found the back-crown and overall witnesses
-    running through the back journal's "8.00" and "JOURNAL".  The native audit
-    reads every dimension's rendered witness, dimension and leader segments, so
-    that defect is now a build failure with sheet-millimetre fix coordinates.
-    Text on text is gated too, since the bond-zone callout moved above the
-    shaft beside the DETAIL A label.  The audit's other finding kinds are
-    logged, not gated: a diametric leader crossing another inside a detail
-    is conventional ink.
-    """
-    blocking = [f for f in findings if f.kind in BLOCKING_LAYOUT_FINDINGS]
-    advisory = [f for f in findings if f.kind not in BLOCKING_LAYOUT_FINDINGS]
-    if advisory:
-        _telemetry.warn(
-            f"pinion-arbor layout audit: {len(advisory)} advisory finding(s)\n"
-            + format_findings(advisory),
-            advisory=len(advisory),
-        )
-    if blocking:
-        raise RuntimeError(
-            f"pinion-arbor layout audit: {len(blocking)} blocking finding(s)\n"
-            + format_findings(blocking)
-        )
-    _telemetry.success(
-        f"pinion-arbor layout audit: no text on a foreign line or text "
-        f"({len(advisory)} advisory)"
-    )
 
 
 FENCE_TOL_M = 0.0002

@@ -1,8 +1,8 @@
 """SolidWorks-free contract for the annotation-level layout geometry.
 
 ``_layout_geometry`` decides whether a dimension's TEXT collides with another
-annotation's ink, with another text box, with the border, or whether two views'
-callout clusters interleave.  Those decisions are pure arithmetic on sheet-space
+annotation's ink or the border, and whether leaders cross.  Those decisions
+are pure arithmetic on sheet-space
 boxes and segments, so they are pinned here without a COM seat; the live
 collection that feeds them lives in
 ``diagnostics/drawing_layout_audit.collect_document``.
@@ -17,21 +17,20 @@ import math
 
 import pytest
 
-from _drawing_layout_check import DrawableRegion
 from _layout_geometry import (
     DEFAULT_ADVANCE_RATIO,
     AnnotationGeometry,
     Box,
+    DrawableRegion,
     Segment,
     SheetGeometry,
     ViewGeometry,
-    audit_sheet,
     calibrate_advance_ratio,
     clip_segment_to_box,
     estimate_text_box,
+    find_border_breaches,
+    find_leader_crossings,
     find_text_on_line,
-    find_text_on_text,
-    find_view_crowding,
     segment_box_overlap_length,
 )
 
@@ -219,24 +218,9 @@ def test_an_annotations_own_dimension_line_never_collides_with_its_own_text():
     assert find_text_on_line(_sheet([own])) == []
 
 
-def test_two_callouts_printing_on_each_other_are_reported_once():
-    first = _text("D1", Box(0.100, 0.100, 0.120, 0.104))
-    second = _text("D2", Box(0.110, 0.101, 0.130, 0.105))
-    findings = find_text_on_text(_sheet([first, second]))
-    assert len(findings) == 1
-    assert findings[0].extra["depth_x_mm"] == pytest.approx(10.0)
-    assert findings[0].extra["depth_y_mm"] == pytest.approx(3.0)
-
-
-def test_text_boxes_that_merely_abut_are_not_a_collision():
-    first = _text("D1", Box(0.100, 0.100, 0.120, 0.104))
-    second = _text("D2", Box(0.120, 0.100, 0.140, 0.104))
-    assert find_text_on_text(_sheet([first, second])) == []
-
-
 def test_annotation_crossing_the_inner_border_is_reported_with_the_side():
     escaping = _text("NOTE1", Box(0.005, 0.100, 0.030, 0.104))
-    findings = [f for f in audit_sheet(_sheet([escaping])) if f.kind == "outside-border"]
+    findings = [f for f in find_border_breaches(_sheet([escaping])) if f.kind == "outside-border"]
     assert len(findings) == 1
     assert findings[0].b == "left border"
     assert findings[0].extra["breach_mm"] == pytest.approx(7.7)
@@ -251,86 +235,13 @@ def test_annotation_inside_the_title_block_keep_out_is_reported():
         keep_outs=(("title-block", Box(0.216, 0.0, SHEET_W, 0.066)),),
         annotations=(_text("D9", Box(0.300, 0.040, 0.320, 0.044)),),
     )
-    findings = [f for f in audit_sheet(sheet) if f.kind == "keep-out"]
+    findings = [f for f in find_border_breaches(sheet) if f.kind == "keep-out"]
     assert len(findings) == 1
     assert findings[0].b == "title-block"
 
 
-def test_callouts_of_two_views_within_a_text_height_mean_add_a_sheet():
-    """drawing-guidelines.md rule 14 (keep text off the part)'s diagnostic symptom, which no box-vs-box audit was watching for.
-
-    Each view's callouts may legitimately crowd THAT view; the defect is one
-    view's callout squeezed against another view's callout.
-    """
-    section = [_text("S1", Box(0.100, 0.100, 0.130, 0.104), owner="Section A-A")]
-    detail = [_text("T1", Box(0.132, 0.100, 0.150, 0.104), owner="Detail B")]
-    findings = find_view_crowding(_sheet(section + detail))
-    assert len(findings) == 1
-    assert {findings[0].a, findings[0].b} == {"S1", "T1"}
-    assert findings[0].extra["gap_mm"] == pytest.approx(2.0)
-    assert "another sheet" in findings[0].detail
-
-
-def test_one_finding_per_view_pair_naming_the_closest_callouts():
-    """A dense pair of views must not emit a finding per callout combination."""
-    section = [
-        _text("S1", Box(0.100, 0.100, 0.130, 0.104), owner="Section A-A"),
-        _text("S2", Box(0.100, 0.120, 0.130, 0.124), owner="Section A-A"),
-    ]
-    detail = [
-        _text("T1", Box(0.133, 0.100, 0.150, 0.104), owner="Detail B"),
-        _text("T2", Box(0.131, 0.120, 0.150, 0.124), owner="Detail B"),
-    ]
-    findings = find_view_crowding(_sheet(section + detail))
-    assert len(findings) == 1
-    assert {findings[0].a, findings[0].b} == {"S2", "T2"}
-    assert findings[0].extra["gap_mm"] == pytest.approx(1.0)
-
-
-def test_a_view_whose_callouts_straddle_another_view_is_not_crowding():
-    """Measured on tube-frame: union-box clusters invent a collision.
-
-    'Drawing View1' owns a note at the top of the sheet and dimensions at the
-    bottom, so its union box spans 320 mm of sheet it does not occupy, and any
-    callout of a second view inside that span looked like interleaving.
-    """
-    tall = [
-        _text("D1", Box(0.060, 0.079, 0.090, 0.083), owner="Drawing View1"),
-        _text("N1", Box(0.060, 0.395, 0.115, 0.400), owner="Drawing View1"),
-    ]
-    other = [_text("R1", Box(0.152, 0.368, 0.248, 0.389), owner="Drawing View2")]
-    assert find_view_crowding(_sheet(tall + other)) == []
-
-
-def test_overlapping_callouts_are_left_to_the_text_on_text_finding():
-    left = [_text("S1", Box(0.100, 0.100, 0.130, 0.104), owner="Front")]
-    right = [_text("T1", Box(0.120, 0.100, 0.150, 0.104), owner="Top")]
-    assert find_view_crowding(_sheet(left + right)) == []
-
-
-def test_well_separated_view_callouts_are_clean():
-    left = [_text("S1", Box(0.050, 0.100, 0.080, 0.104), owner="Front")]
-    right = [_text("T1", Box(0.200, 0.100, 0.230, 0.104), owner="Top")]
-    assert find_view_crowding(_sheet(left + right)) == []
-
-
-def test_sheet_annotations_are_not_clustered_into_a_view():
-    """The general-notes block belongs to the sheet, not to any view's cluster."""
-    notes = [_text("NOTE1", Box(0.050, 0.100, 0.150, 0.150), owner="sheet")]
-    view = [_text("D1", Box(0.060, 0.110, 0.080, 0.114), owner="Front")]
-    assert find_view_crowding(_sheet(notes + view)) == []
-
-
-def test_a_sheet_with_no_annotations_audits_clean():
-    """The audit must be safe on a drawing that has not been annotated yet."""
-    sheet = _sheet(
-        [], views=(ViewGeometry("Front", Box(0.050, 0.050, 0.150, 0.150)),)
-    )
-    assert audit_sheet(sheet) == []
-
-
 def test_leader_crossing_a_foreign_view_is_reported_through_the_shared_audit():
-    """Leader routing stays ``_drawing_layout_check``'s question, and still fires."""
+    """A leader running across a foreign view is reported."""
     views = (
         ViewGeometry("Front", Box(0.050, 0.050, 0.150, 0.150)),
         ViewGeometry("Top", Box(0.200, 0.050, 0.300, 0.150)),
@@ -343,14 +254,13 @@ def test_leader_crossing_a_foreign_view_is_reported_through_the_shared_audit():
         # Runs from the Top view's text back across the whole Front view.
         segments=(Segment(0.320, 0.102, 0.060, 0.102, "leader"),),
     )
-    findings = audit_sheet(_sheet([crossing], views=views))
+    findings = find_leader_crossings(_sheet([crossing], views=views))
     assert any(finding.kind == "leader-crosses-view" for finding in findings)
 
 
 def test_leader_clipping_a_pictorial_view_is_not_a_crossing():
-    """The shared contract gives pictorial outlines ``CollisionScope.NONE`` (an
-    isometric's box is mostly empty diagonal space); the annotation-level audit
-    must honour it instead of defaulting every view to ``ALL``."""
+    """A pictorial outline is not an obstacle: an isometric's box is mostly
+    empty diagonal space."""
     views = (
         ViewGeometry("Isometric", Box(0.050, 0.050, 0.150, 0.150), pictorial=True),
         ViewGeometry("Top", Box(0.200, 0.050, 0.300, 0.150)),
@@ -362,14 +272,14 @@ def test_leader_clipping_a_pictorial_view_is_not_a_crossing():
         text_boxes=(Box(0.320, 0.100, 0.340, 0.104),),
         segments=(Segment(0.320, 0.102, 0.060, 0.102, "leader"),),
     )
-    findings = audit_sheet(_sheet([crossing], views=views))
+    findings = find_leader_crossings(_sheet([crossing], views=views))
     assert not any(finding.kind == "leader-crosses-view" for finding in findings)
 
 
 def test_a_hole_callouts_attach_run_is_leader_even_where_it_misses_its_text():
     """swing, #902 case 2: collect_document promoted only the run touching the
     text, so MHA-DT-20 RD1's rim-to-shelf diagonal (S1 @ ac4fa6dd0 dump) stayed
-    "line" and a leader crossing it passed audit_sheet. A hole callout's
+    "line" and a leader crossing it passed the leader audit. A hole callout's
     display lines are all leader."""
     from diagnostics.drawing_layout_audit import _classify_segments
 
@@ -401,7 +311,7 @@ def test_a_hole_callouts_attach_run_is_leader_even_where_it_misses_its_text():
     views = (ViewGeometry("v", Box(0.050, 0.050, 0.260, 0.260)),)
 
     def crossings(callout):
-        findings = audit_sheet(_sheet([callout, rd3], views=views))
+        findings = find_leader_crossings(_sheet([callout, rd3], views=views))
         return [(f.a, f.b) for f in findings if f.kind == "leader-crosses-leader"]
 
     assert crossings(rd1)

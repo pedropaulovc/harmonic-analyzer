@@ -20,7 +20,6 @@ import mg_magnifying_lever_geom as geom
 import mg_magnifying_lever_spec as spec
 import _drawing_leader_notes as leader_notes
 import _drawing_dimension_import as dimension_import
-from _drawing_layout_check import DrawableRegion
 from _drawing_types import DRAWING_TEMPLATES
 from _layout_audit import (
     find_leader_across_lines,
@@ -33,12 +32,12 @@ from _layout_geometry import (
     ARROW_TEXT_CLEARANCE_M,
     AnnotationGeometry,
     Box,
+    DrawableRegion,
     segment_box_distance,
     Segment,
     SheetGeometry,
     find_border_breaches,
     find_text_on_line,
-    find_text_on_text,
 )
 
 
@@ -1011,7 +1010,6 @@ def _assert_detail_thread_ink_routes(annotations, native_note, project, detail):
     wrapped = AnnotationGeometry(label=unwrapped.label, kind="note", owner="detail", text_boxes=rows)
     after = SheetGeometry("Sheet1", template.width_m, template.height_m, region, annotations=(length, incomplete, wrapped))
     assert find_text_on_line(after) == []
-    assert find_text_on_text(after) == []
     assert find_border_breaches(after) == []
     # The rows sit wholly under the rod: the leader rises to its near edge.
     assert max(row.ymax for row in rows) < project(None, detail, (0.0, bottom, 0.0))[1]
@@ -1127,7 +1125,6 @@ def _assert_finish_ink_routes(annotations, finish, seat_note_xy, project, front)
     after = sheet(rod_dia, new_finish, seat_label, thread_note, parent_a, free_end)
     assert find_leader_across_lines(after) == []
     assert find_text_on_line(after) == []
-    assert find_text_on_text(after) == []
     assert find_leader_through_text(after) == []
     assert find_border_breaches(after) == []
     moved = {rod_dia.label, new_finish.label, seat_label.label}

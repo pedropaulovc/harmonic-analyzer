@@ -19,7 +19,7 @@ import _config
 import _component_references
 import _drawing_balloons
 import _drawing_tables
-from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
+from _layout_geometry import LeaderSegment, find_leader_leader_crossings
 from _printed_tolerance import printed_band_mm
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_types import DRAWING_TEMPLATES
@@ -1050,7 +1050,7 @@ def test_the_inner_ring_knob_pair_from_run_222629_swaps_when_touching(offset_m) 
     """Run 20261023T222629630Z's audit: inner-view balloons 36 (knob shaft) and
     40 (cup pin) crossed 0.115 mm past 36's attachment after the final rebuild;
     within the 0.1 mm touch tolerance at uncross time no swap was made."""
-    from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
+    from _layout_geometry import LeaderSegment, find_leader_leader_crossings
 
     start_40, end_40 = (0.2453, 0.1719), (0.2317, 0.1763)
     dx, dy = end_40[0] - start_40[0], end_40[1] - start_40[1]

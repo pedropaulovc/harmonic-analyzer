@@ -23,43 +23,19 @@ Never render to find out where things are. Render to confirm what you already
 measured.
 
 1. **Author** the views and annotations as usual.
-2. **Audit the live document** before export:
+2. **Read the layout audit** of the leaf run: `finalize_drawing` writes
+   `reports/layout-audit/<stem>.json`, every finding with its boxes in sheet
+   millimetres (see [drawing-layout-audit.md](drawing-layout-audit.md)).
+3. **Fix by coordinates.** Convert the finding's sheet mm to metres (`/1000`)
+   and set the position; rebuild the leaf. Do not nudge by trial.
+4. **Eyeball the render** for what geometry cannot judge (balance, emphasis,
+   readability).
 
-   ```python
-   from diagnostics.drawing_layout_audit import audit_document
-   from _layout_geometry import format_findings
-
-   findings = audit_document(adapter)
-   if findings:
-       raise RuntimeError("layout:\n" + format_findings(findings))
-   ```
-
-   Ten seconds, on the open document, in sheet millimetres. The 5-13 minute
-   PDF/PNG export is not a layout tool.
-3. **Fix by coordinates.** Every finding carries the offending boxes in sheet mm
-   and a `try SetPosition2(x, y, 0.0)` starting point. Convert mm to metres
-   (`/1000`) and set the position; re-audit. Do not nudge by trial.
-4. **Export once**, at the end, and eyeball the render for what geometry cannot
-   judge (balance, emphasis, readability).
-
-Standalone, on a built drawing, without touching a recipe:
-
-```bash
-uv run cad/scripts/diagnostics/drawing_layout_audit.py \
-  cad/out/slddrw/<part>.SLDDRW [--json dump.json] [--sheet N] [--quiet]
-```
-
-It holds the machine-global COM seat lock (`dodo._com_seat`) for the whole
-open-audit-close, so it queues behind a running `doit` build instead of landing
-inside it. Never bypass that with a bare attach: an attach-only `OpenDoc6`
-changes the seat's active document and a sibling part build mid-sketch dies in a
-plain selection call (three `part:top_frame` builds were lost that way on
-2026-09-16 to an unlocked probe). Any read-only COM probe you write gets the
-same `with dodo._com_seat("<label>"):` wrapper.
-
-Exit 1 means findings. The dump lists, per sheet: size, inner border from
-`ISheet::GetZoneMargin`, the title-block keep-out, every view's outline / scale /
-display mode, and every annotation's text box, `GetPosition`, and line segments.
+Any read-only COM probe you write on a built drawing takes the machine-global
+seat lock (`with dodo._com_seat("<label>"):`): an attach-only `OpenDoc6`
+changes the seat's active document, and a sibling part build mid-sketch dies in
+a plain selection call (three `part:top_frame` builds were lost that way on
+2026-09-16 to an unlocked probe).
 
 ## REPORT findings versus per-drawing enforcement
 
@@ -937,8 +913,7 @@ Every one of these produced a plausible-looking wrong answer instead of an error
   declares (the late-binding fallback was deliberately removed). `GetViews` is
   `IDrawingDoc`; `GetAnnotations`/`GetOutline` are `IView`; `GetExtent` is
   `INote`; `GetProperties2` is `ISheet`. Bind the owning interface at each hop.
-  The registered [`test_drawing_layout_check.py`](../scripts/test_drawing_layout_check.py)
-  contracts use explicit producer owners and closed interface member surfaces,
+  Contract tests use explicit producer owners and closed interface member surfaces,
   never identity-cast fallbacks. Notes, annotations and text formats stay separate;
   a sketch profile may support both segment and arc QI, but each binding exposes
   only its own methods. Wrong-owner returns injected into the actual note factory,

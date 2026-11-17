@@ -39,7 +39,6 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
-    rebuild_drawing,
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
@@ -49,14 +48,12 @@ from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _gear_drawing_entities import visible_circle_edge
-from _layout_geometry import audit_sheet, format_findings
 from _machinist_review_mode import MachinistReviewMode
 from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
-from diagnostics.drawing_layout_audit import collect_document
 from pd_transgear_front_bushing_spec import (
     BORE_CALLOUT,
     BORE_DIA,
@@ -168,16 +165,6 @@ BORE_FINISH_ATTACH = (
 BORE_FINISH_SYMBOL = (END_CENTER[0] - OD * _S / 2.0 - 0.022, END_CENTER[1] - 0.012)
 FINISH_CHAR_HEIGHT = 0.0025
 ISO_NOTE_XY = (0.315, 0.145)
-# Text over ink, an extension line through its own text and a mark printed
-# twice are defects; leader crossings stay logged.
-BLOCKING_LAYOUT_FINDINGS = frozenset(
-    {
-        "text-on-line",
-        "text-on-text",
-        "extension-through-own-text",
-        "duplicate-annotation",
-    }
-)
 
 
 def _move_dimension(
@@ -254,24 +241,6 @@ def _mark_bore_axis(adapter: Any, view: Any) -> None:
     draw.ClearSelection2(True)
     if mark is None:
         raise RuntimeError("failed to centre-mark the bushing bore")
-
-
-def _assert_layout_clean(findings: list[Any]) -> None:
-    """Fail the sheet on text over ink; log every other audit finding."""
-    blocking = [f for f in findings if f.kind in BLOCKING_LAYOUT_FINDINGS]
-    advisory = [f for f in findings if f.kind not in BLOCKING_LAYOUT_FINDINGS]
-    if advisory:
-        _telemetry.warn(
-            f"transgear-front-bushing layout audit: {len(advisory)} advisory "
-            "finding(s)\n" + format_findings(advisory),
-            advisory=len(advisory),
-        )
-    if blocking:
-        raise RuntimeError(
-            f"transgear-front-bushing layout audit: {len(blocking)} blocking "
-            "finding(s)\n" + format_findings(blocking)
-        )
-    _telemetry.success("transgear-front-bushing layout audit: no text over ink")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -404,15 +373,6 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
-    rebuild_drawing(adapter, label="front bushing layout audit")
-    _assert_layout_clean(
-        [
-            finding
-            for sheet in collect_document(adapter)
-            for finding in audit_sheet(sheet)
-        ]
-    )
-
     return await finalize_drawing(
         adapter,
         OUTPUTS,

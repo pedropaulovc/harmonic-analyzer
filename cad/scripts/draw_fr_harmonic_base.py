@@ -33,7 +33,6 @@ from typing import Any, NamedTuple
 
 from solidworks_mcp.adapters.com_variant import dispatch_array
 from solidworks_mcp.adapters.solidworks.drawing import (
-    _note_text,
     add_note,
     auto_center_marks,
     dimension_name,
@@ -66,14 +65,10 @@ from _drawing_hidden_sketches import (
     curate_view_dimensions as curate_hidden_owner_dimensions,
 )
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
-from _drawing_layout_check import DrawableRegion
-from _drawing_layout_collect import _iter_tables, _iter_view_annotations
 from _drawing_leaders import set_near_side_diameter
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
-from _drawing_types import DRAWING_TEMPLATES
 from _drawing_sections import create_section_view
-from _drawing_sheet_region import sheet_drawable_region
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_tables import create_view_theoretical_datum, insert_hole_table
 from _drawing_view_display import set_hidden_lines_removed
@@ -262,9 +257,9 @@ def socket_note(tags: list[str]) -> str:
 # character and 4.6 mm per row, the text hanging from its top-left anchor.
 NOTE_CHAR_M = 0.00249
 NOTE_ROW_M = 0.0046
-# Sheet-2 hole callout text anchors. _check_hole_sheet_callouts proves each
-# clears the others, the notes, the table, the table's datum origin and every
-# view's casting outline, and that no leader runs through another text.
+# Sheet-2 hole callout text anchors. The layout audit proves each clears the
+# others, the notes, the table, the table's datum origin and every view, and
+# that no leader runs through another text (``STEM_ENFORCED_KINDS``).
 # SolidWorks centres a callout's text block on its anchor, 1 mm below it
 # (hb-callout-cal display data), so the four-line transfer blocks share the
 # 0.252 row and grow evenly, with no upward nudge towards the frame. The
@@ -286,7 +281,7 @@ PEDESTAL_CALLOUT_XY = (0.200, 0.252)
 BLOCK_CALLOUT_XY = (0.272, 0.252)
 SPRING_CALLOUT_XY = (0.315, 0.1428)
 # Sheet 5's cross-tap and clearance callouts stand over the front view
-# (HOLE_SIDE_CENTER), checked there by _check_hole_sheet_callouts. A callout
+# (HOLE_SIDE_CENTER). A callout
 # block centres on its anchor and its shoulder runs about 8.4 mm below it,
 # here about 6 mm over the view's top edge. The tap block's right shoulder
 # end stops 24 mm short of the +X axis, so its leader drops onto the tap's far
@@ -1494,125 +1489,8 @@ def _log_tapped_hole_notes(adapter: Any, ddoc: Any) -> None:
     )
 
 
-# Sheet 2's native hole callouts are display dimensions, which the shared
-# layout audit boxes only as a nominal square around their text anchor
-# (_drawing_common._dim_element, NONE scope). So the MHA-DT-02/MHA-DT-18 transfer
-# callouts running into each other, and the MHA-DT-24 callout struck through by
-# the plan outline, both passed it (hb-notes-2 eye pass, 2026-09-25). This
-# drawing-local check boxes each callout from its own display data and fails
-# on any clash; it stays out of _drawing_common so no other drawing re-keys.
-CALLOUT_CLEARANCE_M = 0.001
-# Two callout blocks stacked in one column read as one block unless the gap
-# between them is wider than the spacing between their own rows; the
-# spring block 1.7 mm over the cross-tap block read as its fourth row
-# (hb-render-4 eye pass). SolidWorks sets rows 5.556 mm apart at 3.5 mm.
-CALLOUT_ROW_PITCH_M = 0.005556
-# The drawing policy's note rule: a text block runs to four rows at most.
-CALLOUT_ROW_LIMIT = 4
-_LAYOUT_LABEL_WORDS = ("SCALE", "SECTION")  # view labels among a view's notes
-
-Box = tuple[float, float, float, float]
-
-
-def box_gap(a: Box, b: Box) -> float:
-    """Clearance between two (xmin, ymin, xmax, ymax) boxes; negative on overlap."""
-    return max(a[0] - b[2], b[0] - a[2], a[1] - b[3], b[1] - a[3])
-
-
-def find_callout_clashes(
-    callouts: dict[str, Box],
-    obstacles: dict[str, Box],
-    clearance: float = CALLOUT_CLEARANCE_M,
-) -> list[str]:
-    """Every callout pair, and every callout-obstacle pair, closer than
-    ``clearance`` (sheet metres), named with its clearance in mm."""
-    findings = []
-    names = sorted(callouts)
-    for index, name in enumerate(names):
-        others = [(f"callout {other}", callouts[other]) for other in names[index + 1 :]]
-        others += sorted(obstacles.items())
-        for other, other_box in others:
-            gap = box_gap(callouts[name], other_box)
-            if gap < clearance:
-                findings.append(f"callout {name} vs {other}: clearance {gap * 1000.0:.1f} mm")
-    return findings
-
-
-def find_merged_blocks(
-    callouts: dict[str, Box], min_gap: float = CALLOUT_ROW_PITCH_M
-) -> list[str]:
-    """Every pair of callouts stacked in one column (their x spans overlap)
-    with less than ``min_gap`` between them, so they read as one block."""
-    findings = []
-    names = sorted(callouts)
-    for index, name in enumerate(names):
-        a = callouts[name]
-        for other in names[index + 1 :]:
-            b = callouts[other]
-            if min(a[2], b[2]) <= max(a[0], b[0]):
-                continue
-            gap = max(a[1] - b[3], b[1] - a[3])
-            if gap < min_gap:
-                findings.append(
-                    f"callout {name} over callout {other}: {gap * 1000.0:.1f} mm apart, "
-                    f"under the {min_gap * 1000.0:.1f} mm row pitch"
-                )
-    return findings
-
-
-def find_tall_callouts(
-    rows: dict[str, dict[str, Box]], limit: int = CALLOUT_ROW_LIMIT
-) -> list[str]:
-    """Every callout whose text runs over ``limit`` rows."""
-    return [
-        f"callout {label} runs {len(label_rows)} rows, over the {limit}-row note rule"
-        for label, label_rows in sorted(rows.items())
-        if len(label_rows) > limit
-    ]
-
-
-def frame_obstacles(
-    sheet_size: tuple[float, float],
-    drawable: DrawableRegion,
-    title_block_corner: tuple[float, float],
-) -> dict[str, Box]:
-    """The sheet frame as obstacle boxes: the four border bands outside the
-    drawable region (the zone band that carries the frame line), and the
-    title block from its top-left corner down to the sheet's bottom right."""
-    width, height = sheet_size
-    xmin, ymin, xmax, ymax = drawable.xmin, drawable.ymin, drawable.xmax, drawable.ymax
-    left, top = title_block_corner
-    return {
-        "frame left": (0.0, 0.0, xmin, height),
-        "frame right": (xmax, 0.0, width, height),
-        "frame bottom": (0.0, 0.0, width, ymin),
-        "frame top": (0.0, ymax, width, height),
-        "title block": (left, 0.0, width, top),
-    }
-
-
-def _sheet_frame_obstacles(adapter: Any, ddoc: Any) -> dict[str, Box]:
-    """frame_obstacles for the active sheet: its zone margins read live, its
-    title block from the checked-in template."""
-    template = DRAWING_TEMPLATES[SPEC.layout]
-    sheet = ddoc.GetCurrentSheet()
-    if sheet is None:
-        raise RuntimeError("callout check found no current sheet")
-    region = sheet_drawable_region(
-        adapter, sheet, width=template.width_m, height=template.height_m
-    )
-    return frame_obstacles(
-        (template.width_m, template.height_m),
-        region,
-        (template.title_block_left_m, template.title_block_top_m),
-    )
-
-
 Segment = tuple[float, float, float, float]  # x0, y0, x1, y1 in sheet metres
 
-# The hole table's datum origin draws "0", "X" and "Y" labels one character
-# past its axis segments; one callout text height covers them.
-DATUM_LABEL_PAD_M = 0.0035
 # swLeaderSide_e (R2026x swconst.dll): which end of the shoulder the leader
 # leaves from.
 _LEADER_SIDE_LEFT = 1
@@ -1675,173 +1553,6 @@ def leader_sides(lines: list[Segment], label: str) -> tuple[int, int]:
     return attached, nearest
 
 
-def segment_crosses_box(segment: Segment, box: Box) -> bool:
-    """True when any part of ``segment`` lies inside ``box`` (Liang-Barsky)."""
-    x0, y0, x1, y1 = segment
-    dx, dy = x1 - x0, y1 - y0
-    low, high = 0.0, 1.0
-    for p, q in ((-dx, x0 - box[0]), (dx, box[2] - x0), (-dy, y0 - box[1]), (dy, box[3] - y0)):
-        if p == 0.0:
-            if q < 0.0:
-                return False
-            continue
-        t = q / p
-        if p < 0.0:
-            low = max(low, t)
-        else:
-            high = min(high, t)
-        if low > high:
-            return False
-    return True
-
-
-# A leader leaves its shoulder at the corner of the text row sitting on it,
-# so its own rows are tested shrunk by this much: the joint touches the row's
-# corner without running through its text.
-OWN_ROW_INSET_M = 0.0002
-
-
-def callout_text_rows(
-    lines: list[Segment], texts: list[tuple[str, list[float], float]], label: str
-) -> dict[str, Box]:
-    """A callout's text rows as boxes, keyed by their text. SolidWorks centres
-    every row on the shoulder, which spans the widest one, so a row runs from
-    its first item's lower-left to the mirror of that point about the
-    shoulder's midpoint, and up one text height."""
-    shoulders = [line for line in lines if _is_shoulder(line)]
-    if not shoulders or not texts:
-        raise RuntimeError(f"callout {label} has no shoulder or no text rows")
-    centre = (
-        min(x for line in shoulders for x in (line[0], line[2]))
-        + max(x for line in shoulders for x in (line[0], line[2]))
-    ) / 2.0
-    rows: list[list[tuple[str, list[float], float]]] = []
-    for item in sorted(texts, key=lambda item: -item[1][1]):
-        if rows and abs(rows[-1][0][1][1] - item[1][1]) < 0.001:
-            rows[-1].append(item)
-            continue
-        rows.append([item])
-    boxes = {}
-    for row in rows:
-        left = min(position[0] for _, position, _ in row)
-        bottom = min(position[1] for _, position, _ in row)
-        height = max(item_height for _, _, item_height in row)
-        name = "".join(text for text, _, _ in sorted(row, key=lambda item: item[1][0])).strip()
-        boxes[name] = (left, bottom, 2.0 * centre - left, bottom + height)
-    return boxes
-
-
-def find_leader_crossings(
-    leaders: dict[str, list[Segment]],
-    texts: dict[str, Box],
-    own_rows: dict[str, dict[str, Box]] | None = None,
-    inset: float = OWN_ROW_INSET_M,
-) -> list[str]:
-    """Every callout leader that runs through a text: another callout's box,
-    a note, a label, the table or the datum origin (``texts``, where a
-    callout's own box is ``callout <label>`` and skipped), or one of its own
-    callout's text rows (``own_rows``, shrunk by ``inset`` so the joint at the
-    shoulder end does not count)."""
-    findings = []
-    for label, segments in sorted(leaders.items()):
-        for name, box in sorted(texts.items()):
-            if name == f"callout {label}":
-                continue
-            if any(segment_crosses_box(segment, box) for segment in segments):
-                findings.append(f"leader of callout {label} crosses {name}")
-        for row, box in (own_rows or {}).get(label, {}).items():
-            inner = (box[0] + inset, box[1] + inset, box[2] - inset, box[3] - inset)
-            if any(segment_crosses_box(segment, inner) for segment in segments):
-                findings.append(f"leader of callout {label} crosses its own row {row!r}")
-    return findings
-
-
-def datum_origin_boxes(axis_points: list[float], pad: float = DATUM_LABEL_PAD_M) -> dict[str, Box]:
-    """The hole table's datum origin as two obstacle boxes, one per axis:
-    IDatumOrigin.GetAxisPoints2 gives X start, X tip, Y start, Y tip in sheet
-    space, each padded by ``pad`` for the "0", "X" and "Y" labels."""
-    if len(axis_points) != 8:
-        raise RuntimeError(f"datum origin axis points are not 4 (x, y) pairs: {axis_points!r}")
-    boxes = {}
-    for name, (x0, y0, x1, y1) in (
-        ("origin X axis", axis_points[0:4]),
-        ("origin Y axis", axis_points[4:8]),
-    ):
-        boxes[name] = (min(x0, x1) - pad, min(y0, y1) - pad, max(x0, x1) + pad, max(y0, y1) + pad)
-    return boxes
-
-
-# Half the section arrowhead's width, around each arrow segment.
-SECTION_ARROW_PAD_M = 0.002
-
-
-def note_reaches_final_sheet(text: str, removed: tuple[str, ...] = FINAL_SHEET_REMOVED_NOTES) -> bool:
-    """Whether a note is ink on the final sheet: it has visible text, and
-    finalize_drawing's cleanup (the same case-blind substring match as
-    remove_notes_matching) does not delete it."""
-    if not text.strip():
-        return False
-    return not any(substring.lower() in text.lower() for substring in removed)
-
-
-def section_line_boxes(
-    name: str,
-    arrow_info: list[float],
-    text_info: list[float],
-    text_height: float,
-    label: str,
-    sheet_size: tuple[float, float],
-) -> dict[str, Box]:
-    """A section line's two arrows and two labels as obstacle boxes, from
-    IDrSection.GetArrowInfo (start and end xyz of each arrow) and GetTextInfo
-    (each label's upper-left xyz). Refuses points off the sheet: the API does
-    not say these are sheet coordinates, so a view-space reply fails loud."""
-    if len(arrow_info) != 12 or len(text_info) != 6:
-        raise RuntimeError(
-            f"section {name}: expected 12 arrow and 6 text values, got {arrow_info!r} {text_info!r}"
-        )
-    width, height = sheet_size
-    points = [arrow_info[i : i + 2] for i in (0, 3, 6, 9)] + [text_info[i : i + 2] for i in (0, 3)]
-    off_sheet = [point for point in points if not (0.0 <= point[0] <= width and 0.0 <= point[1] <= height)]
-    if off_sheet:
-        raise RuntimeError(f"section {name}: arrow/label points are not in sheet space: {off_sheet!r}")
-    pad = SECTION_ARROW_PAD_M
-    boxes = {}
-    for index, base in enumerate((0, 6), start=1):
-        x0, y0, x1, y1 = arrow_info[base], arrow_info[base + 1], arrow_info[base + 3], arrow_info[base + 4]
-        boxes[f"section {name} arrow {index}"] = (
-            min(x0, x1) - pad, min(y0, y1) - pad, max(x0, x1) + pad, max(y0, y1) + pad
-        )
-    glyphs = max(1, len(label))
-    for index, base in enumerate((0, 3), start=1):
-        x, y = text_info[base], text_info[base + 1]
-        boxes[f"label section {name} {index}"] = (x, y - text_height, x + glyphs * text_height, y)
-    return boxes
-
-
-def _section_line_obstacles(views: dict[str, Any]) -> dict[str, Box]:
-    """section_line_boxes for every section line drawn in ``views``."""
-    template = DRAWING_TEMPLATES[SPEC.layout]
-    boxes: dict[str, Box] = {}
-    for view in views.values():
-        for section in _early_bound(view, "IView").GetSectionLines() or ():
-            section = _early_bound(section, "IDrSection")
-            label = str(section.GetLabel())
-            text_height = float(_early_bound(section.GetTextFormat(), "ITextFormat").CharHeight)
-            arrow_info = [float(v) for v in (section.GetArrowInfo() or ())]
-            text_info = [float(v) for v in (section.GetTextInfo() or ())]
-            _telemetry.info(
-                f"section line {label}: arrows={arrow_info!r} labels={text_info!r} height={text_height}"
-            )
-            boxes.update(
-                section_line_boxes(
-                    label, arrow_info, text_info, text_height, label,
-                    (template.width_m, template.height_m),
-                )
-            )
-    return boxes
-
-
 def _attach_leader_nearest_hole(adapter: Any, display: Any, label: str) -> None:
     """Ask SolidWorks to run ``display``'s leader from the shoulder end nearest
     its hole, and log what it did. IAnnotation.SetLeader3 documents leader-side
@@ -1868,45 +1579,6 @@ def _attach_leader_nearest_hole(adapter: Any, display: Any, label: str) -> None:
         f"GetLeaderSide {side_before} -> {int(annotation.GetLeaderSide())}; "
         f"SetLeader3(style={style}, side={nearest}, smart={smart}) returned {status}"
     )
-
-
-def callout_text_box(
-    anchor: list[float],
-    lines: list[tuple[float, float, float, float]],
-    texts: list[tuple[str, list[float], float]],
-    label: str,
-) -> Box:
-    """The text block of a callout from its display data, in sheet metres.
-
-    Each text row's position is its lower-left corner in sheet space, and the
-    last row sits on the horizontal shoulder SolidWorks draws under the block,
-    which spans the widest row. So the block runs across the shoulder, and from
-    the shoulder up to the top row's position plus its height. The sloped
-    leader is left out: it has to reach into the view it points at."""
-    shoulders = [line for line in lines if abs(line[1] - line[3]) < 1e-7]
-    if not shoulders:
-        raise RuntimeError(f"callout {label} has no horizontal shoulder line: {lines!r}")
-    if not texts:
-        raise RuntimeError(f"callout {label} has no text rows")
-    xs = [anchor[0], *(x for line in shoulders for x in (line[0], line[2]))]
-    xs += [position[0] for _, position, _ in texts]
-    ys = [anchor[1], *(line[1] for line in shoulders)]
-    ys += [position[1] + height for _, position, height in texts]
-    return (min(xs), min(ys), max(xs), max(ys))
-
-
-def _view_geometry_box(adapter: Any, view: Any, label: str) -> Box:
-    """The casting's own outline in ``view``: its bounding-box corners projected
-    onto the sheet, free of GetOutline's padding and attached annotations."""
-    points = [
-        model_point_in_view(adapter, view, (x, y, z), label=f"{label} extent")
-        for x in (-BOTTOM_LENGTH / 2000.0, BOTTOM_LENGTH / 2000.0)
-        for y in (0.0, STACK_HEIGHT / 1000.0)
-        for z in (BOTTOM_FRONT_Z / 1000.0, BOTTOM_REAR_Z / 1000.0)
-    ]
-    xs = [point[0] for point in points]
-    ys = [point[1] for point in points]
-    return (min(xs), min(ys), max(xs), max(ys))
 
 
 # A drawn station a hundredth of a millimetre off its intended sheet point is
@@ -2124,103 +1796,6 @@ def _add_serial_location(adapter: Any, view: Any) -> None:
         display.SetPrecision3(DRAWING_REFERENCE_PRECISION, -1, -1, -1)
         if int(display.GetPrimaryPrecision2()) != DRAWING_REFERENCE_PRECISION:
             raise RuntimeError(f"{label} reference precision did not persist")
-
-
-_TEXT_OBSTACLE_KINDS = ("note ", "label ", "table ", "origin ", "section ")
-
-
-def _check_hole_sheet_callouts(
-    adapter: Any,
-    ddoc: Any,
-    *,
-    sheet_name: str,
-    callouts: dict[str, Any],
-    views: dict[str, Any],
-    datum_origin: Any | None = None,
-    hole_table: Any | None = None,
-) -> None:
-    """Fail loud on any of ``sheet_name``'s hole callouts that crowds another
-    callout, a note, a view label, the hole table, the table's datum origin,
-    any view's casting outline, the sheet frame or the title block; that sits
-    closer than a row pitch over another callout; that runs over four rows; or
-    whose leader runs through any of those texts or through its own text rows.
-    The holes sheet passes its table and datum origin; the cross-tap sheet,
-    which carries neither, passes none."""
-    pivot_tag = (
-        None if hole_table is None
-        else _hole_table_station_rows(hole_table)[PIVOT_SCREW_XZ].tag
-    )
-    if not ddoc.ActivateSheet(sheet_name):
-        raise RuntimeError(f"failed to activate {sheet_name} for the callout check")
-    boxes = {}
-    leaders = {}
-    own_rows = {}
-    for label, display in callouts.items():
-        anchor, lines, texts = _callout_display_data(display, label)
-        boxes[label] = callout_text_box(anchor, lines, texts, label)
-        leaders[label] = leader_segments(lines)
-        own_rows[label] = callout_text_rows(lines, texts, label)
-    obstacles = _sheet_frame_obstacles(adapter, ddoc)
-    obstacles.update(
-        (f"view {label}", _view_geometry_box(adapter, view, label))
-        for label, view in views.items()
-    )
-    if datum_origin is not None:
-        axis_points = [
-            float(v)
-            for v in (_early_bound(datum_origin, "IDatumOrigin").GetAxisPoints2() or ())
-        ]
-        obstacles.update(datum_origin_boxes(axis_points))
-    obstacles.update(_section_line_obstacles(views))
-    sheet_view = ddoc.GetFirstView()  # the sheet itself: its free notes and tables
-    pivot_seat_notes = 0
-    for view in (sheet_view, *views.values()):
-        for element, annotation in _iter_view_annotations(adapter, view):
-            # Display dimensions come back as (None, annotation) (#902); only
-            # notes are measured here.
-            if element is None or element.kind != "note":
-                continue
-            # The check runs before finalize_drawing deletes the Hole Wizard
-            # "Tapped Hole" notes (hb-render-3 flagged leaders over them), so
-            # only notes that reach the final sheet are obstacles.
-            text = _note_text(adapter, annotation)
-            if not note_reaches_final_sheet(text):
-                continue
-            if pivot_tag is not None and (
-                text.replace("\r\n", "\n").strip() == pivot_seat_step(pivot_tag)
-            ):
-                pivot_seat_notes += 1
-            is_label = any(word in element.label.upper() for word in _LAYOUT_LABEL_WORDS)
-            obstacles[f"{'label' if is_label else 'note'} {element.label}"] = element.box
-    if pivot_tag is not None and pivot_seat_notes != 1:
-        raise RuntimeError(
-            f"callout check requires exactly one numbered pivot seat note, found {pivot_seat_notes}"
-        )
-    tables = [
-        element
-        for view in (sheet_view, *views.values())
-        for element in _iter_tables(adapter, view)
-    ]
-    if hole_table is not None and not tables:
-        raise RuntimeError("callout check found no hole table on the holes sheet")
-    for element in tables:
-        obstacles[f"table {element.label}"] = element.box
-    _telemetry.info(
-        f"{sheet_name} callout boxes: {boxes!r}; leaders: {leaders!r}; obstacles: {obstacles!r}"
-    )
-    texts = {f"callout {label}": box for label, box in boxes.items()}
-    texts.update(
-        (name, box) for name, box in obstacles.items()
-        if name.startswith(_TEXT_OBSTACLE_KINDS)
-    )
-    findings = (
-        find_callout_clashes(boxes, obstacles)
-        + find_merged_blocks(boxes)
-        + find_tall_callouts(own_rows)
-        + find_leader_crossings(leaders, texts, own_rows)
-    )
-    if findings:
-        raise RuntimeError(f"{sheet_name} callout clashes: " + "; ".join(findings))
 
 
 def _visible_hole_table_entities(
@@ -2914,15 +2489,6 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to activate the holes sheet for the leader sides")
     for label, display in hole_sheet_callouts.items():
         _attach_leader_nearest_hole(adapter, display, label)
-    _check_hole_sheet_callouts(
-        adapter,
-        ddoc,
-        sheet_name=SHEET_NAMES[1],
-        callouts=hole_sheet_callouts,
-        views={"holes top": hole_top, "section A-A": section},
-        datum_origin=hole_feature.DatumOrigin,
-        hole_table=hole_table,
-    )
     if not ddoc.ActivateSheet(SHEET_NAMES[4]):
         raise RuntimeError("failed to activate the cross-tap sheet for the leader sides")
     for label, display in cross_tap_sheet_callouts.items():
@@ -2936,13 +2502,6 @@ async def build(adapter: Any) -> dict[str, str]:
         "base cross near-wall clearance callout",
     )
     rebuild_drawing(adapter, label="base cross near-wall clearance near-side leader")
-    _check_hole_sheet_callouts(
-        adapter,
-        ddoc,
-        sheet_name=SHEET_NAMES[4],
-        callouts=cross_tap_sheet_callouts,
-        views={"holes front": hole_side},
-    )
     _log_tapped_hole_notes(adapter, ddoc)
     return await finalize_drawing(
         adapter,

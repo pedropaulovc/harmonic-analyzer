@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from _drawing_layout_check import DrawableRegion
+from _layout_geometry import DrawableRegion
 import _telemetry
 
 

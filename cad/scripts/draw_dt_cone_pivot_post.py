@@ -1552,8 +1552,6 @@ def _assert_native_layout(
     from _layout_geometry import (
         DEFAULT_TEXT_TOUCH_TOL_M,
         Box,
-        audit_sheet,
-        format_findings,
         segment_box_overlap_length,
     )
     from diagnostics.drawing_layout_audit import collect_document
@@ -1677,12 +1675,6 @@ def _assert_native_layout(
                 f"{own_overlap * 1000.0:.3f} mm"
             )
         own_overlaps[label] = round(own_overlap * 1000.0, 3)
-    findings = audit_sheet(sheet)
-    if findings:
-        raise RuntimeError(
-            "cone pivot post native annotation layout failed:\n"
-            f"{format_findings(findings)}"
-        )
     axis_box, line_x, shift = journal_axis_text_shift(sheet)
     if shift < -1e-4:
         raise RuntimeError(

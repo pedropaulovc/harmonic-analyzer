@@ -725,11 +725,9 @@ def _sheet_notes() -> tuple[tuple[str, float, float], ...]:
 # (callout text on value text), and the adjuster callout's THRU ALL / BOTH
 # ENDS printed over the right view's north face (callout text on a view's
 # model outline), its shoulder also crossed by an outside arrow (callout text
-# on a dimension line).  The shared audit cannot see any of those classes:
-# _drawing_common._dim_element boxes every display dimension and hole callout
-# as a nominal 8 mm square with CollisionScope.NONE, _drawing_layout_check.
-# _may_collide drops every pair holding a NONE element, and since ab28f4e49
-# finalize_drawing no longer runs check_drawing_layout at all.
+# on a dimension line).  The element audit of the time boxed every display
+# dimension and hole callout as a nominal 8 mm square it never compared, and
+# it has since been retired for the PDF-ink audit (_layout_audit).
 #
 # So the sheet audits its own ink before it opens a document: every text
 # block it places, boxed from where it places it and how large that text

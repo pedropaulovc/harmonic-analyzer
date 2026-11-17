@@ -55,7 +55,6 @@ from _drawing_dimensions import (
     set_dimension_callouts,
     set_reference_dimensions,
 )
-from _drawing_layout_collect import check_drawing_layout
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
@@ -576,8 +575,6 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(
         adapter, "Manufacturing Notes", *MANUFACTURING_NOTES_XY, char_height=0.0025
     )
-    rebuild_drawing(adapter, label="crank pinion layout audit")
-    check_drawing_layout(adapter, layout=SPEC.layout, stem=PART_STEM)
     return await finalize_drawing(
         adapter,
         OUTPUTS,
