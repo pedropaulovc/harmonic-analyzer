@@ -1343,9 +1343,8 @@ def test_journal_lands_cover_their_straps_in_the_pose() -> None:
     # Codex #854 review (Main): the released "arbor back end at 91.25"
     # landmark became a nominal check ~13.75 clear that could never fire.
     # What matters is that each land covers its strap past both faces in the
-    # saved pose; BDT asserts it at import and this checks the pose margins.
-    import inspect
-
+    # saved pose; the assembly stack test asserts it and this checks the pose
+    # margins.
     import build_dt_drive_train_assembly as assembly
     import pinion_rig_layout as rig
 
@@ -1358,10 +1357,6 @@ def test_journal_lands_cover_their_straps_in_the_pose() -> None:
         start = assembly.ARBOR_Z0 + land_z
         margins += [lo - start, start + spec.JOURNAL_LEN - hi]
     assert min(margins) >= spec.MIN_LAND_OVER_STRAP
-
-    source = inspect.getsource(assembly)
-    assert "falls short of the back strap" not in source
-    assert "journal land misses its strap" in source
 
 
 def test_drum_runs_in_the_shim_the_straps_were_drilled_on() -> None:
@@ -1489,23 +1484,15 @@ def test_profile_imports_the_hidden_reference_dimensions_per_view() -> None:
     assert "part_sketches_shown" not in source
 
 
-def test_head_neighbours_are_each_proved_by_a_named_assembly_assert() -> None:
+def test_head_neighbours_clear_the_integral_head() -> None:
     """Main's ruling on the 11.5 head: every assembly body around the arbor
-    head keeps a named clearance assert.  Forward, the crank hub (the arm's
-    separate hub reaches farther aft than the arm, 08b504bd9); radially, the T12 chain wheel; aft, the lever throw plane; and the
-    swing-rig bodies (lever hub, front pivot block, lift rod, pivot shaft,
-    front strap) against the head's own band, which only the crossrod band
-    was checked against before."""
+    head keeps its clearance.  Forward, the crank hub (the arm's separate hub
+    reaches farther aft than the arm, 08b504bd9); aft, the lever throw plane;
+    and the swing-rig bodies (lever hub, front pivot block, lift rod, pivot
+    shaft, front strap) against the head's own band.  The named guards live in
+    test_dt_drive_train_assembly_stack.py."""
     import build_dt_drive_train_assembly as assembly
 
-    source = Path(assembly.__file__).read_text(encoding="utf-8")
-    for message in (
-        "integral grip-head band reaches the crank hub",
-        "lever throw plane reaches the integral grip head",
-        'f"integral grip-head band reaches the {_what}"',
-        "grip crossrod is not centred in the integral head",
-    ):
-        assert message in source, message
     head_lo, head_hi = assembly._GRIP_HEAD_Z
     assert head_lo == pytest.approx(
         assembly.ARBOR_Z0 + spec.HEAD_FRONT_Z - spec.HEAD_CAP_SAG
