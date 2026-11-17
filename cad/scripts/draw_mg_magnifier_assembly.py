@@ -10,7 +10,9 @@ boundary circle or viewing arrow drawn on the right side view:
 - DETAIL A (2:1) shows only the bar and the axle. It prints the press gauge
   from the bar's front face to the shank step (the wheel hub hides the step
   once it is fitted) and, as limits, the axle's plain end below the bar's far
-  face, the press's first setting.
+  face, the press's first setting. A broken-out window to the axle's
+  mid-plane shows the plain end, sunk in the bar's bore, as the visible edge
+  that setting ends on.
 - DETAIL B (4:1) shows the stack. It prints, as limits, the drum's face below
   the wheel's spigot end and the axle's thread end past the second nut (the
   press's acceptance), and the endshake between the spigot face and the
@@ -131,7 +133,7 @@ from mg_magnifying_wheel_geom import TIE1_X, TIE1_Y, TIE_HOLE_DIA
 from mg_magnifying_vertical_rod_geom import ROD_DIA as VROD_DIA
 from mg_magnifying_vertical_rod_geom import SHOULDER_X as VROD_SHOULDER_X
 from mg_wheel_axle_spec import TIP_Y
-from mg_wheel_bar_geom import BAR_TOP_ABOVE_ROW, BORE_ROW_HEIGHT
+from mg_wheel_bar_geom import BAR_LENGTH, BAR_TOP_ABOVE_ROW, BORE_ROW_HEIGHT, WHEEL_BAR_X0
 
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -557,6 +559,8 @@ class StackDetail:
     # The detail's letter stands outside its boundary on the right side view,
     # toward this corner (x, y signs).
     letter_corner: tuple[int, int] = (1, 1)
+    # Cut BREAK_OUT_WINDOW_MM to the axle's mid-plane before dimensioning.
+    break_out: bool = False
 
     @property
     def letter(self) -> str:
@@ -794,7 +798,32 @@ PRESSED = StackDetail(
     f"ITEM {notes.ITEM_NUMBERS['mg-wheel-axle']} PRESSED INTO "
     f"ITEM {notes.ITEM_NUMBERS['mg-wheel-bar']},\nOTHER PARTS NOT SHOWN",
     letter_corner=(-1, 1),
+    break_out=True,
 )
+# DETAIL A's broken-out window (rule 9, issue #3031): the axle's plain end
+# sits BACK_END_SUNK inside the bar's bore, so a plain hidden-lines-removed
+# view never draws the edge BackEndSunk ends on. The window, (d, rise) mm
+# fit points of a closed freehand boundary, spans the far face and the plain
+# end with room either side and stays inside the bar's top and bottom faces
+# (BAR_TOP_ABOVE_ROW over, BORE_ROW_HEIGHT under the axle). It is cut from
+# the bar's +x end, the nearest face to the MG LEFT viewer, down to the
+# axle's mid-plane.
+_BREAK_OUT_CENTRE_D = stack.BAR_FAR_D + 2.0
+_BREAK_OUT_HALF_D = 3.5
+_BREAK_OUT_HALF_RISE = 4.0
+BREAK_OUT_WINDOW_MM = tuple(
+    (
+        _BREAK_OUT_CENTRE_D + _BREAK_OUT_HALF_D * math.cos(angle) * wobble,
+        _BREAK_OUT_HALF_RISE * math.sin(angle) * wobble,
+    )
+    for angle, wobble in (
+        (index * math.pi / 4.0, (1.0, 0.92)[index % 2]) for index in range(8)
+    )
+)
+BREAK_OUT_DEPTH = WHEEL_BAR_X0 + BAR_LENGTH / 2.0 - stack.AXLE_X
+# Where the plain end's edge is picked: on the end face's edge-on line,
+# well inside the pin's radius.
+PLAIN_END_PICK_RISE = 1.0
 _ENDSHAKE_CENTRE_D = (stack.HUB_FRONT_D + TIP_Y) / 2.0
 _ENDSHAKE_RADIUS = 7.0
 ENDSHAKE = StackDetail(
@@ -1015,13 +1044,14 @@ def _sketch_in_view(
     adapter: Any,
     view: Any,
     kind: str,
-    sheet_points: tuple[tuple[float, float], tuple[float, float]],
+    sheet_points: tuple[tuple[float, float], ...],
     *,
     label: str,
 ) -> Any:
-    """Sketch a ``kind`` ("circle": centre, rim point; "line": ends) at two
-    sheet points (m) in ``view``'s own sketch and return it, left selected
-    (draw_ch_channel_assembly._sketch_in_view, with deterministic creation)."""
+    """Sketch a ``kind`` ("circle": centre, rim point; "line": ends;
+    "spline": its fit points) at sheet points (m) in ``view``'s own sketch and
+    return it (draw_ch_channel_assembly._sketch_in_view, with deterministic
+    creation)."""
     view = _early_bound(view, "IView")
     _activate(adapter, view, label=label)
     sketch = _early_bound(view.GetSketch(), "ISketch")
@@ -1035,18 +1065,58 @@ def _sketch_in_view(
         projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
         points.append(tuple(float(value) for value in projected.ArrayData))
     manager = _early_bound(adapter.currentModel.SketchManager, "ISketchManager")
-    create = getattr(manager, {"circle": "CreateCircle", "line": "CreateLine"}[kind])
     previous = bool(manager.AddToDB)
     # Deterministic creation: inference must not move a fence or a line onto
     # the model's nearby witnesses or visible edges.
     manager.AddToDB = True
     try:
-        segment = create(*points[0], *points[1])
+        if kind == "spline":
+            segment = manager.CreateSpline(
+                double_array([value for point in points for value in point[:3]])
+            )
+        else:
+            create = getattr(manager, {"circle": "CreateCircle", "line": "CreateLine"}[kind])
+            segment = create(*points[0], *points[1])
     finally:
         manager.AddToDB = previous
     if segment is None:
         raise RuntimeError(f"failed to sketch the {label} {kind}")
     return _early_bound(segment, "ISketchSegment")
+
+
+@_telemetry.traced("magnifier.break_out_plain_end")
+def _break_out_plain_end(adapter: Any, view: Any, detail: StackDetail) -> None:
+    """Cut ``detail``'s BREAK_OUT_WINDOW down to the axle's mid-plane, so the
+    axle's plain end, sunk in the bar's bore, prints as a visible edge for
+    BackEndSunk to end on (rule 9: a section or breakout, never a hidden
+    line); read back the section count and pick that edge."""
+    draw = adapter.currentModel
+    native = _early_bound(view, "IView")
+    sheet = tuple(detail.sheet_xy(d, rise) for d, rise in BREAK_OUT_WINDOW_MM)
+    label = f"{detail.title} broken-out window"
+    segment = _sketch_in_view(adapter, native, "spline", (*sheet, sheet[0]), label=label)
+    selection = _early_bound(draw.SelectionManager, "ISelectionMgr")
+    data = selection.CreateSelectData()
+    data.View = native
+    if not segment.Select4(False, data):
+        raise RuntimeError(f"failed to select the {label}")
+    if _early_bound(draw, "IDrawingDoc").CreateBreakOutSection(BREAK_OUT_DEPTH / 1000.0) is not True:
+        raise RuntimeError(f"{label} was refused")
+    draw.ClearSelection2(True)
+    rebuild_drawing(adapter, label=label)
+    count = int(native.GetBreakOutSectionCount())
+    if count != 1:
+        raise RuntimeError(f"{detail.title} holds {count} broken-out sections, not 1")
+    _pick_view_edge(
+        adapter,
+        native,
+        detail.sheet_xy(stack.BACK_END_D, PLAIN_END_PICK_RISE),
+        label=f"{detail.title} axle plain end",
+    )
+    _telemetry.info(
+        f"{detail.title}: broken out {BREAK_OUT_DEPTH:.3f} mm deep from the bar's "
+        "end; the axle's plain end is a visible edge"
+    )
 
 
 def _crop(
@@ -1106,9 +1176,11 @@ def _dimensioned_detail(
     detail: StackDetail,
     keep: dict[str, tuple[float, float]],
 ) -> list[Any]:
-    """Place ``detail``, show the stack chain in it, import ``keep``, crop it
-    and prove the kept dimensions survived the crop."""
+    """Place ``detail``, break it out if it asks, show the stack chain in it,
+    import ``keep``, crop it and prove the kept dimensions survived the crop."""
     view = _placed_detail(adapter, detail)
+    if detail.break_out:
+        _break_out_plain_end(adapter, view, detail)
     _show_base_view_sketches(adapter, view, (stack.FEATURE,), label=detail.title)
     annotations = curate_view_dimensions(
         adapter,

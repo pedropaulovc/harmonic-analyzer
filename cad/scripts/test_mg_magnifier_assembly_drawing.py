@@ -558,6 +558,102 @@ def test_the_endshake_line_rides_above_the_nuts_and_text_stands_past_the_crop() 
     assert x + 0.030 < SHEET_RIGHT
 
 
+def test_detail_a_breaks_out_the_plain_end_inside_the_bar() -> None:
+    """Issue #3031 (rule 9): BackEndSunk ends on the axle's plain end, sunk
+    in the bar's bore, so DETAIL A cuts a window from the bar's +x end to the
+    axle's mid-plane over the far face and the plain end; it stays inside the
+    bar's faces and the crop, and only DETAIL A is broken out."""
+    from mg_wheel_bar_geom import (
+        AXLE_BORE_DIA,
+        BAR_LENGTH,
+        BAR_TOP_ABOVE_ROW,
+        BORE_ROW_HEIGHT,
+        WHEEL_BAR_X0,
+    )
+
+    assert drawing.PRESSED.break_out and not drawing.ENDSHAKE.break_out
+    assert stack.BAR_FAR_D < stack.BACK_END_D < 0.0
+    ds = [d for d, _rise in drawing.BREAK_OUT_WINDOW_MM]
+    rises = [rise for _d, rise in drawing.BREAK_OUT_WINDOW_MM]
+    assert min(ds) < stack.BAR_FAR_D - 1.0
+    assert max(ds) > stack.BACK_END_D + 1.0
+    assert min(max(rises), -min(rises)) * 0.92 > AXLE_BORE_DIA / 2.0 + 1.0
+    assert max(rises) < BAR_TOP_ABOVE_ROW
+    assert -min(rises) < BORE_ROW_HEIGHT
+    for d, rise in drawing.BREAK_OUT_WINDOW_MM:
+        assert math.hypot(d - drawing.PRESSED.centre_d, rise) < drawing.PRESSED.radius_mm
+    # Cut from the bar's +x end (nearest the MG LEFT viewer) to the axle line.
+    assert WHEEL_BAR_X0 + BAR_LENGTH / 2.0 - drawing.BREAK_OUT_DEPTH == pytest.approx(
+        stack.AXLE_X
+    )
+    assert 0.0 < drawing.PLAIN_END_PICK_RISE < mg_wheel_axle_spec.PIN_DIA / 2.0 - 0.5
+
+
+def test_break_out_plain_end_cuts_one_window_and_picks_the_end(monkeypatch) -> None:
+    events = []
+    detail = drawing.PRESSED
+    native = SimpleNamespace(GetBreakOutSectionCount=lambda: 1)
+    segment = SimpleNamespace(
+        Select4=lambda append, data: events.append(("select", append, data.View)) or True
+    )
+
+    def sketch(_adapter, view, kind, points, *, label):
+        events.append(("sketch", view, kind, points))
+        return segment
+
+    draw = SimpleNamespace(
+        SelectionManager=SimpleNamespace(CreateSelectData=lambda: SimpleNamespace()),
+        CreateBreakOutSection=lambda depth: events.append(("cut", depth)) or True,
+        ClearSelection2=lambda _all: events.append(("clear",)),
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _iface: value)
+    monkeypatch.setattr(drawing, "_sketch_in_view", sketch)
+    monkeypatch.setattr(
+        drawing, "rebuild_drawing", lambda _adapter, *, label: events.append(("rebuild",))
+    )
+    monkeypatch.setattr(
+        drawing,
+        "_pick_view_edge",
+        lambda _adapter, view, xy, *, label: events.append(("pick", view, xy)),
+    )
+    drawing._break_out_plain_end(SimpleNamespace(currentModel=draw), native, detail)
+    window = tuple(detail.sheet_xy(d, rise) for d, rise in drawing.BREAK_OUT_WINDOW_MM)
+    assert events == [
+        ("sketch", native, "spline", (*window, window[0])),
+        ("select", False, native),
+        ("cut", drawing.BREAK_OUT_DEPTH / 1000.0),
+        ("clear",),
+        ("rebuild",),
+        ("pick", native, detail.sheet_xy(stack.BACK_END_D, drawing.PLAIN_END_PICK_RISE)),
+    ]
+
+
+@pytest.mark.parametrize("detail", [drawing.PRESSED, drawing.ENDSHAKE])
+def test_only_detail_a_is_broken_out_before_its_chain_shows(monkeypatch, detail) -> None:
+    order = []
+    keep = drawing.PRESSED_KEEP if detail is drawing.PRESSED else drawing.ENDSHAKE_KEEP
+    annotations = [SimpleNamespace(name=name) for name in keep]
+    view = SimpleNamespace(GetAnnotations=lambda: annotations)
+    monkeypatch.setattr(drawing, "_placed_detail", lambda *_a: order.append("place") or view)
+    monkeypatch.setattr(
+        drawing, "_break_out_plain_end", lambda *_a: order.append("break out")
+    )
+    monkeypatch.setattr(
+        drawing, "_show_base_view_sketches", lambda *_a, **_k: order.append("chain")
+    )
+    monkeypatch.setattr(
+        drawing, "curate_view_dimensions", lambda *_a, **_k: order.append("import") or annotations
+    )
+    monkeypatch.setattr(drawing, "_crop", lambda *_a: order.append("crop"))
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _iface: value)
+    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, item: item.name)
+    monkeypatch.setattr(drawing, "_activate", lambda *_a, **_k: None)
+    monkeypatch.setattr(drawing, "add_note", lambda *_a: order.append("label") or object())
+    assert drawing._dimensioned_detail(object(), detail, keep) == annotations
+    head = ["place", "break out"] if detail.break_out else ["place"]
+    assert order == [*head, "chain", "import", "crop", "label"]
+
+
 def test_the_gauge_detail_shows_only_the_bar_and_the_axle() -> None:
     assert drawing.PRESSED.stems == {"mg-wheel-bar", "mg-wheel-axle"}
     assert {
