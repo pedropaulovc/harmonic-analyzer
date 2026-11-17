@@ -662,7 +662,7 @@ sub-assembly, never on part fabrication.
   requires; an item reference is enough when the BOM supplies the item's name
   and number unambiguously.
 
-**The steps live in ASSEMBLY.md, not on the sheets.** A package may print
+**Steps may print in ASSEMBLY.md instead of on the sheets.** A package may print
 its ordered assembly steps, the wording of their non-numeric checks and
 remedies, setup and adjustment procedures, and the consumables and loose
 items in the release's generated `ASSEMBLY.md` instead of on its sheets, from
