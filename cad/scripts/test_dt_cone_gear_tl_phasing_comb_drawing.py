@@ -376,10 +376,11 @@ def test_the_shop_kit_holds_the_comb() -> None:
     assert "KIT_POSITION_MM" in inspect.getsource(kit_build)
     # No view of its own: item 2 shows under item 1 in the plate's face view
     # at its kit pose, a balloon's room below the rim and above the
-    # isometric (1:2, plate radius half size); the steps say where it fits.
+    # isometric (1:2, plate radius half size); the sheet's note says where it
+    # fits.
     assert kit.BOM_DESCRIPTIONS[spec.PART_NAME] == "CONE TIP GEAR PHASING COMB"
     assert not any(name.startswith("COMB_VIEW") for name in vars(kit))
-    assert kit.COMB_FITTING_LINE in kit.ASSEMBLY_STEPS.splitlines()
+    assert kit.notes.COMB_FITTING_LINE in kit.notes.FITTING_NOTE.splitlines()
     points = spec.profile_points_mm()
     top = spec.KIT_POSITION_MM[1] + max(y for _, y in points)
     bottom = spec.KIT_POSITION_MM[1] + min(y for _, y in points)
