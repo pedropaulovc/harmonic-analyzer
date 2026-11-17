@@ -168,10 +168,15 @@ def test_the_od_and_offset_flag_the_follower_pin_note_once() -> None:
     )
 
 
-def test_tap_callout_gives_the_tap_only() -> None:
+def test_tap_callout_gives_the_tap_and_the_screw_seat_only() -> None:
     # Rule 7: the stake is an assembly instruction; MHA-DT-00's
-    # cam-collars-set step carries it (rule 23).
-    assert drawing.DIMENSION_CALLOUTS["TapDrillDia"] == "TAP DRILL THRU TO BORE\n#2-56 UNC"
+    # cam-collars-set step carries it (rule 23).  The last line states the
+    # design intent that the screw sits below the OD (MainBuild R5: read
+    # without it as unable to reach the bore), with no number and no step.
+    assert drawing.DIMENSION_CALLOUTS["TapDrillDia"] == (
+        "TAP DRILL THRU TO BORE\n#2-56 UNC\nSET SCREW SEATS BELOW OD"
+    )
+    assert dt_pinion_cam_spec.SET_SCREW_SUBFLUSH_MIN_MM > 0.0
 
 
 def test_set_screw_view_is_lettered_with_its_arrow_on_the_front_view() -> None:

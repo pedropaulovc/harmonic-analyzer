@@ -232,7 +232,13 @@ _OD_TEXT = f"{CAM_OD / 25.4:.{COLLAR_OD_PLACES}f}".removeprefix("0")
 _ECC_TEXT = f"{ECC / 25.4:.{ECC_PLACES}f}".removeprefix("0")
 # The stake over the set screw is MHA-DT-00's cam-collars-set step (rule 23:
 # the assembly step gives the method); the part sheet gives only the tap.
-TAP_DRILL_CALLOUT = "TAP DRILL THRU TO BORE\n#2-56 UNC"
+# The thick-side wall is deeper than the longest screw
+# (SET_SCREW_SUBFLUSH_MIN_MM), so the tightened screw sits wholly inside the
+# tap.  Without saying so, a reviewer read the 3/16 screw against the .238 wall
+# as unable to reach the bore (MainBuild R5 FIX); the last line states that
+# intent, with no number and no step.
+SET_SCREW_INTENT = "SET SCREW SEATS BELOW OD"
+TAP_DRILL_CALLOUT = f"TAP DRILL THRU TO BORE\n#2-56 UNC\n{SET_SCREW_INTENT}"
 
 # drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): the roughness goes on the surface that runs.  The follower pin rides
 # the cam OD; the set-screwed bore never moves on the rod, so it carries none.
@@ -289,10 +295,10 @@ if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
 
 # The tapped-hole requirement is attached to its tap-drill dimension.  Note 2
 # carries only loose hardware; the ASME source and stack above account for
-# the supplier's overall-length limits, not an invented SKU.  The thick-side
-# wall is deeper than the longest screw (SET_SCREW_SUBFLUSH_MIN_MM); saying
-# the tightened screw sits below the OD read as assembly narration (fan-out
-# r2, rule 7), so the sheet does not.
+# the supplier's overall-length limits, not an invented SKU.  The screw's
+# sub-flush seat is a design-intent line on the tap callout
+# (SET_SCREW_INTENT), never a tightening step here: that read as assembly
+# narration (fan-out r2, rule 7).
 DRAWING_NOTES = "\n".join(
     (
         f"{LIFT_NOTE_NUMBER}. \N{LATIN CAPITAL LETTER O WITH STROKE}{_OD_TEXT} AND "
