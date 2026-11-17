@@ -76,10 +76,13 @@ def build(adapter) -> dict[str, str]:
     # suffix is load-bearing: the equation manager reads bare numbers in
     # document units.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
+    # "Thickness" is refused as a global name by the equation manager (farm
+    # 20261117T234245842Z: "Failed to add equation"), so the global carries
+    # the part's name; the model dimension keeps the plain name.
     for name, value in (
         ("OuterDia", spec.OUTER_DIA),
         ("BoreDia", spec.BORE_DIA),
-        ("Thickness", spec.THICKNESS),
+        ("WasherThickness", spec.THICKNESS),
     ):
         set_global(adapter, name, f"{value}mm")
 
@@ -117,7 +120,7 @@ def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, spec.WASHER)
     (thickness,) = name_dimensions(adapter, spec.WASHER, ["Thickness"])
-    drive_jobs.append((thickness, '"Thickness"'))
+    drive_jobs.append((thickness, '"WasherThickness"'))
     volume_check(adapter, "hub washer", spec.V_WASHER, _V_TOL * spec.V_WASHER)
 
     # Axis1: the washer axis, model Z, for the fixture assembly's mates.

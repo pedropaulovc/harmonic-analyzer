@@ -197,12 +197,13 @@ def build_26000(adapter, truth=None):
         _draw(adapter, obround(spec.THROUGH_SLOT_DIA), _plan(0.0))
     check("exit_sketch screw slot", adapter.exit_sketch())
     name_last_feature(adapter, spec.THROUGH_SLOT_SKETCH)
+    # Blind both ways past the body's full height: FeatureCut3 refuses
+    # ThroughAll in both directions ("Type mismatch", farm
+    # 20261117T234245842Z); the counterbore's blind both-way cut is proven.
     check(
         "cut screw slot",
         adapter.create_cut_extrude(
-            ExtrusionParameters(
-                depth=1.0, end_condition="ThroughAll", both_directions=True
-            )
+            ExtrusionParameters(depth=2.0 * spec.TOP_Z, both_directions=True)
         ),
     )
     name_last_feature(adapter, spec.THROUGH_SLOT_FEATURE)
