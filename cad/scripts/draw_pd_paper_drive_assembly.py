@@ -2332,8 +2332,12 @@ def _step_text(
             f"AND THE {n['pd-transgear-pin']} PIN'S SHANK IN ITS PIN BORE S, AT "
             f"THE HEIGHT THE DISC WILL RUN, TRUE ON ONE DRO AXIS ({KNOB_SETTING_TRUE}).",
             "ZERO THE DRO ON S.",
-            f"SET THE TABLE TO {KNOB_SETTING_VIEW_NAME}'S ALONG AND ACROSS "
-            "SETTINGS FROM S.",
+            # 12E can print on the sheet after DETAIL K's key: it points to
+            # the key's sheet (review of run
+            # 20261117T152142787Z-3d98e09383ba4ebea17fbf039b2b0697).
+            f"SET THE TABLE TO {KNOB_SETTING_VIEW_NAME}'S "
+            f"(SHEET {SHEET_NAMES.index(KNOB_SETTING_SHEET) + 1}) ALONG AND ACROSS "
+            "FROM S.",
             f"TAP THE PLATE UNTIL KNOB BORE {KNOB_BORE_LETTER} READS TRUE PER "
             f"{s('arm-plate-located', 2)} (SHEET {SHEET_NAMES.index(KNOB_SETTING_SHEET) + 1}).",
             "TIGHTEN THE CLAMPS.",
