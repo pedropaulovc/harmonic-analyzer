@@ -7,10 +7,8 @@ re-keys nothing. That is sound only because nothing here can change a saved
 artefact, which ``check:inert`` (``test_recipe_inert.py``) enforces:
 
 - Tracked code reaches this module only through pinned call sites: connect-time
-  provenance and the post-save teardown in ``_session.run_build``, the pre-save
-  authoring snapshot in ``_part_save.save_part_and_images`` (read-only: it has to
-  run before the camera moves), the pre-save display record in
-  ``_drawing_common.new_project_drawing`` (read-only), ``package_native``'s
+  provenance and the post-save teardown in ``_session.run_build``,
+  ``package_native``'s
   teardown, the missing-property capture behind
   ``_drawing_common.read_required_properties``, the pick-miss capture behind
   ``_drawing_selection._select_view_entity`` (it always raises), and

@@ -38,8 +38,8 @@ DIAGNOSTICS_DIR = SCRIPTS_DIR / "diagnostics"
 
 # ``ISketchManager`` calls that put raw geometry into a sketch.  Inference acts
 # on creation, so these are the only calls whose RESULT a user setting can
-# change -- the adapter's own ``add_line``/``add_arc``/``define_*`` helpers are
-# already wrapped by their callers.
+# change -- the adapter's own ``add_*`` creators author direct-to-DB
+# themselves (vendored ``adapters/solidworks/sketch.py``).
 RAW_SKETCH_CALLS = frozenset({
     "CreateArc",
     "CreateCenterLine",
