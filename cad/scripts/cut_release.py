@@ -1020,7 +1020,7 @@ NOTICE = """# Notice -- sources and permitted use
 
 **Everything this project made is MIT-licensed** -- see `LICENSE` beside this
 file. The CAD, the drawings, the neutral geometry and the derived numbers in
-`READOUT.md`, `ASSEMBLY.md` and `docs/` are this project's own work, built from `cad/config` +
+`READOUT.md`, `ASSEMBLY.md`, `HARDWARE.md` and `docs/` are this project's own work, built from `cad/config` +
 `cad/scripts`, and you may use them commercially under the MIT terms.
 
 **The machine is public domain.** Michelson and Stratton published in 1898;
@@ -1048,7 +1048,8 @@ def stage_readout_procedure(stage: Path, tag: str) -> list[str]:
     """Write the operating/readout procedure (error_budget.readout_procedure)
     into the bundle root as ``READOUT.md``, the master build sequence, the
     packages' fit-up steps and the assembly tool list (ha_assembly_package)
-    as ``ASSEMBLY.md``, plus the
+    as ``ASSEMBLY.md``, the Master Hardware Schedule (hardware_schedule) as
+    ``HARDWARE.md``, plus the
     repository ``LICENSE``,
     ``NOTICE`` (what is MIT, and the permitted use of each third-party source the
     staged pages quote) and ``operating_docs()`` under
@@ -1058,6 +1059,7 @@ def stage_readout_procedure(stage: Path, tag: str) -> list[str]:
     relative paths."""
     import error_budget
     import ha_assembly_package
+    import hardware_schedule
 
     dst = stage / "READOUT.md"
     dst.write_text(
@@ -1068,6 +1070,9 @@ def stage_readout_procedure(stage: Path, tag: str) -> list[str]:
     assembly = stage / ha_assembly_package.DOCUMENT_NAME
     assembly.write_text(ha_assembly_package.markdown(), encoding="utf-8")
     staged.append(assembly.name)
+    hardware = stage / hardware_schedule.DOCUMENT_NAME
+    hardware.write_text(hardware_schedule.markdown(), encoding="utf-8")
+    staged.append(hardware.name)
     docs = stage / "docs"
     docs.mkdir(exist_ok=True)
     names = operating_docs()

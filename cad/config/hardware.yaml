@@ -1,0 +1,415 @@
+# COTS tier of every purchased part (#2886), read by hardware_schedule.py,
+# which prints the release's HARDWARE.md. No build leaf reads this file.
+#
+# ASME Y14.24: tier 1 = standard hardware, fully defined by a generic
+# designation (a HARDWARE.md row); tier 2 = proprietary/non-standard item, a
+# specification-control sheet; tier 3 = shop-altered item, an altered-item
+# sheet (MAKE FROM blank + the shop's cuts). The oblique trammel jig's vendor
+# parts are not listed: that family is retiring.
+#
+# Tier-1 rows also carry `designation`, `standard` and, where a head, nut,
+# washer or wire must clear its seat, an `envelope`. Each envelope value is
+# "<pure provider module> [factor*]<attribute path>": an attribute such as
+# HEAD_DIA or DIMS.od_max, or a Supplier* reference dimension; millimetres.
+# Heads and nuts print across corners (factor 1/cos(pi/n)). Pins, chain,
+# set-screw lengths (a headed set screw keeps its head envelope) and retaining
+# rings carry none: their sizes are fits fixed by the designation and, where
+# the row names one, its standard; they print "per <standard>" or "per
+# designation". A part the assembly steps cut or face keeps its tier-1 row when
+# its `why` names that step.
+ch-vn-bracket-hold-down-screw:
+  tier: 1
+  why: "ASME B18.6.3 slotted machine screw, used as supplied"
+  designation: "#8-32 UNC-2A x 5/8 slotted narrow fillister head machine screw, zinc-plated steel"
+  standard: "ASME B18.6.3"
+  envelope:
+    "head Ø": "_mcmaster_90280a196 SupplierHeadDiameter"
+    "head H": "_mcmaster_90280a196 SupplierHeadHeight"
+ch-vn-frame-side-screw:
+  tier: 1
+  why: "ASME B18.6.3 slotted machine screw, used as supplied"
+  designation: "#2-56 UNC-2A x 7/16 slotted fillister head machine screw, 18-8 stainless"
+  standard: "ASME B18.6.3"
+  envelope:
+    "head Ø": "_mcmaster_91794a080 SupplierHeadDiameter"
+    "head H": "_mcmaster_91794a080 SupplierHeadHeight"
+ch-vn-fulcrum-set-screw:
+  tier: 1
+  why: "ASME B18.3 socket set screw, used as supplied"
+  designation: "#1-72 UNF-3A x 5/32 hex socket set screw, cup point, alloy steel"
+  standard: "ASME B18.3"
+ch-vn-rocker-thrust-washer:
+  tier: 1
+  why: "commodity ring shim defined by ID, OD and thickness"
+  designation: "Ring shim 1/4 ID x 3/8 OD x .031, carbon steel"
+  standard: "—"
+  envelope:
+    "OD": "_mcmaster_3088a429 DIMS.od_max"
+    "T": "_mcmaster_3088a429 DIMS.thickness_max"
+dt-cone-gear-tl-vn-arbor-nut:
+  tier: 1
+  why: "ASME B18.2.2 hex nut, used as supplied"
+  designation: "1/4-28 UNF-2B hex nut, zinc-plated steel"
+  standard: "ASME B18.2.2"
+  envelope:
+    "AC": "_mcmaster_95462a505 1.1547005383792515*ACROSS_FLATS"
+    "T": "_mcmaster_95462a505 THICKNESS"
+dt-vn-cone-tip-block-screw:
+  tier: 1
+  why: "ASME B18.3 socket head cap screw, used as supplied"
+  designation: "#4-40 UNC-3A x 3/8 hex socket head cap screw, black-oxide alloy steel"
+  standard: "ASME B18.3"
+  envelope:
+    "head Ø": "_mcmaster_91251a108 SupplierHeadDiameter"
+    "head H": "_mcmaster_91251a108 SupplierHeadHeight"
+dt-vn-cone-tip-pinch-screw:
+  tier: 1
+  why: "ASME B18.6.3 slotted machine screw, used as supplied"
+  designation: "#4-40 UNC-2A x 5/8 slotted fillister head machine screw, 18-8 stainless"
+  standard: "ASME B18.6.3"
+  envelope:
+    "head Ø": "_mcmaster_91794a112 SupplierHeadDiameter"
+    "head H": "_mcmaster_91794a112 SupplierHeadHeight"
+dt-vn-crank-seat-drive-pin:
+  tier: 1
+  why: "ASME B18.8.2 hardened dowel pin, used as supplied"
+  designation: "Ø3/32 x 1/4 hardened dowel pin, alloy steel"
+  standard: "ASME B18.8.2"
+dt-vn-keeper-chain-screw:
+  tier: 1
+  why: "ASME B18.6.3 slotted machine screw, used as supplied"
+  designation: "#2-56 UNC-2A x 1/4 slotted binding head machine screw, brass"
+  standard: "ASME B18.6.3"
+  envelope:
+    "head Ø": "_mcmaster_92443a077 SupplierHeadDiameter"
+    "head H": "_mcmaster_92443a077 SupplierHeadHeight"
+dt-vn-locating-pin:
+  tier: 1
+  why: "ASME B18.8.2 hardened dowel pin, used as supplied"
+  designation: "Ø1/16 x 3/8 hardened dowel pin, alloy steel"
+  standard: "ASME B18.8.2"
+dt-vn-pedestal-hold-down-screw:
+  tier: 1
+  why: "ASME B18.6.3 slotted machine screw, used as supplied"
+  designation: "#8-32 UNC-2A x 3/4 slotted narrow fillister head machine screw, zinc-plated steel"
+  standard: "ASME B18.6.3"
+  envelope:
+    "head Ø": "_mcmaster_90280a197 SupplierHeadDiameter"
+    "head H": "_mcmaster_90280a197 SupplierHeadHeight"
+dt-vn-pinion-strap-pin:
+  tier: 1
+  why: "ASME B18.8.2 slotted spring pin, used as supplied"
+  designation: "Ø1/16 x 1/2 slotted spring pin, spring steel"
+  standard: "ASME B18.8.2"
+dt-vn-slotted-screw:
+  tier: 1
+  why: "ASME B18.6.3 slotted machine screw, used as supplied"
+  designation: "#8-32 UNC-2A x 1-1/2 slotted narrow fillister head machine screw, zinc-plated steel"
+  standard: "ASME B18.6.3"
+  envelope:
+    "head Ø": "_mcmaster_90280a203 SupplierHeadDiameter"
+    "head H": "_mcmaster_90280a203 SupplierHeadHeight"
+fr-vn-frame-cross-screw:
+  tier: 1
+  why: "ASME B18.6.3 slotted machine screw, used as supplied"
+  designation: "#10-32 UNF-2A x 1-3/4 slotted narrow fillister head machine screw, zinc-plated steel"
+  standard: "ASME B18.6.3"
+  envelope:
+    "head Ø": "_mcmaster_90280a837 SupplierHeadDiameter"
+    "head H": "_mcmaster_90280a837 SupplierHeadHeight"
+fr-vn-gooseneck-set-screw:
+  tier: 1
+  why: "ASME B18.6.2 square head set screw, used as supplied"
+  designation: "1/4-20 UNC-2A x 3/4 square head set screw, cup point, steel"
+  standard: "ASME B18.6.2"
+  envelope:
+    "head AC": "_mcmaster_91410a540 1.414213562373095*SupplierHeadWidth"
+    "head H": "_mcmaster_91410a540 SupplierHeadHeight"
+fr-vn-lag-screw:
+  tier: 1
+  why: "ASME B18.2.1 hex head screw, used as supplied"
+  designation: "1/4-20 UNC-2A x 3/4 hex head screw, fully threaded, 18-8 stainless"
+  standard: "ASME B18.2.1"
+  envelope:
+    "head AC": "_mcmaster_92240a540 1.1547005383792515*SupplierHeadWidth"
+    "head H": "_mcmaster_92240a540 SupplierHeadHeight"
+mg-vn-magnifying-bracket-screw:
+  tier: 1
+  why: "ASME B18.6.3 slotted machine screw, used as supplied"
+  designation: "#2-56 UNC-2A x 5/16 slotted fillister head machine screw, 18-8 stainless"
+  standard: "ASME B18.6.3"
+  envelope:
+    "head Ø": "_mcmaster_91794a078 SupplierHeadDiameter"
+    "head H": "_mcmaster_91794a078 SupplierHeadHeight"
+mg-vn-wheel-axle-back-washer:
+  tier: 1
+  why: "commodity flat washer defined by ID, OD and thickness"
+  designation: "#10 flat washer, brass"
+  standard: "—"
+  envelope:
+    "OD": "mg_vn_wheel_axle_back_washer_spec OD"
+    "T": "mg_vn_wheel_axle_back_washer_spec THICKNESS_MAX"
+mg-vn-wheel-axle-front-washer:
+  tier: 1
+  why: "commodity flat washer defined by ID, OD and thickness"
+  designation: "#4 flat washer, brass"
+  standard: "—"
+  envelope:
+    "OD": "mg_vn_wheel_axle_front_washer_spec OD"
+    "T": "mg_vn_wheel_axle_front_washer_spec THICKNESS_MAX"
+mg-vn-wheel-axle-nut:
+  tier: 1
+  why: "ASME B18.6.3 machine screw nut, used as supplied"
+  designation: "#4-40 UNC-2B hex machine screw nut, brass"
+  standard: "ASME B18.6.3"
+  envelope:
+    "AC": "mg_vn_wheel_axle_nut_spec 1.1547005383792515*ACROSS_FLATS"
+    "T": "mg_vn_wheel_axle_nut_spec THICKNESS_MAX"
+ms-vn-stop-plate-screw:
+  tier: 1
+  why: "ASME B18.6.3 slotted machine screw, used as supplied"
+  designation: "#2-56 UNC-2A x 1/4 slotted fillister head machine screw, brass"
+  standard: "ASME B18.6.3"
+  envelope:
+    "head Ø": "_mcmaster_90114a124 SupplierHeadDiameter"
+    "head H": "_mcmaster_90114a124 SupplierHeadHeight"
+pd-vn-chain-connecting-link:
+  tier: 1
+  why: "ASME B29.1 No. 25 connecting link, used as supplied"
+  designation: "No. 25 roller chain connecting link, spring-clip type, steel"
+  standard: "ASME B29.1"
+pd-vn-guide-lock-screw:
+  tier: 1
+  why: "ASME B18.6.3 slotted machine screw, used as supplied"
+  designation: "#4-40 UNC-2A x 3/8 slotted pan head machine screw, 18-8 stainless"
+  standard: "ASME B18.6.3"
+  envelope:
+    "head Ø": "_mcmaster_91792a108 SupplierHeadDiameter"
+    "head H": "_mcmaster_91792a108 SupplierHeadHeight"
+pd-vn-platen-clip-screw:
+  tier: 1
+  why: "ASME B18.6.3 slotted machine screw, used as supplied"
+  designation: "#2-56 UNC-2A x 1/4 slotted pan head machine screw, brass"
+  standard: "ASME B18.6.3"
+  envelope:
+    "head Ø": "_mcmaster_92446a077 SupplierHeadDiameter"
+    "head H": "_mcmaster_92446a077 SupplierHeadHeight"
+pd-vn-transgear-arm-plate-locating-pin:
+  tier: 1
+  why: "ASME B18.8.2 hardened dowel pin, used as supplied"
+  designation: "Ø3/32 x 5/16 hardened dowel pin, alloy steel"
+  standard: "ASME B18.8.2"
+pd-vn-transgear-arm-plate-screw:
+  tier: 1
+  why: "ASME B18.6.3 slotted machine screw; cut flush at assembly (MHA-PD-00 arm-plate-screws-cut)"
+  designation: "#8-32 UNC-2A x 1 slotted oval head machine screw, 18-8 stainless"
+  standard: "ASME B18.6.3"
+  envelope:
+    "head Ø": "pd_vn_transgear_arm_plate_screw_spec HEAD_DIA"
+    "head H": "pd_vn_transgear_arm_plate_screw_spec HEAD_WHOLE_METAL_HEIGHT_MAX_MM"
+pd-vn-transgear-cluster-shim:
+  tier: 1
+  why: "commodity shim defined by ID, OD and thickness"
+  designation: "Shoulder-screw shim 1/8 ID x 1/4 OD x .005, 18-8 stainless"
+  standard: "—"
+  envelope:
+    "OD": "_mcmaster_94773a606 DIMS.od_max"
+    "T": "_mcmaster_94773a606 DIMS.thickness_max"
+pd-vn-transgear-collar-flat-pin:
+  tier: 1
+  why: "commodity 18-8 dowel pin; faced flush and crest-broken at assembly with its collar"
+  designation: "Ø1/16 x 3/16 dowel pin, 18-8 stainless"
+  standard: "—"
+pd-vn-transgear-hub-key-pin:
+  tier: 1
+  why: "ASME B18.8.2 hardened dowel pin, used as supplied"
+  designation: "Ø1/16 x 5/16 hardened dowel pin, alloy steel"
+  standard: "ASME B18.8.2"
+pd-vn-transgear-knob-cup-pin:
+  tier: 1
+  why: "ASME B18.8.2 slotted spring pin, used as supplied"
+  designation: "Ø1/16 x 5/8 slotted spring pin, spring steel"
+  standard: "ASME B18.8.2"
+pd-vn-transgear-knob-drive-pin:
+  tier: 1
+  why: "ASME B18.8.2 hardened dowel pin, used as supplied"
+  designation: "Ø3/32 x 3/16 hardened dowel pin, alloy steel"
+  standard: "ASME B18.8.2"
+pd-vn-transgear-latch-pin:
+  tier: 1
+  why: "ASME B18.8.2 hardened dowel pin, used as supplied"
+  designation: "Ø1/8 x 7/8 hardened dowel pin, alloy steel"
+  standard: "ASME B18.8.2"
+pd-vn-transgear-retaining-ring:
+  tier: 1
+  why: "commodity E-style external ring sized by its shaft"
+  designation: "E-style external retaining ring for Ø1/8 shaft, .015 ±.002 thick, for a .020 wide x Ø.095 groove, spring steel"
+  standard: "—"
+pn-vn-hanger-screw:
+  tier: 1
+  why: "ASME B18.6.3 hex head machine screw, used as supplied"
+  designation: "#8-32 UNC-2A x 1 hex head machine screw, fully threaded, zinc-plated steel"
+  standard: "ASME B18.6.3"
+  envelope:
+    "head AC": "_mcmaster_93075a199 1.1547005383792515*SupplierHeadWidth"
+    "head H": "_mcmaster_93075a199 SupplierHeadHeight"
+pn-vn-pen-adjust-nut:
+  tier: 1
+  why: "ASME B18.6.3 machine screw nut, used as supplied"
+  designation: "#0-80 UNF-2B hex machine screw nut, brass"
+  standard: "ASME B18.6.3"
+  envelope:
+    "AC": "_mcmaster_92671a115 1.1547005383792515*ACROSS_FLATS"
+    "T": "_mcmaster_92671a115 THICKNESS"
+pn-vn-pen-hanger-jam-nut:
+  tier: 1
+  why: "commodity thin hex nut defined by thread, AF and thickness"
+  designation: "#8-32 UNC-2B thin hex nut, zinc-plated steel"
+  standard: "—"
+  envelope:
+    "AC": "_mcmaster_90760a009 1.1547005383792515*ACROSS_FLATS"
+    "T": "_mcmaster_90760a009 THICKNESS"
+pn-vn-pen-hanger-nut:
+  tier: 1
+  why: "ASME B18.6.3 machine screw nut, used as supplied"
+  designation: "#8-32 UNC-2B hex machine screw nut, zinc-plated steel"
+  standard: "ASME B18.6.3"
+  envelope:
+    "AC": "_mcmaster_90480a009 1.1547005383792515*ACROSS_FLATS"
+    "T": "_mcmaster_90480a009 THICKNESS"
+sh-vn-arbor-set-screw:
+  tier: 1
+  why: "ASME B18.3 socket set screw, used as supplied"
+  designation: "#4-40 UNC-3A x 1/4 hex socket set screw, cup point, alloy steel"
+  standard: "ASME B18.3"
+sh-vn-brass-fillister-screw:
+  tier: 1
+  why: "ASME B18.6.3 slotted machine screw, used as supplied"
+  designation: "#4-40 UNC-2A x 1/4 slotted fillister head machine screw, brass"
+  standard: "ASME B18.6.3"
+  envelope:
+    "head Ø": "sh_vn_brass_fillister_screw_spec HEAD_DIA"
+    "head H": "sh_vn_brass_fillister_screw_spec HEAD_H"
+sh-vn-chain-link:
+  tier: 1
+  why: "ASME B29.1 No. 25 roller chain, used as supplied"
+  designation: "No. 25 single-strand roller chain, 1/4 pitch, steel"
+  standard: "ASME B29.1"
+sh-vn-clamp-screw:
+  tier: 1
+  why: "ASME B18.6.3 slotted machine screw, used as supplied"
+  designation: "#8-32 UNC-2A x 1-1/4 slotted narrow fillister head machine screw, zinc-plated steel"
+  standard: "ASME B18.6.3"
+  envelope:
+    "head Ø": "sh_vn_clamp_screw_spec FILLISTER_SIZE[3]"
+    "head H": "sh_vn_clamp_screw_spec FILLISTER_SIZE[2]"
+sh-vn-fillister-screw-90280a108:
+  tier: 1
+  why: "ASME B18.6.3 slotted machine screw, used as supplied"
+  designation: "#4-40 UNC-2A x 3/8 slotted narrow fillister head machine screw, zinc-plated steel"
+  standard: "ASME B18.6.3"
+  envelope:
+    "head Ø": "dt_swing_stop_screw_spec HEAD_DIA_MAX_MM"
+    "head H": "dt_swing_stop_screw_spec HEAD_TOTAL_MAX_MM"
+sh-vn-fillister-screw-91794a055:
+  tier: 1
+  why: "ASME B18.6.3 slotted machine screw; disc screws' tips cut at assembly (MHA-PD-00 disc-screws-cut)"
+  designation: "#0-80 UNF-2A x 1/4 slotted fillister head machine screw, 18-8 stainless"
+  standard: "ASME B18.6.3"
+  envelope:
+    "head Ø": "_mcmaster_91794a055 SupplierHeadDiameter"
+    "head H": "_mcmaster_91794a055 SupplierHeadHeight"
+sh-vn-music-wire:
+  tier: 1
+  why: "ASTM A228 music wire; cut and formed in the assembly steps"
+  designation: "Ø.008 music wire, ASTM A228 spring steel"
+  standard: "ASTM A228"
+  envelope:
+    "Ø": "_mcmaster_9666k142 DIA_MAX"
+sh-vn-pivot-pin:
+  tier: 1
+  why: "commodity 18-8 dowel pin defined by diameter and length"
+  designation: "Ø5/64 x 5/16 dowel pin, 18-8 stainless"
+  standard: "—"
+sm-vn-knife-hanger-washer:
+  tier: 1
+  why: "ASME B18.21.1 SAE plain washer, used as supplied"
+  designation: "#10 SAE plain washer, 18-8 stainless"
+  standard: "ASME B18.21.1"
+  envelope:
+    "OD": "_mcmaster_96659a104 DIMS.od_max"
+    "T": "_mcmaster_96659a104 DIMS.thickness_max"
+sm-vn-knife-mount-dowel:
+  tier: 1
+  why: "ASME B18.8.2 hardened dowel pin, used as supplied"
+  designation: "Ø1/8 x 3/4 hardened dowel pin, alloy steel"
+  standard: "ASME B18.8.2"
+ch-vn-channel-spring-installed:
+  tier: 2
+  why: "extension spring: rate, free length, hook form and max OD govern"
+ch-vn-rocker-bank-spring:
+  tier: 2
+  why: "wave disc spring: load at working height, ID/OD govern"
+dt-vn-cone-lock-knob:
+  tier: 2
+  why: "knurled thumb screw: no dimensional standard; head and thread govern"
+dt-vn-cone-pivot-screw:
+  tier: 2
+  why: "slotted precision shoulder screw: no ASME standard; shoulder fit governs"
+dt-vn-cylinder-bank-spring:
+  tier: 2
+  why: "wave disc spring: load at working height, ID/OD govern"
+dt-vn-keeper-chain:
+  tier: 2
+  why: "jack chain trade size: no dimensional standard"
+fr-vn-tube-frame-cap:
+  tier: 2
+  why: "push-on tube cap: fit on the tube OD governs"
+pd-vn-transgear-pivot-spring:
+  tier: 2
+  why: "curved disc spring: load at working height, ID/OD govern"
+pn-vn-pen-marker:
+  tier: 2
+  why: "proprietary marker: barrel diameter and tip govern"
+pn-vn-pen-set-screw:
+  tier: 2
+  why: "flared-collar thumb screw: no dimensional standard"
+sh-vn-thumb-screw:
+  tier: 2
+  why: "knurled thumb screw: no dimensional standard; head and thread govern"
+sm-vn-counter-spring:
+  tier: 2
+  why: "extension spring: rate, free length, loop form and max OD govern"
+sm-vn-gooseneck-shoulder-screw:
+  tier: 2
+  why: "slotted precision shoulder screw: no ASME standard; shoulder fit governs"
+ch-vn-spring-hook:
+  tier: 3
+  why: "eyebolt shank cut and its nut discarded"
+dt-cone-tip-end-screw:
+  tier: 3
+  why: "fillister screw drilled and reamed (MHA-DT-39)"
+dt-vn-cone-shaft-key:
+  tier: 3
+  why: "key stock cut to length"
+dt-vn-crank-hub-pin:
+  tier: 3
+  why: "dowel cut to length"
+dt-vn-post-mount-screw:
+  tier: 3
+  why: "screw stock cut to length"
+pd-feed-rack:
+  tier: 3
+  why: "rack stock cut to length, drilled and tapped (MHA-PD-26)"
+pd-transgear-removable:
+  tier: 3
+  why: "sprocket blanks: hub turned, bored and drilled (MHA-PD-09)"
+pd-vn-transgear-pivot-screw:
+  tier: 3
+  why: "shoulder screw faced to fit"
+sm-vn-boss-hook:
+  tier: 3
+  why: "eyebolt shank trimmed"
+sm-vn-knife-hanger-stud:
+  tier: 3
+  why: "hex screw cut to length"
