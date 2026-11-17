@@ -189,7 +189,8 @@ BOM_DESCRIPTIONS = {
 if set(BOM_DESCRIPTIONS) != set(BOM_ORDER) or len(set(BOM_ORDER)) != len(BOM_ORDER):
     raise AssertionError("every BOM family needs exactly one description")
 
-EXPLODED_CAPTION = "EXPLODED VIEW"
+# The fit-up steps and checks print in the release's ASSEMBLY.md (#2889).
+EXPLODED_CAPTION = "EXPLODED VIEW - FIT-UP STEPS IN ASSEMBLY.MD"
 
 # The BOM's item numbers, as the native table numbers the families (component
 # order in the source assembly); the drawing proves the inserted table prints

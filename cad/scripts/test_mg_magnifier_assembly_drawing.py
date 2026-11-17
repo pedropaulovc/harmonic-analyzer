@@ -321,14 +321,20 @@ def test_the_joints_left_loose_cite_the_mha_ha_00_step_that_seats_them() -> None
 
 
 def test_every_printed_step_is_one_short_action_by_the_shared_lint() -> None:
-    """Rule 22, offline, by the shared step lint (#2248): each printed step
-    is at most six lines and one action, a check's remedies follow it as
-    lettered sub-steps of its step, a press is followed by its hand check and
-    slip-fit remedy, every step cite names a printed head, and every direction
-    word is one the sheet defines. No step is allowlisted."""
+    """Rule 22, offline, by the shared step lint (#2248): each step, wrapped
+    at a 100-character line as ASSEMBLY.md is read, is at most six lines and
+    one action, a check's remedies follow it as lettered sub-steps of its
+    step, a press is followed by its hand check and slip-fit remedy, every
+    step cite names a printed head, and every direction word is one the sheet
+    defines. No step is allowlisted."""
+    import textwrap
+
     from _test_assembly_steps import step_structure_violations
 
-    printed = "\n".join(notes.ASSEMBLY_STEPS)
+    printed = "\n".join(
+        textwrap.fill(step, width=100, subsequent_indent="   ")
+        for step in notes.ASSEMBLY_STEPS
+    )
     # The direction words the steps use, each with its definition as printed:
     # a standard view name and a sense seen in a lettered view (rule 26).
     direction_key = "\n".join(

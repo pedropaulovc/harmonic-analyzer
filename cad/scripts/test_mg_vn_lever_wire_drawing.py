@@ -118,8 +118,12 @@ def test_assembly_pointer_cites_the_sheets_and_steps_that_cut_and_form_each_memb
     assert all("WIRE" in magnifier_sheet.STEP_TEXT[key] for key in wire_keys)
     assert "mg-magnifier" in ha_assembly_package.STEPS_IN_DOCUMENT
     first, last = (drawing.magnifier_steps.step_number(key) for key in wire_keys)
+    printed = "\n".join(ha_assembly_package.fitup_lines("mg-magnifier"))
+    assert f"- **{first}.** " in printed and f"- **{last}.** " in printed
     [line] = [line for line in lines if numbers["mg-magnifier"] in line]
-    assert line == f"LEVER WIRE: {numbers['mg-magnifier']} STEPS {first}-{last}"
+    assert line == (
+        f"LEVER WIRE: {numbers['mg-magnifier']} STEPS {first}-{last} (ASSEMBLY.MD)"
+    )
     # The pen sheet has no keyed sequence: its numbered steps naming the pen
     # wire are the ones the pointer must cite, on the sheets that print them.
     pen_steps = {
