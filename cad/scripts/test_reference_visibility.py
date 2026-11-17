@@ -623,11 +623,6 @@ _REFERENCE_HIDES = (
     ".BlankRefGeom(",
     "_blank_recipe_references(",
 )
-# Modules that create reference geometry but never save a document: the
-# motion studies author transient points/planes on an open model and discard it.
-_NON_SAVING_CREATORS = frozenset(
-    {"build_motion_study.py", "build_motion_study_springs.py"}
-)
 
 
 def _creates_without_hiding(text: str) -> bool:
@@ -663,7 +658,6 @@ def test_every_reference_creator_hides_what_it_creates() -> None:
         for path in SCRIPTS.rglob("*.py")
         if "diagnostics" not in path.relative_to(SCRIPTS).parts
         and not path.name.startswith("test_")
-        and path.name not in _NON_SAVING_CREATORS
         and _creates_without_hiding(path.read_text(encoding="utf-8"))
     )
     assert offenders == []
@@ -762,18 +756,9 @@ def test_every_literal_named_reference_is_hidden_by_name() -> None:
         for path in SCRIPTS.rglob("*.py")
         if "diagnostics" not in path.relative_to(SCRIPTS).parts
         and not path.name.startswith("test_")
-        and path.name not in _NON_SAVING_CREATORS
         for name in _named_references_left_shown(path.read_text(encoding="utf-8"))
     )
     assert offenders == []
-
-
-def test_the_non_saving_allowance_stays_honest() -> None:
-    for module in _NON_SAVING_CREATORS:
-        text = (SCRIPTS / module).read_text(encoding="utf-8")
-        assert _creates_without_hiding(text), module
-        assert "save_part_and_images" not in text, module
-        assert "save_assembly_and_images" not in text, module
 
 
 def test_one_error_names_both_unexpected_and_stale_entries() -> None:

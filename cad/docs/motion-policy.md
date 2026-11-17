@@ -1,21 +1,16 @@
 # Motion & simulation policy
 
-## Solver: Basic Motion only — never Motion Analysis
+## Solver: mate-driven kinematics — no Motion study
 
-The model is validated with SolidWorks **Basic Motion** (physical simulation) and mate-driven
-kinematics. The **Motion Analysis** add-in is deliberately **not** used and is **not required**
-to build, open, inspect, or validate the release. (It is also unavailable on the Makers seat.)
+The model is validated by mate-driven kinematics only: the saved assemblies keep their
+operational DOF free, and `verify:kinematics` / `verify:soundness` drive and gate them. No
+SolidWorks Motion study (Basic Motion or Motion Analysis) is built or required to build, open,
+inspect, or validate the release; the hand-run Basic Motion study scripts were retired with
+#2887 (none was wired into `doit`). The **Motion Analysis** add-in is also unavailable on the
+Makers seat.
 
-Basic Motion is treated as a **kinematic / visual smoke-test layer**, validating:
-
-- the mechanism moves and the channels **decohere** (each runs at its own harmonic);
-- gear ratios hold (cone `j` ↔ cylinder 120; crank 16:64);
-- rockers oscillate at the correct **relative** frequencies;
-- amplitude bars stay constrained, springs stay within their travel envelope;
-- no catastrophic interference across a crank revolution.
-
-It is **not** trusted for: crank torque, contact/spring force, friction, dynamic vibration,
-gear-tooth or cam stress, or tolerance stackup under load.
+No simulation result is trusted for crank torque, contact/spring force, friction, dynamic
+vibration, gear-tooth or cam stress, or tolerance stackup under load.
 
 ## The summation is computed, not simulated
 

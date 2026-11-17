@@ -1549,9 +1549,7 @@ engaged path is a documented KINEMATIC coupling at the faithful ch30 rest geomet
 the intermediate transgear (fine-pinion → 96T disc) keeps its 13.1 mm rest gap and
 the coupling spans it — the single latch arm cannot serve both the 66.05 rest and
 51.0 engaged centre distances (DIMENSIONS.md Appendix C #8's open kinematic riddle),
-so the engage is coupled, not geometrically meshed. The motion/mobility
-diagnostics treat every freed (absent-driver) DOF as already-free
-(`build_motion_setup_drives.py`).
+so the engage is coupled, not geometrically meshed.
 
 The mechanism is the **kinematic DOF manifest**. A freed DOF gets NO driver
 mate at all — every part is inserted on its exact Python-solved transform and
@@ -1560,7 +1558,7 @@ full definition. The build only RECORDS each freed DOF's drive spec
 (`free_dof_key=…` on the `*_driver` helpers → `_assembly` records
 `entities`/scalars/rest value/mate side) into a sidecar `.<stem>.dof.json`
 beside the `.SLDASM` (a cached assembly output, so it rides the remote cache).
-`verify:kinematics` (and the mobility/motion diagnostics) author those specs
+`verify:kinematics` authors those specs
 TRANSIENTLY (`_assembly_postbuild.author_dof_drives`, mates named
 `DRIVE_<key>`) to pin or sweep a DOF on a reopened model, then discard the
 model **without saving** — the shipped `.SLDASM` stays the free kinematic
@@ -1578,9 +1576,7 @@ set from both directions with one status walk (`assert_free_dof_necessity`):
 ≥ N components under-constrained with each freed DOF's family present
 (necessity), and — where the contract's `allowed_free_stems` pins the assembly's
 coupled families — no component outside that list under-constrained (exact
-set). As a hand-run diagnostic, `build_mobility_probe.py` authors the manifest
-drives to reconstitute a 0-DOF baseline, then suppresses each to show it frees
-its own part family.
+set).
 
 ## Stamps & incrementality
 

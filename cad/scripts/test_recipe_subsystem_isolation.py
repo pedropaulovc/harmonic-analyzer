@@ -39,7 +39,6 @@ def part_closures() -> dict[str, frozenset[str]]:
         assert builder.name.startswith("build_"), builder
         assert builder.name not in NON_PART_SCRIPTS, builder
         assert not builder.name.endswith("_assembly.py"), builder
-        assert not builder.stem.startswith("build_motion_"), builder
         assert not builder.stem.endswith("_probe"), builder
         deps = frozenset(Path(dep).stem for dep in module_deps_of(builder))
         assert deps, f"empty production part dependency closure: {builder.stem}"

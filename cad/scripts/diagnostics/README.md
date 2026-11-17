@@ -10,7 +10,7 @@ locates `cad/scripts` for standalone entrypoints; it re-exports no helpers.
 The existing `_chain.py` shim still supports archived chain imports:
 
 ```
-C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\diagnostics\probe_motion.py
+C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\diagnostics\audit_unanchored_sketches.py
 ```
 
 Reusable knowledge from these has been distilled into the build scripts,
