@@ -11,6 +11,7 @@ import _config
 import dt_cone_gear_stack
 import cone_stack_end_play
 import draw_dt_drive_train_assembly as drawing
+import dt_drive_train_acceptance_assembly_sheet as acceptance_sheet
 import dt_drive_train_assembly_sheet as sheet
 import dt_drive_train_steps as steps
 import pinion_rig_tip_gap as tip_gap
@@ -33,6 +34,15 @@ def _step_body(key: str) -> str:
     index = next(i for i, head in enumerate(heads) if int(head.group(1)) == number)
     end = heads[index + 1].start() if index + 1 < len(heads) else len(text)
     return " ".join(text[heads[index].end() : end].split())
+
+
+def _accept(key: str, *, cites: str) -> str:
+    """The SET TO / ACCEPT cell of a sheet 16 setting-table row, once the
+    printed step ``cites`` has been checked to cite that row."""
+    assert f"({drawing.acceptance_ref(key)})" in cites, key
+    number = str(drawing.ACCEPTANCE_ROW_NUMBERS[key])
+    (row,) = (row for row in drawing.ACCEPTANCE_TABLE_ROWS if row[0] == number)
+    return row[drawing.ACCEPTANCE_TABLE_HEADER.index("SET TO / ACCEPT")]
 
 
 def test_the_printed_step_heads_are_the_registry_in_order() -> None:
@@ -77,13 +87,17 @@ def test_the_cone_stack_step_prints_measured_limits() -> None:
         "SLIDE MHA-DT-07"
     )
     assert f"SLIDE MHA-DT-07 ON {key}" in stack
-    # The decimal-inch window rounds inward, a thousandth inside each limit.
-    printed = re.search(r"MHA-DT-37 TEETH' BACK: ACCEPT (\d*\.\d{3})-(\d*\.\d{3})\.", stack)
+    # The decimal-inch window rounds inward, a thousandth inside each limit;
+    # it prints as the step's sheet 16 setting-table row (R5 review, rule 22).
+    assert "MHA-DT-37 TEETH' BACK (" in stack
+    printed = re.fullmatch(r"(\d*\.\d{3})-(\d*\.\d{3})", _accept("cone-stack", cites=stack))
     assert printed is not None
     first, last = (float(value) * 25.4 for value in printed.groups())
     assert low <= first < low + 0.0254 and high - 0.0254 < last <= high
     # The remedy is its own sub-step after the check (rule 22).
-    assert stack.index("ACCEPT") < stack.index("IF THE STACK IS LONG, RE-FACE ITS THICKEST GEAR")
+    assert stack.index(drawing.acceptance_ref("cone-stack")) < stack.index(
+        "IF THE STACK IS LONG, RE-FACE ITS THICKEST GEAR"
+    )
     assert "IF IT IS SHORT, REMAKE ITS THINNEST GEAR" in stack
 
 
@@ -119,7 +133,7 @@ def test_the_tip_is_measured_dry_then_bonded_on_the_feeler_in_two_cures() -> Non
         stack,
         (
             "DRY, NO FEELER",
-            "ACCEPT",
+            drawing.acceptance_ref("cone-stack"),
             "PRESS MHA-DT-38 ON THE MHA-DT-37 PIVOT",
             "DEGREASE T024",
             "PASTE WAX",
@@ -184,7 +198,7 @@ def test_the_end_screw_sets_the_end_play_after_the_pivot_runs_free() -> None:
         "THREAD MHA-DT-39 IN UNTIL MHA-DT-04 JUST STOPS SHUTTLING",
         "BACK MHA-DT-39 OFF 1/8 TURN",
         "TIGHTEN MHA-DT-VN-56",
-        "REPEAT 3-3C UNTIL THE END PLAY READS IN ITS WINDOW",
+        "IF IT READ OVER, REDO 3B-3C WITH MHA-DT-39 IN MORE, IF UNDER LESS",
         # Rule 23 (PR 2 machinist review round 10): the pinch lock's bench
         # acceptance comes once the end play is final.
         "CHECK THAT MHA-DT-39 DOES NOT TURN IN MHA-DT-21 BY HAND",
@@ -218,11 +232,10 @@ def test_the_end_screw_sets_the_end_play_after_the_pivot_runs_free() -> None:
 def test_the_printed_shaft_end_play_is_the_band_the_stacks_book() -> None:
     """The end screw's embed and the bushing air book
     cone_stack_end_play.SHAFT_END_PLAY; the sheet prints that band, rounded
-    inward to the thousandth."""
-    match = re.search(
-        r"DIAL-INDICATE THE MHA-DT-04 END PLAY AT THE SHAFT END: (\.\d{3})-(\.\d{3})",
-        _step_body("end-play-set"),
-    )
+    inward to the thousandth, as step 3C's sheet 16 row."""
+    body = _step_body("end-play-set")
+    assert "INDICATE THE MHA-DT-04 END PLAY AT THE SHAFT END (" in body
+    match = re.fullmatch(r"(\.\d{3})-(\.\d{3})", _accept("shaft-end-play", cites=body))
     assert match is not None
     low, high = (float(value) * 25.4 for value in match.groups())
     least, most = cone_stack_end_play.SHAFT_END_PLAY
@@ -245,12 +258,15 @@ def test_post_screws_keep_spec_owned_stock_and_cut_to_fit_acceptance() -> None:
     assert f"MSC {screw.SKU}" not in fitup
     places = screw.DRAWING_PRECISION_BY_NAME[screw.CUT_LENGTH_DIMENSION]
     assert f"({sheet.inch_text(screw.CUT_LENGTH_MM, places)}) REF LONG" in fitup
-    # The step prints the part sheet's exact maximum short, never a wider one.
-    printed_short = float(re.search(r"FLUSH TO (\d*\.\d+) SHORT", fitup).group(1))
+    # The part sheet's exact maximum short, never a wider one, prints as the
+    # step's sheet 16 row.
+    printed_short = float(
+        re.fullmatch(r"FLUSH TO (\d*\.\d+) SHORT", _accept("post-screw-cut", cites=fitup)).group(1)
+    )
     assert printed_short * 25.4 == pytest.approx(screw.POST_SCREW_CUT_TO_FIT_SHORT, abs=1e-9)
     assert (
         "CUT EACH MHA-DT-VN-61 TO FIT" in fitup
-        and "SHORT OF THE MHA-DT-20 UNDERSIDE" in fitup
+        and "TO THE MHA-DT-20 UNDERSIDE" in fitup
     )
     assert "DEBURR THE CUT ENDS" in fitup
     assert screw.FIXED_CUT_LENGTH_EXISTS is False
@@ -337,14 +353,15 @@ def test_step_four_holds_the_collar_on_the_boss_and_leaves_the_end_proud() -> No
         f"SET MHA-DT-10 {sheet.inch_text(pinion.SEAT_FEELER_MM, sheet.FEELER_PLACES)} "
         "OFF THE BOSS BACK FACE WITH A FEELER",
         "MATCH-DRILL THE MHA-DT-10",
-        f"END STANDS {drawing.inch_envelope((least, most), 3)} PROUD OF MHA-DT-10.",
+        f"END STANDS PROUD OF MHA-DT-10 ({drawing.acceptance_ref('crank-end-proud')}).",
         "DO NOT FACE",
     )
     positions = [fitup.index(phrase) for phrase in order]
     assert positions == sorted(positions)
     # A stack result the fitter cannot adjust: every accepted part set,
     # including both extremes, must fall inside the printed range.
-    printed = fitup.split("END STANDS ", 1)[1].split(" PROUD", 1)[0]
+    printed = _accept("crank-end-proud", cites=fitup)
+    assert printed == acceptance_sheet.inch_envelope((least, most), 3)
     low, high = (float(limit) * 25.4 for limit in printed.split("-"))
     assert low <= least and most <= high
     assert "SHIM" not in fitup and "MHA-CH-VN-57" not in fitup

@@ -92,8 +92,9 @@ T120_FITUP_BAND_REMEDY = (
     "IF IT STOPS AT THE BAND, TURN MHA-DT-10'S BAND DOWN, "
     f"Ø{inch_min_text(pinion.TURNED_DIA_FITUP_MIN, 3)} MIN."
 )
+# The limit names its dimension (machinist review of #3023, rule 26).
 T120_FITUP_SHOULDER_REMEDY = (
-    "IF IT STOPS AT THE SHOULDER, FACE THE SHOULDER BACK, "
+    "IF IT STOPS AT THE SHOULDER, FACE THE SHOULDER BACK: MHA-DT-10 SHOULDER LENGTH "
     f"{inch_min_text(pinion.SHOULDER_LENGTH_FITUP_MIN, 3)} MIN."
 )
 

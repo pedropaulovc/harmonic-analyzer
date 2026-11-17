@@ -104,19 +104,21 @@ from ch_channel_assembly_steps import (
 )
 import ch_vn_rocker_thrust_washer_spec as rocker_washer
 import cone_line
-from cone_stack_end_play import SHAFT_END_PLAY, STACK_FEELER
+from cone_stack_end_play import STACK_FEELER
 import cylinder_bank_layout as bank
 import dt_cylinder_bank_setting_spec as bank_settings
 from dt_cone_gear_spec import CONE_TEETH, ROUND_BORE_TEETH
-from dt_cone_gear_stack import STACK_L20_ACCEPT
+import dt_drive_train_acceptance_assembly_sheet as acceptance_sheet
+from dt_drive_train_acceptance_assembly_sheet import (
+    FLUSH_SET_TEXT,
+    STRAP_PIN_DEPTH_TEXT,
+)
 from dt_cone_swing_platform_spec import POST_MOUNT_ENGAGEMENT_ASSEMBLY_FACT
 import dt_crank_drive_gear_spec as gear64
 import dt_crank_handle_pivot_screw_spec as handle_screw
 from dt_crank_hub_notes import FRONT_FACE_DATUM as HUB_FRONT_FACE_DATUM
-from dt_crank_pin_ring_spec import BUTT_GAP_BAND as RING_BUTT_GAP_BAND
 import dt_crank_pinion_spec as pinion
 from dt_crank_pinion_spec import SEAT_FEELER_MM as PINION_SEAT_FEELER
-from dt_crankshaft_spec import SHAFT_END_PROUD_RANGE as CRANK_END_PROUD_RANGE
 from dt_cylinder_end_disc_spec import WASHER_THICK as BANK_WASHER_THICK
 import dt_cylinder_gear_spec as drum
 import dt_drum_station_setting_spec as drum_station_setting
@@ -137,7 +139,6 @@ from dt_drive_train_assembly_sheet import (
     T120_FITUP_SHOULDER_REMEDY,
     inch_ceil_mm,
     inch_floor_mm,
-    inch_max_text,
     inch_text,
     inch_window,
 )
@@ -158,12 +159,12 @@ from dt_drive_train_assembly_spec import (
 )
 import dt_drive_train_steps as steps
 import dt_pinion_cam_geometry as cam_geometry
+from dt_pinion_arbor_collar_spec import PIN_END_DEPTH_SPREAD_TEXT as COLLAR_PIN_DEPTH_SPREAD
 from dt_pinion_arbor_geometry import (
     HEAD_CAP_SAG as ARBOR_HEAD_CAP_SAG,
     HEAD_FRONT_Z as ARBOR_HEAD_FRONT_Z,
     HEAD_REAR_Z as ARBOR_HEAD_REAR_Z,
 )
-from dt_pinion_spring_section import SCREW_EAST_OF_PIVOT as SPRING_SCREW_EAST_OF_PIVOT
 import fr_frame_assembly_steps
 import fr_harmonic_base_spec as base
 import pinion_rig_fitup as FITUP
@@ -173,7 +174,6 @@ import rocker_bank_layout as rockers
 import dt_vn_cone_lock_knob_spec as lock_knob
 import dt_vn_cone_pivot_screw_spec as pivot_screw
 import dt_vn_post_mount_screw_spec as post_screw
-import dt_swing_stop_screw_spec as stop_screw
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
@@ -217,6 +217,7 @@ SHEET_NAMES = (
     "CHECKS + SETUP",
     "CYLINDER BANK + MHA-DT-01 STATION SETTINGS",
     "SETTING TABLES + CONE STATIONS",
+    "SETTING TABLE CONT. - FITS AND ACCEPTANCES",
 )
 SHEET_LAYOUTS = {name: DrawingLayout.LANDSCAPE for name in SHEET_NAMES}
 if SPEC.layout is not DrawingLayout.LANDSCAPE:
@@ -262,10 +263,18 @@ BANK_SETTINGS_SHEET = 14
 # The DRO targets, feeler stacks, pedestal recheck record and the cone
 # station table: the sheet the steps and checks read their numbers from.
 SETTING_SHEET = 15
+# Every other measurable fit and acceptance the steps and checks make (end
+# plays, stack, proud, flush and pin-depth limits, the spring-foot station,
+# the tip gap) prints here as a setting-table row the step cites (R5
+# machinist review, rule 22: they printed only inside step text).  Sheet 15
+# has no room for them, and none is a single model dimension a setting view
+# could carry.
+ACCEPTANCE_SHEET = 16
 # Owner ruling 2026-11-08 (Pedro): one labelled code key defines the cone-gear
 # codes and GEAR 0-19 (code_key_text).  It is the sheet 15 station table,
-# titled as the key, and every step sheet's first heading points to it.
-CODE_KEY_HEADING = f"CODE KEY (SHEETS {SEQUENCE_SHEET}-{CHECKS_SHEET})"
+# titled as the key, and every step sheet's first heading points to it, as
+# sheet 16's table title does (Codjiflo on #3023: its rows use the codes).
+CODE_KEY_HEADING = f"CODE KEY (SHEETS {SEQUENCE_SHEET}-{CHECKS_SHEET}, {ACCEPTANCE_SHEET})"
 CODE_KEY_POINTER = f"(CODES: SHEET {SETTING_SHEET} KEY)"
 BANK_SETTING_SCALE = (1.0, 1.0)
 BANK_SPRING_DETAIL_SCALE = (4.0, 1.0)
@@ -1353,13 +1362,31 @@ ASSEMBLED_HEADING = (
 )
 
 
-def inch_envelope(limits_mm: tuple[float, float], places: int) -> str:
-    """A predicted (min, max) stack result the fitter cannot adjust, rounded
-    outward so every accepted part set lands inside the printed range."""
-    return (
-        f"{inch_text(inch_floor_mm(limits_mm[0], places), places)}-"
-        f"{inch_text(inch_ceil_mm(limits_mm[1], places), places)}"
-    )
+# --- sheet 16: the setting table's fits and acceptances ----------------------
+# R5 machinist review (rule 22): every measurable fit and acceptance a step or
+# check makes prints as a row of sheet 16, numbered on from sheet 15's rows,
+# and its step cites the row in place of the number (as 8Q-8S and 10B-10C
+# cite rows 2, 3 and 5).  The rows and their spec values live in
+# dt_drive_train_acceptance_assembly_sheet; this script numbers and places them.
+# Codjiflo on #3023 (rules 22, 26): the rows use the cone-gear codes, so the
+# title points at the code key, whose heading names sheet 16.
+ACCEPTANCE_TABLE_TITLE = (
+    f"SETTING TABLE CONT. - ASSEMBLY FITS AND ACCEPTANCES (ROWS 1-{len(SETTING_TABLE_ROWS)}: "
+    f"SHEET {SETTING_SHEET}) {CODE_KEY_POINTER}"
+)
+ACCEPTANCE_TABLE_HEADER = ("ROW", "STEP", "SETTING", "SET TO / ACCEPT", "CHECK WITH")
+ACCEPTANCE_ROW_NUMBERS = {
+    key: len(SETTING_TABLE_ROWS) + index
+    for index, (key, *_cells) in enumerate(acceptance_sheet.ACCEPTANCES, 1)
+}
+ACCEPTANCE_TABLE_ROWS = tuple(
+    (str(ACCEPTANCE_ROW_NUMBERS[key]), *cells) for key, *cells in acceptance_sheet.ACCEPTANCES
+)
+
+
+def acceptance_ref(key: str) -> str:
+    """A step's citation of its sheet 16 setting-table row."""
+    return f"SHEET {ACCEPTANCE_SHEET} ROW {ACCEPTANCE_ROW_NUMBERS[key]}"
 
 
 # Rule 23 (rubric sample round 13, #3): a press whose part slides in by hand
@@ -1406,7 +1433,7 @@ CONE_CRANK_STEPS = _note_text(
         "1C. SLIDE T024 ON MHA-DT-04 AGAINST T030, DRY, NO FEELER.",
         "1D. SLIDE T012 AND T018 ON THE MHA-DT-37 SPIGOT, DRY.",
         "1E. PUSH MHA-DT-37 INTO THE MHA-DT-04 SOCKET UNTIL T018 BEARS ON T024.",
-        f"1F. MEASURE T120 FRONT TO MHA-DT-37 TEETH' BACK: ACCEPT {inch_window(STACK_L20_ACCEPT, 3)}.",
+        f"1F. MEASURE T120 FRONT TO MHA-DT-37 TEETH' BACK ({acceptance_ref('cone-stack')}).",
         "1G. IF THE STACK IS LONG, RE-FACE ITS THICKEST GEAR.",
         "1H. IF IT IS SHORT, REMAKE ITS THINNEST GEAR.",
         "1J. REPEAT 1F UNTIL THE STACK READS IN ITS WINDOW.",
@@ -1488,16 +1515,16 @@ CONE_CRANK_STEPS = _note_text(
         # step does one thing.
         "2J. ALIGN THE MHA-DT-05 COUNTERBORES TO THE MHA-DT-20 TAPS.",
         # The exact maximum short the part sheet allows (.005 in = 0.127): a
-        # maximum never rounds outward, and the part's places print it whole.
-        # Rule 22 (rubric sample round 10 lint): one sentence; the REF cut
-        # length and the stated engagement are the cut's own facts.  FLUSH TO
-        # .005 SHORT is the never-proud limit (MHA-DT-VN-61's own sheet dropped
-        # NEVER PROUD as a restatement; PR 2 round 4 needed its line here).
+        # maximum never rounds outward, and the part's places print it whole
+        # (POST_SCREW_SHORT_TEXT, its sheet 16 row).  Rule 22 (rubric sample
+        # round 10 lint): one sentence; the REF cut length and the stated
+        # engagement are the cut's own facts.  FLUSH TO .005 SHORT is the
+        # never-proud limit (MHA-DT-VN-61's own sheet dropped NEVER PROUD as a
+        # restatement; PR 2 round 4 needed its line here).
         "2K. CUT EACH MHA-DT-VN-61 TO FIT, "
         f"({inch_text(post_screw.CUT_LENGTH_MM, post_screw.DRAWING_PRECISION_BY_NAME[post_screw.CUT_LENGTH_DIMENSION])}) "
-        "REF LONG: FLUSH TO "
-        f"{inch_max_text(post_screw.POST_SCREW_CUT_TO_FIT_SHORT, post_screw.CUT_TO_FIT_SHORT_PLACES)}"
-        " SHORT OF THE MHA-DT-20 UNDERSIDE, " + POST_MOUNT_ENGAGEMENT_ASSEMBLY_FACT,
+        f"REF LONG, TO THE MHA-DT-20 UNDERSIDE ({acceptance_ref('post-screw-cut')}), "
+        + POST_MOUNT_ENGAGEMENT_ASSEMBLY_FACT,
         "2L. DEBURR THE CUT ENDS.",
         "2M. RUN BOTH MHA-DT-VN-61 IN, LOOSE ENOUGH TO TURN MHA-DT-05.",
         # #1074: the collar's bearing on the boss end reacts the end screw's
@@ -1541,10 +1568,13 @@ CONE_CRANK_STEPS = _note_text(
         "3. THREAD MHA-DT-39 IN UNTIL MHA-DT-04 JUST STOPS SHUTTLING.",
         f"3A. BACK MHA-DT-39 OFF 1/8 TURN: {END_SCREW_ENGAGEMENT_ASSEMBLY_FACT}",
         "3B. TIGHTEN MHA-DT-VN-56 ACROSS THE SLIT.",
-        "3C. DIAL-INDICATE THE MHA-DT-04 END PLAY AT THE SHAFT END: "
-        f"{inch_window(SHAFT_END_PLAY, 3)}.",
+        "3C. INDICATE THE MHA-DT-04 END PLAY AT THE SHAFT END "
+        f"({acceptance_ref('shaft-end-play')}).",
         "3D. IF THE END PLAY IS OUT, LOOSEN MHA-DT-VN-56.",
-        "3E. REPEAT 3-3C UNTIL THE END PLAY READS IN ITS WINDOW.",
+        # Attempt 1 review (clarity, rule 22): the redo says which way
+        # MHA-DT-39 moves; Codjiflo on #3023: it redoes 3B-3C only, not 3A's
+        # fixed 1/8 turn (the embed books SHAFT_END_PLAY[1] either way).
+        "3E. IF IT READ OVER, REDO 3B-3C WITH MHA-DT-39 IN MORE, IF UNDER LESS.",
         # Rule 23 (PR 2 machinist review round 10): the pinch lock's bench
         # acceptance, worded as 2Z's, once the end play is final.
         "3F. CHECK THAT MHA-DT-39 DOES NOT TURN IN MHA-DT-21 BY HAND.",
@@ -1578,6 +1608,7 @@ CONE_CRANK_STEPS = _note_text(
         "4H. " + T120_FITUP_BAND_CHECK,
         "4J. " + T120_FITUP_SHOULDER_CHECK,
         "4K. " + T120_FITUP_BAND_REMEDY,
+        # Attempt 1 review (clarity, rule 26): the limit names its dimension.
         "4L. " + T120_FITUP_SHOULDER_REMEDY,
         "4M. REPEAT 4E-4J UNTIL THE FEELER PASSES BOTH.",
         "4N. TURN MHA-DT-07 ONE FULL REVOLUTION BY HAND: IT MUST NEVER BIND.",
@@ -1595,10 +1626,8 @@ CONE_CRANK_STEPS = _note_text(
         f"4T. CHECK THAT {pinion.PIN_NUMBER} IS {PIN_FIT_ACCEPTANCE}.",
         f"4U. IF IT IS, {SLIP_FIT_BOND}",
         "4V. TURN MHA-DT-07 ONE FULL REVOLUTION AGAIN: NO BINDING.",
-        "4W. CHECK THAT THE MHA-DT-11 END STANDS "
-        # A stack result, not a set window: rounded outward (Codjiflo, #2194).
-        f"{inch_envelope((max(CRANK_END_PROUD_RANGE[0], 0.0), CRANK_END_PROUD_RANGE[1]), 3)}"
-        " PROUD OF MHA-DT-10.",
+        "4W. CHECK MHA-DT-11'S END STANDS PROUD OF MHA-DT-10 "
+        f"({acceptance_ref('crank-end-proud')}).",
         "4X. DO NOT FACE THAT END.",
         f"5. SLIDE {CRANK_CHAIN_WHEEL} ON MHA-DT-11, HOLES OVER THE 2X MHA-DT-VN-67.",
         # U33 (user, 2026-09-23): crank hub MHA-DT-31 pressed into the arm and
@@ -1646,9 +1675,7 @@ CONE_CRANK_STEPS = _note_text(
         # screw's bench acceptance.
         "6M. CHECK THAT MHA-DT-VN-70 IS SEATED AND DOES NOT TURN BY HAND.",
         "6N. THREAD MHA-DT-27 THROUGH THE MHA-DT-09 CROSS-HOLE AND THE FAR LINK'S EYE.",
-        "6P. CLOSE MHA-DT-27 WITH PLIERS: BUTT GAP 0-"
-        + f"{RING_BUTT_GAP_BAND[1] / 25.4:.3f}".removeprefix("0")
-        + ".",
+        f"6P. CLOSE MHA-DT-27 WITH PLIERS TO ITS BUTT GAP ({acceptance_ref('ring-butt-gap')}).",
         "6Q. HANG MHA-DT-27 FROM THE MHA-DT-09 HEAD: CLEAR OF THE HUB.",
         # Rule 23 (rubric sample round 12, #1): the taper-pinned crank arm's
         # bench acceptance.
@@ -1668,8 +1695,8 @@ CONE_CRANK_STEPS = _note_text(
         "7E. WIPE THE WAX OFF MHA-DT-32.",
         "7F. SLIDE MHA-DT-08 ON MHA-DT-32.",
         "7G. THREAD MHA-DT-32 INTO MHA-DT-06, NO THREADLOCKER, SHOULDER TIGHT.",
-        "7H. CHECK THE MHA-DT-08 END PLAY ON MHA-DT-32 WITH FEELERS: "
-        f"{inch_window(handle_screw.END_PLAY_RANGE, 3)}.",
+        "7H. CHECK MHA-DT-08'S END PLAY ON MHA-DT-32 "
+        f"({acceptance_ref('handle-end-play')}).",
         "7J. FILE THE MHA-DT-32 TIP FLUSH TO THE ARM INBOARD FACE.",
         f"7K. STAKE THE TAP MOUTH ONTO IT AT {HANDLE_STAKE_POINTS} (SHEET {FULL_DETAIL_SHEET}).",
         "7L. CHECK THAT MHA-DT-32 DOES NOT TURN BY HAND.",
@@ -1766,9 +1793,9 @@ BANK_STEPS = _note_text(
         # spec SHAFT_DIA): pushed in end to end, the arbor drives the mandrel
         # out the front and every gear passes onto it in place (machinist
         # review r7/r8 of PR #2640: no step removed the mandrel).
-        "9T. PUSH MHA-DT-13 IN FROM THE BACK UNTIL EACH DOME STANDS "
-        f"{inch_text(bank.ARBOR_DOME_HEIGHT, 2)} PROUD: IT DRIVES THE MANDREL OUT THE "
-        "FRONT AND THE GEARS PASS ONTO IT.",
+        "9T. PUSH MHA-DT-13 IN FROM THE BACK UNTIL EACH DOME STANDS PROUD "
+        f"({acceptance_ref('arbor-dome')}): IT DRIVES THE MANDREL OUT THE FRONT AND THE GEARS "
+        "PASS ONTO IT.",
         "9U. SPOT MHA-DT-13 THROUGH EACH MHA-DT-02 SET-SCREW TAP WITH A #43 DRILL, .02 DEEP.",
         "9V. BLOW OUT THE CHIPS.",
         "9W. RUN THE FRONT MHA-SH-VN-54 IN TIGHT, THEN THE BACK ONE.",
@@ -1829,7 +1856,7 @@ RIG_SEQUENCE_HEADING = "ASSEMBLY SEQUENCE CONT. - PINION RIG"
 # along the bank.  The window a fitter must hold it in is known issue #1037,
 # which ships this as the interim.
 SPRING_EAST_WEST = (
-    f"FOOT HOLE CENTRE {inch_text(SPRING_SCREW_EAST_OF_PIVOT, 2)} RIGHT OF THE MHA-DT-19 AXIS"
+    f"FOOT HOLE CENTRE RIGHT OF THE MHA-DT-19 AXIS ({acceptance_ref('spring-foot')})"
 )
 
 # Sub-step letters: I and O are skipped, as on drawing zones.
@@ -1870,7 +1897,11 @@ RIG_REWORDINGS: dict[str, tuple[tuple[str, str], ...]] = {
         # label; the back end is plain.
         ("FROM ITS BACK CROWN END", "FROM ITS BACK END"),
         ("THRU BOTH, BOTH ENDS SUB-FLUSH AND", "THRU BOTH: BOTH ENDS SUB-FLUSH,"),
-        ("OF EACH OTHER; THEN SLIDE ", "OF EACH OTHER.\nSLIDE "),
+        # R5 machinist review (rule 22): the depth spread is its sheet 16 row.
+        (
+            f"WITHIN {COLLAR_PIN_DEPTH_SPREAD} OF EACH OTHER; THEN SLIDE ",
+            f"MATCHED ({acceptance_ref('collar-pin-ends')}).\nSLIDE ",
+        ),
     ),
     # The drum is bonded to the setting MHA-DT-22 prints only as a REF:
     # bond, set the station, wipe.  Round 13: the station is named by its
@@ -1895,9 +1926,23 @@ RIG_REWORDINGS: dict[str, tuple[tuple[str, str], ...]] = {
     # Round 19: 16C on one line (the possessive, as 21A), so step 23 has room.
     "straps-pinned-to-torque-shaft": (
         (", SO IT BEARS IN BOTH MHA-DT-18 AND CLEARS MHA-DT-16.", "."),
+        # R5 machinist review (rule 22): the flush band and the pin depths are
+        # their sheet 16 rows.
         (
-            "SET THE MHA-DT-19 REAR END FLUSH WITH THE MHA-DT-18 REAR FACE ",
-            "SET MHA-DT-19'S REAR END FLUSH WITH MHA-DT-18'S REAR FACE ",
+            f"SET THE MHA-DT-19 REAR END FLUSH WITH THE MHA-DT-18 REAR FACE {FLUSH_SET_TEXT}.",
+            "SET MHA-DT-19 FLUSH AT MHA-DT-18'S REAR FACE "
+            f"({acceptance_ref('shaft-rear-flush')}).",
+        ),
+        (
+            f"BOTH ENDS {STRAP_PIN_DEPTH_TEXT} BELOW THE MHA-DT-14 EDGES.",
+            f"BOTH ENDS BELOW THE MHA-DT-14 EDGES ({acceptance_ref('strap-pin-ends')}).",
+        ),
+    ),
+    "cam-collars-set": (
+        (
+            f"SET MHA-DT-17'S REAR END FLUSH WITH MHA-DT-18'S REAR FACE {FLUSH_SET_TEXT}.",
+            "SET MHA-DT-17 FLUSH AT MHA-DT-18'S REAR FACE "
+            f"({acceptance_ref('lift-rod-rear-flush')}).",
         ),
     ),
 }
@@ -1927,6 +1972,7 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
             ("handle-bonded", _flat(_HANDLE_BOND_STEP)),
             # A multi-line spec step: its lines are already one-thing lines.
             ("straps-pinned-to-torque-shaft", _SHAFT_DRILL_STEP),
+            ("cam-collars-set", _COLLAR_SET_STEP),
         )
     }
     numbered = (
@@ -1974,7 +2020,7 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
             "TURN MHA-DT-01 SO A TOOTH TIP FACES A MHA-DT-12 TOOTH TIP ON THE LEVEL "
             "LINE OF CENTRES.\n"
             f"SLIDE THE RIG IN UNTIL A {TIP_GAP.TIP_GAP_FEELER_TEXT} IS SNUG "
-            f"BETWEEN THE TIPS: {TIP_GAP.TIP_GAP_ACCEPT_TEXT}.\n"
+            f"BETWEEN THE TIPS ({acceptance_ref('tip-gap')}).\n"
             f"SET THE TIP GAP AS {steps.step_number('rig-located')}D-"
             # Round 15 (#2, rule 26): the stations by gear (sheet 8's key).
             f"{steps.step_number('rig-located')}E AT GEAR 0 AND AT GEAR 19.",
@@ -2008,7 +2054,7 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
         # each cam along the rod, tightens its set screw and stakes the tap.
         (
             "cam-collars-set",
-            f"PUT MHA-DT-16 AT PARK, EACH CAM ECCENTRIC DOWN.\n{_COLLAR_SET_STEP}",
+            f"PUT MHA-DT-16 AT PARK, EACH CAM ECCENTRIC DOWN.\n{reworded['cam-collars-set']}",
         ),
         # Rubric sample round 4: the hole's station, drill and fit read before
         # the match-drill, insert and peen lines that use them.
@@ -2170,13 +2216,13 @@ CHECKS = _note_text(
         "4T. REDO 4N-4R.",
         "4U. LEAVE MHA-DT-02 AS THEY ARE FROM HERE ON.",
         "4V. REDO CHECKS 4-7 AFTER ANY LATER LOOSENING OF MHA-DT-02.",
-        "4W. VERIFY MHA-DT-VN-52 FULL-FORM THREAD ENGAGEMENT "
-        f"{pivot_screw.MIN_USEFUL_ENGAGEMENT_TEXT}: THE LESSER READING OF STEPS "
-        f"{_step_ref('other-base-mounting', 'H')}-{_step_ref('other-base-mounting', 'J')}.",
+        "4W. VERIFY MHA-DT-VN-52 FULL-FORM THREAD ENGAGEMENT, THE LESSER READING OF STEPS "
+        f"{_step_ref('other-base-mounting', 'H')}-{_step_ref('other-base-mounting', 'J')} "
+        f"({acceptance_ref('pivot-screw-engagement')}).",
         "4X. CHECK THAT MHA-DT-20 AND THE MHA-DT-VN-52 SHOULDER STAY SEATED.",
-        "4Y. VERIFY THE MHA-SH-VN-52 SWING STOP FULL-FORM THREAD ENGAGEMENT "
-        f"{stop_screw.MIN_USEFUL_ENGAGEMENT_TEXT}: THE LESSER READING OF STEPS "
-        f"{_step_ref('other-base-mounting', 'M')}-{_step_ref('other-base-mounting', 'N')}.",
+        "4Y. VERIFY THE MHA-SH-VN-52 SWING STOP FULL-FORM THREAD ENGAGEMENT, THE LESSER "
+        f"READING OF STEPS {_step_ref('other-base-mounting', 'M')}-"
+        f"{_step_ref('other-base-mounting', 'N')} ({acceptance_ref('stop-screw-engagement')}).",
         "4Z. CHECK THAT ITS HEAD IS FULLY SEATED.",
         # Rubric sample round 2: the notch's reference, the running direction
         # and the sine sense must be readable.  Notches up = cosine mode,
@@ -2208,8 +2254,8 @@ CHECKS = _note_text(
         "5H. TURN THE CRANK ON UNTIL EVERY NOTCH IS BACK AS 5D OR 5E.",
         "6. PARKED, MHA-DT-24 HOLDS MHA-DT-01 CLEAR OF EVERY MHA-DT-12.",
         f"7. PARKED, PINS ON THE CAMS: A {TIP_GAP.TIP_GAP_SETTING_TEXT} FEELER IS SNUG TIP TO TIP",
-        f"   AT GEAR 0 AND AT GEAR 19, {TIP_GAP.TIP_GAP_ACCEPT_TEXT}",
-        f"   (SHEET {CONTINUATION_SHEET}, STEP {steps.step_number('rig-located')}E).",
+        f"   AT GEAR 0 AND AT GEAR 19 ({acceptance_ref('tip-gap')}, SET AT SHEET",
+        f"   {CONTINUATION_SHEET}, STEP {steps.step_number('rig-located')}E).",
         "7A. IF ONE IS OUT, EASE THE MHA-DT-VN-57 SCREWS.",
         f"7B. REFIT THE STEP {steps.step_number('rig-set')} LEAVES SNUG.",
         f"7C. RE-SET THE RIG AS STEP {steps.step_number('rig-located')}F.",
@@ -3353,6 +3399,44 @@ def _place_setting_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
         top = box[1] - SETTING_TABLE_GAP
     return findings + _stack_sheet_note_fields(adapter, facts, SETTING_SHEET)
 
+
+# Sheet 16's reference view, padded, as on every sheet: its caption prints
+# under the outline, and the acceptance table must stay clear of both.
+ACCEPTANCE_REFERENCE_KEEP_OUT = (
+    REFERENCE_ISO_CENTER[0] - REFERENCE_ISO_HALF_OUTLINE - REFERENCE_ISO_GAP,
+    REFERENCE_ISO_CENTER[1] + REFERENCE_ISO_HALF_OUTLINE + REFERENCE_ISO_GAP,
+)
+
+
+def acceptance_table_violations(box: tuple[float, float, float, float]) -> list[str]:
+    """Sheet 16's table stays above the note floor and off the reference view."""
+    _x0, y0, x1, _y1 = box
+    findings = []
+    if y0 < NOTE_FIELD_LEFT[3]:
+        findings.append(
+            f"sheet {ACCEPTANCE_SHEET} acceptance table runs "
+            f"{(NOTE_FIELD_LEFT[3] - y0) * 1000.0:.1f} mm below its floor"
+        )
+    left, top = ACCEPTANCE_REFERENCE_KEEP_OUT
+    if x1 > left and y0 < top:
+        findings.append(f"sheet {ACCEPTANCE_SHEET} acceptance table overlaps the reference view")
+    return findings
+
+
+def _place_acceptance_sheet(adapter: Any) -> list[str]:
+    """Sheet 16: the setting table's fits and acceptances rows."""
+    _activate_sheet(adapter, SHEET_NAMES[ACCEPTANCE_SHEET - 1])
+    _heading(adapter, ACCEPTANCE_SHEET)
+    _reference_iso(adapter, caption="FINISHED ASSEMBLY", label="acceptance reference isometric")
+    box = insert_general_table(
+        adapter,
+        title=ACCEPTANCE_TABLE_TITLE,
+        header=ACCEPTANCE_TABLE_HEADER,
+        rows=ACCEPTANCE_TABLE_ROWS,
+        top_left=(SETTING_TABLE_LEFT, NOTE_FIELD_LEFT[1]),
+        label="acceptance table",
+    )
+    return acceptance_table_violations(box)
 
 
 def _view_outline(view: Any) -> tuple[float, float, float, float]:
@@ -5353,6 +5437,8 @@ def _place_package(
     step("checks sheet")
     findings += _place_setting_sheet(adapter, facts)
     step("setting sheet")
+    findings += _place_acceptance_sheet(adapter)
+    step("acceptance sheet")
     full_detail = _place_full_detail_sheet(adapter)
     step("full-detail sheet")
     findings += _place_continuation_sheet(adapter, facts)
