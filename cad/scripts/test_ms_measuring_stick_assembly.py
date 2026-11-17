@@ -412,7 +412,9 @@ def test_fitter_package_covers_rule_9() -> None:
     for text in (*sheet.ASSEMBLY_STEPS, *sheet.ASSEMBLY_CHECKS):
         for phrase in ("NEAR-FACE", "SAVED POSE", "PLATE IS MASTER", "DIA "):
             assert phrase not in text
-    assert drawing.EXPLODED_CAPTION == sheet.EXPLODED_CAPTION == "EXPLODED VIEW"
+    assert drawing.EXPLODED_CAPTION == sheet.EXPLODED_CAPTION == (
+        "EXPLODED VIEW - FIT-UP STEPS IN ASSEMBLY.MD"
+    )
     # drawing-guidelines.md rule 2 (the title block is the general specification) and drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the component Finish fields, not fitter notes or steps, own finish.
     assert not any("BLACKEN" in step or "FINISH" in step for step in sheet.ASSEMBLY_STEPS)
     for obsolete in ("FINISH_NOTE", "FINISH_NOTE_TEXT", "FINISH_NOTE_XY", "_BLOCK_FINISH"):
