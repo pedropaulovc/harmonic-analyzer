@@ -133,8 +133,13 @@ def test_integral_head_owns_the_crossrod_interface() -> None:
     assert spec.NECK_LEN == pytest.approx(spec.NECK_END_Z - spec.HEAD_REAR_Z)
     callout = drawing.DIMENSION_CALLOUTS["CrossHoleDia"]
     assert callout is drawing.CROSS_HOLE_CALLOUT
-    # Rule 4: a bonded fit names its mate by number and its LOCTITE grade.
-    assert callout == "REAM THRU, BONDED FIT ON\nMHA-DT-15, LOCTITE 638"
+    # Rule 4: a bonded fit names its mate by number and its LOCTITE grade,
+    # in note 4 the callout flags (rule 7), with its clearance (rule 23).
+    assert callout == "REAM THRU, SEE NOTE 4"
+    note_4 = " ".join(drawing.SHEET_NOTES.split("\n4. ")[1].split())
+    assert note_4 == (
+        "HEAD CROSS BORE: BONDED FIT ON MHA-DT-15, LOCTITE 638 (CLEARANCE .0010-.0070)."
+    )
     # Machinist review r1 of #1685 (blocker): the band names its mate, and
     # every mate a callout names is the registry's part number.
     import _config
@@ -179,9 +184,9 @@ def test_crossrod_is_a_bonded_slip_fit_not_a_press() -> None:
         <= reamer
         <= spec.CROSS_HOLE_DIA + spec.CROSS_HOLE_DIA_BAND[0]
     )
-    # The callout names the function, the mate and the compound, never the
-    # numbers.
-    assert drawing.CROSS_HOLE_CALLOUT == "REAM THRU, BONDED FIT ON\nMHA-DT-15, LOCTITE 638"
+    # The callout names the process and flags note 4, which names the mate,
+    # the compound and the clearance the limits give (rule 23).
+    assert drawing.CROSS_HOLE_CALLOUT == "REAM THRU, SEE NOTE 4"
     assert "INTO MHA-DT-22 HEAD WITH LOCTITE 638" in crossrod.ASSEMBLY_STEP
     for retired in ("MATCH-REAM", "PRESS", "INTERNAL SHOULDERS SHARP"):
         assert retired not in spec.DRAWING_NOTES
@@ -227,9 +232,9 @@ def test_only_the_two_journal_lands_carry_the_running_band_and_finish() -> None:
         "1. JOURNALS (2X): RUNNING FIT IN MHA-DT-14 PINION BRACKET STRAP, "
         "TURN TO MEASURED BORE (CLEARANCE .0014-.0027)."
     )
-    # Rule 7: four short rows at most, left of the title block (x 0.216).
+    # Left of the title block (x 0.216), over the border.
     rows = drawing.SHEET_NOTES.replace("<MOD-DIAM>", "Ø").splitlines()
-    assert len(rows) <= 4
+    assert len(rows) <= 7
     assert drawing.NOTES_XY[0] + max(map(len, rows)) * 0.0026 < 0.216 - 0.010
     assert "MHA-DT-14" not in spec.DRAWING_NOTES
     assert not hasattr(spec, "PART_DATUMS")
@@ -503,12 +508,19 @@ def test_back_bond_land_carries_its_own_diameter_under_the_shaft() -> None:
     line under the shaft, between the 6.80 and 8.25 station witnesses and
     over the 8.25 row."""
     # #1038 r11 machinist review (rule 26, all 3 runs): both lands carry the
-    # same fit name with its LOCTITE grade, through note 3.
+    # same fit name with its LOCTITE grade, through note 3; farm run
+    # 20261117T130901535Z r2 (rule 23): with the clearance the drum's
+    # REAM_SLIDE bore and the land band give.
     assert drawing.DIMENSION_CALLOUTS["BackBondDia"] == drawing.BOND_CALLOUT
     assert drawing.DIMENSION_CALLOUTS["BondZoneDia"] == drawing.BOND_CALLOUT
     assert drawing.BOND_CALLOUT == "SEE NOTE 3"
-    note_3 = drawing.SHEET_NOTES.split("\n3. ")[1]
-    assert note_3 == "BOND LANDS (2X): BONDED IN MHA-DT-01, LOCTITE 638."
+    note_3 = " ".join(drawing.SHEET_NOTES.split("\n3. ")[1].split("\n4. ")[0].split())
+    assert (
+        note_3
+        == "BOND LANDS (2X): BONDED IN MHA-DT-01, LOCTITE 638 (CLEARANCE .0014-.0053)."
+    )
+    assert max(drawing.BOND_CLEARANCE) <= spec.RETAINING_COMPOUND_MAX_GAP_MM
+    assert min(drawing.BOND_CLEARANCE) > 0.0
     assert sheet.DRAWING_PRECISION_BY_NAME["BackBondDia"] == 4
     assert "BackBondDia" in drawing.ARROWS_INSIDE
     x, y = drawing.PRINCIPAL_KEEP["BackBondDia"]
@@ -847,7 +859,7 @@ def test_spans_outside_the_journals_share_one_2x_diameter_and_mate() -> None:
     assert land_crown_x - stub_xy[0] >= 0.0015
     assert "right" not in _crossed_either_side(stub_xy, _DIA_BLOCK_RUN_MM + _COUNT_PREFIX_MM)
     rows = drawing.SHEET_NOTES.replace("<MOD-DIAM>", "Ø").splitlines()
-    assert len(rows) <= 4
+    assert len(rows) <= 7
     assert max(map(len, rows)) <= 66
 
 
@@ -912,8 +924,8 @@ def test_bond_zone_diameter_is_a_flank_dimension_on_the_drum() -> None:
     assert drawing.DIMENSION_CALLOUTS["BondZoneDia"] is drawing.BOND_CALLOUT
     # The bonded fit, its mate and its grade print once, on note 3, which
     # both bond lands' callouts link (#1038 r11 machinist review, rule 26).
-    words = drawing.SHEET_NOTES.split("\n3. ")[1].split()
-    assert "BONDED" in words and "MHA-DT-01," in words and "638." in words
+    words = drawing.SHEET_NOTES.split("\n3. ")[1].split("\n4. ")[0].split()
+    assert "BONDED" in words and "MHA-DT-01," in words and "638" in words
     assert drawing.SHEET_NOTES.count("MHA-DT-01") == 1
     import _config
 

@@ -65,6 +65,8 @@ from dt_pinion_arbor_spec import (
     BOND_RELIEF_LEN,
     BOND_RELIEF_Z,
     BOND_ZONE_DIA_Z,
+    CROSSROD_MAX_CLEARANCE,
+    CROSSROD_MIN_CLEARANCE,
     CROSSROD_NUMBER,
     DRUM_NUMBER,
     FRONT_JOURNAL_Z,
@@ -96,6 +98,10 @@ from dt_pinion_arbor_collar_spec import (
     BORE as COLLAR_BORE,
     BORE_BAND as COLLAR_BORE_BAND,
     COLLAR_NUMBER,
+)
+from dt_alignment_pinion_spec import (
+    ARBOR_BORE_BAND as DRUM_BORE_BAND,
+    BORE_DIA as DRUM_BORE,
 )
 from dt_pinion_bracket_geometry import ARBOR_BORE as STRAP_BORE
 
@@ -143,9 +149,18 @@ COLLAR_CLEARANCE = (
 # its callout without the grade read as a different compound).
 BOND_CALLOUT = "SEE NOTE 3"
 SPAN_CALLOUT = "SEE NOTE 2"
-CROSS_HOLE_CALLOUT = f"REAM THRU, BONDED FIT ON\n{CROSSROD_NUMBER}, {RETAINING_COMPOUND}"
-# Rule 7: the notes block stays at four short rows; the widest (66
-# characters, ~172 mm) ends ~24 mm left of the title block (x 0.216).
+# Rule 23: a bonded joint prints its diametral clearance on the part sheet,
+# inside the grade's gap (farm run 20261117T130901535Z r2, two blockers).
+# The lands in the MHA-DT-01 drum's REAM_SLIDE bore, and the head cross bore
+# on the MHA-DT-15 crossrod; the cross bore's callout has no room for a
+# third row under the border, so it flags note 4 as the lands flag note 3.
+BOND_CLEARANCE = (
+    DRUM_BORE + DRUM_BORE_BAND[1] - (SHAFT_DIA + SHAFT_DIA_BAND[0]),
+    DRUM_BORE + DRUM_BORE_BAND[0] - (SHAFT_DIA + SHAFT_DIA_BAND[1]),
+)
+CROSS_HOLE_CALLOUT = "REAM THRU, SEE NOTE 4"
+# The widest row (66 characters, ~172 mm) ends ~24 mm left of the title
+# block (x 0.216); seven rows end ~8 mm over the border.
 # Each 2X's second span carries a leadered SEE NOTE tag (SPAN_TAGS), so the
 # note says what the spans are, not where (#1038 r9 machinist review, rules
 # 1 and 26: "PIN-HOLE SPAN AND BACK-END SPAN" named them in words only).
@@ -156,7 +171,11 @@ SHEET_NOTES = (
     f"{_inch(JOURNAL_CLEARANCE[1])}).\n"
     f"2. SPANS (2X): SLIDING FIT IN {COLLAR_NUMBER} (CLEARANCE "
     f"{_inch(COLLAR_CLEARANCE[0])}-{_inch(COLLAR_CLEARANCE[1])}).\n"
-    f"3. BOND LANDS (2X): BONDED IN {DRUM_NUMBER}, {RETAINING_COMPOUND}."
+    f"3. BOND LANDS (2X): BONDED IN {DRUM_NUMBER}, {RETAINING_COMPOUND}\n"
+    f"   (CLEARANCE {_inch(BOND_CLEARANCE[0])}-{_inch(BOND_CLEARANCE[1])}).\n"
+    f"4. HEAD CROSS BORE: BONDED FIT ON {CROSSROD_NUMBER}, {RETAINING_COMPOUND}\n"
+    f"   (CLEARANCE {_inch(CROSSROD_MIN_CLEARANCE)}-"
+    f"{_inch(CROSSROD_MAX_CLEARANCE)})."
 )
 # Under the property-linked inside-corner note (top-left at y 0.060).
 NOTES_XY = (0.020, 0.052)
@@ -594,8 +613,8 @@ PRINCIPAL_KEEP = {
     # centres on its position, so the third row (interference) adds half a
     # row at each end: set at 0.2300 its top rose to 242.8, 0.2 mm under the
     # Ø6's shoulder (layout audit, farm run 20261117T125119461Z).  At 0.2272
-    # it spans about 214.4-240.1: 2.3 mm under that shoulder, 2.6 mm over the
-    # (3.0)'s top.
+    # it spans about 214.4-240.1: 2.6 mm over the (3.0)'s top and 2.3 mm
+    # under that shoulder, more since note 4 took a row from the Ø6 callout.
     "PinStationFromHeadRear": (0.288, 0.207),
     "PinHoleDia": (PIN_HOLE_CALLOUT_X, 0.2272),
 }
@@ -636,8 +655,9 @@ DETAIL_KEEP = {
     "HeadCapR": (0.205, 0.257),
     "HeadCapSagDim": (0.205, 0.210),
     # Above the hole's centre line, so the leader drops onto the hole edge.
-    # Two callout lines (r3 of #1685) under the value: the block's top stays
-    # inside the border and its shoulder well over the pin hole's.
+    # One callout line under the value (note 4 carries the bonded fit): the
+    # block's top stays inside the border and its shoulder well over the pin
+    # hole's.
     "CrossHoleDia": (0.245, 0.2525),
     # The hole's station rides under the head, its text left of the
     # rear-face witness and clear of the neck above and the head length below.
