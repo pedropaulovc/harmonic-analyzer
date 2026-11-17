@@ -437,10 +437,11 @@ def test_each_step_column_fits_its_field() -> None:
     lever = headings.index("LEVER BANK FIT-UP")
     assert all(h == "ROCKER BANK FIT-UP (CONT.)" for h in headings[1:lever])
     assert all(h == "LEVER BANK FIT-UP (CONT.)" for h in headings[lever + 1 :])
-    # Round 1 review: no near-empty step column beside an empty half sheet.
+    # Round 1 review: no near-empty step column beside an empty half sheet
+    # (every column is full height or beside a view; sheet 6's right half
+    # holds view G and the setting table, not steps).
     for column, block in drawing.FITUP_NOTES:
-        if column is not drawing.LEVER_COLUMNS[-1]:
-            assert len(block.splitlines()) > column.capacity // 2, column
+        assert len(block.splitlines()) > column.capacity // 2, column
     # Each 1:1 bank's right-hand end (the keeper and ear outer faces) clears
     # the right column.
     for view, south_z in (
