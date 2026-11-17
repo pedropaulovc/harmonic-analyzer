@@ -1302,66 +1302,6 @@ def _session_connect_state(session_id: int) -> str | None:
     return f"unknown({state})"
 
 
-def record_authoring_context(adapter: Any, label: str) -> dict[str, Any]:
-    """Publish the authoring-time screen-space state for a SUCCESSFUL build too.
-
-    A failure-only capture cannot answer "what was different about the run that
-    worked?", which is the question that identifies a seat-state cause. Sketch
-    inference is still live on many sketch paths: the adapter's
-    ``add_line``/``add_circle``/``add_arc`` (``CreateLine``/
-    ``CreateCircleByRadius``/``CreateArc``) do not set ``AddToDB``; only sites
-    that set ``ISketchManager.AddToDB`` (inline, or through
-    :func:`_sketch.set_sketch_direct_db`) author direct-to-DB. A screen-space
-    snap rebuilds a wrong but valid shape that
-    raises nothing, so this record is the only evidence such a build leaves.
-    It holds the two bags that diagnosis needs: the screen-space geometry
-    (frame rect, view scale, measured px/mm) and ``ISketchManager``'s sticky
-    session state. Recorded once per part build, as a span event plus one INFO
-    record carrying the snapshot as JSON.
-
-    The ~30 sketch-authoring preferences are NOT read here: the 2026-09-17
-    root cause refuted preference drift by measurement (zero differences
-    across workers), the pool's ``SeatSettings`` audits and pins them on the
-    seat, and :func:`capture_com_failure` still reads them at failure time.
-    Seat provenance is published once at connect
-    (:func:`record_seat_provenance`).
-
-    EVERY probe is guarded individually, because this runs on the path where
-    nothing is wrong: ``save_part_and_images`` calls it before ``save_file``, and
-    these probes reach ``_early_bound`` (raises when no generated wrapper binds)
-    and raw ``user32`` calls. A diagnostic that fails a good part export is worse
-    than no diagnostic, so a bag that cannot be read is recorded as its own error
-    string and the build continues.
-    """
-    bags: dict[str, Callable[[], Any]] = {
-        "display": lambda: display_geometry(adapter),
-        "sketch_manager": lambda: sketch_manager_state(adapter),
-    }
-    context: dict[str, Any] = {"label": label}
-    for name, probe in bags.items():
-        try:
-            context[name] = probe()
-        except Exception as exc:  # noqa: BLE001 - see above: never fail a good build
-            context[name] = {"capture_error": f"{type(exc).__name__}: {exc}"}
-    display = context["display"]
-    summary = (
-        f"authoring {label}: px/mm={display.get('px_per_mm', 'unknown')} "
-        f"snap_floor={display.get('snap_floor_mm', 'unknown')}mm "
-        f"view_scale2={display.get('view_scale2', 'unknown')} "
-        f"frame={display.get('frame_width_px', '?')}x"
-        f"{display.get('frame_height_px', '?')}"
-        f"({display.get('frame_state', 'unknown')}) "
-        f"AddToDB={context['sketch_manager'].get('AddToDB', 'unknown')}"
-    )
-    with contextlib.suppress(Exception):
-        _telemetry.event(
-            "seat.authoring_context",
-            label=label,
-            **_session._attributes_of(display),
-        )
-        _telemetry.info(summary, label=label, authoring=json.dumps(context, default=str))
-    return context
-
 
 def _display_summary(display: Mapping[str, Any], seat: Mapping[str, Any]) -> str:
     """One console line for the hit-test surface: session, windows, zoom."""
@@ -1392,22 +1332,6 @@ def _display_bags(adapter: Any) -> tuple[dict[str, Any], dict[str, Any]]:
         except Exception as exc:  # noqa: BLE001 - forensics never raise
             bags.append({f"{name}_capture_error": f"{type(exc).__name__}: {exc}"})
     return bags[0], bags[1]
-
-
-def record_drawing_display(adapter: Any, label: str) -> None:
-    """No-op; it only remains as a pinned call site.
-
-    It recorded the drawing's pick window on every successful drawing, for
-    ``com_replay``'s ``seat_display`` judgement (retired, #2880) and as the
-    passing half of a pick-miss comparison. A pick miss now captures its own
-    window (:func:`capture_pick_miss`), and the pool's seat check records the
-    frame size on every seat.
-
-    TODO(#2883): delete this and its call in
-    ``_drawing_common.new_project_drawing`` with the next change that re-keys
-    every drawing anyway (the adapter's direct-to-DB sketch wave). Removing the
-    tracked call alone would re-key all drawings for nothing.
-    """
 
 
 def capture_pick_miss(

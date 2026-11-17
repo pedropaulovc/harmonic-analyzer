@@ -555,8 +555,6 @@ def new_project_drawing(
     draw.ViewZoomtofit2()
     draw.ForceRebuild3(False)
     rebuild_drawing(adapter, label="new_project_drawing")
-    # The window every coordinate pick in this drawing hit-tests in, as fitted.
-    _seat_forensics.record_drawing_display(adapter, f"new {layout.value} drawing")
     return draw, sheet
 
 

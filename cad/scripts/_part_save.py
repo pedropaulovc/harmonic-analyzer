@@ -9,10 +9,6 @@ from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any
 
-# Recipe-inert (in no cache key; see its docstring and check:inert). Imported as a
-# module and used by attribute: it reads these helpers the same way, so neither
-# side needs the other fully initialised at import time.
-import _seat_forensics
 import _telemetry
 from _check import check, log
 from _com import _early_bound
@@ -97,14 +93,6 @@ async def save_part_and_images(
     the save fails if anything still shows, including any sketch not listed in
     ``allowed_shown`` (``reference_visibility_allowances``)."""
     from _visibility import assert_reference_geometry_hidden
-
-    # Recorded BEFORE anything touches the camera: this runs at the end of
-    # authoring, and set_isometric_view below (like export_image further down) is
-    # the first thing in the whole build path that moves the view, so this is the
-    # last moment at which the screen-space state the sketches were authored
-    # under can still be read. A SUCCESS has to record it too -- otherwise a good
-    # run and a bad one cannot be compared (see _seat_forensics.record_authoring_context).
-    _seat_forensics.record_authoring_context(adapter, part_name)
     assert_reference_geometry_hidden(adapter, part_name, allowed_shown)
     OUT_SLDPRT.mkdir(parents=True, exist_ok=True)
     part_path = (OUT_SLDPRT / f"{part_name}.SLDPRT").resolve()

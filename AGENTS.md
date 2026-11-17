@@ -1306,13 +1306,10 @@ enforces it, and derives its scope from that one constant:
 2. **Pinned call sites only.** Tracked code names it only as `<module>.<name>`,
    inside a pinned `(file, function)`: `_session.run_build` (connect-time
    provenance and the startup gate, post-save `teardown_seat`),
-   `_part_save.save_part_and_images` (`record_authoring_context`),
    `_rebuild.force_rebuild` (`capture_rebuild_failure`),
    `_drawing_common.read_required_properties` (`capture_missing_properties`),
    `_drawing_selection._select_view_entity` (`capture_pick_miss`, a sheet-point
-   pick that selected nothing),
-   `_drawing_common.new_project_drawing` (`record_drawing_display`, a no-op
-   awaiting removal with the next drawing re-key) and `package_native._release_seat`.
+   pick that selected nothing) and `package_native._release_seat`.
    The pinned failure captures never return, but a caller can catch their
    exceptions and continue: `draw_rocker_arm` retries a missed pivot-bore pick. Therefore
    `capture_pick_miss` preserves the pick's `RuntimeError` and logs WARN, not a
@@ -1326,8 +1323,8 @@ enforces it, and derives its scope from that one constant:
    pinned root: `SaveAs3`/`SaveBMP` under the always-raising
    `capture_com_failure`, and `SetCurrentWorkingDirectory` under
    `teardown_seat`. Nothing reachable from a PRE-save entry point
-   (`record_authoring_context`, `record_seat_provenance`,
-   `note_seats_before_connect`, `record_drawing_display`) reaches any of them.
+   (`record_seat_provenance`,
+   `note_seats_before_connect`) reaches any of them.
 4. **Pinned reads.** The module reads tracked code only as attributes from a
    pinned list (`_com._read_member`, `_com._early_bound`, …,
    `_sketch_closure._sketch_state`). Tracked helpers are accessed through module
