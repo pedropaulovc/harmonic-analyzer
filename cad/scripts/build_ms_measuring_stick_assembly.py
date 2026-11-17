@@ -42,7 +42,7 @@ from _assembly import (
     save_assembly_and_images,
 )
 from _assembly_contract import assembly_contract
-from _explode_steps import Step as ExplodeStep, author_explode_steps, stem_groups
+from _explode import Step as ExplodeStep, author_explode_steps, stem_groups
 from _check import check
 from _com import _early_bound
 from _custom_properties import apply_custom_properties

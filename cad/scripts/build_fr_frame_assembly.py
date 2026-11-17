@@ -99,7 +99,7 @@ import _telemetry
 
 from _check import check
 from _com import _early_bound
-from _explode_steps import Step as ExplodeStep, author_explode_steps, stem_groups
+from _explode import Step as ExplodeStep, author_explode_steps, stem_groups
 from _custom_properties import apply_custom_properties
 from _document_units import apply_package_model_units
 from _paths import OUT_SLDPRT

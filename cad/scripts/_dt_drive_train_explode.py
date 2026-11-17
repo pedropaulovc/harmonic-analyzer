@@ -1,6 +1,6 @@
 """Author the drive-train's named exploded presentation (DRIVE_TRAIN_EXPLODED).
 
-``_explode_steps.author_explode_steps`` authors and proves each step of
+``_explode.author_explode_steps`` authors and proves each step of
 ``dt_drive_train_assembly_spec.plan_explode`` along a global axis or along the
 cone axis (the stationary post's journal); the saved operational pose (the
 free kinematic model) is proven unchanged after collapse. The small exploded
@@ -13,11 +13,11 @@ import math
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
-import _explode_steps
+import _explode
 import _telemetry
 from _com import _early_bound
 from _component_references import component_reference_names
-from _explode_steps import Direction, Step, Transform
+from _explode import Direction, Step, Transform
 from cone_line import COS_I, SIN_I
 from dt_drive_train_assembly_spec import (
     COMPONENT_IDENTITIES,
@@ -62,7 +62,7 @@ def _cone_direction(
             f"{EXPLODED_VIEW_NAME}: {owner} has no resolved part document"
         )
     label = f"{feature_name}@{owner}"
-    local = _explode_steps.axis_vector(
+    local = _explode.axis_vector(
         _early_bound(part.FeatureByName(feature_name), "IFeature"), label
     )
     rows = baseline[owner]
@@ -138,7 +138,7 @@ def create_drive_train_explode(
             for step, names in steps
         ]
 
-    _explode_steps.author_explode_steps(
+    _explode.author_explode_steps(
         adapter,
         configuration_name,
         view=EXPLODED_VIEW_NAME,
