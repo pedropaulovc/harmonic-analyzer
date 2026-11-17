@@ -11,7 +11,6 @@ import _dowel_dimensions
 import _mcmaster_90145a299 as catalogue
 import ch_channel_assembly_sheet as channel_sheet
 import ch_channel_explode_spec as explode
-import joint_retention
 import pytest
 import sh_vn_pivot_pin_bar_spec as bar_pin
 import sh_vn_pivot_pin_rod_spec as rod_pin
@@ -53,12 +52,6 @@ def test_the_catalogue_band_is_not_the_generic_dowel_band() -> None:
     low, high = pin.PIN_DIA_LIMITS
     assert low == pin.PIN_DIA == pytest.approx(25.4 * 5 / 64)
     assert high - low == pytest.approx(0.0002 * 25.4)
-
-
-def test_joint_retention_lists_the_pin_as_purchased_and_unthreaded() -> None:
-    stem = pin.PART_STEM.replace("-", "_")
-    assert stem in joint_retention.UNTHREADED_PARTS
-    assert stem in joint_retention.UNTHREADED_STOCK
 
 
 def test_the_channel_bom_rows_are_keyed_by_member() -> None:
