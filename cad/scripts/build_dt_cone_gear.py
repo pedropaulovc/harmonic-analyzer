@@ -353,11 +353,13 @@ def _set_gap_floor_limits(adapter: Any) -> None:
 
 
 def _set_keyway_t_limits(adapter: Any, places: int) -> None:
-    """Print KeywayT as stacked limits, .4065 over .3995: the envelope of
-    cone_land_key.KEYWAY_T_BAND (#2519; T MAX and the T030 web unchanged).
-    As +/-.0035 the band read as a converted value, not an inch step
-    (machinist review of PR #2557, 3 of 3 runs).  One SetValues for every
-    configuration, the form set_dimension_symmetric_tolerance used here."""
+    """Print KeywayT as stacked limits, .4055 over .3995: the envelope of
+    cone_land_key.KEYWAY_T_BAND, .4025 +/-.003 (a plain inch step; T MAX
+    .001 shallower than RV-07's .4065, so T030's web is thicker).  As
+    +/-.0035 (.4065/.3995, #2519) the band read as a converted value, not an
+    inch step (machinist review of PR #2557 and of main R5), in either form.
+    One SetValues for every configuration, the form
+    set_dimension_symmetric_tolerance used here."""
     lower, upper = deviations(cone_land_key.KEYWAY_T_BAND)
     display, dimension = _named_dimension(adapter, KEYED_BORE_SKETCH, "KeywayT")
     tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")

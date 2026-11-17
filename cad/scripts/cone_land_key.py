@@ -69,30 +69,34 @@ KEYSEAT_DEPTH_MM = LAND_DIA_MM - KEYSEAT_S_MM  # .0395 at the centreline
 
 # Hub keyway: one pass of a 1/16 A broach, width +.0020/-.0000 (the shop
 # table's milled-width row, .002 wide; machinist review of PR #2331 at
-# 5994f29: a .001 band named no fit route), its top at T = .4030 +/-.0035
-# from the bore's far side.  The broach sets T.  A 1/16 A broach in its 3/8
-# A bushing cuts its full depth in one pass with no shim (duMONT catalogue:
-# no shims for the 1/16-A); the published depth is 0.70 mm (Rev Broaching
-# Tool's duMONT table, "Standard broaches for keyway - inch sizes", 1/16"-A
-# row, read live 2026-11-10), BROACH_DEPTH_MM across its 0.01 mm rounding.
-# The table names no reference, so the band holds every reading of it
-# (test_dt_cone_gear_seat_fit): from the bore's far side, or from the
-# bushing's 3/8 circle when the cut pushes the bushing onto that side; at the
-# keyway's centreline, or at its walls, where ANSI B17.1 takes depth and the
-# circle stands its chord height Y below the centreline.  That is .3996
-# (3/8 circle, widest cut's wall) to .4046 (largest bore, centreline).  The
-# depth is taken as the broach-and-bushing pair's in a 3/8 bore: the
-# bushing's own slide clearance is not published, and a bushing that sits
-# low by it cuts T low by as much, which the first gear's T check finds and
-# one more pass over a shim of that size makes up.  A one-pass broach
-# cannot be set shallower, so the band's room is above the deepest reading:
-# it stops at .4065, the T the keyed webs were ruled at
-# (cad/config/parts/dt-cone-gear.yaml RV-07).  ANSI B17.1's T for this key
-# and land, .4087 (below), would take T030's web under rule 17's floor.
+# 5994f29: a .001 band named no fit route), its top at T = .4025 +/-.003
+# from the bore's far side, a plain inch step.  The broach sets T.  A 1/16 A
+# broach in its 3/8 A bushing cuts its full depth in one pass with no shim
+# (duMONT catalogue: no shims for the 1/16-A); the published depth is 0.70 mm
+# (Rev Broaching Tool's duMONT table, "Standard broaches for keyway - inch
+# sizes", 1/16"-A row, read live 2026-11-10), BROACH_DEPTH_MM across its
+# 0.01 mm rounding.  The table names no reference, so the band holds every
+# reading of it (test_dt_cone_gear_seat_fit): from the bore's far side, or
+# from the bushing's 3/8 circle when the cut pushes the bushing onto that
+# side; at the keyway's centreline, or at its walls, where ANSI B17.1 takes
+# depth and the circle stands its chord height Y below the centreline.  That
+# is .3996 (3/8 circle, widest cut's wall) to .4046 (largest bore,
+# centreline).  The depth is taken as the broach-and-bushing pair's in a 3/8
+# bore: the bushing's own slide clearance is not published, and a bushing
+# that sits low by it cuts T low by as much, which the first gear's T check
+# finds and one more pass over a shim of that size makes up.  A one-pass
+# broach cannot be set shallower, so the band's room is above the deepest
+# reading: .3995 (the key's top clearance at S's largest, above) to .4055.
+# The keyed webs were ruled at T .4065 (cad/config/parts/dt-cone-gear.yaml
+# RV-07); .4055 stands .001 shallower, so every web is thicker than ruled.
+# The former .4030 +/-.0035 (.4065/.3995) read as a converted millimetre
+# band, not an inch step (rule 4; machinist review of PR #2557 and main R5).
+# ANSI B17.1's T for this key and land, .4087 (below), would take T030's web
+# under rule 17's floor.
 KEYWAY_WIDTH_MM = KEY_SIZE_MM
 KEYWAY_WIDTH_BAND = (0.0508, 0.0)  # +.0020/-.0000
-KEYWAY_T_MM = 10.2362  # .4030
-KEYWAY_T_BAND = (0.0889, -0.0889)  # +/-.0035
+KEYWAY_T_MM = 10.2235  # .4025
+KEYWAY_T_BAND = (0.0762, -0.0762)  # +/-.003
 KEYWAY_PLACES = 4
 
 

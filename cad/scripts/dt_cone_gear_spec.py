@@ -599,12 +599,13 @@ def keyway_web_min_mm(teeth: int) -> float:
     return _keyway_web_mm(teeth, floor_limits_mm(teeth)[0])
 
 
-# The keyed webs under rule 17's .080 target: T030's .06218 in (printed
-# .0621, floored like every GEAR DATA web; the keyway width at the milled-
-# width row's +.0020) is recorded as a minor
-# (cad/config/parts/dt-cone-gear.yaml, owner ruling 2026-11-09 via PR #1992),
-# above the .060 floor; every other keyed gear keeps the target.
-KEYWAY_WEB_EXCEPTIONS_MM: dict[int, float] = {30: 1.57734}  # T030: .0621
+# The keyed webs under rule 17's .080 target: T030's .06317 in (printed
+# .0631, floored like every GEAR DATA web; the keyway width at the milled-
+# width row's +.0020, T at .4055) is recorded as a minor
+# (cad/config/parts/dt-cone-gear.yaml RV-07, owner ruling 2026-11-09 via PR
+# #1992, ruled at .0621 with T at .4065), above the .060 floor; every other
+# keyed gear keeps the target.
+KEYWAY_WEB_EXCEPTIONS_MM: dict[int, float] = {30: 1.60274}  # T030: .0631
 if min(KEYWAY_WEB_EXCEPTIONS_MM.values()) < MACHINED_WEB_FLOOR_MM:
     raise AssertionError("a keyed web exception falls under rule 17's .060 floor")
 
