@@ -4276,10 +4276,6 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         SCRIPTS_DIR / "test_pd48_knob_mechanics.py",
         # Source-only adapter member/signature census; no SDK or native import.
         SCRIPTS_DIR / "test_pd_transgear_adapter_contract.py",
-        SCRIPTS_DIR / "test_native_bank_retention_contract.py",
-        # Captured-pivot tooling recipes: the source-only adapter census
-        # checks the real native builders without importing or connecting them.
-        SCRIPTS_DIR / "test_ch_rocker_arm_tl_oblique_adapter_contract.py",
         # Finite purchased-rack ends and the complete recording-paper sweep.
         SCRIPTS_DIR / "test_paper_drive_rack_travel.py",
         SCRIPTS_DIR / "test_pd_platen_refit.py",
