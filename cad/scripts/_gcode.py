@@ -863,9 +863,6 @@ def check_outline(
     elements: Sequence[dict],
     passes: Sequence[dict],
     z_top: float,
-    tabs: Sequence[Point] = (),
-    tab_clear: float = 0.0,
-    tab_top: float | None = None,
     clearing: Sequence[dict] = (),
 ) -> list[Finding]:
     """Profile passes round a closed part outline. ``elements`` are its lines
@@ -875,13 +872,10 @@ def check_outline(
     cut, are each a cutter-centre ``offset`` from the outline and its depth
     ``levels``. Below the stock top ``z_top`` every feed move that moves in XY
     runs level, every point of it lies at a pass's offset from the nearest
-    element at one of that pass's levels (or ``tab_top``, riding over a tab:
-    no gouge, no stray), no pass's point comes after a later pass's, and every
-    point runs the element's way (anticlockwise elements: conventional outside
-    the part with a clockwise spindle). Each pass covers the whole outline at
-    each of its levels, except near a tab (within ``tab_clear`` plus the pass
-    offset of a tab's cutter-centre point in ``tabs``) at levels below
-    ``tab_top``; :func:`check_tabs` checks the tabs themselves.
+    element at one of that pass's levels (no gouge, no stray), no pass's
+    point comes after a later pass's, and every point runs the element's way
+    (anticlockwise elements: conventional outside the part with a clockwise
+    spindle). Each pass covers the whole outline at each of its levels.
 
     Each of ``clearing`` is waste cleared before the passes, an ``x`` range
     and its ``levels``: there a point farther from the outline than every
@@ -892,8 +886,6 @@ def check_outline(
     findings: list[Finding] = []
     levels = {round(z, 3) for p in passes for z in p["levels"]}
     levels |= {round(z, 3) for c in clearing for z in c["levels"]}
-    if tab_top is not None:
-        levels.add(round(tab_top, 3))
     moves = [
         m
         for m in program.cutting
@@ -939,12 +931,11 @@ def check_outline(
             ):
                 stages = [0]
             else:
-                riding = tab_top is not None and _close(point[2], tab_top)
                 stages = [
                     k + 1
                     for k, p in enumerate(passes)
                     if abs(distance - p["offset"]) <= element["tol"]
-                    and (riding or at(point[2], p["levels"]))
+                    and at(point[2], p["levels"])
                 ]
                 if not stages:
                     where = f"{_where(point)} is {distance:.3f}"
@@ -968,12 +959,9 @@ def check_outline(
         reach = p["offset"]
         for z in p["levels"]:
             grid = grids.get((k, round(z, 3)), {})
-            tabbed = tab_top is not None and z < tab_top - _TOL_MM
             uncovered = []
             for element, s in samples:
                 limit = reach + element["tol"]
-                if tabbed and any(math.dist(s, t) < tab_clear + limit for t in tabs):
-                    continue
                 cx, cy = int(s[0] // cell), int(s[1] // cell)
                 cells = [(cx + i, cy + j) for i in (-1, 0, 1) for j in (-1, 0, 1)]
                 near = (q for c in cells for q in grid.get(c, ()))
@@ -1047,28 +1035,3 @@ def _move_distance(m: Move, point: Point) -> float:
             return abs(math.hypot(dx, dy) - radius)
         return min(math.dist(m.start[:2], point[:2]), math.dist(m.end[:2], point[:2]))
     return _element_distance({"start": m.start[:2], "end": m.end[:2]}, point)[0]
-
-
-def check_tabs(
-    program: Program, centres: Sequence[Point], clear: float, top: float
-) -> list[Finding]:
-    """Holding tabs a profile leaves: below the tab top ``top`` the cutter
-    centre keeps exactly ``clear`` (half the tab's width plus the cutter
-    radius) from each tab's cutter-centre point in ``centres`` (closer cuts
-    into the tab, farther leaves it wider), and a feed move at ``top`` passes
-    over each point (the tab is cut down to its top, not left full height)."""
-    findings = []
-    cutting = program.cutting
-    below = [m for m in cutting if min(m.start[2], m.end[2]) < top - _TOL_MM]
-    level = [m for m in cutting if _close(m.start[2], top) and _close(m.end[2], top)]
-    for c in centres:
-        tab = f"tab at X{c[0]:.3f} Y{c[1]:.3f}"
-        nearest = min((_move_distance(m, c) for m in below), default=math.inf)
-        if not _close(nearest, clear, _ENTRY_TOL_MM):
-            detail = f"{tab}: cutter centre {nearest:.3f} from it below Z{top:.3f}"
-            detail += f", expected {clear:.3f}"
-            findings.append(Finding(program.name, "tabs", detail))
-        if not any(_move_distance(m, c) <= _ENTRY_TOL_MM for m in level):
-            detail = f"{tab}: no feed move over it at its top Z{top:.3f}"
-            findings.append(Finding(program.name, "tabs", detail))
-    return findings

@@ -303,12 +303,12 @@ _ONE_PASS = {
 }
 
 
-def _loop(z: float, bottom: str = "G1 X10 Y-1\n") -> str:
+def _loop(z: float) -> str:
     """One anticlockwise lap at cutter-centre offset 1 round ``_OUTLINE``, from
     and back to (5, -1), at depth ``z``; its corners are radius-1 arcs."""
     nx, ny = _N
     return (
-        f"G1 X5 Y-1 Z{z} F100\n{bottom}G3 X11 Y0 I0 J1\nG1 X11 Y10\n"
+        f"G1 X5 Y-1 Z{z} F100\nG1 X10 Y-1\nG3 X11 Y0 I0 J1\nG1 X11 Y10\n"
         f"G3 X{10 + nx:.4f} Y{10 + ny:.4f} I-1 J0\n"
         f"G3 X{-nx:.4f} Y{10 + ny:.4f} I{-5 - nx:.4f} J{-30 - ny:.4f}\n"
         f"G3 X-1 Y10 I{nx:.4f} J{-ny:.4f}\nG1 X-1 Y0\nG3 X0 Y-1 I1 J0\nG1 X5 Y-1\n"
@@ -348,18 +348,6 @@ def test_outline_passes_hold_their_offset_direction_levels_and_coverage(tmp_path
     stray = _outline(tmp_path, "G0 X5 Y-1 Z5\n" + _loop(-1.0) + _loop(-1.5) + "G0 Z5\n")
     assert any("off the levels" in d for d in stray)
     assert any("uncut at Z-2.000" in d for d in stray)
-
-
-def test_outline_coverage_excuses_only_the_tabs(tmp_path):
-    # The deeper lap lifts to Z-1 over a tab at (7, -1), keeping 1.5 from it.
-    hop = "G1 X5.5 Y-1\nG1 Z-1\nG1 X8.5\nG1 Z-2\nG1 X10 Y-1\n"
-    text = "G0 X5 Y-1 Z5\n" + _loop(-1.0) + _loop(-2.0, bottom=hop) + "G0 Z5\n"
-    assert (
-        _outline(tmp_path, text, tabs=[(7.0, -1.0)], tab_clear=1.5, tab_top=-1.0) == []
-    )
-    assert _gcode.check_tabs(_program(tmp_path, text), [(7.0, -1.0)], 1.5, -1.0) == []
-    details = [d.split(":")[0] for d in _outline(tmp_path, text)]
-    assert details == ["3 outline points the offset-1.000 pass leaves uncut at Z-2.000"]
 
 
 def test_outline_passes_run_in_order_after_the_clearing(tmp_path):
@@ -413,25 +401,6 @@ def test_keep_out_catches_the_cutter_entering_a_fixture_below_its_top(tmp_path):
     assert hits(clear) == []
     assert hits("G0 X5 Y-0.5 Z5\nG0 Z1\nG1 X6 F100\n") == ["fence"]
     assert hits("G0 X20 Y-1.5 Z7\nG0 Z5\n") == ["flange"]
-
-
-def test_tabs_keep_their_width_and_are_cut_to_their_top(tmp_path):
-    def tabs(left, right, lift):
-        text = f"G0 X0 Y-1 Z5\nG1 Z-1 F100\nG1 X{left}\nG1 Z{lift}\nG1 X{right}\nG1 Z-1\nG1 X20\nG0 Z5\n"
-        return [
-            f.detail
-            for f in _gcode.check_tabs(
-                _program(tmp_path, text), [(10.0, -1.0)], 2.5, 0.5
-            )
-        ]
-
-    assert tabs(7.5, 12.5, 0.5) == []
-    # A narrower gap cuts into the tab; a lift above its top leaves it full height.
-    tab = "tab at X10.000 Y-1.000"
-    assert tabs(8, 12, 0.5) == [
-        f"{tab}: cutter centre 2.000 from it below Z0.500, expected 2.500"
-    ]
-    assert tabs(7.5, 12.5, 1.0) == [f"{tab}: no feed move over it at its top Z0.500"]
 
 
 def test_a_reamer_rapided_out_of_its_bore_is_caught(tmp_path):

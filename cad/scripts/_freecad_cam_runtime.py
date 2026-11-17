@@ -34,10 +34,6 @@ programming the oblique base bar (2026-11-16):
   cycles) but leaves G73 chip-breaking and G85 (feed out) as blocks GRBL
   rejects, so pecks are full-retract G83 and a bore fed out is a Custom
   operation (:func:`bore`).
-- the holding-tag dressup (Path.Dressup.Tags, rocker strap 2026-11-17)
-  needs its profile's path computed when it is created, joins the job
-  before the profile instead of replacing it (both would post), and on any
-  internal error posts the profile with no tags, logging only to the console.
 """
 
 import importlib.util
@@ -50,7 +46,6 @@ import types
 import FreeCAD
 import Part
 import Path
-import Path.Dressup.Tags as PathDressupTags
 import Path.Main.Job as PathJob
 import Path.Main.Stock as PathStock
 import Path.Op.Custom as PathCustom
@@ -306,27 +301,6 @@ def drill(target_job, tc, label, base, top, final, retract, peck=None):
     return op
 
 
-def tags(op, positions, width, height):
-    """Holding tags on profile ``op``: FreeCAD's tag dressup with square
-    (90°) tags ``width`` wide at the cutter-centre points ``positions``
-    (x, y) on its path, ``height`` above its deepest level. Below that the
-    path lifts over each tag, keeping the cutter centre half the width plus
-    the cutter radius from the point. The dressup replaces ``op`` in its job.
-    The dressup drops every tag when it fails (a console error only), so
-    only the posted NC proves the tags (``_gcode.check_tabs``)."""
-    op.Document.recompute()  # the dressup reads the profile's path when created
-    dressup = PathDressupTags.Create(op)
-    dressup.Width = f"{width} mm"
-    dressup.Height = f"{height} mm"
-    dressup.Angle = 90.0
-    dressup.Radius = "0 mm"
-    dressup.Positions = [FreeCAD.Vector(x, y, 0) for x, y in positions]
-    dressup.Disabled = []
-    job = PathUtils.findParentJob(dressup)
-    job.Operations.Group = [o for o in job.Operations.Group if o.Name != op.Name]
-    return dressup
-
-
 def custom(target_job, tc, label, lines):
     """An operation posting ``lines`` of G-code as written, after formatting
     ``{feed}`` and ``{plunge}`` in them to the controller's feeds (mm/s,
@@ -365,11 +339,8 @@ def generate(doc):
     bad = []
     for target_job in [o for o in doc.Objects if isinstance(getattr(o, "Proxy", None), PathJob.ObjectJob)]:
         for op in target_job.Operations.Group:
-            state = list(getattr(op, "State", ()))  # a dressup has no State
-            moved = any(c.Name in _MOTION for c in op.Path.Commands)
-            if "Invalid" in state or not moved:
-                why = state or "no feed move"
-                bad.append(f"{target_job.Label} / {op.Label}: {why}")
+            if "Invalid" in op.State or not any(c.Name in _MOTION for c in op.Path.Commands):
+                bad.append(f"{target_job.Label} / {op.Label}: {list(op.State) or 'no feed move'}")
     if bad:
         raise RuntimeError("toolpaths not clean: " + "; ".join(bad))
 
