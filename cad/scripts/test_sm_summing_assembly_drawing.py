@@ -18,7 +18,7 @@ from _assembly_contract import assembly_contract
 import _shop_equipment
 from _buildgraph import module_deps_of
 from _drawing_registry import DRAWINGS_BY_NAME
-from _general_table import table_column_widths
+from _general_table import TABLE_TITLE_DROP, table_column_widths
 from _sm_summing_explode import station_of
 from _cone_axis_constants import SUMMING_Z
 import sm_summing_lever_spec
@@ -289,6 +289,17 @@ def test_setting_table_fits_the_top_border() -> None:
     # Cells never wrap: each column is cut to its longest cell, so the whole
     # table must fit with room to spare.
     assert left + drawing.SETTING_TABLE_INSET + sum(widths) < right - 0.005
+
+
+def test_setting_table_rows_keep_their_top_whatever_the_title_drop() -> None:
+    """The rows' bottom read 228.55 mm, 0.55 mm over the DETAIL A guard (run
+    20261117T155408788Z): the table's top stays 10.525 mm under the inner
+    border, where 1.5 mm title gaps put it, and the title rides above it,
+    its top still under the border."""
+    border_top = drawing.SHEET_INNER_BORDER[3]
+    title_top = drawing.setting_table_title_top()
+    assert title_top - TABLE_TITLE_DROP == pytest.approx(border_top - 0.010525)
+    assert border_top - title_top >= 0.002
 
 
 # The finished isometric's native outline at 1:3 (run
