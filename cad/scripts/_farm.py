@@ -759,7 +759,10 @@ class FarmReporter(ConsoleReporter):
         self._errors = [*getattr(self, "_errors", []), {
             "task": task.name, "error": lines[-1][:500] if lines else "",
         }]
-        _record_json("task-errors.json", self._errors)
+        try:
+            _record_json("task-errors.json", self._errors)
+        except OSError as exc:  # a diagnostics record never aborts the build
+            _telemetry.warn(f"farm task-errors record not updated: {exc}")
 
 
 def _display_name(label: str | None = None) -> str:

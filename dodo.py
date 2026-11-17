@@ -4605,6 +4605,7 @@ def _check_undefined_names_spec(pytest_cmd: list[str]) -> dict[str, Any]:
                 "cad/scripts",
                 "dodo.py",
                 "build.py",
+                "farm_build.py",
             ],
             cwd=REPO_ROOT,
         ).decode("utf-8").split("\0")

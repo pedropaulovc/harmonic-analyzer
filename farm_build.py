@@ -279,7 +279,7 @@ def process_identity(pid: int) -> int | None:
 
 def process_alive(identity: dict | None) -> bool:
     """Whether the recorded ``{pid, created}`` is still that same live process."""
-    if not identity:
+    if not identity or identity.get("created") is None:
         return False
     return process_identity(int(identity["pid"])) == int(identity["created"])
 
@@ -569,7 +569,8 @@ def launch(options: argparse.Namespace) -> Path:
     # The trampoline starts the supervisor and exits, so no live parent chain
     # links the caller to the supervisor.
     trampoline = _spawn_detached(
-        [sys.executable, str(Path(__file__).resolve()), "_spawn", str(run_dir)]
+        [sys.executable, str(Path(__file__).resolve()), "_spawn", str(run_dir)],
+        cwd=run_dir,
     )
     if trampoline.wait() != 0 or not (run_dir / "supervisor.json").is_file():
         raise RuntimeError(f"supervisor did not start for {run_dir}")
@@ -601,6 +602,7 @@ def spawn_supervisor(run_dir: Path) -> int:
             "_supervise",
             str(run_dir),
         ],
+        cwd=run_dir,  # never pin the caller's worktree as a current directory
     )
     write_json(
         run_dir / "supervisor.json",
@@ -903,7 +905,6 @@ def run_farm_build(
     """
     from doit import loader as doit_loader
     from doit.cmd_base import TaskLoader2, tasks_and_deps_iter
-    from doit.control import TaskControl
     from doit.doit_cmd import DoitMain
     from doit.exceptions import InvalidCommand, InvalidDodoFile, InvalidTask
 
@@ -916,8 +917,7 @@ def run_farm_build(
     try:
         config = doit_loader.load_doit_config(namespace)
         tasks = doit_loader.load_tasks(namespace, allow_delayed=True, args=targets)
-        control = TaskControl(local_build._isolated_tasks(tasks))
-        control.process(targets)
+        control = local_build._validate_farm_selection(tasks, targets)
     except (InvalidCommand, InvalidTask, InvalidDodoFile) as err:
         print(f"ERROR: {err}", file=sys.stderr)
         return 3
@@ -1032,12 +1032,23 @@ def _cache_hits(outputs: Path | None, farm_tasks: set[str]) -> int:
     return len(hits - farm_tasks)
 
 
+def _run_state(run_dir: Path) -> tuple[dict | None, bool, str]:
+    """``(status.json, supervisor alive, state)``.
+
+    Liveness first: the supervisor writes status.json before it exits, so a
+    supervisor already gone with still no status.json never wrote one.
+    """
+    alive = process_alive(read_json(run_dir / "supervisor.json"))
+    final = read_json(run_dir / "status.json")
+    if final:
+        return final, False, final["state"]
+    return None, alive, "running" if alive else "launcher-died"
+
+
 def run_status(run_dir: Path) -> dict:
     record = read_json(run_dir / "run.json")
-    final = read_json(run_dir / "status.json")
+    final, alive, state = _run_state(run_dir)
     supervisor = read_json(run_dir / "supervisor.json")
-    alive = process_alive(supervisor) if final is None else False
-    state = final["state"] if final else ("running" if alive else "launcher-died")
     leaves = (
         sorted(
             (read_json(path) for path in (run_dir / "leaves").glob("*.json")),
@@ -1175,16 +1186,7 @@ def list_runs(
         started = _parse_time(record["started_at"])
         if max_age_h and (now - started).total_seconds() > max_age_h * 3600:
             continue
-        final = read_json(run_dir / "status.json")
-        run_state = (
-            final["state"]
-            if final
-            else (
-                "running"
-                if process_alive(read_json(run_dir / "supervisor.json"))
-                else "launcher-died"
-            )
-        )
+        final, _alive, run_state = _run_state(run_dir)
         if state and run_state != state:
             continue
         rows.append(
@@ -1329,12 +1331,7 @@ def cancel(run_dir: Path, why: str, binding_wait_s: int) -> int:
         raise LaunchError("cancel --why must say why")
     record = read_json(run_dir / "run.json")
     supervisor = read_json(run_dir / "supervisor.json")
-    finished = read_json(run_dir / "status.json")
-    was = (
-        finished["state"]
-        if finished
-        else ("running" if process_alive(supervisor) else "launcher-died")
-    )
+    _finished, _alive, was = _run_state(run_dir)
     if was == "running":
         # Every member at once: the supervisor cannot react to its child dying
         # by writing a `failed` record, and nothing is left to dispatch.
