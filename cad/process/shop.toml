@@ -88,14 +88,14 @@ resolution_mm = 0.0127
 
 # The owner's other indicators (owner inventory 2026-11-17, Pedro, PR #2874;
 # ownership is cad/config/shop-equipment.toml, same keys): two .001 in dial
-# indicators and one digital indicator reading .0001 in. No travel was
-# stated, so none is declared. The release's tool list reads them
-# (ha_assembly_package).
+# indicators and "one digital 0.000'' indicator", recorded as written: a
+# three-place inch display, .001 in. No travel was stated, so none is
+# declared. The release's tool list reads them (ha_assembly_package).
 [gauges.dial-indicators]
 resolution_mm = 0.0254
 
 [gauges.digital-indicator]
-resolution_mm = 0.00254
+resolution_mm = 0.0254
 
 # PM-30MV X DRO scale read as a length gauge (feed-lever length, hand sheet
 # TL-26 Setup B). Range: machines.pm-30mv X travel; resolution: archive
