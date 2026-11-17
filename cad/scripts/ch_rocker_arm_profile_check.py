@@ -35,18 +35,17 @@ corner inset and the 0.01 rounding. Pedro may overrule them.
 from __future__ import annotations
 
 import math
-import tomllib
 
 import ch_rocker_arm_spec as rocker
 import _rocker_interface as rocker_interface
 import draw_ch_rocker_arm as drawing
 from _hole_spec import blind_cut_dia_mm
-from _paths import CAD_ROOT
 from _printed_tolerance import (
     drilled_oversize_mm,
     drilled_undersize_mm,
     printed_band_mm,
 )
+from _shop_records import shop_record
 
 INCH = 25.4
 INSET_MM = 1.0  # stations stay this far from a corner (AUTHOR'S CHOICE)
@@ -54,9 +53,7 @@ _SAMPLES = 64
 _PLACES = 2
 
 # The DTI's range and resolution are prechips shop records (cad/process/shop.toml).
-_DTI = tomllib.loads(
-    (CAD_ROOT / "process" / "shop.toml").read_text(encoding="utf-8")
-)["gauges"]["dti"]
+_DTI = shop_record("shop.toml", "gauges", "dti")
 DTI_RESOLUTION_MM = _DTI["resolution_mm"]  # 0.0127
 DTI_TRAVEL_IN = (_DTI["range_mm"][1] - _DTI["range_mm"][0]) / INCH
 ZONE_MM = float(drawing.ARC_PROFILE_ZONE_MM)

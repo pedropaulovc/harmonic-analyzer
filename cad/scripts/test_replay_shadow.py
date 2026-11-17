@@ -1889,6 +1889,7 @@ _PINS: dict[str, str | None] = {
     "PYTHONHASHSEED": "0",
     "HARMONIC_FASTENER_ROWS": None,
     "HARMONIC_FIT_GROUPS": None,
+    "HARMONIC_SHOP_RECORDS": None,
 }
 _NATIVE = b"the base's native part"
 _PY = b'{"written": "by Python"}\n'

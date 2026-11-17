@@ -4215,10 +4215,11 @@ def test_feature_subprocess_refuses_fit_groups_outside_its_cache_key(
 
     def feature_deps(stem):
         stems.append(stem)
-        return [
+        # Like the real function, record the (empty) shop-record selection.
+        return dodo._fold_shop_records(f"package:features:{stem}", [
             str((dodo.CONFIG_DIR / "tolerances" / f"{group}.yaml").resolve())
             for group in ("_base", *groups)
-        ]
+        ])
 
     def fake_run(cmd, cwd, env):
         seen.update(env)
@@ -4516,6 +4517,7 @@ def test_every_subprocess_launch_names_a_task_the_guard_can_map():
         for action, args in task["actions"]:
             if action is dodo._run_stamped:
                 dodo._fastener_rows_env(args[3])  # raises on an unmappable task
+                dodo._shop_records_env(args[3])
 
 
 def test_every_title_block_reader_is_classified() -> None:

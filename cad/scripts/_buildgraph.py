@@ -1815,6 +1815,24 @@ class TableReads(NamedTuple):
     dynamic: bool  # it also calls the accessor with a runtime value
 
 
+_ESCAPE_NAMES = frozenset({"eval", "exec", "globals", "vars", "__import__"})
+_ESCAPE_ATTRIBUTES = frozenset({"import_module", "modules"})
+
+
+def _escapes_static_reads(node: ast.AST, module: str) -> bool:
+    """Whether ``node`` can reach an accessor without a visible call to it:
+    ``eval``/``exec``/``globals``/``vars``/``__import__``, an ``import_module``
+    or ``sys.modules`` lookup, or a star/``import_module`` import from another
+    module. Shared by the accessor classifiers so both stay conservative alike."""
+    if isinstance(node, ast.ImportFrom):
+        return (
+            node.module is None or node.module.rsplit(".", 1)[-1] != module
+        ) and any(alias.name in {"*", "import_module"} for alias in node.names)
+    if isinstance(node, ast.Attribute):
+        return node.attr in _ESCAPE_ATTRIBUTES
+    return isinstance(node, ast.Name) and node.id in _ESCAPE_NAMES
+
+
 @functools.lru_cache(maxsize=512)
 @_persisted_facts(
     "table_reads",
@@ -1862,7 +1880,7 @@ def table_reads(
                 return None
         elif isinstance(node, ast.ImportFrom):
             if node.module is None or node.module.rsplit(".", 1)[-1] != module:
-                if any(alias.name in {"*", "import_module"} for alias in node.names):
+                if _escapes_static_reads(node, module):
                     return None
                 continue
             for alias in node.names:
@@ -1872,16 +1890,11 @@ def table_reads(
                     accessor_names.add(alias.name)
                 elif alias.name not in exports:
                     return None
-        elif isinstance(node, ast.Attribute) and node.attr in {table, "import_module", "modules"}:
+        elif isinstance(node, ast.Attribute) and node.attr == table:
             return None
-        elif isinstance(node, ast.Name) and node.id in {
-            table,
-            "eval",
-            "exec",
-            "globals",
-            "vars",
-            "__import__",
-        }:
+        elif isinstance(node, ast.Name) and node.id == table:
+            return None
+        elif _escapes_static_reads(node, module):
             return None
 
     keys: set[str] = set()
@@ -1935,6 +1948,135 @@ def fastener_rows_selected(
         if reads.dynamic and own_row in rows:
             selected.add(own_row)
     return frozenset(selected)
+
+
+SHOP_RECORDS_MODULE = "_shop_records"
+SHOP_RECORD_ACCESSOR = "shop_record"
+# A whole-file fallback that names no file: every shop file.
+ALL_SHOP_FILES = "*"
+
+
+class ShopRecordReads(NamedTuple):
+    """What sources read from the shop TOML files through ``shop_record``."""
+
+    records: frozenset[tuple[str, str, str]]  # literal (file, table, key)
+    files: frozenset[str]  # files read whole; ALL_SHOP_FILES for every file
+
+
+NO_SHOP_RECORDS = ShopRecordReads(frozenset(), frozenset())
+
+
+@functools.lru_cache(maxsize=512)
+@_persisted_facts(
+    "shop_record_reads",
+    encode=lambda reads: (tuple(sorted(reads.records)), tuple(sorted(reads.files))),
+    decode=lambda raw: ShopRecordReads(
+        frozenset(tuple(record) for record in raw[0]), frozenset(raw[1])
+    ),
+)
+def shop_record_reads(text: str) -> ShopRecordReads:
+    """Classify how ``text`` reads the shop files through ``shop_record``.
+
+    A literal (or literal-constant, as in :func:`table_reads`) file, table and
+    key name one record. A runtime table or key keeps that file whole; a
+    runtime file, or a use this cannot classify (a module import or alias of
+    ``_shop_records``, the module named in a string, the accessor rebound or
+    passed around, or an escape :func:`_escapes_static_reads` names), keeps
+    every file whole. Reads outside the static import graph are caught at run
+    time by ``HARMONIC_SHOP_RECORDS``.
+    """
+    if SHOP_RECORDS_MODULE not in text:
+        return NO_SHOP_RECORDS
+    everything = ShopRecordReads(frozenset(), frozenset({ALL_SHOP_FILES}))
+    tree = ast.parse(text)
+    nodes = tuple(ast.walk(tree))
+    stored: dict[str, int] = {}
+    for node in nodes:
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store):
+            stored[node.id] = stored.get(node.id, 0) + 1
+    constants = {
+        node.targets[0].id: node.value.value
+        for node in tree.body
+        if isinstance(node, ast.Assign)
+        and len(node.targets) == 1
+        and isinstance(node.targets[0], ast.Name)
+        and stored.get(node.targets[0].id) == 1
+        and isinstance(node.value, ast.Constant)
+        and isinstance(node.value.value, str)
+    }
+    imported = escaped = False
+    for node in nodes:
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            if node.value.rsplit(".", 1)[-1] == SHOP_RECORDS_MODULE:
+                return everything
+        elif isinstance(node, ast.Import):
+            if any(a.name.rsplit(".", 1)[-1] == SHOP_RECORDS_MODULE for a in node.names):
+                return everything
+        elif isinstance(node, ast.ImportFrom) and (
+            node.module is not None
+            and node.module.rsplit(".", 1)[-1] == SHOP_RECORDS_MODULE
+        ):
+            for alias in node.names:
+                if alias.name != SHOP_RECORD_ACCESSOR or alias.asname is not None:
+                    return everything
+            imported = True
+        elif _escapes_static_reads(node, SHOP_RECORDS_MODULE):
+            escaped = True
+    if not imported:
+        return NO_SHOP_RECORDS
+    if escaped:
+        return everything
+
+    def literal(argument: ast.expr) -> str | None:
+        if isinstance(argument, ast.Constant) and isinstance(argument.value, str):
+            return argument.value
+        if isinstance(argument, ast.Name) and argument.id in constants:
+            return constants[argument.id]
+        return None
+
+    calls = {
+        id(node.func): node
+        for node in nodes
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == SHOP_RECORD_ACCESSOR
+    }
+    records: set[tuple[str, str, str]] = set()
+    files: set[str] = set()
+    for node in nodes:
+        if not (isinstance(node, ast.Name) and node.id == SHOP_RECORD_ACCESSOR):
+            continue
+        call = calls.get(id(node))
+        if (
+            isinstance(node.ctx, ast.Store)
+            or call is None
+            or len(call.args) != 3
+            or call.keywords
+        ):
+            return everything
+        file, table, key = (literal(argument) for argument in call.args)
+        if file is None:
+            return everything
+        if table is None or key is None:
+            files.add(file)
+        else:
+            records.add((file, table, key))
+    return ShopRecordReads(frozenset(records), frozenset(files))
+
+
+def shop_records_selected(texts: tuple[str, ...]) -> ShopRecordReads:
+    """The shop records (and whole files) a complete consumer closure reads.
+
+    ``shop_record`` enforces the result at run time against
+    ``HARMONIC_SHOP_RECORDS``: a read outside it fails the build instead of
+    reusing an artefact keyed without that record."""
+    records: set[tuple[str, str, str]] = set()
+    files: set[str] = set()
+    for text in texts:
+        reads = shop_record_reads(text)
+        records |= reads.records
+        files |= reads.files
+    return ShopRecordReads(frozenset(records), frozenset(files))
 
 
 def data_deps_of(script: Path) -> list[str]:

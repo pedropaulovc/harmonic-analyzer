@@ -87,15 +87,14 @@ from __future__ import annotations
 
 import itertools
 import math
-import tomllib
 from collections.abc import Iterator
 from dataclasses import dataclass
 
 import _config
 from _assembly_contract import assembly_contract
 from _hole_spec import NUMBER_DRILL_MM
-from _paths import CAD_ROOT
 from _printed_tolerance import printed_band_mm
+from _shop_records import shop_record
 from _title_block_units import LENGTH_UNITS
 
 import ch_rocker_arm_tl_oblique_base_bar_spec as base_bar
@@ -1494,9 +1493,7 @@ STATION_BAND = 0.0005 * trammel.INCH
 CHAIN_STATIONS = tuple(s * trammel.INCH for s in (4.0, 11.0))
 _CHAIN_LINKS = tuple(zip((0.0, *CHAIN_STATIONS[:-1]), CHAIN_STATIONS))
 _GAUGE_SET_KEY = "gauge-blocks-mitutoyo"
-_GAUGE_SET = tomllib.loads(
-    (CAD_ROOT / "config" / "shop-equipment.toml").read_text(encoding="utf-8")
-)["gauges"][_GAUGE_SET_KEY]
+_GAUGE_SET = shop_record("shop-equipment.toml", "gauges", _GAUGE_SET_KEY)
 if not (
     _GAUGE_SET["present"]
     and "81-piece inch" in _GAUGE_SET["name"]
@@ -1508,9 +1505,7 @@ if not (
 # abrasive cut-off wheel and ground square. Owner ruling #2144 item 13.1 A
 # (2026-11-08) keeps the trimmed ends flush with the bars; the owner's
 # 2026-11-16 ruling trims each rail only after it is fitted to its bar.
-_RAIL_TRIM_GRINDER = tomllib.loads(
-    (CAD_ROOT / "config" / "shop-equipment.toml").read_text(encoding="utf-8")
-)["tools"]["rail-trim-grinder"]
+_RAIL_TRIM_GRINDER = shop_record("shop-equipment.toml", "tools", "rail-trim-grinder")
 if not (
     _RAIL_TRIM_GRINDER["kind"] == "angle_grinder"
     and {"cut-off", "grinding"} <= set(_RAIL_TRIM_GRINDER["wheels"])
@@ -1529,9 +1524,7 @@ RAIL_CUT_OFF_ALLOWANCE_IN = ".06"
 # table's lengthwise midpoint, centred on that travel by eye. Every table
 # setting the steps print therefore stays TABLE_TRAVEL_MARGIN inside half the
 # travel either side of the origin (clearance_report asserts it).
-TABLE_TRAVEL_X = tomllib.loads(
-    (CAD_ROOT / "process" / "shop.toml").read_text(encoding="utf-8")
-)["machines"]["pm-30mv"]["travel_mm"]["x"]
+TABLE_TRAVEL_X = shop_record("shop.toml", "machines", "pm-30mv")["travel_mm"]["x"]
 TABLE_TRAVEL_MARGIN = 0.5 * trammel.INCH
 TABLE_REACH_X = TABLE_TRAVEL_X / 2.0 - TABLE_TRAVEL_MARGIN
 # The set's composition (its shop-equipment comment), in ten-thousandths: .1001-
