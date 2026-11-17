@@ -124,14 +124,19 @@ def test_the_sheet_is_bom_balloons_and_one_action_steps() -> None:
     ]
     # Rule 22: at most six printed lines a step.
     assert all(len(step.splitlines()) <= 6 for step in steps)
-    window = fixture._window_text()
+    # Rule 22: the stick-out window prints on its front-view dimension
+    # (build_dt_cone_tip_gear_tl_cutter_assembly's LIMIT pair); the steps cite
+    # that dimension and never restate its numbers.
+    cite = "STICK-OUT"
+    for value in fixture.STICK_OUT_WINDOW:
+        assert f"{value / 25.4:.3f}".lstrip("0") not in fixture.ASSEMBLY_STEPS
     # Setting the stick-out and squaring the face are separate steps; each
     # names the tool it is read with and its acceptance.
     (setting,) = (step for step in steps if "SET THE STICK-OUT" in step)
-    assert window in setting and "(CALIPER)" in setting and "FACE" not in setting
+    assert "LIMITS" in setting and "(CALIPER)" in setting and "FACE" not in setting
     (squaring,) = (step for step in steps if "PARALLEL" in step)
     assert "SQUARE" in squaring and "NO LIGHT" in squaring
-    assert "STICK-OUT" not in squaring
+    assert cite not in squaring
     # Item 3 clamps item 2's plain round at an adjustable setting (rule 23's
     # adjustable-clamp row): the step names what it bears on, and later steps
     # check the clamp holds and the setting survived it, each on its own.
@@ -139,7 +144,9 @@ def test_the_sheet_is_bom_balloons_and_one_action_steps() -> None:
     assert "ITEM 2'S ROUND" in clamp
     after = steps[steps.index(clamp) + 1 :]
     assert any("DOES NOT TURN OR SLIDE BY HAND" in step for step in after)
-    assert any(window in step and "(CALIPER)" in step for step in after)
+    assert any(
+        cite in step and "LIMITS" in step and "(CALIPER)" in step for step in after
+    )
 
 
 def test_the_references_are_the_spec_values_at_the_spec_places() -> None:

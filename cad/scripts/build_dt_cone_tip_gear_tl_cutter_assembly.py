@@ -8,8 +8,9 @@ sh-vn-arbor-set-screw (MHA-SH-VN-54) seated on the bit, each fixed (0 DOF) at
 ``dt_cone_tip_gear_tl_cutter_spec``'s pose. The ``_tl_`` stem keeps the
 fixture out of every machine assembly and BOM
 (``_buildgraph.is_shop_fixture``). One hidden assembly sketch on the Front
-Plane carries the stick-out and swing radius the fitter sheet prints as
-references (``build_sm_summing_assembly._author_settings``'s recipe).
+Plane carries the stick-out, which the fitter sheet prints as its LIMIT
+window, and the swing radius, which it prints as a reference
+(``build_sm_summing_assembly._author_settings``'s recipe).
 
 Run (SolidWorks already open)::
 
@@ -37,6 +38,7 @@ from _drawing_marks import DRAWN_BY, mark_dimensions_for_drawing
 from _drawing_precision import apply_drawing_precision
 from _dt_cone_tip_gear_tl_cutter_interference import ALLOWED_PAIRS
 from _feature_tree import name_last_feature
+from _limit_tolerance import set_limits
 from _session import run_build
 from _sketch import (
     SketchDims,
@@ -58,9 +60,11 @@ from dt_cone_tip_gear_tl_cutter_spec import (
     SET_SCREW_POSITION,
     SET_SCREW_ROWS,
     SETTINGS_CHAIN,
+    SETTINGS_PLACES,
     SETTINGS_SKETCH,
     STICK_OUT,
     STICK_OUT_DIMENSION,
+    STICK_OUT_WINDOW,
     SWING_RADIUS,
     SWING_RADIUS_DIMENSION,
 )
@@ -140,6 +144,16 @@ def _author_settings(adapter: Any) -> None:
     check("exit cutter settings sketch", adapter.exit_sketch())
     name_last_feature(adapter, SETTINGS_SKETCH)
     dims.apply(adapter, SETTINGS_SKETCH)
+    # Rule 22: the stick-out is the fitter's setting, so it prints as its
+    # window on the native dimension (steps 2 and 6 cite it).
+    set_limits(
+        adapter,
+        SETTINGS_SKETCH,
+        STICK_OUT_DIMENSION,
+        limits=STICK_OUT_WINDOW,
+        places=SETTINGS_PLACES,
+        display_unit=CONTRACT.drawing_unit,
+    )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     for feature, names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature, names)
