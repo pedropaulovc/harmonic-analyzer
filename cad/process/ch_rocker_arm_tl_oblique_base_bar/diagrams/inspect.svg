@@ -33,7 +33,7 @@
 
   <!-- Bar 1 as used on the table: section A-A turned over, ZERO EDGE left -->
   <g id="labels" data-cad-group="labels"/>
-  <rect class="part-kept" x="{{view.sxl}}" y="{{view.stop}}" width="{{view.sw}}" height="{{view.st}}" stroke-width="1.5"/>
+  <rect class="section" x="{{view.sxl}}" y="{{view.stop}}" width="{{view.sw}}" height="{{view.st}}"/>
   <g id="section-cuts" data-cad-group="section-cuts" class="paper"/>
   <g id="section-outlines" data-cad-group="section-outlines" class="dims" stroke-width="1.2"/>
   <!-- socket screw recessed in the counterbore from below -->
@@ -50,7 +50,7 @@
 
   <!-- Bar 2 as used (drawing sheet 2): rail on the marked RAIL SIDE, table seat opposite -->
   <text x="430" y="{{view.bar2_title_y}}">Bar 2: rail on marked RAIL SIDE</text>
-  <rect class="part-kept" x="{{view.sxl}}" y="{{view.stop2}}" width="{{view.sw}}" height="{{view.st}}" stroke-width="1.5"/>
+  <rect class="section" x="{{view.sxl}}" y="{{view.stop2}}" width="{{view.sw}}" height="{{view.st}}"/>
   <rect class="part-rest" x="{{view.rail2_x}}" y="{{view.rail2_y}}" width="{{view.rail_w}}" height="{{view.rail_h}}"/>
   <text x="{{view.rail2_label_x}}" y="{{view.rail2_label_y}}">HGR15 rail</text>
   <text x="430" y="{{view.seat2_label_y}}">table seat: opposite face</text>

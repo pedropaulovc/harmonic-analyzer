@@ -14,8 +14,8 @@
   <!-- front jaw with parallels hidden behind -->
   <rect class="clamp" x="249" y="{{view.jaw_top}}" width="168" height="{{view.jaw_h}}"/>
   <rect class="fixture-support" x="255" y="{{view.fbottom}}" width="156" height="{{view.parallel_h}}" fill="none"/>
-  <text x="333" y="148" text-anchor="middle">front jaw</text>
-  <text x="333" y="165" text-anchor="middle" font-size="14">1-3/8 parallels behind</text>
+  <text class="label-on-clamp" x="333" y="148" text-anchor="middle">front jaw</text>
+  <text class="label-on-clamp" x="333" y="165" text-anchor="middle" font-size="14">1-3/8 parallels behind</text>
 
   <!-- screw jacks under both ends -->
   <g transform="translate({{view.fx0}} 0)">
