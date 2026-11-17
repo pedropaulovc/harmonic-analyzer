@@ -39,10 +39,11 @@ What it does, in order:
      Everything is staged and zipped into ONE bundle
      ``cad/out/release/harmonic-analyzer-<version>.zip`` (``solidworks/`` native +
      ``slddrw/`` + ``step/`` + ``stl/`` + ``gltf/`` + ``boxes/`` + ``png/`` +
-     ``pdf/`` + ``diff/`` + ``features/`` + ``travelers/``). Records the SW
-     revision. ``travelers/`` holds each enrolled part's hobby prechips
+     ``pdf/`` + ``diff/`` + ``features/`` + ``travelers/`` + ``nc/``). Records
+     the SW revision. ``travelers/`` holds each enrolled part's hobby prechips
      traveler printed to ``<slug>-traveler.pdf`` by its ``prechips:<stem>``
-     task; a missing one fails the cut.
+     task, and ``nc/<stem>/`` each enrolled part's NC programs, cycle times and
+     CAM manifest posted by its ``cam:<stem>`` task; a missing one fails the cut.
      (Build logs ship as a SEPARATE logs asset, not in this zip.)
   4. diff: render the changed-parts highlight (this staged bundle vs the previous
      release, fetched from GitHub) into ``stage/diff`` so it ships in the zip.
@@ -102,6 +103,7 @@ from typing import Any
 
 from _check import log
 from _paths import CAD_ROOT, OUT_SLDASM
+import _cam_programs
 import _config
 from _buildgraph import module_deps_of, script_for
 from _drawing_registry import DRAWINGS
@@ -790,6 +792,58 @@ def stage_travelers(stage: Path) -> list[str]:
     return staged
 
 
+def stage_nc_programs(stage: Path) -> list[str]:
+    """Copy each enrolled part's ``cam:<stem>`` outputs to ``nc/<stem>/``: every
+    program's ``.nc``, ``cycle_times.json`` and the CAM ``manifest.json``.
+
+    A full ``doit release`` runs those tasks first, but ``doit -s release`` does
+    not, so a missing or empty output fails the cut, and so does a stale set:
+    the CAM manifest must record exactly the current SHA-256 of every input
+    ``_cam_programs.cam_inputs`` names (the feature bundle's ``features.toml``
+    and STEP, the part's ``plan.toml``, ``shop.toml``, the recipe and the
+    FreeCAD runtime), each program's current bytes and the current
+    ``cycle_times.json``. A plan or shop edit since the post would otherwise
+    ship programs beside a traveler rendered from the newer plan.
+    """
+    out = CAD_ROOT / "out"
+    staged: list[str] = []
+    for stem in _cam_programs.CAM_STEMS:
+        rerun = f"run `doit -s cam:{stem}`"
+        outputs = _cam_programs.cam_outputs(stem, out)
+        for source in outputs:
+            if not source.is_file() or source.stat().st_size == 0:
+                raise RuntimeError(f"required NC output is missing: {source} ({rerun})")
+        manifest_path = _cam_programs.nc_dir(stem, out) / _cam_programs.MANIFEST_NAME
+        recorded = json.loads(manifest_path.read_text(encoding="utf-8"))
+        inputs = _cam_programs.cam_inputs(stem, out)
+        if sorted(recorded["inputs"]) != sorted(inputs):
+            raise RuntimeError(
+                f"NC programs are stale: {manifest_path} records inputs {sorted(recorded['inputs'])}, "
+                f"expected {sorted(inputs)} ({rerun})"
+            )
+        for name, path in inputs.items():
+            if not path.is_file():
+                raise RuntimeError(f"NC programs for {stem} have no {name} input at {path}")
+            if recorded["inputs"][name]["sha256"] != _sha256(path):
+                raise RuntimeError(
+                    f"NC programs are stale: {manifest_path} records another {path} ({rerun})"
+                )
+        for source in outputs:
+            if source.suffix == ".nc" and recorded["programs"].get(source.name) != _sha256(source):
+                raise RuntimeError(
+                    f"NC program {source} differs from its manifest {manifest_path} ({rerun})"
+                )
+        times = _cam_programs.nc_dir(stem, out) / _cam_programs.CYCLE_TIMES_NAME
+        if recorded["cycle_times"] != _sha256(times):
+            raise RuntimeError(f"{times} differs from its manifest {manifest_path} ({rerun})")
+        destination_dir = stage / "nc" / stem
+        destination_dir.mkdir(parents=True, exist_ok=True)
+        for source in outputs:
+            shutil.copy2(source, destination_dir / source.name)
+            staged.append(f"nc/{stem}/{source.name}")
+    return staged
+
+
 def drawing_diff(stage: Path, version: str) -> dict[str, Any]:
     """Create the required separate drawing asset before any tag or publication.
 
@@ -1143,6 +1197,7 @@ def bundle(
     # beside the PDFs that name it.
     facts["artwork"] = stage_noted_artwork(stage, drawing_note_texts())
     facts["travelers"] = stage_travelers(stage)
+    facts["nc"] = stage_nc_programs(stage)
     facts["solidworks_files"] = sum(1 for path in sw_dir.iterdir() if path.is_file())
 
     # 3. Scene graph (mm): per-component transforms + mesh keys + colours. The
@@ -1293,6 +1348,14 @@ def release_notes(version: str, facts: dict[str, Any]) -> str:
             f"- `travelers/` -- hobby process travelers as `<slug>-traveler.pdf` "
             f"({len(facts['travelers'])} parts), rendered by prechips\n"
             if facts.get("travelers")
+            else ""
+        )
+        + (
+            "- `nc/` -- CNC mill G-code for "
+            f"{len({path.split('/')[1] for path in facts['nc']})} parts as "
+            "`nc/<stem>/<program>.nc`, with `cycle_times.json` and the CAM "
+            "`manifest.json`, posted by headless FreeCAD CAM\n"
+            if facts.get("nc")
             else ""
         )
         + (

@@ -86,6 +86,24 @@ def test_tool_changes_split_the_program_into_tool_sections(tmp_path):
     assert any("G28/G30/G53" in f.detail for f in _gcode.check_tool_changes(_program(tmp_path, text + "G53 G0 Z0\n"), 12.0, [1, 3]))
 
 
+def test_a_program_that_loads_its_first_tool_does_so_before_any_move(tmp_path):
+    body = "M3 S2250\nG0 X0 Y0 Z20\nG1 Z5 F100\nG0 Z20\n"
+    change = "M5\n%msg TOOL CHANGE: T1 END MILL, SET SPINDLE TO 2250 RPM\nM6 T1\n"
+    loaded = _program(tmp_path, "G17 G90\nG21\nG54\n" + change + body)
+    assert [s.name for s in loaded.tool_sections()] == ["p.nc@0"]
+    assert _gcode.check_tool_changes(loaded, 12.0, [1], loads_first=True) == []
+    # The same cut on whatever tool and length the previous file left.
+    carried = _program(tmp_path, "G17 G90\nG21\nG54\n" + body)
+    found = _gcode.check_tool_changes(carried, 12.0, [1], loads_first=True)
+    assert [f.detail for f in found] == [
+        "M6 calls [], expected [1]",
+        "moves or spindle words before the first M6: the program runs on the previous tool's length",
+    ]
+    # A move before the load.
+    early = _program(tmp_path, "G54\nG0 X0 Y0 Z20\n" + change + body)
+    assert len(_gcode.check_tool_changes(early, 12.0, [1], loads_first=True)) == 1
+
+
 def test_probe_sets_one_work_zero_after_a_touch_along_its_axis(tmp_path):
     probe = (
         "G0 X0 Y0 Z20\nM5\n(TOOL CHANGE: T8 PROBE, SPINDLE OFF - PROBE IN)\nM6 T8\nG0 Z17\nG0 X-22 Y-70\n"
@@ -278,6 +296,138 @@ def test_face_passes_must_zigzag_within_the_engagement_and_cover_the_face(tmp_pa
     # Bites within the engagement but a strip left uncut between two passes.
     gappy = rows[:4] + [rows[4] - 20.0] + [r - 20.0 for r in rows[5:]]
     assert any("clearing" in f.detail for f in _gcode.check_face_passes(_program(tmp_path, _face(gappy)), **kwargs))
+
+
+# A 10 x 10 outline whose top edge is a minor arc about (5, -20), anticlockwise
+# (conventional outside with a clockwise spindle), each element held to 0.05.
+_OUTLINE = [
+    {"name": "bottom", "start": (0.0, 0.0), "end": (10.0, 0.0), "tol": 0.05},
+    {"name": "right", "start": (10.0, 0.0), "end": (10.0, 10.0), "tol": 0.05},
+    {
+        "name": "top",
+        "start": (10.0, 10.0),
+        "end": (0.0, 10.0),
+        "centre": (5.0, -20.0),
+        "tol": 0.05,
+    },
+    {"name": "left", "start": (0.0, 10.0), "end": (0.0, 0.0), "tol": 0.05},
+]
+# The top arc's outward normal at (10, 10).
+_N = (5.0 / math.hypot(5.0, 30.0), 30.0 / math.hypot(5.0, 30.0))
+_ONE_PASS = {
+    "elements": _OUTLINE,
+    "passes": [{"offset": 1.0, "levels": [-1.0, -2.0]}],
+    "z_top": 0.0,
+}
+
+
+def _loop(z: float) -> str:
+    """One anticlockwise lap at cutter-centre offset 1 round ``_OUTLINE``, from
+    and back to (5, -1), at depth ``z``; its corners are radius-1 arcs."""
+    nx, ny = _N
+    return (
+        f"G1 X5 Y-1 Z{z} F100\nG1 X10 Y-1\nG3 X11 Y0 I0 J1\nG1 X11 Y10\n"
+        f"G3 X{10 + nx:.4f} Y{10 + ny:.4f} I-1 J0\n"
+        f"G3 X{-nx:.4f} Y{10 + ny:.4f} I{-5 - nx:.4f} J{-30 - ny:.4f}\n"
+        f"G3 X-1 Y10 I{nx:.4f} J{-ny:.4f}\nG1 X-1 Y0\nG3 X0 Y-1 I1 J0\nG1 X5 Y-1\n"
+    )
+
+
+def _outline(tmp_path: Path, text: str, **kwargs) -> list[str]:
+    return [
+        f.detail
+        for f in _gcode.check_outline(_program(tmp_path, text), **_ONE_PASS, **kwargs)
+    ]
+
+
+def test_outline_passes_hold_their_offset_direction_levels_and_coverage(tmp_path):
+    good = "G0 X5 Y-1 Z5\n" + _loop(-1.0) + _loop(-2.0) + "G0 Z5\n"
+    assert _outline(tmp_path, good) == []
+    # The bottom run 0.2 mm into the part: a gouge, and that side left uncut.
+    first = "G1 X5 Y-1 Z-2.0 F100\nG1 X10 Y-1\nG3 X11 Y0 I0 J1"
+    gouge = good.replace(
+        first, "G1 X5 Y-0.8 Z-2.0 F100\nG1 X10 Y-0.8\nG3 X11 Y0.2 I0 J1"
+    )
+    assert any(
+        "off every pass offset" in d and "0.800 from bottom" in d
+        for d in _outline(tmp_path, gouge)
+    )
+    # The second lap clockwise round the part (climb), on the same offset path.
+    nx, ny = _N
+    clockwise = (
+        "G1 X5 Y-1 Z-2.0 F100\nG1 X0 Y-1\nG2 X-1 Y0 I0 J1\nG1 X-1 Y10\n"
+        f"G2 X{-nx:.4f} Y{10 + ny:.4f} I1 J0\n"
+        f"G2 X{10 + nx:.4f} Y{10 + ny:.4f} I{5 + nx:.4f} J{-30 - ny:.4f}\n"
+        f"G2 X11 Y10 I{-nx:.4f} J{-ny:.4f}\nG1 X11 Y0\nG2 X10 Y-1 I-1 J0\nG1 X5 Y-1\n"
+    )
+    climb = _outline(tmp_path, "G0 X5 Y-1 Z5\n" + _loop(-1.0) + clockwise + "G0 Z5\n")
+    assert len(climb) == 1 and "against the outline's way" in climb[0]
+    # A level the plan does not list, and a listed level never cut.
+    stray = _outline(tmp_path, "G0 X5 Y-1 Z5\n" + _loop(-1.0) + _loop(-1.5) + "G0 Z5\n")
+    assert any("off the levels" in d for d in stray)
+    assert any("uncut at Z-2.000" in d for d in stray)
+
+
+def test_outline_passes_run_in_order_after_the_clearing(tmp_path):
+    passes = [{"offset": 1.0, "levels": [-1.0]}, {"offset": 1.0, "levels": [-2.0]}]
+    # Waste 4 from the bottom edge, cleared +X (the bottom's way) at Z-2.
+    clear = "G0 X2 Y-4 Z5\nG1 Z-2 F100\nG1 X8\nG0 Z5\n"
+    zone = [{"x": (1.0, 9.0), "levels": [-2.0]}]
+
+    def check(text, clearing=zone):
+        program = _program(tmp_path, text + "G0 Z5\n")
+        found = _gcode.check_outline(
+            program, _OUTLINE, passes, 0.0, clearing=clearing
+        )
+        return [f.detail for f in found]
+
+    laps = "G0 X5 Y-1 Z5\n" + _loop(-1.0) + _loop(-2.0)
+    assert check(clear + laps) == []
+    assert any("off every pass offset" in d for d in check(clear + laps, ()))
+    late = check(laps + clear)
+    assert len(late) == 1 and "cut after a later pass" in late[0]
+    swapped = check("G0 X5 Y-1 Z5\n" + _loop(-2.0) + _loop(-1.0))
+    assert len(swapped) == 1 and "cut after a later pass" in swapped[0]
+
+
+def test_cleared_waste_is_swept_at_depth(tmp_path):
+    program = _program(tmp_path, "G0 X0 Y-4 Z5\nG1 Z-2 F100\nG1 X10\nG0 Z5\n")
+    assert _gcode.check_cleared(program, [(5.0, -4.5), (10.0, -3.0)], 1.0, -2.0) == []
+    found = _gcode.check_cleared(program, [(5.0, -5.5), (5.0, -4.0)], 1.0, -2.0)
+    assert [f.detail for f in found] == [
+        "1 points no cut at Z-2.000 clears: X5.000 Y-5.500"
+    ]
+    assert _gcode.check_cleared(program, [(5.0, -4.0)], 1.0, -1.0) != []
+
+
+def test_keep_out_catches_the_cutter_entering_a_fixture_below_its_top(tmp_path):
+    fence = {"name": "fence", "x": (0.0, 10.0), "y": (0.0, 5.0), "z_top": 2.0}
+    flange = {"name": "flange", "centre": (20.0, -5.0), "radius": 3.0, "z_top": 6.0}
+
+    def hits(text):
+        found = _gcode.check_keep_out(
+            _program(tmp_path, text), 1.0, boxes=[fence], circles=[flange]
+        )
+        return [f.detail.split(" into ")[1].split(":")[0] for f in found]
+
+    # Beside the fence and the flange by more than the cutter radius, then
+    # over both above their tops.
+    clear = (
+        "G0 X5 Y-2 Z5\nG1 Z1 F100\nG1 X12\nG0 Z7\nG0 X15 Y-9.5\nG1 Z1\nG1 X25\n"
+        "G0 Z7\nG0 X20 Y-5\nG0 X5 Y2\n"
+    )
+    assert hits(clear) == []
+    assert hits("G0 X5 Y-0.5 Z5\nG0 Z1\nG1 X6 F100\n") == ["fence"]
+    assert hits("G0 X20 Y-1.5 Z7\nG0 Z5\n") == ["flange"]
+
+
+def test_a_reamer_rapided_out_of_its_bore_is_caught(tmp_path):
+    fed = _program(tmp_path, "G0 X10 Y5 Z5\nG0 Z1\nG1 Z-7 F80\nG1 Z1 F80\nG0 Z5\n")
+    assert _gcode.check_feed_out(fed, 0.0) == []
+    rapided = _program(tmp_path, "G0 X10 Y5 Z5\nG0 Z1\nG1 Z-7 F80\nG0 Z5\n")
+    assert [f.detail for f in _gcode.check_feed_out(rapided, 0.0)] == [
+        "G0 from X10.000 Y5.000 Z-7.000, below the stock top 0.000"
+    ]
 
 
 def test_freecad_older_than_1_1_is_refused(tmp_path, monkeypatch):

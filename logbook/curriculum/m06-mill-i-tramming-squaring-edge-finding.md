@@ -13,41 +13,39 @@ hours_actual: 21.75
 - Hold work stiffly enough that the cut, not the setup, decides the finish
 - Face a sawn bar to length and thickness by cutting to a written allowance
 - Square a block on all six faces
-- Find an edge and trust the DRO after it
+- Find an edge with the touch probe and set the work zero from it
+- Set tool lengths on the tool setter and prove a program in air before it cuts
 - Tell climb from conventional milling before the cut starts
 - Tram the head and know when it has drifted
 
 ## Prerequisites
 
-- m01 — the allowance sheet for the oblique-jig stock
+- m01 — the allowance sheet for the first mill parts' stock
 
 ## References
 
 - `references/machining-for-hobbyists-getting-started/09_chapter-7-milling-machines.pdf`
-- `references/magxact-mx100m-mill-dro-manual/`, `references/el400-operation-manual/`
-- The jig parts' registry rows:
-  [`end-bracket`](../../cad/config/parts/ch-rocker-arm-tl-oblique-end-bracket.yaml),
-  [`feed-lever`](../../cad/config/parts/ch-rocker-arm-tl-oblique-feed-lever.yaml),
-  [`base-bar`](../../cad/config/parts/ch-rocker-arm-tl-oblique-base-bar.yaml),
-  [`pivot-block`](../../cad/config/parts/ch-rocker-arm-tl-oblique-pivot-block.yaml),
-  [`feed-block`](../../cad/config/parts/ch-rocker-arm-tl-oblique-feed-block.yaml),
-  [`carrier`](../../cad/config/parts/ch-rocker-arm-tl-oblique-carrier.yaml)
-- `cad/process/ch_rocker_arm_tl_oblique_base_bar/plan.toml`, a held preview
-  route for the base bar's setups; not approval to machine
+- `references/magxact-mx100m-mill-dro-manual/`
+- [`sm-knife-mount`](../../cad/config/parts/sm-knife-mount.yaml) registry row
+- [`cad/process/README.md`](../../cad/process/README.md) (process plans, and
+  the NC programs posted for CNC parts)
 
 ## Practice
 
 - Workholding first: parallels, how high the work sits above the jaws,
   overhang, and when the table beats the vise
 - Facing to length: measure, write target − actual, split the passes, cut to
-  an absolute DRO coordinate
+  an absolute work coordinate
 - Squaring a block: the order of faces
-- Edge finding: mechanical, electronic, and the tool-diameter arithmetic
+- Edge finding: the touch probe, a mechanical finder as the cross-check, and
+  the tip-diameter arithmetic
+- Jogging, tool lengths from the tool setter, and running a program in air
+  above the stock before it cuts
 - Climb vs conventional: which side of the cutter the work is on, worked out
   with the spindle direction before the cut starts
 - Axes: every axis describes the cutter moving relative to the work
 - Tramming: the sweep method, and how often to re-check
-- The escape: stop, wait for motion to end, retract Z
+- The escape: feed hold or e-stop, wait for motion to end, retract Z
 
 ## Controlled mistakes
 
@@ -76,41 +74,20 @@ are made deliberately, with a light cut.
 
 ## Now make — the real part this unlocks
 
-**The oblique jig's bars, blocks and carrier**, in this order, so each part
-needs one new skill:
-
-1. **`ch-rocker-arm-tl-oblique-end-bracket`** ×2 (TL-28) and
-   **`ch-rocker-arm-tl-oblique-feed-lever`** (TL-26): 1/2 × 1 in bar, saw and
-   face to length. These are the smallest first cuts.
-2. **`ch-rocker-arm-tl-oblique-base-bar`** ×2 (TL-20): 440 long with both large
-   faces faced to 12.0. The owned 6 in bar is milled to width; the target width
-   is open in [#2083](https://github.com/pedropaulovc/harmonic-analyzer/issues/2083).
-   This is the long-part workholding lesson.
-3. **`ch-rocker-arm-tl-oblique-pivot-block`** (TL-22) and
-   **`ch-rocker-arm-tl-oblique-feed-block`** (TL-32): 40 wide by 24.3 high from
-   1 × 3-1/2 in bar, squared on all six faces.
-4. **`ch-rocker-arm-tl-oblique-carrier`** (TL-21): ripped from the 6 in bar,
-   faced to 12.0 and milled to 520 × 130.
-
-Their holes come in M08 and the base bars' slots in M07.
-
-Then, in the analyzer: **`sm-knife-mount`** ×2, a rectangular block
-34 × 43.77 × 14. It is the simplest prismatic part in the machine, and there
-are two of them.
+**`sm-knife-mount`** ×2, a rectangular block 34 × 43.77 × 14. It is the
+simplest prismatic part in the machine, and there are two of them.
 
 ## Competency check
 
-A block square within 0.02 mm across 40 mm, verified on a surface plate. The
-pivot block and the feed block are each 40 wide, so either can be the block
-checked.
+A block square within 0.02 mm across 40 mm, verified on a surface plate.
 
 ## Notes
 
 Watch the 4 mm floor under the knife-mount's Ø25.4 bore when you get to boring
 it — breakout there scraps the part.
 
-Standing a base bar on its end is out: 443 mm is more than the 17 in maximum
-from spindle to table (`cad/process/shop.toml` machines.pm-30mv).
+The oblique trammel jig this module used to open on was deleted (2026-11-17);
+the sessions below made its parts and stay as they were logged.
 
 ## Sessions
 

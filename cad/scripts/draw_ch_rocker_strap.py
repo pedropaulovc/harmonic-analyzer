@@ -53,29 +53,48 @@ from _drawing_edges import scan_view_edges
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _part_properties import part_drawing_unit
+from _printed_limits import limits
+from _printed_tolerance import angular_band_deg
 from _session import run_build
 from ch_rocker_arm_spec import _ALPHA_TOP
+from ch_rocker_hub_fit import STRAP_HOLE_BAND
 from ch_rocker_strap_notes import (
     DIMENSION_CALLOUTS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    HOLE_CALLOUT,
+    HOLE_EDGE_CALLOUT,
+    STRAP_FIT_CALLOUT,
     TIP_LAND_ANGLE_PREFIX,
 )
 from ch_rocker_strap_spec import (
     ARM_THICKNESS,
+    ARM_THICKNESS_BAND,
     BOT_END_X,
+    BOT_END_Y,
+    BOTTOM_EDGE_BAND,
     BOTTOM_EDGE_BELOW_PIVOT,
+    CENTER_Y,
     DRAWING_REFERENCE_PRECISION,
     HOLE_DIA,
+    HUB_NUMBER,
     PIVOT_MID_Y,
+    R_BOTTOM,
+    R_TOP,
     ROD_TIP_X,
     ROD_TIP_Y,
+    TIP_FACE,
     TOP_EDGE_ABOVE_PIVOT,
+    TOP_EDGE_BAND,
     TOP_END_X,
     TOP_END_Y,
+    UNIT,
 )
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -168,10 +187,107 @@ FRONT_KEEP = {
         _front(TOP_END_X, TOP_END_Y)[1] - 0.025 * math.cos(_ALPHA_TOP),
     ),
 }
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, each beside the code that
+# prints it, in the part's model frame (ch_rocker_strap_spec: origin on the
+# mirror axis at the book bottom edge, +X the rod side, the hub hole
+# PIVOT_MID_Y up on that axis, the strap extruded mid-plane in Z). A band is
+# the dimension's own native band, else the title block's row for the places
+# it prints at (DRAWING_PRECISION); the declarations print nothing.
+_P = DRAWING_PRECISION_BY_NAME
+part_metadata(
+    fields={
+        "material.thickness": (
+            ARM_THICKNESS,
+            (("ch_rocker_arm_spec", "ARM_THICKNESS"),),
+        ),
+    },
+    model_sources=(
+        ("ch_rocker_arm_spec", "ARM_THICKNESS"),
+        ("_rocker_interface", "PIVOT_MID_Y"),
+    ),
+    precision_sources=(
+        ("ch_rocker_strap_notes", "DRAWING_PRECISION"),
+        ("ch_rocker_strap_notes", "DRAWING_PRECISION_BY_NAME"),
+        "DRAWING_REFERENCE_PRECISION",
+    ),
+)
+# The hub hole's Ø, its press band and its callout (FRONT_KEEP "HoleDia",
+# DIMENSION_CALLOUTS): every printed location runs from its centre.
+_HOLE_CALLOUT_SOURCES = (
+    ("ch_rocker_strap_notes", "HOLE_CALLOUT"),
+    ("ch_rocker_strap_notes", "DIMENSION_CALLOUTS"),
+    ("draw_ch_rocker_strap", "build"),
+)
+requirement(
+    "hub_hole",
+    kind="hole",
+    faces=(CylinderFace(HOLE_DIA),),
+    requirements=("dia", "thru"),
+    fields={
+        "at": ([0.0, PIVOT_MID_Y, 0.0], (("_rocker_interface", "PIVOT_MID_Y"),)),
+        "axis": ((0.0, 0.0, 1.0), ("__frame__",)),
+        "dia": (
+            limits(HOLE_DIA, _P["HoleDia"], STRAP_HOLE_BAND),
+            (
+                "HOLE_DIA",
+                ("ch_rocker_hub_fit", "STRAP_HOLE_BAND"),
+                ("draw_ch_rocker_strap", "FRONT_KEEP"),
+            ),
+        ),
+        "nominal_dia": (HOLE_DIA, ("HOLE_DIA",)),
+        "thru": (True, _HOLE_CALLOUT_SOURCES),
+        "process": ("ream", _HOLE_CALLOUT_SOURCES),
+        "press_fit_on": (HUB_NUMBER, ("HUB_NUMBER", *_HOLE_CALLOUT_SOURCES)),
+        "edge_note": (
+            HOLE_EDGE_CALLOUT,
+            (("ch_rocker_strap_notes", "HOLE_EDGE_CALLOUT"), *_HOLE_CALLOUT_SOURCES),
+        ),
+        "callout": (HOLE_CALLOUT, _HOLE_CALLOUT_SOURCES),
+    },
+    precision={"dia": _P["HoleDia"]},
+)
+
 # The 2.5 mm end view is narrower than its four-row callout: centred over it
 # (r1) both extension lines ran through the text, so the text stands below
 # the view, left of its left extension line, the dimension line carried out.
 RIGHT_KEEP = {"StrapThickness": (RIGHT_CENTER[0] - 0.027, 0.150)}
+
+# Both broad faces, finished to the end view's thickness (RIGHT_KEEP) and
+# never cut again (ch_rocker_strap_spec).
+_THICKNESS = (ARM_THICKNESS, (("ch_rocker_arm_spec", "ARM_THICKNESS"),))
+for _name, _sign in (("broad_face_pos_z", 1), ("broad_face_neg_z", -1)):
+    requirement(
+        _name,
+        kind="face",
+        faces=(PlanarFace((0, 0, _sign), ARM_THICKNESS / 2.0),),
+        requirements=("thickness",),
+        fields={
+            "thickness": (
+                limits(ARM_THICKNESS, _P["StrapThickness"], ARM_THICKNESS_BAND),
+                (
+                    ("ch_rocker_arm_spec", "ARM_THICKNESS"),
+                    ("ch_rocker_arm_spec", "ARM_THICKNESS_BAND"),
+                    ("draw_ch_rocker_strap", "RIGHT_KEEP"),
+                ),
+            ),
+            "thickness_nominal": _THICKNESS,
+            "plane": (
+                {"frame": "model", "axis": "z", "value": _sign * ARM_THICKNESS / 2.0},
+                _THICKNESS[1],
+            ),
+            "callout": (
+                STRAP_FIT_CALLOUT,
+                (
+                    ("ch_rocker_arm_notes", "STRAP_FIT_CALLOUT"),
+                    ("ch_rocker_strap_notes", "DIMENSION_CALLOUTS"),
+                ),
+            ),
+        },
+        precision={"thickness": _P["StrapThickness"]},
+    )
+
 ARC_RADIUS_NAMES = ("TopRadius", "BottomRadius")
 # The hub hole's template centre mark, its vertical arms extended past both
 # edges: the drawn centreline the edges' heights stand on, the part's
@@ -240,6 +356,91 @@ def _exterior_radius_leaders(adapter: Any, annotations: list[Any]) -> None:
         raise RuntimeError(f"strap radius dimensions missing: {sorted(remaining)}")
 
 
+# Each edge's height from the hole on its extended vertical centreline
+# (FRONT_KEEP, CENTRE_MARK_ARMS_MM), with the band the finished MHA-CH-06's
+# arc-system zone gives it, and each arc's own radius
+# (_exterior_radius_leaders) about the shared centre on that line.
+_HEIGHT_SOURCES = (
+    ("draw_ch_rocker_strap", "FRONT_KEEP"),
+    ("draw_ch_rocker_strap", "CENTRE_MARK_ARMS_MM"),
+)
+_RADIUS_SOURCES = (
+    "UNIT",
+    ("draw_ch_rocker_strap", "ARC_RADIUS_NAMES"),
+    ("draw_ch_rocker_strap", "_exterior_radius_leaders"),
+)
+_ARC_CENTRE = ([0.0, CENTER_Y, 0.0], (("_rocker_interface", "CENTER_Y"),))
+_TOP_EDGE = (
+    ("ch_rocker_arm_spec", "TOP_EDGE_ABOVE_PIVOT"),
+    ("ch_rocker_arm_spec", "TOP_EDGE_BAND"),
+)
+_BOTTOM_EDGE = (
+    ("ch_rocker_arm_spec", "BOTTOM_EDGE_BELOW_PIVOT"),
+    ("ch_rocker_arm_spec", "BOTTOM_EDGE_BAND"),
+)
+requirement(
+    "top_arc",
+    kind="profile",
+    faces=(CylinderFace(2.0 * R_TOP),),
+    requirements=("height_above_pivot", "radius"),
+    fields={
+        "height_above_pivot": (
+            limits(TOP_EDGE_ABOVE_PIVOT, _P["TopAbovePivot"], TOP_EDGE_BAND),
+            (*_TOP_EDGE, *_HEIGHT_SOURCES),
+        ),
+        "height_above_pivot_nominal": (TOP_EDGE_ABOVE_PIVOT, _TOP_EDGE[:1]),
+        "height_from": ("hub_hole", _HEIGHT_SOURCES),
+        "edge_on_axis": (
+            [0.0, PIVOT_MID_Y + TOP_EDGE_ABOVE_PIVOT, 0.0],
+            (("_rocker_interface", "PIVOT_MID_Y"), *_TOP_EDGE[:1]),
+        ),
+        "radius": (
+            limits(R_TOP, _P["TopRadius"], unit=UNIT),
+            (("ch_rocker_arm_spec", "R_TOP"), *_RADIUS_SOURCES),
+        ),
+        "radius_nominal": (R_TOP, (("ch_rocker_arm_spec", "R_TOP"),)),
+        "arc_centre": _ARC_CENTRE,
+        "ends": (
+            [[-TOP_END_X, TOP_END_Y, 0.0], [TOP_END_X, TOP_END_Y, 0.0]],
+            (("ch_rocker_arm_spec", "TOP_END_X"), ("ch_rocker_arm_spec", "TOP_END_Y")),
+        ),
+    },
+    precision={"height_above_pivot": _P["TopAbovePivot"], "radius": _P["TopRadius"]},
+)
+requirement(
+    "bottom_arc",
+    kind="profile",
+    faces=(CylinderFace(2.0 * R_BOTTOM),),
+    requirements=("height_below_pivot", "radius"),
+    fields={
+        "height_below_pivot": (
+            limits(BOTTOM_EDGE_BELOW_PIVOT, _P["BottomBelowPivot"], BOTTOM_EDGE_BAND),
+            (*_BOTTOM_EDGE, *_HEIGHT_SOURCES),
+        ),
+        "height_below_pivot_nominal": (BOTTOM_EDGE_BELOW_PIVOT, _BOTTOM_EDGE[:1]),
+        "height_from": ("hub_hole", _HEIGHT_SOURCES),
+        "edge_on_axis": (
+            [0.0, PIVOT_MID_Y - BOTTOM_EDGE_BELOW_PIVOT, 0.0],
+            (("_rocker_interface", "PIVOT_MID_Y"), *_BOTTOM_EDGE[:1]),
+        ),
+        "radius": (
+            limits(R_BOTTOM, _P["BottomRadius"], unit=UNIT),
+            (("_rocker_interface", "R_BOTTOM"), *_RADIUS_SOURCES),
+        ),
+        "radius_nominal": (R_BOTTOM, (("_rocker_interface", "R_BOTTOM"),)),
+        "arc_centre": _ARC_CENTRE,
+        "ends": (
+            [[-BOT_END_X, BOT_END_Y, 0.0], [BOT_END_X, BOT_END_Y, 0.0]],
+            (("ch_rocker_arm_spec", "BOT_END_X"), "BOT_END_Y"),
+        ),
+    },
+    precision={
+        "height_below_pivot": _P["BottomBelowPivot"],
+        "radius": _P["BottomRadius"],
+    },
+)
+
+
 def _dress_tip_land_angle(adapter: Any, annotations: list[Any]) -> None:
     """The imported land angle still measures the real radial land from
     vertical (draw_ch_rocker_arm._dress_detail_dimensions) and counts both
@@ -262,6 +463,101 @@ def _dress_tip_land_angle(adapter: Any, annotations: list[Any]) -> None:
             raise RuntimeError("tip land angle lost its 2X count")
         return
     raise RuntimeError("strap tip land angle dimension missing")
+
+
+_TOP_END = (TOP_END_X, TOP_END_Y)
+_TIP_CORNER = (ROD_TIP_X, ROD_TIP_Y)
+_FOOT = (BOT_END_X, BOT_END_Y)
+_CORNER_SOURCES = (("ch_rocker_arm_spec", "ROD_TIP_X"), "ROD_TIP_Y")
+
+
+def _outline_face(
+    start: tuple[float, float], end: tuple[float, float], side: int
+) -> PlanarFace:
+    """The +X outline face from vertex ``start`` to ``end``, its outward
+    normal left of that direction (draw_ch_rocker_arm._plane_between), or for
+    ``side`` -1 its mirror about the YZ plane."""
+    dx, dy = end[0] - start[0], end[1] - start[1]
+    length = math.hypot(dx, dy)
+    nx, ny = -dy / length, dx / length
+    return PlanarFace((side * nx, ny, 0.0), nx * start[0] + ny * start[1])
+
+
+# Both radial tip lands: the 2X land length and its 2X angle from the hole's
+# vertical centreline (_dress_tip_land_angle, under the title block's angular
+# row), each tip corner's offset from the hole (FRONT_KEEP "RodTipX" and
+# "TailTipX").
+_LAND_ANGLE_DEG = math.degrees(_ALPHA_TOP)
+_LAND_ANGLE_PRINTED = round(_LAND_ANGLE_DEG, _P["TipLandAngle"])
+_ANGULAR_BAND_DEG = angular_band_deg(unit=UNIT)
+for _name, _side, _corner_dimension in (
+    ("tip_land_pos_x", 1, "RodTipX"),
+    ("tip_land_neg_x", -1, "TailTipX"),
+):
+    requirement(
+        _name,
+        kind="face",
+        faces=(_outline_face(_TOP_END, _TIP_CORNER, _side),),
+        requirements=("land_length", "land_angle_deg", "corner_station"),
+        fields={
+            "land_length": (
+                limits(TIP_FACE, _P["RodTipLen"], unit=UNIT),
+                (
+                    ("ch_rocker_arm_spec", "TIP_FACE"),
+                    "UNIT",
+                    ("ch_rocker_strap_notes", "TIP_LAND_PREFIX"),
+                    ("draw_ch_rocker_strap", "FRONT_KEEP"),
+                ),
+            ),
+            "land_length_nominal": (TIP_FACE, (("ch_rocker_arm_spec", "TIP_FACE"),)),
+            "land_angle_deg": (
+                [
+                    round(_LAND_ANGLE_PRINTED - _ANGULAR_BAND_DEG, 12),
+                    round(_LAND_ANGLE_PRINTED + _ANGULAR_BAND_DEG, 12),
+                ],
+                (
+                    ("ch_rocker_arm_spec", "_ALPHA_TOP"),
+                    "UNIT",
+                    ("ch_rocker_strap_notes", "TIP_LAND_ANGLE_PREFIX"),
+                    ("draw_ch_rocker_strap", "_dress_tip_land_angle"),
+                ),
+            ),
+            "land_angle_nominal_deg": (
+                _LAND_ANGLE_DEG,
+                (("ch_rocker_arm_spec", "_ALPHA_TOP"),),
+            ),
+            "land_angle_from": (
+                "vertical",
+                (("draw_ch_rocker_strap", "_dress_tip_land_angle"),),
+            ),
+            "corner_station": (
+                limits(ROD_TIP_X, _P[_corner_dimension], unit=UNIT),
+                (
+                    ("ch_rocker_arm_spec", "ROD_TIP_X"),
+                    "UNIT",
+                    ("draw_ch_rocker_strap", "FRONT_KEEP"),
+                ),
+            ),
+            "corner_station_nominal": (
+                ROD_TIP_X,
+                (("ch_rocker_arm_spec", "ROD_TIP_X"),),
+            ),
+            "station_from": ("hub_hole", (("draw_ch_rocker_strap", "FRONT_KEEP"),)),
+            "inner_end": (
+                [_side * TOP_END_X, TOP_END_Y, 0.0],
+                (
+                    ("ch_rocker_arm_spec", "TOP_END_X"),
+                    ("ch_rocker_arm_spec", "TOP_END_Y"),
+                ),
+            ),
+            "corner": ([_side * ROD_TIP_X, ROD_TIP_Y, 0.0], _CORNER_SOURCES),
+        },
+        precision={
+            "land_length": _P["RodTipLen"],
+            "land_angle_deg": _P["TipLandAngle"],
+            "corner_station": _P[_corner_dimension],
+        },
+    )
 
 
 @_telemetry.traced("drawing.strap_overall_length")
@@ -318,6 +614,55 @@ def _add_overall_length(adapter: Any, front: Any) -> None:
             f"strap overall length prints {applied} decimal places, "
             f"not {DRAWING_REFERENCE_PRECISION[label]}"
         )
+
+
+# Both tapered end faces, from the tip corner down to the foot on the bottom
+# arc: each foot's offset from the hole (FRONT_KEEP "BottomRodX" and
+# "BottomTailX"), and the parenthesised overall length across both tip
+# corners (_add_overall_length), a band-free reference.
+for _name, _side, _foot_dimension, _land in (
+    ("end_face_pos_x", 1, "BottomRodX", "tip_land_pos_x"),
+    ("end_face_neg_x", -1, "BottomTailX", "tip_land_neg_x"),
+):
+    requirement(
+        _name,
+        kind="face",
+        faces=(_outline_face(_TIP_CORNER, _FOOT, _side),),
+        requirements=("foot_station",),
+        fields={
+            "foot_station": (
+                limits(BOT_END_X, _P[_foot_dimension], unit=UNIT),
+                (
+                    ("ch_rocker_arm_spec", "BOT_END_X"),
+                    "UNIT",
+                    ("draw_ch_rocker_strap", "FRONT_KEEP"),
+                ),
+            ),
+            "foot_station_nominal": (
+                BOT_END_X,
+                (("ch_rocker_arm_spec", "BOT_END_X"),),
+            ),
+            "station_from": ("hub_hole", (("draw_ch_rocker_strap", "FRONT_KEEP"),)),
+            "foot": (
+                [_side * BOT_END_X, BOT_END_Y, 0.0],
+                (("ch_rocker_arm_spec", "BOT_END_X"), "BOT_END_Y"),
+            ),
+            "corner": ([_side * ROD_TIP_X, ROD_TIP_Y, 0.0], _CORNER_SOURCES),
+            "corner_feature": (_land, (("draw_ch_rocker_strap", "FRONT_KEEP"),)),
+            "overall_length_ref": (
+                2.0 * ROD_TIP_X,
+                (
+                    ("ch_rocker_arm_spec", "ROD_TIP_X"),
+                    "DRAWING_REFERENCE_PRECISION",
+                    ("draw_ch_rocker_strap", "_add_overall_length"),
+                ),
+            ),
+        },
+        precision={
+            "foot_station": _P[_foot_dimension],
+            "overall_length_ref": DRAWING_REFERENCE_PRECISION["OverallLength"],
+        },
+    )
 
 
 def build(adapter: Any) -> dict[str, str]:

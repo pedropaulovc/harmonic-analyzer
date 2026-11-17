@@ -137,7 +137,7 @@ facts.
 | | |
 |---|---|
 | **[CAD](cad/)** | The generated SolidWorks reconstruction, production drawings, verification and releases. |
-| **[The book](book/README.md)** | *A Project for Hobby Machinists*: every part, setup and cut on a manual mill and lathe. |
+| **[The book](book/README.md)** | *A Project for Hobby Machinists*: every part, setup and cut on a CNC mill (a PM-30MV conversion running FluidNC and CNCjs, with G-code posted by open-source FreeCAD CAM) and a manual lathe. |
 | **[Learning](logbook/README.md)** | Twelve modules of lathe and mill work, each ending with a real analyzer part. |
 | **[Manufacture](logbook/progress.md#parts-made)** | The physical build: accepted quantities, scrap and the entries that record each shop session. |
 | **[Kickstarter](kickstarter/README.md)** | Campaign, budget, rewards, assets and fulfilment for funding the build and book. |
@@ -174,20 +174,25 @@ uv run python -m doit          # every part + assembly + every gate
 
 Without a seat you can still run the offline gates
 (`uv run python -m doit check:math`), and every release ships the STEP, STL and
-glTF exports plus the drawing PDFs and the process travelers.
+glTF exports plus the drawing PDFs, the process travelers and the CNC programs.
 
 Drawing-bound requirement manifests are exported with named STEP face sets.
 `prechips:<stem>` tasks render two standalone HTML
 [prechips](https://github.com/pedropaulovc/prechips) travelers (a concise `pro`
-sheet and a `hobby` sheet with setup pictures) for each part
-in `_process_plans.TRAVELER_STEMS` (none since the oblique trammel jig was
-deleted, 2026-11-17) from its `cad/process/<stem>/plan.toml`, which reads that part's
+sheet and a `hobby` sheet with setup pictures, which is the part's CNC setup
+sheet) for each part
+in `_process_plans.TRAVELER_STEMS` (the rocker strap is the first part
+enrolled for CNC) from its `cad/process/<stem>/plan.toml`, which reads that part's
 exported manifest, and print the hobby sheet to `<slug>-traveler.pdf`. They
 always use the latest prechips release from PyPI, run with `uv tool run`
-outside the project environment. `build` renders them alongside the drawing
-PDFs (`build_bare` does not); every release ships the hobby PDFs under
-`travelers/`. See the
-[export/traveler contract](cad/docs/pipeline/features-travelers.md).
+outside the project environment. `cam:<stem>` tasks post each part in
+`_cam_programs.CAM_STEMS` to G-code for the PM-30MV with headless FreeCAD CAM
+(FreeCAD 1.1 or later on the machine that runs the build), with estimated
+cycle times. `build` renders the travelers and posts the programs alongside the
+drawing PDFs (`build_bare` does neither); every release ships the hobby PDFs
+under `travelers/` and the programs under `nc/<stem>/`. See the
+[export/traveler contract](cad/docs/pipeline/features-travelers.md) and
+[`cad/process/README.md`](cad/process/README.md).
 
 ## References
 

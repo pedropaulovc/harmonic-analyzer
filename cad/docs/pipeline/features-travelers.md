@@ -10,7 +10,8 @@ aggregator depending on every `package:features:<stem>` leaf, not a COM export a
 This namespace is interim until `solidworks-pool` admits top-level `features` targets; no pool change is included.
 Each leaf's native dependency is its own part, not assemblies or drawing
 artefacts. Parts in `_process_plans.TRAVELER_STEMS` feed their manifest to a
-prechips traveler (below). Fixture bundles expose drawing requirements too.
+prechips traveler, and parts in `_cam_programs.CAM_STEMS` feed it and its STEP
+to their NC programs (below). Fixture bundles expose drawing requirements too.
 Each leaf writes only its own self-contained bundle:
 
 ```text
@@ -254,9 +255,11 @@ is in a leaf's cache key (AGENTS.md, "Fine-grained config deps"). See
 ## Travelers
 
 `_process_plans.TRAVELER_STEMS` lists the parts with a
-`prechips:<stem>` task. None is enrolled since the oblique trammel jig, whose
-eight parts were the only ones, was deleted (owner ruling 2026-11-17, #2885);
-the machinery stays for the CNC migration.
+`prechips:<stem>` task. Parts are enrolled by the CNC migration (owner ruling
+2026-11-17): the machine premise is a CNC mill, the CNC-converted PM-30MV, and
+a manual lathe, the PM-1127VF-LB, so a milled part's hobby sheet is the CNC
+setup sheet for its NC programs. The oblique trammel jig's eight parts, the
+previously enrolled ones, were deleted (owner ruling 2026-11-17, #2885).
 
 prechips is not an HA dependency while it stabilises
 ([#2502](https://github.com/pedropaulovc/harmonic-analyzer/issues/2502)): a
@@ -361,22 +364,51 @@ Each plan's `[cad]` table names a neutral prechips adapter and the manifest's
 manifest's contents: a drawing change that alters a part's manifest
 requirements needs a prechips adapter release before its traveler passes again.
 
+## NC programs
+
+`_cam_programs.CAM_STEMS` lists the parts milled on the CNC mill; each has a
+`cad/process/<stem>/cam.py` CAM recipe and a `cam:<stem>` task that posts its
+G-code with headless FreeCAD CAM (`cad/scripts/cam_nc.py`, FreeCAD 1.1 or
+later). `build` and `release` run every enrolled one and `build_bare` runs
+none (owner ruling 2026-11-17). Like a traveler, the task is SolidWorks-free,
+submitter-only (including under the farm executor: no farm worker has
+FreeCAD) and not remote-cache-keyed, and its only task dependency is its own
+`package:features:<stem>` leaf. Its file dependencies are the recipe, its
+plan, `cad/process/shop.toml`, the scoped `features.toml` and STEP, the
+FreeCAD runtime script and the driver's script closure, so a CAD change
+re-posts the programs. Its targets are the stamp
+`cad/out/reports/cam-<stem>.ok` and, under `cad/out/nc/<stem>/`, one
+`<program>.nc` per recipe program, `cycle_times.json` and `manifest.json`
+(input, post and output SHA-256s and the FreeCAD version). A submitter
+without FreeCAD fails the task. See
+[`cad/process/README.md`](../../process/README.md#nc-programs-freecad-cam).
+
 ## Releases
 
 Releases ship every enrolled part's hobby traveler as a PDF (owner ruling
-2026-11-14). A full `doit release` depends on every `prechips:<stem>` task, so
-it re-renders them with the then-latest prechips; `doit -s release` clears
-those dependencies and renders nothing. `cut_release.py` copies each
-`cad/out/travelers/<stem>/<slug>-traveler.pdf` to the bundle's
-`travelers/<slug>-traveler.pdf`, where `SHA256SUMS.txt` hashes them like every
-other staged file, and names the directory in the release notes. A missing or
-empty PDF, or one older than its part's `features/<stem>/features.toml`, fails
-the cut before anything is zipped; the HTML sheets do not ship. A prechips
-refusal, an unreachable PyPI or a missing browser therefore blocks the
-release, like any other release gate. The farm release runs
-`doit -s prechips` on the submitter after restoring the farm outputs, before
-`doit -s release`
-([`DEVELOPING.md`](../../../DEVELOPING.md#farm-releases)).
+2026-11-14) and its NC programs (owner ruling 2026-11-17). A full `doit release`
+depends on every `prechips:<stem>` and `cam:<stem>` task, so it re-renders the
+travelers with the then-latest prechips and re-posts any stale programs;
+`doit -s release` clears those dependencies and renders nothing.
+`cut_release.py` copies each `cad/out/travelers/<stem>/<slug>-traveler.pdf` to
+the bundle's `travelers/<slug>-traveler.pdf` and every `cam:<stem>` output to
+`nc/<stem>/`, where `SHA256SUMS.txt` hashes them like every other staged
+file, and names both directories in the release notes. A missing or empty PDF,
+or one older than its part's `features/<stem>/features.toml`, fails the cut
+before anything is zipped; the HTML sheets do not ship. So does a missing or
+empty NC output, a program or `cycle_times.json` whose SHA-256 differs from
+the CAM manifest, or a CAM manifest recording any input other than the
+current one (`features.toml`, the STEP, `plan.toml`, `shop.toml`, the recipe
+or the FreeCAD runtime; the refusal names the file), so programs posted from
+an older plan never ship beside a traveler rendered from the newer one;
+`freecadcmd.log` does not
+ship. A prechips refusal, an unreachable PyPI, a missing browser or a failed
+post therefore blocks the release, like any other release gate. The farm
+release runs `doit -s prechips` on the submitter after restoring the farm
+outputs, before `doit -s release`
+([`DEVELOPING.md`](../../../DEVELOPING.md#farm-releases)); the farm run's
+`build` already posted the NC programs on that submitter, so they arrive with
+the restored outputs.
 
 The publisher's only tracked-source update is `cad/config/release.yaml`
 `next_revision`; it does not edit process plans. The generated-only follow-up

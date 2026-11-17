@@ -23,12 +23,17 @@ No. Building one analyzer is this project. Building them to order is a
 different business, and pretending otherwise is how campaigns fail.
 
 **Do I need CNC?**
-No. The book is written for a manual mill and lathe, which is what the original
-maker had. Six part families repeat 19–20 times and CNC makes those less
-tedious — the book notes where, but never requires it.
+For the milled parts, the book assumes it. I cut them on a CNC-converted bench
+mill (a PM-30MV running FluidNC, sent from CNCjs) because makerspace mill time
+costs too much to make them by hand, and the programs are posted with
+open-source CAM (FreeCAD); each release ships the G-code for every part that
+has a program, beside its drawing. Turned parts are made on a manual lathe.
+Without a CNC mill you can still work from the drawings on a manual mill at
+your own pace, but the book does not walk that route and I have not tested it.
 
 **What machines and tooling do I actually need?**
-A bench mill, a lathe, a dividing head, and a normal measuring kit. The full
+A CNC bench mill (or a manual one, at your own pace), a lathe, a dividing head,
+and a normal measuring kit. The full
 list with sizes is in the book's shop-setup chapter, and it is published free
 before launch so you can decide before you pledge.
 

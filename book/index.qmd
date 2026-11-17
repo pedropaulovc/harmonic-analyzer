@@ -15,8 +15,8 @@ called too mathematical to explain.
 One of these machines survives in a glass case at the University of Illinois.
 There has never been a plan for building one.
 
-This book is that plan: every part, every setup, every cut, on a manual mill
-and a lathe.
+This book is that plan: every part, every setup, every cut, on a CNC mill
+and a manual lathe.
 
 ::: {.callout-important}
 ## Verification policy

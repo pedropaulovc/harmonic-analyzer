@@ -31,8 +31,9 @@ programming the oblique base bar (2026-11-16):
   ``Direction`` "CCW" runs anticlockwise round the model, i.e. conventional
   outside the part with a clockwise spindle.
 - the ``grbl`` post expands G81/G82/G83 into G0/G1 (GRBL has no canned
-  cycles) but leaves G73 chip-breaking as a G73 block GRBL rejects, so pecks
-  are full-retract G83.
+  cycles) but leaves G73 chip-breaking and G85 (feed out) as blocks GRBL
+  rejects, so pecks are full-retract G83 and a bore fed out is a Custom
+  operation (:func:`bore`).
 """
 
 import importlib.util
@@ -47,6 +48,7 @@ import Part
 import Path
 import Path.Main.Job as PathJob
 import Path.Main.Stock as PathStock
+import Path.Op.Custom as PathCustom
 import Path.Op.Drilling as PathDrilling
 import Path.Op.MillFace as PathMillFace
 import Path.Op.Profile as PathProfile
@@ -238,15 +240,19 @@ def holes(target, diameter, centres):
 
 def profile(target_job, tc, label, base, side, direction, start, final, step,
             clearance=None, safe=None, offset=0.0, passes=1, stepover=0.0, start_point=None):
-    """Profile ``base`` (edges) on ``side`` running ``direction`` from ``start``
-    down to ``final`` in levels of at most ``step``. ``offset`` moves the pass
-    beyond the cutter-radius offset; ``passes`` stations ``stepover`` apart run
-    outermost first. ``start_point`` (x, y) picks where a closed loop is entered."""
+    """Profile ``base`` (edges, or a face: its outer perimeter only, never its
+    holes) on ``side`` running ``direction`` from ``start`` down to ``final``
+    in levels of at most ``step``. ``offset`` moves the pass beyond the
+    cutter-radius offset; ``passes`` stations ``stepover`` apart run outermost
+    first. ``start_point`` (x, y) picks where a closed loop is entered."""
     op = _operation(PathProfile, target_job, tc, label)
     op.Base = [base]
     op.Side = side
     op.Direction = direction
     op.UseComp = True
+    op.processPerimeter = True
+    op.processHoles = False
+    op.processCircles = False
     op.NumPasses = passes
     op.Stepover = stepover
     op.OffsetExtra = offset
@@ -295,6 +301,38 @@ def drill(target_job, tc, label, base, top, final, retract, peck=None):
     return op
 
 
+def custom(target_job, tc, label, lines):
+    """An operation posting ``lines`` of G-code as written, after formatting
+    ``{feed}`` and ``{plunge}`` in them to the controller's feeds (mm/s,
+    FreeCAD's internal feed unit, which the post converts). Arc centres
+    (``I``/``J``) are relative to the arc's start, as FreeCAD and GRBL read
+    them. For a path the recipe computes itself."""
+    op = _operation(PathCustom, target_job, tc, label)
+    op.Source = "Text"
+    feeds = {"feed": tc.HorizFeed.Value, "plunge": tc.VertFeed.Value}
+    op.Gcode = [line.format(**feeds) for line in lines]
+    return op
+
+
+def bore(target_job, tc, label, centres, final, retract, clearance):
+    """Feed in and out of each hole at ``centres``: G0 to ``retract`` (the R
+    plane), G1 down to ``final`` and back up to ``retract`` at the
+    controller's plunge feed, G0 to ``clearance`` between holes. For a
+    reamer, which a rapid retract can score; GRBL has no G85 and the grbl
+    post leaves it unexpanded."""
+    lines = []
+    for x, y in centres:
+        lines += [
+            f"G0 Z{clearance}",
+            f"G0 X{x} Y{y}",
+            f"G0 Z{retract}",
+            f"G1 Z{final} F{{plunge}}",
+            f"G1 Z{retract} F{{plunge}}",
+            f"G0 Z{clearance}",
+        ]
+    return custom(target_job, tc, label, lines)
+
+
 def generate(doc):
     """Recompute every toolpath; fail when an operation is invalid or cut nothing."""
     doc.recompute()
@@ -332,7 +370,7 @@ def _index(lines, marker, name, start=False):
     return found[0]
 
 
-def post(sections, path, name, comment):
+def post(sections, path, name, comment, load_first=False):
     """Post ``sections`` to ``path`` as one program with a header naming it and
     its tools; returns the path and the file of the post the factory loaded
     (FreeCAD searches user post directories before its own, so the name alone
@@ -342,16 +380,20 @@ def post(sections, path, name, comment):
     controller; or a manual section, a dict of its tool number and label, the
     G-code the recipe wrote for it (operator stops, probing) and the
     ``setting`` its tool change asks for (the spindle stays off). A single
-    section is its Job's post as
-    it is. Several are one program from the first section's tool, loaded and
-    touched off before it runs: each later tool starts at ``M5``, an operator
+    section is its Job's post as it is. Several are one program from the
+    first section's tool: each later tool starts at ``M5``, an operator
     comment (the speed to set by hand, or spindle off) and ``M6 T<n>``, which
     the sender (CNCjs, Manual Tool Change) expands into its tool change and
     tool-setter probe. A section that keeps the tool but changes speed starts
     at an operator comment and ``M0`` (the PM-30MV's speed is set by hand);
     one after a manual section of its tool, or with the tool and speed
     running, carries on. Each posted section runs from its own ``M3 S`` word;
-    earlier postambles and later preambles are dropped."""
+    earlier postambles and later preambles are dropped.
+
+    With ``load_first`` the program loads its first tool the same way, right
+    after the preamble's ``G54`` and before any move, so it never runs on the
+    tool length a previous program left; without it the first tool is the
+    one already in the spindle and touched off."""
     tools, bodies, preamble, postamble, sources = [], [], None, None, set()
     for index, section in enumerate(sections):
         if isinstance(section, dict):
@@ -370,7 +412,9 @@ def post(sections, path, name, comment):
             raise RuntimeError(f"{name}: post returned {len(exported)} sections")
         lines = exported[0][1].splitlines()
         if len(sections) == 1:
-            bodies.append(lines)
+            # One Job posted as it is, split after its G54 for a leading load.
+            preamble = lines[:_index(lines, "G54", name) + 1]
+            bodies.append(lines[len(preamble):])
         else:
             if preamble is None:
                 preamble = lines[:_index(lines, "G54", name) + 1]
@@ -380,36 +424,33 @@ def post(sections, path, name, comment):
     if len(sources) != 1:
         raise RuntimeError(f"{name}: sections posted by several post files: {sorted(sources)}")
     if isinstance(sections[0], dict):
-        raise RuntimeError(f"{name}: the first section must be a posted Job (its tool is loaded before the program runs)")
+        raise RuntimeError(f"{name}: the first section must be a posted Job (it sets the program's first tool and speed)")
     listed = {}
     for number, label, _rpm, dia, _setting in tools:
         listed.setdefault(number, f"(T{number} D={dia:.3f} {label})" if dia else f"(T{number} {label})")
     out = [f"({name})", f"({comment})", *listed.values()]
-    if len(sections) == 1:
-        out += bodies[0]
-    else:
-        out += preamble
-        previous = None
-        for index, ((number, label, rpm, _dia, manual), body) in enumerate(zip(tools, bodies)):
-            if previous is not None and number != previous[0]:
-                # The speed this tool runs at, from its first posted section, or
-                # a manual section's own setting (spindle off).
-                speed = next((t[2] for t in tools[index:] if t[0] == number and t[2] is not None), None)
-                setting = f"SET SPINDLE TO {speed:g} RPM" if speed else manual
-                # CNCjs strips comments before sending and shows the pending
-                # %msg at the M6's pause (GrblController, Manual Tool Change),
-                # so the speed to set, or spindle off, reaches the operator.
-                out += ["M5", f"%msg TOOL CHANGE: T{number} {label}, {setting}", f"M6 T{number}"]
-            elif previous is not None and rpm is not None and previous[1] is not None:
-                if rpm != previous[1]:
-                    # CNCjs shows a %msg line when the M0 pauses it; it strips
-                    # comments before sending and never shows them.
-                    out += [f"%msg PAUSE: SET SPINDLE TO {rpm:g} RPM, THEN CYCLE START", "M0"]
-                else:
-                    body = body[1:]  # the running tool and speed carry on: no second M3
-            out += body
-            previous = (number, rpm)
-        out += postamble
+    out += preamble
+    previous = None
+    for index, ((number, label, rpm, _dia, manual), body) in enumerate(zip(tools, bodies)):
+        if (previous is None and load_first) or (previous is not None and number != previous[0]):
+            # The speed this tool runs at, from its first posted section, or
+            # a manual section's own setting (spindle off).
+            speed = next((t[2] for t in tools[index:] if t[0] == number and t[2] is not None), None)
+            setting = f"SET SPINDLE TO {speed:g} RPM" if speed else manual
+            # CNCjs strips comments before sending and shows the pending
+            # %msg at the M6's pause (GrblController, Manual Tool Change),
+            # so the speed to set, or spindle off, reaches the operator.
+            out += ["M5", f"%msg TOOL CHANGE: T{number} {label}, {setting}", f"M6 T{number}"]
+        elif previous is not None and rpm is not None and previous[1] is not None:
+            if rpm != previous[1]:
+                # CNCjs shows a %msg line when the M0 pauses it; it strips
+                # comments before sending and never shows them.
+                out += [f"%msg PAUSE: SET SPINDLE TO {rpm:g} RPM, THEN CYCLE START", "M0"]
+            else:
+                body = body[1:]  # the running tool and speed carry on: no second M3
+        out += body
+        previous = (number, rpm)
+    out += postamble or []
     with open(path, "w", encoding="utf-8", newline="\n") as handle:
         handle.write("\n".join(out) + "\n")
     return path, os.path.abspath(sources.pop())
@@ -428,7 +469,13 @@ def main():
     try:
         rt = types.ModuleType("_freecad_cam_runtime")
         rt.__dict__.update({k: v for k, v in globals().items() if not k.startswith("__")})
-        built = _load_recipe(spec["recipe"]).build(spec["ctx"], rt)
+        recipe = _load_recipe(spec["recipe"])
+        built = recipe.build(spec["ctx"], rt)
+        # The programs that load their own first tool (``post``'s load_first).
+        loads = set(recipe.LOAD_FIRST_TOOL)
+        unknown = loads - {name for name, _keys in spec["programs"]}
+        if unknown:
+            raise RuntimeError(f"LOAD_FIRST_TOOL names no program: {sorted(unknown)}")
         posted = []
         for name, keys in spec["programs"]:
             # A program lists operation keys (one Job, posted as it is), or
@@ -442,7 +489,8 @@ def main():
                 if manual and len(items) != 1:
                     raise RuntimeError(f"{name}: a manual section stands alone: {section}")
                 sections.append(manual[0] if manual else list(_flatten(items)))
-            posted.append(post(sections, os.path.join(spec["out_dir"], f"{name}.nc"), name, spec["ctx"]["comment"]))
+            path = os.path.join(spec["out_dir"], f"{name}.nc")
+            posted.append(post(sections, path, name, spec["ctx"]["comment"], load_first=name in loads))
         sources = sorted({source for _path, source in posted})
         if len(sources) != 1:
             raise RuntimeError(f"programs posted by several post files: {sources}")

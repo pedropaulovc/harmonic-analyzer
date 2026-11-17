@@ -4,9 +4,10 @@ Each enrolled part has a recipe at ``cad/process/<stem>/cam.py`` beside its
 ``plan.toml``. ``cam_nc.py`` runs it in headless FreeCAD (``freecadcmd``,
 FreeCAD's CAM workbench) and writes one G-code file per recipe program, their
 estimated cycle times (``cycle_times.json``) and a ``manifest.json`` binding
-them to their inputs, under ``cad/out/nc/<stem>/``. FreeCAD is not part of the
-build: only an opt-in ``cam:<stem>`` task on a machine with FreeCAD installed
-produces these files.
+them to their inputs, under ``cad/out/nc/<stem>/``. FreeCAD is part of the
+build on the submitter: ``build`` and ``release`` run every enrolled part's
+``cam:<stem>`` task there (no farm worker has FreeCAD), and a release ships the
+files under ``nc/<stem>/``.
 """
 
 from __future__ import annotations
@@ -16,11 +17,12 @@ import importlib.util
 from pathlib import Path
 from types import ModuleType
 
-from export_features import OUT as CAD_OUT
+import _process_plans
+from export_features import OUT as CAD_OUT, bundle_paths
 
-# No part is enrolled since the oblique trammel jig's base bar was deleted
-# (2026-11-17); the CNC migration enrols machine parts here.
-CAM_STEMS: tuple[str, ...] = ()
+# The parts milled on the CNC mill, enrolled by the CNC migration; each one's
+# programs are posted by every build and shipped by every release.
+CAM_STEMS: tuple[str, ...] = ("ch_rocker_strap",)
 PROCESS_ROOT = Path(__file__).resolve().parents[1] / "process"
 SCRIPTS_DIR = Path(__file__).resolve().parent
 # Executed by freecadcmd, never imported on the host: an input of every cam task.
@@ -33,6 +35,22 @@ MANIFEST_NAME = "manifest.json"
 
 def recipe_path(stem: str) -> Path:
     return PROCESS_ROOT / stem / "cam.py"
+
+
+def cam_inputs(stem: str, out: Path = CAD_OUT) -> dict[str, Path]:
+    """Every file a posted set depends on, by the name ``manifest.json``
+    records its SHA-256 under: the scoped feature bundle (``features``,
+    ``step``), the part's ``plan``, the ``shop`` record, the ``recipe`` and the
+    FreeCAD ``runtime``."""
+    features, step = bundle_paths(stem, out)
+    return {
+        "features": features,
+        "step": step,
+        "plan": _process_plans.plan_path(stem),
+        "shop": _process_plans.SHOP_PATH,
+        "recipe": recipe_path(stem),
+        "runtime": RUNTIME_PATH,
+    }
 
 
 def load_recipe(stem: str) -> ModuleType:

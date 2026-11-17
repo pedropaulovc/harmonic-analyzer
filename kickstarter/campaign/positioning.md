@@ -70,8 +70,9 @@
 
 - Not a kit. Not machined parts. Not a finished analyzer. (See
   [`../rewards/tiers.md`](../rewards/tiers.md).)
-- Not a CNC project. The point is **manual mill and lathe**, period-appropriate
-  methods, with CNC as an optional accelerator for the 20× repeat families.
+- Not a CNC showcase. The milled parts run as CNC programs on a converted bench
+  mill because makerspace mill time is the scarce resource; turned parts stay
+  on a manual lathe, and the machine keeps the original's accuracy.
 - Not a reprint of the 2014 book, and not affiliated with it.
 
 ## Competitive / adjacent shelf

@@ -40,9 +40,11 @@ closed by making something the build needs, it doesn't belong in the course.
 
 Modules are ordered by what the build needs next rather than by textbook order.
 Parting off to a length tolerance comes early because thirty-eight bushings
-whose lengths set the channel pitch come early. The mill track opens on the
-rocker arm's oblique jig, because rocker arms can't be cut without it and its
-parts teach the beginner mill skills in order.
+whose lengths set the channel pitch come early. The mill is CNC-converted and
+milled parts run from G-code posted with FreeCAD's CAM (owner ruling
+2026-11-17), so the mill track teaches workholding, zeroing, proving a program
+in air and checking the part. The rocker strap is the first part routed for
+the CNC mill. The lathe stays manual.
 
 Every module also makes its common mistakes on purpose first: on scrap, with a
 small cut, one change at a time, before doing the job right. You only recognize
@@ -66,7 +68,7 @@ All in [`references/`](../references/), which is a git submodule:
 - `machinerys-handbook/`, the lookup, with a local search index
 - `gears-and-gear-cutting/`, whose ch. 12 forms cutters with a button tool (the Eureka device there only relieves them)
 - `jet-bd-920n-operators-manual.pdf`, historical reference for the former JET lathe only
-- `magxact-mx100m-mill-dro-manual/` and `el400-operation-manual/`, the DROs
+- `magxact-mx100m-mill-dro-manual/`, the mill's DRO
 
 The installed lathe is the Precision Matthews PM-1127VF-LB. Its manual is
 unresolved: verify the machine's build year and nameplate, then obtain the

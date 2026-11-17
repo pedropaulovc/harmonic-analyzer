@@ -17,8 +17,10 @@ import _rocker_interface as rocker_interface
 import ch_rocker_strap_notes as notes
 import ch_rocker_strap_spec as spec
 import draw_ch_rocker_strap as drawing
+import export_features
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
+from _gtol_face import FaceGeometry
 from _inch_wall_limits import WALL_TARGET_MM
 from _machinist_review_mode import MachinistReviewMode
 
@@ -145,3 +147,96 @@ def test_the_strap_stays_flat_by_its_route_not_by_a_frame() -> None:
     assert "1/8 x 1-1/2" in str(row["material_specification"])
     per_face = (0.125 * 25.4 - spec.ARM_THICKNESS) / 2.0 / 25.4
     assert f"{per_face:.4f}".lstrip("0") in row["process"]
+
+
+_FEATURE_KINDS = {
+    "hub_hole": "hole",
+    "broad_face_pos_z": "face",
+    "broad_face_neg_z": "face",
+    "top_arc": "profile",
+    "bottom_arc": "profile",
+    "tip_land_pos_x": "face",
+    "tip_land_neg_x": "face",
+    "end_face_pos_x": "face",
+    "end_face_neg_x": "face",
+}
+
+
+def _plane(normal: tuple[float, ...], point_mm: tuple[float, float, float]):
+    length = math.hypot(*normal)
+    unit = tuple(value / length for value in normal)
+    return FaceGeometry(None, 4001, (*unit, *(v / 1000 for v in point_mm)), unit, ())
+
+
+def _cylinder(radius_mm: float, centre_y_mm: float):
+    axis = (0.0, centre_y_mm / 1000, 0.0, 0.0, 0.0, 1.0)
+    return FaceGeometry(None, 4002, (*axis, radius_mm / 1000), None, ())
+
+
+def _owners(geometry: FaceGeometry) -> list[str]:
+    selectors = export_features.feature_selectors("ch_rocker_strap")
+    return [
+        name
+        for name, specs in selectors.items()
+        if any(selector.matches(geometry) for selector in specs)
+    ]
+
+
+def test_the_strap_is_a_feature_export_part_with_one_feature_per_face() -> None:
+    assert "ch_rocker_strap" in export_features.SUPPORTED_PARTS
+    manifest = export_features.requirement_manifest("ch_rocker_strap")
+    kinds = {name: feature["kind"] for name, feature in manifest["features"].items()}
+    assert kinds == _FEATURE_KINDS
+    assert manifest["construction"] == "one_piece"
+    assert manifest["notes"]["manufacturing"] == []
+    assert manifest["material"]["thickness"] == rocker.ARM_THICKNESS
+    # Every face of the native solid (both broad faces, the hole, both arcs,
+    # both radial lands and both tapered ends) has exactly one owner; the
+    # lands lie on the top arc's radius through their inner end.
+    t = rocker.ARM_THICKNESS / 2.0
+    expected = {
+        "broad_face_pos_z": _plane((0.0, 0.0, 1.0), (0.0, 0.0, t)),
+        "broad_face_neg_z": _plane((0.0, 0.0, -1.0), (0.0, 0.0, -t)),
+        "hub_hole": _cylinder(spec.HOLE_DIA / 2.0, spec.PIVOT_MID_Y),
+        "top_arc": _cylinder(spec.R_TOP, spec.CENTER_Y),
+        "bottom_arc": _cylinder(spec.R_BOTTOM, spec.CENTER_Y),
+    }
+    radial = (spec.TOP_END_X, spec.TOP_END_Y - spec.CENTER_Y)
+    taper = (spec.BOT_END_X - spec.ROD_TIP_X, spec.BOT_END_Y - spec.ROD_TIP_Y)
+    for side, suffix in ((1, "pos_x"), (-1, "neg_x")):
+        land_end = (side * spec.TOP_END_X, spec.TOP_END_Y, 0.0)
+        foot = (side * spec.BOT_END_X, spec.BOT_END_Y, 0.0)
+        land_normal = (side * -radial[1], radial[0], 0.0)
+        expected[f"tip_land_{suffix}"] = _plane(land_normal, land_end)
+        expected[f"end_face_{suffix}"] = _plane((side * -taper[1], taper[0], 0.0), foot)
+    assert set(expected) == set(_FEATURE_KINDS)
+    for name, geometry in expected.items():
+        assert _owners(geometry) == [name], name
+
+
+def test_feature_bands_are_the_printed_ones() -> None:
+    features = export_features.requirement_manifest("ch_rocker_strap")["features"]
+    hole = features["hub_hole"]
+    assert hole["dia"] == [spec.HOLE_DIA, spec.HOLE_DIA + fit.STRAP_HOLE_BAND[0]]
+    assert hole["at"] == [0.0, spec.PIVOT_MID_Y, 0.0] and hole["thru"] is True
+    assert hole["precision"] == {"dia": notes.DRAWING_PRECISION_BY_NAME["HoleDia"]}
+    for side in ("pos_z", "neg_z"):
+        face = features[f"broad_face_{side}"]
+        assert face["thickness"] == pytest.approx(
+            [rocker.ARM_THICKNESS - 0.0254, rocker.ARM_THICKNESS + 0.0254]
+        )
+    assert features["top_arc"]["height_above_pivot"] == pytest.approx(
+        [spec.TOP_EDGE_ABOVE_PIVOT - 0.254, spec.TOP_EDGE_ABOVE_PIVOT + 0.254]
+    )
+    assert features["bottom_arc"]["height_below_pivot"] == pytest.approx(
+        [spec.BOTTOM_EDGE_BELOW_PIVOT - 0.254, spec.BOTTOM_EDGE_BELOW_PIVOT + 0.254]
+    )
+    # General rows qualify the printed inch nominal: R31.5, 5.75, 5.22, .22.
+    assert features["top_arc"]["radius"] == pytest.approx([797.56, 802.64])
+    land = features["tip_land_pos_x"]
+    assert land["corner_station"] == pytest.approx([145.796, 146.304])
+    assert land["land_length"] == pytest.approx([5.334, 5.842])
+    assert land["land_angle_deg"] == pytest.approx([9.4, 11.4])
+    end = features["end_face_neg_x"]
+    assert end["foot_station"] == pytest.approx([132.334, 132.842])
+    assert end["overall_length_ref"] == pytest.approx(2.0 * spec.ROD_TIP_X)

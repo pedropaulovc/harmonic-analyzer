@@ -75,6 +75,14 @@ resolution_mm = 0.00254
 range_mm = [0.2794, 12.7]
 resolution_mm = 0.0254
 
+# The MHA-CH-13 hub-hole go/no-go pair (cad/config/shop-equipment.toml
+# gauges.plug-gauges-4000-4005, to buy): GO .4000 and NO-GO .4005 in =
+# 10.16 and 10.1727 mm. A fixed-limit pair reads no scale; its resolution is
+# each member's Class X tolerance, .000040 in = 0.001016 mm.
+[gauges.plug-gauges-4000-4005]
+range_mm = [10.16, 10.1727]
+resolution_mm = 0.001016
+
 [gauges.height-gauge]
 range_mm = [0.0, 304.8]
 resolution_mm = 0.0254
@@ -459,3 +467,119 @@ sfm = 50  # Below LMS 70 for hand feed in 304: ~600 rpm (machinist review 2026-1
 # the plan's milling_cuts declare; the feed prints from the calculated rpm.
 chip_load_mm_per_tooth = 0.0254
 flutes = 2
+
+# --- 3-flute uncoated carbide square end mills (McMaster 88815) ---
+# Owned (McMaster-Carr packing list, PO 0803PCAMPOS, 1616317-01, 08/04/2025;
+# owner, Pedro, 2026-11-17: "add to inventory ... already owned"); ownership,
+# SKU and overall length are cad/config/shop-equipment.toml, same keys.
+# diameter_mm: the nominal size the packing list states, × 25.4.
+# helix_deg and flute_length_mm: each SKU's McMaster product page, read live
+# 2026-11-17 in a browser (https://www.mcmaster.com/<SKU>/): "Helix Angle 30°"
+# on all four; "Length of Cut" 1/2, 1 1/8, 1 3/4 and 1 in. The pages also give
+# the mill diameter tolerance -0.0020 to 0.0000 in. With the helix declared,
+# prechips takes the axial force from it instead of axial_ratio 1.0.
+[tools.endmill-carbide-3fl-1-8]
+description = "1/8 in 3-flute uncoated carbide square end mill, 1-1/2 in OAL (McMaster 88815A18)"
+diameter_mm = 3.175
+flute_length_mm = 12.7
+helix_deg = 30
+[tools.endmill-carbide-3fl-1-4]
+description = "1/4 in 3-flute uncoated carbide square end mill, 3 in OAL (McMaster 88815A43)"
+diameter_mm = 6.35
+flute_length_mm = 28.575
+helix_deg = 30
+[tools.endmill-carbide-3fl-3-8]
+description = "3/8 in 3-flute uncoated carbide square end mill, 4 in OAL (McMaster 88815A56)"
+diameter_mm = 9.525
+flute_length_mm = 44.45
+helix_deg = 30
+[tools.endmill-carbide-3fl-1-2]
+description = "1/2 in 3-flute uncoated carbide square end mill, 3 in OAL (McMaster 88815A45)"
+diameter_mm = 12.7
+flute_length_mm = 25.4
+helix_deg = 30
+
+# Their cutting settings on 1018 cold-finished steel at the PM-30MV. Material
+# key: settings.rocker-profile-hss-low-carbon-steel's, unchanged.
+# Speed: the spindle tops out at 2800 rpm (machines.pm-30mv, owner
+# 2026-11-16), which is 92, 183, 275 and 367 ft/min on the 1/8, 1/4, 3/8 and
+# 1/2 in cutters. Ceiling: The Carbide End Mill Store "Carbide End Mill Speeds
+# and Feeds, General Purpose, Uncoated" (6gtools.com, PDF read 2026-11-17),
+# row Steels P, Mild - 1018 (.2-.3 Carbon): 350 SFM. The 1/2 in cutter is
+# held under it: 350 × 3.82 / .5 = 2674 rpm, taken down to 2650 (347 ft/min);
+# the other three run at 2800. Tru-Edge "Solid Carbide Endmills Feeds and
+# Speeds" (PDF read 2026-11-17), row Low Carbon Steel - 1018: 200-400 SFM,
+# would admit 2800 on all four; the lower ceiling is kept for this mill.
+# Chip load: the same 6G table's Mild - 1018 feeds, .0006, .0017, .0025 and
+# .0028 in/tooth for 1/8, 1/4, 3/8 and 1/2 in, × 25.4. These are its low end:
+# the table multiplies them by a chip-load factor of 1.0 at 50 % radial
+# engagement (and more) up to 5.0 at 1 %, and the factor is left at 1.0. For
+# comparison Tru-Edge's 1018 row gives .001 (1/8), .0015 (1/4), .003 (1/2).
+# Carbide on this mill (Blondihacks, "Common Beginner Mistakes In Hobby
+# Machining", https://www.youtube.com/watch?v=PwSE3BeWuiM, mistake 1: carbide
+# pays only up to the machine's rigidity and power, and a sharp carbide edge
+# mimics HSS on a small machine). At 2800 rpm the 1/8 in cutter's 92 ft/min
+# is inside the HSS milling range for 1018 (LittleMachineShop "Cutting
+# Speeds", Milling, Plain carbon steels 1006-1026: 65-110 ft/min, read
+# 2026-11-17) and under the carbide ranges above, so there carbide buys
+# stiffness, about three times HSS's (FM Carbide "Solid Carbide vs. HSS End
+# Mills", read 2026-11-17: Young's modulus ~600 GPa against 200-210 GPa), not
+# speed. The 1/4 in cutter's 183 ft/min is already past the HSS range, and the
+# speed gain grows with diameter to 3.2× the HSS top at 1/2 in.
+[settings.endmill-carbide-3fl-1-8-1018-cf]
+tool = "endmill-carbide-3fl-1-8"
+material = "rocker-1018-cold-finished"
+rpm = 2800
+chip_load_mm_per_tooth = 0.01524  # .0006 in; 2800 × 3 × .0006 = 5.0 in/min
+flutes = 3
+feed_unit = "in/min"
+[settings.endmill-carbide-3fl-1-4-1018-cf]
+tool = "endmill-carbide-3fl-1-4"
+material = "rocker-1018-cold-finished"
+rpm = 2800
+chip_load_mm_per_tooth = 0.04318  # .0017 in; 2800 × 3 × .0017 = 14.3 in/min
+flutes = 3
+feed_unit = "in/min"
+[settings.endmill-carbide-3fl-3-8-1018-cf]
+tool = "endmill-carbide-3fl-3-8"
+material = "rocker-1018-cold-finished"
+rpm = 2800
+chip_load_mm_per_tooth = 0.0635  # .0025 in; 2800 × 3 × .0025 = 21.0 in/min
+flutes = 3
+feed_unit = "in/min"
+[settings.endmill-carbide-3fl-1-2-1018-cf]
+tool = "endmill-carbide-3fl-1-2"
+material = "rocker-1018-cold-finished"
+rpm = 2650
+chip_load_mm_per_tooth = 0.07112  # .0028 in; 2650 × 3 × .0028 = 22.3 in/min
+flutes = 3
+feed_unit = "in/min"
+
+# --- MHA-CH-13 rocker strap (cad/process/ch_rocker_strap/plan.toml) ---
+# The 1/8 in carbide end mill at Tru-Edge's chip load (owner ruling
+# 2026-11-17, relayed by Main): Tru-Edge "Solid Carbide Endmills Feeds and
+# Speeds" (PDF read 2026-11-17), row Low Carbon Steel - 1018, 1/8 in: .001
+# in/tooth, 200-400 SFM. The 6G table's .0006 in/tooth
+# (settings.endmill-carbide-3fl-1-8-1018-cf) is below the .001 in/tooth floor
+# of prechips' milling feed-factor table (Machinery's Handbook Table 4), which
+# is not extended without a source, so the strap's outline runs at this
+# setting; HA #3050 measures it. 2800 rpm as the 6G setting (92 ft/min).
+[settings.endmill-carbide-3fl-1-8-1018-cf-tru-edge]
+tool = "endmill-carbide-3fl-1-8"
+material = "rocker-1018-cold-finished"
+rpm = 2800
+chip_load_mm_per_tooth = 0.0254  # .001 in; 2800 × 3 × .001 = 8.4 in/min
+flutes = 3
+feed_unit = "in/min"
+
+# Hub hole Ø.4000 +.0005/0 REAM THRU. The 25/64 (.3906 in) drill is the
+# 115-piece index's (as tools.jig-drill-11-32), nominal × 25.4; it leaves
+# .0094 in on the diameter for the reamer. The .4000 reamer is not owned
+# (cad/config/shop-equipment.toml tools.reamer-4000, to buy); diameter_mm is
+# its nominal size.
+[tools.drill-25-64]
+description = "25/64 (.3906 in) drill, 115-piece index"
+diameter_mm = 9.921875
+[tools.reamer-4000]
+description = ".4000 in HSS straight-flute chucking reamer"
+diameter_mm = 10.16

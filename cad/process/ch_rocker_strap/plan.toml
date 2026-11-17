@@ -1,0 +1,518 @@
+# Rocker strap MHA-CH-13: the first part routed for the CNC mill
+# (owner ruling 2026-11-17). Route, owner-chosen: 12 in blanks sawn from the
+# 1/8 x 1-1/2 in 1018 CF flat (OnlineMetals 4807), 20 off; a shop-made 6061
+# sub-plate gripped in the PM vise carries a fixed fence (Y0), an end stop (X0)
+# and four Mitee-Bite Pitbull 26000 edge clamps (to buy). The sub-plate is a
+# fixture made beforehand (cad/config/shop-equipment.toml
+# fixtures.strap-sub-plate: its top and fence face are milled in the vise
+# there); this traveler cuts only the strap. Per the part registry's process
+# text (cad/config/parts/ch-rocker-strap.yaml): rough both faces in turns,
+# release and reseat, finish both faces to the thickness band; then, still in
+# the edge clamps, spot, drill and ream the hub hole.
+#
+# The outline is not held on tabs (owner decision 2026-11-17): the blank is
+# bonded to the plate with double-sided tape and screwed down through the
+# reamed hub hole over a plug in the plate's counterbore; the edge clamps are
+# backed off, since once the cut is through they would push loose waste into
+# the cutter. No tape is under the blank while its faces are cut: the tape's
+# thickness variation would go into the thickness band. The #47 rod-pin hole
+# is not on this part.
+#
+# NC (cam:ch_rocker_strap, cad/process/ch_rocker_strap/cam.py): RS01_rough_faces,
+# RS02_finish_face_1, RS03_finish_face_2_hub, RS04_outline. G54 is fixed to
+# the plate in all four: X0 the end stop's face, Y0 the fence face, Z0 the
+# plate top. Program names, the [parameters] and the milling_cuts names are a
+# contract with that recipe.
+#
+# Holding in prechips' terms: clamped stages are a plate hold with clamp
+# stations (a downward push bends nothing). The outline is a bonded plate
+# hold: nothing bends; each cut's forces are compared with the tape's derated
+# strengths under every piece it leaves on the plate.
+title = "Rocker strap"
+part = "{{cad.drawing_number}}"
+revision = "{{cad.revision}}"
+material = "1018 cold-finished flat, 1/8 × 1-1/2 in (OnlineMetals 4807)"
+stock = "{{process.blank_thickness_in:fraction}} × {{process.blank_width_in:fraction}} in flat; {{process.quantity:d}} × {{process.blank_length_in:g}} in blanks."
+note = "Inches unless mm. Finished {{cad.thickness_min_in:.3dot}}–{{cad.thickness_max_in:.3dot}} thick, ({{cad.overall_length_in:.2f}}) long. One blank at a time through Setups 2–5; the sub-plate stays in the vise. All spindle work is on the PM-30MV low belt (100–2800 rpm): no belt change."
+shop = "../shop.toml"
+material_key = "rocker-1018-cold-finished"
+milling_material = "steel_1018"
+
+[cad]
+file = "../../out/features/ch_rocker_strap/features.toml"
+adapter = "arc_strap"
+part = "ch-rocker-strap"
+
+[parameters]
+quantity = 20
+blank_length_in = 12.0
+blank_width_in = 1.5
+blank_thickness_in = 0.125
+kerf_in = 0.125
+# Blank-thickness band the fixed facing heights are posted for (the catalogue
+# states no tolerance): RS01 roughs face 1 at a fixed Z, so the adapter
+# refuses a band whose thinnest blank that pass would miss. The operator mics
+# each blank; out of band, stop.
+blank_thickness_min_in = 0.122
+blank_thickness_max_in = 0.126
+# Left on each face by RS01 for the finish passes (.005 in).
+face_finish_stock_mm = 0.127
+# Face stepover of the 1/2 in end mill: four passes over the 1-1/2 in width
+# plus the recipe's overhang, a width cam.py posts exactly.
+face_stepover_mm = 9.652
+# The strap in the blank, setup frame: X from the end stop, Y from the fence
+# into the blank (machine −Y), top arc toward the fence, bottom arc toward
+# the front edge. The hub is centred along the blank and 1.000 in from the
+# fence, not centred across: the outline slot then leaves 0.53 mm of blank at
+# the fence under the strap's tips (milled away, see the fence notches) and
+# 1.58 mm at the front edge under the hub.
+hub_x_mm = 152.4
+hub_y_mm = 25.4
+# Edge clamps for the faces and the hub hole, X from the end stop: 1.00, 4.25,
+# 7.75 and 11.00 in.
+clamp_1_x_mm = 25.4
+clamp_2_x_mm = 107.95
+clamp_3_x_mm = 196.85
+clamp_4_x_mm = 279.4
+# Clamp screw torque, reduced from the maker's 1.3 ft-lb maximum so the edge
+# load does not bow a .098 in strip off the plate (owner-adopted estimate, no
+# source: confirm on the first article).
+clamp_torque_ft_lb = 0.5
+# Sub-plate: 13 × 3 × 1/2 in 6061, top faced in place (Z0), fence along its
+# back, end stop at the blank's left end.
+plate_start_x_mm = -12.7
+plate_length_mm = 330.2
+plate_width_mm = 76.2
+plate_thickness_mm = 12.7
+fence_width_mm = 12.7
+# Fence top, end-stop top and clamp noses above the plate top: all under the
+# finished thickness, so the face cutter clears them. Clamp: the Pitbull
+# 26000's minimum clamped height, .075 in (shop-equipment
+# fixtures.edge-clamps-low-profile.min_clamp_height_mm).
+fence_height_mm = 2.0
+end_stop_height_mm = 2.0
+clamp_height_mm = 1.905
+# Under the hub the plate has a Ø1/2 in counterbore .185 in deep with a
+# 5/16-18 tapped hole through its floor. In RS03 it is the relief the drill
+# and reamer run into: their tips stop relief_floor_clearance_mm above its
+# floor (25/64 drill: 118° point 2.98 mm long, so its full diameter is 1.0 mm
+# through the strap; the reamer's lead likewise). In RS04 the hub plug sits in
+# it. The hub hole may be drilled x_stop_tolerance_mm off the counterbore's
+# centre (setting X0 and Y0, and the fixture's own error): the author's
+# allowance, no source; Ø12.7 leaves 1.26 mm round the hub hole.
+hub_relief_dia_mm = 12.7
+hub_relief_depth_mm = 4.7
+relief_floor_clearance_mm = 0.5
+x_stop_tolerance_mm = 0.5
+drill_tip_z_mm = -4.0
+ream_tip_z_mm = -4.0
+# Outline hold-down (shop-equipment fixtures.strap-hub-plug, shop-made): a
+# stepped plug in the counterbore whose pilot slips into the reamed hub hole,
+# a washer over the hole and a 5/16-18 button-head screw through both into
+# the plate. bushing_flange_dia_mm is the largest diameter above the strap
+# (the screw head's .547 in, the washer turned to match); the outline cutter's
+# edge must pass bushing_clearance_mm from it (prechips refuses otherwise: the
+# strap's bottom edge is at least 7.49 mm from the hub centre, so 0.54 mm).
+# bushing_stack_height_mm is washer 2.0 + head 4.2 mm above the strap's top;
+# cam.py keeps the holder and every link move clear of it.
+bushing_flange_dia_mm = 13.9
+bushing_clearance_mm = 0.5
+bushing_stack_height_mm = 6.2
+# Tape: 3M VHB 5906, .006 in (shop-equipment consumables.tape-3m-vhb-5906).
+# 3M "VHB Tapes Technical Data" (November 2015), Typical Performance
+# Characteristics, 5906, 72 h dwell at room temperature: normal tensile
+# (ASTM D-897, to aluminium) 100 lb/in² = 690 kPa; dynamic overlap shear
+# (ASTM D-1002, to stainless steel) 100 lb/in² = 690 kPa.
+tape_thickness_mm = 0.15
+tape_shear_mpa = 0.69
+tape_tensile_mpa = 0.69
+# Derating of both strengths: 0.5 for the dwell (same data sheet, Application
+# Techniques: "approximately 50% of ultimate bond strength will be achieved
+# after 20 minutes", so the plan waits 20 minutes) × 0.5, the author's
+# allowance for cutting oil at the slot and a warm cut, no source.
+bond_derating = 0.25
+# Outline, 1/8 in 3-flute carbide end mill at .001 in/tooth (shop
+# settings.endmill-carbide-3fl-1-8-1018-cf-tru-edge); its 30° helix (shop
+# tools.endmill-carbide-3fl-1-8.helix_deg) lifts with tan 30° of the
+# tangential force. The slot is roughed .2 mm outside the edge and the wall
+# finished down to a skin left under the slot (owner-adopted, about .010 in);
+# only then is the skin cut through at the finished size, into the tape and
+# short of the plate (outline_breakthrough_mm below the strap's underside,
+# under the tape's least thickness, .006 in −15 %).
+outline_cutter_dia_mm = 3.175
+outline_finish_stock_mm = 0.2
+outline_skin_mm = 0.25
+outline_breakthrough_mm = 0.08
+# Depth levels, the fewest equal levels the bond check accepts with margin
+# (derated tensile 0.1725 MPa; a lift at an edge loads the bond with 4 × force
+# over a patch as long as the piece is wide):
+# - fence sliver, cut first, the blank whole (38.1 mm wide): levels of 0.75 mm
+#   at most lift 39.4 N, 0.108 MPa;
+# - outline rough, finish and through are all judged on the strap alone
+#   (16 mm wide): near the bottom of the rough slot only the skin joins it to
+#   the blank, and a 0.25 mm skin carries no lift across the slot. So the
+#   rough slot goes down in levels of 0.17 mm at most (14 over the 2.239 mm
+#   wall; 8.9 N, 0.139 MPa); 0.75 mm levels, 39.4 N, would be 0.615 MPa;
+# - finish pass, one level over the wall depth (cad.outline_wall_depth_mm):
+#   7.4 N, 0.116 MPa;
+# - through cut, 0.33 mm: levels of 0.165 mm lift 8.9 N, 0.139 MPa (one
+#   0.33 mm level: 0.271 MPa, refused).
+fence_sliver_step_mm = 0.75
+outline_rough_step_mm = 0.17
+outline_through_step_mm = 0.17
+# The fence-side strip is milled away before the outline where it is under
+# sliver_width_min_mm (owner-adopted: no free strip of that order; the value,
+# as wide as the strap is thick, is the author's). That is 133.5 to 148.0 mm
+# either side of the hub; the fence is notched there (distances from the hub
+# centre along X, a cutter radius and more beyond each end), fence_notch_depth_mm
+# back from the fence face, down to the plate top.
+sliver_width_min_mm = 2.5
+fence_notch_inner_mm = 131.0
+fence_notch_outer_mm = 150.0
+# Notch depth and floor, the end stop's height and the bushing stack are read
+# and checked by cam.py against the posted paths, not by prechips.
+fence_notch_depth_mm = 4.0
+fence_notch_floor_z_mm = 0.0
+# Hub hole: spot Ø.125 at the top with the 60° centre drill.
+spot_dia_mm = 3.175
+spot_point_deg = 60
+hub_drill_dia_mm = 9.921875
+hub_reamer_dia_mm = 10.16
+# Feeds the program runs and the sheet prints, each from one number (mm/min):
+# spot 1800 rpm × .002 in/rev = 3.6 in/min; drill 600 × .004 = 2.4; reamer
+# 400 × .008 = 3.2 (feeds per rev: the author's choice, no source); outline
+# plunge at half the 1/8 in end mill's chip load, 2800 × 3 × .0005 = 4.2.
+hub_spot_feed_per_min_mm = 91.44
+hub_drill_feed_per_min_mm = 60.96
+hub_ream_feed_per_min_mm = 81.28
+outline_plunge_feed_per_min_mm = 106.68
+face_cutter_dia_mm = 12.7
+# Machine-capacity inputs (mm): heights above the mill table, tool lengths
+# from spindle nose to tip.
+vise_bed_height_mm = 73.3044     # Shop workholding.vise-pm-6.bed_height_mm.
+vise_jaw_width_mm = 158.6738     # Shop workholding.vise-pm-6.jaw_width_mm.
+parallel_height_mm = 25.4        # 1 in parallels (shop-equipment fixtures.parallels-lms-6745).
+plate_overhang_mm = 85.76        # (plate length − jaw width)/2, plate centred in the jaws.
+r8_collet_gauge_mm = 6.3         # HA: holders.r8-collets-lms-4860.gauge_len_mm (as the base-bar plan).
+drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
+# ANSI B94.2 13/32 in class chucking reamer: 7 in overall, bounded by its
+# whole length below the chuck.
+reamer_oal_mm = 177.8
+# 1/2 in carbide end mill, 3 in overall (shop-equipment
+# tools.endmill-carbide-3fl-1-2): held at least 1 in in its collet, so at most
+# 2 in out; set at least 1 in out.
+half_mill_projection_min_mm = 25.4
+half_mill_projection_max_mm = 50.8
+# 1/8 in end mill, 1-1/2 in overall, 1/2 in of flute: between this much out
+# of the collet and its flute length (4 diameters).
+eighth_mill_projection_min_mm = 12.0
+eighth_mill_projection_max_mm = 12.7
+
+[[tools]]
+id = "em-half"
+name = "1/2 in carbide end mill"
+ref = "endmill-carbide-3fl-1-2"
+[[tools]]
+id = "em-eighth"
+name = "1/8 in carbide end mill"
+ref = "endmill-carbide-3fl-1-8"
+[[tools]]
+id = "spot"
+name = "#2 centre drill"
+ref = "jig-spot"
+[[tools]]
+id = "hub-drill"
+name = "25/64 drill"
+ref = "drill-25-64"
+[[tools]]
+id = "hub-reamer"
+name = ".4000 reamer"
+ref = "reamer-4000"
+[[tools]]
+id = "saw"
+name = "Evolution miter saw"
+ref = "saw-evolution-14"
+[[tools]]
+id = "files"
+name = "Files"
+ref = "jig-files"
+
+[[setups]]
+machine_kind = "other"
+title = "Saw blanks"
+machine = "Saw / bench"
+indexing = "none"
+diagram = { file = "diagrams/saw.svg", alt = "{{process.quantity:d}} blanks {{process.blank_length_in:g}} in long sawn one after another from the end of the {{process.blank_thickness_in:fraction}} × {{process.blank_width_in:fraction}} in flat." }
+envelope = "other"
+vise_hold = "other"
+beam = "other"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "saw"
+drilling = "none"
+sizing = "other"
+instruction = "Saw {{process.quantity:d}} × {{process.blank_length_in:g}} in blanks from the {{process.blank_thickness_in:fraction}} × {{process.blank_width_in:fraction}} in flat, flat on the saw bed. Deburr the sawn ends and both long edges: the blank must seat flat on the plate and square against the fence."
+feed = "hand"
+
+# RS01: face 1, M0 flip, face 2. Heights are fixed from the plate top (Z0), so
+# the faces are skimmed equally on a nominal blank; cad.face_z_* come from the
+# blank thickness, the finished thickness and face_finish_stock_mm.
+[[setups]]
+machine_kind = "other"
+title = "Rough both faces on the sub-plate"
+machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "Sub-plate (made beforehand, its top and fence face milled in the vise) in the vise on 1 in parallels, centred, the fence indicated <.001 along X; it stays there for every blank. Blank flat on the plate, one long edge against the fence, its left end against the plate's end stop, pushed by the Pitbull edge clamps at X {{cad.clamp_stations_in}} from the end stop, each tightened to {{process.clamp_torque_ft_lb:g}} ft-lb. Clamp noses {{process.clamp_height_mm:in.3dot}} and the fence top {{process.fence_height_mm:in.3dot}} above the plate stay below the cut."
+datum = "Program RS01_rough_faces (cam:ch_rocker_strap). One G54 while the plate stays put: Z0 = the faced plate top, Y0 = the fence face (blank at −Y), X0 = the end stop's face. Tool lengths from the tool setter at each M6; every file (RS01–RS04) starts with an M6 for its first tool, so none runs on the length the last file left, even re-run or restarted."
+diagram = { file = "diagrams/rough.svg", alt = "Plan of the sub-plate: fence along the back, blank against it and against the end stop at its left end, edge clamps at the front at X {{cad.clamp_stations_in}}; the 1/2 in end mill faces the full blank, one face, then the other after the flip." }
+envelope = { x_span_mm = ["{{cad.blank_length_mm}}", "{{process.face_cutter_dia_mm}}"], y_span_mm = ["{{cad.blank_width_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_thickness_mm}}", "{{cad.blank_thickness_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_thickness_mm}}", "{{cad.thickness_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
+# The vise grips the sub-plate, not the blank: every size here is the plate's.
+vise_hold = { vise = "vise-pm-6", grips = "plate", across_jaws_mm = "{{process.plate_width_mm}}", along_jaws_mm = "{{process.plate_length_mm}}", part_height_mm = "{{process.plate_thickness_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.plate_overhang_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
+# Section at the finished thickness, the thinnest the blank gets.
+beam = { axis = "x", hold = "plate", extent_mm = [0, "{{cad.blank_length_mm}}"], seat = "faced sub-plate", seat_mm = "{{cad.plate_x_mm}}", clamps_mm = "{{cad.clamp_x_mm}}", section_mm = { y = "{{cad.blank_width_mm}}", z = "{{cad.thickness_mm}}" } }
+
+[[setups.operations]]
+instruction = "Once per vise setup, no blank in: set Z0 on the plate top, Y0 on the fence face and X0 on the end stop's face."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-half"
+drilling = "none"
+sizing = "other"
+instruction = "Per blank: mic it, {{process.blank_thickness_in:.3dot}} nominal, every reading {{process.blank_thickness_min_in:.3dot}}–{{process.blank_thickness_max_in:.3dot}}, else stop. Clamp against the fence. Run RS01_rough_faces (M6 T1, 1/2 in end mill; set 2650): face 1 at Z {{cad.rough_face_1_z_in:.4dot}}. At its M0: unclamp, flip the blank end for end, reclamp, Cycle Start: face 2 at Z {{cad.rough_face_2_z_in:.4dot}}."
+settings = "endmill-carbide-3fl-1-2-1018-cf"
+milling_cuts = [
+  { name = "face rough", kind = "end", phase = "rough", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{cad.face_rough_doc_mm}}", radial_woc_mm = "{{process.face_stepover_mm}}", traverse_mm = [0, "{{cad.blank_length_mm}}"] },
+]
+
+[[setups]]
+machine_kind = "other"
+title = "Reseat; finish the first face"
+machine = "PM-30MV CNC / vise, swivel off"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "Release the blank, turn it over end for end (face 1, the first one roughed, up), seat it against the fence and the end stop and clamp again at the same stations, {{process.clamp_torque_ft_lb:g}} ft-lb: the rough passes' stress is let go before the finish cuts."
+datum = "Program RS02_finish_face_1. G54 unchanged: Z0 plate top, Y0 fence, X0 end stop."
+diagram = { file = "diagrams/finish.svg", alt = "Plan of the sub-plate: the reseated blank against the fence and the end stop under the edge clamps; the 1/2 in end mill takes the finish pass over the full face." }
+envelope = { x_span_mm = ["{{cad.blank_length_mm}}", "{{process.face_cutter_dia_mm}}"], y_span_mm = ["{{cad.blank_width_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_thickness_mm}}", "{{cad.blank_thickness_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_thickness_mm}}", "{{cad.thickness_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
+vise_hold = { vise = "vise-pm-6", grips = "plate", across_jaws_mm = "{{process.plate_width_mm}}", along_jaws_mm = "{{process.plate_length_mm}}", part_height_mm = "{{process.plate_thickness_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.plate_overhang_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
+beam = { axis = "x", hold = "plate", extent_mm = [0, "{{cad.blank_length_mm}}"], seat = "faced sub-plate", seat_mm = "{{cad.plate_x_mm}}", clamps_mm = "{{cad.clamp_x_mm}}", section_mm = { y = "{{cad.blank_width_mm}}", z = "{{cad.thickness_mm}}" } }
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-half"
+drilling = "none"
+sizing = "other"
+instruction = "Run RS02_finish_face_1 (M6 T1 at its start, the 1/2 in end mill: set it on the tool setter again; 2650): the face at Z {{cad.finish_face_1_z_in:.4dot}}."
+settings = "endmill-carbide-3fl-1-2-1018-cf"
+milling_cuts = [
+  { name = "face finish", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{cad.face_finish_doc_mm}}", radial_woc_mm = "{{process.face_stepover_mm}}", traverse_mm = [0, "{{cad.blank_length_mm}}"] },
+]
+
+# RS03, still in the edge clamps, no tape: finish face 2, then the hub hole.
+# Tool numbers are the places in the tools list: T1 1/2 in end mill, T2 1/8 in
+# end mill, T3 centre drill, T4 25/64 drill, T5 reamer.
+[[setups]]
+machine_kind = "other"
+title = "Finish the second face; hub hole"
+machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "Flip the blank end for end, finished face down, seat against the fence and the end stop and clamp at X {{cad.clamp_stations_in}}, {{process.clamp_torque_ft_lb:g}} ft-lb. Counterbore under the hub empty: no plug in it."
+datum = "Program RS03_finish_face_2_hub. G54 unchanged: Z0 plate top, Y0 fence, X0 end stop; the hub hole is at X {{cad.hub_x_in:.3f}}, Y −{{cad.hub_y_in:.3f}}, over the plate's counterbore."
+diagram = { file = "diagrams/hub.svg", alt = "Plan of the sub-plate: blank against the fence and the end stop under the edge clamps; the 1/2 in end mill takes the finish pass over the full face; the hub hole at X {{cad.hub_x_in:.3f}} Y −{{cad.hub_y_in:.3f}}." }
+# Deepest: the drill and reamer tips in the counterbore; longest tool: the
+# reamer in the drill chuck; shortest: the 1/2 in end mill in its collet.
+envelope = { x_span_mm = ["{{cad.blank_length_mm}}", "{{process.face_cutter_dia_mm}}"], y_span_mm = ["{{cad.blank_width_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_thickness_mm}}", "{{cad.blank_thickness_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_thickness_mm}}", "{{process.ream_tip_z_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.reamer_oal_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
+vise_hold = { vise = "vise-pm-6", grips = "plate", across_jaws_mm = "{{process.plate_width_mm}}", along_jaws_mm = "{{process.plate_length_mm}}", part_height_mm = "{{process.plate_thickness_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.plate_overhang_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
+beam = { axis = "x", hold = "plate", extent_mm = [0, "{{cad.blank_length_mm}}"], seat = "faced sub-plate", seat_mm = "{{cad.plate_x_mm}}", clamps_mm = "{{cad.clamp_x_mm}}", section_mm = { y = "{{cad.blank_width_mm}}", z = "{{cad.thickness_mm}}" } }
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-half"
+drilling = "none"
+sizing = "other"
+instruction = "Run RS03_finish_face_2_hub (M6 T1 at its start, the 1/2 in end mill; 2650): the face at Z {{cad.thickness_in:.4dot}}. At its M6 T3 pause, before the centre drill goes in: mic the thickness at both ends and the middle."
+settings = "endmill-carbide-3fl-1-2-1018-cf"
+inspection = "Thickness {{cad.thickness_min_in:.3dot}}–{{cad.thickness_max_in:.3dot}} at both ends and mid-length (out: stop, the blank is scrap or goes back for a skim)."
+gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.thickness_band_mm}}" }]
+milling_cuts = [
+  { name = "face finish", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{cad.face_finish_doc_mm}}", radial_woc_mm = "{{process.face_stepover_mm}}", traverse_mm = [0, "{{cad.blank_length_mm}}"] },
+]
+
+# Hub hole, over the plate's counterbore: the blank spans it as a short beam
+# between its edges; the drill and reamer push down on it.
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "spot"
+drilling = "none"
+sizing = "other"
+instruction = "Same file, M6 T3: spot the hub hole Ø{{process.spot_dia_mm:in.3dot}} at X {{cad.hub_x_in:.3f}}, Y −{{cad.hub_y_in:.3f}}; set 1800."
+rpm = 1800
+feed = "{{process.hub_spot_feed_per_min_mm:in.1f}} in/min"
+beam = { axis = "x", hold = "between", extent_mm = [0, "{{cad.blank_length_mm}}"], supports_mm = "{{cad.hub_relief_x_mm}}", section_mm = { y = "{{cad.blank_width_mm}}", z = "{{cad.thickness_mm}}" } }
+milling_cuts = [
+  { name = "hub spot", kind = "drill", phase = "rough", cutter_dia_mm = "{{process.spot_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = "{{process.hub_spot_feed_per_min_mm}}", stations_mm = "{{process.hub_x_mm}}" },
+]
+
+# Drill and ream speeds: LittleMachineShop "Cutting Speeds", Drilling &
+# Reaming, Plain carbon steels 1006-1026 (read 2026-11-17): drilling
+# 60-100 ft/min, reaming 40-65; the low ends: 600 rpm on the 25/64 drill
+# (61 ft/min), 400 rpm on the .400 reamer (42 ft/min). Feeds: [parameters].
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "hub-drill"
+drilling = "twist_drill"
+sizing = "other"
+instruction = "Same file, M6 T4: 25/64 drill through into the counterbore, no peck; set 600. Cutting oil."
+rpm = 600
+feed = "{{process.hub_drill_feed_per_min_mm:in.1f}} in/min"
+beam = { axis = "x", hold = "between", extent_mm = [0, "{{cad.blank_length_mm}}"], supports_mm = "{{cad.hub_relief_x_mm}}", section_mm = { y = "{{cad.blank_width_mm}}", z = "{{cad.thickness_mm}}" } }
+hole_depth_mm = "{{cad.thickness_mm}}"
+peck = "none"
+milling_cuts = [
+  { name = "hub drill", kind = "drill", phase = "rough", cutter_dia_mm = "{{process.hub_drill_dia_mm}}", flutes = 2, rpm = 600, feed_mm_min = "{{process.hub_drill_feed_per_min_mm}}", stations_mm = "{{process.hub_x_mm}}" },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "hub-reamer"
+drilling = "none"
+sizing = { kind = "band", band_mm = "{{cad.hub_dia_band_mm}}" }
+instruction = "Same file, M6 T5: ream through, .4000 reamer in the drill chuck; set 400. Cutting oil. The file feeds the reamer in and feeds it back out, spindle running: no rapid leaves the bore. Then unclamp and lift the blank out."
+rpm = 400
+feed = "{{process.hub_ream_feed_per_min_mm:in.1f}} in/min, in and out"
+inspection = "Hub hole Ø{{cad.hub_dia_min_in:.4dot}}–{{cad.hub_dia_max_in:.4dot}} by the .4000 GO / .4005 NO-GO plug gauges, before unclamping: the GO enters, the NO-GO does not. Gauge the first blank's hole before reaming any other (NO-GO enters or GO will not: stop, the reamer is out of band), then every hole. Both edges sharp, no burr."
+gauge_checks = [{ gauge = "plug-gauges-4000-4005", band_mm = "{{cad.hub_dia_band_mm}}" }]
+beam = { axis = "x", hold = "between", extent_mm = [0, "{{cad.blank_length_mm}}"], supports_mm = "{{cad.hub_relief_x_mm}}", section_mm = { y = "{{cad.blank_width_mm}}", z = "{{cad.thickness_mm}}" } }
+# No reamer kind: its thrust is analysed as a two-lip twist drill's at the
+# reamer Ø and the same feed (flutes = 2 is that model's, not the reamer's),
+# far above what a .009 in ream allowance takes.
+milling_cuts = [
+  { name = "hub ream", kind = "drill", phase = "finish", cutter_dia_mm = "{{process.hub_reamer_dia_mm}}", flutes = 2, rpm = 400, feed_mm_min = "{{process.hub_ream_feed_per_min_mm}}", stations_mm = "{{process.hub_x_mm}}" },
+]
+
+# RS04: the outline, one tool, no stop inside the file. The blank is bonded
+# to the plate and screwed down at the hub; the setup's beam is the whole
+# blank on its tape, which the plunge and the fence sliver cut into.
+[[setups]]
+machine_kind = "other"
+title = "Bond to the plate; outline"
+machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "Blank bonded to the plate on {{process.tape_thickness_mm:in.3dot}} tape under its whole face, the reamed hub hole over the plug in the plate's counterbore, one long edge against the fence, and screwed down at the hub through the washer. Edge clamps backed off clear of the blank."
+datum = "Program RS04_outline. G54 unchanged: Y0 fence, X0 end stop, Z0 the plate top; the file works {{process.tape_thickness_mm:in.3dot}} above it for the tape. The plug puts the hub hole at X {{cad.hub_x_in:.3f}}, Y −{{cad.hub_y_in:.3f}}; the fence sets the blank square."
+diagram = { file = "diagrams/outline.svg", alt = "Plan of the sub-plate: blank bonded to the plate against the fence, no edge clamps; screw and washer at the hub hole; the fence notched under both tips of the strap; the 1/8 in end mill's slot runs round the whole outline, top arc toward the fence." }
+# Top: the strap on its tape; deepest: the through cut stops in the tape,
+# above the plate top.
+envelope = { x_span_mm = ["{{cad.blank_length_mm}}", "{{process.outline_cutter_dia_mm}}"], y_span_mm = ["{{cad.blank_width_mm}}", "{{process.fence_notch_depth_mm}}", "{{process.outline_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_thickness_mm}}", "{{process.tape_thickness_mm}}", "{{cad.thickness_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_thickness_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.eighth_mill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.eighth_mill_projection_min_mm}}"] }
+vise_hold = { vise = "vise-pm-6", grips = "plate", across_jaws_mm = "{{process.plate_width_mm}}", along_jaws_mm = "{{process.plate_length_mm}}", part_height_mm = "{{process.plate_thickness_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.plate_overhang_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
+beam = { axis = "x", hold = "plate", extent_mm = [0, "{{cad.blank_length_mm}}"], seat = "faced sub-plate", seat_mm = "{{cad.plate_x_mm}}", bond = { shear_mpa = "{{process.tape_shear_mpa}}", tensile_mpa = "{{process.tape_tensile_mpa}}", derating = "{{process.bond_derating}}", pieces = [{ name = "blank", kind = "part", area_mm2 = "{{cad.blank_bond_area_mm2}}", width_mm = "{{cad.blank_width_mm}}" }] } }
+
+[[setups.operations]]
+instruction = "Per blank. Degrease the plate top and the blank's face 1 with isopropyl alcohol and water. Lay the tape on the plate over the blank's whole footprint, cut away at the counterbore; drop the plug into the counterbore. Lower the blank, face 1 down, hub hole over the plug's pilot, long edge against the fence, and press it down over its whole face (the tape wants about 15 psi). Washer and screw on at the hub, snug. Back the edge clamps off clear of the blank. Wait 20 minutes: the tape is taken at half strength, which it reaches by then."
+feed = "hand"
+
+# Every level starts with a straight plunge (feed: [parameters]); the plunge
+# pushes down onto the plate.
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-eighth"
+drilling = "none"
+sizing = "other"
+instruction = "Run RS04_outline (M6 T2: 1/8 in end mill, {{process.eighth_mill_projection_min_mm:in.2dot}}–{{process.eighth_mill_projection_max_mm:in.2dot}} out of the collet; set 2800). Each depth level starts with a straight plunge."
+rpm = 2800
+feed = "{{process.outline_plunge_feed_per_min_mm:in.1f}} in/min plunge"
+milling_cuts = [
+  { name = "outline plunge", kind = "plunge", phase = "rough", cutter_dia_mm = "{{process.outline_cutter_dia_mm}}", flutes = 3, rpm = 2800, feed_mm_min = "{{process.outline_plunge_feed_per_min_mm}}", traverse_mm = "{{cad.outline_x_mm}}" },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-eighth"
+drilling = "none"
+sizing = "other"
+instruction = "Fence sliver: inside both fence notches the strip of blank between the outline and the fence ({{cad.fence_margin_mm:in.3dot}} at its thinnest) is milled away, levels ≤ {{process.fence_sliver_step_mm:in.3dot}}, before the outline is cut."
+settings = "endmill-carbide-3fl-1-8-1018-cf-tru-edge"
+milling_cuts = [
+  { name = "fence sliver", kind = "slot", phase = "rough", cutter_dia_mm = "{{process.outline_cutter_dia_mm}}", axial_doc_mm = "{{process.fence_sliver_step_mm}}", radial_woc_mm = "{{process.outline_cutter_dia_mm}}", stations_mm = "{{cad.fence_notch_x_mm}}" },
+]
+
+# From here every outline cut is judged on the pieces the slot separates: the
+# strap, the fence-side waste between the notches and the front waste, each
+# held by its own tape (and the strap by the screw, which is given no credit).
+# The front waste's area is its strip along the bottom arc only.
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-eighth"
+drilling = "none"
+sizing = "other"
+instruction = "Outline rough: a slot {{process.outline_finish_stock_mm:in.3dot}} outside the strap's edge, full perimeter, levels ≤ {{process.outline_rough_step_mm:in.3dot}}, down to a skin {{process.outline_skin_mm:in.3dot}} thick."
+settings = "endmill-carbide-3fl-1-8-1018-cf-tru-edge"
+beam = { axis = "x", hold = "plate", extent_mm = [0, "{{cad.blank_length_mm}}"], seat = "faced sub-plate", seat_mm = "{{cad.plate_x_mm}}", bond = { shear_mpa = "{{process.tape_shear_mpa}}", tensile_mpa = "{{process.tape_tensile_mpa}}", derating = "{{process.bond_derating}}", pieces = [{ name = "strap", kind = "part", area_mm2 = "{{cad.strap_bond_area_mm2}}", width_mm = "{{cad.width_mm}}" }, { name = "fence-side waste", kind = "waste", area_mm2 = "{{cad.fence_waste_area_mm2}}" }, { name = "front waste", kind = "waste", area_mm2 = "{{cad.front_waste_area_mm2}}" }] } }
+milling_cuts = [
+  { name = "outline rough", kind = "slot", phase = "rough", cutter_dia_mm = "{{process.outline_cutter_dia_mm}}", axial_doc_mm = "{{process.outline_rough_step_mm}}", radial_woc_mm = "{{process.outline_cutter_dia_mm}}", traverse_mm = "{{cad.outline_x_mm}}" },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-eighth"
+drilling = "none"
+sizing = "other"
+instruction = "Outline finish: the edge itself, {{process.outline_finish_stock_mm:in.3dot}} radial, one level down to the skin."
+settings = "endmill-carbide-3fl-1-8-1018-cf-tru-edge"
+beam = { axis = "x", hold = "plate", extent_mm = [0, "{{cad.blank_length_mm}}"], seat = "faced sub-plate", seat_mm = "{{cad.plate_x_mm}}", bond = { shear_mpa = "{{process.tape_shear_mpa}}", tensile_mpa = "{{process.tape_tensile_mpa}}", derating = "{{process.bond_derating}}", pieces = [{ name = "strap", kind = "part", area_mm2 = "{{cad.strap_bond_area_mm2}}", width_mm = "{{cad.width_mm}}" }, { name = "fence-side waste", kind = "waste", area_mm2 = "{{cad.fence_waste_area_mm2}}" }, { name = "front waste", kind = "waste", area_mm2 = "{{cad.front_waste_area_mm2}}" }] } }
+milling_cuts = [
+  { name = "outline finish", kind = "side", phase = "finish", cutter_dia_mm = "{{process.outline_cutter_dia_mm}}", axial_doc_mm = "{{cad.outline_wall_depth_mm}}", radial_woc_mm = "{{process.outline_finish_stock_mm}}", traverse_mm = "{{cad.part_x_mm}}" },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "em-eighth"
+drilling = "none"
+sizing = "other"
+instruction = "Outline through: the skin, at the finished size, levels ≤ {{process.outline_through_step_mm:in.3dot}}, {{cad.outline_through_depth_mm:in.3dot}} in all, to {{process.outline_breakthrough_mm:in.3dot}} below the strap into the tape; the cutter does not reach the plate."
+settings = "endmill-carbide-3fl-1-8-1018-cf-tru-edge"
+beam = { axis = "x", hold = "plate", extent_mm = [0, "{{cad.blank_length_mm}}"], seat = "faced sub-plate", seat_mm = "{{cad.plate_x_mm}}", bond = { shear_mpa = "{{process.tape_shear_mpa}}", tensile_mpa = "{{process.tape_tensile_mpa}}", derating = "{{process.bond_derating}}", pieces = [{ name = "strap", kind = "part", area_mm2 = "{{cad.strap_bond_area_mm2}}", width_mm = "{{cad.width_mm}}" }, { name = "fence-side waste", kind = "waste", area_mm2 = "{{cad.fence_waste_area_mm2}}" }, { name = "front waste", kind = "waste", area_mm2 = "{{cad.front_waste_area_mm2}}" }] } }
+milling_cuts = [
+  { name = "outline through", kind = "slot", phase = "rough", cutter_dia_mm = "{{process.outline_cutter_dia_mm}}", axial_doc_mm = "{{process.outline_through_step_mm}}", radial_woc_mm = "{{process.outline_cutter_dia_mm}}", traverse_mm = "{{cad.part_x_mm}}" },
+]
+
+[[setups]]
+machine_kind = "other"
+title = "Free, clean, deburr, inspect"
+machine = "Bench"
+indexing = "none"
+diagram = { file = "diagrams/inspect.svg", alt = "The finished strap: two concentric arc edges, a tip land and an end face at each end, the reamed hub hole on the centre line; overall length for reference, edge heights and corner stations from the hub centre." }
+envelope = "other"
+vise_hold = "other"
+beam = "other"
+inspection = ["Thickness {{cad.thickness_min_in:.3dot}}–{{cad.thickness_max_in:.3dot}}. From the hub hole's centre: top edge {{cad.top_height_min_in:.3dot}}–{{cad.top_height_max_in:.3dot}} above, bottom edge {{cad.bottom_height_min_in:.3dot}}–{{cad.bottom_height_max_in:.3dot}} below; corners {{cad.corner_station_min_in:.2f}}–{{cad.corner_station_max_in:.2f}} and end-face feet {{cad.foot_station_min_in:.2f}}–{{cad.foot_station_max_in:.2f}} each side; tip lands {{cad.tip_length_min_in:.2f}}–{{cad.tip_length_max_in:.2f}} long. Not gauged, the program's interpolated path: arc radii R{{cad.top_radius_min_in:.1f}}–{{cad.top_radius_max_in:.1f}} top and R{{cad.bottom_radius_min_in:.1f}}–{{cad.bottom_radius_max_in:.1f}} bottom, tip-land angle {{cad.tip_angle_min_deg:.1f}}–{{cad.tip_angle_max_deg:.1f}}°."]
+gauge_checks = [
+  { gauge = "micrometers", band_mm = "{{cad.thickness_band_mm}}" },
+  { gauge = "calipers", band_mm = "{{cad.top_height_band_mm}}" },
+  { gauge = "calipers", band_mm = "{{cad.bottom_height_band_mm}}" },
+  { gauge = "calipers", band_mm = "{{cad.corner_station_band_mm}}" },
+  { gauge = "calipers", band_mm = "{{cad.foot_station_band_mm}}" },
+  { gauge = "calipers", band_mm = "{{cad.tip_length_band_mm}}" },
+]
+
+[[setups.operations]]
+instruction = "First article only, strap still on the plate: caliper its width across the two edges at the hub and 4.7 in either side, and try a .124 pin gauge in the slot all round (a tight slot means a waste piece has moved toward the strap)."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "files"
+drilling = "none"
+sizing = "other"
+instruction = "Screw, washer and plug out. Lift the waste pieces. Free the strap by working a thin blade under it along its length; do not lever it up from one end. Clean the tape off strap and plate with isopropyl alcohol. Edges R{{cad.edge_break_in:.3f}} or chamfer {{cad.chamfer_max_in:.3f}} max, except the hub hole: both edges sharp, no burr; file off any step left at the skin, {{process.outline_skin_mm:in.3dot}} above face 1. A strap bowed after it is freed is set straight by hand on the surface plate."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "First article only, strap freed: the same three widths again (a change from the readings on the plate is spring, not the cutter's path); flatness on the surface plate."
+feed = "hand"

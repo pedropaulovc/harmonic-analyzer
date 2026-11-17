@@ -64,6 +64,19 @@ credibility rests on:
    product.** It is free for *non-commercial* use; the book and the campaign are
    commercial. See `kickstarter/campaign/risks.md`.
 
+> [!IMPORTANT]
+> **Manufacturing premise (owner ruling 2026-11-17, Pedro).** Milled parts are
+> authored for **CNC milling** on the owner's CNC-converted PM-30MV (FluidNC
+> controller, CNCjs sender, electronic tool setter, 3D touch probe), from
+> G-code posted headless with open-source FreeCAD CAM (`cam:<stem>`, shipped
+> in every release under `nc/<stem>/`). **Speed of manufacture is the
+> priority**, because makerspace mill time costs too much for manual milling;
+> the device's historical accuracy is kept. Turned parts stay on the **manual
+> lathe** (PM-1127VF-LB). Do not add rules, process text or tooling that
+> assume a manual mill, nor a DRO-simulator or handwheel-pendant workflow that
+> makes the CNC mill imitate one. The prechips hobby traveler is the part's
+> CNC setup sheet.
+
 
 The **minimum merge gate below applies to changes under `cad/`**; a
 prose-only or `web/`-only PR is gated by its own area's rules (and, for `web/`,
@@ -399,7 +412,7 @@ uv run python farm_build.py cancel <run-id | tag> --why "superseded by <sha>"
 | `check:verify_telemetry` | **no** | no (opt-in — NOT in build/release) | no |
 | `check:machinist_review:<stem>` (one cached aggregate per drawing; opt-in enforcement) | **no** | no (parallel) | no (submitter-only) |
 | `prechips:<stem>` (enrolled process travelers; in `build` and `release`, NOT in `build_bare`) | **no** (latest PyPI prechips via `uv tool run`; headless Edge/Chrome prints the hobby PDF) | no (parallel; needs its own scoped `features.toml`) | no (submitter-only) |
-| `cam:<stem>` (enrolled NC programs; opt-in — NOT in build/release) | **no** (needs FreeCAD 1.1+: `$HARMONIC_FREECAD` or a discovered `freecadcmd`) | no (needs its own scoped `features.toml`) | no (submitter-only; no worker has FreeCAD) |
+| `cam:<stem>` (enrolled NC programs; in `build` and `release`, NOT in `build_bare`) | **no** (needs FreeCAD 1.1+: `$HARMONIC_FREECAD` or a discovered `freecadcmd`; fails loud without it) | no (needs its own scoped `features.toml`) | no (submitter-only; no worker has FreeCAD) |
 | `check:features_bound` | **no** | no (release only; validates scoped face refs and identical full STEP copy) | no |
 | `gallery` | **no** (Blender + GPU) | no | no (submitter-only; no worker has Blender) |
 | `cache_status` | **no** | no (diagnostic) | no |
@@ -443,9 +456,11 @@ it checks part identity, the adjacent STEP name and sha256, a non-empty features
 table and each feature's face set against that STEP; neither it nor
 `export_features` validates against a prechips schema.
 
-Each part in `_process_plans.TRAVELER_STEMS` (none since the oblique trammel jig
-was deleted, 2026-11-17)
-has a `prechips:<stem>` task. `build` runs every one, so each build that
+Each part in `_process_plans.TRAVELER_STEMS` (that tuple is the enrolment
+list; the rocker strap, `ch_rocker_strap`, is the first part enrolled under the
+CNC premise) has a `prechips:<stem>` task. Its hobby sheet is the part's CNC
+setup sheet: the setups, workholding and zeros the NC programs assume.
+`build` runs every one, so each build that
 produces the drawing PDFs also produces the traveler PDFs; `build_bare` runs
 none. `release` runs every one too
 and ships each part's hobby sheet as `travelers/<slug>-traveler.pdf` in the
@@ -499,8 +514,14 @@ a prechips adapter release before that part's traveler passes again.
 A generated traveler is not machining approval.
 See [feature exports and travelers](cad/docs/pipeline/features-travelers.md).
 
-Each part in `_cam_programs.CAM_STEMS` (none since 2026-11-17) has an
-opt-in `cam:<stem>` task, run by `cad/scripts/cam_nc.py`. Its recipe,
+Each part in `_cam_programs.CAM_STEMS` (the enrolment list; the rocker strap
+is the first) has a `cam:<stem>` task, run by `cad/scripts/cam_nc.py`.
+`build` and `release` run every one (`build_bare` none), on the submitter
+like `prechips:<stem>` and `gallery`: no farm worker has FreeCAD, so the
+submitter needs FreeCAD 1.1+ and the task fails loud without it. `release`
+ships each part's outputs under `nc/<stem>/` beside
+`travelers/<slug>-traveler.pdf`, and the cut fails if any is missing or
+stale. Its recipe,
 `cad/process/<stem>/cam.py`, derives every part dimension, cut step, cutter
 diameter, speed and feed from the part's `features.toml`, its `plan.toml` and
 `cad/process/shop.toml`; constants that neither record carries are named in
@@ -524,7 +545,8 @@ version and the post file FreeCAD loaded are recorded, not keyed. The
 FreeCAD positive control, `test_cam_nc_freecad.py`, is in no `check:*` gate:
 run it by hand after changing the driver, the runtime or FreeCAD. The
 generated NC is never committed. Like a traveler, it is not machining
-approval.
+approval: prove each program in air and check the setup against the
+traveler first.
 
 - `build` is the **one** fully-safe entry: every part + assembly + every gate.
   (`verify.py` has no `--suite all` anymore — `build` replaced it.) It offers the
@@ -558,7 +580,8 @@ approval.
   `cad/out`, then run `uv run --frozen python -m doit -s gallery`,
   `uv run --frozen python -m doit -s prechips` (every enrolled traveler, from the
   restored feature bundles) and `uv run --frozen python -m doit -s release -- vNN`
-  there. This avoids
+  there. The NC programs arrive with the restored `out/`: the run's `build`
+  posts them on the submitter, which therefore needs FreeCAD 1.1+. This avoids
   postpublish changes being discarded with the snapshot and prevents local COM
   redispatch. See
   [`DEVELOPING.md`](DEVELOPING.md#farm-releases).

@@ -410,6 +410,110 @@ def test_release_notes_count_shared_member_files_not_part_documents() -> None:
     assert "plus 7 per-configuration STLs" not in notes
 
 
+def test_release_stages_every_cam_output_under_nc_and_refuses_missing_or_stale_ones(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import _cam_programs
+    import _process_plans
+    import export_features
+
+    # A synthetic enrolment of a feature-exporting part, every input of its
+    # posted set under tmp_path.
+    stem = "ch_rocker_arm"
+    process = tmp_path / "process"
+    recipe = process / stem / "cam.py"
+    recipe.parent.mkdir(parents=True)
+    recipe.write_bytes(f'STEM = "{stem}"\nPROGRAMS = [("OP1", ()), ("OP2", ())]\n'.encode())
+    (process / stem / "plan.toml").write_bytes(b"[parameters]\nhub_x_mm = 1.0\n")
+    (process / "shop.toml").write_bytes(b"[tools]\n")
+    runtime = tmp_path / "_freecad_cam_runtime.py"
+    runtime.write_bytes(b"# runtime\n")
+    out = tmp_path / "cad" / "out"
+    monkeypatch.setattr(_cam_programs, "CAM_STEMS", (stem,))
+    monkeypatch.setattr(_cam_programs, "PROCESS_ROOT", process)
+    monkeypatch.setattr(_cam_programs, "RUNTIME_PATH", runtime)
+    monkeypatch.setattr(_process_plans, "PROCESS_ROOT", process)
+    monkeypatch.setattr(_process_plans, "SHOP_PATH", process / "shop.toml")
+    monkeypatch.setattr(cut_release, "CAD_ROOT", out.parent)
+    features, step = export_features.bundle_paths(stem, out)
+    features.parent.mkdir(parents=True)
+    features.write_bytes(b'part = "fixture"\n')
+    step.write_bytes(b"ISO-10303-21;\n")
+    directory = _cam_programs.nc_dir(stem, out)
+    directory.mkdir(parents=True)
+    for name in ("OP1", "OP2"):
+        (directory / f"{name}.nc").write_bytes(f"(PROGRAM {name})\nG0 Z5\n".encode())
+    times = directory / _cam_programs.CYCLE_TIMES_NAME
+    times.write_bytes(b'{"total_min": 1.0}\n')
+    # freecadcmd's console log sits beside the outputs but is not one of them.
+    (directory / "freecadcmd.log").write_bytes(b"FreeCAD console\n")
+    manifest = directory / _cam_programs.MANIFEST_NAME
+    inputs = {
+        "features": features, "step": step, "plan": process / stem / "plan.toml",
+        "shop": process / "shop.toml", "recipe": recipe, "runtime": runtime,
+    }
+
+    def sha(path: Path) -> str:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+
+    def write_manifest() -> None:
+        manifest.write_bytes(json.dumps({
+            "inputs": {name: {"path": p.name, "sha256": sha(p)} for name, p in inputs.items()},
+            "programs": {f"{name}.nc": sha(directory / f"{name}.nc") for name in ("OP1", "OP2")},
+            "cycle_times": sha(times),
+        }).encode())
+
+    write_manifest()
+    names = ["OP1.nc", "OP2.nc", "cycle_times.json", "manifest.json"]
+    stage = tmp_path / "stage"
+    staged = cut_release.stage_nc_programs(stage)
+    assert staged == [f"nc/{stem}/{name}" for name in names]
+    assert sorted(path.name for path in (stage / "nc" / stem).iterdir()) == sorted(names)
+    for name in names:
+        assert (stage / "nc" / stem / name).read_bytes() == (directory / name).read_bytes()
+    facts = {
+        "native_documents": 1, "sw_revision": "35", "steps": 1, "stls": 1,
+        "assemblies": 1, "pngs": 1, "comparisons": {"pairs": 0, "mean_score": None},
+        "size_mb": 1.0, "provenance": {"git": {"commit": "0" * 40}}, "nc": staged,
+    }
+    assert "`nc/` -- CNC mill G-code for 1 parts" in cut_release.release_notes("v42", facts)
+    assert "`nc/`" not in cut_release.release_notes("v42", {**facts, "nc": []})
+
+    # A program edited after posting no longer matches its manifest.
+    (directory / "OP2.nc").write_bytes(b"(PROGRAM OP2)\nG0 Z1\n")
+    with pytest.raises(RuntimeError, match="differs from its manifest"):
+        cut_release.stage_nc_programs(tmp_path / "edited")
+    write_manifest()
+    # Programs posted from an earlier version of any input are stale: the
+    # refusal names the changed file.
+    for name, path in inputs.items():
+        original = path.read_bytes()
+        path.write_bytes(original + b"# edited after the post\n")
+        with pytest.raises(RuntimeError, match=f"stale.*{path.name}.*doit -s cam:{stem}"):
+            cut_release.stage_nc_programs(tmp_path / f"stale-{name}")
+        path.write_bytes(original)
+    assert not any((tmp_path / f"stale-{name}").exists() for name in inputs)
+    # Cycle times rewritten after the post.
+    times.write_bytes(b'{"total_min": 2.0}\n')
+    with pytest.raises(RuntimeError, match=f"{times.name} differs from its manifest"):
+        cut_release.stage_nc_programs(tmp_path / "times")
+    times.write_bytes(b'{"total_min": 1.0}\n')
+    # A manifest from a driver that recorded fewer inputs.
+    recorded = json.loads(manifest.read_bytes())
+    del recorded["inputs"]["plan"]
+    manifest.write_bytes(json.dumps(recorded).encode())
+    with pytest.raises(RuntimeError, match="stale.*records inputs"):
+        cut_release.stage_nc_programs(tmp_path / "fewer")
+    write_manifest()
+    times.unlink()
+    with pytest.raises(RuntimeError, match="required NC output is missing"):
+        cut_release.stage_nc_programs(tmp_path / "missing")
+
+    monkeypatch.setattr(_cam_programs, "CAM_STEMS", ())
+    assert cut_release.stage_nc_programs(tmp_path / "none") == []
+    assert not (tmp_path / "none").exists()
+
+
 def _byte_record(path: Path, out: Path) -> dict:
     content = path.read_bytes()
     return {
@@ -563,6 +667,9 @@ def feature_release(
     monkeypatch.setattr(cut_release, "load_native_package", lambda: package)
     monkeypatch.setattr(cut_release, "stage_comparisons", lambda _stage: {})
     monkeypatch.setattr(cut_release, "stage_readout_procedure", lambda *_args: [])
+    # The fixture ships no traveler PDF or NC program, so it enrols none.
+    monkeypatch.setattr(cut_release, "TRAVELER_STEMS", ())
+    monkeypatch.setattr(cut_release._cam_programs, "CAM_STEMS", ())
     monkeypatch.setattr(
         cut_release, "_git_provenance",
         lambda _version: {"commit_short": "offline", "tree_clean": True},

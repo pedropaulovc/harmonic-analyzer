@@ -7,9 +7,9 @@ Machinists*
 machine that adds twenty sine waves with gears and springs, and you will be a
 better machinist than when you started.
 
-**Reader assumed at page 1:** owns or has access to a bench mill and a lathe,
-can read a drawing, has never cut a gear. Not assumed: CNC, a dividing head, a
-surface grinder, or any prior gear work.
+**Reader assumed at page 1:** owns or has access to a CNC bench mill and a
+manual lathe, can read a drawing, has never cut a gear. Not assumed: writing
+CAM programs, a dividing head, a surface grinder, or any prior gear work.
 
 **Structure principle:** *skills before parts, parts before assemblies.* Every
 skill chapter in Part III ends by cutting a real part from the machine, so the
@@ -44,7 +44,7 @@ and order, not status.
 
 | # | chapter | contains |
 |---|---|---|
-| 5 | Machines and tooling | Minimum viable shop for this project. Mill, lathe, dividing head, what size, what to skip. What the author used (PM-30MV, PM-1127VF-LB) and what else works. |
+| 5 | Machines and tooling | Minimum viable shop for this project. CNC mill, manual lathe, dividing head, what size, what to skip. What the author used (PM-30MV converted to CNC: FluidNC, CNCjs, tool setter, touch probe; PM-1127VF-LB) and what else works. The CAM toolchain (FreeCAD) and the G-code each release ships. |
 | 6 | Measuring | Micrometers, bore gauges, indicators, gauge blocks, DRO. **What each tolerance in this book actually means at the bench** and how to check it. |
 | 7 | Materials and stock | Brass, steel, cast iron; why the original used what it used; the full stock list with sizes and quantities, cut from the BOM. |
 | 8 | Workholding and fixturing | Collets, chucks, vices, mandrels, soft jaws; the fixturing problems this machine specifically creates (tiny gears, long slender shafts, thin discs). |
@@ -79,7 +79,7 @@ stock, setups, operations, inspection, and what went wrong the first time.
 | 22 | **The cone gear set** | `dt-cone-gear` ×20 (T006–T120), `dt-cone-gear-shaft`, the swing platform and its pivot, tip collar, tip block and adjuster. **The hardest chapter in the book** — the T006 gear has a 0.64 mm minimum root-to-bore web on its 1/32 in (Ø0.794 mm) bore. |
 | 23 | The cylinder gear set | `dt-cylinder-gear` ×20 with integral eccentric cam and 0.4 mm index notch; `dt-cylinder-gear-shaft`, `dt-arbor-pedestal` |
 | 24 | The alignment pinion | `dt-alignment-pinion`, `dt-pinion-arbor`, bracket, lever, cam and lift rod — the sine/cosine setup mechanism |
-| 25 | A channel, twenty times | `ch-connecting-rod`, `ch-rocker-arm` (with `ch-rocker-hub` on the built-up route), `ch-amplitude-bar`, `ch-channel-lever`, springs. Batch strategy: how to make twenty identical things by hand without drift. |
+| 25 | A channel, twenty times | `ch-connecting-rod`, `ch-rocker-arm` (with `ch-rocker-hub` on the built-up route), `ch-amplitude-bar`, `ch-channel-lever`, springs. Batch strategy: how to make twenty identical things without drift (one program for the milled parts; stops and fixtures on the lathe). |
 | 26 | The measuring stick | `ms-stick` — hand-stamped divisions, and why the original's are uneven; `ms-stop-block` + `ms-stop-plate`, the thumbscrew stop clamped at the 2.0 mark |
 | 27 | The summing lever and knife edge | `sm-summing-lever`, `sm-knife-mount`, `sm-vn-knife-hanger-stud`, `sm-vn-knife-mount-dowel`, `sm-vn-boss-hook`, `sm-vn-counter-spring`. The fabrication decision: cast, fabricate, or hog from solid. |
 | 28 | The magnifier | `mg-magnifying-lever`, `mg-magnifying-wheel` (100 mm rim, ×5 via the pressed brass `mg-wheel-drum`), `mg-wheel-axle` + `mg-wheel-axle-spacer`, bracket, clamp, vertical rod, and the purchased music wire `sh-vn-music-wire` (`LeverWire` configuration; McMaster 9666K142) |

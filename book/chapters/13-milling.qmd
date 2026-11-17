@@ -23,7 +23,7 @@ TODO
 
 TODO
 
-## Climb versus conventional on a manual machine
+## Climb versus conventional on a ball-screw CNC mill
 
 TODO
 
@@ -31,7 +31,7 @@ TODO
 
 TODO
 
-## Twenty identical profiles without a CNC: templates and stops
+## Twenty identical profiles from one program
 
 TODO
 

@@ -356,10 +356,9 @@ homing = "switches on all three axes"
 probe_pin = "gpio.5:high:pd, nothing wired (2026-11-16); gpio.5:low:pu once the touch probe is wired"
 toolsetter_pin = "gpio.21:low:pu, the tool setter"
 sender = "CNCjs 1.11.5, Manual Tool Change (Custom Probing)"
-pendant = "WHB04B via cncjs-whb04b6-el400-integration 48f0c378e44341870a60914181237382efb158b8 (its Probe-Z reads CNCjs Touch Plate Height)"
 note = "FluidNC 3.7.8 has no manual tool change of its own (atc_manual arrives in 3.8), no expressions, variables or flow control, and no canned cycles (GCode.cpp 'Not supported'); CNCjs expands M6 and FreeCAD's post translates drill cycles to G0/G1."
 cite = [
-  "Owner (Pedro) 2026-11-16, relayed by Main: FluidNC config (board, homing, probe and toolsetter pins), CNCjs 1.11.5, WHB04B pendant.",
+  "Owner (Pedro) 2026-11-16, relayed by Main: FluidNC config (board, homing, probe and toolsetter pins), CNCjs 1.11.5.",
   "FluidNC v3.7.8 source: Probe.cpp tripped() ORs the probe and toolsetter pins; MotionControl.cpp mc_probe_cycle alarms ProbeFailInitial on a tripped start; GCode.cpp G10 L20 = MPos - G92 - TLO - value, saved to NVS (Settings.cpp Coordinates::set).",
 ]
 
@@ -799,6 +798,11 @@ on_hand = false
 cite = ["OnlineMetals part 4807 https://www.onlinemetals.com/en/buy/x/pid/4807 ordered 2026-11-03"]
 
 # Oblique-trammel stock: owner-reported purchase (2026-10-23), not metrology.
+# Owner (Pedro) 2026-11-17: the jig is no longer made, so its stock, less the
+# two base-bar lengths already cut, is free for fixture plates. The allocation
+# text in the rows below records what each piece was bought for, not a
+# current claim. First reuse: fixtures.strap-sub-plate, one 13 in length of
+# the 1/2 x 6 in 1173 bar. Lengths left on hand are not measured.
 [[stock]]
 form = "flat_bar"
 material = "6061-T6511 aluminium"
@@ -1045,3 +1049,466 @@ kind = "countersink"
 present = false
 status = "not owned"
 use = "Leadscrew kit (MHA-CH-06-TL-VN-84) feed nut: the four countersinks beside the body, at the cutter size the sheet allows"
+
+# --- McMaster-Carr PO 0803PCAMPOS (owned) ------------------------------------
+
+# Every tool, gauge, cutter, insert, holder, saw and shop fluid on the owner's
+# McMaster-Carr packing list for PO 0803PCAMPOS (McMaster-Carr number
+# 1616317-01, 08/04/2025), all shipped; owner (Pedro) 2026-11-17: "add to
+# inventory ... already owned". Names, sizes and quantities are the packing
+# list's descriptions; nothing it does not state is recorded (the McMaster
+# product pages returned no product text, read 2026-11-17). Its fasteners,
+# wire, brass and 12L14 stock and brass balls are consumable stock, not
+# recorded here. Where an older record may be the same object (noted at the
+# record), neither is merged: the packing list does not say.
+
+[gauges.telescoping-gauges-starrett-s579gz]
+name = "Starrett S579Gz telescoping bore gauge set, 4 pieces"
+kind = "telescoping_gauge_set"
+make = "Starrett"
+sku = "2081A8"
+present = true
+pieces = 1
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 1: \"Starrett Telescoping Bore Gauge, 4-Piece Set, Model S579Gz\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+# Range and resolution: cad/process/shop.toml gauges.height-gauge (its 0-12 in
+# range agrees with this gauge; its .001 in resolution is not on the list).
+[gauges.height-gauge]
+name = "Dial height gauge, 0-12 in"
+kind = "height_gauge"
+sku = "19765A72"
+present = true
+pieces = 1
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 9: \"Dial Height Gauge with 0 to 12\" Measuring Range\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[gauges.lathe-alignment-bar]
+name = "Precision lathe alignment bar"
+kind = "alignment_bar"
+sku = "9244N111"
+present = true
+pieces = 1
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 51: \"Precision Lathe Alignment Bar\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+# Carbide 3-flute square end mills. The 1/8, 1/4, 3/8 and 1/2 in share their
+# keys with cad/process/shop.toml, which holds their diameters and their
+# cutting settings on 1018.
+[tools.endmill-carbide-3fl-1-8]
+name = "Uncoated carbide square 3-flute end mill, 1/8 in, 1-1/2 in OAL"
+kind = "endmill"
+sku = "88815A18"
+present = true
+pieces = 1
+flutes = 3
+oal_in = 1.5
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 10: \"Uncoated Carbide Square 3-Flute End Mill, 1/8\" Mill Diameter, 1-1/2\" Overall Length\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[tools.endmill-carbide-3fl-3-16]
+name = "Uncoated carbide square 3-flute end mill, 3/16 in, 2 in OAL"
+kind = "endmill"
+sku = "88815A23"
+present = true
+pieces = 2
+flutes = 3
+dia_in = 0.1875
+oal_in = 2.0
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 11: \"Uncoated Carbide Square 3-Flute End Mill, 3/16\" Mill Diameter, 2\" Overall Length\", 2 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[tools.endmill-carbide-3fl-1-4]
+name = "Uncoated carbide square 3-flute end mill, 1/4 in, 3 in OAL"
+kind = "endmill"
+sku = "88815A43"
+present = true
+pieces = 1
+flutes = 3
+oal_in = 3.0
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 14: \"Uncoated Carbide Square 3-Flute End Mill, 1/4\" Mill Diameter, 3\" Overall Length\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[tools.endmill-carbide-3fl-3-8]
+name = "Uncoated carbide square 3-flute end mill, 3/8 in, 4 in OAL"
+kind = "endmill"
+sku = "88815A56"
+present = true
+pieces = 1
+flutes = 3
+oal_in = 4.0
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 12: \"Uncoated Carbide Square 3-Flute End Mill, 3/8\" Mill Diameter, 4\" Overall Length\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[tools.endmill-carbide-3fl-1-2]
+name = "Uncoated carbide square 3-flute end mill, 1/2 in, 3 in OAL"
+kind = "endmill"
+sku = "88815A45"
+present = true
+pieces = 1
+flutes = 3
+oal_in = 3.0
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 13: \"Uncoated Carbide Square 3-Flute End Mill, 1/2\" Mill Diameter, 3\" Overall Length\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[tools.roughing-endmill-carbide-4fl-3-8]
+name = "Roughing carbide square end mill, TiN coated, 4-flute, 3/8 in, 1/2 in length of cut"
+kind = "roughing_endmill"
+sku = "87825A13"
+present = true
+pieces = 1
+flutes = 4
+dia_in = 0.375
+loc_in = 0.5
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 35: \"Roughing Carbide Square End Mill, TiN Coated, 4 Flute, 3/8\" Mill Diameter, 1/2\" Long Cut\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[tools.ball-endmill-carbide-2fl-1-4]
+name = "Uncoated carbide ball end mill, 2-flute, 1/4 in, 2-1/2 in OAL"
+kind = "ball_endmill"
+sku = "8878A17"
+present = true
+pieces = 1
+flutes = 2
+dia_in = 0.25
+oal_in = 2.5
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 32: \"Uncoated Carbide Ball End Mill, 2 Flute, 1/4\" Mill Diameter, 2-1/2\" Overall Length\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[tools.chamfer-mill-carbide-1-4-30]
+name = "Carbide chamfering end mill, uncoated, 2-flute, 30 deg cut, 1/4 in"
+kind = "chamfer_mill"
+sku = "3073A533"
+present = true
+pieces = 1
+flutes = 2
+dia_in = 0.25
+cut_angle_deg = 30
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 33: \"Carbide Chamfering End Mill, Uncoated, 2 Flute, 30 Degree Cut, 1/4\" Mill Diameter\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+# Possibly the same cutter as tools.chamfer-mill-330ch-1-4-90 (owner
+# inventory 2026-11-13: 1/4 in 90 deg 2-flute chamfer mill); not reconciled.
+[tools.chamfer-mill-carbide-1-4-90]
+name = "Carbide chamfering end mill, uncoated, 2-flute, 90 deg cut, 1/4 in"
+kind = "chamfer_mill"
+sku = "3073A46"
+present = true
+pieces = 1
+flutes = 2
+dia_in = 0.25
+cut_angle_deg = 90
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 52: \"Carbide Chamfering End Mill, Uncoated, 2 Flute, 90 Degree Cut, 1/4\" Mill Diameter\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+# HSS 2-flute square end mills. The 1/2 in ones have the 1 in of flute that
+# tools.endmill-half-long-flute (owner 2026-11-13) records; that record may be
+# one of them.
+[tools.endmill-hss-2fl-1-2-oal-3]
+name = "Uncoated HSS square end mill, 2-flute, 1/2 in, 1 in length of cut, 3 in OAL"
+kind = "endmill"
+sku = "3051A18"
+present = true
+pieces = 3
+flutes = 2
+dia_in = 0.5
+loc_in = 1.0
+oal_in = 3.0
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 27: \"Uncoated High-Speed Steel Square End Mill, 2 Flute, 1/2\" Mill Diameter, 1\" Long Cut, 3\" Overall Length\", 3 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[tools.endmill-hss-2fl-1-2-oal-4]
+name = "Uncoated HSS square end mill, 2-flute, 1/2 in, 1 in length of cut, 4 in OAL"
+kind = "endmill"
+sku = "3051A67"
+present = true
+pieces = 1
+flutes = 2
+dia_in = 0.5
+loc_in = 1.0
+oal_in = 4.0
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 31: \"Uncoated High-Speed Steel Square End Mill, 2 Flute, 1/2\" Mill Diameter, 1\" Long Cut, 4\" Overall Length\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[tools.endmill-hss-2fl-3-8]
+name = "Uncoated HSS square end mill, 2-flute, 3/8 in, 1-1/2 in length of cut, 3-1/4 in OAL"
+kind = "endmill"
+sku = "3051A61"
+present = true
+pieces = 1
+flutes = 2
+dia_in = 0.375
+loc_in = 1.5
+oal_in = 3.25
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 30: \"Uncoated High-Speed Steel Square End Mill, 2 Flute, 3/8\" Mill Diameter, 1-1/2\" Long Cut, 3-1/4\" Overall Length\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[tools.endmill-hss-2fl-1-4]
+name = "Uncoated HSS square end mill, 2-flute, 1/4 in, 5/8 in length of cut, 3-1/16 in OAL"
+kind = "endmill"
+sku = "3051A51"
+present = true
+pieces = 2
+flutes = 2
+dia_in = 0.25
+loc_in = 0.625
+oal_in = 3.0625
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 29: \"Uncoated High-Speed Steel Square End Mill, 2 Flute, 1/4\" Mill Diameter, 5/8\" Long Cut, 3-1/16\" Overall Length\", 2 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[tools.endmill-hss-tin-2fl-3-16]
+name = "TiN-coated HSS square end mill, 2-flute, 3/16 in, 2-5/16 in OAL"
+kind = "endmill"
+sku = "8949A16"
+present = true
+pieces = 1
+flutes = 2
+dia_in = 0.1875
+oal_in = 2.3125
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 28: \"TiN-Coated High-Speed Steel Square End Mill, 2 Flute, 3/16\" Mill Diameter, 2-5/16\" Overall Length\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[tools.centre-drills-carbide-60]
+name = "Carbide 60 deg centre drills, trade sizes 1, 3 and 6"
+kind = "centre_drill_set"
+present = true
+pieces = 3
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), lines 43-45: \"Center Drill, Carbide, 60 Degree, Trade Size 1, for 3/64\" Drill Bit\", \"... Trade Size 3, for 7/64\" Drill Bit\", \"... Trade Size 6, for 7/32\" Drill Bit\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[tools.centre-drills-carbide-60.members]
+1 = { sku = "2925A11", for_drill_in = 0.046875 }
+3 = { sku = "2925A13", for_drill_in = 0.109375 }
+6 = { sku = "2925A16", for_drill_in = 0.21875 }
+
+[tools.slitting-saw-1-032]
+name = "Smooth-finish slitting saw, 1 in diameter, .032 in thick, 3/8 in arbor hole"
+kind = "slitting_saw"
+sku = "3044A23"
+present = true
+pieces = 1
+dia_in = 1.0
+thickness_in = 0.032
+bore_in = 0.375
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 15: \"Smooth-Finish Slitting Saw, 0.032\" Thick, 1\" Diameter with 3/8\" Arbor Hole\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+# Arbor hole not on the packing list.
+[tools.slitting-saw-2-75-064]
+name = "HSS slitting saw, 2-3/4 in diameter, .064 in thick, 72 teeth"
+kind = "slitting_saw"
+sku = "3062A21"
+present = true
+pieces = 1
+dia_in = 2.75
+thickness_in = 0.064
+teeth = 72
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 16: \"High-Speed Steel Slitting Saw, 0.064\" Thick, 2-3/4\" Mill Diameter, 72 Teeth\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+# Lathe inserts, insert code CCMT-32.51, one each. No holder for them is on
+# the packing list; their fit to tools.boring-bar-s10r-sclcr3 is not asserted.
+[tools.lathe-inserts-ccmt-32-51]
+name = "CCMT-32.51 carbide lathe tool inserts, seven grades"
+kind = "lathe_insert_set"
+present = true
+pieces = 7
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), lines 2-8, 1 each (descriptions in members)", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[tools.lathe-inserts-ccmt-32-51.members]
+3867N133 = { use = "multiple materials, semi-interrupted cutting, finishing" }
+3867N136 = { use = "multiple materials, semi-interrupted cutting, medium" }
+1691N15 = { use = "economy carbide, aluminum, brass and bronze" }
+1691N16 = { use = "economy carbide, steel and stainless steel" }
+6110N142 = { use = "carbide, steel, semi-interrupted cutting, finishing" }
+3244A574 = { use = "carbide, steel, semi-interrupted cutting, medium" }
+6110N147 = { use = "carbide, steel, semi-interrupted cutting, roughing" }
+
+[tools.cutoff-blade-holder]
+name = "Blade-style holder for cutoff and grooving carbide inserts, 4-5/16 in long x 1/8 in wide"
+kind = "cutoff_holder"
+sku = "3212A119"
+present = true
+pieces = 1
+length_in = 4.3125
+width_in = 0.125
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 41: \"Blade-Style Holder, 4-5/16\" Long x 1/8\" Wide for Cutoff and Grooving Carbide Lathe Tool Insert\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[tools.cutoff-inserts]
+name = "Cutoff and grooving carbide lathe inserts, neutral, .252 in thick, uncoated C2 and C5"
+kind = "cutoff_insert_set"
+present = true
+pieces = 2
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), lines 42 and 40: \"Cutoff and Grooving Carbide Lathe Tool Insert, Neutral, 0.252\" Thick, Uncoated C2 Carbide\" and \"... Uncoated C5 Carbide\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[tools.cutoff-inserts.members]
+C2 = { sku = "3212A75" }
+C5 = { sku = "3212A76" }
+
+[tools.centre-punch-spring-impact]
+name = "Spring-impact centre punch, aluminum handle, 1/16 in point"
+kind = "centre_punch"
+sku = "34895A65"
+present = true
+pieces = 1
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 46: \"Spring-Impact Center Punch with Aluminum Handle, 1/16\" Diameter Point\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[tools.deburring-set]
+name = "7-piece deburring scraper and countersink set"
+kind = "deburring_set"
+sku = "4289A78"
+present = true
+pieces = 1
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 34: \"7 Piece Deburring Scraper and Countersink Set\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[tools.sharpening-stone-two-grit]
+name = "Aluminum oxide two-grit sharpening stone, 6 x 2 x 1 in, 100 x 320 grit"
+kind = "sharpening_stone"
+sku = "4506A2"
+present = true
+pieces = 1
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 50: \"Aluminum Oxide Two Grit Sharpening Stone, 6\" Long x 2\" Wide x 1\" Thick, 100 Grit x 320 Grit\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[tools.oil-dispenser]
+name = "Hand-held oil dispenser, 16 fl oz, flexible nozzle"
+kind = "oil_can"
+sku = "10085K36"
+present = true
+pieces = 1
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 25: \"Hand-Held Oil Dispenser, 16 FL oz Capacity with Flexible Nozzle\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[consumables.tapmatic-gold]
+name = "LPS Tapmatic #1 Gold milling, turning and sawing lubricant, 16 fl oz"
+kind = "cutting_fluid"
+make = "LPS"
+sku = "2008K13"
+present = true
+pieces = 1
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 17: \"Milling, Turning, and Sawing Lubricant, LPS Tapmatic #1 Gold, 16 FL. oz Squeeze Bottle\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[consumables.anchorlube]
+name = "Anchorlube milling, drilling and turning coolant, 16 fl oz"
+kind = "cutting_fluid"
+make = "Anchorlube"
+sku = "10705K49"
+present = true
+pieces = 1
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 26: \"Milling, Drilling, and Turning Coolant, Anchorlube, 16 FL. oz Squeeze Bottle\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[consumables.marking-fluid-blue]
+name = "Scribe-enhancing marking fluid, blue, 2 fl oz felt-tip bottle"
+kind = "layout_fluid"
+sku = "2131A74"
+present = true
+pieces = 1
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 24: \"Marking Fluid, Scribe-Enhancing, 2 FL. oz Felt-Tip Bottle, Blue\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[consumables.stone-lubricant]
+name = "Lubricant for polishing and sharpening stones, 4.5 fl oz"
+kind = "honing_oil"
+sku = "1386K41"
+present = true
+pieces = 1
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 47: \"Lubricant for Polishing and Sharpening Stones, 4.5 FL. oz. Bottle\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[consumables.sanding-roll-soft-metals-220]
+name = "Clog- and water-resistant sanding roll for aluminum, soft metals and nonmetals, 2 in wide, 220 grit"
+kind = "abrasive_roll"
+sku = "8230A32"
+present = true
+pieces = 1
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 48: \"Clog- and Water-Resistant Sanding Roll for Aluminum, Soft Metals and Nonmetals, 2\" Wide, 220 Grit\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[consumables.sanding-roll-220]
+name = "Sanding roll for smooth finish, 2 in wide, 220 grit, 30 ft"
+kind = "abrasive_roll"
+sku = "4687A223"
+present = true
+pieces = 1
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 49: \"Sanding Roll for Smooth Finish, 2\" Wide, 220 Grit, 30 Feet Long\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+# --- MHA-CH-13 rocker strap on the CNC (cad/process/ch_rocker_strap) ---------
+# Owner-chosen route (2026-11-17, relayed by Main): a shop-made sub-plate in
+# the PM vise, the blank against its fence under four low-profile edge clamps.
+# The plan's [parameters] carry the sizes prechips reads (plate_*, fence_*,
+# clamp_height_mm, hub_relief_dia_mm); they are not repeated here.
+[fixtures.strap-sub-plate]
+name = "Rocker-strap sub-plate with fence, 6061, 13 x 3 x 1/2 in"
+kind = "fixture_plate"
+present = false
+status = "not made: shop-made from owned stock"
+purchase = "Make from the owned 1/2 x 6 in 6061-T6511 flat (OnlineMetals 1173, bought for the oblique trammel jig and freed, owner 2026-11-17): saw one 13 in length and mill a 3.00 in wide strip off it (the rest, about 2.8 x 13 in, stays as fixture stock). Mill both long edges for the vise jaws; in the vise, face the top in place (the plan's Z0); a fence strip along the back edge, its front face milled in place (Y0) and its top under the strap's finished thickness; an end stop at the blank's left end, its face milled in place (X0) and its top at most .079 in (2.0 mm) above the plate top; under the hub hole, at X 6.000 from the stop face and Y 1.000 in front of the fence face, a counterbore .500 dia x .185 deep (4.7 mm) with a 5/16-18 tapped hole through its floor: the drill and reamer run into it, and for the outline it takes the hub plug (fixtures.strap-hub-plug); the fence notched down to the plate top, at least .157 in (4.0 mm) back from its face, over X .094-.843 and X 11.157-11.906 (2.4-21.4 and 283.4-302.4 mm), where the outline cutter mills away the strip of blank under the strap's tips; four Pitbull clamp slots and 4-40 holes along the front at the plan's clamp stations (fixtures.edge-clamps-low-profile)."
+use = "MHA-CH-13 Setups 2-5: seats the 1/8 x 1-1/2 in blank for facing and the hub hole (edge clamps), and for the outline (bonded with consumables.tape-3m-vhb-5906, screwed down at the hub)"
+
+# Model picked from Mitee-Bite's Pitbull table (read 2026-11-17): the 4-40 size
+# is the only one whose minimum clamped height D (.075 in) is under the
+# strap's finished .098 in; the 8-32 size needs .100 in. The clamp sits in a
+# slot milled into the plate and, on the maker's installation section, its
+# nose stands about D above the plate. That height is read off a drawing, not
+# a dimension: measure the installed clamp against the .098 in face cut before
+# the first finish pass. Knife edge because the gripped edge is waste.
+[fixtures.edge-clamps-low-profile]
+name = "Mitee-Bite Pitbull clamps 26000, tool steel knife edge, 4-40, pack of 8"
+kind = "edge_clamp"
+present = false
+status = "not owned: to buy (owner approved, 2026-11-17)"
+sku = "Mitee-Bite 26000"
+pieces = 8
+min_clamp_height_mm = 1.905
+slot_depth_mm = 3.556
+slot_width_mm = 9.525
+screw_from_work_edge_mm = 3.81
+holding_force_lbf = 650
+max_torque_ft_lb = 1.3
+purchase = "One pack of 8 (4 used, 4 spare). Price not read for 26000; the same-size blunt-edge 26010 was $83.99 at Shars, read 2026-11-17 (https://www.shars.com/mitee-bite-26010-4-40-blunt-edge-pitbull-clamp-8-pcs-set). Each clamp needs a .375 in wide x .140 in deep slot in the sub-plate and a 4-40 tapped hole .150 in from the blank's edge."
+use = "MHA-CH-13 Setups 2-4, at the plan's clamp stations: pushes the blank's edge toward the fence and down onto the plate"
+cite = ["Mitee-Bite Pitbull Clamp inch instructions 0426, table row 26000 (A .150, B .140, C .375, D* .075 minimum clamp height, 4-40 SHCS, 1.30 ft-lb, 650 lb, throw .0075, 8 per package) and its installation section: https://www.miteebite.com/wp-content/uploads/2026/04/PITBULL-INST-0426.pdf"]
+
+# Hub-hole reamer for MHA-CH-13: Ø.4000 +.0005/0 REAM THRU, a press fit on
+# MHA-CH-12. To purchase: not owned; no make, price or stock read. Cutting
+# band: ANSI B94.2 chucking-reamer diameter tolerance +.0001/+.0005 (as
+# tools.reamer-2550), so it cuts .4001-.4005, inside the bore's .4000-.4005
+# band with nothing to spare at the top: gauge the first hole before the lot.
+# Its sizing data is cad/process/shop.toml tools.reamer-4000.
+[tools.reamer-4000]
+name = ".4000 in HSS straight-flute chucking reamer"
+kind = "reamer"
+present = false
+purchase = "One .4000 in (decimal size) HSS straight-flute straight-shank chucking reamer; ANSI B94.2 cutting band .4001-.4005."
+note = "Cuts the MHA-CH-13 hub hole in 1018 after a 25/64 drill, 400 rpm, cutting oil, fed in and out. Checked with the go/no-go pair gauges.plug-gauges-4000-4005 (first hole before the lot, then every part): the pin-gauge set's .001 in steps cannot resolve the .0005 in band, and a telescoping gauge read on the micrometer repeats to about the whole band."
+
+# Hub-hole acceptance for MHA-CH-13, Ø.4000-.4005 (codjiflo PR #3049): a
+# fixed-limit pair, .4000 GO and .4005 NO-GO. Vermont Gage's standard Class X
+# pin/plug gages: .004-1.000 in by .0001 in, tolerance .000040 in up to
+# .8250 in, GO plus and NO-GO minus, so a GO that enters proves the hole at or
+# over .4000 and a NO-GO that does not proves it at or under .4005. The pair
+# gives up .00008 in (16 %) of the .0005 in band; Vermont's 10 % rule would
+# take class XX (.000020 in, a quoted custom gage). Range and tolerance:
+# cad/process/shop.toml gauges.plug-gauges-4000-4005.
+[gauges.plug-gauges-4000-4005]
+name = "Plug gauge pair, .4000 GO and .4005 NO-GO, Class X"
+kind = "plug_gauge_pair"
+make = "Vermont Gage"
+present = false
+status = "not owned: to buy"
+purchase = "Two Vermont Gage standard Class X steel pin/plug gages, .4000 in GO (plus tolerance) and .4005 in NO-GO (minus tolerance), each +/- .000040 in; no part number, price or stock read."
+use = "MHA-CH-13 Setup 4 (RS03, after the ream): the first hole gauged before the lot, then every hole; GO enters, NO-GO does not."
+cite = ["Vermont Gage, Standard Class X pin/plug gages (read 2026-11-17): range .004-1.000 in, increments .0001 in, tolerance +/- .000040 in up to .8250 in, Go: plus tolerance, NoGo: minus tolerance: https://www.vermontgage.com/gaging-products/standard-pin-gages-and-sets/class-x-standard-pin-plug-gages", "Vermont Gage, Gage Tolerance Selection (read 2026-11-17): the 10% rule, GO at the hole's minimum with the tolerance plus, NO-GO at its maximum with the tolerance minus; ASME B89.1.5 chart, .010-.825 in: XX .000020, X .000040 in: https://vermontgage.com/support/detail/gage-tolerance-selection"]
+
+# Outline hold-down for MHA-CH-13 (owner decision 2026-11-17: no tabs; tape
+# under the strap and a screw through the reamed hub hole). Sizes follow the
+# hub hole's .4000-.4005 band and the sub-plate's .500 x .185 counterbore.
+[fixtures.strap-hub-plug]
+name = "Rocker-strap hub plug and washer, shop-made"
+kind = "locating_plug"
+present = false
+status = "not made: shop-made on the lathe"
+purchase = "Turn from round bar on hand, 9/16 in or over (no stock is allocated here). Plug: body .499 dia x .177 long (4.5 mm), a slip fit in the sub-plate's counterbore as made; pilot .3990-.3995 dia standing .087 (2.2 mm) above the plate top, under the strap's .098 plus tape; bore .328 (8.3 mm) through for the screw. Washer: .547 dia (13.9 mm, no larger: the outline cutter passes .021 in from it) x .079 thick (2.0 mm), bore .328. Screw: fixtures.strap-hub-screw."
+use = "MHA-CH-13 Setup 5: the pilot locates the reamed hub hole over the counterbore; washer and screw hold the strap down at the hub while the outline is cut. Out of the plate for Setup 4, where the drill and reamer run into the counterbore."
+
+[fixtures.strap-hub-screw]
+name = "5/16-18 x 5/8 in button-head socket cap screw"
+kind = "fastener"
+present = false
+status = "not owned: to buy"
+purchase = "One (a box is the usual pack). Button head: .547 in head diameter, .166 in head height (ASME B18.3 nominal for 5/16; confirm on the screw bought). 5/8 long: through the .079 washer, the strap and tape and the .185 counterbore it reaches .26 in into the plate's .315 in of 5/16-18 thread."
+use = "MHA-CH-13 Setup 5: hub hold-down through fixtures.strap-hub-plug"
+
+# Tape for the MHA-CH-13 outline hold. Chosen because its data sheet states
+# both a normal tensile and a shear strength; the thin transfer tapes read
+# (3M 468MP, Nitto P-02) state peel and, for 468MP, lap shear only. It is a
+# permanent tape: freeing the strap and cleaning both faces is part of the
+# route (plan Setup 6).
+[consumables.tape-3m-vhb-5906]
+name = "3M VHB tape 5906, .006 in (0.15 mm), black"
+kind = "double_sided_tape"
+make = "3M"
+sku = "5906"
+present = false
+status = "not owned: to buy"
+thickness_mm = 0.15
+normal_tensile_kpa = 690
+dynamic_shear_kpa = 690
+purchase = "One roll, 1-1/2 in wide or two 3/4 in strips side by side: 12 in per strap, 20 ft for the lot of 20. No price or stock read."
+use = "MHA-CH-13 Setup 5: bonds the faced blank to the sub-plate under its whole face while the outline is cut"
+cite = ["3M VHB Tapes Technical Data, November 2015, Typical Performance Characteristics, 5906: thickness .006 in (0.15 mm); 90 degree peel 9 lb/in (16 N/cm); normal tensile (ASTM D-897, to aluminium, 72 h dwell) 100 lb/in2 (690 kPa); dynamic overlap shear (ASTM D-1002, to stainless steel, 72 h dwell) 100 lb/in2 (690 kPa); Application Techniques: clean with 50:50 isopropyl alcohol and water, about 15 psi application pressure, about 50% of ultimate bond strength after 20 minutes, 90% after 24 hours, 100% after 72 hours. Read 2026-11-17 from a distributor's copy (3M's own link refused the fetch): https://www.tspinc.com/pdf/3M-VHB-Tapes-Technical-Data.pdf"]

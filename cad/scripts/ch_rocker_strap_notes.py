@@ -18,6 +18,7 @@ __all__ = [
     "DRAWING_DIMENSIONS",
     "DRAWING_PRECISION",
     "DRAWING_PRECISION_BY_NAME",
+    "DRAWING_NOTES",
     "HOLE_CALLOUT",
     "ISOMETRIC_VIEW_NOTE",
     "STRAP_FIT_CALLOUT",
@@ -107,5 +108,10 @@ DIMENSION_CALLOUTS: dict[str, str] = {
     "HoleDia": HOLE_CALLOUT,
     "StrapThickness": STRAP_FIT_CALLOUT,
 }
+
+# The sheet prints no manufacturing note (drawing-guidelines.md rule 7: every
+# requirement here is a dimension, its band or its callout), so the feature
+# manifest's notes (export_features) are empty, as dt_cone_pivot_post_spec's.
+DRAWING_NOTES = ""
 
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"
