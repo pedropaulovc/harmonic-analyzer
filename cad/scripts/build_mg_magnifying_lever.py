@@ -187,14 +187,7 @@ def build(adapter) -> dict[str, str]:
     name_bore_axis(adapter, "Right Plane", KNIFE_LOCAL_X, "Top Plane", KNIFE_LOCAL_Y, "knife axis")
     # The rod diameter is as-bought stock: untoleranced, the sheet prints it REF.
     set_dimension_bilateral_tolerance(adapter, "RodProfile", "TipChamfer", *deviations(TIP_CHAMFER_BAND), display_unit=UNIT)
-    # The tangent hemisphere follows from the stock diameter, so its radius
-    # prints as a spherical reference, (SR.125), not a toleranced size.
-    set_dimension_prefix(adapter, "RodProfile", "DomeR", "(SR")
-    dome_display, _ = _named_dimension(adapter, "RodProfile", "DomeR")
-    dome_display = _early_bound(dome_display, "IDisplayDimension")
-    dome_display.SetText(2, ")")  # swDimensionTextSuffix; void, read back
-    if str(dome_display.GetText(2) or "") != ")":
-        raise RuntimeError("DomeR@RodProfile: reference suffix did not persist")
+    set_dimension_prefix(adapter, "RodProfile", "DomeR", "SR")
     # The hidden native distance owns the footer ceiling without changing the
     # nominal profile. The joint separately charges the ordinary angle band.
     _, chamfer_dimension = _named_dimension(adapter, "RodProfile", "TipChamfer")
