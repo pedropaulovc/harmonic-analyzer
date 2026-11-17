@@ -91,12 +91,15 @@ ISO_NOTE_XY = (0.3245, 0.180)
 _LEFT_X = FRONT_CENTER[0] - GUIDE_LENGTH / 2000.0
 FRONT_KEEP = {
     "Length": (FRONT_CENTER[0], 0.080),
-    # The value and its two-line reason (~17.5 mm) are taller than the .624
-    # height (15.9 mm): between the extension lines the lower one struck the
-    # last line (r5), so the text stands below the rail's bottom extension
-    # line, the dimension line carried down to it, right of the length's
-    # extension line and left of the right view.
-    "Height": (0.354, 0.099),
+    # The value and its two-line reason (~15 mm with the shelf) hang right of
+    # the dimension line, its left end on the given x, the block centred on
+    # the given y with the shelf 8.4 mm under it.  Between the extension
+    # lines the lower one struck the last line (r5); below the rail the line
+    # ran down beside every row to the shelf and touched the flush widest one
+    # (R5 full build).  So the text stands above the rail's top extension
+    # line (~0.128), the line carried up only to its shelf (~0.131), the
+    # rows x ~0.337..0.380: right of the rail and left of the right view.
+    "Height": (0.337, 0.139),
     # The lock taps' stations stack under the view, the row left of it.
     "LockTap1X": (_LEFT_X + LOCK_TAP_X[0] / 2000.0, 0.104),
     "LockTap2X": (_LEFT_X + LOCK_TAP_X[1] / 2000.0, 0.098),
@@ -107,8 +110,10 @@ FRONT_KEEP = {
 # The depth's limits and clearance text are wider than the 10 mm right view:
 # centred over it (r3, r4) both extension lines ran up into CLEAR MHA-PD-19,
 # so the text stands left of the left extension line, the dimension line
-# carried out, clear right of the top view and above the height's arrow.
-RIGHT_KEEP = {"Depth": (0.358, 0.153)}
+# carried out, clear right of the top view and over the height's text (its
+# shelf ~0.151, 5 mm over the height's top row, the block under the
+# isometric's caption).
+RIGHT_KEEP = {"Depth": (0.358, 0.161)}
 # The height's .XXX band is half of the counterbore floor's band, which the
 # rack screws' worst engagement pays (pd_feed_rack_spec.SCREW_FLOOR_BAND); the
 # band names its mate by number (rule 4, r4), two lines that fit between the

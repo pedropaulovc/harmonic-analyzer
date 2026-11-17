@@ -146,29 +146,35 @@ def test_right_view_dimensions_stand_clear_of_the_front_view() -> None:
     # The front view's right end, where the length's extension line drops.
     rail_end = drawing._LEFT_X + spec.GUIDE_LENGTH / 1000.0
     right_left = drawing.RIGHT_CENTER[0] - spec.GUIDE_DEPTH / 2000.0
-    # ~2.8 mm per character at the sheet's text height (r3 render).
-    half_text = 0.0028 * max(
+    # ~2.85 mm per character at the sheet's text height (r3, R5 renders).
+    height_width = 0.00285 * max(
         len(line) for line in drawing.HEIGHT_CALLOUT.splitlines()
-    ) / 2.0
+    )
+    # The text hangs right of the dimension line, its left end on the x.
     height_x = drawing.FRONT_KEEP["Height"][0]
-    assert rail_end < height_x - half_text
-    assert height_x + half_text < right_left
-    # Value plus reason (~5.9 mm a line) is taller than the rail, so the text
-    # stands wholly below its bottom extension line (r5).
+    assert rail_end < height_x
+    assert height_x + height_width < right_left
+    # Value plus reason (~5.6 mm a line) is taller than the rail, so the text
+    # stands wholly above its top extension line (r5: between them the lower
+    # one struck it; R5: below the rail the line ran beside the rows to the
+    # shelf 8.4 mm under the given y and touched the widest).
     height_y = drawing.FRONT_KEEP["Height"][1]
-    half_block = 0.0059 * (1 + len(drawing.HEIGHT_CALLOUT.splitlines())) / 2.0
-    assert spec.GUIDE_HEIGHT / 1000.0 < 2.0 * half_block
-    assert height_y + half_block < drawing.FRONT_CENTER[1] - spec.GUIDE_HEIGHT / 2000.0
+    rows = 1 + len(drawing.HEIGHT_CALLOUT.splitlines())
+    assert spec.GUIDE_HEIGHT / 1000.0 < 0.0056 * rows
+    height_shelf = height_y - 0.0084
+    height_top = height_shelf + 0.0056 * rows
+    assert height_shelf > drawing.FRONT_CENTER[1] + spec.GUIDE_HEIGHT / 2000.0
     # The depth's text is wider than the right view, so it stands left of the
     # view's left extension line, right of the top view's end, above the
-    # front view's top (r4: centred, both extension lines struck it).
+    # height's text (r4: centred, both extension lines struck it).
     depth_x, depth_y = drawing.RIGHT_KEEP["Depth"]
     half_depth = (
         0.0028 * max(len(line) for line in spec.GUIDE_DEPTH_CALLOUT.splitlines()) / 2.0
     )
     assert rail_end < depth_x - half_depth
     assert depth_x + half_depth < right_left
-    assert depth_y > drawing.FRONT_CENTER[1] + spec.GUIDE_HEIGHT / 1000.0
+    # Its shelf stands ~10.2 mm under its given y, clear over the height's top.
+    assert depth_y - 0.0102 > height_top + 0.003
 
 
 def test_the_height_band_names_its_screw_by_number() -> None:
