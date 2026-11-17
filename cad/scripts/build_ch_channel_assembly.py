@@ -995,6 +995,8 @@ def _author_settings_reference(adapter) -> None:
         ("ChRockerSpringSet", spec.PIVOT_CHAIN_Z[1] - spec.PIVOT_CHAIN_Z[0]),
         ("ChSouthWasherThickness", washer_t),
         ("ChRockerStackLength", spec.PIVOT_CHAIN_Z[3] - spec.PIVOT_CHAIN_Z[2]),
+        ("ChNorthHubToEarOuter", spec.PIVOT_CHAIN_Z[4] - spec.PIVOT_CHAIN_Z[3]),
+        ("ChPivotTipProud", spec.PIVOT_CHAIN_Z[5] - spec.PIVOT_CHAIN_Z[4]),
         ("ChSouthLugInnerX", lug_xs[0]),
         ("ChFulcrumAxisY", spec.FULCRUM_Y),
         ("ChKeeperLugSpan", spec.LUG_INNER_FACE_Z[1] - spec.LUG_INNER_FACE_Z[0]),
@@ -1029,6 +1031,8 @@ def _author_settings_reference(adapter) -> None:
             (spec.SPRING_SET_DIMENSION, '"ChRockerSpringSet"'),
             ("SouthWasherThickness", '"ChSouthWasherThickness"'),
             (spec.STACK_LENGTH_DIMENSION, '"ChRockerStackLength"'),
+            ("NorthHubToEarOuter", '"ChNorthHubToEarOuter"'),
+            (spec.TIP_PROUD_DIMENSION, '"ChPivotTipProud"'),
         ),
         strict=True,
     ):

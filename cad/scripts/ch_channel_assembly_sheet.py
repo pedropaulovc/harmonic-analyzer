@@ -23,6 +23,7 @@ from ch_channel_assembly_spec import (
     LUG_SPAN_DIMENSION,
     SPRING_SET_DIMENSION,
     STACK_LENGTH_DIMENSION,
+    TIP_PROUD_DIMENSION,
 )
 from ch_channel_explode_spec import (
     BANK_SPRING,
@@ -61,6 +62,10 @@ DIMENSION_CALLOUTS = {
     # its rod's cam plane and under its bar's foot notch (test_channel_axial_
     # budget); r10 machinist review: name what the tight band sets (rule 4).
     STACK_LENGTH_DIMENSION: "HUB STACK, HUBS IN CONTACT: SETS ARM PITCH",
+    # View D's left tip off the left ear's outer face (the shaft-set step,
+    # caliper depth rod); R5 machinist review, rule 22: the setting prints on
+    # the view, not in the step.
+    TIP_PROUD_DIMENSION: "TIP PROUD",
     LUG_SPAN_DIMENSION: "LUG SPAN",
     # View F: what each fit-up band sets. Both Z settings run to a lug inner
     # face; the view's own projection shows which.

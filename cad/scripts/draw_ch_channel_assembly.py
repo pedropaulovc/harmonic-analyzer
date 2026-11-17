@@ -8,25 +8,27 @@ r"""Create the MHA-CH-00 channel assembly fitter package (six sheets).
    numbers, vendor SKUs and ch_channel_assembly_sheet's descriptions, and one
    balloon per BOM row.
 3. ROCKER BANK FIT-UP: view D, the bank isolated at 1:1 with the stack
-   length, and the first rocker-bank steps. The right bracket is set off a
-   wave disc spring that preloads the bank left, and the plain pivot shaft is
-   held by a set screw in each ear (#948 ruling R, PR #1292; user,
-   2026-10-10).
+   length and the shaft's tip set, and the first rocker-bank steps. The
+   right bracket is set off a wave disc spring that preloads the bank left,
+   and the plain pivot shaft is held by a set screw in each ear (#948
+   ruling R, PR #1292; user, 2026-10-10).
 4. ROCKER BANK FIT-UP (CONT.): detail A, the cropped 4:1 right end with the
    spring set, and the rest of the rocker-bank steps.
 5. LEVER BANK FIT-UP: view E, the keepers, fulcrum shaft and levers isolated
    at 1:1 with the keeper lug span, view F, the 1:2 keeper plan with the
    keepers' three settings off the top frame's datums, and the first
    lever-bank steps.
-6. LEVER BANK FIT-UP (CONT.): view G, the spring hook-up at 1:2, and the rest
-   of the lever-bank steps.
+6. LEVER BANK FIT-UP (CONT.): view G, the spring hook-up at 1:2, the rest
+   of the lever-bank steps and the setting table of the lever bank's feeler
+   acceptances.
 
 Ends and sides are named as the right side views (D, E) draw them: left and
 right, never a compass (drawing-guidelines.md rule 26). Steps name parts by
 BOM item (rule 22). The settings are the assembly's own model dimensions (the
 hidden rocker-bank, lever-bank and keeper-plan settings sketches,
-build_ch_channel_assembly), not numbers in note text; the steps are numbered
-by ``ch_channel_assembly_steps``.
+build_ch_channel_assembly), not numbers in note text; the feeler-leaf
+acceptances, which no model dimension carries, are setting-table rows the
+steps cite. The steps are numbered by ``ch_channel_assembly_steps``.
 """
 
 from __future__ import annotations
@@ -98,6 +100,7 @@ from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
 from _session import run_build
 from _simplified_names import simplified_name
+from _general_table import TABLE_TITLE_DROP, insert_general_table, table_column_widths
 import _telemetry
 from _printed_tolerance import printed_deviations
 from _title_block_units import LENGTH_UNITS, render_number
@@ -134,7 +137,6 @@ from ch_pivot_bracket_spec import (
     FOOT_W as BRACKET_FOOT_W,
 )
 from ch_pivot_shaft_spec import (
-    DOME_HEIGHT,
     FLAT_DEPTH as PIVOT_FLAT_DEPTH,
     SHAFT_DIA as PIVOT_SHAFT_DIA,
 )
@@ -148,7 +150,6 @@ from rocker_bank_layout import (
     PIVOT_BRACKET_Z,
     PIVOT_SHAFT_FLAT_STATIONS,
     ROCKER_SPRING_SET_BAND,
-    SHAFT_TIP_SET_BAND,
     STACK_L20_ACCEPT,
     STACK_MID_Z,
 )
@@ -899,6 +900,15 @@ _LUG_MID = sum(asm.LUG_INNER_FACE_Z) / 2.0
 STACK_KEEP = {
     asm.STACK_LENGTH_DIMENSION: ROCKER_BANK.sheet_xy(_STACK_MID, _PIVOT_Y + 40.0)
 }
+# The left tip's set proud of the left ear's outer face (R5 machinist review,
+# rule 22: printed in the shaft-set step only). Its two extension lines stand
+# 1.5 mm apart left of the stack's, so its text rides above the stack
+# callout, 5 mm right of the tip so the callout clears the left border.
+_TIP_MID = (asm.PIVOT_CHAIN_Z[4] + asm.PIVOT_CHAIN_Z[5]) / 2.0
+TIP_KEEP = {
+    asm.TIP_PROUD_DIMENSION: ROCKER_BANK.sheet_xy(_TIP_MID - 5.0, _PIVOT_Y + 62.0)
+}
+ROCKER_KEEP = {**STACK_KEEP, **TIP_KEEP}
 # Above the 8 mm crop circle: at +6 the circle's arc crossed the callout
 # text (r7 layout audit, text-on-line). South of the ear-side extension line,
 # not between the two: centred on the 0.60 gap the text sat on its own
@@ -1027,8 +1037,8 @@ _RIGHT_FOOT = _TEMPLATE.title_block_top_m + STEPS_FOOT_CLEARANCE
 _BORDER_FOOT = BORDER + STEPS_FOOT_CLEARANCE
 # Sheet 3: right of view D. Sheet 4: the full-height left column, detail A
 # right of it. Sheet 5: right of views E and F. Sheet 6: the full-height left
-# column, then under view G's label on the right (round 1 review: balanced
-# sheets, no lone step in an empty half).
+# column, then the setting table under view G's label on the right (round 1
+# review: balanced sheets, no lone step in an empty half).
 _HOOKUP_LABEL_FOOT = (
     HOOKUP_BOTTOM_Y - 0.004 - len(HOOKUP.label_text.splitlines()) * NOTE_LINE_PITCH
 )
@@ -1039,13 +1049,12 @@ ROCKER_COLUMNS = (
 LEVER_COLUMNS = (
     StepColumn(SHEET_NAMES[4], (STEPS_RIGHT_X, STEPS_TOP_Y), _RIGHT_FOOT),
     StepColumn(SHEET_NAMES[5], (STEPS_LEFT_X, STEPS_TOP_Y), _BORDER_FOOT),
-    StepColumn(SHEET_NAMES[5], (STEPS_RIGHT_X, _HOOKUP_LABEL_FOOT - 0.008), _RIGHT_FOOT),
 )
 
 
 # A reference word and its number or letter (ITEM 10, STEP 5, VIEW D) print
 # on one line: wrapped with a placeholder space textwrap never breaks at.
-_REFERENCE_SPACE = re.compile(r"\b(ITEM|STEP|SHEET|VIEW|DETAIL) (?=\w)")
+_REFERENCE_SPACE = re.compile(r"\b(ITEM|STEP|SHEET|VIEW|DETAIL|ROW) (?=\w)")
 _UNBROKEN_SPACE = "\x00"
 
 
@@ -1093,11 +1102,104 @@ def flow_steps(
     return tuple(blocks)
 
 
-# The pivot shaft's tip setting prints .XXX (.050 TO .070).
-TIP_SET_PLACES = 3
-# The lever bank's end-play leaf prints .XXX, the .001 grid a feeler set is
-# sold in.
+# A feeler leaf prints .XXX, the .001 grid a feeler set is sold in.
 FEELER_LEAF_PLACES = 3
+
+
+def _inch(mm: float) -> str:
+    return render_number(mm / LENGTH_UNITS[asm.UNIT], asm.UNIT, FEELER_LEAF_PLACES)
+
+
+# The lever bank is never fitted like the rocker stack: the bars on the arms
+# locate it, and twenty hubs at the top of their band still leave end play
+# between the lugs at the extremes of both inner-face bands (#1660 r2). The
+# lever-bank-slides check gauges that play on a feeler leaf: the worst case
+# rounded down to .01 in, so a bank inside its bands always passes (moved here
+# from the MHA-CH-02 hub callout, FoChFab2 round 1).
+_LEVER_STACK_MAX = COUNT * (LEVER_HUB_LENGTH + LEVER_HUB_LENGTH_BAND[0])
+_LUG_SPAN_MIN = KEEPER_INNER_FACE_SPAN_MM - 2.0 * KEEPER_FITUP_LOCATION_BAND_MM
+_END_PLAY_MIN_IN = (_LUG_SPAN_MIN - _LEVER_STACK_MAX) / LENGTH_UNITS[asm.UNIT]
+END_PLAY_LEAF_MM = math.floor(_END_PLAY_MIN_IN * 100.0) / 100.0 * LENGTH_UNITS[asm.UNIT]
+if END_PLAY_LEAF_MM <= 0.0:
+    raise AssertionError(
+        "the lever bank must slide between the lugs, but the longest hubs "
+        "leave no gaugeable play in the shortest lug span"
+    )
+
+# --- sheet 6: the setting table ------------------------------------------------
+# R5 machinist review (rule 22): the lever bank's three feeler acceptances
+# printed only in their steps. None is one model dimension (a leaf that must
+# not enter under a bar on the plate, a leaf that must pass between bars, a
+# leaf the pushed-together levers must leave room for at the other lug), so
+# each is a row of a native general table (draw_dt_drive_train_assembly's
+# SETTING TABLE columns) the steps cite by row; every cell is built from the
+# spec (#2341 bow and bar-gap budget, the end-play worst case above). The
+# table sits under view G's label, right of the full-height step column.
+SETTING_TABLE_SHEET = SHEET_NAMES[5]
+# #2341: each bar's bow is accepted at the surface plate before it is pinned
+# (no leaf of the allowed bow enters under either side face); the bank is
+# then accepted on the bars' least running gap, at the worst case of every
+# band with each bar at that bow, floored to .001 (the assembly spec's
+# bar-gap budget): a bank inside its bands always passes.
+SETTING_TABLE_TITLE = "SETTING TABLE"
+SETTING_TABLE_HEADER = (
+    "ROW",
+    "STEP",
+    "SETTING",
+    "MEASURE FIRST",
+    "SET TO / ACCEPT",
+    "CHECK WITH",
+)
+_FEELER = "FEELER LEAF"
+_SETTINGS = (
+    # (step key, setting, accept)
+    (
+        "bars-straight",
+        f"{item(explode.BAR)} BAR BOW",
+        f"{_inch(asm.BAR_BOW_MAX_MM)} MAX",
+    ),
+    (
+        "bars-gapped",
+        f"{item(explode.BAR)} BAR GAP",
+        f"{_inch(asm.BAR_GAP['leaf'])} MIN",
+    ),
+    ("lever-bank-slides", "LEVER END PLAY", f"{_inch(END_PLAY_LEAF_MM)} MIN"),
+)
+SETTING_TABLE_ROWS = tuple(
+    (str(row), str(steps.step_number(key)), setting, "-", accept, _FEELER)
+    for row, (key, setting, accept) in enumerate(_SETTINGS, start=1)
+)
+SETTING_ROW = {
+    key: row for row, (key, _setting, _accept) in enumerate(_SETTINGS, start=1)
+}
+SETTING_TABLE_XY = (0.205, _HOOKUP_LABEL_FOOT - 0.008)  # the title's top left
+SETTING_TABLE_ROW_HEIGHT = 0.0055  # a general table row at the note font
+
+
+def setting_table_box() -> tuple[float, float, float, float]:
+    """The setting table's planned box (x0, y0, x1, y1) under its title."""
+    x, top = SETTING_TABLE_XY
+    top -= TABLE_TITLE_DROP
+    width = sum(table_column_widths(SETTING_TABLE_HEADER, SETTING_TABLE_ROWS))
+    height = (len(SETTING_TABLE_ROWS) + 1) * SETTING_TABLE_ROW_HEIGHT
+    return (x, top - height, x + width, top)
+
+
+_planned = setting_table_box()
+if _planned[0] < STEPS_LEFT_X + STEPS_LINE_WIDTH * NOTE_CHAR_WIDTH:
+    raise AssertionError("the setting table runs into the left step column")
+if _planned[2] > _TEMPLATE.width_m - BORDER - 0.003:
+    raise AssertionError("the setting table runs past the right border")
+if _planned[1] < _TEMPLATE.title_block_top_m + 0.003:
+    raise AssertionError("the setting table runs into the title block")
+
+
+def setting_row(key: str) -> str:
+    """How a step cites its setting table row."""
+    sheet = SHEET_NAMES.index(SETTING_TABLE_SHEET) + 1
+    return f"SETTING TABLE ROW {SETTING_ROW[key]} (SHEET {sheet})"
+
+
 # The right bracket is set by DRO off a test-indicator zero on its own foot
 # end, taken with its ear on the right washer before the wave spring goes on
 # (#2337: the spring covers all but .004 of the washer face, so no feeler leaf
@@ -1164,18 +1266,6 @@ def _fitup_text() -> dict[str, str]:
             "the re-face step covers only a long stack, but twenty hubs at "
             "their printed low limit fall under the stack's printed low limit"
         )
-    # The pivot shaft comes finished, domed both ends to its overall length
-    # (ch_pivot_shaft_spec): its left tip set DOME_HEIGHT proud of the left
-    # ear, within SHAFT_TIP_SET_BAND, puts both flats under their screws
-    # (rocker_bank_layout checks the worst case).
-    tip_low, tip_high = (
-        render_number(
-            (DOME_HEIGHT + sign * SHAFT_TIP_SET_BAND) / LENGTH_UNITS[asm.UNIT],
-            asm.UNIT,
-            TIP_SET_PLACES,
-        )
-        for sign in (-1.0, 1.0)
-    )
     # Each keeper lug is set off the top-frame rail web under it (its column's
     # socket axis) in X and off the frame's hole-station origin line, the
     # upper socket centres, in Z (Main's ruling): the lug centre on the
@@ -1189,33 +1279,6 @@ def _fitup_text() -> dict[str, str]:
     # lug span.
     if abs(rear_face - front_face - KEEPER_INNER_FACE_SPAN_MM) > 1e-9:
         raise AssertionError("the view E lug span is not the fit-up span")
-    # The lever bank is never fitted like the rocker stack: the bars on the
-    # arms locate it, and twenty hubs at the top of their band still leave end
-    # play between the lugs at the extremes of both inner-face bands (#1660
-    # r2). The lever-bank-slides check gauges that play on a feeler leaf: the
-    # worst case rounded down to .01, so a bank inside its bands always passes
-    # (moved here from the MHA-CH-02 hub callout, FoChFab2 round 1).
-    lever_stack_max = COUNT * (LEVER_HUB_LENGTH + LEVER_HUB_LENGTH_BAND[0])
-    lug_span_min = KEEPER_INNER_FACE_SPAN_MM - 2.0 * KEEPER_FITUP_LOCATION_BAND_MM
-    play_min = (lug_span_min - lever_stack_max) / LENGTH_UNITS[asm.UNIT]
-    end_play_leaf = math.floor(play_min * 100.0) / 100.0
-    if end_play_leaf <= 0.0:
-        raise AssertionError(
-            "the lever bank must slide between the lugs, but the longest hubs "
-            "leave no gaugeable play in the shortest lug span"
-        )
-    end_play_text = render_number(end_play_leaf, asm.UNIT, FEELER_LEAF_PLACES)
-    # #2341: each bar's bow is accepted at the surface plate before it is
-    # pinned (no leaf of the allowed bow enters under either side face); the
-    # bank is then accepted on the bars' least running gap, at the worst case
-    # of every band with each bar at that bow, floored to .001 (the assembly
-    # spec's bar-gap budget): a bank inside its bands always passes.
-    bow_text = render_number(
-        asm.BAR_BOW_MAX_MM / LENGTH_UNITS[asm.UNIT], asm.UNIT, FEELER_LEAF_PLACES
-    )
-    bar_gap_text = render_number(
-        asm.BAR_GAP["leaf"] / LENGTH_UNITS[asm.UNIT], asm.UNIT, FEELER_LEAF_PLACES
-    )
     return {
         # The hub stack is proved on the shaft first, while the arms are
         # loose; each rod + arm pair is then pinned at the bench, before the
@@ -1343,8 +1406,8 @@ def _fitup_text() -> dict[str, str]:
         "south-bracket-unclamped": "REMOVE THE CLAMP.",
         "south-bracket-held": f"CHECK THE RIGHT {bracket} DOES NOT TURN BY HAND.",
         "shaft-set": (
-            f"SLIDE {shaft} UNTIL ITS LEFT TIP STANDS {tip_low} TO {tip_high} "
-            "PROUD OF THE LEFT EAR'S OUTER FACE (CALIPER DEPTH ROD)."
+            f"SLIDE {shaft} UNTIL ITS LEFT TIP MEETS THE {rocker_view} TIP PROUD "
+            "DIMENSION (CALIPER DEPTH ROD)."
         ),
         # drawing-guidelines.md rule 23: staked like the keeper set screws
         # (fulcrum-set-screws-staked). The Loctite waiver was retired on
@@ -1387,7 +1450,8 @@ def _fitup_text() -> dict[str, str]:
         ),
         "bars-straight": (
             f"LAY EACH {bar} BAR ON THE SURFACE PLATE ON EACH SIDE FACE IN TURN: "
-            f"A {bow_text} FEELER GAUGE LEAF MUST NOT ENTER UNDER IT."
+            f"THE FEELER LEAF OF {setting_row('bars-straight')} MUST NOT ENTER "
+            "UNDER IT."
         ),
         "bar-straightened": (
             f"STRAIGHTEN BY HAND, OR EXCHANGE, ANY {bar} BAR THE LEAF ENTERED AND "
@@ -1424,14 +1488,14 @@ def _fitup_text() -> dict[str, str]:
             "BELOW IT."
         ),
         "bars-gapped": (
-            f"CHECK A {bar_gap_text} FEELER GAUGE LEAF PASSES BETWEEN EVERY "
-            f"ADJACENT PAIR OF {bar} BARS, TOP TO BOTTOM."
+            f"CHECK THE FEELER LEAF OF {setting_row('bars-gapped')} PASSES "
+            f"BETWEEN EVERY ADJACENT PAIR OF {bar} BARS, TOP TO BOTTOM."
         ),
         "levers-swing": f"CHECK EVERY {lever} SWINGS FREE ON {fulcrum_shaft}.",
         "lever-bank-slides": (
             f"CHECK THE LEVERS SLIDE TOGETHER ALONG {fulcrum_shaft}: PUSHED "
-            f"AGAINST ONE {keeper} LUG, THEY LEAVE ROOM FOR A {end_play_text} "
-            "FEELER GAUGE LEAF AT THE OTHER."
+            f"AGAINST ONE {keeper} LUG, THEY LEAVE ROOM FOR THE FEELER LEAF OF "
+            f"{setting_row('lever-bank-slides')} AT THE OTHER."
         ),
         "fulcrum-flats-aligned": (
             f"SLIDE {fulcrum_shaft} UNTIL EACH OF ITS FLATS LIES UP, UNDER THE "
@@ -2418,7 +2482,7 @@ def _place_fitup_sheets(adapter: Any) -> Callable[[], None]:
     steps."""
     _activate_sheet(adapter, SHEET_NAMES[2])
     annotations = _dimensioned_bank(
-        adapter, ROCKER_BANK, STACK_KEEP, detail=SOUTH_END, pointers=ROCKER_POINTERS
+        adapter, ROCKER_BANK, ROCKER_KEEP, detail=SOUTH_END, pointers=ROCKER_POINTERS
     )
     _place_steps(adapter, SHEET_NAMES[2])
 
@@ -2459,8 +2523,8 @@ def _place_fitup_sheets(adapter: Any) -> Callable[[], None]:
 
 
 def _place_hookup_sheet(adapter: Any) -> None:
-    """Sheet 6: view G, the spring hook-up, and the rest of the lever-bank
-    steps."""
+    """Sheet 6: view G, the spring hook-up, the rest of the lever-bank steps
+    and the setting table under view G's label."""
     _activate_sheet(adapter, SHEET_NAMES[5])
     view = _placed_bank_view(adapter, HOOKUP)
     _assert_view_on_sheet(view, label=HOOKUP.title)
@@ -2479,6 +2543,27 @@ def _place_hookup_sheet(adapter: Any) -> None:
     if add_note(adapter, HOOKUP.label_text, *label_xy) is None:
         raise RuntimeError(f"failed to label {HOOKUP.title}")
     _place_steps(adapter, SHEET_NAMES[5])
+    label_foot = label_xy[1] - len(HOOKUP.label_text.splitlines()) * NOTE_LINE_PITCH
+    if SETTING_TABLE_XY[1] > label_foot - 0.002:
+        raise RuntimeError(
+            f"the setting table's title ({SETTING_TABLE_XY!r}) runs into the "
+            f"{HOOKUP.title} label (foot {label_foot:.4f})"
+        )
+    _activate_sheet(adapter, SETTING_TABLE_SHEET)
+    box = insert_general_table(
+        adapter,
+        title=SETTING_TABLE_TITLE,
+        header=SETTING_TABLE_HEADER,
+        rows=SETTING_TABLE_ROWS,
+        top_left=SETTING_TABLE_XY,
+        label="setting table",
+    )
+    if (
+        box[0] < left_column_right
+        or box[2] > _TEMPLATE.width_m - BORDER - 0.003
+        or box[1] < _TEMPLATE.title_block_top_m + 0.003
+    ):
+        raise RuntimeError(f"the setting table {box!r} leaves its field on sheet 6")
 
 
 def _break_line_at_text(display: Any, *, label: str) -> None:

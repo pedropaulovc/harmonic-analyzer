@@ -460,7 +460,7 @@ def test_each_step_column_fits_its_field() -> None:
     assert y1 < template.height_m - drawing.BORDER
     assert y0 == pytest.approx(drawing.HOOKUP_BOTTOM_Y)
     label_lines = len(hookup.label_text.splitlines())
-    assert y0 - 0.004 - label_lines * NOTE_LINE_PITCH > drawing.LEVER_COLUMNS[-1].xy[1]
+    assert y0 - 0.004 - label_lines * NOTE_LINE_PITCH > drawing.SETTING_TABLE_XY[1]
 
 
 def test_a_column_never_splits_a_step_and_overflow_is_refused() -> None:
@@ -496,17 +496,19 @@ def test_the_package_sheets_and_settings_contract() -> None:
     explode = drawing.explode
     kept = {
         **drawing.STACK_KEEP,
+        **drawing.TIP_KEEP,
         **drawing.SPRING_KEEP,
         **drawing.LUG_KEEP,
         **drawing.PLAN_KEEP,
     }
+    assert drawing.ROCKER_KEEP == {**drawing.STACK_KEEP, **drawing.TIP_KEEP}
     assert sorted(kept) == sorted(asm.DIMENSION_FEATURE)
     # Each bank view shows only its own axis's sketch.
     assert {asm.DIMENSION_FEATURE[name] for name in drawing.LUG_KEEP} == {
         asm.FULCRUM_FEATURE
     }
     assert {
-        asm.DIMENSION_FEATURE[name] for name in (*drawing.STACK_KEEP, *drawing.SPRING_KEEP)
+        asm.DIMENSION_FEATURE[name] for name in (*drawing.ROCKER_KEEP, *drawing.SPRING_KEEP)
     } == {asm.PIVOT_FEATURE}
     assert {asm.DIMENSION_FEATURE[name] for name in drawing.PLAN_KEEP} == {
         asm.KEEPER_PLAN_FEATURE
@@ -1145,7 +1147,26 @@ def test_the_finished_shaft_is_set_by_its_tip_before_the_screws() -> None:
         for sign in (-1.0, 1.0)
     )
     assert (low, high) == (".050", ".070")
-    assert f"{low} TO {high}" in _step_body(key)
+    # R5 machinist review (rule 22): the band prints on view D's native tip
+    # dimension, the dome's height off the left (north) ear's outer face; the
+    # step names the view and carries no number.
+    asm = drawing.asm
+    nominal = asm.PIVOT_CHAIN_Z[5] - asm.PIVOT_CHAIN_Z[4]
+    assert nominal == pytest.approx(shaft.DOME_HEIGHT)
+    assert asm.PIVOT_CHAIN_Z[4] == pytest.approx(bank.NORTH_EAR_OUTER_Z)
+    lower, upper = asm.DIMENSION_TOLERANCES[asm.TIP_PROUD_DIMENSION]
+    assert (lower, upper) == (-bank.SHAFT_TIP_SET_BAND, bank.SHAFT_TIP_SET_BAND)
+    assert asm.TOLERANCE_PRECISION[asm.TIP_PROUD_DIMENSION] == 3
+    body = _step_body(key)
+    assert f"{drawing.ROCKER_BANK.title} TIP PROUD DIMENSION" in body
+    assert drawing.notes.DIMENSION_CALLOUTS[asm.TIP_PROUD_DIMENSION] == "TIP PROUD"
+    assert low not in body and high not in body
+    # The callout clears the left border and stands above the stack's.
+    ((x, y),) = drawing.TIP_KEEP.values()
+    half = len("TIP PROUD") * NOTE_CHAR_WIDTH / 2.0
+    assert x - half > drawing.BORDER + 0.003
+    ((_, stack_y),) = drawing.STACK_KEEP.values()
+    assert y > stack_y + 3 * NOTE_LINE_PITCH
     # Positive control: no other step sets the tip.
     for other in steps.SEQUENCE:
         if other != key:
@@ -1245,8 +1266,10 @@ def test_a_feeler_leaf_passes_between_every_pair_of_bars() -> None:
     assert pin.RUNNING_FLOOR <= leaf <= least
     assert leaf == pytest.approx(0.005 * 25.4)
     body = _step_body("bars-gapped")
-    assert "A .005 FEELER GAUGE LEAF" in body
+    assert f"THE FEELER LEAF OF {drawing.setting_row('bars-gapped')} PASSES" in body
     assert "EVERY ADJACENT PAIR" in body and "TOP TO BOTTOM" in body
+    assert ".005" not in body
+    assert _setting_table_row("bars-gapped")[4:] == (".005 MIN", "FEELER LEAF")
 
 
 def test_each_bar_is_proved_straight_before_it_is_pinned() -> None:
@@ -1263,10 +1286,61 @@ def test_each_bar_is_proved_straight_before_it_is_pinned() -> None:
     assert asm.BAR_GAP["mid_span_bowed"] >= asm._BAR_RUNNING_FLOOR
     body = _step_body("bars-straight")
     assert "SURFACE PLATE ON EACH SIDE FACE" in body
-    assert "A .005 FEELER GAUGE LEAF MUST NOT ENTER" in body
+    assert f"THE FEELER LEAF OF {drawing.setting_row('bars-straight')} MUST NOT" in body
+    assert _setting_table_row("bars-straight")[4:] == (".005 MAX", "FEELER LEAF")
     # Rule 22: the remedy is its own step and loops back to the check.
     assert "STRAIGHTEN" not in body
     assert steps.step_number("bar-straightened") == straight + 1
     remedy = _step_body("bar-straightened")
     assert "STRAIGHTEN BY HAND, OR EXCHANGE" in remedy
     assert f"RETURN TO STEP {straight}." in remedy
+
+
+def _setting_table_row(key: str) -> tuple[str, ...]:
+    (row,) = (
+        row
+        for row in drawing.SETTING_TABLE_ROWS
+        if row[1] == str(steps.step_number(key))
+    )
+    return row
+
+
+def test_the_feeler_acceptances_are_setting_table_rows_their_steps_cite() -> None:
+    """R5 machinist review (rule 22): the lever bank's three feeler
+    acceptances printed only in their steps. Each is a setting table row on
+    sheet 6, cited by its step, which carries no number; the end-play leaf is
+    the worst case floored to .01 in."""
+    import ch_fulcrum_keeper_spec as keeper
+    from ch_channel_lever_spec import HUB_LENGTH as LEVER_HUB, HUB_LENGTH_BAND
+
+    assert drawing.SETTING_TABLE_HEADER == (
+        "ROW",
+        "STEP",
+        "SETTING",
+        "MEASURE FIRST",
+        "SET TO / ACCEPT",
+        "CHECK WITH",
+    )
+    keys = ("bars-straight", "bars-gapped", "lever-bank-slides")
+    assert [row[0] for row in drawing.SETTING_TABLE_ROWS] == ["1", "2", "3"]
+    assert [row[1] for row in drawing.SETTING_TABLE_ROWS] == [
+        str(steps.step_number(key)) for key in keys
+    ]
+    for key in keys:
+        assert drawing.setting_row(key) in _step_body(key)
+        assert "SHEET 6" in drawing.setting_row(key)
+    span_min = (
+        keeper.KEEPER_INNER_FACE_SPAN_MM - 2 * keeper.KEEPER_FITUP_LOCATION_BAND_MM
+    )
+    play_min_in = (span_min - drawing.COUNT * (LEVER_HUB + HUB_LENGTH_BAND[0])) / 25.4
+    leaf_in = math.floor(play_min_in * 100.0) / 100.0
+    assert 0.0 < leaf_in <= play_min_in
+    assert _setting_table_row("lever-bank-slides")[2:] == (
+        "LEVER END PLAY",
+        "-",
+        f"{leaf_in:.3f}".removeprefix("0") + " MIN",
+        "FEELER LEAF",
+    )
+    body = _step_body("lever-bank-slides")
+    assert f"{leaf_in:.3f}".removeprefix("0") not in body
+    assert drawing.SETTING_TABLE_SHEET == drawing.SHEET_NAMES[5]
