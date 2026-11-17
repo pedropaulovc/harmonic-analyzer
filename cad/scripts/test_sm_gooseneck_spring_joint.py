@@ -189,10 +189,11 @@ def _declared(package: str):
 def test_engagement_minor_is_declared_and_required(monkeypatch) -> None:
     # Owner rulings 2026-11-08 (Pedro), #2315: the tap moved to the end plug,
     # so its shortfall stands as the plug's RV-01, and the bent tube carries
-    # no exception at all.
+    # no engagement exception. The tube's own RV-01 (2026-11-17, #3010) accepts
+    # the 3.72 reach at .XX and is not a `minor`.
     declared = _declared("sm_gooseneck_end_plug")
     assert declared == {"RV-01": "minor"}
-    assert _declared("sm_gooseneck") == {}
+    assert "minor" not in _declared("sm_gooseneck").values()
     joint.owner_minor(
         _config.parts("sm-gooseneck-end-plug"), "RV-01", "sm_gooseneck_end_plug"
     )
