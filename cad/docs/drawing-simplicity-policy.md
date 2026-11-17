@@ -655,8 +655,7 @@ both verdicts and the finding diff.
   **confirmed** blocker, over-specification or clarity finding raised by two or
   more runs. Confirmed minor findings, single-run confirmations and rejected
   clusters remain in the report but do not gate. `SHIP`
-  means no confirmed gating findings and no aggregate error, or an explicitly
-  warned minimal-change skip. If valid runs return zero findings, findings
+  means no confirmed gating findings and no aggregate error. If valid runs return zero findings, findings
   adjudication is skipped. The judge schema enumerates the submitted finding
   ids, so a cluster citing any other id is a schema violation (repaired in the
   same OMP session when possible). If all runs fail, or

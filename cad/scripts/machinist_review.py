@@ -979,8 +979,7 @@ def codex_rollout_evidence(
     elif metadata[0].get("session_id", metadata[0]["id"]) != metadata[0]["id"]:
         errors.append("Codex rollout session identifiers disagree")
     session_id = metadata[0].get("id") if len(metadata) == 1 else None
-    expected_prompts = [prompt.replace("\r\n", "\n")]
-    prompt_count = 0
+    expected_prompt = prompt.replace("\r\n", "\n")
     prompt_seen = False
     turn_start = 0
     for index, row in enumerate(events):
@@ -1023,11 +1022,10 @@ def codex_rollout_evidence(
                     role == "user" and isinstance(content, list) and len(content) == 1
                     and isinstance(content[0], dict) and content[0].get("type") == "input_text"
                     and isinstance(content[0].get("text"), str)
-                    and prompt_count < len(expected_prompts)
-                    and content[0]["text"].replace("\r\n", "\n") == expected_prompts[prompt_count]
+                    and not prompt_seen
+                    and content[0]["text"].replace("\r\n", "\n") == expected_prompt
                 )
                 if matches:
-                    prompt_count += 1
                     prompt_seen = True
                     turn_start = len(normalized)
                     first_usage = {}
@@ -1104,7 +1102,7 @@ def codex_rollout_evidence(
                         prompt_seen and isinstance(content, list) and len(content) == 1
                         and isinstance(content[0], dict) and content[0].get("type") == "text"
                         and isinstance(content[0].get("text"), str)
-                        and content[0]["text"].replace("\r\n", "\n") == expected_prompts[prompt_count - 1]
+                        and content[0]["text"].replace("\r\n", "\n") == expected_prompt
                     )
                     if not matches:
                         errors.append("unexpected user input in Codex protocol message")
@@ -1172,7 +1170,7 @@ def codex_rollout_evidence(
                     "type": "item.completed",
                     "item": {**payload, "id": payload.get("call_id") or payload.get("id")},
                 })
-    if prompt_count != len(expected_prompts):
+    if not prompt_seen:
         errors.append("expected harness prompt missing from authoritative Codex rollout")
     for call_id in calls.keys() - outputs:
         errors.append(f"authoritative Codex call {call_id} has no recorded output")
