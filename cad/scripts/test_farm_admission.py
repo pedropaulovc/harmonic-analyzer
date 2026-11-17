@@ -39,6 +39,7 @@ _LABEL = "Offline selected-pool admission regression"
 def admission(tmp_path, monkeypatch):
     events = []
     selected = {"pool": tmp_path / "no-pool-selected"}
+    (tmp_path / "run").mkdir()
     monkeypatch.setenv("HARMONIC_FARM_RUN_DIR", str(tmp_path / "run"))
     for key in (
         "HARMONIC_FARM_BUILD_ID",
@@ -185,7 +186,7 @@ def _assert_no_ownership_or_actions(admission):
     assert admission.events == [], (
         "refused admission ran preflight, ownership or an action"
     )
-    assert not (admission.tmp_path / "run").exists()
+    assert list((admission.tmp_path / "run").iterdir()) == []
     assert os.environ.get("HARMONIC_FARM_BUILD_ID") is None
     assert os.environ.get("HARMONIC_FARM_ADMITTED_LEAVES") is None
 
