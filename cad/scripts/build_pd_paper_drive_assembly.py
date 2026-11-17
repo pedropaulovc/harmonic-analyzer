@@ -114,7 +114,10 @@ from _session import run_build
 from _dimensions import drive_dimension, set_global
 from _drawing_marks import DRAWN_BY, mark_dimensions_for_drawing
 from _drawing_precision import _named_dimension, apply_drawing_precision
-from _drawing_tolerances import set_dimension_bilateral_tolerance
+from _drawing_tolerances import (
+    set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
+)
 from _feature_tree import name_last_feature
 from _sketch import (
     SketchDims,
@@ -126,6 +129,7 @@ from _sketch import (
 )
 import pd_paper_drive_knob_setting_spec as KNOB_SETTING
 import pd_paper_drive_cluster_float_spec as CLUSTER_FLOAT
+import pd_paper_drive_setting_details_spec as SETTING_DETAILS
 from _assembly_contract import assembly_contract
 from _document_units import apply_package_model_units
 from _assembly import (
@@ -2325,6 +2329,151 @@ def _author_cluster_float_reference(adapter) -> None:
         raise RuntimeError(f"{spec.FEATURE} still visible after BlankSketch")
 
 
+def _assert_setting_detail_faces() -> None:
+    """Each setting line's anchor and end lie on the faces this builder
+    places (pd_paper_drive_setting_details_spec computes them from the same
+    sources; the line shows on its detail only if they agree)."""
+    spec = SETTING_DETAILS
+    pairs = {
+        "bar front face z": (spec.BAR_FRONT_Z, BAR_FRONT_Z),
+        "rack front face z": (spec.RACK_FRONT_Z, RACK_TEETH_FRONT_Z),
+        "rack flat top y": (spec.RACK_TOP_Y, RACK_Y0),
+        "collar front face z": (spec.COLLAR_FRONT_Z, KNOB_COLLAR_Z0),
+        "collar dowel y": (spec.DRIVE_PIN_Y, max(y for _x, y in KNOB_DRIVE_PIN_XY)),
+        "arm rear face z": (spec.ARM_REAR_Z, PLATE_Z0),
+        "locating dowel x": (spec.LOCATOR_XY[0], LOCATING_PIN_XY[0][0]),
+        "locating dowel y": (spec.LOCATOR_XY[1], LOCATING_PIN_XY[0][1]),
+        "locating dowel proud": (
+            spec.ARM_REAR_Z + LOCATING_INTERFACE.PROUD_MM, LOCATING_PIN_Z0
+        ),
+        "latch dowel floor x": (spec.LATCH_FLOOR_XY[0], LATCH_PIN_POS[0]),
+        "latch dowel floor y": (spec.LATCH_FLOOR_XY[1], LATCH_PIN_POS[1]),
+        "latch dowel z": (spec.LATCH_DOWEL.lines[0].start[2], LATCH_PIN_POS[2]),
+        "crest drop": (PAPER_PLACEMENT.RACK_CREST_DROP, PLATE_Y0 - RACK_TIP_Y),
+    }
+    off = {name: a - b for name, (a, b) in pairs.items() if abs(a - b) > 1e-6}
+    if off:
+        raise AssertionError(f"setting detail faces off the placed model: {off}")
+    if abs(spec.LATCH_PROUD_MODEL - (LATCH_PIN.LENGTH - ARM.PIN_HOLE_DEPTH)) > 1e-9:
+        raise AssertionError("the latch dowel's proud is not the placed pin's")
+    if abs(spec.COLLAR_DOWELS.lines[0].length_mm - COLLAR.DRIVE_PIN_PROUD) > 0.0127:
+        raise AssertionError("the collar dowel's printed proud is off the placed dowel")
+
+
+def _author_setting_details(adapter) -> None:
+    """MHA-PD-00's geometric settings as model dimensions (DETAILS F-L): per
+    detail one construction sketch, each line anchored on the face it is
+    measured from, its length driven from a global and toleranced to its
+    step's band (pd_paper_drive_setting_details_spec); marked for the
+    drawing and blanked; no solid or pose changes."""
+    _assert_setting_detail_faces()
+    unit = assembly_contract(ASM_NAME).drawing_unit
+    for detail in SETTING_DETAILS.DETAILS:
+        label = f"setting detail {detail.letter}"
+        for line_spec in detail.lines:
+            set_global(adapter, line_spec.global_name, f"{line_spec.length_mm}mm")
+        dims = SketchDims()
+
+        def anchor(point_ref: str, uv: tuple[float, float], name: str) -> None:
+            # anchor_point_to_origin dimensions only the nonzero coordinates.
+            anchor_point_to_origin(adapter, point_ref, *uv, name)
+            for axis, value in zip("UV", uv):
+                if abs(value) >= 1e-9:
+                    dims.record(f"{name}{axis}")
+
+        check(f"create {label} sketch", adapter.create_sketch(detail.plane))
+        set_sketch_direct_db(adapter, True)
+        drawn = []
+        for line_spec in detail.lines:
+            start = SETTING_DETAILS.sketch_uv(detail.plane, line_spec.start)
+            end = SETTING_DETAILS.sketch_uv(detail.plane, line_spec.end)
+            via = (
+                None
+                if line_spec.via is None
+                else check(
+                    f"{label} {line_spec.dimension} axis",
+                    adapter.add_line(
+                        *SETTING_DETAILS.sketch_uv(detail.plane, line_spec.via), *start
+                    ),
+                )
+            )
+            line = check(f"{label} {line_spec.dimension}", adapter.add_line(*start, *end))
+            drawn.append((line_spec, start, end, via, line))
+        set_sketch_direct_db(adapter, False)
+        for line_spec, start, end, via, line in drawn:
+            for entity in (line,) if via is None else (via, line):
+                segment = _early_bound(adapter._sketch_entities[entity], "ISketchSegment")
+                segment.ConstructionGeometry = True
+                if not bool(segment.ConstructionGeometry):
+                    raise RuntimeError(f"{label} {line_spec.dimension} is not construction")
+            if via is None:
+                along_u = abs(end[1] - start[1]) < 1e-9
+                check(
+                    f"{label} {line_spec.dimension} along its axis",
+                    adapter.add_sketch_constraint(
+                        line, None, "horizontal" if along_u else "vertical"
+                    ),
+                )
+                anchor(f"{line}.start", start, f"{line_spec.dimension}Face")
+                kind = "horizontal_distance" if along_u else "vertical_distance"
+            else:
+                # The axis leg runs from ``via`` to the face, both anchored;
+                # the setting continues it, collinear, from the face.
+                via_uv = SETTING_DETAILS.sketch_uv(detail.plane, line_spec.via)
+                anchor(f"{via}.start", via_uv, f"{line_spec.dimension}Axis")
+                anchor(f"{via}.end", start, f"{line_spec.dimension}Face")
+                check(
+                    f"{label} {line_spec.dimension} from the face",
+                    adapter.add_sketch_constraint(
+                        f"{line}.start", f"{via}.end", "coincident"
+                    ),
+                )
+                check(
+                    f"{label} {line_spec.dimension} on the axis",
+                    adapter.add_sketch_constraint(line, via, "collinear"),
+                )
+                kind = "distance"
+            dimension_between(
+                adapter, f"{line}.start", f"{line}.end", kind,
+                line_spec.length_mm, line_spec.dimension,
+            )
+            dims.record(line_spec.dimension, f'"{line_spec.global_name}"')
+        ensure_fully_defined(adapter, label)
+        check(f"exit {label} sketch", adapter.exit_sketch())
+        name_last_feature(adapter, detail.feature)
+        for name, expression in dims.apply(adapter, detail.feature):
+            drive_dimension(adapter, name, expression)
+        for line_spec in detail.lines:
+            deviations = line_spec.deviations_mm
+            if deviations is None:
+                continue
+            if line_spec.symmetric:
+                set_dimension_symmetric_tolerance(
+                    adapter, detail.feature, line_spec.dimension, deviations[1],
+                    places=SETTING_DETAILS.PLACES, display_unit=unit,
+                )
+            else:
+                set_dimension_bilateral_tolerance(
+                    adapter, detail.feature, line_spec.dimension, *deviations,
+                    places=SETTING_DETAILS.PLACES, display_unit=unit,
+                )
+        apply_drawing_precision(
+            adapter, {detail.feature: SETTING_DETAILS.DRAWING_PRECISION[detail.feature]}
+        )
+        mark_dimensions_for_drawing(
+            adapter, detail.feature, SETTING_DETAILS.DRAWING_DIMENSIONS[detail.feature]
+        )
+        blank_sketch(adapter, detail.feature)
+        feature = _early_bound(
+            _early_bound(adapter.currentModel, "IAssemblyDoc").FeatureByName(
+                detail.feature
+            ),
+            "IFeature",
+        )
+        if int(feature.Visible) != 1:  # swVisibilityStateHide
+            raise RuntimeError(f"{detail.feature} still visible after BlankSketch")
+
+
 def _insert_roller_chain(adapter) -> None:
     """The drive chain: a native CHAIN COMPONENT PATTERN (connected linkage) of
     alternating inner/outer links along the _chain.py loop, closed by the
@@ -3683,6 +3832,8 @@ def build(adapter) -> dict[str, str]:
     _author_knob_setting_reference(adapter)
     # The cluster's shimmed ring gap, for MHA-PD-00's VIEW E (hidden sketch only).
     _author_cluster_float_reference(adapter)
+    # MHA-PD-00's setting details F-L (hidden sketches only).
+    _author_setting_details(adapter)
     # Machine coords put the output/paper side at -Z, so SolidWorks' native Front
     # renders the machine BACK (chain and transgear cluster mirrored). Re-base the
     # standard views (same as the top assembly) so the saved doc and the _front
