@@ -951,7 +951,25 @@ def _assert_shared_component_references(adapter: Any, name: str) -> None:
 def _run_soundness_battery(
     adapter: Any, name: str, report: Report, rebuilt: Any
 ) -> None:
-    """Run the complete per-document soundness battery on the active assembly."""
+    """Run the complete per-document soundness battery on the active assembly.
+
+    The freed operational DOF have no driver mates in the saved model (see
+    AGENTS.md "Default-free DOF"). Prove NECESSITY -- each freed DOF's
+    component family itself reads under-constrained (the aggregate count alone
+    passes on the crank chain even with the swing pinned -- codex 2026-07-04)
+    -- and the EXACT SET: no component outside the allowed coupled families may
+    read under-constrained. pd-paper-drive alone has a SHARED stem (three
+    pd-transgear-removable siblings), so it targets the EXACT T12 crank
+    instance from the recorded DOF manifest (codex #189 :679) and fails loud
+    when the manifest records none, instead of falling back to the weak
+    shared-stem check.
+
+    component-count is REMOVED (every historical failure was a stale band or a
+    gate bug); the expected counts survive as reference data in
+    ``_COMPONENT_BAND``. channel-independence (the "no component pattern for
+    moving parts" invariant) runs here because soundness already opens
+    ``ch-channel``.
+    """
     free_dof = _expected_free_dof(name)
     if free_dof:
         insts = _required_free_instances(name) if name == "pd-paper-drive" else ()
@@ -1087,101 +1105,7 @@ async def _verify_static_one(
 
     assembly_failures_before = len(report.failed)
 
-    free_dof = _expected_free_dof(name)
-    if free_dof:
-        # The freed operational DOF have no driver mates in the saved model
-        # (see AGENTS.md "Default-free DOF"). Prove NECESSITY -- the DOF are
-        # genuinely free, each freed DOF's component family itself reading
-        # under-constrained (the aggregate count alone passes on the crank
-        # chain even with the swing pinned -- codex 2026-07-04) -- and the
-        # EXACT SET: no component outside the allowed coupled families may
-        # read under-constrained (an unintended freedom fails here, the
-        # replacement for the retired release park-closure proof).
-        # pd-paper-drive alone has a SHARED stem (three pd-transgear-removable siblings),
-        # so target the EXACT T12 crank instance from the recorded DOF manifest
-        # (codex #189 :679); every other assembly keeps its unique stem families
-        # (unchanged -- their DOF map to distinct part names).
-        insts = _required_free_instances(name) if name == "pd-paper-drive" else ()
-        if name == "pd-paper-drive" and not insts:
-            # A free pd-paper-drive MUST have recorded its crank_spin instance in
-            # .pd-paper-drive.dof.json. A missing/stale sidecar would silently fall
-            # back to the weak shared-stem check (which :679 showed passes even with
-            # T12 pinned and a T24/T18 sibling loose). Fail loud instead (codex #189).
-            report.gate(
-                f"{name}:dof-free-necessity",
-                lambda: _fail(
-                    "free pd-paper-drive but .pd-paper-drive.dof.json records no crank_spin "
-                    "instance -- stale/missing DOF manifest; refusing the weak stem "
-                    "fallback. Rebuild pd-paper-drive to regenerate it."
-                ),
-            )
-        else:
-            stems = () if insts else _required_free_stems(name)
-            report.gate(
-                f"{name}:dof-free-necessity",
-                lambda: assert_free_dof_necessity(
-                    adapter,
-                    free_dof,
-                    resolve=False,
-                    required_stems=stems,
-                    required_instances=insts,
-                    allowed_stems=allowed_free_stems(name),
-                ),
-            )
-    else:
-        report.gate(
-            f"{name}:dof-fully-defined",
-            lambda: assert_components_fully_defined(adapter, resolve=False),
-        )
-    report.gate(
-        f"{name}:no-over-constrained",
-        lambda: assert_no_over_constrained(adapter, resolve=False),
-    )
-    report.gate(
-        f"{name}:model-healthy",
-        lambda: _assert_soundness_health(adapter, name, rebuilt),
-    )
-    if _shared_reference_counts(name):
-        report.gate(
-            f"{name}:shared-component-references",
-            lambda: _assert_shared_component_references(adapter, name),
-        )
-    report.gate(
-        f"{name}:interference-free",
-        lambda: check_no_interference(
-            adapter,
-            allowed_pairs=_allowed_pairs(name),
-            chain_mounts=_soundness_chain_mounts(name),
-        ),
-    )
-    if name in ("ch-channel", "sm-summing"):
-        report.gate(
-            f"{name}:spring-native-contacts",
-            lambda: assert_assembly_spring_contacts(adapter, name),
-        )
-    if name in ("dt-drive-train", "ha-harmonic-analyzer"):
-        report.gate(
-            f"{name}:bank-retention-native",
-            lambda: measure_bank_retention(
-                adapter,
-                assembly_kind="top_assembly" if name == "ha-harmonic-analyzer" else "drive_train",
-            ),
-        )
-    # component-count REMOVED: every historical failure of that gate was a stale band
-    # or a gate bug (never a real regression), so it cost more in false alarms than it
-    # ever caught. The expected counts survive as reference data in `_COMPONENT_BAND`.
-    # gear-ratios is DEMOTED to the release preflight (preflight_release.py): it is the
-    # single most expensive gate and re-proves a property fixed by the tooth-count
-    # config that check:math already validates analytically -- so it no longer runs on
-    # every build, only against the shipped artefact at release.
-    # channel-independence (the "no component pattern for moving parts" invariant) is
-    # folded in here: soundness already opens `channel`, so the retired
-    # verify:subsystems suite's one unique gate runs on this same open model.
-    if name == CHANNEL_OWNER:
-        report.gate(
-            f"{name}:channel-independence",
-            lambda: assert_channel_independence(adapter),
-        )
+    _run_soundness_battery(adapter, name, report, rebuilt)
 
     if repaired:
         if len(report.failed) != assembly_failures_before:
