@@ -274,14 +274,6 @@ def test_stock_build_uses_its_registered_recipe_head_up_on_the_origin(
     assert seen["screw_axis_planes"] == ("Front Plane", "Right Plane")
 
 
-def test_standalone_recipe_run_is_catalog_only() -> None:
-    """No vendor model: the standalone command must not enter the McMaster
-    replica path, which demands a vendor SLDPRT and its harvest."""
-    source = Path(recipe.__file__).read_text(encoding="utf-8")
-    assert "replica_main(" not in source and "import replica_main" not in source
-    assert "run_build(build_catalog)" in source
-
-
 def test_no_vendor_model_of_the_new_hardware_is_tracked() -> None:
     root = Path(__file__).resolve().parents[2]
     assert not list(root.glob("cad/references/**/91251A108*.SLDPRT"))

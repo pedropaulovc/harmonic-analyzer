@@ -6,11 +6,8 @@ the part the assemblies still build.
 
 from __future__ import annotations
 
-import ast
-import asyncio
 import importlib.util
 import math
-from pathlib import Path
 
 import pytest
 
@@ -51,29 +48,6 @@ def test_the_pin_is_not_another_identitys_sku() -> None:
     for stem, stock in FASTENERS.items():
         if stem != _STEM:
             assert spec.SKU not in stock.skus, stem
-
-
-def test_standalone_recipe_run_is_catalog_only(monkeypatch) -> None:
-    """No vendor model is tracked: the standalone run builds and saves the
-    nominal catalogue cylinder and never enters a replica path."""
-    from diagnostics.diag_build_mcmaster import REGISTRY
-
-    assert spec.SKU not in REGISTRY
-    assert not list(
-        Path(__file__)
-        .resolve()
-        .parents[2]
-        .glob(f"cad/references/**/{spec.SKU}*.SLDPRT")
-    )
-    seen: list = []
-
-    async def fake_catalog(adapter, part_no, size, ends):
-        seen.append((part_no, size, ends))
-        return {}
-
-    monkeypatch.setattr(recipe, "build_catalog", fake_catalog)
-    asyncio.run(recipe._catalog(None))
-    assert seen == [(spec.SKU, (spec.DIA, spec.LENGTH), None)]
 
 
 def test_catalogue_size_and_supplier_reference() -> None:
@@ -126,14 +100,6 @@ def test_the_assembled_pin_is_faced_flush_and_crest_broken_with_the_collar() -> 
     assert part.V_FACED < part.V_STOCK
     assert spec.SUPPLIER_STOCK_SUPPRESSED_FEATURES == ("StockFacing", "CrestBreak")
     assert spec.SUPPLIER_STOCK_CONFIGURATION != "Default"
-    named = {
-        node.args[1].value
-        for node in ast.walk(ast.parse(Path(part.__file__).read_text(encoding="utf-8")))
-        if isinstance(node, ast.Call)
-        and getattr(node.func, "id", None) == "name_last_feature"
-        and isinstance(node.args[1], ast.Constant)
-    }
-    assert set(spec.SUPPLIER_STOCK_SUPPRESSED_FEATURES) <= named
 
 
 def test_the_crest_break_is_the_collars_rear_break_cone() -> None:

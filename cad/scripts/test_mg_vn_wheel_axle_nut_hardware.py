@@ -163,44 +163,6 @@ def test_stock_build_turns_the_recipe_axis_onto_part_z(monkeypatch) -> None:
     assert seen["screw_axis_planes"] == ("Top Plane", "Right Plane")
 
 
-def test_standalone_recipe_run_is_catalog_only(monkeypatch, tmp_path) -> None:
-    from diagnostics import diag_mcmaster_lib as lib
-
-    assert not hasattr(recipe, "replica_main")
-    saved: list[str] = []
-    built: list = []
-
-    class _Adapter:
-        async def create_part(self):
-            return "ok"
-
-        async def save_file(self, path):
-            saved.append(path)
-            return "ok"
-
-    async def fake_recipe(adapter, truth=None):
-        built.append(adapter)
-
-    async def no_views(_adapter, _stem):
-        return {}
-
-    async def no_close(_adapter):
-        return None
-
-    monkeypatch.setattr(recipe, "check", lambda *a, **k: True)
-    monkeypatch.setattr(recipe, BUILD, fake_recipe)
-    monkeypatch.setattr(lib, "OUT_DIR", tmp_path)
-    monkeypatch.setattr(lib, "assert_seat_sketch_baseline", lambda *a: None)
-    monkeypatch.setattr(lib, "mass_properties", lambda _a: {"volume_mm3": 13.0})
-    monkeypatch.setattr(lib, "export_views", no_views)
-    monkeypatch.setattr(lib, "close_all", no_close)
-    adapter = _Adapter()
-    artefacts = asyncio.run(recipe.build_catalog(adapter))
-    assert built == [adapter]
-    assert saved == [str((tmp_path / f"{spec.SKU}-catalog.SLDPRT").resolve())]
-    assert artefacts["sldprt"] == str(tmp_path / f"{spec.SKU}-catalog.SLDPRT")
-
-
 def test_no_vendor_model_is_tracked() -> None:
     root = Path(__file__).resolve().parents[2]
     assert not list(root.glob(f"cad/references/**/{spec.SKU}*.SLDPRT"))

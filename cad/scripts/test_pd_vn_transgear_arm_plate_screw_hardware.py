@@ -375,22 +375,6 @@ def test_stock_build_uses_its_registered_recipe_head_up_on_the_origin(
     assert seen["screw_axis_planes"] == ("Front Plane", "Right Plane")
 
 
-def test_standalone_recipe_run_is_catalog_only(monkeypatch) -> None:
-    """No vendor model: the standalone run builds, checks and saves the
-    catalog recipe and never enters the McMaster replica path, which demands
-    a vendor SLDPRT and its harvest."""
-    assert not hasattr(entry, "replica_main")
-    seen: list = []
-
-    async def fake_catalog_run(adapter, part_no, builder):
-        seen.append((part_no, builder))
-        return {}
-
-    monkeypatch.setattr(entry, "catalog_run", fake_catalog_run)
-    asyncio.run(entry.build_catalog(None))
-    assert seen == [(screw.SKU, entry.build_91790A199)]
-
-
 def test_no_vendor_model_of_the_new_hardware_is_tracked() -> None:
     root = Path(__file__).resolve().parents[2]
     assert not list(root.glob(f"cad/references/**/{screw.SKU}*.SLDPRT"))

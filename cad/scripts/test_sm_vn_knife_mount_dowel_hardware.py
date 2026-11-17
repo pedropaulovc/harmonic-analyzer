@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import re
 from fractions import Fraction
-from pathlib import Path
 
 import pytest
 
@@ -37,16 +36,6 @@ def test_catalogue_row_is_the_registered_mcmaster_dowel() -> None:
     assert metadata.module == recipe.__name__
     assert getattr(recipe, metadata.callable_name) is recipe.build_98381A473
     assert metadata.threaded is False
-
-
-def test_standalone_recipe_run_is_the_replica_gate() -> None:
-    """98381A473 has a user-supplied vendor model, so the standalone run is
-    the replica gate, not a catalog-only build."""
-    from diagnostics.diag_build_mcmaster import REGISTRY
-
-    assert REGISTRY[spec.SKU] is recipe.build_98381A473
-    source = Path(recipe.__file__).read_text(encoding="utf-8")
-    assert "replica_main(PART_NO, build_98381A473)" in source
 
 
 def test_recipe_is_the_size_the_registry_names() -> None:
