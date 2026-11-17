@@ -158,7 +158,9 @@ every one and ships each hobby sheet as
 travelers from the same plan: `traveler.html` (`pro`, concise) and
 `traveler-hobby.html` (`hobby`, with the setup pictures in `<stem>/diagrams/`),
 then prints the hobby sheet to `<slug>-traveler.pdf` with a headless Edge or
-Chrome. A plan that prechips refuses therefore blocks the release. Under prechips 0.10.1 the base bar and
+Chrome. A plan that prechips refuses therefore blocks the release. Every plan
+needs prechips 0.11.4, released on PyPI; the wrapper's `prechips@latest` runs
+it. The version history below says which release brought each binding. Under prechips 0.10.1 the base bar and
 end bracket pass both on the v49 manifests. The base-bar and feed-lever plans
 need 0.10.1: they read its adapter bindings `cad.vise_centred_overhang_mm`
 (centred overhang from the CAD length and `vise_jaw_width_mm`) and
@@ -174,7 +176,7 @@ carry 0.11.0's `milling_deflection` data (a `beam` per non-lathe setup or
 operation, `milling_cuts` per spindle operation) and pass that check enforced;
 the end-bracket plan's tap flags need the 0.11.0 jig pictures. The riser plan needs 0.11.4
 (its `riser` adapter's Setup 2 stations and Setup 4 guards). The base-bar, end-bracket and
-feed-lever plans need the first prechips release after 0.11.3, which carries
+feed-lever plans need prechips 0.11.4, which carries
 pedropaulovc/prechips#436: they read that release's adapter-bound
 milling-deflection stations (base bar `cad.jack_*_x_mm`, `cad.strap_*_x_mm`
 from `strap_inset_mm`, `cad.blank_centred_*`, `cad.vise_centred_jaw_right_mm`,
@@ -211,7 +213,7 @@ them from the carrier and drills each at its own mark, so its table gives the
 REF X/Y only to find the marks. The 12 mm HUB drill and the 82° countersink are
 recorded as not owned in `cad/config/shop-equipment.toml`.
 
-Every plan needs the first prechips release after 0.11.3 (pedropaulovc/prechips#437,
+Every plan needs prechips 0.11.4 (pedropaulovc/prechips#437,
 owner rulings 2026-11-16 on #407–#410, #429 and #430). Each vise setup's
 cantilever `beam` declares `vise_left` (`"start"`/`"end"`: the beam end at
 the hold's left overhang; the grip is measured from the end whose overhang
@@ -277,15 +279,30 @@ What the 0.10 port and the 2026-11-13 v49 reassessment changed on the sheets:
   stand-out above the jaws, keeps the 1-3/8 in parallels and two screw jacks
   (touch only, at the DRO positions it gives) as set, and splits its drill and
   counterbore operations by end, each over its jack. Facing runs full length
-  at 850 rpm, 6.8 in/min (owner ruling 2026-11-11,
-  `settings.basebar-face-6061-t6511`). The edges and ends use the dechatter
+  with the 2 in Shrum Tri Fly at 2500 rpm, .004 in/tooth (30 in/min), in
+  zigzag passes (Main relaying the owner, 2026-11-16;
+  `settings.basebar-trifly-6061-t6511`; #2850 keeps the dechatter sweep of
+  .004–.006 in/tooth open): five on side 1 and four on side 2, each pass,
+  the first included, taking no more than the plan cut's radial width
+  (side 1 at four failed prechips' bending estimate at the bar ends; the
+  plan's face operation records why). Side 1 faces at a fixed Z, half the
+  nominal allowance off, so the blank's thickness must sit in the plan's band
+  (miked first) and nobody types a depth per bar. The edges and ends use the dechatter
   v11 records (`settings.em-half-hss-6061-v11-wide`/`-narrow`, at most
   7.62 mm per depth level, 48.8 mm stickout), both at 2250 rpm: the narrow
   column was stable at every speed measured, and the ends no longer share the
   slots' 1250. Every speed is on the PM-30MV's low belt, 100–2800 rpm (owner
-  ruling 2026-11-16, "2800 max with low belty"): no belt change. The rail
+  ruling 2026-11-16, "2800 max with low belty"): no belt change. Setup 3 is
+  one NC file per bar (BB02 bar 1, BB03 bar 2), its tools called by `M6 T<n>`,
+  which CNCjs's Manual Tool Change (Custom Probing) expands into a tool change
+  and a tool-setter probe (`cad/config/shop-equipment.toml`
+  `cnc.pm-30mv-controller`, `fixtures.tool-setter-ets`). There is no touch
+  plate: Z0 is the parallels' top, set once per vise setup with T1 and a
+  0.200 in gauge block, and the faced top is Z = finished thickness. After
+  the flip the file's 3D touch probe (`gauges.touch-probe-diy0-tp05`) finds
+  the bar's left end and sets X0. The rail
   holes are drilled at their printed stations, ±0.05 mm from ZERO END, on
-  the CNC by programs BB05 (spot) and BB07 (#29 drill) of
+  the CNC by the Setup 3 file of
   `cam:ch_rocker_arm_tl_oblique_base_bar` (owner rulings 2026-11-16,
   superseding the R4 transfer from the trimmed rail; "Rail holes CNC at
   ±0.05 mm OK" is the part yaml's RV-04): each bar's untrimmed rail is then
@@ -443,13 +460,22 @@ minutes, and leaves freecadcmd's console output in `freecadcmd.log` there.
 
 A recipe has four parts:
 
-- `PROGRAMS`: the file names, each listing its operations. Each program is one
-  tool, because GRBL has no tool changer, and one FreeCAD Job per spindle
-  speed. The PM-30MV's speed is set by hand on the knob, so a program whose
-  operations are grouped runs each group after an operator comment and `M0`
-  (the base bar's BB04: ends at 2250 rpm, then slots at 1250); `_gcode`
-  checks each stop is retracted above the stock and commented, and each
-  section's S word.
+- `PROGRAMS`: the file names, each listing its operations, flat (one FreeCAD
+  Job, posted as it is) or in sections (one Job per tool and spindle speed,
+  or a manual section: G-code the recipe writes itself, such as an operator
+  stop or a probing cycle). Sections join into one file. A new tool starts at
+  `M5`, a `%msg` naming it and the speed to set, and `M6 T<n>`, which CNCjs
+  (Manual Tool Change, Custom Probing) expands into its tool change and
+  tool-setter probe; FluidNC 3.7.8 has no tool change of its own. The
+  PM-30MV's speed is set by hand on the knob, so the same tool at a new speed
+  starts at `%msg` and `M0`. CNCjs strips comments before sending and shows
+  the pending `%msg` text at the next M0 or M6 pause. The base bar's BB02 (bar 1) runs the Tri Fly,
+  the flip stop, the probe, the end mill at 2250 then 1250, the drills, the
+  tap stops and the counterbore. `_gcode` splits a file at its `M6`s into
+  tool sections, named `FILE@k` in expectations, and checks the tools called,
+  each stop and tool change (retracted above the stock, spindle stopped where
+  hands go in, commented), each section's S words and the probe's single
+  `G10 L20 P1` straight after its `G38.2`.
 - `context(features, plan, shop, step)`: a pure function. It reads every part
   dimension from the part's `features.toml`. Blank size, cutter tip depths,
   radial steps and jack positions come from the part's `plan.toml`
@@ -467,8 +493,9 @@ A recipe has four parts:
 - `expectations(ctx)`: the `_gcode` checks every posted file must pass, such
   as depths, hole centres, slot cutter-centre envelopes and plunge corners,
   pass positions and directions, zigzag face passes, spindle speeds, no rapid
-  below the stock top and no feed move above it. Each program's `air_feed`
-  expectation also names the stock top its cycle time is split at.
+  below the stock top and no feed move above it. Each file's `air_feed`
+  expectation (or each tool section's) also names the stock top its cycle
+  time is split at.
 
 CAM produced toolpaths that looked valid while the base-bar programs were
 being written, yet these checks caught a spot depth measured from the
@@ -490,18 +517,23 @@ the plan's strategy. Edge and end passes plunge beside the stock, so they
 plunge at their cutting feed; only the slot corners plunge into metal at the
 plan's slow feed. With the rapid rate assumed at 100 in/min
 (`_gcode.RAPID_MM_MIN`, until the controller's `$110`/`$111` are read), one
-bar's programs fell from about 207 to 86 minutes.
+bar's programs fell from about 207 to 86 minutes, and to about 43 (bar 1)
+with the Tri Fly facing at 30 in/min (Main relaying the owner,
+2026-11-16). Probing moves and tool changes are not timed.
 
 FreeCAD's `grbl` post expands G81/G82/G83 into G0/G1 but not G73, so the
 drilled holes peck with full retracts (G83), one drill diameter each, as the
 traveler says; FreeCAD measures each peck from the R plane, which is why the
 R plane sits just above the stock.
 
-For the base bar, S3 after the side-2 face (S3c) puts X0 at ZERO END and Y0
-at ZERO EDGE, against the back jaw. The bar lies at −Y, so drawing Y becomes
-−Y, and Z0 is the top face. Bar 1's C'BORE SIDE and bar 2's RAIL SIDE are the
-model's Z0 face, so one set of S3 programs serves both hands; `_bar1` programs
-are bar 1 only. S2 is different: X0 is the blank's left end, Y0 the finished
-front edge with the bar at +Y, and Z0 the blank's top. Posted NC is not
-machining approval: prove each program in air and check the setup against the
-traveler first.
+For the base bar, Setup 3 puts Z0 on the parallels' top (T1 and a 0.200 in
+block, once per vise setup), so every top-face operation is posted from
+Z = finished thickness, which the side-2 face makes true; Y0 is ZERO EDGE
+against the back jaw; after the flip the file's touch probe sets X0 at ZERO
+END. The bar lies at −Y, so drawing Y becomes −Y. Bar 1's C'BORE SIDE and
+bar 2's RAIL SIDE are the model's underside, face up at Z = T (the model's
+top seat lies on the parallels), so both files share one frame;
+bar 2's has no bracket holes. S2 is different: X0 is the blank's left end,
+Y0 the finished front edge with the bar at +Y, and Z0 the blank's top.
+Posted NC is not machining approval: prove each program in air and check the
+setup against the traveler first.

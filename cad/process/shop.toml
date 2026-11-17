@@ -144,6 +144,17 @@ tap_drill_mm = 3.4544
 [tools.basebar-counterbore]
 description = "5/16 in centre-cutting 2-flute end mill"
 diameter_mm = 7.9375
+# Shrum Solutions Tri Fly fly cutter (owner, 2026-11-16, relayed by Main):
+# 2 in cutting Ø, three TCGT 32.52 carbide inserts, 3/4 in shank held in the
+# 3/4 in R8 collet. https://www.shrumsolutions.com/product-page/tri-fly and
+# https://www.shrumsolutions.com/general-5 (inserts).
+[tools.basebar-trifly]
+description = "Shrum Tri Fly, 2 in, 3 TCGT 32.52 inserts, 3/4 in shank"
+diameter_mm = 50.8
+# The base bar's Setup 3 X0 probe; inventory, wiring and holder:
+# cad/config/shop-equipment.toml gauges.touch-probe-diy0-tp05.
+[tools.basebar-probe]
+description = "DIY0 TP05 3D touch probe, 6 mm shank"
 
 [settings.basebar-edge-6061-t6511]
 tool = "basebar-em-half"
@@ -188,6 +199,17 @@ tool = "basebar-em-face"
 material = "6061-t6511"
 rpm = 850
 feed = "6.8 in/min"
+
+# Base-bar facing on the Tri Fly (owner, 2026-11-16, relayed by Main): 2500 rpm
+# on the low belt, .004 in/tooth: 2500 * 3 * .004 = 30 in/min (762 mm/min).
+# prechips 0.11.3 passes the plan's face cuts at .004; .005 and .006 are refused
+# on axial_ratio = 1 (prechips#429). #2850 keeps the dechatter sweep
+# (.004–.006 in/tooth at ≤ 2500 rpm) open.
+[settings.basebar-trifly-6061-t6511]
+tool = "basebar-trifly"
+material = "6061-t6511"
+rpm = 2500
+feed = "30 in/min"
 
 # Source: end-bracket.toml and feed-lever.toml; hand travelers dated
 # 2026-11-02 (MHA-CH-06-TL-28/TL-26 v47), the v48 manifest notes (#29 tap

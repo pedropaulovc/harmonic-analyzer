@@ -38,12 +38,13 @@
     <text x="-8" y="153" text-anchor="end" font-size="13">jack: touch only</text>
   </g>
 
-  <!-- 3/4 end mill facing the top; its path over the bar -->
-  <rect class="cutter" x="345" y="34" width="31" height="26"/>
-  <rect class="cutter" x="350" y="60" width="21" height="28"/>
-  <text x="384" y="56">3/4 in end mill faces full length</text>
-  <line class="arrow" x1="384" y1="74" x2="472" y2="74"/>
-  <text x="478" y="79">cutter path +X</text>
+  <!-- 2 in Tri Fly facing the top: 3/4 shank, wide body; its path over the bar -->
+  <rect class="cutter" x="350" y="34" width="21" height="40"/>
+  <rect class="cutter" x="320" y="74" width="81" height="14"/>
+  <text x="410" y="40">2 in Tri Fly faces full length</text>
+  <text x="410" y="58" font-size="13">Z0 = parallels' top</text>
+  <line class="arrow" x1="410" y1="74" x2="498" y2="74"/>
+  <text x="504" y="79">+X</text>
 
   <!-- Top view: final orientation for marking; blank length, finished width -->
   <text class="title" x="10" y="240">Top view</text>
