@@ -150,6 +150,7 @@ beam = "other"
 [[setups.operations]]
 speed_kind = "other"
 tool = "saw"
+drilling = "none"
 sizing = "other"
 instruction = "Saw {{process.quantity:d}} × {{process.blank_length_in:fraction}} in blanks from {{process.blank_thickness_in:fraction}} × {{process.blank_width_in:fraction}} in bar, bar flat on the saw bed."
 feed = "hand"
@@ -171,6 +172,7 @@ beam = { axis = "x", hold = "between", extent_mm = [0, "{{cad.blank_length_mm}}"
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-half"
+drilling = "none"
 sizing = "other"
 instruction = "1/2 in end mill out 1.92 in (48.8 mm) from the collet, as measured (dechatter v11). Cutter .04–.08 below, in two equal depth levels (≤ .30 each). Front edge, conventional, table −X (cutter +X): rough ≤ .100 radial, finish .010; note finish-pass Y; mark ZERO EDGE."
 settings = "em-half-hss-6061-v11-wide"
@@ -182,6 +184,7 @@ milling_cuts = [
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-half"
+drilling = "none"
 sizing = "other"
 instruction = "Opposite edge, conventional, table +X (cutter −X), two equal depth levels; D = measured cutter Ø. Rough to cutter-centre Y = front-pass Y + {{cad.width_rough_in:.3f}} + D; finish at front-pass Y + {{cad.width_in:.3f}} + D."
 instruction_detailed = "Opposite edge, conventional: table moves +X (cutter −X). Measure the cutter: D. The front-pass Y is the cutter centre, D/2 outside ZERO EDGE, so this edge's cutter centre sits the width plus D beyond it. Each pass runs at two equal depth levels, ≤ .30 each. Rough passes of at most .100 radial down to cutter-centre Y = front-pass Y + {{cad.width_rough_in:.3f}} + D; caliper the width at both ends; finish in one pass at front-pass Y + {{cad.width_in:.3f}} + D. Never set the DRO to {{cad.width_in:.3f}} alone: that cuts the bar a cutter diameter narrow."
@@ -214,6 +217,7 @@ beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.blank_length_mm
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-face"
+drilling = "none"
 sizing = "other"
 instruction = "Face full length by programs BB02/BB03: zigzag passes along X (climb on alternate passes: ball screws, owner ruling 2026-11-16), .60 stepover, .02 past each edge. Side 1: one level, ~half the allowance. Flip end-for-end, ZERO EDGE at fixed jaw; side 2: one level to {{cad.thickness_in:.4f}}."
 # TODO(#2850): facing is ~107 min of the two bars' cutting at these chart
@@ -228,6 +232,7 @@ milling_cuts = [
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-half"
+drilling = "none"
 sizing = "other"
 instruction = "1/2 in end mill out 1.92 in (48.8 mm), as measured. Cutter .04 below bar, in two equal depth levels. Left end, conventional (table away, cutter −Y), .020 passes: X0 here; mark ZERO END. Right end, conventional (table toward you, cutter +Y), .010 passes to cutter-centre X = {{cad.length_in:.4f}} + D/2. Mark top: bar 1 C'BORE SIDE, bar 2 RAIL SIDE."
 instruction_detailed = "Measure cutter D. Cutter .04 below bar; it runs just past the end, clear of parallels and jacks. Every pass runs at two equal depth levels, ≤ .30 each. Left end: conventional, table moving away from you (cutter −Y), .020 passes until clean; mark ZERO END both faces; cutter still touching that end, set DRO X = −D/2 (X0 = end face). Right end: conventional, table moving toward you (cutter +Y), .010 passes; read length on DRO before the last pass; final cutter-centre X = {{cad.length_in:.4f}} + D/2. With ZERO END left and ZERO EDGE at the back jaw, mark the upper face: bar 1 C'BORE SIDE, bar 2 RAIL SIDE."
@@ -247,6 +252,7 @@ milling_cuts = [
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-half"
+drilling = "none"
 sizing = { kind = "band", band_mm = "{{cad.slot_cutter_band_mm}}" }
 instruction = "S1–S2 entries: each step, plunge at the cutter-centre corner nearest that slot's jack."
 rpm = 1250
@@ -263,6 +269,7 @@ milling_cuts = [
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-half"
+drilling = "none"
 sizing = { kind = "band", band_mm = "{{cad.slot_cutter_band_mm}}" }
 instruction = "{{cad.slot_range}}, {{cad.slot_cutter_in:.3dot}} cutter only, ±{{cad.slot_position_tol_in:.2f}}: after each entry, traverse the cutter-centre rectangle; {{process.slot_step_in:.2dot}} steps to {{cad.slot_depth_in:.2f}} deep; {{cad.slot_width_in:.3f}} wide, {{cad.slot_spacing_in:.3f}} arc centres."
 instruction_detailed = "{{cad.slot_range}}, {{cad.slot_cutter_in:.3dot}} cutter only, positions ±{{cad.slot_position_tol_in:.2f}}: after each entry plunge (op above), traverse the cutter-centre rectangle at each depth {{cad.slot_depths_in}} below top (light steps: the jacks only push up, so the jaws alone hold the bar down against the end mill's lift). Makes {{cad.slot_width_in:.3f}} wide, {{cad.slot_spacing_in:.3f}} between arc centres."
@@ -311,13 +318,12 @@ gauge_checks = [
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "spot"
+drilling = "none"
 sizing = "other"
 instruction = "Spot all holes Ø.125: R1–R8 on the CNC by program BB05 (cam:ch_rocker_arm_tl_oblique_base_bar), rail X ±{{cad.rail_station_tol_in:.4f}} as posted; {{cad.bracket_range}} bar 1 only by DRO, X/Y ±{{cad.bracket_position_tol_in:.3f}}. Drill tips .125 past underside. Rail row ±{{cad.rail_row_tol_in:.2f}}."
 rpm = 2800
 feed = "BB05 program (R1–R8); hand (B1–B4)"
 # Spotting cones are drilled away later; the jaws alone carry them.
-peck = "other"
-peck_reason = "centre-drill spots"
 milling_cuts = [
   { name = "spot R1–R4, B1–B2", kind = "drill", phase = "rough", material = "aluminum_6061", cutter_dia_mm = 3.175, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = [9.964, 69.964, 129.964, 189.964, 47.484] },
   { name = "spot R5–R8, B3–B4", kind = "drill", phase = "rough", material = "aluminum_6061", cutter_dia_mm = 3.175, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = [249.964, 309.964, 369.964, 429.964, 428.0] },
@@ -330,6 +336,7 @@ rows = "{{cad.hole_rows}}"
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "rail-drill"
+drilling = "twist_drill"
 sizing = { kind = "tap_drill", tap = "tap" }
 instruction = "R1–R8 through on the CNC by program BB07 (cam:ch_rocker_arm_tl_oblique_base_bar), R1–R4 over the left jack; full-retract pecks every {{process.rail_peck_mm:in.3dot}}."
 rpm = 2800
@@ -345,6 +352,7 @@ milling_cuts = [
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "rail-drill"
+drilling = "twist_drill"
 sizing = { kind = "tap_drill", tap = "tap" }
 instruction = "R5–R8 in the same BB07 run, over the right jack."
 rpm = 2800
@@ -359,6 +367,7 @@ milling_cuts = [
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "bracket-drill"
+drilling = "twist_drill"
 sizing = { kind = "band", band_mm = "{{cad.bracket_dia_band_mm}}" }
 instruction = "Bar 1 only: B1–B2 through over the left jack; no peck."
 rpm = 2800
@@ -373,6 +382,7 @@ milling_cuts = [
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "bracket-drill"
+drilling = "twist_drill"
 sizing = { kind = "band", band_mm = "{{cad.bracket_dia_band_mm}}" }
 instruction = "Bar 1 only: B3–B4 over the right jack, as above."
 rpm = 2800
@@ -387,6 +397,7 @@ milling_cuts = [
 [[setups.operations]]
 speed_kind = "other"
 tool = "tap"
+drilling = "none"
 sizing = "other"
 instruction = "Tap {{cad.rail_range}} through, {{cad.rail_thread}}, in the spring tap guide."
 instruction_detailed = "Tap {{cad.rail_range}} through, {{cad.rail_thread}}: the tap in the spring tap guide held in the spindle, squared to the quill (owner ruling 2026-11-16; cad/config/shop-equipment.toml tools.spring-tap-guide), spindle off; turn it by hand with tap fluid, backing off to clear chips."
@@ -395,6 +406,7 @@ feed = "hand"
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "counterbore"
+drilling = "none"
 sizing = { kind = "band", band_mm = "{{cad.counterbore_dia_band_mm}}" }
 instruction = "Bar 1 only: counterbore B1–B2 {{cad.counterbore_depth_in:.3f}} deep from top, over the left jack."
 rpm = 2000
@@ -407,6 +419,7 @@ milling_cuts = [
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "counterbore"
+drilling = "none"
 sizing = { kind = "band", band_mm = "{{cad.counterbore_dia_band_mm}}" }
 instruction = "Bar 1 only: counterbore B3–B4, as above, over the right jack."
 rpm = 2000

@@ -168,6 +168,7 @@ beam = "other"
 [[setups.operations]]
 speed_kind = "other"
 tool = "saw"
+drilling = "none"
 sizing = "other"
 instruction = "Saw {{process.quantity:d}} × {{process.blank_length_in:.2f}} from the 1173 bar, waste side of the line; blank ≥{{process.blank_min_length_in:.2f}}. Then saw a 1.0 strip off the same bar and cut it to about 1 × 3: the reamer's test coupon."
 feed = "hand"
@@ -193,6 +194,7 @@ vise_hold = "other"
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-half"
+drilling = "none"
 sizing = "other"
 instruction = "Cutter .04–.08 below underside. Front edge in +X, conventional; rough .050–.080 radial, finish .005–.010; take about half the {{process.blank_width_in:.1f}} − {{cad.width_in:.1f}} excess. Mark ZERO EDGE on TOP. Keep this clamping."
 settings = "basebar-edge-6061-t6511"
@@ -205,6 +207,7 @@ milling_cuts = [
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-half"
+drilling = "none"
 sizing = "other"
 instruction = "Back edge in −X, conventional; rough .050–.080 radial, finish to {{cad.width_in:.1f}} wide from ZERO EDGE."
 settings = "basebar-edge-6061-t6511"
@@ -236,6 +239,7 @@ vise_hold = "other"
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-half"
+drilling = "none"
 sizing = "other"
 instruction = "Cutter .04 below plate. Left end in −Y to the scribed line: .100 passes, last .010; with the cutter touching it set X = −D/2 (D = measured cutter Ø); mark ZERO END on TOP. Right end in +Y: .100 passes, last .010 at cutter-centre X = {{cad.length_in:.3f}} + D/2."
 instruction_detailed = "Measure the cutter, D. Cutter .04 below the plate. Square the left end in −Y down to the scribed ZERO END line: .100 passes, then a last .010 pass that just splits the line; with the cutter still touching that end, set DRO X = −D/2, so X0 is the end face; mark ZERO END on TOP. Right end in +Y: .100 passes, reading the length on the DRO, until a last .010 pass at cutter-centre X = {{cad.length_in:.3f}} + D/2."
@@ -271,6 +275,7 @@ vise_hold = "other"
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-face"
+drilling = "none"
 sizing = "other"
 instruction = "Caliper the plate at the four corners and mid-length. If every reading is {{cad.thickness_min_in:.3dot}}–{{cad.thickness_max_in:.3dot}}, skip to the check; if any is under {{cad.thickness_min_in:.3dot}}, stop: the bar is undersize. Else face TOP only, +X, +Y stepover .60: passes ≤.030 to Z {{cad.thickness_max_in:.3dot}}, last pass to Z {{cad.thickness_in:.3dot}}; then the footprints the same way; re-mark ZERO END and ZERO EDGE."
 instruction_detailed = "The plate is still on the blocks: caliper it at the four finished corners and at mid-length. If every reading, the thickest included, is already {{cad.thickness_min_in:.3dot}}–{{cad.thickness_max_in:.3dot}}, the plate meets the drawing: skip the facing and do the check below. If any reading is under {{cad.thickness_min_in:.3dot}}, stop: the bar is undersize and facing cannot help. Otherwise touch TOP with a cigarette paper at mid-length and set Z to that spot's reading. Face TOP only, feeding +X along the whole length and stepping .60 in +Y, round each edge strap's footprint: passes of .030 or less down to Z = {{cad.thickness_max_in:.3dot}}, then a last pass to Z = {{cad.thickness_in:.3dot}}. After that last full-area pass, without touching Z: put the end straps back on at mid-width over the end blocks, toes on faced metal with paper under them, snug them, then take the edge straps off and face their footprints the same way: passes of .030 or less to Z = {{cad.thickness_max_in:.3dot}}, last pass at Z = {{cad.thickness_in:.3dot}}. Facing takes off the ZERO END and ZERO EDGE marks: mark them on TOP again. UNDERSIDE stays as the bar came."
@@ -313,6 +318,7 @@ beam = { axis = "x", hold = "between", extent_mm = [0, "{{cad.length_mm}}"], sup
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "spot"
+drilling = "none"
 sizing = "other"
 instruction = "Spot A1, A2, B1, B2 and the coupon (full Ø.19 cone) and CL, CR (cone just under .136) from one X0/Y0, each axis approached from the same side. Note 2: B1, A2, B2, CL, CR, R1–R4 ±{{cad.location_tol_in:.3dot}} from A1 in X and the A1–B1 line in Y; A2, B2 {{cad.outer_row_in:.3dot}} ±{{cad.outer_row_tol_in:.3dot}} above that line."
 instruction_detailed = "Edge-find ZERO END for X0 and ZERO EDGE for Y0. Spot A1, A2, B1, B2, CL and CR at the table's X/Y: CL and CR with the cone just under the #29 (.136); A1, A2, B1, B2 down to the full Ø.19 body, the largest cone a #2 centre drill cuts, so the 23/64 starts true; spot the coupon's test hole (X 10.25, Y 5.9) the same way. R1–R4, L1 and L2 follow in the next op. Every position is ±{{cad.location_tol_in:.3dot}}, except that A2 and B2 sit {{cad.outer_row_in:.3dot}} ±{{cad.outer_row_tol_in:.3dot}} above the A1–B1 line. Sheet 2's note 2 measures B1, A2, B2, CL, CR and R1–R4 from A1 and that line, not from the corner, so keep one zero for every hole and approach each X and each Y from the same side: the holes then sit right relative to A1 even if the edge-find is a little off."
@@ -320,8 +326,6 @@ rpm = 2800
 feed = "hand"
 # The #2 centre drill's Ø3/16 body cone, .001 in/rev.
 beam = { axis = "x", hold = "between", extent_mm = [0, "{{cad.length_mm}}"], supports_mm = "{{cad.end_block_x_mm}}", section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
-peck = "other"
-peck_reason = "centre-drill spots"
 milling_cuts = [
   { name = "A1, A2, B1, B2", kind = "drill", phase = "rough", material = "aluminum_6061", cutter_dia_mm = 4.7625, flutes = 2, feed_per_tooth_mm = 0.0127, stations_mm = "{{cad.pin_x_mm}}" },
   { name = "CL, CR", kind = "drill", phase = "rough", material = "aluminum_6061", cutter_dia_mm = 4.7625, flutes = 2, feed_per_tooth_mm = 0.0127, stations_mm = "{{cad.clamp_x_mm}}" },
@@ -334,12 +338,11 @@ rows = "{{cad.hole_rows}}"
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "spot"
+drilling = "none"
 sizing = "other"
 instruction = "Spot R1–R4 (cone just under .089) and L1, L2 (full Ø.19 cone) the same way, from the same zero."
 rpm = 2800
 feed = "hand"
-peck = "other"
-peck_reason = "centre-drill spots"
 milling_cuts = [
   { name = "R1–R4", kind = "drill", phase = "rough", material = "aluminum_6061", cutter_dia_mm = 4.7625, flutes = 2, feed_per_tooth_mm = 0.0127, stations_mm = "{{cad.riser_x_mm}}" },
   { name = "L1, L2", kind = "drill", phase = "rough", material = "aluminum_6061", cutter_dia_mm = 4.7625, flutes = 2, feed_per_tooth_mm = 0.0127, stations_mm = "{{cad.lever_x_mm}}" },
@@ -357,6 +360,7 @@ milling_cuts = [
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "drill-43"
+drilling = "twist_drill"
 sizing = { kind = "band", band_mm = "{{cad.riser_drill_band_mm}}" }
 instruction = "R1–R4 through; full-retract pecks every {{process.riser_peck_mm:in.3dot}}."
 rpm = 2800
@@ -368,6 +372,7 @@ milling_cuts = [{ name = "R1–R4 at .001 in/rev", kind = "drill", phase = "fini
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "drill-29"
+drilling = "twist_drill"
 sizing = { kind = "band", band_mm = "{{cad.clamp_drill_band_mm}}" }
 instruction = "CL, CR through; chip-break pecks every {{process.clamp_peck_mm:in.3dot}}."
 rpm = 2800
@@ -380,6 +385,7 @@ milling_cuts = [{ name = "CL, CR at .002 in/rev", kind = "drill", phase = "finis
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "drill-f"
+drilling = "twist_drill"
 sizing = { kind = "band", band_mm = "{{cad.lever_drill_band_mm}}" }
 instruction = "L1, L2 through; no peck."
 instruction_detailed = "L1 and L2 straight through, no peck (the plate is under 2 drill diameters thick): light feed for the first .05 so the drill follows the spot, then a steady feed."
@@ -392,6 +398,7 @@ milling_cuts = [{ name = "L1, L2 at .002 in/rev", kind = "drill", phase = "finis
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "drill-23-64"
+drilling = "twist_drill"
 sizing = "other"
 instruction = "A1, B1, A2, B2 and the coupon's test hole through for the reamer; no peck."
 instruction_detailed = "Chuck the 23/64 short, no more than 1-1/4 in out of the chuck, so it cannot wander. Drill A1, B1, A2, B2 straight through, no peck: light feed for the first .05 in the spot, then a steady feed. Drill the coupon's test hole the same way."
@@ -405,6 +412,7 @@ milling_cuts = [{ name = "A1, A2, B1, B2 at .004 in/rev", kind = "drill", phase 
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "reamer"
+drilling = "none"
 sizing = { kind = "band", band_mm = "{{cad.pin_dia_band_mm}}" }
 instruction = "Indicate the reamer's runout in the chuck, ≤.0005. Ream the coupon's test hole and gauge it, then A1, B1, A2, B2 through."
 instruction_detailed = "Reamer in the drill chuck: indicate it just above the flutes and turn the chuck by hand; re-seat it until the runout reads .0005 or less, and leave it in the chuck until the four plate holes are done. Ream the coupon's test hole first, exactly as below, then gauge it: the .376 GO pin enters and the .377 NO-GO does not start. If it fails, stop and sort out the reamer before touching the plate: these four holes cannot be reworked. Then, at the same X/Y as each 23/64 hole, brush on cutting fluid (WD-40 or kerosene for aluminium) and feed down in one steady pass, about .004 per revolution (11.2 in/min at 2800 rpm: about 4.3 s for the .8 in of travel, the plate plus the reamer's lead past the underside), until the full-diameter flutes are through the underside; do not dwell or stop in the bore. Withdraw with the spindle still running, then wipe the chips off the flutes before the next hole."
@@ -415,8 +423,6 @@ feed = "hand"
 # No reamer kind: its thrust is declared as a twist drill's at the reamer Ø
 # (the larger, chisel-edge figure), .004 in/rev.
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.length_mm}}"], clamp_mm = "{{cad.block_span_mm}}", section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
-peck = "other"
-peck_reason = "reamer through the 23/64 holes"
 milling_cuts = [{ name = "ream A1, A2, B1, B2 at .004 in/rev", kind = "drill", phase = "finish", material = "aluminum_6061", cutter_dia_mm = 9.5504, flutes = 2, feed_per_tooth_mm = 0.0508, stations_mm = "{{cad.pin_x_mm}}" }]
 inspection = "Ø{{cad.pin_dia_min_in:.4dot}}–{{cad.pin_dia_max_in:.4dot}}: the .376 GO pin enters full depth, the .377 NO-GO does not start, each hole."
 gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.pin_dia_band_mm}}" }]
@@ -434,6 +440,7 @@ rows = "{{cad.relation_rows}}"
 [[setups.operations]]
 speed_kind = "other"
 tool = "tap-4-40"
+drilling = "none"
 sizing = "other"
 instruction = "Tap R1–R4 {{cad.riser_thread}} through."
 instruction_detailed = "Put the 4-40 plug tap in the drill chuck over each hole, spindle off, and turn the chuck by hand about three turns with light quill pressure so it starts square. Release the chuck and finish through with the tap wrench, backing off a half turn every turn: a 4-40 tap breaks easily in a chip-packed hole."
@@ -442,6 +449,7 @@ feed = "hand"
 [[setups.operations]]
 speed_kind = "other"
 tool = "tap-8-32"
+drilling = "none"
 sizing = "other"
 instruction = "Tap CL, CR {{cad.clamp_thread}} through."
 instruction_detailed = "Tap CL and CR {{cad.clamp_thread}} through as R1–R4: started square from the drill chuck, spindle off, finished with the tap wrench."
@@ -450,6 +458,7 @@ feed = "hand"
 [[setups.operations]]
 speed_kind = "other"
 tool = "tap-5-16"
+drilling = "none"
 sizing = "other"
 instruction = "Tap L1, L2 {{cad.lever_thread}} through."
 instruction_detailed = "Tap L1 and L2 {{cad.lever_thread}} through as R1–R4: started square from the drill chuck, spindle off, finished with the tap wrench."

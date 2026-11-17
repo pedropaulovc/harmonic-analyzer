@@ -153,6 +153,7 @@ diagram = { file = "diagrams/riser/saw.svg", alt = "The riser blank from the mea
 [[setups.operations]]
 speed_kind = "other"
 tool = "saw"
+drilling = "none"
 sizing = "other"
 instruction = "Cut {{process.blank_length_in:.2f}} from the measured bar end, ~{{process.kerf_in:fraction}} kerf, waste side of the line; blank ≥{{process.blank_min_length_in:.2f}}."
 feed = "hand"
@@ -182,6 +183,7 @@ beam = { axis = "x", hold = "between", extent_mm = [0, "{{cad.blank_length_mm}}"
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-face"
+drilling = "none"
 sizing = "other"
 instruction = "Stage A: face the left span, cutter edge ≥{{process.strap_clear_in:.1dot}} off each toe; ≤.010 passes, +X, stepover .60; last pass .005 to Z {{cad.thickness_in:.3dot}}."
 instruction_detailed = "Stage A: clean the table and the bar underside first: a chip under this thin bar prints through as a step. Touch the cutter on a paper strip on the table beside the bar and set Z = +.003 (the paper). Face the left span between the end and middle straps, cutter edge ≥{{process.strap_clear_in:.1dot}} off each toe: ≤.010 per pass, +X, stepover .60; last pass .005 deep, at Z {{cad.thickness_in:.3dot}}."
@@ -194,6 +196,7 @@ milling_cuts = [
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-face"
+drilling = "none"
 sizing = "other"
 instruction = "Stage A: face the right span the same way."
 settings = "basebar-face-6061-t6511"
@@ -206,6 +209,7 @@ milling_cuts = [
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-face"
+drilling = "none"
 sizing = "other"
 instruction = "Stage B straps on, A's off (bar unmoved): face the left end to the same Z, ≥{{process.face_overlap_in:.2dot}} over A; last pass .005."
 settings = "basebar-face-6061-t6511"
@@ -218,6 +222,7 @@ milling_cuts = [
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-face"
+drilling = "none"
 sizing = "other"
 instruction = "Face the strip under the old middle strap the same way."
 settings = "basebar-face-6061-t6511"
@@ -230,6 +235,7 @@ milling_cuts = [
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-face"
+drilling = "none"
 sizing = "other"
 instruction = "Face the right end the same way."
 settings = "basebar-face-6061-t6511"
@@ -266,6 +272,7 @@ beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.blank_length_mm
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-half"
+drilling = "none"
 sizing = "other"
 instruction = "Hold 1: cutter centred on the edge; clean up the top edge, ~{{process.edge_cleanup_in:.2dot}} in .010 passes, last .005. Mark it ZERO EDGE."
 instruction_detailed = "Hold 1: one parallel only: the .24 bar is too thin to straddle a pair. Tap the bar down until the parallel will not slide. Cutter centred on the edge, clean up the top edge along X in .010 passes, last .005, ~{{process.edge_cleanup_in:.2dot}} in all, until it is milled full length: the thin bar overhangs the jaws ~{{cad.blank_centred_overhang_in:.1f}} each side, so heavier passes push it sideways. Mark it ZERO EDGE on both faces."
@@ -278,6 +285,7 @@ milling_cuts = [
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-half"
+drilling = "none"
 sizing = "other"
 instruction = "Hold 2: turn end-for-end, ZERO EDGE down on the parallel. Measure width w; .010 passes to .005 over, then .005 to {{cad.width_in:.3f}}."
 instruction_detailed = "Hold 2: turn end-for-end, ZERO EDGE down on the parallel. Measure the width w, touch the cutter on the top edge and set Z = w. Cutter centred on the edge, take .010 passes to Z .005 over {{cad.width_in:.3f}}, then a .005 pass to Z {{cad.width_in:.3f}}."
@@ -313,6 +321,7 @@ beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.length_mm}}"], 
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-half"
+drilling = "none"
 sizing = "other"
 instruction = "Hold 1: cutter .04 below the bar; clean up the left end, .02 X steps, conventional: table away from you. Mark ZERO END."
 settings = "riser-em-half-6061-t6511"
@@ -323,12 +332,11 @@ milling_cuts = [
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "spot"
+drilling = "none"
 sizing = "other"
 instruction = "Spot P1, cone ~.10 across. X ±{{cad.stop_station_tol_in:.2dot}}; Y {{cad.stop_row_min_in:.2dot}}–{{cad.stop_row_max_in:.2dot}}."
 rpm = 2800
 feed = "hand"
-peck = "other"
-peck_reason = "centre-drill spot"
 milling_cuts = [
   { name = "P1 spot", kind = "drill", phase = "rough", material = "aluminum_6061", cutter_dia_mm = 2.54, flutes = 2, feed_per_tooth_mm = 0.0127, stations_mm = "{{cad.p1_x_mm}}" },
 ]
@@ -340,6 +348,7 @@ rows = "{{cad.stop_rows}}"
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "drill-30"
+drilling = "twist_drill"
 sizing = { kind = "band", band_mm = "{{cad.stop_dia_band_mm}}" }
 instruction = "P1 through, beyond the left jaw side."
 rpm = 2800
@@ -353,6 +362,7 @@ milling_cuts = [
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-half"
+drilling = "none"
 sizing = "other"
 instruction = "Hold 2: slide left; re-find X0 on ZERO END. Cut the right end, .02 steps, conventional: table toward you; final X = {{cad.length_in:.3f}} + D/2."
 instruction_detailed = "Hold 2: slide left; re-find X0 on ZERO END, keep Y. Measure the cutter diameter D. Cut the right end in .02 X steps, conventional: table moving toward you; final X = {{cad.length_in:.3f}} + D/2."
@@ -367,13 +377,12 @@ gauge_checks = [{ gauge = "mill-x-dro", band_mm = "{{cad.length_band_mm}}" }]
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "spot"
+drilling = "none"
 sizing = "other"
 instruction = "Spot P2 as P1."
 rpm = 2800
 feed = "hand"
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.length_mm}}"], clamp_mm = "{{cad.ends_hold2_jaw_mm}}", section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
-peck = "other"
-peck_reason = "centre-drill spot"
 milling_cuts = [
   { name = "P2 spot", kind = "drill", phase = "rough", material = "aluminum_6061", cutter_dia_mm = 2.54, flutes = 2, feed_per_tooth_mm = 0.0127, stations_mm = "{{cad.p2_x_mm}}" },
 ]
@@ -381,6 +390,7 @@ milling_cuts = [
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "drill-30"
+drilling = "twist_drill"
 sizing = { kind = "band", band_mm = "{{cad.stop_dia_band_mm}}" }
 instruction = "P2 through, beyond the right jaw side."
 rpm = 2800
@@ -433,13 +443,12 @@ rows = "{{cad.spot_rows}}"
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "spot"
+drilling = "none"
 sizing = "other"
 instruction = "Pick up each mark on the centre-drill point, lock X/Y, spot ~.10 across (HUB: full cone, ~.18) and drill it (below) before the next. Hold C: R1, R2 before HUB."
 instruction_detailed = "Pick up each mark: spindle stopped, bring the centre-drill point down into the mark and move X/Y until the point seats at the bottom without pushing the bar sideways; lock both axes. Spot ~.10 across (HUB: the full centre-drill cone, ~.18), then drill that hole with the drills below at the same setting before moving to the next mark. In hold C drill R1 and R2 before HUB, so the HUB drills come last."
 rpm = 2800
 feed = "hand"
-peck = "other"
-peck_reason = "centre-drill spots"
 milling_cuts = [
   { name = "spots", kind = "drill", phase = "rough", material = "aluminum_6061", cutter_dia_mm = 2.54, flutes = 2, feed_per_tooth_mm = 0.0127, stations_mm = "{{cad.spot_y_mm}}" },
   { name = "HUB spot", kind = "drill", phase = "rough", material = "aluminum_6061", cutter_dia_mm = 4.572, flutes = 2, feed_per_tooth_mm = 0.0127, stations_mm = "{{cad.hub_y_mm}}" },
@@ -448,6 +457,7 @@ milling_cuts = [
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "drill-30"
+drilling = "twist_drill"
 sizing = { kind = "band", band_mm = "{{cad.screw_dia_band_mm}}" }
 instruction = "R1–R4 through."
 rpm = 2800
@@ -461,6 +471,7 @@ milling_cuts = [
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "drill-9"
+drilling = "twist_drill"
 sizing = { kind = "band", band_mm = "{{cad.clamp_dia_band_mm}}" }
 instruction = "CL, CR through."
 rpm = 2800
@@ -474,6 +485,7 @@ milling_cuts = [
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "drill-quarter"
+drilling = "twist_drill"
 sizing = "other"
 instruction = "HUB pilot through."
 rpm = 2500
@@ -487,6 +499,7 @@ milling_cuts = [
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "drill-12mm"
+drilling = "twist_drill"
 sizing = { kind = "band", band_mm = "{{cad.hub_dia_band_mm}}" }
 instruction = "HUB through."
 instruction_detailed = "HUB through. A large drill grabs in thin plate and can leave a lobed hole: steady light feed, ease off as the point breaks through."
@@ -501,13 +514,12 @@ milling_cuts = [
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "csk"
+drilling = "none"
 sizing = "other"
 instruction = "Turn over, marked face down, ZERO EDGE now at the moving jaw; same holds. Low belt. Countersink R1–R4 Ø{{cad.csk_dia_in:.2dot}} × {{cad.csk_angle_deg:g}}°."
 instruction_detailed = "Turn the riser over, marked face down, ZERO EDGE now at the moving jaw; same holds. Move the belt to the low range: a countersink chatters at drilling speed. Centre the countersink in each R hole, spindle stopped, then sink until the mouth calipers Ø{{cad.csk_dia_min_in:.2dot}}–{{cad.csk_dia_max_in:.2dot}}; a #4-40 flat head then sits just below the face."
 rpm = 600
 feed = "hand"
-peck = "other"
-peck_reason = "countersinks"
 milling_cuts = [
   { name = "R1-R4 countersinks", kind = "drill", phase = "finish", material = "aluminum_6061", cutter_dia_mm = 6.35, flutes = 2, feed_per_tooth_mm = 0.0127, stations_mm = "{{cad.screw_y_mm}}" },
 ]

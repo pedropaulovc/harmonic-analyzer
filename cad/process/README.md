@@ -174,16 +174,17 @@ carry 0.11.0's `milling_deflection` data (a `beam` per non-lathe setup or
 operation, `milling_cuts` per spindle operation) and pass that check enforced;
 the end-bracket plan's tap flags and the dropped feed-lever grip-end setup
 need the 0.11.0 jig pictures, so they pass under `@latest` from 0.11.0 (released). The riser plan needs 0.11.0 too
-(its `harmonic_riser` adapter). Every plan with a drill operation (base bar,
-end bracket, feed lever, riser, carrier, pivot and feed blocks) carries
+(its `harmonic_riser` adapter). Every plan (base bar, end bracket, feed
+lever, riser, carrier, pivot and feed blocks, leadscrew kit) carries
 `drill_pecking` data and so needs prechips 0.11.4 (pedropaulovc/prechips#403):
-each drill cut's operation declares `peck` (`"none"`, `{ step_mm, retract }`,
-or `"other"` with a `peck_reason` for a spot, countersink or reamer) and the
-drilled hole's `hole_depth_mm`. Each step is one mm process parameter
-(`*_peck_mm`, one drill Ø) bound into both `step_mm` and the instruction
-(`{{process.<name>:in.3dot}}`), and the feed-block pilot depth is
-`cad.lug_bore_depth_mm`, derived from `process.lug_bore_depth_in`; earlier
-releases refuse those fields and bindings.
+every operation with a tool declares `drilling` (`"twist_drill"`, or `"none"`
+for spots, countersinks, reamers, end mills, taps, saws and files), and each
+twist-drilled hole declares `peck` (`"none"` or `{ step_mm, retract }`) and
+`hole_depth_mm`. Each step is one mm process parameter (`*_peck_mm`, one
+drill Ø) bound into both `step_mm` and the instruction
+(`{{process.<name>:in.3dot}}`), and the feed-block pilot depth is the process
+parameter `lug_bore_depth_mm`, printed the same way; earlier releases refuse
+those fields and bindings.
 
 The riser plan (TL-24) needs prechips 0.11.0, which adds its `harmonic_riser`
 adapter and the `milling_deflection` check. It passes both profiles, with every
