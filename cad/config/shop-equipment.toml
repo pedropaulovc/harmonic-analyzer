@@ -1415,14 +1415,29 @@ status = "not made: shop-made"
 purchase = "Make from 1/2 x 3 in 6061 flat, 13 in long: mill both long edges for the vise jaws; in the vise, face the top in place (the plan's Z0); a fence strip along the back edge, its front face milled in place (Y0) and its top under the strap's finished thickness; a through relief hole under the hub hole; four mounting holes for the edge clamps along the front at the plan's clamp stations."
 use = "MHA-CH-13 Setups 2-4: seats the 1/8 x 1-1/2 in blank for facing, the hub hole and the outline"
 
+# Model picked from Mitee-Bite's Pitbull table (read 2026-11-17): the 4-40 size
+# is the only one whose minimum clamped height D (.075 in) is under the
+# strap's finished .098 in; the 8-32 size needs .100 in. The clamp sits in a
+# slot milled into the plate and, on the maker's installation section, its
+# nose stands about D above the plate. That height is read off a drawing, not
+# a dimension: measure the installed clamp against the .098 in face cut before
+# the first finish pass. Knife edge because the gripped edge is waste.
 [fixtures.edge-clamps-low-profile]
-name = "Low-profile edge clamps, 4"
+name = "Mitee-Bite Pitbull clamps 26000, tool steel knife edge, 4-40, pack of 8"
 kind = "edge_clamp"
 present = false
 status = "not owned: to buy (owner approved, 2026-11-17)"
-pieces = 4
-purchase = "Four low-profile edge (side) clamps that push the blank's edge toward the fence and down onto the plate, their tops no higher than 2.0 mm (.079 in) above the plate when clamped on a 3.2 mm (.125 in) edge: the face cutter passes over them at the strap's finished .098 in. No make or model chosen."
-use = "MHA-CH-13 Setups 2-4, at the plan's clamp_stations_mm"
+sku = "Mitee-Bite 26000"
+pieces = 8
+min_clamp_height_mm = 1.905
+slot_depth_mm = 3.556
+slot_width_mm = 9.525
+screw_from_work_edge_mm = 3.81
+holding_force_lbf = 650
+max_torque_ft_lb = 1.3
+purchase = "One pack of 8 (4 used, 4 spare). Price not read for 26000; the same-size blunt-edge 26010 was $83.99 at Shars, read 2026-11-17 (https://www.shars.com/mitee-bite-26010-4-40-blunt-edge-pitbull-clamp-8-pcs-set). Each clamp needs a .375 in wide x .140 in deep slot in the sub-plate and a 4-40 tapped hole .150 in from the blank's edge."
+use = "MHA-CH-13 Setups 2-4, at the plan's clamp stations: pushes the blank's edge toward the fence and down onto the plate"
+cite = ["Mitee-Bite Pitbull Clamp inch instructions 0426, table row 26000 (A .150, B .140, C .375, D* .075 minimum clamp height, 4-40 SHCS, 1.30 ft-lb, 650 lb, throw .0075, 8 per package) and its installation section: https://www.miteebite.com/wp-content/uploads/2026/04/PITBULL-INST-0426.pdf"]
 
 # Hub-hole reamer for MHA-CH-13: Ø.4000 +.0005/0 REAM THRU, a press fit on
 # MHA-CH-12. To purchase: not owned; no make, price or stock read. Cutting
