@@ -63,7 +63,7 @@ def test_dimension_table_cells_remain_renderable_prose() -> None:
     assert any(line.startswith("| ") for line in render_markdown(doc).splitlines())
 
 
-def test_tolerance_document_aggregation_and_fit_guard(monkeypatch) -> None:
+def test_tolerance_document_aggregation() -> None:
     import _config
 
     base = yaml.safe_load(
@@ -76,15 +76,8 @@ def test_tolerance_document_aggregation_and_fit_guard(monkeypatch) -> None:
         for key, value in yaml.safe_load(path.read_text(encoding="utf-8")).items()
     }
     assert _config._doc("tolerances") == {**base, "fits": groups}
-    monkeypatch.setenv("HARMONIC_FIT_GROUPS", "gear_mesh")
     assert _config.fit("gear_mesh") == groups["gear_mesh"]
     assert _config.fit("gear_mesh", "rack_backlash_mm") == 0.30
-    with pytest.raises(KeyError, match="outside this build's cache key"):
-        _config.fit("crank_mesh")
-    monkeypatch.setenv("HARMONIC_FIT_GROUPS", "")
-    with pytest.raises(KeyError, match="outside this build's cache key"):
-        _config.fit("gear_mesh")
-    monkeypatch.delenv("HARMONIC_FIT_GROUPS")
     assert _config.fit("crank_mesh") == groups["crank_mesh"]
 
 

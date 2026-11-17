@@ -4047,103 +4047,15 @@ def test_run_subprocess_hands_the_fastener_rows_to_the_build(monkeypatch):
         return type("Done", (), {"returncode": 0})()
 
     monkeypatch.setenv("HARMONIC_FASTENER_ROWS", "inherited-must-not-leak")
-    monkeypatch.setenv("HARMONIC_FIT_GROUPS", "inherited-must-not-leak")
     monkeypatch.setattr(dodo.subprocess, "run", fake_run)
     assert dodo._run_subprocess(["x"], "part:ch_vn_frame_side_screw") == 0
     assert seen["HARMONIC_FASTENER_ROWS"] == "ch-vn-frame-side-screw"
-    assert seen["HARMONIC_FIT_GROUPS"] == dodo._fit_groups_env("part:ch_vn_frame_side_screw")
     seen.clear()
     assert dodo._run_subprocess(["x"], "check:math") == 0
     assert "HARMONIC_FASTENER_ROWS" not in seen
-    assert "HARMONIC_FIT_GROUPS" not in seen
     seen.clear()
     assert dodo._run_subprocess(["x"], "package:features") == 0
     assert "HARMONIC_FASTENER_ROWS" not in seen
-    assert "HARMONIC_FIT_GROUPS" not in seen
-
-
-def test_fit_guard_uses_task_recipe_config_dependencies():
-    dodo = _load_dodo()
-    for task, deps in (
-        (
-            "part:dt_cone_gear",
-            dodo._part_file_deps(
-                dodo.SCRIPTS_DIR / "build_dt_cone_gear.py", "dt_cone_gear"
-            ),
-        ),
-        ("assembly:dt_drive_train", dodo._recipe_files("dt_drive_train")),
-        ("drawing:ch_vn_frame_side_screw", dodo._drawing_file_deps("ch_vn_frame_side_screw")),
-        (
-            "package:features:ch_rocker_arm",
-            dodo._feature_export_file_deps("ch_rocker_arm"),
-        ),
-    ):
-        groups = {
-            Path(dep).stem for dep in deps
-            if Path(dep).parent == (dodo.CONFIG_DIR / "tolerances").resolve()
-            and Path(dep).stem != "_base"
-        }
-        assert dodo._fit_groups_env(task) == ",".join(sorted(groups))
-    # The drive train and its crank pinion read these groups through literal
-    # fit() calls; an empty guard here would refuse a real build. The inch
-    # cone and drum tips read gear_tip; the crank gears sit on cone_line's
-    # stations, so the pinion also reads the cone mesh's edge slack. The
-    # train's stock-form transgear specs read stock_form_quality.
-    assert dodo._fit_groups_env("assembly:dt_drive_train") == (
-        "cone_drum_oblique_mesh,crank_mesh,gear_tip,"
-        "shaft_in_bushing,stock_form_quality"
-    )
-    assert dodo._fit_groups_env("part:dt_crank_pinion") == (
-        "cone_drum_oblique_mesh,crank_mesh,gear_mesh,shaft_in_bushing"
-    )
-    assert dodo._fit_groups_env("check:config") is None
-    assert dodo._fit_groups_env("package:features") is None
-    assert dodo._fit_groups_env("features:ch_rocker_arm") is None
-    with pytest.raises(ValueError, match="fit groups are unknown"):
-        dodo._fit_groups_env("part:no_such_part")
-
-
-@pytest.mark.parametrize("groups", [(), ("gear_mesh",)])
-def test_feature_subprocess_refuses_fit_groups_outside_its_cache_key(
-    monkeypatch, groups
-):
-    import _config
-
-    dodo = _load_dodo()
-    stems = []
-    seen = {}
-
-    def feature_deps(stem):
-        stems.append(stem)
-        return [
-            str((dodo.CONFIG_DIR / "tolerances" / f"{group}.yaml").resolve())
-            for group in ("_base", *groups)
-        ]
-
-    def fake_run(cmd, cwd, env):
-        seen.update(env)
-        # Apply only the child's fit guard, including its absence. Without the
-        # package namespace fix this real group read succeeds, failing raises().
-        with monkeypatch.context() as child:
-            if "HARMONIC_FIT_GROUPS" in env:
-                child.setenv("HARMONIC_FIT_GROUPS", env["HARMONIC_FIT_GROUPS"])
-            else:
-                child.delenv("HARMONIC_FIT_GROUPS", raising=False)
-            _config.fit("crank_mesh")
-        return type("Done", (), {"returncode": 0})()
-
-    monkeypatch.setenv("HARMONIC_FASTENER_ROWS", "inherited-must-not-leak")
-    monkeypatch.setenv("HARMONIC_FIT_GROUPS", "inherited-must-not-leak")
-    monkeypatch.setattr(dodo, "_feature_export_file_deps", feature_deps)
-    monkeypatch.setattr(dodo.subprocess, "run", fake_run)
-    with pytest.raises(
-        KeyError, match="fit group 'crank_mesh' is outside this build's cache key"
-    ):
-        dodo._run_subprocess(["x"], "package:features:ch_rocker_arm")
-    assert stems == ["ch_rocker_arm"]
-    assert seen["HARMONIC_FIT_GROUPS"] == ",".join(groups)
-    assert "HARMONIC_FASTENER_ROWS" not in seen
-    assert os.environ["HARMONIC_FIT_GROUPS"] == "inherited-must-not-leak"
 
 
 def test_fit_config_dependencies_expand_conservatively(tmp_path):
@@ -4209,7 +4121,6 @@ def _assembly_subprocess_envs(dodo, monkeypatch, tmp_path, stem, *, mode):
     monkeypatch.setattr(dodo, "_stamp_assembly_execution", lambda _stem: None)
     monkeypatch.setattr(dodo.subprocess, "Popen", FakePopen)
     monkeypatch.setenv("HARMONIC_FASTENER_ROWS", "inherited-must-not-leak")
-    monkeypatch.setenv("HARMONIC_FIT_GROUPS", "inherited-must-not-leak")
 
     dodo.build_or_refresh(stem, [], [], [str(target)])
 
@@ -4226,7 +4137,6 @@ def test_every_assembly_subprocess_is_guarded_by_its_rows(monkeypatch, tmp_path,
     monkeypatch.setitem(
         dodo._FASTENER_ROWS, "assembly:ms_measuring_stick", frozenset({"pn-vn-pen-set-screw"})
     )
-    fit_groups = dodo._fit_groups_env("assembly:ms_measuring_stick")
     launched = _assembly_subprocess_envs(
         dodo, monkeypatch, tmp_path, "ms_measuring_stick", mode=mode
     )
@@ -4239,7 +4149,6 @@ def test_every_assembly_subprocess_is_guarded_by_its_rows(monkeypatch, tmp_path,
         assert scripts == ["refresh_assembly.py", "verify.py"]
     for name, env in launched[:-1]:
         assert env.get("HARMONIC_FASTENER_ROWS") == "pn-vn-pen-set-screw", name
-        assert env.get("HARMONIC_FIT_GROUPS") == fit_groups, name
 
 
 @pytest.mark.parametrize(

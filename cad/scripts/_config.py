@@ -15,7 +15,6 @@ data lives in YAML.
 from __future__ import annotations
 
 import functools
-import os
 import re
 from pathlib import Path
 from typing import Any
@@ -146,13 +145,6 @@ def machine(*keys: str) -> Any:
 
 def fit(group: str, *keys: str) -> Any:
     """A fit value from ``tolerances/<group>.yaml``, e.g. ``fit('gear_mesh', 'rack_backlash_mm')``."""
-    allowed = os.environ.get("HARMONIC_FIT_GROUPS")
-    if allowed is not None and group not in allowed.split(","):
-        raise KeyError(
-            f"fit group {group!r} is outside this build's cache key "
-            f"(HARMONIC_FIT_GROUPS={allowed!r}); read it through a literal "
-            "fit(...) call so the build graph can see it"
-        )
     node: Any = _doc("tolerances")["fits"][group]
     for key in keys:
         node = node[key]

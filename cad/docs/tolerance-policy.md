@@ -16,8 +16,7 @@ classes; they do not hardcode clearance numbers.
 `tolerances/<group>.yaml` owns one fit group. `_config._doc("tolerances")`
 aggregates the unchanged document shape. Literal `_config.fit("<group>", ...)`
 reads key only that group; dynamic or unknown groups and fit references retain
-the whole family. Build subprocesses receive `HARMONIC_FIT_GROUPS` from their
-recipe's config dependencies and refuse reads outside that set.
+the whole family.
 
 Accuracy-driven limits on the **critical features** live in
 [`cad/config/error_budget.yaml`](../config/error_budget.yaml) and are derived — not asserted —
