@@ -135,7 +135,6 @@ from _assembly import (
     apply_component_color,
     author_in_drawing_configurations,
     assembly_title_properties,
-    assert_component_placed,
     assert_free_dof_necessity,
     check_no_interference,
     component_origin,
@@ -2738,7 +2737,7 @@ async def build(adapter) -> dict[str, str]:
     # The bar is FIRST so the auto-fixed seed is structure, not the mated platen.
     # Its body is symmetric about machine x=0; the hanger's pivot tap and the
     # latch hook's screw taps are not (see pd_support_bar_spec.py).
-    support_bar = await place_component(
+    await place_component(
         adapter,
         "pd-support-bar",
         [0.0, BAR_CY, BAR_Z],
@@ -2758,28 +2757,19 @@ async def build(adapter) -> dict[str, str]:
                 ROT_Y_POS90,
                 label=f"{arc} (x{sx * COLUMN_X:+.0f})",
             )
-    # Two exact-pose clamp-screw seeds at the east column plus one native
-    # multi-seed pattern across the frame. Each rigid seed uses one lock mate.
+    # Two fixed clamp-screw seeds at the east column plus one native
+    # multi-seed pattern across the frame.
     clamp_x = sorted(CLAMP_HOLE_X)
     clamp_seeds: list[str] = []
-    for index, x in enumerate(clamp_x[:2]):
-        target = [x, CLAMP_Y, BAR_FRONT_Z + CLAMP_CBORE_DEPTH]
+    for x in clamp_x[:2]:
         seed = await place_component(
             adapter,
             "sh-vn-clamp-screw",
-            target,
+            [x, CLAMP_Y, BAR_FRONT_Z + CLAMP_CBORE_DEPTH],
             [0.0, 0.0, 0.0],
             IDENTITY,
-            ground=False,
             label=f"clamp-screw seed (x{x:+.1f})",
         )
-        await lock_mate(
-            adapter,
-            named_ref(f"Right Plane@{seed}", "PLANE"),
-            named_ref(f"Right Plane@{support_bar}", "PLANE"),
-            label=f"support clamp-screw seed {index} fixed to bar",
-        )
-        assert_component_placed(adapter, seed, target, IDENTITY)
         clamp_seeds.append(seed)
     clamp_targets = [[x, CLAMP_Y, BAR_FRONT_Z + CLAMP_CBORE_DEPTH] for x in clamp_x[2:]]
     clamp_instances = await linear_component_pattern(
@@ -3143,62 +3133,19 @@ async def build(adapter) -> dict[str, str]:
         IDENTITY,
     )
     plate_origin = [KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1], PLATE_Z0]
+    # The arm, plate and dowels are static: the plate is fixed at its exact
+    # pose, and the face readback below proves its seat and both dowel
+    # sockets register on the arm's.
     arm_plate = await place_component(
         adapter, "pd-transgear-arm-plate", plate_origin,
-        [0.0, 0.0, ARM_ANGLE_DEG], arm_rows, ground=False,
+        [0.0, 0.0, ARM_ANGLE_DEG], arm_rows,
     )
-    # Physical seat 3DOF + ONE primary dowel 2DOF + clock 1DOF.
-    # The second pin is inspected, not a redundant second concentric mate.
-    # Two reference axes take a coincident mate (the repo's axis-to-axis
-    # coaxial idiom); CreateMate refuses concentric between two axes (run
-    # 20261010T001620278Z: "CreateMate failed for concentric mate").
-    await coincident_mate(
-        adapter, named_ref(f"Front Plane@{arm_plate}", "PLANE"),
-        named_ref(f"RearFace@{arm}", "PLANE"),
-        label="arm-plate actual mounting seat", verify=(arm_plate, plate_origin),
-    )
-    await coincident_mate(
-        adapter, named_ref(f"Axis4@{arm_plate}", "AXIS"),
-        named_ref(f"Axis6@{arm}", "AXIS"),
-        label="arm-plate primary locating dowel", verify=(arm_plate, plate_origin),
-    )
-    await parallel_mate(
-        adapter, named_ref(f"LocatorClock@{arm_plate}", "PLANE"),
-        named_ref(f"LocatorClock@{arm}", "PLANE"),
-        label="arm-plate common locator clock", verify=(arm_plate, plate_origin),
-        witness_local=[*ARM_PLATE.LOCATOR_SITES_MM[1], 0.0],
-    )
-    assert_component_placed(adapter, arm_plate, plate_origin, arm_rows)
     _assert_arm_plate_registered(adapter, arm, arm_plate)
-    for index, (x, y) in enumerate(LOCATING_PIN_XY, 1):
-        pin_origin = [x, y, LOCATING_PIN_Z0]
-        locating_pin = await place_component(
-            adapter, "pd-vn-transgear-arm-plate-locating-pin", pin_origin,
-            [-90.0, 0.0, 0.0], ROT_X_NEG90, ground=False,
+    for x, y in LOCATING_PIN_XY:
+        await place_component(
+            adapter, "pd-vn-transgear-arm-plate-locating-pin", [x, y, LOCATING_PIN_Z0],
+            [-90.0, 0.0, 0.0], ROT_X_NEG90,
         )
-        await coincident_mate(
-            adapter, named_ref(f"ScrewAxis@{locating_pin}", "AXIS"),
-            named_ref(f"Axis{index + 5}@{arm}", "AXIS"),
-            label=f"locating dowel {index} arm press axis", verify=(locating_pin, pin_origin),
-        )
-        # The dowel's spin is immaterial; clock it to the grounded frame it
-        # was placed in. Its origin sits on the axis, so an off-axis witness
-        # separates the two parallel solutions.
-        await parallel_mate(
-            adapter, named_ref(f"Right Plane@{locating_pin}", "PLANE"),
-            named_ref("Right Plane", "PLANE"),
-            label=f"locating dowel {index} spin clock", verify=(locating_pin, pin_origin),
-            witness_local=[1.0, 0.0, 0.0],
-        )
-        # Same rows and plane pair as run 9, whose -4.30 (origin into the
-        # arm) verified on the -Z side; the proud end is +1.70 on the +Z side.
-        await distance_driver(
-            adapter, named_ref(f"Top Plane@{locating_pin}", "PLANE"),
-            named_ref(f"RearFace@{arm}", "PLANE"),
-            LOCATING_INTERFACE.PROUD_MM,
-            label=f"locating dowel {index} proud stop", verify=(locating_pin, pin_origin),
-        )
-        assert_component_placed(adapter, locating_pin, pin_origin, ROT_X_NEG90)
     for k, (x, y) in enumerate(PLATE_SCREW_XY, start=1):
         await place_component(
             adapter,

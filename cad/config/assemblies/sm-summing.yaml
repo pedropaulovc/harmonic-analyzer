@@ -27,9 +27,9 @@ allowed_free_stems:
 # read under-constrained WITH it (a grounded/fixed
 # regression would freeze the counter-spring anchor while the lever still
 # swings, codex #201).
-# The MHA-SM-05 end plug is locked to the fixed gooseneck (bonded with
-# LOCTITE 638, owner rulings 2026-11-08 (Pedro), #2315), and the purchased
-# MHA-SM-VN-56 shoulder screw is locked to the plug it threads into; the upper
+# The MHA-SM-05 end plug (bonded into the gooseneck with LOCTITE 638, owner
+# rulings 2026-11-08 (Pedro), #2315) and the purchased MHA-SM-VN-56 shoulder
+# screw threaded into it are fixed at their authored poses; the upper
 # eye rides free on the shoulder under its head (owner ruling 2026-11-08
 # (Pedro), #2144 item 11.4: bare slotted McMaster 91829A566, washer dropped)
 # and adds no operational freedom.
