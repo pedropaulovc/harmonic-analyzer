@@ -5074,8 +5074,8 @@ async def build(adapter) -> dict[str, str]:
 
     # =================== structure (fixed statics + moving joints) ===========
     # The stationary arbor is the reference frame the moving train mates
-    # against. Inserted FIRST, so SolidWorks auto-fixes it as the seed (the one
-    # allowed fixed component, mirroring frame's harmonic-base) -- no explicit fix.
+    # against. Inserted FIRST, so SolidWorks auto-fixes it as the seed; the
+    # base-bolted statics below are fixed at their authored poses too.
     arbor = await place_component(
         adapter,
         "dt-cylinder-gear-shaft",
