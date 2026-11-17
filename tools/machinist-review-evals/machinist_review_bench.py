@@ -1,8 +1,8 @@
 """Skill-creator-compatible benchmarks for blind release-package machinist reviews.
 
 The skill is the composed reviewer prompt, not the CAD authoring context. Inputs
-and results live outside Git worktrees; the separate machinist_review_eval.py
-continues to serve frozen-PNG calibration and human assessments.
+and results live outside Git worktrees. This offline prompt-tuning harness lives
+outside ``cad/scripts``: no CAD build or review leaf imports it.
 """
 
 from __future__ import annotations
@@ -30,11 +30,14 @@ import time
 from typing import Any, Mapping, Sequence
 import zipfile
 
-import _telemetry as telemetry
-import machinist_review as mr
+SCRIPTS_DIR = Path(__file__).resolve().parents[2] / "cad" / "scripts"
+sys.path.insert(0, str(SCRIPTS_DIR))
+
+import _telemetry as telemetry  # noqa: E402
+import machinist_review as mr  # noqa: E402
 
 REPO_ROOT = mr.CAD_ROOT.parent
-DEFAULT_EVALS = mr.SCRIPTS_DIR / "machinist_review_evals" / "evals.json"
+DEFAULT_EVALS = Path(__file__).with_name("evals.json")
 CONFIGURATIONS = ("with_skill", "old_skill")
 DEFAULT_SKILL_CREATOR = Path("C:/src/anthropics-skills/skills/skill-creator")
 

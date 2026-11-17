@@ -4598,6 +4598,7 @@ def _executed_closure(cmd: list[str]) -> set[str]:
 def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
     import _cam_programs
 
+    review_bench = REPO_ROOT / "tools" / "machinist-review-evals" / "machinist_review_bench.py"
     recipe_tests = [
         SCRIPTS_DIR / "test_dodo_recipe.py",
         SCRIPTS_DIR / "test_selected_factories.py",
@@ -4963,7 +4964,7 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         SCRIPTS_DIR / "test_machinist_review_precheck.py",
         # Release-package prompt benchmarks: deterministic grading and workspace
         # contracts run offline, without reviewer/model or SolidWorks activity.
-        SCRIPTS_DIR / "test_machinist_review_bench.py",
+        review_bench.with_name("test_machinist_review_bench.py"),
         # The settings-independence contracts this PR adds.  All three are
         # pure Python (no COM), and unenrolled they would be exactly the
         # "green gate that checks nothing" the comments above warn about: the
@@ -5034,6 +5035,10 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
             *(str(path.resolve()) for path in recipe_tests),
             *(dep for path in recipe_tests for dep in module_deps_of(path)),
             *(str(path.resolve()) for path in machinist_review_contract_deps),
+            # module_deps_of resolves only cad/scripts modules: name the
+            # out-of-tree benchmark harness its test imports, and its imports.
+            str(review_bench.resolve()),
+            *module_deps_of(review_bench),
             *adapter_contract_deps,
             *scanned_by_binding_gate,
             # Supplier native regressions read captured paint and shelf facts.
