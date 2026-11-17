@@ -8,8 +8,9 @@ Cite a rule by number and title, for example "rule 5 (avoid excessive GD&T)".
 
 ## Who reads these drawings
 
-One builder, a first-time hobby machinist, making one of each part. The parts
-are cut on a manual mill and lathe with DROs and assembled at a bench with
+One builder, a first-time hobby machinist, making one of each part. Milled
+features are cut on a CNC mill, turned ones on a manual lathe with a DRO; the
+parts are assembled at a bench with
 hand tools. Inspection and setting use what a well-equipped hobby shop owns:
 rule, calipers, micrometers, pin, feeler and thread gauges, a square, a granite
 surface plate with a height gauge and dial or test indicators, V-blocks, a sine
