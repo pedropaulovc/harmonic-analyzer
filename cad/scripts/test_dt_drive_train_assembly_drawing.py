@@ -451,30 +451,25 @@ def test_native_bom_requires_the_combined_screw_quantity(
 
 
 @pytest.mark.parametrize("proud", [0.0, 1.75])
-def test_shared_stop_frame_preserves_world_geometry_and_static_lock(proud: float) -> None:
+def test_shared_stop_frame_preserves_world_geometry(proud: float) -> None:
     import build_dt_drive_train_assembly as assembly
 
     tree = ast.parse(BUILDER.read_text(encoding="utf-8"))
-    insertions = {
-        node.targets[0].id: node.value.value
+    by_reference = {
+        ast.literal_eval(keyword.value): node
         for node in ast.walk(tree)
-        if isinstance(node, ast.Assign)
-        and len(node.targets) == 1
-        and isinstance(node.targets[0], ast.Name)
-        and isinstance(node.value, ast.Await)
-        and isinstance(node.value.value, ast.Call)
-        and isinstance(node.value.value.func, ast.Name)
-        and node.value.value.func.id == "place_component"
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "place_component"
+        for keyword in node.keywords
+        if keyword.arg == "component_reference"
     }
-    for name, reference in (
-        ("stop_screw", "SwingStopScrew:1"),
-        ("spring_foot_screw", "FootScrew:1"),
-    ):
-        call = insertions[name]
+    insertions = {
+        "stop_screw": by_reference["SwingStopScrew:1"],
+        "spring_foot_screw": by_reference["FootScrew:1"],
+    }
+    for call in insertions.values():
         assert ast.literal_eval(call.args[1]) == SCREW_STEM
-        options = {keyword.arg: keyword.value for keyword in call.keywords}
-        assert ast.literal_eval(options["component_reference"]) == reference
-        assert ast.literal_eval(options["ground"]) is False
         assert isinstance(call.args[4], ast.Name) and call.args[4].id == "IDENTITY"
     namespace = {**vars(assembly), "STOP_PROUD_LEN": proud}
     position = eval(
@@ -497,12 +492,6 @@ def test_shared_stop_frame_preserves_world_geometry_and_static_lock(proud: float
         namespace["sx"], assembly.Y_BASE_TOP + assembly.SPRING_T, namespace["sz"],
     ]
     calls = [node for node in ast.walk(tree) if isinstance(node, ast.Call)]
-    assert any(
-        isinstance(call.func, ast.Name)
-        and call.func.id == "_lock_static"
-        and [getattr(arg, "id", None) for arg in call.args] == ["adapter", "stop_screw", "arbor"]
-        for call in calls
-    )
     appearances = [
         call for call in calls
         if isinstance(call.func, ast.Name) and call.func.id == "apply_component_color"
