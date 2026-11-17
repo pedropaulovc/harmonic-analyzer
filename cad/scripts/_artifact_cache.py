@@ -1008,11 +1008,8 @@ class _BlobBackend:
         except ResourceNotFoundError:
             return None
 
-    def put(
-        self, key: str, blob: BinaryIO, *, replace_etag: str | None = None
-    ) -> tuple[str, int]:
-        """Commit ``blob`` as ``key``'s archive; returns the identity committed
-        with it (``archive_sha256``, ``archive_size``)."""
+    def put(self, key: str, blob: BinaryIO, *, replace_etag: str | None = None) -> None:
+        """Commit ``blob`` as ``key``'s archive."""
         # Input identity does not imply identical native bytes. Ordinary writers
         # create only; explicit refresh is the sole CAS replacement. Writer-unique
         # blocks also prevent interleaved uploads from committing a torn archive.
@@ -1035,9 +1032,8 @@ class _BlobBackend:
                 blob, length=size, overwrite=replace_etag is not None, metadata=metadata,
                 **(condition if replace_etag is not None else {}),
             )
-            return digest, size
+            return
         self._put_blocks(self._name(key), blob, size, metadata, condition)
-        return digest, size
 
     def _put_blocks(
         self,
