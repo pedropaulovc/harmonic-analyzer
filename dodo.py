@@ -112,7 +112,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent / "cad" / "scripts"))
 # ``clear_import_caches``); dodo's per-task path plumbing shares it.
 from _buildgraph import (  # noqa: E402
     _resolved,
-    ALL_SHOP_FILES,
     ASSEMBLY_ORDER,
     CAD_OUT,
     POST_ASSEMBLY,
@@ -143,8 +142,6 @@ from _buildgraph import (  # noqa: E402
     read_source,
     references_of,
     script_for,
-    ShopRecordReads,
-    shop_records_selected,
     stamps_part_properties,
     source_text_digest,
     syntax_digest,
@@ -161,7 +158,6 @@ from machinist_review_config import (  # noqa: E402
 _MACHINIST_REVIEW_PROFILE = registered_review_profile()
 
 import _artifact_cache as _cache  # noqa: E402  (remote build-artefact cache)
-import _shop_records  # noqa: E402  (shop TOML records: file table, digests)
 import _farm  # noqa: E402  (farm executor: cache-missing leaves run on the pool)
 import _sw_lifecycle  # noqa: E402  (SolidWorks autostart/recover; lazy-imports sw_recovery)
 import _telemetry  # noqa: E402  (observability spine: console logging + tracing)
@@ -725,13 +721,11 @@ _COM_ENV_PINS = {"PYTHONHASHSEED": "0"}
 
 def _read_guard_env(task: str) -> dict[str, str | None]:
     """The read guards a subprocess working for ``task`` gets (None: unset):
-    the catalog rows its cache key folds (`fastener` refuses others), the fit
-    groups it may read and the shop records its key folds (`shop_record`
-    refuses others)."""
+    the catalog rows its cache key folds (`fastener` refuses others) and the
+    fit groups it may read."""
     return {
         "HARMONIC_FASTENER_ROWS": _fastener_rows_env(task),
         "HARMONIC_FIT_GROUPS": _fit_groups_env(task),
-        _shop_records.ENV: _shop_records_env(task),
     }
 
 
@@ -1999,116 +1993,6 @@ def _fit_groups_env(task: str) -> str | None:
     return ",".join(sorted(groups))
 
 
-_SHOP_RECORDS_PY = (SCRIPTS_DIR / "_shop_records.py").resolve()
-# label -> the shop records/whole files its cache key folds (see _fold_shop_records).
-_SHOP_RECORD_READS: dict[str, ShopRecordReads] = {}
-# The shop files' (path, mtime_ns, size) when ``_shop_records`` last parsed them.
-_SHOP_FILE_STATS: tuple[tuple[str, int, int], ...] | None = None
-
-
-def _shop_records_recipe(records: frozenset[tuple[str, str, str]]) -> str:
-    """``_shop_records.records_recipe`` from the files as they are now.
-
-    The accessor memoizes each parse for its process, which suits a build
-    subprocess but not dodo: a long ``doit`` run that re-folds a task after a
-    shop edit must digest the new values. Drop the memo whenever a shop file's
-    stat moved, or is too recent to identify its content (as ``read_source``
-    does)."""
-    global _SHOP_FILE_STATS
-    stats = []
-    for path in _shop_records.SHOP_FILES.values():
-        stat = path.stat()
-        stats.append((str(path), stat.st_mtime_ns, stat.st_size))
-    current = tuple(stats)
-    if current != _SHOP_FILE_STATS or any(
-        is_racy_mtime(mtime_ns / 1e9) for _, mtime_ns, _ in current
-    ):
-        _shop_records._document.cache_clear()
-        _SHOP_FILE_STATS = current
-    return _shop_records.records_recipe(records)
-
-
-def _fold_shop_records(
-    label: str, deps: list[str], extra: ShopRecordReads | None = None
-) -> list[str]:
-    """Fold the shop records ``label``'s closure reads into its deps (#2852).
-
-    ``cad/config/shop-equipment.toml`` and ``cad/process/shop.toml`` are read
-    at import time by specs on many COM closures, but no import edge reaches
-    them. When the task's closure includes ``_shop_records``, the literal
-    ``shop_record(file, table, key)`` reads it makes
-    (``_buildgraph.shop_records_selected``) become a sidecar digest of exactly
-    those records' values, like ``_narrow_fastener_catalog``; a file read with
-    a runtime table or key (or any unclassified use) is a whole-file dep.
-    ``extra`` adds reads the task's subprocess makes outside these deps (a
-    soundness gate's lazy import of its assembly's spec). ``_run_subprocess``
-    hands the selection to the build as ``HARMONIC_SHOP_RECORDS``, and
-    ``shop_record`` refuses any other record, so a hidden read fails loud
-    instead of reusing a mis-keyed artefact."""
-    reads = (
-        shop_records_selected(
-            tuple(
-                read_source(Path(dep))
-                for dep in sorted(set(deps))
-                if dep.endswith(".py") and Path(dep) != _SHOP_RECORDS_PY
-            )
-        )
-        if str(_SHOP_RECORDS_PY) in deps
-        else ShopRecordReads(frozenset(), frozenset())
-    )
-    if extra is not None:
-        reads = ShopRecordReads(reads.records | extra.records, reads.files | extra.files)
-    files = frozenset(
-        _shop_records.SHOP_FILES if ALL_SHOP_FILES in reads.files
-        else (file for file in reads.files if file in _shop_records.SHOP_FILES)
-    )
-    records = frozenset(record for record in reads.records if record[0] not in files)
-    _SHOP_RECORD_READS[label] = ShopRecordReads(records, files)
-    out = [*deps, *(str(_shop_records.SHOP_FILES[file].resolve()) for file in sorted(files))]
-    if records:
-        out.append(
-            _write_digest_sidecar(
-                CAD_OUT / ".shop-records" / f"{label.replace(':', '-')}.digest",
-                hashlib.md5(
-                    _shop_records_recipe(records).encode("utf-8")
-                ).hexdigest(),
-            )
-        )
-    return out
-
-
-def _shop_records_env(task: str) -> str | None:
-    """The ``HARMONIC_SHOP_RECORDS`` value for ``task``'s subprocess.
-
-    Part, assembly, drawing, soundness-gate and feature-export leaves are
-    always guarded (an empty selection refuses every record); other tasks fold
-    no shop record and run unguarded. Recomputed from the task's own file_dep
-    function in a process that never built the graph, like the fastener guard;
-    a display label or an unknown stem raises."""
-    if not task or any(ch.isspace() for ch in task):
-        raise ValueError(f"{task!r} is not a doit task name; its shop records are unknown")
-    family, _, stem = task.partition(":")
-    if task not in _SHOP_RECORD_READS:
-        if family == "part" and stem in part_stems():
-            _part_file_deps(SCRIPTS_DIR / f"build_{stem}.py", stem)
-        elif family == "assembly" and stem in ASSEMBLY_ORDER:
-            _recipe_files(stem)
-        elif family == "drawing" and stem in DRAWINGS_BY_NAME:
-            _drawing_file_deps(stem)
-        elif family == "verify_soundness" and stem in ASSEMBLY_ORDER:
-            _soundness_file_deps(stem)
-        elif task.startswith("package:features:"):
-            _feature_export_file_deps(task.removeprefix("package:features:"))
-        elif family in ("part", "assembly", "drawing", "verify_soundness"):
-            raise ValueError(f"{task!r} names no {family} task; its shop records are unknown")
-        else:
-            return None
-    # A dep function that folded nothing leaves no entry: its key holds no shop
-    # record, so every read is refused.
-    reads = _SHOP_RECORD_READS.get(task, ShopRecordReads(frozenset(), frozenset()))
-    return _shop_records.guard_value(reads.records, reads.files)
-
-
 def _drawing_file_deps(stem: str) -> list[str]:
     """Inputs for both doit freshness and the shared drawing-cache key.
 
@@ -2153,10 +2037,7 @@ def _drawing_file_deps(stem: str) -> list[str]:
             *(str(_resolved(path)) for path in spec.assets),
         }
     )
-    return _fold_shop_records(
-        f"drawing:{stem}",
-        _narrow_fastener_catalog(f"drawing:{stem}", deps, spec.artifact_stem),
-    )
+    return _narrow_fastener_catalog(f"drawing:{stem}", deps, spec.artifact_stem)
 
 
 def _drawing_cache_outputs(stem: str) -> list[Path]:
@@ -2219,12 +2100,7 @@ def _soundness_file_deps(stem: str) -> list[str]:
     ]
     if stem == "pd_paper_drive":
         deps.append(_dof_json(stem))
-    assembly = f"assembly:{stem}"
-    if assembly not in _SHOP_RECORD_READS:
-        _recipe_files(stem)
-    return _fold_shop_records(
-        f"verify_soundness:{stem}", deps, _SHOP_RECORD_READS[assembly]
-    )
+    return deps
 
 
 def _kinematics_file_deps() -> list[str]:
@@ -2312,13 +2188,13 @@ def _export_requirement_deps() -> list[str]:
 
 def _feature_export_file_deps(stem: str) -> list[str]:
     """One bundle's recipe plus release revision and exact native identity."""
-    return _fold_shop_records(f"package:features:{stem}", sorted({
+    return sorted({
         *_feature_requirement_deps(stem),
         str(RELEASE_VERSION_FILE),
         _submodule_assembly_dep(),
         _sldprt(stem),
         _part_execution_token(stem),
-    }))
+    })
 
 
 def _feature_export_outputs(stem: str) -> list[Path]:
@@ -2618,10 +2494,7 @@ def _part_file_deps(script: Path, stem: str) -> list[str]:
         str(PART_TEMPLATE.resolve()),
         _submodule_part_dep(),
     ]
-    return _fold_shop_records(
-        f"part:{stem}",
-        _narrow_fastener_catalog(f"part:{stem}", deps, stem.replace("_", "-")),
-    )
+    return _narrow_fastener_catalog(f"part:{stem}", deps, stem.replace("_", "-"))
 
 
 def _assembly_file_deps(stem: str) -> list[str]:
@@ -2807,9 +2680,7 @@ def _recipe_files(stem: str) -> list[str]:
         *template,
         _submodule_assembly_dep(),
     ]
-    return _fold_shop_records(
-        f"assembly:{stem}", _narrow_fastener_catalog(f"assembly:{stem}", deps, None)
-    )
+    return _narrow_fastener_catalog(f"assembly:{stem}", deps, None)
 
 
 def _input_ledger(stem: str) -> Path:
