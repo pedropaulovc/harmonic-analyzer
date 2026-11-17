@@ -72,7 +72,9 @@ ACCEPTANCES = (
         _step_ref("cone-gears-stacked", "F"),
         "T120 FRONT TO MHA-DT-37 TEETH' BACK, DRY STACK",
         inch_window(STACK_L20_ACCEPT, 3),
-        "5-6 IN MICROMETER",
+        # Codjiflo on #3023: the owned 6 in calipers read the ~5.87 in
+        # stack; the shop's micrometers stop at 3 in.
+        "CALIPERS",
     ),
     (
         "post-screw-cut",

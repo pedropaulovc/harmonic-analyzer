@@ -755,6 +755,17 @@ def test_cone_swing_check_requires_pivot_thread_engagement() -> None:
         "MHA-DT-VN-52'S THREAD LENGTH",
         "pivot-screw-engagement",
     )
+    # Owner ruling DT-04's location follows the minimum to its sheet 16 row
+    # (Codjiflo on #3023), as DT-07's is pinned to its fact.
+    from machinist_exceptions import load_exceptions
+
+    (dt04,) = (
+        entry
+        for entry in load_exceptions(_config.CONFIG_DIR, "dt_drive_train_assembly", "assembly")
+        if entry.id == "DT-04"
+    )
+    row = drawing.acceptance_ref("pivot-screw-engagement")
+    assert f"({row}: {pivot_screw.MIN_USEFUL_ENGAGEMENT_TEXT})" in dt04.where
 
 
 def _flat(text: str) -> str:

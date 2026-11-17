@@ -1571,9 +1571,10 @@ CONE_CRANK_STEPS = _note_text(
         "3C. INDICATE THE MHA-DT-04 END PLAY AT THE SHAFT END "
         f"({acceptance_ref('shaft-end-play')}).",
         "3D. IF THE END PLAY IS OUT, LOOSEN MHA-DT-VN-56.",
-        # Attempt 1 review (clarity, rule 22): the redo says which way the
-        # back-off moves; the end play grows with it from 3's zero.
-        "3E. IF IT READ OVER, REDO 3-3C WITH LESS BACK-OFF, IF UNDER WITH MORE.",
+        # Attempt 1 review (clarity, rule 22): the redo says which way
+        # MHA-DT-39 moves; Codjiflo on #3023: it redoes 3B-3C only, not 3A's
+        # fixed 1/8 turn (the embed books SHAFT_END_PLAY[1] either way).
+        "3E. IF IT READ OVER, REDO 3B-3C WITH MHA-DT-39 IN MORE, IF UNDER LESS.",
         # Rule 23 (PR 2 machinist review round 10): the pinch lock's bench
         # acceptance, worded as 2Z's, once the end play is final.
         "3F. CHECK THAT MHA-DT-39 DOES NOT TURN IN MHA-DT-21 BY HAND.",
