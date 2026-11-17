@@ -1891,18 +1891,6 @@ _GRANDFATHERED_BUILDER_EDGES = {
     ("build_kinematic_probe.py", "build_pd_paper_drive_assembly"): (
         "dtrefactor: reads CHAIN_CRANK_CENTRE, DISC_TEETH, FEED_PD, KNOB_SHAFT_XY, NET_RACK_TRAVEL_PER_CRANK_REV, SPARE_GEAR_POS, THIRD_TEETH"
     ),
-    ("build_mobility_probe.py", "build_motion_study"): (
-        "dtrefactor: reads ANGLE, DISTANCE, _family, _iter_mates, _real_parts"
-    ),
-    ("build_motion_setup_drives.py", "build_motion_study"): (
-        "dtrefactor: reads ANGLE, DISTANCE, _comp_xform, _entity_ref, _family, _find_one, _iter_mates, _real_parts, _reset_to_assembled, _rot_angle, assert_motion_progressed"
-    ),
-    ("build_motion_study.py", "build_motion_study_springs"): (
-        "dtrefactor: reads add_springs, add_wires_gravity"
-    ),
-    ("build_motion_study_springs.py", "build_motion_study"): (
-        "dtrefactor: reads ANGLE, DISTANCE, SPRING_KCH, SPRING_KCT, STOCK_KCH, STOCK_KCT, _by_z_rank, _components, _entity_ref, _family, _find_one, _iter_mates, _lone_real, _read_member, _sub_model, _suppress_named"
-    ),
     ("build_pd_paper_drive_assembly.py", "build_pd_guide_lock"): (
         "dtrefactor: reads HOLE_DIA, LOCK_THICK, LOCK_WIDTH"
     ),

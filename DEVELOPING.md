@@ -2446,8 +2446,7 @@ skipped, labelled or ordered under a placeholder. A loop that only collects
 names into a set is left as it is (its requests are the same name reads), and
 a part drawing view's one visible component needs no order
 (`_drawing_edges.visible_view_entities` sorts only an assembly view's).
-Exempt: scripts no doit task runs (`build_motion_study`,
-`build_mobility_probe`, `export_glb`, `diagnostics/`), and `_drawing_tables`'
+Exempt: scripts no doit task runs (`export_glb`, `diagnostics/`), and `_drawing_tables`'
 failure evidence, whose `collect()` records a failed row's first native
 component after the failure. `test_component_order.py` (`check:recipe`)
 runs the Default Simplified pass over two enumeration orders and requires the

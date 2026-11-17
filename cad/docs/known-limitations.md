@@ -4,7 +4,7 @@
 
 - The 21-spring **static force balance is computed, not simulated** — see
   [motion-policy.md](./motion-policy.md). No force/torque, friction, or stress results.
-- Basic Motion is a kinematic smoke test, not a dynamics or certification solver.
+- No dynamics are simulated: kinematics are mate-driven (`verify:kinematics`), with no Motion study.
 - Gear meshing uses **gear mates + simplified pitch geometry**, not full tooth-contact, in the
   top assembly (full-tooth contact across 20 channels is unstable/slow and not relied upon).
 

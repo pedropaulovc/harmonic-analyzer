@@ -100,18 +100,9 @@ def is_shop_fixture(stem: str) -> bool:
 MACHINE_ASSEMBLIES = tuple(a for a in ASSEMBLY_ORDER if not is_shop_fixture(a))
 
 # Scripts that match build_*.py but produce no .SLDPRT part in the SolidWorks
-# queue -- excluded from the part list: motion/diagnostic deliverables that
-# consume/probe the saved assemblies (Basic Motion sweeps, mobility probes).
-# None builds the machine.
-NON_PART_SCRIPTS = frozenset(
-    {
-        "build_motion_study.py",
-        "build_motion_study_springs.py",
-        "build_motion_setup_drives.py",
-        "build_mobility_probe.py",
-        "build_kinematic_probe.py",
-    }
-)
+# queue -- excluded from the part list: diagnostic probes that consume the saved
+# assemblies. None builds the machine.
+NON_PART_SCRIPTS = frozenset({"build_kinematic_probe.py"})
 
 # Post-assembly hooks: scripts that mutate an already-built assembly IN PLACE (no
 # new artefact), run after their base assembly rather than in the part queue.
@@ -127,8 +118,8 @@ _POST_SCRIPT_NAMES = frozenset(s for v in POST_ASSEMBLY.values() for s in v)
 
 
 def part_scripts() -> list[Path]:
-    """Every build_*.py except the assemblies, config hooks, motion/diagnostic
-    scripts and the orchestrator."""
+    """Every build_*.py except the assemblies, config hooks, diagnostic probes
+    and the orchestrator."""
     out = []
     for path in sorted(SCRIPTS_DIR.glob("build_*.py")):
         if (
@@ -1323,7 +1314,7 @@ def module_deps_of(script: Path) -> list[str]:
     ``diagnostics.diag_build_90280A194`` retain their exact recipe chain.
     Following real imports transitively prevents under-invalidation so long as a
     script imports what it uses, which Python enforces at run time.  The BFS is
-    cycle-safe (``build_motion_study`` <-> ``build_motion_study_springs``).
+    cycle-safe.
     """
     return list(_module_closure(_resolved(script)))
 
