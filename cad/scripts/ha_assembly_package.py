@@ -261,11 +261,14 @@ TOOLS: tuple[Tool, ...] = (
         ("shop.toml:gauges.dti", "shop-equipment.toml:gauges.mag-base"),
     ),
     Tool(
-        "Dial indicators, three at once",
+        "Dial indicators on magnetic bases, three at once",
         r"(?:DIAL )?\bINDICATORS?\b",
         (
-            "shop-equipment.toml:gauges.dial-indicator",
-            "shop-equipment.toml:gauges.dial-indicators-extra",
+            "shop-equipment.toml:gauges.dial-indicators",
+            "shop.toml:gauges.dial-indicators",
+            "shop-equipment.toml:gauges.digital-indicator",
+            "shop.toml:gauges.digital-indicator",
+            "shop-equipment.toml:gauges.mag-bases-extra",
         ),
     ),
     Tool(

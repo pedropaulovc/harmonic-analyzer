@@ -118,17 +118,29 @@ kind = "micrometer_set"
 make = "LittleMachineShop"
 present = true
 
-[gauges.dial-indicator]
-name = "Dial indicator, 1 in travel (archived inventory)"
+# Owner inventory 2026-11-17 (Pedro, PR #2874): "2 0.001'' dial indicators,
+# one 1um lever indicator and one digital 0.000'' indicator". The lever
+# indicator is gauges.dti. Resolutions are cad/process/shop.toml, same keys;
+# no make, model or travel was stated (the archived inventory's one Mitutoyo
+# 1 in-travel dial indicator carried #1413 placeholder values).
+[gauges.dial-indicators]
+name = "Dial indicators"
 kind = "dial_indicator"
-make = "Mitutoyo"
+present = true
+pieces = 2
+
+[gauges.digital-indicator]
+name = "Digital indicator"
+kind = "digital_indicator"
 present = true
 
 # MHA-DT-00 zeroes an indicator on each pedestal and one more across them at
-# once; the shop records one dial indicator and one test indicator.
-[gauges.dial-indicators-extra]
-name = "Two more dial indicators, each on a magnetic base"
-kind = "dial_indicator"
+# once: the two dial indicators and the digital one cover the three, but the
+# shop records one magnetic base (gauges.mag-base). The owner's inventory
+# names no more bases: to buy, or to record if the shop has them.
+[gauges.mag-bases-extra]
+name = "Two more magnetic indicator bases"
+kind = "magnetic_base"
 present = false
 
 [gauges.mag-base]
@@ -139,8 +151,8 @@ present = true
 [gauges.surface-plate]
 name = "Surface plate"
 kind = "surface_plate"
-present = false
-note = "The archived inventory listed only an illustrative example granite plate."
+present = true
+note = "Owned (Pedro, 2026-11-17, PR #2874: \"I do have surface plate, and feeler gauges\"). Size, material and grade unrecorded."
 
 [gauges.depth-micrometer]
 name = "Depth micrometer (or depth gauge)"
@@ -150,8 +162,8 @@ present = false
 [gauges.feeler-gauges]
 name = "Feeler gauge leaves"
 kind = "feeler_gauge_set"
-present = false
-note = "Pedro 2026-10-11 (archived inventory): feeler gauges are not owned. MHA-DT-00 names the metric set its leaf stacks are built from (pinion_rig_fitup.FEELER_GAGE); the other sheets name inch leaves."
+present = true
+note = "Owned (Pedro, 2026-11-17, PR #2874), superseding the archived inventory's 2026-10-11 \"feeler gauges are not owned\". Whether the set is inch, metric or both is unrecorded: MHA-DT-00 names the metric set its leaf stacks are built from (pinion_rig_fitup.FEELER_GAGE); the other sheets name inch leaves."
 
 [gauges.digital-angle-gauge]
 name = "Digital angle gauge"
