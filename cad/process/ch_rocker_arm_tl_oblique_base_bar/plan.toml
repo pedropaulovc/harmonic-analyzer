@@ -25,6 +25,7 @@ stock = "{{process.blank_thickness_in:fraction}} × {{process.blank_width_in:fra
 note = "Inches unless mm. Finished {{cad.size_summary}}. Bar 2: no bracket holes; rail/table faces swapped. Run both bars through Setup 2 (high belt range), then Setup 3 (low range), then Setup 4 (high range): two belt changes."
 shop = "../shop.toml"
 material_key = "6061-t6511"
+milling_material = "aluminum_6061"
 
 [cad]
 file = "../../out/features/ch_rocker_arm_tl_oblique_base_bar/features.toml"
@@ -177,8 +178,8 @@ sizing = "other"
 instruction = "1/2 in end mill out 1.92 in (48.8 mm) from the collet, as measured (dechatter v11). Cutter .04–.08 below, in two equal depth levels (≤ .30 each). Front edge, conventional, table −X (cutter +X): rough ≤ .100 radial, finish .010; note finish-pass Y; mark ZERO EDGE."
 settings = "em-half-hss-6061-v11-wide"
 milling_cuts = [
-  { name = "front edge rough", kind = "side", phase = "rough", material = "aluminum_6061", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = 7.366, radial_woc_mm = 2.54, rpm = 2250, feed_mm_min = 400.05, traverse_mm = [0, "{{cad.blank_length_mm}}"], finish_cut = "front edge finish", finish_stock_mm = { y = 0.254, z = "through" } },
-  { name = "front edge finish", kind = "side", phase = "finish", material = "aluminum_6061", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = 7.366, radial_woc_mm = 0.254, rpm = 2250, feed_mm_min = 400.05, traverse_mm = [0, "{{cad.blank_length_mm}}"] },
+  { name = "front edge rough", kind = "side", phase = "rough", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = 7.366, radial_woc_mm = 2.54, rpm = 2250, feed_mm_min = 400.05, traverse_mm = [0, "{{cad.blank_length_mm}}"], finish_cut = "front edge finish", finish_stock_mm = { y = 0.254, z = "through" } },
+  { name = "front edge finish", kind = "side", phase = "finish", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = 7.366, radial_woc_mm = 0.254, rpm = 2250, feed_mm_min = 400.05, traverse_mm = [0, "{{cad.blank_length_mm}}"] },
 ]
 
 [[setups.operations]]
@@ -191,8 +192,8 @@ settings = "em-half-hss-6061-v11-wide"
 inspection = "Width at ends/middle."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.width_band_mm}}" }]
 milling_cuts = [
-  { name = "opposite edge rough", kind = "side", phase = "rough", material = "aluminum_6061", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = 7.366, radial_woc_mm = 2.54, rpm = 2250, feed_mm_min = 400.05, traverse_mm = [0, "{{cad.blank_length_mm}}"], finish_cut = "opposite edge finish", finish_stock_mm = { y = 0.254, z = "through" } },
-  { name = "opposite edge finish", kind = "side", phase = "finish", material = "aluminum_6061", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = 7.366, radial_woc_mm = 0.254, rpm = 2250, feed_mm_min = 400.05, traverse_mm = [0, "{{cad.blank_length_mm}}"] },
+  { name = "opposite edge rough", kind = "side", phase = "rough", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = 7.366, radial_woc_mm = 2.54, rpm = 2250, feed_mm_min = 400.05, traverse_mm = [0, "{{cad.blank_length_mm}}"], finish_cut = "opposite edge finish", finish_stock_mm = { y = 0.254, z = "through" } },
+  { name = "opposite edge finish", kind = "side", phase = "finish", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = 7.366, radial_woc_mm = 0.254, rpm = 2250, feed_mm_min = 400.05, traverse_mm = [0, "{{cad.blank_length_mm}}"] },
 ]
 
 [[setups]]
@@ -223,8 +224,8 @@ instruction = "Face full length, +X passes, .60 stepover. Side 1: one pass, ~hal
 # and move to a measured record as the edges did (#2846).
 settings = "basebar-face-6061-t6511"
 milling_cuts = [
-  { name = "side 1 face", kind = "end", phase = "finish", material = "aluminum_6061", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 4, axial_doc_mm = 0.381, radial_woc_mm = 15.24, rpm = 850, feed_mm_min = 172.72, traverse_mm = [0, "{{cad.blank_length_mm}}"] },
-  { name = "side 2 face", kind = "end", phase = "finish", material = "aluminum_6061", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 4, axial_doc_mm = 0.381, radial_woc_mm = 15.24, rpm = 850, feed_mm_min = 172.72, traverse_mm = [0, "{{cad.blank_length_mm}}"] },
+  { name = "side 1 face", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 4, axial_doc_mm = 0.381, radial_woc_mm = 15.24, rpm = 850, feed_mm_min = 172.72, traverse_mm = [0, "{{cad.blank_length_mm}}"] },
+  { name = "side 2 face", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 4, axial_doc_mm = 0.381, radial_woc_mm = 15.24, rpm = 850, feed_mm_min = 172.72, traverse_mm = [0, "{{cad.blank_length_mm}}"] },
 ]
 
 [[setups.operations]]
@@ -237,8 +238,8 @@ settings = "em-half-hss-6061-v11-narrow"
 inspection = "DRO X, before unclamping: right end {{cad.length_min_in:.2f}}–{{cad.length_max_in:.2f}} at both edges."
 gauge_checks = [{ gauge = "mill-x-dro", band_mm = "{{cad.length_band_mm}}" }]
 milling_cuts = [
-  { name = "left end to ZERO END", kind = "side", phase = "finish", material = "aluminum_6061", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = 6.477, radial_woc_mm = 0.508, rpm = 1250, feed_mm_min = 222.25, stations_mm = 0 },
-  { name = "right end to length", kind = "side", phase = "finish", material = "aluminum_6061", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = 6.477, radial_woc_mm = 0.254, rpm = 1250, feed_mm_min = 222.25, stations_mm = "{{cad.blank_length_mm}}" },
+  { name = "left end to ZERO END", kind = "side", phase = "finish", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = 6.477, radial_woc_mm = 0.508, rpm = 1250, feed_mm_min = 222.25, stations_mm = 0 },
+  { name = "right end to length", kind = "side", phase = "finish", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = 6.477, radial_woc_mm = 0.254, rpm = 1250, feed_mm_min = 222.25, stations_mm = "{{cad.blank_length_mm}}" },
 ]
 
 # Each depth step starts with a slow plunge at the cutter-centre rectangle's
@@ -255,7 +256,7 @@ rpm = 1250
 feed = "slow hand plunge"
 beam = { axis = "x", hold = "between", extent_mm = [0, "{{cad.length_mm}}"], supports_mm = ["{{process.jack_left_x_mm}}", "{{process.jack_right_x_mm}}"], section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
 milling_cuts = [
-  { name = "S1–S2 corner plunges", kind = "plunge", phase = "finish", material = "aluminum_6061", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = [22.479, 390.271] },
+  { name = "S1–S2 corner plunges", kind = "plunge", phase = "finish", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = [22.479, 390.271] },
 ]
 
 # One cutter makes each slot: the adapter offsets the cutter-centre rectangle
@@ -277,7 +278,7 @@ gauge_checks = [
 # The bar is squared to length here: slot stations sit in the finished frame.
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.length_mm}}"], clamp_mm = ["{{cad.vise_centred_overhang_mm}}", "{{process.jaw_right_x_mm}}"], section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
 milling_cuts = [
-  { name = "S1–S2 depth steps", kind = "slot", phase = "finish", material = "aluminum_6061", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = "{{cad.slot_step_mm}}", radial_woc_mm = "{{process.half_cutter_dia_mm}}", rpm = 1250, feed_mm_min = 127.0, stations_mm = [22.098, 389.89] },
+  { name = "S1–S2 depth steps", kind = "slot", phase = "finish", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = "{{cad.slot_step_mm}}", radial_woc_mm = "{{process.half_cutter_dia_mm}}", rpm = 1250, feed_mm_min = 127.0, stations_mm = [22.098, 389.89] },
 ]
 
 [setups.operations.table]
@@ -319,8 +320,8 @@ rpm = 2800
 feed = "BB05 program (R1–R8); hand (B1–B4)"
 # Spotting cones are drilled away later; the jaws alone carry them.
 milling_cuts = [
-  { name = "spot R1–R4, B1–B2", kind = "drill", phase = "rough", material = "aluminum_6061", cutter_dia_mm = 3.175, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = [9.964, 69.964, 129.964, 189.964, 47.484] },
-  { name = "spot R5–R8, B3–B4", kind = "drill", phase = "rough", material = "aluminum_6061", cutter_dia_mm = 3.175, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = [249.964, 309.964, 369.964, 429.964, 428.0] },
+  { name = "spot R1–R4, B1–B2", kind = "drill", phase = "rough", cutter_dia_mm = 3.175, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = [9.964, 69.964, 129.964, 189.964, 47.484] },
+  { name = "spot R5–R8, B3–B4", kind = "drill", phase = "rough", cutter_dia_mm = 3.175, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = [249.964, 309.964, 369.964, 429.964, 428.0] },
 ]
 
 [setups.operations.table]
@@ -336,7 +337,7 @@ rpm = 2800
 feed = "BB07 program"
 beam = { axis = "x", hold = "between", extent_mm = [0, "{{cad.length_mm}}"], supports_mm = ["{{process.jack_left_x_mm}}", "{{cad.vise_centred_overhang_mm}}"], section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
 milling_cuts = [
-  { name = "R1–R4", kind = "drill", phase = "finish", material = "aluminum_6061", cutter_dia_mm = 3.4544, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = [9.964, 69.964, 129.964, 189.964] },
+  { name = "R1–R4", kind = "drill", phase = "finish", cutter_dia_mm = 3.4544, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = [9.964, 69.964, 129.964, 189.964] },
 ]
 
 [[setups.operations]]
@@ -348,7 +349,7 @@ rpm = 2800
 feed = "BB07 program"
 beam = { axis = "x", hold = "between", extent_mm = [0, "{{cad.length_mm}}"], supports_mm = ["{{process.jaw_right_x_mm}}", "{{process.jack_right_x_mm}}"], section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
 milling_cuts = [
-  { name = "R5–R8", kind = "drill", phase = "finish", material = "aluminum_6061", cutter_dia_mm = 3.4544, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = [249.964, 309.964, 369.964, 429.964] },
+  { name = "R5–R8", kind = "drill", phase = "finish", cutter_dia_mm = 3.4544, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = [249.964, 309.964, 369.964, 429.964] },
 ]
 
 [[setups.operations]]
@@ -360,7 +361,7 @@ rpm = 2800
 feed = "hand"
 beam = { axis = "x", hold = "between", extent_mm = [0, "{{cad.length_mm}}"], supports_mm = ["{{process.jack_left_x_mm}}", "{{cad.vise_centred_overhang_mm}}"], section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
 milling_cuts = [
-  { name = "B1–B2", kind = "drill", phase = "finish", material = "aluminum_6061", cutter_dia_mm = 4.8006, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = 47.484 },
+  { name = "B1–B2", kind = "drill", phase = "finish", cutter_dia_mm = 4.8006, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = 47.484 },
 ]
 
 [[setups.operations]]
@@ -372,7 +373,7 @@ rpm = 2800
 feed = "hand"
 beam = { axis = "x", hold = "between", extent_mm = [0, "{{cad.length_mm}}"], supports_mm = ["{{process.jaw_right_x_mm}}", "{{process.jack_right_x_mm}}"], section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
 milling_cuts = [
-  { name = "B3–B4", kind = "drill", phase = "finish", material = "aluminum_6061", cutter_dia_mm = 4.8006, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = 428.0 },
+  { name = "B3–B4", kind = "drill", phase = "finish", cutter_dia_mm = 4.8006, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = 428.0 },
 ]
 
 [[setups.operations]]
@@ -392,7 +393,7 @@ rpm = 2000
 feed = "slow hand plunge"
 beam = { axis = "x", hold = "between", extent_mm = [0, "{{cad.length_mm}}"], supports_mm = ["{{process.jack_left_x_mm}}", "{{cad.vise_centred_overhang_mm}}"], section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
 milling_cuts = [
-  { name = "B1–B2 counterbores", kind = "plunge", phase = "finish", material = "aluminum_6061", cutter_dia_mm = 7.9375, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = 47.484 },
+  { name = "B1–B2 counterbores", kind = "plunge", phase = "finish", cutter_dia_mm = 7.9375, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = 47.484 },
 ]
 
 [[setups.operations]]
@@ -404,7 +405,7 @@ rpm = 2000
 feed = "slow hand plunge"
 beam = { axis = "x", hold = "between", extent_mm = [0, "{{cad.length_mm}}"], supports_mm = ["{{process.jaw_right_x_mm}}", "{{process.jack_right_x_mm}}"], section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
 milling_cuts = [
-  { name = "B3–B4 counterbores", kind = "plunge", phase = "finish", material = "aluminum_6061", cutter_dia_mm = 7.9375, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = 428.0 },
+  { name = "B3–B4 counterbores", kind = "plunge", phase = "finish", cutter_dia_mm = 7.9375, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = 428.0 },
 ]
 
 [[setups]]

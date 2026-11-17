@@ -23,6 +23,7 @@ stock = "{{process.blank_thickness_in:fraction}} × {{process.bar_width_in:fract
 note = "Inches. Every face machined; all holes from TOP in one hold."
 shop = "../shop.toml"
 material_key = "6061-t6511"
+milling_material = "aluminum_6061"
 
 [cad]
 file = "../../out/features/ch_rocker_arm_tl_oblique_pivot_block/features.toml"
@@ -148,7 +149,7 @@ speed_kind = "spindle"
 tool = "em-face"
 sizing = "other"
 instruction = "Face the up side just clean (≤{{process.cleanup_in:.2dot}}), four .40 steps. Mark it SEAT."
-milling_cuts = [{ name = "SEAT clean-up", kind = "end", material = "aluminum_6061", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 203.2, phase = "finish", axial_doc_mm = 0.508, radial_woc_mm = 10.16, traverse_mm = [0, "{{cad.blank_length_mm}}"] }]
+milling_cuts = [{ name = "SEAT clean-up", kind = "end", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 203.2, phase = "finish", axial_doc_mm = 0.508, radial_woc_mm = 10.16, traverse_mm = [0, "{{cad.blank_length_mm}}"] }]
 settings = "block-em-half-6061-t6511"
 
 [[setups.operations]]
@@ -158,8 +159,8 @@ sizing = "other"
 instruction = "SEAT down; face TOP to height {{cad.height_min_in:.3dot}}–{{cad.height_max_in:.3dot}}: one rough pass, then a .005–.010 finish pass."
 instruction_detailed = "Turn the blank over, SEAT down on the parallels, and tap it down until both parallels are pinned. Touch TOP and take one rough pass to about .010 over size, then measure and take the .005–.010 finish pass to {{cad.height_min_in:.3dot}}–{{cad.height_max_in:.3dot}} over SEAT; each pass is four .40 steps across the face."
 milling_cuts = [
-  { name = "TOP rough", kind = "end", material = "aluminum_6061", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 203.2, phase = "rough", axial_doc_mm = 1.016, radial_woc_mm = 10.16, traverse_mm = [0, "{{cad.blank_length_mm}}"] },
-  { name = "TOP finish", kind = "end", material = "aluminum_6061", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 203.2, phase = "finish", axial_doc_mm = 0.254, radial_woc_mm = 10.16, traverse_mm = [0, "{{cad.blank_length_mm}}"] },
+  { name = "TOP rough", kind = "end", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 203.2, phase = "rough", axial_doc_mm = 1.016, radial_woc_mm = 10.16, traverse_mm = [0, "{{cad.blank_length_mm}}"] },
+  { name = "TOP finish", kind = "end", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 203.2, phase = "finish", axial_doc_mm = 0.254, radial_woc_mm = 10.16, traverse_mm = [0, "{{cad.blank_length_mm}}"] },
 ]
 settings = "block-em-half-6061-t6511"
 inspection = "Height {{cad.height_min_in:.3dot}}–{{cad.height_max_in:.3dot}}."
@@ -183,7 +184,7 @@ speed_kind = "spindle"
 tool = "em-face"
 sizing = "other"
 instruction = "Face the up end just clean (≤{{process.cleanup_in:.2dot}}), two passes across the .96. Mark it SPINDLE END."
-milling_cuts = [{ name = "SPINDLE END clean-up", kind = "end", material = "aluminum_6061", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 203.2, phase = "finish", axial_doc_mm = 0.508, radial_woc_mm = 12.7, stations_mm = "{{cad.blank_width_mm}}" }]
+milling_cuts = [{ name = "SPINDLE END clean-up", kind = "end", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 203.2, phase = "finish", axial_doc_mm = 0.508, radial_woc_mm = 12.7, stations_mm = "{{cad.blank_width_mm}}" }]
 settings = "block-em-half-6061-t6511"
 
 [[setups.operations]]
@@ -193,8 +194,8 @@ sizing = "other"
 instruction = "SPINDLE END down; face OUTER END in ≤{{process.layer_in:.2dot}} layers, the last .005–.010, to {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}}."
 instruction_detailed = "Turn the blank over, SPINDLE END down on the 1/2 in parallels, and tap it down. Face OUTER END in layers no deeper than {{process.layer_in:.2dot}}, two passes per layer across the .96 end. Measure from SPINDLE END before the last layer; take it .005–.010 deep to {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}}."
 milling_cuts = [
-  { name = "OUTER END layers", kind = "end", material = "aluminum_6061", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 203.2, phase = "rough", axial_doc_mm = 1.27, radial_woc_mm = 12.7, stations_mm = "{{cad.blank_width_mm}}" },
-  { name = "OUTER END last layer", kind = "end", material = "aluminum_6061", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 203.2, phase = "finish", axial_doc_mm = 0.254, radial_woc_mm = 12.7, stations_mm = "{{cad.length_mm}}" },
+  { name = "OUTER END layers", kind = "end", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 203.2, phase = "rough", axial_doc_mm = 1.27, radial_woc_mm = 12.7, stations_mm = "{{cad.blank_width_mm}}" },
+  { name = "OUTER END last layer", kind = "end", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 203.2, phase = "finish", axial_doc_mm = 0.254, radial_woc_mm = 12.7, stations_mm = "{{cad.length_mm}}" },
 ]
 settings = "block-em-half-6061-t6511"
 inspection = "SPINDLE END to OUTER END {{cad.length_min_in:.3dot}}–{{cad.length_max_in:.3dot}}."
@@ -219,7 +220,7 @@ tool = "em-face"
 sizing = "other"
 instruction = "Square SPINDLE END to the jaw tops; face the up end just clean (≤{{process.cleanup_in:.2dot}}). Mark it ROW SIDE."
 instruction_detailed = "Stand the blank on a sawn end, SEAT and TOP in the jaws. Before tightening, rest the combination square's head across both jaw tops and bring its blade down against SPINDLE END; push SPINDLE END plumb to the blade. Face the up end just clean (≤{{process.cleanup_in:.2dot}}), two passes across the .96, and mark it ROW SIDE: the hole rows measure from it."
-milling_cuts = [{ name = "ROW SIDE clean-up", kind = "end", material = "aluminum_6061", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 203.2, phase = "finish", axial_doc_mm = 0.508, radial_woc_mm = 12.7, stations_mm = "{{cad.blank_length_mm}}" }]
+milling_cuts = [{ name = "ROW SIDE clean-up", kind = "end", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 203.2, phase = "finish", axial_doc_mm = 0.508, radial_woc_mm = 12.7, stations_mm = "{{cad.blank_length_mm}}" }]
 settings = "block-em-half-6061-t6511"
 
 [[setups.operations]]
@@ -228,8 +229,8 @@ tool = "em-face"
 sizing = "other"
 instruction = "ROW SIDE down, SPINDLE END square; face FAR SIDE in ≤{{process.layer_in:.2dot}} layers, the last .005–.010, to {{cad.width_min_in:.3dot}}–{{cad.width_max_in:.3dot}}."
 milling_cuts = [
-  { name = "FAR SIDE layers", kind = "end", material = "aluminum_6061", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 203.2, phase = "rough", axial_doc_mm = 1.27, radial_woc_mm = 12.7, stations_mm = "{{cad.blank_length_mm}}" },
-  { name = "FAR SIDE last layer", kind = "end", material = "aluminum_6061", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 203.2, phase = "finish", axial_doc_mm = 0.254, radial_woc_mm = 12.7, stations_mm = "{{cad.y_length_mm}}" },
+  { name = "FAR SIDE layers", kind = "end", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 203.2, phase = "rough", axial_doc_mm = 1.27, radial_woc_mm = 12.7, stations_mm = "{{cad.blank_length_mm}}" },
+  { name = "FAR SIDE last layer", kind = "end", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 203.2, phase = "finish", axial_doc_mm = 0.254, radial_woc_mm = 12.7, stations_mm = "{{cad.y_length_mm}}" },
 ]
 settings = "block-em-half-6061-t6511"
 inspection = "ROW SIDE to FAR SIDE {{cad.width_min_in:.3dot}}–{{cad.width_max_in:.3dot}}."
@@ -258,7 +259,7 @@ sizing = "other"
 instruction = "Spot B and H1–H4 from the table. H1–H4 X, Y ±{{cad.hole_x_tol_in:.3dot}}; B ±.01."
 instruction_detailed = "Touch ROW SIDE and zero X; the fixed jaw face is SPINDLE END, so touch it and zero Y. Spot B and H1–H4 at the table positions, each X to the left of ROW SIDE (−X on the DRO) (H1–H4 ±{{cad.hole_x_tol_in:.3dot}}, B ±.01), cone a little under each drill."
 # Stations: X from ROW SIDE. The #2 centre drill at its 3/16 in body Ø (largest cone).
-milling_cuts = [{ name = "spots B, H1–H4", kind = "drill", phase = "rough", material = "aluminum_6061", flutes = 2, feed_per_tooth_mm = 0.0254, cutter_dia_mm = 4.7625, stations_mm = ["{{cad.bore_y_mm}}", "{{cad.hole_y1_mm}}", "{{cad.hole_y2_mm}}"] }]
+milling_cuts = [{ name = "spots B, H1–H4", kind = "drill", phase = "rough", flutes = 2, feed_per_tooth_mm = 0.0254, cutter_dia_mm = 4.7625, stations_mm = ["{{cad.bore_y_mm}}", "{{cad.hole_y1_mm}}", "{{cad.hole_y2_mm}}"] }]
 rpm = 2800
 feed = "hand"
 
@@ -271,7 +272,7 @@ speed_kind = "spindle"
 tool = "drill-15"
 sizing = { kind = "band", band_mm = "{{cad.hole_dia_band_mm}}" }
 instruction = "H1–H4 through, full-retract pecks every .18."
-milling_cuts = [{ name = "H1–H4", kind = "drill", phase = "finish", material = "aluminum_6061", flutes = 2, feed_per_tooth_mm = 0.0254, cutter_dia_mm = 4.572, stations_mm = ["{{cad.hole_y1_mm}}", "{{cad.hole_y2_mm}}"] }]
+milling_cuts = [{ name = "H1–H4", kind = "drill", phase = "finish", flutes = 2, feed_per_tooth_mm = 0.0254, cutter_dia_mm = 4.572, stations_mm = ["{{cad.hole_y1_mm}}", "{{cad.hole_y2_mm}}"] }]
 rpm = 2800
 feed = "hand"
 inspection = "Ø{{cad.hole_dia_min_in:.3dot}}–{{cad.hole_dia_max_in:.3dot}} (the #15 drill); rows {{cad.hole_y1_nominal_in:.3dot}}/{{cad.hole_y2_nominal_in:.3dot}}, stations {{cad.hole_x1_nominal_in:.3dot}}/{{cad.hole_x2_nominal_in:.3dot}}, ±{{cad.hole_x_tol_in:.3dot}}."
@@ -283,7 +284,7 @@ tool = "em-5-16"
 sizing = { kind = "band", band_mm = "{{cad.cbore_dia_band_mm}}" }
 instruction = "Counterbore H1–H4: touch TOP, zero Z; measure H; plunge to Z −(H − {{cad.cbore_floor_nominal_in:.3dot}}), floors {{cad.cbore_floor_min_in:.3dot}}–{{cad.cbore_floor_max_in:.3dot}} above SEAT."
 instruction_detailed = "Measure the block's height H. Touch TOP with the 5/16 end mill (paper shim, then subtract its thickness) and zero Z. Plunge on each of H1–H4 to Z = −(H − {{cad.cbore_floor_nominal_in:.3dot}}), about {{cad.cbore_depth_in:.3dot}} deep, so each floor stands {{cad.cbore_floor_min_in:.3dot}}–{{cad.cbore_floor_max_in:.3dot}} above SEAT. Check with the depth rod from TOP: it reads (H − {{cad.cbore_floor_max_in:.3dot}}) to (H − {{cad.cbore_floor_min_in:.3dot}})."
-milling_cuts = [{ name = "H1–H4 counterbores", kind = "plunge", phase = "finish", material = "aluminum_6061", flutes = 2, feed_per_tooth_mm = 0.0254, cutter_dia_mm = 7.9375, stations_mm = ["{{cad.hole_y1_mm}}", "{{cad.hole_y2_mm}}"] }]
+milling_cuts = [{ name = "H1–H4 counterbores", kind = "plunge", phase = "finish", flutes = 2, feed_per_tooth_mm = 0.0254, cutter_dia_mm = 7.9375, stations_mm = ["{{cad.hole_y1_mm}}", "{{cad.hole_y2_mm}}"] }]
 rpm = 2000
 feed = "hand"
 inspection = "Ø{{cad.cbore_dia_min_in:.3dot}}–{{cad.cbore_dia_max_in:.3dot}} (the 5/16 end mill); floors {{cad.cbore_floor_min_in:.3dot}}–{{cad.cbore_floor_max_in:.3dot}} above SEAT."
@@ -294,7 +295,7 @@ speed_kind = "spindle"
 tool = "drill-f"
 sizing = { kind = "band", band_mm = "{{cad.tap_drill_band_mm}}" }
 instruction = "B through (tap drill); chip-break pecks after the first .5."
-milling_cuts = [{ name = "B tap drill", kind = "drill", phase = "finish", material = "aluminum_6061", flutes = 2, feed_per_tooth_mm = 0.0254, cutter_dia_mm = 6.5278, stations_mm = "{{cad.bore_y_mm}}" }]
+milling_cuts = [{ name = "B tap drill", kind = "drill", phase = "finish", flutes = 2, feed_per_tooth_mm = 0.0254, cutter_dia_mm = 6.5278, stations_mm = "{{cad.bore_y_mm}}" }]
 rpm = 2450
 feed = "hand"
 inspection = "B {{cad.bore_y_min_in:.3dot}}–{{cad.bore_y_max_in:.3dot}} from ROW SIDE, {{cad.bore_x_min_in:.3dot}}–{{cad.bore_x_max_in:.3dot}} from SPINDLE END."
@@ -306,7 +307,7 @@ tool = "em-3-8"
 sizing = { kind = "band", band_mm = "{{cad.bore_dia_band_mm}}" }
 instruction = "Seat B: 3/8 end mill miked ≥.3750; touch TOP, zero Z; plunge to Z −{{cad.bore_depth_nominal_in:.3dot}}, flat floor."
 instruction_detailed = "Mike the 3/8 end mill across its flutes first: it must read .3750 or more, or take another 3/8 from the set. Touch TOP with it (paper shim, then subtract its thickness) and zero Z. Still on B, plunge over the F hole to Z −{{cad.bore_depth_nominal_in:.3dot}} and dwell a moment at depth so the floor cleans up flat. The cutter sizes the seat: the .375 pin from the pin-gauge set enters full depth, the .379 does not."
-milling_cuts = [{ name = "seat B", kind = "plunge", phase = "finish", material = "aluminum_6061", flutes = 2, feed_per_tooth_mm = 0.0254, cutter_dia_mm = 9.525, stations_mm = "{{cad.bore_y_mm}}" }]
+milling_cuts = [{ name = "seat B", kind = "plunge", phase = "finish", flutes = 2, feed_per_tooth_mm = 0.0254, cutter_dia_mm = 9.525, stations_mm = "{{cad.bore_y_mm}}" }]
 rpm = 1650
 feed = "hand"
 inspection = "Ø{{cad.bore_dia_min_in:.3dot}}–{{cad.bore_dia_max_in:.3dot}} (pins) × {{cad.bore_depth_min_in:.3dot}}–{{cad.bore_depth_max_in:.3dot}} deep, flat."

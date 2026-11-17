@@ -15,6 +15,7 @@ stock = "{{process.blank_thickness_in:fraction}} × {{process.blank_width_in:fra
 note = "Inches. Only ZERO END, two holes and two grip-end corners are machined; the grip end stays saw-cut; 1/2 and 1 in faces as bought (reference). All spindle work in the high belt range."
 shop = "../shop.toml"
 material_key = "6061-t6511"
+milling_material = "aluminum_6061"
 
 [cad]
 file = "../../out/features/ch_rocker_arm_tl_oblique_feed_lever/features.toml"
@@ -121,7 +122,7 @@ feed = "8 in/min"
 inspection = "Length {{cad.length_min_in:.1f}}–{{cad.length_max_in:.1f}}: edge finder on the saw-cut grip end, DRO X from ZERO END."
 gauge_checks = [{ gauge = "mill-x-dro", band_mm = "{{cad.length_band_mm}}" }]
 milling_cuts = [
-  { name = "ZERO END clean-up", kind = "side", phase = "finish", material = "aluminum_6061", cutter_dia_mm = "{{process.cutter_dia_mm}}", flutes = 2, axial_doc_mm = "{{cad.blank_thickness_mm}}", radial_woc_mm = 0.508, rpm = 2000, feed_mm_min = 203.2, stations_mm = 0 },
+  { name = "ZERO END clean-up", kind = "side", phase = "finish", cutter_dia_mm = "{{process.cutter_dia_mm}}", flutes = 2, axial_doc_mm = "{{cad.blank_thickness_mm}}", radial_woc_mm = 0.508, rpm = 2000, feed_mm_min = 203.2, stations_mm = 0 },
 ]
 
 [[setups.operations]]
@@ -133,7 +134,7 @@ rpm = 2800
 feed = "hand"
 # H1 (.28) sits just outside the left jaw side, H2 (.91) inside the jaws.
 milling_cuts = [
-  { name = "spot H1–H2", kind = "drill", phase = "rough", material = "aluminum_6061", cutter_dia_mm = 4.7625, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = [7.112, 23.114] },
+  { name = "spot H1–H2", kind = "drill", phase = "rough", cutter_dia_mm = 4.7625, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = [7.112, 23.114] },
 ]
 
 [setups.operations.table]
@@ -150,7 +151,7 @@ feed = "hand"
 inspection = "Ø{{cad.hole_dia_min_in:.4dot}}–{{cad.hole_dia_max_in:.4dot}}; stations {{cad.hole_stations_in}} ±{{cad.station_tol_in:.2f}} from ZERO END; row {{cad.row_min_in:.2f}}–{{cad.row_max_in:.2f}} from ZERO EDGE."
 gauge_checks = [{ gauge = "pin-gauges", band_mm = "{{cad.hole_dia_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.hole_1_station_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.hole_2_station_band_mm}}" }, { gauge = "calipers", band_mm = "{{cad.row_band_mm}}" }]
 milling_cuts = [
-  { name = "H1–H2", kind = "drill", phase = "finish", material = "aluminum_6061", cutter_dia_mm = 8.7313, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = [7.112, 23.114] },
+  { name = "H1–H2", kind = "drill", phase = "finish", cutter_dia_mm = 8.7313, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = [7.112, 23.114] },
 ]
 
 [[setups]]
