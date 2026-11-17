@@ -25,7 +25,7 @@ import sm_summing_lever_spec
 from stock_anchor_geom import ANCHOR_9490T1
 
 
-def test_package_keeps_registry_outputs_and_four_landscape_sheets() -> None:
+def test_package_keeps_registry_outputs_and_three_landscape_sheets() -> None:
     row = DRAWINGS_BY_NAME["sm_summing_assembly"]
     assert row.source_kind == "assembly"
     assert row.part == "sm_summing"
@@ -33,7 +33,7 @@ def test_package_keeps_registry_outputs_and_four_landscape_sheets() -> None:
     assert drawing.OUTPUTS == drawing.OUTPUTS.__class__(
         row.outputs["slddrw"], row.outputs["pdf"], row.outputs["png"]
     )
-    assert len(drawing.SHEET_NAMES) == 4
+    assert drawing.SHEET_NAMES == ("ASSEMBLED + SETTINGS", "EXPLODED VIEW + BOM", "FINISHED ASSEMBLY")
     assert (
         set(drawing.SHEET_LAYOUTS)
         == set(drawing.SHEET_SCALES)
@@ -266,16 +266,17 @@ def test_a_caption_pushed_into_the_title_block_is_refused() -> None:
 
 def test_the_shoulder_screw_goes_in_after_the_end_plug_bond() -> None:
     # Owner rulings 2026-11-08 (Pedro), #2315: step 8 bonds the end plug per
-    # sheet 1 note 5, so the shoulder screw goes in at 8A-8B.
+    # bond note B, so the shoulder screw goes in at 8A-8B.
     steps = {step.split(". ", 1)[0]: step for step in notes.ASSEMBLY_STEPS}
-    assert steps["8"].startswith("8. BOND MHA-SM-05 INTO MHA-SM-01 PER SHEET 1 NOTE 5")
+    assert steps["8"].startswith("8. BOND MHA-SM-05 INTO MHA-SM-01 PER BOND NOTE B")
     assert steps["8A"].startswith("8A. PASS MHA-SM-VN-56")
     assert steps["8B"].startswith("8B. TURN MHA-SM-VN-56 INTO MHA-SM-05")
     assert steps["10A"].startswith("10A. TIGHTEN THE HUB SET SCREW MHA-FR-VN-52")
     assert "SNUG, 9 IN-LB MAX" in steps["10A"]
-    (bond_note,) = [n for n in notes.ASSEMBLED_NOTES if n.startswith("5. LOCTITE 638")]
+    bond_note = notes.BOND_NOTE_B
+    assert bond_note in notes.ASSEMBLY_CHECKS
     assert "CURE 24 H BEFORE STEP 8A" in bond_note
-    # Bench acceptance, as note 4's dowel bond (machinist review, run
+    # Bench acceptance, as bond note A's dowel bond (machinist review, run
     # 20261109T142156827Z, rule 23).
     assert bond_note.endswith("ACCEPT: IT DOES NOT TURN OR PULL OUT BY HAND.")
 
@@ -406,56 +407,3 @@ def test_hanger_fit_up_reach_matches_the_builder_band() -> None:
     assert builder.HANGER_REACH_MAX == pytest.approx(
         spec.HANGER_FIT_REACH + spec.HANGER_FIT_REACH_TOL
     )
-
-
-def test_steps_and_checks_stay_above_the_inner_border() -> None:
-    for text in (drawing.STEPS_NOTE, drawing.CHECKS_NOTE):
-        lines = text.splitlines()
-        assert max(map(len, lines)) <= drawing.STEPS_LINE_WIDTH
-        bottom = drawing.STEPS_XY[1] - len(lines) * drawing.NOTE_LINE_PITCH
-        assert bottom > drawing.SHEET_INNER_BORDER[1] + 0.004
-    assert drawing.STEPS_XY[0] > drawing.SHEET_INNER_BORDER[0]
-    assert drawing.STEPS_XY[1] < drawing.SHEET_INNER_BORDER[3]
-    assert drawing.STEPS_RIGHT < drawing.TITLE_BLOCK[0]
-    split = notes.ASSEMBLY_STEPS.index(
-        next(
-            s
-            for s in notes.ASSEMBLY_STEPS
-            if s.startswith(f"{drawing.STEPS_CONTINUED_FROM}. ")
-        )
-    )
-    assert (
-        drawing.STEPS_NOTE.split()
-        == " ".join(("ASSEMBLY SEQUENCE", *notes.ASSEMBLY_STEPS[:split])).split()
-    )
-    assert (
-        drawing.CHECKS_NOTE.split()
-        == " ".join(
-            (
-                "ASSEMBLY SEQUENCE (CONT.)",
-                *notes.ASSEMBLY_STEPS[split:],
-                *notes.ASSEMBLY_CHECKS,
-            )
-        ).split()
-    )
-    for number in drawing.BOM_PART_NUMBERS.values():
-        if any(number in step for step in notes.ASSEMBLY_STEPS):
-            assert number in drawing.STEPS_NOTE + drawing.CHECKS_NOTE
-
-
-def test_one_blank_line_separates_consecutive_numbered_steps() -> None:
-    for text in (drawing.STEPS_NOTE, drawing.CHECKS_NOTE):
-        lines = text.splitlines()
-        starts = [i for i, line in enumerate(lines) if re.match(r"\d+\. ", line)]
-        assert len(starts) > 1
-        for previous, start in zip(starts, starts[1:]):
-            # A blank line, or the CHECKS heading after its own blank line.
-            gap = lines[previous + 1 : start]
-            assert gap.count("") == 1
-            assert lines[start - 1] in ("", "CHECKS:")
-        # A lettered sub-step runs straight on from its step.
-        for index, line in enumerate(lines):
-            if re.match(r"\d+[A-Z]\. ", line):
-                assert lines[index - 1] != ""
-        # The heading runs straight into the first step.
-        assert lines[starts[0] - 1].endswith(("SEQUENCE", "(CONT.)", "CHECKS:"))

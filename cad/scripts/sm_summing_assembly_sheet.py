@@ -1,11 +1,12 @@
 """Drawing-only data of the summing-lever fitter package (MHA-SM-00).
 
 The drawing number, BOM order, the setting dimensions the drawing imports,
-the level tolerance, the BOM descriptions, setting callouts, detail title,
-assembled-view notes, assembly steps and checks the sheets print. Only
-draw_sm_summing_assembly (and its tests) import this module; no assembly
-builder may (``test_assembly_sheet_isolation`` pins it), so a wording edit
-here does not rebuild the summing assembly. No SolidWorks.
+the level tolerance, the BOM descriptions, setting callouts, detail title and
+assembled-view notes the sheets print, and the assembly steps and checks the
+release's ASSEMBLY.md prints (ha_assembly_package, #2889). Only
+draw_sm_summing_assembly, ha_assembly_package (and their tests) import this
+module; no assembly builder may (``test_assembly_sheet_isolation`` pins it),
+so a wording edit here does not rebuild the summing assembly. No SolidWorks.
 """
 
 from __future__ import annotations
@@ -128,7 +129,7 @@ DIMENSION_CALLOUTS = {
 }
 
 # --- Fitter package text ----------------------------------------------------------
-EXPLODED_CAPTION = "EXPLODED VIEW - ASSEMBLY SEQUENCE ON SHEETS 3-4"
+EXPLODED_CAPTION = "EXPLODED VIEW - FIT-UP STEPS IN ASSEMBLY.MD"
 ASSEMBLED_NOTES = (
     "NOTES:",
     "1. NOT SHOWN: TOP FRAME MHA-FR-02. EACH KNIFE-MOUNT TOP SEAT CLAMPS TO "
@@ -136,14 +137,19 @@ ASSEMBLED_NOTES = (
     "THE GOOSENECK POST STANDS IN THE FRAME'S GOOSENECK HUB.",
     "2. LEVER SHOWN LEVEL, RESTING ON THE KNIFE EDGE (TOP RIDGE OF EACH HEX "
     "TRUNNION) UNDER THE TOP OF EACH MOUNT BORE.",
-    f"3. LEVEL SETTING: {LEVEL_CRITERION}, SHEET 4 STEP 10.",
-    f"4. {BOND_GRADE} BOND (STEP 1B): DEGREASE DOWEL AND HOLE; COAT THE "
+    f"3. LEVEL SETTING: {LEVEL_CRITERION} (ASSEMBLY.MD STEP 10).",
+)
+# The bonds' consumable notes print with the checks in ASSEMBLY.md (rule 22).
+BOND_NOTE_A = (
+    f"BOND NOTE A, {BOND_GRADE} (STEP 1B): DEGREASE DOWEL AND HOLE; COAT THE "
     "DOWEL, NEVER THE BLIND HOLE; PRESS IT TO THE HOLE FLOOR; CURE 24 H "
-    "BEFORE STEP 5. ACCEPT: IT DOES NOT TURN OR SLIDE BY HAND.",
-    "5. LOCTITE 638 BOND (STEP 8): DEGREASE THE MHA-SM-05 SPIGOT AND THE "
+    "BEFORE STEP 5. ACCEPT: IT DOES NOT TURN OR SLIDE BY HAND."
+)
+BOND_NOTE_B = (
+    "BOND NOTE B, LOCTITE 638 (STEP 8): DEGREASE THE MHA-SM-05 SPIGOT AND THE "
     "MHA-SM-01 BORE; COAT THE SPIGOT; PUSH IT IN UNTIL THE HEAD SEATS SQUARE "
     "AND FLUSH ON THE TUBE'S FACED END; CURE 24 H BEFORE STEP 8A. ACCEPT: IT "
-    "DOES NOT TURN OR PULL OUT BY HAND.",
+    "DOES NOT TURN OR PULL OUT BY HAND."
 )
 # The fitter's order; sm_summing_explode_spec.EXPLODE_STEPS runs it backwards.
 # A step does one thing (rule 22): a numbered step's own sub-steps carry a
@@ -173,8 +179,8 @@ ASSEMBLED_NOTES = (
 # 2026-11-08 (Pedro), #2144 item 11.4: the upper eye rides free on the
 # shoulder screw (step 8B, check 3), superseding #1951's clamped eye.
 # Owner rulings 2026-11-08 (Pedro), #2315: step 8 bonds the MHA-SM-05 end
-# plug into MHA-SM-01 with LOCTITE 638 (note 5; it may be done before step
-# 1 and cures before the shoulder screw goes in at 8A-8B); step 10A
+# plug into MHA-SM-01 with LOCTITE 638 (BOND NOTE B; it may be done before
+# step 1 and cures before the shoulder screw goes in at 8A-8B); step 10A
 # tightens the hub set screw on the bare leg, to its limit, on its own.
 ASSEMBLY_STEPS = (
     "1. ON THE TOP FRAME MHA-FR-02, AT EACH HANGER HOLE PRESS ONE MHA-SM-VN-53 "
@@ -182,7 +188,7 @@ ASSEMBLY_STEPS = (
     "IN THE CROSSBAR UNDERSIDE, TO THE HOLE FLOOR.",
     "1A. CHECK THAT NO DOWEL TURNS OR SLIDES BY HAND.",
     f"1B. IF ONE DOES, OR ONE SLID IN BY HAND, BOND IT IN WITH {BOND_GRADE} "
-    "PER SHEET 1 NOTE 4.",
+    "PER BOND NOTE A.",
     "1C. AT EACH HANGER HOLE SEAT AN MHA-SM-VN-54 WASHER ON THE FACED TOP.",
     "2. THREAD MHA-SM-VN-50 INTO THE TAPPED BOSS OF MHA-SM-03 UNTIL ITS CUT "
     "END IS WITHIN HALF A TURN OF FLUSH WITH THE BOSS UNDERSIDE, FINISHING "
@@ -223,8 +229,8 @@ ASSEMBLY_STEPS = (
     "THE CROSSBAR UNDERSIDE.",
     f"7. CHECK THE FREE ROCK AGAIN (CHECK 2, DETAIL {DETAIL_LETTER}) BEFORE THE "
     "COUNTER SPRING GOES ON.",
-    # One printed line: sheet 4 is full (note 5 names the compound).
-    "8. BOND MHA-SM-05 INTO MHA-SM-01 PER SHEET 1 NOTE 5 (MAY BE DONE BEFORE STEP 1).",
+    # One line: bond note B names the compound.
+    "8. BOND MHA-SM-05 INTO MHA-SM-01 PER BOND NOTE B (MAY BE DONE BEFORE STEP 1).",
     "8A. PASS MHA-SM-VN-56 THROUGH THE UPPER LOOP OF MHA-SM-VN-51.",
     "8B. TURN MHA-SM-VN-56 INTO MHA-SM-05 UNTIL ITS SHOULDER SEATS ON THE END "
     "FACE; NO THREADLOCKER.",
@@ -242,8 +248,8 @@ ASSEMBLY_STEPS = (
     "10A. TIGHTEN THE HUB SET SCREW MHA-FR-VN-52 ON THE POST, "
     f"{HUB_SET_SCREW_TORQUE}.",
 )
+STEP_SECTIONS = (("ASSEMBLY SEQUENCE", ASSEMBLY_STEPS),)
 ASSEMBLY_CHECKS = (
-    "CHECKS:",
     "1. EACH MOUNT'S TOP SEAT IS FLAT TO THE CROSSBAR UNDERSIDE: A "
     f"{_length(SEAT_FEELER_MM, 3)} FEELER ENTERS NOWHERE ROUND IT; THE MOUNT "
     "DOES NOT TURN ABOUT ITS DOWEL BY HAND.",
@@ -256,4 +262,6 @@ ASSEMBLY_CHECKS = (
     f"4. AFTER STEP 10A THE LEVER PLATE TOP READS {LEVEL_CRITERION} AND THE "
     "GOOSENECK POST DOES NOT TURN OR SLIDE IN ITS HUB.",
     "5. AFTER STEP 5 THE GAUGE BAR SLIDES OUT OF BOTH MOUNTS' BORES BY HAND.",
+    BOND_NOTE_A,
+    BOND_NOTE_B,
 )
