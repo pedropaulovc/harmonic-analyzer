@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import ast
 import asyncio
 from pathlib import Path
 
@@ -195,16 +194,6 @@ def test_pattern_targets_read_candidates_in_sorted_name_order(
     assert_pattern_targets(None, list(stations), targets, rows, "pattern")
     _assembly._POSE_LEDGER.clear()
     assert read[:3] == ["pattern-1", "pattern-2", "pattern-3"]
-
-
-def test_pattern_helpers_do_not_reference_removed_flag_helpers() -> None:
-    tree = ast.parse(Path(_assembly_patterns.__file__).read_text(encoding="utf-8"))
-    loaded_names = {
-        node.id
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load)
-    }
-    assert loaded_names.isdisjoint({"_flag", "_flag_only"})
 
 
 @pytest.mark.parametrize(

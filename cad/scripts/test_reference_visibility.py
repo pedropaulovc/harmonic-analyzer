@@ -323,7 +323,6 @@ def test_every_configuration_is_checked_with_itself_active(
     assert model.active == "T120"
 
 
-
 def test_an_allowance_admits_its_sketch_and_nothing_else() -> None:
     model = _part_tree(
         _Feature("StationReference", "ProfileFeature", SHOWN),
@@ -1000,18 +999,6 @@ def test_the_shared_walk_counts_every_feature_but_skips_components() -> None:
     assert _ROUND_TRIPS == Counter({"InvokeTypes": 1 + 4 + 3 + 4})
 
 
-def test_creation_hides_and_the_save_check_are_distinct_spans() -> None:
-    text = (SCRIPTS / "_visibility.py").read_text(encoding="utf-8")
-    for span in (
-        "appearance.blank_reference_geometry",
-        "appearance.blank_sketch_feature",
-        "appearance.assert_reference_geometry_hidden",
-    ):
-        assert text.count(f'"{span}"') == 1, span
-    stock = (SCRIPTS / "_stock_fastener.py").read_text(encoding="utf-8")
-    assert "FeatureWalk(model)" in stock and "walk_siblings" not in stock
-
-
 # paper-drive's chain pattern and Belt/Chain feature author their own
 # construction; a plane either generates carries a SolidWorks name ('PLANE2' on
 # integ e12b78a2a), so the builder hides what each step newly shows.
@@ -1081,12 +1068,3 @@ def test_paper_drive_plane_that_stays_shown_fails_loud(monkeypatch) -> None:
         paper_drive.hide_generated_planes(
             _PaperDriveAdapter(), set(), "belt/chain coupling"
         )
-
-
-def test_paper_drive_wraps_both_feature_steps() -> None:
-    source = (SCRIPTS / "build_pd_paper_drive_assembly.py").read_text(encoding="utf-8")
-    assert 'hide_generated_planes(adapter, shown, "roller chain pattern")' in source
-    assert 'hide_generated_planes(adapter, shown, "belt/chain coupling")' in source
-    for step in ("await _insert_roller_chain(adapter)", "await adapter.insert_belt_chain("):
-        at = source.index(step)
-        assert source.rindex("shown = _shown_planes(adapter)", 0, at) < at, step

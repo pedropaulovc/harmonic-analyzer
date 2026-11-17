@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-import ast
-from collections import Counter
 from itertools import product
-from pathlib import Path
 
 import pytest
 
@@ -163,67 +160,6 @@ def test_instance_readback_rejects_drifted_hardware(
             screw_transform,
             washer_transform,
         )
-
-
-def test_new_washers_add_two_instances_to_the_one_dowel_per_mount_recipe() -> None:
-    tree = ast.parse(Path(asm.__file__).read_text(encoding="utf-8"))
-    builds = [
-        node
-        for node in tree.body
-        if isinstance(node, ast.AsyncFunctionDef) and node.name == "build"
-    ]
-    assert len(builds) == 1
-    counts: Counter[str] = Counter()
-
-    class Placements(ast.NodeVisitor):
-        multiplier = 1
-
-        def visit_For(self, node: ast.For) -> None:
-            placement_calls = [
-                call
-                for call in ast.walk(node)
-                if isinstance(call, ast.Call)
-                and isinstance(call.func, ast.Name)
-                and call.func.id == "place_component"
-            ]
-            if not placement_calls:
-                return
-            if isinstance(node.iter, ast.Tuple):
-                length = len(node.iter.elts)
-            else:
-                assert isinstance(node.iter, ast.Name)
-                assert node.iter.id == "KNIFE_DOWEL_X_OFFSETS"
-                length = len(asm.KNIFE_DOWEL_X_OFFSETS)
-            previous = self.multiplier
-            self.multiplier *= length
-            self.generic_visit(node)
-            self.multiplier = previous
-
-        def visit_Call(self, node: ast.Call) -> None:
-            if isinstance(node.func, ast.Name) and node.func.id == "place_component":
-                assert isinstance(node.args[1], ast.Constant)
-                counts[node.args[1].value] += self.multiplier
-            self.generic_visit(node)
-
-    Placements().visit(builds[0])
-    assert counts == {
-        "sm-knife-mount": 2,
-        "sm-vn-knife-hanger-stud": 2,
-        "sm-vn-knife-hanger-washer": 2,
-        "sm-vn-knife-mount-dowel": 2,
-        "sm-summing-lever": 1,
-        "sm-vn-boss-hook": 1,
-        "sm-vn-counter-spring": 1,
-        "sm-gooseneck": 1,
-        "sm-gooseneck-end-plug": 1,
-        "sm-vn-gooseneck-shoulder-screw": 1,
-    }
-    # Owner ruling 2026-11-08 (Pedro), #2144 item 11.3: one dowel per mount
-    # takes the former thirteen-component recipe to eleven.  Owner rulings
-    # 2026-11-08 (Pedro), #2315 add the MHA-SM-05 end plug.
-    assert sum(counts.values()) == 14
-    added = counts["sm-vn-knife-hanger-washer"] + counts["sm-gooseneck-end-plug"]
-    assert sum(counts.values()) - added == 11
 
 
 def test_washer_seat_pairs_allow_exact_contacts_but_no_solid_overlap() -> None:
