@@ -196,8 +196,7 @@ throw away afterwards. Non-negotiable shape:
   isolate: SolidWorks keys open documents by FILENAME, so a probe that opens
   `top-frame.SLDDRW` also loads `top-frame.SLDPRT` read-only, and a concurrent
   `part:top_frame` build binds to that resident copy and dies in a plain
-  `Select2` (three builds lost this way, 2026-09-16 — see
-  `drawing_layout_audit.py`'s module docstring).
+  `Select2` (three builds lost this way, 2026-09-16).
 - **One way in.** `_cached_com_action` is the single COM entry point: it probes
   the cache, dispatches a farm leaf when the executor is `farm`, otherwise
   takes the seat, re-probes under it, runs `_exec_com` and stores the result.

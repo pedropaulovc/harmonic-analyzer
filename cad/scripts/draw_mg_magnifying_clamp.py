@@ -741,19 +741,14 @@ def _require_flat_import(adapter, requested_view, source_display, display, sourc
         source_feature = native("source-dimension-feature", source_dimension.GetFeatureOwner(), "IFeature")
         audit["step"] = "drawing-dimension.GetFeatureOwner"
         drawing_feature = native("drawing-dimension-feature", dimension.GetFeatureOwner(), "IFeature")
-        try:
-            audit["feature_match"] = app.IsSame(source_feature, drawing_feature)
-        except Exception as exc:
-            audit["feature_match"] = None
-            audit["feature_match_error_type"] = type(exc).__name__
         audit["feature_names"] = source_feature.Name, drawing_feature.Name
         audit["feature_types"] = source_feature.GetTypeName2(), drawing_feature.GetTypeName2()
         if any(value not in ("ProfileFeature", "3DProfileFeature") for value in audit["feature_types"]):
             raise RuntimeError("native dimension feature is not a supported sketch feature")
         # IDimension identity above is authoritative: source_display was
         # enumerated from this named source feature by _named_dimension.
-        # IFeature wrappers returned by GetFeatureOwner can differ by context;
-        # their IsSame code is diagnostic, not a substitute ownership test.
+        # IFeature wrappers returned by GetFeatureOwner can differ by context,
+        # so only their names are compared.
         if any(type(value) is not str or value != source_point[0] for value in audit["feature_names"]):
             raise RuntimeError("imported native dimension feature differs from its source")
         audit["step"] = "dimension-feature.forward"

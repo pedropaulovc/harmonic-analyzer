@@ -22,7 +22,7 @@ from types import SimpleNamespace
 import pytest
 
 import _drawing_layout_audit as native_audit
-from _drawing_layout_check import DrawableRegion
+from _layout_geometry import DrawableRegion
 import _purchased_fastener_drawing as purchased
 import draw_sh_vn_thumb_screw as thumb
 

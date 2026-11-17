@@ -69,7 +69,6 @@ from _drawing_hole_callout import (
     set_hole_callout_precision,
 )
 from _drawing_tolerances import _tolerance_places
-from _drawing_layout_collect import check_drawing_layout
 from _drawing_leader_notes import add_leader_note
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
@@ -93,7 +92,6 @@ from diagnostics.drawing_layout_audit import (
     _display_data,
     _display_lines,
     collect_document,
-    describe_sheet,
 )
 from dt_cone_swing_platform_drawing_spec import (
     DRAWING_DIMENSIONS,
@@ -2802,7 +2800,6 @@ async def build(adapter: Any) -> dict[str, str]:
             f"sheet_xy_mm=({projected[0] * 1000:.3f},{projected[1] * 1000:.3f})"
         )
     for sheet_geometry in collect_document(adapter):
-        print(describe_sheet(sheet_geometry))
         if sheet_geometry.name != SHEET_NAMES[0]:
             continue
         thickness_geometry = [
@@ -2824,8 +2821,6 @@ async def build(adapter: Any) -> dict[str, str]:
             for segment in witnesses
         ):
             raise RuntimeError(f"plate thickness witnesses did not shorten to the cut edge: {witnesses}")
-    check_drawing_layout(adapter, layout=SPEC.layout, stem=PART_STEM)
-
     return await finalize_drawing(
         adapter,
         OUTPUTS,

@@ -1,23 +1,19 @@
 """Read-back ink boxes for laying drawing annotations out clear of each other.
 
-The layout audit (``_drawing_layout_check``) gives dimensions and GD&T symbols
-``CollisionScope.NONE``: a GD&T symbol sits by design beside its own frame, and
-a dimension's box is only a nominal square around its text anchor.  So a
-feature-control frame parked on a neighbouring dimension's callout text reads
-clean.  It happened on MHA-DT-19 (pc-r7 eye pass): the cylindricity frame sat
-on the match-drill callout's "STRAPS" and "0.45", and the Ra 1.6 bar sat on the
-callout's shoulder.
+The layout audit (``_layout_audit``) measures every annotation on the
+exported PDF, but only after the sheet is finished: a feature-control frame
+parked on a neighbouring dimension's callout text would fail the leaf with no
+way to move it.  It happened on MHA-DT-19 (pc-r7 eye pass): the cylindricity
+frame sat on the match-drill callout's "STRAPS" and "0.45", and the Ra 1.6 bar
+sat on the callout's shoulder.
 
-This module measures a leadered dimension callout from what SolidWorks
-renders, and places a sheet's annotations from those measured boxes.  It
-asserts the result, so a longer callout cannot quietly re-collide.  It is
-opt-in: only the sheets that import it re-key, whereas an edit to
-``_drawing_common`` re-keys every drawing.
+This module measures a leadered dimension callout and GD&T symbols from what
+SolidWorks renders, and places a sheet's annotations from those measured
+boxes.  It asserts the result, so a longer callout cannot quietly re-collide.
 
 A leadered dimension's text block sits on its shoulder, a horizontal line of
-``IDisplayDimension::GetDisplayData`` (sheet space; see
-``_drawing_layout_collect._display_dimension_leader_segments``).  The shoulder runs
-under the full text width, and the text is centred on the annotation's
+``IDisplayDimension::GetDisplayData`` (sheet space).  The shoulder runs under
+the full text width, and the text is centred on the annotation's
 ``GetPosition``.  The block is therefore the shoulder's x-span, from the
 shoulder up to the mirror of the shoulder about that centre.  The other display
 lines are the leader, kept apart as segments so a frame beside a sloped leader
@@ -33,12 +29,40 @@ from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 
 from _com import _early_bound
 from _drawing_common import rebuild_drawing
-from _drawing_layout_check import DrawableRegion, LeaderSegment, _segment_crosses_box
-from _drawing_layout_collect import _ANNOT_DIM, _GDT_TYPES, _gdt_element
+from _drawing_layout_audit import annotation_display
 from _drawing_sheet_region import sheet_drawable_region
+from _layout_audit import display_box, estimated_text_runs
+from _layout_geometry import DrawableRegion, LeaderSegment, segment_crosses_box
 import _telemetry
 
 Box = tuple[float, float, float, float]
+
+# swAnnotationType_e: display dimensions (and native hole callouts), and the
+# native GD&T symbols the recipes place at explicit sheet coordinates.
+_ANNOT_DATUM = 2
+_ANNOT_DIM = 4
+_ANNOT_GTOL = 5
+_ANNOT_SFSYM = 7
+_GDT_TYPES = frozenset({_ANNOT_DATUM, _ANNOT_GTOL, _ANNOT_SFSYM})
+_SEL_DIMENSION = 14  # swSelectType_e.swSelDIMENSIONS
+
+# Fallback only, for a GD&T symbol whose geometry cannot be read. Every symbol
+# that CAN be measured is (see _measured_gdt_box) -- a fixed square is wrong
+# for an FCF by construction, since its width tracks its compartments.
+_NOMINAL_GDT_HALF_M = 0.008
+
+# A SURFACE-FINISH symbol is NOT centred on its anchor. ``GetPosition`` returns
+# the LEADER'S ATTACHMENT POINT -- the bottom vertex of the check-mark triangle
+# -- and the whole body draws UP and to the RIGHT of it: triangle
+# x [ax-0.006, ax+0.006] y [ay, ay+0.011]; the "Ra 1.6" text
+# x [ax+0.013, ax+0.039] y [ay+0.010, ay+0.017]; the arm at y ~= ay+0.018.
+# Measured independently on 3+ sheets by three agents; every sample draws
+# up-right regardless of which side the target sits on, so the offsets are
+# orientation-stable for ``add_surface_finish``'s SetLeader3(BENT, SMART) call.
+_SF_BOX_LEFT_M = 0.008
+_SF_BOX_RIGHT_M = 0.039
+_SF_BOX_UP_M = 0.018
+_SF_BOX_DOWN_M = 0.0
 
 # Two annotations closer than this read as one: one text height of air.
 CLEAR_GAP_M = 0.002
@@ -128,21 +152,113 @@ def callout_ink(adapter: Any, annotation: Any, *, label: str) -> CalloutInk:
     return CalloutInk(label, text, leader)
 
 
+def _datum_is_dimension_attached(annotation: Any) -> bool:
+    """Whether a datum tag is attached to a display dimension.
+
+    SolidWorks reports ``IDatumTag`` primitive coordinates for this attachment
+    type in the dimension's local frame.  They must not be mixed with the
+    sheet-space annotation position.
+    """
+    try:
+        attachment_types = annotation.GetAttachedEntityTypes() or ()
+    except Exception:  # noqa: BLE001 -- unreadable means not dimension-attached
+        return False
+    return _SEL_DIMENSION in (int(value) for value in attachment_types)
+
+
+def _measured_gdt_box(adapter: Any, annotation: Any, kind: int, *, name: str) -> Box | None:
+    """Box a datum tag or feature-control frame from the ink it renders.
+
+    ``IAnnotation::GetDisplayData`` (``annotation_display``): lines, arcs,
+    triangles and text runs where SolidWorks draws them, leader included. NOT
+    the ``IGtol`` / ``IDatumTag`` primitives (``GetLineAtIndex`` and kin) -- on
+    MHA-DT-19 at 4:1 (pc-gdt-ink-diag, a89a13a7a) a leadered FCF's primitives
+    are a crossed 2h x 2h placeholder square at the leader's far end plus the
+    leader's last run, never the frame, and a datum tag's box lies about
+    (-9.9, -5.0) mm off its ink. The display data is where the PDF prints:
+    knife-mount's datum A and its leadered three-compartment FCF match their PDF
+    glyphs within 0.15 mm (layoutcal d09c2b9eb).
+
+    ``None``, with a ``gdt_box.fallback`` event naming the symbol and the
+    reason, when there is nothing to read. A DATUM attached to a display
+    dimension is one such case: whether its display data is sheet space is
+    unmeasured, so it keeps the nominal box.
+    """
+    if kind == _ANNOT_DATUM and _datum_is_dimension_attached(annotation):
+        reason = "dimension-attached datum"
+    else:
+        display, refused = annotation_display(adapter, annotation)
+        box = display_box(display) if display else None
+        if box is not None:
+            estimated = estimated_text_runs(display)
+            if estimated:
+                _telemetry.event("gdt_box.text_estimated", symbol=name, runs=estimated)
+            return (box.xmin, box.ymin, box.xmax, box.ymax)
+        if display:
+            reason = "display data draws nothing"
+        else:
+            reason = f"no display data (refused {refused})" if refused else "no display data"
+    _telemetry.event("gdt_box.fallback", symbol=name, reason=reason)
+    _telemetry.debug(f"{name}: GD&T box falls back to the nominal square: {reason}")
+    return None
+
+
 def gdt_box(adapter: Any, annotation: Any, *, label: str) -> Box:
-    """A GD&T symbol's box as the layout audit measures it."""
+    """A GD&T symbol's box from its rendered geometry where possible.
+
+    Datum tags and feature-control frames are MEASURED (``_measured_gdt_box``):
+    an FCF's anchor is its frame's TOP-LEFT corner and its width grows with
+    compartment count (41.6 mm for "Ø0.20|A|B|C" vs 32.2 mm for "0.10|A|B",
+    both 7.0 mm tall), so no fixed box can be right. A surface-finish symbol
+    keeps its measured ``_SF_BOX_*`` constants: its "Ra 1.6" text overhangs
+    the bar drawn above it by ~1.3 mm and is not among the primitives, so a
+    geometry-derived box would clip it. A symbol with no readable geometry
+    falls back to a nominal square, which still catches one placed clear off
+    the sheet.
+    """
     annotation = _sw_type_info.early_bound_or_flag(
-        annotation, "IAnnotation", "GetType", "GetName"
+        annotation, "IAnnotation", "GetType", "GetName", "GetPosition", "GetAttachedEntityTypes"
     )
     kind = int(annotation.GetType())
     if kind not in _GDT_TYPES:
         raise RuntimeError(f"{label} is not a GD&T symbol (annotation type {kind})")
-    element = _gdt_element(
-        adapter, annotation, str(annotation.GetName() or label), kind
-    )
-    if element is None:
+    position = annotation.GetPosition()
+    if not position:
         raise RuntimeError(f"{label} has no readable position")
-    _telemetry.info(f"{label} ink: {_fmt(element.box)}")
-    return element.box
+    x, y = float(position[0]), float(position[1])
+    name = str(annotation.GetName() or label)
+    if kind == _ANNOT_SFSYM:
+        box = (x - _SF_BOX_LEFT_M, y - _SF_BOX_DOWN_M, x + _SF_BOX_RIGHT_M, y + _SF_BOX_UP_M)
+    else:
+        measured = _measured_gdt_box(adapter, annotation, kind, name=name)
+        half = _NOMINAL_GDT_HALF_M
+        box = measured if measured is not None else (x - half, y - half, x + half, y + half)
+    _telemetry.info(f"{label} ink: {_fmt(box)}")
+    return box
+
+
+def leader_segments_of(annotation: Any, *, label: str, kind: str, owner: str) -> list[LeaderSegment]:
+    """Every straight run of ``annotation``'s registered leader(s), in sheet meters.
+
+    ``GetLeaderPointsAtIndex`` returns a flat x,y,z triple stream in sheet
+    space; consecutive points are joined, so a bent leader yields its elbow AND
+    its tail.
+    """
+    annotation = _sw_type_info.early_bound_or_flag(
+        annotation, "IAnnotation", "GetLeaderCount", "GetLeaderPointsAtIndex"
+    )
+    segments: list[LeaderSegment] = []
+    for index in range(int(annotation.GetLeaderCount() or 0)):
+        raw = annotation.GetLeaderPointsAtIndex(index)
+        if not raw:
+            continue
+        values = [float(v) for v in raw]
+        points = [(values[i], values[i + 1]) for i in range(0, len(values) - 2, 3)]
+        segments.extend(
+            LeaderSegment(label, kind, start[0], start[1], end[0], end[1], owner)
+            for start, end in zip(points, points[1:])
+        )
+    return segments
 
 
 def sheet_region(adapter: Any) -> DrawableRegion:
@@ -195,7 +311,7 @@ def require_leader_clear(ink: CalloutInk, others: dict[str, Box]) -> None:
     hits = [
         name
         for name, box in others.items()
-        if any(_segment_crosses_box(segment, box, inset=0.0) for segment in ink.leader)
+        if any(segment_crosses_box(segment, box, inset=0.0) for segment in ink.leader)
     ]
     if hits:
         raise RuntimeError(f"{ink.label} leader runs through {hits}")

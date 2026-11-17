@@ -447,7 +447,6 @@ def test_back_ra_symbol_hangs_above_the_shaft_clear_of_every_witness() -> None:
     assert (drawing.DETAIL_LABEL_XY[0] - drawing.DETAIL_LABEL_HALF_WIDTH) - (
         symbol_x + right
     ) >= 0.005
-    assert "leader-crosses-leader" in drawing.BLOCKING_LAYOUT_FINDINGS
 
 
 def test_front_ra_symbol_hangs_above_its_land() -> None:
@@ -990,17 +989,6 @@ def test_head_diameter_line_stands_between_crown_apex_and_fence() -> None:
     half = spec.HEAD_DIA / 2000.0
     fence = center + (drawing.DETAIL_RADIUS_MM**2 / 1e6 - half**2) ** 0.5
     assert apex + 0.0015 < x < fence - 0.0020
-
-
-def test_layout_audit_gates_text_on_line_and_logs_the_rest() -> None:
-    from _layout_geometry import Finding
-
-    advisory = Finding(kind="leader-crosses-view", sheet="Sheet1", detail="x")
-    drawing._assert_no_text_on_line([advisory])
-    for kind in ("text-on-line", "text-on-text", "leader-crosses-leader"):
-        blocking = Finding(kind=kind, sheet="Sheet1", detail="journal")
-        with pytest.raises(RuntimeError, match="blocking finding"):
-            drawing._assert_no_text_on_line([advisory, blocking])
 
 
 def test_drum_station_stack_derives_the_land_length_and_station_band() -> None:

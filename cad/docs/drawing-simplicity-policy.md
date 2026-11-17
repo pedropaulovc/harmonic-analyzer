@@ -175,7 +175,7 @@ reviews that read it. This policy file is not a review input.
   dimensions it from the datum feature with a driven dimension picked on both
   features.
 - **Layout (rules 13–15).** Each `DrawingSpec` records its sheet orientation.
-  The layout audit (`_drawing_layout_check`) checks the template's border and
+  The layout audit (`_layout_audit`) checks the template's border and
   title-block keep-out; the machinist review judges containment, balance and
   fit of every visible element. An eye pass never substitutes for it (merge
   gate 3 in the root `AGENTS.md`).

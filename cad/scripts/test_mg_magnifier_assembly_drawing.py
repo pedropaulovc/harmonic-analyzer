@@ -2472,7 +2472,7 @@ def test_whole_check_note_rewrap_clears_r22_aggregate_keepout(
     monkeypatch,
 ) -> None:
     from _drawing_annotation_extent import boxes_clear
-    from _drawing_layout_check import DrawableRegion
+    from _layout_geometry import DrawableRegion
 
     # Native R22 PDF/layout JSON, run 20261021T114849219Z-97170adcbc744b108a6c2f7a37ddaba5.
     # The actual five-row note extent overlaps the panel even though each

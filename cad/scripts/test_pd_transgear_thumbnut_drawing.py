@@ -19,7 +19,7 @@ import build_pd_transgear_thumbnut as part
 import draw_pd_transgear_thumbnut as drawing
 import pd_transgear_thumbnut_spec as spec
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
-from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
+from _layout_geometry import LeaderSegment, find_leader_leader_crossings
 from _drawing_registry import DRAWINGS_BY_NAME
 from _printed_tolerance import angular_band_deg, printed_band_mm
 from _test_stubbed_build import offline_adapter, stub_seat

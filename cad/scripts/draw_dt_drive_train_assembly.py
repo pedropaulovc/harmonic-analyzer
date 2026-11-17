@@ -62,15 +62,10 @@ from _drawing_common import (
     rebuild_drawing,
     set_high_quality_shaded_with_edges,
 )
+from _drawing_annotation_extent import leader_segments_of
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import assert_imported_precision
 from _drawing_hidden_sketches import _show_base_view_sketches
-from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
-from _drawing_layout_collect import (
-    _leader_segments_of,
-    check_drawing_layout,
-    collect_layout_elements,
-)
 from _drawing_leader_notes import add_leader_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -87,6 +82,7 @@ from _drawing_view_configuration import (
 )
 from _drawing_view_display import set_hidden_lines_removed
 from _dt_drive_train_balloon_anchors import DRIVE_TRAIN_BALLOON_ANCHORS
+from _layout_geometry import LeaderSegment, find_leader_leader_crossings
 from _machinist_review_mode import MachinistReviewMode
 import _seat_forensics
 from _session import run_build
@@ -3579,29 +3575,33 @@ def _balloon_attachment(annotation: Any, name: str) -> tuple[float, float]:
 def _placed_balloon_leaders(
     adapter: Any, annotations: dict[str, Any]
 ) -> dict[str, list[LeaderSegment]]:
-    """Each balloon's leader through the layout audit's own reader."""
+    """Each balloon's registered leader, read off COM (``GetLeaderPointsAtIndex``)."""
     leaders = {}
     for name, annotation in annotations.items():
-        segments = _leader_segments_of(adapter, annotation, label=name, kind="note", owner="")
+        segments = leader_segments_of(annotation, label=name, kind="note", owner="")
         if not segments:
             raise RuntimeError(f"{name}: balloon leader is unreadable")
         leaders[name] = segments
     return leaders
 
 
-def _audit_leader_segments(adapter: Any, sheet_name: str) -> list[LeaderSegment]:
-    """The layout audit's own leader read of one sheet, after activating it."""
+def _sheet_balloon_segments(
+    adapter: Any, sheet_name: str, annotations: dict[str, Any]
+) -> list[LeaderSegment]:
+    """The balloons' leaders of one sheet as placed, read after activating it."""
     _activate_sheet(adapter, sheet_name)
-    _elements, segments, _region = collect_layout_elements(
-        adapter, layout=SHEET_LAYOUTS[sheet_name]
-    )
-    return segments
+    return [
+        segment
+        for segments in _placed_balloon_leaders(adapter, annotations).values()
+        for segment in segments
+    ]
 
 
 def _audit_balloon_leaders(
     segments: list[LeaderSegment], annotations: dict[str, Any]
 ) -> dict[str, list[LeaderSegment]]:
-    """The balloons' leaders out of an audit read; its labels read ``DetailItemN '11'``."""
+    """The given balloons' leaders out of a flat leader read, keyed by balloon
+    name; any other leader in the read is dropped."""
     leaders: dict[str, list[LeaderSegment]] = {}
     for segment in segments:
         name = segment.label.split(" ", 1)[0]
@@ -3827,22 +3827,24 @@ def _final_balloon_uncross(
     sheet_name: str,
     annotations: dict[str, Any],
     *,
-    read_segments: Callable[[Any, str], list[LeaderSegment]] = _audit_leader_segments,
+    read_segments: Callable[[Any, str], list[LeaderSegment]] | None = None,
 ) -> None:
-    """Uncross a sheet's balloons on the audit's geometry, just before the audit.
+    """Uncross a sheet's balloons once every view on it is final.
 
-    One predicate, one reader: the audit's ``collect_layout_elements`` after
-    ``_activate_sheet``, exactly as ``_check_package_layout`` will read it. A
-    crossing the placement-time pass could not see (a view regenerated since,
-    sub-mm scatter between reads) is swapped here; one that survives the
-    quadratic cap raises by name. A near pair the swap would not shorten is
-    only warned: the audit does not call it. Crossings with non-balloon leaders
-    are the audit's to report.
+    The leaders are read after ``_activate_sheet``. A crossing the
+    placement-time pass could not see (a view regenerated since, sub-mm
+    scatter between reads) is swapped here; one that survives the quadratic
+    cap raises by name. A near pair the swap would not shorten is only warned.
+    Crossings with non-balloon leaders are the layout audit's to report
+    (``leader-crosses-leader`` on the exported PDF).
     """
+    read = read_segments or (
+        lambda adapter, sheet_name: _sheet_balloon_segments(adapter, sheet_name, annotations)
+    )
     swaps, leaders = _uncross_balloons(
         adapter,
         annotations,
-        lambda: _audit_balloon_leaders(read_segments(adapter, sheet_name), annotations),
+        lambda: _audit_balloon_leaders(read(adapter, sheet_name), annotations),
         label=sheet_name,
     )
     _telemetry.event("drawing.balloon_final_uncross", sheet=sheet_name, swaps=tuple(swaps))
@@ -3934,19 +3936,13 @@ def _configure_view(
 
 
 
-def _check_package_layout(adapter: Any, field_findings: list[str]) -> None:
-    """Audit every sheet; fail on any finding, including note-field findings."""
-    failures = list(field_findings)
-    for number, sheet_name in enumerate(SHEET_NAMES, start=1):
-        _activate_sheet(adapter, sheet_name)
-        try:
-            check_drawing_layout(
-                adapter, layout=SHEET_LAYOUTS[sheet_name], stem=f"{ARTIFACT_STEM} sheet {number}"
-            )
-        except RuntimeError as exc:
-            failures.append(f"sheet {number} {sheet_name}: {exc}")
-    if failures:
-        raise RuntimeError("drive-train package layout audit failed:\n" + "\n".join(failures))
+def _check_package_layout(field_findings: list[str]) -> None:
+    """Fail on any note-field finding; the layout audit judges every sheet on
+    the exported PDF (``finalize_drawing``)."""
+    if field_findings:
+        raise RuntimeError(
+            "drive-train package layout audit failed:\n" + "\n".join(field_findings)
+        )
 
 
 def _export_failure_pdf(adapter: Any, stage: str) -> None:
@@ -5560,7 +5556,7 @@ def _place_package(
     for sheet_name, sheet_balloons, _landings in placed:
         _final_balloon_uncross(adapter, sheet_name, sheet_balloons)
     step("balloon uncross")
-    _check_package_layout(adapter, findings)
+    _check_package_layout(findings)
     step("layout check")
     landings = [landing for _sheet, _balloons, ring in placed for landing in ring]
     return package_sheet_scales(cluster_scales, full_detail), landings, settings_settled

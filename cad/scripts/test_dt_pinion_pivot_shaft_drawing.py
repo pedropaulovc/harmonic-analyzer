@@ -197,7 +197,7 @@ def test_the_callout_moves_above_the_ra_lane_and_right_of_the_end_view_frames(
     monkeypatch,
 ) -> None:
     import _drawing_annotation_extent as extent
-    from _drawing_layout_check import DrawableRegion
+    from _layout_geometry import DrawableRegion
 
     offset = [0.0, 0.0]
     text = (0.066, 0.2227, 0.193, 0.2593)
@@ -241,7 +241,7 @@ def test_a_move_that_reads_back_a_hair_short_still_clears(monkeypatch) -> None:
     margin past the gap, so a read-back short by far less than that margin
     still proves clear at the full gap."""
     import _drawing_annotation_extent as extent
-    from _drawing_layout_check import DrawableRegion
+    from _layout_geometry import DrawableRegion
 
     short = 1e-9
     offset = [0.0, 0.0]
@@ -326,7 +326,7 @@ def test_a_callout_too_long_to_fit_fails_loud_instead_of_re_colliding(
     monkeypatch,
 ) -> None:
     import _drawing_annotation_extent as extent
-    from _drawing_layout_check import DrawableRegion
+    from _layout_geometry import DrawableRegion
 
     monkeypatch.setattr(
         extent,

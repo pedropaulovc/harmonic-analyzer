@@ -66,7 +66,6 @@ from _drawing_dimensions import (
 )
 from _drawing_edges import visible_view_entities
 import _drawing_hidden_sketches as hidden_sketches
-from _drawing_layout_collect import check_drawing_layout
 from _drawing_leaders import (
     ARROW_TEXT_CLEARANCE,
     set_near_side_diameter,
@@ -1397,10 +1396,7 @@ async def build(adapter: Any) -> dict[str, str]:
         cone_sheet.set_note_height(
             numbered, 0.0025, label=f"{configuration} numbered notes"
         )
-        rebuild_drawing(adapter, label=f"{configuration} layout audit")
-        check_drawing_layout(
-            adapter, layout=SPEC.layout, stem=f"cone-gear {configuration}"
-        )
+        rebuild_drawing(adapter, label=f"{configuration} sheet")
 
     _rewrite_callouts(adapter, sheet_callouts)
 

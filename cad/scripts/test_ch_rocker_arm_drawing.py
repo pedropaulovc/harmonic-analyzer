@@ -20,9 +20,8 @@ import _rocker_interface as rocker_interface
 import draw_ch_rocker_arm as drawing
 import build_ch_rocker_arm as arm
 import _drawing_detail_crop as detail_crop
-from _drawing_layout_check import DrawableRegion
 from _gtol_frame import gtol_frame_signature, gtol_frame_xml
-from _layout_geometry import AnnotationGeometry, Box, Segment, segment_box_distance, text_overlap
+from _layout_geometry import AnnotationGeometry, Box, DrawableRegion, Segment, segment_box_distance, text_overlap
 from _drawing_registry import DRAWINGS_BY_NAME
 from _cone_axis_constants import MECHANISM_X_SHIFT
 from _hole_spec import blind_cut_dia_mm
@@ -1353,9 +1352,8 @@ def test_native_profile_guard_is_after_rebuild_and_before_export() -> None:
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
     ]
     guard = next(line for name, line in calls if name == "_require_arc_profile_clearance")
-    layout = next(line for name, line in calls if name == "check_drawing_layout")
     export = next(line for name, line in calls if name == "finalize_drawing")
-    assert max(line for name, line in calls if name == "rebuild_drawing") < guard < layout < export
+    assert max(line for name, line in calls if name == "rebuild_drawing") < guard < export
 
 
 def test_profile_zone_mirror_station_envelopes_and_template_aim() -> None:
@@ -6909,7 +6907,7 @@ _POST_CAPTION_PHASES = (
     "rebuild", "dimension census", "tip land location", "REAM clearance", "front-detail air",
     "radius exterior", "arc profile clearance",
     "R24 detail layout", "R24 DOT state", "R24 DOT route",
-    "shared layout", "finalize",
+    "finalize",
 )
 
 
@@ -6963,7 +6961,6 @@ def post_caption_block():
         "_require_front_detail_air", "_require_radius_exterior",
         "_require_arc_profile_clearance", "_require_r24_detail_layout",
         "_require_rod_position_dot", "_require_rod_dot_route",
-        "check_drawing_layout",
     ), _POST_CAPTION_PHASES[:-1], strict=True):
         namespace[name] = step(phase)
 
@@ -7063,7 +7060,6 @@ def test_post_caption_success_keeps_order_arguments_result_and_skips_capture(pos
         ((adapter, ns["rod_position_gtol"], ns["rod_hole_edge"],
           ns["rod_position_landing"], ns["rod_position_signature"]), {}),
         ((adapter, ns["end"], ns["rod_position_gtol"], ns["rod_position_landing"]), {}),
-        ((adapter,), {"layout": ns["SPEC"].layout, "stem": ns["PART_STEM"]}),
         ((adapter, ns["OUTPUTS"]), {
             "pdf_title": "Rocker Arm Manufacturing Drawing",
             "scale": ns["SHEET_SCALE"], "layout": ns["SPEC"].layout,

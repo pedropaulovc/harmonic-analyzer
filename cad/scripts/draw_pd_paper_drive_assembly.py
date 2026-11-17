@@ -83,7 +83,7 @@ from _drawing_common import (
     rebuild_drawing,
     set_high_quality_shaded_with_edges,
 )
-from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
+from _layout_geometry import LeaderSegment, find_leader_leader_crossings
 from _drawing_leader_notes import add_leader_note
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME

@@ -53,7 +53,6 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
-    rebuild_drawing,
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
@@ -64,7 +63,6 @@ from _drawing_dimensions import (
 )
 from _drawing_edge_dimensions import add_edge_dimension
 from _drawing_finish import add_surface_finish
-from _drawing_layout_collect import check_drawing_layout
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_sheets import create_blank_drawing_sheets
@@ -518,12 +516,6 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, [*annotations, seat_depth], DRAWING_PRECISION_BY_NAME
     )
     _rim_only_bore_callouts(adapter, front_annotations)
-
-    for sheet_name in SHEET_NAMES:
-        if not ddoc.ActivateSheet(sheet_name):
-            raise RuntimeError(f"failed to activate sheet {sheet_name!r} for audit")
-        rebuild_drawing(adapter, label=f"pinion bracket {sheet_name} layout")
-        check_drawing_layout(adapter, layout=SPEC.layout, stem=sheet_name)
 
     return await finalize_drawing(
         adapter,

@@ -88,9 +88,7 @@ from _drawing_gdt import add_datum_feature, add_feature_control_frame, add_frame
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_layout_audit import _DISPLAY_PRIMITIVES, _Reader, _dump_annotation, _dump_display
-from _drawing_layout_collect import check_drawing_layout
 from _drawing_leader_notes import add_leader_note
-from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_types import DRAWING_TEMPLATES
@@ -110,7 +108,8 @@ from _layout_audit import (
     calibrate_sheet_advance,
 )
 from _layout_geometry import (
-    ARROW_TEXT_CLEARANCE_M, Box, Segment, clip_segment_to_circle, point_segment_distance,
+    ARROW_TEXT_CLEARANCE_M, Box, LeaderSegment, Segment, clip_segment_to_circle, find_leader_leader_crossings,
+    point_segment_distance,
     segment_box_distance, segment_circle_distance, text_overlap, union_boxes,
 )
 from _gtol_frame import gtol_frame_signature, gtol_frame_xml
@@ -146,7 +145,6 @@ from ch_rocker_arm_spec import (
     TOP_END_Y,
     UNIT,
     _ALPHA_TOP,
-    inch_text,
 )
 
 
@@ -4293,9 +4291,6 @@ async def build(adapter: Any) -> dict[str, str]:
         _require_rod_position_dot(adapter, rod_position_gtol, rod_hole_edge,
                                   rod_position_landing, rod_position_signature)
         _require_rod_dot_route(adapter, end, rod_position_gtol, rod_position_landing)
-        phase = "shared layout"
-        check_drawing_layout(adapter, layout=SPEC.layout, stem=PART_STEM)
-
         phase = "finalize"
         return await finalize_drawing(
             adapter,

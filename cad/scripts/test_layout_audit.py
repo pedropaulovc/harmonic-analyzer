@@ -466,18 +466,10 @@ def _mha_092_pre_287c_sheet():
     return _dump(views=[plan, right, front], strokes=_box_edges(x0, y0, x1, y1))
 
 
-def test_mha_092_collisions_fail_the_shared_audit_and_passed_the_old_one():
-    """Fail-first: the annotation audit of the time (``_layout_geometry``)
-    passes the 0.68 mm "20.88.42" pair and the ADJUSTER text inside the right
-    view; the element audit boxed every dimension as a NONE-scope placeholder
-    and compared none of the three. The shared audit gates all three."""
-    from _layout_geometry import audit_sheet
-
+def test_mha_092_collisions_fail_the_shared_audit():
+    """Fail-first: Main's I31 eye pass read the 0.68 mm "20.88.42" pair and the
+    ADJUSTER text inside the right view. The shared audit gates all three."""
     dump = _mha_092_pre_287c_sheet()
-    old = audit_sheet(sheet_model(dump).geometry)
-    assert not [f for f in old if {"PlanWidth", "PlanPitch"} <= set((f.a + " " + f.b).split())]
-    assert not [f for f in old if "Adjuster" in f.a and f.kind.startswith("text")]
-
     findings = audit_dump(dump)
     gating = [f for f in findings if severity(f) is FindingSeverity.GATING]
 
@@ -571,6 +563,16 @@ def test_a_leader_through_its_own_rows_is_found_but_its_shoulder_joint_is_not():
     assert not [f for f in findings if f.kind.startswith("leader-through")]
 
 
+def test_a_view_dropped_onto_another_is_found_but_padded_neighbours_are_not():
+    left = _view("left", (0.050, 0.050, 0.150, 0.150))
+    onto = _view("onto", (0.130, 0.050, 0.230, 0.150))
+    beside = _view("beside", (0.148, 0.050, 0.250, 0.150))
+    overlaps = [f for f in audit_dump(_dump(views=[left, onto])) if f.kind == "view-overlap"]
+    assert [(f.a, f.b) for f in overlaps] == [("view left", "view onto")]
+    assert severity(overlaps[0]) is FindingSeverity.GATING
+    assert not [f for f in audit_dump(_dump(views=[left, beside])) if f.kind == "view-overlap"]
+
+
 def test_a_leader_crossing_another_dimension_line_is_found():
     callout = _hole_callout(
         "C", [(0.100, 0.100, 0.140, 0.140), (0.140, 0.140, 0.170, 0.140)], [("Ø4.0", 0.140, 0.1402)]
@@ -583,7 +585,7 @@ def test_a_leader_crossing_another_dimension_line_is_found():
 def test_a_hole_callouts_attach_run_is_leader_even_where_it_misses_its_text():
     """swing, #902 case 2: collect_document tags only the run touching the
     text as leader, so MHA-DT-20 RD1's rim-to-shelf diagonal read "line" and a
-    leader crossing it passed audit_sheet. The shared audit takes every
+    leader crossing it passed. The shared audit takes every
     display line of a hole callout as leader. RD1's lines are the S1 @
     ac4fa6dd0 dump's; RD3 is moved so its diagonal crosses RD1's."""
     rd1 = _hole_callout(
@@ -4749,13 +4751,19 @@ def test_frame_assembly_fails_its_leaf_on_a_leader_printed_through_its_own_ballo
     evidence, so REPORT fails that drawing on a leader printed 1.5 mm inside
     its ring (read from the ring by COM), or on two printed starts. A COM
     start 1.5 mm inside with the leader printed from the ring passes. Other
-    drawings still only report both kinds."""
+    drawings only report a leader through its own text; two printed starts
+    fail every drawing (``leader-ink-ambiguous`` is fleet-enforced)."""
     import _layout_audit
 
     dump = _radial_balloon_17(com_inside_m, *ink)
     live = _patch_collect(monkeypatch, [dump])
-    assert not {"leader-through-own-text", "leader-ink-ambiguous"} & _layout_audit.ENFORCED_KINDS
-    _run(live, LayoutAuditMode.REPORT, tmp_path / "other.json")
+    assert "leader-through-own-text" not in _layout_audit.ENFORCED_KINDS
+    assert "leader-ink-ambiguous" in _layout_audit.ENFORCED_KINDS
+    if kind == "leader-ink-ambiguous":
+        with pytest.raises(RuntimeError, match=r"\[leader-ink-ambiguous\]"):
+            _run(live, LayoutAuditMode.REPORT, tmp_path / "other.json")
+    else:
+        _run(live, LayoutAuditMode.REPORT, tmp_path / "other.json")
     frame = tmp_path / "fr-frame-assembly.json"
     if kind is None:
         _run(live, LayoutAuditMode.REPORT, frame, stem="fr-frame-assembly")

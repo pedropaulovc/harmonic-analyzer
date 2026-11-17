@@ -33,7 +33,6 @@ from _drawing_common import (
 )
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
-from _drawing_layout_collect import check_drawing_layout
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
@@ -268,8 +267,6 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_POS)
-    rebuild_drawing(adapter, label="cone-tip-bushing layout audit")
-    check_drawing_layout(adapter, layout=SPEC.layout, stem=PART_STEM)
     return await finalize_drawing(
         adapter,
         OUTPUTS,
