@@ -69,6 +69,13 @@ Pass 1 — detection. Find every candidate item; classify nothing yet.
 Record each candidate with its where, the defect, its evidence (text layer
 line or crop), and the fix.
 
+A finding that something cannot reach, cannot assemble, cannot be made or
+does not fit states its arithmetic in `issue`: the values printed on the
+sheets, the hardware type they name, and the result. Work every ordinary
+configuration of that hardware first; if any one works, there is no finding.
+For example, a headless set screw is driven below flush, so a 3/16 in screw in
+a .238 in wall reaches the bore with about .05 in of thread above it.
+
 <!-- MACHINIST_SEVERITY_CONTRACT -->
 
 DO NOT ASK FOR

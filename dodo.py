@@ -149,6 +149,7 @@ from _buildgraph import (  # noqa: E402
 from machinist_review_config import (  # noqa: E402
     ReviewProfile,
     registered_review_profile,
+    split_drawing_guidelines,
     validate_review_profile,
 )
 
@@ -3091,6 +3092,24 @@ def _machinist_review_fitup_task(stem: str, target: Path) -> dict[str, Any]:
     }
 
 
+def _drawing_guidelines_version_dep() -> str:
+    """The review's dependency on ``drawing-guidelines.md``: a sidecar holding
+    only its frontmatter ``major_version``. Its review key and doit freshness
+    both read this one file, so an edit that keeps the version re-keys no
+    review and leaves every one fresh, and a bump re-keys them all. A missing
+    or non-integer version fails the graph load. Other tasks that read the
+    guidelines (``check:recipe``) keep hashing the whole file."""
+    version, _body = split_drawing_guidelines(
+        (SCRIPTS_DIR.parent / "docs" / "drawing-guidelines.md").read_text(
+            encoding="utf-8"
+        )
+    )
+    return _write_digest_sidecar(
+        CAD_OUT / ".machinist-review" / "drawing-guidelines-major-version.digest",
+        f"major_version={version}",
+    )
+
+
 def _machinist_review_file_deps(stem: str) -> list[str]:
     spec = DRAWINGS_BY_NAME[stem]
     dashed = stem.replace("_", "-")
@@ -3125,7 +3144,8 @@ def _machinist_review_file_deps(stem: str) -> list[str]:
                 if name not in RECIPE_SKIP_MODULES
             ),
             *prompts,
-            SCRIPTS_DIR.parent / "docs" / "drawing-guidelines.md",
+            # The rubric is keyed by its major version, not its bytes.
+            Path(_drawing_guidelines_version_dep()),
             *([exceptions] if exceptions.is_file() else []),
             *([fitup] if fitup else []),
         )

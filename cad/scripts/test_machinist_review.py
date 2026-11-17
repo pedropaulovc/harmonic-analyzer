@@ -2435,7 +2435,10 @@ def test_relink_codex_auth_never_overwrites_a_newer_user_login(
 @pytest.fixture
 def synthetic_prompt_sources(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     guidelines = tmp_path / "guidelines.md"
-    guidelines.write_text("Synthetic guidelines.\n", encoding="utf-8")
+    guidelines.write_text(
+        "---\n# bump note\nmajor_version: 1\n---\nSynthetic guidelines.\n",
+        encoding="utf-8",
+    )
     templates = {
         kind: tmp_path / f"{kind}.md" for kind in ("part", "assembly")
     }
@@ -2455,7 +2458,8 @@ def synthetic_prompt_sources(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(mr, "JUDGE_PROMPT_FILE", judge_template)
     monkeypatch.setattr(mr, "SEVERITY_FILES", contracts)
     return SimpleNamespace(
-        templates=templates, contracts=contracts, judge_template=judge_template
+        templates=templates, contracts=contracts, judge_template=judge_template,
+        guidelines=guidelines,
     )
 
 
@@ -2463,6 +2467,32 @@ def synthetic_prompt_sources(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 def test_load_prompt_rejects_unsupported_kind(synthetic_prompt_sources, judge) -> None:
     with pytest.raises(ValueError):
         mr.load_prompt("unsupported", judge=judge)
+
+
+@pytest.mark.parametrize("judge", [False, True], ids=["reviewer", "judge"])
+def test_prompt_carries_the_guidelines_body_without_frontmatter(
+    synthetic_prompt_sources, judge
+) -> None:
+    prompt = mr.load_prompt("part", judge=judge)
+    assert prompt.startswith("Synthetic guidelines.\n")
+    assert "major_version" not in prompt and "bump note" not in prompt
+
+
+@pytest.mark.parametrize(
+    "head",
+    ["", "---\n---\n", "---\nmajor_version: one\n---\n", "---\nmajor_version: 1.5\n---\n",
+     "---\nmajor_version: true\n---\n", "---\nmajor_version: 0\n---\n",
+     "---\nmajor_version: 1\n"],
+    ids=["absent", "empty", "word", "float", "bool", "zero", "unclosed"],
+)
+def test_prompt_refuses_guidelines_without_an_integer_major_version(
+    synthetic_prompt_sources, head
+) -> None:
+    synthetic_prompt_sources.guidelines.write_text(
+        head + "Synthetic guidelines.\n", encoding="utf-8"
+    )
+    with pytest.raises(ValueError, match="frontmatter"):
+        mr.load_prompt("part")
 
 
 @pytest.mark.parametrize("kind", ["part", "assembly"])
@@ -5317,7 +5347,10 @@ def test_aggregate_runs_are_parallel_isolated_and_share_frozen_sources(
         inputs = _judge_inputs(kwargs["input"])
         if inputs is not None:
             judged.append(inputs)
-            assert kwargs["input"].startswith(mr.GUIDELINES_FILE.read_text(encoding="utf-8").rstrip())
+            guidelines = mr.GUIDELINES_FILE.read_text(encoding="utf-8")
+            body = mr.review_config.split_drawing_guidelines(guidelines)[1]
+            assert kwargs["input"].startswith(body.rstrip())
+            assert "major_version" not in kwargs["input"]
             value = {"clusters": [_judge_cluster([item["id"] for item in inputs])]}
             return _session_reply(command, kwargs, value)
         if reviewer == "claude":
@@ -5668,13 +5701,15 @@ def test_aggregate_counts_unique_runs_and_only_confirmed_gating_clusters(
 @pytest.mark.parametrize(
     ("members", "category", "verdict"),
     [
-        (["r1.blockers.1"], "blockers", "FIX"),
+        # dt_pinion_cam, 2026-11-17: r1 and r2 SHIP, r3 alone raised a blocker.
+        (["r3.blockers.1"], "blockers", "SHIP"),
+        (["r1.blockers.1", "r2.blockers.1"], "blockers", "FIX"),
         (["r1.blockers.1"], "clarity", "SHIP"),
         (["r1.blockers.1"], "over_specification", "SHIP"),
         (["r1.blockers.1", "r3.blockers.1"], "clarity", "FIX"),
     ],
 )
-def test_aggregate_gates_blockers_on_one_run_and_other_categories_on_two(
+def test_aggregate_gates_every_category_on_two_of_three_runs(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, members: list[str], category: str,
     verdict: str,
 ) -> None:
@@ -5701,6 +5736,8 @@ def test_aggregate_gates_blockers_on_one_run_and_other_categories_on_two(
     assert [item["gating"] for item in aggregate["confirmed"]] == [verdict == "FIX"]
     report = (tmp_path / "reports" / "sample.aggregate.md").read_text(encoding="utf-8")
     assert ("non-gating" in report) == (verdict == "SHIP")
+    assert "blockers 2+ runs" in report
+    assert aggregate["gating_min_runs"]["blockers"] == 2
 
 
 

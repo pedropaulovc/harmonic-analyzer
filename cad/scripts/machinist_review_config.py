@@ -2,6 +2,8 @@
 
 Only the registered gate resolves environment overrides. The standalone CLI uses
 the provider defaults directly, independently of the registered configuration.
+It also reads the drawing guidelines' frontmatter, whose ``major_version`` is
+the rubric's identity in the review key.
 """
 
 from __future__ import annotations
@@ -10,6 +12,8 @@ from collections.abc import Mapping
 import os
 import re
 from typing import NamedTuple
+
+import yaml
 
 
 DEFAULT_MODELS = {
@@ -104,3 +108,30 @@ def registered_review_profile(
     profile = ReviewProfile(**resolved)
     validate_review_profile(profile)
     return profile
+
+
+def split_drawing_guidelines(text: str) -> tuple[int, str]:
+    """``(major_version, body)`` of ``cad/docs/drawing-guidelines.md``.
+
+    The YAML frontmatter's integer ``major_version`` alone keys cached
+    machinist reviews (dodo's ``_drawing_guidelines_version_dep``); the
+    reviewers and judge receive the body, without the frontmatter. A missing
+    frontmatter or a missing, non-integer or non-positive version raises: a
+    rubric with no identity must neither reuse nor publish a verdict."""
+    text = text.replace("\r\n", "\n")
+    end = text.find("\n---\n", 3) if text.startswith("---\n") else -1
+    if end < 0:
+        raise ValueError(
+            "drawing guidelines must open with YAML frontmatter between --- lines"
+        )
+    try:
+        meta = yaml.safe_load(text[4:end])
+    except yaml.YAMLError as error:
+        raise ValueError(f"drawing guidelines frontmatter is not YAML: {error}") from error
+    version = meta.get("major_version") if isinstance(meta, dict) else None
+    if type(version) is not int or version < 1:
+        raise ValueError(
+            "drawing guidelines frontmatter needs an integer major_version >= 1; "
+            f"got {version!r}"
+        )
+    return version, text[end + 5:].lstrip("\n")

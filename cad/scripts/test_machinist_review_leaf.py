@@ -269,7 +269,9 @@ def inputs(dodo, tmp_path, monkeypatch):
         (prompts / name).write_text("{}", encoding="utf-8")
     guidelines = root / "cad" / "docs" / "drawing-guidelines.md"
     guidelines.parent.mkdir()
-    guidelines.write_text("guidelines", encoding="utf-8")
+    guidelines.write_text(
+        "---\nmajor_version: 1\n---\n# Guidelines\n\nRule 1.\n", encoding="utf-8"
+    )
     config = root / "cad" / "config"
     (config / "parts").mkdir(parents=True)
     (config / "assemblies").mkdir()
@@ -293,6 +295,7 @@ def inputs(dodo, tmp_path, monkeypatch):
     monkeypatch.setattr(dodo, "SCRIPTS_DIR", scripts)
     monkeypatch.setattr(dodo, "CONFIG_DIR", config)
     monkeypatch.setattr(dodo, "REPORTS", root / "cad" / "out" / "reports")
+    monkeypatch.setattr(dodo, "CAD_OUT", root / "cad" / "out")
     monkeypatch.setattr(dodo, "DRAWINGS_BY_NAME", {"probe": spec})
     monkeypatch.setattr(dodo._cache, "REPO_ROOT", root)
     return SimpleNamespace(
@@ -300,6 +303,7 @@ def inputs(dodo, tmp_path, monkeypatch):
         root=root,
         scripts=scripts,
         pdf=pdf,
+        guidelines=guidelines,
         exception=exception,
         prompts=prompts,
         draw=draw,
@@ -321,8 +325,13 @@ def test_key_changes_only_with_review_inputs(inputs):
         return _review_key(dodo)
 
     initial = key()
+    # The guidelines enter through their major-version sidecar, which every
+    # key computation rewrites from the guidelines themselves; the tests below
+    # change the version instead.
+    sidecar = Path(dodo._drawing_guidelines_version_dep())
     changed_inputs = [
         Path(path) for path in dodo._machinist_review_file_deps("probe")
+        if Path(path) != sidecar
     ]
     for path in changed_inputs:
         before = path.read_bytes()
@@ -336,6 +345,59 @@ def test_key_changes_only_with_review_inputs(inputs):
     assert key() != initial
     inputs.spec.source_kind = "assembly"
     assert key() != initial
+
+
+def _set_guidelines(inputs, head, body="# Guidelines\n\nRule 1.\n"):
+    inputs.guidelines.write_text(head + body, encoding="utf-8")
+
+
+def test_guidelines_key_the_review_by_major_version_only(inputs, monkeypatch):
+    dodo = inputs.module
+    monkeypatch.setattr(dodo, "_drawing_order", lambda: ["probe"])
+    inputs.draw.write_text("MACHINIST_REVIEW = MachinistReviewMode.LEARN\n")
+    dodo._reviewed_drawings.cache_clear()
+    task = next(dodo._machinist_review_tasks())
+    dodo._reviewed_drawings.cache_clear()
+    sidecar = Path(dodo._drawing_guidelines_version_dep())
+    # doit sees the version sidecar, never the guidelines' bytes.
+    assert str(inputs.guidelines.resolve()) not in task["file_dep"]
+    assert str(sidecar) in task["file_dep"]
+    initial, stamp = _review_key(dodo), sidecar.stat().st_mtime_ns
+
+    _set_guidelines(inputs, "---\n# reworded\nmajor_version: 1\n---\n", "# New text\n")
+    assert _review_key(dodo) == initial
+    assert sidecar.stat().st_mtime_ns == stamp  # doit's stat fast path holds
+
+    _set_guidelines(inputs, "---\nmajor_version: 2\n---\n")
+    bumped = _review_key(dodo)
+    assert bumped != initial
+    inputs.spec.source_kind = "assembly"
+    assert _review_key(dodo) != bumped  # still a full key, not the version alone
+
+
+def test_bumped_guidelines_rekey_every_review(inputs):
+    dodo = inputs.module
+    other = SimpleNamespace(
+        outputs={"pdf": inputs.pdf}, source_kind="assembly", script=inputs.draw,
+    )
+    dodo.DRAWINGS_BY_NAME["other_assembly"] = other
+    stems = ("probe", "other_assembly")
+    before = {stem: _review_key(dodo, stem) for stem in stems}
+    _set_guidelines(inputs, "---\nmajor_version: 2\n---\n")
+    after = {stem: _review_key(dodo, stem) for stem in stems}
+    assert all(after[stem] != before[stem] for stem in stems)
+
+
+@pytest.mark.parametrize(
+    "head",
+    ["", "---\nversion: 1\n---\n", "---\nmajor_version: '1'\n---\n",
+     "---\nmajor_version: 1.0\n---\n"],
+    ids=["no-frontmatter", "missing", "string", "float"],
+)
+def test_review_key_refuses_guidelines_without_an_integer_major_version(inputs, head):
+    _set_guidelines(inputs, head)
+    with pytest.raises(ValueError, match="major_version|frontmatter"):
+        _review_key(inputs.module)
 
 
 def _export_sheet(path, line_end, created):

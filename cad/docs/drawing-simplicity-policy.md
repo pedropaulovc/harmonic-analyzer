@@ -66,8 +66,10 @@ Printed-grid nominals, explicit fits, roughness and worst-case wall checks
 are inch on every fabrication package; metric-only supplier packages keep the
 millimetre title-block rows and metric grades. Supplier fractions remain exact
 REF values through `_supplier_dimensions` with `RoundToFraction=False`; no
-fractional tolerance grade applies. Editing `drawing-guidelines.md` re-keys
-every cached machinist review once; editing a reviewer prompt re-keys the
+fractional tolerance grade applies. Cached machinist reviews are keyed by the
+integer `major_version` in `drawing-guidelines.md`'s frontmatter, not its
+bytes: bump it when an edit should change review verdicts, which re-keys every
+review once; other edits re-key none. Editing a reviewer prompt re-keys the
 reviews that read it. This policy file is not a review input.
 
 - **The model owns tolerance and precision (rules 3 and 4).** A band goes on
@@ -381,7 +383,7 @@ order. PNG CLI input is not supported. Every review is unconditional.
 Each package runs three independent blind senior-machinist
 reviews (`--runs N` changes the count). An isolated judge session then merges
 their findings; independent reviewers never receive another session's context.
-Each run receives `drawing-guidelines.md`
+Each run receives `drawing-guidelines.md` without its frontmatter,
 followed by the reviewer
 instructions for the package kind (`cad/scripts/prompts/machinist_review_part.md`
 or `machinist_review_assembly.md`), with its classification slot expanded from
@@ -397,15 +399,20 @@ remain opaque; repository templates must be composed before use as overrides.
 Historical benchmark composition pins the reviewer rubric, resolving its
 severity contract from the same Git ref rather than the working tree. The
 benchmark judge and its kind-specific contract still come from the working
-tree for both configurations, as before this change. A confirmed blocker
-gates when one run raised it; a confirmed over-specification or clarity
-finding gates only when at least two runs raised it independently
-(`GATING_MIN_RUNS`, each reduced to the number of valid runs when fewer are
-valid). The two-run rule is the owner ruling of 2026-10-18: across repeated
-rounds, lone confirmations moved from round to round while the sheet itself
-converged. The owner ruling of 2026-11-06 exempted blockers after v47 shipped
-two judge-confirmed blockers that only one run had raised. A lone
-non-blocker confirmation stays in the report as non-gating evidence.
+tree for both configurations, as before this change. A confirmed finding in
+any gating category (blocker, over-specification or clarity) gates only when
+at least two runs raised it independently (`GATING_MIN_RUNS`, each reduced to
+the number of valid runs when fewer are valid). The two-run rule is the owner
+ruling of 2026-10-18: across repeated rounds, lone confirmations moved from
+round to round while the sheet itself converged. The owner ruling of
+2026-11-06 exempted blockers after v47 shipped two judge-confirmed blockers
+that only one run had raised; the owner ruling of 2026-11-17 restored the
+two-run rule for blockers after a lone blocker failed `dt_pinion_cam` (r1 and
+r2 SHIP, r3 one blocker). A lone confirmation stays in the report as
+non-gating evidence. A blocker claiming that something cannot reach,
+assemble, be made or fit must show its arithmetic from printed values and the
+named hardware; the judge works the same numbers and rejects it when any
+ordinary configuration of that hardware works.
 
 The gate covers every sheet whose rendered output a PR changes, including a
 sheet that changes only because CAD geometry, config or a helper it reads

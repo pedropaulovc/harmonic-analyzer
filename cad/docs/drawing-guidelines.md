@@ -1,8 +1,14 @@
+---
+# Bump major_version when an edit should change machinist-review verdicts;
+# other edits do not re-run cached reviews.
+major_version: 1
+---
 # Drawing guidelines
 
 The standard every part and assembly drawing package in this project is
 drawn to and reviewed against. Authors follow it. Each blind machinist review
-receives this file verbatim, followed by its own reviewer instructions.
+receives this file from its title down, verbatim, followed by its own reviewer
+instructions.
 
 Cite a rule by number and title, for example "rule 5 (avoid excessive GD&T)".
 
@@ -341,15 +347,20 @@ are gear data, not narration.
   FITTED .153–.271 AT ASSEMBLY`); it then counts as being at the callout, and
   the feature carries no second controlling value. Other part numbers appear
   only to identify a mate.
-- **Say why in a few words, once.** A short functional reason is welcome
-  where a tight band, a roughness symbol or a hardness would otherwise look
-  arbitrary: `BEARING SURFACE`, `KNIFE-EDGE SEAT`, `SETS MESH BACKLASH`,
-  `SLIDING FIT ON MHA-CH-05`. A reason is one line of at most six words,
-  beyond the mate's drawing number, on the callout it explains, once per
-  feature or pattern. A matched-fit statement (rule 4) and a stated shortfall
-  (rule 20) have their own forms and are not counted. Anything beyond that is
-  narration and is over-specification: design rationale (`HOLDS … SCREWS
-  CLEAR OF ITS CUT EDGES`, `MAX KEEPS D AT ENTRY`, `MIRRORS CL STATION`), a
+- **Say why in a few words, once.** The test: a short functional statement
+  that answers a question the builder would foreseeably ask at the machine
+  is not over-specification. It is welcome where a tight band, a roughness
+  symbol or a hardness would otherwise look arbitrary (`BEARING SURFACE`,
+  `KNIFE-EDGE SEAT`, `SETS MESH BACKLASH`, `SLIDING FIT ON MHA-CH-05`) and
+  where the views leave a feature's purpose unclear (`WHEEL BEARING
+  SURFACE`). A reason is one line of at most six
+  words, beyond the mate's drawing number, on the callout it explains, once
+  per feature or pattern. A matched-fit statement (rule 4) and a stated
+  shortfall (rule 20) have their own forms and are not counted. Anything
+  beyond that is narration and is over-specification: a method or procedure
+  (below), design rationale that answers no builder question (`HOLDS …
+  SCREWS CLEAR OF ITS CUT EDGES`, `MAX KEEPS D AT ENTRY`, `MIRRORS CL
+  STATION`), a rationale paragraph, a dimension written into a reason, a
   second reason on one feature, the same reason repeated on several
   dimensions, a reason on an overall or stock size that has no band of its
   own (an overall with an explicit tight band that sets a stack names that

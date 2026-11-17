@@ -4,9 +4,8 @@ Every package receives three blind reviews (``--runs``). An isolated judge
 session then vets every finding, clustering
 duplicates and rejecting misreads or non-gating claims. A confirmed cluster
 gates the aggregate verdict when at least ``GATING_MIN_RUNS[category]`` valid
-runs raised it (fewer when fewer runs are valid): one run for a blocker, two
-for over-specification or clarity. Lone non-blocker confirmations stay in the
-report as non-gating evidence.
+runs raised it (fewer when fewer runs are valid): two runs in every gating
+category. Lone confirmations stay in the report as non-gating evidence.
 Raw per-run verdicts are retained as evidence.
 Every reviewer and the judge use an isolated transport in a fresh session and
 a neutral attempt directory, never another package's context.
@@ -145,10 +144,11 @@ FINDING_KEYS = ("blockers", "over_specification", "clarity", "minor")
 GATING_KEYS = ("blockers", "over_specification", "clarity")
 # Owner rulings: 2026-10-18 required two independent runs before a confirmed
 # finding gates, because lone confirmations kept moving across rounds while the
-# sheet converged. 2026-11-06 keeps that for over-specification and clarity but
-# lets one run's judge-confirmed blocker gate: v47 shipped two confirmed
-# blockers (rule 23 retention, a step contradiction) that one run had raised.
-GATING_MIN_RUNS = {"blockers": 1, "over_specification": 2, "clarity": 2}
+# sheet converged. 2026-11-06 let one run's judge-confirmed blocker gate after
+# v47 shipped two blockers that one run had raised; 2026-11-17 restored two
+# runs for blockers too, after a lone blocker failed dt_pinion_cam (r1 and r2
+# SHIP, r3 one blocker).
+GATING_MIN_RUNS = {"blockers": 2, "over_specification": 2, "clarity": 2}
 # Tool descriptors and isolation settings are static across packages, so neither
 # source paths nor sheet counts disturb the model's cached tool/prompt prefix.
 SHEETS_SERVER = SCRIPTS_DIR / "machinist_review_sheets_mcp.py"
@@ -248,7 +248,9 @@ def load_prompt(kind: str, *, judge: bool = False) -> str:
     """Compose either stage with the same kind-specific severity contract."""
     if kind not in PROMPT_FILES:
         raise ValueError(f"unknown review kind: {kind}")
-    guidelines = GUIDELINES_FILE.read_text(encoding="utf-8").rstrip()
+    guidelines = review_config.split_drawing_guidelines(
+        GUIDELINES_FILE.read_text(encoding="utf-8")
+    )[1].rstrip()
     template = JUDGE_PROMPT_FILE if judge else PROMPT_FILES[kind]
     instructions = expand_severity_contract(
         template.read_text(encoding="utf-8"),
