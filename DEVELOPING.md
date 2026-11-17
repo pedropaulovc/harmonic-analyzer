@@ -721,11 +721,11 @@ retries, never cancels remote work and imposes no deadline. The supervisor:
 1. joins a named kill-on-close Windows job (`job` in `run.json`) before it
    starts anything, so every process of the run dies with the supervisor and
    nothing can keep dispatching after it;
-2. prepares a private snapshot of the commit and the shared environment
+2. prepares a private snapshot of the commit
    ([the build snapshot](#the-build-snapshot));
-3. runs `farm_build.py _build <run-dir>` from the snapshot, in that
-   environment, with `HARMONIC_REMOTE_CACHE_MODE=rw` and
-   `SOLIDWORKS_POOL_HOME`; its output goes to `build.log`;
+3. runs `uv run --frozen python farm_build.py _build <run-dir>` from the
+   snapshot, with `HARMONIC_REMOTE_CACHE_MODE=rw` and `SOLIDWORKS_POOL_HOME`;
+   its output goes to `build.log`;
 4. moves the snapshot's `cad/out` to `<run-dir>/out`, removes the snapshot and
    writes `status.json`.
 
@@ -1016,27 +1016,17 @@ caller's worktree:
 2. `git submodule update --init --recursive` for every gitlink in the commit
    except those its `.farm-sources.json` `exclude_submodules` lists (the set the
    workers skip; possibly none). A commit without `farm_build.py` is refused.
-3. A shared environment at `<runs>\envs\<key>`, where `<key>` hashes the
-   commit's `uv.lock`, `pyproject.toml`, `.python-version` and required gitlinks.
-   The first run for a key syncs a private staging directory
-   (`uv venv --relocatable`, then `uv sync --frozen --no-editable --active`),
-   writes the `.farm-run-environment.json` marker and only then renames it into
-   place; a racing run discards its copy and adopts the winner's. No run ever
-   syncs into or deletes a directory another may use; `--no-editable` keeps it
-   free of pointers into any snapshot.
-4. The build runs from the snapshot with `VIRTUAL_ENV`,
-   `UV_PROJECT_ENVIRONMENT` and `UV_NO_SYNC=1` naming that environment, so
-   nothing touches the caller's worktree again. Commit or edit there freely.
+3. The build runs `uv run --frozen` from the snapshot, so its environment is the
+   snapshot's own `.venv` (uv hardlinks it from its cache in ≈ 7 s) and nothing
+   touches the caller's worktree again. Commit or edit there freely.
 
-Each run records its preparation time as `launch_overhead_s` (≈ 4–5 s with a
-reused environment, ≈ 12–13 s for a new dependency set). Every snapshot starts
-with an empty `cad/out`, so `.doit.db` is fresh and each task first looks for
-its key in the remote cache. Afterwards, whatever the outcome, the snapshot's
-`cad/out` (restored artefacts, `.doit.db`, `reports/cache.jsonl`,
-`reports/telemetry`) moves to `<run-dir>/out` and the snapshot is removed. If the
-move fails the snapshot holds the only copy and is kept, `outputs` points into
-it, `cleanup_errors` says why and the run is `failed`. Delete an `envs\<key>`
-(or a killed run's `<key>.staging-*`) only when no run is active.
+Every snapshot starts with an empty `cad/out`, so `.doit.db` is fresh and each
+task first looks for its key in the remote cache. Afterwards, whatever the
+outcome, the snapshot's `cad/out` (restored artefacts, `.doit.db`,
+`reports/cache.jsonl`, `reports/telemetry`) moves to `<run-dir>/out` and the
+snapshot (with its `.venv`) is removed. If the move fails the snapshot holds the
+only copy and is kept, `outputs` points into it, `cleanup_errors` says why and
+the run is `failed`.
 
 When a leaf reports `cache_missing`, or succeeds without its key, the
 diagnostic names the remaining causes (`_farm.CACHE_MISSING_CAUSES`): a
@@ -1175,7 +1165,7 @@ each file written atomically by the code that knows its contents:
 | `build.json` | the producer, before FIFO registration | `build_id`, `farm_run` |
 | `leaves/<hash>.json` | `_farm._dispatch` | `task`, `workflow_id`, `build_id`, `farm_run`, `refresh_reason`, `state` (`requested` before submission — a failed write fails the leaf — then `bound` with `run_id`, then the result with `worker_id`, `attempt`, `exit_code`, `failure_category`, `failure_message`, `log_blob`) |
 | `task-errors.json` | doit's reporter | each failed task and its last error line |
-| `status.json` | supervisor or `cancel` | `state`, `exit_code`, `finished_at`, `elapsed_s`, `outputs`, `outputs_preserved`, `snapshot_removed`, `cleanup_errors`, `launch_overhead_s`, `environment_reused`, `cancel` |
+| `status.json` | supervisor or `cancel` | `state`, `exit_code`, `finished_at`, `elapsed_s`, `outputs`, `outputs_preserved`, `snapshot_removed`, `cleanup_errors`, `cancel` |
 | `out/` | supervisor or `cancel` | the snapshot's `cad/out` |
 
 Only exit 0 with outputs preserved is `succeeded`. `cache_environment` is

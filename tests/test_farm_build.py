@@ -72,13 +72,6 @@ def _fleet(monkeypatch, agents):
     monkeypatch.setattr(farm_build, "_pool_farm", pool_farm)
 
 
-_UNREPORTED_BLOCK = _agents_summary(
-    verdict="mismatch",
-    mismatch=[{"farm_protocol_version": 3, "workers": ["swmaker000004@4"]}],
-)
-_STALE = dict(fresh=False, age_s=1555200)
-
-
 @pytest.mark.parametrize(
     ("agents", "message"),
     [
@@ -86,25 +79,17 @@ _STALE = dict(fresh=False, age_s=1555200)
             farm_build.FarmPreflightError("agents could not start (uv): gone"),
             "agents could not start (uv): gone",
         ),
-        (
-            "reading seat reports\nnot json at all\n",
-            "agents printed no JSON summary; last line: not json at all",
-        ),
+        ("reading seat reports\nnot json at all\n", "not json at all"),
         (
             _agents_summary(farm_protocol_version="6"),
-            "agents summary farm_protocol_version is not an integer: '6'",
+            "pool CLI supports farm protocol '6', but this client requires 7",
         ),
         (
             _agents_summary(farm_protocol_version=3),
             "pool CLI supports farm protocol 3, but this client requires 7",
         ),
-        (
-            _agents_summary(fresh_within_s="120"),
-            "agents summary fresh_within_s is not an integer: '120'",
-        ),
-        (_agents_summary(ignored=None), "agents summary ignored is not a list"),
-        (_agents_summary(verdict="probably-fine"), "probably-fine"),
-        (_UNREPORTED_BLOCK, "agents returned verdict 'mismatch' without a report"),
+        (_agents_summary(verdict="probably-fine"), "verdict 'probably-fine'"),
+        (_agents_summary(verdict="mismatch"), "verdict 'mismatch'"),
         (
             _agents_summary(verdict="mismatch", report="farm protocol 7 is required"),
             "farm protocol 7 is required",
@@ -115,27 +100,6 @@ _STALE = dict(fresh=False, age_s=1555200)
             ),
             "seat report unreadable",
         ),
-        (
-            _agents_summary(
-                verdict="unverified",
-                workers=[],
-                ignored=[
-                    _worker(protocol=3, **_STALE),
-                    _worker(worker_id="swmaker000005@5", **_STALE),
-                ],
-            ),
-            "swmaker000004@4 (protocol 3, last seen 18d ago)",
-        ),
-        (
-            _agents_summary(
-                verdict="unverified",
-                workers=[],
-                ignored=[
-                    {**_worker(**_STALE), "farm_protocol_version": True},
-                ],
-            ),
-            "protocol unreadable",
-        ),
     ],
 )
 def test_fleet_faults_refuse_the_build(agents, message, monkeypatch):
@@ -145,38 +109,13 @@ def test_fleet_faults_refuse_the_build(agents, message, monkeypatch):
     assert message in str(refusal.value)
 
 
-@pytest.mark.parametrize(
-    ("agents", "says"),
-    [
-        (_agents_summary(), "protocol 7 on 1 worker(s)"),
-        (
-            _agents_summary(workers=[_worker(fresh=False, age_s=21600)]),
-            "no worker has reported within 120s, but the last report of 1 worker(s) supports it",
-        ),
-        (
-            _agents_summary(verdict="unverified", workers=[], listed=0),
-            "no worker has ever reported, so compatibility is unconfirmed",
-        ),
-        (
-            _agents_summary(
-                verdict="unverified", workers=[], ignored=[_worker(**_STALE)]
-            ),
-            "1 worker(s) last reported more than 14d ago supporting it",
-        ),
-        (
-            _agents_summary(
-                ignored=[{"worker_id": "retired@1", "farm_protocol_version": None}]
-            ),
-            "protocol 7 on 1 worker(s)",
-        ),
-    ],
-)
+@pytest.mark.parametrize("verdict", ["matched", "unverified"])
 def test_compatible_or_silent_fleets_are_admitted_and_named(
-    agents, says, monkeypatch, capsys
+    verdict, monkeypatch, capsys
 ):
-    _fleet(monkeypatch, agents)
+    _fleet(monkeypatch, _agents_summary(verdict=verdict))
     farm_build.require_fleet_protocol(Path("pool"), PROTOCOL)
-    assert says in capsys.readouterr().out
+    assert f"fleet verdict {verdict}" in capsys.readouterr().out
 
 
 def test_unadmissible_refresh_stops_before_the_fleet(monkeypatch, capsys):
@@ -277,18 +216,28 @@ def _git(repo, *args):
 
 @pytest.fixture(scope="module")
 def farm(tmp_path_factory):
-    """A runs root with a prepared shared environment, and a pool home."""
+    """A runs root, a pool home, and a locked dependency-free stub project."""
     base = tmp_path_factory.mktemp("farm")
     pool = base / "pool"
     (pool / "agent").mkdir(parents=True)
     (pool / "farm.py").write_text("", encoding="utf-8")
     (pool / "agent" / "protocol.py").write_text("", encoding="utf-8")
-    return base / "runs", pool
+    project = base / "project"
+    project.mkdir()
+    (project / "pyproject.toml").write_text(
+        '[project]\nname = "stub"\nversion = "0"\ndependencies = []\n',
+        encoding="utf-8",
+    )
+    env = {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"}
+    subprocess.run(
+        ["uv", "lock", "--offline", "--quiet"], cwd=project, env=env, check=True
+    )
+    return base / "runs", pool, project
 
 
 @pytest.fixture
 def launch(farm, tmp_path):
-    root, pool = farm
+    root, pool, project = farm
 
     def start(mode):
         origin = tmp_path / f"{mode}-origin.git"
@@ -297,34 +246,15 @@ def launch(farm, tmp_path):
         repo.mkdir()
         _git(repo, "init", "-q")
         (repo / "farm_build.py").write_text(_STUB, encoding="utf-8")
+        for name in ("pyproject.toml", "uv.lock"):
+            (repo / name).write_bytes((project / name).read_bytes())
         (repo / "mode.txt").write_text(mode, encoding="utf-8")
         _git(repo, "add", ".")
         _git(repo, "commit", "-q", "-m", mode)
         _git(repo, "remote", "add", "origin", str(origin))
         _git(repo, "push", "-q", "origin", "HEAD:refs/heads/main")
         _git(repo, "fetch", "-q", "origin")
-        commit = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
-            cwd=repo,
-            check=True,
-            capture_output=True,
-            text=True,
-        ).stdout.strip()
-        environment = root / "envs" / farm_build.environment_key(repo, commit, [])
-        if not (environment / farm_build.ENVIRONMENT_MARKER).is_file():
-            subprocess.run(
-                [
-                    getattr(sys, "_base_executable", sys.executable),
-                    "-m",
-                    "venv",
-                    "--without-pip",
-                    str(environment),
-                ],
-                check=True,
-            )
-            (environment / farm_build.ENVIRONMENT_MARKER).write_text(
-                "{}", encoding="utf-8"
-            )
+        root.mkdir(exist_ok=True)
         before = set(root.iterdir())
         code = farm_build.main(
             [

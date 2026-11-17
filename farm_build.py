@@ -38,13 +38,11 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import hashlib
 import importlib
 import importlib.util
 import json
 import os
 import re
-import shutil
 import subprocess
 import sys
 import time
@@ -59,7 +57,6 @@ RUN_ID_PATTERN = re.compile(r"\d{8}T\d{9}Z-[0-9a-f]{32}\Z")
 TAG_PATTERN = re.compile(r"[A-Za-z0-9_-]+\Z")
 WATCH_EXIT_CODES = {"succeeded": 0, "failed": 20, "launcher-died": 21, "cancelled": 22}
 DEFAULT_PARALLELISM = "8"
-ENVIRONMENT_MARKER = ".farm-run-environment.json"
 _STOP_WAIT_S = 60
 
 
@@ -418,23 +415,6 @@ def _required_submodules(repo: Path, commit: str) -> list[tuple[str, str]]:
     return required
 
 
-def environment_key(repo: Path, commit: str, required: list[tuple[str, str]]) -> str:
-    """One shared environment per lock/pyproject/python/submodule-pin identity."""
-    inputs = ["farm-run-environment/1 uv-sync --frozen --no-editable"]
-    inputs += _git(
-        repo,
-        "ls-tree",
-        "--full-tree",
-        commit,
-        "--",
-        "uv.lock",
-        "pyproject.toml",
-        ".python-version",
-    ).splitlines()
-    inputs += [line for _path, line in required]
-    return hashlib.sha256("\n".join(inputs).encode("utf-8")).hexdigest()[:16]
-
-
 def _inside_a_worktree(path: Path) -> bool:
     probe = path
     while not probe.exists():
@@ -583,7 +563,6 @@ def launch(options: argparse.Namespace) -> Path:
         },
         "started_at": _now(),
         "snapshot": str(root / "snapshots" / run_id[-32:-20]),
-        "environment": str(root / "envs" / environment_key(worktree, commit, required)),
         "job": f"Local\\harmonic-farm-{run_id}",
     }
     write_json(run_dir / "run.json", record, replace=False)
@@ -633,87 +612,12 @@ def spawn_supervisor(run_dir: Path) -> int:
 # --- the supervisor ------------------------------------------------------------
 
 
-def _env_python(environment: Path) -> Path:
-    return environment / (
-        "Scripts/python.exe" if sys.platform == "win32" else "bin/python"
-    )
-
-
 def _run_logged(argv: list[str], log, **kwargs) -> None:
     log.write(f"farm-run $ {' '.join(argv)}\n".encode("utf-8"))
     log.flush()
     code = subprocess.call(argv, stdout=log, stderr=subprocess.STDOUT, **kwargs)
     if code != 0:
         raise RuntimeError(f"{argv[0]} {argv[1]} failed with exit {code}")
-
-
-def ensure_environment(record: dict, snapshot: Path, log) -> bool:
-    """Publish the shared environment once; whether an existing one was reused.
-
-    Each launcher syncs into a private staging directory and renames it into
-    place only after uv has exited and the marker is written, so no launcher
-    ever syncs into or deletes a directory another one may be using.
-    ``--no-editable`` keeps it free of pointers into any snapshot and
-    ``--relocatable`` keeps its entry points valid across the rename.
-    """
-    environment = Path(record["environment"])
-    marker = environment / ENVIRONMENT_MARKER
-    if marker.is_file():
-        return True
-    if environment.exists():
-        raise RuntimeError(
-            f"shared environment {environment} exists without its marker; remove it "
-            "once no run uses it"
-        )
-    environment.parent.mkdir(parents=True, exist_ok=True)
-    staging = environment.with_name(
-        f"{environment.name}.staging-{record['run_id'][-32:-20]}"
-    )
-    env = {
-        k: v
-        for k, v in os.environ.items()
-        if k not in ("VIRTUAL_ENV", "UV_PROJECT_ENVIRONMENT")
-    }
-    try:
-        _run_logged(
-            ["uv", "venv", "--quiet", "--relocatable", str(staging)],
-            log,
-            cwd=snapshot,
-            env=env,
-        )
-        _run_logged(
-            [
-                "uv",
-                "sync",
-                "--frozen",
-                "--no-editable",
-                "--active",
-                "--project",
-                str(snapshot),
-            ],
-            log,
-            cwd=snapshot,
-            env={**env, "VIRTUAL_ENV": str(staging)},
-        )
-        write_json(
-            staging / ENVIRONMENT_MARKER,
-            {
-                "created_by_run": record["run_id"],
-                "commit": record["commit"],
-                "created_at": _now(),
-            },
-        )
-    except BaseException:
-        shutil.rmtree(staging, ignore_errors=True)
-        raise
-    try:
-        os.rename(staging, environment)
-        return False
-    except OSError:
-        if not marker.is_file():
-            raise
-        shutil.rmtree(staging, ignore_errors=True)  # another run published first
-        return True
 
 
 def finish_snapshot(record: dict, run_dir: Path) -> dict:
@@ -793,7 +697,7 @@ def supervise(run_dir: Path) -> int:
         }
     )
     snapshot = Path(record["snapshot"])
-    code, overhead, reused = 1, None, None
+    code = 1
     with (run_dir / "build.log").open("ab") as log:
         try:
             # First: every process this run starts is a member and dies with it.
@@ -830,36 +734,39 @@ def supervise(run_dir: Path) -> int:
                     log,
                 )
             if not (snapshot / "farm_build.py").is_file():
-                raise RuntimeError(
-                    f"{record['commit'][:12]} predates farm_build.py; launch it with that "
-                    "commit's scripts/farm-run.ps1"
-                )
-            reused = ensure_environment(record, snapshot, log)
-            environment = Path(record["environment"])
-            overhead = round(time.monotonic() - prepared, 3)
+                raise RuntimeError(f"{record['commit'][:12]} predates farm_build.py")
             log.write(
-                f"farm-run snapshot {snapshot} ready in {overhead} s; environment "
-                f"{'reused' if reused else 'created'}: {environment}\n".encode("utf-8")
+                f"farm-run snapshot {snapshot} ready in "
+                f"{round(time.monotonic() - prepared, 3)} s\n".encode("utf-8")
             )
             log.flush()
-            env = {k: v for k, v in os.environ.items() if k != "HARMONIC_CACHE_REFRESH"}
+            env = {
+                k: v
+                for k, v in os.environ.items()
+                if k
+                not in (
+                    "HARMONIC_CACHE_REFRESH",
+                    "VIRTUAL_ENV",
+                    "UV_PROJECT_ENVIRONMENT",
+                )
+            }
             env.update(
                 {
-                    "VIRTUAL_ENV": str(environment),
-                    # A nested `uv run` uses the shared environment as is, never a
-                    # snapshot .venv and never a second writer.
-                    "UV_PROJECT_ENVIRONMENT": str(environment),
-                    "UV_NO_SYNC": "1",
                     "PYTHONUNBUFFERED": "1",
                     "PYTHONUTF8": "1",
                     "SOLIDWORKS_POOL_HOME": record["pool_home"],
                     "HARMONIC_REMOTE_CACHE_MODE": "rw",
                 }
             )
+            # The snapshot's own .venv: uv hardlinks it from its cache (~7 s) and
+            # `git worktree remove --force` deletes it with the snapshot.
             code = subprocess.call(
                 [
-                    str(_env_python(environment)),
-                    str(snapshot / "farm_build.py"),
+                    "uv",
+                    "run",
+                    "--frozen",
+                    "python",
+                    "farm_build.py",
                     "_build",
                     str(run_dir),
                 ],
@@ -876,12 +783,7 @@ def supervise(run_dir: Path) -> int:
     write_json(
         run_dir / "status.json",
         _terminal(
-            record,
-            state,
-            code if code != 0 or state == "succeeded" else 1,
-            cleanup,
-            launch_overhead_s=overhead,
-            environment_reused=reused,
+            record, state, code if code != 0 or state == "succeeded" else 1, cleanup
         ),
     )
     return 0
@@ -922,124 +824,30 @@ def _tail(text: str | None, lines: int = 20) -> str:
     return "".join(f"\n  {line}" for line in kept)
 
 
-def _dissenting_workers(reports: object, protocol: int) -> list[str]:
-    """Stale reports that are incompatible with or unreadable under ``protocol``."""
-    if not isinstance(reports, list):
-        return []
-    named = []
-    for report in reports:
-        if not isinstance(report, dict):
-            named.append("? (protocol unreadable)")
-            continue
-        other = report.get("farm_protocol_version")
-        if isinstance(other, int) and not isinstance(other, bool) and other == protocol:
-            continue
-        advertised = (
-            f"protocol {other}"
-            if isinstance(other, int) and not isinstance(other, bool)
-            else "protocol unreadable"
-        )
-        age = report.get("age_s")
-        if not isinstance(age, int):
-            age = report.get("written_age_s")
-        seen = f", last seen {age // 86400}d ago" if isinstance(age, int) else ""
-        named.append(f"{report.get('worker_id') or '?'} ({advertised}{seen})")
-    return sorted(named)
-
-
-_PROTOCOL_VERDICT_BLOCKS = ("mismatch", "unreadable")
-_PROTOCOL_VERDICTS = (*_PROTOCOL_VERDICT_BLOCKS, "matched", "unverified")
-
-
-def _agents_summary(line: str, expected_protocol: int) -> dict:
-    """Parse and validate the last stdout line of ``farm.py agents --json``."""
-    try:
-        summary = json.loads(line)
-    except json.JSONDecodeError:
-        raise FarmPreflightError(
-            f"agents printed no JSON summary; last line: {line[:200]}"
-        ) from None
-    if not isinstance(summary, dict):
-        raise FarmPreflightError(f"agents summary is not an object: {line[:200]}")
-    protocol = summary.get("farm_protocol_version")
-    if not isinstance(protocol, int) or isinstance(protocol, bool):
-        raise FarmPreflightError(
-            f"agents summary farm_protocol_version is not an integer: {protocol!r}"
-        )
-    if protocol != expected_protocol:
-        raise FarmPreflightError(
-            f"pool CLI supports farm protocol {protocol}, but this client requires "
-            f"{expected_protocol}"
-        )
-    if summary.get("verdict") not in _PROTOCOL_VERDICTS:
-        raise FarmPreflightError(
-            f"agents summary verdict is not one of {_PROTOCOL_VERDICTS}: "
-            f"{summary.get('verdict')!r}"
-        )
-    for key in ("workers", "ignored"):
-        if not isinstance(summary.get(key), list):
-            raise FarmPreflightError(
-                f"agents summary {key} is not a list: {line[:200]}"
-            )
-    for key in ("fresh_within_s", "evidence_horizon_s"):
-        value = summary.get(key)
-        if not isinstance(value, int) or isinstance(value, bool):
-            raise FarmPreflightError(
-                f"agents summary {key} is not an integer: {value!r}"
-            )
-    return summary
-
-
 def require_fleet_protocol(pool: Path, protocol: int) -> None:
-    """Stop unless the fleet supports the required protocol."""
+    """Stop unless the pool CLI speaks ``protocol`` and its fleet verdict admits it."""
     result = _pool_farm(pool, "agents", "--json")
     lines = [line for line in result.stdout.splitlines() if line.strip()]
-    if result.returncode != 0 or not lines:
+    try:
+        summary = json.loads(lines[-1]) if result.returncode == 0 and lines else None
+    except json.JSONDecodeError:
+        summary = None
+    if not isinstance(summary, dict):
         raise FarmPreflightError(
             f"agents failed (exit {result.returncode}){_tail(result.stdout)}"
         )
-    summary = _agents_summary(lines[-1], protocol)
-    if summary["verdict"] in _PROTOCOL_VERDICT_BLOCKS:
-        report = summary.get("report")
-        if not isinstance(report, str) or not report:
-            raise FarmPreflightError(
-                f"agents returned verdict {summary['verdict']!r} without a report: "
-                f"{lines[-1][:200]}"
-            )
-        raise FarmPreflightError(report)
-    workers = summary["workers"]
-    fresh = sum(
-        1 for worker in workers if isinstance(worker, dict) and worker.get("fresh")
-    )
-    if fresh:
-        print(f"farm: protocol {protocol} on {fresh} worker(s)")
-    elif workers:
-        print(
-            f"farm: protocol {protocol}; no worker has reported within "
-            f"{summary['fresh_within_s']}s, but the last report of "
-            f"{len(workers)} worker(s) supports it"
+    if summary.get("farm_protocol_version") != protocol:
+        raise FarmPreflightError(
+            f"pool CLI supports farm protocol {summary.get('farm_protocol_version')!r}, "
+            f"but this client requires {protocol}"
         )
-    elif summary["ignored"]:
-        days = summary["evidence_horizon_s"] // 86400
-        dissent = _dissenting_workers(summary["ignored"], protocol)
-        if dissent:
-            raise FarmPreflightError(
-                f"farm protocol {protocol} is required, and no worker has "
-                f"reported within {days}d, but the last report of "
-                + ", ".join(dissent)
-                + " is incompatible or unreadable. Deploy a protocol-compatible "
-                "agent, or delete the seat report of an instance that will "
-                "never come back."
-            )
-        print(
-            f"farm: protocol {protocol}; {len(summary['ignored'])} worker(s) last "
-            f"reported more than {days}d ago supporting it, too old to prove "
-            "the fleet is up but not contradicting it"
+    # The pool decides mismatch/unreadable; "unverified" means no worker reported.
+    if summary.get("verdict") not in ("matched", "unverified"):
+        raise FarmPreflightError(
+            summary.get("report")
+            or f"fleet protocol verdict {summary.get('verdict')!r}"
         )
-    else:
-        print(
-            f"farm: protocol {protocol}; no worker has ever reported, so compatibility is unconfirmed"
-        )
+    print(f"farm: protocol {protocol}; fleet verdict {summary['verdict']}")
 
 
 def require_leaf_admission(closure, pool: Path) -> list[str]:
