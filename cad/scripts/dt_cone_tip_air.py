@@ -52,7 +52,8 @@ printed manufacturing and set tolerances (INDEPENDENT_TOLERANCES, RSS); an
 unclassified source is refused.  The whole sweep is worst-case arithmetic
 over every source when that closes everywhere; otherwise the clearances
 arithmetic plus the RSS of the tolerances, everywhere (machining-dfm.md).
-Either way the build fails if the governing air closes.
+Either way ``check:recipe`` (test_drive_train_cone_tip_holddown) fails if the
+governing air closes.
 """
 
 from __future__ import annotations
@@ -725,7 +726,6 @@ def full_sweep_proof(*, intervals: int = 400) -> list[dict]:
                 stacks.append(
                     (
                         index,
-                        nominal_shadow,
                         AirStack(
                             tier,
                             fixed.name,
@@ -738,11 +738,11 @@ def full_sweep_proof(*, intervals: int = 400) -> list[dict]:
                 )
     method = (
         "arithmetic"
-        if all(s.arithmetic_mm > 0.0 for _, _, s in stacks)
+        if all(s.arithmetic_mm > 0.0 for _, s in stacks)
         else "statistical"
     )
     rows = []
-    for index, nominal_shadow, s in stacks:
+    for index, s in stacks:
         air = s.arithmetic_mm if method == "arithmetic" else s.statistical_mm
         if not math.isfinite(air) or air <= 0.0:
             raise ValueError(
@@ -759,9 +759,7 @@ def full_sweep_proof(*, intervals: int = 400) -> list[dict]:
                     lower + index * width,
                     lower + (index + 1) * width,
                 ),
-                "normal": Z,
                 "nominal_mm": s.nominal_mm,
-                "nominal_shadow": nominal_shadow,
                 "method": method,
                 "arithmetic_mm": s.arithmetic_mm,
                 "statistical_mm": s.statistical_mm,

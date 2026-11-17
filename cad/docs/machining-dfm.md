@@ -74,7 +74,7 @@ its first-root position; no second general note restates that location.
      clearances, thread centring, shaft swing in the post journal and G19 cock can all be taken up
      together; never put them in the RSS. The current calculated least air is 0.080 mm at the bushing,
      3.940 mm at the end screw and 5.001 mm at the block (`dt_cone_tip_air.require_air()`), not a measured
-     clearance; `_native_cone_tip_air` checks the saved bodies against it.
+     clearance; the saved bodies are held only to the `interference-free` gate.
      The shaft drawing (one sheet, **Shaft Controls**) dimensions each chucking
      from its own collar face (rule 11): the journal and the collar web from the
      journal-side thrust face, the land step and the tip from the
