@@ -1906,8 +1906,8 @@ def _source_text_dep(label: str, deps: Iterable[str]) -> str:
     ``ContentChecker`` folds recipe code by its syntax tree: all that a task
     which only RUNS the code can see. A task whose result also holds the text
     lists this sidecar beside its deps, so a comment, docstring or layout edit
-    still moves it: cited line spans (``package:features``), recorded source
-    hashes (``cam``), tests that read sources (``check:*``)."""
+    still moves it: recorded source hashes (``cam``), tests that read sources
+    (``check:*``)."""
     h = hashlib.md5()
     sources = (dep for dep in set(deps) if dep.endswith(".py"))
     for tag, dep in sorted((_rel_tag(dep), dep) for dep in sources):
@@ -2369,15 +2369,9 @@ def _export_requirement_deps() -> list[str]:
 
 
 def _feature_export_file_deps(stem: str) -> list[str]:
-    """One bundle's recipe plus release revision and exact native identity.
-
-    ``features.toml`` cites declarations by source line span, so the bundle
-    also depends on its sources' text (``_source_text_dep``)."""
-    label = f"package:features:{stem}"
-    requirements = _feature_requirement_deps(stem)
-    return _fold_shop_records(label, sorted({
-        *requirements,
-        _source_text_dep(label, requirements),
+    """One bundle's recipe plus release revision and exact native identity."""
+    return _fold_shop_records(f"package:features:{stem}", sorted({
+        *_feature_requirement_deps(stem),
         str(RELEASE_VERSION_FILE),
         _submodule_assembly_dep(),
         _sldprt(stem),

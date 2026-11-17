@@ -1809,7 +1809,6 @@ epoch also keys every machinist review and its carry index).
 A build that only runs its code cannot see what the tree drops. A task whose
 result holds source text lists `dodo._source_text_dep` beside its deps, a
 `cad/out/.source-text/` digest of the text of the recipe code among them:
-`package:features:<stem>` (`features.toml` cites declarations by line span),
 `cam:<stem>` (its manifest records the runtime's hash) and every `check:*` gate
 (tests read sources). `check:machinist_review:<stem>` keys its review code by
 bytes, so no verdict moved with this. Do not make a COM recipe read its own

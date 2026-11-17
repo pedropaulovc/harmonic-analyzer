@@ -1418,9 +1418,9 @@ def clear_import_caches() -> None:
 # Docstrings are dropped as well, except in a module whose own text names
 # ``__doc__`` (``argparse.ArgumentParser(description=__doc__)``): that module
 # can read them, so it keeps them. Positions are dropped, so a leaf whose
-# OUTPUT holds source lines or source bytes (``package:features`` citations,
-# the ``cam`` manifest, the text-reading ``check:*`` gates) must also fold the
-# text: ``dodo._source_text_dep``.
+# OUTPUT holds source lines or source bytes (the ``cam`` manifest, the
+# text-reading ``check:*`` gates) must also fold the text:
+# ``dodo._source_text_dep``.
 #
 # Part of every digest, so changing what the tree keeps moves every COM leaf
 # key once and nothing else (the cache epoch would also move the machinist
