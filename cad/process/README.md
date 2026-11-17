@@ -198,8 +198,10 @@ re-grips. Single-material plans set `milling_material` once instead of a
 `material` per cut (the leadscrew kit keeps per-cut keys). The base-bar edge
 roughs name their finish pass (`finish_cut`) and its stock per loaded axis
 (`finish_stock_mm = { y = 0.254, z = "through" }`: the cutter tip runs
-below the underside), so Z bending no longer limits roughing width. No shop
-tool states `helix_deg` or `axial_ratio` yet; the 1.0 default applies.
+below the underside), so they rough at dechatter's 4.1 mm width again (owner
+ruling 2026-11-16). No shop tool states `helix_deg` or `axial_ratio`: no
+vendor page for the owned cutters (the LMS 6784 set) publishes a helix, so the
+configured 1.0 applies.
 
 prechips 0.10 adds the `vise_holding` check: every non-lathe setup declares
 `vise_hold` (`"other"` for table clamps, saw or bench), and each milling-vise

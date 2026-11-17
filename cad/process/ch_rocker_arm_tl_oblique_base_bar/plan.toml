@@ -68,13 +68,12 @@ end_cut_tip_z_mm = -1.016        # End cutter .04 in below the bar.
 # (shop.toml settings.em-half-hss-6061-v11-*, dechatter v11). Edges and ends
 # go down in equal levels no deeper than this: edges 2 x 7.366 mm
 # ((blank thickness + .08 in)/2), ends 2 x 6.477 mm ((thickness + .04 in)/2).
-# Edge roughing width is 2.54 mm (.100 in), not dechatter's stable 4.1-4.7:
-# at 4.1 the strapped bar's milling_deflection estimate reads 0.127 mm along Z
-# against the 0.1 mm rough limit (prechips 0.11.3, 170 N). The edge roughs now
-# declare their finish pass and its stock (prechips#430): Y against the
-# .010 finish stock, Z skipped because the cutter passes below the underside
-# (edge_cut_tip_z_mm); 4.1 then passes. The width stays 2.54 until Pedro
-# rules on restoring 4.1.
+# Edge roughing width is 4.1 mm (.161 in), the low end of dechatter's stable
+# 4.1-4.7 at 2250 rpm (owner ruling 2026-11-16 on prechips#430). The edge
+# roughs declare their finish pass and its stock: Y is judged against the
+# .010 finish stock, and Z is skipped because the cutter passes below the
+# underside (edge_cut_tip_z_mm). Without that declaration 4.1 reads 0.127 mm
+# along Z against the 0.1 mm rough limit (prechips 0.11.3, 170 N).
 side_max_stepdown_mm = 7.62
 drill_tip_z_mm = -3.175          # Drill tips .125 in past the underside.
 half_cutter_dia_mm = 12.7        # 1/2 in end mill; also cuts the slots.
@@ -175,10 +174,10 @@ beam = { axis = "x", hold = "between", extent_mm = [0, "{{cad.blank_length_mm}}"
 speed_kind = "spindle"
 tool = "em-half"
 sizing = "other"
-instruction = "1/2 in end mill out 1.92 in (48.8 mm) from the collet, as measured (dechatter v11). Cutter .04–.08 below, in two equal depth levels (≤ .30 each). Front edge, conventional, table −X (cutter +X): rough ≤ .100 radial, finish .010; note finish-pass Y; mark ZERO EDGE."
+instruction = "1/2 in end mill out 1.92 in (48.8 mm) from the collet, as measured (dechatter v11). Cutter .04–.08 below, in two equal depth levels (≤ .30 each). Front edge, conventional, table −X (cutter +X): rough ≤ .161 radial, finish .010; note finish-pass Y; mark ZERO EDGE."
 settings = "em-half-hss-6061-v11-wide"
 milling_cuts = [
-  { name = "front edge rough", kind = "side", phase = "rough", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = 7.366, radial_woc_mm = 2.54, rpm = 2250, feed_mm_min = 400.05, traverse_mm = [0, "{{cad.blank_length_mm}}"], finish_cut = "front edge finish", finish_stock_mm = { y = 0.254, z = "through" } },
+  { name = "front edge rough", kind = "side", phase = "rough", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = 7.366, radial_woc_mm = 4.1, rpm = 2250, feed_mm_min = 400.05, traverse_mm = [0, "{{cad.blank_length_mm}}"], finish_cut = "front edge finish", finish_stock_mm = { y = 0.254, z = "through" } },
   { name = "front edge finish", kind = "side", phase = "finish", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = 7.366, radial_woc_mm = 0.254, rpm = 2250, feed_mm_min = 400.05, traverse_mm = [0, "{{cad.blank_length_mm}}"] },
 ]
 
@@ -187,12 +186,12 @@ speed_kind = "spindle"
 tool = "em-half"
 sizing = "other"
 instruction = "Opposite edge, conventional, table +X (cutter −X), two equal depth levels; D = measured cutter Ø. Rough to cutter-centre Y = front-pass Y + {{cad.width_rough_in:.3f}} + D; finish at front-pass Y + {{cad.width_in:.3f}} + D."
-instruction_detailed = "Opposite edge, conventional: table moves +X (cutter −X). Measure the cutter: D. The front-pass Y is the cutter centre, D/2 outside ZERO EDGE, so this edge's cutter centre sits the width plus D beyond it. Each pass runs at two equal depth levels, ≤ .30 each. Rough passes of at most .100 radial down to cutter-centre Y = front-pass Y + {{cad.width_rough_in:.3f}} + D; caliper the width at both ends; finish in one pass at front-pass Y + {{cad.width_in:.3f}} + D. Never set the DRO to {{cad.width_in:.3f}} alone: that cuts the bar a cutter diameter narrow."
+instruction_detailed = "Opposite edge, conventional: table moves +X (cutter −X). Measure the cutter: D. The front-pass Y is the cutter centre, D/2 outside ZERO EDGE, so this edge's cutter centre sits the width plus D beyond it. Each pass runs at two equal depth levels, ≤ .30 each. Rough passes of at most .161 radial down to cutter-centre Y = front-pass Y + {{cad.width_rough_in:.3f}} + D; caliper the width at both ends; finish in one pass at front-pass Y + {{cad.width_in:.3f}} + D. Never set the DRO to {{cad.width_in:.3f}} alone: that cuts the bar a cutter diameter narrow."
 settings = "em-half-hss-6061-v11-wide"
 inspection = "Width at ends/middle."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.width_band_mm}}" }]
 milling_cuts = [
-  { name = "opposite edge rough", kind = "side", phase = "rough", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = 7.366, radial_woc_mm = 2.54, rpm = 2250, feed_mm_min = 400.05, traverse_mm = [0, "{{cad.blank_length_mm}}"], finish_cut = "opposite edge finish", finish_stock_mm = { y = 0.254, z = "through" } },
+  { name = "opposite edge rough", kind = "side", phase = "rough", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = 7.366, radial_woc_mm = 4.1, rpm = 2250, feed_mm_min = 400.05, traverse_mm = [0, "{{cad.blank_length_mm}}"], finish_cut = "opposite edge finish", finish_stock_mm = { y = 0.254, z = "through" } },
   { name = "opposite edge finish", kind = "side", phase = "finish", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = 7.366, radial_woc_mm = 0.254, rpm = 2250, feed_mm_min = 400.05, traverse_mm = [0, "{{cad.blank_length_mm}}"] },
 ]
 
