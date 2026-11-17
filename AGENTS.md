@@ -327,7 +327,9 @@ appear in machine assembly references or BOMs (#1239). A shop tool may stand
 alone or belong to its own `*_tl_*` kit assembly, which references only fixture
 parts and stays outside the top assembly's tree (`_buildgraph.MACHINE_ASSEMBLIES`)
 (owner ruling 2026-11-17, #2885). Every part and assembly needs a
-drawing sourced from its own model kind. The named `PART_DRAWING_EXEMPTIONS`
+drawing sourced from its own model kind, except standard hardware: a tier-1 part
+in `cad/config/hardware.yaml` is delivered as its `HARDWARE.md` row
+and must not keep a drawing. The named `PART_DRAWING_EXEMPTIONS`
 mapping exempts only consumable `pd_platen_paper`, and rejects exemptions for
 missing parts or parts that already have drawings.
 

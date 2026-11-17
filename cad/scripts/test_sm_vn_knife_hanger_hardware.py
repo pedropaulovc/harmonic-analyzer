@@ -263,6 +263,7 @@ def test_washer_recipe_authors_an_annulus_not_a_disc(monkeypatch) -> None:
     assert ("defined", "washer annulus") in seen
 
 
+
 def _native_machining_control_annotations():
     annotations = []
     for key, (nominal, lower, upper) in bolt_drawing.EXPECTED_CONTROLS.items():

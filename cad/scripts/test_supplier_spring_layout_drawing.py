@@ -16,7 +16,6 @@ import pytest
 import _drawing_projection
 import _purchased_fastener_drawing as purchased
 import _reference_source_lifecycle as source_lifecycle
-import _supplier_chain_dimensions as chain_dimensions
 import _supplier_spring_drawing as supplier_drawing
 from _supplier_reference_geometry import NativeSketchGeometry
 from _supplier_spring_drawing import extension_spring_cells, supplier_state_cells
@@ -577,31 +576,6 @@ def test_actual_reference_ink_fits_current_cells_that_native_outline_floor_canno
     assert native.position_writes and native.outline_calls == 0
     assert tuple(harness.model.events) == source_events
     assert native.source.capture_count == 1
-
-
-@pytest.mark.parametrize(
-    "points",
-    [((0.002, 0.003), (0.015, 0.003)), ((0.004, 0.001), (0.004, 0.014))],
-    ids=["zero-height", "zero-width"],
-)
-def test_validated_one_dimensional_reference_ink_is_fitted_and_centered(
-    reference_scene, points
-):
-    cells = supplier_state_cells(purchased.view_band_bottom("", label="1D reference"))
-    fitted = purchased.supplier_fit_cells(
-        cells, chain_dimensions.SUPPLIER_MARGINS, label="1D reference"
-    )
-    cell = next(cell for cell in fitted if cell[0] == "free_top")
-    harness = reference_scene(points)
-    harness.capture()
-    scale = purchased._fit_group(
-        harness.draw, [(harness.view, cell)], read_bounds=harness.read
-    )
-    box = harness.project()
-    assert scale in purchased._SCALES and purchased._inside(box, cell[2])
-    assert ((box[0] + box[2]) / 2, (box[1] + box[3]) / 2) == pytest.approx(cell[1])
-    assert (box[0] == box[2]) != (box[1] == box[3])
-    assert harness.view.outline_calls == 0
 
 
 def test_reference_fit_refreshes_each_projection_without_source_switch_or_live_correspondence(

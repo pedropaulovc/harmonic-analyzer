@@ -803,16 +803,13 @@ def isolated_drawing_keys(tmp_path, monkeypatch):
     import _buildgraph as bg
 
     dodo = _load_dodo()
-    stems = ("pd_platen_guide", "ch_vn_frame_side_screw", "pn_pen_assembly")
-    configured_stems = (
-        "sh_vn_chain_link", "sh_vn_music_wire"
-    )
+    stems = ("pd_platen_guide", "sh_vn_thumb_screw", "pn_pen_assembly")
     release_relative = dodo.RELEASE_VERSION_FILE.relative_to(REPO_ROOT)
     config_relative = dodo.CONFIG_DIR.relative_to(REPO_ROOT)
     # The drawing recipe folds the config rows its closure reads (Codex #936
     # T_oyK), so the checkout carries the config tree its keys hash.
     sources = {dodo.RELEASE_VERSION_FILE, *dodo.CONFIG_DIR.rglob("*.yaml")}
-    for stem in (*stems, *configured_stems):
+    for stem in stems:
         spec = dodo.DRAWINGS_BY_NAME[stem]
         sources.update((spec.script, *spec.assets))
         sources.update(Path(path) for path in dodo._helper_deps(spec.script))
@@ -1165,7 +1162,7 @@ def test_selected_drawing_row_changes_only_its_freshness_and_cache_key(
     )
     after = snapshot()
     assert all(a != b for a, b in zip(before["pd_platen_guide"], after["pd_platen_guide"]))
-    for stem in ("ch_vn_frame_side_screw", "pn_pen_assembly"):
+    for stem in ("sh_vn_thumb_screw", "pn_pen_assembly"):
         assert after[stem] == before[stem]
 
 
@@ -1182,74 +1179,8 @@ def test_config_row_change_moves_only_its_readers_freshness_and_cache_key(
     row.write_text(renumbered, encoding="utf-8")
     after = snapshot()
     assert all(a != b for a, b in zip(before["pd_platen_guide"], after["pd_platen_guide"]))
-    for stem in ("ch_vn_frame_side_screw", "pn_pen_assembly"):
+    for stem in ("sh_vn_thumb_screw", "pn_pen_assembly"):
         assert after[stem] == before[stem], stem
-
-
-@pytest.mark.parametrize(
-    "changed_stem",
-    ["sh_vn_chain_link", "sh_vn_music_wire"],
-)
-@pytest.mark.parametrize("field", ["default_configuration", "configuration_quantities"])
-def test_purchased_configuration_changes_invalidate_only_own_drawing(
-    isolated_drawing_keys, monkeypatch, changed_stem, field
-):
-    """Real member consumers and direct drawing keys agree on registry ownership."""
-    import _config
-    import _part_configuration_exports as exports
-    import _purchased_part_variants as variants
-    import yaml
-
-    purchased = ("sh_vn_chain_link", "sh_vn_music_wire")
-    dodo, _root, drawing_keys = isolated_drawing_keys(
-        drawing_stems=(*purchased, "pd_platen_guide")
-    )
-    monkeypatch.setattr(_config, "CONFIG_DIR", dodo.CONFIG_DIR)
-
-    def snapshot():
-        _config._parts_registry.cache_clear()
-        _config._doc.cache_clear()
-        try:
-            members = {}
-            for stem in purchased:
-                paths = exports.configuration_export_paths(stem, dodo.CAD_OUT)
-                members[stem] = (
-                    paths,
-                    {
-                        name: variants._member_properties(
-                            stem.replace("_", "-"), name, name, {}
-                        )
-                        for name in paths
-                    },
-                )
-            return drawing_keys(), members
-        finally:
-            _config._parts_registry.cache_clear()
-            _config._doc.cache_clear()
-
-    before_keys, before_members = snapshot()
-    dashed = changed_stem.replace("_", "-")
-    path = dodo.CONFIG_DIR / "parts" / f"{dashed}.yaml"
-    document = yaml.safe_load(path.read_text(encoding="utf-8"))
-    row = document[dashed]
-    quantities = row["configuration_quantities"]
-    if field == "default_configuration":
-        row[field] = next(name for name in quantities if name != row[field])
-    else:
-        quantities[row["default_configuration"]] += 1
-        row["quantity"] = sum(quantities.values())
-    path.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
-    after_keys, after_members = snapshot()
-
-    for stem in before_keys:
-        if stem == changed_stem:
-            # Both local freshness and the cross-machine cache must invalidate,
-            # even with the native producer recipe/execution identity held fixed.
-            assert all(a != b for a, b in zip(before_keys[stem], after_keys[stem]))
-        else:
-            assert after_keys[stem] == before_keys[stem], stem
-    for stem in purchased:
-        assert (after_members[stem] != before_members[stem]) == (stem == changed_stem), stem
 
 
 @pytest.mark.parametrize(
@@ -3761,11 +3692,11 @@ def test_fastener_catalog_dep_is_narrowed_to_the_rows_each_task_reads():
     part = dodo._part_file_deps(
         dodo.SCRIPTS_DIR / "build_ch_vn_frame_side_screw.py", "ch_vn_frame_side_screw"
     )
-    drawing = dodo._drawing_file_deps("ch_vn_frame_side_screw")
+    drawing = dodo._drawing_file_deps("sh_vn_thumb_screw")
     assembly = dodo._recipe_files("pn_pen")
     for label, deps in (
         ("part-ch_vn_frame_side_screw", part),
-        ("drawing-ch_vn_frame_side_screw", drawing),
+        ("drawing-sh_vn_thumb_screw", drawing),
     ):
         assert catalog not in deps, label
         assert any(
@@ -3774,7 +3705,7 @@ def test_fastener_catalog_dep_is_narrowed_to_the_rows_each_task_reads():
             for dep in deps
         ), label
     assert dodo._fastener_rows_env("part:ch_vn_frame_side_screw") == "ch-vn-frame-side-screw"
-    assert dodo._fastener_rows_env("drawing:ch_vn_frame_side_screw") == "ch-vn-frame-side-screw"
+    assert dodo._fastener_rows_env("drawing:sh_vn_thumb_screw") == "sh-vn-thumb-screw"
     # The pen reads the pure SKU dimensions, not the stock builder's catalogue row.
     assert catalog not in assembly
     assert not any(Path(dep).parent.name == ".fastener-catalog" for dep in assembly)
@@ -3800,6 +3731,7 @@ def test_run_subprocess_hands_the_fastener_rows_to_the_build(monkeypatch):
     seen.clear()
     assert dodo._run_subprocess(["x"], "package:features") == 0
     assert "HARMONIC_FASTENER_ROWS" not in seen
+
 
 
 def test_fit_config_dependencies_expand_conservatively(tmp_path):

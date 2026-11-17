@@ -1379,7 +1379,6 @@ def test_mha145_is_mcmaster_98296a027_and_a_purchased_bom_line() -> None:
     import build_dt_vn_pinion_strap_pin as part
     import dt_vn_pinion_strap_pin_spec as pin
     from _buildgraph import part_stems, references_of
-    from _drawing_registry import DRAWINGS_BY_NAME
     from _fastener_catalog import FASTENERS
     from _test_stock_recipes import discovered_recipes
     from diagnostics import diag_build_98296A027 as recipe
@@ -1400,9 +1399,6 @@ def test_mha145_is_mcmaster_98296a027_and_a_purchased_bom_line() -> None:
     assert row["process"] == "purchased"
     assert tuple(row["supplier_skus"]) == ("98296A027",)
     assert row["stock_name"] == part.SPEC.stock_name
-    assert DRAWINGS_BY_NAME["dt_vn_pinion_strap_pin"].script_name == (
-        "draw_dt_vn_pinion_strap_pin.py"
-    )
     assert "dt_vn_pinion_strap_pin" in part_stems()
     assert "dt_vn_pinion_strap_pin" in references_of("dt_drive_train")
 
@@ -1845,7 +1841,6 @@ def test_assembly_poses_print_once_on_their_rig_steps() -> None:
         "dt_pinion_*_spec.py",
         "draw_dt_pinion_*.py",
         "dt_vn_pinion_strap_pin_spec.py",
-        "draw_dt_vn_pinion_strap_pin.py",
     ):
         matches = sorted(scripts.glob(pattern))
         assert matches, f"no pinion family modules match {pattern}"
