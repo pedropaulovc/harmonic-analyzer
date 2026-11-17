@@ -1401,3 +1401,38 @@ sku = "4687A223"
 present = true
 pieces = 1
 cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 49: \"Sanding Roll for Smooth Finish, 2\" Wide, 220 Grit, 30 Feet Long\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+# --- MHA-CH-13 rocker strap on the CNC (cad/process/ch_rocker_strap) ---------
+# Owner-chosen route (2026-11-17, relayed by Main): a shop-made sub-plate in
+# the PM vise, the blank against its fence under four low-profile edge clamps.
+# The plan's [parameters] carry the sizes prechips reads (plate_*, fence_*,
+# clamp_height_mm, hub_relief_dia_mm); they are not repeated here.
+[fixtures.strap-sub-plate]
+name = "Rocker-strap sub-plate with fence, 6061, about 13 x 3 x 1/2 in"
+kind = "fixture_plate"
+present = false
+status = "not made: shop-made"
+purchase = "Make from 1/2 x 3 in 6061 flat, 13 in long: mill both long edges for the vise jaws; in the vise, face the top in place (the plan's Z0); a fence strip along the back edge, its front face milled in place (Y0) and its top under the strap's finished thickness; a through relief hole under the hub hole; four mounting holes for the edge clamps along the front at the plan's clamp stations."
+use = "MHA-CH-13 Setups 2-4: seats the 1/8 x 1-1/2 in blank for facing, the hub hole and the outline"
+
+[fixtures.edge-clamps-low-profile]
+name = "Low-profile edge clamps, 4"
+kind = "edge_clamp"
+present = false
+status = "not owned: to buy (owner approved, 2026-11-17)"
+pieces = 4
+purchase = "Four low-profile edge (side) clamps that push the blank's edge toward the fence and down onto the plate, their tops no higher than 2.0 mm (.079 in) above the plate when clamped on a 3.2 mm (.125 in) edge: the face cutter passes over them at the strap's finished .098 in. No make or model chosen."
+use = "MHA-CH-13 Setups 2-4, at the plan's clamp_stations_mm"
+
+# Hub-hole reamer for MHA-CH-13: Ø.4000 +.0005/0 REAM THRU, a press fit on
+# MHA-CH-12. To purchase: not owned; no make, price or stock read. Cutting
+# band: ANSI B94.2 chucking-reamer diameter tolerance +.0001/+.0005 (as
+# tools.reamer-2550), so it cuts .4001-.4005, inside the bore's .4000-.4005
+# band with nothing to spare at the top: gauge the first hole before the lot.
+# Its sizing data is cad/process/shop.toml tools.reamer-4000.
+[tools.reamer-4000]
+name = ".4000 in HSS straight-flute chucking reamer"
+kind = "reamer"
+present = false
+purchase = "One .4000 in (decimal size) HSS straight-flute straight-shank chucking reamer; ANSI B94.2 cutting band .4001-.4005."
+note = "Cuts the MHA-CH-13 hub hole in 1018 after a 25/64 drill, 400 rpm, cutting oil, fed in and out. Checked with the owned telescoping gauges (gauges.telescoping-gauges-starrett-s579gz) read on the micrometer: the pin-gauge set's .001 in steps cannot resolve the .0005 in band."
