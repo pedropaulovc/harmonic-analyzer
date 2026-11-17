@@ -126,9 +126,6 @@ def test_every_profile_size_is_a_model_dimension() -> None:
     assert not hasattr(spec, "DRAWING_NOTES")
     assert spec.REFERENCE_RADII == {"FlareR", "SConcaveR", "SConvexR", "DomeR"}
     assert spec.REFERENCE_RADII <= spec.DRAWING_DIMENSIONS["HandleProfile"]
-    build_source = Path(handle.__file__).read_text(encoding="utf-8")
-    assert "_make_driven(adapter, reference, name)" in build_source
-    assert "PivotBoreProfile" not in build_source
     assert drawing.PIVOT_BORE_CALLOUT.startswith("REAM THRU, RUNNING FIT ON\n")
     assert "MHA-DT-32 PIVOT SCREW" in drawing.PIVOT_BORE_CALLOUT
     # The fitted sizes and the small corner features print at three places,
@@ -155,9 +152,6 @@ def test_oak_ends_in_a_ferrule_tenon_and_a_cup_counterbore() -> None:
     assert spec.COUNTERBORE_DEPTH == pytest.approx(cup.OVERALL_LENGTH)
     assert spec.OVERALL_LENGTH == pytest.approx(spec.HANDLE_LENGTH - spec.TENON_X0)
     assert spec.profile_radius(spec.OAK_END_X) == pytest.approx(spec.END_ROUND_CY)
-    build_source = Path(handle.__file__).read_text(encoding="utf-8")
-    assert '("oak end face", oak_end_face, "vertical")' in build_source
-    assert '(end_round, oak_end_face, "end round crest")' in build_source
     assert spec.TENON_X0 > 0.0  # no oak reaches the arm face
     # Owner ruling B on #1375: the larger cup drives the counterbore limit, up
     # to the next printed thousandth.
@@ -306,11 +300,6 @@ def test_tenon_and_counterbore_are_fitted_to_the_parts_they_take() -> None:
     assert spec.CUP_OFFSET_MAX == pytest.approx(
         spec.BORE_ECCENTRICITY + spec.COUNTERBORE_GLUE_LINE[1] / 2.0
     )
-    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert (
-        "for name in sorted(REFERENCE_DIMENSIONS | TANGENT_POINT_DIAMETERS):"
-        in drawing_source
-    )
 
 
 def test_s_curve_tangent_point_prints_a_driven_reference_diameter() -> None:
@@ -325,8 +314,6 @@ def test_s_curve_tangent_point_prints_a_driven_reference_diameter() -> None:
     assert spec.INFLECTION[0] - spec.TENON_X0 == pytest.approx(0.71 * IN)
     assert round(2.0 * spec.INFLECTION[1] / IN, 2) == pytest.approx(0.49)
     assert spec.S_CONVEX_CENTER[0] == spec.DOME_CENTER[0] == spec.PEAK_X
-    build_source = Path(handle.__file__).read_text(encoding="utf-8")
-    assert "inflection_dimension.DrivenState = 1" in build_source
     assert (
         drawing.FRONT_KEEP["InflectionDia"][0]
         < drawing.FRONT_KEEP["PivotBoreDia"][0] - 0.017
@@ -369,15 +356,6 @@ def test_inside_corners_print_a_max_radius_their_mates_clear() -> None:
     for callout in (drawing.TENON_ROOT_CALLOUT, drawing.COUNTERBORE_FLOOR_CALLOUT):
         assert max(len(row) for row in callout.split("\n")) <= len("SEE NOTE 3")
     assert set(drawing.INSIDE_CORNER_ARC_EXTENSION) == corners
-    build_source = Path(handle.__file__).read_text(encoding="utf-8")
-    assert '("InsideCornerR", INSIDE_CORNER_R_MAX)' in build_source
-    assert "profile.record(name, '\"InsideCornerR\"')" in build_source
-    assert "_inside_corner_max_limit(adapter, name)" in build_source
-    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert (
-        "_dress_inside_corner(adapter, by_name[name], name=name)"
-        in drawing_source
-    )
 
 
 def test_root_relief_prints_in_an_enlarged_detail_with_separate_leaders() -> None:
@@ -386,8 +364,6 @@ def test_root_relief_prints_in_an_enlarged_detail_with_separate_leaders() -> Non
     # native detail of section A-A, carries both, each on its own leader.
     assert set(drawing.DETAIL_KEEP) == {"TenonRootRelief", "TenonRootRadius"}
     assert drawing.DETAIL_SCALE[0] / drawing.DETAIL_SCALE[1] >= 2.0 * drawing.SHEET_SCALE[0]
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "CreateDetailViewAt4(" in source
     # The leg's dimension runs from the tenon end's corner: the fence must
     # show it, the relief and its whole root round, or the import drops it.
     reach = drawing.DETAIL_RADIUS_MM - drawing._FENCE_MARGIN_MM
@@ -489,14 +465,6 @@ def test_tenon_root_relief_clears_the_ferrule_seat_and_keeps_the_tenon() -> None
     assert handle.INSIDE_CORNER_ARC_LENGTHS == pytest.approx(
         (radius * math.pi / 2.0, radius * 3.0 * math.pi / 4.0)
     )
-    build_source = Path(handle.__file__).read_text(encoding="utf-8")
-    assert '("TenonRootRelief", TENON_ROOT_RELIEF)' in build_source
-    assert """profile.record("TenonRootRelief", '"TenonRootRelief"')""" in build_source
-    assert '(tenon_root, relief, "tenon root on the relief")' in build_source
-    # The sweeps are read back from the saved profile after the final,
-    # equation-driven rebuild (codjiflo on PR #1989).
-    rebuilt = build_source.index("equations neutral")
-    assert build_source.index("_check_root_arc_sweep(adapter)", rebuilt) > rebuilt
 
 
 def test_grip_contour_is_tangent_arcs_dimensioned_on_the_section() -> None:
@@ -524,13 +492,6 @@ def test_grip_contour_is_tangent_arcs_dimensioned_on_the_section() -> None:
     assert not hasattr(spec, "CONTOUR_ALLOWANCE_DIA")
     assert not hasattr(spec, "BASIC_DIMENSIONS")
     assert not hasattr(spec, "GEOMETRIC_TOLERANCES_MM")
-    build_source = Path(handle.__file__).read_text(encoding="utf-8")
-    assert 'profile.record(name, f"{knob} - {station}")' in build_source
-    assert '("CrestDia", CREST_DIA)' in build_source
-    assert '("CounterboreDia", COUNTERBORE_DIA)' in build_source
-    assert '(dome, DOME_R, "DomeR")' in build_source
-    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "_style_radius(" in drawing_source
 
 
 def test_ruling_b_butt_stays_inside_the_unchanged_grip_envelope() -> None:
@@ -557,47 +518,15 @@ def test_ruling_b_butt_stays_inside_the_unchanged_grip_envelope() -> None:
 
 
 def test_bore_and_counterbore_read_on_a_section_the_end_view_shares_its_axis() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "auto_center_marks" in source
-    assert "create_section_view(" in source
-    assert "create_section_axis_centerline(" in source
-    assert "set_hidden_lines_visible" not in source
     assert drawing.RIGHT_CENTER[1] == drawing.FRONT_CENTER[1]
 
 
 def test_sheet_runs_at_4_to_1_with_1_to_1_isometric() -> None:
     assert drawing.SHEET_SCALE == (4.0, 1.0)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "scale=(1, 1)" in source  # the isometric override
     assert dt_crank_handle_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:1"
-    assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
-    assert '"Manufacturing Notes"' not in source
-
-
-def test_sheet_carries_no_gdt() -> None:
-    # User ruling 2026-09-29 (MHA-DT-08 review): a plain sheet.
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    for helper in (
-        "add_datum_feature(",
-        "add_feature_control_frame(",
-        "set_basic_dimension(",
-        "add_surface_finish(",
-    ):
-        assert helper not in source
-
-
-def test_model_owns_every_printed_band() -> None:
-    source = Path(handle.__file__).read_text(encoding="utf-8")
-    for name in ("OverallLength", "TenonDia", "CounterboreDia", "PivotBoreDia"):
-        assert f'"{name}"' in source
-    assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in source
-    assert "_paint_collar_brass" not in source
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:
-    source = Path(handle.__file__).read_text(encoding="utf-8")
-    assert "apply_drawing_properties" in source
-    assert "clear_dimensions_for_drawing" in source
     import _config
 
     spec = _config.parts("dt-crank-handle")

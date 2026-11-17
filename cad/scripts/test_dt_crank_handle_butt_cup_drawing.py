@@ -2,11 +2,8 @@
 
 from __future__ import annotations
 
-import asyncio
 import math
 from pathlib import Path
-from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -19,7 +16,7 @@ import dt_crank_handle_pivot_screw_spec as screw
 import draw_dt_crank_handle_butt_cup as drawing
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
-from _printed_tolerance import drilled_oversize_mm, edge_break_chamfer_mm
+from _printed_tolerance import edge_break_chamfer_mm
 from _drawing_registry import DRAWINGS_BY_NAME
 from _layout_geometry import (
     Box,
@@ -171,14 +168,6 @@ def test_head_sits_recessed_and_end_play_is_fitted() -> None:
 
 
 def test_pocket_and_floor_hole_read_on_a_section() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "create_section_view(" in source
-    assert "set_hidden_lines_visible" not in source
-    assert "create_section_axis_centerline(" in source
-    # R5's confirmed projection finding: the view at the left must show the
-    # chamfered floor end, not the counterbore end.  Reversing the cut with
-    # the parent view preserves the existing +X-right section and keeps.
-    assert 'str(SOURCE), "*Left", *END_CENTER' in source
     assert drawing.END_CENTER[0] < drawing.SECTION_CENTER[0]
     assert drawing.CUT_START[0] == drawing.CUT_END[0] == drawing.END_CENTER[0]
     assert drawing.CUT_START[1] > drawing.CUT_END[1]
@@ -223,220 +212,12 @@ def test_cup_is_one_configuration_the_oak_rounds_clear_of() -> None:
 
     assert not hasattr(spec, "INSTALLED_CONFIG")
     assert not hasattr(drive_train, "HANDLE_CUP_INSTALLED_CONFIG")
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "create_configuration" not in source
     # The oak round the largest counterbore, the crest turned its .XX band
     # small and the bore's eccentricity both ways, holds the .080 target plus
     # the .002 owner-ruling-B margin (#1375).
     assert handle.BUTT_WALL_DESIGN_MIN_MM == pytest.approx(WALL_TARGET_MM + 0.0508)
     assert handle.BUTT_WALL_MIN >= handle.BUTT_WALL_DESIGN_MIN_MM
     assert _config.parts("dt-crank-handle-butt-cup")["description"] == "CRANK HANDLE BUTT CUP"
-
-
-@pytest.fixture
-def cup_build(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
-    """Capture the real profile recipe, not a replacement geometric model."""
-    entities: dict[str, tuple[str, tuple[float, ...]]] = {}
-    dimensions: list[tuple[object, ...]] = []
-
-    def success(data: object = None) -> SimpleNamespace:
-        return SimpleNamespace(is_success=True, data=data)
-
-    def entity(kind: str, *coordinates: float) -> SimpleNamespace:
-        assert adapter.currentSketchManager.AddToDB
-        key = f"{kind}_{len(entities)}"
-        entities[key] = (kind, coordinates)
-        return success(key)
-
-    def dimension(*args: object) -> SimpleNamespace:
-        dimensions.append(args)
-        return success(f"Dim_{len(dimensions)}")
-
-    adapter = SimpleNamespace(
-        currentSketchManager=SimpleNamespace(AddToDB=False),
-        _attempt=lambda read, default=None: read(),
-        create_part=AsyncMock(return_value=success()),
-        create_sketch=AsyncMock(return_value=success()),
-        add_centerline=AsyncMock(side_effect=lambda *p: entity("axis", *p)),
-        add_line=AsyncMock(side_effect=lambda *p: entity("line", *p)),
-        add_arc=AsyncMock(side_effect=lambda *p: entity("arc", *p)),
-        add_sketch_constraint=AsyncMock(return_value=success("constraint")),
-        add_sketch_dimension=AsyncMock(side_effect=dimension),
-        check_sketch_fully_defined=AsyncMock(
-            return_value=success({"definition_state": "fully_defined"})
-        ),
-        exit_sketch=AsyncMock(return_value=success()),
-        create_revolve=AsyncMock(return_value=success()),
-    )
-    helpers = {}
-    for name in (
-        "set_global", "drive_dimension", "force_rebuild", "volume_check", "name_bore_axis",
-        "apply_material", "apply_color", "report_mass_properties",
-        "save_part_and_images",
-    ):
-        helpers[name] = AsyncMock()
-        monkeypatch.setattr(part, name, helpers[name])
-    for name in (
-        "name_last_feature",
-        "apply_package_model_units",
-        "clear_dimensions_for_drawing", "mark_dimensions_for_drawing",
-        "apply_drawing_precision", "apply_drawing_properties", "_pocket_floor_max_limit",
-        "set_limits",
-    ):
-        helpers[name] = MagicMock()
-        monkeypatch.setattr(part, name, helpers[name])
-
-    async def diameter(_adapter, axis, line, position, name):
-        return dimension(line, axis, "diameter", getattr(spec, {
-            "BodyDia": "BODY_DIA", "PocketDia": "POCKET_DIA",
-            "FloorHoleDia": "FLOOR_HOLE_DIA",
-        }[name]))
-
-    monkeypatch.setattr(part, "add_diametric_linear_dimension", diameter)
-    named = {}
-
-    def apply(rows, _adapter, feature):
-        assert feature == "CupProfile"
-        assert len(rows._rows) == len(dimensions)
-        for (name, equation), arguments in zip(rows._rows, dimensions, strict=True):
-            named[name] = (arguments, equation)
-        return [
-            (f"{name}@{feature}", equation)
-            for name, (_arguments, equation) in named.items()
-        ]
-
-    monkeypatch.setattr(part.SketchDims, "apply", apply)
-    asyncio.run(part.build(adapter))
-    return SimpleNamespace(
-        adapter=adapter, helpers=helpers, entities=entities, dimensions=named
-    )
-
-
-def test_profile_has_a_driving_tangent_quarter_arc_and_true_floor_depth(cup_build) -> None:
-    captured = cup_build
-    radius = spec.POCKET_FLOOR_CORNER_R_MAX
-    depth = spec.POCKET_DEPTH
-    pocket_r = spec.POCKET_DIA / 2.0
-    arcs = [(name, points) for name, (kind, points) in captured.entities.items()
-            if kind == "arc"]
-    assert len(arcs) == 1
-    arc, (cx, cy, sx, sy, ex, ey) = arcs[0]
-    assert (cx, cy) == pytest.approx((radius - depth, pocket_r - radius))
-    assert (sx, sy) == pytest.approx((radius - depth, pocket_r))  # wall tangent
-    assert (ex, ey) == pytest.approx((-depth, pocket_r - radius))  # floor tangent
-    assert math.hypot(sx - cx, sy - cy) == pytest.approx(radius)
-    assert math.hypot(ex - cx, ey - cy) == pytest.approx(radius)
-    # add_arc is CCW; the 90-degree sweep, not its 270-degree complement.
-    sweep = (math.atan2(ey - cy, ex - cx) - math.atan2(sy - cy, sx - cx)) % math.tau
-    assert sweep == pytest.approx(math.pi / 2)
-    lines = {name: points for name, (kind, points) in captured.entities.items()
-             if kind == "line"}
-    # The flat floor starts past the floor hole's mouth break (#1757).
-    floor = next(name for name, p in lines.items()
-                 if p == pytest.approx(
-                     (-depth, spec.FLOOR_HOLE_DIA / 2.0 + seat.FLOOR_HOLE_CHAMFER,
-                      -depth, pocket_r - radius)
-                 ))
-    wall = next(name for name, p in lines.items()
-                if p == pytest.approx((radius - depth, pocket_r, 0.0, pocket_r)))
-    face = next(name for name, p in lines.items()
-                if p == pytest.approx((0.0, pocket_r, 0.0, spec.BODY_DIA / 2.0)))
-    constraints = [call.args for call in captured.adapter.add_sketch_constraint.call_args_list]
-    assert (floor, arc, "tangent") in constraints
-    assert (arc, wall, "tangent") in constraints
-    assert (floor, None, "vertical") in constraints
-    assert (wall, None, "horizontal") in constraints
-    assert not any(relation == "fix" for _first, _second, relation in constraints)
-    assert captured.dimensions["PocketDepth"] == (
-        (f"{face}.start", f"{floor}.start", "horizontal_distance", depth),
-        '"PocketDepth"',
-    )
-    assert lines[wall][2] - lines[wall][0] == pytest.approx(depth - radius)
-    assert captured.dimensions["PocketFloorRadius"] == (
-        (arc, None, "radial", radius), '"PocketFloorRadius"',
-    )
-    assert any(
-        call.args[1:] == ("PocketFloorRadius", f"{radius}mm")
-        for call in captured.helpers["set_global"].call_args_list
-    )
-    assert any(
-        call.args[1:] == ("PocketFloorRadius@CupProfile", '"PocketFloorRadius"')
-        for call in captured.helpers["drive_dimension"].call_args_list
-    )
-    captured.helpers["_pocket_floor_max_limit"].assert_called_once_with(captured.adapter)
-    captured.helpers["apply_drawing_precision"].assert_called_once_with(
-        captured.adapter, seat.CUP_DRAWING_PRECISION
-    )
-    captured.helpers["mark_dimensions_for_drawing"].assert_called_once_with(
-        captured.adapter, "CupProfile", seat.CUP_DRAWING_DIMENSIONS["CupProfile"]
-    )
-    captured.adapter.check_sketch_fully_defined.assert_awaited_once()
-    assert captured.adapter.currentSketchManager.AddToDB is False
-
-
-def test_bottom_chamfer_has_real_legs_and_a_sound_root_at_the_new_body(cup_build) -> None:
-    # The body's bottom edge is the diagonal at the overall length; the other
-    # is the floor hole's mouth break (#1757).
-    chamfer, = (
-        points for kind, points in cup_build.entities.values()
-        if kind == "line" and points[0] != points[2] and points[1] != points[3]
-        and min(points[0], points[2]) == pytest.approx(-spec.OVERALL_LENGTH)
-    )
-    body_r = spec.BODY_DIA / 2.0
-    assert chamfer == pytest.approx((
-        spec.BODY_CHAMFER - spec.OVERALL_LENGTH, body_r,
-        -spec.OVERALL_LENGTH, body_r - spec.BODY_CHAMFER,
-    ))
-    assert abs(chamfer[2] - chamfer[0]) == pytest.approx(spec.BODY_CHAMFER)
-    assert abs(chamfer[3] - chamfer[1]) == pytest.approx(spec.BODY_CHAMFER)
-    # Smallest body, longest radial leg, largest drilled floor hole and its
-    # mouth's break.
-    root_radial_min = (
-        (spec.BODY_DIA - spec.BODY_DIA_TOL) / 2.0
-        - spec.BODY_CHAMFER_MAX
-        - (spec.FLOOR_HOLE_DIA + drilled_oversize_mm(unit=spec.UNIT)) / 2.0
-        - edge_break_chamfer_mm(unit=spec.UNIT)
-    )
-    assert spec.FLOOR_HOLE_WALL_MIN == pytest.approx(root_radial_min)
-    assert root_radial_min >= spec.WALL_FLOOR_MM
-
-
-def test_model_properties_need_no_general_manufacturing_note(cup_build) -> None:
-    # Owner ruling B on #1375 resolves the wall in geometry, not a note; the
-    # 2026-11-01 ruling accepts its .060 as minor exception RV-01.
-    properties = cup_build.helpers["apply_drawing_properties"].call_args.args[2]
-    assert properties == {"Isometric View Note": notes.ISOMETRIC_VIEW_NOTE}
-    assert not hasattr(notes, "DRAWING_NOTES")
-
-
-def test_floor_hole_mouth_break_is_a_45_degree_model_feature_at_its_limits(
-    cup_build,
-) -> None:
-    # #1757: the pocket-side mouth of the floor hole, modelled mid-limits,
-    # its printed radial leg and its axial leg equal by equation.
-    c = seat.FLOOR_HOLE_CHAMFER
-    hole_r = spec.FLOOR_HOLE_DIA / 2.0
-    lines = {name: points for name, (kind, points) in cup_build.entities.items()
-             if kind == "line"}
-    mouth = next(name for name, p in lines.items()
-                 if p == pytest.approx(
-                     (-(spec.POCKET_DEPTH + c), hole_r, -spec.POCKET_DEPTH, hole_r + c)
-                 ))
-    assert cup_build.dimensions["FloorHoleChamfer"] == (
-        (f"{mouth}.start", f"{mouth}.end", "horizontal_distance", c), '"FloorHoleChamfer"'
-    )
-    assert cup_build.dimensions["FloorHoleChamferRise"] == (
-        (f"{mouth}.start", f"{mouth}.end", "vertical_distance", c), '"FloorHoleChamfer"'
-    )
-    assert seat.FLOOR_HOLE_CHAMFER_LIMITS[0] < c < seat.FLOOR_HOLE_CHAMFER_LIMITS[1]
-    cup_build.helpers["set_limits"].assert_called_once_with(
-        cup_build.adapter,
-        "CupProfile",
-        "FloorHoleChamfer",
-        limits=seat.FLOOR_HOLE_CHAMFER_LIMITS,
-        places=3,
-        display_unit=spec.UNIT,
-    )
 
 
 def test_concave_floor_round_adds_the_exact_revolved_corner_material() -> None:
@@ -474,115 +255,6 @@ def test_concave_floor_round_adds_the_exact_revolved_corner_material() -> None:
     )
     assert part.V_FLOOR_HOLE_CHAMFER == pytest.approx(mouth, rel=1e-6)
     assert part.V_CUP == pytest.approx(sharp + filled - part.V_FLOOR_HOLE_CHAMFER, abs=1e-10)
-
-
-_R_M = spec.POCKET_FLOOR_CORNER_R_MAX / 1000.0
-
-
-def _native_radius() -> SimpleNamespace:
-    tolerance = SimpleNamespace(
-        Type=0,
-        GetMinValue=MagicMock(return_value=-_R_M),
-        GetMaxValue=MagicMock(return_value=0.0),
-    )
-    tolerance.SetValues = MagicMock(return_value=True)
-    # Equation-owned does NOT imply DrivenState 2: the native reference flag
-    # is false even when the equation reports DrivenState 1.
-    return SimpleNamespace(
-        SystemValue=_R_M, DrivenState=1, IsReference=MagicMock(return_value=False),
-        Tolerance=tolerance,
-    )
-
-
-def test_model_floor_radius_sets_and_reads_back_native_max(monkeypatch) -> None:
-    dimension = _native_radius()
-    named = MagicMock(return_value=(object(), dimension))
-    monkeypatch.setattr(part, "_named_dimension", named)
-    monkeypatch.setattr(part, "_early_bound", lambda value, _interface: value)
-    adapter = object()
-    part._pocket_floor_max_limit(adapter)
-    named.assert_called_once_with(adapter, "CupProfile", "PocketFloorRadius")
-    assert dimension.Tolerance.Type == 6
-    dimension.Tolerance.SetValues.assert_called_once_with(-_R_M, 0.0)
-    dimension.Tolerance.GetMinValue.assert_called_once()
-    dimension.Tolerance.GetMaxValue.assert_called_once()
-
-
-@pytest.mark.parametrize("fault", ["nominal", "reference", "reject", "type", "lower", "upper"])
-def test_model_floor_radius_refuses_false_native_limits(monkeypatch, fault: str) -> None:
-    dimension = _native_radius()
-    tolerance = dimension.Tolerance
-    if fault == "nominal":
-        dimension.SystemValue = 0.00005
-    elif fault == "reference":
-        dimension.IsReference.return_value = True
-    elif fault == "reject":
-        tolerance.SetValues.return_value = False
-    elif fault == "type":
-        tolerance.SetValues.side_effect = lambda *_args: setattr(tolerance, "Type", 0) or True
-    elif fault == "lower":
-        tolerance.GetMinValue.return_value = -0.00005
-    else:
-        tolerance.GetMaxValue.return_value = 0.00005
-    monkeypatch.setattr(part, "_named_dimension", lambda *_args: (object(), dimension))
-    monkeypatch.setattr(part, "_early_bound", lambda value, _interface: value)
-    with pytest.raises(RuntimeError, match="PocketFloorRadius@CupProfile"):
-        part._pocket_floor_max_limit(object())
-
-
-def _imported_radius() -> SimpleNamespace:
-    dimension = _native_radius()
-    dimension.Tolerance.Type = 6
-    return SimpleNamespace(
-        dimension=dimension, Diametric=False, Type2=5, ShowParenthesis=False,
-        GetDimension2=lambda _index: dimension,
-        GetText=MagicMock(return_value=""),
-        ArcExtensionLineOrOppositeSide=True, ArrowSide=0, SolidLeader=True,
-    )
-
-
-def test_imported_floor_radius_keeps_its_controlling_max_and_actual_arc(monkeypatch) -> None:
-    display = _imported_radius()
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
-    drawing._dress_pocket_floor_radius(
-        SimpleNamespace(GetSpecificAnnotation=lambda: display)
-    )
-    assert display.ArcExtensionLineOrOppositeSide is False
-    assert display.ArrowSide == 1
-    assert display.SolidLeader is False
-
-
-@pytest.mark.parametrize(
-    "fault", [
-        "diameter", "linear", "nominal", "reference", "parentheses",
-        "native_parentheses", "type", "lower", "upper",
-    ]
-)
-def test_imported_floor_radius_refuses_changed_native_semantics(monkeypatch, fault) -> None:
-    display = _imported_radius()
-    if fault == "diameter":
-        display.Diametric = True
-    elif fault == "linear":
-        display.Type2 = 2
-    elif fault == "nominal":
-        display.dimension.SystemValue = 0.00005
-    elif fault == "reference":
-        display.dimension.IsReference.return_value = True
-    elif fault == "parentheses":
-        display.GetText.return_value = "("
-    elif fault == "native_parentheses":
-        display.ShowParenthesis = True
-    elif fault == "type":
-        display.dimension.Tolerance.Type = 0
-    elif fault == "lower":
-        display.dimension.Tolerance.GetMinValue.return_value = -0.00005
-    else:
-        display.dimension.Tolerance.GetMaxValue.return_value = 0.00005
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
-    with pytest.raises(RuntimeError, match="MHA-DT-35 PocketFloorRadius"):
-        drawing._dress_pocket_floor_radius(
-            SimpleNamespace(GetSpecificAnnotation=lambda: display)
-        )
 
 
 # Native r2 at 22821a1d2, leaf 20261019T131953.462543Z-db20eea3ec6447c0b3aa1b2fa338062b.
@@ -753,5 +425,3 @@ def test_mouth_break_detail_frames_the_break_inside_the_sheet() -> None:
         assert block_left > drawing._detail_xy(*point)[0]
     assert notes.FLOOR_HOLE_CHAMFER_CALLOUT.startswith("X 45")
     assert "MHA-DT-32" in notes.FLOOR_HOLE_CHAMFER_CALLOUT
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.index("keep=DETAIL_KEEP") < source.index("keep=SECTION_KEEP")

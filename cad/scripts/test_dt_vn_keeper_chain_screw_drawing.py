@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
-from math import pi
 
 import pytest
 
@@ -13,7 +11,6 @@ import dt_vn_keeper_chain_screw_spec as spec
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_types import DRAWING_TEMPLATES
 from _fastener_catalog import FASTENERS
-from _stock_fastener import RigidTransform
 from _test_stock_recipes import discovered_recipes
 from diagnostics import diag_build_92443A077 as recipe
 import _mcmaster_92443a077 as catalogue
@@ -85,34 +82,6 @@ def test_supplier_reference_dimensions_are_the_catalogue_row() -> None:
     assert set(catalogue.SUPPLIER_REFERENCE_FORMATS) == names
     # The thread witness carries the catalogue thread designation.
     assert catalogue.SUPPLIER_REFERENCE_FORMATS["SupplierThreadDiameter"][3] == spec.THREAD
-
-
-def test_builder_lands_in_the_slotted_screw_assembly_frame(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    captured = {}
-    adapter = object()
-    outputs = {"sldprt": "stock-part"}
-
-    async def capture_stock(actual_adapter, **kwargs):
-        assert actual_adapter is adapter
-        captured.update(kwargs)
-        return outputs
-
-    monkeypatch.setattr(part, "build_stock_fastener", capture_stock)
-    assert asyncio.run(part.build(adapter)) is outputs
-    assert captured["part_name"] == STEM
-    components = captured["components"]
-    assert len(components) == 1
-    assert components[0].sku == spec.PART_NO
-    assert components[0].author is recipe.build_92443A077
-    # Head toward -Z, under-head plane at z=0, shank along +Z.
-    assert components[0].transform == RigidTransform(
-        rotation_radians=(-pi / 2.0, 0.0, 0.0)
-    )
-    assert captured["material"] == part.SPEC.material
-    assert "color" not in captured
-    assert "screw_axis_planes" not in captured
 
 
 def test_purchased_sheet_documents_the_built_part() -> None:

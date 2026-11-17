@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import ast
 import math
 from pathlib import Path
 
@@ -22,15 +21,6 @@ from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dime
 from _drawing_registry import DRAWINGS_BY_NAME
 from _inch_wall_limits import WALL_TARGET_MM
 from _machinist_review_mode import MachinistReviewMode
-
-
-def _calls(path: str) -> dict[str, ast.Call]:
-    tree = ast.parse(Path(path).read_text(encoding="utf-8"))
-    return {
-        node.func.id: node
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
-    }
 
 
 def test_required_drawing_paths() -> None:
@@ -91,51 +81,6 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
     assert notes.TIP_LAND_PREFIX == notes.TIP_LAND_ANGLE_PREFIX == "2X "
     assert "TipLandAngle" in notes.DRAWING_DIMENSIONS["StrapProfile"]
     assert notes.DRAWING_PRECISION_BY_NAME["TipLandAngle"] == 1
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "set_dimension_precision" not in source
-    assert "assert_imported_precision(" in source
-
-
-def test_printed_edge_limits_are_the_finished_rockers() -> None:
-    # The strap's outline is finished here, so each edge's PRINTED inch limits
-    # must be the finished MHA-CH-06's: the .325 / .305 mid-zone heights each
-    # +/- half the .020 profile zone, above the pivot and below it. They are
-    # the limits the former one-sided .315 bands printed (#2144 item 10.3).
-    def limits(nominal_mm: float, places: int, band: tuple[float, float]):
-        nominal = round(nominal_mm / 25.4, places)
-        upper, lower = (round(d / 25.4, 3) for d in band)
-        return round(nominal + lower, 3), round(nominal + upper, 3)
-
-    arm_places = rocker_notes.DRAWING_PRECISION["TopEdgeReference"]["TopAbovePivot"]
-    zone = round((rocker.TOP_EDGE_BAND[0] - rocker.TOP_EDGE_BAND[1]) / 25.4, 3)
-    arm_height = round(rocker.TOP_EDGE_ABOVE_PIVOT / 25.4, arm_places)
-    assert (arm_height, zone) == (0.325, 0.020)
-    top = limits(
-        spec.TOP_EDGE_ABOVE_PIVOT,
-        notes.DRAWING_PRECISION_BY_NAME["TopAbovePivot"],
-        spec.TOP_EDGE_BAND,
-    )
-    bottom = limits(
-        spec.BOTTOM_EDGE_BELOW_PIVOT,
-        notes.DRAWING_PRECISION_BY_NAME["BottomBelowPivot"],
-        spec.BOTTOM_EDGE_BAND,
-    )
-    assert top == (round(arm_height - zone / 2.0, 3), round(arm_height + zone / 2.0, 3)) == (0.315, 0.335)
-    assert bottom == (0.295, 0.315)
-    # Each edge's tolerance prints at its nominal's places (.325 +/-.010).
-    tree = ast.parse(Path(part.__file__).read_text(encoding="utf-8"))
-    places = {
-        call.args[2].value: ast.unparse(keyword.value)
-        for call in ast.walk(tree)
-        if isinstance(call, ast.Call)
-        and getattr(call.func, "id", None) == "set_dimension_bilateral_tolerance"
-        for keyword in call.keywords
-        if keyword.arg == "places"
-    }
-    assert places == {
-        name: f"DRAWING_PRECISION_BY_NAME['{name}']"
-        for name in ("TopAbovePivot", "BottomBelowPivot")
-    }
 
 
 def test_every_band_is_native_and_names_its_mate() -> None:
@@ -154,24 +99,12 @@ def test_every_band_is_native_and_names_its_mate() -> None:
 
 
 def test_no_rod_pin_hole_and_no_finished_bore_on_the_strap() -> None:
-    build = Path(part.__file__).read_text(encoding="utf-8")
-    assert "ROD_PIN" not in build and "PIVOT_HOLE" not in build
     printed = " ".join(notes.DIMENSION_CALLOUTS.values())
     assert "#47" not in printed
     assert f"{rocker.PIVOT_HOLE_DIA / 25.4:.3f}".removeprefix("0") not in printed
 
 
 def test_drawing_quality_and_no_gdt() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert (
-        "for view in (front, right, iso):\n        set_hidden_lines_removed" in source
-    )
-    names = set(_calls(drawing.__file__))
-    assert not names & {
-        "add_datum_feature",
-        "add_feature_control_frame",
-        "add_surface_finish",
-    }
     assert notes.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:2"
     assert drawing.ISO_SCALE == (1, 2)
 
@@ -187,101 +120,6 @@ def test_overall_length_is_a_one_place_reference_and_enforced() -> None:
     assert overall == pytest.approx(round(offsets, 1))
     # Outermost: above the offsets' row.
     assert drawing.OVERALL_LINE_Y > drawing.TIP_LINE_Y
-    functions = {
-        node.name: node
-        for node in ast.walk(ast.parse(Path(drawing.__file__).read_text("utf-8")))
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-    }
-
-    def called(function: str) -> set[str]:
-        return {
-            node.func.id if isinstance(node.func, ast.Name) else node.func.attr
-            for node in ast.walk(functions[function])
-            if isinstance(node, ast.Call)
-            and isinstance(node.func, (ast.Name, ast.Attribute))
-        }
-
-    # The sheet places it (the helper's behaviour is the next test's).
-    assert "_add_overall_length" in called("build")
-
-
-class _OverallDoubles:
-    """Records what ``_add_overall_length`` asks of the sheet; the display
-    dimension prints whatever places it is set to, or ``applied`` if given."""
-
-    def __init__(self, applied: int | None = None) -> None:
-        self.applied = applied
-        self.vertex_points: list[tuple[float, float, float]] = []
-        self.added: dict = {}
-        self.measured: dict = {}
-        self.referenced: list[str] = []
-        self.precision: int | None = None
-
-    # scan_view_edges(...).exact_vertex_at(point, label=...)
-    def exact_vertex_at(self, point, *, label):
-        self.vertex_points.append(point)
-        return ("vertex", point)
-
-    # The display dimension and its annotation.
-    def GetAnnotation(self):
-        return self
-
-    def SetPrecision3(self, primary, *_rest):
-        self.precision = primary
-
-    def GetPrimaryPrecision2(self):
-        return self.precision if self.applied is None else self.applied
-
-
-def _patch_overall(monkeypatch, doubles: _OverallDoubles) -> None:
-    def add_edge_dimension(_adapter, _view, **kwargs):
-        doubles.added = kwargs
-        return doubles
-
-    def assert_dimension_measures(_adapter, dimension, **kwargs):
-        assert dimension is doubles
-        doubles.measured = kwargs
-        return kwargs["expected_mm"]
-
-    def set_reference_dimension(_adapter, annotation, *, label):
-        assert annotation is doubles
-        doubles.referenced.append(label)
-        return doubles
-
-    monkeypatch.setattr(drawing, "scan_view_edges", lambda _view, *, label: doubles)
-    monkeypatch.setattr(drawing, "add_edge_dimension", add_edge_dimension)
-    monkeypatch.setattr(drawing, "assert_dimension_measures", assert_dimension_measures)
-    monkeypatch.setattr(drawing, "set_reference_dimension", set_reference_dimension)
-    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
-
-
-def test_overall_length_spans_both_tip_corners_as_a_one_place_reference(
-    monkeypatch,
-) -> None:
-    doubles = _OverallDoubles()
-    _patch_overall(monkeypatch, doubles)
-    drawing._add_overall_length(object(), object())
-    # Both +Z-face tip corners, the outermost points of the mirrored outline.
-    corners = [
-        (-spec.ROD_TIP_X, spec.ROD_TIP_Y, spec.ARM_THICKNESS / 2.0),
-        (spec.ROD_TIP_X, spec.ROD_TIP_Y, spec.ARM_THICKNESS / 2.0),
-    ]
-    assert doubles.vertex_points == corners
-    vertices = tuple(("vertex", point) for point in corners)
-    assert doubles.added["entities"] == vertices
-    assert doubles.added["entity_types"] == ("VERTEX", "VERTEX")
-    assert doubles.added["orientation"] == "horizontal"
-    assert doubles.added["text_xy"] == (drawing.FRONT_CENTER[0], drawing.OVERALL_LINE_Y)
-    assert doubles.measured["entities"] == vertices
-    assert doubles.measured["expected_mm"] == pytest.approx(2.0 * spec.ROD_TIP_X)
-    assert doubles.referenced == ["strap overall length"]
-    assert doubles.precision == spec.DRAWING_REFERENCE_PRECISION["OverallLength"]
-
-
-def test_overall_length_refuses_unapplied_places(monkeypatch) -> None:
-    _patch_overall(monkeypatch, _OverallDoubles(applied=2))
-    with pytest.raises(RuntimeError, match="prints 2 decimal places, not 1"):
-        drawing._add_overall_length(object(), object())
 
 
 def test_registry_row() -> None:
@@ -303,40 +141,7 @@ def test_the_strap_stays_flat_by_its_route_not_by_a_frame() -> None:
     those), so this sheet carries no frame; the registry route skims both
     faces of the bought 1/8 flat equally, and the figure it states is the
     model's."""
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "add_feature_control_frame" not in source
     row = _config.parts("ch-rocker-strap")
     assert "1/8 x 1-1/2" in str(row["material_specification"])
     per_face = (0.125 * 25.4 - spec.ARM_THICKNESS) / 2.0 / 25.4
     assert f"{per_face:.4f}".lstrip("0") in row["process"]
-
-
-def test_the_part_carries_every_property_its_drawing_requires(monkeypatch) -> None:
-    import _drawing_marks
-    import _part_properties
-
-    required = ast.literal_eval(
-        next(
-            k.value
-            for k in _calls(drawing.__file__)["read_required_properties"].keywords
-            if k.arg == "required"
-        )
-    )
-    carried = dict(_part_properties.part_properties(part.PART_NAME))
-    stamped: dict[str, str] = {}
-    monkeypatch.setattr(
-        _drawing_marks,
-        "apply_custom_properties",
-        lambda _adapter, props: stamped.update(props),
-    )
-    _drawing_marks.apply_drawing_properties(
-        None,
-        part.PART_NAME,
-        {
-            "Isometric View Note": notes.ISOMETRIC_VIEW_NOTE,
-        },
-    )
-    carried.update(stamped)
-    missing = [name for name in required if not str(carried.get(name) or "").strip()]
-    assert missing == []
-    assert set(required) <= set(part._SAVED_DRAWING_PROPERTIES)

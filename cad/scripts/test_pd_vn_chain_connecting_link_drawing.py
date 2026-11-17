@@ -8,7 +8,6 @@ import draw_pd_paper_drive_assembly as assembly_drawing
 import sh_vn_chain_link_spec as chain
 
 STEM = "pd-vn-chain-connecting-link"
-NAME = "pd_vn_chain_connecting_link"
 ROW = _config.parts(STEM)
 
 

@@ -65,9 +65,6 @@ def test_cross_hole_station_text_clears_its_extension_lines() -> None:
 def test_end_diameters_are_drawing_native_true_diameter_callouts() -> None:
     """The model's end dims are half-profile radii, so the print measures the
     projected big-end circle; the length and the 1:48 ratio give the small end."""
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'below="BIG END"' in source
-    assert 'below="SMALL END"' not in source
     # Custom 1:48 taper over 45 mm -> 0.9375 on diameter.
     taper_on_dia = dt_crank_pin_spec.BIG_END_DIA - dt_crank_pin_spec.SMALL_END_DIA
     assert round(taper_on_dia, 4) == round(dt_crank_pin_spec.PIN_LENGTH / 48.0, 4)
@@ -100,33 +97,20 @@ def test_the_one_note_is_flagged_on_the_taper() -> None:
         # Deburr/edge-break is a title-block note; repeating it here would duplicate it.
         assert "DEBURR" not in text
         assert "X.XX" not in text
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "        TAPER_CALLOUT,\n        text_xy=TAPER_NOTE_XY," in source
-    assert "attach_xy=TAPER_SILHOUETTE_PICK" in source
-    assert "add_note(adapter, TAPER_NOTE, *NOTES_XY)" in source
 
 
 def test_pinned_taper_carries_no_roughness_symbol() -> None:
     """Rule 6: a pinned drive fit neither runs nor slides."""
     assert dt_crank_pin_spec.SURFACE_FINISHES == ()
-    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "add_surface_finish(" not in drawing_source
-    assert "author_part_pmi" not in Path(part.__file__).read_text(encoding="utf-8")
 
 
 def test_view_scales_are_explicit() -> None:
     # Rule 9: every orthographic view is at the sheet scale, so the end view
     # is a projected view with no label and no scale caption.
     assert drawing.SHEET_SCALE == (2.0, 1.0)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("scale=(2, 1)") == 3
-    assert "End View Note" not in source
 
 
 def test_part_stamps_make_critical_properties() -> None:
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "apply_drawing_properties" in source
-    assert "clear_dimensions_for_drawing" in source
     import _config
 
     config = _config.parts("dt-crank-pin")

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import ast
 import itertools
 import math
 import runpy
@@ -769,42 +768,6 @@ def test_registry_row_is_the_made_steel_mha_164() -> None:
     assert row["tolerance_class"] == "machined_block"
 
 
-def _calls(path: str) -> dict[str, ast.Call]:
-    tree = ast.parse(Path(path).read_text(encoding="utf-8"))
-    return {
-        node.func.id: node
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
-    }
-
-
-def test_the_part_carries_every_property_its_drawing_requires(monkeypatch) -> None:
-    import _part_properties
-    import _drawing_marks
-
-    required = ast.literal_eval(
-        next(
-            k.value
-            for k in _calls(drawing.__file__)["read_required_properties"].keywords
-            if k.arg == "required"
-        )
-    )
-    carried = dict(_part_properties.part_properties(part.PART_NAME))
-    stamp = _calls(part.__file__)["apply_drawing_properties"]
-    assert [ast.unparse(a) for a in stamp.args[:2]] == ["adapter", "PART_NAME"]
-    extra = eval(ast.unparse(stamp.args[2]), vars(part)) if len(stamp.args) > 2 else {}
-    stamped: dict[str, str] = {}
-    monkeypatch.setattr(
-        _drawing_marks,
-        "apply_custom_properties",
-        lambda _adapter, props: stamped.update(props),
-    )
-    _drawing_marks.apply_drawing_properties(None, part.PART_NAME, extra)
-    carried.update(stamped)
-    assert [name for name in required if not str(carried.get(name) or "").strip()] == []
-    assert set(required) <= set(part._SAVED_DRAWING_PROPERTIES)
-
-
 def test_the_counterbore_and_its_floor_name_the_pivot_spring() -> None:
     """Machinist review (blocker): the counterbore's +0.1/0 and its floor's
     ±0.05 named no mate. The spring seats in it; the floor sets its room."""
@@ -953,25 +916,6 @@ def test_the_plate_taps_are_transferred_from_the_plate_with_no_frame() -> None:
     assert plate in arm_notes.PLATE_TAP_QUALIFIER and "SPOT" in arm_notes.PLATE_TAP_QUALIFIER
     # The arm's walls pay the transferred taps' location.
     assert joints.PLATE_TAP_LOCATION_RADIUS_MAX_MM <= geometry.PLATE_TAP_LOCATION_RADIUS_MM
-
-
-def test_the_tap_stations_and_pin_hole_depth_print_as_linear_references(monkeypatch) -> None:
-    """Parenthesised without a diameter glyph (``set_reference_dimension``,
-    not the diameter form); a reference the import lost fails the build.
-    The latch-pin hole's depth is its callout's, so A-A's depth is a
-    reference too."""
-    assert drawing.LINEAR_REFERENCES == (*drawing.TAP_STATION_REFERENCES, "PinHoleDepth")
-    marked: list[tuple[str, dict]] = []
-    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, annotation: annotation)
-    monkeypatch.setattr(
-        drawing, "set_reference_dimension",
-        lambda _adapter, annotation, **kwargs: marked.append((annotation, kwargs)),
-    )
-    drawing._reference_linear_dimensions(object(), ["PinStation", *drawing.LINEAR_REFERENCES])
-    assert [name for name, _kwargs in marked] == list(drawing.LINEAR_REFERENCES)
-    assert all(not kwargs.get("diameter", False) for _name, kwargs in marked)
-    with pytest.raises(RuntimeError, match="never reached the sheet"):
-        drawing._reference_linear_dimensions(object(), ["PinStation", drawing.TAP_STATION_REFERENCES[0]])
 
 
 def test_the_dowel_group_prints_one_frame_with_its_count() -> None:

@@ -1,7 +1,6 @@
 """Test-only: run a real PD ``build`` offline with its seat helpers stubbed.
 
-The general form of ``_stubbed_build`` in ``test_dt_cone_gear_shaft_drawing``:
-every helper a module imports from a seat-touching module, its own coroutines
+Every helper a module imports from a seat-touching module, its own coroutines
 and COM-first functions, and a pure module's coroutines and adapter-first
 functions are replaced by recording mocks attached to one parent, so
 ``seat.mock_calls`` is the build's seat traffic in order.  Pure modules

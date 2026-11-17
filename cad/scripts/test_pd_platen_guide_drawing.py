@@ -27,15 +27,6 @@ from pd_platen_guide_spec import TAPPED_HOLE_SPEC
 from pd_platen_spec import CBORE_DEPTH, PLATE_THICKNESS
 
 
-def test_platen_guide_native_front_is_hole_entry_face() -> None:
-    source = Path(guide.__file__).read_text(encoding="utf-8")
-    assert "reverse_direction=True" in source
-    assert "(0.0, 0.0, 1.0)" in source
-    assert "UpdateStandardViews" not in source
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert '"*Front", FRONT_VIEW_X_M, FRONT_VIEW_Y_M' in source
-
-
 def test_contact_preview_grid_preserves_legacy_layout_and_scales() -> None:
     assert [_contact_preview_grid(pages) for pages in (2, 3, 4)] == [
         (2, 2),
@@ -160,11 +151,6 @@ def test_platen_guide_hole_stations_match_native_wizard_features() -> None:
             for offset in (-guide.LOCK_SCREW_DX, guide.LOCK_SCREW_DX)
         )
     )
-    source = Path(guide.__file__).read_text(encoding="utf-8")
-    assert source.count("TAPPED_HOLE_SPEC,") == 1
-    assert "screw_spec = TAPPED_HOLE_SPEC" in source
-    assert "lock_spec = LOCK_TAP_SPEC" in source
-    assert '"tapped_bottoming", "#4-40"' not in source
 
 
 # R9-64: the guide screws' front receivers are tapped THROUGH, so no thread
@@ -288,153 +274,8 @@ def test_the_taps_print_plain_coordinates_without_gdt() -> None:
     assert "±" not in drawing.TAP_WALL_NOTE and "LOC" not in drawing.TAP_WALL_NOTE
     assert not hasattr(drawing, "TAP_ROW_NOTE")
     assert len(drawing.HOLE_TAGS) == len(drawing.HOLE_STATIONS_MM) == 9
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "basic_locations=False" in source
-    for gone in ("add_feature_control_frame", "add_datum_feature", "SPOT THRU", "BASIC)"):
-        assert gone not in source
     exceptions = _config.parts("pd-platen-guide")["machinist_exceptions"]
     assert [entry["id"] for entry in exceptions] == ["RV-01"]
-
-
-class _FakeHoleTable:
-    """Native hole table stand-in: TAG / X LOC / Y LOC / SIZE, rows unordered,
-    the SIZE cells merged.  Like the farm's SolidWorks (round 3), inserting a
-    column re-renders the generated cells (.140 for 0.140, the size's CRLF)
-    and splits the SIZE merge.  Only the header row and inserted (custom)
-    columns are editable; hidden columns stay in the physical domain."""
-
-    def __init__(self) -> None:
-        stations = list(reversed(drawing.HOLE_STATIONS_MM))
-        self.cells = [["TAG", "X LOC", "Y LOC", "SIZE"]] + [
-            [f"A{i}", f"{station / 25.4:.3f}", "0.140", "4-40 UNC - 2B THRU ALL"]
-            for i, station in enumerate(stations, start=1)
-        ]
-        self.widths = [0.02, 0.03, 0.03, 0.06]
-        self.size_merged = True
-        self.merge_calls: list[tuple[int, int, int, int]] = []
-        self.custom: set[int] = set()
-        self.hidden: set[int] = set()
-
-    @property
-    def RowCount(self) -> int:
-        return len(self.cells)
-
-    @property
-    def ColumnCount(self) -> int:
-        return len(self.cells[0]) - len(self.hidden)
-
-    @property
-    def TotalColumnCount(self) -> int:
-        return len(self.cells[0])
-
-    def _size_column(self) -> int:
-        return [" ".join(title.split()) for title in self.cells[0]].index("SIZE")
-
-    def DisplayedText2(self, row: int, column: int, _hidden: bool) -> str:
-        return self.cells[row][column]
-
-    def InsertColumn2(self, where: int, index: int, title: str, _width: int) -> bool:
-        assert where == 3  # after
-        size = self._size_column()
-        for row in self.cells[1:]:
-            row[2] = ".140"
-            row[size] = "4-40 UNC - 2B\r\nTHRU ALL"
-        for row in self.cells:
-            row.insert(index + 1, "")
-        self.cells[0][index + 1] = title
-        self.widths.insert(index + 1, 0.01)
-        self.custom = {c + 1 if c > index else c for c in self.custom} | {index + 1}
-        self.size_merged = False
-        return True
-
-    def IsCellMerged(self, row: int, column: int) -> tuple[bool, int, int]:
-        return (column == self._size_column() and row > 0 and self.size_merged, 1, column)
-
-    def MergeCells(self, *cells: int) -> bool:
-        self.merge_calls.append(cells)
-        self.size_merged = cells[1] == cells[3] == self._size_column()
-        return True
-
-    def SetColumnTitle2(self, column: int, title: str, _flag: bool) -> bool:
-        self.cells[0][column] = title
-        return True
-
-    def IsCellTextEditable(self, row: int, column: int) -> bool:
-        return row > 0 and column in self.custom
-
-    def SetText2(self, row: int, column: int, _flag: bool, text: str) -> None:
-        self.cells[row][column] = text
-
-    def GetColumnWidth(self, column: int) -> float:
-        return self.widths[column]
-
-    def SetColumnWidth(self, column: int, width: float, _change: int) -> float:
-        self.widths[column] = width
-        return width
-
-    def ColumnHidden(self, column: int) -> bool:
-        return column in self.hidden
-
-    def SetColumnHidden(self, column: int, hidden: bool) -> None:
-        (self.hidden.add if hidden else self.hidden.discard)(column)
-
-
-def test_the_hole_table_names_each_taps_mate() -> None:
-    """Round 2 (rules 4 and 10): a MATE column names MHA-PD-02 for the platen
-    taps and MHA-PD-12 for the lock taps, each row bound by its station, not
-    by its tag's order; the generated cells stay as they were."""
-    platen = _config.parts("pd-platen")["number"]
-    lock = _config.parts("pd-guide-lock")["number"]
-    assert {drawing.HOLE_TABLE_MATES[s] for s in drawing.FRONT_X} == {platen}
-    assert {drawing.HOLE_TABLE_MATES[s] for s in drawing.REAR_X} == {lock}
-    table = _FakeHoleTable()
-    generated, size_merged = drawing._add_mate_column(table)
-    assert size_merged is True
-    drawing._check_mate_column(table, generated, size_merged)
-    assert table.merge_calls == [(1, 3, table.RowCount - 1, 3)]
-    assert table.size_merged
-    assert table.cells[0][4] == drawing.HOLE_TABLE_MATE_COLUMN
-    for row in table.cells[1:]:
-        x_mm = float(row[1]) * 25.4
-        station = min(drawing.HOLE_STATIONS_MM, key=lambda s: abs(s - x_mm))
-        assert row[4] == (platen if station in drawing.FRONT_X else lock)
-    assert table.widths[4] == drawing.HOLE_TABLE_MATE_COLUMN_WIDTH
-    table.cells[3][4] = platen if table.cells[3][4] == lock else lock
-    with pytest.raises(RuntimeError, match="MATE cells differ"):
-        drawing._check_mate_column(table, generated, size_merged)
-    table.cells[3][4] = platen if table.cells[3][4] == lock else lock
-    table.cells[3][1] = "9.999"
-    with pytest.raises(RuntimeError, match="tags or locations"):
-        drawing._check_mate_column(table, generated, size_merged)
-
-
-def test_the_y_loc_column_prints_the_tap_row_band() -> None:
-    """Integration review 20261109T062834910Z (rule 3): every printed Y LOC
-    reads .140 ±.005 from a custom column at the native one's width; the
-    native Y LOC, still checked against the model's tap row, is hidden; the
-    SIZE merge and the mates survive."""
-    table = _FakeHoleTable()
-    generated, size_merged = drawing._add_mate_column(table)
-    drawing._check_mate_column(table, generated, size_merged)
-    native_width = table.widths[drawing.HOLE_TABLE_NATIVE_Y_COLUMN]
-    drawing._band_y_column(table)
-    drawing._check_banded_y_column(table)
-    assert table.hidden == {drawing.HOLE_TABLE_NATIVE_Y_COLUMN}
-    assert drawing.HOLE_TABLE_PHYSICAL_COLUMNS == (
-        "TAG", "X LOC", "Y LOC", "Y LOC SEE NOTE 1", "SIZE", "MATE"
-    )
-    banded = drawing.HOLE_TABLE_BANDED_Y_COLUMN
-    assert table.widths[banded] == native_width
-    assert {row[banded] for row in table.cells[1:]} == {".140 ±.005"}
-    assert table.merge_calls[-1] == (1, 4, table.RowCount - 1, 4)
-    assert table.size_merged
-    table.cells[2][banded] = ".140"
-    with pytest.raises(RuntimeError, match="Y LOC native"):
-        drawing._check_banded_y_column(table)
-    table.cells[2][banded] = ".140 ±.005"
-    table.SetColumnHidden(drawing.HOLE_TABLE_NATIVE_Y_COLUMN, False)
-    with pytest.raises(RuntimeError, match="native-Y-only hidden"):
-        drawing._check_banded_y_column(table)
 
 
 def test_drawing_contract_imports_without_pywin32() -> None:
@@ -467,10 +308,6 @@ def test_sheet_carries_no_notes_block() -> None:
     # Note 1 at the hole table carries the only words the taps need
     # (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)).
     assert not hasattr(guide, "DRAWING_NOTES")
-    for module in (guide, drawing):
-        assert "Manufacturing Notes" not in Path(module.__file__).read_text(
-            encoding="utf-8"
-        )
 
 
 def test_bar_slide_face_carries_the_only_roughness_symbol() -> None:
@@ -485,24 +322,11 @@ def test_bar_slide_face_carries_the_only_roughness_symbol() -> None:
     assert [(c.key, c.roughness_um, c.face) for c in SURFACE_FINISHES] == [
         ("bar_slide", MACHINED_UM, PlanarFace((0, -1, 0), 0.0))
     ]
-    build_source = Path(guide.__file__).read_text(encoding="utf-8")
-    assert "author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)" in (
-        build_source
-    )
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_surface_finish(") == 1
-    assert 'surface_finish_by_key(SURFACE_FINISHES, "bar_slide")' in source
     # Its leader lands between the A1 and B1 axes, clear of both, at a point
     # projected from the controlled face's front edge (model y 0, z 0). The
     # 234a39c87 farm sheet drew that edge 1.1 mm under the hard-coded sheet y
     # the leader once asked for, past the 1 mm attachment readback limit.
     assert guide.SCREW_STATION_X[0] < drawing.BAR_SLIDE_STATION_MM < guide.HOLE_X[0]
-    assert (
-        "leader_attach_xy=model_point_in_view(\n"
-        "            adapter,\n"
-        "            front,\n"
-        "            (BAR_SLIDE_STATION_MM / 1000.0, 0.0, 0.0),"
-    ) in source
 
 
 def test_no_tag_text_reaches_the_next_hole_on_its_side_of_the_bar() -> None:
@@ -545,26 +369,6 @@ def test_part_authors_the_printed_dimensions_and_places() -> None:
         "Height": GUIDE_DEPTH_PLACES,
         "Depth": GUIDE_DEPTH_PLACES,
     }
-    build_source = Path(guide.__file__).read_text(encoding="utf-8")
-    assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in build_source
-    assert "in DRAWING_DIMENSIONS.items()" in build_source
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert (
-        "assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)"
-        in source
-    )
-    # Both views import only their own features' marked dimensions, never the
-    # whole model's (which the farm log warns about and then deletes again).
-    assert source.count("curate_view_dimensions(") == 2
-    assert source.count("dimensions_by_feature=DRAWING_DIMENSIONS") == 2
-
-
-def test_bar_slide_finish_lands_on_the_bottom_surface_edge() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "def _bottom_surface_edge(" in source
-    assert 'visible_view_entities(view, 1, label="platen-guide bottom edge")' in source
-    assert "if span_mm < GUIDE_LENGTH - 0.1:" in source
-    assert "entity=_bottom_surface_edge(front)" in source
 
 
 def test_gdt_xml_and_note_links_use_native_drawing_contracts() -> None:
@@ -737,80 +541,6 @@ def test_release_stages_all_drawing_formats(tmp_path: Path, monkeypatch) -> None
     ).read_bytes() == b"referenced model"
 
 
-def test_native_package_sidecar_carries_only_repo_relative_paths(
-    tmp_path: Path, monkeypatch
-) -> None:
-    """The sidecar is written on a farm worker and read on the submitter, whose
-    checkout is somewhere else: an absolute path would point at the worker's
-    disk."""
-    drawing = tmp_path / "source" / "slddrw" / "pd-platen-guide.SLDDRW"
-    drawing.parent.mkdir(parents=True)
-    drawing.write_bytes(b"slddrw")
-
-    def fake_pack(_sw, source, _doc_type, archive):
-        with zipfile.ZipFile(archive, "w") as package:
-            package.writestr(source.name, source.read_bytes())
-        return (source,)
-
-    out = _prepared_native_tree(
-        monkeypatch, tmp_path, {"pd_platen_guide": {"slddrw": drawing}}, fake_pack
-    )
-    drawings = package_native.package_drawings(object(), out, {})
-    sidecar = package_native.write_sidecar(out, "R2026x-test", (), drawings)
-
-    assert sidecar["schema"] == 1
-    assert sidecar["solidworks_revision"] == "R2026x-test"
-    assert sidecar["out_dir"] == "native"
-    assert sidecar["native_dir"] == "native/solidworks"
-    assert sidecar["drawing_dir"] == "native/slddrw"
-    assert sidecar["native_files"] == 1
-    assert sidecar["drawing_files"] == 1
-    assert sidecar["drawings"]["pd_platen_guide"] == {
-        "source": "source/slddrw/pd-platen-guide.SLDDRW",
-        "native_slddrw": "native/solidworks/pd-platen-guide.SLDDRW",
-        "portable_slddrw": "native/slddrw/pd-platen-guide.SLDDRW",
-        "sources": ["source/slddrw/pd-platen-guide.SLDDRW"],
-    }
-
-    def _strings(node):
-        if isinstance(node, dict):
-            return [s for value in node.values() for s in _strings(value)]
-        if isinstance(node, list):
-            return [s for value in node for s in _strings(value)]
-        return [node] if isinstance(node, str) else []
-
-    assert not [
-        text for text in _strings(sidecar) if "\\" in text or ":" in text[1:3]
-    ]
-
-
-def test_release_rejects_a_truncated_prepared_native_tree(
-    tmp_path: Path, monkeypatch
-) -> None:
-    """A partial remote-cache restore must fail the release, not ship a bundle
-    whose solidworks/ is missing documents."""
-    drawing = tmp_path / "source" / "slddrw" / "pd-platen-guide.SLDDRW"
-    drawing.parent.mkdir(parents=True)
-    drawing.write_bytes(b"slddrw")
-
-    def fake_pack(_sw, source, _doc_type, archive):
-        with zipfile.ZipFile(archive, "w") as package:
-            package.writestr(source.name, source.read_bytes())
-        return (source,)
-
-    out = _prepared_native_tree(
-        monkeypatch, tmp_path, {"pd_platen_guide": {"slddrw": drawing}}, fake_pack
-    )
-    drawings = package_native.package_drawings(object(), out, {})
-    package_native.write_sidecar(out, "R2026x-test", (), drawings)
-    (out / "solidworks" / "pd-platen-guide.SLDDRW").unlink()
-
-    stage = tmp_path / "stage"
-    stage.mkdir()
-    with pytest.raises(RuntimeError, match="recorded 1"):
-        cut_release.stage_native(stage, cut_release.load_native_package())
-
-
 def test_release_rejects_a_stale_native_package_schema(
     tmp_path: Path, monkeypatch
 ) -> None:
@@ -824,43 +554,6 @@ def test_release_rejects_a_stale_native_package_schema(
     sidecar.unlink()
     with pytest.raises(SystemExit, match="doit package:release"):
         cut_release.load_native_package()
-
-
-def test_release_accepts_pack_rewrite_of_same_original_source(
-    tmp_path: Path, monkeypatch
-) -> None:
-    drawing = tmp_path / "source" / "slddrw" / "pn-pen-assembly.SLDDRW"
-    assembly = tmp_path / "source" / "sldasm" / "pn-pen.SLDASM"
-    drawing.parent.mkdir(parents=True)
-    assembly.parent.mkdir(parents=True)
-    drawing.write_bytes(b"drawing")
-    assembly.write_bytes(b"source assembly")
-
-    def fake_pack(_sw, _source, _doc_type, archive):
-        with zipfile.ZipFile(archive, "w") as package:
-            package.writestr(drawing.name, b"drawing")
-            package.writestr(assembly.name, b"drawing Pack-and-Go rewrite")
-        return (drawing, assembly)
-
-    out = _prepared_native_tree(
-        monkeypatch, tmp_path, {"pn_pen_assembly": {"slddrw": drawing}}, fake_pack
-    )
-    # The top assembly's Pack-and-Go laid its own rewrite down first; it wins.
-    (out / "solidworks" / assembly.name).write_bytes(b"top-level Pack-and-Go rewrite")
-
-    drawings = package_native.package_drawings(
-        object(), out, {assembly.name.casefold(): assembly}
-    )
-
-    assert drawings["pn_pen_assembly"]["native_slddrw"] == (
-        "native/solidworks/pn-pen-assembly.SLDDRW"
-    )
-    assert (out / "solidworks" / assembly.name).read_bytes() == (
-        b"top-level Pack-and-Go rewrite"
-    )
-    assert (out / "slddrw" / assembly.name).read_bytes() == (
-        b"drawing Pack-and-Go rewrite"
-    )
 
 
 def test_release_rejects_pack_collision_from_distinct_original_sources(

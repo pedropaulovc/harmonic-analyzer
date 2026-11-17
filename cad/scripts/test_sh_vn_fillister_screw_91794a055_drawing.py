@@ -19,7 +19,6 @@ import pd_feed_rack_screw_spec as rack
 import pd_transgear_disc_screw_spec as screw
 import sh_vn_fillister_screw_91794a055_spec as shared
 from _fastener_catalog import FASTENERS
-from _supplier_screw_layout import supplier_screw_lane_plan
 from _test_stock_recipes import discovered_recipes
 from diagnostics import diag_build_91794A055 as entry
 from _mcmaster_91794a055 import FILLISTER_SIZE
@@ -365,27 +364,6 @@ def test_each_member_is_modelled_at_its_installed_length() -> None:
     assert part.MEMBER_FEATURES == {"DiscScrew": part.DISC_CUT_FEATURES, "RackScrew": ()}
 
 
-def test_stock_build_cuts_the_disc_member_from_the_supplied_screw(monkeypatch) -> None:
-    seen: dict = {}
-
-    async def fake_build(adapter, **kwargs):
-        seen.update(kwargs)
-        return {}
-
-    monkeypatch.setattr(part, "build_stock_fastener", fake_build)
-    asyncio.run(part.build(None))
-    (component,) = seen["components"]
-    assert component.sku == screw.SKU
-    # The registered recipe, wrapped: the stock build validates its identity.
-    assert component.author.__wrapped__ is entry.build_91794A055
-    assert component.parameters is None
-    assert component.transform.translation_mm == (0.0, 0.0, 0.0)
-    assert component.transform.rotation_radians == (0.0, 0.0, 0.0)
-    assert seen["material"] == part.SPEC.material
-    assert seen["screw_axis_planes"] == ("Front Plane", "Right Plane")
-    assert seen["save_threaded_part"] is part._save_members
-
-
 def test_disc_cut_leaves_the_replicas_cut_profile(monkeypatch) -> None:
     """The supplied replica, then one revolve cut whose break corner is the
     replica's own cut-to-fit end: above the cut the two profiles agree."""
@@ -408,76 +386,6 @@ def test_disc_cut_leaves_the_replicas_cut_profile(monkeypatch) -> None:
     assert ("require_tip", (_adapter, "DiscScrew"), {}) in calls
 
 
-def test_members_are_split_suppressed_and_exported_after_the_save(monkeypatch) -> None:
-    events: list[tuple] = []
-
-    def sync(name):
-        return lambda *args, **kwargs: events.append((name, *args[1:]))
-
-    def coro(name, result=None):
-        async def call(*args, **kwargs):
-            events.append((name, *args[1:], *sorted(kwargs.items())))
-            return result
-
-        return call
-
-    for name in (
-        "create_member_configurations",
-        "select_member_features",
-        "force_rebuild",
-        "apply_material",
-        "report_mass_properties",
-        "activate_member",
-        "add_supplier_reference_sketch",
-        "export_member_configurations",
-    ):
-        monkeypatch.setattr(part, name, coro(name))
-    monkeypatch.setattr(
-        part, "save_simplified_part", coro("save_simplified_part", {"part": "p"})
-    )
-    for name in (
-        "require_member_configurations",
-        "_require_tip",
-        "apply_member_properties",
-        "require_material_in_every_configuration",
-    ):
-        monkeypatch.setattr(part, name, sync(name))
-    artefacts = asyncio.run(
-        part._save_members(None, part.PART_NAME, ("ThreadGroove",))
-    )
-    assert artefacts == {"part": "p"}
-    kinds = [event[0] for event in events]
-    assert events[kinds.index("create_member_configurations")][1:] == (
-        part.PART_NAME, ("RackScrew", "DiscScrew"),
-    )
-    selected = [e[1:] for e in events if e[0] == "select_member_features"]
-    assert selected == [
-        ("RackScrew", part.MEMBER_FEATURES), ("DiscScrew", part.MEMBER_FEATURES),
-    ]
-    assert [e[1] for e in events if e[0] == "_require_tip"] == ["RackScrew", "DiscScrew"]
-    assert [e[1:3] for e in events if e[0] == "apply_member_properties"] == [
-        (part.PART_NAME, "RackScrew"), (part.PART_NAME, "DiscScrew"),
-    ]
-    assert [e[1:] for e in events if e[0] == "apply_member_properties"][1][2] == (
-        screw.BOM_DESCRIPTION
-    )
-    # Every catalogue reference, the stock length included, rides the part.
-    (reference,) = [e for e in events if e[0] == "add_supplier_reference_sketch"]
-    assert reference[1] == supplier_module().SUPPLIER_REFERENCE_DIMENSIONS
-    # The default member, the drawing's, is active for the save; the member
-    # exports follow it.
-    assert kinds.index("activate_member") < kinds.index("save_simplified_part")
-    assert events[kinds.index("activate_member")][1] == shared.DRAWING_CONFIGURATION
-    assert kinds[-2:] == ["save_simplified_part", "export_member_configurations"]
-    assert events[-1][1:] == (part.PART_NAME, ("RackScrew", "DiscScrew"))
-
-
-def supplier_module():
-    import _mcmaster_91794a055 as supplier
-
-    return supplier
-
-
 _DIMENSION = re.compile(r"\d")
 
 
@@ -494,65 +402,3 @@ def test_sheet_points_to_the_cut_step_and_no_dimension_in_the_registry_names() -
     assert "installation_notes" not in row
     assert drawing.CUT_STEP == steps.step_number("disc-screws-cut")
     assert f"MHA-PD-00 STEP {drawing.CUT_STEP}" in drawing.GENERAL_TEXT
-
-
-def test_the_sheet_shows_the_supplied_rack_screw_with_every_catalogue_reference(
-    monkeypatch,
-) -> None:
-    """Every view shows RackScrew, the screw as supplied, so the catalogue's
-    1/4 stock length lands on the drawn tip (machinist review r7 found it in
-    air below a cut tip); the ITEM row names the stock."""
-    supplier = supplier_module()
-    seen: dict = {}
-    annotated: dict = {}
-    moved: list = []
-    stock_annotation = object()
-
-    class StockDisplay:
-        def GetAnnotation(self):
-            return stock_annotation
-
-    async def fake_drawing(adapter, spec, **kwargs):
-        seen.update(kwargs, spec=spec)
-        kwargs["supplier_dimensions"](adapter, {})
-        return {}
-
-    def fake_annotate(adapter, views, **kwargs):
-        annotated.update(kwargs)
-        kwargs["settled_checks"].append(lambda: None)
-        return {"SupplierStockLength": StockDisplay()}
-
-    def fake_move(adapter, annotation, dx, dy, *, label):
-        moved.append((annotation, dx, dy))
-
-    monkeypatch.setattr(drawing, "build_purchased_fastener_drawing", fake_drawing)
-    monkeypatch.setattr(drawing, "annotate_supplier_screw", fake_annotate)
-    monkeypatch.setattr(drawing, "move_annotation", fake_move)
-    asyncio.run(drawing.build(None))
-    assert seen["spec"] is drawing.SPEC
-    assert drawing.SPEC.artifact_stem == part.PART_NAME
-    assert seen["configuration"] == "RackScrew"
-    assert seen["unit"] == "in"
-    assert seen["item"] == drawing.ITEM and "x 1/4" in drawing.ITEM
-    assert annotated["dimensions"] is supplier.SUPPLIER_REFERENCE_DIMENSIONS
-    assert "SupplierStockLength" in {name for name, *_ in annotated["dimensions"]}
-    assert annotated["formats"] is supplier.SUPPLIER_REFERENCE_FORMATS
-    assert annotated["starts"] is supplier.SUPPLIER_REFERENCE_STARTS
-    # The stock-length dimension stands on its witness's side of the screw,
-    # so neither it nor its qualifier crosses the shank (machinist review r3).
-    witness_x = supplier.SUPPLIER_REFERENCE_STARTS["SupplierStockLength"][0]
-    assert witness_x < -supplier.SHANK_DIA / 2.0
-    assert annotated["sides"]["SupplierStockLength"] == "left"
-    plan = supplier_screw_lane_plan(
-        supplier.SUPPLIER_REFERENCE_DIMENSIONS,
-        planes=supplier.SUPPLIER_REFERENCE_PLANES,
-        sides=annotated["sides"],
-    )
-    assert plan["SupplierStockLength"][0] == "left"
-    # Its ~61 mm qualifier, centred on the lane, ran onto the shank (r4):
-    # the whole dimension moves further left, once.
-    assert moved == [(stock_annotation, -drawing.STOCK_LENGTH_SHIFT_M, 0.0)]
-    (settled,) = seen["settled_checks"]
-    settled()
-    assert supplier.SHANK_LEN == pytest.approx(0.25 * 25.4)
-

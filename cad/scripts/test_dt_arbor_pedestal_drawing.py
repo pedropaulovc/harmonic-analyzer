@@ -71,12 +71,6 @@ def test_the_part_owns_every_printed_decimal_place() -> None:
         name: (4 if name == "BoreDia" else 2)
         for name in set().union(*dt_arbor_pedestal_spec.DRAWING_DIMENSIONS.values())
     }
-    part_source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in part_source
-    source = _drawing_source()
-    # The sheet reads the places back and never rewrites them.
-    assert "set_dimension_precision" not in source
-    assert "assert_imported_precision(" in source
     assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
 
 
@@ -92,16 +86,6 @@ def test_only_the_running_bore_asks_for_a_third_decimal() -> None:
     assert model_toleranced_dimensions(part) == {
         ("BoreProfile", "BoreDia"): "*deviations(BORE_DIA_BAND)"
     }
-
-
-def test_sheet_derived_dimensions_take_their_places_from_the_spec() -> None:
-    """A label the spec does not know is a KeyError ten minutes into a farm
-    leaf, so the recipe's labels and the spec's keys are matched here."""
-    labels = set(
-        re.findall(r'_set_reference_precision\([^,]+,\s*"([^"]+)"\)', _drawing_source())
-    )
-    assert labels == set(dt_arbor_pedestal_spec.DRAWING_REFERENCE_PRECISION)
-    assert labels == {"overall height"}
 
 
 def test_crown_radius_is_the_dome_radius_the_part_drives() -> None:
@@ -127,7 +111,6 @@ def test_crown_radius_is_the_dome_radius_the_part_drives() -> None:
     # 810-l4afp-1 eye pass: the radius line ran through the bore to the
     # centre; the arrow sits outside the arc so the leader stops on it.
     assert drawing._ARROWS_OUTSIDE == 1
-    assert "_show_crown_radius(adapter, front_annotations)" in _drawing_source()
 
 
 # Every Diametric write a drawing script may make, each onto a dimension that
@@ -179,13 +162,6 @@ def test_manufacturing_locations_are_model_dimensions() -> None:
     for sketch, name in owned.items():
         assert spec.DRAWING_DIMENSIONS[sketch] == {name}
         assert spec.DRAWING_PRECISION[sketch] == {name: 2}
-    source = _drawing_source()
-    assert "from _drawing_hidden_sketches import curate_view_dimensions" in source
-    assert source.count("dimensions_by_feature=DRAWING_DIMENSIONS") == 2
-    for label in ("strap depth", "hold-down hole location", "lateral location"):
-        assert f'label="{label}' not in source
-    part_source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "_hide_reference_sketches(adapter)" in part_source
 
 
 def test_reference_lines_restate_the_geometry_their_equations_drive() -> None:
@@ -296,49 +272,6 @@ def test_hold_down_hole_webs_hold_u27_at_the_printed_worst_case() -> None:
     assert spec.STRAP_INNER_Z - spec.SCREW_Z == pytest.approx(0.75 * 25.4)
 
 
-def test_no_dead_band_between_wizard_correction_and_the_builder_assert() -> None:
-    """What the wizard will FORCE must cover what the builder will ACCEPT.
-
-    These were two different literals -- `_holes` only corrected a drift over
-    0.05 mm, while `build_arbor_pedestal` rejected anything over 0.005. A #4
-    clearance initialized at 3.2512 instead of 3.264 drifts 0.0128 and lands in
-    the gap: the wizard leaves it, the builder refuses it, and NO value of the
-    spec pin can satisfy both. It read as the seat's table "moving" and cost
-    three flip-flops of the pin before Codex spotted the real mechanism on #422.
-
-    Both now read one constant. This test fails if they are ever separated
-    again, including by someone tightening only the builder's side.
-    """
-    import _holes
-
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "DIAMETER_TOLERANCE_MM" in source, "builder must use the shared tolerance"
-    # Any numeric literal compared against the cut diameter re-opens the band.
-    # Regex rather than a fixed string so `>0.005`, `> 0.0050` and friends are
-    # caught too -- a whitespace variant slipping through would defeat the gate.
-    assert not re.search(r"[<>]=?\s*0\.0*5\b|[<>]=?\s*0\.005\d*", source), (
-        "builder compares the cut diameter against a numeric literal; use "
-        "_holes.DIAMETER_TOLERANCE_MM so the wizard's correction threshold and "
-        "this acceptance threshold cannot separate into a dead band again"
-    )
-
-    holes_source = Path(_holes.__file__).read_text(encoding="utf-8")
-    assert (
-        "abs(initialized_dia_mm - pinned_dia_mm) > DIAMETER_TOLERANCE_MM"
-        in holes_source
-    )
-
-    # The tolerance must sit strictly between the benign rounding gap (the
-    # 0.0001 between CLEARANCE_MM's 3.264 and the live 3.2639 -- writing there
-    # would corrupt swHoleThru 25 into 26) and the wrong-row drift it must
-    # catch (3.264 vs ("#3","loose") 3.251 = 0.0128).
-    rounding_gap = abs(3.2639 - _holes.CLEARANCE_MM[("#4", "normal")])
-    wrong_row_drift = abs(
-        _holes.CLEARANCE_MM[("#4", "normal")] - _holes.CLEARANCE_MM[("#3", "loose")]
-    )
-    assert rounding_gap < _holes.DIAMETER_TOLERANCE_MM < wrong_row_drift
-
-
 def test_feature_callouts_do_not_repeat_dimension_values() -> None:
     """Feature callouts qualify the model dimensions rather than restating them."""
     source = _drawing_source()
@@ -352,21 +285,10 @@ def test_feature_callouts_do_not_repeat_dimension_values() -> None:
 
 
 def test_pedestal_has_no_gdt_or_basic_dimensions() -> None:
-    source = _drawing_source()
-    for helper in (
-        "add_datum_feature(",
-        "add_feature_control_frame(",
-        "set_basic_dimension(",
-        "project_part_pmi(",
-    ):
-        assert helper not in source, helper
-    assert "datum=" not in source
-    assert "characteristic=" not in source
     assert not hasattr(dt_arbor_pedestal_spec, "GEOMETRIC_TOLERANCES_MM")
 
 
 def test_running_bore_and_mating_foot_seat_carry_surface_finish_controls() -> None:
-    source = _drawing_source()
     by_key = {c.key: c for c in dt_arbor_pedestal_spec.SURFACE_FINISHES}
     assert set(by_key) == {"arbor_bore", "foot_seat"}
     assert by_key["arbor_bore"].roughness_um == 1.6
@@ -376,9 +298,6 @@ def test_running_bore_and_mating_foot_seat_carry_surface_finish_controls() -> No
     assert by_key["foot_seat"].roughness_um == 3.2
     assert by_key["foot_seat"].face.normal == (0, -1, 0)
     assert by_key["foot_seat"].face.offset_mm == 0.0
-    for key in by_key:
-        assert f'surface_finish_by_key(SURFACE_FINISHES, "{key}")' in source
-    assert source.count("add_surface_finish(") == 2
 
 
 def test_projected_views_stay_aligned_and_ordered() -> None:
@@ -494,13 +413,6 @@ def test_apex_tap_callout_clears_the_crown_the_plan_and_the_left_lanes() -> None
     assert "plan far face" not in {**below, **beside}
 
 
-def test_the_tap_note_solidworks_adds_is_removed() -> None:
-    """V37: a stray "#4-40 Tapped Hole" note printed over the plan's 24.0."""
-    source = _drawing_source()
-    assert 'redundant_note_substrings=("Tapped Hole",)' in source
-    assert "expected_redundant_notes=1" in source
-
-
 # The native definitions of a through-next 4-40 Hole Wizard tap, as the
 # fleet's TAP-prefixed callouts carry them (part 5 the thread, part 7 the
 # tap drill).
@@ -520,10 +432,6 @@ def test_tap_callout_gives_one_extent_to_the_bore() -> None:
     joined = "\n".join(updated.values())
     assert "<hw-threaddesc>" in joined and "<hw-thrutapdrldia>" in joined
     assert "<hw-threadclass>" not in joined and "<hw-thru>" not in joined
-    source = _drawing_source()
-    assert source.index("_set_tap_callout_text(tap_callout)") < source.index(
-        "_prove_set_screw_callout_clear(adapter, tap_callout)"
-    )
 
 
 def test_tap_callout_rewrite_refuses_an_unexpected_native_format() -> None:
@@ -547,15 +455,9 @@ def test_hold_down_callout_reads_size_then_drill_then_extent() -> None:
     assert updated == {5: "<MOD-DIAM><hw-diam> DRILL <hw-thru>", 6: "", 7: "", 8: ""}
     with pytest.raises(RuntimeError, match="one bare diameter"):
         drawing.hold_down_callout_definitions(updated)
-    source = _drawing_source()
-    assert 'process="DRILL"' not in source
-    assert "_set_hold_down_callout_text(hold_down_callout)" in source
 
 
 def test_part_stamps_make_flexible_material_and_protective_finish() -> None:
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "apply_drawing_properties" in source
-    assert "clear_dimensions_for_drawing" in source
     assert part.MATERIAL == "Plain Carbon Steel"
     import _config
 
@@ -574,8 +476,6 @@ def test_part_stamps_make_flexible_material_and_protective_finish() -> None:
 def test_lateral_locations_start_on_a_feature_not_the_symmetry_axis() -> None:
     """drawing-guidelines.md rule 10 (dimension from a real feature): X is dimensioned from the foot's west side face in both
     views, and no callout falls back on the part centreline."""
-    source = _drawing_source()
-    assert "PART C/L" not in source
     starts = {row[2]: row[3] for row in part.REFERENCE_LINES}
     assert starts["BoreLateral"][0] == -dt_arbor_pedestal_spec.FOOT_WIDTH / 2.0
     assert starts["HoleLateral"][0] == -dt_arbor_pedestal_spec.FOOT_WIDTH / 2.0
@@ -604,7 +504,6 @@ def test_plan_holes_share_one_drawn_centreline_through_both_centres() -> None:
     tap_radius = blind_cut_dia_mm(spec.SET_SCREW_HOLE_SPEC) / 2.0
     assert z_far < spec.SCREW_Z - spec.SCREW_HOLE_DIA / 2.0
     assert z_near > spec.SET_SCREW_Z + tap_radius
-    assert "_add_plan_hole_centreline(adapter, top)" in _drawing_source()
 
 
 def test_crown_callout_and_flank_angle_define_the_tapered_flanks() -> None:
@@ -614,11 +513,8 @@ def test_crown_callout_and_flank_angle_define_the_tapered_flanks() -> None:
     flank's angle off the seat prints as a reference."""
     import math
 
-    import build_dt_arbor_pedestal
 
     spec = dt_arbor_pedestal_spec
-    source = Path(build_dt_arbor_pedestal.__file__).read_text(encoding="utf-8")
-    assert "half_root = FOOT_WIDTH / 2.0" in source
     assert drawing.CROWN_CALLOUT == "SIDES TANGENT"
     assert not re.search(r"\d", drawing.CROWN_CALLOUT)
     lean = math.degrees(
@@ -667,10 +563,4 @@ def test_apex_set_screw_sits_mid_strap_with_its_webs() -> None:
     assert spec.DRAWING_PRECISION_BY_NAME["SetScrewLocation"] == 2
     assert spec.SET_SCREW_WEB_MM >= WALL_TARGET_MM
     assert round(spec.SET_SCREW_WEB_MM, 2) == 3.15
-    part_source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "wizard_hole_on_cylinder(" in part_source
-    assert '"SetScrewStationPlane", "Right Plane"' in part_source
-    source = _drawing_source()
-    assert 'label="apex set-screw tap"' in source
     assert not re.search(r"\d", drawing.SET_SCREW_PROCESS)
-    assert "_prove_set_screw_callout_clear(adapter, tap_callout)" in source

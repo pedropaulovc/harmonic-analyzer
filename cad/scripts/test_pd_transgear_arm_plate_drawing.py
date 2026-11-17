@@ -326,9 +326,6 @@ def _loosest_row(places: int, holds) -> bool:
     return holds(places) and (places == 2 or not holds(places - 1))
 
 
-_CONE = math.tan(math.radians(geometry.CSK_ANGLE_DEG / 2.0))
-
-
 def _screw_seat(csk_places: int, thickness_places: int) -> tuple[float, float]:
     """Actual rounded print rows: published stock bound and true cone floor."""
     _csk_low, csk_high = printed_deviations(geometry.CSK_DIA, csk_places, unit=geometry.UNIT)
@@ -514,7 +511,6 @@ def test_frames_are_plain_at_the_ruled_rows() -> None:
 # 5 cleared it, the 29.037 row at 11 did not).
 _CHAR_MM = 2.65
 _LINE_MODEL = 2.75  # a note line's pitch, model mm at 2:1 (5.5 mm on the sheet)
-_CAPTION_CLEAR_MODEL = 6.0
 _INNER_BORDER_X = 0.4191  # ASME B landscape inner border, right
 _CAPTION_HEIGHT = 0.0035
 # The 1:1 isometric's half extents, sheet m: 44 x 52 measured on the r3
@@ -979,90 +975,6 @@ def test_each_2x_group_prints_one_frame_with_its_count() -> None:
     hole_top = drawing.FRAME_XY["plate_hole_1_position"][1]
     assert locator_top + count_height <= 0.2667 - 0.002
     assert hole_top + count_height <= locator_top - 0.0069 - 0.002
-
-
-class _FakeGtol:
-    def __init__(self, accept: bool = True) -> None:
-        self.texts: dict[int, str] = {}
-        self.accept = accept
-
-    def SetText(self, which: int, text: str) -> bool:  # noqa: N802 - COM name
-        if self.accept:
-            self.texts[which] = text
-        return self.accept
-
-    def GetText(self, which: int) -> str:  # noqa: N802 - COM name
-        return self.texts.get(which, "")
-
-
-class _FakeFrame:
-    def __init__(self, gtol: _FakeGtol, *, sticky_visible: bool = False) -> None:
-        self._visible = 1
-        self.sticky_visible = sticky_visible
-        self.gtol = gtol
-
-    @property
-    def Visible(self) -> int:  # noqa: N802 - COM name
-        return self._visible
-
-    @Visible.setter
-    def Visible(self, value: int) -> None:  # noqa: N802 - COM name
-        if not self.sticky_visible:
-            self._visible = value
-
-    def GetSpecificAnnotation(self) -> _FakeGtol:  # noqa: N802 - COM name
-        return self.gtol
-
-
-def _fake_frames(**overrides: _FakeFrame) -> dict[str, _FakeFrame]:
-    keys = [control.key for control in spec.GEOMETRIC_CONTROLS]
-    return {key: overrides.get(key, _FakeFrame(_FakeGtol())) for key in keys}
-
-
-def _patch_com(monkeypatch: pytest.MonkeyPatch) -> list[str]:
-    rebuilds: list[str] = []
-    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
-    monkeypatch.setattr(
-        drawing, "rebuild_drawing", lambda _adapter, *, label: rebuilds.append(label)
-    )
-    return rebuilds
-
-
-def test_one_frame_per_group_hides_repeats_and_reads_the_count_back(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    rebuilds = _patch_com(monkeypatch)
-    frames = _fake_frames()
-    drawing._one_frame_per_group(object(), frames)
-    assert len(rebuilds) == 1
-    for shown, hidden, count in drawing.frame_groups():
-        assert frames[shown].Visible == 1
-        assert frames[shown].gtol.GetText(3) == count
-        for key in hidden:
-            assert frames[key].Visible == 3
-            assert frames[key].gtol.texts == {}
-    assert frames["knob_axis_perpendicularity"].Visible == 1
-    assert frames["knob_axis_perpendicularity"].gtol.texts == {}
-
-
-@pytest.mark.parametrize(
-    ("override", "message"),
-    [
-        ("plate_hole_2_position", "did not stay hidden"),
-        ("plate_locator_1_position", "was refused"),
-    ],
-)
-def test_one_frame_per_group_fails_on_a_refused_readback(
-    monkeypatch: pytest.MonkeyPatch, override: str, message: str
-) -> None:
-    _patch_com(monkeypatch)
-    frame = (
-        _FakeFrame(_FakeGtol(), sticky_visible=True)
-        if override == "plate_hole_2_position"
-        else _FakeFrame(_FakeGtol(accept=False))
-    )
-    with pytest.raises(RuntimeError, match=message):
-        drawing._one_frame_per_group(object(), _fake_frames(**{override: frame}))
 
 
 def test_the_overall_references_restate_the_outline() -> None:

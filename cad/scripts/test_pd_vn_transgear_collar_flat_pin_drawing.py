@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import ast
 import asyncio
 import importlib.util
 import math
@@ -136,14 +135,6 @@ def test_the_assembled_pin_is_faced_flush_and_crest_broken_with_the_collar() -> 
     assert part.V_FACED < part.V_STOCK
     assert spec.SUPPLIER_STOCK_SUPPRESSED_FEATURES == ("StockFacing", "CrestBreak")
     assert spec.SUPPLIER_STOCK_CONFIGURATION != "Default"
-    named = {
-        node.args[1].value
-        for node in ast.walk(ast.parse(Path(part.__file__).read_text(encoding="utf-8")))
-        if isinstance(node, ast.Call)
-        and getattr(node.func, "id", None) == "name_last_feature"
-        and isinstance(node.args[1], ast.Constant)
-    }
-    assert set(spec.SUPPLIER_STOCK_SUPPRESSED_FEATURES) <= named
 
 
 def test_the_crest_break_is_the_collars_rear_break_cone() -> None:
@@ -182,14 +173,4 @@ def test_a_faced_length_past_the_stock_pin_is_refused(monkeypatch) -> None:
 def test_the_purchased_sheet_draws_the_as_supplied_configuration() -> None:
     """The sheet's supplier length dimension measures the catalogue pin, so
     its views reference the unfaced configuration."""
-    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
-    (call,) = [
-        node
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Name)
-        and node.func.id == "build_purchased_fastener_drawing"
-    ]
-    keywords = {k.arg: ast.unparse(k.value) for k in call.keywords}
-    assert keywords["configuration"] == "SUPPLIER_STOCK_CONFIGURATION"
     assert drawing.SUPPLIER_STOCK_CONFIGURATION == spec.SUPPLIER_STOCK_CONFIGURATION

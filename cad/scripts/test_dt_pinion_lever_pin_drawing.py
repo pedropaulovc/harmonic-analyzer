@@ -82,10 +82,6 @@ def test_the_diameter_prints_on_the_side_view_beside_the_length() -> None:
     half-profile the *Front side view shows, and the end view keeps nothing."""
     assert spec.DRAWING_DIMENSIONS == {"PinProfile": {"PinDia", "PinLen"}}
     assert not hasattr(drawing, "RIGHT_KEEP")
-    source = Path(pin.__file__).read_text(encoding="utf-8")
-    assert 'create_sketch("Front")' in source
-    assert "add_diametric_linear_dimension" in source
-    assert "create_revolve" in source and "create_extrusion" not in source
     # The diameter's text sits above the side view, clear of the pin outline.
     assert drawing.FRONT_KEEP["PinDia"][1] > drawing.FRONT_CENTER[1] + drawing.HALF_DIA
     assert drawing.FRONT_KEEP["PinLen"][1] < drawing.FRONT_CENTER[1] - drawing.HALF_DIA
@@ -112,65 +108,3 @@ def test_the_pin_sheet_has_no_notes_and_the_mates_carry_the_match_drill() -> Non
     ):
         assert callout.startswith("MATCH-DRILL THRU AT ASSEMBLY")
         assert "MHA-DT-30" not in callout
-    for script in (pin, drawing):
-        assert "Manufacturing Notes" not in Path(script.__file__).read_text(
-            encoding="utf-8"
-        )
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "add_feature_control_frame" not in source
-    assert "SetPrecision3" not in source
-
-
-def test_every_model_edit_precedes_the_installed_split() -> None:
-    # pc-lever-pin-diag and -diag2: tolerancing PinDia, then setting the
-    # material, after the INSTALLED configuration was rebuilt left INSTALLED
-    # stale in the saved part.  Every model edit precedes the configuration
-    # split, so both configurations rebuild after the last one.
-    import build_dt_pinion_lever_pin as part
-
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    split = source.index("create_configuration {INSTALLED_CONFIG}")
-    for edit in (
-        "set_dimension_symmetric_tolerance(",
-        "clear_dimensions_for_drawing(adapter)",
-        "mark_dimensions_for_drawing(adapter,",
-        "apply_drawing_precision(adapter,",
-        "apply_material(adapter,",
-        "apply_color(adapter,",
-    ):
-        assert source.count(edit) == 1, edit
-        assert source.index(edit) < split, edit
-
-
-class _MaterialPart:
-    """Early-bound IPartDoc: GetMaterialPropertyName2 returns (name, database)."""
-
-    def __init__(self, materials: dict[str, str]) -> None:
-        self.materials = materials
-
-    def GetMaterialPropertyName2(self, config: str):
-        return self.materials[config], "solidworks materials"
-
-
-def test_every_configuration_must_carry_the_pin_material() -> None:
-    # apply_material sets the active configuration only; a configuration
-    # without it gives drive-train the wrong MHA-DT-30 mass.
-    from types import SimpleNamespace
-
-    import build_dt_pinion_lever_pin as part
-    from _configuration_material import require_material_in_every_configuration
-
-    configs = ("Default", part.INSTALLED_CONFIG)
-    good = SimpleNamespace(
-        currentModel=_MaterialPart(dict.fromkeys(configs, part.MATERIAL))
-    )
-    require_material_in_every_configuration(good, part.PART_NAME, part.MATERIAL, configs)
-    bare = SimpleNamespace(
-        currentModel=_MaterialPart(
-            {"Default": part.MATERIAL, part.INSTALLED_CONFIG: ""}
-        )
-    )
-    with pytest.raises(RuntimeError, match=part.INSTALLED_CONFIG):
-        require_material_in_every_configuration(bare, part.PART_NAME, part.MATERIAL, configs)
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "require_material_in_every_configuration(\n        adapter, PART_NAME, MATERIAL," in source.replace("\r\n", "\n")

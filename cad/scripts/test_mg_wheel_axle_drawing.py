@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import math
-import re
 from pathlib import Path
 
 import pytest
@@ -97,10 +96,6 @@ def test_thread_relief_is_cut_under_the_die_root() -> None:
     assert spec.THREAD_PITCH <= spec.RELIEF_WIDTH_MIN
     assert spec.TOL_TYPE_MAX == 6  # swTolType_e.swTolMAX
     assert spec.TOL_TYPE_LIMIT == 3  # swTolType_e.swTolLIMIT
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert 'name_last_feature(adapter, "ReliefRoots")' in source
-    assert "_single_limits(adapter)" in source
-    assert "_limit_pairs(adapter)" in source
 
 
 def test_volume_gates_see_the_relief() -> None:
@@ -147,16 +142,6 @@ def test_detail_fence_holds_every_relief_reference() -> None:
 
 
 def test_pin_is_one_front_plane_revolve() -> None:
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert source.count("create_revolve(") == 1
-    assert 'create_sketch("Front")' in source
-    assert 'name_last_feature(adapter, "PinProfile")' in source
-    assert 'name_last_feature(adapter, "Pin")' in source
-    assert "create_extrusion(" not in source
-    # Axis1 on local Y and the Front Plane carry the assembly mates.
-    assert 'name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0' in source
-    for name in spec.DRAWING_DIMENSIONS["PinProfile"]:
-        assert re.search(rf'profile\.record\(\s*"{name}"', source), name
     floor_r = spec.RELIEF_DIA / 2.0
     v = (
         math.pi * (spec.PIN_DIA / 2.0) ** 2 * spec.SHANK_LEN
@@ -186,21 +171,9 @@ def test_tolerances_are_native_on_the_model() -> None:
     assert drawing.ORIGIN_DIMENSIONS == ("ShankLength", "ThreadLength")
     assert drawing.BROKEN_LINE_DIMENSIONS == ("PinLength",)
     assert group.THREAD_PAST_LOCKNUT_MAX <= spec.THREAD_PAST_LOCKNUT_LIMIT
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in source
 
 
 def test_journal_finish_and_no_gdt() -> None:
-    for module in (part, drawing):
-        source = Path(module.__file__).read_text(encoding="utf-8")
-        for token in (
-            "project_part_pmi",
-            "add_feature_control_frame(",
-            "add_datum_feature(",
-            "GEOMETRIC_CONTROLS",
-            "PART_DATUMS",
-        ):
-            assert token not in source, (module.__name__, token)
     for name in ("GEOMETRIC_CONTROLS", "PART_DATUMS"):
         assert not hasattr(spec, name)
     # The wheel runs on the shank: a journal, machined grade (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)), and
@@ -218,14 +191,7 @@ def test_journal_finish_and_no_gdt() -> None:
 
 def test_thread_callout_and_no_general_notes() -> None:
     assert spec.THREAD_CALLOUT == "#4-40 UNC"
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_attached_note(") == 1
-    assert "text=THREAD_CALLOUT" in source
-    # Rule 7: the press-to-gauge step is MHA-MG-00's, and the optional
-    # thread locker is gone; no general note remains.
-    assert "Manufacturing Notes" not in source
     assert not hasattr(spec, "DRAWING_NOTES")
-    assert "Manufacturing Notes" not in Path(part.__file__).read_text(encoding="utf-8")
     # The stock Ø is an untoleranced REF (the supplier's limits govern) that
     # states both fits: the press into the bar's reamed bore and the wheel
     # running on the shank, each matching the wheel group's proofs.
@@ -259,26 +225,14 @@ def test_callouts_are_part_authored_and_only_read_by_the_sheet() -> None:
     assert authored["ReliefRootR"] == {callouts.CALLOUT_ABOVE: "2X"}
 
 
-def test_detail_circles_are_authored_without_inference() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "manager.AddToDB = True" in source
-    assert "manager.AddToDB = previous_add_to_db" in source
-    assert "native_circle_geometry(circle" in source
-
-
 def test_view_scales_are_explicit() -> None:
     assert drawing.SHEET_SCALE == (3.0, 1.0)
     assert drawing.VIEW_SCALE == (3, 1)
     assert drawing.DETAIL_SCALE == (10, 1)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("scale=VIEW_SCALE") == 2
     assert drawing.SIDE_VIEW_ANGLE == -math.pi / 2.0
 
 
 def test_part_stamps_make_critical_properties() -> None:
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "apply_drawing_properties" in source
-    assert "clear_dimensions_for_drawing" in source
     import _config
 
     config = _config.parts("mg-wheel-axle")

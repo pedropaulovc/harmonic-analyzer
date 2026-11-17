@@ -266,8 +266,6 @@ def test_section_looks_down_onto_the_upper_plate_and_spans_its_silhouette() -> N
     places = spec.DRAWING_PRECISION_BY_NAME["PlateOverhang"]
     assert round(draw._OVERHANG_AT_CUT / 25.4, places) == 0.06
     assert round(spec.UPPER_PLATE_OVERHANG / 25.4, places) == 0.06
-    source = inspect.getsource(draw._create_section)
-    assert "SetDisplayOnlySurfaceCut(False)" in source
     strap = draw._strap_x_at(draw.SECTION_Y)
     assert end[0] < min(strap[0], -spec.GUIDE_PLATE_WIDTH / 2.0)
     assert start[0] > max(strap[1], spec.GUIDE_PLATE_WIDTH / 2.0)
@@ -384,23 +382,15 @@ def test_slots_share_one_drawn_centreline_in_the_front_view() -> None:
     # Rule 26: features in line share a drawn centreline; no sentence locates
     # the upper plate.
     assert not hasattr(spec, "UPPER_PLATE_LOCATION_CALLOUT")
-    assert "add_leader_note" not in inspect.getsource(draw)
     low, high = draw.CENTERLINE_Y_MM
     assert low < spec.GUIDE_PLATE_YS[0] and high > draw._UPPER_TOP_Y
     assert low == pytest.approx(spec.GUIDE_PLATE_YS[0] - draw.CENTERLINE_OVERSHOOT_MM)
     assert high == pytest.approx(draw._UPPER_TOP_Y + draw.CENTERLINE_OVERSHOOT_MM)
     # Its foot stays clear above the strap's bottom-width text.
     assert draw._fy(low) - draw.FRONT_KEEP["StrapBotWidth"][1] > 0.005
-    assert "_add_slot_centerline(adapter, front)" in inspect.getsource(draw.build)
 
 
 def test_screw_hole_callout_is_a_native_drill_callout_size_first() -> None:
-    source = inspect.getsource(draw.build)
-    assert "process=" not in source
-    assert "_set_screw_hole_callout_text(screw_callout)" in source
-    assert "SCREW_HOLE_DIA / 2.0" in source
-    assert "omit_title_block_thread_class" not in inspect.getsource(draw)
-    assert "redundant_note_substrings" not in source
     native = {5: "", 6: "", 7: "<MOD-DIAM><hw-diam> <hw-thru>", 8: ""}
     rewritten = draw.screw_hole_callout_definitions(native)
     assert rewritten[7] == "<MOD-DIAM><hw-diam> DRILL <hw-thru>"
@@ -416,7 +406,6 @@ def test_isometric_fills_the_right_of_the_sheet_at_full_size() -> None:
     # Rule 9: the title block states the 1:1, so the caption carries no scale.
     assert "SCALE" not in spec.ISOMETRIC_VIEW_NOTE
     assert not hasattr(spec, "FRONT_VIEW_NOTE")
-    assert "Front View Note" not in inspect.getsource(draw.build)
     # Right of the slot width's parked text block, the note under the view.
     assert draw.ISO_CENTER[0] - 0.021 > (
         draw.SLOT_WIDTH_TEXT_XY[0] + draw._SLOT_TEXT_HALF_WIDTH

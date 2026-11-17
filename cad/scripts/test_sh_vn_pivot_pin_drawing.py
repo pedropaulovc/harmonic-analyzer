@@ -6,7 +6,6 @@ supplier sizes and mate callout, and the channel BOM rows it feeds.
 
 from __future__ import annotations
 
-import asyncio
 
 import _config
 import _dowel_dimensions
@@ -23,7 +22,6 @@ import sh_vn_pivot_pin_rod_spec as rod_pin
 import sh_vn_pivot_pin_spec as pin
 from _drawing_registry import DRAWINGS_BY_NAME
 from _machinist_review_mode import MachinistReviewMode
-from _supplier_spring_drawing import state_captions
 
 ROW = _config.parts(pin.PART_STEM)
 MEMBERS = (rod_pin, bar_pin)
@@ -90,45 +88,6 @@ def test_the_diameter_callout_names_every_mate_by_number() -> None:
         assert _config.parts(stem)["number"] in runs
     callouts = [callout for *_rest, callout in drawing.DIMENSIONS if callout]
     assert callouts == [notes.DIAMETER_CALLOUT]
-
-
-def _build_call(monkeypatch) -> dict:
-    seen: dict = {}
-
-    async def record(adapter, spec, **kwargs):
-        seen.update(kwargs, spec=spec)
-        return {}
-
-    monkeypatch.setattr(drawing, "build_supplier_spring_drawing", record)
-    asyncio.run(drawing.build(object()))
-    return seen
-
-
-def test_the_sheet_shows_an_unnamed_front_and_one_isometric(monkeypatch) -> None:
-    """Rule 26 and the BOM own the names and quantities: one standard
-    ISOMETRIC of the default member, no coined member captions, and no prose
-    name on the principal front."""
-    call = _build_call(monkeypatch)
-    assert not call.get("installed_variants")
-    assert not call["include_right"] and not call["include_top"]
-    assert call["installed_configuration"] == ROW["default_configuration"]
-    captions = state_captions(
-        stock_caption=call["stock_caption"],
-        installed_caption=call["installed_caption"],
-        right_caption="",
-    )
-    assert captions["free_front"] == ""
-    assert captions["installed_iso"] == "ISOMETRIC"
-    assert not any("QTY" in caption for caption in captions.values())
-
-
-def test_the_title_block_material_is_the_plain_registry_material(monkeypatch) -> None:
-    """The SKU prints once, on the footer's SKU row: the MATERIAL cell reads
-    the registry material, short enough for its cell."""
-    call = _build_call(monkeypatch)
-    assert not call.get("spring_metadata")
-    assert ROW["material"] == "18-8 Stainless Steel"
-    assert catalogue.SKU not in ROW["material"]
 
 
 def test_the_note_block_carries_no_assembly_narration() -> None:

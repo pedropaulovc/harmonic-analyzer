@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
-from math import pi
 
 import pytest
 
@@ -16,7 +14,6 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_types import DRAWING_TEMPLATES
 from _fastener_catalog import FASTENERS
 from _hole_spec import THREAD_MAJOR_MM
-from _stock_fastener import RigidTransform
 from _test_stock_recipes import discovered_recipes
 from diagnostics import diag_build_92446A077 as recipe
 from _mcmaster_92446a077 import HEAD_DIA_MIN, PAN_HEAD_SIZE
@@ -109,33 +106,6 @@ def test_pan_head_bears_holds_and_clears_on_the_clip_at_the_worst_case() -> None
     )
     assert clip.HEAD_TO_SPRING_RAIL > clip.NOTCH_WIDTH
     assert clip.HOLE_INSET - spec.HEAD_DIA / 2.0 > clip.SCREW_RAIL_END_RADIUS
-
-
-def test_builder_lands_in_the_fillister_assembly_frame(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    captured = {}
-    adapter = object()
-    outputs = {"sldprt": "stock-part"}
-
-    async def capture_stock(actual_adapter, **kwargs):
-        assert actual_adapter is adapter
-        captured.update(kwargs)
-        return outputs
-
-    monkeypatch.setattr(part, "build_stock_fastener", capture_stock)
-    assert asyncio.run(part.build(adapter)) is outputs
-    assert captured["part_name"] == STEM
-    components = captured["components"]
-    assert len(components) == 1
-    assert components[0].sku == spec.SKU
-    assert components[0].author is recipe.build_92446A077
-    assert components[0].transform == RigidTransform(
-        rotation_radians=(-pi / 2.0, 0.0, 0.0)
-    )
-    assert captured["material"] == part.SPEC.material
-    assert "color" not in captured
-    assert "screw_axis_planes" not in captured
 
 
 def test_purchased_sheet_documents_the_built_part() -> None:

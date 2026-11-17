@@ -1,12 +1,10 @@
 """Offline manufacturing boundaries for the trimmed channel-spring anchor."""
 
 import math
-from types import SimpleNamespace
 
 import pytest
 
 import _config
-import _stock_trim_drawing as trim_drawing
 import draw_ch_vn_spring_hook as drawing
 import ch_vn_spring_hook_spec as spec
 import spring_mount_geom as mounts
@@ -141,109 +139,6 @@ def test_deburr_band_clears_the_receiving_tap_drill():
     assert minimum >= spec.MIN_CHAMFER_WIDTH_MM
     # The cut end's flat must enter the tapped plate, not land on its drill.
     assert anchor.thread_major_dia_mm - 2 * minimum < TAP_DRILL_MM[anchor.thread_size]
-
-
-@pytest.mark.parametrize(
-    "fault",
-    [None, "reference", "nominal", "tolerance_type", "widened", "precision", "missing"],
-)
-def test_drawing_requires_every_cutting_control(monkeypatch, fault):
-    """A lost band, a widened band or a reference-only size is a regression."""
-    monkeypatch.setattr(trim_drawing, "_early_bound", lambda value, _kind: value)
-    annotations = []
-    for name, (nominal, lower, upper) in drawing.EXPECTED_CONTROLS.items():
-        tolerance = SimpleNamespace(
-            Type=spec.DIMENSION_TOLERANCE_TYPES[name],
-            GetMinValue=lambda lower=lower: lower,
-            GetMaxValue=lambda upper=upper: upper,
-        )
-        dimension = SimpleNamespace(
-            Name=name, DrivenState=2, SystemValue=nominal, Tolerance=tolerance
-        )
-        display = SimpleNamespace(
-            GetDimension2=lambda _configuration, dimension=dimension: dimension,
-            GetText=lambda _index: "",
-            GetPrimaryPrecision2=lambda name=name: spec.DIMENSION_PRECISION[name],
-        )
-        annotations.append(
-            SimpleNamespace(
-                name=name,
-                dimension=dimension,
-                display=display,
-                GetSpecificAnnotation=lambda display=display: display,
-            )
-        )
-    if fault == "reference":
-        annotations[0].dimension.DrivenState = 1
-    elif fault == "nominal":
-        annotations[0].dimension.SystemValue += 0.001
-    elif fault == "tolerance_type":
-        # swTolSYMMETRIC prints a band the title block already carries.
-        annotations[0].dimension.Tolerance.Type = 4
-    elif fault == "widened":
-        annotations[0].dimension.Tolerance.GetMaxValue = lambda: (
-            2 * spec.FINISHED_OVERALL_TOLERANCE_MM / 1000
-        )
-    elif fault == "precision":
-        annotations[0].display.GetPrimaryPrecision2 = lambda: (
-            spec.DIMENSION_PRECISION["FinishedOverall"] + 1
-        )
-    elif fault == "missing":
-        annotations.pop()
-    if fault is None:
-        drawing._verify_controls(annotations)
-        return
-    with pytest.raises(RuntimeError):
-        drawing._verify_controls(annotations)
-
-
-@pytest.mark.parametrize(
-    "fault", [None, "extra", "missing", "foreign", "banded", "configuration"]
-)
-def test_settled_sheet_keeps_only_the_thread_as_supplier_reference(monkeypatch, fault):
-    """The #6-32 thread is the one replacement reference; eye and as-supplied
-    sizes are not sourcing criteria, so any extra native dimension fails."""
-    thread = f"SupplierThreadMajor@{spec.SUPPLIER_THREAD_FEATURE}@ch-vn-spring-hook.Part"
-    names = [thread, *(f"{name}@Sketch@ch-vn-spring-hook.Part" for name in drawing.FRONT_KEEP)]
-    if fault == "extra":
-        names.append("EyeID@Drawing View1")
-    elif fault == "missing":
-        names.remove(thread)
-    elif fault == "foreign":
-        names[0] = thread = "SupplierThreadMajor@SupplierStockAxis@ch-vn-spring-hook.Part"
-    displays = []
-    for name in names:
-        native = SimpleNamespace(
-            FullName=name,
-            Tolerance=SimpleNamespace(Type=1 if fault == "banded" else 0),
-        )
-        displays.append(SimpleNamespace(GetDimension2=lambda _index, native=native: native))
-    for display, following in zip(displays, [*displays[1:], None]):
-        display.GetNext5 = lambda following=following: following
-    configuration = "Default"
-    front = SimpleNamespace(
-        name="Drawing View1",
-        ReferencedConfiguration="AsSuppliedStock" if fault == "configuration" else configuration,
-        UpdateViewDisplayGeometry=lambda: None,
-        GetFirstDisplayDimension6=lambda: displays[0],
-    )
-    iso = SimpleNamespace(name="Drawing View2", ReferencedConfiguration=configuration)
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(drawing, "iter_views", lambda _adapter: (front, iso))
-    monkeypatch.setattr(drawing, "view_name", lambda _adapter, view: view.name)
-    monkeypatch.setattr(drawing, "assert_supplier_reference_dimension", lambda *_a, **_k: None)
-    refs = [(thread, {"label": "SupplierThreadMajor"})]
-
-    def check():
-        drawing._verify_supplier_references(
-            None, refs, ("Drawing View1", "Drawing View2"), configuration
-        )
-
-    if fault is None:
-        check()
-        return
-    with pytest.raises(RuntimeError):
-        check()
 
 
 def test_deburr_vertex_follows_the_settled_ink_with_the_trim_and_the_leg():

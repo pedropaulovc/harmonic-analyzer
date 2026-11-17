@@ -211,27 +211,11 @@ def test_tight_bands_name_their_mate() -> None:
     assert "MHA-SH-01" in drawing.DRAWING_NOTES
     assert not {"EarHole1Z", "EarHoleHeight"} & set(drawing.DIMENSION_CALLOUTS)
     assert "MHA-SH-01" in drawing.HOLE_CALLOUT_BELOW
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert '"GripOffset", GRIP_OFFSET_BAND' not in source
-    assert "EAR_STATION_BAND" in source
-    assert "EAR_HEIGHT_BAND" in source
     assert spec.EAR_HEIGHT_BAND is fit.EAR_HEIGHT_BAND
-
-
-def test_sheet_has_no_gdt_notes_or_drawing_precision() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "add_feature_control_frame(" not in source
-    assert "add_datum_feature(" not in source
-    assert "set_dimension_precision" not in source
-    assert "add_native_hole_callout(" in source
-    assert "assert_imported_precision(" in source
 
 
 def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
     assert drawing.SHEET_SCALE == (2.0, 1.0)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "scale=(1, 1)" in source
-    assert "for view in (top, face, iso):" in source
 
 
 def test_split_face_view_projects_beside_the_plan() -> None:

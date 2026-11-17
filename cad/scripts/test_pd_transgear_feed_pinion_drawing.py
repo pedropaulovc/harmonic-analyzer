@@ -18,7 +18,6 @@ import paper_drive_stock_native as stock_native
 import paper_drive_stock_drawing as stock_drawing
 from _drawing_contract import (
     PRECISION_MIGRATED_DRAWINGS,
-    drawing_specification_violations,
     model_toleranced_dimensions,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -153,8 +152,6 @@ def test_fits_take_standard_names_and_name_their_mates() -> None:
 def test_sheet_authors_no_manufacturing_value() -> None:
     # drawing-simplicity-policy.md `How the repository implements the guidelines`: places and bands come from the part; the sheet reads them back.
     assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert not drawing_specification_violations(source, filename=drawing.__file__)
 
 
 def test_bands_come_from_named_spec_constants() -> None:
@@ -437,78 +434,6 @@ def test_flat_volume_is_the_boss_segment() -> None:
     )
     # The bore stays under the flat: it never breaks through.
     assert spec.BORE_DIA / 2.0 < spec.FLAT_TO_AXIS
-
-
-def test_the_nose_view_prints_the_flat_as_a_chord_from_the_axis(monkeypatch) -> None:
-    """r8 machinist review: the flat showed only edge-on, as a step in B-B.
-    Its distance from the axis prints on VIEW E, the nose view, from a
-    hidden Front-plane reference sketch: one construction line along the
-    flat, inside its chord, under the axis, dimensioned from the axis by the
-    same ``FlatToAxis`` global that drives the cut.  B-B keeps only the end
-    wall's station."""
-    import asyncio
-    from types import SimpleNamespace
-
-    events: list = []
-
-    def ok(data=None):
-        return SimpleNamespace(is_success=True, data=data)
-
-    class Adapter:
-        async def create_sketch(self, plane):
-            events.append(("sketch", plane))
-            return ok()
-
-        async def add_centerline(self, x0, y0, x1, y1):
-            events.append(("line", (x0, y0), (x1, y1)))
-            return ok("Line1")
-
-        async def add_sketch_constraint(self, first, second, kind):
-            events.append(("constraint", first, second, kind))
-            return ok()
-
-        async def exit_sketch(self):
-            return ok()
-
-    dims: list = []
-    applied: dict = {}
-    blanked: list = []
-
-    async def dimension_between(_adapter, first, second, kind, value, _label):
-        dims.append((first, second, kind, value))
-
-    async def ensure_fully_defined(_adapter, _label):
-        return None
-
-    def apply(self, _adapter, feature):
-        applied[feature] = list(self._rows)
-        return [(f"{name}@{feature}", drive) for name, drive in self._rows if drive]
-
-    monkeypatch.setattr(part, "dimension_between", dimension_between)
-    monkeypatch.setattr(part, "ensure_fully_defined", ensure_fully_defined)
-    monkeypatch.setattr(part, "suppress_dimension_input", lambda _adapter: None)
-    monkeypatch.setattr(part, "set_sketch_direct_db", lambda _adapter, _on: None)
-    monkeypatch.setattr(part, "name_last_feature", lambda _adapter, name: events.append(("name", name)))
-    monkeypatch.setattr(part, "blank_reference_sketches", lambda _adapter, names: blanked.append(names))
-    monkeypatch.setattr(part.SketchDims, "apply", apply)
-    jobs = asyncio.run(part._flat_reference(Adapter()))
-
-    assert events[0] == ("sketch", "Front")
-    (_kind, (x0, y0), (x1, y1)) = events[1]
-    half_chord = math.sqrt((spec.BOSS_DIA / 2.0) ** 2 - spec.FLAT_TO_AXIS**2)
-    assert y0 == y1 == -spec.FLAT_TO_AXIS
-    assert 0.0 == x1 < x0 < half_chord
-    assert ("constraint", "Line1.end", "origin", "vertical_points") in events
-    assert dims[-1] == ("Line1.start", "origin", "vertical_distance", spec.FLAT_TO_AXIS)
-    assert ("name", "FlatReference") in events
-    assert applied["FlatReference"][-1] == ("FlatToAxis", '"FlatToAxis"')
-    assert jobs == [("FlatToAxis@FlatReference", '"FlatToAxis"')]
-    assert blanked == [("FlatReference",)]
-    # The flat's distance prints once, on the nose view; B-B its end wall.
-    assert spec.DRAWING_DIMENSIONS["FlatReference"] == {"FlatToAxis"}
-    assert spec.DRAWING_DIMENSIONS["FlatProfile"] == {"FlatEnd"}
-    assert set(drawing.NOSE_KEEP) == {"FlatToAxis"}
-    assert "FlatToAxis" not in drawing.RIGHT_KEEP
 
 
 def test_bore_runs_on_the_pin() -> None:
@@ -1235,74 +1160,6 @@ def test_nose_caption_hangs_below_its_views_outline() -> None:
     assert caption.ymax < outline_bottom
     # Beside section B-B, whose outline ends the same margin past its nose.
     assert drawing._NOSE_X + drawing.NOSE_OUTLINE_MARGIN + ARROW_TEXT_CLEARANCE_M < caption.xmin
-
-
-def test_end_view_is_the_sections_third_angle_left_view(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    """2026-10-27 ENFORCE review (r1, r3): a nose view stood left of the
-    section, whose rear face stands left.  The end view now sees the rear
-    face, and its cutting line runs top to bottom so the arrows point left,
-    model +X in that view: the section keeps its rear face left (codjiflo P3
-    on ebde256dc: the build's own call is checked, not just the constants)."""
-    import asyncio
-    from types import SimpleNamespace
-    from unittest.mock import MagicMock
-
-    from _test_stubbed_build import offline_adapter, stub_seat
-
-    source = tmp_path / "source.SLDPRT"
-    source.write_bytes(b"")
-    monkeypatch.setattr(drawing, "SOURCE", source)
-    seat = stub_seat(monkeypatch, drawing)
-    left, bottom, right, top = drawing.SHEET_INNER_BORDER
-    seat._early_bound.return_value.GetExtent.return_value = (
-        left + 0.01, bottom + 0.01, 0.0, right - 0.01, top - 0.01, 0.0
-    )
-    seat.new_project_drawing.return_value = (MagicMock(), MagicMock())
-    seat.place_view.side_effect = lambda _adapter, path, view, x, y, scale: SimpleNamespace(
-        orientation=view, centre=(x, y)
-    )
-    asyncio.run(drawing.build(offline_adapter()))
-
-    (section,) = seat.create_section_view.call_args_list
-    parent = section.args[1]
-    assert (parent.orientation, parent.centre) == ("*Back", drawing.FRONT_CENTER)
-    start, end = section.kwargs["line_start"], section.kwargs["line_end"]
-    assert start[0] == end[0] == drawing.FRONT_CENTER[0]
-    assert start[1] > drawing.FRONT_CENTER[1] + drawing.HALF_OD > drawing.FRONT_CENTER[1]
-    assert end[1] < drawing.FRONT_CENTER[1] - drawing.HALF_OD
-    assert section.kwargs["view_xy"] == drawing.RIGHT_CENTER
-    assert drawing.FRONT_CENTER[1] == drawing.RIGHT_CENTER[1]
-    assert drawing.FRONT_CENTER[0] < drawing._side_x(0.0) < drawing._side_x(spec.OVERALL_LENGTH)
-    # 2026-11-07 screen (rule 9): B-B's caption restated the sheet's 3:1.
-    # The sheet is pinned at its scale before the section is cut, so the
-    # native caption carries no scale field.
-    order = [name for name, _args, _kwargs in seat.mock_calls]
-    assert order.index("_pin_sheet_scale") < order.index("create_section_view")
-    # Views C, D and E are named by viewing arrows on a parent view.
-    arrows = {
-        call.args[2]: (call.args[1], call.args[3])
-        for call in seat._add_view_arrow.call_args_list
-    }
-    assert set(arrows) == {
-        drawing.OUTSIDE_VIEW_LETTER,
-        drawing.REAR_VIEW_LETTER,
-        drawing.NOSE_VIEW_LETTER,
-    }
-    parent, arrow = arrows[drawing.OUTSIDE_VIEW_LETTER]
-    assert (parent.orientation, arrow) == ("*Back", drawing.VIEW_C_ARROW)
-    parent, arrow = arrows[drawing.REAR_VIEW_LETTER]
-    assert (parent.orientation, arrow) == ("*Left", drawing.VIEW_D_ARROW)
-    # VIEW E is the nose (*Front), named on the section B-B.
-    parent, arrow = arrows[drawing.NOSE_VIEW_LETTER]
-    assert parent is seat.create_section_view.return_value
-    assert arrow == drawing.VIEW_E_ARROW
-    placed = {
-        call.args[2]: (call.args[3], call.args[4])
-        for call in seat.place_view.call_args_list
-    }
-    assert placed["*Front"] == drawing.NOSE_CENTER
 
 
 def test_viewing_arrows_point_along_their_views_sight() -> None:

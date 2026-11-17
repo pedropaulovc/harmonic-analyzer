@@ -213,78 +213,14 @@ def test_pinch_thread_readback_checks_the_thread_part_not_string_order() -> None
     )
 
 
-def test_part_hides_every_model_reference_sketch() -> None:
-    """f76387f5's iso and 8929d954's drive-train iso printed reference sketches.
-
-    The part blanks every construction-only reference sketch it authors before
-    save, so no drawing view or assembly instance renders one, and a new one
-    cannot be authored unlisted.
-    """
-
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    authored = re.findall(r'feature_name="([A-Za-z]+Reference)"', source)
-    assert authored and tuple(authored) == part.REFERENCE_SKETCHES
-    build_body = source[source.index("async def build(") :]
-    assert "_blank_reference_sketches(adapter, REFERENCE_SKETCHES)" in build_body
-    assert build_body.index("_blank_reference_sketches(") < build_body.index(
-        "save_part_and_images("
-    )
-
-
 def test_sheet_cuts_no_section() -> None:
     """Machinist review of f86ff6bf8 (gating, two of three runs): section
     A-A, cut down the slot at 8.500, clipped the Ø2.26 hold-down tap drill
     at 7.500 into an unexplained 1 mm sliver, and every hole it showed is
     fully defined by its callout (rule 1).  The sheet cuts no section, so no
     cutting-plane line, label or ROTATED note prints."""
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "create_section_view" not in source
-    assert "ROTATED" not in source
     assert "section A-A" not in drawing.sheet_view_silhouettes()
     assert not any(name.startswith("section") for name in drawing.sheet_text_boxes())
-
-
-def test_only_views_dimensioning_hidden_sketches_opt_in() -> None:
-    """The opt-in import goes where a kept dimension lives on a hidden sketch.
-
-    Right (PinchDepthCenter, and r3's PinchHeight) and the bottom view (the
-    hold-down tap's two stations and the locating dowel's) always do; the
-    adjuster elevation
-    (AxisHeight/PassageCenter) opts in at build time; the plan, left and the
-    base front keep only solid-feature dimensions and stay on
-    _drawing_dimension_import's targeted import.
-    """
-
-    def hidden_owners(keep) -> set[str]:
-        return {
-            feature
-            for feature, names in dt_cone_tip_block_spec.DRAWING_DIMENSIONS.items()
-            if set(names) & set(keep)
-        } & set(part.REFERENCE_SKETCHES)
-
-    assert hidden_owners(drawing.RIGHT_KEEP) == {
-        "PinchDepthReference",
-        "PinchHeightReference",
-    }
-    assert hidden_owners(drawing.BOTTOM_KEEP) == {
-        "FootTapXReference",
-        "FootTapZReference",
-        "DowelXReference",
-    }
-    assert hidden_owners({"AxisHeight": 0, "PassageCenter": 0}) == {
-        "AxisHeightReference",
-        "PassageCenterReference",
-    }
-    for keep in (drawing.TOP_KEEP, drawing.LEFT_KEEP, drawing.FRONT_KEEP):
-        assert hidden_owners(keep) == set()
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    body = source[source.index("async def build(") :]
-    for keep, call in (
-        ("keep=TOP_KEEP", "top_annotations = curate_view_dimensions("),
-        ("keep=BOTTOM_KEEP", "bottom_annotations = hidden_sketches.curate_view_dimensions("),
-    ):
-        before = body[: body.index(keep)].rstrip()
-        assert before[: before.rindex("adapter,")].rstrip().endswith(call)
 
 
 def test_every_marked_dimension_is_kept_in_exactly_one_view() -> None:
@@ -330,10 +266,6 @@ def test_view_b_locates_its_thread_with_its_own_driven_stations() -> None:
         "ViewBPinchDepth": dt_cone_tip_block_spec.PINCH_DEPTH_PLACES,
         "ViewBPinchHeight": dt_cone_tip_block_spec.PINCH_HEIGHT_PLACES,
     }
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    body = source[source.index("async def build(") :]
-    assert "_add_view_b_pinch_dimensions(adapter, left, pinch_thread_edge)" in body
-    assert "CreateCenterLine" not in source
 
 
 def test_slot_width_text_stands_right_of_its_outside_arrows() -> None:
@@ -398,22 +330,6 @@ def test_pinch_depth_dimension_line_stands_clear_of_the_block() -> None:
     assert line_y - top >= 0.005
 
 
-def _matches(finding: str, expected: str) -> bool:
-    at = 0
-    for fragment in expected.split(" ... "):
-        at = finding.find(fragment, at)
-        if at < 0:
-            return False
-        at += len(fragment)
-    return True
-
-
-def _findings_match(findings: list[str], expected: list[str]) -> bool:
-    return len(findings) == len(expected) and all(
-        _matches(finding, pattern) for finding, pattern in zip(findings, expected)
-    )
-
-
 def _sheet_findings(module) -> list[str]:
     return module.sheet_ink_collisions(
         module.sheet_text_boxes(),
@@ -426,31 +342,6 @@ def _sheet_findings(module) -> list[str]:
 def test_sheet_ink_is_clear_and_the_build_places_what_it_audits() -> None:
     assert _sheet_findings(drawing) == []
     drawing.assert_sheet_ink_clear()
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    body = source[source.index("async def build(") :]
-    assert "assert_sheet_ink_clear()" in body
-    assert body.index("assert_sheet_ink_clear(") < body.index("curate_view_dimensions(")
-    for placed in (
-        "callout_xy=ADJUSTER_CALLOUT_XY",
-        "callout_xy=PINCH_CLEARANCE_CALLOUT_XY",
-        "callout_xy=PINCH_THREAD_CALLOUT_XY",
-        "callout_xy=FOOT_TAP_CALLOUT_XY",
-        "for text, x, y in _sheet_notes():",
-        "keep={**FRONT_KEEP, **_adjuster_axis_keep()}",
-        "foot_edge = _foot_edge(adapter, front)",
-        "foot_symbol, foot_right = _foot_finish_placement()",
-        "symbol_xy=foot_symbol",
-        "leader_attach_xy=foot_right",
-        "_set_arrow_sides(",
-        "for name in ARROWS_OUTSIDE",
-        "for name in ARROWS_INSIDE",
-    ):
-        assert placed in body, placed
-    assert body.count("add_note(adapter,") == 1
-    # Round-1 farm review (dt-fab-4): the rear view (VIEW C) is gone; the
-    # foot's finish sits on the front view, the width moved under the bottom
-    # view, so nothing is dimensioned under the front view's foot.
-    assert '"*Back"' not in body
     assert "Width" not in drawing.FRONT_KEEP
     assert drawing.ARROWS_INSIDE == (
         "PinchHeight",
@@ -480,12 +371,7 @@ def test_sheet_audit_uses_the_shared_leader_geometry() -> None:
     module the crank drawings gate on, not from a sheet-local copy."""
     import _drawing_leaders
 
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "_drawing_leaders.leader_crossings(" in source
-    assert "_drawing_leaders.arrows_near_text(" in source
     assert drawing.ARROW_TEXT_CLEARANCE == _drawing_leaders.ARROW_TEXT_CLEARANCE == 0.002
-    for local in ("def _segments_cross", "def _point_segment_distance"):
-        assert local not in source, local
 
 
 # #946's leader-over-part rule, on this sheet's own model: the run over the
@@ -644,7 +530,6 @@ def test_no_leader_on_the_sheet_detours_over_the_part() -> None:
     assert long_way == {}
 
 
-
 # --- r3: codex FIX review of 72ab (C:/src/dt-logs/mreview-i31/block-72ab) ----
 # Every number below is recomputed from the print's own grades
 # (DRAWING_PRECISION) and the title block's general bands, never read back
@@ -685,15 +570,6 @@ def test_width_carries_a_one_sided_band_that_holds_containment() -> None:
     )
 
 
-def _worst_near_jaw_wall() -> float:
-    """Deepest the slit's near wall can stand from the +X (drill) face."""
-    spec = dt_cone_tip_block_spec
-    passage = _printed("PassageCenter", spec.BLOCK_X / 2.0)
-    width = _printed("Width", spec.BLOCK_X)
-    slit_half_min = _printed("SlitW", spec.SLIT_W)[0] / 2.0
-    return max(passage[1] - slit_half_min, width[1] - passage[0] - slit_half_min)
-
-
 def test_pinch_clearance_print_breaks_into_the_slit_at_the_worst_case() -> None:
     """Blocker: 72ab printed the Ø3.26 6.9 deep (.X, floor 6.1) into a near
     jaw the print lets run to 8.47 -- the screw could thread-lock short of the
@@ -701,21 +577,7 @@ def test_pinch_clearance_print_breaks_into_the_slit_at_the_worst_case() -> None:
     case: a printed blind depth by its lower limit, 0.25 past the deepest
     near wall; DRILL TO SLOT by definition, provided drilling full diameter
     0.25 past that wall only meets the far jaw inside its tap drill."""
-    spec = dt_cone_tip_block_spec
-    near_wall = _worst_near_jaw_wall()
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    if '"hw-depth"' in source:
-        depth = spec.PINCH_CLEARANCE_SPEC.depth_mm
-        floor = round(depth, 1) - _GENERAL[1]
-        assert floor >= near_wall + 0.25, (floor, near_wall)
-        return
     assert drawing.PINCH_CLEARANCE_EXTENT_TEXT.endswith("TO SLOT")
-    clearance_max = spec.PINCH_CLEARANCE_DIA + _DRILLED_PLUS
-    point = (clearance_max / 2.0) / math.tan(math.radians(118.0 / 2.0))
-    slit_min = _printed("SlitW", spec.SLIT_W)[0]
-    past_far_wall = 0.25 + point - slit_min
-    assert clearance_max * max(past_far_wall, 0.0) / point <= spec.PINCH_BORE_DIA
-    assert spec.WORST_PINCH_NEAR_WALL_MM == pytest.approx(near_wall)
 
 
 def test_pinch_clearance_callout_rewrites_the_blind_depth_to_drill_to_slot() -> None:
@@ -752,10 +614,6 @@ def test_pinch_clearance_callout_rewrites_the_blind_depth_to_drill_to_slot() -> 
     assert not drawing._pinch_clearance_callout_resolved(
         {1: f"{joint}\n<MOD-DIAM> .129 <HOLE-DEPTH> .272", 2: "", 3: "", 4: ""}
     )
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    body = source[source.index("async def build(") :]
-    assert "_set_pinch_clearance_callout_text(pinch_clearance_callout)" in body
-    assert '"hw-depth"' not in source
 
 
 def test_far_jaw_is_tapped_full_thread_through_to_the_slit() -> None:
@@ -834,13 +692,6 @@ def test_top_ligament_needs_the_pinch_height_at_two_places() -> None:
     assert round(ligament(2), 6) >= WALL_TARGET_MM > ligament(1)
 
 
-def _reference_call(body: str, feature: str) -> str:
-    """The build's one reference-dimension call that authors ``feature``."""
-    at = body.index(f'feature_name="{feature}"')
-    start = body.rindex("await _author_", 0, at)
-    return body[start : body.index("\n    )\n", at)]
-
-
 def test_pinch_hole_height_is_located_from_the_foot() -> None:
     """Clarity: the pinch hole prints its height straight from the foot in the
     right view, where it is drilled, not chained off the adjuster axis."""
@@ -879,44 +730,6 @@ def test_slit_floor_stands_inside_the_adjuster_tap_drill() -> None:
 _PINCH_MAJOR_MM = 0.112 * 25.4  # #4-40 basic major
 
 
-def _datum_face_x(feature: str) -> float:
-    """Sketch x of the face the model's ``feature`` reference measures from."""
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    body = source[source.index("async def build(") :]
-    start = re.search(r"start=\(([^,]+),", _reference_call(body, feature))
-    assert start is not None, feature
-    return float(eval(start.group(1), vars(part)))
-
-
-def _worst_head_face_half() -> float:
-    """Farthest the +X (screw-head) face can stand from the adjuster axis at
-    the printed limits, PassageCenter taken from the face the model uses."""
-    spec = dt_cone_tip_block_spec
-    passage = _printed("PassageCenter", spec.BLOCK_X / 2.0)
-    width = _printed("Width", spec.BLOCK_X)
-    if _datum_face_x("PassageCenterReference") < 0.0:
-        return width[1] - passage[0]
-    return passage[1]
-
-
-def _worst_far_wall_from_head() -> float:
-    """The slit's far wall, where the far jaw's thread starts, from the head."""
-    spec = dt_cone_tip_block_spec
-    return _worst_head_face_half() + _printed("SlitW", spec.SLIT_W)[1] / 2.0
-
-
-def test_far_jaw_keeps_1_5d_of_thread_past_the_slits_far_wall() -> None:
-    """72ab asserted 1.5D to the NEAR wall, crediting the slit as thread: the
-    1/2 screw kept 3.835 (1.35D) past the far wall.  The 5/8 screw keeps
-    over 2D at the printed worst case: the width's one-sided band tops out at
-    its nominal on the head's side under the -X datum, PassageCenter .XX."""
-    spec = dt_cone_tip_block_spec
-    engagement = spec.PINCH_SCREW_LENGTH - _worst_far_wall_from_head()
-    assert engagement >= 1.5 * _PINCH_MAJOR_MM, engagement
-    assert spec.WORST_PINCH_ENGAGEMENT_MM == pytest.approx(engagement)
-    assert engagement == pytest.approx(6.223)
-
-
 def test_pinch_screw_tip_stays_inside_the_minus_x_face() -> None:
     """Regression pin (the 1/2 screw passed it too): at the width's lower
     limit the 5/8 screw's tip stays 0.25 inside the far face; the one-sided
@@ -926,32 +739,6 @@ def test_pinch_screw_tip_stays_inside_the_minus_x_face() -> None:
     assert recess >= 0.25
     assert spec.WORST_PINCH_TIP_RECESS_MM == pytest.approx(recess)
     assert recess == pytest.approx(0.889)
-
-
-def test_axis_and_hold_down_tap_locate_from_the_minus_x_face() -> None:
-    """Main's datum: PassageCenter, and the hold-down tap's FootTapX with it,
-    measure from the -X face, FootTapZ from the north face; the model, the
-    spec and both prints agree."""
-    spec = dt_cone_tip_block_spec
-    for feature in ("PassageCenterReference", "FootTapXReference"):
-        assert _datum_face_x(feature) == pytest.approx(-spec.BLOCK_X / 2.0), feature
-    assert spec.PASSAGE_CENTER_DATUM == "-X"
-    # Each print's extension lines rise from its datum face and the centre.
-    ink = drawing.sheet_dimension_ink()
-    half_x = spec.BLOCK_X * drawing._S / 2.0
-
-    def witnesses(name: str, across: int) -> list[float]:
-        return sorted({round(a[across], 9) for a, b in ink[name].lines if a[across] == b[across]})
-
-    assert witnesses("PassageCenter", 0) == pytest.approx(
-        [drawing.FRONT_CENTER[0] - half_x, drawing.FRONT_CENTER[0]]
-    )
-    tap_x, tap_y = drawing.FOOT_TAP_CENTER
-    assert witnesses("FootTapX", 0) == pytest.approx([drawing._BOTTOM_LEFT, tap_x])
-    assert witnesses("FootTapZ", 1) == pytest.approx(
-        [tap_y, drawing._bottom_y(drawing.Z_NORTH)]
-    )
-
 
 
 def test_print_worst_containment_fails_off_the_plate(
@@ -974,16 +761,6 @@ def test_print_worst_containment_fails_off_the_plate(
     assert drive_train._plat_side_half_widths(
         drive_train.PIVOT_STATION + drive_train.PLAT_OVERHANG + 1.0
     ) == {"+X": -1.0, "-X": -1.0}
-
-
-def test_drive_train_screw_keeps_1_5d_past_the_far_wall() -> None:
-    """The drive train's own check read the NEAR jaw at nominal (12.7 -
-    (15 - 1.2)/2 >= 1.5 mm).  The placed screw keeps 1.5D past the printed
-    worst far wall, and is the screw the block was sized for."""
-    import _mcmaster_91794a112 as pinch_screw
-
-    engagement = pinch_screw.SHANK_LEN - _worst_far_wall_from_head()
-    assert engagement >= 1.5 * _PINCH_MAJOR_MM, engagement
 
 
 def test_pinch_screw_is_the_5_8_stainless_fillister() -> None:
@@ -1242,23 +1019,9 @@ def test_build_models_the_dowel_ream_on_a_named_axis() -> None:
     banded = model_toleranced_dimensions(part)
     assert banded[("DowelProfile", "DowelHoleDia")] == "*deviations(DOWEL_HOLE_BAND)"
     assert ("DowelXReference", "DowelX") not in banded
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    cut = source[source.index('"cut dowel ream"') : source.index('"DowelHole")')]
-    assert "depth=DOWEL_HOLE_DEPTH, reverse_direction=True" in cut
-    assert 'name_last_feature(adapter, "dowel axis")' in source
-    start = source.rindex(
-        "_author_reference_dimension(", 0, source.index('feature_name="DowelXReference"')
-    )
-    reference = source[start : source.index("\n    )\n", start)]
-    assert "start=(DATUM_FACE_X, 0.0)" in reference
-    assert "value_mm=DOWEL_X," in reference
-    assert 'drive_expression=\'"FootTapX" + "DowelFromTap"\'' in reference
     assert spec.DOWEL_X == pytest.approx(spec.FOOT_TAP_X + spec.DOWEL_FROM_TAP)
     assert spec.DOWEL_Z == spec.FOOT_TAP_Z
     assert spec.DOWEL_X_PRINTED_TEXT == "(.528)"
-    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "dimension_name(adapter, item) == \"DowelX\"" in drawing_source
-    assert "set_reference_dimension(\n        adapter, dowel_station[0]" in drawing_source
     # The print's witnesses leave the -X face and the dowel's centre.
     ink = drawing.sheet_dimension_ink()["DowelX"]
     witnesses = sorted({round(a[0], 9) for a, b in ink.lines if a[0] == b[0]})

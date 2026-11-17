@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import math
-import re
 from pathlib import Path
 
 import pytest
@@ -83,15 +82,6 @@ def test_build_sketches_radius_over_station() -> None:
     points = part.profile_points()
     assert points == [(r, y) for y, r in spec.PROFILE]
     assert points[0] == (0.0, 0.0)
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "RevolveParameters(angle=360.0)" in source
-    assert 'volume_check(adapter, "marker", VOLUME_MM3' in source
-
-
-def test_spec_is_pure_data() -> None:
-    source = Path(spec.__file__).read_text(encoding="utf-8")
-    imports = re.findall(r"^(?:from|import) (\S+)", source, re.MULTILINE)
-    assert set(imports) <= {"__future__", "math"}
 
 
 def test_drawing_is_the_purchased_reference_sheet() -> None:

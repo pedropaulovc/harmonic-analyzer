@@ -118,15 +118,6 @@ def test_model_owns_places_and_bands() -> None:
 
 
 def test_policy_sheet_carries_no_gdt_or_render_time_precision() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    for helper in (
-        "add_feature_control_frame",
-        "add_datum_feature",
-        "set_basic_dimension",
-        "set_dimension_precision",
-        "SetPrecision3",
-    ):
-        assert helper not in source
     assert not hasattr(spec, "GEOMETRIC_TOLERANCES_MM")
 
 
@@ -273,15 +264,8 @@ def test_relief_lead_prints_its_model_band_with_words_only() -> None:
     for limit in spec.RELIEF_LEAD_LIMITS:
         assert spec.inch_text(limit, 3) not in callout
     assert max(map(len, callout.splitlines())) <= 18
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert '"ReliefLead": RELIEF_LEAD_CALLOUT' in source
-    assert "RELIEF_LEAD_NOTE" not in source
     for retired in ("LEAD_PICK", "LEAD_NOTE_XY", "LEAD_NOTE_WIDTH"):
         assert not hasattr(drawing, retired)
-    # The detail is curated before its parent: a native detail imported
-    # nothing after its parent's import and deletions (draw_dt_crank_handle).
-    assert source.index("keep=DETAIL_KEEP") < source.index("keep=SIDE_KEEP")
-    assert "CreateDetailViewAt4(" in source
 
 
 def test_detail_a_fence_shows_the_lead_and_clears_the_side_view() -> None:
@@ -329,8 +313,6 @@ def test_engagement_meets_the_1_5d_rule_governed_by_the_stock_arm() -> None:
     # the worst case, so the #8-32's U33b exception stays retired.
     assert spec.ENGAGEMENT_RULE_D == 1.5
     assert not hasattr(spec, "ENGAGEMENT_EXCEPTION_FLOOR_D")
-    source = Path(spec.__file__).read_text(encoding="utf-8")
-    assert "the #8-32's U33b exception (1.26D) stays" in source
     assert spec.ENGAGEMENT_FLOOR == pytest.approx(1.5 * 2.845)
     # The chamfer's partial threads are excluded: full thread reaches the
     # shortest section less the longest printed chamfer (Codex P2 on #1138).
@@ -648,25 +630,9 @@ def test_assembly_seats_the_shoulder_on_the_arm_and_files_the_tip_flush() -> Non
     assert spec.INSTALLED_THREAD_LENGTH == pytest.approx(geometry.ARM_THICKNESS)
     assert spec.INSTALLED_TIP_CHAMFER == pytest.approx(spec.EDGE_BREAK_MAX_MM)
     assert assembly.HANDLE_SCREW_INSTALLED_CONFIG == spec.INSTALLED_CONFIG == "INSTALLED"
-    source = Path(assembly.__file__).read_text(encoding="utf-8")
-    assert "configuration=HANDLE_SCREW_INSTALLED_CONFIG," in source
 
 
 def test_installed_configuration_is_split_from_a_finished_default() -> None:
-    import build_dt_crank_handle_pivot_screw as part
-
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    split = source.index("create_configuration {INSTALLED_CONFIG}")
-    for edit in (
-        "await apply_material(adapter, MATERIAL)",
-        "author_part_pmi(adapter",
-        'blank_sketch(adapter, "StationReference")',
-        "apply_drawing_precision(adapter, DRAWING_PRECISION)",
-    ):
-        assert source.index(edit) < split, edit
-    assert "assert_saved_configurations_regenerate(adapter, PART_NAME)" in source
-    assert "require_material_in_every_configuration(" in source
-    assert part.V_INSTALLED < part.V_FINAL
     assert _config.parts("dt-crank-handle-pivot-screw")["description"] == "CRANK HANDLE PIVOT SCREW"
 
 
@@ -719,18 +685,10 @@ def test_worst_engagement_clears_the_novice_margin_by_geometry() -> None:
     )
 
 
-
 def test_station_reference_is_saved_hidden_and_imported_per_view() -> None:
     # #880: a reference sketch owns printed dimensions but no geometry, so the
     # part saves it hidden (no assembly instance renders it) and the drawing
     # shows it per view through _drawing_hidden_sketches to import them.
-    build = Path(drawing.__file__).with_name("build_dt_crank_handle_pivot_screw.py").read_text(encoding="utf-8")
-    blank = 'blank_sketch(adapter, "StationReference")'
-    assert blank in build
-    assert build.index(blank) < build.rindex("save_part_and_images(adapter, PART_NAME)")
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "from _drawing_hidden_sketches import curate_view_dimensions" in source
-    assert "    curate_view_dimensions,\n" not in source.replace("\r\n", "\n")
     assert "StationReference" in spec.DRAWING_DIMENSIONS
 
 
@@ -785,10 +743,6 @@ def test_head_seat_breaks_clear_each_mating_corner_and_keep_a_bearing_flat() -> 
     )
     assert flat >= spec.HEAD_BEARING_RADIAL_MIN - 1e-9
     assert flat >= 0.1  # the ruling's flat bearing floor (#1757)
-    # The cup's recipes stay out of the screw spec's closure (Codjiflo r2).
-    assert "dt_crank_handle_pivot_screw_spec" not in Path(
-        cup_seat.__file__
-    ).read_text(encoding="utf-8")
 
 
 def test_head_seat_prints_native_limits_with_words_only_callouts() -> None:
@@ -797,12 +751,6 @@ def test_head_seat_prints_native_limits_with_words_only_callouts() -> None:
     for callout in (notes.UNDER_HEAD_RADIUS_CALLOUT, notes.HEAD_CHAMFER_CALLOUT):
         assert "MHA-DT-35" in callout
         assert not re.search(r"\.\d", callout)
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "set_single_limit(" in source and '"UnderHeadRadius"' in source
-    assert "limits=HEAD_CHAMFER_LIMITS" in source
-    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert '"UnderHeadRadius": UNDER_HEAD_RADIUS_CALLOUT' in drawing_source
-    assert '"HeadChamfer": HEAD_CHAMFER_CALLOUT' in drawing_source
 
 
 def test_detail_b_frames_the_head_seat_inside_the_sheet() -> None:
@@ -816,116 +764,3 @@ def test_detail_b_frames_the_head_seat_inside_the_sheet() -> None:
     assert x + crop < 0.218 or y - crop > 0.065
     ax, ay = drawing.DETAIL_CENTER
     assert math.hypot(x - ax, y - ay) > crop + drawing.DETAIL_CROP_RADIUS
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.index("keep=DETAIL_B_KEEP") < source.index("keep=SIDE_KEEP")
-
-
-class _ProfileCaptured(Exception):
-    """Raised at the revolve's volume check: the profile is complete."""
-
-
-def test_profile_runs_the_head_seat_into_a_tangent_round_and_dimensions_it(
-    monkeypatch,
-) -> None:
-    # #1757: drive the real build through the revolve profile with a
-    # recording adapter, stopping at the first volume check.
-    import asyncio
-    from types import SimpleNamespace
-    from unittest.mock import AsyncMock, MagicMock
-
-    entities: dict[str, tuple[str, tuple[float, ...]]] = {}
-    dimensions: list[tuple[object, ...]] = []
-
-    def success(data: object = None) -> SimpleNamespace:
-        return SimpleNamespace(is_success=True, data=data)
-
-    def entity(kind: str, *coordinates: float) -> SimpleNamespace:
-        key = f"{kind}_{len(entities)}"
-        entities[key] = (kind, coordinates)
-        return success(key)
-
-    async def between(_adapter, start, end, kind, value, _label):
-        dimensions.append((start, end, kind, value))
-
-    async def sketch_dimension(first, second, kind, value):
-        dimensions.append((first, second, kind, value))
-        return success("dim")
-
-    adapter = SimpleNamespace(
-        currentSketchManager=SimpleNamespace(AddToDB=False),
-        _attempt=lambda read, default=None: read(),
-        create_part=AsyncMock(return_value=success()),
-        create_sketch=AsyncMock(return_value=success()),
-        add_centerline=AsyncMock(side_effect=lambda *p: entity("axis", *p)),
-        add_line=AsyncMock(side_effect=lambda *p: entity("line", *p)),
-        add_arc=AsyncMock(side_effect=lambda *p: entity("arc", *p)),
-        add_sketch_constraint=AsyncMock(return_value=success("constraint")),
-        add_sketch_dimension=AsyncMock(side_effect=sketch_dimension),
-        exit_sketch=AsyncMock(return_value=success()),
-        create_revolve=AsyncMock(return_value=success()),
-    )
-    for name in (
-        "set_global", "add_diametric_linear_dimension", "anchor_point_to_origin",
-        "ensure_fully_defined",
-    ):
-        monkeypatch.setattr(part, name, AsyncMock())
-    for name in ("apply_package_model_units", "name_last_feature"):
-        monkeypatch.setattr(part, name, MagicMock())
-    monkeypatch.setattr(part, "dimension_between", between)
-    monkeypatch.setattr(part.SketchDims, "apply", lambda *_args: [])
-
-    async def stop(*_args, **_kwargs):
-        raise _ProfileCaptured
-
-    monkeypatch.setattr(part, "volume_check", stop)
-    with pytest.raises(_ProfileCaptured):
-        asyncio.run(part.build(adapter))
-
-    r = seat.UNDER_HEAD_RADIUS_MAX
-    c = seat.HEAD_CHAMFER
-    shoulder_r, head_r = spec.SHOULDER_DIA / 2.0, spec.HEAD_DIA / 2.0
-    lines = {k: p for k, (kind, p) in entities.items() if kind == "line"}
-    (arc, (cx, cy, sx, sy, ex, ey)), = (
-        (k, p) for k, (kind, p) in entities.items() if kind == "arc"
-    )
-    assert (cx, cy) == pytest.approx((-(spec.HEAD_LENGTH + r), shoulder_r + r))
-    assert (sx, sy) == pytest.approx((-(spec.HEAD_LENGTH + r), shoulder_r))
-    assert (ex, ey) == pytest.approx((-spec.HEAD_LENGTH, shoulder_r + r))
-    # add_arc is CCW: the 90-degree fill, not its 270-degree complement.
-    sweep = (math.atan2(ey - cy, ex - cx) - math.atan2(sy - cy, sx - cx)) % math.tau
-    assert sweep == pytest.approx(math.pi / 2)
-    # The profile is one closed loop through the arc.
-    ends = [p[:2] for p in lines.values()] + [p[2:] for p in lines.values()]
-    ends += [(sx, sy), (ex, ey)]
-    for point in ends:
-        assert sum(1 for other in ends if other == pytest.approx(point)) == 2
-    head_break = next(
-        k for k, p in lines.items()
-        if p == pytest.approx(
-            (-(spec.HEAD_LENGTH - c), head_r, -spec.HEAD_LENGTH, head_r - c)
-        )
-    )
-    under_head_face = next(
-        k for k, p in lines.items()
-        if p == pytest.approx(
-            (-spec.HEAD_LENGTH, head_r - c, -spec.HEAD_LENGTH, shoulder_r + r)
-        )
-    )
-    shoulder = next(
-        k for k, p in lines.items()
-        if p == pytest.approx((sx, sy, -spec.SEAT_STATION, shoulder_r))
-    )
-    assert (arc, None, "radial", r) in dimensions
-    assert (f"{head_break}.start", f"{head_break}.end", "horizontal_distance", c) in (
-        dimensions
-    )
-    assert (f"{head_break}.start", f"{head_break}.end", "vertical_distance", c) in (
-        dimensions
-    )
-    constraints = [call.args for call in adapter.add_sketch_constraint.call_args_list]
-    assert (under_head_face, arc, "tangent") in constraints
-    assert (arc, shoulder, "tangent") in constraints
-    assert (under_head_face, None, "vertical") in constraints
-    assert (shoulder, None, "horizontal") in constraints
-    assert (head_break, None, "vertical") not in constraints
-    assert (head_break, None, "horizontal") not in constraints

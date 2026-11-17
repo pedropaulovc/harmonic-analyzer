@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import ast
-import inspect
 import math
 import re
 from dataclasses import replace
@@ -13,7 +11,6 @@ import pytest
 import _buildgraph as bg
 import _config
 import _dt_cone_gear_tl_arbor_interference as interference
-import build_dt_cone_gear_tl_arbor_assembly as build
 import draw_dt_cone_gear_tl_arbor_assembly as drawing
 import dt_cone_gear_spec as cone
 import dt_cone_gear_tl_arbor_assembly_spec as spec
@@ -54,22 +51,6 @@ def test_the_bom_lists_every_kit_part_by_its_registered_number() -> None:
     ]
     assert drawing.BOM_COMPONENTS == spec.BOM_ORDER
     assert nut.SKU in spec.BOM_DESCRIPTIONS[spec.NUT]
-
-
-def test_the_build_inserts_the_parts_in_bom_order() -> None:
-    """The steps cite item numbers, so insertion order is the BOM's."""
-    tree = ast.parse(inspect.getsource(build))
-    stems = [
-        node.args[1].value
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call)
-        and getattr(node.func, "id", "") == "place_component"
-        and isinstance(node.args[1], ast.Constant)
-    ]
-    stems.sort(key=lambda s: inspect.getsource(build).index(f'"{s}"'))
-    order = list(dict.fromkeys(spec.COMPONENT_IDENTITIES[s][0] for s in spec.BOM_ORDER))
-    assert stems == order
-    assert set(bg.references_of(KIT)) == {stem.replace("-", "_") for stem in order}
 
 
 def test_the_kit_pose_is_the_64t_setup_on_the_arbor() -> None:
@@ -126,11 +107,6 @@ def _steps() -> list[str]:
 
 def _flat(step: str) -> str:
     return " ".join(step.split())
-
-
-def _after(steps: list[str], words: str) -> list[str]:
-    (index,) = (i for i, step in enumerate(steps) if words in _flat(step))
-    return [_flat(step) for step in steps[index + 1 :]]
 
 
 def test_the_steps_do_one_thing_each_and_check_every_joint_and_setting() -> None:

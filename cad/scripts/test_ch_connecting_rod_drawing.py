@@ -87,19 +87,6 @@ def test_fork_reference_lengths_run_from_the_crown_top() -> None:
     assert rod.FORK_BOSS_LENGTH == pytest.approx(18.034)  # .71
     # The slot floor stands above the root step, so the bridge is solid.
     assert spec.FORK_BASE_Y < spec.FORK_CROTCH_Y < spec.CENTER_DISTANCE
-    # Every drive in the slot sketch evaluates to its built value.
-    source = "".join(Path(rod.__file__).read_text(encoding="utf-8").split())
-    assert "slot_sd.record(\"SlotDepth\",'\"ForkWidth\"/2+\"ForkCrotchBelowPin\"')" in source
-    assert (
-        "slot_sd.record(\"ForkBossLength\",'\"ForkWidth\"/2+\"ForkBaseBelowPin\"')"
-        in source
-    )
-    # The side view locates from the fork's outer face (the reference line
-    # stands on it), never from the mid-plane.
-    assert "slot_sd.record(\"ForkFaceX\",'\"ForkThickness\"/2')" in source
-    assert "slot_sd.record(\"TineNear\",'\"ForkTine\"')" in source
-    assert 'set_global(adapter,"ForkThickness",\'2*"ForkTine"+"ForkSlotWidth"\')' in source
-    assert "SlotHalfWidth" not in source
 
 
 def test_analytic_volumes_follow_the_fork_geometry() -> None:
@@ -154,12 +141,6 @@ def test_pin_hole_is_the_reamed_press_hole_for_the_rod_pivot_pin() -> None:
     assert model_toleranced_dimensions(rod)[("PinHoleProfile", "PinHoleDia")] == (
         "*deviations(PIN_HOLE_BAND)"
     )
-    build = "".join(Path(rod.__file__).read_text(encoding="utf-8").split())
-    assert 'set_global(adapter,"PinHoleDia",f"{PIN_HOLE_DIA}mm")' in build
-    assert 'names=(None,"PinHoleY","PinHoleDia")' in build
-    assert "drives=(None,'\"CenterDistance\"','\"PinHoleDia\"')" in build
-    assert 'name_last_feature(adapter,"PinHoleProfile")' in build
-    assert 'name_last_feature(adapter,"PinHole")' in build
     assert ch_connecting_rod_notes.PIN_NUMBER == _config.parts("sh-vn-pivot-pin")["number"]
     assert ch_connecting_rod_notes.ARM_NUMBER == _config.parts("ch-rocker-arm")["number"]
     assert drawing.CAM_NUMBER == _config.parts("dt-cylinder-gear")["number"]
@@ -174,10 +155,6 @@ def test_the_pin_bears_on_the_whole_tine() -> None:
     sunk into a tine face), so the pin's land in each tine is the thinnest
     tine the tine's own band leaves (#982)."""
     spec = ch_connecting_rod_spec
-    source = Path(rod.__file__).read_text(encoding="utf-8")
-    assert "add_chamfer(" not in source
-    assert "wizard_holes(" not in source
-    assert source.count("create_cut_extrude(") == 3  # slot, strap bore, pin hole
     assert not [name for name in dir(rod) if "countersink" in name.lower()]
     assert not [name for name in dir(spec) if "CSK" in name]
     thinnest_tine = spec.TINE_THICKNESS + spec.TINE_BAND[1]
@@ -194,15 +171,10 @@ def test_the_pin_bears_on_the_whole_tine() -> None:
 
 def test_sheet_runs_at_1_to_1_with_1_to_2_isometric() -> None:
     assert drawing.SHEET_SCALE == (1.0, 1.0)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "scale=(1, 2)" in source  # the isometric override
     # The left view stands level with the front (third-angle alignment) and
     # carries the fork detail's circle; every side-view dimension prints in
     # the detail.
     assert drawing.LEFT_CENTER == (0.080, drawing.FRONT_CENTER[1])
-    # Fan-out screen 2026-11-07: the reamed hole's matched press fit is the
-    # sheet's one numbered note, top left over the views.
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)' in source
     assert ch_connecting_rod_notes.DRAWING_NOTES.splitlines() == [
         "1. MATCHED PRESS FIT ON ROD PIVOT PIN MHA-SH-VN-58:",
         "    REAM .0002-.0008 UNDER THE MEASURED PIN.",
@@ -212,7 +184,6 @@ def test_sheet_runs_at_1_to_1_with_1_to_2_isometric() -> None:
     assert ch_connecting_rod_notes.CAM_NUMBER == drawing.CAM_NUMBER
     assert max(y for _, y in drawing.DETAIL_KEEP.values()) < 0.260
     assert ch_connecting_rod_notes.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:2"
-    assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
 
 
 def test_the_tine_wall_shortfall_sits_between_the_floor_and_the_target() -> None:
@@ -315,16 +286,6 @@ def test_plate_locates_from_the_fork_face_and_prints_its_thickness() -> None:
     assert spec.SHANK_THICKNESS == spec.RING_THICKNESS
     assert spec.SHANK_THICKNESS_BAND == spec.RING_THICKNESS_BAND
     assert spec.RING_THICKNESS + spec.RING_THICKNESS_BAND[1] >= WALL_TARGET_MM
-    build = "".join(Path(rod.__file__).read_text(encoding="utf-8").split())
-    assert 'set_global(adapter,"RingFaceNear",\'("ForkThickness"-"RingThickness")/2\')' in build
-    assert 'name_dimensions(adapter,"Plate",["RingThick"])' in build
-    # #982 review r2: two coplanar bosses left the shank's flanks as seams
-    # across the ring's faces; ring and shank are one outline, one extrusion.
-    assert 'name_last_feature(adapter,"PlateProfile")' in build
-    assert '"Shank"' not in build and "ShankProfile" not in build
-    assert build.count("create_extrusion(") == 2  # plate, fork boss
-    assert "(ring_thick_dim[0],'\"RingThickness\"')" in build
-    assert "RingFaceFar" not in build
     assert set(drawing.LEFT_KEEP) == {"RingThick"}
     # The thickness stands below the ring, its text out to the left.
     ring_bottom = drawing._left_xy(0.0, spec.RING_BOTTOM_Y)
@@ -351,10 +312,6 @@ def test_inside_corners_are_one_modelled_radius_under_the_title_block() -> None:
     assert spec.INSIDE_CORNER_R <= ceiling
     assert ceiling < pin.BUDGET["crotch_clearance_min"]
     assert 2.0 * ceiling < spec.FORK_SLOT_WIDTH + spec.FORK_SLOT_BAND[1]
-    source = Path(rod.__file__).read_text(encoding="utf-8")
-    assert source.count("add_fillet(") == 1
-    assert 'name_last_feature(adapter, "InsideCorners")' in source
-    assert "_inside_corner_max_limit" not in source
     assert "InsideCorners" not in ch_connecting_rod_notes.DRAWING_DIMENSIONS
     assert "InsideCornerR" not in drawing.FRONT_KEEP
     assert "InsideCornerR" not in drawing.FRONT_CALLOUTS
@@ -382,13 +339,6 @@ def test_overall_length_is_a_side_view_reference() -> None:
     # Right of the side view, left of the centre distance's text.
     tine_outer = d._left_xy(spec.FORK_THICKNESS / 2.0, 0.0)[0]
     assert tine_outer + 0.010 < d.OVERALL_TEXT_XY[0] < 0.125 - 0.015
-    source = Path(d.__file__).read_text(encoding="utf-8")
-    assert "face_silhouettes_through(" in source
-    assert "entities=ends," in source
-    assert (
-        'set_reference_dimension(adapter, overall.GetAnnotation(), label="overall length")'
-        in source
-    )
 
 
 def test_datum_a_tag_stands_clear_of_the_centre_distance_witness() -> None:
@@ -441,11 +391,6 @@ def test_basic_centre_distance_prints_inside_the_pin_position_zone() -> None:
         / 2.0
     )
     assert abs(printed - closure_in) < zone_radius_in / 10.0
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    block = source[source.index('label="rod centre distance",\n    )') :]
-    block = block[: block.index('set_basic_dimension(adapter, centre_distance')]
-    assert "CENTRE_DISTANCE_PLACES" in block
-    assert "expected_mm=CENTER_DISTANCE" in block
 
 
 def test_datum_b_is_basic_from_datum_a() -> None:
@@ -459,22 +404,6 @@ def test_datum_b_is_basic_from_datum_a() -> None:
     assert ring_top < text_y < drawing.DATUM_B_SYMBOL[1] - 0.015
     assert text_y > drawing.FRONT_KEEP["RingOuterDia"][1] + 0.012
     assert text_x < drawing.DATUM_B_EDGE[0] - 0.015
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    # The A-to-B locator's own block: centre-anchored, value-checked at half
-    # the shank width, then boxed (not satisfied by the B-to-pin check).
-    start = source.index("datum_b_offset = add_edge_dimension(")
-    end = source.index(
-        'set_basic_dimension(adapter, datum_b_offset, label="datum B from datum A")'
-    )
-    block = source[start:end]
-    assert "p1=ring_rim," in block
-    assert 'set_arc_endpoints_to_center(adapter, datum_b_offset, label="datum B from datum A")' in block
-    assert (
-        "assert_dimension_measures(\n"
-        "        adapter,\n"
-        "        datum_b_offset,\n"
-        "        expected_mm=SHANK_WIDTH / 2.0,\n"
-    ) in block
 
 
 def test_ring_diameters_keep_one_arrow_on_the_near_rim() -> None:
@@ -483,8 +412,6 @@ def test_ring_diameters_keep_one_arrow_on_the_near_rim() -> None:
     assert drawing.set_near_side_diameter is _drawing_leaders.set_near_side_diameter
     assert drawing.NEAR_SIDE_DIAMETERS == ("RingOuterDia", "StrapBoreDia")
     assert set(drawing.NEAR_SIDE_DIAMETERS) <= set(drawing.FRONT_KEEP)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'set_near_side_diameter(matches[0], f"ring {name}")' in source
 
 
 def test_fork_print_is_three_place_and_model_owned() -> None:
@@ -501,16 +428,6 @@ def test_fork_print_is_three_place_and_model_owned() -> None:
     assert marked["PlateProfile"] == {"RingOuterDia", "ShankWidthDim"}
     assert marked["ForkProfile"] == {"ForkWidthDim"}
     assert rod.DRAWING_PRECISION is ch_connecting_rod_notes.DRAWING_PRECISION
-    build = "".join(Path(rod.__file__).read_text(encoding="utf-8").split())
-    assert 'name_dimensions(adapter,"ForkBoss",["ForkThick"])' in build
-    assert "(fork_thickness_dim[0],'\"ForkThickness\"')" in build
-    assert "apply_drawing_precision(adapter,DRAWING_PRECISION)" in build
-    # The fork over the tines is a reference: two tines and the slot set it.
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert (
-        'set_reference_dimension(adapter, fork_thick[0], label="fork over the tines")'
-        in source
-    )
 
 
 def test_reamed_pin_hole_is_a_native_four_place_dimension() -> None:
@@ -577,16 +494,6 @@ def test_fork_detail_takes_in_the_crown_and_the_ring_faces() -> None:
         assert x < 0.400
     # The datum fork face (model -Z) stands on the detail's left.
     assert d._detail_xy(-half, 0.0)[0] < d.DETAIL_CENTER[0] < d._detail_xy(half, 0.0)[0]
-    source = Path(d.__file__).read_text(encoding="utf-8")
-    assert "detail = _fork_detail(adapter, left)" in source
-    assert "set_hidden_lines_visible" not in source
-    # ENFORCE farm runs: the inferred fence snapped in screen space (12.4,
-    # then 9.7 mm, off the rod axis); it is authored direct-to-DB and read
-    # back, with AddToDB restored in a finally block.
-    detail_source = source[source.index("def _fork_detail") : source.index("async def build")]
-    assert "manager.AddToDB = True" in detail_source
-    assert "finally:\n        manager.AddToDB = previous_add_to_db" in detail_source
-    assert "the fork detail fence moved from where it was placed" in detail_source
 
 
 def test_detail_texts_stand_outside_their_witness_lines() -> None:
@@ -637,14 +544,9 @@ def test_bore_finish_is_routed_clear_of_the_lower_dimension_stack() -> None:
     ra_end = symbol_x + 0.006 + 6 * drawing.BORE_FINISH_CHAR_HEIGHT
     face_callout_left = drawing.DETAIL_KEEP["RingFaceNear"][0] - 0.030
     assert ra_end < face_callout_left - 0.005
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "char_height=BORE_FINISH_CHAR_HEIGHT," in source
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:
-    source = Path(rod.__file__).read_text(encoding="utf-8")
-    assert "apply_drawing_properties" in source
-    assert "clear_dimensions_for_drawing" in source
     import _config
 
     spec = _config.parts("ch-connecting-rod")

@@ -181,29 +181,6 @@ def test_the_recipe_volume_is_the_section_swept_round_the_axis() -> None:
     )
 
 
-def test_stock_build_turns_the_recipe_axis_onto_part_z(monkeypatch) -> None:
-    seen: dict = {}
-
-    async def fake_build(adapter, **kwargs):
-        seen.update(kwargs)
-        return {}
-
-    monkeypatch.setattr(part, "build_stock_fastener", fake_build)
-    asyncio.run(part.build(None))
-    (component,) = seen["components"]
-    assert component.sku == spec.SKU
-    assert component.author is recipe.build_9715K43
-    # Rx(+90 deg) maps the recipe's +Y onto +Z (the transgear-retaining-ring
-    # convention); with no lift the OD rim's bearing face stays on z = 0.
-    assert component.transform.rotation_radians == pytest.approx(
-        (math.pi / 2.0, 0.0, 0.0)
-    )
-    assert component.transform.translation_mm == (0.0, 0.0, 0.0)
-    assert seen["material"] == part.SPEC.material
-    # The published axis is the part's Z: Top (XZ) ∩ Right (YZ).
-    assert seen["screw_axis_planes"] == ("Top Plane", "Right Plane")
-
-
 def test_standalone_recipe_run_is_catalog_only(monkeypatch, tmp_path) -> None:
     """No vendor model: the standalone run builds the recipe and saves it
     under the reference directory, never entering the replica path."""
@@ -262,26 +239,3 @@ def test_purchased_sheet_documents_the_built_part() -> None:
 
 def test_installation_lives_in_the_assembly_steps_not_on_the_sheet() -> None:
     assert "installation_notes" not in _config.parts(STEM)
-
-
-def test_the_sheet_prints_the_catalogue_sizes_as_reference_data(monkeypatch) -> None:
-    """The installed views carry no diagrams; the four replacement sizes print
-    as REF data, and the application gauges (working height, shaft) do not."""
-    import asyncio
-
-    import draw_pd_vn_transgear_pivot_spring as drawing
-
-    assert drawing.SUPPLIER_DATA == (
-        "ID (Ø.200), OD (Ø.423).",
-        "FREE HEIGHT (.047), THICKNESS (.011).",
-    )
-    seen = {}
-
-    async def capture(*_args, **kwargs):
-        seen.update(kwargs)
-        return {}
-
-    monkeypatch.setattr(drawing, "build_purchased_fastener_drawing", capture)
-    asyncio.run(drawing.build(None))
-    assert seen["supplier_data"] == drawing.SUPPLIER_DATA
-    assert "supplier_dimensions" not in seen

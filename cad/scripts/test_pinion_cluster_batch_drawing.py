@@ -335,14 +335,6 @@ def test_clamp_thumb_allowance_bounds_the_actual_pair_and_total_volume(
     assert adapter.currentModel.manager.releases == 1
 
 
-def _press_fit_shell_limit(
-    outer_d: float,
-    bore_d: float,
-    host_chord: float,
-) -> float:
-    return math.pi * (outer_d**2 - bore_d**2) * host_chord / 4.0
-
-
 def _expected_numbered_pairs(
     first_stem: str,
     numbers: Iterable[int],

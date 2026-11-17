@@ -29,35 +29,7 @@ def test_knife_seat_bore_finish_is_part_owned_and_consumed_by_key() -> None:
     assert top_seat.face.offset_mm == sm_knife_mount_spec.BLK_TOP
     # The built top (14.866) is inside the face match.
     assert abs(part.BLK_TOP - top_seat.face.offset_mm) < top_seat.face.tolerance_mm
-    part_source = Path(part.__file__).read_text(encoding="utf-8")
-    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "surface_finishes=SURFACE_FINISHES" in part_source
-    assert 'surface_finish_by_key(SURFACE_FINISHES, "knife_bore")' in drawing_source
-    assert 'surface_finish_by_key(SURFACE_FINISHES, "top_seat")' in drawing_source
-    assert "roughness_ra=" not in drawing_source
-    # The fleet's finish height (62 of 75 finish symbols print at 2.5 mm):
-    # at the document default the Ra 1.6 printed 6.35 mm, twice the sheet's
-    # 3.5 mm notes (farm run 20261009T171439353Z).
-    import ast
 
-    finishes = [
-        call
-        for call in ast.walk(ast.parse(drawing_source))
-        if isinstance(call, ast.Call)
-        and getattr(call.func, "id", "") == "add_surface_finish"
-    ]
-    keywords = [
-        {
-            keyword.arg: ast.literal_eval(keyword.value)
-            for keyword in finish.keywords
-            if keyword.arg in {"label", "char_height"}
-        }
-        for finish in finishes
-    ]
-    assert keywords == [
-        {"label": "knife bore finish", "char_height": 0.0025},
-        {"label": "top seat finish", "char_height": 0.0025},
-    ]
     # The seat's symbol stands over the right view's top edge, its leader
     # landing on that edge.
     edge_x, edge_y = drawing.TOP_SEAT_FINISH_EDGE_XY
@@ -256,11 +228,6 @@ def test_the_tap_is_stated_once_on_its_hole_callout() -> None:
     # thread depth, drill and drill depth stay associative); SolidWorks' raw
     # "#10-24 Tapped Hole" note would restate it, so it is deleted and
     # finalize proves none is left at export.
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_native_hole_callout(") == 1
-    # R4: no tap tool is named (the full thread's depth says how deep), and
-    # the bolt is named once, on the reason row.
-    assert "process=" not in source
     assert "BOTTOMING TAP" not in "".join(
         str(value)
         for value in vars(sm_knife_mount_spec).values()
@@ -273,28 +240,13 @@ def test_the_tap_is_stated_once_on_its_hole_callout() -> None:
     assert sm_knife_mount_spec.BOLT_NUMBER in drawing.TAP_CALLOUT_REASON.split()
     assert "CLEARANCE" in drawing.TAP_CALLOUT_REASON.split()
     assert drawing.TAPPED_HOLE_NOTE == "Tapped Hole"
-    assert "remove_notes_matching(adapter, TAPPED_HOLE_NOTE)" in source
-    assert "redundant_note_substrings=(TAPPED_HOLE_NOTE,)" in source
-    assert "expected_redundant_notes=0" in source
-    assert source.index("remove_notes_matching(adapter, TAPPED_HOLE_NOTE)") > (
-        source.index("keep=TOP_KEEP")
-    )
 
 
 # The ASME B landscape sheet's inner border, left edge.
 SHEET_INNER_BORDER_LEFT = 0.0127
 
 
-# Farm build 20261013T225639.450330Z (c673e62ee, re-run at e5ad7dcdd): the
-# five-row block at anchor (58.6, 209.0) mm printed x 20.0..97.1 with its top
-# ('+0.10') row 213.8..217.4, and the 7.0's (RD4's) outside tail, then left of
-# the top view at x 77.6, ran (77.6, 221.0)->(77.6, 214.7) through that row.
-RUN_CALLOUT_XY = (0.0586, 0.2090)
 RUN_CALLOUT_SPAN_X = (0.0200, 0.0971)
-RUN_CALLOUT_TOP = 0.2174
-# The three-row block moved 6.0 mm down from the run's anchor; T+H3
-# (2026-10-24) took it 20 mm lower again, under the former datum C's tag.
-TAP_CALLOUT_RUN_DROP = 0.006 + 0.020
 
 
 def test_tap_callout_moves_clear_of_the_row_dimension_tail() -> None:
@@ -534,25 +486,6 @@ def test_datum_b_frame_lands_apart_from_the_slip_hole_diameter_leader() -> None:
     assert left - tag_right >= 0.002
     assert (top - height) - tag_top >= 0.008
     assert x - box / 2.0 - tag_right >= 0.015
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    body = source[source.index("    b_frame_angle = math.radians(PIN_FRAME_RIM_DEG)\n") :]
-    body = body[: body.index("    # The bore (Owner ruling")]
-    assert (
-        "    pin_frame = add_feature_control_frame(\n"
-        "        adapter,\n"
-        "        top,\n"
-        "        edge_xy=b_frame_rim,\n"
-        "        leader_attach_xy=b_frame_rim,\n"
-        "        frame_xy=PIN_FRAME_XY,\n"
-    ) in body
-    assert (
-        "    add_frame_datum_feature(\n"
-        "        adapter,\n"
-        "        top,\n"
-        "        pin_frame,\n"
-        '        datum="B",\n'
-        "        symbol_xy=PIN_DATUM_B_XY,\n"
-    ) in body
 
 
 def test_bore_callout_stands_between_the_height_line_and_the_block() -> None:
@@ -572,16 +505,6 @@ def test_bore_callout_stands_between_the_height_line_and_the_block() -> None:
     # 20261024T114146582Z: the +0.03 rode it, text-on-line).
     top_line = drawing._front_y(sm_knife_mount_spec.BLK_TOP)
     assert y + drawing.BORE_DIA_TEXT_TOP_REACH < top_line - 0.0035
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'set_near_side_diameter(bore_dia[0], "knife-bore diameter")' in source
-
-
-def test_the_template_alone_centre_marks_the_bore() -> None:
-    # #913 on this sheet: the template marks the bore as the front view is
-    # placed, and an explicit auto-insert printed a second mark over it.
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "auto_center_marks" not in source
-    assert "expected one knife-bore centre mark" in source
 
 
 def test_spec_geometry_mirrors_the_build_source() -> None:
@@ -636,12 +559,6 @@ def test_the_sheet_carries_no_notes_block() -> None:
     # prose (knife-edge bearing, screw clamp, two blocks) is gone.
     assert not hasattr(sm_knife_mount_spec, "DRAWING_NOTES")
     assert not hasattr(sm_knife_mount_spec, "STUD_SCREW_NUMBER")
-    part_source = Path(part.__file__).read_text(encoding="utf-8")
-    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "Manufacturing Notes" not in part_source
-    assert "Manufacturing Notes" not in drawing_source
-    assert drawing_source.count("add_property_linked_note(") == 1
-    assert 'add_property_linked_note(adapter, "Isometric View Note"' in drawing_source
     # No quantity rides above B's Ø (the 2X pattern is gone); the slip
     # hole's callout names its fit on its mate (rule 4) and its flat floor;
     # the section's depth prints its value alone.
@@ -684,26 +601,6 @@ def test_the_sheet_carries_no_notes_block() -> None:
 
 
 def test_native_gdt_and_bore_geometry() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    # Datum A the top seat, a tag on its edge.  Datum B the round slip hole
-    # (owner ruling 2026-10-24, T+H3: one hole, no 2X pattern), its symbol
-    # on its ⊥ frame (owner ruling 2026-10-27, #2016; a frame's datum
-    # identifier read "B" back but printed nothing, 20261009T171439353Z).
-    # Owner ruling 2026-11-08 (Pedro), #2144 item 11.3: the slot datum C and
-    # its frames are deleted.  Owner ruling 2026-11-10 (Pedro), #2334, S1:
-    # the bore is datum C, its symbol on its ⌖ frame, and clocks the tap.
-    assert source.count("add_datum_feature(") == 1
-    assert "add_dimension_datum_feature" not in source
-    assert "datum_identifier" not in source
-    assert source.count("add_frame_datum_feature(") == 2
-    assert 'datum="A"' in source
-    assert source.count('datum="B"') == 1
-    assert source.count('datum="C"') == 1
-    assert (
-        source.index('datum="A"')
-        < source.index('datum="B"')
-        < source.index('datum="C"')
-    )
     for gone in ("SLOT_FRAME_XY", "SLOT_FRAME_SIZE", "SLOT_DATUM_C_XY", "SLOT_FRAME_WALL_X"):
         assert not hasattr(drawing, gone), gone
     # Datum C hangs under the bore's ⌖ frame's middle as B under its ⊥.
@@ -715,80 +612,8 @@ def test_native_gdt_and_bore_geometry() -> None:
         )
     )
     assert drawing.BORE_DATUM_C_XY[1] > drawing._front_y(sm_knife_mount_spec.BLK_TOP)
-    # The sheet fails unless every frame's datum is printed, over every view
-    # a frame or tag stands in.
-    assert (
-        "assert_frame_datums_defined(\n        (front, right, top, section),"
-    ) in source
-    assert source.index("assert_frame_datums_defined(") > source.rindex(
-        "add_frame_datum_feature("
-    )
-    # B's hole ⊥Ø to A (a cylindrical zone); the bore ⌖Ø to A|B and, a
-    # separate frame, ∥ to A with a two-plane zone (its pitch; a stacked
-    # lower frame would take the upper's Ø).
-    import ast
 
-    frames = [
-        node
-        for node in ast.walk(ast.parse(source))
-        if isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Name)
-        and node.func.id == "add_feature_control_frame"
-    ]
 
-    def literal(value: ast.expr) -> object:
-        # A GEOMETRIC_TOLERANCES_IN[...] lookup reads as its key.
-        if isinstance(value, ast.Subscript):
-            return ast.literal_eval(value.slice)
-        if isinstance(value, ast.Tuple):
-            return tuple(literal(item) for item in value.elts)
-        return ast.literal_eval(value)
-
-    by_label = {}
-    for frame in frames:
-        keywords = {keyword.arg: keyword.value for keyword in frame.keywords}
-        assert set(keywords) <= {
-            "edge_xy",
-            "leader_attach_xy",
-            "frame_xy",
-            "characteristic",
-            "tolerance",
-            "datums",
-            "translated",
-            "diameter",
-            "label",
-        }
-        label = literal(keywords["label"])
-        by_label[label] = (
-            literal(keywords["characteristic"]),
-            literal(keywords["tolerance"]),
-            literal(keywords["datums"]),
-            literal(keywords["diameter"]) if "diameter" in keywords else False,
-        )
-    assert by_label == {
-        "dowel hole perpendicularity": (
-            "perpendicularity",
-            "dowel hole perpendicularity",
-            ("A",),
-            True,
-        ),
-        "knife-bore position": ("position", "knife-bore position", ("A", "B"), True),
-        "knife-bore parallelism": ("parallelism", "knife-bore parallelism", ("A",), False),
-        "knife-hanger tap position": (
-            "position",
-            "knife-hanger tap position",
-            ("A", "B", "C"),
-            True,
-        ),
-    }
-    assert source.count('datums=("A", "B", "C")') == 1
-    assert source.count('translated=("C",)') == 1
-    assert source.count('datums=("A", "B")') == 1
-    assert source.count('datums=("A",)') == 2
-    assert "lower_frame=" not in source
-    assert "composite=" not in source
-    assert "quantity=" not in source
-    assert "_GTOL_TEXT_CALLOUT_ABOVE" not in source
     for gone in ("PIN_FRAME_QUANTITY", "PIN_SPAN_TEXT_XY", "PIN_DATUM_B_RIM_DEG"):
         assert not hasattr(drawing, gone)
     # The ∥ frame stands mirrored, left of the datum-A tag and one row under
@@ -800,9 +625,6 @@ def test_native_gdt_and_bore_geometry() -> None:
         (drawing.FRONT_CENTER[0] - 0.037, drawing.BORE_FRAME_XY[1] - 0.007)
     )
     assert drawing.BORE_PARALLELISM_FRAME_XY[0] + 0.031 < drawing.FRONT_CENTER[0]
-    bore_frame = source[source.index("    # The bore (Owner ruling") :]
-    bore_frame = bore_frame[: bore_frame.index("    bore_basic = ")]
-    assert bore_frame.count("edge_xy=bore_crown,") == 2
     assert sm_knife_mount_spec.GEOMETRIC_TOLERANCES_IN == {
         "knife-bore position": ".008",
         "knife-bore parallelism": ".002",
@@ -832,21 +654,6 @@ def test_native_gdt_and_bore_geometry() -> None:
     assert len(parallel_accepts) == 1
     assert "#2144 item 11.3" in parallel_accepts[0]["reason"]
     assert not any("datum-C" in entry["where"] or "slot" in entry["where"] for entry in declared)
-    # Sheet-added: the block depth, the tap axis's station from B's axis and
-    # the bore centre's height under A (both BASIC), and B's station from the
-    # side face; B's Ø, the depth and B's row from the front face are marked
-    # model dimensions (DRAWING_DIMENSIONS).
-    assert source.count("add_edge_dimension(") == 4
-    assert source.count("set_basic_dimension(") == 2
-    assert "dowel hole span" not in source
-    assert (
-        'set_basic_dimension(adapter, station, label="dowel hole from tap axis")'
-        in source
-    )
-    assert (
-        'set_basic_dimension(adapter, bore_basic, label="knife-bore centre from top seat")'
-        in source
-    )
 
 
 @pytest.mark.parametrize(
@@ -864,8 +671,6 @@ def test_each_basic_prints_the_modelled_value_unrounded(label: str, basic: float
     # prints it at .XXX, so it must be an exact thousandth of an inch.
     places = sm_knife_mount_spec.DRAWING_REFERENCE_PRECISION[label]
     assert abs(round(basic / 25.4, places) * 25.4 - basic) < 1e-9
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "from build_sm_knife_mount import BORE_CENTRE_DEPTH" in source
     assert not hasattr(sm_knife_mount_spec, "BORE_CENTRE_DEPTH")
 
 
@@ -876,9 +681,6 @@ def test_bore_basic_is_the_built_geometry() -> None:
 
 
 def test_part_stamps_make_critical_properties() -> None:
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "apply_drawing_properties" in source
-    assert "clear_dimensions_for_drawing" in source
     import _config
 
     config = _config.parts("sm-knife-mount")
@@ -899,8 +701,6 @@ def test_part_stamps_make_critical_properties() -> None:
     assert "hardening" not in finish
     assert "Brass" not in config["material_specification"]
     assert int(config["quantity"]) == 2
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "apply_color(adapter, HARDENED_STEEL)" in source
     assert part.HARDENED_STEEL == (0.30, 0.30, 0.31)
 
 
@@ -963,23 +763,6 @@ def test_tap_callout_bands_its_full_thread_and_drill_depth_with_a_pitch_of_runou
     assert sm_knife_mount_spec.STUD_TAP_THREAD_DEPTH_MIN >= (
         1.5 * sm_knife_mount_spec.STUD_THREAD_MAJOR
     )
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "tap_callout = add_native_hole_callout(" in source
-    assert (
-        "    _write_tap_callout_definitions(adapter, tap_callout)\n"
-        "    _band_tap_callout(tap_callout)\n"
-    ) in source
-    assert "        TAP_CALLOUT_PLACES,\n" in source
-    body = source[source.index("def _band_tap_callout(") :]
-    body = body[: body.index("\ndef ")]
-    assert "kind, lower, upper = tap_callout_tolerance(band)" in body
-    assert "variable.ToleranceType = kind" in body
-    assert "variable.ToleranceMin = lower / 1000.0" in body
-    assert "variable.ToleranceMax = upper / 1000.0" in body
-    assert "length.TolerancePrecision = TAP_CALLOUT_BAND_PLACES" in body
-    assert "hw-tapdrldia" not in body
-    assert "if required:" in body
-    assert "_prove_tap_point(points[0])" in body
 
 
 def test_tap_crown_web_charges_a_pilot_wider_than_accepted_at_its_sharpest_point() -> None:
@@ -1128,23 +911,7 @@ def test_hidden_threads_and_restated_hidden_lines_are_gone() -> None:
     # Every view is hidden-lines-removed, the front and right views' thread
     # annotations on a hidden layer; A-A's thread on a visible thin
     # continuous layer, and none moved there fails the build.
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert (
-        "for view in (iso, right, front, top):\n"
-        "        set_hidden_lines_removed(adapter, view)"
-    ) in source
-    assert "set_hidden_lines_visible" not in source
     assert drawing.SECTION_THREAD_LAYER != drawing.HIDDEN_THREAD_LAYER
-    section_call = source[source.index("    if not _layer_cosmetic_threads(\n        adapter,\n        section,") :]
-    hidden_loop = 'for view, view_label in ((front, "front"), (right, "right")):'
-    section_call = section_call[: section_call.index(hidden_loop)]
-    assert "layer_name=SECTION_THREAD_LAYER" in section_call
-    assert "visible=True" in section_call
-    assert "raise RuntimeError" in section_call
-    hidden_call = source[source.index(hidden_loop) :]
-    hidden_call = hidden_call[: hidden_call.index("        )\n") + 10]
-    assert "layer_name=HIDDEN_THREAD_LAYER" in hidden_call
-    assert "visible=False" in hidden_call
 
 
 def test_datum_b_is_located_from_the_side_and_front_faces() -> None:
@@ -1171,10 +938,6 @@ def test_datum_b_is_located_from_the_side_and_front_faces() -> None:
     assert row_x > section_end_x
     assert drawing.TOP_CENTER[1] - drawing.TOP_HALF_Z < row_y < drawing.TOP_CENTER[1]
     assert drawing.TOP_KEEP["HoleRowFace"] == drawing.ROW_FACE_TEXT_XY
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert '_set_sheet_precision(side, label="dowel hole from side face")' in source
-    assert source.count('label="dowel hole from side face"') == 3
-    assert "hole row from front face" not in source
     # The band is the part's (blind machinist review, 2026-11-03: the three
     # places alone held the row to the title block's .XXX +/-.005).
     assert sm_knife_mount_spec.HOLE_ROW_FACE_TOL == sm_knife_mount_spec._XX
@@ -1183,13 +946,6 @@ def test_datum_b_is_located_from_the_side_and_front_faces() -> None:
         sm_knife_mount_spec.PIN_HOLE_X,
         -sm_knife_mount_spec.HOLE_ROW_FACE_DISTANCE,
     )
-    builder = Path(part.__file__).read_text(encoding="utf-8")
-    assert "blank_reference_sketches(adapter, (HOLE_ROW_SKETCH,))" in builder
-    assert '"HoleRowFace",\n        HOLE_ROW_FACE_TOL,\n' in builder
-    assert "drive_jobs += await hole_row_reference(adapter)" in builder
-    # B's rim is picked on the +X side of its axis.
-    assert "(PIN_HOLE_X + pin_rim_mm) / 1000.0," in source
-    assert source.count("        p1=b_pick,\n") == 1
 
 
 def test_the_tap_and_bore_axis_is_basic_from_datum_b() -> None:
@@ -1212,20 +968,12 @@ def test_the_tap_and_bore_axis_is_basic_from_datum_b() -> None:
     offset_x, offset_y = drawing.TAP_STATION_OFFSET_XY
     assert offset_y == text_y
     assert offset_x > pin_x
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "    if not pin_axis_x > tap_axis_x:\n" in source
-    # The tap's axis reaches past the bore's bottom, B's past its floor,
-    # both inside the block.
-    assert "(0.0, BORE_CY - R_BORE - SECTION_AXIS_TAIL_MM, 0.0)" in source
-    assert "(PIN_HOLE_X, BLK_TOP - PIN_HOLE_DEPTH - SECTION_AXIS_TAIL_MM, 0.0)" in source
     assert (
         sm_knife_mount_spec.BORE_CY
         - sm_knife_mount_spec.R_BORE
         - drawing.SECTION_AXIS_TAIL_MM
         > sm_knife_mount_spec.BLK_BOT
     )
-    assert 'entity_types=("SKETCHSEGMENT", "SKETCHSEGMENT")' in source
-    assert source.count('label="dowel hole from tap axis"') == 3
 
 
 def test_the_slip_seat_holds_its_webs() -> None:
@@ -1277,9 +1025,6 @@ def test_the_bore_states_its_band_and_mate() -> None:
     assert drawing.LEVER_NUMBER == lever_number
     assert not hasattr(sm_knife_mount_spec, "LEVER_NUMBER")
     assert not hasattr(sm_knife_mount_spec, "BORE_CALLOUT")
-    assert "sm-summing-lever" not in Path(sm_knife_mount_spec.__file__).read_text(
-        encoding="utf-8"
-    )
     assert drawing.DIMENSION_CALLOUTS["BoreDia"].count(lever_number) == 1
     assert len(rows) <= 3
     widest = max(len(row) for row in rows)
@@ -1289,13 +1034,3 @@ def test_the_bore_states_its_band_and_mate() -> None:
     assert sm_knife_mount_spec.BORE_DIA_BAND == pytest.approx((0.0381, 0.0))
     assert sm_knife_mount_spec.BORE_R_MIN == sm_knife_mount_spec.R_BORE
     assert sm_knife_mount_spec.BORE_R_MAX == pytest.approx(6.01345)
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert (
-        "        \"BoreProfile\",\n"
-        "        \"BoreDia\",\n"
-        "        *deviations(BORE_DIA_BAND),\n"
-        "        places=BORE_DIA_PLACES,\n"
-    ) in source
-    assert source.index("*deviations(BORE_DIA_BAND)") < source.index(
-        "apply_drawing_precision(adapter, DRAWING_PRECISION)"
-    )

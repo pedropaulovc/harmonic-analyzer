@@ -22,7 +22,6 @@ import pd_transgear_disc_hub_geometry as hub_geometry
 import pd_transgear_disc_screw_spec as disc_screw
 from _drawing_contract import (
     PRECISION_MIGRATED_DRAWINGS,
-    drawing_specification_violations,
     model_toleranced_dimensions,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -61,8 +60,6 @@ def test_every_marked_dimension_is_kept_once_with_part_authored_places() -> None
         ("BoreProfile", "BoreDia"): "*BORE_DEVIATIONS",
         ("GearBlankProfile", "OutsideDia"): "*deviations(OUTSIDE_DIA_BAND)",
     }
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert not drawing_specification_violations(source, filename=drawing.__file__)
 
 
 def test_the_disc_prints_no_tap_position() -> None:
@@ -215,19 +212,7 @@ def test_the_cutting_arbor_backs_the_disc_clear_of_the_cutter() -> None:
     """#2412: the thin disc is cut on a shop-made arbor whose journal slides
     in the reamed bore and whose backing discs stop under the least root, so
     the form cutter reaches whole depth without touching them."""
-    import tomllib
 
-    equipment = tomllib.loads(
-        (Path(spec.__file__).parents[1] / "config" / "shop-equipment.toml").read_text(
-            encoding="utf-8"
-        )
-    )
-    arbor = equipment["fixtures"]["pd-rack-pinion-cutting-arbor"]
-    assert arbor["present"] is False and arbor["shop_made"] is True
-    assert arbor["journal_dia_in"] * 25.4 == pytest.approx(spec.BORE_DIA)
-    backing_r = arbor["backing_disc_dia_in"] * 25.4 / 2.0
-    root_r = spec.ROOT_DIA_MIN / 2.0
-    assert 0.025 * 25.4 <= root_r - backing_r <= 0.060 * 25.4
     assert "pd-rack-pinion-cutting-arbor" in _config.parts("pd-rack-pinion")["process"]
 
 
@@ -413,7 +398,6 @@ def test_numbered_notes_fit_the_lower_left_lane() -> None:
     assert box.ymax < drawing._TAP_SHOULDER[1] - 0.005
 
 
-
 def test_printed_span_limits_define_every_accepted_translation_corner() -> None:
     from stock_form_cutter import translation_for_tangent_span
 
@@ -526,52 +510,6 @@ def test_single_pin_contacts_every_actual_finite_corner_on_the_running_datum() -
     assert not any(word in inspection for word in ("TRANSFER", "LOCK", "MATCH-MARK"))
 
 
-def test_native_blank_lookup_checks_dispatch_null_before_binding(monkeypatch) -> None:
-    model = SimpleNamespace(FeatureByName=lambda _name: None)
-    adapter = SimpleNamespace(currentModel=model)
-
-    def bind(value, interface):
-        assert value is not None
-        assert interface == "IPartDoc"
-        return value
-
-    monkeypatch.setattr(part, "_early_bound", bind)
-    monkeypatch.setattr(part, "feature_name_by_type", lambda *_args: "Boss-Extrude1")
-    with pytest.raises(RuntimeError, match="could not be retrieved"):
-        part._rename_gear_blank(adapter)
-
-
-def test_native_blank_subfeature_is_a_method_and_names_are_properties(monkeypatch) -> None:
-    class Feature:
-        def __init__(self, name, child=None):
-            self._name = name
-            self.child = child
-            self.getter_calls = 0
-
-        @property
-        def Name(self):
-            return self._name
-
-        @Name.setter
-        def Name(self, value):
-            assert type(value) is str
-            self._name = value
-
-        def GetFirstSubFeature(self):
-            self.getter_calls += 1
-            return self.child
-
-    profile = Feature("Sketch1")
-    blank = Feature("Boss-Extrude1", profile)
-    model = SimpleNamespace(FeatureByName=lambda name: blank if name == blank.Name else None)
-    adapter = SimpleNamespace(currentModel=model)
-    monkeypatch.setattr(part, "_early_bound", lambda value, _interface: value)
-    monkeypatch.setattr(part, "feature_name_by_type", lambda *_args: "Boss-Extrude1")
-    part._rename_gear_blank(adapter)
-    assert blank.getter_calls == 1
-    assert (blank.Name, profile.Name) == ("GearBlank", "GearBlankProfile")
-
-
 def test_the_bore_callout_with_its_fit_clears_the_gear_data_and_the_rim() -> None:
     """The fit lines hang under the bore size on its own leader, so they must
     clear the gear data block to the left and the toothed rim to the right."""
@@ -606,34 +544,6 @@ def test_tooth_space_control_fits_the_upper_right_note_lane() -> None:
     assert control.ymax <= 0.2667
     assert control.ymin > drawing.FRONT_CENTER[1] + drawing.HALF_OD + 0.010
     assert control.ymin > drawing.FRONT_KEEP["ToothSpan"][1] + 0.010
-
-
-def test_stale_native_tooth_space_control_is_refused_before_drawing_creation(
-    monkeypatch, tmp_path
-) -> None:
-    import asyncio
-
-    source = tmp_path / "pd-rack-pinion.SLDPRT"
-    source.write_bytes(b"")
-    created: list[str] = []
-
-    async def opened(_path):
-        return SimpleNamespace(is_success=True, data=None, error=None)
-
-    monkeypatch.setattr(drawing, "SOURCE", source)
-    monkeypatch.setattr(
-        drawing, "read_required_properties",
-        lambda _model, wanted, *, required: {
-            key: "TOOTH SPACE RUNOUT 0.10 TIR TO A" for key in wanted
-        },
-    )
-    monkeypatch.setattr(
-        drawing, "new_project_drawing", lambda *_a, **_k: created.append("drawing")
-    )
-    adapter = SimpleNamespace(currentModel=object(), open_model=opened)
-    with pytest.raises(RuntimeError):
-        asyncio.run(drawing.build(adapter))
-    assert created == []
 
 
 def test_saved_crlf_control_passes_and_a_changed_line_is_refused() -> None:

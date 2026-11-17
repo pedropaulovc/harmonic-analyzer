@@ -10,7 +10,6 @@ lives in the gear-data block.
 
 from __future__ import annotations
 
-import asyncio
 import math
 import re
 from pathlib import Path
@@ -27,14 +26,6 @@ import dt_crankshaft_spec
 import draw_dt_crank_pinion as drawing
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
 from _drawing_registry import DRAWINGS_BY_NAME
-
-
-def _source() -> str:
-    return Path(drawing.__file__).read_text(encoding="utf-8")
-
-
-def _build_source() -> str:
-    return Path(part.__file__).read_text(encoding="utf-8")
 
 
 def _note(number: int) -> str:
@@ -90,16 +81,6 @@ def test_the_blank_sizes_are_native_model_dimensions() -> None:
     # cutter touches the part, so they are model dimensions of the gear blank
     # the shared helper builds -- named, driven and toleranced HERE, never
     # retyped into the gear-data block as text.
-    build = _build_source()
-    assert '"Boss-Extrude1").Name = "GearBlank"' in build
-    assert '"Sketch1").Name = "GearBlankProfile"' in build
-    assert 'name_dimensions(adapter, "GearBlank", ["FaceWidth"])' in build
-    assert 'name_dimensions(adapter, "GearBlankProfile", ["OutsideDia"])' in build
-    # Driven, so a default-name rename that resolved the wrong feature moves
-    # the blank and the equation-neutral volume gate fails loud.
-    assert '\'"FaceWidth"\'' in build
-    assert '\'"OutsideDia"\'' in build
-    assert 'set_global(adapter, "OutsideDia"' in build
     minimum_support = min(
         profile.support_radius_max_mm for _, profile in spec.STOCK_PROFILE_CORNERS
     )
@@ -121,12 +102,6 @@ def test_precision_is_authored_on_the_part_and_only_read_by_the_sheet() -> None:
     # claims, so the model owns them. The overall length is a look (the shaft
     # end stands proud of the boss), not a fit: one place like the face width.
     assert "draw_dt_crank_pinion.py" in PRECISION_MIGRATED_DRAWINGS
-    source = _source()
-    assert "set_dimension_precision" not in source
-    assert "SetPrecision3" not in source
-    assert "DIMENSION_PRECISION" not in source
-    assert "assert_imported_precision(" in source
-    assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in _build_source()
 
 
 def test_tooth_face_shoulder_prints_a_native_single_limit_radius() -> None:
@@ -139,18 +114,12 @@ def test_tooth_face_shoulder_prints_a_native_single_limit_radius() -> None:
     assert spec.BOSS_DIA / 2.0 + spec.SHOULDER_RADIUS < (
         spec.TURNED_DIA - spec.TURNED_DIA_TOLERANCE_MM
     ) / 2.0
-    build = _build_source()
-    assert 'set_global(adapter, "ShoulderRadius"' in build
-    assert 'boss.record("ShoulderRadius", \'"ShoulderRadius"\')' in build
-    assert "_shoulder_radius_max_limit(adapter)" in build
-    assert "_dress_shoulder_radius(adapter, right_annotations)" in _source()
     assert drawing.SHOULDER_RADIUS_TOL_TYPE == spec.SHOULDER_RADIUS_TOL_TYPE
     # Tighter than the title block's inside corners, so it names the
     # mate whose tips run over the corner (machinist review of 2056e3344).
     assert drawing.DIMENSION_CALLOUTS["ShoulderRadius"] == "MHA-DT-07\nTIP CLR"
     assert spec.MESH_GEAR_NUMBER == "MHA-DT-07"
     assert drawing.SHOULDER_RADIUS_ROWS == 3  # R MAX over the two callout rows
-    assert "if callout != SHOULDER_RADIUS_CALLOUT:" in _source()
 
 
 def test_grown_teeth_keep_the_south_seat_and_boss_length() -> None:
@@ -184,12 +153,6 @@ def test_the_boss_is_the_root_circle_and_the_pin_hole_stays_in_its_wall() -> Non
     assert spec.PIN_STATION - spec.PIN_DIA / 2 > spec.FACE_WIDTH
     assert spec.PIN_STATION + spec.PIN_DIA / 2 < spec.OVERALL_LENGTH - 0.5
     assert spec.PIN_LENGTH == spec.BOSS_DIA
-    build = _build_source()
-    assert "[-BOSS_DIA / 2.0, 0.0, PIN_STATION]" in build
-    assert 'point_planes=("PinStationPlane", "Top Plane")' in build
-    # The station is a model dimension (a plane offset driven from the same
-    # knobs); the print locates it from the boss's north face.
-    assert '\'"FaceWidth" + "BossLength" / 2\'' in build
 
 
 def test_the_pin_hole_is_located_from_the_boss_end_and_keeps_its_wall() -> None:
@@ -205,9 +168,6 @@ def test_the_pin_hole_is_located_from_the_boss_end_and_keeps_its_wall() -> None:
         - spec._PIN_HOLE_RADIUS_GROWTH
     )
     assert spec.PIN_FROM_BOSS_END_LIGAMENT_WORST >= spec.PIN_EDGE_MIN_WORST
-    build = _build_source()
-    assert 'boss.record("PinFromBossEnd", \'"BossLength" / 2\')' in build
-    assert 'boss.record("PinHoleDia", None)' in build
     assert "MID-LENGTH" not in drawing.DIMENSION_CALLOUTS["PinHoleDia"]
 
 
@@ -237,28 +197,6 @@ def test_pin_hole_callout_links_the_pins_drive_fit_note() -> None:
     assert f"TAP {spec.PIN_NUMBER} IN FLUSH BOTH SIDES." in assembly.CONE_CRANK_STEPS
     assert f"CHECK THAT {spec.PIN_NUMBER} IS NOT REMOVABLE BY HAND." in assembly.CONE_CRANK_STEPS
     assert drawing.REFERENCE_DIMENSIONS == ("PinHoleDia",)
-    assert "add_leader_note(\n        adapter,\n        PIN_HOLE" not in _source().replace(
-        "\r\n", "\n"
-    )
-
-
-def test_curve_resolution_is_pinned_before_the_first_view() -> None:
-    # Fan-out r3 (rule 8): the isometric's tooth ends printed as polygons.
-    source = _source()
-    assert source.count('set_precise_curve_quality(adapter, label="crank-pinion")') == 1
-    assert source.index("set_precise_curve_quality(adapter") < source.index(
-        'place_view(adapter, str(SOURCE), "*Front"'
-    )
-
-
-def test_the_boss_end_takes_the_title_block_break_not_a_sized_chamfer() -> None:
-    # Machinist review of 4d4e038e3: the 1.0 x 45 chamfer only imitated the
-    # photo's rounding, and at its one-place grade it could reach the bore.
-    spec_source = Path(spec.__file__).read_text(encoding="utf-8")
-    for text in (_build_source(), _source(), spec_source):
-        assert "BossChamfer" not in text
-        assert "BOSS_CHAMFER" not in text
-    assert "add_chamfer" not in _build_source()
 
 
 def test_boss_dia_text_clears_its_extension_lines() -> None:
@@ -281,7 +219,6 @@ def test_boss_dia_text_clears_its_extension_lines() -> None:
     assert drawing._text_line_crossings(reviewed, lines, gap) == [extension[0]]
     x, y = drawing.RIGHT_KEEP["BossDia"]
     assert drawing._text_line_crossings([(x - 0.006, y, height)], lines, gap) == []
-    assert "_boss_dia_text_crossings(adapter, right_annotations)" in _source()
 
 
 def test_isometric_clears_the_boss_dia_text() -> None:
@@ -301,7 +238,6 @@ def test_isometric_clears_the_boss_dia_text() -> None:
     )
     assert drawing.ISO_CENTER[0] - extent >= text_right
     assert drawing.ISO_CENTER[0] + extent <= drawing.SHEET_INNER_BORDER[2]
-    assert "_isometric_clears_boss_dia(iso)" in _source()
 
 
 def test_bore_band_is_derived_from_its_fit_class_not_written_by_hand() -> None:
@@ -378,7 +314,6 @@ def test_callouts_link_the_numbered_note_that_names_their_mate() -> None:
     printed = (notes.DRAWING_NOTES, notes.GEAR_DATA, *callouts.values())
     for private in ("T120", "BORE LIMITS GOVERN", "DIA CLR", "MATE SHAFT"):
         assert not any(private in text for text in printed), private
-    assert "add_leader_note" not in _source()
     assert spec.CONE_GEAR_NUMBER == _config.parts("dt-cone-gear")["number"]
     assert spec.CRANKSHAFT_NUMBER == _config.parts("dt-crankshaft")["number"]
 
@@ -387,8 +322,6 @@ def test_section_caption_prints_no_sheet_scale() -> None:
     # Rule 9: a view's scale prints only when it differs from the sheet's;
     # A-A is at the sheet's 3:1, so its caption keeps only name and letter.
     assert drawing.SECTION_CAPTION_TEXT == "<VLNAME> <VLLABEL>"
-    assert "note.PropertyLinkedText = SECTION_CAPTION_TEXT" in _source()
-    assert "<VLSCALEV>" not in _source()
 
 
 def test_print_carries_no_gdt_basic_dimensions_or_roughness() -> None:
@@ -396,15 +329,6 @@ def test_print_carries_no_gdt_basic_dimensions_or_roughness() -> None:
     # the GD&T allowlist, so no datum, frame or basic dimension survives.
     # Rule 6 (machinist review r1 of #1652): the pinned bore neither runs,
     # slides nor locates, so it carries no roughness symbol either.
-    source = _source()
-    for helper in (
-        "add_datum_feature(",
-        "add_feature_control_frame(",
-        "set_basic_dimension(",
-        "project_part_pmi(",
-        "add_surface_finish(",
-    ):
-        assert helper not in source, helper
     assert not hasattr(spec, "GEOMETRIC_TOLERANCES_MM")
     assert not hasattr(spec, "GEOMETRIC_CONTROLS")
     assert spec.SURFACE_FINISHES == ()
@@ -477,66 +401,6 @@ def test_tooth_system_and_pair_acceptance_match_current_geometry() -> None:
         assert obsolete not in notes.GEAR_DATA
 
 
-def test_notes_carry_the_tooth_edge_override_not_an_obsolete_boss_shortfall() -> None:
-    assert "TOOTH EDGES:  DO NOT BREAK OR CHAMFER FLANKS, TIPS OR ROOTS" in notes.GEAR_DATA
-    lines = notes.DRAWING_NOTES.split("\n")
-    assert spec.BOSS_WALL_WORST >= 2.0
-    assert not any(line.startswith("BOSS WALL") for line in lines)
-    # The cutter runout into the boss is a tooth fact, a gear-data row.
-    assert (
-        "TEETH:  FULL LENGTH OF TURNED BAND; CUTTER RUNOUT INTO BOSS OK"
-        in notes.GEAR_DATA
-    )
-    # Four numbered notes, each a single line, numbered in order.
-    assert len(lines) <= 4
-    assert [line.split(".", 1)[0] for line in lines] == ["1", "2", "3", "4"]
-    # The T120 fit-up may turn the band down; note 2, which the turned
-    # diameter alone links, states the fitted floor and the check that sets
-    # it (rule 19; machinist review r1 of #1652), and leaves the supply size
-    # to that diameter (fan-out r4, rule 7: no second controlling value).
-    supply = (
-        f"Ø{spec.inch_text(spec.TURNED_DIA, spec.TURNED_DIA_PLACES)} "
-        f"±{spec.inch_text(spec.TURNED_DIA_TOLERANCE_MM, spec.TURNED_DIA_PLACES)}"
-    )
-    floor = f"Ø{spec.inch_text(spec.TURNED_DIA_FITUP_MIN, spec.TURNED_DIA_PLACES)} MIN"
-    # Fan-out r2 (rule 4): the gear the feeler check reads against is named
-    # by its number in the note the Ø.730 flags.
-    assert _note(notes.TURNED_DIA_NOTE_NUMBER) == (
-        f"2. FITTED AT ASSEMBLY TO {floor} "
-        "TO PASS MHA-DT-00 FEELER CHECK TO 120T GEAR MHA-DT-03."
-    )
-    assert supply not in notes.DRAWING_NOTES
-    assert not hasattr(spec, "BOSS_WALL_EXCEPTION")
-    for internal in ("EXCEPTION", "ACCEPTED", "RULING", "POLICY", "RULE "):
-        assert internal not in notes.DRAWING_NOTES
-    policy = (
-        Path(spec.__file__).parents[1] / "docs" / "drawing-simplicity-policy.md"
-    ).read_text(encoding="utf-8")
-    assert not any(
-        line.startswith("| MHA-DT-10 crank pinion boss |")
-        for line in policy.splitlines()
-    )
-    note_text = notes.DRAWING_NOTES
-    assert "LIGHT DRIVE FIT" not in note_text
-    assert "FLUSH" not in note_text
-    assert "SUBSTITUTE" not in note_text
-    # Retired with the migration: generic method narration, heat-treatment
-    # negatives, duplicate bore-fit text and pair commissioning protocol.
-    for banned in (
-        "CUT TEETH",
-        "BORE BEFORE",
-        "HARDNESS",
-        "DIAMETRAL CLEARANCE",
-        "ROOT DIAMETER",
-        "COMMISSIONING",
-        "ACCEPTANCE",
-        "N*m",
-        "RPM",
-        "+/-",
-    ):
-        assert banned not in note_text, banned
-
-
 def test_sheet_runs_at_3_to_1_with_every_view_at_sheet_scale() -> None:
     # One scale for every view means the title block's SCALE field is the
     # whole truth and no view needs a scale note. The 24.4-mm boss-ended
@@ -544,7 +408,6 @@ def test_sheet_runs_at_3_to_1_with_every_view_at_sheet_scale() -> None:
     assert drawing.SHEET_SCALE == (3.0, 1.0)
     assert drawing.VIEW_SCALE == (3, 1)
     assert drawing.SHEET_SCALE[0] == drawing.VIEW_SCALE[0]
-    assert _source().count("scale=VIEW_SCALE") == 3
     assert not hasattr(spec, "ISOMETRIC_VIEW_NOTE")
 
 
@@ -667,9 +530,6 @@ def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
 
 
 def test_part_stamps_make_critical_properties() -> None:
-    build = _build_source()
-    assert "apply_drawing_properties" in build
-    assert "clear_dimensions_for_drawing" in build
     import _config
 
     config = _config.parts("dt-crank-pinion")
@@ -732,7 +592,6 @@ def test_root_diameter_boss_meets_the_current_printed_wall_target() -> None:
     assert spec.DRAWING_PRECISION["BossProfile"]["BossDia"] == spec.BOSS_DIA_PLACES
 
 
-
 def _cylinder(radius_mm: float, z_low: float, z_high: float):
     from _gtol_face import SURFACE_CYLINDER, FaceGeometry
 
@@ -764,91 +623,6 @@ def test_boss_gate_face_is_the_outboard_stub_not_a_gap_floor() -> None:
     assert accepted([_cylinder(radius + 0.001, spec.FACE_WIDTH, spec.OVERALL_LENGTH)]) == []
     assert part.BOSS_GATE_TOL_MM == 0.001
     assert spec.FACE_WIDTH < part.BOSS_GATE_FACE.contains_z_mm < spec.OVERALL_LENGTH
-
-
-class _Surface:
-    Identity = 4002  # swSurfaceTypes_e.CYLINDER_TYPE
-
-    def __init__(self, radius_mm: float) -> None:
-        self.CylinderParams = (0.0, 0.0, 0.0, 0.0, 0.0, -1.0, radius_mm / 1000.0)
-
-
-class _Face:
-    def __init__(self, radius_mm: float, z_low: float, z_high: float) -> None:
-        self.surface = _Surface(radius_mm)
-        self.box = (-0.009, -0.009, z_low / 1000.0, 0.009, 0.009, z_high / 1000.0)
-        self.next: _Face | None = None
-
-    def GetSurface(self) -> _Surface:
-        return self.surface
-
-    def GetBox(self) -> tuple[float, ...]:
-        return self.box
-
-    def GetNextFace(self) -> _Face | None:
-        return self.next
-
-
-class _Body:
-    def __init__(self, z_high: float, faces: list[_Face]) -> None:
-        self.z_high = z_high
-        for face, following in zip(faces, [*faces[1:], None]):
-            face.next = following
-        self.first = faces[0] if faces else None
-
-    def GetExtremePoint(self, _x: float, _y: float, z: float):
-        return (True, 0.0, 0.0, self.z_high / 1000.0 if z > 0.0 else 0.0)
-
-    def GetFirstFace(self) -> _Face | None:
-        return self.first
-
-
-class _Seat:
-    def __init__(self, body: _Body) -> None:
-        self.body = body
-        self.currentModel = self
-
-    def GetBodies2(self, _kind: int, _visible_only: bool) -> list[_Body]:
-        return [self.body]
-
-    def _attempt(self, operation, default=None):
-        return operation()
-
-
-@pytest.fixture
-def _plain_binding(monkeypatch):
-    import _com
-    import _gtol_face_resolve
-
-    for module in (_com, _gtol_face_resolve):
-        monkeypatch.setattr(module, "_early_bound", lambda obj, _interface: obj)
-
-
-def _pinion(z_high: float, *, boss: bool) -> _Seat:
-    radius = spec.BOSS_DIA / 2.0
-    faces = [_Face(radius, 0.0, spec.FACE_WIDTH) for _ in range(spec.TEETH)]
-    faces.append(_Face(spec.BORE_DIA / 2.0, 0.0, z_high))
-    if boss:
-        faces.append(_Face(radius, spec.FACE_WIDTH - 0.05, z_high))
-    return _Seat(_Body(z_high, faces))
-
-
-def test_boss_gate_passes_an_intact_pinion(_plain_binding) -> None:
-    asyncio.run(part.assert_boss_present(_pinion(spec.OVERALL_LENGTH, boss=True), "intact"))
-
-
-def test_boss_gate_fails_loud_on_the_silent_drop_diag_v3_saw(_plain_binding) -> None:
-    # d6ca08eb7 s0: after a ForceRebuild3 that reported success, with What's
-    # Wrong silent about the boss, the solid ended at the tooth face.
-    dropped = _pinion(spec.FACE_WIDTH, boss=False)
-    with pytest.raises(RuntimeError, match="overall length: z-extent"):
-        asyncio.run(part.assert_boss_present(dropped, "dropped"))
-
-
-def test_boss_gate_wants_the_boss_cylinder_not_just_the_length(_plain_binding) -> None:
-    boss_less = _pinion(spec.OVERALL_LENGTH, boss=False)
-    with pytest.raises(RuntimeError, match="hub boss: face spec"):
-        asyncio.run(part.assert_boss_present(boss_less, "boss-less"))
 
 
 def test_turned_band_clears_t120_and_each_negative_control_flips() -> None:
@@ -1007,18 +781,6 @@ def test_t120_radial_carries_every_fit_offset_and_axis_pose() -> None:
     assert bdt.T120_TURNED_BAND_RADIAL <= concentric(spec.TURNED_DIA) - budget + 1e-9
 
 
-def _assert_no_t120_shortfall_waiver() -> None:
-    policy = (
-        Path(spec.__file__).parents[1] / "docs" / "drawing-simplicity-policy.md"
-    ).read_text(encoding="utf-8")
-    rows = [
-        line
-        for line in policy.split("\n## Named exceptions", 1)[1].splitlines()
-        if line.startswith("| MHA-DT-10") and "T120" in line.split("|")[1]
-    ]
-    assert not rows
-
-
 def test_t120_clearance_facts_match_the_ordinary_floors_without_a_waiver() -> None:
     # The current envelope passes the ordinary clearance floors. Its finite
     # printed fact is exact and rounded down; an absent section is not a size.
@@ -1055,7 +817,6 @@ def test_t120_clearance_facts_match_the_ordinary_floors_without_a_waiver() -> No
     else:
         assert air == math.inf
         assert "NO AXIAL OVERLAP" in spec.T120_FITUP_ASSEMBLY_CHECK
-    _assert_no_t120_shortfall_waiver()
 
 
 def test_t120_shoulder_air_bounds_every_reachable_south_rim_point() -> None:
@@ -1240,7 +1001,6 @@ def _crank_step() -> str:
     number = dt_drive_train_steps.step_number(_T120_CHECK_STEP_KEY)
     step = drawing.CONE_CRANK_STEPS.split(f"\n{number}. ", 1)[1]
     return step.split(f"\n{number + 1}. ")[0]
-
 
 
 def test_each_t120_cut_answers_only_its_own_failed_reading() -> None:

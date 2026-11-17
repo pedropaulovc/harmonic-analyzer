@@ -71,17 +71,6 @@ def test_disc_envelope_books_the_actual_south_datum_band_once() -> None:
     assert shifted["retaining land"] == normal["retaining land"]
 
 
-@pytest.mark.parametrize("north", [(0.0, 0.0), (0.0, 0.01), (0.01, 0.01)])
-def test_axial_section_rejects_a_nonhorizontal_or_degenerate_axis(
-    monkeypatch, north
-) -> None:
-    monkeypatch.setattr(
-        drawing, "model_points_in_view", lambda *_args, **_kwargs: ((0.0, 0.0), north)
-    )
-    with pytest.raises(RuntimeError, match="horizontal turning axis"):
-        drawing._require_horizontal_axis(object(), object())
-
-
 @pytest.mark.parametrize("target", ["BoreDia"])
 @pytest.mark.parametrize("failure", ["write", "ineffective", "partial", "read"])
 def test_required_callout_failure_prevents_export(

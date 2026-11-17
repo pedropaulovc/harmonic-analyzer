@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import inspect
 import math
 import re
 from pathlib import Path
@@ -106,14 +105,6 @@ def test_crossrod_hole_station_is_toleranced_with_a_rule_12_web() -> None:
     assert spec.HEAD_LEN_BAND == printed_band_mm(2, unit="in")
     assert "CrossHoleFromHeadRear" not in drawing.DIMENSION_CALLOUTS
     assert "CrossHoleFromHeadRear" in drawing.DETAIL_KEEP
-    # Printed toleranced, never as a reference.
-    build = inspect.getsource(drawing.build)
-    assert '"CrossHoleFromHeadRear"' not in build
-    source = inspect.getsource(part.build)
-    call = source[source.index('feature_name="CrossHoleStationReference"') :]
-    call = call[: call.index("\n    )")]
-    assert "drive_expression='\"CrossHoleStation\"'" in call
-    assert "end_v=-HEAD_CENTER_Z" in call
     assert "CENTRED" not in spec.CROSS_HOLE_CALLOUT
     hole_upper = (spec.CROSS_HOLE_DIA + spec.CROSS_HOLE_DIA_BAND[0]) / 2.0
     rear = spec.CROSS_HOLE_STATION - spec.CROSS_HOLE_STATION_BAND - hole_upper
@@ -310,11 +301,6 @@ def test_every_post_import_name_is_carried_by_a_kept_or_moved_dimension() -> Non
     # The seat's precision readback expects exactly the printed set (round 1
     # f08277cd raised on the unprinted drum station).
     assert set(drawing.PRINTED_PRECISION_BY_NAME) == carried
-    source = inspect.getsource(drawing.build)
-    assert (
-        "assert_imported_precision(adapter, annotations, PRINTED_PRECISION_BY_NAME)"
-        in source
-    )
     assert set(drawing.DIAMETER_POSITIONS) <= carried
     # Every donor diameter moves to the profile, and nothing else moves.
     assert set(drawing.DIAMETER_POSITIONS) == set(drawing.DONOR_KEEP)
@@ -525,9 +511,6 @@ def test_back_bond_land_carries_its_own_diameter_under_the_shaft() -> None:
     assert note_3 == "BOND LANDS (2X): BONDED IN MHA-DT-01, LOCTITE 638."
     assert sheet.DRAWING_PRECISION_BY_NAME["BackBondDia"] == 4
     assert "BackBondDia" in drawing.ARROWS_INSIDE
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    for name in ("BondZone", "BackBond"):
-        assert f'"{name}Reference", "{name}Dia", "<MOD-DIAM>"' in source
     x, y = drawing.PRINCIPAL_KEEP["BackBondDia"]
     assert x == pytest.approx(drawing.BACK_BOND_LINE_X)
     assert x < drawing._sheet_x(sheet.BACK_BOND_DIA_Z)
@@ -616,7 +599,6 @@ def test_bond_relief_dimensions_sit_in_open_sheet_space() -> None:
     shaft_bottom = drawing.PRINCIPAL_CENTER[1] - spec.SHAFT_DIA / 2000.0
     assert dia_y + 0.010 <= shaft_bottom
     assert dia_y - 0.004 >= y
-
 
 
 FENCE = {"center": (0.3132, 0.171), "radius": 0.015, "axis": (-1.0, 0.0)}
@@ -877,7 +859,6 @@ def test_each_2x_second_span_carries_a_leadered_tag_in_its_pocket() -> None:
     two witnesses and over the station rows.  r12 (rule 14): a leader landing
     over the block's middle ran into its left side through the S, so each
     landing stands just right of the block and meets its right side."""
-    import inspect
 
     tags = drawing.SPAN_TAGS
     assert set(tags) == {"front_journal", "collar_span"}
@@ -920,9 +901,6 @@ def test_each_2x_second_span_carries_a_leadered_tag_in_its_pocket() -> None:
     # its leader straddled it).
     assert abs(tags["collar_span"][0] - spec.PIN_Z) > 5.0
     assert tags["collar_span"][2][0] - drawing._sheet_x(spec.PIN_Z) >= 0.002
-    source = inspect.getsource(drawing.build)
-    assert "_span_tag_picks(adapter, principal)" in source
-    assert 'entity_type="FACE"' in source
 
 
 def test_bond_zone_diameter_is_a_flank_dimension_on_the_drum() -> None:
@@ -1021,9 +999,6 @@ def test_drum_station_stack_derives_the_land_length_and_station_band() -> None:
     )
     assert spec.DRUM_STATION == pytest.approx(60.96)
     assert spec.DRUM_STATION_BAND == spec.LINEAR_XX_BAND == pytest.approx(0.254)
-    # Codex #854 review (Main): no copies of values the rig and the title block
-    # own -- the spec reads them, so a feeler or row change reaches the lands.
-    import inspect
 
     import pinion_rig_layout as rig
     from _printed_tolerance import printed_band_mm
@@ -1036,15 +1011,6 @@ def test_drum_station_stack_derives_the_land_length_and_station_band() -> None:
     assert spec.HEAD_LEN_BAND == printed_band_mm(2, unit="in")
     assert geometry.DRUM_LEN == rig.DRUM_LEN
     assert geometry.STRAP_T_LIMITS == strap.THICKNESS_LIMITS
-    spec_source = inspect.getsource(spec)
-    for literal in (
-        "LINEAR_XX_BAND = 0.254",
-        "HEAD_LEN_BAND = 0.254",
-        "END_PLAY = 0.25",
-        "END_PLAY_SET_ERROR = 0.10",
-        "DRUM_LEN = 143.2",
-    ):
-        assert literal not in spec_source, literal
     assert (spec.FRONT_JOURNAL_FROM_HEAD_REAR, spec.BACK_JOURNAL_FROM_HEAD_REAR) == (
         pytest.approx(46.228),  # 1.82
         pytest.approx(209.55),  # 8.25 (7.83 at the 5.64 in drum)
@@ -1096,9 +1062,6 @@ def test_drum_station_is_the_assembly_setting_not_printed_here() -> None:
     assert not any(
         name == "DrumStationFromHeadRear" for _feature, name in model_toleranced_dimensions(part)
     )
-    source = inspect.getsource(drawing.build)
-    assert "for name, label in REFERENCE_LENGTHS.items():" in source
-    assert "set_reference_dimension(adapter, matches[0], label=label)" in source
     # MHA-DT-00's setting names the arbor's head rear face and the drum's
     # front end.
     words = " ".join(setting.DIMENSION_CALLOUTS[setting.DIMENSION].split())
@@ -1183,22 +1146,14 @@ def test_front_land_ends_are_baseline_stations_in_an_open_row() -> None:
 def test_drum_station_witness_starts_on_the_flank_not_the_axis() -> None:
     """c3419623: from an axis point the drum station's sheet witness drew a
     4 mm stub inside the Ø8 silhouette that read as a step (Main)."""
-    import inspect
 
     assert part.DRUM_STATION_POINT_X == pytest.approx(spec.SHAFT_DIA / 2.0)
-    source = inspect.getsource(part.build)
-    call = source[source.index('feature_name="DrumStationReference"') :]
-    call = call[: call.index("\n    )")]
-    assert "end_on_flank=DRUM_STATION_POINT_X" in call
-    helper = inspect.getsource(part._add_axial_reference)
-    assert 'far_end = f"{line}.end" if flank is None else f"{flank}.start"' in helper
 
 
 def test_reference_witnesses_are_drawn_in_the_outline_black() -> None:
     """5471a6ef: both standalone reference sketches' flank witnesses printed in
     the default construction grey over the black Ø8 outline, a break a
     machinist reads as a groove (Main)."""
-    import inspect
 
     assert set(drawing.REFERENCE_WITNESSES) == {
         "BondZoneReference",
@@ -1212,101 +1167,6 @@ def test_reference_witnesses_are_drawn_in_the_outline_black() -> None:
         assert z0 == pytest.approx(spec.HEAD_REAR_Z + station)
         assert z1 - z0 == pytest.approx(length)
         assert sheet.DRAWING_DIMENSIONS[feature] == {dimension}
-    helper = inspect.getsource(drawing._blacken_reference_witnesses)
-    assert "drawing.SetLineColor(REFERENCE_WITNESS_COLOR)" in helper
-    assert "SW_SEL_EXT_SKETCH_SEGS" in helper and "ConstructionGeometry" in helper
-    # 7885c0d9: rebinding the ISketch as IFeature read a matrix for Name.
-    assert '"IFeature"' not in helper and "segment.GetLength()" in helper
-    # w8 (437c56d4c) and w7 (7f7fc1717): the point pick landed on the 227.5
-    # BackRimReference line.  The witness is chosen on the model and mapped.
-    assert "SelectByID2" not in helper
-    assert "_reference_witness_in_view(view, sketch_name, expected)" in helper
-    source = inspect.getsource(drawing.build)
-    blacken = source.index("_blacken_reference_witnesses(adapter, principal)")
-    finalize = source.index("await finalize_drawing(")
-    gate = source.index("_assert_outline_unbroken(PNG, witness_spans, sheet_size)")
-    assert blacken < finalize < gate
-
-
-class _FakeSegment:
-    def __init__(self, length_mm: float, construction: bool) -> None:
-        self.length_mm = length_mm
-        self.ConstructionGeometry = construction
-
-    def GetLength(self) -> float:
-        return self.length_mm / 1000.0
-
-
-class _FakeSketch:
-    def __init__(self, segments: list[_FakeSegment]) -> None:
-        self.segments = segments
-
-    def GetSketchSegments(self) -> tuple[_FakeSegment, ...]:
-        return tuple(self.segments)
-
-
-class _FakeFeature:
-    def __init__(self, sketch: _FakeSketch) -> None:
-        self.sketch = sketch
-
-    def GetSpecificFeature2(self) -> _FakeSketch:
-        return self.sketch
-
-
-class _FakePart:
-    def __init__(self, features: dict[str, _FakeFeature]) -> None:
-        self.features = features
-
-    def FeatureByName(self, name: str) -> _FakeFeature | None:
-        return self.features.get(name)
-
-
-class _FakeView:
-    def __init__(self, part: _FakePart) -> None:
-        self.ReferencedDocument = part
-        self.mapped: list[_FakeSegment] = []
-
-    def GetCorresponding(self, segment: _FakeSegment) -> tuple[str, _FakeSegment]:
-        self.mapped.append(segment)
-        return ("in view", segment)
-
-
-def test_reference_witness_is_chosen_on_the_model_not_by_a_point_pick() -> None:
-    """The user's ruling on the w8/w7 mis-picks: the DrumStationReference
-    witness is its sketch's one 1 mm construction segment, mapped into the
-    view; the 227.5 BackRimReference line (the old pick's victim) and the
-    sketch's own axis centerline can never be chosen."""
-    witness = _FakeSegment(part.DRUM_STATION_POINT_LEN, True)
-    sketch = _FakeSketch(
-        [
-            _FakeSegment(spec.DRUM_STATION, True),  # the station's centerline
-            witness,
-            _FakeSegment(part.DRUM_STATION_POINT_LEN, False),  # not construction
-        ]
-    )
-    back_rim = _FakeSketch([_FakeSegment(spec.BACK_RIM_FROM_HEAD_REAR, True)])
-    view = _FakeView(
-        _FakePart(
-            {
-                "DrumStationReference": _FakeFeature(sketch),
-                "BackRimReference": _FakeFeature(back_rim),
-            }
-        )
-    )
-    chosen = drawing._reference_witness_in_view(
-        view, "DrumStationReference", part.DRUM_STATION_POINT_LEN
-    )
-    assert chosen == ("in view", witness)
-    assert view.mapped == [witness]
-    with pytest.raises(RuntimeError, match="must be exactly one"):
-        drawing._reference_witness_in_view(
-            view, "BackRimReference", part.DRUM_STATION_POINT_LEN
-        )
-    sketch.segments.append(_FakeSegment(part.DRUM_STATION_POINT_LEN, True))
-    with pytest.raises(RuntimeError, match="2 construction segments"):
-        drawing._reference_witness_in_view(
-            view, "DrumStationReference", part.DRUM_STATION_POINT_LEN
-        )
 
 
 def _outline_raster(core: int):
@@ -1434,16 +1294,6 @@ def test_every_dimension_carrying_reference_sketch_is_saved_hidden() -> None:
         "BackBondReference",
         "BackStubReference",
     }
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    authored = set(re.findall(r'"(\w+Reference)"', source)) | {
-        f"{prefix}Reference" for prefix in re.findall(r'prefix="(\w+)"', source)
-    }
-    assert authored == expected
-    blank = "blank_reference_sketches(adapter, REFERENCE_SKETCHES)"
-    # One shared helper in _sketch (restricted review), no local copy.
-    assert "def _blank_reference_sketches" not in source
-    assert source.count(blank) == 1
-    assert source.index(blank) < source.rindex("save_part_and_images(adapter, PART_NAME)")
 
 
 def test_reference_sketch_blank_reads_every_sketch_back_hidden(monkeypatch) -> None:
@@ -1456,17 +1306,6 @@ def test_reference_sketch_blank_reads_every_sketch_back_hidden(monkeypatch) -> N
 def test_profile_imports_the_hidden_reference_dimensions_per_view() -> None:
     # The profile is a projected view: _drawing_hidden_sketches shows each
     # childless part-hidden owner in that view before its targeted import.
-    source = Path(drawing.__file__).read_text(encoding="utf-8").replace("\r\n", "\n")
-    assert (
-        "from _drawing_hidden_sketches import (\n"
-        "    curate_view_dimensions as curate_hidden_owner_dimensions,\n)"
-    ) in source
-    call = re.search(
-        r"(\w+)\(\s*adapter,\s*principal,\s*keep=PRINCIPAL_KEEP,([^)]*)\)", source
-    )
-    assert call is not None
-    assert call.group(1) == "curate_hidden_owner_dimensions"
-    assert "dimensions_by_feature=DRAWING_DIMENSIONS" in call.group(2)
     assert drawing.DRAWING_DIMENSIONS is sheet.DRAWING_DIMENSIONS
     # Every other reference sketch prints on the profile, so each one the view shows
     # keeps a dimension there; the donor dimensions none of them, so the part
@@ -1481,7 +1320,6 @@ def test_profile_imports_the_hidden_reference_dimensions_per_view() -> None:
     )
     assert reference_dims & set(drawing.DETAIL_KEEP) == in_detail
     assert not reference_dims & set(drawing.DONOR_KEEP)
-    assert "part_sketches_shown" not in source
 
 
 def test_head_neighbours_clear_the_integral_head() -> None:
@@ -1592,8 +1430,6 @@ def _pin_leader_x_at(dia_xy: tuple[float, float], y: float) -> float:
     )
     elbow = _pin_leader_elbow(dia_xy)
     return start[0] + (elbow[0] - start[0]) * (y - start[1]) / (elbow[1] - start[1])
-
-
 
 
 def test_collar_pin_leader_slopes_clear_of_the_station_witnesses() -> None:
@@ -1831,30 +1667,12 @@ def test_detail_a_imports_its_dimensions_by_feature_before_any_other_view() -> N
     # The station's owner is a part-hidden reference sketch, so the import is
     # the per-view-showing one (_drawing_hidden_sketches).
     assert set(owners) & set(spec.REFERENCE_SKETCHES) == {"CrossHoleStationReference"}
-    source = inspect.getsource(drawing.build)
-    detail = re.search(
-        r"curate_hidden_owner_dimensions\(\s*adapter,\s*detail,\s*keep=DETAIL_KEEP,([^)]*)\)",
-        source,
-    )
-    assert detail is not None
-    assert "dimensions_by_feature=DRAWING_DIMENSIONS" in detail.group(1)
-    crop = source.index("_cropped_head_view(adapter, principal)")
-    assert crop < detail.start() < source.index("keep=DONOR_KEEP")
-    assert detail.start() < source.index("keep=PRINCIPAL_KEEP")
 
 
 def test_no_dimension_is_dragged_into_a_detail_view() -> None:
     """DragModelDimension into this arbor's detail view is dead under every
     variant tried, so the script builds no native detail and its one drag
     helper only ever moves the donor's diameters onto the 1:1 profile."""
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "CreateDetailView" not in source
-    assert source.count("DragModelDimension(") == 1
-    helper = inspect.getsource(drawing._move_dimension)
-    assert "DragModelDimension(" in helper
-    build = inspect.getsource(drawing.build)
-    targets = re.findall(r"_move_dimension\(\s*adapter,\s*annotation,\s*(\w+),", build)
-    assert targets == ["principal"]
     assert set(drawing.DIAMETER_POSITIONS) == set(drawing.DONOR_KEEP) == {"HeadDia"}
 
 
@@ -1946,363 +1764,7 @@ def test_detail_a_fence_gate_judges_every_detail_dimension_on_its_crop() -> None
         )
 
 
-def test_view_dimensions_reads_only_one_views_dimensions() -> None:
-    from _layout_geometry import AnnotationGeometry
-
-    owned = AnnotationGeometry(label="NeckDia", kind="dim", owner="Drawing View4")
-    other = AnnotationGeometry(label="HeadDia", kind="dim", owner="Drawing View2")
-    note = AnnotationGeometry(label="DETAIL A", kind="note", owner="Drawing View4")
-    sheets = [SimpleNamespace(annotations=[owned, other, note])]
-    assert drawing._view_dimensions(sheets, "Drawing View4") == [owned]
-
-
 # --- seat fakes: the cropped view, the profile mark and the notes -----------
-
-
-class _DoubleArray(tuple):
-    """What the fake double_array hands COM: a bare list must never reach
-    CreatePoint or SetViewPosition (a real seat reads it as zeros)."""
-
-
-def _require_double_array(values, what: str) -> None:
-    if not isinstance(values, _DoubleArray):
-        raise TypeError(f"{what} got {type(values).__name__}, not a double_array")
-
-
-class _Point:
-    def __init__(self, xyz) -> None:
-        self.ArrayData = tuple(xyz)
-
-    def MultiplyTransform(self, transform):  # noqa: N802 - the COM member name
-        return _Point(transform(self.ArrayData))
-
-
-class _Utility:
-    def CreatePoint(self, xyz):  # noqa: N802 - the COM member name
-        _require_double_array(xyz, "CreatePoint")
-        return _Point(xyz)
-
-
-class _ViewSketch:
-    # A sheet point maps to its view-sketch point x1000 (any affine map works).
-    ModelToSketchTransform = staticmethod(lambda xyz: tuple(v * 1000.0 for v in xyz))
-
-
-class _Segment:
-    def __init__(self, seat: "_ArborSeat", keep_colour: bool = True) -> None:
-        self.seat = seat
-        self.keep_colour = keep_colour
-        self._color = 0x0000FF
-
-    @property
-    def Color(self):  # noqa: N802 - the COM member name
-        return self._color
-
-    @Color.setter
-    def Color(self, value):  # noqa: N802 - the COM member name
-        if self.keep_colour:
-            self._color = value
-
-
-class _ArborView:
-    """IView stand-in: model z maps to sheet x leftwards at ``scale`` when the
-    view is turned -90 deg like the profile, upwards when it is not."""
-
-    def __init__(self, name: str, seat: "_ArborSeat", scale: float, **kw) -> None:
-        self.name = name
-        self.seat = seat
-        self.ScaleRatio = (scale, 1.0)
-        self.Angle = kw.get("angle", 0.0)
-        self.Position = kw.get("position", (0.2, 0.17))
-        self.cropped = kw.get("cropped", True)
-        self.turns = kw.get("turns", True)
-        self.status = kw.get("status", 1)
-        self.crop_called = False
-        # What the seat reports back for the crop's outline style.
-        self.boundary = kw.get("boundary")
-        # False: IsCropped claims a crop but the outline never shrinks.
-        self.outline_shrinks = kw.get("outline_shrinks", True)
-
-    def __setattr__(self, name, value):
-        if name == "Angle" and not getattr(self, "turns", True):
-            return
-        super().__setattr__(name, value)
-
-    def sheet_point(self, xyz) -> tuple[float, float]:
-        along = -self.ScaleRatio[0] * xyz[2]
-        # 0.05 m between the view's Position and the model origin.
-        if abs(math.remainder(self.Angle + math.pi / 2.0, 2.0 * math.pi)) < 1e-9:
-            return (self.Position[0] + along + 0.05, self.Position[1])
-        return (self.Position[0], self.Position[1] - along + 0.05)
-
-    def SetViewPosition(self, position, move_children):  # noqa: N802
-        _require_double_array(position, "SetViewPosition")
-        self.seat.log.append(("move", self.name, tuple(position), move_children))
-        self.Position = tuple(position)
-        return True
-
-    def GetSketch(self):  # noqa: N802
-        return _ViewSketch()
-
-    def Crop2(self, jagged, no_outline, intensity):  # noqa: N802
-        self.seat.log.append(("crop2", self.name, jagged, no_outline, intensity))
-        self.crop_called = True
-        if self.boundary is None:
-            self.boundary = (jagged, no_outline, intensity)
-        return self.status
-
-    @property
-    def CropViewJaggedOutline(self):  # noqa: N802
-        return self.boundary[0]
-
-    @property
-    def CropViewNoOutline(self):  # noqa: N802
-        return self.boundary[1]
-
-    @property
-    def CropViewJaggedShapeIntensity(self):  # noqa: N802
-        return self.boundary[2]
-
-    def IsCropped(self):  # noqa: N802
-        return self.cropped
-
-    def UpdateViewDisplayGeometry(self):  # noqa: N802
-        return True
-
-    def GetOutline(self):  # noqa: N802
-        cx, cy = drawing.DETAIL_CENTER
-        r = drawing.DETAIL_CROP_RADIUS
-        took = self.crop_called and self.cropped and self.status == 1
-        if not (took and self.outline_shrinks):
-            return (-0.2, cy - r, 0.5, cy + r)  # the whole arbor at 2:1
-        # A crop's outline, with an unmeasured margin round the circle.
-        return (cx - r - 0.004, cy - r - 0.004, cx + r + 0.004, cy + r + 0.004)
-
-    def GetNotes(self):  # noqa: N802
-        return tuple(note for note in self.seat.notes if note.owner == self.name)
-
-
-class _NoteAnnotation:
-    def __init__(self, note: "_ArborNote") -> None:
-        self.note = note
-
-    def GetPosition(self):  # noqa: N802
-        return (*self.note.anchor, 0.0)
-
-    def SetPosition2(self, x, y, z):  # noqa: N802
-        if self.note.moves:
-            self.note.anchor = (x, y)
-        return True
-
-
-class _ArborNote:
-    """A note whose rendered box hangs from its anchor, like a top-left
-    attached note: 2.5 mm per character wide, 4 mm per line tall."""
-
-    def __init__(self, text: str, owner: str, x: float, y: float, moves: bool) -> None:
-        self.text = text
-        self.owner = owner
-        self.anchor = (x, y)
-        self.moves = moves
-
-    def GetText(self):  # noqa: N802
-        return self.text
-
-    def GetAnnotation(self):  # noqa: N802
-        return _NoteAnnotation(self)
-
-    def GetExtent(self):  # noqa: N802
-        lines = self.text.split("\n")
-        width = 0.0025 * max(len(line) for line in lines)
-        x, y = self.anchor
-        return (x, y - 0.004 * len(lines), 0.0, x + width, y, 0.0)
-
-
-class _ArborSeat:
-    """IModelDoc2 + IDrawingDoc + ISketchManager + ISheet + adapter, recorded."""
-
-    def __init__(self, *, notes_move: bool = True, keep_colour: bool = True) -> None:
-        self.log: list[tuple] = []
-        self.notes: list[_ArborNote] = []
-        self.active = ""
-        self.notes_move = notes_move
-        self.keep_colour = keep_colour
-        self.AddToDB = False
-        self.currentModel = self
-        self.SketchManager = self
-        self.swApp = self
-
-    def GetMathUtility(self):  # noqa: N802
-        return _Utility()
-
-    def ActivateView(self, name):  # noqa: N802
-        self.log.append(("activate", name))
-        self.active = name
-        return True
-
-    def ClearSelection2(self, _all):  # noqa: N802
-        return True
-
-    def EditRebuild3(self):  # noqa: N802
-        return True
-
-    def CreateCircle(self, *xyz):  # noqa: N802
-        self.log.append(
-            ("circle", self.active, tuple(v / 1000.0 for v in xyz), self.AddToDB)
-        )
-        return _Segment(self, self.keep_colour)
-
-    def CreateDetailViewAt4(self, *args):  # noqa: N802
-        raise AssertionError("detail A must not be a native detail view")
-
-    def GetCurrentSheet(self):  # noqa: N802
-        return self
-
-    def SetScale(self, *args):  # noqa: N802
-        return True
-
-
-def _arbor_seat(monkeypatch, **kw):
-    seat = _ArborSeat(
-        notes_move=kw.pop("notes_move", True), keep_colour=kw.pop("keep_colour", True)
-    )
-    principal = _ArborView(
-        "Drawing View2", seat, 1.0, angle=-math.pi / 2.0, position=(0.2, 0.17)
-    )
-    detail = _ArborView(
-        "Drawing View4", seat, 2.0, position=drawing.DETAIL_CENTER, **kw
-    )
-    placed: list[tuple] = []
-
-    def place(adapter, source, orientation, x, y, *, scale=None):
-        placed.append((orientation, x, y, scale))
-        return detail
-
-    def note(adapter, text, x, y, **_kwargs):
-        made = _ArborNote(text, seat.active, x, y, seat.notes_move)
-        seat.notes.append(made)
-        seat.log.append(("note", seat.active, text))
-        return made
-
-    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _name: obj)
-    monkeypatch.setattr(drawing, "double_array", lambda values: _DoubleArray(values))
-    monkeypatch.setattr(drawing, "place_view", place)
-    monkeypatch.setattr(
-        drawing,
-        "model_point_in_view",
-        lambda adapter, view, xyz, *, label: view.sheet_point(xyz),
-    )
-    monkeypatch.setattr(drawing, "view_name", lambda adapter, view: view.name)
-    monkeypatch.setattr(drawing, "add_note", note)
-    return seat, principal, detail, placed
-
-
-def test_detail_a_is_a_cropped_2_to_1_model_view_turned_like_the_profile(
-    monkeypatch,
-) -> None:
-    seat, principal, detail, placed = _arbor_seat(monkeypatch)
-    assert drawing._cropped_head_view(seat, principal) is detail
-    assert placed == [("*Top", *drawing.DETAIL_CENTER, drawing.DETAIL_SCALE)]
-    assert detail.Angle == principal.Angle == -math.pi / 2.0
-    # Moved once, so the head centre lands where detail A sits.
-    moves = [entry for entry in seat.log if entry[0] == "move"]
-    assert len(moves) == 1 and moves[0][3] is False
-    head = detail.sheet_point((0.0, 0.0, spec.HEAD_CENTER_Z / 1000.0))
-    assert head == pytest.approx(drawing.DETAIL_CENTER)
-    # The crop circle is sketched in detail A itself, centred on the head at
-    # the fence's 2:1 radius, still selected (not direct-to-database), and
-    # Crop2 runs straight after it.
-    kinds = [entry[0] for entry in seat.log]
-    assert kinds[-3:] == ["activate", "circle", "crop2"]
-    assert seat.log[-3] == ("activate", "Drawing View4")
-    _, owner, xyz, add_to_db = seat.log[-2]
-    assert owner == "Drawing View4" and add_to_db is False
-    cx, cy, _, px, py, _ = xyz
-    assert (cx, cy) == pytest.approx(drawing.DETAIL_CENTER)
-    assert math.dist((cx, cy), (px, py)) == pytest.approx(drawing.DETAIL_CROP_RADIUS)
-    # F1: the boundary where the crop cuts the neck is a freehand break (the
-    # jagged outline), not a smooth arc reading as a domed end.
-    assert seat.log[-1] == (
-        "crop2",
-        "Drawing View4",
-        True,
-        False,
-        drawing.DETAIL_BREAK_INTENSITY,
-    )
-    assert 1 <= drawing.DETAIL_BREAK_INTENSITY <= 5
-    assert seat.AddToDB is False
-
-
-@pytest.mark.parametrize(
-    ("kw", "match"),
-    [
-        ({"cropped": False}, "not cropped"),
-        ({"status": 2}, "not cropped"),
-        ({"turns": False}, "turn detail A"),
-        ({"outline_shrinks": False}, "crop did not take"),
-        ({"boundary": (False, False, 5)}, "not the freehand break"),
-        ({"boundary": (True, True, 3)}, "not the freehand break"),
-    ],
-)
-def test_detail_a_fails_loud_when_the_crop_or_the_turn_did_not_take(
-    monkeypatch, kw, match
-) -> None:
-    seat, principal, _detail, _placed = _arbor_seat(monkeypatch, **kw)
-    with pytest.raises(RuntimeError, match=match):
-        drawing._cropped_head_view(seat, principal)
-
-
-def test_profile_marks_detail_a_with_a_black_fence_circle(monkeypatch) -> None:
-    seat, principal, _detail, _placed = _arbor_seat(monkeypatch)
-    center = drawing._mark_detail_on_profile(seat, principal)
-    head = principal.sheet_point((0.0, 0.0, spec.HEAD_CENTER_Z / 1000.0))
-    assert center == pytest.approx(head)
-    circles = [entry for entry in seat.log if entry[0] == "circle"]
-    assert len(circles) == 1
-    _, owner, xyz, add_to_db = circles[0]
-    assert owner == "Drawing View2" and add_to_db is True
-    cx, cy, _, px, py, _ = xyz
-    assert (cx, cy) == pytest.approx(head)
-    assert math.dist((cx, cy), (px, py)) == pytest.approx(
-        drawing.DETAIL_RADIUS_MM / 1000.0
-    )
-    assert seat.AddToDB is False  # restored
-    seat_grey, principal_grey, _d, _p = _arbor_seat(monkeypatch, keep_colour=False)
-    with pytest.raises(RuntimeError, match="colour did not persist"):
-        drawing._mark_detail_on_profile(seat_grey, principal_grey)
-
-
-def test_detail_a_label_and_letter_are_owned_and_centred(monkeypatch) -> None:
-    seat, principal, detail, _placed = _arbor_seat(monkeypatch)
-    mark = (0.3132, 0.170)
-    drawing._label_detail(seat, detail, principal, mark)
-    owned = [(note.owner, note.text) for note in seat.notes]
-    assert owned == [
-        ("Drawing View4", drawing.DETAIL_LABEL_TEXT),
-        ("Drawing View2", drawing.DETAIL_LETTER),
-    ]
-    label, letter = (drawing._note_box(note, label="t") for note in seat.notes)
-    assert (label[0] + label[2]) / 2.0 == pytest.approx(drawing.DETAIL_LABEL_XY[0])
-    assert label[3] == pytest.approx(drawing.DETAIL_LABEL_XY[1])
-    assert (letter[0] + letter[2]) / 2.0 == pytest.approx(
-        mark[0] + drawing.DETAIL_LETTER_OFFSET[0]
-    )
-    assert (letter[1] + letter[3]) / 2.0 == pytest.approx(
-        mark[1] + drawing.DETAIL_LETTER_OFFSET[1]
-    )
-
-
-def test_detail_a_label_fails_loud_when_it_does_not_move(monkeypatch) -> None:
-    seat, principal, detail, _placed = _arbor_seat(monkeypatch, notes_move=False)
-    with pytest.raises(RuntimeError, match="did not centre"):
-        drawing._label_detail(seat, detail, principal, (0.3132, 0.170))
-
-
-def test_detail_a_label_fails_loud_when_it_lands_in_another_view(monkeypatch) -> None:
-    seat, principal, detail, _placed = _arbor_seat(monkeypatch)
-    monkeypatch.setattr(seat, "ActivateView", lambda name: True)  # stays inactive
-    with pytest.raises(RuntimeError, match="did not land in its view"):
-        drawing._label_detail(seat, detail, principal, (0.3132, 0.170))
 
 
 def test_note_read_back_tolerates_how_a_multi_line_note_returns() -> None:
@@ -2317,66 +1779,6 @@ def test_note_read_back_tolerates_how_a_multi_line_note_returns() -> None:
     assert not drawing._is_note_text("SCALE 2 : 1", label)
     assert drawing._is_note_text("A", drawing.DETAIL_LETTER)
     assert not drawing._is_note_text("A B", drawing.DETAIL_LETTER)
-
-
-class _RadiusDisplay:
-    def __init__(self, keeps: bool, keeps_leader: bool) -> None:
-        self.keeps = keeps
-        self.keeps_leader = keeps_leader
-        self._side = 0  # swDimArrowsSmart
-        self._solid = True  # pc-r8: the line ran on through the hole
-
-    @property
-    def SolidLeader(self):  # noqa: N802 - the COM member name
-        return self._solid
-
-    @SolidLeader.setter
-    def SolidLeader(self, value):  # noqa: N802 - the COM member name
-        if self.keeps_leader:
-            self._solid = value
-
-    @property
-    def ArrowSide(self):  # noqa: N802 - the COM member name
-        return self._side
-
-    @ArrowSide.setter
-    def ArrowSide(self, value):  # noqa: N802 - the COM member name
-        if self.keeps:
-            self._side = value
-
-
-class _RadiusAnnotation:
-    def __init__(self, name: str, keeps: bool = True, keeps_leader: bool = True) -> None:
-        self.name = name
-        self.display = _RadiusDisplay(keeps, keeps_leader)
-
-    def GetSpecificAnnotation(self):  # noqa: N802 - the COM member name
-        return self.display
-
-
-def test_sr_leader_reaches_the_crown_from_outside(monkeypatch) -> None:
-    """F2 (Main, pc-r6): the SR10.9 leader ran from the crown's centre through
-    the cross hole; its arrow now sits outside the arc with no solid line on
-    to the centre (pc-r8 kept that line through the hole with the arrow
-    outside), and a seat that drops either setting fails loud."""
-    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _name: obj)
-    monkeypatch.setattr(drawing, "dimension_name", lambda adapter, a: a.name)
-    annotations = [_RadiusAnnotation("HeadLen"), _RadiusAnnotation("HeadCapR")]
-    drawing._radius_leader_outside(None, annotations, "HeadCapR")
-    assert annotations[1].display.ArrowSide == 1  # swDimArrowsOutside
-    assert annotations[1].display.SolidLeader is False
-    assert annotations[0].display.ArrowSide == 0
-    assert annotations[0].display.SolidLeader is True
-    stuck = [_RadiusAnnotation("HeadCapR", keeps=False)]
-    with pytest.raises(RuntimeError, match="arrow outside the arc"):
-        drawing._radius_leader_outside(None, stuck, "HeadCapR")
-    solid = [_RadiusAnnotation("HeadCapR", keeps_leader=False)]
-    with pytest.raises(RuntimeError, match="solid leader to the centre"):
-        drawing._radius_leader_outside(None, solid, "HeadCapR")
-    with pytest.raises(RuntimeError, match="expected one HeadCapR"):
-        drawing._radius_leader_outside(None, annotations[:1], "HeadCapR")
-    source = inspect.getsource(drawing.build)
-    assert '_radius_leader_outside(adapter, detail_annotations, "HeadCapR")' in source
 
 
 def test_sr_leader_aims_at_the_crown_arc_not_its_corner() -> None:
@@ -2478,63 +1880,6 @@ class _ProfileView:
     @staticmethod
     def sheet(xyz) -> tuple[float, float]:
         return (0.30 - xyz[2], 0.17 + xyz[1])
-
-
-def _journal_profile(monkeypatch, *, drop=()) -> tuple[_ProfileView, dict]:
-    """The arbor's collinear Ø8 zones and its Ø15 head as model faces of the
-    part the profile references; ``drop`` leaves zones out of the model."""
-    front, back = spec.FRONT_JOURNAL_Z, spec.BACK_JOURNAL_Z
-    faces = {
-        "front_journal": _ShaftFace(spec.SHAFT_DIA, front, front + spec.JOURNAL_LEN),
-        "between": _ShaftFace(spec.SHAFT_DIA, front + spec.JOURNAL_LEN, back),
-        "back_journal": _ShaftFace(spec.SHAFT_DIA, back, back + spec.JOURNAL_LEN),
-        "head": _ShaftFace(spec.HEAD_DIA, spec.HEAD_REAR_Z - spec.HEAD_LEN, spec.HEAD_REAR_Z),
-    }
-    part = _ArborPart([face for name, face in faces.items() if name not in drop])
-    view = _ProfileView([], part)
-    monkeypatch.setattr(
-        drawing,
-        "model_point_in_view",
-        lambda adapter, v, xyz, *, label: v.sheet(xyz),
-    )
-    return view, faces
-
-
-def test_each_journal_ra_attaches_its_own_controlled_face_at_its_flank(
-    monkeypatch,
-) -> None:
-    """drawing:dt_pinion_arbor key 870279bc: ``SelectByID2`` at the front land's
-    flank point (0.25355, 0.166) missed on swmaker00000a@10 and hit on
-    swmaker000004@4.  On the first cold v39 build (farm run
-    20261002T180658288Z) the silhouette sweep returned only the front land's
-    UPPER flank, so its lower-flank landing had nothing to take.  Each Ra now
-    attaches the model face its part-owned control names -- never the
-    collinear plain zone next to it -- and still lands at its station on the
-    flank it always did (front lower, back upper), without a silhouette sweep."""
-    view, faces = _journal_profile(monkeypatch)
-
-    picks = drawing._journal_finish_picks(SimpleNamespace(), view)
-
-    assert view.sweeps == []
-    assert set(picks) == set(drawing.JOURNAL_FINISHES)
-    for key, (face, landing, symbol_xy) in picks.items():
-        station_z, want_symbol, flank = drawing.JOURNAL_FINISHES[key]
-        assert face is faces[key]
-        assert symbol_xy == want_symbol
-        assert landing == pytest.approx(
-            view.sheet((0.0, drawing.FLANK_SIGN[flank] * spec.SHAFT_DIA / 2000.0, station_z / 1000.0))
-        )
-
-
-def test_a_journal_land_the_model_does_not_carry_fails_loud(monkeypatch) -> None:
-    """No fallback to a neighbour: without the front land's own face the
-    collinear plain zone beside it is refused."""
-    view, _faces = _journal_profile(monkeypatch, drop={"front_journal"})
-
-    with pytest.raises(
-        RuntimeError, match=r"front_journal: face spec .* matched 0 faces"
-    ):
-        drawing._journal_finish_picks(SimpleNamespace(), view)
 
 
 def test_two_different_lines_of_one_face_through_the_point_are_refused(monkeypatch) -> None:

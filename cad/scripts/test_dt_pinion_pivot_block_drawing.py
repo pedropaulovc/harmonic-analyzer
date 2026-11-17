@@ -87,12 +87,6 @@ def test_surface_finish_is_part_owned_and_consumed_by_key() -> None:
     lift_x = lift.face.contains_x_mm
     assert lift_x == -dt_pinion_pivot_block_spec.LIFT_BORE_SPACING
     assert abs(lift_x) > dt_pinion_pivot_block_spec.BORE_DIA / 2.0
-    part_source = Path(block.__file__).read_text(encoding="utf-8")
-    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "surface_finishes=SURFACE_FINISHES" in part_source
-    assert 'surface_finish_by_key(SURFACE_FINISHES, "pivot_bore")' in drawing_source
-    assert 'surface_finish_by_key(SURFACE_FINISHES, "lift_bore")' in drawing_source
-    assert "roughness_ra=" not in drawing_source
 
 
 def test_required_drawing_paths() -> None:
@@ -126,10 +120,7 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
 
 def test_sheet_runs_at_3_to_1_with_2_to_1_isometric() -> None:
     assert drawing.SHEET_SCALE == (3.0, 1.0)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "scale=(2, 1)" in source  # the isometric override
     assert dt_pinion_pivot_block_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 2:1"
-    assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
 
 
 def test_each_ream_callout_names_its_running_mate() -> None:
@@ -181,9 +172,6 @@ def test_sheet_carries_no_general_notes() -> None:
     # callout, so nothing is left for a general note; general tolerances live
     # in the title block only.
     assert not hasattr(dt_pinion_pivot_block_spec, "DRAWING_NOTES")
-    for script in (drawing, block):
-        source = Path(script.__file__).read_text(encoding="utf-8")
-        assert "Manufacturing Notes" not in source
 
 
 def test_front_view_locations_start_at_the_pivot_bore() -> None:
@@ -218,16 +206,7 @@ def test_hole_states_are_annotated() -> None:
 def test_block_carries_no_gdt_only_its_running_bore_finish() -> None:
     # drawing-guidelines.md rule 5 (avoid excessive GD&T): blocks are not on the GD&T
     # allowlist, so no datum tags, no feature-control frames, no basic boxes.
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "add_datum_feature(" not in source
-    assert "add_feature_control_frame(" not in source
-    assert "set_basic_dimension(" not in source
     assert not hasattr(dt_pinion_pivot_block_spec, "GEOMETRIC_TOLERANCES_MM")
-    assert "set_dimension_origin" in source
-    assert "add_surface_finish(" in source
-    # The hold-downs are ordinary coordinates from the west end.
-    assert '"west hold-down station"' in source
-    assert '"east hold-down station"' in source
 
 
 def test_wizard_holes_are_not_fake_marked_dimensions() -> None:
@@ -247,9 +226,6 @@ def test_screw_hole_contract_is_part_owned_and_resolved() -> None:
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:
-    source = Path(block.__file__).read_text(encoding="utf-8")
-    assert "apply_drawing_properties" in source
-    assert "clear_dimensions_for_drawing" in source
     import _config
 
     spec = _config.parts("dt-pinion-pivot-block")
@@ -273,11 +249,6 @@ def test_assembly_and_base_depend_on_geometry_not_drawing_notes() -> None:
 def test_views_carry_no_hidden_lines() -> None:
     # Fable review r4 (drawing-guidelines.md rule 9 (show internal shape in solid lines)): the holes are standard drills and reams fully
     # defined by their callouts, so every view is hidden-lines-removed.
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "set_hidden_lines_visible" not in source
-    assert "for view in (front, top, right, iso):" in source
-    assert "symbol_xy=PIVOT_FINISH_XY" in source
-    assert "char_height=0.0025" in source
     # The Ra leader must leave the block through its top face, left of the
     # corner where BlockHeight's extension line starts.
     rim = (

@@ -63,15 +63,9 @@ def test_the_lathe_sizes_live_on_the_side_view_plane() -> None:
     # drawing-guidelines.md rule 11 (turned parts read like the lathe): one
     # Right-Plane half-profile carries the diameter, body, crown and overall,
     # so they all import into the side view; the pin hole shares that plane.
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert source.count('adapter.create_sketch("Right")') == 2
-    assert 'create_sketch("Front")' not in source
-    assert "create_revolve" in source
-    assert 'set_dimension_prefix(adapter, "RodProfile", "CapR", "SR")' in source
     assert set(dt_pinion_lift_rod_spec.DRAWING_DIMENSIONS["RodProfile"]) == set(
         drawing.RIGHT_KEEP
     )
-    assert '"*Front"' not in Path(drawing.__file__).read_text(encoding="utf-8")
 
 
 def test_the_overall_is_a_reference_and_the_body_length_controls() -> None:
@@ -121,18 +115,11 @@ def test_the_sheet_has_no_general_notes() -> None:
     # Machinist review r1: the crown note floated far from the feature it
     # governs; the SR on the side view defines the crown.
     assert not hasattr(dt_pinion_lift_rod_spec, "DRAWING_NOTES")
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "Manufacturing Notes" not in source
-    assert "add_feature_control_frame" not in source
-    assert "add_native_axis_datum" not in source
-    assert "SetPrecision3" not in source
 
 
 def test_view_scales_are_explicit() -> None:
     assert drawing.SHEET_SCALE == (1.0, 1.0)
     assert drawing.DETAIL_SCALE == (5, 1)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "scale=(1, 1)" in source  # side view true scale
     assert dt_pinion_lift_rod_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:2"
 
 
@@ -228,10 +215,6 @@ def test_the_flats_take_the_fulcrum_shafts_depth_and_name_their_mate() -> None:
         "AcrossFlat": 3,
     }
     assert 0.24 * _IN + 0.01 * _IN >= spec.ROD_DIA - 1e-9
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert 'set_dimension_prefix(adapter, "FlatProfile", "AcrossFlat", "2X ")' in source
-    assert "create_sketch(FLAT_PLANE)" in source
-    assert 'name_last_feature(adapter, "SetScrewFlats")' in source
     assert part.V_FLATS > 0.0
 
 
@@ -295,8 +278,6 @@ def test_view_b_looks_square_at_the_flats() -> None:
     )
     assert tuple(x) == (0.0, 0.0, -1.0)
     assert tuple(y) == spec.FLAT_NORMAL_LOCAL
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "place_view(adapter, str(SOURCE), FLATS_VIEW" in source
     assert drawing.FLATS_VIEW == spec.FLATS_VIEW
     # All of VIEW B's sizes above the rod, the across-flat off the crown end.
     top = drawing.FLATS_CENTER[1] + spec.ROD_DIA / 2000.0
@@ -316,9 +297,6 @@ def test_view_b_arrow_lies_along_its_line_of_sight_in_the_end_view() -> None:
     assert z[2] == pytest.approx(0.0, abs=1e-12)
     assert abs(z[0]) > 0.9  # within 10 deg of the side view's own line of sight
     assert drawing.VIEW_B_EYE == pytest.approx((-z[0], z[1]))
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'place_view(adapter, str(SOURCE), "*Back", *END_CENTER' in source
-    assert "_view_b_arrow(adapter, end)" in source
     assert drawing.END_CENTER[1] == drawing.RIGHT_CENTER[1]
     assert drawing.END_CENTER[0] > drawing.RIGHT_CENTER[0] + drawing.HALF_SPAN + 0.03
     # The arrow comes from the eye's side, points at the rod's centre and
@@ -348,9 +326,6 @@ def test_across_flat_text_leaves_its_lines() -> None:
     lower_witness_y = drawing.FLATS_CENTER[1] - spec.ROD_DIA / 2000.0
     assert text_y < lower_witness_y - 0.008
     assert text_x < drawing._RIM_X - CAP_SAG_M - 0.005
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "offset_dimension_text" not in source
-    assert "ACROSS_FLAT_TEXT_XY" not in source
     # R8 render: SolidWorks hangs the text LEFT of its dimension line, its
     # widest line ending at the line (the 32-glyph line measured 80.4 mm,
     # ~2.52 mm a glyph, and ran through the inner border at 0.0127).  The

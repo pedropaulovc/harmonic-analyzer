@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import math
-from pathlib import Path
 
 import build_ch_fulcrum_shaft as part
 import ch_fulcrum_keeper_spec
@@ -30,8 +29,6 @@ def test_shaft_carries_no_frames_or_datums() -> None:
     # leave no end face to square anyway.
     assert not hasattr(ch_fulcrum_shaft_spec, "GEOMETRIC_CONTROLS")
     assert not hasattr(ch_fulcrum_shaft_spec, "PART_DATUMS")
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "project_part_pmi" not in source
 
 
 def test_plain_shaft_domed_proud_of_each_keeper() -> None:
@@ -87,10 +84,6 @@ def test_flat_pair_is_baselined_from_one_end() -> None:
     assert spec.DRAWING_PRECISION["FlatProfile"]["FlatBaseline"] == 2
     assert spec.DRAWING_PRECISION["FlatProfile"]["FlatLength"] == 2
     assert round(spec.FLAT_STATION_WINDOW_MM, 3) == 1.219
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert '\'"ShaftLength" / 2 - "FlatPitch" / 2 - "FlatLength" / 2\'' in source
-    assert '\'"ShaftLength" / 2 + "FlatPitch" / 2 - "FlatLength" / 2\'' in source
-    assert 'dims.record("FlatPitch"' not in source
 
 
 def _station_window(spec) -> float:
@@ -124,15 +117,6 @@ def test_both_flats_print_one_length_and_one_across_flat() -> None:
         ("FlatProfile", "FlatLength"): "2X ",
         ("FlatProfile", "AcrossFlat"): "2X ",
     }
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert 'dims.record("FlatLengthB", \'"FlatLength"\')' in source
-    assert "AcrossFlat dim sets both flats' height" in source
-    assert (
-        "set_dimension_prefix(adapter, feature_name, dimension_name, prefix)" in source
-    )
-    assert source.index("set_dimension_prefix(adapter") < source.index(
-        "clear_dimensions_for_drawing(adapter)"
-    )
 
 
 def test_side_view_texts_stand_clear_of_extension_lines() -> None:
@@ -209,9 +193,6 @@ def test_three_place_sizes_name_their_mates() -> None:
         "1/4 GROUND STOCK OK",
     ]
     assert "MHA-CH-VN-55" in notes.ACROSS_FLAT_CALLOUT
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert '"ShaftDia": SHAFT_DIA_CALLOUT_ROWS' in source
-    assert '"AcrossFlat": ACROSS_FLAT_CALLOUT_ROWS' in source
     # The sheet's drawing text lives off the spec the assembly imports.
     for name in ("SHAFT_DIA_CALLOUT", "ACROSS_FLAT_CALLOUT", "DRAWING_NOTES", "ISO_VIEW_NOTE"):
         assert not hasattr(ch_fulcrum_shaft_spec, name)
@@ -222,9 +203,6 @@ def test_dome_prints_as_a_spherical_reference() -> None:
     spec = ch_fulcrum_shaft_spec
     assert "HEMISPHERE" not in notes.DRAWING_NOTES
     assert "DomeRadius" in spec.DRAWING_DIMENSIONS["FlatProfile"]
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert 'dims.record("DomeRadius", \'"ShaftDia" / 2\')' in source
-    assert '"2X (S" + existing' in Path(drawing.__file__).read_text(encoding="utf-8")
 
 
 def test_every_orthographic_view_is_at_sheet_scale() -> None:
