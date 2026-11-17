@@ -70,8 +70,9 @@ the same task names select the same closure.
 Cylinder-bank retention (south disc air to the 64T and alignment pinion,
 retaining lands, rod ring bores against the eccentric cams) is proved by the
 continuous printed-tolerance clearance in `cylinder_bank_layout`
-(`SOUTH_DISC_CLEARANCE`) over all phases and tolerance extremes; the saved
-bodies are covered by the `interference-free` soundness gate.
+(`SOUTH_DISC_CLEARANCE`) over all phases and tolerance extremes, analytically
+only. No gate reads that air from the saved bodies: `interference-free` catches
+overlap of the saved assembly, whose alignment pinion is parked DISENGAGED.
 
 Drive-train drawing acceptance also inspects sheet 3 for separate arbor/spring
 balloon landings, and sheet 8 step 9C against sheet 13 Detail A for the same
