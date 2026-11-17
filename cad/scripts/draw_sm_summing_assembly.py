@@ -654,7 +654,7 @@ def _prove_detail_setting(
     _assert_callout(display, dimension)
 
 
-def _knife_detail(adapter: Any) -> tuple[Any, Callable[[], None]]:
+def _knife_detail(adapter: Any) -> Callable[[], None]:
     """The 1:1 knife-edge detail with the boss's minimum rock travel and the
     hanger bolt's reach below its mount's top seat (step 4A's cut)."""
     label = notes.DETAIL_TITLE
@@ -744,7 +744,7 @@ def _knife_detail(adapter: Any) -> tuple[Any, Callable[[], None]]:
         for display, proof in settings:
             _prove_detail_setting(display, **proof)
 
-    return view, settled
+    return settled
 
 
 def _place_setting_table(adapter: Any, views: dict[str, Any]) -> None:
