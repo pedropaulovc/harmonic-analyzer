@@ -545,7 +545,9 @@ approval.
   61.5 min — so give a cold run a generous budget (90); the farm clamps the
   request to 60 s–3 h. Too small a budget on a cold run costs one retry and then
   a `platform`-style failure per slow leaf.
-- `build_bare` = parts + assemblies only (fast, no gates, no export).
+- `build_bare` = parts + assemblies only (fast, no export). In `rw` cache mode
+  each rebuilt assembly still runs its in-leaf soundness battery (see "Verify
+  suites"); `build_bare` schedules no standalone gate.
 - `release` is opt-in: `doit release` defaults to the next `vNN`; pass an
   explicit tag/options after `--` (for example, `doit release -- v22 --draft`).
   Its COM half is the separate `package:release` leaf. The release action and
@@ -724,6 +726,9 @@ stores the result. `_run`/`_run_stamped` have NO `com` parameter (and no seat
 access), so a new COM task cannot race the STA seat or silently skip the cache:
 route it through `_cached_com_action` (a part/assembly/drawing keeps its
 `_cached_part_action`/`_cached_assembly_action`/`_cached_drawing_action` wrapper).
+The one sanctioned exception is the assembly leaf's in-leaf soundness proof
+(`_prove_soundness_in_leaf`): it runs inside the assembly's own seat, probes the
+`verify_soundness:<stem>` key first and stores under it (see "Verify suites").
 A cache-keyed COM task must therefore declare its inputs as machine-stable
 `file_dep`s and its outputs under `cad/out/`; a gate whose only output is a
 verdict passes its stamp path as `stamp=` and that stamp IS the cached artefact.
@@ -932,7 +937,8 @@ A refresh whose mass-properties fingerprint is IDENTICAL to the last gated
 save (and that auto-repaired nothing) skips the three health/DOF/interference
 gates — they would re-prove what that save already proved (measured 274 s of
 a 780 s no-op top-assembly refresh) — while `verify:soundness` independently
-re-proves every saved assembly on each build.
+re-proves every saved assembly (in `rw` mode usually inside this same leaf; see
+"Verify suites").
 
 **Idempotent — artefact bytes don't drive rebuilds.** Saving an assembly makes
 SolidWorks rewrite volatile save metadata into every nested `.SLDPRT`/`.SLDASM`
@@ -1408,6 +1414,18 @@ SolidWorks-free aggregator over those child stamps (it keeps the CLI and the
 release edge). `verify:kinematics` is one leaf. A gate's stamp IS its cached
 artefact — identical inputs imply an identical verdict — which is what lets a
 machine with no seat run the full gate set through `farm_build.py`.
+
+**The assembly leaf proves its own soundness.** Every `assembly:<stem>` leaf that
+builds or refreshes on a seat (FULL or PARTS, including a no-op refresh
+that skipped its broad gates) runs `verify.py <stem> --suite soundness` on the
+saved file under the same seat, then publishes the stamp under the
+`verify_soundness:<stem>` key, so that leaf restores instead of reopening. The
+standalone leaf still runs when: only a soundness input changed (`verify.py`,
+the contract, the interference table); the assembly was a cache HIT or a COM-free
+replay reuse; the assembly publication was lost to another writer (new token,
+new key); the soundness label is force-refreshed; the in-leaf battery failed
+(WARN in the assembly leaf, which still publishes; the standalone leaf re-runs
+and fails the build); or the cache mode cannot publish (`ro`/off locally).
 
 `soundness` opens EVERY built (sub)assembly standalone and runs the shared health
 battery on each: **one shared re-solve** (`verify.rebuild`) after open, then DOF /
