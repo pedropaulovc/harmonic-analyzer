@@ -2312,6 +2312,10 @@ def aggregate_package(
                     from _drawing_diff import create_drawing_diff
                     if snapshot_error:
                         raise RuntimeError(snapshot_error)
+                    if _fitup_section(package):
+                        # The PDF diff cannot show a change to steps that print
+                        # only in ASSEMBLY.md (rule 22): review in full.
+                        raise RuntimeError("ASSEMBLY.md steps are outside the PDF diff")
                     if not package.sources or len(package.before_sources) != len(package.sources):
                         raise ValueError("precheck requires paired before and after PDFs; use --force for an unconditional after-only review")
                     if any(

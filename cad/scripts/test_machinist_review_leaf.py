@@ -138,7 +138,7 @@ def _local_import_closure(entry: Path) -> set[str]:
                 # The leaf supplies PDF/kind/name and always passes --force,
                 # so the lazy _drawing_diff precheck import is unreachable too.
                 # The ASSEMBLY.md generator is keyed per package instead, by
-                # ha_assembly_package.fitup_sources (rule 22).
+                # dodo._machinist_review_fitup_deps (rule 22).
                 if local.is_file() and name not in {
                     "_drawing_registry",
                     "_drawing_diff",
@@ -152,6 +152,22 @@ def test_declared_review_modules_equal_the_real_import_closure(dodo):
     assert _local_import_closure(dodo.SCRIPTS_DIR / "machinist_review.py") == set(
         dodo._MACHINIST_REVIEW_MODULES
     )
+
+
+def test_assembly_review_keys_on_its_assembly_md_sources(dodo, monkeypatch):
+    """Rule 22: a package whose steps print in ASSEMBLY.md is reviewed with
+    that section, so its sources key the review; the list is read statically."""
+    import ha_assembly_package
+
+    assert dodo._steps_in_document() == ha_assembly_package.STEPS_IN_DOCUMENT
+
+    def names() -> set[str]:
+        return {Path(p).name for p in dodo._machinist_review_file_deps("mg_magnifier_assembly")}
+
+    monkeypatch.setattr(dodo, "_steps_in_document", lambda: ())
+    assert "mg_magnifier_assembly_sheet.py" not in names()
+    monkeypatch.setattr(dodo, "_steps_in_document", lambda: ("mg-magnifier",))
+    assert {"ha_assembly_package.py", "mg_magnifier_assembly_sheet.py"} <= names()
 
 
 def test_forced_leaf_never_imports_or_calls_diff(inputs, monkeypatch):

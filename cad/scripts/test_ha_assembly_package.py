@@ -3,8 +3,6 @@ row backed by a shop record, and ships in the release (#2392)."""
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import cut_release
 import error_budget
 import ha_assembly_package as package
@@ -52,15 +50,6 @@ def test_release_ships_the_sequence_and_tool_list(tmp_path, monkeypatch):
             assert run.text in text
     for use in package.tool_uses():
         assert use.tool.name in text
-
-
-def test_review_keys_on_the_sources_of_a_listed_packages_steps(monkeypatch):
-    """Rule 22: the machinist review of a package whose steps print here is
-    keyed on the modules they are generated from; an unlisted one on none."""
-    assert package.fitup_sources("mg-magnifier") == ()
-    monkeypatch.setattr(package, "STEPS_IN_DOCUMENT", ("mg-magnifier",))
-    names = {Path(path).name for path in package.fitup_sources("mg-magnifier")}
-    assert {"ha_assembly_package.py", "mg_magnifier_assembly_sheet.py"} <= names
 
 
 def test_numbered_steps_and_checks_keep_their_printed_heads():
