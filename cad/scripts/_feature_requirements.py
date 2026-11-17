@@ -307,6 +307,8 @@ def _call_site(frame: Any, api: str) -> Path:
     path = Path(frame.f_code.co_filename).resolve()
     if not path.stem.startswith("draw_"):
         raise ValueError(f"{api} must be declared in a draw_<stem> module")
+    if not any(call.lineno <= frame.f_lineno <= call.end_lineno for call in declaration_calls(source_tree(path), api)):
+        raise ValueError(f"cannot resolve {api} call at {path}:{frame.f_lineno}")
     return path
 
 

@@ -172,7 +172,7 @@ declaration; `built_up_permitted` requires an explicit permission note included
 there. A process plan cannot approve its own assembled substitute. Offline
 citation checks resolve every emitted YAML key path, including dynamic
 part-registry and material-family citations, and require Python symbols to name
-current top-level declarations in existing source files.
+current top-level declarations or registered requirement/metadata calls.
 
 ## Face identity and native hygiene
 

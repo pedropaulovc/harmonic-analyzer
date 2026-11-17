@@ -477,7 +477,7 @@ authority without claiming new sheet text.
 `package:features` is a seat-free aggregator over all those COM leaves. Each
 leaf writes `cad/out/features/<stem>/{<dashed-stem>.STEP,features.toml}` and uses
 `uptodate: [False]` to reach the cache probe even with existing local targets.
-Python citations resolve current declaration/call-site AST spans; YAML citations
+Python citations are `file.py#symbol` (no line numbers); YAML citations
 resolve scalar key paths. Missing cited symbols fail loudly. The manifest's
 `step_sha256` binds the raw adjacent STEP; this self-contained bundle is the
 consumer artefact. Full `export` waits for the bundles and copies their exact

@@ -902,7 +902,10 @@ def test_all_emitted_citations_resolve_current_python_ast_and_yaml_scalar_source
                 }
             api, colon, name = location.partition(":")
             if colon:
-                assert api in {"requirement", "part_metadata"} and name, f"{reference}: invalid call citation"
+                draw = importlib.import_module(path.stem)
+                declared = requirements_for(draw) if api == "requirement" else range(1, len(metadata_for(draw)) + 1)
+                key = name if api == "requirement" else int(name)
+                assert api in {"requirement", "part_metadata"} and key in declared, f"{reference}: unresolved call citation"
             else:
                 assert location in python_symbols[path], f"{reference}: not a current top-level declaration"
         else:
