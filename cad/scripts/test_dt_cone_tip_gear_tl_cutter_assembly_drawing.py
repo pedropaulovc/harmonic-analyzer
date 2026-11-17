@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import textwrap
 
 import pytest
 
@@ -11,6 +12,7 @@ import _config
 import _dt_cone_tip_gear_tl_cutter_interference as interference
 import draw_dt_cone_tip_gear_tl_cutter_assembly as drawing
 import dt_cone_tip_gear_spec as tip
+import dt_cone_tip_gear_tl_cutter_assembly_sheet as notes
 import dt_cone_tip_gear_tl_cutter_spec as fixture
 import sh_vn_arbor_set_screw_spec as set_screw
 from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM
@@ -98,15 +100,9 @@ def test_the_only_allowed_overlap_is_the_set_screw_thread_in_its_tap() -> None:
 
 
 def _steps() -> list[str]:
-    """Each numbered step with its continuation lines, as printed."""
-    steps: list[str] = []
-    for line in fixture.ASSEMBLY_STEPS.splitlines()[1:]:
-        if line[:1].isdigit():
-            steps.append(line)
-        else:
-            assert line.startswith("   "), line
-            steps[-1] += "\n" + line
-    return steps
+    """Each numbered step as ASSEMBLY.md prints it."""
+    ((_title, steps),) = notes.STEP_SECTIONS
+    return list(steps)
 
 
 def test_the_sheet_is_bom_balloons_and_one_action_steps() -> None:
@@ -123,8 +119,12 @@ def test_the_sheet_is_bom_balloons_and_one_action_steps() -> None:
         str(number) for number in range(1, len(steps) + 1)
     ]
     # Rule 22: at most six printed lines a step.
-    assert all(len(step.splitlines()) <= 6 for step in steps)
-    window = fixture._window_text()
+    assert all(
+        len(textwrap.wrap(step, width=100, subsequent_indent="   ")) <= 6 for step in steps
+    )
+    window = notes.WINDOW_TEXT
+    # The window, a measurable setting and acceptance, stays on the sheet.
+    assert window in notes.STICK_OUT_NOTE and "(CALIPER)" in notes.STICK_OUT_NOTE
     # Setting the stick-out and squaring the face are separate steps; each
     # names the tool it is read with and its acceptance.
     (setting,) = (step for step in steps if "SET THE STICK-OUT" in step)
@@ -354,11 +354,11 @@ def test_the_exploded_group_is_centred_on_its_sheet_off_the_title_block() -> Non
 def test_the_steps_name_ends_by_view_and_no_private_phrase() -> None:
     """Rules 22 and 26: item 1's cutting end is its bottom end in the front
     view; the bit's orientation is stated in view terms only."""
-    steps = fixture.ASSEMBLY_STEPS
+    steps = " ".join(_steps())
     assert "CUTTING END" not in steps and "SPINDLE" not in steps
     assert "FORWARD" not in steps and "LEADS" not in steps
     for step in _steps():
         if "ITEM 1'S BOTTOM END" in step:
-            assert "ITEM 1'S BOTTOM END (FRONT VIEW)" in step.replace("\n   ", " ")
+            assert "ITEM 1'S BOTTOM END (FRONT VIEW)" in step
     assert sum("BOTTOM END" in step for step in _steps()) == 2
-    assert "FACE TOWARD THE VIEWER (FRONT VIEW)" in _steps()[0].replace("\n   ", " ")
+    assert "FACE TOWARD THE VIEWER (FRONT VIEW)" in _steps()[0]

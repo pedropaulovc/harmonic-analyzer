@@ -7,11 +7,13 @@ with the spindle in forward) with items 1 and 2 ballooned and the stick-out
 and swing radius as references, the assembly's own settings dimensions
 (its hidden CutterSettingsReference sketch); the bottom view (the cutting
 end, end-on) with item 3 ballooned; the shaded isometric; the BOM; the
-fitting steps.  Sheet 2: the exploded front view (rule 22), one view per
-item, item 2 drawn out along item 1's cross hole and item 3 down out of its
-cutting end, each labelled.  Poses, the settings, the stick-out window and
-the step text come from ``dt_cone_tip_gear_tl_cutter_spec``; this recipe
-only lays the sheets out and never edits the source assembly.
+stick-out note (its window; the fitting steps print in the release's
+ASSEMBLY.md, ``dt_cone_tip_gear_tl_cutter_assembly_sheet``).  Sheet 2: the
+exploded front view (rule 22), one view per item, item 2 drawn out along
+item 1's cross hole and item 3 down out of its cutting end, each labelled.
+Poses, the settings and the stick-out window come from
+``dt_cone_tip_gear_tl_cutter_spec``; this recipe only lays the sheets out
+and never edits the source assembly.
 """
 
 from __future__ import annotations
@@ -24,6 +26,7 @@ from typing import Any
 
 import _config
 import _telemetry
+import dt_cone_tip_gear_tl_cutter_assembly_sheet as notes
 import dt_cone_tip_gear_tl_cutter_spec as fixture
 from _check import check
 from _com import _early_bound
@@ -507,7 +510,7 @@ def _place_sheet(adapter: Any) -> Any:
     _centreline(adapter, front, AXIS_ENDS_MM, label="bar axis")
     _settings(adapter, front)
     for text, xy, label in (
-        (fixture.ASSEMBLY_STEPS, STEPS_XY, "fitting steps"),
+        (notes.STICK_OUT_NOTE, STEPS_XY, "stick-out setting"),
         (fixture.ISO_NOTE, ISO_NOTE_XY, "isometric scale note"),
     ):
         _add_note(adapter, text, xy, label=label)

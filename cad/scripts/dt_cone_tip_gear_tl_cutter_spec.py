@@ -171,34 +171,8 @@ if RUNOFF_OVER_STEMS - FACE_SHIFT_FORWARD_MAX < tip.CUTTER_RUNOFF_MM - 1e-9:
 # --- Sheet words ---------------------------------------------------------------
 BOM_COMPONENTS = (BAR, BIT, SET_SCREW)
 BOM_ITEMS = {BAR: "1", BIT: "2", SET_SCREW: "3"}
-
-
-def _window_text() -> str:
-    low, high = (tip.inch_text(value, 3) for value in STICK_OUT_WINDOW)
-    return f"{low}-{high}"
-
-
-# Item 3's cup bears on item 2's plain round: the stick-out is an adjustable
-# clamp setting (drawing-guidelines rule 23), so the steps set it, then prove
-# the clamp holds it.  Ends and faces go by view names (rule 22): item 1's
-# cutting end is its bottom end in the front view.
-ASSEMBLY_STEPS = "\n".join(
-    (
-        "FITTING",
-        "1. SLIDE ITEM 2 INTO ITEM 1'S CROSS HOLE, FORM END RIGHT, FACE",
-        "   TOWARD THE VIEWER (FRONT VIEW).",
-        f"2. SET THE STICK-OUT {_window_text()} (CALIPER).",
-        "3. TURN ITEM 2 UNTIL ITS FACE IS PARALLEL TO ITEM 1'S AXIS: A",
-        "   SQUARE ON ITEM 1'S BOTTOM END (FRONT VIEW) SHOWS NO LIGHT",
-        "   BETWEEN ITS BLADE AND THE FACE.",
-        "4. TIGHTEN ITEM 3, CUP END FIRST, UP THROUGH ITEM 1'S BOTTOM END",
-        "   (FRONT VIEW) ONTO ITEM 2'S ROUND SHANK.",
-        "5. CHECK: ITEM 2 DOES NOT TURN OR SLIDE BY HAND.",
-        f"6. CHECK: THE STICK-OUT STILL READS {_window_text()} (CALIPER).",
-        "7. IF STEP 5 OR 6 FAILS, LOOSEN ITEM 3 AND REPEAT FROM STEP 2.",
-    )
-)
-# Named above each value; steps 2 and 6 name the stick-out's window.
+# Named above each value; the sheet's stick-out note
+# (dt_cone_tip_gear_tl_cutter_assembly_sheet) prints the stick-out's window.
 DIMENSION_CALLOUTS: dict[str, str] = {
     STICK_OUT_DIMENSION: "STICK-OUT",
     SWING_RADIUS_DIMENSION: "SWING RADIUS",
