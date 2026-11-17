@@ -1,4 +1,4 @@
-# Rocker strap MHA-CH-13: the first part routed end to end on the CNC premise
+# Rocker strap MHA-CH-13: the first part routed for the CNC mill
 # (owner ruling 2026-11-17). Route, owner-chosen: 12 in blanks sawn from the
 # 1/8 x 1-1/2 in 1018 CF flat (OnlineMetals 4807), 20 off; a shop-made 6061
 # sub-plate gripped in the PM vise carries a fixed fence (Y0), an end stop (X0)
@@ -265,7 +265,7 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, 
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "Sub-plate (made beforehand, its top and fence face milled in the vise) in the vise on 1 in parallels, centred, the fence indicated <.001 along X; it stays there for every blank. Blank flat on the plate, one long edge against the fence, its left end against the plate's end stop, pushed by the Pitbull edge clamps at X {{cad.clamp_stations_in}} from the end stop, each tightened to {{process.clamp_torque_ft_lb:g}} ft-lb. Clamp noses {{process.clamp_height_mm:in.3dot}} and the fence top {{process.fence_height_mm:in.3dot}} above the plate stay below the cut."
-datum = "Program RS01_rough_faces (cam:ch_rocker_strap). One G54 while the plate stays put: Z0 = the faced plate top, Y0 = the fence face (blank at −Y), X0 = the end stop's face. Tool lengths from the tool setter at each M6."
+datum = "Program RS01_rough_faces (cam:ch_rocker_strap). One G54 while the plate stays put: Z0 = the faced plate top, Y0 = the fence face (blank at −Y), X0 = the end stop's face. Tool lengths from the tool setter at each M6; every file (RS01–RS04) starts with an M6 for its first tool, so none runs on the length the last file left, even re-run or restarted."
 diagram = { file = "diagrams/rough.svg", alt = "Plan of the sub-plate: fence along the back, blank against it and against the end stop at its left end, edge clamps at the front at X {{cad.clamp_stations_in}}; the 1/2 in end mill faces the full blank, one face, then the other after the flip." }
 envelope = { x_span_mm = ["{{cad.blank_length_mm}}", "{{process.face_cutter_dia_mm}}"], y_span_mm = ["{{cad.blank_width_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_thickness_mm}}", "{{cad.blank_thickness_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_thickness_mm}}", "{{cad.thickness_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
 # The vise grips the sub-plate, not the blank: every size here is the plate's.
@@ -306,7 +306,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run RS02_finish_face_1 (T1 still in, 2650): the face at Z {{cad.finish_face_1_z_in:.4dot}}."
+instruction = "Run RS02_finish_face_1 (M6 T1 at its start, the 1/2 in end mill: set it on the tool setter again; 2650): the face at Z {{cad.finish_face_1_z_in:.4dot}}."
 settings = "endmill-carbide-3fl-1-2-1018-cf"
 milling_cuts = [
   { name = "face finish", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", axial_doc_mm = "{{cad.face_finish_doc_mm}}", radial_woc_mm = "{{process.face_stepover_mm}}", traverse_mm = [0, "{{cad.blank_length_mm}}"] },
@@ -335,7 +335,7 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run RS03_finish_face_2_hub (T1, 2650): the face at Z {{cad.thickness_in:.4dot}}. At its M0, before any other tool: mic the thickness at both ends and the middle."
+instruction = "Run RS03_finish_face_2_hub (M6 T1 at its start, the 1/2 in end mill; 2650): the face at Z {{cad.thickness_in:.4dot}}. At its M6 T3 pause, before the centre drill goes in: mic the thickness at both ends and the middle."
 settings = "endmill-carbide-3fl-1-2-1018-cf"
 inspection = "Thickness {{cad.thickness_min_in:.3dot}}–{{cad.thickness_max_in:.3dot}} at both ends and mid-length (out: stop, the blank is scrap or goes back for a skim)."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.thickness_band_mm}}" }]

@@ -26,6 +26,7 @@ _PROGRAMS = (
 _MINI_RECIPE = f'''
 STEM = "mini"
 PROGRAMS = {_PROGRAMS!r}
+LOAD_FIRST_TOOL = ("P1_face", "P3_two_speeds")
 ''' + '''
 
 
@@ -76,6 +77,9 @@ def test_freecad_posts_real_rapids_zigzag_faces_and_conventional_edges(tmp_path)
     face = _gcode.read_program(tmp_path / "P1_face.nc")
     assert any(m.motion is _gcode.Motion.RAPID and m.length > 0 for m in face.moves)
     assert face.spindle_rpm == {850.0}
+    # P1 (one Job) and P3 (two sections) load their first tool before any
+    # move; P4 runs on the tool already loaded.
+    assert _gcode.check_tool_changes(face, 10.0, [2], loads_first=True) == []
     # FreeCAD's MillFace cuts the box's edge line first: flush with the stock,
     # that pass takes the cutter's full 19.05 mm.
     kwargs = {"z": 9.0, "y": (0.0, 50.0), "max_engagement": 15.24, "radius": 9.525, "span": 50.0}
@@ -93,6 +97,7 @@ def test_freecad_posts_real_rapids_zigzag_faces_and_conventional_edges(tmp_path)
     joined = _gcode.read_program(tmp_path / "P3_two_speeds.nc")
     assert _gcode.check_pauses(joined, 0.0, 1) == []
     assert _gcode.check_spindle(joined, [[2250, 1250]]) == []
+    assert _gcode.check_tool_changes(joined, 0.0, [1], loads_first=True) == []
     text = (tmp_path / "P3_two_speeds.nc").read_text(encoding="utf-8")
     assert text.count("(Begin preamble)") == 1 and text.count("(Begin postamble)") == 1
     assert [line for line in text.splitlines() if line.strip() == "M2"] == ["M2"]

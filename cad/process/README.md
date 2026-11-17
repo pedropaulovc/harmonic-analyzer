@@ -237,7 +237,7 @@ that differs from the manifest, or a manifest recording any input other than
 the current one (the feature bundle, `plan.toml`, `shop.toml`, the recipe or
 the runtime: `_cam_programs.cam_inputs`) fails the cut.
 
-A recipe has four parts:
+A recipe has five parts:
 
 - `PROGRAMS`: the file names, each listing its operations, flat (one FreeCAD
   Job, posted as it is) or in sections (one Job per tool and spindle speed,
@@ -253,6 +253,13 @@ A recipe has four parts:
   each stop and tool change (retracted above the stock, spindle stopped where
   hands go in, commented), each section's S words and the probe's single
   `G10 L20 P1` straight after its `G38.2`.
+- `LOAD_FIRST_TOOL`: the programs that load their own first tool the same
+  way (`M5`, `%msg`, `M6 T<n>` straight after the preamble's `G54`, before
+  any move); any other program runs on the tool already in the spindle and
+  the length last set. The rocker strap lists all four of its files: a
+  carried-over tool is only right when the files run in order, and a re-run
+  or restart breaks that. `check_tool_changes(..., loads_first=True)` refuses
+  a move or S word before the first `M6`.
 - `context(features, plan, shop, step)`: a pure function. It reads every part
   dimension from the part's `features.toml`. Blank size, cutter tip depths,
   radial steps and jack positions come from the part's `plan.toml`

@@ -86,6 +86,24 @@ def test_tool_changes_split_the_program_into_tool_sections(tmp_path):
     assert any("G28/G30/G53" in f.detail for f in _gcode.check_tool_changes(_program(tmp_path, text + "G53 G0 Z0\n"), 12.0, [1, 3]))
 
 
+def test_a_program_that_loads_its_first_tool_does_so_before_any_move(tmp_path):
+    body = "M3 S2250\nG0 X0 Y0 Z20\nG1 Z5 F100\nG0 Z20\n"
+    change = "M5\n%msg TOOL CHANGE: T1 END MILL, SET SPINDLE TO 2250 RPM\nM6 T1\n"
+    loaded = _program(tmp_path, "G17 G90\nG21\nG54\n" + change + body)
+    assert [s.name for s in loaded.tool_sections()] == ["p.nc@0"]
+    assert _gcode.check_tool_changes(loaded, 12.0, [1], loads_first=True) == []
+    # The same cut on whatever tool and length the previous file left.
+    carried = _program(tmp_path, "G17 G90\nG21\nG54\n" + body)
+    found = _gcode.check_tool_changes(carried, 12.0, [1], loads_first=True)
+    assert [f.detail for f in found] == [
+        "M6 calls [], expected [1]",
+        "moves or spindle words before the first M6: the program runs on the previous tool's length",
+    ]
+    # A move before the load.
+    early = _program(tmp_path, "G54\nG0 X0 Y0 Z20\n" + change + body)
+    assert len(_gcode.check_tool_changes(early, 12.0, [1], loads_first=True)) == 1
+
+
 def test_probe_sets_one_work_zero_after_a_touch_along_its_axis(tmp_path):
     probe = (
         "G0 X0 Y0 Z20\nM5\n(TOOL CHANGE: T8 PROBE, SPINDLE OFF - PROBE IN)\nM6 T8\nG0 Z17\nG0 X-22 Y-70\n"

@@ -60,8 +60,7 @@ STEM = "ch_rocker_strap"
 COMMENT = "MHA-CH-13 rocker strap"
 # Programs in order, each listing its operation keys. A program whose keys are
 # grouped in tuples is one section per group (a FreeCAD Job, or a manual
-# section: the flip stop), joined at M6 tool changes and M0 stops;
-# it starts with its first section's tool loaded.
+# section: the flip stop), joined at M6 tool changes and M0 stops.
 PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (
     ("RS01_rough_faces", (("face_1_rough",), ("flip",), ("face_2_rough",))),
     ("RS02_finish_face_1", ("face_1_finish",)),
@@ -71,6 +70,13 @@ PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (
         ("fence_sliver", "outline_rough", "outline_finish", "outline_through"),
     ),
 )
+# Every program loads its own first tool (M6, the tool setter): none relies on
+# the tool and length the previous file left. RS01 -> RS02 -> RS03 would hand
+# T1 on, but RS01 follows RS04's T2 on the next blank, RS04 follows RS03's T5,
+# and the plan sends a thin blank back for a skim (RS02 or RS03 again) or a
+# file is restarted after an abort on T3-T5: CNCjs keeps whatever length was
+# last set, so a carried-over tool would be cut with another's length.
+LOAD_FIRST_TOOL = tuple(name for name, _ops in PROGRAMS)
 # The plan's tools the mill runs, numbered by their places in the plan's tool
 # list among these (tools off the mill, the saw and the files, are not).
 CAM_TOOLS = ("em-half", "em-eighth", "spot", "hub-drill", "hub-reamer")
@@ -589,7 +595,9 @@ def context(
         "hub_dia": hub["nominal_dia"],
         "names": names,
         "numbers": numbers,
-        "tool_changes": [numbers[t] for t in ("spot", "hub-drill", "hub-reamer")],
+        "tool_changes": [
+            numbers[t] for t in ("em-half", "spot", "hub-drill", "hub-reamer")
+        ],
         "face": {
             "rpm": face_rpm,
             "feed": face_feed,
@@ -695,13 +703,14 @@ def expectations(ctx: dict[str, Any]) -> list[tuple[str, str, dict[str, Any]]]:
         )
 
     b_max = ctx["blank_max"]
+    t1 = ctx["numbers"]["em-half"]
     rs1, rs2, rs3, rs4 = (name for name, _ops in PROGRAMS)
     out: list[tuple[str, str, dict[str, Any]]] = [
         # RS01: both rough faces, one tool, the flip stop between them. Face 2
         # starts from Z1 + SAFE_MM, above the thickest blank's top, so the
         # file's stock top is that blank's.
         (rs1, "spindle", {"rpm": face["rpm"]}),
-        (rs1, "tool_changes", {"z_top": b_max, "tools": []}),
+        (rs1, "tool_changes", {"z_top": b_max, "tools": [t1], "loads_first": True}),
         (rs1, "pauses", {"z_top": b_max, "count": 1, "spindle_off": True}),
         (rs1, "depth", {"z_min": z["face_2_rough"][1]}),
         (rs1, "rapids_clear", {"z_top": b_max}),
@@ -709,7 +718,11 @@ def expectations(ctx: dict[str, Any]) -> list[tuple[str, str, dict[str, Any]]]:
         (rs1, *faced("face_1_rough")),
         (rs1, *faced("face_2_rough")),
         (rs2, "spindle", {"rpm": face["rpm"]}),
-        (rs2, "tool_changes", {"z_top": z["face_1_finish"][2], "tools": []}),
+        (
+            rs2,
+            "tool_changes",
+            {"z_top": z["face_1_finish"][2], "tools": [t1], "loads_first": True},
+        ),
         (rs2, "pauses", {"z_top": z["face_1_finish"][2], "count": 0}),
         (rs2, "depth", {"z_min": z["face_1_finish"][1]}),
         (rs2, "rapids_clear", {"z_top": z["face_1_finish"][2]}),
@@ -742,7 +755,11 @@ def expectations(ctx: dict[str, Any]) -> list[tuple[str, str, dict[str, Any]]]:
         ([ctx["ream"]["rpm"]], hole("ream", feed_out=True)),
     ]
     out += [
-        (rs3, "tool_changes", {"z_top": T, "tools": ctx["tool_changes"]}),
+        (
+            rs3,
+            "tool_changes",
+            {"z_top": T, "tools": ctx["tool_changes"], "loads_first": True},
+        ),
         (rs3, "spindle", {"rpm": [speeds for speeds, _checks in sections]}),
         (rs3, "pauses", {"z_top": T, "count": 0}),
     ]
@@ -758,7 +775,15 @@ def expectations(ctx: dict[str, Any]) -> list[tuple[str, str, dict[str, Any]]]:
     r, top4 = ol["dia"] / 2, ol["top"]
     out += [
         (rs4, "spindle", {"rpm": ol["rpm"]}),
-        (rs4, "tool_changes", {"z_top": top4, "tools": []}),
+        (
+            rs4,
+            "tool_changes",
+            {
+                "z_top": top4,
+                "tools": [ctx["numbers"]["em-eighth"]],
+                "loads_first": True,
+            },
+        ),
         (rs4, "pauses", {"z_top": top4, "count": 0}),
         (rs4, "depth", {"z_min": ol["bottom"]}),
         (rs4, "rapids_clear", {"z_top": top4}),

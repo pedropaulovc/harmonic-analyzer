@@ -429,19 +429,30 @@ def check_pauses(
     return findings
 
 
-def check_tool_changes(program: Program, z_top: float, tools: Sequence[int]) -> list[Finding]:
-    """The M6 tool changes call ``tools`` in order (the tool loaded before the
-    program runs is not one). Each comes with the spindle stopped (M5), the
-    tool retracted above the stock top ``z_top`` and an operator comment on
-    the line before it. Between an M6 and the new tool's first feed move only
-    rapids run, and any that moves X or Y stays above the stock top. No
-    G28/G30/G53 anywhere: the sender (CNCjs) makes every tool-change move
-    itself."""
+def check_tool_changes(
+    program: Program, z_top: float, tools: Sequence[int], loads_first: bool = False
+) -> list[Finding]:
+    """The M6 tool changes call ``tools`` in order (without ``loads_first``,
+    the tool loaded before the program runs is not one). Each comes with the
+    spindle stopped (M5), the tool retracted above the stock top ``z_top`` and
+    an operator comment on the line before it. Between an M6 and the new
+    tool's first feed move only rapids run, and any that moves X or Y stays
+    above the stock top. With ``loads_first`` the program's first M6 comes
+    before any move or S word: the program never runs on the tool length the
+    previous program left. No G28/G30/G53 anywhere: the sender (CNCjs) makes
+    every tool-change move itself."""
     findings = []
     changes = program.tool_changes
     called = [stop.tool for stop in changes]
     if called != list(tools):
         findings.append(Finding(program.name, "tools", f"M6 calls {called}, expected {list(tools)}"))
+    if loads_first and (
+        not changes
+        or changes[0].moves_before
+        or any(line < changes[0].line for line, _rpm in program.spindle)
+    ):
+        detail = "moves or spindle words before the first M6: the program runs on the previous tool's length"
+        findings.append(Finding(program.name, "tools", detail))
     for index, stop in enumerate(changes):
         if stop.moves_before and not _retracted(stop, z_top):
             findings.append(Finding(program.name, "tools", f"line {stop.line}: M6 with Z {stop.position[2]}, not retracted above {z_top:.3f}"))
