@@ -55,9 +55,9 @@ def test_every_marked_dimension_prints_in_exactly_one_view() -> None:
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert set(drawing.END_KEEP) | set(drawing.SIDE_KEEP) == marked
     assert not set(drawing.END_KEEP) & set(drawing.SIDE_KEEP)
-    assert set(drawing.DIMENSION_CALLOUTS_BELOW) | set(drawing.DIMENSION_CALLOUTS_ABOVE) <= (
-        set(drawing.END_KEEP) | set(drawing.SIDE_KEEP)
-    )
+    kept = set(drawing.END_KEEP) | set(drawing.SIDE_KEEP)
+    assert set(drawing.DIMENSION_CALLOUTS_BELOW) <= kept
+    assert not hasattr(drawing, "DIMENSION_CALLOUTS_ABOVE")
 
 
 def test_turned_diameters_and_lengths_print_on_the_side_view() -> None:
@@ -82,16 +82,16 @@ def test_turned_diameters_and_lengths_print_on_the_side_view() -> None:
     # Both diameters read right of the pilot face, the O.D. outboard.
     assert drawing.SIDE_KEEP["CollarDia"][0] > drawing.SIDE_KEEP["PilotDia"][0] + 0.026
     assert drawing.SIDE_KEEP["PilotDia"][0] > drawing._PILOT_X
-    # The flat pin's ream reads below the axis.  Its size's one-line process,
-    # value and mate rows stand below the ream as one block ending at its
-    # dimension line, clear of the end view's outline, above the length row
-    # and under the centre's text.
+    # The flat pin's ream reads below the axis.  Its size line (value, band,
+    # process, REF depth) and mate rows stand below the ream as one block
+    # ending at its dimension line, clear of the end view's outline, above the
+    # length row and under the centre's text.
     hole_r = spec.FLAT_PIN_HOLE_DIA * drawing._S / 2000.0
     dia_x, dia_y = drawing.SIDE_KEEP["FlatPinDia"]
-    rows = [
-        drawing.DIMENSION_CALLOUTS_ABOVE["FlatPinDia"],
-        *drawing.DIMENSION_CALLOUTS_BELOW["FlatPinDia"].splitlines(),
-    ]
+    size_row = "Ø.0615 +.0005" + drawing.DIMENSION_SUFFIXES["FlatPinDia"].replace(
+        "<HOLE-DEPTH>", "D"
+    )
+    rows = [size_row, *drawing.DIMENSION_CALLOUTS_BELOW["FlatPinDia"].splitlines()]
     assert dia_x - max(map(len, rows)) * DIM_CHAR_WIDTH > END_VIEW_RIGHT + 0.002
     assert dia_y < drawing._FLAT_PIN_Y - hole_r
     assert dia_y - len(rows) * NOTE_LINE_PITCH > row + NOTE_LINE_PITCH
@@ -411,15 +411,14 @@ def test_every_tight_band_names_its_registered_mate_at_its_callout() -> None:
     assert f"PERMANENT PIN {spec.FLAT_PIN_NUMBER}" in spec.DRAWING_NOTES
     shaft_number = _config.parts("pd-transgear-knob-shaft")["number"]
     assert pin_rows[1] == f"CREST DRIVES {shaft_number}"
-    # The ream is blind, on one line over the value (an above-callout with a
-    # line break does not print); its depth follows the value as a REF from
-    # the section's nominal fitted rear face, the .XX floor controlling.
-    above = drawing.DIMENSION_CALLOUTS_ABOVE["FlatPinDia"]
-    assert "\n" not in above and above.startswith("BLIND REAM")
-    assert drawing.DIMENSION_CALLOUTS_ABOVE.keys() == {"FlatPinDia"}
+    # Rule 26: size, process, depth.  The ream's process follows the value on
+    # its line, as the sheet's other reams read, then its depth: a REF from the
+    # section's nominal fitted rear face, the .XX floor controlling.  The depth
+    # symbol marks it blind.
     depth = spec.LENGTH - spec.FLAT_PIN_FLOOR
     assert depth == pytest.approx(0.163 * 25.4)
-    assert drawing.DIMENSION_SUFFIXES["FlatPinDia"] == " <HOLE-DEPTH> (.163)"
+    assert drawing.DIMENSION_SUFFIXES["FlatPinDia"] == " REAM <HOLE-DEPTH> (.163)"
+    assert all("REAM" not in row for row in pin_rows)
     # The bore's clearance range reads as its reference third row.
     bore_rows = drawing.DIMENSION_CALLOUTS_BELOW["BoreDia"].splitlines()
     assert bore_rows[-1].startswith("(CLEARANCE ") and bore_rows[-1].endswith(")")

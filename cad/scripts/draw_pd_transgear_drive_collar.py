@@ -66,7 +66,6 @@ from pd_transgear_drive_collar_spec import (
     FLAT_PIN_CENTRE,
     FLAT_PIN_FLOOR,
     FLAT_PIN_HOLE_CALLOUT,
-    FLAT_PIN_HOLE_CALLOUT_ABOVE,
     FLAT_PIN_HOLE_SUFFIX,
     LENGTH,
     OD,
@@ -154,8 +153,8 @@ END_KEEP = {
 # floor; its text stands outside left of that 9 mm span, between the floor's
 # and the rear face's witnesses (run 20261111T212425353Z: centred in the span
 # it reached the seat-face witness).  Its size reads left of the rear face,
-# its one-line process over the value, its REF depth after the value and two
-# mate rows under it, the whole block ending at its dimension line
+# its process and REF depth after the value and two mate rows under it, the
+# whole block ending at its dimension line
 # (SOLIDWORKS sets a vertical dimension's outside text there, run
 # 20261111T234324465Z), clear of the end view; that line stands 2 mm short of
 # where the size's witnesses start, room for the 26-character mate row.  The
@@ -245,7 +244,6 @@ DIMENSION_CALLOUTS_BELOW = {
     "FlatPinDia": FLAT_PIN_HOLE_CALLOUT,
     "RearBreak": REAR_BREAK_CALLOUT,
 }
-DIMENSION_CALLOUTS_ABOVE = {"FlatPinDia": FLAT_PIN_HOLE_CALLOUT_ABOVE}
 DIMENSION_SUFFIXES = {"RearBreak": REAR_BREAK_SUFFIX, "FlatPinDia": FLAT_PIN_HOLE_SUFFIX}
 
 ISO_NOTE_XY = (ISO_CENTER[0] - 0.030, ISO_CENTER[1] - 0.040)
@@ -430,9 +428,6 @@ def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_dimension_callouts(
         adapter, annotations, DIMENSION_CALLOUTS_BELOW, location="below"
-    )
-    set_dimension_callouts(
-        adapter, annotations, DIMENSION_CALLOUTS_ABOVE, location="above"
     )
     _set_dimension_suffixes(adapter, annotations, DIMENSION_SUFFIXES)
     _overall_reference(adapter, side)
