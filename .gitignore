@@ -431,7 +431,7 @@ book/*.pdf
 book/*.epub
 
 # Vite/three.js simulator: dependencies, build output, and the GLB it loads
-# (exported by `doit export` into cad/out/gltf/, copied to web/public/).
+# (`npm --prefix web run fetch-model` writes it to web/public/models/).
 web/node_modules/
 web/dist/
 web/.vite/
