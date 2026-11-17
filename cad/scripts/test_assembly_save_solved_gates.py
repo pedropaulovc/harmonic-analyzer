@@ -167,7 +167,7 @@ def _stub_pipeline(save_steps, monkeypatch):
 
         return step
 
-    def arecord(name, result):
+    def record_result(name, result):
         save_steps.append(name)
         return result
 
@@ -181,11 +181,11 @@ def _stub_pipeline(save_steps, monkeypatch):
         ("_discard_copy_source", "discard"),
     ):
         monkeypatch.setattr(_assembly, attr, record(name))
-    monkeypatch.setattr(_assembly, "_export_assembly_images", lambda *_a: arecord("images", {}))
+    monkeypatch.setattr(_assembly, "_export_assembly_images", lambda *_a: record_result("images", {}))
     monkeypatch.setattr(
-        _assembly, "reconcile_saved_rebuild_state", lambda *_a: arecord("reconcile", None)
+        _assembly, "reconcile_saved_rebuild_state", lambda *_a: record_result("reconcile", None)
     )
-    monkeypatch.setattr(_assembly, "assembly_geometry_digest", lambda *_a: arecord("digest", "sha"))
+    monkeypatch.setattr(_assembly, "assembly_geometry_digest", lambda *_a: record_result("digest", "sha"))
 
 
 def _drive_train_like(solved_rod_status=UNDER):

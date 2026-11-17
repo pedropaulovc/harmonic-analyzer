@@ -674,18 +674,13 @@ def test_connect_is_split_into_dispatch_identity_and_discard(
     # startup gate runs inside seat.identity and BEFORE seat.discard, the
     # session's first document operation.
     opened: list[str] = []
-    span, span = _telemetry.span, _telemetry.span
+    span = _telemetry.span
 
     def record_span(name, /, **attrs):
         opened.append(name)
         return span(name, **attrs)
 
-    def record_aspan(name, /, **attrs):
-        opened.append(name)
-        return span(name, **attrs)
-
     monkeypatch.setattr(_telemetry, "span", record_span)
-    monkeypatch.setattr(_telemetry, "span", record_aspan)
     adapter, _app = _seat(str(_seat_forensics._seat_park_directory()))
 
     _run_session(monkeypatch, adapter)

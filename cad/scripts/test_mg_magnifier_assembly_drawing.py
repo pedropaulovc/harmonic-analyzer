@@ -476,7 +476,7 @@ def test_the_gauge_detail_shows_only_the_bar_and_the_axle() -> None:
 def test_the_stack_chain_is_authored_on_the_axle_and_driven_from_globals(
     monkeypatch,
 ) -> None:
-    """Run the builder's chain helper against fakes: every async step must
+    """Run the builder's chain helper against fakes: every authoring step must
     execute, the chain must lie on the axle line through the four stations,
     and both printed settings must carry their bands."""
     from types import SimpleNamespace

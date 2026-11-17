@@ -190,12 +190,11 @@ def nonrecording_tracer(monkeypatch):
     provider.shutdown()
 
 
-@pytest.mark.parametrize("asynchronous", [False, True])
 @pytest.mark.parametrize(
     "outcome", [2, SystemExit(2), RuntimeError("original failure")]
 )
 def test_nonrecording_span_preserves_body_outcome(
-    nonrecording_tracer, asynchronous, outcome
+    nonrecording_tracer, outcome
 ):
     depth = _telemetry._depth.get()
     parent = _telemetry.trace.get_current_span()
@@ -209,16 +208,9 @@ def test_nonrecording_span_preserves_body_outcome(
         sp.set_status(_telemetry.Status(_telemetry.StatusCode.ERROR, "exit 2"))
         return outcome
 
-    def synchronous():
-        with _telemetry.span("nonrecording") as sp:
-            return body(sp)
-
-    def asynchronous_body():
-        with _telemetry.span("nonrecording") as sp:
-            return body(sp)
-
     def invoke():
-        return asynchronous_body() if asynchronous else synchronous()
+        with _telemetry.span("nonrecording") as sp:
+            return body(sp)
 
     if isinstance(outcome, BaseException):
         with pytest.raises(type(outcome)) as caught:
@@ -446,22 +438,22 @@ def test_attribute_names_the_log_farm_selects_on_are_pinned_here(capture):
     assert child.attributes["label"] == "blank_od"
 
 
-def test_traced_decorator_wraps_sync_and_async(capture):
+def test_traced_decorator_wraps_functions(capture):
     spans, _ = capture
 
-    @_telemetry.traced("op.async", label_param="label")
-    def afn(label):
+    @_telemetry.traced("op.labelled", label_param="label")
+    def labelled(label):
         return label
 
-    @_telemetry.traced("op.sync")
-    def sfn():
+    @_telemetry.traced("op.plain")
+    def plain():
         return 1
 
-    assert afn("widget") == "widget"
-    assert sfn() == 1
+    assert labelled("widget") == "widget"
+    assert plain() == 1
 
-    a = [s for s in spans.get_finished_spans() if s.name == "op.async"][-1]
-    s = [s for s in spans.get_finished_spans() if s.name == "op.sync"][-1]
+    a = [s for s in spans.get_finished_spans() if s.name == "op.labelled"][-1]
+    s = [s for s in spans.get_finished_spans() if s.name == "op.plain"][-1]
     assert a.attributes["label"] == "widget"  # label_param copied onto the span
     assert a.status.status_code.name == "OK"
     assert s.status.status_code.name == "OK"

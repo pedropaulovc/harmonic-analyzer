@@ -288,7 +288,7 @@ class SourceSlices:
             (
                 node
                 for node in tree.body
-                if isinstance(node, ast.AsyncFunctionDef)
+                if isinstance(node, ast.FunctionDef)
                 and node.name == "export_part_stl"
             ),
             None,

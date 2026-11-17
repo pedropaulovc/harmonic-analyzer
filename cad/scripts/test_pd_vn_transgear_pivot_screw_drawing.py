@@ -227,7 +227,7 @@ def _record(monkeypatch, bodies=_SPLIT_BODIES) -> _Recorder:
 
         return call
 
-    def async_logger(name):
+    def adapter_logger(name):
         def call(_adapter, *args, **kwargs):
             adapter.log(name, args, kwargs)
 
@@ -248,8 +248,8 @@ def _record(monkeypatch, bodies=_SPLIT_BODIES) -> _Recorder:
     monkeypatch.setattr(entry, "check", logger("check", True))
     monkeypatch.setattr(entry, "name_last_feature", com_logger("name_last_feature"))
     monkeypatch.setattr(entry, "volume_check", volume_check)
-    monkeypatch.setattr(entry, "define_circle", async_logger("define_circle"))
-    monkeypatch.setattr(entry, "add_line_chain", async_logger("add_line_chain"))
+    monkeypatch.setattr(entry, "define_circle", adapter_logger("define_circle"))
+    monkeypatch.setattr(entry, "add_line_chain", adapter_logger("add_line_chain"))
     monkeypatch.setattr(entry, "extrude_at_offset", com_logger("extrude_at_offset"))
     monkeypatch.setattr(entry, "offset_plane", com_logger("offset_plane"))
     monkeypatch.setattr(entry, "insert_helix", com_logger("insert_helix"))
