@@ -3359,7 +3359,7 @@ def test_mg_owned_offsets_refuse_same_count_contract_mutations(monkeypatch, muta
 
 def _native_mg_author(monkeypatch, configuration_name, mismatch=None):
     """Native readbacks are fixed independently of the recipe being authored."""
-    import _explode_steps as steps
+    import _explode as steps
     import _mg_magnifier_explode as author
     import _component_references as references
     from solidworks_mcp.adapters import com_variant

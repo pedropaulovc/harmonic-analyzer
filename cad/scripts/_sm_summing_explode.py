@@ -1,6 +1,6 @@
 """The summing assembly's builder-owned named explode (SM_EXPLODED).
 
-``create_summing_explode`` has ``_explode_steps.author_explode_steps`` author
+``create_summing_explode`` has ``_explode.author_explode_steps`` author
 and prove ``sm_summing_explode_spec.EXPLODE_STEPS`` along the assembly's
 native world axes, leaving the operational model collapsed. A step that names
 a knife-mount station moves only the instances on that side of the lever's
@@ -11,11 +11,11 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-import _explode_steps
+import _explode
 import sm_summing_assembly_spec as spec
 import sm_summing_explode_spec as explode
 from _cone_axis_constants import SUMMING_Z
-from _explode_steps import Step, Transform
+from _explode import Step, Transform
 
 
 def station_of(z_mm: float) -> str:
@@ -28,7 +28,7 @@ def station_of(z_mm: float) -> str:
 def _plan(
     _model: Any, components: Any, baseline: Mapping[str, Transform]
 ) -> list[Step]:
-    groups = _explode_steps.stem_groups(components, spec.QUANTITIES)
+    groups = _explode.stem_groups(components, spec.QUANTITIES)
     steps = []
     for label, stems, station, key, distance_mm in explode.EXPLODE_STEPS:
         moved = tuple(
@@ -48,7 +48,7 @@ def _plan(
 def create_summing_explode(adapter: Any, configuration_name: str) -> None:
     """Author ``explode.EXPLODE_STEPS`` in the active ``configuration_name``
     (Default or Default Simplified) and leave the operational model collapsed."""
-    _explode_steps.author_explode_steps(
+    _explode.author_explode_steps(
         adapter,
         configuration_name,
         view=explode.EXPLODED_VIEW_NAME,

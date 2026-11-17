@@ -1,6 +1,6 @@
 """Author the magnifier's named exploded presentation (MG_MAGNIFIER_EXPLODED).
 
-``_explode_steps.author_explode_steps`` authors and proves each step of
+``_explode.author_explode_steps`` authors and proves each step of
 ``mg_magnifier_explode_spec.plan_explode`` along a global axis; the lever wire
 and the second clamp screw (a native pattern follower) must read unmoved. The
 measured aggregate world translations are stored as file-level custom
@@ -15,11 +15,11 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-import _explode_steps
+import _explode
 from _com import _early_bound
 from _component_references import component_reference_names
 from _custom_properties import apply_custom_properties
-from _explode_steps import Step
+from _explode import Step
 from mg_magnifier_explode_spec import (
     EXPLODED_VIEW_NAME,
     SOURCE_CONFIGURATION,
@@ -52,7 +52,7 @@ def create_mg_magnifier_explode(adapter: Any, configuration_name: str) -> None:
             for step, names in plan_explode(instances)
         ]
 
-    offsets = _explode_steps.author_explode_steps(
+    offsets = _explode.author_explode_steps(
         adapter,
         configuration_name,
         view=EXPLODED_VIEW_NAME,

@@ -998,7 +998,7 @@ def test_one_registry_row_change_rekeys_only_that_drawing():
 _WHOLE_CONTRACT_FAMILY_DRAWINGS = {
     # BOM_PART_NUMBERS reads every BOM component's contract number in a loop.
     "ha_harmonic_analyzer_assembly",
-    # _pd_paper_drive_explode -> _explode_steps -> _assembly_patterns -> _assembly, whose
+    # _pd_paper_drive_explode -> _explode -> _assembly_patterns -> _assembly, whose
     # title/number/free-stem helpers take the stem as a parameter.
     "pd_paper_drive_assembly",
 }

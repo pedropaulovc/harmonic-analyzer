@@ -916,7 +916,7 @@ missing. Force a full rebuild of one assembly by deleting its `.SLDASM` target,
 then `doit assembly:<stem>`.
 
 **Named explodes.** A builder authors its drawing explode with
-`_explode_steps.author_explode_steps` (in Default and Default Simplified via
+`_explode.author_explode_steps` (in Default and Default Simplified via
 `author_in_drawing_configurations`), passing only a plan of steps (instances,
 axis, signed mm); the helper owns the native authoring and its world-space
 readback, collapse and saved-pose proofs. Never copy the authoring loop.
