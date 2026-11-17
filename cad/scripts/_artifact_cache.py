@@ -90,9 +90,10 @@ storage, so it works from anywhere -- including networks (e.g. residential ISPs)
 that block SMB/445, with no VPN, private endpoint, or mounted drive. A cache entry
 is one ``<key>.tar.gz`` blob under a 2-hex virtual prefix. *Sidecars*
 (:func:`publish_sidecar`) are small create-only blobs published BESIDE the
-archives under their own registered prefixes (``com-replay/``: the shadow COM
-recordings, ``_replay_shadow``), each blob with the cache epoch after its prefix
-(``com-replay/epoch-<epoch>/...``); they are never part of an archive or a key.
+archives under their own registered prefixes (``machinist-review/``: the
+reviewed-PDF index of ``_review_carry``), each blob with the cache epoch after
+its prefix (``machinist-review/epoch-<epoch>/...``); they are never part of an
+archive or a key.
 Configure with:
 
 * ``HARMONIC_CACHE_ACCOUNT``   -- storage account name (e.g. ``stswbuildcache07aba2``)
@@ -199,9 +200,6 @@ _KEY_MANIFESTS: dict[tuple[str, str], tuple[dict, str, dict]] = {}
 # seat wait, and never recaptured by an under-seat probe or upload. Alias entries
 # use their root label with their own key. None means the entry was absent.
 _REFRESH_ETAGS: dict[tuple[str, str], str | None] = {}
-# This process's archive publications (:func:`publication`): key -> the last
-# store's outcome and, when ``stored``, the identity it committed.
-_PUBLISHED: dict[str, tuple[str, tuple[str, int] | None]] = {}
 
 # Azure customDimensions values allow 8192 characters. ASCII JSON fragments keep
 # both the character and UTF-8 byte size below that limit, including escaped paths.
@@ -555,13 +553,11 @@ _TRANSFER_CONCURRENCY = 8
 _SINGLE_PUT_MAX = 64 * 1024 * 1024
 _BLOCK_SIZE = 4 * 1024 * 1024
 # Sidecar blobs (publish_sidecar): the registered name prefixes -- never the
-# archives' 2-hex shards -- and a size bound, _replay_shadow.BUNDLE_LIMIT's:
-# the top-assembly drawing's recording is 115,333,120 bytes (#2750), and a
-# recording does not compress (its log and captures are gzip already; the
-# three largest stored, 28.7 to 44.6 MB, deflate by under 0.4%). The blob of
-# a sidecar carries the cache epoch after its prefix (_sidecar_blob).
-# ``machinist-review/`` is the reviewed-PDF index of _review_carry.
-_SIDECAR_PREFIXES = ("com-replay/", "machinist-review/")
+# archives' 2-hex shards -- and a size bound that only stops a runaway upload
+# (a reviewed sheet's PDF is a few MB). The blob of a sidecar carries the
+# cache epoch after its prefix (_sidecar_blob). ``machinist-review/`` is the
+# reviewed-PDF index of _review_carry.
+_SIDECAR_PREFIXES = ("machinist-review/",)
 _SIDECAR_MAX = 512 * 1024 * 1024
 
 # Small gate stamps need one GET, not HEAD+GET. The SDK's first GET is bounded
@@ -1012,11 +1008,8 @@ class _BlobBackend:
         except ResourceNotFoundError:
             return None
 
-    def put(
-        self, key: str, blob: BinaryIO, *, replace_etag: str | None = None
-    ) -> tuple[str, int]:
-        """Commit ``blob`` as ``key``'s archive; returns the identity committed
-        with it (``archive_sha256``, ``archive_size``)."""
+    def put(self, key: str, blob: BinaryIO, *, replace_etag: str | None = None) -> None:
+        """Commit ``blob`` as ``key``'s archive."""
         # Input identity does not imply identical native bytes. Ordinary writers
         # create only; explicit refresh is the sole CAS replacement. Writer-unique
         # blocks also prevent interleaved uploads from committing a torn archive.
@@ -1039,9 +1032,8 @@ class _BlobBackend:
                 blob, length=size, overwrite=replace_etag is not None, metadata=metadata,
                 **(condition if replace_etag is not None else {}),
             )
-            return digest, size
+            return
         self._put_blocks(self._name(key), blob, size, metadata, condition)
-        return digest, size
 
     def _put_blocks(
         self,
@@ -2028,7 +2020,6 @@ def _store(
             _warn(f"nothing to store for {label} (no outputs on disk)")
             _event("cache.store_empty", label, key)
             _record("store_empty", label, key)
-            _PUBLISHED[key] = ("empty", None)
             return "empty"
         with _phase("cache.pack", outputs=len(present)) as pack:
             blob = _pack(present)
@@ -2036,7 +2027,7 @@ def _store(
             pack.set_attribute("bytes", size)
         with _phase("cache.upload", bytes=size):
             try:
-                committed = backend.put(key, blob, replace_etag=replace_etag)
+                backend.put(key, blob, replace_etag=replace_etag)
             except Exception:
                 # Includes ambiguous success/timeouts and InvalidBlockList after
                 # a competing commit discarded our staged blocks. The canonical
@@ -2046,123 +2037,20 @@ def _store(
                 _log(f"lost  {label} ({key[:12]}): canonical entry present")
                 _event("cache.store_lost", label, key)
                 _record("store_lost", label, key)
-                _PUBLISHED[key] = ("lost", None)
                 return "lost"
         _log(f"store {label} ({key[:12]})")
         _event("cache.store", label, key)
         _save_stored_key(label, key)
         _record("store", label, key)
-        _PUBLISHED[key] = ("stored", committed)
         return "stored"
     except Exception as exc:  # noqa: BLE001
         _warn(f"store error for {label}: {exc!r}")
         _event("cache.store_error", label, key)
         _record("store_error", label, key)
-        _PUBLISHED[key] = ("error", None)
         return "error"
     finally:
         if blob is not None:
             blob.close()
-
-
-def publication(key: str) -> tuple[str, tuple[str, int] | None] | None:
-    """How this process's last :func:`store` of ``key`` ended (``stored``,
-    ``lost``, ``empty`` or ``error``) and, when ``stored``, the identity
-    (``archive_sha256``, ``archive_size``) it committed: what a recording of
-    that build can be bound to (``_replay_shadow``). None: no store of ``key``
-    here, or one that could not publish (``skip``/``off``)."""
-    return _PUBLISHED.get(key)
-
-
-def fetch_archive(key: str) -> BinaryIO | None:
-    """``key``'s canonical archive, verified against the identity committed
-    with it exactly as :func:`restore` reads it, for inspection before
-    :func:`install_archive`; None when it is absent, the cache is off, or the
-    download or its verification fails. The caller closes it."""
-    if not enabled():
-        return None
-    try:
-        backend = _backend()
-        if backend is None:
-            return None
-        with _phase("cache.fetch") as fetch:
-            blob = backend.get(key)
-            fetch.set_attribute("found", blob is not None)
-            fetch.set_attribute(
-                "archive_bytes", 0 if blob is None else _archive_size(blob)
-            )
-        return blob
-    except Exception as exc:  # noqa: BLE001 -- the caller treats it as absent
-        _warn(f"archive {key[:12]} not fetched: {exc!r}")
-        return None
-
-
-def archive_identity(archive: BinaryIO) -> tuple[str, int]:
-    """``(sha256, size)`` of an archive's bytes: the identity :func:`store`
-    commits with it."""
-    return _archive_identity(archive)
-
-
-def archive_members(archive: BinaryIO) -> dict[str, str]:
-    """Every regular file of an archive (:func:`fetch_archive`): its path
-    under the output root, ``/``-separated, -> the SHA-256 of its bytes.
-    Raises on any member :func:`restore` would refuse."""
-    archive.seek(0)
-    found: dict[str, str] = {}
-    with tarfile.open(fileobj=archive, mode="r:gz") as tar:
-        for member in tar:
-            target = _safe_member(member)
-            if member.isdir():
-                continue
-            digest = hashlib.sha256()
-            stream = tar.extractfile(member)
-            if stream is None:
-                raise RuntimeError(f"unreadable cache archive member: {member.name}")
-            while chunk := stream.read(_BLOCK_SIZE):
-                digest.update(chunk)
-            found[target.relative_to(_CACHE_OUTPUT_ROOT).as_posix()] = (
-                digest.hexdigest()
-            )
-    archive.seek(0)
-    return found
-
-
-def archive_member(archive: BinaryIO, relative: str) -> bytes | None:
-    """The bytes of the archive's regular file at ``relative`` (named as
-    :func:`archive_members` names it), or None when it holds none. Raises on
-    any member :func:`restore` would refuse."""
-    archive.seek(0)
-    try:
-        with tarfile.open(fileobj=archive, mode="r:gz") as tar:
-            for member in tar:
-                target = _safe_member(member)
-                if member.isdir():
-                    continue
-                if target.relative_to(_CACHE_OUTPUT_ROOT).as_posix() != relative:
-                    continue
-                stream = tar.extractfile(member)
-                if stream is None:
-                    raise RuntimeError(
-                        f"unreadable cache archive member: {member.name}"
-                    )
-                return stream.read()
-        return None
-    finally:
-        archive.seek(0)
-
-
-def install_archive(
-    archive: BinaryIO, outputs: list[Path], label: str, key: str
-) -> None:
-    """Install ``key``'s archive (:func:`fetch_archive`) as ``outputs`` exactly
-    as a HIT restores it (:func:`_unpack`: staged first, owned roots replaced,
-    mtimes now). Raises :class:`RestoreLocked` on a share lock, anything else
-    as raised."""
-    try:
-        with _phase("cache.unpack", bytes=_archive_size(archive)):
-            _unpack(archive, outputs)
-    except PermissionError as exc:
-        raise RestoreLocked(label, key, exc) from exc
 
 
 # --------------------------------------------------------------------------- #
@@ -2185,8 +2073,8 @@ def _sidecar_name(name: str, *, prefix: bool = False) -> str:
 
 def _sidecar_blob(name: str, *, prefix: bool = False) -> str:
     """The blob behind sidecar ``name`` (or a listing prefix): the cache epoch
-    right after the registered prefix, ``com-replay/<rest>`` ->
-    ``com-replay/epoch-<epoch>/<rest>``. An epoch bump therefore lists and
+    right after the registered prefix, ``machinist-review/<rest>`` ->
+    ``machinist-review/epoch-<epoch>/<rest>``. An epoch bump therefore lists and
     fetches none of the older sidecars, as it re-keys every archive."""
     root, _, rest = _sidecar_name(name, prefix=prefix).partition("/")
     return f"{root}/epoch-{_CACHE_EPOCH}/{rest}"
@@ -2243,20 +2131,6 @@ def fetch_sidecar(name: str) -> bytes | None:
         return None
 
 
-def read_sidecar(name: str) -> bytes | None:
-    """Sidecar ``name``'s verified bytes; None when it is absent. RAISES when
-    the cache is off or the answer is unknown (a failed download or
-    verification), for a caller that must fail closed: :func:`fetch_sidecar`
-    reads any failure as absence."""
-    backend = _backend() if enabled() else None
-    if backend is None:
-        raise RuntimeError(f"sidecar {name}: the remote cache is off")
-    with _phase("cache.sidecar.download") as span:
-        data = backend.get_sidecar(_sidecar_blob(name))
-        span.set_attribute("bytes", 0 if data is None else len(data))
-        return data
-
-
 def list_sidecars(prefix: str) -> list[tuple[str, float]]:
     """``(name, last-modified epoch seconds)`` of every sidecar under
     ``prefix`` in this cache epoch, newest first; empty when the cache is off
@@ -2282,6 +2156,6 @@ def list_sidecars(prefix: str) -> list[tuple[str, float]]:
 
 def record_event(event: str, label: str, key: str, **extra) -> None:
     """Append an outcome about ``label``'s cache key that is not a cache
-    operation (e.g. ``replay_shadow``) to cache.jsonl, with the same base record
-    and key provenance as the cache's own events. Best-effort."""
+    operation (e.g. ``review_adopted_byte_key``) to cache.jsonl, with the same
+    base record and key provenance as the cache's own events. Best-effort."""
     _record(event, label, key, **extra)
