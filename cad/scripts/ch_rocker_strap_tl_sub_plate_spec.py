@@ -1,0 +1,430 @@
+r"""Pure-data contract for the rocker-strap sub-plate (MHA-CH-13-TL-01).
+
+PURE DATA, no SolidWorks/COM and no drawing imports. Shop tooling (owner ask
+2026-11-17): the work holder of the rocker strap MHA-CH-13's CNC programs, a
+13 in length of the owned 1/2 x 6 in 6061-T6511 flat milled to a 3.00 in
+strip, its fence and end stop milled integral with it (the top is milled down
+round them). Four Mitee-Bite Pitbull edge clamps MHA-CH-13-TL-VN-50 sit in
+pockets with #4-40 taps; the hub plug MHA-CH-13-TL-02 sits in the hub
+counterbore, and the 1/4-20 hub screw MHA-CH-13-TL-VN-51 runs into the tap
+under it (owner ruling 2026-11-17).
+
+Model frame = the strap programs' G54 (``cad/process/ch_rocker_strap``):
+X0 the end stop's face, Y0 the fence's face, Z0 the plate top the strap's
+tape lies on (the Front Plane), +X along the plate to its right end, +Y
+toward the fence, +Z up. The fence and stop tops (the faced top) stand
+FENCE_HEIGHT above Z0; the underside is as received.
+
+The shop TOMLs and the strap plan are never read here (they are not COM-leaf
+inputs): the plan values the functional checks need are mirrored below, and
+``test_ch_rocker_strap_tl_sub_plate_plan`` holds each mirror to its source.
+"""
+
+from __future__ import annotations
+
+import math
+
+import _config
+from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM, HoleSpec
+from _package_units import drawing_unit
+from _printed_tolerance import printed_band_mm
+
+PART_NAME = "ch-rocker-strap-tl-sub-plate"
+_ROW = _config.parts("ch-rocker-strap-tl-sub-plate")
+if PART_NAME != "ch-rocker-strap-tl-sub-plate":
+    raise AssertionError("PART_NAME and the registry row it reads disagree")
+PART_NUMBER = str(_ROW["number"])
+UNIT = drawing_unit("parts/ch-rocker-strap-tl-sub-plate", _ROW)
+INCH = 25.4
+# The title block's general bands this sheet prints under (inch: .X, .XX, .XXX).
+X1 = printed_band_mm(1, unit=UNIT)
+XX = printed_band_mm(2, unit=UNIT)
+XXX = printed_band_mm(3, unit=UNIT)
+
+
+def inch_grid_mm(value_mm: float, places: int) -> float:
+    """``value_mm`` on its printed inch grid (rule 3: .01 for .XX, .001 for .XXX)."""
+    return round(value_mm / INCH, places) * INCH
+
+
+def inch_text(value_mm: float, places: int) -> str:
+    """``value_mm`` as the sheet prints it: ``.23``, ``1.650``."""
+    text = f"{value_mm / INCH:.{places}f}"
+    return text[1:] if text.startswith("0.") else text
+
+
+# --- Envelope ------------------------------------------------------------------
+# Both ends as sawn (.X); the long edges milled for the vise jaws (.XX); the
+# top faced and the underside as received, overall .49 (.XX).
+LEFT_END_X = -12.7  # .5 from the left sawn end to X0: the stop's length
+PLATE_LENGTH = 330.2  # 13.0
+RIGHT_END_X = LEFT_END_X + PLATE_LENGTH  # 317.5
+FENCE_WIDTH = 12.7  # .50: the fence from Y0 to the back edge
+BACK_EDGE_Y = FENCE_WIDTH
+PLATE_WIDTH = 76.2  # 3.00
+FRONT_EDGE_Y = BACK_EDGE_Y - PLATE_WIDTH  # -63.5
+# The fence and stop tops above Z0 (.XXX: at most .079, the shop record's
+# "at most .079 in (2.0 mm)" and the plan's keep-out). Z0 is milled down
+# round them, so the floor cut's depth from the faced top is this height.
+FENCE_HEIGHT = 1.8796  # .074
+PLATE_THICKNESS = 12.446  # .49 overall, faced top to underside
+UNDERSIDE_Z = FENCE_HEIGHT - PLATE_THICKNESS  # -10.5664 (.416 under Z0)
+PLATE_TOP_Z = 0.0  # Z0: everything not fence or stop
+
+# --- Fence notches -----------------------------------------------------------------
+# Floor Z0, back corners cutter-formed at CORNER_RADIUS MAX. The left notch
+# runs from the stop face, so it also removes the fence at the stop/fence
+# corner (no separate corner relief); the right notch is open at the plate's
+# right end. Each covers the strap plan's notch station (hub -/+ inner..outer)
+# at the worst case of its .XX band and its corner radius (NOTCH_COVER below;
+# owner-accepted .92 / 11.08, StrapFixtureCad 2026-11-17).
+NOTCH_LEFT_END = 23.368  # .92 from X0
+NOTCH_RIGHT_START = 281.432  # 11.08 from X0
+NOTCH_DEPTH = 4.318  # .17 back from Y0
+NOTCH_FLOOR_Z = PLATE_TOP_Z
+# Every cutter-formed inside corner (notch back corners, pocket corners):
+# printed R.07 MAX (StrapFixtureCad ruling 2026-11-17: the smallest owned end
+# mill is the 1/8 carbide, R.0625, which cannot form R.06 MAX). A MAX limit
+# prints its nominal, so the model's corner is the limit itself; the 1/8
+# cutter (CORNER_CUTTER_RADIUS) forms a corner inside it.
+CORNER_RADIUS = 1.778  # R.07 MAX
+CORNER_CUTTER_RADIUS = 1.5875  # the 1/8 end mill
+if CORNER_CUTTER_RADIUS > CORNER_RADIUS:
+    raise AssertionError("the owned cutter cannot form the printed corner limit")
+
+# --- Clamp pockets and taps (TL-VN-50, Mitee-Bite Pitbull 26000) -------------------
+# Stations from X0, the strap plan's clamp_1..4_x_mm (1.000, 4.250, 7.750,
+# 11.000), each a pocket centred on its 4-40 tap.
+CLAMP_STATIONS: tuple[float, ...] = (25.4, 107.95, 196.85, 279.4)
+POCKET_LENGTH = 14.224  # .56 along X
+# The pocket's back wall seats the clamp's heel; its knife reaches the blank's
+# edge at C = .375 from it. Explicit band: it sets where the knife meets the
+# blank (shop table: a milled step <= 6 in from its datum, +/-.002).
+POCKET_BACK_WALL_Y = -47.625  # 1.875 from Y0
+POCKET_BACK_WALL_TOL = 0.0508  # +/-.002
+# The near wall: the blank's edge line (the 1.50 in blank against the fence).
+BLANK_EDGE_Y = -38.1  # 1.50
+POCKET_NEAR_WALL_Y = BLANK_EDGE_Y
+POCKET_DEPTH = 3.556  # .140 from Z0: Pitbull B
+POCKET_FLOOR_Z = PLATE_TOP_Z - POCKET_DEPTH
+# The clamp's screw: A = .150 in front of the blank's edge (1.650 from Y0).
+CLAMP_SCREW_Y = -41.91
+CLAMP_TAP_THREAD = "#4-40"
+CLAMP_TAP_SPEC = HoleSpec("tapped", CLAMP_TAP_THREAD, end="through_all")
+CLAMP_TAP_DRILL = TAP_DRILL_MM[CLAMP_TAP_THREAD]  # #43, .089
+# The clamp as the catalogue gives it (Mitee-Bite 26000: A .150, B .140,
+# C .375, F .375 body width), mirrored from the TL-VN-50 contract.
+CLAMP_A = 3.81
+CLAMP_B = 3.556
+CLAMP_C = 9.525
+CLAMP_BODY_WIDTH = 9.525
+
+# --- Hub counterbore and tap (TL-02 plug, TL-VN-51 screw) ---------------------------
+# The counterbore locates the blank's hub hole through the plug TL-02, so its
+# position carries the shop table's +/-.002 for a milled step; its Ø is the
+# first-made half of a matched slip fit (TL-02 is turned to it), printed at
+# the title block's .XXX.
+HUB_X = 152.4  # 6.000 from X0
+HUB_Y = -25.4  # 1.000 from Y0
+HUB_LOCATION_TOL = 0.0508  # +/-.002
+HUB_CBORE_DIA = 12.7  # .500
+HUB_CBORE_DEPTH = 4.699  # .185 from Z0
+COUNTERBORE_FLOOR_Z = PLATE_TOP_Z - HUB_CBORE_DEPTH
+# Owner ruling 2026-11-17: a 1/4-20 hub screw, its tap through the plate from
+# the counterbore floor.
+HUB_TAP_THREAD = "1/4-20"
+HUB_TAP_SPEC = HoleSpec("tapped", HUB_TAP_THREAD, end="through_all")
+HUB_TAP_DRILL = TAP_DRILL_MM[HUB_TAP_THREAD]  # #7, .201
+
+# --- Strap-plan mirrors (asserted against plan.toml in the plan test) -------------
+PLAN_HUB_X = 152.4
+PLAN_HUB_Y = 25.4  # the plan's distance toward the operator from Y0
+PLAN_FENCE_NOTCH_INNER = 131.0
+PLAN_FENCE_NOTCH_OUTER = 150.0
+PLAN_FENCE_NOTCH_DEPTH = 4.0
+PLAN_DRILL_TIP_Z = -4.0
+PLAN_REAM_TIP_Z = -4.0
+PLAN_RELIEF_FLOOR_CLEARANCE = 0.5
+# The finished strap's thinnest top (ch_rocker_arm_spec ARM_THICKNESS less its
+# band, .097): the face cutter's lowest pass in Setups 2-3 (no tape under).
+STRAP_THICKNESS_MIN = 2.4638
+
+# --- Functional checks -------------------------------------------------------------
+# Fence and stop: their tallest stays under the strap's thinnest finished top,
+# so the face cutter clears them.
+FENCE_HEIGHT_MAX = FENCE_HEIGHT + XXX
+FACE_CUT_CLEARANCE_MIN = STRAP_THICKNESS_MIN - FENCE_HEIGHT_MAX
+if FACE_CUT_CLEARANCE_MIN <= 0.0:
+    raise AssertionError("the fence or stop reaches the strap's face cut")
+
+
+def _in_rounded_notch(
+    point: tuple[float, float],
+    x_range: tuple[float, float],
+    depth: float,
+    rounded_x: tuple[float, ...],
+) -> bool:
+    """Whether ``point`` (x, y >= 0) lies in a notch spanning ``x_range`` back to
+    ``depth`` from Y0, its back corners at each ``rounded_x`` rounded to
+    CORNER_RADIUS."""
+    x, y = point
+    if not (x_range[0] <= x <= x_range[1] and 0.0 <= y <= depth):
+        return False
+    for corner_x in rounded_x:
+        sign = 1.0 if corner_x > x_range[0] else -1.0
+        centre = (corner_x - sign * CORNER_RADIUS, depth - CORNER_RADIUS)
+        beyond_x = (x - centre[0]) * sign > 0.0
+        if beyond_x and y > centre[1] and math.dist(point, centre) > CORNER_RADIUS:
+            return False
+    return True
+
+
+# The plan's notch stations, each the X range its fence-sliver rings sweep
+# (hub -/+ inner..outer), cleared back to its notch depth.
+PLAN_NOTCH_STATIONS: tuple[tuple[float, float], ...] = (
+    (PLAN_HUB_X - PLAN_FENCE_NOTCH_OUTER, PLAN_HUB_X - PLAN_FENCE_NOTCH_INNER),
+    (PLAN_HUB_X + PLAN_FENCE_NOTCH_INNER, PLAN_HUB_X + PLAN_FENCE_NOTCH_OUTER),
+)
+# Worst case of the printed bands: the notch ends .XX short, the depth .XX
+# shallow, the right sawn end .X short; X0 itself (the stop face, the left
+# notch's end wall) is the datum.
+NOTCH_EXTENTS_WORST: tuple[
+    tuple[tuple[float, float], float, tuple[float, ...]], ...
+] = (
+    ((0.0, NOTCH_LEFT_END - XX), NOTCH_DEPTH - XX, (0.0, NOTCH_LEFT_END - XX)),
+    (
+        (NOTCH_RIGHT_START + XX, RIGHT_END_X - X1),
+        NOTCH_DEPTH - XX,
+        (NOTCH_RIGHT_START + XX,),
+    ),
+)
+for (_lo, _hi), ((_x_range, _depth, _rounded)) in zip(
+    PLAN_NOTCH_STATIONS, NOTCH_EXTENTS_WORST, strict=True
+):
+    for _corner in ((_lo, PLAN_FENCE_NOTCH_DEPTH), (_hi, PLAN_FENCE_NOTCH_DEPTH)):
+        if not _in_rounded_notch(_corner, _x_range, _depth, _rounded):
+            raise AssertionError(
+                f"fence notch {_x_range} misses the plan station's corner {_corner}"
+            )
+
+# A square-cornered clamp body clears the pocket's corner radii at both ends.
+POCKET_END_CLEARANCE = (
+    POCKET_LENGTH - XX - CLAMP_BODY_WIDTH - 2.0 * CORNER_RADIUS
+) / 2.0
+if POCKET_END_CLEARANCE <= 0.25:
+    raise AssertionError("the clamp pocket does not clear the clamp body's corners")
+# Heel on the back wall, the knife reaches the blank's edge; the depth is B.
+if abs(POCKET_BACK_WALL_Y + CLAMP_C - BLANK_EDGE_Y) > 1e-9:
+    raise AssertionError(
+        "the pocket's back wall does not put the knife on the blank edge"
+    )
+if abs(BLANK_EDGE_Y - CLAMP_A - CLAMP_SCREW_Y) > 1e-9:
+    raise AssertionError("the clamp tap is not A in front of the blank edge")
+if POCKET_DEPTH != CLAMP_B:
+    raise AssertionError("the clamp pocket's depth is not the clamp's B")
+
+# Thread engagement (rule 18: 1.5D of full thread), each tap through the plate
+# from its floor, at nominal and at the worst case of the printed bands
+# (overall -.01, fence height +.005, the floor's depth +.005).
+CLAMP_THREAD_LENGTH = POCKET_FLOOR_Z - UNDERSIDE_Z  # 7.0104, .276
+CLAMP_THREAD_LENGTH_MIN = CLAMP_THREAD_LENGTH - XX - XXX - XXX
+CLAMP_THREAD_REQUIRED = 1.5 * THREAD_MAJOR_MM[CLAMP_TAP_THREAD]
+if CLAMP_THREAD_LENGTH_MIN < CLAMP_THREAD_REQUIRED:
+    raise AssertionError("the clamp tap is short of 1.5D of thread")
+HUB_THREAD_LENGTH = COUNTERBORE_FLOOR_Z - UNDERSIDE_Z  # 5.8674, .231
+HUB_THREAD_LENGTH_MIN = HUB_THREAD_LENGTH - XX - XXX - XXX  # 5.3594, .211
+HUB_THREAD_MAJOR = THREAD_MAJOR_MM[HUB_TAP_THREAD]
+HUB_THREAD_REQUIRED = 1.5 * HUB_THREAD_MAJOR  # .375
+# Owner ruling 2026-11-17 (registry RV-01) accepts the shortfall: .23 nominal
+# (.92D), .21 at the worst case (.84D). The sheet states the worst case as a
+# plain fact (rule 20), on the tap's callout.
+HUB_ENGAGEMENT_DIAMETERS = HUB_THREAD_LENGTH_MIN / HUB_THREAD_MAJOR
+if not HUB_THREAD_LENGTH_MIN < HUB_THREAD_REQUIRED:
+    raise AssertionError("the hub tap now meets 1.5D: drop the shortfall statement")
+HUB_ENGAGEMENT_STATEMENT = (
+    f"ENGAGEMENT {inch_text(HUB_THREAD_LENGTH_MIN, 2)} MIN "
+    f"({HUB_ENGAGEMENT_DIAMETERS:.2f}D)".replace("(0.", "(.")
+)
+
+# The counterbore is the relief the strap's hub drill and reamer run into:
+# at its shallowest their tips stop the plan's clearance above its floor.
+HUB_CBORE_TIP_CLEARANCE_MIN = (HUB_CBORE_DEPTH - XXX) + max(
+    PLAN_DRILL_TIP_Z, PLAN_REAM_TIP_Z
+)
+if HUB_CBORE_TIP_CLEARANCE_MIN < PLAN_RELIEF_FLOOR_CLEARANCE:
+    raise AssertionError(
+        "the hub counterbore is too shallow for the drill and reamer tips"
+    )
+
+# --- Printed grid (rule 3) ------------------------------------------------------------
+PRINTED_PLACES: tuple[tuple[float, int], ...] = (
+    (-LEFT_END_X, 1),
+    (PLATE_LENGTH, 1),
+    (FENCE_WIDTH, 2),
+    (PLATE_WIDTH, 2),
+    (PLATE_THICKNESS, 2),
+    (FENCE_HEIGHT, 3),
+    (NOTCH_LEFT_END, 2),
+    (NOTCH_RIGHT_START, 2),
+    (NOTCH_DEPTH, 2),
+    (CORNER_RADIUS, 2),
+    *((station, 3) for station in CLAMP_STATIONS),
+    (POCKET_LENGTH, 2),
+    (-POCKET_BACK_WALL_Y, 3),
+    (-POCKET_NEAR_WALL_Y, 2),
+    (POCKET_DEPTH, 3),
+    (-CLAMP_SCREW_Y, 3),
+    (HUB_X, 3),
+    (-HUB_Y, 3),
+    (HUB_CBORE_DIA, 3),
+    (HUB_CBORE_DEPTH, 3),
+)
+for _value, _places in PRINTED_PLACES:
+    if abs(inch_grid_mm(_value, _places) - _value) > 1e-9:
+        raise AssertionError(f"{_value} mm is off its printed .{'X' * _places} grid")
+
+# --- Volume (analytic, for the build's gates) -------------------------------------
+# A filleted inside corner of a cut puts back (1 - pi/4) R^2 per unit height.
+_CORNER_FILL = (1.0 - math.pi / 4.0) * CORNER_RADIUS**2
+V_PLATE = PLATE_LENGTH * PLATE_WIDTH * PLATE_THICKNESS
+V_FLOOR_CUT = (RIGHT_END_X - 0.0) * (0.0 - FRONT_EDGE_Y) * FENCE_HEIGHT
+V_NOTCHES = (
+    (NOTCH_LEFT_END + (RIGHT_END_X - NOTCH_RIGHT_START)) * NOTCH_DEPTH * FENCE_HEIGHT
+)
+V_NOTCH_CORNERS = 3 * _CORNER_FILL * FENCE_HEIGHT
+V_POCKETS = (
+    len(CLAMP_STATIONS)
+    * POCKET_LENGTH
+    * (POCKET_NEAR_WALL_Y - POCKET_BACK_WALL_Y)
+    * POCKET_DEPTH
+)
+V_POCKET_CORNERS = 4 * len(CLAMP_STATIONS) * _CORNER_FILL * POCKET_DEPTH
+V_HUB_CBORE = math.pi / 4.0 * HUB_CBORE_DIA**2 * HUB_CBORE_DEPTH
+V_CLAMP_TAPS = (
+    len(CLAMP_STATIONS) * math.pi / 4.0 * CLAMP_TAP_DRILL**2 * CLAMP_THREAD_LENGTH
+)
+V_HUB_TAP = math.pi / 4.0 * HUB_TAP_DRILL**2 * HUB_THREAD_LENGTH
+V_FINISHED = (
+    V_PLATE
+    - V_FLOOR_CUT
+    - V_NOTCHES
+    + V_NOTCH_CORNERS
+    - V_POCKETS
+    + V_POCKET_CORNERS
+    - V_HUB_CBORE
+    - V_CLAMP_TAPS
+    - V_HUB_TAP
+)
+
+# --- Native model contract ------------------------------------------------------------
+# Feature names (the build names them; the drawing imports their dimensions):
+# PlateProfile/Plate the stock blank (faced top down to the underside),
+# PlateTopProfile/PlateTop the Z0 floor milled down round the fence and stop,
+# NotchProfile/FenceNotches and NotchCorners, PocketProfile/ClampPockets and
+# PocketCorners, HubCboreProfile/HubCbore, and the wizard taps ClampTaps and
+# HubTap. The faced top is the reference plane FacedTopPlane, FENCE_HEIGHT
+# above the Front Plane (Z0).
+FACED_TOP_PLANE = "FacedTopPlane"
+CLAMP_TAP_X_NAMES: tuple[str, ...] = tuple(
+    f"ClampTapX{index}" for index in range(1, len(CLAMP_STATIONS) + 1)
+)
+DRAWING_DIMENSIONS: dict[str, set[str]] = {
+    "PlateProfile": {"LeftEnd", "PlateLength", "FenceWidth", "PlateWidth"},
+    "Plate": {"PlateThickness"},
+    "PlateTop": {"FenceHeight"},
+    "NotchProfile": {"NotchLeftEnd", "NotchRightStart", "NotchDepth"},
+    "NotchCorners": {"NotchCornerR"},
+    "PocketProfile": {"PocketLength", "PocketNearWallY", "PocketBackWallY"},
+    "ClampPockets": {"PocketDepth"},
+    "PocketCorners": {"PocketCornerR"},
+    "HubCboreProfile": {"HubX", "HubY", "HubCboreDia"},
+    "HubCbore": {"HubCboreDepth"},
+    "ClampTaps": {*CLAMP_TAP_X_NAMES, "ClampTapY"},
+}
+DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "PlateProfile": {"LeftEnd": 1, "PlateLength": 1, "FenceWidth": 2, "PlateWidth": 2},
+    "Plate": {"PlateThickness": 2},
+    "PlateTop": {"FenceHeight": 3},
+    "NotchProfile": {"NotchLeftEnd": 2, "NotchRightStart": 2, "NotchDepth": 2},
+    "NotchCorners": {"NotchCornerR": 2},
+    "PocketProfile": {"PocketLength": 2, "PocketNearWallY": 2, "PocketBackWallY": 3},
+    "ClampPockets": {"PocketDepth": 3},
+    "PocketCorners": {"PocketCornerR": 2},
+    "HubCboreProfile": {"HubX": 3, "HubY": 3, "HubCboreDia": 3},
+    "HubCbore": {"HubCboreDepth": 3},
+    "ClampTaps": {**{name: 3 for name in CLAMP_TAP_X_NAMES}, "ClampTapY": 3},
+}
+DRAWING_PRECISION_BY_NAME: dict[str, int] = {
+    name: places for dims in DRAWING_PRECISION.values() for name, places in dims.items()
+}
+for _feature, _names in DRAWING_DIMENSIONS.items():
+    if set(DRAWING_PRECISION[_feature]) != _names:
+        raise AssertionError(
+            f"{_feature}: every marked dimension needs authored places"
+        )
+# Each printed dimension, its model value (mm) for the readback gates.
+DIMENSION_VALUES: dict[str, float] = {
+    "LeftEnd": -LEFT_END_X,
+    "PlateLength": PLATE_LENGTH,
+    "FenceWidth": FENCE_WIDTH,
+    "PlateWidth": PLATE_WIDTH,
+    "PlateThickness": PLATE_THICKNESS,
+    "FenceHeight": FENCE_HEIGHT,
+    "NotchLeftEnd": NOTCH_LEFT_END,
+    "NotchRightStart": NOTCH_RIGHT_START,
+    "NotchDepth": NOTCH_DEPTH,
+    "NotchCornerR": CORNER_RADIUS,
+    "PocketLength": POCKET_LENGTH,
+    "PocketNearWallY": -POCKET_NEAR_WALL_Y,
+    "PocketBackWallY": -POCKET_BACK_WALL_Y,
+    "PocketDepth": POCKET_DEPTH,
+    "PocketCornerR": CORNER_RADIUS,
+    "HubX": HUB_X,
+    "HubY": -HUB_Y,
+    "HubCboreDia": HUB_CBORE_DIA,
+    "HubCboreDepth": HUB_CBORE_DEPTH,
+    **dict(zip(CLAMP_TAP_X_NAMES, CLAMP_STATIONS, strict=True)),
+    "ClampTapY": -CLAMP_SCREW_Y,
+}
+if set(DIMENSION_VALUES) != set(DRAWING_PRECISION_BY_NAME):
+    raise AssertionError("every printed dimension needs its model value")
+# Explicit bands (mm, symmetric) on named model dimensions, each with its
+# function on the sheet; everything else is the title block's row for its
+# places. The build sets each one (build_ch_rocker_strap_tl_sub_plate).
+SYMMETRIC_BANDS: dict[tuple[str, str], float] = {
+    ("PocketProfile", "PocketBackWallY"): POCKET_BACK_WALL_TOL,
+    ("HubCboreProfile", "HubX"): HUB_LOCATION_TOL,
+    ("HubCboreProfile", "HubY"): HUB_LOCATION_TOL,
+}
+# Single-limit (MAX) corner radii: the model value is the limit itself.
+MAX_RADII: tuple[tuple[str, str], ...] = (
+    ("NotchCorners", "NotchCornerR"),
+    ("PocketCorners", "PocketCornerR"),
+)
+
+# --- Sheet words -------------------------------------------------------------------
+# Counts on the pocket set and the corner radii (rule 10: identical features
+# take one nX callout); each tight or three-place feature's mate or reason
+# once, on its own dimension (rules 3, 4, 7).
+POCKET_COUNT = len(CLAMP_STATIONS)
+NOTCH_CORNER_COUNT = 3
+DIMENSION_PREFIXES: dict[tuple[str, str], str] = {
+    ("PocketProfile", "PocketLength"): f"{POCKET_COUNT}X ",
+    ("ClampPockets", "PocketDepth"): f"{POCKET_COUNT}X ",
+    ("PocketCorners", "PocketCornerR"): f"{4 * POCKET_COUNT}X ",
+    ("NotchCorners", "NotchCornerR"): f"{NOTCH_CORNER_COUNT}X ",
+}
+CLAMP_NUMBER = "TL-VN-50"
+PLUG_NUMBER = "TL-02"
+DIMENSION_CALLOUTS: dict[str, str] = {
+    "PocketBackWallY": f"SEATS {CLAMP_NUMBER} HEEL",
+    "PocketDepth": f"{CLAMP_NUMBER} SEAT",
+    "FenceHeight": "CLEARS MHA-CH-13 FACE CUT",
+    "HubCboreDia": f"LOCATES {PLUG_NUMBER}",
+    "HubCboreDepth": "CLEARS MHA-CH-13 DRILL AND REAMER",
+}
+# The taps' native callouts: DRILL after the drill's Ø, the clamp taps' count,
+# the hub tap's stated shortfall as its last row.
+CLAMP_TAP_COUNT = f"{POCKET_COUNT}X"
+DRAWING_NOTES = ""
+ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"
