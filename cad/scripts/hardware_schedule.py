@@ -98,10 +98,11 @@ def markdown() -> str:
     lines = [
         "# Master Hardware Schedule",
         "",
-        "Standard hardware the machine uses as supplied (ASME Y14.24 tier 1). "
-        "Buy to the generic designation; the example SKU is the part the CAD "
-        "models. Fits (thread, pin size, chain size, set-screw length, retaining "
-        "ring) come from the designation and its standard. A seat envelope "
+        "Standard hardware the machine buys by generic designation (ASME Y14.24 "
+        "tier 1); a few items are cut or faced in the assembly steps, which carry "
+        "those cuts. The example SKU is the part the CAD models. Fits (thread, "
+        "pin size, chain size, set-screw length, retaining ring) come from the "
+        "designation and, where named, its standard. A seat envelope "
         "bounds the space a head, nut, washer or wire may occupy (heads and nuts "
         "across corners): the catalogue maximum where its dimension provider "
         "records one, otherwise the modelled catalogue size the assembly "

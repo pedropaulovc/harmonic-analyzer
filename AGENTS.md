@@ -1141,7 +1141,8 @@ budgets and `_stock_fastener`'s declared-thread check are calibrated against
 them. Give every new purchased part its COTS tier in `cad/config/hardware.yaml`;
 a tier-1 (standard) part also takes its designation and standard there, plus
 envelope sources when a head, nut, washer or wire must clear its seat (fits such
-as pins, chain, set-screw lengths and retaining rings print `per <standard>`).
+as pins, chain, set-screw lengths and retaining rings print `per <standard>` or
+`per designation`; a headed set screw keeps its head envelope).
 `hardware_schedule.py` prints these rows as the release's `HARDWARE.md`.
 
 Simplified configuration helpers are separated by their real consumers:
