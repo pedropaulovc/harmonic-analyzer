@@ -240,10 +240,10 @@ def _turn_view(adapter: Any, view: Any, name: str) -> None:
             )
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source fly-cutter bar missing: {SOURCE}")
-    check("open fly-cutter bar", await adapter.open_model(str(SOURCE)))
+    check("open fly-cutter bar", adapter.open_model(str(SOURCE)))
     required = ("Number", "Material Specification", "Finish", "Quantity")
     read_required_properties(
         adapter.currentModel, ("Revision", "Title", *required), required=required
@@ -342,7 +342,7 @@ async def build(adapter: Any) -> dict[str, str]:
     import_cosmetic_threads(adapter, iso)
     removed_tap_labels = remove_notes_matching(adapter, "Tapped Hole")
     _telemetry.info(f"removed {removed_tap_labels} automatic tapped-hole label(s)")
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Cone Tip Gear Fly Cutter Bar Drawing",

@@ -31,24 +31,24 @@ def _box_mm(adapter, comp):
     return [v * 1000.0 for v in list(box)]
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
         ComponentRefParameters,
         InsertComponentParameters,
     )
 
-    check("create_assembly", await adapter.create_assembly())
+    check("create_assembly", adapter.create_assembly())
     for name in ("ch-channel", "output"):
         path = str((OUT_SLDASM / f"{name}.SLDASM").resolve())
         data = check(
             f"insert {name}",
-            await adapter.insert_component(
+            adapter.insert_component(
                 InsertComponentParameters(file_path=path, position=[0, 0, 0], rotation=[0, 0, 0])
             ),
         )
         comp = data["name"]
         if not data.get("fixed"):
-            check(f"fix {name}", await adapter.fix_component(ComponentRefParameters(name=comp)))
+            check(f"fix {name}", adapter.fix_component(ComponentRefParameters(name=comp)))
 
     asm = adapter.currentModel
     _flag(asm, "IAssemblyDoc")
@@ -125,7 +125,7 @@ async def build(adapter) -> dict[str, str]:
     for view in ("right", "top", "isometric", "front"):
         p = (png_dir / f"clash_{view}.png").resolve()
         adapter._attempt(lambda: model.ShowNamedView2("", -1), default=None)
-        await adapter.export_image({
+        adapter.export_image({
             "file_path": str(p), "format_type": "png",
             "width": 1800, "height": 1200, "view_orientation": view,
         })

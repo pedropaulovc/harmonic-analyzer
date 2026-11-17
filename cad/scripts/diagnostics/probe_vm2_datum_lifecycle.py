@@ -280,7 +280,7 @@ def main():
     from _gear_drawing_entities import visible_circle_edge
     from diagnostics._owned_native_session import run_owned_diagnostic
 
-    async def probe(adapter):
+    def probe(adapter):
         app = adapter.swApp
         if app.GetDocuments() or app.ActiveDoc is not None:
             raise RuntimeError("requires an empty seat; no documents closed")
@@ -435,8 +435,8 @@ def main():
                 raise RuntimeError(f"expected exactly one {name}")
             return matches[0]
 
-        async def open_drawing():
-            check("cold open datum lifecycle drawing", await adapter.open_model(str(working)))
+        def open_drawing():
+            check("cold open datum lifecycle drawing", adapter.open_model(str(working)))
             draw = _early_bound(adapter.currentModel, "IModelDoc2")
             if Path(str(draw.GetPathName())).resolve() != working:
                 raise RuntimeError("wrong active drawing")
@@ -462,7 +462,7 @@ def main():
             report["stages"][-1]["exports"] = {str(path): digest(path) for path in (pdf, png)}
             checkpoint()
 
-        async def refresh_ink(draw, view, edge, name):
+        def refresh_ink(draw, view, edge, name):
             if args.ink_refresh == "redraw":
                 return draw, view, edge
             before = {"stage": name, "view_position": list(view.Position),
@@ -471,7 +471,7 @@ def main():
             if type(result) is not int or result != 0:
                 raise RuntimeError(f"save {name} drawing rejected: {result!r}")
             close_owned()
-            draw, view, edge = await open_drawing()
+            draw, view, edge = open_drawing()
             if math.dist(before["view_position"], list(view.Position)) > 1e-8:
                 raise RuntimeError("cold ink refresh changed view position")
             if math.dist(before["view_scale"], list(view.ScaleRatio)) > 1e-10:
@@ -482,7 +482,7 @@ def main():
 
         checkpoint()
         try:
-            draw, view, edge = await open_drawing()
+            draw, view, edge = open_drawing()
             if args.rack_dimension_location == "above":
                 if source.stem != "pd-rack-pinion":
                     raise RuntimeError("rack layout delta is only valid for rack-pinion")
@@ -504,7 +504,7 @@ def main():
             view.Position = double_array(requested)
             if not draw.EditRebuild3():
                 raise RuntimeError("move rebuild rejected")
-            draw, view, edge = await refresh_ink(draw, view, edge, "moved")
+            draw, view, edge = refresh_ink(draw, view, edge, "moved")
             moved = observe(view, "moved", edge)
             if math.dist(moved["view_position"], requested) > 1e-8:
                 raise RuntimeError("view did not move as requested")
@@ -518,7 +518,7 @@ def main():
             view.ScaleRatio = double_array([ratio[0] * 1.25, ratio[1]])
             if not draw.EditRebuild3():
                 raise RuntimeError("scale rebuild rejected")
-            draw, view, edge = await refresh_ink(draw, view, edge, "scaled")
+            draw, view, edge = refresh_ink(draw, view, edge, "scaled")
             scaled = observe(view, "scaled", edge)
             if abs(scaled["view_scale"][0] / scaled["view_scale"][1] - ratio[0] / ratio[1] * 1.25) > 1e-10:
                 raise RuntimeError("scale readback rejected")
@@ -527,7 +527,7 @@ def main():
             view.Position = double_array(initial["view_position"])
             if not draw.EditRebuild3():
                 raise RuntimeError("restore rebuild rejected")
-            draw, view, edge = await refresh_ink(draw, view, edge, "restored")
+            draw, view, edge = refresh_ink(draw, view, edge, "restored")
             restored = observe(view, "restored", edge)
             report["restore_error_m"] = math.dist(restored["position"][:2], initial["position"][:2])
             if report["restore_error_m"] > limit:
@@ -536,7 +536,7 @@ def main():
             if type(result) is not int or result != 0:
                 raise RuntimeError(f"save restored drawing rejected: {result!r}")
             close_owned()
-            draw, view, edge = await open_drawing()
+            draw, view, edge = open_drawing()
             reopened = observe(view, "second_cold_open", edge)
             report["second_reopen_error_m"] = math.dist(reopened["position"][:2], initial["position"][:2])
             if report["second_reopen_error_m"] > limit:

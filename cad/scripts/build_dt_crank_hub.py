@@ -90,19 +90,19 @@ V_BORE = math.pi * BORE_R**2 * HUB_LENGTH
 V_SEAM_GROOVE = lens_area(PIN_R, SEAT_R) * SEAM_DEPTH
 
 
-async def _volume(adapter) -> float:
-    result = await adapter.get_mass_properties()
+def _volume(adapter) -> float:
+    result = adapter.get_mass_properties()
     return result.data.volume if result.is_success else float("nan")
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
         CreatePlaneParameters,
         ExtrusionParameters,
         RevolveParameters,
     )
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     apply_package_model_units(adapter, UNIT, label=PART_NAME)
     for name, value in (
         ("HubLength", HUB_LENGTH),
@@ -116,16 +116,16 @@ async def build(adapter) -> dict[str, str]:
         ("AxialPinDia", AXIAL_PIN_DIA),
         ("SeamDepth", SEAM_DEPTH),
     ):
-        await set_global(adapter, name, f"{value}mm")
+        set_global(adapter, name, f"{value}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
     # Stepped sleeve profile about local +Y: seat, barrel, rear relief.
     profile = SketchDims()
-    check("create_sketch hub profile", await adapter.create_sketch("Front"))
+    check("create_sketch hub profile", adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     axis = check(
-        "hub axis", await adapter.add_centerline(0.0, 0.0, 0.0, HUB_LENGTH)
+        "hub axis", adapter.add_centerline(0.0, 0.0, 0.0, HUB_LENGTH)
     )
     points = [
         (0.0, 0.0),
@@ -137,7 +137,7 @@ async def build(adapter) -> dict[str, str]:
         (RELIEF_R, HUB_LENGTH),
         (0.0, HUB_LENGTH),
     ]
-    lines = await add_line_chain(adapter, points)
+    lines = add_line_chain(adapter, points)
     set_sketch_direct_db(adapter, False)
     for index, line in enumerate(lines):
         p0 = points[index]
@@ -145,17 +145,17 @@ async def build(adapter) -> dict[str, str]:
         relation = "horizontal" if p0[1] == p1[1] else "vertical"
         check(
             f"hub profile {relation} {line}",
-            await adapter.add_sketch_constraint(line, None, relation),
+            adapter.add_sketch_constraint(line, None, relation),
         )
-    check("hub axis vertical", await adapter.add_sketch_constraint(axis, None, "vertical"))
-    await anchor_point_to_origin(
+    check("hub axis vertical", adapter.add_sketch_constraint(axis, None, "vertical"))
+    anchor_point_to_origin(
         adapter, f"{lines[0]}.start", 0.0, 0.0, "hub origin"
     )
-    await add_diametric_linear_dimension(
+    add_diametric_linear_dimension(
         adapter, axis, lines[1], (SEAT_R + 4.0, HUB_SEAT_LENGTH / 2.0), "SeatDia"
     )
     profile.record("SeatDia", '"SeatDia"')
-    await add_diametric_linear_dimension(
+    add_diametric_linear_dimension(
         adapter,
         axis,
         lines[3],
@@ -163,7 +163,7 @@ async def build(adapter) -> dict[str, str]:
         "BarrelDia",
     )
     profile.record("BarrelDia", '"BarrelDia"')
-    await add_diametric_linear_dimension(
+    add_diametric_linear_dimension(
         adapter,
         axis,
         lines[5],
@@ -173,13 +173,13 @@ async def build(adapter) -> dict[str, str]:
     profile.record("ReliefDia", '"ReliefDia"')
     check(
         "seat length",
-        await adapter.add_sketch_dimension(lines[1], None, "linear", HUB_SEAT_LENGTH),
+        adapter.add_sketch_dimension(lines[1], None, "linear", HUB_SEAT_LENGTH),
     )
     profile.record("SeatLength", '"SeatLength"')
     # The overall, front face to rear face (outer corners, where the
     # drawing's extension lines rise): the barrel's length is its remainder
     # and is not printed.
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{lines[1]}.start",
         f"{lines[6]}.start",
@@ -190,21 +190,21 @@ async def build(adapter) -> dict[str, str]:
     profile.record("HubLength", '"HubLength"')
     check(
         "relief length",
-        await adapter.add_sketch_dimension(lines[5], None, "linear", RELIEF_LENGTH),
+        adapter.add_sketch_dimension(lines[5], None, "linear", RELIEF_LENGTH),
     )
     profile.record("ReliefLength", '"ReliefLength"')
-    await ensure_fully_defined(adapter, "hub profile")
-    check("exit_sketch hub profile", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "hub profile")
+    check("exit_sketch hub profile", adapter.exit_sketch())
     name_last_feature(adapter, "HubProfile")
     drive_jobs += profile.apply(adapter, "HubProfile")
-    check("revolve hub", await adapter.create_revolve(RevolveParameters(angle=360.0)))
+    check("revolve hub", adapter.create_revolve(RevolveParameters(angle=360.0)))
     name_last_feature(adapter, "HubBody")
-    await volume_check(adapter, "stepped hub body", V_BODY, 0.005 * V_BODY)
+    volume_check(adapter, "stepped hub body", V_BODY, 0.005 * V_BODY)
 
     # Reamed through bore on the shaft axis.
     bore = SketchDims()
-    check("create_sketch hub bore", await adapter.create_sketch("Top"))
-    await define_circle(
+    check("create_sketch hub bore", adapter.create_sketch("Top"))
+    define_circle(
         adapter,
         0.0,
         0.0,
@@ -214,24 +214,24 @@ async def build(adapter) -> dict[str, str]:
         names=("BoreCx", "BoreCz", "BoreDia"),
         drives=(None, None, '"BoreDia"'),
     )
-    await ensure_fully_defined(adapter, "hub bore sketch")
-    check("exit_sketch hub bore", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "hub bore sketch")
+    check("exit_sketch hub bore", adapter.exit_sketch())
     name_last_feature(adapter, "BoreProfile")
     drive_jobs += bore.apply(adapter, "BoreProfile")
     check(
         "cut hub bore",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=HUB_LENGTH, reverse_direction=True)
         ),
     )
     name_last_feature(adapter, "ThroughBore")
-    await volume_check(adapter, "hub through bore", V_BODY - V_BORE, 0.01 * V_BORE)
+    volume_check(adapter, "hub through bore", V_BODY - V_BORE, 0.01 * V_BORE)
 
     # Axial six-o'clock seam groove: Top sketch coordinates (u,v) map to
     # model (X,-Z), hence v=-radius places the key at local +Z.
     groove = SketchDims()
-    check("create_sketch axial seam groove", await adapter.create_sketch("Top"))
-    await define_circle(
+    check("create_sketch axial seam groove", adapter.create_sketch("Top"))
+    define_circle(
         adapter,
         0.0,
         -AXIAL_PIN_RADIUS_FROM_AXIS,
@@ -241,13 +241,13 @@ async def build(adapter) -> dict[str, str]:
         names=("GrooveX", "GrooveZ", "GrooveDia"),
         drives=(None, '"SeatDia" / 2', '"AxialPinDia"'),
     )
-    await ensure_fully_defined(adapter, "axial seam groove sketch")
-    check("exit_sketch axial seam groove", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "axial seam groove sketch")
+    check("exit_sketch axial seam groove", adapter.exit_sketch())
     name_last_feature(adapter, "AxialPinGrooveProfile")
     drive_jobs += groove.apply(adapter, "AxialPinGrooveProfile")
     check(
         "cut axial seam groove",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=SEAM_DEPTH, reverse_direction=True)
         ),
     )
@@ -256,7 +256,7 @@ async def build(adapter) -> dict[str, str]:
     # SeamDepthReference (Codjiflo review of 278bcf933).
     groove_depth = name_dimensions(adapter, "AxialPinGroove", ["GrooveDepth"])
     drive_jobs += [(groove_depth[0], '"SeamDepth"')]
-    await volume_check(
+    volume_check(
         adapter,
         "hub axial seam groove",
         V_BODY - V_BORE - V_SEAM_GROOVE,
@@ -272,7 +272,7 @@ async def build(adapter) -> dict[str, str]:
     ):
         check(
             f"create_plane {plane_name}",
-            await adapter.create_plane(
+            adapter.create_plane(
                 CreatePlaneParameters(mode="offset", base_plane="Top Plane", offset=station)
             ),
         )
@@ -289,7 +289,7 @@ async def build(adapter) -> dict[str, str]:
         name="ServicePinHole",
         point_planes=("ServicePinStationPlane", "Front Plane"),
     )
-    final_volume = await _volume(adapter)
+    final_volume = _volume(adapter)
     _telemetry.info(
         f"volume after {blind_cut_dia_mm(SERVICE_PIN_HOLE_SPEC):.3f} service pilot: "
         f"{final_volume:.1f} mm^3"
@@ -305,11 +305,11 @@ async def build(adapter) -> dict[str, str]:
     # its view.  On the Front plane the sketch was selected but its dimension
     # never arrived (run 20260922T020620997Z-4a7ef16e).  Right (u, v) -> (-Z, Y).
     station = SketchDims()
-    check("create_sketch service pin station", await adapter.create_sketch("Right"))
+    check("create_sketch service pin station", adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
     station_line = check(
         "service pin station reference line",
-        await adapter.add_line(0.0, 0.0, 0.0, SERVICE_PIN_STATION),
+        adapter.add_line(0.0, 0.0, 0.0, SERVICE_PIN_STATION),
     )
     set_sketch_direct_db(adapter, False)
     segment = _early_bound(adapter._sketch_entities[station_line], "ISketchSegment")
@@ -318,16 +318,16 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError("service pin station reference did not take construction flag")
     check(
         "service pin station reference vertical",
-        await adapter.add_sketch_constraint(station_line, None, "vertical"),
+        adapter.add_sketch_constraint(station_line, None, "vertical"),
     )
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter,
         f"{station_line}.start",
         0.0,
         0.0,
         "service pin station reference at the outboard face",
     )
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{station_line}.start",
         f"{station_line}.end",
@@ -336,8 +336,8 @@ async def build(adapter) -> dict[str, str]:
         "service pin station from the outboard face",
     )
     station.record("ServicePinStation", '"ServicePinStation"')
-    await ensure_fully_defined(adapter, "service pin station reference sketch")
-    check("exit_sketch service pin station", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "service pin station reference sketch")
+    check("exit_sketch service pin station", adapter.exit_sketch())
     name_last_feature(adapter, "ServicePinStationReference")
     drive_jobs += station.apply(adapter, "ServicePinStationReference")
     # Drawing-only seam depth reference on the same Right plane: a
@@ -347,11 +347,11 @@ async def build(adapter) -> dict[str, str]:
     # depth was typed into the seam note).  Right (u, v) -> (-Z, Y): the
     # six-o'clock seam at model +Z is u = -AXIAL_PIN_RADIUS_FROM_AXIS.
     seam_depth = SketchDims()
-    check("create_sketch seam depth", await adapter.create_sketch("Right"))
+    check("create_sketch seam depth", adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
     seam_line = check(
         "seam depth reference line",
-        await adapter.add_line(
+        adapter.add_line(
             -AXIAL_PIN_RADIUS_FROM_AXIS, 0.0, -AXIAL_PIN_RADIUS_FROM_AXIS, SEAM_DEPTH
         ),
     )
@@ -362,9 +362,9 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError("seam depth reference did not take construction flag")
     check(
         "seam depth reference vertical",
-        await adapter.add_sketch_constraint(seam_line, None, "vertical"),
+        adapter.add_sketch_constraint(seam_line, None, "vertical"),
     )
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter,
         f"{seam_line}.start",
         -AXIAL_PIN_RADIUS_FROM_AXIS,
@@ -372,7 +372,7 @@ async def build(adapter) -> dict[str, str]:
         "seam depth reference at the outboard face",
     )
     seam_depth.record(None, '"SeatDia" / 2')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{seam_line}.start",
         f"{seam_line}.end",
@@ -381,13 +381,13 @@ async def build(adapter) -> dict[str, str]:
         "seam depth from the outboard face",
     )
     seam_depth.record("SeamDepth", '"SeamDepth"')
-    await ensure_fully_defined(adapter, "seam depth reference sketch")
-    check("exit_sketch seam depth", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "seam depth reference sketch")
+    check("exit_sketch seam depth", adapter.exit_sketch())
     name_last_feature(adapter, "SeamDepthReference")
     drive_jobs += seam_depth.apply(adapter, "SeamDepthReference")
     # Axis1 is the shaft/hub axis; Axis2 is the axial seam-pin axis.
-    await name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0, "hub axis")
-    seam_axis = await name_bore_axis(
+    name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0, "hub axis")
+    seam_axis = name_bore_axis(
         adapter,
         "Front Plane",
         AXIAL_PIN_RADIUS_FROM_AXIS,
@@ -398,10 +398,10 @@ async def build(adapter) -> dict[str, str]:
         drive_jobs=drive_jobs,
     )
 
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dimension, expression in drive_jobs:
-        await drive_dimension(adapter, dimension, expression)
-    await force_rebuild(adapter)
+        drive_dimension(adapter, dimension, expression)
+    force_rebuild(adapter)
     assert_signed_circle_center(
         adapter,
         "AxialPinGrooveProfile",
@@ -426,14 +426,14 @@ async def build(adapter) -> dict[str, str]:
         places=DRAWING_PRECISION["HubProfile"]["HubLength"],
         display_unit=UNIT,
     )
-    await volume_check(adapter, "driven crank hub", final_volume, 0.001 * final_volume)
+    volume_check(adapter, "driven crank hub", final_volume, 0.001 * final_volume)
     # Both datum planes stay selectable by name for the drive-train mates.
     blank_reference_geometry(
         adapter, (("ArmShoulder", "PLANE"), ("ServicePinStationPlane", "PLANE"))
     )
 
-    await apply_material(adapter, MATERIAL)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    report_mass_properties(adapter)
     clear_dimensions_for_drawing(adapter)
     for feature, dimensions in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature, dimensions)
@@ -451,7 +451,7 @@ async def build(adapter) -> dict[str, str]:
     # view through _drawing_hidden_sketches to import those dimensions.
     blank_sketch(adapter, "ServicePinStationReference")
     blank_sketch(adapter, "SeamDepthReference")
-    return await save_part_and_images(adapter, PART_NAME)
+    return save_part_and_images(adapter, PART_NAME)
 
 
 if __name__ == "__main__":

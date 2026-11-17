@@ -87,7 +87,7 @@ V_CREST_BREAK = cone_cylinder_volume(
 V_FACED_BROKEN = V_FACED - V_CREST_BREAK
 
 
-async def _face_to_collar(adapter) -> None:
+def _face_to_collar(adapter) -> None:
     """Cut the stock pin back to ``FACED_LENGTH`` from its pressed end: a
     rectangle in the pin's axial (Front) plane from the faced station past
     the stock end, cut through both ways."""
@@ -96,8 +96,8 @@ async def _face_to_collar(adapter) -> None:
     radius = DIA / 2.0
     top = LENGTH + DIA
     with no_sketch_inference(adapter):
-        check("create facing sketch", await adapter.create_sketch("Front"))
-        lines = await add_line_chain(
+        check("create facing sketch", adapter.create_sketch("Front"))
+        lines = add_line_chain(
             adapter,
             [
                 (-2.0 * radius, FACED_LENGTH),
@@ -111,10 +111,10 @@ async def _face_to_collar(adapter) -> None:
         ):
             check(
                 "facing profile relation",
-                await adapter.add_sketch_constraint(line, None, direction),
+                adapter.add_sketch_constraint(line, None, direction),
             )
         dims = SketchDims()
-        await anchor_point_to_origin(
+        anchor_point_to_origin(
             adapter,
             f"{lines[0]}.start",
             -2.0 * radius,
@@ -123,7 +123,7 @@ async def _face_to_collar(adapter) -> None:
         )
         dims.record("CutterLeft")
         dims.record("FacedLength")
-        await dimension_between(
+        dimension_between(
             adapter,
             f"{lines[0]}.start",
             f"{lines[0]}.end",
@@ -132,7 +132,7 @@ async def _face_to_collar(adapter) -> None:
             "facing cutter width",
         )
         dims.record("CutterWidth")
-        await dimension_between(
+        dimension_between(
             adapter,
             f"{lines[1]}.start",
             f"{lines[1]}.end",
@@ -141,18 +141,18 @@ async def _face_to_collar(adapter) -> None:
             "facing cutter height",
         )
         dims.record("CutterHeight")
-        await ensure_fully_defined(adapter, "stock facing profile")
-        check("exit facing sketch", await adapter.exit_sketch())
+        ensure_fully_defined(adapter, "stock facing profile")
+        check("exit facing sketch", adapter.exit_sketch())
         name_last_feature(adapter, "StockFacingProfile")
         dims.apply(adapter, "StockFacingProfile")
         check(
             "face stock pin to the collar's rear face",
-            await adapter.create_cut_extrude(
+            adapter.create_cut_extrude(
                 ExtrusionParameters(depth=4.0 * DIA, both_directions=True)
             ),
         )
         name_last_feature(adapter, "StockFacing")
-    await volume_check(adapter, "faced collar flat pin", V_FACED, 0.005 * V_FACED)
+    volume_check(adapter, "faced collar flat pin", V_FACED, 0.005 * V_FACED)
 
 
 def _right_plane_sketch(
@@ -212,7 +212,7 @@ def _right_plane_sketch(
     return to_sketch, axial == 0
 
 
-async def _break_crest(adapter) -> None:
+def _break_crest(adapter) -> None:
     """Cut the collar's rear 45° break through the faced pin's crest corner:
     in the Right plane, a triangle from the cone's apex on the collar axis
     (z = -FLAT_PIN_CENTRE) out to its 45° line past the faced end, revolved
@@ -224,7 +224,7 @@ async def _break_crest(adapter) -> None:
     beyond = FACED_LENGTH + overrun
     reach = _BREAK_FACE_R + overrun
     with no_sketch_inference(adapter):
-        check("create crest break sketch", await adapter.create_sketch("Right"))
+        check("create crest break sketch", adapter.create_sketch("Right"))
         to_sketch, axial_on_u = _right_plane_sketch(adapter)
         axial, radial = (
             ("horizontal", "vertical") if axial_on_u else ("vertical", "horizontal")
@@ -233,29 +233,29 @@ async def _break_crest(adapter) -> None:
         profile = [apex, to_sketch(beyond, axis_z + reach), to_sketch(beyond, axis_z)]
         axis = check(
             "crest break axis",
-            await adapter.add_centerline(
+            adapter.add_centerline(
                 *profile[2], *to_sketch(beyond + overrun, axis_z)
             ),
         )
-        slant, top, axis_side = await add_line_chain(adapter, profile)
+        slant, top, axis_side = add_line_chain(adapter, profile)
         for line, relation in ((top, radial), (axis_side, axial), (axis, axial)):
             check(
                 f"crest break {relation} {line}",
-                await adapter.add_sketch_constraint(line, None, relation),
+                adapter.add_sketch_constraint(line, None, relation),
             )
         check(
             "crest break axis on the profile",
-            await adapter.add_sketch_constraint(
+            adapter.add_sketch_constraint(
                 f"{axis}.start", f"{axis_side}.start", "coincident"
             ),
         )
         dims = SketchDims()
-        await anchor_point_to_origin(
+        anchor_point_to_origin(
             adapter, f"{slant}.start", *apex, "crest break apex"
         )
         dims.record("BreakApexU")
         dims.record("BreakApexV")
-        await dimension_between(
+        dimension_between(
             adapter,
             f"{top}.start",
             f"{top}.end",
@@ -264,7 +264,7 @@ async def _break_crest(adapter) -> None:
             "crest break reach past the faced end",
         )
         dims.record("BreakReach")
-        await dimension_between(
+        dimension_between(
             adapter,
             f"{axis_side}.start",
             f"{axis_side}.end",
@@ -275,32 +275,32 @@ async def _break_crest(adapter) -> None:
         dims.record("BreakDepth")
         check(
             "crest break axis length",
-            await adapter.add_sketch_dimension(axis, None, "linear", overrun),
+            adapter.add_sketch_dimension(axis, None, "linear", overrun),
         )
         dims.record("BreakAxisLength")
-        await ensure_fully_defined(adapter, "crest break profile")
-        check("exit crest break sketch", await adapter.exit_sketch())
+        ensure_fully_defined(adapter, "crest break profile")
+        check("exit crest break sketch", adapter.exit_sketch())
         name_last_feature(adapter, "CrestBreakProfile")
         dims.apply(adapter, "CrestBreakProfile")
         check(
             "revolve-cut the collar's rear break through the crest",
-            await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
+            adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
         )
         name_last_feature(adapter, "CrestBreak")
-    await volume_check(
+    volume_check(
         adapter, "crest-broken collar flat pin", V_FACED_BROKEN, 0.1 * V_CREST_BREAK
     )
 
 
 @wraps(build_90145A414)
-async def _build_faced_pin(adapter, truth=None):
-    await build_90145A414(adapter, truth)
-    await author_supplier_dowel_references(adapter, SUPPLIER_REFERENCE)
-    await _face_to_collar(adapter)
-    await _break_crest(adapter)
+def _build_faced_pin(adapter, truth=None):
+    build_90145A414(adapter, truth)
+    author_supplier_dowel_references(adapter, SUPPLIER_REFERENCE)
+    _face_to_collar(adapter)
+    _break_crest(adapter)
 
 
-async def _add_stock_configuration(adapter) -> None:
+def _add_stock_configuration(adapter) -> None:
     """Restore the as-supplied catalogue pin in its own configuration (the
     build_ch_bar_pivot_pin configuration idiom): suppress the facing and the
     crest break there, prove each configuration's solid by volume and leave
@@ -313,7 +313,7 @@ async def _add_stock_configuration(adapter) -> None:
         raise RuntimeError("collar flat pin has no faced configuration")
     check(
         f"create_configuration {SUPPLIER_STOCK_CONFIGURATION}",
-        await adapter.create_configuration(
+        adapter.create_configuration(
             CreateConfigurationParameters(
                 name=SUPPLIER_STOCK_CONFIGURATION,
                 comment=f"McMaster {SKU} as supplied; facing and crest break suppressed",
@@ -322,7 +322,7 @@ async def _add_stock_configuration(adapter) -> None:
     )
     check(
         f"activate {SUPPLIER_STOCK_CONFIGURATION}",
-        await adapter.set_active_configuration(SUPPLIER_STOCK_CONFIGURATION),
+        adapter.set_active_configuration(SUPPLIER_STOCK_CONFIGURATION),
     )
     for name in SUPPLIER_STOCK_SUPPRESSED_FEATURES:
         feature = _feature_by_name(adapter, name)
@@ -333,11 +333,11 @@ async def _add_stock_configuration(adapter) -> None:
             0, 3, bstr_array([SUPPLIER_STOCK_CONFIGURATION])
         ):
             raise RuntimeError(f"{name}: cannot suppress the assembly cut in stock")
-    await force_rebuild(adapter)
-    await volume_check(adapter, "as-supplied collar flat pin", V_STOCK, 0.005 * V_STOCK)
-    check(f"re-activate {faced}", await adapter.set_active_configuration(faced))
-    await force_rebuild(adapter)
-    await volume_check(
+    force_rebuild(adapter)
+    volume_check(adapter, "as-supplied collar flat pin", V_STOCK, 0.005 * V_STOCK)
+    check(f"re-activate {faced}", adapter.set_active_configuration(faced))
+    force_rebuild(adapter)
+    volume_check(
         adapter, "crest-broken collar flat pin", V_FACED_BROKEN, 0.1 * V_CREST_BREAK
     )
     require_material_in_every_configuration(
@@ -345,12 +345,12 @@ async def _add_stock_configuration(adapter) -> None:
     )
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     # Defined here so the saved-cache proof (save, reopen, tripwire) reads in
     # build() itself, as test_part_save_rebuild audits a configuration author.
-    async def save_with_stock_configuration(adapter, part_name: str) -> dict[str, str]:
-        await _add_stock_configuration(adapter)
-        artefacts = await save_part_and_images(adapter, part_name)
+    def save_with_stock_configuration(adapter, part_name: str) -> dict[str, str]:
+        _add_stock_configuration(adapter)
+        artefacts = save_part_and_images(adapter, part_name)
         # The assembly places the faced configuration and the purchased sheet
         # the as-supplied one, each from its saved cache: reopen and prove
         # both the way they load it (cg-fx1).
@@ -359,12 +359,12 @@ async def build(adapter) -> dict[str, str]:
         )
         adapter.currentModel = None
         check(
-            "reopen saved collar flat pin", await adapter.open_model(artefacts["part"])
+            "reopen saved collar flat pin", adapter.open_model(artefacts["part"])
         )
         assert_saved_configurations_regenerate(adapter, part_name)
         return artefacts
 
-    return await build_stock_fastener(
+    return build_stock_fastener(
         adapter,
         part_name=PART_NAME,
         components=(StockComponent(sku=SKU, author=_build_faced_pin),),

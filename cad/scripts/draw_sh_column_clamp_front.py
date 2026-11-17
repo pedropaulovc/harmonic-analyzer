@@ -269,11 +269,11 @@ def _add_relief_center_mark(adapter: Any, top: Any) -> None:
         raise RuntimeError("failed to centre-mark the bore axis")
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open column-clamp-front source", await adapter.open_model(str(SOURCE)))
+    check("open column-clamp-front source", adapter.open_model(str(SOURCE)))
     required = (
         "Number",
         "Material Specification",
@@ -367,7 +367,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Column Clamp Front Arc Manufacturing Drawing",

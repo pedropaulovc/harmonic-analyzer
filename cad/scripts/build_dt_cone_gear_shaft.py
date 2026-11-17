@@ -147,11 +147,11 @@ STATION_OWNERS: tuple[tuple[str, float, tuple[str, ...]], ...] = (
 )
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
     validate_gear_loading_clearances()
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     # #290: the row's inch calculation units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
@@ -170,15 +170,15 @@ async def build(adapter) -> dict[str, str]:
     # SecEnd1 is the shoulder station and SecEnd2 the tip FROM the collar's
     # tip-side face.
     for i, (dia_in, _end_z) in enumerate(SECTIONS):
-        await set_global(adapter, f"SecDia{i}", f"{dia_in * IN}mm")
-        await set_global(adapter, f"SecEnd{i}", f"{SECTION_KNOBS[i]}mm")
-    await set_global(adapter, "CollarDia", f"{COLLAR_DIA}mm")
-    await set_global(adapter, "CollarWidth", f"{COLLAR_THICKNESS}mm")
-    await set_global(adapter, "Sec1KeyseatW", f"{cone_land_key.KEYSEAT_WIDTH_MM}mm")
-    await set_global(adapter, "Sec1KeyseatS", f"{cone_land_key.KEYSEAT_S_MM}mm")
-    await set_global(adapter, "Sec1KeyseatEndSet", f"{cone_land_key.KEY_END_SET_MM}mm")
-    await set_global(adapter, "SocketDia", f"{SOCKET_DIA}mm")
-    await set_global(adapter, "SocketDepth", f"{SOCKET_DEPTH}mm")
+        set_global(adapter, f"SecDia{i}", f"{dia_in * IN}mm")
+        set_global(adapter, f"SecEnd{i}", f"{SECTION_KNOBS[i]}mm")
+    set_global(adapter, "CollarDia", f"{COLLAR_DIA}mm")
+    set_global(adapter, "CollarWidth", f"{COLLAR_THICKNESS}mm")
+    set_global(adapter, "Sec1KeyseatW", f"{cone_land_key.KEYSEAT_WIDTH_MM}mm")
+    set_global(adapter, "Sec1KeyseatS", f"{cone_land_key.KEYSEAT_S_MM}mm")
+    set_global(adapter, "Sec1KeyseatEndSet", f"{cone_land_key.KEY_END_SET_MM}mm")
+    set_global(adapter, "SocketDia", f"{SOCKET_DIA}mm")
+    set_global(adapter, "SocketDepth", f"{SOCKET_DEPTH}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -189,7 +189,7 @@ async def build(adapter) -> dict[str, str]:
     # under it).
     check(
         "create_plane CollarFace",
-        await adapter.create_plane(
+        adapter.create_plane(
             CreatePlaneParameters(
                 mode="offset", base_plane="Front Plane", offset=COLLAR_START_STATION
             )
@@ -203,7 +203,7 @@ async def build(adapter) -> dict[str, str]:
     # CollarWidth.  The drive train seats the 64T on it by name.
     check(
         "create_plane CollarEndPlane",
-        await adapter.create_plane(
+        adapter.create_plane(
             CreatePlaneParameters(
                 mode="offset", base_plane="CollarFace", offset=COLLAR_THICKNESS
             )
@@ -221,7 +221,7 @@ async def build(adapter) -> dict[str, str]:
         if i == 1:
             # The collar joins the journal before the gear lands start at its
             # tip-side face, so the body stays one solid.
-            volume = await _add_collar(adapter, drive_jobs, volume)
+            volume = _add_collar(adapter, drive_jobs, volume)
             prev_end = COLLAR_END_STATION
         # Each land is a cylinder from its origin (the large-end face, or the
         # collar's tip-side face for the gear-seat lands) to its own end
@@ -242,7 +242,7 @@ async def build(adapter) -> dict[str, str]:
         else:
             check(
                 f"create_plane end of {label}",
-                await adapter.create_plane(
+                adapter.create_plane(
                     CreatePlaneParameters(
                         mode="offset", base_plane=SECTION_ORIGINS[i], offset=knob
                     )
@@ -255,8 +255,8 @@ async def build(adapter) -> dict[str, str]:
         # On-axis circle (centre at the origin): define_circle records ONLY the
         # diameter dim (the X/Z centre slots are relations, not display dims).
         sec = SketchDims()
-        check(f"create_sketch {label}", await adapter.create_sketch(plane_name))
-        await define_circle(
+        check(f"create_sketch {label}", adapter.create_sketch(plane_name))
+        define_circle(
             adapter,
             0.0,
             0.0,
@@ -266,13 +266,13 @@ async def build(adapter) -> dict[str, str]:
             names=(f"Sec{i}Cx", f"Sec{i}Cz", f"Sec{i}Dia"),
             drives=(None, None, f'"SecDia{i}"'),
         )
-        await ensure_fully_defined(adapter, f"{label} sketch")
-        check(f"exit_sketch {label}", await adapter.exit_sketch())
+        ensure_fully_defined(adapter, f"{label} sketch")
+        check(f"exit_sketch {label}", adapter.exit_sketch())
         name_last_feature(adapter, f"Sec{i}Profile")
         drive_jobs += sec.apply(adapter, f"Sec{i}Profile")
         check(
             f"extrude {label}",
-            await adapter.create_extrusion(
+            adapter.create_extrusion(
                 ExtrusionParameters(depth=knob, reverse_direction=i > 0)
             ),
         )
@@ -283,7 +283,7 @@ async def build(adapter) -> dict[str, str]:
         # A land extruded the wrong way lands inside its larger neighbour or
         # off the end of the shaft, so the running volume is the direction
         # check as well as the size check.
-        await volume_check(adapter, label, volume, 0.005 * volume)
+        volume_check(adapter, label, volume, 0.005 * volume)
         prev_end = end_z
     blank_reference_geometry(
         adapter, tuple((f"Sec{i}EndPlane", "PLANE") for i in range(1, len(SECTIONS)))
@@ -301,19 +301,19 @@ async def build(adapter) -> dict[str, str]:
     # the step root, so the fillet follows the cut.  The cut's own volume, not
     # the shaft's, sets the gate: run the wrong way off the end plane it meets
     # only air, since land 2 lies inside the keyseat floor.
-    removed = await _cut_keyseat(adapter, drive_jobs)
+    removed = _cut_keyseat(adapter, drive_jobs)
     volume -= removed
-    await volume_check(adapter, "Sec1 keyseat", volume, 0.1 * removed)
-    removed = await _cut_keyseat_end(adapter, drive_jobs)
+    volume_check(adapter, "Sec1 keyseat", volume, 0.1 * removed)
+    removed = _cut_keyseat_end(adapter, drive_jobs)
     volume -= removed
     # The end's own volume, under 1 mm^3, sets its gate: a plunge on the
     # wrong side of the axis removes a whole fresh disc, twice as much.
-    await volume_check(adapter, "Sec1 keyseat end", volume, 0.25 * removed)
+    volume_check(adapter, "Sec1 keyseat end", volume, 0.25 * removed)
     # The reamed socket for T006's spigot, back from land 2's end plane;
     # run the wrong way it too meets only air.
-    removed = await _cut_socket(adapter, drive_jobs)
+    removed = _cut_socket(adapter, drive_jobs)
     volume -= removed
-    await volume_check(adapter, "socket", volume, 0.1 * removed)
+    volume_check(adapter, "socket", volume, 0.1 * removed)
 
     # Step root.  The land-1 to land-2 step is a full circle on land 2 (land
     # 2 lies inside the keyseat floor), picked once at -X, opposite the
@@ -324,7 +324,7 @@ async def build(adapter) -> dict[str, str]:
     # edge is buried under the collar.)
     check(
         "fillet step root",
-        await adapter.add_fillet(
+        adapter.add_fillet(
             FILLET_RADIUS,
             [[-SECTION_DIAS[2] / 2.0, 0.0, SECTION_ENDS[1]]],
             propagate=False,
@@ -334,25 +334,25 @@ async def build(adapter) -> dict[str, str]:
     name_dimensions(adapter, "ShoulderFillets", ["ShoulderR"])
     # An R0.10 root adds a fraction of a mm^3 to the shaft: this checks
     # that the fillet did not eat a land, not that it moved the number.
-    await volume_check(adapter, "step fillets", volume, 0.005 * volume)
+    volume_check(adapter, "step fillets", volume, 0.005 * volume)
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    volume_check(
         adapter, "driven cone-gear shaft (equations neutral)", volume, 0.005 * volume
     )
     _assert_stations_single_owned(adapter)
 
     # Named bore/central axis for view-independent assembly mate
     # selection (M6 mated-DOF drive train).
-    await name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", 0.0, "shaft axis")
+    name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", 0.0, "shaft axis")
 
-    await apply_material(adapter, MATERIAL)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    report_mass_properties(adapter)
     # The three turned diameters, the keyseat and the socket carry their fit
     # on the MODEL dimension, so SolidWorks renders the limits and
     # re-renders them on a unit change.  The bands are millimetres; UNIT
@@ -408,7 +408,7 @@ async def build(adapter) -> dict[str, str]:
     # feature-control frames (drawing-guidelines.md rule 5 (avoid excessive GD&T)).
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES})
-    return await save_part_and_images(adapter, PART_NAME)
+    return save_part_and_images(adapter, PART_NAME)
 
 
 @_telemetry.traced("part.cone_gear_shaft.shoulder_root_max")
@@ -422,7 +422,7 @@ def _shoulder_root_max_limit(adapter: Any) -> None:
         raise RuntimeError("ShoulderR@ShoulderFillets: swTolMAX did not persist")
 
 
-async def _add_collar(
+def _add_collar(
     adapter: Any, drive_jobs: list[tuple[str, str]], volume: float
 ) -> float:
     """The thrust collar (#914): the full Ø5/8 disc from CollarEndPlane back
@@ -436,8 +436,8 @@ async def _add_collar(
 
     label = f"collar d{COLLAR_DIA:g}mm to z={COLLAR_END_STATION:g}"
     collar = SketchDims()
-    check(f"create_sketch {label}", await adapter.create_sketch("CollarEndPlane"))
-    await define_circle(
+    check(f"create_sketch {label}", adapter.create_sketch("CollarEndPlane"))
+    define_circle(
         adapter,
         0.0,
         0.0,
@@ -447,13 +447,13 @@ async def _add_collar(
         names=("CollarCx", "CollarCz", "CollarDia"),
         drives=(None, None, '"CollarDia"'),
     )
-    await ensure_fully_defined(adapter, f"{label} sketch")
-    check(f"exit_sketch {label}", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, f"{label} sketch")
+    check(f"exit_sketch {label}", adapter.exit_sketch())
     name_last_feature(adapter, "CollarProfile")
     drive_jobs += collar.apply(adapter, "CollarProfile")
     check(
         f"extrude {label}",
-        await adapter.create_extrusion(
+        adapter.create_extrusion(
             ExtrusionParameters(depth=COLLAR_THICKNESS, reverse_direction=True)
         ),
     )
@@ -461,7 +461,7 @@ async def _add_collar(
     width_dim = name_dimensions(adapter, "Collar", ["CollarWidth"])
     drive_jobs += [(width_dim[0], '"CollarWidth"')]
     volume += math.pi / 4.0 * COLLAR_DIA**2 * COLLAR_THICKNESS
-    await volume_check(adapter, label, volume, 0.005 * volume)
+    volume_check(adapter, label, volume, 0.005 * volume)
     return volume
 
 
@@ -520,7 +520,7 @@ def keyseat_end_volume(steps: int = 4000) -> float:
 
 
 
-async def _cut_keyseat(adapter: Any, drive_jobs: list[tuple[str, str]]) -> float:
+def _cut_keyseat(adapter: Any, drive_jobs: list[tuple[str, str]]) -> float:
     """Cut land 1's keyseat and return the volume removed.
 
     Sketched on Sec1EndPlane, where its sizes lie in the plane a section view
@@ -546,9 +546,9 @@ async def _cut_keyseat(adapter: Any, drive_jobs: list[tuple[str, str]]) -> float
     length = SECTION_ENDS[land] - COLLAR_END_STATION - cone_land_key.KEY_END_SET_MM
     profile = "Sec1KeyseatProfile"
     dims = SketchDims()
-    check(f"create_sketch {label}", await adapter.create_sketch("Sec1EndPlane"))
+    check(f"create_sketch {label}", adapter.create_sketch("Sec1EndPlane"))
     sign = _sketch_x_per_model_x(adapter)
-    bottom, outer, top, floor = await add_line_chain(
+    bottom, outer, top, floor = add_line_chain(
         adapter,
         [
             (sign * floor_offset, -half),
@@ -565,9 +565,9 @@ async def _cut_keyseat(adapter: Any, drive_jobs: list[tuple[str, str]]) -> float
     ):
         check(
             f"{label} {direction} {edge}",
-            await adapter.add_sketch_constraint(edge, None, direction),
+            adapter.add_sketch_constraint(edge, None, direction),
         )
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{bottom}.start",
         f"{bottom}.end",
@@ -576,7 +576,7 @@ async def _cut_keyseat(adapter: Any, drive_jobs: list[tuple[str, str]]) -> float
         f"{label} reach",
     )
     dims.record("Sec1KeyseatReach")
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{floor}.start",
         f"{floor}.end",
@@ -585,23 +585,23 @@ async def _cut_keyseat(adapter: Any, drive_jobs: list[tuple[str, str]]) -> float
         f"{label} width",
     )
     dims.record("Sec1KeyseatWidth", '"Sec1KeyseatW"')
-    (across,) = await add_line_chain(
+    (across,) = add_line_chain(
         adapter, [(-sign * radius, 0.0), (sign * floor_offset, 0.0)], close=False
     )
     _as_construction(adapter, across)
     check(
         f"{label} S line horizontal",
-        await adapter.add_sketch_constraint(across, None, "horizontal"),
+        adapter.add_sketch_constraint(across, None, "horizontal"),
     )
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{across}.start", -sign * radius, 0.0, f"{label} far side"
     )
     dims.record("Sec1FarSide", '"SecDia1" / 2')
     check(
         f"{label} S line meets the floor",
-        await adapter.add_sketch_constraint(f"{across}.end", floor, "midpoint"),
+        adapter.add_sketch_constraint(f"{across}.end", floor, "midpoint"),
     )
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{across}.start",
         f"{across}.end",
@@ -610,13 +610,13 @@ async def _cut_keyseat(adapter: Any, drive_jobs: list[tuple[str, str]]) -> float
         f"{label} S",
     )
     dims.record("Sec1KeyseatS", '"Sec1KeyseatS"')
-    await ensure_fully_defined(adapter, f"{label} sketch")
-    check(f"exit_sketch {label}", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, f"{label} sketch")
+    check(f"exit_sketch {label}", adapter.exit_sketch())
     name_last_feature(adapter, profile)
     drive_jobs += dims.apply(adapter, profile)
     check(
         f"cut {label}",
-        await adapter.create_cut_extrude(ExtrusionParameters(depth=length)),
+        adapter.create_cut_extrude(ExtrusionParameters(depth=length)),
     )
     name_last_feature(adapter, "Sec1Keyseat")
     length_dim = name_dimensions(adapter, "Sec1Keyseat", ["Sec1KeyseatLength"])
@@ -624,7 +624,7 @@ async def _cut_keyseat(adapter: Any, drive_jobs: list[tuple[str, str]]) -> float
     return keyseat_area() * length
 
 
-async def _cut_keyseat_end(adapter: Any, drive_jobs: list[tuple[str, str]]) -> float:
+def _cut_keyseat_end(adapter: Any, drive_jobs: list[tuple[str, str]]) -> float:
     """Close the keyseat's collar end with the end mill's semicircle and
     return the volume removed.
 
@@ -657,14 +657,14 @@ async def _cut_keyseat_end(adapter: Any, drive_jobs: list[tuple[str, str]]) -> f
     half = cone_land_key.KEYSEAT_WIDTH_MM / 2.0
     check(
         "create_plane Sec1KeyseatEndPlane",
-        await adapter.create_plane(
+        adapter.create_plane(
             CreatePlaneParameters(mode="offset", base_plane="Right Plane", offset=reach)
         ),
     )
     name_last_feature(adapter, "Sec1KeyseatEndPlane")
     profile = "Sec1KeyseatEndProfile"
     dims = SketchDims()
-    check(f"create_sketch {label}", await adapter.create_sketch("Sec1KeyseatEndPlane"))
+    check(f"create_sketch {label}", adapter.create_sketch("Sec1KeyseatEndPlane"))
     centre = _sketch_xy_mm(adapter, (reach, 0.0, KEYSEAT_END_STATION))
     face = _sketch_xy_mm(adapter, (reach, 0.0, COLLAR_END_STATION))
     corner = _sketch_xy_mm(adapter, (reach, -radius, COLLAR_END_STATION))
@@ -685,19 +685,19 @@ async def _cut_keyseat_end(adapter: Any, drive_jobs: list[tuple[str, str]]) -> f
         if along_x
         else ("vertical_distance", "horizontal_distance")
     )
-    (collar_line,) = await add_line_chain(adapter, [face, corner], close=False)
+    (collar_line,) = add_line_chain(adapter, [face, corner], close=False)
     _as_construction(adapter, collar_line)
     check(
         f"{label} collar line square to the axis",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             collar_line, None, "vertical" if along_x else "horizontal"
         ),
     )
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{collar_line}.start", face[0], face[1], f"{label} collar face"
     )
     dims.record("Sec1KeyseatCollarFace", KEYSEAT_COLLAR_FACE_EXPRESSION)
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{collar_line}.start",
         f"{collar_line}.end",
@@ -710,19 +710,19 @@ async def _cut_keyseat_end(adapter: Any, drive_jobs: list[tuple[str, str]]) -> f
     prev_add_to_db = bool(sketch_mgr.AddToDB)
     sketch_mgr.AddToDB = True
     try:
-        circle = await adapter.add_circle(centre[0], centre[1], half)
+        circle = adapter.add_circle(centre[0], centre[1], half)
         check(f"add_circle {label}", circle)
     finally:
         sketch_mgr.AddToDB = prev_add_to_db
     check(
         f"{label} centre on the axis",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{circle.data}.center",
             "origin",
             "horizontal_points" if along_x else "vertical_points",
         ),
     )
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{collar_line}.end",
         f"{circle.data}.center",
@@ -733,16 +733,16 @@ async def _cut_keyseat_end(adapter: Any, drive_jobs: list[tuple[str, str]]) -> f
     dims.record("Sec1KeyseatEndSet", KEYSEAT_END_SET_EXPRESSION)
     check(
         f"dimension {label} diameter",
-        await adapter.add_sketch_dimension(circle.data, None, "diameter", 2.0 * half),
+        adapter.add_sketch_dimension(circle.data, None, "diameter", 2.0 * half),
     )
     dims.record("Sec1KeyseatEndDia", '"Sec1KeyseatW"')
-    await ensure_fully_defined(adapter, f"{label} sketch")
-    check(f"exit_sketch {label}", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, f"{label} sketch")
+    check(f"exit_sketch {label}", adapter.exit_sketch())
     name_last_feature(adapter, profile)
     drive_jobs += dims.apply(adapter, profile)
     check(
         f"cut {label}",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(
                 depth=2.0 * (reach - floor_offset), both_directions=True
             )
@@ -769,7 +769,7 @@ def _sketch_xy_mm(
     return data[0] * 1000.0, data[1] * 1000.0
 
 
-async def _cut_socket(adapter: Any, drive_jobs: list[tuple[str, str]]) -> float:
+def _cut_socket(adapter: Any, drive_jobs: list[tuple[str, str]]) -> float:
     """Cut the reamed socket for T006's spigot and return the volume removed.
 
     An on-axis ``SocketDia`` circle on Sec2EndPlane (the shaft's end), cut
@@ -780,8 +780,8 @@ async def _cut_socket(adapter: Any, drive_jobs: list[tuple[str, str]]) -> float:
 
     label = f"socket d{SOCKET_DIA:g}mm x {SOCKET_DEPTH:g}mm"
     dims = SketchDims()
-    check(f"create_sketch {label}", await adapter.create_sketch("Sec2EndPlane"))
-    await define_circle(
+    check(f"create_sketch {label}", adapter.create_sketch("Sec2EndPlane"))
+    define_circle(
         adapter,
         0.0,
         0.0,
@@ -791,13 +791,13 @@ async def _cut_socket(adapter: Any, drive_jobs: list[tuple[str, str]]) -> float:
         names=("SocketCx", "SocketCz", "SocketDia"),
         drives=(None, None, '"SocketDia"'),
     )
-    await ensure_fully_defined(adapter, f"{label} sketch")
-    check(f"exit_sketch {label}", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, f"{label} sketch")
+    check(f"exit_sketch {label}", adapter.exit_sketch())
     name_last_feature(adapter, "SocketProfile")
     drive_jobs += dims.apply(adapter, "SocketProfile")
     check(
         f"cut {label}",
-        await adapter.create_cut_extrude(ExtrusionParameters(depth=SOCKET_DEPTH)),
+        adapter.create_cut_extrude(ExtrusionParameters(depth=SOCKET_DEPTH)),
     )
     name_last_feature(adapter, "Socket")
     depth_dim = name_dimensions(adapter, "Socket", ["SocketDepth"])

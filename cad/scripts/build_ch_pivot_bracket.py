@@ -231,25 +231,25 @@ def _as_construction(adapter, entity_id: str) -> None:
         raise RuntimeError(f"{entity_id} did not take the construction flag")
 
 
-async def _reference_line(
+def _reference_line(
     adapter, sketch, plane, dimension, start, end, orientation, value, drives
 ) -> list[tuple[str, str]]:
     """One hidden-reference sketch: a construction line whose driving
     dimension IS ``value``; returns its deferred drive jobs
     (build_dt_arbor_pedestal's idiom)."""
-    check(f"create_sketch {sketch}", await adapter.create_sketch(plane))
+    check(f"create_sketch {sketch}", adapter.create_sketch(plane))
     # Direct-to-DB: the line lies on an outline edge and runs along a sketch
     # axis direction, so creation-time inference would snap in the relations
     # added below and over-define the sketch.
     set_sketch_direct_db(adapter, True)
-    line = check(f"{sketch} line", await adapter.add_line(*start, *end))
+    line = check(f"{sketch} line", adapter.add_line(*start, *end))
     set_sketch_direct_db(adapter, False)
     _as_construction(adapter, line)
     check(
         f"{sketch} {orientation}",
-        await adapter.add_sketch_constraint(line, None, orientation),
+        adapter.add_sketch_constraint(line, None, orientation),
     )
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{line}.start",
         f"{line}.end",
@@ -257,9 +257,9 @@ async def _reference_line(
         value,
         sketch,
     )
-    await anchor_point_to_origin(adapter, f"{line}.start", *start, sketch)
-    await ensure_fully_defined(adapter, f"{sketch} sketch")
-    check(f"exit_sketch {sketch}", await adapter.exit_sketch())
+    anchor_point_to_origin(adapter, f"{line}.start", *start, sketch)
+    ensure_fully_defined(adapter, f"{sketch} sketch")
+    check(f"exit_sketch {sketch}", adapter.exit_sketch())
     name_last_feature(adapter, sketch)
     names = [dimension, *(f"{dimension}Anchor{i}" for i in range(1, len(drives)))]
     full = name_dimensions(adapter, sketch, names)
@@ -316,24 +316,24 @@ def _corner_radius_max_limit(adapter) -> None:
     _telemetry.success(f"{label}: single limit {CORNER_R_MAX:g} MAX")
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). mm suffix load-bearing (INCH document).
-    await set_global(adapter, "FootW", f"{FOOT_W}mm")
-    await set_global(adapter, "FootH", f"{FOOT_H}mm")
-    await set_global(adapter, "FootZ1", f"{FOOT_Z1}mm")
-    await set_global(adapter, "HoleZ", f"{HOLE_Z}mm")
-    await set_global(adapter, "EarW", f"{EAR_W}mm")
-    await set_global(adapter, "EarT", f"{EAR_T}mm")
-    await set_global(adapter, "BoreH", f"{BORE_H}mm")
-    await set_global(adapter, "TopH", f"{EAR_TOP_Y}mm")
-    await set_global(adapter, "BoreDia", f"{BORE_DIA}mm")
-    await set_global(adapter, "HoleDia", f"{HOLE_DIA}mm")
-    await set_global(adapter, "CornerR", f"{CORNER_R_MAX}mm")
+    set_global(adapter, "FootW", f"{FOOT_W}mm")
+    set_global(adapter, "FootH", f"{FOOT_H}mm")
+    set_global(adapter, "FootZ1", f"{FOOT_Z1}mm")
+    set_global(adapter, "HoleZ", f"{HOLE_Z}mm")
+    set_global(adapter, "EarW", f"{EAR_W}mm")
+    set_global(adapter, "EarT", f"{EAR_T}mm")
+    set_global(adapter, "BoreH", f"{BORE_H}mm")
+    set_global(adapter, "TopH", f"{EAR_TOP_Y}mm")
+    set_global(adapter, "BoreDia", f"{BORE_DIA}mm")
+    set_global(adapter, "HoleDia", f"{HOLE_DIA}mm")
+    set_global(adapter, "CornerR", f"{CORNER_R_MAX}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -344,32 +344,32 @@ async def build(adapter) -> dict[str, str]:
     half_w = FOOT_W / 2.0
     foot_z1 = FOOT_Z1
     foot = SketchDims()
-    check("create_sketch foot", await adapter.create_sketch("Top"))
+    check("create_sketch foot", adapter.create_sketch("Top"))
     rect = [
         (-half_w, -foot_z1),
         (half_w, -foot_z1),
         (half_w, -FOOT_Z0),
         (-half_w, -FOOT_Z0),
     ]
-    lines = await add_line_chain(adapter, rect)
-    await define_rectilinear_chain(
+    lines = add_line_chain(adapter, rect)
+    define_rectilinear_chain(
         adapter, lines, rect, label="foot", dims=foot,
         names=["FootW", "FootLen", "FootAnchorX", "FootAnchorZ"],
         drives=['"FootW"', '"FootZ1" + "EarT" / 2', '"FootW" / 2', '"FootZ1"'],
     )
-    await ensure_fully_defined(adapter, "foot sketch")
-    check("exit_sketch foot", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "foot sketch")
+    check("exit_sketch foot", adapter.exit_sketch())
     name_last_feature(adapter, "FootProfile")
     drive_jobs += foot.apply(adapter, "FootProfile")
     check(
         "extrude foot",
-        await adapter.create_extrusion(ExtrusionParameters(depth=FOOT_H)),
+        adapter.create_extrusion(ExtrusionParameters(depth=FOOT_H)),
     )
     name_last_feature(adapter, "Foot")
     foot_ht_dim = name_dimensions(adapter, "Foot", ["FootHt"])
     drive_jobs.append((foot_ht_dim[0], '"FootH"'))
     expected = V_FOOT
-    await volume_check(adapter, "foot", expected, 0.005 * expected)
+    volume_check(adapter, "foot", expected, 0.005 * expected)
 
     # Ear block: Front-plane rectangle x +-EAR_W/2, y FOOT_H..the arch centre
     # (ARCH_LIFT over the bore), extruded both ways (EAR_T total) -- its Z
@@ -378,15 +378,15 @@ async def build(adapter) -> dict[str, str]:
     # corner anchor (x, z).
     half_e = EAR_W / 2.0
     ear = SketchDims()
-    check("create_sketch ear", await adapter.create_sketch("Front"))
+    check("create_sketch ear", adapter.create_sketch("Front"))
     ear_rect = [
         (-half_e, FOOT_H),
         (half_e, FOOT_H),
         (half_e, ARCH_CENTER_Y),
         (-half_e, ARCH_CENTER_Y),
     ]
-    ear_lines = await add_line_chain(adapter, ear_rect)
-    await define_rectilinear_chain(
+    ear_lines = add_line_chain(adapter, ear_rect)
+    define_rectilinear_chain(
         adapter, ear_lines, ear_rect, label="ear", dims=ear,
         names=["EarW", "EarRise", "EarAnchorX", "EarAnchorZ"],
         drives=[
@@ -396,13 +396,13 @@ async def build(adapter) -> dict[str, str]:
             '"FootH"',
         ],
     )
-    await ensure_fully_defined(adapter, "ear sketch")
-    check("exit_sketch ear", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "ear sketch")
+    check("exit_sketch ear", adapter.exit_sketch())
     name_last_feature(adapter, "EarProfile")
     drive_jobs += ear.apply(adapter, "EarProfile")
     check(
         "extrude ear",
-        await adapter.create_extrusion(
+        adapter.create_extrusion(
             ExtrusionParameters(depth=EAR_T, both_directions=True)
         ),
     )
@@ -412,7 +412,7 @@ async def build(adapter) -> dict[str, str]:
     ear_thick_dim = name_dimensions(adapter, "Ear", ["EarThick"])
     drive_jobs.append((ear_thick_dim[0], '"EarT"'))
     expected += V_BLOCK
-    await volume_check(adapter, "ear block", expected, 0.005 * V_BLOCK)
+    volume_check(adapter, "ear block", expected, 0.005 * V_BLOCK)
 
     # Ear arch: a full O EAR_W boss on the block's top edge (ARCH_LIFT over
     # the bore), the block's own width, merged over it -- its lower half lies
@@ -421,48 +421,48 @@ async def build(adapter) -> dict[str, str]:
     # is the RADIUS the print gives the arch (a sheet must never flip a model
     # diameter radial).
     arch = SketchDims()
-    check("create_sketch arch", await adapter.create_sketch("Front"))
-    await define_circle(
+    check("create_sketch arch", adapter.create_sketch("Front"))
+    define_circle(
         adapter, 0.0, ARCH_CENTER_Y, EAR_ARCH_R, "ear arch",
         dims=arch, names=("ArchCx", "ArchCz", "ArchRadius"),
         drives=(None, '"TopH" - "EarW" / 2', '"EarW" / 2'),
         size_dimension="radius",
     )
-    await ensure_fully_defined(adapter, "arch sketch")
-    check("exit_sketch arch", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "arch sketch")
+    check("exit_sketch arch", adapter.exit_sketch())
     name_last_feature(adapter, "ArchProfile")
     drive_jobs += arch.apply(adapter, "ArchProfile")
     check(
         "extrude arch",
-        await adapter.create_extrusion(
+        adapter.create_extrusion(
             ExtrusionParameters(depth=EAR_T, both_directions=True)
         ),
     )
     name_last_feature(adapter, "Arch")
     expected += V_ARCH
-    await volume_check(adapter, "ear arch", expected, 0.01 * V_ARCH)
+    volume_check(adapter, "ear arch", expected, 0.01 * V_ARCH)
 
     # Shaft cross-bore along Z at (0, BORE_H), through the ear.
     bore = SketchDims()
-    check("create_sketch bore", await adapter.create_sketch("Front"))
-    await define_circle(
+    check("create_sketch bore", adapter.create_sketch("Front"))
+    define_circle(
         adapter, 0.0, BORE_H, BORE_DIA / 2.0, "shaft bore",
         dims=bore, names=("BoreCx", "BoreCz", "ShaftBoreDia"),
         drives=(None, '"BoreH"', '"BoreDia"'),
     )
-    await ensure_fully_defined(adapter, "bore sketch")
-    check("exit_sketch bore", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "bore sketch")
+    check("exit_sketch bore", adapter.exit_sketch())
     name_last_feature(adapter, "ShaftBoreProfile")
     drive_jobs += bore.apply(adapter, "ShaftBoreProfile")
     check(
         "cut bore",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=EAR_T + 2.0, both_directions=True)
         ),
     )
     name_last_feature(adapter, "ShaftBore")
     expected -= V_BORE
-    await volume_check(adapter, "shaft bore", expected, 0.02 * V_BORE)
+    volume_check(adapter, "shaft bore", expected, 0.02 * V_BORE)
 
     # Apex set-screw tap (user, 2026-10-10): ONE native #4-40 tapped hole
     # drilled radially down through the arch apex on the ear's mid-plane and
@@ -480,7 +480,7 @@ async def build(adapter) -> dict[str, str]:
         point_planes=("Front Plane", "Right Plane"),
     )
     expected -= V_TAP
-    await volume_check(adapter, "apex set-screw tap", expected, 0.03 * V_TAP)
+    volume_check(adapter, "apex set-screw tap", expected, 0.03 * V_TAP)
 
     # Hold-down hole through the foot: a Top-plane circle on x = 0 (sketch
     # (u, v) = model (X, -Z)), cut both ways past the foot height. A
@@ -490,23 +490,23 @@ async def build(adapter) -> dict[str, str]:
     # oil-hole station idiom); the circle's centre sits on its end.
     hole_z = HOLE_Z
     hole = SketchDims()
-    check("create_sketch hole", await adapter.create_sketch("Top"))
+    check("create_sketch hole", adapter.create_sketch("Top"))
     set_sketch_direct_db(adapter, True)
     station = check(
         "hold-down hole station line",
-        await adapter.add_line(0.0, -FOOT_Z0, 0.0, -hole_z),
+        adapter.add_line(0.0, -FOOT_Z0, 0.0, -hole_z),
     )
     set_sketch_direct_db(adapter, False)
     _as_construction(adapter, station)
     check(
         "hold-down hole station vertical",
-        await adapter.add_sketch_constraint(station, None, "vertical"),
+        adapter.add_sketch_constraint(station, None, "vertical"),
     )
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{station}.start", 0.0, -FOOT_Z0, "hole datum at the inboard face"
     )
     hole.record("HoleDatum", '"EarT" / 2')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{station}.start",
         f"{station}.end",
@@ -521,34 +521,34 @@ async def build(adapter) -> dict[str, str]:
     try:
         circle = check(
             "hold-down hole circle",
-            await adapter.add_circle(0.0, -hole_z, HOLE_DIA / 2.0),
+            adapter.add_circle(0.0, -hole_z, HOLE_DIA / 2.0),
         )
     finally:
         sketch_mgr.AddToDB = prev_add_to_db
     check(
         "hold-down hole centre on the station",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{circle}.center", f"{station}.end", "coincident"
         ),
     )
     check(
         "hold-down hole diameter",
-        await adapter.add_sketch_dimension(circle, None, "diameter", HOLE_DIA),
+        adapter.add_sketch_dimension(circle, None, "diameter", HOLE_DIA),
     )
     hole.record("HoleDia", '"HoleDia"')
-    await ensure_fully_defined(adapter, "hole sketch")
-    check("exit_sketch hole", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "hole sketch")
+    check("exit_sketch hole", adapter.exit_sketch())
     name_last_feature(adapter, "HoleProfile")
     drive_jobs += hole.apply(adapter, "HoleProfile")
     check(
         "cut hole",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=2.0 * FOOT_H + 2.0, both_directions=True)
         ),
     )
     name_last_feature(adapter, "HoldDownHole")
     expected -= V_HOLE
-    await volume_check(adapter, "hold-down hole", expected, 0.02 * V_HOLE)
+    volume_check(adapter, "hold-down hole", expected, 0.02 * V_HOLE)
 
     # Foot-to-ear inside corner (drawing-guidelines.md rule 16): the edge where
     # the foot top meets the ear's outboard face, filleted AT the largest
@@ -556,7 +556,7 @@ async def build(adapter) -> dict[str, str]:
     # print gives as a single MAX limit.
     check(
         "fillet foot-to-ear corner",
-        await adapter.add_fillet(
+        adapter.add_fillet(
             CORNER_R_MAX, [[0.0, FOOT_H, EAR_T / 2.0]], propagate=False
         ),
     )
@@ -564,22 +564,22 @@ async def build(adapter) -> dict[str, str]:
     corner_dim = name_dimensions(adapter, "CornerFillet", ["CornerRadius"])
     drive_jobs.append((corner_dim[0], '"CornerR"'))
     expected += V_CORNER
-    await volume_check(adapter, "foot-to-ear corner fillet", expected, 0.1 * V_CORNER)
+    volume_check(adapter, "foot-to-ear corner fillet", expected, 0.1 * V_CORNER)
 
     for row in REFERENCE_LINES:
-        drive_jobs += await _reference_line(adapter, *row)
+        drive_jobs += _reference_line(adapter, *row)
 
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    volume_check(
         adapter, "driven bracket (equations neutral)", V_TOTAL, 0.005 * V_TOTAL
     )
     _hide_reference_sketches(adapter)
 
-    await apply_material(adapter, MATERIAL)
-    await apply_color(adapter, PANEL_BLACK)
+    apply_material(adapter, MATERIAL)
+    apply_color(adapter, PANEL_BLACK)
 
     # Decimal places are the tolerance statement, so the PART carries them
     # (drawing-simplicity-policy.md `How the repository implements the
@@ -603,13 +603,13 @@ async def build(adapter) -> dict[str, str]:
         display_unit=UNIT,
     )
 
-    await report_mass_properties(adapter)
+    report_mass_properties(adapter)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(adapter, PART_NAME)
-    return await save_part_and_images(adapter, PART_NAME)
+    return save_part_and_images(adapter, PART_NAME)
 
 if __name__ == "__main__":
     sys.exit(run_build(build))

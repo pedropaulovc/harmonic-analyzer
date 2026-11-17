@@ -27,9 +27,9 @@ from _session import run_build  # noqa: E402
 from build_pd_paper_drive_assembly import _insert_roller_chain  # noqa: E402
 
 
-async def build(adapter) -> dict[str, str]:
-    check("create_assembly", await adapter.create_assembly())
-    await _insert_roller_chain(adapter)
+def build(adapter) -> dict[str, str]:
+    check("create_assembly", adapter.create_assembly())
+    _insert_roller_chain(adapter)
 
     png_dir = OUT_PNG / "diag-chain"
     png_dir.mkdir(parents=True, exist_ok=True)
@@ -38,7 +38,7 @@ async def build(adapter) -> dict[str, str]:
         img = (png_dir / f"diag-chain_{view}.png").resolve()
         check(
             f"export_image {view}",
-            await adapter.export_image(
+            adapter.export_image(
                 {
                     "file_path": str(img),
                     "format_type": "png",

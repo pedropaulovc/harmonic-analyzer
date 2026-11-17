@@ -495,11 +495,11 @@ def _drop_section_caption_scale(adapter: Any, section: Any) -> None:
         )
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open crank-handle-butt-cup source", await adapter.open_model(str(SOURCE)))
+    check("open crank-handle-butt-cup source", adapter.open_model(str(SOURCE)))
     read_required_properties(
         adapter.currentModel,
         (
@@ -599,7 +599,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_POS)
     if add_note(adapter, NOTES_TEXT, *POCKET_NOTE_POS) is None:
         raise RuntimeError("failed to add the pocket and body flag notes")
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Crank Handle Butt Cup Manufacturing Drawing",

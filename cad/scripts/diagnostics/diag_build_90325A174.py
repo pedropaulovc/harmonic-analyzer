@@ -137,39 +137,39 @@ def _tail_body(boxes: list[dict]) -> str:
 
 
 @stock_recipe("90325A174", threaded=True)
-async def build_90325A174(adapter, truth=None):
+def build_90325A174(adapter, truth=None):
     from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
 
     # --- base solid -----------------------------------------------------------
-    check("create_sketch head", await adapter.create_sketch("Top"))
-    await define_circle(adapter, 0.0, 0.0, HEAD_DIA / 2.0, "head")
-    check("exit_sketch head", await adapter.exit_sketch())
+    check("create_sketch head", adapter.create_sketch("Top"))
+    define_circle(adapter, 0.0, 0.0, HEAD_DIA / 2.0, "head")
+    check("exit_sketch head", adapter.exit_sketch())
     name_last_feature(adapter, "HeadProfile")
     check(
         "extrude head",
-        await adapter.create_extrusion(ExtrusionParameters(depth=HEAD_H)),
+        adapter.create_extrusion(ExtrusionParameters(depth=HEAD_H)),
     )
     v = math.pi * (HEAD_DIA / 2.0) ** 2 * HEAD_H
-    volume = await volume_check(adapter, "head", v, 0.005 * v)
+    volume = volume_check(adapter, "head", v, 0.005 * v)
 
-    check("create_sketch shoulder", await adapter.create_sketch("Top"))
-    await define_circle(adapter, 0.0, 0.0, SHOULDER_R, "shoulder")
-    check("exit_sketch shoulder", await adapter.exit_sketch())
+    check("create_sketch shoulder", adapter.create_sketch("Top"))
+    define_circle(adapter, 0.0, 0.0, SHOULDER_R, "shoulder")
+    check("exit_sketch shoulder", adapter.exit_sketch())
     name_last_feature(adapter, "ShoulderProfile")
     extrude_at_offset(adapter, SHOULDER_LEN, -SHOULDER_LEN)
     v = math.pi * SHOULDER_R**2 * SHOULDER_LEN
-    volume = await volume_check(adapter, "shoulder", volume + v, 0.005 * v)
+    volume = volume_check(adapter, "shoulder", volume + v, 0.005 * v)
 
-    check("create_sketch shank", await adapter.create_sketch("Top"))
-    await define_circle(adapter, 0.0, 0.0, MAJOR_R, "thread shank")
-    check("exit_sketch shank", await adapter.exit_sketch())
+    check("create_sketch shank", adapter.create_sketch("Top"))
+    define_circle(adapter, 0.0, 0.0, MAJOR_R, "thread shank")
+    check("exit_sketch shank", adapter.exit_sketch())
     name_last_feature(adapter, "ShankProfile")
     extrude_at_offset(adapter, THREAD_LEN, -UNDERHEAD_LEN)
     v = math.pi * MAJOR_R**2 * THREAD_LEN
-    volume = await volume_check(adapter, "thread shank", volume + v, 0.005 * v)
+    volume = volume_check(adapter, "thread shank", volume + v, 0.005 * v)
 
     # --- thread neck (fillet + land + 45 deg flank) -----------------------------
-    check("create_sketch neck", await adapter.create_sketch("Front"))
+    check("create_sketch neck", adapter.create_sketch("Front"))
     sk_mgr = adapter.currentSketchManager
     with no_sketch_inference(adapter):
         axis = sk_mgr.CreateCenterLine(
@@ -195,7 +195,7 @@ async def build_90325A174(adapter, truth=None):
         )
         if arc is None:
             raise RuntimeError(f"{PART_NO} neck: fillet arc failed")
-        await add_line_chain(
+        add_line_chain(
             adapter,
             [
                 (NECK_R, Y_LAND_TOP),
@@ -208,23 +208,23 @@ async def build_90325A174(adapter, truth=None):
         )
     finally:
         sk_mgr.AddToDB = prev_db
-    check("exit_sketch neck", await adapter.exit_sketch())
+    check("exit_sketch neck", adapter.exit_sketch())
     name_last_feature(adapter, "ThreadNeckProfile")
     check(
         "revolve-cut neck",
-        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
+        adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
     )
     name_last_feature(adapter, "ThreadNeck")
     v = _undercut_volume(MAJOR_R, NECK_R, NECK_LAND)
-    volume = await volume_check(adapter, "thread neck", volume - v, 0.01 * v)
+    volume = volume_check(adapter, "thread neck", volume - v, 0.01 * v)
 
     # --- hex socket, blind down from the head top --------------------------------
     offset_plane(adapter, "HeadTop", HEAD_H)
-    check("create_sketch socket", await adapter.create_sketch("HeadTop"))
+    check("create_sketch socket", adapter.create_sketch("HeadTop"))
     flat = SOCKET_AF / 2.0
     corner = SOCKET_CORNER_R
     with no_sketch_inference(adapter):
-        await add_line_chain(
+        add_line_chain(
             adapter,
             [
                 (0.0, corner),
@@ -235,14 +235,14 @@ async def build_90325A174(adapter, truth=None):
                 (flat, corner / 2.0),
             ],
         )
-    check("exit_sketch socket", await adapter.exit_sketch())
+    check("exit_sketch socket", adapter.exit_sketch())
     name_last_feature(adapter, "SocketProfile")
     check(
         "cut hex socket",
-        await adapter.create_cut_extrude(ExtrusionParameters(depth=SOCKET_DEPTH)),
+        adapter.create_cut_extrude(ExtrusionParameters(depth=SOCKET_DEPTH)),
     )
     name_last_feature(adapter, "HexSocket")
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "hex socket", volume - SOCKET_VOLUME, 0.02 * SOCKET_VOLUME
     )
 
@@ -250,7 +250,7 @@ async def build_90325A174(adapter, truth=None):
     # 91829A560's proven flags in this frame: Clockwised=False is a right-hand
     # thread, start azimuth +X on the Front plane's cutter.
     offset_plane(adapter, "TipPlane", -UNDERHEAD_LEN)
-    check("create_sketch helix seed", await adapter.create_sketch("TipPlane"))
+    check("create_sketch helix seed", adapter.create_sketch("TipPlane"))
     with no_sketch_inference(adapter):
         seed = adapter.currentSketchManager.CreateCircleByRadius(
             0.0, 0.0, 0.0, MAJOR_R / 1000.0
@@ -271,19 +271,19 @@ async def build_90325A174(adapter, truth=None):
     head_r = HEAD_DIA / 2.0
     check(
         "chamfer head rim",
-        await adapter.add_chamfer(HEAD_CHAMFER, [[0.0, HEAD_H, head_r]]),
+        adapter.add_chamfer(HEAD_CHAMFER, [[0.0, HEAD_H, head_r]]),
     )
     name_last_feature(adapter, "HeadChamfer")
     v = math.pi * HEAD_CHAMFER**2 * (head_r - HEAD_CHAMFER / 3.0)
-    volume = await volume_check(adapter, "head chamfer", volume - v, 0.03 * v)
+    volume = volume_check(adapter, "head chamfer", volume - v, 0.03 * v)
 
     check(
         "chamfer thread start",
-        await adapter.add_chamfer(TIP_CHAMFER, [[MAJOR_R, -UNDERHEAD_LEN, 0.0]]),
+        adapter.add_chamfer(TIP_CHAMFER, [[MAJOR_R, -UNDERHEAD_LEN, 0.0]]),
     )
     name_last_feature(adapter, "TipChamfer")
     v = math.pi * TIP_CHAMFER**2 * (MAJOR_R - TIP_CHAMFER / 3.0)
-    await volume_check(adapter, "tip chamfer", volume - v, 0.02 * v)
+    volume_check(adapter, "tip chamfer", volume - v, 0.02 * v)
 
     # --- split at the land bottom -------------------------------------------------
     offset_plane(adapter, "SplitPlane", Y_LAND_BOT)
@@ -291,8 +291,8 @@ async def build_90325A174(adapter, truth=None):
     _telemetry.info(f"tail body: {tail}")
 
     # --- thread groove --------------------------------------------------------------
-    check("create_sketch cutter", await adapter.create_sketch("Front"))
-    await add_line_chain(
+    check("create_sketch cutter", adapter.create_sketch("Front"))
+    add_line_chain(
         adapter,
         [
             (CUT_TOP_R, CUT_CENTRE_Y + CUT_TOP_W / 2.0),
@@ -301,7 +301,7 @@ async def build_90325A174(adapter, truth=None):
             (CUT_TOP_R, CUT_CENTRE_Y - CUT_TOP_W / 2.0),
         ],
     )
-    check("exit_sketch cutter", await adapter.exit_sketch())
+    check("exit_sketch cutter", adapter.exit_sketch())
     name_last_feature(adapter, "ThreadCutter")
     thread_sweep_cut(
         adapter, "ThreadCutter", "ThreadHelix", tail, "ThreadGroove", tangency=(0, 0)

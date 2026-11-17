@@ -146,7 +146,7 @@ def main():
         for path in (str(script), *module_deps_of(script))
     } - {str(Path(recipe.__file__))})
 
-    async def probe(adapter):
+    def probe(adapter):
         app = adapter.swApp
         if app.GetDocuments() or app.ActiveDoc is not None:
             raise RuntimeError("requires an empty seat; no documents closed")
@@ -267,10 +267,10 @@ def main():
         original_attempt = adapter._attempt
         observed_attempt = instrument_attempt(original_attempt, checkpoint)
 
-        async def observed_open(path):
+        def observed_open(path):
             nonlocal source_model
             checkpoint("before:open_model")
-            result = await original_open(path)
+            result = original_open(path)
             source_model = _early_bound(adapter.currentModel, "IModelDoc2")
             if source_model is None or Path(str(source_model.GetPathName())).resolve() != source:
                 raise RuntimeError("open did not return this trial's source")
@@ -312,7 +312,7 @@ def main():
                     operation = wrap(name, getattr(recipe, name)) if args.mode in modes else omitted(name)
                     patches.enter_context(patch.object(recipe, name, operation))
                 try:
-                    await recipe.build(adapter)
+                    recipe.build(adapter)
                 except PreparationBoundary:
                     pass
                 else:

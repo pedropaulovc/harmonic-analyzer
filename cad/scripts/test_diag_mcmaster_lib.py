@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -46,11 +45,11 @@ class _Adapter:
         except Exception:
             return default
 
-    async def save_file(self, _path: str):
+    def save_file(self, _path: str):
         self._events.append("save_file")
         return SimpleNamespace(is_success=True, data=None, error=None)
 
-    async def open_model(self, path: str):
+    def open_model(self, path: str):
         assert self.currentModel is None, "previous document was not closed"
         self._events.append(f"open:{Path(path).name}")
         self.currentModel = _Model(self._events)
@@ -79,7 +78,7 @@ def test_stl_arbitration_closes_each_document_before_open_or_compare(
     monkeypatch.setattr(diag, "vendor_face_areas", lambda _truth: [1200.0])
     monkeypatch.setattr(diag, "_early_bound", lambda obj, _name: obj)
 
-    async def _export_views(_adapter, _stem: str) -> dict[str, str]:
+    def _export_views(_adapter, _stem: str) -> dict[str, str]:
         events.append("export_views")
         return {}
 
@@ -99,7 +98,7 @@ def test_stl_arbitration_closes_each_document_before_open_or_compare(
         },
     }
 
-    asyncio.run(diag.gate_and_save(adapter, part_no, truth))
+    diag.gate_and_save(adapter, part_no, truth)
 
     assert events == [
         "save_file",
@@ -189,13 +188,13 @@ class _WeldedSeat:
             is_success=True, data=f"{kind}_{self._next_id}", error=None
         )
 
-    async def add_line(self, _x1, _y1, _x2, _y2):
+    def add_line(self, _x1, _y1, _x2, _y2):
         return self._register("Line")
 
-    async def add_arc(self, _cx, _cy, _x1, _y1, _x2, _y2):
+    def add_arc(self, _cx, _cy, _x1, _y1, _x2, _y2):
         return self._register("Arc")
 
-    async def add_sketch_constraint(self, entity1, entity2, relation, entity3=None):
+    def add_sketch_constraint(self, entity1, entity2, relation, entity3=None):
         return SimpleNamespace(
             is_success=False,
             data=None,
@@ -218,10 +217,8 @@ def test_a_profile_authors_fully_on_a_seat_that_refuses_every_merge() -> None:
     """
     segments = flare_profile()
 
-    ids = asyncio.run(
-        diag.draw_closed_profile(adapter := _WeldedSeat(), segments,
+    ids = diag.draw_closed_profile(adapter := _WeldedSeat(), segments,
                                  label="flare lens", loops=1)
-    )
 
     assert len(ids) == len(segments)
     assert adapter.drawn == [

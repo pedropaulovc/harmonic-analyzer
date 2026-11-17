@@ -8,7 +8,6 @@ emitted primitives/dimension equations, not native constraint solving or COM.
 from __future__ import annotations
 
 import ast
-import asyncio
 import copy
 import math
 import re
@@ -29,13 +28,13 @@ from test_pd_transgear_adapter_contract import (
 )
 
 RECIPE = Path(__file__).with_name("build_sm_summing_lever.py")
-Function = ast.FunctionDef | ast.AsyncFunctionDef
+Function = ast.FunctionDef | ast.FunctionDef
 
 
 def _scope(tree: ast.Module, call: ast.Call) -> Function:
     functions = [
         node for node in ast.walk(tree)
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        if isinstance(node, (ast.FunctionDef,))
         and node.lineno <= call.lineno <= node.end_lineno
     ]
     assert functions, f"adapter call outside a function at {call.lineno}"
@@ -104,7 +103,7 @@ def test_every_lever_adapter_call_exists_and_binds_to_the_pinned_sdk_mro() -> No
     assert not _missing(tree), f"undeclared lever adapter calls: {sorted(_missing(tree))}"
     changed = next(
         node for node in tree.body
-        if isinstance(node, ast.AsyncFunctionDef) and node.name == "_rib_profile_sketch"
+        if isinstance(node, ast.FunctionDef) and node.name == "_rib_profile_sketch"
     )
     changed_calls = _adapter_calls(changed)
     assert {"add_line", "add_arc", "add_sketch_constraint", "add_sketch_dimension"} <= {
@@ -122,7 +121,7 @@ def test_lever_census_rejects_a_nonexistent_changed_call_without_importing_recip
     tree = copy.deepcopy(_tree(RECIPE))
     helper = next(
         node for node in tree.body
-        if isinstance(node, ast.AsyncFunctionDef) and node.name == "_rib_profile_sketch"
+        if isinstance(node, ast.FunctionDef) and node.name == "_rib_profile_sketch"
     )
     calls = [call for call in _adapter_calls(helper) if call.func.attr == "add_arc"]
     assert len(calls) == 1  # The helper emits every profile arc through this call.
@@ -134,7 +133,7 @@ def test_lever_signature_binding_rejects_a_missing_geometry_argument() -> None:
     tree = copy.deepcopy(_tree(RECIPE))
     helper = next(
         node for node in tree.body
-        if isinstance(node, ast.AsyncFunctionDef) and node.name == "_rib_profile_sketch"
+        if isinstance(node, ast.FunctionDef) and node.name == "_rib_profile_sketch"
     )
     call = next(call for call in _adapter_calls(helper) if call.func.attr == "add_line")
     call.args.pop()
@@ -161,24 +160,24 @@ class _SketchRecorder:
         self.primitives[identifier] = (kind, values)
         return self._result(identifier)
 
-    async def create_sketch(self, plane):
+    def create_sketch(self, plane):
         return self._result(None)
 
-    async def add_line(self, x1, y1, x2, y2):
+    def add_line(self, x1, y1, x2, y2):
         return self._primitive("line", (x1, y1, x2, y2))
 
-    async def add_arc(self, cx, cy, x1, y1, x2, y2):
+    def add_arc(self, cx, cy, x1, y1, x2, y2):
         return self._primitive("arc", (cx, cy, x1, y1, x2, y2))
 
-    async def add_sketch_constraint(self, first, second, relation):
+    def add_sketch_constraint(self, first, second, relation):
         self.constraints.append((first, second, relation))
         return self._result(None)
 
-    async def add_sketch_dimension(self, first, second, kind, value):
+    def add_sketch_dimension(self, first, second, kind, value):
         self.dimensions.append((first, second, kind, value))
         return self._result(None)
 
-    async def exit_sketch(self):
+    def exit_sketch(self):
         return self._result(None)
 
 
@@ -186,7 +185,7 @@ def _extracted_sketch(section: profile.RibProfile, *, mutation: str | None = Non
     """Compile only this source function, with no top-level recipe execution."""
     helper = copy.deepcopy(next(
         node for node in _tree(RECIPE).body
-        if isinstance(node, ast.AsyncFunctionDef) and node.name == "_rib_profile_sketch"
+        if isinstance(node, ast.FunctionDef) and node.name == "_rib_profile_sketch"
     ))
     if mutation == "omit_tangency":
         loop = next(
@@ -214,13 +213,13 @@ def _extracted_sketch(section: profile.RibProfile, *, mutation: str | None = Non
         assert result.is_success, label
         return result.data
 
-    async def anchor(adapter, entity, x, y, label):
+    def anchor(adapter, entity, x, y, label):
         return None
 
-    async def distance(adapter, first, second, kind, value, label):
+    def distance(adapter, first, second, kind, value, label):
         recorder.distances.append((first, second, kind, value))
 
-    async def fully_defined(adapter, label):
+    def fully_defined(adapter, label):
         return None
 
     globals_ = {
@@ -312,7 +311,7 @@ def test_extracted_builder_emits_actual_g1_primitives_and_dimension_equations(
 ) -> None:
     helper, recorder = _extracted_sketch(section)
     jobs = []
-    asyncio.run(helper(recorder, stem, jobs, middle=middle))
+    helper(recorder, stem, jobs, middle=middle)
     _assert_recorded_sketch(recorder, section, middle, jobs)
 
 
@@ -320,7 +319,7 @@ def test_extracted_builder_emits_actual_g1_primitives_and_dimension_equations(
 def test_extracted_sketch_contract_rejects_real_primitive_mutations(mutation: str) -> None:
     helper, recorder = _extracted_sketch(profile.PROFILE, mutation=mutation)
     jobs = []
-    asyncio.run(helper(recorder, "MiddleRib", jobs, middle=True))
+    helper(recorder, "MiddleRib", jobs, middle=True)
     with pytest.raises(AssertionError):
         _assert_recorded_sketch(recorder, profile.PROFILE, True, jobs)
 
@@ -429,7 +428,7 @@ def _source_helpers(names: tuple[str, ...], **bindings):
     for name in dict.fromkeys(dependencies + names):
         function = copy.deepcopy(next(
             node for node in _tree(RECIPE).body
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == name
+            if isinstance(node, (ast.FunctionDef,)) and node.name == name
         ))
         imports = [node for node in function.body if isinstance(node, ast.ImportFrom)]
         assert all(node.module in {
@@ -486,19 +485,19 @@ def _source_helpers(names: tuple[str, ...], **bindings):
 def test_extracted_all_three_rib_operations_share_depth_and_drive_equation(rib_t: float) -> None:
     extrusions, profiles, gates = [], [], []
 
-    async def sketch(adapter, stem, jobs, *, middle=False):
+    def sketch(adapter, stem, jobs, *, middle=False):
         profiles.append((stem, middle))
 
-    async def measured(adapter, label):
+    def measured(adapter, label):
         return 1000.0
 
-    async def rebuild(adapter):
+    def rebuild(adapter):
         return None
 
-    async def gate(adapter, label, expected, tolerance):
+    def gate(adapter, label, expected, tolerance):
         gates.append((label, expected, tolerance))
 
-    async def middle_extrusion(parameters):
+    def middle_extrusion(parameters):
         extrusions.append(("middle", parameters.depth, parameters.both_directions))
         return SimpleNamespace(is_success=True)
 
@@ -520,8 +519,8 @@ def test_extracted_all_three_rib_operations_share_depth_and_drive_equation(rib_t
     adapter = SimpleNamespace(create_extrusion=middle_extrusion)
     jobs = []
     for flip, stem in ((False, "EdgeRibFront"), (True, "EdgeRibBack")):
-        asyncio.run(namespace["_edge_rib"](adapter, flip, stem, stem, jobs))
-    asyncio.run(namespace["_middle_rib"](adapter, jobs))
+        namespace["_edge_rib"](adapter, flip, stem, stem, jobs)
+    namespace["_middle_rib"](adapter, jobs)
     # Each rib's inner cap stands one thickness inside its own body end; the
     # -Z rib is the mirrored (flip) boss, so its offset is that cap's |Z|.
     assert extrusions == [
@@ -545,10 +544,10 @@ def test_extracted_taps_use_relocated_joint_axes_and_preserve_complete_pilot_vol
 
     cuts, gates = [], []
 
-    async def mass():
+    def mass():
         return SimpleNamespace(is_success=True, data=SimpleNamespace(volume=1000.0))
 
-    async def gate(adapter, label, expected, tolerance):
+    def gate(adapter, label, expected, tolerance):
         gates.append((expected, tolerance))
 
     namespace = _source_helpers(
@@ -557,7 +556,7 @@ def test_extracted_taps_use_relocated_joint_axes_and_preserve_complete_pilot_vol
         volume_check=gate,
     )
     adapter = SimpleNamespace(get_mass_properties=mass)
-    asyncio.run(namespace["_bracket_mounting_taps"](adapter))
+    namespace["_bracket_mounting_taps"](adapter)
     assert len(cuts) == 1
     arguments, options = cuts[0]
     assert arguments[:4] == (adapter, joint.TAP_SPEC, joint.LEVER_HOLE_POINTS, (0.0, 0.0, -1.0))
@@ -1110,11 +1109,11 @@ def test_extracted_root_operations_disable_propagation_and_gate_actual_added_vol
     operations = []
     proofs = []
 
-    async def fillet(radius, picks, *, propagate):
+    def fillet(radius, picks, *, propagate):
         operations.append((radius, picks, propagate))
         return SimpleNamespace(is_success=True, data=None)
 
-    async def volume(adapter, label):
+    def volume(adapter, label):
         return 1000.0 + (addition if label.startswith("after ") else 0.0)
 
     def check(label, result):
@@ -1133,11 +1132,11 @@ def test_extracted_root_operations_disable_propagation_and_gate_actual_added_vol
     adapter = SimpleNamespace(add_fillet=fillet)
     if addition <= 0.0 or addition > 1e6:
         with pytest.raises(RuntimeError, match="outside"):
-            asyncio.run(helper(adapter, jobs))
+            helper(adapter, jobs)
         assert not proofs
         assert len(operations) == 1  # No fallback or retry of rejected native geometry.
     else:
-        asyncio.run(helper(adapter, jobs))
+        helper(adapter, jobs)
         families = namespace["rib_root_edge_families"]()
         assert operations == [(spec.RIB_BLEND_R, picks, False) for _, picks, _ in families]
         assert proofs == [(name, len(picks)) for name, picks, _ in families]
@@ -1167,11 +1166,11 @@ def test_each_junction_family_has_its_own_increment_bound_without_relaxing_old_r
     upper = 2.0 * spec.RIB_BLEND_R**2 * length
     additions = {"within": upper * 0.5, "zero": 0.0, "negative": -1.0, "excess": upper + 0.01}
 
-    async def fillet(radius, picks, *, propagate):
+    def fillet(radius, picks, *, propagate):
         operations.append((radius, picks, propagate))
         return SimpleNamespace(is_success=True)
 
-    async def volume(adapter, label):
+    def volume(adapter, label):
         addition = additions[increment] if label == f"after {new_name}" else 1.0
         return 1000.0 + (addition if label.startswith("after ") else 0.0)
 
@@ -1185,10 +1184,10 @@ def test_each_junction_family_has_its_own_increment_bound_without_relaxing_old_r
     adapter = SimpleNamespace(add_fillet=fillet)
     applied = families
     if increment == "within":
-        asyncio.run(namespace["_rib_root_fillets"](adapter, []))
+        namespace["_rib_root_fillets"](adapter, [])
     else:
         with pytest.raises(RuntimeError, match="outside"):
-            asyncio.run(namespace["_rib_root_fillets"](adapter, []))
+            namespace["_rib_root_fillets"](adapter, [])
         applied = families[:index + 1]  # No later operation after a refused one.
     assert operations == [(spec.RIB_BLEND_R, picks, False) for _, picks, _ in applied]
 
@@ -1551,7 +1550,7 @@ def _recipe_namespace(functions: tuple[str, ...], **bindings) -> dict:
             for target in node.targets
         ):
             body.append(node)
-        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name in functions:
+        elif isinstance(node, (ast.FunctionDef,)) and node.name in functions:
             function = copy.deepcopy(node)
             function.body = [item for item in function.body if not isinstance(item, ast.ImportFrom)]
             body.append(function)
@@ -1573,19 +1572,19 @@ def _run_spring_row_sketch() -> tuple[dict, dict[str, tuple[str | None, float]],
             assert len(rows) == len(emitted), "recorded names drifted from emitted dims"
             return [(f"{name}@{feature}", drive) for name, drive in rows if drive]
 
-    async def distance(adapter, first, second, kind, value, label):
+    def distance(adapter, first, second, kind, value, label):
         emitted.append(value)
 
-    async def anchor(adapter, point, x, y, label):
+    def anchor(adapter, point, x, y, label):
         emitted.extend(abs(value) for value in (x, y) if value)
 
-    async def drive(adapter, name, expression):
+    def drive(adapter, name, expression):
         events.append(("drive", name, expression))
 
-    async def rebuild(adapter):
+    def rebuild(adapter):
         events.append(("rebuild",))
 
-    async def nothing(*args):
+    def nothing(*args):
         return None
 
     model = SimpleNamespace(
@@ -1610,7 +1609,7 @@ def _run_spring_row_sketch() -> tuple[dict, dict[str, tuple[str | None, float]],
         null_callout=lambda: None,
         _telemetry=SimpleNamespace(traced=lambda name: lambda function: function),
     )
-    asyncio.run(namespace["_spring_row_coordinates"](recorder))
+    namespace["_spring_row_coordinates"](recorder)
     dims = {name: (drive, value) for (name, drive), value in zip(rows, emitted)}
     return namespace, dims, events
 
@@ -1632,7 +1631,7 @@ def test_spring_row_sketch_restores_inference_when_a_line_fails() -> None:
         _telemetry=SimpleNamespace(traced=lambda name: lambda function: function),
     )
     with pytest.raises(RuntimeError, match="seed mark"):
-        asyncio.run(namespace["_spring_row_coordinates"](_SketchRecorder()))
+        namespace["_spring_row_coordinates"](_SketchRecorder())
     assert states == [True, False]
 
 
@@ -1667,7 +1666,7 @@ def test_spring_row_locators_are_driven_by_the_pattern_globals_and_evaluate_to_s
 def test_the_pattern_features_use_the_locators_own_expressions() -> None:
     plate = next(
         node for node in _tree(RECIPE).body
-        if isinstance(node, ast.AsyncFunctionDef) and node.name == "_coefficients_plate"
+        if isinstance(node, ast.FunctionDef) and node.name == "_coefficients_plate"
     )
     used = {node.id for node in ast.walk(plate) if isinstance(node, ast.Name)}
     assert set(_SPRING_EXPRS) <= used

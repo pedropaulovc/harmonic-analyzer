@@ -148,7 +148,7 @@ def _functions(tree: ast.Module) -> dict[str, ast.AST]:
     return {
         node.name: node
         for node in tree.body
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        if isinstance(node, (ast.FunctionDef,))
     }
 
 

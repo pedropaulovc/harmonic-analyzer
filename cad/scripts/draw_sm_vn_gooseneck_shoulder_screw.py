@@ -154,7 +154,7 @@ def _settled_right(adapter):
     return {name: rows[0] for name, rows in found.items()}
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     proofs = []
 
     def supplier_dimensions(adapter, views):
@@ -195,7 +195,7 @@ async def build(adapter) -> dict[str, str]:
             raise RuntimeError("supplier references omitted or repeated")
         proofs[0]()
 
-    return await build_purchased_fastener_drawing(
+    return build_purchased_fastener_drawing(
         adapter, SPEC, item=ITEM, cut_to_suit=False, number_fit=NumberFit.SHRINK_TO_CELL,
         view_layout=VIEW_LAYOUT, supplier_dimensions=supplier_dimensions,
         supplier_margins=SUPPLIER_MARGINS,

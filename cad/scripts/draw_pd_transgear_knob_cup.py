@@ -273,11 +273,11 @@ def _orient_section(adapter: Any, section: Any) -> None:
     )
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open knob-cup source", await adapter.open_model(str(SOURCE)))
+    check("open knob-cup source", adapter.open_model(str(SOURCE)))
     read_required_properties(
         adapter.currentModel,
         (
@@ -364,7 +364,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _add_placed_note(adapter, PIN_HOLE_NOTE, PIN_HOLE_NOTE_XY, "cross pin hole note")
 
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Transgear Knob Cup Manufacturing Drawing",

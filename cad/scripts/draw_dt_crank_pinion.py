@@ -458,11 +458,11 @@ SHEET_INNER_BORDER = (0.0127, 0.0127, 0.4191, 0.2667)
 MANUFACTURING_NOTES_XY = (0.016, 0.060)
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open crank-pinion source", await adapter.open_model(str(SOURCE)))
+    check("open crank-pinion source", adapter.open_model(str(SOURCE)))
     read_required_properties(
         adapter.currentModel,
         (
@@ -575,7 +575,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(
         adapter, "Manufacturing Notes", *MANUFACTURING_NOTES_XY, char_height=0.0025
     )
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Crank Pinion Manufacturing Drawing",

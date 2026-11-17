@@ -149,27 +149,27 @@ def _apply_redundant_normal_fit(adapter: Any) -> None:
     _telemetry.success("redundant normal HoleFit reproduced type 25 -> 26 corruption")
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     REPRO_DIR.mkdir(parents=True, exist_ok=True)
 
     with _telemetry.span("repro.part"):
-        check("create repro part", await adapter.create_part())
-        check("create plate sketch", await adapter.create_sketch("Front"))
+        check("create repro part", adapter.create_part())
+        check("create plate sketch", adapter.create_sketch("Front"))
         check(
             "add plate rectangle",
-            await adapter.add_rectangle(
+            adapter.add_rectangle(
                 -PLATE_WIDTH_MM / 2.0,
                 -PLATE_HEIGHT_MM / 2.0,
                 PLATE_WIDTH_MM / 2.0,
                 PLATE_HEIGHT_MM / 2.0,
             ),
         )
-        check("exit plate sketch", await adapter.exit_sketch())
+        check("exit plate sketch", adapter.exit_sketch())
         check(
             "extrude plate",
-            await adapter.create_extrusion(
+            adapter.create_extrusion(
                 ExtrusionParameters(depth=PLATE_THICKNESS_MM)
             ),
         )
@@ -191,7 +191,7 @@ async def build(adapter: Any) -> dict[str, str]:
             name="NumberDrillHole",
         )
         check(
-            f"save repro part -> {PART_PATH}", await adapter.save_file(str(PART_PATH))
+            f"save repro part -> {PART_PATH}", adapter.save_file(str(PART_PATH))
         )
 
     with _telemetry.span("repro.drawing"):

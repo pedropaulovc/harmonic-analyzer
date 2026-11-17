@@ -13,7 +13,7 @@ from _sketch import SketchDims, _record_origin_anchor, anchor_point_to_origin
 
 
 @_telemetry.traced("sketch.circle", label_param="label")
-async def define_circle(
+def define_circle(
     adapter: Any,
     x: float,
     y: float,
@@ -50,18 +50,18 @@ async def define_circle(
     prev_add_to_db = bool(sketch_mgr.AddToDB)
     sketch_mgr.AddToDB = True
     try:
-        circle = await adapter.add_circle(x, y, radius)
+        circle = adapter.add_circle(x, y, radius)
         check(f"add_circle {label}", circle)
     finally:
         sketch_mgr.AddToDB = prev_add_to_db
-    await anchor_point_to_origin(adapter, f"{circle.data}.center", x, y, label)
+    anchor_point_to_origin(adapter, f"{circle.data}.center", x, y, label)
     n_x, n_z, n_size = names or (None, None, None)
     d_x, d_z, d_size = drives or (None, None, None)
     _record_origin_anchor(dims, x, y, n_x, n_z, d_x, d_z)
     dimension_type, value = _CIRCLE_SIZE_DIMENSIONS[size_dimension](radius)
     check(
         f"dimension {label} {size_dimension}",
-        await adapter.add_sketch_dimension(circle.data, None, dimension_type, value),
+        adapter.add_sketch_dimension(circle.data, None, dimension_type, value),
     )
     if dims is not None:
         dims.record(n_size, d_size)

@@ -410,7 +410,7 @@ def _author_setting_callouts(adapter, feature: str) -> None:
             )
 
 
-async def _author_axle_stack_reference(adapter) -> None:
+def _author_axle_stack_reference(adapter) -> None:
     """The press gauge and the endshake as model dimensions: no solid or pose
     edits, one construction chain on the axle centreline through the bar front
     face, the shank step, the wheel's spigot face and the front washer
@@ -426,14 +426,14 @@ async def _author_axle_stack_reference(adapter) -> None:
         ("HubFrontStation", spec.HUB_FRONT_D),
         ("WheelEndshake", spec.ENDSHAKE),
     ):
-        await set_global(adapter, name, f"{value}mm")
+        set_global(adapter, name, f"{value}mm")
     xs = [-spec.BAR_FRONT_Z + d for d in spec.CHAIN_D]
     y = spec.AXLE_Y
     dims = SketchDims()
-    check("create axle stack sketch", await adapter.create_sketch("Right"))
+    check("create axle stack sketch", adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
     legs = [
-        check(f"axle stack leg {index}", await adapter.add_line(x0, y, x1, y))
+        check(f"axle stack leg {index}", adapter.add_line(x0, y, x1, y))
         for index, (x0, x1) in enumerate(zip(xs, xs[1:]))
     ]
     set_sketch_direct_db(adapter, False)
@@ -444,16 +444,16 @@ async def _author_axle_stack_reference(adapter) -> None:
             raise RuntimeError(f"axle stack leg {index} is not construction")
         check(
             f"axle stack leg {index} horizontal",
-            await adapter.add_sketch_constraint(leg, None, "horizontal"),
+            adapter.add_sketch_constraint(leg, None, "horizontal"),
         )
     for index, (leg, after) in enumerate(zip(legs, legs[1:])):
         check(
             f"axle stack leg {index} chained",
-            await adapter.add_sketch_constraint(
+            adapter.add_sketch_constraint(
                 f"{leg}.end", f"{after}.start", "coincident"
             ),
         )
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{legs[0]}.start", xs[0], y, "bar front face"
     )
     dims.record("StackFaceX", '"AxleBarFrontFace"')
@@ -468,15 +468,15 @@ async def _author_axle_stack_reference(adapter) -> None:
         ),
         strict=True,
     ):
-        await dimension_between(
+        dimension_between(
             adapter, f"{leg}.start", f"{leg}.end", "horizontal_distance", length, name
         )
         dims.record(name, drive)
-    await ensure_fully_defined(adapter, "axle stack")
-    check("exit axle stack sketch", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "axle stack")
+    check("exit axle stack sketch", adapter.exit_sketch())
     name_last_feature(adapter, spec.FEATURE)
     for name, expression in dims.apply(adapter, spec.FEATURE):
-        await drive_dimension(adapter, name, expression)
+        drive_dimension(adapter, name, expression)
     for name, band in spec.DIMENSION_TOLERANCES.items():
         set_dimension_symmetric_tolerance(
             adapter,
@@ -580,7 +580,7 @@ def _assert_thread_projection_faces(adapter, lever_name: str, bracket_name: str)
         raise RuntimeError(f"ThreadProjection endpoints do not lie on the actual installed face planes: {actual!r}, {expected!r}")
 
 
-async def _author_lever_setting_reference(adapter, *, lever_name: str, bracket_name: str) -> None:
+def _author_lever_setting_reference(adapter, *, lever_name: str, bracket_name: str) -> None:
     """The clamp station and the fixture drop as model dimensions: one
     construction chain on the Front plane (sketch x, y = machine x, y) from
     the lever rod's west tip along its axis to the clamp centre, then down the
@@ -595,17 +595,17 @@ async def _author_lever_setting_reference(adapter, *, lever_name: str, bracket_n
         ("LeverClampStation", spec.CLAMP_STATION),
         ("LeverFixtureDrop", spec.FIXTURE_DROP),
     ):
-        await set_global(adapter, name, f"{value}mm")
+        set_global(adapter, name, f"{value}mm")
     points = (
         (spec.LEVER_TIP_X, spec.LEVER_AXIS_Y),
         (spec.CLAMP_CENTRE_X, spec.LEVER_AXIS_Y),
         (spec.CLAMP_CENTRE_X, spec.FIXTURE_AXIS_Y),
     )
     dims = SketchDims()
-    check("create lever settings sketch", await adapter.create_sketch("Front"))
+    check("create lever settings sketch", adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     legs = [
-        check(f"lever settings leg {index}", await adapter.add_line(*p0, *p1))
+        check(f"lever settings leg {index}", adapter.add_line(*p0, *p1))
         for index, (p0, p1) in enumerate(zip(points, points[1:]))
     ]
     set_sketch_direct_db(adapter, False)
@@ -616,18 +616,18 @@ async def _author_lever_setting_reference(adapter, *, lever_name: str, bracket_n
             raise RuntimeError(f"lever settings leg {index} is not construction")
         check(
             f"lever settings leg {index} {relation}",
-            await adapter.add_sketch_constraint(leg, None, relation),
+            adapter.add_sketch_constraint(leg, None, relation),
         )
     check(
         "lever settings legs chained",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{legs[0]}.end", f"{legs[1]}.start", "coincident"
         ),
     )
-    await anchor_point_to_origin(adapter, f"{legs[0]}.start", *points[0], "lever tip")
+    anchor_point_to_origin(adapter, f"{legs[0]}.start", *points[0], "lever tip")
     dims.record("LeverTipX", '"LeverTipX"')
     dims.record("LeverAxisY", '"LeverAxisY"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{legs[0]}.start",
         f"{legs[0]}.end",
@@ -636,7 +636,7 @@ async def _author_lever_setting_reference(adapter, *, lever_name: str, bracket_n
         spec.CLAMP_STATION_DIMENSION,
     )
     dims.record(spec.CLAMP_STATION_DIMENSION, '"LeverClampStation"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{legs[1]}.start",
         f"{legs[1]}.end",
@@ -645,11 +645,11 @@ async def _author_lever_setting_reference(adapter, *, lever_name: str, bracket_n
         spec.FIXTURE_DROP_DIMENSION,
     )
     dims.record(spec.FIXTURE_DROP_DIMENSION, '"LeverFixtureDrop"')
-    await ensure_fully_defined(adapter, "lever settings")
-    check("exit lever settings sketch", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "lever settings")
+    check("exit lever settings sketch", adapter.exit_sketch())
     name_last_feature(adapter, spec.LEVER_FEATURE)
     for name, expression in dims.apply(adapter, spec.LEVER_FEATURE):
-        await drive_dimension(adapter, name, expression)
+        drive_dimension(adapter, name, expression)
     apply_drawing_precision(adapter, spec.LEVER_DRAWING_PRECISION)
     _author_setting_callouts(adapter, spec.LEVER_FEATURE)
     mark_dimensions_for_drawing(
@@ -669,18 +669,18 @@ async def _author_lever_setting_reference(adapter, *, lever_name: str, bracket_n
     # component transforms, not two constants that can agree with themselves.
     tip_x, far_face_x = _physical_thread_projection(adapter, lever_name, bracket_name)
     dims = SketchDims()
-    check("create threaded lever setting", await adapter.create_sketch("Front"))
-    leg = check("thread projection witness", await adapter.add_line(tip_x, spec.LEVER_AXIS_Y, far_face_x, spec.LEVER_AXIS_Y))
+    check("create threaded lever setting", adapter.create_sketch("Front"))
+    leg = check("thread projection witness", adapter.add_line(tip_x, spec.LEVER_AXIS_Y, far_face_x, spec.LEVER_AXIS_Y))
     segment = _early_bound(adapter._sketch_entities[leg], "ISketchSegment")
     segment.ConstructionGeometry = True
-    await anchor_point_to_origin(adapter, f"{leg}.start", tip_x, spec.LEVER_AXIS_Y, "flat threaded tip")
+    anchor_point_to_origin(adapter, f"{leg}.start", tip_x, spec.LEVER_AXIS_Y, "flat threaded tip")
     dims.record("ThreadedTipX")
     dims.record("ThreadAxisY")
-    check("thread projection along lever", await adapter.add_sketch_constraint(leg, None, "horizontal"))
-    await dimension_between(adapter, f"{leg}.start", f"{leg}.end", "horizontal_distance", spec.THREAD_PROJECTION, spec.THREAD_PROJECTION_DIMENSION)
+    check("thread projection along lever", adapter.add_sketch_constraint(leg, None, "horizontal"))
+    dimension_between(adapter, f"{leg}.start", f"{leg}.end", "horizontal_distance", spec.THREAD_PROJECTION, spec.THREAD_PROJECTION_DIMENSION)
     dims.record(spec.THREAD_PROJECTION_DIMENSION)
-    await ensure_fully_defined(adapter, "threaded lever setting")
-    check("exit threaded lever setting", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "threaded lever setting")
+    check("exit threaded lever setting", adapter.exit_sketch())
     name_last_feature(adapter, spec.THREAD_FEATURE)
     dims.apply(adapter, spec.THREAD_FEATURE)
     apply_drawing_precision(adapter, spec.THREAD_DRAWING_PRECISION)
@@ -693,13 +693,13 @@ async def _author_lever_setting_reference(adapter, *, lever_name: str, bracket_n
     _assert_thread_projection_faces(adapter, lever_name, bracket_name)
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     # Flip seeds + free-DOF contract: cad/config/assemblies/<ASM_NAME>.yaml.
     activate_assembly_contract(ASM_NAME)
     # Reset the free-DOF manifest buffer before any *_driver(free_dof_key=...)
     # call: each freed DOF is recorded (never authored) and persisted below.
     reset_dof_manifest()
-    check("create_assembly", await adapter.create_assembly())
+    check("create_assembly", adapter.create_assembly())
     apply_package_model_units(adapter, stack_spec.UNIT, label=ASM_NAME)
 
     # --- wheel bar + clamp ---------------------------------------------------
@@ -709,7 +709,7 @@ async def build(adapter) -> dict[str, str]:
     # at ONE column with a free end just past the pen hanger -- M6.8
     # 8-view pass). Span -8..+192 covers the axle (+53) and the hanger
     # strap top (+3..+19).
-    await place_component(
+    place_component(
         adapter,
         "mg-wheel-bar",
         [WHEEL_BAR_X0, WHEEL_BAR_Y, BAR_Z],
@@ -722,7 +722,7 @@ async def build(adapter) -> dict[str, str]:
     # clamp screws (heads on the bar's front face, ch30 p002) close the stack
     # bar -> front arc -> back arc. Ry(+90): the arcs' local +X faces machine -Z.
     for arc in ("sh-column-clamp-front", "sh-column-clamp-back"):
-        await place_component(
+        place_component(
             adapter,
             arc,
             [COLUMN_X, WHEEL_BAR_Y, COLUMN_Z],
@@ -735,7 +735,7 @@ async def build(adapter) -> dict[str, str]:
     # second Hole Wizard station; both stations derive from the same bar
     # constants.
     seed_x, patterned_x = sorted(CLAMP_SCREW_X)
-    clamp_seed = await place_component(
+    clamp_seed = place_component(
         adapter,
         "sh-vn-clamp-screw",
         [seed_x, WHEEL_BAR_Y, BAR_FRONT_Z],
@@ -743,7 +743,7 @@ async def build(adapter) -> dict[str, str]:
         IDENTITY,
         label=f"clamp-screw seed (wheel x{seed_x:+.1f})",
     )
-    clamp_instances = await linear_component_pattern(
+    clamp_instances = linear_component_pattern(
         adapter,
         [clamp_seed],
         axis="x",
@@ -764,7 +764,7 @@ async def build(adapter) -> dict[str, str]:
     # The lever pivots about the summing bar's knife-edge ridge (see the
     # knife-pivot block above); the rock drive spec uses the Top-plane angle
     # (Y-normal, mirror-invariant -> no flip).
-    ml = await place_component(
+    ml = place_component(
         adapter,
         "mg-magnifying-lever",
         [LEVER_X0, LEVER_ROD_Y, LEVER_ROD_Z],
@@ -783,7 +783,7 @@ async def build(adapter) -> dict[str, str]:
     # knife line, and the WIRE-1 yoke below turns the wheel with it. Same
     # mechanism as drive-train's crank spin. The threaded bracket follows
     # the same knife rock; it is not a loose guide or a second pivot.
-    await distance_driver(
+    distance_driver(
         adapter,
         named_ref(f"Axis2@{ml}", "AXIS"),
         named_ref("Right Plane", "PLANE"),
@@ -791,7 +791,7 @@ async def build(adapter) -> dict[str, str]:
         label="mag-lever knife line across",
         verify=(ml, ml_o),
     )
-    await distance_driver(
+    distance_driver(
         adapter,
         named_ref(f"Axis2@{ml}", "AXIS"),
         named_ref("Top Plane", "PLANE"),
@@ -799,7 +799,7 @@ async def build(adapter) -> dict[str, str]:
         label="mag-lever knife line height",
         verify=(ml, ml_o),
     )
-    await distance_driver(
+    distance_driver(
         adapter,
         named_ref(f"Front Plane@{ml}", "PLANE"),
         named_ref("Front Plane", "PLANE"),
@@ -807,7 +807,7 @@ async def build(adapter) -> dict[str, str]:
         label="mag-lever depth",
         verify=(ml, ml_o),
     )
-    await angle_driver(
+    angle_driver(
         adapter,
         named_ref(f"Top Plane@{ml}", "PLANE"),
         named_ref("Top Plane", "PLANE"),
@@ -820,7 +820,7 @@ async def build(adapter) -> dict[str, str]:
     # Its 1/4-20 thread is installed to the dimensioned depth, not a shoulder;
     # it is locked kinematically to the lever through the common rocking pose.
     # Grounding this moving fitting would constrain the mechanism incorrectly.
-    bracket = await place_component(
+    bracket = place_component(
         adapter,
         "mg-magnifying-bracket",
         list(BRACKET_ORIGIN),
@@ -828,7 +828,7 @@ async def build(adapter) -> dict[str, str]:
         IDENTITY,
         ground=False,
     )
-    await lock_mate(
+    lock_mate(
         adapter,
         named_ref(f"Front Plane@{bracket}", "PLANE"),
         named_ref(f"Front Plane@{ml}", "PLANE"),
@@ -837,7 +837,7 @@ async def build(adapter) -> dict[str, str]:
     # Stock shank is -Y: Rx(-90) points it +Z into the lever's front taps.
     # Heads bear on the flange's front face; both ride the knife-edge rock.
     for index, position in enumerate(BRACKET_SCREW_POSITIONS, start=1):
-        screw = await place_component(
+        screw = place_component(
             adapter,
             "mg-vn-magnifying-bracket-screw",
             list(position),
@@ -846,7 +846,7 @@ async def build(adapter) -> dict[str, str]:
             ground=False,
             label=f"magnifying-bracket screw {index}",
         )
-        await lock_mate(
+        lock_mate(
             adapter,
             named_ref(f"Front Plane@{screw}", "PLANE"),
             named_ref(f"Front Plane@{bracket}", "PLANE"),
@@ -862,7 +862,7 @@ async def build(adapter) -> dict[str, str]:
     # the lever, not stay fixed. Lock each to the lever.
     # Unrotated: the clamp's hex axis is already machine +Y and its lever bore
     # already runs along X through the corners.
-    clamp = await place_component(
+    clamp = place_component(
         adapter,
         "mg-magnifying-clamp",
         list(CLAMP_POS),
@@ -870,7 +870,7 @@ async def build(adapter) -> dict[str, str]:
         IDENTITY,
         ground=False,
     )
-    await lock_mate(
+    lock_mate(
         adapter,
         named_ref(f"Front Plane@{clamp}", "PLANE"),
         named_ref(f"Front Plane@{ml}", "PLANE"),
@@ -888,7 +888,7 @@ async def build(adapter) -> dict[str, str]:
     # Rz(-90) points the shank down the hex axis; the extra Ry(180) turns its head features to
     # the machine hand ([180, 0, -90] is the same rotation's Euler form).
     _rz90_ry180 = compose_rows(rot_z_rows(-90.0), ROT_Y_180)
-    tscrew = await place_component(
+    tscrew = place_component(
         adapter,
         "sh-vn-thumb-screw",
         [CLAMP_X, THUMB_SCREW_OUTER_FACE_Y, LEVER_ROD_Z],
@@ -897,13 +897,13 @@ async def build(adapter) -> dict[str, str]:
         ground=False,
         label="thumb-screw (clamp)",
     )
-    await lock_mate(
+    lock_mate(
         adapter,
         named_ref(f"Front Plane@{tscrew}", "PLANE"),
         named_ref(f"Front Plane@{clamp}", "PLANE"),
         label="thumb-screw locked to clamp",
     )
-    vrod = await place_component(
+    vrod = place_component(
         adapter,
         "mg-magnifying-vertical-rod",
         [CLAMP_X, VROD_TOP_Y, VROD_Z],
@@ -911,13 +911,13 @@ async def build(adapter) -> dict[str, str]:
         _rz90_ry180,
         ground=False,
     )
-    await lock_mate(
+    lock_mate(
         adapter,
         named_ref(f"Front Plane@{vrod}", "PLANE"),
         named_ref(f"Front Plane@{clamp}", "PLANE"),
         label="vertical-rod locked to clamp",
     )
-    fixture = await place_component(
+    fixture = place_component(
         adapter,
         "mg-output-fixture",
         list(FIXTURE_POSITION),
@@ -925,14 +925,14 @@ async def build(adapter) -> dict[str, str]:
         FIXTURE_ROWS,
         ground=False,
     )
-    await lock_mate(
+    lock_mate(
         adapter,
         named_ref(f"Front Plane@{fixture}", "PLANE"),
         named_ref(f"Front Plane@{vrod}", "PLANE"),
         label="output-fixture locked to vertical-rod",
     )
     assert_component_placed(adapter, fixture, list(FIXTURE_POSITION), FIXTURE_ROWS)
-    fixture_screw = await place_component(
+    fixture_screw = place_component(
         adapter,
         "sh-vn-thumb-screw",
         list(FIXTURE_SCREW_POSITION),
@@ -941,7 +941,7 @@ async def build(adapter) -> dict[str, str]:
         ground=False,
         label="thumb-screw (output fixture)",
     )
-    await lock_mate(
+    lock_mate(
         adapter,
         named_ref(f"Front Plane@{fixture_screw}", "PLANE"),
         named_ref(f"Front Plane@{fixture}", "PLANE"),
@@ -956,7 +956,7 @@ async def build(adapter) -> dict[str, str]:
     # front face, the origin; back end about flush). The pin is structure
     # (fixed, pressed in the bar's reamed bore); the wheel spins on its shank
     # (revolute).
-    ax = await place_component(
+    ax = place_component(
         adapter,
         "mg-wheel-axle",
         [WHEEL_X, WHEEL_BAR_Y, BAR_FRONT_Z],
@@ -964,12 +964,12 @@ async def build(adapter) -> dict[str, str]:
         ROT_X_NEG90,
     )
 
-    async def _stack_part(stem: str, d: float) -> None:
+    def _stack_part(stem: str, d: float) -> None:
         """A spacer/washer/nut on the pin at stack station d (mg_wheel_group):
         the part's local +Z axis (z 0..thickness, Front Plane at z 0) turned
         onto machine -Z by Ry(180), its back face at z BAR_FRONT_Z - d, fixed
         like the axle it sits on."""
-        await place_component(
+        place_component(
             adapter,
             stem,
             [WHEEL_X, WHEEL_BAR_Y, BAR_FRONT_Z - d],
@@ -978,9 +978,9 @@ async def build(adapter) -> dict[str, str]:
             label=f"{stem} d{d:.4g}",
         )
 
-    await _stack_part("mg-wheel-axle-spacer", SPACER_D)
-    await _stack_part("mg-vn-wheel-axle-back-washer", BACK_WASHER_D)
-    wh = await place_component(
+    _stack_part("mg-wheel-axle-spacer", SPACER_D)
+    _stack_part("mg-vn-wheel-axle-back-washer", BACK_WASHER_D)
+    wh = place_component(
         adapter,
         "mg-magnifying-wheel",
         [WHEEL_X, WHEEL_BAR_Y, WHEEL_MID_Z],
@@ -992,14 +992,14 @@ async def build(adapter) -> dict[str, str]:
     # Revolute: radial coincident (wheel axis Z || axle stud Z) + axial
     # distance(Front, |z|); the spin -- the old angle(Right, 0) rock snapshot --
     # is now pinned by the WIRE-1 yoke below, coupling it to the lever.
-    await coincident_mate(
+    coincident_mate(
         adapter,
         named_ref(f"Axis1@{wh}", "AXIS"),
         named_ref(f"Axis1@{ax}", "AXIS"),
         label="magnifying-wheel pivot",
         verify=(wh, wh_o),
     )
-    await distance_driver(
+    distance_driver(
         adapter,
         named_ref(f"Front Plane@{wh}", "PLANE"),
         named_ref("Front Plane", "PLANE"),
@@ -1009,7 +1009,7 @@ async def build(adapter) -> dict[str, str]:
     )
     # Brass drum pressed on the wheel's front spigot: rides the wheel.
     drum_target = [WHEEL_X, WHEEL_BAR_Y, DRUM_Z]
-    drum = await place_component(
+    drum = place_component(
         adapter,
         "mg-wheel-drum",
         drum_target,
@@ -1017,21 +1017,21 @@ async def build(adapter) -> dict[str, str]:
         IDENTITY,
         ground=False,
     )
-    await lock_mate(
+    lock_mate(
         adapter,
         named_ref(f"Front Plane@{drum}", "PLANE"),
         named_ref(f"Front Plane@{wh}", "PLANE"),
         label="wheel drum locked to the wheel",
     )
     # Front washer, nut and locknut close the stack at the set endshake.
-    await _stack_part("mg-vn-wheel-axle-front-washer", FRONT_WASHER_D)
-    await _stack_part("mg-vn-wheel-axle-nut", NUT_D)
-    await _stack_part("mg-vn-wheel-axle-nut", LOCKNUT_D)
+    _stack_part("mg-vn-wheel-axle-front-washer", FRONT_WASHER_D)
+    _stack_part("mg-vn-wheel-axle-nut", NUT_D)
+    _stack_part("mg-vn-wheel-axle-nut", LOCKNUT_D)
     # --- amplification wire 1 (fixture -> drum) ------------------------------
     # The straight rest-pose run leaves the fixture's spigot-groove front
     # tangent and grazes the brass drum's tangent; wraps are implied. Part
     # origin = the DRUM end, +Y toward the hook.
-    hw = await place_component(
+    hw = place_component(
         adapter,
         "sh-vn-music-wire",
         list(HUB_WIRE_END),
@@ -1051,7 +1051,7 @@ async def build(adapter) -> dict[str, str]:
     # drum end hugs the drum; the tip only creeps along its own axis (the
     # unmodeled wrap's pay-in/pay-out). Ref POINTs select via GetCorresponding
     # -- they do not resolve through name@comp strings.
-    await coincident_mate(
+    coincident_mate(
         adapter,
         component_named_ref(hw, "HookPoint", "POINT"),
         component_named_ref(fixture, "HookAnchorPoint", "POINT"),
@@ -1059,7 +1059,7 @@ async def build(adapter) -> dict[str, str]:
         verify=(hw, hw_o),
     )
     _assert_fixture_hook_anchor(adapter, fixture)
-    await distance_driver(
+    distance_driver(
         adapter,
         component_named_ref(hw, "Axis1", "AXIS"),
         component_named_ref(wh, "Axis1", "AXIS"),
@@ -1075,7 +1075,7 @@ async def build(adapter) -> dict[str, str]:
     # authority everywhere -- unlike the rest plane-plane angle, 0.74 deg = a
     # Jacobian extremum that authored satisfied but pinned NOTHING;
     # closure-replay catch 2026-07-05).
-    await distance_driver(
+    distance_driver(
         adapter,
         component_named_ref(hw, "HubPoint", "POINT"),
         named_ref("Front Plane", "PLANE"),
@@ -1087,7 +1087,7 @@ async def build(adapter) -> dict[str, str]:
         verify=(hw, hw_o),
         free_dof_key="wire_swing",
     )
-    await angle_driver(
+    angle_driver(
         adapter,
         named_ref(f"Front Plane@{hw}", "PLANE"),
         named_ref("Right Plane", "PLANE"),
@@ -1111,7 +1111,7 @@ async def build(adapter) -> dict[str, str]:
     # component_named_ref, not a name@comp string: a reference POINT does not
     # resolve through SelectByID2 string selection -- the GetCorresponding path
     # is how the Motion study selects its rim RefPoint too.
-    await coincident_mate(
+    coincident_mate(
         adapter,
         component_named_ref(wh, "WireYokePoint", "POINT"),
         named_ref(f"Top Plane@{hw}", "PLANE"),
@@ -1142,8 +1142,8 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         allowed_pairs=ALLOWED_PAIRS,
     )
-    await _author_axle_stack_reference(adapter)
-    await _author_lever_setting_reference(adapter, lever_name=ml, bracket_name=bracket)
+    _author_axle_stack_reference(adapter)
+    _author_lever_setting_reference(adapter, lever_name=ml, bracket_name=bracket)
     # Title-block identity for the assembly drawing (draw_mg_magnifier_assembly.py):
     # assembly_title_properties supplies the Title/Generator and TOL_* cells
     # finalize_drawing requires without consulting the part registry;
@@ -1174,7 +1174,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, views=stack_spec.DRAWING_STANDARD_VIEWS, label=ASM_NAME
     )
     remap_front_to_machine_front(adapter)
-    artefacts = await save_assembly_and_images(adapter, ASM_NAME)
+    artefacts = save_assembly_and_images(adapter, ASM_NAME)
     return artefacts
 
 

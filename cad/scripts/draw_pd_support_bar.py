@@ -1511,11 +1511,11 @@ def _add_slide_finishes(adapter: Any, face: Any, back: Any) -> None:
     )
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open support-bar source", await adapter.open_model(str(SOURCE)))
+    check("open support-bar source", adapter.open_model(str(SOURCE)))
     source_model = adapter.currentModel
     required = (
         "Number",
@@ -1680,7 +1680,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # The countersinks' stacked callouts restate the taps, so the Hole
     # Wizard's own "Tapped Hole" note is the one redundant automatic note.
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Support Bar Manufacturing Drawing",

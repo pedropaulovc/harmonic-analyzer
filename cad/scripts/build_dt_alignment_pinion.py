@@ -97,20 +97,20 @@ BORE_R = BORE_DIA / 2.0
 _WITNESS_STUB_MM = 1.0
 
 
-async def build(adapter) -> dict[str, str]:
-    check("create_part", await adapter.create_part())
+def build(adapter) -> dict[str, str]:
+    check("create_part", adapter.create_part())
     # #290: the row's inch calculation units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing: this
     # is an INCH document and the equation manager reads bare values in inches.
-    await set_global(adapter, "FaceWidth", f"{FACE_WIDTH}mm")
-    await set_global(adapter, "OutsideDia", f"{OUTSIDE_DIA}mm")
-    await set_global(adapter, "BoreDia", f"{BORE_DIA}mm")
+    set_global(adapter, "FaceWidth", f"{FACE_WIDTH}mm")
+    set_global(adapter, "OutsideDia", f"{OUTSIDE_DIA}mm")
+    set_global(adapter, "BoreDia", f"{BORE_DIA}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
-    disc = await build_stock_form_gear(adapter, STOCK_FORM, FACE_WIDTH)
+    disc = build_stock_form_gear(adapter, STOCK_FORM, FACE_WIDTH)
     v_gear = disc.volume
     blank_name = feature_name_by_type(adapter, "Extrusion")
     if not blank_name:
@@ -140,39 +140,39 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     bore = SketchDims()
-    check("create_sketch bore", await adapter.create_sketch("Front"))
-    await define_circle(
+    check("create_sketch bore", adapter.create_sketch("Front"))
+    define_circle(
         adapter, 0.0, 0.0, BORE_R, "arbor bore", dims=bore,
         names=("ArborBoreCx", "ArborBoreCz", "ArborBoreDia"),
         drives=(None, None, '"BoreDia"'),
     )
-    await ensure_fully_defined(adapter, "bore sketch")
-    check("exit_sketch bore", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "bore sketch")
+    check("exit_sketch bore", adapter.exit_sketch())
     name_last_feature(adapter, "ArborBoreProfile")
     drive_jobs += bore.apply(adapter, "ArborBoreProfile")
     check(
         "cut arbor bore",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=2.5 * FACE_WIDTH, both_directions=True)
         ),
     )
     name_last_feature(adapter, "ArborBore")
     v_bore = math.pi * BORE_R**2 * FACE_WIDTH
     expected = v_gear - v_bore
-    await volume_check(adapter, "arbor bore", expected, 0.02 * v_bore)
+    volume_check(adapter, "arbor bore", expected, 0.02 * v_bore)
 
-    await _add_outside_dia_reference(adapter, drive_jobs)
+    _add_outside_dia_reference(adapter, drive_jobs)
     # The stock-form gear's central reference axis (Axis1@alignment-pinion,
     # Top∩Right) is the pinion spin/lock axis used by the p2 swing group in
     # build_dt_drive_train_assembly -- same convention as the cone gears.
 
     # Deferred drive equations, then re-check neutrality
     # (each evaluates to the as-built value, so the geometry must not move).
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    volume_check(
         adapter, "driven alignment pinion (equations neutral)", expected, 0.02 * v_bore
     )
     # The printed tip band rides the side-view witness, not the Front-plane
@@ -197,8 +197,8 @@ async def build(adapter) -> dict[str, str]:
     )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
 
-    await apply_material(adapter, MATERIAL)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    report_mass_properties(adapter)
 
     # Mark the native blank, face and matched bore controls, then stamp the
     # title-block and gear-data properties consumed by the drawing.
@@ -216,10 +216,10 @@ async def build(adapter) -> dict[str, str]:
         },
     )
     blank_reference_sketches(adapter, REFERENCE_SKETCHES)
-    return await save_simplified_part(adapter, PART_NAME, disc.tooth_features)
+    return save_simplified_part(adapter, PART_NAME, disc.tooth_features)
 
 
-async def _add_outside_dia_reference(
+def _add_outside_dia_reference(
     adapter, drive_jobs: list[tuple[str, str]]
 ) -> None:
     """Hidden Right-plane witness of the tip diameter for the side view.
@@ -233,16 +233,16 @@ async def _add_outside_dia_reference(
     """
     radius = OUTSIDE_DIA / 2.0
     ref = SketchDims()
-    check("create_sketch outside-dia reference", await adapter.create_sketch("Right"))
+    check("create_sketch outside-dia reference", adapter.create_sketch("Right"))
     # Inference suppressed: the witness lies on the +Y tooth-tip edge.
     set_sketch_direct_db(adapter, True)
     axis = check(
         "outside-dia reference axis",
-        await adapter.add_centerline(0.0, 0.0, -FACE_WIDTH, 0.0),
+        adapter.add_centerline(0.0, 0.0, -FACE_WIDTH, 0.0),
     )
     witness = check(
         "outside-dia witness stub",
-        await adapter.add_line(0.0, radius, -_WITNESS_STUB_MM, radius),
+        adapter.add_line(0.0, radius, -_WITNESS_STUB_MM, radius),
     )
     set_sketch_direct_db(adapter, False)
     segment = _early_bound(adapter._sketch_entities[witness], "ISketchSegment")
@@ -252,19 +252,19 @@ async def _add_outside_dia_reference(
     for label, line in (("axis", axis), ("witness", witness)):
         check(
             f"outside-dia reference {label} horizontal",
-            await adapter.add_sketch_constraint(line, None, "horizontal"),
+            adapter.add_sketch_constraint(line, None, "horizontal"),
         )
     check(
         "outside-dia reference axis starts at the front face",
-        await adapter.add_sketch_constraint(f"{axis}.start", "origin", "coincident"),
+        adapter.add_sketch_constraint(f"{axis}.start", "origin", "coincident"),
     )
     check(
         "outside-dia witness starts at the front face",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{witness}.start", "origin", "vertical_points"
         ),
     )
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{axis}.start",
         f"{axis}.end",
@@ -274,7 +274,7 @@ async def _add_outside_dia_reference(
     )
     ref.record("WitnessSpan", '"FaceWidth"')
     # The stub's length only defines the sketch: auto-named, unmarked.
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{witness}.start",
         f"{witness}.end",
@@ -286,7 +286,7 @@ async def _add_outside_dia_reference(
     # Centerline to the witness's start POINT, as build_dt_crank_pinion: a
     # centerline-to-construction-line pick made a plain linear dimension
     # (farm r3 4e0aa5d74: "OutsideDia: new dimension is not diametric").
-    await add_diametric_linear_dimension(
+    add_diametric_linear_dimension(
         adapter,
         axis,
         f"{witness}.start",
@@ -294,8 +294,8 @@ async def _add_outside_dia_reference(
         "OutsideDia",
     )
     ref.record("OutsideDia", '"OutsideDia"')
-    await ensure_fully_defined(adapter, "outside-dia reference sketch")
-    check("exit_sketch outside-dia reference", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "outside-dia reference sketch")
+    check("exit_sketch outside-dia reference", adapter.exit_sketch())
     name_last_feature(adapter, OUTSIDE_DIA_REFERENCE)
     drive_jobs += ref.apply(adapter, OUTSIDE_DIA_REFERENCE)
 

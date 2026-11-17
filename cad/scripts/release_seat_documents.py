@@ -22,7 +22,7 @@ from typing import Any
 from _session import run_build
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     return {}
 
 

@@ -20,7 +20,7 @@ from _visibility import blank_sketch_feature
 
 
 @_telemetry.traced("sketch.stop_location", label_param="feature")
-async def location_reference(
+def location_reference(
     adapter: Any, *, feature: str, plane: str, spans: tuple[float, ...],
     station: float, names: tuple[str, ...],
 ) -> None:
@@ -29,31 +29,31 @@ async def location_reference(
     The first chord owns its span and the shared perpendicular station; later
     chords share its starting point and carry just their own baseline span.
     """
-    check(f"create sketch {feature}", await adapter.create_sketch(plane))
+    check(f"create sketch {feature}", adapter.create_sketch(plane))
     first = None
     for index, span in enumerate(spans):
-        (line,) = await add_line_chain(adapter, [(0.0, station), (span, station)], close=False)
+        (line,) = add_line_chain(adapter, [(0.0, station), (span, station)], close=False)
         segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
         segment.ConstructionGeometry = True
         if not segment.ConstructionGeometry:
             raise RuntimeError(f"{feature}: construction flag rejected")
-        check(feature, await adapter.add_sketch_constraint(line, None, "horizontal"))
-        await dimension_between(adapter, f"{line}.start", f"{line}.end",
+        check(feature, adapter.add_sketch_constraint(line, None, "horizontal"))
+        dimension_between(adapter, f"{line}.start", f"{line}.end",
                                 "horizontal_distance", abs(span), feature)
         if index == 0:
-            await anchor_point_to_origin(adapter, f"{line}.start", 0.0, station, feature)
+            anchor_point_to_origin(adapter, f"{line}.start", 0.0, station, feature)
             first = line
         else:
-            check(feature, await adapter.add_sketch_constraint(
+            check(feature, adapter.add_sketch_constraint(
                 f"{line}.start", f"{first}.start", "coincident"))
-    await ensure_fully_defined(adapter, feature)
-    check(f"exit sketch {feature}", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, feature)
+    check(f"exit sketch {feature}", adapter.exit_sketch())
     name_last_feature(adapter, feature)
     name_dimensions(adapter, feature, list(names))
 
 
 @_telemetry.traced("sketch.stop_rebate_profile")
-async def rebate_profile(adapter: Any, dims: SketchDims) -> None:
+def rebate_profile(adapter: Any, dims: SketchDims) -> None:
     """The X-through rebate's profile on the Right plane (local X is -Z).
 
     The profile owns the rebate's real edges: WindowWidth along the roof
@@ -64,62 +64,62 @@ async def rebate_profile(adapter: Any, dims: SketchDims) -> None:
     chords ghosted over the rebate ceiling and across the back wall (machinist
     review, run 20261024T043544205Z-432c211c).
     """
-    check("open rebate profile", await adapter.create_sketch("Right"))
+    check("open rebate profile", adapter.create_sketch("Right"))
     points = [
         (-spec.WINDOW_Z_MIN, spec.WINDOW_Y_MAX), (-spec.WINDOW_Z_MAX, spec.WINDOW_Y_MAX),
         (-spec.WINDOW_Z_MAX, spec.WINDOW_Y_MIN), (-spec.WINDOW_Z_MIN, spec.WINDOW_Y_MIN),
     ]
-    lines = await add_line_chain(adapter, points)
+    lines = add_line_chain(adapter, points)
     # Emission order: roof-underside span, back-face height, then the corner's
     # on-axis (Z=0) anchor, which adds only its height.
-    await define_rectilinear_chain(
+    define_rectilinear_chain(
         adapter, lines, points, label="open rebate", dims=dims,
         names=["WindowWidth", "WindowHeight", "WindowRoofStation"],
         drives=['"WindowWidth"', '"WindowHeight"', '"BlockHeight" - "RoofThickness"'],
     )
     # add_line_chain restores AddToDB even when the line is refused.
-    (wall,) = await add_line_chain(
+    (wall,) = add_line_chain(
         adapter, [points[1], (-spec.BLOCK_DEPTH, spec.WINDOW_Y_MAX)], close=False,
     )
     segment = _early_bound(adapter._sketch_entities[wall], "ISketchSegment")
     segment.ConstructionGeometry = True
     if not segment.ConstructionGeometry:
         raise RuntimeError("back wall construction flag rejected")
-    check("back wall", await adapter.add_sketch_constraint(wall, None, "horizontal"))
-    check("back wall", await adapter.add_sketch_constraint(
+    check("back wall", adapter.add_sketch_constraint(wall, None, "horizontal"))
+    check("back wall", adapter.add_sketch_constraint(
         f"{wall}.start", f"{lines[0]}.end", "coincident"))
-    await dimension_between(adapter, f"{wall}.start", f"{wall}.end",
+    dimension_between(adapter, f"{wall}.start", f"{wall}.end",
                             "horizontal_distance", spec.BACK_WALL_THICKNESS, "back wall")
     dims.record("BackWall", '"BlockDepth" - "WindowWidth"')
-    await ensure_fully_defined(adapter, "rebate profile")
-    check("exit rebate profile", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "rebate profile")
+    check("exit rebate profile", adapter.exit_sketch())
 
 
 @_telemetry.traced("sketch.stop_relief_profile")
-async def relief_profile(adapter: Any, dims: SketchDims) -> None:
+def relief_profile(adapter: Any, dims: SketchDims) -> None:
     """The X-through corner relief's profile on the Right plane (local X is -Z).
 
     A notch into the back wall under the roof, from the rebate's back corner:
     ReliefDepth along the roof underside, then ReliefHeight down the notch.
     """
-    check("open relief profile", await adapter.create_sketch("Right"))
+    check("open relief profile", adapter.create_sketch("Right"))
     back = spec.WINDOW_Z_MAX + spec.RELIEF_DEPTH
     low = spec.WINDOW_Y_MAX - spec.RELIEF_HEIGHT
     points = [
         (-spec.WINDOW_Z_MAX, spec.WINDOW_Y_MAX), (-back, spec.WINDOW_Y_MAX),
         (-back, low), (-spec.WINDOW_Z_MAX, low),
     ]
-    lines = await add_line_chain(adapter, points)
+    lines = add_line_chain(adapter, points)
     # Emission order: depth along the roof, notch height, then the corner's
     # origin anchor (Z station, then roof station).
-    await define_rectilinear_chain(
+    define_rectilinear_chain(
         adapter, lines, points, label="corner relief", dims=dims,
         names=["ReliefDepth", "ReliefHeight", "ReliefWindowStation", "ReliefRoofStation"],
         drives=['"ReliefDepth"', '"ReliefHeight"', '"WindowWidth"',
                 '"BlockHeight" - "RoofThickness"'],
     )
-    await ensure_fully_defined(adapter, "relief profile")
-    check("exit relief profile", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "relief profile")
+    check("exit relief profile", adapter.exit_sketch())
 
 
 @_telemetry.traced("appearance.stop_reference_sketches")
@@ -163,29 +163,29 @@ def author_hole_precision(adapter: Any, feature_name: str) -> None:
 
 
 @_telemetry.traced("sketch.stop_roof_thickness")
-async def roof_reference(adapter: Any) -> list[tuple[str, str]]:
+def roof_reference(adapter: Any) -> list[tuple[str, str]]:
     """Direct roof thickness on the lip's cover-side face (Z=0).
 
     The chord lies on the real lip edge, so the shown construction line hides
     under the outline instead of ghosting through the lip at the rebate wall.
     """
     feature = "RoofThicknessReference"
-    check(feature, await adapter.create_sketch("Right"))
+    check(feature, adapter.create_sketch("Right"))
     # add_line_chain restores AddToDB even when the line is refused.
-    (line,) = await add_line_chain(adapter, [
+    (line,) = add_line_chain(adapter, [
         (-spec.WINDOW_Z_MIN, spec.WINDOW_Y_MAX), (-spec.WINDOW_Z_MIN, spec.BLOCK_HEIGHT),
     ], close=False)
     segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
     segment.ConstructionGeometry = True
     if not segment.ConstructionGeometry:
         raise RuntimeError("roof reference construction flag rejected")
-    check(feature, await adapter.add_sketch_constraint(line, None, "vertical"))
-    await dimension_between(adapter, f"{line}.start", f"{line}.end",
+    check(feature, adapter.add_sketch_constraint(line, None, "vertical"))
+    dimension_between(adapter, f"{line}.start", f"{line}.end",
                             "vertical_distance", spec.ROOF_THICKNESS, feature)
-    await anchor_point_to_origin(adapter, f"{line}.start",
+    anchor_point_to_origin(adapter, f"{line}.start",
                                  -spec.WINDOW_Z_MIN, spec.WINDOW_Y_MAX, feature)
-    await ensure_fully_defined(adapter, feature)
-    check(feature, await adapter.exit_sketch())
+    ensure_fully_defined(adapter, feature)
+    check(feature, adapter.exit_sketch())
     name_last_feature(adapter, feature)
     # WINDOW_Z_MIN is 0: the start point's on-axis anchor adds only its station.
     names = name_dimensions(adapter, feature, ["RoofThickness", "RoofWindowStation"])

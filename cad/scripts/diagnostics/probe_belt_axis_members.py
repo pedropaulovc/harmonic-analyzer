@@ -160,9 +160,9 @@ def _recreate_belt_axis_members(adapter: Any, crank_wheel: str, knob_wheel: str)
     return result.data
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     asm = OUT_SLDASM / "pd-paper-drive.SLDASM"
-    check("open paper-drive", await adapter.open_model(str(asm)))
+    check("open paper-drive", adapter.open_model(str(asm)))
     try:
         roles = _removables_by_role(adapter)
         crank_wheel, knob_wheel = roles["crank"], roles["knob"]
@@ -180,7 +180,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter._attempt(lambda: adapter.currentModel.ForceRebuild3(False), default=None)
         radii2 = _read_path_radii(adapter)
         info(f"new belt path sketch radii (m): {radii2}")
-        ratio = await _measure_ratio(adapter, crank_wheel, knob_wheel, "E-axis-members")
+        ratio = _measure_ratio(adapter, crank_wheel, knob_wheel, "E-axis-members")
         if abs(ratio - 0.5) <= 0.01:
             success(f"AXIS-MEMBER BELT COUPLES AT PITCH -- ratio {ratio:+.4f}")
         else:

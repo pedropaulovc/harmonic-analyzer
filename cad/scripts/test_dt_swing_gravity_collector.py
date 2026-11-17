@@ -187,8 +187,8 @@ def test_export_units_refuse_scaling_or_origin_guessing(tmp_path, units, origin)
         encoding="utf-8",
     )
     (scripts / "_part_save.py").write_text(
-        "async def export_part_stl(adapter):\n"
-        "    await enforce_preferences(adapter, STL_EXPORT_PREFERENCES)\n",
+        "def export_part_stl(adapter):\n"
+        "    enforce_preferences(adapter, STL_EXPORT_PREFERENCES)\n",
         encoding="utf-8",
     )
     with pytest.raises(RuntimeError, match="swMM|part-local origin"):

@@ -37,7 +37,7 @@ def spring_pin_volume(size: tuple[float, float], wall_t: float) -> float:
     return math.pi * (dia**2 - spring_pin_bore(size, wall_t) ** 2) / 4.0 * length
 
 
-async def build_spring_pin(adapter, size: tuple[float, float], wall_t: float) -> None:
+def build_spring_pin(adapter, size: tuple[float, float], wall_t: float) -> None:
     if __package__:
         from . import _script_paths  # noqa: F401
     else:
@@ -49,17 +49,17 @@ async def build_spring_pin(adapter, size: tuple[float, float], wall_t: float) ->
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     dia, length = size
-    check("create_sketch pin section", await adapter.create_sketch("Right"))
-    await define_circle(adapter, 0.0, 0.0, dia / 2.0, "pin OD")
-    await define_circle(adapter, 0.0, 0.0, spring_pin_bore(size, wall_t) / 2.0, "pin bore")
-    check("exit_sketch pin section", await adapter.exit_sketch())
+    check("create_sketch pin section", adapter.create_sketch("Right"))
+    define_circle(adapter, 0.0, 0.0, dia / 2.0, "pin OD")
+    define_circle(adapter, 0.0, 0.0, spring_pin_bore(size, wall_t) / 2.0, "pin bore")
+    check("exit_sketch pin section", adapter.exit_sketch())
     name_last_feature(adapter, "PinSection")
     check(
         "extrude pin",
-        await adapter.create_extrusion(
+        adapter.create_extrusion(
             ExtrusionParameters(depth=length, both_directions=True)
         ),
     )
     name_last_feature(adapter, "PinBody")
     volume = spring_pin_volume(size, wall_t)
-    await volume_check(adapter, "spring pin tube", volume, 0.005 * volume)
+    volume_check(adapter, "spring pin tube", volume, 0.005 * volume)

@@ -245,7 +245,7 @@ def _add_flank_reference(
 
 
 @_telemetry.traced("part.index_plate_countersink")
-async def _countersink(
+def _countersink(
     adapter: Any, *, plane: str, x: float, y: float, x_drive: str
 ) -> list[tuple[str, str]]:
     """Revolve-cut the 82 degree countersink on ``plane`` (model Y = ``y``):
@@ -260,7 +260,7 @@ async def _countersink(
 
     label = "countersink"
     dims = SketchDims()
-    check(f"create_sketch {label}", await adapter.create_sketch(plane))
+    check(f"create_sketch {label}", adapter.create_sketch(plane))
     to_sketch = _sketch_mapper(adapter, u_axis=0, v_axis=2, label=label)
     origin = to_sketch((0.0, y, 0.0))
     if origin != (0.0, 0.0):
@@ -275,17 +275,17 @@ async def _countersink(
     set_sketch_direct_db(adapter, True)
     axis = check(
         f"{label} axis",
-        await adapter.add_centerline(
+        adapter.add_centerline(
             *profile[0], *to_sketch((x, y, THICKNESS + AXIS_OVERRUN))
         ),
     )
-    lines = await add_line_chain(adapter, profile)
+    lines = add_line_chain(adapter, profile)
     set_sketch_direct_db(adapter, False)
     face, flank, axis_side = lines
     for i in range(len(lines)):
         check(
             f"{label} junction {i}",
-            await adapter.add_sketch_constraint(
+            adapter.add_sketch_constraint(
                 f"{lines[i]}.end", f"{lines[(i + 1) % len(lines)]}.start", "coincident"
             ),
         )
@@ -297,9 +297,9 @@ async def _countersink(
     ):
         check(
             f"{label} {relation} {first}",
-            await adapter.add_sketch_constraint(first, second, relation),
+            adapter.add_sketch_constraint(first, second, relation),
         )
-    await dimension_between(
+    dimension_between(
         adapter,
         "origin",
         f"{face}.start",
@@ -308,7 +308,7 @@ async def _countersink(
         f"{label} station",
     )
     dims.record("CskX", x_drive)
-    await dimension_between(
+    dimension_between(
         adapter,
         "origin",
         f"{face}.start",
@@ -317,7 +317,7 @@ async def _countersink(
         f"{label} on the front face",
     )
     dims.record("CskFace", '"PlateThick"')
-    await add_diametric_linear_dimension(
+    add_diametric_linear_dimension(
         adapter,
         axis,
         f"{flank}.start",
@@ -325,7 +325,7 @@ async def _countersink(
         f"{label} mouth diameter",
     )
     dims.record("CskMouthDia", '"CskDia"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{flank}.start",
         f"{flank}.end",
@@ -354,22 +354,22 @@ async def _countersink(
     dims.record("CskFlankAngle")
     check(
         f"{label} axis length",
-        await adapter.add_sketch_dimension(axis, None, "linear", AXIS_OVERRUN),
+        adapter.add_sketch_dimension(axis, None, "linear", AXIS_OVERRUN),
     )
     dims.record("CskAxisLength")
-    await ensure_fully_defined(adapter, f"{label} profile")
-    check(f"exit_sketch {label}", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, f"{label} profile")
+    check(f"exit_sketch {label}", adapter.exit_sketch())
     name_last_feature(adapter, "CountersinkProfile")
     jobs = dims.apply(adapter, "CountersinkProfile")
     check(
         f"revolve-cut {label}",
-        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
+        adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
     )
     name_last_feature(adapter, "Countersink")
     return jobs
 
 
-async def _seed_hole_sketch(
+def _seed_hole_sketch(
     adapter: Any,
     *,
     sketch: str,
@@ -385,8 +385,8 @@ async def _seed_hole_sketch(
     printed one) and one seed hole on it, centre-driven from the same global
     (build_pd_transgear_disc_hub's screw holes)."""
     dims = SketchDims()
-    check(f"create_sketch {label}", await adapter.create_sketch("Front"))
-    bolt_circle = await define_circle(
+    check(f"create_sketch {label}", adapter.create_sketch("Front"))
+    bolt_circle = define_circle(
         adapter,
         0.0,
         0.0,
@@ -397,7 +397,7 @@ async def _seed_hole_sketch(
         drives=(None, None, f'"{pcd_name}"'),
     )
     _as_construction(adapter, bolt_circle)
-    await define_circle(
+    define_circle(
         adapter,
         *seed,
         hole_dia / 2.0,
@@ -406,32 +406,32 @@ async def _seed_hole_sketch(
         names=hole_names,
         drives=hole_drives,
     )
-    await ensure_fully_defined(adapter, f"{label} sketch")
-    check(f"exit_sketch {label}", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, f"{label} sketch")
+    check(f"exit_sketch {label}", adapter.exit_sketch())
     name_last_feature(adapter, sketch)
     return dims.apply(adapter, sketch)
 
 
-async def _cut_through(adapter: Any, feature: str, label: str) -> None:
+def _cut_through(adapter: Any, feature: str, label: str) -> None:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check(
         f"cut {label}",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
         ),
     )
     name_last_feature(adapter, feature)
 
 
-async def _pattern(
+def _pattern(
     adapter: Any, *, axis: str, features: list[str], count: int, name: str
 ) -> None:
     from solidworks_mcp.adapters.base import CircularPatternParameters
 
     check(
         f"circular pattern {name} x{count}",
-        await adapter.circular_pattern_feature(
+        adapter.circular_pattern_feature(
             CircularPatternParameters(
                 axis_name=axis, features=features, count=count, geometry_pattern=True
             )
@@ -440,21 +440,21 @@ async def _pattern(
     name_last_feature(adapter, name)
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
     # The mm suffix is load-bearing: the equation manager reads bare numbers
     # in document units, and this is an inch document.
     for name, value in GLOBALS.items():
-        await set_global(adapter, name, f"{value}mm")
+        set_global(adapter, name, f"{value}mm")
 
     # --- Plate: OD and bore about the origin, extruded +Z ---------------------
     plate = SketchDims()
-    check("create_sketch plate", await adapter.create_sketch("Front"))
+    check("create_sketch plate", adapter.create_sketch("Front"))
     for dia, name in ((PLATE_DIA, "PlateDia"), (BORE_DIA, "BoreDia")):
-        await define_circle(
+        define_circle(
             adapter,
             0.0,
             0.0,
@@ -464,29 +464,29 @@ async def build(adapter: Any) -> dict[str, str]:
             names=(None, None, name),
             drives=(None, None, f'"{name}"'),
         )
-    await ensure_fully_defined(adapter, "plate profile")
-    check("exit_sketch plate", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "plate profile")
+    check("exit_sketch plate", adapter.exit_sketch())
     name_last_feature(adapter, "PlateProfile")
     drive_jobs = plate.apply(adapter, "PlateProfile")
     check(
         "extrude plate",
-        await adapter.create_extrusion(ExtrusionParameters(depth=THICKNESS)),
+        adapter.create_extrusion(ExtrusionParameters(depth=THICKNESS)),
     )
     name_last_feature(adapter, "Plate")
     drive_jobs.append(
         (name_dimensions(adapter, "Plate", ["PlateThick"])[0], '"PlateThick"')
     )
-    volume = await volume_check(adapter, "plate", V_PLATE, 0.002 * V_PLATE)
+    volume = volume_check(adapter, "plate", V_PLATE, 0.002 * V_PLATE)
 
     # Every pattern turns about the plate axis (model Z), selected by name.
-    axis = await name_bore_axis(
+    axis = name_bore_axis(
         adapter, "Top Plane", 0.0, "Right Plane", 0.0, "plate axis"
     )
 
     # --- Index circles: seed on +Y, cut through, patterned ---------------------
     for count in RING_COUNTS:
         pcd_name = f"Ring{count}Pcd"
-        drive_jobs += await _seed_hole_sketch(
+        drive_jobs += _seed_hole_sketch(
             adapter,
             sketch=f"Ring{count}Profile",
             pcd=RING_PCDS[count],
@@ -497,14 +497,14 @@ async def build(adapter: Any) -> dict[str, str]:
             hole_drives=(None, f'"{pcd_name}" / 2', '"IndexHoleDia"'),
             label=f"{count}-hole circle",
         )
-        await _cut_through(adapter, f"Ring{count}Seed", f"{count}-hole circle seed")
-        volume = await volume_check(
+        _cut_through(adapter, f"Ring{count}Seed", f"{count}-hole circle seed")
+        volume = volume_check(
             adapter,
             f"{count}-hole circle seed",
             volume - V_INDEX_HOLE,
             0.01 * V_INDEX_HOLE,
         )
-        await _pattern(
+        _pattern(
             adapter,
             axis=axis,
             features=[f"Ring{count}Seed"],
@@ -512,12 +512,12 @@ async def build(adapter: Any) -> dict[str, str]:
             name=f"Ring{count}Holes",
         )
         expected = volume - (count - 1) * V_INDEX_HOLE
-        volume = await volume_check(
+        volume = volume_check(
             adapter, f"{count}-hole circle", expected, 0.01 * count * V_INDEX_HOLE
         )
 
     # --- Mounting holes: seed at 150 degrees with its countersink, patterned ---
-    drive_jobs += await _seed_hole_sketch(
+    drive_jobs += _seed_hole_sketch(
         adapter,
         sketch="MountHoleProfile",
         pcd=MOUNT_PCD,
@@ -532,13 +532,13 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
         label="mounting hole",
     )
-    await _cut_through(adapter, "MountHole", "mounting hole seed")
-    volume = await volume_check(
+    _cut_through(adapter, "MountHole", "mounting hole seed")
+    volume = volume_check(
         adapter, "mounting hole seed", volume - V_MOUNT_HOLE, 0.01 * V_MOUNT_HOLE
     )
     check(
         f"create_plane {MOUNT_ROW_PLANE}",
-        await adapter.create_plane(
+        adapter.create_plane(
             CreatePlaneParameters(
                 mode="offset", base_plane="Top Plane", offset=MOUNT_SEED[1]
             )
@@ -552,24 +552,24 @@ async def build(adapter: Any) -> dict[str, str]:
         )
     )
     blank_reference_geometry(adapter, (("MountRowPlane", "PLANE"),))
-    drive_jobs += await _countersink(
+    drive_jobs += _countersink(
         adapter,
         plane=MOUNT_ROW_PLANE,
         x=MOUNT_SEED[0],
         y=MOUNT_SEED[1],
         x_drive=f'"MountPcd" * {MOUNT_X_FACTOR!r}',
     )
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "countersink seed", volume - V_CSK, 0.03 * V_CSK + 0.05
     )
-    await _pattern(
+    _pattern(
         adapter,
         axis=axis,
         features=["MountHole", "Countersink"],
         count=MOUNT_COUNT,
         name="MountHoles",
     )
-    volume = await volume_check(
+    volume = volume_check(
         adapter,
         "mounting holes",
         volume - (MOUNT_COUNT - 1) * (V_MOUNT_HOLE + V_CSK),
@@ -577,11 +577,11 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _require_one_solid_body(adapter, label="index plate")
 
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dimension_name, expression in drive_jobs:
-        await drive_dimension(adapter, dimension_name, expression)
-    await force_rebuild(adapter)
-    await volume_check(
+        drive_dimension(adapter, dimension_name, expression)
+    force_rebuild(adapter)
+    volume_check(
         adapter, "driven index plate (equations neutral)", V_FINISHED, 0.002 * V_PLATE
     )
     _require_one_solid_body(adapter, label="driven index plate")
@@ -604,8 +604,8 @@ async def build(adapter: Any) -> dict[str, str]:
         places=INDEX_HOLE_PLACES,
         display_unit=UNIT,
     )
-    await apply_material(adapter, MATERIAL)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    report_mass_properties(adapter)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
@@ -613,7 +613,7 @@ async def build(adapter: Any) -> dict[str, str]:
     apply_drawing_properties(
         adapter, PART_NAME, {"Isometric View Note": ISOMETRIC_VIEW_NOTE}
     )
-    artefacts = await save_part_and_images(adapter, PART_NAME)
+    artefacts = save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
     return artefacts
 

@@ -152,10 +152,10 @@ def _author_reference_dimensions(adapter) -> None:
             raise RuntimeError(f"{label}: reference display did not persist")
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import AddThreadParameters, RevolveParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     # The registry row's IPS document units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
@@ -173,7 +173,7 @@ async def build(adapter) -> dict[str, str]:
         ("ReliefDia", RELIEF_DIA),
         ("ReliefRootR", RELIEF_ROOT_R),
     ):
-        await set_global(adapter, name, f"{value}mm")
+        set_global(adapter, name, f"{value}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -181,9 +181,9 @@ async def build(adapter) -> dict[str, str]:
     # axis, 45 deg chamfer to the basic minor, thread at the basic major,
     # relief, shoulder, body, bottom hemisphere back to the axis.
     profile = SketchDims()
-    check("create_sketch rod profile", await adapter.create_sketch("Front"))
+    check("create_sketch rod profile", adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
-    axis = check("rod axis", await adapter.add_centerline(0.0, 0.0, ROD_LENGTH, 0.0))
+    axis = check("rod axis", adapter.add_centerline(0.0, 0.0, ROD_LENGTH, 0.0))
     points = [
         (0.0, 0.0),
         (0.0, MINOR_R),
@@ -194,14 +194,14 @@ async def build(adapter) -> dict[str, str]:
         (SHOULDER_X, R),
         (BODY_END_X, R),
     ]
-    tip_face, chamfer, thread, step, relief, shoulder, body = await add_line_chain(
+    tip_face, chamfer, thread, step, relief, shoulder, body = add_line_chain(
         adapter, points, close=False
     )
     dome = check(
         "dome arc",
-        await adapter.add_arc(BODY_END_X, 0.0, ROD_LENGTH, 0.0, BODY_END_X, R),
+        adapter.add_arc(BODY_END_X, 0.0, ROD_LENGTH, 0.0, BODY_END_X, R),
     )
-    closure = check("rod closure", await adapter.add_line(ROD_LENGTH, 0.0, 0.0, 0.0))
+    closure = check("rod closure", adapter.add_line(ROD_LENGTH, 0.0, 0.0, 0.0))
     set_sketch_direct_db(adapter, False)
     for label, first, second in (
         ("body-dome", f"{body}.end", f"{dome}.end"),
@@ -210,10 +210,10 @@ async def build(adapter) -> dict[str, str]:
         ("axis start", f"{axis}.start", f"{tip_face}.start"),
         ("axis end", f"{axis}.end", f"{dome}.start"),
     ):
-        check(label, await adapter.add_sketch_constraint(first, second, "coincident"))
+        check(label, adapter.add_sketch_constraint(first, second, "coincident"))
     check(
         "anchor thread tip at origin",
-        await adapter.add_sketch_constraint(f"{tip_face}.start", "origin", "coincident"),
+        adapter.add_sketch_constraint(f"{tip_face}.start", "origin", "coincident"),
     )
     for label, entity, relation in (
         ("tip face", tip_face, "vertical"),
@@ -225,18 +225,18 @@ async def build(adapter) -> dict[str, str]:
         ("closure", closure, "horizontal"),
         ("axis", axis, "horizontal"),
     ):
-        check(label, await adapter.add_sketch_constraint(entity, None, relation))
+        check(label, adapter.add_sketch_constraint(entity, None, relation))
     check(
         "dome tangent to body",
-        await adapter.add_sketch_constraint(body, dome, "tangent"),
+        adapter.add_sketch_constraint(body, dome, "tangent"),
     )
     # Record each dim into SketchDims as it is emitted (creation order).
     # The tip chamfer: down to the basic minor, 45 deg over its length.
-    await add_diametric_linear_dimension(
+    add_diametric_linear_dimension(
         adapter, axis, f"{chamfer}.start", (-3.0, MINOR_R), "TipMinorDia"
     )
     profile.record("TipMinorDia", '"ThreadMinorDia"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{chamfer}.start",
         f"{chamfer}.end",
@@ -245,13 +245,13 @@ async def build(adapter) -> dict[str, str]:
         "tip chamfer",
     )
     profile.record("TipChamfer", '("ThreadDia" - "ThreadMinorDia") / 2')
-    await add_diametric_linear_dimension(
+    add_diametric_linear_dimension(
         adapter, axis, thread, ((TIP_CHAMFER + RELIEF_START_X) / 2.0, 6.0), "ThreadDia"
     )
     profile.record("ThreadDia", '"ThreadDia"')
     # The thread from the shoulder (drawing-guidelines.md rule 10: the seating
     # face is the functional datum), measured to the tip face.
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{shoulder}.end",
         f"{chamfer}.start",
@@ -262,20 +262,20 @@ async def build(adapter) -> dict[str, str]:
     profile.record("ThreadLength", '"ThreadLength"')
     check(
         "relief width",
-        await adapter.add_sketch_dimension(relief, None, "linear", RELIEF_WIDTH),
+        adapter.add_sketch_dimension(relief, None, "linear", RELIEF_WIDTH),
     )
     profile.record("ReliefWidth", '"ReliefWidth"')
-    await add_diametric_linear_dimension(
+    add_diametric_linear_dimension(
         adapter, axis, relief, ((RELIEF_START_X + SHOULDER_X) / 2.0, -4.0), "ReliefDia"
     )
     profile.record("ReliefDia", '"ReliefDia"')
-    await add_diametric_linear_dimension(
+    add_diametric_linear_dimension(
         adapter, axis, body, (ROD_LENGTH / 2.0, R + 4.0), "RodDia"
     )
     profile.record("RodDia", '"RodDia"')
     # The overall, tip to dome tip: made before the body length (so it never
     # over-defines) and turned driven at once, a parenthesised reference.
-    overall = await dimension_between(
+    overall = dimension_between(
         adapter,
         f"{chamfer}.start",
         f"{dome}.start",
@@ -286,7 +286,7 @@ async def build(adapter) -> dict[str, str]:
     _make_driven(adapter, overall, "overall length")
     profile.record("OverallLength")
     # The body from the shoulder to the dome's tip: the hanging length.
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{shoulder}.end",
         f"{dome}.start",
@@ -297,16 +297,16 @@ async def build(adapter) -> dict[str, str]:
     profile.record("BodyLength", '"BodyLength"')
     check(
         "dome radius",
-        await adapter.add_sketch_dimension(dome, None, "radial", R),
+        adapter.add_sketch_dimension(dome, None, "radial", R),
     )
     profile.record("DomeR", '"RodDia" / 2')
-    await ensure_fully_defined(adapter, "rod profile")
-    check("exit_sketch rod profile", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "rod profile")
+    check("exit_sketch rod profile", adapter.exit_sketch())
     name_last_feature(adapter, "RodProfile")
     drive_jobs += profile.apply(adapter, "RodProfile")
-    check("revolve rod", await adapter.create_revolve(RevolveParameters(angle=360.0)))
+    check("revolve rod", adapter.create_revolve(RevolveParameters(angle=360.0)))
     name_last_feature(adapter, "Rod")
-    await volume_check(adapter, "rod", V_PROFILE, 0.005 * V_PROFILE)
+    volume_check(adapter, "rod", V_PROFILE, 0.005 * V_PROFILE)
 
     # The relief's two internal corners (rules 11 and 16), ONE fillet over
     # both circular edges, each picked on the floor's radius at its corner:
@@ -318,7 +318,7 @@ async def build(adapter) -> dict[str, str]:
     # gate checks no step was eaten.
     check(
         "fillet relief roots",
-        await adapter.add_fillet(
+        adapter.add_fillet(
             RELIEF_ROOT_R,
             [[SHOULDER_X, RELIEF_R, 0.0], [RELIEF_START_X, RELIEF_R, 0.0]],
             propagate=False,
@@ -328,15 +328,15 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs.append(
         (name_dimensions(adapter, "ReliefRoots", ["ReliefRootR"])[0], '"ReliefRootR"')
     )
-    await volume_check(adapter, "relief roots", V_TOTAL, 0.005 * V_TOTAL)
+    volume_check(adapter, "relief roots", V_TOTAL, 0.005 * V_TOTAL)
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    driven = await volume_check(
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    driven = volume_check(
         adapter, "driven rod (equations neutral)", V_TOTAL, 0.005 * V_TOTAL
     )
 
@@ -346,7 +346,7 @@ async def build(adapter) -> dict[str, str]:
     adapter._zoom_to_fit(adapter.currentModel)
     check(
         f"cosmetic thread {THREAD}",
-        await adapter.add_thread(
+        adapter.add_thread(
             AddThreadParameters(
                 edge_point=[TIP_CHAMFER, THREAD_R, 0.0],
                 standard="ansi_inch",
@@ -356,10 +356,10 @@ async def build(adapter) -> dict[str, str]:
             )
         ),
     )
-    await volume_check(adapter, "cosmetic thread cuts nothing", driven, 1e-6)
+    volume_check(adapter, "cosmetic thread cuts nothing", driven, 1e-6)
 
-    await apply_material(adapter, MATERIAL)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    report_mass_properties(adapter)
     _single_limits(adapter)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
@@ -367,7 +367,7 @@ async def build(adapter) -> dict[str, str]:
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     _author_reference_dimensions(adapter)
     apply_drawing_properties(adapter, PART_NAME, {"Iso View Note": ISO_VIEW_NOTE})
-    return await save_part_and_images(adapter, PART_NAME)
+    return save_part_and_images(adapter, PART_NAME)
 
 
 if __name__ == "__main__":

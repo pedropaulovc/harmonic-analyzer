@@ -233,7 +233,7 @@ def _one(adapter: Any, stem: str) -> str:
     return hits[0]
 
 
-async def _drive_and_measure(adapter: Any) -> dict[str, str]:
+def _drive_and_measure(adapter: Any) -> dict[str, str]:
     roles = _removables_by_role(adapter)
     crank_wheel, knob_wheel = roles["crank"], roles["knob"]
     collar = _one(adapter, "pd-transgear-drive-collar")
@@ -265,7 +265,7 @@ async def _drive_and_measure(adapter: Any) -> dict[str, str]:
     target = rest_dihedral + DRIVE_DEG
     # angle_driver returns a mate-result dict (raises on hard failure); do NOT wrap
     # it in check() -- that expects an AdapterResult with .is_success.
-    await angle_driver(adapter, named_ref(f"Right Plane@{crank_wheel}", "PLANE"),
+    angle_driver(adapter, named_ref(f"Right Plane@{crank_wheel}", "PLANE"),
                        named_ref("Right Plane", "PLANE"), target,
                        label=f"KINEMATIC drive crank +{DRIVE_DEG:.0f}",
                        verify=None)
@@ -375,7 +375,7 @@ async def _drive_and_measure(adapter: Any) -> dict[str, str]:
         f"-> platen {d_platen:+.3f} mm")
 
     # --- chain-link travel (best-effort attempt; no native coupling) -------
-    chain_moved = await _attempt_chain_advance(adapter, d_crank)
+    chain_moved = _attempt_chain_advance(adapter, d_crank)
 
     _telemetry.info(
         "KINEMATIC PROBE -- crank drives the paper feed:\n"
@@ -393,11 +393,11 @@ async def _drive_and_measure(adapter: Any) -> dict[str, str]:
             "chain_moved": str(chain_moved)}
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     check("open paper-drive",
-          await adapter.open_model(str(OUT_SLDASM / "pd-paper-drive.SLDASM")))
+          adapter.open_model(str(OUT_SLDASM / "pd-paper-drive.SLDASM")))
     try:
-        result = await _drive_and_measure(adapter)
+        result = _drive_and_measure(adapter)
         # Standalone-only (the verify:kinematics gate calls _drive_and_measure
         # directly): render the DRIVEN pose for a visual proof of the moved
         # train -- crank +30 deg, everything downstream displaced. The model
@@ -407,7 +407,7 @@ async def build(adapter: Any) -> dict[str, str]:
         png_dir.mkdir(parents=True, exist_ok=True)
         for view in ("front", "isometric"):
             img = (png_dir / f"paper-drive_driven_{view}.png").resolve()
-            check(f"export driven {view}", await adapter.export_image({
+            check(f"export driven {view}", adapter.export_image({
                 "file_path": str(img), "format_type": "png",
                 "width": 1600, "height": 1000, "view_orientation": view}))
             result[f"driven_{view}"] = str(img)
@@ -419,7 +419,7 @@ async def build(adapter: Any) -> dict[str, str]:
         _discard_open_documents(adapter)
 
 
-async def _attempt_chain_advance(adapter: Any, d_crank_deg: float) -> bool:
+def _attempt_chain_advance(adapter: Any, d_crank_deg: float) -> bool:
     """Best-effort: advance the Dynamic chain pattern by dragging its seed link one
     arc-step along the loop (the crank's ``dTheta_rad * CRANK_PITCH_R``) via
     ``move_component``, ForceRebuild3, and report whether a DIFFERENT link moved (the
@@ -445,7 +445,7 @@ async def _attempt_chain_advance(adapter: Any, d_crank_deg: float) -> bool:
                                        mirror_x=True)
         x1, y1, _ = loop_point_tangent(arc, dx=KNOB_SHAFT_XY[0], dy=KNOB_SHAFT_XY[1],
                                        mirror_x=True)
-        await adapter.move_component(MoveComponentParameters(
+        adapter.move_component(MoveComponentParameters(
             name=seed, position=[x1 - x0, y1 - y0, 0.0], relative=True))
         adapter._attempt(lambda: adapter.currentModel.ForceRebuild3(False), default=None)
         after = component_origin(adapter, probe)

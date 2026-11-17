@@ -7,7 +7,7 @@ there are no Default aliases or synthetic Simplified members.
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable, Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from typing import Any
 
 import _config
@@ -23,7 +23,7 @@ from _rebuild import active_configuration_name, assert_saved_configurations_rege
 from _simplified_part import _bom_identity, _close_part, persist_configurations_in_place
 
 
-async def activate_member(adapter: Any, configuration: str) -> None:
+def activate_member(adapter: Any, configuration: str) -> None:
     """Select an existing member and reject a refused or misdirected switch."""
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     if model.GetConfigurationByName(configuration) is None:
@@ -31,7 +31,7 @@ async def activate_member(adapter: Any, configuration: str) -> None:
     if active_configuration_name(adapter, model) != configuration:
         check(
             f"activate native member {configuration}",
-            await adapter.set_active_configuration(configuration),
+            adapter.set_active_configuration(configuration),
         )
     require_active_member(adapter, configuration)
 
@@ -57,7 +57,7 @@ def require_member_configurations(
     return expected
 
 
-async def create_member_configurations(
+def create_member_configurations(
     adapter: Any, part_name: str, configurations: Sequence[str]
 ) -> None:
     """Replace the fresh part's Default with the registry's real named members."""
@@ -77,14 +77,14 @@ async def create_member_configurations(
     for name in names[1:]:
         check(
             f"create native member {name}",
-            await adapter.create_configuration(
+            adapter.create_configuration(
                 CreateConfigurationParameters(name=name, comment=name)
             ),
         )
     actual = tuple(str(name) for name in (model.GetConfigurationNames() or ()))
     if set(actual) != set(names) or len(actual) != len(names):
         raise RuntimeError(f"native members {actual!r} differ from requested {names!r}")
-    await activate_member(adapter, names[0])
+    activate_member(adapter, names[0])
 
 
 def _feature(adapter: Any, name: str) -> Any:
@@ -145,10 +145,10 @@ def assert_member_suppression(
                 )
 
 
-async def select_member_features(
+def select_member_features(
     adapter: Any, configuration: str, members: Mapping[str, Sequence[str]]
 ) -> None:
-    await activate_member(adapter, configuration)
+    activate_member(adapter, configuration)
     if configuration not in members:
         raise ValueError(f"unknown native member {configuration!r}")
     for member, names in reversed(tuple(members.items())):
@@ -277,13 +277,13 @@ def require_member_colour(
         )
 
 
-async def save_member_part(
+def save_member_part(
     adapter: Any,
     part_name: str,
     configurations: Sequence[str],
     *,
     material: str | Mapping[str, str],
-    readback: Callable[[Any, str], Awaitable[None]],
+    readback: Callable[[Any, str], None],
     hide_model_annotations: bool = False,
 ) -> dict[str, str]:
     """Publish only a saved part whose actual member caches and metadata read clean.
@@ -296,30 +296,30 @@ async def save_member_part(
     names = require_member_configurations(part_name, configurations)
     materials = _member_materials(names, material)
     for name in names:
-        await activate_member(adapter, name)
-        await readback(adapter, name)
+        activate_member(adapter, name)
+        readback(adapter, name)
     _require_member_materials(adapter, part_name, materials)
-    await activate_member(adapter, names[0])
-    artefacts = await save_part_and_images(adapter, part_name)
+    activate_member(adapter, names[0])
+    artefacts = save_part_and_images(adapter, part_name)
     _close_part(adapter)
     check(
         f"reopen {part_name} to persist members",
-        await adapter.open_model(artefacts["part"]),
+        adapter.open_model(artefacts["part"]),
     )
     require_active_member(adapter, names[0])
     persist_configurations_in_place(adapter, part_name)
     _close_part(adapter)
     check(
-        f"reopen saved {part_name} members", await adapter.open_model(artefacts["part"])
+        f"reopen saved {part_name} members", adapter.open_model(artefacts["part"])
     )
     require_active_member(adapter, names[0])
     assert_saved_configurations_regenerate(adapter, part_name)
     for name in names:
-        await activate_member(adapter, name)
-        await readback(adapter, name)
+        activate_member(adapter, name)
+        readback(adapter, name)
     _require_member_materials(adapter, part_name, materials)
-    await activate_member(adapter, names[0])
-    await export_member_configurations(
+    activate_member(adapter, names[0])
+    export_member_configurations(
         adapter, part_name, names, hide_model_annotations=hide_model_annotations
     )
     return artefacts

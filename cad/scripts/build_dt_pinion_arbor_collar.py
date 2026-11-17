@@ -99,25 +99,25 @@ def _pin_hole_removed() -> float:
 V_PIN_HOLE = _pin_hole_removed()
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     # #290: the row's inch calculation units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing (INCH
     # document; the equation manager reads bare numbers in document units).
-    await set_global(adapter, "CollarOd", f"{COLLAR_OD}mm")
-    await set_global(adapter, "CollarLen", f"{COLLAR_LEN}mm")
-    await set_global(adapter, "BoreDia", f"{BORE}mm")
-    await set_global(adapter, "PinHoleDia", f"{PIN_HOLE}mm")
+    set_global(adapter, "CollarOd", f"{COLLAR_OD}mm")
+    set_global(adapter, "CollarLen", f"{COLLAR_LEN}mm")
+    set_global(adapter, "BoreDia", f"{BORE}mm")
+    set_global(adapter, "PinHoleDia", f"{PIN_HOLE}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
     collar = SketchDims()
-    check("create_sketch collar", await adapter.create_sketch("Front"))
-    await define_circle(
+    check("create_sketch collar", adapter.create_sketch("Front"))
+    define_circle(
         adapter,
         0.0,
         0.0,
@@ -127,22 +127,22 @@ async def build(adapter) -> dict[str, str]:
         names=("CollarCx", "CollarCy", "CollarOd"),
         drives=(None, None, '"CollarOd"'),
     )
-    await ensure_fully_defined(adapter, "collar sketch")
-    check("exit_sketch collar", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "collar sketch")
+    check("exit_sketch collar", adapter.exit_sketch())
     name_last_feature(adapter, "CollarProfile")
     drive_jobs += collar.apply(adapter, "CollarProfile")
     check(
         "extrude collar",
-        await adapter.create_extrusion(ExtrusionParameters(depth=COLLAR_LEN)),
+        adapter.create_extrusion(ExtrusionParameters(depth=COLLAR_LEN)),
     )
     name_last_feature(adapter, "Collar")
     drive_jobs += [(name_dimensions(adapter, "Collar", ["Depth"])[0], '"CollarLen"')]
     v_solid = math.pi * COLLAR_R**2 * COLLAR_LEN
-    await volume_check(adapter, "collar", v_solid, 0.005 * v_solid)
+    volume_check(adapter, "collar", v_solid, 0.005 * v_solid)
 
     bore = SketchDims()
-    check("create_sketch bore", await adapter.create_sketch("Front"))
-    await define_circle(
+    check("create_sketch bore", adapter.create_sketch("Front"))
+    define_circle(
         adapter,
         0.0,
         0.0,
@@ -152,24 +152,24 @@ async def build(adapter) -> dict[str, str]:
         names=("BoreCx", "BoreCy", "BoreDia"),
         drives=(None, None, '"BoreDia"'),
     )
-    await ensure_fully_defined(adapter, "bore sketch")
-    check("exit_sketch bore", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "bore sketch")
+    check("exit_sketch bore", adapter.exit_sketch())
     name_last_feature(adapter, "BoreProfile")
     drive_jobs += bore.apply(adapter, "BoreProfile")
     check(
         "cut bore",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=2.5 * COLLAR_LEN, both_directions=True)
         ),
     )
     name_last_feature(adapter, "Bore")
-    volume = await volume_check(adapter, "bore", V_COLLAR, 0.005 * V_COLLAR)
+    volume = volume_check(adapter, "bore", V_COLLAR, 0.005 * V_COLLAR)
 
     # The spring-pin hole through both walls, on the Top plane through the
     # axis (sketch (u, v) -> (X, -Z)), centred on the length.
     pin = SketchDims()
-    check("create_sketch pin hole", await adapter.create_sketch("Top"))
-    await define_circle(
+    check("create_sketch pin hole", adapter.create_sketch("Top"))
+    define_circle(
         adapter,
         0.0,
         -PIN_HOLE_Z,
@@ -179,30 +179,30 @@ async def build(adapter) -> dict[str, str]:
         names=("PinHoleCx", "PinHoleCz", "PinHoleDia"),
         drives=(None, '"CollarLen" / 2', '"PinHoleDia"'),
     )
-    await ensure_fully_defined(adapter, "pin-hole sketch")
-    check("exit_sketch pin hole", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "pin-hole sketch")
+    check("exit_sketch pin hole", adapter.exit_sketch())
     name_last_feature(adapter, "PinHoleProfile")
     drive_jobs += pin.apply(adapter, "PinHoleProfile")
     check(
         "cut pin hole",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=COLLAR_OD + 2.0, both_directions=True)
         ),
     )
     name_last_feature(adapter, "PinHole")
     volume -= V_PIN_HOLE
-    await volume_check(adapter, "pin hole", volume, 0.05 * V_PIN_HOLE)
+    volume_check(adapter, "pin hole", volume, 0.05 * V_PIN_HOLE)
 
-    collar_axis = await name_bore_axis(
+    collar_axis = name_bore_axis(
         adapter, "Top Plane", 0.0, "Right Plane", 0.0, "collar bore axis"
     )
 
     # Deferred drive equations, then re-check neutrality.
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    volume_check(
         adapter, "driven collar (equations neutral)", volume, 0.01 * V_COLLAR
     )
 
@@ -223,9 +223,9 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
 
-    await apply_material(adapter, MATERIAL)
-    await apply_color(adapter, POLISHED_STEEL)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    apply_color(adapter, POLISHED_STEEL)
+    report_mass_properties(adapter)
     apply_drawing_properties(
         adapter,
         PART_NAME,
@@ -234,7 +234,7 @@ async def build(adapter) -> dict[str, str]:
         },
     )
     blank_reference_geometry(adapter, ((collar_axis, "AXIS"),))
-    artefacts = await save_part_and_images(adapter, PART_NAME)
+    artefacts = save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
     return artefacts
 

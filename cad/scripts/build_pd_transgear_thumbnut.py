@@ -188,7 +188,7 @@ V_FRONT_CSK = V_REAR_CSK  # the same break, on the flat dish floor
 V_TOTAL = V_KNURLED + V_STEM - V_THREAD - V_DISH - V_REAR_CSK - V_FRONT_CSK
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
         CircularPatternParameters,
         CreatePlaneParameters,
@@ -196,7 +196,7 @@ async def build(adapter) -> dict[str, str]:
         RevolveParameters,
     )
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     # #290: the row's inch calculation units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
@@ -215,8 +215,8 @@ async def build(adapter) -> dict[str, str]:
         ("DishDepth", DISH_DEPTH),
         ("CountersinkDia", CSK_DIA),
     ):
-        await set_global(adapter, name, f"{value}mm")
-    await set_global(adapter, "CountersinkHalfAngle", f"{CSK_HALF_ANGLE_DEG}deg")
+        set_global(adapter, name, f"{value}mm")
+    set_global(adapter, "CountersinkHalfAngle", f"{CSK_HALF_ANGLE_DEG}deg")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -224,10 +224,10 @@ async def build(adapter) -> dict[str, str]:
     # The centerline merges into the two axis corners at creation, so the
     # chain's own relations define it.
     head = SketchDims()
-    check("create_sketch head profile", await adapter.create_sketch("Front"))
+    check("create_sketch head profile", adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     head_axis = check(
-        "head axis", await adapter.add_centerline(0.0, HEAD_REAR_Y, 0.0, RIM_Y)
+        "head axis", adapter.add_centerline(0.0, HEAD_REAR_Y, 0.0, RIM_Y)
     )
     head_points = [
         (0.0, HEAD_REAR_Y),
@@ -235,21 +235,21 @@ async def build(adapter) -> dict[str, str]:
         (HEAD_R, RIM_Y),
         (0.0, RIM_Y),
     ]
-    head_lines = await add_line_chain(adapter, head_points)
+    head_lines = add_line_chain(adapter, head_points)
     set_sketch_direct_db(adapter, False)
     for index, line in enumerate(head_lines):
         relation = "horizontal" if index % 2 == 0 else "vertical"
         check(
             f"head profile {relation} {line}",
-            await adapter.add_sketch_constraint(line, None, relation),
+            adapter.add_sketch_constraint(line, None, relation),
         )
     check(
         "head profile on the axis",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{head_lines[0]}.start", "origin", "vertical_points"
         ),
     )
-    await add_diametric_linear_dimension(
+    add_diametric_linear_dimension(
         adapter,
         head_axis,
         head_lines[1],
@@ -260,7 +260,7 @@ async def build(adapter) -> dict[str, str]:
     # The head's rear face from the seat face (the sketch origin), baseline
     # with the overall length and the flange length: the waist between them
     # keeps a real length at every printed corner.
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{head_lines[1]}.start",
         "origin",
@@ -271,7 +271,7 @@ async def build(adapter) -> dict[str, str]:
     head.record("HeadRearY", '"OverallLength" - "HeadLength"')
     # Overall length: the rim's outer corner from the seat face (the sketch
     # origin), the one axial dimension the stud's cut-to-fit rides on.
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{head_lines[1]}.end",
         "origin",
@@ -280,19 +280,19 @@ async def build(adapter) -> dict[str, str]:
         "overall length from the seat face",
     )
     head.record("OverallLength", '"OverallLength"')
-    await ensure_fully_defined(adapter, "head profile")
-    check("exit_sketch head profile", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "head profile")
+    check("exit_sketch head profile", adapter.exit_sketch())
     name_last_feature(adapter, "HeadProfile")
     drive_jobs += head.apply(adapter, "HeadProfile")
-    check("revolve head", await adapter.create_revolve(RevolveParameters(angle=360.0)))
+    check("revolve head", adapter.create_revolve(RevolveParameters(angle=360.0)))
     name_last_feature(adapter, "Head")
-    await volume_check(adapter, "plain head", V_HEAD, 0.005 * V_HEAD)
-    await bbox_extent_check(adapter, "head length", "y", HEAD_LENGTH)
-    await bbox_extent_check(adapter, "head diameter", "x", HEAD_DIA)
+    volume_check(adapter, "plain head", V_HEAD, 0.005 * V_HEAD)
+    bbox_extent_check(adapter, "head length", "y", HEAD_LENGTH)
+    bbox_extent_check(adapter, "head diameter", "x", HEAD_DIA)
 
     # The mate axis: the first reference axis, so it is Axis1; the knurl
     # patterns about it.
-    nut_axis = await name_bore_axis(
+    nut_axis = name_bore_axis(
         adapter, "Front Plane", 0.0, "Right Plane", 0.0, "thumbnut axis"
     )
     if nut_axis != "Axis1":
@@ -300,25 +300,25 @@ async def build(adapter) -> dict[str, str]:
 
     # --- Straight knurl: one flute, patterned ------------------------------
     seed = knurl_seed_points()
-    check("create_sketch knurl flute", await adapter.create_sketch("Top"))
-    flute_lines = await add_line_chain(adapter, seed)
-    await define_polygon_chain(adapter, flute_lines, seed, label="knurl flute")
-    await ensure_fully_defined(adapter, "knurl flute seed")
-    check("exit_sketch knurl flute", await adapter.exit_sketch())
+    check("create_sketch knurl flute", adapter.create_sketch("Top"))
+    flute_lines = add_line_chain(adapter, seed)
+    define_polygon_chain(adapter, flute_lines, seed, label="knurl flute")
+    ensure_fully_defined(adapter, "knurl flute seed")
+    check("exit_sketch knurl flute", adapter.exit_sketch())
     name_last_feature(adapter, "KnurlFluteProfile")
     # Top-plane cuts run opposite the sketch normal by default; reversed, the
     # seed runs up through the whole head (it starts in air below it).
     check(
         "cut knurl flute",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=OVERALL_LENGTH + 1.0, reverse_direction=True)
         ),
     )
     name_last_feature(adapter, "KnurlFlute")
-    await volume_check(adapter, "knurl flute", V_HEAD - V_FLUTE, 0.02 * V_FLUTE + 0.01)
+    volume_check(adapter, "knurl flute", V_HEAD - V_FLUTE, 0.02 * V_FLUTE + 0.01)
     check(
         f"knurl pattern ×{KNURL_TEETH}",
-        await adapter.circular_pattern_feature(
+        adapter.circular_pattern_feature(
             CircularPatternParameters(
                 axis_name=nut_axis,
                 features=["KnurlFlute"],
@@ -328,14 +328,14 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "Knurl")
-    await volume_check(adapter, "knurled head", V_KNURLED, 0.02 * KNURL_TEETH * V_FLUTE)
+    volume_check(adapter, "knurled head", V_KNURLED, 0.02 * KNURL_TEETH * V_FLUTE)
 
     # --- Waist and flange, onto the head's rear face ------------------------
     stem = SketchDims()
-    check("create_sketch stem profile", await adapter.create_sketch("Front"))
+    check("create_sketch stem profile", adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     stem_axis = check(
-        "stem axis", await adapter.add_centerline(0.0, 0.0, 0.0, HEAD_REAR_Y)
+        "stem axis", adapter.add_centerline(0.0, 0.0, 0.0, HEAD_REAR_Y)
     )
     stem_points = [
         (0.0, 0.0),
@@ -345,47 +345,47 @@ async def build(adapter) -> dict[str, str]:
         (WAIST_R, HEAD_REAR_Y),
         (0.0, HEAD_REAR_Y),
     ]
-    stem_lines = await add_line_chain(adapter, stem_points)
+    stem_lines = add_line_chain(adapter, stem_points)
     set_sketch_direct_db(adapter, False)
     for index, line in enumerate(stem_lines):
         relation = "horizontal" if index % 2 == 0 else "vertical"
         check(
             f"stem profile {relation} {line}",
-            await adapter.add_sketch_constraint(line, None, relation),
+            adapter.add_sketch_constraint(line, None, relation),
         )
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{stem_lines[0]}.start", 0.0, 0.0, "seat face on the axis"
     )
-    await add_diametric_linear_dimension(
+    add_diametric_linear_dimension(
         adapter, stem_axis, stem_lines[1], (FLANGE_R, -4.0), "FlangeDia"
     )
     stem.record("FlangeDia", '"FlangeDia"')
-    await add_diametric_linear_dimension(
+    add_diametric_linear_dimension(
         adapter, stem_axis, stem_lines[3], (WAIST_R, -8.0), "WaistDia"
     )
     stem.record("WaistDia", '"WaistDia"')
     check(
         "waist length",
-        await adapter.add_sketch_dimension(stem_lines[3], None, "linear", WAIST_LENGTH),
+        adapter.add_sketch_dimension(stem_lines[3], None, "linear", WAIST_LENGTH),
     )
     stem.record("WaistLength", '"OverallLength" - "HeadLength" - "FlangeLength"')
     check(
         "flange length",
-        await adapter.add_sketch_dimension(
+        adapter.add_sketch_dimension(
             stem_lines[1], None, "linear", FLANGE_LENGTH
         ),
     )
     stem.record("FlangeLength", '"FlangeLength"')
-    await ensure_fully_defined(adapter, "stem profile")
-    check("exit_sketch stem profile", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "stem profile")
+    check("exit_sketch stem profile", adapter.exit_sketch())
     name_last_feature(adapter, "StemProfile")
     drive_jobs += stem.apply(adapter, "StemProfile")
-    check("revolve stem", await adapter.create_revolve(RevolveParameters(angle=360.0)))
+    check("revolve stem", adapter.create_revolve(RevolveParameters(angle=360.0)))
     name_last_feature(adapter, "Stem")
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "head and stem", V_KNURLED + V_STEM, 0.005 * (V_KNURLED + V_STEM)
     )
-    await bbox_extent_check(adapter, "overall length", "y", OVERALL_LENGTH)
+    bbox_extent_check(adapter, "overall length", "y", OVERALL_LENGTH)
 
     # --- 1/4-20 UNC-2B through, from the seat face -------------------------
     # Drilled while both end faces are still planar, so the removed volume is
@@ -401,7 +401,7 @@ async def build(adapter) -> dict[str, str]:
         placement_dims=[((None, None), (None, None))],
     )
     drive_jobs += thread.placement_drive_jobs
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "tapped through", volume - V_THREAD, 0.02 * V_THREAD
     )
 
@@ -410,21 +410,21 @@ async def build(adapter) -> dict[str, str]:
     # axis, closed up the axis.  The depth runs between the two corners, the
     # edges the finished nut keeps, not to the axis inside the tap drill.
     dish = SketchDims()
-    check("create_sketch dish", await adapter.create_sketch("Front"))
+    check("create_sketch dish", adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     dish_axis = check(
-        "dish axis", await adapter.add_centerline(0.0, DISH_FLOOR_Y, 0.0, RIM_Y)
+        "dish axis", adapter.add_centerline(0.0, DISH_FLOOR_Y, 0.0, RIM_Y)
     )
-    dish_base = check("dish base", await adapter.add_line(0.0, RIM_Y, *DISH_RIM_CORNER))
+    dish_base = check("dish base", adapter.add_line(0.0, RIM_Y, *DISH_RIM_CORNER))
     dish_cone = check(
-        "dish cone", await adapter.add_line(*DISH_RIM_CORNER, *DISH_FLOOR_CORNER)
+        "dish cone", adapter.add_line(*DISH_RIM_CORNER, *DISH_FLOOR_CORNER)
     )
     dish_floor = check(
         "dish floor",
-        await adapter.add_line(*DISH_FLOOR_CORNER, 0.0, DISH_FLOOR_Y),
+        adapter.add_line(*DISH_FLOOR_CORNER, 0.0, DISH_FLOOR_Y),
     )
     dish_close = check(
-        "dish closure", await adapter.add_line(0.0, DISH_FLOOR_Y, 0.0, RIM_Y)
+        "dish closure", adapter.add_line(0.0, DISH_FLOOR_Y, 0.0, RIM_Y)
     )
     set_sketch_direct_db(adapter, False)
     for label, first, second in (
@@ -435,23 +435,23 @@ async def build(adapter) -> dict[str, str]:
         ("axis start", f"{dish_axis}.start", f"{dish_floor}.end"),
         ("axis end", f"{dish_axis}.end", f"{dish_base}.start"),
     ):
-        check(label, await adapter.add_sketch_constraint(first, second, "coincident"))
+        check(label, adapter.add_sketch_constraint(first, second, "coincident"))
     for label, entity, relation in (
         ("dish base", dish_base, "horizontal"),
         ("dish floor", dish_floor, "horizontal"),
         ("dish closure", dish_close, "vertical"),
         ("dish axis", dish_axis, "vertical"),
     ):
-        check(label, await adapter.add_sketch_constraint(entity, None, relation))
-    await anchor_point_to_origin(
+        check(label, adapter.add_sketch_constraint(entity, None, relation))
+    anchor_point_to_origin(
         adapter, f"{dish_base}.start", 0.0, RIM_Y, "dish rim on the axis"
     )
     dish.record("DishRim", '"OverallLength"')
-    await add_diametric_linear_dimension(
+    add_diametric_linear_dimension(
         adapter, dish_axis, f"{dish_base}.end", (DISH_DIA / 4.0, RIM_Y + 3.0), "DishDia"
     )
     dish.record("DishDia", '"DishDia"')
-    await add_diametric_linear_dimension(
+    add_diametric_linear_dimension(
         adapter,
         dish_axis,
         f"{dish_floor}.start",
@@ -459,7 +459,7 @@ async def build(adapter) -> dict[str, str]:
         "DishFloorDia",
     )
     dish.record("DishFloorDia", '"DishFloorDia"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{dish_floor}.start",
         f"{dish_base}.end",
@@ -468,16 +468,16 @@ async def build(adapter) -> dict[str, str]:
         "dish depth, rim edge to floor edge",
     )
     dish.record("DishDepth", '"DishDepth"')
-    await ensure_fully_defined(adapter, "dish profile")
-    check("exit_sketch dish", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "dish profile")
+    check("exit_sketch dish", adapter.exit_sketch())
     name_last_feature(adapter, "DishProfile")
     drive_jobs += dish.apply(adapter, "DishProfile")
     check(
         "revolve dish",
-        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
+        adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
     )
     name_last_feature(adapter, "Dish")
-    volume = await volume_check(adapter, "dished face", volume - V_DISH, 0.01 * V_DISH)
+    volume = volume_check(adapter, "dished face", volume - V_DISH, 0.01 * V_DISH)
 
     # --- Both actual entry cones, one shared native diameter/half-angle ----
     apex = CSK_R / math.tan(math.radians(CSK_HALF_ANGLE_DEG))
@@ -489,57 +489,57 @@ async def build(adapter) -> dict[str, str]:
          "FrontCountersinkDia", "FrontCountersinkHalfAngle"),
     )
     countersink = SketchDims()
-    check("create_sketch countersinks", await adapter.create_sketch("Front"))
+    check("create_sketch countersinks", adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     csk_axis = check(
         "countersink axis",
-        await adapter.add_centerline(0.0, 0.0, 0.0, DISH_FLOOR_Y),
+        adapter.add_centerline(0.0, 0.0, 0.0, DISH_FLOOR_Y),
     )
-    chains = [(profile, await add_line_chain(adapter, profile[1])) for profile in profiles]
+    chains = [(profile, add_line_chain(adapter, profile[1])) for profile in profiles]
     set_sketch_direct_db(adapter, False)
     for label, first, second, relation in (
         ("countersink axis vertical", csk_axis, None, "vertical"),
         ("countersink axis seat", f"{csk_axis}.start", "origin", "coincident"),
         ("countersink axis floor", f"{csk_axis}.end", f"{chains[1][1][1]}.end", "coincident"),
     ):
-        check(label, await adapter.add_sketch_constraint(first, second, relation))
+        check(label, adapter.add_sketch_constraint(first, second, relation))
     for (label, _points, seat_y, dia_name, angle_name), lines in chains:
         cone, base, axis = lines
         for i in range(3):
             check(
                 f"{label} countersink junction {i}",
-                await adapter.add_sketch_constraint(
+                adapter.add_sketch_constraint(
                     f"{lines[i]}.end", f"{lines[(i + 1) % 3]}.start", "coincident"
                 ),
             )
-        check(f"{label} countersink base", await adapter.add_sketch_constraint(base, None, "horizontal"))
-        check(f"{label} countersink axis", await adapter.add_sketch_constraint(axis, None, "vertical"))
+        check(f"{label} countersink base", adapter.add_sketch_constraint(base, None, "horizontal"))
+        check(f"{label} countersink axis", adapter.add_sketch_constraint(axis, None, "vertical"))
         if seat_y == 0.0:
-            check("rear countersink seat", await adapter.add_sketch_constraint(f"{base}.end", "origin", "coincident"))
+            check("rear countersink seat", adapter.add_sketch_constraint(f"{base}.end", "origin", "coincident"))
         else:
-            await anchor_point_to_origin(adapter, f"{base}.end", 0.0, seat_y, f"{label} countersink seat")
+            anchor_point_to_origin(adapter, f"{base}.end", 0.0, seat_y, f"{label} countersink seat")
             countersink.record(None, '"OverallLength" - "DishDepth"')
-        await add_diametric_linear_dimension(
+        add_diametric_linear_dimension(
             adapter, csk_axis, f"{base}.start",
             text_xy=(CSK_R + 1.0, seat_y), label=f"{label} countersink diameter",
         )
         countersink.record(dia_name, '"CountersinkDia"')
         check(
             f"{label} countersink half-angle",
-            await adapter.add_sketch_dimension(cone, axis, "angular", CSK_HALF_ANGLE_DEG),
+            adapter.add_sketch_dimension(cone, axis, "angular", CSK_HALF_ANGLE_DEG),
         )
         countersink.record(angle_name, '"CountersinkHalfAngle"')
-    await ensure_fully_defined(adapter, "countersink profiles")
-    check("exit_sketch countersinks", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "countersink profiles")
+    check("exit_sketch countersinks", adapter.exit_sketch())
     name_last_feature(adapter, "CountersinkProfile")
     drive_jobs += countersink.apply(adapter, "CountersinkProfile")
     check(
         "revolve countersinks",
-        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
+        adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
     )
     name_last_feature(adapter, "Countersinks")
     v_csk = V_REAR_CSK + V_FRONT_CSK
-    await volume_check(adapter, "countersinks", volume - v_csk, 0.03 * v_csk + 0.05)
+    volume_check(adapter, "countersinks", volume - v_csk, 0.03 * v_csk + 0.05)
 
     # --- Named stations for the stud: the rim and the dish floor ------------
     for plane, offset, drive in (
@@ -548,7 +548,7 @@ async def build(adapter) -> dict[str, str]:
     ):
         check(
             f"create_plane {plane}",
-            await adapter.create_plane(
+            adapter.create_plane(
                 CreatePlaneParameters(
                     mode="offset", base_plane="Top Plane", offset=offset
                 )
@@ -560,16 +560,16 @@ async def build(adapter) -> dict[str, str]:
         drive_jobs.append((plane_offset[0], drive))
 
     # Deferred drive equations, then re-check neutrality.
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    volume_check(
         adapter, "driven thumbnut (equations neutral)", V_TOTAL, 0.005 * V_TOTAL
     )
 
-    await apply_material(adapter, MATERIAL)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    report_mass_properties(adapter)
     # Model-owned MAX on both actual cone diameters; the title block governs
     # their half-angle and the remaining turned sizes. The seat is a clamp,
     # not a running face.
@@ -580,7 +580,7 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_properties(adapter, PART_NAME)
-    return await save_part_and_images(adapter, PART_NAME)
+    return save_part_and_images(adapter, PART_NAME)
 
 
 if __name__ == "__main__":

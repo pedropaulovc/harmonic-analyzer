@@ -71,23 +71,23 @@ _MEMBER_DESCRIPTIONS = {
 _MEMBER_REFERENCES = ("Axis1", "Axis2")
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     require_member_configurations(PART_NAME, CONFIGURATIONS)
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
     # Author before cloning configurations so every member inherits the same
     # station plane and the same two hidden, unsuppressed path-link axes.
-    await _chain_link.author_link_references(adapter)
-    await create_member_configurations(adapter, PART_NAME, CONFIGURATIONS)
+    _chain_link.author_link_references(adapter)
+    create_member_configurations(adapter, PART_NAME, CONFIGURATIONS)
 
     member_features: dict[str, tuple[str, ...]] = {}
     for configuration in CONFIGURATIONS:
-        await activate_member(adapter, configuration)
+        activate_member(adapter, configuration)
         # New members must not merge with, or acquire dependencies on, solids
         # belonging to a previously authored member in the same document.
         for features in reversed(tuple(member_features.values())):
             set_member_suppression(adapter, features, suppressed=True)
-        member_features[configuration] = await _chain_link.author_link_geometry(
+        member_features[configuration] = _chain_link.author_link_geometry(
             adapter, **_MEMBER_DELTAS[configuration]
         )
 
@@ -115,26 +115,26 @@ async def build(adapter: Any) -> dict[str, str]:
         for configuration in CONFIGURATIONS
     }
 
-    async def _readback(current_adapter: Any, configuration: str) -> None:
+    def _readback(current_adapter: Any, configuration: str) -> None:
         """Check native member state without repairing or saving the document."""
         assert_member_suppression(current_adapter, configuration, member_features)
         require_member_bodies(current_adapter, configuration, 4, _MEMBER_REFERENCES)
         require_member_colour(current_adapter, configuration, BAR_STEEL)
         delta = _MEMBER_DELTAS[configuration]
         _chain_link._gate_volume(
-            await _chain_link._volume(current_adapter),
+            _chain_link._volume(current_adapter),
             delta["plate_hole_r"],
             delta["body_outer_r"],
             delta["body_bore_r"],
             delta["body_half_len"],
         )
-        await bbox_extent_check(
+        bbox_extent_check(
             current_adapter,
             f"{configuration} pitch envelope",
             "x",
             LINK_PITCH + 2.0 * PLATE_HALF_H,
         )
-        await bbox_extent_check(
+        bbox_extent_check(
             current_adapter,
             f"{configuration} axial envelope",
             "z",
@@ -157,9 +157,9 @@ async def build(adapter: Any) -> dict[str, str]:
     # Features added after a configuration was created may inherit a native
     # suppression state. Write and read the complete matrix for every member.
     for configuration in CONFIGURATIONS:
-        await select_member_features(adapter, configuration, member_features)
-        await apply_material(adapter, MATERIAL)
-        await apply_color(adapter, BAR_STEEL)
+        select_member_features(adapter, configuration, member_features)
+        apply_material(adapter, MATERIAL)
+        apply_color(adapter, BAR_STEEL)
         apply_member_properties(
             adapter,
             PART_NAME,
@@ -167,13 +167,13 @@ async def build(adapter: Any) -> dict[str, str]:
             _MEMBER_DESCRIPTIONS[configuration],
             member_properties[configuration],
         )
-        await report_mass_properties(adapter)
+        report_mass_properties(adapter)
 
     # Reference-only construction state; existing member solids and suppression
     # matrices are independently compared before returning to the active member.
-    await add_chain_stock_references(adapter)
+    add_chain_stock_references(adapter)
 
-    return await save_member_part(
+    return save_member_part(
         adapter,
         PART_NAME,
         CONFIGURATIONS,

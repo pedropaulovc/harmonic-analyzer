@@ -41,7 +41,7 @@ def main():
     from _com import _early_bound
     from diagnostics._owned_native_session import run_owned_diagnostic
 
-    async def inventory(adapter):
+    def inventory(adapter):
         app = adapter.swApp
         report = {
             "kind": "vm2-datum-read-only-ownership",

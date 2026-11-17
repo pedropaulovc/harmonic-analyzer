@@ -251,7 +251,7 @@ def _as_construction(adapter, entity_id: str) -> None:
         raise RuntimeError(f"{entity_id} did not take the construction flag")
 
 
-async def _key_pin_reference(adapter) -> list[tuple[str, str]]:
+def _key_pin_reference(adapter) -> list[tuple[str, str]]:
     """The hidden ``KeyPinReference`` sketch on the Top plane: one
     construction line on the hub's +X O.D. line from the hub front face back
     to the key-pin hole's axis, whose driving dimension is the printed
@@ -259,19 +259,19 @@ async def _key_pin_reference(adapter) -> list[tuple[str, str]]:
     point's two origin anchors)."""
     sketch = REFERENCE_SKETCHES[0]
     start, end = (HUB_R, _HUB_FRONT_V), (HUB_R, _KEY_PIN_V)
-    check(f"create_sketch {sketch}", await adapter.create_sketch("Top"))
+    check(f"create_sketch {sketch}", adapter.create_sketch("Top"))
     # Direct-to-DB: the line lies on the O.D. outline and runs along the
     # sketch's v axis, so creation-time inference would add relations that
     # over-define the sketch.
     set_sketch_direct_db(adapter, True)
-    line = check(f"{sketch} line", await adapter.add_line(*start, *end))
+    line = check(f"{sketch} line", adapter.add_line(*start, *end))
     set_sketch_direct_db(adapter, False)
     _as_construction(adapter, line)
     check(
         f"{sketch} vertical",
-        await adapter.add_sketch_constraint(line, None, "vertical"),
+        adapter.add_sketch_constraint(line, None, "vertical"),
     )
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{line}.start",
         f"{line}.end",
@@ -279,11 +279,11 @@ async def _key_pin_reference(adapter) -> list[tuple[str, str]]:
         KEY_PIN_STATION,
         "key-pin station from the hub front face",
     )
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{line}.start", *start, "key-pin station datum at hub front"
     )
-    await ensure_fully_defined(adapter, f"{sketch} sketch")
-    check(f"exit_sketch {sketch}", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, f"{sketch} sketch")
+    check(f"exit_sketch {sketch}", adapter.exit_sketch())
     name_last_feature(adapter, sketch)
     full = name_dimensions(
         adapter,
@@ -369,7 +369,7 @@ def _key_pin_profile_points() -> list[tuple[float, float]]:
     ]
 
 
-async def _key_pin_hole(adapter) -> list[tuple[str, str]]:
+def _key_pin_hole(adapter) -> list[tuple[str, str]]:
     """The key pin's chord hole, the drive collar's flat-pin way: on a plane
     through the station (section A-A's cutting plane, so the hole's marked
     sizes and locations print there), a stepped half profile beside the
@@ -381,7 +381,7 @@ async def _key_pin_hole(adapter) -> list[tuple[str, str]]:
 
     check(
         f"create_plane {_KEY_PIN_PLANE}",
-        await adapter.create_plane(
+        adapter.create_plane(
             CreatePlaneParameters(
                 mode="offset", base_plane="Front Plane", offset=KEY_PIN_Z
             )
@@ -397,7 +397,7 @@ async def _key_pin_hole(adapter) -> list[tuple[str, str]]:
     blank_reference_geometry(adapter, ((_KEY_PIN_PLANE, "PLANE"),))
 
     hole = SketchDims()
-    check("create_sketch key-pin hole", await adapter.create_sketch(_KEY_PIN_PLANE))
+    check("create_sketch key-pin hole", adapter.create_sketch(_KEY_PIN_PLANE))
     # Model X runs along the sketch's u, model Y along its v.
     to_sketch = _sketch_mapper(adapter, u_axis=0, v_axis=1, label="key-pin hole")
     origin = to_sketch((0.0, 0.0, KEY_PIN_Z))
@@ -408,23 +408,23 @@ async def _key_pin_hole(adapter) -> list[tuple[str, str]]:
     set_sketch_direct_db(adapter, True)
     axis = check(
         "key-pin hole centreline",
-        await adapter.add_centerline(*points[-1], *points[0]),
+        adapter.add_centerline(*points[-1], *points[0]),
     )
-    lines = await add_line_chain(adapter, points)
+    lines = add_line_chain(adapter, points)
     set_sketch_direct_db(adapter, False)
     for index, line in enumerate(lines):
         (x0, _), (x1, _) = model[index], model[(index + 1) % len(lines)]
         relation = "vertical" if x0 == x1 else "horizontal"
         check(
             f"key-pin hole {relation} {line}",
-            await adapter.add_sketch_constraint(line, None, relation),
+            adapter.add_sketch_constraint(line, None, relation),
         )
     check(
         "key-pin hole centreline horizontal",
-        await adapter.add_sketch_constraint(axis, None, "horizontal"),
+        adapter.add_sketch_constraint(axis, None, "horizontal"),
     )
     _out_end, ream, stop, drill, _in_end, _on_axis = lines
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{_out_end}.start",
         "origin",
@@ -433,7 +433,7 @@ async def _key_pin_hole(adapter) -> list[tuple[str, str]]:
         "key-pin chord from the hub axis",
     )
     hole.record("KeyPinChord", '"KeyPinChord"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{stop}.start",
         "origin",
@@ -442,7 +442,7 @@ async def _key_pin_hole(adapter) -> list[tuple[str, str]]:
         "key-pin ream stop from the hub axis",
     )
     hole.record("KeyPinStop", '"KeyPinStop"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{ream}.start",
         f"{ream}.end",
@@ -451,7 +451,7 @@ async def _key_pin_hole(adapter) -> list[tuple[str, str]]:
         "key-pin ream run from past the O.D.",
     )
     hole.record("KeyPinReamRun")
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{drill}.start",
         f"{drill}.end",
@@ -461,23 +461,23 @@ async def _key_pin_hole(adapter) -> list[tuple[str, str]]:
     )
     hole.record("KeyPinDrillRun")
     ream_text = to_sketch((_KEY_PIN_OUT / 2.0, model[1][1] - 2.0, KEY_PIN_Z))
-    await add_diametric_linear_dimension(adapter, axis, ream, ream_text, "KeyPinDia")
+    add_diametric_linear_dimension(adapter, axis, ream, ream_text, "KeyPinDia")
     hole.record("KeyPinDia", '"KeyPinHoleDia"')
     drill_text = to_sketch((-_KEY_PIN_OUT / 2.0, model[3][1] - 2.0, KEY_PIN_Z))
-    await add_diametric_linear_dimension(
+    add_diametric_linear_dimension(
         adapter, axis, drill, drill_text, "KeyPinDrillDia"
     )
     hole.record("KeyPinDrillDia", '"KeyPinDrillDia"')
-    await ensure_fully_defined(adapter, "key-pin hole sketch")
-    check("exit_sketch key-pin hole", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "key-pin hole sketch")
+    check("exit_sketch key-pin hole", adapter.exit_sketch())
     name_last_feature(adapter, "KeyPinProfile")
     return jobs + hole.apply(adapter, "KeyPinProfile")
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this
@@ -500,7 +500,7 @@ async def build(adapter) -> dict[str, str]:
         ("ScrewHoleDia", SCREW_HOLE_DIA),
         ("OilHoleDia", OIL_HOLE_DIA),
     ):
-        await set_global(adapter, name, f"{value}mm")
+        set_global(adapter, name, f"{value}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -511,11 +511,11 @@ async def build(adapter) -> dict[str, str]:
     # prints as a reference runs from the spigot's end (R9-68); the hub
     # body's own length is the remainder, never printed.
     profile = SketchDims()
-    check("create_sketch hub profile", await adapter.create_sketch("Top"))
+    check("create_sketch hub profile", adapter.create_sketch("Top"))
     set_sketch_direct_db(adapter, True)
     axis = check(
         "hub axis",
-        await adapter.add_centerline(0.0, _SPIGOT_END_V, 0.0, _HUB_FRONT_V),
+        adapter.add_centerline(0.0, _SPIGOT_END_V, 0.0, _HUB_FRONT_V),
     )
     points = [
         (0.0, _SPIGOT_END_V),
@@ -527,7 +527,7 @@ async def build(adapter) -> dict[str, str]:
         (HUB_R, _HUB_FRONT_V),
         (0.0, _HUB_FRONT_V),
     ]
-    lines = await add_line_chain(adapter, points)
+    lines = add_line_chain(adapter, points)
     set_sketch_direct_db(adapter, False)
     for index, line in enumerate(lines):
         p0 = points[index]
@@ -535,33 +535,33 @@ async def build(adapter) -> dict[str, str]:
         relation = "horizontal" if p0[1] == p1[1] else "vertical"
         check(
             f"hub profile {relation} {line}",
-            await adapter.add_sketch_constraint(line, None, relation),
+            adapter.add_sketch_constraint(line, None, relation),
         )
     check(
-        "hub axis vertical", await adapter.add_sketch_constraint(axis, None, "vertical")
+        "hub axis vertical", adapter.add_sketch_constraint(axis, None, "vertical")
     )
     # The axis on u = 0, the flange's rear face on v = 0.
     check(
         "spigot end centre on the axis",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{lines[0]}.start", "origin", "vertical_points"
         ),
     )
     check(
         "flange rear face on the Front Plane",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{lines[2]}.start", "origin", "horizontal_points"
         ),
     )
-    await add_diametric_linear_dimension(
+    add_diametric_linear_dimension(
         adapter, axis, lines[1], (SPIGOT_R + 4.0, _SPIGOT_END_V / 2.0), "SpigotDia"
     )
     profile.record("SpigotDia", '"SpigotDia"')
-    await add_diametric_linear_dimension(
+    add_diametric_linear_dimension(
         adapter, axis, lines[3], (FLANGE_R + 4.0, FLANGE_THICK / 2.0), "FlangeDia"
     )
     profile.record("FlangeDia", '"FlangeDia"')
-    await add_diametric_linear_dimension(
+    add_diametric_linear_dimension(
         adapter,
         axis,
         lines[5],
@@ -571,17 +571,17 @@ async def build(adapter) -> dict[str, str]:
     profile.record("HubDia", '"HubDia"')
     check(
         "spigot length",
-        await adapter.add_sketch_dimension(lines[1], None, "linear", SPIGOT_LENGTH),
+        adapter.add_sketch_dimension(lines[1], None, "linear", SPIGOT_LENGTH),
     )
     profile.record("SpigotLength", '"SpigotLength"')
     check(
         "flange thickness",
-        await adapter.add_sketch_dimension(lines[3], None, "linear", FLANGE_THICK),
+        adapter.add_sketch_dimension(lines[3], None, "linear", FLANGE_THICK),
     )
     profile.record("FlangeThick", '"FlangeThick"')
     # The overall, spigot end to hub front face (outer corners, where the
     # drawing's extension lines rise).
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{lines[1]}.start",
         f"{lines[6]}.start",
@@ -590,23 +590,23 @@ async def build(adapter) -> dict[str, str]:
         "hub overall length",
     )
     profile.record("HubLength", '"HubLength"')
-    await ensure_fully_defined(adapter, "hub profile")
-    check("exit_sketch hub profile", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "hub profile")
+    check("exit_sketch hub profile", adapter.exit_sketch())
     name_last_feature(adapter, "HubProfile")
     drive_jobs += profile.apply(adapter, "HubProfile")
-    check("revolve hub", await adapter.create_revolve(RevolveParameters(angle=360.0)))
+    check("revolve hub", adapter.create_revolve(RevolveParameters(angle=360.0)))
     name_last_feature(adapter, "HubBody")
     v_body = V_SPIGOT + V_FLANGE + V_HUB_BODY
-    await volume_check(adapter, "spigot + flange + hub body", v_body, 0.005 * v_body)
-    await bbox_extent_check(adapter, "overall length", "z", HUB_LENGTH)
-    await bbox_extent_check(adapter, "flange O.D.", "x", FLANGE_DIA)
+    volume_check(adapter, "spigot + flange + hub body", v_body, 0.005 * v_body)
+    bbox_extent_check(adapter, "overall length", "z", HUB_LENGTH)
+    bbox_extent_check(adapter, "flange O.D.", "x", FLANGE_DIA)
     _check_z_span(adapter)
 
     # The reamed bore: one round Front-plane cut, mid-plane, through spigot,
     # flange and body at once.
     bore = SketchDims()
-    check("create_sketch bore", await adapter.create_sketch("Front"))
-    await define_circle(
+    check("create_sketch bore", adapter.create_sketch("Front"))
+    define_circle(
         adapter,
         0.0,
         0.0,
@@ -616,26 +616,26 @@ async def build(adapter) -> dict[str, str]:
         names=(None, None, "BoreDia"),
         drives=(None, None, '"BoreDia"'),
     )
-    await ensure_fully_defined(adapter, "bore sketch")
-    check("exit_sketch bore", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "bore sketch")
+    check("exit_sketch bore", adapter.exit_sketch())
     name_last_feature(adapter, "BoreProfile")
     drive_jobs += bore.apply(adapter, "BoreProfile")
     check(
         "cut hub bore",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=2.0 * HUB_LENGTH, both_directions=True)
         ),
     )
     name_last_feature(adapter, "Bore")
-    await volume_check(adapter, "hub bore", v_body - V_BORE, 0.01 * V_BORE)
+    volume_check(adapter, "hub bore", v_body - V_BORE, 0.01 * V_BORE)
     v_body -= V_BORE
 
     # Three screw holes through the flange on the shared bolt circle: a
     # construction circle carries the printed diameter; each hole centre is
     # driven from the same global (0 deg on +X, 120 / 240 CCW from +Z).
     holes = SketchDims()
-    check("create_sketch screw holes", await adapter.create_sketch("Front"))
-    bolt_circle = await define_circle(
+    check("create_sketch screw holes", adapter.create_sketch("Front"))
+    bolt_circle = define_circle(
         adapter,
         0.0,
         0.0,
@@ -649,7 +649,7 @@ async def build(adapter) -> dict[str, str]:
     x_drive = f'"BoltCircleDia" * {BOLT_CIRCLE_X_FACTOR!r}'
     y_drive = f'"BoltCircleDia" * {BOLT_CIRCLE_Y_FACTOR!r}'
     for index, (x, y) in enumerate(screw_centres()):
-        await define_circle(
+        define_circle(
             adapter,
             x,
             y,
@@ -667,17 +667,17 @@ async def build(adapter) -> dict[str, str]:
                 '"ScrewHoleDia"',
             ),
         )
-    await ensure_fully_defined(adapter, "screw hole sketch")
-    check("exit_sketch screw holes", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "screw hole sketch")
+    check("exit_sketch screw holes", adapter.exit_sketch())
     name_last_feature(adapter, "ScrewHoleProfile")
     drive_jobs += holes.apply(adapter, "ScrewHoleProfile")
     # Blind past the flange into open air: the holes stand outside the hub.
     check(
         "cut screw holes",
-        await adapter.create_cut_extrude(ExtrusionParameters(depth=HUB_LENGTH)),
+        adapter.create_cut_extrude(ExtrusionParameters(depth=HUB_LENGTH)),
     )
     name_last_feature(adapter, "ScrewHoles")
-    await volume_check(
+    volume_check(
         adapter, "screw holes", v_body - V_SCREW_HOLES, 0.02 * V_SCREW_HOLES
     )
 
@@ -687,23 +687,23 @@ async def build(adapter) -> dict[str, str]:
     # station (R9-60: match-drilled at assembly opposite the key pin); the
     # circle's centre sits on its end.
     oil = SketchDims()
-    check("create_sketch oil hole", await adapter.create_sketch("Top"))
+    check("create_sketch oil hole", adapter.create_sketch("Top"))
     set_sketch_direct_db(adapter, True)
     station = check(
         "oil hole station line",
-        await adapter.add_line(0.0, _HUB_FRONT_V, 0.0, _KEY_PIN_V),
+        adapter.add_line(0.0, _HUB_FRONT_V, 0.0, _KEY_PIN_V),
     )
     set_sketch_direct_db(adapter, False)
     _as_construction(adapter, station)
     check(
         "oil hole station vertical",
-        await adapter.add_sketch_constraint(station, None, "vertical"),
+        adapter.add_sketch_constraint(station, None, "vertical"),
     )
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{station}.start", 0.0, _HUB_FRONT_V, "oil hole datum at hub front"
     )
     oil.record("OilHoleDatum", '"HubLength" - "SpigotLength"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{station}.start",
         f"{station}.end",
@@ -717,29 +717,29 @@ async def build(adapter) -> dict[str, str]:
     sketch_mgr.AddToDB = True
     try:
         circle = check(
-            "oil hole circle", await adapter.add_circle(0.0, _KEY_PIN_V, OIL_HOLE_R)
+            "oil hole circle", adapter.add_circle(0.0, _KEY_PIN_V, OIL_HOLE_R)
         )
     finally:
         sketch_mgr.AddToDB = prev_add_to_db
     check(
         "oil hole centre on the station",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{circle}.center", f"{station}.end", "coincident"
         ),
     )
     check(
         "oil hole diameter",
-        await adapter.add_sketch_dimension(circle, None, "diameter", OIL_HOLE_DIA),
+        adapter.add_sketch_dimension(circle, None, "diameter", OIL_HOLE_DIA),
     )
     oil.record("OilHoleDia", '"OilHoleDia"')
-    await ensure_fully_defined(adapter, "oil hole sketch")
-    check("exit_sketch oil hole", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "oil hole sketch")
+    check("exit_sketch oil hole", adapter.exit_sketch())
     name_last_feature(adapter, "OilHoleProfile")
     drive_jobs += oil.apply(adapter, "OilHoleProfile")
     # Reversed cut from the Top plane runs +Y: the +Y wall only.
     check(
         "cut oil hole",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=HUB_DIA, reverse_direction=True)
         ),
     )
@@ -747,41 +747,41 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs.append(
         (name_dimensions(adapter, "OilHole", ["OilHoleDepth"])[0], '"HubDia"')
     )
-    await volume_check(adapter, "oil hole", V_FINAL + V_KEY_PIN_HOLE, 0.05 * V_OIL_HOLE)
+    volume_check(adapter, "oil hole", V_FINAL + V_KEY_PIN_HOLE, 0.05 * V_OIL_HOLE)
 
     # The key-pin hole's printed station, on a hidden reference line.
-    drive_jobs += await _key_pin_reference(adapter)
+    drive_jobs += _key_pin_reference(adapter)
     blank_reference_sketches(adapter, REFERENCE_SKETCHES)
 
     # The key pin's chord hole: the .0615 ream from +X to its stop, the #56
     # knockout on through the -X wall.
-    drive_jobs += await _key_pin_hole(adapter)
+    drive_jobs += _key_pin_hole(adapter)
     check(
         "revolve-cut key-pin hole",
-        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
+        adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
     )
     name_last_feature(adapter, "KeyPinHole")
-    await volume_check(adapter, "key-pin hole", V_FINAL, 0.05 * V_KEY_PIN_HOLE)
+    volume_check(adapter, "key-pin hole", V_FINAL, 0.05 * V_KEY_PIN_HOLE)
 
     # The mate axis: the first reference axis, so it is Axis1.
-    axis = await name_bore_axis(
+    axis = name_bore_axis(
         adapter, "Top Plane", 0.0, "Right Plane", 0.0, "gear axis"
     )
     if axis != "Axis1":
         raise RuntimeError(f"gear axis came back {axis!r}, not Axis1")
 
     # Deferred drive equations, then re-check neutrality.
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    volume_check(
         adapter, "driven disc hub (equations neutral)", V_FINAL, 0.05 * V_OIL_HOLE
     )
     _check_z_span(adapter)
 
-    await apply_material(adapter, MATERIAL)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    report_mass_properties(adapter)
     # The bore carries its reamed band, the sliding fit on the sleeve's boss;
     # the key-pin ream its REAM_H7 band, the pin's press, and its chord and
     # stop the reamed hole's location band; the spigot carries
@@ -827,7 +827,7 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_properties(adapter, PART_NAME)
-    return await save_part_and_images(adapter, PART_NAME)
+    return save_part_and_images(adapter, PART_NAME)
 
 
 if __name__ == "__main__":

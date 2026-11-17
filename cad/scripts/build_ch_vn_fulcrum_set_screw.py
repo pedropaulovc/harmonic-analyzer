@@ -37,8 +37,8 @@ MATERIAL = SPEC.material  # alloy steel, black oxide
 __all__ = ["LENGTH", "PART_NAME", "build"]
 
 
-async def build(adapter) -> dict[str, str]:
-    return await build_stock_fastener(
+def build(adapter) -> dict[str, str]:
+    return build_stock_fastener(
         adapter,
         part_name=PART_NAME,
         components=(

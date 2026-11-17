@@ -99,26 +99,26 @@ def _classify(zs: list[float], n: int) -> str:
     return f"other(z {lo:.1f}..{hi:.1f})"
 
 
-async def _fresh_rig(adapter) -> str:
+def _fresh_rig(adapter) -> str:
     """New throwaway assembly: grounded shaft + one bushing seed. Never saved.
 
     Closes every open document first -- ~15 trials would otherwise pile up
     ~15 abandoned scratch assemblies in the session."""
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
-    check("create_assembly", await adapter.create_assembly())
-    await place_component(
+    check("create_assembly", adapter.create_assembly())
+    place_component(
         adapter, "ch-pivot-shaft", [PIVOT[0], PIVOT[1], PIVOT_SHAFT_Z],
         [0.0, 0.0, 0.0], IDENTITY, ground=True, label="pivot-shaft (grounded)",
     )
-    return await place_component(
+    return place_component(
         adapter, "pivot-bushing", [PIVOT[0], PIVOT[1], Z_TOP_GAP],
         [0.0, 0.0, 0.0], IDENTITY, ground=True, label="pivot-bushing seed",
     )
 
 
-async def _pattern_adapter(adapter, seed: str, n: int):
+def _pattern_adapter(adapter, seed: str, n: int):
     """The retired production call, verbatim (FlipDir1 False inside)."""
-    return await adapter.pattern_components_linear(
+    return adapter.pattern_components_linear(
         ComponentLinearPatternParameters(
             components=[seed], count=n, spacing=PITCH,
             direction_point=PIVOT_OD_PT,
@@ -126,15 +126,15 @@ async def _pattern_adapter(adapter, seed: str, n: int):
     )
 
 
-async def _pattern_axis(adapter, seed: str, n: int, flip: bool):
+def _pattern_axis(adapter, seed: str, n: int, flip: bool):
     """The REVIVED production shape: explicit reference-axis direction
     (BankZ = Top ∩ Right) + the plumbed flip_direction -- what
     build_ch_channel_assembly._pattern_bank now ships. Measures whether the
     axis pick is sense-deterministic and which flip value lands 'down'."""
-    axis = (await adapter.create_axis(
+    axis = (adapter.create_axis(
         CreateAxisParameters(mode="two_planes", planes=["Top Plane", "Right Plane"])
     )).data.name
-    return await adapter.pattern_components_linear(
+    return adapter.pattern_components_linear(
         ComponentLinearPatternParameters(
             components=[seed], count=n, spacing=PITCH,
             direction_name=axis, flip_direction=flip,
@@ -193,14 +193,14 @@ def _try_reverse_direction(adapter, pattern_name: str) -> str:
     return "moved" if moved > SEED_TOL else f"inert(max dz {moved:.3f})"
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     results: list[tuple[str, int, int, str]] = []  # (variant, n, rep, sense)
 
     # --- H1/H2: historic adapter call, face-point direction ------------------
     for n in (3, CHANNELS):
         for rep in range(REPS):
-            seed = await _fresh_rig(adapter)
-            res = await _pattern_adapter(adapter, seed, n)
+            seed = _fresh_rig(adapter)
+            res = _pattern_adapter(adapter, seed, n)
             if res.status != AdapterResultStatus.SUCCESS:
                 results.append(("face", n, rep, f"error({res.error})"))
                 continue
@@ -211,8 +211,8 @@ async def build(adapter) -> dict[str, str]:
     # --- Production shape: reference-axis direction (both flips) -------------
     for flip in (False, True):
         for rep in range(REPS):
-            seed = await _fresh_rig(adapter)
-            res = await _pattern_axis(adapter, seed, CHANNELS, flip)
+            seed = _fresh_rig(adapter)
+            res = _pattern_axis(adapter, seed, CHANNELS, flip)
             if res.status != AdapterResultStatus.SUCCESS:
                 results.append((f"axis-flip{flip}", CHANNELS, rep, f"error({res.error})"))
                 continue
@@ -222,7 +222,7 @@ async def build(adapter) -> dict[str, str]:
 
     # --- H3a: creation-time FlipDir1=True ------------------------------------
     for rep in range(REPS):
-        seed = await _fresh_rig(adapter)
+        seed = _fresh_rig(adapter)
         try:
             feat = _pattern_raw_flip(adapter, seed, CHANNELS)
             sense = _classify(_bushing_zs(adapter), CHANNELS)
@@ -232,8 +232,8 @@ async def build(adapter) -> dict[str, str]:
             results.append(("flipdir1", CHANNELS, rep, f"error({exc})"))
 
     # --- H3b: post-create D1ReverseDirection on a live pattern ---------------
-    seed = await _fresh_rig(adapter)
-    res = await _pattern_adapter(adapter, seed, CHANNELS)
+    seed = _fresh_rig(adapter)
+    res = _pattern_adapter(adapter, seed, CHANNELS)
     if res.status == AdapterResultStatus.SUCCESS:
         pattern_name = getattr(res.data, "name", "") or "LocalLPattern1"
         verdict = _try_reverse_direction(adapter, pattern_name)

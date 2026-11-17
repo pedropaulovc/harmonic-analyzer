@@ -9,7 +9,7 @@ from _simplified_part import save_simplified_part
 from _supplier_screw_reference import add_supplier_reference_sketch
 
 
-async def save_supplier_reference_part(
+def save_supplier_reference_part(
     adapter: Any,
     part_name: str,
     suppressed_features: tuple[str, ...],
@@ -19,5 +19,5 @@ async def save_supplier_reference_part(
     planes: Mapping[str, str] | None = None,
 ) -> dict[str, str]:
     """Add references in the final stock frame, then perform the normal save."""
-    await add_supplier_reference_sketch(adapter, dimensions, starts=starts, planes=planes)
-    return await save_simplified_part(adapter, part_name, suppressed_features)
+    add_supplier_reference_sketch(adapter, dimensions, starts=starts, planes=planes)
+    return save_simplified_part(adapter, part_name, suppressed_features)

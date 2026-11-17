@@ -299,7 +299,7 @@ def _configuration_definition_state(
     )
 
 
-async def _configuration_topology(
+def _configuration_topology(
     adapter: Any,
     configuration: str,
     teeth: int,
@@ -431,7 +431,7 @@ async def _configuration_topology(
             root_issues.append(
                 f"native bore web {minimum_web:.6f} < retained {required_web:.6f} mm"
             )
-    mass = await adapter.get_mass_properties()
+    mass = adapter.get_mass_properties()
     if not mass.is_success:
         raise RuntimeError(f"{configuration}: get_mass_properties failed: {mass.error}")
     volume = float(mass.data.volume)
@@ -493,7 +493,7 @@ def _failure_site(exc: BaseException) -> str:
     return f"{type(exc).__name__} at line {frame.lineno} in {frame.name}: {frame.line}"
 
 
-async def assert_saved_configuration_topology(
+def assert_saved_configuration_topology(
     adapter: Any, *, phase: str = "saved"
 ) -> dict[str, float]:
     """Fully solve each reopened configuration, then strictly validate its teeth.
@@ -532,7 +532,7 @@ async def assert_saved_configuration_topology(
     for configuration, teeth in ordered:
         try:
             activation_started = time.perf_counter()
-            activation = await adapter.set_active_configuration(configuration)
+            activation = adapter.set_active_configuration(configuration)
             activation_elapsed = time.perf_counter() - activation_started
             check(f"{phase} activate {configuration}", activation)
             rebuilt = bool(activation.data.get("rebuilt"))
@@ -547,7 +547,7 @@ async def assert_saved_configuration_topology(
                     f"rebuilt=False after {activation_elapsed:.6f}s"
                 )
                 continue
-            volume, observation, issues = await _configuration_topology(
+            volume, observation, issues = _configuration_topology(
                 adapter,
                 configuration,
                 teeth,
@@ -565,7 +565,7 @@ async def assert_saved_configuration_topology(
 
     try:
         restore_started = time.perf_counter()
-        restore = await adapter.set_active_configuration(CONFIGS[-1][0])
+        restore = adapter.set_active_configuration(CONFIGS[-1][0])
         restore_elapsed = time.perf_counter() - restore_started
         check(f"{phase} restore {CONFIGS[-1][0]}", restore)
         restore_rebuilt = bool(restore.data.get("rebuilt"))

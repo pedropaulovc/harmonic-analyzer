@@ -7,7 +7,6 @@ The caller must hold the shared seat and disable automatic launch/recovery.
 
 from __future__ import annotations
 
-import asyncio
 import os
 
 import win32com.client
@@ -49,16 +48,16 @@ def attach_running(adapter):
     )
 
 
-async def connected_probe(adapter, callback):
+def connected_probe(adapter, callback):
     _watchdog.start()
     try:
-        async with _telemetry.aspan("sw.attach"):
+        with _telemetry.span("sw.attach"):
             attach_running(adapter)
-        return await callback(adapter)
+        return callback(adapter)
     finally:
         try:
-            async with _telemetry.aspan("sw.disconnect"):
-                await adapter.disconnect()
+            with _telemetry.span("sw.disconnect"):
+                adapter.disconnect()
         finally:
             _watchdog.stop()
 
@@ -71,7 +70,7 @@ def run_owned_diagnostic(callback):
     require_owned_diagnostic_environment()
     try:
         with _telemetry.build_session("owned-native-diagnostic"):
-            result = asyncio.run(connected_probe(PyWin32Adapter({}), callback))
+            result = connected_probe(PyWin32Adapter({}), callback)
             _telemetry.info(f"owned diagnostic result: {result}")
     except Exception as error:
         _telemetry.error(f"owned diagnostic failed: {error}", exc_info=True)

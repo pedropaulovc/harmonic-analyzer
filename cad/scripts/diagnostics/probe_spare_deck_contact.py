@@ -452,7 +452,7 @@ def _final_checkpoint(report_path, report, errors, *, phase):
         return
 
 
-async def measure(adapter, report, report_path, expected_sha):
+def measure(adapter, report, report_path, expected_sha):
     owner = None
     errors = []
     completed = False
@@ -467,7 +467,7 @@ async def measure(adapter, report, report_path, expected_sha):
             baseline_inventory=sorted(map(str, owner.inventory())),
         )
         checkpoint(report_path, report)
-        await owner.open()
+        owner.open()
         report["before"] = document_state(owner)
         checkpoint(report_path, report)
         contact(owner, report)
@@ -480,7 +480,7 @@ async def measure(adapter, report, report_path, expected_sha):
     finally:
         if owner is not None:
             try:
-                await owner.close()
+                owner.close()
                 report["final_inventory"] = sorted(map(str, owner.inventory()))
             except BaseException as error:
                 errors.append(error)
@@ -500,7 +500,7 @@ async def measure(adapter, report, report_path, expected_sha):
     _raise_recorded_errors("spare seating diagnostic failed", errors)
 
 
-async def probe(adapter, directory, expected_sha):
+def probe(adapter, directory, expected_sha):
     import solidworks_mcp.adapters.pywin32_adapter as runtime_adapter
 
     if (
@@ -533,7 +533,7 @@ async def probe(adapter, directory, expected_sha):
     completed = False
     try:
         started = time.perf_counter()
-        await measure(adapter, report, report_path, expected_sha)
+        measure(adapter, report, report_path, expected_sha)
         completed = True
     except BaseException as error:
         errors.append(error)

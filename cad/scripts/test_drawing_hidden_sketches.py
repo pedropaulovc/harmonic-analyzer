@@ -9,7 +9,6 @@ is handled by ``part_sketches_shown`` instead.
 
 from __future__ import annotations
 
-import asyncio
 import ast
 import functools
 import inspect
@@ -556,11 +555,11 @@ def test_clamp_blanks_every_location_witness_it_creates(monkeypatch) -> None:
     sketch = SimpleNamespace(GetConstrainedStatus=lambda: 3)
     model = SimpleNamespace(GetActiveSketch2=lambda: sketch)
 
-    async def create_sketch(plane):
+    def create_sketch(plane):
         created.append(plane)
         return SimpleNamespace(is_success=True, data=None)
 
-    async def exit_sketch():
+    def exit_sketch():
         return SimpleNamespace(is_success=True, data=None)
 
     adapter = SimpleNamespace(
@@ -576,7 +575,7 @@ def test_clamp_blanks_every_location_witness_it_creates(monkeypatch) -> None:
     )
     monkeypatch.setattr(clamp, "name_last_feature", lambda _adapter, name: named.append(name))
     monkeypatch.setattr(clamp, "blank_reference_sketches", lambda _adapter, names: hidden.extend(names))
-    asyncio.run(clamp._location_profiles(adapter))
+    clamp._location_profiles(adapter)
     assert created == ["Top", "Top", "Right", "Right"]
     assert named == list(sources)
     assert hidden == named

@@ -181,7 +181,7 @@ def _seated(label: str, contact: ContactSolution, allowance: float) -> bool:
 # --------------------------------------------------------------- channel
 
 
-async def _calibrate_channel(
+def _calibrate_channel(
     adapter, amplitude: float, variant_index: int, report: dict
 ) -> dict:
     """Measure one channel station; returns the springs.yaml ``channel_seats`` row."""
@@ -204,13 +204,13 @@ async def _calibrate_channel(
         }
     )
     for refit in range(_MAX_CHANNEL_REFITS):
-        await build_spring(adapter, variant, pose.length_mm, views=[])
+        build_spring(adapter, variant, pose.length_mm, views=[])
         _close_active_part(adapter)
         titles: list[str] = []
         try:
-            check("create channel seat fixture", await adapter.create_assembly())
+            check("create channel seat fixture", adapter.create_assembly())
             fixture = _early_bound(adapter.currentModel, "IModelDoc2")
-            lever = await place_component(
+            lever = place_component(
                 adapter,
                 "ch-channel-lever",
                 [FULCRUM[0], FULCRUM[1], z_mid],
@@ -218,7 +218,7 @@ async def _calibrate_channel(
                 lever_rows,
                 label=f"channel-lever a={amplitude:g}",
             )
-            spring, hook = await place_components_batch(
+            spring, hook = place_components_batch(
                 adapter,
                 [
                     {
@@ -317,18 +317,18 @@ async def _calibrate_channel(
 # --------------------------------------------------------------- counter
 
 
-async def _build_counter_variant(adapter, name: str, length_mm: float) -> None:
-    check("create_part", await adapter.create_part())
+def _build_counter_variant(adapter, name: str, length_mm: float) -> None:
+    check("create_part", adapter.create_part())
     try:
-        await build_1330K524(adapter, None, length_mm=length_mm)
+        build_1330K524(adapter, None, length_mm=length_mm)
     finally:
         if hasattr(adapter, "_mcm_com_map"):
             delattr(adapter, "_mcm_com_map")
     _blank_recipe_references(adapter)
-    await force_rebuild(adapter)
-    await apply_material(adapter, str(_config.parts("sm-vn-counter-spring")["material"]))
-    await apply_color(adapter, SPRING_BLACK)
-    await save_part_and_images(adapter, name, [])
+    force_rebuild(adapter)
+    apply_material(adapter, str(_config.parts("sm-vn-counter-spring")["material"]))
+    apply_color(adapter, SPRING_BLACK)
+    save_part_and_images(adapter, name, [])
     _close_active_part(adapter)
 
 
@@ -385,7 +385,7 @@ def _require_current_support_parts() -> None:
         )
 
 
-async def _calibrate_counter(
+def _calibrate_counter(
     adapter, preset: str, amplitudes: list[float], report: dict
 ) -> dict:
     """Measure one preset's counter seat; returns the ``presets.<name>.counter`` row."""
@@ -401,16 +401,16 @@ async def _calibrate_counter(
         - sm_gooseneck_geom.ARM_Y
     )
     variant = f"sm-vn-counter-spring-calib-{preset}"
-    await _build_counter_variant(adapter, variant, seed.length_mm)
+    _build_counter_variant(adapter, variant, seed.length_mm)
     lower_direction = (-ux, -uy, 0.0)
     upper_direction = (0.0, -1.0, 0.0)
     bracket = spring_mounts.MIN_CLEARANCE_MM / 2.0
     titles: list[str] = []
     try:
-        check("create counter seat fixture", await adapter.create_assembly())
+        check("create counter seat fixture", adapter.create_assembly())
         fixture = _early_bound(adapter.currentModel, "IModelDoc2")
         screw_rows = ROT_Y_POS90
-        boss, counter, gooseneck, plug, screw = await place_components_batch(
+        boss, counter, gooseneck, plug, screw = place_components_batch(
             adapter,
             [
                 {
@@ -687,7 +687,7 @@ def _merge_yaml(
     _replace_bytes(path, (header + "\n" + text).encode("utf-8"))
 
 
-async def calibrate(
+def calibrate(
     adapter,
     presets: list[str],
     output: Path,
@@ -720,11 +720,11 @@ async def calibrate(
         if mode is CalibrationMode.ALL:
             for index, amplitude in enumerate(amplitudes):
                 channel_rows.append(
-                    await _calibrate_channel(adapter, amplitude, index, report)
+                    _calibrate_channel(adapter, amplitude, index, report)
                 )
             report["channel_seats"] = channel_rows
         for name in presets:
-            counters[name] = await _calibrate_counter(
+            counters[name] = _calibrate_counter(
                 adapter, name, [float(a) for a in table[name]["amplitudes_mm"]], report
             )
         report["counters"] = counters

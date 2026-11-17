@@ -10,7 +10,6 @@ specific build step the migration changed.
 
 from __future__ import annotations
 
-import asyncio
 import sys
 from pathlib import Path
 
@@ -33,7 +32,7 @@ def _needs_rebuild(model) -> int:
     return int(v) if v is not None else -999
 
 
-async def main() -> None:
+def main() -> None:
     arg = sys.argv[1] if len(sys.argv) > 1 else "fr-frame"
     # Accept either a stem (resolved under this repo's OUT) or an absolute path,
     # so the same probe can point at another worktree's artifact.
@@ -42,9 +41,9 @@ async def main() -> None:
 
     adapter = PyWin32Adapter({})
     with _telemetry.span("probe.saved_rebuild", target=str(path), stem=stem):
-        await adapter.connect()
+        adapter.connect()
         adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
-        await adapter.open_model(str(path))
+        adapter.open_model(str(path))
         model = _early_bound(adapter.currentModel, "IModelDoc2")
         _telemetry.info(f"[{stem}] assembly NeedsRebuild2 = {_needs_rebuild(model)}")
 
@@ -76,4 +75,4 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

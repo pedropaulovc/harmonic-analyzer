@@ -45,8 +45,8 @@ from sh_column_clamp_back_spec import (
 PART_NAME = "sh-column-clamp-back"
 
 
-async def build(adapter) -> dict[str, str]:
-    await build_arc(
+def build(adapter) -> dict[str, str]:
+    build_arc(
         adapter,
         part_name=PART_NAME,
         depth=DEPTH,
@@ -88,7 +88,7 @@ async def build(adapter) -> dict[str, str]:
     apply_drawing_properties(
         adapter, PART_NAME, {"Isometric View Note": ISOMETRIC_VIEW_NOTE}
     )
-    return await save_part_and_images(adapter, PART_NAME)
+    return save_part_and_images(adapter, PART_NAME)
 
 
 if __name__ == "__main__":

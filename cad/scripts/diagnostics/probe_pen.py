@@ -61,34 +61,34 @@ def _status(adapter, comp):
     return "??"
 
 
-async def build(adapter):
-    check("create_assembly", await adapter.create_assembly())
+def build(adapter):
+    check("create_assembly", adapter.create_assembly())
     # Fixed seed (v-block) so the rod is not the auto-fixed first component.
-    await place_component(adapter, "pn-pen-v-block", list(VBLOCK_POS),
+    place_component(adapter, "pn-pen-v-block", list(VBLOCK_POS),
                           [0.0, 0.0, 0.0], IDENTITY, ground=True)
-    rod = await place_component(adapter, "pn-pen-rod", list(PEN_ROD_POS),
+    rod = place_component(adapter, "pn-pen-rod", list(PEN_ROD_POS),
                                [0.0, 0.0, 0.0], IDENTITY, ground=False)
     rod_o = _org(adapter, rod)
     log(f"rod org = {rod_o}")
     top0 = world_point(adapter, rod, [2.5, 120.0, 2.5])  # rod top corner (off-axis)
     log(f"rod top BEFORE = {top0}")
 
-    await distance_driver(adapter, named_ref(f"Axis1@{rod}", "AXIS"),
+    distance_driver(adapter, named_ref(f"Axis1@{rod}", "AXIS"),
                           named_ref("Front Plane", "PLANE"), abs(rod_o[2]),
                           label="rod slide depth (Front)", verify=(rod, rod_o))
     log(f"after depth(Front d={abs(rod_o[2]):.1f}): {_status(adapter, rod)}")
 
-    await distance_driver(adapter, named_ref(f"Axis1@{rod}", "AXIS"),
+    distance_driver(adapter, named_ref(f"Axis1@{rod}", "AXIS"),
                           named_ref("Right Plane", "PLANE"), abs(rod_o[0]),
                           label="rod slide across (Right)", verify=(rod, rod_o))
     log(f"after across(Right d={abs(rod_o[0]):.1f}): {_status(adapter, rod)}")
 
-    await angle_driver(adapter, named_ref(f"Front Plane@{rod}", "PLANE"),
+    angle_driver(adapter, named_ref(f"Front Plane@{rod}", "PLANE"),
                        named_ref("Front Plane", "PLANE"), 0.0,
                        label="rod spin snapshot", verify=(rod, rod_o))
     log(f"after angle(Front): {_status(adapter, rod)}")
 
-    await distance_driver(adapter, named_ref(f"Top Plane@{rod}", "PLANE"),
+    distance_driver(adapter, named_ref(f"Top Plane@{rod}", "PLANE"),
                           named_ref("Top Plane", "PLANE"), abs(rod_o[1]),
                           label="rod travel snapshot", verify=(rod, rod_o))
     log(f"after Y snapshot(d={abs(rod_o[1]):.1f}): {_status(adapter, rod)}")
@@ -97,9 +97,9 @@ async def build(adapter):
     log(f"rod top AFTER = {top1}  (flip if jumped from {top0})")
 
     # Marker rides the rod (pen carriage) via a Lock mate.
-    mk = await place_component(adapter, "pn-vn-pen-marker", list(MARKER_POS),
+    mk = place_component(adapter, "pn-vn-pen-marker", list(MARKER_POS),
                               [0.0, 0.0, 0.0], IDENTITY, ground=False)
-    await lock_mate(adapter, named_ref(f"Front Plane@{mk}", "PLANE"),
+    lock_mate(adapter, named_ref(f"Front Plane@{mk}", "PLANE"),
                     named_ref(f"Front Plane@{rod}", "PLANE"),
                     label="marker locked to rod")
     log(f"after lock marker: {_status(adapter, mk)}")

@@ -1078,11 +1078,11 @@ def _prove_pad_hole_centre_mark(adapter: Any, top: Any) -> None:
     )
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open pinion-spring source", await adapter.open_model(str(SOURCE)))
+    check("open pinion-spring source", adapter.open_model(str(SOURCE)))
     read_required_properties(
         adapter.currentModel,
         (
@@ -1208,7 +1208,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.048)
     add_property_linked_note(adapter, "Isometric View Note", 0.325, 0.115)
 
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Pinion Return Leaf Spring Manufacturing Drawing",

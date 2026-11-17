@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import contextlib
 import math
 
@@ -56,12 +55,12 @@ def test_spec_is_the_live_catalogue_screw() -> None:
 def test_stock_build_seats_the_underside_on_the_part_origin(monkeypatch) -> None:
     seen: dict = {}
 
-    async def fake_build(adapter, **kwargs):
+    def fake_build(adapter, **kwargs):
         seen.update(kwargs)
         return {}
 
     monkeypatch.setattr(part, "build_stock_fastener", fake_build)
-    asyncio.run(part.build(None))
+    part.build(None)
     (component,) = seen["components"]
     assert component.sku == "93075A199"
     assert component.author is recipe.build_93075A199
@@ -102,21 +101,21 @@ class _Recorder:
     def log(self, name: str, args=(), kwargs=None) -> None:
         self.events.append((name, tuple(args), dict(kwargs or {})))
 
-    async def _async(self, name: str, *args, **kwargs):
+    def _async(self, name: str, *args, **kwargs):
         self.log(name, args, kwargs)
         return "ok"
 
-    async def create_sketch(self, *args):
-        return await self._async("create_sketch", *args)
+    def create_sketch(self, *args):
+        return self._async("create_sketch", *args)
 
-    async def exit_sketch(self, *args):
-        return await self._async("exit_sketch", *args)
+    def exit_sketch(self, *args):
+        return self._async("exit_sketch", *args)
 
-    async def create_revolve(self, *args):
-        return await self._async("create_revolve", *args)
+    def create_revolve(self, *args):
+        return self._async("create_revolve", *args)
 
-    async def create_extrusion(self, *args):
-        return await self._async("create_extrusion", *args)
+    def create_extrusion(self, *args):
+        return self._async("create_extrusion", *args)
 
 
 def _record(monkeypatch, author) -> list[tuple]:
@@ -130,7 +129,7 @@ def _record(monkeypatch, author) -> list[tuple]:
         return call
 
     def async_logger(name):
-        async def call(*args, **kwargs):
+        def call(*args, **kwargs):
             adapter.log(name, args, kwargs)
 
         return call
@@ -165,7 +164,7 @@ def _record(monkeypatch, author) -> list[tuple]:
         )[1],
     )
     monkeypatch.setattr(_telemetry, "info", lambda *a, **k: None)
-    asyncio.run(author(adapter))
+    author(adapter)
     adapter.log("_mcm_com_map", tuple(adapter._mcm_com_map(["x", "y", "z"])))
     return adapter.events
 

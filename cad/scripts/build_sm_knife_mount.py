@@ -207,28 +207,28 @@ _HOLE_ROW_START = (PIN_HOLE_X, 0.0)
 _HOLE_ROW_END = (PIN_HOLE_X, -HOLE_ROW_FACE_DISTANCE)
 
 
-async def _volume(adapter) -> float:
-    res = await adapter.get_mass_properties()
+def _volume(adapter) -> float:
+    res = adapter.get_mass_properties()
     return res.data.volume if res.is_success else float("nan")
 
 
-async def _mass(adapter) -> tuple[float, list[float]]:
-    res = await adapter.get_mass_properties()
+def _mass(adapter) -> tuple[float, list[float]]:
+    res = adapter.get_mass_properties()
     if not res.is_success:
         raise RuntimeError(f"knife-mount mass properties failed: {res.error}")
     return float(res.data.volume), [float(c) for c in res.data.center_of_mass]
 
 
 @_telemetry.traced("part.knife_mount.hole_row_reference")
-async def hole_row_reference(adapter) -> list[tuple[str, str]]:
+def hole_row_reference(adapter) -> list[tuple[str, str]]:
     """Sketch the datum-B axis -> front-face reference line; return its drives."""
-    check(f"create_sketch {HOLE_ROW_SKETCH}", await adapter.create_sketch("Top"))
+    check(f"create_sketch {HOLE_ROW_SKETCH}", adapter.create_sketch("Top"))
     # Direct-to-DB: the line runs along B's axis line through the slip seat,
     # so creation-time inference would over-define the sketch.
     set_sketch_direct_db(adapter, True)
     line = check(
         f"{HOLE_ROW_SKETCH} line",
-        await adapter.add_line(
+        adapter.add_line(
             _HOLE_ROW_START[0], _HOLE_ROW_START[1], _HOLE_ROW_END[0], _HOLE_ROW_END[1]
         ),
     )
@@ -241,9 +241,9 @@ async def hole_row_reference(adapter) -> list[tuple[str, str]]:
         raise RuntimeError(f"{line} did not take the construction flag")
     check(
         f"{HOLE_ROW_SKETCH} vertical",
-        await adapter.add_sketch_constraint(line, None, "vertical"),
+        adapter.add_sketch_constraint(line, None, "vertical"),
     )
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{line}.start",
         f"{line}.end",
@@ -251,11 +251,11 @@ async def hole_row_reference(adapter) -> list[tuple[str, str]]:
         HOLE_ROW_FACE_DISTANCE,
         HOLE_ROW_SKETCH,
     )
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{line}.start", *_HOLE_ROW_START, HOLE_ROW_SKETCH
     )
-    await ensure_fully_defined(adapter, f"{HOLE_ROW_SKETCH} sketch")
-    check(f"exit_sketch {HOLE_ROW_SKETCH}", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, f"{HOLE_ROW_SKETCH} sketch")
+    check(f"exit_sketch {HOLE_ROW_SKETCH}", adapter.exit_sketch())
     name_last_feature(adapter, HOLE_ROW_SKETCH)
     full = name_dimensions(adapter, HOLE_ROW_SKETCH, ["HoleRowFace", "HoleRowAnchorX"])
     dimension = _early_bound(adapter.currentModel.Parameter(full[0]), "IDimension")
@@ -327,15 +327,15 @@ def _open_top_seat_sketch(
     return mapped, w_out > 0.0
 
 
-async def _volume(adapter) -> float:
-    res = await adapter.get_mass_properties()
+def _volume(adapter) -> float:
+    res = adapter.get_mass_properties()
     return res.data.volume if res.is_success else float("nan")
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations): the bore radius + its top clearance,
@@ -344,17 +344,17 @@ async def build(adapter) -> dict[str, str]:
     # bore centre and block bottom track when a primitive changes. The mm suffix
     # is load-bearing -- this is an INCH document and the equation manager reads
     # BARE numbers in document units (an unsuffixed 12.7 = 12.7 in, 25.4x too big).
-    await set_global(adapter, "RBore", f"{R_BORE}mm")
-    await set_global(adapter, "TopClear", f"{TOP_CLEAR}mm")
-    await set_global(adapter, "SupportZThick", f"{SUPPORT_Z_THICK}mm")
-    await set_global(adapter, "BlkHalfX", f"{BLK_HALF_X}mm")
-    await set_global(adapter, "Wall", f"{WALL}mm")
-    await set_global(adapter, "BlkTop", f"{BLK_TOP}mm")
-    await set_global(adapter, "PinHoleX", f"{PIN_HOLE_X}mm")
-    await set_global(adapter, "PinHoleDia", f"{PIN_HOLE_DIA}mm")
-    await set_global(adapter, "PinHoleDepth", f"{PIN_HOLE_DEPTH}mm")
-    await set_global(adapter, "BoreCy", '"TopClear" - "RBore"')
-    await set_global(adapter, "BlkBot", '"BoreCy" - "RBore" - "Wall"')
+    set_global(adapter, "RBore", f"{R_BORE}mm")
+    set_global(adapter, "TopClear", f"{TOP_CLEAR}mm")
+    set_global(adapter, "SupportZThick", f"{SUPPORT_Z_THICK}mm")
+    set_global(adapter, "BlkHalfX", f"{BLK_HALF_X}mm")
+    set_global(adapter, "Wall", f"{WALL}mm")
+    set_global(adapter, "BlkTop", f"{BLK_TOP}mm")
+    set_global(adapter, "PinHoleX", f"{PIN_HOLE_X}mm")
+    set_global(adapter, "PinHoleDia", f"{PIN_HOLE_DIA}mm")
+    set_global(adapter, "PinHoleDepth", f"{PIN_HOLE_DEPTH}mm")
+    set_global(adapter, "BoreCy", '"TopClear" - "RBore"')
+    set_global(adapter, "BlkBot", '"BoreCy" - "RBore" - "Wall"')
 
     # Each sketch records its dim names + drive equations as the define_* helper
     # emits them; the equations are collected here and applied in one deferred
@@ -371,15 +371,15 @@ async def build(adapter) -> dict[str, str]:
     #    across the front view to the left, under the bore's position-frame
     #    leader (layout audit leader-crosses-line, MHA-SM-02).
     block_dims = SketchDims()
-    check("create_sketch block", await adapter.create_sketch("Front"))
+    check("create_sketch block", adapter.create_sketch("Front"))
     block_rect = [
         (BLK_HALF_X, BLK_BOT),
         (-BLK_HALF_X, BLK_BOT),
         (-BLK_HALF_X, BLK_TOP),
         (BLK_HALF_X, BLK_TOP),
     ]
-    block = await add_line_chain(adapter, block_rect)
-    await define_rectilinear_chain(
+    block = add_line_chain(adapter, block_rect)
+    define_rectilinear_chain(
         adapter,
         block,
         block_rect,
@@ -393,19 +393,19 @@ async def build(adapter) -> dict[str, str]:
             '-"BlkBot"',
         ],
     )
-    await ensure_fully_defined(adapter, "block sketch")
-    check("exit_sketch block", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "block sketch")
+    check("exit_sketch block", adapter.exit_sketch())
     name_last_feature(adapter, "BlockProfile")
     drive_jobs += block_dims.apply(adapter, "BlockProfile")
     check(
         "extrude block",
-        await adapter.create_extrusion(
+        adapter.create_extrusion(
             ExtrusionParameters(depth=SUPPORT_Z_THICK, both_directions=True)
         ),
     )
     name_last_feature(adapter, "Block")
     expected = 2.0 * BLK_HALF_X * (BLK_TOP - BLK_BOT) * SUPPORT_Z_THICK
-    vol = await _volume(adapter)
+    vol = _volume(adapter)
     _telemetry.info(f"volume after block: {vol:.1f} mm^3 (analytic {expected:.1f})")
     if abs(vol - expected) > 0.005 * expected:
         raise RuntimeError(f"block volume {vol:.1f} != {expected:.1f}")
@@ -415,8 +415,8 @@ async def build(adapter) -> dict[str, str]:
     #    ridge so the rest of the hex clears. On the Y-axis (x 0): only the
     #    centre-Z + diameter are dims (the X is a relation).
     bore_dims = SketchDims()
-    check("create_sketch bore", await adapter.create_sketch("Front"))
-    await define_circle(
+    check("create_sketch bore", adapter.create_sketch("Front"))
+    define_circle(
         adapter,
         0.0,
         BORE_CY,
@@ -426,19 +426,19 @@ async def build(adapter) -> dict[str, str]:
         names=("BoreCx", "BoreCz", "BoreDia"),
         drives=(None, '-"BoreCy"', '2 * "RBore"'),
     )
-    await ensure_fully_defined(adapter, "bore sketch")
-    check("exit_sketch bore", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "bore sketch")
+    check("exit_sketch bore", adapter.exit_sketch())
     name_last_feature(adapter, "BoreProfile")
     drive_jobs += bore_dims.apply(adapter, "BoreProfile")
     check(
         "cut knife bore",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
         ),
     )
     name_last_feature(adapter, "KnifeBore")
     expected -= math.pi * R_BORE**2 * SUPPORT_Z_THICK
-    vol = await _volume(adapter)
+    vol = _volume(adapter)
     _telemetry.info(f"volume after bore: {vol:.1f} mm^3 (analytic {expected:.1f})")
     if abs(vol - expected) > 0.01 * expected:
         raise RuntimeError(f"bore volume {vol:.1f} != {expected:.1f}")
@@ -478,7 +478,7 @@ async def build(adapter) -> dict[str, str]:
         # gate below proves the cut.
     )
     expected -= blind_hole_volume_mm3(STUD_TAP_DIA, STUD_TAP_DRILL_DEPTH)
-    vol = await _volume(adapter)
+    vol = _volume(adapter)
     _telemetry.info(f"volume after stud tap: {vol:.1f} mm^3 (analytic {expected:.1f})")
     if abs(vol - expected) > 0.01 * expected:
         raise RuntimeError(f"stud tap volume {vol:.1f} != {expected:.1f}")
@@ -489,7 +489,7 @@ async def build(adapter) -> dict[str, str]:
     # flat-floored by a plain cut-extrude.  Owner ruling 2026-11-08 (Pedro),
     # #2144 item 11.3: the -X slot (datum C) is deleted.  A second seat point
     # PIN_HOLE_X -X of the tap axis only orients the face sketch's axes.
-    before, com_before = await _mass(adapter)
+    before, com_before = _mass(adapter)
     pin = SketchDims()
     (b_uv, ref_uv), normal_out = _open_top_seat_sketch(
         adapter, (PIN_HOLE_X, -PIN_HOLE_X), on_seat=2
@@ -502,7 +502,7 @@ async def build(adapter) -> dict[str, str]:
     if abs(across) > 1e-4:
         raise RuntimeError(f"datum-B hole centre mapped {across:g} mm off the dowel line")
     b_uv = (b_uv[0], 0.0) if along_u else (0.0, b_uv[1])
-    await define_circle(
+    define_circle(
         adapter,
         *b_uv,
         _R_PIN,
@@ -511,14 +511,14 @@ async def build(adapter) -> dict[str, str]:
         names=("PinHoleX", "PinHoleX", "PinHoleDia"),
         drives=('"PinHoleX"', '"PinHoleX"', '"PinHoleDia"'),
     )
-    await ensure_fully_defined(adapter, "dowel slip-hole sketch")
-    check("exit_sketch dowel slip hole", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "dowel slip-hole sketch")
+    check("exit_sketch dowel slip hole", adapter.exit_sketch())
     name_last_feature(adapter, "PinHoleProfile")
     drive_jobs += pin.apply(adapter, "PinHoleProfile")
     # A cut runs opposite the sketch normal unless reversed.
     check(
         "cut dowel slip hole",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=PIN_HOLE_DEPTH, reverse_direction=not normal_out)
         ),
     )
@@ -527,7 +527,7 @@ async def build(adapter) -> dict[str, str]:
         (name_dimensions(adapter, "PinHole", ["PinHoleDepth"])[0], '"PinHoleDepth"')
     ]
     expected -= V_PIN
-    after, com_after = await _mass(adapter)
+    after, com_after = _mass(adapter)
     if abs((before - after) - V_PIN) > 0.02 * V_PIN:
         raise RuntimeError(
             f"dowel slip hole removed {before - after:.2f} mm^3, expected "
@@ -545,30 +545,30 @@ async def build(adapter) -> dict[str, str]:
         f"dowel slip hole (top-seat sketch B {b_uv}) removed "
         f"{before - after:.2f} mm^3 (analytic {V_PIN:.2f})"
     )
-    drive_jobs += await hole_row_reference(adapter)
+    drive_jobs += hole_row_reference(adapter)
 
     # Named axis = the knife-edge contact ridge line (part origin, along Z). The
     # assembly mates Axis3@sm-summing-lever (the hex ridge) coincident to it.
-    await name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", 0.0, "knife axis")
+    name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", 0.0, "knife axis")
 
     # Apply the deferred drive equations after the whole model + a rebuild
     # exists, then re-check: each equation evaluates to the value just built, so
     # the geometry must not move -- the re-check below is the proof.
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    volume_check(
         adapter, "driven knife mount (equations neutral)", expected, 0.01 * expected
     )
     # Saved shown, the reference line would print in every assembly render.
     blank_reference_sketches(adapter, (HOLE_ROW_SKETCH,))
 
-    await apply_material(adapter, MATERIAL)
+    apply_material(adapter, MATERIAL)
     # ch18 p.42: heat-treated and left unpainted -- a dark grey, not the
     # database steel's bright render nor the frame's green.
-    await apply_color(adapter, HARDENED_STEEL)
-    await report_mass_properties(adapter)
+    apply_color(adapter, HARDENED_STEEL)
+    report_mass_properties(adapter)
 
     # Explicit slip band on datum B's Ø (its station and depth are governed
     # by their places).  The band is equal either side, so it prints +/- on
@@ -611,7 +611,7 @@ async def build(adapter) -> dict[str, str]:
         PART_NAME,
         {"Isometric View Note": ISOMETRIC_VIEW_NOTE},
     )
-    return await save_part_and_images(adapter, PART_NAME)
+    return save_part_and_images(adapter, PART_NAME)
 
 
 if __name__ == "__main__":

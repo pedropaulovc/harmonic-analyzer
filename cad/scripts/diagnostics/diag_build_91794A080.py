@@ -33,28 +33,28 @@ from diagnostics.diag_mcmaster_lib import (  # noqa: E402
 
 
 @stock_recipe("91794A080", threaded=True)
-async def build_91794A080(adapter, truth=None):
-    await build_fillister(adapter, "91794A080", FILLISTER_SIZE)
+def build_91794A080(adapter, truth=None):
+    build_fillister(adapter, "91794A080", FILLISTER_SIZE)
 
 
-async def build_catalog(adapter) -> dict[str, str]:
+def build_catalog(adapter) -> dict[str, str]:
     """Build and save the catalog recipe without claiming vendor equivalence."""
     with _telemetry.span("catalog.build", label="91794A080"):
-        check("create_part 91794A080", await adapter.create_part())
+        check("create_part 91794A080", adapter.create_part())
         assert_seat_sketch_baseline(adapter, "91794A080")
-        await build_91794A080(adapter)
+        build_91794A080(adapter)
         props = mass_properties(adapter)
         if not props["volume_mm3"] > 0.0:
             raise RuntimeError("91794A080 catalog build has no solid volume")
         OUT_DIR.mkdir(parents=True, exist_ok=True)
         path = OUT_DIR / "91794A080-catalog.SLDPRT"
-        check(f"save -> {path}", await adapter.save_file(str(path.resolve())))
+        check(f"save -> {path}", adapter.save_file(str(path.resolve())))
         artefacts = {"sldprt": str(path)}
-        artefacts.update(await export_views(adapter, "91794A080-catalog"))
+        artefacts.update(export_views(adapter, "91794A080-catalog"))
         _telemetry.success(
             f"91794A080 catalog build saved: volume {props['volume_mm3']:.4f} mm^3"
         )
-        await close_all(adapter)
+        close_all(adapter)
     return artefacts
 
 

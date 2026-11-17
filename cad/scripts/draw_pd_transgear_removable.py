@@ -370,11 +370,11 @@ def _assert_dimension_callouts(adapter: Any, annotations: list[Any]) -> None:
         raise RuntimeError(f"imported callouts differ from the part's: {wrong!r}")
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open transgear-removable source", await adapter.open_model(str(SOURCE)))
+    check("open transgear-removable source", adapter.open_model(str(SOURCE)))
     read_required_properties(
         adapter.currentModel,
         (
@@ -485,7 +485,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # The callout rows and the labels are proved on the drawing the last
     # settling rebuild leaves, not as each was placed.
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Removable Chain Sprocket Manufacturing Drawing",

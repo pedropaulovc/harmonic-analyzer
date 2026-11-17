@@ -1531,7 +1531,7 @@ class SolidWorksAdapter(ABC):
 
     # Connection Management
     @abstractmethod
-    async def connect(self) -> None:
+    def connect(self) -> None:
         """Connect to SolidWorks application.
 
         Returns:
@@ -1540,7 +1540,7 @@ class SolidWorksAdapter(ABC):
         pass
 
     @abstractmethod
-    async def disconnect(self) -> None:
+    def disconnect(self) -> None:
         """Disconnect from SolidWorks application.
 
         Returns:
@@ -1558,7 +1558,7 @@ class SolidWorksAdapter(ABC):
         pass
 
     @abstractmethod
-    async def health_check(self) -> AdapterHealth:
+    def health_check(self) -> AdapterHealth:
         """Get adapter health status.
 
         Returns:
@@ -1568,7 +1568,7 @@ class SolidWorksAdapter(ABC):
 
     # Model Operations
     @abstractmethod
-    async def open_model(self, file_path: str) -> AdapterResult[SolidWorksModel]:
+    def open_model(self, file_path: str) -> AdapterResult[SolidWorksModel]:
         """Open a SolidWorks model (part, assembly, or drawing).
 
         Args:
@@ -1580,7 +1580,7 @@ class SolidWorksAdapter(ABC):
         pass
 
     @abstractmethod
-    async def close_model(self, save: bool = False) -> AdapterResult[None]:
+    def close_model(self, save: bool = False) -> AdapterResult[None]:
         """Close the current model.
 
         Args:
@@ -1591,7 +1591,7 @@ class SolidWorksAdapter(ABC):
         """
         pass
 
-    async def save_file(self, file_path: str | None = None) -> AdapterResult[Any]:
+    def save_file(self, file_path: str | None = None) -> AdapterResult[Any]:
         """Save the active model to the existing path or the provided path.
 
         Args:
@@ -1606,7 +1606,7 @@ class SolidWorksAdapter(ABC):
         )
 
     @abstractmethod
-    async def get_model_info(self) -> AdapterResult[dict[str, Any]]:
+    def get_model_info(self) -> AdapterResult[dict[str, Any]]:
         """Get metadata for the active model.
 
         Returns:
@@ -1615,7 +1615,7 @@ class SolidWorksAdapter(ABC):
         pass
 
     @abstractmethod
-    async def list_features(
+    def list_features(
         self, include_suppressed: bool = False
     ) -> AdapterResult[list[dict[str, Any]]]:
         """List model features from the feature tree.
@@ -1629,7 +1629,7 @@ class SolidWorksAdapter(ABC):
         pass
 
     @abstractmethod
-    async def list_configurations(self) -> AdapterResult[list[str]]:
+    def list_configurations(self) -> AdapterResult[list[str]]:
         """List configuration names for the active model.
 
         Returns:
@@ -1638,7 +1638,7 @@ class SolidWorksAdapter(ABC):
         pass
 
     @abstractmethod
-    async def create_part(
+    def create_part(
         self, name: str | None = None, units: str | None = None
     ) -> AdapterResult[SolidWorksModel]:
         """Create a new part document.
@@ -1653,7 +1653,7 @@ class SolidWorksAdapter(ABC):
         pass
 
     @abstractmethod
-    async def create_assembly(
+    def create_assembly(
         self, name: str | None = None
     ) -> AdapterResult[SolidWorksModel]:
         """Create a new assembly document.
@@ -1667,7 +1667,7 @@ class SolidWorksAdapter(ABC):
         pass
 
     @abstractmethod
-    async def create_drawing(
+    def create_drawing(
         self, name: str | None = None
     ) -> AdapterResult[SolidWorksModel]:
         """Create a new drawing document.
@@ -1682,7 +1682,7 @@ class SolidWorksAdapter(ABC):
 
     # Feature Operations
     @abstractmethod
-    async def create_extrusion(
+    def create_extrusion(
         self, params: ExtrusionParameters
     ) -> AdapterResult[SolidWorksFeature]:
         """Create an extrusion feature.
@@ -1696,7 +1696,7 @@ class SolidWorksAdapter(ABC):
         pass
 
     @abstractmethod
-    async def create_revolve(
+    def create_revolve(
         self, params: RevolveParameters
     ) -> AdapterResult[SolidWorksFeature]:
         """Create a revolve feature.
@@ -1710,7 +1710,7 @@ class SolidWorksAdapter(ABC):
         pass
 
     @abstractmethod
-    async def create_sweep(
+    def create_sweep(
         self, params: SweepParameters
     ) -> AdapterResult[SolidWorksFeature]:
         """Create a sweep feature.
@@ -1724,7 +1724,7 @@ class SolidWorksAdapter(ABC):
         pass
 
     @abstractmethod
-    async def create_loft(
+    def create_loft(
         self, params: LoftParameters
     ) -> AdapterResult[SolidWorksFeature]:
         """Create a loft feature.
@@ -1739,7 +1739,7 @@ class SolidWorksAdapter(ABC):
 
     # Sketch Operations
     @abstractmethod
-    async def create_sketch(self, plane: str) -> AdapterResult[str]:
+    def create_sketch(self, plane: str) -> AdapterResult[str]:
         """Create a new sketch on the specified plane.
 
         Args:
@@ -1751,7 +1751,7 @@ class SolidWorksAdapter(ABC):
         pass
 
     @abstractmethod
-    async def add_line(
+    def add_line(
         self, x1: float, y1: float, x2: float, y2: float
     ) -> AdapterResult[str]:
         """Add a line to the current sketch.
@@ -1768,7 +1768,7 @@ class SolidWorksAdapter(ABC):
         pass
 
     @abstractmethod
-    async def add_circle(
+    def add_circle(
         self, center_x: float, center_y: float, radius: float
     ) -> AdapterResult[str]:
         """Add a circle to the current sketch.
@@ -1784,7 +1784,7 @@ class SolidWorksAdapter(ABC):
         pass
 
     @abstractmethod
-    async def add_rectangle(
+    def add_rectangle(
         self, x1: float, y1: float, x2: float, y2: float
     ) -> AdapterResult[str]:
         """Add a rectangle to the current sketch.
@@ -1800,7 +1800,7 @@ class SolidWorksAdapter(ABC):
         """
         pass
 
-    async def add_arc(
+    def add_arc(
         self,
         center_x: float,
         center_y: float,
@@ -1827,7 +1827,7 @@ class SolidWorksAdapter(ABC):
             error="add_arc is not implemented by this adapter",
         )
 
-    async def add_spline(self, points: list[dict[str, float]]) -> AdapterResult[str]:
+    def add_spline(self, points: list[dict[str, float]]) -> AdapterResult[str]:
         """Add a spline through the provided points.
 
         Args:
@@ -1841,7 +1841,7 @@ class SolidWorksAdapter(ABC):
             error="add_spline is not implemented by this adapter",
         )
 
-    async def add_centerline(
+    def add_centerline(
         self, x1: float, y1: float, x2: float, y2: float
     ) -> AdapterResult[str]:
         """Add a centerline to the current sketch.
@@ -1860,7 +1860,7 @@ class SolidWorksAdapter(ABC):
             error="add_centerline is not implemented by this adapter",
         )
 
-    async def add_polygon(
+    def add_polygon(
         self, center_x: float, center_y: float, radius: float, sides: int
     ) -> AdapterResult[str]:
         """Add a regular polygon to the current sketch.
@@ -1879,7 +1879,7 @@ class SolidWorksAdapter(ABC):
             error="add_polygon is not implemented by this adapter",
         )
 
-    async def add_ellipse(
+    def add_ellipse(
         self,
         center_x: float,
         center_y: float,
@@ -1902,7 +1902,7 @@ class SolidWorksAdapter(ABC):
             error="add_ellipse is not implemented by this adapter",
         )
 
-    async def add_sketch_constraint(
+    def add_sketch_constraint(
         self,
         entity1: str,
         entity2: str | None,
@@ -1927,7 +1927,7 @@ class SolidWorksAdapter(ABC):
             error="add_sketch_constraint is not implemented by this adapter",
         )
 
-    async def add_sketch_dimension(
+    def add_sketch_dimension(
         self,
         entity1: str,
         entity2: str | None,
@@ -1950,7 +1950,7 @@ class SolidWorksAdapter(ABC):
             error="add_sketch_dimension is not implemented by this adapter",
         )
 
-    async def check_sketch_fully_defined(
+    def check_sketch_fully_defined(
         self, sketch_name: str | None = None
     ) -> AdapterResult[dict[str, Any]]:
         """Check whether a sketch is fully defined.
@@ -1966,7 +1966,7 @@ class SolidWorksAdapter(ABC):
             error="check_sketch_fully_defined is not implemented by this adapter",
         )
 
-    async def get_over_defining_relations(self) -> AdapterResult[dict[str, Any]]:
+    def get_over_defining_relations(self) -> AdapterResult[dict[str, Any]]:
         """List the over-defining relations of the active sketch.
 
         Returns:
@@ -1978,7 +1978,7 @@ class SolidWorksAdapter(ABC):
             error="get_over_defining_relations is not implemented by this adapter",
         )
 
-    async def sketch_linear_pattern(
+    def sketch_linear_pattern(
         self,
         entities: list[str],
         direction_x: float,
@@ -2003,7 +2003,7 @@ class SolidWorksAdapter(ABC):
             error="sketch_linear_pattern is not implemented by this adapter",
         )
 
-    async def sketch_circular_pattern(
+    def sketch_circular_pattern(
         self,
         entities: list[str],
         angle: float,
@@ -2029,7 +2029,7 @@ class SolidWorksAdapter(ABC):
             error="sketch_circular_pattern is not implemented by this adapter",
         )
 
-    async def sketch_mirror(
+    def sketch_mirror(
         self, entities: list[str], mirror_line: str
     ) -> AdapterResult[str]:
         """Mirror sketch entities about a mirror line.
@@ -2046,7 +2046,7 @@ class SolidWorksAdapter(ABC):
             error="sketch_mirror is not implemented by this adapter",
         )
 
-    async def sketch_offset(
+    def sketch_offset(
         self,
         entities: list[str],
         offset_distance: float,
@@ -2067,7 +2067,7 @@ class SolidWorksAdapter(ABC):
             error="sketch_offset is not implemented by this adapter",
         )
 
-    async def add_sketch_circle(
+    def add_sketch_circle(
         self,
         center_x: float,
         center_y: float,
@@ -2085,9 +2085,9 @@ class SolidWorksAdapter(ABC):
         Returns:
             AdapterResult[str]: The result produced by the operation.
         """
-        return await self.add_circle(center_x, center_y, radius)
+        return self.add_circle(center_x, center_y, radius)
 
-    async def create_cut(self, sketch_name: str, depth: float) -> AdapterResult[str]:
+    def create_cut(self, sketch_name: str, depth: float) -> AdapterResult[str]:
         """Create a cut feature from an existing sketch.
 
         Args:
@@ -2102,7 +2102,7 @@ class SolidWorksAdapter(ABC):
             error="create_cut is not implemented by this adapter",
         )
 
-    async def create_cut_extrude(
+    def create_cut_extrude(
         self, params: ExtrusionParameters
     ) -> AdapterResult[Any]:
         """Create a cut-extrude feature from the active sketch.
@@ -2121,7 +2121,7 @@ class SolidWorksAdapter(ABC):
             error="create_cut_extrude is not implemented by this adapter",
         )
 
-    async def add_fillet(
+    def add_fillet(
         self,
         radius: float,
         edge_points: list[list[float]],
@@ -2152,7 +2152,7 @@ class SolidWorksAdapter(ABC):
             error="add_fillet is not implemented by this adapter",
         )
 
-    async def add_chamfer(
+    def add_chamfer(
         self,
         distance: float,
         edge_points: list[list[float]],
@@ -2179,7 +2179,7 @@ class SolidWorksAdapter(ABC):
             error="add_chamfer is not implemented by this adapter",
         )
 
-    async def mirror_feature(
+    def mirror_feature(
         self, params: MirrorFeatureParameters
     ) -> AdapterResult[Any]:
         """Mirror existing features about a reference plane.
@@ -2195,7 +2195,7 @@ class SolidWorksAdapter(ABC):
             error="mirror_feature is not implemented by this adapter",
         )
 
-    async def circular_pattern_feature(
+    def circular_pattern_feature(
         self, params: CircularPatternParameters
     ) -> AdapterResult[Any]:
         """Create a circular pattern of features about an axis.
@@ -2211,7 +2211,7 @@ class SolidWorksAdapter(ABC):
             error="circular_pattern_feature is not implemented by this adapter",
         )
 
-    async def linear_pattern_feature(
+    def linear_pattern_feature(
         self, params: LinearPatternParameters
     ) -> AdapterResult[Any]:
         """Create a linear pattern of features along a direction.
@@ -2227,7 +2227,7 @@ class SolidWorksAdapter(ABC):
             error="linear_pattern_feature is not implemented by this adapter",
         )
 
-    async def shell(self, params: ShellParameters) -> AdapterResult[Any]:
+    def shell(self, params: ShellParameters) -> AdapterResult[Any]:
         """Hollow out the solid body, optionally removing faces.
 
         Args:
@@ -2241,7 +2241,7 @@ class SolidWorksAdapter(ABC):
             error="shell is not implemented by this adapter",
         )
 
-    async def draft(self, params: DraftParameters) -> AdapterResult[Any]:
+    def draft(self, params: DraftParameters) -> AdapterResult[Any]:
         """Apply a neutral-plane draft to selected faces.
 
         Args:
@@ -2255,7 +2255,7 @@ class SolidWorksAdapter(ABC):
             error="draft is not implemented by this adapter",
         )
 
-    async def create_plane(self, params: CreatePlaneParameters) -> AdapterResult[Any]:
+    def create_plane(self, params: CreatePlaneParameters) -> AdapterResult[Any]:
         """Create a constraint-based reference plane.
 
         Args:
@@ -2269,7 +2269,7 @@ class SolidWorksAdapter(ABC):
             error="create_plane is not implemented by this adapter",
         )
 
-    async def create_axis(self, params: CreateAxisParameters) -> AdapterResult[Any]:
+    def create_axis(self, params: CreateAxisParameters) -> AdapterResult[Any]:
         """Create a reference axis.
 
         Args:
@@ -2283,7 +2283,7 @@ class SolidWorksAdapter(ABC):
             error="create_axis is not implemented by this adapter",
         )
 
-    async def import_dxf_dwg(
+    def import_dxf_dwg(
         self, params: ImportDxfDwgParameters
     ) -> AdapterResult[Any]:
         """Import a DXF/DWG file into the active part as a sketch feature.
@@ -2304,7 +2304,7 @@ class SolidWorksAdapter(ABC):
             error="import_dxf_dwg is not implemented by this adapter",
         )
 
-    async def rename_feature(
+    def rename_feature(
         self, params: RenameFeatureParameters
     ) -> AdapterResult[Any]:
         """Rename a feature in the active document's tree.
@@ -2320,7 +2320,7 @@ class SolidWorksAdapter(ABC):
             error="rename_feature is not implemented by this adapter",
         )
 
-    async def create_reference_point(
+    def create_reference_point(
         self, params: CreateReferencePointParameters
     ) -> AdapterResult[Any]:
         """Create one or more reference points.
@@ -2337,7 +2337,7 @@ class SolidWorksAdapter(ABC):
             error="create_reference_point is not implemented by this adapter",
         )
 
-    async def create_coordinate_system(
+    def create_coordinate_system(
         self, params: CreateCoordinateSystemParameters
     ) -> AdapterResult[Any]:
         """Create a coordinate-system feature at a numeric position/rotation.
@@ -2353,7 +2353,7 @@ class SolidWorksAdapter(ABC):
             error="create_coordinate_system is not implemented by this adapter",
         )
 
-    async def create_equation_driven_curve(
+    def create_equation_driven_curve(
         self, params: CreateEquationCurveParameters
     ) -> AdapterResult[str]:
         """Create an equation-driven curve in the active sketch.
@@ -2369,7 +2369,7 @@ class SolidWorksAdapter(ABC):
             error="create_equation_driven_curve is not implemented by this adapter",
         )
 
-    async def set_global_variable(
+    def set_global_variable(
         self, params: SetGlobalVariableParameters
     ) -> AdapterResult[dict[str, Any]]:
         """Add or update a global variable in the equation manager.
@@ -2385,7 +2385,7 @@ class SolidWorksAdapter(ABC):
             error="set_global_variable is not implemented by this adapter",
         )
 
-    async def create_equation(
+    def create_equation(
         self, params: CreateEquationParameters
     ) -> AdapterResult[dict[str, Any]]:
         """Add or update a driving equation in the equation manager.
@@ -2401,7 +2401,7 @@ class SolidWorksAdapter(ABC):
             error="create_equation is not implemented by this adapter",
         )
 
-    async def create_configuration(
+    def create_configuration(
         self, params: CreateConfigurationParameters
     ) -> AdapterResult[dict[str, Any]]:
         """Create a configuration on the active model.
@@ -2417,7 +2417,7 @@ class SolidWorksAdapter(ABC):
             error="create_configuration is not implemented by this adapter",
         )
 
-    async def set_active_configuration(
+    def set_active_configuration(
         self, name: str
     ) -> AdapterResult[dict[str, Any]]:
         """Activate a configuration by name and rebuild.
@@ -2433,7 +2433,7 @@ class SolidWorksAdapter(ABC):
             error="set_active_configuration is not implemented by this adapter",
         )
 
-    async def measure(self, params: MeasureParameters) -> AdapterResult[dict[str, Any]]:
+    def measure(self, params: MeasureParameters) -> AdapterResult[dict[str, Any]]:
         """Measure the given entities (distances, lengths, areas, angles).
 
         Args:
@@ -2448,7 +2448,7 @@ class SolidWorksAdapter(ABC):
             error="measure is not implemented by this adapter",
         )
 
-    async def apply_material(
+    def apply_material(
         self, params: ApplyMaterialParameters
     ) -> AdapterResult[dict[str, Any]]:
         """Assign a material to the active part.
@@ -2464,7 +2464,7 @@ class SolidWorksAdapter(ABC):
             error="apply_material is not implemented by this adapter",
         )
 
-    async def add_thread(
+    def add_thread(
         self, params: AddThreadParameters
     ) -> AdapterResult[dict[str, Any]]:
         """Add a cosmetic thread to a circular edge.
@@ -2480,7 +2480,7 @@ class SolidWorksAdapter(ABC):
             error="add_thread is not implemented by this adapter",
         )
 
-    async def create_bom(
+    def create_bom(
         self, params: CreateBomParameters
     ) -> AdapterResult[dict[str, Any]]:
         """Insert a BOM table and return its contents.
@@ -2496,7 +2496,7 @@ class SolidWorksAdapter(ABC):
             error="create_bom is not implemented by this adapter",
         )
 
-    async def export_bom_csv(
+    def export_bom_csv(
         self, params: CreateBomParameters
     ) -> AdapterResult[dict[str, Any]]:
         """Insert a BOM table and write its contents to a CSV file.
@@ -2512,7 +2512,7 @@ class SolidWorksAdapter(ABC):
             error="export_bom_csv is not implemented by this adapter",
         )
 
-    async def insert_component(
+    def insert_component(
         self, params: InsertComponentParameters
     ) -> AdapterResult[dict[str, Any]]:
         """Insert a component into the active assembly.
@@ -2530,7 +2530,7 @@ class SolidWorksAdapter(ABC):
             error="insert_component is not implemented by this adapter",
         )
 
-    async def remove_component(
+    def remove_component(
         self, params: ComponentRefParameters
     ) -> AdapterResult[dict[str, Any]]:
         """Delete a component from the active assembly.
@@ -2546,7 +2546,7 @@ class SolidWorksAdapter(ABC):
             error="remove_component is not implemented by this adapter",
         )
 
-    async def replace_component(
+    def replace_component(
         self, params: ReplaceComponentParameters
     ) -> AdapterResult[dict[str, Any]]:
         """Replace a component with another model.
@@ -2563,7 +2563,7 @@ class SolidWorksAdapter(ABC):
             error="replace_component is not implemented by this adapter",
         )
 
-    async def move_component(
+    def move_component(
         self, params: MoveComponentParameters
     ) -> AdapterResult[dict[str, Any]]:
         """Move a component to a position in assembly space.
@@ -2579,7 +2579,7 @@ class SolidWorksAdapter(ABC):
             error="move_component is not implemented by this adapter",
         )
 
-    async def rotate_component(
+    def rotate_component(
         self, params: RotateComponentParameters
     ) -> AdapterResult[dict[str, Any]]:
         """Rotate a component about an axis in assembly space.
@@ -2595,7 +2595,7 @@ class SolidWorksAdapter(ABC):
             error="rotate_component is not implemented by this adapter",
         )
 
-    async def fix_component(
+    def fix_component(
         self, params: ComponentRefParameters
     ) -> AdapterResult[dict[str, Any]]:
         """Fix a component (make it immovable).
@@ -2611,7 +2611,7 @@ class SolidWorksAdapter(ABC):
             error="fix_component is not implemented by this adapter",
         )
 
-    async def float_component(
+    def float_component(
         self, params: ComponentRefParameters
     ) -> AdapterResult[dict[str, Any]]:
         """Float a component (make it movable).
@@ -2627,7 +2627,7 @@ class SolidWorksAdapter(ABC):
             error="float_component is not implemented by this adapter",
         )
 
-    async def pattern_components_linear(
+    def pattern_components_linear(
         self, params: ComponentLinearPatternParameters
     ) -> AdapterResult[SolidWorksFeature]:
         """Create a local linear component pattern in the active assembly.
@@ -2644,7 +2644,7 @@ class SolidWorksAdapter(ABC):
             error="pattern_components_linear is not implemented by this adapter",
         )
 
-    async def pattern_components_circular(
+    def pattern_components_circular(
         self, params: ComponentCircularPatternParameters
     ) -> AdapterResult[SolidWorksFeature]:
         """Create a local circular component pattern in the active assembly.
@@ -2661,7 +2661,7 @@ class SolidWorksAdapter(ABC):
             error="pattern_components_circular is not implemented by this adapter",
         )
 
-    async def pattern_components_chain(
+    def pattern_components_chain(
         self, params: ComponentChainPatternParameters
     ) -> AdapterResult[SolidWorksFeature]:
         """Create a chain component pattern (roller chain, belt) in the active
@@ -2680,7 +2680,7 @@ class SolidWorksAdapter(ABC):
             error="pattern_components_chain is not implemented by this adapter",
         )
 
-    async def insert_belt_chain(
+    def insert_belt_chain(
         self, params: BeltChainParameters
     ) -> AdapterResult[SolidWorksFeature]:
         """Create a Belt/Chain assembly feature coupling pulley/sprocket
@@ -2698,7 +2698,7 @@ class SolidWorksAdapter(ABC):
             error="insert_belt_chain is not implemented by this adapter",
         )
 
-    async def add_mate(
+    def add_mate(
         self, params: AddMateParameters
     ) -> AdapterResult[dict[str, Any]]:
         """Add a standard mate between selected entities.
@@ -2714,7 +2714,7 @@ class SolidWorksAdapter(ABC):
             error="add_mate is not implemented by this adapter",
         )
 
-    async def list_mates(self) -> AdapterResult[list[dict[str, Any]]]:
+    def list_mates(self) -> AdapterResult[list[dict[str, Any]]]:
         """List the mates of the active assembly.
 
         Returns:
@@ -2726,7 +2726,7 @@ class SolidWorksAdapter(ABC):
             error="list_mates is not implemented by this adapter",
         )
 
-    async def delete_mate(
+    def delete_mate(
         self, params: MateRefParameters
     ) -> AdapterResult[dict[str, Any]]:
         """Delete a mate by feature name.
@@ -2742,7 +2742,7 @@ class SolidWorksAdapter(ABC):
             error="delete_mate is not implemented by this adapter",
         )
 
-    async def suppress_mate(
+    def suppress_mate(
         self, params: SuppressMateParameters
     ) -> AdapterResult[dict[str, Any]]:
         """Suppress or unsuppress a mate by feature name.
@@ -2758,7 +2758,7 @@ class SolidWorksAdapter(ABC):
             error="suppress_mate is not implemented by this adapter",
         )
 
-    async def set_component_solving(
+    def set_component_solving(
         self, params: SetComponentSolvingParameters
     ) -> AdapterResult[dict[str, Any]]:
         """Set a subassembly component's solve mode (rigid or flexible).
@@ -2774,7 +2774,7 @@ class SolidWorksAdapter(ABC):
             error="set_component_solving is not implemented by this adapter",
         )
 
-    async def set_component_configuration(
+    def set_component_configuration(
         self, params: SetComponentConfigurationParameters
     ) -> AdapterResult[dict[str, Any]]:
         """Set which child configuration a component references.
@@ -2797,7 +2797,7 @@ class SolidWorksAdapter(ABC):
         )
 
     # Motion-study Operations
-    async def create_motion_study(
+    def create_motion_study(
         self, params: MotionStudyParameters
     ) -> AdapterResult[dict[str, Any]]:
         """Create (or re-select) a motion study and set its analysis type.
@@ -2813,7 +2813,7 @@ class SolidWorksAdapter(ABC):
             error="create_motion_study is not implemented by this adapter",
         )
 
-    async def ensure_motion_addin(self) -> AdapterResult[dict[str, Any]]:
+    def ensure_motion_addin(self) -> AdapterResult[dict[str, Any]]:
         """Ensure the SOLIDWORKS Motion add-in is loaded.
 
         Returns:
@@ -2824,7 +2824,7 @@ class SolidWorksAdapter(ABC):
             error="ensure_motion_addin is not implemented by this adapter",
         )
 
-    async def add_motor(
+    def add_motor(
         self, params: MotionMotorParameters
     ) -> AdapterResult[dict[str, Any]]:
         """Add a rotary or linear constant-speed motor to a motion study.
@@ -2840,7 +2840,7 @@ class SolidWorksAdapter(ABC):
             error="add_motor is not implemented by this adapter",
         )
 
-    async def add_gravity(
+    def add_gravity(
         self, params: MotionGravityParameters
     ) -> AdapterResult[dict[str, Any]]:
         """Add gravity to a motion study.
@@ -2856,7 +2856,7 @@ class SolidWorksAdapter(ABC):
             error="add_gravity is not implemented by this adapter",
         )
 
-    async def calculate_motion(
+    def calculate_motion(
         self, params: MotionStudyRefParameters
     ) -> AdapterResult[dict[str, Any]]:
         """Solve a motion study.
@@ -2872,7 +2872,7 @@ class SolidWorksAdapter(ABC):
             error="calculate_motion is not implemented by this adapter",
         )
 
-    async def set_motion_time(
+    def set_motion_time(
         self, params: MotionTimeParameters
     ) -> AdapterResult[dict[str, Any]]:
         """Position a calculated motion study at a point in time.
@@ -2888,7 +2888,7 @@ class SolidWorksAdapter(ABC):
             error="set_motion_time is not implemented by this adapter",
         )
 
-    async def export_motion_video(
+    def export_motion_video(
         self, params: MotionExportParameters
     ) -> AdapterResult[dict[str, Any]]:
         """Export a motion study animation to a single-file H.264 video.
@@ -2907,7 +2907,7 @@ class SolidWorksAdapter(ABC):
             error="export_motion_video is not implemented by this adapter",
         )
 
-    async def list_motion_studies(self) -> AdapterResult[list[dict[str, Any]]]:
+    def list_motion_studies(self) -> AdapterResult[list[dict[str, Any]]]:
         """List the motion studies of the active document.
 
         Returns:
@@ -2918,7 +2918,7 @@ class SolidWorksAdapter(ABC):
             error="list_motion_studies is not implemented by this adapter",
         )
 
-    async def add_motion_spring(
+    def add_motion_spring(
         self, params: MotionSpringParameters
     ) -> AdapterResult[dict[str, Any]]:
         """Add a spring force element to a motion study.
@@ -2934,7 +2934,7 @@ class SolidWorksAdapter(ABC):
             error="add_motion_spring is not implemented by this adapter",
         )
 
-    async def add_motion_damper(
+    def add_motion_damper(
         self, params: MotionDamperParameters
     ) -> AdapterResult[dict[str, Any]]:
         """Add a damper force element to a motion study.
@@ -2950,7 +2950,7 @@ class SolidWorksAdapter(ABC):
             error="add_motion_damper is not implemented by this adapter",
         )
 
-    async def add_motion_force(
+    def add_motion_force(
         self, params: MotionForceParameters
     ) -> AdapterResult[dict[str, Any]]:
         """Add an applied force/torque to a motion study.
@@ -2967,7 +2967,7 @@ class SolidWorksAdapter(ABC):
         )
 
     @abstractmethod
-    async def exit_sketch(self) -> AdapterResult[None]:
+    def exit_sketch(self) -> AdapterResult[None]:
         """Exit sketch editing mode.
 
         Returns:
@@ -2975,7 +2975,7 @@ class SolidWorksAdapter(ABC):
         """
         pass
 
-    async def blank_sketch(self, sketch: str) -> AdapterResult[None]:
+    def blank_sketch(self, sketch: str) -> AdapterResult[None]:
         """Hide a named sketch (construction scaffolding that should not render).
 
         Args:
@@ -2991,7 +2991,7 @@ class SolidWorksAdapter(ABC):
 
     # Analysis Operations
     @abstractmethod
-    async def get_mass_properties(self) -> AdapterResult[MassProperties]:
+    def get_mass_properties(self) -> AdapterResult[MassProperties]:
         """Get mass properties of the current model.
 
         Returns:
@@ -3001,7 +3001,7 @@ class SolidWorksAdapter(ABC):
 
     # Export Operations
     @abstractmethod
-    async def export_image(self, payload: dict) -> AdapterResult[dict]:
+    def export_image(self, payload: dict) -> AdapterResult[dict]:
         """Export a viewport screenshot (PNG/JPG) of the current model.
 
         Payload keys: file_path (str): Absolute output path. width (int): Image width in pixels.
@@ -3017,7 +3017,7 @@ class SolidWorksAdapter(ABC):
         pass
 
     @abstractmethod
-    async def export_file(
+    def export_file(
         self, file_path: str, format_type: str
     ) -> AdapterResult[None]:
         """Export the current model to a file.
@@ -3033,7 +3033,7 @@ class SolidWorksAdapter(ABC):
 
     # Dimension Operations
     @abstractmethod
-    async def get_dimension(self, name: str) -> AdapterResult[float]:
+    def get_dimension(self, name: str) -> AdapterResult[float]:
         """Get the value of a dimension.
 
         Args:
@@ -3045,7 +3045,7 @@ class SolidWorksAdapter(ABC):
         pass
 
     @abstractmethod
-    async def set_dimension(self, name: str, value: float) -> AdapterResult[None]:
+    def set_dimension(self, name: str, value: float) -> AdapterResult[None]:
         """Set the value of a dimension.
 
         Args:

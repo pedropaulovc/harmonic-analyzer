@@ -154,7 +154,7 @@ def _shank_face_areas(adapter) -> list[tuple[object, float]]:
     return faces
 
 
-async def _add_thread_limit(adapter) -> list[tuple[str, str]]:
+def _add_thread_limit(adapter) -> list[tuple[str, str]]:
     """Ring the shank at the thread limit with a projected split line.
 
     One Right-plane sketch: a centerline up the axis from the threaded end to
@@ -169,15 +169,15 @@ async def _add_thread_limit(adapter) -> list[tuple[str, str]]:
     """
     reach = THREAD_R + _SPLIT_OVERHANG
     dims = SketchDims()
-    check("create_sketch thread limit", await adapter.create_sketch("Right"))
+    check("create_sketch thread limit", adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
     axis = check(
         "thread limit axis",
-        await adapter.add_centerline(0.0, 0.0, 0.0, FULL_THREAD_LENGTH),
+        adapter.add_centerline(0.0, 0.0, 0.0, FULL_THREAD_LENGTH),
     )
     split = check(
         "thread limit split line",
-        await adapter.add_line(-reach, FULL_THREAD_LENGTH, reach, FULL_THREAD_LENGTH),
+        adapter.add_line(-reach, FULL_THREAD_LENGTH, reach, FULL_THREAD_LENGTH),
     )
     set_sketch_direct_db(adapter, False)
     for entity, relation in (
@@ -186,16 +186,16 @@ async def _add_thread_limit(adapter) -> list[tuple[str, str]]:
     ):
         check(
             f"thread limit {entity} {relation}",
-            await adapter.add_sketch_constraint(entity, None, relation),
+            adapter.add_sketch_constraint(entity, None, relation),
         )
     check(
         "thread limit split centred on the axis",
-        await adapter.add_sketch_constraint(f"{axis}.end", split, "midpoint"),
+        adapter.add_sketch_constraint(f"{axis}.end", split, "midpoint"),
     )
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{axis}.start", 0.0, 0.0, "thread limit axis on the threaded end"
     )
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{axis}.start",
         f"{axis}.end",
@@ -204,7 +204,7 @@ async def _add_thread_limit(adapter) -> list[tuple[str, str]]:
         "thread limit station",
     )
     dims.record("ThreadLimitStation", '"FullThreadLength"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{split}.start",
         f"{split}.end",
@@ -213,8 +213,8 @@ async def _add_thread_limit(adapter) -> list[tuple[str, str]]:
         "thread limit split reach",
     )
     dims.record(None, None)
-    await ensure_fully_defined(adapter, "thread limit sketch")
-    check("exit_sketch thread limit", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "thread limit sketch")
+    check("exit_sketch thread limit", adapter.exit_sketch())
     name_last_feature(adapter, "ThreadLimitReference")
     drive_jobs = dims.apply(adapter, "ThreadLimitReference")
 
@@ -254,14 +254,14 @@ async def _add_thread_limit(adapter) -> list[tuple[str, str]]:
     return drive_jobs
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
         AddThreadParameters,
         CreatePlaneParameters,
         RevolveParameters,
     )
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this
@@ -276,7 +276,7 @@ async def build(adapter) -> dict[str, str]:
         ("OverallLength", OVERALL_LENGTH),
         ("ShoulderRadius", SHOULDER_FILLET_R),
     ):
-        await set_global(adapter, name, f"{value}mm")
+        set_global(adapter, name, f"{value}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -287,11 +287,11 @@ async def build(adapter) -> dict[str, str]:
     # head's shoulder, the head, the faced top, and the closure back down the
     # axis.
     profile = SketchDims()
-    check("create_sketch stud profile", await adapter.create_sketch("Right"))
+    check("create_sketch stud profile", adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
     axis = check(
         "stud axis centerline",
-        await adapter.add_centerline(0.0, 0.0, 0.0, OVERALL_LENGTH),
+        adapter.add_centerline(0.0, 0.0, 0.0, OVERALL_LENGTH),
     )
     points = [
         (0.0, 0.0),
@@ -302,7 +302,7 @@ async def build(adapter) -> dict[str, str]:
         (HEAD_R, OVERALL_LENGTH),
         (0.0, OVERALL_LENGTH),
     ]
-    end, thread, shank, shoulder, head, top, closure = await add_line_chain(
+    end, thread, shank, shoulder, head, top, closure = add_line_chain(
         adapter, points
     )
     set_sketch_direct_db(adapter, False)
@@ -310,7 +310,7 @@ async def build(adapter) -> dict[str, str]:
         ("axis start", f"{axis}.start", f"{end}.start"),
         ("axis end", f"{axis}.end", f"{top}.end"),
     ):
-        check(label, await adapter.add_sketch_constraint(first, second, "coincident"))
+        check(label, adapter.add_sketch_constraint(first, second, "coincident"))
     for label, entity, relation in (
         ("threaded end", end, "horizontal"),
         ("thread", thread, "vertical"),
@@ -320,9 +320,9 @@ async def build(adapter) -> dict[str, str]:
         ("closure", closure, "vertical"),
         ("axis", axis, "vertical"),
     ):
-        check(label, await adapter.add_sketch_constraint(entity, None, relation))
-    await anchor_point_to_origin(adapter, f"{end}.start", 0.0, 0.0, "threaded end")
-    await add_diametric_linear_dimension(
+        check(label, adapter.add_sketch_constraint(entity, None, relation))
+    anchor_point_to_origin(adapter, f"{end}.start", 0.0, 0.0, "threaded end")
+    add_diametric_linear_dimension(
         adapter, axis, thread, (THREAD_R + 4.0, FULL_THREAD_LENGTH / 2.0), "ThreadDia"
     )
     profile.record("ThreadDia", '"ThreadDia"')
@@ -331,7 +331,7 @@ async def build(adapter) -> dict[str, str]:
     # the overall from end to end. The plain shank is what is left.
     check(
         "full thread length",
-        await adapter.add_sketch_dimension(thread, None, "linear", FULL_THREAD_LENGTH),
+        adapter.add_sketch_dimension(thread, None, "linear", FULL_THREAD_LENGTH),
     )
     profile.record("FullThreadLength", '"FullThreadLength"')
     # The plain shank's Ø (the thread blank, printed as a reference): the
@@ -342,7 +342,7 @@ async def build(adapter) -> dict[str, str]:
     # line-to-axis diameter would restate ThreadDia (over-defined); to the
     # free end it replaces the segment's vertical relation instead, and
     # driving it by ThreadDia keeps the two segments collinear.
-    await add_diametric_linear_dimension(
+    add_diametric_linear_dimension(
         adapter,
         axis,
         f"{shank}.end",
@@ -350,7 +350,7 @@ async def build(adapter) -> dict[str, str]:
         "PlainDia",
     )
     profile.record("PlainDia", '"ThreadDia"')
-    await add_diametric_linear_dimension(
+    add_diametric_linear_dimension(
         adapter,
         axis,
         head,
@@ -360,10 +360,10 @@ async def build(adapter) -> dict[str, str]:
     profile.record("HeadDia", '"HeadDia"')
     check(
         "head height",
-        await adapter.add_sketch_dimension(head, None, "linear", HEAD_HEIGHT),
+        adapter.add_sketch_dimension(head, None, "linear", HEAD_HEIGHT),
     )
     profile.record("HeadHeight", '"HeadHeight"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{end}.start",
         f"{top}.end",
@@ -372,17 +372,17 @@ async def build(adapter) -> dict[str, str]:
         "overall length, threaded end to head end",
     )
     profile.record("OverallLength", '"OverallLength"')
-    await ensure_fully_defined(adapter, "stud profile")
-    check("exit_sketch stud profile", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "stud profile")
+    check("exit_sketch stud profile", adapter.exit_sketch())
     name_last_feature(adapter, "StudProfile")
     drive_jobs += profile.apply(adapter, "StudProfile")
-    check("revolve stud", await adapter.create_revolve(RevolveParameters(angle=360.0)))
+    check("revolve stud", adapter.create_revolve(RevolveParameters(angle=360.0)))
     name_last_feature(adapter, "Stud")
-    stud_volume = await volume_check(adapter, "stud", V_STUD, 0.005 * V_STUD)
+    stud_volume = volume_check(adapter, "stud", V_STUD, 0.005 * V_STUD)
     # Thread limit (drawing-guidelines.md rule 16): the split ring the
     # FullThreadLength extension line lands on.
-    drive_jobs += await _add_thread_limit(adapter)
-    await volume_check(
+    drive_jobs += _add_thread_limit(adapter)
+    volume_check(
         adapter, "thread-limit split cuts nothing", stud_volume, 1e-6 * stud_volume
     )
 
@@ -393,7 +393,7 @@ async def build(adapter) -> dict[str, str]:
     # at y 22).
     check(
         "fillet shoulder root",
-        await adapter.add_fillet(SHOULDER_FILLET_R, [[THREAD_R, SHANK_LENGTH, 0.0]]),
+        adapter.add_fillet(SHOULDER_FILLET_R, [[THREAD_R, SHANK_LENGTH, 0.0]]),
     )
     name_last_feature(adapter, "ShoulderFillet")
     drive_jobs.append(
@@ -402,7 +402,7 @@ async def build(adapter) -> dict[str, str]:
             '"ShoulderRadius"',
         )
     )
-    await volume_check(
+    volume_check(
         adapter, "shoulder root fillet", stud_volume + V_FILLET, 0.5 * V_FILLET
     )
 
@@ -412,7 +412,7 @@ async def build(adapter) -> dict[str, str]:
     # plane holds it on the axis.
     check(
         "create_plane EyeStationPlane",
-        await adapter.create_plane(
+        adapter.create_plane(
             CreatePlaneParameters(mode="offset", base_plane="Top Plane", offset=EYE_Y)
         ),
     )
@@ -431,7 +431,7 @@ async def build(adapter) -> dict[str, str]:
         name="EyeHole",
         point_planes=("EyeStationPlane", "Front Plane"),
     )
-    volume = await volume_check(adapter, "eye cross hole", V_TOTAL, 0.02 * V_EYE)
+    volume = volume_check(adapter, "eye cross hole", V_TOTAL, 0.02 * V_EYE)
 
     # Drawing-only station reference: a construction line down the axis from
     # the head's faced end to the eye, whose printed dimension is the eye's
@@ -440,11 +440,11 @@ async def build(adapter) -> dict[str, str]:
     # line's top on the head end; it is never marked. On the Right plane, the
     # plane of the side view that prints it.
     station = SketchDims()
-    check("create_sketch eye station", await adapter.create_sketch("Right"))
+    check("create_sketch eye station", adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
     station_line = check(
         "eye station reference line",
-        await adapter.add_line(0.0, EYE_Y, 0.0, OVERALL_LENGTH),
+        adapter.add_line(0.0, EYE_Y, 0.0, OVERALL_LENGTH),
     )
     set_sketch_direct_db(adapter, False)
     segment = _early_bound(adapter._sketch_entities[station_line], "ISketchSegment")
@@ -453,9 +453,9 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError("eye station reference did not take the construction flag")
     check(
         "eye station reference vertical",
-        await adapter.add_sketch_constraint(station_line, None, "vertical"),
+        adapter.add_sketch_constraint(station_line, None, "vertical"),
     )
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter,
         f"{station_line}.end",
         0.0,
@@ -463,7 +463,7 @@ async def build(adapter) -> dict[str, str]:
         "eye station reference on the head end",
     )
     station.record("HeadEndStation", '"OverallLength"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{station_line}.start",
         f"{station_line}.end",
@@ -472,14 +472,14 @@ async def build(adapter) -> dict[str, str]:
         "eye station from the head end",
     )
     station.record("EyeFromHeadEnd", EYE_FROM_HEAD_END_EXPR)
-    await ensure_fully_defined(adapter, "eye station reference sketch")
-    check("exit_sketch eye station", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "eye station reference sketch")
+    check("exit_sketch eye station", adapter.exit_sketch())
     name_last_feature(adapter, "EyeStationReference")
     drive_jobs += station.apply(adapter, "EyeStationReference")
 
     # Named stud axis (local Y through the origin): the assembly mates it
     # coaxial with the rod's top tap.
-    stud_axis = await name_bore_axis(
+    stud_axis = name_bore_axis(
         adapter, "Front Plane", 0.0, "Right Plane", 0.0, "stud axis"
     )
     if stud_axis != "Axis1":
@@ -489,11 +489,11 @@ async def build(adapter) -> dict[str, str]:
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    driven = await volume_check(
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    driven = volume_check(
         adapter, "driven stud (equations neutral)", volume, 0.001 * volume
     )
 
@@ -503,7 +503,7 @@ async def build(adapter) -> dict[str, str]:
     adapter._zoom_to_fit(adapter.currentModel)
     check(
         f"cosmetic thread {THREAD}",
-        await adapter.add_thread(
+        adapter.add_thread(
             AddThreadParameters(
                 edge_point=[THREAD_R, 0.0, 0.0],
                 standard="ansi_inch",
@@ -513,11 +513,11 @@ async def build(adapter) -> dict[str, str]:
             )
         ),
     )
-    await volume_check(adapter, "cosmetic thread cuts nothing", driven, 1e-6)
+    volume_check(adapter, "cosmetic thread cuts nothing", driven, 1e-6)
     blank_reference_geometry(adapter, (("EyeStationPlane", "PLANE"),))
 
-    await apply_material(adapter, MATERIAL)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    report_mass_properties(adapter)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
@@ -527,7 +527,7 @@ async def build(adapter) -> dict[str, str]:
     # so no assembly instance renders it; the drawing shows it in the side
     # view only (_drawing_hidden_sketches) to import EyeFromHeadEnd.
     blank_sketch(adapter, "EyeStationReference")
-    artefacts = await save_part_and_images(adapter, PART_NAME)
+    artefacts = save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
     return artefacts
 

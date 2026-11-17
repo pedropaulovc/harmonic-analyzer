@@ -32,32 +32,32 @@ logger = logging.getLogger(__name__)
 class SolidWorksFeaturesMixin:
     """Expose SolidWorks feature methods via mixin-local implementation helpers."""
 
-    async def create_extrusion(
+    def create_extrusion(
         self, params: ExtrusionParameters
     ) -> AdapterResult[SolidWorksFeature]:
         return _create_extrusion_impl(self, params)
 
-    async def create_revolve(
+    def create_revolve(
         self, params: RevolveParameters
     ) -> AdapterResult[SolidWorksFeature]:
         return _create_revolve_impl(self, params)
 
-    async def create_sweep(
+    def create_sweep(
         self, params: SweepParameters
     ) -> AdapterResult[SolidWorksFeature]:
         return _create_sweep_impl(self, params)
 
-    async def create_loft(
+    def create_loft(
         self, params: LoftParameters
     ) -> AdapterResult[SolidWorksFeature]:
         return _create_loft_impl(self, params)
 
-    async def create_cut_extrude(
+    def create_cut_extrude(
         self, params: ExtrusionParameters
     ) -> AdapterResult[SolidWorksFeature]:
         return _create_cut_extrude_impl(self, params)
 
-    async def add_fillet(
+    def add_fillet(
         self,
         radius: float,
         edge_points: list[list[float]],
@@ -65,7 +65,7 @@ class SolidWorksFeaturesMixin:
     ) -> AdapterResult[SolidWorksFeature]:
         return _add_fillet_impl(self, radius, edge_points, propagate)
 
-    async def add_chamfer(
+    def add_chamfer(
         self,
         distance: float,
         edge_points: list[list[float]],
@@ -76,25 +76,25 @@ class SolidWorksFeaturesMixin:
             self, distance, edge_points, face_points, tangent_propagation
         )
 
-    async def mirror_feature(
+    def mirror_feature(
         self, params: MirrorFeatureParameters
     ) -> AdapterResult[SolidWorksFeature]:
         return _mirror_feature_impl(self, params)
 
-    async def circular_pattern_feature(
+    def circular_pattern_feature(
         self, params: CircularPatternParameters
     ) -> AdapterResult[SolidWorksFeature]:
         return _circular_pattern_impl(self, params)
 
-    async def linear_pattern_feature(
+    def linear_pattern_feature(
         self, params: LinearPatternParameters
     ) -> AdapterResult[SolidWorksFeature]:
         return _linear_pattern_impl(self, params)
 
-    async def shell(self, params: ShellParameters) -> AdapterResult[SolidWorksFeature]:
+    def shell(self, params: ShellParameters) -> AdapterResult[SolidWorksFeature]:
         return _shell_impl(self, params)
 
-    async def draft(self, params: DraftParameters) -> AdapterResult[SolidWorksFeature]:
+    def draft(self, params: DraftParameters) -> AdapterResult[SolidWorksFeature]:
         return _draft_impl(self, params)
 
 

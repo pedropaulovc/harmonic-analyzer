@@ -31,7 +31,6 @@ This pins the two span-shape fixes this module exists to prove:
 
 from __future__ import annotations
 
-import asyncio
 import contextlib
 import os
 import sys
@@ -302,7 +301,7 @@ class MockAdapter:
         except Exception:
             return default
 
-    async def open_model(self, path: str) -> _Result:
+    def open_model(self, path: str) -> _Result:
         _sleep(T_OPEN)
         stem = Path(path).stem
         self._current = MockModel(stem, COMPONENT_COUNTS.get(stem, 8))
@@ -310,15 +309,15 @@ class MockAdapter:
         self._current._free_pose = stem == "dt-drive-train"
         return _Result(True)
 
-    async def list_configurations(self) -> _Result:
+    def list_configurations(self) -> _Result:
         _sleep(T_LIST_CONFIGS)
         return _Result([verify.REST])
 
-    async def set_active_configuration(self, _cfg: str) -> _Result:
+    def set_active_configuration(self, _cfg: str) -> _Result:
         _sleep(T_ACTIVATE)
         return _Result(True)
 
-    async def list_mates(self) -> _Result:
+    def list_mates(self) -> _Result:
         # No driver mates exist for the freed DOF in the saved models.
         _sleep(T_LIST_MATES)
         return _Result([])
@@ -401,12 +400,12 @@ def _run_soundness(names: list[str], monkeypatch, tmp_path: Path):
     adapter = MockAdapter()
     report = verify.Report()
 
-    async def drive() -> None:
+    def drive() -> None:
         with _telemetry.run_pipeline_span("verify:soundness"):
             for name in names:
-                await verify._verify_static_one(adapter, name, report)
+                verify._verify_static_one(adapter, name, report)
 
-    asyncio.run(drive())
+    drive()
     # Expose the adapter so a test can inspect the last-opened model's rebuild count.
     global _LAST_RUN_ADAPTER
     _LAST_RUN_ADAPTER = adapter

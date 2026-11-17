@@ -312,7 +312,7 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
     monkeypatch.setattr(drawing, "_add_rebate_slide_finish", lambda adapter, view: None, raising=False)
     utility = _StopMathUtility()
 
-    async def open_model(path):
+    def open_model(path):
         assert path == str(source)
         return SimpleNamespace(is_success=True, data=None)
 
@@ -379,7 +379,7 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
         callouts.append((view, edge_xy, label))
         callout_positions[label] = callout_xy
 
-    async def finalize(adapter, outputs, **kwargs):
+    def finalize(adapter, outputs, **kwargs):
         return {"slddrw": str(outputs.slddrw)}
 
     monkeypatch.setattr(drawing, "add_native_hole_callout", add_callout)
@@ -391,7 +391,7 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
             ),
         )
     monkeypatch.setattr(drawing, "finalize_drawing", finalize)
-    assert asyncio.run(drawing.build(adapter)) == {"slddrw": str(drawing.OUTPUTS.slddrw)}
+    assert drawing.build(adapter) == {"slddrw": str(drawing.OUTPUTS.slddrw)}
     if drawing is block_drawing:
         assert notes == [(block_drawing.REBATE_NOTE, block_drawing.REBATE_NOTE_XY)]
     else:
@@ -682,30 +682,30 @@ def _window_reference_seat(monkeypatch, *, reject_construction=False):
         def _attempt(self, fn, default=None):
             return fn()
 
-        async def create_sketch(self, plane):
+        def create_sketch(self, plane):
             self.planes.append(plane)
             return result()
 
-        async def add_line(self, x1, y1, x2, y2):
+        def add_line(self, x1, y1, x2, y2):
             assert self.currentSketchManager.AddToDB
             name = "line" if not self.lines else f"line{len(self.lines) + 1}"
             self.lines[name] = ((x1, y1), (x2, y2))
             self._sketch_entities[name] = Segment()
             return result(name)
 
-        async def add_sketch_constraint(self, *args):
+        def add_sketch_constraint(self, *args):
             self.constraints.append(args)
             return result()
 
-        async def add_sketch_dimension(self, first, second, kind, value):
+        def add_sketch_dimension(self, first, second, kind, value):
             dimension = SimpleNamespace(first=first, second=second, kind=kind, value_mm=value)
             self.dimensions.append(dimension)
             return result(dimension)
 
-        async def exit_sketch(self):
+        def exit_sketch(self):
             return result()
 
-    async def fully_defined(adapter, feature):
+    def fully_defined(adapter, feature):
         adapter.defined = feature
 
     def name_feature(adapter, feature):
@@ -732,7 +732,7 @@ def test_rebate_profile_owns_width_height_and_back_wall_on_its_consumed_sketch(m
     # owns all three, so its dimensions import without any drawn sketch line.
     adapter = _window_reference_seat(monkeypatch)
     dims = sketch.SketchDims()
-    asyncio.run(stop_geom.rebate_profile(adapter, dims))
+    stop_geom.rebate_profile(adapter, dims)
     assert adapter.planes == ["Right"]
     assert adapter.defined == "rebate profile"
     ceiling, back, floor, cover, wall = (adapter.lines[name] for name in (
@@ -767,14 +767,14 @@ def test_rebate_profile_owns_width_height_and_back_wall_on_its_consumed_sketch(m
 def test_rebate_profile_refuses_unapplied_back_wall_construction_flag(monkeypatch) -> None:
     adapter = _window_reference_seat(monkeypatch, reject_construction=True)
     with pytest.raises(RuntimeError, match="back wall construction flag rejected"):
-        asyncio.run(stop_geom.rebate_profile(adapter, sketch.SketchDims()))
+        stop_geom.rebate_profile(adapter, sketch.SketchDims())
     assert all(d.kind != "horizontal_distance" or d.first != "line5.start" for d in adapter.dimensions)
 
 
 def test_relief_profile_notches_the_back_wall_under_the_roof(monkeypatch) -> None:
     adapter = _window_reference_seat(monkeypatch)
     dims = sketch.SketchDims()
-    asyncio.run(stop_geom.relief_profile(adapter, dims))
+    stop_geom.relief_profile(adapter, dims)
     back = spec.WINDOW_Z_MAX + spec.RELIEF_DEPTH
     low = spec.WINDOW_Y_MAX - spec.RELIEF_HEIGHT
     assert adapter.planes == ["Right"]
@@ -793,7 +793,7 @@ def test_relief_profile_notches_the_back_wall_under_the_roof(monkeypatch) -> Non
 def test_roof_reference_lies_on_the_lip_face_not_through_the_lip(monkeypatch) -> None:
     adapter = _window_reference_seat(monkeypatch)
     monkeypatch.setattr(stop_geom, "ensure_fully_defined", lambda *a: asyncio.sleep(0))
-    equations = dict(asyncio.run(stop_geom.roof_reference(adapter)))
+    equations = dict(stop_geom.roof_reference(adapter))
     assert adapter.lines == {"line": ((0.0, spec.WINDOW_Y_MAX), (0.0, spec.BLOCK_HEIGHT))}
     assert adapter._sketch_entities["line"].ConstructionGeometry
     thickness, station = adapter.dimensions

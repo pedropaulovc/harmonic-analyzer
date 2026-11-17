@@ -72,7 +72,7 @@ CUTTER_HALF_HEIGHT = SIZE / 2.0 + CUTTER_CLEARANCE
 CUT_DEPTH = 2.0 * (SIZE + CUTTER_CLEARANCE)
 
 
-async def _cut_stock(adapter) -> None:
+def _cut_stock(adapter) -> None:
     """Cut the bar at ``CutLength`` from its south end; the cutter's other
     edges and faces stand ``CUTTER_CLEARANCE`` (one key size) clear of the
     bar."""
@@ -81,10 +81,10 @@ async def _cut_stock(adapter) -> None:
     margin = CUTTER_HALF_HEIGHT
     far = STOCK_LENGTH + CUTTER_CLEARANCE
     dims = SketchDims()
-    check("create_sketch key cut", await adapter.create_sketch("Right"))
+    check("create_sketch key cut", adapter.create_sketch("Right"))
     with no_sketch_inference(adapter):
         # Right sketch x is model -Z: the kept key lies at x in [-LENGTH, 0].
-        lines = await add_line_chain(
+        lines = add_line_chain(
             adapter,
             [(-LENGTH, -margin), (-far, -margin), (-far, margin), (-LENGTH, margin)],
         )
@@ -93,15 +93,15 @@ async def _cut_stock(adapter) -> None:
         ):
             check(
                 f"key cut {relation} {line}",
-                await adapter.add_sketch_constraint(line, None, relation),
+                adapter.add_sketch_constraint(line, None, relation),
             )
         # The general anchor dimensions x first (the cut length), then y.
-        await anchor_point_to_origin(
+        anchor_point_to_origin(
             adapter, f"{lines[0]}.start", -LENGTH, -margin, "key cut plane"
         )
         dims.record("CutLength")
         dims.record("CutterBottom")
-        await dimension_between(
+        dimension_between(
             adapter,
             f"{lines[0]}.start",
             f"{lines[0]}.end",
@@ -110,7 +110,7 @@ async def _cut_stock(adapter) -> None:
             "key cutter reach",
         )
         dims.record("CutterReach")
-        await dimension_between(
+        dimension_between(
             adapter,
             f"{lines[1]}.start",
             f"{lines[1]}.end",
@@ -119,19 +119,19 @@ async def _cut_stock(adapter) -> None:
             "key cutter height",
         )
         dims.record("CutterHeight")
-        await ensure_fully_defined(adapter, "key cut")
-    check("exit_sketch key cut", await adapter.exit_sketch())
+        ensure_fully_defined(adapter, "key cut")
+    check("exit_sketch key cut", adapter.exit_sketch())
     name_last_feature(adapter, "KeyCutProfile")
     dims.apply(adapter, "KeyCutProfile")
     check(
         "cut key to length",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=CUT_DEPTH, both_directions=True)
         ),
     )
     name_last_feature(adapter, "KeyCut")
     volume = SIZE * SIZE * LENGTH
-    await volume_check(adapter, "key cut to length", volume, 0.005 * volume)
+    volume_check(adapter, "key cut to length", volume, 0.005 * volume)
 
 
 def _manufacturing_controls(adapter) -> None:
@@ -143,16 +143,16 @@ def _manufacturing_controls(adapter) -> None:
 
 
 @wraps(build_98830A511)
-async def _cut_to_length(adapter, truth=None):
+def _cut_to_length(adapter, truth=None):
     # The shared recipe builds the supplied bar; the cut makes the key.
-    await build_98830A511(adapter, truth)
-    await _cut_stock(adapter)
+    build_98830A511(adapter, truth)
+    _cut_stock(adapter)
     _manufacturing_controls(adapter)
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
 
 
-async def build(adapter) -> dict[str, str]:
-    return await build_stock_fastener(
+def build(adapter) -> dict[str, str]:
+    return build_stock_fastener(
         adapter,
         part_name=PART_NAME,
         components=(StockComponent(sku=SKU, author=_cut_to_length),),

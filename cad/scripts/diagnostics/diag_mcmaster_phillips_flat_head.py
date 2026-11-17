@@ -69,7 +69,7 @@ def chain_segments(points: tuple[Point, ...]) -> tuple[Segment, ...]:
     return tuple(Line(a, b) for a, b in zip(points, points[1:] + points[:1]))
 
 
-async def sketch_revolve(
+def sketch_revolve(
     adapter,
     label: str,
     segments: tuple[Segment, ...],
@@ -84,7 +84,7 @@ async def sketch_revolve(
     from diagnostics.diag_mcmaster_lib import no_sketch_inference
 
     ys = [p[1] for s in segments for p in (s.start, s.end)]
-    check(f"create_sketch {label}", await adapter.create_sketch("Front"))
+    check(f"create_sketch {label}", adapter.create_sketch("Front"))
     with no_sketch_inference(adapter):
         if (
             adapter.currentSketchManager.CreateCenterLine(
@@ -93,18 +93,18 @@ async def sketch_revolve(
             is None
         ):
             raise RuntimeError(f"{label}: CreateCenterLine failed")
-    await draw_closed_profile(adapter, segments, label=label, loops=1)
-    check(f"exit_sketch {label}", await adapter.exit_sketch())
+    draw_closed_profile(adapter, segments, label=label, loops=1)
+    check(f"exit_sketch {label}", adapter.exit_sketch())
     name_last_feature(adapter, profile_name)
     assert_profile_closed(adapter, label, loops=1, feature=profile_name)
     check(
         label,
-        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=is_cut)),
+        adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=is_cut)),
     )
     name_last_feature(adapter, feature_name)
 
 
-async def thread_cut(adapter, d: PhillipsFlatHeadScrew) -> None:
+def thread_cut(adapter, d: PhillipsFlatHeadScrew) -> None:
     """The tip-seeded right-hand ``ThreadHelix`` (91255A148's flags for a +Y
     ``TipPlane``) and the family cutter swept round it as a cut on the
     part's only body, through ``thread_sweep_cut_modern``."""
@@ -113,7 +113,7 @@ async def thread_cut(adapter, d: PhillipsFlatHeadScrew) -> None:
 
     part_no = d.part_no
     offset_plane(adapter, "TipPlane", d.tip_y)
-    check("create_sketch helix seed", await adapter.create_sketch("TipPlane"))
+    check("create_sketch helix seed", adapter.create_sketch("TipPlane"))
     with no_sketch_inference(adapter):
         if (
             adapter.currentSketchManager.CreateCircleByRadius(
@@ -131,10 +131,10 @@ async def thread_cut(adapter, d: PhillipsFlatHeadScrew) -> None:
         start_angle_rad=math.pi / 2.0,
         feature_name="ThreadHelix",
     )
-    check("create_sketch cutter", await adapter.create_sketch("Front"))
+    check("create_sketch cutter", adapter.create_sketch("Front"))
     with no_sketch_inference(adapter):
-        await add_line_chain(adapter, list(d.thread_cutter()))
-    check("exit_sketch cutter", await adapter.exit_sketch())
+        add_line_chain(adapter, list(d.thread_cutter()))
+    check("exit_sketch cutter", adapter.exit_sketch())
     name_last_feature(adapter, "ThreadCutter")
     count = len(bodies(adapter))
     if count != 1:
@@ -194,7 +194,7 @@ def drafted_cut_down(
 
 
 @_telemetry.traced("stock.phillips_flat_head")
-async def build_phillips_flat_head(adapter, d: PhillipsFlatHeadScrew) -> None:
+def build_phillips_flat_head(adapter, d: PhillipsFlatHeadScrew) -> None:
     """Author ``d`` in the open part (see the module docstring)."""
     from _sketch import add_line_chain
     from diagnostics.diag_mcmaster_lib import no_sketch_inference
@@ -203,7 +203,7 @@ async def build_phillips_flat_head(adapter, d: PhillipsFlatHeadScrew) -> None:
     shank = d.shank_profile()
 
     # --- 1. shank (below the thread top) ---------------------------------------
-    await sketch_revolve(
+    sketch_revolve(
         adapter,
         f"{part_no} shank",
         profile_segments(shank),
@@ -212,13 +212,13 @@ async def build_phillips_flat_head(adapter, d: PhillipsFlatHeadScrew) -> None:
         is_cut=False,
     )
     v = revolved_volume(shank)
-    await volume_check(adapter, f"{part_no} revolved shank", v, 1e-4 * v)
+    volume_check(adapter, f"{part_no} revolved shank", v, 1e-4 * v)
 
     # --- 2. helix and single-body thread groove ------------------------------
-    await thread_cut(adapter, d)
+    thread_cut(adapter, d)
 
     # --- 3. head ---------------------------------------------------------------
-    await sketch_revolve(
+    sketch_revolve(
         adapter,
         f"{part_no} head",
         profile_segments(d.head_profile()),
@@ -234,10 +234,10 @@ async def build_phillips_flat_head(adapter, d: PhillipsFlatHeadScrew) -> None:
     # --- 4. drafted cross-and-notch cut ---------------------------------------
     # The outline is symmetric under the square's rotations and reflections,
     # so the Top sketch's axis directions do not matter.
-    check("create_sketch recess", await adapter.create_sketch("Top"))
+    check("create_sketch recess", adapter.create_sketch("Top"))
     with no_sketch_inference(adapter):
-        await add_line_chain(adapter, list(d.recess_outline()))
-    check("exit_sketch recess", await adapter.exit_sketch())
+        add_line_chain(adapter, list(d.recess_outline()))
+    check("exit_sketch recess", adapter.exit_sketch())
     name_last_feature(adapter, "RecessProfile")
     # Ddir1 False drafts the walls inward (farm-verified sense, see
     # drafted_cut_down); a wrong sense fails the recess volume check below by
@@ -247,7 +247,7 @@ async def build_phillips_flat_head(adapter, d: PhillipsFlatHeadScrew) -> None:
     )
 
     # --- 5. refill outside the entry cylinder and the cone, 6. cone tip ------
-    await sketch_revolve(
+    sketch_revolve(
         adapter,
         f"{part_no} recess refill",
         profile_segments(d.refill_profile()),
@@ -255,7 +255,7 @@ async def build_phillips_flat_head(adapter, d: PhillipsFlatHeadScrew) -> None:
         feature_name="RecessRefill",
         is_cut=False,
     )
-    await sketch_revolve(
+    sketch_revolve(
         adapter,
         f"{part_no} recess cone tip",
         chain_segments(d.cone_tip_profile()),
@@ -264,7 +264,7 @@ async def build_phillips_flat_head(adapter, d: PhillipsFlatHeadScrew) -> None:
         is_cut=True,
     )
     recess = d.recess_volume()
-    await volume_check(
+    volume_check(
         adapter, f"{part_no} Phillips recess", before - recess, 0.01 * recess
     )
     merged = len(bodies(adapter))
@@ -272,7 +272,7 @@ async def build_phillips_flat_head(adapter, d: PhillipsFlatHeadScrew) -> None:
         raise RuntimeError(f"{part_no}: {merged} bodies after the recess, expected 1")
 
 
-async def build_phillips_flat_head_catalog(
+def build_phillips_flat_head_catalog(
     adapter, d: PhillipsFlatHeadScrew
 ) -> dict[str, str]:
     """Catalog-only run (``diag_mcmaster_socket_head.build_socket_head_catalog``'s
@@ -287,19 +287,19 @@ async def build_phillips_flat_head_catalog(
 
     part_no = d.part_no
     with _telemetry.span("catalog.build", label=part_no):
-        check(f"create_part {part_no}", await adapter.create_part())
+        check(f"create_part {part_no}", adapter.create_part())
         assert_seat_sketch_baseline(adapter, part_no)
-        await build_phillips_flat_head(adapter, d)
+        build_phillips_flat_head(adapter, d)
         props = mass_properties(adapter)
         if not props["volume_mm3"] > 0.0:
             raise RuntimeError(f"{part_no} catalog build has no solid volume")
         OUT_DIR.mkdir(parents=True, exist_ok=True)
         path = OUT_DIR / f"{part_no}-catalog.SLDPRT"
-        check(f"save -> {path}", await adapter.save_file(str(path.resolve())))
+        check(f"save -> {path}", adapter.save_file(str(path.resolve())))
         artefacts = {"sldprt": str(path)}
-        artefacts.update(await export_views(adapter, f"{part_no}-catalog"))
+        artefacts.update(export_views(adapter, f"{part_no}-catalog"))
         _telemetry.success(
             f"{part_no} catalog build saved: volume {props['volume_mm3']:.4f} mm^3"
         )
-        await close_all(adapter)
+        close_all(adapter)
     return artefacts

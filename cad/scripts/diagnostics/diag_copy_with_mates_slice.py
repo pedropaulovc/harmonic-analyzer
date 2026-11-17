@@ -207,7 +207,7 @@ def _spin_dim_value(
     return abs(target_xy[1]) if abs(dx) >= abs(dy) else abs(target_xy[0])
 
 
-async def _seed_chain(
+def _seed_chain(
     adapter, j: int, bushing: str
 ) -> tuple[dict[str, str], list[float], float]:
     """Author channel ``j``'s 4-part chain the production way, HARD-PINNED
@@ -230,7 +230,7 @@ async def _seed_chain(
     bar_rows = rows_from_euler([st["bar_tilt"], -90.0, 0.0])
     lever_rows = compose_rows(rot_z_rows(st["lever_tilt"]), ROT_Y_180)
 
-    rocker = await place_component(
+    rocker = place_component(
         adapter,
         "ch-rocker-arm",
         [PIVOT[0] - arm_origin_dx, PIVOT[1] - arm_origin_dy, z_mid],
@@ -239,7 +239,7 @@ async def _seed_chain(
         ground=False,
         label=f"rocker-arm ch{j:02d} (slice seed)",
     )
-    rod = await place_component(
+    rod = place_component(
         adapter,
         "ch-connecting-rod",
         [RING_CENTER[0], RING_CENTER[1], zj + CAM_DZ],
@@ -248,7 +248,7 @@ async def _seed_chain(
         ground=False,
         label=f"connecting-rod ch{j:02d} (slice seed)",
     )
-    bar = await place_component(
+    bar = place_component(
         adapter,
         "ch-amplitude-bar",
         [st["bar_origin_x"], st["bar_origin_y"], z_mid - BAR_WIDTH / 2.0],
@@ -257,7 +257,7 @@ async def _seed_chain(
         ground=False,
         label=f"amplitude-bar ch{j:02d} (slice seed)",
     )
-    lever = await place_component(
+    lever = place_component(
         adapter,
         "ch-channel-lever",
         [FULCRUM[0], FULCRUM[1], z_mid],
@@ -274,7 +274,7 @@ async def _seed_chain(
     # J1 rocker revolute: concentric(dead) + axial distance(SUBSTITUTED) +
     # spin pin. Same call as production but free_spin=None -> hard pin.
     rocker_rod_pin = world_point(adapter, rocker, ROCKER_ROD_BORE_LOCAL)
-    await _revolute(
+    _revolute(
         adapter,
         rocker,
         bore_axis_ref(PIVOT_OD_PT),
@@ -298,14 +298,14 @@ async def _seed_chain(
     rod_tgt = _org(adapter, rod)
     rod_ring = world_point(adapter, rod, ROD_STRAP_BORE_LOCAL)
     rod_pin = world_point(adapter, rod, ROD_PIN_BORE_LOCAL)
-    await coincident_mate(
+    coincident_mate(
         adapter,
         named_ref(f"Axis2@{rocker}", "AXIS"),
         named_ref(f"Axis2@{rod}", "AXIS"),
         label=f"J2 rod ch{j:02d} coaxial pin <- {rocker}",
         verify=(rod, rod_tgt),
     )
-    await distance_driver(
+    distance_driver(
         adapter,
         named_ref(f"Front Plane@{rod}", "PLANE"),
         named_ref(f"Front Plane@{rocker}", "PLANE"),
@@ -332,7 +332,7 @@ async def _seed_chain(
         ("axis~Top", axis_ref, named_ref("Top Plane", "PLANE"), rod_ring[1]),
         ("Top~axis", named_ref("Top Plane", "PLANE"), axis_ref, rod_ring[1]),
     ):
-        await distance_driver(
+        distance_driver(
             adapter,
             ra,
             rb,
@@ -352,13 +352,13 @@ async def _seed_chain(
             break
         check(
             f"delete rod spin [{tag}] (flip=True, try next formulation)",
-            await adapter.delete_mate(MateRefParameters(name=row["name"])),
+            adapter.delete_mate(MateRefParameters(name=row["name"])),
         )
     if spin_val is None:
         # No False-side formulation exists -- re-author the production form
         # and let copies lean on the FlipDimension repair (the documented
         # fallback).
-        await spin_driver(
+        spin_driver(
             adapter,
             axis_ref,
             (rod_pin[0], rod_pin[1]),
@@ -375,7 +375,7 @@ async def _seed_chain(
 
     # J4 lever revolute: concentric(dead) + coincident mid-plane(dead), no
     # spin (closed by J5).
-    await _revolute(
+    _revolute(
         adapter,
         lever,
         bore_axis_ref(FULC_OD_PT),
@@ -394,21 +394,21 @@ async def _seed_chain(
     # amplitude driver, hard-pinned here).
     bar_tgt = _org(adapter, bar)
     foot = world_point(adapter, bar, BAR_FOOT_LOCAL)
-    await coincident_mate(
+    coincident_mate(
         adapter,
         named_ref(f"Axis2@{lever}", "AXIS"),
         named_ref(f"Axis1@{bar}", "AXIS"),
         label=f"J3 bar ch{j:02d} radial (top-pin hinge)",
         verify=(bar, bar_tgt),
     )
-    await coincident_mate(
+    coincident_mate(
         adapter,
         named_ref(f"MidWidth@{bar}", "PLANE"),
         named_ref(f"Front Plane@{rocker}", "PLANE"),
         label=f"J3 bar ch{j:02d} axial coincident mid-plane <- {rocker}",
         verify=(bar, bar_tgt),
     )
-    await distance_driver(
+    distance_driver(
         adapter,
         named_ref(f"Axis2@{bar}", "AXIS"),
         named_ref("Right Plane", "PLANE"),
@@ -421,7 +421,7 @@ async def _seed_chain(
     # J5 foot-on-arc coupling: axis-axis distance at the as-solved radius.
     arc_c = world_point(adapter, rocker, [0.0, ARM_ARC_CENTER_LOCAL_Y, 0.0])
     foot_r = math.hypot(foot[0] - arc_c[0], foot[1] - arc_c[1])
-    await distance_driver(
+    distance_driver(
         adapter,
         named_ref(f"Axis2@{bar}", "AXIS"),
         named_ref(f"Axis3@{rocker}", "AXIS"),
@@ -440,8 +440,8 @@ async def _seed_chain(
     return comps, dims, time.perf_counter() - t0
 
 
-async def _mate_count(adapter) -> int:
-    res = await adapter.list_mates()
+def _mate_count(adapter) -> int:
+    res = adapter.list_mates()
     return len(res.data or []) if res.is_success else -1
 
 
@@ -502,9 +502,9 @@ def _slice_transforms(
     return out
 
 
-async def build(adapter) -> dict[str, str]:
-    check("create_assembly", await adapter.create_assembly())
-    await place_component(
+def build(adapter) -> dict[str, str]:
+    check("create_assembly", adapter.create_assembly())
+    place_component(
         adapter,
         "ch-pivot-shaft",
         [PIVOT[0], PIVOT[1], PIVOT_SHAFT_Z],
@@ -513,7 +513,7 @@ async def build(adapter) -> dict[str, str]:
         ground=True,
         label="pivot-shaft (grounded)",
     )
-    await place_component(
+    place_component(
         adapter,
         "ch-fulcrum-shaft",
         [FULCRUM[0], FULCRUM[1], 0.0],
@@ -525,7 +525,7 @@ async def build(adapter) -> dict[str, str]:
     # The anchor bushing in the gap below the seed channel, seated the
     # production way (concentric + Front-datum distance + anti-spin).
     z_gap = z_station(SEED_J) + ARM_MID_DZ - PITCH / 2.0
-    bushing = await place_component(
+    bushing = place_component(
         adapter,
         "pivot-bushing",
         [PIVOT[0], PIVOT[1], z_gap],
@@ -534,7 +534,7 @@ async def build(adapter) -> dict[str, str]:
         ground=False,
         label=f"pivot-bushing gap {SEED_J - 1:02d}/{SEED_J:02d} (anchor)",
     )
-    await _seat_bushing_on_shaft(
+    _seat_bushing_on_shaft(
         adapter,
         bushing,
         PIVOT_OD_PT,
@@ -542,13 +542,13 @@ async def build(adapter) -> dict[str, str]:
         PIVOT_BUSHING_OD / 2.0,
     )
 
-    comps, dims, t_seed = await _seed_chain(adapter, SEED_J, bushing)
+    comps, dims, t_seed = _seed_chain(adapter, SEED_J, bushing)
     log(
         f"seed chain ch{SEED_J:02d}: {SLICE_MATES} mates in {t_seed:.1f}s; "
         f"dims (mm) = {[round(d, 3) for d in dims]}"
     )
-    mates_before = await _mate_count(adapter)
-    res = await adapter.list_mates()
+    mates_before = _mate_count(adapter)
+    res = adapter.list_mates()
     order = [(m["name"], m["type"]) for m in (res.data or [])]
     log(f"mate tree order ({len(order)}): {order}")
 
@@ -627,7 +627,7 @@ async def build(adapter) -> dict[str, str]:
         for name in sorted(set(component_names(adapter)) - comps_before):
             check(
                 f"remove calibration copy {name}",
-                await adapter.remove_component(ComponentRefParameters(name=name)),
+                adapter.remove_component(ComponentRefParameters(name=name)),
             )
         if cal != slot_by_sem:
             raise RuntimeError(
@@ -831,7 +831,7 @@ async def build(adapter) -> dict[str, str]:
     # (1) Mate count, re-read POST-rebuild: a copied mate that the closing
     # solve dropped would keep the pre-rebuild count and evade the health
     # scan (which only sees mates that still exist).
-    mates_final = await _mate_count(adapter)
+    mates_final = _mate_count(adapter)
     # (2) Absolute poses post-rebuild: seed rotation/XY + exact station Z
     # for every copy of all four parts.
     pose_fail, _ = _measure("final")
@@ -852,7 +852,7 @@ async def build(adapter) -> dict[str, str]:
     # (4) Copied-mate HEALTH: count and poses can hold while a copied mate
     # sits suppressed or in a hard error state (the park-replay corpse mode
     # _mate_hard_error documents). Scan every mate the real copies added.
-    res = await adapter.list_mates()
+    res = adapter.list_mates()
     unhealthy = []
     for m in res.data or []:
         if m["name"] in pre_copy_mates:

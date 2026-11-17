@@ -541,11 +541,11 @@ def _section_thread_on_visible_layer(adapter: Any, section: Any) -> None:
     )
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open pen-v-block source", await adapter.open_model(str(SOURCE)))
+    check("open pen-v-block source", adapter.open_model(str(SOURCE)))
     source_model = adapter.currentModel
     read_required_properties(
         adapter.currentModel,
@@ -718,7 +718,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # otherwise its descriptive label first appears during the native drawing save.
     import_cosmetic_threads(adapter, iso)
 
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Pen V-Block Manufacturing Drawing",

@@ -92,9 +92,9 @@ def _dump(adapter: Any) -> None:
         sub = adapter._attempt(lambda: sub_t.GetNextSubFeature(), default=None)
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     asm = OUT_SLDASM / "pd-paper-drive.SLDASM"
-    check("open paper-drive", await adapter.open_model(str(asm)))
+    check("open paper-drive", adapter.open_model(str(asm)))
     try:
         adapter._handle_com_operation("belt_mate_dump", lambda: _dump(adapter))
         return {}

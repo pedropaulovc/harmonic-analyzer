@@ -76,27 +76,27 @@ def _author_dimension_callouts(adapter) -> None:
                 raise RuntimeError(f"{name}@{feature}: callout did not persist")
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     # #290: the row's inch calculation units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this
     # is an INCH document and the equation manager reads BARE numbers in
     # document units.
-    await set_global(adapter, "RingOd", f"{OD}mm")
-    await set_global(adapter, "RingLength", f"{LENGTH}mm")
-    await set_global(adapter, "BoreDia", f"{ID}mm")
+    set_global(adapter, "RingOd", f"{OD}mm")
+    set_global(adapter, "RingLength", f"{LENGTH}mm")
+    set_global(adapter, "BoreDia", f"{ID}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
     # Annulus: O.D. + bore in ONE Top-plane sketch (both on-axis circles ->
     # only the two diameter dims emit), extruded once along the plane's +Y.
     ring = SketchDims()
-    check("create_sketch ring", await adapter.create_sketch("Top"))
-    await define_circle(
+    check("create_sketch ring", adapter.create_sketch("Top"))
+    define_circle(
         adapter,
         0.0,
         0.0,
@@ -106,7 +106,7 @@ async def build(adapter) -> dict[str, str]:
         names=("OdCx", "OdCz", "RingOd"),
         drives=(None, None, '"RingOd"'),
     )
-    await define_circle(
+    define_circle(
         adapter,
         0.0,
         0.0,
@@ -116,39 +116,39 @@ async def build(adapter) -> dict[str, str]:
         names=("BoreCx", "BoreCz", "BoreDia"),
         drives=(None, None, '"BoreDia"'),
     )
-    await ensure_fully_defined(adapter, "ring sketch")
-    check("exit_sketch ring", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "ring sketch")
+    check("exit_sketch ring", adapter.exit_sketch())
     name_last_feature(adapter, "RingProfile")
     drive_jobs += ring.apply(adapter, "RingProfile")
     check(
         "extrude ring",
-        await adapter.create_extrusion(ExtrusionParameters(depth=LENGTH)),
+        adapter.create_extrusion(ExtrusionParameters(depth=LENGTH)),
     )
     name_last_feature(adapter, "Ring")
     ring_depth = name_dimensions(adapter, "Ring", ["RingLength"])
     drive_jobs.append((ring_depth[0], '"RingLength"'))
-    await volume_check(adapter, "ring", V_RING, 0.005 * V_RING)
-    await bbox_extent_check(adapter, "ring length", "y", LENGTH)
-    await bbox_extent_check(adapter, "ring O.D.", "x", OD)
+    volume_check(adapter, "ring", V_RING, 0.005 * V_RING)
+    bbox_extent_check(adapter, "ring length", "y", LENGTH)
+    bbox_extent_check(adapter, "ring O.D.", "x", OD)
 
     # The mate axis: the first reference axis, so it is Axis1.
-    axis = await name_bore_axis(
+    axis = name_bore_axis(
         adapter, "Front Plane", 0.0, "Right Plane", 0.0, "ring axis"
     )
     if axis != "Axis1":
         raise RuntimeError(f"ring axis came back {axis!r}, not Axis1")
 
     # Deferred drive equations, then re-check neutrality.
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    volume_check(
         adapter, "driven ring (equations neutral)", V_RING, 0.005 * V_RING
     )
 
-    await apply_material(adapter, MATERIAL)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    report_mass_properties(adapter)
     # The bore carries no band of its own: its DRILL THRU callout takes the
     # title block's DRILLED HOLES row (spec ID_BAND).
     # The forward stop of the knob's end float: its explicit band.
@@ -164,7 +164,7 @@ async def build(adapter) -> dict[str, str]:
     # extruded -Y would have no +Y face at y = LENGTH and refuse here.
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(adapter, PART_NAME)
-    return await save_part_and_images(adapter, PART_NAME)
+    return save_part_and_images(adapter, PART_NAME)
 
 
 if __name__ == "__main__":

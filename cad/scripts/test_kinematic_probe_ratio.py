@@ -7,7 +7,6 @@ diameters p/sin(180/N) typed instead of the per-tooth N*p/pi.
 
 from __future__ import annotations
 
-import asyncio
 import math
 import runpy
 
@@ -155,7 +154,7 @@ def test_assembly_couples_the_free_mounted_wheels_at_their_tooth_diameters(
     seat.place_component.side_effect = place
     seat.component_transform.return_value = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
     adapter = offline_adapter()
-    asyncio.run(assembly.build(adapter))
+    assembly.build(adapter)
 
     wheels = {}
     for placed, name in zip(seat.place_component.call_args_list, placed_names):
@@ -168,8 +167,8 @@ def test_assembly_couples_the_free_mounted_wheels_at_their_tooth_diameters(
             wheels[configuration] = name
     crank, knob = wheels[removable.CRANK_CONFIG], wheels[removable.KNOB_CONFIG]
 
-    adapter.insert_belt_chain.assert_awaited_once()
-    (belt,) = adapter.insert_belt_chain.await_args.args
+    adapter.insert_belt_chain.assert_called_once()
+    (belt,) = adapter.insert_belt_chain.call_args.args
     assert belt.pulley_components == [crank, knob]
     assert belt.pulley_diameters == [
         assembly.CHAIN_PULLEY_DIA[removable.CRANK_CONFIG],
@@ -306,7 +305,7 @@ def test_chain_advance_targets_reference_bound_seed_and_probe(monkeypatch):
         assert tuple(selectors) == ("@InnerLink:1", "@InnerLink:18")
         return bound
 
-    async def move(parameters):
+    def move(parameters):
         seen.append(parameters.name)
 
     origins = iter(((0.0, 0.0, 0.0), (1.0, 0.0, 0.0)))
@@ -321,7 +320,7 @@ def test_chain_advance_targets_reference_bound_seed_and_probe(monkeypatch):
         currentModel=model, move_component=move,
         _attempt=lambda fn, default=None: fn(),
     )
-    assert asyncio.run(probe._attempt_chain_advance(adapter, 30.0)) is True
+    assert probe._attempt_chain_advance(adapter, 30.0) is True
     assert seen == ["renamed-link-904"]
 
 
@@ -333,4 +332,4 @@ def test_chain_reference_corruption_is_not_hidden_as_motion_limitation(monkeypat
 
     monkeypatch.setattr(probe, "bind_component_selectors", refused)
     with pytest.raises(RuntimeError, match="missing native component references"):
-        asyncio.run(probe._attempt_chain_advance(SimpleNamespace(currentModel=object()), 30.0))
+        probe._attempt_chain_advance(SimpleNamespace(currentModel=object()), 30.0)

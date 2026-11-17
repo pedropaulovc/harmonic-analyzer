@@ -151,12 +151,12 @@ V_JOURNAL = math.pi * _R_JOURNAL**2 * JOURNAL_LENGTH
 
 
 
-async def _create_sketch(adapter: Any, plane: str, label: str) -> None:
-    check(f"create_sketch {label}", await adapter.create_sketch(plane))
+def _create_sketch(adapter: Any, plane: str, label: str) -> None:
+    check(f"create_sketch {label}", adapter.create_sketch(plane))
     suppress_dimension_input(adapter)
 
 
-async def _native_volume_check(
+def _native_volume_check(
     adapter: Any, label: str, lower: float, upper: float, allowance: float
 ) -> float:
     """A paid interval on one true native solid, never an adapter fallback."""
@@ -177,7 +177,7 @@ async def _native_volume_check(
     return actual
 
 
-async def _straight_stock_gaps(
+def _straight_stock_gaps(
     adapter: Any, drive_jobs: list[tuple[str, str]]
 ) -> ToothedDisc:
     """The actual blank and exact straight finite pass through the whole face."""
@@ -185,17 +185,17 @@ async def _straight_stock_gaps(
 
     radius = STOCK_PROFILE.blank_radius_mm
     blank_volume = math.pi * radius**2 * FACE_WIDTH
-    await _create_sketch(adapter, "Front", "gear blank")
-    await define_circle(adapter, 0.0, 0.0, radius, "knob stock blank")
-    await ensure_fully_defined(adapter, "knob stock blank")
-    check("exit_sketch gear blank", await adapter.exit_sketch())
+    _create_sketch(adapter, "Front", "gear blank")
+    define_circle(adapter, 0.0, 0.0, radius, "knob stock blank")
+    ensure_fully_defined(adapter, "knob stock blank")
+    check("exit_sketch gear blank", adapter.exit_sketch())
     name_last_feature(adapter, "GearBlankProfile")
     drive_jobs.append(
         (name_dimensions(adapter, "GearBlankProfile", ["BlankDia"])[0], '"OutsideDia"')
     )
     check(
         "extrude native stock blank",
-        await adapter.create_extrusion(
+        adapter.create_extrusion(
             ExtrusionParameters(
                 depth=FACE_WIDTH,
                 end_condition="Blind",
@@ -208,25 +208,25 @@ async def _straight_stock_gaps(
     drive_jobs.append(
         (name_dimensions(adapter, "GearBlank", ["FaceWidth"])[0], '"FaceWidth"')
     )
-    await _native_volume_check(
+    _native_volume_check(
         adapter, "stock blank", blank_volume, blank_volume, 0.005 * blank_volume
     )
 
-    await _create_sketch(adapter, "Front", "finite straight stock gap")
+    _create_sketch(adapter, "Front", "finite straight stock gap")
     # Main's cut_tooth_gap order (flanks first), FIXed as created.
     segments = STOCK_PROFILE.cut_order_native_segments(clearance_radius_mm=radius + 1.0)
-    curves = [await placed_ground_curve(adapter, segment, math.pi / TEETH) for segment in segments]
-    await ensure_fully_defined(
+    curves = [placed_ground_curve(adapter, segment, math.pi / TEETH) for segment in segments]
+    ensure_fully_defined(
         adapter,
         "finite straight stock gap",
         fix_entities=curves,
         allow_fix_escalation=True,
     )
-    check("exit_sketch straight stock gap", await adapter.exit_sketch())
+    check("exit_sketch straight stock gap", adapter.exit_sketch())
     name_last_feature(adapter, "StraightToothProfile")
     check(
         "cut actual finite stock gap",
-        await adapter.create_cut_extrude(ExtrusionParameters(depth=FACE_WIDTH)),
+        adapter.create_cut_extrude(ExtrusionParameters(depth=FACE_WIDTH)),
     )
     name_last_feature(adapter, "StraightToothGap")
     drive_jobs.append(
@@ -234,15 +234,15 @@ async def _straight_stock_gaps(
     )
     one_gap = STOCK_PROFILE.gap_area_mm2 * FACE_WIDTH
     area_error = STOCK_PROFILE.gap_area_error_bound_mm2 * FACE_WIDTH
-    await _native_volume_check(
+    _native_volume_check(
         adapter, "finite stock gap seed",
         blank_volume - one_gap - area_error,
         blank_volume - one_gap + area_error,
         1.0,
     )
-    pattern = await pattern_stock_feature(adapter, "StraightToothGap", TEETH, "StraightToothPattern")
+    pattern = pattern_stock_feature(adapter, "StraightToothGap", TEETH, "StraightToothPattern")
     expected = blank_volume - TEETH * one_gap
-    volume = await _native_volume_check(
+    volume = _native_volume_check(
         adapter, f"finite {TEETH}-gap straight pattern",
         expected - TEETH * area_error, expected + TEETH * area_error, 0.01 * expected,
     )
@@ -274,26 +274,26 @@ def _as_construction(adapter: Any, line: str) -> None:
         raise RuntimeError(f"{line}: failed to become construction geometry")
 
 
-async def _stud_profile(adapter: Any) -> list[tuple[str, str]]:
+def _stud_profile(adapter: Any) -> list[tuple[str, str]]:
     """The revolve in front of F.  Right sketch (u, v) maps to model (-Z, Y),
     so the stud (model z < 0) lies at positive u."""
     profile = SketchDims()
-    await _create_sketch(adapter, "Right", "stud")
+    _create_sketch(adapter, "Right", "stud")
     set_sketch_direct_db(adapter, True)
     axis = check(
-        "stud axis centerline", await adapter.add_centerline(0.0, 0.0, TIP_STATION, 0.0)
+        "stud axis centerline", adapter.add_centerline(0.0, 0.0, TIP_STATION, 0.0)
     )
     # Two real tangent quarter-circle neck corners are part of the turned
     # profile. Their exact revolution is the pure source's quarter-tori.
     radius = FRONT_CORNER_RADIUS
-    (front_face,) = await add_line_chain(
+    (front_face,) = add_line_chain(
         adapter, [(0.0, 0.0), (0.0, _R_NECK + radius)], close=False
     )
     front_corner = _native_arc(
         adapter, "front neck corner",
         radius, _R_NECK + radius, 0.0, _R_NECK + radius, radius, _R_NECK,
     )
-    (neck_floor,) = await add_line_chain(
+    (neck_floor,) = add_line_chain(
         adapter,
         [(radius, _R_NECK), (FRONT_RELIEF_WIDTH - radius, _R_NECK)],
         close=False,
@@ -307,7 +307,7 @@ async def _stud_profile(adapter: Any) -> list[tuple[str, str]]:
     (
         neck_step, core, core_step, relief, thread_end,
         blank, chamfer, tip_face, axis_edge,
-    ) = await add_line_chain(
+    ) = add_line_chain(
         adapter,
         [
             (FRONT_RELIEF_WIDTH, _R_NECK + radius),
@@ -325,13 +325,13 @@ async def _stud_profile(adapter: Any) -> list[tuple[str, str]]:
     )
     outside = check(
         "tooth-tip blank witness",
-        await adapter.add_line(0.0, OUTSIDE_DIA / 2.0, -FACE_WIDTH, OUTSIDE_DIA / 2.0),
+        adapter.add_line(0.0, OUTSIDE_DIA / 2.0, -FACE_WIDTH, OUTSIDE_DIA / 2.0),
     )
     # Construction witness for the controlled overall length: from the tip
     # face's top corner back to the rear end face's station.
     overall = check(
         "overall-length witness",
-        await adapter.add_line(
+        adapter.add_line(
             TIP_STATION,
             _R_BLANK - TIP_CHAMFER,
             -REAR_END_Z,
@@ -357,7 +357,7 @@ async def _stud_profile(adapter: Any) -> list[tuple[str, str]]:
     ):
         check(
             f"stud profile {relation} {line}",
-            await adapter.add_sketch_constraint(line, None, relation),
+            adapter.add_sketch_constraint(line, None, relation),
         )
     for first, second in (
         (front_face, front_corner), (front_corner, neck_floor),
@@ -365,33 +365,33 @@ async def _stud_profile(adapter: Any) -> list[tuple[str, str]]:
     ):
         check(
             "tangent physical neck corner",
-            await adapter.add_sketch_constraint(first, second, "tangent"),
+            adapter.add_sketch_constraint(first, second, "tangent"),
         )
     check(
         "equal physical neck radii",
-        await adapter.add_sketch_constraint(front_corner, core_corner, "equal"),
+        adapter.add_sketch_constraint(front_corner, core_corner, "equal"),
     )
     check(
         "dimension physical front corner",
-        await adapter.add_sketch_dimension(front_corner, None, "radial", FRONT_CORNER_RADIUS),
+        adapter.add_sketch_dimension(front_corner, None, "radial", FRONT_CORNER_RADIUS),
     )
     profile.record("FrontCornerRadius", '"FrontCornerRadius"')
     check(
         "tip witness starts at F",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{outside}.start", "origin", "vertical_points"
         ),
     )
     check(
         "overall witness starts at the tip face",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{overall}.start", f"{chamfer}.end", "coincident"
         ),
     )
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{front_face}.start", 0.0, 0.0, "stud profile at F"
     )
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{tip_face}.end",
         "origin",
@@ -400,7 +400,7 @@ async def _stud_profile(adapter: Any) -> list[tuple[str, str]]:
         "stud TipStation",
     )
     profile.record("TipStation", '"TipStation"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{chamfer}.start",
         f"{chamfer}.end",
@@ -409,7 +409,7 @@ async def _stud_profile(adapter: Any) -> list[tuple[str, str]]:
         "stud TipChamfer",
     )
     profile.record("TipChamfer", '"TipChamfer"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{chamfer}.start",
         f"{chamfer}.end",
@@ -425,7 +425,7 @@ async def _stud_profile(adapter: Any) -> list[tuple[str, str]]:
         ("CoreFromTip", core_step, TIP_STATION - CORE_FRONT_FROM_F, '"TipStation" - "CoreFront"'),
         ("ThreadEndFromTip", thread_end, TIP_STATION - PLAIN_CORE, '"TipStation" - "PlainCore"'),
     ):
-        await dimension_between(
+        dimension_between(
             adapter,
             f"{line}.start",
             f"{tip_face}.end",
@@ -434,7 +434,7 @@ async def _stud_profile(adapter: Any) -> list[tuple[str, str]]:
             f"stud {name}",
         )
         profile.record(name, expr)
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{neck_step}.start",
         "origin",
@@ -443,7 +443,7 @@ async def _stud_profile(adapter: Any) -> list[tuple[str, str]]:
         "stud FrontReliefWidth",
     )
     profile.record("FrontReliefWidth", '"FrontReliefWidth"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{outside}.start",
         f"{outside}.end",
@@ -452,7 +452,7 @@ async def _stud_profile(adapter: Any) -> list[tuple[str, str]]:
         "tooth-tip witness span",
     )
     profile.record("BlankSpan", '"FaceWidth"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{overall}.start",
         f"{overall}.end",
@@ -476,28 +476,28 @@ async def _stud_profile(adapter: Any) -> list[tuple[str, str]]:
             (-FACE_WIDTH / 2.0, OUTSIDE_DIA / 2.0 + 5.0),
         ),
     ):
-        await add_diametric_linear_dimension(adapter, axis, target, xy, name)
+        add_diametric_linear_dimension(adapter, axis, target, xy, name)
         profile.record(name, f'"{name}"')
-    await ensure_fully_defined(adapter, "stud sketch")
-    check("exit_sketch stud", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "stud sketch")
+    check("exit_sketch stud", adapter.exit_sketch())
     name_last_feature(adapter, "StudProfile")
     jobs = profile.apply(adapter, "StudProfile")
-    await _revolve_profile(adapter, "stud", "Stud")
+    _revolve_profile(adapter, "stud", "Stud")
     return jobs
 
 
-async def _revolve_profile(adapter: Any, label: str, feature: str) -> None:
+def _revolve_profile(adapter: Any, label: str, feature: str) -> None:
     """Main's adapter revolve about the just-closed sketch's one centerline."""
     from solidworks_mcp.adapters.base import RevolveParameters
 
     check(
         f"revolve {label}",
-        await adapter.create_revolve(RevolveParameters(angle=360.0)),
+        adapter.create_revolve(RevolveParameters(angle=360.0)),
     )
     name_last_feature(adapter, feature)
 
 
-async def _cut_core_flat(
+def _cut_core_flat(
     adapter: Any, drive_jobs: list[tuple[str, str]], volume: float
 ) -> float:
     """Mill the local -Y D face; the signed physical tool end stays before F."""
@@ -508,9 +508,9 @@ async def _cut_core_flat(
     floor = -CORE_FLAT_FROM_AXIS
     bottom = -CORE_DIA  # closure is wholly outside the turned body
     dims = SketchDims()
-    await _create_sketch(adapter, "Right", "D core flat")
+    _create_sketch(adapter, "Right", "D core flat")
     set_sketch_direct_db(adapter, True)
-    bottom_edge, core_end, flat = await add_line_chain(
+    bottom_edge, core_end, flat = add_line_chain(
         adapter,
         [(end, bottom), (CORE_FRONT_FROM_F, bottom),
          (CORE_FRONT_FROM_F, floor), (end + radius, floor)],
@@ -520,7 +520,7 @@ async def _cut_core_flat(
         adapter, "signed physical flat-tool end",
         end + radius, floor - radius, end + radius, floor, end, floor - radius,
     )
-    (tool_end,) = await add_line_chain(
+    (tool_end,) = add_line_chain(
         adapter, [(end, floor - radius), (end, bottom)], close=False
     )
     set_sketch_direct_db(adapter, False)
@@ -530,47 +530,47 @@ async def _cut_core_flat(
     ):
         check(
             f"flat profile {relation}",
-            await adapter.add_sketch_constraint(segment, None, relation),
+            adapter.add_sketch_constraint(segment, None, relation),
         )
     for segment in (flat, tool_end):
         check(
             "tangent physical flat-tool corner",
-            await adapter.add_sketch_constraint(segment, corner, "tangent"),
+            adapter.add_sketch_constraint(segment, corner, "tangent"),
         )
-    await dimension_between(
+    dimension_between(
         adapter, f"{flat}.start", "origin", "vertical_distance",
         CORE_FLAT_FROM_AXIS, "actual D flat plane",
     )
     dims.record("FlatToAxis", '"CoreFlat"')
-    await dimension_between(
+    dimension_between(
         adapter, f"{core_end}.start", "origin", "horizontal_distance",
         CORE_FRONT_FROM_F, "flat front shoulder station",
     )
     dims.record("FlatCoreFront", '"CoreFront"')
     # Anchored at the tool end's lower tangent point, not its far closure
     # corner, so Detail B's fence holds both of FlatEnd's references.
-    await dimension_between(
+    dimension_between(
         adapter, f"{tool_end}.start", "origin", "horizontal_distance",
         end, "signed physical tool end station",
     )
     dims.record("FlatEnd", '"FlatEnd"')
-    await dimension_between(
+    dimension_between(
         adapter, f"{bottom_edge}.start", "origin", "vertical_distance",
         -bottom, "flat closure outside body",
     )
     dims.record("FlatClosure", '"CoreDia"')
     check(
         "actual physical flat-tool corner radius",
-        await adapter.add_sketch_dimension(corner, None, "radial", radius),
+        adapter.add_sketch_dimension(corner, None, "radial", radius),
     )
     dims.record("FlatToolRadius")
-    await ensure_fully_defined(adapter, "physical D-flat tool profile")
-    check("exit_sketch D core flat", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "physical D-flat tool profile")
+    check("exit_sketch D core flat", adapter.exit_sketch())
     name_last_feature(adapter, "CoreFlatProfile")
     drive_jobs.extend(dims.apply(adapter, "CoreFlatProfile"))
     check(
         "cut actual solid D core",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=CORE_DIA, both_directions=True)
         ),
     )
@@ -578,7 +578,7 @@ async def _cut_core_flat(
     r = CORE_DIA / 2.0
     h = CORE_FLAT_FROM_AXIS
     removed = (r**2 * math.acos(h / r) - h * math.sqrt(r**2 - h**2)) * CORE_ACTIVE_LENGTH
-    return await _native_volume_check(
+    return _native_volume_check(
         adapter, "actual D circular-segment removal", volume - removed, volume - removed,
         0.005 * removed,
     )
@@ -597,26 +597,26 @@ _FLAT_HALF_CHORD = math.sqrt(_R_CORE**2 - CORE_FLAT_FROM_AXIS**2)
 FLAT_WITNESS_STATION = 0.85 * _FLAT_HALF_CHORD
 
 
-async def _flat_end_view_reference(adapter: Any) -> list[tuple[str, str]]:
+def _flat_end_view_reference(adapter: Any) -> list[tuple[str, str]]:
     """The printed FlatToAxis, driven by the same ``CoreFlat`` global as the cut."""
     dims = SketchDims()
     floor = -CORE_FLAT_FROM_AXIS
-    await _create_sketch(adapter, "Front", "D flat end-view reference")
+    _create_sketch(adapter, "Front", "D flat end-view reference")
     set_sketch_direct_db(adapter, True)
     flat = check(
         "D flat reference line",
-        await adapter.add_centerline(-FLAT_WITNESS_STATION, floor, 0.0, floor),
+        adapter.add_centerline(-FLAT_WITNESS_STATION, floor, 0.0, floor),
     )
     set_sketch_direct_db(adapter, False)
     check(
         "D flat reference horizontal",
-        await adapter.add_sketch_constraint(flat, None, "horizontal"),
+        adapter.add_sketch_constraint(flat, None, "horizontal"),
     )
     check(
         "D flat reference under the axis",
-        await adapter.add_sketch_constraint(f"{flat}.end", "origin", "vertical_points"),
+        adapter.add_sketch_constraint(f"{flat}.end", "origin", "vertical_points"),
     )
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{flat}.start",
         "origin",
@@ -625,7 +625,7 @@ async def _flat_end_view_reference(adapter: Any) -> list[tuple[str, str]]:
         "D flat witness station",
     )
     dims.record("FlatWitnessStation")
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{flat}.start",
         "origin",
@@ -634,8 +634,8 @@ async def _flat_end_view_reference(adapter: Any) -> list[tuple[str, str]]:
         "printed D flat from axis",
     )
     dims.record("FlatToAxis", '"CoreFlat"')
-    await ensure_fully_defined(adapter, "D flat end-view reference")
-    check("exit_sketch D flat end-view reference", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "D flat end-view reference")
+    check("exit_sketch D flat end-view reference", adapter.exit_sketch())
     name_last_feature(adapter, "CoreFlatReference")
     jobs = dims.apply(adapter, "CoreFlatReference")
     # Saved hidden so no part image or assembly renders it (#880); the
@@ -644,7 +644,7 @@ async def _flat_end_view_reference(adapter: Any) -> list[tuple[str, str]]:
     return jobs
 
 
-async def _root_profile(adapter: Any) -> list[tuple[str, str]]:
+def _root_profile(adapter: Any) -> list[tuple[str, str]]:
     """The root envelope's MIN as a construction circle on F (Front plane).
 
     The straight gaps run through the whole face, so the view from the tip
@@ -652,8 +652,8 @@ async def _root_profile(adapter: Any) -> list[tuple[str, str]]:
     feed pinion's RootProfile).  Construction only: the volume is unchanged.
     """
     dims = SketchDims()
-    await _create_sketch(adapter, "Front", "root minimum")
-    circle = await define_circle(
+    _create_sketch(adapter, "Front", "root minimum")
+    circle = define_circle(
         adapter,
         0.0,
         0.0,
@@ -664,8 +664,8 @@ async def _root_profile(adapter: Any) -> list[tuple[str, str]]:
         drives=(None, None, '"RootDia"'),
     )
     _as_construction(adapter, circle)
-    await ensure_fully_defined(adapter, "root sketch")
-    check("exit_sketch root", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "root sketch")
+    check("exit_sketch root", adapter.exit_sketch())
     name_last_feature(adapter, "RootProfile")
     jobs = dims.apply(adapter, "RootProfile")
     # A standalone sketch saves shown and renders in every assembly; the
@@ -736,14 +736,14 @@ def _apply_neck_and_flat_limits(adapter: Any) -> None:
     )
 
 
-async def _journal_profile(adapter: Any) -> list[tuple[str, str]]:
+def _journal_profile(adapter: Any) -> list[tuple[str, str]]:
     """The source-owned 6g6 journal behind the actual rear tooth ends."""
     profile = SketchDims()
-    await _create_sketch(adapter, "Right", "journal")
+    _create_sketch(adapter, "Right", "journal")
     set_sketch_direct_db(adapter, True)
     axis = check(
         "journal axis centerline",
-        await adapter.add_centerline(-PINION_REAR_Z, 0.0, -REAR_END_Z, 0.0),
+        adapter.add_centerline(-PINION_REAR_Z, 0.0, -REAR_END_Z, 0.0),
     )
     points = [
         (-PINION_REAR_Z, 0.0),
@@ -751,20 +751,20 @@ async def _journal_profile(adapter: Any) -> list[tuple[str, str]]:
         (-REAR_END_Z, _R_JOURNAL),
         (-REAR_END_Z, 0.0),
     ]
-    lines = await add_line_chain(adapter, points)
+    lines = add_line_chain(adapter, points)
     set_sketch_direct_db(adapter, False)
     for i, line in enumerate(lines):
         (_, y1), (_, y2) = points[i], points[(i + 1) % len(lines)]
         relation = "horizontal" if y1 == y2 else "vertical"
         check(
             f"journal {relation} {line}",
-            await adapter.add_sketch_constraint(line, None, relation),
+            adapter.add_sketch_constraint(line, None, relation),
         )
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{lines[0]}.start", -PINION_REAR_Z, 0.0, "journal at the rear teeth"
     )
     profile.record("ProfileStart", '"FaceWidth"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{lines[1]}.start",
         f"{lines[1]}.end",
@@ -773,7 +773,7 @@ async def _journal_profile(adapter: Any) -> list[tuple[str, str]]:
         "journal JournalLength",
     )
     profile.record("JournalLength", '"JournalLength"')
-    await add_diametric_linear_dimension(
+    add_diametric_linear_dimension(
         adapter,
         axis,
         lines[1],
@@ -781,20 +781,20 @@ async def _journal_profile(adapter: Any) -> list[tuple[str, str]]:
         "JournalDia",
     )
     profile.record("JournalDia", '"JournalDia"')
-    await ensure_fully_defined(adapter, "journal sketch")
-    check("exit_sketch journal", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "journal sketch")
+    check("exit_sketch journal", adapter.exit_sketch())
     name_last_feature(adapter, "JournalProfile")
     jobs = profile.apply(adapter, "JournalProfile")
-    await _revolve_profile(adapter, "journal", "Journal")
+    _revolve_profile(adapter, "journal", "Journal")
     return jobs
 
 
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     from solidworks_mcp.adapters.base import CreatePlaneParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     # #290: the row's inch calculation units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
     # Linear globals retain an explicit mm suffix in the inch source model.
@@ -818,31 +818,31 @@ async def build(adapter: Any) -> dict[str, str]:
         ("JournalDia", JOURNAL_DIA),
         ("JournalLength", JOURNAL_LENGTH),
     ):
-        await set_global(adapter, name, f"{value}mm")
+        set_global(adapter, name, f"{value}mm")
 
     drive_jobs: list[tuple[str, str]] = []
-    disc = await _straight_stock_gaps(adapter, drive_jobs)
+    disc = _straight_stock_gaps(adapter, drive_jobs)
     volume = disc.volume
     _feature_by_name(adapter, "Axis1")  # retained assembly mate axis
 
-    drive_jobs += await _stud_profile(adapter)
-    volume = await _native_volume_check(
+    drive_jobs += _stud_profile(adapter)
+    volume = _native_volume_check(
         adapter, "actual neck core relief and stud", volume + V_STUD, volume + V_STUD,
         0.005 * V_STUD,
     )
-    volume = await _cut_core_flat(adapter, drive_jobs, volume)
+    volume = _cut_core_flat(adapter, drive_jobs, volume)
 
-    drive_jobs += await _journal_profile(adapter)
-    volume = await _native_volume_check(
+    drive_jobs += _journal_profile(adapter)
+    volume = _native_volume_check(
         adapter, "actual running journal", volume + V_JOURNAL, volume + V_JOURNAL,
         0.005 * V_JOURNAL,
     )
 
     # Both cutter terminals are genuinely empty by the pure envelope proofs:
     # the run-out clears the neck and D-core at F and the journal at the rear.
-    await author_span(adapter, STOCK_PROFILE, SPAN_TEETH, places=SPAN_PLACES, unit=UNIT)
-    drive_jobs += await _flat_end_view_reference(adapter)
-    drive_jobs += await _root_profile(adapter)
+    author_span(adapter, STOCK_PROFILE, SPAN_TEETH, places=SPAN_PLACES, unit=UNIT)
+    drive_jobs += _flat_end_view_reference(adapter)
+    drive_jobs += _root_profile(adapter)
 
     stations = (
         ("PinionRear", PINION_REAR_Z, '"FaceWidth"'),
@@ -853,7 +853,7 @@ async def build(adapter: Any) -> dict[str, str]:
     for plane, offset, expr in stations:
         check(
             f"create_plane {plane}",
-            await adapter.create_plane(
+            adapter.create_plane(
                 CreatePlaneParameters(mode="offset", base_plane="Front Plane", offset=offset)
             ),
         )
@@ -861,15 +861,15 @@ async def build(adapter: Any) -> dict[str, str]:
         drive_jobs.append((name_dimensions(adapter, plane, [f"{plane}Offset"])[0], expr))
     blank_reference_geometry(adapter, tuple((plane, "PLANE") for plane, _, _ in stations))
 
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await _native_volume_check(
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    _native_volume_check(
         adapter, "neutral source equations", volume, volume, 0.005 * V_JOURNAL
     )
     lower_volume, upper_volume = expected_volume_bounds_mm3()
-    await _native_volume_check(
+    _native_volume_check(
         adapter, "complete finite-stock shaft source oracle",
         lower_volume, upper_volume, 0.005 * V_JOURNAL,
     )
@@ -900,8 +900,8 @@ async def build(adapter: Any) -> dict[str, str]:
     _apply_root_min(adapter)
     set_dimension_prefix(adapter, "RootProfile", "RootDia", ROOT_PREFIX)
 
-    await apply_material(adapter, MATERIAL)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    report_mass_properties(adapter)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
@@ -915,7 +915,7 @@ async def build(adapter: Any) -> dict[str, str]:
         PART_NAME,
         {TOOTH_SPACE_CALLOUT_PROPERTY: TOOTH_SPACE_CALLOUT},
     )
-    return await save_simplified_part(adapter, PART_NAME, disc.tooth_features)
+    return save_simplified_part(adapter, PART_NAME, disc.tooth_features)
 
 
 if __name__ == "__main__":

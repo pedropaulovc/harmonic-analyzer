@@ -17,7 +17,7 @@ from _visibility import blank_reference_geometry
 
 import _telemetry
 
-async def sketch_rounded_rect(
+def sketch_rounded_rect(
     adapter: Any, w: float, h: float, r: float, cx: float = 0.0, cy: float = 0.0
 ) -> None:
     """Draw a CCW rounded rectangle (4 edges + 4 corner arcs) into the OPEN sketch.
@@ -42,9 +42,9 @@ async def sketch_rounded_rect(
     sketch_mgr.AddToDB = True
     try:
         for (x1, y1), (x2, y2) in [(e[0], e[1]), (e[2], e[3]), (e[4], e[5]), (e[6], e[7])]:
-            check(f"rrect edge ({x1:g},{y1:g})", await adapter.add_line(x1, y1, x2, y2))
+            check(f"rrect edge ({x1:g},{y1:g})", adapter.add_line(x1, y1, x2, y2))
         for ccx, ccy, (sx, sy), (ex, ey) in corners:
-            check(f"rrect arc @({ccx:g},{ccy:g})", await adapter.add_arc(ccx, ccy, sx, sy, ex, ey))
+            check(f"rrect arc @({ccx:g},{ccy:g})", adapter.add_arc(ccx, ccy, sx, sy, ex, ey))
     finally:
         sketch_mgr.AddToDB = prev
     _telemetry.success(f"rounded_rect {w:g}x{h:g} r{r:g} @ ({cx:g}, {cy:g})")
@@ -70,7 +70,7 @@ def insert_helix(
     _telemetry.success(f"insert_helix -> {name}")
     return name
 
-async def add_spring_end_hooks(
+def add_spring_end_hooks(
     adapter: Any,
     mean_radius: float,
     wire_dia: float,
@@ -117,17 +117,17 @@ async def add_spring_end_hooks(
     wire_area = math.pi * (wire_dia / 2.0) ** 2
     max_overlap = 16.0 * (wire_dia / 2.0) ** 3 / 3.0
 
-    async def _volume() -> float:
-        res = await adapter.get_mass_properties()
+    def _volume() -> float:
+        res = adapter.get_mass_properties()
         if not res.is_success:
             raise RuntimeError(f"get_mass_properties failed: {res.error}")
         return float(res.data.volume)
 
-    async def _profile(plane: str, label: str) -> None:
-        check(f"create_sketch {label} hook profile", await adapter.create_sketch(plane))
-        await define_circle(adapter, mean_radius, 0.0, wire_dia / 2.0, f"{label} hook wire")
-        await ensure_fully_defined(adapter, f"{label} hook profile")
-        check(f"exit_sketch {label} hook profile", await adapter.exit_sketch())
+    def _profile(plane: str, label: str) -> None:
+        check(f"create_sketch {label} hook profile", adapter.create_sketch(plane))
+        define_circle(adapter, mean_radius, 0.0, wire_dia / 2.0, f"{label} hook wire")
+        ensure_fully_defined(adapter, f"{label} hook profile")
+        check(f"exit_sketch {label} hook profile", adapter.exit_sketch())
 
     for (label, y_end, d), lead in zip(
         (("bottom", 0.0, -1.0), ("top", body_length, 1.0)), lead_by_end, strict=True
@@ -140,19 +140,19 @@ async def add_spring_end_hooks(
         c = (mean_radius - loop_r, p1[1])
         open_pt = (c[0], c[1] - d * loop_r)  # 270 deg around from the junction
         path_name = check(
-            f"create_sketch {label} hook path", await adapter.create_sketch("Front")
+            f"create_sketch {label} hook path", adapter.create_sketch("Front")
         )
         set_sketch_direct_db(adapter, True)
         lead_line = check(
             f"{label} hook lead",
-            await adapter.add_line(mean_radius, y_end, p1[0], p1[1]),
+            adapter.add_line(mean_radius, y_end, p1[0], p1[1]),
         )
         # add_arc draws CCW: below the coil (d < 0) the 270-degree loop runs
         # open end -> junction, above it junction -> open end.
         if d < 0:
             loop_arc = check(
                 f"{label} hook loop",
-                await adapter.add_arc(
+                adapter.add_arc(
                     c[0], c[1], open_pt[0], open_pt[1], p1[0], p1[1]
                 ),
             )
@@ -160,7 +160,7 @@ async def add_spring_end_hooks(
         else:
             loop_arc = check(
                 f"{label} hook loop",
-                await adapter.add_arc(
+                adapter.add_arc(
                     c[0], c[1], p1[0], p1[1], open_pt[0], open_pt[1]
                 ),
             )
@@ -172,9 +172,9 @@ async def add_spring_end_hooks(
         # across the loop centre (the arc's radius intrinsic does the rest).
         check(
             f"{label} hook lead vertical",
-            await adapter.add_sketch_constraint(lead_line, None, "vertical"),
+            adapter.add_sketch_constraint(lead_line, None, "vertical"),
         )
-        await anchor_point_to_origin(
+        anchor_point_to_origin(
             adapter,
             f"{lead_line}.start",
             mean_radius,
@@ -183,29 +183,29 @@ async def add_spring_end_hooks(
         )
         check(
             f"{label} hook lead length",
-            await adapter.add_sketch_dimension(lead_line, None, "linear", lead),
+            adapter.add_sketch_dimension(lead_line, None, "linear", lead),
         )
         check(
             f"{label} hook tangent",
-            await adapter.add_sketch_constraint(lead_line, loop_arc, "tangent"),
+            adapter.add_sketch_constraint(lead_line, loop_arc, "tangent"),
         )
         check(
             f"{label} hook loop radius",
-            await adapter.add_sketch_dimension(loop_arc, None, "radial", loop_r),
+            adapter.add_sketch_dimension(loop_arc, None, "radial", loop_r),
         )
         check(
             f"{label} hook open end over centre",
-            await adapter.add_sketch_constraint(
+            adapter.add_sketch_constraint(
                 open_ref, f"{loop_arc}.center", "vertical_points"
             ),
         )
-        await ensure_fully_defined(adapter, f"{label} hook path")
-        check(f"exit_sketch {label} hook path", await adapter.exit_sketch())
+        ensure_fully_defined(adapter, f"{label} hook path")
+        check(f"exit_sketch {label} hook path", adapter.exit_sketch())
 
         if d > 0:
             plane = check(
                 "create_plane top hook profile",
-                await adapter.create_plane(
+                adapter.create_plane(
                     CreatePlaneParameters(
                         mode="offset", base_plane="Top Plane", offset=body_length
                     )
@@ -215,15 +215,15 @@ async def add_spring_end_hooks(
             hook_planes = [profile_plane]
         else:
             profile_plane = "Top Plane"
-        await _profile(profile_plane, label)
+        _profile(profile_plane, label)
 
-        before = await _volume()
-        res = await adapter.create_sweep(SweepParameters(path=path_name))
+        before = _volume()
+        res = adapter.create_sweep(SweepParameters(path=path_name))
         if not res.is_success and d > 0:
             _telemetry.debug(f"top hook sweep failed ({res.error}); flipping profile plane")
             plane = check(
                 "create_plane top hook profile (flipped)",
-                await adapter.create_plane(
+                adapter.create_plane(
                     CreatePlaneParameters(
                         mode="offset",
                         base_plane="Top Plane",
@@ -232,15 +232,15 @@ async def add_spring_end_hooks(
                 ),
             )
             hook_planes.append(getattr(plane, "name", plane))
-            await _profile(hook_planes[-1], f"{label} (flipped)")
-            res = await adapter.create_sweep(SweepParameters(path=path_name))
+            _profile(hook_planes[-1], f"{label} (flipped)")
+            res = adapter.create_sweep(SweepParameters(path=path_name))
         check(f"sweep {label} hook", res)
         if d > 0:
             # The profile planes have served the sweep; a failed first attempt
             # leaves its plane behind too, so hide every one from renders.
             blank_reference_geometry(adapter, tuple((name, "PLANE") for name in hook_planes))
 
-        added = await _volume() - before
+        added = _volume() - before
         # Upper bound 1%: planar-path Pappus is exact analytically, but the
         # mass-properties integrator came back +0.34% on the top hook live.
         # `added` is a difference of two whole-part reads, so the helix
@@ -276,7 +276,7 @@ def lens_area(groove_r: float, body_r: float) -> float:
     )
     return a_small + a_big - a_tri
 
-async def add_reeded_head_and_thread(
+def add_reeded_head_and_thread(
     adapter: Any,
     head_dia: float,
     head_length: float,
@@ -302,26 +302,26 @@ async def add_reeded_head_and_thread(
         ExtrusionParameters,
     )
 
-    async def _volume() -> float:
-        res = await adapter.get_mass_properties()
+    def _volume() -> float:
+        res = adapter.get_mass_properties()
         if not res.is_success:
             raise RuntimeError(f"get_mass_properties failed: {res.error}")
         return float(res.data.volume)
 
-    before = await _volume()
+    before = _volume()
     v_groove = lens_area(groove_dia / 2.0, head_dia / 2.0) * head_length
 
-    check("create_sketch reeding seed", await adapter.create_sketch("Right"))
+    check("create_sketch reeding seed", adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
-    await define_circle(adapter, head_dia / 2.0, 0.0, groove_dia / 2.0, "reeding seed")
+    define_circle(adapter, head_dia / 2.0, 0.0, groove_dia / 2.0, "reeding seed")
     set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(adapter, "reeding seed sketch")
-    check("exit_sketch reeding seed", await adapter.exit_sketch())
-    groove_cut = await adapter.create_cut_extrude(
+    ensure_fully_defined(adapter, "reeding seed sketch")
+    check("exit_sketch reeding seed", adapter.exit_sketch())
+    groove_cut = adapter.create_cut_extrude(
         ExtrusionParameters(depth=head_length)
     )
     check("cut reeding seed", groove_cut)
-    after_seed = await _volume()
+    after_seed = _volume()
     if abs(after_seed - (before - v_groove)) > 0.02 * v_groove:
         raise RuntimeError(
             f"reeding seed: volume {after_seed:.2f}, expected "
@@ -334,7 +334,7 @@ async def add_reeded_head_and_thread(
     # select the reference axis by NAME instead (MCP PR #47).
     axis = check(
         "create_axis X (Front x Top)",
-        await adapter.create_axis(
+        adapter.create_axis(
             CreateAxisParameters(mode="two_planes", planes=["Front Plane", "Top Plane"])
         ),
     )
@@ -345,7 +345,7 @@ async def add_reeded_head_and_thread(
     # extrusions patterns fine).
     check(
         f"reeding pattern about {axis.name}",
-        await adapter.circular_pattern_feature(
+        adapter.circular_pattern_feature(
             CircularPatternParameters(
                 axis_name=axis.name,
                 features=[groove_cut.data.name],
@@ -356,7 +356,7 @@ async def add_reeded_head_and_thread(
     )
     # Hidden once the pattern owns it, so it does not print in renders.
     blank_reference_geometry(adapter, ((axis.name, "AXIS"),))
-    after_pattern = await _volume()
+    after_pattern = _volume()
     expected = before - groove_count * v_groove
     if abs(after_pattern - expected) > 0.02 * groove_count * v_groove:
         raise RuntimeError(
@@ -367,7 +367,7 @@ async def add_reeded_head_and_thread(
     adapter._zoom_to_fit(adapter.currentModel)
     check(
         f"cosmetic thread {thread_size}",
-        await adapter.add_thread(
+        adapter.add_thread(
             AddThreadParameters(
                 edge_point=[head_length + shank_length, shank_dia / 2.0, 0.0],
                 standard="ansi_inch",  # was ansi_metric M3x0.5 -> US-customary UNC
@@ -377,5 +377,5 @@ async def add_reeded_head_and_thread(
             )
         ),
     )
-    if abs(await _volume() - after_pattern) > 1e-6:
+    if abs(_volume() - after_pattern) > 1e-6:
         raise RuntimeError("cosmetic thread changed the volume -- it cut geometry")

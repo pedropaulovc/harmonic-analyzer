@@ -249,7 +249,7 @@ def active_configuration_name(adapter: Any, model: Any = None) -> str:
 
 
 @_telemetry.traced("feature.rebuild")
-async def force_rebuild(adapter: Any) -> None:
+def force_rebuild(adapter: Any) -> None:
     """Force a full rebuild of the active doc, failing loud on error.
 
     Renamed features/dimensions register for the API immediately, but a rebuild
@@ -259,7 +259,7 @@ async def force_rebuild(adapter: Any) -> None:
     raises through :func:`check` rather than passing silently.  A refused
     rebuild first names its What's Wrong features and captures the seat
     (:func:`_seat_forensics.capture_rebuild_failure`), raising the same message."""
-    result = await adapter.rebuild_model()
+    result = adapter.rebuild_model()
     if not result.is_success:
         _seat_forensics.capture_rebuild_failure(
             adapter, f"rebuild failed: {result.error}"

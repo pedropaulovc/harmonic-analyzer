@@ -170,7 +170,7 @@ def _delete_feature(adapter, name: str, kind: str) -> None:
     model.ClearSelection2(True)
 
 
-async def _angled_plane_containing(
+def _angled_plane_containing(
     adapter,
     name: str,
     *,
@@ -192,7 +192,7 @@ async def _angled_plane_containing(
     for attempt, signed in enumerate((angle_deg, -angle_deg)):
         check(
             f"create_plane {name} ({signed:+.4f} deg about {pivot_axis})",
-            await adapter.create_plane(
+            adapter.create_plane(
                 CreatePlaneParameters(
                     mode="angle",
                     base_plane=base_plane,
@@ -238,7 +238,7 @@ _STATION_DRIVES = {
 }
 
 
-async def _cut_annulus_inboard(
+def _cut_annulus_inboard(
     adapter,
     name: str,
     *,
@@ -272,7 +272,7 @@ async def _cut_annulus_inboard(
     plane = f"{name}StartPlane"
     check(
         f"create_plane {plane}",
-        await adapter.create_plane(
+        adapter.create_plane(
             CreatePlaneParameters(mode="offset", base_plane="Top Plane", offset=start)
         ),
     )
@@ -280,20 +280,20 @@ async def _cut_annulus_inboard(
     start_dim = name_dimensions(adapter, plane, [start_global])
     drive_jobs += [(start_dim[0], f'"{start_global}"')]
     dims = SketchDims()
-    check(f"create_sketch {name}", await adapter.create_sketch(plane))
-    await define_circle(
+    check(f"create_sketch {name}", adapter.create_sketch(plane))
+    define_circle(
         adapter, 0.0, 0.0, inner_dia / 2.0, f"{name} turned circle",
         dims=dims,
         names=(f"{name}Cx", f"{name}Cz", f"{name}DiaDim"),
         drives=(None, None, f'"{inner_global}"'),
     )
-    await define_circle(
+    define_circle(
         adapter, 0.0, 0.0, turned_dia / 2.0 + 1.0, f"{name} clearance circle",
         dims=dims,
         names=(f"{name}OuterCx", f"{name}OuterCz", f"{name}OuterDia"),
     )
     if witness_dim is not None:
-        witness = await define_circle(
+        witness = define_circle(
             adapter, 0.0, 0.0, turned_dia / 2.0, f"{name} core witness circle",
             dims=dims,
             names=(None, None, witness_dim),
@@ -303,13 +303,13 @@ async def _cut_annulus_inboard(
         segment.ConstructionGeometry = True
         if not bool(segment.ConstructionGeometry):
             raise RuntimeError(f"{name} core witness did not take construction flag")
-    await ensure_fully_defined(adapter, f"{name} sketch")
-    check(f"exit_sketch {name}", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, f"{name} sketch")
+    check(f"exit_sketch {name}", adapter.exit_sketch())
     name_last_feature(adapter, f"{name}Profile")
     drive_jobs += dims.apply(adapter, f"{name}Profile")
     check(
         f"cut {name}",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=length, reverse_direction=True)
         ),
     )
@@ -319,7 +319,7 @@ async def _cut_annulus_inboard(
     return math.pi * ((turned_dia / 2.0) ** 2 - (inner_dia / 2.0) ** 2) * length
 
 
-async def _collar_section(
+def _collar_section(
     adapter,
     name: str,
     *,
@@ -345,7 +345,7 @@ async def _collar_section(
 
     check(
         f"create_plane {plane}",
-        await adapter.create_plane(
+        adapter.create_plane(
             CreatePlaneParameters(mode="offset", base_plane="Top Plane", offset=station)
         ),
     )
@@ -353,8 +353,8 @@ async def _collar_section(
     plane_dim = name_dimensions(adapter, plane, [f"{plane}Offset"])
     drive_jobs += [(plane_dim[0], station_expr)]
     dims = SketchDims()
-    check(f"create_sketch {name}", await adapter.create_sketch(plane))
-    await define_circle(
+    check(f"create_sketch {name}", adapter.create_sketch(plane))
+    define_circle(
         adapter,
         0.0,
         0.0,
@@ -364,13 +364,13 @@ async def _collar_section(
         names=(f"{name}Cx", f"{name}Cz", f"{name}DiaDim"),
         drives=(None, None, f'"{dia_global}"'),
     )
-    await ensure_fully_defined(adapter, f"{name} sketch")
-    check(f"exit_sketch {name}", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, f"{name} sketch")
+    check(f"exit_sketch {name}", adapter.exit_sketch())
     name_last_feature(adapter, f"{name}Profile")
     drive_jobs += dims.apply(adapter, f"{name}Profile")
     check(
         f"extrude {name}",
-        await adapter.create_extrusion(ExtrusionParameters(depth=length)),
+        adapter.create_extrusion(ExtrusionParameters(depth=length)),
     )
     name_last_feature(adapter, name)
     length_dim = name_dimensions(adapter, name, [length_name])
@@ -378,19 +378,19 @@ async def _collar_section(
     return math.pi * ((dia / 2.0) ** 2 - (SHAFT_DIA / 2.0) ** 2) * length
 
 
-async def _volume(adapter) -> float:
-    result = await adapter.get_mass_properties()
+def _volume(adapter) -> float:
+    result = adapter.get_mass_properties()
     return result.data.volume if result.is_success else float("nan")
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
         CreatePlaneParameters,
         ExtrusionParameters,
         RevolveParameters,
     )
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     # #290: the row's inch calculation units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
@@ -399,40 +399,40 @@ async def build(adapter) -> dict[str, str]:
     # INCH document and the equation manager reads BARE numbers in document units
     # (an unsuffixed 120 = 120 in, blowing the part up 25.4x). SHAFT_DIA is
     # already mm (0.375 * IN), so it serialises as its mm value.
-    await set_global(adapter, "ShaftDia", f"{SHAFT_DIA}mm")
-    await set_global(adapter, "ShaftLength", f"{SHAFT_LENGTH}mm")
-    await set_global(adapter, "JournalDia", f"{JOURNAL_DIA}mm")
-    await set_global(adapter, "JournalStart", f"{JOURNAL_START}mm")
-    await set_global(adapter, "JournalLength", f"{JOURNAL_LENGTH}mm")
-    await set_global(adapter, "ReliefDia", f"{RELIEF_DIA}mm")
-    await set_global(adapter, "ReliefStart", f"{RELIEF_START}mm")
-    await set_global(adapter, "ReliefLength", f"{RELIEF_LENGTH}mm")
-    await set_global(adapter, "PinionSeatDia", f"{PINION_SEAT_DIA}mm")
-    await set_global(adapter, "PinionSeatStep", f"{SEAT_STEP}mm")
-    await set_global(adapter, "PinHoleHeight", f"{PIN_HOLE_HEIGHT}mm")
-    await set_global(adapter, "PinionPinStation", f"{PINION_PIN_STATION_Y}mm")
-    await set_global(adapter, "PinionPinDia", f"{PINION_PIN_DIA}mm")
-    await set_global(adapter, "DomeHeight", f"{SHAFT_DOME_HEIGHT}mm")
-    await set_global(adapter, "FiducialDia", f"{FIDUCIAL_MODEL_DIA}mm")
-    await set_global(adapter, "FiducialDepth", f"{FIDUCIAL_MODEL_DEPTH}mm")
+    set_global(adapter, "ShaftDia", f"{SHAFT_DIA}mm")
+    set_global(adapter, "ShaftLength", f"{SHAFT_LENGTH}mm")
+    set_global(adapter, "JournalDia", f"{JOURNAL_DIA}mm")
+    set_global(adapter, "JournalStart", f"{JOURNAL_START}mm")
+    set_global(adapter, "JournalLength", f"{JOURNAL_LENGTH}mm")
+    set_global(adapter, "ReliefDia", f"{RELIEF_DIA}mm")
+    set_global(adapter, "ReliefStart", f"{RELIEF_START}mm")
+    set_global(adapter, "ReliefLength", f"{RELIEF_LENGTH}mm")
+    set_global(adapter, "PinionSeatDia", f"{PINION_SEAT_DIA}mm")
+    set_global(adapter, "PinionSeatStep", f"{SEAT_STEP}mm")
+    set_global(adapter, "PinHoleHeight", f"{PIN_HOLE_HEIGHT}mm")
+    set_global(adapter, "PinionPinStation", f"{PINION_PIN_STATION_Y}mm")
+    set_global(adapter, "PinionPinDia", f"{PINION_PIN_DIA}mm")
+    set_global(adapter, "DomeHeight", f"{SHAFT_DOME_HEIGHT}mm")
+    set_global(adapter, "FiducialDia", f"{FIDUCIAL_MODEL_DIA}mm")
+    set_global(adapter, "FiducialDepth", f"{FIDUCIAL_MODEL_DEPTH}mm")
     # Sketch distance dimensions are unsigned magnitudes; the seeded point
     # coordinates below retain the witness's quadrant.
-    await set_global(adapter, "FiducialX", f"{abs(FIDUCIAL_MODEL_X)}mm")
-    await set_global(adapter, "FiducialZ", f"{abs(FIDUCIAL_MODEL_Z)}mm")
-    await set_global(adapter, "SeatCollar", f"{SEAT_COLLAR}mm")
-    await set_global(adapter, "CollarLength", f"{COLLAR_LENGTH}mm")
-    await set_global(adapter, "SpigotDia", f"{SPIGOT_DIA}mm")
-    await set_global(adapter, "DrivePinCircleRadius", f"{DRIVE_PIN_CIRCLE_RADIUS}mm")
-    await set_global(adapter, "DrivePinHoleDia", f"{DRIVE_PIN_HOLE_DIA}mm")
-    await set_global(adapter, "DrivePinDepth", f"{DRIVE_PIN_DEPTH}mm")
+    set_global(adapter, "FiducialX", f"{abs(FIDUCIAL_MODEL_X)}mm")
+    set_global(adapter, "FiducialZ", f"{abs(FIDUCIAL_MODEL_Z)}mm")
+    set_global(adapter, "SeatCollar", f"{SEAT_COLLAR}mm")
+    set_global(adapter, "CollarLength", f"{COLLAR_LENGTH}mm")
+    set_global(adapter, "SpigotDia", f"{SPIGOT_DIA}mm")
+    set_global(adapter, "DrivePinCircleRadius", f"{DRIVE_PIN_CIRCLE_RADIUS}mm")
+    set_global(adapter, "DrivePinHoleDia", f"{DRIVE_PIN_HOLE_DIA}mm")
+    set_global(adapter, "DrivePinDepth", f"{DRIVE_PIN_DEPTH}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
     # Shaft: on-axis circle (centre at the origin), so define_circle emits only
     # the diameter dim -- the two centre slots are ignored.
     shaft = SketchDims()
-    check("create_sketch shaft", await adapter.create_sketch("Top"))
-    await define_circle(
+    check("create_sketch shaft", adapter.create_sketch("Top"))
+    define_circle(
         adapter,
         0.0,
         0.0,
@@ -442,36 +442,36 @@ async def build(adapter) -> dict[str, str]:
         names=("ShaftCx", "ShaftCz", "ShaftDiaDim"),
         drives=(None, None, '"ShaftDia"'),
     )
-    await ensure_fully_defined(adapter, "shaft sketch")
-    check("exit_sketch shaft", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "shaft sketch")
+    check("exit_sketch shaft", adapter.exit_sketch())
     name_last_feature(adapter, "ShaftProfile")
     drive_jobs += shaft.apply(adapter, "ShaftProfile")
     check(
         "extrude shaft",
-        await adapter.create_extrusion(ExtrusionParameters(depth=SHAFT_LENGTH)),
+        adapter.create_extrusion(ExtrusionParameters(depth=SHAFT_LENGTH)),
     )
     name_last_feature(adapter, "Shaft")
     depth_dim = name_dimensions(adapter, "Shaft", ["Depth"])
     drive_jobs += [(depth_dim[0], '"ShaftLength"')]
     v_shaft = math.pi * (SHAFT_DIA / 2.0) ** 2 * SHAFT_LENGTH
-    await volume_check(adapter, "shaft", v_shaft, 0.005 * v_shaft)
+    volume_check(adapter, "shaft", v_shaft, 0.005 * v_shaft)
 
     # Integral same-diameter spherical dome on the outboard end.  Its base is
     # exactly the shaft cylinder, so no mushroom head or removable cap can trap
     # the crank behind the through hub.
     dome = SketchDims()
-    check("create_sketch shaft dome", await adapter.create_sketch("Front"))
+    check("create_sketch shaft dome", adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     dome_axis = check(
         "dome axis",
-        await adapter.add_centerline(0.0, -SHAFT_DOME_HEIGHT, 0.0, 0.0),
+        adapter.add_centerline(0.0, -SHAFT_DOME_HEIGHT, 0.0, 0.0),
     )
     dome_base = check(
-        "dome base", await adapter.add_line(0.0, 0.0, DOME_R, 0.0)
+        "dome base", adapter.add_line(0.0, 0.0, DOME_R, 0.0)
     )
     dome_arc = check(
         "dome arc",
-        await adapter.add_arc(
+        adapter.add_arc(
             0.0,
             DOME_SPHERE_R - SHAFT_DOME_HEIGHT,
             0.0,
@@ -482,7 +482,7 @@ async def build(adapter) -> dict[str, str]:
     )
     dome_close = check(
         "dome closure",
-        await adapter.add_line(0.0, -SHAFT_DOME_HEIGHT, 0.0, 0.0),
+        adapter.add_line(0.0, -SHAFT_DOME_HEIGHT, 0.0, 0.0),
     )
     set_sketch_direct_db(adapter, False)
     for label, first, second in (
@@ -492,47 +492,47 @@ async def build(adapter) -> dict[str, str]:
         ("axis start", f"{dome_axis}.start", f"{dome_arc}.start"),
         ("axis end", f"{dome_axis}.end", f"{dome_base}.start"),
     ):
-        check(label, await adapter.add_sketch_constraint(first, second, "coincident"))
+        check(label, adapter.add_sketch_constraint(first, second, "coincident"))
     for label, entity, relation in (
         ("dome base", dome_base, "horizontal"),
         ("dome closure", dome_close, "vertical"),
         ("dome axis", dome_axis, "vertical"),
     ):
-        check(label, await adapter.add_sketch_constraint(entity, None, relation))
-    await anchor_point_to_origin(
+        check(label, adapter.add_sketch_constraint(entity, None, relation))
+    anchor_point_to_origin(
         adapter, f"{dome_base}.start", 0.0, 0.0, "dome base"
     )
     check(
         "dome base radius",
-        await adapter.add_sketch_dimension(dome_base, None, "linear", DOME_R),
+        adapter.add_sketch_dimension(dome_base, None, "linear", DOME_R),
     )
     dome.record("DomeBaseR", '"ShaftDia" / 2')
     check(
         "dome height",
-        await adapter.add_sketch_dimension(
+        adapter.add_sketch_dimension(
             f"{dome_arc}.start", "origin", "vertical_distance", SHAFT_DOME_HEIGHT
         ),
     )
     dome.record("DomeHeight", '"DomeHeight"')
     check(
         "dome sphere radius",
-        await adapter.add_sketch_dimension(dome_arc, None, "radial", DOME_SPHERE_R),
+        adapter.add_sketch_dimension(dome_arc, None, "radial", DOME_SPHERE_R),
     )
     dome.record(
         "DomeSphereR",
         '("ShaftDia" / 2 * "ShaftDia" / 2 + "DomeHeight" * "DomeHeight") '
         '/ (2 * "DomeHeight")',
     )
-    await ensure_fully_defined(adapter, "shaft dome profile")
-    check("exit_sketch shaft dome", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "shaft dome profile")
+    check("exit_sketch shaft dome", adapter.exit_sketch())
     name_last_feature(adapter, "ShaftDomeProfile")
     drive_jobs += dome.apply(adapter, "ShaftDomeProfile")
     check(
         "revolve shaft dome",
-        await adapter.create_revolve(RevolveParameters(angle=360.0)),
+        adapter.create_revolve(RevolveParameters(angle=360.0)),
     )
     name_last_feature(adapter, "ShaftDome")
-    await volume_check(
+    volume_check(
         adapter,
         "shaft with integral dome",
         v_shaft + V_DOME,
@@ -543,7 +543,7 @@ async def build(adapter) -> dict[str, str]:
     # arm witness.  The shallow cut is visual-only and never dimensioned.
     check(
         "create_plane ShaftFiducialPlane",
-        await adapter.create_plane(
+        adapter.create_plane(
             CreatePlaneParameters(
                 mode="offset",
                 base_plane="Top Plane",
@@ -555,9 +555,9 @@ async def build(adapter) -> dict[str, str]:
     fiducial = SketchDims()
     check(
         "create_sketch shaft fiducial",
-        await adapter.create_sketch("ShaftFiducialPlane"),
+        adapter.create_sketch("ShaftFiducialPlane"),
     )
-    await define_circle(
+    define_circle(
         adapter,
         FIDUCIAL_MODEL_X,
         -FIDUCIAL_MODEL_Z,
@@ -567,13 +567,13 @@ async def build(adapter) -> dict[str, str]:
         names=("FiducialX", "FiducialZ", "FiducialDia"),
         drives=('"FiducialX"', '"FiducialZ"', '"FiducialDia"'),
     )
-    await ensure_fully_defined(adapter, "shaft fiducial sketch")
-    check("exit_sketch shaft fiducial", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "shaft fiducial sketch")
+    check("exit_sketch shaft fiducial", adapter.exit_sketch())
     name_last_feature(adapter, "ShaftFiducialProfile")
     drive_jobs += fiducial.apply(adapter, "ShaftFiducialProfile")
     check(
         "cut shaft fiducial",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(
                 depth=2.0 * FIDUCIAL_MODEL_DEPTH,
                 both_directions=True,
@@ -581,13 +581,13 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "PunchedFiducial")
-    v_shaft_nose = await _volume(adapter)
+    v_shaft_nose = _volume(adapter)
 
     # Integral journal: the original concentric extrusion and middle relief,
     # retaining the later rebuild-neutrality, signed witness and visibility gates.
     check(
         "create_plane JournalStartPlane",
-        await adapter.create_plane(
+        adapter.create_plane(
             CreatePlaneParameters(
                 mode="offset", base_plane="Top Plane", offset=JOURNAL_START
             )
@@ -597,20 +597,20 @@ async def build(adapter) -> dict[str, str]:
     start_dim = name_dimensions(adapter, "JournalStartPlane", ["JournalStart"])
     drive_jobs += [(start_dim[0], '"JournalStart"')]
     journal = SketchDims()
-    check("create_sketch bearing journal", await adapter.create_sketch("JournalStartPlane"))
-    await define_circle(
+    check("create_sketch bearing journal", adapter.create_sketch("JournalStartPlane"))
+    define_circle(
         adapter, 0.0, 0.0, JOURNAL_DIA / 2.0, "bearing journal circle",
         dims=journal,
         names=("JournalCx", "JournalCz", "JournalDiaDim"),
         drives=(None, None, '"JournalDia"'),
     )
-    await ensure_fully_defined(adapter, "bearing journal sketch")
-    check("exit_sketch bearing journal", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "bearing journal sketch")
+    check("exit_sketch bearing journal", adapter.exit_sketch())
     name_last_feature(adapter, "JournalProfile")
     drive_jobs += journal.apply(adapter, "JournalProfile")
     check(
         "extrude bearing journal",
-        await adapter.create_extrusion(ExtrusionParameters(depth=JOURNAL_LENGTH)),
+        adapter.create_extrusion(ExtrusionParameters(depth=JOURNAL_LENGTH)),
     )
     name_last_feature(adapter, "Journal")
     journal_depth_dim = name_dimensions(adapter, "Journal", ["JournalLength"])
@@ -618,10 +618,10 @@ async def build(adapter) -> dict[str, str]:
     v_with_seat = v_shaft_nose + math.pi * (
         (JOURNAL_DIA / 2.0) ** 2 - (SHAFT_DIA / 2.0) ** 2
     ) * JOURNAL_LENGTH
-    await volume_check(
+    volume_check(
         adapter, "shaft + bearing journal", v_with_seat, 0.005 * v_with_seat
     )
-    v_with_seat -= await _cut_annulus_inboard(
+    v_with_seat -= _cut_annulus_inboard(
         adapter,
         "Relief",
         start=RELIEF_START,
@@ -633,11 +633,11 @@ async def build(adapter) -> dict[str, str]:
         length_expr='"ReliefLength"',
         drive_jobs=drive_jobs,
     )
-    await volume_check(adapter, "journal relief", v_with_seat, 0.005 * v_with_seat)
+    volume_check(adapter, "journal relief", v_with_seat, 0.005 * v_with_seat)
     # The Ø9.0 pinion seat (RULING (b)): the same cut from the seat step to
     # the far end face.  Its profile also carries the loose Ø9.5 the drawing
     # prints on the inboard neck, the bare land that ends at this step.
-    v_with_seat -= await _cut_annulus_inboard(
+    v_with_seat -= _cut_annulus_inboard(
         adapter,
         "PinionSeat",
         start=SEAT_STEP,
@@ -650,13 +650,13 @@ async def build(adapter) -> dict[str, str]:
         drive_jobs=drive_jobs,
         witness_dim="NeckDiaDim",
     )
-    await volume_check(
+    volume_check(
         adapter, "pinion seat step", v_with_seat, 0.005 * v_with_seat
     )
 
     check(
         "create_plane PinHoleStationPlane",
-        await adapter.create_plane(
+        adapter.create_plane(
             CreatePlaneParameters(
                 mode="offset", base_plane="Top Plane", offset=PIN_HOLE_HEIGHT
             )
@@ -685,14 +685,14 @@ async def build(adapter) -> dict[str, str]:
     # constant for the retired Ø5.0).
     v_pin = cross_hole_volume_mm3(pin_hole_dia, SHAFT_DIA)
     v_final = v_with_seat - v_pin
-    await volume_check(adapter, "shaft + pin hole", v_final, 0.02 * v_pin)
+    volume_check(adapter, "shaft + pin hole", v_final, 0.02 * v_pin)
 
     # Named central axis (shaft axis = local +Y through the origin) so the
     # crankshaft mates concentric in the pedestal and the crank parts /
     # pinion / chain wheel lock to it (M6 mated-DOF drive train). Created
     # BEFORE the pinion-pin hole because that hole's clocking plane pivots on
     # it; the hole adds no axis of its own, so it stays Axis1.
-    shaft_axis = await name_bore_axis(
+    shaft_axis = name_bore_axis(
         adapter, "Front Plane", 0.0, "Right Plane", 0.0, "shaft axis"
     )
 
@@ -712,7 +712,7 @@ async def build(adapter) -> dict[str, str]:
     # deleted and the mirror built instead).
     check(
         "create_plane PinionPinStationPlane",
-        await adapter.create_plane(
+        adapter.create_plane(
             CreatePlaneParameters(
                 mode="offset", base_plane="Top Plane", offset=PINION_PIN_STATION_Y
             )
@@ -725,7 +725,7 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += [(pinion_station_dim[0], '"PinionPinStation"')]
     clocking = math.radians(PINION_PIN_CLOCKING_DEG)
     entry_dir = (-math.cos(clocking), 0.0, -math.sin(clocking))
-    await _angled_plane_containing(
+    _angled_plane_containing(
         adapter,
         "PinionPinClockingPlane",
         base_plane="Front Plane",
@@ -747,13 +747,13 @@ async def build(adapter) -> dict[str, str]:
     )
     v_pinion_pin = cross_hole_volume_mm3(PINION_PIN_DIA, PINION_SEAT_DIA)
     v_final -= v_pinion_pin
-    await volume_check(adapter, "shaft + pinion pin hole", v_final, 0.02 * v_pinion_pin)
+    volume_check(adapter, "shaft + pinion pin hole", v_final, 0.02 * v_pinion_pin)
 
     # ch. 23 seat collar, integral with the shaft (CONTRACT-crank): one seat
     # spigot, whose face on the SeatCollar datum is the removable sprocket's
     # seat, which the #25 plates wrapping the T12 pass over, and whose
     # CollarRear face bears on the post boss.
-    v_final += await _collar_section(
+    v_final += _collar_section(
         adapter,
         "Spigot",
         plane="SeatCollar",
@@ -766,7 +766,7 @@ async def build(adapter) -> dict[str, str]:
         length_expr='"CollarLength"',
         drive_jobs=drive_jobs,
     )
-    await volume_check(adapter, "shaft + seat collar", v_final, 0.005 * v_final)
+    volume_check(adapter, "shaft + seat collar", v_final, 0.005 * v_final)
 
     # Two blind, flat-bottomed holes reamed into the seat face for the pressed
     # MHA-DT-VN-67 dowels, on the wheel's pin circle at local +Z (#1) and -Z (#2);
@@ -775,12 +775,12 @@ async def build(adapter) -> dict[str, str]:
     # so it takes reverse_direction, and the volume gate fails loud on the
     # wrong side.  The pin holes' rim to the spigot is logged below.
     pins = SketchDims()
-    check("create_sketch drive-pin holes", await adapter.create_sketch("SeatCollar"))
+    check("create_sketch drive-pin holes", adapter.create_sketch("SeatCollar"))
     for index, sketch_v in (
         (1, -DRIVE_PIN_CIRCLE_RADIUS),
         (2, DRIVE_PIN_CIRCLE_RADIUS),
     ):
-        await define_circle(
+        define_circle(
             adapter,
             0.0,
             sketch_v,
@@ -790,13 +790,13 @@ async def build(adapter) -> dict[str, str]:
             names=(None, f"DrivePinOffset{index}", f"DrivePinHoleDia{index}"),
             drives=(None, '"DrivePinCircleRadius"', '"DrivePinHoleDia"'),
         )
-    await ensure_fully_defined(adapter, "drive-pin hole sketch")
-    check("exit_sketch drive-pin holes", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "drive-pin hole sketch")
+    check("exit_sketch drive-pin holes", adapter.exit_sketch())
     name_last_feature(adapter, "DrivePinProfile")
     drive_jobs += pins.apply(adapter, "DrivePinProfile")
     check(
         "cut drive-pin holes",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=DRIVE_PIN_DEPTH, reverse_direction=True)
         ),
     )
@@ -805,7 +805,7 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += [(pin_depth_dim[0], '"DrivePinDepth"')]
     v_pin_holes = 2.0 * math.pi * (DRIVE_PIN_HOLE_DIA / 2.0) ** 2 * DRIVE_PIN_DEPTH
     v_final -= v_pin_holes
-    await volume_check(
+    volume_check(
         adapter, "seat collar drive-pin holes", v_final, 0.05 * v_pin_holes
     )
     _telemetry.info(
@@ -842,7 +842,7 @@ async def build(adapter) -> dict[str, str]:
         2.0 * math.pi * (DRIVE_PIN_KNOCKOUT_DIA / 2.0) ** 2 * DRIVE_PIN_KNOCKOUT_LENGTH
     )
     v_final -= v_knockouts
-    await volume_check(
+    volume_check(
         adapter, "seat collar drive-pin knockouts", v_final, 0.05 * v_knockouts
     )
     for plane, station, expr in (
@@ -851,7 +851,7 @@ async def build(adapter) -> dict[str, str]:
     ):
         check(
             f"create_plane {plane} (Top Plane + {station:g})",
-            await adapter.create_plane(
+            adapter.create_plane(
                 CreatePlaneParameters(
                     mode="offset", base_plane="Top Plane", offset=station
                 )
@@ -867,7 +867,7 @@ async def build(adapter) -> dict[str, str]:
         ("DrivePinAxis1", DRIVE_PIN_CIRCLE_RADIUS),
         ("DrivePinAxis2", -DRIVE_PIN_CIRCLE_RADIUS),
     ):
-        await name_bore_axis(
+        name_bore_axis(
             adapter,
             "Right Plane",
             0.0,
@@ -893,22 +893,22 @@ async def build(adapter) -> dict[str, str]:
     # Right (u, v) -> (-Z, Y); u < 0 is model +Z, the side the rotated side
     # view prints UP.
     stations = SketchDims()
-    check("create_sketch station reference", await adapter.create_sketch("Right"))
+    check("create_sketch station reference", adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
     overall_line = check(
         "overall reference line",
-        await adapter.add_line(0.0, -SHAFT_DOME_HEIGHT, 0.0, SHAFT_LENGTH),
+        adapter.add_line(0.0, -SHAFT_DOME_HEIGHT, 0.0, SHAFT_LENGTH),
     )
     station_lines = {}
     for name, station in _STATIONS.items():
         station_lines[name] = check(
             f"{name} reference line",
-            await adapter.add_line(0.0, SHAFT_LENGTH, 0.0, station),
+            adapter.add_line(0.0, SHAFT_LENGTH, 0.0, station),
         )
     # Counter-clockwise from the dome root corner down to the tip.
     dome_arc = check(
         "dome radius reference arc",
-        await adapter.add_arc(
+        adapter.add_arc(
             0.0,
             DOME_SPHERE_R - SHAFT_DOME_HEIGHT,
             -DOME_R,
@@ -923,7 +923,7 @@ async def build(adapter) -> dict[str, str]:
     # the clocked hole's saddle rim).
     pin_witness = check(
         "pinion pin-hole reference line",
-        await adapter.add_line(
+        adapter.add_line(
             -PINION_SEAT_DIA / 2.0,
             PINION_PIN_STATION_Y - PINION_PIN_DIA / 2.0,
             -PINION_SEAT_DIA / 2.0,
@@ -938,45 +938,45 @@ async def build(adapter) -> dict[str, str]:
             raise RuntimeError(f"station reference {entity} did not take construction flag")
     check(
         "overall reference vertical",
-        await adapter.add_sketch_constraint(overall_line, None, "vertical"),
+        adapter.add_sketch_constraint(overall_line, None, "vertical"),
     )
     for name, line in station_lines.items():
         check(
             f"{name} reference vertical",
-            await adapter.add_sketch_constraint(line, None, "vertical"),
+            adapter.add_sketch_constraint(line, None, "vertical"),
         )
         check(
             f"{name} reference starts at the far end",
-            await adapter.add_sketch_constraint(
+            adapter.add_sketch_constraint(
                 f"{line}.start", f"{overall_line}.end", "coincident"
             ),
         )
     check(
         "dome radius reference ends at the tip",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{dome_arc}.end", f"{overall_line}.start", "coincident"
         ),
     )
     check(
         "dome radius reference centre on the axis",
-        await adapter.add_sketch_constraint(f"{dome_arc}.center", "origin", "vertical_points"),
+        adapter.add_sketch_constraint(f"{dome_arc}.center", "origin", "vertical_points"),
     )
     check(
         "dome radius reference starts at the dome root",
-        await adapter.add_sketch_constraint(f"{dome_arc}.start", "origin", "horizontal_points"),
+        adapter.add_sketch_constraint(f"{dome_arc}.start", "origin", "horizontal_points"),
     )
     check(
         "pinion pin-hole reference vertical",
-        await adapter.add_sketch_constraint(pin_witness, None, "vertical"),
+        adapter.add_sketch_constraint(pin_witness, None, "vertical"),
     )
     # Dimensions in creation order; SketchDims renames them by that order.
     # Every anchor is named so its drive equation is applied (an unnamed
     # record drives nothing): the references follow the globals they restate.
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{overall_line}.start", 0.0, -SHAFT_DOME_HEIGHT, "dome tip reference"
     )
     stations.record("DomeTipReference", '"DomeHeight"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{overall_line}.start",
         f"{overall_line}.end",
@@ -986,7 +986,7 @@ async def build(adapter) -> dict[str, str]:
     )
     stations.record("OverallLength", '"ShaftLength" + "DomeHeight"')
     for name, line in station_lines.items():
-        await dimension_between(
+        dimension_between(
             adapter,
             f"{line}.start",
             f"{line}.end",
@@ -997,14 +997,14 @@ async def build(adapter) -> dict[str, str]:
         stations.record(name, _STATION_DRIVES[name])
     check(
         "dome radius reference",
-        await adapter.add_sketch_dimension(dome_arc, None, "radial", DOME_SPHERE_R),
+        adapter.add_sketch_dimension(dome_arc, None, "radial", DOME_SPHERE_R),
     )
     stations.record(
         "DomeSphereRadius",
         '("ShaftDia" / 2 * "ShaftDia" / 2 + "DomeHeight" * "DomeHeight") '
         '/ (2 * "DomeHeight")',
     )
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter,
         f"{pin_witness}.start",
         -PINION_SEAT_DIA / 2.0,
@@ -1013,7 +1013,7 @@ async def build(adapter) -> dict[str, str]:
     )
     stations.record("PinionPinWitnessRadius", '"PinionSeatDia" / 2')
     stations.record("PinionPinWitnessStart", '"PinionPinStation" - "PinionPinDia" / 2')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{pin_witness}.start",
         f"{pin_witness}.end",
@@ -1022,18 +1022,18 @@ async def build(adapter) -> dict[str, str]:
         "pinion pin-hole reference",
     )
     stations.record("PinionPinHoleDia", '"PinionPinDia"')
-    await ensure_fully_defined(adapter, "station reference sketch")
-    check("exit_sketch station reference", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "station reference sketch")
+    check("exit_sketch station reference", adapter.exit_sketch())
     name_last_feature(adapter, "StationReference")
     drive_jobs += stations.apply(adapter, "StationReference")
 
     # Apply the deferred drive equations after the whole model + a rebuild
     # exists, then re-check neutrality (each equation evaluates to the as-built
     # value, so the geometry must not move).
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
     assert_signed_circle_center(
         adapter,
         "ShaftFiducialProfile",
@@ -1090,13 +1090,13 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_symmetric_tolerance(
         adapter, "DrivePinHoles", "DrivePinDepth", DRIVE_PIN_DEPTH_TOL, display_unit=UNIT
     )
-    await volume_check(adapter, "driven crankshaft (equations neutral)", v_final, 50.0)
+    volume_check(adapter, "driven crankshaft (equations neutral)", v_final, 50.0)
 
     # The 16T's seat datum.  The through hub seats at the shaft's Top/origin
     # plane; the wheel's seat datums were made with the collar.
     check(
         f"create_plane SeatPinion (Top Plane, +{SEAT_PINION:.3f})",
-        await adapter.create_plane(
+        adapter.create_plane(
             CreatePlaneParameters(
                 mode="offset",
                 base_plane="Top Plane",
@@ -1127,8 +1127,8 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
 
-    await apply_material(adapter, MATERIAL)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    report_mass_properties(adapter)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
@@ -1152,7 +1152,7 @@ async def build(adapter) -> dict[str, str]:
     # no assembly instance renders it (#880).  The drawing shows it per view
     # through _drawing_hidden_sketches to import those dimensions.
     blank_sketch(adapter, "StationReference")
-    return await save_part_and_images(adapter, PART_NAME)
+    return save_part_and_images(adapter, PART_NAME)
 
 
 if __name__ == "__main__":

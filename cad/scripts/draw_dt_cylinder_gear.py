@@ -560,11 +560,11 @@ def _pattern_notch_reference(adapter: Any, annotations: list[Any]) -> Any:
     return set_reference_dimension(adapter, matches[0], label="pattern-to-CAM-notch reference")
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open cylinder-gear source", await adapter.open_model(str(SOURCE)))
+    check("open cylinder-gear source", adapter.open_model(str(SOURCE)))
     read_required_properties(
         adapter.currentModel,
         (
@@ -758,7 +758,7 @@ async def build(adapter: Any) -> dict[str, str]:
     drawing_model.GraphicsRedraw2()
     if str(overall_display.GetText(1) or "") != overall_prefix:
         raise RuntimeError("overall thickness stacking text did not persist")
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Cylinder Gear Manufacturing Drawing",

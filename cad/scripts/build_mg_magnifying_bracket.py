@@ -95,26 +95,26 @@ def _author_dimension_callouts(adapter) -> None:
                 raise RuntimeError(f"{name}@{feature}: structural callout did not persist")
 
 
-async def _coordinates(adapter, jobs) -> None:
+def _coordinates(adapter, jobs) -> None:
     # The mounting coordinates still originate on the real west/lower edges.
     dims = SketchDims()
-    check("mounting coordinates", await adapter.create_sketch("Front"))
+    check("mounting coordinates", adapter.create_sketch("Front"))
     for index, point in enumerate(BRACKET_HOLE_POINTS):
         start = (FLANGE_X[0], FLANGE_Y[0])
         corner = (point[0], start[1])
-        lines = await add_line_chain(adapter, [start, corner, point[:2]], close=False)
+        lines = add_line_chain(adapter, [start, corner, point[:2]], close=False)
         if index == 0:  # exact-coordinate branches share this one corner
-            await anchor_point_to_origin(adapter, f"{lines[0]}.start", *start, "mounting corner")
+            anchor_point_to_origin(adapter, f"{lines[0]}.start", *start, "mounting corner")
             dims.record("MountingOriginX")
             dims.record("MountingOriginY")
-        await anchor_point_to_point(adapter, f"{lines[0]}.start", f"{lines[0]}.end", corner[0] - start[0], 0.0, "mounting X")
+        anchor_point_to_point(adapter, f"{lines[0]}.start", f"{lines[0]}.end", corner[0] - start[0], 0.0, "mounting X")
         dims.record(f"MountingX{index}")
-        await anchor_point_to_point(adapter, f"{lines[1]}.start", f"{lines[1]}.end", 0.0, point[1] - start[1], "mounting Y")
+        anchor_point_to_point(adapter, f"{lines[1]}.start", f"{lines[1]}.end", 0.0, point[1] - start[1], "mounting Y")
         dims.record(f"MountingY{index}")
         for line in lines:
             _construction(adapter, line)
-    await ensure_fully_defined(adapter, "mounting coordinates")
-    check("exit mounting coordinates", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "mounting coordinates")
+    check("exit mounting coordinates", adapter.exit_sketch())
     name_last_feature(adapter, "MountingCoordinates")
     jobs.extend(dims.apply(adapter, "MountingCoordinates"))
     # No explicit band: the holes drill to the title block's .XXX row and the
@@ -126,19 +126,19 @@ async def _coordinates(adapter, jobs) -> None:
     # The native witness dimensions own the manufactured location requirement;
     # the Wizard's on-origin placement owns the nominal hole geometry.
     dims = SketchDims()
-    check("tap coordinate sketch", await adapter.create_sketch("Right"))
-    lines = await add_line_chain(adapter, [(NOSE_R, -NOSE_R), (0.0, -NOSE_R), (0.0, 0.0)], close=False)
-    await anchor_point_to_origin(adapter, f"{lines[0]}.start", NOSE_R, -NOSE_R, "nose tip and side")
+    check("tap coordinate sketch", adapter.create_sketch("Right"))
+    lines = add_line_chain(adapter, [(NOSE_R, -NOSE_R), (0.0, -NOSE_R), (0.0, 0.0)], close=False)
+    anchor_point_to_origin(adapter, f"{lines[0]}.start", NOSE_R, -NOSE_R, "nose tip and side")
     dims.record("TipReference", '"NoseR"')
     dims.record("SideReference", '"NoseR"')
-    await anchor_point_to_point(adapter, f"{lines[0]}.start", f"{lines[0]}.end", -NOSE_R, 0.0, "tap from tip")
+    anchor_point_to_point(adapter, f"{lines[0]}.start", f"{lines[0]}.end", -NOSE_R, 0.0, "tap from tip")
     dims.record("TapFromTip", '"NoseR"')
-    await anchor_point_to_point(adapter, f"{lines[1]}.start", f"{lines[1]}.end", 0.0, NOSE_R, "tap from side")
+    anchor_point_to_point(adapter, f"{lines[1]}.start", f"{lines[1]}.end", 0.0, NOSE_R, "tap from side")
     dims.record("TapFromSide", '"NoseR"')
     for line in lines:
         _construction(adapter, line)
-    await ensure_fully_defined(adapter, "tap coordinates")
-    check("exit tap coordinates", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "tap coordinates")
+    check("exit tap coordinates", adapter.exit_sketch())
     name_last_feature(adapter, "TapCoordinates")
     jobs.extend(dims.apply(adapter, "TapCoordinates"))
     for name in ("TapFromTip", "TapFromSide"):
@@ -146,7 +146,7 @@ async def _coordinates(adapter, jobs) -> None:
 
 
 
-async def _round_foot_root(adapter) -> None:
+def _round_foot_root(adapter) -> None:
     """Solve the three incident edge-break rounds before any blend changes them."""
     # Matched Y sides make these a single interacting corner treatment.
     # Do not first create the inside-root cylinder and then try to terminate
@@ -157,7 +157,7 @@ async def _round_foot_root(adapter) -> None:
         *[[(FLANGE_X[0] - NECK_HALF_X) / 2.0, y, FLANGE_Z[0]] for y in FLANGE_Y],
     ]
     check("joint inside-root and outside-foot rounds",
-          await adapter.add_fillet(FOOT_CORNER_R, points, propagate=False))
+          adapter.add_fillet(FOOT_CORNER_R, points, propagate=False))
     name_last_feature(adapter, "RootAndFootRounds")
 
 
@@ -252,47 +252,47 @@ def _assert_matched_width_topology(adapter) -> None:
     _telemetry.info(f"matched-width native topology: {evidence}", auditJSON=evidence)
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
-    check("create part", await adapter.create_part())
+    check("create part", adapter.create_part())
     # #290: the row's inch calculation units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
     for name, value in (("NoseR", NOSE_R), ("SeatToAxis", FLANGE_Z[1]), ("NeckThickness", NECK_THICKNESS)):
-        await set_global(adapter, name, f"{value}mm")
+        set_global(adapter, name, f"{value}mm")
     jobs = []
     dims = SketchDims()
-    check("neck profile", await adapter.create_sketch("Right"))
+    check("neck profile", adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
-    arc = check("semicircular nose", await adapter.add_arc(0.0, 0.0, 0.0, -NOSE_R, 0.0, NOSE_R))
-    lines = await add_line_chain(adapter, [(0.0, NOSE_R), (-FLANGE_Z[1], NOSE_R), (-FLANGE_Z[1], -NOSE_R), (0.0, -NOSE_R)], close=False)
+    arc = check("semicircular nose", adapter.add_arc(0.0, 0.0, 0.0, -NOSE_R, 0.0, NOSE_R))
+    lines = add_line_chain(adapter, [(0.0, NOSE_R), (-FLANGE_Z[1], NOSE_R), (-FLANGE_Z[1], -NOSE_R), (0.0, -NOSE_R)], close=False)
     set_sketch_direct_db(adapter, False)
     for first, second in ((f"{arc}.end", f"{lines[0]}.start"), (f"{arc}.start", f"{lines[2]}.end")):
-        check("nose contour closes", await adapter.add_sketch_constraint(first, second, "coincident"))
-    check("nose centre", await adapter.add_sketch_constraint(f"{arc}.center", "origin", "coincident"))
+        check("nose contour closes", adapter.add_sketch_constraint(first, second, "coincident"))
+    check("nose centre", adapter.add_sketch_constraint(f"{arc}.center", "origin", "coincident"))
     for point in (f"{arc}.start", f"{arc}.end"):
-        check("nose semicircle", await adapter.add_sketch_constraint(point, "origin", "vertical_points"))
-    check("nose radius", await adapter.add_sketch_dimension(arc, None, "radial", NOSE_R))
+        check("nose semicircle", adapter.add_sketch_constraint(point, "origin", "vertical_points"))
+    check("nose radius", adapter.add_sketch_dimension(arc, None, "radial", NOSE_R))
     dims.record("NoseR", '"NoseR"')
     for line, relation in zip(lines, ("horizontal", "vertical", "horizontal"), strict=True):
-        check("parallel straight neck", await adapter.add_sketch_constraint(line, None, relation))
-    await dimension_between(adapter, f"{lines[0]}.end", "origin", "horizontal_distance", FLANGE_Z[1], "seat to nose axis")
+        check("parallel straight neck", adapter.add_sketch_constraint(line, None, relation))
+    dimension_between(adapter, f"{lines[0]}.end", "origin", "horizontal_distance", FLANGE_Z[1], "seat to nose axis")
     dims.record("SeatToAxis", '"SeatToAxis"')
-    await ensure_fully_defined(adapter, "neck profile")
-    check("exit neck profile", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "neck profile")
+    check("exit neck profile", adapter.exit_sketch())
     name_last_feature(adapter, "NeckProfile")
     jobs.extend(dims.apply(adapter, "NeckProfile"))
-    check("centred neck", await adapter.create_extrusion(ExtrusionParameters(depth=NECK_THICKNESS, both_directions=True)))
+    check("centred neck", adapter.create_extrusion(ExtrusionParameters(depth=NECK_THICKNESS, both_directions=True)))
     name_last_feature(adapter, "Neck")
     jobs.append((name_dimensions(adapter, "Neck", ["NeckThickness"])[0], '"NeckThickness"'))
 
     dims = SketchDims()
-    check("foot profile", await adapter.create_sketch("Top"))
+    check("foot profile", adapter.create_sketch("Top"))
     points = list(FOOT_PROFILE)
-    lines = await add_line_chain(adapter, points)
-    await define_rectilinear_chain(adapter, lines, points, anchor=FOOT_PROFILE_ANCHOR, label="foot", dims=dims, names=list(FOOT_PROFILE_DIMENSIONS))
-    await ensure_fully_defined(adapter, "foot profile")
-    check("exit foot profile", await adapter.exit_sketch())
+    lines = add_line_chain(adapter, points)
+    define_rectilinear_chain(adapter, lines, points, anchor=FOOT_PROFILE_ANCHOR, label="foot", dims=dims, names=list(FOOT_PROFILE_DIMENSIONS))
+    ensure_fully_defined(adapter, "foot profile")
+    check("exit foot profile", adapter.exit_sketch())
     name_last_feature(adapter, "FlangeProfile")
     jobs.extend(dims.apply(adapter, "FlangeProfile"))
     extrude_at_offset(adapter, FLANGE_Y[1] - FLANGE_Y[0], FLANGE_Y[0])
@@ -303,16 +303,16 @@ async def build(adapter) -> dict[str, str]:
 
     # The matched-width foot has no axial side-root bridge. Its inside X
     # root and two outside foot edges are solved together on the raw solid.
-    await _round_foot_root(adapter)
+    _round_foot_root(adapter)
     # Only the two free-end edges remain foot corners. At +X the old picks
     # now lie on full-length upright edges and must never receive a fillet.
-    check("rounded free-end foot corners", await adapter.add_fillet(FOOT_CORNER_R, [[FLANGE_X[0], y, sum(FLANGE_Z) / 2.0] for y in FLANGE_Y], propagate=False))
+    check("rounded free-end foot corners", adapter.add_fillet(FOOT_CORNER_R, [[FLANGE_X[0], y, sum(FLANGE_Z) / 2.0] for y in FLANGE_Y], propagate=False))
     name_last_feature(adapter, "FootCorners")
     name_dimensions(adapter, "FootCorners", ["FootCornerR"])
     wizard_holes(adapter, CLEARANCE_SPEC, BRACKET_HOLE_POINTS, (0.0, 0.0, -1.0), "relocated plate-tap mounting holes", name="MountingHoles", expect_dia_mm=CLEARANCE_DIA, placement_dims=[((None, None), (None, None)) for _ in BRACKET_HOLE_POINTS])
     wizard_holes(adapter, TAP_SPEC, [(NECK_HALF_X, 0.0, 0.0)], (1.0, 0.0, 0.0), "lever through tap", name="LeverTap", expect_dia_mm=TAP_DRILL_DIA, placement_dims=[((None, None), (None, None))])
     _assert_placement_sketches_fully_defined(adapter)
-    check("both tap mouth chamfers", await adapter.add_chamfer(MOUTH_CHAMFER, [[x, TAP_DRILL_DIA / 2.0, 0.0] for x in (-NECK_HALF_X, NECK_HALF_X)]))
+    check("both tap mouth chamfers", adapter.add_chamfer(MOUTH_CHAMFER, [[x, TAP_DRILL_DIA / 2.0, 0.0] for x in (-NECK_HALF_X, NECK_HALF_X)]))
     name_last_feature(adapter, "MouthBreak")
     name_dimensions(adapter, "MouthBreak", ["MouthChamfer"])
     set_dimension_bilateral_tolerance(adapter, "MouthBreak", "MouthChamfer", *deviations(MOUTH_CHAMFER_BAND), display_unit=UNIT)
@@ -327,19 +327,19 @@ async def build(adapter) -> dict[str, str]:
         and math.isclose(chamfer_nominal + float(chamfer_tolerance.GetMaxValue()) * 1000.0, MOUTH_CHAMFER_MAX, abs_tol=1e-6)
     ):
         raise RuntimeError("MouthChamfer@MouthBreak: native primary-distance limits changed")
-    await _coordinates(adapter, jobs)
-    await force_rebuild(adapter)
+    _coordinates(adapter, jobs)
+    force_rebuild(adapter)
     for dimension, expression in jobs:
-        await drive_dimension(adapter, dimension, expression)
-    await force_rebuild(adapter)
+        drive_dimension(adapter, dimension, expression)
+    force_rebuild(adapter)
     # Exact nominal prismatic volume plus bounded small corner/chamfer changes.
     neck = NECK_THICKNESS * (2.0 * NOSE_R * FLANGE_Z[1] + math.pi * NOSE_R**2 / 2.0)
     foot = (FLANGE_X[1] - FLANGE_X[0]) * SIDE_PLATE_THICKNESS * (FLANGE_Y[1] - FLANGE_Y[0])
     overlap = NECK_THICKNESS * 2.0 * NOSE_R * SIDE_PLATE_THICKNESS
     holes = math.pi / 4.0 * (TAP_DRILL_DIA**2 * NECK_THICKNESS + 2.0 * CLEARANCE_DIA**2 * SIDE_PLATE_THICKNESS)
     expected = neck + foot - overlap - holes
-    await volume_check(adapter, "simple L with through tap and rounded corners", expected, 10.0)
-    await name_bore_axis(adapter, "Front Plane", 0.0, "Top Plane", 0.0, "threaded lever axis")
+    volume_check(adapter, "simple L with through tap and rounded corners", expected, 10.0)
+    name_bore_axis(adapter, "Front Plane", 0.0, "Top Plane", 0.0, "threaded lever axis")
     set_dimension_symmetric_tolerance(adapter, "NeckProfile", "NoseR", NOSE_R_TOL, display_unit=UNIT)
     _author_dimension_callouts(adapter)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
@@ -347,15 +347,15 @@ async def build(adapter) -> dict[str, str]:
     for feature, names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature, names)
     blank_reference_sketches(adapter, ("MountingCoordinates", "TapCoordinates"))
-    await apply_material(adapter, MATERIAL)
-    await apply_color(adapter, (0.12, 0.12, 0.13))  # blued, not bare steel
+    apply_material(adapter, MATERIAL)
+    apply_color(adapter, (0.12, 0.12, 0.13))  # blued, not bare steel
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(adapter, PART_NAME, {"Isometric View Note": ISOMETRIC_VIEW_NOTE})
-    await report_mass_properties(adapter)
-    await force_rebuild(adapter)
+    report_mass_properties(adapter)
+    force_rebuild(adapter)
     _assert_matched_width_topology(adapter)
-    await volume_check(adapter, "final native dimensions preserve L bracket", expected, 10.0)
-    return await save_part_and_images(adapter, PART_NAME)
+    volume_check(adapter, "final native dimensions preserve L bracket", expected, 10.0)
+    return save_part_and_images(adapter, PART_NAME)
 
 
 if __name__ == "__main__":

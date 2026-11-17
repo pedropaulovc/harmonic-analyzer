@@ -118,21 +118,21 @@ def _shoulder_fillet_max_limit(adapter) -> None:
 
 
 @_telemetry.traced("sketch.pn_pen_rod_tap_wall_reference")
-async def _tap_wall_reference(adapter) -> None:
+def _tap_wall_reference(adapter) -> None:
     """RV-01's accepted tap wall, stated on the sheet natively (rule 20): a
     hidden construction line on the Top plane (the shoulder; sketch x = model
     X, sketch y = model -Z, as the end view looks) running +Z from the stud
     tap's thread major on the rod axis toward a flat, as long as the printed
     minimum, so its driving dimension prints ".067 MIN" once set_single_limit
     types it (build_pn_pen_frame's _tap_wall_reference)."""
-    check("create_sketch tap wall reference", await adapter.create_sketch("Top"))
+    check("create_sketch tap wall reference", adapter.create_sketch("Top"))
     # Direct-to-DB: the line starts on the axis, where creation-time inference
     # would snap it to the origin or the pivot's circle.
     set_sketch_direct_db(adapter, True)
     start = (0.0, -TAP_WALL_START_R)
     line = check(
         "tap wall reference line",
-        await adapter.add_line(*start, start[0], start[1] - TAP_WALL_MIN_MM),
+        adapter.add_line(*start, start[0], start[1] - TAP_WALL_MIN_MM),
     )
     set_sketch_direct_db(adapter, False)
     segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
@@ -141,9 +141,9 @@ async def _tap_wall_reference(adapter) -> None:
         raise RuntimeError("tap wall reference line did not take the construction flag")
     check(
         "tap wall reference vertical",
-        await adapter.add_sketch_constraint(line, None, "vertical"),
+        adapter.add_sketch_constraint(line, None, "vertical"),
     )
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{line}.start",
         f"{line}.end",
@@ -151,29 +151,29 @@ async def _tap_wall_reference(adapter) -> None:
         TAP_WALL_MIN_MM,
         "tap wall reference",
     )
-    await anchor_point_to_origin(adapter, f"{line}.start", *start, "tap wall reference")
-    await ensure_fully_defined(adapter, "tap wall reference sketch")
-    check("exit_sketch tap wall reference", await adapter.exit_sketch())
+    anchor_point_to_origin(adapter, f"{line}.start", *start, "tap wall reference")
+    ensure_fully_defined(adapter, "tap wall reference sketch")
+    check("exit_sketch tap wall reference", adapter.exit_sketch())
     name_last_feature(adapter, "TapWallReference")
     name_dimensions(adapter, "TapWallReference", ["TapWallMin", "TapWallStart"])
     blank_reference_sketches(adapter, ("TapWallReference",))
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     # #290: the row's inch calculation units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this
     # is an INCH document and the equation manager reads BARE numbers in
     # document units (an unsuffixed 112 = 112 in, blowing the part up 25.4x).
-    await set_global(adapter, "RodSection", f"{ROD_SECTION}mm")
-    await set_global(adapter, "SquareLength", f"{SQUARE_LENGTH}mm")
-    await set_global(adapter, "PivotDia", f"{PIVOT_DIA}mm")
-    await set_global(adapter, "PivotLength", f"{PIVOT_LENGTH}mm")
-    await set_global(adapter, "ShoulderRadius", f"{SHOULDER_FILLET_R}mm")
+    set_global(adapter, "RodSection", f"{ROD_SECTION}mm")
+    set_global(adapter, "SquareLength", f"{SQUARE_LENGTH}mm")
+    set_global(adapter, "PivotDia", f"{PIVOT_DIA}mm")
+    set_global(adapter, "PivotLength", f"{PIVOT_LENGTH}mm")
+    set_global(adapter, "ShoulderRadius", f"{SHOULDER_FILLET_R}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -184,15 +184,15 @@ async def build(adapter) -> dict[str, str]:
     #    redundant), THEN the anchor dims at the bottom-left corner (-S/2, 0):
     #    only X is non-zero, so one anchor dim.
     section = SketchDims()
-    check("create_sketch section", await adapter.create_sketch("Front"))
+    check("create_sketch section", adapter.create_sketch("Front"))
     section_rect = [
         (-ROD_SECTION / 2.0, 0.0),
         (ROD_SECTION / 2.0, 0.0),
         (ROD_SECTION / 2.0, SQUARE_LENGTH),
         (-ROD_SECTION / 2.0, SQUARE_LENGTH),
     ]
-    lines = await add_line_chain(adapter, section_rect)
-    await define_rectilinear_chain(
+    lines = add_line_chain(adapter, section_rect)
+    define_rectilinear_chain(
         adapter,
         lines,
         section_rect,
@@ -201,15 +201,15 @@ async def build(adapter) -> dict[str, str]:
         names=["Section", "Length", "CornerX"],
         drives=['"RodSection"', '"SquareLength"', '"RodSection" / 2'],
     )
-    await ensure_fully_defined(adapter, "rod outline")
-    check("exit_sketch section", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "rod outline")
+    check("exit_sketch section", adapter.exit_sketch())
     name_last_feature(adapter, "RodProfile")
     drive_jobs += section.apply(adapter, "RodProfile")
     # Mid-plane: Depth is the TOTAL depth, S/2 each side of the Front Plane, so
     # the square is centred on the rod axis in Z as well as X.
     check(
         "extrude rod",
-        await adapter.create_extrusion(
+        adapter.create_extrusion(
             ExtrusionParameters(depth=ROD_SECTION, both_directions=True)
         ),
     )
@@ -217,14 +217,14 @@ async def build(adapter) -> dict[str, str]:
     depth_dim = name_dimensions(adapter, "Rod", ["Depth"])
     drive_jobs += [(depth_dim[0], '"RodSection"')]
     v_square = ROD_SECTION * ROD_SECTION * SQUARE_LENGTH
-    volume = await volume_check(adapter, "rod square", v_square, 0.005 * v_square)
+    volume = volume_check(adapter, "rod square", v_square, 0.005 * v_square)
 
     # 2. Pivot: Top-plane circle on the axis, boss extruded REVERSED (-Y) from
     #    the shoulder. A Top-plane boss runs +Y by default (into the square);
     #    reverse_direction=True drops it below, as fr_top_frame's HubBoss.
     pivot = SketchDims()
-    check("create_sketch pivot", await adapter.create_sketch("Top"))
-    await define_circle(
+    check("create_sketch pivot", adapter.create_sketch("Top"))
+    define_circle(
         adapter,
         0.0,
         0.0,
@@ -234,13 +234,13 @@ async def build(adapter) -> dict[str, str]:
         names=("PivotCx", "PivotCz", "PivotDia"),
         drives=(None, None, '"PivotDia"'),
     )
-    await ensure_fully_defined(adapter, "rod pivot sketch")
-    check("exit_sketch pivot", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "rod pivot sketch")
+    check("exit_sketch pivot", adapter.exit_sketch())
     name_last_feature(adapter, "PivotProfile")
     drive_jobs += pivot.apply(adapter, "PivotProfile")
     check(
         "extrude pivot",
-        await adapter.create_extrusion(
+        adapter.create_extrusion(
             ExtrusionParameters(depth=PIVOT_LENGTH, reverse_direction=True)
         ),
     )
@@ -248,7 +248,7 @@ async def build(adapter) -> dict[str, str]:
     pivot_length_dim = name_dimensions(adapter, "Pivot", ["PivotLength"])
     drive_jobs += [(pivot_length_dim[0], '"PivotLength"')]
     v_pivot = math.pi * (PIVOT_DIA / 2.0) ** 2 * PIVOT_LENGTH
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "rod pivot end", volume + v_pivot, 0.005 * v_pivot
     )
 
@@ -258,7 +258,7 @@ async def build(adapter) -> dict[str, str]:
     #    through that point.
     check(
         "fillet shoulder root",
-        await adapter.add_fillet(SHOULDER_FILLET_R, [[PIVOT_DIA / 2.0, 0.0, 0.0]]),
+        adapter.add_fillet(SHOULDER_FILLET_R, [[PIVOT_DIA / 2.0, 0.0, 0.0]]),
     )
     name_last_feature(adapter, "ShoulderFillet")
     fillet_dim = name_dimensions(adapter, "ShoulderFillet", ["ShoulderRadius"])
@@ -270,7 +270,7 @@ async def build(adapter) -> dict[str, str]:
         3.0 * (4.0 - math.pi)
     )
     v_fillet = 2.0 * math.pi * spandrel_r * spandrel
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "shoulder root fillet", volume + v_fillet, 0.005 * v_pivot
     )
 
@@ -288,18 +288,18 @@ async def build(adapter) -> dict[str, str]:
     )
     drive_jobs += stud_tap.placement_drive_jobs
     v_tap = blind_hole_volume_mm3(stud_tap.hole_dia_mm, STUD_TAP_SPEC.depth_mm)
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "adjuster stud tap", volume - v_tap, 0.03 * v_tap
     )
 
     # Apply the deferred drive equations after the whole model + a rebuild exists,
     # then re-check: every equation evaluates to the value just built, so the
     # geometry must not move.
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    volume_check(
         adapter, "driven pen rod (equations neutral)", volume, 0.005 * v_square
     )
 
@@ -307,7 +307,7 @@ async def build(adapter) -> dict[str, str]:
     #    Plane, the rod axis): the rod line the assembly mates to as
     #    ``Axis1@<rod>``. No feature above creates a reference axis, so this is
     #    Axis1; fail loud if SolidWorks named it anything else.
-    slide_axis = await name_bore_axis(
+    slide_axis = name_bore_axis(
         adapter,
         "Front Plane",
         0.0,
@@ -320,10 +320,10 @@ async def build(adapter) -> dict[str, str]:
             f"pen-rod slide axis is {slide_axis!r}; the assembly mates {SLIDE_AXIS!r}"
         )
     _blank_ref_axis(adapter, slide_axis)
-    await _tap_wall_reference(adapter)
+    _tap_wall_reference(adapter)
 
-    await apply_material(adapter, MATERIAL)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    report_mass_properties(adapter)
     for (feature_name, dimension_name), band in DRAWING_BANDS.items():
         set_dimension_bilateral_tolerance(
             adapter, feature_name, dimension_name, *deviations(band), display_unit=UNIT
@@ -350,7 +350,7 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
-    artefacts = await save_part_and_images(adapter, PART_NAME)
+    artefacts = save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(
         adapter,
         (

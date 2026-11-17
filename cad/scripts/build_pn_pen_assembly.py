@@ -220,7 +220,7 @@ def _construction(adapter: Any, line: str, label: str) -> None:
         raise RuntimeError(f"{label} is not construction")
 
 
-async def _author_stud_setting(adapter: Any) -> None:
+def _author_stud_setting(adapter: Any) -> None:
     """STUD HEIGHT: a vertical construction line on the rod axis from the
     rod's top face to the stud's head top (Right plane, sketch = machine -Z,
     Y), its length the nominal stud's setting. It carries no band: the stud
@@ -228,22 +228,22 @@ async def _author_stud_setting(adapter: Any) -> None:
     drawing prints it as a reference. No solid or pose edits."""
     (u, rod_top_y), (_u, head_top_y) = spec.STUD_LINE
     dims = SketchDims()
-    check("create stud setting sketch", await adapter.create_sketch("Right"))
+    check("create stud setting sketch", adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
-    line = check("stud setting line", await adapter.add_line(u, rod_top_y, u, head_top_y))
+    line = check("stud setting line", adapter.add_line(u, rod_top_y, u, head_top_y))
     set_sketch_direct_db(adapter, False)
     _construction(adapter, line, "stud setting line")
-    check("stud setting vertical", await adapter.add_sketch_constraint(line, None, "vertical"))
-    await anchor_point_to_origin(adapter, f"{line}.start", u, rod_top_y, "rod top on axis")
+    check("stud setting vertical", adapter.add_sketch_constraint(line, None, "vertical"))
+    anchor_point_to_origin(adapter, f"{line}.start", u, rod_top_y, "rod top on axis")
     dims.record("StudRodAxisZ")
     dims.record("StudRodTopY")
-    await dimension_between(
+    dimension_between(
         adapter, f"{line}.start", f"{line}.end", "vertical_distance",
         spec.STUD_HEIGHT, "stud head top above rod top",
     )
     dims.record(spec.STUD_DIMENSION)
-    await ensure_fully_defined(adapter, "stud setting")
-    check("exit stud setting sketch", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "stud setting")
+    check("exit stud setting sketch", adapter.exit_sketch())
     name_last_feature(adapter, spec.STUD_FEATURE)
     dims.apply(adapter, spec.STUD_FEATURE)
 
@@ -290,40 +290,40 @@ def _add_driving_yaw_angle(adapter: Any, nib_line: str, flat_line: str) -> None:
     _telemetry.success(f"driving pen yaw: {spec.YAW_DEG:g} deg")
 
 
-async def _author_carriage_setting(adapter: Any) -> None:
+def _author_carriage_setting(adapter: Any) -> None:
     """PEN YAW and NIB PRESET on the Top plane (sketch u, v = machine X, -Z):
     from the marker axis at the block's paper-end face, a rod-flat arm along
     machine -X and the marker-axis arm to the nib tip. Their angle is the yaw,
     the second arm's length the nib preset. No solid or pose edits."""
     end_u, end_v = spec.CARRIAGE_END_UV
     dims = SketchDims()
-    check("create carriage setting sketch", await adapter.create_sketch("Top"))
+    check("create carriage setting sketch", adapter.create_sketch("Top"))
     set_sketch_direct_db(adapter, True)
     # Both arms start on the one end-face point (exactly coincident
     # endpoints merge in the sketch database).
-    flat = check("rod-flat arm", await adapter.add_line(end_u, end_v, *spec.FLAT_END_UV))
-    nib = check("marker-axis arm", await adapter.add_line(end_u, end_v, *spec.NIB_UV))
+    flat = check("rod-flat arm", adapter.add_line(end_u, end_v, *spec.FLAT_END_UV))
+    nib = check("marker-axis arm", adapter.add_line(end_u, end_v, *spec.NIB_UV))
     set_sketch_direct_db(adapter, False)
     _construction(adapter, flat, "rod-flat arm")
     _construction(adapter, nib, "marker-axis arm")
-    check("rod-flat arm horizontal", await adapter.add_sketch_constraint(flat, None, "horizontal"))
-    await anchor_point_to_origin(adapter, f"{flat}.start", end_u, end_v, "paper-end point")
+    check("rod-flat arm horizontal", adapter.add_sketch_constraint(flat, None, "horizontal"))
+    anchor_point_to_origin(adapter, f"{flat}.start", end_u, end_v, "paper-end point")
     dims.record("CarriageEndX")
     dims.record("CarriageEndZ")
-    await dimension_between(
+    dimension_between(
         adapter, f"{flat}.start", f"{flat}.end", "horizontal_distance",
         spec.FLAT_LINE_LENGTH, "rod-flat arm",
     )
     dims.record("RodFlatArm")
-    await dimension_between(
+    dimension_between(
         adapter, f"{nib}.start", f"{nib}.end", "distance",
         spec.NIB_PROTRUSION, "nib beyond the paper-end face",
     )
     dims.record(spec.NIB_DIMENSION)
     _add_driving_yaw_angle(adapter, nib, flat)
     dims.record(spec.YAW_DIMENSION)
-    await ensure_fully_defined(adapter, "carriage setting")
-    check("exit carriage setting sketch", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "carriage setting")
+    check("exit carriage setting sketch", adapter.exit_sketch())
     name_last_feature(adapter, spec.CARRIAGE_FEATURE)
     dims.apply(adapter, spec.CARRIAGE_FEATURE)
     set_dimension_symmetric_tolerance(
@@ -339,23 +339,23 @@ async def _author_carriage_setting(adapter: Any) -> None:
     )
 
 
-async def _author_settings(adapter: Any) -> None:
+def _author_settings(adapter: Any) -> None:
     """Both setting sketches, their places, drawing marks, then blanked."""
-    await _author_stud_setting(adapter)
-    await _author_carriage_setting(adapter)
+    _author_stud_setting(adapter)
+    _author_carriage_setting(adapter)
     apply_drawing_precision(adapter, spec.DRAWING_PRECISION)
     for feature, names in spec.DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature, names)
         blank_sketch(adapter, feature)
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     # Flip seeds + free-DOF contract: cad/config/assemblies/<ASM_NAME>.yaml.
     activate_assembly_contract(ASM_NAME)
     # Reset the free-DOF manifest buffer before any *_driver(free_dof_key=...)
     # call: each freed DOF is recorded (never authored) and persisted below.
     reset_dof_manifest()
-    check("create_assembly", await adapter.create_assembly())
+    check("create_assembly", adapter.create_assembly())
     apply_package_model_units(
         adapter, assembly_contract(ASM_NAME).drawing_unit, label=ASM_NAME
     )
@@ -370,10 +370,10 @@ async def build(adapter) -> dict[str, str]:
     # manifest -- the travel stays live in the saved model. The carriage
     # rides the rod via Lock mates. The hanger is FIRST so the auto-fixed
     # seed is structure, not the rod.
-    await place_component(
+    place_component(
         adapter, "pn-pen-hanger", list(HANGER_POS), [0.0, 0.0, 0.0], IDENTITY
     )
-    pen_rod = await place_component(
+    pen_rod = place_component(
         adapter,
         "pn-pen-rod",
         list(PEN_ROD_POS),
@@ -382,7 +382,7 @@ async def build(adapter) -> dict[str, str]:
         ground=False,
     )
     rod_o = component_origin(adapter, pen_rod)
-    await distance_driver(
+    distance_driver(
         adapter,
         named_ref(f"Axis1@{pen_rod}", "AXIS"),
         named_ref("Front Plane", "PLANE"),
@@ -390,7 +390,7 @@ async def build(adapter) -> dict[str, str]:
         label="pen-rod slide depth",
         verify=(pen_rod, rod_o),
     )
-    await distance_driver(
+    distance_driver(
         adapter,
         named_ref(f"Axis1@{pen_rod}", "AXIS"),
         named_ref("Right Plane", "PLANE"),
@@ -398,7 +398,7 @@ async def build(adapter) -> dict[str, str]:
         label="pen-rod slide across",
         verify=(pen_rod, rod_o),
     )
-    await angle_driver(
+    angle_driver(
         adapter,
         named_ref(f"Front Plane@{pen_rod}", "PLANE"),
         named_ref("Front Plane", "PLANE"),
@@ -410,7 +410,7 @@ async def build(adapter) -> dict[str, str]:
     # magnifying wheel's wire drives in the real device): its drive spec is
     # recorded into the DOF manifest, never authored -- drag the rod and the
     # whole carriage + pen-wire slide with it.
-    await distance_driver(
+    distance_driver(
         adapter,
         named_ref(f"Top Plane@{pen_rod}", "PLANE"),
         named_ref("Top Plane", "PLANE"),
@@ -421,7 +421,7 @@ async def build(adapter) -> dict[str, str]:
     )
 
     for part, pos, rows in RIDERS:
-        name = await place_component(
+        name = place_component(
             adapter,
             part,
             list(pos),
@@ -431,7 +431,7 @@ async def build(adapter) -> dict[str, str]:
             configuration=PEN_WIRE_CONFIGURATION if part == spec.WIRE else "",
             component_reference="PenWire:1" if part == spec.WIRE else "",
         )
-        await lock_mate(
+        lock_mate(
             adapter,
             named_ref(f"Front Plane@{name}", "PLANE"),
             named_ref(f"Front Plane@{pen_rod}", "PLANE"),
@@ -451,7 +451,7 @@ async def build(adapter) -> dict[str, str]:
     # The hanger screw, the nut on the strap front and the jam nut on the
     # nut are static: each is fixed at its exact authored pose on the screw
     # axis, like the hanger they clamp.
-    await place_component(
+    place_component(
         adapter,
         "pn-vn-hanger-screw",
         list(HANGER_SCREW_POS),
@@ -462,7 +462,7 @@ async def build(adapter) -> dict[str, str]:
         ("pn-vn-pen-hanger-nut", HANGER_NUT_POS),
         ("pn-vn-pen-hanger-jam-nut", HANGER_JAM_NUT_POS),
     ):
-        await place_component(adapter, stem, list(pos), [0.0, 0.0, 0.0], IDENTITY)
+        place_component(adapter, stem, list(pos), [0.0, 0.0, 0.0], IDENTITY)
 
     # Certify the AS-BUILT model. Necessity only: the freed pen travel is
     # genuinely free; the lock-mated riders MUST read under-constrained WITH
@@ -481,7 +481,7 @@ async def build(adapter) -> dict[str, str]:
     # The fitter drawing's settings: driving, toleranced model dimensions on
     # blanked construction sketches, authored once the as-built model is
     # certified (they touch no component, mate or pose).
-    await _author_settings(adapter)
+    _author_settings(adapter)
     # Title-block identity for the fitter drawing (draw_pn_pen_assembly.py):
     # assembly_title_properties supplies the Title/Generator and TOL_* cells
     # finalize_drawing requires; material and finish are per component (each
@@ -512,7 +512,7 @@ async def build(adapter) -> dict[str, str]:
         label=ASM_NAME,
         model_rotation=spec.EXPLODED_VIEW_TURN,
     )
-    return await save_assembly_and_images(adapter, ASM_NAME)
+    return save_assembly_and_images(adapter, ASM_NAME)
 
 
 if __name__ == "__main__":

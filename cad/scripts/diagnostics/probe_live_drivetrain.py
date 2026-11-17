@@ -7,7 +7,6 @@ GetWhatsWrong return so we parse its shape correctly.
 
 from __future__ import annotations
 
-import asyncio
 
 import _telemetry
 if __package__:
@@ -28,12 +27,12 @@ def _comps(adapter, doc):
     return adapter._attempt(lambda: doc.GetComponents(False), default=None) or []
 
 
-async def main():
+def main():
     from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter
 
     adapter = PyWin32Adapter({})
     _telemetry.info("Connecting (ATTACH) ...")
-    await adapter.connect()
+    adapter.connect()
 
     doc = adapter._attempt(lambda: adapter.swApp.ActiveDoc, default=None)
     if doc is None:
@@ -94,9 +93,9 @@ async def main():
         else:
             log("    no per-feature error codes found")
 
-    await adapter.disconnect()
+    adapter.disconnect()
     _telemetry.info("Disconnected.")
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

@@ -328,17 +328,17 @@ def _finish_reference(
 
 
 @_telemetry.traced("drawing.supplier_pin_dowel_source_author")
-async def author_supplier_dowel_references(adapter: Any, source: SupplierPinReference) -> None:
+def author_supplier_dowel_references(adapter: Any, source: SupplierPinReference) -> None:
     """Exact nominal OD witness in the Top end-view plane; never a print literal."""
-    check("create supplier dowel OD reference", await adapter.create_sketch("Top"))
+    check("create supplier dowel OD reference", adapter.create_sketch("Top"))
     dims = SketchDims()
-    circle = await define_circle(
+    circle = define_circle(
         adapter, 0.0, 0.0, source.diameter_mm / 2.0,
         "supplier exact nominal dowel OD", dims=dims, names=(None, None, DIAMETER_DIMENSION),
     )
     _construction(adapter, circle)
-    await ensure_fully_defined(adapter, "supplier exact nominal dowel OD")
-    check("exit supplier dowel OD reference", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "supplier exact nominal dowel OD")
+    check("exit supplier dowel OD reference", adapter.exit_sketch())
     _finish_reference(adapter, dims, DIAMETER_FEATURE, source)
     blank_reference_sketches(adapter, (DIAMETER_FEATURE,))
     assert_supplier_dowel_references(adapter, adapter.currentModel, source)
@@ -360,7 +360,7 @@ def assert_supplier_dowel_references(
 
 
 @_telemetry.traced("drawing.supplier_pin_source_author")
-async def author_supplier_spring_pin_references(adapter: Any, source: SupplierPinReference) -> None:
+def author_supplier_spring_pin_references(adapter: Any, source: SupplierPinReference) -> None:
     """Author and fully format wall plus any separate supplier-application witness."""
     _reference_contract(source, WALL_FEATURE)
     application_hole = declares_application_hole(source)
@@ -368,32 +368,32 @@ async def author_supplier_spring_pin_references(adapter: Any, source: SupplierPi
         _reference_contract(source, MATING_HOLE_FEATURE)
     inner_radius = source.diameter_mm / 2.0 - source.wall_mm
     outer_radius = source.diameter_mm / 2.0
-    check("create supplier wall reference", await adapter.create_sketch("Right"))
+    check("create supplier wall reference", adapter.create_sketch("Right"))
     dims = SketchDims()
-    (wall,) = await add_line_chain(adapter, [(inner_radius, 0.0), (outer_radius, 0.0)], close=False)
+    (wall,) = add_line_chain(adapter, [(inner_radius, 0.0), (outer_radius, 0.0)], close=False)
     _construction(adapter, wall)
-    await anchor_point_to_origin(adapter, f"{wall}.start", inner_radius, 0.0, "source wall inner radius")
+    anchor_point_to_origin(adapter, f"{wall}.start", inner_radius, 0.0, "source wall inner radius")
     dims.record(None)
-    check("orient radial wall witness", await adapter.add_sketch_constraint(wall, None, "horizontal"))
-    await dimension_between(
+    check("orient radial wall witness", adapter.add_sketch_constraint(wall, None, "horizontal"))
+    dimension_between(
         adapter, f"{wall}.start", f"{wall}.end", "distance", source.wall_mm, "supplier wall"
     )
     dims.record(WALL_DIMENSION)
-    await ensure_fully_defined(adapter, "supplier wall radial witness")
-    check("exit supplier wall reference", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "supplier wall radial witness")
+    check("exit supplier wall reference", adapter.exit_sketch())
     _finish_reference(adapter, dims, WALL_FEATURE, source)
 
     if application_hole:
         lower = source.application_hole_limits[0]
-        check("create supplier mating-hole reference", await adapter.create_sketch("Right"))
+        check("create supplier mating-hole reference", adapter.create_sketch("Right"))
         dims = SketchDims()
-        circle = await define_circle(
+        circle = define_circle(
             adapter, *source.application_hole_center, lower * source.unit_mm / 2.0,
             "supplier mating-hole application", dims=dims, names=(None, None, MATING_HOLE_DIMENSION),
         )
         _construction(adapter, circle)
-        await ensure_fully_defined(adapter, "supplier mating-hole application diagram")
-        check("exit supplier mating-hole reference", await adapter.exit_sketch())
+        ensure_fully_defined(adapter, "supplier mating-hole application diagram")
+        check("exit supplier mating-hole reference", adapter.exit_sketch())
         _finish_reference(adapter, dims, MATING_HOLE_FEATURE, source)
         blank_reference_sketches(adapter, (WALL_FEATURE, MATING_HOLE_FEATURE))
     else:

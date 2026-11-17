@@ -172,85 +172,85 @@ _SW_SOLID_BODY = 0
 class SolidWorksAssemblyMixin:
     """Expose SolidWorks assembly component methods via mixin-local helpers."""
 
-    async def insert_component(
+    def insert_component(
         self, params: InsertComponentParameters
     ) -> AdapterResult[dict[str, Any]]:
         return _insert_component_impl(self, params)
 
-    async def remove_component(
+    def remove_component(
         self, params: ComponentRefParameters
     ) -> AdapterResult[dict[str, Any]]:
         return _remove_component_impl(self, params)
 
-    async def replace_component(
+    def replace_component(
         self, params: ReplaceComponentParameters
     ) -> AdapterResult[dict[str, Any]]:
         return _replace_component_impl(self, params)
 
-    async def move_component(
+    def move_component(
         self, params: MoveComponentParameters
     ) -> AdapterResult[dict[str, Any]]:
         return _move_component_impl(self, params)
 
-    async def rotate_component(
+    def rotate_component(
         self, params: RotateComponentParameters
     ) -> AdapterResult[dict[str, Any]]:
         return _rotate_component_impl(self, params)
 
-    async def fix_component(
+    def fix_component(
         self, params: ComponentRefParameters
     ) -> AdapterResult[dict[str, Any]]:
         return _set_component_fixed_impl(self, params, fixed=True)
 
-    async def float_component(
+    def float_component(
         self, params: ComponentRefParameters
     ) -> AdapterResult[dict[str, Any]]:
         return _set_component_fixed_impl(self, params, fixed=False)
 
-    async def pattern_components_linear(
+    def pattern_components_linear(
         self, params: ComponentLinearPatternParameters
     ) -> AdapterResult[SolidWorksFeature]:
         return _pattern_components_linear_impl(self, params)
 
-    async def pattern_components_circular(
+    def pattern_components_circular(
         self, params: ComponentCircularPatternParameters
     ) -> AdapterResult[SolidWorksFeature]:
         return _pattern_components_circular_impl(self, params)
 
-    async def pattern_components_chain(
+    def pattern_components_chain(
         self, params: ComponentChainPatternParameters
     ) -> AdapterResult[SolidWorksFeature]:
         return _pattern_components_chain_impl(self, params)
 
-    async def insert_belt_chain(
+    def insert_belt_chain(
         self, params: BeltChainParameters
     ) -> AdapterResult[SolidWorksFeature]:
         return _insert_belt_chain_impl(self, params)
 
-    async def add_mate(
+    def add_mate(
         self, params: AddMateParameters
     ) -> AdapterResult[dict[str, Any]]:
         return _add_mate_impl(self, params)
 
-    async def list_mates(self) -> AdapterResult[list[dict[str, Any]]]:
+    def list_mates(self) -> AdapterResult[list[dict[str, Any]]]:
         return _list_mates_impl(self)
 
-    async def delete_mate(
+    def delete_mate(
         self, params: MateRefParameters
     ) -> AdapterResult[dict[str, Any]]:
         return _delete_mate_impl(self, params)
 
-    async def suppress_mate(
+    def suppress_mate(
         self, params: SuppressMateParameters
     ) -> AdapterResult[dict[str, Any]]:
         return _suppress_mate_impl(self, params)
 
-    async def set_component_solving(
+    def set_component_solving(
         self, params: SetComponentSolvingParameters
     ) -> AdapterResult[dict[str, Any]]:
         return _set_component_solving_impl(self, params)
 
-    async def set_component_configuration(
+    def set_component_configuration(
         self, params: SetComponentConfigurationParameters
     ) -> AdapterResult[dict[str, Any]]:
         return _set_component_configuration_impl(self, params)

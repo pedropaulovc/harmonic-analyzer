@@ -156,10 +156,10 @@ def _verify_reference_length(annotation: Any) -> None:
         raise RuntimeError("CutLength: reference display did not persist")
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
-    check("open faced pivot screw", await adapter.open_model(str(SOURCE)))
+    check("open faced pivot screw", adapter.open_model(str(SOURCE)))
     required = (
         "Number",
         "Material Specification",
@@ -226,7 +226,7 @@ async def build(adapter: Any) -> dict[str, str]:
         _verify_reference_length(by_name["CutLength"])
 
     settled_controls()
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Transgear Pivot Screw — Altered Item Drawing",

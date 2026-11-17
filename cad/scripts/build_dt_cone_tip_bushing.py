@@ -72,19 +72,19 @@ V_BUSHING = V_RING - V_CHAMFERS
 NORTH_FACE = "NorthFace"
 
 
-async def _profile(adapter) -> list[tuple[str, str]]:
+def _profile(adapter) -> list[tuple[str, str]]:
     """Front-plane half section revolved about the X axis: south face -> OD ->
     north face -> bore.  Returns the deferred drive equations."""
     from solidworks_mcp.adapters.base import RevolveParameters
 
     profile = SketchDims()
-    check("create_sketch bushing profile", await adapter.create_sketch("Front"))
+    check("create_sketch bushing profile", adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     axis = check(
         "bushing axis centerline",
-        await adapter.add_centerline(0.0, 0.0, LENGTH, 0.0),
+        adapter.add_centerline(0.0, 0.0, LENGTH, 0.0),
     )
-    south_face, outer, north_face, bore = await add_line_chain(
+    south_face, outer, north_face, bore = add_line_chain(
         adapter,
         [
             (0.0, BORE_R),
@@ -95,7 +95,7 @@ async def _profile(adapter) -> list[tuple[str, str]]:
     )
     set_sketch_direct_db(adapter, False)
     check(
-        "axis horizontal", await adapter.add_sketch_constraint(axis, None, "horizontal")
+        "axis horizontal", adapter.add_sketch_constraint(axis, None, "horizontal")
     )
     for label, entity, relation in (
         ("south face", south_face, "vertical"),
@@ -105,51 +105,51 @@ async def _profile(adapter) -> list[tuple[str, str]]:
     ):
         check(
             f"bushing {label} {relation}",
-            await adapter.add_sketch_constraint(entity, None, relation),
+            adapter.add_sketch_constraint(entity, None, relation),
         )
     check(
         "axis starts at the origin",
-        await adapter.add_sketch_constraint(f"{axis}.start", "origin", "coincident"),
+        adapter.add_sketch_constraint(f"{axis}.start", "origin", "coincident"),
     )
     check(
         "south face on the origin plane",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{south_face}.start", "origin", "vertical_points"
         ),
     )
     # Dimensions in creation order.
     check(
-        "axis length", await adapter.add_sketch_dimension(axis, None, "linear", LENGTH)
+        "axis length", adapter.add_sketch_dimension(axis, None, "linear", LENGTH)
     )
     profile.record("AxisLength", '"Length"')
     check(
         "bushing length",
-        await adapter.add_sketch_dimension(outer, None, "linear", LENGTH),
+        adapter.add_sketch_dimension(outer, None, "linear", LENGTH),
     )
     profile.record("Length", '"Length"')
-    await add_diametric_linear_dimension(
+    add_diametric_linear_dimension(
         adapter, axis, outer, (LENGTH / 2.0, OUTER_R + 2.0), "OuterDia"
     )
     profile.record("OuterDia", '"OuterDia"')
-    await add_diametric_linear_dimension(
+    add_diametric_linear_dimension(
         adapter, axis, bore, (LENGTH / 2.0, BORE_R - 0.5), "BoreDia"
     )
     profile.record("BoreDia", '"BoreDia"')
-    await ensure_fully_defined(adapter, "bushing profile sketch")
-    check("exit_sketch bushing profile", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "bushing profile sketch")
+    check("exit_sketch bushing profile", adapter.exit_sketch())
     name_last_feature(adapter, "BushingProfile")
     drive_jobs = profile.apply(adapter, "BushingProfile")
     check(
-        "revolve bushing", await adapter.create_revolve(RevolveParameters(angle=360.0))
+        "revolve bushing", adapter.create_revolve(RevolveParameters(angle=360.0))
     )
     name_last_feature(adapter, "Bushing")
     return drive_jobs
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import CreatePlaneParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     # #290: the row's inch calculation units, before the first global.  The mm
     # suffix is load-bearing: the equation manager reads bare numbers in
     # document units.
@@ -160,37 +160,37 @@ async def build(adapter) -> dict[str, str]:
         ("Length", LENGTH),
         ("EndChamferSize", END_CHAMFER),
     ):
-        await set_global(adapter, name, f"{value}mm")
+        set_global(adapter, name, f"{value}mm")
 
-    drive_jobs = await _profile(adapter)
-    await volume_check(adapter, "brass ring", V_RING, 0.005 * V_RING)
-    await bbox_extent_check(adapter, "bushing length", "x", LENGTH)
+    drive_jobs = _profile(adapter)
+    volume_check(adapter, "brass ring", V_RING, 0.005 * V_RING)
+    bbox_extent_check(adapter, "bushing length", "x", LENGTH)
     # Both O.D. corners in one native 45 deg chamfer (the
     # pd_transgear_front_bushing recipe; one pick on each face's O.D. edge).
     check(
         "chamfer both O.D. corners",
-        await adapter.add_chamfer(
+        adapter.add_chamfer(
             END_CHAMFER, [[0.0, OUTER_R, 0.0], [LENGTH, OUTER_R, 0.0]]
         ),
     )
     name_last_feature(adapter, "EndChamfer")
     chamfer_dim = name_dimensions(adapter, "EndChamfer", ["EndChamferSize"])
     drive_jobs.append((chamfer_dim[0], '"EndChamferSize"'))
-    await volume_check(
+    volume_check(
         adapter, "chamfered bushing", V_BUSHING, 0.02 * V_CHAMFERS + 0.05
     )
-    await bbox_extent_check(adapter, "chamfered bushing length", "x", LENGTH)
+    bbox_extent_check(adapter, "chamfered bushing length", "x", LENGTH)
 
     # Mate datums: the bore axis first, so it is Axis1; then the north face,
     # driven by the length so it tracks a length edit.
-    axis = await name_bore_axis(
+    axis = name_bore_axis(
         adapter, "Front Plane", 0.0, "Top Plane", 0.0, "bushing bore axis"
     )
     if axis != "Axis1":
         raise RuntimeError(f"bushing bore axis came back {axis!r}, not Axis1")
     check(
         f"create_plane {NORTH_FACE} (Right Plane + Length)",
-        await adapter.create_plane(
+        adapter.create_plane(
             CreatePlaneParameters(
                 mode="offset", base_plane="Right Plane", offset=LENGTH
             )
@@ -201,19 +201,19 @@ async def build(adapter) -> dict[str, str]:
     north_offset = name_dimensions(adapter, NORTH_FACE, ["NorthFaceOffset"])
     drive_jobs.append((north_offset[0], '"Length"'))
 
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dimension, expression in drive_jobs:
-        await drive_dimension(adapter, dimension, expression)
-    await force_rebuild(adapter)
-    await volume_check(
+        drive_dimension(adapter, dimension, expression)
+    force_rebuild(adapter)
+    volume_check(
         adapter,
         "driven brass bushing (equations neutral)",
         V_BUSHING,
         0.02 * V_CHAMFERS + 0.05,
     )
 
-    await apply_material(adapter, MATERIAL)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    report_mass_properties(adapter)
     # The bore is reamed for the press on the pivot: its band lives on the
     # model dimension.  OD and length take the title block's .XXX.
     set_dimension_bilateral_tolerance(
@@ -230,7 +230,7 @@ async def build(adapter) -> dict[str, str]:
     apply_drawing_properties(
         adapter, PART_NAME, {"Isometric View Note": ISOMETRIC_VIEW_NOTE}
     )
-    return await save_part_and_images(adapter, PART_NAME)
+    return save_part_and_images(adapter, PART_NAME)
 
 
 if __name__ == "__main__":

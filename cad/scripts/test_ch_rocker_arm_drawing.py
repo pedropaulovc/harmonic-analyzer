@@ -282,7 +282,7 @@ def test_datum_b_sits_on_the_projected_broad_face_above_the_hub_and_thickness_bl
     tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
     build = next(
         node for node in tree.body
-        if isinstance(node, ast.AsyncFunctionDef) and node.name == "build"
+        if isinstance(node, ast.FunctionDef) and node.name == "build"
     )
     broad = next(
         node for node in build.body
@@ -1526,7 +1526,7 @@ def test_hub_length_stack_callout_is_below_and_preserves_native_size(
     tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
     build = next(
         node for node in tree.body
-        if isinstance(node, ast.AsyncFunctionDef) and node.name == "build"
+        if isinstance(node, ast.FunctionDef) and node.name == "build"
     )
     start = next(
         index for index, node in enumerate(build.body)
@@ -1919,7 +1919,7 @@ def test_ordinary_linked_note_factory_keeps_no_height_and_single_write_paths(nat
 
 def test_style_normalization_precedes_settled_link_capture_and_both_final_probes():
     tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
-    build = next(node for node in tree.body if isinstance(node, ast.AsyncFunctionDef) and node.name == "build")
+    build = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "build")
     calls = [node for node in ast.walk(build) if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)]
     (normalize,) = [node for node in calls if node.func.id == "_normalize_detail_caption_styles"]
     (letters,) = [node for node in calls if node.func.id == "_place_detail_letters"]

@@ -129,10 +129,10 @@ def _pocket_floor_max_limit(adapter) -> None:
         raise RuntimeError(f"{label}: MAX-limit tolerance readback changed")
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import RevolveParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     # #290: the row's inch calculation units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
     # The mm suffix is load-bearing: the equation manager reads bare numbers in
@@ -147,7 +147,7 @@ async def build(adapter) -> dict[str, str]:
         ("PocketFloorRadius", POCKET_FLOOR_CORNER_R_MAX),
         ("FloorHoleChamfer", FLOOR_HOLE_CHAMFER),
     ):
-        await set_global(adapter, name, f"{value}mm")
+        set_global(adapter, name, f"{value}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -158,11 +158,11 @@ async def build(adapter) -> dict[str, str]:
     # minimum radial clearance; the break takes the MHA-DT-32 under-head
     # radius (#1757).
     profile = SketchDims()
-    check("create_sketch cup profile", await adapter.create_sketch("Front"))
+    check("create_sketch cup profile", adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     axis = check(
         "cup axis centerline",
-        await adapter.add_centerline(0.0, 0.0, -OVERALL_LENGTH, 0.0),
+        adapter.add_centerline(0.0, 0.0, -OVERALL_LENGTH, 0.0),
     )
     corner_r = POCKET_FLOOR_CORNER_R_MAX
     floor_round_center = (-POCKET_DEPTH + corner_r, POCKET_R - corner_r)
@@ -178,21 +178,21 @@ async def build(adapter) -> dict[str, str]:
         (-POCKET_DEPTH, FLOOR_HOLE_R + FLOOR_HOLE_CHAMFER),
         floor_round_end,
     ]
-    lines = await add_line_chain(adapter, points, close=False)
+    lines = add_line_chain(adapter, points, close=False)
     # add_arc is CCW: wall -> floor is the 90-degree arc, not the 270-degree
     # complement.  Its traversal is opposite the surrounding line chain.
     floor_round = check(
         "pocket floor round",
-        await adapter.add_arc(
+        adapter.add_arc(
             *floor_round_center, *floor_round_start, *floor_round_end
         ),
     )
-    (pocket_wall,) = await add_line_chain(
+    (pocket_wall,) = add_line_chain(
         adapter, [floor_round_start, points[0]], close=False
     )
     set_sketch_direct_db(adapter, False)
     face, body_od, chamfer, bottom, floor_hole, hole_chamfer, floor_top = lines
-    check("axis horizontal", await adapter.add_sketch_constraint(axis, None, "horizontal"))
+    check("axis horizontal", adapter.add_sketch_constraint(axis, None, "horizontal"))
     for line, (u0, v0), (u1, v1) in (
         *zip(lines, points, points[1:], strict=False),
         (pocket_wall, floor_round_start, points[0]),
@@ -202,23 +202,23 @@ async def build(adapter) -> dict[str, str]:
         relation = "horizontal" if v0 == v1 else "vertical"
         check(
             f"cup profile {relation} {line}",
-            await adapter.add_sketch_constraint(line, None, relation),
+            adapter.add_sketch_constraint(line, None, relation),
         )
     check(
         "axis starts at the origin",
-        await adapter.add_sketch_constraint(f"{axis}.start", "origin", "coincident"),
+        adapter.add_sketch_constraint(f"{axis}.start", "origin", "coincident"),
     )
     check(
         "face on the origin plane",
-        await adapter.add_sketch_constraint(f"{face}.start", "origin", "vertical_points"),
+        adapter.add_sketch_constraint(f"{face}.start", "origin", "vertical_points"),
     )
     # Dimensions in creation order.
     check(
         "axis length",
-        await adapter.add_sketch_dimension(axis, None, "linear", OVERALL_LENGTH),
+        adapter.add_sketch_dimension(axis, None, "linear", OVERALL_LENGTH),
     )
     profile.record("AxisLength", '"OverallLength"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{body_od}.start",
         f"{bottom}.start",
@@ -229,7 +229,7 @@ async def build(adapter) -> dict[str, str]:
     profile.record("OverallLength", '"OverallLength"')
     # Face to FLAT floor, not the wall segment: the tangent round shortens
     # that line by its radius without changing the head's recess.
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{face}.start",
         f"{floor_top}.start",
@@ -240,7 +240,7 @@ async def build(adapter) -> dict[str, str]:
     profile.record("PocketDepth", '"PocketDepth"')
     # The bottom chamfer's axial leg, and its radial leg equal to it by
     # equation: 45 degrees.
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{chamfer}.start",
         f"{chamfer}.end",
@@ -249,7 +249,7 @@ async def build(adapter) -> dict[str, str]:
         "cup bottom chamfer",
     )
     profile.record("BodyChamfer", '"BodyChamfer"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{chamfer}.start",
         f"{chamfer}.end",
@@ -261,7 +261,7 @@ async def build(adapter) -> dict[str, str]:
     # The floor hole's pocket-side mouth break prints its axial leg, as the
     # body chamfer and the screw's head break; its radial leg equals it by
     # equation: 45 degrees.
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{hole_chamfer}.start",
         f"{hole_chamfer}.end",
@@ -270,7 +270,7 @@ async def build(adapter) -> dict[str, str]:
         "cup floor-hole mouth break",
     )
     profile.record("FloorHoleChamfer", '"FloorHoleChamfer"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{hole_chamfer}.start",
         f"{hole_chamfer}.end",
@@ -284,13 +284,13 @@ async def build(adapter) -> dict[str, str]:
         ("PocketDia", pocket_wall, -POCKET_DEPTH / 2.0, POCKET_R),
         ("FloorHoleDia", floor_hole, -(POCKET_DEPTH + OVERALL_LENGTH) / 2.0, FLOOR_HOLE_R),
     ):
-        await add_diametric_linear_dimension(
+        add_diametric_linear_dimension(
             adapter, axis, line, (u_mid, radius + 3.0), name
         )
         profile.record(name, f'"{name}"')
     check(
         "pocket floor radius",
-        await adapter.add_sketch_dimension(
+        adapter.add_sketch_dimension(
             floor_round, None, "radial", POCKET_FLOOR_CORNER_R_MAX
         ),
     )
@@ -301,29 +301,29 @@ async def build(adapter) -> dict[str, str]:
     ):
         check(
             f"floor round tangent to {label}",
-            await adapter.add_sketch_constraint(first, second, "tangent"),
+            adapter.add_sketch_constraint(first, second, "tangent"),
         )
-    await ensure_fully_defined(adapter, "cup profile sketch")
-    check("exit_sketch cup profile", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "cup profile sketch")
+    check("exit_sketch cup profile", adapter.exit_sketch())
     name_last_feature(adapter, "CupProfile")
     drive_jobs += profile.apply(adapter, "CupProfile")
-    check("revolve cup", await adapter.create_revolve(RevolveParameters(angle=360.0)))
+    check("revolve cup", adapter.create_revolve(RevolveParameters(angle=360.0)))
     name_last_feature(adapter, "Cup")
-    await volume_check(adapter, "butt cup", V_CUP, 0.005 * V_CUP)
+    volume_check(adapter, "butt cup", V_CUP, 0.005 * V_CUP)
 
-    await name_bore_axis(adapter, "Front Plane", 0.0, "Top Plane", 0.0, "cup axis")
+    name_bore_axis(adapter, "Front Plane", 0.0, "Top Plane", 0.0, "cup axis")
 
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dimension, expression in drive_jobs:
-        await drive_dimension(adapter, dimension, expression)
-    await force_rebuild(adapter)
-    await volume_check(
+        drive_dimension(adapter, dimension, expression)
+    force_rebuild(adapter)
+    volume_check(
         adapter, "driven butt cup (equations neutral)", V_CUP, 0.005 * V_CUP
     )
 
-    await apply_material(adapter, MATERIAL)
-    await apply_color(adapter, POLISHED_STEEL)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    apply_color(adapter, POLISHED_STEEL)
+    report_mass_properties(adapter)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
@@ -342,7 +342,7 @@ async def build(adapter) -> dict[str, str]:
         PART_NAME,
         {"Isometric View Note": ISOMETRIC_VIEW_NOTE},
     )
-    return await save_part_and_images(adapter, PART_NAME)
+    return save_part_and_images(adapter, PART_NAME)
 
 
 if __name__ == "__main__":

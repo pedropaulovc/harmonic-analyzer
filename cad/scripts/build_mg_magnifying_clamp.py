@@ -985,10 +985,10 @@ def _measure_tap_from_flat(adapter: Any, point: Any, circle: Any, flat: Any, nam
     _assert_tap_flat_attachment(adapter, display, point, circle, flat, name=name, stage=f"{name}.after-create")
 
 
-async def _location_profiles(adapter: Any) -> None:
+def _location_profiles(adapter: Any) -> None:
     sources = _location_sources(adapter)
     for feature, (plane, circle, interface, flats) in sources.items():
-        check(f"create_sketch {feature}", await adapter.create_sketch(plane))
+        check(f"create_sketch {feature}", adapter.create_sketch(plane))
         converted = _convert_location_source(adapter, circle, interface)
         arc = _early_bound(converted, "ISketchArc")
         center = _early_bound(arc.GetCenterPoint2(), "ISketchPoint")
@@ -1004,7 +1004,7 @@ async def _location_profiles(adapter: Any) -> None:
         status = sketch.GetConstrainedStatus()
         if type(status) is not int or status != 3:
             raise RuntimeError(f"{feature}: linked witness is not fully defined: {status!r}")
-        check(f"exit_sketch {feature}", await adapter.exit_sketch())
+        check(f"exit_sketch {feature}", adapter.exit_sketch())
         name_last_feature(adapter, feature)
     blank_reference_sketches(adapter, tuple(sources))
 
@@ -1135,10 +1135,10 @@ def _author_stock_af(adapter: Any) -> None:
     _assert_stock_af_source(adapter, stage="HexAf.source-authored")
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     # The registry row's IPS document units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
@@ -1151,30 +1151,30 @@ async def build(adapter) -> dict[str, str]:
         ("LeverBoreDia", LEVER_BORE_DIA),
         ("LeverBoreY", LEVER_BORE_Y),
     ):
-        await set_global(adapter, name, f"{value}mm")
+        set_global(adapter, name, f"{value}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
     # --- Hex block: the bar's section on the Top plane, extruded up +Y --------
-    drive_jobs += await _hex_profile(adapter)
+    drive_jobs += _hex_profile(adapter)
     check(
         "extrude block",
-        await adapter.create_extrusion(ExtrusionParameters(depth=BLOCK_HEIGHT)),
+        adapter.create_extrusion(ExtrusionParameters(depth=BLOCK_HEIGHT)),
     )
     name_last_feature(adapter, "Block")
     (height,) = name_dimensions(adapter, "Block", ["Height"])
     drive_jobs.append((height, '"BlockHeight"'))
-    volume = await volume_check(adapter, "hex block", V_HEX, 0.005 * V_HEX)
-    await bbox_extent_check(adapter, "block height", "y", BLOCK_HEIGHT)
-    await bbox_extent_check(adapter, "hex across the flats", "z", HEX_AF)
-    await bbox_extent_check(adapter, "hex across the corners", "x", HEX_AC)
+    volume = volume_check(adapter, "hex block", V_HEX, 0.005 * V_HEX)
+    bbox_extent_check(adapter, "block height", "y", BLOCK_HEIGHT)
+    bbox_extent_check(adapter, "hex across the flats", "z", HEX_AF)
+    bbox_extent_check(adapter, "hex across the corners", "x", HEX_AC)
 
     # --- Lever bore along X through both corners ---------------------------------
     # On the hex axis (sketch x = 0 is model Z = 0), so define_circle emits the
     # height then the diameter -- the x slot is ignored.
     lever = SketchDims()
-    check("create_sketch lever bore", await adapter.create_sketch("Right"))
-    await define_circle(
+    check("create_sketch lever bore", adapter.create_sketch("Right"))
+    define_circle(
         adapter,
         0.0,
         LEVER_BORE_Y,
@@ -1184,18 +1184,18 @@ async def build(adapter) -> dict[str, str]:
         names=("LeverCz", "LeverBoreYDim", "LeverBoreDiaDim"),
         drives=(None, '"LeverBoreY"', '"LeverBoreDia"'),
     )
-    await ensure_fully_defined(adapter, "lever bore sketch")
-    check("exit_sketch lever bore", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "lever bore sketch")
+    check("exit_sketch lever bore", adapter.exit_sketch())
     name_last_feature(adapter, "LeverBoreProfile")
     drive_jobs += lever.apply(adapter, "LeverBoreProfile")
     check(
         "cut lever bore",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=BORE_CUT_DEPTH, both_directions=True)
         ),
     )
     name_last_feature(adapter, "LeverBore")
-    volume = await volume_check(adapter, "lever bore", volume - V_BORE, 0.01 * V_BORE)
+    volume = volume_check(adapter, "lever bore", volume - V_BORE, 0.01 * V_BORE)
 
     # --- Thumb-screw tap: top face, hex axis, into the lever bore ---------------
     thumb = wizard_holes(
@@ -1209,7 +1209,7 @@ async def build(adapter) -> dict[str, str]:
         placement_dims=[((None, None), (None, None))],
     )
     drive_jobs += thumb.placement_drive_jobs
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "thumb-screw tap", volume - V_THUMB, 0.03 * V_THUMB
     )
 
@@ -1225,36 +1225,36 @@ async def build(adapter) -> dict[str, str]:
         placement_dims=[((None, None), (None, None))],
     )
     drive_jobs += rod.placement_drive_jobs
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "vertical-rod tap", volume - V_ROD_TAP, 0.03 * V_ROD_TAP
     )
 
     # Named lever-bore axis (local X through (y=LEVER_BORE_Y, z=0)) so the clamp
     # rides the magnifying lever as a concentric slider in the assembly.
-    await name_bore_axis(
+    name_bore_axis(
         adapter, "Top Plane", LEVER_BORE_Y, "Front Plane", 0.0, "lever bore axis",
         drive_a='"LeverBoreY"', drive_jobs=drive_jobs,
     )
 
     # Independent ordinary entry locations are measured from real stock flats;
     # nominal origin-coincident hole placement is not a tolerance statement.
-    await _location_profiles(adapter)
+    _location_profiles(adapter)
 
     # Deferred drive equations, then re-check neutrality.
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    volume_check(
         adapter, "driven magnifying clamp (equations neutral)", V_TOTAL, 0.005 * V_TOTAL
     )
 
-    await apply_material(adapter, MATERIAL)
+    apply_material(adapter, MATERIAL)
     _set_section_hatch(adapter)
     # ch20 p.47 (img07) + p.46: the clamp block is BLACKENED brass (reads
     # dark against the bright lever rod and the bright thumb screw).
-    await apply_color(adapter, PANEL_BLACK)
-    await report_mass_properties(adapter)
+    apply_color(adapter, PANEL_BLACK)
+    report_mass_properties(adapter)
 
     # Places are the tolerance statement (drawing-guidelines.md rule 3): the
     # part carries them, the drawing reads them back.
@@ -1278,7 +1278,7 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
-    return await save_part_and_images(adapter, PART_NAME)
+    return save_part_and_images(adapter, PART_NAME)
 
 
 def _set_section_hatch(adapter: Any) -> None:
@@ -1306,7 +1306,7 @@ def _set_section_hatch(adapter: Any) -> None:
         )
 
 
-async def _hex_profile(adapter: Any) -> list[tuple[str, str]]:
+def _hex_profile(adapter: Any) -> list[tuple[str, str]]:
     """The 1/2 hex on the Top plane, corners on the sketch's horizontal axis.
 
     The ``build_mg_output_fixture._hex_profile`` technique turned a quarter:
@@ -1329,31 +1329,31 @@ async def _hex_profile(adapter: Any) -> list[tuple[str, str]]:
         (corner / 2.0, -half_af),
     ]
     hexd = SketchDims()
-    check("create_sketch hex", await adapter.create_sketch("Top"))
+    check("create_sketch hex", adapter.create_sketch("Top"))
     set_sketch_direct_db(adapter, True)
-    lines = await add_line_chain(adapter, points)
+    lines = add_line_chain(adapter, points)
     set_sketch_direct_db(adapter, False)
     for flat in (lines[1], lines[4]):
         check(
             f"hex flat {flat} horizontal",
-            await adapter.add_sketch_constraint(flat, None, "horizontal"),
+            adapter.add_sketch_constraint(flat, None, "horizontal"),
         )
     for first, second in ((0, 1), (1, 2), (3, 4), (4, 5)):
         check(
             f"hex sides {first}={second}",
-            await adapter.add_sketch_constraint(lines[first], lines[second], "equal"),
+            adapter.add_sketch_constraint(lines[first], lines[second], "equal"),
         )
     # Equal flats, equal halves: the hex axis centred between the flats.
     check(
         "hex flats equal (axis centred)",
-        await adapter.add_sketch_constraint(lines[1], lines[4], "equal"),
+        adapter.add_sketch_constraint(lines[1], lines[4], "equal"),
     )
     corner_drive = f'"HexAf" * {_CORNER_PER_AF!r}'
-    await anchor_point_to_origin(adapter, f"{lines[0]}.start", corner, 0.0, "hex +X corner")
+    anchor_point_to_origin(adapter, f"{lines[0]}.start", corner, 0.0, "hex +X corner")
     hexd.record("HexCornerPlus", corner_drive)
-    await anchor_point_to_origin(adapter, f"{lines[3]}.start", -corner, 0.0, "hex -X corner")
+    anchor_point_to_origin(adapter, f"{lines[3]}.start", -corner, 0.0, "hex -X corner")
     hexd.record("HexCornerMinus", corner_drive)
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{lines[1]}.end",
         f"{lines[4]}.start",
@@ -1362,8 +1362,8 @@ async def _hex_profile(adapter: Any) -> list[tuple[str, str]]:
         "hex across the flats",
     )
     hexd.record("HexAf", '"HexAf"')
-    await ensure_fully_defined(adapter, "hex profile")
-    check("exit_sketch hex", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "hex profile")
+    check("exit_sketch hex", adapter.exit_sketch())
     name_last_feature(adapter, "HexProfile")
     return hexd.apply(adapter, "HexProfile")
 

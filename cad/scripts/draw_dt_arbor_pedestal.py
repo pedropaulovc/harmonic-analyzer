@@ -747,11 +747,11 @@ def _add_plan_hole_centreline(adapter: Any, view: Any) -> None:
     rebuild_drawing(adapter, label=label)
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open arbor-pedestal source", await adapter.open_model(str(SOURCE)))
+    check("open arbor-pedestal source", adapter.open_model(str(SOURCE)))
     read_required_properties(
         adapter.currentModel,
         (
@@ -924,7 +924,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # import kept them instead of falling back to the sheet's two-place
     # default (drawing-simplicity-policy.md `How the repository implements the guidelines` -- the sheet may not rewrite them).
     assert_imported_precision(adapter, imported_annotations, DRAWING_PRECISION_BY_NAME)
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Cylinder-Arbor Pedestal Manufacturing Drawing",

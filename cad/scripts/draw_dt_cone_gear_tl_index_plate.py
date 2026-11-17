@@ -223,10 +223,10 @@ def _position_index_holes(adapter: Any, view: Any) -> None:
     )
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source index plate missing: {SOURCE}")
-    check("open index plate", await adapter.open_model(str(SOURCE)))
+    check("open index plate", adapter.open_model(str(SOURCE)))
     required = (
         "Number",
         "Material Specification",
@@ -289,7 +289,7 @@ async def build(adapter: Any) -> dict[str, str]:
         set_hidden_lines_removed(adapter, view)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
     add_note(adapter, part.HEAD_NOTE, *HEAD_NOTE_XY)
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Cone Gear Dividing Head Index Plate Drawing",

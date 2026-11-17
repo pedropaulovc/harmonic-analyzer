@@ -7,7 +7,6 @@ writer carries face names (that needs the farm proof described in issue #1204).
 
 from __future__ import annotations
 
-import asyncio
 import hashlib
 import re
 import sys
@@ -423,7 +422,7 @@ def _exporter(tmp_path: Path, monkeypatch, doc=lambda _native: _ExportDoc()):
         swApp = SimpleNamespace(CloseAllDocuments=lambda _include_unsaved: True)
         currentModel = None
 
-        async def open_model(self, path: str):
+        def open_model(self, path: str):
             seen["opened"].append(Path(path).name)
             self.currentModel = doc(Path(path))
             self.currentModel.drop_half |= seen["drop_half"]
@@ -459,10 +458,10 @@ def _exporter(tmp_path: Path, monkeypatch, doc=lambda _native: _ExportDoc()):
     monkeypatch.setattr(export_models, "validated_outputs", lambda *_args: [])
     monkeypatch.setattr(export_models, "stamp_render_cache_current", lambda _paths: None)
     monkeypatch.setattr(
-        export_models, "run_build", lambda build: (asyncio.run(build(_Adapter())), 0)[1],
+        export_models, "run_build", lambda build: (build(_Adapter()), 0)[1],
     )
 
-    async def _render_png(_adapter, _stem: str) -> None:
+    def _render_png(_adapter, _stem: str) -> None:
         return None
 
     monkeypatch.setattr(export_models, "export_build_png", _render_png)

@@ -46,9 +46,9 @@ def _origins(adapter, needles):
     return out
 
 
-async def build(adapter):
+def build(adapter):
     path = sys.argv[1]
-    res0 = await adapter.open_model(path)
+    res0 = adapter.open_model(path)
     log(f"opened {path}: {res0.is_success}")
     res = _origins(adapter, ["ch-connecting-rod-1", "dt-cylinder-gear-1", "ch-rocker-arm-1"])
     for k, (nm, org) in sorted(res.items()):

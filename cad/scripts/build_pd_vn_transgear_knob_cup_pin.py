@@ -35,13 +35,13 @@ MATERIAL = SPEC.material
 
 
 @wraps(build_98296A031)
-async def _build_pin_with_supplier_references(adapter, truth=None):
-    await build_98296A031(adapter, truth)
-    await author_supplier_spring_pin_references(adapter, SUPPLIER_REFERENCE)
+def _build_pin_with_supplier_references(adapter, truth=None):
+    build_98296A031(adapter, truth)
+    author_supplier_spring_pin_references(adapter, SUPPLIER_REFERENCE)
 
 
-async def build(adapter) -> dict[str, str]:
-    return await build_stock_fastener(
+def build(adapter) -> dict[str, str]:
+    return build_stock_fastener(
         adapter,
         part_name=PART_NAME,
         components=(StockComponent(sku=SKU, author=_build_pin_with_supplier_references),),

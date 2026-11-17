@@ -186,12 +186,12 @@ RIGHT_HOLE = SCREW_XY[1]
 TOP_HOLE = SCREW_XY[2]
 
 
-async def _construction_chord(
+def _construction_chord(
     adapter, feature: str, start: tuple[float, float], end: tuple[float, float]
 ) -> str:
     """One construction line, placed with inference off (ms_stop_geom recipe)."""
     set_sketch_direct_db(adapter, True)
-    line = check(feature, await adapter.add_line(*start, *end))
+    line = check(feature, adapter.add_line(*start, *end))
     set_sketch_direct_db(adapter, False)
     segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
     segment.ConstructionGeometry = True
@@ -200,7 +200,7 @@ async def _construction_chord(
     return line
 
 
-async def _square_chord(
+def _square_chord(
     adapter,
     feature: str,
     line: str,
@@ -210,8 +210,8 @@ async def _square_chord(
     name: str,
 ) -> None:
     """Hold ``line`` horizontal or vertical at ``length``."""
-    check(feature, await adapter.add_sketch_constraint(line, None, relation))
-    await dimension_between(
+    check(feature, adapter.add_sketch_constraint(line, None, relation))
+    dimension_between(
         adapter,
         f"{line}.start",
         f"{line}.end",
@@ -222,7 +222,7 @@ async def _square_chord(
     dims.record(name)
 
 
-async def _face_reference(adapter) -> None:
+def _face_reference(adapter) -> None:
     """The outline's width and height and the far-edge hole stations.
 
     On the Front plane (the decorated face), sketch (u, v) = model (X, Y),
@@ -239,25 +239,25 @@ async def _face_reference(adapter) -> None:
     feature = FACE_REFERENCE
     dims = SketchDims()
     station, chord = FACE_EDGE_STATION, REFERENCE_CHORD
-    check(f"create sketch {feature}", await adapter.create_sketch("Front"))
-    left = await _construction_chord(
+    check(f"create sketch {feature}", adapter.create_sketch("Front"))
+    left = _construction_chord(
         adapter, feature, (0.0, station), (0.0, station + chord)
     )
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{left}.start", 0.0, station, f"{feature} left edge chord"
     )
     dims.record("LeftEdgeStation")
-    await _square_chord(adapter, feature, left, "vertical", chord, dims, "LeftChord")
-    right = await _construction_chord(
+    _square_chord(adapter, feature, left, "vertical", chord, dims, "LeftChord")
+    right = _construction_chord(
         adapter, feature, (PLATE_WIDTH, station), (PLATE_WIDTH, station + chord)
     )
     check(
         feature,
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{right}.start", f"{left}.start", "horizontal_points"
         ),
     )
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{left}.start",
         f"{right}.start",
@@ -266,27 +266,27 @@ async def _face_reference(adapter) -> None:
         f"{feature} plate width",
     )
     dims.record("PlateWidth")
-    await _square_chord(adapter, feature, right, "vertical", chord, dims, "RightChord")
-    bottom = await _construction_chord(
+    _square_chord(adapter, feature, right, "vertical", chord, dims, "RightChord")
+    bottom = _construction_chord(
         adapter, feature, (station, 0.0), (station + chord, 0.0)
     )
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{bottom}.start", station, 0.0, f"{feature} bottom edge chord"
     )
     dims.record("BottomEdgeStation")
-    await _square_chord(
+    _square_chord(
         adapter, feature, bottom, "horizontal", chord, dims, "BottomChord"
     )
-    top = await _construction_chord(
+    top = _construction_chord(
         adapter, feature, (station, PLATE_HEIGHT), (station + chord, PLATE_HEIGHT)
     )
     check(
         feature,
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{top}.start", f"{bottom}.start", "vertical_points"
         ),
     )
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{bottom}.start",
         f"{top}.start",
@@ -295,12 +295,12 @@ async def _face_reference(adapter) -> None:
         f"{feature} plate height",
     )
     dims.record("PlateHeight")
-    await _square_chord(adapter, feature, top, "horizontal", chord, dims, "TopChord")
+    _square_chord(adapter, feature, top, "horizontal", chord, dims, "TopChord")
     right_x, right_y = RIGHT_HOLE
-    right_hole = await _construction_chord(
+    right_hole = _construction_chord(
         adapter, feature, (right_x, right_y), (right_x + chord, right_y)
     )
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{right_hole}.start",
         f"{right}.start",
@@ -309,7 +309,7 @@ async def _face_reference(adapter) -> None:
         f"{feature} right hole station",
     )
     dims.record("RightHoleStation")
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{bottom}.start",
         f"{right_hole}.start",
@@ -318,14 +318,14 @@ async def _face_reference(adapter) -> None:
         f"{feature} right hole height",
     )
     dims.record("RightHoleY")
-    await _square_chord(
+    _square_chord(
         adapter, feature, right_hole, "horizontal", chord, dims, "RightHoleChord"
     )
     top_x, top_y = TOP_HOLE
-    top_hole = await _construction_chord(
+    top_hole = _construction_chord(
         adapter, feature, (top_x, top_y), (top_x, top_y + chord)
     )
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{top_hole}.start",
         f"{top}.start",
@@ -334,7 +334,7 @@ async def _face_reference(adapter) -> None:
         f"{feature} top hole station",
     )
     dims.record("TopHoleStation")
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{left}.start",
         f"{top_hole}.start",
@@ -343,23 +343,23 @@ async def _face_reference(adapter) -> None:
         f"{feature} top hole across",
     )
     dims.record("TopHoleX")
-    await _square_chord(
+    _square_chord(
         adapter, feature, top_hole, "vertical", chord, dims, "TopHoleChord"
     )
-    await ensure_fully_defined(adapter, feature)
-    check(f"exit sketch {feature}", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, feature)
+    check(f"exit sketch {feature}", adapter.exit_sketch())
     name_last_feature(adapter, feature)
     dims.apply(adapter, feature)
 
 
-async def _section_plane(adapter) -> None:
+def _section_plane(adapter) -> None:
     """Section A-A's cutting plane: the Top plane carried SECTION_Y along +Y,
     so a sketch on it keeps the Top plane's (u, v) = model (X, -Z)."""
     from solidworks_mcp.adapters.base import CreatePlaneParameters
 
     check(
         f"create plane {SECTION_PLANE}",
-        await adapter.create_plane(
+        adapter.create_plane(
             CreatePlaneParameters(
                 mode="offset", base_plane="Top Plane", offset=SECTION_Y
             )
@@ -397,7 +397,7 @@ def _add_reference_point(adapter, uv: tuple[float, float], label: str) -> str:
     return adapter._register_sketch_entity("Point", point)
 
 
-async def _section_reference(adapter) -> None:
+def _section_reference(adapter) -> None:
     """The sunk field's and the engraving floor's depths below the face.
 
     On SECTION_PLANE, sketch (u, v) = model (X, -Z), points only and hidden.
@@ -411,21 +411,21 @@ async def _section_reference(adapter) -> None:
     """
     feature = SECTION_REFERENCE
     dims = SketchDims()
-    check(f"create sketch {feature}", await adapter.create_sketch(SECTION_PLANE))
+    check(f"create sketch {feature}", adapter.create_sketch(SECTION_PLANE))
     face_x, face_z = SECTION_REFERENCE_POINTS["face"]
     face = _add_reference_point(adapter, (face_x, -face_z), f"{feature} face")
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, face, face_x, -face_z, f"{feature} face point"
     )
     dims.record("FacePointStation")
     for name, depth in (("field", "FieldDepth"), ("groove", "EngravingDepth")):
         x, z = SECTION_REFERENCE_POINTS[name]
         point = _add_reference_point(adapter, (x, -z), f"{feature} {name}")
-        await dimension_between(
+        dimension_between(
             adapter, face, point, "vertical_distance", -z, f"{feature} {depth}"
         )
         dims.record(depth)
-        await dimension_between(
+        dimension_between(
             adapter,
             face,
             point,
@@ -434,20 +434,20 @@ async def _section_reference(adapter) -> None:
             f"{feature} {name} point station",
         )
         dims.record(f"{name.title()}PointStation")
-    await ensure_fully_defined(adapter, feature)
-    check(f"exit sketch {feature}", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, feature)
+    check(f"exit sketch {feature}", adapter.exit_sketch())
     name_last_feature(adapter, feature)
     _require_on_section_plane(adapter, feature)
     dims.apply(adapter, feature)
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
         ExtrusionParameters,
         ImportDxfDwgParameters,
     )
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Only the screw-coordinate globals drive geometry. The imported outline and
@@ -455,8 +455,8 @@ async def build(adapter) -> dict[str, str]:
     # Explicit mm is load-bearing: this is an INCH document, so bare numbers would
     # evaluate in inches and move the placement sketch by a factor of 25.4.
     for n, (x, y) in enumerate(SCREW_XY):
-        await set_global(adapter, f"Screw{n}X", f"{x}mm")
-        await set_global(adapter, f"Screw{n}Y", f"{y}mm")
+        set_global(adapter, f"Screw{n}X", f"{x}mm")
+        set_global(adapter, f"Screw{n}Y", f"{y}mm")
 
     # The Hole Wizard declares placement dim names + drive equations inline.
     # Collect its deferred drive jobs for one batch after the finished model's
@@ -470,7 +470,7 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError(f"outline DXF not found: {OUTLINE_DXF}")
     check(
         "import outline DXF",
-        await adapter.import_dxf_dwg(
+        adapter.import_dxf_dwg(
             ImportDxfDwgParameters(
                 file_path=str(OUTLINE_DXF),
                 plane="Front",
@@ -488,22 +488,22 @@ async def build(adapter) -> dict[str, str]:
     # (unlike the cut path, it never looks up the last ProfileFeature), and the
     # DXF import leaves its sketch closed and unselected: farm leaf 2026-10-10
     # failed "Failed to create extrusion feature" right here without this select.
-    check("select outline profile", await adapter.select_feature("OutlineProfile"))
+    check("select outline profile", adapter.select_feature("OutlineProfile"))
     check(
         "extrude plate",
         # Extrude the body in -Z so the decorated z=0 face (where the field recess,
         # lettering and pinstripe incise) is the EXPOSED FRONT face (normal +Z),
         # not buried behind the body -- the traced lettering then reads correctly
         # with no mirror.
-        await adapter.create_extrusion(
+        adapter.create_extrusion(
             ExtrusionParameters(depth=PLATE_THICKNESS, reverse_direction=True)
         ),
     )
     name_last_feature(adapter, "PlateSlab")
     name_dimensions(adapter, "PlateSlab", ["PlateThick"])
-    await bbox_extent_check(adapter, "plate width (traced outline)", "x", PLATE_WIDTH)
-    await bbox_extent_check(adapter, "plate height (traced outline)", "y", PLATE_HEIGHT)
-    await volume_check(
+    bbox_extent_check(adapter, "plate width (traced outline)", "x", PLATE_WIDTH)
+    bbox_extent_check(adapter, "plate height (traced outline)", "y", PLATE_HEIGHT)
+    volume_check(
         adapter, "traced plate slab", OUTLINE_AREA_MM2 * PLATE_THICKNESS, 0.02
     )
 
@@ -512,10 +512,10 @@ async def build(adapter) -> dict[str, str]:
     # Both-directions 2x depth about z=0 lands RECESS_DEPTH into the -z body.
     if not FIELD_DXF.is_file():
         raise RuntimeError(f"field DXF not found: {FIELD_DXF}")
-    pre = await adapter.get_mass_properties()
+    pre = adapter.get_mass_properties()
     check(
         "import field DXF",
-        await adapter.import_dxf_dwg(
+        adapter.import_dxf_dwg(
             ImportDxfDwgParameters(
                 file_path=str(FIELD_DXF),
                 plane="Front",
@@ -531,13 +531,13 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "FieldProfile")
     check(
         "cut field recess",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=2.0 * RECESS_DEPTH, both_directions=True)
         ),
     )
     name_last_feature(adapter, "FieldRecess")
     v_field = FIELD_AREA_MM2 * RECESS_DEPTH
-    removed = float(pre.data.volume) - float((await adapter.get_mass_properties()).data.volume)
+    removed = float(pre.data.volume) - float((adapter.get_mass_properties()).data.volume)
     _telemetry.info(f"field recess removed {removed:.1f} mm^3 (analytic {v_field:.1f})")
     if abs(removed - v_field) > 0.02 * v_field:
         raise RuntimeError(f"field recess removed {removed:.1f}, expected {v_field:.1f}")
@@ -553,7 +553,7 @@ async def build(adapter) -> dict[str, str]:
     # here, front and back face alike). Before engraving only the outline/field
     # walls exist; the pristine back face at z=-PLATE_THICKNESS carries all four
     # stations and through-all is geometrically identical from either side.
-    pre = await adapter.get_mass_properties()
+    pre = adapter.get_mass_properties()
     screw_drives = tuple((f'"Screw{n}X"', f'"Screw{n}Y"') for n in range(len(SCREW_XY)))
     screw_cut = wizard_holes(
         adapter,
@@ -570,7 +570,7 @@ async def build(adapter) -> dict[str, str]:
     )
     drive_jobs += screw_cut.placement_drive_jobs
     v_holes = len(SCREW_XY) * math.pi * (SCREW_HOLE_DIA / 2.0) ** 2 * PLATE_THICKNESS
-    removed = float(pre.data.volume) - float((await adapter.get_mass_properties()).data.volume)
+    removed = float(pre.data.volume) - float((adapter.get_mass_properties()).data.volume)
     _telemetry.info(f"screw holes removed {removed:.1f} mm^3 (analytic {v_holes:.1f})")
     if abs(removed - v_holes) > 0.02 * v_holes:
         raise RuntimeError(f"screw holes removed {removed:.1f}, expected {v_holes:.1f}")
@@ -591,10 +591,10 @@ async def build(adapter) -> dict[str, str]:
     # cutting through the slab) rather than matched to a closed form.
     if not ENGRAVING_DXF.is_file():
         raise RuntimeError(f"engraving DXF not found: {ENGRAVING_DXF}")
-    pre = await adapter.get_mass_properties()
+    pre = adapter.get_mass_properties()
     check(
         "import engraving DXF",
-        await adapter.import_dxf_dwg(
+        adapter.import_dxf_dwg(
             ImportDxfDwgParameters(
                 file_path=str(ENGRAVING_DXF),
                 plane="Front",
@@ -611,14 +611,14 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "EngravingImport")
     check(
         "cut engraving",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(
                 depth=2.0 * (RECESS_DEPTH + ENGRAVE_DEPTH), both_directions=True
             )
         ),
     )
     name_last_feature(adapter, "EngravingCut")
-    removed = float(pre.data.volume) - float((await adapter.get_mass_properties()).data.volume)
+    removed = float(pre.data.volume) - float((adapter.get_mass_properties()).data.volume)
     slab_volume = OUTLINE_AREA_MM2 * PLATE_THICKNESS
     _telemetry.info(f"engraving cut removed {removed:.1f} mm^3 (imported DXF artwork)")
     if removed <= 0.0:
@@ -630,21 +630,21 @@ async def build(adapter) -> dict[str, str]:
         )
 
     # The hidden references the sheet prints (no solid change).
-    await _face_reference(adapter)
-    await _section_plane(adapter)
-    await _section_reference(adapter)
+    _face_reference(adapter)
+    _section_plane(adapter)
+    _section_reference(adapter)
 
     # Apply the deferred drive equations now -- after the whole model + a rebuild
     # exists, so every target resolves. Each equation evaluates to the value just
     # built, so geometry must not move. This part has no single analytic-total
     # volume_check (its incremental cuts are asserted in place above), so the
     # neutrality proof captures the as-built volume and re-asserts it unchanged.
-    final_volume = float((await adapter.get_mass_properties()).data.volume)
-    await force_rebuild(adapter)
+    final_volume = float((adapter.get_mass_properties()).data.volume)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    volume_check(
         adapter, "driven nameplate (equations neutral)", final_volume, 1e-3 * final_volume
     )
 
@@ -661,8 +661,8 @@ async def build(adapter) -> dict[str, str]:
     blank_reference_sketches(adapter, REFERENCE_SKETCHES)
     blank_reference_geometry(adapter, ((SECTION_PLANE, "PLANE"),))
 
-    await apply_material(adapter, MATERIAL)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    report_mass_properties(adapter)
     apply_drawing_properties(
         adapter,
         PART_NAME,
@@ -671,7 +671,7 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
-    return await save_part_and_images(adapter, PART_NAME)
+    return save_part_and_images(adapter, PART_NAME)
 
 
 if __name__ == "__main__":

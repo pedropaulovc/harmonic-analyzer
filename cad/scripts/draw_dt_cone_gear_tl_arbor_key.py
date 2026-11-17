@@ -88,11 +88,11 @@ RIGHT_KEEP = {
 NOTES_XY = (0.030, 0.120)
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open arbor key source", await adapter.open_model(str(SOURCE)))
+    check("open arbor key source", adapter.open_model(str(SOURCE)))
     read_required_properties(
         adapter.currentModel,
         (
@@ -168,7 +168,7 @@ async def build(adapter: Any) -> dict[str, str]:
             fraction_denominator=STOCK_FRACTION_DENOMINATOR,
         )
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Keyed Cutting Arbor Key Drawing",

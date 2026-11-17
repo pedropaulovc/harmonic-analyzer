@@ -9,7 +9,7 @@ import _telemetry
 from _assembly import _mate, _mate_hard_error, suspend_automatic_assembly_rebuilds
 
 
-async def gear_mate(
+def gear_mate(
     adapter: Any,
     ref_a: Any,
     ref_b: Any,
@@ -25,7 +25,7 @@ async def gear_mate(
     """
     ratio = list(ratio)
     label = label or f"gear {ratio[0]:g}:{ratio[1]:g}"
-    return await _mate(
+    return _mate(
         adapter, label, "gear", [ref_a, ref_b], gear_ratio=ratio, alignment=alignment
     )
 
@@ -102,14 +102,14 @@ def gear_mates_batch(
     return results
 
 
-async def cam_follower_mate(
+def cam_follower_mate(
     adapter: Any, cam_ref: Any, follower_ref: Any, *, label: str = "cam_follower"
 ) -> Any:
     """Cam-follower mate; the adapter applies the cam selection mark (8)."""
-    return await _mate(adapter, label, "cam_follower", [cam_ref, follower_ref])
+    return _mate(adapter, label, "cam_follower", [cam_ref, follower_ref])
 
 
-async def rack_pinion_mate(
+def rack_pinion_mate(
     adapter: Any,
     rack_ref: Any,
     pinion_ref: Any,
@@ -134,7 +134,7 @@ async def rack_pinion_mate(
     verify:kinematics gate (the probe's signed feed assert), per the
     GEAR_SENSE/FEED_SIGN precedent.
     """
-    return await _mate(
+    return _mate(
         adapter,
         label,
         "rack_pinion",

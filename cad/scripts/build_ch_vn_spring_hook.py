@@ -104,7 +104,7 @@ NUT = "omitted"
 
 
 @_telemetry.traced("stock.shank.deburr")
-async def _size_deburr(adapter) -> None:
+def _size_deburr(adapter) -> None:
     """Drive the restored factory deburr's leg to the sheet's inch nominal.
 
     The shared trim recipe restores the vendor's 0.4557 leg; the anchor's own
@@ -115,7 +115,7 @@ async def _size_deburr(adapter) -> None:
     status = dimension.SetSystemValue3(CHAMFER_WIDTH_MM / 1000, 2, null_variant())
     if int(status) != 0:  # swSetValueReturnStatus_e.swSetValue_Successful
         raise RuntimeError(f"ChamferWidth@StockDeburrProfile: deburr rejected ({status})")
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     faults = _hard_faults(adapter, adapter.currentModel)
     if faults:
         raise RuntimeError(f"sized deburr rebuilt with faults {faults}")
@@ -217,12 +217,12 @@ def _stock_span(adapter, first, last, expected_mm, name, dims):
     dims.record(name)
 
 
-async def _supplier_stock_profile(adapter):
+def _supplier_stock_profile(adapter):
     """Source station references, hidden outside the stock drawing view."""
     dims = SketchDims()
-    check("create original stock axis", await adapter.create_sketch("Front"))
-    axis = await add_line_chain(adapter, list(SUPPLIER_STOCK_AXIS_MM), close=False)
-    await anchor_point_to_origin(
+    check("create original stock axis", adapter.create_sketch("Front"))
+    axis = add_line_chain(adapter, list(SUPPLIER_STOCK_AXIS_MM), close=False)
+    anchor_point_to_origin(
         adapter, f"{axis[0]}.start", *SUPPLIER_STOCK_AXIS_MM[0], "original eye crown"
     )
     dims.record(None)
@@ -231,8 +231,8 @@ async def _supplier_stock_profile(adapter):
         segment.ConstructionGeometry = True
         if not bool(segment.ConstructionGeometry):
             raise RuntimeError("original stock axis must remain construction-only")
-        check("vertical original stock axis", await adapter.add_sketch_constraint(entity, None, "vertical"))
-        await dimension_between(
+        check("vertical original stock axis", adapter.add_sketch_constraint(entity, None, "vertical"))
+        dimension_between(
             adapter, f"{entity}.start", f"{entity}.end", "vertical_distance",
             SUPPLIER_STOCK_AXIS_MM[index][1] - SUPPLIER_STOCK_AXIS_MM[index + 1][1],
             "original stock axis segment",
@@ -243,8 +243,8 @@ async def _supplier_stock_profile(adapter):
         ("SupplierStockOverall", f"{axis[0]}.start"),
     ):
         _stock_span(adapter, first, f"{axis[-1]}.end", SUPPLIER_STOCK_MM[name], name, dims)
-    await ensure_fully_defined(adapter, SUPPLIER_STOCK_FEATURE)
-    check("close original stock axis", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, SUPPLIER_STOCK_FEATURE)
+    check("close original stock axis", adapter.exit_sketch())
     name_last_feature(adapter, SUPPLIER_STOCK_FEATURE)
     dims.apply(adapter, SUPPLIER_STOCK_FEATURE)
     mark_dimensions_for_drawing(
@@ -253,14 +253,14 @@ async def _supplier_stock_profile(adapter):
     blank_reference_sketches(adapter, REFERENCE_SKETCHES)
 
 
-async def _supplier_stock(adapter):
+def _supplier_stock(adapter):
     """Recover the original body after material assignment, then restore the cut."""
-    await add_supplier_reference_sketch(
+    add_supplier_reference_sketch(
         adapter,
         (("SupplierThreadMajor", SUPPLIER_THREAD_MAJOR_MM, "horizontal"),),
         starts={"SupplierThreadMajor": SUPPLIER_THREAD_START_MM},
     )
-    await _supplier_stock_profile(adapter)
+    _supplier_stock_profile(adapter)
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     manager = _early_bound(model.ConfigurationManager, "IConfigurationManager")
     original = active_configuration_name(adapter, model)
@@ -293,7 +293,7 @@ async def _supplier_stock(adapter):
             feature = _feature_by_name(adapter, name)
             if feature.SetSuppression2(0, 1, null_variant()) is not True:
                 raise RuntimeError(f"cannot suppress finished {name} in original stock")
-        await force_rebuild(adapter)
+        force_rebuild(adapter)
         for name in FINISHED_FEATURES:
             expected = (name in ("StockDeburr", "StockTrim"),)
             if tuple(_feature_by_name(adapter, name).IsSuppressed2(1, null_variant()) or ()) != expected:
@@ -320,7 +320,7 @@ async def _supplier_stock(adapter):
                 if tuple(feature.IsSuppressed2(1, null_variant()) or ()) != expected:
                     if feature.SetSuppression2(1, 1, null_variant()) is not True:
                         raise RuntimeError(f"cannot restore finished {name}")
-            await force_rebuild(adapter)
+            force_rebuild(adapter)
             for name, expected in original_states.items():
                 state = _feature_by_name(adapter, name).IsSuppressed2(1, null_variant())
                 if tuple(state or ()) != expected:
@@ -336,19 +336,19 @@ async def _supplier_stock(adapter):
     )
 
 
-async def _save_anchor(adapter, part_name, suppressed_features):
+def _save_anchor(adapter, part_name, suppressed_features):
     """Keep the finished simplified derivative separate from original stock."""
     # The stock saver runs after normalized geometry and material assignment.
-    await _supplier_stock(adapter)
+    _supplier_stock(adapter)
     finished = active_configuration_name(adapter, adapter.currentModel)
     if not finished or finished == SUPPLIER_STOCK_CONFIGURATION:
         raise RuntimeError("cannot save spring anchor without its finished configuration")
     parents = (finished,)
-    artefacts = await save_part_and_images(adapter, part_name)
-    await derive_simplified_on_saved_part(
+    artefacts = save_part_and_images(adapter, part_name)
+    derive_simplified_on_saved_part(
         adapter, part_name, suppressed_features, artefacts["part"], parents=parents
     )
-    check(f"reopen saved {part_name}", await adapter.open_model(artefacts["part"]))
+    check(f"reopen saved {part_name}", adapter.open_model(artefacts["part"]))
     assert_saved_configurations_regenerate(adapter, part_name)
     assert_simplified_configurations(
         adapter, part_name, suppressed_features, parents=parents
@@ -359,15 +359,15 @@ async def _save_anchor(adapter, part_name, suppressed_features):
 
 
 @wraps(build_9489T111)
-async def _modified_anchor(adapter, truth=None, **parameters):
-    receipt = await build_9489T111(adapter, truth, **parameters)
-    await _size_deburr(adapter)
+def _modified_anchor(adapter, truth=None, **parameters):
+    receipt = build_9489T111(adapter, truth, **parameters)
+    _size_deburr(adapter)
     _manufacturing_controls(adapter)
     return receipt
 
 
-async def build(adapter) -> dict[str, str]:
-    return await build_stock_fastener(
+def build(adapter) -> dict[str, str]:
+    return build_stock_fastener(
         adapter,
         part_name=PART_NAME,
         components=(

@@ -1363,11 +1363,11 @@ def _assert_outline_unbroken(
     )
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open pinion-arbor source", await adapter.open_model(str(SOURCE)))
+    check("open pinion-arbor source", adapter.open_model(str(SOURCE)))
     read_required_properties(
         adapter.currentModel,
         (
@@ -1632,7 +1632,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     properties = tuple(float(value) for value in sheet.GetProperties2())
     sheet_size = (properties[5], properties[6])
-    outputs = await finalize_drawing(
+    outputs = finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Integral Pinion Arbor Manufacturing Drawing",

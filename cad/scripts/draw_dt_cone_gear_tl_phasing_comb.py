@@ -260,10 +260,10 @@ def _place_point(
         raise RuntimeError(f"{label}: point sits at {here!r}, not {target!r}")
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source phasing comb missing: {SOURCE}")
-    check("open phasing comb", await adapter.open_model(str(SOURCE)))
+    check("open phasing comb", adapter.open_model(str(SOURCE)))
     required = (
         "Number",
         "Material Specification",
@@ -353,7 +353,7 @@ async def build(adapter: Any) -> dict[str, str]:
     drawing.ClearSelection2(True)
     _early_bound(drawing, "IDrawingDoc").EditSheet()
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Cone Tip Gear Phasing Comb Drawing",

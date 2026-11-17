@@ -174,7 +174,7 @@ THROUGH_CUT_DEPTH = 40.0  # mid-plane total (both_directions splits it half per
 _NOTCH_ANGLE_RAY_MM = 20.0
 
 
-async def _add_notch_run_angle(
+def _add_notch_run_angle(
     adapter: Any, run_line: str, vertex: tuple[float, float], dims: SketchDims
 ) -> None:
     """Author the notch run's plan angle as a driven dimension on its sketch.
@@ -197,7 +197,7 @@ async def _add_notch_run_angle(
     try:
         ray = check(
             "add notch angle construction ray",
-            await adapter.add_line(
+            adapter.add_line(
                 vertex[0], vertex[1], vertex[0] + _NOTCH_ANGLE_RAY_MM, vertex[1]
             ),
         )
@@ -211,15 +211,15 @@ async def _add_notch_run_angle(
         )
     check(
         "notch angle ray start -> run corner",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{ray}.start", f"{run_line}.start", "coincident"
         ),
     )
     check(
         "notch angle ray horizontal",
-        await adapter.add_sketch_constraint(ray, None, "horizontal"),
+        adapter.add_sketch_constraint(ray, None, "horizontal"),
     )
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{ray}.start",
         f"{ray}.end",
@@ -270,7 +270,7 @@ if PIVOT_BEARING_RELIEF_DIAMETER / 2.0 >= NORTH_OVERHANG:
     raise AssertionError("pivot relief no longer runs out through the north edge")
 
 
-async def _sketch_pivot_relief(adapter, dims: SketchDims) -> None:
+def _sketch_pivot_relief(adapter, dims: SketchDims) -> None:
     """Top relief: a south half-circle about the pivot plus two lines north.
 
     Sketched on the plate top.  The arc's centre is the pivot, the two lines
@@ -283,13 +283,13 @@ async def _sketch_pivot_relief(adapter, dims: SketchDims) -> None:
     far = -(NORTH_OVERHANG + PIVOT_RELIEF_RUNOUT)  # sketch y -> part -Z
     set_sketch_direct_db(adapter, True)
     arc = check(
-        "pivot relief south arc", await adapter.add_arc(0.0, 0.0, r, 0.0, -r, 0.0)
+        "pivot relief south arc", adapter.add_arc(0.0, 0.0, r, 0.0, -r, 0.0)
     )
-    line_w = check("pivot relief line a", await adapter.add_line(-r, 0.0, -r, far))
-    line_n = check("pivot relief runout", await adapter.add_line(-r, far, r, far))
-    line_e = check("pivot relief line b", await adapter.add_line(r, far, r, 0.0))
+    line_w = check("pivot relief line a", adapter.add_line(-r, 0.0, -r, far))
+    line_n = check("pivot relief runout", adapter.add_line(-r, far, r, far))
+    line_e = check("pivot relief line b", adapter.add_line(r, far, r, 0.0))
     set_sketch_direct_db(adapter, False)
-    await anchor_point_to_origin(adapter, f"{arc}.center", 0.0, 0.0, "pivot relief")
+    anchor_point_to_origin(adapter, f"{arc}.center", 0.0, 0.0, "pivot relief")
     for line, relation in (
         (line_w, "vertical"),
         (line_e, "vertical"),
@@ -297,14 +297,14 @@ async def _sketch_pivot_relief(adapter, dims: SketchDims) -> None:
     ):
         check(
             f"pivot relief {relation} {line}",
-            await adapter.add_sketch_constraint(line, None, relation),
+            adapter.add_sketch_constraint(line, None, relation),
         )
     for junction, e1, e2 in (("a", arc, line_w), ("b", line_e, arc)):
         check(
             f"pivot relief tangent {junction}",
-            await adapter.add_sketch_constraint(e1, e2, "tangent"),
+            adapter.add_sketch_constraint(e1, e2, "tangent"),
         )
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{line_w}.end",
         f"{line_e}.start",
@@ -313,7 +313,7 @@ async def _sketch_pivot_relief(adapter, dims: SketchDims) -> None:
         "pivot relief width",
     )
     dims.record("PivotBearingReliefDia", '"PivotBearingReliefDia"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{line_n}.start",
         "origin",
@@ -365,7 +365,7 @@ def _corner_fillet_area(label: str, r: float) -> float:
     return r * r * (1.0 / math.tan(theta / 2.0) - (math.pi - theta) / 2.0)
 
 
-async def _sketch_tip_dowel(adapter, dims: SketchDims) -> None:
+def _sketch_tip_dowel(adapter, dims: SketchDims) -> None:
     """The tip-block locating dowel's slip ream, on the Top plane.
 
     Rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric sample, PR
@@ -396,15 +396,15 @@ async def _sketch_tip_dowel(adapter, dims: SketchDims) -> None:
             raise RuntimeError("cannot create the tip dowel's hold-down point")
         circle = check(
             "tip dowel ream circle",
-            await adapter.add_circle(centre[0], centre[1], TIP_DOWEL_HOLE_DIA / 2.0),
+            adapter.add_circle(centre[0], centre[1], TIP_DOWEL_HOLE_DIA / 2.0),
         )
     finally:
         sketch_manager.AddToDB = previous
     anchor = adapter._register_sketch_entity("Point", point)
-    await anchor_point_to_origin(adapter, f"{circle}.center", *centre, "tip dowel ream centre")
+    anchor_point_to_origin(adapter, f"{circle}.center", *centre, "tip dowel ream centre")
     dims.record("TipDowelPivotX", '"TipDowelFromHoldDown" - "HoldDownLateral"')
     dims.record("TipDowelRefZ", '"HoldDownOffset"')
-    await anchor_point_to_point(
+    anchor_point_to_point(
         adapter,
         anchor,
         f"{circle}.center",
@@ -415,7 +415,7 @@ async def _sketch_tip_dowel(adapter, dims: SketchDims) -> None:
     dims.record("TipDowelX", '"TipDowelFromHoldDown"')
     check(
         "tip dowel ream diameter",
-        await adapter.add_sketch_dimension(circle, None, "diameter", TIP_DOWEL_HOLE_DIA),
+        adapter.add_sketch_dimension(circle, None, "diameter", TIP_DOWEL_HOLE_DIA),
     )
     dims.record("TipDowelDia", '"TipDowelDia"')
 
@@ -441,7 +441,7 @@ def require_crank_gear_platform_clearance() -> None:
         )
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     require_crank_gear_platform_clearance()
     from solidworks_mcp.adapters.base import (
         CreateAxisParameters,
@@ -449,38 +449,38 @@ async def build(adapter) -> dict[str, str]:
         ExtrusionParameters,
     )
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this
     # is an INCH document and the equation manager reads BARE numbers in
     # document units (an unsuffixed 214 = 214 in).
-    await set_global(adapter, "PlateT", f"{PLATE_T}mm")
-    await set_global(
+    set_global(adapter, "PlateT", f"{PLATE_T}mm")
+    set_global(
         adapter, "PivotBearingReliefDia", f"{PIVOT_BEARING_RELIEF_DIAMETER}mm"
     )
-    await set_global(
+    set_global(
         adapter, "PivotBearingReliefDepth", f"{PIVOT_BEARING_RELIEF_DEPTH}mm"
     )
-    await set_global(adapter, "HalfWidthN", f"{HALF_WIDTH_N}mm")
-    await set_global(adapter, "WestHalfN", f"{WEST_HALF_N}mm")
-    await set_global(adapter, "EastHalfS", f"{EAST_HALF_S}mm")
-    await set_global(adapter, "WestHalfS", f"{WEST_HALF_S}mm")
-    await set_global(adapter, "PlateLen", f"{PLATE_LEN}mm")
-    await set_global(adapter, "NorthOverhang", f"{NORTH_OVERHANG}mm")
-    await set_global(adapter, "SeChamferRun", f"{SE_CHAMFER_RUN}mm")
-    await set_global(adapter, "SeChamferRise", f"{SE_CHAMFER_RISE}mm")
+    set_global(adapter, "HalfWidthN", f"{HALF_WIDTH_N}mm")
+    set_global(adapter, "WestHalfN", f"{WEST_HALF_N}mm")
+    set_global(adapter, "EastHalfS", f"{EAST_HALF_S}mm")
+    set_global(adapter, "WestHalfS", f"{WEST_HALF_S}mm")
+    set_global(adapter, "PlateLen", f"{PLATE_LEN}mm")
+    set_global(adapter, "NorthOverhang", f"{NORTH_OVERHANG}mm")
+    set_global(adapter, "SeChamferRun", f"{SE_CHAMFER_RUN}mm")
+    set_global(adapter, "SeChamferRise", f"{SE_CHAMFER_RISE}mm")
     # The pivot hole remains a native Hole Wizard 1/4 close-clearance feature;
     # its diameter and callout come from the table rather than a model global.
-    await set_global(adapter, "SlotW", f"{SLOT_W}mm")
-    await set_global(adapter, "PostLocalZ", f"{POST_LOCAL_Z}mm")
-    await set_global(adapter, "PostMountX", f"{POST_MOUNT_X}mm")
-    await set_global(adapter, "PostMountDZ", f"{POST_MOUNT_DZ}mm")
-    await set_global(adapter, "HoldDownOffset", f"{-HOLDDOWN_LOCAL_Z}mm")
+    set_global(adapter, "SlotW", f"{SLOT_W}mm")
+    set_global(adapter, "PostLocalZ", f"{POST_LOCAL_Z}mm")
+    set_global(adapter, "PostMountX", f"{POST_MOUNT_X}mm")
+    set_global(adapter, "PostMountDZ", f"{POST_MOUNT_DZ}mm")
+    set_global(adapter, "HoldDownOffset", f"{-HOLDDOWN_LOCAL_Z}mm")
     # Unsigned: the placement point keeps its authored -x side.
-    await set_global(adapter, "HoldDownLateral", f"{abs(HOLDDOWN_LOCAL_X)}mm")
-    await set_global(adapter, "TipDowelFromHoldDown", f"{TIP_DOWEL_FROM_HOLDDOWN}mm")
-    await set_global(adapter, "TipDowelDia", f"{TIP_DOWEL_HOLE_DIA}mm")
+    set_global(adapter, "HoldDownLateral", f"{abs(HOLDDOWN_LOCAL_X)}mm")
+    set_global(adapter, "TipDowelFromHoldDown", f"{TIP_DOWEL_FROM_HOLDDOWN}mm")
+    set_global(adapter, "TipDowelDia", f"{TIP_DOWEL_HOLE_DIA}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -491,7 +491,7 @@ async def build(adapter) -> dict[str, str]:
     # overall length establish the two end edges without chaining feature
     # locations around the profile.
     plate = SketchDims()
-    check("create_sketch plate", await adapter.create_sketch("Top"))
+    check("create_sketch plate", adapter.create_sketch("Top"))
     set_sketch_direct_db(adapter, True)
     plan_pts = [
         (-HALF_WIDTH_N, -NORTH_OVERHANG),  # north-east (anchor)
@@ -500,19 +500,19 @@ async def build(adapter) -> dict[str, str]:
         (WEST_HALF_S, PLATE_LEN - NORTH_OVERHANG),  # south-west (flare)
         (-EAST_HALF_S, PLATE_LEN - NORTH_OVERHANG),  # south-east
     ]
-    lines = await add_line_chain(adapter, plan_pts)
+    lines = add_line_chain(adapter, plan_pts)
     set_sketch_direct_db(adapter, False)
     north_line, _west_line, south_line, _east_line = lines
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{north_line}.start", *plan_pts[0], "plate plan north-east"
     )
     plate.record("NorthEastX", '"HalfWidthN"')
     plate.record("NorthEdgeZ", '"NorthOverhang"')
     check(
         "horizontal plate north edge",
-        await adapter.add_sketch_constraint(north_line, None, "horizontal"),
+        adapter.add_sketch_constraint(north_line, None, "horizontal"),
     )
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{north_line}.end",
         "origin",
@@ -523,9 +523,9 @@ async def build(adapter) -> dict[str, str]:
     plate.record("NorthWestX", '"WestHalfN"')
     check(
         "horizontal plate south edge",
-        await adapter.add_sketch_constraint(south_line, None, "horizontal"),
+        adapter.add_sketch_constraint(south_line, None, "horizontal"),
     )
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{south_line}.start",
         "origin",
@@ -534,7 +534,7 @@ async def build(adapter) -> dict[str, str]:
         "plate plan south-west",
     )
     plate.record("SouthWestX", '"WestHalfS"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{north_line}.start",
         f"{south_line}.start",
@@ -543,7 +543,7 @@ async def build(adapter) -> dict[str, str]:
         "plate overall length",
     )
     plate.record("PlateLenDim", '"PlateLen"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{south_line}.end",
         "origin",
@@ -552,13 +552,13 @@ async def build(adapter) -> dict[str, str]:
         "plate plan south-east",
     )
     plate.record("SouthEastX", '"EastHalfS"')
-    await ensure_fully_defined(adapter, "plate plan")
-    check("exit_sketch plate", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "plate plan")
+    check("exit_sketch plate", adapter.exit_sketch())
     name_last_feature(adapter, "PlateProfile")
     drive_jobs += plate.apply(adapter, "PlateProfile")
     check(
         "extrude plate",
-        await adapter.create_extrusion(ExtrusionParameters(depth=PLATE_T)),
+        adapter.create_extrusion(ExtrusionParameters(depth=PLATE_T)),
     )
     name_last_feature(adapter, "Plate")
     plate_thk_dim = name_dimensions(adapter, "Plate", ["PlateThk"])
@@ -569,7 +569,7 @@ async def build(adapter) -> dict[str, str]:
         * PLATE_LEN
         * PLATE_T
     )
-    volume = await volume_check(adapter, "plate", v_plate, 0.005 * v_plate)
+    volume = volume_check(adapter, "plate", v_plate, 0.005 * v_plate)
 
     # Pivot bore at the origin: native Hole Wizard 1/4 drill-size hole,
     # reamed H7 on the stock shoulder (dt_cone_swing_platform_spec). The band
@@ -585,7 +585,7 @@ async def build(adapter) -> dict[str, str]:
         dia_tolerance_mm=(-PIVOT_HOLE_BAND[1], PIVOT_HOLE_BAND[0]),
     )
     v_hole = math.pi * (pivot_dia / 2.0) ** 2 * PLATE_T
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "pivot hole", volume - v_hole, 0.01 * v_hole
     )
 
@@ -594,7 +594,7 @@ async def build(adapter) -> dict[str, str]:
     # functional acceptance; 0.25 is reference, not an independent depth limit.
     check(
         "create_plane PivotBearingTop",
-        await adapter.create_plane(
+        adapter.create_plane(
             CreatePlaneParameters(mode="offset", base_plane="Top Plane", offset=PLATE_T)
         ),
     )
@@ -602,16 +602,16 @@ async def build(adapter) -> dict[str, str]:
     bearing_relief = SketchDims()
     check(
         "create_sketch pivot bearing relief",
-        await adapter.create_sketch("PivotBearingTop"),
+        adapter.create_sketch("PivotBearingTop"),
     )
-    await _sketch_pivot_relief(adapter, bearing_relief)
-    await ensure_fully_defined(adapter, "pivot bearing relief sketch")
-    check("exit_sketch pivot bearing relief", await adapter.exit_sketch())
+    _sketch_pivot_relief(adapter, bearing_relief)
+    ensure_fully_defined(adapter, "pivot bearing relief sketch")
+    check("exit_sketch pivot bearing relief", adapter.exit_sketch())
     name_last_feature(adapter, "PivotBearingReliefProfile")
     drive_jobs += bearing_relief.apply(adapter, "PivotBearingReliefProfile")
     check(
         "cut pivot bearing relief",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=PIVOT_BEARING_RELIEF_DEPTH)
         ),
     )
@@ -631,7 +631,7 @@ async def build(adapter) -> dict[str, str]:
         )
         * PIVOT_BEARING_RELIEF_DEPTH
     )
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "pivot bearing relief", volume - v_relief, 0.01 * v_relief
     )
 
@@ -666,7 +666,7 @@ async def build(adapter) -> dict[str, str]:
     )
     drive_jobs += post_mount_cut.placement_drive_jobs
     v_post_mounts = 2.0 * math.pi * (POST_MOUNT_TAP_DIA / 2.0) ** 2 * PLATE_T
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "v2 post mount taps", volume - v_post_mounts, 0.01 * v_post_mounts
     )
 
@@ -693,7 +693,7 @@ async def build(adapter) -> dict[str, str]:
         * ((HOLDDOWN_CBORE_DIA / 2.0) ** 2 - (HOLDDOWN_CLEARANCE_DIA / 2.0) ** 2)
         * HOLDDOWN_CBORE_DEPTH
     )
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "tip-block hold-down hole", volume - v_holddown, 0.01 * v_holddown
     )
 
@@ -703,21 +703,21 @@ async def build(adapter) -> dict[str, str]:
     # at its nominal station, as the lift rod's pin hole is.  Through both
     # ways from the Top plane like the notch cap.
     tip_dowel = SketchDims()
-    check("create_sketch tip dowel", await adapter.create_sketch("Top"))
-    await _sketch_tip_dowel(adapter, tip_dowel)
-    await ensure_fully_defined(adapter, "tip dowel sketch")
-    check("exit_sketch tip dowel", await adapter.exit_sketch())
+    check("create_sketch tip dowel", adapter.create_sketch("Top"))
+    _sketch_tip_dowel(adapter, tip_dowel)
+    ensure_fully_defined(adapter, "tip dowel sketch")
+    check("exit_sketch tip dowel", adapter.exit_sketch())
     name_last_feature(adapter, "TipDowelProfile")
     drive_jobs += tip_dowel.apply(adapter, "TipDowelProfile")
     check(
         "cut tip dowel ream",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
         ),
     )
     name_last_feature(adapter, "TipDowelHole")
     v_tip_dowel = math.pi * (TIP_DOWEL_HOLE_DIA / 2.0) ** 2 * PLATE_T
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "tip-block locating dowel ream", volume - v_tip_dowel, 0.02 * v_tip_dowel
     )
 
@@ -731,7 +731,7 @@ async def build(adapter) -> dict[str, str]:
     _e = (SLOT_E_X, -SLOT_E_Z)
     _out = (SLOT_OUT_X, -SLOT_OUT_Z)
     slot = SketchDims()
-    check("create_sketch lock notch", await adapter.create_sketch("Top"))
+    check("create_sketch lock notch", adapter.create_sketch("Top"))
     set_sketch_direct_db(adapter, True)
     slot_pts = [
         (_e[0] + _nx, _e[1] + _ny),
@@ -739,9 +739,9 @@ async def build(adapter) -> dict[str, str]:
         (_out[0] - _nx, _out[1] - _ny),
         (_e[0] - _nx, _e[1] - _ny),
     ]
-    slot_lines = await add_line_chain(adapter, slot_pts)
+    slot_lines = add_line_chain(adapter, slot_pts)
     set_sketch_direct_db(adapter, False)
-    await define_polygon_chain(
+    define_polygon_chain(
         adapter,
         slot_lines,
         slot_pts,
@@ -764,14 +764,14 @@ async def build(adapter) -> dict[str, str]:
     # follows, tangent to the swing arc about the pivot).  A construction ray
     # from the run's closed-end corner gives that angle a second line; the
     # angle itself is DRIVEN, so it reports the chord and can never bend it.
-    await _add_notch_run_angle(adapter, slot_lines[0], slot_pts[0], slot)
-    await ensure_fully_defined(adapter, "lock notch sketch")
-    check("exit_sketch lock notch", await adapter.exit_sketch())
+    _add_notch_run_angle(adapter, slot_lines[0], slot_pts[0], slot)
+    ensure_fully_defined(adapter, "lock notch sketch")
+    check("exit_sketch lock notch", adapter.exit_sketch())
     name_last_feature(adapter, "LockNotchProfile")
     drive_jobs += slot.apply(adapter, "LockNotchProfile")
     check(
         "cut lock notch",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
         ),
     )
@@ -780,15 +780,15 @@ async def build(adapter) -> dict[str, str]:
     # The moved notch exits almost tangent to the east taper; SolidWorks' tiny
     # open-edge cut carries about 0.4 mm^3 of B-rep tessellation noise, larger
     # than one percent of this unusually small 6.3 mm^3 removal.
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "lock notch", volume - v_slot, max(0.01 * v_slot, 0.5)
     )
 
     # Closed-end cap at the engaged seat (the mouth end is open -- no W cap).
     v_cap = math.pi * (SLOT_W / 2.0) ** 2 / 2.0 * PLATE_T
     cap = SketchDims()
-    check("create_sketch notch cap E", await adapter.create_sketch("Top"))
-    await define_circle(
+    check("create_sketch notch cap E", adapter.create_sketch("Top"))
+    define_circle(
         adapter,
         _e[0],
         _e[1],
@@ -798,28 +798,28 @@ async def build(adapter) -> dict[str, str]:
         names=("CapECx", "CapECz", "CapEDia"),
         drives=(None, None, '"SlotW"'),
     )
-    await ensure_fully_defined(adapter, "notch cap E sketch")
-    check("exit_sketch notch cap E", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "notch cap E sketch")
+    check("exit_sketch notch cap E", adapter.exit_sketch())
     name_last_feature(adapter, "LockNotchCapEProfile")
     drive_jobs += cap.apply(adapter, "LockNotchCapEProfile")
     check(
         "cut notch cap E",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
         ),
     )
     name_last_feature(adapter, "LockNotchCapE")
-    volume = await volume_check(adapter, "notch cap E", volume - v_cap, 0.02 * v_cap)
+    volume = volume_check(adapter, "notch cap E", volume - v_cap, 0.02 * v_cap)
 
     # Vertical swing axis through the pivot hole -- Axis1 ("swing pivot").
-    swing_axis = await name_bore_axis(
+    swing_axis = name_bore_axis(
         adapter, "Front Plane", 0.0, "Right Plane", 0.0, "swing pivot"
     )
 
     # Crank-axis construction (see the constants block): a vertical anchor
     # AXIS through CRANK_SEAT_ANCHOR (name-selected pivot, view-independent),
     # then the two angled planes rotated about it.
-    anchor_axis = await name_bore_axis(
+    anchor_axis = name_bore_axis(
         adapter,
         "Front Plane",
         CRANK_SEAT_ANCHOR[1],
@@ -829,7 +829,7 @@ async def build(adapter) -> dict[str, str]:
     )
     check(
         "create_plane CrankAxisVert (angled about the anchor axis)",
-        await adapter.create_plane(
+        adapter.create_plane(
             CreatePlaneParameters(
                 mode="angle",
                 base_plane="Right Plane",
@@ -841,7 +841,7 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "CrankAxisVert")
     check(
         "create_plane CrankAxisHigh (Top + crank height)",
-        await adapter.create_plane(
+        adapter.create_plane(
             CreatePlaneParameters(
                 mode="offset",
                 base_plane="Top Plane",
@@ -856,7 +856,7 @@ async def build(adapter) -> dict[str, str]:
     # plate instead of a world datum.
     check(
         "create_plane CrankAxisSeat (angled, perpendicular to the axis)",
-        await adapter.create_plane(
+        adapter.create_plane(
             CreatePlaneParameters(
                 mode="angle",
                 base_plane="Front Plane",
@@ -869,7 +869,7 @@ async def build(adapter) -> dict[str, str]:
     # Crank axis: the machine-z crank line, in plate coordinates.
     check(
         "create_axis crank axis",
-        await adapter.create_axis(
+        adapter.create_axis(
             CreateAxisParameters(
                 mode="two_planes",
                 planes=["CrankAxisVert", "CrankAxisHigh"],
@@ -884,14 +884,14 @@ async def build(adapter) -> dict[str, str]:
         ("post mount west", POST_MOUNT_WEST_XZ),
         ("post mount east", POST_MOUNT_EAST_XZ),
     ):
-        await name_bore_axis(
+        name_bore_axis(
             adapter, "Front Plane", mount_z, "Right Plane", mount_x, axis_name
         )
         name_last_feature(adapter, axis_name)
     # The tip-block locating dowel's axis: the assembly mates MHA-DT-VN-69
     # on it (rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00 rubric
     # sample, PR #2248)).
-    await name_bore_axis(
+    name_bore_axis(
         adapter,
         "Front Plane",
         TIP_DOWEL_LOCAL_Z,
@@ -912,16 +912,16 @@ async def build(adapter) -> dict[str, str]:
     if SE_CHAMFER_SOUTH_XZ[0] <= 0.0:
         raise AssertionError("the chamfer's start no longer stands west of the pivot axis")
     chamfer = SketchDims()
-    check("create_sketch south-east chamfer", await adapter.create_sketch("Top"))
+    check("create_sketch south-east chamfer", adapter.create_sketch("Top"))
     set_sketch_direct_db(adapter, True)
     chamfer_pts = [
         (-EAST_HALF_S, PLATE_LEN - NORTH_OVERHANG),
         (SE_CHAMFER_SOUTH_XZ[0], -SE_CHAMFER_SOUTH_XZ[1]),
         (SE_CHAMFER_EAST_XZ[0], -SE_CHAMFER_EAST_XZ[1]),
     ]
-    chamfer_lines = await add_line_chain(adapter, chamfer_pts)
+    chamfer_lines = add_line_chain(adapter, chamfer_pts)
     set_sketch_direct_db(adapter, False)
-    await define_polygon_chain(
+    define_polygon_chain(
         adapter,
         chamfer_lines,
         chamfer_pts,
@@ -945,19 +945,19 @@ async def build(adapter) -> dict[str, str]:
             '"SeChamferRise"',
         ],
     )
-    await ensure_fully_defined(adapter, "south-east chamfer sketch")
-    check("exit_sketch south-east chamfer", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "south-east chamfer sketch")
+    check("exit_sketch south-east chamfer", adapter.exit_sketch())
     name_last_feature(adapter, "CornerSEProfile")
     drive_jobs += chamfer.apply(adapter, "CornerSEProfile")
     check(
         "cut south-east chamfer",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
         ),
     )
     name_last_feature(adapter, "CornerSE")
     v_chamfer = SE_CHAMFER_RUN * SE_CHAMFER_RISE / 2.0 * PLATE_T
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "south-east chamfer", volume - v_chamfer, 0.01 * v_chamfer
     )
 
@@ -967,23 +967,23 @@ async def build(adapter) -> dict[str, str]:
     for lbl, cx_a, cz_l, r in ROUNDED_CORNERS:
         check(
             f"fillet corner {lbl}",
-            await adapter.add_fillet(r, [[cx_a, PLATE_T / 2.0, cz_l]]),
+            adapter.add_fillet(r, [[cx_a, PLATE_T / 2.0, cz_l]]),
         )
         name_last_feature(adapter, f"Corner{lbl}")
         name_dimensions(adapter, f"Corner{lbl}", [f"Corner{lbl}R"])
         v_fillets += _corner_fillet_area(lbl, r) * PLATE_T
         v_fillets -= _north_fillet_relief_overlap(lbl, r) * PIVOT_BEARING_RELIEF_DEPTH
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "rounded corners", volume - v_fillets, 0.01 * v_fillets
     )
 
     # Apply the deferred drive equations after the model + a rebuild exist, then
     # re-check: every equation evaluates to the value just built, so geometry
     # must not move.
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
     # Decimal places for imported model dimensions live on the PART.  The
     # Hole Wizard owns the pivot-hole precision and native size callout.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
@@ -1016,7 +1016,7 @@ async def build(adapter) -> dict[str, str]:
         places=DRAWING_PRECISION["TipDowelProfile"]["TipDowelDia"],
         display_unit=UNIT,
     )
-    await volume_check(
+    volume_check(
         adapter, "driven platform (equations neutral)", volume, 0.01 * v_hole
     )
 
@@ -1025,15 +1025,15 @@ async def build(adapter) -> dict[str, str]:
     # riders' height mates are flip-free and face-pick-free.
     check(
         "create_plane PlateTop (Top Plane, +PLATE_T)",
-        await adapter.create_plane(
+        adapter.create_plane(
             CreatePlaneParameters(mode="offset", base_plane="Top Plane", offset=PLATE_T)
         ),
     )
     name_last_feature(adapter, "PlateTop")
 
-    await apply_material(adapter, MATERIAL)
-    await apply_color(adapter, PANEL_BLACK)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    apply_color(adapter, PANEL_BLACK)
+    report_mass_properties(adapter)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
@@ -1076,7 +1076,7 @@ async def build(adapter) -> dict[str, str]:
             ("tip dowel axis", "AXIS"),
         ),
     )
-    return await save_part_and_images(adapter, PART_NAME)
+    return save_part_and_images(adapter, PART_NAME)
 
 
 if __name__ == "__main__":

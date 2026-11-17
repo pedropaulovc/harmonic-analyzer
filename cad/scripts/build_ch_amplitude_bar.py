@@ -102,10 +102,10 @@ TOP_PIN_DROP = 0.25 * IN  # 6.35  DIMENSIONS.md ch15: hole centre below bar top 
 THROUGH_CUT_DEPTH = 20.0  # mid-plane total; > the bar width
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     # #290: the row's inch calculation units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
@@ -115,21 +115,21 @@ async def build(adapter) -> dict[str, str]:
     # BARE numbers in document units (an unsuffixed 812.8 = 812.8 in, 25.4x
     # too big). Each end's NotchOffset is derived (the notches are centred on
     # the width), so it tracks BarWidth and its own notch width.
-    await set_global(adapter, "BarLength", f"{BAR_LENGTH}mm")
-    await set_global(adapter, "BarWidth", f"{BAR_WIDTH}mm")
-    await set_global(adapter, "BarDepth", f"{BAR_DEPTH}mm")
-    await set_global(adapter, "BottomNotchWidth", f"{BOTTOM_NOTCH_WIDTH}mm")
-    await set_global(adapter, "BottomNotchHeight", f"{BOTTOM_NOTCH_HEIGHT}mm")
-    await set_global(adapter, "TopNotchWidth", f"{TOP_NOTCH_WIDTH}mm")
-    await set_global(adapter, "TopNotchHeight", f"{TOP_NOTCH_HEIGHT}mm")
+    set_global(adapter, "BarLength", f"{BAR_LENGTH}mm")
+    set_global(adapter, "BarWidth", f"{BAR_WIDTH}mm")
+    set_global(adapter, "BarDepth", f"{BAR_DEPTH}mm")
+    set_global(adapter, "BottomNotchWidth", f"{BOTTOM_NOTCH_WIDTH}mm")
+    set_global(adapter, "BottomNotchHeight", f"{BOTTOM_NOTCH_HEIGHT}mm")
+    set_global(adapter, "TopNotchWidth", f"{TOP_NOTCH_WIDTH}mm")
+    set_global(adapter, "TopNotchHeight", f"{TOP_NOTCH_HEIGHT}mm")
     # TopPinDrop stays a live knob: the top-pin bore AXIS drive references it
     # ('"BarLength" - "TopPinDrop"'). TopPinDia is the reamed press hole.
-    await set_global(adapter, "TopPinDrop", f"{TOP_PIN_DROP}mm")
-    await set_global(adapter, "TopPinDia", f"{TOP_PIN_HOLE_DIA}mm")
-    await set_global(
+    set_global(adapter, "TopPinDrop", f"{TOP_PIN_DROP}mm")
+    set_global(adapter, "TopPinDia", f"{TOP_PIN_HOLE_DIA}mm")
+    set_global(
         adapter, "BottomNotchOffset", '("BarWidth" - "BottomNotchWidth") / 2'
     )
-    await set_global(adapter, "TopNotchOffset", '("BarWidth" - "TopNotchWidth") / 2')
+    set_global(adapter, "TopNotchOffset", '("BarWidth" - "TopNotchWidth") / 2')
 
     # Each sketch's dim names + drive equations are recorded inline as the dims
     # are created (a per-sketch SketchDims), then renamed immediately; the drive
@@ -138,7 +138,7 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs: list[tuple[str, str]] = []
 
     profile = SketchDims()
-    check("create_sketch profile", await adapter.create_sketch("Front"))
+    check("create_sketch profile", adapter.create_sketch("Front"))
 
     # Clockwise from the origin at the bottom-left corner.
     points = [
@@ -155,14 +155,14 @@ async def build(adapter) -> dict[str, str]:
         (BAR_WIDTH - TOP_NOTCH_OFFSET - TOP_NOTCH_WIDTH, BAR_LENGTH),
         (0.0, BAR_LENGTH),
     ]
-    lines = await add_line_chain(adapter, points)
+    lines = add_line_chain(adapter, points)
 
     horizontal = lines[0::2]  # even-index segments run along X
     vertical = lines[1::2]  # odd-index segments run along Y
     for ent in horizontal:
-        check("constraint horizontal", await adapter.add_sketch_constraint(ent, None, "horizontal"))
+        check("constraint horizontal", adapter.add_sketch_constraint(ent, None, "horizontal"))
     for ent in vertical:
-        check("constraint vertical", await adapter.add_sketch_constraint(ent, None, "vertical"))
+        check("constraint vertical", adapter.add_sketch_constraint(ent, None, "vertical"))
 
     # Ten driving dimensions; the last horizontal + closing vertical segment
     # lengths follow from profile closure. Each is recorded into ``profile`` in
@@ -187,7 +187,7 @@ async def build(adapter) -> dict[str, str]:
     for ent, value, label, name, drive in dims:
         check(
             f"dimension {label} = {value:g}",
-            await adapter.add_sketch_dimension(ent, None, "linear", value),
+            adapter.add_sketch_dimension(ent, None, "linear", value),
         )
         profile.record(name, drive)
 
@@ -196,10 +196,10 @@ async def build(adapter) -> dict[str, str]:
     # single anchor completes the 24-DOF profile.
     check(
         "anchor profile corner",
-        await adapter.add_sketch_constraint(f"{lines[0]}.start", "origin", "coincident"),
+        adapter.add_sketch_constraint(f"{lines[0]}.start", "origin", "coincident"),
     )
-    await ensure_fully_defined(adapter, "bar profile")
-    check("exit_sketch profile", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "bar profile")
+    check("exit_sketch profile", adapter.exit_sketch())
     # Name + record-rename the profile BEFORE the extrude absorbs it (an
     # absorbed sketch drops off the top-level tree the namer walks). The anchor
     # is a coincident RELATION, not a display dim, so it is not recorded -- the
@@ -208,7 +208,7 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += profile.apply(adapter, "BarProfile")
     check(
         "extrude bar",
-        await adapter.create_extrusion(ExtrusionParameters(depth=BAR_DEPTH)),
+        adapter.create_extrusion(ExtrusionParameters(depth=BAR_DEPTH)),
     )
     name_last_feature(adapter, "Bar")
     # Drive the bar's extrude depth from BarDepth too (D1 is the blind-extrude
@@ -220,7 +220,7 @@ async def build(adapter) -> dict[str, str]:
 
     # Reamed press hole through the top-slot cheeks. The removed volume is
     # asserted against both cheeks so a misplaced hole fails loud.
-    res = await adapter.get_mass_properties()
+    res = adapter.get_mass_properties()
     vol_before = res.data.volume
     _telemetry.info(f"volume before top pin hole: {vol_before:.1f} mm^3")
     pin_y = BAR_LENGTH - TOP_PIN_DROP
@@ -235,28 +235,28 @@ async def build(adapter) -> dict[str, str]:
     # Both entities go in direct to the sketch DB (no inference relation onto
     # the bar's own edges); every relation below is explicit.
     pin_hole = SketchDims()
-    check("create_sketch top pin hole", await adapter.create_sketch("Right"))
+    check("create_sketch top pin hole", adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
     try:
         top_edge = check(
             "top edge construction line",
-            await adapter.add_centerline(0.0, BAR_LENGTH, -BAR_DEPTH, BAR_LENGTH),
+            adapter.add_centerline(0.0, BAR_LENGTH, -BAR_DEPTH, BAR_LENGTH),
         )
         circle = check(
             "add_circle top pin hole",
-            await adapter.add_circle(-BAR_DEPTH / 2.0, pin_y, TOP_PIN_HOLE_DIA / 2.0),
+            adapter.add_circle(-BAR_DEPTH / 2.0, pin_y, TOP_PIN_HOLE_DIA / 2.0),
         )
     finally:
         set_sketch_direct_db(adapter, False)
     check(
         "top edge horizontal",
-        await adapter.add_sketch_constraint(top_edge, None, "horizontal"),
+        adapter.add_sketch_constraint(top_edge, None, "horizontal"),
     )
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{top_edge}.start", 0.0, BAR_LENGTH, "top edge back end"
     )
     pin_hole.record("TopEdgeY", '"BarLength"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{top_edge}.start",
         f"{top_edge}.end",
@@ -265,7 +265,7 @@ async def build(adapter) -> dict[str, str]:
         "bar section",
     )
     pin_hole.record("BarSection", '"BarDepth"')
-    await anchor_point_to_point(
+    anchor_point_to_point(
         adapter,
         f"{top_edge}.start",
         f"{circle}.center",
@@ -277,21 +277,21 @@ async def build(adapter) -> dict[str, str]:
     pin_hole.record("TopPinDrop", '"TopPinDrop"')
     check(
         "dimension top pin hole diameter",
-        await adapter.add_sketch_dimension(circle, None, "diameter", TOP_PIN_HOLE_DIA),
+        adapter.add_sketch_dimension(circle, None, "diameter", TOP_PIN_HOLE_DIA),
     )
     pin_hole.record("TopPinDia", '"TopPinDia"')
-    await ensure_fully_defined(adapter, "top pin hole sketch")
-    check("exit_sketch top pin hole", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "top pin hole sketch")
+    check("exit_sketch top pin hole", adapter.exit_sketch())
     name_last_feature(adapter, "TopPinProfile")
     drive_jobs += pin_hole.apply(adapter, "TopPinProfile")
     check(
         "cut top pin hole",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
         ),
     )
     name_last_feature(adapter, "TopPinHole")
-    res = await adapter.get_mass_properties()
+    res = adapter.get_mass_properties()
     removed = vol_before - res.data.volume
     if abs(removed - expected_removed) >= 2.0:
         raise RuntimeError(
@@ -313,12 +313,12 @@ async def build(adapter) -> dict[str, str]:
     # in lockstep. pin_y = BarLength - TopPinDrop; mid-depth = BarDepth / 2. The
     # foot axis sits on the Top plane (offset 0, no dim to drive). Each equation
     # equals the as-built offset, so the placement stays neutral.
-    await name_bore_axis(
+    name_bore_axis(
         adapter, "Top Plane", pin_y, "Front Plane", BAR_DEPTH / 2.0, "top pin bore",
         drive_a='"BarLength" - "TopPinDrop"', drive_b='"BarDepth" / 2',
         drive_jobs=drive_jobs,
     )
-    await name_bore_axis(
+    name_bore_axis(
         adapter, "Top Plane", 0.0, "Front Plane", BAR_DEPTH / 2.0, "foot axis",
         drive_b='"BarDepth" / 2', drive_jobs=drive_jobs,
     )
@@ -338,7 +338,7 @@ async def build(adapter) -> dict[str, str]:
 
     mid_plane = check(
         f"plane mid-width (Right + {BAR_WIDTH / 2.0:g})",
-        await adapter.create_plane(
+        adapter.create_plane(
             CreatePlaneParameters(
                 mode="offset", base_plane="Right Plane", offset=BAR_WIDTH / 2.0
             )
@@ -346,7 +346,7 @@ async def build(adapter) -> dict[str, str]:
     ).name
     check(
         "rename mid-width plane -> MidWidth",
-        await adapter.rename_feature(
+        adapter.rename_feature(
             RenameFeatureParameters(old_name=mid_plane, new_name="MidWidth")
         ),
     )
@@ -358,31 +358,31 @@ async def build(adapter) -> dict[str, str]:
     # Each equation evaluates to the value just built, so the geometry must not
     # move; the volume re-check is the neutrality proof (vol_final is the
     # post-cut volume read back above).
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    volume_check(
         adapter, "driven amplitude bar (equations neutral)", vol_final, 0.005 * vol_final
     )
 
-    await apply_material(adapter, MATERIAL)
-    await apply_color(adapter, BAR_STEEL)  # ch30 plates: see _appearance palette
+    apply_material(adapter, MATERIAL)
+    apply_color(adapter, BAR_STEEL)  # ch30 plates: see _appearance palette
 
     # Verify the two book-sourced dims on the built solid (ch. 15).
-    await bbox_extent_check(adapter, "bar width (annotated 6.35)", "x", BAR_WIDTH)
+    bbox_extent_check(adapter, "bar width (annotated 6.35)", "x", BAR_WIDTH)
     # A point-picked long edge is view-dependent: the back silhouette is hidden
     # in some SolidWorks sessions and selection then fails before measurement.
     # The end notches do not change the Y extent, so the bounding box is the
     # direct, view-independent proof of the book-sourced overall length.
-    await bbox_extent_check(
+    bbox_extent_check(
         adapter,
         "bar length (32 in less the keeper drop = 808.2932)",
         "y",
         BAR_LENGTH,
     )
 
-    await report_mass_properties(adapter)
+    report_mass_properties(adapter)
 
     # Manufacturing drawing support: the foot notch may only come out shallow
     # (ch_amplitude_bar_spec.BOTTOM_NOTCH_DEPTH_BAND), natively on its depth;
@@ -443,7 +443,7 @@ async def build(adapter) -> dict[str, str]:
     # The foot notch floor's roughness lives on the MODEL as a plain annotation.
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES})
-    artefacts = await save_part_and_images(adapter, PART_NAME)
+    artefacts = save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(
         adapter,
         ("Number", "Material Specification", "Finish", "Quantity", "Manufacturing Notes"),

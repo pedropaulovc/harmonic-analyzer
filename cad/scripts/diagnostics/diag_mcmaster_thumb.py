@@ -43,7 +43,7 @@ from diagnostics.diag_mcmaster_lib import (  # noqa: E402
 
 
 
-async def build_thumb_screw(adapter, s: dict[str, float]):
+def build_thumb_screw(adapter, s: dict[str, float]):
     from _com import _early_bound, _read_member  # noqa: E402 -- diagnostic path bootstrap
     from _sketch import add_line_chain  # noqa: E402 -- diagnostic path bootstrap
     from diagnostics.diag_mcmaster_lib import (combine_union, mass_properties,
@@ -68,65 +68,65 @@ async def build_thumb_screw(adapter, s: dict[str, float]):
     knurl_d = head_h / 40.0
 
     # --- shank with tip chamfer (vendor Extrude1 + Chamfer1) ----------------
-    check("create_sketch shank", await adapter.create_sketch("Front"))
+    check("create_sketch shank", adapter.create_sketch("Front"))
     sk = adapter.currentSketchManager
     with no_sketch_inference(adapter):
         if sk.CreateCenterLine(0.0, 0.0, 0.0, 0.0, tip_y / 1000.0, 0.0) is None:
             raise RuntimeError("thumb shank: CreateCenterLine failed")
-        await add_line_chain(adapter, [
+        add_line_chain(adapter, [
             (0.0, 0.0),
             (major_r, 0.0),
             (major_r, tip_y + tip_ch),
             (major_r - tip_ch, tip_y),
             (0.0, tip_y),
         ])
-    check("exit_sketch shank", await adapter.exit_sketch())
+    check("exit_sketch shank", adapter.exit_sketch())
     name_last_feature(adapter, "ShankProfile")
-    check("revolve shank", await adapter.create_revolve(
+    check("revolve shank", adapter.create_revolve(
         RevolveParameters(angle=360.0, is_cut=False)))
     name_last_feature(adapter, "Shank")
     v_shank = (math.pi * major_r ** 2 * (length - tip_ch)
                + _rev_frustum(tip_ch, major_r, major_r - tip_ch))
-    await volume_check(adapter, "shank revolve", v_shank, 0.005 * v_shank)
+    volume_check(adapter, "shank revolve", v_shank, 0.005 * v_shank)
 
     # --- collar + head bosses ----------------------------------------------
-    check("create_sketch collar", await adapter.create_sketch("Top"))
+    check("create_sketch collar", adapter.create_sketch("Top"))
     with no_sketch_inference(adapter):
         if adapter.currentSketchManager.CreateCircleByRadius(
                 0.0, 0.0, 0.0, collar_r / 1000.0) is None:
             raise RuntimeError("collar circle failed")
-    check("exit_sketch collar", await adapter.exit_sketch())
+    check("exit_sketch collar", adapter.exit_sketch())
     name_last_feature(adapter, "CollarProfile")
-    check("collar boss", await adapter.create_extrusion(ExtrusionParameters(
+    check("collar boss", adapter.create_extrusion(ExtrusionParameters(
         depth=collar_h)))
     name_last_feature(adapter, "Collar")
     v_collar = math.pi * collar_r ** 2 * collar_h
-    await volume_check(adapter, "collar boss",
+    volume_check(adapter, "collar boss",
                        v_shank + v_collar, 0.005 * v_collar)
 
     offset_plane(adapter, "HeadBasePlane", collar_h)
-    check("create_sketch head", await adapter.create_sketch("HeadBasePlane"))
+    check("create_sketch head", adapter.create_sketch("HeadBasePlane"))
     with no_sketch_inference(adapter):
         if adapter.currentSketchManager.CreateCircleByRadius(
                 0.0, 0.0, 0.0, head_r / 1000.0) is None:
             raise RuntimeError("head circle failed")
-    check("exit_sketch head", await adapter.exit_sketch())
+    check("exit_sketch head", adapter.exit_sketch())
     name_last_feature(adapter, "HeadProfile")
-    check("head boss", await adapter.create_extrusion(ExtrusionParameters(
+    check("head boss", adapter.create_extrusion(ExtrusionParameters(
         depth=head_h)))
     name_last_feature(adapter, "Head")
     v_head = math.pi * head_r ** 2 * head_h
-    await volume_check(adapter, "head boss",
+    volume_check(adapter, "head boss",
                        v_shank + v_collar + v_head, 0.005 * v_head)
 
     # --- Chamfer2 (three rims, HH/10 x 45deg) then Fillet1 ------------------
-    check("chamfer2", await adapter.add_chamfer(ch2, [
+    check("chamfer2", adapter.add_chamfer(ch2, [
         [head_r, head_top, 0.0],       # head top rim
         [head_r, collar_h, 0.0],       # head bottom rim
         [collar_r, 0.0, 0.0],          # collar bottom rim
     ]))
     name_last_feature(adapter, "RimChamfers")
-    check("fillet1", await adapter.add_fillet(
+    check("fillet1", adapter.add_fillet(
         fil, [[collar_r, collar_h, 0.0]]))
     name_last_feature(adapter, "CollarFillet")
 
@@ -142,7 +142,7 @@ async def build_thumb_screw(adapter, s: dict[str, float]):
     _telemetry.info(f"shank body: {shank_name}")
 
     offset_plane(adapter, "TipPlane", tip_y)
-    check("create_sketch helix seed", await adapter.create_sketch("TipPlane"))
+    check("create_sketch helix seed", adapter.create_sketch("TipPlane"))
     with no_sketch_inference(adapter):
         if adapter.currentSketchManager.CreateCircleByRadius(
                 0.0, 0.0, 0.0, major_r / 1000.0) is None:
@@ -153,15 +153,15 @@ async def build_thumb_screw(adapter, s: dict[str, float]):
 
     cy = tip_y - 7.0 * pitch / 16.0
     top_r = major_r + h_sharp / 16.0
-    check("create_sketch cutter", await adapter.create_sketch("Front"))
+    check("create_sketch cutter", adapter.create_sketch("Front"))
     with no_sketch_inference(adapter):
-        await add_line_chain(adapter, [
+        add_line_chain(adapter, [
             (top_r, cy + 15.0 * pitch / 32.0),
             (root_r, cy + pitch / 16.0),
             (root_r, cy - pitch / 16.0),
             (top_r, cy - 15.0 * pitch / 32.0),
         ])
-    check("exit_sketch cutter", await adapter.exit_sketch())
+    check("exit_sketch cutter", adapter.exit_sketch())
     name_last_feature(adapter, "ThreadCutter")
     thread_sweep_cut(adapter, "ThreadCutter", "ThreadHelix", shank_name,
                      "ThreadGroove", tangency=(0, 0))
@@ -172,7 +172,7 @@ async def build_thumb_screw(adapter, s: dict[str, float]):
     # --- crossed knurl ------------------------------------------------------
     offset_plane(adapter, "KnurlTopPlane", head_top)
     check("create_sketch knurl helix seed",
-          await adapter.create_sketch("KnurlTopPlane"))
+          adapter.create_sketch("KnurlTopPlane"))
     with no_sketch_inference(adapter):
         if adapter.currentSketchManager.CreateCircleByRadius(
                 0.0, 0.0, 0.0, head_r / 1000.0) is None:
@@ -185,14 +185,14 @@ async def build_thumb_screw(adapter, s: dict[str, float]):
     # meridian the Front mirror plane contains, so the mirrored groove's
     # crossings land on the pattern grid exactly as the vendor's do).
     check("create_sketch knurl cutter",
-          await adapter.create_sketch("KnurlTopPlane"))
+          adapter.create_sketch("KnurlTopPlane"))
     with no_sketch_inference(adapter):
-        await add_line_chain(adapter, [
+        add_line_chain(adapter, [
             (head_r, knurl_w),
             (head_r - knurl_d, 0.0),
             (head_r, -knurl_w),
         ])
-    check("exit_sketch knurl cutter", await adapter.exit_sketch())
+    check("exit_sketch knurl cutter", adapter.exit_sketch())
     name_last_feature(adapter, "KnurlCutter")
     merged = bodies(adapter)
     if len(merged) != 1:
@@ -201,14 +201,14 @@ async def build_thumb_screw(adapter, s: dict[str, float]):
     thread_sweep_cut(adapter, "KnurlCutter", "KnurlHelix", merged_name,
                      "KnurlGroove", tangency=(0, 0))
 
-    check("knurl mirror", await adapter.mirror_feature(MirrorFeatureParameters(
+    check("knurl mirror", adapter.mirror_feature(MirrorFeatureParameters(
         plane="Front Plane", features=["KnurlGroove"])))
     name_last_feature(adapter, "KnurlMirror")
 
-    check("pattern axis", await adapter.create_axis(CreateAxisParameters(
+    check("pattern axis", adapter.create_axis(CreateAxisParameters(
         mode="two_planes", planes=["Front Plane", "Right Plane"])))
     name_last_feature(adapter, "PatternAxis")
-    check("knurl pattern", await adapter.circular_pattern_feature(
+    check("knurl pattern", adapter.circular_pattern_feature(
         CircularPatternParameters(
             axis_name="PatternAxis",
             features=["KnurlGroove", "KnurlMirror"],

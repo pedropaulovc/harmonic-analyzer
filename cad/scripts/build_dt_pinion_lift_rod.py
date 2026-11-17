@@ -142,7 +142,7 @@ def _delete_feature(adapter: Any, name: str, kind: str) -> None:
     model.ClearSelection2(True)
 
 
-async def _angled_plane_containing(
+def _angled_plane_containing(
     adapter: Any,
     name: str,
     *,
@@ -160,7 +160,7 @@ async def _angled_plane_containing(
     for attempt, signed in enumerate((angle_deg, -angle_deg)):
         check(
             f"create_plane {name} ({signed:+.4f} deg about {pivot_axis})",
-            await adapter.create_plane(
+            adapter.create_plane(
                 CreatePlaneParameters(
                     mode="angle",
                     base_plane=base_plane,
@@ -256,7 +256,7 @@ def _as_construction(adapter: Any, entity_id: str) -> None:
         raise RuntimeError(f"{entity_id} did not take the construction flag")
 
 
-async def _flats(adapter: Any, rod_axis: str) -> list[tuple[str, str]]:
+def _flats(adapter: Any, rod_axis: str) -> list[tuple[str, str]]:
     """The two set-screw flats: one mid-plane cut from two rectangles on
     FLAT_PLANE, each from the flat (FLAT_HEIGHT along the normal) out past the
     O.D. -- build_ch_fulcrum_shaft's ``_flats`` on a plane turned
@@ -274,7 +274,7 @@ async def _flats(adapter: Any, rod_axis: str) -> list[tuple[str, str]]:
     """
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
-    await _angled_plane_containing(
+    _angled_plane_containing(
         adapter,
         FLAT_PLANE,
         base_plane="Right Plane",
@@ -284,7 +284,7 @@ async def _flats(adapter: Any, rod_axis: str) -> list[tuple[str, str]]:
     )
     blank_reference_geometry(adapter, ((FLAT_PLANE, "PLANE"),))
     dims = SketchDims()
-    check("create_sketch flats", await adapter.create_sketch(FLAT_PLANE))
+    check("create_sketch flats", adapter.create_sketch(FLAT_PLANE))
     to_sketch, axial_is_u = _flat_sketch_frame(adapter)
     along, across = ("horizontal", "vertical") if axial_is_u else ("vertical", "horizontal")
 
@@ -301,16 +301,16 @@ async def _flats(adapter: Any, rod_axis: str) -> list[tuple[str, str]]:
 
     back_z = ROD_LEN - BACK_FLAT_EDGE_FROM_RIM
     set_sketch_direct_db(adapter, True)
-    back = await add_line_chain(adapter, rectangle(BACK_FLAT_EDGE_FROM_RIM, BACK_FLAT_LEN))
-    front = await add_line_chain(
+    back = add_line_chain(adapter, rectangle(BACK_FLAT_EDGE_FROM_RIM, BACK_FLAT_LEN))
+    front = add_line_chain(
         adapter, rectangle(FRONT_FLAT_EDGE_FROM_RIM, FRONT_FLAT_LEN)
     )
-    (rim_witness,) = await add_line_chain(
+    (rim_witness,) = add_line_chain(
         adapter, [to_sketch(0.0, 0.0), to_sketch(ROD_LEN, 0.0)], close=False
     )
     witness = check(
         "across-flat witness",
-        await adapter.add_line(*to_sketch(back_z, -ROD_R), *to_sketch(back_z, 0.0)),
+        adapter.add_line(*to_sketch(back_z, -ROD_R), *to_sketch(back_z, 0.0)),
     )
     set_sketch_direct_db(adapter, False)
     _as_construction(adapter, rim_witness)
@@ -319,24 +319,24 @@ async def _flats(adapter: Any, rod_axis: str) -> list[tuple[str, str]]:
         for line, direction in zip(lines, (along, across, along, across), strict=True):
             check(
                 f"flat {direction} {line}",
-                await adapter.add_sketch_constraint(line, None, direction),
+                adapter.add_sketch_constraint(line, None, direction),
             )
     check(
         "rim witness along the axis",
-        await adapter.add_sketch_constraint(rim_witness, None, along),
+        adapter.add_sketch_constraint(rim_witness, None, along),
     )
     check(
         "rim witness starts at the origin",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{rim_witness}.start", "origin", "coincident"
         ),
     )
     check(
         "across-flat witness across the axis",
-        await adapter.add_sketch_constraint(witness, None, across),
+        adapter.add_sketch_constraint(witness, None, across),
     )
     rim = f"{rim_witness}.end"
-    await dimension_between(
+    dimension_between(
         adapter, f"{rim_witness}.start", rim, f"{along}_distance", ROD_LEN, "rim witness"
     )
     dims.record("RimStation", '"RodLen"')
@@ -346,11 +346,11 @@ async def _flats(adapter: Any, rod_axis: str) -> list[tuple[str, str]]:
     ):
         flat, rise = lines[0], lines[1]
         corner = f"{flat}.start"  # the rim-side corner on the flat line
-        await dimension_between(
+        dimension_between(
             adapter, corner, f"{flat}.end", f"{along}_distance", length, f"{prefix}FlatLen"
         )
         dims.record(f"{prefix}FlatLen", f'"{prefix}FlatLen"')
-        await dimension_between(
+        dimension_between(
             adapter,
             f"{rise}.start",
             f"{rise}.end",
@@ -359,28 +359,28 @@ async def _flats(adapter: Any, rod_axis: str) -> list[tuple[str, str]]:
             f"{prefix.lower()} flat rise",
         )
         dims.record(f"{prefix}FlatRise")
-        await dimension_between(
+        dimension_between(
             adapter, rim, corner, f"{along}_distance", edge, f"{prefix}FlatFromRim"
         )
         dims.record(f"{prefix}FlatFromRim", f'"{prefix}FlatFromRim"')
     back_corner = f"{back[0]}.start"
     check(
         "flats on one line",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{front[0]}.start", back_corner, f"{along}_points"
         ),
     )
     check(
         "across-flat witness under the back flat's corner",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{witness}.start", back_corner, f"{across}_points"
         ),
     )
-    await dimension_between(
+    dimension_between(
         adapter, back_corner, f"{witness}.start", f"{across}_distance", ACROSS_FLAT, "AcrossFlat"
     )
     dims.record("AcrossFlat", '"RodDia" - "FlatDepth"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{witness}.start",
         "origin",
@@ -391,17 +391,17 @@ async def _flats(adapter: Any, rod_axis: str) -> list[tuple[str, str]]:
     dims.record("WitnessFoot", '"RodDia" / 2')
     check(
         "across-flat witness top on the axis",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{witness}.end", "origin", f"{along}_points"
         ),
     )
-    await ensure_fully_defined(adapter, "flats sketch")
-    check("exit_sketch flats", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "flats sketch")
+    check("exit_sketch flats", adapter.exit_sketch())
     name_last_feature(adapter, "FlatProfile")
     drive_jobs = dims.apply(adapter, "FlatProfile")
     check(
         "cut flats",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=_FLAT_CUT_DEPTH, both_directions=True)
         ),
     )
@@ -492,10 +492,10 @@ def _pin_hole_removed() -> float:
     return total * h / 3.0
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations): the rod diameter, body length and
@@ -503,16 +503,16 @@ async def build(adapter) -> dict[str, str]:
     # crown and the overall. The mm suffix is load-bearing -- this is an INCH
     # document and the equation manager reads BARE numbers in document units
     # (an unsuffixed 6.35 = 6.35 in).
-    await set_global(adapter, "RodDia", f"{ROD_DIA}mm")
-    await set_global(adapter, "RodLen", f"{ROD_LEN}mm")
-    await set_global(adapter, "CapSag", f"{CAP_SAG}mm")
-    await set_global(adapter, "PinHoleDia", f"{PIN_HOLE_DIA}mm")
-    await set_global(adapter, "PinHoleFromEnd", f"{ROD_PIN_HOLE_FROM_END}mm")
-    await set_global(adapter, "FlatDepth", f"{FLAT_DEPTH}mm")
-    await set_global(adapter, "FrontFlatLen", f"{FRONT_FLAT_LEN}mm")
-    await set_global(adapter, "BackFlatLen", f"{BACK_FLAT_LEN}mm")
-    await set_global(adapter, "FrontFlatFromRim", f"{FRONT_FLAT_EDGE_FROM_RIM}mm")
-    await set_global(adapter, "BackFlatFromRim", f"{BACK_FLAT_EDGE_FROM_RIM}mm")
+    set_global(adapter, "RodDia", f"{ROD_DIA}mm")
+    set_global(adapter, "RodLen", f"{ROD_LEN}mm")
+    set_global(adapter, "CapSag", f"{CAP_SAG}mm")
+    set_global(adapter, "PinHoleDia", f"{PIN_HOLE_DIA}mm")
+    set_global(adapter, "PinHoleFromEnd", f"{ROD_PIN_HOLE_FROM_END}mm")
+    set_global(adapter, "FlatDepth", f"{FLAT_DEPTH}mm")
+    set_global(adapter, "FrontFlatLen", f"{FRONT_FLAT_LEN}mm")
+    set_global(adapter, "BackFlatLen", f"{BACK_FLAT_LEN}mm")
+    set_global(adapter, "FrontFlatFromRim", f"{FRONT_FLAT_EDGE_FROM_RIM}mm")
+    set_global(adapter, "BackFlatFromRim", f"{BACK_FLAT_EDGE_FROM_RIM}mm")
 
     # The rod is one half-profile revolved about its axis, as it sits in the
     # lathe (drawing-guidelines.md rule 11 (turned parts read like the lathe);
@@ -529,37 +529,37 @@ async def build(adapter) -> dict[str, str]:
     u_rim, u_apex = -ROD_LEN, -(ROD_LEN + CAP_SAG)
     u_centre = -(ROD_LEN + CAP_SAG - CAP_R)
     rod = SketchDims()
-    check("create_sketch rod", await adapter.create_sketch("Right"))
+    check("create_sketch rod", adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
     axis = check(
-        "rod axis centerline", await adapter.add_centerline(0.0, 0.0, u_apex, 0.0)
+        "rod axis centerline", adapter.add_centerline(0.0, 0.0, u_apex, 0.0)
     )
-    front = check("rod front end", await adapter.add_line(0.0, 0.0, 0.0, ROD_R))
-    outline = check("rod outline", await adapter.add_line(0.0, ROD_R, u_rim, ROD_R))
+    front = check("rod front end", adapter.add_line(0.0, 0.0, 0.0, ROD_R))
+    outline = check("rod outline", adapter.add_line(0.0, ROD_R, u_rim, ROD_R))
     arc = check(
         "rod crown arc",
-        await adapter.add_arc(u_centre, 0.0, u_rim, ROD_R, u_apex, 0.0),
+        adapter.add_arc(u_centre, 0.0, u_rim, ROD_R, u_apex, 0.0),
     )
-    close = check("rod close on axis", await adapter.add_line(u_apex, 0.0, 0.0, 0.0))
+    close = check("rod close on axis", adapter.add_line(u_apex, 0.0, 0.0, 0.0))
     set_sketch_direct_db(adapter, False)
     check(
         "rod front end vertical",
-        await adapter.add_sketch_constraint(front, None, "vertical"),
+        adapter.add_sketch_constraint(front, None, "vertical"),
     )
     check(
         "rod outline horizontal",
-        await adapter.add_sketch_constraint(outline, None, "horizontal"),
+        adapter.add_sketch_constraint(outline, None, "horizontal"),
     )
     check(
         "rod close horizontal",
-        await adapter.add_sketch_constraint(close, None, "horizontal"),
+        adapter.add_sketch_constraint(close, None, "horizontal"),
     )
-    await anchor_point_to_origin(adapter, f"{front}.start", 0.0, 0.0, "rod front end")
-    await add_diametric_linear_dimension(
+    anchor_point_to_origin(adapter, f"{front}.start", 0.0, 0.0, "rod front end")
+    add_diametric_linear_dimension(
         adapter, axis, outline, (u_rim / 2.0, ROD_R + 4.0), "RodDia"
     )
     rod.record("RodDia", '"RodDia"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{outline}.start",
         f"{outline}.end",
@@ -568,7 +568,7 @@ async def build(adapter) -> dict[str, str]:
         "rod body length",
     )
     rod.record("RodBody", '"RodLen"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{close}.start",
         "origin",
@@ -579,20 +579,20 @@ async def build(adapter) -> dict[str, str]:
     rod.record("RodOverall", '"RodLen" + "CapSag"')
     check(
         "rod crown radius",
-        await adapter.add_sketch_dimension(arc, None, "radial", CAP_R),
+        adapter.add_sketch_dimension(arc, None, "radial", CAP_R),
     )
     rod.record(
         "CapR",
         '("RodDia" / 2 * "RodDia" / 2 + "CapSag" * "CapSag") / (2 * "CapSag")',
     )
-    await ensure_fully_defined(adapter, "rod sketch")
-    check("exit_sketch rod", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "rod sketch")
+    check("exit_sketch rod", adapter.exit_sketch())
     name_last_feature(adapter, "RodProfile")
     drive_jobs = rod.apply(adapter, "RodProfile")
-    check("revolve rod", await adapter.create_revolve(RevolveParameters(angle=360.0)))
+    check("revolve rod", adapter.create_revolve(RevolveParameters(angle=360.0)))
     name_last_feature(adapter, "Rod")
     expected = V_ROD + V_CAP
-    await volume_check(adapter, "rod with crown", expected, 0.03 * V_CAP)
+    volume_check(adapter, "rod with crown", expected, 0.03 * V_CAP)
 
     # U36 pin hole: a diametral cross-hole along X at the lever's
     # mid-engagement, sketched on the Right Plane (normal X; sketch u = -z) --
@@ -605,8 +605,8 @@ async def build(adapter) -> dict[str, str]:
     # cuts nothing and the volume gate fails loud.
     v_hole = _pin_hole_removed()
     pin_hole = SketchDims()
-    check("create_sketch pin hole", await adapter.create_sketch("Right"))
-    await define_circle(
+    check("create_sketch pin hole", adapter.create_sketch("Right"))
+    define_circle(
         adapter,
         -ROD_PIN_HOLE_FROM_END,
         0.0,
@@ -616,11 +616,11 @@ async def build(adapter) -> dict[str, str]:
         names=("PinHoleZ", "PinHoleY", "PinHoleDia"),
         drives=('"PinHoleFromEnd"', None, '"PinHoleDia"'),
     )
-    await ensure_fully_defined(adapter, "pin hole sketch")
-    check("exit_sketch pin hole", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "pin hole sketch")
+    check("exit_sketch pin hole", adapter.exit_sketch())
     name_last_feature(adapter, "PinHoleProfile")
     drive_jobs += pin_hole.apply(adapter, "PinHoleProfile")
-    cut = await adapter.create_cut_extrude(
+    cut = adapter.create_cut_extrude(
         ExtrusionParameters(
             depth=2.0 * ROD_DIA, both_directions=True
         )
@@ -629,39 +629,39 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError(f"pin hole cut failed: {cut.error}")
     name_last_feature(adapter, "PinHole")
     expected -= v_hole
-    await volume_check(adapter, "pin hole", expected, 0.05 * v_hole)
+    volume_check(adapter, "pin hole", expected, 0.05 * v_hole)
 
     # Named centreline axis (Axis1): the assembly's revolute (coaxial to the
     # block's lift-bore axis) and the cam/lever clamps all key off it (PR8).
-    rod_axis = await name_bore_axis(
+    rod_axis = name_bore_axis(
         adapter, "Right Plane", 0.0, "Top Plane", 0.0, "rod axis"
     )
     # Named pin-hole axis (along X at the pin station): the MHA-DT-30 pin's
     # coaxial reference in the assembly.
-    await name_bore_axis(
+    name_bore_axis(
         adapter, "Top Plane", 0.0, "Front Plane", ROD_PIN_HOLE_FROM_END, "lever pin"
     )
 
     # Set-screw flats (rule-23 retention, owner ruling 2026-11-07 (MHA-DT-00
     # rubric sample, PR #2248)): one cut from a plane
     # turned about the rod axis (so after it), the cams' screw axis in it.
-    drive_jobs += await _flats(adapter, rod_axis)
+    drive_jobs += _flats(adapter, rod_axis)
     expected -= V_FLATS
-    await volume_check(adapter, "set-screw flats", expected, 0.05 * V_FLATS)
+    volume_check(adapter, "set-screw flats", expected, 0.05 * V_FLATS)
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    volume_check(
         adapter, "driven lift rod (equations neutral)", expected, 0.03 * V_CAP
     )
 
-    await apply_material(adapter, MATERIAL)
-    await apply_color(adapter, POLISHED_STEEL)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    apply_color(adapter, POLISHED_STEEL)
+    report_mass_properties(adapter)
     set_dimension_bilateral_tolerance(
         adapter, "RodProfile", "RodDia", *deviations(ROD_DIA_BAND), display_unit=UNIT
     )
@@ -677,7 +677,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, PART_NAME, {"Isometric View Note": ISOMETRIC_VIEW_NOTE}
     )
     _name_flats_view(adapter)
-    return await save_part_and_images(adapter, PART_NAME)
+    return save_part_and_images(adapter, PART_NAME)
 
 
 if __name__ == "__main__":

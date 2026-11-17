@@ -2775,7 +2775,7 @@ class _RebuildAdapter(_Adapter):
         super().__init__(sw=_MessagingSeat(), model=model)
         self._result = _RebuildResult(error)
 
-    async def rebuild_model(self) -> _RebuildResult:
+    def rebuild_model(self) -> _RebuildResult:
         return self._result
 
 
@@ -2785,7 +2785,6 @@ def test_a_refused_rebuild_names_its_features_captures_and_raises(
     """part:dt_crank_pinion failed five times with only "Failed to rebuild model".
     The refusal now carries What's Wrong on the rebuild span, and the full
     capture (session messages included) lands before the unchanged raise."""
-    import asyncio
 
     monkeypatch.setattr(_appearance, "_early_bound", lambda obj, _iface: obj)
     monkeypatch.setattr(_com, "_early_bound", lambda obj, _iface: obj)
@@ -2804,7 +2803,7 @@ def test_a_refused_rebuild_names_its_features_captures_and_raises(
     with pytest.raises(
         RuntimeError, match=r"^rebuild failed: Error in rebuild_model: Failed to rebuild model$"
     ):
-        asyncio.run(_rebuild.force_rebuild(adapter))
+        _rebuild.force_rebuild(adapter)
 
     (rebuild,) = [s for s in spans.get_finished_spans() if s.name == "feature.rebuild"]
     (event,) = [e for e in rebuild.events if e.name == "rebuild.failed"]
@@ -2842,7 +2841,6 @@ def test_a_refused_rebuild_names_its_features_captures_and_raises(
 def test_a_warning_only_table_names_no_failing_feature(
     tmp_path, monkeypatch, capture_telemetry
 ):
-    import asyncio
 
     monkeypatch.setattr(_appearance, "_early_bound", lambda obj, _iface: obj)
     monkeypatch.setattr(_com, "_early_bound", lambda obj, _iface: obj)
@@ -2861,7 +2859,7 @@ def test_a_warning_only_table_names_no_failing_feature(
     )
 
     with pytest.raises(RuntimeError, match=r"^rebuild failed: "):
-        asyncio.run(_rebuild.force_rebuild(adapter))
+        _rebuild.force_rebuild(adapter)
 
     (rebuild,) = [s for s in spans.get_finished_spans() if s.name == "feature.rebuild"]
     (event,) = [e for e in rebuild.events if e.name == "rebuild.failed"]
@@ -2872,7 +2870,6 @@ def test_a_warning_only_table_names_no_failing_feature(
 
 
 def test_a_clean_rebuild_captures_nothing(tmp_path, monkeypatch, capture_telemetry):
-    import asyncio
 
     monkeypatch.setattr(_appearance, "_early_bound", lambda obj, _iface: obj)
     monkeypatch.setattr(_com, "_early_bound", lambda obj, _iface: obj)
@@ -2886,7 +2883,7 @@ def test_a_clean_rebuild_captures_nothing(tmp_path, monkeypatch, capture_telemet
     monkeypatch.setattr(_sketch, "_early_bound", lambda obj, _iface: obj)
     monkeypatch.setattr(_sketch_rectangle, "_early_bound", lambda obj, _iface: obj)
     spans, _logs = capture_telemetry
-    asyncio.run(_rebuild.force_rebuild(_RebuildAdapter(tmp_path, None)))
+    _rebuild.force_rebuild(_RebuildAdapter(tmp_path, None))
 
     (rebuild,) = [s for s in spans.get_finished_spans() if s.name == "feature.rebuild"]
     assert not [e for e in rebuild.events if e.name == "rebuild.failed"]

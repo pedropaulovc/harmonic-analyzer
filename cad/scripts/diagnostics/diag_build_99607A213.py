@@ -103,7 +103,7 @@ def flare_profile() -> tuple[Segment, ...]:
 
 
 @stock_recipe("99607A213", threaded=True)
-async def build_99607A213(adapter, truth=None):
+def build_99607A213(adapter, truth=None):
     from _com import _early_bound, _read_member
     from _feature_tree import _feature_by_name
     from _sketch import add_line_chain
@@ -125,54 +125,54 @@ async def build_99607A213(adapter, truth=None):
     ch2 = 7.540625 / 16.0                 # 0.471289
 
     # --- shank with tip chamfer ---------------------------------------------
-    check("create_sketch shank", await adapter.create_sketch("Front"))
+    check("create_sketch shank", adapter.create_sketch("Front"))
     sk = adapter.currentSketchManager
     with no_sketch_inference(adapter):
         if sk.CreateCenterLine(0.0, 0.0, 0.0, 0.0, tip_y / 1000.0, 0.0) is None:
             raise RuntimeError("99607 shank: CreateCenterLine failed")
-        await add_line_chain(adapter, [
+        add_line_chain(adapter, [
             (0.0, 0.0),
             (major_r, 0.0),
             (major_r, tip_y + tip_ch),
             (major_r - tip_ch, tip_y),
             (0.0, tip_y),
         ])
-    check("exit_sketch shank", await adapter.exit_sketch())
+    check("exit_sketch shank", adapter.exit_sketch())
     name_last_feature(adapter, "ShankProfile")
-    check("revolve shank", await adapter.create_revolve(
+    check("revolve shank", adapter.create_revolve(
         RevolveParameters(angle=360.0, is_cut=False)))
     name_last_feature(adapter, "Shank")
     v_shank = (math.pi * major_r ** 2 * (TS_LEN - tip_ch)
                + _rev_frustum(tip_ch, major_r, major_r - tip_ch))
-    await volume_check(adapter, "shank revolve", v_shank, 0.005 * v_shank)
+    volume_check(adapter, "shank revolve", v_shank, 0.005 * v_shank)
 
     # --- shoulder + head bosses ---------------------------------------------
-    check("create_sketch shoulder", await adapter.create_sketch("Top"))
+    check("create_sketch shoulder", adapter.create_sketch("Top"))
     with no_sketch_inference(adapter):
         if adapter.currentSketchManager.CreateCircleByRadius(
                 0.0, 0.0, 0.0, TS_SH_R / 1000.0) is None:
             raise RuntimeError("shoulder circle failed")
-    check("exit_sketch shoulder", await adapter.exit_sketch())
+    check("exit_sketch shoulder", adapter.exit_sketch())
     name_last_feature(adapter, "ShoulderProfile")
-    check("shoulder boss", await adapter.create_extrusion(ExtrusionParameters(
+    check("shoulder boss", adapter.create_extrusion(ExtrusionParameters(
         depth=TS_SH_H)))
     name_last_feature(adapter, "Shoulder")
     v_sh = math.pi * TS_SH_R ** 2 * TS_SH_H
-    await volume_check(adapter, "shoulder boss", v_shank + v_sh, 0.005 * v_sh)
+    volume_check(adapter, "shoulder boss", v_shank + v_sh, 0.005 * v_sh)
 
     offset_plane(adapter, "HeadBasePlane", head_base)
-    check("create_sketch head", await adapter.create_sketch("HeadBasePlane"))
+    check("create_sketch head", adapter.create_sketch("HeadBasePlane"))
     with no_sketch_inference(adapter):
         if adapter.currentSketchManager.CreateCircleByRadius(
                 0.0, 0.0, 0.0, TS_HEAD_R / 1000.0) is None:
             raise RuntimeError("head circle failed")
-    check("exit_sketch head", await adapter.exit_sketch())
+    check("exit_sketch head", adapter.exit_sketch())
     name_last_feature(adapter, "HeadProfile")
-    check("head boss", await adapter.create_extrusion(ExtrusionParameters(
+    check("head boss", adapter.create_extrusion(ExtrusionParameters(
         depth=TS_HEAD_H)))
     name_last_feature(adapter, "Head")
     v_head = math.pi * TS_HEAD_R ** 2 * TS_HEAD_H
-    await volume_check(adapter, "head boss",
+    volume_check(adapter, "head boss",
                        v_shank + v_sh + v_head, 0.005 * v_head)
 
     # --- flare: revolve-cut the chord+arc lens off the shoulder -------------
@@ -195,7 +195,7 @@ async def build_99607A213(adapter, truth=None):
     # worker.  ``draw_closed_profile`` therefore authors the coordinates and
     # ``assert_profile_closed`` MEASURES the weld, instead of asking for a
     # relation that a welded pair can only refuse.
-    check("create_sketch flare", await adapter.create_sketch("Front"))
+    check("create_sketch flare", adapter.create_sketch("Front"))
     with no_sketch_inference(adapter):
         # Revolve axis: raw construction geometry, drawn under the same
         # suppression as the profile so it cannot snap to the silhouette
@@ -203,8 +203,8 @@ async def build_99607A213(adapter, truth=None):
         if adapter.currentSketchManager.CreateCenterLine(
                 0.0, 0.0, 0.0, 0.0, 1.0 / 1000.0, 0.0) is None:
             raise RuntimeError("flare centerline failed")
-    await draw_closed_profile(adapter, flare_profile(), label="flare lens", loops=1)
-    check("exit_sketch flare", await adapter.exit_sketch())
+    draw_closed_profile(adapter, flare_profile(), label="flare lens", loops=1)
+    check("exit_sketch flare", adapter.exit_sketch())
     name_last_feature(adapter, "FlareProfile")
     # The revolve axis is construction geometry in this same sketch, which is
     # exactly why the contour COUNT is not allowed to fail a build here -- see
@@ -212,12 +212,12 @@ async def build_99607A213(adapter, truth=None):
     assert_profile_closed(
         adapter, "flare lens", loops=1, feature="FlareProfile"
     )
-    check("flare cut", await adapter.create_revolve(
+    check("flare cut", adapter.create_revolve(
         RevolveParameters(angle=360.0, is_cut=True)))
     name_last_feature(adapter, "FlareCut")
 
     # --- head rim chamfers ---------------------------------------------------
-    check("chamfer2", await adapter.add_chamfer(ch2, [
+    check("chamfer2", adapter.add_chamfer(ch2, [
         [TS_HEAD_R, head_top, 0.0],
         [TS_HEAD_R, head_base, 0.0],
     ]))
@@ -237,7 +237,7 @@ async def build_99607A213(adapter, truth=None):
     _telemetry.info(f"shank body: {shank_name}")
 
     offset_plane(adapter, "TipPlane", tip_y)
-    check("create_sketch helix seed", await adapter.create_sketch("TipPlane"))
+    check("create_sketch helix seed", adapter.create_sketch("TipPlane"))
     with no_sketch_inference(adapter):
         if adapter.currentSketchManager.CreateCircleByRadius(
                 0.0, 0.0, 0.0, major_r / 1000.0) is None:
@@ -251,9 +251,9 @@ async def build_99607A213(adapter, truth=None):
     # extended past the major radius to a top flat at major+0.254.
     ext = 0.254
     ext_dx = ext / math.sqrt(3.0)
-    check("create_sketch cutter", await adapter.create_sketch("Front"))
+    check("create_sketch cutter", adapter.create_sketch("Front"))
     with no_sketch_inference(adapter):
-        await add_line_chain(adapter, [
+        add_line_chain(adapter, [
             (major_r + ext, tip_y + ext_dx),                       # top corner (tip side)
             (major_r, tip_y),                                      # flank crosses major at tip
             (root_r, tip_y - 3.0 * pitch / 8.0),                   # root flat (tip side)
@@ -261,17 +261,17 @@ async def build_99607A213(adapter, truth=None):
             (major_r, tip_y - 7.0 * pitch / 8.0),                  # flank crosses major
             (major_r + ext, tip_y - 7.0 * pitch / 8.0 - ext_dx),   # top corner (far side)
         ])
-    check("exit_sketch cutter", await adapter.exit_sketch())
+    check("exit_sketch cutter", adapter.exit_sketch())
     name_last_feature(adapter, "ThreadCutter")
     thread_sweep_cut(adapter, "ThreadCutter", "ThreadHelix", shank_name,
                      "ThreadGroove", tangency=(0, 0))
 
-    check("create_sketch runout", await adapter.create_sketch("Top"))
+    check("create_sketch runout", adapter.create_sketch("Top"))
     with no_sketch_inference(adapter):
         if adapter.currentSketchManager.CreateCircleByRadius(
                 0.0, 0.0, 0.0, major_r / 1000.0) is None:
             raise RuntimeError("runout circle failed")
-    check("exit_sketch runout", await adapter.exit_sketch())
+    check("exit_sketch runout", adapter.exit_sketch())
     name_last_feature(adapter, "RunoutProfile")
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     fm = _early_bound(_read_member(model, "FeatureManager"), "IFeatureManager")
@@ -301,15 +301,15 @@ async def build_99607A213(adapter, truth=None):
     offset_plane(adapter, "KnurlSidePlane", TS_HEAD_R + 0.5,
                  base="Front Plane")
     check("create_sketch knurl stripe",
-          await adapter.create_sketch("KnurlSidePlane"))
+          adapter.create_sketch("KnurlSidePlane"))
     with no_sketch_inference(adapter):
-        await add_line_chain(adapter, [
+        add_line_chain(adapter, [
             (-1.029926, 6.316747),
             (-0.921732, 6.383253),
             (1.029926, 3.208253),
             (0.921732, 3.141747),
         ])
-    check("exit_sketch knurl stripe", await adapter.exit_sketch())
+    check("exit_sketch knurl stripe", adapter.exit_sketch())
     name_last_feature(adapter, "KnurlStripe")
 
     selmgr = _early_bound(_read_member(model, "SelectionManager"),
@@ -383,17 +383,17 @@ async def build_99607A213(adapter, truth=None):
     # their fragments fuse (observed: 3 floor faces per groove instead of
     # the vendor's 4, exactly 72 faces short).  Front flips the translation,
     # the floors differ everywhere, and the crossings split cleanly.
-    check("knurl mirror", await adapter.mirror_feature(MirrorFeatureParameters(
+    check("knurl mirror", adapter.mirror_feature(MirrorFeatureParameters(
         plane="Front Plane", features=["KnurlGroove"])))
     name_last_feature(adapter, "KnurlMirror")
 
-    check("pattern axis", await adapter.create_axis(CreateAxisParameters(
+    check("pattern axis", adapter.create_axis(CreateAxisParameters(
         mode="two_planes", planes=["Front Plane", "Right Plane"])))
     name_last_feature(adapter, "PatternAxis")
     # geometry_pattern=True (vendor used a re-solved pattern, but re-solve
     # fails through the adapter with the Front-mirrored seed; a geometry
     # pattern of the same seeds is rotationally identical here).
-    check("knurl pattern", await adapter.circular_pattern_feature(
+    check("knurl pattern", adapter.circular_pattern_feature(
         CircularPatternParameters(
             axis_name="PatternAxis",
             features=["KnurlGroove", "KnurlMirror"],

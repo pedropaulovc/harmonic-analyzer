@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 
 import json
 from pathlib import Path
@@ -256,10 +255,10 @@ def test_unchanged_channel_refresh_refuses_invalid_display_or_contact_and_never_
     renders = []
 
     class Adapter(_Adapter):
-        async def open_model(self, _path):
+        def open_model(self, _path):
             return True
 
-        async def list_configurations(self):
+        def list_configurations(self):
             return ["Default"]
 
     adapter = Adapter(status=0)
@@ -274,10 +273,10 @@ def test_unchanged_channel_refresh_refuses_invalid_display_or_contact_and_never_
         _assembly, "final_rebuild_before_save", lambda _adapter, _name: None
     )
 
-    async def digest(_adapter, _name):
+    def digest(_adapter, _name):
         return "same-digest"
 
-    async def images(_adapter, _name, _views):
+    def images(_adapter, _name, _views):
         renders.append(True)
         return {}
 
@@ -317,14 +316,12 @@ def test_unchanged_channel_refresh_refuses_invalid_display_or_contact_and_never_
         raise RuntimeError("nanometre contact failed")
 
     with pytest.raises(RuntimeError, match=failure):
-        asyncio.run(
-            _assembly.refresh_assembly(
+        _assembly.refresh_assembly(
                 adapter,
                 "ch-channel",
                 views=[],
                 native_contact_check=fail_native_contact,
             )
-        )
 
     assert saves == ([False] if flag == 1 else [])
     assert contacts == ([True] if flag == 1 else [])
@@ -347,7 +344,7 @@ def test_spring_assembly_rejects_missing_native_checker(operation, assembly_name
     import _assembly
 
     with pytest.raises(ValueError):
-        asyncio.run(getattr(_assembly, operation)(None, assembly_name))
+        getattr(_assembly, operation)(None, assembly_name)
 
 
 @pytest.mark.parametrize(
@@ -497,7 +494,7 @@ def test_auto_repair_saves_every_document_before_persisted_contact_gate(
             self.open_documents.clear()
             return True
 
-        async def open_model(self, path):
+        def open_model(self, path):
             name = Path(path).stem
             events.append(("open", path))
             if name in proofs:
@@ -509,7 +506,7 @@ def test_auto_repair_saves_every_document_before_persisted_contact_gate(
             self.open_documents.append(self.currentModel)
             return SimpleNamespace(is_success=True, data=None)
 
-        async def list_configurations(self):
+        def list_configurations(self):
             return SimpleNamespace(is_success=True, data=["Default", "Default Simplified"])
 
     adapter = Adapter()
@@ -570,7 +567,7 @@ def test_auto_repair_saves_every_document_before_persisted_contact_gate(
 
     monkeypatch.setattr(verify, "assert_assembly_spring_contacts", contact)
 
-    async def render(_adapter, name, _views):
+    def render(_adapter, name, _views):
         if any(
             not files[sibling].repaired or any(files[sibling].stale.values())
             for sibling in repaired_names
@@ -592,11 +589,9 @@ def test_auto_repair_saves_every_document_before_persisted_contact_gate(
     )
 
     report = verify.Report()
-    asyncio.run(
-        verify._verify_static_one(
+    verify._verify_static_one(
             adapter, "ha-harmonic-analyzer", report, auto_repair=True
         )
-    )
 
     if top_gate == "fail":
         failed_label = "ha-harmonic-analyzer:interference-free"

@@ -53,7 +53,7 @@ from diagnostics.diag_mcmaster_lib import (  # noqa: E402
 )
 
 
-async def build_fillister(adapter, part_no: str, size: tuple[float, ...]):
+def build_fillister(adapter, part_no: str, size: tuple[float, ...]):
     from _sketch import add_line_chain  # noqa: E402 -- diagnostic path bootstrap
     from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
     from diagnostics.diag_mcmaster_lib import no_sketch_inference, split_at_plane
@@ -75,7 +75,7 @@ async def build_fillister(adapter, part_no: str, size: tuple[float, ...]):
     cap_R = (head_r**2 + dome_h**2) / (2.0 * dome_h)
 
     # --- revolve profile ----------------------------------------------------
-    check("create_sketch profile", await adapter.create_sketch("Front"))
+    check("create_sketch profile", adapter.create_sketch("Front"))
     sk_mgr = adapter.currentSketchManager
     with no_sketch_inference(adapter):
         if (
@@ -107,7 +107,7 @@ async def build_fillister(adapter, part_no: str, size: tuple[float, ...]):
         )
         if arc is None:
             raise RuntimeError("fillister profile: dome arc failed")
-        await add_line_chain(
+        add_line_chain(
             adapter,
             [
                 (head_r, band),
@@ -120,11 +120,11 @@ async def build_fillister(adapter, part_no: str, size: tuple[float, ...]):
             ],
             close=False,
         )
-    check("exit_sketch profile", await adapter.exit_sketch())
+    check("exit_sketch profile", adapter.exit_sketch())
     name_last_feature(adapter, "BodyProfile")
     check(
         "revolve body",
-        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=False)),
+        adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=False)),
     )
     name_last_feature(adapter, "Body")
     v = (
@@ -133,12 +133,12 @@ async def build_fillister(adapter, part_no: str, size: tuple[float, ...]):
         + math.pi * major_r**2 * (length - tip_ch)
         + _rev_frustum(tip_ch, major_r, major_r - tip_ch)
     )
-    await volume_check(adapter, "revolved body", v, 0.005 * v)
+    volume_check(adapter, "revolved body", v, 0.005 * v)
 
     # --- driver slot (from the dome apex) -----------------------------------
-    check("create_sketch slot", await adapter.create_sketch("Front"))
+    check("create_sketch slot", adapter.create_sketch("Front"))
     with no_sketch_inference(adapter):
-        await add_line_chain(
+        add_line_chain(
             adapter,
             [
                 (-slot_w / 2.0, apex_y + 0.5),
@@ -147,11 +147,11 @@ async def build_fillister(adapter, part_no: str, size: tuple[float, ...]):
                 (-slot_w / 2.0, apex_y - slot_d),
             ],
         )
-    check("exit_sketch slot", await adapter.exit_sketch())
+    check("exit_sketch slot", adapter.exit_sketch())
     name_last_feature(adapter, "SlotProfile")
     check(
         "cut slot",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=2.0 * hd, both_directions=True)
         ),
     )
@@ -169,7 +169,7 @@ async def build_fillister(adapter, part_no: str, size: tuple[float, ...]):
     _telemetry.info(f"shank body: {shank_name}")
 
     # --- helix (junction -> P past the tip) ---------------------------------
-    check("create_sketch helix seed", await adapter.create_sketch("Top"))
+    check("create_sketch helix seed", adapter.create_sketch("Top"))
     with no_sketch_inference(adapter):
         seed = adapter.currentSketchManager.CreateCircleByRadius(
             0.0, 0.0, 0.0, major_r / 1000.0
@@ -187,9 +187,9 @@ async def build_fillister(adapter, part_no: str, size: tuple[float, ...]):
     )
 
     # --- thread groove -------------------------------------------------------
-    check("create_sketch cutter", await adapter.create_sketch("Front"))
+    check("create_sketch cutter", adapter.create_sketch("Front"))
     with no_sketch_inference(adapter):
-        await add_line_chain(
+        add_line_chain(
             adapter,
             [
                 (root_r + (7.0 * pitch / 16.0) * math.sqrt(3.0), 15.0 * pitch / 16.0),
@@ -198,7 +198,7 @@ async def build_fillister(adapter, part_no: str, size: tuple[float, ...]):
                 (root_r, pitch / 2.0),
             ],
         )
-    check("exit_sketch cutter", await adapter.exit_sketch())
+    check("exit_sketch cutter", adapter.exit_sketch())
     name_last_feature(adapter, "ThreadCutter")
     thread_sweep_cut(adapter, "ThreadCutter", "ThreadHelix", shank_name, "ThreadGroove")
 
@@ -207,7 +207,7 @@ async def build_fillister(adapter, part_no: str, size: tuple[float, ...]):
     # directions, 30-deg draft) decomposes into: a straight cylinder fill
     # from the junction down to -P/2, then a 30-deg taper cone below it
     # until the cone falls under the thread root (adds nothing deeper).
-    check("create_sketch runout fill", await adapter.create_sketch("Top"))
+    check("create_sketch runout fill", adapter.create_sketch("Top"))
     with no_sketch_inference(adapter):
         if (
             adapter.currentSketchManager.CreateCircleByRadius(
@@ -216,11 +216,11 @@ async def build_fillister(adapter, part_no: str, size: tuple[float, ...]):
             is None
         ):
             raise RuntimeError("runout fill circle failed")
-    check("exit_sketch runout fill", await adapter.exit_sketch())
+    check("exit_sketch runout fill", adapter.exit_sketch())
     name_last_feature(adapter, "RunoutFillProfile")
     check(
         "runout fill",
-        await adapter.create_extrusion(
+        adapter.create_extrusion(
             ExtrusionParameters(depth=pitch / 2.0, reverse_direction=True)
         ),
     )
@@ -230,7 +230,7 @@ async def build_fillister(adapter, part_no: str, size: tuple[float, ...]):
     # Dchk1=False, so its draft_angle never applies.  The frustum's bottom
     # disc sits at the thread root radius, fully submerged -- no face.
     taper_h = (major_r - root_r) * math.sqrt(3.0)  # 30 deg from the axis
-    check("create_sketch runout taper", await adapter.create_sketch("Front"))
+    check("create_sketch runout taper", adapter.create_sketch("Front"))
     sk2 = adapter.currentSketchManager
     with no_sketch_inference(adapter):
         if (
@@ -240,7 +240,7 @@ async def build_fillister(adapter, part_no: str, size: tuple[float, ...]):
             is None
         ):
             raise RuntimeError("runout taper: CreateCenterLine failed")
-        await add_line_chain(
+        add_line_chain(
             adapter,
             [
                 (0.0, -pitch / 2.0),
@@ -249,16 +249,16 @@ async def build_fillister(adapter, part_no: str, size: tuple[float, ...]):
                 (0.0, -pitch / 2.0 - taper_h),
             ],
         )
-    check("exit_sketch runout taper", await adapter.exit_sketch())
+    check("exit_sketch runout taper", adapter.exit_sketch())
     name_last_feature(adapter, "RunoutTaperProfile")
     check(
         "runout taper",
-        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=False)),
+        adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=False)),
     )
     name_last_feature(adapter, "RunoutTaper")
 
     check(
-        "junction fillet", await adapter.add_fillet(pitch / 10.0, [[major_r, 0.0, 0.0]])
+        "junction fillet", adapter.add_fillet(pitch / 10.0, [[major_r, 0.0, 0.0]])
     )
     name_last_feature(adapter, "JunctionFillet")
 

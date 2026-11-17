@@ -152,7 +152,7 @@ def rim_cut_profile() -> tuple[Segment, ...]:
 
 
 @stock_recipe("93585A190", threaded=True)
-async def build_93585A190(adapter, truth=None):
+def build_93585A190(adapter, truth=None):
     from _com import _early_bound, _read_member
     from _feature_tree import _feature_by_name
     from diagnostics.diag_mcmaster_lib import no_sketch_inference
@@ -166,8 +166,8 @@ async def build_93585A190(adapter, truth=None):
 
     tip_y = -LENGTH
 
-    async def circle_sketch(plane: str, r: float, name: str) -> None:
-        check(f"create_sketch {name}", await adapter.create_sketch(plane))
+    def circle_sketch(plane: str, r: float, name: str) -> None:
+        check(f"create_sketch {name}", adapter.create_sketch(plane))
         with no_sketch_inference(adapter):
             if (
                 adapter.currentSketchManager.CreateCircleByRadius(
@@ -176,26 +176,26 @@ async def build_93585A190(adapter, truth=None):
                 is None
             ):
                 raise RuntimeError(f"{name}: circle failed")
-        check(f"exit_sketch {name}", await adapter.exit_sketch())
+        check(f"exit_sketch {name}", adapter.exit_sketch())
         name_last_feature(adapter, name)
 
     # --- Extrude1 stud + Chamfer2 tip ----------------------------------------
-    await circle_sketch("Top", MAJOR_R, "StudProfile")
+    circle_sketch("Top", MAJOR_R, "StudProfile")
     check(
         "stud extrude",
-        await adapter.create_extrusion(
+        adapter.create_extrusion(
             ExtrusionParameters(depth=LENGTH, reverse_direction=True)
         ),
     )
     name_last_feature(adapter, "Stud")
     check(
-        "tip chamfer", await adapter.add_chamfer(TIP_CHAMFER, [[MAJOR_R, tip_y, 0.0]])
+        "tip chamfer", adapter.add_chamfer(TIP_CHAMFER, [[MAJOR_R, tip_y, 0.0]])
     )
     name_last_feature(adapter, "TipChamfer")
     v_stud = math.pi * MAJOR_R**2 * (LENGTH - TIP_CHAMFER) + _rev_frustum(
         TIP_CHAMFER, MAJOR_R, MAJOR_R - TIP_CHAMFER
     )
-    await volume_check(adapter, "stud", v_stud, 0.005 * v_stud)
+    volume_check(adapter, "stud", v_stud, 0.005 * v_stud)
 
     # --- Boss-Extrude1/2/3: three non-merged core bands ----------------------
     offset_plane(adapter, "Plane2", BAND_H)
@@ -206,28 +206,28 @@ async def build_93585A190(adapter, truth=None):
         ("Plane1", "Band2", BAND_H),
     )
     for plane, name, depth in bands:
-        await circle_sketch(plane, CORE_R, f"{name}Profile")
+        circle_sketch(plane, CORE_R, f"{name}Profile")
         check(
             f"{name} boss",
-            await adapter.create_extrusion(
+            adapter.create_extrusion(
                 ExtrusionParameters(depth=depth, merge_result=False)
             ),
         )
         name_last_feature(adapter, name)
     v_core = math.pi * CORE_R**2 * HEAD_H
-    await volume_check(adapter, "core bands", v_stud + v_core, 0.005 * v_core)
+    volume_check(adapter, "core bands", v_stud + v_core, 0.005 * v_core)
 
     # --- Chamfer3 / Chamfer4 on the outer band rims, Combine1 ----------------
-    check("chamfer3", await adapter.add_chamfer(BAND_H, [[CORE_R, 0.0, 0.0]]))
+    check("chamfer3", adapter.add_chamfer(BAND_H, [[CORE_R, 0.0, 0.0]]))
     name_last_feature(adapter, "BottomBandChamfer")
-    check("chamfer4", await adapter.add_chamfer(BAND_H, [[CORE_R, HEAD_H, 0.0]]))
+    check("chamfer4", adapter.add_chamfer(BAND_H, [[CORE_R, HEAD_H, 0.0]]))
     name_last_feature(adapter, "TopBandChamfer")
     combine_union(adapter, "Combine")
     _telemetry.info(f"pre-thread volume: {mass_properties(adapter)['volume_mm3']}")
 
     # --- thread: tip-seeded helix + Sketch14 cutter, Cut-Sweep1 --------------
     offset_plane(adapter, "TipPlane", tip_y)
-    check("create_sketch helix seed", await adapter.create_sketch("TipPlane"))
+    check("create_sketch helix seed", adapter.create_sketch("TipPlane"))
     with no_sketch_inference(adapter):
         if (
             adapter.currentSketchManager.CreateCircleByRadius(
@@ -246,11 +246,11 @@ async def build_93585A190(adapter, truth=None):
         feature_name="ThreadHelix",
     )
 
-    check("create_sketch cutter", await adapter.create_sketch("Front"))
-    await draw_closed_profile(
+    check("create_sketch cutter", adapter.create_sketch("Front"))
+    draw_closed_profile(
         adapter, thread_cutter_profile(), label="thread cutter", loops=1
     )
-    check("exit_sketch cutter", await adapter.exit_sketch())
+    check("exit_sketch cutter", adapter.exit_sketch())
     name_last_feature(adapter, "ThreadCutter")
     assert_profile_closed(adapter, "thread cutter", loops=1, feature="ThreadCutter")
     thread_sweep_cut(
@@ -259,16 +259,16 @@ async def build_93585A190(adapter, truth=None):
     _telemetry.info(f"post-thread volume: {mass_properties(adapter)['volume_mm3']}")
 
     # --- knurl: Sketch26 ridge on Plane1, down to Plane2, x131 ---------------
-    check("create_sketch knurl ridge", await adapter.create_sketch("Plane1"))
-    await draw_closed_profile(
+    check("create_sketch knurl ridge", adapter.create_sketch("Plane1"))
+    draw_closed_profile(
         adapter, knurl_ridge_profile(), label="knurl ridge", loops=1
     )
-    check("exit_sketch knurl ridge", await adapter.exit_sketch())
+    check("exit_sketch knurl ridge", adapter.exit_sketch())
     name_last_feature(adapter, "KnurlRidgeProfile")
     assert_profile_closed(adapter, "knurl ridge", loops=1, feature="KnurlRidgeProfile")
     check(
         "knurl ridge boss",
-        await adapter.create_extrusion(
+        adapter.create_extrusion(
             ExtrusionParameters(depth=HEAD_H - 2.0 * BAND_H, reverse_direction=True)
         ),
     )
@@ -277,7 +277,7 @@ async def build_93585A190(adapter, truth=None):
 
     check(
         "pattern axis",
-        await adapter.create_axis(
+        adapter.create_axis(
             CreateAxisParameters(
                 mode="two_planes", planes=["Front Plane", "Right Plane"]
             )
@@ -286,7 +286,7 @@ async def build_93585A190(adapter, truth=None):
     name_last_feature(adapter, "PatternAxis")
     check(
         "knurl pattern",
-        await adapter.circular_pattern_feature(
+        adapter.circular_pattern_feature(
             CircularPatternParameters(
                 axis_name="PatternAxis",
                 features=["KnurlRidge"],
@@ -300,7 +300,7 @@ async def build_93585A190(adapter, truth=None):
     name_last_feature(adapter, "KnurlPattern")
 
     # --- Cut-Revolve4 head-top rim, Mirror1 across Plane3 --------------------
-    check("create_sketch rim cut", await adapter.create_sketch("Front"))
+    check("create_sketch rim cut", adapter.create_sketch("Front"))
     with no_sketch_inference(adapter):
         if (
             adapter.currentSketchManager.CreateCenterLine(
@@ -309,19 +309,19 @@ async def build_93585A190(adapter, truth=None):
             is None
         ):
             raise RuntimeError("rim cut centerline failed")
-    await draw_closed_profile(adapter, rim_cut_profile(), label="rim cut", loops=1)
-    check("exit_sketch rim cut", await adapter.exit_sketch())
+    draw_closed_profile(adapter, rim_cut_profile(), label="rim cut", loops=1)
+    check("exit_sketch rim cut", adapter.exit_sketch())
     name_last_feature(adapter, "RimCutProfile")
     assert_profile_closed(adapter, "rim cut", loops=1, feature="RimCutProfile")
     check(
         "rim revolve cut",
-        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
+        adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
     )
     name_last_feature(adapter, "TopRimCut")
     offset_plane(adapter, "Plane3", HEAD_H / 2.0)
     check(
         "rim mirror",
-        await adapter.mirror_feature(
+        adapter.mirror_feature(
             MirrorFeatureParameters(plane="Plane3", features=["TopRimCut"])
         ),
     )
@@ -329,7 +329,7 @@ async def build_93585A190(adapter, truth=None):
     _telemetry.info(f"pre-runout volume: {mass_properties(adapter)['volume_mm3']}")
 
     # --- Boss-Extrude7: run-out cone (dir1) + head refill (dir2) -------------
-    await circle_sketch("Top", MAJOR_R, "RunoutProfile")
+    circle_sketch("Top", MAJOR_R, "RunoutProfile")
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     fm = _early_bound(_read_member(model, "FeatureManager"), "IFeatureManager")
     model.ClearSelection2(True)

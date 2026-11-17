@@ -36,7 +36,7 @@ def _record_point_to_point_cursor(
 
 
 @_telemetry.traced("sketch.polygon", label_param="label")
-async def define_polygon_chain(
+def define_polygon_chain(
     adapter: Any,
     lines: list[str],
     points: list[tuple[float, float]],
@@ -68,7 +68,7 @@ async def define_polygon_chain(
             f"{label}: need a closed chain (lines {n} != points {len(points)})"
         )
     rec = _dim_cursor(dims, names, drives)
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{lines[anchor]}.start", *points[anchor], f"{label} anchor"
     )
     _record_origin_anchor_cursor(rec, *points[anchor])
@@ -77,7 +77,7 @@ async def define_polygon_chain(
         if i == skip:
             continue
         (x1, y1), (x2, y2) = points[i], points[(i + 1) % n]
-        await anchor_point_to_point(
+        anchor_point_to_point(
             adapter, f"{line}.start", f"{line}.end", x2 - x1, y2 - y1, f"{label} {line}"
         )
         _record_point_to_point_cursor(rec, x2 - x1, y2 - y1)
@@ -121,7 +121,7 @@ def _record_origin_anchor_cursor(rec: "Callable[[], None]", x: float, y: float) 
 
 
 @_telemetry.traced("sketch.rect_chain", label_param="label")
-async def define_rectilinear_chain(
+def define_rectilinear_chain(
     adapter: Any,
     lines: list[str],
     points: list[tuple[float, float]],
@@ -170,7 +170,7 @@ async def define_rectilinear_chain(
         directions.append(direction)
         check(
             f"{label} {direction} {line}",
-            await adapter.add_sketch_constraint(line, None, direction),
+            adapter.add_sketch_constraint(line, None, direction),
         )
     last = {
         d: max(i for i, d2 in enumerate(directions) if d2 == d) for d in set(directions)
@@ -183,11 +183,11 @@ async def define_rectilinear_chain(
             kind, span = "horizontal_distance", abs(x2 - x1)
         else:
             kind, span = "vertical_distance", abs(y2 - y1)
-        await dimension_between(
+        dimension_between(
             adapter, f"{line}.start", f"{line}.end", kind, span, f"{label} {line}"
         )
         rec()
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{lines[anchor]}.start", *points[anchor], f"{label} anchor"
     )
     _record_origin_anchor_cursor(rec, *points[anchor])

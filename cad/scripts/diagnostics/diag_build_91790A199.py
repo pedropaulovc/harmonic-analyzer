@@ -32,20 +32,20 @@ PART_NO = "91790A199"
 
 
 @stock_recipe("91790A199", threaded=True)
-async def build_91790A199(
+def build_91790A199(
     adapter,
     truth=None,
     *,
     cut_length: float | None = None,
     cut_end_break: float | None = None,
 ):
-    await build_oval(
+    build_oval(
         adapter, PART_NO, cut_length=cut_length, cut_end_break=cut_end_break
     )
 
 
-async def build_catalog(adapter) -> dict[str, str]:
-    return await catalog_run(adapter, PART_NO, build_91790A199)
+def build_catalog(adapter) -> dict[str, str]:
+    return catalog_run(adapter, PART_NO, build_91790A199)
 
 
 if __name__ == "__main__":

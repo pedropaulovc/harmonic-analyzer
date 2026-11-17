@@ -43,7 +43,7 @@ def load_dof_manifest(name: str) -> list[dict[str, Any]]:
     return json.loads(path.read_text()).get("specs", [])
 
 
-async def _rename_drive_mate(adapter: Any, mate: Any, key: str) -> str:
+def _rename_drive_mate(adapter: Any, mate: Any, key: str) -> str:
     """Rename a just-authored transient drive mate to ``DRIVE_<key>``.
 
     ``mate`` is the dict :func:`_assembly._mate` returns (it carries the SW
@@ -58,12 +58,12 @@ async def _rename_drive_mate(adapter: Any, mate: Any, key: str) -> str:
     new = f"{DRIVE_PREFIX}{key}"
     check(
         f"rename drive mate {old!r} -> {new!r}",
-        await adapter.rename_feature(RenameFeatureParameters(old_name=old, new_name=new)),
+        adapter.rename_feature(RenameFeatureParameters(old_name=old, new_name=new)),
     )
     return new
 
 
-async def author_dof_drives(adapter: Any, specs: list[dict[str, Any]]) -> list[str]:
+def author_dof_drives(adapter: Any, specs: list[dict[str, Any]]) -> list[str]:
     """Author the given free-DOF drive specs on the ACTIVE assembly and rename
     each ``DRIVE_<key>``; return the new names.
 
@@ -87,7 +87,7 @@ async def author_dof_drives(adapter: Any, specs: list[dict[str, Any]]) -> list[s
             # authored world position, so a flip-ambiguous angle replay fails
             # loud on the wrong lean exactly like the build would.
             witness = (list(spec["witness"][0]), list(spec["witness"][1]))
-        res = await _mate(
+        res = _mate(
             adapter,
             f"transient drive {spec['key']}",
             spec["kind"],
@@ -97,7 +97,7 @@ async def author_dof_drives(adapter: Any, specs: list[dict[str, Any]]) -> list[s
             flip=bool(spec.get("flip", False)),
             **spec.get("params", {}),
         )
-        names.append(await _rename_drive_mate(adapter, res, spec["key"]))
+        names.append(_rename_drive_mate(adapter, res, spec["key"]))
     if names:
         adapter._attempt(lambda: adapter.currentModel.ForceRebuild3(False), default=None)
     return names

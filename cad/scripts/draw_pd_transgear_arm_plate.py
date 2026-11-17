@@ -839,11 +839,11 @@ def _add_linked_note(
     )
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open transgear-arm-plate source", await adapter.open_model(str(SOURCE)))
+    check("open transgear-arm-plate source", adapter.open_model(str(SOURCE)))
     read_required_properties(
         adapter.currentModel,
         (
@@ -1062,7 +1062,7 @@ async def build(adapter: Any) -> dict[str, str]:
         )
     _add_note(adapter, back, FRONT_VIEW_LABEL, FRONT_LABEL_XY, "front view label")
 
-    artefacts = await finalize_drawing(
+    artefacts = finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Transgear Arm Plate Manufacturing Drawing",

@@ -61,7 +61,7 @@ def _early(obj, iface: str):
     return cls(obj._oleobj_)
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     app = adapter.swApp
     for hole_type, wanted in WANT:
         hsd_raw = app.GetHoleStandardsData(hole_type)

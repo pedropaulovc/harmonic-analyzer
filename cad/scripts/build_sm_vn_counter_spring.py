@@ -44,21 +44,21 @@ STOCK_PROPERTIES = {
 }
 
 
-async def build(adapter) -> dict[str, str]:
-    check("create_part", await adapter.create_part())
+def build(adapter) -> dict[str, str]:
+    check("create_part", adapter.create_part())
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
     try:
-        await build_1330K524(adapter, None, length_mm=spec.INSTALLED_LENGTH_MM)
+        build_1330K524(adapter, None, length_mm=spec.INSTALLED_LENGTH_MM)
     finally:
         if hasattr(adapter, "_mcm_com_map"):
             delattr(adapter, "_mcm_com_map")
 
     _blank_recipe_references(adapter)
-    await force_rebuild(adapter)
-    await apply_material(adapter, MATERIAL)
+    force_rebuild(adapter)
+    apply_material(adapter, MATERIAL)
     # The uncoated music wire is dark as supplied; this is an appearance, not
     # an additional finish or coating requirement.
-    await apply_color(adapter, SPRING_BLACK)
+    apply_color(adapter, SPRING_BLACK)
     apply_custom_properties(adapter, STOCK_PROPERTIES)
     clear_dimensions_for_drawing(adapter)
     apply_drawing_properties(
@@ -68,13 +68,13 @@ async def build(adapter) -> dict[str, str]:
             "Manufacturing Notes": DRAWING_NOTES,
         },
     )
-    await add_extension_spring_references(
+    add_extension_spring_references(
         adapter, free_length_mm=spec.FREE_LENGTH_MM, max_length_mm=spec.MAX_LENGTH_MM,
         coil_od_mm=spec.SUPPLIER_COIL_OD_MM, wire_dia_mm=spec.SUPPLIER_WIRE_DIA_MM,
         body_count=2,
     )
-    await report_mass_properties(adapter)
-    artefacts = await save_part_and_images(adapter, PART_NAME)
+    report_mass_properties(adapter)
+    artefacts = save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(
         adapter,
         (

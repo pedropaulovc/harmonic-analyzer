@@ -41,13 +41,13 @@ from diagnostics.diag_mcmaster_socket_head import (  # noqa: E402
 
 
 @stock_recipe("91251A108", threaded=True)
-async def build_91251A108(adapter, truth=None):
-    await build_socket_head(adapter, DIMS)
+def build_91251A108(adapter, truth=None):
+    build_socket_head(adapter, DIMS)
 
 
-async def build_catalog(adapter) -> dict[str, str]:
+def build_catalog(adapter) -> dict[str, str]:
     """Catalog-only run: build the recipe and save it, no vendor truth."""
-    return await build_socket_head_catalog(adapter, DIMS)
+    return build_socket_head_catalog(adapter, DIMS)
 
 
 if __name__ == "__main__":

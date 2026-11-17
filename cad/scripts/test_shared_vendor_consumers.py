@@ -6,7 +6,6 @@ construct an adapter, connect to SOLIDWORKS or read production native files.
 
 from __future__ import annotations
 
-import asyncio
 import re
 import sys
 from types import ModuleType, SimpleNamespace
@@ -1629,7 +1628,7 @@ def placement_scene(unwrapped_com, monkeypatch, tmp_path):
         EditRebuild3=lambda: rebuild(False),
     )
 
-    async def insert(_parameters):
+    def insert(_parameters):
         return {"name": component.Name2, "fixed": False}
 
     adapter = SimpleNamespace(
@@ -1661,8 +1660,7 @@ def insertion_api(placement_scene, monkeypatch, request):
         options = {} if configuration is None else {"configuration": configuration}
         if request.param == "single":
             return [
-                asyncio.run(
-                    assembly.place_component(
+                assembly.place_component(
                         adapter,
                         part,
                         position,
@@ -1671,10 +1669,8 @@ def insertion_api(placement_scene, monkeypatch, request):
                         ground=False,
                         **options,
                     )
-                )
             ]
-        return asyncio.run(
-            assembly.place_components_batch(
+        return assembly.place_components_batch(
                 adapter,
                 [
                     {
@@ -1687,7 +1683,6 @@ def insertion_api(placement_scene, monkeypatch, request):
                 ],
                 label="shared configuration guard",
             )
-        )
 
     return place, adapter, component, rebuilds, placements
 
@@ -1762,8 +1757,7 @@ def test_explicit_member_without_reference_is_read_back_after_rebuild(
 def test_individual_insertion_reads_member_and_persists_reference(placement_scene):
     adapter, component, rebuilds, placements = placement_scene
     component.ComponentReference = ""
-    actual = asyncio.run(
-        assembly.place_component(
+    actual = assembly.place_component(
             adapter,
             WIRE,
             [1.0, 2.0, 3.0],
@@ -1773,7 +1767,6 @@ def test_individual_insertion_reads_member_and_persists_reference(placement_scen
             configuration="LeverWire",
             component_reference="LeverWire:1",
         )
-    )
     assert actual == component.Name2 == WIRE + "--LeverWire-73"
     assert component.ComponentReference == "LeverWire:1"
     assert rebuilds == [False]
@@ -1790,8 +1783,7 @@ def test_individual_insertion_refuses_configuration_substitution(
     component.ReferencedConfiguration = actual_member
     component.ComponentReference = ""
     with pytest.raises(RuntimeError, match="selected configuration"):
-        asyncio.run(
-            assembly.place_component(
+        assembly.place_component(
                 adapter,
                 WIRE,
                 [1.0, 2.0, 3.0],
@@ -1801,7 +1793,6 @@ def test_individual_insertion_refuses_configuration_substitution(
                 configuration="LeverWire",
                 component_reference="LeverWire:1",
             )
-        )
     assert component.ComponentReference == ""
     assert rebuilds == [] and placements == []
 
@@ -1831,8 +1822,7 @@ def test_individual_insertion_refuses_metadata_lost_during_rebuild(
         RuntimeError,
         match=re.escape(expected_error),
     ):
-        asyncio.run(
-            assembly.place_component(
+        assembly.place_component(
                 adapter,
                 WIRE,
                 [1.0, 2.0, 3.0],
@@ -1842,7 +1832,6 @@ def test_individual_insertion_refuses_metadata_lost_during_rebuild(
                 configuration="LeverWire",
                 component_reference="LeverWire:1",
             )
-        )
     assert placements == []
 
 
@@ -1911,14 +1900,10 @@ def test_batch_insertion_keeps_reordered_member_metadata_and_native_names(
             RuntimeError,
             match=re.escape(expected_error),
         ):
-            asyncio.run(
-                assembly.place_components_batch(adapter, specs, label="wire members")
-            )
+            assembly.place_components_batch(adapter, specs, label="wire members")
         assert rebuilds == [False]
         return
-    actual = asyncio.run(
-        assembly.place_components_batch(adapter, specs, label="wire members")
-    )
+    actual = assembly.place_components_batch(adapter, specs, label="wire members")
     assert actual == [first.Name2, second.Name2]
     assert [(c.ReferencedConfiguration, c.ComponentReference) for c in components] == [
         ("LeverWire", "LeverWire:1"),
@@ -2233,19 +2218,15 @@ def test_batch_rebinds_four_reordered_studs_and_ordinary_row_after_rebuild(
             RuntimeError,
             match=re.escape(expected_error),
         ):
-            asyncio.run(
-                assembly.place_components_batch(
+            assembly.place_components_batch(
                     scene.adapter, specs, label="four studs"
                 )
-            )
         assert scene.rebuilds == [False]
         if fault == "ledger-collision":
             assert assembly._POSE_LEDGER[expected_names[0]] is collision_pose
             assert assembly._POSE_LEDGER[old_names[0]] is ledger_entries[0]
         return
-    actual = asyncio.run(
-        assembly.place_components_batch(scene.adapter, specs, label="four studs")
-    )
+    actual = assembly.place_components_batch(scene.adapter, specs, label="four studs")
     assert actual == expected_names
     assert [c.Name2 for c in components] == expected_names
     assert [c.ReferencedConfiguration for c in components] == ["InnerLink"] * 4 + [

@@ -248,13 +248,13 @@ if not (
     raise AssertionError("a flat-pattern bend centreline leaves its edges")
 
 
-async def _relate(adapter, rows) -> None:
+def _relate(adapter, rows) -> None:
     """Apply ``(label, first, second, relation)`` sketch relations."""
     for label, first, second, relation in rows:
-        check(label, await adapter.add_sketch_constraint(first, second, relation))
+        check(label, adapter.add_sketch_constraint(first, second, relation))
 
 
-async def _arm_profile(adapter) -> SketchDims:
+def _arm_profile(adapter) -> SketchDims:
     """The arm's Front-plane outline in the open sketch, fully defined.
 
     Direct to the DB at the geometry's exact points, then constrained (48
@@ -268,41 +268,41 @@ async def _arm_profile(adapter) -> SketchDims:
     """
     dims = SketchDims()
     set_sketch_direct_db(adapter, True)
-    top = check("arm top", await adapter.add_line(*INNER_TOP, *OUTER_TOP))
+    top = check("arm top", adapter.add_line(*INNER_TOP, *OUTER_TOP))
     outer_v = check(
-        "arm outer vertical", await adapter.add_line(*OUTER_TOP, *OUTER_ROLL_START)
+        "arm outer vertical", adapter.add_line(*OUTER_TOP, *OUTER_ROLL_START)
     )
     outer_roll = check(
         "outer roll",
-        await adapter.add_arc(*ROLL_C_L, *OUTER_ROLL_END, *OUTER_ROLL_START),
+        adapter.add_arc(*ROLL_C_L, *OUTER_ROLL_END, *OUTER_ROLL_START),
     )
     outer_upper = check(
         "outer straight above the pin",
-        await adapter.add_line(*OUTER_ROLL_END, *FAR_FACE_POINT),
+        adapter.add_line(*OUTER_ROLL_END, *FAR_FACE_POINT),
     )
     outer_lower = check(
         "outer straight below the pin",
-        await adapter.add_line(*FAR_FACE_POINT, *OUTER_TAB_START),
+        adapter.add_line(*FAR_FACE_POINT, *OUTER_TAB_START),
     )
     outer_tab = check(
-        "inside tab", await adapter.add_arc(*TAB_C_L, *OUTER_TAB_START, *OUTER_TAB_END)
+        "inside tab", adapter.add_arc(*TAB_C_L, *OUTER_TAB_START, *OUTER_TAB_END)
     )
-    end = check("tab end", await adapter.add_line(*OUTER_TAB_END, *INNER_TAB_END))
+    end = check("tab end", adapter.add_line(*OUTER_TAB_END, *INNER_TAB_END))
     inner_tab = check(
-        "outside tab", await adapter.add_arc(*TAB_C_L, *INNER_TAB_START, *INNER_TAB_END)
+        "outside tab", adapter.add_arc(*TAB_C_L, *INNER_TAB_START, *INNER_TAB_END)
     )
     inner_straight = check(
-        "inner straight", await adapter.add_line(*INNER_TAB_START, *INNER_ROLL_END)
+        "inner straight", adapter.add_line(*INNER_TAB_START, *INNER_ROLL_END)
     )
     inner_roll = check(
         "inner roll",
-        await adapter.add_arc(*ROLL_C_L, *INNER_ROLL_END, *INNER_ROLL_START),
+        adapter.add_arc(*ROLL_C_L, *INNER_ROLL_END, *INNER_ROLL_START),
     )
     inner_v = check(
-        "arm inner vertical", await adapter.add_line(*INNER_ROLL_START, *INNER_TOP)
+        "arm inner vertical", adapter.add_line(*INNER_ROLL_START, *INNER_TOP)
     )
     set_sketch_direct_db(adapter, False)
-    await _relate(
+    _relate(
         adapter,
         (
             ("top-outer join", f"{top}.end", f"{outer_v}.start", "coincident"),
@@ -384,14 +384,14 @@ async def _arm_profile(adapter) -> SketchDims:
     )
     check(
         "arm thickness",
-        await adapter.add_sketch_dimension(top, None, "linear", SHEET_T),
+        adapter.add_sketch_dimension(top, None, "linear", SHEET_T),
     )
     dims.record("ArmT", '"SheetT"')
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{outer_v}.start", *OUTER_TOP, "arm top at the ear's top"
     )
     dims.record("ArmTop", '"Width"')
-    await dimension_between(
+    dimension_between(
         adapter,
         "origin",
         f"{outer_v}.end",
@@ -402,10 +402,10 @@ async def _arm_profile(adapter) -> SketchDims:
     dims.record("RollStart")
     check(
         "inside roll radius",
-        await adapter.add_sketch_dimension(inner_roll, None, "radial", INNER_ROLL_R),
+        adapter.add_sketch_dimension(inner_roll, None, "radial", INNER_ROLL_R),
     )
     dims.record("RollR")
-    await dimension_between(
+    dimension_between(
         adapter,
         "origin",
         f"{outer_upper}.end",
@@ -414,7 +414,7 @@ async def _arm_profile(adapter) -> SketchDims:
         "far face at the pin, X",
     )
     dims.record("FaceX")
-    await dimension_between(
+    dimension_between(
         adapter,
         "origin",
         f"{outer_upper}.end",
@@ -423,7 +423,7 @@ async def _arm_profile(adapter) -> SketchDims:
         "far face at the pin, Y",
     )
     dims.record("FaceY")
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{outer_upper}.start",
         f"{outer_lower}.end",
@@ -434,10 +434,10 @@ async def _arm_profile(adapter) -> SketchDims:
     dims.record("StraightLen")
     check(
         "inside tab radius",
-        await adapter.add_sketch_dimension(outer_tab, None, "radial", OUTER_TAB_R),
+        adapter.add_sketch_dimension(outer_tab, None, "radial", OUTER_TAB_R),
     )
     dims.record("TabR")
-    await dimension_between(
+    dimension_between(
         adapter,
         "origin",
         f"{outer_tab}.end",
@@ -449,7 +449,7 @@ async def _arm_profile(adapter) -> SketchDims:
     return dims
 
 
-async def _flat_blank(adapter) -> SketchDims:
+def _flat_blank(adapter) -> SketchDims:
     """The flat pattern in the open Right-plane sketch: its outline ordinary
     sketch geometry, so the drawing draws it continuous (the chain font of
     construction geometry broke its short edges apart), and the three bend
@@ -464,40 +464,40 @@ async def _flat_blank(adapter) -> SketchDims:
     dims = SketchDims()
     p = _FLAT
     set_sketch_direct_db(adapter, True)
-    top = check("flat top edge", await adapter.add_line(*p["top_rear"], *p["top_end"]))
+    top = check("flat top edge", adapter.add_line(*p["top_rear"], *p["top_end"]))
     base_end = check(
-        "flat base end", await adapter.add_line(*p["top_end"], *p["low_end"])
+        "flat base end", adapter.add_line(*p["top_end"], *p["low_end"])
     )
     low = check(
-        "flat low edge", await adapter.add_line(*p["low_end"], *p["root_start"])
+        "flat low edge", adapter.add_line(*p["low_end"], *p["root_start"])
     )
     root = check(
         "flat root relief",
-        await adapter.add_arc(*p["root_c"], *p["root_start"], *p["root_end"]),
+        adapter.add_arc(*p["root_c"], *p["root_start"], *p["root_end"]),
     )
     front = check(
-        "flat front edge", await adapter.add_line(*p["root_end"], *p["taper_start"])
+        "flat front edge", adapter.add_line(*p["root_end"], *p["taper_start"])
     )
     taper = check(
-        "flat taper", await adapter.add_line(*p["taper_start"], *p["taper_end"])
+        "flat taper", adapter.add_line(*p["taper_start"], *p["taper_end"])
     )
     low_front = check(
         "flat low front edge",
-        await adapter.add_line(*p["taper_end"], *p["round_front"]),
+        adapter.add_line(*p["taper_end"], *p["round_front"]),
     )
     tip = check(
         "flat full round",
-        await adapter.add_arc(*_FLAT_ROUND_C, *p["round_rear"], *p["round_front"]),
+        adapter.add_arc(*_FLAT_ROUND_C, *p["round_rear"], *p["round_front"]),
     )
     rear = check(
-        "flat rear edge", await adapter.add_line(*p["round_rear"], *p["top_rear"])
+        "flat rear edge", adapter.add_line(*p["round_rear"], *p["top_rear"])
     )
     bends = {
-        name: check(f"flat {name} centreline", await adapter.add_centerline(*a, *b))
+        name: check(f"flat {name} centreline", adapter.add_centerline(*a, *b))
         for name, (a, b) in _FLAT_BENDS.items()
     }
     set_sketch_direct_db(adapter, False)
-    await _relate(
+    _relate(
         adapter,
         (
             ("flat top-end join", f"{top}.end", f"{base_end}.start", "coincident"),
@@ -555,27 +555,27 @@ async def _flat_blank(adapter) -> SketchDims:
             ("flat tab line horizontal", bends["tab"], None, "horizontal"),
         ),
     )
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{top}.start", *p["top_rear"], "flat blank beside the part"
     )
     dims.record(None)
     dims.record(None)
     check(
         "flat length",
-        await adapter.add_sketch_dimension(top, None, "linear", FLAT_LENGTH),
+        adapter.add_sketch_dimension(top, None, "linear", FLAT_LENGTH),
     )
     dims.record("FlatLength")
     check(
         "flat width",
-        await adapter.add_sketch_dimension(base_end, None, "linear", WIDTH),
+        adapter.add_sketch_dimension(base_end, None, "linear", WIDTH),
     )
     dims.record("FlatWidth", '"Width"')
     check(
         "flat root relief radius",
-        await adapter.add_sketch_dimension(root, None, "radial", ROOT_R),
+        adapter.add_sketch_dimension(root, None, "radial", ROOT_R),
     )
     dims.record("FlatRootR", '"RootR"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{top}.start",
         f"{front}.start",
@@ -584,7 +584,7 @@ async def _flat_blank(adapter) -> SketchDims:
         "flat arm width",
     )
     dims.record("FlatArmW", '"EarHeight" - "ArmFrontZ"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{top}.start",
         f"{low_front}.start",
@@ -598,11 +598,11 @@ async def _flat_blank(adapter) -> SketchDims:
         ("DevTaper2", f"{taper}.end", DEV_TAPER[1]),
         ("DevRoundC", f"{tip}.center", -_FLAT_ROUND_C[1]),
     ):
-        await dimension_between(
+        dimension_between(
             adapter, f"{base_end}.end", ref, "vertical_distance", value, name
         )
         dims.record(name)
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{top}.start",
         f"{bends['bend']}.end",
@@ -618,21 +618,21 @@ async def _flat_blank(adapter) -> SketchDims:
         ("FlatRollC", f"{base_end}.end", bends["roll"], DEV_ROLL_C),
         ("FlatTabC", f"{tip}.center", bends["tab"], DEV_TAB_C + _FLAT_ROUND_C[1]),
     ):
-        await dimension_between(
+        dimension_between(
             adapter, ref, f"{line}.end", "vertical_distance", value, name
         )
         dims.record(name)
     return dims
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
         CreatePlaneParameters,
         ExtrusionParameters,
         RevolveParameters,
     )
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- the
@@ -653,15 +653,15 @@ async def build(adapter) -> dict[str, str]:
         ("PinHoleDia", PIN_HOLE_DIA),
         ("PinHoleZ", PIN_HOLE_ZL),
     ):
-        await set_global(adapter, name, f"{value}mm")
+        set_global(adapter, name, f"{value}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
     # --- Base and ear: one Top-plane section extruded +Y by the width.
     profile = SketchDims()
-    check("create_sketch base and ear", await adapter.create_sketch("Top"))
-    lines = await add_line_chain(adapter, _L_POINTS)
-    await define_rectilinear_chain(
+    check("create_sketch base and ear", adapter.create_sketch("Top"))
+    lines = add_line_chain(adapter, _L_POINTS)
+    define_rectilinear_chain(
         adapter,
         lines,
         _L_POINTS,
@@ -676,44 +676,44 @@ async def build(adapter) -> dict[str, str]:
             '"EarHeight" - "SheetT"',
         ],
     )
-    await ensure_fully_defined(adapter, "base and ear profile")
-    check("exit_sketch base and ear", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "base and ear profile")
+    check("exit_sketch base and ear", adapter.exit_sketch())
     name_last_feature(adapter, "BaseEarProfile")
     drive_jobs += profile.apply(adapter, "BaseEarProfile")
     check(
         "extrude base and ear",
-        await adapter.create_extrusion(ExtrusionParameters(depth=WIDTH)),
+        adapter.create_extrusion(ExtrusionParameters(depth=WIDTH)),
     )
     name_last_feature(adapter, "BaseEar")
     width_dim = name_dimensions(adapter, "BaseEar", ["Width"])
     drive_jobs.append((width_dim[0], '"Width"'))
-    await volume_check(adapter, "sharp L", V_SHARP_L, 0.005 * V_SHARP_L)
+    volume_check(adapter, "sharp L", V_SHARP_L, 0.005 * V_SHARP_L)
 
     # The bend: the inside radius in the re-entrant corner, the outside one
     # (inside plus the sheet) on the outer corner, about one centre.
     check(
         "fillet inside bend",
-        await adapter.add_fillet(INSIDE_BEND_R, [[-SHEET_T, WIDTH / 2.0, SHEET_T]]),
+        adapter.add_fillet(INSIDE_BEND_R, [[-SHEET_T, WIDTH / 2.0, SHEET_T]]),
     )
     name_last_feature(adapter, "InsideBend")
     inside = name_dimensions(adapter, "InsideBend", ["InsideBendR"])
     drive_jobs.append((inside[0], '"InsideBendR"'))
     check(
         "fillet outside bend",
-        await adapter.add_fillet(OUTSIDE_BEND_R, [[0.0, WIDTH / 2.0, 0.0]]),
+        adapter.add_fillet(OUTSIDE_BEND_R, [[0.0, WIDTH / 2.0, 0.0]]),
     )
     name_last_feature(adapter, "OutsideBend")
     outside = name_dimensions(adapter, "OutsideBend", ["OutsideBendR"])
     drive_jobs.append((outside[0], '"InsideBendR" + "SheetT"'))
     expected = V_L
-    await volume_check(adapter, "bent L", expected, 0.005 * V_L)
+    volume_check(adapter, "bent L", expected, 0.005 * V_L)
 
     # --- The arm: its Front-plane outline over the z band, from a start
     # offset.  Its top (y 0..WIDTH) lies inside the ear, already solid.
-    check("create_sketch arm", await adapter.create_sketch("Front"))
-    arm = await _arm_profile(adapter)
-    await ensure_fully_defined(adapter, "arm profile")
-    check("exit_sketch arm", await adapter.exit_sketch())
+    check("create_sketch arm", adapter.create_sketch("Front"))
+    arm = _arm_profile(adapter)
+    ensure_fully_defined(adapter, "arm profile")
+    check("exit_sketch arm", adapter.exit_sketch())
     name_last_feature(adapter, "ArmProfile")
     drive_jobs += arm.apply(adapter, "ArmProfile")
     extrude_at_offset(adapter, ARM_Z1 - ARM_Z0, ARM_Z0)
@@ -725,16 +725,16 @@ async def build(adapter) -> dict[str, str]:
         (low_dim, '"ArmLowZ"'),
     ]
     expected += V_ARM_PRISM - V_ARM_ON_EAR
-    await volume_check(adapter, "arm", expected, 0.005 * expected)
+    volume_check(adapter, "arm", expected, 0.005 * expected)
 
     # --- The taper: the front edge 1.588 forward of the guide-lock screw heads
     # down to TAPER_L[0], then out to the low band at TAPER_L[1].  Cut
     # through along X; the region stops at the ear's lower edge (y = 0).
     taper = SketchDims()
-    check("create_sketch taper", await adapter.create_sketch("Right"))
-    taper_lines = await add_line_chain(adapter, _TAPER_POINTS)
+    check("create_sketch taper", adapter.create_sketch("Right"))
+    taper_lines = add_line_chain(adapter, _TAPER_POINTS)
     a, _slope, c, d, e = taper_lines
-    await _relate(
+    _relate(
         adapter,
         (
             ("taper front edge vertical", a, None, "vertical"),
@@ -743,11 +743,11 @@ async def build(adapter) -> dict[str, str]:
             ("taper top horizontal", e, None, "horizontal"),
         ),
     )
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{a}.start", *_TAPER_POINTS[0], "front edge at the ear"
     )
     taper.record("ArmFrontZ", '"ArmFrontZ"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{a}.start",
         f"{a}.end",
@@ -756,7 +756,7 @@ async def build(adapter) -> dict[str, str]:
         "taper start below the ear",
     )
     taper.record("TaperY1")
-    await dimension_between(
+    dimension_between(
         adapter,
         "origin",
         f"{c}.start",
@@ -765,7 +765,7 @@ async def build(adapter) -> dict[str, str]:
         "taper end on the low front edge",
     )
     taper.record("TaperLowZ", '"ArmLowZ"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{a}.start",
         f"{c}.start",
@@ -776,18 +776,18 @@ async def build(adapter) -> dict[str, str]:
     taper.record("TaperY2")
     check(
         "taper cut margin",
-        await adapter.add_sketch_dimension(
+        adapter.add_sketch_dimension(
             c, None, "linear", _TAPER_POINTS[3][0] - _TAPER_POINTS[2][0]
         ),
     )
     taper.record("TaperMargin")
-    await ensure_fully_defined(adapter, "taper profile")
-    check("exit_sketch taper", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "taper profile")
+    check("exit_sketch taper", adapter.exit_sketch())
     name_last_feature(adapter, "TaperProfile")
     drive_jobs += taper.apply(adapter, "TaperProfile")
     check(
         "cut taper",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(
                 depth=4.0 * (BBOX_X[1] - BBOX_X[0]), both_directions=True
             )
@@ -795,33 +795,33 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "Taper")
     expected -= V_TAPER_CUT
-    await volume_check(adapter, "taper", expected, 0.03 * V_TAPER_CUT)
+    volume_check(adapter, "taper", expected, 0.03 * V_TAPER_CUT)
 
     # --- The root relief: the inside corner where the front edge meets the
     # ear's lower edge, across the strip.
     check(
         "fillet root relief",
-        await adapter.add_fillet(ROOT_R, [[-SHEET_T / 2.0, 0.0, ARM_FRONT_Z]]),
+        adapter.add_fillet(ROOT_R, [[-SHEET_T / 2.0, 0.0, ARM_FRONT_Z]]),
     )
     name_last_feature(adapter, "RootRelief")
     root = name_dimensions(adapter, "RootRelief", ["RootR"])
     drive_jobs.append((root[0], '"RootR"'))
     expected += V_ROOT_FILL
-    await volume_check(adapter, "root relief", expected, 0.1 * V_ROOT_FILL + 0.05)
+    volume_check(adapter, "root relief", expected, 0.1 * V_ROOT_FILL + 0.05)
 
     # --- The full round at the tip, seen along X: everything below the
     # round's centre outside its lower half-circle, cut through along X.
     rnd = SketchDims()
-    check("create_sketch round", await adapter.create_sketch("Right"))
+    check("create_sketch round", adapter.create_sketch("Right"))
     rear_x = _ROUND_C[0] - ROUND_R
     front_x = _ROUND_C[0] + ROUND_R
     set_sketch_direct_db(adapter, True)
     arc = check(
         "full round",
-        await adapter.add_arc(*_ROUND_C, rear_x, _ROUND_C[1], front_x, _ROUND_C[1]),
+        adapter.add_arc(*_ROUND_C, rear_x, _ROUND_C[1], front_x, _ROUND_C[1]),
     )
     set_sketch_direct_db(adapter, False)
-    round_lines = await add_line_chain(
+    round_lines = add_line_chain(
         adapter,
         [
             (rear_x, _ROUND_C[1]),
@@ -834,7 +834,7 @@ async def build(adapter) -> dict[str, str]:
         close=False,
     )
     rear_lip, rear_side, bottom, front_side, front_lip = round_lines
-    await _relate(
+    _relate(
         adapter,
         (
             ("round-rear lip join", f"{arc}.start", f"{rear_lip}.start", "coincident"),
@@ -860,10 +860,10 @@ async def build(adapter) -> dict[str, str]:
     )
     check(
         "full round radius",
-        await adapter.add_sketch_dimension(arc, None, "radial", ROUND_R),
+        adapter.add_sketch_dimension(arc, None, "radial", ROUND_R),
     )
     rnd.record("RoundR", '("EarHeight" - "ArmLowZ") / 2')
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{arc}.center", *_ROUND_C, "full round centre"
     )
     rnd.record("RoundZ", '("EarHeight" + "ArmLowZ") / 2')
@@ -873,15 +873,15 @@ async def build(adapter) -> dict[str, str]:
         ("RoundFrontLip", front_lip, _ROUND_OVERRUN),
         ("RoundDepth", rear_side, _ROUND_C[1] - _ROUND_BOTTOM),
     ):
-        check(name, await adapter.add_sketch_dimension(line, None, "linear", value))
+        check(name, adapter.add_sketch_dimension(line, None, "linear", value))
         rnd.record(name)
-    await ensure_fully_defined(adapter, "round profile")
-    check("exit_sketch round", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "round profile")
+    check("exit_sketch round", adapter.exit_sketch())
     name_last_feature(adapter, "RoundProfile")
     drive_jobs += rnd.apply(adapter, "RoundProfile")
     check(
         "cut full round",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(
                 depth=4.0 * (BBOX_X[1] - BBOX_X[0]), both_directions=True
             )
@@ -889,15 +889,15 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "Round")
     expected -= V_ROUND_CUT
-    await volume_check(adapter, "full round", expected, 0.05 * V_ROUND_CUT + 0.1)
+    volume_check(adapter, "full round", expected, 0.05 * V_ROUND_CUT + 0.1)
 
     # --- Screw holes, drilled through the base after bending: a Front-plane
     # sketch cut +Z through the sheet.  Both holes' X run from the ear's
     # outer face (the origin); the second hole's Y and size ride the same
     # globals and print once under "2X".
     screws = SketchDims()
-    check("create_sketch screw holes", await adapter.create_sketch("Front"))
-    await define_circle(
+    check("create_sketch screw holes", adapter.create_sketch("Front"))
+    define_circle(
         adapter,
         SCREW_HOLE_X[0],
         SCREW_HOLE_Y,
@@ -907,7 +907,7 @@ async def build(adapter) -> dict[str, str]:
         names=("ScrewX1", "ScrewY", "ScrewDia"),
         drives=('"ScrewHoleX1"', '"ScrewHoleY"', '"ScrewHoleDia"'),
     )
-    await define_circle(
+    define_circle(
         adapter,
         SCREW_HOLE_X[1],
         SCREW_HOLE_Y,
@@ -917,26 +917,26 @@ async def build(adapter) -> dict[str, str]:
         names=("ScrewX2", "ScrewY2", "ScrewDia2"),
         drives=('"ScrewHoleX2"', '"ScrewHoleY"', '"ScrewHoleDia"'),
     )
-    await ensure_fully_defined(adapter, "screw hole sketch")
-    check("exit_sketch screw holes", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "screw hole sketch")
+    check("exit_sketch screw holes", adapter.exit_sketch())
     name_last_feature(adapter, "ScrewHoleProfile")
     drive_jobs += screws.apply(adapter, "ScrewHoleProfile")
     check(
         "cut screw holes",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=SHEET_T, reverse_direction=True)
         ),
     )
     name_last_feature(adapter, "ScrewHoles")
     expected -= V_SCREW_HOLES
-    await volume_check(adapter, "screw holes", expected, 0.02 * V_SCREW_HOLES)
+    volume_check(adapter, "screw holes", expected, 0.02 * V_SCREW_HOLES)
 
     # --- The pin hole: a revolve cut about its axis along U, sketched on the
     # plane at the pin's height.  Match-drilled from the pin at assembly; the
     # model holds the geometry's nominal and the sheet prints its size only.
     check(
         "create_plane PinHolePlane",
-        await adapter.create_plane(
+        adapter.create_plane(
             CreatePlaneParameters(
                 mode="offset", base_plane="Front Plane", offset=PIN_HOLE_ZL
             )
@@ -947,15 +947,15 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs.append((plane_dim[0], '"PinHoleZ"'))
     blank_reference_geometry(adapter, (("PinHolePlane", "PLANE"),))
     pin = SketchDims()
-    check("create_sketch pin hole", await adapter.create_sketch("PinHolePlane"))
+    check("create_sketch pin hole", adapter.create_sketch("PinHolePlane"))
     set_sketch_direct_db(adapter, True)
     axis = check(
-        "pin hole axis", await adapter.add_centerline(*_PIN_AXIS[0], *_PIN_AXIS[1])
+        "pin hole axis", adapter.add_centerline(*_PIN_AXIS[0], *_PIN_AXIS[1])
     )
     set_sketch_direct_db(adapter, False)
-    pin_lines = await add_line_chain(adapter, _PIN_PROFILE)
+    pin_lines = add_line_chain(adapter, _PIN_PROFILE)
     on_axis, near_end, rim, far_end = pin_lines
-    await _relate(
+    _relate(
         adapter,
         (
             (
@@ -972,52 +972,52 @@ async def build(adapter) -> dict[str, str]:
     )
     for index, point in enumerate(_PIN_AXIS):
         end_ref = f"{axis}.start" if index == 0 else f"{axis}.end"
-        await anchor_point_to_origin(adapter, end_ref, *point, f"pin axis end {index}")
+        anchor_point_to_origin(adapter, end_ref, *point, f"pin axis end {index}")
         pin.record(None)
         pin.record(None)
     text = (
         _PIN_PROFILE[2][0] + 2.0 * _PIN_R * ARM_N[0],
         _PIN_PROFILE[2][1] + 2.0 * _PIN_R * ARM_N[1],
     )
-    await add_diametric_linear_dimension(adapter, axis, rim, text, "PinHoleDia")
+    add_diametric_linear_dimension(adapter, axis, rim, text, "PinHoleDia")
     pin.record("PinHoleDia", '"PinHoleDia"')
-    await ensure_fully_defined(adapter, "pin hole profile")
-    check("exit_sketch pin hole", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "pin hole profile")
+    check("exit_sketch pin hole", adapter.exit_sketch())
     name_last_feature(adapter, "PinHoleProfile")
     drive_jobs += pin.apply(adapter, "PinHoleProfile")
     check(
         "revolve-cut pin hole",
-        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
+        adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
     )
     name_last_feature(adapter, "PinHole")
     expected -= V_PIN_HOLE
-    await volume_check(adapter, "pin hole", expected, 0.02 * V_PIN_HOLE)
+    volume_check(adapter, "pin hole", expected, 0.02 * V_PIN_HOLE)
     if abs(expected - VOLUME) > 1e-6:
         raise AssertionError(f"feature gates sum to {expected}, geometry says {VOLUME}")
 
     # --- The flat pattern: hidden reference sketch, printed by the drawing.
-    check("create_sketch flat blank", await adapter.create_sketch("Right"))
-    flat = await _flat_blank(adapter)
-    await ensure_fully_defined(adapter, "flat blank")
-    check("exit_sketch flat blank", await adapter.exit_sketch())
+    check("create_sketch flat blank", adapter.create_sketch("Right"))
+    flat = _flat_blank(adapter)
+    ensure_fully_defined(adapter, "flat blank")
+    check("exit_sketch flat blank", adapter.exit_sketch())
     name_last_feature(adapter, FLAT_SKETCH)
     drive_jobs += flat.apply(adapter, FLAT_SKETCH)
 
     # Deferred drive equations, then re-check neutrality.
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    volume_check(
         adapter, "driven hook (equations neutral)", VOLUME, 0.005 * VOLUME
     )
-    await bbox_extent_check(adapter, "hook X", "x", BBOX_X[1] - BBOX_X[0], 0.1)
-    await bbox_extent_check(adapter, "hook Y", "y", BBOX_Y[1] - BBOX_Y[0])
-    await bbox_extent_check(adapter, "hook Z", "z", BBOX_Z[1] - BBOX_Z[0])
+    bbox_extent_check(adapter, "hook X", "x", BBOX_X[1] - BBOX_X[0], 0.1)
+    bbox_extent_check(adapter, "hook Y", "y", BBOX_Y[1] - BBOX_Y[0])
+    bbox_extent_check(adapter, "hook Z", "z", BBOX_Z[1] - BBOX_Z[0])
 
-    await apply_material(adapter, MATERIAL)
-    await apply_color(adapter, POLISHED_STEEL)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    apply_color(adapter, POLISHED_STEEL)
+    report_mass_properties(adapter)
     # The drilled holes, the width, the inside bend radius and the screw-hole
     # positions (the bar's taps are spotted through them at assembly) take
     # the title block's rows (DRILLED HOLES, .XX, .XXX): no explicit band.
@@ -1040,7 +1040,7 @@ async def build(adapter) -> dict[str, str]:
     # Hidden so no assembly instance renders it; the drawing shows it per view.
     blank_reference_sketches(adapter, REFERENCE_SKETCHES)
     apply_drawing_properties(adapter, PART_NAME, DRAWING_PROPERTIES)
-    return await save_part_and_images(adapter, PART_NAME)
+    return save_part_and_images(adapter, PART_NAME)
 
 
 if __name__ == "__main__":

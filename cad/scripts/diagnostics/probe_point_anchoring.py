@@ -229,20 +229,20 @@ def _driven_state(adapter: Any, display_dim: Any) -> Any:
     return state
 
 
-async def _sketch_state(adapter: Any) -> str:
-    res = await adapter.check_sketch_fully_defined()
+def _sketch_state(adapter: Any) -> str:
+    res = adapter.check_sketch_fully_defined()
     if res.is_success and res.data:
         return str(res.data.get("definition_state"))
     return f"probe-failed:{res.error}"
 
 
-async def build(adapter) -> dict[str, str]:
-    check("create_part", await adapter.create_part())
+def build(adapter) -> dict[str, str]:
+    check("create_part", adapter.create_part())
 
     # ---- Sketch 1: resolution, origin, coincident, driving dims ----------
-    check("create_sketch probe-1", await adapter.create_sketch("Front"))
+    check("create_sketch probe-1", adapter.create_sketch("Front"))
 
-    circle_a = check("add_circle A @origin r8", await adapter.add_circle(0.0, 0.0, 8.0))
+    circle_a = check("add_circle A @origin r8", adapter.add_circle(0.0, 0.0, 8.0))
     circle_a_obj = adapter._sketch_entities[circle_a]
 
     # Step 1: accessor resolution on a circle (centre) and later on lines.
@@ -262,17 +262,17 @@ async def build(adapter) -> dict[str, str]:
 
     # Step 3: coincident centre -> origin. Creation-time inference may have
     # anchored it already, so capture the state before and after.
-    state_before = await _sketch_state(adapter)
+    state_before = _sketch_state(adapter)
     coincident_result = "skipped (no origin)"
     if center_a is not None and origin is not None:
         rel = _add_relation_raw(adapter, [center_a, origin], 9)
         coincident_result = "ok" if rel is not None else "None/failed"
-    state_mid = await _sketch_state(adapter)
+    state_mid = _sketch_state(adapter)
     dia_a = check(
         "diameter dim A (16)",
-        await adapter.add_sketch_dimension(circle_a, None, "diameter", 16.0),
+        adapter.add_sketch_dimension(circle_a, None, "diameter", 16.0),
     )
-    state_a = await _sketch_state(adapter)
+    state_a = _sketch_state(adapter)
     record(
         "3 coincident centre->origin",
         state_a == "fully_defined",
@@ -282,7 +282,7 @@ async def build(adapter) -> dict[str, str]:
     dia_a_driven = _driven_state(adapter, adapter._sketch_entities[dia_a])
 
     # Step 4: circle B at (-20,-15), H/V driving dims to origin, rebuild.
-    circle_b = check("add_circle B @(-20,-15) r5", await adapter.add_circle(-20.0, -15.0, 5.0))
+    circle_b = check("add_circle B @(-20,-15) r5", adapter.add_circle(-20.0, -15.0, 5.0))
     circle_b_obj = adapter._sketch_entities[circle_b]
     center_b, how_b = _get_point(adapter, circle_b_obj, "ISketchArc", "GetCenterPoint2")
     record("4a circle B centre accessor", center_b is not None, how_b)
@@ -299,11 +299,11 @@ async def build(adapter) -> dict[str, str]:
             )
             dia_b = check(
                 "diameter dim B (10)",
-                await adapter.add_sketch_dimension(circle_b, None, "diameter", 10.0),
+                adapter.add_sketch_dimension(circle_b, None, "diameter", 10.0),
             )
             adapter._attempt(lambda: adapter.currentModel.ForceRebuild3(False))
             xyz_b = _xyz(adapter, center_b)
-            state_b = await _sketch_state(adapter)
+            state_b = _sketch_state(adapter)
             side_kept = (
                 xyz_b is not None
                 and abs(xyz_b[0] - (-20.0)) < 1e-3
@@ -323,12 +323,12 @@ async def build(adapter) -> dict[str, str]:
             detail4 = f"{type(exc).__name__}: {exc}"
     record("4 H/V driving dims, negative quadrant", step4_ok, detail4)
 
-    check("exit_sketch probe-1", await adapter.exit_sketch())
+    check("exit_sketch probe-1", adapter.exit_sketch())
 
     # ---- Sketch 2: relation enums on points (scratch geometry) -----------
-    check("create_sketch probe-2", await adapter.create_sketch("Front"))
-    circle_c = check("add_circle C", await adapter.add_circle(30.0, 10.0, 4.0))
-    circle_d = check("add_circle D", await adapter.add_circle(50.0, 10.0, 4.0))
+    check("create_sketch probe-2", adapter.create_sketch("Front"))
+    circle_c = check("add_circle C", adapter.add_circle(30.0, 10.0, 4.0))
+    circle_d = check("add_circle D", adapter.add_circle(50.0, 10.0, 4.0))
     center_c, _ = _get_point(adapter, adapter._sketch_entities[circle_c], "ISketchArc", "GetCenterPoint2")
     center_d, _ = _get_point(adapter, adapter._sketch_entities[circle_d], "ISketchArc", "GetCenterPoint2")
 
@@ -345,8 +345,8 @@ async def build(adapter) -> dict[str, str]:
     else:
         record("6 horizontal between points", False, "centre resolution failed")
 
-    line_1 = check("add_line L1", await adapter.add_line(0.0, -30.0, 20.0, -30.0))
-    line_2 = check("add_line L2", await adapter.add_line(20.0, -25.0, 40.0, -25.0))
+    line_1 = check("add_line L1", adapter.add_line(0.0, -30.0, 20.0, -30.0))
+    line_2 = check("add_line L2", adapter.add_line(20.0, -25.0, 40.0, -25.0))
     l1_start, _ = _get_point(adapter, adapter._sketch_entities[line_1], "ISketchLine", "GetStartPoint2")
     l1_end, _ = _get_point(adapter, adapter._sketch_entities[line_1], "ISketchLine", "GetEndPoint2")
     l2_start, how_l2 = _get_point(adapter, adapter._sketch_entities[line_2], "ISketchLine", "GetStartPoint2")
@@ -378,7 +378,7 @@ async def build(adapter) -> dict[str, str]:
     else:
         record("7b ATMIDDLE(12)", False, "centre resolution failed")
 
-    check("exit_sketch probe-2", await adapter.exit_sketch())
+    check("exit_sketch probe-2", adapter.exit_sketch())
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True))
 
     passed = sum(1 for _, ok, _ in RESULTS if ok)

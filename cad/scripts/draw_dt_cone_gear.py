@@ -1199,12 +1199,12 @@ def _curate_repeated_dimensions(
     return curate_dimensions(adapter, curated, reposition=dict(keep))
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open cone-gear source", await adapter.open_model(str(SOURCE)))
-    await assert_saved_configuration_topology(adapter, phase="drawing source")
+    check("open cone-gear source", adapter.open_model(str(SOURCE)))
+    assert_saved_configuration_topology(adapter, phase="drawing source")
     read_required_properties(
         adapter.currentModel,
         (
@@ -1400,7 +1400,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     _rewrite_callouts(adapter, sheet_callouts)
 
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Cone Gear Batch Manufacturing Drawing",

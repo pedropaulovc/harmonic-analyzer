@@ -1885,11 +1885,11 @@ def _visible_hole_table_entities(
     )
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open harmonic-base source", await adapter.open_model(str(SOURCE)))
+    check("open harmonic-base source", adapter.open_model(str(SOURCE)))
     for index in range(len(COLUMN_SOCKET_XZ)):
         name = "SocketDia" if index == 0 else f"Socket{index}Dia"
         raw = adapter.currentModel.Parameter(f"{name}@ColumnSocketProfile")
@@ -2503,7 +2503,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     rebuild_drawing(adapter, label="base cross near-wall clearance near-side leader")
     _log_tapped_hole_notes(adapter, ddoc)
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Harmonic Base Manufacturing Drawing",

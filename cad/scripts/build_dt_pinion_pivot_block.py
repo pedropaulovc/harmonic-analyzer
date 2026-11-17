@@ -87,25 +87,25 @@ _SAVED_DRAWING_PROPERTIES = (
 # native #8-32 tapped seats.
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations): the block envelope, the two bores and
     # their spacing. The mm suffix is load-bearing -- this is an INCH document and
     # the equation manager reads BARE numbers in document units (an unsuffixed 33
     # = 33 in).
-    await set_global(adapter, "BlockWidth", f"{BLOCK_WIDTH}mm")
-    await set_global(adapter, "BlockHeight", f"{BLOCK_HEIGHT}mm")
-    await set_global(adapter, "BlockDepth", f"{BLOCK_DEPTH}mm")
-    await set_global(adapter, "BoreUp", f"{BORE_UP}mm")
-    await set_global(adapter, "Bore", f"{BORE_DIA}mm")
-    await set_global(adapter, "BlockEast", f"{BLOCK_EAST}mm")
-    await set_global(adapter, "LiftBoreSpacing", f"{LIFT_BORE_SPACING}mm")
-    await set_global(adapter, "LiftBoreRise", f"{LIFT_BORE_RISE}mm")
-    await set_global(adapter, "ScrewHalfSpacing", f"{SCREW_HALF_SPACING}mm")
+    set_global(adapter, "BlockWidth", f"{BLOCK_WIDTH}mm")
+    set_global(adapter, "BlockHeight", f"{BLOCK_HEIGHT}mm")
+    set_global(adapter, "BlockDepth", f"{BLOCK_DEPTH}mm")
+    set_global(adapter, "BoreUp", f"{BORE_UP}mm")
+    set_global(adapter, "Bore", f"{BORE_DIA}mm")
+    set_global(adapter, "BlockEast", f"{BLOCK_EAST}mm")
+    set_global(adapter, "LiftBoreSpacing", f"{LIFT_BORE_SPACING}mm")
+    set_global(adapter, "LiftBoreRise", f"{LIFT_BORE_RISE}mm")
+    set_global(adapter, "ScrewHalfSpacing", f"{SCREW_HALF_SPACING}mm")
     # Hole diameter is owned by the native #8 normal-clearance HoleSpec; only
     # the two placement stations remain editable globals.
 
@@ -115,17 +115,17 @@ async def build(adapter) -> dict[str, str]:
     # and define_circle both suppress sketch inference internally (the bores sit
     # on the sketch x axis, so an auto-relation would mis-snap them).
     block = SketchDims()
-    check("create_sketch block", await adapter.create_sketch("Front"))
+    check("create_sketch block", adapter.create_sketch("Front"))
     block_rect = [
         (-BLOCK_WEST, -BORE_UP),
         (BLOCK_EAST, -BORE_UP),
         (BLOCK_EAST, BLOCK_HEIGHT - BORE_UP),
         (-BLOCK_WEST, BLOCK_HEIGHT - BORE_UP),
     ]
-    entities = await add_line_chain(adapter, block_rect)
+    entities = add_line_chain(adapter, block_rect)
     # Pivot bore ON the origin: only its diameter is recorded.  The
     # lift bore's two unsigned centre dims are its spacing and rise from it.
-    await define_circle(
+    define_circle(
         adapter,
         0.0,
         0.0,
@@ -135,7 +135,7 @@ async def build(adapter) -> dict[str, str]:
         names=(None, None, "PivotBoreDia"),
         drives=(None, None, '"Bore"'),
     )
-    await define_circle(
+    define_circle(
         adapter,
         -LIFT_BORE_SPACING,
         LIFT_BORE_RISE,
@@ -148,7 +148,7 @@ async def build(adapter) -> dict[str, str]:
     # Rectangle anchored at vertex 0 (-BLOCK_WEST, -BORE_UP): the width (X
     # span) and height (Y span) segment dims, then the two anchor dims (absolute
     # distances to the origin, so AnchorX = BLOCK_WEST and AnchorZ = BORE_UP).
-    await define_rectilinear_chain(
+    define_rectilinear_chain(
         adapter,
         entities,
         block_rect,
@@ -162,20 +162,20 @@ async def build(adapter) -> dict[str, str]:
             '"BoreUp"',
         ],
     )
-    await ensure_fully_defined(adapter, "block sketch")
-    check("exit_sketch block", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "block sketch")
+    check("exit_sketch block", adapter.exit_sketch())
     name_last_feature(adapter, "BlockProfile")
     drive_jobs += block.apply(adapter, "BlockProfile")
     check(
         "extrude block",
-        await adapter.create_extrusion(ExtrusionParameters(depth=BLOCK_DEPTH)),
+        adapter.create_extrusion(ExtrusionParameters(depth=BLOCK_DEPTH)),
     )
     name_last_feature(adapter, "Block")
     depth_dim = name_dimensions(adapter, "Block", ["Depth"])
     drive_jobs += [(depth_dim[0], '"BlockDepth"')]
     area = BLOCK_WIDTH * BLOCK_HEIGHT - 2.0 * math.pi * (BORE_DIA / 2.0) ** 2
     expected = area * BLOCK_DEPTH
-    await volume_check(adapter, "block", expected, 0.005 * expected)
+    volume_check(adapter, "block", expected, 0.005 * expected)
 
     # Two vertical slotted-screw hold-down holes: ONE native normal-fit #8
     # clearance feature (2 through-all instances), drilled from the block
@@ -200,11 +200,11 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += screw_cut.placement_drive_jobs
     v_holes = 2.0 * math.pi * (screw_dia / 2.0) ** 2 * BLOCK_HEIGHT
     expected -= v_holes
-    await volume_check(adapter, "screw holes", expected, 0.02 * v_holes)
+    volume_check(adapter, "screw holes", expected, 0.02 * v_holes)
 
     # Named lift-bore axis (Axis1): the lift rod's revolute mates coaxial to
     # this in the assembly (PR8 -- the rod spins to drive the cams).
-    lift_axis = await name_bore_axis(
+    lift_axis = name_bore_axis(
         adapter,
         "Right Plane",
         -LIFT_BORE_SPACING,
@@ -218,11 +218,11 @@ async def build(adapter) -> dict[str, str]:
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    volume_check(
         adapter, "driven block (equations neutral)", expected, 0.005 * expected
     )
 
@@ -248,14 +248,14 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
 
-    await apply_material(adapter, MATERIAL)
-    await apply_color(adapter, PANEL_BLACK)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    apply_color(adapter, PANEL_BLACK)
+    report_mass_properties(adapter)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter, PART_NAME, {"Isometric View Note": ISOMETRIC_VIEW_NOTE}
     )
-    artefacts = await save_part_and_images(adapter, PART_NAME)
+    artefacts = save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
     return artefacts
 

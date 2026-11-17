@@ -28,9 +28,9 @@ MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 ITEM = "WAVE DISC SPRING"
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     settled_checks = []
-    return await build_supplier_spring_drawing(
+    return build_supplier_spring_drawing(
         adapter, SPEC, item=ITEM,
         stock_configuration=SUPPLIER_DIAGRAM_CONFIGURATION,
         prepare_views=partial(prepare_supplier_disc_diagram, spec=supplier_spec),

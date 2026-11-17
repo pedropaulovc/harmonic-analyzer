@@ -7,7 +7,6 @@ build, source-dimension readback and exact-sheet machinist review.
 from __future__ import annotations
 
 import ast
-import asyncio
 import contextlib
 
 import math
@@ -178,12 +177,12 @@ def test_stock_identity_recipe_and_normalized_frame(
     assert int(row["quantity"]) == 2
     seen = {}
 
-    async def capture(_adapter, **kwargs):
+    def capture(_adapter, **kwargs):
         seen.update(kwargs)
         return {}
 
     monkeypatch.setattr(part, "build_stock_fastener", capture)
-    asyncio.run(part.build(None))
+    part.build(None)
     (component,) = seen["components"]
     assert component.sku == spec.SKU
     assert component.transform.translation_mm == (0.0, 0.0, 0.0)
@@ -199,11 +198,11 @@ def test_stock_identity_recipe_and_normalized_frame(
 def test_complete_stock_is_positioned_before_production_cut(monkeypatch) -> None:
     seen = []
 
-    async def capture(_adapter, dims):
+    def capture(_adapter, dims):
         seen.append(dims)
 
     monkeypatch.setattr(bolt_recipe, "build_hex_head_screw", capture)
-    asyncio.run(bolt_recipe.build_92314A253(None, bearing_y_mm=bolt.LENGTH))
+    bolt_recipe.build_92314A253(None, bearing_y_mm=bolt.LENGTH)
     (dims,) = seen
     assert dims.length == bolt.CATALOG_LENGTH
     assert dims.underside_y == bolt.HEAD_UNDERFACE_Y
@@ -217,22 +216,22 @@ def test_washer_recipe_authors_an_annulus_not_a_disc(monkeypatch) -> None:
     seen = []
 
     class Recorder:
-        async def create_sketch(self, plane):
+        def create_sketch(self, plane):
             seen.append(("plane", plane))
 
-        async def exit_sketch(self):
+        def exit_sketch(self):
             pass
 
-        async def create_extrusion(self, parameters):
+        def create_extrusion(self, parameters):
             seen.append(("extrusion", parameters))
 
-    async def circle(_adapter, x, y, radius, _label):
+    def circle(_adapter, x, y, radius, _label):
         seen.append(("circle", x, y, radius))
 
-    async def defined(_adapter, label):
+    def defined(_adapter, label):
         seen.append(("defined", label))
 
-    async def volume(_adapter, _label, expected, _tol):
+    def volume(_adapter, _label, expected, _tol):
         seen.append(("volume", expected))
 
     monkeypatch.setattr(washer_recipe, "check", lambda *_args: None)
@@ -243,7 +242,7 @@ def test_washer_recipe_authors_an_annulus_not_a_disc(monkeypatch) -> None:
     monkeypatch.setattr(
         washer_recipe, "no_sketch_inference", lambda _adapter: contextlib.nullcontext()
     )
-    asyncio.run(washer_recipe.build_96659A104(Recorder()))
+    washer_recipe.build_96659A104(Recorder())
     assert ("plane", "Top") in seen
     assert [entry[1:] for entry in seen if entry[0] == "circle"] == [
         (0.0, 0.0, washer.OD / 2),

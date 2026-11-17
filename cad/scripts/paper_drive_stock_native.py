@@ -70,7 +70,7 @@ def measure_one_solid_body_volume(adapter: Any) -> float:
     return volume
 
 
-async def check_one_solid_body_volume(
+def check_one_solid_body_volume(
     adapter: Any, label: str, expected_mm3: float, tolerance_mm3: float
 ) -> float:
     """Gate the strict native measurement against a caller-owned error budget."""
@@ -98,14 +98,14 @@ def rotate_mm(
     return c * x - s * y, s * x + c * y
 
 
-async def placed_ground_curve(
+def placed_ground_curve(
     adapter: Any, segment: Any, angle: float, translation_mm: float = 0.0
 ) -> str:
     """Rigid placement, not a second form-equation or upper-tip generator."""
     c, s = f"{math.cos(angle):.17g}", f"{math.sin(angle):.17g}"
     x = f"(({segment.x})+({translation_mm / 25.4:.17g}))"
     y = f"({segment.y})"
-    return await equation_curve(
+    return equation_curve(
         adapter, segment.name, f"({x})*({c})-({y})*({s})", f"({x})*({s})+({y})*({c})"
     )
 
@@ -177,7 +177,7 @@ def _driven_carrier(
     return actual_mm
 
 
-async def author_span(
+def author_span(
     adapter: Any,
     profile: StockFormProfile,
     teeth_spanned: int,
@@ -200,7 +200,7 @@ async def author_span(
         raise ValueError("printed span places must be nonnegative")
     per_unit = _MM_PER_UNIT[unit]
     expected = profile.tangent_span_mm(teeth_spanned)
-    check("create_sketch physical span", await adapter.create_sketch("Front"))
+    check("create_sketch physical span", adapter.create_sketch("Front"))
     suppress_dimension_input(adapter)
     segments = profile.gap_segments(unit_scale=1.0 / 25.4)
     upper = next((s for s in segments if s.kind == "flank" and s.name.startswith("Upper")), None)
@@ -209,33 +209,33 @@ async def author_span(
         raise ValueError("physical span lacks both supported finite flank descriptors")
     seed = math.pi / profile.teeth
     half = math.pi * teeth_spanned / profile.teeth
-    first = await placed_ground_curve(adapter, upper, seed)
-    second = await placed_ground_curve(adapter, lower, seed + 2.0 * half)
+    first = placed_ground_curve(adapter, upper, seed)
+    second = placed_ground_curve(adapter, lower, seed + 2.0 * half)
     for curve in (first, second):
         _construction(adapter, curve)
-    await ensure_fully_defined(
+    ensure_fully_defined(
         adapter, "span exact finite flank copies", fix_entities=[first, second], allow_fix_escalation=True
     )
     direction = (math.cos(seed + half), math.sin(seed + half))
-    (bisector,) = await add_line_chain(
+    (bisector,) = add_line_chain(
         adapter,
         [(0.0, 0.0), (direction[0] * 2 * profile.blank_radius_mm, direction[1] * 2 * profile.blank_radius_mm)],
         close=False,
     )
     _construction(adapter, bisector)
-    await anchor_point_to_origin(adapter, f"{bisector}.start", 0.0, 0.0, "span bisector origin")
-    await anchor_point_to_origin(
+    anchor_point_to_origin(adapter, f"{bisector}.start", 0.0, 0.0, "span bisector origin")
+    anchor_point_to_origin(
         adapter, f"{bisector}.end", direction[0] * 2 * profile.blank_radius_mm,
         direction[1] * 2 * profile.blank_radius_mm, "physical pair bisector"
     )
     a, b = span_contact_points_mm(profile, teeth_spanned)
     tangent_length = profile.template.module_mm
-    (tangent,) = await add_line_chain(
+    (tangent,) = add_line_chain(
         adapter, [a, (a[0] + tangent_length * direction[0], a[1] + tangent_length * direction[1])], close=False
     )
     # AddToDB merges the two exactly equal native contact points. A second
     # point-pair coincident relation would be redundant.
-    (bridge,) = await add_line_chain(adapter, [a, b], close=False)
+    (bridge,) = add_line_chain(adapter, [a, b], close=False)
     for line in (tangent, bridge):
         _construction(adapter, line)
     for label, entity1, entity2, relation in (
@@ -245,11 +245,11 @@ async def author_span(
         ("span normal to actual tangent", bridge, tangent, "perpendicular"),
         ("span normal to pair bisector", bridge, bisector, "perpendicular"),
     ):
-        check(label, await adapter.add_sketch_constraint(entity1, entity2, relation))
-    await dimension_between(
+        check(label, adapter.add_sketch_constraint(entity1, entity2, relation))
+    dimension_between(
         adapter, f"{tangent}.start", f"{tangent}.end", "distance", tangent_length, "construction tangent length"
     )
-    await ensure_fully_defined(adapter, "physical span contacts and fixed inspection direction")
+    ensure_fully_defined(adapter, "physical span contacts and fixed inspection direction")
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     suppress_dimension_input(adapter)
     model.ClearSelection2(True)
@@ -260,7 +260,7 @@ async def author_span(
     actual_mm = _driven_carrier(
         display, name, expected, 0.5 * 10.0**-places * per_unit, reference=False
     )
-    check("exit_sketch physical span", await adapter.exit_sketch())
+    check("exit_sketch physical span", adapter.exit_sketch())
     name_last_feature(adapter, feature)
     # A standalone sketch saves shown and renders in every assembly; the
     # drawing still imports its dimension from the hidden sketch.
@@ -323,7 +323,7 @@ def apply_span_limits(
     set_dimension_prefix(adapter, feature, name, prefix)
 
 
-async def author_root_envelope(
+def author_root_envelope(
     adapter: Any,
     profile: StockFormProfile,
     *,
@@ -338,15 +338,15 @@ async def author_root_envelope(
     dispatch (run 20261009T224545531Z, knob shaft).
     """
     diameter = 2.0 * profile.root_radius_min_mm
-    check("create_sketch axis-root reference", await adapter.create_sketch("Front"))
+    check("create_sketch axis-root reference", adapter.create_sketch("Front"))
     suppress_dimension_input(adapter)
     dims = SketchDims()
-    circle = await define_circle(
+    circle = define_circle(
         adapter, 0.0, 0.0, diameter / 2.0, "root envelope", dims=dims, names=(None, None, name)
     )
     _construction(adapter, circle)
-    await ensure_fully_defined(adapter, "axis-root reference circle")
-    check("exit_sketch axis-root reference", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "axis-root reference circle")
+    check("exit_sketch axis-root reference", adapter.exit_sketch())
     name_last_feature(adapter, feature)
     dims.apply(adapter, feature)
     display, dimension = _named_dimension(adapter, feature, name)
@@ -364,7 +364,7 @@ async def author_root_envelope(
     return actual_mm
 
 
-async def author_cutter_endcut(
+def author_cutter_endcut(
     adapter: Any,
     profile: StockFormProfile,
     cutter_diameter_mm: float,
@@ -404,9 +404,9 @@ async def author_cutter_endcut(
         raise ValueError("finite ground component crosses its tangential cutter arbor")
     upper, lower = ground[0].start_mm, ground[-1].end_mm
     plane, sketch, cut = f"{prefix}EndPlane", f"{prefix}RunoutProfile", f"{prefix}EndCut"
-    check("create_plane finite cutter end", await adapter.create_plane(CreatePlaneParameters(mode="offset", base_plane="Front Plane", offset=station_mm)))
+    check("create_plane finite cutter end", adapter.create_plane(CreatePlaneParameters(mode="offset", base_plane="Front Plane", offset=station_mm)))
     name_last_feature(adapter, plane)
-    check("create_sketch finite cutter ground", await adapter.create_sketch(plane))
+    check("create_sketch finite cutter ground", adapter.create_sketch(plane))
     suppress_dimension_input(adapter)
     # Main's cut_tooth_gap order, less the clearance pieces the tool never
     # carries: both finite flanks first (base to tip), then the floor from the
@@ -416,28 +416,28 @@ async def author_cutter_endcut(
     created = [s for s in master_profile.cut_order_native_segments(unit_scale=1.0 / 25.4) if s.kind in kinds]
     if sorted(s.name for s in created) != sorted(s.name for s in ground):
         raise ValueError("finite cutter creation order lost a ground branch")
-    curves = [await placed_ground_curve(adapter, segment, angle, translation) for segment in created]
-    await ensure_fully_defined(adapter, "finite ground curves", fix_entities=curves, allow_fix_escalation=True)
+    curves = [placed_ground_curve(adapter, segment, angle, translation) for segment in created]
+    ensure_fully_defined(adapter, "finite ground curves", fix_entities=curves, allow_fix_escalation=True)
     a, b = rotate_mm((axis_x, lower[1]), angle), rotate_mm((axis_x, upper[1]), angle)
-    arbor = check("tangential cutter arbor", await adapter.add_centerline(*a, *b))
-    await anchor_point_to_origin(adapter, f"{arbor}.start", *a, "cutter arbor lower end")
-    await anchor_point_to_origin(adapter, f"{arbor}.end", *b, "cutter arbor upper end")
-    await add_line_chain(
+    arbor = check("tangential cutter arbor", adapter.add_centerline(*a, *b))
+    anchor_point_to_origin(adapter, f"{arbor}.start", *a, "cutter arbor lower end")
+    anchor_point_to_origin(adapter, f"{arbor}.end", *b, "cutter arbor upper end")
+    add_line_chain(
         adapter, [rotate_mm(lower, angle, translation), a, b, rotate_mm(upper, angle, translation)], close=False
     )
-    await ensure_fully_defined(adapter, "finite cutter ground envelope")
-    check("exit_sketch finite cutter ground", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "finite cutter ground envelope")
+    check("exit_sketch finite cutter ground", adapter.exit_sketch())
     name_last_feature(adapter, sketch)
     check(
         "revolve-cut finite cutter end",
-        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
+        adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
     )
     name_last_feature(adapter, cut)
     blank_reference_geometry(adapter, ((plane, "PLANE"),))
     return CutterEndFeatures(plane, sketch, cut)
 
 
-async def pattern_stock_feature(adapter: Any, seed: str, count: int, name: str) -> str:
+def pattern_stock_feature(adapter: Any, seed: str, count: int, name: str) -> str:
     """Circular feature pattern of one stock gap or cutter end about origin Z.
 
     A feature pattern re-solves every instance as its seed was solved. The
@@ -450,13 +450,13 @@ async def pattern_stock_feature(adapter: Any, seed: str, count: int, name: str) 
 
     axis = check(
         "stock pattern origin-Z axis",
-        await adapter.create_axis(
+        adapter.create_axis(
             CreateAxisParameters(mode="two_planes", planes=["Top Plane", "Right Plane"])
         ),
     )
     check(
         f"native stock pattern {seed}",
-        await adapter.circular_pattern_feature(
+        adapter.circular_pattern_feature(
             CircularPatternParameters(
                 axis_name=axis.name,
                 features=[seed],

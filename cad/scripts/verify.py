@@ -288,7 +288,7 @@ class Report:
             self.passed.append(label)
             _telemetry.success(f"GATE PASSED [{label}]")
 
-    async def agate(self, label: str, fn: Callable[[], Any]) -> None:
+    def agate(self, label: str, fn: Callable[[], Any]) -> None:
         """Async sibling of :meth:`gate`: ``await`` the coroutine ``fn()`` returns.
 
         Used by gates that drive async adapter mate-ops (suppress/unsuppress for the
@@ -297,7 +297,7 @@ class Report:
         """
         with _telemetry.span("gate", label=label) as sp:
             try:
-                await fn()
+                fn()
             except Exception as exc:  # noqa: BLE001 -- a gate failure is data, not a crash
                 self.failed.append((label, str(exc)))
                 sp.record_exception(exc)
@@ -707,13 +707,13 @@ def _assert_soundness_health(adapter: Any, name: str, rebuilt: Any) -> None:
         raise
 
 
-async def _reopen_assembly_rest_pose(adapter: Any, name: str, sldasm: Path) -> None:
+def _reopen_assembly_rest_pose(adapter: Any, name: str, sldasm: Path) -> None:
     """Freshly reopen ``name`` for post-repair rendering without stale COM handles."""
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
-    check(f"open {name}", await adapter.open_model(str(sldasm)))
-    configs = check("list configurations", await adapter.list_configurations())
+    check(f"open {name}", adapter.open_model(str(sldasm)))
+    configs = check("list configurations", adapter.list_configurations())
     if REST in (configs or []) and active_configuration_name(adapter) != REST:
-        check(f"activate {REST}", await adapter.set_active_configuration(REST))
+        check(f"activate {REST}", adapter.set_active_configuration(REST))
 
 
 def _soundness_chain_mounts(name: str) -> Any:
@@ -877,7 +877,7 @@ def _run_soundness_battery(
         )
 
 
-async def _verify_static_one(
+def _verify_static_one(
     adapter: Any, name: str, report: Report, *, auto_repair: bool = False
 ) -> None:
     sldasm = OUT_SLDASM / f"{name}.SLDASM"
@@ -894,17 +894,17 @@ async def _verify_static_one(
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
     # Span the open+activate: loading and re-posing the document is 8-27 s of COM
     # work per assembly that otherwise sits in an unspanned gap between gates.
-    async with _telemetry.aspan("verify.open", name=name):
-        check(f"open {name}", await adapter.open_model(str(sldasm)))
+    with _telemetry.span("verify.open", name=name):
+        check(f"open {name}", adapter.open_model(str(sldasm)))
         # Capture the persisted flag before configuration activation, whose adapter
         # path rebuilds and can clear the evidence in memory.
         report.gate(
             f"{name}:saved-rebuild-clean",
             lambda: assert_saved_rebuild_clean(adapter, name),
         )
-        configs = check("list configurations", await adapter.list_configurations())
+        configs = check("list configurations", adapter.list_configurations())
         if REST in (configs or []) and active_configuration_name(adapter) != REST:
-            check(f"activate {REST}", await adapter.set_active_configuration(REST))
+            check(f"activate {REST}", adapter.set_active_configuration(REST))
     log(f"--- verifying {name} ({REST} pose) ---")
 
     # Single shared re-solve for the whole static battery. The DOF, over-constrained
@@ -1028,7 +1028,7 @@ async def _verify_static_one(
         reconcile_order = sorted(repaired_documents, key=lambda item: item[0] == name)
         for repaired_name, _stale_model in reconcile_order:
             failures_before_reconcile = len(report.failed)
-            await report.agate(
+            report.agate(
                 f"{repaired_name}:auto-repair-reconcile",
                 lambda n=repaired_name: reconcile_saved_rebuild_state(
                     adapter, n, OUT_SLDASM / f"{n}.SLDASM"
@@ -1056,7 +1056,7 @@ async def _verify_static_one(
         render_names = [n for n in repaired_names if n != name] + [name]
         for render_name in render_names:
             render_failures_before = len(report.failed)
-            await report.agate(
+            report.agate(
                 f"{render_name}:auto-repair-render-reopen",
                 lambda n=render_name: _reopen_assembly_rest_pose(
                     adapter, n, OUT_SLDASM / f"{n}.SLDASM"
@@ -1064,7 +1064,7 @@ async def _verify_static_one(
             )
             if len(report.failed) != render_failures_before:
                 continue
-            await report.agate(
+            report.agate(
                 f"{render_name}:auto-repair-renders",
                 lambda n=render_name: _export_assembly_images(
                     adapter, n, ("front", "top", "isometric")
@@ -1096,7 +1096,7 @@ def _tip_y_mm(adapter: Any, marker: str) -> float:
     return component_transform(adapter, marker)[10] * 1000.0
 
 
-async def _verify_motion_one(adapter: Any, report: Report) -> None:
+def _verify_motion_one(adapter: Any, report: Report) -> None:
     """Kinematic pen-driver fidelity (plan F5): sweep CrankDeg, prove the tip traces truth_model.
 
     pn-pen.SLDASM's pen-rod travel mate is equation-linked to a CrankDeg global
@@ -1117,7 +1117,7 @@ async def _verify_motion_one(adapter: Any, report: Report) -> None:
         return
 
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
-    check(f"open {name}", await adapter.open_model(str(sldasm)))
+    check(f"open {name}", adapter.open_model(str(sldasm)))
     try:
         # The shipped pen.SLDASM has neither the travel mate nor the F5
         # equation (the carriage is a live free DOF). Author the drive mate
@@ -1136,7 +1136,7 @@ async def _verify_motion_one(adapter: Any, report: Report) -> None:
             )
             _telemetry.error(f"{name}: pen_travel drive spec missing/ambiguous")
             return
-        (travel_mate,) = await author_dof_drives(adapter, travel)
+        (travel_mate,) = author_dof_drives(adapter, travel)
         base_mm = abs(float(travel[0]["params"]["distance"]))
         param = adapter._attempt(
             lambda: adapter.currentModel.Parameter(f"D1@{travel_mate}"), default=None
@@ -1151,7 +1151,7 @@ async def _verify_motion_one(adapter: Any, report: Report) -> None:
             _telemetry.error(f"{name}: cannot read D1@{travel_mate}")
             return
         base_doc = float(_read_member(param, "Value"))  # IPS doc -> inches
-        info = await pen_driver.install(
+        info = pen_driver.install(
             adapter, travel_mate, base_doc, base_doc / base_mm
         )
         log(
@@ -1166,13 +1166,13 @@ async def _verify_motion_one(adapter: Any, report: Report) -> None:
 
         # Rest pose: at pen_rest_crank_deg the driver equation subtracts pen_y(rest),
         # so the mate sits at its build datum -- tip0 is the saved render pose.
-        await pen_driver.set_crank_deg(adapter, pen_driver.rest_crank_deg())
+        pen_driver.set_crank_deg(adapter, pen_driver.rest_crank_deg())
         _rebuild(adapter)
         tip0 = _tip_y_mm(adapter, marker)
 
         sweep: list[tuple[float, float, float]] = []  # (theta_deg, got_mm, want_mm)
         for theta in _MOTION_SWEEP_DEG:
-            await pen_driver.set_crank_deg(adapter, theta)
+            pen_driver.set_crank_deg(adapter, theta)
             _rebuild(adapter)
             got = _tip_y_mm(adapter, marker) - tip0
             want = pen_driver.expected_tip_disp_mm(math.radians(theta))
@@ -1193,7 +1193,7 @@ async def _verify_motion_one(adapter: Any, report: Report) -> None:
         )[-2:]
         interference: list[tuple[float, str]] = []
         for theta in far:
-            await pen_driver.set_crank_deg(adapter, theta)
+            pen_driver.set_crank_deg(adapter, theta)
             _rebuild(adapter)
             try:
                 check_no_interference(
@@ -1203,7 +1203,7 @@ async def _verify_motion_one(adapter: Any, report: Report) -> None:
                 interference.append((theta, str(exc)))
 
         # Leave the doc at its deterministic rest datum (matches the saved pose).
-        await pen_driver.set_crank_deg(adapter, pen_driver.rest_crank_deg())
+        pen_driver.set_crank_deg(adapter, pen_driver.rest_crank_deg())
         _rebuild(adapter)
 
         report.gate(
@@ -1246,7 +1246,7 @@ _CHAIN_MIN_WHEEL_SPAN_DEG = 5.0  # coupling-alive floor over the 0..1 deg sweep
 _CHAIN_REST_TOL = 0.02  # mm / deg drift allowed after restoring the rest pose
 
 
-async def _verify_paper_feed_one(adapter: Any, report: Report) -> None:
+def _verify_paper_feed_one(adapter: Any, report: Report) -> None:
     """Kinematic proof that the crank drives the WHOLE paper feed (codex #189).
 
     The belt/chain (T12->T24) and rack-pinion ratios are otherwise exercised only by
@@ -1266,19 +1266,19 @@ async def _verify_paper_feed_one(adapter: Any, report: Report) -> None:
         return
 
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
-    check(f"open {name}", await adapter.open_model(str(sldasm)))
+    check(f"open {name}", adapter.open_model(str(sldasm)))
     log(f"--- motion: {name} crank->feed kinematic proof (codex #189) ---")
     # _drive_and_measure authors a temporary crank driver, rebuilds, and asserts the
     # whole train follows -- raising on any broken coupling (belt / lock / rack-pinion).
     from build_kinematic_probe import _drive_and_measure  # noqa: E402
 
     try:
-        await report.agate(f"{name}:crank-feed", lambda: _drive_and_measure(adapter))
+        report.agate(f"{name}:crank-feed", lambda: _drive_and_measure(adapter))
     finally:
         discard_open_documents(adapter)
 
 
-async def _verify_live_chain_one(adapter: Any, report: Report) -> None:
+def _verify_live_chain_one(adapter: Any, report: Report) -> None:
     """Magnifier live-chain physics sweep (WIRE 1 articulation).
 
     Catches the regression class the 2026-07-04 side-view screenshot exposed
@@ -1321,7 +1321,7 @@ async def _verify_live_chain_one(adapter: Any, report: Report) -> None:
         return
 
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
-    check(f"open {name}", await adapter.open_model(str(sldasm)))
+    check(f"open {name}", adapter.open_model(str(sldasm)))
     model = adapter.currentModel
     wire_name = bind_component_selectors(model, ("@LeverWire:1",))["@LeverWire:1"]
     log("--- live chain: magnifier lever sweep (knife rock, WIRE 1) ---")
@@ -1362,7 +1362,7 @@ async def _verify_live_chain_one(adapter: Any, report: Report) -> None:
         d_hook = math.dist(hook, anchor)
         return d_axis, d_hook, pos
 
-    replayed = await author_dof_drives(adapter, specs)
+    replayed = author_dof_drives(adapter, specs)
     mate = replayed[0]
     param = adapter._attempt(lambda: model.Parameter(f"D1@{mate}"), default=None)
     if param is None:
@@ -2066,20 +2066,20 @@ def verify_amplitude_preset(report: Report) -> None:
     report.gate("amplitude:truth-reads-same-vector", _matches_truth)
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     """Entry for ``run_build``: dispatch to the requested suite(s)."""
     suite, names = _ARGS.suite, _ARGS.names
     report = Report()
 
     if suite == "soundness":
         for name in names:
-            await _verify_static_one(
+            _verify_static_one(
                 adapter, name, report, auto_repair=_ARGS.auto_repair
             )
     if suite == "kinematics":
-        await _verify_motion_one(adapter, report)
-        await _verify_live_chain_one(adapter, report)
-        await _verify_paper_feed_one(adapter, report)
+        _verify_motion_one(adapter, report)
+        _verify_live_chain_one(adapter, report)
+        _verify_paper_feed_one(adapter, report)
     if suite == "math":
         verify_truth(report)
         verify_spring_base(report)

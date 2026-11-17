@@ -25,8 +25,8 @@ SPEC = fastener(PART_NAME)
 MATERIAL = SPEC.material
 
 
-async def _save_supplier_part(adapter, part_name, suppressed_features) -> dict[str, str]:
-    await add_supplier_reference_sketch(
+def _save_supplier_part(adapter, part_name, suppressed_features) -> dict[str, str]:
+    add_supplier_reference_sketch(
         adapter,
         SUPPLIER_REFERENCE_DIMENSIONS,
         starts=SUPPLIER_REFERENCE_STARTS,
@@ -70,11 +70,11 @@ async def _save_supplier_part(adapter, part_name, suppressed_features) -> dict[s
             or int(native.Tolerance.Type) != 0
         ):
             raise RuntimeError(f"{name}: source supplier presentation did not persist")
-    return await save_simplified_part(adapter, part_name, suppressed_features)
+    return save_simplified_part(adapter, part_name, suppressed_features)
 
 
-async def build(adapter) -> dict[str, str]:
-    return await build_stock_fastener(
+def build(adapter) -> dict[str, str]:
+    return build_stock_fastener(
         adapter,
         part_name=PART_NAME,
         components=(

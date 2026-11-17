@@ -1057,11 +1057,11 @@ def _assert_section_letters_clear(section: Any) -> None:
             raise RuntimeError(f"section A-A letter {index} meets the flange's ink: {printed!r}")
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open disc-hub source", await adapter.open_model(str(SOURCE)))
+    check("open disc-hub source", adapter.open_model(str(SOURCE)))
     read_required_properties(
         adapter.currentModel,
         (
@@ -1190,7 +1190,7 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (end, side, section):
         set_hidden_lines_removed(adapter, view)
 
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Transgear Disc Hub Manufacturing Drawing",

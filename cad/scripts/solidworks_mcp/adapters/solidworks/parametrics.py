@@ -30,27 +30,27 @@ _SPECIFY_CONFIGURATION = 3
 class SolidWorksParametricsMixin:
     """Expose SolidWorks parametric-variant methods via mixin-local helpers."""
 
-    async def create_equation_driven_curve(
+    def create_equation_driven_curve(
         self, params: CreateEquationCurveParameters
     ) -> AdapterResult[str]:
         return _create_equation_driven_curve_impl(self, params)
 
-    async def set_global_variable(
+    def set_global_variable(
         self, params: SetGlobalVariableParameters
     ) -> AdapterResult[dict[str, Any]]:
         return _set_global_variable_impl(self, params)
 
-    async def create_equation(
+    def create_equation(
         self, params: CreateEquationParameters
     ) -> AdapterResult[dict[str, Any]]:
         return _create_equation_impl(self, params)
 
-    async def create_configuration(
+    def create_configuration(
         self, params: CreateConfigurationParameters
     ) -> AdapterResult[dict[str, Any]]:
         return _create_configuration_impl(self, params)
 
-    async def set_active_configuration(
+    def set_active_configuration(
         self, name: str
     ) -> AdapterResult[dict[str, Any]]:
         return _set_active_configuration_impl(self, name)

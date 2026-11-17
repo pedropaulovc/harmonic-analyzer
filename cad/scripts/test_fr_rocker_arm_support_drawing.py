@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import math
 import re
 from collections import defaultdict
@@ -796,17 +795,17 @@ def _record_location_sketch(monkeypatch: pytest.MonkeyPatch, sketch_builder) -> 
     for name in ("set_sketch_direct_db", "name_last_feature"):
         monkeypatch.setattr(support, name, lambda *_: None)
 
-    async def dimension(_adapter, ref1, ref2, kind, value, _label) -> None:
+    def dimension(_adapter, ref1, ref2, kind, value, _label) -> None:
         emitted.append((ref1, ref2, kind, value))
 
-    async def anchor(_adapter, ref, x, y, _label) -> None:
+    def anchor(_adapter, ref, x, y, _label) -> None:
         assert y != 0.0
         if x == 0.0:  # on the vertical axis: a relation and one dimension
             emitted.append(("origin", ref, "y", y))
             return
         emitted.extend([("origin", ref, "x", x), ("origin", ref, "y", y)])
 
-    async def nothing(*_args: object) -> None:
+    def nothing(*_args: object) -> None:
         return None
 
     monkeypatch.setattr(support, "dimension_between", dimension)
@@ -821,15 +820,15 @@ def _record_location_sketch(monkeypatch: pytest.MonkeyPatch, sketch_builder) -> 
             lambda: SimpleNamespace(ConstructionGeometry=False)
         )
 
-        async def create_sketch(self, _plane: str) -> SimpleNamespace:
+        def create_sketch(self, _plane: str) -> SimpleNamespace:
             return ok
 
-        async def add_line(self, x0, y0, x1, y1) -> SimpleNamespace:
+        def add_line(self, x0, y0, x1, y1) -> SimpleNamespace:
             line = f"L{len(lines)}"
             lines[line] = ((x0, y0), (x1, y1))
             return SimpleNamespace(is_success=True, data=line)
 
-        async def add_sketch_constraint(self, line, other, relation) -> SimpleNamespace:
+        def add_sketch_constraint(self, line, other, relation) -> SimpleNamespace:
             if other is not None:
                 assert relation == "horizontal_points"
                 point_relations.append((line, other))
@@ -837,11 +836,11 @@ def _record_location_sketch(monkeypatch: pytest.MonkeyPatch, sketch_builder) -> 
             relations[line] = relation
             return ok
 
-        async def exit_sketch(self) -> SimpleNamespace:
+        def exit_sketch(self) -> SimpleNamespace:
             return ok
 
     adapter = Adapter()
-    jobs = dict(asyncio.run(sketch_builder(adapter)))
+    jobs = dict(sketch_builder(adapter))
     assert all(adapter._sketch_entities[line].ConstructionGeometry for line in lines)
     dims = dict(zip(names, emitted, strict=True))
     chords = {}

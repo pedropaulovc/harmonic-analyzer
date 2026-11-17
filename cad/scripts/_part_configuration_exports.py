@@ -281,7 +281,7 @@ def _set_model_annotations_displayed(doc: Any, shown: bool) -> bool:
 
 
 
-async def export_member_configurations(
+def export_member_configurations(
     adapter: Any,
     part_name: str,
     configurations: Iterable[str],
@@ -355,7 +355,7 @@ async def export_member_configurations(
             png.unlink(missing_ok=True)
             check(
                 f"export member PNG {configuration}",
-                await adapter.export_image(
+                adapter.export_image(
                     {
                         "file_path": str(png.resolve()),
                         "format_type": "png",

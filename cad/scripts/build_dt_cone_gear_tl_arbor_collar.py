@@ -61,7 +61,7 @@ MATERIAL = "Plain Carbon Steel"  # see _appearance.apply_material docstring
 _V_TOL = 0.005
 
 
-async def _readback(adapter, configuration: str) -> None:
+def _readback(adapter, configuration: str) -> None:
     """Assert the selected member without authoring it: its own disc, its BOM
     identity and its volume."""
     assert_member_suppression(adapter, configuration, spec.CONFIGURATION_FEATURES)
@@ -73,12 +73,12 @@ async def _readback(adapter, configuration: str) -> None:
         {},
     )
     expected = spec.V_BY_CONFIGURATION[configuration]
-    await volume_check(
+    volume_check(
         adapter, f"collar member {configuration}", expected, _V_TOL * expected
     )
 
 
-async def _add_disc(
+def _add_disc(
     adapter, drive_jobs: list[tuple[str, str]], configuration: str
 ) -> None:
     """One member's annulus on the Front Plane, extruded +Z by the length."""
@@ -87,9 +87,9 @@ async def _add_disc(
     od = spec.OD_BY_CONFIGURATION[configuration]
     label = f"collar {configuration}"
     dims = SketchDims()
-    check(f"create_sketch {label}", await adapter.create_sketch("Front"))
+    check(f"create_sketch {label}", adapter.create_sketch("Front"))
     with no_sketch_inference(adapter):
-        await define_circle(
+        define_circle(
             adapter,
             0.0,
             0.0,
@@ -99,7 +99,7 @@ async def _add_disc(
             names=(None, None, spec.od_name(configuration)),
             drives=(None, None, f'"{spec.od_name(configuration)}"'),
         )
-        await define_circle(
+        define_circle(
             adapter,
             0.0,
             0.0,
@@ -109,13 +109,13 @@ async def _add_disc(
             names=(None, None, spec.bore_name(configuration)),
             drives=(None, None, '"CollarBore"'),
         )
-    await ensure_fully_defined(adapter, f"{label} sketch")
-    check(f"exit_sketch {label}", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, f"{label} sketch")
+    check(f"exit_sketch {label}", adapter.exit_sketch())
     name_last_feature(adapter, spec.disc_sketch(configuration))
     drive_jobs += dims.apply(adapter, spec.disc_sketch(configuration))
     check(
         f"extrude {label}",
-        await adapter.create_extrusion(ExtrusionParameters(depth=spec.LENGTH)),
+        adapter.create_extrusion(ExtrusionParameters(depth=spec.LENGTH)),
     )
     name_last_feature(adapter, spec.disc_feature(configuration))
     (length,) = name_dimensions(
@@ -124,36 +124,36 @@ async def _add_disc(
     drive_jobs.append((length, '"CollarLength"'))
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     require_member_configurations(PART_NAME, CONFIGURATIONS)
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     # #290: the row's inch calculation units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
-    await create_member_configurations(adapter, PART_NAME, CONFIGURATIONS)
+    create_member_configurations(adapter, PART_NAME, CONFIGURATIONS)
     for name, value in spec.GLOBALS.items():
-        await set_global(adapter, name, f"{value}mm")
+        set_global(adapter, name, f"{value}mm")
 
     # Each disc with its own member active and every disc authored before it
     # suppressed there, so no disc merges into another member's solid; its
     # equations are driven while its member is active.
     authored: list[str] = []
     for configuration in CONFIGURATIONS:
-        await activate_member(adapter, configuration)
+        activate_member(adapter, configuration)
         for previous in reversed(authored):
             set_member_suppression(
                 adapter, spec.CONFIGURATION_FEATURES[previous], suppressed=True
             )
         drive_jobs: list[tuple[str, str]] = []
-        await _add_disc(adapter, drive_jobs, configuration)
+        _add_disc(adapter, drive_jobs, configuration)
         expected = spec.V_BY_CONFIGURATION[configuration]
-        await volume_check(
+        volume_check(
             adapter, f"collar disc {configuration}", expected, _V_TOL * expected
         )
-        await force_rebuild(adapter)
+        force_rebuild(adapter)
         for dimension_name, expression in drive_jobs:
-            await drive_dimension(adapter, dimension_name, expression)
-        await force_rebuild(adapter)
-        await volume_check(
+            drive_dimension(adapter, dimension_name, expression)
+        force_rebuild(adapter)
+        volume_check(
             adapter,
             f"driven collar {configuration} (equations neutral)",
             expected,
@@ -169,10 +169,10 @@ async def build(adapter) -> dict[str, str]:
         adapter, PART_NAME, {"Isometric View Note": spec.ISOMETRIC_VIEW_NOTE}
     )
     for configuration in CONFIGURATIONS:
-        await select_member_features(
+        select_member_features(
             adapter, configuration, spec.CONFIGURATION_FEATURES
         )
-        await apply_material(adapter, MATERIAL)
+        apply_material(adapter, MATERIAL)
         apply_member_properties(
             adapter,
             PART_NAME,
@@ -180,8 +180,8 @@ async def build(adapter) -> dict[str, str]:
             spec.CONFIGURATION_DESCRIPTIONS[configuration],
             {},
         )
-        await report_mass_properties(adapter)
-    return await save_member_part(
+        report_mass_properties(adapter)
+    return save_member_part(
         adapter,
         PART_NAME,
         CONFIGURATIONS,

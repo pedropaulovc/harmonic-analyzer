@@ -22,8 +22,8 @@ SPEC = DRAWINGS_BY_NAME["fr_vn_tube_frame_cap"]
 ITEM = "PUSH-ON ROUND CAP FOR MHA-FR-03 1 IN OD TUBE (ID 1 X 23/32 DEEP)"
 
 
-async def build(adapter: Any) -> dict[str, str]:
-    return await build_purchased_fastener_drawing(
+def build(adapter: Any) -> dict[str, str]:
+    return build_purchased_fastener_drawing(
         adapter, SPEC, item=ITEM, unit=part_drawing_unit("fr-vn-tube-frame-cap")
     )
 

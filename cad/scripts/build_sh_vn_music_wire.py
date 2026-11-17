@@ -115,19 +115,19 @@ def _wire_cylinder_areas(adapter) -> list[tuple[object, float]]:
     return faces
 
 
-async def _add_balloon_ring(adapter) -> list[tuple[str, str]]:
+def _add_balloon_ring(adapter) -> list[tuple[str, str]]:
     """Preserve the shape-neutral projected midpoint split on the lever member."""
     reach = WIRE_DIA / 2.0 + _SPLIT_OVERHANG
     dims = SketchDims()
-    check("create_sketch balloon ring", await adapter.create_sketch("Front"))
+    check("create_sketch balloon ring", adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     axis = check(
         "balloon ring axis",
-        await adapter.add_centerline(0.0, 0.0, 0.0, BALLOON_RING_STATION),
+        adapter.add_centerline(0.0, 0.0, 0.0, BALLOON_RING_STATION),
     )
     split = check(
         "balloon ring split line",
-        await adapter.add_line(
+        adapter.add_line(
             -reach, BALLOON_RING_STATION, reach, BALLOON_RING_STATION
         ),
     )
@@ -135,16 +135,16 @@ async def _add_balloon_ring(adapter) -> list[tuple[str, str]]:
     for entity, relation in ((axis, "vertical"), (split, "horizontal")):
         check(
             f"balloon ring {entity} {relation}",
-            await adapter.add_sketch_constraint(entity, None, relation),
+            adapter.add_sketch_constraint(entity, None, relation),
         )
     check(
         "balloon ring split centred on the axis",
-        await adapter.add_sketch_constraint(f"{axis}.end", split, "midpoint"),
+        adapter.add_sketch_constraint(f"{axis}.end", split, "midpoint"),
     )
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{axis}.start", 0.0, 0.0, "balloon ring axis on the drum end"
     )
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{axis}.start",
         f"{axis}.end",
@@ -153,7 +153,7 @@ async def _add_balloon_ring(adapter) -> list[tuple[str, str]]:
         "balloon ring station",
     )
     dims.record("BalloonRingStation", f'"WireLength" * {BALLOON_RING_FRACTION}')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{split}.start",
         f"{split}.end",
@@ -162,8 +162,8 @@ async def _add_balloon_ring(adapter) -> list[tuple[str, str]]:
         "balloon ring split reach",
     )
     dims.record(None, None)
-    await ensure_fully_defined(adapter, "balloon ring sketch")
-    check("exit_sketch balloon ring", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "balloon ring sketch")
+    check("exit_sketch balloon ring", adapter.exit_sketch())
     name_last_feature(adapter, "BalloonRingReference")
     drive_jobs = dims.apply(adapter, "BalloonRingReference")
 
@@ -212,12 +212,12 @@ def _require_cylinder_areas(adapter, configuration: str) -> None:
         )
 
 
-async def _author_wire(adapter) -> list[tuple[str, str]]:
+def _author_wire(adapter) -> list[tuple[str, str]]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     body = SketchDims()
-    check("create_sketch wire", await adapter.create_sketch("Top"))
-    await define_circle(
+    check("create_sketch wire", adapter.create_sketch("Top"))
+    define_circle(
         adapter,
         0.0,
         0.0,
@@ -227,28 +227,28 @@ async def _author_wire(adapter) -> list[tuple[str, str]]:
         names=("WireCx", "WireCz", "WireDiaDim"),
         drives=(None, None, '"WireDia"'),
     )
-    await ensure_fully_defined(adapter, "wire sketch")
-    check("exit_sketch wire", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "wire sketch")
+    check("exit_sketch wire", adapter.exit_sketch())
     name_last_feature(adapter, "WireProfile")
     drive_jobs = body.apply(adapter, "WireProfile")
     check(
         "extrude wire",
-        await adapter.create_extrusion(ExtrusionParameters(depth=WIRE_LEN)),
+        adapter.create_extrusion(ExtrusionParameters(depth=WIRE_LEN)),
     )
     name_last_feature(adapter, "Wire")
     length_dim = name_dimensions(adapter, "Wire", ["Depth"])
     drive_jobs.append((length_dim[0], '"WireLength"'))
     v_wire = math.pi * (WIRE_DIA / 2.0) ** 2 * WIRE_LEN
-    await volume_check(adapter, "wire", v_wire, 0.005 * v_wire)
+    volume_check(adapter, "wire", v_wire, 0.005 * v_wire)
     return drive_jobs
 
 
-async def _add_lever_wire_references(adapter) -> None:
+def _add_lever_wire_references(adapter) -> None:
     from solidworks_mcp.adapters.base import CreateReferencePointParameters
 
     check(
         "ref point HookPoint",
-        await adapter.create_reference_point(
+        adapter.create_reference_point(
             CreateReferencePointParameters(
                 mode="arc_center", edge_point=[WIRE_DIA / 2.0, WIRE_LEN, 0.0]
             )
@@ -257,7 +257,7 @@ async def _add_lever_wire_references(adapter) -> None:
     name_last_feature(adapter, "HookPoint")
     check(
         "ref point HubPoint",
-        await adapter.create_reference_point(
+        adapter.create_reference_point(
             CreateReferencePointParameters(
                 mode="arc_center", edge_point=[WIRE_DIA / 2.0, 0.0, 0.0]
             )
@@ -269,7 +269,7 @@ async def _add_lever_wire_references(adapter) -> None:
     )
 
 
-async def _readback(adapter, configuration: str) -> None:
+def _readback(adapter, configuration: str) -> None:
     assert_member_suppression(adapter, configuration, MEMBER_FEATURES)
     references = (
         ("Axis1", "HookPoint", "HubPoint")
@@ -279,8 +279,8 @@ async def _readback(adapter, configuration: str) -> None:
     require_member_bodies(adapter, configuration, 1, references)
     length = lever.WIRE_LEN if configuration == lever.CONFIGURATION else pen.WIRE_LEN
     volume = math.pi * (WIRE_DIA / 2.0) ** 2 * length
-    await volume_check(adapter, f"{configuration} wire", volume, 0.005 * volume)
-    await bbox_extent_check(adapter, f"{configuration} length", "y", length)
+    volume_check(adapter, f"{configuration} wire", volume, 0.005 * volume)
+    bbox_extent_check(adapter, f"{configuration} length", "y", length)
     _require_cylinder_areas(adapter, configuration)
     assert_member_properties(
         adapter, PART_NAME, configuration, DESCRIPTIONS[configuration], {}
@@ -288,34 +288,34 @@ async def _readback(adapter, configuration: str) -> None:
     assert_reference_geometry_hidden(adapter, f"{PART_NAME} {configuration}")
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import SetGlobalVariableParameters
 
     require_member_configurations(PART_NAME, CONFIGURATIONS)
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
-    await create_member_configurations(adapter, PART_NAME, CONFIGURATIONS)
-    await activate_member(adapter, lever.CONFIGURATION)
+    create_member_configurations(adapter, PART_NAME, CONFIGURATIONS)
+    activate_member(adapter, lever.CONFIGURATION)
     # All globals are born after the member configurations exist (IEquationMgr.Add3).
-    await set_global(adapter, "WireDia", f"{WIRE_DIA}mm")
-    await set_global(adapter, "WireLength", f"{WIRE_LEN}mm")
-    drive_jobs = await _author_wire(adapter)
-    drive_jobs += await _add_balloon_ring(adapter)
-    await force_rebuild(adapter)
+    set_global(adapter, "WireDia", f"{WIRE_DIA}mm")
+    set_global(adapter, "WireLength", f"{WIRE_LEN}mm")
+    drive_jobs = _author_wire(adapter)
+    drive_jobs += _add_balloon_ring(adapter)
+    force_rebuild(adapter)
     for dimension, expression in drive_jobs:
-        await drive_dimension(adapter, dimension, expression)
-    await force_rebuild(adapter)
-    await _add_lever_wire_references(adapter)
-    await name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0, "wire axis")
+        drive_dimension(adapter, dimension, expression)
+    force_rebuild(adapter)
+    _add_lever_wire_references(adapter)
+    name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0, "wire axis")
 
     for configuration, geometry in (
         (lever.CONFIGURATION, lever),
         (pen.CONFIGURATION, pen),
     ):
-        await select_member_features(adapter, configuration, MEMBER_FEATURES)
+        select_member_features(adapter, configuration, MEMBER_FEATURES)
         check(
             f"WireLength in {configuration}",
-            await adapter.set_global_variable(
+            adapter.set_global_variable(
                 SetGlobalVariableParameters(
                     name="WireLength",
                     expression=f"{geometry.WIRE_LEN}mm",
@@ -323,7 +323,7 @@ async def build(adapter) -> dict[str, str]:
                 )
             ),
         )
-        await force_rebuild(adapter)
+        force_rebuild(adapter)
         blank_sketch(adapter, "WireProfile")
         if configuration == lever.CONFIGURATION:
             blank_sketch(adapter, "BalloonRingReference")
@@ -331,16 +331,16 @@ async def build(adapter) -> dict[str, str]:
                 adapter, (("HookPoint", "DATUMPOINT"), ("HubPoint", "DATUMPOINT"))
             )
         blank_reference_geometry(adapter, (("Axis1", "AXIS"),))
-        await apply_material(adapter, MATERIAL)
+        apply_material(adapter, MATERIAL)
         apply_member_properties(
             adapter, PART_NAME, configuration, DESCRIPTIONS[configuration], {}
         )
-        await report_mass_properties(adapter)
+        report_mass_properties(adapter)
 
     clear_dimensions_for_drawing(adapter)
     # The supplier's .2032-mm stock circle lives only in its own zero-body
     # construction reference state; it is the package's one printed dimension.
-    await author_nominal_stock_cross_section(adapter)
+    author_nominal_stock_cross_section(adapter)
     row = _config.parts(PART_NAME)
     apply_custom_properties(
         adapter,
@@ -351,7 +351,7 @@ async def build(adapter) -> dict[str, str]:
         },
     )
     apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES})
-    return await save_member_part(
+    return save_member_part(
         adapter,
         PART_NAME,
         CONFIGURATIONS,

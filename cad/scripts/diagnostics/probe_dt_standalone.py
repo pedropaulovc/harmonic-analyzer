@@ -3,7 +3,6 @@ Open it standalone, rebuild, report What's Wrong with the fixed byref call."""
 
 from __future__ import annotations
 
-import asyncio
 
 if __package__:
     from . import _script_paths  # noqa: F401
@@ -15,13 +14,13 @@ from _paths import OUT_SLDASM
 from _assembly import whats_wrong
 
 
-async def main():
+def main():
     from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter
 
     dt = (OUT_SLDASM / "dt-drive-train.SLDASM").resolve()
     adapter = PyWin32Adapter({})
-    await adapter.connect()
-    await adapter.open_model(str(dt))
+    adapter.connect()
+    adapter.open_model(str(dt))
     doc = adapter.currentModel
     _flag(doc, "IModelDoc2")
     log(f"opened {str(_read_member(doc, 'GetTitle'))!r}")
@@ -34,8 +33,8 @@ async def main():
         log(f"    ERROR {n!r} code={c}")
     for n, c in warns[:10]:
         log(f"    warn  {n!r} code={c}")
-    await adapter.disconnect()
+    adapter.disconnect()
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

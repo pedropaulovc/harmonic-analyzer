@@ -3963,11 +3963,11 @@ def _seat_notes_on_border(
     return extent
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open rocker-arm source", await adapter.open_model(str(SOURCE)))
+    check("open rocker-arm source", adapter.open_model(str(SOURCE)))
     read_required_properties(
         adapter.currentModel,
         (
@@ -4292,7 +4292,7 @@ async def build(adapter: Any) -> dict[str, str]:
                                   rod_position_landing, rod_position_signature)
         _require_rod_dot_route(adapter, end, rod_position_gtol, rod_position_landing)
         phase = "finalize"
-        return await finalize_drawing(
+        return finalize_drawing(
             adapter,
             OUTPUTS,
             pdf_title="Rocker Arm Manufacturing Drawing",

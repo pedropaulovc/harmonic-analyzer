@@ -29,7 +29,7 @@ SPEC = DRAWINGS_BY_NAME["dt_vn_cone_lock_knob"]
 ITEM = "1/4-20 x 3/4 HIGH-PROFILE KNURLED-HEAD THUMB SCREW"
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     supplier_checks = []
     callback_count = 0
     settled = False
@@ -57,7 +57,7 @@ async def build(adapter: Any) -> dict[str, str]:
         supplier_checks[0]()
         settled = True
 
-    return await build_purchased_fastener_drawing(
+    return build_purchased_fastener_drawing(
         adapter,
         SPEC,
         item=ITEM,

@@ -109,7 +109,7 @@ def require_callout(callout, spec):
             raise RuntimeError(f"rendered blind depths are incorrect: {callout}")
 
 
-async def native_callout(adapter, part_path, output, slug):
+def native_callout(adapter, part_path, output, slug):
     draw, _ = new_project_drawing(adapter, layout=DrawingLayout.LANDSCAPE)
     adapter.currentModel = draw
     ddoc = _early_bound(draw, "IDrawingDoc")
@@ -139,14 +139,14 @@ async def native_callout(adapter, part_path, output, slug):
         ],
     }
     path = output / f"{slug}.SLDDRW"
-    check("save native probe drawing", await adapter.save_file(str(path)))
+    check("save native probe drawing", adapter.save_file(str(path)))
     result["drawing"] = str(path)
     return result
 
 
 
 
-async def build(adapter, output):
+def build(adapter, output):
     report = {"status": "running", "native_units": "metres/radians", "cases": []}
     receipt = output / "readback.json"
     try:
@@ -164,27 +164,27 @@ async def build(adapter, output):
                 row = {"size": size, "end": end, "thread_class": spec.thread_class}
                 report["cases"].append(row)
                 try:
-                    check("create probe plate", await adapter.create_part())
-                    check("create plate sketch", await adapter.create_sketch("Top"))
+                    check("create probe plate", adapter.create_part())
+                    check("create plate sketch", adapter.create_sketch("Top"))
                     sm = _early_bound(
                         adapter.currentModel.SketchManager, "ISketchManager"
                     )
                     with no_sketch_inference(adapter):
                         if sm.CreateCornerRectangle(-0.01, -0.01, 0, 0.01, 0.01, 0) is None:
                             raise RuntimeError("rectangle creation failed")
-                    check("close sketch", await adapter.exit_sketch())
+                    check("close sketch", adapter.exit_sketch())
                     check(
                         "extrude plate",
-                        await adapter.create_extrusion(
+                        adapter.create_extrusion(
                             ExtrusionParameters(depth=5.08, both_directions=True)
                         ),
                     )
-                    before = await adapter.get_mass_properties()
+                    before = adapter.get_mass_properties()
                     check("plate mass", before)
                     result = wizard_holes(
                         adapter, spec, [[0, 2.54, 0]], (0, 1, 0), slug, name="ProbeHole"
                     )
-                    after = await adapter.get_mass_properties()
+                    after = adapter.get_mass_properties()
                     check("cut plate mass", after)
                     row["reported_drill_diameter_mm"] = result.hole_dia_mm
                     row["cut_volume_mm3"] = before.data.volume - after.data.volume
@@ -199,16 +199,16 @@ async def build(adapter, output):
                             "drill readback disagrees with actual material removed"
                         )
                     part_path = output / f"{slug}.SLDPRT"
-                    check("save probe plate", await adapter.save_file(str(part_path)))
+                    check("save probe plate", adapter.save_file(str(part_path)))
                     discard_open_documents(adapter)
                     adapter.currentModel = None
                     check(
-                        "reopen probe plate", await adapter.open_model(str(part_path))
+                        "reopen probe plate", adapter.open_model(str(part_path))
                     )
                     model = _early_bound(adapter.currentModel, "IModelDoc2")
                     row["reopened_SI"] = native_state(model)
                     require_state(row["reopened_SI"], spec)
-                    row["native_callout"] = await native_callout(
+                    row["native_callout"] = native_callout(
                         adapter, part_path, output, slug
                     )
                     require_callout(row["native_callout"], spec)

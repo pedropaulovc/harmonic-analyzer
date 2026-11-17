@@ -45,25 +45,25 @@ PART_NO = SKU
 
 
 @stock_recipe("94773A606", threaded=False)
-async def build_94773A606(adapter, truth=None):
+def build_94773A606(adapter, truth=None):
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
-    check("create_sketch shim annulus", await adapter.create_sketch("Top"))
+    check("create_sketch shim annulus", adapter.create_sketch("Top"))
     with no_sketch_inference(adapter):
-        await define_circle(adapter, 0.0, 0.0, OD / 2.0, "shim OD")
-        await define_circle(adapter, 0.0, 0.0, ID / 2.0, "shim ID")
-    check("exit_sketch shim annulus", await adapter.exit_sketch())
+        define_circle(adapter, 0.0, 0.0, OD / 2.0, "shim OD")
+        define_circle(adapter, 0.0, 0.0, ID / 2.0, "shim ID")
+    check("exit_sketch shim annulus", adapter.exit_sketch())
     name_last_feature(adapter, "ShimProfile")
     check(
         "extrude shim",
-        await adapter.create_extrusion(ExtrusionParameters(depth=THICKNESS)),
+        adapter.create_extrusion(ExtrusionParameters(depth=THICKNESS)),
     )
     name_last_feature(adapter, "ShimBody")
     volume = shim_volume()
-    await volume_check(adapter, "shim", volume, 0.005 * volume)
+    volume_check(adapter, "shim", volume, 0.005 * volume)
 
 
-async def build_catalog(adapter) -> dict[str, str]:
+def build_catalog(adapter) -> dict[str, str]:
     """Catalog-only run: build the recipe and save it, no vendor truth."""
     import _telemetry
     from diagnostics.diag_mcmaster_lib import (
@@ -75,21 +75,21 @@ async def build_catalog(adapter) -> dict[str, str]:
     )
 
     with _telemetry.span("catalog.build", label=PART_NO):
-        check(f"create_part {PART_NO}", await adapter.create_part())
+        check(f"create_part {PART_NO}", adapter.create_part())
         assert_seat_sketch_baseline(adapter, PART_NO)
-        await build_94773A606(adapter)
+        build_94773A606(adapter)
         props = mass_properties(adapter)
         if not props["volume_mm3"] > 0.0:
             raise RuntimeError(f"{PART_NO} catalog build has no solid volume")
         OUT_DIR.mkdir(parents=True, exist_ok=True)
         path = OUT_DIR / f"{PART_NO}-catalog.SLDPRT"
-        check(f"save -> {path}", await adapter.save_file(str(path.resolve())))
+        check(f"save -> {path}", adapter.save_file(str(path.resolve())))
         artefacts = {"sldprt": str(path)}
-        artefacts.update(await export_views(adapter, f"{PART_NO}-catalog"))
+        artefacts.update(export_views(adapter, f"{PART_NO}-catalog"))
         _telemetry.success(
             f"{PART_NO} catalog build saved: volume {props['volume_mm3']:.4f} mm^3"
         )
-        await close_all(adapter)
+        close_all(adapter)
     return artefacts
 
 

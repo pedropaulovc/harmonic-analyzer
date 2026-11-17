@@ -10,7 +10,7 @@ configuration is restored even when authoring fails.
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable, Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 import math
 from typing import Any, Literal
@@ -32,8 +32,8 @@ class ReferenceState:
     """Paused call signature retained; only zero-body diagram states are legal."""
 
     name: str
-    author: Callable[[Any], Awaitable[None]] | None
-    references: Callable[[Any], Awaitable[Sequence[str]]] | None = None
+    author: Callable[[Any], None] | None
+    references: Callable[[Any], Sequence[str]] | None = None
     body_count: int | None = None
     kind: Literal["diagram"] = "diagram"
 
@@ -269,7 +269,7 @@ def _require_diagram_sketch(feature: Any, name: str, *, before: set[str], label:
     raise RuntimeError(f"{label}: diagram sketch {name} has no drawing-marked dimension")
 
 
-async def add_supplier_reference_configurations(
+def add_supplier_reference_configurations(
     adapter: Any, states: Sequence[ReferenceState], *, body_count: int,
 ) -> None:
     """Add zero-solid/zero-sheet diagrams; never change original member identities."""
@@ -366,7 +366,7 @@ async def add_supplier_reference_configurations(
             before = set(_features(model, top_level=True))
             callback_failure: BaseException | None = None
             try:
-                referenced = tuple(await state.references(adapter))
+                referenced = tuple(state.references(adapter))
             except BaseException as error:
                 callback_failure = error
                 raise

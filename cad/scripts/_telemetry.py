@@ -1578,8 +1578,8 @@ def span(
         _exit_span(handle, None)
 
 
-@contextlib.asynccontextmanager
-async def aspan(name: str, /, **attributes: Any) -> AsyncGenerator[Span, None]:
+@contextlib.contextmanager
+def span(name: str, /, **attributes: Any) -> AsyncGenerator[Span, None]:
     """Async sibling of :func:`span` for ``async with`` build steps."""
     sp, handle, _ = _enter_span(name, attributes)
     try:
@@ -1618,9 +1618,9 @@ def traced(name: str, *, label_param: str | None = None):
         if inspect.iscoroutinefunction(fn):
 
             @functools.wraps(fn)
-            async def awrap(*args, **kwargs):
-                async with aspan(name, **_attrs(args, kwargs)):
-                    return await fn(*args, **kwargs)
+            def awrap(*args, **kwargs):
+                with span(name, **_attrs(args, kwargs)):
+                    return fn(*args, **kwargs)
 
             return awrap
 
@@ -1728,9 +1728,9 @@ def _traced_adapter_method(name: str, method: Any) -> Any:
     span_name = f"adapter.{name}"
 
     @functools.wraps(method)
-    async def traced_call(self: Any, *args: Any, **kwargs: Any) -> Any:
-        async with aspan(span_name, arg=_adapter_arg(args)) as sp:
-            result = await method(self, *args, **kwargs)
+    def traced_call(self: Any, *args: Any, **kwargs: Any) -> Any:
+        with span(span_name, arg=_adapter_arg(args)) as sp:
+            result = method(self, *args, **kwargs)
             # The adapter RETURNS its failures (``AdapterResult`` with an error
             # status) and callers often probe with them -- ``build_dt_cone_gear`` tries
             # several axis candidates for one pattern. The status is an attribute,

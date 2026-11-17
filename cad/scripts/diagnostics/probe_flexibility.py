@@ -74,14 +74,14 @@ def _set_flexible(adapter, comp, comp_name):
     adapter._attempt(lambda: asm.ClearSelection2(True), default=None)
 
 
-async def build(adapter):
+def build(adapter):
     from solidworks_mcp.adapters.base import InsertComponentParameters, ComponentRefParameters
 
-    check("create_assembly", await adapter.create_assembly())
+    check("create_assembly", adapter.create_assembly())
     for name in ("fr-frame", "dt-drive-train", "ch-channel"):
         data = check(
             f"insert {name}",
-            await adapter.insert_component(
+            adapter.insert_component(
                 InsertComponentParameters(file_path=_sub_path(name),
                                           position=[0.0, 0.0, 0.0], rotation=[0.0, 0.0, 0.0])
             ),
@@ -89,7 +89,7 @@ async def build(adapter):
         # Fix only the frame (the structural anchor); leave drive-train +
         # channel free so they can be made flexible (a fixed sub can't be).
         if name == "fr-frame" and not data.get("fixed"):
-            await adapter.fix_component(ComponentRefParameters(name=data["name"]))
+            adapter.fix_component(ComponentRefParameters(name=data["name"]))
 
     asm = adapter.currentModel
     adapter._attempt(lambda: asm.ForceRebuild3(False), default=None)

@@ -14,8 +14,8 @@ SPEC = fastener(PART_NAME)
 MATERIAL = SPEC.material
 
 
-async def build(adapter) -> dict[str, str]:
-    return await build_stock_fastener(
+def build(adapter) -> dict[str, str]:
+    return build_stock_fastener(
         adapter,
         part_name=PART_NAME,
         components=(StockComponent(sku="9275K141", author=build_9275K141),),

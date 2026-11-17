@@ -33,11 +33,11 @@ PARTS = [
 ]
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     results: dict[str, str] = {}
     for stem in PARTS:
         path = ROOT / "out" / "sldprt" / f"{stem}.SLDPRT"
-        check(f"open {stem}", await adapter.open_model(str(path)))
+        check(f"open {stem}", adapter.open_model(str(path)))
         model = adapter.currentModel
         _flag(model, "IModelDoc2")
 

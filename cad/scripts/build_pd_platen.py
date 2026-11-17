@@ -141,7 +141,7 @@ def _plane_frame(adapter, name: str) -> tuple[tuple[float, ...], tuple[float, ..
     return tuple(data[0:9]), tuple(v * 1000.0 for v in data[9:12])
 
 
-async def _cbore_section_plane(adapter) -> None:
+def _cbore_section_plane(adapter) -> None:
     """Section A-A's cutting plane: the Right plane carried +X to the top row's
     middle guide hole.  Read back against the Right plane: the same rotation
     (so a sketch on it keeps the Right plane's (u, v) = model (-Z, Y)) and an
@@ -150,7 +150,7 @@ async def _cbore_section_plane(adapter) -> None:
 
     check(
         f"create plane {CBORE_SECTION_PLANE}",
-        await adapter.create_plane(
+        adapter.create_plane(
             CreatePlaneParameters(
                 mode="offset", base_plane="Right Plane", offset=CBORE_SECTION_X
             )
@@ -184,10 +184,10 @@ def _require_on_section_plane(adapter, sketch: str) -> None:
         )
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     # #290: the row's inch calculation units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
@@ -198,21 +198,21 @@ async def build(adapter) -> dict[str, str]:
     # the fastener holes are now native Hole Wizard features whose dimensions
     # come from the #2-56 / #4 standards + explicit artefact overrides, not
     # equation-driven sketch dims -- same as harmonic_base's FastenerHoles.)
-    await set_global(adapter, "PlateWidth", f"{PLATE_WIDTH}mm")
-    await set_global(adapter, "PlateHeight", f"{PLATE_HEIGHT}mm")
-    await set_global(adapter, "PlateThickness", f"{PLATE_THICKNESS}mm")
+    set_global(adapter, "PlateWidth", f"{PLATE_WIDTH}mm")
+    set_global(adapter, "PlateHeight", f"{PLATE_HEIGHT}mm")
+    set_global(adapter, "PlateThickness", f"{PLATE_THICKNESS}mm")
     # The counterbore depth the guide Hole Wizard override cuts; only the
     # drawing's floor reference reads it.
-    await set_global(adapter, "CounterBoreDepth", f"{CBORE_DEPTH}mm")
+    set_global(adapter, "CounterBoreDepth", f"{CBORE_DEPTH}mm")
     # The printed hole stations (SOCKET_PLACEMENT / GUIDE_PLACEMENT).
     for index, value in enumerate(sorted({x for x, _ in SOCKET_XY}), start=1):
-        await set_global(adapter, f"SocketX{index}", f"{value}mm")
+        set_global(adapter, f"SocketX{index}", f"{value}mm")
     for index, value in enumerate(sorted({y for _, y in SOCKET_XY}), start=1):
-        await set_global(adapter, f"SocketY{index}", f"{value}mm")
+        set_global(adapter, f"SocketY{index}", f"{value}mm")
     for index, value in enumerate(GUIDE_HOLE_X, start=1):
-        await set_global(adapter, f"GuideX{index}", f"{value}mm")
+        set_global(adapter, f"GuideX{index}", f"{value}mm")
     for index, value in enumerate(GUIDE_HOLE_Y, start=1):
-        await set_global(adapter, f"GuideY{index}", f"{value}mm")
+        set_global(adapter, f"GuideY{index}", f"{value}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -221,36 +221,36 @@ async def build(adapter) -> dict[str, str]:
     # dims skipping the last of each direction (width on L0, height on L1; L2/L3
     # supplied by closure), THEN the (0, 0) anchor (which emits no dims).
     outline = SketchDims()
-    check("create_sketch outline", await adapter.create_sketch("Front"))
+    check("create_sketch outline", adapter.create_sketch("Front"))
     plate_rect = [
         (0.0, 0.0),
         (PLATE_WIDTH, 0.0),
         (PLATE_WIDTH, PLATE_HEIGHT),
         (0.0, PLATE_HEIGHT),
     ]
-    lines = await add_line_chain(adapter, plate_rect)
-    await define_rectilinear_chain(
+    lines = add_line_chain(adapter, plate_rect)
+    define_rectilinear_chain(
         adapter, lines, plate_rect, label="plate", dims=outline,
         names=["Width", "Height"],
         drives=['"PlateWidth"', '"PlateHeight"'],
     )
-    await ensure_fully_defined(adapter, "plate outline")
-    check("exit_sketch outline", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "plate outline")
+    check("exit_sketch outline", adapter.exit_sketch())
     name_last_feature(adapter, "PlateProfile")
     drive_jobs += outline.apply(adapter, "PlateProfile")
     check(
         "extrude plate",
-        await adapter.create_extrusion(ExtrusionParameters(depth=PLATE_THICKNESS)),
+        adapter.create_extrusion(ExtrusionParameters(depth=PLATE_THICKNESS)),
     )
     name_last_feature(adapter, "Plate")
     depth_dim = name_dimensions(adapter, "Plate", ["Depth"])
     drive_jobs += [(depth_dim[0], '"PlateThickness"')]
     v_plate = PLATE_WIDTH * PLATE_HEIGHT * PLATE_THICKNESS
-    await volume_check(adapter, "plate", v_plate, 0.005 * v_plate)
+    volume_check(adapter, "plate", v_plate, 0.005 * v_plate)
 
     # Verify the user-confirmed 1:2 front-face height BEFORE cutting any holes
     # (the post-cut view broke the screen-projected face pick live).
-    await bbox_extent_check(
+    bbox_extent_check(
         adapter, "plate height (1:2 front-face ratio)", "y", PLATE_HEIGHT
     )
 
@@ -259,7 +259,7 @@ async def build(adapter) -> dict[str, str]:
     # .032 sheet, so the plate takes the stock shank as thread and its tip
     # stands proud of the back face (#2411) rather than bottoming in a blind
     # socket.
-    pre = await adapter.get_mass_properties()
+    pre = adapter.get_mass_properties()
     sockets = wizard_holes(
         adapter, SOCKET_SPEC,
         [[x, y, 0.0] for x, y in SOCKET_ORDER],
@@ -268,7 +268,7 @@ async def build(adapter) -> dict[str, str]:
         placement_dims=SOCKET_PLACEMENT,
     )
     drive_jobs += sockets.placement_drive_jobs
-    post = await adapter.get_mass_properties()
+    post = adapter.get_mass_properties()
     v_sockets = (
         len(SOCKET_XY)
         * math.pi
@@ -300,7 +300,7 @@ async def build(adapter) -> dict[str, str]:
         placement_dims=GUIDE_PLACEMENT,
     )
     drive_jobs += guide_holes.placement_drive_jobs
-    post = await adapter.get_mass_properties()
+    post = adapter.get_mass_properties()
     v_guide = len(GUIDE_HOLE_XY) * (
         math.pi * (GUIDE_HOLE_DIA / 2.0) ** 2 * PLATE_THICKNESS
         + math.pi * ((CBORE_DIA / 2.0) ** 2 - (GUIDE_HOLE_DIA / 2.0) ** 2) * CBORE_DEPTH
@@ -317,16 +317,16 @@ async def build(adapter) -> dict[str, str]:
     # plane because the drawing's section through that hole prints it (a
     # reference sketch a derived view imports lies in its cut;
     # build_pn_pen_v_block).  Section plane (u, v) -> (-Z, Y), as Right.
-    await _cbore_section_plane(adapter)
+    _cbore_section_plane(adapter)
     floor = SketchDims()
     check(
         "create_sketch counterbore floor",
-        await adapter.create_sketch(CBORE_SECTION_PLANE),
+        adapter.create_sketch(CBORE_SECTION_PLANE),
     )
     set_sketch_direct_db(adapter, True)
     floor_line = check(
         "counterbore floor reference line",
-        await adapter.add_line(
+        adapter.add_line(
             -PLATE_THICKNESS,
             CBORE_FLOOR_REFERENCE_Y,
             -CBORE_DEPTH,
@@ -340,9 +340,9 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError("counterbore floor reference did not take construction flag")
     check(
         "counterbore floor reference horizontal",
-        await adapter.add_sketch_constraint(floor_line, None, "horizontal"),
+        adapter.add_sketch_constraint(floor_line, None, "horizontal"),
     )
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter,
         f"{floor_line}.start",
         -PLATE_THICKNESS,
@@ -351,7 +351,7 @@ async def build(adapter) -> dict[str, str]:
     )
     floor.record("CboreFloorZ", '"PlateThickness"')
     floor.record("CboreFloorY", None)
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{floor_line}.start",
         f"{floor_line}.end",
@@ -360,8 +360,8 @@ async def build(adapter) -> dict[str, str]:
         "counterbore floor",
     )
     floor.record("CboreFloor", '"PlateThickness" - "CounterBoreDepth"')
-    await ensure_fully_defined(adapter, "counterbore floor reference sketch")
-    check("exit_sketch counterbore floor", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "counterbore floor reference sketch")
+    check("exit_sketch counterbore floor", adapter.exit_sketch())
     name_last_feature(adapter, "CboreFloorReference")
     _require_on_section_plane(adapter, "CboreFloorReference")
     drive_jobs += floor.apply(adapter, "CboreFloorReference")
@@ -370,20 +370,20 @@ async def build(adapter) -> dict[str, str]:
     # exists, then re-check neutrality (each equation evaluates to the as-built
     # value, so the geometry must not move).
     v_final = v_plate - v_sockets - v_guide
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(adapter, "driven platen (equations neutral)", v_final, 0.02 * v_sockets)
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    volume_check(adapter, "driven platen (equations neutral)", v_final, 0.02 * v_sockets)
 
-    await apply_material(adapter, MATERIAL)
-    await apply_color(adapter, PANEL_BLACK)  # ch30 plates: see _appearance palette
+    apply_material(adapter, MATERIAL)
+    apply_color(adapter, PANEL_BLACK)  # ch30 plates: see _appearance palette
 
     # Named slide axis (local X through the origin = Front Plane ∩ Top Plane) so
     # the platen runs as a prismatic joint along the rails in the M6 mated-DOF
     # assembly: collinear with an assembly axis at the slide line, an angle snap
     # kills the residual spin, an X distance snapshot pins the feed position.
-    await name_bore_axis(adapter, "Front Plane", 0.0, "Top Plane", 0.0, "slide axis")
+    name_bore_axis(adapter, "Front Plane", 0.0, "Top Plane", 0.0, "slide axis")
 
     # Manufacturing drawing support: every printed dimension's places live on
     # the model (drawing-simplicity-policy.md `How the repository implements
@@ -394,7 +394,7 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
 
-    await report_mass_properties(adapter)
+    report_mass_properties(adapter)
     apply_drawing_properties(
         adapter,
         PART_NAME,
@@ -409,7 +409,7 @@ async def build(adapter) -> dict[str, str]:
     # plane is hidden too.
     blank_sketch(adapter, "CboreFloorReference")
     blank_reference_geometry(adapter, ((CBORE_SECTION_PLANE, "PLANE"),))
-    return await save_part_and_images(adapter, PART_NAME)
+    return save_part_and_images(adapter, PART_NAME)
 
 
 if __name__ == "__main__":

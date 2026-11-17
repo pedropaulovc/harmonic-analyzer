@@ -341,7 +341,7 @@ def _registered_drawing_spec(tree: ast.Module) -> str | None:
             return None
         if isinstance(
             node,
-            (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef,
+            (ast.FunctionDef, ast.ClassDef,
              ast.ExceptHandler, ast.MatchAs, ast.MatchStar),
         ) and node.name == "SPEC":
             return None
@@ -618,8 +618,8 @@ def test_simplified_part_wrapper_requires_exact_passthrough(
     script.write_text("", encoding="utf-8")
     wrapper = tmp_path / "_simplified_part.py"
     candidate = (
-        "async def save_simplified_part(adapter, part_name):\n"
-        f"    await save_part_and_images(adapter, {selected})\n"
+        "def save_simplified_part(adapter, part_name):\n"
+        f"    save_part_and_images(adapter, {selected})\n"
         + ("save_part_and_images(adapter, foreign_part)\n" if extra_call else "")
     )
     spec = SimpleNamespace(script=script, part="sh_vn_chain_link")
@@ -629,8 +629,8 @@ def test_simplified_part_wrapper_requires_exact_passthrough(
     )
     monkeypatch.setattr(bg, "module_deps_of", lambda _script: (wrapper,))
     wrapper.write_text(
-        "async def save_simplified_part(adapter, part_name):\n"
-        "    await save_part_and_images(adapter, part_name)\n",
+        "def save_simplified_part(adapter, part_name):\n"
+        "    save_part_and_images(adapter, part_name)\n",
         encoding="utf-8",
     )
     test_drawing_closures_read_no_foreign_dynamic_part_row()
@@ -654,7 +654,7 @@ def test_supplier_row_reader_requires_unmodified_source_binding(
     supplier = tmp_path / "_supplier_spring_drawing.py"
     candidate = (
         "import _config\n"
-        "async def build_supplier_spring_drawing(adapter, spec):\n"
+        "def build_supplier_spring_drawing(adapter, spec):\n"
         f"    source = {binding}\n"
         + ("    source = foreign_spec.source\n" if rebind else "")
         + "    return _config.parts(source.stem)\n"
@@ -667,7 +667,7 @@ def test_supplier_row_reader_requires_unmodified_source_binding(
     monkeypatch.setattr(bg, "module_deps_of", lambda _script: (supplier,))
     supplier.write_text(
         "import _config\n"
-        "async def build_supplier_spring_drawing(adapter, spec):\n"
+        "def build_supplier_spring_drawing(adapter, spec):\n"
         "    source = spec.source\n"
         "    return _config.parts(source.stem)\n",
         encoding="utf-8",
@@ -724,7 +724,7 @@ def test_drawing_closures_read_no_foreign_dynamic_part_row():
             # source is only an alias for the caller's spec, never a foreign row.
             supplier = next(
                 node for node in tree.body
-                if isinstance(node, ast.AsyncFunctionDef)
+                if isinstance(node, ast.FunctionDef)
                 and node.name == "build_supplier_spring_drawing"
             )
             assert supplier.args.args[1].arg == "spec"
@@ -751,7 +751,7 @@ def test_drawing_closures_read_no_foreign_dynamic_part_row():
             # the own-builder/PART_NAME checks below.
             wrapper = next(
                 node for node in tree.body
-                if isinstance(node, ast.AsyncFunctionDef)
+                if isinstance(node, ast.FunctionDef)
                 and node.name == "save_simplified_part"
             )
             assert wrapper.args.args[1].arg == "part_name"

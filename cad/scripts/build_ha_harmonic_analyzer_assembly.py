@@ -210,12 +210,12 @@ def _assert_ms_working_pose(adapter: Any, instance: str) -> None:
     )
 
 
-async def _author_integration_settings(adapter: Any) -> None:
+def _author_integration_settings(adapter: Any) -> None:
     """No solid/pose edits: one vertical construction line per setting, its
     low end anchored to the origin and its length the driving dimension the
     drawing imports (ha_harmonic_analyzer_assembly_spec.SETTING_LINES)."""
     dims = SketchDims()
-    check("create integration settings sketch", await adapter.create_sketch("Front"))
+    check("create integration settings sketch", adapter.create_sketch("Front"))
     for line_spec in spec.SETTING_LINES:
         label = line_spec.dimension
         # Direct to the database: inference would snap the line ends to the
@@ -223,7 +223,7 @@ async def _author_integration_settings(adapter: Any) -> None:
         set_sketch_direct_db(adapter, True)
         line = check(
             f"{label} line",
-            await adapter.add_line(
+            adapter.add_line(
                 line_spec.x, line_spec.y_low, line_spec.x, line_spec.y_high
             ),
         )
@@ -234,14 +234,14 @@ async def _author_integration_settings(adapter: Any) -> None:
             raise RuntimeError(f"{label} line is not construction")
         check(
             f"{label} vertical",
-            await adapter.add_sketch_constraint(line, None, "vertical"),
+            adapter.add_sketch_constraint(line, None, "vertical"),
         )
-        await anchor_point_to_origin(
+        anchor_point_to_origin(
             adapter, f"{line}.start", line_spec.x, line_spec.y_low, f"{label} low end"
         )
         dims.record(f"{label}X")
         dims.record(f"{label}Y")
-        await dimension_between(
+        dimension_between(
             adapter,
             f"{line}.start",
             f"{line}.end",
@@ -250,8 +250,8 @@ async def _author_integration_settings(adapter: Any) -> None:
             label,
         )
         dims.record(label)
-    await ensure_fully_defined(adapter, "integration settings")
-    check("exit integration settings sketch", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "integration settings")
+    check("exit integration settings sketch", adapter.exit_sketch())
     name_last_feature(adapter, spec.SETTING_FEATURE)
     dims.apply(adapter, spec.SETTING_FEATURE)
     apply_drawing_precision(adapter, spec.DRAWING_PRECISION)
@@ -263,7 +263,7 @@ async def _author_integration_settings(adapter: Any) -> None:
     blank_sketch(adapter, spec.SETTING_FEATURE)
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     # Flip seeds + free-DOF contract: cad/config/assemblies/<ASM_NAME>.yaml.
     activate_assembly_contract(ASM_NAME)
     from solidworks_mcp.adapters.base import (
@@ -271,13 +271,13 @@ async def build(adapter) -> dict[str, str]:
         InsertComponentParameters,
     )
 
-    check("create_assembly", await adapter.create_assembly())
+    check("create_assembly", adapter.create_assembly())
     apply_package_model_units(adapter, assembly_contract(ASM_NAME).drawing_unit, label=ASM_NAME)
 
     for name in SUBASSEMBLIES:
         data = check(
             f"insert {name}.SLDASM",
-            await adapter.insert_component(
+            adapter.insert_component(
                 InsertComponentParameters(
                     file_path=_subassembly(name),
                     position=[0.0, 0.0, 0.0],
@@ -289,14 +289,14 @@ async def build(adapter) -> dict[str, str]:
         if not data.get("fixed"):
             check(
                 f"fix {name}",
-                await adapter.fix_component(ComponentRefParameters(name=comp)),
+                adapter.fix_component(ComponentRefParameters(name=comp)),
             )
         assert_component_placed(adapter, comp, [0.0, 0.0, 0.0], IDENTITY)
     # The measuring stick and its clamped stop, fixed at the exact park
     # transform (not the identity: it is authored in its own working frame).
     data = check(
         "insert ms-measuring-stick.SLDASM",
-        await adapter.insert_component(
+        adapter.insert_component(
             InsertComponentParameters(
                 file_path=_subassembly("ms-measuring-stick"),
                 position=list(MS_POS),
@@ -308,7 +308,7 @@ async def build(adapter) -> dict[str, str]:
     if not data.get("fixed"):
         check(
             "fix ms-measuring-stick",
-            await adapter.fix_component(ComponentRefParameters(name=ms_component)),
+            adapter.fix_component(ComponentRefParameters(name=ms_component)),
         )
     assert_component_placed(adapter, ms_component, list(MS_POS), MS_ROWS)
 
@@ -318,7 +318,7 @@ async def build(adapter) -> dict[str, str]:
         allowed_pairs=ALLOWED_PAIRS,
         chain_mounts=mounted_wheels(),
     )
-    await _author_integration_settings(adapter)
+    _author_integration_settings(adapter)
 
     # Title-block identity for the top assembly drawing
     # (draw_ha_harmonic_analyzer_assembly.py): assembly_title_properties supplies
@@ -349,7 +349,7 @@ async def build(adapter) -> dict[str, str]:
         ASM_NAME,
         lambda configuration: create_harmonic_analyzer_explode(adapter, configuration),
     )
-    artefacts = await save_assembly_and_images(
+    artefacts = save_assembly_and_images(
         adapter,
         ASM_NAME,
         solved_gates=lambda current: _assert_ms_working_pose(current, ms_component),
@@ -359,15 +359,15 @@ async def build(adapter) -> dict[str, str]:
     # those exports dirty the reopened document, so discard it again without
     # saving to keep the shipped assembly table-free.
     asm_path = (OUT_SLDASM / f"{ASM_NAME}.SLDASM").resolve()
-    check(f"reopen {ASM_NAME} for gallery/BOM", await adapter.open_model(str(asm_path)))
+    check(f"reopen {ASM_NAME} for gallery/BOM", adapter.open_model(str(asm_path)))
     try:
-        artefacts.update(await export_gallery_and_bom(adapter))
+        artefacts.update(export_gallery_and_bom(adapter))
     finally:
         _discard_copy_source(adapter)
     return artefacts
 
 
-async def export_gallery_and_bom(adapter) -> dict[str, str]:
+def export_gallery_and_bom(adapter) -> dict[str, str]:
     """Export the top-level parts-only BOM CSV.
 
     Factored out of :func:`build` so the cheap REFRESH path (refresh_assembly.py)
@@ -385,7 +385,7 @@ async def export_gallery_and_bom(adapter) -> dict[str, str]:
     bom_path = (OUT_PNG.parent / "ha-harmonic-analyzer-bom.csv").resolve()
     data = check(
         "export_bom_csv",
-        await adapter.export_bom_csv(
+        adapter.export_bom_csv(
             CreateBomParameters(bom_type="parts_only", file_path=str(bom_path))
         ),
     )

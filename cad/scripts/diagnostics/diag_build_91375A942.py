@@ -148,7 +148,7 @@ if ROOT_R <= hex_corner_r():
 
 
 @stock_recipe("91375A942", threaded=True)
-async def build_91375A942(adapter, truth=None):
+def build_91375A942(adapter, truth=None):
     from _com import _early_bound, _read_member
     from _feature_tree import _feature_by_name
     from _sketch import add_line_chain
@@ -161,7 +161,7 @@ async def build_91375A942(adapter, truth=None):
     flat = HEX_AF / 2.0
 
     # --- revolve profile (the 91375A106 Sketch2 + Revolve1 + Chamfer1) ------
-    check("create_sketch profile", await adapter.create_sketch("Front"))
+    check("create_sketch profile", adapter.create_sketch("Front"))
     sk_mgr = adapter.currentSketchManager
     with no_sketch_inference(adapter):
         if (
@@ -169,7 +169,7 @@ async def build_91375A942(adapter, truth=None):
             is None
         ):
             raise RuntimeError("91375A942 profile: CreateCenterLine failed")
-        await add_line_chain(
+        add_line_chain(
             adapter,
             [
                 (0.0, HALF),  # socket face on the axis
@@ -181,21 +181,21 @@ async def build_91375A942(adapter, truth=None):
                 (0.0, -HALF + cup_depth()),  # cup apex
             ],
         )
-    check("exit_sketch profile", await adapter.exit_sketch())
+    check("exit_sketch profile", adapter.exit_sketch())
     name_last_feature(adapter, "BodyProfile")
     check(
         "revolve body",
-        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=False)),
+        adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=False)),
     )
     name_last_feature(adapter, "Body")
     v = revolved_volume()
-    v = await volume_check(adapter, "revolved body", v, 0.005 * v)
+    v = volume_check(adapter, "revolved body", v, 0.005 * v)
 
     # --- hex socket: blind cut down from the socket face ---------------------
     offset_plane(adapter, "SocketFacePlane", HALF)
-    check("create_sketch socket", await adapter.create_sketch("SocketFacePlane"))
+    check("create_sketch socket", adapter.create_sketch("SocketFacePlane"))
     with no_sketch_inference(adapter):
-        await add_line_chain(
+        add_line_chain(
             adapter,
             [
                 (0.0, corner),
@@ -206,7 +206,7 @@ async def build_91375A942(adapter, truth=None):
                 (flat, corner / 2.0),
             ],
         )
-    check("exit_sketch socket", await adapter.exit_sketch())
+    check("exit_sketch socket", adapter.exit_sketch())
     name_last_feature(adapter, "SocketProfile")
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     fm = _early_bound(_read_member(model, "FeatureManager"), "IFeatureManager")
@@ -223,7 +223,7 @@ async def build_91375A942(adapter, truth=None):
     if feat is None:
         raise RuntimeError("91375A942 hex socket cut failed")
     name_last_feature(adapter, "HexSocket")
-    v = await volume_check(
+    v = volume_check(
         adapter, "hex socket", v - socket_volume(), 0.01 * socket_volume()
     )
 
@@ -233,7 +233,7 @@ async def build_91375A942(adapter, truth=None):
     # the point, so no cut face lands on the floor plane or the hex walls.
     floor_y = HALF - SOCKET_DEPTH
     apex_y = floor_y - drill_point_depth()
-    check("create_sketch drill point", await adapter.create_sketch("Front"))
+    check("create_sketch drill point", adapter.create_sketch("Front"))
     sk2 = adapter.currentSketchManager
     with no_sketch_inference(adapter):
         if (
@@ -248,7 +248,7 @@ async def build_91375A942(adapter, truth=None):
             is None
         ):
             raise RuntimeError("drill point: CreateCenterLine failed")
-        await add_line_chain(
+        add_line_chain(
             adapter,
             [
                 (0.0, floor_y + drill_point_depth()),
@@ -256,14 +256,14 @@ async def build_91375A942(adapter, truth=None):
                 (0.0, apex_y),
             ],
         )
-    check("exit_sketch drill point", await adapter.exit_sketch())
+    check("exit_sketch drill point", adapter.exit_sketch())
     name_last_feature(adapter, "DrillPointProfile")
     check(
         "drill point",
-        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
+        adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
     )
     name_last_feature(adapter, "SocketDrillPoint")
-    v = await volume_check(
+    v = volume_check(
         adapter, "socket drill point", v - drill_point_volume(), SMALL_CUT_TOL_MM3
     )
 
@@ -272,7 +272,7 @@ async def build_91375A942(adapter, truth=None):
     lift = 0.05
     csk_slope = math.tan(math.radians(CSK_HALF_ANGLE_DEG))
     csk_apex_y = HALF - corner / csk_slope
-    check("create_sketch countersink", await adapter.create_sketch("Front"))
+    check("create_sketch countersink", adapter.create_sketch("Front"))
     sk3 = adapter.currentSketchManager
     with no_sketch_inference(adapter):
         if (
@@ -282,7 +282,7 @@ async def build_91375A942(adapter, truth=None):
             is None
         ):
             raise RuntimeError("countersink: CreateCenterLine failed")
-        await add_line_chain(
+        add_line_chain(
             adapter,
             [
                 (0.0, HALF + lift),
@@ -290,14 +290,14 @@ async def build_91375A942(adapter, truth=None):
                 (0.0, csk_apex_y),
             ],
         )
-    check("exit_sketch countersink", await adapter.exit_sketch())
+    check("exit_sketch countersink", adapter.exit_sketch())
     name_last_feature(adapter, "CountersinkProfile")
     check(
         "countersink",
-        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
+        adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
     )
     name_last_feature(adapter, "SocketCountersink")
-    v = await volume_check(
+    v = volume_check(
         adapter, "socket countersink", v - countersink_volume(), SMALL_CUT_TOL_MM3
     )
 
@@ -305,7 +305,7 @@ async def build_91375A942(adapter, truth=None):
     # The 91375A106 helix exactly: flags inverted for the +y seed plane, and
     # the pi/2 start that puts the sweep path on the Front-plane cutter.
     offset_plane(adapter, "CupEndPlane", -HALF)
-    check("create_sketch helix seed", await adapter.create_sketch("CupEndPlane"))
+    check("create_sketch helix seed", adapter.create_sketch("CupEndPlane"))
     with no_sketch_inference(adapter):
         if (
             adapter.currentSketchManager.CreateCircleByRadius(
@@ -327,9 +327,9 @@ async def build_91375A942(adapter, truth=None):
     # --- thread groove: the symmetric cutter 7P/16 past the cup end ----------
     cy = -HALF - 7.0 * PITCH / 16.0
     crest_r = major_r + H_SHARP / 16.0
-    check("create_sketch cutter", await adapter.create_sketch("Front"))
+    check("create_sketch cutter", adapter.create_sketch("Front"))
     with no_sketch_inference(adapter):
-        await add_line_chain(
+        add_line_chain(
             adapter,
             [
                 (crest_r, cy + 15.0 * PITCH / 32.0),
@@ -338,7 +338,7 @@ async def build_91375A942(adapter, truth=None):
                 (crest_r, cy - 15.0 * PITCH / 32.0),
             ],
         )
-    check("exit_sketch cutter", await adapter.exit_sketch())
+    check("exit_sketch cutter", adapter.exit_sketch())
     name_last_feature(adapter, "ThreadCutter")
     if len(bodies(adapter)) != 1:
         raise RuntimeError("91375A942: expected one body before the thread cut")
@@ -348,24 +348,24 @@ async def build_91375A942(adapter, truth=None):
     adapter._mcm_com_map = lambda c: [c[0], c[2], -c[1]]
 
 
-async def build_catalog(adapter) -> dict[str, str]:
+def build_catalog(adapter) -> dict[str, str]:
     """Build and save the catalogue recipe without claiming vendor equivalence."""
     with _telemetry.span("catalog.build", label="91375A942"):
-        check("create_part 91375A942", await adapter.create_part())
+        check("create_part 91375A942", adapter.create_part())
         assert_seat_sketch_baseline(adapter, "91375A942")
-        await build_91375A942(adapter)
+        build_91375A942(adapter)
         props = mass_properties(adapter)
         if not props["volume_mm3"] > 0.0:
             raise RuntimeError("91375A942 catalogue build has no solid volume")
         OUT_DIR.mkdir(parents=True, exist_ok=True)
         path = OUT_DIR / "91375A942-catalog.SLDPRT"
-        check(f"save -> {path}", await adapter.save_file(str(path.resolve())))
+        check(f"save -> {path}", adapter.save_file(str(path.resolve())))
         artefacts = {"sldprt": str(path)}
-        artefacts.update(await export_views(adapter, "91375A942-catalog"))
+        artefacts.update(export_views(adapter, "91375A942-catalog"))
         _telemetry.success(
             f"91375A942 catalogue build saved: volume {props['volume_mm3']:.4f} mm^3"
         )
-        await close_all(adapter)
+        close_all(adapter)
     return artefacts
 
 

@@ -282,11 +282,11 @@ def _hole_rims(front: Any) -> list[Any]:
     ]
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open wheel-bar source", await adapter.open_model(str(SOURCE)))
+    check("open wheel-bar source", adapter.open_model(str(SOURCE)))
     read_required_properties(
         adapter.currentModel,
         (
@@ -389,7 +389,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # callout above.
     add_property_linked_note(adapter, "Isometric View Note", 0.335, 0.125)
 
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Wheel Bar Manufacturing Drawing",

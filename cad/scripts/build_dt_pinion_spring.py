@@ -289,7 +289,7 @@ def _driving_kink_angle(adapter, blade: str, flat: str, pts, label: str) -> None
     _telemetry.success(f"driving {label}: {KINK_INCLUDED_DEG:g} deg")
 
 
-async def _formed_path(
+def _formed_path(
     adapter, pts: dict[str, tuple[float, float]], *, prefix: str, construction: bool
 ) -> SketchDims:
     """The strip's inside-surface path in the open Front sketch, fully defined.
@@ -306,23 +306,23 @@ async def _formed_path(
     set_sketch_direct_db(adapter, True)
     flat = check(
         f"{prefix}flat line",
-        await adapter.add_line(*pts["flat_tip"], *pts["kink_exit"]),
+        adapter.add_line(*pts["flat_tip"], *pts["kink_exit"]),
     )
     kink = check(
         f"{prefix}kink arc",
-        await adapter.add_arc(*pts["kink_c"], *pts["kink_exit"], *pts["kink_start"]),
+        adapter.add_arc(*pts["kink_c"], *pts["kink_exit"], *pts["kink_start"]),
     )
     blade = check(
         f"{prefix}blade line",
-        await adapter.add_line(*pts["kink_start"], *pts["bend_exit"]),
+        adapter.add_line(*pts["kink_start"], *pts["bend_exit"]),
     )
     bend = check(
         f"{prefix}bend arc",
-        await adapter.add_arc(*pts["bend_c"], *pts["bend_exit"], *pts["foot_tan"]),
+        adapter.add_arc(*pts["bend_c"], *pts["bend_exit"], *pts["foot_tan"]),
     )
     foot = check(
         f"{prefix}foot line",
-        await adapter.add_line(*pts["foot_tan"], *pts["foot_end"]),
+        adapter.add_line(*pts["foot_tan"], *pts["foot_end"]),
     )
     # The hole's axis on the foot's surface: a construction stub collinear
     # with the foot, east from the axis, under the foot's own edge on the
@@ -331,7 +331,7 @@ async def _formed_path(
     hole_x = foot_end[0] - HOLE_FROM_END
     hole_axis = check(
         f"{prefix}hole axis stub",
-        await adapter.add_line(
+        adapter.add_line(
             hole_x, foot_end[1], hole_x + HOLE_AXIS_STUB, foot_end[1]
         ),
     )
@@ -352,7 +352,7 @@ async def _formed_path(
     # the stub, not the origin; the kink's height is from the foot's surface.
     check(
         f"{prefix}foot horizontal",
-        await adapter.add_sketch_constraint(foot, None, "horizontal"),
+        adapter.add_sketch_constraint(foot, None, "horizontal"),
     )
     for label, first, second in (
         ("bend tangent foot", bend, foot),
@@ -362,17 +362,17 @@ async def _formed_path(
     ):
         check(
             f"{prefix}{label}",
-            await adapter.add_sketch_constraint(first, second, "tangent"),
+            adapter.add_sketch_constraint(first, second, "tangent"),
         )
 
-    await anchor_point_to_origin(adapter, f"{foot}.end", *foot_end, "foot end")
+    anchor_point_to_origin(adapter, f"{foot}.end", *foot_end, "foot end")
     dims.record(f"{prefix}FootEndX")
     dims.record(f"{prefix}FootEndY")
     check(
         f"{prefix}hole axis on the foot",
-        await adapter.add_sketch_constraint(hole_axis, foot, "collinear"),
+        adapter.add_sketch_constraint(hole_axis, foot, "collinear"),
     )
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{foot}.end",
         f"{hole_axis}.start",
@@ -383,10 +383,10 @@ async def _formed_path(
     dims.record(f"{prefix}HoleAxisX", '"HoleFromEnd"')
     check(
         f"{prefix}hole axis stub length",
-        await adapter.add_sketch_dimension(hole_axis, None, "linear", HOLE_AXIS_STUB),
+        adapter.add_sketch_dimension(hole_axis, None, "linear", HOLE_AXIS_STUB),
     )
     dims.record(f"{prefix}HoleAxisStub")
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{hole_axis}.start",
         f"{foot}.start",
@@ -397,10 +397,10 @@ async def _formed_path(
     dims.record(f"{prefix}FootLen", '"BendFromHole"')
     check(
         f"{prefix}bend radius",
-        await adapter.add_sketch_dimension(bend, None, "radial", R_BEND),
+        adapter.add_sketch_dimension(bend, None, "radial", R_BEND),
     )
     dims.record(f"{prefix}BendR", '"BendRadius"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{hole_axis}.start",
         f"{blade}.start",
@@ -409,7 +409,7 @@ async def _formed_path(
         "kink start from the hole axis",
     )
     dims.record(f"{prefix}KinkH")
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{foot}.end",
         f"{blade}.start",
@@ -420,12 +420,12 @@ async def _formed_path(
     dims.record(f"{prefix}KinkV")
     check(
         f"{prefix}kink radius",
-        await adapter.add_sketch_dimension(kink, None, "radial", R_KINK),
+        adapter.add_sketch_dimension(kink, None, "radial", R_KINK),
     )
     dims.record(f"{prefix}KinkR", '"KinkRadius"')
     check(
         f"{prefix}flat length",
-        await adapter.add_sketch_dimension(flat, None, "linear", FLAT_LEN),
+        adapter.add_sketch_dimension(flat, None, "linear", FLAT_LEN),
     )
     dims.record(f"{prefix}FlatLen", '"FlatLength"')
     _driving_kink_angle(adapter, blade, flat, pts, f"{prefix}kink angle")
@@ -433,10 +433,10 @@ async def _formed_path(
     return dims
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing --
@@ -445,24 +445,24 @@ async def build(adapter) -> dict[str, str]:
     # (built with the literals); declared so a GUI edit sees the knobs.
     # Blade-tilt-dependent endpoint dims stay literal (no trig equations --
     # the equation manager rejects several dim bindings, probed 2026-07-02).
-    await set_global(adapter, "HoleFromEnd", f"{HOLE_FROM_END}mm")
-    await set_global(adapter, "BendFromHole", f"{FOOT_FROM_HOLE}mm")
-    await set_global(adapter, "BendRadius", f"{R_BEND}mm")
-    await set_global(adapter, "KinkRadius", f"{R_KINK}mm")
-    await set_global(adapter, "FlatLength", f"{FLAT_LEN}mm")
-    await set_global(adapter, "StripThickness", f"{THICK}mm")
-    await set_global(adapter, "StripWidth", f"{WIDTH}mm")
-    await set_global(adapter, "PadWidth", f"{PAD_WIDTH}mm")
-    await set_global(adapter, "WingFromHole", f"{PAD_WING_FROM_HOLE}mm")
-    await set_global(adapter, "PadReliefRadius", f"{PAD_RELIEF_R}mm")
-    await set_global(adapter, "KinkIncludedAngle", f"{KINK_INCLUDED_DEG}deg")
+    set_global(adapter, "HoleFromEnd", f"{HOLE_FROM_END}mm")
+    set_global(adapter, "BendFromHole", f"{FOOT_FROM_HOLE}mm")
+    set_global(adapter, "BendRadius", f"{R_BEND}mm")
+    set_global(adapter, "KinkRadius", f"{R_KINK}mm")
+    set_global(adapter, "FlatLength", f"{FLAT_LEN}mm")
+    set_global(adapter, "StripThickness", f"{THICK}mm")
+    set_global(adapter, "StripWidth", f"{WIDTH}mm")
+    set_global(adapter, "PadWidth", f"{PAD_WIDTH}mm")
+    set_global(adapter, "WingFromHole", f"{PAD_WING_FROM_HOLE}mm")
+    set_global(adapter, "PadReliefRadius", f"{PAD_RELIEF_R}mm")
+    set_global(adapter, "KinkIncludedAngle", f"{KINK_INCLUDED_DEG}deg")
 
     # Open inside-surface path, drawn from the free tip DOWN (_formed_path).
-    check("create_sketch spring", await adapter.create_sketch("Front"))
-    spring = await _formed_path(adapter, INSTALLED_PATH, prefix="", construction=False)
+    check("create_sketch spring", adapter.create_sketch("Front"))
+    spring = _formed_path(adapter, INSTALLED_PATH, prefix="", construction=False)
 
-    await ensure_fully_defined(adapter, "spring sketch")
-    check("exit_sketch spring", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "spring sketch")
+    check("exit_sketch spring", adapter.exit_sketch())
     name_last_feature(adapter, "SpringProfile")
     drive_jobs = spring.apply(adapter, "SpringProfile")
 
@@ -470,7 +470,7 @@ async def build(adapter) -> dict[str, str]:
     # (SolidWorks splits it); the THICK wall lands one-sided, right of travel.
     check(
         "extrude spring",
-        await adapter.create_extrusion(
+        adapter.create_extrusion(
             ExtrusionParameters(
                 depth=WIDTH,
                 both_directions=True,
@@ -483,7 +483,7 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += [
         (name_dimensions(adapter, "Spring", ["StripWidth"])[0], '"StripWidth"')
     ]
-    volume = await volume_check(adapter, "spring", VOLUME, 0.01 * VOLUME)
+    volume = volume_check(adapter, "spring", VOLUME, 0.01 * VOLUME)
     # Blade side: with the wall west of the path the crest's outer face is the
     # part's westmost point; on the wrong side it would read THICK further east
     # and every contact number would be off by the strip.
@@ -507,7 +507,7 @@ async def build(adapter) -> dict[str, str]:
     # the hole's axis -- the wing is located from the screw, as the bend is,
     # so the hole's own location band does not narrow the web between them.
     pad = SketchDims()
-    check("create_sketch pad", await adapter.create_sketch("Top"))
+    check("create_sketch pad", adapter.create_sketch("Top"))
     x0 = FOOT_END[0]
     pad_pts = [
         (x0, WIDTH / 2.0 - PAD_WIDTH),
@@ -515,13 +515,13 @@ async def build(adapter) -> dict[str, str]:
         (x0 - PAD_WING_LEN, WIDTH / 2.0),
         (x0, WIDTH / 2.0),
     ]
-    pad_lines = await add_line_chain(adapter, pad_pts)
+    pad_lines = add_line_chain(adapter, pad_pts)
     hole_x = x0 - HOLE_FROM_END
     fwd = pad_pts[0][1]
     set_sketch_direct_db(adapter, True)
     pad_axis = check(
         "pad hole axis stub",
-        await adapter.add_line(hole_x, fwd, hole_x + HOLE_AXIS_STUB, fwd),
+        adapter.add_line(hole_x, fwd, hole_x + HOLE_AXIS_STUB, fwd),
     )
     set_sketch_direct_db(adapter, False)
     _as_construction(adapter, pad_axis)
@@ -530,13 +530,13 @@ async def build(adapter) -> dict[str, str]:
     ):
         check(
             f"pad {direction} {line}",
-            await adapter.add_sketch_constraint(line, None, direction),
+            adapter.add_sketch_constraint(line, None, direction),
         )
     check(
         "pad hole axis on the forward edge",
-        await adapter.add_sketch_constraint(pad_axis, pad_lines[0], "collinear"),
+        adapter.add_sketch_constraint(pad_axis, pad_lines[0], "collinear"),
     )
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{pad_lines[1]}.start",
         f"{pad_lines[1]}.end",
@@ -545,7 +545,7 @@ async def build(adapter) -> dict[str, str]:
         "pad width",
     )
     pad.record("PadWidth", '"PadWidth"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{pad_lines[0]}.start",
         f"{pad_axis}.start",
@@ -556,10 +556,10 @@ async def build(adapter) -> dict[str, str]:
     pad.record("PadHoleAxisX", '"HoleFromEnd"')
     check(
         "pad hole axis stub length",
-        await adapter.add_sketch_dimension(pad_axis, None, "linear", HOLE_AXIS_STUB),
+        adapter.add_sketch_dimension(pad_axis, None, "linear", HOLE_AXIS_STUB),
     )
     pad.record("PadHoleAxisStub")
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{pad_axis}.start",
         f"{pad_lines[0]}.end",
@@ -568,21 +568,21 @@ async def build(adapter) -> dict[str, str]:
         "wing edge from the hole axis",
     )
     pad.record("PadLen", '"WingFromHole"')
-    await anchor_point_to_origin(adapter, f"{pad_lines[3]}.start", *pad_pts[3], "pad")
+    anchor_point_to_origin(adapter, f"{pad_lines[3]}.start", *pad_pts[3], "pad")
     pad.record("PadEndX")
     pad.record("PadEdgeZ", '"StripWidth" / 2')
-    await ensure_fully_defined(adapter, "pad sketch")
-    check("exit_sketch pad", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "pad sketch")
+    check("exit_sketch pad", adapter.exit_sketch())
     name_last_feature(adapter, "PadProfile")
     drive_jobs += pad.apply(adapter, "PadProfile")
     check(
         "extrude pad",
-        await adapter.create_extrusion(ExtrusionParameters(depth=THICK)),
+        adapter.create_extrusion(ExtrusionParameters(depth=THICK)),
     )
     name_last_feature(adapter, "Pad")
     drive_jobs += [(name_dimensions(adapter, "Pad", ["PadThk"])[0], '"StripThickness"')]
     volume += PAD_VOLUME
-    padded = await volume_check(adapter, "pad", volume, 0.02 * PAD_VOLUME)
+    padded = volume_check(adapter, "pad", volume, 0.02 * PAD_VOLUME)
 
     # Bend relief: the wing's inside corner, where its west edge meets the
     # strip's forward edge short of the bend (PAD_WING_LEN keeps the round's
@@ -592,7 +592,7 @@ async def build(adapter) -> dict[str, str]:
     # spandrel (a round on a convex edge would remove one).
     check(
         "fillet pad relief",
-        await adapter.add_fillet(
+        adapter.add_fillet(
             PAD_RELIEF_R,
             [[x0 - PAD_WING_LEN, THICK / 2.0, WIDTH / 2.0]],
             propagate=False,
@@ -603,7 +603,7 @@ async def build(adapter) -> dict[str, str]:
         (name_dimensions(adapter, "PadRelief", ["PadReliefR"])[0], '"PadReliefRadius"')
     ]
     volume += PAD_RELIEF_VOLUME
-    await volume_check(
+    volume_check(
         adapter, "pad relief", padded + PAD_RELIEF_VOLUME, 0.5 * PAD_RELIEF_VOLUME
     )
 
@@ -624,27 +624,27 @@ async def build(adapter) -> dict[str, str]:
     )
     v_hole = math.pi * (screw_dia / 2.0) ** 2 * THICK
     volume -= v_hole
-    await volume_check(adapter, "foot hole", volume, 0.05 * v_hole)
+    volume_check(adapter, "foot hole", volume, 0.05 * v_hole)
 
     # O2 (Main, 2026-09-24): the part is the INSTALLED shape; the maker forms
     # the FREE shape.  A hidden construction-only reference sketch carries the
     # whole free profile -- the blade turned PRESET_DEG further toward the
     # strap about the bend centre -- and owns the printed free locations; the
     # drawing shows it as the phantom (_drawing_hidden_sketches).
-    check("create_sketch free form", await adapter.create_sketch("Front"))
-    free = await _formed_path(adapter, FREE_PATH, prefix="Free", construction=True)
-    await ensure_fully_defined(adapter, "free-form sketch")
-    check("exit_sketch free form", await adapter.exit_sketch())
+    check("create_sketch free form", adapter.create_sketch("Front"))
+    free = _formed_path(adapter, FREE_PATH, prefix="Free", construction=True)
+    ensure_fully_defined(adapter, "free-form sketch")
+    check("exit_sketch free form", adapter.exit_sketch())
     name_last_feature(adapter, FREE_FORM_SKETCH)
     drive_jobs += free.apply(adapter, FREE_FORM_SKETCH)
 
     # Deferred drive equations, then re-check neutrality (each evaluates to
     # the as-built value, so the geometry must not move).
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    volume_check(
         adapter, "driven spring (equations neutral)", volume, 0.01 * VOLUME
     )
 
@@ -671,8 +671,8 @@ async def build(adapter) -> dict[str, str]:
     if int(feature.Visible) != 1:  # swVisibilityStateHide
         raise RuntimeError(f"{FREE_FORM_SKETCH} still visible after BlankSketch")
 
-    await apply_material(adapter, MATERIAL)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    report_mass_properties(adapter)
     apply_drawing_properties(
         adapter,
         PART_NAME,
@@ -681,7 +681,7 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
-    artefacts = await save_part_and_images(adapter, PART_NAME)
+    artefacts = save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
     return artefacts
 

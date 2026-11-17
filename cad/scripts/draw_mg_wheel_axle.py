@@ -853,11 +853,11 @@ def _hide_side_thread_callout(adapter: Any, side: Any) -> None:
         raise RuntimeError("could not hide the wheel-axle side thread callout")
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open wheel-axle source", await adapter.open_model(str(SOURCE)))
+    check("open wheel-axle source", adapter.open_model(str(SOURCE)))
     read_required_properties(
         adapter.currentModel,
         (
@@ -988,7 +988,7 @@ async def build(adapter: Any) -> dict[str, str]:
             )
     _hide_side_thread_callout(adapter, side)
 
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Wheel Axle Manufacturing Drawing",

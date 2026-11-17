@@ -3626,7 +3626,7 @@ def _org(adapter, name: str) -> list[float]:
     return [a[9] * 1000.0, a[10] * 1000.0, a[11] * 1000.0]
 
 
-async def _key_to_shaft(
+def _key_to_shaft(
     adapter,
     part,
     part_axis,
@@ -3658,15 +3658,15 @@ async def _key_to_shaft(
     axial seat, anti-spin]: the cone-gear CopyWithMates2 ladder's slot
     contract."""
     p_o = _org(adapter, part)
-    await coincident_mate(
+    coincident_mate(
         adapter,
         named_ref(f"{part_axis}@{part}", "AXIS"),
         shaft_axis_ref,
         label=f"{label} coaxial",
         verify=(part, p_o),
     )
-    await _axial_seat(adapter, part, shaft, shaft_o, axis_dir, p_o, label, seat_plane)
-    await parallel_mate(
+    _axial_seat(adapter, part, shaft, shaft_o, axis_dir, p_o, label, seat_plane)
+    parallel_mate(
         adapter,
         named_ref(f"Right Plane@{part}", "PLANE"),
         named_ref(f"Right Plane@{shaft}", "PLANE"),
@@ -3675,14 +3675,14 @@ async def _key_to_shaft(
     )
 
 
-async def _axial_seat(
+def _axial_seat(
     adapter, part, shaft, shaft_o, axis_dir, p_o, label, seat_plane
 ) -> None:
     """A gear's axial seat on its shaft: contact with a named shaft plane (a
     gear located by a shoulder -- the 64T on the thrust collar, #914), else the
     Front-plane distance at its as-placed station."""
     if seat_plane:
-        await coincident_mate(
+        coincident_mate(
             adapter,
             named_ref(f"Front Plane@{part}", "PLANE"),
             named_ref(f"{seat_plane}@{shaft}", "PLANE"),
@@ -3691,7 +3691,7 @@ async def _axial_seat(
         )
         return
     d_axial = sum((p_o[k] - shaft_o[k]) * axis_dir[k] for k in range(3))
-    await distance_driver(
+    distance_driver(
         adapter,
         named_ref(f"Front Plane@{part}", "PLANE"),
         named_ref(f"Front Plane@{shaft}", "PLANE"),
@@ -3701,7 +3701,7 @@ async def _axial_seat(
     )
 
 
-async def _seat_on_crank(
+def _seat_on_crank(
     adapter,
     part,
     part_axis,
@@ -3723,14 +3723,14 @@ async def _seat_on_crank(
     leaving only the shared crank rotation.  Returns the part's live origin.
     """
     o = _org(adapter, part)
-    await coincident_mate(
+    coincident_mate(
         adapter,
         named_ref(f"{part_axis}@{part}", "AXIS"),
         crank_axis,
         label=f"{part} coaxial on crank",
         verify=(part, o),
     )
-    await coincident_mate(
+    coincident_mate(
         adapter,
         named_ref(f"Front Plane@{part}", "PLANE"),
         named_ref(f"{seat_plane}@{crankshaft}", "PLANE"),
@@ -3741,7 +3741,7 @@ async def _seat_on_crank(
     return o
 
 
-async def _place_on_shaft(
+def _place_on_shaft(
     adapter,
     part: str,
     station: float,
@@ -3756,7 +3756,7 @@ async def _place_on_shaft(
     shaft axis, so a lock / gear mate against the shaft holds the tuned phase.
     """
     centre = cone_station(station)
-    return await place_component(
+    return place_component(
         adapter,
         part,
         [
@@ -3793,7 +3793,7 @@ def _require_collar_pin_in_collar_hole(adapter, pin: str, collar: str) -> None:
         raise AssertionError(f"{pin} stands {off_axis * 1000.0:.4f} mm off {collar}'s pin hole")
 
 
-async def _author_setting_references(adapter, settings) -> None:
+def _author_setting_references(adapter, settings) -> None:
     """Native, globals-driven assembly settings; no solids or mate edits.
 
     ``settings`` is a setting spec (dt_cylinder_bank_setting_spec,
@@ -3805,34 +3805,34 @@ async def _author_setting_references(adapter, settings) -> None:
         x0, x1 = -south, -north  # Right-plane sketch x is machine -Z
         y = settings.AXIS_Y
         start_global, axis_global = f"{name}StartX", f"{name}AxisY"
-        await set_global(adapter, start_global, f"{abs(x0)}mm")
-        await set_global(adapter, axis_global, f"{y}mm")
-        await set_global(adapter, name, f"{north - south}mm")
-        check(f"create {feature}", await adapter.create_sketch("Right"))
+        set_global(adapter, start_global, f"{abs(x0)}mm")
+        set_global(adapter, axis_global, f"{y}mm")
+        set_global(adapter, name, f"{north - south}mm")
+        check(f"create {feature}", adapter.create_sketch("Right"))
         set_sketch_direct_db(adapter, True)
         try:
-            leg = check(f"{name} leg", await adapter.add_line(x0, y, x1, y))
+            leg = check(f"{name} leg", adapter.add_line(x0, y, x1, y))
         finally:
             set_sketch_direct_db(adapter, False)
         segment = _early_bound(adapter._sketch_entities[leg], "ISketchSegment")
         segment.ConstructionGeometry = True
         if not bool(segment.ConstructionGeometry):
             raise RuntimeError(f"{name} is not construction geometry")
-        check(f"{name} horizontal", await adapter.add_sketch_constraint(leg, None, "horizontal"))
-        await anchor_point_to_origin(adapter, f"{leg}.start", x0, y, f"{name} south face")
+        check(f"{name} horizontal", adapter.add_sketch_constraint(leg, None, "horizontal"))
+        anchor_point_to_origin(adapter, f"{leg}.start", x0, y, f"{name} south face")
         dims = SketchDims()
         dims.record("SouthFaceX", f'"{start_global}"')
         dims.record("ArborAxisY", f'"{axis_global}"')
-        await dimension_between(
+        dimension_between(
             adapter, f"{leg}.start", f"{leg}.end", "horizontal_distance", north - south, name
         )
         dims.record(name, f'"{name}"')
-        await ensure_fully_defined(adapter, feature)
-        check(f"exit {feature}", await adapter.exit_sketch())
+        ensure_fully_defined(adapter, feature)
+        check(f"exit {feature}", adapter.exit_sketch())
         name_last_feature(adapter, feature)
         drives += dims.apply(adapter, feature)
     for name, expression in drives:
-        await drive_dimension(adapter, name, expression)
+        drive_dimension(adapter, name, expression)
     for feature, name, _south, _north in settings.LEGS:
         upper, lower = settings.DIMENSION_BANDS[name]
         if abs(upper + lower) > 1e-12:
@@ -3865,7 +3865,7 @@ async def _author_setting_references(adapter, settings) -> None:
             raise RuntimeError(f"{feature} remained visible after BlankSketch")
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     # Flip seeds + free-DOF contract: cad/config/assemblies/<ASM_NAME>.yaml.
     activate_assembly_contract(ASM_NAME)
     # Reset the free-DOF manifest buffer before any *_driver(free_dof_key=...)
@@ -3914,14 +3914,14 @@ async def build(adapter) -> dict[str, str]:
     # (pc-p1 leaf, 2026-09-25).
     for line in rig_margin_lines():
         _telemetry.info(f"rig margin {line}")
-    check("create_assembly", await adapter.create_assembly())
+    check("create_assembly", adapter.create_assembly())
     apply_package_model_units(adapter, assembly_contract(ASM_NAME).drawing_unit, label=ASM_NAME)
 
     # =================== structure (fixed statics + moving joints) ===========
     # The stationary arbor is the reference frame the moving train mates
     # against. Inserted FIRST, so SolidWorks auto-fixes it as the seed; the
     # base-bolted statics below are fixed at their authored poses too.
-    arbor = await place_component(
+    arbor = place_component(
         adapter,
         "dt-cylinder-gear-shaft",
         [X_DRUM, Y_DRIVE, ARBOR_SOUTH_Z],
@@ -3937,7 +3937,7 @@ async def build(adapter) -> dict[str, str]:
     # column below rides the swing platform.)
     # Both pedestals support the complete strap depth; their transferred base
     # seats follow the revised disc/spring stack rather than old coordinates.
-    await place_component(
+    place_component(
         adapter,
         "dt-arbor-pedestal",
         [X_DRUM, Y_BASE_TOP, -ARBOR_PEDESTAL_Z],
@@ -3948,7 +3948,7 @@ async def build(adapter) -> dict[str, str]:
     # NORTH pedestal (PR8, ch12 img09): the same casting rotated 180 about Y
     # so its strap face looks south at the bank's spring. Its full strap bore
     # supports the arbor, like the south one.
-    await place_component(
+    place_component(
         adapter,
         "dt-arbor-pedestal",
         [X_DRUM, Y_BASE_TOP, ARBOR_PEDESTAL_NORTH_Z],
@@ -3957,7 +3957,7 @@ async def build(adapter) -> dict[str, str]:
         label=f"arbor-pedestal north z={ARBOR_PEDESTAL_NORTH_Z:g}",
     )
     # One stationary south disc, seated directly against the datum pedestal.
-    await place_component(
+    place_component(
         adapter,
         "dt-cylinder-end-disc",
         [X_DRUM, Y_DRIVE, END_DISC_SOUTH_Z0],
@@ -3966,7 +3966,7 @@ async def build(adapter) -> dict[str, str]:
         label=f"cylinder south end disc z0={END_DISC_SOUTH_Z0:.3f}",
     )
     # North spring: south face directly on gear 19, north face on its strap.
-    await place_component(
+    place_component(
         adapter,
         "dt-vn-cylinder-bank-spring",
         [X_DRUM, Y_DRIVE, BANK_SPRING_Z0],
@@ -3977,7 +3977,7 @@ async def build(adapter) -> dict[str, str]:
     # Apex set screws (MHA-SH-VN-54, #743 Q3): point down through each crown onto
     # the arbor's top at the strap's mid-depth; static like their pedestals.
     for _screw_z, _end in ((SET_SCREW_SOUTH_Z, "south"), (SET_SCREW_NORTH_Z, "north")):
-        await place_component(
+        place_component(
             adapter,
             "sh-vn-arbor-set-screw",
             [X_DRUM, SET_SCREW_TIP_Y, _screw_z],
@@ -3992,7 +3992,7 @@ async def build(adapter) -> dict[str, str]:
     # block are seated ON its PlateTop below, so they -- and the shaft they
     # journal -- ride the swing as one unit.
     ppivot = cone_station(PIVOT_STATION)
-    platform = await place_component(
+    platform = place_component(
         adapter,
         "dt-cone-swing-platform",
         [ppivot[0], Y_BASE_TOP, ppivot[2]],
@@ -4002,7 +4002,7 @@ async def build(adapter) -> dict[str, str]:
         label="cone-swing-platform (swing bracket, engaged rest)",
     )
     ppost = cone_station(POST_STATION)
-    pivot_post = await place_component(
+    pivot_post = place_component(
         adapter,
         "dt-cone-pivot-post",
         [ppost[0], Y_BASE_TOP + PLAT_T, ppost[2]],
@@ -4017,7 +4017,7 @@ async def build(adapter) -> dict[str, str]:
     post_screws: list[str] = []
     for tag, dx in (("west", -POST_ATTACHMENT_X), ("east", POST_ATTACHMENT_X)):
         post_screws.append(
-            await place_component(
+            place_component(
                 adapter,
                 "dt-vn-post-mount-screw",
                 [ppost[0] + dx, Y_BASE_TOP + PLAT_T + POST_SCREW_SEAT, ppost[2]],
@@ -4032,7 +4032,7 @@ async def build(adapter) -> dict[str, str]:
     # on PlateTop (no shim), so its foot is the plate top and its height is
     # the axis-height assert above.
     tip_foot_y = Y_BASE_TOP + PLAT_T
-    tip_block = await place_component(
+    tip_block = place_component(
         adapter,
         "dt-cone-tip-block",
         [ptip[0], tip_foot_y, ptip[2]],
@@ -4050,7 +4050,7 @@ async def build(adapter) -> dict[str, str]:
         ptip[0] + PLAT_HOLDDOWN_LOCAL_X * ROT_Y_INCLINE[0][0],
         ptip[2] + PLAT_HOLDDOWN_LOCAL_X * ROT_Y_INCLINE[0][2],
     )
-    tip_holddown = await place_component(
+    tip_holddown = place_component(
         adapter,
         "dt-vn-cone-tip-block-screw",
         [tip_tap_xz[0], Y_BASE_TOP + PLAT_HOLDDOWN_CBORE_DEPTH, tip_tap_xz[1]],
@@ -4070,7 +4070,7 @@ async def build(adapter) -> dict[str, str]:
         ptip[0] + PLAT_TIP_DOWEL_LOCAL_X * ROT_Y_INCLINE[0][0],
         ptip[2] + PLAT_TIP_DOWEL_LOCAL_X * ROT_Y_INCLINE[0][2],
     )
-    tip_dowel = await place_component(
+    tip_dowel = place_component(
         adapter,
         "dt-vn-locating-pin",
         [tip_dowel_xz[0], TIP_DOWEL_BOTTOM_Y, tip_dowel_xz[1]],
@@ -4087,7 +4087,7 @@ async def build(adapter) -> dict[str, str]:
     # authored head up (+Y), its under-head face at y = 0: ROT_SHAFT_NORTH lays
     # +Y along the increasing-station shaft direction and its slot upright.
     pend = cone_station(END_SCREW_HEAD_STATION)
-    end_screw = await place_component(
+    end_screw = place_component(
         adapter,
         "dt-cone-tip-end-screw",
         [pend[0], Y_DRIVE, pend[2]],
@@ -4096,7 +4096,7 @@ async def build(adapter) -> dict[str, str]:
         ground=False,
         label="cone-tip-end-screw (MHA-DT-39 end-play screw, head north)",
     )
-    pinch_screw = await place_component(
+    pinch_screw = place_component(
         adapter,
         "dt-vn-cone-tip-pinch-screw",
         [
@@ -4113,7 +4113,7 @@ async def build(adapter) -> dict[str, str]:
     # plate top and its longer stud passes through the slot into the new 1/4-20
     # base seat. The plate remains the mover, sweeping around the stationary
     # stud without changing the assembly's operational swing DOF.
-    await place_component(
+    place_component(
         adapter,
         "dt-vn-cone-lock-knob",
         [KNOB_X, Y_BASE_TOP + PLAT_T, KNOB_Z],
@@ -4125,7 +4125,7 @@ async def build(adapter) -> dict[str, str]:
     # Its shoulder bottoms on the base top, placing the head 0.25 above the
     # plate and leaving the plate free to swing; the threaded tail enters the
     # matching through #10-24 UNC-2B deck seat.
-    await place_component(
+    place_component(
         adapter,
         "dt-vn-cone-pivot-screw",
         [ppivot[0], Y_BASE_TOP + PSCREW_SHOULDER_LEN, ppivot[2]],
@@ -4136,7 +4136,7 @@ async def build(adapter) -> dict[str, str]:
     # The canonical screw uses the foot's stock frame. Preserve the stop's
     # former local (0, PROUD_LEN, 0) body translation at this identity-rotation
     # occurrence; its head still meets the same disengaged platform edge.
-    await place_component(
+    place_component(
         adapter,
         "sh-vn-fillister-screw-90280a108",
         [STOP_X, Y_BASE_TOP + STOP_PROUD_LEN, STOP_Z],
@@ -4156,7 +4156,7 @@ async def build(adapter) -> dict[str, str]:
     # MHA-DT-22's integral head in the joints section, so the freed p2 swing
     # carries it with the rig instead of leaving it base-fixed in space
     # (Codex catch, 2026-07-05).
-    align_pinion = await place_component(
+    align_pinion = place_component(
         adapter,
         "dt-alignment-pinion",
         [APINION_X, APINION_Y, APINION_Z_FRONT],
@@ -4173,7 +4173,7 @@ async def build(adapter) -> dict[str, str]:
     _strap_euler = euler_from_rows(_strap_rows)
     pinion_brackets: dict[str, str] = {}
     for tag, z0 in zip(("front", "back"), STRAP_ORIGIN_Z, strict=True):
-        pinion_brackets[tag] = await place_component(
+        pinion_brackets[tag] = place_component(
             adapter,
             "dt-pinion-bracket",
             [PIVOT_X, PIVOT_Y, z0],
@@ -4188,7 +4188,7 @@ async def build(adapter) -> dict[str, str]:
     # Front first: the interference contract keys the front pin as -1.
     strap_pins: dict[str, str] = {}
     for tag, z_pin in zip(("front", "back"), STRAP_PIN_Z, strict=True):
-        strap_pins[tag] = await place_component(
+        strap_pins[tag] = place_component(
             adapter,
             "dt-vn-pinion-strap-pin",
             [PIVOT_X, PIVOT_Y, z_pin],
@@ -4199,7 +4199,7 @@ async def build(adapter) -> dict[str, str]:
         )
     pinion_blocks: list[str] = []
     for tag, z0 in (("front", BLOCK_FRONT_Z0), ("back", BLOCK_BACK_Z0)):
-        blk = await place_component(
+        blk = place_component(
             adapter,
             "dt-pinion-pivot-block",
             [BLOCK_X, PIVOT_Y, z0 + BLOCK_DEPTH],
@@ -4211,7 +4211,7 @@ async def build(adapter) -> dict[str, str]:
     # Option E-a: the shaft is pinned to both straps through their cross
     # holes, so it is inserted phased to them -- its local X (the pin-hole
     # axis) lies along the straps' local X at the park lean.
-    pivot_shaft = await place_component(
+    pivot_shaft = place_component(
         adapter,
         "dt-pinion-pivot-shaft",
         [PIVOT_X, PIVOT_Y, PIVOT_SHAFT_Z0],
@@ -4220,7 +4220,7 @@ async def build(adapter) -> dict[str, str]:
         ground=False,
         label="pinion-pivot-shaft (pinned to the straps, E-a)",
     )
-    lift_rod = await place_component(
+    lift_rod = place_component(
         adapter,
         "dt-pinion-lift-rod",
         [LIFT_X, LIFT_Y, LIFT_ROD_Z0],
@@ -4229,7 +4229,7 @@ async def build(adapter) -> dict[str, str]:
         ground=False,
         label="pinion-lift-rod (in the blocks' raised west bores)",
     )
-    await place_component(
+    place_component(
         adapter,
         "dt-pinion-spring",
         [SPRING_X, Y_BASE_TOP, SPRING_Z],
@@ -4239,7 +4239,7 @@ async def build(adapter) -> dict[str, str]:
     )
     cam_pins: dict[str, str] = {}
     for tag, z_mid in (("front", _STRAP_MID_Z[0]), ("back", _STRAP_MID_Z[1])):
-        cam_pins[tag] = await place_component(
+        cam_pins[tag] = place_component(
             adapter,
             "dt-pinion-cam-pin",
             [_FPIN_ORG[0], _FPIN_ORG[1], z_mid],
@@ -4252,7 +4252,7 @@ async def build(adapter) -> dict[str, str]:
     # the lift rod in the authored PARK pose (ecc straight down).
     pinion_cams: dict[str, str] = {}
     for tag, z0 in (("front", CAM_Z0[0]), ("back", CAM_Z0[1])):
-        pinion_cams[tag] = await place_component(
+        pinion_cams[tag] = place_component(
             adapter,
             "dt-pinion-cam",
             [LIFT_X, LIFT_Y, z0],
@@ -4261,7 +4261,7 @@ async def build(adapter) -> dict[str, str]:
             ground=False,
             label=f"pinion-cam {tag} (parked ecc down)",
         )
-    lever = await place_component(
+    lever = place_component(
         adapter,
         "dt-pinion-lever",
         [LIFT_X, LIFT_Y, LEVER_Z],
@@ -4275,7 +4275,7 @@ async def build(adapter) -> dict[str, str]:
     # the rod's "lever pin" station.  The INSTALLED configuration is the pin
     # trimmed and peened flush with the hub (Codex #858 P2), not the overlength
     # cut the part's drawing prints.
-    lever_pin = await place_component(
+    lever_pin = place_component(
         adapter,
         "dt-pinion-lever-pin",
         [LIFT_X, LIFT_Y, LIFT_ROD_Z0 + LEVER_PIN_FROM_ROD_END],
@@ -4285,7 +4285,7 @@ async def build(adapter) -> dict[str, str]:
         configuration=LEVER_PIN_INSTALLED_CONFIG,
         label="pinion-lever-pin (MHA-DT-30 through hub and rod)",
     )
-    grip_crossrod = await place_component(
+    grip_crossrod = place_component(
         adapter,
         "dt-pinion-handle",
         [APINION_X, APINION_Y, HANDLE_Z],
@@ -4299,7 +4299,7 @@ async def build(adapter) -> dict[str, str]:
     # Rotate only about the circular shaft axis so its local-Y cross-hole is
     # coaxial with MHA-DT-15's local-Y rod; every world centre and Z station stays
     # unchanged.
-    pinion_arbor = await place_component(
+    pinion_arbor = place_component(
         adapter,
         "dt-pinion-arbor",
         [APINION_X, APINION_Y, ARBOR_Z0],
@@ -4308,7 +4308,7 @@ async def build(adapter) -> dict[str, str]:
         ground=False,
         label="pinion-arbor (integral steel arbor and grip head)",
     )
-    arbor_collar = await place_component(
+    arbor_collar = place_component(
         adapter,
         "dt-pinion-arbor-collar",
         [APINION_X, APINION_Y, ARBOR_COLLAR_Z0],
@@ -4318,7 +4318,7 @@ async def build(adapter) -> dict[str, str]:
         label="pinion-arbor-collar (spring-pinned walk-out backstop)",
     )
     # Its MHA-DT-VN-63 spring pin through collar and arbor.
-    collar_pin = await place_component(
+    collar_pin = place_component(
         adapter,
         "dt-vn-pinion-strap-pin",
         [APINION_X, APINION_Y, COLLAR_PIN_Z],
@@ -4330,7 +4330,7 @@ async def build(adapter) -> dict[str, str]:
     # Rig hold-downs (PR7 items 2/11/12): physically located seeds are patterned
     # across the repeated block/pedestal stations in the joints section below.
     sx, sz = _BLOCK_SCREW_XZ[0]
-    block_screw = await place_component(
+    block_screw = place_component(
         adapter,
         "dt-vn-slotted-screw",
         [sx, BLOCK_TOP_Y, sz],
@@ -4339,7 +4339,7 @@ async def build(adapter) -> dict[str, str]:
         label="slotted-screw block hold-down seed",
     )
     sx, sz = _FOOT_SCREW_XZ[0]
-    spring_foot_screw = await place_component(
+    spring_foot_screw = place_component(
         adapter,
         "sh-vn-fillister-screw-90280a108",
         [sx, Y_BASE_TOP + SPRING_T, sz],
@@ -4348,11 +4348,11 @@ async def build(adapter) -> dict[str, str]:
         component_reference="FootScrew:1",
         label="foot-screw (spring foot)",
     )
-    await apply_component_color(adapter, spring_foot_screw, _config.palette("panel_black"))
+    apply_component_color(adapter, spring_foot_screw, _config.palette("panel_black"))
     # U34c: the south pedestal's MHA-DT-VN-62 is the seed; the north one is its
     # linear pattern instance below (dt-vn-pedestal-hold-down-screw-1 / -2).
     sx, sz = _PEDESTAL_SCREW_XZ[0]
-    pedestal_screw = await place_component(
+    pedestal_screw = place_component(
         adapter,
         "dt-vn-pedestal-hold-down-screw",
         [sx, Y_BASE_TOP + ARBOR_PED_FLANGE_T, sz],
@@ -4362,7 +4362,7 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # =================== cone cluster (driven, on-solution) ====================
-    cone_shaft = await place_component(
+    cone_shaft = place_component(
         adapter,
         "dt-cone-gear-shaft",
         cone_station(SHAFT_FRONT_STATION),  # part origin = the front stub end
@@ -4373,7 +4373,7 @@ async def build(adapter) -> dict[str, str]:
     # MHA-DT-VN-71 in land 1's keyseat (owner decision C1 keyed, 2026-11-09,
     # PR #1992): inserted in the shaft's orientation at CONE_KEY_ORIGIN and
     # mated to the shaft's planes below, before the gears slide over it.
-    cone_key_part = await place_component(
+    cone_key_part = place_component(
         adapter,
         "dt-vn-cone-shaft-key",
         CONE_KEY_ORIGIN,
@@ -4382,7 +4382,7 @@ async def build(adapter) -> dict[str, str]:
         ground=False,
         label="cone-shaft-key (MHA-DT-VN-71 in the land 1 keyseat)",
     )
-    gear64 = await _place_on_shaft(
+    gear64 = _place_on_shaft(
         adapter,
         "dt-crank-drive-gear",
         GEAR64_CENTRE_STATION,
@@ -4401,7 +4401,7 @@ async def build(adapter) -> dict[str, str]:
     # decision C1 keyed, 2026-11-09, PR #1992), inserted on its model station
     # with MHA-DT-38 pressed on its pivot.
     seed_teeth = _config.cone_teeth(0)
-    seed_cg = await _place_on_shaft(
+    seed_cg = _place_on_shaft(
         adapter,
         "dt-cone-gear",
         SHAFT_T120_STATION + GEAR_AXIS_SHIFT + (CONE_FACE_STATION_REFERENCE - CONE_FACE) / 2.0,
@@ -4410,7 +4410,7 @@ async def build(adapter) -> dict[str, str]:
         label=f"cone-gear T{seed_teeth:03d}",
     )
     cone_gears: list[tuple[int, str]] = [(seed_teeth, seed_cg)]
-    tip_gear = await _place_on_shaft(
+    tip_gear = _place_on_shaft(
         adapter,
         "dt-cone-tip-gear",
         TIP_GEAR_SOUTH_STATION + CONE_FACE / 2.0,
@@ -4418,7 +4418,7 @@ async def build(adapter) -> dict[str, str]:
         label="cone-tip-gear T006 (MHA-DT-37, spigot bonded in the shaft socket)",
     )
     pbush = cone_station(BUSHING_SOUTH_STATION)
-    tip_bushing = await place_component(
+    tip_bushing = place_component(
         adapter,
         "dt-cone-tip-bushing",
         [pbush[0], Y_DRIVE, pbush[2]],
@@ -4448,7 +4448,7 @@ async def build(adapter) -> dict[str, str]:
     # lock phase is gear_train.cylinder_lock_phase_deg via channel_frame_geom.
     cylinder_rows = compose_rows(ROT_Y_180, rot_z_rows(-CYLINDER_LOCK_PHASE_DEG))
     cyl_gears: list[str] = [
-        await place_component(
+        place_component(
             adapter,
             "dt-cylinder-gear",
             [X_DRUM, Y_DRIVE, Z_DRUM0 + DRUM_FACE / 2.0],
@@ -4460,7 +4460,7 @@ async def build(adapter) -> dict[str, str]:
     ]
 
     # =================== crank (driven, on-solution) ===========================
-    crankshaft = await place_component(
+    crankshaft = place_component(
         adapter,
         "dt-crankshaft",
         [X_CRANK, Y_CRANK, CRANKSHAFT_Z0],
@@ -4468,7 +4468,7 @@ async def build(adapter) -> dict[str, str]:
         ROT_X_POS90,
         ground=False,
     )
-    pinion = await place_component(
+    pinion = place_component(
         adapter,
         "dt-crank-pinion",
         [X_CRANK, Y_CRANK, PINION_TOOTH_Z - PINION_FACE / 2.0],
@@ -4477,7 +4477,7 @@ async def build(adapter) -> dict[str, str]:
         ground=False,
         label="crank-pinion (centred on the 64T contact tooth)",
     )
-    hub = await place_component(
+    hub = place_component(
         adapter,
         "dt-crank-hub",
         [X_CRANK, Y_CRANK, CRANK_HUB_Z0],
@@ -4486,7 +4486,7 @@ async def build(adapter) -> dict[str, str]:
         ground=False,
         label="MHA-DT-31 through hub",
     )
-    seam_pin = await place_component(
+    seam_pin = place_component(
         adapter,
         "dt-vn-crank-hub-pin",
         CRANK_HUB_PIN_ORIGIN,
@@ -4500,7 +4500,7 @@ async def build(adapter) -> dict[str, str]:
     # -Z).  DrivePinAxis1 lies on the shaft's local +Z (machine -Y),
     # DrivePinAxis2 opposite.
     seat_pins = [
-        await place_component(
+        place_component(
             adapter,
             "dt-vn-crank-seat-drive-pin",
             [X_CRANK, Y_CRANK + side * seat_geometry.PIN_CIRCLE_RADIUS, CRANK_DRIVE_PIN_Z0],
@@ -4523,7 +4523,7 @@ async def build(adapter) -> dict[str, str]:
     # since a downward vector lies on the views' vertical rotation axis). The
     # arm's local +x maps to machine -Y, while local +z maps toward machine -Z;
     # its origin is the inboard face at -175 and the plate fills -183..-175.
-    arm = await place_component(
+    arm = place_component(
         adapter,
         "dt-crank-arm",
         [X_CRANK, Y_CRANK, CRANK_ARM_ORIGIN_Z],
@@ -4537,7 +4537,7 @@ async def build(adapter) -> dict[str, str]:
     # The hub #14 and shaft #9 pilots are match-reamed together to the pin's
     # 1:48 taper, so those two overlaps alone are volume-bounded allowed pairs
     # in _dt_drive_train_interference.
-    pin = await place_component(
+    pin = place_component(
         adapter,
         "dt-crank-pin",
         [CRANK_PIN_X0, Y_CRANK, CRANK_PIN_Z],
@@ -4546,13 +4546,13 @@ async def build(adapter) -> dict[str, str]:
         ground=False,
         label="crank taper pin",
     )
-    await lock_mate(
+    lock_mate(
         adapter,
         named_ref(f"Front Plane@{pin}", "PLANE"),
         named_ref(f"Front Plane@{hub}", "PLANE"),
         label="MHA-DT-09 locked to the crank hub",
     )
-    ring = await place_component(
+    ring = place_component(
         adapter,
         "dt-crank-pin-ring",
         [CRANK_PIN_X0 + PIN_RING_HOLE_X, CRANK_RING_Y, CRANK_PIN_Z],
@@ -4561,7 +4561,7 @@ async def build(adapter) -> dict[str, str]:
         ground=False,
         label="crank pin keeper ring",
     )
-    await lock_mate(
+    lock_mate(
         adapter,
         named_ref(f"Front Plane@{ring}", "PLANE"),
         named_ref(f"Front Plane@{pin}", "PLANE"),
@@ -4572,7 +4572,7 @@ async def build(adapter) -> dict[str, str]:
     # the boss both sides. Locked to the pinion so it turns with the crank; a
     # light drive fit in its own match-drilled hole is line contact at the
     # nominal, so no allowed-pair volume is needed.
-    pinion_pin = await place_component(
+    pinion_pin = place_component(
         adapter,
         "dt-crank-pinion-pin",
         PINION_PIN_ORIGIN,
@@ -4581,7 +4581,7 @@ async def build(adapter) -> dict[str, str]:
         ground=False,
         label="crank pinion retention pin",
     )
-    await lock_mate(
+    lock_mate(
         adapter,
         named_ref(f"Front Plane@{pinion_pin}", "PLANE"),
         named_ref(f"Front Plane@{pinion}", "PLANE"),
@@ -4591,7 +4591,7 @@ async def build(adapter) -> dict[str, str]:
     # p.14; owner ruling 2026-11-08): authored head toward -z with its
     # under-head plane at z = 0, so it seats on the end link's wire. It locks
     # to the arm so it turns with the crank.
-    anchor = await place_component(
+    anchor = place_component(
         adapter,
         "dt-vn-keeper-chain-screw",
         [ANCHOR_SCREW_XY[0], ANCHOR_SCREW_XY[1], ANCHOR_HEAD_Z],
@@ -4600,7 +4600,7 @@ async def build(adapter) -> dict[str, str]:
         ground=False,
         label="keeper-chain anchor screw",
     )
-    await lock_mate(
+    lock_mate(
         adapter,
         named_ref(f"Front Plane@{anchor}", "PLANE"),
         named_ref(f"Front Plane@{arm}", "PLANE"),
@@ -4610,7 +4610,7 @@ async def build(adapter) -> dict[str, str]:
     # screwed flat to the arm, the pin's ring closed through its far link's
     # eye. It locks to the arm: the screw, the pin and the ring all turn with
     # the crank, so the strand's rest drape rides with it.
-    chain = await place_component(
+    chain = place_component(
         adapter,
         "dt-vn-keeper-chain",
         [c + o for c, o in zip(CRANK_FRAME_ORIGIN, dt_vn_keeper_chain_spec.CHAIN_PART_ORIGIN)],
@@ -4619,7 +4619,7 @@ async def build(adapter) -> dict[str, str]:
         ground=False,
         label="keeper chain",
     )
-    await lock_mate(
+    lock_mate(
         adapter,
         named_ref(f"Front Plane@{chain}", "PLANE"),
         named_ref(f"Front Plane@{arm}", "PLANE"),
@@ -4627,7 +4627,7 @@ async def build(adapter) -> dict[str, str]:
     )
     # Handle pivot rides the arm tip, now ARM_C2C below the crankshaft. Its grip
     # axis stays parallel to the crankshaft (ROT_Y_POS90 -> assembly -Z).
-    handle = await place_component(
+    handle = place_component(
         adapter,
         "dt-crank-handle",
         [X_CRANK, Y_CRANK - ARM_C2C, CRANK_ARM_Z0],
@@ -4640,7 +4640,7 @@ async def build(adapter) -> dict[str, str]:
     # handle's own frame -- the ferrule from the arm face at x=0, the cup from
     # its face at the basic overall length -- so both take the handle's
     # transform and lock to it.
-    handle_ferrule = await place_component(
+    handle_ferrule = place_component(
         adapter,
         "dt-crank-handle-ferrule",
         [X_CRANK, Y_CRANK - ARM_C2C, CRANK_ARM_Z0],
@@ -4652,7 +4652,7 @@ async def build(adapter) -> dict[str, str]:
         # shoulder (user ruling 2026-10-01).
         configuration=HANDLE_FERRULE_INSTALLED_CONFIG,
     )
-    handle_cup = await place_component(
+    handle_cup = place_component(
         adapter,
         "dt-crank-handle-butt-cup",
         [X_CRANK, Y_CRANK - ARM_C2C, CRANK_ARM_Z0 - HANDLE_BASIC_LENGTH],
@@ -4665,7 +4665,7 @@ async def build(adapter) -> dict[str, str]:
     # machine +z, so the shoulder's ArmSeat lands on the arm's outboard face.
     # Its INSTALLED configuration is the tip filed flush with the arm's
     # inboard face, not the long as-turned thread the part's drawing prints.
-    handle_screw = await place_component(
+    handle_screw = place_component(
         adapter,
         "dt-crank-handle-pivot-screw",
         [X_CRANK, Y_CRANK - ARM_C2C, HANDLE_SCREW_Z0],
@@ -4685,7 +4685,7 @@ async def build(adapter) -> dict[str, str]:
     # so its Top Plane is the axial reference; the plate's Front plane is the
     # swing-following axial datum (distance read live from the rest pose).
     cs_o = _org(adapter, crankshaft)
-    await coincident_mate(
+    coincident_mate(
         adapter,
         named_ref(f"Axis1@{crankshaft}", "AXIS"),
         named_ref(f"crank axis@{platform}", "AXIS"),
@@ -4698,7 +4698,7 @@ async def build(adapter) -> dict[str, str]:
     # |Delta z| at the engaged rest pose (both are machine-z-normal planes
     # there).
     _cs_axial = cs_o[2] - _SEAT_ANCHOR_M[1]
-    await distance_driver(
+    distance_driver(
         adapter,
         named_ref(f"Top Plane@{crankshaft}", "PLANE"),
         named_ref(f"CrankAxisSeat@{platform}", "PLANE"),
@@ -4719,7 +4719,7 @@ async def build(adapter) -> dict[str, str]:
     # live dihedral between its Right plane and the crankshaft's (~11.25 deg). The
     # pinion origin sits ON the spin axis (flip-recovery can't read it), so a
     # wrong side surfaces as tooth interference, not a silent miss.
-    pn_o = await _seat_on_crank(
+    pn_o = _seat_on_crank(
         adapter, pinion, "Axis2", crank_axis, crankshaft, "SeatPinion"
     )
     a_pn = component_transform(adapter, pinion)
@@ -4727,7 +4727,7 @@ async def build(adapter) -> dict[str, str]:
     pin_phase = math.degrees(
         math.acos(max(-1.0, min(1.0, sum(a_pn[k] * a_cs[k] for k in range(3)))))
     )
-    await angle_driver(
+    angle_driver(
         adapter,
         named_ref(f"Right Plane@{pinion}", "PLANE"),
         cs_right,
@@ -4741,14 +4741,14 @@ async def build(adapter) -> dict[str, str]:
     # out; the Right-plane anti-spin represents that installed taper pin.
     hub_o = _org(adapter, hub)
     hub_axis = named_ref(f"Axis1@{hub}", "AXIS")
-    await coincident_mate(
+    coincident_mate(
         adapter,
         hub_axis,
         crank_axis,
         label="MHA-DT-31 coaxial on crankshaft",
         verify=(hub, hub_o),
     )
-    await coincident_mate(
+    coincident_mate(
         adapter,
         named_ref(f"Top Plane@{hub}", "PLANE"),
         named_ref(f"Top Plane@{crankshaft}", "PLANE"),
@@ -4756,7 +4756,7 @@ async def build(adapter) -> dict[str, str]:
         alignment="aligned",
         verify=(hub, hub_o),
     )
-    await parallel_mate(
+    parallel_mate(
         adapter,
         named_ref(f"Right Plane@{hub}", "PLANE"),
         cs_right,
@@ -4768,14 +4768,14 @@ async def build(adapter) -> dict[str, str]:
     # against ArmShoulder at local station 8.  Its local +x hangs machine -Y,
     # putting the seam at six o'clock.
     arm_o = _org(adapter, arm)
-    await coincident_mate(
+    coincident_mate(
         adapter,
         named_ref(f"Axis1@{arm}", "AXIS"),
         hub_axis,
         label="crank arm matched on MHA-DT-31 seat",
         verify=(arm, arm_o),
     )
-    await coincident_mate(
+    coincident_mate(
         adapter,
         named_ref(f"Front Plane@{arm}", "PLANE"),
         named_ref(f"ArmShoulder@{hub}", "PLANE"),
@@ -4783,7 +4783,7 @@ async def build(adapter) -> dict[str, str]:
         alignment="anti_aligned",
         verify=(arm, arm_o),
     )
-    await parallel_mate(
+    parallel_mate(
         adapter,
         named_ref(f"Right Plane@{arm}", "PLANE"),
         named_ref(f"Front Plane@{hub}", "PLANE"),
@@ -4794,14 +4794,14 @@ async def build(adapter) -> dict[str, str]:
     # MHA-DT-VN-59 runs axially from the common outboard face for 4 mm and keys only
     # the arm/hub seam; it never crosses the shaft bore.
     seam_o = _org(adapter, seam_pin)
-    await coincident_mate(
+    coincident_mate(
         adapter,
         named_ref(f"Axis1@{seam_pin}", "AXIS"),
         named_ref(f"Axis2@{hub}", "AXIS"),
         label="MHA-DT-VN-59 coaxial with six-o'clock seam",
         verify=(seam_pin, seam_o),
     )
-    await coincident_mate(
+    coincident_mate(
         adapter,
         named_ref(f"Front Plane@{seam_pin}", "PLANE"),
         named_ref(f"Top Plane@{hub}", "PLANE"),
@@ -4809,7 +4809,7 @@ async def build(adapter) -> dict[str, str]:
         alignment="aligned",
         verify=(seam_pin, seam_o),
     )
-    await parallel_mate(
+    parallel_mate(
         adapter,
         named_ref(f"Right Plane@{seam_pin}", "PLANE"),
         named_ref(f"Right Plane@{hub}", "PLANE"),
@@ -4821,21 +4821,21 @@ async def build(adapter) -> dict[str, str]:
     # drilled pin axis, and the parallel closes the revolved pin's spin.
     for k, seat_pin in enumerate(seat_pins, start=1):
         seat_pin_o = _org(adapter, seat_pin)
-        await coincident_mate(
+        coincident_mate(
             adapter,
             named_ref(f"ScrewAxis@{seat_pin}", "AXIS"),
             named_ref(f"DrivePinAxis{k}@{crankshaft}", "AXIS"),
             label=f"MHA-DT-VN-67 #{k} coaxial in DrivePinAxis{k}",
             verify=(seat_pin, seat_pin_o),
         )
-        await coincident_mate(
+        coincident_mate(
             adapter,
             named_ref(f"Top Plane@{seat_pin}", "PLANE"),
             named_ref(f"DrivePinFloor@{crankshaft}", "PLANE"),
             label=f"MHA-DT-VN-67 #{k} pressed to DrivePinFloor",
             verify=(seat_pin, seat_pin_o),
         )
-        await parallel_mate(
+        parallel_mate(
             adapter,
             named_ref(f"Right Plane@{seat_pin}", "PLANE"),
             cs_right,
@@ -4857,14 +4857,14 @@ async def build(adapter) -> dict[str, str]:
     # Coincident has one branch -- and referencing the ARM keeps the seat
     # internal to the swinging rig.
     hd_o = _org(adapter, handle)
-    await coincident_mate(
+    coincident_mate(
         adapter,
         named_ref(f"Axis1@{handle}", "AXIS"),
         named_ref(f"Axis2@{arm}", "AXIS"),
         label="handle coaxial on arm pivot",
         verify=(handle, hd_o),
     )
-    await coincident_mate(
+    coincident_mate(
         adapter,
         named_ref(f"Right Plane@{handle}", "PLANE"),
         named_ref(f"HandleSeat@{arm}", "PLANE"),
@@ -4874,7 +4874,7 @@ async def build(adapter) -> dict[str, str]:
         alignment="aligned",
         verify=(handle, hd_o),
     )
-    await parallel_mate(
+    parallel_mate(
         adapter,
         named_ref(f"Top Plane@{handle}", "PLANE"),
         named_ref(f"Right Plane@{arm}", "PLANE"),
@@ -4886,7 +4886,7 @@ async def build(adapter) -> dict[str, str]:
         (handle_ferrule, "MHA-DT-34 ferrule"),
         (handle_cup, "MHA-DT-35 butt cup"),
     ):
-        await lock_mate(
+        lock_mate(
             adapter,
             named_ref(f"Front Plane@{bonded}", "PLANE"),
             named_ref(f"Front Plane@{handle}", "PLANE"),
@@ -4898,14 +4898,14 @@ async def build(adapter) -> dict[str, str]:
     # clocking (immaterial, like the handle's grip spin).  The arm's Right
     # Plane is machine XZ, the identity-placed screw's Top Plane.
     hs_o = _org(adapter, handle_screw)
-    await coincident_mate(
+    coincident_mate(
         adapter,
         named_ref(f"Axis1@{handle_screw}", "AXIS"),
         named_ref(f"Axis2@{arm}", "AXIS"),
         label="MHA-DT-32 coaxial on arm pivot",
         verify=(handle_screw, hs_o),
     )
-    await coincident_mate(
+    coincident_mate(
         adapter,
         named_ref(f"ArmSeat@{handle_screw}", "PLANE"),
         named_ref(f"HandleSeat@{arm}", "PLANE"),
@@ -4913,7 +4913,7 @@ async def build(adapter) -> dict[str, str]:
         alignment="anti_aligned",
         verify=(handle_screw, hs_o),
     )
-    await parallel_mate(
+    parallel_mate(
         adapter,
         named_ref(f"Top Plane@{handle_screw}", "PLANE"),
         named_ref(f"Right Plane@{arm}", "PLANE"),
@@ -4933,7 +4933,7 @@ async def build(adapter) -> dict[str, str]:
     # plate below and follow the swing, so the validated 20-gear mesh is
     # untouched in `rest`; drag the plate to articulate the disengage.
     plat_o = _org(adapter, platform)
-    await distance_driver(
+    distance_driver(
         adapter,
         named_ref(f"Top Plane@{platform}", "PLANE"),
         named_ref("Top Plane", "PLANE"),
@@ -4941,7 +4941,7 @@ async def build(adapter) -> dict[str, str]:
         label=f"cone-platform height d={abs(plat_o[1]):.2f}",
         verify=(platform, plat_o),
     )
-    await distance_driver(
+    distance_driver(
         adapter,
         named_ref(f"Axis1@{platform}", "AXIS"),
         named_ref("Right Plane", "PLANE"),
@@ -4949,7 +4949,7 @@ async def build(adapter) -> dict[str, str]:
         label=f"cone-platform pivot-X d={abs(plat_o[0]):.2f}",
         verify=(platform, plat_o),
     )
-    await distance_driver(
+    distance_driver(
         adapter,
         named_ref(f"Axis1@{platform}", "AXIS"),
         named_ref("Front Plane", "PLANE"),
@@ -4960,7 +4960,7 @@ async def build(adapter) -> dict[str, str]:
     # The swing is a FREED operational DOF (user item 1): its drive spec is
     # recorded, not authored -- the plate swings freely between the gear mesh
     # and the stop screw. Same mechanism as the crank spin below.
-    await angle_driver(
+    angle_driver(
         adapter,
         named_ref(f"Right Plane@{platform}", "PLANE"),
         named_ref("Right Plane", "PLANE"),
@@ -4977,21 +4977,21 @@ async def build(adapter) -> dict[str, str]:
     # asymmetric crank boss points to the photographed side.  The turn swaps
     # the physical east/west holes, hence the cross-paired axes below.
     post_o = _org(adapter, pivot_post)
-    await coincident_mate(
+    coincident_mate(
         adapter,
         named_ref(f"Top Plane@{pivot_post}", "PLANE"),
         named_ref(f"PlateTop@{platform}", "PLANE"),
         label="cone-post seats on the plate (Top <-> PlateTop)",
         verify=(pivot_post, post_o),
     )
-    await coincident_mate(
+    coincident_mate(
         adapter,
         named_ref(f"mount east@{pivot_post}", "AXIS"),
         named_ref(f"post mount west@{platform}", "AXIS"),
         label="cone-post local-east to platform-west mounting axis",
         verify=(pivot_post, post_o),
     )
-    await coincident_mate(
+    coincident_mate(
         adapter,
         named_ref(f"mount west@{pivot_post}", "AXIS"),
         named_ref(f"post mount east@{platform}", "AXIS"),
@@ -5000,7 +5000,7 @@ async def build(adapter) -> dict[str, str]:
     )
     # I22: each MHA-DT-VN-61 clamps the post to the plate.
     for screw in post_screws:
-        await lock_mate(
+        lock_mate(
             adapter,
             named_ref(f"Front Plane@{screw}", "PLANE"),
             named_ref(f"Front Plane@{pivot_post}", "PLANE"),
@@ -5014,7 +5014,7 @@ async def build(adapter) -> dict[str, str]:
     a_s = component_transform(adapter, cone_shaft)
     cone_o = [a_s[9] * 1000.0, a_s[10] * 1000.0, a_s[11] * 1000.0]
     cone_axis_dir = [a_s[6], a_s[7], a_s[8]]  # image of local Z = inclined shaft axis
-    await coincident_mate(
+    coincident_mate(
         adapter,
         named_ref(f"Axis1@{cone_shaft}", "AXIS"),
         named_ref(f"journal axis@{pivot_post}", "AXIS"),
@@ -5028,7 +5028,7 @@ async def build(adapter) -> dict[str, str]:
         collar_face=collar_face.name,
         boss_face=boss_face.name,
     )
-    await coincident_mate(
+    coincident_mate(
         adapter,
         collar_face,
         boss_face,
@@ -5044,14 +5044,14 @@ async def build(adapter) -> dict[str, str]:
     # mate.  It follows the p1 swing through the shaft.
     tb_o = _org(adapter, tip_block)
     tb_axial = sum((tb_o[k] - cone_o[k]) * cone_axis_dir[k] for k in range(3))
-    await coincident_mate(
+    coincident_mate(
         adapter,
         named_ref(f"Axis1@{tip_block}", "AXIS"),
         named_ref(f"Axis1@{cone_shaft}", "AXIS"),
         label="tip-block end-screw axis aligned to shaft tip",
         verify=(tip_block, tb_o),
     )
-    await distance_driver(
+    distance_driver(
         adapter,
         named_ref(f"Front Plane@{tip_block}", "PLANE"),
         named_ref(f"Front Plane@{cone_shaft}", "PLANE"),
@@ -5059,7 +5059,7 @@ async def build(adapter) -> dict[str, str]:
         label=f"tip-block axial seat d={tb_axial:.2f}",
         verify=(tip_block, tb_o),
     )
-    await parallel_mate(
+    parallel_mate(
         adapter,
         named_ref(f"Right Plane@{tip_block}", "PLANE"),
         named_ref(f"Right Plane@{platform}", "PLANE"),
@@ -5069,7 +5069,7 @@ async def build(adapter) -> dict[str, str]:
     # MHA-DT-VN-60 clamps the block to the plate: locked to the platform, whose
     # hold-down hole is the block's station.  Its origin (the head's bearing
     # face) must sit on the counterbore floor, under the block's foot tap.
-    await lock_mate(
+    lock_mate(
         adapter,
         named_ref(f"Front Plane@{tip_holddown}", "PLANE"),
         named_ref(f"Front Plane@{platform}", "PLANE"),
@@ -5093,7 +5093,7 @@ async def build(adapter) -> dict[str, str]:
     # MHA-DT-VN-69 (rule-23 retention, owner ruling 2026-11-07) is pressed in the
     # block foot: locked to it, its axis must stand on the foot's dowel ream
     # (DOWEL_FROM_TAP past the foot tap), its upper end on the ream's floor.
-    await lock_mate(
+    lock_mate(
         adapter,
         named_ref(f"Front Plane@{tip_dowel}", "PLANE"),
         named_ref(f"Front Plane@{tip_block}", "PLANE"),
@@ -5118,14 +5118,14 @@ async def build(adapter) -> dict[str, str]:
     # "pinch axis"): coaxial + its head seat a half-block off the block's Right
     # plane + an anti-spin.
     pin_o = _org(adapter, pinch_screw)
-    await coincident_mate(
+    coincident_mate(
         adapter,
         named_ref(f"ScrewAxis@{pinch_screw}", "AXIS"),
         named_ref(f"Axis2@{tip_block}", "AXIS"),
         label="pinch screw in the cross-bore",
         verify=(pinch_screw, pin_o),
     )
-    await distance_driver(
+    distance_driver(
         adapter,
         named_ref(f"Top Plane@{pinch_screw}", "PLANE"),
         named_ref(f"Right Plane@{tip_block}", "PLANE"),
@@ -5133,7 +5133,7 @@ async def build(adapter) -> dict[str, str]:
         label=f"pinch head seat d={TIP_BLOCK_X / 2.0:.2f}",
         verify=(pinch_screw, pin_o),
     )
-    await parallel_mate(
+    parallel_mate(
         adapter,
         named_ref(f"Front Plane@{pinch_screw}", "PLANE"),
         named_ref(f"Front Plane@{tip_block}", "PLANE"),
@@ -5160,7 +5160,7 @@ async def build(adapter) -> dict[str, str]:
     key_o = _org(adapter, cone_key_part)
     key_s = component_transform(adapter, cone_shaft)
     key_x_dir = [key_s[0], key_s[1], key_s[2]]  # image of the shaft's local +X
-    await coincident_mate(
+    coincident_mate(
         adapter,
         named_ref(f"Top Plane@{cone_key_part}", "PLANE"),
         named_ref(f"Top Plane@{cone_shaft}", "PLANE"),
@@ -5168,7 +5168,7 @@ async def build(adapter) -> dict[str, str]:
         verify=(cone_key_part, key_o),
     )
     d_floor = sum((key_o[k] - cone_o[k]) * key_x_dir[k] for k in range(3))
-    await distance_driver(
+    distance_driver(
         adapter,
         named_ref(f"Right Plane@{cone_key_part}", "PLANE"),
         named_ref(f"Right Plane@{cone_shaft}", "PLANE"),
@@ -5176,7 +5176,7 @@ async def build(adapter) -> dict[str, str]:
         label=f"cone key on the keyseat floor d={d_floor:.4f}",
         verify=(cone_key_part, key_o),
     )
-    await _axial_seat(
+    _axial_seat(
         adapter, cone_key_part, cone_shaft, cone_o, cone_axis_dir, key_o, "cone key", ""
     )
     _key_live = _org(adapter, cone_key_part)
@@ -5200,7 +5200,7 @@ async def build(adapter) -> dict[str, str]:
     # _place_on_shaft puts that origin face/2 south of the gear's centre), so
     # Front coincident with the collar's north plane sits the gear ON it.
     cone_axis = named_ref(f"Axis1@{cone_shaft}", "AXIS")
-    await _key_to_shaft(
+    _key_to_shaft(
         adapter,
         gear64,
         "BoreAxis",
@@ -5218,7 +5218,7 @@ async def build(adapter) -> dict[str, str]:
     # copies land ON the mates -- no landing recipe needed (contrast the
     # channel's free-DOF put+driver dance). Measured ~0.7 s/copy vs ~8.7 s
     # authored (memory/v018-perf-review.md, cone-gear ladder GO).
-    await _key_to_shaft(
+    _key_to_shaft(
         adapter,
         seed_cg,
         "Axis1",
@@ -5346,7 +5346,7 @@ async def build(adapter) -> dict[str, str]:
                 cg
             ).ReferencedConfiguration = cfg
             if teeth in TIP_TEETH:  # the four hard yellow tip gears
-                await apply_component_color(adapter, cg, MUNTZ_YELLOW)
+                apply_component_color(adapter, cg, MUNTZ_YELLOW)
             cone_gears.append((teeth, cg))
         # No post-copy flip heal: FlipDimension=seed_flip was honoured in each
         # copy call (Repeat=false on the axial-seat slot), so the copied dims
@@ -5416,7 +5416,7 @@ async def build(adapter) -> dict[str, str]:
     # spigot bonded in MHA-DT-04's socket, so it seats on its own model
     # station like a cone gear (coaxial, axial seat, Right-plane anti-spin:
     # its tooth zero sits on +X as the family's does).
-    await _key_to_shaft(
+    _key_to_shaft(
         adapter,
         tip_gear,
         "Axis1",
@@ -5426,26 +5426,26 @@ async def build(adapter) -> dict[str, str]:
         cone_axis_dir,
         "cone-tip-gear T006",
     )
-    await apply_component_color(adapter, tip_gear, MUNTZ_YELLOW)
+    apply_component_color(adapter, tip_gear, MUNTZ_YELLOW)
     cone_gears.append((6, tip_gear))
     # MHA-DT-38 pressed on the pivot against T006's leaves: coaxial, its south
     # face (Right Plane) on LeavesNorthPlane, and no spin on the press.
     bush_o = _org(adapter, tip_bushing)
-    await coincident_mate(
+    coincident_mate(
         adapter,
         named_ref(f"Axis1@{tip_bushing}", "AXIS"),
         cone_axis,
         label="tip bushing coaxial on the T006 pivot",
         verify=(tip_bushing, bush_o),
     )
-    await coincident_mate(
+    coincident_mate(
         adapter,
         named_ref(f"Right Plane@{tip_bushing}", "PLANE"),
         named_ref(f"LeavesNorthPlane@{tip_gear}", "PLANE"),
         label="tip bushing pressed against the T006 leaves",
         verify=(tip_bushing, bush_o),
     )
-    await parallel_mate(
+    parallel_mate(
         adapter,
         named_ref(f"Top Plane@{tip_bushing}", "PLANE"),
         named_ref(f"Top Plane@{tip_gear}", "PLANE"),
@@ -5456,14 +5456,14 @@ async def build(adapter) -> dict[str, str]:
     # axis, its reamed end the model end play off the bushing, and its slot
     # held upright (the pinch screw locks its turn in reality).
     end_o = _org(adapter, end_screw)
-    await coincident_mate(
+    coincident_mate(
         adapter,
         named_ref(f"ScrewAxis@{end_screw}", "AXIS"),
         named_ref(f"Axis1@{tip_block}", "AXIS"),
         label="end screw in the block tap",
         verify=(end_screw, end_o),
     )
-    await distance_driver(
+    distance_driver(
         adapter,
         named_ref(f"TipFace@{end_screw}", "PLANE"),
         named_ref(f"NorthFace@{tip_bushing}", "PLANE"),
@@ -5471,7 +5471,7 @@ async def build(adapter) -> dict[str, str]:
         label=f"end screw end play gap d={END_SCREW_MODEL_END_PLAY_MM:.2f}",
         verify=(end_screw, end_o),
     )
-    await parallel_mate(
+    parallel_mate(
         adapter,
         named_ref(f"Right Plane@{end_screw}", "PLANE"),
         named_ref(f"Right Plane@{tip_block}", "PLANE"),
@@ -5570,7 +5570,7 @@ async def build(adapter) -> dict[str, str]:
                 put_component_pose(
                     adapter, _nm, _spun(list(component_transform(adapter, _nm)))
                 )
-        await force_rebuild(adapter)
+        force_rebuild(adapter)
         _err2 = _seed_error()
         log(f"crank-mesh phase corrected: seed error {_err:+.4f} -> {_err2:+.4f} deg")
         if abs(_err2) > 0.10:
@@ -5585,7 +5585,7 @@ async def build(adapter) -> dict[str, str]:
         # assert_pose_ledger rotation check as pose drift. Re-anchor them.
         for _nm in _cone_family:
             reledger_to_solved(adapter, _nm)
-    await gear_mate(
+    gear_mate(
         adapter,
         named_ref(f"Axis2@{pinion}", "AXIS"),
         named_ref(f"BoreAxis@{gear64}", "AXIS"),
@@ -5616,14 +5616,14 @@ async def build(adapter) -> dict[str, str]:
     # diagnostics/diag_cwm_cylinder.py + the 2026-07-10 validation build.)
     seed_cyl = cyl_gears[0]
     seed_cyl_o = _org(adapter, seed_cyl)
-    await coincident_mate(
+    coincident_mate(
         adapter,
         named_ref(f"Axis2@{seed_cyl}", "AXIS"),
         named_ref(f"Axis1@{arbor}", "AXIS"),
         label="cylinder-gear 0 radial",
         verify=(seed_cyl, seed_cyl_o),
     )
-    await distance_driver(  # anchor the stack's reference end once
+    distance_driver(  # anchor the stack's reference end once
         adapter,
         named_ref(f"Front Plane@{seed_cyl}", "PLANE"),
         named_ref("Front Plane", "PLANE"),
@@ -5832,7 +5832,7 @@ async def build(adapter) -> dict[str, str]:
     # assembly planes); only its spin is left, and the pin tie to the front
     # strap below takes that.
     ps_o = _org(adapter, pivot_shaft)
-    await distance_driver(
+    distance_driver(
         adapter,
         named_ref(f"Axis1@{pivot_shaft}", "AXIS"),
         named_ref("Right Plane", "PLANE"),
@@ -5840,7 +5840,7 @@ async def build(adapter) -> dict[str, str]:
         label=f"torque shaft axis X d={abs(ps_o[0]):.2f}",
         verify=(pivot_shaft, ps_o),
     )
-    await distance_driver(
+    distance_driver(
         adapter,
         named_ref(f"Axis1@{pivot_shaft}", "AXIS"),
         named_ref("Top Plane", "PLANE"),
@@ -5848,7 +5848,7 @@ async def build(adapter) -> dict[str, str]:
         label=f"torque shaft axis Y d={abs(ps_o[1]):.2f}",
         verify=(pivot_shaft, ps_o),
     )
-    await distance_driver(
+    distance_driver(
         adapter,
         named_ref(f"Front Plane@{pivot_shaft}", "PLANE"),
         named_ref("Front Plane", "PLANE"),
@@ -5856,7 +5856,7 @@ async def build(adapter) -> dict[str, str]:
         label=f"torque shaft axial d={abs(ps_o[2]):.2f}",
         verify=(pivot_shaft, ps_o),
     )
-    block_instances = await grid_component_pattern(
+    block_instances = grid_component_pattern(
         adapter,
         [block_screw],
         axis1="x",
@@ -5881,7 +5881,7 @@ async def build(adapter) -> dict[str, str]:
         Y_BASE_TOP + ARBOR_PED_FLANGE_T,
         _PEDESTAL_SCREW_XZ[1][1],
     ]
-    pedestal_instances = await linear_component_pattern(
+    pedestal_instances = linear_component_pattern(
         adapter,
         [pedestal_screw],
         axis="z",
@@ -5903,14 +5903,14 @@ async def build(adapter) -> dict[str, str]:
     # the drum in/out of mesh by hand.
     fb, bb = pinion_brackets["front"], pinion_brackets["back"]
     fb_o = _org(adapter, fb)
-    await coincident_mate(
+    coincident_mate(
         adapter,
         named_ref(f"Axis1@{fb}", "AXIS"),
         named_ref(f"Axis1@{pivot_shaft}", "AXIS"),
         label="pinion swing radial",
         verify=(fb, fb_o),
     )
-    await distance_driver(
+    distance_driver(
         adapter,
         named_ref(f"Front Plane@{fb}", "PLANE"),
         named_ref("Front Plane", "PLANE"),
@@ -5918,7 +5918,7 @@ async def build(adapter) -> dict[str, str]:
         label=f"pinion swing axial d={abs(fb_o[2]):.2f}",
         verify=(fb, fb_o),
     )
-    await angle_driver(
+    angle_driver(
         adapter,
         named_ref(f"Right Plane@{fb}", "PLANE"),
         named_ref("Right Plane", "PLANE"),
@@ -5943,14 +5943,14 @@ async def build(adapter) -> dict[str, str]:
     # front strap (both inserted at the same lean, so their Right planes are
     # parallel) -- the rigid-group tie, semantic (no lock).
     bb_o = _org(adapter, bb)
-    await coincident_mate(
+    coincident_mate(
         adapter,
         named_ref(f"Axis1@{bb}", "AXIS"),
         named_ref(f"Axis1@{pivot_shaft}", "AXIS"),
         label="pinion back strap radial",
         verify=(bb, bb_o),
     )
-    await distance_driver(
+    distance_driver(
         adapter,
         named_ref(f"Front Plane@{bb}", "PLANE"),
         named_ref("Front Plane", "PLANE"),
@@ -5958,7 +5958,7 @@ async def build(adapter) -> dict[str, str]:
         label=f"pinion back strap axial d={abs(bb_o[2]):.2f}",
         verify=(bb, bb_o),
     )
-    await parallel_mate(
+    parallel_mate(
         adapter,
         named_ref(f"Right Plane@{bb}", "PLANE"),
         named_ref(f"Right Plane@{fb}", "PLANE"),
@@ -5983,7 +5983,7 @@ async def build(adapter) -> dict[str, str]:
         raise AssertionError(
             "torque-shaft pin holes are not phased to the straps' cross holes"
         )
-    await parallel_mate(
+    parallel_mate(
         adapter,
         named_ref(f"Right Plane@{pivot_shaft}", "PLANE"),
         named_ref(f"Right Plane@{fb}", "PLANE"),
@@ -6001,14 +6001,14 @@ async def build(adapter) -> dict[str, str]:
         cpin = cam_pins[tag]
         br = pinion_brackets[tag]
         cp_o = _org(adapter, cpin)
-        await coincident_mate(
+        coincident_mate(
             adapter,
             named_ref(f"Axis1@{cpin}", "AXIS"),
             named_ref(f"Axis3@{br}", "AXIS"),
             label=f"cam follower {tag} pressed in the edge seat",
             verify=(cpin, cp_o),
         )
-        await distance_driver(
+        distance_driver(
             adapter,
             named_ref(f"Front Plane@{cpin}", "PLANE"),
             named_ref(f"Right Plane@{br}", "PLANE"),
@@ -6030,7 +6030,7 @@ async def build(adapter) -> dict[str, str]:
                 max(-1.0, min(1.0, sum(a_cp[3 + k] * a_br[6 + k] for k in range(3))))
             )
         )
-        await angle_driver(
+        angle_driver(
             adapter,
             named_ref(f"Top Plane@{cpin}", "PLANE"),
             named_ref(f"Front Plane@{br}", "PLANE"),
@@ -6042,7 +6042,7 @@ async def build(adapter) -> dict[str, str]:
     # hole -- coaxial with its shaft hole -- and locked to that strap, so it
     # rides the freed swing.
     for tag in ("front", "back"):
-        await lock_mate(
+        lock_mate(
             adapter,
             named_ref(f"Front Plane@{strap_pins[tag]}", "PLANE"),
             named_ref(f"Front Plane@{pinion_brackets[tag]}", "PLANE"),
@@ -6054,14 +6054,14 @@ async def build(adapter) -> dict[str, str]:
     # authored. Top@rod vs the assembly RIGHT plane reads 90 at insert
     # (mid-range, no flip singularity).
     lr_o = _org(adapter, lift_rod)
-    await coincident_mate(
+    coincident_mate(
         adapter,
         named_ref(f"Axis1@{lift_rod}", "AXIS"),
         named_ref(f"Axis1@{pinion_blocks[0]}", "AXIS"),
         label="lift rod revolute in the block west bores",
         verify=(lift_rod, lr_o),
     )
-    await distance_driver(
+    distance_driver(
         adapter,
         named_ref(f"Front Plane@{lift_rod}", "PLANE"),
         named_ref("Front Plane", "PLANE"),
@@ -6069,7 +6069,7 @@ async def build(adapter) -> dict[str, str]:
         label=f"lift rod axial d={abs(lr_o[2]):.2f}",
         verify=(lift_rod, lr_o),
     )
-    await angle_driver(
+    angle_driver(
         adapter,
         named_ref(f"Top Plane@{lift_rod}", "PLANE"),
         named_ref("Right Plane", "PLANE"),
@@ -6091,7 +6091,7 @@ async def build(adapter) -> dict[str, str]:
     for tag in ("front", "back"):
         cam = pinion_cams[tag]
         cam_o = _org(adapter, cam)
-        await coincident_mate(
+        coincident_mate(
             adapter,
             named_ref(f"Axis1@{cam}", "AXIS"),
             named_ref(f"Axis1@{lift_rod}", "AXIS"),
@@ -6099,7 +6099,7 @@ async def build(adapter) -> dict[str, str]:
             verify=(cam, cam_o),
         )
         _cam_ax = cam_o[2] - lr_o[2]
-        await distance_driver(
+        distance_driver(
             adapter,
             named_ref(f"Front Plane@{cam}", "PLANE"),
             named_ref(f"Front Plane@{lift_rod}", "PLANE"),
@@ -6107,7 +6107,7 @@ async def build(adapter) -> dict[str, str]:
             label=f"pinion cam {tag} set-pin axial d={_cam_ax:.2f}",
             verify=(cam, cam_o),
         )
-        await angle_driver(
+        angle_driver(
             adapter,
             named_ref(f"Right Plane@{cam}", "PLANE"),
             named_ref(f"Right Plane@{lift_rod}", "PLANE"),
@@ -6121,14 +6121,14 @@ async def build(adapter) -> dict[str, str]:
     # so the match-drilled MHA-DT-30 holes stay coaxial) -- so it spins WITH the
     # rod: dragging the lever in the saved free model turns the cams.
     lev_o = _org(adapter, lever)
-    await coincident_mate(
+    coincident_mate(
         adapter,
         named_ref(f"Axis1@{lever}", "AXIS"),
         named_ref(f"Axis1@{lift_rod}", "AXIS"),
         label="lever clamp hub on the lift rod",
         verify=(lever, lev_o),
     )
-    await distance_driver(
+    distance_driver(
         adapter,
         named_ref(f"Front Plane@{lever}", "PLANE"),
         named_ref(f"Front Plane@{lift_rod}", "PLANE"),
@@ -6136,7 +6136,7 @@ async def build(adapter) -> dict[str, str]:
         label=f"lever axial seat d={abs(lev_o[2] - lr_o[2]):.2f}",
         verify=(lever, lev_o),
     )
-    await parallel_mate(
+    parallel_mate(
         adapter,
         named_ref(f"Right Plane@{lever}", "PLANE"),
         named_ref(f"Right Plane@{lift_rod}", "PLANE"),
@@ -6149,21 +6149,21 @@ async def build(adapter) -> dict[str, str]:
     # anti-spun about its own axis by a Top-plane parallel.  Rigid with the
     # rod, it turns with the freed lift-rod spin.
     lp_o = _org(adapter, lever_pin)
-    await coincident_mate(
+    coincident_mate(
         adapter,
         named_ref(f"Axis1@{lever_pin}", "AXIS"),
         named_ref(f"Axis2@{lift_rod}", "AXIS"),
         label="MHA-DT-30 on the lift rod's pin-hole axis",
         verify=(lever_pin, lp_o),
     )
-    await coincident_mate(
+    coincident_mate(
         adapter,
         named_ref(f"Right Plane@{lever_pin}", "PLANE"),
         named_ref(f"Right Plane@{lift_rod}", "PLANE"),
         label="MHA-DT-30 centred across the lift rod",
         verify=(lever_pin, lp_o),
     )
-    await parallel_mate(
+    parallel_mate(
         adapter,
         named_ref(f"Top Plane@{lever_pin}", "PLANE"),
         named_ref(f"Top Plane@{lift_rod}", "PLANE"),
@@ -6177,14 +6177,14 @@ async def build(adapter) -> dict[str, str]:
     # (the tilted analogue of the 16T's tooth-in-gap anti-spin); riding the
     # strap, the pin survives the engage swing.
     ap_o = _org(adapter, align_pinion)
-    await coincident_mate(
+    coincident_mate(
         adapter,
         named_ref(f"Axis1@{align_pinion}", "AXIS"),
         named_ref(f"Axis2@{fb}", "AXIS"),
         label="alignment-pinion journaled in the straps",
         verify=(align_pinion, ap_o),
     )
-    await distance_driver(
+    distance_driver(
         adapter,
         named_ref(f"Front Plane@{align_pinion}", "PLANE"),
         named_ref("Front Plane", "PLANE"),
@@ -6197,7 +6197,7 @@ async def build(adapter) -> dict[str, str]:
     ap_phase = math.degrees(
         math.acos(max(-1.0, min(1.0, sum(a_ap[k] * a_fb[k] for k in range(3)))))
     )
-    await angle_driver(
+    angle_driver(
         adapter,
         named_ref(f"Right Plane@{align_pinion}", "PLANE"),
         named_ref(f"Right Plane@{fb}", "PLANE"),
@@ -6211,14 +6211,14 @@ async def build(adapter) -> dict[str, str]:
     # to the drum.  The phase clocks its local-Y cross-hole onto the grip rod;
     # an off-axis head witness distinguishes the two angle-mate branches.
     arb_o = _org(adapter, pinion_arbor)
-    await coincident_mate(
+    coincident_mate(
         adapter,
         named_ref(f"Axis1@{pinion_arbor}", "AXIS"),
         named_ref(f"Axis2@{fb}", "AXIS"),
         label="pinion arbor journaled in the straps",
         verify=(pinion_arbor, arb_o),
     )
-    await distance_driver(
+    distance_driver(
         adapter,
         named_ref(f"Front Plane@{pinion_arbor}", "PLANE"),
         named_ref("Front Plane", "PLANE"),
@@ -6226,7 +6226,7 @@ async def build(adapter) -> dict[str, str]:
         label=f"pinion arbor axial d={abs(arb_o[2]):.2f}",
         verify=(pinion_arbor, arb_o),
     )
-    await angle_driver(
+    angle_driver(
         adapter,
         named_ref(f"Right Plane@{pinion_arbor}", "PLANE"),
         named_ref(f"Right Plane@{align_pinion}", "PLANE"),
@@ -6238,7 +6238,7 @@ async def build(adapter) -> dict[str, str]:
     # The separate grip crossrod is bonded in MHA-DT-22's reamed integral head
     # (R1).  A LOCK records that authored relative pose with no
     # branches or added DOF, so the engage swing carries the complete crank.
-    await lock_mate(
+    lock_mate(
         adapter,
         named_ref(f"Front Plane@{grip_crossrod}", "PLANE"),
         named_ref(f"Front Plane@{pinion_arbor}", "PLANE"),
@@ -6246,7 +6246,7 @@ async def build(adapter) -> dict[str, str]:
     )
     # R1a: the collar is spring-pinned to the arbor, so it LOCKs to it and
     # rides the engage swing with no added DOF.
-    await lock_mate(
+    lock_mate(
         adapter,
         named_ref(f"Front Plane@{arbor_collar}", "PLANE"),
         named_ref(f"Front Plane@{pinion_arbor}", "PLANE"),
@@ -6254,7 +6254,7 @@ async def build(adapter) -> dict[str, str]:
     )
     # Its pin is line-to-line in both 1/16 holes (no interference row, as the
     # strap pins) and rides the collar.
-    await lock_mate(
+    lock_mate(
         adapter,
         named_ref(f"Front Plane@{collar_pin}", "PLANE"),
         named_ref(f"Front Plane@{arbor_collar}", "PLANE"),
@@ -6283,7 +6283,7 @@ async def build(adapter) -> dict[str, str]:
     # transient kinematics replays -- leaving the crank (and the whole
     # keyed/geared train it pins) free to spin: the working kinematic model.
     # The BDC dihedral + handle verify target feed the recorded spec.
-    await angle_driver(
+    angle_driver(
         adapter,
         named_ref(f"Right Plane@{arm}", "PLANE"),
         named_ref("Right Plane", "PLANE"),
@@ -6336,7 +6336,7 @@ async def build(adapter) -> dict[str, str]:
         )
 
     for settings in (bank_settings, drum_station_setting):
-        await _author_setting_references(adapter, settings)
+        _author_setting_references(adapter, settings)
     # Title-block identity for the assembly drawing (draw_dt_drive_train_assembly.py):
     # assembly_title_properties supplies the Title/Generator and TOL_* cells
     # finalize_drawing requires without consulting the part registry;
@@ -6373,7 +6373,7 @@ async def build(adapter) -> dict[str, str]:
         )
 
     author_in_drawing_configurations(adapter, ASM_NAME, _create_drawing_explode)
-    return await save_assembly_and_images(
+    return save_assembly_and_images(
         adapter, ASM_NAME, solved_gates=_certify_as_built, dof_manifest=True
     )
 

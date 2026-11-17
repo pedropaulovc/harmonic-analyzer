@@ -77,11 +77,11 @@ RIGHT_KEEP = {
 }
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open crank-hub-pin source", await adapter.open_model(str(SOURCE)))
+    check("open crank-hub-pin source", adapter.open_model(str(SOURCE)))
     read_required_properties(
         adapter.currentModel,
         (
@@ -158,7 +158,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="MHA-DT-VN-59 axis centerline",
     )
     add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.082)
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Crank Hub Axial Pin Manufacturing Drawing",

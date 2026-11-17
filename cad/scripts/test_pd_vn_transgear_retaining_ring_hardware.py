@@ -6,7 +6,6 @@ the part the assemblies still build.
 
 from __future__ import annotations
 
-import asyncio
 import math
 import re
 
@@ -83,12 +82,12 @@ def test_part_puts_the_rear_face_on_the_front_plane(monkeypatch) -> None:
     land on 0 <= z <= THICKNESS whichever way the quarter turn runs."""
     seen: dict = {}
 
-    async def fake_build(adapter, **kwargs):
+    def fake_build(adapter, **kwargs):
         seen.update(kwargs)
         return {}
 
     monkeypatch.setattr(part, "build_stock_fastener", fake_build)
-    asyncio.run(part.build(None))
+    part.build(None)
     (component,) = seen["components"]
     assert component.sku == spec.SKU
     assert component.author is recipe.build_97431A240

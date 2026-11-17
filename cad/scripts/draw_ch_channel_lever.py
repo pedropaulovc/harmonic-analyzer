@@ -266,11 +266,11 @@ PLATE_OFFSET_NOTE_XY = (0.020, 0.055)
 FINISH_CHAR_HEIGHT = 0.0025
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open channel-lever source", await adapter.open_model(str(SOURCE)))
+    check("open channel-lever source", adapter.open_model(str(SOURCE)))
     read_required_properties(
         adapter.currentModel,
         (
@@ -461,7 +461,7 @@ async def build(adapter: Any) -> dict[str, str]:
     if add_note(adapter, PLATE_OFFSET_NOTE, *PLATE_OFFSET_NOTE_XY) is None:
         raise RuntimeError("failed to create the plate-offset note")
 
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Channel Lever Manufacturing Drawing",

@@ -14,7 +14,7 @@ import inspect
 from collections.abc import Iterable
 from types import ModuleType
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -75,7 +75,7 @@ def stub_seat(
             continue
         if not (inspect.isfunction(value) or inspect.isclass(value)):
             continue
-        mock = AsyncMock if inspect.iscoroutinefunction(value) else MagicMock
+        mock = MagicMock if inspect.iscoroutinefunction(value) else MagicMock
         if name in spied:
             stub = mock(side_effect=value)
         else:
@@ -110,7 +110,7 @@ def offline_adapter() -> MagicMock:
     adapter = MagicMock()
     for name in dir(PyWin32Adapter):
         if inspect.iscoroutinefunction(getattr(PyWin32Adapter, name, None)):
-            setattr(adapter, name, AsyncMock())
+            setattr(adapter, name, MagicMock())
     return adapter
 
 

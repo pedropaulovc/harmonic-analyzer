@@ -57,7 +57,7 @@ def _delete_feature(adapter: Any, name: str, kind: str) -> None:
     model.ClearSelection2(True)
 
 
-async def _plane_through(
+def _plane_through(
     adapter: Any,
     name: str,
     *,
@@ -77,7 +77,7 @@ async def _plane_through(
     for attempt, signed in enumerate((angle_deg, -angle_deg)):
         check(
             f"create_plane {name} ({signed:+.6f} deg about {pivot_axis})",
-            await adapter.create_plane(
+            adapter.create_plane(
                 CreatePlaneParameters(
                     mode="angle", base_plane=base_plane, angle=signed, pivot_axis=pivot_axis
                 )
@@ -93,7 +93,7 @@ async def _plane_through(
     raise RuntimeError(f"{name}: neither angled-plane solution contains {direction}")
 
 
-async def _crossing_plane(adapter: Any, name: str, z_mm: float) -> None:
+def _crossing_plane(adapter: Any, name: str, z_mm: float) -> None:
     """Front offset to z = ``z_mm``, its side proven from the read-back
     origin rather than the adapter's undocumented offset sign."""
     from solidworks_mcp.adapters.base import CreatePlaneParameters
@@ -101,7 +101,7 @@ async def _crossing_plane(adapter: Any, name: str, z_mm: float) -> None:
     for attempt, offset in enumerate((z_mm, -z_mm)):
         check(
             f"create_plane {name} (Front {offset:+.6f} mm)",
-            await adapter.create_plane(
+            adapter.create_plane(
                 CreatePlaneParameters(mode="offset", base_plane="Front Plane", offset=offset)
             ),
         )
@@ -182,7 +182,7 @@ def _affine_expression(offset: float, along_x: float, along_y: float, x: str, y:
 
 
 @_telemetry.traced("gear.straight_gash")
-async def build_straight_gash_gear(
+def build_straight_gash_gear(
     adapter: Any,
     section: StockFormProfile,
     gash: StraightGash,
@@ -213,37 +213,37 @@ async def build_straight_gash_gear(
     if not 0.0 < teeth * removed < blank_area * face_width:
         raise ValueError("straight tooth spaces must leave positive toothed-disc material")
 
-    check("create_sketch tooth blank", await adapter.create_sketch("Front"))
-    await define_circle(adapter, 0.0, 0.0, radius, "gear blank")
-    await ensure_fully_defined(adapter, "blank sketch")
-    check("exit_sketch tooth blank", await adapter.exit_sketch())
+    check("create_sketch tooth blank", adapter.create_sketch("Front"))
+    define_circle(adapter, 0.0, 0.0, radius, "gear blank")
+    ensure_fully_defined(adapter, "blank sketch")
+    check("exit_sketch tooth blank", adapter.exit_sketch())
     check(
         "extrude tooth blank",
-        await adapter.create_extrusion(ExtrusionParameters(depth=face_width)),
+        adapter.create_extrusion(ExtrusionParameters(depth=face_width)),
     )
     blank_volume = blank_area * face_width
-    await volume_check(adapter, "blank", blank_volume, 0.005 * blank_volume)
+    volume_check(adapter, "blank", blank_volume, 0.005 * blank_volume)
 
     gear_axis = check(
         "create_axis tooth-space gear axis (Top x Right)",
-        await adapter.create_axis(
+        adapter.create_axis(
             CreateAxisParameters(mode="two_planes", planes=["Top Plane", "Right Plane"])
         ),
     ).name
-    await _plane_through(
+    _plane_through(
         adapter, "ToothSpaceRadialPlane", base_plane="Top Plane", pivot_axis=gear_axis,
         angle_deg=math.degrees(gash.azimuth_rad), direction=gash.radial,
     )
-    await _crossing_plane(adapter, "ToothSpaceCrossingPlane", gash.crossing_z_mm)
+    _crossing_plane(adapter, "ToothSpaceCrossingPlane", gash.crossing_z_mm)
     pivot = check(
         "create_axis tooth-space pivot (radial x crossing)",
-        await adapter.create_axis(
+        adapter.create_axis(
             CreateAxisParameters(
                 mode="two_planes", planes=["ToothSpaceRadialPlane", "ToothSpaceCrossingPlane"]
             )
         ),
     ).name
-    await _plane_through(
+    _plane_through(
         adapter, "ToothSpaceCutterPlane", base_plane="ToothSpaceCrossingPlane",
         pivot_axis=pivot, angle_deg=gash.inclination_deg, direction=gash.section_tangential,
     )
@@ -258,7 +258,7 @@ async def build_straight_gash_gear(
         ),
     )
 
-    check("create_sketch tooth space", await adapter.create_sketch("ToothSpaceCutterPlane"))
+    check("create_sketch tooth space", adapter.create_sketch("ToothSpaceCutterPlane"))
     origin, r_axis, n_axis = _sketch_mapper(adapter, gash)
     clearance = max(R_CLEAR_IN * IN, section.blank_radius_mm + 1.0)
     curves = []
@@ -269,25 +269,25 @@ async def build_straight_gash_gear(
             _affine_expression(o / IN, a[k], b[k], segment.x, segment.y)
             for k, o, a, b in ((0, origin[0], r_axis, n_axis), (1, origin[1], r_axis, n_axis))
         )
-        curves.append(await equation_curve(adapter, segment.name, x_expr, y_expr))
-    await ensure_fully_defined(
+        curves.append(equation_curve(adapter, segment.name, x_expr, y_expr))
+    ensure_fully_defined(
         adapter, "tooth-space sketch", fix_entities=curves, allow_fix_escalation=True
     )
-    check("exit_sketch tooth space", await adapter.exit_sketch())
+    check("exit_sketch tooth space", adapter.exit_sketch())
     name_last_feature(adapter, "ToothSpaceProfile")
     # Mid-plane: from the cutter's plane the face lies at most
     # max(crossing, face - crossing) + |Y| tan away along the tooth line.
     seed = check(
         "cut straight tooth space",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=2.0 * (face_width + 2.0), both_directions=True)
         ),
     ).name
-    await volume_check(adapter, "seeded tooth space", blank_volume - removed, 1.0)
+    volume_check(adapter, "seeded tooth space", blank_volume - removed, 1.0)
     assert_straight_gash_flanks(adapter, section, gash, tolerance_mm=flank_bound_mm)
-    pattern = await pattern_about_z(adapter, seed, teeth, radius, face_width / 2.0)
+    pattern = pattern_about_z(adapter, seed, teeth, radius, face_width / 2.0)
     expected_volume = blank_volume - teeth * removed
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "toothed disc", expected_volume, 0.01 * expected_volume
     )
     return ToothedDisc(volume, (seed, str(pattern.name)))

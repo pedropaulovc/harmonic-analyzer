@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from types import SimpleNamespace
 
 import pytest
@@ -120,10 +119,10 @@ def test_required_callout_failure_prevents_export(
         except RuntimeError:
             return None
 
-    async def open_model(_path):
+    def open_model(_path):
         return None
 
-    async def finalize(*_args, **_kwargs):
+    def finalize(*_args, **_kwargs):
         nonlocal exported
         exported = True
         return {}
@@ -173,5 +172,5 @@ def test_required_callout_failure_prevents_export(
         "read": "native callout read failed",
     }[failure]
     with pytest.raises(RuntimeError, match=expected):
-        asyncio.run(drawing.build(adapter))
+        drawing.build(adapter)
     assert not exported

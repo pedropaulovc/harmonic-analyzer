@@ -455,9 +455,9 @@ def supplier_dimensions(
     settled_checks.append(check_settled_references)
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     settled_checks = []
-    return await build_supplier_spring_drawing(
+    return build_supplier_spring_drawing(
         adapter, SPEC, item=ITEM,
         stock_configuration=SUPPLIER_DIAGRAM_CONFIGURATION,
         prepare_views=prepare_diagrams,

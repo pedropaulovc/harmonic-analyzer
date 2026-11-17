@@ -522,11 +522,11 @@ def _place_hole_tags(view: Any, table: Any) -> None:
     _telemetry.info(f"hole tags placed beside their holes: {sorted(moved)}")
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open platen-guide source", await adapter.open_model(str(SOURCE)))
+    check("open platen-guide source", adapter.open_model(str(SOURCE)))
     source_model = adapter.currentModel
     read_required_properties(
         source_model,
@@ -695,7 +695,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Platen Guide Manufacturing Drawing",

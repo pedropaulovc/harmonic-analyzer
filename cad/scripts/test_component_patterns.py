@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 from pathlib import Path
 
 import pytest
@@ -74,28 +73,24 @@ def test_global_pattern_axis_rejects_unknown_axis_before_com() -> None:
 
 def test_linear_pattern_rejects_single_instance_before_com() -> None:
     with pytest.raises(ValueError, match="at least two"):
-        asyncio.run(
-            linear_component_pattern(
+        linear_component_pattern(
                 None,
                 ["seed-1"],
                 axis="x",
                 spacing_mm=10.0,
                 instances=1,
             )
-        )
 
 
 def test_linear_pattern_rejects_nonpositive_spacing_before_com() -> None:
     with pytest.raises(ValueError, match="positive"):
-        asyncio.run(
-            linear_component_pattern(
+        linear_component_pattern(
                 None,
                 ["seed-1"],
                 axis="x",
                 spacing_mm=0.0,
                 instances=2,
             )
-        )
 
 
 def test_linear_pattern_preserves_reverse_direction(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -103,8 +98,7 @@ def test_linear_pattern_preserves_reverse_direction(monkeypatch: pytest.MonkeyPa
     monkeypatch.setattr(_assembly_patterns, "ensure_global_pattern_axis", lambda *_: "PatternAxisX")
     monkeypatch.setattr(_assembly_patterns, "_select_pattern_inputs", lambda *_: None)
     monkeypatch.setattr(_assembly_patterns, "_early_bound", lambda obj, *_: obj)
-    names = asyncio.run(
-        linear_component_pattern(
+    names = linear_component_pattern(
             adapter,
             ["seed-1"],
             axis="x",
@@ -112,7 +106,6 @@ def test_linear_pattern_preserves_reverse_direction(monkeypatch: pytest.MonkeyPa
             instances=2,
             direction=PatternDirection.REVERSE,
         )
-    )
 
     assert adapter.currentModel.FeatureManager.definition.D1ReverseDirection is True
     assert names == ["seed-2"]
@@ -120,20 +113,17 @@ def test_linear_pattern_preserves_reverse_direction(monkeypatch: pytest.MonkeyPa
 
 def test_circular_pattern_rejects_single_instance_before_com() -> None:
     with pytest.raises(ValueError, match="at least two"):
-        asyncio.run(
-            circular_component_pattern(
+        circular_component_pattern(
                 None,
                 ["seed-1"],
                 axis_name="Axis1",
                 instances=1,
             )
-        )
 
 
 def test_grid_pattern_rejects_repeated_axis_before_com() -> None:
     with pytest.raises(ValueError, match="axes must differ"):
-        asyncio.run(
-            grid_component_pattern(
+        grid_component_pattern(
                 None,
                 ["seed-1"],
                 axis1="x",
@@ -143,7 +133,6 @@ def test_grid_pattern_rejects_repeated_axis_before_com() -> None:
                 spacing2_mm=20.0,
                 instances2=2,
             )
-        )
 
 
 def test_pattern_targets_join_final_pose_ledger(

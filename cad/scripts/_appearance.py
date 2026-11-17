@@ -13,7 +13,7 @@ from _com import _early_bound
 
 
 @_telemetry.traced("appearance.material", label_param="material")
-async def apply_material(adapter: Any, material: str) -> None:
+def apply_material(adapter: Any, material: str) -> None:
     """Assign a SolidWorks-database material (saved with the part).
 
     Materials follow the book: brass for the polished gauge/lever/pen
@@ -25,7 +25,7 @@ async def apply_material(adapter: Any, material: str) -> None:
 
     check(
         f"apply_material {material}",
-        await adapter.apply_material(ApplyMaterialParameters(material=material)),
+        adapter.apply_material(ApplyMaterialParameters(material=material)),
     )
 
 
@@ -54,7 +54,7 @@ BAR_STEEL = (0.42, 0.41, 0.39)  # amplitude-bar curtain (p004 edge-on 0.56,
 
 # back views read darker from shadowing; mid value chosen)
 @_telemetry.traced("appearance.color")
-async def apply_color(adapter: Any, rgb: tuple[float, float, float]) -> None:
+def apply_color(adapter: Any, rgb: tuple[float, float, float]) -> None:
     """Explicit part display colour, overriding the material appearance.
 
     The real machine's frame castings are green-painted, but their database

@@ -6,7 +6,6 @@ the part the assemblies still build.
 
 from __future__ import annotations
 
-import asyncio
 
 import pytest
 
@@ -66,10 +65,10 @@ def test_native_author_passes_the_per_sku_catalogue_size(monkeypatch) -> None:
     adapter = object()
     calls = []
 
-    async def capture(actual_adapter, sku, size):
+    def capture(actual_adapter, sku, size):
         calls.append((actual_adapter, sku, size))
 
     monkeypatch.setattr(recipe, "build_fillister", capture)
-    asyncio.run(recipe.build_90114A124(adapter))
+    recipe.build_90114A124(adapter)
     assert calls == [(adapter, spec.SKU, spec.FILLISTER_SIZE)]
     assert calls[0][2] is spec.FILLISTER_SIZE

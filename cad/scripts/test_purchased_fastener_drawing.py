@@ -305,7 +305,7 @@ def test_spec_layout_selects_template_dimensions_and_reaches_all_layout_checks(
 
     monkeypatch.setattr(purchased, "_fit_number", fit_number)
 
-    async def finalize(
+    def finalize(
         _adapter,
         actual_outputs,
         *,
@@ -327,11 +327,9 @@ def test_spec_layout_selects_template_dimensions_and_reaches_all_layout_checks(
     options = {} if number_fit is None else {"number_fit": number_fit}
     if general_text is not None:
         options["general_text"] = general_text
-    result = asyncio.run(
-        purchased.build_purchased_fastener_drawing(
+    result = purchased.build_purchased_fastener_drawing(
             _Adapter(source), spec, item="#4-40 x 1/4 TEST SCREW", **options
         )
-    )
 
     # Every view is hidden-lines-removed (rule 9: no dimension names a
     # hidden edge on a purchased reference sheet).
@@ -526,7 +524,7 @@ def _isometric_only_sheet(monkeypatch, tmp_path):
     monkeypatch.setattr(configured, "_literal_note", note)
     finalizations = []
 
-    async def finalize(_adapter, outputs, *, settled_checks, **kwargs):
+    def finalize(_adapter, outputs, *, settled_checks, **kwargs):
         finalizations.append(kwargs)
         state.before_settle()
         for settled in settled_checks:
@@ -542,8 +540,7 @@ def test_isometric_only_member_shows_its_isometric_and_cites_its_sheet(
     monkeypatch, tmp_path
 ):
     state, variants, texts, finalizations = _isometric_only_sheet(monkeypatch, tmp_path)
-    asyncio.run(
-        configured.build_purchased_variant_drawing(
+    configured.build_purchased_variant_drawing(
             state.adapter,
             state.spec,
             variants=variants,
@@ -553,7 +550,6 @@ def test_isometric_only_member_shows_its_isometric_and_cites_its_sheet(
             append_sheets=lambda _adapter: (),
             isometric_only={"Rail": 2},
         )
-    )
     assert state.finalized
     assert [(view.ReferencedConfiguration, view.GetOrientationName()) for view in state.views] == [
         ("Rail", "*Isometric"),
@@ -584,8 +580,7 @@ def test_isometric_only_member_refuses_a_restored_orthographic_view(
         )
     )
     with pytest.raises(RuntimeError, match="missing or extra member views"):
-        asyncio.run(
-            configured.build_purchased_variant_drawing(
+        configured.build_purchased_variant_drawing(
                 state.adapter,
                 state.spec,
                 variants=variants,
@@ -595,7 +590,6 @@ def test_isometric_only_member_refuses_a_restored_orthographic_view(
                 append_sheets=lambda _adapter: (),
                 isometric_only={"Rail": 2},
             )
-        )
     assert not state.finalized
 
 
@@ -613,13 +607,13 @@ def test_isometric_only_must_cite_an_appended_sheet_before_native_calls(
     isometric_only, scales
 ):
     with pytest.raises(ValueError):
-        asyncio.run(configured.build_purchased_variant_drawing(
+        configured.build_purchased_variant_drawing(
             object(), object(), variants=(("Rail", "RAIL"), ("Carriage", "CARRIAGE")),
             item="KIT", purchase_unit="KIT",
             additional_sheet_scales=scales,
             append_sheets=None if scales is None else (lambda _adapter: ()),
             isometric_only=isometric_only,
-        ))
+        )
 
 
 def _variant_sheet(monkeypatch, tmp_path, variants, quantities, total):
@@ -759,7 +753,7 @@ def _variant_sheet(monkeypatch, tmp_path, variants, quantities, total):
         ),
     )
 
-    async def finalize(_adapter, actual_outputs, *, settled_checks, **kwargs):
+    def finalize(_adapter, actual_outputs, *, settled_checks, **kwargs):
         state.before_settle()
         for settled_check in settled_checks:
             settled_check()
@@ -827,10 +821,10 @@ def test_configured_footer_override_reaches_native_placement_and_settled_checks(
         options["general_text"] = custom if footer == "kit" else None
 
     def build():
-        return asyncio.run(configured.build_purchased_variant_drawing(
+        return configured.build_purchased_variant_drawing(
             state.adapter, state.spec, variants=variants, item="TEST KIT",
             purchase_unit="KIT", **options,
-        ))
+        )
 
     if drift is None:
         assert build() == {"pdf": str(state.spec.outputs["pdf"])}
@@ -872,8 +866,7 @@ def test_configured_sheet_refuses_member_or_quantity_mismatch_before_opening(
 ) -> None:
     state = _variant_sheet(monkeypatch, tmp_path, variants, quantities, total)
     with pytest.raises(ValueError):
-        asyncio.run(
-            configured.build_purchased_variant_drawing(
+        configured.build_purchased_variant_drawing(
                 state.adapter,
                 state.spec,
                 variants=variants,
@@ -881,7 +874,6 @@ def test_configured_sheet_refuses_member_or_quantity_mismatch_before_opening(
                 purchase_unit="ONE CHAIN",
                 cut_to_suit=True,
             )
-        )
     assert state.opens == []
     assert state.views == []
     assert not state.finalized
@@ -906,15 +898,13 @@ def test_configured_sheet_accepts_complete_consistent_native_members(
     monkeypatch, tmp_path, variants, quantities, total
 ):
     state = _variant_sheet(monkeypatch, tmp_path, variants, quantities, total)
-    asyncio.run(
-        configured.build_purchased_variant_drawing(
+    configured.build_purchased_variant_drawing(
             state.adapter,
             state.spec,
             variants=variants,
             item="PURCHASED PRODUCT",
             purchase_unit="ONE PRODUCT",
         )
-    )
     assert state.finalized
 
 
@@ -934,7 +924,7 @@ def _guarded_finalize(monkeypatch, state, mutate=None):
     """finalize_drawing's settled checks, then its save/close checkpoints."""
     stages = []
 
-    async def finalize(_adapter, outputs, *, settled_checks, checkpoint, **_kwargs):
+    def finalize(_adapter, outputs, *, settled_checks, checkpoint, **_kwargs):
         state.before_settle()
         for settled in settled_checks:
             settled()
@@ -976,15 +966,13 @@ def test_configured_sheet_keeps_its_source_read_only_clean_and_unchanged(
         state.before_settle = lambda: state.active.__setitem__(0, "OuterLink")
 
     def build():
-        return asyncio.run(
-            configured.build_purchased_variant_drawing(
+        return configured.build_purchased_variant_drawing(
                 state.adapter,
                 state.spec,
                 variants=_MEMBERS,
                 item="PURCHASED PRODUCT",
                 purchase_unit="ONE PRODUCT",
             )
-        )
 
     if drift is None:
         build()
@@ -1040,8 +1028,7 @@ def test_configured_sheet_holds_exactly_the_declared_source_member(
     state.before_settle = settle
 
     def build():
-        return asyncio.run(
-            configured.build_purchased_variant_drawing(
+        return configured.build_purchased_variant_drawing(
                 state.adapter,
                 state.spec,
                 variants=_MEMBERS,
@@ -1050,7 +1037,6 @@ def test_configured_sheet_holds_exactly_the_declared_source_member(
                 annotate_member=annotate,
                 source_configuration="OuterLink",
             )
-        )
 
     if drift is None:
         build()
@@ -1090,8 +1076,7 @@ def test_configured_sheet_refuses_an_undepicted_source_member_before_opening(
 ):
     state = _variant_sheet(monkeypatch, tmp_path, _MEMBERS, _MEMBER_QUANTITIES, 67)
     with pytest.raises(ValueError, match="depicted member"):
-        asyncio.run(
-            configured.build_purchased_variant_drawing(
+        configured.build_purchased_variant_drawing(
                 state.adapter,
                 state.spec,
                 variants=_MEMBERS,
@@ -1099,7 +1084,6 @@ def test_configured_sheet_refuses_an_undepicted_source_member_before_opening(
                 purchase_unit="ONE PRODUCT",
                 source_configuration="Default",
             )
-        )
     assert state.opens == []
 
 
@@ -1151,7 +1135,7 @@ def test_configured_sheet_appends_rework_sheets_before_single_guarded_finalizati
 
     finalizations = []
 
-    async def finalize(_adapter, outputs, *, settled_checks, **kwargs):
+    def finalize(_adapter, outputs, *, settled_checks, **kwargs):
         finalizations.append(kwargs)
         if drift == "reference-view":
             state.views.pop()
@@ -1170,11 +1154,11 @@ def test_configured_sheet_appends_rework_sheets_before_single_guarded_finalizati
     scales = {"REWORK": (2.0, 1.0), "MEASURE-AND-FIT": (2.0, 1.0)}
 
     def build():
-        return asyncio.run(configured.build_purchased_variant_drawing(
+        return configured.build_purchased_variant_drawing(
             state.adapter, state.spec, variants=variants, item="PM KIT",
             purchase_unit="52-PIECE KIT", annotate_member=annotate,
             additional_sheet_scales=scales, append_sheets=append,
-        ))
+        )
 
     if drift:
         with pytest.raises(RuntimeError):
@@ -1200,10 +1184,10 @@ def test_configured_sheet_appends_rework_sheets_before_single_guarded_finalizati
 ])
 def test_configured_sheet_refuses_incomplete_append_contract_before_native_calls(scales, author):
     with pytest.raises(ValueError):
-        asyncio.run(configured.build_purchased_variant_drawing(
+        configured.build_purchased_variant_drawing(
             object(), object(), variants=(), item="KIT", purchase_unit="KIT",
             additional_sheet_scales=scales, append_sheets=author,
-        ))
+        )
 
 
 @pytest.mark.parametrize(
@@ -1250,15 +1234,13 @@ def test_member_caption_native_extents_are_centered_or_refused(
     monkeypatch.setattr(configured, "_literal_note", native_note)
 
     def build():
-        return asyncio.run(
-            configured.build_purchased_variant_drawing(
+        return configured.build_purchased_variant_drawing(
                 state.adapter,
                 state.spec,
                 variants=variants,
                 item="PURCHASED PRODUCT",
                 purchase_unit="ONE PRODUCT",
             )
-        )
 
     if not fits:
         with pytest.raises(RuntimeError):
@@ -1289,8 +1271,7 @@ def test_configured_sheet_refuses_default_fallback_during_final_readback(
         state.views[-1], "ReferencedConfiguration", "Default"
     )
     with pytest.raises(RuntimeError):
-        asyncio.run(
-            configured.build_purchased_variant_drawing(
+        configured.build_purchased_variant_drawing(
                 state.adapter,
                 state.spec,
                 variants=variants,
@@ -1298,7 +1279,6 @@ def test_configured_sheet_refuses_default_fallback_during_final_readback(
                 purchase_unit="ONE CHAIN",
                 cut_to_suit=True,
             )
-        )
     assert not state.finalized
 
 
@@ -1328,15 +1308,13 @@ def test_configured_sheet_refuses_projection_or_native_view_inventory_drift(
 
     state.before_settle = change_native_state
     with pytest.raises(RuntimeError):
-        asyncio.run(
-            configured.build_purchased_variant_drawing(
+        configured.build_purchased_variant_drawing(
                 state.adapter,
                 state.spec,
                 variants=variants,
                 item="PURCHASED PRODUCT",
                 purchase_unit="ONE PRODUCT",
             )
-        )
     assert not state.finalized
 
 
@@ -3003,12 +2981,12 @@ def _supplier_reference_solver(monkeypatch):
         entity, endpoint = ref.rsplit(".", 1)
         return getattr(case.lines[entity], endpoint)
 
-    async def add_line(x1, y1, x2, y2):
+    def add_line(x1, y1, x2, y2):
         name = f"line{len(case.lines)}"
         case.lines[name] = Line(point(x1, y1), point(x2, y2))
         return success(name)
 
-    async def constraint(left, right, kind):
+    def constraint(left, right, kind):
         if kind in ("horizontal", "vertical"):
             case.lines[left].orientation = kind
         elif kind == "coincident":
@@ -3024,7 +3002,7 @@ def _supplier_reference_solver(monkeypatch):
         solve()
         return success()
 
-    async def dimension(left, right, kind, value):
+    def dimension(left, right, kind, value):
         case.emitted.append((left, right, kind, value))
         if right == "origin":
             target = resolve(left)
@@ -3037,7 +3015,7 @@ def _supplier_reference_solver(monkeypatch):
         solve()
         return success(f"D{len(case.emitted)}")
 
-    async def definition():
+    def definition():
         solve()
         state = (
             "over_defined" if case.overdefined else
@@ -3048,7 +3026,7 @@ def _supplier_reference_solver(monkeypatch):
         )
         return success({"definition_state": state})
 
-    async def over_relations():
+    def over_relations():
         return success(["redundant origin anchor"])
 
     case.adapter = SimpleNamespace(
@@ -3061,14 +3039,10 @@ def _supplier_reference_solver(monkeypatch):
     case.dimensions = _sketch.SketchDims()
     case.point = point
     case.solve = solve
-    case.ensure = lambda: asyncio.run(
-        reference.ensure_fully_defined(case.adapter, "SupplierReference")
-    )
-    case.linear = lambda name, value, orientation, start: asyncio.run(
-        reference._linear(
+    case.ensure = lambda: reference.ensure_fully_defined(case.adapter, "SupplierReference")
+    case.linear = lambda name, value, orientation, start: reference._linear(
             case.adapter, case.dimensions, name, value, orientation, start
         )
-    )
     return case
 
 
@@ -3147,8 +3121,8 @@ def test_supplier_reference_linear_constrained_wrong_frame_is_rejected(
     case = _supplier_reference_solver(monkeypatch)
     original = case.adapter.add_sketch_dimension
 
-    async def displaced(*args):
-        result = await original(*args)
+    def displaced(*args):
+        result = original(*args)
         if args[1] != "origin":
             line = case.lines["line0"]
             line.start.axes.update(("x", "y"))
@@ -3261,11 +3235,9 @@ def _supplier_reference_angle_solver(monkeypatch, defect=None):
         ClearSelection2=lambda all_marks: case.selected.clear(),
         Extension=SimpleNamespace(AddSpecificDimension=add_specific),
     )
-    case.angle = lambda: asyncio.run(
-        case.reference._angle(
+    case.angle = lambda: case.reference._angle(
             case.adapter, case.dimensions, "Included", 82.0, (2.0, 3.0)
         )
-    )
     return case
 
 
@@ -3699,7 +3671,7 @@ def _purchased_source_lifecycle(monkeypatch, tmp_path, lane):
         phase("properties")
         return properties
 
-    async def complete_sheet(_adapter, _spec, **_kwargs):
+    def complete_sheet(_adapter, _spec, **_kwargs):
         case.model.presentation_dirty = True
         for name in ("layout", "slddrw-save", "pdf-save", "drawing-close"):
             phase(name)
@@ -3707,7 +3679,7 @@ def _purchased_source_lifecycle(monkeypatch, tmp_path, lane):
 
     monkeypatch.setattr(module, "read_required_properties", read_properties)
     monkeypatch.setattr(module, "_build_reference_sheet", complete_sheet)
-    case.run = lambda: asyncio.run(builder(case.adapter, spec, item="SUPPLIER STOCK"))
+    case.run = lambda: builder(case.adapter, spec, item="SUPPLIER STOCK")
     return case
 
 
@@ -4527,8 +4499,8 @@ def test_source_checkpoint_real_finalizer_boundaries_preserve_native_failure(
     )
     monkeypatch.setattr(common, "_visible_document_paths", lambda _adapter: ())
 
-    async def finalize():
-        return await common.finalize_drawing(
+    def finalize():
+        return common.finalize_drawing(
             case.adapter,
             outputs,
             layout=DrawingLayout.LANDSCAPE,
@@ -4538,7 +4510,7 @@ def test_source_checkpoint_real_finalizer_boundaries_preserve_native_failure(
         )
 
     if failure is None:
-        result = asyncio.run(finalize())
+        result = finalize()
         assert set(result) == {"drawing", "pdf", "png"}
         assert operations == ["drawing_save", "pdf_save", "drawing_close"]
         assert [row["phase"] for row in case.evidence][-7:] == [
@@ -4553,7 +4525,7 @@ def test_source_checkpoint_real_finalizer_boundaries_preserve_native_failure(
         assert not any(row["failures"] for row in case.evidence)
     else:
         with pytest.raises(error_type) as caught:
-            asyncio.run(finalize())
+            finalize()
         assert caught.value is original
         assert case.evidence[-1]["phase"] == f"after_{failure}"
         assert f"after_{failure} checkpoint also failed" in "\n".join(
@@ -4576,8 +4548,7 @@ def test_source_checkpoint_finalizer_rejects_noncallable_before_native_work(tmp_
     import _drawing_common as common
 
     with pytest.raises(TypeError, match="checkpoint must be callable"):
-        asyncio.run(
-            common.finalize_drawing(
+        common.finalize_drawing(
                 object(),
                 common.DrawingOutputs(
                     slddrw=tmp_path / "unused.SLDDRW",
@@ -4588,7 +4559,6 @@ def test_source_checkpoint_finalizer_rejects_noncallable_before_native_work(tmp_
                 pdf_title="unused",
                 checkpoint=object(),
             )
-        )
 
 
 @pytest.mark.parametrize("lane", ("fastener", "spring", "part"))
@@ -4602,7 +4572,7 @@ def test_source_checkpoint_public_wrappers_reject_and_retain_native_transition(
     views = []
     monkeypatch.setattr(purchased, "iter_views", lambda _adapter: iter(views))
 
-    async def create_sheet(adapter, _spec, *, source_checkpoint, **_kwargs):
+    def create_sheet(adapter, _spec, *, source_checkpoint, **_kwargs):
         drawing = _Drawing()
         drawing.native_id = object()
         adapter.currentModel = drawing

@@ -432,12 +432,11 @@ def test_changed_in_place_mark_readback_failure_retires_proof_before_save(
 def test_refresh_strict_preflight_refuses_before_native_open(
     tmp_path, monkeypatch, saved_native_bytes, flag
 ):
-    import asyncio
     import _assembly
 
     monkeypatch.setattr(_assembly, "OUT_SLDASM", tmp_path)
     adapter = _Adapter()
-    async def forbidden_open(_path):
+    def forbidden_open(_path):
         pytest.fail("invalid refresh preflight reached native open")
     adapter.open_model = forbidden_open
     target = tmp_path / "fr-frame.SLDASM"
@@ -446,7 +445,7 @@ def test_refresh_strict_preflight_refuses_before_native_open(
     proof = tmp_path / ".fr-frame.massprops.sha"
     proof.write_text("old-proof\n", encoding="utf-8")
     with pytest.raises(RuntimeError):
-        asyncio.run(_assembly.refresh_assembly(adapter, "fr-frame"))
+        _assembly.refresh_assembly(adapter, "fr-frame")
     assert target.read_bytes() == original
     assert adapter.currentModel.events == []
     assert proof.read_text(encoding="utf-8") == "old-proof\n"

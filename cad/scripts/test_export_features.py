@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import ast
 import builtins
 from collections import Counter
@@ -928,37 +927,37 @@ class _GearProfileAdapter:
     def _result(data=None):
         return SimpleNamespace(is_success=True, data=data, error=None)
 
-    async def create_sketch(self, plane):
+    def create_sketch(self, plane):
         assert self.active_plane is None
         assert plane in ("Front", "Top")
         self.planes.append(plane)
         self.active_plane = plane
         return self._result()
 
-    async def create_equation_driven_curve(self, params):
+    def create_equation_driven_curve(self, params):
         assert self.active_plane == "Front"
         assert (params.range_start, params.range_end) == ("0", "1")
         assert not params.z_expression
         self.curves.append(params)
         return self._result(f"Curve{len(self.curves)}")
 
-    async def check_sketch_fully_defined(self):
+    def check_sketch_fully_defined(self):
         assert self.active_plane is not None
         return self._result({"definition_state": "fully_defined"})
 
-    async def exit_sketch(self):
+    def exit_sketch(self):
         assert self.active_plane is not None
         self.active_plane = None
         return self._result()
 
-    async def add_line(self, x1, y1, x2, y2):
+    def add_line(self, x1, y1, x2, y2):
         assert self.active_plane == "Top"
         assert (x1, y1, x2) == (0.0, 0.0, 0.0)
         assert y2 < 0.0
         self.path_length = -y2
         return self._result("Line1")
 
-    async def add_sketch_constraint(self, entity, other, kind):
+    def add_sketch_constraint(self, entity, other, kind):
         assert self.active_plane == "Top"
         assert (entity, other, kind) in (
             ("Line1", None, "vertical"),
@@ -967,7 +966,7 @@ class _GearProfileAdapter:
         self.constraints.append((entity, other, kind))
         return self._result()
 
-    async def add_sketch_dimension(self, first, second, kind, value):
+    def add_sketch_dimension(self, first, second, kind, value):
         assert (first, second, kind) == (
             "Line1.start",
             "Line1.end",
@@ -983,7 +982,7 @@ class _GearProfileAdapter:
         self.path_name = name
         return name
 
-    async def create_sweep(self, params):
+    def create_sweep(self, params):
         assert self.active_plane is None
         assert len(self.curves) == 6
         assert len(self.constraints) == 2
@@ -992,7 +991,7 @@ class _GearProfileAdapter:
         self.sweep = params
         return self._result(SimpleNamespace(name="ToothSweep"))
 
-    async def create_cut_extrude(self, params):
+    def create_cut_extrude(self, params):
         assert self.active_plane is None
         assert self.planes == ["Front"]
         assert params.depth > 0.0
@@ -1114,8 +1113,7 @@ def test_above_base_helical_regression_starts_at_root_and_never_crosses(
     assert root > facts["Rb"]
     assert root - _gear._TOOTH_EMBED_MM / 25.4 > facts["Rb"]
     rho = -twist / 2.0
-    name = asyncio.run(
-        _gear.boss_tooth_swept(
+    name = _gear.boss_tooth_swept(
             gear_profile_adapter,
             facts,
             face,
@@ -1124,7 +1122,6 @@ def test_above_base_helical_regression_starts_at_root_and_never_crosses(
             widen_rad=eps,
             root_r_in=root,
         )
-    )
     assert name == "ToothSweep"
     assert gear_profile_adapter.sweep.twist_angle == pytest.approx(math.degrees(twist))
     curves = gear_profile_adapter.curves
@@ -1187,8 +1184,7 @@ def test_above_base_helical_regression_gap_matches_root_and_volume_oracle(
     import _gear
 
     facts, root, eps, twist, face, extra, dp, pa = _above_base_helical_regression_profile()
-    asyncio.run(
-        _gear.cut_tooth_gap(
+    _gear.cut_tooth_gap(
             gear_profile_adapter,
             facts,
             face + 1.0,
@@ -1196,7 +1192,6 @@ def test_above_base_helical_regression_gap_matches_root_and_volume_oracle(
             widen_rad=eps,
             root_r_in=root,
         )
-    )
     curves = gear_profile_adapter.curves
     assert len(curves) == 6  # no zero-length or outward base-to-root extensions
     walk = ((0, False), (2, False), (3, False), (4, False), (1, True), (5, False))
@@ -1238,8 +1233,7 @@ def test_below_base_sweep_keeps_original_profile(gear_profile_adapter, teeth, dp
     assert 0.0 < root < facts["Rb"]
     assert _gear._root_start_parameter(facts["Rb"], root) == 0.0
     eps, rho = 0.001, -0.012
-    asyncio.run(
-        _gear.boss_tooth_swept(
+    _gear.boss_tooth_swept(
             gear_profile_adapter,
             facts,
             7.2244,
@@ -1248,7 +1242,6 @@ def test_below_base_sweep_keeps_original_profile(gear_profile_adapter, teeth, dp
             widen_rad=eps,
             root_r_in=root,
         )
-    )
     rb, ra = facts["Rb"], facts["Ra"]
     embed = root - _gear._TOOTH_EMBED_MM / 25.4
     a_lo = facts["Gamma"] - facts["Delta"] + eps + rho
@@ -1298,7 +1291,7 @@ def test_below_base_gap_keeps_floor_and_involute_endpoints(
     facts = gear_facts(16, 24.0, 20.0)
     root = {"chord": None, "below": 7.14375 / 25.4, "base": facts["Rb"]}[root_kind]
     assert _gear._root_start_parameter(facts["Rb"], root) == 0.0
-    asyncio.run(_gear.cut_tooth_gap(gear_profile_adapter, facts, 8.0, root_r_in=root))
+    _gear.cut_tooth_gap(gear_profile_adapter, facts, 8.0, root_r_in=root)
     curves = gear_profile_adapter.curves
     assert len(curves) == (8 if root_kind == "below" else 6)
     for i in range(17):
@@ -1340,8 +1333,7 @@ def test_invalid_root_is_refused_before_sweep_profile(gear_profile_adapter, root
         "embed_zero": _gear._TOOTH_EMBED_MM / 25.4,
     }[root_kind]
     with pytest.raises(ValueError, match="root"):
-        asyncio.run(
-            _gear.boss_tooth_swept(
+        _gear.boss_tooth_swept(
                 gear_profile_adapter,
                 facts,
                 face,
@@ -1350,19 +1342,16 @@ def test_invalid_root_is_refused_before_sweep_profile(gear_profile_adapter, root
                 widen_rad=eps,
                 root_r_in=root,
             )
-        )
     assert not gear_profile_adapter.curves
     assert not gear_profile_adapter.planes
     if root_kind != "embed_zero":
         with pytest.raises(ValueError, match="root"):
-            asyncio.run(
-                _gear.cut_tooth_gap(
+            _gear.cut_tooth_gap(
                     gear_profile_adapter,
                     facts,
                     face,
                     root_r_in=root,
                 )
-            )
         with pytest.raises(ValueError, match="root"):
             _gear.gap_area_in_disc_ext(
                 64,

@@ -5715,7 +5715,7 @@ def _function(node, name):
     (function,) = [
         item
         for item in ast.walk(node)
-        if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)) and item.name == name
+        if isinstance(item, (ast.FunctionDef,)) and item.name == name
     ]
     return function
 

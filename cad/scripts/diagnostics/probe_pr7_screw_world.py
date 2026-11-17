@@ -6,7 +6,6 @@ authored hole stations to see the misalignment's shape (x-flip? z-flip?).
 
 from __future__ import annotations
 
-import asyncio
 
 if __package__:
     from . import _script_paths  # noqa: F401
@@ -32,13 +31,13 @@ SCREWS = (
 )
 
 
-async def main():
+def main():
     from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter
 
     dt = (OUT_SLDASM / "dt-drive-train.SLDASM").resolve()
     adapter = PyWin32Adapter({})
-    await adapter.connect()
-    await adapter.open_model(str(dt))
+    adapter.connect()
+    adapter.open_model(str(dt))
     doc = adapter.currentModel
     _flag(doc, "IModelDoc2")
     log(f"opened {str(_read_member(doc, 'GetTitle'))!r}")
@@ -50,8 +49,8 @@ async def main():
             log(f"{selector} [{name}]: origin=({a[9]*1000:.2f}, {a[10]*1000:.2f}, {a[11]*1000:.2f})")
         except Exception as e:  # noqa: BLE001
             log(f"{name}: <{e}>")
-    await adapter.disconnect()
+    adapter.disconnect()
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

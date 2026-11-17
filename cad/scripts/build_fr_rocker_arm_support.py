@@ -579,7 +579,7 @@ CHAMFER_FACES = [  # whole faces whose every edge is chamfered (tangent-propagat
 ]
 
 
-async def _seat_station_reference(adapter) -> list[tuple[str, str]]:
+def _seat_station_reference(adapter) -> list[tuple[str, str]]:
     """The blanked REF sketch: per seat, a construction line on the Top
     plane's x axis from the end face to the seat centre, its length the
     station; returns the drive jobs. The start follows the end face
@@ -588,14 +588,14 @@ async def _seat_station_reference(adapter) -> list[tuple[str, str]]:
     seat edit: a REF reports, it does not control."""
     sketch = REFERENCE_SKETCHES[0]
     dims = SketchDims()
-    check(f"create_sketch {sketch}", await adapter.create_sketch("Top"))
+    check(f"create_sketch {sketch}", adapter.create_sketch("Top"))
     for row in SEAT_STATION_LINES:
         name = row.dimension
         # Direct-to-DB: both lines lie on the sketch's x axis, so creation-
         # time inference would snap in the relations added below.
         set_sketch_direct_db(adapter, True)
         line = check(
-            f"{name} line", await adapter.add_line(row.end_x, 0.0, row.seat_x, 0.0)
+            f"{name} line", adapter.add_line(row.end_x, 0.0, row.seat_x, 0.0)
         )
         set_sketch_direct_db(adapter, False)
         segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
@@ -604,13 +604,13 @@ async def _seat_station_reference(adapter) -> list[tuple[str, str]]:
             raise RuntimeError(f"{name} line did not take the construction flag")
         check(
             f"{name} horizontal",
-            await adapter.add_sketch_constraint(line, None, "horizontal"),
+            adapter.add_sketch_constraint(line, None, "horizontal"),
         )
-        await anchor_point_to_origin(
+        anchor_point_to_origin(
             adapter, f"{line}.start", row.end_x, 0.0, f"{name} end face"
         )
         dims.record(f"{name}Anchor", END_FACE_DRIVE)
-        await dimension_between(
+        dimension_between(
             adapter,
             f"{line}.start",
             f"{line}.end",
@@ -619,13 +619,13 @@ async def _seat_station_reference(adapter) -> list[tuple[str, str]]:
             f"{name} from the end face",
         )
         dims.record(name, SEAT_STATION_DRIVES[name])
-    await ensure_fully_defined(adapter, f"{sketch} sketch")
-    check(f"exit_sketch {sketch}", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, f"{sketch} sketch")
+    check(f"exit_sketch {sketch}", adapter.exit_sketch())
     name_last_feature(adapter, sketch)
     return dims.apply(adapter, sketch)
 
 
-async def _reference_chord(
+def _reference_chord(
     adapter,
     sketch: str,
     dims: SketchDims,
@@ -638,7 +638,7 @@ async def _reference_chord(
     as the seat lines are, so creation-time inference adds no relation."""
     relation = "horizontal" if start[1] == end[1] else "vertical"
     set_sketch_direct_db(adapter, True)
-    line = check(f"{sketch} {name}", await adapter.add_line(*start, *end))
+    line = check(f"{sketch} {name}", adapter.add_line(*start, *end))
     set_sketch_direct_db(adapter, False)
     segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
     segment.ConstructionGeometry = True
@@ -646,9 +646,9 @@ async def _reference_chord(
         raise RuntimeError(f"{sketch} {name} did not take the construction flag")
     check(
         f"{sketch} {name} {relation}",
-        await adapter.add_sketch_constraint(line, None, relation),
+        adapter.add_sketch_constraint(line, None, relation),
     )
-    await _location(
+    _location(
         adapter,
         sketch,
         dims,
@@ -661,7 +661,7 @@ async def _reference_chord(
     return line
 
 
-async def _location(
+def _location(
     adapter,
     sketch: str,
     dims: SketchDims,
@@ -673,11 +673,11 @@ async def _location(
     drive: str | None = None,
 ) -> None:
     """One dimension between two point refs, recorded as ``name``."""
-    await dimension_between(adapter, ref1, ref2, kind, value, f"{sketch} {name}")
+    dimension_between(adapter, ref1, ref2, kind, value, f"{sketch} {name}")
     dims.record(name, drive)
 
 
-async def _cavity_location_reference(adapter) -> list[tuple[str, str]]:
+def _cavity_location_reference(adapter) -> list[tuple[str, str]]:
     """CavityLocationReference on the Front plane, sketch (u, v) = model
     (X, Y); returns the drive jobs.
 
@@ -694,21 +694,21 @@ async def _cavity_location_reference(adapter) -> list[tuple[str, str]]:
     sketch = REFERENCE_SKETCHES[1]
     dims = SketchDims()
     station, chord = REFERENCE_EDGE_STATION, REFERENCE_CHORD
-    check(f"create_sketch {sketch}", await adapter.create_sketch("Front"))
+    check(f"create_sketch {sketch}", adapter.create_sketch("Front"))
     end_x, end_y = -BOSS_DEPTH / 2.0, HALF_Y - station
-    end = await _reference_chord(
+    end = _reference_chord(
         adapter, sketch, dims, "EndChord", (end_x, end_y), (end_x, end_y - chord)
     )
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{end}.start", end_x, end_y, f"{sketch} end face chord"
     )
     dims.record("EndChordX", END_FACE_DRIVE)
     dims.record("EndChordY")
     top_x = end_x + station
-    top = await _reference_chord(
+    top = _reference_chord(
         adapter, sketch, dims, "TopChord", (top_x, HALF_Y), (top_x + chord, HALF_Y)
     )
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{top}.start", top_x, HALF_Y, f"{sketch} top face chord"
     )
     dims.record("TopChordX")
@@ -724,10 +724,10 @@ async def _cavity_location_reference(adapter) -> list[tuple[str, str]]:
             BIG - POCKET_FILLET_R - station,
         ),
     ):
-        side = await _reference_chord(
+        side = _reference_chord(
             adapter, sketch, dims, chord_name, (x, y), (x, y - chord)
         )
-        await _location(
+        _location(
             adapter,
             sketch,
             dims,
@@ -738,7 +738,7 @@ async def _cavity_location_reference(adapter) -> list[tuple[str, str]]:
             value,
             LOCATION_DRIVES[name],
         )
-        await _location(
+        _location(
             adapter,
             sketch,
             dims,
@@ -748,7 +748,7 @@ async def _cavity_location_reference(adapter) -> list[tuple[str, str]]:
             "vertical_distance",
             y,
         )
-    cavity_top = await _reference_chord(
+    cavity_top = _reference_chord(
         adapter,
         sketch,
         dims,
@@ -756,7 +756,7 @@ async def _cavity_location_reference(adapter) -> list[tuple[str, str]]:
         (-cavity_run, CAV),
         (-cavity_run + chord, CAV),
     )
-    await _location(
+    _location(
         adapter,
         sketch,
         dims,
@@ -767,7 +767,7 @@ async def _cavity_location_reference(adapter) -> list[tuple[str, str]]:
         CAVITY_TOP_STATION,
         LOCATION_DRIVES["CavityTopStation"],
     )
-    await _location(
+    _location(
         adapter,
         sketch,
         dims,
@@ -779,7 +779,7 @@ async def _cavity_location_reference(adapter) -> list[tuple[str, str]]:
     )
     # The pocket's bottom wall up from the bottom (mounting) face, the
     # pocket's vertical location (r6 review).
-    bottom = await _reference_chord(
+    bottom = _reference_chord(
         adapter,
         sketch,
         dims,
@@ -787,13 +787,13 @@ async def _cavity_location_reference(adapter) -> list[tuple[str, str]]:
         (top_x, -HALF_Y),
         (top_x + chord, -HALF_Y),
     )
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{bottom}.start", top_x, -HALF_Y, f"{sketch} bottom face chord"
     )
     dims.record("BottomChordX")
     dims.record("BottomChordY", '"HalfHeight"')
     pocket_run = BIG - POCKET_FILLET_R - station
-    pocket_bottom = await _reference_chord(
+    pocket_bottom = _reference_chord(
         adapter,
         sketch,
         dims,
@@ -801,7 +801,7 @@ async def _cavity_location_reference(adapter) -> list[tuple[str, str]]:
         (-pocket_run, -BIG),
         (-pocket_run + chord, -BIG),
     )
-    await _location(
+    _location(
         adapter,
         sketch,
         dims,
@@ -812,7 +812,7 @@ async def _cavity_location_reference(adapter) -> list[tuple[str, str]]:
         POCKET_BOTTOM_STATION,
         LOCATION_DRIVES["PocketBottomStation"],
     )
-    await _location(
+    _location(
         adapter,
         sketch,
         dims,
@@ -822,13 +822,13 @@ async def _cavity_location_reference(adapter) -> list[tuple[str, str]]:
         "horizontal_distance",
         pocket_run,
     )
-    await ensure_fully_defined(adapter, f"{sketch} sketch")
-    check(f"exit_sketch {sketch}", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, f"{sketch} sketch")
+    check(f"exit_sketch {sketch}", adapter.exit_sketch())
     name_last_feature(adapter, sketch)
     return dims.apply(adapter, sketch)
 
 
-async def _web_location_reference(adapter) -> list[tuple[str, str]]:
+def _web_location_reference(adapter) -> list[tuple[str, str]]:
     """WebLocationReference on the Right plane, section A-A's cutting plane,
     sketch (u, v) = model (-Z, Y); returns the drive jobs.
 
@@ -844,8 +844,8 @@ async def _web_location_reference(adapter) -> list[tuple[str, str]]:
     """
     sketch = REFERENCE_SKETCHES[2]
     dims = SketchDims()
-    check(f"create_sketch {sketch}", await adapter.create_sketch("Right"))
-    base = await _reference_chord(
+    check(f"create_sketch {sketch}", adapter.create_sketch("Right"))
+    base = _reference_chord(
         adapter,
         sketch,
         dims,
@@ -853,16 +853,16 @@ async def _web_location_reference(adapter) -> list[tuple[str, str]]:
         (WIDE, -HALF_Y),
         (WIDE - REFERENCE_EDGE_STATION, -HALF_Y),
     )
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{base}.start", WIDE, -HALF_Y, f"{sketch} base edge chord"
     )
     dims.record("BaseChordZ", '"FootHalf"')
     dims.record("BaseChordY", '"HalfHeight"')
     web_y = -(BIG - POCKET_FLOOR_R - REFERENCE_CHORD)
-    web = await _reference_chord(
+    web = _reference_chord(
         adapter, sketch, dims, "WebChord", (WEB, web_y), (WEB, web_y + REFERENCE_CHORD)
     )
-    await _location(
+    _location(
         adapter,
         sketch,
         dims,
@@ -873,7 +873,7 @@ async def _web_location_reference(adapter) -> list[tuple[str, str]]:
         WEB_FACE_STATION,
         LOCATION_DRIVES["WebFaceStation"],
     )
-    await _location(
+    _location(
         adapter,
         sketch,
         dims,
@@ -888,7 +888,7 @@ async def _web_location_reference(adapter) -> list[tuple[str, str]]:
     # web's straight run above the cavity's rim chamfer.
     face_y = BIG - POCKET_FLOOR_R - REFERENCE_CHORD
     for name, row in TOP_FLAT_STATIONS.items():
-        face = await _reference_chord(
+        face = _reference_chord(
             adapter,
             sketch,
             dims,
@@ -896,7 +896,7 @@ async def _web_location_reference(adapter) -> list[tuple[str, str]]:
             (row.face_u, face_y),
             (row.face_u, face_y - REFERENCE_CHORD),
         )
-        await _location(
+        _location(
             adapter,
             sketch,
             dims,
@@ -906,7 +906,7 @@ async def _web_location_reference(adapter) -> list[tuple[str, str]]:
             "horizontal_distance",
             abs(row.face_u),
         )
-        await _location(
+        _location(
             adapter,
             sketch,
             dims,
@@ -917,7 +917,7 @@ async def _web_location_reference(adapter) -> list[tuple[str, str]]:
             face_y,
         )
         inward = -math.copysign(REFERENCE_CHORD, row.edge_u)
-        flat = await _reference_chord(
+        flat = _reference_chord(
             adapter,
             sketch,
             dims,
@@ -925,7 +925,7 @@ async def _web_location_reference(adapter) -> list[tuple[str, str]]:
             (row.edge_u, HALF_Y),
             (row.edge_u + inward, HALF_Y),
         )
-        await _location(
+        _location(
             adapter,
             sketch,
             dims,
@@ -936,7 +936,7 @@ async def _web_location_reference(adapter) -> list[tuple[str, str]]:
             HALF_Y,
             '"HalfHeight"',
         )
-        await _location(
+        _location(
             adapter,
             sketch,
             dims,
@@ -947,8 +947,8 @@ async def _web_location_reference(adapter) -> list[tuple[str, str]]:
             TOP_FLAT_EDGE_FROM_WEB,
             LOCATION_DRIVES[name],
         )
-    await ensure_fully_defined(adapter, f"{sketch} sketch")
-    check(f"exit_sketch {sketch}", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, f"{sketch} sketch")
+    check(f"exit_sketch {sketch}", adapter.exit_sketch())
     name_last_feature(adapter, sketch)
     return dims.apply(adapter, sketch)
 
@@ -1061,10 +1061,10 @@ def _cut_through_all(
     return feat
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs: named equation-manager globals (mm) that drive every
@@ -1073,18 +1073,18 @@ async def build(adapter) -> dict[str, str]:
     # tracked parts -- see build_fr_top_frame.py). Lengths carry an explicit `mm`:
     # the part is modelled inch, and the equation manager evaluates bare numbers
     # in DOCUMENT units, so an unsuffixed global would be read as inches.
-    await set_global(adapter, "FootHalf", f"{WIDE}mm")  # trapezoid foot half-width (Z)
-    await set_global(adapter, "TopHalf", f"{NARROW}mm")  # trapezoid top half-width (Z)
-    await set_global(adapter, "HalfHeight", f"{HALF_Y}mm")  # trapezoid half-height (Y)
-    await set_global(adapter, "CavHalf", f"{CAV}mm")  # cavity square half
-    await set_global(adapter, "WindowOuter", f"{BIG}mm")  # window square half
-    await set_global(
+    set_global(adapter, "FootHalf", f"{WIDE}mm")  # trapezoid foot half-width (Z)
+    set_global(adapter, "TopHalf", f"{NARROW}mm")  # trapezoid top half-width (Z)
+    set_global(adapter, "HalfHeight", f"{HALF_Y}mm")  # trapezoid half-height (Y)
+    set_global(adapter, "CavHalf", f"{CAV}mm")  # cavity square half
+    set_global(adapter, "WindowOuter", f"{BIG}mm")  # window square half
+    set_global(
         adapter, "WallWidth", f"{BOSS_DEPTH}mm"
     )  # mid-plane extrude span (X)
     # The seats' stations off the centre plane (X): their Hole Wizard
     # placements and the REF stations both read them.
     for seat_global, station in SEAT_GLOBALS.items():
-        await set_global(adapter, seat_global, f"{station}mm")
+        set_global(adapter, seat_global, f"{station}mm")
 
     # Each sketch records its dim names + drive equations inline as it is drawn
     # (per-sketch SketchDims); the (dim@feature, expr) jobs are collected here and
@@ -1098,10 +1098,10 @@ async def build(adapter) -> dict[str, str]:
     #    along X. A polygon chain (two slanted sides) anchored at the foot's
     #    -Z corner; the six dims drive off FootHalf/TopHalf/HalfHeight.
     trap = SketchDims()
-    check("sketch boss", await adapter.create_sketch("Right"))
+    check("sketch boss", adapter.create_sketch("Right"))
     trap_pts = [(-WIDE, -HALF_Y), (WIDE, -HALF_Y), (NARROW, HALF_Y), (-NARROW, HALF_Y)]
-    trap_lines = await add_line_chain(adapter, trap_pts)
-    await define_polygon_chain(
+    trap_lines = add_line_chain(adapter, trap_pts)
+    define_polygon_chain(
         adapter,
         trap_lines,
         trap_pts,
@@ -1125,20 +1125,20 @@ async def build(adapter) -> dict[str, str]:
             '2 * "TopHalf"',
         ],
     )
-    await ensure_fully_defined(adapter, "trapezoid")
-    check("exit boss", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "trapezoid")
+    check("exit boss", adapter.exit_sketch())
     name_last_feature(adapter, "WallProfile")
     drive_jobs += trap.apply(adapter, "WallProfile")
     check(
         "boss",
-        await adapter.create_extrusion(
+        adapter.create_extrusion(
             ExtrusionParameters(depth=BOSS_DEPTH, both_directions=True)
         ),
     )
     name_last_feature(adapter, "Wall")
     depth_dim = name_dimensions(adapter, "Wall", ["Depth"])
     drive_jobs += [(depth_dim[0], '"WallWidth"')]
-    await volume_check(adapter, "Wall", WALL_VOLUME, 200)
+    volume_check(adapter, "Wall", WALL_VOLUME, 200)
 
     # 2-4. Two sketches drive three cuts, exactly as the source tree does (only
     # the names are semantic here, not the source's Sketch11/Cut-ExtrudeN). Both
@@ -1157,8 +1157,8 @@ async def build(adapter) -> dict[str, str]:
     # Built in the source's creation order (window profile, then cavity) and cut
     # in the source's order (cavity, then the two windows).
     windows = SketchDims()
-    check("sketch windows", await adapter.create_sketch("Front"))
-    await define_centered_rectangle(
+    check("sketch windows", adapter.create_sketch("Front"))
+    define_centered_rectangle(
         adapter,
         BIG,
         BIG,
@@ -1169,14 +1169,14 @@ async def build(adapter) -> dict[str, str]:
         name_depth="WinHeight",
         drive_depth='2 * "WindowOuter"',
     )
-    await ensure_fully_defined(adapter, "window")
-    check("exit windows", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "window")
+    check("exit windows", adapter.exit_sketch())
     name_last_feature(adapter, "WindowProfile")
     drive_jobs += windows.apply(adapter, "WindowProfile")
 
     cavity = SketchDims()
-    check("sketch cavity", await adapter.create_sketch("Front"))
-    await define_centered_rectangle(
+    check("sketch cavity", adapter.create_sketch("Front"))
+    define_centered_rectangle(
         adapter,
         CAV,
         CAV,
@@ -1187,15 +1187,15 @@ async def build(adapter) -> dict[str, str]:
         name_depth="CavDepth",
         drive_depth='2 * "CavHalf"',
     )
-    await ensure_fully_defined(adapter, "cavity")
-    check("exit cavity", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "cavity")
+    check("exit cavity", adapter.exit_sketch())
     name_last_feature(adapter, "CavityProfile")
     drive_jobs += cavity.apply(adapter, "CavityProfile")
 
     # CavityCut: cavity -- whole CavityProfile, Through-All-Both.
     _cut_through_all(adapter, "CavityProfile", both=True, reverse_dir=False)
     name_last_feature(adapter, "CavityCut")
-    await volume_check(adapter, "CavityCut", CAVITY_CUT_VOLUME, 200)
+    volume_check(adapter, "CavityCut", CAVITY_CUT_VOLUME, 200)
 
     # WindowCut1: one window -- Through-All forward, started WEB off-plane.
     _cut_through_all(
@@ -1207,7 +1207,7 @@ async def build(adapter) -> dict[str, str]:
         flip_start=True,
     )
     name_last_feature(adapter, "WindowCut1")
-    await volume_check(adapter, "WindowCut1", WINDOW_CUT1_VOLUME, 200)
+    volume_check(adapter, "WindowCut1", WINDOW_CUT1_VOLUME, 200)
 
     # WindowCut2: the other window -- the SAME WindowProfile, Through-All reverse,
     # started WEB off-plane the other way (leaves the 2*WEB central web).
@@ -1220,33 +1220,33 @@ async def build(adapter) -> dict[str, str]:
         flip_start=False,
     )
     name_last_feature(adapter, "WindowCut2")
-    await volume_check(adapter, "WindowCut2", WINDOW_CUT2_VOLUME, 200)
+    volume_check(adapter, "WindowCut2", WINDOW_CUT2_VOLUME, 200)
 
     # 5. CornerFillet: R12.7 on the four cavity corners.
-    check("fillet cavity corners", await adapter.add_fillet(FILLET_R, FILLET_EDGES))
+    check("fillet cavity corners", adapter.add_fillet(FILLET_R, FILLET_EDGES))
     name_last_feature(adapter, "CornerFillet")
-    await volume_check(adapter, "CornerFillet", CORNER_FILLET_VOLUME, 200)
+    volume_check(adapter, "CornerFillet", CORNER_FILLET_VOLUME, 200)
     name_dimensions(adapter, "CornerFillet", ["CavityRadius"])
 
     # 6. PocketCornerFillet: R6.35 on both opposed pocket openings.
     check(
         "fillet pocket corners",
-        await adapter.add_fillet(POCKET_FILLET_R, POCKET_FILLET_EDGES),
+        adapter.add_fillet(POCKET_FILLET_R, POCKET_FILLET_EDGES),
     )
     name_last_feature(adapter, "PocketCornerFillet")
     name_dimensions(adapter, "PocketCornerFillet", ["PocketRadius"])
-    await volume_check(adapter, "PocketCornerFillet", POCKET_FILLET_VOLUME, 20)
+    volume_check(adapter, "PocketCornerFillet", POCKET_FILLET_VOLUME, 20)
 
     # 6b. PocketFloorFillet: R0.8 around both pocket floors.
     check(
         "fillet pocket floors",
-        await adapter.add_fillet(
+        adapter.add_fillet(
             POCKET_FLOOR_R, POCKET_FLOOR_FILLET_EDGES, propagate=True
         ),
     )
     name_last_feature(adapter, "PocketFloorFillet")
     name_dimensions(adapter, "PocketFloorFillet", ["PocketFloorRadius"])
-    await volume_check(adapter, "PocketFloorFillet", POCKET_FLOOR_FILLET_VOLUME, 20)
+    volume_check(adapter, "PocketFloorFillet", POCKET_FLOOR_FILLET_VOLUME, 20)
 
     # 7. FootClearanceHoles: one native Hole Wizard feature, four 5/16 drills.
     wizard_holes(
@@ -1258,7 +1258,7 @@ async def build(adapter) -> dict[str, str]:
         name="FootClearanceHoles",
         expect_dia_mm=HOLE_DIA,
     )
-    await volume_check(adapter, "FootClearanceHoles", FOOT_HOLED_VOLUME, 200)
+    volume_check(adapter, "FootClearanceHoles", FOOT_HOLED_VOLUME, 200)
 
     # 8. RimChamfer: 1.524 mm (.06) / 45° around the whole window rim and ten
     #    of the twelve outside edges -- the +X end face's foot edge first (it
@@ -1267,13 +1267,13 @@ async def build(adapter) -> dict[str, str]:
     #    end faces' top edges keep the title block's break.
     check(
         "chamfer",
-        await adapter.add_chamfer(
+        adapter.add_chamfer(
             CHAMFER, CHAMFER_EDGES, face_points=CHAMFER_FACES, tangent_propagation=True
         ),
     )
     name_last_feature(adapter, "RimChamfer")
     name_dimensions(adapter, "RimChamfer", ["RimChamferSize"])
-    await volume_check(adapter, "RimChamfer", RIM_CHAMFER_VOLUME, 200)
+    volume_check(adapter, "RimChamfer", RIM_CHAMFER_VOLUME, 200)
 
     # 9. BracketSeats: the rocker brackets' two #8-32 bottoming-tapped seats,
     #    down from the top face into the end posts. Located at their nominal
@@ -1288,24 +1288,24 @@ async def build(adapter) -> dict[str, str]:
         placement_dims=SEAT_PLACEMENT_DIMS,
     )
     drive_jobs += bracket_seats.placement_drive_jobs
-    await volume_check(adapter, "BracketSeats", BRACKET_SEATS_VOLUME, 200)
+    volume_check(adapter, "BracketSeats", BRACKET_SEATS_VOLUME, 200)
 
     # 10. SeatStationReference: the seats' REF stations for VIEW B; the
     #     cavity's, the pockets', and the web's locations for the front view
     #     and section A-A.
-    drive_jobs += await _seat_station_reference(adapter)
-    drive_jobs += await _cavity_location_reference(adapter)
-    drive_jobs += await _web_location_reference(adapter)
+    drive_jobs += _seat_station_reference(adapter)
+    drive_jobs += _cavity_location_reference(adapter)
+    drive_jobs += _web_location_reference(adapter)
 
     # Apply the deferred drive equations now that the whole model + a rebuild
     # exist, so every named-dim target resolves. Each equation evaluates to the
     # value just built, so the geometry must not move -- the re-check below is
     # the proof.
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    volume_check(
         adapter, "driven part (equations neutral)", BRACKET_SEATS_VOLUME, 200
     )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
@@ -1318,13 +1318,13 @@ async def build(adapter) -> dict[str, str]:
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     blank_reference_sketches(adapter, REFERENCE_SKETCHES)
 
-    await apply_material(adapter, MATERIAL)
-    await apply_color(
+    apply_material(adapter, MATERIAL)
+    apply_color(
         adapter, CASTING_GREEN
     )  # green-painted casting, like the base/top-frame
-    await report_mass_properties(adapter)
+    report_mass_properties(adapter)
     apply_drawing_properties(adapter, PART_NAME)
-    return await save_part_and_images(adapter, PART_NAME)
+    return save_part_and_images(adapter, PART_NAME)
 
 
 if __name__ == "__main__":

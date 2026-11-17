@@ -414,11 +414,11 @@ def _view_b_arrow(adapter: Any, end: Any) -> None:
     )
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open pinion-lift-rod source", await adapter.open_model(str(SOURCE)))
+    check("open pinion-lift-rod source", adapter.open_model(str(SOURCE)))
     read_required_properties(
         adapter.currentModel,
         (
@@ -516,7 +516,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # Under the 1:2 isometric (x ~0.104-0.176, bottom y ~0.067).
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Pinion Lift Rod Manufacturing Drawing",

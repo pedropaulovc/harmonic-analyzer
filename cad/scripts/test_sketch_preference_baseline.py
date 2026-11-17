@@ -421,9 +421,8 @@ _EVERY_RECEIVER = "*"
 # guard -- so ``ClassDef`` is deliberately absent.
 _DEFERRED_CODE = (
     ast.FunctionDef,
-    ast.AsyncFunctionDef,
     ast.Lambda,
-    ast.GeneratorExp,
+    ast.GeneratorExp
 )
 
 
@@ -496,7 +495,7 @@ def _visit(
         # HERE says anything about it -- and by the same argument a disable
         # in there says nothing about the code around it.
         guards, enabled = frozenset(), {}
-    if isinstance(node, (ast.With, ast.AsyncWith)) and any(
+    if isinstance(node, (ast.With,)) and any(
         _is_guard_call(item.context_expr) for item in node.items
     ):
         guards = guards | {_EVERY_RECEIVER}
@@ -634,7 +633,7 @@ def test_the_audit_detects_an_unguarded_primitive(tmp_path: Path) -> None:
     """The audit's own teeth: it must fail on the shape it is looking for."""
     offender = tmp_path / "diag_build_regression.py"
     offender.write_text(
-        "async def build(adapter):\n"
+        "def build(adapter):\n"
         "    sk = adapter.currentSketchManager\n"
         "    sk.CreateLine(0.0, 0.0, 0.0, 1.0, 1.0, 0.0)\n"
         "    with no_sketch_inference(adapter):\n"
@@ -649,7 +648,7 @@ def test_a_real_add_to_db_block_counts_as_a_guard(tmp_path: Path) -> None:
     """The engine-level control: enable before the try, restore in finally."""
     good = tmp_path / "diag_build_addtodb.py"
     good.write_text(
-        "async def build(adapter):\n"
+        "def build(adapter):\n"
         "    sk = adapter.currentSketchManager\n"
         "    prev = sk.AddToDB\n"
         "    sk.AddToDB = True\n"
@@ -672,7 +671,7 @@ def test_an_intervening_disable_cancels_the_guard(tmp_path: Path) -> None:
     """
     offender = tmp_path / "diag_build_disabled.py"
     offender.write_text(
-        "async def build(adapter):\n"
+        "def build(adapter):\n"
         "    sk = adapter.currentSketchManager\n"
         "    sk.AddToDB = True\n"
         "    sk.AddToDB = False\n"
@@ -695,7 +694,7 @@ def test_an_enable_on_a_different_receiver_is_not_a_guard(tmp_path: Path) -> Non
     """
     offender = tmp_path / "diag_build_two_managers.py"
     offender.write_text(
-        "async def build(adapter):\n"
+        "def build(adapter):\n"
         "    sk1 = adapter.currentSketchManager\n"
         "    sk2 = adapter.otherSketchManager\n"
         "    sk1.AddToDB = True\n"
@@ -718,7 +717,7 @@ def test_a_disable_inside_the_block_ends_the_guard(tmp_path: Path) -> None:
     """
     offender = tmp_path / "diag_build_disabled_inside.py"
     offender.write_text(
-        "async def build(adapter):\n"
+        "def build(adapter):\n"
         "    sk = adapter.currentSketchManager\n"
         "    sk.AddToDB = True\n"
         "    try:\n"
@@ -740,7 +739,7 @@ def test_a_primitive_in_the_finally_clause_is_not_guarded(tmp_path: Path) -> Non
     """
     offender = tmp_path / "diag_build_finally_draws.py"
     offender.write_text(
-        "async def build(adapter):\n"
+        "def build(adapter):\n"
         "    sk = adapter.currentSketchManager\n"
         "    prev = sk.AddToDB\n"
         "    sk.AddToDB = True\n"
@@ -767,7 +766,7 @@ def test_a_reset_in_an_except_clause_does_not_unguard_the_body(
     """
     guarded = tmp_path / "diag_build_reset_on_error.py"
     guarded.write_text(
-        "async def build(adapter):\n"
+        "def build(adapter):\n"
         "    sk = adapter.currentSketchManager\n"
         "    prev = sk.AddToDB\n"
         "    sk.AddToDB = True\n"
@@ -796,7 +795,7 @@ def test_a_call_on_an_unguarded_receiver_inside_the_block_is_reported(
     """
     offender = tmp_path / "diag_build_wrong_receiver.py"
     offender.write_text(
-        "async def build(adapter):\n"
+        "def build(adapter):\n"
         "    sk1 = adapter.currentSketchManager\n"
         "    sk2 = adapter.otherSketchManager\n"
         "    prev = sk1.AddToDB\n"
@@ -821,7 +820,7 @@ def test_a_nested_function_does_not_inherit_the_guard(tmp_path: Path) -> None:
     """
     offender = tmp_path / "diag_build_deferred.py"
     offender.write_text(
-        "async def build(adapter):\n"
+        "def build(adapter):\n"
         "    sk = adapter.currentSketchManager\n"
         "    with no_sketch_inference(adapter):\n"
         "        def draw():\n"
@@ -841,7 +840,7 @@ def test_a_nested_function_with_its_own_guard_is_clean(tmp_path: Path) -> None:
     """
     guarded = tmp_path / "diag_build_deferred_guarded.py"
     guarded.write_text(
-        "async def build(adapter):\n"
+        "def build(adapter):\n"
         "    sk = adapter.currentSketchManager\n"
         "    def draw():\n"
         "        with no_sketch_inference(adapter):\n"
@@ -862,7 +861,7 @@ def test_a_qualified_guard_call_is_recognised(tmp_path: Path) -> None:
     """
     guarded = tmp_path / "diag_build_qualified.py"
     guarded.write_text(
-        "async def build(adapter):\n"
+        "def build(adapter):\n"
         "    sk = adapter.currentSketchManager\n"
         "    with diag.no_sketch_inference(adapter):\n"
         "        sk.CreateLine(0.0, 0.0, 0.0, 1.0, 1.0, 0.0)\n",
@@ -884,7 +883,7 @@ def test_a_finally_that_never_enabled_add_to_db_is_not_a_guard(
     """
     offender = tmp_path / "diag_build_pretend.py"
     offender.write_text(
-        "async def build(adapter):\n"
+        "def build(adapter):\n"
         "    sk = adapter.currentSketchManager\n"
         "    try:\n"
         "        sk.CreateLine(0.0, 0.0, 0.0, 1.0, 1.0, 0.0)\n"
@@ -908,7 +907,7 @@ def test_an_enable_in_an_outer_suite_still_guards_a_nested_block(
     """
     guarded = tmp_path / "diag_build_nested_suite.py"
     guarded.write_text(
-        "async def build(adapter, deep):\n"
+        "def build(adapter, deep):\n"
         "    sk = adapter.currentSketchManager\n"
         "    prev = sk.AddToDB\n"
         "    sk.AddToDB = True\n"
@@ -933,7 +932,7 @@ def test_a_disable_in_a_branch_cancels_a_later_guard(tmp_path: Path) -> None:
     """
     offender = tmp_path / "diag_build_branch_disable.py"
     offender.write_text(
-        "async def build(adapter, deep):\n"
+        "def build(adapter, deep):\n"
         "    sk = adapter.currentSketchManager\n"
         "    prev = sk.AddToDB\n"
         "    sk.AddToDB = True\n"
@@ -959,7 +958,7 @@ def test_a_disable_inside_a_nested_function_does_not_leak_out(
     """
     guarded = tmp_path / "diag_build_deferred_disable.py"
     guarded.write_text(
-        "async def build(adapter):\n"
+        "def build(adapter):\n"
         "    sk = adapter.currentSketchManager\n"
         "    prev = sk.AddToDB\n"
         "    sk.AddToDB = True\n"

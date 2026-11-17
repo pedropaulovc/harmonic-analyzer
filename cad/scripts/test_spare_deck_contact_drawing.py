@@ -2,7 +2,7 @@
 
 from copy import deepcopy
 from types import SimpleNamespace as NS
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import MagicMock, Mock
 
 import pytest
 from solidworks_mcp.adapters.base import AdapterResult, AdapterResultStatus
@@ -106,24 +106,23 @@ def local_dependencies(monkeypatch, tmp_path):
     )
     adapter = NS(swApp=app, currentModel=None)
 
-    async def open_model(path):
+    def open_model(path):
         assert path == str(source)
         app.GetDocuments.return_value = (top, child)
         app.ActiveDoc = top
         adapter.currentModel = top
         return AdapterResult(AdapterResultStatus.SUCCESS)
 
-    adapter.open_model = AsyncMock(side_effect=open_model)
+    adapter.open_model = MagicMock(side_effect=open_model)
     return NS(**locals())
 
 
-@pytest.mark.asyncio
-async def test_owned_inputs_are_resolved_local_bytes_not_producer_authentication(
+def test_owned_inputs_are_resolved_local_bytes_not_producer_authentication(
     local_dependencies,
 ):
     c = local_dependencies
     owner = ownership.OwnedAssembly(c.adapter, c.source)
-    await owner.open()
+    owner.open()
     assert owner.inputs == {c.source, c.local}
     assert owner.hashes[str(c.local)] == ownership.digest(c.local)
     assert owner.hashes[str(c.local)] != ownership.digest(c.foreign)
@@ -149,7 +148,7 @@ def test_empty_dependency_result_rejects_before_open_and_restores_directory(
     with pytest.raises(RuntimeError, match="resolved no dependencies"):
         ownership.OwnedAssembly(c.adapter, c.source)
     c.app.SetCurrentWorkingDirectory.assert_called_once_with(str(c.tmp_path))
-    c.adapter.open_model.assert_not_awaited()
+    c.adapter.open_model.assert_not_called()
 
 
 def test_resolved_same_name_foreign_dependency_is_not_relocated_by_name(
@@ -159,18 +158,17 @@ def test_resolved_same_name_foreign_dependency_is_not_relocated_by_name(
     c.app.GetDocumentDependencies2.return_value = ("part", str(c.foreign))
     with pytest.raises(RuntimeError, match="leave this checkout"):
         ownership.OwnedAssembly(c.adapter, c.source)
-    c.adapter.open_model.assert_not_awaited()
+    c.adapter.open_model.assert_not_called()
 
 
-@pytest.mark.asyncio
-async def test_native_open_cannot_claim_a_foreign_same_name_document(
+def test_native_open_cannot_claim_a_foreign_same_name_document(
     local_dependencies,
 ):
     c = local_dependencies
     owner = ownership.OwnedAssembly(c.adapter, c.source)
     foreign_child = c.document(c.foreign, 1)
 
-    async def open_foreign(path):
+    def open_foreign(path):
         assert path == str(c.source)
         c.app.GetDocuments.return_value = (c.top, foreign_child)
         c.app.ActiveDoc = c.top
@@ -179,17 +177,16 @@ async def test_native_open_cannot_claim_a_foreign_same_name_document(
 
     c.adapter.open_model.side_effect = open_foreign
     with pytest.raises(RuntimeError, match="unowned or ambiguous native document"):
-        await owner.open()
+        owner.open()
     assert owner.handles == {}
     assert owner.root is None
-    c.adapter.open_model.assert_awaited_once_with(str(c.source))
+    c.adapter.open_model.assert_called_once_with(str(c.source))
 
 
-@pytest.mark.asyncio
-async def test_same_path_native_handle_replacement_is_not_owned(local_dependencies):
+def test_same_path_native_handle_replacement_is_not_owned(local_dependencies):
     c = local_dependencies
     owner = ownership.OwnedAssembly(c.adapter, c.source)
-    await owner.open()
+    owner.open()
     replacement = c.document(c.local, 1)
     c.app.GetDocuments.return_value = (c.top, replacement)
     with pytest.raises(RuntimeError, match="native document identity changed"):
@@ -403,8 +400,7 @@ def test_scaled_or_nonrigid_component_transform_is_rejected(scene, fault):
         probe.transform(scene.spare)
 
 
-@pytest.mark.asyncio
-async def test_primary_cleanup_and_hash_failures_all_remain_in_receipt(
+def test_primary_cleanup_and_hash_failures_all_remain_in_receipt(
     monkeypatch, tmp_path
 ):
     monkeypatch.setattr(probe, "ROOT", tmp_path)
@@ -417,8 +413,8 @@ async def test_primary_cleanup_and_hash_failures_all_remain_in_receipt(
     )
     owner = NS(
         hashes={str(source): probe.digest(source)},
-        open=AsyncMock(),
-        close=AsyncMock(side_effect=cleanup),
+        open=MagicMock(),
+        close=MagicMock(side_effect=cleanup),
         inventory=Mock(return_value={}),
         input_evidence=lambda: {str(source): {"status": "unreadable"}},
     )
@@ -430,7 +426,7 @@ async def test_primary_cleanup_and_hash_failures_all_remain_in_receipt(
         probe, "checkpoint", lambda _, row: receipts.append(deepcopy(row))
     )
     with pytest.raises(ExceptionGroup) as caught:
-        await probe.measure(
+        probe.measure(
             object(), {}, tmp_path / "contact.json", probe.digest(source)
         )
     assert caught.value.exceptions[:2] == (primary, cleanup)
@@ -438,12 +434,11 @@ async def test_primary_cleanup_and_hash_failures_all_remain_in_receipt(
     assert receipts[-1]["status"] == "failed"
     assert receipts[-1]["inputs"][str(source)]["status"] == "unreadable"
     assert "final_inventory" not in receipts[-1]
-    owner.close.assert_awaited_once()
+    owner.close.assert_called_once()
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize("outcome", ["passed", "failed"])
-async def test_final_checkpoint_failure_preserves_native_error_and_cleanup(
+def test_final_checkpoint_failure_preserves_native_error_and_cleanup(
     monkeypatch, tmp_path, outcome
 ):
     monkeypatch.setattr(probe, "ROOT", tmp_path)
@@ -454,8 +449,8 @@ async def test_final_checkpoint_failure_preserves_native_error_and_cleanup(
     write_error = OSError("final receipt unavailable")
     owner = NS(
         hashes={str(source): probe.digest(source)},
-        open=AsyncMock(),
-        close=AsyncMock(),
+        open=MagicMock(),
+        close=MagicMock(),
         inventory=Mock(return_value={}),
         input_evidence=lambda: {str(source): {"status": "unchanged"}},
     )
@@ -472,18 +467,17 @@ async def test_final_checkpoint_failure_preserves_native_error_and_cleanup(
     checkpoint = Mock(side_effect=unavailable_final_receipt)
     monkeypatch.setattr(probe, "checkpoint", checkpoint)
     with pytest.raises(ExceptionGroup) as caught:
-        await probe.measure(
+        probe.measure(
             object(), {}, tmp_path / "contact.json", probe.digest(source)
         )
     assert caught.value.exceptions == (
         (primary, write_error) if outcome == "failed" else (write_error,)
     )
-    owner.close.assert_awaited_once()
+    owner.close.assert_called_once()
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize("inventory_result", ["empty", "read_error"])
-async def test_final_inventory_receipt_requires_actual_native_read(
+def test_final_inventory_receipt_requires_actual_native_read(
     monkeypatch, tmp_path, inventory_result
 ):
     monkeypatch.setattr(probe, "ROOT", tmp_path)
@@ -493,8 +487,8 @@ async def test_final_inventory_receipt_requires_actual_native_read(
     read_error = RuntimeError("final inventory unavailable")
     owner = NS(
         hashes={str(source): probe.digest(source)},
-        open=AsyncMock(),
-        close=AsyncMock(),
+        open=MagicMock(),
+        close=MagicMock(),
         inventory=Mock(
             side_effect=[{}, read_error if inventory_result == "read_error" else {}]
         ),
@@ -507,25 +501,24 @@ async def test_final_inventory_receipt_requires_actual_native_read(
     report = {}
     if inventory_result == "read_error":
         with pytest.raises(ExceptionGroup) as caught:
-            await probe.measure(
+            probe.measure(
                 object(), report, tmp_path / "contact.json", probe.digest(source)
             )
         assert caught.value.exceptions == (read_error,)
         assert "final_inventory" not in report
         assert report["status"] == "failed"
     if inventory_result == "empty":
-        await probe.measure(
+        probe.measure(
             object(), report, tmp_path / "contact.json", probe.digest(source)
         )
         assert report["final_inventory"] == []
         assert report["status"] == "passed"
     assert report["baseline_inventory"] == []
     assert owner.inventory.call_count == 2
-    owner.close.assert_awaited_once()
+    owner.close.assert_called_once()
 
 
-@pytest.mark.asyncio
-async def test_outer_timing_checkpoint_cannot_replace_measure_failure(
+def test_outer_timing_checkpoint_cannot_replace_measure_failure(
     monkeypatch, tmp_path
 ):
     from solidworks_mcp.adapters import pywin32_adapter
@@ -543,9 +536,9 @@ async def test_outer_timing_checkpoint_cannot_replace_measure_failure(
         "native and cleanup", [RuntimeError("native read rejected")]
     )
     write_error = OSError("timing receipt unavailable")
-    monkeypatch.setattr(probe, "measure", AsyncMock(side_effect=primary))
+    monkeypatch.setattr(probe, "measure", MagicMock(side_effect=primary))
     monkeypatch.setattr(probe, "checkpoint", Mock(side_effect=write_error))
     adapter = NS(swApp=NS(GetProcessID=lambda: 123, RevisionNumber=lambda: "34.3.0"))
     with pytest.raises(ExceptionGroup) as caught:
-        await probe.probe(adapter, tmp_path, "e" * 64)
+        probe.probe(adapter, tmp_path, "e" * 64)
     assert caught.value.exceptions == (primary, write_error)

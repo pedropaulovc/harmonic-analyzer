@@ -9,7 +9,6 @@ in-place save + reopen — to see whether a normal rebuild+save persists clean.
 
 from __future__ import annotations
 
-import asyncio
 import sys
 from pathlib import Path
 
@@ -32,20 +31,20 @@ def _nr(model) -> int:
     return int(v) if v is not None else -999
 
 
-async def _fresh(adapter, path):
+def _fresh(adapter, path):
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
-    await adapter.open_model(str(path))
+    adapter.open_model(str(path))
     return _early_bound(adapter.currentModel, "IModelDoc2")
 
 
-async def main() -> None:
+def main() -> None:
     arg = sys.argv[1] if len(sys.argv) > 1 else "fr-frame"
     path = Path(arg) if arg.lower().endswith(".sldasm") else OUT / f"{arg}.SLDASM"
 
     adapter = PyWin32Adapter({})
     with _telemetry.span("probe.rebuild_cause", target=str(path), stem=path.stem):
-        await adapter.connect()
-        model = await _fresh(adapter, path)
+        adapter.connect()
+        model = _fresh(adapter, path)
         _telemetry.info(f"[{path.stem}] NeedsRebuild2 on open = {_nr(model)}")
 
         cfgmgr = _read_member(model, "ConfigurationManager")
@@ -80,9 +79,9 @@ async def main() -> None:
         _telemetry.info(f"[fix] EditRebuild3 = {adapter._attempt(lambda: m2.EditRebuild3(), default=None)!r} "
                         f"-> in-mem NeedsRebuild2 = {_nr(m2)}")
         _telemetry.info(f"[fix] Save3(Silent) = {adapter._attempt(lambda: m2.Save3(1,0,0), default=None)!r}")
-        m3 = await _fresh(adapter, path)
+        m3 = _fresh(adapter, path)
         _telemetry.info(f"[fix] AFTER EditRebuild3+save, reopen NeedsRebuild2 = {_nr(m3)}")
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

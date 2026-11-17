@@ -92,34 +92,34 @@ def stock_properties(part_name: str) -> dict[str, str]:
     }
 
 
-async def _sketch_plate(adapter: Any, hole_r: float) -> None:
+def _sketch_plate(adapter: Any, hole_r: float) -> None:
     """Front-plane obround side-plate outline (one LINK_PITCH long) with a
     clearance hole at each pin station; fully defined, ready to extrude."""
     from _sketch import anchor_point_to_origin
 
     p, h = LINK_PITCH, PLATE_HALF_H
-    check("create_sketch plate", await adapter.create_sketch("Front"))
+    check("create_sketch plate", adapter.create_sketch("Front"))
     # ALL geometry under direct-db (suppress inference snapping at the
     # origin/axes), then constraints with it off.
     set_sketch_direct_db(adapter, True)
     # CCW obround: bottom line, right end-arc (+x bulge), top line, left
     # end-arc (-x bulge). Endpoints share exact coords so they merge.
-    line_bot = check("plate bottom", await adapter.add_line(0.0, -h, p, -h))
-    arc_right = check("plate right arc", await adapter.add_arc(p, 0.0, p, -h, p, h))
-    line_top = check("plate top", await adapter.add_line(p, h, 0.0, h))
-    arc_left = check("plate left arc", await adapter.add_arc(0.0, 0.0, 0.0, h, 0.0, -h))
-    hole0 = check("plate hole 0", await adapter.add_circle(0.0, 0.0, hole_r))
-    holep = check("plate hole P", await adapter.add_circle(p, 0.0, hole_r))
+    line_bot = check("plate bottom", adapter.add_line(0.0, -h, p, -h))
+    arc_right = check("plate right arc", adapter.add_arc(p, 0.0, p, -h, p, h))
+    line_top = check("plate top", adapter.add_line(p, h, 0.0, h))
+    arc_left = check("plate left arc", adapter.add_arc(0.0, 0.0, 0.0, h, 0.0, -h))
+    hole0 = check("plate hole 0", adapter.add_circle(0.0, 0.0, hole_r))
+    holep = check("plate hole P", adapter.add_circle(p, 0.0, hole_r))
     set_sketch_direct_db(adapter, False)
     # Outline: both end-arc centres anchored, both radii, all 4 junction
     # tangents (the proven chain-loop recipe -- tangency makes the two lines
     # the circles' common external tangents, i.e. horizontal).
-    await anchor_point_to_origin(adapter, f"{arc_left}.center", 0.0, 0.0, "left arc")
-    await anchor_point_to_origin(adapter, f"{arc_right}.center", p, 0.0, "right arc")
+    anchor_point_to_origin(adapter, f"{arc_left}.center", 0.0, 0.0, "left arc")
+    anchor_point_to_origin(adapter, f"{arc_right}.center", p, 0.0, "right arc")
     for label, arc in (("left", arc_left), ("right", arc_right)):
         check(
             f"plate {label} arc radius",
-            await adapter.add_sketch_dimension(arc, None, "radial", h),
+            adapter.add_sketch_dimension(arc, None, "radial", h),
         )
     for label, e1, e2 in (
         ("bot-right", line_bot, arc_right),
@@ -129,41 +129,41 @@ async def _sketch_plate(adapter: Any, hole_r: float) -> None:
     ):
         check(
             f"plate tangent {label}",
-            await adapter.add_sketch_constraint(e1, e2, "tangent"),
+            adapter.add_sketch_constraint(e1, e2, "tangent"),
         )
     # Pin-station clearance holes (concentric with the end arcs).
     for label, circle, cx in (("0", hole0, 0.0), ("P", holep, p)):
-        await anchor_point_to_origin(adapter, f"{circle}.center", cx, 0.0, f"hole {label}")
+        anchor_point_to_origin(adapter, f"{circle}.center", cx, 0.0, f"hole {label}")
         check(
             f"plate hole {label} diameter",
-            await adapter.add_sketch_dimension(circle, None, "diameter", 2.0 * hole_r),
+            adapter.add_sketch_dimension(circle, None, "diameter", 2.0 * hole_r),
         )
-    await ensure_fully_defined(adapter, "plate sketch")
-    check("exit_sketch plate", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "plate sketch")
+    check("exit_sketch plate", adapter.exit_sketch())
 
 
-async def _sketch_round_bodies(adapter: Any, outer_r: float, bore_r: float | None) -> None:
+def _sketch_round_bodies(adapter: Any, outer_r: float, bore_r: float | None) -> None:
     """Front-plane circles at both pin stations -- a bored tube (bushing) when
     ``bore_r`` is given (nested circle = even-odd hole), else a solid disc."""
     p = LINK_PITCH
-    check("create_sketch bodies", await adapter.create_sketch("Front"))
+    check("create_sketch bodies", adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     for label, cx in (("0", 0.0), ("P", p)):
-        await define_circle(adapter, cx, 0.0, outer_r, f"body outer {label}")
+        define_circle(adapter, cx, 0.0, outer_r, f"body outer {label}")
         if bore_r is not None:
-            await define_circle(adapter, cx, 0.0, bore_r, f"body bore {label}")
+            define_circle(adapter, cx, 0.0, bore_r, f"body bore {label}")
     set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(adapter, "round bodies sketch")
-    check("exit_sketch bodies", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "round bodies sketch")
+    check("exit_sketch bodies", adapter.exit_sketch())
 
 
-async def author_link_references(adapter: Any) -> None:
+def author_link_references(adapter: Any) -> None:
     """The unchanged two pin-station axes shared by every member."""
     from solidworks_mcp.adapters.base import CreateAxisParameters, CreatePlaneParameters
 
     station_plane = check(
         "create_plane @ x=P",
-        await adapter.create_plane(
+        adapter.create_plane(
             CreatePlaneParameters(
                 mode="offset", base_plane="Right Plane", offset=LINK_PITCH
             )
@@ -173,7 +173,7 @@ async def author_link_references(adapter: Any) -> None:
     for label, second_plane in (("Axis1", "Right Plane"), ("Axis2", station_plane_name)):
         axis = check(
             f"create_axis {label}",
-            await adapter.create_axis(
+            adapter.create_axis(
                 CreateAxisParameters(mode="two_planes", planes=["Top Plane", second_plane])
             ),
         )
@@ -185,7 +185,7 @@ async def author_link_references(adapter: Any) -> None:
     )
 
 
-async def author_link_geometry(
+def author_link_geometry(
     adapter: Any,
     *,
     plate_z: float,
@@ -201,20 +201,20 @@ async def author_link_geometry(
     """
     features: list[str] = []
     for sign in (1.0, -1.0):
-        await _sketch_plate(adapter, plate_hole_r)
+        _sketch_plate(adapter, plate_hole_r)
         features.append(feature_name_by_type(adapter, "ProfileFeature"))
         z_lo = sign * plate_z - PLATE_THICK / 2.0
         features.append(extrude_at_offset(adapter, PLATE_THICK, z_lo))
-    await _sketch_round_bodies(adapter, body_outer_r, body_bore_r)
+    _sketch_round_bodies(adapter, body_outer_r, body_bore_r)
     features.append(feature_name_by_type(adapter, "ProfileFeature"))
     features.append(extrude_at_offset(adapter, 2.0 * body_half_len, -body_half_len))
     _gate_volume(
-        await _volume(adapter), plate_hole_r, body_outer_r, body_bore_r, body_half_len
+        _volume(adapter), plate_hole_r, body_outer_r, body_bore_r, body_half_len
     )
     return tuple(features)
 
 
-async def build_link(
+def build_link(
     adapter: Any,
     *,
     part_name: str,
@@ -226,11 +226,11 @@ async def build_link(
     body_half_len: float,
 ) -> dict[str, str]:
     """Build the separately purchased connecting link with the same authoring."""
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     # The package's unit before any global, sketch or feature (Codjiflo, #2148).
     apply_package_model_units(adapter, part_drawing_unit(part_name), label=part_name)
-    await author_link_references(adapter)
-    await author_link_geometry(
+    author_link_references(adapter)
+    author_link_geometry(
         adapter,
         plate_z=plate_z,
         plate_hole_r=plate_hole_r,
@@ -238,20 +238,20 @@ async def build_link(
         body_bore_r=body_bore_r,
         body_half_len=body_half_len,
     )
-    await apply_material(adapter, material)
-    await apply_color(adapter, BAR_STEEL)
+    apply_material(adapter, material)
+    apply_color(adapter, BAR_STEEL)
     apply_custom_properties(adapter, stock_properties(part_name))
     apply_drawing_properties(
         adapter, part_name, {"Manufacturing Notes": DRAWING_NOTES[part_name]}
     )
-    await report_mass_properties(adapter)
-    artefacts = await save_part_and_images(adapter, part_name)
+    report_mass_properties(adapter)
+    artefacts = save_part_and_images(adapter, part_name)
     require_saved_drawing_properties(adapter, DRAWING_PROPERTIES)
     return artefacts
 
 
-async def _volume(adapter: Any) -> float:
-    res = await adapter.get_mass_properties()
+def _volume(adapter: Any) -> float:
+    res = adapter.get_mass_properties()
     volume = float(check("chain member mass properties", res).volume)
     if not math.isfinite(volume):
         raise RuntimeError(f"chain member volume is not finite: {volume!r}")

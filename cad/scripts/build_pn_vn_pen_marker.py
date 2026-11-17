@@ -56,40 +56,40 @@ def profile_points() -> list[tuple[float, float]]:
     return [(r, y) for y, r in PROFILE]
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import RevolveParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
-    check("create_sketch profile", await adapter.create_sketch("Front"))
+    check("create_sketch profile", adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     check(
         "axis centerline",
-        await adapter.add_centerline(0.0, 0.0, 0.0, OVERALL_LENGTH),
+        adapter.add_centerline(0.0, 0.0, 0.0, OVERALL_LENGTH),
     )
     points = profile_points()
-    profile = await add_line_chain(adapter, points)
+    profile = add_line_chain(adapter, points)
     set_sketch_direct_db(adapter, False)
     # The chain starts at the nib tip on the origin and closes along the axis
     # from the back end, so the centerline merges into its two axis corners.
-    await define_polygon_chain(adapter, profile, points, label="marker")
-    await ensure_fully_defined(adapter, "marker profile")
-    check("exit_sketch profile", await adapter.exit_sketch())
+    define_polygon_chain(adapter, profile, points, label="marker")
+    ensure_fully_defined(adapter, "marker profile")
+    check("exit_sketch profile", adapter.exit_sketch())
     name_last_feature(adapter, "MarkerProfile")
     check(
-        "revolve marker", await adapter.create_revolve(RevolveParameters(angle=360.0))
+        "revolve marker", adapter.create_revolve(RevolveParameters(angle=360.0))
     )
     name_last_feature(adapter, "Marker")
-    await volume_check(adapter, "marker", VOLUME_MM3, 0.005 * VOLUME_MM3)
+    volume_check(adapter, "marker", VOLUME_MM3, 0.005 * VOLUME_MM3)
 
-    await apply_material(adapter, MATERIAL)
+    apply_material(adapter, MATERIAL)
     # The silver barrel; the ink-coloured grip and nose are not split out.
-    await apply_color(adapter, POLISHED_STEEL)
+    apply_color(adapter, POLISHED_STEEL)
     apply_custom_properties(adapter, STOCK_PROPERTIES)
     apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES})
-    await report_mass_properties(adapter)
-    artefacts = await save_part_and_images(adapter, PART_NAME)
+    report_mass_properties(adapter)
+    artefacts = save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(
         adapter,
         (

@@ -37,13 +37,13 @@ def _src() -> Path:
     return OUT_SLDASM / f"{arg.replace('_', '-')}.SLDASM"
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     src = _src()
     if not src.is_file():
         raise SystemExit(f"assembly not found: {src}")
     OUT_GLTF.mkdir(parents=True, exist_ok=True)
 
-    check(f"open {src.name}", await adapter.open_model(str(src)))
+    check(f"open {src.name}", adapter.open_model(str(src)))
     doc = adapter.currentModel
 
     # Silent OpenDoc6 loads unresolved references as SUPPRESSED rather than

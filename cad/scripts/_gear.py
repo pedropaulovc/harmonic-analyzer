@@ -68,11 +68,11 @@ def fmt(value: float) -> str:
     return f"{value:.12g}"
 
 
-async def equation_curve(adapter: Any, label: str, x_expr: str, y_expr: str) -> str:
+def equation_curve(adapter: Any, label: str, x_expr: str, y_expr: str) -> str:
     """Add a parametric equation curve over t in [0, 1]; return its entity ID."""
     from solidworks_mcp.adapters.base import CreateEquationCurveParameters
 
-    res = await adapter.create_equation_driven_curve(
+    res = adapter.create_equation_driven_curve(
         CreateEquationCurveParameters(
             x_expression=x_expr,
             y_expression=y_expr,
@@ -94,7 +94,7 @@ def _root_start_parameter(base_r_in: float, root_r_in: float | None) -> float:
     return math.sqrt((root_r_in / base_r_in) ** 2 - 1.0)
 
 
-async def cut_tooth_gap(
+def cut_tooth_gap(
     adapter: Any,
     facts: dict[str, float],
     depth: float,
@@ -137,33 +137,33 @@ async def cut_tooth_gap(
     ph_up = f"({u} + {fmt(facts['Gamma'] - facts['Delta'] + eps + rho)})"
     a1 = facts["Delta"] - foot_inv - eps + rho
     a2 = facts["Gamma"] - facts["Delta"] + foot_inv + eps + rho
-    check("create_sketch gap", await adapter.create_sketch("Front"))
+    check("create_sketch gap", adapter.create_sketch("Front"))
     gap_curves = [
-        await equation_curve(
+        equation_curve(
             adapter,
             "lower flank (tooth 0 upper, mirrored involute)",
             f"{rb} * (cos{ph_low} + {u} * sin{ph_low})",
             f"{rb} * ({u} * cos{ph_low} - sin{ph_low})",
         ),
-        await equation_curve(
+        equation_curve(
             adapter,
             "upper flank (tooth 1 lower involute)",
             f"{rb} * (cos{ph_up} + {u} * sin{ph_up})",
             f"{rb} * (sin{ph_up} - {u} * cos{ph_up})",
         ),
-        await equation_curve(
+        equation_curve(
             adapter,
             "lower radial extension B1->clearance",
             f"({ra} + t * ({rc} - {ra})) * {fmt(math.cos(theta_l))}",
             f"({ra} + t * ({rc} - {ra})) * {fmt(math.sin(theta_l))}",
         ),
-        await equation_curve(
+        equation_curve(
             adapter,
             "outer clearance arc",
             f"{rc} * cos({th_l} + t * ({th_u} - {th_l}))",
             f"{rc} * sin({th_l} + t * ({th_u} - {th_l}))",
         ),
-        await equation_curve(
+        equation_curve(
             adapter,
             "upper radial extension clearance->B2",
             f"({rc} + t * ({ra} - {rc})) * {fmt(math.cos(theta_u))}",
@@ -171,7 +171,7 @@ async def cut_tooth_gap(
         ),
     ]
     if root_r_in is None:
-        gap_curves.append(await equation_curve(
+        gap_curves.append(equation_curve(
             adapter,
             "base chord A2->A1",
             f"{rb} * ((1 - t) * {fmt(math.cos(a2))} + t * {fmt(math.cos(a1))})",
@@ -181,7 +181,7 @@ async def cut_tooth_gap(
         rr = fmt(root_r_in)
         if root_r_in < facts["Rb"]:
             gap_curves.append(
-                await equation_curve(
+                equation_curve(
                     adapter,
                     "upper root extension A2->A2r",
                     f"({rb} + t * ({rr} - {rb})) * {fmt(math.cos(a2))}",
@@ -189,7 +189,7 @@ async def cut_tooth_gap(
                 )
             )
         gap_curves.append(
-            await equation_curve(
+            equation_curve(
                 adapter,
                 "root arc A2r->A1r",
                 f"{rr} * cos({fmt(a2)} + t * ({fmt(a1)} - {fmt(a2)}))",
@@ -198,7 +198,7 @@ async def cut_tooth_gap(
         )
         if root_r_in < facts["Rb"]:
             gap_curves.append(
-                await equation_curve(
+                equation_curve(
                     adapter,
                     "lower root extension A1r->A1",
                     f"({rr} + t * ({rb} - {rr})) * {fmt(math.cos(a1))}",
@@ -208,16 +208,16 @@ async def cut_tooth_gap(
     # Equation-driven curves are the whitelist class for fix (no free
     # endpoints to dimension); B3 attempts a semantic scheme before keeping
     # this escalation (cad/FIX_MIGRATION.md).
-    await ensure_fully_defined(
+    ensure_fully_defined(
         adapter, "gap sketch", fix_entities=gap_curves, allow_fix_escalation=True
     )
-    check("exit_sketch gap", await adapter.exit_sketch())
-    gap_cut = await adapter.create_cut_extrude(ExtrusionParameters(depth=depth))
+    check("exit_sketch gap", adapter.exit_sketch())
+    gap_cut = adapter.create_cut_extrude(ExtrusionParameters(depth=depth))
     check("cut tooth gap", gap_cut)
     return gap_cut
 
 
-async def pattern_about_z(
+def pattern_about_z(
     adapter: Any, seed_feature: str | list[str], count: int,
     radius_mm: float, z_mm: float
 ) -> Any:
@@ -231,14 +231,14 @@ async def pattern_about_z(
 
     axis = check(
         "create_axis Z (Top x Right)",
-        await adapter.create_axis(
+        adapter.create_axis(
             CreateAxisParameters(mode="two_planes", planes=["Top Plane", "Right Plane"])
         ),
     )
     features = [seed_feature] if isinstance(seed_feature, str) else list(seed_feature)
     pattern = check(
         f"circular pattern about {axis.name}",
-        await adapter.circular_pattern_feature(
+        adapter.circular_pattern_feature(
             CircularPatternParameters(
                 axis_name=axis.name,
                 features=features,
@@ -358,7 +358,7 @@ _SWEEP_PATH_Y = -1.0
 _TWIST_CCW = 1.0
 
 
-async def boss_tooth_swept(
+def boss_tooth_swept(
     adapter: Any,
     facts: dict[str, float],
     face_width: float,
@@ -399,53 +399,53 @@ async def boss_tooth_swept(
     u = f"({fmt(tmin)} + {fmt(facts['Tmax'] - tmin)} * t)"
     ph_a = f"({u} + {fmt(a_lo)})"
     ph_b = f"({u} - {fmt(a_hi)})"
-    check("create_sketch tooth", await adapter.create_sketch("Front"))
+    check("create_sketch tooth", adapter.create_sketch("Front"))
     tooth_curves = [
-        await equation_curve(
+        equation_curve(
             adapter,
             "tooth lower flank (gap 0 upper involute)",
             f"{rb} * (cos{ph_a} + {u} * sin{ph_a})",
             f"{rb} * (sin{ph_a} - {u} * cos{ph_a})",
         ),
-        await equation_curve(
+        equation_curve(
             adapter,
             "tip arc at Ra",
             f"{ra} * cos({fmt(theta_lo)} + t * ({fmt(theta_hi)} - {fmt(theta_lo)}))",
             f"{ra} * sin({fmt(theta_lo)} + t * ({fmt(theta_hi)} - {fmt(theta_lo)}))",
         ),
-        await equation_curve(
+        equation_curve(
             adapter,
             "tooth upper flank (gap 1 lower, mirrored involute)",
             f"{rb} * (cos{ph_b} + {u} * sin{ph_b})",
             f"{rb} * ({u} * cos{ph_b} - sin{ph_b})",
         ),
-        await equation_curve(
+        equation_curve(
             adapter,
             "upper root extension B->embed",
             f"({foot_r} + t * ({rr_embed} - {foot_r})) * {fmt(math.cos(foot_hi))}",
             f"({foot_r} + t * ({rr_embed} - {foot_r})) * {fmt(math.sin(foot_hi))}",
         ),
-        await equation_curve(
+        equation_curve(
             adapter,
             "embedded root arc B->A",
             f"{rr_embed} * cos({fmt(foot_hi)} + t * ({fmt(foot_lo)} - {fmt(foot_hi)}))",
             f"{rr_embed} * sin({fmt(foot_hi)} + t * ({fmt(foot_lo)} - {fmt(foot_hi)}))",
         ),
-        await equation_curve(
+        equation_curve(
             adapter,
             "lower root extension embed->A",
             f"({rr_embed} + t * ({foot_r} - {rr_embed})) * {fmt(math.cos(foot_lo))}",
             f"({rr_embed} + t * ({foot_r} - {rr_embed})) * {fmt(math.sin(foot_lo))}",
         ),
     ]
-    await ensure_fully_defined(
+    ensure_fully_defined(
         adapter, "tooth sketch", fix_entities=tooth_curves, allow_fix_escalation=True
     )
-    check("exit_sketch tooth", await adapter.exit_sketch())
-    return await _sweep_tooth_sketch(adapter, face_width, twist_deg=twist_deg)
+    check("exit_sketch tooth", adapter.exit_sketch())
+    return _sweep_tooth_sketch(adapter, face_width, twist_deg=twist_deg)
 
 
-async def _sweep_tooth_sketch(
+def _sweep_tooth_sketch(
     adapter: Any, face_width: float, *, twist_deg: float
 ) -> str:
     """Sweep the current closed tooth sketch along the existing +Z axis path."""
@@ -454,27 +454,27 @@ async def _sweep_tooth_sketch(
 
     # Path: a fully-defined line up the gear axis (origin coincidence +
     # vertical + one length dim -- the build_sm_vn_boss_hook recipe).
-    check("create_sketch tooth path", await adapter.create_sketch("Top"))
+    check("create_sketch tooth path", adapter.create_sketch("Top"))
     line = check(
         "tooth path line",
-        await adapter.add_line(0.0, 0.0, 0.0, _SWEEP_PATH_Y * face_width),
+        adapter.add_line(0.0, 0.0, 0.0, _SWEEP_PATH_Y * face_width),
     )
-    check("path vertical", await adapter.add_sketch_constraint(line, None, "vertical"))
+    check("path vertical", adapter.add_sketch_constraint(line, None, "vertical"))
     check(
         "path start -> origin",
-        await adapter.add_sketch_constraint(f"{line}.start", "origin", "coincident"),
+        adapter.add_sketch_constraint(f"{line}.start", "origin", "coincident"),
     )
-    await dimension_between(
+    dimension_between(
         adapter, f"{line}.start", f"{line}.end", "vertical_distance",
         face_width, "tooth path length",
     )
-    await ensure_fully_defined(adapter, "tooth path sketch")
-    check("exit_sketch tooth path", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "tooth path sketch")
+    check("exit_sketch tooth path", adapter.exit_sketch())
     name_last_feature(adapter, "ToothPath")
 
     sweep = check(
         "sweep tooth (twisted)",
-        await adapter.create_sweep(SweepParameters(
+        adapter.create_sweep(SweepParameters(
             path="ToothPath",
             twist_along_path=True,
             twist_angle=_TWIST_CCW * twist_deg,
@@ -500,7 +500,7 @@ def _blank_ref_plane(adapter: Any, name: str) -> None:
     model.ClearSelection2(True)
 
 
-async def build_fixed_gear(
+def build_fixed_gear(
     adapter: Any,
     teeth: int,
     face_width: float,
@@ -566,23 +566,23 @@ async def build_fixed_gear(
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     blank_r_mm = (root_r_in * IN) if helix_deg else ra_mm
-    check("create_sketch blank", await adapter.create_sketch("Front"))
-    await define_circle(adapter, 0.0, 0.0, blank_r_mm, "gear blank")
-    await ensure_fully_defined(adapter, "blank sketch")
-    check("exit_sketch blank", await adapter.exit_sketch())
+    check("create_sketch blank", adapter.create_sketch("Front"))
+    define_circle(adapter, 0.0, 0.0, blank_r_mm, "gear blank")
+    ensure_fully_defined(adapter, "blank sketch")
+    check("exit_sketch blank", adapter.exit_sketch())
     check(
         "extrude blank",
-        await adapter.create_extrusion(ExtrusionParameters(depth=face_width)),
+        adapter.create_extrusion(ExtrusionParameters(depth=face_width)),
     )
     v_blank = math.pi * blank_r_mm**2 * face_width
-    await volume_check(adapter, "blank", v_blank, 0.005 * v_blank)
+    volume_check(adapter, "blank", v_blank, 0.005 * v_blank)
 
     gap_area = gap_area_in_disc_ext(
         teeth, dp=dp, pa_deg=pa_deg, widen_rad=widen_rad, root_r_in=root_r_in,
         addendum_extra_in=addendum_extra_in,
     )
     if not helix_deg:
-        gap_cut = await cut_tooth_gap(
+        gap_cut = cut_tooth_gap(
             adapter, facts, face_width + 1.0,
             widen_rad=widen_rad, root_r_in=root_r_in,
         )
@@ -596,7 +596,7 @@ async def build_fixed_gear(
     else:
         twist_deg = math.degrees(
             face_width * math.tan(math.radians(helix_deg)) / (pitch_r_in * IN))
-        seeds = [await boss_tooth_swept(
+        seeds = [boss_tooth_swept(
             adapter, facts, face_width,
             twist_deg=twist_deg,
             rotate_rad=-math.radians(twist_deg) / 2.0,  # z=0 phase: mid-face = design azimuth
@@ -612,14 +612,14 @@ async def build_fixed_gear(
         )
         v_seeded = v_blank + tooth_area * IN**2 * face_width
         v_gear = v_blank + teeth * tooth_area * IN**2 * face_width
-    await volume_check(adapter, "seeded tooth/gap", v_seeded, 1.0)
+    volume_check(adapter, "seeded tooth/gap", v_seeded, 1.0)
 
-    pattern = await pattern_about_z(adapter, seeds, teeth, ra_mm, face_width / 2.0)
-    volume = await volume_check(adapter, "toothed disc", v_gear, 0.01 * v_gear)
+    pattern = pattern_about_z(adapter, seeds, teeth, ra_mm, face_width / 2.0)
+    volume = volume_check(adapter, "toothed disc", v_gear, 0.01 * v_gear)
     return ToothedDisc(volume, (*seeds, str(pattern.name)))
 
 
-async def build_stock_form_gear(
+def build_stock_form_gear(
     adapter: Any,
     profile: StockFormProfile,
     face_width: float,
@@ -644,7 +644,7 @@ async def build_stock_form_gear(
     if profile.helix_angle_deg:
         if screw_sweep_bound_mm is None:
             raise ValueError("helical stock-form gear requires screw_sweep_bound_mm")
-        return await _build_helical_stock_form_gear(
+        return _build_helical_stock_form_gear(
             adapter, profile, face_width, rotate_rad=rotate_rad,
             sweep_bound_mm=screw_sweep_bound_mm,
         )
@@ -663,49 +663,49 @@ async def build_stock_form_gear(
     if not 0.0 < profile.teeth * gap_area < blank_area:
         raise ValueError("stock-form gaps must leave positive toothed-disc material")
 
-    check("create_sketch stock blank", await adapter.create_sketch("Front"))
-    await define_circle(adapter, 0.0, 0.0, radius, "gear blank")
-    await ensure_fully_defined(adapter, "blank sketch")
-    check("exit_sketch stock blank", await adapter.exit_sketch())
+    check("create_sketch stock blank", adapter.create_sketch("Front"))
+    define_circle(adapter, 0.0, 0.0, radius, "gear blank")
+    ensure_fully_defined(adapter, "blank sketch")
+    check("exit_sketch stock blank", adapter.exit_sketch())
     check(
         "extrude stock blank",
-        await adapter.create_extrusion(ExtrusionParameters(depth=face_width)),
+        adapter.create_extrusion(ExtrusionParameters(depth=face_width)),
     )
     blank_volume = blank_area * face_width
-    await volume_check(adapter, "blank", blank_volume, 0.005 * blank_volume)
+    volume_check(adapter, "blank", blank_volume, 0.005 * blank_volume)
 
-    check("create_sketch stock gap", await adapter.create_sketch("Front"))
+    check("create_sketch stock gap", adapter.create_sketch("Front"))
     gap_curves = []
     for segment in segments:
         gap_curves.append(
-            await equation_curve(
+            equation_curve(
                 adapter,
                 segment.name,
                 f"({segment.x}) * {cosine} - ({segment.y}) * {sine}",
                 f"({segment.x}) * {sine} + ({segment.y}) * {cosine}",
             )
         )
-    await ensure_fully_defined(
+    ensure_fully_defined(
         adapter, "stock gap sketch", fix_entities=gap_curves, allow_fix_escalation=True
     )
-    check("exit_sketch stock gap", await adapter.exit_sketch())
+    check("exit_sketch stock gap", adapter.exit_sketch())
     seed = check(
         "cut stock tooth gap",
-        await adapter.create_cut_extrude(ExtrusionParameters(depth=face_width + 1.0)),
+        adapter.create_cut_extrude(ExtrusionParameters(depth=face_width + 1.0)),
     )
     seeded_volume = blank_volume - gap_area * face_width
     expected_volume = blank_volume - profile.teeth * gap_area * face_width
-    await volume_check(adapter, "seeded tooth/gap", seeded_volume, 1.0)
-    pattern = await pattern_about_z(
+    volume_check(adapter, "seeded tooth/gap", seeded_volume, 1.0)
+    pattern = pattern_about_z(
         adapter, seed.name, profile.teeth, radius, face_width / 2.0
     )
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "toothed disc", expected_volume, 0.01 * expected_volume
     )
     return ToothedDisc(volume, (seed.name, str(pattern.name)))
 
 
-async def _build_helical_stock_form_gear(
+def _build_helical_stock_form_gear(
     adapter: Any,
     profile: StockFormProfile,
     face_width: float,
@@ -752,43 +752,43 @@ async def _build_helical_stock_form_gear(
         embed_radius_mm=base_radius - _TOOTH_EMBED_MM,
         rotate_rad=midface_phase - twist_rad / 2.0,
     )
-    check("create_sketch stock base", await adapter.create_sketch("Front"))
-    await define_circle(adapter, 0.0, 0.0, base_radius, "gear blank")
-    await ensure_fully_defined(adapter, "blank sketch")
-    check("exit_sketch stock base", await adapter.exit_sketch())
+    check("create_sketch stock base", adapter.create_sketch("Front"))
+    define_circle(adapter, 0.0, 0.0, base_radius, "gear blank")
+    ensure_fully_defined(adapter, "blank sketch")
+    check("exit_sketch stock base", adapter.exit_sketch())
     check(
         "extrude stock base",
-        await adapter.create_extrusion(ExtrusionParameters(depth=face_width)),
+        adapter.create_extrusion(ExtrusionParameters(depth=face_width)),
     )
     base_volume = base_area * face_width
-    await volume_check(adapter, "blank", base_volume, 0.005 * base_volume)
+    volume_check(adapter, "blank", base_volume, 0.005 * base_volume)
 
-    check("create_sketch stock tooth", await adapter.create_sketch("Front"))
+    check("create_sketch stock tooth", adapter.create_sketch("Front"))
     curves = [
-        await equation_curve(adapter, segment.name, segment.x, segment.y)
+        equation_curve(adapter, segment.name, segment.x, segment.y)
         for segment in segments
     ]
-    await ensure_fully_defined(
+    ensure_fully_defined(
         adapter, "stock tooth", fix_entities=curves, allow_fix_escalation=True
     )
-    check("exit_sketch stock tooth", await adapter.exit_sketch())
+    check("exit_sketch stock tooth", adapter.exit_sketch())
     name_last_feature(adapter, "StockToothProfile")
-    seed = await _sweep_tooth_sketch(
+    seed = _sweep_tooth_sketch(
         adapter, face_width, twist_deg=math.degrees(twist_rad)
     )
     # gap_area below the foot circle (the root dip) is at most root_spread
     # deep over one gap: < 0.005 mm * 2 mm * face, far inside the 1 mm^3 gate.
     seeded_volume = base_volume + tooth_area * face_width
-    await volume_check(adapter, "seeded tooth/gap", seeded_volume, 1.0)
+    volume_check(adapter, "seeded tooth/gap", seeded_volume, 1.0)
     assert_stock_screw_sweep_phase(
         adapter, profile, face_width, midface_tooth_phase_rad=midface_phase,
         tolerance_mm=sweep_bound_mm,
     )
-    pattern = await pattern_about_z(
+    pattern = pattern_about_z(
         adapter, seed, profile.teeth, profile.blank_radius_mm, face_width / 2.0
     )
     expected_volume = (blank_area - profile.teeth * gap_area) * face_width
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "toothed disc", expected_volume, 0.01 * expected_volume
     )
     return ToothedDisc(volume, (seed, str(pattern.name)))

@@ -525,7 +525,7 @@ def _stadium_points(
     )
 
 
-async def _author_clamp_slot_profile(
+def _author_clamp_slot_profile(
     adapter, feature: str, base: str, width: float, run: float
 ) -> tuple[list[tuple[str, str]], bool]:
     """One closed stadium per west clamp slot on the front face
@@ -538,7 +538,7 @@ async def _author_clamp_slot_profile(
     normal points out of the front face (-Z): a cut runs opposite the sketch
     normal unless reversed (build_fr_top_frame's slip holes and slots)."""
     front_z = -BAR_DEPTH / 2.0
-    check(f"create_sketch {feature}", await adapter.create_sketch(FRONT_FACE_PLANE))
+    check(f"create_sketch {feature}", adapter.create_sketch(FRONT_FACE_PLANE))
     outer = max(CLAMP_SLOT_X)
     u0, v0, w0 = _sketch_uvw(adapter, (outer, CLAMP_TAP_Y, front_z))
     u1, v1, _ = _sketch_uvw(adapter, (outer + 1.0, CLAMP_TAP_Y, front_z))
@@ -563,10 +563,10 @@ async def _author_clamp_slot_profile(
             (u, v), along_u=u_is_x, half_run=run / 2.0, half_width=width / 2.0
         )
         set_sketch_direct_db(adapter, True)
-        side_a = check(f"{where} side a", await adapter.add_line(*p1, *p2))
-        end_b = check(f"{where} end b", await adapter.add_arc(*c_end_b, *p2, *p3))
-        side_b = check(f"{where} side b", await adapter.add_line(*p3, *p4))
-        end_a = check(f"{where} end a", await adapter.add_arc(*c_end_a, *p4, *p1))
+        side_a = check(f"{where} side a", adapter.add_line(*p1, *p2))
+        end_b = check(f"{where} end b", adapter.add_arc(*c_end_b, *p2, *p3))
+        side_b = check(f"{where} side b", adapter.add_line(*p3, *p4))
+        end_a = check(f"{where} end a", adapter.add_arc(*c_end_a, *p4, *p1))
         set_sketch_direct_db(adapter, False)
         for join, a, b in (
             ("side a - end b", f"{side_a}.end", f"{end_b}.start"),
@@ -576,13 +576,13 @@ async def _author_clamp_slot_profile(
         ):
             check(
                 f"{where} {join}",
-                await adapter.add_sketch_constraint(a, b, "coincident"),
+                adapter.add_sketch_constraint(a, b, "coincident"),
             )
         along = "horizontal" if u_is_x else "vertical"
         for side in (side_a, side_b):
             check(
                 f"{where} {side} {along}",
-                await adapter.add_sketch_constraint(side, None, along),
+                adapter.add_sketch_constraint(side, None, along),
             )
         # Tangency closes the shape: both ends' radii follow from the sides'
         # spacing, the far side's length from the near side's.
@@ -594,12 +594,12 @@ async def _author_clamp_slot_profile(
         ):
             check(
                 f"{where} {a} tangent {b}",
-                await adapter.add_sketch_constraint(a, b, "tangent"),
+                adapter.add_sketch_constraint(a, b, "tangent"),
             )
         # Emission order: the width across the sides, the near side's
         # straight run, then end a's centre anchors (one dimension per
         # off-axis coordinate, anchor_point_to_origin).
-        await dimension_between(
+        dimension_between(
             adapter,
             f"{side_a}.start",
             f"{side_b}.end",
@@ -608,7 +608,7 @@ async def _author_clamp_slot_profile(
             f"{where} width",
         )
         dims.record(f"{base}Width{tag}")
-        await dimension_between(
+        dimension_between(
             adapter,
             f"{side_a}.start",
             f"{side_a}.end",
@@ -617,14 +617,14 @@ async def _author_clamp_slot_profile(
             f"{where} run",
         )
         dims.record(f"{base}Travel{tag}")
-        await anchor_point_to_origin(
+        anchor_point_to_origin(
             adapter, f"{end_a}.center", *c_end_a, f"{where} end a"
         )
         for axis, coordinate in zip("UV", c_end_a):
             if abs(coordinate) >= 1e-9:
                 dims.record(f"{base}End{axis}{tag}")
-    await ensure_fully_defined(adapter, f"{feature} sketch")
-    check(f"exit_sketch {feature}", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, f"{feature} sketch")
+    check(f"exit_sketch {feature}", adapter.exit_sketch())
     name_last_feature(adapter, feature)
     return dims.apply(adapter, feature), w_out > 0.0
 
@@ -634,7 +634,7 @@ async def _author_clamp_slot_profile(
 HEIGHT_STUB_LENGTH = 5.0
 
 
-async def _author_row(adapter, row: ReferenceRow) -> list[tuple[str, str]]:
+def _author_row(adapter, row: ReferenceRow) -> list[tuple[str, str]]:
     """One hole row as model dimensions on a hidden Front-plane sketch (the
     build_mg_wheel_bar BoreRowReference pattern): construction runs on the
     row through its holes only (``row.runs``), so each row draws its own
@@ -657,25 +657,25 @@ async def _author_row(adapter, row: ReferenceRow) -> list[tuple[str, str]]:
     on_rise = end_x == rise_x
     equations = row_equations(row)
     dims = SketchDims()
-    check(f"create_sketch {feature}", await adapter.create_sketch("Front"))
+    check(f"create_sketch {feature}", adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     drop = None
     if row.runs[0][0] != LEFT_END_X:
         drop = check(
             f"{feature} END A drop",
-            await adapter.add_line(LEFT_END_X, top_y, LEFT_END_X, row_y),
+            adapter.add_line(LEFT_END_X, top_y, LEFT_END_X, row_y),
         )
     if on_rise:
-        top = check(f"{feature} rise", await adapter.add_line(rise_x, top_y, rise_x, row_y))
+        top = check(f"{feature} rise", adapter.add_line(rise_x, top_y, rise_x, row_y))
     else:
         top = check(
             f"{feature} height stub",
-            await adapter.add_line(end_x - HEIGHT_STUB_LENGTH, top_y, end_x, top_y),
+            adapter.add_line(end_x - HEIGHT_STUB_LENGTH, top_y, end_x, top_y),
         )
     early = [
         check(
             f"{feature} run {index} height stub",
-            await adapter.add_line(x - HEIGHT_STUB_LENGTH, top_y, x, top_y),
+            adapter.add_line(x - HEIGHT_STUB_LENGTH, top_y, x, top_y),
         )
         for index, (_x0, x) in enumerate(row.runs[:-1])
     ]
@@ -686,7 +686,7 @@ async def _author_row(adapter, row: ReferenceRow) -> list[tuple[str, str]]:
             [
                 check(
                     f"{feature} run {index} leg {leg}",
-                    await adapter.add_line(x0, row_y, x1, row_y),
+                    adapter.add_line(x0, row_y, x1, row_y),
                 )
                 for leg, (x0, x1) in enumerate(zip(xs, xs[1:]))
             ]
@@ -695,18 +695,18 @@ async def _author_row(adapter, row: ReferenceRow) -> list[tuple[str, str]]:
     if drop is not None:
         check(
             f"{feature} END A drop vertical",
-            await adapter.add_sketch_constraint(drop, None, "vertical"),
+            adapter.add_sketch_constraint(drop, None, "vertical"),
         )
     check(
         f"{feature} {'rise vertical' if on_rise else 'stub horizontal'}",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             top, None, "vertical" if on_rise else "horizontal"
         ),
     )
     for index, stub in enumerate(early):
         check(
             f"{feature} run {index} stub horizontal",
-            await adapter.add_sketch_constraint(stub, None, "horizontal"),
+            adapter.add_sketch_constraint(stub, None, "horizontal"),
         )
     for index, legs in enumerate(runs):
         for leg_index, leg in enumerate(legs):
@@ -714,7 +714,7 @@ async def _author_row(adapter, row: ReferenceRow) -> list[tuple[str, str]]:
             _as_construction(adapter, leg, label)
             check(
                 f"{label} horizontal",
-                await adapter.add_sketch_constraint(leg, None, "horizontal"),
+                adapter.add_sketch_constraint(leg, None, "horizontal"),
             )
         ends = [f"{after}.start" for after in legs[1:]]
         if on_rise and index == len(runs) - 1:
@@ -722,18 +722,18 @@ async def _author_row(adapter, row: ReferenceRow) -> list[tuple[str, str]]:
         for leg_index, (leg, end) in enumerate(zip(legs, ends)):
             check(
                 f"{feature} run {index} leg {leg_index} chained",
-                await adapter.add_sketch_constraint(f"{leg}.end", end, "coincident"),
+                adapter.add_sketch_constraint(f"{leg}.end", end, "coincident"),
             )
 
-    async def stub_height(
+    def stub_height(
         stub: str, run_end: str, x: float, prefix: str, name: str, label: str
     ) -> None:
         """A run's height off the stub on the top face over its end: the stub
         held at its fixed offset from the bar's centre on the top face."""
-        await anchor_point_to_origin(adapter, f"{stub}.end", x, top_y, label)
+        anchor_point_to_origin(adapter, f"{stub}.end", x, top_y, label)
         dims.record(f"{prefix}StubX", f"{abs(x):.10g}mm")
         dims.record(f"{prefix}StubY", BAR_HALF_HEIGHT_EQUATION)
-        await dimension_between(
+        dimension_between(
             adapter,
             f"{stub}.start",
             f"{stub}.end",
@@ -742,18 +742,18 @@ async def _author_row(adapter, row: ReferenceRow) -> list[tuple[str, str]]:
             f"{label} length",
         )
         dims.record(f"{prefix}StubLength", f"{HEIGHT_STUB_LENGTH:.10g}mm")
-        await dimension_between(
+        dimension_between(
             adapter, f"{stub}.end", run_end, "vertical_distance", top_y - row_y, name
         )
         dims.record(name, equations[row.height_name])
 
     if on_rise:
-        await anchor_point_to_origin(
+        anchor_point_to_origin(
             adapter, f"{top}.start", rise_x, top_y, f"{feature} top corner"
         )
         dims.record(f"{row.prefix}RiseX", BAR_HALF_LENGTH_EQUATION)
         dims.record(f"{row.prefix}RiseY", BAR_HALF_HEIGHT_EQUATION)
-        await dimension_between(
+        dimension_between(
             adapter,
             f"{top}.start",
             f"{top}.end",
@@ -763,7 +763,7 @@ async def _author_row(adapter, row: ReferenceRow) -> list[tuple[str, str]]:
         )
         dims.record(row.height_name, equations[row.height_name])
     else:
-        await stub_height(
+        stub_height(
             top,
             f"{runs[-1][-1]}.end",
             end_x,
@@ -772,7 +772,7 @@ async def _author_row(adapter, row: ReferenceRow) -> list[tuple[str, str]]:
             f"{feature} height stub",
         )
     for index, (stub, name) in enumerate(zip(early, row.run_heights, strict=True)):
-        await stub_height(
+        stub_height(
             stub,
             f"{runs[index][-1]}.end",
             row.runs[index][1],
@@ -781,12 +781,12 @@ async def _author_row(adapter, row: ReferenceRow) -> list[tuple[str, str]]:
             f"{feature} run {index} height stub",
         )
     if drop is not None:
-        await anchor_point_to_origin(
+        anchor_point_to_origin(
             adapter, f"{drop}.start", LEFT_END_X, top_y, f"{feature} END A corner"
         )
         dims.record(f"{row.prefix}StartX", BAR_HALF_LENGTH_EQUATION)
         dims.record(f"{row.prefix}StartY", BAR_HALF_HEIGHT_EQUATION)
-        await dimension_between(
+        dimension_between(
             adapter,
             f"{drop}.start",
             f"{drop}.end",
@@ -798,7 +798,7 @@ async def _author_row(adapter, row: ReferenceRow) -> list[tuple[str, str]]:
         start = f"{drop}.end"
     else:
         start = f"{runs[0][0]}.start"
-        await dimension_between(
+        dimension_between(
             adapter,
             start,
             "origin",
@@ -809,7 +809,7 @@ async def _author_row(adapter, row: ReferenceRow) -> list[tuple[str, str]]:
         dims.record(f"{row.prefix}StartX", BAR_HALF_LENGTH_EQUATION)
     for index, (run, legs) in enumerate(zip(row.runs, runs, strict=True)):
         if f"{legs[0]}.start" != start:
-            await dimension_between(
+            dimension_between(
                 adapter,
                 start,
                 f"{legs[0]}.start",
@@ -823,7 +823,7 @@ async def _author_row(adapter, row: ReferenceRow) -> list[tuple[str, str]]:
             )
         # Each hole ends one leg; the last leg runs on to the run's end.
         for leg, (name, x) in zip(legs[:-1], _run_holes(row, run), strict=True):
-            await dimension_between(
+            dimension_between(
                 adapter,
                 start,
                 f"{leg}.end",
@@ -833,7 +833,7 @@ async def _author_row(adapter, row: ReferenceRow) -> list[tuple[str, str]]:
             )
             dims.record(name, equations[name])
         if not (on_rise and index == len(runs) - 1):
-            await dimension_between(
+            dimension_between(
                 adapter,
                 start,
                 f"{legs[-1]}.end",
@@ -845,8 +845,8 @@ async def _author_row(adapter, row: ReferenceRow) -> list[tuple[str, str]]:
                 f"{row.prefix}Run{index}EndX",
                 _plus_mm(BAR_HALF_LENGTH_EQUATION, run[1]),
             )
-    await ensure_fully_defined(adapter, f"{feature} sketch")
-    check(f"exit_sketch {feature}", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, f"{feature} sketch")
+    check(f"exit_sketch {feature}", adapter.exit_sketch())
     name_last_feature(adapter, feature)
     return dims.apply(adapter, feature)
 
@@ -879,10 +879,10 @@ def _max_limit(adapter, feature: str, name: str, nominal: float) -> None:
     _telemetry.success(f"{label}: single MAX limit as text")
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     # #290: the row's inch calculation units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
@@ -892,27 +892,27 @@ async def build(adapter) -> dict[str, str]:
     # (The old ClampHoleDia/BracketHoleDia knobs are gone: the screw holes are
     # now native Hole Wizard features whose diameters come from the ANSI-inch
     # clearance/tap tables, not driven dims.)
-    await set_global(adapter, "BarHeight", f"{BAR_HEIGHT}mm")
-    await set_global(adapter, "BarDepth", f"{BAR_DEPTH}mm")
-    await set_global(adapter, "BarLength", f"{BAR_LENGTH}mm")
+    set_global(adapter, "BarHeight", f"{BAR_HEIGHT}mm")
+    set_global(adapter, "BarDepth", f"{BAR_DEPTH}mm")
+    set_global(adapter, "BarLength", f"{BAR_LENGTH}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
     # Bar profile: width along X = length, height along Y; depth extruded along Z.
     bar = SketchDims()
-    check("create_sketch bar", await adapter.create_sketch("Front"))
-    await define_centered_rectangle(
+    check("create_sketch bar", adapter.create_sketch("Front"))
+    define_centered_rectangle(
         adapter, BAR_LENGTH / 2.0, BAR_HEIGHT / 2.0, "bar", dims=bar,
         name_width="Length", drive_width='"BarLength"',
         name_depth="Height", drive_depth='"BarHeight"',
     )
-    await ensure_fully_defined(adapter, "bar sketch")
-    check("exit_sketch bar", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "bar sketch")
+    check("exit_sketch bar", adapter.exit_sketch())
     name_last_feature(adapter, "BarProfile")
     drive_jobs += bar.apply(adapter, "BarProfile")
     check(
         "extrude bar",
-        await adapter.create_extrusion(
+        adapter.create_extrusion(
             ExtrusionParameters(depth=BAR_DEPTH, both_directions=True)
         ),
     )
@@ -920,7 +920,7 @@ async def build(adapter) -> dict[str, str]:
     name_dimensions(adapter, "Bar", ["Depth"])
 
     expected = BAR_HEIGHT * BAR_DEPTH * BAR_LENGTH
-    await volume_check(adapter, "bar", expected, 0.005 * expected)
+    volume_check(adapter, "bar", expected, 0.005 * expected)
 
     # Clamp-screw holes, through along Z on the clamp line (CLAMP_TAP_Y), drilled
     # from the bar FRONT face (local z = -BAR_DEPTH/2, where the clamp-screw heads
@@ -941,7 +941,7 @@ async def build(adapter) -> dict[str, str]:
         * CLAMP_CBORE_DEPTH
     )
     expected -= v_holes
-    await volume_check(adapter, "bar with clamp holes", expected, 0.02 * v_holes)
+    volume_check(adapter, "bar with clamp holes", expected, 0.02 * v_holes)
 
     # The west column's clamp screws pass counterbored slots along the bar,
     # which take up the column pitch (owner ruling 2026-10-15, option A; see
@@ -949,14 +949,14 @@ async def build(adapter) -> dict[str, str]:
     # counterbore's width as deep, each run CLAMP_SLOT_RUN along the bar.
     check(
         f"create_plane {FRONT_FACE_PLANE} (Front Plane, {front_z})",
-        await adapter.create_plane(
+        adapter.create_plane(
             CreatePlaneParameters(
                 mode="offset", base_plane="Front Plane", offset=front_z
             )
         ),
     )
     name_last_feature(adapter, FRONT_FACE_PLANE)
-    slot_jobs, _ = await _author_clamp_slot_profile(
+    slot_jobs, _ = _author_clamp_slot_profile(
         adapter, "ClampSlotProfile", "ClampSlot", CLAMP_SLOT_WIDTH, CLAMP_SLOT_RUN
     )
     drive_jobs += slot_jobs
@@ -964,7 +964,7 @@ async def build(adapter) -> dict[str, str]:
     # from the front face, a millimetre past the back face.
     check(
         "cut clamp slots (through)",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=2.0 * (BAR_DEPTH + 1.0), both_directions=True)
         ),
     )
@@ -973,8 +973,8 @@ async def build(adapter) -> dict[str, str]:
     v_slots = len(CLAMP_SLOT_X) * slot_area * BAR_DEPTH
     expected -= v_slots
     # A cut the wrong way leaves the solid untouched and fails here.
-    await volume_check(adapter, "bar with clamp slots", expected, 0.01 * v_slots)
-    cbore_jobs, normal_out = await _author_clamp_slot_profile(
+    volume_check(adapter, "bar with clamp slots", expected, 0.01 * v_slots)
+    cbore_jobs, normal_out = _author_clamp_slot_profile(
         adapter,
         "ClampSlotCboreProfile",
         "ClampSlotCbore",
@@ -984,7 +984,7 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += cbore_jobs
     check(
         "cut clamp slot counterbores",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(
                 depth=CLAMP_CBORE_DEPTH, reverse_direction=not normal_out
             )
@@ -998,7 +998,7 @@ async def build(adapter) -> dict[str, str]:
         * CLAMP_CBORE_DEPTH
     )
     expected -= v_slot_cbores
-    await volume_check(
+    volume_check(
         adapter, "bar with clamp slot counterbores", expected, 0.01 * v_slot_cbores
     )
     blank_reference_geometry(adapter, ((FRONT_FACE_PLANE, "PLANE"),))
@@ -1017,11 +1017,11 @@ async def build(adapter) -> dict[str, str]:
     r_bracket = bracket_dia / 2.0
     v_bracket = len(BRACKET_TAP_X) * math.pi * r_bracket**2 * BAR_DEPTH
     expected -= v_bracket
-    await volume_check(adapter, "bar with bracket taps", expected, 0.03 * v_bracket)
+    volume_check(adapter, "bar with bracket taps", expected, 0.03 * v_bracket)
     bracket_csk = (BRACKET_TAP_CSK_DIA - bracket_dia) / 2.0
     check(
         "countersink bracket-tap mouths",
-        await adapter.add_chamfer(
+        adapter.add_chamfer(
             bracket_csk,
             [
                 [x + r_bracket, HANGER_TAP_Y, z_face]
@@ -1035,7 +1035,7 @@ async def build(adapter) -> dict[str, str]:
         2 * len(BRACKET_TAP_X) * math.pi * bracket_csk**2 * (r_bracket + bracket_csk / 3.0)
     )
     expected -= v_bracket_csk
-    await volume_check(
+    volume_check(
         adapter, "bracket-tap countersinks", expected, 0.03 * v_bracket_csk + 0.05
     )
 
@@ -1045,14 +1045,14 @@ async def build(adapter) -> dict[str, str]:
     # on the drill diameter.
     check(
         f"create_plane BackFace (Front Plane, +{BACK_FACE_Z})",
-        await adapter.create_plane(
+        adapter.create_plane(
             CreatePlaneParameters(mode="offset", base_plane="Front Plane", offset=BACK_FACE_Z)
         ),
     )
     name_last_feature(adapter, "BackFace")
     pivot = SketchDims()
-    check("create_sketch pivot tap drill", await adapter.create_sketch("BackFace"))
-    await define_circle(
+    check("create_sketch pivot tap drill", adapter.create_sketch("BackFace"))
+    define_circle(
         adapter,
         PIVOT_TAP_X,
         HANGER_TAP_Y,
@@ -1062,13 +1062,13 @@ async def build(adapter) -> dict[str, str]:
         names=("PivotTapX", "PivotTapY", "PivotTapDrillDia"),
         drives=(None, None, None),
     )
-    await ensure_fully_defined(adapter, "pivot tap drill sketch")
-    check("exit_sketch pivot tap drill", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "pivot tap drill sketch")
+    check("exit_sketch pivot tap drill", adapter.exit_sketch())
     name_last_feature(adapter, "PivotTapProfile")
     drive_jobs += pivot.apply(adapter, "PivotTapProfile")
     check(
         "cut pivot tap drill (through)",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=2.0 * BAR_DEPTH, both_directions=True)
         ),
     )
@@ -1076,11 +1076,11 @@ async def build(adapter) -> dict[str, str]:
     r_pivot = PIVOT_TAP_DRILL_DIA / 2.0
     v_pivot = math.pi * r_pivot**2 * BAR_DEPTH
     expected -= v_pivot
-    await volume_check(adapter, "bar with pivot tap drill", expected, 0.03 * v_pivot)
+    volume_check(adapter, "bar with pivot tap drill", expected, 0.03 * v_pivot)
     pivot_csk = (PIVOT_TAP_CSK_DIA - PIVOT_TAP_DRILL_DIA) / 2.0
     check(
         "countersink pivot-tap mouths",
-        await adapter.add_chamfer(
+        adapter.add_chamfer(
             pivot_csk,
             [
                 [PIVOT_TAP_X + r_pivot, HANGER_TAP_Y, z_face]
@@ -1091,7 +1091,7 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "PivotTapCountersinks")
     v_pivot_csk = 2 * math.pi * pivot_csk**2 * (r_pivot + pivot_csk / 3.0)
     expected -= v_pivot_csk
-    await volume_check(
+    volume_check(
         adapter, "pivot-tap countersinks", expected, 0.03 * v_pivot_csk + 0.05
     )
 
@@ -1102,7 +1102,7 @@ async def build(adapter) -> dict[str, str]:
     # stands to the right, so the leader never crosses the other hole
     # (draw_pd_support_bar.FRONT_KEEP).
     countersinks = SketchDims()
-    check("create_sketch CountersinkReference", await adapter.create_sketch("BackFace"))
+    check("create_sketch CountersinkReference", adapter.create_sketch("BackFace"))
     for x, dia, label, names in (
         (
             PIVOT_TAP_X,
@@ -1117,7 +1117,7 @@ async def build(adapter) -> dict[str, str]:
             ("BracketCskX", "BracketCskY", "BracketCskDia"),
         ),
     ):
-        await define_circle(
+        define_circle(
             adapter,
             x,
             HANGER_TAP_Y,
@@ -1127,21 +1127,21 @@ async def build(adapter) -> dict[str, str]:
             names=names,
             drives=(None, None, None),
         )
-    await ensure_fully_defined(adapter, "CountersinkReference sketch")
-    check("exit_sketch CountersinkReference", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "CountersinkReference sketch")
+    check("exit_sketch CountersinkReference", adapter.exit_sketch())
     name_last_feature(adapter, "CountersinkReference")
     drive_jobs += countersinks.apply(adapter, "CountersinkReference")
-    drive_jobs += await _author_row(adapter, HANGER_ROW)
-    drive_jobs += await _author_row(adapter, CLAMP_ROW)
+    drive_jobs += _author_row(adapter, HANGER_ROW)
+    drive_jobs += _author_row(adapter, CLAMP_ROW)
     blank_reference_geometry(adapter, (("BackFace", "PLANE"),))
 
     # Apply the deferred drive equations after the model exists, then re-check:
     # every equation evaluates to the value just built, so geometry must not move.
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(adapter, "driven bar (equations neutral)", expected, 0.005 * expected)
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    volume_check(adapter, "driven bar (equations neutral)", expected, 0.005 * expected)
 
     # The bottom rail's running clearance under the bar spends the height's
     # band, and the pivot screw's tip recess and the bracket-screw tips the
@@ -1211,9 +1211,9 @@ async def build(adapter) -> dict[str, str]:
         },
     )
 
-    await apply_material(adapter, MATERIAL)
-    await report_mass_properties(adapter)
-    return await save_part_and_images(adapter, PART_NAME)
+    apply_material(adapter, MATERIAL)
+    report_mass_properties(adapter)
+    return save_part_and_images(adapter, PART_NAME)
 
 
 if __name__ == "__main__":

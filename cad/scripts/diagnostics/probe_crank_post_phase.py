@@ -82,11 +82,11 @@ def _interference_volumes(adapter) -> dict[tuple[str, str], float]:
     return volumes
 
 
-async def build(adapter) -> dict[str, str]:
-    check("create_assembly", await adapter.create_assembly())
+def build(adapter) -> dict[str, str]:
+    check("create_assembly", adapter.create_assembly())
     post_position = dta.cone_station(dta.POST_STATION)
     post_position[1] = dta.Y_BASE_TOP + dta.PLAT_T
-    post = await place_component(
+    post = place_component(
         adapter,
         "dt-cone-pivot-post",
         post_position,
@@ -101,7 +101,7 @@ async def build(adapter) -> dict[str, str]:
         dta.Y_DRIVE,
         gear_centre[2] - dta.GEAR64_FACE / 2.0 * dta.COS_I,
     ]
-    gear = await place_component(
+    gear = place_component(
         adapter,
         "dt-crank-drive-gear",
         gear_position,
@@ -116,7 +116,7 @@ async def build(adapter) -> dict[str, str]:
         dta.Y_CRANK,
         dta.PINION_TOOTH_Z - dta.PINION_FACE / 2.0,
     ]
-    pinion = await place_component(
+    pinion = place_component(
         adapter,
         "dt-crank-pinion",
         pinion_position,

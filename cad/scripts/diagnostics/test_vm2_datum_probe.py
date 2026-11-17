@@ -1,6 +1,5 @@
 """Offline execution of diagnostic guards; fakes never attach to SolidWorks."""
 
-import asyncio
 from contextlib import nullcontext
 import importlib.util
 import hashlib
@@ -174,7 +173,7 @@ def harness(tmp_path, monkeypatch):
     recipe = SimpleNamespace(SOURCE=source, ROD_DIA=6.35, __file__=str(recipe_path))
     recipe.add_datum_feature = lambda *_args, **_kwargs: None
 
-    async def build(_adapter):
+    def build(_adapter):
         app.documents = [part, drawing]
         recipe.add_datum_feature(
             adapter, drawing.views[1], edge_xy=(0.055, 0.21135),
@@ -191,7 +190,7 @@ def harness(tmp_path, monkeypatch):
         "_gear_drawing_entities": SimpleNamespace(visible_circle_edge=lambda *_args: edge),
         "_telemetry": SimpleNamespace(span=lambda *_args, **_kwargs: nullcontext()),
         "diagnostics._owned_native_session": SimpleNamespace(
-            run_owned_diagnostic=lambda callback: asyncio.run(callback(adapter))
+            run_owned_diagnostic=lambda callback: callback(adapter)
         ),
         "solidworks_mcp.adapters.com_variant": SimpleNamespace(null_callout=lambda: None),
         "draw_dt_pinion_lift_rod": recipe,

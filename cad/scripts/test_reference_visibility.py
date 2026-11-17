@@ -9,7 +9,6 @@ a fake feature tree, and pin the allowance list that may only shrink.
 from __future__ import annotations
 
 import ast
-import asyncio
 import re
 from collections import Counter
 from pathlib import Path
@@ -200,7 +199,7 @@ class _Model(_Dispatch):
 
 
 def _adapter(model: _Model, saves: list[str] | None = None):
-    async def save_file(path: str):
+    def save_file(path: str):
         saves.append(path)
         return SimpleNamespace(is_success=True, data={}, error=None)
 
@@ -349,7 +348,7 @@ def test_part_save_checks_before_the_first_save() -> None:
         _part_tree(_Feature("StationReference", "ProfileFeature", SHOWN)), saves
     )
     with pytest.raises(RuntimeError, match="StationReference"):
-        asyncio.run(_part_save.save_part_and_images(adapter, "dt-crank-arm"))
+        _part_save.save_part_and_images(adapter, "dt-crank-arm")
     assert saves == []
 
 
@@ -359,7 +358,7 @@ def test_a_shown_plane_reaching_the_save_fails_it() -> None:
     saves: list[str] = []
     model = _part_tree(_Feature("Axis1", "RefAxis", SHOWN))
     with pytest.raises(RuntimeError, match="axis 'Axis1'"):
-        asyncio.run(_part_save.save_part_and_images(_adapter(model, saves), "dt-crank-arm"))
+        _part_save.save_part_and_images(_adapter(model, saves), "dt-crank-arm")
     assert model.by_name["Axis1"].Visible == SHOWN
     assert saves == []
 
@@ -511,14 +510,14 @@ def test_name_bore_axis_hides_the_planes_and_axis_it_creates() -> None:
             is_success=True, error=None, data=SimpleNamespace(name=name)
         )
 
-    async def create_plane(_params):
+    def create_plane(_params):
         feature = _Feature(f"Plane{len(model.features) - 1}", "RefPlane", SHOWN)
         model.features[-1].next = feature
         model.features.append(feature)
         model.by_name[feature.Name] = feature
         return _ok(feature.Name)
 
-    async def create_axis(_params):
+    def create_axis(_params):
         feature = _Feature("Axis1", "RefAxis", SHOWN)
         model.features[-1].next = feature
         model.features.append(feature)
@@ -528,9 +527,7 @@ def test_name_bore_axis_hides_the_planes_and_axis_it_creates() -> None:
     adapter = SimpleNamespace(
         currentModel=model, create_plane=create_plane, create_axis=create_axis
     )
-    axis = asyncio.run(
-        _bore_axis.name_bore_axis(adapter, "Front Plane", 4.0, "Top Plane", 0.0, "bore")
-    )
+    axis = _bore_axis.name_bore_axis(adapter, "Front Plane", 4.0, "Top Plane", 0.0, "bore")
     assert axis == "Axis1"
     assert [f.Name for f in model.features if f.Visible == SHOWN] == []
     assert _visibility.visible_reference_geometry(model) == []
@@ -607,8 +604,8 @@ def test_an_empty_feature_tree_fails_the_check(monkeypatch, returned) -> None:
 def test_shared_reference_creators_hide_what_they_create() -> None:
     for module in ("_gear.py", "_chain_link.py", "_features.py", "_assembly.py"):
         text = (SCRIPTS / module).read_text(encoding="utf-8")
-        creates = text.count("await adapter.create_plane(") + text.count(
-            "await adapter.create_axis("
+        creates = text.count("adapter.create_plane(") + text.count(
+            "adapter.create_axis("
         )
         assert creates and "blank_reference_geometry(" in text, module
 
@@ -634,16 +631,16 @@ def _creates_without_hiding(text: str) -> bool:
 
 def test_the_creator_sweep_flags_a_create_without_a_hide() -> None:
     assert _creates_without_hiding(
-        "plane = check('p', await adapter.create_plane(params)).name\n"
+        "plane = check('p', adapter.create_plane(params)).name\n"
     )
     assert _creates_without_hiding(
         "model.FeatureManager.InsertReferencePoint(7, 0, 0.0, 1)\n"
     )
     assert not _creates_without_hiding(
-        "name = check('p', await adapter.create_plane(params)).name\n"
+        "name = check('p', adapter.create_plane(params)).name\n"
         "blank_reference_geometry(adapter, ((name, 'PLANE'),))\n"
     )
-    assert not _creates_without_hiding("# await adapter.create_axis(params)\n")
+    assert not _creates_without_hiding("# adapter.create_axis(params)\n")
     assert not _creates_without_hiding("CreateAxisParameters(mode='two_planes')\n")
 
 
@@ -723,9 +720,9 @@ def test_the_per_name_sweep_flags_a_named_plane_left_shown() -> None:
     """The cg-916 shape: one plane hidden by name, a second named and never
     hidden, in a module that does hide something."""
     source = (
-        "check('p', await adapter.create_plane(params))\n"
+        "check('p', adapter.create_plane(params))\n"
         "name_last_feature(adapter, 'CollarFace')\n"
-        "check('p', await adapter.create_plane(params))\n"
+        "check('p', adapter.create_plane(params))\n"
         "name_last_feature(adapter, 'Sec1EndPlane')\n"
         "blank_reference_geometry(adapter, (('Sec1EndPlane', 'PLANE'),))\n"
     )
@@ -736,7 +733,7 @@ def test_the_per_name_sweep_flags_a_named_plane_left_shown() -> None:
     # A type-based hider right after the naming covers it (_stock_fastener).
     assert (
         _named_references_left_shown(
-            "check('a', await adapter.create_axis(params))\n"
+            "check('a', adapter.create_axis(params))\n"
             "name_last_feature(adapter, 'ScrewAxis')\n"
             "_blank_recipe_references(adapter)\n"
         )
@@ -744,7 +741,7 @@ def test_the_per_name_sweep_flags_a_named_plane_left_shown() -> None:
     )
     # A commented-out hide does not count.
     assert _named_references_left_shown(
-        "check('p', await adapter.create_plane(params))\n"
+        "check('p', adapter.create_plane(params))\n"
         "name_last_feature(adapter, 'YokePlane')\n"
         "# blank_reference_geometry(adapter, (('YokePlane', 'PLANE'),))\n"
     ) == ["YokePlane"]
@@ -817,7 +814,7 @@ def _loop_authored_reference_names(tree: ast.Module) -> set[str]:
 
     name_arguments = {"name_last_feature": 1}
     for helper in ast.walk(tree):
-        if not isinstance(helper, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        if not isinstance(helper, (ast.FunctionDef,)):
             continue
         calls = [node for node in ast.walk(helper) if isinstance(node, ast.Call)]
         if not any(_REFERENCE_CREATE.fullmatch(f"{called(node)}(") for node in calls):
@@ -930,7 +927,7 @@ def _blanked_names_never_authored(text: str) -> list[str]:
 
 def test_the_blank_sweep_flags_a_name_nothing_authors() -> None:
     stale = (
-        'await cut("PinionSeat")\n'
+        'cut("PinionSeat")\n'
         'blank_reference_geometry(adapter, (("JournalStartPlane", "PLANE"),))\n'
     )
     assert _blanked_names_never_authored(stale) == ["JournalStartPlane"]
@@ -943,21 +940,21 @@ def test_the_blank_sweep_flags_a_name_nothing_authors() -> None:
 
 def test_the_blank_sweep_tracks_loop_names_through_reference_creators() -> None:
     source = (
-        "async def _offset_plane(adapter, name, base, offset):\n"
-        "    await adapter.create_plane(params)\n"
+        "def _offset_plane(adapter, name, base, offset):\n"
+        "    adapter.create_plane(params)\n"
         "    name_last_feature(adapter, name)\n"
         "for which, y in (('Body', BODY_Y), ('Tail', TAIL_Y)):\n"
         "    plane = f'{which}SeatPlane'\n"
-        "    await _offset_plane(adapter, plane, 'Top Plane', y)\n"
+        "    _offset_plane(adapter, plane, 'Top Plane', y)\n"
         "blank_reference_geometry(adapter, (('BodySeatPlane', 'PLANE'), "
         "('TailSeatPlane', 'PLANE')))\n"
     )
     assert _blanked_names_never_authored(source) == []
     assert _blanked_names_never_authored(
-        source.replace("await _offset_plane(adapter, plane, 'Top Plane', y)", "pass")
+        source.replace("_offset_plane(adapter, plane, 'Top Plane', y)", "pass")
     ) == ["BodySeatPlane", "TailSeatPlane"]
     assert _blanked_names_never_authored(
-        source.replace("await adapter.create_plane(params)", "pass")
+        source.replace("adapter.create_plane(params)", "pass")
     ) == ["BodySeatPlane", "TailSeatPlane"]
     assert _blanked_names_never_authored(
         source.replace("f'{which}SeatPlane'", "f'{which}SeatProfile'")

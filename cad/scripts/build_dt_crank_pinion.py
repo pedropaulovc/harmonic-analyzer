@@ -161,11 +161,11 @@ def _shoulder_radius_max_limit(adapter) -> None:
     _telemetry.success(f"{label}: single limit {SHOULDER_RADIUS:g} MAX")
 
 
-async def assert_boss_present(adapter, label: str) -> None:
+def assert_boss_present(adapter, label: str) -> None:
     """Fail loud unless the solid still reaches OVERALL_LENGTH along the axis
     and carries exactly one boss-radius cylinder outboard of the teeth."""
     with _telemetry.span("pinion.boss_gate", label=label):
-        await bbox_extent_check(
+        bbox_extent_check(
             adapter, f"{label} overall length", "z", OVERALL_LENGTH,
             tol=BOSS_GATE_TOL_MM,
         )
@@ -173,14 +173,14 @@ async def assert_boss_present(adapter, label: str) -> None:
         _telemetry.success(f"{label}: hub boss present")
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
         CreatePlaneParameters,
         ExtrusionParameters,
         RevolveParameters,
     )
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     # #290: the row's inch calculation units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
@@ -190,20 +190,20 @@ async def build(adapter) -> dict[str, str]:
     # FaceWidth drives the gear blank's extrude depth, OutsideDia its tip
     # circle: both are printed dimensions, so both are knobs. The physical
     # tooth count and actual finite cutter form are owned by STOCK_PROFILE.
-    await set_global(adapter, "FaceWidth", f"{FACE_WIDTH}mm")
-    await set_global(adapter, "OutsideDia", f"{OUTSIDE_DIA}mm")
-    await set_global(adapter, "BoreDia", f"{BORE_DIAMETER}mm")
-    await set_global(adapter, "BossDia", f"{BOSS_DIA}mm")
-    await set_global(adapter, "BossLength", f"{BOSS_LENGTH}mm")
-    await set_global(adapter, "ShoulderLength", f"{SHOULDER_LENGTH}mm")
-    await set_global(adapter, "TurnedDia", f"{TURNED_DIA}mm")
-    await set_global(adapter, "ShoulderRadius", f"{SHOULDER_RADIUS}mm")
+    set_global(adapter, "FaceWidth", f"{FACE_WIDTH}mm")
+    set_global(adapter, "OutsideDia", f"{OUTSIDE_DIA}mm")
+    set_global(adapter, "BoreDia", f"{BORE_DIAMETER}mm")
+    set_global(adapter, "BossDia", f"{BOSS_DIA}mm")
+    set_global(adapter, "BossLength", f"{BOSS_LENGTH}mm")
+    set_global(adapter, "ShoulderLength", f"{SHOULDER_LENGTH}mm")
+    set_global(adapter, "TurnedDia", f"{TURNED_DIA}mm")
+    set_global(adapter, "ShoulderRadius", f"{SHOULDER_RADIUS}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
     # Cut the declared finite #7/14T stock form; no actual-N involute fallback,
     # artificial root-circle closure, or independent angular tooth widening.
-    disc = await build_stock_form_gear(adapter, STOCK_PROFILE, FACE_WIDTH)
+    disc = build_stock_form_gear(adapter, STOCK_PROFILE, FACE_WIDTH)
     volume = disc.volume
 
     # The shared stock-form helper leaves the blank under adapter default names.
@@ -246,11 +246,11 @@ async def build(adapter) -> dict[str, str]:
     # diameter as a doubled centerline-to-outline dim, the overall length
     # along the outline.
     boss = SketchDims()
-    check("create_sketch boss", await adapter.create_sketch("Right"))
+    check("create_sketch boss", adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
     boss_axis = check(
         "boss axis centerline",
-        await adapter.add_centerline(-FACE_WIDTH, 0.0, -OVERALL_LENGTH, 0.0),
+        adapter.add_centerline(-FACE_WIDTH, 0.0, -OVERALL_LENGTH, 0.0),
     )
     # The internal shoulder at the tooth face is a tangent arc IN the profile
     # (dt_crank_pinion_spec.SHOULDER_RADIUS), not a fillet feature: the gap
@@ -258,18 +258,18 @@ async def build(adapter) -> dict[str, str]:
     # #906 note above keeps the profile's start away from. The arc runs CCW
     # from the boss outline up to the band face; local x -> model -Z.
     rho = SHOULDER_RADIUS
-    (boss_face,) = await add_line_chain(
+    (boss_face,) = add_line_chain(
         adapter, [(-FACE_WIDTH, 0.0), (-FACE_WIDTH, BOSS_DIA / 2.0 + rho)], close=False
     )
     shoulder_arc = check(
         "boss shoulder radius arc",
-        await adapter.add_arc(
+        adapter.add_arc(
             -(FACE_WIDTH + rho), BOSS_DIA / 2.0 + rho,
             -(FACE_WIDTH + rho), BOSS_DIA / 2.0,
             -FACE_WIDTH, BOSS_DIA / 2.0 + rho,
         ),
     )
-    boss_rest = await add_line_chain(
+    boss_rest = add_line_chain(
         adapter,
         [
             (-(FACE_WIDTH + rho), BOSS_DIA / 2.0),
@@ -289,11 +289,11 @@ async def build(adapter) -> dict[str, str]:
     # solid or showing hidden bore lines.
     outside_ref = check(
         "outside-diameter reference line",
-        await adapter.add_line(0.0, OUTSIDE_DIA / 2.0, -FACE_WIDTH, OUTSIDE_DIA / 2.0),
+        adapter.add_line(0.0, OUTSIDE_DIA / 2.0, -FACE_WIDTH, OUTSIDE_DIA / 2.0),
     )
     bore_ref = check(
         "bore-diameter reference line",
-        await adapter.add_line(0.0, BORE_DIAMETER / 2.0, -OVERALL_LENGTH, BORE_DIAMETER / 2.0),
+        adapter.add_line(0.0, BORE_DIAMETER / 2.0, -OVERALL_LENGTH, BORE_DIAMETER / 2.0),
     )
     # Construction witnesses along the LOWER half-profile carry the printed
     # lengths: the faced end at the tip line, the shoulder, the tooth face,
@@ -312,10 +312,10 @@ async def build(adapter) -> dict[str, str]:
         (-PIN_STATION, -BOSS_DIA / 2.0),
         (-OVERALL_LENGTH, -BOSS_DIA / 2.0),
     ]
-    lower = await add_line_chain(adapter, lower_pts, close=False)
+    lower = add_line_chain(adapter, lower_pts, close=False)
     pin_ref = check(
         "pin-hole reference circle",
-        await adapter.add_circle(-PIN_STATION, 0.0, PIN_DIA / 2.0),
+        adapter.add_circle(-PIN_STATION, 0.0, PIN_DIA / 2.0),
     )
     set_sketch_direct_db(adapter, False)
     for entity in (outside_ref, bore_ref, *lower, pin_ref):
@@ -328,19 +328,19 @@ async def build(adapter) -> dict[str, str]:
         direction = "horizontal" if y1 == y2 else "vertical"
         check(
             f"lower witness {direction} {line}",
-            await adapter.add_sketch_constraint(line, None, direction),
+            adapter.add_sketch_constraint(line, None, direction),
         )
     for line, direction in zip(
         boss_lines, ("vertical", "horizontal", "vertical", "horizontal"), strict=True
     ):
         check(
             f"boss {direction} {line}",
-            await adapter.add_sketch_constraint(line, None, direction),
+            adapter.add_sketch_constraint(line, None, direction),
         )
     for first, second in ((boss_face, shoulder_arc), (shoulder_arc, boss_lines[1])):
         check(
             "tangent boss shoulder radius",
-            await adapter.add_sketch_constraint(first, second, "tangent"),
+            adapter.add_sketch_constraint(first, second, "tangent"),
         )
     for label, line in (
         ("outside-diameter reference", outside_ref),
@@ -348,17 +348,17 @@ async def build(adapter) -> dict[str, str]:
     ):
         check(
             f"{label} horizontal",
-            await adapter.add_sketch_constraint(line, None, "horizontal"),
+            adapter.add_sketch_constraint(line, None, "horizontal"),
         )
         check(
             f"{label} starts at faced end",
-            await adapter.add_sketch_constraint(
+            adapter.add_sketch_constraint(
                 f"{line}.start", "origin", "vertical_points"
             ),
         )
     check(
         "bore-diameter reference ends at boss end",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{bore_ref}.end", f"{boss_lines[2]}.end", "vertical_points"
         ),
     )
@@ -367,11 +367,11 @@ async def build(adapter) -> dict[str, str]:
     # below the view drives the revolve.
     check(
         "boss end over the lower witness end",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{boss_lines[2]}.start", f"{lower[4]}.end", "vertical_points"
         ),
     )
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{lower[0]}.start", 0.0, -OUTSIDE_DIA / 2.0, "lower witness start"
     )
     boss.record(None, '"OutsideDia" / 2')
@@ -379,12 +379,12 @@ async def build(adapter) -> dict[str, str]:
         ("ShoulderLength", f"{lower[0]}.end", SHOULDER_LENGTH),
         ("FaceWidth", f"{lower[1]}.end", FACE_WIDTH),
     ):
-        await dimension_between(
+        dimension_between(
             adapter, f"{lower[0]}.start", point, "horizontal_distance", value,
             f"lower witness {label}",
         )
         boss.record(label, f'"{label}"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{lower[2]}.start",
         f"{lower[2]}.end",
@@ -393,7 +393,7 @@ async def build(adapter) -> dict[str, str]:
         "lower witness step to the boss",
     )
     boss.record(None, '("OutsideDia" - "BossDia") / 2')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{lower[0]}.start",
         f"{lower[4]}.end",
@@ -402,7 +402,7 @@ async def build(adapter) -> dict[str, str]:
         "boss OverallLength",
     )
     boss.record("OverallLength", '"FaceWidth" + "BossLength"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{lower[4]}.start",
         f"{lower[4]}.end",
@@ -413,22 +413,22 @@ async def build(adapter) -> dict[str, str]:
     boss.record("PinFromBossEnd", '"BossLength" / 2')
     check(
         "pin-hole reference on the axis",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{pin_ref}.center", "origin", "horizontal_points"
         ),
     )
     check(
         "pin-hole reference over the pin station",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{pin_ref}.center", f"{lower[3]}.end", "vertical_points"
         ),
     )
     check(
         "pin-hole reference diameter",
-        await adapter.add_sketch_dimension(pin_ref, None, "diameter", PIN_DIA),
+        adapter.add_sketch_dimension(pin_ref, None, "diameter", PIN_DIA),
     )
     boss.record("PinHoleDia", None)
-    await add_diametric_linear_dimension(
+    add_diametric_linear_dimension(
         adapter,
         boss_axis,
         boss_outline,
@@ -439,7 +439,7 @@ async def build(adapter) -> dict[str, str]:
     # The outside-diameter witness stops at the tooth face, so its axial
     # attachment says which cylinder the diameter belongs to.  Its span is
     # definition-only and therefore deliberately stays auto-named/unmarked.
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{outside_ref}.start",
         f"{outside_ref}.end",
@@ -448,7 +448,7 @@ async def build(adapter) -> dict[str, str]:
         "outside-diameter reference span",
     )
     boss.record(None, None)
-    await add_diametric_linear_dimension(
+    add_diametric_linear_dimension(
         adapter,
         boss_axis,
         f"{outside_ref}.start",
@@ -456,7 +456,7 @@ async def build(adapter) -> dict[str, str]:
         "OutsideDia",
     )
     boss.record("OutsideDia", '"OutsideDia"')
-    await add_diametric_linear_dimension(
+    add_diametric_linear_dimension(
         adapter,
         boss_axis,
         f"{bore_ref}.start",
@@ -466,21 +466,21 @@ async def build(adapter) -> dict[str, str]:
     boss.record("BoreDia", '"BoreDia"')
     check(
         "boss shoulder radius",
-        await adapter.add_sketch_dimension(shoulder_arc, None, "radial", rho),
+        adapter.add_sketch_dimension(shoulder_arc, None, "radial", rho),
     )
     boss.record("ShoulderRadius", '"ShoulderRadius"')
     # The profile's start sits on the axis at the tooth face: one alignment
     # relation plus one distance, driven by FaceWidth.
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{boss_lines[0]}.start", -FACE_WIDTH, 0.0, "boss anchor"
     )
     boss.record("BossStart", '"FaceWidth"')
-    await ensure_fully_defined(adapter, "boss sketch")
-    check("exit_sketch boss", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "boss sketch")
+    check("exit_sketch boss", adapter.exit_sketch())
     name_last_feature(adapter, "BossProfile")
     drive_jobs += boss.apply(adapter, "BossProfile")
     check(
-        "revolve boss", await adapter.create_revolve(RevolveParameters(angle=360.0))
+        "revolve boss", adapter.create_revolve(RevolveParameters(angle=360.0))
     )
     name_last_feature(adapter, "Boss")
     # The shoulder arc adds its spandrel ring: area rho^2 (1 - pi/4), centroid
@@ -491,7 +491,7 @@ async def build(adapter) -> dict[str, str]:
         math.pi * (BOSS_DIA / 2.0) ** 2 * BOSS_LENGTH
         + 2.0 * math.pi * spandrel_r * spandrel
     )
-    volume = await volume_check(adapter, "hub boss", volume + v_boss, 0.01 * v_boss)
+    volume = volume_check(adapter, "hub boss", volume + v_boss, 0.01 * v_boss)
 
     # Turned band (user ruling c'' variant B, 2026-09-30): north of the
     # full-OD shoulder the teeth are turned down to TURNED_DIA so the grown
@@ -503,7 +503,7 @@ async def build(adapter) -> dict[str, str]:
     # so it cuts tooth material alone -- and both of those extents are driven
     # definition-only dimensions that follow the knobs.
     band = SketchDims()
-    check("create_sketch turned band", await adapter.create_sketch("Right"))
+    check("create_sketch turned band", adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
     band_top = OUTSIDE_DIA - TURNED_DIA / 2.0
     band_pts = [
@@ -512,33 +512,33 @@ async def build(adapter) -> dict[str, str]:
         (-OVERALL_LENGTH, band_top),
         (-SHOULDER_LENGTH, band_top),
     ]
-    band_lines = await add_line_chain(adapter, band_pts)
+    band_lines = add_line_chain(adapter, band_pts)
     band_axis = check(
         "turned band axis centerline",
-        await adapter.add_centerline(0.0, 0.0, -SHOULDER_LENGTH, 0.0),
+        adapter.add_centerline(0.0, 0.0, -SHOULDER_LENGTH, 0.0),
     )
     set_sketch_direct_db(adapter, False)
     for i, line in enumerate(band_lines):
         direction = "horizontal" if i % 2 == 0 else "vertical"
         check(
             f"turned band {direction} {line}",
-            await adapter.add_sketch_constraint(line, None, direction),
+            adapter.add_sketch_constraint(line, None, direction),
         )
     check(
         "turned band axis at the origin",
-        await adapter.add_sketch_constraint(f"{band_axis}.start", "origin", "coincident"),
+        adapter.add_sketch_constraint(f"{band_axis}.start", "origin", "coincident"),
     )
     check(
         "turned band axis level",
-        await adapter.add_sketch_constraint(band_axis, None, "horizontal"),
+        adapter.add_sketch_constraint(band_axis, None, "horizontal"),
     )
     check(
         "turned band axis ends under the shoulder",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{band_axis}.end", f"{band_lines[0]}.start", "vertical_points"
         ),
     )
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{band_lines[0]}.start",
         "origin",
@@ -549,7 +549,7 @@ async def build(adapter) -> dict[str, str]:
     # Definition only: the printed shoulder length is BossProfile's lower
     # witness, on the same faced end and global.
     band.record(None, '"ShoulderLength"')
-    await add_diametric_linear_dimension(
+    add_diametric_linear_dimension(
         adapter,
         band_axis,
         band_lines[0],
@@ -557,7 +557,7 @@ async def build(adapter) -> dict[str, str]:
         "TurnedDia",
     )
     band.record("TurnedDia", '"TurnedDia"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{band_lines[0]}.end",
         "origin",
@@ -566,7 +566,7 @@ async def build(adapter) -> dict[str, str]:
         "turned band far end",
     )
     band.record(None, '"FaceWidth" + "BossLength"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{band_lines[1]}.start",
         f"{band_lines[1]}.end",
@@ -575,46 +575,46 @@ async def build(adapter) -> dict[str, str]:
         "turned band rise past the tip",
     )
     band.record(None, '"OutsideDia" - "TurnedDia"')
-    await ensure_fully_defined(adapter, "turned band sketch")
-    check("exit_sketch turned band", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "turned band sketch")
+    check("exit_sketch turned band", adapter.exit_sketch())
     name_last_feature(adapter, "TurnedBandProfile")
     drive_jobs += band.apply(adapter, "TurnedBandProfile")
     check(
         "revolve-cut turned band",
-        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
+        adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
     )
     name_last_feature(adapter, "TurnedBand")
     v_band = turned_band_volume_mm3()
-    volume = await volume_check(adapter, "turned band", volume - v_band, 0.01 * v_band)
+    volume = volume_check(adapter, "turned band", volume - v_band, 0.01 * v_band)
 
     # On-axis bore (centre 0,0) through teeth and boss: define_circle emits
     # only the diameter dim, so only the "Dia" slot is recorded -- the X/Z
     # names are ignored.
     bore = SketchDims()
-    check("create_sketch bore", await adapter.create_sketch("Front"))
-    await define_circle(
+    check("create_sketch bore", adapter.create_sketch("Front"))
+    define_circle(
         adapter, 0.0, 0.0, BORE_DIAMETER / 2.0, "bore", dims=bore,
         names=("BoreCx", "BoreCz", "BoreDia"),
         drives=(None, None, '"BoreDia"'),
     )
-    await ensure_fully_defined(adapter, "bore sketch")
-    check("exit_sketch bore", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "bore sketch")
+    check("exit_sketch bore", adapter.exit_sketch())
     name_last_feature(adapter, "BoreProfile")
     drive_jobs += bore.apply(adapter, "BoreProfile")
     check(
         "cut bore",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=OVERALL_LENGTH + 2.0)
         ),
     )
     name_last_feature(adapter, "Bore")
     v_bore = math.pi * (BORE_DIAMETER / 2.0) ** 2 * OVERALL_LENGTH
-    volume = await volume_check(adapter, "bore", volume - v_bore, 0.01 * v_bore)
+    volume = volume_check(adapter, "bore", volume - v_bore, 0.01 * v_bore)
 
     # Named bore/central axis for view-independent assembly mate
     # selection (M6 mated-DOF drive train). Stays Axis2: the cross-hole comes
     # after it and creates no axis of its own.
-    await name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", 0.0, "bore axis")
+    name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", 0.0, "bore axis")
 
     # Retention-pin cross-hole (dt_crank_pinion_spec): a native 1/8 in drill
     # radially through the boss wall on local -X at the boss's mid-length,
@@ -624,7 +624,7 @@ async def build(adapter) -> dict[str, str]:
     # assembly with the crankshaft, whose own hole carries the mesh clocking.
     check(
         "create_plane PinStationPlane",
-        await adapter.create_plane(
+        adapter.create_plane(
             CreatePlaneParameters(
                 mode="offset", base_plane="Front Plane", offset=PIN_STATION
             )
@@ -649,21 +649,21 @@ async def build(adapter) -> dict[str, str]:
     v_pin_hole = cross_hole_volume_mm3(PIN_DIA, BOSS_DIA) - cross_hole_volume_mm3(
         PIN_DIA, BORE_DIAMETER
     )
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "retention-pin cross-hole", volume - v_pin_hole, 0.02 * v_pin_hole
     )
     blank_reference_geometry(adapter, (("PinStationPlane", "PLANE"),))
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
     # A second regeneration is where the old boss profile vanished; take one
     # and prove the solid kept its boss (the rebuild's own verdict did not).
-    await force_rebuild(adapter)
-    await assert_boss_present(adapter, "driven crank pinion")
+    force_rebuild(adapter)
+    assert_boss_present(adapter, "driven crank pinion")
     # The bands are millimetres; UNIT prints them in inches.
     set_dimension_bilateral_tolerance(
         adapter, "BossProfile", "BoreDia", *deviations(BORE_DIA_BAND), display_unit=UNIT
@@ -699,12 +699,12 @@ async def build(adapter) -> dict[str, str]:
     )
     # The tooth-face shoulder: sharp up to its printed R MAX (dt_crank_pinion_spec).
     _shoulder_radius_max_limit(adapter)
-    await volume_check(
+    volume_check(
         adapter, "driven crank pinion (equations neutral)", volume, 0.01 * v_bore
     )
 
-    await apply_material(adapter, MATERIAL)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    report_mass_properties(adapter)
 
     # Mark this part's manufacturing dimensions, author the decimal
     # places they print with (drawing-simplicity-policy.md `How the repository implements the guidelines`: the model owns both the band and
@@ -720,8 +720,8 @@ async def build(adapter) -> dict[str, str]:
         PART_NAME,
         {"Gear Data": GEAR_DATA, "Manufacturing Notes": DRAWING_NOTES},
     )
-    await assert_boss_present(adapter, "crank pinion before save")
-    return await save_simplified_part(adapter, PART_NAME, disc.tooth_features)
+    assert_boss_present(adapter, "crank pinion before save")
+    return save_simplified_part(adapter, PART_NAME, disc.tooth_features)
 
 
 if __name__ == "__main__":

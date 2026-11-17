@@ -114,7 +114,7 @@ def _drawing_callouts(drawing) -> list:
     raise RuntimeError("drawing view traversal did not terminate")
 
 
-async def regression(adapter) -> dict:
+def regression(adapter) -> dict:
     OUTPUT.mkdir(parents=True, exist_ok=True)
     scratch = OUTPUT / "association-scratch.SLDPRT"
     drawing_path = OUTPUT / "association-updated.SLDDRW"
@@ -126,7 +126,7 @@ async def regression(adapter) -> dict:
     report = {"source_sha256_before": before, "scratch": str(scratch)}
     titles = []
     try:
-        check("open scratch model", await adapter.open_model(str(scratch)))
+        check("open scratch model", adapter.open_model(str(scratch)))
         model = _early_bound(adapter.currentModel, "IModelDoc2")
         titles.append(str(model.GetTitle()))
         new_project_drawing(adapter, layout=DrawingLayout.LANDSCAPE, scale=SCALE)
@@ -172,7 +172,7 @@ async def regression(adapter) -> dict:
         report["artifacts"]["png"] = str(png_path)
         adapter.swApp.CloseDoc(titles.pop())
         adapter.swApp.CloseDoc(titles.pop())
-        check("reopen association drawing", await adapter.open_model(str(drawing_path)))
+        check("reopen association drawing", adapter.open_model(str(drawing_path)))
         reopened = _early_bound(adapter.currentModel, "IModelDoc2")
         titles.append(str(reopened.GetTitle()))
         callouts = _drawing_callouts(reopened)

@@ -115,7 +115,7 @@ def test_build_authors_both_settings_through_one_globals_driven_recipe() -> None
         assert call in source
     build = inspect.getsource(assembly.build)
     assert "for settings in (bank_settings, drum_station_setting):" in build
-    assert "await _author_setting_references(adapter, settings)" in build
+    assert "_author_setting_references(adapter, settings)" in build
     # The two specs keep distinct features, dimensions and globals.
     names = [name for spec in (bank_settings, setting) for _f, name, _s, _n in spec.LEGS]
     features = [feature for spec in (bank_settings, setting) for feature, *_ in spec.LEGS]

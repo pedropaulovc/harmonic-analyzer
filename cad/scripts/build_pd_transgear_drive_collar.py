@@ -141,11 +141,11 @@ V_REAR_BREAK = (
 V_TOTAL = V_COLLAR + V_PILOT - V_BORE - V_PIN_HOLES - V_FLAT_PIN_HOLE - V_REAR_BREAK
 
 
-async def _round_bore(adapter) -> list[tuple[str, str]]:
+def _round_bore(adapter) -> list[tuple[str, str]]:
     """The plain round bore's circle on the seat face, centred on the axis."""
     bore = SketchDims()
-    check("create_sketch bore", await adapter.create_sketch("Front"))
-    await define_circle(
+    check("create_sketch bore", adapter.create_sketch("Front"))
+    define_circle(
         adapter,
         0.0,
         0.0,
@@ -155,13 +155,13 @@ async def _round_bore(adapter) -> list[tuple[str, str]]:
         names=(None, None, "BoreDia"),
         drives=(None, None, '"BoreDia"'),
     )
-    await ensure_fully_defined(adapter, "bore sketch")
-    check("exit_sketch bore", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "bore sketch")
+    check("exit_sketch bore", adapter.exit_sketch())
     name_last_feature(adapter, "BoreProfile")
     return bore.apply(adapter, "BoreProfile")
 
 
-async def _flat_pin_hole(adapter) -> list[tuple[str, str]]:
+def _flat_pin_hole(adapter) -> list[tuple[str, str]]:
     """The flat pin's blind ream, the body profile's way: in the Right sketch
     (u, v) = (-Z, Y), a rectangle beside the hole's centreline at
     v = -FLAT_PIN_CENTRE, from the floor station u = -FLAT_PIN_FLOOR out past
@@ -171,48 +171,48 @@ async def _flat_pin_hole(adapter) -> list[tuple[str, str]]:
     centre, floor = -FLAT_PIN_CENTRE, -FLAT_PIN_FLOOR
     far = -(LENGTH + _OVERRUN)
     rim_v = centre - FLAT_PIN_HOLE_R
-    check("create_sketch flat-pin hole", await adapter.create_sketch("Right"))
+    check("create_sketch flat-pin hole", adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
     axis = check(
-        "flat-pin hole centreline", await adapter.add_centerline(floor, centre, far, centre)
+        "flat-pin hole centreline", adapter.add_centerline(floor, centre, far, centre)
     )
     points = [(floor, centre), (floor, rim_v), (far, rim_v), (far, centre)]
-    lines = await add_line_chain(adapter, points)
+    lines = add_line_chain(adapter, points)
     set_sketch_direct_db(adapter, False)
     for index, line in enumerate(lines):
         (_, v0), (_, v1) = points[index], points[(index + 1) % len(lines)]
         relation = "horizontal" if v0 == v1 else "vertical"
         check(
             f"flat-pin hole {relation} {line}",
-            await adapter.add_sketch_constraint(line, None, relation),
+            adapter.add_sketch_constraint(line, None, relation),
         )
     floor_edge, rim, _far_end, _on_axis = lines
-    await dimension_between(
+    dimension_between(
         adapter, f"{floor_edge}.start", "origin", "vertical_distance",
         FLAT_PIN_CENTRE, "flat-pin hole centre from the bore axis",
     )
     hole.record("FlatPinCentre", '"FlatPinCentre"')
-    await dimension_between(
+    dimension_between(
         adapter, f"{floor_edge}.start", "origin", "horizontal_distance",
         FLAT_PIN_FLOOR, "flat-pin hole floor from the seat face",
     )
     hole.record("FlatPinFloor", '"FlatPinFloor"')
-    await add_diametric_linear_dimension(
+    add_diametric_linear_dimension(
         adapter, axis, rim, ((floor + far) / 2.0, rim_v - 2.0), "FlatPinDia"
     )
     hole.record("FlatPinDia", '"FlatPinHoleDia"')
-    await dimension_between(
+    dimension_between(
         adapter, f"{rim}.start", f"{rim}.end", "horizontal_distance",
         LENGTH + _OVERRUN - FLAT_PIN_FLOOR, "flat-pin hole run past the rear face",
     )
     hole.record("FlatPinRun")
-    await ensure_fully_defined(adapter, "flat-pin hole sketch")
-    check("exit_sketch flat-pin hole", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "flat-pin hole sketch")
+    check("exit_sketch flat-pin hole", adapter.exit_sketch())
     name_last_feature(adapter, "FlatPinProfile")
     return hole.apply(adapter, "FlatPinProfile")
 
 
-async def _rear_break(adapter) -> list[tuple[str, str]]:
+def _rear_break(adapter) -> list[tuple[str, str]]:
     """The rear bore mouth's 45° break, build_pd_transgear_arm's pin-mouth
     profile in the Right sketch (u, v) = (-Z, Y): it spans the bore's empty
     middle from the axis, the leg's depth in from the rear face, out past the
@@ -223,12 +223,12 @@ async def _rear_break(adapter) -> list[tuple[str, str]]:
     rim_v = BORE_R + REAR_BREAK
     beyond = -(LENGTH + _OVERRUN)
     profile = [(floor_u, 0.0), (floor_u, BORE_R), (-LENGTH, rim_v), (beyond, rim_v), (beyond, 0.0)]
-    check("create_sketch rear break", await adapter.create_sketch("Right"))
+    check("create_sketch rear break", adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
     axis = check(
-        "rear break axis", await adapter.add_centerline(beyond, 0.0, beyond - _OVERRUN, 0.0)
+        "rear break axis", adapter.add_centerline(beyond, 0.0, beyond - _OVERRUN, 0.0)
     )
-    floor, leg, rim, top, axis_side = await add_line_chain(adapter, profile)
+    floor, leg, rim, top, axis_side = add_line_chain(adapter, profile)
     set_sketch_direct_db(adapter, False)
     for line, relation in (
         (floor, "vertical"),
@@ -239,50 +239,50 @@ async def _rear_break(adapter) -> list[tuple[str, str]]:
     ):
         check(
             f"rear break {relation} {line}",
-            await adapter.add_sketch_constraint(line, None, relation),
+            adapter.add_sketch_constraint(line, None, relation),
         )
     check(
         "rear break axis on the profile",
-        await adapter.add_sketch_constraint(f"{axis}.start", f"{axis_side}.start", "coincident"),
+        adapter.add_sketch_constraint(f"{axis}.start", f"{axis_side}.start", "coincident"),
     )
     check(
         "rear break on the bore axis",
-        await adapter.add_sketch_constraint(f"{axis_side}.start", "origin", "horizontal_points"),
+        adapter.add_sketch_constraint(f"{axis_side}.start", "origin", "horizontal_points"),
     )
     check(
         "rear break axis length",
-        await adapter.add_sketch_dimension(axis, None, "linear", _OVERRUN),
+        adapter.add_sketch_dimension(axis, None, "linear", _OVERRUN),
     )
     mouth.record("RearBreakAxisLength")
-    await dimension_between(
+    dimension_between(
         adapter, "origin", f"{rim}.start", "horizontal_distance", LENGTH,
         "rear break on the rear face",
     )
     mouth.record("RearBreakSeat", '"CollarLength"')
-    await dimension_between(
+    dimension_between(
         adapter, f"{rim}.start", f"{rim}.end", "horizontal_distance", _OVERRUN,
         "rear break overrun",
     )
     mouth.record("RearBreakOverrun")
     check(
         "rear break bore radius",
-        await adapter.add_sketch_dimension(floor, None, "linear", BORE_R),
+        adapter.add_sketch_dimension(floor, None, "linear", BORE_R),
     )
     mouth.record("RearBreakBoreR", '"BoreDia" / 2')
     # The printed leg, across the rear face (section A-A shows it at the +Y
     # mouth); the equal leg along the bore holds the 45 degrees.
-    await dimension_between(
+    dimension_between(
         adapter, f"{leg}.start", f"{leg}.end", "vertical_distance", REAR_BREAK,
         "rear break leg on the rear face",
     )
     mouth.record("RearBreak", '"RearBreak"')
-    await dimension_between(
+    dimension_between(
         adapter, f"{leg}.start", f"{leg}.end", "horizontal_distance", REAR_BREAK,
         "rear break leg along the bore",
     )
     mouth.record("RearBreakDepth", '"RearBreak"')
-    await ensure_fully_defined(adapter, "rear break profile")
-    check("exit_sketch rear break", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "rear break profile")
+    check("exit_sketch rear break", adapter.exit_sketch())
     name_last_feature(adapter, "RearBreakProfile")
     return mouth.apply(adapter, "RearBreakProfile")
 
@@ -301,14 +301,14 @@ def _fitted_length_reference(adapter, name: str, nominal: float) -> None:
         raise RuntimeError(f"collar {name} reference text did not persist")
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
         CreatePlaneParameters,
         ExtrusionParameters,
         RevolveParameters,
     )
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     # #290: the row's inch calculation units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
     # The mm suffix is load-bearing: the equation manager reads bare numbers in
@@ -326,10 +326,10 @@ async def build(adapter) -> dict[str, str]:
         ("FlatPinHoleDia", FLAT_PIN_HOLE_DIA),
         ("RearBreak", REAR_BREAK),
     ):
-        await set_global(adapter, name, f"{value}mm")
+        set_global(adapter, name, f"{value}mm")
 
     # The bore axis before any other reference geometry, so it is Axis1.
-    bore_axis = await name_bore_axis(
+    bore_axis = name_bore_axis(
         adapter, "Top Plane", 0.0, "Right Plane", 0.0, "collar bore axis"
     )
     if bore_axis != "Axis1":
@@ -345,11 +345,11 @@ async def build(adapter) -> dict[str, str]:
     # lengths run from the seat face, the datum the T24 seats on.  A profile
     # turned the wrong way fails the volume gate and the planes' rebuild.
     body = SketchDims()
-    check("create_sketch body profile", await adapter.create_sketch("Right"))
+    check("create_sketch body profile", adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
     axis = check(
         "body axis centerline",
-        await adapter.add_centerline(-LENGTH, 0.0, PILOT_LENGTH, 0.0),
+        adapter.add_centerline(-LENGTH, 0.0, PILOT_LENGTH, 0.0),
     )
     points = [
         (-LENGTH, 0.0),
@@ -359,25 +359,25 @@ async def build(adapter) -> dict[str, str]:
         (PILOT_LENGTH, PILOT_R),
         (PILOT_LENGTH, 0.0),
     ]
-    lines = await add_line_chain(adapter, points)
+    lines = add_line_chain(adapter, points)
     set_sketch_direct_db(adapter, False)
     for index, line in enumerate(lines):
         (_, v0), (_, v1) = points[index], points[(index + 1) % len(lines)]
         relation = "horizontal" if v0 == v1 else "vertical"
         check(
             f"body profile {relation} {line}",
-            await adapter.add_sketch_constraint(line, None, relation),
+            adapter.add_sketch_constraint(line, None, relation),
         )
     rear_face, collar, seat_face, pilot, pilot_front, axis_edge = lines
     check(
         "body axis on the origin",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{axis_edge}.end", "origin", "horizontal_points"
         ),
     )
     check(
         "seat face on the origin",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{seat_face}.start", "origin", "vertical_points"
         ),
     )
@@ -385,7 +385,7 @@ async def build(adapter) -> dict[str, str]:
         ("CollarDia", collar, -LENGTH / 2.0, OD_R),
         ("PilotDia", pilot, PILOT_LENGTH / 2.0, PILOT_R),
     ):
-        await add_diametric_linear_dimension(
+        add_diametric_linear_dimension(
             adapter, axis, line, (u_mid, radius + 4.0), name
         )
         body.record(name, f'"{name}"')
@@ -393,32 +393,32 @@ async def build(adapter) -> dict[str, str]:
         ("CollarLength", f"{seat_face}.start", f"{rear_face}.end", LENGTH),
         ("PilotLength", f"{seat_face}.end", f"{pilot_front}.start", PILOT_LENGTH),
     ):
-        await dimension_between(
+        dimension_between(
             adapter, start, end, "horizontal_distance", value, f"body {name}"
         )
         body.record(name, f'"{name}"')
-    await ensure_fully_defined(adapter, "body profile sketch")
-    check("exit_sketch body profile", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "body profile sketch")
+    check("exit_sketch body profile", adapter.exit_sketch())
     name_last_feature(adapter, "BodyProfile")
     drive_jobs += body.apply(adapter, "BodyProfile")
-    check("revolve body", await adapter.create_revolve(RevolveParameters(angle=360.0)))
+    check("revolve body", adapter.create_revolve(RevolveParameters(angle=360.0)))
     name_last_feature(adapter, "Body")
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "collar body and pilot", V_COLLAR + V_PILOT, 0.005 * V_COLLAR
     )
 
     # --- Round bore through pilot and body ------------------------------------
-    drive_jobs += await _round_bore(adapter)
+    drive_jobs += _round_bore(adapter)
     check(
         "cut bore",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(
                 depth=2.0 * (LENGTH + PILOT_LENGTH + _OVERRUN), both_directions=True
             )
         ),
     )
     name_last_feature(adapter, "Bore")
-    volume = await volume_check(adapter, "bore", volume - V_BORE, 0.01 * V_BORE)
+    volume = volume_check(adapter, "bore", volume - V_BORE, 0.01 * V_BORE)
 
     # --- Datum planes -------------------------------------------------------------
     stations = (
@@ -428,7 +428,7 @@ async def build(adapter) -> dict[str, str]:
     for plane, offset, expression in stations:
         check(
             f"create_plane {plane} (Front Plane {offset:+g})",
-            await adapter.create_plane(
+            adapter.create_plane(
                 CreatePlaneParameters(
                     mode="offset", base_plane="Front Plane", offset=offset
                 )
@@ -446,9 +446,9 @@ async def build(adapter) -> dict[str, str]:
     # the overrun breaks out into the air beside the pilot (the holes' inner
     # edge r 5.81 clears the pilot's r 5.0).
     holes = SketchDims()
-    check("create_sketch pin holes", await adapter.create_sketch("RearFace"))
+    check("create_sketch pin holes", adapter.create_sketch("RearFace"))
     for label, y in (("PinPos", PIN_CIRCLE_RADIUS), ("PinNeg", -PIN_CIRCLE_RADIUS)):
-        await define_circle(
+        define_circle(
             adapter,
             0.0,
             y,
@@ -458,18 +458,18 @@ async def build(adapter) -> dict[str, str]:
             names=(None, f"{label}Y", f"{label}Dia"),
             drives=(None, '"PinCircleRadius"', '"PinHoleDia"'),
         )
-    await ensure_fully_defined(adapter, "pin-hole sketch")
-    check("exit_sketch pin holes", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "pin-hole sketch")
+    check("exit_sketch pin holes", adapter.exit_sketch())
     name_last_feature(adapter, "PinHoleProfile")
     drive_jobs += holes.apply(adapter, "PinHoleProfile")
     check(
         "cut pin holes",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=PIN_HOLE_DEPTH + _OVERRUN)
         ),
     )
     name_last_feature(adapter, "PinHoles")
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "drive-pin holes", volume - V_PIN_HOLES, 0.05 * V_PIN_HOLES
     )
 
@@ -478,7 +478,7 @@ async def build(adapter) -> dict[str, str]:
         ("DrivePinAxis1", PIN_CIRCLE_RADIUS),
         ("DrivePinAxis2", -PIN_CIRCLE_RADIUS),
     ):
-        await name_bore_axis(
+        name_bore_axis(
             adapter,
             "Right Plane",
             0.0,
@@ -493,16 +493,16 @@ async def build(adapter) -> dict[str, str]:
     # --- The flat pin's blind ream on local -Y --------------------------------
     # After the drive-pin holes and their axes, so every earlier feature and
     # datum the assembly mates keeps its name.
-    drive_jobs += await _flat_pin_hole(adapter)
+    drive_jobs += _flat_pin_hole(adapter)
     check(
         "revolve-cut flat-pin hole",
-        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
+        adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
     )
     name_last_feature(adapter, "FlatPinHole")
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "flat-pin hole", volume - V_FLAT_PIN_HOLE, 0.05 * V_FLAT_PIN_HOLE
     )
-    await name_bore_axis(
+    name_bore_axis(
         adapter,
         "Right Plane",
         0.0,
@@ -515,23 +515,23 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "FlatPinAxis")
 
     # --- The rear bore mouth's break, after the flat-pin hole it crosses ------
-    drive_jobs += await _rear_break(adapter)
+    drive_jobs += _rear_break(adapter)
     check(
         "revolve-cut rear break",
-        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
+        adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
     )
     name_last_feature(adapter, "RearBreak")
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "rear break", volume - V_REAR_BREAK, 0.05 * V_REAR_BREAK + 0.02
     )
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dimension, expression in drive_jobs:
-        await drive_dimension(adapter, dimension, expression)
-    await force_rebuild(adapter)
-    await volume_check(
+        drive_dimension(adapter, dimension, expression)
+    force_rebuild(adapter)
+    volume_check(
         adapter, "driven collar (equations neutral)", V_TOTAL, 0.005 * V_TOTAL
     )
     _telemetry.info(
@@ -572,8 +572,8 @@ async def build(adapter) -> dict[str, str]:
         adapter, "RearBreakProfile", "RearBreak", REAR_BREAK_TOL, display_unit=UNIT
     )
 
-    await apply_material(adapter, MATERIAL)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    report_mass_properties(adapter)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
@@ -597,7 +597,7 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
-    return await save_part_and_images(adapter, PART_NAME)
+    return save_part_and_images(adapter, PART_NAME)
 
 
 if __name__ == "__main__":

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import importlib
 import math
 import re
@@ -701,7 +700,7 @@ def test_sheet_calls_out_the_tooth_space_on_its_full_depth_face_view(
     seat.place_view.side_effect = lambda _adapter, path, view, x, y, scale: SimpleNamespace(
         path=path, orientation=view, centre=(x, y)
     )
-    asyncio.run(module.build(offline_adapter()))
+    module.build(offline_adapter())
 
     (callout,) = seat.add_toothspace_callout.call_args_list
     view = callout.args[1]

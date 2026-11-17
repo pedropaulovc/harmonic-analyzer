@@ -59,13 +59,13 @@ def _status(adapter, comp):
     return "??"
 
 
-async def build(adapter):
-    check("create_assembly", await adapter.create_assembly())
+def build(adapter):
+    check("create_assembly", adapter.create_assembly())
     # Fixed seed so the platen is NOT the first component (SW auto-fixes the
     # first inserted part); in the real assembly many fixed parts precede it.
-    await place_component(adapter, "pd-support-bar", [0.0, 440.0, -133.9],
+    place_component(adapter, "pd-support-bar", [0.0, 440.0, -133.9],
                           [0.0, 0.0, 0.0], IDENTITY, ground=True)
-    pl = await place_component(adapter, "pd-platen",
+    pl = place_component(adapter, "pd-platen",
                               [PLATE_X0, PLATE_Y0, PLATE_FRONT_Z], [0.0, 0.0, 0.0],
                               IDENTITY, ground=False)
     pl_o = _org(adapter, pl)
@@ -76,17 +76,17 @@ async def build(adapter):
     # Slide axis held parallel to the Top and Front planes at the slide-line
     # offsets (axis-to-plane distance: each removes 1 translation + 1 rotation,
     # orthogonal, no overlap) -> leaves T_x + spin about X.
-    await distance_driver(adapter, named_ref(f"Axis1@{pl}", "AXIS"),
+    distance_driver(adapter, named_ref(f"Axis1@{pl}", "AXIS"),
                           named_ref("Top Plane", "PLANE"), abs(pl_o[1]),
                           label="platen slide height (Top)", verify=(pl, pl_o))
     log(f"after height(Top d={abs(pl_o[1]):.1f}): {_status(adapter, pl)}")
 
-    await distance_driver(adapter, named_ref(f"Axis1@{pl}", "AXIS"),
+    distance_driver(adapter, named_ref(f"Axis1@{pl}", "AXIS"),
                           named_ref("Front Plane", "PLANE"), abs(pl_o[2]),
                           label="platen slide depth (Front)", verify=(pl, pl_o))
     log(f"after depth(Front d={abs(pl_o[2]):.1f}): {_status(adapter, pl)}")
 
-    await angle_driver(adapter, named_ref(f"Top Plane@{pl}", "PLANE"),
+    angle_driver(adapter, named_ref(f"Top Plane@{pl}", "PLANE"),
                        named_ref("Top Plane", "PLANE"), 0.0,
                        label="platen spin snapshot", verify=(pl, pl_o))
     log(f"after angle(Top): {_status(adapter, pl)}")
@@ -95,7 +95,7 @@ async def build(adapter):
     # its learned inverted side lives HERE, not as a dead seed in
     # cad/config/assemblies/pd-paper-drive.yaml (codex #873). flip=True is the old
     # global seed applied to this magnitude: (d < 0) XOR inverted.
-    await distance_driver(adapter, named_ref(f"Right Plane@{pl}", "PLANE"),
+    distance_driver(adapter, named_ref(f"Right Plane@{pl}", "PLANE"),
                           named_ref("Right Plane", "PLANE"), abs(pl_o[0]),
                           label="platen feed snapshot", verify=(pl, pl_o),
                           flip=True)
@@ -109,9 +109,9 @@ async def build(adapter):
     from _assembly import lock_mate
     rot_z180 = [[-1.0, 0.0, 0.0], [0.0, -1.0, 0.0], [0.0, 0.0, 1.0]]
     RACK_X0, RACK_Y0, RACK_Z = 41.23, 296.5, -138.9
-    rk = await place_component(adapter, "pd-platen-rack", [RACK_X0, RACK_Y0, RACK_Z],
+    rk = place_component(adapter, "pd-platen-rack", [RACK_X0, RACK_Y0, RACK_Z],
                               [0.0, 0.0, 180.0], rot_z180, ground=False)
-    await lock_mate(adapter, named_ref(f"Front Plane@{rk}", "PLANE"),
+    lock_mate(adapter, named_ref(f"Front Plane@{rk}", "PLANE"),
                     named_ref(f"Front Plane@{pl}", "PLANE"), label="rack locked to platen")
     log(f"after lock rack: {_status(adapter, rk)}")
     return {}

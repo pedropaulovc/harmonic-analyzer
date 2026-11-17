@@ -27,8 +27,8 @@ import _telemetry  # noqa: E402
 ROOT = Path(__file__).resolve().parents[1]
 
 
-async def build(adapter) -> dict[str, str]:
-    check("open part", await adapter.open_model(str(ROOT / "out" / "sldprt" / "fr-tube-frame.SLDPRT")))
+def build(adapter) -> dict[str, str]:
+    check("open part", adapter.open_model(str(ROOT / "out" / "sldprt" / "fr-tube-frame.SLDPRT")))
     model = adapter.currentModel
     _flag(model, "IModelDoc2")
     mpv = model.MaterialPropertyValues
@@ -53,7 +53,7 @@ async def build(adapter) -> dict[str, str]:
                 n_face_appearance += 1
         _telemetry.info(f"faces: {len(faces)}, with face MPV: {n_face_appearance}")
 
-    check("open frame asm", await adapter.open_model(str(ROOT / "out" / "sldasm" / "fr-frame.SLDASM")))
+    check("open frame asm", adapter.open_model(str(ROOT / "out" / "sldasm" / "fr-frame.SLDASM")))
     asm = adapter.currentModel
     _flag(asm, "IModelDoc2")
     _flag(asm, "IAssemblyDoc")

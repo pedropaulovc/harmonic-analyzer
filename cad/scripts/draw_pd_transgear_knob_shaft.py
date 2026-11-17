@@ -1072,11 +1072,11 @@ def _add_sheet_note(
         raise RuntimeError(f"{label} reads back {got!r}")
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open transgear-knob-shaft source", await adapter.open_model(str(SOURCE)))
+    check("open transgear-knob-shaft source", adapter.open_model(str(SOURCE)))
     source_properties = read_required_properties(
         adapter.currentModel,
         (
@@ -1277,7 +1277,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _add_sheet_note(
         adapter, NOTES, NOTES_XY, char_height=NOTES_CHAR_HEIGHT, label="numbered notes"
     )
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Transgear Knob Shaft Manufacturing Drawing",

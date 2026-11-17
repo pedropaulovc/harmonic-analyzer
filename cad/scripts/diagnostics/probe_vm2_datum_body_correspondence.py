@@ -28,7 +28,7 @@ def main():
     from diagnostics._owned_native_session import run_owned_diagnostic
     import dodo
 
-    async def probe(adapter):
+    def probe(adapter):
         app = adapter.swApp
         witness = json.loads(witness_path.read_text(encoding="utf-8"))
         if witness["status"] != "read_only_complete" or int(app.GetProcessID()) != witness["pid"]:

@@ -60,12 +60,12 @@ def _probe_doc(adapter, label):  # noqa: ANN001
         log(f"[{label}] GetPackAndGo -> object {type(raw).__name__} but count failed: {exc!r}")
 
 
-async def build(adapter):  # noqa: ANN001
-    check("open part", await adapter.open_model(str(PART)))
+def build(adapter):  # noqa: ANN001
+    check("open part", adapter.open_model(str(PART)))
     _probe_doc(adapter, "PART a-frame (no refs)")
 
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
-    check("open assembly", await adapter.open_model(str(ASSEMBLY)))
+    check("open assembly", adapter.open_model(str(ASSEMBLY)))
     _probe_doc(adapter, "ASSEMBLY harmonic-analyzer (184 refs)")
     return {"probe": "done -- see log"}
 

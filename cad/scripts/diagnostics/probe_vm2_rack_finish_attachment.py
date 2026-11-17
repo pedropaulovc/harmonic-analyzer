@@ -64,7 +64,7 @@ def main():
     from diagnostics.probe_vm2_datum_lifecycle import read_rack_finish
     import dodo
 
-    async def probe(adapter):
+    def probe(adapter):
         app = adapter.swApp
         source = ROOT / "cad/out/sldprt/pd-rack-pinion.SLDPRT"
         control = ROOT / "cad/out/slddrw/pd-rack-pinion.SLDDRW"
@@ -228,11 +228,11 @@ def main():
                     app.CloseDoc(title)
                 if app.GetDocuments():
                     raise RuntimeError("candidate cold reopen requires empty seat")
-                check("cold reopen experimental finish", await adapter.open_model(str(candidate)))
+                check("cold reopen experimental finish", adapter.open_model(str(candidate)))
                 failed = _early_bound(adapter.currentModel, "IModelDoc2")
                 observe(failed, "fresh_insert_cold_reopen" if args.fresh_insert else "after_point_trials_cold_reopen")
                 report["candidate_sha256_after"] = digest(candidate)
-            check("open saved production finish control", await adapter.open_model(str(control)))
+            check("open saved production finish control", adapter.open_model(str(control)))
             opened = _early_bound(adapter.currentModel, "IModelDoc2")
             if Path(opened.GetPathName()).resolve() != control:
                 raise RuntimeError("control open returned another drawing")

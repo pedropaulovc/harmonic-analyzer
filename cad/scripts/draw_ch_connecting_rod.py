@@ -447,11 +447,11 @@ def _fork_detail(adapter: Any, left: Any) -> Any:
     return detail
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open connecting-rod source", await adapter.open_model(str(SOURCE)))
+    check("open connecting-rod source", adapter.open_model(str(SOURCE)))
     read_required_properties(
         adapter.currentModel,
         (
@@ -734,7 +734,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
 
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Connecting Rod Manufacturing Drawing",

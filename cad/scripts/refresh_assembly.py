@@ -42,14 +42,14 @@ def _allowed_pairs(asm_name: str):
     return importlib.import_module(interference_module(asm_name)).ALLOWED_PAIRS
 
 
-async def _refresh_parts(adapter, asm_name: str) -> dict[str, str]:
+def _refresh_parts(adapter, asm_name: str) -> dict[str, str]:
     native_contact_check = None
     if asm_name in ("ch-channel", "sm-summing"):
         from _native_spring_contact import assert_assembly_spring_contacts
 
         native_contact_check = assert_assembly_spring_contacts
 
-    artefacts = await refresh_assembly(
+    artefacts = refresh_assembly(
         adapter,
         asm_name,
         allowed_pairs=_allowed_pairs(asm_name),
@@ -61,7 +61,7 @@ async def _refresh_parts(adapter, asm_name: str) -> dict[str, str]:
         # a subassembly change does not leave them stale (codex review #6).
         from build_ha_harmonic_analyzer_assembly import export_gallery_and_bom
 
-        artefacts.update(await export_gallery_and_bom(adapter))
+        artefacts.update(export_gallery_and_bom(adapter))
     return artefacts
 
 
@@ -73,8 +73,8 @@ def main() -> int:
     asm_name = sys.argv[1].removesuffix(".SLDASM").replace("_", "-")
     refresh = tiers[sys.argv[2]]
 
-    async def build(adapter):
-        return await refresh(adapter, asm_name)
+    def build(adapter):
+        return refresh(adapter, asm_name)
 
     return run_build(build)
 

@@ -644,11 +644,11 @@ def _floor_reference(adapter: Any, section: Any) -> None:
     )
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open nameplate source", await adapter.open_model(str(SOURCE)))
+    check("open nameplate source", adapter.open_model(str(SOURCE)))
     source_model = adapter.currentModel
     properties = (
         "Number",
@@ -764,7 +764,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
     _telemetry.info("nameplate drawing views, dimensions and notes placed")
 
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Nameplate Manufacturing Drawing",

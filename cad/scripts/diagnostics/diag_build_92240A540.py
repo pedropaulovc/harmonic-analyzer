@@ -35,9 +35,9 @@ from diagnostics.diag_mcmaster_lib import replica_main  # noqa: E402
 
 
 @stock_recipe("92240A540", threaded=True)
-async def build_92240A540(adapter, truth=None):
+def build_92240A540(adapter, truth=None):
     """Build 92240A540 by the 92240A539 family law at its 3/4-in length."""
-    await build_hex_screw(adapter, sku="92240A540", size=HEX_SCREW_SIZE)
+    build_hex_screw(adapter, sku="92240A540", size=HEX_SCREW_SIZE)
 
 
 if __name__ == "__main__":

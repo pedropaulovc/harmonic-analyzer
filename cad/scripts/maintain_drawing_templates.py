@@ -890,7 +890,7 @@ def _main() -> int:
     parser.add_argument("--operation", action="append", choices=OPERATIONS)
     args = parser.parse_args()
 
-    async def build(adapter: Any) -> dict[str, str]:
+    def build(adapter: Any) -> dict[str, str]:
         return maintain_templates(
             adapter, operations=tuple(args.operation or OPERATIONS)
         )

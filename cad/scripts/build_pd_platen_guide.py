@@ -252,18 +252,18 @@ def _depth_limits(adapter) -> None:
     )
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     # #290: the row's inch calculation units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). mm suffix load-bearing (INCH document;
     # the equation manager reads bare numbers in document units).
-    await set_global(adapter, "GuideLength", f"{GUIDE_LENGTH}mm")
-    await set_global(adapter, "GuideHeight", f"{GUIDE_HEIGHT}mm")
-    await set_global(adapter, "GuideDepth", f"{GUIDE_DEPTH}mm")
+    set_global(adapter, "GuideLength", f"{GUIDE_LENGTH}mm")
+    set_global(adapter, "GuideHeight", f"{GUIDE_HEIGHT}mm")
+    set_global(adapter, "GuideDepth", f"{GUIDE_DEPTH}mm")
     # Both hole families are native #4-40 taps (front bottoming, rear through);
     # their diameters come from the ANSI-inch table rather than
     # equation-driven sketch dimensions.
@@ -272,15 +272,15 @@ async def build(adapter) -> dict[str, str]:
 
     # Rail outline: corner-at-origin rectangle, length along X, height along Y.
     outline = SketchDims()
-    check("create_sketch outline", await adapter.create_sketch("Front"))
+    check("create_sketch outline", adapter.create_sketch("Front"))
     rect = [
         (0.0, 0.0),
         (GUIDE_LENGTH, 0.0),
         (GUIDE_LENGTH, GUIDE_HEIGHT),
         (0.0, GUIDE_HEIGHT),
     ]
-    lines = await add_line_chain(adapter, rect)
-    await define_rectilinear_chain(
+    lines = add_line_chain(adapter, rect)
+    define_rectilinear_chain(
         adapter,
         lines,
         rect,
@@ -289,13 +289,13 @@ async def build(adapter) -> dict[str, str]:
         names=["Length", "Height"],
         drives=['"GuideLength"', '"GuideHeight"'],
     )
-    await ensure_fully_defined(adapter, "guide outline")
-    check("exit_sketch outline", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "guide outline")
+    check("exit_sketch outline", adapter.exit_sketch())
     name_last_feature(adapter, "GuideProfile")
     drive_jobs += outline.apply(adapter, "GuideProfile")
     check(
         "extrude guide",
-        await adapter.create_extrusion(
+        adapter.create_extrusion(
             ExtrusionParameters(depth=GUIDE_DEPTH, reverse_direction=True)
         ),
     )
@@ -303,7 +303,7 @@ async def build(adapter) -> dict[str, str]:
     depth_dim = name_dimensions(adapter, "Guide", ["Depth"])
     drive_jobs += [(depth_dim[0], '"GuideDepth"')]
     v_rail = GUIDE_LENGTH * GUIDE_HEIGHT * GUIDE_DEPTH
-    await volume_check(adapter, "guide rail", v_rail, 0.005 * v_rail)
+    volume_check(adapter, "guide rail", v_rail, 0.005 * v_rail)
 
     # Lock-screw receivers: ONE native Hole Wizard #4-40 tapped THROUGH
     # feature (4 points) from the guide's REAR face (local z=-10, outward
@@ -321,7 +321,7 @@ async def build(adapter) -> dict[str, str]:
     v_holes = (
         len(HOLE_X) * math.pi * (blind_cut_dia_mm(lock_spec) / 2.0) ** 2 * GUIDE_DEPTH
     )
-    await volume_check(
+    volume_check(
         adapter, "guide with lock receivers", v_rail - v_holes, 0.05 * v_holes
     )
 
@@ -345,17 +345,17 @@ async def build(adapter) -> dict[str, str]:
         * GUIDE_DEPTH
     )
     v_final = v_rail - v_holes - v_screws
-    await volume_check(
+    volume_check(
         adapter, "guide with screw receivers", v_final, 0.05 * (v_holes + v_screws)
     )
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    volume_check(
         adapter, "driven guide (equations neutral)", v_final, 0.02 * v_holes
     )
 
@@ -369,11 +369,11 @@ async def build(adapter) -> dict[str, str]:
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
 
-    await apply_material(adapter, MATERIAL)
-    await apply_color(adapter, PANEL_BLACK)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    apply_color(adapter, PANEL_BLACK)
+    report_mass_properties(adapter)
     _apply_drawing_properties(adapter)
-    return await save_part_and_images(adapter, PART_NAME)
+    return save_part_and_images(adapter, PART_NAME)
 
 
 if __name__ == "__main__":

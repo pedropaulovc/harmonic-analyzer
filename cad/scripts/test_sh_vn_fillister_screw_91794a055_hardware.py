@@ -6,7 +6,6 @@ the part the assemblies still build.
 
 from __future__ import annotations
 
-import asyncio
 import contextlib
 import json
 import math
@@ -156,24 +155,24 @@ class _Recorder:
     def log(self, name: str, args=(), kwargs=None) -> None:
         self.events.append((name, tuple(args), dict(kwargs or {})))
 
-    async def _async(self, name: str, *args, **kwargs):
+    def _async(self, name: str, *args, **kwargs):
         self.log(name, args, kwargs)
         return "ok"
 
-    async def create_sketch(self, *args):
-        return await self._async("create_sketch", *args)
+    def create_sketch(self, *args):
+        return self._async("create_sketch", *args)
 
-    async def exit_sketch(self, *args):
-        return await self._async("exit_sketch", *args)
+    def exit_sketch(self, *args):
+        return self._async("exit_sketch", *args)
 
-    async def create_revolve(self, *args):
-        return await self._async("create_revolve", *args)
+    def create_revolve(self, *args):
+        return self._async("create_revolve", *args)
 
-    async def create_cut_extrude(self, *args):
-        return await self._async("create_cut_extrude", *args)
+    def create_cut_extrude(self, *args):
+        return self._async("create_cut_extrude", *args)
 
-    async def add_fillet(self, *args):
-        return await self._async("add_fillet", *args)
+    def add_fillet(self, *args):
+        return self._async("add_fillet", *args)
 
 
 def _record(monkeypatch, author=None, **cut) -> tuple[_Recorder, list[tuple]]:
@@ -186,10 +185,10 @@ def _record(monkeypatch, author=None, **cut) -> tuple[_Recorder, list[tuple]]:
 
         return call
 
-    async def add_line_chain(_adapter, points, **kwargs):
+    def add_line_chain(_adapter, points, **kwargs):
         adapter.log("add_line_chain", (tuple(points),), kwargs)
 
-    async def volume_check(_adapter, label, expected, tol):
+    def volume_check(_adapter, label, expected, tol):
         adapter.log("volume_check", (label, expected, tol))
         return expected
 
@@ -207,19 +206,19 @@ def _record(monkeypatch, author=None, **cut) -> tuple[_Recorder, list[tuple]]:
     monkeypatch.setattr(entry, "no_sketch_inference", no_inference)
     monkeypatch.setattr(_telemetry, "info", lambda *a, **k: None)
     if author is None:
-        asyncio.run(entry.build_91794A055(adapter, **cut))
+        entry.build_91794A055(adapter, **cut)
     else:
         monkeypatch.setattr(part, "check", logger("check", True))
         monkeypatch.setattr(part, "name_last_feature", logger("name_last_feature"))
         monkeypatch.setattr(part, "add_line_chain", add_line_chain)
         monkeypatch.setattr(part, "no_sketch_inference", no_inference)
 
-        async def force_rebuild(_adapter):
+        def force_rebuild(_adapter):
             adapter.log("force_rebuild")
 
         monkeypatch.setattr(part, "force_rebuild", force_rebuild)
         monkeypatch.setattr(part, "_require_tip", logger("require_tip"))
-        asyncio.run(author(adapter))
+        author(adapter)
     return adapter, adapter.events
 
 
@@ -373,12 +372,12 @@ def test_each_member_is_modelled_at_its_installed_length() -> None:
 def test_stock_build_cuts_the_disc_member_from_the_supplied_screw(monkeypatch) -> None:
     seen: dict = {}
 
-    async def fake_build(adapter, **kwargs):
+    def fake_build(adapter, **kwargs):
         seen.update(kwargs)
         return {}
 
     monkeypatch.setattr(part, "build_stock_fastener", fake_build)
-    asyncio.run(part.build(None))
+    part.build(None)
     (component,) = seen["components"]
     assert component.sku == screw.SKU
     # The registered recipe, wrapped: the stock build validates its identity.
@@ -420,7 +419,7 @@ def test_members_are_split_suppressed_and_exported_after_the_save(monkeypatch) -
         return lambda *args, **kwargs: events.append((name, *args[1:]))
 
     def coro(name, result=None):
-        async def call(*args, **kwargs):
+        def call(*args, **kwargs):
             events.append((name, *args[1:], *sorted(kwargs.items())))
             return result
 
@@ -447,7 +446,7 @@ def test_members_are_split_suppressed_and_exported_after_the_save(monkeypatch) -
         "require_material_in_every_configuration",
     ):
         monkeypatch.setattr(part, name, sync(name))
-    artefacts = asyncio.run(part._save_members(None, part.PART_NAME, ("ThreadGroove",)))
+    artefacts = part._save_members(None, part.PART_NAME, ("ThreadGroove",))
     assert artefacts == {"part": "p"}
     kinds = [event[0] for event in events]
     assert events[kinds.index("create_member_configurations")][1:] == (

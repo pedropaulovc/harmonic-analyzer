@@ -108,27 +108,27 @@ _POINT_MODES = ("face_center", "arc_center", "along_curve")
 class SolidWorksReferenceGeometryMixin:
     """Expose SolidWorks reference-geometry methods via mixin-local helpers."""
 
-    async def create_plane(
+    def create_plane(
         self, params: CreatePlaneParameters
     ) -> AdapterResult[SolidWorksFeature]:
         return _create_plane_impl(self, params)
 
-    async def create_axis(
+    def create_axis(
         self, params: CreateAxisParameters
     ) -> AdapterResult[SolidWorksFeature]:
         return _create_axis_impl(self, params)
 
-    async def rename_feature(
+    def rename_feature(
         self, params: RenameFeatureParameters
     ) -> AdapterResult[SolidWorksFeature]:
         return _rename_feature_impl(self, params)
 
-    async def create_reference_point(
+    def create_reference_point(
         self, params: CreateReferencePointParameters
     ) -> AdapterResult[SolidWorksFeature]:
         return _create_reference_point_impl(self, params)
 
-    async def create_coordinate_system(
+    def create_coordinate_system(
         self, params: CreateCoordinateSystemParameters
     ) -> AdapterResult[SolidWorksFeature]:
         return _create_coordinate_system_impl(self, params)

@@ -112,7 +112,7 @@ def _as_construction(adapter, entity_id: str) -> None:
         raise RuntimeError(f"{entity_id} did not take the construction flag")
 
 
-async def _shaft_profile(adapter) -> list[tuple[str, str]]:
+def _shaft_profile(adapter) -> list[tuple[str, str]]:
     """The capsule half-profile, revolved into the body. Constraint accounting
     (12 point unknowns less the two arcs' equal-radius ties = 10): close line
     horizontal with the origin at its midpoint (3), O.D. line horizontal (1),
@@ -121,52 +121,52 @@ async def _shaft_profile(adapter) -> list[tuple[str, str]]:
     from solidworks_mcp.adapters.base import RevolveParameters
 
     dims = SketchDims()
-    check("create_sketch shaft", await adapter.create_sketch("Right"))
+    check("create_sketch shaft", adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
     axis = check(
-        "shaft axis centerline", await adapter.add_centerline(-TIP, 0.0, TIP, 0.0)
+        "shaft axis centerline", adapter.add_centerline(-TIP, 0.0, TIP, 0.0)
     )
     top = check(
         "shaft O.D. line",
-        await adapter.add_line(-CYLINDER_HALF, SHAFT_R, CYLINDER_HALF, SHAFT_R),
+        adapter.add_line(-CYLINDER_HALF, SHAFT_R, CYLINDER_HALF, SHAFT_R),
     )
     # add_arc sweeps CCW p1 -> p2: apex -> rim at +u, rim -> apex at -u.
     cap_pos = check(
         "shaft +u dome",
-        await adapter.add_arc(CYLINDER_HALF, 0.0, TIP, 0.0, CYLINDER_HALF, SHAFT_R),
+        adapter.add_arc(CYLINDER_HALF, 0.0, TIP, 0.0, CYLINDER_HALF, SHAFT_R),
     )
-    close = check("shaft close line", await adapter.add_line(TIP, 0.0, -TIP, 0.0))
+    close = check("shaft close line", adapter.add_line(TIP, 0.0, -TIP, 0.0))
     cap_neg = check(
         "shaft -u dome",
-        await adapter.add_arc(-CYLINDER_HALF, 0.0, -CYLINDER_HALF, SHAFT_R, -TIP, 0.0),
+        adapter.add_arc(-CYLINDER_HALF, 0.0, -CYLINDER_HALF, SHAFT_R, -TIP, 0.0),
     )
     set_sketch_direct_db(adapter, False)
     check(
         "shaft close horizontal",
-        await adapter.add_sketch_constraint(close, None, "horizontal"),
+        adapter.add_sketch_constraint(close, None, "horizontal"),
     )
     check(
         "shaft centred on the origin",
-        await adapter.add_sketch_constraint("origin", close, "midpoint"),
+        adapter.add_sketch_constraint("origin", close, "midpoint"),
     )
     check(
         "shaft O.D. horizontal",
-        await adapter.add_sketch_constraint(top, None, "horizontal"),
+        adapter.add_sketch_constraint(top, None, "horizontal"),
     )
     for cap, end, tag in ((cap_neg, "start", "-u"), (cap_pos, "end", "+u")):
         check(
             f"shaft {tag} dome centre on the axis",
-            await adapter.add_sketch_constraint(
+            adapter.add_sketch_constraint(
                 f"{cap}.center", "origin", "horizontal_points"
             ),
         )
         check(
             f"shaft {tag} dome centre under the O.D. end",
-            await adapter.add_sketch_constraint(
+            adapter.add_sketch_constraint(
                 f"{top}.{end}", f"{cap}.center", "vertical_points"
             ),
         )
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{close}.start",
         f"{close}.end",
@@ -175,20 +175,20 @@ async def _shaft_profile(adapter) -> list[tuple[str, str]]:
         "shaft OverallLength",
     )
     dims.record("OverallLength", '"ShaftLength"')
-    await add_diametric_linear_dimension(
+    add_diametric_linear_dimension(
         adapter, axis, top, (0.0, SHAFT_R + 5.0), "ShaftDia"
     )
     dims.record("ShaftDia", '"ShaftDia"')
-    await ensure_fully_defined(adapter, "shaft sketch")
-    check("exit_sketch shaft", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "shaft sketch")
+    check("exit_sketch shaft", adapter.exit_sketch())
     name_last_feature(adapter, "ShaftProfile")
     drive_jobs = dims.apply(adapter, "ShaftProfile")
-    check("revolve shaft", await adapter.create_revolve(RevolveParameters(angle=360.0)))
+    check("revolve shaft", adapter.create_revolve(RevolveParameters(angle=360.0)))
     name_last_feature(adapter, "Shaft")
     return drive_jobs
 
 
-async def _flats(adapter) -> list[tuple[str, str]]:
+def _flats(adapter) -> list[tuple[str, str]]:
     """The two set-screw flats: one mid-plane cut from two rectangles on the
     Right plane, each from the flat (v = FLAT_HEIGHT) up past the O.D.
 
@@ -214,21 +214,21 @@ async def _flats(adapter) -> list[tuple[str, str]]:
         (station - half, FLAT_RECT_TOP),
     ]
     rect_neg = [(u - FLAT_PITCH, v) for u, v in rect_pos]
-    check("create_sketch flats", await adapter.create_sketch("Right"))
+    check("create_sketch flats", adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
-    lines_pos = await add_line_chain(adapter, rect_pos)
-    lines_neg = await add_line_chain(adapter, rect_neg)
+    lines_pos = add_line_chain(adapter, rect_pos)
+    lines_neg = add_line_chain(adapter, rect_neg)
     witness = check(
         "flat witness",
-        await adapter.add_line(rect_pos[0][0], -SHAFT_R, rect_pos[0][0], 0.0),
+        adapter.add_line(rect_pos[0][0], -SHAFT_R, rect_pos[0][0], 0.0),
     )
-    (tip_witness,) = await add_line_chain(
+    (tip_witness,) = add_line_chain(
         adapter, [(0.0, 0.0), (-TIP, 0.0)], close=False
     )
     # Counter-clockwise from the dome's rim on the O.D. down to the tip.
     dome_arc = check(
         "dome radius reference arc",
-        await adapter.add_arc(-CYLINDER_HALF, 0.0, -CYLINDER_HALF, SHAFT_R, -TIP, 0.0),
+        adapter.add_arc(-CYLINDER_HALF, 0.0, -CYLINDER_HALF, SHAFT_R, -TIP, 0.0),
     )
     set_sketch_direct_db(adapter, False)
     _as_construction(adapter, witness)
@@ -240,41 +240,41 @@ async def _flats(adapter) -> list[tuple[str, str]]:
             direction = "horizontal" if v1 == v2 else "vertical"
             check(
                 f"flat {direction} {line}",
-                await adapter.add_sketch_constraint(line, None, direction),
+                adapter.add_sketch_constraint(line, None, direction),
             )
     check(
         "flat witness vertical",
-        await adapter.add_sketch_constraint(witness, None, "vertical"),
+        adapter.add_sketch_constraint(witness, None, "vertical"),
     )
     check(
         "tip witness horizontal",
-        await adapter.add_sketch_constraint(tip_witness, None, "horizontal"),
+        adapter.add_sketch_constraint(tip_witness, None, "horizontal"),
     )
     check(
         "tip witness starts at the origin",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{tip_witness}.start", "origin", "coincident"
         ),
     )
     check(
         "dome radius reference ends at the tip",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{dome_arc}.end", f"{tip_witness}.end", "coincident"
         ),
     )
     check(
         "dome radius reference centre on the axis",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{dome_arc}.center", "origin", "horizontal_points"
         ),
     )
     check(
         "dome radius reference starts over its centre",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{dome_arc}.start", f"{dome_arc}.center", "vertical_points"
         ),
     )
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{tip_witness}.start",
         f"{tip_witness}.end",
@@ -286,7 +286,7 @@ async def _flats(adapter) -> list[tuple[str, str]]:
     flat_pos, rise_pos = lines_pos[0], lines_pos[1]
     flat_neg, rise_neg = lines_neg[0], lines_neg[1]
     corner = f"{flat_pos}.start"  # the +u flat's -u edge on the flat line
-    await dimension_between(
+    dimension_between(
         adapter,
         corner,
         f"{flat_pos}.end",
@@ -295,7 +295,7 @@ async def _flats(adapter) -> list[tuple[str, str]]:
         "FlatLength",
     )
     dims.record("FlatLength", '"FlatLength"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{rise_pos}.start",
         f"{rise_pos}.end",
@@ -306,11 +306,11 @@ async def _flats(adapter) -> list[tuple[str, str]]:
     dims.record("FlatRise")
     check(
         "flat witness under the corner",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{witness}.start", corner, "vertical_points"
         ),
     )
-    await dimension_between(
+    dimension_between(
         adapter,
         corner,
         f"{witness}.start",
@@ -319,7 +319,7 @@ async def _flats(adapter) -> list[tuple[str, str]]:
         "AcrossFlat",
     )
     dims.record("AcrossFlat", '"ShaftDia" - "FlatDepth"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{witness}.start",
         "origin",
@@ -330,11 +330,11 @@ async def _flats(adapter) -> list[tuple[str, str]]:
     dims.record("WitnessFoot", '"ShaftDia" / 2')
     check(
         "flat witness top on the axis",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{witness}.end", "origin", "horizontal_points"
         ),
     )
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{flat_neg}.start",
         f"{flat_neg}.end",
@@ -343,7 +343,7 @@ async def _flats(adapter) -> list[tuple[str, str]]:
         "-u FlatLength",
     )
     dims.record("FlatLengthB", '"FlatLength"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{rise_neg}.start",
         f"{rise_neg}.end",
@@ -354,7 +354,7 @@ async def _flats(adapter) -> list[tuple[str, str]]:
     dims.record("FlatRiseB")
     # Both stations are baselines off the -u dome tip: the -u flat's outer
     # edge and the +u flat's inner edge, so neither chains through the other.
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{tip_witness}.end",
         f"{flat_neg}.start",
@@ -363,7 +363,7 @@ async def _flats(adapter) -> list[tuple[str, str]]:
         "FlatFromEnd",
     )
     dims.record("FlatFromEnd", '"ShaftLength" / 2 - "FlatPitch" / 2 - "FlatLength" / 2')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{tip_witness}.end",
         corner,
@@ -376,24 +376,24 @@ async def _flats(adapter) -> list[tuple[str, str]]:
     )
     check(
         "flats on one line",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{flat_neg}.start", corner, "horizontal_points"
         ),
     )
     check(
         "dome radius reference",
-        await adapter.add_sketch_dimension(dome_arc, None, "radial", SHAFT_R),
+        adapter.add_sketch_dimension(dome_arc, None, "radial", SHAFT_R),
     )
     dims.record("DomeRadius", '"ShaftDia" / 2')
-    await ensure_fully_defined(adapter, "flats sketch")
-    check("exit_sketch flats", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "flats sketch")
+    check("exit_sketch flats", adapter.exit_sketch())
     name_last_feature(adapter, "FlatProfile")
     drive_jobs = dims.apply(adapter, "FlatProfile")
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check(
         "cut flats",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=FLAT_CUT_DEPTH, both_directions=True)
         ),
     )
@@ -401,45 +401,45 @@ async def _flats(adapter) -> list[tuple[str, str]]:
     return drive_jobs
 
 
-async def build(adapter) -> dict[str, str]:
-    check("create_part", await adapter.create_part())
+def build(adapter) -> dict[str, str]:
+    check("create_part", adapter.create_part())
     # #290: the row's inch calculation units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this
     # is an INCH document and the equation manager reads BARE numbers in
     # document units (an unsuffixed 166.4 = 166.4 in).
-    await set_global(adapter, "ShaftDia", f"{SHAFT_DIA}mm")
-    await set_global(adapter, "ShaftLength", f"{SHAFT_LENGTH}mm")
-    await set_global(adapter, "FlatLength", f"{FLAT_LENGTH}mm")
-    await set_global(adapter, "FlatPitch", f"{FLAT_PITCH}mm")
-    await set_global(adapter, "FlatDepth", f"{FLAT_DEPTH}mm")
+    set_global(adapter, "ShaftDia", f"{SHAFT_DIA}mm")
+    set_global(adapter, "ShaftLength", f"{SHAFT_LENGTH}mm")
+    set_global(adapter, "FlatLength", f"{FLAT_LENGTH}mm")
+    set_global(adapter, "FlatPitch", f"{FLAT_PITCH}mm")
+    set_global(adapter, "FlatDepth", f"{FLAT_DEPTH}mm")
 
-    drive_jobs = await _shaft_profile(adapter)
-    volume = await volume_check(adapter, "shaft", V_BODY, 0.005 * V_BODY)
-    drive_jobs += await _flats(adapter)
-    volume = await volume_check(
+    drive_jobs = _shaft_profile(adapter)
+    volume = volume_check(adapter, "shaft", V_BODY, 0.005 * V_BODY)
+    drive_jobs += _flats(adapter)
+    volume = volume_check(
         adapter, "set-screw flats", volume - 2.0 * V_FLAT, 0.03 * 2.0 * V_FLAT
     )
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    volume_check(
         adapter, "driven shaft (equations neutral)", volume, 0.001 * volume
     )
 
     # The levers ride this axis by name.  A point on the O.D. is a
     # view-dependent pick that grazes the silhouette in the standard views,
     # where the lever bores' edges sit 0.075 mm off it (#916).
-    await name_bore_axis(adapter, "Right Plane", 0.0, "Top Plane", 0.0, "shaft axis")
+    name_bore_axis(adapter, "Right Plane", 0.0, "Top Plane", 0.0, "shaft axis")
     name_last_feature(adapter, "shaft axis")
 
-    await apply_material(adapter, MATERIAL)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    report_mass_properties(adapter)
     # The band is millimetres; UNIT prints it in inches.
     set_dimension_bilateral_tolerance(
         adapter,
@@ -465,7 +465,7 @@ async def build(adapter) -> dict[str, str]:
             "Iso View Note": ISO_VIEW_NOTE,
         },
     )
-    return await save_part_and_images(adapter, PART_NAME)
+    return save_part_and_images(adapter, PART_NAME)
 
 
 if __name__ == "__main__":

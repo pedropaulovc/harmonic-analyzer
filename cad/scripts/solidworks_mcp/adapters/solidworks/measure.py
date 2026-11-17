@@ -52,7 +52,7 @@ _MEASURE_FLAGS = ("IsParallel", "IsIntersect", "IsPerpendicular")
 class SolidWorksMeasureMixin:
     """Expose the SolidWorks measure tool via a mixin-local helper."""
 
-    async def measure(self, params: MeasureParameters) -> AdapterResult[dict[str, Any]]:
+    def measure(self, params: MeasureParameters) -> AdapterResult[dict[str, Any]]:
         return _measure_impl(self, params)
 
 

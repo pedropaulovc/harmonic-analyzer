@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from copy import deepcopy
 from types import SimpleNamespace
 
@@ -437,7 +436,7 @@ class FakeOpenAssembly:
 
 
 def _reconcile(file: FakeAssemblyFile) -> SimpleNamespace:
-    async def open_model(_path: str) -> bool:
+    def open_model(_path: str) -> bool:
         adapter.currentModel = FakeOpenAssembly(file)
         file.opens.append(adapter.currentModel)
         file.events.append(("open", adapter.currentModel.NeedsRebuild2))
@@ -449,9 +448,7 @@ def _reconcile(file: FakeAssemblyFile) -> SimpleNamespace:
         open_model=open_model,
         _attempt=lambda fn, default=None: fn(),
     )
-    asyncio.run(
-        _assembly.reconcile_saved_rebuild_state(adapter, "pd-paper-drive", file.path)
-    )
+    _assembly.reconcile_saved_rebuild_state(adapter, "pd-paper-drive", file.path)
     return adapter
 
 
@@ -1284,11 +1281,9 @@ def test_invalid_local_mapping_is_refused_before_any_native_mutation(mapping, op
     adapter = _part_adapter(part)
     with pytest.raises(ValueError):
         if operation == "saved":
-            asyncio.run(
-                _simplified_part.derive_simplified_on_saved_part(
+            _simplified_part.derive_simplified_on_saved_part(
                     adapter, "local-teeth", mapping, "fixture.SLDPRT", list(LOCAL_TEETH)
                 )
-            )
         else:
             function = (
                 _simplified_part.add_simplified_configurations
@@ -1385,7 +1380,7 @@ def _saved_local_adapter(*, save_ok=True):
             disk = deepcopy(adapter.currentModel)
         return (save_ok, 0 if save_ok else 1, 0)
 
-    async def open_model(path):
+    def open_model(path):
         events.append(("open", path))
         adapter.currentModel = deepcopy(disk)
         adapter.currentModel.Save3 = save
@@ -1399,16 +1394,14 @@ def _saved_local_adapter(*, save_ok=True):
 def test_local_saved_reopen_derivation_persists_and_reads_every_parent_and_child():
     adapter, authoring, events = _saved_local_adapter()
     before = authoring.detailed_state()
-    asyncio.run(
-        _simplified_part.derive_simplified_on_saved_part(
+    _simplified_part.derive_simplified_on_saved_part(
             adapter, "local-teeth", LOCAL_TEETH, "fixture.SLDPRT", list(LOCAL_TEETH)
         )
-    )
     assert adapter.currentModel is None
     assert authoring.GetConfigurationNames() == ["Default", *LOCAL_TEETH]
     assert not authoring.mutations
     assert [event[0] for event in events] == ["close", "open", "save", "close"]
-    asyncio.run(adapter.open_model("fixture.SLDPRT"))
+    adapter.open_model("fixture.SLDPRT")
     reopened = adapter.currentModel
     assert reopened is not authoring
     assert reopened.detailed_state() == before
@@ -1424,11 +1417,9 @@ def test_local_saved_reopen_derivation_persists_and_reads_every_parent_and_child
 def test_local_saved_derivation_refuses_failed_save():
     adapter, _authoring, events = _saved_local_adapter(save_ok=False)
     with pytest.raises(RuntimeError, match="Save3 failed"):
-        asyncio.run(
-            _simplified_part.derive_simplified_on_saved_part(
+        _simplified_part.derive_simplified_on_saved_part(
                 adapter, "local-teeth", LOCAL_TEETH, "fixture.SLDPRT", list(LOCAL_TEETH)
             )
-        )
     assert [event[0] for event in events] == ["close", "open", "save"]
 
 
@@ -1483,16 +1474,14 @@ def test_local_telemetry_names_the_actual_targets_for_each_parent(monkeypatch):
 def test_local_saved_derivation_refuses_failed_reopen():
     adapter, authoring, events = _saved_local_adapter()
 
-    async def failed_open(_path):
+    def failed_open(_path):
         return SimpleNamespace(is_success=False, error="cannot reopen saved part")
 
     adapter.open_model = failed_open
     with pytest.raises(RuntimeError, match="cannot reopen saved part"):
-        asyncio.run(
-            _simplified_part.derive_simplified_on_saved_part(
+        _simplified_part.derive_simplified_on_saved_part(
                 adapter, "local-teeth", LOCAL_TEETH, "fixture.SLDPRT", list(LOCAL_TEETH)
             )
-        )
     assert not authoring.mutations
     assert [event[0] for event in events] == ["close"]
 
@@ -1513,14 +1502,14 @@ def test_direct_save_rejects_invalid_mapping_before_save_or_export(monkeypatch, 
         mapping["T120"] = ("duplicate", "duplicate")
     calls = []
 
-    async def save_or_export(*args, **kwargs):
+    def save_or_export(*args, **kwargs):
         calls.append((args, kwargs))
         raise AssertionError("invalid mappings must never save or export")
 
     monkeypatch.setattr(_simplified_part, "save_part_and_images", save_or_export)
     before = part.detailed_state()
     with pytest.raises(ValueError):
-        asyncio.run(_simplified_part.save_simplified_part(adapter, "local-teeth", mapping))
+        _simplified_part.save_simplified_part(adapter, "local-teeth", mapping)
     assert not calls
     assert not part.mutations
     assert adapter.currentModel is part

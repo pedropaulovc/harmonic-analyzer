@@ -29,24 +29,24 @@ import build_pd_transgear_removable as btr
 _orig = _sketch.dimension_between
 
 
-async def _patched(adapter, ref1, ref2, kind, value, label):
+def _patched(adapter, ref1, ref2, kind, value, label):
     try:
-        return await _orig(adapter, ref1, ref2, kind, value, label)
+        return _orig(adapter, ref1, ref2, kind, value, label)
     except RuntimeError as exc:
         _telemetry.warn(f"dim FAILED, dumping diagnostics: {exc}")
-        st = await adapter.check_sketch_fully_defined()
+        st = adapter.check_sketch_fully_defined()
         _telemetry.debug(f"state: {st.data if st.is_success else st.error!r}")
-        over = await adapter.get_over_defining_relations()
+        over = adapter.get_over_defining_relations()
         _telemetry.debug(f"over-defining: {over.data if over.is_success else over.error!r}")
-        retry = await adapter.add_sketch_dimension(ref1, ref2, kind, value)
+        retry = adapter.add_sketch_dimension(ref1, ref2, kind, value)
         _telemetry.debug(f"retry same dim: {retry.is_success}"
                          + ("" if retry.is_success else f" [{retry.error}]"))
         if retry.is_success:
             return retry
-        aligned = await adapter.add_sketch_dimension(ref1, ref2, "distance", value)
+        aligned = adapter.add_sketch_dimension(ref1, ref2, "distance", value)
         _telemetry.debug(f"aligned 'distance' fallback: {aligned.is_success}"
                          + ("" if aligned.is_success else f" [{aligned.error}]"))
-        swapped = await adapter.add_sketch_dimension(ref2, ref1, kind, value)
+        swapped = adapter.add_sketch_dimension(ref2, ref1, kind, value)
         _telemetry.debug(f"swapped-operand retry: {swapped.is_success}"
                          + ("" if swapped.is_success else f" [{swapped.error}]"))
         raise

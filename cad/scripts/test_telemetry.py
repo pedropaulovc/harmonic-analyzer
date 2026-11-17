@@ -11,7 +11,6 @@ log<->trace correlation, and cross-process trace-context propagation.
 
 from __future__ import annotations
 
-import asyncio
 import builtins
 import importlib.util
 import inspect
@@ -215,12 +214,12 @@ def test_nonrecording_span_preserves_body_outcome(
         with _telemetry.span("nonrecording") as sp:
             return body(sp)
 
-    async def asynchronous_body():
-        async with _telemetry.aspan("nonrecording") as sp:
+    def asynchronous_body():
+        with _telemetry.span("nonrecording") as sp:
             return body(sp)
 
     def invoke():
-        return asyncio.run(asynchronous_body()) if asynchronous else synchronous()
+        return asynchronous_body() if asynchronous else synchronous()
 
     if isinstance(outcome, BaseException):
         with pytest.raises(type(outcome)) as caught:
@@ -452,14 +451,14 @@ def test_traced_decorator_wraps_sync_and_async(capture):
     spans, _ = capture
 
     @_telemetry.traced("op.async", label_param="label")
-    async def afn(label):
+    def afn(label):
         return label
 
     @_telemetry.traced("op.sync")
     def sfn():
         return 1
 
-    assert asyncio.run(afn("widget")) == "widget"
+    assert afn("widget") == "widget"
     assert sfn() == 1
 
     a = [s for s in spans.get_finished_spans() if s.name == "op.async"][-1]
@@ -1146,18 +1145,18 @@ def _fake_adapter_class():
     from solidworks_mcp.adapters.base import AdapterResult, AdapterResultStatus
 
     class FakeAdapter:
-        async def create_plane(self, name, offset_mm=0.0):
+        def create_plane(self, name, offset_mm=0.0):
             return AdapterResult(
                 status=AdapterResultStatus.SUCCESS, data=(name, offset_mm)
             )
 
-        async def create_axis(self, *args, **kwargs):
+        def create_axis(self, *args, **kwargs):
             return AdapterResult(status=AdapterResultStatus.ERROR, error="no such edge")
 
-        async def open_model(self, path):
+        def open_model(self, path):
             raise OSError(f"cannot open {path}")
 
-        async def add_line(self, *args):
+        def add_line(self, *args):
             return AdapterResult(status=AdapterResultStatus.SUCCESS)
 
     return FakeAdapter
@@ -1170,16 +1169,16 @@ def test_instrumented_adapter_calls_are_spans_and_stay_transparent(capture):
     assert _telemetry.instrument_adapter(cls) == 0, "a second pass must not double-wrap"
     adapter = cls()
 
-    async def drive():
+    def drive():
         with _telemetry.span("part.build"):
-            ok = await adapter.create_plane("Tooth Plane", offset_mm=2.5)
-            probe = await adapter.create_axis("candidate")
-            await adapter.add_line(0, 0, 1, 1)
+            ok = adapter.create_plane("Tooth Plane", offset_mm=2.5)
+            probe = adapter.create_axis("candidate")
+            adapter.add_line(0, 0, 1, 1)
             with pytest.raises(OSError, match="cannot open"):
-                await adapter.open_model(Path("C:/models/cone_gear.SLDPRT"))
+                adapter.open_model(Path("C:/models/cone_gear.SLDPRT"))
         return ok, probe
 
-    ok, probe = asyncio.run(drive())
+    ok, probe = drive()
     assert ok.data == ("Tooth Plane", 2.5)
     assert probe.error == "no such edge"
 

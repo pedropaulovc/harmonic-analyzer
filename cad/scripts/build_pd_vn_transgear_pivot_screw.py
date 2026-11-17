@@ -88,17 +88,17 @@ SPEC = fastener(PART_NAME)
 MATERIAL = SPEC.material
 
 
-async def _shoulder_end_point(adapter, label: str) -> str:
+def _shoulder_end_point(adapter, label: str) -> str:
     """A sketch point on the shoulder's end face, anchored on the axis."""
     point = adapter.currentSketchManager.CreatePoint(0, SHOULDER_END_Y / 1000, 0)
     if point is None:
         raise RuntimeError(f"cannot create the {label} shoulder-end reference")
     ref = adapter._register_sketch_entity("Point", point)
-    await anchor_point_to_origin(adapter, ref, 0.0, SHOULDER_END_Y, "shoulder end")
+    anchor_point_to_origin(adapter, ref, 0.0, SHOULDER_END_Y, "shoulder end")
     return ref
 
 
-async def _trim_stock(adapter) -> None:
+def _trim_stock(adapter) -> None:
     """The native CutLength places the actual facing plane from the shoulder's
     end face."""
     from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
@@ -107,8 +107,8 @@ async def _trim_stock(adapter) -> None:
     radius = THREAD_MAJOR / 2
     bottom = SHOULDER_END_Y - THREAD_LEN - THREAD_MAJOR
     with no_sketch_inference(adapter):
-        check("create trim sketch", await adapter.create_sketch("Front"))
-        lines = await add_line_chain(
+        check("create trim sketch", adapter.create_sketch("Front"))
+        lines = add_line_chain(
             adapter,
             [
                 (-2 * radius, bottom),
@@ -123,14 +123,14 @@ async def _trim_stock(adapter) -> None:
         ):
             check(
                 "trim profile relation",
-                await adapter.add_sketch_constraint(line, None, direction),
+                adapter.add_sketch_constraint(line, None, direction),
             )
-        await anchor_point_to_origin(
+        anchor_point_to_origin(
             adapter, f"{lines[0]}.start", -2 * radius, bottom, "trim cutter margin"
         )
         dims.record("CutterLeft")
         dims.record("CutterBottom")
-        await dimension_between(
+        dimension_between(
             adapter,
             f"{lines[0]}.start",
             f"{lines[0]}.end",
@@ -139,9 +139,9 @@ async def _trim_stock(adapter) -> None:
             "trim cutter width",
         )
         dims.record("CutterWidth")
-        shoulder = await _shoulder_end_point(adapter, "trim")
+        shoulder = _shoulder_end_point(adapter, "trim")
         dims.record("ShoulderEndY")
-        await dimension_between(
+        dimension_between(
             adapter,
             shoulder,
             f"{lines[2]}.start",
@@ -150,21 +150,21 @@ async def _trim_stock(adapter) -> None:
             "fitted thread length",
         )
         dims.record("CutLength")
-        await ensure_fully_defined(adapter, "stock trim profile")
-        check("exit trim sketch", await adapter.exit_sketch())
+        ensure_fully_defined(adapter, "stock trim profile")
+        check("exit trim sketch", adapter.exit_sketch())
         name_last_feature(adapter, "StockTrimProfile")
         dims.apply(adapter, "StockTrimProfile")
         check(
             "face stock to length",
-            await adapter.create_cut_extrude(
+            adapter.create_cut_extrude(
                 ExtrusionParameters(depth=4 * THREAD_MAJOR, both_directions=True)
             ),
         )
         name_last_feature(adapter, "StockTrim")
 
         chamfer = CHAMFER_WIDTH
-        check("create deburr sketch", await adapter.create_sketch("Front"))
-        lines = await add_line_chain(
+        check("create deburr sketch", adapter.create_sketch("Front"))
+        lines = add_line_chain(
             adapter,
             [
                 (radius - chamfer, TIP_Y),
@@ -180,9 +180,9 @@ async def _trim_stock(adapter) -> None:
         ):
             check(
                 "deburr profile relation",
-                await adapter.add_sketch_constraint(line, None, direction),
+                adapter.add_sketch_constraint(line, None, direction),
             )
-        await dimension_between(
+        dimension_between(
             adapter,
             f"{lines[1]}.start",
             "origin",
@@ -191,11 +191,11 @@ async def _trim_stock(adapter) -> None:
             "cutter outer radius",
         )
         dims.record("CutterRadius")
-        shoulder = await _shoulder_end_point(adapter, "deburr")
+        shoulder = _shoulder_end_point(adapter, "deburr")
         dims.record("ShoulderEndY")
         # A nonzero length from the real shoulder end locates the cutter. Its
         # equation follows CutLength.
-        await dimension_between(
+        dimension_between(
             adapter,
             shoulder,
             f"{lines[1]}.start",
@@ -204,7 +204,7 @@ async def _trim_stock(adapter) -> None:
             "faced tip from shoulder end",
         )
         dims.record("CutEndFromShoulder")
-        await dimension_between(
+        dimension_between(
             adapter,
             f"{lines[3]}.start",
             "origin",
@@ -213,7 +213,7 @@ async def _trim_stock(adapter) -> None:
             "stock major radius",
         )
         dims.record("StockMajorRadius")
-        await dimension_between(
+        dimension_between(
             adapter,
             f"{lines[3]}.start",
             f"{lines[3]}.end",
@@ -257,18 +257,18 @@ async def _trim_stock(adapter) -> None:
         axis_id = adapter._register_sketch_entity("Line", axis)
         # The construction axis only represents the fixed stock shank axis.
         check(
-            "fix deburr axis", await adapter.add_sketch_constraint(axis_id, None, "fix")
+            "fix deburr axis", adapter.add_sketch_constraint(axis_id, None, "fix")
         )
-        await ensure_fully_defined(adapter, "stock deburr profile")
-        check("exit deburr sketch", await adapter.exit_sketch())
+        ensure_fully_defined(adapter, "stock deburr profile")
+        check("exit deburr sketch", adapter.exit_sketch())
         name_last_feature(adapter, "StockDeburrProfile")
         dims.apply(adapter, "StockDeburrProfile")
-        await drive_dimension(
+        drive_dimension(
             adapter,
             "ShoulderEndY@StockDeburrProfile",
             '"ShoulderEndY@StockTrimProfile"',
         )
-        await drive_dimension(
+        drive_dimension(
             adapter,
             "CutEndFromShoulder@StockDeburrProfile",
             '"CutLength@StockTrimProfile"',
@@ -288,31 +288,31 @@ async def _trim_stock(adapter) -> None:
             raise RuntimeError("cannot select stock deburr axis")
         check(
             "deburr faced tip",
-            await adapter.create_revolve(RevolveParameters(angle=360, is_cut=True)),
+            adapter.create_revolve(RevolveParameters(angle=360, is_cut=True)),
         )
         name_last_feature(adapter, "StockDeburr")
 
 
-async def _thread_tail_acceptance(adapter) -> None:
+def _thread_tail_acceptance(adapter) -> None:
     """Retain the native thread-tail MIN from the faced tip."""
     radius = THREAD_MAJOR / 2
-    check("create tail inspection", await adapter.create_sketch("Front"))
-    lines = await add_line_chain(
+    check("create tail inspection", adapter.create_sketch("Front"))
+    lines = add_line_chain(
         adapter,
         [(radius, TIP_Y), (radius, TIP_Y + THREAD_LENGTH_MIN)],
         close=False,
     )
     dims = SketchDims()
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{lines[0]}.start", radius, TIP_Y, "faced tip plane"
     )
     dims.record("TailMajorRadius")
     dims.record("TailTipY")
     check(
         "tail direction",
-        await adapter.add_sketch_constraint(lines[0], None, "vertical"),
+        adapter.add_sketch_constraint(lines[0], None, "vertical"),
     )
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{lines[0]}.start",
         f"{lines[0]}.end",
@@ -321,12 +321,12 @@ async def _thread_tail_acceptance(adapter) -> None:
         "continuous inspected thread tail",
     )
     dims.record("ThreadLengthMin")
-    await ensure_fully_defined(adapter, "tail inspection length")
-    check("exit tail inspection", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "tail inspection length")
+    check("exit tail inspection", adapter.exit_sketch())
     name_last_feature(adapter, "ThreadTailAcceptance")
     dims.apply(adapter, "ThreadTailAcceptance")
     # The tail starts at the faced tip wherever the fit-up puts it.
-    await drive_dimension(
+    drive_dimension(
         adapter,
         "TailTipY@ThreadTailAcceptance",
         '"ShoulderEndY@StockTrimProfile" + "CutLength@StockTrimProfile"',
@@ -396,17 +396,17 @@ def _manufacturing_controls(adapter) -> None:
 
 
 @wraps(build_90325A174)
-async def _face_to_fit(adapter, truth=None, **parameters):
-    receipt = await build_90325A174(adapter, truth, **parameters)
-    await _trim_stock(adapter)
-    await drive_dimension(
+def _face_to_fit(adapter, truth=None, **parameters):
+    receipt = build_90325A174(adapter, truth, **parameters)
+    _trim_stock(adapter)
+    drive_dimension(
         adapter,
         "CutterRadius@StockDeburrProfile",
         '"StockMajorRadius@StockDeburrProfile" + "ChamferWidth@StockDeburrProfile"',
     )
-    await _thread_tail_acceptance(adapter)
+    _thread_tail_acceptance(adapter)
     _manufacturing_controls(adapter)
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     part = _early_bound(adapter.currentModel, "IPartDoc")
     bodies = tuple(part.GetBodies2(0, False) or ())
     if len(bodies) != 1:
@@ -483,23 +483,23 @@ def _add_stock_configuration(adapter) -> str:
     return finished
 
 
-async def _save_supplier_references(adapter, part_name, suppressed_features):
+def _save_supplier_references(adapter, part_name, suppressed_features):
     """Author untoleranced source references without changing solid or final controls.
 
     Supplier sizes print as REF with no band: the catalogue governs, and the
     fit math reads its limits from the spec, never from these dimensions.
     """
-    await add_supplier_reference_sketch(
+    add_supplier_reference_sketch(
         adapter, SUPPLIER_REFERENCE_SKETCH, starts=SUPPLIER_REFERENCE_STARTS
     )
     apply_drawing_properties(
         adapter, part_name, {"Supplier Reference Title": SUPPLIER_STOCK_TITLE}
     )
-    artefacts = await save_simplified_part(adapter, part_name, suppressed_features)
+    artefacts = save_simplified_part(adapter, part_name, suppressed_features)
     finished = _add_stock_configuration(adapter)
     persist_configurations_in_place(adapter, part_name)
     _close_part(adapter)
-    check("reopen source-stock pivot screw", await adapter.open_model(artefacts["part"]))
+    check("reopen source-stock pivot screw", adapter.open_model(artefacts["part"]))
     assert_saved_configurations_regenerate(adapter, part_name)
     assert_simplified_configurations(
         adapter, part_name, suppressed_features, parents=(finished,)
@@ -507,8 +507,8 @@ async def _save_supplier_references(adapter, part_name, suppressed_features):
     return artefacts
 
 
-async def build(adapter) -> dict[str, str]:
-    return await build_stock_fastener(
+def build(adapter) -> dict[str, str]:
+    return build_stock_fastener(
         adapter,
         part_name=PART_NAME,
         components=(StockComponent(SKU, _face_to_fit),),

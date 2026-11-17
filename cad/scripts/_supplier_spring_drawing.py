@@ -769,7 +769,7 @@ def state_captions(
     return captions
 
 
-async def build_supplier_spring_drawing(
+def build_supplier_spring_drawing(
     adapter: Any,
     spec: DrawingSpec,
     *,
@@ -1294,7 +1294,7 @@ async def build_supplier_spring_drawing(
     with _preserve_reference_source_file(
         source, source_sha256, label=spec.artifact_stem
     ):
-        return await finalize_drawing(
+        return finalize_drawing(
             adapter,
             DrawingOutputs(slddrw=paths["slddrw"], pdf=paths["pdf"], png=paths["png"]),
             layout=spec.layout,

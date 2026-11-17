@@ -102,7 +102,7 @@ class HexHeadScrew:
         return self.head_af * 2.0 / math.sqrt(3.0)
 
 
-async def build_hex_head_screw(adapter, dims: HexHeadScrew) -> None:
+def build_hex_head_screw(adapter, dims: HexHeadScrew) -> None:
     from _com import _early_bound, _read_member
     from _feature_tree import _feature_by_name
     from _sketch import add_line_chain
@@ -124,33 +124,33 @@ async def build_hex_head_screw(adapter, dims: HexHeadScrew) -> None:
     crown_d = dims.crown_d
 
     # --- shank with tip chamfer (their Boss-Extrude1 + Chamfer1) ------------
-    check("create_sketch shank", await adapter.create_sketch("Front"))
+    check("create_sketch shank", adapter.create_sketch("Front"))
     sk = adapter.currentSketchManager
     with no_sketch_inference(adapter):
         if sk.CreateCenterLine(0.0, underside / 1000.0, 0.0,
                                0.0, tip_y / 1000.0, 0.0) is None:
             raise RuntimeError(f"{tag} shank: CreateCenterLine failed")
-        await add_line_chain(adapter, [
+        add_line_chain(adapter, [
             (0.0, underside),
             (major_r, underside),
             (major_r, tip_y + tip_ch),
             (major_r - tip_ch, tip_y),
             (0.0, tip_y),
         ])
-    check("exit_sketch shank", await adapter.exit_sketch())
+    check("exit_sketch shank", adapter.exit_sketch())
     name_last_feature(adapter, "ShankProfile")
-    check("revolve shank", await adapter.create_revolve(
+    check("revolve shank", adapter.create_revolve(
         RevolveParameters(angle=360.0, is_cut=False)))
     name_last_feature(adapter, "Shank")
     v_shank = (math.pi * major_r ** 2 * (dims.length - tip_ch)
                + _rev_frustum(tip_ch, major_r, major_r - tip_ch))
-    await volume_check(adapter, "shank revolve", v_shank, 0.005 * v_shank)
+    volume_check(adapter, "shank revolve", v_shank, 0.005 * v_shank)
 
     # --- hex head from the underside ----------------------------------------
     offset_plane(adapter, "UndersidePlane", underside)
-    check("create_sketch hex", await adapter.create_sketch("UndersidePlane"))
+    check("create_sketch hex", adapter.create_sketch("UndersidePlane"))
     with no_sketch_inference(adapter):
-        await add_line_chain(adapter, [
+        add_line_chain(adapter, [
             (0.0, hex_R),
             (-flat_r, hex_R / 2.0),
             (-flat_r, -hex_R / 2.0),
@@ -158,22 +158,22 @@ async def build_hex_head_screw(adapter, dims: HexHeadScrew) -> None:
             (flat_r, -hex_R / 2.0),
             (flat_r, hex_R / 2.0),
         ])
-    check("exit_sketch hex", await adapter.exit_sketch())
+    check("exit_sketch hex", adapter.exit_sketch())
     name_last_feature(adapter, "HexProfile")
-    check("extrude hex", await adapter.create_extrusion(ExtrusionParameters(
+    check("extrude hex", adapter.create_extrusion(ExtrusionParameters(
         depth=dims.head_h)))
     name_last_feature(adapter, "HexHead")
     v_hex = dims.head_af ** 2 * math.sqrt(3.0) / 2.0 * dims.head_h
-    await volume_check(adapter, "hex head", v_shank + v_hex, 0.005 * v_hex)
+    volume_check(adapter, "hex head", v_shank + v_hex, 0.005 * v_hex)
 
     # --- corner trim: outside the inscribed circle, 60-deg cone --------------
     offset_plane(adapter, "HeadTopPlane", top_y)
-    check("create_sketch trim", await adapter.create_sketch("HeadTopPlane"))
+    check("create_sketch trim", adapter.create_sketch("HeadTopPlane"))
     with no_sketch_inference(adapter):
         if adapter.currentSketchManager.CreateCircleByRadius(
                 0.0, 0.0, 0.0, flat_r / 1000.0) is None:
             raise RuntimeError("trim circle failed")
-    check("exit_sketch trim", await adapter.exit_sketch())
+    check("exit_sketch trim", adapter.exit_sketch())
     name_last_feature(adapter, "TrimProfile")
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     model.ClearSelection2(True)
@@ -193,22 +193,22 @@ async def build_hex_head_screw(adapter, dims: HexHeadScrew) -> None:
     name_last_feature(adapter, "CornerTrim")
 
     # --- crown dish (45-deg revolved cut) ------------------------------------
-    check("create_sketch crown", await adapter.create_sketch("Front"))
+    check("create_sketch crown", adapter.create_sketch("Front"))
     sk2 = adapter.currentSketchManager
     with no_sketch_inference(adapter):
         if sk2.CreateCenterLine(0.0, top_y / 1000.0, 0.0,
                                 0.0, (top_y - crown_d) / 1000.0, 0.0) is None:
             raise RuntimeError("crown: CreateCenterLine failed")
-        await add_line_chain(adapter, [
+        add_line_chain(adapter, [
             (0.0, top_y + 0.2),
             (crown_r + 0.2, top_y + 0.2),
             (crown_r, top_y),
             (crown_r - crown_d, top_y - crown_d),
             (0.0, top_y - crown_d),
         ])
-    check("exit_sketch crown", await adapter.exit_sketch())
+    check("exit_sketch crown", adapter.exit_sketch())
     name_last_feature(adapter, "CrownProfile")
-    check("crown cut", await adapter.create_revolve(
+    check("crown cut", adapter.create_revolve(
         RevolveParameters(angle=360.0, is_cut=True)))
     name_last_feature(adapter, "CrownDish")
 
@@ -224,7 +224,7 @@ async def build_hex_head_screw(adapter, dims: HexHeadScrew) -> None:
 
     # --- tip-seeded ascending helix, L/P + 1 revolutions ---------------------
     offset_plane(adapter, "TipPlane", tip_y)
-    check("create_sketch helix seed", await adapter.create_sketch("TipPlane"))
+    check("create_sketch helix seed", adapter.create_sketch("TipPlane"))
     with no_sketch_inference(adapter):
         if adapter.currentSketchManager.CreateCircleByRadius(
                 0.0, 0.0, 0.0, major_r / 1000.0) is None:
@@ -235,28 +235,28 @@ async def build_hex_head_screw(adapter, dims: HexHeadScrew) -> None:
 
     cy = tip_y - 7.0 * pitch / 16.0
     top_r = major_r + h_sharp / 16.0
-    check("create_sketch cutter", await adapter.create_sketch("Front"))
+    check("create_sketch cutter", adapter.create_sketch("Front"))
     with no_sketch_inference(adapter):
-        await add_line_chain(adapter, [
+        add_line_chain(adapter, [
             (top_r, cy + 15.0 * pitch / 32.0),
             (root_r, cy + pitch / 16.0),
             (root_r, cy - pitch / 16.0),
             (top_r, cy - 15.0 * pitch / 32.0),
         ])
-    check("exit_sketch cutter", await adapter.exit_sketch())
+    check("exit_sketch cutter", adapter.exit_sketch())
     name_last_feature(adapter, "ThreadCutter")
     thread_sweep_cut(adapter, "ThreadCutter", "ThreadHelix", shank_name,
                      "ThreadGroove", tangency=(0, 0))
 
     # --- under-head runout: ONE both-directions drafted extrude -------------
-    check("create_sketch runout", await adapter.create_sketch("UndersidePlane"))
+    check("create_sketch runout", adapter.create_sketch("UndersidePlane"))
     # 0.0508 from the shank silhouette is inside pixel-snapping range:
     # without inference off the circle snaps to the major (seen live on 194).
     with no_sketch_inference(adapter):
         if adapter.currentSketchManager.CreateCircleByRadius(
                 0.0, 0.0, 0.0, dims.runout_r / 1000.0) is None:
             raise RuntimeError("runout circle failed")
-    check("exit_sketch runout", await adapter.exit_sketch())
+    check("exit_sketch runout", adapter.exit_sketch())
     name_last_feature(adapter, "RunoutProfile")
     model.ClearSelection2(True)
     _feature_by_name(adapter, "RunoutProfile").Select2(False, 0)

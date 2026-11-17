@@ -44,7 +44,7 @@ def _sldasm_dir() -> Path:
     return OUT_SLDASM
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     argv = sys.argv[1:]
     if "--dir" in argv:
         i = argv.index("--dir")
@@ -58,7 +58,7 @@ async def build(adapter) -> dict[str, str]:
             log(f"{name}: not built -- skipped")
             continue
         adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
-        check(f"open {name}", await adapter.open_model(str(sldasm)))
+        check(f"open {name}", adapter.open_model(str(sldasm)))
         under = sorted(_under_constrained_components(adapter))
         stems = sorted({re.sub(r"-\d+$", "", n) for n in under})
         log(f"{name}: {len(under)} under-constrained")

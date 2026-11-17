@@ -1076,11 +1076,11 @@ def _set_spherical_reference(adapter: Any, annotation: Any, *, label: str) -> No
         raise RuntimeError(f"failed to mark {label} as a spherical reference: {applied}")
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open crankshaft source", await adapter.open_model(str(SOURCE)))
+    check("open crankshaft source", adapter.open_model(str(SOURCE)))
     read_required_properties(
         adapter.currentModel,
         (
@@ -1353,7 +1353,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # rule 9 (show internal shape in solid lines)): the punch mark is flagged by
     # its own leader, so no dashed cross-hole is needed to clock it.
 
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Crankshaft Manufacturing Drawing",

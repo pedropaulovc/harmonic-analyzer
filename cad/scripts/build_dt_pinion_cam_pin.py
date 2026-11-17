@@ -83,18 +83,18 @@ V_CAP = math.pi * CAP_SAG**2 * (3.0 * CAP_R - CAP_SAG) / 3.0
 V_PIN = math.pi * PIN_R**2 * PIN_LEN
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import RevolveParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     # #290: the row's inch calculation units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing (INCH
     # document; the equation manager reads bare numbers in document units).
-    await set_global(adapter, "PinDia", f"{PIN_DIA}mm")
-    await set_global(adapter, "PinLen", f"{PIN_LEN}mm")
-    await set_global(adapter, "CapSag", f"{CAP_SAG}mm")
+    set_global(adapter, "PinDia", f"{PIN_DIA}mm")
+    set_global(adapter, "PinLen", f"{PIN_LEN}mm")
+    set_global(adapter, "CapSag", f"{CAP_SAG}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -105,11 +105,11 @@ async def build(adapter) -> dict[str, str]:
     # diameter as a doubled centerline-to-outline dim -- so both import into
     # the *Right side view.
     pin = SketchDims()
-    check("create_sketch pin", await adapter.create_sketch("Right"))
+    check("create_sketch pin", adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
-    axis = check("axis centerline", await adapter.add_centerline(0.0, 0.0, -PIN_LEN, 0.0))
+    axis = check("axis centerline", adapter.add_centerline(0.0, 0.0, -PIN_LEN, 0.0))
     profile_pts = [(0.0, 0.0), (0.0, PIN_R), (-PIN_LEN, PIN_R), (-PIN_LEN, 0.0)]
-    profile_lines = await add_line_chain(adapter, profile_pts)
+    profile_lines = add_line_chain(adapter, profile_pts)
     set_sketch_direct_db(adapter, False)
     n = len(profile_lines)
     for i, line in enumerate(profile_lines):
@@ -117,10 +117,10 @@ async def build(adapter) -> dict[str, str]:
         direction = "horizontal" if y1 == y2 else "vertical"
         check(
             f"pin {direction} {line}",
-            await adapter.add_sketch_constraint(line, None, direction),
+            adapter.add_sketch_constraint(line, None, direction),
         )
     outline = profile_lines[1]
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{outline}.start",
         f"{outline}.end",
@@ -129,98 +129,98 @@ async def build(adapter) -> dict[str, str]:
         "pin Depth",
     )
     pin.record("Depth", '"PinLen"')
-    await add_diametric_linear_dimension(
+    add_diametric_linear_dimension(
         adapter, axis, outline, (-PIN_LEN / 4.0, PIN_R + 4.0), "PinDia"
     )
     pin.record("PinDia", '"PinDia"')
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{profile_lines[0]}.start", 0.0, 0.0, "pin seated end"
     )
-    await ensure_fully_defined(adapter, "pin sketch")
-    check("exit_sketch pin", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "pin sketch")
+    check("exit_sketch pin", adapter.exit_sketch())
     name_last_feature(adapter, "PinProfile")
     drive_jobs += pin.apply(adapter, "PinProfile")
-    check("revolve pin", await adapter.create_revolve(RevolveParameters(angle=360.0)))
+    check("revolve pin", adapter.create_revolve(RevolveParameters(angle=360.0)))
     name_last_feature(adapter, "Pin")
-    volume = await volume_check(adapter, "pin", V_PIN, 0.005 * V_PIN)
+    volume = volume_check(adapter, "pin", V_PIN, 0.005 * V_PIN)
 
     # Domed outer end on the same Right plane (the MHA-DT-17 back-cap idiom;
     # rim -> apex is the minor CCW lobe at a +Z end, u = -z).
     u_base, u_apex = -PIN_LEN, -(PIN_LEN + CAP_SAG)
     u_centre = -(PIN_LEN + CAP_SAG - CAP_R)
     cap = SketchDims()
-    check("create_sketch cap", await adapter.create_sketch("Right"))
+    check("create_sketch cap", adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
-    check("cap centerline", await adapter.add_centerline(u_base, 0.0, u_apex, 0.0))
-    base = check("cap base", await adapter.add_line(u_base, 0.0, u_base, PIN_R))
+    check("cap centerline", adapter.add_centerline(u_base, 0.0, u_apex, 0.0))
+    base = check("cap base", adapter.add_line(u_base, 0.0, u_base, PIN_R))
     arc = check(
         "cap arc",
-        await adapter.add_arc(u_centre, 0.0, u_base, PIN_R, u_apex, 0.0),
+        adapter.add_arc(u_centre, 0.0, u_base, PIN_R, u_apex, 0.0),
     )
-    close = check("cap close", await adapter.add_line(u_apex, 0.0, u_base, 0.0))
+    close = check("cap close", adapter.add_line(u_apex, 0.0, u_base, 0.0))
     set_sketch_direct_db(adapter, False)
     check(
         "cap base vertical",
-        await adapter.add_sketch_constraint(base, None, "vertical"),
+        adapter.add_sketch_constraint(base, None, "vertical"),
     )
     check(
         "cap close horizontal",
-        await adapter.add_sketch_constraint(close, None, "horizontal"),
+        adapter.add_sketch_constraint(close, None, "horizontal"),
     )
     check(
         "cap rim reach",
-        await adapter.add_sketch_dimension(
+        adapter.add_sketch_dimension(
             f"{base}.end", "origin", "vertical_distance", PIN_R
         ),
     )
     cap.record("CapRim", '"PinDia" / 2')
     check(
         "cap sagitta",
-        await adapter.add_sketch_dimension(
+        adapter.add_sketch_dimension(
             f"{close}.start", f"{close}.end", "horizontal_distance", CAP_SAG
         ),
     )
     cap.record("CapSagDim", '"CapSag"')
     check(
         "cap on axis",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{base}.start", "origin", "horizontal_points"
         ),
     )
     check(
         "cap station",
-        await adapter.add_sketch_dimension(
+        adapter.add_sketch_dimension(
             f"{base}.start", "origin", "horizontal_distance", PIN_LEN
         ),
     )
     cap.record("CapZ", '"PinLen"')
     check(
         "cap radius",
-        await adapter.add_sketch_dimension(arc, None, "radial", CAP_R),
+        adapter.add_sketch_dimension(arc, None, "radial", CAP_R),
     )
     cap.record(
         "CapR",
         '("PinDia" / 2 * "PinDia" / 2 + "CapSag" * "CapSag") / (2 * "CapSag")',
     )
-    await ensure_fully_defined(adapter, "cap sketch")
-    check("exit_sketch cap", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "cap sketch")
+    check("exit_sketch cap", adapter.exit_sketch())
     name_last_feature(adapter, "CapProfile")
     drive_jobs += cap.apply(adapter, "CapProfile")
-    check("revolve cap", await adapter.create_revolve(RevolveParameters(angle=360.0)))
+    check("revolve cap", adapter.create_revolve(RevolveParameters(angle=360.0)))
     name_last_feature(adapter, "Cap")
-    volume = await volume_check(adapter, "cap", volume + V_CAP, 0.03 * V_CAP)
+    volume = volume_check(adapter, "cap", volume + V_CAP, 0.03 * V_CAP)
 
     # Named central axis (Axis1): mates coaxial to the strap's blind edge-bore
     # axis in the assembly, riding the p2 swing group.
-    await name_bore_axis(adapter, "Right Plane", 0.0, "Top Plane", 0.0, "pin axis")
+    name_bore_axis(adapter, "Right Plane", 0.0, "Top Plane", 0.0, "pin axis")
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(adapter, "driven pin (equations neutral)", volume, 0.005 * V_PIN)
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    volume_check(adapter, "driven pin (equations neutral)", volume, 0.005 * V_PIN)
 
     # Manufacturing drawing support: mark exactly the print's dimensions and
     # stamp the make-critical title-block properties.  Only the bonded
@@ -235,15 +235,15 @@ async def build(adapter) -> dict[str, str]:
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
 
-    await apply_material(adapter, MATERIAL)
-    await apply_color(adapter, POLISHED_STEEL)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    apply_color(adapter, POLISHED_STEEL)
+    report_mass_properties(adapter)
     apply_drawing_properties(
         adapter,
         PART_NAME,
         {"Isometric View Note": ISOMETRIC_VIEW_NOTE},
     )
-    artefacts = await save_part_and_images(adapter, PART_NAME)
+    artefacts = save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
     return artefacts
 

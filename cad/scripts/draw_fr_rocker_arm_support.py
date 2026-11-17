@@ -810,11 +810,11 @@ def _create_view_centerline(
     return centerline
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open rocker-arm-support source", await adapter.open_model(str(SOURCE)))
+    check("open rocker-arm-support source", adapter.open_model(str(SOURCE)))
     source_model = adapter.currentModel
     read_required_properties(
         source_model,
@@ -1110,7 +1110,7 @@ async def build(adapter: Any) -> dict[str, str]:
     removed_tap_labels = remove_notes_matching(adapter, "Tapped Hole")
     _telemetry.info(f"removed {removed_tap_labels} automatic tapped-hole label(s)")
 
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Rocker-Arm Support Manufacturing Drawing",

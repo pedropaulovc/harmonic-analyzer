@@ -56,7 +56,7 @@ from sh_vn_brass_fillister_screw_spec import (  # noqa: E402
 
 
 @stock_recipe("90114A511", threaded=True)
-async def build_90114A511(adapter, truth=None):
+def build_90114A511(adapter, truth=None):
     from _sketch import add_line_chain
     from diagnostics.diag_mcmaster_lib import no_sketch_inference, split_at_plane
     from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
@@ -72,7 +72,7 @@ async def build_90114A511(adapter, truth=None):
     cap_R = (head_r ** 2 + dome_h ** 2) / (2.0 * dome_h)
     fillet_r = BF_HH * 0.05
 
-    check("create_sketch profile", await adapter.create_sketch("Front"))
+    check("create_sketch profile", adapter.create_sketch("Front"))
     sk_mgr = adapter.currentSketchManager
     with no_sketch_inference(adapter):
         if sk_mgr.CreateCenterLine(0.0, apex_y / 1000.0, 0.0,
@@ -89,7 +89,7 @@ async def build_90114A511(adapter, truth=None):
         )
         if arc is None:
             raise RuntimeError("90114 profile: dome arc failed")
-        await add_line_chain(adapter, [
+        add_line_chain(adapter, [
             (head_r, band),
             (head_r, 0.0),
             (major_r, 0.0),
@@ -98,16 +98,16 @@ async def build_90114A511(adapter, truth=None):
             (0.0, -BF_LEN),
             (0.0, apex_y),
         ], close=False)
-    check("exit_sketch profile", await adapter.exit_sketch())
+    check("exit_sketch profile", adapter.exit_sketch())
     name_last_feature(adapter, "BodyProfile")
-    check("revolve body", await adapter.create_revolve(
+    check("revolve body", adapter.create_revolve(
         RevolveParameters(angle=360.0, is_cut=False)))
     name_last_feature(adapter, "Body")
     v = (_spherical_cap_volume(head_r, dome_h)
          + math.pi * head_r ** 2 * band
          + math.pi * major_r ** 2 * (BF_LEN - tip_ch)
          + _rev_frustum(tip_ch, major_r, major_r - tip_ch))
-    await volume_check(adapter, "revolved body", v, 0.005 * v)
+    volume_check(adapter, "revolved body", v, 0.005 * v)
 
     # Vendor Fillet1 (before the slot) rounds TWO edges: the head-OD
     # bottom rim (underside plane <-> band cylinder -- their 3.0508 torus
@@ -115,21 +115,21 @@ async def build_90114A511(adapter, truth=None):
     # pi*(2.188^2 - 1.4224^2), outer radius trimmed by the fillet while
     # the shank corner stays SHARP) AND the dome-to-band rim (the
     # spherical cap is not tangent to the head cylinder).
-    check("junction fillet", await adapter.add_fillet(
+    check("junction fillet", adapter.add_fillet(
         fillet_r, [[head_r, 0.0, 0.0], [head_r, band, 0.0]]))
     name_last_feature(adapter, "JunctionFillet")
 
-    check("create_sketch slot", await adapter.create_sketch("Front"))
+    check("create_sketch slot", adapter.create_sketch("Front"))
     with no_sketch_inference(adapter):
-        await add_line_chain(adapter, [
+        add_line_chain(adapter, [
             (-BF_SLOT_W / 2.0, apex_y + 0.5),
             (BF_SLOT_W / 2.0, apex_y + 0.5),
             (BF_SLOT_W / 2.0, apex_y - BF_SLOT_D),
             (-BF_SLOT_W / 2.0, apex_y - BF_SLOT_D),
         ])
-    check("exit_sketch slot", await adapter.exit_sketch())
+    check("exit_sketch slot", adapter.exit_sketch())
     name_last_feature(adapter, "SlotProfile")
-    check("cut slot", await adapter.create_cut_extrude(ExtrusionParameters(
+    check("cut slot", adapter.create_cut_extrude(ExtrusionParameters(
         depth=2.0 * BF_HEAD_R * 2.0, both_directions=True)))
     name_last_feature(adapter, "DriverSlot")
 
@@ -150,7 +150,7 @@ async def build_90114A511(adapter, truth=None):
     # (proven on 93075A194, where clockwise=True left a mirror thread
     # whose sweep end slivers read +0.0575 mm^3 across every phase).
     offset_plane(adapter, "TipPlane", -BF_LEN)
-    check("create_sketch helix seed", await adapter.create_sketch("TipPlane"))
+    check("create_sketch helix seed", adapter.create_sketch("TipPlane"))
     with no_sketch_inference(adapter):
         if adapter.currentSketchManager.CreateCircleByRadius(
                 0.0, 0.0, 0.0, major_r / 1000.0) is None:
@@ -161,15 +161,15 @@ async def build_90114A511(adapter, truth=None):
 
     cy = -BF_LEN - 7.0 * pitch / 16.0
     top_r = major_r + h_sharp / 16.0
-    check("create_sketch cutter", await adapter.create_sketch("Front"))
+    check("create_sketch cutter", adapter.create_sketch("Front"))
     with no_sketch_inference(adapter):
-        await add_line_chain(adapter, [
+        add_line_chain(adapter, [
             (top_r, cy + 15.0 * pitch / 32.0),
             (root_r, cy + pitch / 16.0),
             (root_r, cy - pitch / 16.0),
             (top_r, cy - 15.0 * pitch / 32.0),
         ])
-    check("exit_sketch cutter", await adapter.exit_sketch())
+    check("exit_sketch cutter", adapter.exit_sketch())
     name_last_feature(adapter, "ThreadCutter")
     thread_sweep_cut(adapter, "ThreadCutter", "ThreadHelix", shank_name,
                      "ThreadGroove")
@@ -178,21 +178,21 @@ async def build_90114A511(adapter, truth=None):
     # single direction, no offset -- a plain revolved frustum, merging
     # the split bodies back).
     taper_h = major_r - root_r  # 45 deg
-    check("create_sketch runout", await adapter.create_sketch("Front"))
+    check("create_sketch runout", adapter.create_sketch("Front"))
     sk2 = adapter.currentSketchManager
     with no_sketch_inference(adapter):
         if sk2.CreateCenterLine(0.0, 0.0, 0.0,
                                 0.0, -taper_h / 1000.0, 0.0) is None:
             raise RuntimeError("runout: CreateCenterLine failed")
-        await add_line_chain(adapter, [
+        add_line_chain(adapter, [
             (0.0, 0.0),
             (major_r, 0.0),
             (root_r, -taper_h),
             (0.0, -taper_h),
         ])
-    check("exit_sketch runout", await adapter.exit_sketch())
+    check("exit_sketch runout", adapter.exit_sketch())
     name_last_feature(adapter, "RunoutProfile")
-    check("runout cone", await adapter.create_revolve(
+    check("runout cone", adapter.create_revolve(
         RevolveParameters(angle=360.0, is_cut=False)))
     name_last_feature(adapter, "ThreadRunout")
 

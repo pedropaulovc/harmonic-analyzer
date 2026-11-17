@@ -10,7 +10,7 @@ from _com import _early_bound, _read_member
 
 
 @_telemetry.traced("dim.diametric", label_param="label")
-async def add_diametric_linear_dimension(
+def add_diametric_linear_dimension(
     adapter: Any,
     centerline: str,
     line: str,
@@ -56,7 +56,7 @@ async def add_diametric_linear_dimension(
 
 
 @_telemetry.traced("dim.angular_reference", label_param="label")
-async def add_angular_reference_dimension(
+def add_angular_reference_dimension(
     adapter: Any,
     first_line: str,
     second_line: str,

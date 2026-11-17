@@ -38,11 +38,11 @@ PART_NO = "40923906"
 
 
 @stock_recipe("40923906", threaded=True)
-async def build_40923906(adapter, truth=None):
-    await build_fillister(adapter, PART_NO, FILLISTER_SIZE)
+def build_40923906(adapter, truth=None):
+    build_fillister(adapter, PART_NO, FILLISTER_SIZE)
 
 
-async def build_catalog(adapter) -> dict[str, str]:
+def build_catalog(adapter) -> dict[str, str]:
     """Catalog-only run: build the recipe and save it, no vendor truth."""
     import _telemetry
     if __package__:
@@ -59,21 +59,21 @@ async def build_catalog(adapter) -> dict[str, str]:
     )
 
     with _telemetry.span("catalog.build", label=PART_NO):
-        check(f"create_part {PART_NO}", await adapter.create_part())
+        check(f"create_part {PART_NO}", adapter.create_part())
         assert_seat_sketch_baseline(adapter, PART_NO)
-        await build_40923906(adapter)
+        build_40923906(adapter)
         props = mass_properties(adapter)
         if not props["volume_mm3"] > 0.0:
             raise RuntimeError(f"{PART_NO} catalog build has no solid volume")
         OUT_DIR.mkdir(parents=True, exist_ok=True)
         path = OUT_DIR / f"{PART_NO}-catalog.SLDPRT"
-        check(f"save -> {path}", await adapter.save_file(str(path.resolve())))
+        check(f"save -> {path}", adapter.save_file(str(path.resolve())))
         artefacts = {"sldprt": str(path)}
-        artefacts.update(await export_views(adapter, f"{PART_NO}-catalog"))
+        artefacts.update(export_views(adapter, f"{PART_NO}-catalog"))
         _telemetry.success(
             f"{PART_NO} catalog build saved: volume {props['volume_mm3']:.4f} mm^3"
         )
-        await close_all(adapter)
+        close_all(adapter)
     return artefacts
 
 

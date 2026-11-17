@@ -94,7 +94,7 @@ def bound_names(path: Path) -> set[str]:
     """Public top-level names ``path`` binds by assignment, def or class."""
     found = set()
     for node in ast.parse(path.read_text(encoding="utf-8")).body:
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+        if isinstance(node, (ast.FunctionDef, ast.ClassDef)):
             found.add(node.name)
         elif isinstance(node, (ast.Assign, ast.AnnAssign)):
             targets = node.targets if isinstance(node, ast.Assign) else [node.target]
@@ -131,7 +131,7 @@ def _not_printed(tree: ast.Module) -> set[int]:
         if isinstance(node, ast.FormattedValue) and node.format_spec is not None:
             found.update(id(part) for part in ast.walk(node.format_spec))
         if isinstance(
-            node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
+            node, (ast.Module, ast.ClassDef, ast.FunctionDef)
         ):
             body = node.body
             if (

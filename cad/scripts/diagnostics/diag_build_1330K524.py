@@ -276,7 +276,7 @@ def _tube_volume_mm3(path_mm: float) -> float:
     return math.pi * geom.WIRE_RADIUS_MM**2 * path_mm
 
 
-async def _check_volume(adapter, label: str, path_mm: float) -> float:
+def _check_volume(adapter, label: str, path_mm: float) -> float:
     """Stage guard: part volume against the ideal tube volume of the wire laid
     down so far.
 
@@ -290,7 +290,7 @@ async def _check_volume(adapter, label: str, path_mm: float) -> float:
     SolidWorks-against-SolidWorks gate in ``diag_mcmaster_lib``.
     """
     expected = _tube_volume_mm3(path_mm)
-    return await volume_check(adapter, label, expected, VOLUME_STAGE_TOL * expected)
+    return volume_check(adapter, label, expected, VOLUME_STAGE_TOL * expected)
 
 
 # ------------------------------------------------------------ COM helpers
@@ -392,7 +392,7 @@ def _parallel_plane(
     )
 
 
-async def _sketch_on(
+def _sketch_on(
     adapter,
     plane: str,
     label: str,
@@ -410,7 +410,7 @@ async def _sketch_on(
     on planes parallel to Right at ``x0`` that is ``(0, 0, -x0)``, in the
     sketch's own (u, v, normal) slots, not ``(-x0, 0, 0)``.
     """
-    check(f"create_sketch {label}", await adapter.create_sketch(plane))
+    check(f"create_sketch {label}", adapter.create_sketch(plane))
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     sketch = adapter.currentSketch or model.GetActiveSketch2()
     if sketch is None:
@@ -789,7 +789,7 @@ def _combine_coil(adapter, length_mm: float, feature_name: str) -> None:
 
 
 # ------------------------------------------------------------------ build
-async def build_1330K524(adapter, truth=None, *, length_mm: float | None = None):
+def build_1330K524(adapter, truth=None, *, length_mm: float | None = None):
     """Re-author the vendor's 1330K524 tree in the EMPTY active part.
 
     Args:
@@ -870,7 +870,7 @@ async def build_1330K524(adapter, truth=None, *, length_mm: float | None = None)
         # --- coil helix: one patterned segment (vendor Helix/Spiral1) -----
         # On a || Right plane the sketch axes are (u, v) = (-z, y), so the
         # 180 deg start angle lands the wire at (coil_x, 0, +R).
-        await _sketch_on(
+        _sketch_on(
             adapter, coil_plane, "coil helix base", _SKETCH_RIGHT, (coil_x, 0.0, 0.0)
         )
         _circle(adapter, 0.0, 0.0, radius, "coil helix base")
@@ -887,7 +887,7 @@ async def build_1330K524(adapter, truth=None, *, length_mm: float | None = None)
         # --- -X double loop (vendor Helix/Spiral3) ------------------------
         # || Front plane: sketch axes are model (x, y); start angle 0 puts the
         # wire tip at (coil_x, 0, -loop_z), and 1.75 cw turns end at +90 deg.
-        await _sketch_on(
+        _sketch_on(
             adapter, loop_plane, "-X loop base", _SKETCH_FRONT, (0.0, 0.0, -loop_z)
         )
         _circle(adapter, eye_neg[0], 0.0, radius, "-X loop base")
@@ -904,7 +904,7 @@ async def build_1330K524(adapter, truth=None, *, length_mm: float | None = None)
         path_neg = _composite_curve(adapter, (loop_neg, transition_neg), "PathLoopNeg")
 
         # --- +X end: half-turn, transition, loop (vendor Helix2/4) --------
-        await _sketch_on(
+        _sketch_on(
             adapter, half_plane, "+X half-turn base", _SKETCH_RIGHT, (-coil_x, 0.0, 0.0)
         )
         _circle(adapter, 0.0, 0.0, radius, "+X half-turn base")
@@ -918,7 +918,7 @@ async def build_1330K524(adapter, truth=None, *, length_mm: float | None = None)
             feature_name="HalfTurnPos",
         )
         transition_pos = _transition_sketch(adapter, pos_ctrl, "TransitionPos")
-        await _sketch_on(
+        _sketch_on(
             adapter, loop_plane, "+X loop base", _SKETCH_FRONT, (0.0, 0.0, -loop_z)
         )
         _circle(adapter, eye_pos[0], 0.0, radius, "+X loop base")
@@ -939,11 +939,11 @@ async def build_1330K524(adapter, truth=None, *, length_mm: float | None = None)
         # Every profile is the wire section on the Top plane (y = 0), where
         # (u, v) = (x, -z): vendor Sketch28/32 at the coil start, Sketch38 at
         # the +X loop's wire tip.
-        await _sketch_on(
+        _sketch_on(
             adapter, "Top", "-X loop profile", _SKETCH_TOP, (0.0, 0.0, 0.0)
         )
         _circle(adapter, coil_x, -radius, wire_r, "-X loop profile")
-        check("exit_sketch -X loop profile", await adapter.exit_sketch())
+        check("exit_sketch -X loop profile", adapter.exit_sketch())
         name_last_feature(adapter, "ProfileLoopNeg")
         _boss_sweep(
             adapter,
@@ -953,7 +953,7 @@ async def build_1330K524(adapter, truth=None, *, length_mm: float | None = None)
             align_end_faces=False,
             end_tangency=1,
         )
-        await _check_volume(adapter, "-X loop sweep", loop_arc + neg_arc)
+        _check_volume(adapter, "-X loop sweep", loop_arc + neg_arc)
         _check_box(
             adapter,
             "-X loop sweep",
@@ -971,9 +971,9 @@ async def build_1330K524(adapter, truth=None, *, length_mm: float | None = None)
         # The coil seed shares that same wire section (vendor Sketch32): the
         # two sweeps meet on a coincident disc, which is why the vendor's
         # bodies touch without merging.
-        await _sketch_on(adapter, "Top", "coil profile", _SKETCH_TOP, (0.0, 0.0, 0.0))
+        _sketch_on(adapter, "Top", "coil profile", _SKETCH_TOP, (0.0, 0.0, 0.0))
         _circle(adapter, coil_x, -radius, wire_r, "coil profile")
-        check("exit_sketch coil profile", await adapter.exit_sketch())
+        check("exit_sketch coil profile", adapter.exit_sketch())
         name_last_feature(adapter, "ProfileCoil")
         _boss_sweep(
             adapter,
@@ -984,7 +984,7 @@ async def build_1330K524(adapter, truth=None, *, length_mm: float | None = None)
             end_tangency=0,
         )
         wire_so_far = loop_arc + neg_arc + coil_arc
-        await _check_volume(adapter, "coil seed sweep", wire_so_far)
+        _check_volume(adapter, "coil seed sweep", wire_so_far)
         _check_box(
             adapter,
             "coil seed sweep",
@@ -1003,7 +1003,7 @@ async def build_1330K524(adapter, truth=None, *, length_mm: float | None = None)
         axis = _spring_axis(adapter, "SpringAxis")
         _coil_pattern(adapter, "CoilSegment", axis, segment_rise, "CoilPattern")
         wire_so_far = loop_arc + neg_arc + geom.COIL_SEGMENTS * coil_arc
-        await _check_volume(adapter, "coil pattern", wire_so_far)
+        _check_volume(adapter, "coil pattern", wire_so_far)
         _check_box(
             adapter,
             "coil pattern",
@@ -1020,11 +1020,11 @@ async def build_1330K524(adapter, truth=None, *, length_mm: float | None = None)
 
         # --- +X end sweep (vendor Sweep3, left UNCOMBINED) ----------------
         # Profile sits at the +X loop's wire tip, the far end of PathLoopPos.
-        await _sketch_on(
+        _sketch_on(
             adapter, "Top", "+X loop profile", _SKETCH_TOP, (0.0, 0.0, 0.0)
         )
         _circle(adapter, -coil_x, -loop_z, wire_r, "+X loop profile")
-        check("exit_sketch +X loop profile", await adapter.exit_sketch())
+        check("exit_sketch +X loop profile", adapter.exit_sketch())
         name_last_feature(adapter, "ProfileLoopPos")
         _boss_sweep(
             adapter,
@@ -1035,7 +1035,7 @@ async def build_1330K524(adapter, truth=None, *, length_mm: float | None = None)
             end_tangency=0,
         )
         wire_total = wire_so_far + half_arc + pos_arc + loop_arc
-        await _check_volume(adapter, "+X loop sweep", wire_total)
+        _check_volume(adapter, "+X loop sweep", wire_total)
         _check_box(
             adapter,
             "+X loop sweep",
@@ -1052,7 +1052,7 @@ async def build_1330K524(adapter, truth=None, *, length_mm: float | None = None)
 
         # --- vendor Combine1: everything but the +X loop ------------------
         _combine_coil(adapter, length, "Combine1")
-        volume = await _check_volume(adapter, "combined spring", wire_total)
+        volume = _check_volume(adapter, "combined spring", wire_total)
         _check_box(
             adapter,
             "combined spring",

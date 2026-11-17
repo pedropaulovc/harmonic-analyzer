@@ -13,7 +13,6 @@ Run with a 3DEXPERIENCE-launched SolidWorks session already open::
 
 from __future__ import annotations
 
-import asyncio
 import os
 import shutil
 import sys
@@ -90,18 +89,18 @@ def _assert_symbol(annotation, *, stage: str) -> None:
 
 
 @_telemetry.traced("diagnostic.surface_finish_pmi")
-async def main() -> int:
+def main() -> int:
     _telemetry.set_service("diagnostics")
     adapter = PyWin32Adapter({})
     _watchdog.start()
     try:
-        await adapter.connect()
+        adapter.connect()
         adapter.swApp.CloseAllDocuments(True)
         shutil.copy2(SOURCE, SCRATCH_PRT)
         SCRATCH_DRW.unlink(missing_ok=True)
 
         with _telemetry.span("diagnostic.surface_finish_pmi.part_authoring"):
-            result = await adapter.open_model(str(SCRATCH_PRT))
+            result = adapter.open_model(str(SCRATCH_PRT))
             if not result.is_success:
                 raise RuntimeError(f"part open failed: {result.error}")
             model = adapter.currentModel
@@ -118,7 +117,7 @@ async def main() -> int:
             model.SaveAs3(os.path.abspath(SCRATCH_PRT), 0, 0)
             adapter.swApp.CloseAllDocuments(True)
 
-            result = await adapter.open_model(str(SCRATCH_PRT))
+            result = adapter.open_model(str(SCRATCH_PRT))
             if not result.is_success:
                 raise RuntimeError(f"part reopen failed: {result.error}")
             reopened = _surface_annotations(adapter.currentModel)
@@ -176,7 +175,7 @@ async def main() -> int:
             adapter.swApp.CloseAllDocuments(True)
 
         with _telemetry.span("diagnostic.surface_finish_pmi.drawing_final_reopen"):
-            result = await adapter.open_model(str(SCRATCH_DRW))
+            result = adapter.open_model(str(SCRATCH_DRW))
             if not result.is_success:
                 raise RuntimeError(f"drawing reopen failed: {result.error}")
             final = _drawing_surface_annotations(adapter.currentModel)
@@ -204,9 +203,9 @@ async def main() -> int:
         _telemetry.success("surface-finish PMI positive control passed")
         return 0
     finally:
-        await adapter.disconnect()
+        adapter.disconnect()
         _watchdog.stop()
 
 
 if __name__ == "__main__":
-    raise SystemExit(asyncio.run(main()))
+    raise SystemExit(main())

@@ -184,7 +184,7 @@ class _ComSessionCoordinator:
         pythoncom.CoUninitialize()
         self._adapter._com_initialized = False
 
-    async def acquire_solidworks_application(self) -> Any:
+    def acquire_solidworks_application(self) -> Any:
         """Acquire a live SolidWorks COM application object.
 
         Attaching to an already-running instance works for every edition and
@@ -224,7 +224,7 @@ class _ComSessionCoordinator:
         # session of SOLIDWORKS may already be running" journal warning, so poll
         # for attach instead of starting a duplicate.
         if sw_install.is_solidworks_process_running():
-            return await self._await_running_application()
+            return self._await_running_application()
 
         # No instance is running — validate how this install must be started
         # before blindly cold-starting it.
@@ -240,9 +240,9 @@ class _ComSessionCoordinator:
             )
 
         if strategy is sw_install.LaunchStrategy.PLATFORM_SHORTCUT:
-            return await self._launch_via_platform_and_attach(shortcut)
+            return self._launch_via_platform_and_attach(shortcut)
 
-        return await self._cold_start_application()
+        return self._cold_start_application()
 
     def _attach_to_running_application(self) -> Any | None:
         """Bind to an already-running SolidWorks instance, if there is one.
@@ -260,7 +260,7 @@ class _ComSessionCoordinator:
             return None
         return _early_bound_application(raw) if raw is not None else None
 
-    async def _cold_start_application(self) -> Any:
+    def _cold_start_application(self) -> Any:
         """Cold-start a standard SolidWorks install via the COM class.
 
         Retries up to 8 times, sleeping 1 second between attempts so a slow
@@ -282,13 +282,13 @@ class _ComSessionCoordinator:
             except pywintypes.com_error as dispatch_error:
                 last_error = dispatch_error
 
-            await asyncio.sleep(1.0)
+            asyncio.sleep(1.0)
 
         if last_error is not None:
             raise SolidWorksMCPError(str(last_error))
         raise SolidWorksMCPError("SolidWorks COM application instance is None")
 
-    async def _launch_via_platform_and_attach(self, shortcut: Any) -> Any:
+    def _launch_via_platform_and_attach(self, shortcut: Any) -> Any:
         """Launch the Makers edition via its Platform shortcut, then attach.
 
         Args:
@@ -303,7 +303,7 @@ class _ComSessionCoordinator:
                 instance becomes attachable within the timeout.
         """
         sw_install.launch_via_platform_shortcut(shortcut)
-        app = await self._poll_for_running_application()
+        app = self._poll_for_running_application()
         if app is not None:
             return app
 
@@ -314,7 +314,7 @@ class _ComSessionCoordinator:
             "startup dialogs, then retry."
         )
 
-    async def _await_running_application(self) -> Any:
+    def _await_running_application(self) -> Any:
         """Attach to a SolidWorks process that is up but not yet COM-attachable.
 
         Polls without ever launching a second instance, so it cannot trigger the
@@ -327,7 +327,7 @@ class _ComSessionCoordinator:
             SolidWorksMCPError: When the running process never becomes
                 COM-attachable within the timeout.
         """
-        app = await self._poll_for_running_application()
+        app = self._poll_for_running_application()
         if app is not None:
             return app
 
@@ -338,7 +338,7 @@ class _ComSessionCoordinator:
             "SolidWorks via the 3DEXPERIENCE Platform."
         )
 
-    async def _poll_for_running_application(self, attempts: int = 60) -> Any | None:
+    def _poll_for_running_application(self, attempts: int = 60) -> Any | None:
         """Poll ``GetActiveObject`` until a running instance attaches.
 
         The Platform splash can take ~30 s to hand off a licensed session, so the
@@ -352,14 +352,14 @@ class _ComSessionCoordinator:
             ``adapter.swApp`` on success.
         """
         for _ in range(attempts):
-            await asyncio.sleep(1.0)
+            asyncio.sleep(1.0)
             app = self._attach_to_running_application()
             if app is not None:
                 self._adapter.swApp = app
                 return app
         return None
 
-    async def wait_for_server_ready(self, app: Any) -> None:
+    def wait_for_server_ready(self, app: Any) -> None:
         """Poll until the SolidWorks COM server is responsive.
 
         Reads ``app.RevisionNumber`` up to 10 times with 0.5-second pauses
@@ -384,7 +384,7 @@ class _ComSessionCoordinator:
             )
             if revision is not None:
                 return
-            await asyncio.sleep(0.5)
+            asyncio.sleep(0.5)
 
         raise SolidWorksMCPError(
             "SolidWorks COM server did not become ready in time. "
@@ -430,7 +430,7 @@ class _ComSessionCoordinator:
             app.SetUserPreferenceToggle(520, False)
             app.SetUserPreferenceToggle(642, False)
 
-    async def connect(self) -> None:
+    def connect(self) -> None:
         """Orchestrate the full SolidWorks connection sequence.
 
         Performs in order:
@@ -449,8 +449,8 @@ class _ComSessionCoordinator:
         """
         try:
             self.initialize_com_apartment()
-            app = await self.acquire_solidworks_application()
-            await self.wait_for_server_ready(app)
+            app = self.acquire_solidworks_application()
+            self.wait_for_server_ready(app)
             app.Visible = True
             self.set_automation_preferences(app, interactive=False)
         except Exception as exc:
@@ -458,7 +458,7 @@ class _ComSessionCoordinator:
             self.uninitialize_com_apartment()
             raise SolidWorksMCPError(f"Failed to connect to SolidWorks: {exc}") from exc
 
-    async def disconnect(self) -> None:
+    def disconnect(self) -> None:
         """Clear session state and release the COM apartment.
 
         Resets all adapter model/sketch references to ``None`` and always
@@ -1699,7 +1699,7 @@ class PyWin32Adapter(
         """Uninitialize COM apartment when it was initialized by this adapter."""
         self._session_coordinator.uninitialize_com_apartment()
 
-    async def _acquire_solidworks_application(self) -> Any:
+    def _acquire_solidworks_application(self) -> Any:
         """Acquire a running SolidWorks COM server or start one with retries.
 
         Returns:
@@ -1708,9 +1708,9 @@ class PyWin32Adapter(
         Raises:
             SolidWorksMCPError: If no application instance can be obtained.
         """
-        return await self._session_coordinator.acquire_solidworks_application()
+        return self._session_coordinator.acquire_solidworks_application()
 
-    async def _wait_for_server_ready(self, app: Any) -> None:
+    def _wait_for_server_ready(self, app: Any) -> None:
         """Wait until the SolidWorks COM server reports readiness.
 
         Args:
@@ -1719,7 +1719,7 @@ class PyWin32Adapter(
         Raises:
             SolidWorksMCPError: If readiness probe times out.
         """
-        await self._session_coordinator.wait_for_server_ready(app)
+        self._session_coordinator.wait_for_server_ready(app)
 
     def _set_automation_preferences(self, app: Any, *, interactive: bool) -> None:
         """Toggle SolidWorks warning/question prompts for automation safety.
@@ -1732,15 +1732,15 @@ class PyWin32Adapter(
             app, interactive=interactive
         )
 
-    async def connect(self) -> None:
+    def connect(self) -> None:
         """Connect to SolidWorks COM and prepare automation-safe session state.
 
         Raises:
             SolidWorksMCPError: If connection or readiness checks fail.
         """
-        await self._session_coordinator.connect()
+        self._session_coordinator.connect()
 
-    async def disconnect(self) -> None:
+    def disconnect(self) -> None:
         """Disconnect from SolidWorks application.
 
         Properly disconnects from SolidWorks COM interface and cleans up resources. This method
@@ -1761,7 +1761,7 @@ class PyWin32Adapter(
                                 await adapter.disconnect()
                             ```
         """
-        await self._session_coordinator.disconnect()
+        self._session_coordinator.disconnect()
 
     def is_connected(self) -> bool:
         """Check if connected to SolidWorks.
@@ -1779,7 +1779,7 @@ class PyWin32Adapter(
         """
         return self.swApp is not None
 
-    async def health_check(self) -> AdapterHealth:
+    def health_check(self) -> AdapterHealth:
         """Get adapter health status.
 
         Performs comprehensive health check including connection status, operation metrics, and
@@ -2237,7 +2237,7 @@ class PyWin32Adapter(
             doc.GraphicsRedraw2()
             yield
 
-    async def export_image(self, payload: dict) -> AdapterResult[dict]:
+    def export_image(self, payload: dict) -> AdapterResult[dict]:
         """Export a screenshot of the current model to a PNG/JPG file.
 
         Payload keys (matching ExportImageInput): file_path (str): Output path including
@@ -2459,7 +2459,7 @@ class PyWin32Adapter(
                 "(tried Extension.SaveAs2 and SaveAs3)"
             )
 
-    async def export_file(
+    def export_file(
         self, file_path: str, format_type: str
     ) -> AdapterResult[None]:
         """Export the current model to a file.
@@ -2610,7 +2610,7 @@ class PyWin32Adapter(
             "errors": errors,
         }
 
-    async def execute_macro(
+    def execute_macro(
         self, params: dict[str, Any]
     ) -> AdapterResult[dict[str, Any]]:
         """Provide execute macro support for the py win32 adapter.

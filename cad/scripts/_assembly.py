@@ -340,7 +340,7 @@ def add_ellipse(
     return seg
 
 
-async def apply_component_color(
+def apply_component_color(
     adapter: Any,
     name: str,
     rgb: tuple[float, float, float],
@@ -617,7 +617,7 @@ def bore_axis_ref(point_mm: list[float], entity_type: str = "FACE") -> Any:
     return MateEntityRef(entity_type=entity_type, point=list(point_mm))
 
 
-async def _add_mate(
+def _add_mate(
     adapter: Any,
     kind: str,
     entities: list[Any],
@@ -633,7 +633,7 @@ async def _add_mate(
 ) -> Any:
     from solidworks_mcp.adapters.base import AddMateParameters
 
-    return await adapter.add_mate(
+    return adapter.add_mate(
         AddMateParameters(
             mate_type=kind,
             entities=entities,
@@ -850,7 +850,7 @@ def witness_from_ledger(comp_name: str, local_mm: list[float]) -> list[float]:
     ]
 
 
-async def _mate(
+def _mate(
     adapter: Any,
     label: str,
     kind: str,
@@ -897,8 +897,8 @@ async def _mate(
     # for the caller's descriptive ``label`` (e.g. "mate top@crank_pin <-> ...")
     # rather than the generic mate ``kind`` -- a waterfall of 40 identical
     # "mate distance" rows is unreadable; the mate TYPE stays as an attribute.
-    async with _telemetry.aspan(label, kind=kind, label=label) as msp:
-        res = check(label, await _add_mate(adapter, kind, entities, flip=flip, **kw))
+    with _telemetry.span(label, kind=kind, label=label) as msp:
+        res = check(label, _add_mate(adapter, kind, entities, flip=flip, **kw))
         err = _mate_hard_error(adapter, res.get("name", ""))
         if verify is None and not err:
             return res
@@ -954,7 +954,7 @@ async def _mate(
         )
 
 
-async def plane_distance_mate(
+def plane_distance_mate(
     adapter: Any,
     comp_name: str,
     comp_plane: str,
@@ -994,7 +994,7 @@ async def plane_distance_mate(
 
         plane = check(
             f"create_plane {base_plane}{distance:+g} for {comp_name}",
-            await adapter.create_plane(
+            adapter.create_plane(
                 CreatePlaneParameters(
                     mode="offset", base_plane=base_plane, offset=distance
                 )
@@ -1005,7 +1005,7 @@ async def plane_distance_mate(
         # prints in the assembly's renders.
         blank_reference_geometry(adapter, ((plane_name, "PLANE"),))
         target_ref = named_ref(plane_name, "PLANE")
-    return await coincident_mate(
+    return coincident_mate(
         adapter,
         named_ref(f"{comp_plane}@{comp_name}", "PLANE"),
         target_ref,
@@ -1014,7 +1014,7 @@ async def plane_distance_mate(
     )
 
 
-async def concentric_mate(
+def concentric_mate(
     adapter: Any,
     ref_a: Any,
     ref_b: Any,
@@ -1025,7 +1025,7 @@ async def concentric_mate(
     verify: tuple[str, list[float]] | None = None,
 ) -> Any:
     """Concentric (coaxial) mate; ``lock_rotation`` removes the spin DOF too."""
-    return await _mate(
+    return _mate(
         adapter,
         label,
         "concentric",
@@ -1036,7 +1036,7 @@ async def concentric_mate(
     )
 
 
-async def coincident_mate(
+def coincident_mate(
     adapter: Any,
     ref_a: Any,
     ref_b: Any,
@@ -1046,7 +1046,7 @@ async def coincident_mate(
     verify: tuple[str, list[float]] | None = None,
 ) -> Any:
     """Coincident mate between two faces / planes / points."""
-    return await _mate(
+    return _mate(
         adapter,
         label,
         "coincident",
@@ -1056,7 +1056,7 @@ async def coincident_mate(
     )
 
 
-async def parallel_mate(
+def parallel_mate(
     adapter: Any,
     ref_a: Any,
     ref_b: Any,
@@ -1082,7 +1082,7 @@ async def parallel_mate(
         if verify is None:
             raise RuntimeError(f"{label!r}: witness_local requires verify")
         witness = (list(witness_local), witness_from_ledger(verify[0], witness_local))
-    return await _mate(
+    return _mate(
         adapter,
         label,
         "parallel",
@@ -1093,7 +1093,7 @@ async def parallel_mate(
     )
 
 
-async def distance_driver(
+def distance_driver(
     adapter: Any,
     ref_a: Any,
     ref_b: Any,
@@ -1122,7 +1122,7 @@ async def distance_driver(
     if flip is None:
         comp = verify[0] if verify else ""
         flip = _seed_flip(label, distance, _orient_suffix(adapter, comp))
-    return await _driver_or_record(
+    return _driver_or_record(
         adapter,
         "distance",
         ref_a,
@@ -1135,7 +1135,7 @@ async def distance_driver(
     )
 
 
-async def angle_driver(
+def angle_driver(
     adapter: Any,
     ref_a: Any,
     ref_b: Any,
@@ -1166,7 +1166,7 @@ async def angle_driver(
         if verify is None:
             raise RuntimeError(f"{label!r}: witness_local requires verify")
         witness = (list(witness_local), witness_from_ledger(verify[0], witness_local))
-    return await _driver_or_record(
+    return _driver_or_record(
         adapter,
         "angle",
         ref_a,
@@ -1179,7 +1179,7 @@ async def angle_driver(
     )
 
 
-async def spin_driver(
+def spin_driver(
     adapter: Any,
     off_axis_ref: Any,
     pivot_xy: tuple[float, float],
@@ -1215,7 +1215,7 @@ async def spin_driver(
     else:
         plane, target = "Right Plane", target_xy[0]
     label = label or f"spin driver via {plane} d={abs(target):g}"
-    return await distance_driver(
+    return distance_driver(
         adapter,
         off_axis_ref,
         named_ref(plane, "PLANE"),
@@ -1229,7 +1229,7 @@ async def spin_driver(
     )
 
 
-async def tangent_mate(
+def tangent_mate(
     adapter: Any,
     ref_a: Any,
     ref_b: Any,
@@ -1239,7 +1239,7 @@ async def tangent_mate(
     verify: tuple[str, list[float]] | None = None,
 ) -> Any:
     """Tangent mate (e.g. an amplitude-bar notch riding a rocker arc)."""
-    return await _mate(
+    return _mate(
         adapter,
         label,
         "tangent",
@@ -1249,11 +1249,11 @@ async def tangent_mate(
     )
 
 
-async def lock_mate(
+def lock_mate(
     adapter: Any, ref_a: Any, ref_b: Any, *, label: str = "lock"
 ) -> Any:
     """Lock mate: rigidly fix two components' relative pose (e.g. crank parts)."""
-    return await _mate(adapter, label, "lock", [ref_a, ref_b])
+    return _mate(adapter, label, "lock", [ref_a, ref_b])
 
 
 def _set_component_reference(component: Any, reference: str) -> str:
@@ -1340,7 +1340,7 @@ def _inserted_configuration(part: str, configuration: str) -> str:
     return configuration or ("Default" if part.casefold().startswith("sh-vn-") else "")
 
 
-async def place_component(
+def place_component(
     adapter: Any,
     part: str,
     position: list[float],
@@ -1379,7 +1379,7 @@ async def place_component(
     # One span per part: insert + (fix) + placement assert for THIS component, so
     # the full-build waterfall shows where each part's time went and a failed
     # insert/mate is attributed to the part by name.
-    async with _telemetry.aspan(
+    with _telemetry.span(
         f"part {label}",
         part=part,
         ground=ground,
@@ -1392,7 +1392,7 @@ async def place_component(
             )
         data = check(
             f"insert {label} @ ({position[0]:.2f}, {position[1]:.2f}, {position[2]:.2f})",
-            await adapter.insert_component(
+            adapter.insert_component(
                 InsertComponentParameters(
                     file_path=str(path),
                     position=position,
@@ -1430,7 +1430,7 @@ async def place_component(
         if ground and not data.get("fixed"):
             check(
                 f"fix {label}",
-                await adapter.fix_component(ComponentRefParameters(name=name)),
+                adapter.fix_component(ComponentRefParameters(name=name)),
             )
         if (
             expected_configuration
@@ -1470,7 +1470,7 @@ def _placement_transform(
     ]
 
 
-async def place_components_batch(
+def place_components_batch(
     adapter: Any,
     specs: list[dict[str, Any]],
     *,
@@ -1555,7 +1555,7 @@ async def place_components_batch(
     # op is never an unsegmented hole under the task span.
     out_names: list[str] = [""] * len(specs)
     matched_components: list[Any] = [None] * len(specs)
-    async with _telemetry.aspan(
+    with _telemetry.span(
         f"batch {label}",
         count=len(specs),
         grounded=sum(grounds),
@@ -1950,7 +1950,7 @@ def _record_dof_spec(
     )
 
 
-async def _driver_or_record(
+def _driver_or_record(
     adapter: Any,
     kind: str,
     ref_a: Any,
@@ -1981,7 +1981,7 @@ async def _driver_or_record(
             **params,
         )
         return {"free_dof": free_dof_key, "name": ""}
-    return await _mate(
+    return _mate(
         adapter,
         label,
         kind,
@@ -2541,7 +2541,7 @@ def remap_front_to_machine_front(adapter: Any) -> None:
     log("standard views remapped: Front now shows the machine front (-Z paper side)")
 
 
-async def _export_assembly_images(
+def _export_assembly_images(
     adapter: Any, asm_name: str, views: Iterable[str]
 ) -> dict[str, str]:
     """Export PNG views to ``cad/out/png/<asm>`` (gitignored build output).
@@ -2564,10 +2564,10 @@ async def _export_assembly_images(
     for stale in png_dir.glob(f"{asm_name}_*.png"):
         if stale.name not in requested:
             stale.unlink()
-    async with _telemetry.aspan("export_images", count=len(views)):
+    with _telemetry.span("export_images", count=len(views)):
         for view in views:
             img_path = (png_dir / f"{asm_name}_{view}.png").resolve()
-            async with _telemetry.aspan("export_image", view=view):
+            with _telemetry.span("export_image", view=view):
                 # A freshly created anonymous assembly can have a partially
                 # painted viewport even after ShowNamedView2/ZoomToFit. SaveBMP
                 # then captures large black tiles; reopening the saved copy
@@ -2594,7 +2594,7 @@ async def _export_assembly_images(
                 model.GraphicsRedraw2()
                 check(
                     f"export_image {view}",
-                    await adapter.export_image(
+                    adapter.export_image(
                         {
                             "file_path": str(img_path),
                             "format_type": "png",
@@ -2792,7 +2792,7 @@ def _referenced_comment(
     return cache[key]
 
 
-async def save_assembly_and_images(
+def save_assembly_and_images(
     adapter: Any,
     asm_name: str,
     views: Iterable[str] = DEFAULT_VIEWS,
@@ -2861,7 +2861,7 @@ async def save_assembly_and_images(
     _save_new_assembly_as_copy(adapter, asm_path)
     try:
         artefacts = {"assembly": str(asm_path)}
-        artefacts.update(await _export_assembly_images(adapter, asm_name, views))
+        artefacts.update(_export_assembly_images(adapter, asm_name, views))
     finally:
         _discard_copy_source(adapter)
     # Reopen the just-saved artifact and reconcile its persisted rebuild mark
@@ -2869,14 +2869,14 @@ async def save_assembly_and_images(
     # part IN MEMORY, so the copy-save recorded a rebuild stamp absent from the
     # on-disk parts and a fresh open would report NeedsRebuild2 != 0. Runs after
     # the copy source is discarded so the reopen loads clean children from disk.
-    await reconcile_saved_rebuild_state(adapter, asm_name, asm_path)
+    reconcile_saved_rebuild_state(adapter, asm_name, asm_path)
     if asm_name in ("ch-channel", "sm-summing"):
         if native_contact_check is None:
             raise ValueError(f"{asm_name} assembly requires native_contact_check")
         native_contact_check(adapter, asm_name)
     # Fingerprint the actual reconciled persisted model and publish its proof
     # only after every strict native contact has succeeded.
-    digest = await assembly_geometry_digest(adapter, asm_name)
+    digest = assembly_geometry_digest(adapter, asm_name)
     sidecar.parent.mkdir(parents=True, exist_ok=True)
     sidecar.write_text(digest + "\n", encoding="utf-8")
     if dof_manifest:
@@ -3119,7 +3119,7 @@ def _save_native_assembly(
     return ok, errors, warnings
 
 
-async def reconcile_saved_rebuild_state(
+def reconcile_saved_rebuild_state(
     adapter: Any, asm_name: str, asm_path: Any
 ) -> None:
     """Prove saved rebuild state and part display flags without writing children.
@@ -3157,7 +3157,7 @@ async def reconcile_saved_rebuild_state(
     assert_saved_display_data(asm_path)
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
     with _telemetry.span("assembly.reconcile_rebuild", asm=asm_name) as sp:
-        await adapter.open_model(str(asm_path))
+        adapter.open_model(str(asm_path))
         model = _early_bound(adapter.currentModel, "IModelDoc2")
         status = saved_rebuild_status(adapter, model)
         sp.set_attribute("needs_rebuild_on_open", status)
@@ -3193,7 +3193,7 @@ async def reconcile_saved_rebuild_state(
                 f"(save result={result!r})"
             )
         adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
-        await adapter.open_model(str(asm_path))
+        adapter.open_model(str(asm_path))
         model = _early_bound(adapter.currentModel, "IModelDoc2")
         if active_configuration_name(adapter, model) != rest:
             raise RuntimeError(f"{asm_name}: reconciled saved active configuration changed from {rest!r}")
@@ -3237,7 +3237,7 @@ def rebuild_if_needed_before_save(adapter: Any, label: str, model: Any = None) -
     return False
 
 
-async def _solved_mass_properties(adapter: Any, span: Any) -> Any:
+def _solved_mass_properties(adapter: Any, span: Any) -> Any:
     """Mass properties of the active model WITHOUT a redundant deep rebuild.
 
     ``adapter.get_mass_properties()`` opens with ``ForceRebuild3(False)``: a deep
@@ -3276,7 +3276,7 @@ async def _solved_mass_properties(adapter: Any, span: Any) -> Any:
     )
     if mass_props is None:
         span.set_attribute("rebuild_skipped", False)
-        return await adapter.get_mass_properties()
+        return adapter.get_mass_properties()
     span.set_attribute("rebuild_skipped", True)
     return AdapterResult(
         status=AdapterResultStatus.SUCCESS,
@@ -3333,7 +3333,7 @@ def _fast_mass_properties(adapter: Any, mass_props: Any) -> dict[str, Any]:
 
 
 @_telemetry.traced("assembly.geometry_digest", label_param="asm_name")
-async def assembly_geometry_digest(adapter: Any, asm_name: str) -> str:
+def assembly_geometry_digest(adapter: Any, asm_name: str) -> str:
     """A deterministic fingerprint of an assembly's RESOLVED geometry across every
     configuration: exact-BREP mass properties (mass / volume / surface area / centre
     of mass / moments of inertia) PLUS every top-level component's rounded pose (the
@@ -3371,7 +3371,7 @@ async def assembly_geometry_digest(adapter: Any, asm_name: str) -> str:
     through ``refresh_assembly`` even when Default's geometry is unchanged."""
     configs = [
         cfg
-        for cfg in check("list configurations", await adapter.list_configurations())
+        for cfg in check("list configurations", adapter.list_configurations())
         if not is_simplified(cfg)
     ]
     rest = "Default" if "Default" in configs else (configs[0] if configs else None)
@@ -3381,11 +3381,11 @@ async def assembly_geometry_digest(adapter: Any, asm_name: str) -> str:
     # read mass properties in place and never activate/re-activate.
     multi = len(configs) > 1
 
-    async def activate_resolved(cfg: str) -> None:
+    def activate_resolved(cfg: str) -> None:
         """Activate and explicitly solve one config after a lazy switch."""
         if active_configuration_name(adapter) == cfg:
             return
-        check(f"activate {cfg}", await adapter.set_active_configuration(cfg))
+        check(f"activate {cfg}", adapter.set_active_configuration(cfg))
         with _telemetry.span(
             "geometry_digest.resolve_configuration", configuration=cfg
         ) as rsp:
@@ -3407,11 +3407,11 @@ async def assembly_geometry_digest(adapter: Any, asm_name: str) -> str:
     rows: list[Any] = []
     for cfg in configs:
         if multi:
-            await activate_resolved(cfg)
-        async with _telemetry.aspan(
+            activate_resolved(cfg)
+        with _telemetry.span(
             "geometry_digest.mass_properties", configuration=cfg
         ) as msp:
-            res = await _solved_mass_properties(adapter, msp)
+            res = _solved_mass_properties(adapter, msp)
         if not res.is_success:
             raise RuntimeError(
                 f"{asm_name}: get_mass_properties failed for config {cfg!r}: "
@@ -3476,7 +3476,7 @@ async def assembly_geometry_digest(adapter: Any, asm_name: str) -> str:
                 )
         rows.extend((cfg, *pr) for pr in sorted(pose_rows))
     if multi and rest is not None:
-        await activate_resolved(rest)
+        activate_resolved(rest)
     return hashlib.sha256(repr(rows).encode("utf-8")).hexdigest()
 
 
@@ -3649,7 +3649,7 @@ def save_assembly_in_place(
     return True
 
 
-async def refresh_assembly(
+def refresh_assembly(
     adapter: Any,
     asm_name: str,
     views: Iterable[str] = DEFAULT_VIEWS,
@@ -3692,13 +3692,13 @@ async def refresh_assembly(
     # Refuse incomplete, unknown or damaged persisted data before any native write.
     assert_saved_display_data(asm_path)
     with _telemetry.span("open", asm=asm_name):
-        check(f"open {asm_name}", await adapter.open_model(str(asm_path)))
+        check(f"open {asm_name}", adapter.open_model(str(asm_path)))
         opened_rebuild_status = saved_rebuild_status(adapter)
     # A refreshed part may have gained, lost or changed its "<cfg> Simplified",
     # so the drawing configuration is re-pointed and re-fingerprinted before
     # the per-config rebuild below proves it clean; any change forces the save.
     simplified_changes = sync_simplified_configuration(adapter, asm_name, verify=False)
-    configs = check("list configurations", await adapter.list_configurations())
+    configs = check("list configurations", adapter.list_configurations())
     log(f"refresh {asm_name}: {len(configs)} configuration(s): {configs}")
     # The deterministic export/rest pose: Default is the saved, rendered pose the
     # top-level assembly references, and the DOF gate runs on it.
@@ -3714,7 +3714,7 @@ async def refresh_assembly(
             with _telemetry.span("rebuild_config", config=cfg):
                 if active_configuration_name(adapter) != cfg:
                     check(
-                        f"activate {cfg}", await adapter.set_active_configuration(cfg)
+                        f"activate {cfg}", adapter.set_active_configuration(cfg)
                     )
                 adapter._attempt(
                     lambda: adapter.currentModel.ForceRebuild3(False), default=None
@@ -3748,7 +3748,7 @@ async def refresh_assembly(
     # exported PNGs must match the from-scratch build's deterministic pose.
     if rest is not None and active_configuration_name(adapter) != rest:
         with _telemetry.span("reactivate", config=rest):
-            check(f"re-activate {rest}", await adapter.set_active_configuration(rest))
+            check(f"re-activate {rest}", adapter.set_active_configuration(rest))
 
     # Establish the solved state inspected by the fingerprint and gates. The save
     # chokepoint performs one final idempotent rebuild after those reads.
@@ -3762,7 +3762,7 @@ async def refresh_assembly(
     # calibrated distances are nanometre-scale, far below the component-pose
     # fingerprint's 0.1 mm rounding, so channel/summing run that gate below
     # after the final save/reconciliation on both changed and unchanged paths.
-    digest = await assembly_geometry_digest(adapter, asm_name)
+    digest = assembly_geometry_digest(adapter, asm_name)
     sidecar = _massprops_sidecar(asm_name)
     try:
         prev = sidecar.read_text(encoding="utf-8").strip()
@@ -3820,7 +3820,7 @@ async def refresh_assembly(
     # memory, so a fresh open would report needs-rebuild. Only when we actually
     # re-saved -- a no-op reload leaves the reconciled artifact byte-stable.
     if saved:
-        await reconcile_saved_rebuild_state(adapter, asm_name, asm_path)
+        reconcile_saved_rebuild_state(adapter, asm_name, asm_path)
 
     if asm_name in ("ch-channel", "sm-summing"):
         if native_contact_check is None:
@@ -3831,5 +3831,5 @@ async def refresh_assembly(
     sidecar.parent.mkdir(parents=True, exist_ok=True)
     sidecar.write_text(digest + "\n", encoding="utf-8")
     artefacts = {"assembly": str(asm_path)}
-    artefacts.update(await _export_assembly_images(adapter, asm_name, views))
+    artefacts.update(_export_assembly_images(adapter, asm_name, views))
     return artefacts

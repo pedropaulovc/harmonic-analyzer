@@ -1834,7 +1834,7 @@ def test_pivot_callout_has_a_full_text_height_between_the_identifier_and_caption
 def test_pivot_section_uses_profile_station_and_native_connected_style():
     """Pin the actual A-A dataflow, not merely the presence of 'profile'."""
     tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
-    build = next(node for node in tree.body if isinstance(node, ast.AsyncFunctionDef) and node.name == "build")
+    build = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "build")
     assignments = {
         node.targets[0].id: node
         for node in build.body

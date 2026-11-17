@@ -14,7 +14,7 @@ from _sketch import SketchDims, add_line_chain, dimension_between
 
 
 @_telemetry.traced("sketch.rectangle", label_param="label")
-async def define_centered_rectangle(
+def define_centered_rectangle(
     adapter: Any,
     half_x: float,
     half_z: float,
@@ -81,7 +81,7 @@ async def define_centered_rectangle(
             raise RuntimeError(
                 f"{label}: native center rectangle has no orthogonal edge pair"
             )
-        await dimension_between(
+        dimension_between(
             adapter,
             f"{horizontal[0]}.start",
             f"{horizontal[0]}.end",
@@ -89,7 +89,7 @@ async def define_centered_rectangle(
             abs(horizontal[1]),
             f"{label} width",
         )
-        await dimension_between(
+        dimension_between(
             adapter,
             f"{vertical[0]}.start",
             f"{vertical[0]}.end",
@@ -107,7 +107,7 @@ async def define_centered_rectangle(
         # construction diagonal's midpoint to the origin. Idempotent: skipped
         # when the native anchor already fixed it, so it never over-defines the
         # seat where the option is on.
-        rect_state = await adapter.check_sketch_fully_defined()
+        rect_state = adapter.check_sketch_fully_defined()
         already_defined = bool(
             rect_state.is_success
             and rect_state.data
@@ -124,7 +124,7 @@ async def define_centered_rectangle(
             if diagonal_id is not None:
                 check(
                     f"{label} centre -> origin",
-                    await adapter.add_sketch_constraint(
+                    adapter.add_sketch_constraint(
                         "origin", diagonal_id, "midpoint"
                     ),
                 )
@@ -139,14 +139,14 @@ async def define_centered_rectangle(
         (half_x, half_z),
         (-half_x, half_z),
     ]
-    edges = await add_line_chain(adapter, points)
+    edges = add_line_chain(adapter, points)
     sketch_mgr = adapter.currentSketchManager
     previous_add_to_db = bool(sketch_mgr.AddToDB)
     sketch_mgr.AddToDB = True
     diagonals: list[str] = []
     try:
         for start, end in ((points[0], points[2]), (points[1], points[3])):
-            result = await adapter.add_line(*start, *end)
+            result = adapter.add_line(*start, *end)
             diagonal_id = check(f"add construction diagonal {label}", result)
             # ConstructionGeometry is declared on the base ISketchSegment, not the
             # derived ISketchLine the entity is bound as — rebind before the set.
@@ -162,13 +162,13 @@ async def define_centered_rectangle(
     ):
         check(
             f"{label} {direction} {edge}",
-            await adapter.add_sketch_constraint(edge, None, direction),
+            adapter.add_sketch_constraint(edge, None, direction),
         )
     check(
         f"{label} midpoint -> origin",
-        await adapter.add_sketch_constraint("origin", diagonals[0], "midpoint"),
+        adapter.add_sketch_constraint("origin", diagonals[0], "midpoint"),
     )
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{edges[0]}.start",
         f"{edges[0]}.end",
@@ -176,7 +176,7 @@ async def define_centered_rectangle(
         2.0 * half_x,
         f"{label} width",
     )
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{edges[1]}.start",
         f"{edges[1]}.end",

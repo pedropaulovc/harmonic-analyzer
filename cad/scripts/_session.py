@@ -5,11 +5,10 @@ Separate module so edits affect only recipes that use this scope.
 
 from __future__ import annotations
 
-import asyncio
 import os
 import sys
 import time
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -144,7 +143,7 @@ def _attributes_of(values: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
-def run_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:
+def run_build(build: Callable[[Any], dict[str, str]]) -> int:
     """Connect, run ``build(adapter)``, disconnect; return a process exit code."""
     from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter
 
@@ -195,7 +194,7 @@ def run_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:
     elif kind is not None:
         _telemetry.set_service(f"{kind}-build")
 
-    async def _run() -> dict[str, str]:
+    def _run() -> dict[str, str]:
         # Runtime successor to dodo's removed ``_assert_spine_complete`` tripwire:
         # a COM build launched BY doit (which injects TRACEPARENT into every child)
         # must hold the single SolidWorks seat lock -- dodo's ``_com_seat`` sets
@@ -216,7 +215,7 @@ def run_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:
         adapter = PyWin32Adapter({})
         _watchdog.start()
         try:
-            async with _telemetry.aspan("sw.connect"):
+            with _telemetry.span("sw.connect"):
                 _telemetry.info("connecting to SolidWorks")
                 # Sample the seats already running BEFORE connecting: COM starts
                 # SolidWorks when none is running, so this is the only moment at
@@ -224,9 +223,9 @@ def run_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:
                 # left?" can still be answered (see _seat_forensics.note_seats_before_connect).
                 # 2.2 s p50 per COM subprocess, split into its three steps so
                 # the connect cost is attributable (dispatch/identity/discard).
-                async with _telemetry.aspan("sw.dispatch"):
+                with _telemetry.span("sw.dispatch"):
                     _seat_forensics.note_seats_before_connect()
-                    await adapter.connect()
+                    adapter.connect()
                 _telemetry.success("connected")
                 # WHICH sldworks.exe is about to build this target, how old it is
                 # and how big: the attribution a "failed once, passed on retry"
@@ -264,11 +263,11 @@ def run_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:
             # "assembly.build drive-train" instead of a flat run under the task span.
             # Non-build entries (verify/export/probes) keep their operations flat.
             if kind is None:
-                return await build(adapter)
+                return build(adapter)
             # The provenance rides the phase span, so every operation of this
             # build hangs under a span that names the seat that ran it.
-            async with _telemetry.aspan(f"{kind}.build", target=target, **provenance):
-                return await build(adapter)
+            with _telemetry.span(f"{kind}.build", target=target, **provenance):
+                return build(adapter)
         finally:
             # Teardown is its own span so a disconnect failure is attributable
             # and never a silent gap before process exit. The watchdog stop is
@@ -277,8 +276,8 @@ def run_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:
             # outside every checkout, disconnect -- is post-save seat hygiene,
             # so it lives in the recipe-inert _seat_forensics.
             try:
-                async with _telemetry.aspan("sw.disconnect"):
-                    await _seat_forensics.teardown_seat(adapter)
+                with _telemetry.span("sw.disconnect"):
+                    _seat_forensics.teardown_seat(adapter)
             finally:
                 # COM session over: stop the watchdog so a long SolidWorks-free
                 # tail (pure-python post-processing) can't trip the idle timeout.
@@ -291,7 +290,7 @@ def run_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:
     # parent: one gapless trace from process start to exit.
     with _telemetry.build_session(target, script=script) as root:
         try:
-            artefacts = asyncio.run(_run())
+            artefacts = _run()
         except Exception as exc:  # noqa: BLE001 - recorded on the root span
             # A bare `return` would let the root exit cleanly and be marked OK, so
             # a failed build (process exits 1) would trace as success. Mark ERROR

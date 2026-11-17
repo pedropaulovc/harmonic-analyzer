@@ -90,32 +90,32 @@ _BOM_TEMPLATE_GLOBS = [
 class SolidWorksManufacturingMixin:
     """Expose SolidWorks manufacturing-prep methods via mixin-local helpers."""
 
-    async def apply_material(
+    def apply_material(
         self, params: ApplyMaterialParameters
     ) -> AdapterResult[dict[str, Any]]:
         return _apply_material_impl(self, params)
 
-    async def add_thread(
+    def add_thread(
         self, params: AddThreadParameters
     ) -> AdapterResult[dict[str, Any]]:
         return _add_thread_impl(self, params)
 
-    async def insert_tapped_hole(
+    def insert_tapped_hole(
         self, params: TappedHoleParameters
     ) -> AdapterResult[dict[str, Any]]:
         return _insert_tapped_hole_impl(self, params)
 
-    async def edit_hole_position(
+    def edit_hole_position(
         self, hole_name: str, rename_sketch: str
     ) -> AdapterResult[str]:
         return _edit_hole_position_impl(self, hole_name, rename_sketch)
 
-    async def create_bom(
+    def create_bom(
         self, params: CreateBomParameters
     ) -> AdapterResult[dict[str, Any]]:
         return _create_bom_impl(self, params)
 
-    async def export_bom_csv(
+    def export_bom_csv(
         self, params: CreateBomParameters
     ) -> AdapterResult[dict[str, Any]]:
         return _export_bom_csv_impl(self, params)

@@ -499,18 +499,18 @@ def _create_frame_explode(adapter: Any, configuration_name: str) -> None:
 
 
 @_telemetry.traced("assembly.frame_top_axis_setting")
-async def _author_top_axis_setting(adapter: Any) -> None:
+def _author_top_axis_setting(adapter: Any) -> None:
     """MHA-FR-00 step 3's controlling height: a vertical construction line on
     the Front plane (sketch u, v = machine X, Y) up the +X column's axis, from
     the base underside to the top cross-bore axis. Its length carries the
     setting's band and places for the drawing to import. No solid or pose
     edits; the sketch is blanked."""
     dims = SketchDims()
-    check("create top-axis setting sketch", await adapter.create_sketch("Front"))
+    check("create top-axis setting sketch", adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     line = check(
         "top-axis setting line",
-        await adapter.add_line(COLUMN_X, 0.0, COLUMN_X, TOP_SCREW_Y),
+        adapter.add_line(COLUMN_X, 0.0, COLUMN_X, TOP_SCREW_Y),
     )
     set_sketch_direct_db(adapter, False)
     segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
@@ -519,13 +519,13 @@ async def _author_top_axis_setting(adapter: Any) -> None:
         raise RuntimeError("top-axis setting line is not construction")
     check(
         "top-axis setting vertical",
-        await adapter.add_sketch_constraint(line, None, "vertical"),
+        adapter.add_sketch_constraint(line, None, "vertical"),
     )
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{line}.start", COLUMN_X, 0.0, "base underside on the column axis"
     )
     dims.record("TopAxisColumnX")
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{line}.start",
         f"{line}.end",
@@ -534,8 +534,8 @@ async def _author_top_axis_setting(adapter: Any) -> None:
         "top cross-bore axis above the base underside",
     )
     dims.record(TOP_AXIS_HEIGHT_DIMENSION)
-    await ensure_fully_defined(adapter, "top-axis setting")
-    check("exit top-axis setting sketch", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "top-axis setting")
+    check("exit top-axis setting sketch", adapter.exit_sketch())
     name_last_feature(adapter, TOP_AXIS_SETTING_FEATURE)
     dims.apply(adapter, TOP_AXIS_SETTING_FEATURE)
     set_dimension_symmetric_tolerance(
@@ -556,7 +556,7 @@ async def _author_top_axis_setting(adapter: Any) -> None:
     blank_sketch(adapter, TOP_AXIS_SETTING_FEATURE)
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     # Flip seeds + free-DOF contract: cad/config/assemblies/<ASM_NAME>.yaml.
     activate_assembly_contract(ASM_NAME)
     from solidworks_mcp.adapters.base import InsertComponentParameters
@@ -571,11 +571,11 @@ async def build(adapter) -> dict[str, str]:
     _part("fr-vn-tube-frame-cap")  # four intact stock push-on caps
     _part("fr-top-frame")  # placed via place_component below
 
-    check("create_assembly", await adapter.create_assembly())
+    check("create_assembly", adapter.create_assembly())
     apply_package_model_units(adapter, assembly_contract(ASM_NAME).drawing_unit, label=ASM_NAME)
 
     # Base: first insert is auto-fixed by SolidWorks.
-    res = await adapter.insert_component(InsertComponentParameters(file_path=base_path))
+    res = adapter.insert_component(InsertComponentParameters(file_path=base_path))
     check("insert_component harmonic-base (auto-fixed)", res)
     if not res.data.get("fixed"):
         raise RuntimeError("base component was not auto-fixed")
@@ -585,7 +585,7 @@ async def build(adapter) -> dict[str, str]:
     # socket floor) preserves the exposed span and every upper attachment
     # station.
     column_target = [COLUMN_X, COLUMN_BOTTOM_Y, REAR_COLUMN_Z]
-    column_name = await place_component(
+    column_name = place_component(
         adapter,
         "fr-tube-frame",
         column_target,
@@ -593,7 +593,7 @@ async def build(adapter) -> dict[str, str]:
         IDENTITY,
         label="tube-frame column seed",
     )
-    column_instances = await grid_component_pattern(
+    column_instances = grid_component_pattern(
         adapter,
         [column_name],
         axis1="x",
@@ -628,7 +628,7 @@ async def build(adapter) -> dict[str, str]:
     #
     # Inserted on-solution (a single machine-handed casting) and fixed. Its
     # authored transform places the physical foot on the base top.
-    await place_component(
+    place_component(
         adapter,
         "fr-rocker-arm-support",
         [SUPPORT_X, SUPPORT_SEAT_Y, SUPPORT_Z],
@@ -647,7 +647,7 @@ async def build(adapter) -> dict[str, str]:
     # two-direction grid populate the other three holes; both spacings derive
     # from the same foot-pattern constants as the base hole grid.
     bx, bz = LAG_SCREW_XZ[0]
-    screw_name = await place_component(
+    screw_name = place_component(
         adapter,
         "fr-vn-lag-screw",
         [bx, LAG_SCREW_UNDER_HEAD_Y, bz],
@@ -655,7 +655,7 @@ async def build(adapter) -> dict[str, str]:
         IDENTITY,
         label=f"lag-screw hold-down ({bx:.2f}, {bz:+.2f})",
     )
-    pattern_instances = await grid_component_pattern(
+    pattern_instances = grid_component_pattern(
         adapter,
         [screw_name],
         axis1="x",
@@ -677,7 +677,7 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # Top-frame casting clamped around the four columns, at its insert plane.
-    await place_component(
+    place_component(
         adapter,
         "fr-top-frame",
         [0.0, TOP_FRAME_MID_Y, 0.0],
@@ -695,7 +695,7 @@ async def build(adapter) -> dict[str, str]:
         ("front west", -COLUMN_X, FRONT_COLUMN_Z),
         ("front east", COLUMN_X, FRONT_COLUMN_Z),
     ):
-        await place_component(
+        place_component(
             adapter,
             "fr-vn-tube-frame-cap",
             [cx, CAP_MOUTH_Y, cz],
@@ -707,7 +707,7 @@ async def build(adapter) -> dict[str, str]:
     # Maker's nameplate: flat on the WEST end of the black base deck, decorated
     # face up, centred front-back (see NAMEPLATE_POS / NAMEPLATE_ROWS).
     # Cosmetic + rigid -> fixed.
-    await place_component(
+    place_component(
         adapter,
         "fr-nameplate",
         NAMEPLATE_POS,
@@ -725,7 +725,7 @@ async def build(adapter) -> dict[str, str]:
             f"{'rear' if nz > 0 else 'front'} "
             f"{'west' if nx > NAMEPLATE_POS[0] - NAMEPLATE_HEIGHT / 2.0 else 'east'}"
         )
-        await place_component(
+        place_component(
             adapter,
             "sh-vn-brass-fillister-screw",
             [nx, NAMEPLATE_FRONT_Y, nz],
@@ -749,7 +749,7 @@ async def build(adapter) -> dict[str, str]:
             ("rear west", -COLUMN_X, seat_z, [90.0, 0.0, 0.0], ROT_X_POS90),
             ("rear east", COLUMN_X, seat_z, [90.0, 0.0, 0.0], ROT_X_POS90),
         ):
-            await place_component(
+            place_component(
                 adapter,
                 "fr-vn-frame-cross-screw",
                 [sx, screw_y, sz],
@@ -761,7 +761,7 @@ async def build(adapter) -> dict[str, str]:
     # Gooseneck set screw: 1/4-20 x 3/4 square head through the hub boss's tap
     # hole along +X at the hub centreline; tip 0.21 clear of the Ø12.70 tube
     # (see SET_SCREW_* constants). Fixed likewise.
-    await place_component(
+    place_component(
         adapter,
         "fr-vn-gooseneck-set-screw",
         [SET_SCREW_UNDER_HEAD_X, TOP_SCREW_Y, GOOSENECK_HUB_Z],
@@ -775,7 +775,7 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         allowed_pairs=ALLOWED_PAIRS,
     )
-    await _author_top_axis_setting(adapter)
+    _author_top_axis_setting(adapter)
     # Title-block identity for the assembly drawing (draw_fr_frame_assembly.py):
     # assembly_title_properties supplies the Title/Generator and TOL_* cells
     # finalize_drawing requires without consulting the part registry;
@@ -797,7 +797,7 @@ async def build(adapter) -> dict[str, str]:
     author_in_drawing_configurations(
         adapter, ASM_NAME, lambda configuration: _create_frame_explode(adapter, configuration)
     )
-    return await save_assembly_and_images(adapter, ASM_NAME)
+    return save_assembly_and_images(adapter, ASM_NAME)
 
 
 if __name__ == "__main__":

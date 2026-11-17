@@ -2499,11 +2499,11 @@ def _place_holes_sheet(adapter: Any) -> list[Any]:
     return [*plan_annotations, *detail_annotations]
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open cone-swing-platform source", await adapter.open_model(str(SOURCE)))
+    check("open cone-swing-platform source", adapter.open_model(str(SOURCE)))
     read_required_properties(
         adapter.currentModel,
         (
@@ -2821,7 +2821,7 @@ async def build(adapter: Any) -> dict[str, str]:
             for segment in witnesses
         ):
             raise RuntimeError(f"plate thickness witnesses did not shorten to the cut edge: {witnesses}")
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Cone Swing Platform Manufacturing Drawing",

@@ -17,7 +17,6 @@ Creates ONE scratch part and closes only it — safe next to open documents.
 
 from __future__ import annotations
 
-import asyncio
 import math
 import sys
 import tempfile
@@ -53,17 +52,17 @@ def _report(label: str, settable: bool, ok: bool) -> None:
     emit(f"{label}: ret={ok}" + ("" if expected else " (UNEXPECTED — claim drifted)"))
 
 
-async def main() -> int:
+def main() -> int:
     _telemetry.set_service("diagnostics")
-    async with _telemetry.aspan("probe.block_tolerance"):
-        return await _probe()
+    with _telemetry.span("probe.block_tolerance"):
+        return _probe()
 
 
-async def _probe() -> int:
+def _probe() -> int:
     adapter = PyWin32Adapter({})
     try:
-        await adapter.connect()
-        res = await adapter.create_part()
+        adapter.connect()
+        res = adapter.create_part()
         if not res.is_success:
             raise RuntimeError(f"create_part failed: {res.error}")
         model = adapter.currentModel
@@ -99,7 +98,7 @@ async def _probe() -> int:
         _report("get-only ang after ForceRebuild3",
                 False, ext.SetUserPreferenceDouble(_PREF_ANGULAR_VALUE, _PREF_OPT_NONE, math.radians(1.0)))
         save_path = str(Path(tempfile.gettempdir()) / "probe_block_tol.SLDPRT")
-        saved = await adapter.save_file(save_path)
+        saved = adapter.save_file(save_path)
         if not saved.is_success:
             raise RuntimeError(f"save failed: {saved.error}")
         _report("get-only ang on saved doc",
@@ -115,8 +114,8 @@ async def _probe() -> int:
         _telemetry.success(f"scratch part closed: {title}")
         return 0
     finally:
-        await adapter.disconnect()
+        adapter.disconnect()
 
 
 if __name__ == "__main__":
-    raise SystemExit(asyncio.run(main()))
+    raise SystemExit(main())

@@ -889,11 +889,11 @@ def _group_flat_locations(adapter: Any, view: Any, annotations: list[Any]) -> No
     _assert_grouped_flat_locations(group)
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open magnifying-clamp source", await adapter.open_model(str(SOURCE)))
+    check("open magnifying-clamp source", adapter.open_model(str(SOURCE)))
     read_required_properties(
         adapter.currentModel,
         (
@@ -1111,7 +1111,7 @@ async def build(adapter: Any) -> dict[str, str]:
             raise RuntimeError("clamp settled height qualifier, bore wall callout or title-block acceptance changed")
         _telemetry.info("clamp native dimension census after final rebuild", source_dimension_count=len(visibility), visible_dimension_count=sum(value == 1 for value in visibility.values()), native_visibility=repr(visibility))
 
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Magnifying Clamp Manufacturing Drawing",

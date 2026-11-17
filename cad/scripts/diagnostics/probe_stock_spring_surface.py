@@ -187,7 +187,7 @@ def snapshot(doc, kind, phase, queries):
     return row
 
 
-async def probe(adapter, paths, output):
+def probe(adapter, paths, output):
     length = sm_vn_counter_spring_spec.INSTALLED_LENGTH_MM
     free_eye = stock.end_centers_mm(stock.FREE_LENGTH_MM)[1]
     installed_eye = stock.end_centers_mm(length)[1]
@@ -206,7 +206,7 @@ async def probe(adapter, paths, output):
     owned = []
     try:
         for kind, path in paths.items():
-            check("open " + kind, await adapter.open_model(str(path)))
+            check("open " + kind, adapter.open_model(str(path)))
             doc = _early_bound(adapter.currentModel, "IModelDoc2")
             title = str(doc.GetTitle())
             owned.append(title)

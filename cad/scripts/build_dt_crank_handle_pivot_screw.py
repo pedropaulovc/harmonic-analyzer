@@ -161,7 +161,7 @@ V_FINAL = V_BODY - V_SLOT
 V_INSTALLED = turned_volume(INSTALLED_THREAD_LENGTH, INSTALLED_TIP_CHAMFER) - V_SLOT
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
         CreateConfigurationParameters,
         CreatePlaneParameters,
@@ -170,7 +170,7 @@ async def build(adapter) -> dict[str, str]:
         SetGlobalVariableParameters,
     )
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     # #290: the row's inch calculation units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
     # The mm suffix is load-bearing: the equation manager reads bare numbers in
@@ -191,7 +191,7 @@ async def build(adapter) -> dict[str, str]:
         ("SlotWidth", SLOT_WIDTH),
         ("SlotDepth", SLOT_DEPTH),
     ):
-        await set_global(adapter, name, f"{value}mm")
+        set_global(adapter, name, f"{value}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -199,11 +199,11 @@ async def build(adapter) -> dict[str, str]:
     # model (-Z, Y), so negative u runs from the head face (origin) toward the
     # thread tip in model +Z.
     profile = SketchDims()
-    check("create_sketch screw profile", await adapter.create_sketch("Right"))
+    check("create_sketch screw profile", adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
     axis = check(
         "screw axis centerline",
-        await adapter.add_centerline(0.0, 0.0, -OVERALL_LENGTH, 0.0),
+        adapter.add_centerline(0.0, 0.0, -OVERALL_LENGTH, 0.0),
     )
     # The thread-relief groove is part of the profile: the seat face steps down
     # to a 45-degree lead onto the relief floor, which runs to RELIEF_WIDTH
@@ -233,14 +233,14 @@ async def build(adapter) -> dict[str, str]:
         (-OVERALL_LENGTH, 0.0),
         head_points[0],
     ]
-    head_lines = await add_line_chain(adapter, head_points, close=False)
+    head_lines = add_line_chain(adapter, head_points, close=False)
     # add_arc is CCW: shoulder -> face is the 90-degree arc, not the
     # 270-degree complement (build_dt_crank_handle_butt_cup's floor round).
     under_head_round = check(
         "under-head round",
-        await adapter.add_arc(*round_center, *round_on_shoulder, *round_on_face),
+        adapter.add_arc(*round_center, *round_on_shoulder, *round_on_face),
     )
-    shank_lines = await add_line_chain(adapter, shank_points, close=False)
+    shank_lines = add_line_chain(adapter, shank_points, close=False)
     set_sketch_direct_db(adapter, False)
     for line, (u0, v0), (u1, v1) in (
         *zip(head_lines, head_points[:-1], head_points[1:], strict=True),
@@ -251,7 +251,7 @@ async def build(adapter) -> dict[str, str]:
         relation = "horizontal" if v0 == v1 else "vertical"
         check(
             f"screw profile {relation} {line}",
-            await adapter.add_sketch_constraint(line, None, relation),
+            adapter.add_sketch_constraint(line, None, relation),
         )
     head_face, head_outline, head_chamfer, under_head_face = head_lines
     shoulder_outline = shank_lines[0]
@@ -276,12 +276,12 @@ async def build(adapter) -> dict[str, str]:
         ("TipChamfer", f"{tip_chamfer}.start", f"{tip_chamfer}.end", TIP_CHAMFER),
         ("HeadChamfer", f"{head_chamfer}.start", f"{head_chamfer}.end", HEAD_CHAMFER),
     ):
-        await dimension_between(
+        dimension_between(
             adapter, start, end, "horizontal_distance", value, f"screw {name}"
         )
         profile.record(name, f'"{name}"')
     # The lead's radial leg equals its axial leg by equation: 45 degrees.
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{relief_lead}.start",
         f"{relief_lead}.end",
@@ -290,7 +290,7 @@ async def build(adapter) -> dict[str, str]:
         "screw relief lead rise",
     )
     profile.record("ReliefLeadRise", '"ReliefLead"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{tip_chamfer}.start",
         f"{tip_chamfer}.end",
@@ -299,7 +299,7 @@ async def build(adapter) -> dict[str, str]:
         "screw tip chamfer rise",
     )
     profile.record("TipChamferRise", '"TipChamfer"')
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{head_chamfer}.start",
         f"{head_chamfer}.end",
@@ -329,13 +329,13 @@ async def build(adapter) -> dict[str, str]:
             THREAD_R,
         ),
     ):
-        await add_diametric_linear_dimension(
+        add_diametric_linear_dimension(
             adapter, axis, line, (u_mid, radius + 4.0), name
         )
         profile.record(name, f'"{name}"')
     check(
         "under-head radius",
-        await adapter.add_sketch_dimension(
+        adapter.add_sketch_dimension(
             under_head_round, None, "radial", UNDER_HEAD_RADIUS_MAX
         ),
     )
@@ -346,18 +346,18 @@ async def build(adapter) -> dict[str, str]:
     ):
         check(
             f"under-head round tangent to {label}",
-            await adapter.add_sketch_constraint(first, second, "tangent"),
+            adapter.add_sketch_constraint(first, second, "tangent"),
         )
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{head_face}.start", 0.0, 0.0, "screw head face centre"
     )
-    await ensure_fully_defined(adapter, "screw profile sketch")
-    check("exit_sketch screw profile", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "screw profile sketch")
+    check("exit_sketch screw profile", adapter.exit_sketch())
     name_last_feature(adapter, "ScrewProfile")
     drive_jobs += profile.apply(adapter, "ScrewProfile")
-    check("revolve screw", await adapter.create_revolve(RevolveParameters(angle=360.0)))
+    check("revolve screw", adapter.create_revolve(RevolveParameters(angle=360.0)))
     name_last_feature(adapter, "Screw")
-    await volume_check(
+    volume_check(
         adapter,
         "turned shoulder screw with thread relief, tip chamfer and head seat",
         V_BODY,
@@ -371,8 +371,8 @@ async def build(adapter) -> dict[str, str]:
     # default, so it is reversed into the +Z head, exactly as build_dt_crank_hub
     # cuts its bore from the Top Plane into its +Y body.
     slot = SketchDims()
-    check("create_sketch driver slot", await adapter.create_sketch("Front"))
-    await define_centered_rectangle(
+    check("create_sketch driver slot", adapter.create_sketch("Front"))
+    define_centered_rectangle(
         adapter,
         SLOT_SPAN / 2.0,
         SLOT_WIDTH / 2.0,
@@ -382,20 +382,20 @@ async def build(adapter) -> dict[str, str]:
         name_depth="SlotWidth",
         drive_depth='"SlotWidth"',
     )
-    await ensure_fully_defined(adapter, "driver slot sketch")
-    check("exit_sketch driver slot", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "driver slot sketch")
+    check("exit_sketch driver slot", adapter.exit_sketch())
     name_last_feature(adapter, "SlotProfile")
     drive_jobs += slot.apply(adapter, "SlotProfile")
     check(
         "cut driver slot",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=SLOT_DEPTH, reverse_direction=True)
         ),
     )
     name_last_feature(adapter, "DriverSlot")
     slot_depth_dim = name_dimensions(adapter, "DriverSlot", ["SlotDepth"])
     drive_jobs += [(slot_depth_dim[0], '"SlotDepth"')]
-    await volume_check(adapter, "slotted screw", V_FINAL, 0.02 * V_SLOT)
+    volume_check(adapter, "slotted screw", V_FINAL, 0.02 * V_SLOT)
 
     # Drawing-only station reference: the overall length, printed as a
     # reference restatement for stock cut-off.  One construction line on the
@@ -403,11 +403,11 @@ async def build(adapter) -> dict[str, str]:
     # dimension IS the printed value (drawing-simplicity-policy.md `How the repository implements the guidelines`), driven by the same
     # globals as the profile so no geometry moves.
     stations = SketchDims()
-    check("create_sketch station reference", await adapter.create_sketch("Right"))
+    check("create_sketch station reference", adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
     overall_line = check(
         "overall reference line",
-        await adapter.add_line(0.0, 0.0, -OVERALL_LENGTH, 0.0),
+        adapter.add_line(0.0, 0.0, -OVERALL_LENGTH, 0.0),
     )
     set_sketch_direct_db(adapter, False)
     segment = _early_bound(adapter._sketch_entities[overall_line], "ISketchSegment")
@@ -416,12 +416,12 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError("overall reference line did not take construction flag")
     check(
         "overall reference horizontal",
-        await adapter.add_sketch_constraint(overall_line, None, "horizontal"),
+        adapter.add_sketch_constraint(overall_line, None, "horizontal"),
     )
-    await anchor_point_to_origin(
+    anchor_point_to_origin(
         adapter, f"{overall_line}.start", 0.0, 0.0, "overall reference head face"
     )
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{overall_line}.start",
         f"{overall_line}.end",
@@ -430,15 +430,15 @@ async def build(adapter) -> dict[str, str]:
         "overall length reference",
     )
     stations.record("OverallLength", '"HeadLength" + "ShoulderLength" + "ThreadLength"')
-    await ensure_fully_defined(adapter, "station reference sketch")
-    check("exit_sketch station reference", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "station reference sketch")
+    check("exit_sketch station reference", adapter.exit_sketch())
     name_last_feature(adapter, "StationReference")
     drive_jobs += stations.apply(adapter, "StationReference")
 
     # Named seat plane on the shoulder's arm-seat face for the assembly mate.
     check(
         "create_plane ArmSeat",
-        await adapter.create_plane(
+        adapter.create_plane(
             CreatePlaneParameters(
                 mode="offset", base_plane="Front Plane", offset=SEAT_STATION
             )
@@ -450,15 +450,15 @@ async def build(adapter) -> dict[str, str]:
     # Hidden but still selectable by name for the arm-seat mate.
     blank_reference_geometry(adapter, (("ArmSeat", "PLANE"),))
 
-    await name_bore_axis(adapter, "Right Plane", 0.0, "Top Plane", 0.0, "screw axis")
+    name_bore_axis(adapter, "Right Plane", 0.0, "Top Plane", 0.0, "screw axis")
 
     # Apply the deferred drive equations once the whole model exists, then
     # re-check neutrality: every equation evaluates to its as-built value.
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dimension, expression in drive_jobs:
-        await drive_dimension(adapter, dimension, expression)
-    await force_rebuild(adapter)
-    await volume_check(
+        drive_dimension(adapter, dimension, expression)
+    force_rebuild(adapter)
+    volume_check(
         adapter, "driven slotted screw (equations neutral)", V_FINAL, 0.02 * V_SLOT
     )
 
@@ -502,8 +502,8 @@ async def build(adapter) -> dict[str, str]:
     # PMI and the hidden reference sketch -- precedes the INSTALLED split, so
     # the split copies a finished default (the MHA-DT-30 lesson: an edit after
     # it touches the active configuration only and leaves the other stale).
-    await apply_material(adapter, MATERIAL)
-    await apply_color(adapter, POLISHED_STEEL)
+    apply_material(adapter, MATERIAL)
+    apply_color(adapter, POLISHED_STEEL)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
@@ -523,7 +523,7 @@ async def build(adapter) -> dict[str, str]:
     default_config = active_configuration_name(adapter)
     check(
         f"create_configuration {INSTALLED_CONFIG}",
-        await adapter.create_configuration(
+        adapter.create_configuration(
             CreateConfigurationParameters(
                 name=INSTALLED_CONFIG,
                 comment="tip filed flush with the arm's inboard face",
@@ -540,7 +540,7 @@ async def build(adapter) -> dict[str, str]:
         ):
             check(
                 f"{global_name} = {value} in {name}",
-                await adapter.set_global_variable(
+                adapter.set_global_variable(
                     SetGlobalVariableParameters(
                         name=global_name, expression=f"{value}mm", configuration=name
                     )
@@ -548,16 +548,16 @@ async def build(adapter) -> dict[str, str]:
             )
     check(
         f"activate {INSTALLED_CONFIG}",
-        await adapter.set_active_configuration(INSTALLED_CONFIG),
+        adapter.set_active_configuration(INSTALLED_CONFIG),
     )
-    await force_rebuild(adapter)
-    await volume_check(adapter, "installed screw (tip filed flush)", V_INSTALLED, 0.02 * V_SLOT)
+    force_rebuild(adapter)
+    volume_check(adapter, "installed screw (tip filed flush)", V_INSTALLED, 0.02 * V_SLOT)
     check(
         f"re-activate {default_config}",
-        await adapter.set_active_configuration(default_config),
+        adapter.set_active_configuration(default_config),
     )
-    await force_rebuild(adapter)
-    await volume_check(adapter, "as-turned screw (default)", V_FINAL, 0.02 * V_SLOT)
+    force_rebuild(adapter)
+    volume_check(adapter, "as-turned screw (default)", V_FINAL, 0.02 * V_SLOT)
     # The configuration description wins over the drive-train BOM's written
     # cell, so it is the text that BOM prints (the MHA-DT-30 precedent).
     grouped_spec = _config.parts(PART_NAME)
@@ -567,7 +567,7 @@ async def build(adapter) -> dict[str, str]:
         part_number=str(grouped_spec["number"]),
         description=str(grouped_spec["description"]),
     )
-    await report_mass_properties(adapter)
+    report_mass_properties(adapter)
     require_material_in_every_configuration(
         adapter, PART_NAME, MATERIAL, (default_config, INSTALLED_CONFIG)
     )
@@ -576,7 +576,7 @@ async def build(adapter) -> dict[str, str]:
         PART_NAME,
         {"Isometric View Note": ISOMETRIC_VIEW_NOTE},
     )
-    artefacts = await save_part_and_images(adapter, PART_NAME)
+    artefacts = save_part_and_images(adapter, PART_NAME)
     # The drive train places INSTALLED while the part saves on its default, so
     # INSTALLED's saved cache is what it rebuilds.  Reopen and prove it the way
     # the assembly loads it (cg-fx1).
@@ -584,7 +584,7 @@ async def build(adapter) -> dict[str, str]:
     adapter.swApp.CloseDoc(part_title)
     adapter.currentModel = None
     check(
-        f"reopen saved {PART_NAME}", await adapter.open_model(artefacts["part"])
+        f"reopen saved {PART_NAME}", adapter.open_model(artefacts["part"])
     )
     assert_saved_configurations_regenerate(adapter, PART_NAME)
     return artefacts

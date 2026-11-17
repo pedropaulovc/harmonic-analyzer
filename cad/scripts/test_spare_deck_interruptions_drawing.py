@@ -4,7 +4,7 @@ from asyncio import CancelledError
 from copy import deepcopy
 import json
 from types import SimpleNamespace as NS
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import MagicMock, Mock
 
 import pytest
 
@@ -22,8 +22,8 @@ def context(monkeypatch, tmp_path):
     inputs = {str(source): {"status": "unchanged", "before": sha, "after": sha}}
     owner = NS(
         hashes={str(source): sha},
-        open=AsyncMock(),
-        close=AsyncMock(),
+        open=MagicMock(),
+        close=MagicMock(),
         inventory=Mock(return_value={}),
         input_evidence=Mock(return_value=inputs),
     )
@@ -52,13 +52,12 @@ def context(monkeypatch, tmp_path):
     )
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize("entry", ["measure", "probe"])
 @pytest.mark.parametrize("interrupt", [CancelledError, KeyboardInterrupt])
 @pytest.mark.parametrize(
     "boundary", ["open", "before", "contact", "after", "close", "inventory", "inputs"]
 )
-async def test_native_or_cleanup_interruption_retains_nonpass_receipt(
+def test_native_or_cleanup_interruption_retains_nonpass_receipt(
     context, entry, interrupt, boundary
 ):
     c = context
@@ -78,15 +77,15 @@ async def test_native_or_cleanup_interruption_retains_nonpass_receipt(
 
     with pytest.raises(interrupt) as caught:
         if entry == "measure":
-            await probe.measure(c.adapter, c.report, c.path, c.sha)
+            probe.measure(c.adapter, c.report, c.path, c.sha)
         if entry == "probe":
-            await probe.probe(c.adapter, c.directory, c.sha)
+            probe.probe(c.adapter, c.directory, c.sha)
 
     assert caught.value is primary
     receipt = json.loads(c.path.read_text(encoding="utf-8"))
     assert receipt["status"] == "failed"
     assert repr(primary) in receipt["errors"]
-    c.owner.close.assert_awaited_once()
+    c.owner.close.assert_called_once()
     c.owner.input_evidence.assert_called_once()
     if boundary != "inputs":
         assert receipt["inputs"] == c.inputs
@@ -97,9 +96,8 @@ async def test_native_or_cleanup_interruption_retains_nonpass_receipt(
         assert "final_inventory" not in receipt
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize("interrupt", [CancelledError, KeyboardInterrupt])
-async def test_interruption_survives_secondary_cleanup_hash_and_timing_errors(
+def test_interruption_survives_secondary_cleanup_hash_and_timing_errors(
     context, interrupt
 ):
     c = context
@@ -112,7 +110,7 @@ async def test_interruption_survives_secondary_cleanup_hash_and_timing_errors(
     probe.time.perf_counter.side_effect = [1.0, timing]
 
     with pytest.raises(interrupt) as caught:
-        await probe.probe(c.adapter, c.directory, c.sha)
+        probe.probe(c.adapter, c.directory, c.sha)
 
     assert caught.value is primary
     receipt = json.loads(c.path.read_text(encoding="utf-8"))
@@ -123,14 +121,13 @@ async def test_interruption_survives_secondary_cleanup_hash_and_timing_errors(
     assert any("saved input hashes" in error for error in receipt["errors"])
     assert any("close refused" in note for note in primary.__notes__)
     assert any("clock failed" in note for note in primary.__notes__)
-    c.owner.close.assert_awaited_once()
+    c.owner.close.assert_called_once()
     c.owner.input_evidence.assert_called_once()
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize("interrupt", [CancelledError, KeyboardInterrupt])
 @pytest.mark.parametrize("boundary", ["start", "end"])
-async def test_timing_interruption_never_leaves_a_passed_receipt(
+def test_timing_interruption_never_leaves_a_passed_receipt(
     context, interrupt, boundary
 ):
     c = context
@@ -139,25 +136,24 @@ async def test_timing_interruption_never_leaves_a_passed_receipt(
         [primary] if boundary == "start" else [1.0, primary]
     )
     with pytest.raises(interrupt) as caught:
-        await probe.probe(c.adapter, c.directory, c.sha)
+        probe.probe(c.adapter, c.directory, c.sha)
     assert caught.value is primary
     receipt = json.loads(c.path.read_text(encoding="utf-8"))
     assert receipt["status"] == "failed"
     assert repr(primary) in receipt["errors"]
     assert "inspection_and_owned_cleanup_seconds" not in receipt
     if boundary == "start":
-        c.owner.open.assert_not_awaited()
-        c.owner.close.assert_not_awaited()
+        c.owner.open.assert_not_called()
+        c.owner.close.assert_not_called()
     if boundary == "end":
         assert receipt["inputs"] == c.inputs
-        c.owner.close.assert_awaited_once()
+        c.owner.close.assert_called_once()
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize("interrupt", [CancelledError, KeyboardInterrupt])
 @pytest.mark.parametrize("entry,checkpoint_index", [("measure", 3), ("probe", 4)])
 @pytest.mark.parametrize("publication", ["before_write", "after_write"])
-async def test_interrupted_final_checkpoint_records_failure_without_repeating_native_work(
+def test_interrupted_final_checkpoint_records_failure_without_repeating_native_work(
     context, monkeypatch, interrupt, entry, checkpoint_index, publication
 ):
     c = context
@@ -176,9 +172,9 @@ async def test_interrupted_final_checkpoint_records_failure_without_repeating_na
     monkeypatch.setattr(probe, "checkpoint", checkpoint)
     with pytest.raises(interrupt) as caught:
         if entry == "measure":
-            await probe.measure(c.adapter, c.report, c.path, c.sha)
+            probe.measure(c.adapter, c.report, c.path, c.sha)
         if entry == "probe":
-            await probe.probe(c.adapter, c.directory, c.sha)
+            probe.probe(c.adapter, c.directory, c.sha)
     assert caught.value is primary
     receipt = json.loads(c.path.read_text(encoding="utf-8"))
     assert receipt["status"] == "failed"
@@ -186,15 +182,14 @@ async def test_interrupted_final_checkpoint_records_failure_without_repeating_na
     assert receipt["inputs"] == c.inputs
     assert receipt["final_inventory"] == []
     assert len(observations) == checkpoint_index + 1
-    c.owner.close.assert_awaited_once()
-    c.owner.open.assert_awaited_once()
+    c.owner.close.assert_called_once()
+    c.owner.open.assert_called_once()
     probe.contact.assert_called_once()
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize("interrupt", [CancelledError, KeyboardInterrupt])
 @pytest.mark.parametrize("boundary", ["cleanup", "timing"])
-async def test_secondary_interruption_cannot_replace_the_first(
+def test_secondary_interruption_cannot_replace_the_first(
     context, interrupt, boundary
 ):
     c = context
@@ -211,7 +206,7 @@ async def test_secondary_interruption_cannot_replace_the_first(
         probe.time.perf_counter.side_effect = [1.0, secondary]
 
     with pytest.raises(interrupt) as caught:
-        await probe.probe(c.adapter, c.directory, c.sha)
+        probe.probe(c.adapter, c.directory, c.sha)
 
     assert caught.value is primary
     receipt = json.loads(c.path.read_text(encoding="utf-8"))
@@ -220,13 +215,12 @@ async def test_secondary_interruption_cannot_replace_the_first(
     assert repr(primary) in receipt["errors"]
     assert repr(secondary) in receipt["errors"]
     assert any(repr(secondary) in note for note in primary.__notes__)
-    c.owner.close.assert_awaited_once()
+    c.owner.close.assert_called_once()
     c.owner.input_evidence.assert_called_once()
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize("secondary_type", [OSError, KeyboardInterrupt])
-async def test_failure_checkpoint_attempt_is_bounded_and_preserves_both_errors(
+def test_failure_checkpoint_attempt_is_bounded_and_preserves_both_errors(
     context, monkeypatch, secondary_type
 ):
     c = context
@@ -245,7 +239,7 @@ async def test_failure_checkpoint_attempt_is_bounded_and_preserves_both_errors(
 
     monkeypatch.setattr(probe, "checkpoint", checkpoint)
     with pytest.raises(CancelledError) as caught:
-        await probe.measure(c.adapter, c.report, c.path, c.sha)
+        probe.measure(c.adapter, c.report, c.path, c.sha)
 
     assert caught.value is primary
     assert c.report["status"] == "failed"
@@ -253,11 +247,10 @@ async def test_failure_checkpoint_attempt_is_bounded_and_preserves_both_errors(
     assert any(repr(secondary) in note for note in primary.__notes__)
     assert json.loads(c.path.read_text(encoding="utf-8"))["status"] == "failed"
     assert len(calls) == 4
-    c.owner.close.assert_awaited_once()
+    c.owner.close.assert_called_once()
     c.owner.input_evidence.assert_called_once()
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "entry,checkpoint_index,phase,total_calls",
     [
@@ -267,7 +260,7 @@ async def test_failure_checkpoint_attempt_is_bounded_and_preserves_both_errors(
     ],
 )
 @pytest.mark.parametrize("publication", ["before_write", "after_write"])
-async def test_ordinary_final_write_failure_publishes_failure_on_one_retry(
+def test_ordinary_final_write_failure_publishes_failure_on_one_retry(
     context, monkeypatch, entry, checkpoint_index, phase, total_calls, publication
 ):
     c = context
@@ -288,9 +281,9 @@ async def test_ordinary_final_write_failure_publishes_failure_on_one_retry(
     monkeypatch.setattr(probe, "checkpoint", checkpoint)
     with pytest.raises(ExceptionGroup) as caught:
         if entry == "measure":
-            await probe.measure(c.adapter, c.report, c.path, c.sha)
+            probe.measure(c.adapter, c.report, c.path, c.sha)
         if entry == "probe":
-            await probe.probe(c.adapter, c.directory, c.sha)
+            probe.probe(c.adapter, c.directory, c.sha)
     expected = (primary,)
     if entry == "probe" and phase == "measure":
         (nested,) = caught.value.exceptions
@@ -327,16 +320,15 @@ async def test_ordinary_final_write_failure_publishes_failure_on_one_retry(
     )
     assert written_group["attempts"][1]["outcome"] == expected_retry_outcome
     assert memory_group["attempts"][1]["outcome"] == "returned"
-    c.owner.open.assert_awaited_once()
-    c.owner.close.assert_awaited_once()
+    c.owner.open.assert_called_once()
+    c.owner.close.assert_called_once()
     c.owner.input_evidence.assert_called_once()
     probe.contact.assert_called_once()
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize("secondary_kind", ["same_instance", "distinct_instance"])
 @pytest.mark.parametrize("entry", ["measure", "probe"])
-async def test_ordinary_retry_failure_is_bounded_and_preserves_error_identity(
+def test_ordinary_retry_failure_is_bounded_and_preserves_error_identity(
     context, monkeypatch, secondary_kind, entry
 ):
     c = context
@@ -360,9 +352,9 @@ async def test_ordinary_retry_failure_is_bounded_and_preserves_error_identity(
     monkeypatch.setattr(probe, "checkpoint", checkpoint)
     with pytest.raises(ExceptionGroup) as caught:
         if entry == "measure":
-            await probe.measure(c.adapter, c.report, c.path, c.sha)
+            probe.measure(c.adapter, c.report, c.path, c.sha)
         if entry == "probe":
-            await probe.probe(c.adapter, c.directory, c.sha)
+            probe.probe(c.adapter, c.directory, c.sha)
     failure = caught.value
     if entry == "probe":
         (failure,) = failure.exceptions
@@ -386,15 +378,14 @@ async def test_ordinary_retry_failure_is_bounded_and_preserves_error_identity(
     assert receipt["inputs"] == c.inputs
     assert receipt["final_inventory"] == []
     assert len(observations) == (4 if entry == "measure" else 5)
-    c.owner.open.assert_awaited_once()
-    c.owner.close.assert_awaited_once()
+    c.owner.open.assert_called_once()
+    c.owner.close.assert_called_once()
     c.owner.input_evidence.assert_called_once()
     probe.contact.assert_called_once()
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize("identity", ["same_instance", "distinct_instances"])
-async def test_persistent_checkpoint_failure_across_actual_probe_keeps_unique_errors(
+def test_persistent_checkpoint_failure_across_actual_probe_keeps_unique_errors(
     context, monkeypatch, identity
 ):
     c = context
@@ -413,7 +404,7 @@ async def test_persistent_checkpoint_failure_across_actual_probe_keeps_unique_er
 
     monkeypatch.setattr(probe, "checkpoint", checkpoint)
     with pytest.raises(ExceptionGroup) as caught:
-        await probe.probe(c.adapter, c.directory, c.sha)
+        probe.probe(c.adapter, c.directory, c.sha)
     measure_failure = caught.value.exceptions[0]
     assert type(measure_failure) is ExceptionGroup
     assert measure_failure.message == "spare seating diagnostic failed"
@@ -444,7 +435,7 @@ async def test_persistent_checkpoint_failure_across_actual_probe_keeps_unique_er
     assert receipt["inputs"] == c.inputs
     assert receipt["final_inventory"] == []
     assert len(receipt["final_checkpoints"]) == 2
-    c.owner.open.assert_awaited_once()
-    c.owner.close.assert_awaited_once()
+    c.owner.open.assert_called_once()
+    c.owner.close.assert_called_once()
     c.owner.input_evidence.assert_called_once()
     probe.contact.assert_called_once()

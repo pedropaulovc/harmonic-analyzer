@@ -560,7 +560,7 @@ def persist_configurations_in_place(adapter: Any, part_name: str) -> None:
     _telemetry.annotate(config_count=len(names), active=active)
 
 
-async def derive_simplified_on_saved_part(
+def derive_simplified_on_saved_part(
     adapter: Any,
     part_name: str,
     features: Sequence[str] | Mapping[str, Sequence[str]],
@@ -582,14 +582,14 @@ async def derive_simplified_on_saved_part(
     _close_part(adapter)
     check(
         f"reopen saved {part_name} to derive simplified configurations",
-        await adapter.open_model(part_path),
+        adapter.open_model(part_path),
     )
     add_simplified_configurations(adapter, part_name, features, parents)
     persist_configurations_in_place(adapter, part_name)
     _close_part(adapter)
 
 
-async def save_simplified_part(
+def save_simplified_part(
     adapter: Any,
     part_name: str,
     features: Sequence[str] | Mapping[str, Sequence[str]],
@@ -607,11 +607,11 @@ async def save_simplified_part(
     names = [str(name) for name in (model.GetConfigurationNames() or ())]
     selected = _simplified_parents(part_name, names, None)
     _feature_names_by_parent(part_name, features, selected)
-    artefacts = await save_part_and_images(adapter, part_name, views)
-    await derive_simplified_on_saved_part(
+    artefacts = save_part_and_images(adapter, part_name, views)
+    derive_simplified_on_saved_part(
         adapter, part_name, features, artefacts["part"]
     )
-    check(f"reopen saved {part_name}", await adapter.open_model(artefacts["part"]))
+    check(f"reopen saved {part_name}", adapter.open_model(artefacts["part"]))
     assert_saved_configurations_regenerate(adapter, part_name)
     assert_simplified_configurations(adapter, part_name, features)
     return artefacts

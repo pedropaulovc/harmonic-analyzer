@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import ast
-import asyncio
 import importlib
 import re
 from functools import wraps
@@ -55,7 +54,7 @@ def _part(groove: bool) -> SimpleNamespace:
 @pytest.fixture
 def saves(monkeypatch) -> SimpleNamespace:
     def record(kind: str):
-        async def save(*_args, **_kwargs) -> str:
+        def save(*_args, **_kwargs) -> str:
             return kind
 
         return save
@@ -73,7 +72,7 @@ def test_a_stock_part_saves_with_its_declared_thread(threaded, saved, saves) -> 
         threaded=threaded,
         save_threaded_part=saves.simplified if threaded else None,
     )
-    assert asyncio.run(result) == saved
+    assert result == saved
 
 
 @pytest.mark.usefixtures("saves")
@@ -87,51 +86,43 @@ def test_a_stock_part_saves_with_its_declared_thread(threaded, saved, saves) -> 
 )
 def test_a_stock_part_contradicting_its_recipe_is_refused(threaded, groove, message) -> None:
     with pytest.raises(RuntimeError, match=message):
-        asyncio.run(
-            _stock_fastener._save_stock_part(_part(groove), "screw", threaded=threaded)
-        )
+        _stock_fastener._save_stock_part(_part(groove), "screw", threaded=threaded)
 
 
 @pytest.mark.parametrize("saver", [None, False, "save_simplified_part"])
 def test_threaded_stock_requires_an_explicit_callable_saver(saver) -> None:
     with pytest.raises(TypeError, match="requires a callable simplified saver"):
-        asyncio.run(
-            _stock_fastener._save_stock_part(
+        _stock_fastener._save_stock_part(
                 _part(True), "screw", threaded=True, save_threaded_part=saver
             )
-        )
 
 
 def test_threaded_save_receives_the_declared_suppression_feature() -> None:
     adapter = _part(True)
     saved = {"part": "screw.SLDPRT"}
 
-    async def save(actual_adapter, name, features):
+    def save(actual_adapter, name, features):
         assert actual_adapter is adapter
         assert name == "screw"
         assert features == (THREAD_FEATURE,)
         return saved
 
     assert (
-        asyncio.run(
-            _stock_fastener._save_stock_part(
+        _stock_fastener._save_stock_part(
                 adapter, "screw", threaded=True, save_threaded_part=save
             )
-        )
         is saved
     )
 
 
 def test_unthreaded_save_never_calls_part_simplification(saves) -> None:
-    async def forbidden(*_args, **_kwargs):
+    def forbidden(*_args, **_kwargs):
         raise AssertionError("unthreaded part reached simplification")
 
     assert (
-        asyncio.run(
-            _stock_fastener._save_stock_part(
+        _stock_fastener._save_stock_part(
                 _part(False), "washer", threaded=False, save_threaded_part=forbidden
             )
-        )
         == "plain"
     )
 
@@ -141,19 +132,19 @@ def test_unthreaded_supplier_references_use_one_final_save(monkeypatch):
     saved = {"part": "nut.SLDPRT"}
     calls = []
 
-    async def default_save(*_args):
+    def default_save(*_args):
         raise AssertionError("supplier part was saved a second time")
 
-    async def supplier_save(actual_adapter, name):
+    def supplier_save(actual_adapter, name):
         assert actual_adapter is adapter
         assert name == "nut"
         calls.append(name)
         return saved
 
     monkeypatch.setattr(_stock_fastener, "save_part_and_images", default_save)
-    result = asyncio.run(_stock_fastener._save_stock_part(
+    result = _stock_fastener._save_stock_part(
         adapter, "nut", threaded=False, save_unthreaded_part=supplier_save,
-    ))
+    )
     assert result is saved
     assert calls == ["nut"]
 
@@ -202,10 +193,10 @@ def test_stock_properties_are_written_before_one_save(monkeypatch, with_metadata
         GetCustomInfoValue=lambda _configuration, name: written.get(name, ""),
     )
 
-    async def create_part():
+    def create_part():
         return SimpleNamespace(is_success=True, data=None, error=None)
 
-    async def author(_adapter, _truth=None):
+    def author(_adapter, _truth=None):
         bodies.append(SimpleNamespace(Name="StockBody"))
 
     author.__name__ = "build_TEST123"
@@ -217,10 +208,10 @@ def test_stock_properties_are_written_before_one_save(monkeypatch, with_metadata
         _attempt=lambda call, default: call(),
     )
 
-    async def finish(*_args):
+    def finish(*_args):
         return None
 
-    async def save(
+    def save(
         actual_adapter, part_name, *, threaded, save_threaded_part, save_unthreaded_part
     ):
         assert actual_adapter is adapter
@@ -240,15 +231,13 @@ def test_stock_properties_are_written_before_one_save(monkeypatch, with_metadata
     monkeypatch.setattr(_stock_fastener, "report_mass_properties", finish)
     monkeypatch.setattr(_stock_fastener, "_save_stock_part", save)
 
-    result = asyncio.run(
-        _stock_fastener.build_stock_fastener(
+    result = _stock_fastener.build_stock_fastener(
             adapter,
             part_name="purchased-part",
             components=(_stock_fastener.StockComponent(sku="TEST123", author=author),),
             material="AISI 304",
             properties=properties,
         )
-    )
     assert result == {"part": "purchased-part.SLDPRT"}
     assert saves == ["purchased-part"]
     if properties is not None:
@@ -256,7 +245,7 @@ def test_stock_properties_are_written_before_one_save(monkeypatch, with_metadata
 
 
 def _author(sku: str = "TEST123"):
-    async def author(_adapter, _truth=None):
+    def author(_adapter, _truth=None):
         return None
 
     author.__name__ = f"build_{sku}"
@@ -275,8 +264,8 @@ def test_local_declaration_preserves_the_author_and_stock_rework_wrapper() -> No
     assert declaration.threaded is True
 
     @wraps(author)
-    async def reworked(*args, **kwargs):
-        return await author(*args, **kwargs)
+    def reworked(*args, **kwargs):
+        return author(*args, **kwargs)
 
     assert recipe_declaration("TEST123", reworked) is declaration
 
@@ -352,12 +341,12 @@ def test_stock_builder_closures_track_local_metadata_and_threaded_saves(monkeypa
         builder = importlib.import_module(path.stem)
         captured = {}
 
-        async def capture(_adapter, **kwargs):
+        def capture(_adapter, **kwargs):
             captured.update(kwargs)
             return {}
 
         monkeypatch.setattr(builder, "build_stock_fastener", capture)
-        asyncio.run(builder.build(object()))
+        builder.build(object())
         declarations = [
             recipe_declaration(component.sku, component.author)
             for component in captured["components"]

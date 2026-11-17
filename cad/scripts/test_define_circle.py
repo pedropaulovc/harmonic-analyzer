@@ -8,7 +8,6 @@ radius is dimensioned as one in the part, and its drive then means a radius.
 
 from __future__ import annotations
 
-import asyncio
 from types import SimpleNamespace
 
 import pytest
@@ -23,10 +22,10 @@ class _Adapter:
         self.currentSketchManager = SimpleNamespace(AddToDB=False)
         self.dimensions: list[tuple[str, float]] = []
 
-    async def add_circle(self, _x: float, _y: float, _radius: float):
+    def add_circle(self, _x: float, _y: float, _radius: float):
         return SimpleNamespace(is_success=True, data="Circle1", error=None)
 
-    async def add_sketch_dimension(self, entity, other, kind, value):
+    def add_sketch_dimension(self, entity, other, kind, value):
         assert (entity, other) == ("Circle1", None)
         self.dimensions.append((kind, value))
         return SimpleNamespace(is_success=True, data=None, error=None)
@@ -34,7 +33,7 @@ class _Adapter:
 
 @pytest.fixture
 def adapter(monkeypatch) -> _Adapter:
-    async def anchored(*_args) -> None:
+    def anchored(*_args) -> None:
         return None
 
     monkeypatch.setattr(_sketch, "anchor_point_to_origin", anchored)
@@ -45,8 +44,7 @@ def adapter(monkeypatch) -> _Adapter:
 
 def _define(adapter: _Adapter, **kwargs) -> _sketch.SketchDims:
     dims = _sketch.SketchDims()
-    asyncio.run(
-        _sketch_circle.define_circle(
+    _sketch_circle.define_circle(
             adapter,
             0.0,
             39.718,
@@ -57,7 +55,6 @@ def _define(adapter: _Adapter, **kwargs) -> _sketch.SketchDims:
             drives=(None, '"BoreHeight"', '"CrownSize"'),
             **kwargs,
         )
-    )
     return dims
 
 

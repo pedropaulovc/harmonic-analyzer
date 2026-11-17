@@ -151,11 +151,11 @@ def _face_areas(adapter) -> list[float]:
     return sorted(areas)
 
 
-async def _export_views(adapter, stem: str) -> dict[str, str]:
+def _export_views(adapter, stem: str) -> dict[str, str]:
     out = {}
     for view in ("front", "isometric"):
         img = (OUT_DIR / f"{stem}_{view}.png").resolve()
-        check(f"export_image {stem} {view}", await adapter.export_image({
+        check(f"export_image {stem} {view}", adapter.export_image({
             "file_path": str(img), "format_type": "png",
             "width": 1600, "height": 1000, "view_orientation": view,
         }))
@@ -185,7 +185,7 @@ def _offset_plane(adapter, name: str, offset_mm: float):
 
 
 @stock_recipe("91829A560", threaded=True)
-async def build_91829A560(adapter, truth=None):
+def build_91829A560(adapter, truth=None):
     import pythoncom
     from win32com.client import VARIANT
     from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
@@ -196,37 +196,37 @@ async def build_91829A560(adapter, truth=None):
     model = adapter.currentModel
 
     # --- base solid ----------------------------------------------------------
-    check("create_sketch head", await adapter.create_sketch("Top"))
-    await define_circle(adapter, 0.0, 0.0, HEAD_DIA / 2.0, "head")
-    check("exit_sketch head", await adapter.exit_sketch())
+    check("create_sketch head", adapter.create_sketch("Top"))
+    define_circle(adapter, 0.0, 0.0, HEAD_DIA / 2.0, "head")
+    check("exit_sketch head", adapter.exit_sketch())
     name_last_feature(adapter, "HeadProfile")
     check("extrude head",
-          await adapter.create_extrusion(ExtrusionParameters(depth=HEAD_T)))
+          adapter.create_extrusion(ExtrusionParameters(depth=HEAD_T)))
     v = math.pi * (HEAD_DIA / 2.0) ** 2 * HEAD_T
-    volume = await volume_check(adapter, "head", v, 0.005 * v)
+    volume = volume_check(adapter, "head", v, 0.005 * v)
 
-    check("create_sketch shoulder", await adapter.create_sketch("Top"))
-    await define_circle(adapter, 0.0, 0.0, SHOULDER_DIA / 2.0, "shoulder")
-    check("exit_sketch shoulder", await adapter.exit_sketch())
+    check("create_sketch shoulder", adapter.create_sketch("Top"))
+    define_circle(adapter, 0.0, 0.0, SHOULDER_DIA / 2.0, "shoulder")
+    check("exit_sketch shoulder", adapter.exit_sketch())
     name_last_feature(adapter, "ShoulderProfile")
     extrude_at_offset(adapter, SHOULDER_LEN, -SHOULDER_LEN)
     v = math.pi * (SHOULDER_DIA / 2.0) ** 2 * SHOULDER_LEN
-    volume = await volume_check(adapter, "shoulder", volume + v, 0.005 * v)
+    volume = volume_check(adapter, "shoulder", volume + v, 0.005 * v)
 
-    check("create_sketch shank", await adapter.create_sketch("Top"))
-    await define_circle(adapter, 0.0, 0.0, THREAD_MAJOR / 2.0, "thread shank")
-    check("exit_sketch shank", await adapter.exit_sketch())
+    check("create_sketch shank", adapter.create_sketch("Top"))
+    define_circle(adapter, 0.0, 0.0, THREAD_MAJOR / 2.0, "thread shank")
+    check("exit_sketch shank", adapter.exit_sketch())
     name_last_feature(adapter, "ShankProfile")
     extrude_at_offset(adapter, THREAD_LEN, -UNDERHEAD_LEN)
     v = math.pi * (THREAD_MAJOR / 2.0) ** 2 * THREAD_LEN
-    volume = await volume_check(adapter, "thread shank", volume + v, 0.005 * v)
+    volume = volume_check(adapter, "thread shank", volume + v, 0.005 * v)
 
     # --- thread-relief undercut (vendor Cut-Revolve1: fillet + land + flank) -
     major_r = THREAD_MAJOR / 2.0
     y_jct = -SHOULDER_LEN
     y_land_top = y_jct - UC_FILLET
     y_land_bot = y_jct - UC_W
-    check("create_sketch undercut", await adapter.create_sketch("Front"))
+    check("create_sketch undercut", adapter.create_sketch("Front"))
     sk_mgr = adapter.currentSketchManager
     with no_sketch_inference(adapter):
         axis = sk_mgr.CreateCenterLine(
@@ -245,7 +245,7 @@ async def build_91829A560(adapter, truth=None):
         )
         if arc is None:
             raise RuntimeError("undercut: fillet arc failed")
-        await add_line_chain(adapter, [
+        add_line_chain(adapter, [
             (UC_LAND_R, y_land_top),
             (UC_LAND_R, y_land_bot),
             (SHOULDER_DIA / 2.0, y_land_bot - (SHOULDER_DIA / 2.0 - UC_LAND_R)),
@@ -254,30 +254,30 @@ async def build_91829A560(adapter, truth=None):
         ], close=False)
     finally:
         sk_mgr.AddToDB = prev_db
-    check("exit_sketch undercut", await adapter.exit_sketch())
+    check("exit_sketch undercut", adapter.exit_sketch())
     name_last_feature(adapter, "ThreadReliefProfile")
-    check("revolve-cut undercut", await adapter.create_revolve(
+    check("revolve-cut undercut", adapter.create_revolve(
         RevolveParameters(angle=360.0, is_cut=True)))
     name_last_feature(adapter, "ThreadRelief")
     v = _undercut_volume(major_r, UC_LAND_R, UC_LAND)
-    volume = await volume_check(adapter, "thread relief", volume - v, 0.01 * v)
+    volume = volume_check(adapter, "thread relief", volume - v, 0.01 * v)
 
     # --- driver slot (vendor Cut-Extrude2) ------------------------------------
     _offset_plane(adapter, "HeadTop", HEAD_T)
-    check("create_sketch slot", await adapter.create_sketch("HeadTop"))
-    await define_centered_rectangle(
+    check("create_sketch slot", adapter.create_sketch("HeadTop"))
+    define_centered_rectangle(
         adapter, HEAD_DIA / 2.0 + 1.0, SLOT_W / 2.0, "slot")
-    check("exit_sketch slot", await adapter.exit_sketch())
+    check("exit_sketch slot", adapter.exit_sketch())
     name_last_feature(adapter, "SlotProfile")
-    check("cut slot", await adapter.create_cut_extrude(
+    check("cut slot", adapter.create_cut_extrude(
         ExtrusionParameters(depth=SLOT_D)))
     name_last_feature(adapter, "DriverSlot")
     v = _slot_strip_area(HEAD_DIA / 2.0, SLOT_W) * SLOT_D
-    volume = await volume_check(adapter, "driver slot", volume - v, 0.02 * v)
+    volume = volume_check(adapter, "driver slot", volume - v, 0.02 * v)
 
     # --- helix (vendor Helix/Spiral2: tip-seeded, ascending, 9 revs) ---------
     _offset_plane(adapter, "TipPlane", -UNDERHEAD_LEN)
-    check("create_sketch helix seed", await adapter.create_sketch("TipPlane"))
+    check("create_sketch helix seed", adapter.create_sketch("TipPlane"))
     with no_sketch_inference(adapter):
         seed = adapter.currentSketchManager.CreateCircleByRadius(
             0.0, 0.0, 0.0, major_r / 1000.0)
@@ -305,18 +305,18 @@ async def build_91829A560(adapter, truth=None):
 
     # --- chamfers (vendor order: after the helix, before the thread cut) -----
     head_r = HEAD_DIA / 2.0
-    check("chamfer head rim", await adapter.add_chamfer(
+    check("chamfer head rim", adapter.add_chamfer(
         HEAD_CHAMFER,
         [[0.0, HEAD_T, head_r], [0.0, HEAD_T, -head_r]]))
     name_last_feature(adapter, "HeadChamfer")
     v = _slotted_rim_chamfer_volume(head_r, HEAD_CHAMFER, SLOT_W)
-    volume = await volume_check(adapter, "head chamfer", volume - v, 0.03 * v)
+    volume = volume_check(adapter, "head chamfer", volume - v, 0.03 * v)
 
-    check("chamfer thread start", await adapter.add_chamfer(
+    check("chamfer thread start", adapter.add_chamfer(
         TIP_CHAMFER, [[major_r, -UNDERHEAD_LEN, 0.0]]))
     name_last_feature(adapter, "TipChamfer")
     v = math.pi * TIP_CHAMFER**2 * (major_r - TIP_CHAMFER / 3.0)
-    volume = await volume_check(adapter, "tip chamfer", volume - v, 0.02 * v)
+    volume = volume_check(adapter, "tip chamfer", volume - v, 0.02 * v)
 
     # --- split at the land bottom (vendor Split2 @ Plane1) --------------------
     # Scopes the thread cut to the tail body: the sweep physically cannot
@@ -355,14 +355,14 @@ async def build_91829A560(adapter, truth=None):
     _telemetry.info(f"tail body: {tail_name}")
 
     # --- thread groove (vendor Cut-Sweep1) ------------------------------------
-    check("create_sketch cutter", await adapter.create_sketch("Front"))
-    await add_line_chain(adapter, [
+    check("create_sketch cutter", adapter.create_sketch("Front"))
+    add_line_chain(adapter, [
         (CUT_TOP_R, CUT_CENTRE_Y + CUT_TOP_W / 2.0),
         (ROOT_R, CUT_CENTRE_Y + ROOT_FLAT / 2.0),
         (ROOT_R, CUT_CENTRE_Y - ROOT_FLAT / 2.0),
         (CUT_TOP_R, CUT_CENTRE_Y - CUT_TOP_W / 2.0),
     ])
-    check("exit_sketch cutter", await adapter.exit_sketch())
+    check("exit_sketch cutter", adapter.exit_sketch())
     name_last_feature(adapter, "ThreadCutter")
 
     from solidworks_mcp.adapters.solidworks.features import (
@@ -418,10 +418,10 @@ async def build_91829A560(adapter, truth=None):
     name_last_feature(adapter, "ThreadedUnion")
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    check("create_part", await adapter.create_part())
-    await build_91829A560(adapter)
+    check("create_part", adapter.create_part())
+    build_91829A560(adapter)
 
     # --- vendor ground-truth gates --------------------------------------------
     props = _mass_properties(adapter)
@@ -463,9 +463,9 @@ async def build(adapter) -> dict[str, str]:
         problems.append(f"COM {com} != (0, {VENDOR_COM_Y:.6f}, 0)")
 
     # Save FIRST so a gate failure still leaves the model on disk to inspect.
-    check(f"save -> {REPLICA}", await adapter.save_file(str(REPLICA.resolve())))
+    check(f"save -> {REPLICA}", adapter.save_file(str(REPLICA.resolve())))
     artefacts = {"part": str(REPLICA), "report": str(REPORT)}
-    artefacts.update(await _export_views(adapter, "91829A560-replica"))
+    artefacts.update(_export_views(adapter, "91829A560-replica"))
 
     if problems:
         raise RuntimeError("replica differs from vendor: " + "; ".join(problems))
@@ -480,9 +480,9 @@ async def build(adapter) -> dict[str, str]:
     if not closed:
         raise RuntimeError("failed to close replica before vendor render")
     adapter.currentModel = None
-    check("open vendor part", await adapter.open_model(str(VENDOR)))
+    check("open vendor part", adapter.open_model(str(VENDOR)))
     artefacts.update({f"vendor_{k}": p
-                      for k, p in (await _export_views(adapter, "91829A560-vendor")).items()})
+                      for k, p in (_export_views(adapter, "91829A560-vendor")).items()})
     return artefacts
 
 

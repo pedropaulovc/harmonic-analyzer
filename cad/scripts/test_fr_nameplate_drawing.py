@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import math
 import re
 from pathlib import Path
@@ -85,26 +84,26 @@ class _ReferenceSketchAdapter:
     def _ok(data: Any = None) -> SimpleNamespace:
         return SimpleNamespace(is_success=True, data=data, error=None)
 
-    async def create_sketch(self, plane: str) -> SimpleNamespace:
+    def create_sketch(self, plane: str) -> SimpleNamespace:
         self.sketch_planes.append(plane)
         return self._ok()
 
-    async def add_line(self, x0: float, y0: float, x1: float, y1: float) -> Any:
+    def add_line(self, x0: float, y0: float, x1: float, y1: float) -> Any:
         line = f"Line{len(self.lines) + 1}"
         self.lines[line] = ((x0, y0), (x1, y1))
         self._sketch_entities[line] = _FakeSegment()
         return self._ok(line)
 
-    async def add_sketch_constraint(
+    def add_sketch_constraint(
         self, ref1: str, ref2: str | None, relation: str
     ) -> SimpleNamespace:
         self.relations.append((ref1, ref2, relation))
         return self._ok()
 
-    async def exit_sketch(self) -> SimpleNamespace:
+    def exit_sketch(self) -> SimpleNamespace:
         return self._ok()
 
-    async def create_plane(self, parameters: Any) -> SimpleNamespace:
+    def create_plane(self, parameters: Any) -> SimpleNamespace:
         self.planes.append(parameters)
         return self._ok()
 
@@ -126,7 +125,7 @@ def _run_reference_sketch(
     anchors: list[str] = []
     applied: list[list[str]] = []
 
-    async def dimension_between(
+    def dimension_between(
         _adapter: Any, ref1: str, ref2: str, kind: str, value: float, label: str
     ) -> str:
         (x0, y0), (x1, y1) = adapter.point(ref1), adapter.point(ref2)
@@ -136,7 +135,7 @@ def _run_reference_sketch(
         values.append(value)
         return label
 
-    async def anchor_point_to_origin(
+    def anchor_point_to_origin(
         _adapter: Any, ref: str, x: float, y: float, label: str
     ) -> None:
         assert adapter.point(ref) == pytest.approx((x, y)), label
@@ -144,7 +143,7 @@ def _run_reference_sketch(
         anchors.append(ref)
         values.append(x or y)
 
-    async def ensure_fully_defined(_adapter: Any, _label: str) -> None:
+    def ensure_fully_defined(_adapter: Any, _label: str) -> None:
         return None
 
     class Dims(part.SketchDims):
@@ -167,7 +166,7 @@ def _run_reference_sketch(
     monkeypatch.setattr(part, "_early_bound", lambda obj, _iface: obj)
     monkeypatch.setattr(part, "name_last_feature", lambda _adapter, _name: None)
     monkeypatch.setattr(part, "_require_on_section_plane", lambda *_args: None)
-    asyncio.run(recipe(adapter))
+    recipe(adapter)
 
     (names,) = applied
     assert len(names) == len(values) == len(set(names))

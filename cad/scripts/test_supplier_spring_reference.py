@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from types import SimpleNamespace
 
 import pytest
@@ -155,7 +154,7 @@ def _adapter(monkeypatch, active="Default", *, model_type=_Model):
     )
     adapter._reset_sketch_entity_registry = lambda: None
 
-    async def create_part():
+    def create_part():
         adapter.currentModel = _Model("Transient.sldprt", [])
         return True
 
@@ -183,7 +182,7 @@ def _bodies_in(model, name, kind=0):
 
 
 def _run(adapter, *states, body_count=2):
-    asyncio.run(refs.add_supplier_reference_configurations(adapter, states, body_count=body_count))
+    refs.add_supplier_reference_configurations(adapter, states, body_count=body_count)
 
 
 def _diagram(references):
@@ -205,7 +204,7 @@ def test_diagram_state_preserves_every_original_body_and_configuration(monkeypat
     original = {name: refs._signature(bodies)
                 for name, bodies in model.initial_by_configuration.items()}
 
-    async def references(target):
+    def references(target):
         assert target.currentModel is model
         assert model.GetBodies2(0, False) == []
         return (_sketch(model, "NominalSupplierGauge").Name,)
@@ -226,15 +225,15 @@ def test_diagram_state_preserves_every_original_body_and_configuration(monkeypat
 def test_two_diagrams_have_no_scratch_or_body_copy_path(monkeypatch):
     adapter, model = _adapter(monkeypatch)
 
-    async def no_scratch():
+    def no_scratch():
         raise AssertionError("diagram must not create a scratch document")
 
     adapter.create_part = no_scratch
 
-    async def free(target):
+    def free(target):
         return (_sketch(model, "FreeGauge").Name,)
 
-    async def maximum(target):
+    def maximum(target):
         return (_sketch(model, "MaximumGauge").Name,)
 
     states = (
@@ -265,7 +264,7 @@ def test_diagram_census_reads_added_features_in_name_order(monkeypatch):
 
     monkeypatch.setattr(_Feature, "GetTypeName2", typed)
 
-    async def references(target):
+    def references(target):
         return tuple(_sketch(model, name).Name for name in names)
 
     _run(adapter, _diagram(references))
@@ -276,7 +275,7 @@ def test_diagram_census_reads_added_features_in_name_order(monkeypatch):
 def test_diagrams_require_new_hidden_construction_dimension_owners(monkeypatch, corruption):
     adapter, model = _adapter(monkeypatch)
 
-    async def references(target):
+    def references(target):
         feature = _sketch(model, "SupplierGauge", owner="Other" if corruption == "wrong_owner" else None)
         if corruption == "shown":
             feature.Visible = 2
@@ -300,7 +299,7 @@ def test_undeclared_physical_feature_is_rejected_and_originals_restored(monkeypa
     adapter, model = _adapter(monkeypatch)
     original = refs._signature(model.GetBodies2(0, False))
 
-    async def references(target):
+    def references(target):
         _Feature(model, kind, _Body(0.5))
         return (_sketch(model, "SupplierGauge").Name,)
 
@@ -315,7 +314,7 @@ def test_undeclared_physical_feature_is_rejected_and_originals_restored(monkeypa
 def test_partial_callback_failure_preserves_originals_and_active_configuration(monkeypatch):
     adapter, model = _adapter(monkeypatch)
 
-    async def references(target):
+    def references(target):
         _sketch(model, "PartialGauge")
         _Feature(model, "body", _Body(0.5))
         raise RuntimeError("source reference failed")
@@ -332,7 +331,7 @@ def test_original_suppression_corruption_is_detected_without_geometry_change(mon
     adapter, model = _adapter(monkeypatch)
     original = _Feature(model, "installed")
 
-    async def references(target):
+    def references(target):
         original.suppressed["Default"] = True
         return (_sketch(model, "SupplierGauge").Name,)
 
@@ -579,7 +578,7 @@ def test_configuration_proofs_reacquire_feature_proxies_after_each_transition(mo
     signatures = {name: refs._signature(bodies)
                   for name, bodies in model.initial_by_configuration.items()}
 
-    async def references(target):
+    def references(target):
         return (_sketch(model, "ProxySafeSupplierGauge").Name,)
 
     _run(adapter, _diagram(references))
@@ -603,7 +602,7 @@ def test_original_mass_baselines_are_rebuilt_before_lazy_body_readback(monkeypat
     model.initial_by_configuration = {name: list(stale) for name in refreshed}
     model.pending_body_refresh = {name: list(bodies) for name, bodies in refreshed.items()}
 
-    async def references(target):
+    def references(target):
         return (_sketch(model, "RebuiltBaselineGauge").Name,)
 
     _run(adapter, _diagram(references))
@@ -622,7 +621,7 @@ def test_original_feature_identity_is_not_replaced_by_a_name_collision(monkeypat
     adapter, model = _adapter(monkeypatch, model_type=_ProxyModel)
     original, _other = _proxy_originals(model)
 
-    async def references(target):
+    def references(target):
         if corruption == "duplicate":
             duplicate = _Feature(model, "installed")
             duplicate.Name = original.Name
@@ -650,7 +649,7 @@ def test_partial_callback_cleanup_never_suppresses_configuration_created_metadat
     model.metadata_name = metadata_name
     primary = RuntimeError("supplier callback failed after partial authoring")
 
-    async def references(target):
+    def references(target):
         _sketch(model, "PartialProxyGauge")
         _Feature(model, "body", _Body(.5))
         raise primary
@@ -675,7 +674,7 @@ def test_undeclared_callback_body_cleanup_uses_owned_window_not_configuration_me
     _proxy_originals(model)
     initial = refs._signature(model.initial)
 
-    async def references(target):
+    def references(target):
         _Feature(model, "sheet", _Body(.5))
         return (_sketch(model, "ReportedSupplierGauge").Name,)
 
@@ -693,7 +692,7 @@ def test_callback_exception_survives_failed_post_callback_feature_census(monkeyp
     _proxy_originals(model)
     primary = RuntimeError("original callback failure")
 
-    async def references(target):
+    def references(target):
         _sketch(model, "UncensusedPartialGauge")
         model.census_fails = True
         raise primary
@@ -711,7 +710,7 @@ def test_callback_exception_survives_failed_owned_feature_cleanup(monkeypatch):
     _proxy_originals(model)
     primary = RuntimeError("original callback failure")
 
-    async def references(target):
+    def references(target):
         _sketch(model, "RefusingPartialGauge").refuses = True
         raise primary
 
@@ -735,7 +734,7 @@ def test_original_suppression_read_failure_names_configuration_feature_and_type(
 
     original.IsSuppressed2 = disconnected_in_second_original
 
-    async def references(target):
+    def references(target):
         raise AssertionError("a failed original baseline must stop before supplier authoring")
 
     with pytest.raises(RuntimeError) as failure:
@@ -772,7 +771,7 @@ def test_body_delete_is_owned_before_its_first_suppression_read_can_fail(monkeyp
 
     monkeypatch.setattr(model, "InsertDeleteBody2", insert_with_one_read_failure)
 
-    async def references(target):
+    def references(target):
         callbacks.append(target)
         return (_sketch(model, "NeverReachedGauge").Name,)
 
@@ -878,7 +877,7 @@ def test_body_delete_rename_fault_recovers_owned_identity_and_every_original(mon
 
     monkeypatch.setattr(model, "InsertDeleteBody2", insert_with_name_fault)
 
-    async def references(target):
+    def references(target):
         callbacks.append(target)
         return (_sketch(model, "NeverReachedRenameGauge").Name,)
 

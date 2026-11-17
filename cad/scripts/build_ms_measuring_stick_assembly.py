@@ -69,12 +69,12 @@ def _rows(rows: spec.Rows) -> list[list[float]]:
     return [list(row) for row in rows]
 
 
-async def _place_fixed(
+def _place_fixed(
     adapter: Any, part: str, origin: tuple[float, float, float], rows: spec.Rows
 ) -> str:
     """One fixed component at its exact assembly-frame transform."""
     matrix = _rows(rows)
-    return await place_component(
+    return place_component(
         adapter, part, list(origin), euler_from_rows(matrix), matrix
     )
 
@@ -100,7 +100,7 @@ def _create_ms_explode(adapter: Any, configuration_name: str) -> None:
     )
 
 
-async def _author_clamped_setting(adapter: Any) -> None:
+def _author_clamped_setting(adapter: Any) -> None:
     """No solid/pose edits: a source-owned chord between physical face stations."""
     (left_x, contact_y), (face_x, _) = spec.SETTING_CHORD
     for name, value in (
@@ -108,30 +108,30 @@ async def _author_clamped_setting(adapter: Any) -> None:
         ("SettingBlockFace", face_x),
         ("SettingContact", contact_y),
     ):
-        await set_global(adapter, name, f"{value}mm")
+        set_global(adapter, name, f"{value}mm")
     dims = SketchDims()
-    check("create clamped setting sketch", await adapter.create_sketch("Front"))
+    check("create clamped setting sketch", adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
-    line = check("setting chord", await adapter.add_line(left_x, contact_y, face_x, contact_y))
+    line = check("setting chord", adapter.add_line(left_x, contact_y, face_x, contact_y))
     set_sketch_direct_db(adapter, False)
     segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
     segment.ConstructionGeometry = True
     if not bool(segment.ConstructionGeometry):
         raise RuntimeError("clamped setting chord is not construction")
-    check("setting horizontal", await adapter.add_sketch_constraint(line, None, "horizontal"))
-    await anchor_point_to_origin(adapter, f"{line}.start", left_x, contact_y, "setting left end")
+    check("setting horizontal", adapter.add_sketch_constraint(line, None, "horizontal"))
+    anchor_point_to_origin(adapter, f"{line}.start", left_x, contact_y, "setting left end")
     dims.record("SettingLeftX", '-"SettingStickLeft"')
     dims.record("SettingContactY", '-"SettingContact"')
-    await dimension_between(
+    dimension_between(
         adapter, f"{line}.start", f"{line}.end", "horizontal_distance",
         spec.SETTING_NEAR_FACE_MM, "near face from left stick end",
     )
     dims.record(spec.SETTING_DIMENSION, '"SettingBlockFace" - "SettingStickLeft"')
-    await ensure_fully_defined(adapter, "clamped setting")
-    check("exit clamped setting sketch", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "clamped setting")
+    check("exit clamped setting sketch", adapter.exit_sketch())
     name_last_feature(adapter, spec.SETTING_FEATURE)
     for name, expression in dims.apply(adapter, spec.SETTING_FEATURE):
-        await drive_dimension(adapter, name, expression)
+        drive_dimension(adapter, name, expression)
     # A parenthesized reference to the saved pose, not a band: the native
     # prefix/suffix channel around the live value, as the magnifier's.
     display, dimension = _named_dimension(adapter, spec.SETTING_FEATURE, spec.SETTING_DIMENSION)
@@ -151,25 +151,25 @@ def _assert_working_pose(adapter: Any, thumbscrew: str) -> None:
     )
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     # Flip seeds + free-DOF contract: cad/config/assemblies/<ASM_NAME>.yaml.
     activate_assembly_contract(ASM_NAME)
-    check("create_assembly", await adapter.create_assembly())
+    check("create_assembly", adapter.create_assembly())
     apply_package_model_units(adapter, assembly_contract(ASM_NAME).drawing_unit, label=ASM_NAME)
 
     # The block and cover share the stop's turned, thumbscrew-up frame.
-    await _place_fixed(adapter, "ms-stop-block", spec.BLOCK_ORIGIN, spec.BLOCK_ROWS)
-    await _place_fixed(adapter, "ms-stop-plate", spec.PLATE_ORIGIN, spec.PLATE_ROWS)
+    _place_fixed(adapter, "ms-stop-block", spec.BLOCK_ORIGIN, spec.BLOCK_ROWS)
+    _place_fixed(adapter, "ms-stop-plate", spec.PLATE_ORIGIN, spec.PLATE_ROWS)
     # The graduated face still bears on the fixed wall opposite the screw.
-    await _place_fixed(adapter, "ms-stick", spec.STICK_ORIGIN, spec.STICK_ROWS)
+    _place_fixed(adapter, "ms-stick", spec.STICK_ORIGIN, spec.STICK_ROWS)
     # The stop thumbscrew points down onto the stick's plain face.
-    thumbscrew = await _place_fixed(
+    thumbscrew = _place_fixed(
         adapter, "sh-vn-thumb-screw", spec.THUMB_ORIGIN, spec.THUMB_ROWS
     )
     # The cover plate screws into the block: heads on the cover's outer face,
     # threads in the #2-56 blind taps (MHA-MS-00 step 4).
     for origin in spec.PLATE_SCREW_ORIGINS:
-        await _place_fixed(adapter, "ms-vn-stop-plate-screw", origin, spec.PLATE_SCREW_ROWS)
+        _place_fixed(adapter, "ms-vn-stop-plate-screw", origin, spec.PLATE_SCREW_ROWS)
     _telemetry.info(
         f"stop clamped at mark {spec.stop.STOP_MARK:.1f}: bar x {spec.STICK_X_MIN:.2f}.."
         f"{spec.STICK_X_MAX:.2f}, graduated face y {spec.STICK_BOTTOM_Y:.2f}, "
@@ -178,7 +178,7 @@ async def build(adapter) -> dict[str, str]:
         f"plate screws {spec.PLATE_SCREW_TAP_RESERVE:.2f} short of the tapped depth"
     )
 
-    await _author_clamped_setting(adapter)
+    _author_clamped_setting(adapter)
     assert_components_fully_defined(adapter)
     # Only the two thread engagements may overlap; the bar's fixed-wall contact,
     # the tip contact and the cover's seat are faces, not volume.
@@ -218,7 +218,7 @@ async def build(adapter) -> dict[str, str]:
     name_octant_views(
         adapter, octants=spec.DRAWING_EXPLODED_OCTANTS, label=ASM_NAME
     )
-    return await save_assembly_and_images(
+    return save_assembly_and_images(
         adapter,
         ASM_NAME,
         solved_gates=lambda current: _assert_working_pose(current, thumbscrew),

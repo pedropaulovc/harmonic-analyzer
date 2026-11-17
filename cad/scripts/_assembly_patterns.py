@@ -198,7 +198,7 @@ def assert_pattern_targets(
         raise RuntimeError(f"{label} has unexpected instances: {sorted(unmatched)}")
 
 
-async def linear_component_pattern(
+def linear_component_pattern(
     adapter: Any,
     seed_components: Iterable[str],
     *,
@@ -228,7 +228,7 @@ async def linear_component_pattern(
         str(_read_member(component, "Name2"))
         for component in (asm_h.GetComponents(False) or [])
     }
-    async with _telemetry.aspan(
+    with _telemetry.span(
         f"pattern {label}",
         kind="linear",
         seeds=",".join(seeds),
@@ -272,7 +272,7 @@ async def linear_component_pattern(
         return names
 
 
-async def grid_component_pattern(
+def grid_component_pattern(
     adapter: Any,
     seed_components: Iterable[str],
     *,
@@ -309,7 +309,7 @@ async def grid_component_pattern(
         str(_read_member(component, "Name2"))
         for component in (asm_h.GetComponents(False) or [])
     }
-    async with _telemetry.aspan(
+    with _telemetry.span(
         f"pattern {label}",
         kind="grid",
         seeds=",".join(seeds),
@@ -358,7 +358,7 @@ async def grid_component_pattern(
         return names
 
 
-async def circular_component_pattern(
+def circular_component_pattern(
     adapter: Any,
     seed_components: Iterable[str],
     *,
@@ -384,7 +384,7 @@ async def circular_component_pattern(
         str(_read_member(component, "Name2"))
         for component in (asm_h.GetComponents(False) or [])
     }
-    async with _telemetry.aspan(
+    with _telemetry.span(
         f"pattern {label}",
         kind="circular",
         seeds=",".join(seeds),

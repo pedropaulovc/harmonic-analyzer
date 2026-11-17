@@ -26,13 +26,13 @@ ROOT = Path(__file__).resolve().parents[1]
 ASMS = ("fr-frame", "output", "ha-harmonic-analyzer")
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     for asm in ASMS:
         path = ROOT / "out" / "sldasm" / f"{asm}.SLDASM"
         if not path.exists():
             _telemetry.info(f"{asm}: no file")
             continue
-        check(f"open {asm}", await adapter.open_model(str(path)))
+        check(f"open {asm}", adapter.open_model(str(path)))
         model = adapter.currentModel
         _flag(model, "IModelDoc2")
         ext = model.Extension

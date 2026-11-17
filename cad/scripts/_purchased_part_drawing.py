@@ -27,7 +27,7 @@ from _purchased_fastener_drawing import (
 )
 
 
-async def build_purchased_part_drawing(
+def build_purchased_part_drawing(
     adapter: Any,
     spec: DrawingSpec,
     *,
@@ -72,7 +72,7 @@ async def build_purchased_part_drawing(
             "Manufacturing Notes",
         )
         properties = read_required_properties(model, names, required=names)
-        return await _build_reference_sheet(
+        return _build_reference_sheet(
             adapter,
             spec,
             properties=properties,

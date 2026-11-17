@@ -118,11 +118,11 @@ def disc_cut_profile() -> list[tuple[float, float]]:
     ]
 
 
-async def _author_disc_cut(adapter) -> None:
+def _author_disc_cut(adapter) -> None:
     from solidworks_mcp.adapters.base import RevolveParameters
 
     profile = disc_cut_profile()
-    check("create_sketch disc cut", await adapter.create_sketch("Front"))
+    check("create_sketch disc cut", adapter.create_sketch("Front"))
     with no_sketch_inference(adapter):
         if (
             adapter.currentSketchManager.CreateCenterLine(
@@ -131,12 +131,12 @@ async def _author_disc_cut(adapter) -> None:
             is None
         ):
             raise RuntimeError(f"{PART_NAME} disc cut: CreateCenterLine failed")
-        await add_line_chain(adapter, profile)
-    check("exit_sketch disc cut", await adapter.exit_sketch())
+        add_line_chain(adapter, profile)
+    check("exit_sketch disc cut", adapter.exit_sketch())
     name_last_feature(adapter, DISC_CUT_FEATURES[0])
     check(
         "cut the disc screw to fit",
-        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
+        adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
     )
     name_last_feature(adapter, DISC_CUT_FEATURES[1])
 
@@ -157,16 +157,16 @@ def _require_tip(adapter, configuration: str) -> None:
 
 
 @wraps(build_91794A055)
-async def _supplied_with_disc_cut(adapter, truth=None, **parameters):
+def _supplied_with_disc_cut(adapter, truth=None, **parameters):
     """The supplied screw, then the DiscScrew cut as its own feature."""
-    receipt = await build_91794A055(adapter, truth, **parameters)
-    await _author_disc_cut(adapter)
-    await force_rebuild(adapter)
+    receipt = build_91794A055(adapter, truth, **parameters)
+    _author_disc_cut(adapter)
+    force_rebuild(adapter)
     _require_tip(adapter, disc.CONFIGURATION)
     return receipt
 
 
-async def _save_members(adapter, part_name, suppressed_features):
+def _save_members(adapter, part_name, suppressed_features):
     """Split the members, then the supplier references, the normal save and
     the member STEP/PNG exports on the reopened native.
 
@@ -175,35 +175,35 @@ async def _save_members(adapter, part_name, suppressed_features):
     catalogue references print on the purchase sheet's RackScrew views.
     """
     require_member_configurations(part_name, CONFIGURATIONS)
-    await create_member_configurations(adapter, part_name, CONFIGURATIONS)
+    create_member_configurations(adapter, part_name, CONFIGURATIONS)
     for configuration in CONFIGURATIONS:
-        await select_member_features(adapter, configuration, MEMBER_FEATURES)
-        await force_rebuild(adapter)
+        select_member_features(adapter, configuration, MEMBER_FEATURES)
+        force_rebuild(adapter)
         _require_tip(adapter, configuration)
-        await apply_material(adapter, MATERIAL)
+        apply_material(adapter, MATERIAL)
         apply_member_properties(
             adapter, part_name, configuration, DESCRIPTIONS[configuration], {}
         )
-        await report_mass_properties(adapter)
-    await activate_member(adapter, CONFIGURATIONS[0])
+        report_mass_properties(adapter)
+    activate_member(adapter, CONFIGURATIONS[0])
     require_material_in_every_configuration(
         adapter, part_name, MATERIAL, CONFIGURATIONS
     )
-    await add_supplier_reference_sketch(
+    add_supplier_reference_sketch(
         adapter,
         supplier.SUPPLIER_REFERENCE_DIMENSIONS,
         starts=supplier.SUPPLIER_REFERENCE_STARTS,
         planes=supplier.SUPPLIER_REFERENCE_PLANES,
     )
-    artefacts = await save_simplified_part(adapter, part_name, suppressed_features)
+    artefacts = save_simplified_part(adapter, part_name, suppressed_features)
     # save_simplified_part leaves the saved native open, RackScrew active; no
     # native save may follow the member exports.
-    await export_member_configurations(adapter, part_name, CONFIGURATIONS)
+    export_member_configurations(adapter, part_name, CONFIGURATIONS)
     return artefacts
 
 
-async def build(adapter) -> dict[str, str]:
-    return await build_stock_fastener(
+def build(adapter) -> dict[str, str]:
+    return build_stock_fastener(
         adapter,
         part_name=PART_NAME,
         components=(StockComponent(sku=SKU, author=_supplied_with_disc_cut),),

@@ -33,9 +33,9 @@ from diagnostics.diag_mcmaster_square_set_screw import (  # noqa: E402
 
 
 @stock_recipe("91410A540", threaded=True)
-async def build_91410A540(adapter, truth=None):
+def build_91410A540(adapter, truth=None):
     """Build 91410A540 by the 91410A538 family law at its 3/4-in length."""
-    await build_square_set_screw(
+    build_square_set_screw(
         adapter, sku="91410A540", size=SQUARE_SET_SCREW_SIZE
     )
 

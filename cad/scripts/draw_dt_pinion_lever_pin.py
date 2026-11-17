@@ -107,11 +107,11 @@ def _prove_one_end_mark(view: Any) -> None:
         raise RuntimeError(f"expected one pin end-view centre mark, found {len(marks)}")
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open pinion-lever-pin source", await adapter.open_model(str(SOURCE)))
+    check("open pinion-lever-pin source", adapter.open_model(str(SOURCE)))
     read_required_properties(
         adapter.currentModel,
         (
@@ -175,7 +175,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     add_property_linked_note(adapter, "Isometric View Note", 0.325, 0.160)
 
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Pinion Lever Pin Manufacturing Drawing",

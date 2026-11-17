@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import math
 from types import SimpleNamespace
 
@@ -265,12 +264,12 @@ def test_disc_segments_are_construction_only_and_exact(monkeypatch):
     model = SimpleNamespace(GetActiveSketch2=lambda: sketch)
     adapter = SimpleNamespace(currentModel=model)
 
-    async def exit_sketch():
+    def exit_sketch():
         return True
 
     adapter.exit_sketch = exit_sketch
 
-    async def fully_defined(*args):
+    def fully_defined(*args):
         return None
 
     dims = SimpleNamespace(apply=lambda *args: None)
@@ -282,8 +281,7 @@ def test_disc_segments_are_construction_only_and_exact(monkeypatch):
     monkeypatch.setattr(stock, "name_last_feature", lambda *args: None)
     monkeypatch.setattr(stock, "mark_dimensions_for_drawing", lambda *args: None)
     monkeypatch.setattr(stock, "_named_dimension", lambda *args: (display, native))
-    asyncio.run(
-        stock._finish_reference(
+    stock._finish_reference(
             adapter,
             "Diagram",
             dims,
@@ -291,7 +289,6 @@ def test_disc_segments_are_construction_only_and_exact(monkeypatch):
             spec=SimpleNamespace(FREE_HEIGHT=1.0),
             segment_lengths_mm=(1.0,),
         )
-    )
     assert all(segment.ConstructionGeometry for segment in segments)
 
 

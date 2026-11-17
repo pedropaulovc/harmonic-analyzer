@@ -6,7 +6,6 @@ the part the assemblies still build.
 
 from __future__ import annotations
 
-import asyncio
 from math import pi
 
 import pytest
@@ -123,13 +122,13 @@ def test_builder_lands_in_the_fillister_assembly_frame(
     adapter = object()
     outputs = {"sldprt": "stock-part"}
 
-    async def capture_stock(actual_adapter, **kwargs):
+    def capture_stock(actual_adapter, **kwargs):
         assert actual_adapter is adapter
         captured.update(kwargs)
         return outputs
 
     monkeypatch.setattr(part, "build_stock_fastener", capture_stock)
-    assert asyncio.run(part.build(adapter)) is outputs
+    assert part.build(adapter) is outputs
     assert captured["part_name"] == STEM
     components = captured["components"]
     assert len(components) == 1

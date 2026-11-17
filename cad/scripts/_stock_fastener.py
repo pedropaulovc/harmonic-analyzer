@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -22,8 +22,8 @@ from _stock_recipe import RecipeAuthor, recipe_declaration
 from _visibility import FeatureWalk
 
 
-type ThreadedPartSaver = Callable[[Any, str, Sequence[str]], Awaitable[dict[str, str]]]
-type UnthreadedPartSaver = Callable[[Any, str], Awaitable[dict[str, str]]]
+type ThreadedPartSaver = Callable[[Any, str, Sequence[str]], dict[str, str]]
+type UnthreadedPartSaver = Callable[[Any, str], dict[str, str]]
 type Vector3 = tuple[float, float, float]
 
 # The helical groove every threaded stock recipe cuts
@@ -343,7 +343,7 @@ def _transform_new_bodies(
         )
 
 
-async def build_stock_fastener(
+def build_stock_fastener(
     adapter: Any,
     *,
     part_name: str,
@@ -370,7 +370,7 @@ async def build_stock_fastener(
     Catalog stock name, supplier and SKUs always retain their catalog values.
     """
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     # A row that declares inches gets its IPS/inch/8-place calculation units
     # before the first recipe feature, volume check or supplier reference, so
     # every check runs under the units the part saves with; the save only
@@ -406,9 +406,9 @@ async def build_stock_fastener(
                 assert_seat_sketch_baseline(adapter, component.sku)
                 try:
                     if component.parameters is None:
-                        await component.author(adapter, None)
+                        component.author(adapter, None)
                     else:
-                        await component.author(adapter, None, **component.parameters)
+                        component.author(adapter, None, **component.parameters)
                 finally:
                     model.ClearSelection2(True)
             after = _solid_bodies(model)
@@ -446,7 +446,7 @@ async def build_stock_fastener(
 
         check(
             f"create_axis ScrewAxis ({' ∩ '.join(screw_axis_planes)})",
-            await adapter.create_axis(
+            adapter.create_axis(
                 CreateAxisParameters(
                     mode="two_planes",
                     planes=list(screw_axis_planes),
@@ -456,10 +456,10 @@ async def build_stock_fastener(
         name_last_feature(adapter, "ScrewAxis")
         _blank_recipe_references(adapter)
 
-    await force_rebuild(adapter)
-    await apply_material(adapter, material)
+    force_rebuild(adapter)
+    apply_material(adapter, material)
     if color is not None:
-        await apply_color(adapter, color)
+        apply_color(adapter, color)
     stock = fastener(part_name)
     stock_properties = {
         **(properties or {}),
@@ -468,8 +468,8 @@ async def build_stock_fastener(
         "Supplier SKUs": ", ".join(stock.skus),
     }
     apply_custom_properties(adapter, stock_properties)
-    await report_mass_properties(adapter)
-    return await _save_stock_part(
+    report_mass_properties(adapter)
+    return _save_stock_part(
         adapter,
         part_name,
         threaded=threaded,
@@ -478,7 +478,7 @@ async def build_stock_fastener(
     )
 
 
-async def _save_stock_part(
+def _save_stock_part(
     adapter: Any,
     part_name: str,
     *,
@@ -508,9 +508,9 @@ async def _save_stock_part(
                 f"{part_name}: threaded stock part requires a callable simplified saver"
             )
         # "<cfg> Simplified" suppresses the helical cut for assembly views.
-        return await save_threaded_part(adapter, part_name, (THREAD_FEATURE,))
+        return save_threaded_part(adapter, part_name, (THREAD_FEATURE,))
     if save_unthreaded_part is not None:
         if not callable(save_unthreaded_part):
             raise TypeError(f"{part_name}: unthreaded stock saver must be callable")
-        return await save_unthreaded_part(adapter, part_name)
-    return await save_part_and_images(adapter, part_name)
+        return save_unthreaded_part(adapter, part_name)
+    return save_part_and_images(adapter, part_name)

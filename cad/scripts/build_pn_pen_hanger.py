@@ -103,12 +103,12 @@ PART_NAME = "pn-pen-hanger"
 MATERIAL = "Plain Carbon Steel"  # black hardware
 
 
-async def _volume(adapter) -> float:
-    res = await adapter.get_mass_properties()
+def _volume(adapter) -> float:
+    res = adapter.get_mass_properties()
     return res.data.volume if res.is_success else float("nan")
 
 
-async def _overhang_reference(adapter, plate_back: str, sketch: SketchDims) -> None:
+def _overhang_reference(adapter, plate_back: str, sketch: SketchDims) -> None:
     """The upper plate's bond station across the strap (pn_pen_hanger_spec
     UPPER_PLATE_OVERHANG): a construction line along the plate's back edge,
     from the tapered strap's edge at the plate's top face to the plate's +x
@@ -118,7 +118,7 @@ async def _overhang_reference(adapter, plate_back: str, sketch: SketchDims) -> N
     set_sketch_direct_db(adapter, True)
     line = check(
         "upper plate overhang reference",
-        await adapter.add_line(
+        adapter.add_line(
             half_plate - UPPER_PLATE_OVERHANG, v_back, half_plate, v_back
         ),
     )
@@ -129,15 +129,15 @@ async def _overhang_reference(adapter, plate_back: str, sketch: SketchDims) -> N
         raise RuntimeError(f"{line} did not take the construction flag")
     check(
         "upper plate overhang reference root",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{line}.end", f"{plate_back}.start", "coincident"
         ),
     )
     check(
         "upper plate overhang reference direction",
-        await adapter.add_sketch_constraint(line, None, "horizontal"),
+        adapter.add_sketch_constraint(line, None, "horizontal"),
     )
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{line}.start",
         f"{line}.end",
@@ -151,7 +151,7 @@ async def _overhang_reference(adapter, plate_back: str, sketch: SketchDims) -> N
     )
 
 
-async def _guide_plate(adapter, prefix: str, drop: float) -> list[tuple[str, str]]:
+def _guide_plate(adapter, prefix: str, drop: float) -> list[tuple[str, str]]:
     """One open U plate: a Top-plane outline ((u, v) = model (x, -z)) extruded
     down from ``drop`` below the strap top.  Emission (rectilinear chain):
     slot width, slot depth, right arm, right reach, plate width, left reach,
@@ -171,11 +171,11 @@ async def _guide_plate(adapter, prefix: str, drop: float) -> list[tuple[str, str
         (-half_slot, v_front),
     ]
     sketch = SketchDims()
-    check(f"create_sketch {prefix} guide", await adapter.create_sketch("Top"))
+    check(f"create_sketch {prefix} guide", adapter.create_sketch("Top"))
     set_sketch_direct_db(adapter, True)
-    lines = await add_line_chain(adapter, points)
+    lines = add_line_chain(adapter, points)
     set_sketch_direct_db(adapter, False)
-    await define_rectilinear_chain(
+    define_rectilinear_chain(
         adapter, lines, points, label=f"{prefix} guide", dims=sketch,
         names=["SlotWidth", "SlotDepth", "ArmWidth", "PlateReach",
                "PlateWidth", "PlateReachLeft", "SlotX", "SlotBottom"],
@@ -190,9 +190,9 @@ async def _guide_plate(adapter, prefix: str, drop: float) -> list[tuple[str, str
     )
     if prefix == "Upper":
         # lines[4] runs from the plate's +x back corner along its back edge.
-        await _overhang_reference(adapter, lines[4], sketch)
-    await ensure_fully_defined(adapter, f"{prefix} guide sketch")
-    check(f"exit_sketch {prefix} guide", await adapter.exit_sketch())
+        _overhang_reference(adapter, lines[4], sketch)
+    ensure_fully_defined(adapter, f"{prefix} guide sketch")
+    check(f"exit_sketch {prefix} guide", adapter.exit_sketch())
     profile = f"{prefix}GuideProfile"
     name_last_feature(adapter, profile)
     jobs = sketch.apply(adapter, profile)
@@ -205,30 +205,30 @@ async def _guide_plate(adapter, prefix: str, drop: float) -> list[tuple[str, str
     return [*jobs, (thick, '"PlateThick"'), (offset, f'"{prefix}PlateDrop"')]
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). mm suffix load-bearing: this is an INCH
     # document and the equation manager reads BARE numbers in document units.
     # The strap-edge and screw-hole knobs hold SIGNED local coordinates; the dims
     # they drive are UNSIGNED distances, so the drives negate them positive.
-    await set_global(adapter, "StrapTopLeftX", f"{STRAP_TOP_X[0]}mm")
-    await set_global(adapter, "StrapBotHalf", f"{STRAP_BOT_X[1]}mm")
-    await set_global(adapter, "StrapRise", f"{STRAP_RISE}mm")
-    await set_global(adapter, "StrapThick", f"{STRAP_T}mm")
-    await set_global(adapter, "ScrewHoleX", f"{SCREW_HOLE_XY[0]}mm")
-    await set_global(adapter, "ScrewHoleY", f"{SCREW_HOLE_XY[1]}mm")
-    await set_global(adapter, "PlateThick", f"{GUIDE_PLATE_T}mm")
-    await set_global(adapter, "PlateWidth", f"{GUIDE_PLATE_WIDTH}mm")
-    await set_global(adapter, "PlateReach", f"{PLATE_REACH}mm")
-    await set_global(adapter, "SlotWidth", f"{SLOT_WIDTH}mm")
-    await set_global(adapter, "SlotBottom", f"{SLOT_BOTTOM}mm")
-    await set_global(adapter, "LowerPlateDrop", f"{GUIDE_PLATE_DROPS[0]}mm")
-    await set_global(adapter, "UpperPlateDrop", f"{GUIDE_PLATE_DROPS[1]}mm")
-    await set_global(adapter, "SlotCornerR", f"{SLOT_CORNER_R}mm")
+    set_global(adapter, "StrapTopLeftX", f"{STRAP_TOP_X[0]}mm")
+    set_global(adapter, "StrapBotHalf", f"{STRAP_BOT_X[1]}mm")
+    set_global(adapter, "StrapRise", f"{STRAP_RISE}mm")
+    set_global(adapter, "StrapThick", f"{STRAP_T}mm")
+    set_global(adapter, "ScrewHoleX", f"{SCREW_HOLE_XY[0]}mm")
+    set_global(adapter, "ScrewHoleY", f"{SCREW_HOLE_XY[1]}mm")
+    set_global(adapter, "PlateThick", f"{GUIDE_PLATE_T}mm")
+    set_global(adapter, "PlateWidth", f"{GUIDE_PLATE_WIDTH}mm")
+    set_global(adapter, "PlateReach", f"{PLATE_REACH}mm")
+    set_global(adapter, "SlotWidth", f"{SLOT_WIDTH}mm")
+    set_global(adapter, "SlotBottom", f"{SLOT_BOTTOM}mm")
+    set_global(adapter, "LowerPlateDrop", f"{GUIDE_PLATE_DROPS[0]}mm")
+    set_global(adapter, "UpperPlateDrop", f"{GUIDE_PLATE_DROPS[1]}mm")
+    set_global(adapter, "SlotCornerR", f"{SLOT_CORNER_R}mm")
 
     # Drive equations collected as dims are recorded, applied in one deferred
     # batch after the whole model + a rebuild exists (every target must resolve).
@@ -239,11 +239,11 @@ async def build(adapter) -> dict[str, str]:
     # (general) taper dx then rise, seg2 bottom width; the closing right edge
     # is supplied by closure.
     strap = SketchDims()
-    check("create_sketch strap", await adapter.create_sketch("Front"))
+    check("create_sketch strap", adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
-    strap_lines = await add_line_chain(adapter, list(STRAP_OUTLINE))
+    strap_lines = add_line_chain(adapter, list(STRAP_OUTLINE))
     set_sketch_direct_db(adapter, False)
-    await define_polygon_chain(
+    define_polygon_chain(
         adapter, strap_lines, list(STRAP_OUTLINE), label="strap", dims=strap,
         names=["StrapTopRun", "StrapTaperDx", "StrapRise", "StrapBotWidth"],
         drives=['-"StrapTopLeftX"',
@@ -251,14 +251,14 @@ async def build(adapter) -> dict[str, str]:
                 '"StrapRise"',
                 '2 * "StrapBotHalf"'],
     )
-    await ensure_fully_defined(adapter, "strap sketch")
-    check("exit_sketch strap", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "strap sketch")
+    check("exit_sketch strap", adapter.exit_sketch())
     name_last_feature(adapter, "StrapProfile")
     drive_jobs += strap.apply(adapter, "StrapProfile")
     # Reversed: from the bar seat (z 0) forward to the strap front face (-3).
     check(
         "extrude strap",
-        await adapter.create_extrusion(
+        adapter.create_extrusion(
             ExtrusionParameters(depth=STRAP_T, reverse_direction=True)
         ),
     )
@@ -269,15 +269,15 @@ async def build(adapter) -> dict[str, str]:
     top_w = STRAP_TOP_X[1] - STRAP_TOP_X[0]
     bot_w = STRAP_BOT_X[1] - STRAP_BOT_X[0]
     v_strap = (top_w + bot_w) / 2.0 * STRAP_RISE * STRAP_T
-    vol = await volume_check(adapter, "strap", v_strap, 0.002 * v_strap)
+    vol = volume_check(adapter, "strap", v_strap, 0.002 * v_strap)
 
     # 2. The two guide plates, each butting the strap front face.
     v_plate = GUIDE_PLATE_T * (
         GUIDE_PLATE_WIDTH * PLATE_REACH - SLOT_WIDTH * SLOT_DEPTH
     )
     for prefix, drop in zip(("Lower", "Upper"), GUIDE_PLATE_DROPS, strict=True):
-        drive_jobs += await _guide_plate(adapter, prefix, drop)
-        vol = await volume_check(
+        drive_jobs += _guide_plate(adapter, prefix, drop)
+        vol = volume_check(
             adapter, f"{prefix.lower()} guide plate", vol + v_plate, 0.01 * v_plate
         )
 
@@ -303,12 +303,12 @@ async def build(adapter) -> dict[str, str]:
     v_corner = (SLOT_CORNER_R**2 - math.pi * SLOT_CORNER_R**2 / 4.0) * GUIDE_PLATE_T
     for feature, dimension, corners in corner_features:
         edges = [[x, y, SLOT_BOTTOM_Z] for x, y in corners]
-        check(f"fillet {feature}", await adapter.add_fillet(SLOT_CORNER_R, edges))
+        check(f"fillet {feature}", adapter.add_fillet(SLOT_CORNER_R, edges))
         name_last_feature(adapter, feature)
         corner_dim = name_dimensions(adapter, feature, [dimension])
         drive_jobs.append((corner_dim[0], '"SlotCornerR"'))
         v_corners = len(corners) * v_corner
-        vol = await volume_check(
+        vol = volume_check(
             adapter, f"hanger with {feature}", vol + v_corners, 0.1 * v_corners
         )
 
@@ -333,12 +333,12 @@ async def build(adapter) -> dict[str, str]:
     )
     drive_jobs += screw_cut.placement_drive_jobs
     expected = vol - math.pi * (screw_dia / 2.0) ** 2 * STRAP_T
-    vol = await _volume(adapter)
+    vol = _volume(adapter)
     _telemetry.info(f"volume after screw hole: {vol:.1f} mm^3 (analytic {expected:.1f})")
     if abs(vol - expected) > 1.0:
         raise RuntimeError(f"screw hole volume {vol:.1f} != {expected:.1f}")
 
-    await name_bore_axis(
+    name_bore_axis(
         adapter,
         "Right Plane",
         SCREW_HOLE_XY[0],
@@ -351,19 +351,19 @@ async def build(adapter) -> dict[str, str]:
     # Apply the deferred drive equations after the model + a rebuild exists, then
     # re-check neutrality: every equation evaluates to the as-built value, so the
     # geometry must not move.
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(adapter, "driven pen hanger (equations neutral)", vol, 1.0)
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    volume_check(adapter, "driven pen hanger (equations neutral)", vol, 1.0)
 
-    await apply_material(adapter, MATERIAL)
+    apply_material(adapter, MATERIAL)
     # ch21 p.52 (img03) / ch30 plates: the hanger is BLACK-oxide steel, but
     # PANEL_BLACK shaded its 1:1 iso solid black with the black edges lost
     # (r12 review, rule 8).  BAR_STEEL, the darkest named tone light enough
     # for black edges to read.
-    await apply_color(adapter, BAR_STEEL)
-    await report_mass_properties(adapter)
+    apply_color(adapter, BAR_STEEL)
+    report_mass_properties(adapter)
     for (feature_name, dimension_name), band in DRAWING_BANDS.items():
         set_dimension_bilateral_tolerance(
             adapter,
@@ -395,7 +395,7 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
-    return await save_part_and_images(adapter, PART_NAME)
+    return save_part_and_images(adapter, PART_NAME)
 
 
 if __name__ == "__main__":

@@ -327,7 +327,7 @@ def _com_out(result, label: str):
 # --------------------------------------------------------------------------
 # feature steps
 # --------------------------------------------------------------------------
-async def _coil_helix(adapter, length_mm: float | None, feature_name: str) -> None:
+def _coil_helix(adapter, length_mm: float | None, feature_name: str) -> None:
     """Vendor Sketch3 + Helix/Spiral1: seed circle on a plane at the coil start.
 
     The start angle and the two direction flags are computed from the plane
@@ -341,7 +341,7 @@ async def _coil_helix(adapter, length_mm: float | None, feature_name: str) -> No
     x_start, _ = coil_ends_mm(length_mm)
     plane = "CoilStartPlane"
     offset_plane(adapter, plane, x_start, base="Right Plane")
-    check(f"create_sketch {plane}", await adapter.create_sketch(plane))
+    check(f"create_sketch {plane}", adapter.create_sketch(plane))
     with no_sketch_inference(adapter):
         seed = _sketch_manager(adapter).CreateCircleByRadius(0.0, 0.0, 0.0, a / 1000.0)
         if seed is None:
@@ -750,7 +750,7 @@ def _hook_pattern(adapter, sketch_name: str, feature_name: str) -> None:
 # --------------------------------------------------------------------------
 # builder
 # --------------------------------------------------------------------------
-async def build_9432K31(adapter, truth=None, *, length_mm: float | None = None):
+def build_9432K31(adapter, truth=None, *, length_mm: float | None = None):
     """Build 9432K31 into the current (empty) part.  Never opens or saves."""
     length = check_length_mm(length_mm)
     bez = transition_bezier_mm(length)
@@ -762,12 +762,12 @@ async def build_9432K31(adapter, truth=None, *, length_mm: float | None = None):
 
     with no_sketch_inference(adapter):
         # --- coil (vendor Sketch3 + Helix/Spiral1) -------------------------
-        await _coil_helix(adapter, length, "CoilHelix")
+        _coil_helix(adapter, length, "CoilHelix")
 
         # --- hook path (vendor Sketch2 + 3DSketch1 + CompCurve4) -----------
-        check("create_sketch hook", await adapter.create_sketch("Front"))
+        check("create_sketch hook", adapter.create_sketch("Front"))
         _hook_sketch(adapter, length, "HookProfile")
-        check("exit_sketch hook", await adapter.exit_sketch())
+        check("exit_sketch hook", adapter.exit_sketch())
         name_last_feature(adapter, "HookProfile")
         _transition_sketch(adapter, bez, "HookTransition")
         _composite_curve(adapter, ["HookProfile", "HookTransition"], "HookPath")
@@ -799,7 +799,7 @@ async def build_9432K31(adapter, truth=None, *, length_mm: float | None = None):
     # this helical body (vendor part: 349.6031 mm^3 against 349.7950 analytic),
     # so this is a shape sanity check, not the vendor gate.
     expected = math.pi * (WIRE_DIA_MM / 2.0) ** 2 * wire_length_mm(length)
-    await volume_check(adapter, "spring wire", expected, 0.003 * expected)
+    volume_check(adapter, "spring wire", expected, 0.003 * expected)
 
     # The replica is authored in the vendor's own frame: no COM remap.
     adapter._mcm_com_map = None

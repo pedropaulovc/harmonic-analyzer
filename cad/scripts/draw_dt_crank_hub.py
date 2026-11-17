@@ -287,11 +287,11 @@ def _add_seam_station(adapter: Any, view: Any) -> None:
         raise RuntimeError(f"{label} prints {places} places, not {SEAM_STATION_PLACES}")
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open crank-hub source", await adapter.open_model(str(SOURCE)))
+    check("open crank-hub source", adapter.open_model(str(SOURCE)))
     read_required_properties(
         adapter.currentModel,
         ("Number", "Revision", "Title", "Material Specification", "Finish", "Quantity"),
@@ -392,7 +392,7 @@ async def build(adapter: Any) -> dict[str, str]:
     if add_note(adapter, ISO_NOTE, *ISO_NOTE_XY) is None:
         raise RuntimeError("failed to add the crank hub's isometric label")
 
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Crank Through Hub Manufacturing Drawing",

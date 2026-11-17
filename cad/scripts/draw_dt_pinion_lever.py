@@ -478,11 +478,11 @@ def _hub_detail(adapter: Any, section: Any) -> Any:
     return detail
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open pinion-lever source", await adapter.open_model(str(SOURCE)))
+    check("open pinion-lever source", adapter.open_model(str(SOURCE)))
     source_model = adapter.currentModel
     read_required_properties(
         adapter.currentModel,
@@ -584,7 +584,7 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, detail, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the pin hole")
 
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Pinion Engage Lever Manufacturing Drawing",

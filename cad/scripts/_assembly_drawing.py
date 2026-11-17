@@ -24,7 +24,7 @@ import _telemetry
 
 
 @_telemetry.traced("drawing.simple_three_view", label_param="pdf_title")
-async def build_simple_three_view_drawing(
+def build_simple_three_view_drawing(
     adapter: Any,
     *,
     source: Path,
@@ -42,7 +42,7 @@ async def build_simple_three_view_drawing(
     if not source.is_file():
         raise FileNotFoundError(f"source assembly is missing: {source}")
 
-    check("open assembly drawing source", await adapter.open_model(str(source)))
+    check("open assembly drawing source", adapter.open_model(str(source)))
     # An assembly missing its title-block properties would render blank
     # $PRPSHEET cells; read_required_properties also enforces the current
     # release Revision, and finalize_drawing repeats that check per sheet.
@@ -86,7 +86,7 @@ async def build_simple_three_view_drawing(
     if annotate is not None:
         annotate(adapter)
 
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         outputs,
         layout=layout,

@@ -58,27 +58,27 @@ MATERIAL = "Brass"  # C36000 free-machining brass bar
 V_DRUM = math.pi * ((DRUM_OD / 2.0) ** 2 - (DRUM_BORE / 2.0) ** 2) * DRUM_LEN
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     # #290: the row's inch calculation units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this
     # is an INCH document and the equation manager reads BARE numbers in
     # document units.
-    await set_global(adapter, "DrumOd", f"{DRUM_OD}mm")
-    await set_global(adapter, "DrumBore", f"{DRUM_BORE}mm")
-    await set_global(adapter, "DrumLen", f"{DRUM_LEN}mm")
+    set_global(adapter, "DrumOd", f"{DRUM_OD}mm")
+    set_global(adapter, "DrumBore", f"{DRUM_BORE}mm")
+    set_global(adapter, "DrumLen", f"{DRUM_LEN}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
     # Annulus: OD + bore in ONE sketch (both on-axis circles -> only the two
     # diameter dims emit), extruded once.
     ring = SketchDims()
-    check("create_sketch ring", await adapter.create_sketch("Front"))
-    await define_circle(
+    check("create_sketch ring", adapter.create_sketch("Front"))
+    define_circle(
         adapter,
         0.0,
         0.0,
@@ -88,7 +88,7 @@ async def build(adapter) -> dict[str, str]:
         names=("OdCx", "OdCz", "DrumOd"),
         drives=(None, None, '"DrumOd"'),
     )
-    await define_circle(
+    define_circle(
         adapter,
         0.0,
         0.0,
@@ -98,36 +98,36 @@ async def build(adapter) -> dict[str, str]:
         names=("BoreCx", "BoreCz", "DrumBore"),
         drives=(None, None, '"DrumBore"'),
     )
-    await ensure_fully_defined(adapter, "ring sketch")
-    check("exit_sketch ring", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "ring sketch")
+    check("exit_sketch ring", adapter.exit_sketch())
     name_last_feature(adapter, "RingProfile")
     drive_jobs += ring.apply(adapter, "RingProfile")
     check(
         "extrude drum",
-        await adapter.create_extrusion(
+        adapter.create_extrusion(
             ExtrusionParameters(depth=DRUM_LEN, both_directions=True)
         ),
     )
     name_last_feature(adapter, "Drum")
     drum_depth = name_dimensions(adapter, "Drum", ["DrumLen"])
     drive_jobs.append((drum_depth[0], '"DrumLen"'))
-    await volume_check(adapter, "drum", V_DRUM, 0.005 * V_DRUM)
+    volume_check(adapter, "drum", V_DRUM, 0.005 * V_DRUM)
 
     # Axis1: the drum axis, model Z (Top Plane x Right Plane); the assembly
     # mates it coaxial with the wheel.
-    await name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", 0.0, "drum axis")
+    name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", 0.0, "drum axis")
 
     # Deferred drive equations, then re-check neutrality.
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    volume_check(
         adapter, "driven drum (equations neutral)", V_DRUM, 0.005 * V_DRUM
     )
 
-    await apply_material(adapter, MATERIAL)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    report_mass_properties(adapter)
     # The O.D. and the length take the title block's .XX and .XXX rows
     # (DRAWING_PRECISION); the reamed bore carries its band (millimetres,
     # printed in UNIT).
@@ -144,7 +144,7 @@ async def build(adapter) -> dict[str, str]:
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(adapter, PART_NAME)
-    return await save_part_and_images(adapter, PART_NAME)
+    return save_part_and_images(adapter, PART_NAME)
 
 
 if __name__ == "__main__":

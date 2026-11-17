@@ -91,16 +91,16 @@ def chain_links() -> list[tuple[str, str]]:
     return links
 
 
-async def set_crank_deg(adapter, theta_deg: float) -> None:
+def set_crank_deg(adapter, theta_deg: float) -> None:
     """Set the CrankDeg global (used by verify.py to sweep the pose)."""
     from solidworks_mcp.adapters.base import SetGlobalVariableParameters
-    res = await adapter.set_global_variable(
+    res = adapter.set_global_variable(
         SetGlobalVariableParameters(name=CRANK_GLOBAL, expression=f"{theta_deg:.12g}"))
     if not res.is_success:
         raise RuntimeError(f"set {CRANK_GLOBAL}={theta_deg}: {res.error}")
 
 
-async def install(adapter, travel_mate_name: str, base_doc: float, factor: float) -> dict:
+def install(adapter, travel_mate_name: str, base_doc: float, factor: float) -> dict:
     """Install the globals + equation that drive the named travel mate.
 
     Args:
@@ -113,30 +113,30 @@ async def install(adapter, travel_mate_name: str, base_doc: float, factor: float
         CreateEquationParameters, SetGlobalVariableParameters,
     )
 
-    async def setg(name: str, expr: str) -> float:
-        res = await adapter.set_global_variable(
+    def setg(name: str, expr: str) -> float:
+        res = adapter.set_global_variable(
             SetGlobalVariableParameters(name=name, expression=expr))
         if not res.is_success:
             raise RuntimeError(f"global {name} rejected: {res.error}")
         return float(res.data.get("value"))
 
-    await setg("Magnify", f"{truth_model.magnify():.12g}")
-    await setg(CRANK_GLOBAL, f"{rest_crank_deg():g}")
+    setg("Magnify", f"{truth_model.magnify():.12g}")
+    setg(CRANK_GLOBAL, f"{rest_crank_deg():g}")
     links = chain_links()
     for name, expr in links:
-        await setg(name, expr)
-    await setg("PenY", f'"Magnify" * "S{len(links)}"')
-    await setg("PenScale", f"{scale_mm_per_unit() * factor:.12g}")
+        setg(name, expr)
+    setg("PenY", f'"Magnify" * "S{len(links)}"')
+    setg("PenScale", f"{scale_mm_per_unit() * factor:.12g}")
     # Rest offset as a GLOBAL (not an inline literal): an arbitrary coefficient
     # vector can put pen_y(rest) anywhere, and inlining it risks a double operator
     # (``- -1.9e-13``) and exponent notation the SW parser rejects -- both avoided
     # by referencing a plain fixed-decimal global. At rest the mate == base, so the
     # saved render pose is held for ANY coefficient vector.
-    await setg("PenRest", _decimal(pen_y_rest()))
+    setg("PenRest", _decimal(pen_y_rest()))
 
     eqn = (f'"D1@{travel_mate_name}" = {base_doc:.9f} '
            f'+ "PenScale" * ("PenY" - "PenRest")')
-    res = await adapter.create_equation(CreateEquationParameters(equation=eqn))
+    res = adapter.create_equation(CreateEquationParameters(equation=eqn))
     if not res.is_success:
         raise RuntimeError(f"pen-driver equation rejected: {res.error}")
     return {

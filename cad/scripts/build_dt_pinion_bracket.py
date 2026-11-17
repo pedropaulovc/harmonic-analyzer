@@ -234,10 +234,10 @@ def _edge_x(y: float) -> float:
 
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     # #290: the row's inch calculation units, before the first global.
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
@@ -247,36 +247,36 @@ async def build(adapter) -> dict[str, str]:
     # numbers in document units (an unsuffixed 22 = 22 in). Thickness is the
     # extrude feature parameter (built with the literal); StrapThickness is
     # declared so a GUI edit sees the knob.
-    await set_global(adapter, "StrapWidth", f"{WIDTH}mm")
-    await set_global(adapter, "C2C", f"{C2C}mm")
-    await set_global(adapter, "StrapThickness", f"{THICKNESS}mm")
-    await set_global(adapter, "PivotBore", f"{PIVOT_BORE}mm")
-    await set_global(adapter, "ArborBore", f"{ARBOR_BORE}mm")
-    await set_global(adapter, "PinBore", f"{PIN_BORE}mm")
-    await set_global(adapter, "PinDrop", f"{PIN_DROP}mm")
-    await set_global(adapter, "PinSeatDepth", f"{PIN_SEAT}mm")
-    await set_global(adapter, "CrossHoleDia", f"{CROSS_HOLE_DIA}mm")
+    set_global(adapter, "StrapWidth", f"{WIDTH}mm")
+    set_global(adapter, "C2C", f"{C2C}mm")
+    set_global(adapter, "StrapThickness", f"{THICKNESS}mm")
+    set_global(adapter, "PivotBore", f"{PIVOT_BORE}mm")
+    set_global(adapter, "ArborBore", f"{ARBOR_BORE}mm")
+    set_global(adapter, "PinBore", f"{PIN_BORE}mm")
+    set_global(adapter, "PinDrop", f"{PIN_DROP}mm")
+    set_global(adapter, "PinSeatDepth", f"{PIN_SEAT}mm")
+    set_global(adapter, "CrossHoleDia", f"{CROSS_HOLE_DIA}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
     # Outer rounded-bar loop + both bores in ONE sketch -> single extrude.
     # Inference OFF: the bottom cap arc endpoints sit near the origin.
     strap = SketchDims()
-    check("create_sketch strap", await adapter.create_sketch("Front"))
+    check("create_sketch strap", adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     bottom_cap = check(
         "add bottom cap arc",
-        await adapter.add_arc(0.0, 0.0, -R_END, 0.0, R_END, 0.0),
+        adapter.add_arc(0.0, 0.0, -R_END, 0.0, R_END, 0.0),
     )
-    check("add right edge", await adapter.add_line(R_END, 0.0, R_END, C2C))
+    check("add right edge", adapter.add_line(R_END, 0.0, R_END, C2C))
     top_cap = check(
         "add top cap arc",
-        await adapter.add_arc(0.0, C2C, R_END, C2C, -R_END, C2C),
+        adapter.add_arc(0.0, C2C, R_END, C2C, -R_END, C2C),
     )
-    check("add left edge", await adapter.add_line(-R_END, C2C, -R_END, 0.0))
+    check("add left edge", adapter.add_line(-R_END, C2C, -R_END, 0.0))
     # Pivot bore on the origin (only its diameter recorded); arbor bore on the +Y
     # axis (x 0): one centre dim (the rise, driven by the positive C2C) + diameter.
-    await define_circle(
+    define_circle(
         adapter,
         0.0,
         0.0,
@@ -286,7 +286,7 @@ async def build(adapter) -> dict[str, str]:
         names=("PivotBoreCx", "PivotBoreCz", "PivotBoreDia"),
         drives=(None, None, '"PivotBore"'),
     )
-    arbor_bore = await define_circle(
+    arbor_bore = define_circle(
         adapter,
         0.0,
         C2C,
@@ -304,13 +304,13 @@ async def build(adapter) -> dict[str, str]:
     # so the four h-aligned cap ends pin them too.
     check(
         "anchor bottom cap centre",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{bottom_cap}.center", "origin", "coincident"
         ),
     )
     check(
         "bottom cap radius",
-        await adapter.add_sketch_dimension(bottom_cap, None, "radial", R_END),
+        adapter.add_sketch_dimension(bottom_cap, None, "radial", R_END),
     )
     strap.record("BottomCapRadius", '"StrapWidth" / 2')
     # The top cap is CONCENTRIC with the arbor bore -- that is the design intent,
@@ -322,13 +322,13 @@ async def build(adapter) -> dict[str, str]:
     # Probed 2026-07-02; same bug class as the magnifying-lever dome radius.)
     check(
         "top cap centre concentric with arbor bore",
-        await adapter.add_sketch_constraint(
+        adapter.add_sketch_constraint(
             f"{top_cap}.center", f"{arbor_bore}.center", "coincident"
         ),
     )
     check(
         "top cap radius",
-        await adapter.add_sketch_dimension(top_cap, None, "radial", R_END),
+        adapter.add_sketch_dimension(top_cap, None, "radial", R_END),
     )
     strap.record("TopCapRadius", '"StrapWidth" / 2')
     for cap, end in (
@@ -339,17 +339,17 @@ async def build(adapter) -> dict[str, str]:
     ):
         check(
             f"cap {end} level",
-            await adapter.add_sketch_constraint(
+            adapter.add_sketch_constraint(
                 f"{cap}.{end}", f"{cap}.center", "horizontal_points"
             ),
         )
-    await ensure_fully_defined(adapter, "strap sketch")
-    check("exit_sketch strap", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "strap sketch")
+    check("exit_sketch strap", adapter.exit_sketch())
     name_last_feature(adapter, "StrapProfile")
     drive_jobs += strap.apply(adapter, "StrapProfile")
     check(
         "extrude strap",
-        await adapter.create_extrusion(ExtrusionParameters(depth=THICKNESS)),
+        adapter.create_extrusion(ExtrusionParameters(depth=THICKNESS)),
     )
     name_last_feature(adapter, "Strap")
     depth_dim = name_dimensions(adapter, "Strap", ["Depth"])
@@ -361,7 +361,7 @@ async def build(adapter) -> dict[str, str]:
         - math.pi * (ARBOR_BORE / 2.0) ** 2
     )
     expected = area * THICKNESS
-    await volume_check(adapter, "strap", expected, 0.005 * expected)
+    volume_check(adapter, "strap", expected, 0.005 * expected)
 
 
     # Blind cam-pin seat (PR8): O4 along X into the -X edge at (y -PIN_DROP,
@@ -375,7 +375,7 @@ async def build(adapter) -> dict[str, str]:
     # so a volumetric pass alone cannot tell the -x seat from its +x mirror)
     # and the centre-of-mass x sign (material removed at -x pushes the COM to +x).
     v_bore = _pin_bore_removed()
-    res = await adapter.get_mass_properties()
+    res = adapter.get_mass_properties()
     vol_before = res.data.volume
     com_before = res.data.center_of_mass
     com_before_x = com_before[0] * 1000.0 if com_before is not None else None
@@ -396,7 +396,7 @@ async def build(adapter) -> dict[str, str]:
             f"pin seat centre mapped to unexpected sketch ({u:g}, {v:g})"
         )
     _telemetry.debug(f"pin seat flank sketch centre ({u:+g}, {v:+g})")
-    await define_circle(
+    define_circle(
         adapter,
         u,
         v,
@@ -408,16 +408,16 @@ async def build(adapter) -> dict[str, str]:
         # seat above the pivot), so drive the magnitude.
         drives=drives,
     )
-    await ensure_fully_defined(adapter, "pin seat sketch")
-    check("exit_sketch pin seat", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "pin seat sketch")
+    check("exit_sketch pin seat", adapter.exit_sketch())
     name_last_feature(adapter, "PinSeatProfile")
     drive_jobs += seat.apply(adapter, "PinSeatProfile")
-    cut = await adapter.create_cut_extrude(
+    cut = adapter.create_cut_extrude(
         ExtrusionParameters(depth=PIN_SEAT, reverse_direction=not normal_out)
     )
     if not cut.is_success:
         raise RuntimeError(f"pin seat cut failed: {cut.error}")
-    res = await adapter.get_mass_properties()
+    res = adapter.get_mass_properties()
     removed = vol_before - res.data.volume
     if abs(removed - v_bore) > 0.02 * v_bore + 0.5:
         raise RuntimeError(
@@ -439,7 +439,7 @@ async def build(adapter) -> dict[str, str]:
     seat_depth_dim = name_dimensions(adapter, "PinSeat", ["PinSeatDepth"])
     drive_jobs += [(seat_depth_dim[0], '"PinSeatDepth"')]
     expected -= v_bore
-    await volume_check(adapter, "strap with pin seat", expected, 0.005 * expected)
+    volume_check(adapter, "strap with pin seat", expected, 0.005 * expected)
 
     # Option E-a set-pin cross hole (dt_vn_pinion_strap_pin_spec): along X through
     # the pivot-bore axis, centred on the thickness.  Sketched on the Right
@@ -451,11 +451,11 @@ async def build(adapter) -> dict[str, str]:
     # volume is gated against the analytic two-wall integral at 5% of the
     # hole (a whole-part tolerance would pass a missing cut).
     v_cross = _cross_hole_removed()
-    res = await adapter.get_mass_properties()
+    res = adapter.get_mass_properties()
     vol_before = res.data.volume
     cross = SketchDims()
-    check("create_sketch cross hole", await adapter.create_sketch("Right"))
-    await define_circle(
+    check("create_sketch cross hole", adapter.create_sketch("Right"))
+    define_circle(
         adapter,
         -CROSS_HOLE_CZ,
         0.0,
@@ -465,17 +465,17 @@ async def build(adapter) -> dict[str, str]:
         names=("CrossHoleCz", "CrossHoleCy", "CrossHoleDia"),
         drives=('"StrapThickness" / 2', None, '"CrossHoleDia"'),
     )
-    await ensure_fully_defined(adapter, "cross hole sketch")
-    check("exit_sketch cross hole", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "cross hole sketch")
+    check("exit_sketch cross hole", adapter.exit_sketch())
     name_last_feature(adapter, "CrossHoleProfile")
     drive_jobs += cross.apply(adapter, "CrossHoleProfile")
-    cut = await adapter.create_cut_extrude(
+    cut = adapter.create_cut_extrude(
         ExtrusionParameters(depth=2.0 * WIDTH, both_directions=True)
     )
     if not cut.is_success:
         raise RuntimeError(f"cross hole cut failed: {cut.error}")
     name_last_feature(adapter, "CrossHole")
-    res = await adapter.get_mass_properties()
+    res = adapter.get_mass_properties()
     removed = vol_before - res.data.volume
     if abs(removed - v_cross) > 0.05 * v_cross:
         raise RuntimeError(
@@ -490,25 +490,25 @@ async def build(adapter) -> dict[str, str]:
     # Named bore axes for the assembly: the pivot bore (Axis1) rides the torque
     # shaft, the arbor bore (Axis2) journals the pinion. The p2 swing group keys
     # off these (concentric to the shaft + lock the pinion in -- build_drive_train).
-    pivot_axis = await name_bore_axis(
+    pivot_axis = name_bore_axis(
         adapter, "Right Plane", 0.0, "Top Plane", 0.0, "pivot bore"
     )
-    arbor_axis = await name_bore_axis(
+    arbor_axis = name_bore_axis(
         adapter, "Right Plane", 0.0, "Top Plane", C2C, "arbor bore"
     )
     # Pin seat axis (along X): Front @ mid-thickness x Top @ -PIN_DROP. The
     # follower pin mates coaxial to this in the assembly, riding the swing.
-    pin_seat_axis = await name_bore_axis(
+    pin_seat_axis = name_bore_axis(
         adapter, "Front Plane", THICKNESS / 2.0, "Top Plane", -PIN_DROP, "pin seat"
     )
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(
+        drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    volume_check(
         adapter, "driven strap (equations neutral)", expected, 0.005 * expected
     )
 
@@ -555,9 +555,9 @@ async def build(adapter) -> dict[str, str]:
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
 
-    await apply_material(adapter, MATERIAL)
-    await apply_color(adapter, POLISHED_STEEL)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    apply_color(adapter, POLISHED_STEEL)
+    report_mass_properties(adapter)
     apply_drawing_properties(adapter, PART_NAME)
     blank_reference_geometry(
         adapter,
@@ -572,7 +572,7 @@ async def build(adapter) -> dict[str, str]:
             (pin_seat_axis, "AXIS"),
         ),
     )
-    artefacts = await save_part_and_images(adapter, PART_NAME)
+    artefacts = save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
     return artefacts
 

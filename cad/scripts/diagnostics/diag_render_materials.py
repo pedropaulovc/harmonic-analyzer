@@ -31,10 +31,10 @@ ROOT = Path(__file__).resolve().parents[1]
 PARTS = ("fr-tube-frame", "pd-platen-paper", "dt-crank-handle", "ch-amplitude-bar", "fr-harmonic-base")
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     first = True
     for part in PARTS:
-        check(f"open {part}", await adapter.open_model(
+        check(f"open {part}", adapter.open_model(
             str(ROOT / "out" / "sldprt" / f"{part}.SLDPRT")))
         model = adapter.currentModel
         _flag(model, "IModelDoc2")
