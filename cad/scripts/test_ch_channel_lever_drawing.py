@@ -170,7 +170,7 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
 def test_the_plate_stays_flat_by_its_route_not_by_a_frame() -> None:
     """#2340: the plate's bow is bounded by its thickness and plate-offset
     bands (the bar-to-bar gap spends exactly those), so the sheet carries no
-    flatness frame (test_sheet_carries_no_gdt_and_drill_callouts); the
+    flatness frame; the
     registry route takes equal stock off both faces of the bought 5/16 flat,
     and the figure it states is the model's."""
     import _config

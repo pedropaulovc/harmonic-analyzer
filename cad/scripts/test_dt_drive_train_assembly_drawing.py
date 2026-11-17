@@ -15,6 +15,8 @@ import cylinder_bank_layout as bank_layout
 import dt_cone_gear_spec as cone_spec
 import pytest
 
+import dt_crank_handle_pivot_screw_spec as screw_spec
+import dt_crank_handle_spec as handle_spec
 import draw_dt_drive_train_assembly as drawing
 import dt_drive_train_assembly_spec as spec
 from _assembly_contract import assembly_contract
@@ -152,6 +154,14 @@ def test_registry_row_and_outputs() -> None:
     assert drawing.OUTPUTS.pdf == row.outputs["pdf"]
 
 
+def test_every_builder_family_has_a_bom_identity_and_a_cluster() -> None:
+    stems = _builder_stems()
+    assert stems, "builder census found no place_component stems"
+    assert stems <= set(drawing.BOM_PART_NUMBERS)
+    assert stems <= spec.classified_stems()
+    assert not stems & spec.RETIRED_STEMS
+
+
 def test_bom_part_numbers_match_the_parts_registry() -> None:
     for stem, number in drawing.BOM_PART_NUMBERS.items():
         path = PARTS / f"{stem}.yaml"
@@ -194,6 +204,14 @@ def test_package_text_cites_only_bom_or_external_part_numbers() -> None:
     assert cited <= bom | EXTERNAL_NUMBERS
 
 
+def test_note_lines_fit_a_half_sheet_field() -> None:
+    """The actual note producer stays inside the unchanged 70-character budget."""
+    for field in drawing.package_note_fields(_drawing_facts()):
+        for label, text in field.blocks:
+            for line in text.splitlines():
+                assert len(line) <= 70, (field.label, label, line)
+
+
 def _stacked_height(blocks: tuple[tuple[str, str], ...]) -> float:
     """Blocks stacked in one field (metres): NOTE_LINE_PITCH a rendered line,
     NOTE_FIELD_INSET above each block (the anchor target), NOTE_BLOCK_GAP
@@ -208,6 +226,31 @@ def _stacked_height(blocks: tuple[tuple[str, str], ...]) -> float:
 
 def _spare(field: drawing.NoteField) -> float:
     return field.bounds[1] - field.bounds[3] - _stacked_height(field.blocks)
+
+
+def test_every_note_field_holds_its_stacked_blocks() -> None:
+    """Every produced block fits its field at the native-measured line pitch."""
+    for field in drawing.package_note_fields(_drawing_facts()):
+        assert _spare(field) >= 0, (field.label, _spare(field))
+
+
+def test_the_package_prints_each_numbered_assembly_step_once() -> None:
+    import dt_drive_train_steps as steps
+
+    numbers = [
+        int(number)
+        for field in drawing.package_note_fields(_drawing_facts())
+        if field.sheet in (
+            drawing.SEQUENCE_SHEET,
+            drawing.CRANK_SHEET,
+            drawing.BANK_SHEET,
+            drawing.FIT_SHEET,
+            drawing.CONTINUATION_SHEET,
+        )
+        for _label, text in field.blocks
+        for number in re.findall(r"^(\d+)\. ", text, re.MULTILINE)
+    ]
+    assert sorted(numbers) == list(range(1, len(steps.SEQUENCE) + 1))
 
 
 def test_sheet_numbers_are_pinned_where_the_sheets_cite_them() -> None:
@@ -236,6 +279,36 @@ def test_sheet_numbers_are_pinned_where_the_sheets_cite_them() -> None:
     assert set(drawing.SHEET_SCALES) == set(names)
     assert "BALLOONS ON SHEETS 3-6" in drawing.BOM_REFERENCE_NOTES
     assert f"STATIONS: SHEET {drawing.SETTING_SHEET}" in drawing.BOM_REFERENCE_NOTES
+    fields = {field.label: field for field in drawing.package_note_fields(_drawing_facts())}
+    sequence_right = fields[f"sheet {drawing.SEQUENCE_SHEET} right note field"].blocks[-1][1]
+    assert sequence_right.endswith(
+        f"CONT. STEP {drawing.CRANK_SHEET_FROM}: SHEET {drawing.CRANK_SHEET}."
+    )
+    crank_right = fields[f"sheet {drawing.CRANK_SHEET} right note field"].blocks[-1][1]
+    assert crank_right.endswith(
+        f"CONT. STEP {drawing.CRANK_CONTINUED_FROM}: SHEET {drawing.BANK_SHEET}."
+    )
+    # MHA-PD-00 cites steps 4 and 5 on the crank sheet: both print whole there.
+    def sequence(sheets: set[int]) -> str:
+        return "\n".join(
+            text
+            for field in fields.values()
+            if field.sheet in sheets
+            for _label, text in field.blocks
+        )
+
+    others = {
+        drawing.SEQUENCE_SHEET,
+        drawing.BANK_SHEET,
+        drawing.FIT_SHEET,
+        drawing.CONTINUATION_SHEET,
+    }
+    crank = sequence({drawing.CRANK_SHEET})
+    for key in ("crank-mesh-checked", "paper-drive-wheel"):
+        number = drawing.steps.step_number(key)
+        assert re.search(rf"^{number}\. ", crank, re.MULTILINE), key
+        assert not re.search(rf"^{number}[A-Z]?\. ", sequence(others), re.MULTILINE)
+    assert all(text.count(",") <= 1 for text in drawing.BOM_DESCRIPTIONS.values())
 
 
 def test_grouped_parts_stamp_the_description_the_bom_prints() -> None:
@@ -295,8 +368,22 @@ def test_bom_descriptions_keep_one_line() -> None:
 
 
 def test_shared_screws_combine_quantity_without_merging_operational_roles() -> None:
+    facts = _drawing_facts()
     assert drawing.BOM_PART_NUMBERS[SCREW_STEM] == "MHA-SH-VN-52"
     assert "90280A108" in drawing.BOM_DESCRIPTIONS[SCREW_STEM]
+    assert facts.components.count(SCREW_STEM) == 1
+    assert facts.count(SCREW_STEM) == 2
+    assert facts.role_count(spec.SWING_STOP_SCREW_SELECTOR) == 1
+    assert facts.role_count(spec.FOOT_SCREW_SELECTOR) == 1
+    assert STOP_NAME in facts.clusters["cone-set"]
+    assert FOOT_NAME not in facts.clusters["cone-set"]
+    assert FOOT_NAME in facts.clusters["pinion-rig"]
+    assert STOP_NAME not in facts.clusters["pinion-rig"]
+    moved = {step.label: names for step, names in spec.plan_explode(facts.instances)}
+    assert moved["swing stop lifts"] == (STOP_NAME,)
+    assert moved["spring foot screw lifts"] == (FOOT_NAME,)
+    assert FOOT_NAME in moved["pivot blocks drop"]
+    assert STOP_NAME not in moved["pivot blocks drop"]
     for cluster, selector in (
         ("cone-set", spec.SWING_STOP_SCREW_SELECTOR),
         ("pinion-rig", spec.FOOT_SCREW_SELECTOR),
@@ -417,6 +504,18 @@ def test_shared_stop_frame_preserves_world_geometry(proud: float) -> None:
     assert len(appearances) == 1
     color = eval(compile(ast.Expression(appearances[0].args[2]), str(BUILDER), "eval"), namespace)
     assert color == pytest.approx((0.08, 0.08, 0.09))
+
+
+@pytest.mark.parametrize("role", [spec.FOOT_SCREW_ROLE, spec.SWING_STOP_SCREW_ROLE])
+def test_shared_screw_explode_rejects_missing_and_duplicate_roles(role: str) -> None:
+    census = _instances()
+    missing = [spec.Instance(i.name, i.stem, i.origin_mm, None if i.role == role else i.role) for i in census]
+    with pytest.raises(ValueError, match="must tag one"):
+        spec.plan_explode(missing)
+    original = next(i for i in census if i.role == role)
+    duplicate = spec.Instance("unrelated-native-index-77", original.stem, original.origin_mm, role)
+    with pytest.raises(ValueError, match="must tag one"):
+        spec.plan_explode([*census, duplicate])
 
 
 def test_changed_gear_bom_counts_come_from_their_specs() -> None:
@@ -686,6 +785,8 @@ def test_rig_is_located_by_its_parked_tip_gap() -> None:
     low, high = (float(value) * 25.4 for value in printed.groups())
     assert tip_gap.TIP_GAP_ACCEPT[0] - 1e-9 <= low < high <= tip_gap.TIP_GAP_ACCEPT[1] + 1e-9
     assert f"SEE SHEET {drawing.CHECKS_SHEET}" in drawing.ASSEMBLED_HEADING
+    fields = {field.label: field for field in drawing.package_note_fields(_drawing_facts())}
+    assert "pinion rig sequence" in dict(fields[f"sheet {drawing.FIT_SHEET} left note field"].blocks)
     # The seats are spotted after RIG SET, and drilled per the base's own
     # transfer callouts, not a second copy of their sizes.
     seats = _rig_step_body("rig-seats-transferred")
@@ -811,6 +912,86 @@ def test_every_set_feeler_the_steps_and_checks_print_has_a_leaf_row() -> None:
     assert drawing.SETTING_TABLE_LEFT + sum(widths) <= drawing.STATION_TABLE_FIELD[0]
 
 
+class _SheetTable:
+    """A native general table that keeps what it was given, as SolidWorks does."""
+
+    ROW_HEIGHT = 0.005525  # GetRowHeight, both seats (leaf 20261112T161937Z)
+
+    def __init__(self, x: float, top: float, rows: int, columns: int) -> None:
+        self.anchor = (x, top, 0.0)
+        self.RowCount, self.ColumnCount = rows, columns
+        self.widths: dict[int, float] = {}
+        self.cells: dict[tuple[int, int], str] = {}
+
+    def SetColumnWidth(self, column, width, _mode):  # noqa: N802
+        self.widths[column] = width
+        return width
+
+    def SetText2(self, row, column, _displayed, text):  # noqa: N802
+        self.cells[row, column] = text
+
+    def DisplayedText2(self, row, column, _displayed):  # noqa: N802
+        return self.cells[row, column]
+
+    def GetAnnotation(self):  # noqa: N802
+        return SimpleNamespace(GetPosition=lambda: self.anchor)
+
+    def GetRowHeight(self, _row):  # noqa: N802
+        return self.ROW_HEIGHT
+
+    def GetColumnWidth(self, column):  # noqa: N802
+        return self.widths[column]
+
+
+@pytest.mark.parametrize("title_read_error", (0.0, -0.0009, 0.0009))
+def test_sheet_15_tables_stack_clear_of_the_station_field_on_any_seat(
+    monkeypatch: pytest.MonkeyPatch, title_read_error: float
+) -> None:
+    """Release v49 r2 (leaf 20261113T025825Z): on a 1010x678 px seat window the
+    titles' pixel-read boxes put the pedestal recheck table 0.37 mm inside the
+    station table field; on the 1010x598 px one it cleared by 0.53 mm.  A
+    table hangs off its title's requested top, so a title box read a pixel
+    or two off moves no table, and the stack ends 2 mm clear of the station
+    table field and the interface notes."""
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(drawing, "_activate_sheet", lambda *_args: None)
+    monkeypatch.setattr(drawing, "_heading", lambda *_args: None)
+    monkeypatch.setattr(drawing, "_reference_iso", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(drawing, "_stack_sheet_note_fields", lambda *_args: [])
+    monkeypatch.setattr(drawing, "_add_note_block", lambda *_args, **_kwargs: object())
+    monkeypatch.setattr(
+        drawing,
+        "_anchor_note",
+        lambda _adapter, _note, corner, **_kwargs: (
+            corner[0],
+            corner[1] - drawing.NOTE_LINE_PITCH + title_read_error,
+            corner[0] + 0.08,
+            corner[1] + title_read_error,
+        ),
+    )
+    tables: list[_SheetTable] = []
+
+    def insert(_bom, x, top, _anchor, _template, rows, columns):
+        tables.append(_SheetTable(x, top, rows, columns))
+        return tables[-1]
+
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(InsertTableAnnotation2=insert))
+
+    assert drawing._place_setting_sheet(adapter, facts=None) == []
+
+    setting, recheck, feeler = tables
+    assert setting.anchor[1] == pytest.approx(
+        drawing.NOTE_FIELD_LEFT[1] - drawing.TABLE_TITLE_DROP
+    )
+    bottoms = [table.anchor[1] - table.RowCount * table.ROW_HEIGHT for table in tables]
+    for above, below in zip(bottoms, (recheck, feeler)):
+        assert above - below.anchor[1] == pytest.approx(
+            drawing.SETTING_TABLE_GAP + drawing.TABLE_TITLE_DROP
+        )
+    assert bottoms[1] - drawing.STATION_TABLE_FIELD[1] >= 0.002
+    assert bottoms[2] - drawing.INTERFACE_FIELD[1] >= 0.002
+
+
 def test_the_pivot_seat_is_transferred_and_trusted() -> None:
     """Owner ruling 2026-11-08 (Pedro): step 23 transfer-punches D1 through
     the MHA-DT-20 pivot bore with the cone set at its working position,
@@ -874,7 +1055,38 @@ def test_one_code_key_defines_every_code_and_every_step_sheet_points_to_it() -> 
     """Owner ruling 2026-11-08 (Pedro; rubric sample round 20 #2): one
     labelled key, built from the placed cone gears and the MHA-DT-12 count,
     defines the Tnnn codes and GEAR 0-19; each step sheet points to it."""
+    facts = _drawing_facts()
+    fields = drawing.package_note_fields(facts)
+    keys = [
+        (field, text)
+        for field in fields
+        for _label, text in field.blocks
+        if text.startswith(drawing.CODE_KEY_HEADING)
+    ]
+    assert len(keys) == 1
+    key_field, key = keys[0]
+    assert key_field.sheet == drawing.SETTING_SHEET
     assert drawing.CODE_KEY_POINTER == f"(CODES: SHEET {drawing.SETTING_SHEET} KEY)"
+    keyed = set(re.findall(r"\bT\d{3}\b", key))
+    assert keyed == {code for _station, code in facts.cone_rows()}
+    last_gear = facts.count("dt-cylinder-gear") - 1
+    assert f"GEAR 0-{last_gear} = MHA-DT-12 FROM THE FRONT" in key
+    step_sheets = (
+        drawing.SEQUENCE_SHEET,
+        drawing.CRANK_SHEET,
+        drawing.BANK_SHEET,
+        drawing.FIT_SHEET,
+        drawing.CONTINUATION_SHEET,
+        drawing.CHECKS_SHEET,
+    )
+    for sheet in step_sheets:
+        blocks = [field.blocks for field in fields if field.sheet == sheet]
+        texts = [text for block in blocks for _label, text in block]
+        assert any(drawing.CODE_KEY_POINTER in text for text in texts), sheet
+        printed = " ".join(texts)
+        assert set(re.findall(r"(?<!MHA-PD-09 )\bT\d{3}\b", printed)) <= keyed, sheet
+        gears = {int(n) for n in re.findall(r"\bGEARS? (\d+)\b", printed)}
+        assert all(0 <= gear <= last_gear for gear in gears), sheet
 
 
 @pytest.mark.parametrize("setting", (0.05, 0.95, 1.0, 1.05, 2.0, 2.5, 2.95))
@@ -904,6 +1116,7 @@ def test_the_spring_is_stationed_east_west_where_its_preload_is_gated() -> None:
     assert float(printed.group(1)) * 25.4 == pytest.approx(SCREW_EAST_OF_PIVOT, abs=0.127)
     assert "UNTIL ITS CREST BEARS ON THE PARKED BACK MHA-DT-14 FLANK" in located
     assert "TERMINAL FLAT" not in _flat(RIG_STEPS)
+    assert "TERMINAL FLAT" not in Path(drawing.__file__).read_text(encoding="utf-8")
     assert steps.step_number("rig-located") < steps.step_number("rig-set")
 
 
@@ -952,6 +1165,51 @@ def test_torque_shaft_pins_go_in_before_the_cams() -> None:
 
 
 def test_explode_plan_resolves_every_step_on_the_built_census() -> None:
+    plan = spec.plan_explode(_instances())
+    assert [step.label for step, _names in plan] == [s.label for s in spec.EXPLODE_STEPS]
+    moved = {step.label: names for step, names in plan}
+    assert moved["south pedestal"] == (
+        "dt-arbor-pedestal-1",
+        "dt-vn-pedestal-hold-down-screw-1",
+        "sh-vn-arbor-set-screw-1",
+    )
+    assert moved["north pedestal"] == (
+        "dt-arbor-pedestal-2",
+        "dt-vn-pedestal-hold-down-screw-2",
+        "sh-vn-arbor-set-screw-2",
+    )
+    assert moved["apex set screws lift"] == ("sh-vn-arbor-set-screw-1", "sh-vn-arbor-set-screw-2")
+    assert moved["pedestal screws lift"] == (
+        "dt-vn-pedestal-hold-down-screw-1",
+        "dt-vn-pedestal-hold-down-screw-2",
+    )
+    assert moved["south end disc"] == ("dt-cylinder-end-disc-1",)
+    assert moved["bank spring"] == ("dt-vn-cylinder-bank-spring-1",)
+    assert not any(i.name == "dt-cylinder-end-disc-2" for i in _instances())
+    assert moved["spring foot screw lifts"] == (FOOT_NAME,)
+    assert moved["spring steps east"] == ("dt-pinion-spring-1", FOOT_NAME)
+    # The MHA-DT-VN-69 tip dowel is pressed in the block foot (owner ruling
+    # 2026-11-07, PR #2248), so it leaves with the block, then drops out of
+    # the foot's blind ream past its depth (integration proof
+    # 20261109T105251629Z, balloon 11 on the seated stub).
+    import dt_cone_tip_block_spec as tip_block
+
+    assert "dt-vn-locating-pin-1" in moved["tip block slides off"]
+    assert moved["tip dowel drops"] == ("dt-vn-locating-pin-1",)
+    drop = {step.label: step for step in spec.EXPLODE_STEPS}["tip dowel drops"]
+    assert drop.axis == "y" and -drop.distance_mm > tip_block.DOWEL_HOLE_DEPTH + 10.0
+    # MHA-DT-VN-71 (owner decision C1 keyed, 2026-11-09, PR #1992) leaves with
+    # the rotor, stays as the gears slide off it, then rises square to the
+    # level cone axis to stand above the largest gear's tips.
+    assert "dt-vn-cone-shaft-key-1" in moved["cone rotor withdraws"]
+    assert "dt-vn-cone-shaft-key-1" not in moved["cone gears slide toward the tip"]
+    assert moved["cone key lifts out"] == ("dt-vn-cone-shaft-key-1",)
+    lift = {step.label: step for step in spec.EXPLODE_STEPS}["cone key lifts out"]
+    assert (
+        lift.axis == "y"
+        and lift.distance_mm > cone_spec.outside_dia_mm(120) / 2.0 + 10.0
+    )
+    assert moved["block screws lift"] == tuple(f"dt-vn-slotted-screw-{i}" for i in range(1, 5))
     # The rig sheet's MHA-DT-VN-57 balloon is pinned to the front block's west screw.
     rig_anchors = drawing.DRIVE_TRAIN_BALLOON_ANCHORS["pinion-rig"]
     assert rig_anchors["dt-vn-slotted-screw"].instance == "dt-vn-slotted-screw-3"
@@ -959,9 +1217,11 @@ def test_explode_plan_resolves_every_step_on_the_built_census() -> None:
     # its hole; MHA-DT-VN-62 the north screw, lifted clear of its pedestal
     # (integration proof 20261109T105251629Z, balloons 20 and 33).
     assert rig_anchors["dt-vn-pinion-strap-pin"].instance == "dt-vn-pinion-strap-pin-3"
+    assert moved["collar pin drives out"] == ("dt-vn-pinion-strap-pin-3",)
     bank_anchors = drawing.DRIVE_TRAIN_BALLOON_ANCHORS["cylinder-bank"]
     pinned = bank_anchors["dt-vn-pedestal-hold-down-screw"].instance
     assert pinned == "dt-vn-pedestal-hold-down-screw-2"
+    assert pinned in moved["north pedestal"] and pinned in moved["pedestal screws lift"]
 
 
 def test_bank_spring_explode_clears_arbor_and_pedestal_in_isometric() -> None:
@@ -990,10 +1250,55 @@ def test_bank_spring_explode_clears_arbor_and_pedestal_in_isometric() -> None:
     ) * radial
 
 
+def test_explode_plan_refuses_unknown_retired_and_missing_families() -> None:
+    with pytest.raises(ValueError, match="does not classify"):
+        spec.plan_explode([*_instances(), spec.Instance("widget-1", "widget", (0, 0, 0))])
+    with pytest.raises(ValueError, match="does not classify"):
+        spec.plan_explode(
+            [*_instances(), spec.Instance("pinion-handle-pin-1", "pinion-handle-pin", (0, 0, 0))]
+        )
+    census = [i for i in _instances() if i.stem != "dt-crank-handle"]
+    with pytest.raises(ValueError, match="absent from the model"):
+        spec.plan_explode(census)
+
+
+def test_built_families_are_no_longer_pending() -> None:
+    """A family the builder inserts has landed: it must not stay excused as pending."""
+    assert not _builder_stems() & spec.PENDING_STEMS
+
+
+def test_crank_hub_families_explode_with_the_crank_arm() -> None:
+    census = _instances()
+    assert {"dt-crank-hub", "dt-vn-crank-hub-pin"} <= {i.stem for i in census}
+    moved = {step.label: names for step, names in spec.plan_explode(census)}
+    assert {"dt-crank-hub-1", "dt-vn-crank-hub-pin-1"} <= set(moved["crank arm group"])
+
+
 def test_explode_families_are_either_moved_or_stationary_never_both() -> None:
     moved = {spec.component_stem(key) for step in spec.EXPLODE_STEPS for key in step.stems}
     assert not moved & spec.STATIONARY_STEMS
     assert moved | spec.STATIONARY_STEMS == spec.classified_stems()
+
+
+def test_clusters_partition_every_instance_once() -> None:
+    census = _instances()
+    members = drawing.cluster_members(census)
+    flat = [name for names in members.values() for name in names]
+    assert sorted(flat) == sorted(i.name for i in census)
+    assert FOOT_NAME in members["pinion-rig"]
+    assert {"dt-vn-pedestal-hold-down-screw-1", "dt-vn-pedestal-hold-down-screw-2"} <= set(
+        members["cylinder-bank"]
+    )
+
+
+def test_source_refusals_and_bom_order() -> None:
+    counts = drawing.instance_counts(_instances())
+    assert drawing.source_violations(counts) == []
+    assert drawing.bom_components(counts)[0] == "dt-cylinder-gear-shaft"
+    assert set(drawing.bom_components(counts)) == set(counts)
+    del counts["dt-crank-arm"]
+    assert "dt-crank-arm" in drawing.source_violations(counts)[0]
+    assert drawing.source_violations({**counts, "dt-crank-arm": 1, "pinion-handle-pin": 1})
 
 
 def test_cone_station_rows_run_front_to_back() -> None:
@@ -1033,12 +1338,27 @@ def test_bom_split_keeps_the_first_column_no_taller() -> None:
 
 def test_bom_reference_view_and_metadata_fit_below_the_first_piece() -> None:
     # Historical header height is an offline budget input, not native-head proof.
+    data_rows = len(drawing.bom_components(drawing.instance_counts(_instances())))
+    first_rows = drawing.bom_split_row(data_rows)
+    first_height = 0.0102 + first_rows * drawing.BOM_ROW_HEIGHT
+    first_bottom = drawing.BOM_ANCHOR[1] - first_height
+    assert drawing.bom_extent_violations(
+        drawing.BOM_ANCHOR, drawing.BOM_COLUMN_WIDTH, first_height
+    ) == []
+    second_height = 0.0102 + (data_rows - first_rows) * drawing.BOM_ROW_HEIGHT
+    assert drawing.bom_extent_violations(
+        (drawing.BOM_SECOND_COLUMN_X, drawing.BOM_ANCHOR[1]),
+        drawing.BOM_COLUMN_WIDTH,
+        second_height,
+    ) == []
     half = drawing.REFERENCE_ISO_HALF_OUTLINE
     cx, cy = drawing.BOM_REFERENCE_ISO_CENTER
     # GetOutline can extend farther below the requested centre than above it.
     # Exercise that asymmetric consumer boundary, not just a centred square.
     outline = (cx - half, cy - half - 0.001, cx + half, cy + half)
     assert drawing.bom_reference_iso_violations(outline) == []
+    assert outline[3] < first_bottom
+    assert outline[2] < drawing.BOM_REFERENCE_NOTE_FIELD[0]
     metadata = drawing.NoteField(
         2,
         "BOM metadata",
@@ -1046,6 +1366,13 @@ def test_bom_reference_view_and_metadata_fit_below_the_first_piece() -> None:
         (("BOM reference and station pointer", drawing.BOM_REFERENCE_NOTES),),
     )
     assert _spare(metadata) >= 0
+    assert drawing.BOM_REFERENCE_NOTE_FIELD[1] < first_bottom
+    onto_bom = (outline[0], outline[1] + 0.010, outline[2], outline[3] + 0.010)
+    assert drawing.bom_reference_iso_violations(onto_bom)
+    onto_metadata = (outline[0] + 0.020, outline[1], outline[2] + 0.020, outline[3])
+    assert drawing.bom_reference_iso_violations(onto_metadata)
+    below_view_field = (outline[0], outline[1] - 0.002, outline[2], outline[3])
+    assert drawing.bom_reference_iso_violations(below_view_field)
 
 
 def test_bom_budget_refuses_the_title_block_and_sheet_edges() -> None:
@@ -1389,10 +1716,25 @@ def test_the_cone_tip_detail_balloons_the_tip_families_the_1_3_view_drops() -> N
     The six tip families are the cone set's own, each has a frozen anchor,
     and the 1:3 view keeps every other cone-set family, so each BOM item is
     still ballooned once on sheet 4."""
+    facts = _drawing_facts()
+    names = drawing.cone_tip_detail_names(facts)
+    assert names <= frozenset(facts.clusters["cone-set"])
+    shown = {i.stem for i in facts.instances if i.name in names}
+    assert shown == drawing.CONE_TIP_DETAIL_STEMS
+    assert {"dt-cone-tip-gear", "dt-cone-tip-bushing"} <= shown
     assert drawing.CONE_TIP_DETAIL_STEMS <= set(drawing.DRIVE_TRAIN_BALLOON_ANCHORS["cone-set"])
+    cone_set = {i.stem for i in facts.instances if i.name in facts.clusters["cone-set"]}
+    assert cone_set - drawing.CONE_TIP_DETAIL_STEMS, "the 1:3 view keeps balloons"
     arrows = (letter for letter, _y in drawing.SHEET1_VIEW_ARROWS)
     taken = {drawing.FULL_DETAIL_VIEW_LETTER, "A", "B", *arrows}
     assert drawing.CONE_TIP_DETAIL_LETTER not in taken
+
+
+def test_a_cone_tip_detail_with_no_tip_family_in_the_cone_set_is_refused() -> None:
+    facts = _drawing_facts()
+    facts.clusters = {**facts.clusters, "cone-set": ()}
+    with pytest.raises(RuntimeError, match="cone tip detail"):
+        drawing.cone_tip_detail_names(facts)
 
 
 def _ring(box: tuple[float, ...], reach: float) -> tuple[float, ...]:
@@ -1570,10 +1912,206 @@ def test_the_centre_shift_centres_the_outline_in_the_region() -> None:
     assert moved == pytest.approx((0.15, 0.075, 0.25, 0.125))
 
 
+class _Annotation:
+    def __init__(self, x: float, attach: float) -> None:
+        self.position = (x, 1.0)
+        self.attach = attach
+
+    def GetPosition(self):
+        return (*self.position, 0.0)
+
+    def SetPosition(self, x, y, z) -> bool:
+        self.position = (x, y)
+        return True
+
+    def GetLeaderCount(self) -> int:
+        return 1
+
+    def GetLeaderPointsAtIndex(self, index):
+        return (*self.position, 0.0, self.attach, 0.0, 0.0)
+
+
+class _Balloon:
+    def __init__(self, name: str, annotation: _Annotation) -> None:
+        self.name = name
+        self.annotation = annotation
+
+    def GetName(self) -> str:
+        return self.name
+
+    def GetAnnotation(self) -> _Annotation:
+        return self.annotation
+
+
+class _RebuildModel:
+    def EditRebuild3(self) -> bool:
+        return True
+
+
+class _RebuildAdapter:
+    currentModel = _RebuildModel()
+
+    def _attempt(self, call, default=None):
+        return call()
+
+
+def _placed(annotations: dict[str, _Annotation]):
+    leaders = drawing._placed_balloon_leaders(_RebuildAdapter(), annotations)
+    return [segment for run in leaders.values() for segment in run]
+
+
+def test_uncross_needs_more_than_one_swap_per_balloon_and_still_converges() -> None:
+    """Six fully reversed leaders cross pairwise: 15 swaps, not 6 (integ1)."""
+    count = 6
+    annotations = [_Annotation(float(i), float(count - 1 - i)) for i in range(count)]
+    balloons = [_Balloon(str(i), a) for i, a in enumerate(annotations)]
+    drawing._uncross_balloon_leaders(_RebuildAdapter(), balloons, label="test")
+    assert not drawing.find_leader_leader_crossings(
+        _placed({str(i): a for i, a in enumerate(annotations)})
+    )
+
+
+def _near_pair(past_m: float) -> dict[str, _Annotation]:
+    """Leader 2's end sits ``past_m`` beyond leader 1's line (negative: short of it).
+
+    Leader 1 runs (0, 1) -> (1, 0); leader 2 comes down the diagonal from (1, 1)
+    and stops ``past_m`` measured perpendicular to that line.
+    """
+    tip = (1.0 - past_m * math.sqrt(2.0)) / 2.0
+    first = _Annotation(0.0, 1.0)
+    second = _Annotation(1.0, 0.0)
+    second.position = (1.0, 1.0)
+
+    def second_points(index):
+        return (*second.position, 0.0, tip, tip, 0.0)
+
+    second.GetLeaderPointsAtIndex = second_points
+    return {"DetailItem1": first, "DetailItem2": second}
+
+
+@pytest.mark.parametrize("past_m", [0.0003, -0.0003, 0.00005, -0.00005])
+def test_uncross_swaps_a_near_crossing_the_audit_tolerance_could_miss(past_m) -> None:
+    """integ1's 375/385 was 0.32 mm past; scatter must not decide a swap."""
+    annotations = _near_pair(past_m)
+    balloons = [_Balloon(name, a) for name, a in annotations.items()]
+    drawing._uncross_balloon_leaders(_RebuildAdapter(), balloons, label="test")
+    assert annotations["DetailItem1"].position == (1.0, 1.0)
+    assert annotations["DetailItem2"].position == (0.0, 1.0)
+
+
+def test_near_margin_leaves_a_pair_whose_swap_would_lengthen_it() -> None:
+    # Parallel leaders 0.5 mm apart: near, but swapping cannot shorten them.
+    annotations = {"DetailItem1": _Annotation(0.0, 0.0), "DetailItem2": _Annotation(0.0005, 0.0)}
+    annotations["DetailItem2"].GetLeaderPointsAtIndex = lambda index: (
+        *annotations["DetailItem2"].position,
+        0.0,
+        0.0005,
+        0.5,
+        0.0,
+    )
+    leaders = drawing._placed_balloon_leaders(_RebuildAdapter(), annotations)
+    assert [pair[2:] for pair in drawing._near_balloons(leaders)] == [
+        ("DetailItem1", "DetailItem2")
+    ]
+    assert drawing._next_balloon_swap(leaders) is None
+
+
+def test_near_margin_ignores_leaders_sharing_an_attachment() -> None:
+    annotations = {"DetailItem1": _Annotation(0.0, 0.0), "DetailItem2": _Annotation(0.0002, 0.0)}
+    leaders = drawing._placed_balloon_leaders(_RebuildAdapter(), annotations)
+    assert drawing._near_balloons(leaders) == []
+
+
+def test_anchor_offsets_warn_only_on_a_balloon_off_the_sheet_mean(monkeypatch) -> None:
+    warnings = []
+    monkeypatch.setattr(drawing._telemetry, "warn", warnings.append)
+    # Every leader starts 4 m right of its anchor: a constant offset, no warning.
+    annotations = {str(i): _Annotation(float(i), float(i)) for i in range(3)}
+    leaders = {
+        name: [drawing.LeaderSegment(name, "note", a.position[0] + 4.0, 1.0, a.attach, 0.0)]
+        for name, a in annotations.items()
+    }
+    drawing._log_balloon_anchor_offsets(annotations, leaders, label="t")
+    assert warnings == []
+    leaders["2"] = [drawing.LeaderSegment("2", "note", 2.0 + 4.002, 1.0, 2.0, 0.0)]
+    drawing._log_balloon_anchor_offsets(annotations, leaders, label="t")
+    assert len(warnings) == 1 and "2 " in warnings[0].split("off the sheet mean:")[1]
+
+
+def _audit_reader(attach_after_activation: dict[str, float], annotations: dict[str, _Annotation]):
+    """Audit-style segments from CURRENT positions to post-activation attachments."""
+    reads = []
+
+    def read(adapter, sheet_name):
+        reads.append(sheet_name)
+        return [
+            drawing.LeaderSegment(
+                f"{name} '{name[-1]}'", "note", *annotation.position, attach_after_activation[name], 0.0
+            )
+            for name, annotation in annotations.items()
+        ]
+
+    return read, reads
+
+
+def test_final_uncross_swaps_a_crossing_only_the_audit_geometry_shows() -> None:
+    annotations = {"DetailItem1": _Annotation(0.0, 0.0), "DetailItem2": _Annotation(1.0, 1.0)}
+    # Placement-time leaders are parallel; after activation the attachments
+    # have moved so the leaders cross, as the audit read integ1's 375/385.
+    assert not drawing.find_leader_leader_crossings(_placed(annotations))
+    read, reads = _audit_reader({"DetailItem1": 1.0, "DetailItem2": 0.0}, annotations)
+    drawing._final_balloon_uncross(_RebuildAdapter(), "SHEET", annotations, read_segments=read)
+    assert annotations["DetailItem1"].position[0] == 1.0
+    assert annotations["DetailItem2"].position[0] == 0.0
+    assert not drawing.find_leader_leader_crossings(read(None, "SHEET"))
+    assert reads[0] == "SHEET"
+
+
+def test_final_uncross_raises_by_name_when_a_crossing_survives() -> None:
+    annotations = {"DetailItem1": _Annotation(0.0, 0.0), "DetailItem2": _Annotation(1.0, 0.0)}
+
+    def always_crossed(adapter, sheet_name):
+        return [
+            drawing.LeaderSegment("DetailItem1 '1'", "note", 0.0, 1.0, 1.0, 0.0),
+            drawing.LeaderSegment("DetailItem2 '2'", "note", 1.0, 1.0, 0.0, 0.0 + 0.5),
+        ]
+
+    with pytest.raises(RuntimeError, match="DetailItem1/DetailItem2"):
+        drawing._final_balloon_uncross(
+            _RebuildAdapter(), "SHEET", annotations, read_segments=always_crossed
+        )
+
+
+def test_final_uncross_leaves_non_balloon_crossings_to_the_audit() -> None:
+    annotations = {"DetailItem1": _Annotation(0.0, 0.0)}
+
+    def crossed_with_a_note(adapter, sheet_name):
+        return [
+            drawing.LeaderSegment("DetailItem1 '1'", "note", 0.0, 1.0, 1.0, 0.0),
+            drawing.LeaderSegment("DetailItem9 'NOTE'", "note", 1.0, 1.0, 0.0, 0.0 + 0.5),
+        ]
+
+    drawing._final_balloon_uncross(
+        _RebuildAdapter(), "SHEET", annotations, read_segments=crossed_with_a_note
+    )
+    assert annotations["DetailItem1"].position == (0.0, 1.0)
+
+
 def test_handle_pivot_screw_is_built_released_and_backs_out_of_the_handle() -> None:
     """#831 P1: MHA-DT-32 is a builder family with its BOM row, and its explode
     carries it with the handle, then clear of the handle's bore."""
+    assert "dt-crank-handle-pivot-screw" in _builder_stems()
     assert drawing.BOM_PART_NUMBERS["dt-crank-handle-pivot-screw"] == "MHA-DT-32"
+    moved = {step.label: names for step, names in spec.plan_explode(_instances())}
+    screw = "dt-crank-handle-pivot-screw-1"
+    assert screw in moved["crank arm group"]
+    assert screw in moved["crank handle"]
+    steps = {step.label: step for step in spec.EXPLODE_STEPS}
+    back_out = steps["handle screw backs out"]
+    assert back_out.stems == ("dt-crank-handle-pivot-screw",) and back_out.axis == "z"
+    # Relative to the handle, the tip starts THREAD_LENGTH past its inboard
+    # end; it must travel the whole handle and clear it.
+    assert -back_out.distance_mm > screw_spec.THREAD_LENGTH + handle_spec.HANDLE_LENGTH
 
 
 def _pivot_in_end_screw() -> float:
@@ -1622,9 +2160,71 @@ def test_the_cone_gears_slide_off_the_64t_gear_short_of_the_end_screw() -> None:
     assert gears.distance_mm + _pivot_in_end_screw() < lead
 
 
+
+
 def test_the_collar_pin_explodes_with_the_arbor_and_the_strap_pins_stay() -> None:
     """Main's MHA-DT-VN-63 ruling: one family serves as the two strap set pins and
     the MHA-DT-33 collar pin.  The builder tags the collar pin by what it pins,
     and only that instance leaves, with the arbor; the strap pins stay with
     the stationary strap group."""
     assert drawing.BOM_PART_NUMBERS["dt-vn-pinion-strap-pin"] == "MHA-DT-VN-63"
+    moved = {step.label: names for step, names in spec.plan_explode(_instances())}
+    assert moved["arbor collar pin"] == ("dt-vn-pinion-strap-pin-3",)
+    steps = {step.label: step for step in spec.EXPLODE_STEPS}
+    arbor, pin = steps["pinion arbor"], steps["arbor collar pin"]
+    assert (pin.axis, pin.distance_mm) == (arbor.axis, arbor.distance_mm)
+    every_moved = {name for names in moved.values() for name in names}
+    assert not {"dt-vn-pinion-strap-pin-1", "dt-vn-pinion-strap-pin-2"} & every_moved
+
+
+def test_the_collar_pin_role_is_carried_by_exactly_one_pin() -> None:
+    untagged = [
+        spec.Instance(i.name, i.stem, i.origin_mm) for i in _instances()
+    ]
+    with pytest.raises(ValueError, match="must tag one"):
+        spec.plan_explode(untagged)
+    twice = [
+        spec.Instance(i.name, i.stem, i.origin_mm, spec.COLLAR_PIN_ROLE)
+        if i.stem == "dt-vn-pinion-strap-pin"
+        else i
+        for i in _instances()
+    ]
+    with pytest.raises(ValueError, match="must tag one"):
+        spec.plan_explode(twice)
+    wrong_family = [
+        spec.Instance(i.name, i.stem, i.origin_mm, spec.COLLAR_PIN_ROLE)
+        if i.name == "dt-pinion-lever-pin-1"
+        else spec.Instance(i.name, i.stem, i.origin_mm)
+        for i in _instances()
+    ]
+    with pytest.raises(ValueError, match="must tag one"):
+        spec.plan_explode(wrong_family)
+
+
+def test_the_builder_refuses_a_mislabelled_collar_pin(monkeypatch) -> None:
+    """The builder proves the tagged MHA-DT-VN-63 sits in the collar's pin hole
+    before authoring the explode; a strap pin tagged by mistake fails loud."""
+    import build_dt_drive_train_assembly as assembly
+
+    def rows(rows3, origin_mm):
+        flat = [value for row in rows3 for value in row]
+        return [*flat, *(value / 1000.0 for value in origin_mm), 1.0, 0.0, 0.0, 0.0]
+
+    collar = rows(
+        assembly.ARBOR_ROWS, (assembly.APINION_X, assembly.APINION_Y, assembly.ARBOR_COLLAR_Z0)
+    )
+    transforms = {
+        "collar": collar,
+        "collar-pin": rows(
+            assembly.COLLAR_PIN_ROWS,
+            (assembly.APINION_X, assembly.APINION_Y, assembly.COLLAR_PIN_Z),
+        ),
+        "strap-pin": rows(
+            assembly.TORQUE_SHAFT_ROWS,
+            (assembly.PIVOT_X, assembly.PIVOT_Y, assembly.STRAP_PIN_Z[0]),
+        ),
+    }
+    monkeypatch.setattr(assembly, "component_transform", lambda _a, name: transforms[name])
+    assembly._require_collar_pin_in_collar_hole(None, "collar-pin", "collar")
+    with pytest.raises(AssertionError):
+        assembly._require_collar_pin_in_collar_hole(None, "strap-pin", "collar")

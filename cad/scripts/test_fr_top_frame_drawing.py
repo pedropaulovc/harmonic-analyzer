@@ -4286,7 +4286,7 @@ def test_knockout_callout_leader_passes_left_of_the_land_dimension() -> None:
             assert segment_circle_distance(leader, circle) >= ink, name
     # It crosses no line of the land-end dimension: it lands left of them
     # all, inside the front ream, whose rim stands 1.1 mm off the bar-face
-    # extension line (test_land_end_dimension_is_crossed_by_no_leader).
+    # extension line.
     ream_r = drawing.HANGER_PIN_HOLE_DIA / 2.0 * m_per_mm
     rim_gap = land_lines["land-end bar-face extension"].x0 - floor[0] - ream_r
     for name, line in land_lines.items():
