@@ -63,6 +63,14 @@ def test_review_keys_on_the_sources_of_a_listed_packages_steps(monkeypatch):
     assert {"ha_assembly_package.py", "mg_magnifier_assembly_sheet.py"} <= names
 
 
+def test_numbered_steps_and_checks_keep_their_printed_heads():
+    """A numbered step or check prints its head in bold (never a nested
+    ordered list); an unnumbered check is a plain row."""
+    assert package._list_item("12A. TIGHTEN IT.") == "- **12A.** TIGHTEN IT."
+    assert package._list_item("1. THE BAR IS LEVEL.") == "- **1.** THE BAR IS LEVEL."
+    assert package._list_item("CHECK: IT TURNS.") == "- CHECK: IT TURNS."
+
+
 def test_summing_lever_step_stops_before_its_final_assembly_step():
     import ha_harmonic_analyzer_assembly_sheet as ha_sheet
     import sm_summing_assembly_sheet as sm_sheet

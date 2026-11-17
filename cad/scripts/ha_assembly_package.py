@@ -507,6 +507,16 @@ def _cell(values: tuple[str, ...]) -> str:
     return ", ".join(values) if values else "-"
 
 
+def _list_item(line: str) -> str:
+    """A Markdown list row: a numbered step or check (``12.``, ``12A.``)
+    keeps its printed head in bold, so a reader's renumbering cannot drift and
+    a numbered check does not open a nested ordered list."""
+    head, sep, body = line.partition(". ")
+    if sep and re.fullmatch(r"\d+[A-Z]?", head):
+        return f"- **{head}.** {body}"
+    return f"- {line}"
+
+
 def fitup_lines(stem: str) -> list[str]:
     """Package ``stem``'s fit-up section: each titled step group, then its
     checks and notes, every step under the head its sheets cite."""
@@ -521,15 +531,9 @@ def fitup_lines(stem: str) -> list[str]:
         "",
     ]
     for title, steps in sheet.STEP_SECTIONS:
-        lines += [f"### {title}", ""]
-        for step in steps:
-            head, body = step.split(". ", 1)
-            lines.append(f"- **{head}.** {body}")
-        lines.append("")
+        lines += [f"### {title}", "", *map(_list_item, steps), ""]
     if sheet.ASSEMBLY_CHECKS:
-        lines += ["### Checks and notes", ""]
-        lines += [f"- {line}" for line in sheet.ASSEMBLY_CHECKS]
-        lines.append("")
+        lines += ["### Checks and notes", "", *map(_list_item, sheet.ASSEMBLY_CHECKS), ""]
     return lines
 
 
