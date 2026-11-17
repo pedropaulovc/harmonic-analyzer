@@ -4302,6 +4302,8 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
             ),
             # test_pytest_scope reads pytest's own configuration.
             str((REPO_ROOT / "pyproject.toml").resolve()),
+            # Root farm tests import farm_build.py, outside module_deps_of.
+            str((REPO_ROOT / "farm_build.py").resolve()),
             # Release pairing tests compose the current and sealed identity maps.
             str(
                 (REPO_ROOT / "cad" / "config" / "identity-migration-map.json").resolve()
