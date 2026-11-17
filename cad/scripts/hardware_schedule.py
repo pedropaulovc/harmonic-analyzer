@@ -55,7 +55,7 @@ def envelope_mm(source: str) -> float:
 
 def _envelope_text(row: dict[str, Any]) -> str:
     if not row.get("envelope"):
-        return f"per {row['standard']}"
+        return "per designation" if row["standard"] == "—" else f"per {row['standard']}"
     return " x ".join(
         f"{label} {math.ceil(envelope_mm(source) / 25.4 * 1000 - 1e-6) / 1000:.3f}"
         for label, source in row["envelope"].items()
@@ -100,12 +100,12 @@ def markdown() -> str:
         "",
         "Standard hardware the machine uses as supplied (ASME Y14.24 tier 1). "
         "Buy to the generic designation; the example SKU is the part the CAD "
-        "models. Fits (thread, pin diameter) come from the designation and its "
-        "standard. The seat envelope bounds the space the part may occupy "
-        "(heads and nuts across corners): the catalogue maximum where its "
-        "dimension provider records one, otherwise the modelled catalogue size "
-        "the assembly clearance checks use, rounded up to 0.001 in; a substitute "
-        "must not exceed it. Inches.",
+        "models. Fits (thread, pin size, chain size) come from the designation "
+        "and its standard. A seat envelope bounds the space a head, nut, washer, "
+        "wire or set screw may occupy (heads and nuts across corners): the catalogue "
+        "maximum where its dimension provider records one, otherwise the "
+        "modelled catalogue size the assembly clearance checks use, rounded up "
+        "to 0.001 in; a substitute must not exceed it. Inches.",
         "",
         "| Number | Part | Designation | Standard | Seat envelope (in) | Qty | Used in | Example SKU |",
         "|---|---|---|---|---|---:|---|---|",

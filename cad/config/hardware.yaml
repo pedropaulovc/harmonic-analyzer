@@ -7,11 +7,13 @@
 # sheet (MAKE FROM blank + the shop's cuts). The oblique trammel jig's vendor
 # parts are not listed: that family is retiring.
 #
-# Tier-1 rows also carry `designation`, `standard` and `envelope`. Each
-# envelope value is "<pure provider module> [factor*]<attribute path>": an
-# attribute such as HEAD_DIA, DIMS.od_max or DOWEL_SIZE[1], or a Supplier*
-# reference dimension; millimetres. Heads and nuts print across corners
-# (factor 1/cos(pi/n)).
+# Tier-1 rows also carry `designation`, `standard` and, where a head, nut or
+# washer must clear its seat, an `envelope`. Each envelope value is
+# "<pure provider module> [factor*]<attribute path>": an attribute such as
+# HEAD_DIA or DIMS.od_max, or a Supplier* reference dimension; millimetres.
+# Heads and nuts print across corners (factor 1/cos(pi/n)). Pins and chain
+# carry none: their sizes are fits fixed by the designation and standard,
+# and their catalogue tolerances lie above the modelled nominal.
 ch-vn-bracket-hold-down-screw:
   tier: 1
   why: "ASME B18.6.3 slotted machine screw, used as supplied"
@@ -72,9 +74,6 @@ dt-vn-crank-seat-drive-pin:
   why: "ASME B18.8.2 hardened dowel pin, used as supplied"
   designation: "Ø3/32 x 1/4 hardened dowel pin, alloy steel"
   standard: "ASME B18.8.2"
-  envelope:
-    "Ø": "_mcmaster_98381a434 DOWEL_SIZE[0]"
-    "L": "_mcmaster_98381a434 DOWEL_SIZE[1]"
 dt-vn-keeper-chain-screw:
   tier: 1
   why: "ASME B18.6.3 slotted machine screw, used as supplied"
@@ -88,9 +87,6 @@ dt-vn-locating-pin:
   why: "ASME B18.8.2 hardened dowel pin, used as supplied"
   designation: "Ø1/16 x 3/8 hardened dowel pin, alloy steel"
   standard: "ASME B18.8.2"
-  envelope:
-    "Ø": "_mcmaster_98381a417 DOWEL_SIZE[0]"
-    "L": "_mcmaster_98381a417 DOWEL_SIZE[1]"
 dt-vn-pedestal-hold-down-screw:
   tier: 1
   why: "ASME B18.6.3 slotted machine screw, used as supplied"
@@ -104,9 +100,6 @@ dt-vn-pinion-strap-pin:
   why: "ASME B18.8.2 slotted spring pin, used as supplied"
   designation: "Ø1/16 x 1/2 slotted spring pin, spring steel"
   standard: "ASME B18.8.2"
-  envelope:
-    "Ø": "_mcmaster_98296a027 SPRING_PIN_SIZE[0]"
-    "L": "_mcmaster_98296a027 SPRING_PIN_SIZE[1]"
 dt-vn-slotted-screw:
   tier: 1
   why: "ASME B18.6.3 slotted machine screw, used as supplied"
@@ -205,9 +198,6 @@ pd-vn-transgear-arm-plate-locating-pin:
   why: "ASME B18.8.2 hardened dowel pin, used as supplied"
   designation: "Ø3/32 x 5/16 hardened dowel pin, alloy steel"
   standard: "ASME B18.8.2"
-  envelope:
-    "Ø": "_mcmaster_98381a435 DOWEL_SIZE[0]"
-    "L": "_mcmaster_98381a435 DOWEL_SIZE[1]"
 pd-vn-transgear-arm-plate-screw:
   tier: 1
   why: "ASME B18.6.3 slotted machine screw, used as supplied"
@@ -229,41 +219,26 @@ pd-vn-transgear-collar-flat-pin:
   why: "commodity 18-8 dowel pin defined by diameter and length"
   designation: "Ø1/16 x 3/16 dowel pin, 18-8 stainless"
   standard: "—"
-  envelope:
-    "Ø": "_mcmaster_90145a414 DOWEL_SIZE[0]"
-    "L": "_mcmaster_90145a414 DOWEL_SIZE[1]"
 pd-vn-transgear-hub-key-pin:
   tier: 1
   why: "ASME B18.8.2 hardened dowel pin, used as supplied"
   designation: "Ø1/16 x 5/16 hardened dowel pin, alloy steel"
   standard: "ASME B18.8.2"
-  envelope:
-    "Ø": "_mcmaster_98381a416 DOWEL_SIZE[0]"
-    "L": "_mcmaster_98381a416 DOWEL_SIZE[1]"
 pd-vn-transgear-knob-cup-pin:
   tier: 1
   why: "ASME B18.8.2 slotted spring pin, used as supplied"
   designation: "Ø1/16 x 5/8 slotted spring pin, spring steel"
   standard: "ASME B18.8.2"
-  envelope:
-    "Ø": "_mcmaster_98296a031 SPRING_PIN_SIZE[0]"
-    "L": "_mcmaster_98296a031 SPRING_PIN_SIZE[1]"
 pd-vn-transgear-knob-drive-pin:
   tier: 1
   why: "ASME B18.8.2 hardened dowel pin, used as supplied"
   designation: "Ø3/32 x 3/16 hardened dowel pin, alloy steel"
   standard: "ASME B18.8.2"
-  envelope:
-    "Ø": "_mcmaster_98381a433 DOWEL_SIZE[0]"
-    "L": "_mcmaster_98381a433 DOWEL_SIZE[1]"
 pd-vn-transgear-latch-pin:
   tier: 1
   why: "ASME B18.8.2 hardened dowel pin, used as supplied"
   designation: "Ø1/8 x 7/8 hardened dowel pin, alloy steel"
   standard: "ASME B18.8.2"
-  envelope:
-    "Ø": "_mcmaster_98381a474 DOWEL_SIZE[0]"
-    "L": "_mcmaster_98381a474 DOWEL_SIZE[1]"
 pd-vn-transgear-retaining-ring:
   tier: 1
   why: "commodity E-style external ring sized by its shaft"
@@ -324,9 +299,6 @@ sh-vn-chain-link:
   why: "ASME B29.1 No. 25 roller chain, used as supplied"
   designation: "No. 25 single-strand roller chain, 1/4 pitch, steel"
   standard: "ASME B29.1"
-  envelope:
-    "plate H": "_chain PLATE_HEIGHT"
-    "over pins": "sh_vn_chain_link_spec 2*PIN_HALF_LEN"
 sh-vn-clamp-screw:
   tier: 1
   why: "ASME B18.6.3 slotted machine screw, used as supplied"
@@ -363,9 +335,6 @@ sh-vn-pivot-pin:
   why: "commodity 18-8 dowel pin defined by diameter and length"
   designation: "Ø5/64 x 5/16 dowel pin, 18-8 stainless"
   standard: "—"
-  envelope:
-    "Ø": "sh_vn_pivot_pin_spec PIN_DIA_LIMITS[1]"
-    "L": "sh_vn_pivot_pin_spec PIN_LENGTH"
 sm-vn-knife-hanger-washer:
   tier: 1
   why: "ASME B18.21.1 SAE plain washer, used as supplied"
@@ -379,9 +348,6 @@ sm-vn-knife-mount-dowel:
   why: "ASME B18.8.2 hardened dowel pin, used as supplied"
   designation: "Ø1/8 x 3/4 hardened dowel pin, alloy steel"
   standard: "ASME B18.8.2"
-  envelope:
-    "Ø": "_mcmaster_98381a473 DOWEL_SIZE[0]"
-    "L": "_mcmaster_98381a473 DOWEL_SIZE[1]"
 ch-vn-channel-spring-installed:
   tier: 2
   why: "extension spring: rate, free length, hook form and max OD govern"
