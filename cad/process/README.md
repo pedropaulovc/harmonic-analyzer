@@ -173,19 +173,24 @@ grip-corner fillet (`cad.corner_radius_in` and its limits). All three plans
 carry 0.11.0's `milling_deflection` data (a `beam` per non-lathe setup or
 operation, `milling_cuts` per spindle operation) and pass that check enforced;
 the end-bracket plan's tap flags and the dropped feed-lever grip-end setup
-need the 0.11.0 jig pictures, so they pass under `@latest` from 0.11.0 (released). The riser plan needs 0.11.0 too
-(its `harmonic_riser` adapter).
+need the 0.11.0 jig pictures, so they pass under `@latest` from 0.11.0 (released). The riser plan needs 0.11.4
+(its `harmonic_riser` adapter's Setup 2 stations and Setup 4 guards).
 
-The riser plan (TL-24) needs prechips 0.11.0, which adds its `harmonic_riser`
-adapter and the `milling_deflection` check. It passes both profiles, with every
-check enforced, on the v49 manifest. Setups 1–4 make the bar
-and drill the stop-pin holes P1/P2 at their printed stations. Setup 1 calipers
-the bar: Setup 2 faces it only when it is over the .25 thickness limit, from three
-straps then four, because a single strap span along the bar's length bends the
-thin bar ~.23 mm under the cutter. The other seven
-holes print X/Y LOC REF: Setup 5 runs after TL-00 step 11C has spotted them
-from the carrier and drills each at its own mark, so its table gives the REF
-X/Y only to find the marks. The 12 mm HUB drill and the 82° countersink are
+The riser plan (TL-24) needs prechips 0.11.4: 0.11.0 added its `harmonic_riser`
+adapter and the `milling_deflection` check; 0.11.4 derives the Setup 2 strap
+stations and faced spans from the authored strap layout (refusing a strap off
+faced metal or in a cut), binds the .230 minimum thickness the Setup 3–5 beams
+take, and refuses a stop hole over a jaw with the longest (14.05) blank or a Y0
+touch the .200 edge finder cannot make clear of hold 1's jaws. It passes both
+profiles, with every check enforced, on the v49 manifest. Setups 1–4 make the
+bar and drill the stop-pin holes P1/P2 at their printed stations. Setup 1
+calipers the bar: under .230 anywhere rejects it, and Setup 2 faces it only when
+it is over the .25 thickness limit, from three straps then four, because a
+single strap span along the bar's length bends the thin bar ~.23 mm under the
+cutter. The 1/2 in end mill runs at the logbook's 1800 rpm, 7 in/min. The other
+seven holes print X/Y LOC REF: Setup 5 runs after TL-00 step 11C has spotted
+them from the carrier and drills each at its own mark, so its table gives the
+REF X/Y only to find the marks. The 12 mm HUB drill and the 82° countersink are
 recorded as not owned in `cad/config/shop-equipment.toml`.
 
 prechips 0.10 adds the `vise_holding` check: every non-lathe setup declares

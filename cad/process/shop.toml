@@ -301,14 +301,15 @@ diameter_mm = 12.0
 [tools.riser-countersink]
 description = "3/8 in 82° countersink"
 
-# Riser Setups 3-4 (blind machinist review of the riser traveler, items S4/S5,
-# coordinator plan fix batch 2026-11-14 UTC): the 1/2 in 2-flute HSS end mill
-# at 1800 rpm = 236 ft/min; 8 in/min / (1800 x 2) = .0022 in/tooth.
+# Riser Setups 3-4, the 1/2 in 2-flute HSS end mill in 6061: the speed and
+# feed the owner ran a 1/2 in 2-flute HSS end mill at on the PM-30MV, facing
+# the base bar's long edge (logbook/entries/2026-11-05-base-bar-on-the-table.md,
+# op 3: 1800 rpm, 7 in/min). 1800 rpm = 236 ft/min; 7 / (1800 x 2) = .0019 in/tooth.
 [settings.riser-em-half-6061-t6511]
 tool = "jig-em-half"
 material = "6061-t6511"
 rpm = 1800
-feed = "8 in/min"
+feed = "7 in/min"
 
 # Source: ch_rocker_arm_tl_oblique_{pivot,feed}_block/plan.toml (MHA-CH-06-TL-22
 # and TL-32, v50). The blocks also use saw-evolution-14, jig-em-half (the LMS
