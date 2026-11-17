@@ -4246,6 +4246,21 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
             str((REPO_ROOT / "conftest.py").resolve()),
             *(str(path.resolve()) for path in recipe_tests),
             *(dep for path in recipe_tests for dep in module_deps_of(path)),
+            # Reference DXFs a test reads through its imports (test_base_serial).
+            # Tests also quote fake DXF names, so keep only committed files.
+            *(
+                dep
+                for path in recipe_tests
+                for dep in data_deps_of(path)
+                if Path(dep).is_file()
+            ),
+            # The vm2 datum tests pin their committed probe receipts.
+            *(
+                str(path.resolve())
+                for path in (
+                    REPO_ROOT / "cad" / "docs" / "pipeline" / "evidence" / "vm2-datum-placement" / "probes"
+                ).glob("*/receipt.json")
+            ),
             *(str(path.resolve()) for path in machinist_review_contract_deps),
             # module_deps_of resolves only cad/scripts modules: name the
             # out-of-tree benchmark harness its test imports, and its imports.
@@ -4274,8 +4289,16 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
             # module_deps_of only walks cad/scripts; comparison tests import
             # sibling tools (and load render_diff via importlib) outside it.
             *(
-                str(path.resolve())
-                for path in (REPO_ROOT / "cad" / "comparisons" / "tools").glob("*.py")
+                str((REPO_ROOT / "cad" / "comparisons" / "tools" / name).resolve())
+                for name in (
+                    "composite.py",
+                    "pose_manifest.py",
+                    "render_offline.py",
+                    "release_diff.py",
+                    "render_diff.py",
+                    "pose_to_meshprobe.py",
+                    "seed_manifest.py",
+                )
             ),
             # test_pytest_scope reads pytest's own configuration.
             str((REPO_ROOT / "pyproject.toml").resolve()),
