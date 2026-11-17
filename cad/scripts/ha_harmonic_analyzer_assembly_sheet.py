@@ -341,9 +341,12 @@ _STEP_TEXT: dict[str, tuple[str, ...]] = {
         "CHECK: PUSHED LIGHTLY ALONG ITS AXIS, THE MARKER DOES NOT SLIDE.",
         "CHECK: ONLY THE NIB TOUCHES THE PAPER.",
         # Rule 22: one action a step (machinist review of main 67ba11bf1a,
-        # R5: the remedy slackened, turned and repeated in one step).
-        "IF ANY OTHER PART OF MHA-PN-00 TOUCHES, SLACKEN BOTH MHA-SH-VN-53 "
-        "CLAMP SCREWS.",
+        # R5: the remedy slackened, turned and repeated in one step). The
+        # branch is its own step, so the remedy steps after it run only when
+        # the check fails (codjiflo on #3034: split, they read unconditional).
+        "IF ONLY THE NIB TOUCHES, GO ON TO STEP "
+        f"{_n(steps.SEQUENCE[steps.SEQUENCE.index('nib-on-paper') + 1])}.",
+        "OTHERWISE SLACKEN BOTH MHA-SH-VN-53 CLAMP SCREWS.",
         "TURN THE MHA-MG-08 BAR AWAY FROM THE PAPER UNTIL NO OTHER PART OF "
         "MHA-PN-00 TOUCHES.",
         f"REPEAT {_n('magnifier-bar-clamped')}B, "
@@ -371,8 +374,8 @@ def _table_sub_step(key: str) -> str:
     return sub_step(key, index)
 
 
-# The setting table's rows: the level step (6D) and the parked nib's feeler
-# step (13B), each from the constants its step prints.
+# The setting table's rows: the plate-level step and the parked nib's feeler
+# step, each from the constants its step prints.
 SETTING_TABLE_ROWS: tuple[tuple[str, ...], ...] = (
     (
         _table_sub_step("summing-levelled"),

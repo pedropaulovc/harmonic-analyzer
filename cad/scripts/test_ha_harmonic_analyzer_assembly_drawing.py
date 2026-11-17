@@ -219,11 +219,16 @@ def test_bar_turn_sets_its_heading_against_the_platen_not_level() -> None:
     # review run 20261115T044005360Z, r1/r2).
     acceptance = notes.sub_step("nib-on-paper", check)
     assert f"FIRST SETTING; {acceptance} IS ITS ACCEPTANCE" in turn
-    # The remedy is three steps, one action each (rule 22; machinist review
-    # of main 67ba11bf1a, R5): slacken, turn, repeat.
-    slacken, turn_away, repeat = (line.split(". ", 1)[1] for line in nib[check + 1 :])
+    # The remedy is a branch, then one action a step (rule 22; machinist
+    # review of main 67ba11bf1a, R5): a passing check skips to the next step,
+    # so slacken, turn and repeat run only when it fails (codjiflo on #3034).
+    branch, slacken, turn_away, repeat = (
+        line.split(". ", 1)[1] for line in nib[check + 1 :]
+    )
+    after = steps.step_number(steps.SEQUENCE[steps.SEQUENCE.index("nib-on-paper") + 1])
     bar = steps.step_number("magnifier-bar-clamped")
-    assert slacken.startswith("IF ") and slacken.endswith("CLAMP SCREWS.")
+    assert branch == f"IF ONLY THE NIB TOUCHES, GO ON TO STEP {after}."
+    assert slacken.startswith("OTHERWISE ") and slacken.endswith("CLAMP SCREWS.")
     assert turn_away.startswith("TURN THE MHA-MG-08 BAR AWAY FROM THE PAPER")
     assert repeat.startswith(f"REPEAT {bar}B, {bar}D-{bar}E AND ")
     assert "PEN ROD" not in " ".join(notes.ASSEMBLY_STEPS)
@@ -386,7 +391,7 @@ def test_the_plate_level_and_nib_gap_print_in_the_sheet_1_setting_table() -> Non
 
 
 def test_the_setting_table_fits_over_the_views() -> None:
+    # A pre-flight on the planned columns and rows; the build holds the box
+    # SolidWorks reads back to the same limits.
     box = drawing.planned_setting_table_box()
     assert drawing.setting_table_box_violations(box) == []
-    # R5 printed the views' ink no higher than 387.6 mm.
-    assert drawing.SETTING_TABLE_FLOOR > 0.3876

@@ -2,8 +2,8 @@ r"""Create the three-sheet complete-machine fitter package (MHA-HA-00).
 
 Sheet 1 shows the assembled machine (front and crank-side views at 1:5) with
 the two settings only the complete machine makes, imported as the builder's
-driving dimensions, and the setting table for the plate's level; sheet 2 the
-finished machine in full detail; sheet 3 the
+driving dimensions, and the setting table for the plate's level and the
+parked nib's feeler gap; sheet 2 the finished machine in full detail; sheet 3 the
 builder-owned ``HA_EXPLODED`` presentation with the top-level BOM (one row per
 subassembly) and a balloon on every row. The integration sequence and the
 checks before running print in the release's ASSEMBLY.md (#2889). Every pose
