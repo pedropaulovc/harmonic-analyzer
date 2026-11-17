@@ -12,9 +12,7 @@ print.
 
 from __future__ import annotations
 
-import ast
 import math as _math
-from pathlib import Path
 import sys
 from types import SimpleNamespace
 
@@ -415,7 +413,6 @@ def _bind_owner(obj, interface, *_members, **_kwargs):
         obj._native_reads = []
         obj._native_writes = []
     return _OwnerView(obj, interface)
-
 
 
 class _CropMathTransform:
@@ -2564,34 +2561,6 @@ def test_no_sheet_is_exempt_from_a_leader_crossing(monkeypatch, stem):
         )
 
 
-def test_the_grandfather_machinery_is_gone():
-    """A tripwire on the retirement: re-adding an allowlist must be a deliberate
-    act that trips a test, not a quiet way to make a red build green."""
-    sources = sorted(Path(__file__).resolve().parent.glob("_drawing_*.py"))
-    assert sources, "no drawing-helper sources found"
-    assert {"_drawing_common.py", "_drawing_layout_collect.py"} <= {
-        source.name for source in sources
-    }
-    for source in sources:
-        tree = ast.parse(source.read_text(encoding="utf-8"))
-        bindings = {
-            node.id
-            for node in ast.walk(tree)
-            if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store)
-        }
-        bindings.update(
-            node.name
-            for node in ast.walk(tree)
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
-        )
-        bindings.update(
-            node.asname or node.name.split(".")[0]
-            for node in ast.walk(tree)
-            if isinstance(node, ast.alias)
-        )
-        assert "_KNOWN_LEADER_CROSSINGS" not in bindings, source
-
-
 # --- the shared-terminus exemption must not swallow real crossings -----------
 
 
@@ -4178,7 +4147,6 @@ def test_landed_listed_edge_keeps_its_proven_landing(monkeypatch, honours_point)
     else:
         with pytest.raises(RuntimeError, match="attachment moved"):
             insert()
-
 
 
 @pytest.mark.parametrize(

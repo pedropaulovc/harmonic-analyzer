@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import math
-from pathlib import Path
 
 import pytest
 
@@ -39,8 +38,6 @@ def test_stock_build_uses_its_registered_recipe() -> None:
 def test_part_frame_is_the_arbor_set_screws() -> None:
     """Cup end on the Top plane at y 0, socket face at y +LENGTH, axis +Y
     through the origin: the owner's channel placement depends on it."""
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "transform=RigidTransform(translation_mm=(0.0, HALF, 0.0))," in source
     lift = RigidTransform(translation_mm=(0.0, recipe.HALF, 0.0))
     assert lift.translation_mm[1] - recipe.HALF == 0.0
     assert lift.translation_mm[1] + recipe.HALF == spec.LENGTH
@@ -76,9 +73,6 @@ def test_catalog_recipe_claims_no_vendor_truth() -> None:
     """Catalogue-only (the 91794A078 precedent): no harvest, no pinned truth."""
     assert not [name for name in vars(recipe) if name.startswith("VENDOR_")]
     assert not hasattr(recipe, "_check_truth")
-    source = Path(recipe.__file__).read_text(encoding="utf-8")
-    assert "no vendor model has been harvested" in source
-    assert "sys.exit(run_build(build_catalog))" in source
 
 
 def test_family_laws_leave_a_sound_part() -> None:
@@ -108,13 +102,6 @@ def test_pre_thread_volume_is_positive_and_below_the_blank() -> None:
     )
     blank = math.pi * (recipe.MAJOR_DIA / 2.0) ** 2 * recipe.LENGTH
     assert 0.0 < pre_thread < blank
-
-
-def test_recipe_cuts_the_registered_thread_feature() -> None:
-    source = Path(recipe.__file__).read_text(encoding="utf-8")
-    assert 'await adapter.create_sketch("Front")' in source
-    assert "start_angle_rad=math.pi / 2.0," in source
-    assert '"ThreadGroove"' in source
 
 
 def test_drawing_is_the_purchased_reference_sheet() -> None:

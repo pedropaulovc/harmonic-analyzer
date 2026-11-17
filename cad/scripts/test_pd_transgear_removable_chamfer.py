@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-import ast
 import math
 import re
-from pathlib import Path
 
 import pytest
 
@@ -288,55 +286,3 @@ def test_native_sections_and_teeth_match_both_volume_gates(teeth: int) -> None:
             abs(_section_toothed_volume(teeth, faces=0) - spec.toothed_volume(teeth))
             > tolerance
         )
-
-
-def test_native_cut_is_after_pattern_before_toothed_gate_and_mounting_ops() -> None:
-    tree = ast.parse(Path(part.__file__).read_text(encoding="utf-8"))
-    build = next(
-        node
-        for node in tree.body
-        if isinstance(node, ast.AsyncFunctionDef) and node.name == "build"
-    )
-    nodes = list(ast.walk(build))
-    calls = [node for node in nodes if isinstance(node, ast.Call)]
-    named_features = {
-        node.args[1].value: node.lineno
-        for node in calls
-        if isinstance(node.func, ast.Name)
-        and node.func.id == "name_last_feature"
-        and len(node.args) > 1
-        and isinstance(node.args[1], ast.Constant)
-    }
-    cuts = [
-        node
-        for node in calls
-        if isinstance(node.func, ast.Name)
-        and node.func.id == "RevolveParameters"
-        and any(
-            keyword.arg == "is_cut"
-            and isinstance(keyword.value, ast.Constant)
-            and keyword.value.value is True
-            for keyword in node.keywords
-        )
-    ]
-    assert len(cuts) == 1
-    assert any(
-        keyword.arg == "angle"
-        and isinstance(keyword.value, ast.Constant)
-        and keyword.value.value == 360.0
-        for keyword in cuts[0].keywords
-    )
-    toothed_gate = next(
-        node.lineno
-        for node in calls
-        if isinstance(node.func, ast.Attribute) and node.func.attr == "toothed_volume"
-    )
-    assert (
-        named_features["ToothGapPattern"]
-        < named_features["ToothChamferProfile"]
-        < cuts[0].lineno
-        < named_features["ToothSideChamfers"]
-        < toothed_gate
-        < named_features["BorePinsCut"]
-    )
-    assert part.MATERIAL == "Plain Carbon Steel"

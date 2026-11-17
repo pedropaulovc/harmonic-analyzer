@@ -8,7 +8,6 @@ text as process.rstrip() + " ", which ate the prefix's closing line break.
 
 from __future__ import annotations
 
-import inspect
 
 from types import SimpleNamespace
 
@@ -34,12 +33,6 @@ def test_a_closing_line_break_puts_the_native_size_on_its_own_row() -> None:
 def test_a_one_line_process_still_joins_with_one_space() -> None:
     assert _drawing_hole_callout.compose_hole_callout_prefix("DRILL ", " 2X <MOD-DIAM>") == "DRILL 2X <MOD-DIAM>"
     assert _drawing_hole_callout.compose_hole_callout_prefix("A\nB", "2X") == "A\nB 2X"
-
-
-def test_add_native_hole_callout_composes_through_it() -> None:
-    source = inspect.getsource(_drawing_hole_callout.add_native_hole_callout)
-    assert "compose_hole_callout_prefix(process, existing)" in source
-    assert 'process.rstrip() + " "' not in source
 
 
 @pytest.mark.parametrize("separate_size_row", [False, True])

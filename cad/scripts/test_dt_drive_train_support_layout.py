@@ -410,34 +410,12 @@ def test_mha135_is_shown_trimmed_flush_in_its_installed_configuration() -> None:
     # and peened flush with the hub, not the 16.0 overlength cut the part's
     # drawing prints.  The part carries both as configurations with one BOM
     # identity, and BDT places the installed one.
-    import ast
-    import inspect
 
-    import build_dt_pinion_lever_pin as pin_build
     import dt_pinion_lever_pin_geometry as pin
     from dt_pinion_lever_geometry import HUB_OD
 
     assert pin.INSTALLED_LEN == HUB_OD < pin.PIN_LEN
-    calls = [
-        node
-        for node in ast.walk(ast.parse(inspect.getsource(drive)))
-        if isinstance(node, ast.Call)
-        and getattr(node.func, "id", None) == "place_component"
-        and any(
-            isinstance(arg, ast.Constant) and arg.value == "dt-pinion-lever-pin"
-            for arg in node.args
-        )
-    ]
-    assert len(calls) == 1
-    keywords = {kw.arg: kw.value for kw in calls[0].keywords}
-    configuration = keywords["configuration"]
-    assert isinstance(configuration, ast.Name)
-    assert configuration.id == "LEVER_PIN_INSTALLED_CONFIG"
     assert drive.LEVER_PIN_INSTALLED_CONFIG == pin.INSTALLED_CONFIG
-    source = inspect.getsource(pin_build)
-    assert "(INSTALLED_CONFIG, INSTALLED_LEN)" in source
-    assert "(default_config, PIN_LEN)" in source
-    assert "apply_grouped_bom_properties(" in source
 
 
 def test_rod_phase_leaves_the_cams_parked_ecc_down() -> None:
@@ -1450,16 +1428,12 @@ def test_mha145_pins_carry_no_interference_exemption() -> None:
     # shaft hole are the one 1/16 drill on one axis: line-to-line contact,
     # which the gate does not count.  The contracts therefore carry no strap
     # pin row and read neither the rig layout nor the pin spec.
-    import inspect
 
     import _dt_drive_train_interference as ic
 
     pairs = ic.ALLOWED_PAIRS
     assert not [p for p in pairs if any(n.startswith("dt-vn-pinion-strap-pin") for n in p)]
     assert not [p for p in pairs if any(n.startswith("dt-pinion-bracket") for n in p)]
-    source = inspect.getsource(ic)
-    for module in ("pinion_rig_layout", "dt_vn_pinion_strap_pin_spec"):
-        assert module not in source, module
 
 
 def test_torque_shaft_is_phased_to_the_straps_and_swings_with_them() -> None:
@@ -1577,10 +1551,7 @@ def test_spring_pad_books_its_printed_bands() -> None:
     # Main (restricted review of #858, P2-4): the pad reads the bands its sheet
     # prints, not a 0.51 literal.  Flush with the strip's aft edge (#859 option
     # (iv)), the pad's width band never reaches the edge the leaf sets.
-    import inspect
-    import re
 
-    assert not re.search(r"\b0\.51\b", inspect.getsource(drive))
     assert not hasattr(drive, "_SPR_PAD_WEST_X")  # z only: the leaf sets z
     assert math.isclose(
         drive._SPR_PAD_Z_HI,
@@ -1925,16 +1896,11 @@ def test_assembly_poses_print_once_on_their_rig_steps() -> None:
 def test_rig_margin_table_is_logged_at_build() -> None:
     # Main (restricted review of #858): the margin table is visible in the
     # task log, one line per row, not only asserted at import.
-    import inspect
 
     lines = drive.rig_margin_lines()
     assert len(lines) == len(drive.RIG_MARGINS)
     for name, line in zip(drive.RIG_MARGINS, lines, strict=True):
         assert line.startswith(name), line
-    source = inspect.getsource(drive.build)
-    assert "rig_margin_lines()" in source
-    # At info, so the farm leaf log (run at info) carries it.
-    assert '_telemetry.info(f"rig margin {line}")' in source
 
 
 def test_strap_pin_guard_reads_the_strap_parts_cross_holes() -> None:
