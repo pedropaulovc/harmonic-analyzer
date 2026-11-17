@@ -1307,10 +1307,12 @@ def record_authoring_context(adapter: Any, label: str) -> dict[str, Any]:
 
     A failure-only capture cannot answer "what was different about the run that
     worked?", which is the question that identifies a seat-state cause. Sketch
-    inference is still live on most sketch paths (the adapter's
-    ``create_line``/``create_circle``/``create_arc`` do not set ``AddToDB``;
-    only the call sites that wrap :func:`_sketch.set_sketch_direct_db` author
-    direct-to-DB), and a screen-space snap rebuilds a wrong but valid shape that
+    inference is still live on many sketch paths: the adapter's
+    ``add_line``/``add_circle``/``add_arc`` (``CreateLine``/
+    ``CreateCircleByRadius``/``CreateArc``) do not set ``AddToDB``; only sites
+    that set ``ISketchManager.AddToDB`` (inline, or through
+    :func:`_sketch.set_sketch_direct_db`) author direct-to-DB. A screen-space
+    snap rebuilds a wrong but valid shape that
     raises nothing, so this record is the only evidence such a build leaves.
     It holds the two bags that diagnosis needs: the screen-space geometry
     (frame rect, view scale, measured px/mm) and ``ISketchManager``'s sticky

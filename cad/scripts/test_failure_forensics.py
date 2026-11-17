@@ -1897,7 +1897,7 @@ def test_retry_capture_does_not_erase_the_first_failure(tmp_path):
 
 def test_authoring_context_is_recorded_on_the_success_path(tmp_path, capture_telemetry):
     """A failure-only capture cannot answer "what was different about the run
-    that worked?", so the same state bags are recorded per part build."""
+    that worked?", so the screen-space bags are recorded per part build."""
     spans, logs = capture_telemetry
     context = _seat_forensics.record_authoring_context(_unmerged_profile(tmp_path), "logo_ring")
 
