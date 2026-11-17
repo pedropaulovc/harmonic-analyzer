@@ -150,17 +150,21 @@ COLLAR_CLEARANCE = (
 BOND_CALLOUT = "SEE NOTE 3"
 SPAN_CALLOUT = "SEE NOTE 2"
 # Rule 23: a bonded joint prints its diametral clearance on the part sheet,
-# inside the grade's gap (farm run 20261117T130901535Z r2, two blockers).
-# The lands in the MHA-DT-01 drum's REAM_SLIDE bore, and the head cross bore
-# on the MHA-DT-15 crossrod; the cross bore's callout has no room for a
-# third row under the border, so it flags note 4 as the lands flag note 3.
+# inside the grade's gap (farm run 20261117T130901535Z r2, two blockers):
+# the lands' in the MHA-DT-01 drum's REAM_SLIDE bore on note 3, which keeps
+# one row by naming the lands and their fit in one phrase, and the head
+# cross bore's on the MHA-DT-15 crossrod at its own callout, in two wider
+# rows (rule 7 holds the notes block to four).
 BOND_CLEARANCE = (
     DRUM_BORE + DRUM_BORE_BAND[1] - (SHAFT_DIA + SHAFT_DIA_BAND[0]),
     DRUM_BORE + DRUM_BORE_BAND[0] - (SHAFT_DIA + SHAFT_DIA_BAND[1]),
 )
-CROSS_HOLE_CALLOUT = "REAM THRU, SEE NOTE 4"
-# The widest row (66 characters, ~172 mm) ends ~24 mm left of the title
-# block (x 0.216); seven rows end ~8 mm over the border.
+CROSS_HOLE_CALLOUT = (
+    f"REAM THRU, BONDED FIT ON {CROSSROD_NUMBER},\n{RETAINING_COMPOUND} (CLEARANCE "
+    f"{_inch(CROSSROD_MIN_CLEARANCE)}-{_inch(CROSSROD_MAX_CLEARANCE)})"
+)
+# Rule 7: the notes block stays at four short rows; the widest (66
+# characters, ~172 mm) ends ~24 mm left of the title block (x 0.216).
 # Each 2X's second span carries a leadered SEE NOTE tag (SPAN_TAGS), so the
 # note says what the spans are, not where (#1038 r9 machinist review, rules
 # 1 and 26: "PIN-HOLE SPAN AND BACK-END SPAN" named them in words only).
@@ -171,11 +175,8 @@ SHEET_NOTES = (
     f"{_inch(JOURNAL_CLEARANCE[1])}).\n"
     f"2. SPANS (2X): SLIDING FIT IN {COLLAR_NUMBER} (CLEARANCE "
     f"{_inch(COLLAR_CLEARANCE[0])}-{_inch(COLLAR_CLEARANCE[1])}).\n"
-    f"3. BOND LANDS (2X): BONDED IN {DRUM_NUMBER}, {RETAINING_COMPOUND}\n"
-    f"   (CLEARANCE {_inch(BOND_CLEARANCE[0])}-{_inch(BOND_CLEARANCE[1])}).\n"
-    f"4. HEAD CROSS BORE: BONDED FIT ON {CROSSROD_NUMBER}, {RETAINING_COMPOUND}\n"
-    f"   (CLEARANCE {_inch(CROSSROD_MIN_CLEARANCE)}-"
-    f"{_inch(CROSSROD_MAX_CLEARANCE)})."
+    f"3. LANDS BONDED IN {DRUM_NUMBER}, {RETAINING_COMPOUND} (CLEARANCE "
+    f"{_inch(BOND_CLEARANCE[0])}-{_inch(BOND_CLEARANCE[1])})."
 )
 # Under the property-linked inside-corner note (top-left at y 0.060).
 NOTES_XY = (0.020, 0.052)
@@ -497,24 +498,22 @@ DIAMETER_BLOCK_SIZE = (0.027, 0.014)
 # 20261109T105251629Z, 3 of 3 runs: the pin's number alone named no fit),
 # dropping "SPRING PIN" (the number names the pin) to stay 25 characters.
 # The third row prints the interference the band gives as a reference, the
-# MHA-DT-36 bushing's and MHA-PD-20 spacer's pattern: R5 machinist review
+# MHA-DT-38 bushing's and MHA-PD-20 spacer's pattern: R5 machinist review
 # (run 20261117T111407559Z) read the .0625-.0650 hole as a clearance fit on
 # a 1/16 pin, as no row said the pin is driven oversize.
-# B18.8.2 makes the 1/16 pin .066-.069 across before it is driven.
-PIN_FREE_DIA_IN = (0.066, 0.069)
-PIN_HOLE_INTERFERENCE_IN = (
-    PIN_FREE_DIA_IN[0] - _PIN_HOLE_DIA_MAX / 25.4,
-    PIN_FREE_DIA_IN[1] - _PIN_HOLE_DIA / 25.4,
+# B18.8.2 makes the 1/16 pin .066-.069 across before it is driven.  The
+# fact stays on this sheet: the shared pin spec keys the strap, shaft,
+# collar and drive-train leaves, and the collar sheet names the pin a
+# SPRING PIN (its own review SHIPs on that).
+PIN_FREE_DIA = (0.066 * 25.4, 0.069 * 25.4)
+PIN_HOLE_INTERFERENCE = (
+    PIN_FREE_DIA[0] - _PIN_HOLE_DIA_MAX,
+    PIN_FREE_DIA[1] - _PIN_HOLE_DIA,
 )
 PIN_HOLE_FIT_ROW = f"PRESS FIT ON {_PIN_NUMBER}"
-PIN_HOLE_CALLOUT = "\n".join(
-    (
-        _PIN_DRILL_THRU_CALLOUT,
-        PIN_HOLE_FIT_ROW,
-        "(INTERFERENCE "
-        + "-".join(f"{value:.4f}".lstrip("0") for value in PIN_HOLE_INTERFERENCE_IN)
-        + ")",
-    )
+PIN_HOLE_CALLOUT = (
+    f"{_PIN_DRILL_THRU_CALLOUT}\n{PIN_HOLE_FIT_ROW}\n(INTERFERENCE "
+    f"{_inch(PIN_HOLE_INTERFERENCE[0])}-{_inch(PIN_HOLE_INTERFERENCE[1])})"
 )
 PIN_HOLE_CALLOUT_ADVANCE = 0.00267
 PIN_HOLE_CALLOUT_CENTRE_DX = 0.00075
@@ -612,11 +611,12 @@ PRINCIPAL_KEEP = {
     # position, its top 10.1 mm over it and a 5.5 mm row pitch.  The block
     # centres on its position, so the third row (interference) adds half a
     # row at each end: set at 0.2300 its top rose to 242.8, 0.2 mm under the
-    # Ø6's shoulder (layout audit, farm run 20261117T125119461Z).  At 0.2272
-    # it spans about 214.4-240.1: 2.6 mm over the (3.0)'s top and 2.3 mm
-    # under that shoulder, more since note 4 took a row from the Ø6 callout.
+    # Ø6's shoulder (layout audit, farm run 20261117T125119461Z); at 0.2272
+    # (run 20261117T135248809Z) it spanned 214.4-240.0, its underline only
+    # 2.6 mm over the (3.0)'s 211.8 top.  At 0.2277 it spans about
+    # 214.9-240.5: 3.1 mm over that text, 2.8 mm under the Ø6's shoulder.
     "PinStationFromHeadRear": (0.288, 0.207),
-    "PinHoleDia": (PIN_HOLE_CALLOUT_X, 0.2272),
+    "PinHoleDia": (PIN_HOLE_CALLOUT_X, 0.2277),
 }
 # In detail A the neck runs from the fence (x ~0.137 at its edges) to the
 # head rear face (x 0.1545), its Ø10.5 at y 0.2245-0.2455.  Its end-on
@@ -655,10 +655,13 @@ DETAIL_KEEP = {
     "HeadCapR": (0.205, 0.257),
     "HeadCapSagDim": (0.205, 0.210),
     # Above the hole's centre line, so the leader drops onto the hole edge.
-    # One callout line under the value (note 4 carries the bonded fit): the
-    # block's top stays inside the border and its shoulder well over the pin
-    # hole's.
-    "CrossHoleDia": (0.245, 0.2525),
+    # Two callout lines (r3 of #1685) under the value.  Since the second
+    # carries the bonded clearance (rule 23) the rows run ~89 mm, so the
+    # block centres 14 mm right of the R5 spot (0.245, 0.2525) to start right
+    # of SR.43's text (x 212.1), and 0.8 mm higher: its top ~263.4, 3.2 mm
+    # under the border (266.6), its shoulder ~243.3, 2.8 mm over the pin
+    # hole's callout.
+    "CrossHoleDia": (0.259, 0.2533),
     # The hole's station rides under the head, its text left of the
     # rear-face witness and clear of the neck above and the head length below.
     "CrossHoleFromHeadRear": CROSS_HOLE_STATION_TEXT_XY,
