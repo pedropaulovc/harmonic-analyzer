@@ -747,9 +747,19 @@ def _knife_detail(adapter: Any) -> tuple[Any, Callable[[], None]]:
     return view, settled
 
 
-def _place_setting_table(adapter: Any, views: tuple[Any, ...]) -> None:
-    """The sheet 1 setting table along the top border, above every view."""
+def _place_setting_table(adapter: Any, views: dict[str, Any]) -> None:
+    """The sheet 1 setting table along the top border, above every view.
+
+    A 1:5 view occupies its native outline; the cropped 1:1 detail occupies
+    its crop circle (_drawing_detail_crop: the occupied box is the geometric
+    circle), not its native outline, which farm run
+    20261117T131841014Z-1d07290b read 17.5 mm over the circle's top."""
     label = "summing setting table"
+    occupied_tops = {
+        name: _view_outline(view, label=f"{label} {name}")[3]
+        for name, view in views.items()
+    }
+    occupied_tops[notes.DETAIL_TITLE] = DETAIL_CENTRE[1] + DETAIL_CROP_RADIUS
     _activate_sheet(adapter, SHEET_NAMES[0])
     left, _bottom, _right, top = SHEET_INNER_BORDER
     box = insert_general_table(
@@ -761,14 +771,19 @@ def _place_setting_table(adapter: Any, views: tuple[Any, ...]) -> None:
         label=label,
     )
     _assert_box_on_sheet(box, label=label)
-    views_top = max(
-        _view_outline(view, label=f"{label} view {index}")[3]
-        for index, view in enumerate(views)
+    _telemetry.info(
+        f"{label}: box {box!r}; occupied view tops {occupied_tops!r}",
+        occupied_tops=repr(occupied_tops),
     )
-    if box[1] < views_top + SETTING_TABLE_VIEW_GAP:
+    clashes = {
+        name: view_top
+        for name, view_top in occupied_tops.items()
+        if box[1] < view_top + SETTING_TABLE_VIEW_GAP
+    }
+    if clashes:
         raise RuntimeError(
             f"{label}: bottom {box[1]:.4f} m is within {SETTING_TABLE_VIEW_GAP} m "
-            f"of the views' top {views_top:.4f} m"
+            f"of the tops {clashes!r}"
         )
 
 
@@ -786,8 +801,8 @@ def _place_assembled_sheet(adapter: Any) -> Callable[[], None]:
         views[name] = view
     counter_settled = _counter_setting(adapter, views["*Front"])
     _mark_detail_boundary(adapter, views["*Front"])
-    detail, detail_settled = _knife_detail(adapter)
-    _place_setting_table(adapter, (*views.values(), detail))
+    detail_settled = _knife_detail(adapter)
+    _place_setting_table(adapter, views)
     _add_note_block(
         adapter, SHEET_NAMES[0], ASSEMBLED_NOTES, NOTES_XY, label="assembled notes"
     )
