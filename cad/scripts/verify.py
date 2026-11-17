@@ -803,10 +803,13 @@ def _run_soundness_battery(
     gate bug); the expected counts survive as reference data in
     ``_COMPONENT_BAND``. channel-independence (the "no component pattern for
     moving parts" invariant) runs here because soundness already opens
-    ``ch-channel``. Spring native contacts run only on an auto-repaired
-    document, before it is saved: every builder save and refresh of
-    ch-channel / sm-summing already proves them on the saved bytes
-    (``_assembly`` ``native_contact_check``).
+    ``ch-channel``. Spring native contacts run only where no builder proof
+    covers the bytes: on an auto-repaired document before it is saved, and on
+    a saved file without its ``.massprops.sha`` proof (the builder writes it
+    only after ``native_contact_check`` passed on the saved bytes; a verify
+    auto-repair revokes it before saving). The builder proves the stations of
+    its ``CHANNEL_COUNT``, so a debug build with that override is certified
+    for those stations only.
     """
     free_dof = _expected_free_dof(name)
     if free_dof:
@@ -859,7 +862,9 @@ def _run_soundness_battery(
             chain_mounts=_soundness_chain_mounts(name),
         ),
     )
-    if repaired and name in ("ch-channel", "sm-summing"):
+    if name in ("ch-channel", "sm-summing") and (
+        repaired or not _massprops_sidecar(name).exists()
+    ):
         report.gate(
             f"{name}:spring-native-contacts",
             lambda: assert_assembly_spring_contacts(adapter, name),
