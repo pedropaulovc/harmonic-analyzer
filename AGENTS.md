@@ -324,7 +324,7 @@ uv run python farm_build.py --help  # the farm CLI: run / watch / status / list 
 
 The SolidWorks-free `check:*` gates and the comparison/diff tooling run from this
 `.venv` with nothing else installed; the COM tasks (`part:`/`assembly:`/`drawing:`/
-`verify_soundness:`/`verify:`/`preflight`/`export`/`package:release`) need a
+`verify_soundness:`/`verify:`/`export`/`package:release`) need a
 SolidWorks seat — either open on this machine (`build.py`, always local) or on the
 build farm (`farm_build.py`, which is how a seatless machine runs them).
 
@@ -397,7 +397,7 @@ uv run python farm_build.py cancel <run-id | tag> --why "superseded by <sha>"
 |-------|:---:|:---:|:---:|
 | `part:<stem>`, `assembly:<stem>`, `drawing:<stem>` | yes | yes | yes |
 | `verify_soundness:<stem>`, `verify:kinematics` | yes | yes | yes |
-| `preflight`, `export`, `package:release` | yes | yes | yes |
+| `export`, `package:release` | yes | yes | yes |
 | `package:features:<stem>` (one isolated STEP/requirements bundle) | yes | yes | yes |
 | `package:features` | no (aggregator) | no | — (its leaves are) |
 | `verify:soundness` | no (aggregator) | no | — (its leaves are) |
@@ -556,7 +556,7 @@ approval.
   README image files. It may merge immediately. Plan or shop changes, code,
   prose, docs, README markup/layout or any other change stays in an ordinary PR
   and MUST satisfy the ordinary PR requirements.
-- For a farm release, run only `build export package:release preflight` through
+- For a farm release, run only `build export package:release` through
   `farm_build.py run` (`build` supplies drawing and check gates). On success copy
   the run's complete `out/` (`status` → `outputs`) over the owning worktree's
   `cad/out`, then run `uv run --frozen python -m doit -s gallery`,
@@ -706,7 +706,7 @@ worktrees and concurrent `doit` invocations** on the seat.
 
 The task graph now carries only **real** dependency edges (an assembly's `file_dep`
 on its parts, `verify`/`export`/`package:release` on the built `.SLDASM` identities,
-`release` on `export`+`gallery`+`package:release`+`verify:*`+`preflight`+`check:*`),
+`release` on `export`+`gallery`+`package:release`+`verify:*`+`check:*`),
 so the DAG reads true and a COM failure
 no longer skips *unrelated* downstream COM tasks. (History: this replaced the old
 `task_dep` **spine** — `_COM_TAIL`/`_spine_dep`/`_assert_spine_complete`, a
@@ -1413,10 +1413,10 @@ machine with no seat run the full gate set through `farm_build.py`.
 battery on each: **one shared re-solve** (`verify.rebuild`) after open, then DOF /
 over-constrained / model-healthy-deep / interference reading that resolved model
 (the three gates that each used to `ForceRebuild3` now share one — `resolve=False`;
-model-healthy gets the shared rebuild's result). Three former members left the
-every-build battery: **gear-ratios** is DEMOTED to the release preflight (it was ~50%
-of a run and re-proves a property the tooth-count config already fixes, which
-`check:math` validates analytically); **channel-independence** (the retired
+model-healthy gets the shared rebuild's result). **gear-ratios** runs on the two
+gear-carrying assemblies (it was demoted to a release preflight when it cost ~80 s;
+the MateGroup read now costs ~6.5 s, so the preflight task is gone). Two former
+members left the every-build battery: **channel-independence** (the retired
 `subsystems` suite's one unique gate) is FOLDED IN — soundness already opens
 `ch-channel`, so it runs there; and **component-count is REMOVED** (every failure it
 ever raised was a stale band or a gate bug, never a real regression — `_COMPONENT_BAND`
@@ -1432,8 +1432,8 @@ OUTSIDE that list reads under-constrained (the exact-set direction — an
 unintended freedom, e.g. a dropped mate on a structural part, fails soundness
 loud). Every assembly with nothing freed gets the strict 0-DOF check,
 unchanged. All NON-DOF gates always run on the as-built model. gear-ratios
-runs at release only, in `preflight_release.py`, on the reopened `dt-drive-train`
-+ `ch-channel` (the only assemblies carrying real gear meshes).
+runs on `dt-drive-train` (crank + channel meshes) and `pd-paper-drive` (15T:150T
+feed mesh), the only assemblies carrying rotational gear mates (~6.5 s each).
 (History: `subsystems` used to re-open all 8 and repeat the whole battery — ~95%
 duplicate COM work — then was trimmed to only `channel`-independence, and is now
 folded into soundness entirely; see `memory/release-perf-incremental.md` and

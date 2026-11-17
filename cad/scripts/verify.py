@@ -18,8 +18,7 @@ is the single fully-safe entry point that runs every gate.
                       component / model healthy (deep) / interference-free, plus
                       the channel assembly's 20-way moving-stem instance
                       independence (folded in from the retired `subsystems` suite).
-                      gear ratios == config is verified at the RELEASE preflight,
-                      not on every build.
+                      gear ratios == config on drive-train and paper-drive.
   kinematics          NEEDS SOLIDWORKS. Kinematic pen-driver fidelity (plan F5):
                       open pn-pen.SLDASM (first author the travel drive mate
                       transiently from the recorded DOF manifest and install
@@ -129,10 +128,11 @@ REST = "Default"  # the deterministic, fully-defined, render/photo-gated pose
 OVER_CONSTRAINED = 4  # swConstrainedStatus_e
 DANGLING_ENTITY_NOT_FOUND = 48  # What's Wrong: mate reference PID not found
 
-# The gear mates live in this sub-assembly's MateGroup. The top assembly
-# references it flexibly, so its own MateGroup has none -- they are verified
-# when this sub is verified, not duplicated at the top.
+# Gear-ratio owners: the crank + channel meshes live in this sub-assembly's
+# MateGroup (the top references it flexibly, so its own MateGroup has none), and
+# paper-drive carries the 15T:150T feed mesh. Soundness proves both.
 GEAR_OWNER = "dt-drive-train"
+GEAR_ASSEMBLIES = (GEAR_OWNER, "pd-paper-drive")
 # The channel assembly carries the independent moving stations (CHANNELS of them).
 # These stems are mated instances (one per channel), NOT pattern slaves -- the
 # isolation suite asserts CHANNELS of each, the structural precondition for the
@@ -403,10 +403,9 @@ def assert_gear_ratios(adapter: Any, name: str) -> None:
     each other AND with the crank (e.g. 30:120 and 16:64 both reduce to 1:4) --
     the count and the value set are what must hold.
     """
-    # Span the gate; reading the live gear mates walks the MateGroup over the COM
-    # bridge and is the whole cost (~80 s for drive-train) -- it was a single
-    # unspanned 82 s gap. Give the read its own child span so that wall-clock is
-    # attributable, mirroring gate.dof/gate.health.
+    # Reading the live gear mates walks the MateGroup over the COM bridge and is
+    # the whole cost (6.5 s on drive-train, 2026-11); its own child span keeps it
+    # attributable.
     with _telemetry.span("gate.gear_ratios") as gsp:
         with _telemetry.span("gear.read_links"):
             links = _gear_mate_links(adapter)
@@ -425,22 +424,8 @@ def assert_gear_ratios(adapter: Any, name: str) -> None:
         ]
         gsp.set_attribute("gear_mates", len(rotational))
         if not rotational:
-            if name == GEAR_OWNER:
-                raise RuntimeError(
-                    f"{GEAR_OWNER} has no gear mates -- the drive train is broken"
-                )
-            if name == "pd-paper-drive":
-                # A missing/suppressed 15T:150T feed mesh must fail loud, not
-                # take the harmless no-gears path below (codex #196).
-                raise RuntimeError(
-                    "paper-drive has no gear mates -- the paper-feed train is broken"
-                )
-            _telemetry.debug(
-                f"{name}: no rotational gear meshes at this level "
-                f"(rack-pinion/none; the crank + channel meshes live in the "
-                f"flexible {GEAR_OWNER} sub, verified there)"
-            )
-            return
+            # A missing/suppressed mesh must fail loud (codex #196).
+            raise RuntimeError(f"{name} has no rotational gear mates -- its train is broken")
 
         crank_links: list[tuple[int, int]] = []
         feed_links: list[tuple[int, int]] = []
@@ -884,6 +869,8 @@ def _run_soundness_battery(
                 assembly_kind="top_assembly" if name == "ha-harmonic-analyzer" else "drive_train",
             ),
         )
+    if name in GEAR_ASSEMBLIES:
+        report.gate(f"{name}:gear-ratios", lambda: assert_gear_ratios(adapter, name))
     if name == CHANNEL_OWNER:
         report.gate(
             f"{name}:channel-independence",

@@ -54,7 +54,7 @@ trip up anyone reasoning about this model:
    whole train, so a reversal can't hide behind a retuned pairwise constant.
 
 The probe never saves (drives + reads, then discards via
-`preflight_release._discard_open_documents` in a `finally`). NON_PART_SCRIPT,
+`_session.discard_open_documents` in a `finally`). NON_PART_SCRIPT,
 run by hand or via `verify:kinematics` (skipped for a `locked` build — no free
 crank DOF to drive). See [[default-free-dof-park-drivers]] and
 [[chain-component-pattern]].

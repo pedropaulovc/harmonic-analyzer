@@ -687,7 +687,7 @@ def test_soundness_shares_one_rebuild_across_dof_over_health(monkeypatch, tmp_pa
         f"{_LAST_RUN_ADAPTER.currentModel.rebuild_calls} rebuilds -- "
         "the gates are still re-solving redundantly"
     )
-    # gear-ratios is DEMOTED to the release preflight, so it must NOT run in soundness.
+    # gear-ratios runs only on the gear-carrying dt-drive-train / pd-paper-drive.
     assert _by_name(spans, "gate.gear_ratios") == []
     assert _by_name(spans, "gear.read_links") == []
 

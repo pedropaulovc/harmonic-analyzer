@@ -68,7 +68,7 @@ from _assembly import (
 
 import _telemetry
 import pd_transgear_removable_spec as removable
-from preflight_release import _discard_open_documents
+from _session import discard_open_documents as _discard_open_documents
 
 # Coupled ratios read the mounted selection and gear parts' authorities;
 # rack-pinion travel is pi*FEED_PD per feed-pinion revolution.

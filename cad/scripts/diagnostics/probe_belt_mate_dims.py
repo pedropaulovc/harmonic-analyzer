@@ -32,7 +32,7 @@ from _check import check  # noqa: E402
 from _paths import OUT_SLDASM  # noqa: E402
 from _session import run_build  # noqa: E402
 from _telemetry import info, warn  # noqa: E402
-from preflight_release import _discard_open_documents  # noqa: E402
+from _session import discard_open_documents as _discard_open_documents  # noqa: E402
 
 
 def _dump(adapter: Any) -> None:

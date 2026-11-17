@@ -968,7 +968,7 @@ def run_farm_build(
         with _farm.producer_build(label) as producer:
             print(
                 "farm: every SolidWorks task runs on the farm (parts, assemblies, "
-                "drawings, verify:*, preflight, export, package:release)"
+                "drawings, verify:*, export, package:release)"
             )
             code = doit.run(["run", "-n", workers, "--continue", *targets])
             producer.finish(code == 0)

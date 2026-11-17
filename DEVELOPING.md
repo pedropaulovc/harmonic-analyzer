@@ -1053,7 +1053,7 @@ executors, cache contracts or release checks.
 
 `farm_build.py run` refuses the `release` target: it would run in a disposable
 snapshot, and cleanup would discard the publisher's post-release tracked image
-and `release.yaml` updates. Run `build export package:release preflight`
+and `release.yaml` updates. Run `build export package:release`
 (`build` supplies drawing and check gates). Once successful, copy the run's
 complete `out/` (`status` → `outputs`) over the owning worktree's `cad/out`.
 Then run `uv run --frozen python -m doit -s gallery`,
@@ -1352,8 +1352,8 @@ has been collected from the changed native parts.
 ## Remote build-artifact cache
 
 Every task that opens SolidWorks is cached: `part:<stem>`, `assembly:<stem>`,
-`drawing:<stem>`, the gates (`verify_soundness:<stem>`, `verify:kinematics`,
-`preflight`), the neutral `export` and the release Pack-and-Go
+`drawing:<stem>`, the gates (`verify_soundness:<stem>`, `verify:kinematics`),
+the neutral `export` and the release Pack-and-Go
 (`package:release`). They are the slow part of the pipeline — a part is ~20 s and
 a full assembly ~500 s. Hashed inputs identify reusable geometry, not necessarily
 identical native bytes. A shared cache lets one machine **download a
@@ -1389,7 +1389,7 @@ An ordinary upload failure with no canonical entry remains fail-soft; `ro` and
 `off` contracts are unchanged.
 
 A gate produces no CAD artefact, so **its stamp is its cached output**
-(`cad/out/reports/verify-*.ok`, `preflight.ok`): identical inputs imply an
+(`cad/out/reports/verify-*.ok`): identical inputs imply an
 identical verdict, so restoring the stamp is restoring the proof. This is also
 the mechanism behind farm builds: a cache-missing COM task dispatches one
 farm leaf and then restores what the worker published, which is how a machine

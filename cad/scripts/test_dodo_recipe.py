@@ -2206,7 +2206,7 @@ def test_artefact_digest_is_recipe_not_bytes():
 
 
 def test_verify_gate_logic_off_build_closure_is_a_file_dep():
-    """A verify/preflight gate whose LOGIC lives in a module on NO assembly's build
+    """A verify gate whose LOGIC lives in a module on NO assembly's build
     closure (so it rides no .SLDASM digest) MUST list that module as a direct
     file_dep -- else a change to the gate logic leaves the verify-*.ok stamp
     stale-fresh and SKIPS the gate (codex PR #193: the transient-drive replay
@@ -2235,7 +2235,7 @@ def test_verify_gate_logic_off_build_closure_is_a_file_dep():
     ] + [
         (f"verify_soundness:{task['name']}", task)
         for task in dodo.task_verify_soundness()
-    ] + [("preflight", dodo.task_preflight())]
+    ]
     verify_entry_seen = False
     for label, task in tasks:
         entries = set()
@@ -2885,7 +2885,7 @@ def test_com_seat_is_reentrant_within_a_process(tmp_path, monkeypatch):
 
 
 def test_com_tasks_carry_no_inter_com_task_dep():
-    """DAG accuracy: with the spine gone, part/assembly/verify/preflight tasks must
+    """DAG accuracy: with the spine gone, part/assembly/verify tasks must
     carry NO ``task_dep`` on another COM task -- ordering comes from their real
     file_dep on built artefacts, serialization from the seat lock. (export/release
     DO carry real gate edges -- asserted separately below.)
@@ -2912,7 +2912,6 @@ def test_com_tasks_carry_no_inter_com_task_dep():
         assert t.get("task_dep", []) == aggregated.get(t["name"], []), (
             f"verify:{t['name']} carries an unexpected task_dep"
         )
-    assert not dodo.task_preflight().get("task_dep"), "preflight has a stray task_dep"
 
 
 def test_export_is_gated_on_the_sw_verify_suites():
@@ -2930,7 +2929,6 @@ def test_release_is_gated_on_every_gate_and_staged_drawing():
     deps = set(dodo.task_release()["task_dep"])
     expected = {
         "export",
-        "preflight",
         "verify:soundness",
         "verify:kinematics",
         *(f"check:{c}" for c in dodo._CHECK_NAMES),

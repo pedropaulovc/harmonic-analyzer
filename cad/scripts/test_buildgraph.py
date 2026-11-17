@@ -1783,7 +1783,7 @@ _GRANDFATHERED_BUILDER_EDGES = {
 }
 # Entry tools that open built models and therefore import their builders; they
 # are run, never imported by a build recipe's pure helpers.
-_ENTRY_TOOLS = frozenset({"verify.py", "preflight_release.py"})
+_ENTRY_TOOLS = frozenset({"verify.py"})
 
 
 def _direct_builder_edges() -> set[tuple[str, str]]:

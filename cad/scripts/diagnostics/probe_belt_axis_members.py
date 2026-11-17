@@ -40,7 +40,7 @@ from _session import run_build  # noqa: E402
 from _telemetry import info, success, warn  # noqa: E402
 from build_kinematic_probe import _removables_by_role  # noqa: E402
 from probe_belt_ratio_fix import _measure_ratio  # noqa: E402
-from preflight_release import _discard_open_documents  # noqa: E402
+from _session import discard_open_documents as _discard_open_documents  # noqa: E402
 
 SW_FM_BELT_AND_CHAIN = 119
 PITCH_DIAMS_M = [0.024, 0.048]

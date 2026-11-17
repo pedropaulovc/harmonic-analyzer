@@ -77,7 +77,7 @@ async def build(adapter) -> dict[str, str]:
         # on an exception -- a headless run must not hang on the save modal or leave
         # the modified session resident (codex #189). _discard closes the active
         # title first, then CloseAllDocuments as a backstop with nothing left dirty.
-        from preflight_release import _discard_open_documents  # noqa: E402
+        from _session import discard_open_documents as _discard_open_documents  # noqa: E402
         _discard_open_documents(adapter)
 
 
