@@ -95,7 +95,7 @@ BOM_DESCRIPTIONS = {
     ),
 }
 
-EXPLODED_CAPTION = "EXPLODED VIEW"
+EXPLODED_CAPTION = "EXPLODED VIEW - FIT-UP STEPS IN ASSEMBLY.MD"
 DRAWING_DIMENSIONS = {spec.SETTING_FEATURE: {spec.SETTING_DIMENSION}}
 # Components own material and finish; no assembly coating operation is required.
 # The fitter's order, one action a step; the explode
