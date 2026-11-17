@@ -47,7 +47,10 @@ dimensions, limits and the drawing revision from `{{cad.…}}` rather than typin
 them, so a CAD change reaches the traveler through the exported manifest. Every
 file in the plan directory is an input to the traveler task.
 
-Parts are enrolled by the CNC migration. The oblique trammel jig's eight parts,
+Parts are enrolled by the CNC migration. The rocker strap (`ch_rocker_strap`,
+MHA-CH-13) is the first: faced and bored in edge clamps on a shop-made
+sub-plate, then bonded to it on tape and screwed down at the hub for the
+outline. The oblique trammel jig's eight parts,
 enrolled before it was deleted (owner ruling 2026-11-17, #2885), left their
 plans, diagrams and the base bar's CAM recipe at
 `ebd3bf3b44:cad/process/ch_rocker_arm_tl_oblique_*/` and
