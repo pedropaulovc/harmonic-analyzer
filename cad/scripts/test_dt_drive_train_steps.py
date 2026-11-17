@@ -11,6 +11,7 @@ import _config
 import dt_cone_gear_stack
 import cone_stack_end_play
 import draw_dt_drive_train_assembly as drawing
+import dt_drive_train_acceptance_assembly_sheet as acceptance_sheet
 import dt_drive_train_assembly_sheet as sheet
 import dt_drive_train_steps as steps
 import pinion_rig_tip_gap as tip_gap
@@ -360,7 +361,7 @@ def test_step_four_holds_the_collar_on_the_boss_and_leaves_the_end_proud() -> No
     # A stack result the fitter cannot adjust: every accepted part set,
     # including both extremes, must fall inside the printed range.
     printed = _accept("crank-end-proud", cites=fitup)
-    assert printed == drawing.inch_envelope((least, most), 3)
+    assert printed == acceptance_sheet.inch_envelope((least, most), 3)
     low, high = (float(limit) * 25.4 for limit in printed.split("-"))
     assert low <= least and most <= high
     assert "SHIM" not in fitup and "MHA-CH-VN-57" not in fitup

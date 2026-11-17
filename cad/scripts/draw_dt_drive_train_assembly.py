@@ -104,19 +104,21 @@ from ch_channel_assembly_steps import (
 )
 import ch_vn_rocker_thrust_washer_spec as rocker_washer
 import cone_line
-from cone_stack_end_play import SHAFT_END_PLAY, STACK_FEELER
+from cone_stack_end_play import STACK_FEELER
 import cylinder_bank_layout as bank
 import dt_cylinder_bank_setting_spec as bank_settings
 from dt_cone_gear_spec import CONE_TEETH, ROUND_BORE_TEETH
-from dt_cone_gear_stack import STACK_L20_ACCEPT
+import dt_drive_train_acceptance_assembly_sheet as acceptance_sheet
+from dt_drive_train_acceptance_assembly_sheet import (
+    FLUSH_SET_TEXT,
+    STRAP_PIN_DEPTH_TEXT,
+)
 from dt_cone_swing_platform_spec import POST_MOUNT_ENGAGEMENT_ASSEMBLY_FACT
 import dt_crank_drive_gear_spec as gear64
 import dt_crank_handle_pivot_screw_spec as handle_screw
 from dt_crank_hub_notes import FRONT_FACE_DATUM as HUB_FRONT_FACE_DATUM
-from dt_crank_pin_ring_spec import BUTT_GAP_BAND as RING_BUTT_GAP_BAND
 import dt_crank_pinion_spec as pinion
 from dt_crank_pinion_spec import SEAT_FEELER_MM as PINION_SEAT_FEELER
-from dt_crankshaft_spec import SHAFT_END_PROUD_RANGE as CRANK_END_PROUD_RANGE
 from dt_cylinder_end_disc_spec import WASHER_THICK as BANK_WASHER_THICK
 import dt_cylinder_gear_spec as drum
 import dt_drum_station_setting_spec as drum_station_setting
@@ -137,7 +139,6 @@ from dt_drive_train_assembly_sheet import (
     T120_FITUP_SHOULDER_REMEDY,
     inch_ceil_mm,
     inch_floor_mm,
-    inch_max_text,
     inch_text,
     inch_window,
 )
@@ -164,19 +165,15 @@ from dt_pinion_arbor_geometry import (
     HEAD_FRONT_Z as ARBOR_HEAD_FRONT_Z,
     HEAD_REAR_Z as ARBOR_HEAD_REAR_Z,
 )
-from dt_pinion_spring_section import SCREW_EAST_OF_PIVOT as SPRING_SCREW_EAST_OF_PIVOT
 import fr_frame_assembly_steps
 import fr_harmonic_base_spec as base
 import pinion_rig_fitup as FITUP
-from pinion_rig_layout import FLUSH_SET_ERROR
 from pinion_rig_park_geometry import APINION_X
 import pinion_rig_tip_gap as TIP_GAP
 import rocker_bank_layout as rockers
 import dt_vn_cone_lock_knob_spec as lock_knob
 import dt_vn_cone_pivot_screw_spec as pivot_screw
 import dt_vn_post_mount_screw_spec as post_screw
-import dt_swing_stop_screw_spec as stop_screw
-from dt_vn_pinion_strap_pin_spec import PIN_SUB_FLUSH_MAX as STRAP_PIN_SUB_FLUSH_MAX
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
@@ -275,8 +272,9 @@ SETTING_SHEET = 15
 ACCEPTANCE_SHEET = 16
 # Owner ruling 2026-11-08 (Pedro): one labelled code key defines the cone-gear
 # codes and GEAR 0-19 (code_key_text).  It is the sheet 15 station table,
-# titled as the key, and every step sheet's first heading points to it.
-CODE_KEY_HEADING = f"CODE KEY (SHEETS {SEQUENCE_SHEET}-{CHECKS_SHEET})"
+# titled as the key, and every step sheet's first heading points to it, as
+# sheet 16's table title does (Codjiflo on #3023: its rows use the codes).
+CODE_KEY_HEADING = f"CODE KEY (SHEETS {SEQUENCE_SHEET}-{CHECKS_SHEET}, {ACCEPTANCE_SHEET})"
 CODE_KEY_POINTER = f"(CODES: SHEET {SETTING_SHEET} KEY)"
 BANK_SETTING_SCALE = (1.0, 1.0)
 BANK_SPRING_DETAIL_SCALE = (4.0, 1.0)
@@ -1364,153 +1362,25 @@ ASSEMBLED_HEADING = (
 )
 
 
-def inch_envelope(limits_mm: tuple[float, float], places: int) -> str:
-    """A predicted (min, max) stack result the fitter cannot adjust, rounded
-    outward so every accepted part set lands inside the printed range."""
-    return (
-        f"{inch_text(inch_floor_mm(limits_mm[0], places), places)}-"
-        f"{inch_text(inch_ceil_mm(limits_mm[1], places), places)}"
-    )
-
-
 # --- sheet 16: the setting table's fits and acceptances ----------------------
-# R5 machinist review (rule 22, 3/3 runs): every measurable fit and acceptance
-# a step or check makes prints in a setting-table row, not only in its step.
-# None is a single model dimension a setting view could carry (stack results,
-# end plays, gaps, flush and pin-depth limits, the interim spring-foot station
-# of known issue #1037), so each is a row numbered on from sheet 15's rows 1-5,
-# and its step cites the row in place of the number (as 8Q-8S and 10B-10C cite
-# rows 2, 3 and 5).  Every value is the spec symbol the step printed.
-FLUSH_SET_TEXT = f"±{inch_max_text(FLUSH_SET_ERROR, 3)}"
-STRAP_PIN_DEPTH_TEXT = f"0 TO {inch_max_text(STRAP_PIN_SUB_FLUSH_MAX, 3)}"
-POST_SCREW_SHORT_TEXT = inch_max_text(
-    post_screw.POST_SCREW_CUT_TO_FIT_SHORT, post_screw.CUT_TO_FIT_SHORT_PLACES
-)
+# R5 machinist review (rule 22): every measurable fit and acceptance a step or
+# check makes prints as a row of sheet 16, numbered on from sheet 15's rows,
+# and its step cites the row in place of the number (as 8Q-8S and 10B-10C
+# cite rows 2, 3 and 5).  The rows and their spec values live in
+# dt_drive_train_acceptance_assembly_sheet; this script numbers and places them.
+# Codjiflo on #3023 (rules 22, 26): the rows use the cone-gear codes, so the
+# title points at the code key, whose heading names sheet 16.
 ACCEPTANCE_TABLE_TITLE = (
     f"SETTING TABLE CONT. - ASSEMBLY FITS AND ACCEPTANCES (ROWS 1-{len(SETTING_TABLE_ROWS)}: "
-    f"SHEET {SETTING_SHEET})"
+    f"SHEET {SETTING_SHEET}) {CODE_KEY_POINTER}"
 )
 ACCEPTANCE_TABLE_HEADER = ("ROW", "STEP", "SETTING", "SET TO / ACCEPT", "CHECK WITH")
-# (key, step, setting, set to / accept, check with), in step order.
-_ACCEPTANCES = (
-    (
-        "cone-stack",
-        _step_ref("cone-gears-stacked", "F"),
-        "T120 FRONT TO MHA-DT-37 TEETH' BACK, DRY STACK",
-        inch_window(STACK_L20_ACCEPT, 3),
-        "5-6 IN MICROMETER",
-    ),
-    (
-        "post-screw-cut",
-        _step_ref("post-and-tip-block", "K"),
-        "EACH MHA-DT-VN-61 CUT END TO THE MHA-DT-20 UNDERSIDE",
-        f"FLUSH TO {POST_SCREW_SHORT_TEXT} SHORT",
-        "DEPTH MICROMETER",
-    ),
-    (
-        "shaft-end-play",
-        _step_ref("end-play-set", "C"),
-        "MHA-DT-04 END PLAY AT THE SHAFT END",
-        inch_window(SHAFT_END_PLAY, 3),
-        "DIAL INDICATOR",
-    ),
-    (
-        "crank-end-proud",
-        _step_ref("crank-mesh-checked", "W"),
-        "MHA-DT-11 END PROUD OF MHA-DT-10",
-        # A stack result, not a set window: rounded outward (Codjiflo, #2194).
-        inch_envelope((max(CRANK_END_PROUD_RANGE[0], 0.0), CRANK_END_PROUD_RANGE[1]), 3),
-        "DEPTH MICROMETER",
-    ),
-    (
-        "ring-butt-gap",
-        _step_ref("crank-hub-fitted", "P"),
-        "MHA-DT-27 BUTT GAP, CLOSED",
-        "0-" + f"{RING_BUTT_GAP_BAND[1] / 25.4:.3f}".removeprefix("0"),
-        "FEELERS",
-    ),
-    (
-        "handle-end-play",
-        _step_ref("crank-handle-fitted", "H"),
-        "MHA-DT-08 END PLAY ON MHA-DT-32",
-        inch_window(handle_screw.END_PLAY_RANGE, 3),
-        "FEELERS",
-    ),
-    (
-        "arbor-dome",
-        _step_ref("cylinder-bank-located", "T"),
-        "EACH MHA-DT-13 DOME PROUD OF ITS MHA-DT-02 OUTER FACE",
-        inch_text(bank.ARBOR_DOME_HEIGHT, 2),
-        "CALIPER DEPTH ROD",
-    ),
-    (
-        "collar-pin-ends",
-        _step_ref("arbor-collar-pinned", "A"),
-        "MHA-DT-VN-63 END DEPTHS BELOW THE MHA-DT-33 OD",
-        f"WITHIN {COLLAR_PIN_DEPTH_SPREAD} OF EACH OTHER",
-        "CALIPER DEPTH ROD",
-    ),
-    (
-        "shaft-rear-flush",
-        _step_ref("straps-pinned-to-torque-shaft", "C"),
-        "MHA-DT-19 REAR END TO THE MHA-DT-18 REAR FACE",
-        f"FLUSH {FLUSH_SET_TEXT}",
-        "DEPTH MICROMETER",
-    ),
-    (
-        "strap-pin-ends",
-        _step_ref("straps-pinned-to-torque-shaft", "E"),
-        "MHA-DT-VN-63 PIN ENDS BELOW THE MHA-DT-14 EDGES",
-        STRAP_PIN_DEPTH_TEXT,
-        "CALIPER DEPTH ROD",
-    ),
-    (
-        "spring-foot",
-        _step_ref("rig-located", "A"),
-        "MHA-DT-24 FOOT HOLE CENTRE RIGHT OF THE MHA-DT-19 AXIS",
-        inch_text(SPRING_SCREW_EAST_OF_PIVOT, 2),
-        "CALIPERS",
-    ),
-    (
-        "tip-gap",
-        f"{_step_ref('rig-located', 'E')}, CHECK 7",
-        "PARKED TIP GAP AT GEAR 0 AND AT GEAR 19",
-        inch_window(TIP_GAP.TIP_GAP_ACCEPT, FEELER_PLACES),
-        f"{TIP_GAP.TIP_GAP_FEELER_TEXT} SNUG",
-    ),
-    (
-        "lift-rod-rear-flush",
-        _step_ref("cam-collars-set", "A"),
-        "MHA-DT-17 REAR END TO THE MHA-DT-18 REAR FACE",
-        f"FLUSH {FLUSH_SET_TEXT}",
-        "DEPTH MICROMETER",
-    ),
-    # Attempt 1 review (run 20261117T133225781Z, rule 22): checks 4W and 4Y
-    # printed their engagement minimums only in check text.  Each is the lesser
-    # of two recorded readings (step 23's depth gauge and calipers), never one
-    # model dimension.
-    (
-        "pivot-screw-engagement",
-        "CHECK 4W",
-        "MHA-DT-VN-52 FULL-FORM THREAD ENGAGEMENT",
-        pivot_screw.MIN_USEFUL_ENGAGEMENT_TEXT,
-        f"LESSER OF {_step_ref('other-base-mounting', 'H')}, "
-        f"{_step_ref('other-base-mounting', 'J')}",
-    ),
-    (
-        "stop-screw-engagement",
-        "CHECK 4Y",
-        "MHA-SH-VN-52 SWING STOP FULL-FORM THREAD ENGAGEMENT",
-        stop_screw.MIN_USEFUL_ENGAGEMENT_TEXT,
-        f"LESSER OF {_step_ref('other-base-mounting', 'M')}, "
-        f"{_step_ref('other-base-mounting', 'N')}",
-    ),
-)
 ACCEPTANCE_ROW_NUMBERS = {
-    key: len(SETTING_TABLE_ROWS) + index for index, (key, *_cells) in enumerate(_ACCEPTANCES, 1)
+    key: len(SETTING_TABLE_ROWS) + index
+    for index, (key, *_cells) in enumerate(acceptance_sheet.ACCEPTANCES, 1)
 }
 ACCEPTANCE_TABLE_ROWS = tuple(
-    (str(ACCEPTANCE_ROW_NUMBERS[key]), *cells) for key, *cells in _ACCEPTANCES
+    (str(ACCEPTANCE_ROW_NUMBERS[key]), *cells) for key, *cells in acceptance_sheet.ACCEPTANCES
 )
 
 
@@ -1518,14 +1388,6 @@ def acceptance_ref(key: str) -> str:
     """A step's citation of its sheet 16 setting-table row."""
     return f"SHEET {ACCEPTANCE_SHEET} ROW {ACCEPTANCE_ROW_NUMBERS[key]}"
 
-
-# Attempt 1 review (clarity, rule 26): 4L's bare .320 MIN named no dimension;
-# it limits MHA-DT-10's printed shoulder length.
-_T120_SHOULDER_REMEDY = T120_FITUP_SHOULDER_REMEDY.replace(
-    "FACE THE SHOULDER BACK, ", "FACE THE SHOULDER BACK: MHA-DT-10 SHOULDER LENGTH "
-)
-if _T120_SHOULDER_REMEDY == T120_FITUP_SHOULDER_REMEDY:
-    raise AssertionError("T120_FITUP_SHOULDER_REMEDY no longer prints 'FACE THE SHOULDER BACK, '")
 
 # Rule 23 (rubric sample round 13, #3): a press whose part slides in by hand
 # is a slip fit, so each pressed pin's check is followed by this one remedy,
@@ -1746,7 +1608,7 @@ CONE_CRANK_STEPS = _note_text(
         "4J. " + T120_FITUP_SHOULDER_CHECK,
         "4K. " + T120_FITUP_BAND_REMEDY,
         # Attempt 1 review (clarity, rule 26): the limit names its dimension.
-        "4L. " + _T120_SHOULDER_REMEDY,
+        "4L. " + T120_FITUP_SHOULDER_REMEDY,
         "4M. REPEAT 4E-4J UNTIL THE FEELER PASSES BOTH.",
         "4N. TURN MHA-DT-07 ONE FULL REVOLUTION BY HAND: IT MUST NEVER BIND.",
         # Rubric sample round 4: the bind remedy names what to check and how;

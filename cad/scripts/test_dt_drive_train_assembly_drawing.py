@@ -802,7 +802,6 @@ def test_rig_is_located_by_its_parked_tip_gap() -> None:
     ) in check
     # The inch acceptance rounds inward, inside the spec's window, and prints
     # as the steps' sheet 16 row (R5 machinist review, rule 22).
-    assert tip_gap.TIP_GAP_ACCEPT_TEXT == f"ACCEPT {_accept_cell('tip-gap')}"
     printed = re.fullmatch(r"(\.\d{3})-(\.\d{3})", _accept_cell("tip-gap"))
     assert printed is not None
     low, high = (float(value) * 25.4 for value in printed.groups())
@@ -1045,6 +1044,10 @@ def test_every_sheet_16_row_is_cited_by_its_step_and_fits_its_sheet(
         head = re.search(rf"\b{re.escape(first)}\. ((?:(?!\b\d+[A-Z]?\. ).)*)", text)
         assert head is not None and cite in head.group(1), (key, first)
     assert drawing.acceptance_ref("tip-gap") in _flat(drawing.CHECKS)
+    # Codjiflo on #3023 (rules 22, 26): the rows use the cone-gear codes, so
+    # the title points at the code key and the key's scope names sheet 16.
+    assert drawing.ACCEPTANCE_TABLE_TITLE.endswith(drawing.CODE_KEY_POINTER)
+    assert drawing.CODE_KEY_HEADING.endswith(f", {drawing.ACCEPTANCE_SHEET})")
     # No cited value prints in its step any more.
     assert "ACCEPT 5." not in printed and "END PLAY AT THE SHAFT END: ." not in printed
 
