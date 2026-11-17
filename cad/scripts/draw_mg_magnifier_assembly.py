@@ -8,10 +8,13 @@ group's two operator settings, the clamp station and the fixture drop. Every
 other view carries a letter (drawing-guidelines.md rules 9 and 26), its
 boundary circle or viewing arrow drawn on the right side view:
 - DETAIL A (2:1) shows only the bar and the axle. It prints the press gauge
-  from the bar's front face to the shank step. The wheel hub hides the step
-  once it is fitted.
-- DETAIL B (4:1) shows the stack. It prints the endshake between the wheel's
-  spigot face and the front washer.
+  from the bar's front face to the shank step (the wheel hub hides the step
+  once it is fitted) and, as limits, the axle's plain end below the bar's far
+  face, the press's first setting.
+- DETAIL B (4:1) shows the stack. It prints, as limits, the drum's face below
+  the wheel's spigot end and the axle's thread end past the second nut (the
+  press's acceptance), and the endshake between the spigot face and the
+  front washer.
 - VIEW C (4:1) looks at the flat threaded lever tip beyond the far bracket
   face, with the single imported ThreadProjection setting.
 - VIEW D (2:1, sheet 5) looks at the wheel hub at rest: TIE 1 and its angle
@@ -768,24 +771,26 @@ if (
 
 
 # The free field right of the isometric, above the title block. The gauge
-# detail spans the bar's front face to past the step; its lowest edge is the
+# detail spans the bar's far face to past the step; its lowest edge is the
 # bar's underside, the bore row height below the axle. Its circle frames the
-# gauge with this much of the bar behind the front face and of the axle past
-# the step, so it grows with the spacer the gauge carries (about 38 long, the
-# circle about 101 across at 2:1). The endshake detail
-# spans the spigot face to the axle's tip; the hub and drum fill the circle
-# up to the spigot face, so its lowest edge is the circle's chord there.
+# bar's far face (the plain end's setting reads from it) to the step with
+# this much margin either side, so it grows with the spacer the gauge
+# carries (about 48 long, the circle about 120 across at 2:1). The endshake
+# detail spans the spigot face to the axle's tip; the hub and drum fill the
+# circle up to the spigot face, so its lowest edge is the circle's chord
+# there.
 _PRESSED_MARGIN = 6.25
 PRESSED = StackDetail(
     notes.PRESS_DETAIL_TITLE,
     (2, 1),
-    stack.PRESS_GAUGE / 2.0,
-    stack.PRESS_GAUGE / 2.0 + _PRESSED_MARGIN,
-    (0.330, 0.200),
+    (stack.BAR_FAR_D + stack.PRESS_GAUGE) / 2.0,
+    (stack.PRESS_GAUGE - stack.BAR_FAR_D) / 2.0 + _PRESSED_MARGIN,
+    # 12 mm right of the old 0.330, so the plain end's limits, left of the
+    # bar's far face, clear the isometric (its ink ends at x 0.255).
+    (0.342, 0.200),
     frozenset({"mg-wheel-bar", "mg-wheel-axle"}),
     BORE_ROW_HEIGHT,
     # The BOM items it shows (machinist review r1); the rest are left out.
-    # The acceptance, both limits, is the model callout over the gauge.
     f"ITEM {notes.ITEM_NUMBERS['mg-wheel-axle']} PRESSED INTO "
     f"ITEM {notes.ITEM_NUMBERS['mg-wheel-bar']},\nOTHER PARTS NOT SHOWN",
     letter_corner=(-1, 1),
@@ -892,19 +897,65 @@ def boundary_letter_xy(
 
 
 # The gauge's dimension line runs above the bar, inside the circle, a bare
-# reference; the endshake's text stands right of the stack, above the nuts
-# and past the crop, with its callout below.
+# reference; the plain end's limits stand left of the bar's far face, their
+# line level with the gauge's, clear of the bar's top face. The endshake's
+# text stands right of the stack, above the nuts and past the crop, with its
+# callout below; the drum recess's and the thread end's lines run below the
+# axle, under the nuts' corners and over DETAIL B's label, their texts left of
+# the drum and right of the nuts respectively, so no two of DETAIL B's three
+# dimension lines share a side of a face.
+# SOLIDWORKS centres a dimension's text block on the requested position and
+# runs the dimension line along the block's bottom: run
+# 20261117T130535982Z measured 2.55 mm of sheet per printed line (value lines
+# plus callout lines) from the position down to the line (its limit texts at
+# y 90 mm drew their lines at 77-80 mm, through DETAIL B's label).
+DIM_TEXT_HALF_LINE = 0.00255
 GAUGE_RISE = 12.0
+BACK_END_SUNK_RUN = 0.019
 ENDSHAKE_RISE = 5.5
+STACK_LINE_DROP = 5.25
+STACK_SIDE_RUN = 0.055
+DRUM_RECESS_RUN = 0.050
+
+
+def text_over_line(name: str, line_y: float) -> float:
+    """The text position whose block's bottom, and so its dimension line,
+    lands at sheet ``line_y``: two value lines for a limit pair, one for the
+    rest, plus the native callout's lines."""
+    values = 2 if name in stack.LIMIT_DIMENSIONS else 1
+    callout = stack.SETTING_CALLOUTS[stack.FEATURE].get(name, (0, ""))[1]
+    lines = values + (len(callout.splitlines()) if callout else 0)
+    return line_y + lines * DIM_TEXT_HALF_LINE
+
+
+_GAUGE_XY = PRESSED.sheet_xy(stack.PRESS_GAUGE / 2.0, GAUGE_RISE)
+GAUGE_LINE_Y = _GAUGE_XY[1] - DIM_TEXT_HALF_LINE
+STACK_LINE_Y = ENDSHAKE.sheet_xy(stack.HUB_FRONT_D, -STACK_LINE_DROP)[1]
 PRESSED_KEEP = {
-    stack.PRESS_GAUGE_DIMENSION: PRESSED.sheet_xy(stack.PRESS_GAUGE / 2.0, GAUGE_RISE),
+    stack.PRESS_GAUGE_DIMENSION: _GAUGE_XY,
+    stack.BACK_END_SUNK_DIMENSION: (
+        PRESSED.sheet_xy(stack.BAR_FAR_D)[0] - BACK_END_SUNK_RUN,
+        text_over_line(stack.BACK_END_SUNK_DIMENSION, GAUGE_LINE_Y),
+    ),
 }
 ENDSHAKE_KEEP = {
     stack.ENDSHAKE_DIMENSION: (
-        ENDSHAKE.centre[0] + 0.055,
+        ENDSHAKE.centre[0] + STACK_SIDE_RUN,
         ENDSHAKE.sheet_xy(stack.HUB_FRONT_D, ENDSHAKE_RISE)[1],
     ),
+    stack.DRUM_RECESS_DIMENSION: (
+        ENDSHAKE.centre[0] - DRUM_RECESS_RUN,
+        text_over_line(stack.DRUM_RECESS_DIMENSION, STACK_LINE_Y),
+    ),
+    stack.THREAD_PAST_LOCKNUT_DIMENSION: (
+        ENDSHAKE.centre[0] + STACK_SIDE_RUN,
+        text_over_line(stack.THREAD_PAST_LOCKNUT_DIMENSION, STACK_LINE_Y),
+    ),
 }
+if set(PRESSED_KEEP) != notes.PRESS_DETAIL_DIMENSIONS or set(ENDSHAKE_KEEP) != (
+    notes.ENDSHAKE_DETAIL_DIMENSIONS
+):
+    raise AssertionError("each axle detail keeps exactly the settings it prints")
 
 
 def _assert_callouts(
@@ -1085,9 +1136,9 @@ def _dimensioned_detail(
 def _stack_dimensions(
     adapter: Any, source_step: Callable[[str], None]
 ) -> Callable[[], None]:
-    """Both settings, with their callouts, places and bands read back once
-    both details are cropped; the returned check re-reads the bands and the
-    callouts once the drawing has settled."""
+    """Every axle-stack setting, with its callouts, places and bands or
+    limits read back once both details are cropped; the returned check
+    re-reads the bands, limits and callouts once the drawing has settled."""
     callouts = stack.SETTING_CALLOUTS[stack.FEATURE]
     annotations = [
         *_dimensioned_detail(adapter, PRESSED, PRESSED_KEEP),
@@ -1128,6 +1179,17 @@ def _stack_dimensions(
                     or str(display.GetText(2) or "") != ")"
                 ):
                     raise RuntimeError(f"{name}: settled reference form changed")
+                continue
+            if name in stack.LIMIT_DIMENSIONS:
+                nominal = float(dimension.SystemValue)
+                low, high = (limit / 1000.0 for limit in stack.LIMIT_DIMENSIONS[name])
+                if (
+                    int(tolerance.Type) != 3  # swTolLIMIT
+                    or abs(nominal + float(tolerance.GetMinValue()) - low) > 1e-9
+                    or abs(nominal + float(tolerance.GetMaxValue()) - high) > 1e-9
+                    or int(display.GetPrimaryTolPrecision2()) != stack.LIMIT_PRECISION
+                ):
+                    raise RuntimeError(f"{name}: settled limits changed")
                 continue
             band_m = stack.DIMENSION_TOLERANCES[name] / 1000.0
             if (

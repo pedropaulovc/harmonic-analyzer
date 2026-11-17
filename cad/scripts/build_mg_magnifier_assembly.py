@@ -21,9 +21,11 @@ in machine coordinates (assembly origin = base origin; the output side is -Z).
   revolute), front washer, nut and locknut (stations: mg_wheel_group). The
   brass wheel-drum is pressed on the wheel's front spigot and rides it. The
   wheel rim drives the pen rod via WIRE 2 (pn-pen.SLDASM).
-  Its two assembly settings, the press gauge and the endshake, are model
-  dimensions of a blanked construction chain (mg_magnifier_assembly_spec)
-  that the MHA-MG-00 sheet prints; a second blanked chain carries the lever
+  Its axle-stack settings (the press gauge, the axle's plain end below the
+  bar's far face, the drum face below the spigot end, the endshake and the
+  thread end past the second nut) are model dimensions of a blanked
+  construction chain (mg_magnifier_assembly_spec) that the MHA-MG-00 sheet
+  prints; a second blanked chain carries the lever
   group's clamp station and fixture drop. The named explode the MHA-MG-00
   exploded sheets show (MG_MAGNIFIER_EXPLODED) is authored here too
   (_mg_magnifier_explode).
@@ -82,6 +84,7 @@ from _session import run_build
 from _drawing_marks import DRAWN_BY, mark_dimensions_for_drawing
 from _drawing_precision import apply_drawing_precision, _named_dimension
 from _drawing_tolerances import set_dimension_symmetric_tolerance
+from _limit_tolerance import set_limits
 from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
 from _assembly_named_views import name_standard_views
@@ -410,11 +413,28 @@ def _author_setting_callouts(adapter, feature: str) -> None:
             )
 
 
+# Each axle-stack leg's driving expression, by its dimension name: every
+# station comes from the globals the chain sets, so one source drives the
+# chain and the stack it reports.
+_AXLE_STACK_DRIVES = {
+    stack_spec.BACK_END_SUNK_DIMENSION: '"AxleBackEndSunk"',
+    "PlainEndToFrontFace": '"AxleBarDepth" - "AxleBackEndSunk"',
+    stack_spec.PRESS_GAUGE_DIMENSION: '"AxlePressGauge"',
+    "StepToDrumFace": '"HubFrontStation" - "AxlePressGauge" - "WheelDrumRecess"',
+    stack_spec.DRUM_RECESS_DIMENSION: '"WheelDrumRecess"',
+    stack_spec.ENDSHAKE_DIMENSION: '"WheelEndshake"',
+    "WasherToLocknutFace": '"LocknutFaceStation" - "HubFrontStation" - "WheelEndshake"',
+    stack_spec.THREAD_PAST_LOCKNUT_DIMENSION: '"AxleThreadPastLocknut"',
+}
+if tuple(_AXLE_STACK_DRIVES) != stack_spec.CHAIN_LEG_DIMENSIONS:
+    raise AssertionError("every axle stack leg needs its drive, in chain order")
+
+
 def _author_axle_stack_reference(adapter) -> None:
-    """The press gauge and the endshake as model dimensions: no solid or pose
-    edits, one construction chain on the axle centreline through the bar front
-    face, the shank step, the wheel's spigot face and the front washer
-    (mg_magnifier_assembly_spec), dimensioned from globals, banded or shown
+    """The axle-stack settings as model dimensions: no solid or pose edits,
+    one construction chain on the axle centreline through the stations of
+    mg_magnifier_assembly_spec.CHAIN_D (the bar's far face to the axle's
+    thread end), dimensioned from globals, banded, printed as limits or shown
     as a reference, marked for the drawing and blanked (the ms ClampedSetting
     pattern).
     On the Right plane, sketch x is machine -z and sketch y is machine y."""
@@ -422,13 +442,19 @@ def _author_axle_stack_reference(adapter) -> None:
     for name, value in (
         ("AxleBarFrontFace", -spec.BAR_FRONT_Z),
         ("AxleAxisY", spec.AXLE_Y),
+        ("AxleBarDepth", -spec.BAR_FAR_D),
+        ("AxleBackEndSunk", spec.BACK_END_D - spec.BAR_FAR_D),
         ("AxlePressGauge", spec.PRESS_GAUGE),
+        ("WheelDrumRecess", spec.DRUM_RECESS),
         ("HubFrontStation", spec.HUB_FRONT_D),
         ("WheelEndshake", spec.ENDSHAKE),
+        ("LocknutFaceStation", spec.LOCKNUT_FACE_D),
+        ("AxleThreadPastLocknut", spec.THREAD_END_D - spec.LOCKNUT_FACE_D),
     ):
         set_global(adapter, name, f"{value}mm")
     xs = [-spec.BAR_FRONT_Z + d for d in spec.CHAIN_D]
     y = spec.AXLE_Y
+    origin = spec.CHAIN_ORIGIN_INDEX
     dims = SketchDims()
     check("create axle stack sketch", adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
@@ -454,18 +480,14 @@ def _author_axle_stack_reference(adapter) -> None:
             ),
         )
     anchor_point_to_origin(
-        adapter, f"{legs[0]}.start", xs[0], y, "bar front face"
+        adapter, f"{legs[origin]}.start", xs[origin], y, "bar front face"
     )
     dims.record("StackFaceX", '"AxleBarFrontFace"')
     dims.record("StackAxisY", '"AxleAxisY"')
     for leg, length, (name, drive) in zip(
         legs,
         (x1 - x0 for x0, x1 in zip(xs, xs[1:])),
-        (
-            (spec.PRESS_GAUGE_DIMENSION, '"AxlePressGauge"'),
-            ("StepToHubFront", '"HubFrontStation" - "AxlePressGauge"'),
-            (spec.ENDSHAKE_DIMENSION, '"WheelEndshake"'),
-        ),
+        _AXLE_STACK_DRIVES.items(),
         strict=True,
     ):
         dimension_between(
@@ -484,6 +506,15 @@ def _author_axle_stack_reference(adapter) -> None:
             name,
             band,
             places=spec.TOLERANCE_PRECISION,
+            display_unit=spec.UNIT,
+        )
+    for name, limits in spec.LIMIT_DIMENSIONS.items():
+        set_limits(
+            adapter,
+            spec.FEATURE,
+            name,
+            limits=limits,
+            places=spec.LIMIT_PRECISION,
             display_unit=spec.UNIT,
         )
     for name in sorted(spec.REFERENCE_DIMENSIONS):

@@ -1411,10 +1411,11 @@ temporary and revert when the dimension changes. The drawing-only
 is a separate lane, not the required above/below callouts. No proven
 drawing-only setter preserves these exact callout compartments.
 
-All five MG setting callouts belong to the assembly model:
+Every MG setting callout belongs to the assembly model:
 `mg_magnifier_assembly_spec.SETTING_CALLOUTS` owns the exact text and native
-compartments for PressGauge, Endshake, ClampStation, FixtureDrop and
-ThreadProjection.
+compartments for Endshake, BackEndSunk, DrumRecess, ThreadPastLocknut,
+ClampStation, FixtureDrop and ThreadProjection (PressGauge prints as a bare
+reference with no callout since #2286).
 `build_mg_magnifier_assembly` authors them beside their reference dimensions,
 strictly reads each compartment back and marks/blanks the chains before its
 normal assembly save, following `build_pd_transgear_arm`'s model-text pattern.

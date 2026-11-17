@@ -102,7 +102,11 @@ def test_release_prints_the_steps_moved_off_their_sheets():
             assert f"{package._list_item(line)}\n" in text
     # The printed values are the ones the spec derives, not pasted text.
     assert f"{mg.ENDSHAKE_GO_TEXT} ENTERS, {mg.ENDSHAKE_NO_GO_TEXT} DOES NOT." in text
-    assert f"{mg.BACK_END_SUNK_TEXT} BELOW THE FAR FACE OF ITEM" in text
+    # A setting the sheets dimension is cited by its view, never valued.
+    assert (
+        f"BELOW THE FAR FACE OF ITEM {mg.ITEM_NUMBERS['mg-wheel-bar']} AS "
+        f"{mg.PRESS_DETAIL_TITLE} SETS IT" in text
+    )
 
 
 def test_summing_lever_step_stops_before_its_final_assembly_step():
