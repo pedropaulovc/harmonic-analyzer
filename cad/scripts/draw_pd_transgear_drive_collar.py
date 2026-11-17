@@ -66,7 +66,6 @@ from pd_transgear_drive_collar_spec import (
     FLAT_PIN_CENTRE,
     FLAT_PIN_FLOOR,
     FLAT_PIN_HOLE_CALLOUT,
-    FLAT_PIN_HOLE_CALLOUT_ABOVE,
     FLAT_PIN_HOLE_SUFFIX,
     LENGTH,
     OD,
@@ -154,8 +153,8 @@ END_KEEP = {
 # floor; its text stands outside left of that 9 mm span, between the floor's
 # and the rear face's witnesses (run 20261111T212425353Z: centred in the span
 # it reached the seat-face witness).  Its size reads left of the rear face,
-# its one-line process over the value, its REF depth after the value and two
-# mate rows under it, the whole block ending at its dimension line
+# its process and REF depth after the value and two mate rows under it, the
+# whole block ending at its dimension line
 # (SOLIDWORKS sets a vertical dimension's outside text there, run
 # 20261111T234324465Z), clear of the end view; that line stands 2 mm short of
 # where the size's witnesses start, room for the 26-character mate row.  The
@@ -189,7 +188,10 @@ SIDE_KEEP = {
     "PilotDia": (_PILOT_X + 0.022, SIDE_CENTER[1]),
     "FlatPinFloor": ((_REAR_X + _FLAT_PIN_FLOOR_X) / 2.0, SIDE_CENTER[1] - HALF_OD - 0.005),
     "FlatPinCentre": (_REAR_X - 0.0025, SIDE_CENTER[1] + 0.006),
-    "FlatPinDia": (_REAR_X - 0.007, _FLAT_PIN_Y - 0.006),
+    # The block centres on its text point: its size row stands under the
+    # ream's lower witness (run 20261117T122426763Z, centred 3.5 mm higher
+    # with no row over the value: that witness struck "(.163)").
+    "FlatPinDia": (_REAR_X - 0.007, _FLAT_PIN_Y - 0.0095),
     "RearBreak": (_REAR_X - 0.029, _BORE_EDGE_Y + 0.015),
 }
 OVERALL_TEXT_XY = ((_REAR_X + _SEAT_X) / 2.0, SIDE_CENTER[1] + HALF_OD + 0.010)
@@ -228,6 +230,15 @@ FIT_NOTES = "\n".join(
 )
 # The #25 chain the O.D. clears, by its drawing number (rule 4).
 CHAIN_NUMBER = _config.parts("sh-vn-chain-link")["number"]
+# The flat pin's block hangs left of its own dimension line and SOLIDWORKS
+# sets the widest row's last glyph against that line: run
+# 20261117T123054105Z put the ")" of "(.163)" on its arrowhead.  Two trailing
+# spaces on every row stop the ink short of it, as draw_ch_fulcrum_shaft and
+# draw_dt_crank_drive_gear do.
+_INK_AIR = "  "
+_FLAT_PIN_ROWS = "\n".join(
+    f"{row}{_INK_AIR}" for row in FLAT_PIN_HOLE_CALLOUT.splitlines()
+)
 # Rule 7: a callout carries its size and process lines plus at most two lines
 # of words, and a location dimension carries only its value and band.  The
 # dowel pattern names the dowel and the sprocket its pins locate once, on its
@@ -242,11 +253,13 @@ DIMENSION_CALLOUTS_BELOW = {
     "CollarDia": f"CLEARS CHAIN {CHAIN_NUMBER}\nON 12-TOOTH {SPROCKET_NUMBER}",
     "PilotLength": f"SEE NOTE {PILOT_NOTE}",
     "CollarLength": f"SEE NOTE {BODY_NOTE}",
-    "FlatPinDia": FLAT_PIN_HOLE_CALLOUT,
+    "FlatPinDia": _FLAT_PIN_ROWS,
     "RearBreak": REAR_BREAK_CALLOUT,
 }
-DIMENSION_CALLOUTS_ABOVE = {"FlatPinDia": FLAT_PIN_HOLE_CALLOUT_ABOVE}
-DIMENSION_SUFFIXES = {"RearBreak": REAR_BREAK_SUFFIX, "FlatPinDia": FLAT_PIN_HOLE_SUFFIX}
+DIMENSION_SUFFIXES = {
+    "RearBreak": REAR_BREAK_SUFFIX,
+    "FlatPinDia": f"{FLAT_PIN_HOLE_SUFFIX}{_INK_AIR}",
+}
 
 ISO_NOTE_XY = (ISO_CENTER[0] - 0.030, ISO_CENTER[1] - 0.040)
 # The part's note, then the drawing's two fitted-length notes, in one
@@ -430,9 +443,6 @@ def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_dimension_callouts(
         adapter, annotations, DIMENSION_CALLOUTS_BELOW, location="below"
-    )
-    set_dimension_callouts(
-        adapter, annotations, DIMENSION_CALLOUTS_ABOVE, location="above"
     )
     _set_dimension_suffixes(adapter, annotations, DIMENSION_SUFFIXES)
     _overall_reference(adapter, side)

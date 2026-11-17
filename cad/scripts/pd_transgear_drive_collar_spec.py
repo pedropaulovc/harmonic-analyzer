@@ -644,18 +644,17 @@ BORE_CALLOUT = (
     f"(CLEARANCE {inch_text(inch_floor_mm(BORE_CORE_CLEARANCE[0], 4), 4)}-"
     f"{inch_text(inch_ceil_mm(BORE_CORE_CLEARANCE[1], 4), 4)})"
 )
-# The flat pin's press ream.  Its process reads on one line over the size:
-# BLIND, to the floor the .XX station dimension places, which controls.  The
-# size carries the depth as a REF from the section's (nominal fitted) rear
-# face (rule 26: a depth is never left to the view; REF because the rear is
-# faced to fit after reaming).  Under the size, two lines of words (rule 7):
-# its pin and fit, and why its location is tight (rule 4): the crest drives
-# the shaft.  That the pin is pressed for good, collar and pin one permanent
-# pair (rule 16), is part note 2, beside its web.
-# An above-callout prints only on one line.
+# The flat pin's press ream.  Rule 26 orders a hole callout size, process,
+# depth, as the sheet's other two reams read: the process follows the size on
+# its line, then the depth, a REF from the section's (nominal fitted) rear face
+# (rule 26: a depth is never left to the view; REF because the rear is faced to
+# fit after reaming).  The depth symbol marks it blind, to the floor the .XX
+# station dimension places, which controls.  Under the size, two lines of
+# words (rule 7): its pin and fit, and why its location is tight (rule 4): the
+# crest drives the shaft.  That the pin is pressed for good, collar and pin one
+# permanent pair (rule 16), is part note 2, beside its web.
 FLAT_PIN_HOLE_DEPTH_REF = LENGTH - FLAT_PIN_FLOOR
-FLAT_PIN_HOLE_SUFFIX = f" <HOLE-DEPTH> ({inch_text(FLAT_PIN_HOLE_DEPTH_REF, 3)})"
-FLAT_PIN_HOLE_CALLOUT_ABOVE = "BLIND REAM"
+FLAT_PIN_HOLE_SUFFIX = f" REAM <HOLE-DEPTH> ({inch_text(FLAT_PIN_HOLE_DEPTH_REF, 3)})"
 FLAT_PIN_HOLE_CALLOUT = f"PRESS FIT, PIN {FLAT_PIN_NUMBER}\nCREST DRIVES {SHAFT_NUMBER}"
 # The rear break prints its leg and angle on one line, then the mate it
 # clears (rule 4) on two short rows under it; the clearance is the spec's
