@@ -202,6 +202,22 @@ NOT_FIT_BANDS: dict[tuple[str, str], str] = {
         "the pan-head screw's B18.6.3 length tolerance (plus, minus): "
         "indexed for the shortest reach into the platen guide's through tap"
     ),
+    # MHA-PD-00's setting details (rule 22): absolute (low, high) windows in
+    # mm of an assembly setting dimension, not (upper, lower) part-fit
+    # deviations; the spec's import-time loop proves each on the .001 grid
+    # with its nominal strictly inside.
+    ("pd_paper_drive_setting_details_spec", "DRIVE_PIN_PROUD_BAND"): (
+        "DETAIL F's printed limits for the collar dowels' proud (an assembly setting)"
+    ),
+    ("pd_paper_drive_setting_details_spec", "LATCH_PROUD_BAND"): (
+        "DETAIL L's printed limits for the latch dowel's proud (an assembly setting)"
+    ),
+    ("pd_paper_drive_setting_details_spec", "RACK_CREST_BAND"): (
+        "DETAIL J's printed window for the rack crests below the platen (an assembly setting)"
+    ),
+    ("pd_paper_drive_setting_details_spec", "RACK_FRONT_BAND"): (
+        "DETAIL J's printed window for the rack front behind the guide (an assembly setting)"
+    ),
     ("dt_vn_cylinder_bank_spring_spec", "ID_BAND"): (
         "McMaster 9714K392's catalogue ID tolerance (plus, minus): indexed for "
         "the tightest spring against the largest arbor"
