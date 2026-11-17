@@ -3306,6 +3306,7 @@ def _prove_soundness_in_leaf(stem: str) -> str | None:
         if _probe_cache(key, [Path(stamp)], label, probe) == "hit":
             return None
     Path(stamp).unlink(missing_ok=True)
+    _sw_ensure_once()  # the seat just ran the heaviest work: memory preflight
     with _telemetry.span(f"task {label}", label=label, service=_stage_name(label)) as sp:
         sp.set_attribute("cache", "in_leaf")
         _tag_cache_key(sp, key)
@@ -5471,7 +5472,9 @@ def task_build():
 
 
 def task_build_bare():
-    """Quick rebuild: parts + assemblies only -- no verification, no export.
+    """Quick rebuild: parts + assemblies only -- no standalone gates, no export
+    (in ``rw`` cache mode each rebuilt assembly still proves its soundness
+    in-leaf, see :func:`_prove_soundness_in_leaf`).
     Parts in per-seat order (scheduling hint); the seat lock keeps COM serial."""
     return {
         "actions": None,

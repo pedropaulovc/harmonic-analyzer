@@ -544,7 +544,9 @@ approval.
   61.5 min — so give a cold run a generous budget (90); the farm clamps the
   request to 60 s–3 h. Too small a budget on a cold run costs one retry and then
   a `platform`-style failure per slow leaf.
-- `build_bare` = parts + assemblies only (fast, no gates, no export).
+- `build_bare` = parts + assemblies only (fast, no export). In `rw` cache mode
+  each rebuilt assembly still runs its in-leaf soundness battery (see "Verify
+  suites"); `build_bare` schedules no standalone gate.
 - `release` is opt-in: `doit release` defaults to the next `vNN`; pass an
   explicit tag/options after `--` (for example, `doit release -- v22 --draft`).
   Its COM half is the separate `package:release` leaf. The release action and
@@ -933,8 +935,9 @@ exits non-zero and leaves the `.SLDASM` untouched — never a stale artefact.
 A refresh whose mass-properties fingerprint is IDENTICAL to the last gated
 save (and that auto-repaired nothing) skips the three health/DOF/interference
 gates — they would re-prove what that save already proved (measured 274 s of
-a 780 s no-op top-assembly refresh) — because the same leaf then runs the full
-soundness battery on the saved file (see "Verify suites").
+a 780 s no-op top-assembly refresh) — while `verify:soundness` independently
+re-proves every saved assembly (in `rw` mode usually inside this same leaf; see
+"Verify suites").
 
 **Idempotent — artefact bytes don't drive rebuilds.** Saving an assembly makes
 SolidWorks rewrite volatile save metadata into every nested `.SLDPRT`/`.SLDASM`

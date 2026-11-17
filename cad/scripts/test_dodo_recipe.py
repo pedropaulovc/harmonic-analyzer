@@ -4229,6 +4229,10 @@ def _assembly_subprocess_envs(dodo, monkeypatch, tmp_path, stem, *, mode):
     monkeypatch.setattr(dodo._cache, "restore", lambda *_a: False)
     monkeypatch.setattr(dodo._cache, "store", lambda *_a, **_kw: "stored")
     monkeypatch.setattr(dodo._cache, "writable", lambda: True)
+    monkeypatch.setattr(
+        dodo, "_soundness_stamp", lambda _stem: str(tmp_path / "soundness.ok")
+    )
+    monkeypatch.setattr(dodo, "_soundness_file_deps", lambda _stem: [])
     monkeypatch.setattr(dodo._farm, "enabled", lambda: False)
     monkeypatch.setattr(dodo, "_com_seat", free_seat)
     monkeypatch.setattr(dodo, "_reprobe_under_seat", lambda *_a: False)
@@ -4303,6 +4307,7 @@ def test_in_leaf_soundness_publishes_only_a_proof_of_the_saved_bytes(
         dodo, "_probe_cache", lambda *_a: "hit" if case == "published" else "miss"
     )
     monkeypatch.setattr(dodo, "_exec_com", exec_com)
+    monkeypatch.setattr(dodo, "_sw_ensure_once", lambda: None)
     monkeypatch.setattr(dodo, "_store_outputs", lambda *args: stored.append(args))
 
     proved = dodo._prove_soundness_in_leaf(stem)
@@ -4971,6 +4976,8 @@ def canonical_publication(tmp_path, monkeypatch):
     monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", "rw")
     monkeypatch.delenv("HARMONIC_CACHE_REFRESH", raising=False)
     dodo = _load_dodo()
+    # Publication only: the in-leaf soundness proof has its own test.
+    monkeypatch.setattr(dodo, "_prove_soundness_in_leaf", lambda _stem: None)
     cache_module = dodo._cache
     complete_part_cache_outputs = dodo._part_cache_outputs
     service = _BlockBlobService()
