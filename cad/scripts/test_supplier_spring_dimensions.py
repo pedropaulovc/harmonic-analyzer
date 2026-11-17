@@ -15,6 +15,7 @@ import ch_vn_channel_spring_installed_spec as channel
 import dt_vn_cylinder_bank_spring_spec as cylinder
 import pd_vn_transgear_pivot_spring_spec as pivot
 import sm_vn_counter_spring_spec as counter
+import vn_disc_spring_acceptance as acceptance
 import vn_disc_spring_supplier_stock as stock
 
 
@@ -66,12 +67,20 @@ def _captured_reference_bounds(views):
     return reference_bounds
 
 
-def _native_annotation(name, owner, value, band=None):
-    tolerance = SimpleNamespace(
-        Type=0 if band is None else (4 if math.isclose(band[0], -band[1]) else 2),
-        GetMinValue=lambda: 0.0 if band is None else band[1] / 1000,
-        GetMaxValue=lambda: 0.0 if band is None else band[0] / 1000,
-    )
+def _native_annotation(name, owner, value, band=None, limits=None):
+    if limits is not None:
+        # A receiving LIMIT (swTolLIMIT = 3): deviations about the nominal.
+        tolerance = SimpleNamespace(
+            Type=3,
+            GetMinValue=lambda: (limits[0] - value) / 1000,
+            GetMaxValue=lambda: (limits[1] - value) / 1000,
+        )
+    else:
+        tolerance = SimpleNamespace(
+            Type=0 if band is None else (4 if math.isclose(band[0], -band[1]) else 2),
+            GetMinValue=lambda: 0.0 if band is None else band[1] / 1000,
+            GetMaxValue=lambda: 0.0 if band is None else band[0] / 1000,
+        )
     native = SimpleNamespace(
         FullName=f"{name}@{owner}@Source", value=value, Tolerance=tolerance
     )
@@ -152,7 +161,10 @@ def _disc_views(spec):
                 if name in names
             )
             views[key].annotations.append(
-                _native_annotation(name, owner, getattr(spec, semantic))
+                _native_annotation(
+                    name, owner, getattr(spec, semantic),
+                    limits=acceptance.LIMITS.get(spec.SKU, {}).get(semantic),
+                )
             )
     return views
 
@@ -546,15 +558,20 @@ def test_channel_spring_prints_catalogue_tolerances_as_spec_control_limits():
 
 
 @pytest.mark.parametrize(
-    "spec,expected",
+    "spec,expected_in",
     [
-        (rocker, ("ID Ø.245-.275, OD Ø.347-.377", "WORKING LOAD (3 LB AT .015 HEIGHT)")),
-        (
-            cylinder,
-            ("ID Ø.375-.395, OD Ø.490-.510", "WORKING LOAD (1.5 LB AT .024 HEIGHT)"),
-        ),
+        (rocker, {"ID": (0.252, 0.275), "OD": (0.347, 0.377)}),
+        (cylinder, {"ID": (0.377, 0.395), "OD": (0.490, 0.510)}),
     ],
     ids=["9714K24", "9714K392"],
 )
-def test_wave_springs_print_catalogue_id_od_limits(spec, expected):
-    assert layout.disc_spring_spec_control_data(spec) == expected
+def test_wave_spring_receiving_limits(spec, expected_in):
+    # Owner ruling 2026-11-17 (#3044): catalogue OD band and ID maximum; the
+    # ID minimum is the largest printed shaft plus the slip fit's mean
+    # clearance, rounded up to .001 in.
+    limits = acceptance.LIMITS[spec.SKU]
+    for field, (low, high) in expected_in.items():
+        assert limits[field] == pytest.approx((low * 25.4, high * 25.4))
+        nominal = getattr(spec, field)
+        assert limits[field][0] < nominal < limits[field][1]
+    assert pivot.SKU not in acceptance.LIMITS

@@ -241,30 +241,6 @@ def extension_spring_spec_control_data(
     )
 
 
-def disc_spring_spec_control_data(spec: Any) -> tuple[str, ...]:
-    """A disc spring's catalogue ID/OD limits and its working load (REF).
-
-    ``spec`` is a pure disc-spring spec (``ID``/``OD`` with ``ID_BAND`` and
-    ``OD_BAND`` as (upper, lower) deviations, all mm). The supplier states no
-    tolerance on height, thickness or load, so the working load prints as
-    parenthesized reference; the sheet's native diagram sizes stay REF.
-    """
-
-    def limits(nominal: float, band: tuple[float, float]) -> str:
-        upper, lower = band
-        return (
-            f"Ø{_inch_text((nominal + lower) / _MM_PER_IN, 3)}"
-            f"-{_inch_text((nominal + upper) / _MM_PER_IN, 3)}"
-        )
-
-    load = f"{spec.WORKING_LOAD_N / _N_PER_LBF:.1f}".removesuffix(".0")
-    height = _inch_text(spec.WORKING_HEIGHT / _MM_PER_IN, 3)
-    return (
-        f"ID {limits(spec.ID, spec.ID_BAND)}, OD {limits(spec.OD, spec.OD_BAND)}",
-        f"WORKING LOAD ({load} LB AT {height} HEIGHT)",
-    )
-
-
 def supplier_state_cells(caption_y: float) -> tuple:
     """Reserve an annotation band around every fitted native view."""
     return (

@@ -33,11 +33,13 @@ from _sketch import (
 )
 from _sketch_chains import define_rectilinear_chain
 from _sketch_circle import define_circle
+from _limit_tolerance import set_limits
 from _supplier_spring_reference import (
     ReferenceState,
     SUPPLIER_DIAGRAM_CONFIGURATION,
     add_supplier_reference_configurations,
 )
+from vn_disc_spring_acceptance import LIMITS, PLACES as ACCEPTANCE_PLACES
 
 SUPPLIER_DIMENSION_NAMES = {
     "ID": "SupplierID",
@@ -218,6 +220,14 @@ def author_supplier_references(adapter: Any, *, spec: Any) -> tuple[str, ...]:
         segment_lengths_mm=(math.pi * spec.ID, math.pi * spec.OD), circles=True,
     )
     features.append("DiscSupplierPlan")
+    # Owner ruling 2026-11-17 (#3044): the wave springs' ID and OD print as
+    # receiving limits on these native dimensions; the 9715K43 catalogue
+    # states none, so its sizes stay untoleranced REF.
+    for key, limits in LIMITS.get(spec.SKU, {}).items():
+        set_limits(
+            adapter, "DiscSupplierPlan", SUPPLIER_DIMENSION_NAMES[key],
+            limits=limits, places=ACCEPTANCE_PLACES, display_unit="in",
+        )
     envelope, strip = _nominal_side_profiles(spec)
     # A closed rectangle conveys only OD x free height, never the spring shape.
     dims = SketchDims()
