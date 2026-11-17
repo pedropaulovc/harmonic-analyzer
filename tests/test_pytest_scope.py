@@ -30,7 +30,7 @@ def _testpaths() -> list[str]:
 def test_bare_pytest_runs_only_this_repositorys_suites():
     for path in _testpaths():
         assert (ROOT / path).is_dir(), path
-        assert not path.startswith(SUBMODULE)
+        assert not (ROOT / path).resolve().is_relative_to(ROOT / SUBMODULE), path
 
 
 @pytest.mark.parametrize(
