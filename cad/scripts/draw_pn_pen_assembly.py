@@ -1,4 +1,4 @@
-r"""Create the four-sheet pen fitter package (MHA-PN-00).
+r"""Create the three-sheet pen fitter package (MHA-PN-00).
 
 Sheet 1 shows the pen assembled (front and right) beside four details, three
 of which carry its settings as the builder's driving, toleranced model
@@ -8,8 +8,8 @@ preset (``CarriageSetting``), DETAIL D the stirrup and its thumb screw on the
 block, with the as-shipped note; sheet 2 the builder-owned ``PN_EXPLODED``
 presentation (``pn_pen_explode_spec``) with its explode trails, the BOM
 (numbers, descriptions, vendor SKU, quantity) and a balloon on every row;
-sheet 3 the finished isometric beside the numbered bench steps; sheet 4 the
-at-machine steps and the checks. Every setting and pose comes from
+sheet 3 the finished isometric. The numbered fit-up steps and checks print in
+the release's ASSEMBLY.md (#2889). Every setting and pose comes from
 ``pn_pen_assembly_spec``, every printed text and detail region from
 ``pn_pen_assembly_sheet``, the rest from the part registry; this recipe only
 lays the sheets out. It never edits the source assembly or its explodes.
@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import argparse
 import math
-import re
 import sys
 import textwrap
 from dataclasses import dataclass
@@ -114,8 +113,7 @@ PDF_TITLE = "Pen Assembly Drawing Package"
 SHEET_NAMES = (
     "ASSEMBLED VIEWS + SETTINGS",
     "EXPLODED VIEW + BOM",
-    "ASSEMBLY STEPS",
-    "ASSEMBLY STEPS CONTINUED",
+    "FINISHED ASSEMBLY",
 )
 if SPEC.layout is not DrawingLayout.LANDSCAPE:
     raise AssertionError("the pen package sheets are landscape")
@@ -516,9 +514,14 @@ EXPLODED_VIEW_NAMES = {
 if explode.SOURCE_CONFIGURATION != ASSEMBLY_VIEW_CONFIGURATION:
     raise AssertionError("the pen explode is authored in Default")
 
-# --- sheets 3 and 4: the finished isometric beside the bench steps (sheet 3),
-# then beside the at-machine steps and the checks (sheet 4) -------------------------
-ASSEMBLY_ISO_CENTER = (0.062, 0.145)
+# --- sheet 3: the finished isometric, centred in the field between the title
+# block's top and the top border (the outline stands ~26 mm under the ink, so
+# the sheet's mid-height would crowd the title block); the fit-up steps and
+# checks print in the release's ASSEMBLY.md (#2889) -------------------------------
+ASSEMBLY_ISO_CENTER = (
+    (SHEET_INNER_BORDER[0] + SHEET_INNER_BORDER[2]) / 2.0,
+    (TITLE_BLOCK[3] + SHEET_INNER_BORDER[3]) / 2.0,
+)
 # GetOutline frames the finished iso's projected bounding box, not its ink: on
 # the c03368c sheets 3 and 4 the pen's ink spanned x 0.0304..0.0950, y
 # 0.0955..0.1952 about ASSEMBLY_ISO_CENTER while the outline's bottom stood
@@ -529,68 +532,11 @@ FINISHED_INK_LOWER_LEFT = (
     ASSEMBLY_ISO_CENTER[0] - 0.0316,
     ASSEMBLY_ISO_CENTER[1] - 0.0495,
 )
-STEPS_TOP = SHEET_INNER_BORDER[3] - 0.005
-STEPS_LINE_WIDTH = 108  # characters
 
 
-_STEP_LABEL = re.compile(r"(\d+)[A-HJ-NP-Z]?")
-
-
-def _step_group(line: str) -> str | None:
-    """The step number a numbered line belongs to ("1" for "1" and "1A"), or
-    None for a heading or a plain line."""
-    number, sep, _rest = line.partition(". ")
-    match = _STEP_LABEL.fullmatch(number) if sep else None
-    return match.group(1) if match else None
-
-
-def _wrapped(lines: tuple[str, ...], *, width: int, heading: str | None = None) -> str:
-    """Wrap each numbered line under its own number or lettered sub-step
-    label, one blank line between a step group (a step and its lettered
-    sub-steps) and whatever follows it; one note per block."""
-    out = [heading] if heading else []
-    group: str | None = None
-    for line in lines:
-        number, _sep, rest = line.partition(". ")
-        current = _step_group(line)
-        if group is not None and current != group:
-            out.append("")
-        group = current
-        if current is not None:
-            out += textwrap.wrap(
-                rest,
-                width=width,
-                initial_indent=f"{number}. ",
-                subsequent_indent=" " * (len(number) + 2),
-            )
-        else:
-            out += textwrap.wrap(line, width=width, subsequent_indent="   ")
-    return "\n".join(out)
-
-
-# The spaced sequence and checks overran sheet 3 into the title block (main
-# farm run 20261023T233427412Z: the checks' last line stood 31.5 mm above it,
-# the 7 blank lines take 31.7 mm), so the second group heading's steps -- the
-# ones done at MHA-HA-00 -- and the checks after them continue on sheet 4.
-_GROUP_HEADINGS = tuple(
-    index
-    for index, line in enumerate(notes.ASSEMBLY_STEPS)
-    if _step_group(line) is None
+SETTINGS_NOTE = "\n".join(
+    textwrap.wrap(notes.SETTINGS_NOTE, width=SETTINGS_NOTE_WIDTH, subsequent_indent="   ")
 )
-if len(_GROUP_HEADINGS) != 2 or _GROUP_HEADINGS[0] != 0:
-    raise AssertionError("the pen sequence is a bench group then an at-machine group")
-SETTINGS_NOTE = _wrapped((notes.SETTINGS_NOTE,), width=SETTINGS_NOTE_WIDTH)
-ASSEMBLY_STEPS = _wrapped(
-    notes.ASSEMBLY_STEPS[: _GROUP_HEADINGS[1]],
-    width=STEPS_LINE_WIDTH,
-    heading="ASSEMBLY SEQUENCE",
-)
-ASSEMBLY_STEPS_CONTINUED = _wrapped(
-    notes.ASSEMBLY_STEPS[_GROUP_HEADINGS[1] :],
-    width=STEPS_LINE_WIDTH,
-    heading="ASSEMBLY SEQUENCE (CONT.)",
-)
-ASSEMBLY_CHECKS = _wrapped(notes.ASSEMBLY_CHECKS, width=STEPS_LINE_WIDTH)
 
 Box = tuple[float, float, float, float]
 
@@ -1671,15 +1617,13 @@ def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
     return settled
 
 
-# --- sheets 3 and 4 ---------------------------------------------------------------
+# --- sheet 3 ----------------------------------------------------------------------
 
 
-def _place_finished_view(adapter: Any, sheet_name: str) -> float:
-    """The finished assembly in full detail down the sheet's left, labelled;
-    returns the x the steps beside it start at. Every sheet needs a view for
-    its title-block property links, so the continuation sheet repeats it."""
-    label = f"pen finished ({sheet_name})"
-    _activate_sheet(adapter, sheet_name)
+def _place_finished_sheet(adapter: Any) -> None:
+    """The finished assembly in full detail, centred and labelled."""
+    label = "pen finished"
+    _activate_sheet(adapter, SHEET_NAMES[2])
     finished = place_view(
         adapter, str(SOURCE), "*Isometric", *ASSEMBLY_ISO_CENTER, scale=SHEET_SCALE
     )
@@ -1691,8 +1635,7 @@ def _place_finished_view(adapter: Any, sheet_name: str) -> float:
         adapter, finished, False, configuration=configuration, label=label
     )
     _center_view_outline(adapter, finished, ASSEMBLY_ISO_CENTER, label=label)
-    x0, y0, x1, y1 = _view_outline(finished, label=label)
-    _assert_on_sheet((x0, y0, x1, y1), label=label)
+    _assert_on_sheet(_view_outline(finished, label=label), label=label)
     assert_full_detail_view(adapter, label="pen assembly")
     _label_view(
         adapter,
@@ -1700,38 +1643,6 @@ def _place_finished_view(adapter: Any, sheet_name: str) -> float:
         notes.VIEW_TITLES["finished"],
         (FINISHED_INK_LOWER_LEFT[0], FINISHED_INK_LOWER_LEFT[1] - VIEW_LABEL_GAP),
         label=label,
-    )
-    return x1 + NOTE_GAP
-
-
-def _place_steps_sheet(adapter: Any) -> None:
-    """The finished assembly beside the bench steps."""
-    steps_x = _place_finished_view(adapter, SHEET_NAMES[2])
-    _add_note_block(
-        adapter,
-        SHEET_NAMES[2],
-        ASSEMBLY_STEPS,
-        (steps_x, STEPS_TOP),
-        label="assembly sequence",
-    )
-
-
-def _place_steps_continued_sheet(adapter: Any) -> None:
-    """The finished assembly beside the at-machine steps and the checks."""
-    steps_x = _place_finished_view(adapter, SHEET_NAMES[3])
-    steps = _add_note_block(
-        adapter,
-        SHEET_NAMES[3],
-        ASSEMBLY_STEPS_CONTINUED,
-        (steps_x, STEPS_TOP),
-        label="assembly sequence continued",
-    )
-    _add_note_block(
-        adapter,
-        SHEET_NAMES[3],
-        ASSEMBLY_CHECKS,
-        (steps_x, steps[1] - NOTE_GAP),
-        label="assembly checks",
     )
 
 
@@ -1748,8 +1659,7 @@ def _place_package(adapter: Any) -> Callable[[], None]:
             raise RuntimeError(f"failed to set pen sheet scale: {sheet_name}")
     settings_settled = _place_settings_sheet(adapter)
     exploded_settled = _place_exploded_sheet(adapter)
-    _place_steps_sheet(adapter)
-    _place_steps_continued_sheet(adapter)
+    _place_finished_sheet(adapter)
 
     def settled() -> None:
         settings_settled()

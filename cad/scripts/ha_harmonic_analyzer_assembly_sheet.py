@@ -290,7 +290,7 @@ _STEP_TEXT: dict[str, tuple[str, ...]] = {
     "pen-hung": (
         "PEN: HANG MHA-PN-00 FROM THE MHA-MG-08 BAR.",
         "LOCK ITS MHA-PN-VN-50 HANGER SCREW WITH THE MHA-PN-VN-54 NUT AND "
-        "MHA-PN-VN-55 JAM NUT PER THE MHA-PN-00 HANGER SCREW LOCK STEP.",
+        "MHA-PN-VN-55 JAM NUT PER THE MHA-PN-00 HANGER SCREW LOCK STEP (ASSEMBLY.MD).",
     ),
     # The wrap follows mg_wheel_group (PEN_WIRE_WRAP_DEG: from the right-hand
     # tangent counter-clockwise, up over the top, to the rim's radial wire tie
