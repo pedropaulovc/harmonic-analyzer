@@ -127,8 +127,9 @@ their sheet re-keys for another reason.
   model, as the [rack source-save controls](pipeline/evidence/vm2-datum-placement/source-hash-cause.md)
   demonstrated. Source-clean guards remain fail-closed before drawing export.
   Purchased supplier-reference sheets retain the supplier's explicit units,
-  precision and exact fractions, and print every supplier size as untoleranced
-  REF (the catalogue tolerance governs) rather than project fabrication
+  precision and exact fractions, and print every native supplier size as
+  untoleranced REF (the catalogue tolerance governs; a tier-2 sheet prints that
+  tolerance once, in its footer, below) rather than project fabrication
   controls. `_supplier_dimensions` formats a visible native value without
   assigning `SystemValue` or replacing numeric text; sizes are parenthesized
   and unit-labelled. Model-owned hidden construction carriers are explicitly
