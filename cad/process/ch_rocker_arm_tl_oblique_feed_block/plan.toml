@@ -224,7 +224,7 @@ tool = "em-face"
 drilling = "none"
 sizing = "other"
 instruction = "Spacer: the offcut on the same parallels; face it at the block's finish Z, unmoved: at most {{process.spacer_over_max_in:.3dot}} over the block's height, thin shimmed up to it."
-instruction_detailed = "The spacer balances the vise in the notch setup; the finished TL-22 is not used. Leave the head and quill locked, Z where the block's finish pass ran. Unclamp the block and clamp the spacer offcut in its place, flat on the same parallels, its as-bought 3 in edges in the jaws; tap it down until both parallels are pinned. Take a rough pass about .010 above the finish Z, then the finish pass at the block's finish Z: the spacer comes out at the block's height over the same parallels. Caliper the block and the spacer at both ends: the spacer may stand up to {{process.spacer_over_max_in:.3dot}} over the block, never more. If it is thicker, take another .001–.002; if it is thin, it is still good: shim it up to the block's height between the spacer and the moving jaw in the notch setup. Mark it SPACER."
+instruction_detailed = "The spacer balances the vise in the notch setup; the finished TL-22 is not used. Leave the head and quill locked, Z where the block's finish pass ran. Unclamp the block and clamp the spacer offcut in its place, flat on the same parallels, its as-bought 3 in edges in the jaws; tap it down until both parallels are pinned. Take a rough pass about .010 above the finish Z, then the finish pass at the block's finish Z: the spacer comes out at the block's height over the same parallels. Mic the block and the spacer at both ends, each pair at the same spot: the spacer may stand up to {{process.spacer_over_max_in:.3dot}} over the block, never more. If it is thicker, take another .001–.002; if it is thin, it is still good: shim it up to the block's height between the spacer and the moving jaw in the notch setup. Mark it SPACER."
 milling_cuts = [
   { name = "spacer rough", kind = "end", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 203.2, phase = "rough", axial_doc_mm = 1.016, radial_woc_mm = 10.16, traverse_mm = [0, "{{cad.offcut_length_mm}}"] },
   { name = "spacer finish", kind = "end", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = 203.2, phase = "finish", axial_doc_mm = 0.254, radial_woc_mm = 10.16, traverse_mm = [0, "{{cad.offcut_length_mm}}"] },
@@ -232,11 +232,11 @@ milling_cuts = [
 settings = "block-em-half-6061-t6511"
 # The spacer stands in the vise alone: its own section and grip.
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.offcut_length_mm}}"], clamp_mm = [0, "{{cad.offcut_length_mm}}"], section_mm = { y = "{{cad.blank_width_mm}}", z = "{{cad.height_mm}}" }, vise_left = "start", vise_hold = 2 }
-# The block alone keeps its drawing band. The spacer is a comparison, not a
-# gauged dimension: two caliper readings, spacer minus block at the same
-# spot, and a thin spacer is shimmed, not refused.
-inspection = "Spacer 0–{{process.spacer_over_max_in:.3dot}} over the block's height (caliper both, same spot); thin: shimmed to it in the notch setup."
-gauge_checks = "other"
+# The block alone keeps its drawing band; the spacer is a comparison, spacer
+# minus block mic'd at the same spot. A micrometer resolves the .001 band
+# (two caliper readings would not); a thin spacer is shimmed, not refused.
+inspection = "Spacer 0–{{process.spacer_over_max_in:.3dot}} over the block's height (mic both, same spot); thin: shimmed to it in the notch setup."
+gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.spacer_over_band_mm}}" }]
 
 [[setups]]
 machine_kind = "other"
@@ -483,7 +483,8 @@ envelope = { x_span_mm = ["{{cad.lug_length_mm}}", "{{process.half_cutter_dia_mm
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.height_mm}}", along_jaws_mm = "{{cad.y_length_mm}}", part_height_mm = "{{cad.length_mm}}", parallel_height_mm = "{{process.edge_parallel_height_mm}}", overhang_mm = ["rest", "{{cad.notch_overhang_mm}}"], jaw_offset = "balanced", balance = "spacer", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 # Stations from LUG END. The lug hangs out past the jaw side, a cantilever
 # from it at the 2.15 worst case; the finished lug section (.96 across the
-# jaws, .77 high) is taken for every pass, the weakest.
+# jaws, .75 high at the thinnest lug the bands allow, 1.630 − .880) is taken
+# for every pass, the weakest.
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.overall_y_mm}}"], clamp_mm = ["{{cad.notch_overhang_mm}}", "{{cad.overall_y_mm}}"], section_mm = { y = "{{cad.height_mm}}", z = "{{cad.lug_width_mm}}" }, vise_left = "end" }
 
 [[setups.operations]]

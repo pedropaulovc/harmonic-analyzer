@@ -61,6 +61,13 @@ bed_height_mm = 73.3044
 range_mm = [0.0, 152.4]
 resolution_mm = 0.0127
 
+# The owned 0-1, 1-2 and 2-3 in outside micrometer set
+# (cad/config/shop-equipment.toml gauges.micrometers): 0-3 in = 76.2 mm;
+# .0001 in = .00254 mm resolution as prechips examples/shop.toml records it.
+[gauges.micrometers]
+range_mm = [0.0, 76.2]
+resolution_mm = 0.00254
+
 # Pin-gauge set range, 0.011-0.500 in by 0.001 in; its grade note is
 # cad/config/shop-equipment.toml gauges.pin-gauges. 0.011 in = 0.2794 mm exactly.
 [gauges.pin-gauges]
