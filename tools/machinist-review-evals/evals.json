@@ -2806,48 +2806,6 @@
       ]
     },
     {
-      "id": 41,
-      "name": "mg-lever-wire-rules",
-      "package": "sh_vn_music_wire",
-      "kind": "part",
-      "release": "v40",
-      "release_pdf": "mg-lever-wire.pdf",
-      "prompt": "Blind machinist review of the mg-lever-wire part package.",
-      "expected_output": "Rule-coverage case (rules 1, 15): reports each negative finding in the stated category and raises no positive-case item.",
-      "expectations": [
-        {
-          "text": "A blocker reports that the formed hook, hub wrap and developed cut length of the wire are not defined (the sheet says 'DO NOT RELEASE UNTIL THOSE DETAILS ARE SPECIFIED'; 352.8 is explicitly 'NOT A CUT LENGTH')",
-          "check": {
-            "category": "blockers"
-          },
-          "rule": 1,
-          "polarity": "negative",
-          "confidence": "high",
-          "evidence": "Sheet 1: the front and isometric views are a bare straight wire with no dimensions; notes: 'THIS SHEET DEFINES THE STRAIGHT REST RUN ONLY. FORMED HOOK, HUB WRAP, AND DEVELOPED CUT LENGTH ARE NOT DEFINED BY THE SOURCE MODEL. DO NOT RELEASE UNTIL THOSE DETAILS ARE SPECIFIED. STRAIGHT REST-RUN LENGTH 352.8 END FACE TO END FACE; NOT A CUT LENGTH.'"
-        },
-        {
-          "text": "The verdict is FIX",
-          "check": {
-            "verdict": "FIX"
-          },
-          "rule": 1,
-          "polarity": "negative",
-          "confidence": "high",
-          "evidence": "The hook/wrap/cut length are declared undefined on the sheet itself (rule 1)."
-        },
-        {
-          "text": "A clarity finding says the FRONT VIEW SCALE 1:5 and ISOMETRIC VIEW SCALE 1:5 of the Ø0.8 wire are undersized on an otherwise empty sheet",
-          "check": {
-            "category": "clarity"
-          },
-          "rule": 15,
-          "polarity": "negative",
-          "confidence": "medium",
-          "evidence": "Sheet 1: each view is a single ~70 mm line in the middle of a blank landscape sheet; a larger scale (or rotated orientation) would fit easily. Rule 15: a sparse sheet with undersized views; never scale a view down."
-        }
-      ]
-    },
-    {
       "id": 42,
       "name": "mg-magnifier-assembly-rules",
       "package": "mg_magnifier_assembly",

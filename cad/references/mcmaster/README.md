@@ -1881,9 +1881,10 @@ opened read-only and NEVER saved or modified; everything derived from them
 
 ## Reference drawings
 
-Each production part identity above has a registered `drawing:`
-task, including identities that share a supplier SKU. Most identification
-sheets use front, top, right and isometric views with stock and ordering data.
+Each production part identity above that is not standard hardware has a
+registered `drawing:` task, including identities that share a supplier SKU;
+standard hardware (tier 1 in `cad/config/hardware.yaml`) is a `HARDWARE.md` row instead (#2886).
+Most identification sheets use front, top, right and isometric views with stock and ordering data.
 Supplier dimensions are associative native reference annotations, never typed
 numeric replacements. When the installed clearance model differs from the
 catalogue, explicitly labelled construction-only stock/application diagrams
@@ -1916,30 +1917,6 @@ receive their normal origin controls; all retain exact final-frame readback and
 the complete sketch's fully-defined guard. Head angles use a native angular
 dimension between the two actual construction rays, with the text point mapped
 from their owning sketch plane, and require exact driving-angle readback.
-Y-axis dowels and X-axis spring pins use native linear measurements of the
-complete axial span between their two end rims. Both drawing-created end conditions
-must remain `None`: neither orthographic edge-on span uses an arc-center
-setter. Exact end-rim attachments, full source length, native type and the
-bandless reference remain checked after layout.
-
-Pin drawing imports validate the original model's value, presentation, band
-and physical witness before import. Only the drawing-local display is formatted,
-including its tolerance-display precision; source values and tolerance bands
-are never written. The drawing checks the independently mapped witness in its
-actual view, then rechecks the original source after dressing and final rebuild.
-The shared pin stations reserve room for the dressed reference text: dowel
-diameters clear the end-view center marks, and spring-pin application-hole
-labels sit to the right of their circle so the leader approaches outside the
-multiline qualifier. These are drawing-only moves within the existing lanes.
-A spring pin whose mating parts' own sheets specify its holes declares no
-application hole (`dt-vn-pinion-strap-pin`: the loose circle read as a second
-pin feature). Its model authors no `SupplierMatingHoleReference`, the readback
-refuses a stale one, and its drawing imports only the wall reference.
-A spring pin's FRONT length text, centred on its horizontal dimension line,
-printed with that line through its parentheses; it now takes the shared
-measured text shelf (`_supplier_text_shelf`) right of its end witnesses, in a
-reserved FRONT right lane, and the settled check rereads that shelf. A dowel's
-vertical length text already sits beside its line and is not shelved.
 
 Read-only supplier presentation refusals identify the first mismatched field
 and its actual/expected values, preserving native getter order and stopping
@@ -1994,7 +1971,7 @@ measured zero or acceptance. `KeyboardInterrupt` and `SystemExit` abort without
 starting or continuing optional observations. Identity refusals remain strict;
 optional observations do not license acceptance.
 
-Nut chord endpoints and washer witness points/segments attach in the drawing's
+Washer witness points/segments attach in the drawing's
 namespace. Their independently checked part entities are mapped through the
 exact owning view's `GetCorresponding`; native one-to-one identity, distinct
 endpoints and no extra attachments are required there. Direct comparison
@@ -2050,7 +2027,7 @@ Capture proves error-free named source features, actual requested configuration,
 zero solid/sheet bodies, unsuppressed model-hidden construction owners and
 drawing correspondences. It does not infer drawing visibility from a
 corresponding feature's `Visible` property.
-The spring/chain path makes one capture pass per source configuration, then
+The spring path makes one capture pass per source configuration, then
 restores the original configuration, body counts, dirty/read-only state and
 drawing context before fitting. It never switches or rebuilds the source during
 fitting, dimension placement or final settled checks. Captures are bound to the
@@ -2164,8 +2141,9 @@ arrow/text and dimension-extension-at-text refusals. Source-only checks do
 not establish a native visual pass or guaranteed scale; the scoped native
 sheet and final shared audit still need qualification.
 
-For example, `uv run python build.py drawing:sm_vn_knife_mount_dowel` writes
-`cad/out/slddrw/sm-vn-knife-mount-dowel.SLDDRW`,
-`cad/out/pdf/sm-vn-knife-mount-dowel.pdf` and
-`cad/out/png/sm-vn-knife-mount-dowel_drawing.png`. Run these tasks through the
+For example, `uv run python build.py drawing:sh_vn_thumb_screw` writes
+`cad/out/slddrw/sh-vn-thumb-screw.SLDDRW`,
+`cad/out/pdf/sh-vn-thumb-screw.pdf` and
+`cad/out/png/sh-vn-thumb-screw_drawing.png`. Standard hardware (COTS tier 1)
+has no sheet: its `HARDWARE.md` row is the deliverable (#2886). Run these tasks through the
 pipeline so they acquire the shared SolidWorks seat lock.

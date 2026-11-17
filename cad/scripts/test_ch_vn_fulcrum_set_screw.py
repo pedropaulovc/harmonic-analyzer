@@ -9,9 +9,7 @@ import pytest
 import _config
 import build_ch_vn_fulcrum_set_screw as part
 import ch_fulcrum_keeper_spec as keeper
-import draw_ch_vn_fulcrum_set_screw as drawing
 import ch_vn_fulcrum_set_screw_spec as spec
-from _drawing_registry import DRAWINGS_BY_NAME
 from _fastener_catalog import FASTENERS
 from _hole_spec import THREAD_MAJOR_MM
 from _stock_fastener import RigidTransform
@@ -102,11 +100,3 @@ def test_pre_thread_volume_is_positive_and_below_the_blank() -> None:
     )
     blank = math.pi * (recipe.MAJOR_DIA / 2.0) ** 2 * recipe.LENGTH
     assert 0.0 < pre_thread < blank
-
-
-def test_drawing_is_the_purchased_reference_sheet() -> None:
-    sheet = DRAWINGS_BY_NAME["ch_vn_fulcrum_set_screw"]
-    assert drawing.SPEC is sheet
-    assert sheet.artifact_stem == part.PART_NAME
-    assert sheet.source_kind == "part"
-    assert drawing.ITEM.startswith("#1-72 x 5/32 ")

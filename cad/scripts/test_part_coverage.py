@@ -6,6 +6,7 @@ import _buildgraph as bg
 import _config
 import _drawing_registry as registry
 import export_features
+import hardware_schedule
 
 PART_DRAWING_EXEMPTIONS = {
     "pd_platen_paper": "consumable recording paper sheet; not manufactured",
@@ -81,6 +82,8 @@ def test_part_and_assembly_coverage():
         if row.source_kind == "assembly"
     }
     exemptions = set(PART_DRAWING_EXEMPTIONS)
+    # Standard hardware is delivered as its HARDWARE.md row, not a sheet.
+    scheduled = {stem.replace("-", "_") for stem in hardware_schedule.SCHEDULE}
     referenced_fixtures = fixtures & machine_references
     components = _components()
     reachable |= {stem for stem, parent in components.items() if parent in reachable}
@@ -88,7 +91,8 @@ def test_part_and_assembly_coverage():
         "orphans": parts - fixtures - reachable,
         "shop fixtures referenced by machine assemblies (#1239)": referenced_fixtures,
         "shop-fixture assemblies in the machine tree": fixture_assemblies & reachable,
-        "undrawn": parts - part_drawings - exemptions,
+        "undrawn": parts - part_drawings - exemptions - scheduled,
+        "scheduled parts that still have drawings": scheduled & part_drawings,
         "exemptions with drawings": exemptions & (part_drawings | assembly_drawings),
         "exemptions naming nonexistent parts": exemptions - parts,
         "assemblies without assembly drawings": assemblies - assembly_drawings,
