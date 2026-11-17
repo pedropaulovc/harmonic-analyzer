@@ -1,6 +1,7 @@
 """Observable package contract for the frame assembly drawing."""
 
 import draw_fr_frame_assembly as drawing
+import fr_frame_assembly_sheet as notes
 
 
 def test_frame_package_bom_identifies_all_29_released_components() -> None:
@@ -133,8 +134,8 @@ def test_checked_heights_print_their_model_values() -> None:
     band = render_number(
         drawing.TOP_AXIS_HEIGHT_BAND_MM / 25.4, drawing.UNIT, drawing.TOP_AXIS_HEIGHT_PLACES
     )
-    assert drawing.TOP_AXIS_HEIGHT_TEXT == f"{printed} ±{band}"
-    assert drawing.TOP_AXIS_HEIGHT_TEXT in _step(drawing.steps.TOP_AXIS_SET_KEY)
+    assert notes.TOP_AXIS_HEIGHT_TEXT == f"{printed} ±{band}"
+    assert notes.TOP_AXIS_HEIGHT_TEXT in _step(notes.steps.TOP_AXIS_SET_KEY)
     assert not hasattr(drawing, "TOP_AXIS_HEIGHT_SUFFIX")
 
 
@@ -192,163 +193,53 @@ def test_a_failed_point_names_its_index_identity_and_progress(monkeypatch) -> No
     }
 
 
-STEP_HEAD = re.compile(r"^(\d+)\. ", re.MULTILINE)
-
-
-def _printed_steps(text: str) -> dict[int, list[str]]:
-    """Every numbered step of ``text``: its number to its printed lines."""
-    lines = text.splitlines()
-    heads = [i for i, line in enumerate(lines) if STEP_HEAD.match(line)]
-    bodies = {}
-    for start in heads:
-        body = []
-        for line in lines[start:]:
-            if not line.strip() or (body and not line.startswith(drawing.STEPS_HANG)):
-                break
-            body.append(line)
-        bodies[int(STEP_HEAD.match(lines[start]).group(1))] = body
-    return bodies
-
-
 def _step(key: str) -> str:
-    lines = _printed_steps(drawing.ASSEMBLY_STEPS)[drawing.steps.step_number(key)]
-    return " ".join(line.strip() for line in lines)
+    return notes.STEP_TEXT[key]
 
 
 def test_step_numbers_follow_the_registry_and_unknown_keys_are_refused() -> None:
-    steps = drawing.steps
-    assert tuple(drawing.STEP_TEXT) == steps.SEQUENCE
+    steps = notes.steps
+    assert tuple(notes.STEP_TEXT) == steps.SEQUENCE
     for index, key in enumerate(steps.SEQUENCE, start=1):
         assert steps.step_number(key) == index
         assert steps.step_ref(key) == f"MHA-FR-00 STEP {index}"
     with pytest.raises(KeyError):
         steps.step_number("no-such-step")
-    assert list(_printed_steps(drawing.ASSEMBLY_STEPS)) == list(
-        range(1, len(steps.SEQUENCE) + 1)
-    )
+    printed = [step for _title, group in notes.STEP_SECTIONS for step in group]
+    assert printed == [
+        f"{index}. {notes.STEP_TEXT[key]}"
+        for index, key in enumerate(steps.SEQUENCE, start=1)
+    ]
 
 
 def test_every_step_is_one_short_instruction() -> None:
-    # Rule 22: at most six printed lines, never wider than the column.
-    for key in drawing.steps.SEQUENCE:
-        lines = drawing.numbered_step(key)
-        assert 1 <= len(lines) <= drawing.STEP_MAX_LINES, key
-        assert max(map(len, lines)) <= drawing.STEPS_LINE_WIDTH, key
-        assert lines[0].startswith(f"{drawing.steps.step_number(key)}. ")
-        assert all(line.startswith(drawing.STEPS_HANG) for line in lines[1:])
+    # Rule 22: at most six lines, wrapped at 100 characters as ASSEMBLY.md is read.
+    import textwrap
 
-
-def test_a_wrap_never_parts_an_item_or_step_reference_from_its_number() -> None:
-    for key in drawing.steps.SEQUENCE:
-        lines = drawing.numbered_step(key)
-        for line in lines:
-            assert not re.search(r"\b(ITEMS?|STEPS?)$", line), (key, line)
-        for line in lines[1:]:
-            assert not re.match(r"(MIN\b|±)", line.strip()), (key, line)
+    for _title, group in notes.STEP_SECTIONS:
+        for step in group:
+            assert len(textwrap.wrap(step, width=100, subsequent_indent="   ")) <= 6, step
 
 
 def test_each_check_and_remedy_is_its_own_step() -> None:
     # A step that checks only checks; a remedy (IF ...) is its own step.
-    for key, text in drawing.STEP_TEXT.items():
+    for key, text in notes.STEP_TEXT.items():
         if text.startswith("CHECK"):
             assert " AND REPEAT" not in text and "IF " not in text, key
         if text.startswith("IF "):
             assert "CHECK " not in text, key
 
 
-def test_steps_flow_in_order_through_the_columns_of_sheets_3_onward() -> None:
-    notes = drawing.STEP_NOTES
-    assert [column.sheet for column, _text in notes] == list(drawing.STEP_SHEET_NAMES)
-    assert drawing.SHEET_NAMES[2:] == drawing.STEP_SHEET_NAMES
-    sheets = set(drawing.SHEET_NAMES)
-    assert set(drawing.SHEET_LAYOUTS) == set(drawing.SHEET_SCALES) == sheets
-    printed = []
-    for column, text in notes:
-        lines = text.splitlines()
-        assert len(lines) <= column.max_lines
-        assert column.xy[1] - len(lines) * drawing.STEPS_LINE_PITCH >= 0.0127 + 0.005
-        assert (
-            column.xy[0] + max(map(len, lines)) * drawing.STEPS_CHAR_WIDTH
-            <= 0.4318 - 0.0127
-        )
-        bodies = _printed_steps(text)
-        # A step never splits: each prints whole, as numbered_step wraps it.
-        for number, body in bodies.items():
-            assert tuple(body) == drawing.numbered_step(drawing.steps.SEQUENCE[number - 1])
-        printed.extend(bodies)
-        # One blank line before every step and group title but the column's
-        # first; a title sits directly on its first step.
-        heads = {i for i, line in enumerate(lines) if STEP_HEAD.match(line)}
-        titles = {
-            i
-            for i, line in enumerate(lines)
-            if i not in heads and line.strip() and not line.startswith(drawing.STEPS_HANG)
-        }
-        assert min(titles) == 0
-        for i in sorted(heads | titles):
-            if i and i - 1 not in titles:
-                assert lines[i - 1] == "" and lines[i - 2].strip(), (column.sheet, lines[i])
-        assert all(i + 1 in heads for i in titles)
-    assert printed == list(range(1, len(drawing.steps.SEQUENCE) + 1))
-
-
-def test_a_continued_column_repeats_its_group_title() -> None:
-    titles = [title for title, _key in drawing.STEP_GROUPS]
-    for _column, text in drawing.STEP_NOTES:
-        first = text.splitlines()[0]
-        assert first in titles or (
-            first.endswith(" (CONT.)") and first.removesuffix(" (CONT.)") in titles
-        )
-
-
-def _flow_columns(*capacities: int) -> tuple:
-    return tuple(
-        drawing.StepColumn(f"S{index}", drawing.STEPS_XY, capacity)
-        for index, capacity in enumerate(capacities)
-    )
-
-
-def test_flow_moves_a_step_that_does_not_fit_whole_to_the_next_column() -> None:
-    groups = (("A", (("1. X",), ("2. Y", "   Y"))), ("B", (("3. Z",),)))
-    notes = drawing.flow_steps(groups, _flow_columns(4, 6))
-    assert [text.splitlines() for _column, text in notes] == [
-        ["A", "1. X"],
-        ["A (CONT.)", "2. Y", "   Y", "", "B", "3. Z"],
-    ]
-
-
-@pytest.mark.parametrize(
-    ("capacities", "match"),
-    [
-        ((2,), "overflow"),
-        ((9, 9), "no steps reach"),
-        ((1, 9), "does not fit an empty column"),
-    ],
-)
-def test_flow_refuses_overflow_and_empty_columns(capacities, match) -> None:
-    groups = (("A", (("1. X",), ("2. Y", "   Y"))),)
-    with pytest.raises(ValueError, match=match):
-        drawing.flow_steps(groups, _flow_columns(*capacities))
-
-
-def test_flow_refuses_a_line_wider_than_the_column() -> None:
-    with pytest.raises(ValueError, match="characters"):
-        drawing.flow_steps((("A", (("1. " + "X" * 70,),)),), _flow_columns(9))
-
-
 def test_no_view_label_repeats_its_sheet_scale() -> None:
     # Over-specification: the title block prints each sheet's scale.
     for caption in (drawing.EXPLODED_CAPTION, drawing.ASSEMBLY_ISO_CAPTION):
         assert not re.search(r"\d+\s*:\s*\d+", caption)
-    first, last = (
-        drawing.SHEET_NAMES.index(name) + 1
-        for name in (drawing.STEP_SHEET_NAMES[0], drawing.STEP_SHEET_NAMES[-1])
-    )
-    assert f"SHEETS {first}-{last}" in drawing.EXPLODED_CAPTION
+    assert "ASSEMBLY.MD" in drawing.EXPLODED_CAPTION
+    assert set(drawing.SHEET_LAYOUTS) == set(drawing.SHEET_SCALES) == set(drawing.SHEET_NAMES)
 
 
 def test_steps_name_parts_by_item_and_use_no_private_vocabulary() -> None:
-    steps = " ".join(drawing.ASSEMBLY_STEPS.split())
+    steps = " ".join(notes.STEP_TEXT.values())
     for word in (
         "GOOSENECK", "DECK", "NEAR-WALL", "FAR-WALL", "NEAR WALL", "FAR WALL",
         "LOWER AXIS", "TOP AXIS", "FRONT", "REAR", "DECORATED", "HUB", "DIA ",
@@ -358,7 +249,7 @@ def test_steps_name_parts_by_item_and_use_no_private_vocabulary() -> None:
     for number in drawing.BOM_PART_NUMBERS.values():
         assert re.findall(rf"(?<!DRAWING ){re.escape(number)}\b", steps) == [], number
     cited = {int(n) for n in re.findall(r"\bITEM (\d+)", steps)}
-    assert cited == set(drawing.ITEM_NUMBERS.values())
+    assert cited == set(notes.ITEM_NUMBERS.values())
 
 
 def test_the_bom_items_the_steps_cite_are_the_native_tables() -> None:
@@ -368,9 +259,10 @@ def test_the_bom_items_the_steps_cite_are_the_native_tables() -> None:
         "fr-nameplate", "sh-vn-brass-fillister-screw",
         "fr-vn-frame-cross-screw", "fr-vn-gooseneck-set-screw",
     )
-    assert drawing.ITEM_NUMBERS == {
+    assert notes.ITEM_NUMBERS == {
         stem: index for index, stem in enumerate(native_order, start=1)
     }
+
 
 
 def test_the_support_windows_face_the_short_ends_of_item_1() -> None:
@@ -382,11 +274,11 @@ def test_the_support_windows_face_the_short_ends_of_item_1() -> None:
     assert [abs(value) for value in frame.SUPPORT_ROWS[2]] == [1.0, 0.0, 0.0]
     assert DECK_LENGTH > DECK_WIDTH
     assert "SHORT ENDS" in _step("support-seated")
-    assert "LONG SIDES" not in drawing.ASSEMBLY_STEPS
+    assert not any("LONG SIDES" in text for text in notes.STEP_TEXT.values())
 
 
 def _nameplate_keys() -> list[str]:
-    steps = drawing.steps
+    steps = notes.steps
     return [
         steps.NAMEPLATE_SET_KEY,
         "nameplate-clamped",
@@ -403,7 +295,7 @@ def test_the_nameplate_is_set_then_its_base_seats_are_spotted_through_it() -> No
     # spotted through, drilled and tapped before the screws go in.
     import build_fr_harmonic_base as base
 
-    steps = drawing.steps
+    steps = notes.steps
     assert drawing.NAMEPLATE_END_INSET == pytest.approx(base.NAMEPLATE_DECK_CLEARANCE)
     numbers = [steps.step_number(key) for key in _nameplate_keys()]
     assert numbers == list(range(numbers[0], numbers[0] + len(numbers)))
@@ -411,16 +303,16 @@ def test_the_nameplate_is_set_then_its_base_seats_are_spotted_through_it() -> No
     placed = _step(steps.NAMEPLATE_SET_KEY)
     assert "SECTION B-B" in placed
     assert not re.search(r"\d\.\d", placed)
-    assert drawing.BOM_PART_NUMBERS[drawing.BASE] in _step(steps.NAMEPLATE_SEATS_TAPPED_KEY)
+    assert drawing.BOM_PART_NUMBERS[notes.BASE] in _step(steps.NAMEPLATE_SEATS_TAPPED_KEY)
 
 
 def test_the_nameplate_seats_are_tapped_before_the_columns_go_in() -> None:
     # #2390: the bare base goes on the mill for its nameplate seats; once the
     # columns and top frame stand on it, it cannot.
-    steps = drawing.steps
+    steps = notes.steps
     tapped = steps.step_number(steps.NAMEPLATE_SEATS_TAPPED_KEY)
     assert tapped < steps.step_number("base-sockets-fitted")
-    assert drawing.STEP_GROUPS[0][1] == steps.NAMEPLATE_SET_KEY
+    assert notes.STEP_GROUPS[0][1] == steps.NAMEPLATE_SET_KEY
 
 
 def test_tube_cross_holes_are_spotted_through_the_clearance_hole_not_drilled() -> None:
@@ -429,9 +321,9 @@ def test_tube_cross_holes_are_spotted_through_the_clearance_hole_not_drilled() -
     # frame. The punch enters the clearance hole with little play.
     from fr_frame_cross_screw import NEAR_WALL_CLEARANCE_DIAMETER
 
-    play = NEAR_WALL_CLEARANCE_DIAMETER / 25.4 - drawing.TRANSFER_PUNCH_IN
+    play = NEAR_WALL_CLEARANCE_DIAMETER / 25.4 - notes.TRANSFER_PUNCH
     assert 0.0 < play <= 0.005
-    steps = drawing.steps
+    steps = notes.steps
     marked = steps.step_number(steps.LOWER_HOLES_MARKED_KEY)
     lifted = steps.step_number("lower-columns-lifted")
     drilled = steps.step_number(steps.LOWER_HOLES_DRILLED_KEY)
@@ -445,7 +337,8 @@ def test_tube_cross_holes_are_spotted_through_the_clearance_hole_not_drilled() -
     reassembled = steps.step_number("frame-reassembled")
     upper_checked = steps.step_number(steps.UPPER_HOLES_CHECKED_KEY)
     assert steps.step_number("upper-holes-drilled") < reassembled < upper_checked
-    assert drawing.TRANSFER_PUNCH_TEXT in _step(steps.LOWER_HOLES_MARKED_KEY)
+    assert notes.TRANSFER_PUNCH_TEXT == "13/64"
+    assert notes.TRANSFER_PUNCH_TEXT in _step(steps.LOWER_HOLES_MARKED_KEY)
     assert "DRILL" not in _step(steps.LOWER_HOLES_MARKED_KEY)
 
 
@@ -454,13 +347,13 @@ def test_the_set_screw_step_points_to_the_drawing_step_that_tightens_it() -> Non
     # it grips is named and MHA-HA-00's levelling step tightens it there.
     import ha_harmonic_analyzer_assembly_steps as ha_steps
 
-    steps = drawing.steps
+    steps = notes.steps
     started = _step(steps.GOOSENECK_STARTED_KEY)
     assert ha_steps.step_ref("summing-levelled") in started
-    assert drawing.GOOSENECK_POST_NUMBER in started
+    assert notes.GOOSENECK_POST_NUMBER in started
     following = steps.SEQUENCE[steps.step_number(steps.GOOSENECK_STARTED_KEY)]
-    assert drawing.STEP_TEXT[following].startswith("CHECK")
-    assert drawing.GOOSENECK_POST_NUMBER in drawing.STEP_TEXT[following]
+    assert notes.STEP_TEXT[following].startswith("CHECK")
+    assert notes.GOOSENECK_POST_NUMBER in notes.STEP_TEXT[following]
 
 
 def test_the_nameplate_spot_through_is_declared_on_the_assembly() -> None:
@@ -487,7 +380,7 @@ def test_the_nameplate_spot_through_is_declared_on_the_assembly() -> None:
     assert not [id_ for id_ in entries if "1667" in id_]
     assert (entry.id, entry.kind) == ("RV-01", "accept")
     assert re.search(r"\brule 19\b", entry.finding)
-    first, last = (drawing.steps.step_number(key) for key in _nameplate_keys()[::5])
+    first, last = (notes.steps.step_number(key) for key in _nameplate_keys()[::5])
     assert re.search(rf"\bsteps {first}-{last}\b", entry.where)
     assert not re.search(r"\bstep 9\b", entry.where)
     # Without the spot-through, the plate's .XX station and the base's .XXX

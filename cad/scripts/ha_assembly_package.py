@@ -57,6 +57,7 @@ PACKAGES: tuple[str, ...] = (*BOM_ORDER, ASM_NAME)
 # The packages whose fit-up steps and checks print in this document, not on
 # their sheets (#2889).
 STEPS_IN_DOCUMENT: tuple[str, ...] = (
+    "fr-frame",
     "mg-magnifier",
     "ms-measuring-stick",
     "pn-pen",
