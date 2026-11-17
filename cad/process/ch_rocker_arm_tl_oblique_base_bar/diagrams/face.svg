@@ -37,12 +37,13 @@
     <text x="-50" y="186">jack: touch only</text>
   </g>
 
-  <!-- 3/4 end mill facing the top (shown dashed) -->
-  <rect x="345" y="34" width="31" height="26" fill="none" stroke="#111" stroke-width="1.2" stroke-dasharray="5 3"/>
-  <rect x="350" y="60" width="21" height="28" fill="none" stroke="#111" stroke-width="1.2" stroke-dasharray="5 3"/>
-  <text x="384" y="56">3/4 in end mill faces full length</text>
-  <line x1="384" y1="74" x2="472" y2="74" stroke="#111" stroke-width="1.5" marker-end="url(#arr)"/>
-  <text x="478" y="79">+X</text>
+  <!-- 2 in Tri Fly facing the top (shown dashed): 3/4 shank, wide body -->
+  <rect x="350" y="34" width="21" height="40" fill="none" stroke="#111" stroke-width="1.2" stroke-dasharray="5 3"/>
+  <rect x="320" y="74" width="81" height="14" fill="none" stroke="#111" stroke-width="1.2" stroke-dasharray="5 3"/>
+  <text x="410" y="40">2 in Tri Fly faces full length</text>
+  <text x="410" y="58" font-size="13">Z0 = parallels' top</text>
+  <line x1="410" y1="74" x2="498" y2="74" stroke="#111" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="504" y="79">+X</text>
 
   <!-- Top view: final orientation for marking, CAD length × width -->
   <text x="10" y="240" fill="#555" font-style="italic">Top view</text>

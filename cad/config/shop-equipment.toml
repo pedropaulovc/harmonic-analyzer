@@ -377,6 +377,63 @@ cite = [
   "Owner (Pedro) 2026-11-16, relayed by Main: PM-30MV CNC-converted, GRBL, ballscrews on X/Y; positioning repeatability ±0.02 mm (owner value).",
 ]
 
+# PM-30MV controller, sender and the tool-length and probing kit the base
+# bar's Setup 3 programs use (cam:ch_rocker_arm_tl_oblique_base_bar; plan
+# Setup 3). Owner (Pedro) 2026-11-16, relayed by Main: the controller's FluidNC
+# config. Firmware and sender commits as read for the tool-change design:
+# FluidNC v3.7.8 = bdring/FluidNC bc5f3e936a9b4f2c29f0d4b9099d4dcdfffcdc5d,
+# CNCjs v1.11.5 = cncjs/cncjs b56f643a1f178978ba4d416f508ed26ea1db5008.
+[cnc.pm-30mv-controller]
+firmware = "FluidNC v3.7.8"
+board = "generic ESP32 (config board: None), CP210x USB"
+homing = "switches on all three axes"
+probe_pin = "gpio.5:high:pd, nothing wired (2026-11-16); gpio.5:low:pu once the touch probe is wired"
+toolsetter_pin = "gpio.21:low:pu, the tool setter"
+sender = "CNCjs 1.11.5, Manual Tool Change (Custom Probing)"
+pendant = "WHB04B via cncjs-whb04b6-el400-integration 48f0c378e44341870a60914181237382efb158b8 (its Probe-Z reads CNCjs Touch Plate Height)"
+note = "FluidNC 3.7.8 has no manual tool change of its own (atc_manual arrives in 3.8), no expressions, variables or flow control, and no canned cycles (GCode.cpp 'Not supported'); CNCjs expands M6 and FreeCAD's post translates drill cycles to G0/G1."
+cite = [
+  "Owner (Pedro) 2026-11-16, relayed by Main: FluidNC config (board, homing, probe and toolsetter pins), CNCjs 1.11.5, WHB04B pendant.",
+  "FluidNC v3.7.8 source: Probe.cpp tripped() ORs the probe and toolsetter pins; MotionControl.cpp mc_probe_cycle alarms ProbeFailInitial on a tripped start; GCode.cpp G10 L20 = MPos - G92 - TLO - value, saved to NVS (Settings.cpp Coordinates::set).",
+]
+
+[fixtures.tool-setter-ets]
+name = "Electronic tool setter, Tormach PCNC pattern (BobberCycle, ETS only)"
+kind = "tool_setter"
+present = true
+contact = "normally open, dry contact"
+repeatability_mm = 0.002
+plate_dia_mm = 20.0
+sealing = "IP67"
+wiring = "to the controller's toolsetter_pin gpio.21 and GND"
+source = "https://bobbercycle.com/products/ets-electronic-tool-setter-fits-tormach-1100mx-770mx-1100m-770m-pcnc-1100-770-440"
+note = "Height and trigger travel not published. Tools probed on it must land on the 20 mm plate: the 2 in Tri Fly cannot and is touched off by hand (base-bar plan Setup 3)."
+
+[gauges.touch-probe-diy0-tp05]
+name = "DIY0 TP05 3D touch probe"
+kind = "touch_probe"
+present = true
+source = "https://www.aliexpress.us/item/3256803280100804.html"
+purchase = "AliExpress item 3256803280100804, $9.57 on sale (owner 2026-11-16)"
+shank_mm = 6.0
+holder = "6 mm R8 collet, to buy (owner 2026-11-16)"
+supply = "DC 5-24 V; run at 5 V"
+repeatability = "<0.01 mm (listing claim, unverified: base-bar plan Setup 3 ten-touch test)"
+cable = "USB-C: red +5-24 V, black GND, yellow signal; the signal is low when tripped (wiki.fluidnc.com/en/config/probe)"
+wiring = "signal to gpio.5 through a Schottky diode, cathode at the probe signal, anode at gpio.5; FluidNC probe pin gpio.5:low:pu (owner's config change); never the idle-high signal straight into the 3.3 V input"
+use = "Never spun: every M6 to it reads SPINDLE OFF - PROBE IN"
+note = "Ball diameter not on the owner's listing; TP05-class listings give 2 mm, which the base-bar plan's probe_ball_radius_mm assumes until the Setup 3 calibration measures it."
+
+[holders.r8-collets-south-bend-sb1280]
+name = "South Bend SB1280 precision R-8 collet set of 12"
+present = true
+source = "https://www.grizzly.com/products/south-bend-precision-r-8-collet-set-of-12/sb1280"
+purchase = "$99.95 (read live 2026-11-16)"
+sizes_in = ["1/8", "3/16", "1/4", "5/16", "3/8", "7/16", "1/2", "9/16", "5/8", "11/16", "3/4", "7/8"]
+runout_tir_in = 0.00059
+drawbar = "7/16-20"
+note = "Owned (owner 2026-11-16). No metric size: the touch probe's 6 mm shank needs a 6 mm R8 collet (to buy). Gauge length unmeasured; the base-bar plan's r8_collet_gauge_mm still cites the archived LMS 4860 set."
+
 # --- tools ----------------------------------------------------------------
 
 # Existing set confirmed live 2026-10-16, SKU 6784: each size includes 2 and 4 flutes;

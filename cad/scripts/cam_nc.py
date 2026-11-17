@@ -156,32 +156,47 @@ def run_freecad(recipe: Path, ctx: dict[str, Any], programs, staging: Path, free
         raise FreeCadError(f"{exc}\n(full freecadcmd output: {log})") from exc
 
 
+def _program(directory: Path, name: str, cache: dict[str, _gcode.Program]) -> _gcode.Program:
+    """The posted program ``name``, or with ``NAME@k`` its ``k``-th tool section."""
+    file, _, section = name.partition("@")
+    if file not in cache:
+        cache[file] = _gcode.read_program(directory / f"{file}.nc")
+    return cache[file].tool_section(int(section)) if section else cache[file]
+
+
 def verify(expectations, directory: Path) -> list[_gcode.Finding]:
-    """Run every expectation against its posted program."""
+    """Run every expectation against its posted program or tool section."""
     findings: list[_gcode.Finding] = []
-    programs: dict[str, _gcode.Program] = {}
+    cache: dict[str, _gcode.Program] = {}
     for program, check, kwargs in expectations:
-        if program not in programs:
-            programs[program] = _gcode.read_program(directory / f"{program}.nc")
-        findings += getattr(_gcode, f"check_{check}")(programs[program], **kwargs)
+        findings += getattr(_gcode, f"check_{check}")(_program(directory, program, cache), **kwargs)
     return findings
 
 
 def cycle_times(expectations, directory: Path, rapid_mm_min: float = _gcode.RAPID_MM_MIN) -> dict[str, _gcode.CycleTime]:
-    """Each program's cycle time, split at the stock top its ``air_feed``
-    expectation names (every program must have exactly one)."""
-    tops: dict[str, list[float]] = {}
+    """Each posted file's cycle time, split at the stock top its ``air_feed``
+    expectation names: exactly one for the whole file, or exactly one per tool
+    section (``NAME@k``) of a file whose stock top drops between tools."""
+    tops: dict[str, dict[str, list[float]]] = {}
     for program, check, kwargs in expectations:
-        tops.setdefault(program, [])
+        file, _, section = program.partition("@")
+        found = tops.setdefault(file, {}).setdefault(section, [])
         if check == "air_feed":
-            tops[program].append(kwargs["z_top"])
-    missing = sorted(name for name, found in tops.items() if len(found) != 1)
-    if missing:
-        raise ValueError(f"programs {missing} need exactly one air_feed expectation (their stock top)")
-    return {
-        name: _gcode.cycle_time(_gcode.read_program(directory / f"{name}.nc"), rapid_mm_min, found[0])
-        for name, found in tops.items()
-    }
+            found.append(kwargs["z_top"])
+    times = {}
+    for file, by_section in tops.items():
+        nc = _gcode.read_program(directory / f"{file}.nc")
+        sections = nc.tool_sections()
+        whole = by_section.get("", [])
+        split = {key: found for key, found in by_section.items() if key}
+        if len(whole) == 1 and not any(split.values()):
+            times[file] = _gcode.cycle_time(nc, rapid_mm_min, whole[0])
+        elif not whole and sorted(split) == sorted(str(k) for k in range(len(sections))) and all(len(f) == 1 for f in split.values()):
+            parts = [_gcode.cycle_time(sections[int(key)], rapid_mm_min, found[0]) for key, found in split.items()]
+            times[file] = _gcode.CycleTime(*(sum(getattr(p, field) for p in parts) for field in ("cutting", "air", "rapid")))
+        else:
+            raise ValueError(f"{file} needs exactly one air_feed expectation (its stock top), or one per tool section")
+    return times
 
 
 def time_table(times: dict[str, _gcode.CycleTime]) -> str:
@@ -265,11 +280,14 @@ def main(argv: list[str] | None = None) -> int:
             if findings:
                 raise RuntimeError("posted G-code failed its checks:\n  " + "\n  ".join(map(str, findings)))
             times = cycle_times(checks, staging)
+            # Operator stops are not machine time; their counts go beside it.
+            stops = {name: _gcode.read_program(staging / f"{name}.nc") for name in times}
             for path in programs:
                 os.replace(staging / path.name, path)
             times_path.write_text(json.dumps({
                 "rapid_mm_min": _gcode.RAPID_MM_MIN,
-                "programs": {name: {"cutting_min": t.cutting, "air_feed_min": t.air, "rapid_min": t.rapid, "total_min": t.total}
+                "programs": {name: {"cutting_min": t.cutting, "air_feed_min": t.air, "rapid_min": t.rapid, "total_min": t.total,
+                                    "tool_changes": len(stops[name].tool_changes), "pauses": len(stops[name].pauses)}
                              for name, t in times.items()},
                 "total_min": sum(t.total for t in times.values()),
             }, indent=2) + "\n", encoding="utf-8")

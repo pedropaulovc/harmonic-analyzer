@@ -104,61 +104,147 @@ class Move:
 
 
 @dataclass(frozen=True)
-class Pause:
-    """An ``M0`` program stop: its line, the comment line just before it (the
-    operator's instruction; ``None`` when the previous line is not a comment)
-    and the tool position there (``None`` per axis while unknown)."""
+class Stop:
+    """An ``M0`` program stop or an ``M6`` tool change: its line, the comment
+    line just before it (the operator's instruction; ``None`` when the previous
+    line is not a comment), the tool position there (``None`` per axis while
+    unknown), how many moves precede it, the tool an ``M6`` calls (``T`` on its
+    line) and whether the spindle was still on (an ``M3``/``M4`` since the last
+    ``M5``)."""
 
     line: int
+    kind: str  # "M0" or "M6"
     comment: str | None
     position: tuple[float | None, float | None, float | None]
+    moves_before: int
+    tool: int | None = None
+    spindle_on: bool = False
+
+
+@dataclass(frozen=True)
+class Probe:
+    """A probing move (``G38.2``-``G38.5``, ``code`` 38.2...) or a work-offset
+    setting (``G10 L20 P1``, ``code`` 10.0): its line, how many moves precede
+    it, the axis words it names, and whether the spindle was on."""
+
+    line: int
+    code: float
+    moves_before: int
+    axes: tuple[tuple[str, float], ...]
+    spindle_on: bool = False
 
 
 @dataclass(frozen=True)
 class Program:
     path: Path
     moves: tuple[Move, ...]
-    # The S words of each section; an M0 starts a new section.
-    spindle_sections: tuple[frozenset[float], ...]
-    pauses: tuple[Pause, ...] = ()
+    stops: tuple[Stop, ...] = ()
+    # Every S word in file order, as (line, rpm).
+    spindle: tuple[tuple[int, float], ...] = ()
+    # Lines holding a machine-coordinate move (G28/G30/G53).
+    machine_moves: tuple[int, ...] = ()
+    # G38.x probing moves and G10 L20 P1 settings, in file order.
+    probes: tuple[Probe, ...] = ()
+    # Set on the slices :meth:`tool_sections` returns.
+    section: int | None = None
+
+    @property
+    def name(self) -> str:
+        """The file name, with ``@k`` for its ``k``-th tool section."""
+        return self.path.name if self.section is None else f"{self.path.name}@{self.section}"
+
+    @property
+    def pauses(self) -> tuple[Stop, ...]:
+        return tuple(s for s in self.stops if s.kind == "M0")
+
+    @property
+    def tool_changes(self) -> tuple[Stop, ...]:
+        return tuple(s for s in self.stops if s.kind == "M6")
 
     @property
     def spindle_rpm(self) -> frozenset[float]:
-        return frozenset().union(*self.spindle_sections)
+        return frozenset(rpm for _line, rpm in self.spindle)
 
     @property
     def cutting(self) -> tuple[Move, ...]:
         return tuple(m for m in self.moves if m.motion is not Motion.RAPID)
 
+    def tool_sections(self) -> list[Program]:
+        """The program split at its ``M6`` tool changes: the tool loaded
+        before the program runs (when anything happens before the first
+        ``M6``), then one slice from each ``M6`` on."""
+        changes = self.tool_changes
+        bounds = [(stop.line, stop.moves_before) for stop in changes]
+        if not changes or changes[0].moves_before or any(line < changes[0].line for line, _rpm in self.spindle):
+            bounds.insert(0, (0, 0))
+        sections = []
+        for index, (first, start) in enumerate(bounds):
+            last, end = bounds[index + 1] if index + 1 < len(bounds) else (math.inf, len(self.moves))
+            sections.append(Program(
+                self.path,
+                self.moves[start:end],
+                tuple(s for s in self.stops if first <= s.line < last),
+                tuple(w for w in self.spindle if first <= w[0] < last),
+                tuple(n for n in self.machine_moves if first <= n < last),
+                tuple(p for p in self.probes if first <= p.line < last),
+                index,
+            ))
+        return sections
+
+    def tool_section(self, index: int) -> Program:
+        sections = self.tool_sections()
+        if not 0 <= index < len(sections):
+            raise ValueError(f"{self.path.name}: no tool section {index} (it has {len(sections)})")
+        return sections[index]
+
 
 def read_program(path: Path) -> Program:
     """Parse one posted file.
 
-    A machine-coordinate block (G28/G53) still applies its modal G words: the
-    motion, and the distance mode the Grbl post sets with ``G28 G91 Z0`` before
-    its ``G90``. Its axis words are skipped because they are not part
+    A machine-coordinate block (G28/G30/G53) still applies its modal G words:
+    the motion, and the distance mode the Grbl post sets with ``G28 G91 Z0``
+    before its ``G90``. Its axis words are skipped because they are not part
     coordinates, and the axes it moves are unknown until a later block sets
-    them. A part move made in incremental mode (G91), and an R-form arc, are
-    refused, not modelled. ``M0`` records a :class:`Pause` and starts a new
-    spindle section.
+    them; its line is recorded. A probing move (G38.2-G38.5) stops where the
+    probe trips, so the axes it names become unknown; ``G10 L20 P1`` makes the
+    current position read the values it names. Both record a :class:`Probe`.
+    A part move made in incremental mode (G91), an R-form arc and any other
+    ``G10`` are refused, not modelled. ``M0`` and ``M6`` record a
+    :class:`Stop`.
     """
     position: list[float | None] = [None, None, None]
     motion: Motion | None = None
     incremental = False
     plane = 17
     feed: float | None = None
+    spindle_on = False
     moves: list[Move] = []
-    sections: list[set[float]] = [set()]
-    pauses: list[Pause] = []
+    stops: list[Stop] = []
+    spindle: list[tuple[int, float]] = []
+    machine_moves: list[int] = []
+    probes: list[Probe] = []
     previous = ""
     for number, raw in enumerate(Path(path).read_text(encoding="utf-8").splitlines(), 1):
+        # A CNCjs "%msg" line is the operator's instruction CNCjs shows at the
+        # next M0 (it sends no comment); any other "%" directive is not modelled.
+        if raw.strip().startswith("%"):
+            if not raw.strip().lower().startswith("%msg "):
+                raise ValueError(f"{Path(path).name}:{number}: only the CNCjs %msg directive is modelled: {raw.strip()}")
+            previous = f"({raw.strip()[5:].strip()})"
+            continue
         line = _COMMENT.sub("", raw).strip().upper()
         words = [(letter, float(value)) for letter, value in _WORD.findall(line)]
         codes = {value for letter, value in words if letter == "G"}
-        if any(letter == "M" and value == 0 for letter, value in words):
-            comment = previous[1:-1].strip() if previous.startswith("(") and previous.endswith(")") else None
-            pauses.append(Pause(number, comment, (position[0], position[1], position[2])))
-            sections.append(set())
+        mcodes = {value for letter, value in words if letter == "M"}
+        for kind, code in (("M0", 0), ("M6", 6)):
+            if code in mcodes:
+                comment = previous[1:-1].strip() if previous.startswith("(") and previous.endswith(")") else None
+                tool = next((int(v) for letter, v in words if letter == "T"), None) if code == 6 else None
+                stops.append(Stop(number, kind, comment, (position[0], position[1], position[2]), len(moves), tool, spindle_on))
+        if mcodes & {3, 4}:
+            spindle_on = True
+        if 5 in mcodes:
+            spindle_on = False
         if raw.strip():
             previous = raw.strip()
         for letter, value in words:
@@ -169,16 +255,28 @@ def read_program(path: Path) -> Program:
             elif letter == "G" and value in (17, 18, 19):
                 plane = int(value)
             elif letter == "S":
-                sections[-1].add(value)
+                spindle.append((number, value))
             elif letter == "F":
                 feed = value
         axes = {letter: value for letter, value in words if letter in "XYZ"}
-        if codes & {28, 53}:
-            # A bare G28 homes every axis; otherwise only the named axes move.
-            moved = "XYZ" if 28 in codes and not axes else axes
+        if codes & {28, 30, 53}:
+            machine_moves.append(number)
+            # A bare G28/G30 homes every axis; otherwise only the named axes move.
+            moved = "XYZ" if codes & {28, 30} and not axes else axes
             for i, axis in enumerate("XYZ"):
                 if axis in moved:
                     position[i] = None
+            continue
+        probing = sorted(codes & {38.2, 38.3, 38.4, 38.5})
+        if probing or 10 in codes:
+            if 10 in codes and (("L", 20.0) not in words or ("P", 1.0) not in words):
+                raise ValueError(f"{Path(path).name}:{number}: only G10 L20 P1 is modelled: {raw.strip()}")
+            probes.append(Probe(number, probing[0] if probing else 10.0, len(moves), tuple(axes.items()), spindle_on))
+            for i, axis in enumerate("XYZ"):
+                if axis in axes:
+                    position[i] = None if probing else axes[axis]
+            if probing:
+                motion = None  # G38 is modal: a later bare axis word would probe again
             continue
         if not axes:
             continue
@@ -202,7 +300,7 @@ def read_program(path: Path) -> Program:
                 feed=None if motion is Motion.RAPID else feed, centre=centre, plane=plane,
             ))
         position = target
-    return Program(Path(path), tuple(moves), tuple(frozenset(s) for s in sections), tuple(pauses))
+    return Program(Path(path), tuple(moves), tuple(stops), tuple(spindle), tuple(machine_moves), tuple(probes))
 
 
 @dataclass(frozen=True)
@@ -234,7 +332,7 @@ def cycle_time(nc: Program, rapid_mm_min: float = RAPID_MM_MIN, z_top: float = 0
         if length == 0.0:
             continue
         if not m.feed:
-            raise ValueError(f"{nc.path.name}: feed move to {m.end} without a feed rate")
+            raise ValueError(f"{nc.name}: feed move to {m.end} without a feed rate")
         low, high = sorted((m.start[2], m.end[2]))
         if _wholly_above(m, z_top):
             above = 1.0
@@ -266,31 +364,132 @@ def check_depth(program: Program, z_min: float) -> list[Finding]:
     lowest = min(min(m.start[2], m.end[2]) for m in program.moves)
     if _close(lowest, z_min):
         return []
-    return [Finding(program.path.name, "depth", f"deepest Z {lowest:.3f}, expected {z_min:.3f}")]
+    return [Finding(program.name, "depth", f"deepest Z {lowest:.3f}, expected {z_min:.3f}")]
 
 
-def check_spindle(program: Program, rpm: float | Sequence[float]) -> list[Finding]:
-    """Each section (the program, split at its M0 stops) sets one spindle
-    speed: ``rpm`` alone for a program without stops, else one per section."""
-    expected = [rpm] if isinstance(rpm, (int, float)) else list(rpm)
-    actual = [sorted(s) for s in program.spindle_sections]
-    if actual == [[float(r)] for r in expected]:
-        return []
-    return [Finding(program.path.name, "spindle", f"S words per section {actual}, expected {[float(r) for r in expected]}")]
+def _speeds(program: Program) -> list[float]:
+    """The speeds the S words set, in order, repeats of the running one dropped."""
+    speeds: list[float] = []
+    for _line, rpm in program.spindle:
+        if not speeds or speeds[-1] != rpm:
+            speeds.append(rpm)
+    return speeds
 
 
-def check_pauses(program: Program, z_top: float, count: int) -> list[Finding]:
+def check_spindle(program: Program, rpm: float | Sequence[float | Sequence[float]]) -> list[Finding]:
+    """``rpm`` alone: every S word sets that speed. A sequence: one entry per
+    tool section (the program split at its M6 tool changes), each the speed,
+    or the speeds in order, that section sets; an empty entry is a section
+    with the spindle off. Within a tool section a speed change needs an M0
+    stop between the two S words: the PM-30MV's speed is set by hand."""
+    findings = []
+    if isinstance(rpm, (int, float)):
+        if program.spindle_rpm != {float(rpm)}:
+            findings.append(Finding(program.name, "spindle", f"S words {sorted(program.spindle_rpm)}, expected {float(rpm)}"))
+    else:
+        actual = [_speeds(section) for section in program.tool_sections()]
+        expected = [[float(r)] if isinstance(r, (int, float)) else [float(v) for v in r] for r in rpm]
+        if actual != expected:
+            findings.append(Finding(program.name, "spindle", f"speeds per tool section {actual}, expected {expected}"))
+    for section in program.tool_sections():
+        for (before, old), (line, new) in zip(section.spindle, section.spindle[1:]):
+            if old != new and not any(before < stop.line < line for stop in section.pauses):
+                findings.append(Finding(program.name, "spindle", f"line {line}: S{new:g} after S{old:g} without an M0 stop between"))
+    return findings
+
+
+def _retracted(stop: Stop, z_top: float) -> bool:
+    z = stop.position[2]
+    return z is not None and z > z_top + _TOL_MM
+
+
+def check_pauses(
+    program: Program, z_top: float, count: int, at: Sequence[tuple[float, float]] | None = None, spindle_off: bool = False,
+) -> list[Finding]:
     """``count`` M0 stops, each with the tool retracted above the stock top
-    and an operator comment on the line before it."""
+    and an operator comment on the line before it; with ``at``, the stops sit
+    over those XY points, in order; with ``spindle_off``, an ``M5`` has stopped
+    the spindle before each (the operator's hands are at the tool or bar)."""
     findings = []
     if len(program.pauses) != count:
-        findings.append(Finding(program.path.name, "pauses", f"{len(program.pauses)} M0 stops, expected {count}"))
+        findings.append(Finding(program.name, "pauses", f"{len(program.pauses)} M0 stops, expected {count}"))
     for pause in program.pauses:
-        z = pause.position[2]
-        if z is None or z <= z_top + _TOL_MM:
-            findings.append(Finding(program.path.name, "pauses", f"line {pause.line}: M0 with Z {z}, not retracted above {z_top:.3f}"))
+        if not _retracted(pause, z_top):
+            findings.append(Finding(program.name, "pauses", f"line {pause.line}: M0 with Z {pause.position[2]}, not retracted above {z_top:.3f}"))
         if not pause.comment:
-            findings.append(Finding(program.path.name, "pauses", f"line {pause.line}: M0 without an operator comment before it"))
+            findings.append(Finding(program.name, "pauses", f"line {pause.line}: M0 without an operator comment before it"))
+        if spindle_off and pause.spindle_on:
+            findings.append(Finding(program.name, "pauses", f"line {pause.line}: M0 with the spindle on (no M5 before it)"))
+    if at is not None:
+        got = [(p.position[0], p.position[1]) for p in program.pauses]
+        if len(got) != len(at) or not all(
+            x is not None and y is not None and _close(x, ex) and _close(y, ey) for (x, y), (ex, ey) in zip(got, at)
+        ):
+            findings.append(Finding(program.name, "pauses", f"M0 stops at {got}, expected at {[tuple(p) for p in at]}"))
+    return findings
+
+
+def check_tool_changes(program: Program, z_top: float, tools: Sequence[int]) -> list[Finding]:
+    """The M6 tool changes call ``tools`` in order (the tool loaded before the
+    program runs is not one). Each comes with the spindle stopped (M5), the
+    tool retracted above the stock top ``z_top`` and an operator comment on
+    the line before it. Between an M6 and the new tool's first feed move only
+    rapids run, and any that moves X or Y stays above the stock top. No
+    G28/G30/G53 anywhere: the sender (CNCjs) makes every tool-change move
+    itself."""
+    findings = []
+    changes = program.tool_changes
+    called = [stop.tool for stop in changes]
+    if called != list(tools):
+        findings.append(Finding(program.name, "tools", f"M6 calls {called}, expected {list(tools)}"))
+    for index, stop in enumerate(changes):
+        if stop.moves_before and not _retracted(stop, z_top):
+            findings.append(Finding(program.name, "tools", f"line {stop.line}: M6 with Z {stop.position[2]}, not retracted above {z_top:.3f}"))
+        if stop.spindle_on:
+            findings.append(Finding(program.name, "tools", f"line {stop.line}: M6 with the spindle on (no M5 before it)"))
+        if not stop.comment:
+            findings.append(Finding(program.name, "tools", f"line {stop.line}: M6 without an operator comment before it"))
+        end = changes[index + 1].moves_before if index + 1 < len(changes) else len(program.moves)
+        for m in program.moves[stop.moves_before:end]:
+            if m.motion is not Motion.RAPID:
+                break
+            lateral = not (_close(m.start[0], m.end[0]) and _close(m.start[1], m.end[1]))
+            if lateral and min(m.start[2], m.end[2]) <= z_top + _TOL_MM:
+                findings.append(Finding(
+                    program.name, "tools",
+                    f"T{stop.tool}: G0 to X{m.end[0]:.3f} Y{m.end[1]:.3f} at Z{min(m.start[2], m.end[2]):.3f}, "
+                    f"not above the stock top {z_top:.3f}, before its first feed",
+                ))
+    if program.machine_moves:
+        findings.append(Finding(program.name, "tools", f"machine-coordinate moves (G28/G30/G53) on lines {list(program.machine_moves)}"))
+    return findings
+
+
+def check_probe_zero(program: Program, axis: str, value: float, z_top: float) -> list[Finding]:
+    """The probe sets one work zero: exactly one ``G10 L20 P1``, naming only
+    ``axis`` = ``value``, straight after a ``G38.2`` along ``axis`` alone; no
+    feed move in the program and the spindle off at every probing move (a
+    touch probe is never spun); every rapid that moves X or Y stays above the
+    stock top ``z_top`` (the probe descends beside the stock by ``G38.3``)."""
+    findings = []
+    offsets = [p for p in program.probes if p.code == 10.0]
+    if len(offsets) != 1:
+        return [Finding(program.name, "probe", f"{len(offsets)} G10 L20 P1 settings, expected 1")]
+    offset = offsets[0]
+    if dict(offset.axes).keys() != {axis} or not _close(dict(offset.axes)[axis], value):
+        findings.append(Finding(program.name, "probe", f"line {offset.line}: G10 L20 P1 sets {dict(offset.axes)}, expected {axis}{value:.3f}"))
+    before = [p for p in program.probes if p.line < offset.line]
+    if not before or before[-1].code != 38.2 or [a for a, _v in before[-1].axes] != [axis]:
+        findings.append(Finding(program.name, "probe", f"line {offset.line}: G10 L20 P1 not straight after a G38.2 along {axis}"))
+    for p in program.probes:
+        if p.spindle_on:
+            findings.append(Finding(program.name, "probe", f"line {p.line}: probing with the spindle on"))
+    if program.cutting:
+        findings.append(Finding(program.name, "probe", f"{len(program.cutting)} feed moves in a probe section"))
+    for m in program.moves:
+        lateral = not (_close(m.start[0], m.end[0]) and _close(m.start[1], m.end[1]))
+        if lateral and min(m.start[2], m.end[2]) <= z_top + _TOL_MM:
+            findings.append(Finding(program.name, "probe", f"G0 to X{m.end[0]:.3f} Y{m.end[1]:.3f} at Z{min(m.start[2], m.end[2]):.3f}, not above {z_top:.3f}"))
     return findings
 
 
@@ -310,12 +509,12 @@ def check_holes(program: Program, centres: Iterable[tuple[float, float]], z_bott
     missing = sorted(expected - set(bottoms))
     extra = sorted(set(bottoms) - expected)
     if missing:
-        findings.append(Finding(program.path.name, "holes", f"no plunge at {missing}"))
+        findings.append(Finding(program.name, "holes", f"no plunge at {missing}"))
     if extra:
-        findings.append(Finding(program.path.name, "holes", f"unexpected plunge at {extra}"))
+        findings.append(Finding(program.name, "holes", f"unexpected plunge at {extra}"))
     shallow = sorted((xy, z) for xy, z in bottoms.items() if xy in expected and not _close(z, z_bottom))
     if shallow:
-        findings.append(Finding(program.path.name, "holes", f"bottom ≠ {z_bottom:.3f} at {shallow}"))
+        findings.append(Finding(program.name, "holes", f"bottom ≠ {z_bottom:.3f} at {shallow}"))
     return findings
 
 
@@ -334,7 +533,7 @@ def check_rapids_clear(program: Program, z_top: float, open_holes: Iterable[tupl
             continue
         reentry = xy in allowed and m.end[2] >= reached.get(xy, float("inf")) - _TOL_MM
         if not reentry:
-            findings.append(Finding(program.path.name, "rapid", f"G0 to Z{m.end[2]:.3f} at X{xy[0]} Y{xy[1]} below stock top {z_top:.3f}"))
+            findings.append(Finding(program.name, "rapid", f"G0 to Z{m.end[2]:.3f} at X{xy[0]} Y{xy[1]} below stock top {z_top:.3f}"))
     return findings
 
 
@@ -348,7 +547,7 @@ def check_vertical_below_top(program: Program, z_top: float) -> list[Finding]:
         lateral = not (_close(m.start[0], m.end[0]) and _close(m.start[1], m.end[1]))
         if low and lateral:
             findings.append(Finding(
-                program.path.name, "lateral",
+                program.name, "lateral",
                 f"{m.motion.name} X{m.start[0]:.3f} Y{m.start[1]:.3f} -> X{m.end[0]:.3f} Y{m.end[1]:.3f} below stock top {z_top:.3f}",
             ))
     return findings
@@ -362,8 +561,9 @@ def check_bounds(
     z_min: float,
     arc: str,
     entry: tuple[float, float] | None = None,
+    z_top: float = 0.0,
 ) -> list[Finding]:
-    """Cutting moves below the stock top (Z0) whose endpoint lies in the XY
+    """Cutting moves below the stock top ``z_top`` whose endpoint lies in the XY
     ``window`` sweep a path spanning exactly ``x`` × ``y`` (the cutter-centre
     envelope of a pocket or slot, arcs included), reach exactly ``z_min``, and
     turn every arc one way: ``arc`` is ``"G2"`` (clockwise; conventional inside
@@ -373,17 +573,17 @@ def check_bounds(
     (wx0, wx1), (wy0, wy1) = window
     inside = [
         m for m in program.cutting
-        if m.end[2] < 0 and wx0 <= m.end[0] <= wx1 and wy0 <= m.end[1] <= wy1
+        if m.end[2] < z_top and wx0 <= m.end[0] <= wx1 and wy0 <= m.end[1] <= wy1
     ]
     if not inside:
-        return [Finding(program.path.name, "bounds", f"no cutting move in window {window}")]
-    points = [p for m in inside for p in (*m.extremes(), *([m.start] if m.start[2] < 0 else []))]
+        return [Finding(program.name, "bounds", f"no cutting move in window {window}")]
+    points = [p for m in inside for p in (*m.extremes(), *([m.start] if m.start[2] < z_top else []))]
     got_x = (min(p[0] for p in points), max(p[0] for p in points))
     got_y = (min(p[1] for p in points), max(p[1] for p in points))
     findings = []
     if not all(_close(a, b) for a, b in zip((*got_x, *got_y), (*x, *y))):
         findings.append(Finding(
-            program.path.name, "bounds",
+            program.name, "bounds",
             f"cutter centre X[{got_x[0]:.3f},{got_x[1]:.3f}] Y[{got_y[0]:.3f},{got_y[1]:.3f}], "
             f"expected X[{x[0]:.3f},{x[1]:.3f}] Y[{y[0]:.3f},{y[1]:.3f}]",
         ))
@@ -393,14 +593,14 @@ def check_bounds(
             if m.motion is Motion.LINEAR and m.end[2] < m.start[2] and _close(m.start[0], m.end[0]) and _close(m.start[1], m.end[1])
         })
         if not plunges or any(math.dist((px, py), entry) > _ENTRY_TOL_MM for px, py in plunges):
-            findings.append(Finding(program.path.name, "bounds", f"plunges at {plunges}, expected only at X{entry[0]:.3f} Y{entry[1]:.3f}"))
+            findings.append(Finding(program.name, "bounds", f"plunges at {plunges}, expected only at X{entry[0]:.3f} Y{entry[1]:.3f}"))
     lowest = min(m.end[2] for m in inside)
     if not _close(lowest, z_min):
-        findings.append(Finding(program.path.name, "bounds", f"deepest Z {lowest:.3f} in {window}, expected {z_min:.3f}"))
+        findings.append(Finding(program.name, "bounds", f"deepest Z {lowest:.3f} in {window}, expected {z_min:.3f}"))
     wanted = {"G2": Motion.ARC_CW, "G3": Motion.ARC_CCW}[arc]
     senses = {m.motion for m in inside if m.motion in (Motion.ARC_CW, Motion.ARC_CCW)}
     if senses != {wanted}:
-        findings.append(Finding(program.path.name, "bounds", f"arcs {sorted(s.name for s in senses)}, expected only {arc}"))
+        findings.append(Finding(program.name, "bounds", f"arcs {sorted(s.name for s in senses)}, expected only {arc}"))
     return findings
 
 
@@ -434,18 +634,18 @@ def check_side_passes(
         and min(raw, final) - _TOL_MM <= m.end[a] <= max(raw, final) + _TOL_MM
     ]
     if not passes:
-        return [Finding(program.path.name, "passes", f"no {axis}-constant pass longer than {span}")]
+        return [Finding(program.name, "passes", f"no {axis}-constant pass longer than {span}")]
     toward = 1.0 if final > raw else -1.0
     stations = sorted({round(m.end[a], 3) for m in passes}, key=lambda v: toward * v)
     findings = []
     if not _close(stations[-1], final):
-        findings.append(Finding(program.path.name, "passes", f"final {axis} {stations[-1]:.3f}, expected {final:.3f}"))
+        findings.append(Finding(program.name, "passes", f"final {axis} {stations[-1]:.3f}, expected {final:.3f}"))
     previous = raw
     for index, station in enumerate(stations):
         step = toward * (station - previous)
         limit = finish if finish is not None and index == len(stations) - 1 else max_step
         if step > limit + _TOL_MM:
-            findings.append(Finding(program.path.name, "passes", f"{axis} {station:.3f} removes {step:.3f} > {limit:.3f}"))
+            findings.append(Finding(program.name, "passes", f"{axis} {station:.3f} removes {step:.3f} > {limit:.3f}"))
         previous = station
     if max_stepdown is not None:
         for station in stations:
@@ -454,7 +654,7 @@ def check_side_passes(
             for level in levels:
                 if previous - level > max_stepdown + _TOL_MM:
                     findings.append(Finding(
-                        program.path.name, "passes",
+                        program.name, "passes",
                         f"{axis} {station:.3f}: Z {level:.3f} steps down {previous - level:.3f} > {max_stepdown:.3f}",
                     ))
                 previous = level
@@ -462,7 +662,7 @@ def check_side_passes(
     for m in passes:
         if (m.end[b] - m.start[b]) * direction <= 0:
             findings.append(Finding(
-                program.path.name, "passes",
+                program.name, "passes",
                 f"{axis} {m.end[a]:.3f} Z {m.end[2]:.3f}: pass does not run {sign}{'XY'[b]}",
             ))
     return findings
@@ -478,7 +678,7 @@ def check_air_feed(program: Program, z_top: float, max_mm: float = AIR_FEED_MAX_
     spent cutting air at feed rate."""
     return [
         Finding(
-            program.path.name, "air_feed",
+            program.name, "air_feed",
             f"{m.motion.name} {m.length:.3f} mm at feed above stock top {z_top:.3f}: "
             f"X{m.start[0]:.3f} Y{m.start[1]:.3f} Z{m.start[2]:.3f} -> X{m.end[0]:.3f} Y{m.end[1]:.3f} Z{m.end[2]:.3f}",
         )
@@ -493,7 +693,7 @@ def check_no_return(program: Program, axis: str, span: float) -> list[Finding]:
     opposite sides in opposite directions ends each pass where the next begins."""
     i = "XYZ".index(axis)
     return [
-        Finding(program.path.name, "return", f"G0 {axis}{m.start[i]:.3f} -> {axis}{m.end[i]:.3f} travels {abs(m.end[i] - m.start[i]):.3f} > {span:.3f}")
+        Finding(program.name, "return", f"G0 {axis}{m.start[i]:.3f} -> {axis}{m.end[i]:.3f} travels {abs(m.end[i] - m.start[i]):.3f} > {span:.3f}")
         for m in program.moves
         if m.motion is Motion.RAPID and abs(m.end[i] - m.start[i]) > span
     ]
@@ -503,31 +703,50 @@ def check_face_passes(
     program: Program,
     z: float,
     y: tuple[float, float],
-    max_stepover: float,
+    max_engagement: float,
     radius: float,
     span: float,
+    overhang: float = 0.0,
 ) -> list[Finding]:
-    """A zigzag face: the straight X passes longer than ``span`` at depth ``z``
-    alternate direction pass to pass, sit no more than ``max_stepover`` apart,
-    and their cutter (``radius``) covers the face's Y extent ``y``."""
+    """A zigzag face of the stock's Y extent ``y``: the straight X passes
+    longer than ``span`` at depth ``z`` alternate direction pass to pass; each
+    pass, in cutting order, takes at most ``max_engagement`` of stock no
+    earlier pass cut (the radial width the plan's force estimate assumes, the
+    first pass included); together the cutter (``radius``) clears all of ``y``
+    and reaches ``overhang`` past both edges."""
     passes = [
         m for m in program.cutting
         if m.motion is Motion.LINEAR and _close(m.start[2], z) and _close(m.end[2], z)
         and _close(m.start[1], m.end[1]) and abs(m.end[0] - m.start[0]) > span
     ]
     if not passes:
-        return [Finding(program.path.name, "face", f"no X pass longer than {span} at Z {z:.3f}")]
+        return [Finding(program.name, "face", f"no X pass longer than {span} at Z {z:.3f}")]
     findings = []
     for before, after in zip(passes, passes[1:]):
         if (before.end[0] - before.start[0]) * (after.end[0] - after.start[0]) > 0:
-            findings.append(Finding(program.path.name, "face", f"passes at Y {before.end[1]:.3f} and Y {after.end[1]:.3f} run the same way"))
-    stations = sorted({round(m.end[1], 3) for m in passes})
-    for low, high in zip(stations, stations[1:]):
-        if high - low > max_stepover + _TOL_MM:
-            findings.append(Finding(program.path.name, "face", f"stepover {high - low:.3f} between Y {low:.3f} and Y {high:.3f} > {max_stepover:.3f}"))
-    if stations[0] - radius > y[0] + _TOL_MM or stations[-1] + radius < y[1] - _TOL_MM:
+            findings.append(Finding(program.name, "face", f"passes at Y {before.end[1]:.3f} and Y {after.end[1]:.3f} run the same way"))
+    cut: list[tuple[float, float]] = []  # disjoint Y intervals of stock already cut
+    for m in passes:
+        low, high = max(m.end[1] - radius, y[0]), min(m.end[1] + radius, y[1])
+        reach = max(high - low, 0.0)
+        engaged = reach - sum(max(0.0, min(high, b) - max(low, a)) for a, b in cut)
+        if engaged > max_engagement + _TOL_MM:
+            findings.append(Finding(program.name, "face", f"pass at Y {m.end[1]:.3f} engages {engaged:.3f} > {max_engagement:.3f}"))
+        if reach > 0:
+            merged = [(low, high)]
+            for a, b in cut:
+                if b < merged[0][0] or a > merged[0][1]:
+                    merged.append((a, b))
+                else:
+                    merged[0] = (min(a, merged[0][0]), max(b, merged[0][1]))
+            cut = merged
+    stations = sorted(m.end[1] for m in passes)
+    cleared = sum(b - a for a, b in cut)
+    if (cleared < y[1] - y[0] - _TOL_MM or stations[0] - radius > y[0] - overhang + _TOL_MM
+            or stations[-1] + radius < y[1] + overhang - _TOL_MM):
         findings.append(Finding(
-            program.path.name, "face",
-            f"cutter covers Y[{stations[0] - radius:.3f},{stations[-1] + radius:.3f}], face Y[{y[0]:.3f},{y[1]:.3f}]",
+            program.name, "face",
+            f"cutter covers Y[{stations[0] - radius:.3f},{stations[-1] + radius:.3f}] clearing {cleared:.3f} of "
+            f"face Y[{y[0]:.3f},{y[1]:.3f}] ±{overhang:.3f}",
         ))
     return findings

@@ -9,12 +9,13 @@
 # v48/v49 drawing: bar 1 alone carries the four #12 bracket holes. Owner
 # rulings 2026-11-16: the rail holes are drilled at their printed stations
 # (±0.05 mm from ZERO END) on the CNC, "Rail holes CNC at ±0.05 mm OK" (the
-# part yaml's RV-04): Setup 3 spots and drills R1–R8 from programs BB05 and
-# BB07 of cam:ch_rocker_arm_tl_oblique_base_bar, whose posted cutter
-# positions are the stations. "merge": the facing, ends, slots and holes are
-# one clamping per bar (Setup 3), so the holes keep the ZERO END and ZERO EDGE
-# they were squared and edge-found in. Each bar's untrimmed rail is fitted to
-# it, then trimmed flush with both ends (MHA-CH-06-TL-00 steps 1D–1F). Bar 2
+# part yaml's RV-04): Setup 3 spots and drills R1–R8 in each bar's
+# cam:ch_rocker_arm_tl_oblique_base_bar program (BB02 bar 1, BB03 bar 2),
+# whose posted cutter positions are the stations. "merge": the facing, ends,
+# slots and holes are one clamping per bar (Setup 3), so the holes keep the
+# ZERO END and ZERO EDGE they were squared and located in. Each bar's
+# untrimmed rail is fitted to it, then trimmed flush with both ends
+# (MHA-CH-06-TL-00 steps 1D–1F). Bar 2
 # (drawing sheet 2) swaps the seats: its rail seats on the face that is far in
 # the front view (up in Setup 3 after the side-2 face) and its near face seats
 # on the mill table. The manifest describes bar 1 only, so the per-bar face
@@ -36,6 +37,12 @@ adapter = "harmonic_base_bar"
 blank_length_in = 17.4375
 blank_width_in = 6.0
 blank_thickness_in = 0.5
+# Blank-thickness band side 1 is posted for: cam.py faces it at a fixed Z, half
+# the nominal allowance off, with no per-bar input; it refuses a band whose
+# thinnest blank keeps a skin under .004 in there or whose thickest is cut
+# deeper than the 'side 1 face' cut (0.508 mm). The operator mics each blank.
+blank_thickness_min_in = 0.495
+blank_thickness_max_in = 0.505
 quantity = 2
 width_rough_allowance_in = 0.015
 slot_breakthrough_in = 0.02
@@ -75,7 +82,7 @@ end_cut_tip_z_mm = -1.016        # End cutter .04 in below the bar.
 side_max_stepdown_mm = 7.62
 drill_tip_z_mm = -3.175          # Drill tips .125 in past the underside.
 half_cutter_dia_mm = 12.7        # 1/2 in end mill; also cuts the slots.
-face_cutter_dia_mm = 19.05       # 3/4 in end mill.
+face_cutter_dia_mm = 50.8        # 2 in Shrum Tri Fly (shop tools.basebar-trifly).
 r8_collet_gauge_mm = 6.3         # HA: holders.r8-collets-lms-4860.gauge_len_mm.
 drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
 # Archive LMS 6784 set projections from the R8 collet grow with size: 3/16 and
@@ -83,11 +90,23 @@ drill_chuck_gauge_mm = 95.0      # Archive holders.drill-chuck-r8.gauge_len_mm.
 # cutters have no member record, so they are bounded by their neighbours.
 half_mill_projection_min_mm = 41.0
 half_mill_projection_max_mm = 50.0
-face_mill_projection_mm = 57.0
+# Tri Fly projection below the 3/4 in collet: photo estimate 28.6–30.2 mm
+# (1-1/8 to 1-3/16 in), from shank and insert scales; replace with a
+# measurement on arrival.
+face_mill_projection_mm = 28.6
 small_mill_projection_min_mm = 25.0
 # Archive drill-index-115 13/32 in member, 112.8 out of drill-chuck-r8: a
 # recorded jobber above both drills here, so it bounds the longest drill.
 drill_projection_max_mm = 112.8
+# Setup 3 touch-offs and probing. Gauge block for the reference touches: the
+# 0.200 in block of the Mitutoyo set (shop-equipment gauges.gauge-blocks-mitutoyo).
+touch_block_mm = 5.08
+# DIY0 TP05 touch probe ball radius: 2 mm ball (listing class; owner's
+# listing unread for it). An error here only shifts how much the probe's X0
+# leaves on the left end for the squaring passes (ZERO END is cut at X0); the
+# calibration in Setup 3 measures it, and a value off by more than 0.05 mm is
+# corrected here and re-posted.
+probe_ball_radius_mm = 1.0
 # Milling-deflection stations, mm along X (bindings cannot do arithmetic).
 # Setup 2: one strap at mid-width ~1 in in from each blank end.
 strap_left_x_mm = 25.4           # 1 in.
@@ -114,9 +133,9 @@ id = "em-half"
 name = "1/2 in end mill"
 ref = "basebar-em-half"
 [[tools]]
-id = "em-face"
-name = "3/4 in end mill"
-ref = "basebar-em-face"
+id = "face-mill"
+name = "2 in Tri Fly"
+ref = "basebar-trifly"
 [[tools]]
 id = "spot"
 name = "#2 centre drill"
@@ -137,6 +156,10 @@ ref = "basebar-tap"
 id = "counterbore"
 name = "5/16 in end mill"
 ref = "basebar-counterbore"
+[[tools]]
+id = "probe"
+name = "3D touch probe"
+ref = "basebar-probe"
 
 [[setups]]
 machine_kind = "other"
@@ -196,19 +219,25 @@ milling_cuts = [
 ]
 
 # One clamping per bar from the side-2 face to the counterbores (owner ruling
-# 2026-11-16, "merge"): the holes keep the ZERO END squared and the ZERO EDGE
-# edge-found here, with no re-clamp or second edge-find between them.
+# 2026-11-16, "merge"): the holes keep the ZERO END squared here, with no
+# re-clamp between them. NC (cam:ch_rocker_arm_tl_oblique_base_bar): one file
+# per bar, BB02 bar 1 and BB03 bar 2, from the side-1 face through the flip
+# stop, the side-2 face and the probe's X0 to the last hole, M6 tool changes
+# expanded by CNCjs (Main relaying the owner, 2026-11-16). Controller, tool
+# setter and touch probe: cad/config/shop-equipment.toml
+# cnc.pm-30mv-controller, fixtures.tool-setter-ets and
+# gauges.touch-probe-diy0-tp05.
 [[setups]]
 machine_kind = "other"
-title = "Face, square ends, slots, drill / tap / counterbore in vise"
+title = "Face (Tri Fly), square ends, slots, drill / tap / counterbore in vise"
 # The PM-30MV is CNC-converted (GRBL, X/Y ballscrews, ±0.02 mm repeatability:
 # cad/config/shop-equipment.toml cnc.pm-30mv); its DRO still reads back.
-machine = "PM-30MV CNC (GRBL) / vise, swivel off; inch DRO"
+machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter and the 3D touch probe) / vise, swivel off; inch DRO"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "Vise indicated <.001 along X. On 1-3/8 in parallels inside the jaw ends; blank centred, ZERO EDGE at fixed (back) jaw; top {{cad.jaw_standout_in:.2dot}}–{{cad.jaw_standout_blank_in:.2dot}} above jaws. Jacks, touch only: X {{process.jack_left_x_in:.1f}} Y {{process.jack_left_y_in:.1f}}; X {{process.jack_right_x_in:.1f}} Y {{process.jack_right_y_in:.1f}} (X from ZERO END), kept as set through the holes. After the side-2 face, do not unclamp until the counterbores are done."
-datum = "Facing: Z0 underside from measured thickness. Y0: edge-find ZERO EDGE once at the fixed jaw; it stays there through the flip. After the side-2 face, for the ends, slots and holes: X0 = ({{process.blank_length_in:.4f}} − {{cad.length_in:.4f}})/2 inside the faced blank's left end, which BB04 squares to ZERO END; Z0 = top face; drawing Y becomes −Y."
-diagram = { file = "diagrams/face.svg", alt = "Bar in vise on 1-3/8 in parallels, ZERO EDGE at fixed jaw, top just above the jaws, jacks touching under both overhangs; 3/4 in end mill faces the full length, side 1 then side 2 after an end-for-end flip. Then, without unclamping, the 1/2 in end mill squares the left end (ZERO END) and the right end to length, the upper face is marked (bar 1 C'BORE SIDE, bar 2 RAIL SIDE), the slots are milled and the holes are spotted, drilled, tapped and counterbored." }
+holding = "Vise indicated <.001 along X. On 1-3/8 in parallels inside the jaw ends; blank centred on the jaw-centre mark by eye (±10 mm), ZERO EDGE at fixed (back) jaw; top {{cad.jaw_standout_in:.2dot}}–{{cad.jaw_standout_blank_in:.2dot}} above jaws. Jacks, touch only: X {{process.jack_left_x_in:.1f}} Y {{process.jack_left_y_in:.1f}}; X {{process.jack_right_x_in:.1f}} Y {{process.jack_right_y_in:.1f}} (X from ZERO END), kept as set through the holes. After the flip, do not unclamp until the counterbores are done."
+datum = "One G54 for both bars while the vise and parallels stay put. Z0 = the parallels' top, set once per vise setup (first operation); the faced top is then Z {{cad.thickness_in:.4f}} with no top-face touch-off: the side-2 face makes it so. Y0 = the fixed jaw face (ZERO EDGE), edge-found once per vise setup. X: set roughly once per vise setup from the fixed jaw's left end; after the flip the file's touch probe finds the bar's left end and sets X0 ({{process.blank_length_in:.4f}} − {{cad.length_in:.4f}})/2 inside it, where the file squares ZERO END. Drawing Y becomes −Y."
+diagram = { file = "diagrams/face.svg", alt = "Bar in vise on 1-3/8 in parallels, ZERO EDGE at fixed jaw, top just above the jaws, jacks touching under both overhangs; the 2 in Tri Fly faces the full length, side 1 then side 2 after an end-for-end flip, Z0 on the parallels' top. Then, without unclamping, the touch probe finds the left end, the 1/2 in end mill squares it (ZERO END) and the right end to length, the upper face is marked (bar 1 C'BORE SIDE, bar 2 RAIL SIDE), the slots are milled and the holes are spotted, drilled, tapped and counterbored." }
 # The face cutter runs past both ends; the end cutter centre runs D/2 past
 # each end, .04 in below the bar. Deepest: the drill tips; longest tool: a
 # drill in the drill chuck; shortest: the 5/16 in counterbore in an R8 collet.
@@ -227,29 +256,83 @@ gauge_checks = [
   { gauge = "mill-x-dro", band_mm = "{{cad.bracket_x2_band_mm}}" },
 ]
 
+# Tool lengths (Main relaying the owner, 2026-11-16): there is no touch plate,
+# so Z0 is the parallels' top, set with the reference tool (T1) and a gauge
+# block, and every tool's length is a CNCjs-made G43.1 offset. The offset is
+# the tool's machine Z at the tool setter's trigger (mposz, verified in the
+# CNCjs 1.11.5 GrblController tool:change source), so it carries no reference
+# value to record and does not depend on Z0, G92 or the previous offset;
+# CNCjs' own TLO policy computes from posz, which includes the active offset
+# (and FluidNC 3.7.8 reports a changed offset only with its next periodic
+# WCO). Touch Plate Height stays free for the WHB04B pendant's Probe-Z. The
+# Tri Fly cannot sit on the 20 mm setter plate: a macro sets its offset from a
+# gauge-block touch on the fixed jaw top, referenced to T1's at the same touch
+# (CNCjs %global variables, kept for the CNCjs session). Z0 stays a T1 touch,
+# not a probe touch: the probe's length comes off the tool setter with its
+# own or the setter's trigger travel, so a probed Z0 would sit that travel off
+# the cutting tools' Z0 until calibrated against a T1 touch.
+[[setups.operations]]
+instruction = "Once per vise setup, no bar in (detailed sheet for the once-only probe wiring and calibration): CNCjs settings and macros as in the table. T1 (1/2 in end mill) in: console M6 T1. 0.200 in gauge block on a parallel, T1 just dragging on it: G10 L20 P1 Z{{process.touch_block_mm:.3f}}. Block on the fixed jaw top, T1 dragging: macro Record jaw. Edge-find the fixed jaw face: Y0; its left end: X {{cad.vise_centred_overhang_mm:.3f}} − 2.540 mm. Scribe the jaw centre. Then the dry run in air."
+instruction_detailed = "Once only, before the first probe use: 1) 6 mm R8 collet in hand (to buy, owner 2026-11-16); the probe is not held any other way. 2) Wiring: the probe's cable red to +5 V (not more: its idle signal sits at the supply), black to GND, yellow to the controller's probe input gpio.5 through a Schottky diode, cathode at the probe signal, anode at gpio.5; the owner changes the FluidNC config's probe pin from gpio.5:high:pd to gpio.5:low:pu. Never wire the signal straight to gpio.5. 3) Calibration, probe in the 6 mm collet, spindle never run: indicate the ball turning the spindle by hand, under 0.01 mm TIR (the probe's four side screws adjust it); ten G38.2 touches on one face of a gauge block, backing off between, trigger positions within 0.01 mm; touch a 1.000 in block from both sides in X: effective ball radius = (right touch X − left touch X − 25.4)/2, within 0.05 mm of process.probe_ball_radius_mm ({{process.probe_ball_radius_mm:.3f}}), else set it there and re-post. Once per vise setup (vise indicated, parallels in, no bar), and again after any change to the CNCjs tool settings: 4) Tool setter (Tormach-style, normally open, 20 mm plate) bolted to the table right of the vise, at least 1 in past the finished bar's right end, its top below the parallels' top ({{process.vise_bed_height_mm:.1f}} + {{process.parallel_height_mm:.3f}} mm above the table): only the end cutter and the drill tips go below that, and only at the bar. 5) CNCjs Tool widget: the settings in the table, Tool Change Policy Manual Tool Change (Custom Probing), the custom commands exactly as in the table; Touch Plate Height stays the pendant's plate (the commands do not read it). 6) T1, the 1/2 in end mill out 1.92 in (48.8 mm): type M6 T1 in the console, follow its two stops (spindle off). 7) Z0: the 0.200 in gauge block on a parallel, lower T1 in .001 steps until the block just drags under it, send G10 L20 P1 Z{{process.touch_block_mm:.3f}}. 8) Jaw reference: block on the fixed jaw top, T1 just dragging, run macro Record jaw (CNCjs keeps it until CNCjs restarts; after a restart, put T1 in, M6 T1, record it again). 9) Edge-find the fixed jaw face: Y0. Edge-find the fixed jaw's left end: set X {{cad.vise_centred_overhang_mm:.3f}} − 2.540 mm (a centred bar's ZERO END, near enough to face by; the file's probe sets the true X0). Scribe the jaw centre on the fixed jaw's top. 10) Dry run in air, the positive control, before the first bar: M6 T1, M6 T3 (#2 centre drill), M6 T1 again, from the console; $# after each: T1's TLO the second time within .0005 in (0.013 mm) of the first, T3's minus T1's equal to their length difference (calipers, collet face to tip) within 0.1 mm, and T1 on the block on the parallel reads Z {{process.touch_block_mm:.3f}} ±.0005. Any miss: stop, recheck the setter's cable and the custom commands."
+feed = "hand"
+
+[setups.operations.table]
+columns = ["CNCjs", "Set to"]
+rows = [
+  ["Tool Change Policy", "Manual Tool Change (Custom Probing)"],
+  ["Tool Change X/Y/Z", "Jog to a spot clear of the vise where the spindle is easy to reach, Z near its top; Get Position"],
+  ["Tool Probe X/Y", "Over the tool setter's plate centre; Get Position"],
+  ["Tool Probe Z", "With the longest tool in (the #29 drill in the drill chuck, or the tap in its guide if longer), 5 mm above the plate; Get Position"],
+  ["Tool Probe Distance", "Tool Probe Z down to 5 mm below the shortest tool's (5/16 in end mill) trigger, measured by jogging"],
+  ["Tool Probe Feedrate", "300 mm/min (the fast seek; the commands re-probe at 20)"],
+  ["Custom probe commands", "G91 [tool_probe_command] F[tool_probe_feedrate] Z[tool_probe_z - mposz - tool_probe_distance] | G0 Z2 | G38.2 F20 Z-4 | %wait 1 | %global.tlo = mposz | G43.1 Z[global.tlo]   (one per line, in that order)"],
+  ["Macro Record jaw", "%wait | %global.jaw = mposz - global.tlo   (T1, after its M6, on the block on the fixed jaw top)"],
+  ["Macro Tri Fly TLO", "%wait | G49 | %global.tlo = mposz - global.jaw | G43.1 Z[global.tlo]   (Tri Fly on the same block on the fixed jaw top)"],
+]
+
 [[setups.operations]]
 speed_kind = "spindle"
-tool = "em-face"
+tool = "face-mill"
 sizing = "other"
-instruction = "Face full length by programs BB02/BB03: zigzag passes along X (climb on alternate passes: ball screws, owner ruling 2026-11-16), .60 stepover, .02 past each edge. Side 1: one level, ~half the allowance. Flip end-for-end, ZERO EDGE at fixed jaw; side 2: one level to {{cad.thickness_in:.4f}}."
-# TODO(#2850): facing is ~107 min of the two bars' cutting at these chart
-# speeds (850 rpm, .002 in/tooth); measure the 3/4 in face mill with dechatter
-# and move to a measured record as the edges did (#2846).
-settings = "basebar-face-6061-t6511"
+instruction = "Per bar: mic the blank at both ends and mid-length, {{process.blank_thickness_min_in:.3f}}–{{process.blank_thickness_max_in:.3f}}, else stop. Clamp it centred on the jaw mark. Tri Fly in; 0.200 block on the fixed jaw top, an insert just dragging: macro Tri Fly TLO. Run BB02 (bar 1) or BB03 (bar 2): side 1, zigzag along X (ball screws, owner ruling 2026-11-16). At its stop: unclamp, flip end-for-end, side 1 down, ZERO EDGE at the fixed jaw, centred, re-clamp, Cycle Start: side 2 to Z {{cad.thickness_in:.4f}}."
+instruction_detailed = "Per bar. Mic the blank at both ends and mid-length: every reading {{process.blank_thickness_min_in:.3f}}–{{process.blank_thickness_max_in:.3f}}, else stop: the file faces side 1 at a fixed Z, half the nominal allowance off, which cleans up only that band. Out of band, do not run the file on that blank: a thick one gets side 1 skimmed by hand first (Tri Fly, one level, by the DRO) until every reading is inside the band, then is miked again; a thin one is set aside for the owner (side 1 might not clean up). Clamp the blank centred on the jaw mark by eye. Tri Fly (2 in, three TCGT inserts) in the 3/4 in collet, out {{process.face_mill_projection_mm:.1f}} mm. Its length cannot be set on the tool setter: lay the 0.200 in block on the fixed jaw top beside the bar, turn the spindle by hand so one insert is over the block, lower until the insert just drags on it, run macro Tri Fly TLO; the Tri Fly then reads Z as T1 did on the block there. Take the block off the jaw: the first pass of each side runs partly over the fixed jaw. Run BB02 (bar 1) or BB03 (bar 2): side 1, one level, zigzag passes along X (climb on alternate passes: ball screws, owner ruling 2026-11-16), five passes, each taking 1.12 in of the width, the first from the fixed-jaw side. The file then lifts the Tri Fly, stops the spindle and pauses: unclamp, flip end-for-end, side 1 down on the parallels, ZERO EDGE at the fixed jaw, centred on the mark, re-clamp, jacks touching, Cycle Start. Side 2, one level to Z {{cad.thickness_in:.4f}}, the finished top, four passes of 1.38 in. From here the top is at that Z: every later depth is posted from the parallels' top, so do not unclamp."
+# Tri Fly at 2500 rpm, .004 in/tooth (owner, 2026-11-16); #2850 keeps the
+# dechatter sweep open. Side 1 cuts at most blank max − (blank + finished)/2
+# (0.508 mm), side 2 the other half of the nominal allowance (0.381 mm).
+# radial_woc_mm is what each posted pass takes of uncut width, the first pass
+# included (the recipe's _face_layout; the NC check measures it). Side 1 at
+# four passes (34.925 mm) failed prechips milling_deflection: 0.0288 mm at the
+# bar end on the 142 mm cantilever past the jaws, over the 0.025 mm finish
+# limit, from prechips' axial-force assumption (prechips#429). Five passes of
+# 28.448 mm bring it to ~0.0235 mm (force scales with the radial width); side
+# 2 keeps four, 35.052 mm (~0.0217 mm). Main, 2026-11-16: neither the jacks
+# (they take a push, not lift) nor a narrower blank band is credited instead.
+settings = "basebar-trifly-6061-t6511"
 milling_cuts = [
-  { name = "side 1 face", kind = "end", phase = "finish", material = "aluminum_6061", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 4, axial_doc_mm = 0.381, radial_woc_mm = 15.24, rpm = 850, feed_mm_min = 172.72, traverse_mm = [0, "{{cad.blank_length_mm}}"] },
-  { name = "side 2 face", kind = "end", phase = "finish", material = "aluminum_6061", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 4, axial_doc_mm = 0.381, radial_woc_mm = 15.24, rpm = 850, feed_mm_min = 172.72, traverse_mm = [0, "{{cad.blank_length_mm}}"] },
+  { name = "side 1 face", kind = "end", phase = "finish", material = "aluminum_6061", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 3, axial_doc_mm = 0.508, radial_woc_mm = 28.448, rpm = 2500, feed_mm_min = 762.0, traverse_mm = [0, "{{cad.blank_length_mm}}"] },
+  { name = "side 2 face", kind = "end", phase = "finish", material = "aluminum_6061", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 3, axial_doc_mm = 0.381, radial_woc_mm = 35.052, rpm = 2500, feed_mm_min = 762.0, traverse_mm = [0, "{{cad.blank_length_mm}}"] },
 ]
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "probe"
+sizing = "other"
+instruction = "Same file, M6 T8 (SPINDLE OFF - PROBE IN): the 3D touch probe in the 6 mm collet; CNCjs measures it on the tool setter. The file probes the bar's left end at mid-thickness (seek, back off, slow touch) and sets X0 ({{process.blank_length_in:.4f}} − {{cad.length_in:.4f}})/2 inside it. Never start the spindle with the probe in."
+instruction_detailed = "Same file, M6 T8: CNCjs stops at the tool-change position with the spindle off; put in the 3D touch probe, cable plugged, in the 6 mm R8 collet, Cycle Start; CNCjs probes its ball on the tool setter. The file then moves the probe beside the bar's left end, lowers it to mid-thickness by G38.3 (a bar that is not where expected stops it there, and the next probe move alarms), seeks the end in +X, backs off, touches it again slowly and sets X0 ({{process.blank_length_in:.4f}} − {{cad.length_in:.4f}})/2 inside it with G10 L20 P1, allowing the ball's radius ({{process.probe_ball_radius_mm:.3f}} mm). The left end must be within 20 mm of where the vise-setup X puts it. A probe alarm stops the file with both sides faced and nothing else cut: re-centre the bar on its jaw mark, then run the rest of the file from its M6 T8 line (a copy cut there). Never start the spindle with the probe in."
+feed = "BB02/BB03 program"
 
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-half"
 sizing = "other"
-instruction = "Ends by program BB04 (spindle 2250), 1/2 in end mill out 1.92 in (48.8 mm), as measured. X0 = ({{process.blank_length_in:.4f}} − {{cad.length_in:.4f}})/2 inside the faced blank's left end. Cutter .04 below bar, two equal depth levels. Left end conventional (cutter −Y), .020 passes to X0 (ZERO END); right end conventional (cutter +Y), .010 passes to {{cad.length_in:.4f}}. At BB04's M0 stop: mark ZERO END; mark top: bar 1 C'BORE SIDE, bar 2 RAIL SIDE."
-instruction_detailed = "Ends by program BB04 (spindle 2250). Edge-find the faced blank's left end and set X0 ({{process.blank_length_in:.4f}} − {{cad.length_in:.4f}})/2 inside it: BB04 squares that end to X0, which becomes ZERO END. Measure the blank length first: BB04 assumes {{process.blank_length_in:fraction}}, and its first right-end pass takes its .010 plus any excess. More than .013 over (the .6 mm width the narrow setting was measured to), take the excess off the right end by hand first. The cutter runs .04 below the bar, just past each end, clear of parallels and jacks, at two equal depth levels, ≤ .30 each. Left end: conventional, table moving away from you (cutter −Y), .020 passes to X0. Right end: conventional, table moving toward you (cutter +Y), .010 passes to cutter-centre X = {{cad.length_in:.4f}} + .250. BB04 then stops at M0 for the slots' spindle speed: there, mark ZERO END on both faces and, with ZERO END left and ZERO EDGE at the back jaw, mark the upper face: bar 1 C'BORE SIDE, bar 2 RAIL SIDE."
+instruction = "Ends in the same file: at M6 T1 put in the 1/2 in end mill out 1.92 in (48.8 mm), as measured; CNCjs probes it, then set 2250. Cutter .04 below bar, two equal depth levels. Left end conventional (cutter −Y), .020 passes to X0 (ZERO END); right end conventional (cutter +Y), .010 passes to {{cad.length_in:.4f}}. At the next M0: mark ZERO END; mark top: bar 1 C'BORE SIDE, bar 2 RAIL SIDE; caliper the thickness."
+instruction_detailed = "Ends in the same BB02/BB03 run. At M6 T1 CNCjs stops at the tool-change position: put in the 1/2 in end mill out 1.92 in (48.8 mm), as measured (dechatter v11), Cycle Start; it probes the tool setter and stops again: set the spindle to 2250, Cycle Start. Measure the blank length before the file: it assumes {{process.blank_length_in:fraction}}, and the first right-end pass takes its .010 plus any excess. More than .013 over (the .6 mm width the narrow setting was measured to), take the excess off by hand first, from the end that is left before the flip (it is the right end after it). The cutter runs .04 below the bar, just past each end, clear of parallels and jacks, at two equal depth levels, ≤ .30 each. Left end: conventional, table moving away from you (cutter −Y), .020 passes to X0. Right end: conventional, table moving toward you (cutter +Y), .010 passes to cutter-centre X = {{cad.length_in:.4f}} + .250. The file then stops at M0 for the slots' spindle speed: there, mark ZERO END on both faces and, with ZERO END left and ZERO EDGE at the back jaw, mark the upper face: bar 1 C'BORE SIDE, bar 2 RAIL SIDE; and caliper the thickness at both ends (inspection): the slots, holes and counterbores are posted for a top at Z {{cad.thickness_in:.4f}}."
 settings = "em-half-hss-6061-v11-narrow"
-inspection = "DRO X, before unclamping: right end {{cad.length_min_in:.2f}}–{{cad.length_max_in:.2f}} at both edges."
-gauge_checks = [{ gauge = "mill-x-dro", band_mm = "{{cad.length_band_mm}}" }]
+inspection = "At the M0 before the slots: thickness {{cad.thickness_min_in:.4f}}–{{cad.thickness_max_in:.4f}} at both ends (out: stop); DRO X, before unclamping: right end {{cad.length_min_in:.2f}}–{{cad.length_max_in:.2f}} at both edges."
+gauge_checks = [
+  { gauge = "calipers", band_mm = "{{cad.thickness_band_mm}}" },
+  { gauge = "mill-x-dro", band_mm = "{{cad.length_band_mm}}" },
+]
 milling_cuts = [
   { name = "left end to ZERO END", kind = "side", phase = "finish", material = "aluminum_6061", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = 6.477, radial_woc_mm = 0.508, rpm = 2250, feed_mm_min = 400.05, stations_mm = 0 },
   { name = "right end to length", kind = "side", phase = "finish", material = "aluminum_6061", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = 6.477, radial_woc_mm = 0.254, rpm = 2250, feed_mm_min = 400.05, stations_mm = "{{cad.blank_length_mm}}" },
@@ -264,7 +347,7 @@ milling_cuts = [
 speed_kind = "spindle"
 tool = "em-half"
 sizing = { kind = "band", band_mm = "{{cad.slot_cutter_band_mm}}" }
-instruction = "S1–S2 in the same BB04 run: at its M0 stop set the spindle to 1250, then cycle start. Each step plunges at the cutter-centre corner nearest that slot's jack."
+instruction = "S1–S2 in the same file: at its M0 stop set the spindle to 1250, then cycle start. Each step plunges at the cutter-centre corner nearest that slot's jack."
 rpm = 1250
 feed = "slow hand plunge"
 beam = { axis = "x", hold = "between", extent_mm = [0, "{{cad.length_mm}}"], supports_mm = ["{{process.jack_left_x_mm}}", "{{process.jack_right_x_mm}}"], section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
@@ -305,9 +388,9 @@ rows = "{{cad.slot_rows}}"
 speed_kind = "spindle"
 tool = "spot"
 sizing = "other"
-instruction = "Spot all holes Ø.125: R1–R8 on the CNC by program BB05 (cam:ch_rocker_arm_tl_oblique_base_bar), rail X ±{{cad.rail_station_tol_in:.4f}} as posted; {{cad.bracket_range}} bar 1 only by DRO, X/Y ±{{cad.bracket_position_tol_in:.3f}}. Drill tips .125 past underside. Rail row ±{{cad.rail_row_tol_in:.2f}}."
+instruction = "Same file, M6 T3: spot all holes Ø.125, R1–R8 and (bar 1) {{cad.bracket_range}}, at the posted stations: rail X ±{{cad.rail_station_tol_in:.4f}}, bracket X/Y ±{{cad.bracket_position_tol_in:.3f}}, rail row ±{{cad.rail_row_tol_in:.2f}}. Drill tips .125 past underside."
 rpm = 2800
-feed = "BB05 program (R1–R8); hand (B1–B4)"
+feed = "BB02/BB03 program"
 # Spotting cones are drilled away later; the jaws alone carry them.
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.length_mm}}"], clamp_mm = ["{{cad.vise_centred_overhang_mm}}", "{{process.jaw_right_x_mm}}"], section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
 milling_cuts = [
@@ -323,9 +406,9 @@ rows = "{{cad.hole_rows}}"
 speed_kind = "spindle"
 tool = "rail-drill"
 sizing = { kind = "tap_drill", tap = "tap" }
-instruction = "R1–R8 through on the CNC by program BB07 (cam:ch_rocker_arm_tl_oblique_base_bar), R1–R4 over the left jack; full-retract pecks of one drill diameter (L/D 4)."
+instruction = "Same file, M6 T4: R1–R8 through, R1–R4 over the left jack; full-retract pecks of one drill diameter (L/D 4)."
 rpm = 2800
-feed = "BB07 program"
+feed = "BB02/BB03 program"
 beam = { axis = "x", hold = "between", extent_mm = [0, "{{cad.length_mm}}"], supports_mm = ["{{process.jack_left_x_mm}}", "{{cad.vise_centred_overhang_mm}}"], section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
 milling_cuts = [
   { name = "R1–R4", kind = "drill", phase = "finish", material = "aluminum_6061", cutter_dia_mm = 3.4544, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = [9.964, 69.964, 129.964, 189.964] },
@@ -335,9 +418,9 @@ milling_cuts = [
 speed_kind = "spindle"
 tool = "rail-drill"
 sizing = { kind = "tap_drill", tap = "tap" }
-instruction = "R5–R8 in the same BB07 run, over the right jack."
+instruction = "R5–R8 in the same run, over the right jack."
 rpm = 2800
-feed = "BB07 program"
+feed = "BB02/BB03 program"
 beam = { axis = "x", hold = "between", extent_mm = [0, "{{cad.length_mm}}"], supports_mm = ["{{process.jaw_right_x_mm}}", "{{process.jack_right_x_mm}}"], section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
 milling_cuts = [
   { name = "R5–R8", kind = "drill", phase = "finish", material = "aluminum_6061", cutter_dia_mm = 3.4544, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = [249.964, 309.964, 369.964, 429.964] },
@@ -347,9 +430,9 @@ milling_cuts = [
 speed_kind = "spindle"
 tool = "bracket-drill"
 sizing = { kind = "band", band_mm = "{{cad.bracket_dia_band_mm}}" }
-instruction = "Bar 1 only: B1–B2 through over the left jack; chip-break pecks after .38 deep (L/D 3)."
+instruction = "Bar 1 only (BB02, M6 T5): B1–B2 through over the left jack; chip-break pecks after .38 deep (L/D 3)."
 rpm = 2800
-feed = "hand"
+feed = "BB02 program"
 beam = { axis = "x", hold = "between", extent_mm = [0, "{{cad.length_mm}}"], supports_mm = ["{{process.jack_left_x_mm}}", "{{cad.vise_centred_overhang_mm}}"], section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
 milling_cuts = [
   { name = "B1–B2", kind = "drill", phase = "finish", material = "aluminum_6061", cutter_dia_mm = 4.8006, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = 47.484 },
@@ -361,7 +444,7 @@ tool = "bracket-drill"
 sizing = { kind = "band", band_mm = "{{cad.bracket_dia_band_mm}}" }
 instruction = "Bar 1 only: B3–B4 over the right jack, as above."
 rpm = 2800
-feed = "hand"
+feed = "BB02 program"
 beam = { axis = "x", hold = "between", extent_mm = [0, "{{cad.length_mm}}"], supports_mm = ["{{process.jaw_right_x_mm}}", "{{process.jack_right_x_mm}}"], section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
 milling_cuts = [
   { name = "B3–B4", kind = "drill", phase = "finish", material = "aluminum_6061", cutter_dia_mm = 4.8006, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = 428.0 },
@@ -371,17 +454,17 @@ milling_cuts = [
 speed_kind = "other"
 tool = "tap"
 sizing = "other"
-instruction = "Tap {{cad.rail_range}} through, {{cad.rail_thread}}, in the spring tap guide."
-instruction_detailed = "Tap {{cad.rail_range}} through, {{cad.rail_thread}}: the tap in the spring tap guide held in the spindle, squared to the quill (owner ruling 2026-11-16; cad/config/shop-equipment.toml tools.spring-tap-guide), spindle off; turn it by hand with tap fluid, backing off to clear chips."
+instruction = "Same file, M6 T6 (spindle stays off): tap {{cad.rail_range}} through, {{cad.rail_thread}}, in the spring tap guide; the file stops over each hole: tap it, back out, Cycle Start."
+instruction_detailed = "Same file, M6 T6: the tap in the spring tap guide held in the spindle, squared to the quill (owner ruling 2026-11-16; cad/config/shop-equipment.toml tools.spring-tap-guide); CNCjs probes the tap's point on the tool setter. The spindle stays off. The file stops over each of {{cad.rail_range}} in turn, the point just above the hole: tap it through, {{cad.rail_thread}}, by hand with tap fluid, backing off to clear chips; back the tap out and Cycle Start for the next hole."
 feed = "hand"
 
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "counterbore"
 sizing = { kind = "band", band_mm = "{{cad.counterbore_dia_band_mm}}" }
-instruction = "Bar 1 only: counterbore B1–B2 {{cad.counterbore_depth_in:.3f}} deep from top, over the left jack."
+instruction = "Bar 1 only (BB02, M6 T7): counterbore B1–B2 {{cad.counterbore_depth_in:.3f}} deep from top, over the left jack."
 rpm = 2000
-feed = "slow hand plunge"
+feed = "BB02 program"
 beam = { axis = "x", hold = "between", extent_mm = [0, "{{cad.length_mm}}"], supports_mm = ["{{process.jack_left_x_mm}}", "{{cad.vise_centred_overhang_mm}}"], section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
 milling_cuts = [
   { name = "B1–B2 counterbores", kind = "plunge", phase = "finish", material = "aluminum_6061", cutter_dia_mm = 7.9375, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = 47.484 },
@@ -393,7 +476,7 @@ tool = "counterbore"
 sizing = { kind = "band", band_mm = "{{cad.counterbore_dia_band_mm}}" }
 instruction = "Bar 1 only: counterbore B3–B4, as above, over the right jack."
 rpm = 2000
-feed = "slow hand plunge"
+feed = "BB02 program"
 beam = { axis = "x", hold = "between", extent_mm = [0, "{{cad.length_mm}}"], supports_mm = ["{{process.jaw_right_x_mm}}", "{{process.jack_right_x_mm}}"], section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
 milling_cuts = [
   { name = "B3–B4 counterbores", kind = "plunge", phase = "finish", material = "aluminum_6061", cutter_dia_mm = 7.9375, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = 428.0 },
