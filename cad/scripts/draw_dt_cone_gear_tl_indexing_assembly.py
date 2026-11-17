@@ -5,9 +5,11 @@ PM BS-0 dividing head, which is shop equipment and is not modelled, and the
 tip gears' phasing comb (item 2, MHA-DT-03-TL-02), which MHA-DT-00 step 1
 fits, not this sheet. The sheet shows the plate face (countersunk side, the
 side that faces out on the head) and the comb under it with their balloons,
-the edge view and the shaded isometric, the BOM, the plate's fitting steps
-and checks, and the indexing table for the three cone gears the plate exists
-for. Hole-circle counts, tooth counts and the worm ratio come from
+the edge view and the shaded isometric, the BOM, a note pointing at the
+plate's fitting steps and checks in the release's ASSEMBLY.md
+(``dt_cone_gear_tl_indexing_assembly_sheet``), and the indexing table for
+the three cone gears the plate exists for. Hole-circle counts, tooth counts
+and the worm ratio come from
 ``dt_cone_gear_tl_index_plate_spec``; this recipe only lays the sheet out
 and never edits the source assembly.
 """
@@ -22,6 +24,7 @@ from typing import Any, Callable
 import _config
 import _telemetry
 import dt_cone_gear_tl_index_plate_spec as plate
+import dt_cone_gear_tl_indexing_assembly_sheet as notes
 import dt_cone_gear_tl_phasing_comb_spec as comb
 from _assembly_contract import assembly_contract
 from _check import check
@@ -100,10 +103,9 @@ ISO_NOTE_XY = (0.120, 0.038)
 # The BOM's template columns print 196.6 mm wide (farm r2 layout audit), so
 # its left edge sits close enough to the views to end inside the right border.
 BOM_ANCHOR = (0.219, 0.262)
-# The BOM's two item rows end above the steps; the steps' twelve lines (4.5
-# mm a line) above the checks, the checks above the indexing table.
+# The BOM's two item rows end above the fitting note (its steps and checks
+# print in ASSEMBLY.md, #2889), the note above the indexing table.
 STEPS_XY = (0.219, 0.228)
-CHECKS_XY = (0.219, 0.1665)
 TABLE_XY = (0.219, 0.1335)
 BALLOON_MARGIN = 0.012
 
@@ -132,41 +134,6 @@ BALLOON_ANCHORS = {
 }
 # The kit-frame model point (mm) every view is placed by: the plate's centre.
 PLATE_CENTER_MM = (0.0, 0.0, plate.THICKNESS / 2.0)
-# Item 2 has no fitting here: the drive train's bonding step engages it. It
-# shows under item 1 in the plate's face and edge views at its kit pose,
-# ballooned there (rule 22); the steps say where it is fitted.
-COMB_FITTING_LINE = "ITEM 2 IS FITTED BY MHA-DT-00 STEP 1, NOT ON THE HEAD."
-
-# Steps 1 and 4 reuse the head's own plate screws without a lock: owner
-# ruling RV-01 (the kit's machinist_exceptions) accepts that joint. The head
-# and its screws are shop equipment, named as such and not parts-list rows
-# (RV-02). A step does one thing (rule 22).
-HEAD = "PM BS-0 DIVIDING HEAD (SHOP EQUIPMENT)"
-ASSEMBLY_STEPS = "\n".join(
-    (
-        f"FITTING ON THE {HEAD}",
-        "1. REMOVE THE HEAD'S STOCK INDEX PLATE; KEEP ITS THREE #8 FLAT HEAD",
-        "   SCREWS.",
-        "2. SLIDE ITEM 1 ONTO THE HEAD'S PLATE HUB, COUNTERSUNK FACE OUT",
-        "   (SHEET 2).",
-        "3. TURN ITEM 1 UNTIL ITS THREE COUNTERSINKS LINE UP WITH THE",
-        "   HEAD'S PLATE-SCREW TAPS.",
-        "4. FIT THE SCREWS FROM STEP 1 AND TIGHTEN THEM EVENLY.",
-        "5. SET THE CRANK PIN ON THE CIRCLE THE INDEXING TABLE NAMES.",
-        "6. SET THE SECTOR ARMS TO SPAN THE PIN'S HOLE PLUS THE TABLE'S",
-        "   HOLE SPACES PER TOOTH (10 SPACES = 11 HOLES).",
-        COMB_FITTING_LINE,
-    )
-)
-ASSEMBLY_CHECKS = "\n".join(
-    (
-        "CHECKS",
-        "1. ITEM 1 SITS FLAT ON THE HEAD; NO SCREW HEAD STANDS PROUD.",
-        "2. THE INDEX PIN DROPS INTO EVERY HOLE OF THE CHOSEN CIRCLE.",
-        "3. INDEXING EVERY TOOTH OF ONE BLANK TURN BRINGS THE PIN BACK",
-        "   TO ITS STARTING HOLE.",
-    )
-)
 
 # --- sheet 2: the exploded view ----------------------------------------------
 # Item 1's edge view at 1:1 with what it fits to, which the kit does not
@@ -448,8 +415,7 @@ def _place_sheet(adapter: Any) -> Any:
             f"indexing kit carries {len(landings)} balloons, expected {len(BOM_COMPONENTS)}"
         )
     for text, xy, label in (
-        (ASSEMBLY_STEPS, STEPS_XY, "fitting steps"),
-        (ASSEMBLY_CHECKS, CHECKS_XY, "checks"),
+        (notes.FITTING_NOTE, STEPS_XY, "fitting pointer"),
         (INDEXING_TABLE, TABLE_XY, "indexing table"),
         (ISO_NOTE, ISO_NOTE_XY, "isometric scale note"),
     ):
