@@ -21,31 +21,9 @@ import _buildgraph as bg
 from test_part_coverage import PART_DRAWING_EXEMPTIONS
 
 # Metric-only supplier packages: package -> why its sheet stays millimetres.
-# Each reason cites one of its row's ``supplier_skus``.
-METRIC_PACKAGES: dict[str, str] = {
-    "parts/ch-rocker-arm-tl-vn-oblique-carriage-screw": (
-        "DIN 912 / ISO 4762 M4 x 20 socket head screw (McMaster-Carr 91290A168) "
-        "into the HGH15CA carriage's vendor-cut M4 holes, the fastener policy's "
-        "vendor-cut metric exception"
-    ),
-    "parts/ch-rocker-arm-tl-vn-oblique-handwheel": (
-        "HARFINGTON 50 mm handwheel with an 8 mm bore (Amazon B0DJ3DZT86) for the "
-        "Tr8 leadscrew"
-    ),
-    "parts/ch-rocker-arm-tl-vn-oblique-leadscrew-kit": (
-        "ReliaBot T8 Tr8x2 lead screw cut to 410 mm and its brass flange nut "
-        "(Amazon B085DDHJTW), the Tr8 metric-only vendor line (owner ruling 4, "
-        "2026-11-01)"
-    ),
-    "parts/ch-rocker-arm-tl-vn-oblique-pillow-block": (
-        "uxcell KP08 pillow block with an 8 mm bore insert bearing (Amazon "
-        "B0D2L8M4QR), a metric-only vendor line (owner ruling 4, 2026-11-01)"
-    ),
-    "parts/ch-rocker-arm-tl-vn-oblique-rail-kit": (
-        "NUIBBYED HGR15 rail and HGH15CA carriage kit, 450 mm (Amazon B0C4DJNL33), "
-        "a metric-only vendor line (owner ruling 4, 2026-11-01)"
-    ),
-}
+# Each reason cites one of its row's ``supplier_skus``. None remain since the
+# oblique trammel jig's HGR15/KP08/Tr8 packages were deleted (2026-11-17).
+METRIC_PACKAGES: dict[str, str] = {}
 
 _UNITS = ("in", "mm")
 _MISSING = object()

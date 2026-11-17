@@ -18,7 +18,9 @@ from types import ModuleType
 
 from export_features import OUT as CAD_OUT
 
-CAM_STEMS: tuple[str, ...] = ("ch_rocker_arm_tl_oblique_base_bar",)
+# No part is enrolled since the oblique trammel jig's base bar was deleted
+# (2026-11-17); the CNC migration enrols machine parts here.
+CAM_STEMS: tuple[str, ...] = ()
 PROCESS_ROOT = Path(__file__).resolve().parents[1] / "process"
 SCRIPTS_DIR = Path(__file__).resolve().parent
 # Executed by freecadcmd, never imported on the host: an input of every cam task.

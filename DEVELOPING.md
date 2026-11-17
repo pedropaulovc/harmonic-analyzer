@@ -417,12 +417,6 @@ bytes for private mutation fixtures. Keep each case's writable checkout, task
 state and invalidation checks isolated. Error-budget timings must retain the
 configured draws, seeds, reference cases and numerical acceptance checks.
 
-The oblique-jig drawing's fake native owners use a per-test, saved source path,
-not the real `cad/out/sldasm` source. On Windows, a file disappearing between a
-resolver's native lookup and prefix-removal probe can leave `\\?\` on only one
-of two resolutions of the same input, so a fixture reading live build outputs is
-not isolated from concurrent artifact publication.
-
 The startup-retry cases in `test_machinist_review.py` use a test-local MCP
 poll clock and a fixed number of pending responses. A proxy of only that test's
 `machinist_review.asyncio` binding arms a real startup `Timeout` when polling
@@ -2039,8 +2033,7 @@ build):
   cannot change cache outcomes.
 
 **Vendor-part builds are actionable.** An actual vendor-part `part:` build (its
-stem contains `_vn_`, such as `part:sm_vn_counter_spring` or
-`part:ch_rocker_arm_tl_vn_oblique_rail_kit`) emits a
+stem contains `_vn_`, such as `part:sm_vn_counter_spring`) emits a
 `!!` / OTel `WARN` immediately before its COM execution, with structured `label`
 and `cache.key` (the 12-character prefix shared with phase spans and the console),
 plus the full `key_full` for correlation with cache events and recipe manifests.

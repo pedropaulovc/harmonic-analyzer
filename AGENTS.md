@@ -110,7 +110,7 @@ used by one assembly takes that parent's prefix plus `vn` and is numbered from
 Shared: one native model per supplier-qualified SKU. A SKU qualifies as Shared
 when more than one assembly uses it directly, or when its installed members
 take more than one modelled form even inside one assembly (the chain's inner
-and outer links, the clamping kit's stud, T-nut and flange nut). It is one
+and outer links). It is one
 shared `sh-vn-<name>` native model, registry row and drawing package,
 `MHA-SH-VN-NN` from `50`; every consumer references it, and the differing
 members are named configurations of that one model, never separate
@@ -490,8 +490,8 @@ it checks part identity, the adjacent STEP name and sha256, a non-empty features
 table and each feature's face set against that STEP; neither it nor
 `export_features` validates against a prechips schema.
 
-Each part in `_process_plans.TRAVELER_STEMS` (the oblique-trammel base bar, end
-bracket, feed lever, riser, pivot block, feed block, leadscrew kit and carrier)
+Each part in `_process_plans.TRAVELER_STEMS` (none since the oblique trammel jig
+was deleted, 2026-11-17)
 has a `prechips:<stem>` task. `build` runs every one, so each build that
 produces the drawing PDFs also produces the traveler PDFs; `build_bare` runs
 none. `release` runs every one too
@@ -538,16 +538,15 @@ nominal), not prechips example values. Only exit 0 from both profiles and a prin
 PDF passes; exit 2 from either profile is a prechips refusal (bad input or a failed
 enforced check) and leaves no traveler file nor a stamp. The task is not cache-keyed and always runs when asked
 (`uptodate: [False]`), because its generator version floats. A stem without a
-plan fails only its own task. Every plan needs prechips 0.11.4 (released):
-each plan's `[cad]` table names a neutral adapter (`base_bar`, `riser`,
-`carrier`, …) and the manifest's `part` id; see `cad/process/README.md` for
+plan fails only its own task. Each plan's `[cad]` table names a neutral prechips
+adapter and the manifest's `part` id; see `cad/process/README.md` for
 which release brought each binding. prechips adapters are tied to the manifest's
 contents, so a drawing change that alters a part's manifest requirements needs
 a prechips adapter release before that part's traveler passes again.
 A generated traveler is not machining approval.
 See [feature exports and travelers](cad/docs/pipeline/features-travelers.md).
 
-Each part in `_cam_programs.CAM_STEMS` (the oblique-trammel base bar) has an
+Each part in `_cam_programs.CAM_STEMS` (none since 2026-11-17) has an
 opt-in `cam:<stem>` task, run by `cad/scripts/cam_nc.py`. Its recipe,
 `cad/process/<stem>/cam.py`, derives every part dimension, cut step, cutter
 diameter, speed and feed from the part's `features.toml`, its `plan.toml` and
@@ -560,7 +559,7 @@ posts with FreeCAD's `grbl` post, joining a program's sections into one file:
 `M5`, a `%msg` and `M6 T<n>` at a new tool (CNCjs's Manual Tool Change,
 Custom Probing, expands it into the tool change and tool-setter probe), a
 `%msg` and `M0` at a hand-set speed change, and the recipe's own manual
-sections (operator stops, the base bar's touch-probe X0). The driver then
+sections (operator stops, touch-probe zeroing). The driver then
 checks every file, and every tool section (`FILE@k`), against the recipe's
 `expectations` (`_gcode`), logs each program's
 cutting / air-at-feed / rapid minutes, and writes

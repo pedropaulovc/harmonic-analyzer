@@ -333,9 +333,7 @@ cite = [
 # machines.pm-30mv (prechips has no control or repeatability field). Owner
 # (Pedro) 2026-11-16, relayed by Main: "the PM-30MV is CNC-converted and runs
 # GRBL with ballscrews on X/Y. Positioning repeatability is ±0.02 mm" (owner
-# value). The base bar's rail stations are drilled on it (programs BB05/BB07
-# of cam:ch_rocker_arm_tl_oblique_base_bar; part yaml RV-04), and its
-# repeatability is the rail row's hole-to-hole scatter.
+# value).
 [cnc.pm-30mv]
 control = "GRBL"
 drive = "ballscrews on X and Y"
@@ -344,9 +342,8 @@ cite = [
   "Owner (Pedro) 2026-11-16, relayed by Main: PM-30MV CNC-converted, GRBL, ballscrews on X/Y; positioning repeatability ±0.02 mm (owner value).",
 ]
 
-# PM-30MV controller, sender and the tool-length and probing kit the base
-# bar's Setup 3 programs use (cam:ch_rocker_arm_tl_oblique_base_bar; plan
-# Setup 3). Owner (Pedro) 2026-11-16, relayed by Main: the controller's FluidNC
+# PM-30MV controller, sender and tool-length and probing kit. Owner (Pedro)
+# 2026-11-16, relayed by Main: the controller's FluidNC
 # config. Firmware and sender commits as read for the tool-change design:
 # FluidNC v3.7.8 = bdring/FluidNC bc5f3e936a9b4f2c29f0d4b9099d4dcdfffcdc5d,
 # CNCjs v1.11.5 = cncjs/cncjs b56f643a1f178978ba4d416f508ed26ea1db5008.

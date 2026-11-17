@@ -10,17 +10,19 @@ Drawing Numbers use `MHA-<CATEGORY>-<NN>`, with two-digit sequences. `00` is the
 
 Vendor parts are purchased finished parts. Supplier, SKU and commercial-process evidence decides that a part is a vendor part. A vendor part that one assembly uses directly belongs to that assembly. Its stem is the parent assembly's prefix, then `vn`, then the descriptive name, such as `dt-vn-cone-lock-knob`; a name that already began with the parent prefix drops the repeat, so the measuring stick's stop-plate screw is `ms-vn-stop-plate-screw`. Its Number puts `VN` after the parent's category and counts from `50` within that parent: `dt-vn-cone-lock-knob` is `MHA-DT-VN-51`. Containment through a sub-assembly or the top assembly is not direct use.
 
-SH means Shared: one native model per supplier-qualified SKU (supplier plus SKU). A SKU qualifies as Shared when more than one assembly uses it directly, or when its installed members take more than one modelled form, even inside one assembly: the chain's inner and outer links are one SKU used by `pd-paper-drive` alone, and the clamping kit's stud, T-nut and flange nut are one SKU used by the oblique jig alone, and both are Shared. Owner exception, answering Codjiflo P3 on #2187 (comment 4473182209): "option A (one native model per kit SKU, members as named configurations, one drawing package each), BUT the identities stay parent-scoped under `ch-rocker-arm-tl-vn-*` with MHA-CH-06-TL-VN-NN Numbers, not `sh-vn-`. Both kits are used only by this jig." (owner ruling 2026-11-04, relayed by Main). So `ch-rocker-arm-tl-vn-oblique-rail-kit` (MHA-CH-06-TL-VN-83, configurations `Rail` ×2 and `Carriage` ×2) and `ch-rocker-arm-tl-vn-oblique-leadscrew-kit` (MHA-CH-06-TL-VN-84, configurations `LeadScrew` ×1 and `FeedNut` ×1) are each one native model whose members are named configurations. A shared vendor identity is stem `sh-vn-<descriptive-name>`, Number `MHA-SH-VN-<NN>` from `50`, one registry row, one native model and one drawing package. Every consuming assembly references that identity; a parent-scoped copy of a shared SKU is never created, and no compatibility alias or module stands in for a retired parent-scoped identity. A SKU with one installed form used by one assembly stays parent-scoped (`pd-vn-chain-connecting-link`, 6261K108, is the chain's one-form, one-consumer companion). Members of one SKU that differ in form are explicit named configurations of the one shared model; a consumer selects its member configuration explicitly and never relies on the default. Members that share one form use the `Default` configuration. The registry `quantity` of a shared vendor part counts installed member occurrences across the machine, and `configuration_quantities` splits that count per member; neither counts purchase units such as chains, coils or kits, which the drawing package and the supplier evidence disclose separately. Members share one purchase Number; their BOM rows differ by Description. A shared vendor part used only by shop fixtures carries `usage_scope: tooling`, never enters a machine assembly or BOM and is excluded from the machine part counts. See [Shared vendor families](#shared-vendor-families).
+SH means Shared: one native model per supplier-qualified SKU (supplier plus SKU). A SKU qualifies as Shared when more than one assembly uses it directly, or when its installed members take more than one modelled form, even inside one assembly: the chain's inner and outer links are one SKU used by `pd-paper-drive` alone, and it is Shared. A shared vendor identity is stem `sh-vn-<descriptive-name>`, Number `MHA-SH-VN-<NN>` from `50`, one registry row, one native model and one drawing package. Every consuming assembly references that identity; a parent-scoped copy of a shared SKU is never created, and no compatibility alias or module stands in for a retired parent-scoped identity. A SKU with one installed form used by one assembly stays parent-scoped (`pd-vn-chain-connecting-link`, 6261K108, is the chain's one-form, one-consumer companion). Members of one SKU that differ in form are explicit named configurations of the one shared model; a consumer selects its member configuration explicitly and never relies on the default. Members that share one form use the `Default` configuration. The registry `quantity` of a shared vendor part counts installed member occurrences across the machine, and `configuration_quantities` splits that count per member; neither counts purchase units such as chains, coils or kits, which the drawing package and the supplier evidence disclose separately. Members share one purchase Number; their BOM rows differ by Description. See [Shared vendor families](#shared-vendor-families).
 
 Shared physical dimensions live in pure-data `_mcmaster_<sku>.py` modules and in the shared part's own `sh_vn_<name>_spec.py` (or per-member `sh_vn_<name>_<member>_spec.py`) modules, not in a helper named after one consuming parent.
 
-Shop fixtures, the shop-made tooling that holds or gauges one part while it is machined, carry their parent part's Number plus `-TL-<NN>`, sequenced per parent from `01`: `MHA-CH-06-TL-20` is the rocker arm's oblique base bar. The stem is the parent stem plus `-tl-<name>`, such as `ch-rocker-arm-tl-oblique-base-bar`. Fixture parts never enter a machine assembly or BOM, and the table's part counts exclude them. A fixture kit may have its own TL-numbered assembly, such as `ch-rocker-arm-tl-oblique-jig` (`MHA-CH-06-TL-00`, using the `00` assembly convention); it references only its fixture parts and never enters a machine assembly or BOM. Every registered fixture part must belong to a registered assembly, which for a fixture is its kit's TL assembly: the coverage contract (`test_part_coverage.py`) no longer exempts tooling from orphan detection, it only exempts tooling from the machine tree. Tooling that no registered assembly references is retired, not kept as a standalone model; the current fixture kits are the oblique trammel jig, whose logical families use the current tooling part identities below, including three configurations of shared SH-VN-57, two configurations each of the parent-scoped rail kit TL-VN-83 and leadscrew kit TL-VN-84, and the TL-VN-67 flat-head screw that serves both the riser and the feed nut, and the cone gear's dividing-head indexing kit `dt-cone-gear-tl-indexing` (`MHA-DT-03-TL-00`), whose one part is the index plate `MHA-DT-03-TL-01`. The 18 standalone rocker-arm, pivot-bracket and cone-pivot-post fixtures retired on 2026-10-21 (MHA-CH-06-TL-04, TL-05 and TL-10 through TL-19; MHA-CH-08-TL-01 and TL-02; MHA-DT-05-TL-01 through TL-04) keep their rows below and their Numbers are never reissued; any shop-inventory geometry they kept after retirement is historical, last at `45952b66bc:cad/process/shop/inventory.toml`. Bought finished fixture hardware, such as dowels, screws and magnetic bases, is not modelled, except the oblique trammel jig's. Those bought parts are modelled as purchased parts (`process: purchased`) so the jig assembly can run native interference against them. Their direct parent assembly is the jig, `ch-rocker-arm-tl-oblique-jig` (`MHA-CH-06-TL-00`), but apart from shared supplier SKUs their stems and Numbers belong to the namespace of the fixture's parent part, the rocker arm `ch-rocker-arm` (`MHA-CH-06`): the stem is that part's stem plus `-tl-vn-<name>`, and the Number is its Number plus `-TL-VN-<NN>`, counted from `50`. `ch-rocker-arm-tl-vn-oblique-rail-screw` is `MHA-CH-06-TL-VN-61`, and the set runs to `MHA-CH-06-TL-VN-84` (VN-53, VN-58 through VN-60, VN-68 and VN-72 retired, never reissued, with the further retirements and reservations listed below).
+Shop fixtures, the shop-made tooling that holds or gauges one part while it is machined, carry their parent part's Number plus `-TL-<NN>`, sequenced per parent from `01`: `MHA-DT-03-TL-01` is the cone gear's index plate. The stem is the parent stem plus `-tl-<name>`, such as `dt-cone-gear-tl-index-plate`. Fixture parts never enter a machine assembly or BOM, and the table's part counts exclude them. A fixture kit may have its own TL-numbered assembly, such as `dt-cone-tip-gear-tl-cutter` (`MHA-DT-37-TL-00`, using the `00` assembly convention); it references only its fixture parts and never enters a machine assembly or BOM. Every registered fixture part must belong to a registered assembly, which for a fixture is its kit's TL assembly: the coverage contract (`test_part_coverage.py`) no longer exempts tooling from orphan detection, it only exempts tooling from the machine tree. The 18 standalone rocker-arm, pivot-bracket and cone-pivot-post fixtures retired on 2026-10-21 (MHA-CH-06-TL-04, TL-05 and TL-10 through TL-19; MHA-CH-08-TL-01 and TL-02; MHA-DT-05-TL-01 through TL-04) keep their rows below and their Numbers are never reissued; any shop-inventory geometry they kept after retirement is historical, last at `45952b66bc:cad/process/shop/inventory.toml`. Bought finished fixture hardware is modelled only when a fixture kit assembly must run native interference against it; its stem is the fixture parent part's stem plus `-tl-vn-<name>`, and its Number is that part's Number plus `-TL-VN-<NN>`, counted from `50` (`dt-cone-gear-tl-vn-arbor-nut` is `MHA-DT-03-TL-VN-50`).
+
+The rocker arm's oblique trammel jig (`ch-rocker-arm-tl-oblique-jig`, MHA-CH-06-TL-00) was deleted on 2026-11-17 (owner ruling, #2885) with every part only it used: its made parts including the TL-20 base bar and its CAM recipe, its `ch-rocker-arm-tl-vn-*` purchased parts including the rail kit TL-VN-83 and leadscrew kit TL-VN-84, and the tooling-only shared clamping kit `sh-vn-clamping-kit-hardware` (MHA-SH-VN-57). Their rows below are retired and their Numbers are never reissued. Read surviving references to their modules, process plans or sheets as `ebd3bf3b44:<path>`, not as live modules or dependencies.
 
 The 2026-10-21 standalone-tooling retirement removes CAD ownership. The held rocker reference route that kept analytic shop-process checks for the retired risers, shim stacks, filing stand and hub filing kit (`test_process_shop.py` against `cad/process/ch_rocker_arm/plan.toml`) was later deleted with the legacy process plans; its last version is at commit `45952b66bc`. Neither the route nor those checks qualified a physical fixture or machining route. Their historical source is revision `fcfc947c4`, under `cad/scripts/ch_rocker_arm_tl_{riser_block,strap_shim_stack,filing_stand,filing_button,filing_stud}_spec.py` and the corresponding drawing/tests; those are provenance references, not current imports.
 
 Surviving native builders, drawings and specs also cite retired implementations as examples: the outline-template reference sketches and slot marks, the trammel-pivot-plate coordinate mapper and dimension text, `_trammel_block_drawing` edge selector, the trammel-pivot-point angle placement, the filing-stud single-limit setter, the filing-button center-mark audit, the trammel-setting-bar angle orientation, and the cone-post bond-cradle mapper/captions and soft-jaw hole callout. Read each such reference as `fcfc947c4:cad/scripts/<cited module>.py`, not as a live module or dependency. Keeping these historical example comments does not require re-keying every native recipe.
 
-TL-VN-58 to TL-VN-60 are reserved; their Precision Matthews clamping-kit members are now configurations of the shared tooling-only `sh-vn-clamping-kit-hardware` (MHA-SH-VN-57).
+TL-VN-58 to TL-VN-60 are reserved; their Precision Matthews clamping-kit members became configurations of `sh-vn-clamping-kit-hardware` (MHA-SH-VN-57), retired with the jig on 2026-11-17.
 
 Components of a built-up part are the detail parts a finished part may be made from when its own drawing notes permit it (`BUILT_UP_PERMISSION_NOTE` in its notes module). They are ordinary machine parts: each takes the next free Number in its category and its own stem, such as `ch-rocker-hub` (MHA-CH-12) and `ch-rocker-strap` (MHA-CH-13) for the rocker arm MHA-CH-06, and the table's part counts include them. The finished part stays the assembly's part, so a component never enters an assembly or BOM. Its registry row instead names its parent's stem in `component_of`, and the coverage contract (`test_part_coverage.py`) counts it reachable through that parent and refuses a `component_of` parent whose notes do not permit the built-up route. A component's drawing gives it as supplied to the joint; sizes finished after joining print on the parent's drawing only.
 
@@ -35,9 +37,9 @@ Components of a built-up part are the detail parts a finished part may be made f
 | `pn` / `PN` | Pen | 5 | 7 |
 | `ms` / `MS` | Measuring stick | 3 | 1 |
 | `sm` / `SM` | Summing | 4 | 6 |
-| `sh` / `SH` | Shared parts | 2 | 9 (+1 tooling-only kit family) |
+| `sh` / `SH` | Shared parts | 2 | 9 |
 
-The vendor column counts machine vendor families. The 2026-10-20 shared-vendor consolidation moved nineteen parent-scoped vendor identities into eight shared ones: CH lost 1 (8 to 7), DT lost 4 (19 to 15), FR lost 1 (5 to 4), MG lost 3 (7 to 4), PD lost 5 (18 to 13), PN lost 1 (8 to 7) and MS lost 1 (2 to 1); SM is unchanged. SH gained seven machine vendor families (MHA-SH-VN-50 to MHA-SH-VN-56) plus one tooling-only family, `sh-vn-clamping-kit-hardware` (MHA-SH-VN-57, `usage_scope: tooling`), which replaced three oblique-jig fixture identities and is listed separately because fixture hardware is excluded from machine counts. Count it neither as a machine vendor family nor twice. The 2026-10-31 retirement of the MHA-PD-VN-67 pivot shim took PD from 13 to 12. The 2026-11-08 keeper-chain ruling (#2144 item 9.2) retired the MHA-DT-28 anchor eye and the MHA-DT-VN-66 loop link and added the MHA-DT-VN-70 keeper-chain screw: DT parts went from 35 to 34, and DT vendor families stayed at 15. The 2026-11-08 gooseneck ruling (#2144 item 11.4) retired MHA-SM-04 and added the MHA-SM-VN-56 shoulder screw (SM 3 parts, 7 vendor families). The 2026-11-09 spring-hook ruling (#2326) retired the MHA-CH-14 and MHA-SM-VN-55 jam nuts: CH parts went from 13 to 12 and SM vendor families from 7 to 6. The 2026-11-08 gooseneck end-plug rulings (#2315) added the MHA-SM-05 end plug: SM parts went from 3 to 4. The 2026-11-11 bought-pin change (#2339) retired the shop-made MHA-CH-10 rod and MHA-CH-11 bar pivot pins into the `RodPin` and `BarPin` members of one purchased dowel, `sh-vn-pivot-pin` (MHA-SH-VN-58, McMaster 90145A299): CH fabricated parts went from 12 to 10 and SH machine vendor families from 7 to 8. The 2026-11-11 Main ruling on #2409 added the MHA-PD-VN-69 hub key pin and the MHA-PD-VN-70 collar flat pin: PD vendor families went from 13 to 15. The 2026-11-13 platen-rack rulings (#2410) retired the MHA-PD-05 soldered rack and backer and added the MHA-PD-26 feed rack and the MHA-PD-27 bottom guide rail: PD parts went from 23 to 24. The 2026-11-14 rack-screw change (#2410) put the same McMaster 91794A055 #0-80 x 1/4 fillister in a second modelled form, so the MHA-PD-VN-55 disc screws retired into the `DiscScrew` member of the shared `sh-vn-fillister-screw-91794a055` (MHA-SH-VN-59), beside its `RackScrew` member: PD vendor families went from 15 to 14 and SH machine vendor families from 8 to 9.
+The vendor column counts machine vendor families. The 2026-10-20 shared-vendor consolidation moved nineteen parent-scoped vendor identities into eight shared ones: CH lost 1 (8 to 7), DT lost 4 (19 to 15), FR lost 1 (5 to 4), MG lost 3 (7 to 4), PD lost 5 (18 to 13), PN lost 1 (8 to 7) and MS lost 1 (2 to 1); SM is unchanged. SH gained seven machine vendor families (MHA-SH-VN-50 to MHA-SH-VN-56) plus one tooling-only family, `sh-vn-clamping-kit-hardware` (MHA-SH-VN-57), which replaced three oblique-jig fixture identities and was never counted as a machine vendor family; it retired with the jig on 2026-11-17. The 2026-10-31 retirement of the MHA-PD-VN-67 pivot shim took PD from 13 to 12. The 2026-11-08 keeper-chain ruling (#2144 item 9.2) retired the MHA-DT-28 anchor eye and the MHA-DT-VN-66 loop link and added the MHA-DT-VN-70 keeper-chain screw: DT parts went from 35 to 34, and DT vendor families stayed at 15. The 2026-11-08 gooseneck ruling (#2144 item 11.4) retired MHA-SM-04 and added the MHA-SM-VN-56 shoulder screw (SM 3 parts, 7 vendor families). The 2026-11-09 spring-hook ruling (#2326) retired the MHA-CH-14 and MHA-SM-VN-55 jam nuts: CH parts went from 13 to 12 and SM vendor families from 7 to 6. The 2026-11-08 gooseneck end-plug rulings (#2315) added the MHA-SM-05 end plug: SM parts went from 3 to 4. The 2026-11-11 bought-pin change (#2339) retired the shop-made MHA-CH-10 rod and MHA-CH-11 bar pivot pins into the `RodPin` and `BarPin` members of one purchased dowel, `sh-vn-pivot-pin` (MHA-SH-VN-58, McMaster 90145A299): CH fabricated parts went from 12 to 10 and SH machine vendor families from 7 to 8. The 2026-11-11 Main ruling on #2409 added the MHA-PD-VN-69 hub key pin and the MHA-PD-VN-70 collar flat pin: PD vendor families went from 13 to 15. The 2026-11-13 platen-rack rulings (#2410) retired the MHA-PD-05 soldered rack and backer and added the MHA-PD-26 feed rack and the MHA-PD-27 bottom guide rail: PD parts went from 23 to 24. The 2026-11-14 rack-screw change (#2410) put the same McMaster 91794A055 #0-80 x 1/4 fillister in a second modelled form, so the MHA-PD-VN-55 disc screws retired into the `DiscScrew` member of the shared `sh-vn-fillister-screw-91794a055` (MHA-SH-VN-59), beside its `RackScrew` member: PD vendor families went from 15 to 14 and SH machine vendor families from 8 to 9.
 
 SH contains fabricated parts used directly by several assemblies, currently the front and back column clamps, `sh-column-clamp-front` (MHA-SH-01) and `sh-column-clamp-back` (MHA-SH-02), and the shared vendor parts listed under [Shared vendor families](#shared-vendor-families). Each keeps one shared identity. The wheel axle nut, `mg-vn-wheel-axle-nut`, is a vendor part by commercial-process evidence. HA holds the top assembly only: its two former parts, the measuring stick and its stop, moved into the MS category on 2026-10-09 when the stop was re-derived as a block, a plate and stock screws inside their own `ms-measuring-stick` sub-assembly.
 
@@ -80,140 +82,6 @@ Drawing callouts retain complete category-qualified Numbers and process
 information; do not abbreviate Numbers in cross-part callouts.
 Per-configuration Gear Data and linked Manufacturing or Installation Notes
 retain their complete mate identifiers.
-
-### Oblique jig plain-pivot tooling
-
-The owner-approved 2026-10-23 simplification replaces the captured bearing
-cartridges with purchased shoulder screws, spacers and selected shims; the
-2026-10-30 inch ruling (issue #290) swaps the metric shoulder screw for a 3/8
-extended-thread 5/16-18 one whose thread the shop cuts to length. The carrier
-sits on loose spacers over the shim packs on the TL-20 base bars (owner
-rulings 2026-10-27: the .359 shoulder seat leaves the unshimmed gap open at
-every loose band, and a nominal five .008 shims a support close it;
-2026-10-30: face both large faces of each bar). Positive lift capture runs
-carrier → shoulder-screw head → 5/16-18 thread → block → carriage, not through
-a bearing or press fit. Fit the measured head-to-carrier running gap to
-.002–.010 in using the purchased shim stock. The assembly owns the full
-fit-up, torque, lubrication, travel and actual tool/holder clearance checks.
-
-The plain rail-2 pivot block retains MHA-CH-06-TL-22. Rail 1 uses the new
-integral feed block `ch-rocker-arm-tl-oblique-feed-block`, MHA-CH-06-TL-32,
-whose spec owns the nut layout, and the bought brass flange nut, the `FeedNut`
-configuration of the leadscrew kit `ch-rocker-arm-tl-vn-oblique-leadscrew-kit`,
-MHA-CH-06-TL-VN-84, supplied with its ReliaBot `LeadScrew` (owner option B, 2026-11-04: its 1.5 mm spigot is
-faced off so the flange seats flat on the lug, held by four TL-VN-67 #4-40
-X 5/8 82° flat-head screws, the riser screw's McMaster 91771A112, in Ø4.6
-countersinks on its 16 mm PCD at 0.3 N·m, no dowel; it retires the shop-made
-TL-27 nut of 2026-11-01, the TL-VN-81 dowel and the TL-VN-66 nut screw). The
-lug's nut taps are transferred from
-the seated nut at TL-00 assembly (Main ruling 2026-11-03). Both blocks use new 6061 1 × 3-1/2 in bar; TL-28 end brackets use
-owned OnlineMetals 1165 1/2 × 1 in bar on edge, raising the screw axis to
-Z52.4. The owned 1164 1/2 × 3/4 in stock is spare.
-
-The 2026-11-06 centred-block relayout puts each pivot bore and the
-1.64 × 1.58 in block on its HGH15CA carriage centre. The carrier's pin holes
-and cutter circles stay unchanged; carriage travel is 75.215–389.366 mm on
-the retained 439.928 mm rails. The feed nut now seats on the lug's +X face,
-body away from the spindle. Near KP08 station is 62.484 mm (2.46 in);
-the far station remains 443 mm. The native LeadScrew cut is 419.5 mm.
-Clearance stacks include both #8 mounting joints' full hole float and their
-station bands, not a no-slip assumption. KP08 axis height/foot thickness
-remain unverified (#2184). Native block bore/dimension readbacks, one-free-DOF
-proof and driven whole-assembly interference at both passes remain mandatory;
-analytic separating axes and generated sweep targets are not native results.
-Feed-tap cylinder radii are checked against the committed Hole Wizard
-`ThruTapDrillDiameter`, after checking its three-decimal catalogue identity;
-the rounded tap-drill table is not an exact native-radius oracle. Missing
-or displaced cylinders still refuse, reporting the observed axes and sizes.
-The centred-block sheets keep B-B on the -X M4 column, with its upper arrow
-above the X-dimension tiers and its lower arrow below the clearance-hole
-leader. Native dimensions and normal fonts remain; the .308 text sits clear
-of its narrow datum-witness span. Retained-PDF lane measurements guide this
-placement but do not replace the fresh native drawing/layout/review gates.
-TL-32 keeps its VIEW D sheet reference beneath that direction letter, separate
-from the counterbore callout. The counterbore leader stays above the direction
-arrow and identifies its floor through B-B, not through the nut-face sheet.
-TL-VN-84 retains its associative 3:1 end details and normal text; the detail
-bank reserves the settled native frames as well as the geometric fences.
-Containment is read again after projection settlement and in the final sheet
-callback: a smaller early `GetOutline` does not prove the finished view fits.
-
-TL-00's last sheet, LINEAR MOTION FROM ABOVE (owner, PR4 #2227), is the
-arrangement's named plan of the same assembly with the TL-21 carrier and
-every occurrence locked to it (riser and its four screws, feed lever with its
-screws and wedge-lock washers, the TL-VN-85 hub washer, the two loose
-SM-VN-53 stop pins and the common TL-VN-61 screw's CL, CR and HUB clamp
-occurrences) hidden in that one drawing view. The common screw is hidden by
-occurrence, not by stem: its rail and TL-28 bar occurrences stay drawn. The
-base bars, rails, carriages, both blocks, the shoulder screws with their
-spacers and shims, the leadscrew feed, the hold-downs and all of their
-fasteners stay drawn; ten BOM balloons name the slide and feed parts. No
-configuration, display state or model hide exists for it: the model, its BOM,
-interference, sweeps and every other sheet keep the full assembly.
-
-New purchases are TL-VN-77 shoulder screws (Huyett BLTS40-0375-1500188P,
-thread shop-cut), TL-VN-78 spacers (AluminumSpacers.com AS62-18-40) and TL-VN-79
-shims (Huyett SHIM-0375-008 nominal; SHIM-0375-004/-020 fitting stock);
-the CL and CR end clamps and the HUB clamp are the common MHA-CH-06-TL-VN-61
-#8-32 X 3/4 SHCS (McMaster 91251A197) into TL-21's ordinary #8-32 THRU taps; the HUB
-is tapped in situ and its strap reamed at the same position. The HUB clamp bears on the
-bought brass #8 SAE flat washer MHA-CH-06-TL-VN-85 (McMaster 90231A116, used as
-supplied; owner ruling 2026-11-13, #2448), centred by its screw and seated flat on the
-strap over the reamed hole; the end clamps bear directly on the strap. The TL-VN-53 CL dowel (McMaster
-98381A542) and the TL-VN-68 CR clamp screw are retired; no hub stud, sleeve or low-head
-screw is carried. The loose 1/8 in stops physically reuse the existing MHA-SM-VN-53 stock
-pin (`sm-vn-knife-mount-dowel`, SKU 98381A473) with no CH alias. The clamps and washer
-belong only to the jig, never a machine assembly.
-New identity-map rows use their canonical stem as source key,
-`old_number: null`, and the introduction date.
-
-Retirement records below reserve TL-23, TL-25, TL-27, TL-29, TL-30, TL-31, TL-52,
-TL-VN-50, TL-VN-51, TL-VN-52, TL-VN-53, TL-VN-54, TL-VN-55, TL-VN-63, TL-VN-65, TL-VN-66, TL-VN-68, TL-VN-70,
-TL-VN-73 through TL-VN-76, TL-VN-80, TL-VN-81 and TL-VN-82 (assigned to the
-feed nut on 2026-11-04 but never released) permanently.
-TL-VN-72 also stays retired. Owned 6200 bearings remain shop stock without
-a jig identity. For a pass change, isolate the machine, support the carrier,
-unscrew both shoulder screws, lift the carrier, move the carriages and refit
-the same carrier on the other hole pair before repeating assembly acceptance.
-
-The `HoldDownStud` configuration of **MHA-SH-VN-57** retains Precision Matthews
-52PCCK-9/16-14mm procurement: **four 1/2-13 × 3 in STOCK studs**, not a
-57.2 mm vendor SKU. Rework only each unused upper free end to **57.2 mm
-finished length, ordinary .X ±0.8 mm**, and restore the cut-end chamfer
-(1.0 mm maximum). Its native configuration and the shared drawing's **REWORK**
-sheet describe the finished reworked stud, not a purchased-identification-only envelope.
-The lower factory end, loaded lower thread interval and insertion remain
-unchanged, as do all anchors, stations, slots, footprints, clamp spans,
-T-nut/flange-nut positions and both full pass sweeps.
-
-Accept the actual installed stud/nut stack only with **G ≥3 mm** to the moving
-block throughout **both complete hand sweeps**, and at least **one
-complete 1/2-13 pitch (25.4/13 mm)** beyond every fully seated flange nut,
-while retaining that nut's **entire actual complete internal thread span**.
-Do not cut an engaged thread, insert a stud deeper to rescue the cut, add a
-hold-down washer or force the assembly; reject an incompatible setup.
-Measure the actual complete-thread setback separately: the cut-end chamfer
-limit alone does not bound incomplete threads or establish nut engagement.
-The complete installed authority is **TL-00, steps 13A–13F, sheet 9**. The
-stud's single REWORK sheet cites that authority rather than duplicating it.
-The studs are cut to the kit sheet's length at step 3 and accepted directly
-in place: 13A gauges .119 MIN under every moving block over both passes,
-13B–13D cut a replacement stud shorter by the missing clearance plus .010
-and refit it, 13E checks one complete pitch beyond each seated nut, and 13F
-stops the setup for the designer when a stud cannot pass (delegated ruling
-2026-11-07 (Main), no precedent; owner review #2144; pending owner
-confirmation). The earlier HD1/HD2 prediction from measured stack intervals
-is retired.
-
-These are actual fit-up requirements, not invented PM kit tolerance bands.
-The 22 mm insertion stack (assumed 14 mm throat + 8 mm foot), 28 mm nominal
-carriage height and 13 mm estimated nut height remain unverified kit inputs.
-TECO 41605's approximately 17.5 mm nut is comparison data, not a PM maximum.
-Explicit measured ranges and their uncertainty are needed to accept the
-installed setup; nominal dimensions alone cannot mark it VERIFIED. Neither
-the free-end trim nor these geometric checks certify preload, mechanical
-strength, bump-force capacity or deflection.
-
 
 ## Drawing package layout
 
@@ -487,18 +355,18 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | retired tooling part | — | — | `ch-rocker-arm-tl-trammel-setting-bar` | MHA-CH-006-TL-17 | — | MHA-CH-06-TL-17 (retired 2026-10-21; never reissued) |
 | retired tooling part | — | — | `ch-rocker-arm-tl-trammel-pivot-point` | MHA-CH-006-TL-18 | — | MHA-CH-06-TL-18 (retired 2026-10-21; never reissued) |
 | retired tooling part | — | — | `ch-rocker-arm-tl-trammel-pivot-plate` | MHA-CH-006-TL-19 | — | MHA-CH-06-TL-19 (retired 2026-10-21; never reissued) |
-| tooling part | — | — | `ch-rocker-arm-tl-oblique-base-bar` | MHA-CH-006-TL-20 | `ch-rocker-arm-tl-oblique-base-bar` | MHA-CH-06-TL-20 |
-| tooling part | — | — | `ch-rocker-arm-tl-oblique-carrier` | MHA-CH-006-TL-21 | `ch-rocker-arm-tl-oblique-carrier` | MHA-CH-06-TL-21 |
-| tooling part | — | — | `ch-rocker-arm-tl-oblique-pivot-block` | MHA-CH-006-TL-22 | `ch-rocker-arm-tl-oblique-pivot-block` | MHA-CH-06-TL-22 |
+| retired tooling part | — | — | `ch-rocker-arm-tl-oblique-base-bar` | MHA-CH-006-TL-20 | — | MHA-CH-06-TL-20 (retired 2026-11-17; never reissued) |
+| retired tooling part | — | — | `ch-rocker-arm-tl-oblique-carrier` | MHA-CH-006-TL-21 | — | MHA-CH-06-TL-21 (retired 2026-11-17; never reissued) |
+| retired tooling part | — | — | `ch-rocker-arm-tl-oblique-pivot-block` | MHA-CH-006-TL-22 | — | MHA-CH-06-TL-22 (retired 2026-11-17; never reissued) |
 | retired tooling part | — | — | `ch-rocker-arm-tl-oblique-pivot-pin` | MHA-CH-006-TL-23 | — | MHA-CH-06-TL-23 (retired 2026-10-23; never reissued) |
-| tooling part | — | — | `ch-rocker-arm-tl-oblique-riser` | MHA-CH-006-TL-24 | `ch-rocker-arm-tl-oblique-riser` | MHA-CH-06-TL-24 |
+| retired tooling part | — | — | `ch-rocker-arm-tl-oblique-riser` | MHA-CH-006-TL-24 | — | MHA-CH-06-TL-24 (retired 2026-11-17; never reissued) |
 | retired tooling part | — | — | `ch-rocker-arm-tl-oblique-hub-pin` | MHA-CH-006-TL-25 | — | MHA-CH-06-TL-25 (retired 2026-10-23; never reissued) |
-| tooling part | — | — | `ch-rocker-arm-tl-oblique-feed-lever` | MHA-CH-006-TL-26 | `ch-rocker-arm-tl-oblique-feed-lever` | MHA-CH-06-TL-26 |
-| tooling part | — | — | `ch-rocker-arm-tl-oblique-end-bracket` | MHA-CH-006-TL-28 | `ch-rocker-arm-tl-oblique-end-bracket` | MHA-CH-06-TL-28 |
+| retired tooling part | — | — | `ch-rocker-arm-tl-oblique-feed-lever` | MHA-CH-006-TL-26 | — | MHA-CH-06-TL-26 (retired 2026-11-17; never reissued) |
+| retired tooling part | — | — | `ch-rocker-arm-tl-oblique-end-bracket` | MHA-CH-006-TL-28 | — | MHA-CH-06-TL-28 (retired 2026-11-17; never reissued) |
 | retired tooling part | — | — | `ch-rocker-arm-tl-oblique-nut-bracket` | MHA-CH-006-TL-29 | — | MHA-CH-06-TL-29 (retired 2026-10-23; never reissued) |
 | retired tooling part | — | — | `ch-rocker-arm-tl-oblique-pivot-cap` | MHA-CH-06-TL-30 | — | MHA-CH-06-TL-30 (retired 2026-10-23; never reissued) |
 | retired tooling part | — | — | `ch-rocker-arm-tl-oblique-pivot-retainer` | MHA-CH-06-TL-31 | — | MHA-CH-06-TL-31 (retired 2026-10-23; never reissued) |
-| new tooling part (2026-10-23) | — | — | — | — | `ch-rocker-arm-tl-oblique-feed-block` | MHA-CH-06-TL-32 |
+| retired tooling part (added 2026-10-23) | — | — | `ch-rocker-arm-tl-oblique-feed-block` | — | — | MHA-CH-06-TL-32 (retired 2026-11-17; never reissued) |
 | retired tooling part | — | — | `ch-rocker-arm-tl-oblique-hub-washer` | MHA-CH-06-TL-52 | — | MHA-CH-06-TL-52 (retired 2026-11-13; never reissued) |
 | retired tooling part | — | — | `ch-rocker-arm-tl-oblique-feed-nut` | MHA-CH-06-TL-27 | — | MHA-CH-06-TL-27 (retired 2026-11-04; never reissued) |
 | retired tooling vendor part | — | — | `ch-rocker-arm-tl-oblique-rail` | MHA-CH-006-TL-30 | — | MHA-CH-06-TL-VN-50 (retired 2026-11-04 into TL-VN-83 `Rail`; never reissued) |
@@ -507,35 +375,35 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | retired tooling vendor part | — | — | `ch-rocker-arm-tl-oblique-cl-dowel` | MHA-CH-006-TL-33 | — | MHA-CH-06-TL-VN-53 (retired 2026-11-07; never reissued) |
 | retired tooling vendor part | — | — | `ch-rocker-arm-tl-oblique-leadscrew` | MHA-CH-006-TL-34 | — | MHA-CH-06-TL-VN-54 (retired 2026-11-04 into TL-VN-84 `LeadScrew`; never reissued) |
 | retired tooling vendor part | — | — | `ch-rocker-arm-tl-oblique-leadscrew-nut` | MHA-CH-006-TL-35 | — | MHA-CH-06-TL-VN-55 (retired 2026-11-01; never reissued) |
-| tooling part | — | — | `ch-rocker-arm-tl-oblique-pillow-block` | MHA-CH-006-TL-36 | `ch-rocker-arm-tl-vn-oblique-pillow-block` | MHA-CH-06-TL-VN-56 |
-| tooling part | — | — | `ch-rocker-arm-tl-oblique-handwheel` | MHA-CH-006-TL-37 | `ch-rocker-arm-tl-vn-oblique-handwheel` | MHA-CH-06-TL-VN-57 |
-| tooling part | — | — | `ch-rocker-arm-tl-oblique-hold-down-stud` | MHA-CH-006-TL-38 | `sh-vn-clamping-kit-hardware` (`HoldDownStud`) | MHA-SH-VN-57 |
-| tooling part | — | — | `ch-rocker-arm-tl-oblique-t-nut` | MHA-CH-006-TL-39 | `sh-vn-clamping-kit-hardware` (`TNut`) | MHA-SH-VN-57 |
-| tooling part | — | — | `ch-rocker-arm-tl-oblique-flange-nut` | MHA-CH-006-TL-40 | `sh-vn-clamping-kit-hardware` (`FlangeNut`) | MHA-SH-VN-57 |
-| tooling part | — | — | `ch-rocker-arm-tl-oblique-rail-screw` | MHA-CH-006-TL-41 | `ch-rocker-arm-tl-vn-oblique-rail-screw` | MHA-CH-06-TL-VN-61 |
-| tooling part | — | — | `ch-rocker-arm-tl-oblique-bracket-screw` | MHA-CH-006-TL-42 | `ch-rocker-arm-tl-vn-oblique-bracket-screw` | MHA-CH-06-TL-VN-62 |
+| retired tooling vendor part | — | — | `ch-rocker-arm-tl-oblique-pillow-block` | MHA-CH-006-TL-36 | — | MHA-CH-06-TL-VN-56 (retired 2026-11-17; never reissued) |
+| retired tooling vendor part | — | — | `ch-rocker-arm-tl-oblique-handwheel` | MHA-CH-006-TL-37 | — | MHA-CH-06-TL-VN-57 (retired 2026-11-17; never reissued) |
+| retired tooling vendor part | — | — | `ch-rocker-arm-tl-oblique-hold-down-stud` | MHA-CH-006-TL-38 | — | MHA-SH-VN-57 `HoldDownStud` (retired 2026-11-17; never reissued) |
+| retired tooling vendor part | — | — | `ch-rocker-arm-tl-oblique-t-nut` | MHA-CH-006-TL-39 | — | MHA-SH-VN-57 `TNut` (retired 2026-11-17; never reissued) |
+| retired tooling vendor part | — | — | `ch-rocker-arm-tl-oblique-flange-nut` | MHA-CH-006-TL-40 | — | MHA-SH-VN-57 `FlangeNut` (retired 2026-11-17; never reissued) |
+| retired tooling vendor part | — | — | `ch-rocker-arm-tl-oblique-rail-screw` | MHA-CH-006-TL-41 | — | MHA-CH-06-TL-VN-61 (retired 2026-11-17; never reissued) |
+| retired tooling vendor part | — | — | `ch-rocker-arm-tl-oblique-bracket-screw` | MHA-CH-006-TL-42 | — | MHA-CH-06-TL-VN-62 (retired 2026-11-17; never reissued) |
 | retired tooling vendor part | — | — | `ch-rocker-arm-tl-oblique-block-screw` | MHA-CH-006-TL-43 | — | MHA-CH-06-TL-VN-63 (retired 2026-10-23; never reissued) |
-| tooling part | — | — | `ch-rocker-arm-tl-oblique-carriage-screw` | MHA-CH-006-TL-44 | `ch-rocker-arm-tl-vn-oblique-carriage-screw` | MHA-CH-06-TL-VN-64 |
+| retired tooling vendor part | — | — | `ch-rocker-arm-tl-oblique-carriage-screw` | MHA-CH-006-TL-44 | — | MHA-CH-06-TL-VN-64 (retired 2026-11-17; never reissued) |
 | retired tooling vendor part | — | — | `ch-rocker-arm-tl-oblique-kp08-screw` | MHA-CH-006-TL-45 | — | MHA-CH-06-TL-VN-65 (retired 2026-11-06; never reissued) |
 | retired tooling vendor part | — | — | `ch-rocker-arm-tl-oblique-nut-screw` | MHA-CH-006-TL-46 | — | MHA-CH-06-TL-VN-66 (retired 2026-11-04; never reissued) |
-| tooling part | — | — | `ch-rocker-arm-tl-oblique-riser-screw` | MHA-CH-006-TL-47 | `ch-rocker-arm-tl-vn-oblique-riser-screw` | MHA-CH-06-TL-VN-67 |
+| retired tooling vendor part | — | — | `ch-rocker-arm-tl-oblique-riser-screw` | MHA-CH-006-TL-47 | — | MHA-CH-06-TL-VN-67 (retired 2026-11-17; never reissued) |
 | retired tooling vendor part | — | — | `ch-rocker-arm-tl-oblique-clamp-screw` | MHA-CH-006-TL-48 | — | MHA-CH-06-TL-VN-68 (retired 2026-11-07; never reissued) |
-| tooling part | — | — | `ch-rocker-arm-tl-oblique-lever-screw` | MHA-CH-006-TL-49 | `ch-rocker-arm-tl-vn-oblique-lever-screw` | MHA-CH-06-TL-VN-69 |
+| retired tooling vendor part | — | — | `ch-rocker-arm-tl-oblique-lever-screw` | MHA-CH-006-TL-49 | — | MHA-CH-06-TL-VN-69 (retired 2026-11-17; never reissued) |
 | retired tooling vendor part | — | — | `ch-rocker-arm-tl-oblique-block-washer` | MHA-CH-006-TL-50 | — | MHA-CH-06-TL-VN-70 (retired 2026-10-23; never reissued) |
-| tooling part | — | — | `ch-rocker-arm-tl-oblique-lever-washer` | MHA-CH-006-TL-51 | `ch-rocker-arm-tl-vn-oblique-lever-washer` | MHA-CH-06-TL-VN-71 |
+| retired tooling vendor part | — | — | `ch-rocker-arm-tl-oblique-lever-washer` | MHA-CH-006-TL-51 | — | MHA-CH-06-TL-VN-71 (retired 2026-11-17; never reissued) |
 | retired tooling vendor part | — | — | `ch-rocker-arm-tl-vn-oblique-pivot-cap-screw` | MHA-CH-06-TL-VN-73 | — | MHA-CH-06-TL-VN-73 (retired 2026-10-23; never reissued) |
 | retired tooling vendor part | — | — | `ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin` | MHA-CH-06-TL-VN-74 | — | MHA-CH-06-TL-VN-74 (retired 2026-10-23; never reissued) |
 | retired tooling vendor part | — | — | `ch-rocker-arm-tl-vn-oblique-pivot-cotter` | MHA-CH-06-TL-VN-75 | — | MHA-CH-06-TL-VN-75 (retired 2026-10-23; never reissued) |
 | retired tooling vendor part | — | — | `ch-rocker-arm-tl-vn-oblique-pivot-lock-wire` | MHA-CH-06-TL-VN-76 | — | MHA-CH-06-TL-VN-76 (retired 2026-10-23; never reissued) |
-| new tooling vendor part (2026-10-23) | — | — | — | — | `ch-rocker-arm-tl-vn-oblique-pivot-screw` | MHA-CH-06-TL-VN-77 |
-| new tooling vendor part (2026-10-23) | — | — | — | — | `ch-rocker-arm-tl-vn-oblique-pivot-spacer` | MHA-CH-06-TL-VN-78 |
-| new tooling vendor part (2026-10-23) | — | — | — | — | `ch-rocker-arm-tl-vn-oblique-pivot-shim` | MHA-CH-06-TL-VN-79 |
+| retired tooling vendor part (added 2026-10-23) | — | — | `ch-rocker-arm-tl-vn-oblique-pivot-screw` | — | — | MHA-CH-06-TL-VN-77 (retired 2026-11-17; never reissued) |
+| retired tooling vendor part (added 2026-10-23) | — | — | `ch-rocker-arm-tl-vn-oblique-pivot-spacer` | — | — | MHA-CH-06-TL-VN-78 (retired 2026-11-17; never reissued) |
+| retired tooling vendor part (added 2026-10-23) | — | — | `ch-rocker-arm-tl-vn-oblique-pivot-shim` | — | — | MHA-CH-06-TL-VN-79 (retired 2026-11-17; never reissued) |
 | retired tooling vendor part | — | — | `ch-rocker-arm-tl-vn-oblique-hub-pin` | MHA-CH-06-TL-VN-80 | — | MHA-CH-06-TL-VN-80 (retired 2026-11-06; never reissued) |
 | retired tooling vendor part | — | — | `ch-rocker-arm-tl-vn-oblique-nut-dowel` | MHA-CH-06-TL-VN-81 | — | MHA-CH-06-TL-VN-81 (retired 2026-11-04; never reissued) |
 | reserved tooling vendor Number | — | — | — | — | — | MHA-CH-06-TL-VN-82 (assigned to `ch-rocker-arm-tl-vn-oblique-feed-nut` 2026-11-04, never released; now TL-VN-84 `FeedNut`; never reissued) |
-| new tooling vendor part (2026-11-04) | — | — | — | — | `ch-rocker-arm-tl-vn-oblique-rail-kit` | MHA-CH-06-TL-VN-83 |
-| new tooling vendor part (2026-11-04) | — | — | — | — | `ch-rocker-arm-tl-vn-oblique-leadscrew-kit` | MHA-CH-06-TL-VN-84 |
-| new tooling vendor part (2026-11-13) | — | — | — | — | `ch-rocker-arm-tl-vn-oblique-hub-washer` | MHA-CH-06-TL-VN-85 |
+| retired tooling vendor part (added 2026-11-04) | — | — | `ch-rocker-arm-tl-vn-oblique-rail-kit` | — | — | MHA-CH-06-TL-VN-83 (retired 2026-11-17; never reissued) |
+| retired tooling vendor part (added 2026-11-04) | — | — | `ch-rocker-arm-tl-vn-oblique-leadscrew-kit` | — | — | MHA-CH-06-TL-VN-84 (retired 2026-11-17; never reissued) |
+| retired tooling vendor part (added 2026-11-13) | — | — | `ch-rocker-arm-tl-vn-oblique-hub-washer` | — | — | MHA-CH-06-TL-VN-85 (retired 2026-11-17; never reissued) |
 | retired tooling part | — | — | `ch-pivot-bracket-tl-ledge` | MHA-CH-008-TL-01 | — | MHA-CH-08-TL-01 (retired 2026-10-21; never reissued) |
 | retired tooling part | — | — | `ch-pivot-bracket-tl-angle-plate` | MHA-CH-008-TL-02 | — | MHA-CH-08-TL-02 (retired 2026-10-21; never reissued) |
 | retired tooling part | — | — | `dt-cone-pivot-post-tl-bond-cradle` | MHA-DT-005-TL-01 | — | MHA-DT-05-TL-01 (retired 2026-10-21; never reissued) |
@@ -559,7 +427,7 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | assembly | `paper-drive` | MHA-A06 | `pd-paper-drive` | MHA-PD-000 | `pd-paper-drive` | MHA-PD-00 |
 | assembly | — | — | `ms-measuring-stick` | MHA-MS-000 | `ms-measuring-stick` | MHA-MS-00 |
 | assembly | `harmonic-analyzer` | MHA-A08 | `ha-harmonic-analyzer` | MHA-HA-000 | `ha-harmonic-analyzer` | MHA-HA-00 |
-| tooling assembly | — | — | `ch-rocker-arm-tl-oblique-jig` | MHA-CH-006-TL-000 | `ch-rocker-arm-tl-oblique-jig` | MHA-CH-06-TL-00 |
+| retired tooling assembly | — | — | `ch-rocker-arm-tl-oblique-jig` | MHA-CH-006-TL-000 | — | MHA-CH-06-TL-00 (retired 2026-11-17; never reissued) |
 | new tooling assembly (2026-11-02) | — | — | — | — | `dt-cone-gear-tl-indexing` | MHA-DT-03-TL-00 |
 | new tooling assembly (2026-11-12) | — | — | — | — | `dt-cone-tip-gear-tl-cutter` | MHA-DT-37-TL-00 |
 | new tooling assembly (2026-11-12) | — | — | — | — | `dt-cone-gear-tl-arbor` | MHA-DT-03-TL-05 |
@@ -577,19 +445,14 @@ At the 2026-10-19 cutover, four category vendor families were in direct use by m
 | `sh-vn-arbor-set-screw` | MHA-SH-VN-54 | McMaster-Carr 91375A106 | `Default` (alloy steel, Rockwell C45, black oxide, unchanged) | `ch-channel`, `dt-drive-train`, `pn-pen` (rod set screw) |
 | `sh-vn-thumb-screw` | MHA-SH-VN-55 | McMaster-Carr 91882A221 | `Default` | `mg-magnifier`, `ms-measuring-stick` |
 | `sh-vn-music-wire` | MHA-SH-VN-56 | McMaster-Carr 9666K142, one 1/4 lb coil (Ø.008; Ø.031 9666K56 until 2026-11-12, #2398) | `LeverWire` 1; `PenWire` 1 (one-sheet purchase drawing: supplier wire Ø and SKU only; terminations, wraps and cut lengths are not modelled) | `mg-magnifier` (lever wire), `pn-pen` (pen wire) |
-| `sh-vn-clamping-kit-hardware` | MHA-SH-VN-57 | Precision Matthews 52PCCK-9/16-14mm, one kit | `HoldDownStud` 4; `TNut` 4; `FlangeNut` 4 | `ch-rocker-arm-tl-oblique-jig` only; `usage_scope: tooling`, no machine assembly or BOM, excluded from machine counts |
 | `sh-vn-pivot-pin` | MHA-SH-VN-58 | McMaster-Carr 90145A299, 18-8 stainless 5/64 x 5/16 dowel, sold in packs | `RodPin` 20; `BarPin` 20 (each pressed through its fork or bar and dressed flush to the installed length at MHA-CH-00) | `ch-channel` only (rod fork and bar notch joints, 2026-11-11, #2339) |
 | `sh-vn-fillister-screw-91794a055` | MHA-SH-VN-59 | McMaster-Carr 91794A055, 18-8 stainless #0-80 x 1/4 slotted fillister | `DiscScrew` 3 (cut to fit under the MHA-PD-06 disc's rear face at MHA-PD-00); `RackScrew` 4 (stock length, MHA-PD-26 strip to the MHA-PD-27 rail); four spare `RackScrew` stock become MHA-PD-00's transfer screws | `pd-paper-drive` only (two modelled forms of one SKU, 2026-11-14, #2410) |
 
-The registry `quantity` is the sum of the installed member counts (65 links, 2 wire forms, 12 kit members, 40 pins, 7 screws), never the purchase units (one chain cut from 2 ft, one coil, one kit, pin and screw packs). Members share one purchase Number; where their bodies differ, their BOM rows differ by Description and are not summed into one row. The SKU suffix in `sh-vn-fillister-screw-90280a108` separates that steel fillister product from the brass 90114A511 one. No supplier dimension changed in the consolidation; the shared models carry the geometry the parent-scoped models had.
+The registry `quantity` is the sum of the installed member counts (65 links, 2 wire forms, 40 pins, 7 screws), never the purchase units (one chain cut from 2 ft, one coil, pin and screw packs). Members share one purchase Number; where their bodies differ, their BOM rows differ by Description and are not summed into one row. The SKU suffix in `sh-vn-fillister-screw-90280a108` separates that steel fillister product from the brass 90114A511 one. No supplier dimension changed in the consolidation; the shared models carry the geometry the parent-scoped models had.
 
-Configured chain and clamping-kit reference sheets place each member caption from its measured native text extent and annotation position, centering the text box within its reserved panel-header band. After the final rebuild, strict containment checks require the actual note extent to remain inside both that band and the drawable sheet border. An insertion coordinate or a successful positioning call alone is not proof of fit. This placement contract does not change supplier dimensions, member geometry or installed quantities.
+The configured chain reference sheet places each member caption from its measured native text extent and annotation position, centering the text box within its reserved panel-header band. After the final rebuild, strict containment checks require the actual note extent to remain inside both that band and the drawable sheet border. An insertion coordinate or a successful positioning call alone is not proof of fit. This placement contract does not change supplier dimensions, member geometry or installed quantities.
 
 The wire's one-sheet purchase drawing prints only what replacement needs. A 75:1 end view of the zero-body `SUPPLIER_REFERENCE` circle carries the native supplier Ø as its one dimension; the circle's centre mark is deleted and its construction curves print as a solid outline. An undimensioned `PenWire` isometric, Shaded With Edges, is labelled reference only, not to length. One property-linked note gives the SKU. A second note says each member is cut to length and formed at assembly and cites the magnifier and pen assembly drawing sheets and steps that do it; neither note carries a dimension. The source part is opened read-only, must be clean, and its file bytes are proven unchanged through export and drawing close. Final readback re-checks the Ø identity and value, both views' configuration, scale and fields, and every note's text and clearance.
-
-The clamping-kit sheet identifies its installed stud with an associative overall reference between the existing model's end rims; its measured reference text must stay at least 2 mm left of the FRONT view outline. Each nut retains one bore-owned native `ICThread.ThreadCallout` in its isometric view, inserting that callout once if absent. Bore-owned native callouts in other views are deliberately retired by selected-note identity, with fresh readback proving removal and unchanged cosmetic-thread/model geometry; they are not transferred by changing annotation ownership or replaced with free text. The returned `INote` can have zero direct geometry attachments: hole association and strict edge/face identity are proved on the owning cosmetic-thread annotation. Each leader targets the projected native top bore rim, identified by its center, axis, height, owning feature identity and the Hole Wizard's actual through-tap drill diameter, not a rounded nominal. A visible rim edge must map into the referenced source part and back to the exact original view edge; its adjacent features are compared with the bore feature only within that source context, never by matching names or comparing source and drawing feature wrappers directly. Source queries use fresh inventories in one explicitly activated view configuration, then strictly restore the prior configuration in `finally` without saving or forcing a rebuild. Initial mismatched/matched mapping observations test configuration dependence; the SDK does not state it as a precondition. Source SHA before/after the initial control, unsaved state, all view configurations and drawing activation must remain unchanged, and a fresh inventory after restoration must identify exactly the same visible edge. Across scopes, bore identity uses the source path, persistent `IFeature.GetID()` and exact diameter; mapped source-edge wrappers never escape the active scope. Native edge-parameter and closest-point readbacks require that target to lie on exactly one visible physical rim edge; an underlying circle alone does not establish its trim. After relocation and the final rebuild, checks require the same native note, cosmetic thread, bore feature/diameter, attachments and visible rim edge, unchanged note content, a live leader at that rim, and rendered text plus complete native extent inside the member's reserved panel. A successful leader setter alone is not evidence that the native parent relationship survived. The reference sheet prints sourcing facts only; the per-member installation legend and its `[1]`/`[2]`/`[3]` view flags were retired because installation belongs to the jig assembly's steps (MHA-CH-06-TL-00).
-
-The stud-only REWORK sheet prints the finished-length model dimension and one native side-view chamfer leader attached to the upper bevel/barrel boundary. The leader uses the saved source angle and the model's validated maximum size and precision; the unprinted chamfer dimension must remain a driving MAX control with its original tolerance band and decimal places. Settled readback verifies that source control and the leader's front-view ownership, text, native attachment and landing. The end view retains no duplicate chamfer dimension. The reference-sheet footer retains the reference-view limitation, scopes “as supplied” to the two nuts and directs the stud rework explicitly to sheet 2.
 
 SOLIDWORKS owns occurrence names and native instance indices. Shared components are identified by physical file, selected configuration and scoped `Role:N` component reference, not a custom `Name2` spelling. Logical BOM keys such as `sh-vn-chain-link--InnerLink` identify file/configuration rows; they are not native occurrence aliases. The pipeline never renames these occurrences or changes the application naming preference.
 
@@ -814,3 +677,7 @@ A retired Number is never reused. A family added after a cutover takes the next 
 | added | `pd-platen-bottom-guide` | MHA-PD-27 | Owner rulings 2026-11-13 ([#2410](https://github.com/pedropaulovc/harmonic-analyzer/issues/2410)): the platen's bottom guide rail, MHA-PD-11's .40-deep section grown 8.27 mm downward to .616 so the MHA-PD-26 strip seats on its underside; its top and four lock taps stay where the bottom MHA-PD-11 rail's were, its five platen-screw taps are transferred from MHA-PD-02 at MHA-PD-00 with the crests set, and four stepped #48 holes take the rack screws; MHA-PD-11 is now the top rail only (x1) |
 | retired | `pd-vn-transgear-disc-screw` | MHA-PD-VN-55 | 2026-11-14 ([#2410](https://github.com/pedropaulovc/harmonic-analyzer/issues/2410)): the rack screws use the same McMaster-Carr 91794A055 at stock length, so the cut disc screws became the `DiscScrew` member of the shared MHA-SH-VN-59; no registry, builder or drawing; stem and Number never reissued, no alias |
 | shared | `sh-vn-fillister-screw-91794a055` | MHA-SH-VN-59 | 2026-11-14 ([#2410](https://github.com/pedropaulovc/harmonic-analyzer/issues/2410)): McMaster-Carr 91794A055 18-8 stainless #0-80 x 1/4 slotted fillister, one SKU in two modelled forms, `DiscScrew` x3 (MHA-PD-06 disc to the MHA-PD-17 hub flange, each tip cut to fit at MHA-PD-00; was MHA-PD-VN-55) and `RackScrew` x4 (MHA-PD-26 strip to the MHA-PD-27 rail, untrimmed); four more spare `RackScrew` stock, heads filed off and ends filed to a point, are MHA-PD-00's transfer screws (tools, not BOM quantity) |
+| retired | `ch-rocker-arm-tl-oblique-jig` | MHA-CH-06-TL-00 | Owner ruling 2026-11-17 (#2885): the oblique trammel jig is deleted with every part only it used, including the TL-20 base bar, its CAM recipe and posted NC; no registry, builder or drawing; Numbers never reissued |
+| retired | `ch-rocker-arm-tl-oblique-*` | MHA-CH-06-TL-20, TL-21, TL-22, TL-24, TL-26, TL-28, TL-32 | Owner ruling 2026-11-17 (#2885): the jig's made parts; no registry, builder or drawing; Numbers never reissued |
+| retired | `ch-rocker-arm-tl-vn-oblique-*` | MHA-CH-06-TL-VN-56, VN-57, VN-61, VN-62, VN-64, VN-67, VN-69, VN-71, VN-77, VN-78, VN-79, VN-83, VN-84, VN-85 | Owner ruling 2026-11-17 (#2885): the jig's purchased parts; no registry, builder or drawing; Numbers never reissued |
+| retired | `sh-vn-clamping-kit-hardware` | MHA-SH-VN-57 | Owner ruling 2026-11-17 (#2885): the Precision Matthews clamping kit served only the jig; no registry, builder or drawing; Number never reissued |

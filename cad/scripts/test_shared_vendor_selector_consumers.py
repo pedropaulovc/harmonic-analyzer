@@ -18,14 +18,6 @@ def _component(role, ordinal, *, scope="", index=91, configuration=None, stem=No
         native_stem, member = "sh-vn-chain-link", role
     elif role in {"LeverWire", "PenWire"}:
         native_stem, member = "sh-vn-music-wire", role
-    elif role in {"HoldDownStud", "TNut", "FlangeNut"}:
-        native_stem, member = "sh-vn-clamping-kit-hardware", role
-    elif role in {"Rail", "Carriage"}:
-        native_stem, member = "ch-rocker-arm-tl-vn-oblique-rail-kit", role
-    elif role in {"LeadScrew", "FeedNut"}:
-        native_stem, member = "ch-rocker-arm-tl-vn-oblique-leadscrew-kit", role
-    elif role in {"Bar1", "Bar2"}:
-        native_stem, member = "ch-rocker-arm-tl-oblique-base-bar", role
     elif role in {"FootScrew", "SwingStopScrew"}:
         native_stem, member = "sh-vn-fillister-screw-90280a108", "Default"
     else:
@@ -57,11 +49,6 @@ def _inventory(name):
     # Installed acceptance quantities, independent of the production census.
     counts = {
         "pd-paper-drive": {"InnerLink": 33, "OuterLink": 32},
-        "ch-rocker-arm-tl-oblique-jig": {
-            "HoldDownStud": 4, "TNut": 4, "FlangeNut": 4,
-            "Rail": 2, "Carriage": 2, "LeadScrew": 1, "FeedNut": 1,
-            "Bar1": 1, "Bar2": 1,
-        },
         "dt-drive-train": {"FootScrew": 1, "SwingStopScrew": 1},
         "mg-magnifier": {"LeverWire": 1},
         "pn-pen": {"PenWire": 1},
@@ -84,7 +71,6 @@ def _inventory(name):
     "name",
     [
         "pd-paper-drive",
-        "ch-rocker-arm-tl-oblique-jig",
         "dt-drive-train",
         "mg-magnifier",
         "pn-pen",
@@ -147,9 +133,6 @@ def test_reopened_member_census_rejects_identity_or_quantity_drift(
     [
         ("pd-paper-drive", "InnerLink", 33),
         ("pd-paper-drive", "OuterLink", 32),
-        ("ch-rocker-arm-tl-oblique-jig", "HoldDownStud", 4),
-        ("ch-rocker-arm-tl-oblique-jig", "TNut", 4),
-        ("ch-rocker-arm-tl-oblique-jig", "FlangeNut", 4),
     ],
 )
 @pytest.mark.parametrize("extra", [False, True])
@@ -313,8 +296,6 @@ def test_gravity_reads_exact_wire_members_and_closes_after_success_or_failure(
     ("first_role", "second_role"),
     [
         ("FootScrew", "SwingStopScrew"),
-        ("HoldDownStud", "TNut"),
-        ("HoldDownStud", "FlangeNut"),
     ],
 )
 @pytest.mark.parametrize("wrong_member", [False, True])

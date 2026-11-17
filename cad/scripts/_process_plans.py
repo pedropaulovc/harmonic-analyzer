@@ -16,16 +16,9 @@ from pathlib import Path
 
 from export_features import OUT as CAD_OUT
 
-TRAVELER_STEMS: tuple[str, ...] = (
-    "ch_rocker_arm_tl_oblique_base_bar",
-    "ch_rocker_arm_tl_oblique_end_bracket",
-    "ch_rocker_arm_tl_oblique_feed_lever",
-    "ch_rocker_arm_tl_oblique_riser",
-    "ch_rocker_arm_tl_oblique_pivot_block",
-    "ch_rocker_arm_tl_oblique_feed_block",
-    "ch_rocker_arm_tl_vn_oblique_leadscrew_kit",
-    "ch_rocker_arm_tl_oblique_carrier",
-)
+# No part is enrolled since the oblique trammel jig was deleted (2026-11-17);
+# the CNC migration enrols machine parts here.
+TRAVELER_STEMS: tuple[str, ...] = ()
 PROCESS_ROOT = Path(__file__).resolve().parents[1] / "process"
 SHOP_PATH = PROCESS_ROOT / "shop.toml"
 # Each traveler file and the built-in prechips profile it is rendered with,

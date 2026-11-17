@@ -214,7 +214,6 @@ def test_transgear_pivot_isolation(part_closures, contract: Contract) -> None:
                 "build_sh_vn_arbor_set_screw",
                 "build_sh_vn_fillister_screw_90280a108",
                 "build_sh_vn_music_wire",
-                "build_sh_vn_clamping_kit_hardware",
                 "build_pd_feed_rack",
             ),
             forbidden=("paper_drive_geom", "mg_magnifying_wheel_geom"),

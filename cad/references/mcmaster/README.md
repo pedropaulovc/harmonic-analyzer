@@ -30,7 +30,7 @@ recipes:
 | 90126A211 | — (the former `vn-knife-hanger-washer`, retired; diagnostic recipe removed 2026-11-16, #2886) | Zinc-Plated Steel SAE Washer |
 | 90145A299 | `sh-vn-pivot-pin` (MHA-SH-VN-58, `RodPin` and `BarPin`; catalogue-only; no vendor model) | 18-8 Stainless Steel Dowel Pin |
 | 90145A414 | `pd-vn-transgear-collar-flat-pin` (MHA-PD-VN-70; catalogue-only; no vendor model) | 18-8 Stainless Steel Dowel Pin |
-| 90231A116 | `ch-rocker-arm-tl-vn-oblique-hub-washer` (MHA-CH-06-TL-VN-85; catalogue-only, the vendor STEP is evidence only) | Brass SAE Washer for Number 8 Screw Size |
+| 90231A116 | — (retired TL-VN-85, 2026-11-17: oblique jig deleted; `_mcmaster_90231a116.py` removed) | Brass SAE Washer for Number 8 Screw Size |
 | 90280A108 | `sh-vn-fillister-screw-90280a108` (MHA-SH-VN-52; shared by the dt foot and swing-stop roles and the pd latch-hook screws) | Steel Narrow Fillister Head Slotted Screw |
 | 90280A194 | — (a former `ch-vn-frame-side-screw`; diagnostic recipe removed 2026-11-16, #2886) | Steel Narrow Fillister Head Slotted Screw |
 | 90280A196 | `ch-vn-bracket-hold-down-screw` | Steel Narrow Fillister Head Slotted Screw |
@@ -46,12 +46,12 @@ recipes:
 | 91251A108 | `dt-vn-cone-tip-block-screw` (catalogue-only; no vendor model) | Black-Oxide Alloy Steel Socket Head Screw |
 | 91251A157 | — (former `sm-vn-knife-hanger-stud`; catalogue-only diagnostic recipe removed 2026-11-16, #2886) | Black-Oxide Alloy Steel Socket Head Screw |
 | 91251A188 | — (retired TL-VN-63, 2026-10-23; former catalogue-only diagnostic recipe removed) | Black-Oxide Alloy Steel Socket Head Screw |
-| 91251A196 | `ch-rocker-arm-tl-vn-oblique-bracket-screw` (MHA-CH-06-TL-VN-62, 8 in the final A″ stack: 4 KP08-to-bracket + 4 bracket-to-bar; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Socket Head Screw |
-| 91251A197 | `ch-rocker-arm-tl-vn-oblique-rail-screw` (MHA-CH-06-TL-VN-61, 19 in the final A″ stack: 16 rail + 3 CL/CR/HUB clamps; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Socket Head Screw |
+| 91251A196 | — (retired TL-VN-62, 2026-11-17: oblique jig deleted; spec and diagnostic removed) | Socket Head Screw |
+| 91251A197 | — (retired TL-VN-61, 2026-11-17: oblique jig deleted; spec and diagnostic removed) | Socket Head Screw |
 | 91251A541 | — (retired TL-VN-68, 2026-11-07: the CR clamp takes the common 91251A197; catalogue-only diagnostic removed) | Socket Head Screw |
-| 91251A583 | `ch-rocker-arm-tl-vn-oblique-lever-screw` (MHA-CH-06-TL-VN-69; shop fixture; catalogue-only, product page login-walled, the 7/8 in sibling's vendor model read for dimensions, not replica-gated) | Socket Head Screw |
+| 91251A583 | — (retired TL-VN-69, 2026-11-17: oblique jig deleted; spec and diagnostic removed) | Socket Head Screw |
 | 91812A215 | — (retired TL-VN-70, 2026-10-23; jig-only diagnostic recipe removed) | Extreme-Vibration-Resistant Wedge Lock Washer |
-| 91812A230 | `ch-rocker-arm-tl-vn-oblique-lever-washer` (MHA-CH-06-TL-VN-71; shop fixture; catalogue-only, product page login-walled, no vendor model) | Extreme-Vibration-Resistant Wedge Lock Washer |
+| 91812A230 | — (retired TL-VN-71, 2026-11-17: oblique jig deleted; spec removed) | Extreme-Vibration-Resistant Wedge Lock Washer |
 | 90323A492 | — (retired TL-VN-77 source, 2026-10-31; now Huyett BLTS40-0375-1500188P, issue #290) | 18-8 Precision Shoulder Screw, Ø10 × 35, metric thread |
 | 92871A359 | — (retired TL-VN-78 source, 2026-10-31; now AluminumSpacers.com AS62-18-40, issue #290) | 18-8 Round Spacer, 10 ID × 16 OD × 15 |
 | 98055A118 | — (retired TL-VN-79 source with 98055A117/98055A121, 2026-10-31; now Huyett SHIM-0375-004/-008/-020, issue #290) | DIN 988 Spring Steel Shim, 10 × 16 × 0.2 |
@@ -61,7 +61,7 @@ recipes:
 | 91255A148 | — (a former `dt-vn-cone-tip-block-screw`; diagnostic recipe removed 2026-11-16, #2886) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
 | 91255A150 | — (retired TL-VN-65, 2026-11-06; the KP08 screws are now 91251A196, TL-VN-62; diagnostic recipe removed) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
 | 91251A150 | — (retired TL-VN-65 source, 2026-11-04; now 91255A150, whose larger head covers the uxcell KP08's Ø5 hole; diagnostic recipe removed) | Black-Oxide Alloy Steel Socket Head Screw |
-| 91290A168 | `ch-rocker-arm-tl-vn-oblique-carriage-screw` (MHA-CH-06-TL-VN-64; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Socket Head Screw |
+| 91290A168 | — (retired TL-VN-64, 2026-11-17: oblique jig deleted; spec and diagnostic removed) | Socket Head Screw |
 | 91355A581 | — (retired TL-VN-66 source, 2026-11-04: TL-VN-66 retired; the TL-VN-84 kit's feed nut uses TL-VN-67's 91771A112; diagnostic recipe removed) | Black-Oxide Flanged Button Head Hex-Drive Screw, Alloy Steel |
 | 90325A174 | `pd-vn-transgear-pivot-screw` (catalogue-only; CAD download refused) | 18-8 Stainless Steel Precision Shoulder Screw, hex socket |
 | 91375A106 | `sh-vn-arbor-set-screw` (MHA-SH-VN-54; shared by ch, dt and pn) | Alloy Steel Cup-Tip Set Screw |
@@ -71,7 +71,7 @@ recipes:
 | 91595A452 | — (retired TL-VN-53 source, 2026-10-31; now 98381A542, issue #290; diagnostic recipe removed) | Dowel Pin |
 | 98381A542 | — (retired TL-VN-53, 2026-11-07: the CL end clamp takes the common 91251A197; catalogue-only diagnostic removed) | Alloy Steel Dowel Pin |
 | 98381A438 | — (retired TL-VN-81, 2026-11-04; owner option B: the bought ReliaBot feed nut, TL-VN-84 `FeedNut`, needs no dowel; diagnostic recipe removed) | Alloy Steel Dowel Pin |
-| 91771A112 | `ch-rocker-arm-tl-vn-oblique-riser-screw` (MHA-CH-06-TL-VN-67, 8 in the jig: 4 riser and, since 2026-11-04, 4 feed nut; shop fixture; catalogue-only, same-family vendor geometry, not replica-gated) | Stainless Steel Phillips Flat Head Screw |
+| 91771A112 | — (retired TL-VN-67, 2026-11-17: oblique jig deleted; spec and diagnostic removed) | Stainless Steel Phillips Flat Head Screw |
 | 91790A199 | `pd-vn-transgear-arm-plate-screw` (catalogue-only; populated live SKU verified; 2-D PDF offered, CAD requires login) | 18-8 Stainless Steel Oval Head Slotted Screw |
 | 91792A108 | `pd-vn-guide-lock-screw` (catalogue-only; no vendor model) | 18-8 Stainless Steel Pan Head Slotted Screw |
 | 91794A112 | `dt-vn-cone-tip-pinch-screw` | 18-8 Stainless Steel Fillister Head Slotted Screw |
@@ -307,7 +307,7 @@ lug became integral with TL-32. The following describes the former joint.
   the actual TL-22 cap mounting plane after free-feed alignment and final
   tightening throughout travel. Do not force nut/screw alignment to obtain
   this gap or substitute invented HGH/KP08/end-bracket STOCK height bands.
-  See the [captured-pivot fit-up acceptance](../../docs/subsystem-identities.md#oblique-jig-captured-pivot-tooling);
+  See the captured-pivot fit-up acceptance (historical: `ebd3bf3b44:cad/docs/subsystem-identities.md`);
   this material cut is not a new native certificate or a cap relief.
   The page gives no socket depth, so the model takes ASME B18.3's minimum key
   engagement for #8, 0.077 in (the 91251A108 convention).
@@ -513,8 +513,8 @@ or assembly instruction. Primary supplier pages were read on October 20, 2026.
 | MHA-CH-06-TL-VN-75 | 2 | Huyett [CP-062-0500](https://www.huyett.com/cp-062-0500), 1/16 × 1/2 in split cotter |
 | MHA-CH-06-TL-VN-76 | 4 formed pieces | Aircraft Spruce [05-02685](https://www.aircraftspruce.com/catalog/appages/safetywire.php), 0.032 in soft 302/304 stainless, MS20995; [catalogue](https://www.aircraftspruce.com/pdf/2027Individual/Cat270142.pdf) |
 
-The current plain-pivot identities and Number reservations are documented in
-[subsystem identities](../../docs/subsystem-identities.md#oblique-jig-plain-pivot-tooling).
+The plain-pivot identities, retired with the jig on 2026-11-17, and their Number
+reservations are listed in [subsystem identities](../../docs/subsystem-identities.md#identity-migration-table).
 
 
 Live catalogue verification on October 12, 2026:

@@ -19,7 +19,6 @@ from pypdf.generic import DecodedStreamObject
 
 import cut_release
 import trim_renders
-from _part_configuration_exports import member_configurations
 
 
 def test_release_refuses_an_incomplete_or_stale_comparison_gallery(
@@ -424,9 +423,6 @@ def _refuse_release_host_action(*_args, **_kwargs):
     raise AssertionError("release fixture reached a host-action collaborator")
 
 
-_TRAVELER_STEM = "ch_rocker_arm_tl_oblique_base_bar"
-
-
 @pytest.fixture
 def feature_release(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
@@ -567,11 +563,6 @@ def feature_release(
     monkeypatch.setattr(cut_release, "load_native_package", lambda: package)
     monkeypatch.setattr(cut_release, "stage_comparisons", lambda _stage: {})
     monkeypatch.setattr(cut_release, "stage_readout_procedure", lambda *_args: [])
-    # One enrolled traveler whose prechips task printed its hobby PDF.
-    monkeypatch.setattr(cut_release, "TRAVELER_STEMS", (_TRAVELER_STEM,))
-    pdf = cut_release.traveler_pdf_path(_TRAVELER_STEM, cut_release.CAD_ROOT / "out")
-    pdf.parent.mkdir(parents=True, exist_ok=True)
-    pdf.write_bytes(b"%PDF-1.4 hobby traveler; v38\n")
     monkeypatch.setattr(
         cut_release, "_git_provenance",
         lambda _version: {"commit_short": "offline", "tree_clean": True},
@@ -601,43 +592,6 @@ def test_feature_release_refuses_host_action_collaborators(feature_release: Path
     with pytest.raises(AssertionError, match="unexpected GitHub operation"):
         cut_release._gh("release", "create", "fixture-must-not-exist")
     assert not (feature_release / "release" / "harmonic-analyzer-v38").exists()
-
-
-@pytest.mark.parametrize(
-    "configuration", member_configurations("sh_vn_clamping_kit_hardware"),
-)
-@pytest.mark.parametrize("fault", ["scene-member", "certificate-member"])
-def test_feature_release_preserves_member_coverage_refusals(
-    feature_release: Path, configuration: str, fault: str,
-) -> None:
-    """Each real kit member is mandatory in both scene and certificate."""
-    out = feature_release
-    stem = "sh-vn-clamping-kit-hardware"
-    if fault == "scene-member":
-        scene = cut_release.SCENE_JSON
-        content = json.loads(scene.read_bytes())
-        content["components"] = [
-            component for component in content["components"]
-            if (component["part"], component["cfg"]) != (stem, configuration)
-        ]
-        scene.write_text(json.dumps(content), encoding="utf-8")
-        expected = "member scene coverage missing"
-    else:
-        certificate_path = out / "reports" / "release-neutral.json"
-        certificate = json.loads(certificate_path.read_bytes())
-        del certificate["part_configurations"][stem][configuration]
-        certificate_path.write_text(json.dumps(certificate), encoding="utf-8")
-        expected = "member inventory drifted"
-
-    with pytest.raises(RuntimeError, match=expected):
-        cut_release.bundle("v38")
-
-    stage = out / "release" / "harmonic-analyzer-v38"
-    assert (stage / "solidworks" / "fixture.SLDPRT").is_file()
-    assert not (stage / "step").exists()
-    assert not (stage / "features").exists()
-    assert not (stage / "PROVENANCE.json").exists()
-    assert not stage.with_suffix(".zip").exists()
 
 
 def test_release_zip_keeps_exact_adjacent_feature_bundles(feature_release: Path) -> None:
@@ -734,47 +688,6 @@ def test_release_stages_baseline_but_never_seals_divergent_feature_producers(
     assert (stage / "step" / full_step.name).read_bytes() == full_step.read_bytes()
     assert not (stage / "features").exists()
     assert not stage.with_suffix(".zip").exists()
-
-
-def test_release_ships_each_hobby_traveler_pdf(feature_release: Path) -> None:
-    """Each enrolled part's hobby traveler ships as ``travelers/<slug>-traveler.pdf``
-    (owner ruling 2026-11-14); the HTML sheets beside it do not ship."""
-    pdf = cut_release.traveler_pdf_path(_TRAVELER_STEM, cut_release.CAD_ROOT / "out")
-    for name in ("traveler.html", "traveler-hobby.html"):
-        (pdf.parent / name).write_text("<p>MHA-CH-06-TL-20; v38</p>", encoding="utf-8")
-    zip_path, facts = cut_release.bundle("v38")
-    shipped = "travelers/ch-rocker-arm-tl-oblique-base-bar-traveler.pdf"
-    assert facts["travelers"] == [shipped]
-    with zipfile.ZipFile(zip_path) as archive:
-        assert [
-            info.filename for info in archive.infolist()
-            if info.filename.startswith("travelers/") and not info.is_dir()
-        ] == [shipped]
-        assert archive.read(shipped) == pdf.read_bytes()
-        sums = archive.read("SHA256SUMS.txt").decode()
-    assert f"{hashlib.sha256(pdf.read_bytes()).hexdigest()}  {shipped}" in sums.splitlines()
-
-
-def test_release_refuses_a_missing_traveler(feature_release: Path) -> None:
-    cut_release.traveler_pdf_path(_TRAVELER_STEM, cut_release.CAD_ROOT / "out").unlink()
-    with pytest.raises(RuntimeError, match="required traveler is missing"):
-        cut_release.bundle("v38")
-    assert not (feature_release / "release" / "harmonic-analyzer-v38.zip").exists()
-
-
-def test_release_refuses_a_traveler_older_than_its_manifest(feature_release: Path) -> None:
-    """``doit -s release`` renders no traveler, so a PDF left from an earlier run
-    beside a newer restored feature bundle must not ship."""
-    import export_features
-
-    out = cut_release.CAD_ROOT / "out"
-    pdf = cut_release.traveler_pdf_path(_TRAVELER_STEM, out)
-    manifest, _step = export_features.bundle_paths(_TRAVELER_STEM, out)
-    newer = manifest.stat().st_mtime
-    os.utime(pdf, (newer - 60, newer - 60))
-    with pytest.raises(RuntimeError, match="traveler is stale"):
-        cut_release.bundle("v38")
-    assert not (feature_release / "release" / "harmonic-analyzer-v38.zip").exists()
 
 
 @pytest.fixture

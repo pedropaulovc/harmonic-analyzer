@@ -163,16 +163,6 @@ def test_missing_configuration_step_never_stages(
     assert not (tmp_path / "stage").exists()
 
 
-def test_member_step_drift_never_stages(tmp_path: Path) -> None:
-    out = bound_output(tmp_path)
-    stem = "ch_rocker_arm_tl_vn_oblique_leadscrew_kit"
-    (member,) = export_features.member_step_paths(stem, out).values()
-    member.write_bytes(member.read_bytes().replace(b"2026-10-01T22:03:25", b"2026-10-01T22:03:26"))
-    with pytest.raises(features_bound.FeaturesBoundError, match="member_steps.FeedNut"):
-        features_bound.stage_bound_features(out, tmp_path / "stage")
-    assert not (tmp_path / "stage").exists()
-
-
 @pytest.mark.parametrize("member", [0, 1], ids=["manifest", "step"])
 def test_unproduced_feature_leaf_never_stages_a_partial_package(tmp_path: Path, member: int) -> None:
     out = bound_output(tmp_path)

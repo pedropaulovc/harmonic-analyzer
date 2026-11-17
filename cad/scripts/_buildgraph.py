@@ -32,8 +32,6 @@ from enum import Enum
 from pathlib import Path
 from typing import NamedTuple
 
-import yaml
-
 SCRIPTS_DIR = Path(__file__).resolve().parent
 CAD_OUT = SCRIPTS_DIR.parent / "out"
 CONFIG_DIR = SCRIPTS_DIR.parent / "config"
@@ -56,10 +54,9 @@ _DATA_LITERAL_RE = re.compile(r"""["']([^"']+\.(?:dxf|dwg))["']""", re.IGNORECAS
 # ``output`` is split by function into summing -> magnifier -> pen (the value
 # chain) + paper-drive; the measuring stick + its clamped stop form their own
 # sub (MS, 2026-10-09). Shop-fixture assemblies (``is_shop_fixture``: the
-# rocker's oblique-trammel jig, the cone gear's dividing-head indexing kit
-# and the cone tip gear's fly cutter, all TL-00, and the cone gear's keyed
-# cutting arbor kit, TL-05) build here too but never enter the machine tree:
-# ``MACHINE_ASSEMBLIES`` excludes them.
+# cone gear's dividing-head indexing kit and the cone tip gear's fly cutter,
+# both TL-00, and the cone gear's keyed cutting arbor kit, TL-05) build here
+# too but never enter the machine tree: ``MACHINE_ASSEMBLIES`` excludes them.
 ASSEMBLY_ORDER = (
     "fr_frame",
     "dt_drive_train",
@@ -69,7 +66,6 @@ ASSEMBLY_ORDER = (
     "pn_pen",
     "pd_paper_drive",
     "ms_measuring_stick",
-    "ch_rocker_arm_tl_oblique_jig",
     "dt_cone_gear_tl_indexing",
     "dt_cone_tip_gear_tl_cutter",
     "dt_cone_gear_tl_arbor",
@@ -78,22 +74,12 @@ ASSEMBLY_ORDER = (
 
 
 def is_shop_fixture(stem: str) -> bool:
-    """Classify tooling by its existing TL stem or explicit registry usage scope.
+    """Classify tooling by its TL stem.
 
-    Shared supplier hardware can serve a fixture without carrying its parent's
-    TL stem. Its own row declares ``usage_scope: tooling``; omitted scopes are
-    ``machine``. A fixture part may appear only in a shop-fixture assembly, which
-    never enters a machine assembly or BOM (test_part_coverage.py, #1239).
+    A fixture part may appear only in a shop-fixture assembly, which never
+    enters a machine assembly or BOM (test_part_coverage.py, #1239).
     """
-    dashed = stem.replace("_", "-")
-    registry = CONFIG_DIR / "parts" / f"{dashed}.yaml"
-    scope = "machine"
-    if registry.is_file():
-        row = yaml.safe_load(registry.read_text(encoding="utf-8"))[dashed]
-        scope = row.get("usage_scope", "machine")
-        if not isinstance(scope, str) or scope not in {"machine", "tooling"}:
-            raise ValueError(f"{registry}: invalid usage_scope {scope!r}")
-    return "_tl_" in stem or scope == "tooling"
+    return "_tl_" in stem
 
 
 # The machine's own assemblies: the harmonic-analyzer and the subs it places.
@@ -2632,8 +2618,6 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
     {
         "_printed_tolerance",
         "sm_vn_boss_hook_spec",
-        # Edge-break row sizes the pillow-block screws' full engagement.
-        "ch_rocker_arm_tl_vn_oblique_leadscrew_spec",
         "error_budget",
         "export_features",
         # Angular row sets the lever-level acceptance the summing sheet prints,

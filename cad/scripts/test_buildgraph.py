@@ -141,22 +141,6 @@ _INSERTED_SOURCES = {
     "pd_transgear_removable pd_vn_transgear_retaining_ring pd_vn_transgear_cluster_shim "
     "pd_transgear_thumbnut",
     "ms_measuring_stick": "ms_stick ms_stop_block ms_stop_plate ms_vn_stop_plate_screw sh_vn_thumb_screw",
-    "ch_rocker_arm_tl_oblique_jig": "ch_rocker_arm_tl_oblique_base_bar ch_rocker_arm_tl_oblique_carrier "
-    "ch_rocker_arm_tl_oblique_feed_lever ch_rocker_arm_tl_oblique_feed_block "
-    "ch_rocker_arm_tl_oblique_end_bracket "
-    "ch_rocker_arm_tl_oblique_pivot_block ch_rocker_arm_tl_oblique_riser "
-    "ch_rocker_arm_tl_vn_oblique_rail_kit "
-    "sm_vn_knife_mount_dowel "
-    "ch_rocker_arm_tl_vn_oblique_leadscrew_kit "
-    "ch_rocker_arm_tl_vn_oblique_pillow_block "
-    "ch_rocker_arm_tl_vn_oblique_handwheel sh_vn_clamping_kit_hardware "
-    "ch_rocker_arm_tl_vn_oblique_rail_screw ch_rocker_arm_tl_vn_oblique_bracket_screw "
-    "ch_rocker_arm_tl_vn_oblique_carriage_screw "
-    "ch_rocker_arm_tl_vn_oblique_riser_screw "
-    "ch_rocker_arm_tl_vn_oblique_lever_screw ch_rocker_arm_tl_vn_oblique_lever_washer "
-    "ch_rocker_arm_tl_vn_oblique_pivot_screw ch_rocker_arm_tl_vn_oblique_pivot_spacer "
-    "ch_rocker_arm_tl_vn_oblique_pivot_shim "
-    "ch_rocker_arm_tl_vn_oblique_hub_washer",
     "dt_cone_gear_tl_indexing": "dt_cone_gear_tl_index_plate dt_cone_gear_tl_phasing_comb",
     "dt_cone_tip_gear_tl_cutter": "dt_cone_tip_gear_tl_cutter_bar dt_cone_tip_gear_tl_form_cutter "
     "sh_vn_arbor_set_screw",
@@ -185,13 +169,8 @@ def test_all_assembly_references_match_inserted_source_manifests(assembly):
         ),
         ("sh_vn_thumb_screw", {"mg_magnifier", "ms_measuring_stick"}),
         ("sh_vn_music_wire", {"mg_magnifier", "pn_pen"}),
-        ("sh_vn_clamping_kit_hardware", {"ch_rocker_arm_tl_oblique_jig"}),
         ("sh_vn_pivot_pin", {"ch_channel"}),
         ("sh_vn_fillister_screw_91794a055", {"pd_paper_drive"}),
-        # Parent-scoped kits (owner exception, #2187): one producer, two
-        # configured members each, one direct consumer.
-        ("ch_rocker_arm_tl_vn_oblique_rail_kit", {"ch_rocker_arm_tl_oblique_jig"}),
-        ("ch_rocker_arm_tl_vn_oblique_leadscrew_kit", {"ch_rocker_arm_tl_oblique_jig"}),
     ],
 )
 def test_shared_vendor_producers_have_exact_direct_consumers(producer, consumers):
@@ -207,114 +186,12 @@ def test_shared_vendor_producers_have_exact_direct_consumers(producer, consumers
     assert set(dependents_of(producer)) == expected_dependents
 
 
-@pytest.mark.parametrize(
-    ("stem", "scope", "expected"),
-    [
-        ("sh_vn_clamping_kit_hardware", None, False),
-        ("sh_vn_clamping_kit_hardware", "machine", False),
-        ("sh_vn_clamping_kit_hardware", "tooling", True),
-        ("ch_rocker_arm_tl_oblique_base_bar", None, True),
-        ("ch_rocker_arm_tl_oblique_base_bar", "machine", True),
-        ("ch_rocker_arm_tl_oblique_base_bar", "tooling", True),
-    ],
-)
-def test_shop_fixture_scope_preserves_tl_and_defaults_shared_parts_to_machine(
-    tmp_path, monkeypatch, stem, scope, expected,
-):
-    parts = tmp_path / "parts"
-    parts.mkdir()
-    dashed = stem.replace("_", "-")
-    row = f"{dashed}:\n  number: MHA-SH-VN-57\n"
-    if scope is not None:
-        row += f"  usage_scope: {scope}\n"
-    (parts / f"{dashed}.yaml").write_text(row, encoding="utf-8")
-    monkeypatch.setattr(bg, "CONFIG_DIR", tmp_path)
-    assert bg.is_shop_fixture(stem) is expected
-
-
-@pytest.mark.parametrize("scope", ["fixture", "Tooling", "null", "true", "7", "[]"])
-@pytest.mark.parametrize(
-    "stem", ["sh_vn_clamping_kit_hardware", "ch_rocker_arm_tl_oblique_base_bar"],
-)
-def test_shop_fixture_scope_rejects_invalid_enums_even_for_tl_stems(
-    tmp_path, monkeypatch, scope, stem,
-):
-    parts = tmp_path / "parts"
-    parts.mkdir()
-    dashed = stem.replace("_", "-")
-    (parts / f"{dashed}.yaml").write_text(
-        f"{dashed}:\n  usage_scope: {scope}\n", encoding="utf-8",
-    )
-    monkeypatch.setattr(bg, "CONFIG_DIR", tmp_path)
-    with pytest.raises(ValueError, match="invalid usage_scope"):
-        bg.is_shop_fixture(stem)
-
-
-def test_registered_shared_kit_is_tooling_without_a_tl_identity():
-    assert "_tl_" not in "sh_vn_clamping_kit_hardware"
-    assert bg.is_shop_fixture("sh_vn_clamping_kit_hardware")
-    assert not bg.is_shop_fixture("sh_vn_brass_fillister_screw")
-
-
 def test_arm_plate_locating_pin_has_real_assembly_dependents() -> None:
     """The inserted locating dowels must be produced before the paper drive."""
     stem = "pd_vn_transgear_arm_plate_locating_pin"
     assert stem in part_stems(), "dependency census requires a real producer"
     assert stem in references_of("pd_paper_drive")
     assert set(dependents_of(stem)) == {"pd_paper_drive", "ha_harmonic_analyzer"}
-
-
-def test_plain_pivot_components_are_first_class_jig_only_targets() -> None:
-    import json
-
-    import _config
-    from _assembly_contract import assembly_contract
-    from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
-    from _drawing_registry import DRAWINGS_BY_NAME
-    from _drawing_types import DrawingLayout
-
-    identities = {
-        "ch_rocker_arm_tl_oblique_feed_block": ("MHA-CH-06-TL-32", 1),
-        "ch_rocker_arm_tl_vn_oblique_pivot_screw": ("MHA-CH-06-TL-VN-77", 2),
-        "ch_rocker_arm_tl_vn_oblique_pivot_spacer": ("MHA-CH-06-TL-VN-78", 2),
-        "ch_rocker_arm_tl_vn_oblique_pivot_shim": ("MHA-CH-06-TL-VN-79", 10),
-    }
-    jig = "ch_rocker_arm_tl_oblique_jig"
-    contract = assembly_contract(jig.replace("_", "-"))
-    source_rows = json.loads(
-        (bg.CONFIG_DIR / "current-identity-map.json").read_text(encoding="utf-8")
-    )["parts_and_assemblies"]
-    for stem, (number, quantity) in identities.items():
-        dashed = stem.replace("_", "-")
-        assert stem in part_stems(), f"{stem}: missing native part producer"
-        assert script_for(stem).name == f"build_{stem}.py"
-        assert script_for(stem).is_file()
-        assert set(dependents_of(stem)) == {jig}
-        assert stem in references_of(jig)
-        assert all(stem not in references_of(machine) for machine in bg.MACHINE_ASSEMBLIES)
-        assert dashed in contract.allowed_free_stems
-        assert dashed in contract.required_free_stems
-        drawing = DRAWINGS_BY_NAME[stem]
-        assert (drawing.part, drawing.artifact_stem) == (stem, dashed)
-        assert drawing.source_kind == "part"
-        assert drawing.script_name == f"draw_{stem}.py" and drawing.script.is_file()
-        assert drawing.layout is DrawingLayout.LANDSCAPE
-        row = _config.parts(dashed)
-        assert (row["number"], int(row["quantity"])) == (number, quantity)
-        mapped = [
-            (source, identity)
-            for source in source_rows
-            for identity in source["new_identities"]
-            if identity["stem"] == dashed
-        ]
-        assert len(mapped) == 1
-        source, identity = mapped[0]
-        assert identity["number"] == number
-        assert source["old_stem"] == dashed and source["old_number"] is None
-        assert source["introduced"] == "2026-10-23"
-        if "_vn_" in stem:
-            assert identity["parent"] == jig.replace("_", "-")
-        assert drawing.script_name in PRECISION_MIGRATED_DRAWINGS
 
 
 @pytest.mark.parametrize(
@@ -1816,7 +1693,6 @@ def test_assemblies_depend_on_assembly_helpers():
                 "sm_summing",
                 # its explode selects the global axes (_ha_harmonic_analyzer_explode)
                 "ha_harmonic_analyzer",
-                "ch_rocker_arm_tl_oblique_jig",
             },
         ),
         ("_assembly_couplings", {"dt_drive_train", "pd_paper_drive"}),
@@ -3059,26 +2935,6 @@ def test_unclassified_shop_record_use_keeps_every_file(source):
     assert bg.shop_record_reads(source).files == {bg.ALL_SHOP_FILES}
 
 
-def test_the_jig_specs_shop_reads_are_seen_statically():
-    """The two specs #2852 found reading the shop files at import time."""
-    scripts = Path(bg.__file__).resolve().parent
-    reads = bg.shop_records_selected(tuple(
-        (scripts / name).read_text(encoding="utf-8")
-        for name in (
-            "ch_rocker_arm_tl_oblique_base_bar_spec.py",
-            "ch_rocker_arm_tl_oblique_jig_assembly_spec.py",
-        )
-    ))
-    assert reads.files == frozenset()
-    assert reads.records == {
-        ("shop-equipment.toml", "cnc", "pm-30mv"),
-        ("shop-equipment.toml", "tools", "spring-tap-guide"),
-        ("shop-equipment.toml", "gauges", "gauge-blocks-mitutoyo"),
-        ("shop-equipment.toml", "tools", "rail-trim-grinder"),
-        ("shop.toml", "machines", "pm-30mv"),
-    }
-
-
 def test_dynamic_reads_resolve_to_the_tasks_own_row_only():
     dynamic = "from _fastener_catalog import fastener\ndef f(n):\n    return fastener(n)\n"
     literal = 'from _fastener_catalog import fastener\nS = fastener("b")\n'
@@ -3178,16 +3034,11 @@ def test_features_source_closures_preserve_draw_and_spec_config_reads():
     import export_features
 
     globs = {"machine/*", "tolerances/*", "parts/*", "title_block", "**", bg.ASSEMBLY_CONTRACTS_TOKEN}
-    # Shared configured producers cite the saved/default member's real spec,
-    # not a synthetic aggregate spec. Keep this oracle independent of the resolver.
-    member_specs = {
-        "sh_vn_clamping_kit_hardware": "sh_vn_clamping_kit_hold_down_stud_spec",
-        "ch_rocker_arm_tl_vn_oblique_leadscrew_kit": "ch_rocker_arm_tl_vn_oblique_leadscrew_kit_leadscrew_spec",
-    }
+    # Every features part cites its own <stem>_spec.
     for stem in export_features.SUPPORTED_PARTS:
         sources = {path.resolve() for path in export_features.source_paths(stem)}
         drawing = (SCRIPTS_DIR / f"draw_{stem}.py").resolve()
-        spec_module = member_specs.get(stem, f"{stem}_spec")
+        spec_module = f"{stem}_spec"
         spec = (SCRIPTS_DIR / f"{spec_module}.py").resolve()
         assert spec.is_file(), stem
         assert {drawing, spec} <= sources, stem

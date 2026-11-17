@@ -633,7 +633,7 @@ def _retained_washer_layout(monkeypatch, scope):
 
 
 @pytest.mark.parametrize("scope", (
-    "ch-lever", "ch-thrust", "sm-hanger", "mg-back", "mg-front",
+    "ch-thrust", "sm-hanger", "mg-back", "mg-front",
 ))
 def test_washer_consumer_clears_retained_native_od_blocks_and_preserves_neighbors(monkeypatch, scope):
     from _layout_audit import display_box
@@ -714,95 +714,3 @@ def test_washer_already_clear_od_is_unchanged_without_repositioning(monkeypatch)
     settled = case.helper.supplier_washer_dimensions(case.adapter, case.views, **case.kwargs)
     settled()
     assert case.paint[case.helper.OUTER_DIAMETER].record == before
-
-
-# The retired clamp screw (MHA-CH-06-TL-VN-68) has no consumer. Its CL, CR and HUB
-# clamps use the common screw (91251A197, MHA-CH-06-TL-VN-61), which the rail row covers.
-@pytest.mark.parametrize(
-    "family,head_half,head_one,front_half,front_one",
-    (
-        ("carriage", 14.676, 18.176, 23.332567791611, 35.489135583221),
-        ("bracket", 14.605, 18.034, 21.353286632314, 31.530573264629),
-        ("rail", 14.605, 18.034, 22.950425184312, 34.724850368624),
-        ("lever", 17.129125, 23.08225, 28.115608490064, 45.055216980128),
-    ),
-)
-def test_ch_supplier_screw_consumers_fit_actual_padded_outlines_and_keep_annotation_lanes(
-    monkeypatch, tmp_path, family, head_half, head_one, front_half, front_one,
-):
-    import asyncio
-    import importlib
-
-    import _purchased_fastener_drawing as purchased
-    from test_purchased_fastener_drawing import _Drawing, _View
-
-    # Recorded R38 native GetOutline sizes at 1:2 and 1:1. Interpolating these
-    # two measurements retains the observed fixed sheet-space padding; this is
-    # not a catalogue-only body rectangle or a scaled 1:1 native outline.
-    sizes = {
-        "*Front": ((head_half, front_half), (head_one, front_one)),
-        "*Top": ((head_half, head_half), (head_one, head_one)),
-        "*Right": ((head_half, front_half), (head_one, front_one)),
-    }
-
-    class NativeView(_View):
-        @property
-        def Position(self):
-            return self._center
-
-        def GetOutline(self):
-            half, one = sizes[self._orientation]
-            ratio = self.ScaleRatio[0] / self.ScaleRatio[1]
-            width, height = (
-                (2 * (full - small) * ratio + 2 * small - full) / 1000.0
-                for small, full in zip(half, one, strict=True)
-            )
-            x, y = self._center
-            return (x - width / 2, y - height / 2, x + width / 2, y + height / 2)
-
-        def SetViewPosition(self, position, _update):
-            self._center = tuple(position)
-            return True
-
-    monkeypatch.setattr(purchased, "double_array", tuple)
-    consumer = importlib.import_module(
-        f"draw_ch_rocker_arm_tl_vn_oblique_{family}_screw"
-    )
-
-    async def fit_native(_adapter, spec, *, view_layout, supplier_margins, **_kwargs):
-        stock = purchased.fastener(spec.artifact_stem)
-        notes = str(purchased._config.parts(stock.part_name).get("installation_notes", ""))
-        caption_y = purchased.view_band_bottom(notes, label=spec.artifact_stem)
-
-        def fit(layout):
-            outer = purchased.fastener_view_cells(caption_y, layout=layout)
-            fitted = purchased.supplier_fit_cells(
-                outer, supplier_margins, label=spec.artifact_stem,
-            )
-            members = [
-                (NativeView(name, tmp_path / "supplier.SLDPRT", center), (name, center, box))
-                for name, center, box in fitted if name in sizes
-            ]
-            scale = purchased._fit_group(_Drawing(), members)
-            return scale, outer, members
-
-        # The original native failure: constant outline padding leaves no
-        # supported standard scale inside the ordinary Top annotation lanes.
-        with pytest.raises(RuntimeError, match="no project-standard scale"):
-            fit("standard")
-        scale, outer, members = fit(view_layout)
-        assert scale == (1, 2)
-        outer_bounds = {name: box for name, _, box in outer}
-        for view, (name, _center, geometry_cell) in members:
-            bounds = view.GetOutline()
-            assert purchased._inside(bounds, geometry_cell)
-            left, bottom, right, top = supplier_margins.get(name, (0.0,) * 4)
-            complete = (
-                bounds[0] - left, bounds[1] - bottom,
-                bounds[2] + right, bounds[3] + top,
-            )
-            assert purchased._inside(complete, outer_bounds[name])
-        return {"orthographic": scale}
-
-    monkeypatch.setattr(consumer, "build_purchased_fastener_drawing", fit_native)
-    assert asyncio.run(consumer.build(object())) == {"orthographic": (1, 2)}

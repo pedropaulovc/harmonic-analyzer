@@ -805,7 +805,7 @@ def isolated_drawing_keys(tmp_path, monkeypatch):
     dodo = _load_dodo()
     stems = ("pd_platen_guide", "ch_vn_frame_side_screw", "pn_pen_assembly")
     configured_stems = (
-        "sh_vn_chain_link", "sh_vn_clamping_kit_hardware", "sh_vn_music_wire"
+        "sh_vn_chain_link", "sh_vn_music_wire"
     )
     release_relative = dodo.RELEASE_VERSION_FILE.relative_to(REPO_ROOT)
     config_relative = dodo.CONFIG_DIR.relative_to(REPO_ROOT)
@@ -1191,7 +1191,7 @@ def test_config_row_change_moves_only_its_readers_freshness_and_cache_key(
 
 @pytest.mark.parametrize(
     "changed_stem",
-    ["sh_vn_chain_link", "sh_vn_clamping_kit_hardware", "sh_vn_music_wire"],
+    ["sh_vn_chain_link", "sh_vn_music_wire"],
 )
 @pytest.mark.parametrize("field", ["default_configuration", "configuration_quantities"])
 def test_purchased_configuration_changes_invalidate_only_own_drawing(
@@ -1203,7 +1203,7 @@ def test_purchased_configuration_changes_invalidate_only_own_drawing(
     import _purchased_part_variants as variants
     import yaml
 
-    purchased = ("sh_vn_chain_link", "sh_vn_clamping_kit_hardware", "sh_vn_music_wire")
+    purchased = ("sh_vn_chain_link", "sh_vn_music_wire")
     dodo, _root, drawing_keys = isolated_drawing_keys(
         drawing_stems=(*purchased, "pd_platen_guide")
     )
@@ -1551,7 +1551,6 @@ def isolated_assembly_helper_keys(tmp_path, monkeypatch):
                 "pn_pen",
                 "sm_summing",
                 "ha_harmonic_analyzer",
-                "ch_rocker_arm_tl_oblique_jig",
             },
         ),
         ("_assembly_couplings", {"dt_drive_train", "pd_paper_drive"}),
@@ -1610,7 +1609,6 @@ def test_assembly_depends_on_exact_child_execution_identities():
             "pd_paper_drive",
             ("sh_vn_chain_link", "sh_vn_fillister_screw_90280a108"),
         ),
-        ("ch_rocker_arm_tl_oblique_jig", ("sh_vn_clamping_kit_hardware",)),
     ],
 )
 def test_repeated_roles_and_configured_members_share_exact_producer_dependencies(
@@ -2523,10 +2521,6 @@ def test_vendor_warning_capture_restores_jsonl_sink(tmp_path, monkeypatch, faile
         pytest.param("dt_vn_bearing", "farm", (False,), False, False, id="submitter-dispatch"),
         pytest.param("pn_pen_rod", "local", (False, False), False, False, id="ordinary-part"),
         pytest.param("dt_vn_bearing", "drawing", (False, False), False, False, id="vendor-drawing"),
-        pytest.param(
-            "ch_rocker_arm_tl_oblique_carrier", "local", (False, False),
-            False, False, id="fabricated-tooling-build",
-        ),
     ],
 )
 def test_vendor_part_warning_only_at_actual_build(
@@ -4449,7 +4443,7 @@ def test_produced_bundle_edits_rekey_full_export_without_invalidating_native_led
 
 
 @pytest.mark.parametrize("source", [
-    "draw_ch_rocker_arm.py", "draw_ch_rocker_arm_tl_oblique_carrier.py",
+    "draw_ch_rocker_arm.py",
     "_drawing_layout_audit.py", "_pdf_ink.py",
 ])
 def test_draw_source_edits_do_not_rekey_full_export_before_producing_bundles(
@@ -4566,9 +4560,7 @@ def test_build_and_release_render_every_traveler_build_bare_none(synthetic_prech
     setup or file-implied edge."""
     from doit.loader import load_tasks
 
-    dodo, plans, _, stem, _, _, _ = synthetic_prechips_task
-    other = "ch_rocker_arm_tl_oblique_base_bar"
-    plans.TRAVELER_STEMS = (stem, other)
+    dodo, _, _, stem, _, _, _ = synthetic_prechips_task
     tasks = {task.name: task for task in load_tasks(dict(vars(dodo)), allow_delayed=True)}
     owners = {target: task.name for task in tasks.values() for target in task.targets}
 
@@ -4587,7 +4579,7 @@ def test_build_and_release_render_every_traveler_build_bare_none(synthetic_prech
 
     assert not any(name.startswith("prechips") for name in closure("build_bare"))
     for root in ("build", "release"):
-        assert {f"prechips:{stem}", f"prechips:{other}"} <= closure(root), root
+        assert f"prechips:{stem}" in closure(root), root
     assert dodo._stage_name(f"prechips:{stem}") == "prechips-traveler"
     assert not any(name.startswith("traveler_") for name in dodo._CHECK_NAMES)
     assert not any(task["name"].startswith("traveler_") for task in dodo.task_check())
@@ -5498,7 +5490,6 @@ def test_refresh_bypasses_each_cached_task_family_freshness(monkeypatch):
 
 _SHARED_MEMBER_STEMS = (
     "sh_vn_chain_link",
-    "sh_vn_clamping_kit_hardware",
     "sh_vn_music_wire",
 )
 

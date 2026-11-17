@@ -136,13 +136,6 @@ _SHARED_MEMBERS = {
         ("InnerLink", "sh-vn-chain-link", "sh-vn-chain-link--innerlink"),
         ("OuterLink", "sh-vn-chain-link--outerlink", "sh-vn-chain-link--outerlink"),
     ),
-    "sh_vn_clamping_kit_hardware": (
-        ("HoldDownStud", "sh-vn-clamping-kit-hardware",
-         "sh-vn-clamping-kit-hardware--holddownstud"),
-        ("TNut", "sh-vn-clamping-kit-hardware--tnut", "sh-vn-clamping-kit-hardware--tnut"),
-        ("FlangeNut", "sh-vn-clamping-kit-hardware--flangenut",
-         "sh-vn-clamping-kit-hardware--flangenut"),
-    ),
     "sh_vn_music_wire": (
         ("LeverWire", "sh-vn-music-wire", "sh-vn-music-wire--leverwire"),
         ("PenWire", "sh-vn-music-wire--penwire", "sh-vn-music-wire--penwire"),
@@ -226,7 +219,7 @@ def _staged_shared_members() -> dict[Path, str]:
     return export_models.stage_neutral_producers(list(_SHARED_MEMBERS))
 
 
-def test_shared_release_inventory_requires_all_seven_members_without_scenes(
+def test_shared_release_inventory_requires_all_four_members_without_scenes(
     tmp_path: Path, monkeypatch,
 ) -> None:
     _root, expected, _owned = _shared_release_fixture(tmp_path, monkeypatch)
@@ -234,9 +227,9 @@ def test_shared_release_inventory_requires_all_seven_members_without_scenes(
     inventory = export_models._release_inventory(list(_SHARED_MEMBERS), [], {}, set())
 
     assert inventory == expected
-    assert len([name for name in inventory if name.startswith("step/")]) == 7
-    assert len([name for name in inventory if name.startswith("png/")]) == 7
-    assert len([name for name in inventory if name.startswith("stl/")]) == 7
+    assert len([name for name in inventory if name.startswith("step/")]) == 4
+    assert len([name for name in inventory if name.startswith("png/")]) == 4
+    assert len([name for name in inventory if name.startswith("stl/")]) == 4
     for stem, configurations in _SHARED_MEMBERS.items():
         dashed = stem.replace("_", "-")
         assert f"stl/{dashed}.STL" not in inventory
@@ -284,14 +277,14 @@ def test_shared_neutral_certificate_and_stage_include_unseen_members(
     facts = export_models.stage_release_neutral(stage)
 
     assert facts == {
-        "documents": 3,
-        "parts": 3,
+        "documents": 2,
+        "parts": 2,
         "assemblies": 0,
-        "steps": 7,
-        "stls": 7,
-        "pngs": 7,
+        "steps": 4,
+        "stls": 4,
+        "pngs": 4,
         "views": 1,
-        "config_meshes": 7,
+        "config_meshes": 4,
     }
     for relative, source in expected.items():
         assert (stage / relative).read_bytes() == source.read_bytes()
@@ -417,112 +410,6 @@ def test_forced_full_export_preserves_part_owned_member_bytes(
     for path, payload in {**owned, **certificates}.items():
         assert path.read_bytes() == payload
     assert all(path.is_file() for path in expected.values())
-
-
-def _feature_member_export(tmp_path: Path, monkeypatch, before_build=None):
-    """Shared fixture where the clamping kit's bare STEP is feature-owned.
-
-    sh_vn_clamping_kit_hardware is both a member part and a feature part: its
-    labelled feature STEP, not the part-certified HoldDownStud STEP, is the
-    neutral ``step/sh-vn-clamping-kit-hardware.STEP`` (check:features_bound).
-    """
-    import _part_configuration_exports as members
-    import features_bound
-
-    root, expected, owned = _shared_release_fixture(tmp_path, monkeypatch)
-    feature_step = root / "step" / "sh-vn-clamping-kit-hardware.STEP"
-    labelled = b"labelled feature STEP"
-
-    def stage(_out, _step_directory):
-        feature_step.parent.mkdir(parents=True, exist_ok=True)
-        feature_step.write_bytes(labelled)
-        return {feature_step: hashlib.sha256(labelled).hexdigest()}
-
-    def run_build(build):
-        if before_build is not None:
-            before_build(root)
-        asyncio.run(build(_MemberAdapter()))
-        return 0
-
-    scene_meshes = _shared_scene_meshes()
-    digests = {stem.replace("_", "-"): "fixture-recipe" for stem in _SHARED_MEMBERS}
-    digests.update({mesh: "fixture-recipe" for entries in scene_meshes.values()
-                    for _configuration, mesh in entries})
-    monkeypatch.setattr(features_bound, "stage_feature_steps", stage)
-    monkeypatch.setattr(export_models, "load_src_digests", lambda: dict(digests))
-    monkeypatch.setattr(export_models, "all_scene_part_meshes", lambda _scenes: scene_meshes)
-    monkeypatch.setattr(export_models, "export_build_png", None)
-    monkeypatch.setattr(export_models, "run_build", run_build)
-    monkeypatch.setattr(sys, "argv", ["export_models.py", "--force", "--record-digests"])
-    part_inputs = [
-        path for stem in _SHARED_MEMBERS
-        for path in members.part_configuration_outputs(stem, root)
-    ]
-    return root, expected, owned, labelled, part_inputs
-
-
-def test_feature_owned_member_step_exports_repeatably_without_touching_part_inputs(
-    tmp_path: Path, monkeypatch,
-) -> None:
-    root, expected, owned, labelled, part_inputs = _feature_member_export(
-        tmp_path, monkeypatch,
-    )
-    before = {path: path.read_bytes() for path in part_inputs}
-
-    # The second run is the regression: the first run's staged neutral STEP must
-    # neither invalidate the part certificate nor change export's own key inputs.
-    for _run in range(2):
-        assert export_models.main() == 0
-        assert {path: path.read_bytes() for path in part_inputs} == before
-
-    files = json.loads(export_models.NEUTRAL_MANIFEST.read_text(encoding="utf-8"))["files"]
-    assert set(files) == set(expected)
-    assert files["step/sh-vn-clamping-kit-hardware.STEP"]["sha256"] == (
-        hashlib.sha256(labelled).hexdigest()
-    )
-    produced = {
-        path.relative_to(root).as_posix().replace(
-            f"part-neutral/{path.parent.name}/", "step/",
-        ): payload
-        for path, payload in owned.items()
-    }
-    assert produced.pop("step/sh-vn-clamping-kit-hardware.STEP") != labelled
-    for relative, payload in produced.items():
-        assert files[relative]["sha256"] == hashlib.sha256(payload).hexdigest()
-        assert (root / relative).read_bytes() == payload
-
-
-def _mutate_staged_member(root: Path) -> None:
-    path = root / "step" / "sh-vn-clamping-kit-hardware--tnut.STEP"
-    path.write_bytes(b"x" * path.stat().st_size)
-
-
-def _mutate_staged_feature(root: Path) -> None:
-    path = root / "step" / "sh-vn-clamping-kit-hardware.STEP"
-    path.write_bytes(b"x" * path.stat().st_size)
-
-
-def _replace_native_execution(root: Path) -> None:
-    (root / "sldprt" / ".sh-vn-music-wire.execution").write_text("e" * 64, encoding="utf-8")
-
-
-@pytest.mark.parametrize(
-    "fault,message",
-    [
-        (_mutate_staged_member, "changed after staging"),
-        (_mutate_staged_feature, "changed after staging"),
-        (_replace_native_execution, "identity"),
-    ],
-    ids=["staged-member", "staged-feature", "execution-identity"],
-)
-def test_release_certificate_refuses_changes_after_producer_staging(
-    tmp_path: Path, monkeypatch, fault, message: str,
-) -> None:
-    _feature_member_export(tmp_path, monkeypatch, before_build=fault)
-
-    with pytest.raises(RuntimeError, match=message):
-        export_models.main()
-    assert not export_models.NEUTRAL_MANIFEST.exists()
 
 
 @pytest.mark.parametrize("stem", list(_SHARED_MEMBERS))

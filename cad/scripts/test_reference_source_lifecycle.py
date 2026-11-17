@@ -28,11 +28,6 @@ def test_configured_purchased_drawings_do_not_depend_on_spring_drawing() -> None
         for script in sorted(SCRIPTS.glob("draw_*.py"))
         if "_purchased_variant_drawing.py" in _closure(script)
     }
-    assert {
-        "draw_ch_rocker_arm_tl_vn_oblique_rail_kit.py",
-        "draw_ch_rocker_arm_tl_vn_oblique_leadscrew_kit.py",
-        "draw_sh_vn_clamping_kit_hardware.py",
-    } <= set(configured)
     for name, closure in configured.items():
         assert "_reference_source_lifecycle.py" in closure, name
         assert not closure & _SPRING_MODULES, (name, sorted(closure & _SPRING_MODULES))

@@ -810,9 +810,12 @@ def test_pose_source_resolver_rejects_ambiguous_extracted_cache_without_fetch(tm
         pose_to_meshprobe.release_member(f"gltf/{GROUPS[1][0]}.glb", "v50")
 
 
+# Retired families (the oblique jig's kits) keep their map rows for history but
+# have no registry row to produce paths from.
 @pytest.mark.parametrize("stem,configuration,neutral", [
     (stem, configuration, neutral)
     for stem, _, neutral, members in NAMED_FAMILIES
+    if (Path(__file__).resolve().parents[1] / "config" / "parts" / f"{stem}.yaml").is_file()
     for configuration in members.values()
 ])
 def test_named_members_use_the_same_format_paths_as_producer_and_registry(
