@@ -49,11 +49,15 @@ PIVOT_NOTE_NUMBER = 1
 TEETH_NOTE_NUMBER = 2
 PIVOT_NOTE_FLAG = f"SEE NOTE {PIVOT_NOTE_NUMBER}"
 TEETH_NOTE_FLAG = f"SEE NOTE {TEETH_NOTE_NUMBER}"
-# The gear width's callout, in MHA-DT-03's form (draw_dt_cone_gear): the
-# .2934 nominal is the stack closure of the touching faces, and the callout
-# names that stack at the dimension (machinist review, farm run
-# 20261112T053742990Z: behind a note flag it read as an off-grid nominal).
-FACE_STACK_CALLOUT = f"20-GEAR STACK\nON {SHAFT_MATE_NUMBER}"
+# The gear width's callout: the .2934 nominal is the cone's seat pitch on
+# MHA-DT-04 (cone_pitch.SEAT_PITCH, floored to four millimetre places), the
+# stack closure of the touching faces that dt_cone_gear_spec records as not
+# snapped to the inch grid (rule 3's pitch-geometry exemption).  The callout
+# says so at the dimension (machinist review, farm runs 20261112T053742990Z
+# and 20261117T111407559Z: "20-GEAR STACK" alone read as an off-grid nominal).
+# A .293 face would break the stack's one-seat-pitch lockstep
+# (dt_cone_gear_stack.PITCH_LOCKSTEP_TOLERANCE).
+FACE_STACK_CALLOUT = f"CONE SEAT PITCH\nON {SHAFT_MATE_NUMBER}"
 
 
 def sheet_notes() -> str:
@@ -61,21 +65,23 @@ def sheet_notes() -> str:
 
     Note 1 is the pivot's two fits (rule 4): the bushing presses over its root
     and the end screw's reamed hole runs on its end, one diameter for both.
-    Its .0003 band is under the turned-diameter row, so the pivot is made to
-    the measured MHA-DT-38 bore, the interference the parts' limits give; the
-    end screw's hole then runs on it with the clearance its limits give. Note
-    2 names the mesh and the fit route of the tip, thickness and root bands,
-    with the teeth's do-not-cut. Note 3: the stems are turned between centres,
-    and a centre hole in either end harms nothing (rule 11).
+    The window that gives both ranges on the mates' printed limits is .0003
+    wide, under any plain inch step, so the diameter prints REF and the pivot
+    is turned to its measured mates: the two ranges are the requirement
+    (matched pair). Note 2 names the mesh and the fit route of the tip,
+    thickness and root bands, with the teeth's do-not-cut. Note 3: the stems
+    are turned between centres, and a centre hole in either end harms nothing
+    (rule 11).
     """
     interference = spec.inch_range(spec.PIVOT_PRESS_INTERFERENCE_MM)
     clearance = spec.inch_range(spec.PIVOT_RUNNING_CLEARANCE_MM)
     return "\n".join(
         (
-            f"{PIVOT_NOTE_NUMBER}. PIVOT: PRESS FIT IN {BUSHING_MATE_NUMBER} {BUSHING_MATE_TITLE}, "
-            f"MADE TO ITS MEASURED BORE (INTERFERENCE {interference});",
-            f"   ITS END RUNS IN {END_SCREW_MATE_NUMBER} {END_SCREW_MATE_TITLE} "
-            f"(DIAMETRAL CLEARANCE {clearance}).",
+            f"{PIVOT_NOTE_NUMBER}. PIVOT: TURN TO ITS MEASURED MATES. PRESS FIT IN "
+            f"{BUSHING_MATE_NUMBER} {BUSHING_MATE_TITLE}",
+            f"   (INTERFERENCE {interference} ON ITS BORE); ITS END RUNNING FIT IN "
+            f"{END_SCREW_MATE_NUMBER} {END_SCREW_MATE_TITLE}",
+            f"   (DIAMETRAL CLEARANCE {clearance} IN ITS HOLE).",
             f"{TEETH_NOTE_NUMBER}. TEETH MESH WITH {CYLINDER_MATE_NUMBER}: ACCEPT OVER PINS, "
             "THEN BY FEEL AT ASSEMBLY,",
             f"   PER GEAR DATA. {TOOTH_EDGE_NOTE}",
@@ -95,7 +101,7 @@ DIMENSION_CALLOUTS = {
         f"BONDED FIT, {cone_tip_cluster.RETAINING_COMPOUND}, IN {SHAFT_MATE_NUMBER} SOCKET\n"
         f"AND {STEM_BORE_MATES[0]}, {STEM_BORE_MATES[1]}"
     ),
-    # One diameter carries both of note 1's fits.
+    # One REF diameter carries both of note 1's fits.
     "PivotDia": f"PRESS AND RUNNING FIT\n{PIVOT_NOTE_FLAG}",
     "ToothThickness": TEETH_NOTE_FLAG,
     # The origin circle is an inspection witness, not the off-centre root arc.

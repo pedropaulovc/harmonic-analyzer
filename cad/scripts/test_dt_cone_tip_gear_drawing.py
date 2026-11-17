@@ -13,7 +13,6 @@ import pytest
 
 import _config
 import cone_tip_cluster as cluster
-import draw_dt_cone_gear
 import draw_dt_cone_tip_gear as drawing
 import dt_cone_gear_spec as family
 import dt_cone_tip_gear_notes as notes
@@ -52,12 +51,16 @@ def test_the_part_is_the_family_t006_on_its_own_identity() -> None:
 def test_stems_are_the_clusters_and_clear_the_tooth_cutter() -> None:
     assert spec.STEM_DIA_MM == cluster.STEM_DIA_MM == pytest.approx(0.0625 * 25.4)
     assert spec.SPIGOT_DIA_BAND == cluster.SPIGOT_DIA_BAND
-    assert spec.PIVOT_DIA_BAND == cluster.PIVOT_DIA_BAND
+    # The pivot is turned to its measured mates (note 1): every in-limit
+    # MHA-DT-38 bore and MHA-DT-39 hole leave it a size, .0617-.0630.
+    low, high = (v / 25.4 for v in spec.PIVOT_MATCHED_LIMITS_MM)
+    assert (low, high) == (pytest.approx(0.0617), pytest.approx(0.0630))
+    assert spec.STEM_MAX_DIA_MM == spec.PIVOT_MATCHED_LIMITS_MM[1]
     assert spec.SPIGOT_LENGTH_MM == cluster.SPIGOT_LENGTH_MM
     assert spec.PIVOT_LENGTH_MM == cluster.PIVOT_LENGTH_MM
     # DT6-FORM1 runs off over both stems: every stem limit stands under the
     # smallest root envelope and under every actual cutter corner.
-    assert spec.CUTTER_RUNOFF_MM / 25.4 == pytest.approx(0.01075, abs=1e-5)
+    assert spec.CUTTER_RUNOFF_MM / 25.4 == pytest.approx(0.0105, abs=1e-5)
     corners = family.manufacturing_corner_profiles(6)
     assert min(c.root_radius_min_mm for c in corners) > spec.STEM_MAX_DIA_MM / 2.0
 
@@ -113,21 +116,23 @@ def test_callouts_and_notes_name_every_mate_once() -> None:
     assert pivot == f"PRESS AND RUNNING FIT\n{notes.PIVOT_NOTE_FLAG}"
     sheet = notes.sheet_notes().splitlines()
     assert len(sheet) <= 6
-    # One pivot diameter: pressed in the bushing, its end running in the end
-    # screw's hole; both mates by number and name, both acceptances.
-    pivot_note = " ".join(sheet[:2])
+    # One REF pivot diameter turned to its measured mates: pressed in the
+    # bushing, its end running in the end screw's hole; both mates by number
+    # and name, both ranges as the requirement.
+    pivot_note = " ".join(sheet[:3])
     assert sheet[0].startswith(
-        f"{notes.PIVOT_NOTE_NUMBER}. PIVOT: PRESS FIT IN MHA-DT-38"
+        f"{notes.PIVOT_NOTE_NUMBER}. PIVOT: TURN TO ITS MEASURED MATES. "
+        "PRESS FIT IN MHA-DT-38"
     )
     assert "MHA-DT-39 CONE TIP END SCREW" in pivot_note
     assert spec.inch_range(spec.PIVOT_PRESS_INTERFERENCE_MM) in pivot_note
     assert spec.inch_range(spec.PIVOT_RUNNING_CLEARANCE_MM) in pivot_note
-    assert sheet[2].startswith(f"{notes.TEETH_NOTE_NUMBER}. TEETH MESH WITH MHA-DT-12")
+    assert sheet[3].startswith(f"{notes.TEETH_NOTE_NUMBER}. TEETH MESH WITH MHA-DT-12")
     assert sheet[-1] == "3. CENTRES OK."
-    # The width names its stack at the dimension, as the MHA-DT-03 sheets do;
-    # each line is shorter than the face it sits under.
-    assert callouts["FaceWidth"] == draw_dt_cone_gear.DIMENSION_CALLOUTS["FaceWidth"]
-    assert "MHA-DT-04" in callouts["FaceWidth"]
+    # The width says at the dimension that it is the cone's seat pitch on its
+    # shaft (rule 3's pitch-geometry exemption); each line is shorter than the
+    # face it sits under.
+    assert callouts["FaceWidth"].splitlines() == ["CONE SEAT PITCH", "ON MHA-DT-04"]
     assert all(
         len(line) * 2.6 < drawing.sheet_mm(spec.FACE_WIDTH) * 1000.0
         for line in callouts["FaceWidth"].splitlines()
@@ -361,10 +366,10 @@ def test_tooth_space_plot_stands_beside_the_table() -> None:
     assert {1, root_end, junction_row, len(rows)} <= tagged
 
 
-# The lengths and the overall print at the title block's places with no
-# band of their own (``.25``, ``(1.30)``); every other value carries a
-# stacked band (``.0625 +.0000/-.0010``).
-_UNBANDED = {"PivotLength", "SpigotLength", "overall"}
+# The lengths, the overall and the REF pivot print with no band of their own
+# (``.25``, ``(1.30)``, ``(Ø.0625)``); every other value carries a stacked
+# band (``.0625 +.0000/-.0010``).
+_UNBANDED = {"PivotLength", "SpigotLength", "overall", "PivotDia"}
 # A diameter's text hangs beside its vertical dimension line, not across it:
 # left of the line for the pivot and the tip, right of it for the spigot
 # (farm runs 20261111T234611671Z and 20261112T053742990Z: the spigot block
