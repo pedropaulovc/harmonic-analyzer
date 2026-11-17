@@ -285,7 +285,7 @@ TOOLS: tuple[Tool, ...] = (
             "shop.toml:gauges.dial-indicators",
             "shop-equipment.toml:gauges.digital-indicator",
             "shop.toml:gauges.digital-indicator",
-            "shop-equipment.toml:gauges.mag-bases-extra",
+            "shop-equipment.toml:gauges.mag-base",
         ),
     ),
     Tool(

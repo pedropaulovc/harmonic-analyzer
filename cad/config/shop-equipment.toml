@@ -87,19 +87,14 @@ name = "Digital indicator"
 kind = "digital_indicator"
 present = true
 
-# MHA-DT-00 zeroes an indicator on each pedestal and one more across them at
-# once: the two dial indicators and the digital one cover the three, but the
-# shop records one magnetic base (gauges.mag-base). The owner's inventory
-# names no more bases: to buy, or to record if the shop has them.
-[gauges.mag-bases-extra]
-name = "Two more magnetic indicator bases"
-kind = "magnetic_base"
-present = false
-
+# Three magnetic indicator bases (owner, Pedro, 2026-11-17: "3 magnetic
+# indicator bases"). MHA-DT-00 step 4B, the most any sheet sets up at once,
+# zeroes an indicator on each pedestal and one more across them: three.
 [gauges.mag-base]
-name = "Magnetic indicator base (archived inventory)"
+name = "Magnetic indicator bases"
 kind = "magnetic_base"
 present = true
+pieces = 3
 
 [gauges.surface-plate]
 name = "Surface plate"
@@ -113,10 +108,10 @@ kind = "depth_micrometer"
 present = false
 
 [gauges.feeler-gauges]
-name = "Feeler gauge leaves"
+name = "Feeler gauge leaves, inch"
 kind = "feeler_gauge_set"
 present = true
-note = "Owned (Pedro, 2026-11-17, PR #2874), superseding the archived inventory's 2026-10-11 \"feeler gauges are not owned\". Whether the set is inch, metric or both is unrecorded: MHA-DT-00 names the metric set its leaf stacks are built from (pinion_rig_fitup.FEELER_GAGE); the other sheets name inch leaves."
+note = "Owned (Pedro, 2026-11-17, PR #2874), superseding the archived inventory's 2026-10-11 \"feeler gauges are not owned\". Inch leaves only (owner, Pedro, 2026-11-17): the shop has no metric set, so MHA-DT-00's STARRETT 66MA metric leaf stacks (pinion_rig_fitup.FEELER_GAGE) are not owned."
 
 [gauges.digital-angle-gauge]
 name = "Digital angle gauge"
