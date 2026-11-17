@@ -2,11 +2,12 @@ r"""Create the three-sheet summing-lever fitter package (MHA-SM-00).
 
 Sheet 1 shows the assembled lever on its knife mounts (front and right) with
 the counter-spring screw height the level setting finds, a 1:1 knife-edge
-detail carrying the free-rock acceptance, and the notes. Sheet 2 is the
-builder-owned SM_EXPLODED isometric with its BOM (vendor SKU added) and one
-balloon per BOM row. Sheet 3 is the finished isometric. The numbered fit-up
-steps and checks print in the release's ASSEMBLY.md (#2889). Both settings
-are the assembly's own sketch dimensions
+detail carrying the free-rock acceptance and the hanger bolt's cut reach, the
+setting table (the acceptances no model dimension carries) and the notes.
+Sheet 2 is the builder-owned SM_EXPLODED isometric with its BOM (vendor SKU
+added) and one balloon per BOM row. Sheet 3 is the finished isometric. The
+numbered fit-up steps and checks print in the release's ASSEMBLY.md (#2889).
+The three settings are the assembly's own sketch dimensions
 (``build_sm_summing_assembly._author_settings``), imported here; the explode
 comes from ``sm_summing_explode_spec`` and every printed text comes from
 ``sm_summing_assembly_sheet``.
@@ -61,6 +62,7 @@ from _drawing_dimensions import (
 )
 from _drawing_hidden_sketches import _show_base_view_sketches
 from _drawing_projection import model_point_in_view
+from _general_table import insert_general_table
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_types import DRAWING_TEMPLATES, DrawingLayout
 from _drawing_sheets import create_blank_drawing_sheets
@@ -77,6 +79,7 @@ from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
 from _session import run_build
 from _simplified_names import simplified_name
+from sm_knife_mount_spec import BLK_HALF_X
 from stock_anchor_geom import ANCHOR_9490T1
 
 
@@ -156,6 +159,12 @@ DETAIL_CROP_RADIUS = DETAIL_RADIUS_MM * DETAIL_MM
 ROCK_TEXT_OFFSET = 0.010
 ROCK_TEXT_DROP = 0.008
 DETAIL_LABEL_GAP = 0.005
+# The hanger bolt reach (step 4A's cut) on the same detail: its dimension line
+# stands this far outboard of the knife mount's far side (away from the boss),
+# its text this far under the cut tip, hanging off the outboard shelf into the
+# open sheet right of the crop circle.
+HANGER_TEXT_OFFSET = 0.005
+HANGER_TEXT_DROP = 0.008
 DETAIL_LABEL_INSET = 0.040
 CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
 DETAIL_POSITION_TOL_M = 1e-4
@@ -167,6 +176,10 @@ DETAIL_POSITION_TOL_M = 1e-4
 DETAIL_BOUNDARY_COLOR = 0  # COLORREF black
 DETAIL_LETTER_GAP = 0.002
 DETAIL_LETTER_HALF_WIDTH = 0.0013
+# The setting table (rule 22: acceptances that are no model dimension) runs
+# along the top border, above every view on the sheet.
+SETTING_TABLE_INSET = 0.004
+SETTING_TABLE_VIEW_GAP = 0.004
 
 # --- Sheet 2 ------------------------------------------------------------------
 EXPLODED_ISO_CENTER = (0.112, 0.150)
@@ -631,47 +644,93 @@ def _mark_detail_boundary(adapter: Any, front: Any) -> None:
     _telemetry.info(f"summing: {label} centre {centre!r} radius {radius!r}")
 
 
-def _knife_detail(adapter: Any) -> Callable[[], None]:
-    """The 1:1 knife-edge detail with the boss's minimum rock travel."""
+def _prove_detail_setting(
+    display: Any, *, dimension: str, value_mm: float, places: int, label: str
+) -> None:
+    if abs(_dimension_value_mm(display) - value_mm) > 1e-4:
+        raise RuntimeError(f"{label} reads {_dimension_value_mm(display):g} mm")
+    if int(display.GetPrimaryPrecision2()) != places:
+        raise RuntimeError(f"{label}: precision changed")
+    _assert_callout(display, dimension)
+
+
+def _knife_detail(adapter: Any) -> tuple[Any, Callable[[], None]]:
+    """The 1:1 knife-edge detail with the boss's minimum rock travel and the
+    hanger bolt's reach below its mount's top seat (step 4A's cut)."""
     label = notes.DETAIL_TITLE
     view = _placed_detail(adapter)
-    face, knife = (
+    face, knife, seat, tip = (
         model_point_in_view(
             adapter, view, (x / 1000.0, y / 1000.0, 0.0), label=f"{label} {name}"
         )
         for name, (x, y) in (
             ("boss face", spec.BOSS_FACE_POINT),
             ("knife", spec.KNIFE_POINT),
+            ("hanger top seat", spec.HANGER_SEAT_POINT),
+            ("hanger tip", spec.HANGER_TIP_POINT),
         )
     )
     outboard = math.copysign(1.0, face[0] - knife[0])
-    text_xy = (
+    rock_xy = (
         face[0] + outboard * ROCK_TEXT_OFFSET,
         face[1] - ROCK_TEXT_DROP,
     )
-    annotation = _imported_setting(
-        adapter,
-        view,
-        feature=spec.ROCK_FEATURE,
-        dimension=spec.ROCK_DIMENSION,
-        text_xy=text_xy,
-        label="knife rock gauge",
+    # The bolt stands on the mount's centre plane; its far side is a block
+    # half-width out, away from the boss.
+    hanger_side = math.copysign(1.0, seat[0] - face[0])
+    hanger_xy = (
+        seat[0] + hanger_side * (BLK_HALF_X * DETAIL_MM + HANGER_TEXT_OFFSET),
+        tip[1] - HANGER_TEXT_DROP,
     )
-    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    settings = []
+    for feature, dimension, value_mm, places, text_xy, setting in (
+        (
+            spec.ROCK_FEATURE,
+            spec.ROCK_DIMENSION,
+            spec.BOSS_ROCK_TRAVEL,
+            spec.ROCK_PRECISION,
+            rock_xy,
+            "knife rock gauge",
+        ),
+        (
+            spec.HANGER_FEATURE,
+            spec.HANGER_DIMENSION,
+            spec.HANGER_FIT_REACH,
+            spec.HANGER_FIT_REACH_PLACES,
+            hanger_xy,
+            "hanger bolt reach",
+        ),
+    ):
+        annotation = _imported_setting(
+            adapter,
+            view,
+            feature=feature,
+            dimension=dimension,
+            text_xy=text_xy,
+            label=setting,
+        )
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        settings.append(
+            (
+                display,
+                {
+                    "dimension": dimension,
+                    "value_mm": value_mm,
+                    "places": places,
+                    "label": setting,
+                },
+            )
+        )
     _crop_detail(adapter, view)
     kept = {
         dimension_name(adapter, _early_bound(item, "IAnnotation"))
         for item in (_early_bound(view, "IView").GetAnnotations() or ())
     }
-    if spec.ROCK_DIMENSION not in kept:
-        raise RuntimeError(
-            f"{label} lost {spec.ROCK_DIMENSION} to its crop; kept {sorted(kept)}"
-        )
-    if abs(_dimension_value_mm(display) - spec.BOSS_ROCK_TRAVEL) > 1e-4:
-        raise RuntimeError(
-            f"knife rock gauge reads {_dimension_value_mm(display):g} mm"
-        )
-    _assert_callout(display, spec.ROCK_DIMENSION)
+    lost = sorted({proof["dimension"] for _, proof in settings} - kept)
+    if lost:
+        raise RuntimeError(f"{label} lost {lost} to its crop; kept {sorted(kept)}")
+    for display, proof in settings:
+        _prove_detail_setting(display, **proof)
     label_xy = (
         DETAIL_CENTRE[0] - DETAIL_LABEL_INSET,
         DETAIL_CENTRE[1] - DETAIL_CROP_RADIUS - DETAIL_LABEL_GAP,
@@ -682,18 +741,40 @@ def _knife_detail(adapter: Any) -> Callable[[], None]:
     _assert_view_on_sheet(view, label=label)
 
     def settled() -> None:
-        if abs(_dimension_value_mm(display) - spec.BOSS_ROCK_TRAVEL) > 1e-4:
-            raise RuntimeError("knife rock gauge: settled nominal changed")
-        if int(display.GetPrimaryPrecision2()) != spec.ROCK_PRECISION:
-            raise RuntimeError("knife rock gauge: settled precision changed")
-        _assert_callout(display, spec.ROCK_DIMENSION)
+        for display, proof in settings:
+            _prove_detail_setting(display, **proof)
 
-    return settled
+    return view, settled
+
+
+def _place_setting_table(adapter: Any, views: tuple[Any, ...]) -> None:
+    """The sheet 1 setting table along the top border, above every view."""
+    label = "summing setting table"
+    _activate_sheet(adapter, SHEET_NAMES[0])
+    left, _bottom, _right, top = SHEET_INNER_BORDER
+    box = insert_general_table(
+        adapter,
+        title=notes.SETTING_TABLE_TITLE,
+        header=notes.SETTING_TABLE_HEADER,
+        rows=notes.SETTING_TABLE_ROWS,
+        top_left=(left + SETTING_TABLE_INSET, top - SETTING_TABLE_INSET),
+        label=label,
+    )
+    _assert_box_on_sheet(box, label=label)
+    views_top = max(
+        _view_outline(view, label=f"{label} view {index}")[3]
+        for index, view in enumerate(views)
+    )
+    if box[1] < views_top + SETTING_TABLE_VIEW_GAP:
+        raise RuntimeError(
+            f"{label}: bottom {box[1]:.4f} m is within {SETTING_TABLE_VIEW_GAP} m "
+            f"of the views' top {views_top:.4f} m"
+        )
 
 
 def _place_assembled_sheet(adapter: Any) -> Callable[[], None]:
     """Front and right at 1:5 (the screw height on the front), the knife-edge
-    detail, and the notes."""
+    detail, the setting table and the notes."""
     _activate_sheet(adapter, SHEET_NAMES[0])
     views = {}
     for name, centre in (("*Front", FRONT_CENTER), ("*Right", RIGHT_CENTER)):
@@ -705,7 +786,8 @@ def _place_assembled_sheet(adapter: Any) -> Callable[[], None]:
         views[name] = view
     counter_settled = _counter_setting(adapter, views["*Front"])
     _mark_detail_boundary(adapter, views["*Front"])
-    detail_settled = _knife_detail(adapter)
+    detail, detail_settled = _knife_detail(adapter)
+    _place_setting_table(adapter, (*views.values(), detail))
     _add_note_block(
         adapter, SHEET_NAMES[0], ASSEMBLED_NOTES, NOTES_XY, label="assembled notes"
     )

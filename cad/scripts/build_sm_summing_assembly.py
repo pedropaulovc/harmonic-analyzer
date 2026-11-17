@@ -659,10 +659,14 @@ _SETTING_GLOBALS = {
     "SmBossX": spec.BOSS_FACE_POINT[0],
     "SmBossFaceY": spec.BOSS_FACE_POINT[1],
     "SmBossRockTravel": spec.BOSS_ROCK_TRAVEL,
+    "SmHangerX": spec.HANGER_SEAT_POINT[0],
+    "SmHangerSeatY": spec.HANGER_SEAT_POINT[1],
+    "SmHangerReach": spec.HANGER_FIT_REACH,
 }
 if not (
     spec.KNIFE_POINT[0] < 0.0 < spec.KNIFE_POINT[1]
     and spec.BOSS_FACE_POINT[0] < 0.0 < spec.BOSS_FACE_POINT[1]
+    and spec.HANGER_SEAT_POINT[0] < 0.0 < spec.HANGER_TIP_POINT[1]
     and spec.COUNTER_SCREW_POINT[0] < spec.KNIFE_POINT[0]
 ):
     raise AssertionError("summing setting drives assume x < 0 < y, screw left of knife")
@@ -695,7 +699,9 @@ def _finish_setting(
 def _author_settings(adapter) -> None:
     """CounterSetting: the MHA-SM-VN-56 axis above the knife contact level (the
     gooseneck height the level setting finds). KnifeRockGauge: the boss face's
-    minimum travel at the free-rock floor, up the boss-hook axis."""
+    minimum travel at the free-rock floor, up the boss-hook axis.
+    HangerReachSetting: the cut MHA-SM-VN-52 tip's reach below its mount's top
+    seat, down the bolt axis."""
     for name, value in _SETTING_GLOBALS.items():
         set_global(adapter, name, f"{value}mm")
 
@@ -738,6 +744,21 @@ def _author_settings(adapter) -> None:
     )
     dims.record(spec.ROCK_DIMENSION, '"SmBossRockTravel"')
     _finish_setting(adapter, spec.ROCK_FEATURE, dims, spec.ROCK_DIMENSION)
+
+    seat, tip = spec.HANGER_SEAT_POINT, spec.HANGER_TIP_POINT
+    dims = SketchDims()
+    check("create hanger reach sketch", adapter.create_sketch("Front"))
+    line = _construction_line(adapter, seat, tip, "hanger reach line")
+    check("hanger reach vertical", adapter.add_sketch_constraint(line, None, "vertical"))
+    anchor_point_to_origin(adapter, f"{line}.start", *seat, "hanger top seat")
+    dims.record("HangerX", '-"SmHangerX"')
+    dims.record("HangerSeatY", '"SmHangerSeatY"')
+    dimension_between(
+        adapter, f"{line}.start", f"{line}.end", "vertical_distance",
+        spec.HANGER_FIT_REACH, "hanger bolt reach",
+    )
+    dims.record(spec.HANGER_DIMENSION, '"SmHangerReach"')
+    _finish_setting(adapter, spec.HANGER_FEATURE, dims, spec.HANGER_DIMENSION)
 
     apply_drawing_precision(adapter, spec.DRAWING_PRECISION)
     for feature in spec.SETTING_FEATURES:

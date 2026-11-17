@@ -1,5 +1,5 @@
 """Pure fitting contract for sm-summing.SLDASM (MHA-SM-00): inventory and
-the two assembly settings.
+the three assembly settings.
 
 Builder data only: the builder (``build_sm_summing_assembly``) places
 ``QUANTITIES`` and authors the two setting sketches from these values; the
@@ -27,6 +27,7 @@ import sm_gooseneck_geom
 import sm_gooseneck_spring_joint as spring_joint
 import sm_summing_lever_spec as lever
 from spring_mount_geom import COUNTER_ANCHOR_XY, KNIFE, KNIFE_CONTACT_Y
+from top_frame_plane import TOP_FRAME_UNDERSIDE_Y
 
 ASM_NAME = "sm-summing"
 
@@ -72,7 +73,7 @@ HANGER_FIT_REACH_TOL = 0.127  # .005, the title block's three-place band
 HANGER_FIT_REACH_PLACES = 3
 
 # --- Assembly settings, as model dimensions -------------------------------------
-# Two blanked Front-plane construction sketches in the assembly (sketch x =
+# Three blanked Front-plane construction sketches in the assembly (sketch x =
 # machine X, sketch y = machine Y), each driven from globals and marked for the
 # drawing, which shows each in the one view that dimensions it.
 #
@@ -85,10 +86,19 @@ HANGER_FIT_REACH_PLACES = 3
 # free-rock floor about the knife edge -- the free-rock acceptance in a
 # distance a fitter measures at the boss, rounded up so the check is never
 # looser than the floor.
-SETTING_FEATURES = ("CounterSetting", "KnifeRockGauge")
-COUNTER_FEATURE, ROCK_FEATURE = SETTING_FEATURES
+#
+# HangerReachSetting: the cut MHA-SM-VN-52 tip's reach below its mount's top
+# seat (the crossbar underside), down the bolt axis -- the HANGER_FIT_REACH
+# the step 4A cut adds to the measured stack (rule 22: the cut-to-fit setting
+# prints on the sheet). The bolt stands on the knife-edge X at each station.
+SETTING_FEATURES = ("CounterSetting", "KnifeRockGauge", "HangerReachSetting")
+COUNTER_FEATURE, ROCK_FEATURE, HANGER_FEATURE = SETTING_FEATURES
 COUNTER_DIMENSION = "CounterScrewRise"
 ROCK_DIMENSION = "BossRockTravel"
+HANGER_DIMENSION = "HangerBoltReach"
+# The mount's top seat is clamped to the crossbar underside, gap 0.
+HANGER_SEAT_POINT = (KNIFE[0], TOP_FRAME_UNDERSIDE_Y)
+HANGER_TIP_POINT = (KNIFE[0], TOP_FRAME_UNDERSIDE_Y - HANGER_FIT_REACH)
 
 KNIFE_POINT = (KNIFE[0], KNIFE_CONTACT_Y)
 _COUNTER_SEAT, GOOSENECK_ORIGIN_Y = settled_spring_seats.counter_seat()
@@ -162,6 +172,7 @@ COUNTER_PRECISION = 2
 DRAWING_PRECISION = {
     COUNTER_FEATURE: {COUNTER_DIMENSION: COUNTER_PRECISION},
     ROCK_FEATURE: {ROCK_DIMENSION: ROCK_PRECISION},
+    HANGER_FEATURE: {HANGER_DIMENSION: HANGER_FIT_REACH_PLACES},
 }
 
 assert 0.0 < COUNTER_SCREW_RISE, COUNTER_SCREW_RISE

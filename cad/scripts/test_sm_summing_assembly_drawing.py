@@ -19,6 +19,7 @@ from _assembly_contract import assembly_contract
 from _paths import CAD_ROOT
 from _buildgraph import module_deps_of
 from _drawing_registry import DRAWINGS_BY_NAME
+from _general_table import table_column_widths
 from _sm_summing_explode import station_of
 from _cone_axis_constants import SUMMING_Z
 import sm_summing_lever_spec
@@ -213,11 +214,61 @@ def test_setting_drives_reproduce_the_sketch_values() -> None:
         spec.COUNTER_SCREW_RISE
     )
     assert g["SmBossRockTravel"] == spec.BOSS_ROCK_TRAVEL
+    assert g["SmHangerReach"] == spec.HANGER_FIT_REACH
+    assert g["SmHangerSeatY"] - g["SmHangerReach"] == spec.HANGER_TIP_POINT[1]
     assert notes.DRAWING_DIMENSIONS == {
         spec.COUNTER_FEATURE: {spec.COUNTER_DIMENSION},
         spec.ROCK_FEATURE: {spec.ROCK_DIMENSION},
+        spec.HANGER_FEATURE: {spec.HANGER_DIMENSION},
     }
     assert set(drawing.PRECISION) == set(notes.DIMENSION_CALLOUTS)
+
+
+def test_hanger_reach_setting_runs_down_the_bolt_from_the_clamped_top_seat() -> None:
+    # Rule 22 (machinist review of R5, main 67ba11bf1a): step 4A's cut reach
+    # prints as DETAIL A's own model dimension, from the mount's top seat
+    # (clamped to the crossbar underside) down the bolt axis.
+    assert spec.HANGER_SEAT_POINT == (builder.KNIFE[0], builder.KNIFE_MOUNT_TOP_Y)
+    assert spec.HANGER_TIP_POINT[1] == pytest.approx(
+        builder.KNIFE_MOUNT_TOP_Y - spec.HANGER_FIT_REACH
+    )
+    # The modelled cut tip sits inside the printed band about the setting.
+    assert abs(builder.HANGER_REACH - spec.HANGER_FIT_REACH) <= spec.HANGER_FIT_REACH_TOL
+    assert drawing.PRECISION[spec.HANGER_DIMENSION] == spec.HANGER_FIT_REACH_PLACES
+    cut = next(s for s in notes.ASSEMBLY_STEPS if s.startswith("4A. "))
+    assert f"PLUS {notes.HANGER_FIT_CUT} UNDER THE HEAD" in cut
+    assert f"DETAIL {notes.DETAIL_LETTER}, SHEET 1" in cut
+
+
+def test_setting_table_carries_the_non_dimension_acceptances_the_steps_cite() -> None:
+    # Rule 22: the bracket transfer band and the top-seat feeler are no model
+    # dimension, so they print in the sheet 1 setting table; step 3 and
+    # check 1 cite the row that carries their value.
+    header = notes.SETTING_TABLE_HEADER
+    rows = {cells[0]: dict(zip(header, cells, strict=True)) for cells in notes.SETTING_TABLE_ROWS}
+    assert list(rows) == [notes.BRACKET_ROW, notes.SEAT_ROW]
+    band = f"±{notes._length(notes.BRACKET_STATION_TOL_MM, 3)}"
+    assert band == "±.005"
+    assert band in rows[notes.BRACKET_ROW]["SET TO / ACCEPT"]
+    feeler = notes._length(notes.SEAT_FEELER_MM, 3)
+    assert feeler == ".002"
+    assert rows[notes.SEAT_ROW]["SET TO / ACCEPT"].startswith(f"{feeler} FEELER")
+    bracket = next(s for s in notes.ASSEMBLY_STEPS if s.startswith("3. "))
+    assert band in bracket and notes.setting_row(notes.BRACKET_ROW) in bracket
+    check = next(c for c in notes.ASSEMBLY_CHECKS if c.startswith("1. "))
+    assert feeler in check and notes.setting_row(notes.SEAT_ROW) in check
+    # The steps that draw each top seat flat send the fitter to check 1.
+    for label in ("5C. ", "6H. "):
+        step = next(s for s in notes.ASSEMBLY_STEPS if s.startswith(label))
+        assert "(CHECK 1" in step
+    with pytest.raises(KeyError):
+        notes.setting_row("9")
+
+
+def test_setting_table_fits_the_top_border() -> None:
+    left, _bottom, right, _top = drawing.SHEET_INNER_BORDER
+    widths = table_column_widths(notes.SETTING_TABLE_HEADER, notes.SETTING_TABLE_ROWS)
+    assert left + drawing.SETTING_TABLE_INSET + sum(widths) < right
 
 
 def test_layout_constants_stay_on_the_sheet() -> None:
