@@ -78,7 +78,6 @@ from _drawing_hidden_sketches import (
 )
 from _drawing_hole_callout import (
     add_native_hole_callout,
-    compose_hole_callout_prefix,
     set_hole_callout_precision,
 )
 from _drawing_leader_notes import add_leader_note
@@ -852,13 +851,14 @@ RIM_DETAIL_LABEL_XY = (
     RIM_DETAIL_CENTER[1] + RIM_DETAIL_CROP_RADIUS + 0.0165,
 )
 # The circle's letter on Section A-A stands outside the far face, right of
-# the bore: 4.5 mm out from the face and 1.5 mm along it from the sharp,
-# under the 1.654's extension line along that face and clear of the axis's
-# centreline (sheet metres from the sharp; A-A prints model X right and
-# model -Z up).
+# the bore: its centre 7.5 mm out from the face and 2.5 mm along it from the
+# sharp, so its 6.4 mm glyph clears the 1.654's extension line along that
+# face (R5 fix attempt 3: 4.5 mm out, the glyph's top touched it) and stays
+# right of the axis's centreline and View C's letter (sheet metres from the
+# sharp; A-A prints model X right and model -Z up).
 RIM_DETAIL_LETTER_OFFSET = (
-    (4.5 * _BORE_AXIS[0] + 1.5 * _BORE_SIDE[0]) * _S,
-    -(4.5 * _BORE_AXIS[2] + 1.5 * _BORE_SIDE[2]) * _S,
+    (7.5 * _BORE_AXIS[0] + 2.5 * _BORE_SIDE[0]) * _S,
+    -(7.5 * _BORE_AXIS[2] + 2.5 * _BORE_SIDE[2]) * _S,
 )
 # The break's leg runs along the far face, 12 degrees off level, so its
 # dimension is aligned: SolidWorks centres level text on the line and breaks
@@ -1639,10 +1639,13 @@ def _set_dimension_prefixes(adapter: Any, annotations: list[Any]) -> None:
         )
 
 
-# The mounting holes' process, on its own row above the native through row
-# (rule 12: "2X Ø7.14 THRU ALL" left drill against ream unsaid, r5 machinist
-# review; draw_ch_fulcrum_keeper's foot-hole recipe).
-MOUNT_HOLE_PROCESS = "DRILL\n"
+# The mounting holes' process, written into the native through row after the
+# size and ahead of THRU: "2X Ø.295 DRILL THRU ALL" (rule 12: "2X Ø7.14 THRU
+# ALL" left drill against ream unsaid, r5 machinist review; rule 26: size,
+# then process, then depth -- R5 fix attempt 3 read DRILL on its own row
+# above the size as process first).
+MOUNT_HOLE_PROCESS = "DRILL"
+_HOLE_THRU_TOKEN = "<hw-thru>"
 # IDisplayDimension text definitions (5..8) and the parts SetText writes them
 # through (1..4).
 _HOLE_CALLOUT_DEFINITION_PARTS = ((5, 1), (6, 2), (7, 3), (8, 4))
@@ -1656,12 +1659,13 @@ MOUNT_HOLE_PRECISION = {
 
 
 def mount_hole_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
-    """Put MOUNT_HOLE_PROCESS ahead of the one definition holding THRU.
+    """Write MOUNT_HOLE_PROCESS into the one definition holding THRU, just
+    ahead of its THRU token, so the row reads size, process, THRU.
 
     The counterbored callout's through row and its counterbore row live in
     different parts, so ``add_native_hole_callout(process=...)`` -- which
     writes the Prefix part whichever row that is -- could put DRILL ahead of
-    the counterbore; ahead of the THRU part it stands on its own row first.
+    the counterbore, and a prefix reads process before size anyway.
     """
     if set(definitions) != {part for part, _ in _HOLE_CALLOUT_DEFINITION_PARTS}:
         raise RuntimeError(f"unexpected mounting-hole callout parts: {definitions!r}")
@@ -1671,14 +1675,21 @@ def mount_hole_callout_definitions(definitions: dict[int, str]) -> dict[int, str
             f"mounting-hole THRU row is not in one part: {definitions!r}"
         )
     part = thru_parts[0]
+    if definitions[part].count(_HOLE_THRU_TOKEN) != 1:
+        raise RuntimeError(
+            f"mounting-hole THRU row has no single {_HOLE_THRU_TOKEN}: {definitions!r}"
+        )
     return {
         **definitions,
-        part: compose_hole_callout_prefix(MOUNT_HOLE_PROCESS, definitions[part]),
+        part: definitions[part].replace(
+            _HOLE_THRU_TOKEN, f"{MOUNT_HOLE_PROCESS} {_HOLE_THRU_TOKEN}"
+        ),
     }
 
 
 def _set_mount_hole_process(display: Any) -> None:
-    """Write the mounting holes' process row and prove it persisted first."""
+    """Write the mounting holes' process into the through row and prove it
+    persisted between the size and THRU."""
     native = _early_bound(display, "IDisplayDimension")
     parts = [part for part, _ in _HOLE_CALLOUT_DEFINITION_PARTS]
     definitions = {part: str(native.GetText(part) or "") for part in parts}
@@ -1691,11 +1702,18 @@ def _set_mount_hole_process(display: Any) -> None:
         part: str(native.GetText(part) or "")
         for _, part in _HOLE_CALLOUT_DEFINITION_PARTS
     }
-    # The CalloutAbove part (3) prints ahead of the Prefix part (1).
-    first = resolved[3] or resolved[1]
-    if persisted != updated or not first.startswith(MOUNT_HOLE_PROCESS):
+    process_rows = [
+        text for text in resolved.values() if MOUNT_HOLE_PROCESS in text.upper()
+    ]
+    if (
+        persisted != updated
+        or not process_rows
+        or any(
+            row.lstrip().upper().startswith(MOUNT_HOLE_PROCESS) for row in process_rows
+        )
+    ):
         raise RuntimeError(
-            "mounting-hole process row did not persist first: "
+            "mounting-hole process did not persist after the size: "
             f"definitions={persisted!r}, resolved={resolved!r}"
         )
     _telemetry.info(f"mounting-hole callout: {resolved!r}")
@@ -2164,10 +2182,12 @@ def build(adapter: Any) -> dict[str, str]:
             center_y_mm=BLOCK_HEIGHT,
             center_x_mm=ATTACHMENT_X,
         ),
-        # Its three rows (DRILL on its own) run 61 mm wide; at x=0.160 they
-        # stood 10 mm from the section's thrust-face station, under one text
-        # height (r6 view-crowding).
-        callout_xy=(0.155, 0.250),
+        # Two rows, the widest "2X Ø.295 DRILL THRU ALL" (about 59 mm), centred
+        # here: its left end stands 7 mm clear of the plan's .51 text and its
+        # right end about 28 mm short of the section's .827 station text (at
+        # x=0.160 a wider block stood 10 mm from that station, under one text
+        # height: r6 view-crowding).
+        callout_xy=(0.161, 0.250),
         label="mounting counterbores",
     )
     _set_mount_hole_process(mount_callout)

@@ -810,8 +810,10 @@ def test_crank_bore_mate_line_stands_clear_of_the_head_height_extension() -> Non
     assert 0.1806 - box_right >= spacing_block_height
 
 
-def test_mounting_hole_callout_says_drill_above_its_through_row() -> None:
-    # r5 machinist review (rule 12): "2X Ø7.14 THRU ALL" left drill or ream unsaid.
+def test_mounting_hole_callout_says_drill_after_its_size() -> None:
+    # r5 machinist review (rule 12): "2X Ø7.14 THRU ALL" left drill or ream
+    # unsaid.  R5 fix attempt 3 (rule 26): DRILL on its own row above the
+    # size read process first, so it goes between the size and THRU.
     native = {
         5: "<HOLE-SPOT><MOD-DIAM><hw-cbdiam> <HOLE-DEPTH><hw-cbdepth>",
         6: "",
@@ -819,11 +821,16 @@ def test_mounting_hole_callout_says_drill_above_its_through_row() -> None:
         8: "",
     }
     updated = drawing.mount_hole_callout_definitions(native)
-    assert updated == {**native, 7: "DRILL\n<NUM_INST>X <MOD-DIAM><hw-diam> <hw-thru>"}
+    assert updated == {**native, 7: "<NUM_INST>X <MOD-DIAM><hw-diam> DRILL <hw-thru>"}
+    assert "\n" not in updated[7]
     with pytest.raises(RuntimeError, match="THRU row"):
         drawing.mount_hole_callout_definitions({**native, 5: native[7]})
     with pytest.raises(RuntimeError, match="callout parts"):
         drawing.mount_hole_callout_definitions({5: native[5], 7: native[7]})
+    with pytest.raises(RuntimeError, match="no single"):
+        drawing.mount_hole_callout_definitions(
+            {**native, 7: "<NUM_INST>X <MOD-DIAM><hw-diam> THRU ALL"}
+        )
 
 
 def test_thrust_face_station_flags_note_2_which_names_the_collar() -> None:
