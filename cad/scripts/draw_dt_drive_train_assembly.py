@@ -679,7 +679,7 @@ SEQUENCE_LEFT_FIELD = (
     SEQUENCE_ISO_CENTER[1] + REFERENCE_ISO_HALF_OUTLINE + SEQUENCE_ISO_GAP,
 )
 # Sheet 15: the setting, pedestal recheck and feeler stack tables stack down
-# the left from NOTE_FIELD_LEFT's top (SETTING_TABLE_LEFT); the cone station
+# the left from SETTING_TABLE_TOP (SETTING_TABLE_LEFT); the cone station
 # table prints right of the narrow feeler stack table, under the pedestal
 # recheck table (round 1 measured those at x 147.6 mm and y 178.1 mm) and
 # clear left of the reference view (x 361 mm up).
@@ -697,6 +697,13 @@ STATION_TABLE_FIELD = (0.158, 0.172, 0.350, 0.1055)
 # R16 print's pitch) take the table bottom from ~120 to ~109 mm.
 INTERFACE_FIELD = (NOTE_FIELD_LEFT[0], 0.101, NOTE_FIELD_LEFT[2], NOTE_FIELD_LEFT[3])
 SETTING_TABLE_LEFT = NOTE_FIELD_LEFT[0]
+# The stack's first title top.  _general_table's title gap grew 1.26 mm a
+# table (its title ink's air, 2026-11-17), which put the pedestal recheck
+# table 0.36 mm into the station table field; starting the stack 2.5 mm over
+# NOTE_FIELD_LEFT's top keeps that table where it was (2.1 mm over the field)
+# and its title's ink ~5 mm under the heading's (run 20261117T130750991Z:
+# heading extent bottom 258.8 mm).
+SETTING_TABLE_TOP = NOTE_FIELD_LEFT[1] + 0.0025
 # Between one table's last row and the next table's title
 # (draw_ch_rocker_arm_tl_oblique_jig_assembly.TABLE_GAP).  At NOTE_BLOCK_GAP
 # the pedestal recheck table, four rows since PR #2640, ended 0.2 mm over the
@@ -3388,7 +3395,7 @@ def _place_setting_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
     _heading(adapter, SETTING_SHEET)
     _reference_iso(adapter, caption="FINISHED ASSEMBLY", label="setting reference isometric")
     findings = []
-    top = NOTE_FIELD_LEFT[1]
+    top = SETTING_TABLE_TOP
     for title, header, rows, label in (
         (SETTING_TABLE_TITLE, SETTING_TABLE_HEADER, SETTING_TABLE_ROWS, "setting table"),
         (

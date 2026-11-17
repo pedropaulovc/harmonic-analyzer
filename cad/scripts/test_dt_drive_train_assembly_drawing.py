@@ -1082,7 +1082,7 @@ def test_sheet_15_tables_stack_clear_of_the_station_field_on_any_seat(
 
     setting, recheck, feeler = tables
     assert setting.anchor[1] == pytest.approx(
-        drawing.NOTE_FIELD_LEFT[1] - general_table.TABLE_TITLE_DROP
+        drawing.SETTING_TABLE_TOP - general_table.TABLE_TITLE_DROP
     )
     bottoms = [table.anchor[1] - table.RowCount * table.ROW_HEIGHT for table in tables]
     for above, below in zip(bottoms, (recheck, feeler)):

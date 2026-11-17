@@ -35,7 +35,15 @@ NOTE_LINE_PITCH = 0.004525
 # is cut to its longest cell plus 2 mm a side.
 TABLE_CHAR_WIDTH = 0.0028
 TABLE_CELL_PAD = 0.004
-TABLE_TITLE_GAP = 0.0015
+# The air between a title's ink and its table: half the title's ink height
+# (the layout audit's text-clearance, _layout_audit.TEXT_CLEARANCE_HEIGHTS),
+# which for a title with a descending glyph is the whole line, plus one seat
+# pixel (~0.45 mm at 2.1-2.3 px/mm) for its anchored box.  At 1.5 mm a title
+# with parentheses printed its ink 1.44 mm over the table, needing 2.26 mm
+# (pd_paper_drive_assembly SETTING TABLE, run 20261117T152142787Z; the dt
+# drive train PEDESTAL RECHECK (CHECK 4) title 1.48 mm, run
+# 20261117T130750991Z); "SETTING TABLE" alone has no descender and cleared.
+TABLE_TITLE_GAP = 0.5 * NOTE_LINE_PITCH + 0.0005
 # A table hangs a fixed drop under its title's requested top: the inset, the
 # title's one line and the gap.  It used to hang off the title's
 # INote.GetExtent bottom, which reads to the seat window's pixel, and each
