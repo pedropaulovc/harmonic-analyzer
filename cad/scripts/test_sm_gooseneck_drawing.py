@@ -76,7 +76,11 @@ def test_sheet_places_every_marked_dimension_at_its_places() -> None:
     }
     for feature, by_name in spec.DIMENSION_CALLOUTS.items():
         assert set(by_name) <= spec.DRAWING_DIMENSIONS[feature]
-    assert set(spec.DIMENSION_CALLOUTS_BY_NAME) == {"BendRadius", "TubeOdRef"}
+    assert set(spec.DIMENSION_CALLOUTS_BY_NAME) == {
+        "BendRadius",
+        "TubeOdRef",
+        "OverallReach",
+    }
     assert spec.DIMENSION_CALLOUTS_BY_NAME["BendRadius"] == "TUBE CENTERLINE"
     # The stock wall is the supplier's size: its value prints only as a
     # bracketed reference, never as a bare (toleranced) three-place size.
@@ -102,14 +106,21 @@ def test_references_and_the_governing_end_sizes() -> None:
     referenced = set().union(*spec.REFERENCE_DIMENSIONS.values())
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert marked - referenced == {"OverallHeight", "OverallReach"}
-    # Both print at two places only because their sizes round there; the
-    # foot only has to leave the leg spanning the hub and the post's level
-    # setting takes up the spring eye's lean, so each band is looser than the
-    # .XX row's.
+    # The reach sits at the title block's .XX row: it hangs the counter
+    # spring plumb over its anchor, and its callout names that spring by its
+    # registry Number, ABOVE the value (clear of the arm straight's row
+    # below).  The height prints at two places (a one-place tie) but the foot
+    # only has to leave the leg spanning the hub, so its own band is looser
+    # than the .XX row's.
     assert spec.DRAWING_PRECISION_BY_NAME["OverallReach"] == 2
     assert spec.DRAWING_PRECISION_BY_NAME["OverallHeight"] == 2
     assert spec.OVERALL_HEIGHT_TOLERANCE_MM > 0.01 * geom.MM_PER_IN
-    assert spec.OVERALL_REACH_TOLERANCE_MM > 0.01 * geom.MM_PER_IN
+    assert _config.parts("sm-vn-counter-spring")["number"] == spec.COUNTER_SPRING_NUMBER
+    reach_callout = spec.DIMENSION_CALLOUTS_BY_NAME["OverallReach"]
+    assert reach_callout.startswith(spec.COUNTER_SPRING_NUMBER)
+    assert "PLUMB" in reach_callout and "\n" not in reach_callout
+    assert spec.callout_slot("OverallReach") == 3
+    assert {spec.callout_slot(name) for name in ("BendRadius", "TubeOdRef")} == {4}
     # The tube Ø's reference line runs on the leg, below the bend tangent.
     low = spec.TUBE_OD_REF_Y - spec.TUBE_OD_REF_SPAN / 2.0
     high = spec.TUBE_OD_REF_Y + spec.TUBE_OD_REF_SPAN / 2.0

@@ -81,10 +81,10 @@ from sm_gooseneck_spec import (
     DRAWING_PRECISION,
     ISOMETRIC_VIEW_NOTE,
     OVERALL_HEIGHT_TOLERANCE_MM,
-    OVERALL_REACH_TOLERANCE_MM,
     REFERENCE_DIMENSIONS,
     TUBE_OD_REF_SPAN,
     TUBE_OD_REF_Y,
+    callout_slot,
 )
 
 # The form nominals live in sm_gooseneck_geom -- the prose-free module the
@@ -153,15 +153,16 @@ def _construction(adapter, line: str, label: str) -> None:
 
 @_telemetry.traced("part.dimension_callouts")
 def _author_dimension_callouts(adapter) -> None:
-    """Persist each printed callout below its source dimension: the drawing
-    imports and reads them back, never writing them itself."""
-    # swDimensionTextCalloutBelow = 4.
+    """Persist each printed callout above or below its source dimension (spec
+    ``callout_slot``): the drawing imports and reads them back, never writing
+    them itself."""
     for feature, callouts in DIMENSION_CALLOUTS.items():
         resolved = _named_dimensions(adapter, feature, set(callouts))
         for name, text in callouts.items():
             display, _dimension = resolved[name]
-            display.SetText(4, text)
-            if str(display.GetText(4) or "").replace("\r\n", "\n") != text:
+            slot = callout_slot(name)
+            display.SetText(slot, text)
+            if str(display.GetText(slot) or "").replace("\r\n", "\n") != text:
                 raise RuntimeError(f"{name}@{feature}: callout did not persist")
 
 
@@ -734,21 +735,16 @@ def build(adapter) -> dict[str, str]:
     # its wall callout, so _author_reference_dimensions writes its
     # "(<MOD-DIAM>" prefix.
     _author_reference_dimensions(adapter)
-    # The two governing sizes' loose bands (spec OVERALL_HEIGHT_TOLERANCE_MM,
-    # OVERALL_REACH_TOLERANCE_MM), native on their source dimensions; the .XX
-    # row would hold each to ±.01.
-    for name, tolerance_mm in (
-        ("OverallHeight", OVERALL_HEIGHT_TOLERANCE_MM),
-        ("OverallReach", OVERALL_REACH_TOLERANCE_MM),
-    ):
-        set_dimension_symmetric_tolerance(
-            adapter,
-            "OverallReference",
-            name,
-            tolerance_mm,
-            places=DRAWING_PRECISION["OverallReference"][name],
-            display_unit=part_drawing_unit(PART_NAME),
-        )
+    # The foot's loose band (spec OVERALL_HEIGHT_TOLERANCE_MM), native on the
+    # overall height's source dimension; the .XX row would hold it to ±.01.
+    set_dimension_symmetric_tolerance(
+        adapter,
+        "OverallReference",
+        "OverallHeight",
+        OVERALL_HEIGHT_TOLERANCE_MM,
+        places=DRAWING_PRECISION["OverallReference"]["OverallHeight"],
+        display_unit=part_drawing_unit(PART_NAME),
+    )
     # The reference sketches own printed dimensions and only reference lines:
     # hide them so no assembly instance renders them (#880).  The drawing shows
     # them per view through _drawing_hidden_sketches to import those dimensions.
