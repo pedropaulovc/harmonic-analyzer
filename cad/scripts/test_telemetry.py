@@ -111,25 +111,20 @@ def capture():
 
     A processor added to the global provider is added to the one processor set
     every provider of this process shares, so spans and records routed to another
-    resource (build-infra, a relabelled stage) are captured too; each test reads a
-    fresh exporter, so it only sees its own records.
+    resource (build-infra, a relabelled stage) are captured too. The autouse
+    reconfigure above retires it after the test.
     """
     _telemetry.configure()
 
     spans = InMemorySpanExporter()
-    processor = SimpleSpanProcessor(spans)
     cast(SdkTracerProvider, _telemetry.trace.get_tracer_provider()).add_span_processor(
-        processor
+        SimpleSpanProcessor(spans)
     )
     logs = InMemoryLogRecordExporter()
-    log_processor = SimpleLogRecordProcessor(logs)
     cast(SdkLoggerProvider, get_logger_provider()).add_log_record_processor(
-        log_processor
+        SimpleLogRecordProcessor(logs)
     )
     yield spans, logs
-
-    _telemetry._span_processors.remove(processor)
-    _telemetry._log_processors.remove(log_processor)
 
 
 def test_logs_split_into_severity_levels(capture):
@@ -162,13 +157,13 @@ def test_console_verbosity_configures_handler_and_spans(monkeypatch):
     _telemetry.configure(force=True)
     (handler,) = console_handlers()
     assert handler.level == logging.WARNING
-    assert _telemetry._span_processors == []
+    assert _telemetry._span_processors == ()
 
     monkeypatch.setenv("HARMONIC_VERBOSITY", "success")
     _telemetry.configure(force=True)
     (handler,) = console_handlers()
     assert handler.level == _telemetry.SUCCESS
-    assert _telemetry._span_processors == []
+    assert _telemetry._span_processors == ()
 
 
 def test_span_records_exception_and_sets_error_status(capture):

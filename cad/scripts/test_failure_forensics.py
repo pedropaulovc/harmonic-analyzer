@@ -381,23 +381,21 @@ def strict_forensic_owners(monkeypatch):
 
 
 @pytest.fixture
-def capture_telemetry():
+def capture_telemetry(monkeypatch):
     """Attach in-memory OTel exporters to the spine's live providers."""
     _telemetry.configure()
+    # The test's exporters are the only processors; teardown restores the real set.
+    monkeypatch.setattr(_telemetry, "_span_processors", ())
+    monkeypatch.setattr(_telemetry, "_log_processors", ())
     spans = InMemorySpanExporter()
-    processor = SimpleSpanProcessor(spans)
     cast(SdkTracerProvider, _telemetry.trace.get_tracer_provider()).add_span_processor(
-        processor
+        SimpleSpanProcessor(spans)
     )
-    _telemetry._span_processors.append(processor)
-    _telemetry._aux_providers.clear()
     logs = InMemoryLogRecordExporter()
     cast(SdkLoggerProvider, get_logger_provider()).add_log_record_processor(
         SimpleLogRecordProcessor(logs)
     )
     yield spans, logs
-    _telemetry._span_processors.remove(processor)
-    _telemetry._aux_providers.clear()
 
 
 # swconst R2026x ids, verified against this install's type library. Offline

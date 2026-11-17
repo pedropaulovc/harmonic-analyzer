@@ -32,6 +32,7 @@ instrumented without touching their call sites.
 
 from __future__ import annotations
 
+import atexit
 import contextlib
 import contextvars
 import functools
@@ -439,12 +440,12 @@ _configured = False
 # provider below emits through (:class:`_SharedSpanProcessors` /
 # :class:`_SharedLogProcessors`), so every resource lands on the same console
 # stream / traces.jsonl / logs.jsonl / OTLP exporter instead of duplicating handles,
-# and a forced reconfigure that replaces these lists reaches every provider at once.
-_span_processors: list[Any] = []
-_log_processors: list[Any] = []
+# and a forced reconfigure that replaces them reaches every provider at once.
+# Immutable, replaced on add, like the SDK's own multi-processors.
+_span_processors: tuple[Any, ...] = ()
+_log_processors: tuple[Any, ...] = ()
 # The OTel global provider pair, installed ONCE (OTel refuses to replace a set
-# provider, and nothing needs it replaced). It owns the shared processors:
-# :func:`shutdown`, and the interpreter-exit hook, close them through it.
+# provider, and nothing needs it replaced).
 _tracer_provider: TracerProvider | None = None
 _logger_provider: LoggerProvider | None = None
 # One provider per ``service.name`` this process emits under -- its stage (the
@@ -932,12 +933,6 @@ def _otlp_log_processor(*, pending_warnings: list[str] | None = None):
         return None
 
 
-def _live(processors: list[Any]) -> tuple[Any, ...]:
-    """``processors`` in registration order, each once: a processor registered
-    both through a provider and in the list directly must not export twice."""
-    return tuple(dict.fromkeys(processors))
-
-
 class _SharedSpanProcessors(SpanProcessor):
     """Every provider's active span processor: forwards to :data:`_span_processors`.
 
@@ -948,22 +943,23 @@ class _SharedSpanProcessors(SpanProcessor):
     all of them."""
 
     def add_span_processor(self, span_processor: SpanProcessor) -> None:
-        _span_processors.append(span_processor)
+        global _span_processors
+        _span_processors = (*_span_processors, span_processor)
 
     def on_start(self, span: Any, parent_context: Any = None) -> None:
-        for processor in _live(_span_processors):
+        for processor in _span_processors:
             processor.on_start(span, parent_context=parent_context)
 
     def on_end(self, span: ReadableSpan) -> None:
-        for processor in _live(_span_processors):
+        for processor in _span_processors:
             processor.on_end(span)
 
     def shutdown(self) -> None:
-        for processor in _live(_span_processors):
+        for processor in _span_processors:
             processor.shutdown()
 
     def force_flush(self, timeout_millis: int = 30000) -> bool:
-        return all(p.force_flush(timeout_millis) for p in _live(_span_processors))
+        return all(p.force_flush(timeout_millis) for p in _span_processors)
 
 
 class _SharedLogProcessors(LogRecordProcessor):
@@ -973,38 +969,38 @@ class _SharedLogProcessors(LogRecordProcessor):
     def add_log_record_processor(
         self, log_record_processor: LogRecordProcessor
     ) -> None:
-        _log_processors.append(log_record_processor)
+        global _log_processors
+        _log_processors = (*_log_processors, log_record_processor)
 
     def on_emit(self, log_record: Any) -> None:
-        for processor in _live(_log_processors):
+        for processor in _log_processors:
             processor.on_emit(log_record)
 
     def shutdown(self) -> None:
-        for processor in _live(_log_processors):
+        for processor in _log_processors:
             processor.shutdown()
 
     def force_flush(self, timeout_millis: int = 30000) -> bool:
-        return all(p.force_flush(timeout_millis) for p in _live(_log_processors))
+        return all(p.force_flush(timeout_millis) for p in _log_processors)
 
 
-def _new_tracer_provider(service: str, *, owner: bool = False) -> TracerProvider:
+def _new_tracer_provider(service: str) -> TracerProvider:
     """A ``TracerProvider`` whose resource names ``service``, emitting through the
-    shared processors. Only the global ``owner`` shuts them down at interpreter
-    exit; another provider doing it too would re-close every exporter -- one
-    "Exporter already shutdown" per extra resource."""
+    shared processors. None registers an exit hook: :func:`configure` registers
+    :func:`shutdown` once instead, which outlives any later reconfigure."""
     return TracerProvider(
         resource=Resource.create(_resource_attributes(service)),
-        shutdown_on_exit=owner,
+        shutdown_on_exit=False,
         # Typed as the SDK's own multi-processor; ours keeps the same contract.
         active_span_processor=cast(Any, _SharedSpanProcessors()),
     )
 
 
-def _new_logger_provider(service: str, *, owner: bool = False) -> LoggerProvider:
+def _new_logger_provider(service: str) -> LoggerProvider:
     """The ``LoggerProvider`` counterpart of :func:`_new_tracer_provider`."""
     return LoggerProvider(
         resource=Resource.create(_resource_attributes(service)),
-        shutdown_on_exit=owner,
+        shutdown_on_exit=False,
         multi_log_record_processor=cast(Any, _SharedLogProcessors()),
     )
 
@@ -1102,20 +1098,18 @@ def configure(*, console: bool = True, force: bool = False) -> None:
         if processor is not None:
             log_processors.append(processor)
 
-    # Every provider emits through these lists, so swapping them reconfigures them
-    # all; the previous set is flushed and closed, since nothing references it now.
-    retired = _live([*_span_processors, *_log_processors])
-    _span_processors, _log_processors = span_processors, log_processors
-    for processor in retired:
-        with contextlib.suppress(Exception):
-            processor.shutdown()
+    # Every provider emits through these, so swapping them reconfigures them all;
+    # the previous set is flushed and closed, since nothing references it now.
+    shutdown()
+    _span_processors, _log_processors = tuple(span_processors), tuple(log_processors)
     if _tracer_provider is None:
-        _tracer_provider = _new_tracer_provider(_service_name, owner=True)
-        _logger_provider = _new_logger_provider(_service_name, owner=True)
+        _tracer_provider = _new_tracer_provider(_service_name)
+        _logger_provider = _new_logger_provider(_service_name)
         _aux_providers[_service_name] = _tracer_provider
         _aux_logger_providers[_service_name] = _logger_provider
         trace.set_tracer_provider(_tracer_provider)
         set_logger_provider(_logger_provider)
+        atexit.register(shutdown)
 
     pylog = logging.getLogger(_LOGGER_NAME)
     pylog.setLevel(logging.DEBUG)
@@ -1976,20 +1970,20 @@ def run_pipeline_span(stage: str, /, **attributes: Any) -> Generator[Span, None,
 
 
 def shutdown() -> None:
-    """Flush + close providers (force-flush exporters). Best-effort.
+    """Flush + close the shared processors (force-flush exporters). Best-effort.
 
     Covers BOTH signals: OTLP export is batched (see the block above
     :func:`_otlp_span_processor`), so anything still queued -- spans AND log records
     -- is only delivered because this runs. It is the reason the batch trade is safe:
-    ``_session.run_build`` calls this after the build session closes, and the watchdog
-    calls it before ``os._exit``.
-
-    The other per-resource providers (a relabel, build-infra) are deliberately NOT
-    shut down: they emit through the same shared processors, so this one call
-    already closes every exporter -- and shutting them down too would just re-close
-    each exporter and log "Exporter already shutdown" for every extra resource.
-    A process that never configured has nothing to flush."""
-    for provider in (_tracer_provider, _logger_provider):
-        if provider is not None:
-            with contextlib.suppress(Exception):
-                provider.shutdown()
+    ``_session.run_build`` calls this after the build session closes, the watchdog
+    calls it before ``os._exit``, and :func:`configure` registers it at exit. Every
+    provider emits through these processors, so no provider needs shutting down;
+    they are retired, so a later record goes nowhere instead of into a closed
+    exporter, and the exit hook never closes them twice. A process that never
+    configured has nothing to flush."""
+    global _span_processors, _log_processors
+    retired = (*_span_processors, *_log_processors)
+    _span_processors = _log_processors = ()
+    for processor in retired:
+        with contextlib.suppress(Exception):
+            processor.shutdown()

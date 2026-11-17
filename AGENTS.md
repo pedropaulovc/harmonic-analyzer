@@ -1841,9 +1841,8 @@ scripts that `from _check import log, check` are instrumented unchanged.
       processor set — one console stream, one `traces.jsonl`, one OTLP exporter.
       Pass `service=` to
       `_telemetry.span` to put a span there; it changes only the resource, never the
-      parent/child shape. (Only the global pair owns the shared processors: the
-      others are built with `shutdown_on_exit=False` and skipped by `shutdown()`,
-      since double-shutting them just re-closes every exporter.)
+      parent/child shape. (No provider has an exit hook: `shutdown()` closes the
+      shared processors directly, and `configure` registers it at exit once.)
       Logs follow their span: the logging bridge (`_ResourceRoutedLoggingHandler`)
       files a record under the resource of the span it is written under (a
       `[cache]` line inside `cache.probe` lands on `build-infra`, beside its span),
