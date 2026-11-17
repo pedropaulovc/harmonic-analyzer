@@ -52,10 +52,11 @@ the DOF manifest, never authored); the carriage parts placed on-solution and
 lock-mated to the rod; transforms asserted by read-back; zero interference
 beyond the thread-envelope allowances in ``_pn_pen_interference``.
 
-Fitter package (draw_pn_pen_assembly.py, MHA-PN-00): the three carriage
-settings -- stud height, pen yaw and nib preset -- are blanked construction
-sketches (``StudSetting`` on the Right plane, ``CarriageSetting`` on the Top
-plane) whose driving, toleranced dimensions the drawing imports, and the
+Fitter package (draw_pn_pen_assembly.py, MHA-PN-00): the four settings --
+stud height, pen yaw, nib preset and rod travel -- are blanked construction
+sketches (``StudSetting`` and ``TravelSetting`` on the Right plane,
+``CarriageSetting`` on the Top plane) whose driving, toleranced dimensions
+the drawing imports, and the
 ``PN_EXPLODED`` presentation is authored by ``_pn_pen_explode`` from
 ``pn_pen_explode_spec.EXPLODE_STEPS`` in both drawing configurations.
 
@@ -248,6 +249,43 @@ def _author_stud_setting(adapter: Any) -> None:
     dims.apply(adapter, spec.STUD_FEATURE)
 
 
+def _author_travel_setting(adapter: Any) -> None:
+    """ROD TRAVEL: a vertical construction line on the rod axis from the
+    hanger's upper U-guide top down to the block top (Right plane, sketch =
+    machine -Z, Y) in the rest pose, toleranced by the pen's travel each way.
+    No solid or pose edits: the rod stays free in Y."""
+    (u, guide_top_y), (_u, block_top_y) = spec.TRAVEL_LINE
+    dims = SketchDims()
+    check("create travel setting sketch", adapter.create_sketch("Right"))
+    set_sketch_direct_db(adapter, True)
+    line = check("travel line", adapter.add_line(u, guide_top_y, u, block_top_y))
+    set_sketch_direct_db(adapter, False)
+    _construction(adapter, line, "travel line")
+    check("travel line vertical", adapter.add_sketch_constraint(line, None, "vertical"))
+    anchor_point_to_origin(
+        adapter, f"{line}.start", u, guide_top_y, "upper guide top on axis"
+    )
+    dims.record("TravelRodAxisZ")
+    dims.record("TravelGuideTopY")
+    dimension_between(
+        adapter, f"{line}.start", f"{line}.end", "vertical_distance",
+        spec.TRAVEL_REFERENCE, "block top below upper guide top",
+    )
+    dims.record(spec.TRAVEL_DIMENSION)
+    ensure_fully_defined(adapter, "travel setting")
+    check("exit travel setting sketch", adapter.exit_sketch())
+    name_last_feature(adapter, spec.TRAVEL_FEATURE)
+    dims.apply(adapter, spec.TRAVEL_FEATURE)
+    set_dimension_symmetric_tolerance(
+        adapter,
+        spec.TRAVEL_FEATURE,
+        spec.TRAVEL_DIMENSION,
+        spec.TRAVEL_TOLERANCE_MM,
+        places=spec.TRAVEL_PRECISION,
+        display_unit=assembly_contract(ASM_NAME).drawing_unit,
+    )
+
+
 def _add_driving_yaw_angle(adapter: Any, nib_line: str, flat_line: str) -> None:
     """The marker axis's angle to the rod-flat arm, as a DRIVING dimension.
 
@@ -340,9 +378,10 @@ def _author_carriage_setting(adapter: Any) -> None:
 
 
 def _author_settings(adapter: Any) -> None:
-    """Both setting sketches, their places, drawing marks, then blanked."""
+    """The three setting sketches, their places, drawing marks, then blanked."""
     _author_stud_setting(adapter)
     _author_carriage_setting(adapter)
+    _author_travel_setting(adapter)
     apply_drawing_precision(adapter, spec.DRAWING_PRECISION)
     for feature, names in spec.DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature, names)

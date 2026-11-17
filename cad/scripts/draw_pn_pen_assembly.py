@@ -1,10 +1,11 @@
 r"""Create the three-sheet pen fitter package (MHA-PN-00).
 
-Sheet 1 shows the pen assembled (front and right) beside four details, three
-of which carry its settings as the builder's driving, toleranced model
-dimensions: DETAIL A the stud height and its jam nut (``StudSetting``),
-DETAIL B the hanger screw's nut and jam nut, DETAIL C the pen yaw and nib
-preset (``CarriageSetting``), DETAIL D the stirrup and its thumb screw on the
+Sheet 1 shows the pen assembled (front and right) beside four details; RIGHT
+and two of the details carry its settings as the builder's driving,
+toleranced model dimensions: RIGHT the rod travel (``TravelSetting``),
+DETAIL A the stud height and its jam nut (``StudSetting``), DETAIL B the
+hanger screw's nut and jam nut, DETAIL C the pen yaw and nib preset
+(``CarriageSetting``), DETAIL D the stirrup and its thumb screw on the
 block, with the as-shipped note; sheet 2 the builder-owned ``PN_EXPLODED``
 presentation (``pn_pen_explode_spec``) with its explode trails, the BOM
 (numbers, descriptions, vendor SKU, quantity) and a balloon on every row;
@@ -294,11 +295,17 @@ DIMENSION_TEXT_POINTS = {
         spec.NIB_DIMENSION: _top_plan_point(notes.NIB_TEXT_UV),
     },
 }
+# The rod travel prints on RIGHT itself, which draws the whole stroke: both U
+# guides and the block; its text point, machine mm, projected into RIGHT.
+RIGHT_TEXT_POINTS = {spec.TRAVEL_DIMENSION: notes.TRAVEL_TEXT_POINT}
 # Every callout is two lines, which only the below compartment prints.
 CALLOUT_LOCATION = "below"
 CALLOUT_TEXT_PART = 4  # swDimensionTextParts_e: swDimensionTextCalloutBelow
 if set(notes.DIMENSION_CALLOUTS) != {
     name for names in spec.DRAWING_DIMENSIONS.values() for name in names
+} or set(notes.DIMENSION_CALLOUTS) != {
+    *RIGHT_TEXT_POINTS,
+    *(name for points in DIMENSION_TEXT_POINTS.values() for name in points),
 }:
     raise AssertionError("every pen setting carries its callout")
 
@@ -1196,6 +1203,29 @@ def _assert_settings(displays: list[tuple[str, Any]], *, when: str) -> None:
             )
 
 
+def _right_settings(adapter: Any, right: Any) -> list[Any]:
+    """The rod travel on RIGHT: its setting sketch shown in the view, the
+    dimension imported at its text point."""
+    label = "pen right"
+    _show_base_view_sketches(adapter, right, (spec.TRAVEL_FEATURE,), label=label)
+    keep = {
+        name: model_point_in_view(
+            adapter,
+            right,
+            tuple(value / 1000.0 for value in xyz),
+            label=f"{label} {name} text",
+        )
+        for name, xyz in RIGHT_TEXT_POINTS.items()
+    }
+    return curate_view_dimensions(
+        adapter,
+        right,
+        keep=keep,
+        view_label=label,
+        dimensions_by_feature=spec.DRAWING_DIMENSIONS,
+    )
+
+
 def _place_settings_sheet(adapter: Any) -> Callable[[], None]:
     """Front and right at 1:2, the four details, the as-shipped note; returns
     the check that re-reads every setting once the drawing has settled."""
@@ -1206,7 +1236,7 @@ def _place_settings_sheet(adapter: Any) -> Callable[[], None]:
     right = _placed_base_view(
         adapter, "*Right", RIGHT_CENTER, notes.VIEW_TITLES["right"], label="pen right"
     )
-    annotations = [
+    annotations = _right_settings(adapter, right) + [
         annotation for detail in DETAILS for annotation in _detail(adapter, detail)
     ]
     set_dimension_callouts(

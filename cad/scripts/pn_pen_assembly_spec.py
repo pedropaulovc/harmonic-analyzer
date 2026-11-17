@@ -1,5 +1,5 @@
 """Pure fitting contract for pn-pen.SLDASM (MHA-PN-00): inventory, the
-exploded view's camera and the three carriage settings.
+exploded view's camera and the four carriage settings.
 
 Builder data only: the builder (``build_pn_pen_assembly``) authors the
 settings as blanked construction sketches carrying driving, toleranced model
@@ -26,6 +26,11 @@ setup and adjustment):
 * NIB PRESET -- the nib tip beyond the v-block/stirrup paper-end face along
   the marker axis, ``NibProtrusion@CarriageSetting``. The nib-to-paper
   clearance is set at MHA-HA-00, where the paper exists.
+* ROD TRAVEL -- the block top (the rod's shoulder) below the hanger's upper
+  U-guide top in the rest pose, ``BlockTopBelowUpperGuide@TravelSetting`` on
+  the Right plane, its band the pen's travel each way: the rod slides free
+  over that range (rule 22: an acceptance prints on a view); the RIGHT view
+  prints it.
 """
 
 from __future__ import annotations
@@ -34,6 +39,7 @@ import math
 
 import pn_pen_adjust_screw_spec as stud
 import pn_pen_carriage_geom as carriage
+import pn_pen_hanger_spec as hanger
 import pn_pen_rod_spec as rod
 import pn_pen_v_block_spec as v_block
 from _hole_spec import THREAD_MAJOR_MM
@@ -218,14 +224,37 @@ YAW_TEXT_UV = (
     CARRIAGE_END_UV[1] + YAW_TEXT_RADIUS * math.sin(math.radians(_BISECTOR_DEG)),
 )
 
+# ROD TRAVEL (Right plane, sketch (u, v) = machine (-Z, Y), the stud
+# setting's convention): a vertical construction line on the rod axis from
+# the hanger's upper U-guide top down to the block top (the rod's shoulder)
+# in the rest pose, mid-travel. Its band is the pen's travel each way
+# (carriage.PEN_TRAVEL_HALF_MM, the stroke ASSEMBLY.md's first check slides
+# the rod over) at the sheet's two inch places: a band is stored in exact
+# printed inches (_drawing_tolerances._tolerance_places), so .59, the 15 mm
+# stroke as printed. The span is the longest guide-to-carriage reference the
+# RIGHT view draws with open paper beside it: the stud's DETAIL A circle
+# grazes the rod top, and the block top to the lower guide (1.05) is too
+# short a span for the callout to stand between its arrows at 1:2.
+TRAVEL_FEATURE = "TravelSetting"
+TRAVEL_DIMENSION = "BlockTopBelowUpperGuide"
+TRAVEL_LINE = (
+    (-carriage.PEN_Z_MID, hanger.GUIDE_SPAN_Y[1]),
+    (-carriage.PEN_Z_MID, carriage.BLOCK_TOP_Y),
+)
+TRAVEL_REFERENCE = TRAVEL_LINE[0][1] - TRAVEL_LINE[1][1]
+TRAVEL_PRECISION = 2
+TRAVEL_TOLERANCE_MM = round(carriage.PEN_TRAVEL_HALF_MM / 25.4, TRAVEL_PRECISION) * 25.4
+
 # The builder marks exactly these for the drawing, at these places.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     STUD_FEATURE: {STUD_DIMENSION},
     CARRIAGE_FEATURE: {YAW_DIMENSION, NIB_DIMENSION},
+    TRAVEL_FEATURE: {TRAVEL_DIMENSION},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     STUD_FEATURE: {STUD_DIMENSION: STUD_PRECISION},
     CARRIAGE_FEATURE: {YAW_DIMENSION: YAW_PRECISION, NIB_DIMENSION: NIB_PRECISION},
+    TRAVEL_FEATURE: {TRAVEL_DIMENSION: TRAVEL_PRECISION},
 }
 
 # --- contract asserts ---------------------------------------------------------
@@ -262,3 +291,13 @@ _nib_dir = (
 assert math.isclose(
     math.degrees(math.atan2(-_nib_dir[1], -_nib_dir[0])), YAW_DEG, abs_tol=1e-9
 ), _nib_dir
+# The printed travel band is the stroke rounded to its places, and at the top
+# of it the block top still stands below the lower guide (the full envelope is
+# test_pn_pen_hanger_drawing's, at the stroke itself).
+assert (
+    abs(TRAVEL_TOLERANCE_MM - carriage.PEN_TRAVEL_HALF_MM)
+    <= 0.5 * 25.4 / 10**TRAVEL_PRECISION
+)
+assert (
+    TRAVEL_REFERENCE - TRAVEL_TOLERANCE_MM > hanger.GUIDE_PITCH + hanger.GUIDE_PLATE_T
+)

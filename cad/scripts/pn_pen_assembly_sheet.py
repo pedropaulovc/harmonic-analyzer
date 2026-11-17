@@ -54,6 +54,11 @@ from pn_pen_assembly_spec import (
     STUD_PRECISION,
     STUD_TOLERANCE_MM,
     THUMB_SCREW,
+    TRAVEL_DIMENSION,
+    TRAVEL_LINE,
+    TRAVEL_PRECISION,
+    TRAVEL_REFERENCE,
+    TRAVEL_TOLERANCE_MM,
     V_BLOCK,
     WIRE,
     YAW_DEG,
@@ -76,10 +81,21 @@ ITEM = {stem: index for index, stem in enumerate(BOM_ORDER, 1)}
 # carries no band: the stud's band rides on the measured-length setting the
 # callout and step 1 print.
 REFERENCE_DIMENSIONS = frozenset({STUD_DIMENSION})
-DIMENSION_TOLERANCES = {NIB_DIMENSION: NIB_TOLERANCE_MM}
+DIMENSION_TOLERANCES = {
+    NIB_DIMENSION: NIB_TOLERANCE_MM,
+    TRAVEL_DIMENSION: TRAVEL_TOLERANCE_MM,
+}
 ANGULAR_TOLERANCES = {YAW_DIMENSION: YAW_TOLERANCE_DEG}
-TOLERANCE_PRECISION = {NIB_DIMENSION: NIB_PRECISION, YAW_DIMENSION: 0}
-DIMENSION_NOMINALS = {STUD_DIMENSION: STUD_HEIGHT, NIB_DIMENSION: NIB_PROTRUSION}
+TOLERANCE_PRECISION = {
+    NIB_DIMENSION: NIB_PRECISION,
+    YAW_DIMENSION: 0,
+    TRAVEL_DIMENSION: TRAVEL_PRECISION,
+}
+DIMENSION_NOMINALS = {
+    STUD_DIMENSION: STUD_HEIGHT,
+    NIB_DIMENSION: NIB_PROTRUSION,
+    TRAVEL_DIMENSION: TRAVEL_REFERENCE,
+}
 
 
 def exploded_point(stem: str, point: tuple[float, float, float]) -> tuple[float, ...]:
@@ -234,6 +250,16 @@ STUD_TEXT_POINT = (
     (STUD_LINE[0][1] + STUD_LINE[1][1]) / 2.0,
     carriage.PEN_Z_MID + 13.0,
 )
+# The rod travel's text point, machine mm: on the sheet-right of the rod axis
+# in a Right view (machine -Z), mid-span between the upper guide top and the
+# block top, far enough out that the callout's widest line (about 41 sheet mm,
+# 82 model mm at 1:2) clears the U guides' noses and stands over open paper
+# above the marker.
+TRAVEL_TEXT_POINT = (
+    carriage.PEN_ROD_X,
+    (TRAVEL_LINE[0][1] + TRAVEL_LINE[1][1]) / 2.0,
+    carriage.PEN_Z_MID - 60.0,
+)
 
 # The stud is set from its measured length (code review C05): the head top
 # stands that length less the nominal engagement, ±STUD_TOLERANCE_MM.
@@ -243,6 +269,7 @@ DIMENSION_CALLOUTS = {
     STUD_DIMENSION: f"STUD HEAD\nABOVE ROD TOP:\nSTUD LENGTH\nLESS {_STUD_LESS}",
     NIB_DIMENSION: "NIB PRESET\nBEYOND END FACE",
     YAW_DIMENSION: "MARKER TO\nROD FLAT",
+    TRAVEL_DIMENSION: "FREE ROD TRAVEL:\nBLOCK TOP BELOW\nUPPER GUIDE TOP",
 }
 
 # --- fitter text ----------------------------------------------------------------
@@ -263,7 +290,8 @@ _NIB_SETTING = (
     f"±{_decimal(NIB_TOLERANCE_MM, NIB_PRECISION)}"
 )
 _YAW_SETTING = f"{YAW_DEG:.0f}° ±{YAW_TOLERANCE_DEG:.0f}°"
-_TRAVEL = f"±{_decimal(carriage.PEN_TRAVEL_HALF_MM, 2)}"
+_TRAVEL = f"±{_decimal(TRAVEL_TOLERANCE_MM, TRAVEL_PRECISION)}"
+_TRAVEL_SETTING = f"{_decimal(TRAVEL_REFERENCE, TRAVEL_PRECISION)} {_TRAVEL}"
 
 # --- detail regions (machine mm): what each fitter detail is centred on and how
 # far round it reaches ------------------------------------------------------------
@@ -422,6 +450,7 @@ STEP_SECTIONS = (("AT THE BENCH", _BENCH_STEPS), ("AT MHA-HA-00", _MACHINE_STEPS
 ASSEMBLY_STEPS = (*_BENCH_STEPS, *_MACHINE_STEPS)
 ASSEMBLY_CHECKS = (
     f"THE ROD SLIDES FREELY THROUGH BOTH GUIDES OVER ITS {_TRAVEL} TRAVEL "
+    f"(RIGHT VIEW: BLOCK TOP {_TRAVEL_SETTING} BELOW THE UPPER GUIDE TOP) "
     f"AND FALLS UNDER THE WEIGHT OF ITEMS {_CARRIAGE_ITEMS[0]}-"
     f"{_CARRIAGE_ITEMS[-1]} WHEN LIFTED AND RELEASED.",
     "THE V-BLOCK DOES NOT TURN ON THE PIVOT BY HAND, AND THE YAW STILL "
