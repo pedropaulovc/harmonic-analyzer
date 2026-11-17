@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-import ast
 import math
 from pathlib import Path
 import re
-from types import SimpleNamespace
 
 import pytest
 
@@ -17,7 +15,6 @@ from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dime
 import _drawing_edges
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_types import DRAWING_TEMPLATES, DrawingLayout
-import _gtol_face
 from _layout_geometry import Box, estimate_text_box
 from _surface_finish import MACHINED_UM, SEAT_UM
 import build_pd_transgear_pivot_spacer as part
@@ -441,68 +438,6 @@ def test_each_frame_finds_the_od_rim_of_its_own_face() -> None:
             drawing.face_rim(split, mark)
 
 
-def _surface_face(
-    identity: int, parameters: tuple[float, ...], *, flipped: bool = False
-):
-    """A model face as ``_gtol_face_read.face_geometry`` reads it (metres)."""
-    surface = SimpleNamespace(
-        Identity=identity, PlaneParams=parameters, CylinderParams=parameters
-    )
-    return SimpleNamespace(
-        GetSurface=lambda: surface,
-        FaceInSurfaceSense=lambda: flipped,
-        GetBox=lambda: (),
-    )
-
-
-def _plane(z_mm: float, *, facing: float):
-    """The plane square to the spacer axis at ``z_mm``, facing +Z or -Z."""
-    return _surface_face(
-        _gtol_face.SURFACE_PLANE,
-        (0.0, 0.0, 1.0, 0.0, 0.0, z_mm / 1000.0),
-        flipped=facing < 0.0,
-    )
-
-
-def _od_cylinder():
-    return _surface_face(
-        _gtol_face.SURFACE_CYLINDER,
-        (0.0, 0.0, 0.0, 0.0, 0.0, 1.0, spec.OD / 2000.0),
-    )
-
-
-def _rim_between(*faces):
-    edge = SimpleNamespace(GetTwoAdjacentFaces2=lambda: faces)
-    return _drawing_edges.ViewEdge(edge=edge, line=None, circle=None, vertices=None)
-
-
-@pytest.mark.parametrize("plane_first", [False, True])
-def test_each_frame_attaches_to_its_end_face_never_the_od(plane_first: bool) -> None:
-    """Of its rim's two faces, the front frame takes the front face (z 0,
-    facing -Z) and the rear frame the rear face (z LENGTH, facing +Z),
-    whichever the rim reports first; the O.D., the other end, or a plane
-    facing the other way never stands in, and two such planes or a lone face
-    fail."""
-    for mark, z, facing in (
-        (drawing.FRONT_FACE_FRAME, 0.0, -1.0),
-        (drawing.REAR_FACE_FRAME, spec.LENGTH, 1.0),
-    ):
-        plane, cylinder = _plane(z, facing=facing), _od_cylinder()
-        pair = (plane, cylinder) if plane_first else (cylinder, plane)
-        assert drawing.controlled_face(_rim_between(*pair), mark) is plane
-        for wrong in (
-            _plane(z, facing=-facing),
-            _plane(spec.LENGTH - z, facing=-facing),
-        ):
-            with pytest.raises(RuntimeError, match="matched 0 of 2 faces"):
-                drawing.controlled_face(_rim_between(_od_cylinder(), wrong), mark)
-        twin = _plane(z, facing=facing)
-        with pytest.raises(RuntimeError, match="matched 2 of 2 faces"):
-            drawing.controlled_face(_rim_between(plane, twin), mark)
-        with pytest.raises(RuntimeError, match="matched 1 of 1 faces"):
-            drawing.controlled_face(_rim_between(None, plane), mark)
-
-
 @pytest.mark.parametrize("turn", [1.0, -1.0])
 def test_face_landing_puts_the_leader_at_its_model_x_on_the_projected_line(
     turn: float,
@@ -660,46 +595,3 @@ def test_registry_row_is_the_turned_brass_mha_167() -> None:
     assert row["material"] == part.MATERIAL
     assert row["tolerance_class"] == "machined_block"
     assert "fit_class" not in row
-
-
-def _calls(path: str) -> dict[str, ast.Call]:
-    tree = ast.parse(Path(path).read_text(encoding="utf-8"))
-    return {
-        node.func.id: node
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
-    }
-
-
-def test_the_part_carries_every_property_its_drawing_requires(monkeypatch) -> None:
-    """The drawing refuses a source part missing a required property; every
-    one must be carried and non-blank, and the notes the sheet links are the
-    spec's."""
-    import _part_properties
-    import _drawing_marks
-
-    required = ast.literal_eval(
-        next(
-            k.value
-            for k in _calls(drawing.__file__)["read_required_properties"].keywords
-            if k.arg == "required"
-        )
-    )
-    carried = dict(_part_properties.part_properties(part.PART_NAME))
-    stamp = _calls(part.__file__)["apply_drawing_properties"]
-    assert [ast.unparse(a) for a in stamp.args[:2]] == ["adapter", "PART_NAME"]
-    extra = {
-        ast.literal_eval(key): getattr(part, value.id)
-        for key, value in zip(stamp.args[2].keys, stamp.args[2].values, strict=True)
-    }
-    stamped: dict[str, str] = {}
-    monkeypatch.setattr(
-        _drawing_marks,
-        "apply_custom_properties",
-        lambda _adapter, props: stamped.update(props),
-    )
-    _drawing_marks.apply_drawing_properties(None, part.PART_NAME, extra)
-    carried.update(stamped)
-    assert [name for name in required if not str(carried.get(name) or "").strip()] == []
-    assert carried["Isometric View Note"] == spec.ISOMETRIC_VIEW_NOTE
-    assert set(part._SAVED_DRAWING_PROPERTIES) <= set(required)

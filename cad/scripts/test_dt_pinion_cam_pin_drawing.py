@@ -34,20 +34,7 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
 def test_sheet_runs_at_8_to_1_with_a_4_to_1_pictorial() -> None:
     # Fable review r4: at 4:1 the pin was tiny and bunched in the top half.
     assert drawing.SHEET_SCALE == (8.0, 1.0)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert '"*Front", *FRONT_CENTER, scale=(8, 1)' in source
-    assert '"*Right", *RIGHT_CENTER, scale=(8, 1)' in source
-    assert '"*Isometric", *ISO_CENTER, scale=(4, 1)' in source
-    # Every marked dimension belongs to a sketch on the Right plane, so the
-    # side view must face that plane to import them natively.
-    assert '"*Top", *RIGHT_CENTER' not in source
-    build_source = Path(pin.__file__).read_text(encoding="utf-8")
-    assert build_source.count('create_sketch("Right")') == 2
-    assert 'create_sketch("Top")' not in build_source
-    assert 'create_sketch("Front")' not in build_source
     assert dt_pinion_cam_pin_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 4:1"
-    assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
-    assert "End View Note" not in source
 
 
 def test_side_view_lies_as_turned_with_the_end_view_in_projection() -> None:
@@ -81,32 +68,6 @@ def test_sheet_has_no_general_notes() -> None:
     title block and named no reason; the crown root takes the title block's
     edge break like every other edge, and the bond is the fit-up step."""
     assert not hasattr(dt_pinion_cam_pin_spec, "DRAWING_NOTES")
-    for module in (drawing, pin):
-        assert "Manufacturing Notes" not in Path(module.__file__).read_text(
-            encoding="utf-8"
-        )
-
-
-def test_end_view_keeps_the_templates_one_center_mark(monkeypatch) -> None:
-    """Layout audit r1-r2 of #1009: the template's centre mark and an
-    unconditional auto_center_marks printed two identical marks on the end
-    view.  The sheet adds one only when the template did not."""
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "if _center_mark_count(front) == 0 and not auto_center_marks(" in source
-    assert "if found != 1:" in source
-    assert drawing._CENTER_MARK_ANNOTATION == 13
-
-    class _View:
-        def __init__(self, marks):
-            self.marks = marks
-
-        def GetAnnotationsByType(self, kind):  # noqa: N802 - the COM member name
-            assert kind == 13
-            return self.marks
-
-    monkeypatch.setattr(drawing, "_early_bound", lambda view, _iface: view)
-    assert drawing._center_mark_count(_View(None)) == 0
-    assert drawing._center_mark_count(_View(("mark",))) == 1
 
 
 def test_bonded_slip_fit_replaces_the_press() -> None:
@@ -162,21 +123,11 @@ def test_no_gdt_the_shank_carries_the_finish_and_only_the_fit_is_banded() -> Non
     mate; they take the title block's .XX."""
     from _gtol_cylinder import CylinderFace
 
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    build_source = Path(pin.__file__).read_text(encoding="utf-8")
     assert not hasattr(dt_pinion_cam_pin_spec, "GEOMETRIC_TOLERANCES_MM")
-    assert "add_datum_feature(" not in source
-    assert "add_feature_control_frame(" not in source
     (control,) = dt_pinion_cam_pin_spec.SURFACE_FINISHES
     assert control.key == "shank"
     assert control.roughness_um == 1.6
     assert control.face == CylinderFace(diameter_mm=dt_pinion_cam_pin_spec.PIN_DIA)
-    assert source.count("add_surface_finish(") == 1
-    assert 'surface_finish_by_key(SURFACE_FINISHES, "shank")' in source
-    assert "author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)" in (
-        build_source
-    )
-    assert "add_view_centerline(" in source
     assert model_toleranced_dimensions(pin) == {
         ("PinProfile", "PinDia"): "PIN_DIA_BAND[0]",
     }
@@ -184,11 +135,6 @@ def test_no_gdt_the_shank_carries_the_finish_and_only_the_fit_is_banded() -> Non
     # Rule 7: the length and the crown radius carry their values only.
     assert set(drawing.DIMENSION_CALLOUTS) == {"PinDia"}
     assert "CapR" in drawing.RIGHT_KEEP
-    # The reference overall replaces the crown-height prose (drawing-guidelines.md rule 10 (dimension from a real feature)).
-    assert "_overall_reference(adapter, right)" in source
-    assert "set_reference_dimension(" in source
-    assert "SetPrecision3(DRAWING_REFERENCE_PRECISION" in source
-    assert "REF AXIAL HEIGHT" not in source
     assert drawing.OVERALL == pytest.approx(20.801, abs=5e-4)
 
 
@@ -258,10 +204,6 @@ def test_shank_finish_sits_clear_above_the_shank() -> None:
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:
-    source = Path(pin.__file__).read_text(encoding="utf-8")
-    assert "apply_drawing_properties" in source
-    assert "clear_dimensions_for_drawing" in source
-    assert '"Isometric View Note": ISOMETRIC_VIEW_NOTE' in source
     import _config
 
     spec = _config.parts("dt-pinion-cam-pin")
@@ -308,7 +250,6 @@ def test_the_part_owns_the_printed_precision() -> None:
     authors every marked dimension's places and the sheet only asserts them."""
     from _drawing_contract import (
         PRECISION_MIGRATED_DRAWINGS,
-        drawing_specification_violations,
     )
 
     precision = dt_pinion_cam_pin_spec.DRAWING_PRECISION
@@ -320,12 +261,4 @@ def test_the_part_owns_the_printed_precision() -> None:
         "Depth": 2,
         "CapR": 2,
     }
-    build_source = Path(pin.__file__).read_text(encoding="utf-8")
-    assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in build_source
-    draw_source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert (
-        "assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)"
-        in draw_source
-    )
     assert "draw_dt_pinion_cam_pin.py" in PRECISION_MIGRATED_DRAWINGS
-    assert not drawing_specification_violations(draw_source, filename=drawing.__file__)

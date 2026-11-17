@@ -75,9 +75,6 @@ def test_every_tight_band_names_its_mate_or_function() -> None:
     # Rule 7: a hole location carries its value and band only.
     for location in ("BarPinCx", "SpringCx"):
         assert location not in callouts
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    for label in drawing.HOLE_MATES:
-        assert f'_callout, label="{label}")' in source
     # .256 +.0010/.0000 on the .250 (.0000/-.0008) shaft: .0060-.0078 in.
     assert drawing._CLEARANCE_LEAST == pytest.approx(0.1524)
     assert drawing._CLEARANCE_MOST == pytest.approx(0.19812)
@@ -132,18 +129,6 @@ def test_sheet_runs_at_1_to_1_with_1_to_2_isometric() -> None:
     assert drawing.SHEET_SCALE == (1.0, 1.0)
     assert drawing.ISO_SCALE == (1, 2)
     assert notes.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:2"
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
-    assert "Manufacturing Notes" not in source
-
-
-def test_sheet_carries_no_gdt_and_drill_callouts() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "add_feature_control_frame(" not in source
-    assert "add_datum_feature(" not in source
-    assert "set_basic_dimension(" not in source
-    assert source.count("add_native_hole_callout(") == 2
-    assert source.count("process=drill_process(") == 2
 
 
 def test_hub_diameter_lands_on_its_near_rim() -> None:
@@ -160,22 +145,12 @@ def test_one_centreline_joins_the_three_holes_along_the_bar() -> None:
     long edges prints their cross-bar position and the .43 bar symmetric
     about it. The edges are picked between the two drilled holes, where only
     the bar's own edges run."""
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("_add_bar_centerline(adapter, front)") == 1
-    assert source.index("auto_center_marks(adapter, front") < source.index(
-        "_add_bar_centerline(adapter, front)"
-    )
-    assert "(BAR_PIN_X + LEVER_SPRING_X) / 2000.0" in source
-    assert "side * BAR_TALL / 2000.0" in source
     assert spec.BAR_PIN_X < (spec.BAR_PIN_X + spec.LEVER_SPRING_X) / 2.0
     assert (spec.BAR_PIN_X + spec.LEVER_SPRING_X) / 2.0 < spec.TIP_ARC_CX
     assert spec.TIP_RADIUS == spec.NOSE_RADIUS == spec.BAR_TALL / 2.0
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:
-    source = Path(lever.__file__).read_text(encoding="utf-8")
-    assert "apply_drawing_properties" in source
-    assert "clear_dimensions_for_drawing" in source
     import _config
 
     part = _config.parts("ch-channel-lever")

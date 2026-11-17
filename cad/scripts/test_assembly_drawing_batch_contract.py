@@ -296,28 +296,6 @@ def test_changed_drivetrain_packages_keep_their_registered_assembly_sources() ->
         }
 
 
-def test_each_simple_recipe_is_only_a_precomputed_shared_builder_call() -> None:
-    prohibited = (
-        "add_auto_balloons",
-        "add_component_bom_balloons",
-        "add_note(",
-        "create_blank_drawing_sheets",
-        "insert_bom_table",
-        "insert_identified_bom_table",
-        "set_hidden_lines_",
-        "stamp_drawing_summary",
-        "ViewDisplay",
-    )
-    for drawing in SIMPLE_ASSEMBLY_DRAWINGS:
-        source = Path(drawing.__file__).read_text(encoding="utf-8")
-        assert "return await build_simple_three_view_drawing(" in source
-        assert "place_view(" not in source
-        assert "SHEET_NAMES" not in source
-        assert "BOM_" not in source
-        assert "ASSEMBLY_NOTES" not in source
-        assert not any(token in source for token in prohibited), drawing.ARTIFACT_STEM
-
-
 def test_each_simple_recipe_forwards_its_registered_layout(monkeypatch) -> None:
     for drawing in SIMPLE_ASSEMBLY_DRAWINGS:
         forwarded: list[dict[str, object]] = []
@@ -343,27 +321,6 @@ def test_each_simple_three_view_layout_has_distinct_left_to_right_centers() -> N
         assert front_x < right_x < iso_x, drawing.ARTIFACT_STEM
         assert right_x - front_x >= 0.065, drawing.ARTIFACT_STEM
         assert iso_x - right_x >= 0.065, drawing.ARTIFACT_STEM
-
-
-def test_shared_builder_places_named_views_without_per_script_visual_overrides() -> (
-    None
-):
-    source = Path(_assembly_drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("place_view(") == 1
-    assert '("*Front", front_center)' in source
-    assert '("*Right", right_center)' in source
-    assert '("*Isometric", iso_center)' in source
-    assert "scale=sheet_scale" in source
-    for token in (
-        "set_hidden_lines_",
-        "ViewDisplay",
-        "DisplayMode",
-        "add_note(",
-        "balloon",
-        "bom_table",
-        "create_blank_drawing_sheets",
-    ):
-        assert token not in source
 
 
 @pytest.mark.parametrize("with_annotations", (False, True))

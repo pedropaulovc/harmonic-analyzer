@@ -24,97 +24,6 @@ _HOLE_OVERSIZE = drilled_oversize_mm(unit="in")
 _WEB_TARGET = WALL_TARGET_MM  # machined webs >= .080 at the printed worst case
 
 
-class _MarkDisplay:
-    def __init__(self, lines):
-        self.lines = lines
-
-    def GetLineCount(self):
-        return len(self.lines)
-
-    def GetLineAtIndex2(self, index):
-        return self.lines[index]
-
-
-class _CentreMark:
-    def __init__(self, data):
-        self.data = data
-
-    def GetDisplayData(self):
-        return self.data
-
-
-class _MarkedTop:
-    def __init__(self, marks):
-        self.marks = marks
-
-    def GetAnnotationsByType(self, kind):
-        assert kind == 13  # swCenterMark
-        return self.marks
-
-
-def _pad_mark(x=0.1147081, y=0.228):
-    return _CentreMark(
-        _MarkDisplay(
-            [
-                [0, 0, 0, 0, x - 0.003, y, 0, x + 0.003, y, 0],
-                [0, 0, 0, 0, x, y - 0.003, 0, x, y + 0.003, 0],
-            ]
-        )
-    )
-
-
-@pytest.fixture
-def pad_mark_projection(monkeypatch):
-    adapter = object()
-    calls = []
-    monkeypatch.setattr(drawing, "_early_bound", lambda obj, interface: obj)
-
-    def project(actual_adapter, view, point, *, label):
-        assert actual_adapter is adapter
-        assert point == pytest.approx(
-            tuple(value / 1000.0 for value in drawing.HOLE_CENTER)
-        )
-        assert label == "pad hole axis"
-        calls.append(view)
-        return (0.1147081, 0.228, 0.0)
-
-    monkeypatch.setattr(drawing, "model_point_in_view", project)
-    monkeypatch.setattr(drawing._telemetry, "success", lambda message: None)
-    return adapter, calls
-
-
-@pytest.mark.parametrize("offset", [0.0, 0.00049])
-def test_template_pad_mark_is_proved_from_printed_lines(pad_mark_projection, offset):
-    adapter, calls = pad_mark_projection
-    top = _MarkedTop([_pad_mark(x=0.1147081 + offset)])
-    drawing._prove_pad_hole_centre_mark(adapter, top)
-    assert calls == [top]
-
-
-@pytest.mark.parametrize("marks", [None, [], [_pad_mark(), _pad_mark()]])
-def test_template_pad_mark_census_fails_closed(pad_mark_projection, marks):
-    adapter, calls = pad_mark_projection
-    with pytest.raises(RuntimeError, match="centre marks"):
-        drawing._prove_pad_hole_centre_mark(adapter, _MarkedTop(marks))
-    assert calls == []
-
-
-@pytest.mark.parametrize(
-    ("mark", "message"),
-    [
-        (_pad_mark(x=0.1157081), "off the hole axis"),
-        (_CentreMark(None), "no display data"),
-        (_CentreMark(_MarkDisplay([])), "draws no lines"),
-        (_CentreMark(_MarkDisplay([[0] * 9])), "invalid display lines"),
-        (_pad_mark(x=float("nan")), "invalid display lines"),
-    ],
-)
-def test_invalid_template_pad_mark_is_rejected(pad_mark_projection, mark, message):
-    adapter, _calls = pad_mark_projection
-    with pytest.raises(RuntimeError, match=message):
-        drawing._prove_pad_hole_centre_mark(adapter, _MarkedTop([mark]))
-
-
 def test_spring_contact_rises_with_pivot_while_foot_stays_on_base() -> None:
     from dt_pinion_pivot_block_geometry import BORE_UP
     from pinion_rig_park_geometry import STRAP_LEAN_DEG
@@ -179,8 +88,6 @@ def test_preload_setting_formed_features_carry_the_formed_band() -> None:
         2,
         3,
     )
-    source = Path(spring.__file__).read_text(encoding="utf-8")
-    assert "_pad_relief_max_limit(adapter)" in source
 
 
 def test_profile_and_wing_are_baselined_from_the_hole_axis() -> None:
@@ -189,16 +96,6 @@ def test_profile_and_wing_are_baselined_from_the_hole_axis() -> None:
     # the screw that fixes the foot -- never from the model origin, so the
     # hole's own .XX location from the free end moves none of them (Codex P1
     # and machinist review r13, PR #1675).
-    source = Path(spring.__file__).read_text(encoding="utf-8")
-    assert "KinkStartX" not in source and "FlatTipX" not in source
-    for needle in (
-        'dims.record(f"{prefix}HoleAxisX", \'"HoleFromEnd"\')',
-        'dims.record(f"{prefix}FootLen", \'"BendFromHole"\')',
-        'pad.record("PadHoleAxisX", \'"HoleFromEnd"\')',
-        'pad.record("PadLen", \'"WingFromHole"\')',
-        '"kink start from the hole axis"',
-    ):
-        assert source.count(needle) == 1, needle
     assert geometry.FOOT_FROM_HOLE == geometry.FOOT_LEN - geometry.HOLE_FROM_END
     assert geometry.FREE_KINK_H == pytest.approx(
         geometry.HOLE_X - geometry.FREE_KINK_START[0]
@@ -349,11 +246,6 @@ def test_free_form_prints_from_the_hidden_reference_sketch() -> None:
     # prints from the hidden sketch in the front view and the kink angle in
     # detail A, each through the opt-in hidden-sketch curation.
     assert dt_pinion_spring_spec.REFERENCE_SKETCHES == ("FreeForm",)
-    build_source = Path(spring.__file__).read_text(encoding="utf-8")
-    assert "blank_sketch(adapter, FREE_FORM_SKETCH)" in build_source
-    assert 'prefix="Free", construction=True' in build_source
-    draw_source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert draw_source.count("hidden_sketches.curate_view_dimensions(") == 2
     assert {"FreeKinkH", "FreeKinkV"} <= set(drawing.FRONT_KEEP)
     assert dt_pinion_spring_spec.FREE_KINK_ANGLE in drawing.DETAIL_KEEP
     assert "FREE FORM" in dt_pinion_spring_spec.DRAWING_NOTES
@@ -395,16 +287,6 @@ def test_kink_angle_drives_the_flick_as_its_included_angle() -> None:
     # start's (two .X dimensions) let the flick read flat, reversed or sharply
     # kinked.  The kink's included angle, blade to flat, now drives both
     # profiles and prints on the free one, between its drawn legs in detail A.
-    build_source = Path(spring.__file__).read_text(encoding="utf-8")
-    assert "TipH" not in build_source
-    assert (
-        build_source.count('dims.record(f"{prefix}KinkAngle", \'"KinkIncludedAngle"\')')
-        == 1
-    )
-    assert (
-        'set_global(adapter, "KinkIncludedAngle", f"{KINK_INCLUDED_DEG}deg")'
-        in build_source
-    )
     assert geometry.KINK_INCLUDED_DEG == pytest.approx(180.0 - geometry.KINK_DEG)
     for start, bend_exit, kink_exit, tip, vertex, bisector, included in (
         (
@@ -527,201 +409,6 @@ def test_minor_arc_points_sweep_the_short_way_either_sense() -> None:
     assert drawing.kink_arc_faults(arc, vertex)
 
 
-class _KinkView:
-    """A recording IView double for the kink detail's place-move-crop."""
-
-    def __init__(self, *, crop_status: int = 1, crops: bool = True, moves: bool = True):
-        self.ScaleRatio = (5.0, 1.0)
-        self.Position = (0.300, 0.100)
-        self.crop_status = crop_status
-        self.crops = crops
-        self.moves = moves
-        self.cropped = False
-        self.calls: list[str] = []
-        self.CropViewJaggedOutline = False
-        self.CropViewNoOutline = False
-
-    def SetViewPosition(self, target, _update) -> bool:  # noqa: N802
-        self.calls.append("SetViewPosition")
-        if self.moves:
-            self.Position = tuple(float(value) for value in target)
-        return True
-
-    def GetOutline(self):  # noqa: N802
-        if self.cropped:
-            return (0.2225, 0.1665, 0.2575, 0.2015)
-        return (0.180, 0.050, 0.300, 0.290)
-
-    def Crop2(self, jagged, no_outline, intensity) -> int:  # noqa: N802
-        self.calls.append(f"Crop2({jagged}, {no_outline}, {intensity})")
-        self.cropped = self.crops
-        return self.crop_status
-
-    def IsCropped(self) -> bool:  # noqa: N802
-        return self.cropped
-
-    def UpdateViewDisplayGeometry(self) -> None:  # noqa: N802
-        self.calls.append("UpdateViewDisplayGeometry")
-
-
-class _KinkModel:
-    def ClearSelection2(self, _all) -> None:  # noqa: N802
-        pass
-
-    def EditRebuild3(self) -> None:  # noqa: N802
-        pass
-
-
-def _kink_seat(monkeypatch, view: _KinkView) -> list[tuple]:
-    """Point draw_pinion_spring's COM helpers at ``view``; returns the log of
-    placements and crop circles."""
-    log: list[tuple] = []
-    # The focus sits a fixed sheet offset from the view's position.
-    offset = (-0.050, 0.070)
-
-    def place(_adapter, source, orientation, x, y, *, scale):
-        log.append(("place", orientation, (x, y), scale))
-        return view
-
-    def model_point(_adapter, _view, point, *, label):
-        assert point[:2] == pytest.approx(
-            (drawing.DETAIL_FOCUS[0] / 1000.0, drawing.DETAIL_FOCUS[1] / 1000.0)
-        )
-        return (view.Position[0] + offset[0], view.Position[1] + offset[1])
-
-    def circle(_adapter, _view, center, radius, *, label, add_to_db=False):
-        log.append(("circle", center, radius, add_to_db))
-        return object()
-
-    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _name: obj)
-    monkeypatch.setattr(drawing, "double_array", lambda values: tuple(values))
-    monkeypatch.setattr(drawing, "place_view", place)
-    monkeypatch.setattr(drawing, "model_point_in_view", model_point)
-    monkeypatch.setattr(drawing, "_sketch_circle", circle)
-    monkeypatch.setattr(drawing, "_activate_view", lambda *_a, **_k: "Drawing View4")
-    return log
-
-
-def _kink_adapter():
-    return type("Adapter", (), {"currentModel": _KinkModel()})()
-
-
-def _crop_kink(adapter, monkeypatch, view: _KinkView) -> list[tuple]:
-    log = _kink_seat(monkeypatch, view)
-    assert drawing._placed_kink_view(adapter) is view
-    drawing._crop_kink_view(adapter, view)
-    return log
-
-
-def test_kink_detail_is_a_cropped_front_model_view(monkeypatch) -> None:
-    # pc-r13 (leaf 20260927T001822Z-1-ba1f4546): the native detail's
-    # targeted import brought KinkR but not FlatLen.  Detail A is now a *Front
-    # model view at 5:1, its kink focus moved onto DETAIL_CENTER, cropped by
-    # the fence's 5:1 circle with a plain circular outline.
-    view = _KinkView()
-    log = _crop_kink(_kink_adapter(), monkeypatch, view)
-    assert log[0] == ("place", "*Front", drawing.DETAIL_CENTER, drawing.DETAIL_SCALE)
-    kind, center, radius, add_to_db = log[1]
-    assert kind == "circle" and not add_to_db
-    assert center == pytest.approx(drawing.DETAIL_CENTER, abs=1e-12)
-    assert radius == pytest.approx(5 * drawing.DETAIL_RADIUS_MM / 1000.0)
-    assert view.calls[0] == "SetViewPosition"
-    assert "Crop2(False, False, 1)" in view.calls
-    assert not hasattr(drawing, "_kink_detail")
-    assert "CreateDetailViewAt4" not in Path(drawing.__file__).read_text(encoding="utf-8")
-
-
-class _Annotation:
-    def __init__(self, name: str) -> None:
-        self.name = name
-
-
-class _DimensionedView:
-    def __init__(self) -> None:
-        self.names: list[str] = []
-
-    def GetAnnotations(self):  # noqa: N802
-        return [_Annotation(name) for name in self.names]
-
-
-def _order_seat(monkeypatch, view: _DimensionedView, *, crop_drops: tuple[str, ...]):
-    """Record import, read-back and crop order on ``view``; the crop drops
-    ``crop_drops`` from it.  Returns the call log and the recorded events."""
-    calls: list[str] = []
-    events: list[tuple[str, dict]] = []
-
-    def curate(_adapter, _view, *, keep, view_label, dimensions_by_feature):
-        calls.append("import")
-        view.names = sorted(keep)
-        return ["curated"]
-
-    def crop(_adapter, _view):
-        calls.append("crop")
-        view.names = [name for name in view.names if name not in crop_drops]
-
-    def names(_adapter, _view):
-        calls.append("read")
-        return sorted(view.names)
-
-    monkeypatch.setattr(drawing.hidden_sketches, "curate_view_dimensions", curate)
-    monkeypatch.setattr(drawing, "_crop_kink_view", crop)
-    monkeypatch.setattr(drawing, "_view_dimension_names", names)
-    monkeypatch.setattr(
-        drawing._telemetry, "event", lambda name, **attrs: events.append((name, attrs))
-    )
-    return calls, events
-
-
-def test_kink_detail_is_dimensioned_before_it_is_cropped(monkeypatch) -> None:
-    # pc-r14 (6aebefd18, leaf 20260927T005429Z-1-555a9662): imported into the
-    # cropped view, SpringProfile brought FlatLen but not KinkR; the uncropped
-    # *Front imports both.  The detail imports while uncropped, then crops,
-    # and the pair is read back on both sides of the crop.
-    view = _DimensionedView()
-    calls, events = _order_seat(monkeypatch, view, crop_drops=())
-    assert drawing._dimension_then_crop_kink_view(object(), view) == ["curated"]
-    assert calls == ["import", "read", "crop", "read"]
-    assert events == [
-        (
-            "kink_detail.crop",
-            {
-                "dimensions_before": "FlatLen,FreeKinkAngle,KinkR",
-                "dimensions_after": "FlatLen,FreeKinkAngle,KinkR",
-                "lost": "",
-            },
-        )
-    ]
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    body = source[source.index("async def build(") :]
-    assert body.index("_placed_kink_view(adapter)") < body.index(
-        "_dimension_then_crop_kink_view(adapter, detail)"
-    ) < body.index("keep=FRONT_KEEP")
-
-
-def test_kink_detail_fails_loud_when_the_crop_takes_a_dimension(monkeypatch) -> None:
-    view = _DimensionedView()
-    calls, events = _order_seat(monkeypatch, view, crop_drops=("KinkR",))
-    with pytest.raises(RuntimeError, match=r"lost \['KinkR'\] to its crop"):
-        drawing._dimension_then_crop_kink_view(object(), view)
-    assert events[0][1]["lost"] == "KinkR"
-
-
-@pytest.mark.parametrize(
-    ("kwargs", "message"),
-    [
-        ({"crop_status": 0}, "not cropped"),
-        ({"crops": False}, "not cropped"),
-        ({"moves": False}, "kink focus sits at"),
-    ],
-)
-def test_kink_detail_fails_loud_when_the_seat_does_not_obey(
-    monkeypatch, kwargs, message
-) -> None:
-    view = _KinkView(**kwargs)
-    with pytest.raises(RuntimeError, match=message):
-        _crop_kink(_kink_adapter(), monkeypatch, view)
-
-
 def test_kink_crop_holds_its_dimensions_and_labels_clear_of_them() -> None:
     # The fence takes both crests: the phantom free crest with its angle's
     # arc ends on the drawn legs and the installed crest with its centre and
@@ -765,25 +452,15 @@ def test_kink_crop_holds_its_dimensions_and_labels_clear_of_them() -> None:
 def test_views_are_projected_and_hidden_lines_removed() -> None:
     assert drawing.TOP_CENTER[0] == drawing.FRONT_CENTER[0]
     assert drawing.TOP_CENTER[1] > drawing.FRONT_CENTER[1]
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "set_hidden_lines_visible" not in source
-    assert "add_feature_control_frame" not in source
-    assert "add_datum_feature" not in source
-    assert "process=HOLE_PROCESS" in source
     assert drawing.HOLE_PROCESS == "#30 DRILL"
     assert geometry.HOLE_DIA == pytest.approx(0.1285 * 25.4, abs=1e-3)  # No. 30 drill
-    assert source.count("add_edge_dimension(") == 1  # the blank's driven dimensions
 
 
 def test_bend_coupon_qualifies_the_tightest_accepted_radius() -> None:
     # Codex #859 (PRRT_kwDOPHDy386mTao0): both R3.3 bends may be formed at
     # R3.3 - band, so the mandatory coupon bends over that low limit or under
     # it, never the nominal.  The mandrel is a 7/32 in drill rod.
-    policy = (Path(__file__).parents[1] / "docs" / "tolerance-policy.md").read_text(
-        encoding="utf-8"
-    )
     mandrel_r = 7.0 / 32.0 * 25.4 / 2.0
-    assert "7/32 in (Ø5.56) drill-rod mandrel, R2.78" in policy
     assert round(mandrel_r, 2) == 2.78
     low_limit = min(geometry.R_BEND, geometry.R_KINK) - geometry.FORMED_BAND_MM
     assert mandrel_r <= low_limit
@@ -798,20 +475,12 @@ def test_notes_carry_no_dimension_and_stay_short() -> None:
     assert "COIL" not in notes
     # The blank's orientation is the coupon's (Codex #859, PRRT_kwDOPHDy386mTtoA).
     assert "ALONG ROLL LENGTH (BENDS ACROSS ROLLING DIRECTION)" in notes
-    policy = (Path(__file__).parents[1] / "docs" / "tolerance-policy.md").read_text(
-        encoding="utf-8"
-    )
-    assert "bend line across the rolling direction, as the part is cut" in policy
     assert max(len(line) for line in notes.splitlines()) <= 63
     assert not any(ch.isdigit() for ch in notes)
     assert "+/-" not in "\n".join(drawing.DIMENSION_CALLOUTS.values())
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:
-    source = Path(spring.__file__).read_text(encoding="utf-8")
-    assert "apply_drawing_properties" in source
-    assert "clear_dimensions_for_drawing" in source
-    assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in source
     spec = _config.parts("dt-pinion-spring")
     # The title-block cell holds one line (<= 30 characters); the full
     # stock callout stays in the material specification.

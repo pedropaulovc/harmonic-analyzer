@@ -117,14 +117,12 @@ def test_hole_coordinates_print_from_the_corner_without_a_frame() -> None:
     title block's .XXX, and the shared Y once, 2X. Round-2 review: TRANSFER
     FROM MHA-PD-11 sets the positions, so a ±.001 band on them would be a
     second controlling value; the part carries none."""
-    import inspect
 
     holes = pd_guide_lock_spec.DRAWING_DIMENSIONS["ScrewHoles"]
     assert holes == {"Hole1X", "Hole2X", "Hole1Y"} <= set(drawing.FRONT_KEEP)
     assert {pd_guide_lock_spec.DRAWING_PRECISION_BY_NAME[name] for name in holes} == {3}
     assert drawing.DIMENSION_PREFIXES["Hole1Y"] == "2X "
     assert len({y for _, y in pd_guide_lock_spec.HOLE_XY}) == 1
-    assert "tolerance" not in inspect.getsource(lock).lower()
 
 
 def test_the_drill_callout_stands_between_the_plate_and_the_right_view() -> None:
@@ -278,7 +276,6 @@ def test_the_four_rounded_corners_print_once_4x_clear_of_the_holes() -> None:
     photo (R ~1.75 measured -> R.07); one printed 4X radius at .XX, and the
     holes stay outside every corner's R x R square at the printed worst case,
     so their edge ligaments still run to straight edges."""
-    import inspect
 
     r = pd_guide_lock_spec.CORNER_R
     assert r == pytest.approx(0.07 * 25.4)
@@ -287,10 +284,6 @@ def test_the_four_rounded_corners_print_once_4x_clear_of_the_holes() -> None:
     # A custom prefix replaces SolidWorks' own "R" (farm run
     # 20261012T061737079Z printed "4X 1.8"), so the prefix carries it.
     assert drawing.DIMENSION_PREFIXES["CornerR"] == "4X R"
-    source = inspect.getsource(lock.build)
-    assert '("Corners", "CornerR", ((LOCK_WIDTH, LOCK_HEIGHT),))' in source
-    assert '"OtherCorners"' in source
-    assert source.count("'\"LockCornerR\"'") == 1  # both fillets, one drive loop
     r_max = r + _TWO_PLACES
     x_min = min(x for x, _ in pd_guide_lock_spec.HOLE_XY) - _HOLE_BAND
     x_from_right = (

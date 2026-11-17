@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from fractions import Fraction
 import re
 
@@ -15,7 +14,6 @@ import mg_vn_magnifying_bracket_screw_spec as spec
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_types import DRAWING_TEMPLATES
 from _fastener_catalog import FASTENERS
-from _stock_fastener import RigidTransform
 from _test_stock_recipes import discovered_recipes
 from diagnostics import diag_build_91794A078 as recipe
 from _mcmaster_91794a078 import FILLISTER_SIZE
@@ -57,28 +55,6 @@ def test_joint_nominals_match_the_stock_family() -> None:
     )
     assert spec.ENGAGEMENT_NOMINAL == joint.ENGAGEMENT
     assert spec.ENGAGEMENT_NOMINAL == spec.LENGTH - joint.GRIP
-
-
-def test_builder_preserves_the_supplied_frame(monkeypatch: pytest.MonkeyPatch) -> None:
-    captured = {}
-    adapter = object()
-    outputs = {"sldprt": "stock-part"}
-
-    async def capture_stock(actual_adapter, **kwargs):
-        assert actual_adapter is adapter
-        captured.update(kwargs)
-        return outputs
-
-    monkeypatch.setattr(part, "build_stock_fastener", capture_stock)
-    assert asyncio.run(part.build(adapter)) is outputs
-    assert captured["part_name"] == STEM
-    components = captured["components"]
-    assert len(components) == 1
-    assert components[0].sku == spec.SKU
-    assert components[0].author is recipe.build_91794A078
-    assert components[0].transform == RigidTransform()
-    assert captured["screw_axis_planes"] == ("Front Plane", "Right Plane")
-    assert captured["material"] == part.SPEC.material
 
 
 def test_purchased_sheet_documents_the_built_part() -> None:

@@ -7,7 +7,6 @@ import _config
 import draw_pd_paper_drive_assembly as assembly_drawing
 
 STEM = "sh-vn-chain-link"
-NAME = "sh_vn_chain_link"
 ROW = _config.parts(STEM)
 CONFIGURATION = "OuterLink"
 BOM_KEY = f"{STEM}--{CONFIGURATION}"

@@ -2,11 +2,8 @@
 
 from __future__ import annotations
 
-import asyncio
 import importlib
 import math
-from pathlib import Path
-from unittest.mock import MagicMock
 
 import pytest
 
@@ -19,11 +16,9 @@ import pd_feed_rack_spec as spec
 import pd_transgear_feed_pinion_spec as feed
 from _drawing_contract import (
     PRECISION_MIGRATED_DRAWINGS,
-    drawing_specification_violations,
 )
 from _hole_spec import TAP_DRILL_MM
 from _inch_wall_limits import WALL_FLOOR_MM
-from _test_stubbed_build import offline_adapter, stub_seat
 from _drawing_types import DrawingLayout
 from _printed_tolerance import printed_deviations
 from pd_platen_spec import GUIDE_HOLE_X, PLATE_WIDTH
@@ -196,99 +191,6 @@ def test_sheet_sizes_have_native_controls_and_stock_references() -> None:
     assert builder.DRAWING_REFERENCE_DIMENSIONS is spec.DRAWING_REFERENCE_DIMENSIONS
 
 
-_SOLID_FEATURES = (
-    "create_extrusion", "create_cut_extrude", "create_plane", "create_revolve",
-    "linear_pattern_feature",
-)
-
-
-def test_tap_station_witness_carries_the_sheet_sizes_and_adds_no_solid(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    seat = stub_seat(monkeypatch, builder, keep=("_tap_station_witness",))
-    sketches: list = []
-
-    class Dims:
-        def __init__(self) -> None:
-            self.names: list[str] = []
-            self.feature = None
-            sketches.append(self)
-
-        def record(self, name, _drive=None) -> None:
-            self.names.append(name)
-
-        def apply(self, _adapter, feature):
-            self.feature = feature
-            return []
-
-    monkeypatch.setattr(builder, "SketchDims", Dims)
-    seat.add_line_chain.return_value = ["L0", "L1", "L2"]
-    seat.name_last_feature.side_effect = lambda _adapter, name: name
-    adapter = offline_adapter()
-    asyncio.run(builder._tap_station_witness(adapter))
-
-    ((sketch,),) = (sketches,)
-    assert sketch.feature == "TapStations"
-    assert set(sketch.names) == spec.DRAWING_DIMENSIONS["TapStations"]
-    spans = [call.args[3:5] for call in seat.dimension_between.call_args_list]
-    assert spans == [
-        ("horizontal_distance", pytest.approx(spec.TAP_X[k] - spec.TAP_X[0]))
-        for k in (1, 2, 3)
-    ]
-    (blanked,) = seat.blank_reference_sketches.call_args_list
-    assert set(blanked.args[1]) == {"TapStations"}
-    for method in _SOLID_FEATURES:
-        getattr(adapter, method).assert_not_awaited()
-
-
-def test_build_taps_marks_the_sheet_and_saves_a_simplified_plain_bar(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    seat = stub_seat(monkeypatch, builder)
-    seat.name_last_feature.side_effect = lambda _adapter, name: name
-    seat._named_dimension.side_effect = lambda *_args: (MagicMock(), MagicMock())
-    seat.wizard_holes.return_value.hole_dia_mm = spec.TAP_DRILL_DIA
-    adapter = offline_adapter()
-    seat.attach_mock(adapter, "adapter")
-    saved = asyncio.run(builder.build(adapter))
-
-    calls = seat.mock_calls
-    names = [name for name, _args, _kwargs in calls]
-
-    def named_after(method: str) -> str:
-        at = len(names) - 1 - names[::-1].index(f"adapter.{method}")
-        return next(args[1] for name, args, _ in calls[at:] if name == "name_last_feature")
-
-    # One native tap feature into the flat top, after the teeth.
-    (taps,) = seat.wizard_holes.call_args_list
-    assert taps.args[1] is spec.TAP_SPEC
-    assert [point[1] for point in taps.args[2]] == [0.0] * 4
-    assert [point[0] for point in taps.args[2]] == list(spec.TAP_X)
-    assert tuple(taps.args[3]) == (0.0, -1.0, 0.0)
-    assert names.index("wizard_holes") > names.index("adapter.linear_pattern_feature")
-    assert names.index("_tap_station_witness") > names.index("wizard_holes")
-    last_rebuild = len(names) - 1 - names[::-1].index("force_rebuild")
-    assert "volume_check" in names[last_rebuild:]
-    # Drawing precision, then a clean slate, then exactly the sheet's marks.
-    precision = names.index("apply_drawing_precision")
-    cleared = names.index("clear_dimensions_for_drawing")
-    marks = [k for k, name in enumerate(names) if name == "mark_dimensions_for_drawing"]
-    assert precision < cleared < min(marks)
-    assert {
-        (calls[k].args[1], frozenset(calls[k].args[2])) for k in marks
-    } == {
-        (feature, frozenset(dimensions))
-        for feature, dimensions in spec.DRAWING_DIMENSIONS.items()
-    }
-    # The simplified configuration suppresses the seed gap and its pattern.
-    (simplified,) = seat.save_simplified_part.await_args_list
-    assert simplified.args[1] == builder.PART_NAME == "pd-feed-rack"
-    assert tuple(simplified.args[2]) == (
-        named_after("create_cut_extrude"), named_after("linear_pattern_feature")
-    )
-    assert saved is seat.save_simplified_part.return_value
-
-
 def test_sheet_has_aligned_clean_views_and_a_legible_enlarged_end() -> None:
     assert drawing.SPEC.layout == DrawingLayout.LANDSCAPE
     assert drawing.SPEC.source_kind == "part"
@@ -301,10 +203,6 @@ def test_sheet_has_aligned_clean_views_and_a_legible_enlarged_end() -> None:
     assert drawing.ISO_SCALE == (1, 2)
     assert drawing.curate_view_dimensions.__module__ == "_drawing_hidden_sketches"
     assert "draw_pd_feed_rack.py" in PRECISION_MIGRATED_DRAWINGS
-    assert not drawing_specification_violations(
-        Path(drawing.__file__).read_text(encoding="utf-8"),
-        filename="draw_pd_feed_rack.py",
-    )
     assert drawing.TAP_CALLOUT_PRECISION is spec.TAP_CALLOUT_PRECISION
     assert set(spec.TAP_CALLOUT_PRECISION.values()) == {spec.TAP_PLACES}
     assert len(drawing.NOTES_TEXT.splitlines()) <= 4

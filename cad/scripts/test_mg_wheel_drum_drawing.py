@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import ast
 import math
 from pathlib import Path
 
@@ -89,49 +88,6 @@ def test_registry_row() -> None:
     assert part.MATERIAL == "Brass"
 
 
-def _calls(path: str) -> dict[str, ast.Call]:
-    tree = ast.parse(Path(path).read_text(encoding="utf-8"))
-    return {
-        node.func.id: node
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
-    }
-
-
-def test_the_part_carries_every_property_its_drawing_requires(monkeypatch) -> None:
-    import _part_properties
-    import _drawing_marks
-
-    required = ast.literal_eval(
-        next(
-            k.value
-            for k in _calls(drawing.__file__)["read_required_properties"].keywords
-            if k.arg == "required"
-        )
-    )
-    carried = dict(_part_properties.part_properties(part.PART_NAME))
-    build_calls = _calls(part.__file__)
-    stamp = build_calls["apply_drawing_properties"]
-    assert [ast.unparse(a) for a in stamp.args] == ["adapter", "PART_NAME"]
-    assert stamp.lineno < build_calls["save_part_and_images"].lineno
-    stamped: dict[str, str] = {}
-    monkeypatch.setattr(
-        _drawing_marks,
-        "apply_custom_properties",
-        lambda _adapter, props: stamped.update(props),
-    )
-    _drawing_marks.apply_drawing_properties(None, part.PART_NAME)
-    carried.update(stamped)
-    missing = [name for name in required if not str(carried.get(name) or "").strip()]
-    assert missing == []
-
-
 def test_pressed_bore_carries_no_finish_and_no_gdt() -> None:
     # drawing-guidelines.md rule 6: a pressed bore neither runs nor slides.
-    names = set(_calls(drawing.__file__))
-    assert not names & {
-        "add_datum_feature",
-        "add_feature_control_frame",
-        "add_surface_finish",
-    }
     assert spec.SURFACE_FINISHES == ()

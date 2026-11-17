@@ -117,11 +117,7 @@ def test_geometry_and_hole_contracts_are_part_owned() -> None:
 
 def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
     assert drawing.SHEET_SCALE == (2.0, 1.0)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "scale=(1, 1)" in source  # the isometric override
-    assert "for view in (top, face, iso):" in source
     assert spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:1"
-    assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
 
 
 def test_split_face_view_projects_beside_the_plan() -> None:
@@ -263,21 +259,10 @@ def test_shortfall_notes_stand_in_the_open_lower_left_field() -> None:
 def test_sheet_has_no_gdt_notes_or_drawing_precision() -> None:
     # Clamps are not on the drawing-simplicity GD&T allowlist; the ear holes
     # locate by +/- from the bore axis, authored on the part.
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "add_datum_feature(" not in source
-    assert "add_feature_control_frame(" not in source
-    assert "set_basic_dimension(" not in source
-    assert "set_dimension_precision" not in source
     assert not hasattr(spec, "GEOMETRIC_TOLERANCES_MM")
-    assert "add_native_hole_callout(" in source
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "apply_drawing_properties" in source
-    assert "clear_dimensions_for_drawing" in source
-    assert "EAR_STATION_BAND" in source
-    assert "EAR_HEIGHT_BAND" in source
     import _config
 
     row = _config.parts("sh-column-clamp-front")

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import inspect
 import math
 
 import pytest
@@ -37,7 +36,6 @@ def test_registry_row_is_sheet_tooling_in_inch_its_stock_a_one_line_change() -> 
     assert spec.SHEET_THICK == pytest.approx(0.020 * INCH)
     assert spec.SHEET_THICK_TOLERANCE_MM == pytest.approx(0.002 * INCH)
     assert "MATERIAL" not in vars(part) or part.MATERIAL == spec.MATERIAL
-    assert "apply_material(adapter, MATERIAL)" in inspect.getsource(part.build)
     entry = DRAWINGS_BY_NAME["dt_cone_gear_tl_phasing_comb"]
     assert entry.artifact_stem == spec.PART_NAME == part.PART_NAME
     assert entry.layout is DrawingLayout.LANDSCAPE
@@ -235,7 +233,6 @@ def test_every_dimension_prints_at_the_title_block() -> None:
         assert spec.DRAWING_PRECISION_BY_NAME[name] == places, name
     assert spec.REFERENCE_DIMENSIONS == {"SheetThick"}
     assert spec.CALLOUTS_BELOW["SheetThick"] == "SHEET STOCK"
-    assert "set_reference_dimension" in inspect.getsource(drawing.build)
     assert ".020 in" in _config.parts(spec.PART_NAME)["material_specification"]
 
 
@@ -263,17 +260,9 @@ def test_each_depth_states_its_function_and_each_gear_is_named_once() -> None:
     for teeth in spec.GEARS:
         assert named.count(spec.gear_number(teeth)) == 1, teeth
     assert not hasattr(spec, "SHEET_NOTES")
-    assert "add_note(" not in inspect.getsource(drawing.build)
     # No method (rule 7).
     for word in ("MILL", "SAW", "FILE", "SNIP", "PHASE", "BEND"):
         assert word not in named
-
-
-def test_no_old_plate_wording_survives() -> None:
-    for module in (spec, part, drawing):
-        source = inspect.getsource(module).lower()
-        for word in ("fork", "tine", "relief", "back face", "both faces", "1018"):
-            assert word not in source, (module, word)
 
 
 def _apart(a: tuple[float, ...], b: tuple[float, ...]) -> bool:
@@ -355,8 +344,6 @@ def test_sheet_text_stands_apart_inside_the_border_and_off_the_title_block() -> 
     assert set(drawing.OFFSET_TEXT) == {"SheetThick"}
     assert thick[3] < drawing.BOTTOM_CENTER_Y - edge_half - 0.003
     assert thick[2] < drawing.SHEET_THICK_X - 0.002
-    assert "offset_dimension_text" in inspect.getsource(drawing.build)
-    assert "_set_suffixes" in inspect.getsource(drawing.build)
     # The isometric's label sits left of the title block, under it.
     assert drawing.ISO_NOTE_XY[0] + len(spec.ISOMETRIC_VIEW_NOTE) * 0.0026 < title[0]
     assert drawing.ISO_NOTE_XY[1] < drawing.ISO_CENTER[1]

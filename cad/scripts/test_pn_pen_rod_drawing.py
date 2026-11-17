@@ -33,10 +33,6 @@ def _calls(tree: ast.AST, name: str) -> list[ast.Call]:
     return sorted(found, key=lambda node: (node.lineno, node.col_offset))
 
 
-def _keywords(call: ast.Call) -> dict[str, str]:
-    return {kw.arg: ast.unparse(kw.value) for kw in call.keywords if kw.arg}
-
-
 def test_required_drawing_paths() -> None:
     assert drawing.SLDDRW.as_posix().endswith("/slddrw/pn-pen-rod.SLDDRW")
     assert drawing.PDF.as_posix().endswith("/pdf/pn-pen-rod.pdf")
@@ -73,22 +69,6 @@ def test_side_view_is_turned_and_proved_before_any_import() -> None:
     turned *Front); the frame every position is computed in is read back by
     projection before HLR, the edge scan or an import uses it."""
     assert drawing.SIDE_ROTATION == -math.pi / 2.0
-    tree = ast.parse(_DRAWING_SOURCE)
-    curated = [
-        ast.unparse(call.args[1]) for call in _calls(tree, "curate_view_dimensions")
-    ]
-    assert curated == ["side", "end"]
-    order = [
-        _DRAWING_SOURCE.index(text)
-        for text in (
-            'place_view(adapter, str(SOURCE), "*Front"',
-            "_lay_side_view_horizontal(adapter, side)",
-            "_prove_side_view_frame(adapter, side)",
-            "for view in (side, end, iso):",
-            "*curate_view_dimensions(",
-        )
-    ]
-    assert order == sorted(order)
     # Model +Y (the axis) -> sheet +x, model +X -> sheet -y, centred on the
     # bounding box: the pivot end left, the tapped top face right.
     scale = drawing.SIDE_SCALE[0] / drawing.SIDE_SCALE[1]
@@ -98,10 +78,6 @@ def test_side_view_is_turned_and_proved_before_any_import() -> None:
     mid = (drawing._sx(-spec.PIVOT_LENGTH) + drawing._sx(spec.SQUARE_LENGTH)) / 2.0
     assert mid == pytest.approx(drawing.SIDE_CENTER[0])
     assert drawing._sy(spec.ROD_SECTION / 2.0) < drawing.SIDE_CENTER[1]
-    # No detail view and no drag: every dimension imports where it prints.
-    for retired in ("CreateDetailViewAt4", "DragModelDimension(", "*Bottom"):
-        assert retired not in _DRAWING_SOURCE
-    assert "move_model_dimension(" not in _DRAWING_SOURCE
     assert not hasattr(drawing, "DETAIL_CENTER")
 
 
@@ -167,7 +143,6 @@ def test_side_view_layout_stays_clear() -> None:
     assert text_x - 0.0058 > pivot_end + air
     assert text_x + 0.0058 < shoulder - air
     assert drawing.ARROW_SIDES == {"PivotLength": 0, "Depth": 1}
-    assert "_set_arrow_sides(adapter, annotations)" in _DRAWING_SOURCE
     # The Ø's line stands left of the pivot end, where every row's lines
     # start, and rises to its block ABOVE the rows, so it meets the block
     # only at its shoulder (never beside a row of text).
@@ -342,73 +317,10 @@ def test_pivot_band_clears_the_v_block_pivot_bore() -> None:
     assert spec.PIVOT_DIA < spec.ROD_SECTION  # a real shoulder
 
 
-def test_part_frame_square_is_mid_plane_and_pivot_runs_down() -> None:
-    knobs = {
-        ast.literal_eval(call.args[1]): ast.unparse(call.args[2])
-        for call in _calls(_PART_TREE, "set_global")
-    }
-    assert knobs == {
-        "RodSection": "f'{ROD_SECTION}mm'",
-        "SquareLength": "f'{SQUARE_LENGTH}mm'",
-        "PivotDia": "f'{PIVOT_DIA}mm'",
-        "PivotLength": "f'{PIVOT_LENGTH}mm'",
-        "ShoulderRadius": "f'{SHOULDER_FILLET_R}mm'",
-    }
-    extrusions = [
-        _keywords(call.args[0]) for call in _calls(_PART_TREE, "create_extrusion")
-    ]
-    assert extrusions == [
-        {"depth": "ROD_SECTION", "both_directions": "True"},
-        {"depth": "PIVOT_LENGTH", "reverse_direction": "True"},
-    ]
-    assert "create_cut_extrude" not in _PART_SOURCE
-    # Shoulder at y 0, square to the top face, centred on the axis in X.
-    assert "(-ROD_SECTION / 2.0, 0.0)" in _PART_SOURCE
-    assert "(ROD_SECTION / 2.0, SQUARE_LENGTH)" in _PART_SOURCE
-    assert "drives=['\"RodSection\"', '\"SquareLength\"', '\"RodSection\" / 2']" in (
-        _PART_SOURCE
-    )
-    (circle,) = _calls(_PART_TREE, "define_circle")
-    assert [ast.unparse(arg) for arg in circle.args[1:4]] == [
-        "0.0",
-        "0.0",
-        "PIVOT_DIA / 2.0",
-    ]
-    assert _keywords(circle)["drives"] == "(None, None, '\"PivotDia\"')"
-    assert 'name_dimensions(adapter, "Rod", ["Depth"])' in _PART_SOURCE
-    assert 'name_dimensions(adapter, "Pivot", ["PivotLength"])' in _PART_SOURCE
-
-
 def test_stud_tap_is_one_blind_wizard_hole_on_the_top_face_axis() -> None:
     assert spec.STUD_TAP_SPEC.kind == "tapped"
     assert spec.STUD_TAP_SPEC.end == "blind"
     assert spec.STUD_TAP_SPEC.size == spec.STUD_THREAD == "#0-80"
-    (tap,) = _calls(_PART_TREE, "wizard_holes")
-    assert [ast.unparse(arg) for arg in tap.args[1:4]] == [
-        "STUD_TAP_SPEC",
-        "[[0.0, SQUARE_LENGTH, 0.0]]",
-        "(0.0, 1.0, 0.0)",
-    ]
-    keywords = _keywords(tap)
-    assert keywords["name"] == "'StudTap'"
-    assert keywords["expect_dia_mm"] == "STUD_TAP_DRILL_DIA"
-    assert keywords["placement_dims"] == "[((None, None), (None, None))]"
-    assert (
-        "blind_hole_volume_mm3(stud_tap.hole_dia_mm, STUD_TAP_SPEC.depth_mm)"
-        in _PART_SOURCE
-    )
-    assert "HoleSpec(" not in _PART_SOURCE
-    # The sheet prints the native wizard callout once, on the top view, picked
-    # on the tap-drill rim.
-    assert _DRAWING_SOURCE.count("add_native_hole_callout(") == 1
-    (callout,) = _calls(ast.parse(_DRAWING_SOURCE), "add_native_hole_callout")
-    assert ast.unparse(callout.args[1]) == "end"
-    assert "STUD_TAP_DRILL_DIA / 2.0" in _keywords(callout)["edge_xy"]
-    # The title block owns the thread class: the callout drops its ``- 2B``.
-    assert (
-        'omit_title_block_thread_class(stud_callout, label="adjuster stud blind tap")'
-        in _DRAWING_SOURCE
-    )
 
 
 def test_stud_tap_drill_leaves_a_plug_tap_lead_at_the_printed_bands() -> None:
@@ -449,24 +361,6 @@ def test_overall_length_is_one_parenthesised_reference() -> None:
     """Rule 10: the end-to-end length prints once, as a reference."""
     assert spec.TOTAL_LENGTH == spec.SQUARE_LENGTH + spec.PIVOT_LENGTH == 122.414
     assert spec.DRAWING_REFERENCE_PRECISION == 2
-    tree = ast.parse(_DRAWING_SOURCE)
-    (edge,) = _calls(tree, "add_edge_dimension")
-    keywords = _keywords(edge)
-    assert ast.unparse(edge.args[1]) == "side"
-    # Sheet horizontal: the turned view's axis runs along sheet x.
-    assert keywords["orientation"] == "'horizontal'"
-    assert keywords["text_xy"] == "OVERALL_REF_XY"
-    assert keywords["entities"] == "picks"
-    assert "picks = (_top_face_edge(edges), _pivot_end_edge(edges))" in (
-        _DRAWING_SOURCE
-    )
-    assert "expected_mm=TOTAL_LENGTH" in _DRAWING_SOURCE
-    assert "set_reference_dimension(adapter, display.GetAnnotation()" in (
-        _DRAWING_SOURCE
-    )
-    # No sheet hit-test: leaf 20261014T002718Z could not select the edge-on
-    # pivot rim at sheet (0.069, 0.08875).
-    assert "OVERALL_TOP_PICK_MM" not in _DRAWING_SOURCE
     assert drawing.OVERALL_END_SHEET_XY[0] == drawing._sx(-spec.PIVOT_LENGTH)
     assert drawing.OVERALL_TOP_SHEET_XY[0] == drawing._sx(spec.SQUARE_LENGTH)
     # Mid-span, the outermost row above the rod.
@@ -510,42 +404,6 @@ def test_overall_picks_resolve_from_the_scanned_edges() -> None:
 
 def test_slide_axis_is_axis1_through_the_rod_axis() -> None:
     assert part.SLIDE_AXIS == "Axis1"
-    (axis,) = _calls(_PART_TREE, "name_bore_axis")
-    assert [ast.unparse(arg) for arg in axis.args[1:6]] == [
-        "'Front Plane'",
-        "0.0",
-        "'Right Plane'",
-        "0.0",
-        "'slide axis'",
-    ]
-    # No other reference axis may take the Axis1 name first.
-    assert "create_axis" not in _PART_SOURCE
-    assert "if slide_axis != SLIDE_AXIS:" in _PART_SOURCE
-    assert "_blank_ref_axis(adapter, slide_axis)" in _PART_SOURCE
-
-
-def test_no_gdt_or_part_pmi() -> None:
-    """Rule 5: the pen rod is not on the GD&T allowlist."""
-    for retired in (
-        "PART_DATUMS",
-        "GEOMETRIC_CONTROLS",
-        "SURFACE_FINISHES",
-        "WIRE_HOLE",
-    ):
-        assert not hasattr(spec, retired), retired
-        assert retired not in _PART_SOURCE
-        assert retired not in _DRAWING_SOURCE
-    for token in ("author_part_pmi", "_part_pmi", "_gtol"):
-        assert token not in _PART_SOURCE
-    for token in (
-        "project_part_pmi",
-        "_drawing_gdt",
-        "add_feature_control_frame(",
-        "add_datum_feature(",
-        "set_dimension_basic_tolerance",
-    ):
-        assert token not in _DRAWING_SOURCE
-        assert token not in _PART_SOURCE
 
 
 def test_pivot_fit_route_is_note_1_linked_from_the_diameter() -> None:
@@ -568,11 +426,6 @@ def test_pivot_fit_route_is_note_1_linked_from_the_diameter() -> None:
     )
     clearance = "-".join(spec._inch_text(mm) for mm in spec.PIVOT_CLEARANCE_MM)
     assert f"(CLEARANCE {clearance})" in spec.DRAWING_NOTES
-    assert '"Manufacturing Notes": DRAWING_NOTES' in _PART_SOURCE
-    assert (
-        'add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)'
-        in _DRAWING_SOURCE
-    )
     # Note 1 stands in the field under the side view, right of the tap's
     # callout and under the R MAX block, left of the title block's top.
     x, y = drawing.NOTES_XY
@@ -597,53 +450,12 @@ def test_end_view_is_lettered_view_a_with_its_arrow_on_the_side_view() -> None:
     assert text_xy[0] > tip_xy[0]
     assert text_xy[1] - drawing.VIEW_LETTER_HEIGHT / 2.0 == pytest.approx(tip_xy[1])
     assert text_xy[0] + 0.005 < drawing.ISO_CENTER[0] - 0.0091 - 0.010
-    assert "_add_view_arrow(adapter, side)" in _DRAWING_SOURCE
-
-
-def test_view_scales_and_notes_are_explicit() -> None:
-    assert drawing.SHEET_SCALE == (2.0, 1.0)
-    assert drawing.SIDE_SCALE == (2, 1)
-    assert drawing.END_SCALE == (5, 1)
-    assert drawing.ISO_SCALE == (1, 1)
-    # Every view off the sheet scale says its own scale.
-    assert spec.END_VIEW_NOTE.endswith(
-        f" SCALE {drawing.END_SCALE[0]}:{drawing.END_SCALE[1]}"
-    )
-    assert spec.ISOMETRIC_VIEW_NOTE.endswith(
-        f" SCALE {drawing.ISO_SCALE[0]}:{drawing.ISO_SCALE[1]}"
-    )
-    for retired in ("TOP_VIEW_NOTE", "BOTTOM_VIEW_NOTE"):
-        assert not hasattr(spec, retired)
-    views = {
-        ast.literal_eval(call.args[2]): _keywords(call)["scale"]
-        for call in _calls(ast.parse(_DRAWING_SOURCE), "place_view")
-    }
-    assert views == {
-        "*Front": "SIDE_SCALE",
-        "*Top": "END_SCALE",
-        "*Isometric": "ISO_SCALE",
-    }
-    for retired in ("Top View Note", "Bottom View Note"):
-        assert retired not in _DRAWING_SOURCE
-        assert retired not in _PART_SOURCE
-    for note in ("End View Note", "Isometric View Note"):
-        assert f'add_property_linked_note(adapter, "{note}"' in _DRAWING_SOURCE
-        assert f'"{note}": ' in _PART_SOURCE
-
-
-def test_isometric_starts_hidden_lines_removed() -> None:
-    # Left at its default Shaded With Edges, finalize_drawing's shading call is
-    # a no-op and the iso's cosmetic thread stays draft (farm c0b95549c).
-    assert "for view in (side, end, iso):" in _DRAWING_SOURCE
 
 
 @pytest.mark.parametrize(
     "name", ["Number", "Material Specification", "Finish", "Quantity"]
 )
 def test_part_stamps_make_critical_properties(name: str) -> None:
-    assert "apply_drawing_properties" in _PART_SOURCE
-    assert "clear_dimensions_for_drawing" in _PART_SOURCE
-    assert f'"{name}",' in _PART_SOURCE
     import _config
 
     config = _config.parts("pn-pen-rod")

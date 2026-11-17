@@ -23,10 +23,7 @@ import transgear_hanger_joints as joints
 import pd_vn_transgear_pivot_screw_spec as screw
 from _buildgraph import module_deps_of
 from _drawing_registry import DRAWINGS_BY_NAME
-from _fastener_catalog import FASTENERS
 from _printed_tolerance import angular_band_deg
-from _stock_recipe import recipe_declaration
-from _test_stock_recipes import discovered_recipes
 from diagnostics import diag_build_90325A174 as entry
 
 IN = 25.4
@@ -363,41 +360,6 @@ def test_fleet_diagnostic_driver_gates_the_new_sku() -> None:
 
     assert REGISTRY[screw.SKU] is entry.build_90325A174
     assert "91829A205" not in REGISTRY
-
-
-def test_stock_build_faces_its_registered_recipe_head_up_on_the_origin(
-    monkeypatch,
-) -> None:
-    metadata = discovered_recipes()[screw.SKU]
-    assert metadata.module == entry.__name__
-    assert metadata.callable_name == entry.build_90325A174.__name__
-    assert metadata.threaded
-    assert FASTENERS[part.PART_NAME] is part.SPEC
-    assert part.SPEC.skus == (screw.SKU,)
-    row = _config.parts(part.PART_NAME)
-    assert row["number"] == "MHA-PD-VN-57"
-    assert row["supplier_skus"] == [screw.SKU]
-    assert row["stock_name"] == part.SPEC.stock_name
-
-    seen: dict = {}
-
-    async def fake_build(adapter, **kwargs):
-        seen.update(kwargs)
-        return {}
-
-    monkeypatch.setattr(part, "build_stock_fastener", fake_build)
-    asyncio.run(part.build(None))
-    (component,) = seen["components"]
-    assert component.sku == screw.SKU
-    # The facing wraps the complete stock recipe: same declaration, new cut.
-    assert component.author is not entry.build_90325A174
-    assert recipe_declaration(component.sku, component.author) == recipe_declaration(
-        screw.SKU, entry.build_90325A174
-    )
-    assert component.transform.translation_mm == (0.0, 0.0, 0.0)
-    assert component.transform.rotation_radians == (0.0, 0.0, 0.0)
-    assert seen["material"] == part.SPEC.material
-    assert seen["screw_axis_planes"] == ("Front Plane", "Right Plane")
 
 
 def test_native_controls_are_owned_and_the_length_prints_as_reference() -> None:

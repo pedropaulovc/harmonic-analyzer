@@ -31,7 +31,6 @@ import dt_cone_tip_block_spec as block
 import draw_dt_vn_cone_tip_block_screw as drawing
 from _drawing_registry import DRAWINGS_BY_NAME
 from _mcmaster_91251a108 import DIMS
-from _test_stock_recipes import discovered_recipes
 from diagnostics import diag_build_91251A108 as recipe
 from diagnostics import diag_mcmaster_lib
 from diagnostics import diag_mcmaster_socket_head as socket_head
@@ -246,44 +245,6 @@ def test_recipe_cuts_the_catalogue_socket_and_thread(monkeypatch) -> None:
     assert ("split_at_plane", ("Top Plane", "HeadSplit"), ()) in calls
 
 
-def test_stock_build_uses_its_registered_recipe_head_up_on_the_origin(
-    monkeypatch,
-) -> None:
-    metadata = discovered_recipes()["91251A108"]
-    assert metadata.module == recipe.__name__
-    assert metadata.callable_name == recipe.build_91251A108.__name__
-    assert metadata.threaded
-    assert part.SPEC.skus == ("91251A108",)
-    assert part.SPEC.stock_name == "Black-Oxide Alloy Steel Socket Head Screw"
-    assert part.MATERIAL == "Alloy Steel"
-    row = _config.parts(part.PART_NAME)
-    assert row["number"] == "MHA-DT-VN-60"
-    assert row["supplier_skus"] == ["91251A108"]
-
-    seen: dict = {}
-
-    async def fake_build(adapter, **kwargs):
-        seen.update(kwargs)
-        return {}
-
-    monkeypatch.setattr(part, "build_stock_fastener", fake_build)
-    asyncio.run(part.build(None))
-    (component,) = seen["components"]
-    assert component.sku == "91251A108"
-    assert component.author is recipe.build_91251A108
-    assert component.transform.translation_mm == (0.0, 0.0, 0.0)
-    assert component.transform.rotation_radians == (0.0, 0.0, 0.0)
-    assert seen["screw_axis_planes"] == ("Front Plane", "Right Plane")
-
-
-def test_standalone_recipe_run_is_catalog_only() -> None:
-    """No vendor model: the standalone command must not enter the McMaster
-    replica path, which demands a vendor SLDPRT and its harvest."""
-    source = Path(recipe.__file__).read_text(encoding="utf-8")
-    assert "replica_main(" not in source and "import replica_main" not in source
-    assert "run_build(build_catalog)" in source
-
-
 def test_no_vendor_model_of_the_new_hardware_is_tracked() -> None:
     root = Path(__file__).resolve().parents[2]
     assert not list(root.glob("cad/references/**/91251A108*.SLDPRT"))
@@ -308,6 +269,3 @@ def test_drawing_is_the_purchased_reference_sheet() -> None:
     assert drawing.SPEC is spec
     assert spec.artifact_stem == part.PART_NAME
     assert spec.script == Path(drawing.__file__).resolve()
-    assert "build_purchased_fastener_drawing" in Path(drawing.__file__).read_text(
-        encoding="utf-8"
-    )

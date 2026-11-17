@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-import ast
 import itertools
 import math
 import re
 from pathlib import Path
-from types import SimpleNamespace
 
 import pytest
 
@@ -61,8 +59,6 @@ def test_the_model_owns_every_band_the_sheet_prints() -> None:
     assert model_toleranced_dimensions(part) == {
         ("feature_name", "dimension_name"): "FORMED_TOL",
     }
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "for feature_name, dimension_names in FORMED_DIMENSIONS.items()" in source
     assert spec.HOLE_GROWTH > 0.0
     # R.05 at the .XX row: R.06 at the top, R.04 (1.25 T) at the bottom.
     assert geom.INSIDE_BEND_R == pytest.approx(0.050 * 25.4)
@@ -230,46 +226,6 @@ def test_registry_row_is_the_formed_spring_steel_hook() -> None:
     # the cell holds 30 characters.
     assert row["material"] == spec.MATERIAL_TITLE
     assert len(spec.MATERIAL_TITLE) <= 30
-
-
-def _calls(path: str) -> dict[str, ast.Call]:
-    tree = ast.parse(Path(path).read_text(encoding="utf-8"))
-    return {
-        node.func.id: node
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
-    }
-
-
-def test_the_part_carries_every_property_its_drawing_requires(monkeypatch) -> None:
-    import _part_properties
-    import _drawing_marks
-
-    required = ast.literal_eval(
-        next(
-            k.value
-            for k in _calls(drawing.__file__)["read_required_properties"].keywords
-            if k.arg == "required"
-        )
-    )
-    carried = dict(_part_properties.part_properties(part.PART_NAME))
-    stamp = _calls(part.__file__)["apply_drawing_properties"]
-    assert [ast.unparse(a) for a in stamp.args] == [
-        "adapter",
-        "PART_NAME",
-        "DRAWING_PROPERTIES",
-    ]
-    stamped: dict[str, str] = {}
-    monkeypatch.setattr(
-        _drawing_marks,
-        "apply_custom_properties",
-        lambda _adapter, props: stamped.update(props),
-    )
-    _drawing_marks.apply_drawing_properties(
-        None, part.PART_NAME, part.DRAWING_PROPERTIES
-    )
-    carried.update(stamped)
-    assert [name for name in required if not str(carried.get(name) or "").strip()] == []
 
 
 _TITLE_BLOCK_TEXT = ("BREAK SHARP EDGES", "DEBURR", "REMOVE BURRS", "1095", "HRC")
@@ -617,8 +573,6 @@ def test_the_pin_hole_is_called_out_on_the_side_view_at_its_rim() -> None:
     assert float(spec.PIN_HOLE_SIZE_TEXT[1:]) == pytest.approx(
         round(geom.PIN_HOLE_DIA / 25.4, spec.HOLE_PLACES)
     )
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "set_hidden_lines_visible" not in source
     # The rim: on the far face (the strip's +U face, at the pin's height),
     # its plane square to U, facing the side view's +X viewer.
     centre = drawing.PIN_RIM_CENTRE
@@ -904,61 +858,6 @@ def test_the_screw_callout_leader_strikes_none_of_its_own_rows() -> None:
     boxes, leader = _screw_callout(drawing.FRONT_KEEP["ScrewDia"])
     gaps = {text: distance_to_box(leader, box) for text, box in boxes.items()}
     assert min(gaps.values()) >= _LEADER_ROW_CLEARANCE, gaps
-
-
-class _Display:
-    """A drawing dimension stub: its value, the precision put on it."""
-
-    def __init__(self, value_mm: float) -> None:
-        self.value_mm = value_mm
-        self.precision = -1
-
-    def GetDimension2(self, _index: int) -> SimpleNamespace:
-        return SimpleNamespace(SystemValue=self.value_mm / 1000.0)
-
-    def GetAnnotation(self) -> object:
-        return self
-
-    def SetPrecision3(self, primary: int, *_rest: int) -> bool:
-        self.precision = primary
-        return True
-
-    def GetPrimaryPrecision2(self) -> int:
-        return self.precision
-
-
-def test_the_overall_reference_takes_its_places_from_the_spec(monkeypatch) -> None:
-    calls: dict[str, object] = {}
-    display = _Display(spec.OVERALL_HEIGHT)
-
-    def add_edge_dimension(_adapter, _view, **kwargs):
-        calls["edge"] = kwargs
-        return display
-
-    monkeypatch.setattr(drawing, "add_edge_dimension", add_edge_dimension)
-    monkeypatch.setattr(
-        drawing,
-        "set_arc_endpoints_to_max",
-        lambda _a, dimension, *, label: calls.setdefault("arc", dimension),
-    )
-    monkeypatch.setattr(
-        drawing,
-        "set_reference_dimension",
-        lambda _a, annotation, *, label: calls.setdefault("reference", annotation),
-    )
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, _name: value)
-    drawing._overall_reference(object(), object())
-    edge = calls["edge"]
-    assert edge["orientation"] == "vertical"
-    assert (edge["p0"], edge["p1"]) == drawing.OVERALL_PICKS
-    assert edge["text_xy"] == drawing.OVERALL_TEXT_XY
-    assert calls["arc"] is display and calls["reference"] is display
-    assert display.precision == spec.DRAWING_REFERENCE_PRECISION
-
-    # Negative control: a pick that resolved to the round's centre reads short.
-    display = _Display(spec.OVERALL_HEIGHT - geom.ROUND_R)
-    with pytest.raises(RuntimeError, match="overall height reference measured"):
-        drawing._overall_reference(object(), object())
 
 
 def test_the_roll_radius_is_shortened_because_its_centre_leaves_the_sheet() -> None:

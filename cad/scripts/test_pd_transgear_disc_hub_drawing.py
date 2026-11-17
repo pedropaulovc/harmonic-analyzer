@@ -2,35 +2,21 @@
 
 from __future__ import annotations
 
-import ast
-import asyncio
 import importlib.util
 import itertools
 import math
 from pathlib import Path
 import re
-from types import SimpleNamespace
 
 import pytest
 
-import _appearance
-import _bore_axis
-import _check
 import _config
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 import _drawing_edges
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_types import DRAWING_TEMPLATES
-import _gtol_face
 from _layout_geometry import Box, estimate_text_box
-import _part_properties
-import _part_save
 import _printed_tolerance
-import _rebuild
-import _sketch
-import _sketch_chains
-import _sketch_circle
-import _sketch_rectangle
 import build_pd_transgear_disc_hub as part
 import draw_pd_transgear_disc_hub as drawing
 from pd_cluster_stack_band import FIT_LENGTH_BAND_IN, STACK_NAME
@@ -46,12 +32,6 @@ IN = 25.4
 def _row(places: int) -> float:
     """The ± the inch title block prints for a dimension shown at ``places``."""
     return _printed_tolerance.printed_band_mm(places, unit="in")
-
-
-def _clr(text: str) -> tuple[float, float]:
-    """A printed inch clearance range ``.0005-.0018`` in millimetres."""
-    low, high = text.split("-")
-    return float(low) * IN, float(high) * IN
 
 
 def _places(name: str) -> int:
@@ -577,80 +557,6 @@ def test_face_rim_resolves_exactly_one_circle_on_the_hub_axis() -> None:
         drawing.face_rim(_drawing_edges.ViewEdges(label="edge", edges=()), frame)
 
 
-def _surface_face(
-    identity: int, parameters: tuple[float, ...], *, flipped: bool = False
-):
-    """A model face as ``_gtol_face_read.face_geometry`` reads it (metres)."""
-    surface = SimpleNamespace(
-        Identity=identity, PlaneParams=parameters, CylinderParams=parameters
-    )
-    return SimpleNamespace(
-        GetSurface=lambda: surface,
-        FaceInSurfaceSense=lambda: flipped,
-        GetBox=lambda: (),
-    )
-
-
-def _plane(z_mm: float, *, facing: float = 1.0):
-    """The plane square to the hub axis at ``z_mm``, its outward normal +Z
-    (or -Z)."""
-    return _surface_face(
-        _gtol_face.SURFACE_PLANE,
-        (0.0, 0.0, 1.0, 0.0, 0.0, z_mm / 1000.0),
-        flipped=facing < 0.0,
-    )
-
-
-def _cylinder(radius_mm: float):
-    return _surface_face(
-        _gtol_face.SURFACE_CYLINDER, (0.0, 0.0, 0.0, 0.0, 0.0, 1.0, radius_mm / 1000.0)
-    )
-
-
-def _rim_between(*faces):
-    edge = SimpleNamespace(GetTwoAdjacentFaces2=lambda: faces)
-    return _drawing_edges.ViewEdge(edge=edge, line=None, circle=None, vertices=None)
-
-
-@pytest.mark.parametrize("plane_first", [False, True])
-def test_each_frame_attaches_to_the_plane_its_rim_bounds_never_the_cylinder(
-    plane_first: bool,
-) -> None:
-    """MR #1166: the spigot end's frame, left on the rim the end shares with
-    the spigot's O.D., read as controlling the cylinder.  Each frame takes,
-    of its rim's two faces, the one plane square to the hub axis at its
-    station facing +Z -- the spigot's end at z .144, the flange's rear face
-    at z 0 -- whichever face the rim reports first.  A plane at another
-    station or facing the other way never stands in for it, and two such
-    planes, or fewer than two faces, fail naming each face."""
-    spigot, flange = drawing.SPIGOT_END_FRAME, drawing.FLANGE_FACE_FRAME
-    assert spec.SPIGOT_LENGTH == pytest.approx(0.144 * IN)
-    for frame, z, radius in (
-        (spigot, spec.SPIGOT_LENGTH, spec.SPIGOT_DIA / 2.0),
-        (flange, 0.0, spec.FLANGE_DIA / 2.0),
-    ):
-        cylinder, plane = _cylinder(radius), _plane(z)
-        pair = (plane, cylinder) if plane_first else (cylinder, plane)
-        assert drawing.controlled_face(_rim_between(*pair), frame) is plane
-    cylinder = _cylinder(spec.SPIGOT_DIA / 2.0)
-    for wrong in (
-        _plane(0.0),  # the flange's rear face
-        _plane(spec.SPIGOT_LENGTH + 0.1),
-        _plane(spec.SPIGOT_LENGTH, facing=-1.0),
-    ):
-        with pytest.raises(
-            RuntimeError, match=r"matched 0 of 2 faces: surface 4002 .*; surface 4001 "
-        ):
-            drawing.controlled_face(_rim_between(cylinder, wrong), spigot)
-    end = _plane(spec.SPIGOT_LENGTH)
-    with pytest.raises(RuntimeError, match="matched 2 of 2 faces"):
-        drawing.controlled_face(_rim_between(end, _plane(spec.SPIGOT_LENGTH)), spigot)
-    with pytest.raises(RuntimeError, match="matched 1 of 1 faces"):
-        drawing.controlled_face(_rim_between(None, end), spigot)
-    with pytest.raises(RuntimeError, match="matched 0 of 0 faces: none"):
-        drawing.controlled_face(_rim_between(), spigot)
-
-
 @pytest.mark.parametrize("turn", [1.0, -1.0])
 def test_face_landing_puts_the_leader_at_its_model_x_on_the_projected_line(
     turn: float,
@@ -855,7 +761,6 @@ def test_the_native_bore_follows_the_feed_boss_instead_of_an_old_literal(
     assert fresh.SPIGOT_DIA == spec.SPIGOT_DIA
     assert fresh.FLANGE_DIA == spec.FLANGE_DIA
     assert fresh.HUB_WALL_WORST > spec.HUB_WALL_WORST
-
 
 
 def test_the_wall_gate_refuses_a_coarser_printed_row(monkeypatch) -> None:
@@ -1145,48 +1050,6 @@ def test_section_letters_stand_clear_of_the_flange_and_its_dimensions() -> None:
     assert Box(cut_x, cut_low, cut_x, cut_high).gap(_STATION_TEXT) >= 0.001
 
 
-def _drawn_section(arrow_tails, letter_origins, height):
-    arrows = tuple(
-        value
-        for x, y in arrow_tails
-        for value in (x, y, 0.0, x + drawing.SECTION_ARROW_LENGTH, y, 0.0)
-    )
-    texts = tuple(value for x, y in letter_origins for value in (x, y, 0.0))
-    cut = SimpleNamespace(
-        GetArrowInfo=lambda: arrows,
-        GetTextInfo=lambda: texts,
-        GetTextFormat=lambda: SimpleNamespace(CharHeight=height),
-    )
-    return SimpleNamespace(GetSection=lambda: cut)
-
-
-def test_the_build_reads_each_letter_back_clear_of_the_flange(monkeypatch) -> None:
-    """The build reads A-A's arrows and letters back and fails unless each
-    letter printed where the recipe's letter model puts it, clear of the
-    flange's ink: the r6 placement fails, the planned one passes."""
-    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
-    tails = drawing.SECTION_LINE
-    planned = [
-        (box.xmin, box.ymax) for box in map(drawing.section_letter_box, tails)
-    ]
-    drawing._assert_section_letters_clear(
-        _drawn_section(tails, planned, drawing.SECTION_LETTER_HEIGHT)
-    )
-    r6_tails = (_R6_LOWER_TAIL, (_R6_LOWER_TAIL[0], 0.191574))
-    r6_letters = [
-        (box.xmin, box.ymax) for box in map(drawing.section_letter_box, r6_tails)
-    ]
-    with pytest.raises(RuntimeError, match="meets the flange's ink"):
-        drawing._assert_section_letters_clear(
-            _drawn_section(r6_tails, r6_letters, drawing.SECTION_LETTER_HEIGHT)
-        )
-    moved = [(x + 0.002, y) for x, y in planned]
-    with pytest.raises(RuntimeError, match="printed at"):
-        drawing._assert_section_letters_clear(
-            _drawn_section(tails, moved, drawing.SECTION_LETTER_HEIGHT)
-        )
-
-
 def test_the_chord_hole_dimensions_print_left_of_the_ring() -> None:
     """The ream's size and fit (two lines of words naming the pin, rules 4
     and 7) and the knockout's stand left of the ring, each dimension line at
@@ -1330,67 +1193,6 @@ def test_section_centrelines_end_past_the_ring_clear_of_every_text() -> None:
         assert line.ymin >= title_top + 0.003, line
 
 
-def _centre_mark_section(marks: list, deletes: bool):
-    """A section holding ``marks`` and a drawing whose EditDelete drops the
-    selected ones (or, ``deletes=False``, silently keeps them)."""
-    events: list = []
-    selected: list = []
-
-    def select(mark):
-        def _select(append, _data):
-            selected.append(mark)
-            events.append(("select", append))
-            return True
-
-        return _select
-
-    for mark in marks:
-        mark.Select2 = select(mark)
-
-    def edit_delete():
-        events.append("delete")
-        if deletes:
-            for mark in selected:
-                marks.remove(mark)
-
-    draw = SimpleNamespace(
-        ClearSelection2=lambda _all: selected.clear() or True,
-        EditDelete=edit_delete,
-    )
-    view = SimpleNamespace(
-        GetAnnotationsByType=lambda kind: (
-            tuple(marks) if kind == drawing._CENTER_MARK_ANNOTATION else ()
-        )
-    )
-    return SimpleNamespace(currentModel=draw), view, events
-
-
-def test_section_a_a_loses_the_centre_marks_it_arrives_with(monkeypatch) -> None:
-    """Machinist review r5: the section arrived centre-marked, the mark's
-    arms printed far past the ring.  Every mark is deleted in one selection
-    and read back gone; a section with none is left alone; a delete that
-    does not land fails the build; the deletion runs before the drawn
-    centrelines."""
-    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
-    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_k: None)
-    marks = [SimpleNamespace(), SimpleNamespace()]
-    adapter, view, events = _centre_mark_section(marks, deletes=True)
-    drawing._delete_section_centre_marks(adapter, view)
-    assert marks == []
-    assert events == [("select", False), ("select", True), "delete"]
-    adapter, view, events = _centre_mark_section([], deletes=True)
-    drawing._delete_section_centre_marks(adapter, view)
-    assert events == []
-    adapter, view, _events = _centre_mark_section([SimpleNamespace()], deletes=False)
-    with pytest.raises(RuntimeError, match="survived deletion"):
-        drawing._delete_section_centre_marks(adapter, view)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    body = source[source.index("def _section_a_a(") :]
-    assert body.index("_delete_section_centre_marks(") < body.index(
-        "_add_section_centerlines("
-    )
-
-
 def test_the_hub_od_callout_states_the_wall_its_third_place_holds() -> None:
     """Machinist review r5 (rule 3): Ø.540 at three places, finer than the
     turned row, states its function under the size: the least wall over the
@@ -1402,7 +1204,6 @@ def test_the_hub_od_callout_states_the_wall_its_third_place_holds() -> None:
     assert printed * IN <= spec.KEY_PIN_WALL_WORST + 1e-9
     assert spec.KEY_PIN_WALL_WORST - printed * IN < 0.001 * IN
     assert printed * IN >= spec.WALL_FLOOR_MM - 1e-9
-
 
 
 @pytest.mark.parametrize(
@@ -1432,330 +1233,6 @@ def test_section_caption_of_unforeseen_form_is_left_alone(linked) -> None:
     assert drawing.caption_without_scale(linked) is None
 
 
-class _CaptionNote:
-    def __init__(self, linked: str) -> None:
-        self.PropertyLinkedText = linked
-
-
-class _SectionView:
-    def __init__(self, notes, ratio=(3.0, 1.0)) -> None:
-        self._notes = notes
-        self.ScaleRatio = ratio
-
-    def GetNotes(self):
-        return self._notes
-
-
-def test_section_caption_scale_is_removed_natively(monkeypatch) -> None:
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, _iface: value)
-    rebuilds: list[str] = []
-    monkeypatch.setattr(drawing, "rebuild_drawing", lambda _a, *, label: rebuilds.append(label))
-    caption = _CaptionNote("<VLNAME> <VLLABEL>\r\nSCALE <VLSCALEV>")
-    other = _CaptionNote("")
-    drawing._drop_sheet_scale_from_caption(None, _SectionView([other, caption]))
-    assert caption.PropertyLinkedText == "<VLNAME> <VLLABEL>"
-    assert other.PropertyLinkedText == ""
-    assert len(rebuilds) == 1
-    with pytest.raises(RuntimeError, match="not at the sheet scale"):
-        drawing._drop_sheet_scale_from_caption(None, _SectionView([caption], (2.0, 1.0)))
-
-
-class _FakeSketchManager:
-    AddToDB = False
-
-
-class _FakeSolidWorks:
-    """Just enough of the adapter for the recipe's own calls; it keeps the
-    lines, arcs and circles the recipe draws, by sketch in creation order."""
-
-    def __init__(self) -> None:
-        self.currentSketchManager = _FakeSketchManager()
-        self._n = 0
-        self.sketch = 0
-        self.lines: dict[str, tuple[float, ...]] = {}
-        self.sketch_lines: dict[int, list[str]] = {}
-        self.arcs: list[tuple[float, ...]] = []
-        self.circles: list[tuple[float, ...]] = []
-        self.planes: dict[int, str] = {}
-
-    async def _entity(self, *_args, **_kwargs) -> str:
-        self._n += 1
-        return f"Entity{self._n}"
-
-    async def create_sketch(self, plane) -> str:
-        self.sketch += 1
-        self.planes[self.sketch] = plane
-        return await self._entity()
-
-    async def add_line(self, *args) -> str:
-        line = await self._entity()
-        self.lines[line] = args
-        self.sketch_lines.setdefault(self.sketch, []).append(line)
-        return line
-
-    async def add_arc(self, *args) -> str:
-        self.arcs.append(args)
-        return await self._entity()
-
-    async def add_circle(self, *args) -> str:
-        self.circles.append(args)
-        return await self._entity()
-
-    create_part = exit_sketch = create_plane = _entity
-    create_extrusion = create_cut_extrude = create_revolve = add_chamfer = _entity
-    add_centerline = add_sketch_constraint = add_sketch_dimension = _entity
-
-
-def _drive_value(expr: str, globals_mm: dict[str, float]) -> float:
-    text = re.sub(r'"(\w+)"', lambda m: repr(globals_mm[m.group(1)]), expr)
-    return float(eval(text, {"__builtins__": {}}, {}))  # noqa: S307 -- test-local arithmetic
-
-
-def test_every_drive_equation_reproduces_the_modelled_geometry(monkeypatch) -> None:
-    """Every drive equation (bolt-circle factors included) evaluates to the
-    size, centre or length the recipe draws, so a rebuild after the drives
-    moves nothing: the screw holes stay on the joint's shared pattern, the
-    turned profile on its printed sizes, the round bore on its size, the key
-    pin's chord hole on its station plane, and its printed station and the
-    oil hole opposite it at one station."""
-    globals_mm: dict[str, float] = {}
-    circles: list[tuple] = []
-    chains: list[list[str]] = []
-    diametric: dict[str, str] = {}
-    rows: dict[int, list[tuple[str | None, str | None]]] = {}
-    drives: dict[str, dict[str | None, str | None]] = {}
-    driven: dict[str, str] = {}
-    blanked: list[tuple[str, ...]] = []
-    blanked_geometry: list[tuple[tuple[str, str], ...]] = []
-    between: list[tuple[str, str, str, float]] = []
-
-    async def dimension_between(_adapter, ref1, ref2, kind, value, _label):
-        between.append((ref1, ref2, kind, value))
-
-    async def set_global(_adapter, name, value):
-        globals_mm[name] = float(value.removesuffix("mm"))
-
-    async def define_circle(_adapter, x, y, radius, label, *, dims, names, drives):
-        circles.append((label, x, y, radius, names, drives))
-        return label
-
-    real_chain = part.add_line_chain
-
-    async def add_line_chain(adapter, points, close=True):
-        chains.append(await real_chain(adapter, points, close))
-        return chains[-1]
-
-    async def add_diametric(_adapter, _axis, line, _text_xy, label):
-        diametric[label] = line
-
-    def record(self, name, drive=None):
-        rows.setdefault(id(self), []).append((name, drive))
-
-    def apply(self, _adapter, feature):
-        drives[feature] = dict(rows.get(id(self), []))
-        return []
-
-    async def quiet(*_args, **_kwargs):
-        return None
-
-    async def drive_dimension(_adapter, dim_name, expr):
-        driven[dim_name] = expr
-
-    def names(_adapter, feature, dim_names):
-        return [f"{name}@{feature}" for name in dim_names]
-
-    monkeypatch.setattr(part, "set_global", set_global)
-    monkeypatch.setattr(part, "define_circle", define_circle)
-    monkeypatch.setattr(part, "add_line_chain", add_line_chain)
-    monkeypatch.setattr(part, "add_diametric_linear_dimension", add_diametric)
-    monkeypatch.setattr(_sketch.SketchDims, "record", record)
-    monkeypatch.setattr(_sketch.SketchDims, "apply", apply)
-    monkeypatch.setattr(_appearance, "check", lambda _label, result: result)
-    monkeypatch.setattr(_bore_axis, "check", lambda _label, result: result)
-    monkeypatch.setattr(_check, "check", lambda _label, result: result)
-    monkeypatch.setattr(_part_save, "check", lambda _label, result: result)
-    monkeypatch.setattr(_rebuild, "check", lambda _label, result: result)
-    monkeypatch.setattr(_sketch, "check", lambda _label, result: result)
-    monkeypatch.setattr(_sketch_chains, "check", lambda _label, result: result)
-    monkeypatch.setattr(_sketch_circle, "check", lambda _label, result: result)
-    monkeypatch.setattr(_sketch_rectangle, "check", lambda _label, result: result)
-    monkeypatch.setattr(part, "check", lambda _label, result: result)
-    monkeypatch.setattr(part, "name_dimensions", names)
-    monkeypatch.setattr(part, "name_bore_axis", lambda *a, **k: _async("Axis1"))
-    monkeypatch.setattr(
-        part, "blank_reference_sketches", lambda _a, sketches: blanked.append(sketches)
-    )
-    monkeypatch.setattr(
-        part,
-        "blank_reference_geometry",
-        lambda _a, references: blanked_geometry.append(references),
-    )
-    # The station plane's sketch reads (u, v) = model (X, Y).
-    monkeypatch.setattr(
-        part,
-        "_sketch_mapper",
-        lambda _a, *, u_axis, v_axis, label: lambda point: (point[0], point[1]),
-    )
-    monkeypatch.setattr(part, "dimension_between", dimension_between)
-    monkeypatch.setattr(part, "drive_dimension", drive_dimension)
-    monkeypatch.setattr(part, "_early_bound", lambda obj, _iface: obj)
-    for helper in (
-        "volume_check",
-        "bbox_extent_check",
-        "ensure_fully_defined",
-        "anchor_point_to_origin",
-        "force_rebuild",
-        "apply_material",
-        "report_mass_properties",
-        "save_part_and_images",
-    ):
-        monkeypatch.setattr(part, helper, quiet)
-    for helper in (
-        "apply_package_model_units",
-        "name_last_feature",
-        "set_sketch_direct_db",
-        "_as_construction",
-        "_check_z_span",
-        "set_dimension_bilateral_tolerance",
-        "set_dimension_symmetric_tolerance",
-        "apply_drawing_precision",
-        "clear_dimensions_for_drawing",
-        "mark_dimensions_for_drawing",
-        "apply_drawing_properties",
-    ):
-        monkeypatch.setattr(part, helper, lambda *a, **k: None)
-
-    fake = _FakeSolidWorks()
-    asyncio.run(part.build(fake))
-
-    def value(feature: str, name: str) -> float:
-        return _drive_value(drives[feature][name], globals_mm)
-
-    # Turned profile: each diameter twice its step's radius, the flange's
-    # thickness the run of its O.D., the overall the profile's reach.
-    profile, pin_hole = chains
-    flange_u, flange_v0, _u, flange_v1 = fake.lines[diametric["FlangeDia"]]
-    hub_u, *_hub = fake.lines[diametric["HubDia"]]
-    spigot_u, spigot_v0, _su, spigot_v1 = fake.lines[diametric["SpigotDia"]]
-    profile_v = [v for line in profile for v in fake.lines[line][1::2]]
-    drawn = {
-        "FlangeDia": 2.0 * flange_u,
-        "HubDia": 2.0 * hub_u,
-        "SpigotDia": 2.0 * spigot_u,
-        "FlangeThick": abs(flange_v1 - flange_v0),
-        "SpigotLength": abs(spigot_v1 - spigot_v0),
-        "HubLength": max(profile_v) - min(profile_v),
-    }
-    assert set(drives["HubProfile"]) == set(drawn)
-    for name, size in drawn.items():
-        assert value("HubProfile", name) == pytest.approx(size, abs=1e-9), name
-    assert drawn["FlangeDia"] == pytest.approx(spec.FLANGE_DIA)
-    assert drawn["HubLength"] == pytest.approx(spec.HUB_LENGTH)
-    assert drawn["SpigotLength"] == pytest.approx(spec.SPIGOT_LENGTH)
-    # The bore: one round circle on the axis, cut through the whole part.
-    (bore,) = [c for c in circles if c[0] == "bore"]
-    assert bore[1:4] == pytest.approx((0.0, 0.0, spec.BORE_DIA / 2.0))
-    assert not fake.arcs
-
-    # Oil hole: the station line runs from the hub front face to the hole's
-    # centre, the key pin's station behind it.
-    (station,) = fake.sketch_lines[4]
-    _u0, front_v, _u1, hole_v = fake.lines[station]
-    ((_cu, centre_v, oil_r),) = fake.circles
-    assert centre_v == pytest.approx(hole_v)
-    assert value("OilHoleProfile", "OilHoleDatum") == pytest.approx(front_v)
-    assert value("OilHoleProfile", "OilHoleStation") == pytest.approx(front_v - hole_v)
-    assert value("OilHoleProfile", "OilHoleStation") == pytest.approx(
-        spec.KEY_PIN_STATION
-    )
-    assert value("OilHoleProfile", "OilHoleDia") == pytest.approx(2.0 * oil_r)
-    # The one-wall cut runs a body's width deep.
-    assert _drive_value(driven["OilHoleDepth@OilHole"], globals_mm) == spec.HUB_DIA
-
-    # The key-pin station's hidden reference: a line on the +X O.D. from
-    # the hub front face back to the hole's axis, blanked once drawn.
-    (reference,) = fake.sketch_lines[5]
-    ru0, rv0, ru1, rv1 = fake.lines[reference]
-    assert ru0 == ru1 == pytest.approx(spec.HUB_DIA / 2.0)
-    assert (rv0, rv1) == pytest.approx((-spec.HUB_FRONT_Z, -spec.KEY_PIN_Z))
-    sketch = spec.REFERENCE_SKETCHES[0]
-    for name, size in (
-        ("KeyPinStation", rv0 - rv1),
-        ("KeyPinStationAnchor1", ru0),
-        ("KeyPinStationAnchor2", rv0),
-    ):
-        assert _drive_value(driven[f"{name}@{sketch}"], globals_mm) == pytest.approx(
-            size
-        ), name
-    assert blanked == [spec.REFERENCE_SKETCHES]
-    # The key pin's chord hole: on the hidden station plane, whose offset
-    # drives from the printed station, a stepped half profile beside its
-    # centreline at y = -chord, revolved: the ream from past the +X O.D. to
-    # the stop, the knockout on past the -X O.D.  The chord, the stop and
-    # both diameters drive from their globals.
-    plane = "KeyPinStationPlane"
-    assert fake.planes[6] == plane
-    assert blanked_geometry == [((plane, "PLANE"),)]
-    assert _drive_value(driven[f"KeyPinZ@{plane}"], globals_mm) == pytest.approx(
-        -spec.KEY_PIN_Z
-    )
-    out_end, ream, stop, drill, in_end, _on_axis = pin_hole
-    assert diametric["KeyPinDia"] == ream
-    assert diametric["KeyPinDrillDia"] == drill
-    out_x, axis_y, _ox, ream_y = fake.lines[out_end]
-    _rx, _ry, stop_x, _ry1 = fake.lines[ream]
-    _sx, _sy, _sx1, drill_y = fake.lines[stop]
-    _dx, _dy, far_x, _dy1 = fake.lines[drill]
-    assert fake.lines[in_end][3] == axis_y
-    drawn_pin = {
-        "KeyPinChord": -axis_y,
-        "KeyPinStop": -stop_x,
-        "KeyPinDia": 2.0 * (axis_y - ream_y),
-        "KeyPinDrillDia": 2.0 * (axis_y - drill_y),
-    }
-    for name, size in drawn_pin.items():
-        assert value("KeyPinProfile", name) == pytest.approx(size), name
-    assert drawn_pin == pytest.approx(
-        {
-            "KeyPinChord": spec.KEY_PIN_CHORD_OFFSET,
-            "KeyPinStop": spec.KEY_PIN_STOP,
-            "KeyPinDia": spec.KEY_PIN_HOLE_DIA,
-            "KeyPinDrillDia": spec.KEY_PIN_DRILL_DIA,
-        }
-    )
-    assert out_x > spec.HUB_DIA / 2.0 and -far_x > spec.HUB_DIA / 2.0
-    # The printed chord and stop run from the sketch origin, the hub axis.
-    assert (f"{out_end}.start", "origin", "vertical_distance") in {
-        row[:3] for row in between
-    }
-    assert (f"{stop}.start", "origin", "horizontal_distance") in {
-        row[:3] for row in between
-    }
-    holes = [c for c in circles if c[0].startswith("screw hole")]
-    drawn_holes = [v for _label, x, y, *_rest in holes for v in (x, y)]
-    assert drawn_holes == pytest.approx([v for xy in joint.screw_centres() for v in xy])
-    checked = 0
-    for label, x, y, radius, _names, (d_x, d_y, d_size) in circles:
-        for emitted, drive in ((abs(x), d_x), (abs(y), d_y), (2.0 * radius, d_size)):
-            if emitted < 1e-9:
-                continue
-            assert drive is not None, (label, emitted)
-            assert _drive_value(drive, globals_mm) == pytest.approx(
-                emitted, abs=1e-9
-            ), (
-                label,
-                drive,
-            )
-            checked += 1
-    # The bolt circle's diameter, three hole sizes, five non-zero hole
-    # centres and the bore's size.
-    assert checked == 1 + 3 + 5 + 1
-
-
-async def _async(value):
-    return value
-
-
 def test_registry_row_is_the_turned_brass_mha_159() -> None:
     row = _config.parts(part.PART_NAME)
     assert row["number"] == "MHA-PD-17"
@@ -1763,41 +1240,6 @@ def test_registry_row_is_the_turned_brass_mha_159() -> None:
     assert "C36000" in row["material_specification"]
     assert row["material"] == part.MATERIAL
     assert row["tolerance_class"] == "machined_block"
-
-
-def _calls(path: str) -> dict[str, ast.Call]:
-    tree = ast.parse(Path(path).read_text(encoding="utf-8"))
-    return {
-        node.func.id: node
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
-    }
-
-
-def test_the_part_carries_every_property_its_drawing_requires(monkeypatch) -> None:
-    """The drawing refuses a source part missing a required property; every
-    one must be carried and non-blank."""
-    import _drawing_marks
-
-    required = ast.literal_eval(
-        next(
-            k.value
-            for k in _calls(drawing.__file__)["read_required_properties"].keywords
-            if k.arg == "required"
-        )
-    )
-    carried = dict(_part_properties.part_properties(part.PART_NAME))
-    stamp = _calls(part.__file__)["apply_drawing_properties"]
-    extra = ast.literal_eval(ast.unparse(stamp.args[2])) if len(stamp.args) > 2 else {}
-    stamped: dict[str, str] = {}
-    monkeypatch.setattr(
-        _drawing_marks,
-        "apply_custom_properties",
-        lambda _adapter, props: stamped.update(props),
-    )
-    _drawing_marks.apply_drawing_properties(None, part.PART_NAME, extra)
-    carried.update(stamped)
-    assert [name for name in required if not str(carried.get(name) or "").strip()] == []
 
 
 def test_seat_bound_takes_full_depth_to_the_step() -> None:

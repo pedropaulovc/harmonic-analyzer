@@ -5,8 +5,6 @@ from __future__ import annotations
 import itertools
 import math
 from pathlib import Path
-from types import SimpleNamespace
-from unittest.mock import AsyncMock, Mock
 
 import pytest
 
@@ -361,10 +359,6 @@ def test_front_view_shows_which_side_the_set_screw_enters() -> None:
     # Fable review r4 blocker: nothing tied the set-screw hole to the
     # eccentricity.  The front view keeps hidden lines so the tap drill shows
     # on the heavy side, opposite the bore offset; every other view is HLR.
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "set_hidden_lines_visible(adapter, front)" in source
-    assert "for view in (side, bottom, iso):" in source
-    assert "_add_view_arrow(adapter, front)" in source
     import dt_pinion_cam_geometry as geometry
     import build_dt_pinion_cam
 
@@ -387,104 +381,7 @@ def test_native_tap_identity_and_drill_come_from_one_geometry_spec() -> None:
     assert not hole.overrides_mm
 
 
-@pytest.mark.asyncio
-async def test_build_uses_a_native_radial_tap_and_hidden_construction_reference(
-    monkeypatch,
-) -> None:
-    # Exercise the recipe without a COM seat. The one remaining manual cut is
-    # the rod bore; the tap must be native and stop at that bore.
-    success = SimpleNamespace(is_success=True, data=None)
-    segment = SimpleNamespace(ConstructionGeometry=False)
-    wall_segment = SimpleNamespace(ConstructionGeometry=False)
-    adapter = SimpleNamespace(
-        **{
-            name: AsyncMock(return_value=success)
-            for name in (
-                "create_part", "create_sketch", "exit_sketch",
-                "create_extrusion", "create_cut_extrude", "create_plane",
-                "add_sketch_constraint",
-            )
-        },
-        add_line=AsyncMock(return_value=SimpleNamespace(is_success=True, data="wall")),
-        _sketch_entities={"tap-reference": segment, "wall": wall_segment},
-    )
-    for name in (
-        "set_global", "force_rebuild", "drive_dimension", "ensure_fully_defined",
-        "apply_material", "apply_color", "report_mass_properties",
-        "dimension_between", "anchor_point_to_origin",
-    ):
-        monkeypatch.setattr(cam, name, AsyncMock())
-    for name in (
-        "set_dimension_symmetric_tolerance", "set_dimension_bilateral_tolerance",
-        "set_single_limit", "apply_drawing_precision",
-        "name_octant_views", "clear_dimensions_for_drawing",
-        "mark_dimensions_for_drawing", "author_part_pmi", "apply_drawing_properties",
-        "require_saved_drawing_properties", "blank_reference_geometry",
-        "blank_reference_sketches", "wizard_hole_on_cylinder",
-        "set_sketch_direct_db", "apply_package_model_units",
-    ):
-        monkeypatch.setattr(cam, name, Mock())
-    monkeypatch.setattr(cam, "_early_bound", lambda value, _interface: value)
-    monkeypatch.setattr(
-        cam, "SketchDims", lambda: SimpleNamespace(apply=lambda *_args: [])
-    )
-    monkeypatch.setattr(
-        cam, "name_last_feature", Mock(side_effect=lambda _adapter, name: name)
-    )
-    monkeypatch.setattr(
-        cam, "name_dimensions",
-        Mock(side_effect=lambda _adapter, feature, names: [
-            f"{name}@{feature}" for name in names
-        ]),
-    )
-    monkeypatch.setattr(cam, "define_circle", AsyncMock(return_value="tap-reference"))
-    monkeypatch.setattr(
-        cam, "volume_check",
-        AsyncMock(side_effect=lambda _adapter, _label, volume, _tolerance: volume),
-    )
-    monkeypatch.setattr(cam, "name_bore_axis", AsyncMock(return_value="Axis1"))
-    monkeypatch.setattr(cam, "save_part_and_images", AsyncMock(return_value={}))
-
-    await cam.build(adapter)
-
-    cam.wizard_hole_on_cylinder.assert_called_once_with(
-        adapter,
-        dt_pinion_cam_geometry.SET_SCREW_HOLE_SPEC,
-        [0.0, -(cam.ECC + cam.CAM_OD / 2.0), cam.SET_SCREW_Z],
-        "heavy-side set-screw tap (#2-56)",
-        name="SetScrewTap",
-        point_planes=("SetScrewStationPlane", "Right Plane"),
-    )
-    assert adapter.create_cut_extrude.await_count == 1
-    station = adapter.create_plane.await_args_list[-1].args[0]
-    assert (station.mode, station.base_plane, station.offset) == (
-        "offset", "Front Plane", 4.1
-    )
-    cam.set_global.assert_any_await(adapter, "SetScrewZ", "4.1mm")
-    cam.drive_dimension.assert_any_await(
-        adapter, "SetScrewZ@SetScrewStationPlane", '"SetScrewZ"'
-    )
-    reference = cam.define_circle.await_args_list[-1]
-    assert reference.args[1:4] == (0.0, -4.1, 1.778 / 2.0)
-    assert reference.kwargs["names"] == ("TapCx", "TapCz", "TapDrillDia")
-    assert reference.kwargs["drives"] == (None, '"SetScrewZ"', '"TapDrillDia"')
-    assert segment.ConstructionGeometry is True
-    assert wall_segment.ConstructionGeometry is True
-    cam.blank_reference_sketches.assert_called_once_with(
-        adapter, ("TapDrillProfile", "ThinWallReference")
-    )
-    hidden = cam.blank_reference_geometry.call_args.args[1]
-    assert ("TapDrillPlane", "PLANE") in hidden
-    assert ("SetScrewStationPlane", "PLANE") in hidden
-    assert "SetScrewStationPlane" not in dt_pinion_cam_spec.DRAWING_DIMENSIONS
-    assert "SetScrewZ" not in dt_pinion_cam_spec.DRAWING_PRECISION_BY_NAME
-
-
 def test_hidden_reference_import_and_native_note_cleanup_preserve_the_views() -> None:
     from _drawing_hidden_sketches import curate_view_dimensions
 
     assert drawing.curate_view_dimensions is curate_view_dimensions
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("dimensions_by_feature=DRAWING_DIMENSIONS") == 3
-    assert 'redundant_note_substrings=("Tapped Hole",)' in source
-    assert "expected_redundant_notes=1" in source

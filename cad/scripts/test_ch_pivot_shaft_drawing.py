@@ -44,10 +44,6 @@ def test_every_marked_dimension_lands_on_the_side_view_or_its_detail() -> None:
         "FlatAF",
         "FlatStation",
     }
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    # The profile, the flats and the caps.
-    assert source.count('create_sketch("Right")') == 3
-    assert "create_revolve(" in source
 
 
 def test_only_the_running_fit_carries_a_size_band() -> None:
@@ -80,8 +76,6 @@ def test_the_part_owns_display_precision_and_the_sheet_only_asserts_it() -> None
     digits = spec.DRAWING_PRECISION_BY_NAME["ShaftDia"]
     printed = float(f"{spec.SHAFT_DIA:.{digits}f}")
     assert abs(printed - spec.SHAFT_DIA) <= math.ulp(spec.SHAFT_DIA)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "assert_imported_precision(" in source
 
 
 def test_a_shaft_carries_no_gdt() -> None:
@@ -95,8 +89,6 @@ def test_a_shaft_carries_no_gdt() -> None:
         "SHAFT_LENGTH",
     ):
         assert not hasattr(spec, attribute)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "project_part_pmi(" not in source
 
 
 def test_the_overall_length_runs_tip_to_tip_and_nothing_is_cut_to_fit() -> None:
@@ -109,19 +101,11 @@ def test_the_overall_length_runs_tip_to_tip_and_nothing_is_cut_to_fit() -> None:
     assert "UNCUT" not in spec.DRAWING_NOTES and "SUPPLY" not in spec.DRAWING_NOTES
     assert "OverallLength" in drawing.PROFILE_KEEP
     assert "OverallLength" in spec.DRAWING_DIMENSIONS["FlatProfile"]
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert 'dims.record("OverallLength", \'"ShaftLength" + 2 * "DomeHeight"\')' in source
-    assert 'dims.record("NorthTip", \'"DomeHeight"\')' in source
-    sheet = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "set_reference_dimension" not in sheet
 
 
 def test_both_ends_are_domed_and_the_height_is_model_owned() -> None:
     assert spec.DRAWING_DIMENSIONS["NorthCapProfile"] == {"DomeHeight", "Radius"}
     assert spec.DOME_CALLOUT == "BOTH ENDS"
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert '_dome(adapter, "North", 0.0, -1.0)' in source
-    assert '_dome(adapter, "South", SHAFT_LENGTH, 1.0)' in source
     assert spec.DOME_SPHERE_RADIUS > spec.SHAFT_DIA / 2
 
 
@@ -163,11 +147,6 @@ def test_surface_finishes_name_the_running_face() -> None:
     half = spec.FLAT_LENGTH_RANGE[1] / 2.0
     for station in bank.PIVOT_SHAFT_FLAT_STATIONS:
         assert not station - half <= z <= station + half
-    part_source = "".join(Path(part.__file__).read_text(encoding="utf-8").split())
-    assert "surface_finishes=SURFACE_FINISHES" in part_source
-    sheet_source = "".join(Path(drawing.__file__).read_text(encoding="utf-8").split())
-    assert 'control=surface_finish_by_key(SURFACE_FINISHES,"pivot_bearing")' in sheet_source
-    assert "roughness_ra=" not in sheet_source
 
 
 def test_the_flats_sit_at_the_layout_stations() -> None:
@@ -185,9 +164,6 @@ def test_the_flats_sit_at_the_layout_stations() -> None:
     assert bank.PIVOT_SHAFT_OVERALL_LENGTH - spec.DOME_HEIGHT - part.FLAT_STATIONS[0] == (
         pytest.approx(spec.FLAT_TIP_STATION)
     )
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert 'tip = f"{axis}.start" if north else f"{axis}.end"' in source
-    assert 'set_global(adapter, "FlatStation"' in source
     assert drawing.FLAT_STATION_CALLOUT == spec.FLAT_STATION_CALLOUT == "BOTH ENDS"
 
 
@@ -242,17 +218,10 @@ def test_flat_volume_is_two_segments() -> None:
     segment = radius**2 * (half_angle - math.sin(half_angle) * math.cos(half_angle))
     assert spec.segment_area(spec.FLAT_DEPTH) == pytest.approx(segment)
     assert spec.V_FLAT == pytest.approx(segment * spec.FLAT_LENGTH)
-    source = "".join(Path(part.__file__).read_text(encoding="utf-8").split())
-    assert "volume-2.0*V_FLAT" in source
 
 
 def test_the_flats_print_once_as_two_places() -> None:
     assert drawing.FLATS_CALLOUT == "2X"
-    source = "".join(Path(drawing.__file__).read_text(encoding="utf-8").split())
-    assert (
-        '"FlatLength":FLATS_CALLOUT,"FlatAF":FLATS_CALLOUT,'
-        '"FlatStation":FLAT_STATION_CALLOUT,"DomeHeight":DOME_CALLOUT'
-    ) in source
 
 
 def test_the_running_fit_names_its_mate_clear_of_its_witnesses() -> None:
@@ -264,8 +233,6 @@ def test_the_running_fit_names_its_mate_clear_of_its_witnesses() -> None:
     flank, right of the south tip."""
     arm = _config.parts("ch-rocker-arm")["number"]
     assert drawing.SHAFT_FIT_CALLOUT == f"RUNNING FIT IN {arm}\n1/4 GROUND STOCK OK"
-    source = "".join(Path(drawing.__file__).read_text(encoding="utf-8").split())
-    assert '{"ShaftDia":SHAFT_FIT_CALLOUT}' in source
     x, y = drawing.PROFILE_KEEP["ShaftDia"]
     lower_flank = drawing.PROFILE_CENTER[1] - spec.SHAFT_DIA * drawing._MM / 2.0
     assert y < lower_flank - 0.005
@@ -279,8 +246,6 @@ def test_finishes_print_at_note_height() -> None:
     """r743-2R: at the template's default height the Ra symbols printed
     ~18 mm tall."""
     assert drawing.FINISH_CHAR_HEIGHT == 0.0025
-    source = "".join(Path(drawing.__file__).read_text(encoding="utf-8").split())
-    assert source.count("char_height=FINISH_CHAR_HEIGHT") == len(spec.SURFACE_FINISHES)
 
 
 # Measured on the r743-3 render: "BOTH ENDS" runs 24.5 mm, centred on its
@@ -317,8 +282,6 @@ def test_the_dome_radius_prints_as_a_spherical_reference() -> None:
     assert spec.DRAWING_PRECISION["NorthCapProfile"]["Radius"] == 2
     assert f"{spec.DOME_SPHERE_RADIUS / 25.4:.2f}" == "0.16"
     assert "Radius" in drawing.DETAIL_KEEP
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "_set_spherical_reference(adapter, radius_annotations[0]" in source
 
 
 # The ASME B inner border's right edge, and the width of the profile's

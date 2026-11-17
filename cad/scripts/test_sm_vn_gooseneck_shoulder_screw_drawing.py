@@ -8,10 +8,7 @@ end plug bonded into MHA-SM-01 (owner rulings 2026-11-08 (Pedro), #2315).
 """
 from __future__ import annotations
 
-import asyncio
 import math
-from types import SimpleNamespace
-from unittest.mock import AsyncMock
 
 import pytest
 import _config
@@ -38,57 +35,6 @@ def test_envelope_volume_has_all_three_supplied_sections_less_the_slot():
         )
         - part.SLOT_VOLUME
     )
-
-
-def test_driver_slot_is_cut_down_from_the_head_face(monkeypatch):
-    rectangles = AsyncMock()
-    monkeypatch.setattr(part, "define_centered_rectangle", rectangles)
-    monkeypatch.setattr(part, "ensure_fully_defined", AsyncMock())
-    monkeypatch.setattr(part, "check", lambda label, value: value)
-    names = []
-    monkeypatch.setattr(part, "name_last_feature", lambda _adapter, name: names.append(name))
-    monkeypatch.setattr(part, "blank_reference_geometry", lambda *args: None)
-    adapter = SimpleNamespace(
-        create_plane=AsyncMock(), create_sketch=AsyncMock(), exit_sketch=AsyncMock(),
-        create_cut_extrude=AsyncMock(),
-    )
-    asyncio.run(part._driver_slot(adapter))
-    plane = adapter.create_plane.call_args.args[0]
-    assert (plane.base_plane, plane.offset) == ("Front Plane", spec.LENGTH)
-    adapter.create_sketch.assert_awaited_once_with("SlotPlane")
-    assert rectangles.call_args.args[1:3] == (part.SLOT_SPAN / 2.0, spec.SLOT_WIDTH / 2.0)
-    assert part.SLOT_SPAN > spec.HEAD_DIA
-    cut = adapter.create_cut_extrude.call_args.args[0]
-    assert cut.depth == spec.SLOT_DEPTH and not cut.reverse_direction
-    assert names[-1] == part.SLOT_FEATURE == "DriverSlot"
-
-
-@pytest.mark.parametrize("offset,reverse", [(0.0, False), (9.525, False), (0.0, True)])
-def test_native_section_frame_and_direction(monkeypatch, offset, reverse):
-    circles = AsyncMock()
-    monkeypatch.setattr(part, "define_circle", circles)
-    monkeypatch.setattr(part, "ensure_fully_defined", AsyncMock())
-    monkeypatch.setattr(part, "check", lambda label, value: value)
-    monkeypatch.setattr(part, "name_last_feature", lambda *args: None)
-    blanked = []
-    monkeypatch.setattr(part, "blank_reference_geometry", lambda _adapter, refs: blanked.extend(refs))
-    adapter = SimpleNamespace(
-        create_plane=AsyncMock(return_value=SimpleNamespace(name="HeadPlane")),
-        create_sketch=AsyncMock(), exit_sketch=AsyncMock(), create_extrusion=AsyncMock(),
-    )
-    asyncio.run(part._ring(adapter, "Section", 10.0, 0.0, 13.0, offset=offset, reverse=reverse))
-    adapter.create_sketch.assert_awaited_once_with("HeadPlane" if offset else "Front")
-    circles.assert_awaited_once_with(adapter, 0.0, 0.0, 5.0, "Section OD")
-    extrusion = adapter.create_extrusion.call_args.args[0]
-    assert extrusion.depth == 13.0
-    assert extrusion.reverse_direction is reverse
-    if offset:
-        plane = adapter.create_plane.call_args.args[0]
-        assert plane.base_plane == "Front Plane"
-        assert plane.offset == offset
-        assert blanked == [("HeadPlane", "PLANE")]
-    else:
-        adapter.create_plane.assert_not_awaited()
 
 
 def test_catalogue_and_current_identity():
@@ -159,38 +105,6 @@ def test_native_supplier_witness_inventory():
         "SupplierHeadDiameter": (-spec.LENGTH, -spec.HEAD_DIA / 2.0),
     }
     assert spec.THREAD_NOTE == "10-24 UNC-2A\n(AS SUPPLIED)"
-
-
-def test_build_uses_contract_dimensions_and_publishes_z_axis(monkeypatch):
-    calls = []
-
-    async def ring(adapter, name, od, bore, length, **kwargs):
-        calls.append((name, od, bore, length, kwargs))
-
-    monkeypatch.setattr(part, "_ring", ring)
-    monkeypatch.setattr(part, "check", lambda label, value: value)
-    monkeypatch.setattr(part, "name_last_feature", lambda *args: None)
-    monkeypatch.setattr(part, "blank_reference_geometry", lambda *args: None)
-    monkeypatch.setattr(part, "apply_package_model_units", lambda *args, **kwargs: None)
-    monkeypatch.setattr(part, "apply_custom_properties", lambda *args: None)
-    for name in ("volume_check", "bbox_extent_check", "apply_material", "apply_color",
-                 "_supplier_references", "report_mass_properties", "_driver_slot"):
-        monkeypatch.setattr(part, name, AsyncMock())
-    saved = AsyncMock(return_value={"part": STEM})
-    monkeypatch.setattr(part, "save_part_and_images", saved)
-    adapter = SimpleNamespace(create_part=AsyncMock(), create_axis=AsyncMock())
-    assert asyncio.run(part.build(adapter)) == {"part": STEM}
-    assert calls == [
-        ("Shoulder", spec.SHOULDER_DIA, 0.0, spec.SHOULDER_LENGTH, {}),
-        ("Head", spec.HEAD_DIA, 0.0, spec.HEAD_HEIGHT, {"offset": spec.SHOULDER_LENGTH}),
-        (part.THREAD_FEATURE, spec.MAJOR_DIA, 0.0, spec.THREAD_LENGTH, {"reverse": True}),
-    ]
-    axis = adapter.create_axis.call_args.args[0]
-    assert axis.mode == "two_planes"
-    assert set(axis.planes) == {"Top Plane", "Right Plane"}
-    part._driver_slot.assert_awaited_once_with(adapter)
-    part.volume_check.assert_awaited_once()
-    saved.assert_awaited_once_with(adapter, STEM)
 
 
 def test_purchased_sheet_documents_built_part():

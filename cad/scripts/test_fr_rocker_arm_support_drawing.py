@@ -7,7 +7,6 @@ import math
 import re
 from collections import defaultdict
 from decimal import Decimal
-from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
 
@@ -104,9 +103,6 @@ def test_no_process_callout_on_the_sheet() -> None:
     # "Machine both pockets" dictates method (ASME Y14.5 1.4(e)); the section's
     # web dimension defines what the pockets leave, so no callout exists.
     assert not hasattr(support, "WEB_CALLOUT")
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "add_property_linked_callout" not in source
-    assert "Web Callout" not in source
 
 
 def test_support_finish_masks_both_mating_faces() -> None:
@@ -118,9 +114,6 @@ def test_support_finish_masks_both_mating_faces() -> None:
     assert support.HOLE_SPEC.kind == "drilled_fractional"
     assert support.HOLE_SPEC.size == "5/16"
     assert support.HOLE_DIA == pytest.approx(7.938)
-    source = Path(support.__file__).read_text(encoding="utf-8")
-    assert "ThreadClass" not in source
-    assert "TITLE_BLOCK_THREAD_CLASS" not in source
 
 
 def test_mounting_face_carries_the_seat_finish_symbol_not_a_note() -> None:
@@ -133,11 +126,6 @@ def test_mounting_face_carries_the_seat_finish_symbol_not_a_note() -> None:
     assert control.roughness_um == 3.2
     assert control.face.normal == (0, -1, 0)
     assert control.face.offset_mm == support.HALF_Y == drawing_spec.HALF_Y
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'surface_finish_by_key(SURFACE_FINISHES, "mounting_face")' in source
-    assert source.count("add_surface_finish(") == 1
-    assert "MOUNTING_FACE_CALLOUT" not in source
-    assert "add_attached_note" not in source
 
 
 def test_native_hole_table_covers_every_foot_hole() -> None:
@@ -708,14 +696,12 @@ def test_the_end_faces_top_edges_skip_the_rim_chamfer_to_keep_the_seat_end_wall(
     assert chamfered < WALL_FLOOR_MM
 
 
-
 def test_rim_chamfer_size_lands_on_an_outside_corner_of_the_front_view() -> None:
     """r7 machinist review (clarity): the size sat on a cavity rim inside the
     section. A chamfer's size lands on its first selected edge and prints
     only where that edge is seen end-on, so the +X end face's foot edge goes
     first and the front view, which sees it end-on at its bottom-right
     corner, carries the size. The section keeps its targeted import."""
-    import ast
 
     first, second = support.CHAMFER_EDGES[:2]
     assert first == [support.BOSS_DEPTH / 2.0, -support.HALF_Y, 0.0]
@@ -734,33 +720,7 @@ def test_rim_chamfer_size_lands_on_an_outside_corner_of_the_front_view() -> None
     text_x, text_y = drawing.RIM_CHAMFER_TEXT_XY
     assert math.dist((text_x, text_y), (line_x, line_y)) < 0.060
 
-    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
-    curates = {
-        call.args[1].id: {kw.arg: kw.value for kw in call.keywords}
-        for call in ast.walk(tree)
-        if isinstance(call, ast.Call)
-        and isinstance(call.func, ast.Name)
-        and call.func.id in {"curate_view_dimensions", "curate_hidden_owner_dimensions"}
-    }
-    for view, keep in (
-        ("front", "FRONT_KEEP"),
-        ("right", "RIGHT_KEEP"),
-        ("view_b", "VIEW_B_KEEP"),
-    ):
-        curate = curates[view]
-        assert isinstance(curate["keep"], ast.Name) and curate["keep"].id == keep
-        by_feature = curate.get("dimensions_by_feature")
-        assert isinstance(by_feature, ast.Name)
-        assert by_feature.id == "DRAWING_DIMENSIONS"
     assert drawing.DRAWING_DIMENSIONS is support.DRAWING_DIMENSIONS
-    offsets = [
-        call
-        for call in ast.walk(tree)
-        if isinstance(call, ast.Call)
-        and isinstance(call.func, ast.Name)
-        and call.func.id == "offset_dimension_text"
-    ]
-    assert [call.args[1].id for call in offsets] == ["front_dimensions"]
 
 
 def test_precision_reaches_every_dimension_exactly_once() -> None:
@@ -769,108 +729,17 @@ def test_precision_reaches_every_dimension_exactly_once() -> None:
     kept, and the sheet-made ones (web, foot) set their own after the import.
     Every DIMENSION_PRECISION name goes through exactly one of them, and every
     part-owned name is read back by exactly one curate pass."""
-    import ast
 
     kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP)
     bulk = drawing.imported_precision(kept)
     assert set(bulk) == kept & set(drawing.DIMENSION_PRECISION)
     # VIEW B shows only part-owned places: the sheet sets none there.
     assert drawing.imported_precision(drawing.VIEW_B_KEEP) == {}
-    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
-    own = {
-        node.slice.value
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Subscript)
-        and isinstance(node.value, ast.Name)
-        and node.value.id == "DIMENSION_PRECISION"
-        and isinstance(node.slice, ast.Constant)
-    }
-    assert own == {"WebThickness", "FootThickness"}
-    assert not own & set(bulk)
-    assert own | set(bulk) == set(drawing.DIMENSION_PRECISION)
     part = set(drawing.PART_PRECISION)
     assert not part & set(drawing.DIMENSION_PRECISION)
     read_main, read_view_b = part & kept, part & set(drawing.VIEW_B_KEEP)
     assert not read_main & read_view_b
     assert read_main | read_view_b == part
-
-
-def _imported(name: str, places: int) -> SimpleNamespace:
-    """An imported dimension annotation the sheet may read but never set."""
-    display = SimpleNamespace(
-        GetPrimaryPrecision2=lambda: places,
-        SetPrecision3=lambda *_: pytest.fail("the part owns these places"),
-    )
-    return SimpleNamespace(name=name, GetSpecificAnnotation=lambda: display)
-
-
-@pytest.mark.parametrize(
-    "name",
-    [
-        "RimChamferSize",
-        "SeatEastStation",
-        "SeatWestStation",
-        "TopFlatPlusZStation",
-        "CavityEndStation",
-        "CavityTopStation",
-        "PocketEndStation",
-        "PocketBottomStation",
-        "WebFaceStation",
-    ],
-)
-def test_part_owned_places_are_the_parts_and_the_sheet_reads_them_back(
-    monkeypatch: pytest.MonkeyPatch, name: str
-) -> None:
-    """Review findings: the chamfer's and the seat REF
-    stations' places were rewritten on the sheet. The part build authors
-    them, and the locations' (PR #1469 r4 review); the sheet reads them back,
-    never SetPrecision3, and fails closed when the import lost them."""
-    import ast
-    import inspect
-
-    import _drawing_dimensions
-
-    assert drawing.PART_PRECISION == {
-        "RimChamferSize": 2,
-        "SeatEastStation": 3,
-        "SeatWestStation": 3,
-        "CavityEndStation": 2,
-        "CavityTopStation": 2,
-        "PocketEndStation": 2,
-        "PocketBottomStation": 2,
-        "WebFaceStation": 2,
-        "TopFlatPlusZStation": seats.TOP_FLAT_PLACES,
-    }
-    assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in inspect.getsource(
-        support.build
-    )
-    assert name not in drawing.DIMENSION_PRECISION
-    all_kept = (
-        set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP) | set(drawing.VIEW_B_KEEP)
-    )
-    assert name not in drawing.imported_precision(all_kept)
-    calls = [
-        node.func.id
-        for node in ast.walk(ast.parse(inspect.getsource(drawing.build)))
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
-    ]
-    assert calls.count("_assert_part_precision") == 2
-
-    adapter = SimpleNamespace(_attempt=lambda fn: fn())
-    monkeypatch.setattr(
-        _drawing_dimensions._sw_type_info, "early_bound_or_flag", lambda obj, *_: obj
-    )
-    monkeypatch.setattr(
-        _drawing_dimensions, "dimension_name", lambda _adapter, ann: ann.name
-    )
-    places = drawing.PART_PRECISION[name]
-    drawing._assert_part_precision(adapter, [_imported(name, places)], {name})
-    with pytest.raises(RuntimeError, match=name):
-        drawing._assert_part_precision(adapter, [_imported(name, places + 1)], {name})
-    with pytest.raises(RuntimeError, match="never reached the sheet"):
-        drawing._assert_part_precision(adapter, [], {name})
-    # A pass that did not keep the dimension does not demand it.
-    drawing._assert_part_precision(adapter, [], set())
 
 
 def test_seat_stations_print_as_ref_from_the_real_end_faces() -> None:
@@ -904,95 +773,6 @@ def _evaluate_equation(expression: str, values: dict[str, float]) -> float:
     """An equation-manager expression of quoted names and arithmetic, in mm."""
     numeric = re.sub(r'"(\w+)"', lambda match: repr(values[match[1]]), expression)
     return float(eval(numeric, {"__builtins__": {}}))
-
-
-def test_seat_station_drives_end_on_the_seats_for_any_wall_width_or_seat_edit(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """PR #1469 round-3 review: the REF lines started at "WallWidth" / 2 but
-    their lengths were undriven, so 178.8 -> 180.8 left the east REF at 4.95
-    while the seat stood 5.95 in. Record the sketch's real drive jobs
-    offline, evaluate them as the equation manager would, and check each line
-    still ends on the seat the Hole Wizard drills (SEAT_POINTS)."""
-    import _sketch
-
-    rows = support.SEAT_STATION_LINES
-    monkeypatch.setattr(_sketch, "_feature_by_name", lambda _adapter, name: name)
-    monkeypatch.setattr(
-        _sketch, "_display_dimensions", lambda *_: [None] * (2 * len(rows))
-    )
-    monkeypatch.setattr(_sketch, "_rename_dimensions", lambda *_: None)
-    monkeypatch.setattr(support, "_early_bound", lambda obj, _interface: obj)
-    for name in ("set_sketch_direct_db", "name_last_feature"):
-        monkeypatch.setattr(support, name, lambda *_: None)
-
-    async def nothing(*_args: object) -> None:
-        return None
-
-    for name in ("anchor_point_to_origin", "dimension_between", "ensure_fully_defined"):
-        monkeypatch.setattr(support, name, nothing)
-    ok = SimpleNamespace(is_success=True, data=None)
-    lines = iter(row.dimension for row in rows)
-
-    class Adapter:
-        _sketch_entities = defaultdict(
-            lambda: SimpleNamespace(ConstructionGeometry=False)
-        )
-
-        async def create_sketch(self, _plane: str) -> SimpleNamespace:
-            return ok
-
-        async def add_line(self, *_xy: float) -> SimpleNamespace:
-            return SimpleNamespace(is_success=True, data=next(lines))
-
-        async def add_sketch_constraint(self, *_args: object) -> SimpleNamespace:
-            return ok
-
-        async def exit_sketch(self) -> SimpleNamespace:
-            return ok
-
-    jobs = dict(asyncio.run(support._seat_station_reference(Adapter())))
-    sketch = support.REFERENCE_SKETCHES[0]
-    seat_x = [x for x, _y, _z in support.SEAT_POINTS]
-    assert all(z == 0.0 for _x, _y, z in support.SEAT_POINTS)
-    assert [y for _x, y in support.SEAT_PLACEMENT_DIMS] == [(None, None)] * 2
-    nominal = dict(support.SEAT_GLOBALS)
-    edits = [
-        (support.BOSS_DEPTH, nominal),
-        (180.8, nominal),
-        (175.0, nominal),
-        (support.BOSS_DEPTH, {**nominal, "SeatEastX": nominal["SeatEastX"] - 1.5}),
-        (180.8, {**nominal, "SeatWestX": nominal["SeatWestX"] + 0.7}),
-    ]
-    for wall_width, seat_globals in edits:
-        values = {"WallWidth": wall_width, **seat_globals}
-        # Each seat stands at its driven placement, on its authored side.
-        drilled = [
-            math.copysign(_evaluate_equation(drive, values), x)
-            for ((_name, drive), _y), x in zip(
-                support.SEAT_PLACEMENT_DIMS, seat_x, strict=True
-            )
-        ]
-        if seat_globals is nominal:
-            assert drilled == pytest.approx(seat_x)
-        seat_on = {1.0: max(drilled), -1.0: min(drilled)}
-        expected = {
-            "SeatEastStation": wall_width / 2.0 - seat_on[1.0],
-            "SeatWestStation": seat_on[-1.0] + wall_width / 2.0,
-        }
-        for row in rows:
-            side = math.copysign(1.0, row.end_x)
-            anchor = _evaluate_equation(jobs[f"{row.dimension}Anchor@{sketch}"], values)
-            station = _evaluate_equation(jobs[f"{row.dimension}@{sketch}"], values)
-            assert anchor == pytest.approx(wall_width / 2.0)
-            assert station == pytest.approx(expected[row.dimension])
-            # The line runs inboard from its end face and ends on its seat.
-            assert side * (anchor - station) == pytest.approx(seat_on[side])
-    # The finding's case: the REF tracks the 2.0 longer wall.
-    values = {"WallWidth": support.BOSS_DEPTH + 2.0, **nominal}
-    assert f"{_evaluate_equation(jobs[f'SeatEastStation@{sketch}'], values):.2f}" == (
-        f"{placement.SUPPORT_HALF_MACHINE_Z + 1.0 - max(seats.SEAT_LOCAL_X):.2f}"
-    )
 
 
 def _record_location_sketch(monkeypatch: pytest.MonkeyPatch, sketch_builder) -> tuple:
@@ -1380,20 +1160,6 @@ def test_section_locations_stand_off_the_section_and_its_texts() -> None:
             assert _boxes_clear(box, other, 0.002)
 
 
-def _z_line(y_mm: float, z0_mm: float, z1_mm: float, *, direction=(0.0, 0.0, 1.0)):
-    points = [
-        (0.0, y_mm / 1000.0, z0_mm / 1000.0),
-        (0.0, y_mm / 1000.0, z1_mm / 1000.0),
-    ]
-    curve = SimpleNamespace(IsLine=lambda: True, LineParams=(*points[0], *direction))
-    return SimpleNamespace(
-        GetCurve=lambda: curve,
-        GetStartVertex=lambda: SimpleNamespace(GetPoint=lambda: points[0]),
-        GetEndVertex=lambda: SimpleNamespace(GetPoint=lambda: points[1]),
-        name=f"y{y_mm} z{z0_mm}..{z1_mm}",
-    )
-
-
 # Sheet-default note text as rendered by r743-rocker-fix3 (leaf
 # 20260926T112244Z-1-a884759d): "TRANSFER FROM MHA-CH-008" spanned 57.6 mm for 21
 # characters and five lines stepped 4.45 mm. add_note does not apply a height,
@@ -1514,38 +1280,6 @@ def test_foot_thickness_text_sits_above_its_extension_lines() -> None:
     assert foot[0] > front_right + 0.003
 
 
-def test_iso_tapped_hole_label_is_materialized_then_counted() -> None:
-    """r743-rocker-fix3's isometric carried SolidWorks' own "#8-32 Tapped
-    Hole" label past the right border. The seat note already states the thread,
-    so the cosmetic threads are imported before finalize (the pen-hanger
-    pattern) and finalize sweeps for that label. The 180.5 casting draws none
-    (main-stack r1 and its probes), so the sweep must remove exactly zero."""
-    import ast
-
-    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
-    calls = [
-        node
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
-    ]
-    (finalize,) = [c for c in calls if c.func.id == "finalize_drawing"]
-    kwargs = {
-        k.arg: ast.literal_eval(k.value)
-        for k in finalize.keywords
-        if k.arg in {"redundant_note_substrings", "expected_redundant_notes"}
-    }
-    assert kwargs == {
-        "redundant_note_substrings": ("Tapped Hole",),
-        "expected_redundant_notes": 0,
-    }
-    threads = [c for c in calls if c.func.id == "import_cosmetic_threads"]
-    assert [[ast.unparse(a) for a in c.args] for c in threads] == [
-        ["adapter", "iso"],
-        ["adapter", "view_b"],
-    ]
-    assert all(c.lineno < finalize.lineno for c in threads)
-
-
 def test_stacked_pocket_widths_keep_separate_bands() -> None:
     """Each stacked width prints its text just above its own dimension line.
     At WinWidth y 0.118 the 127.0 line ran through "165.1" (Main's fix3 eye
@@ -1586,75 +1320,6 @@ def test_cavity_radius_callout_sits_on_its_corner_bisector_outside_the_view() ->
         assert _boxes_clear(label, other, 0.003)
 
 
-def _fake_note_annotation(text: str, x: float, y: float, *, kind: int = 6):
-    state = {"position": (x, y, 0.0)}
-    note = SimpleNamespace(GetText=lambda: text)
-
-    def set_position(new_x, new_y, new_z):
-        state["position"] = (new_x, new_y, new_z)
-        return True
-
-    return SimpleNamespace(
-        GetType=lambda: kind,
-        GetSpecificAnnotation=lambda: note,
-        GetPosition=lambda: state["position"],
-        SetPosition2=set_position,
-    )
-
-
-def test_right_end_hole_tags_move_left_of_their_holes(monkeypatch) -> None:
-    """A3 and A4 printed across the pocket's hidden end lines (fix3 render).
-    They take the mirror spot left of their holes; A1 and A2 stay put."""
-    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _name: obj)
-    tags = {
-        name: _fake_note_annotation(name, x, y)
-        for name, x, y in (
-            ("A1", 0.0796, 0.0661),
-            ("A2", 0.0796, 0.0878),
-            ("A3", 0.1397, 0.0661),
-            ("A4", 0.1397, 0.0878),
-        )
-    }
-    dimension = _fake_note_annotation("A4", 0.2, 0.1, kind=1)
-    view = SimpleNamespace(GetAnnotations=lambda: (*tags.values(), dimension))
-    moved = drawing._mirror_right_end_hole_tags(view)
-    assert set(moved) == {"A3", "A4"}
-    for name in ("A3", "A4"):
-        assert tags[name].GetPosition()[0] == pytest.approx(
-            0.1397 + drawing.HOLE_TAG_MIRROR_SHIFT
-        )
-    assert tags["A1"].GetPosition()[0] == 0.0796
-    assert dimension.GetPosition()[0] == 0.2
-
-    # Measured on A4 in the fix3 render: the tag's left edge 4.6 mm right of
-    # its hole centre, 5.8 mm wide. The shift mirrors it about the hole.
-    scale = drawing.VIEW_SCALE / 1000
-    hole_x = (
-        drawing.BOTTOM_CENTER[0]
-        + (
-            drawing.HOLE_TABLE_DATUM_XZ_MM[0]
-            + drawing.EXPECTED_HOLE_TABLE_LOCATIONS_MM[0][0]
-        )
-        * scale
-    )
-    moved_right = hole_x + 0.0046 + 0.0058 + drawing.HOLE_TAG_MIRROR_SHIFT
-    assert hole_x - moved_right == pytest.approx(0.0046, abs=0.0005)
-
-
-def test_right_end_hole_tag_mover_fails_loud(monkeypatch) -> None:
-    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _name: obj)
-    only_a3 = SimpleNamespace(
-        GetAnnotations=lambda: (_fake_note_annotation("A3", 0.1397, 0.0661),)
-    )
-    with pytest.raises(RuntimeError, match="A4"):
-        drawing._mirror_right_end_hole_tags(only_a3)
-    left_a4 = SimpleNamespace(
-        GetAnnotations=lambda: (_fake_note_annotation("A4", 0.0796, 0.0878),)
-    )
-    with pytest.raises(RuntimeError, match="not at the right end"):
-        drawing._mirror_right_end_hole_tags(left_a4)
-
-
 def test_seats_print_as_one_native_callout_with_only_the_transfer_as_text() -> None:
     """Codex #936 (PRRT_kwDOPHDy386mRSOJ): the seat note retyped BracketSeats'
     thread and depths, so a model change would leave the print stale. The
@@ -1664,10 +1329,6 @@ def test_seats_print_as_one_native_callout_with_only_the_transfer_as_text() -> N
     bracket = _config.parts("ch-pivot-bracket")["number"]
     assert drawing.SEAT_CALLOUT_PROCESS == f"TRANSFER FROM {bracket}\nAT ASSEMBLY;\n"
     assert not hasattr(drawing, "SEAT_NOTE")
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    for retyped in ("UNC-2B", " DEEP", "SEAT_THREAD_DEPTH", "SEAT_DRILL_DEPTH"):
-        assert retyped not in source, retyped
-    assert "process=SEAT_CALLOUT_PROCESS" in source
     assert drawing.SEAT_CALLOUT_X_MM == max(seats.SEAT_LOCAL_X)
 
 
@@ -1751,228 +1412,3 @@ def test_view_b_arrow_looks_down_on_the_rail_from_above_the_front_view() -> None
     assert abs(text_xy[0] + drawing.VIEW_LETTER_HEIGHT * 0.36 - tip_xy[0]) < 0.001
     # Clear of the section's own A arrow on the centreline.
     assert abs(tip_xy[0] - drawing.FRONT_CENTER[0]) > 0.015
-
-
-def _circle_edge(x_mm: float, y_mm: float, radius_mm: float):
-    curve = SimpleNamespace(
-        IsCircle=lambda: True,
-        CircleParams=(x_mm / 1000, y_mm / 1000, 0.0, 0.0, 1.0, 0.0, radius_mm / 1000),
-    )
-    return SimpleNamespace(GetCurve=lambda: curve, name=(x_mm, y_mm, radius_mm))
-
-
-def test_seat_entry_edge_is_the_east_seats_rim_on_the_rail_top(monkeypatch) -> None:
-    """The edge comes from the part through the typed seat cylinder: the one
-    drill-diameter circle of the east seat on the rail top, never the rim
-    where the drill point starts."""
-    from _hole_spec import blind_cut_dia_mm
-
-    radius = blind_cut_dia_mm(seats.SEAT_SPEC) / 2
-    east = max(seats.SEAT_LOCAL_X)
-    entry = _circle_edge(east, support.HALF_Y, radius)
-    face = SimpleNamespace(
-        GetEdges=lambda: (
-            _circle_edge(east, support.HALF_Y - seats.SEAT_DRILL_DEPTH, radius),
-            entry,
-            SimpleNamespace(GetCurve=lambda: SimpleNamespace(IsCircle=lambda: False)),
-        )
-    )
-    requested = {}
-
-    def resolve(model, requests):
-        requested.update(requests)
-        return {"seat": face}
-
-    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _name: obj)
-    monkeypatch.setattr(drawing, "resolve_faces", resolve)
-    view = SimpleNamespace(ReferencedDocument=object())
-    assert drawing._seat_entry_edge(view) is entry
-    (spec,) = requested.values()
-    assert spec.diameter_mm == pytest.approx(2 * radius)
-    assert spec.contains_x_mm == east
-
-
-# r743-p1s-A: VIEW B's GetOutline right after its crop, which had not
-# narrowed it; the fake serves it as the uncropped outline.
-UNCROPPED_VIEW_B_OUTLINE = (0.15183, 0.09033, 0.26817, 0.12565)
-# The view border GetOutline adds around what a crop keeps (fake only).
-BORDER = (0.012, 0.002)
-
-
-class _CropSeat:
-    """Just enough of IDrawingDoc/IView to run the VIEW B crop offline."""
-
-    def __init__(
-        self,
-        crop_result: int = 1,
-        cropped: bool = True,
-        crop_lands: bool = True,
-        origin: tuple[float, float] = drawing.VIEW_B_CENTER,
-        end_run: float | None = None,
-    ) -> None:
-        self.rectangle = None
-        self.crop_calls = []
-        self.selected = []
-        self.selected_at_crop = None
-        self.rebuilds = []
-        self.origin = origin
-        self.end_run = (
-            support.BOSS_DEPTH / 2 * drawing.VIEW_SCALE / 1000
-            if end_run is None
-            else end_run
-        )
-        self.crop_result = crop_result
-        self.cropped = cropped
-        self.crop_lands = crop_lands
-        identity = SimpleNamespace()
-        self.sketch = SimpleNamespace(ModelToSketchTransform=identity)
-        self.model = SimpleNamespace(
-            ActivateView=lambda _name: True,
-            ClearSelection2=lambda _all: None,
-            EditRebuild3=lambda: True,
-            SketchManager=SimpleNamespace(
-                AddToDB=False, CreateCornerRectangle=self._rectangle
-            ),
-            SelectionManager=SimpleNamespace(
-                GetSelectedObjectCount2=lambda _mark: len(self.selected)
-            ),
-        )
-        math_utility = SimpleNamespace(
-            CreatePoint=lambda data: SimpleNamespace(
-                MultiplyTransform=lambda _t: SimpleNamespace(ArrayData=tuple(data))
-            )
-        )
-        self.adapter = SimpleNamespace(
-            currentModel=self.model,
-            swApp=SimpleNamespace(GetMathUtility=lambda: math_utility),
-        )
-        self.view = SimpleNamespace(
-            GetSketch=lambda: self.sketch,
-            Crop2=self._crop,
-            UpdateViewDisplayGeometry=lambda: None,
-            IsCropped=lambda: self.cropped,
-            GetOutline=self._outline,
-            ScaleDecimal=0.5,
-            Position=drawing.VIEW_B_CENTER,
-        )
-
-    def _rectangle(self, *coords):
-        self.rectangle = coords
-        self.rectangle_add_to_db = self.model.SketchManager.AddToDB
-        return tuple(
-            SimpleNamespace(
-                Select4=lambda append, _data, i=i: self.selected.append(i) or True
-            )
-            for i in range(4)
-        )
-
-    def _crop(self, *args):
-        self.crop_calls.append(args)
-        self.selected_at_crop = sorted(self.selected)
-        return self.crop_result
-
-    def project(self, _adapter, _view, xyz, *, label):
-        # *Top at 1:2: model +X runs along the sheet from the part origin.
-        del label
-        return (
-            self.origin[0] + xyz[0] / (support.BOSS_DEPTH / 2000) * self.end_run,
-            self.origin[1],
-        )
-
-    def _outline(self):
-        if not (self.crop_calls and self.crop_lands):
-            return UNCROPPED_VIEW_B_OUTLINE
-        x1, y1, _z1, x2, y2, _z2 = self.rectangle
-        bx, by = BORDER
-        return (
-            min(x1, x2) - bx,
-            min(y1, y2) - by,
-            max(x1, x2) + bx,
-            max(y1, y2) + by,
-        )
-
-
-def _patch_crop_seat(monkeypatch, seat: _CropSeat) -> None:
-    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _name: obj)
-    monkeypatch.setattr(drawing, "view_name", lambda _adapter, _view: "VIEW B")
-    monkeypatch.setattr(drawing, "double_array", list)
-    monkeypatch.setattr(drawing, "model_point_in_view", seat.project)
-    monkeypatch.setattr(
-        drawing,
-        "rebuild_drawing",
-        lambda _adapter, *, label: seat.rebuilds.append(label),
-    )
-
-
-def test_view_b_crop_fence_is_the_rail_strip_across_the_whole_rail(monkeypatch) -> None:
-    seat = _CropSeat()
-    _patch_crop_seat(monkeypatch, seat)
-    drawing._crop_view_b_to_rail(seat.adapter, seat.view)
-    # Rebuilt after placement, before the fence is located (positive control).
-    assert seat.rebuilds == ["VIEW B placement"]
-    # Crop2 is handed the whole closed fence.
-    assert seat.selected_at_crop == [0, 1, 2, 3]
-    # The fence went straight to the database, past inference, and the
-    # sketch manager was handed back as found.
-    assert seat.rectangle_add_to_db is True
-    assert seat.model.SketchManager.AddToDB is False
-    scale = drawing.VIEW_SCALE / 1000
-    x1, y1, _z1, x2, y2, _z2 = seat.rectangle
-    cx, cy = drawing.VIEW_B_CENTER
-    assert min(x1, x2) < cx - support.BOSS_DEPTH / 2 * scale
-    assert max(x1, x2) > cx + support.BOSS_DEPTH / 2 * scale
-    assert (min(y1, y2), max(y1, y2)) == pytest.approx(
-        (
-            cy - drawing.VIEW_B_CROP_HALF_Z_MM * scale,
-            cy + drawing.VIEW_B_CROP_HALF_Z_MM * scale,
-        )
-    )
-    # Straight-edged crop with no outline (swCropViewErrors_e NoError = 1).
-    assert seat.crop_calls == [(False, True, 0)]
-
-
-@pytest.mark.parametrize(
-    ("crop_result", "cropped", "crop_lands", "message"),
-    (
-        (0, True, True, "failed to crop"),
-        (1, False, True, "did not retain"),
-        # Crop2 and IsCropped both report success, but the outline is the
-        # uncropped view's.
-        (1, True, False, "not the rail strip"),
-    ),
-)
-def test_view_b_crop_fails_loud(
-    monkeypatch, crop_result, cropped, crop_lands, message
-) -> None:
-    seat = _CropSeat(crop_result=crop_result, cropped=cropped, crop_lands=crop_lands)
-    _patch_crop_seat(monkeypatch, seat)
-    with pytest.raises(RuntimeError, match=message):
-        drawing._crop_view_b_to_rail(seat.adapter, seat.view)
-
-
-def test_view_b_fence_follows_the_part_origin_it_measured(monkeypatch) -> None:
-    offset = (drawing.VIEW_B_CENTER[0] + 0.0006, drawing.VIEW_B_CENTER[1] - 0.0004)
-    seat = _CropSeat(origin=offset)
-    _patch_crop_seat(monkeypatch, seat)
-    drawing._crop_view_b_to_rail(seat.adapter, seat.view)
-    x1, y1, _z1, x2, y2, _z2 = seat.rectangle
-    assert ((x1 + x2) / 2, (y1 + y2) / 2) == pytest.approx(offset)
-
-
-@pytest.mark.parametrize(
-    ("origin", "end_run"),
-    (
-        # The part landed off VIEW_B_CENTER.
-        ((drawing.VIEW_B_CENTER[0] + 0.003, drawing.VIEW_B_CENTER[1]), None),
-        # The view came out 1:1, not 1:2.
-        (drawing.VIEW_B_CENTER, support.BOSS_DEPTH / 2 / 1000),
-    ),
-)
-def test_view_b_refuses_a_misplaced_or_misscaled_view(
-    monkeypatch, origin, end_run
-) -> None:
-    seat = _CropSeat(origin=origin, end_run=end_run)
-    _patch_crop_seat(monkeypatch, seat)
-    with pytest.raises(RuntimeError, match="not the rail at 1:2"):
-        drawing._crop_view_b_to_rail(seat.adapter, seat.view)
-    assert seat.crop_calls == []

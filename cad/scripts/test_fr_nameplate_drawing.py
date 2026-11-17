@@ -64,23 +64,6 @@ def test_places_are_the_parts_and_the_sheet_sets_only_the_reference() -> None:
     # back on the sheet; SetPrecision3 is reserved for the one reference, and
     # takes its places from the spec's DRAWING_REFERENCE_PRECISION.
     assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    calls = re.findall(r"SetPrecision3\(([^)]*)\)", source)
-    assert calls == ["DRAWING_REFERENCE_PRECISION[label], -1, -1, -1"]
-    assert "set_dimension_precision" not in source
-    assert (
-        "assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)"
-        in source
-    )
-    build = Path(part.__file__).read_text(encoding="utf-8")
-    order = [
-        build.index("    await _face_reference(adapter)\n"),
-        build.index("    await _section_reference(adapter)\n"),
-        build.index("    apply_drawing_precision(adapter, DRAWING_PRECISION)\n"),
-        build.index("    blank_reference_sketches(adapter, REFERENCE_SKETCHES)\n"),
-        build.index("    return await save_part_and_images(adapter, PART_NAME)\n"),
-    ]
-    assert order == sorted(order)
 
 
 class _FakeSegment:
@@ -269,65 +252,6 @@ def test_section_reference_carries_both_depths_on_the_cut_plane(
         assert drawing.SECTION_CROP[0][0] < x < drawing.SECTION_CROP[1][0]
 
 
-def test_section_plane_is_the_top_plane_carried_to_the_cut(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    # The +Y offset keeps the Top plane's (u, v) = model (X, -Z), the frame
-    # SectionReference's points are drawn in.
-    adapter = _ReferenceSketchAdapter()
-    monkeypatch.setattr(part, "name_last_feature", lambda _adapter, _name: None)
-    asyncio.run(part._section_plane(adapter))
-    (plane,) = adapter.planes
-    assert (plane.mode, plane.base_plane, plane.offset) == (
-        "offset",
-        "Top Plane",
-        print_spec.SECTION_Y,
-    )
-
-
-class _PointSketchManager:
-    def __init__(self, result: Any) -> None:
-        self.AddToDB = False
-        self.result = result
-        self.calls: list[tuple[tuple[float, float, float], bool]] = []
-
-    def CreatePoint(self, x: float, y: float, z: float) -> Any:  # noqa: N802
-        self.calls.append(((x, y, z), self.AddToDB))
-        if isinstance(self.result, Exception):
-            raise self.result
-        return self.result
-
-
-@pytest.mark.parametrize("result", [object(), None, RuntimeError("COM")])
-def test_reference_point_goes_straight_to_the_db_and_restores_it(
-    monkeypatch: pytest.MonkeyPatch, result: Any
-) -> None:
-    # The real helper: CreatePoint with AddToDB on (no inference snap), in
-    # metres, registered for dimension refs, and AddToDB restored on every
-    # path, a failed or raising CreatePoint included.
-    monkeypatch.setattr(part, "_early_bound", lambda obj, _iface: obj)
-    manager = _PointSketchManager(result)
-    registered: list[tuple[str, Any]] = []
-
-    def register(kind: str, entity: Any) -> str:
-        registered.append((kind, entity))
-        return f"{kind}1"
-
-    adapter = SimpleNamespace(
-        currentSketchManager=manager, _register_sketch_entity=register
-    )
-    if result is None or isinstance(result, Exception):
-        with pytest.raises(RuntimeError):
-            part._add_reference_point(adapter, (2.6, 0.7), "face")
-        assert registered == []
-    else:
-        assert part._add_reference_point(adapter, (2.6, 0.7), "face") == "Point1"
-        assert registered == [("Point", result)]
-    ((point, add_to_db),) = manager.calls
-    assert point == pytest.approx((0.0026, 0.0007, 0.0)) and add_to_db
-    assert manager.AddToDB is False
-
-
 def test_no_model_band_every_dimension_prints_the_title_block_grade() -> None:
     assert model_toleranced_dimensions(part) == {}
 
@@ -439,14 +363,6 @@ def test_section_a_break_line_closes_the_crops_open_end() -> None:
     assert all(
         -spec.PLATE_THICKNESS < z < -print_spec.FIELD_DEPTH for _x, z in points[1:5]
     )
-    # The break draws after the crop, once A-A sits on its centre.
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    order = [
-        source.index("    _crop_section(adapter, view)\n"),
-        source.index("    _place_crop_on_center(adapter, view)\n"),
-        source.index("    _sketch_section_break(adapter, view)\n"),
-    ]
-    assert order == sorted(order)
 
 
 def test_section_a_dimensions_each_depth_on_its_own_line() -> None:

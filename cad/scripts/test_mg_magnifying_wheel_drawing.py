@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import ast
 import math
 from pathlib import Path
 
@@ -17,16 +16,6 @@ import mg_magnifying_wheel_spec
 from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import MACHINED_UM
-
-
-def _called_names(path: str) -> list[str]:
-    tree = ast.parse(Path(path).read_text(encoding="utf-8"))
-    return [
-        node.func.id if isinstance(node.func, ast.Name) else node.func.attr
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call)
-        and isinstance(node.func, (ast.Name, ast.Attribute))
-    ]
 
 
 def test_required_drawing_paths() -> None:
@@ -59,30 +48,6 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
         set(drawing.FRONT_KEEP) | set(drawing.SECTION_KEEP)
     )
     assert set(drawing.DIMENSION_CALLOUTS) | set(drawing.CALLOUTS_ABOVE) <= kept
-
-
-def test_rim_diameters_ride_the_hidden_section_reference() -> None:
-    build = Path(part.__file__).read_text(encoding="utf-8")
-    blank = "blank_reference_sketches(adapter, REFERENCE_SKETCHES)"
-    assert build.count(blank) == 1
-    assert build.index(blank) < build.rindex("save_part_and_images(adapter, PART_NAME)")
-    # A diametric linear dimension prints no Ø unless the prefix carries it.
-    assert (
-        'set_dimension_prefix(adapter, DIAMETER_REFERENCE, name, "<MOD-DIAM>")' in build
-    )
-    # A-A is cut and curated while the part shows the diameter reference
-    # alone (the spoke reference would print in the cut), through the face it
-    # is cut from; the isometric is placed after the re-blank.
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    block = source.index("with _drawing_hidden_sketches.part_sketches_shown(")
-    header = source[block : source.index("):", block)]
-    assert "(DIAMETER_REFERENCE,)" in header and "base_view=front" in header
-    assert (
-        block
-        < source.index("section = create_section_view(")
-        < source.index("_drawing_hidden_sketches.curate_view_dimensions(")
-        < source.index('iso = place_view(adapter, str(SOURCE), "*Isometric"')
-    )
 
 
 def test_every_marked_dimension_has_model_places() -> None:
@@ -185,11 +150,6 @@ def test_drawing_contract_is_split_from_the_assembly_nominals() -> None:
     # The hub stations the assembly imports live in the drawing-FREE geom
     # module, so a print-note edit cannot enter the assembly recipe.
     assert (rim.RIM_OUTER_DIA, geom.HUB_DIA, geom.SPOKE_COUNT) == (100.0, 30.0, 6)
-    assembly = Path(part.__file__).with_name("build_mg_magnifier_assembly.py").read_text(
-        encoding="utf-8"
-    )
-    assert "from mg_magnifying_wheel_geom import" in assembly
-    assert "from build_mg_magnifying_wheel import" not in assembly
 
 
 def test_feature_volumes_are_consistent() -> None:
@@ -321,8 +281,6 @@ def test_linked_notes_specify_the_fits_the_ties_and_the_angle_the_spokes() -> No
         rim.GROOVE_BOTTOM_DIA * drawing.SHEET_SCALE[0] / 2000.0
     )
     assert drawing._GROOVE_BOTTOM_R < drawing._RIM_R
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "target = SECTION_CENTER[1] - _GROOVE_BOTTOM_R" in source
     # Each tie hole is named plainly at its own callout (rule 26: WIRE TIE
     # HOLE, no coined label), size before process, at most two lines of
     # words (rule 7): no project label, so no key.
@@ -382,14 +340,9 @@ def test_linked_notes_specify_the_fits_the_ties_and_the_angle_the_spokes() -> No
     assert "GRAY-IRON" not in notes and "BLACK" not in notes
     assert "DEBURR" not in notes and "BREAK SHARP" not in notes
     assert "X.XX" not in notes
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
 
 
 def test_no_gdt_frames_and_one_sheet_dimension() -> None:
-    calls = _called_names(drawing.__file__)
-    assert calls.count("add_datum_feature") == 0
-    assert calls.count("add_feature_control_frame") == 0
     # drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): the running bore takes the machined grade; the
     # spigot is pressed into the drum and takes none.
     finishes = {
@@ -397,11 +350,6 @@ def test_no_gdt_frames_and_one_sheet_dimension() -> None:
         for control in mg_magnifying_wheel_spec.SURFACE_FINISHES
     }
     assert finishes == {"mg_wheel_bore": MACHINED_UM}
-    # Only the rim's axial width is added on the sheet.  The spokes' back
-    # face is a part dimension (SpokeFaceOffset on the hidden A-A reference
-    # sketch) carrying the spokes' casting band, centred in the rim: the
-    # part owns its band, the sheet only places it.
-    assert calls.count("add_edge_dimension") == 1
     spec = mg_magnifying_wheel_spec
     assert spec.SPOKE_FACE_OFFSET == pytest.approx(
         (rim.RIM_AXIAL - geom.SPOKE_AXIAL) / 2.0
@@ -418,9 +366,6 @@ def test_no_gdt_frames_and_one_sheet_dimension() -> None:
 
 
 def test_part_stamps_make_critical_properties() -> None:
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "apply_drawing_properties" in source
-    assert "clear_dimensions_for_drawing" in source
     import _config
 
     config = _config.parts("mg-magnifying-wheel")

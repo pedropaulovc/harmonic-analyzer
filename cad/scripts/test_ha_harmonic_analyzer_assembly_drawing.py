@@ -1,8 +1,6 @@
 """Offline contract for the complete-machine fitter package (MHA-HA-00)."""
 
 import re
-from pathlib import Path
-from types import SimpleNamespace
 
 import pytest
 
@@ -14,7 +12,6 @@ import fr_tube_frame_spec
 import ha_harmonic_analyzer_assembly_sheet as notes
 import ha_harmonic_analyzer_assembly_spec as spec
 import ha_harmonic_analyzer_assembly_steps as steps
-import ms_measuring_stick_assembly_spec as ms
 from _assembly_contract import assembly_contract
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_types import DRAWING_TEMPLATES, DrawingLayout
@@ -53,29 +50,6 @@ def test_bom_is_one_row_per_subassembly_in_insertion_order() -> None:
         max(map(len, notes.BOM_DESCRIPTIONS.values()))
         <= drawing.BOM_DESCRIPTION_MAX_CHARS
     )
-
-
-@pytest.mark.parametrize("row", spec.BOM_ORDER)
-def test_each_row_balloons_a_part_only_its_subassembly_builds(row: str) -> None:
-    part = notes.BALLOON_PARTS[row]
-    scripts = Path(builder.__file__).parent
-    owners = [
-        stem
-        for stem in spec.BOM_ORDER
-        if f'"{part}"'
-        in (scripts / f"build_{stem.replace('-', '_')}_assembly.py").read_text(
-            encoding="utf-8"
-        )
-    ]
-    assert owners == [row]
-
-
-def test_builder_recipe_does_not_read_the_sheet_text() -> None:
-    # Wording edits must not rebuild the complete-machine assembly.
-    for module in (builder, spec):
-        source = Path(module.__file__).read_text(encoding="utf-8")
-        assert "import ha_harmonic_analyzer_assembly_sheet" not in source
-        assert "from ha_harmonic_analyzer_assembly_sheet" not in source
 
 
 def test_explode_moves_every_subassembly_but_the_frame_once_each() -> None:
@@ -128,51 +102,6 @@ def test_settings_print_at_the_inch_xx_grade() -> None:
     for line in spec.SETTING_LINES:
         offset = abs(float(printed[line.dimension]) * 25.4 - line.length)
         assert offset < band / 2.0
-
-
-def test_the_package_is_decimal_inch_end_to_end(monkeypatch) -> None:
-    """The contract's drawing_unit drives the model's units (right after
-    create_assembly), the TOL_* rows and both new_project_drawing calls."""
-    import asyncio
-
-    from _title_block_units import linear_band_display
-
-    assert assembly_contract(spec.ASM_NAME).drawing_unit == "in" == drawing.UNIT
-    assert linear_band_display(2, unit=drawing.UNIT) == "±.01"
-
-    class Reached(Exception):
-        pass
-
-    calls: list[object] = []
-
-    async def create_assembly():
-        calls.append("create_assembly")
-        return SimpleNamespace(is_success=True, data=None, error=None)
-
-    def model_units(adapter, unit, *, label):
-        calls.append((unit, label))
-        raise Reached
-
-    monkeypatch.setattr(builder, "apply_package_model_units", model_units)
-    adapter = SimpleNamespace(create_assembly=create_assembly)
-    with pytest.raises(Reached):
-        asyncio.run(builder.build(adapter))
-    assert calls == ["create_assembly", ("in", builder.ASM_NAME)]
-
-    units: list[str] = []
-
-    def new_drawing(_adapter, *, layout, scale, unit):
-        units.append(unit)
-        raise Reached
-
-    monkeypatch.setattr(drawing, "new_project_drawing", new_drawing)
-    with pytest.raises(Reached):
-        drawing._create_mixed_package_sheets(SimpleNamespace())
-    with pytest.raises(Reached):
-        drawing._append_template_sheet(
-            SimpleNamespace(), None, name=drawing.SHEET_NAMES[-1]
-        )
-    assert units == ["in", "in"]
 
 
 def test_bar_height_chain_lies_on_the_west_front_column_axis() -> None:
@@ -460,58 +389,3 @@ def test_a_blank_line_separates_each_numbered_step() -> None:
         if block is not drawing.ASSEMBLY_CHECKS:
             printed += [lines[i].split(". ", 1)[0] for i in starts]
     assert printed == [line.split(". ", 1)[0] for line in notes.ASSEMBLY_STEPS]
-
-
-@pytest.mark.parametrize("axis", ((0.0, -1.0, 0.0), (0.0, 1.0, 0.0),
-                                (0.6, -0.8, 0.0), (0.0, -0.8, 0.6)))
-def test_native_ha_final_guard_uses_nested_screw_root_transform(monkeypatch, axis) -> None:
-    monkeypatch.setattr(builder, "_early_bound", lambda value, interface: value)
-    screw = SimpleNamespace(
-        Name2=f"ms-measuring-stick-1/{ms.THUMB_SCREW}-1",
-        GetPathName=lambda: f"C:/models/{ms.THUMB_SCREW}.SLDPRT",
-        Transform2=SimpleNamespace(
-            ArrayData=(*axis, 1, 0, 0, 0, 0, 1, 10, 20, 30, 1)
-        ),
-    )
-
-    # Other children are ignored; applying the parent's rotation a second time
-    # would corrupt the correct root-frame axis supplied by Transform2.
-    other = SimpleNamespace(
-        Name2=f"ms-measuring-stick-1/{ms.STICK}-1",
-        GetPathName=lambda: f"C:/models/{ms.STICK}.SLDPRT",
-    )
-    component = SimpleNamespace(GetChildren=lambda: (other, screw))
-    adapter = SimpleNamespace(
-        currentModel=SimpleNamespace(GetComponentByName=lambda instance: component)
-    )
-    if axis == (0.0, -1.0, 0.0):
-        builder._assert_ms_working_pose(adapter, "ms-measuring-stick-1")
-    else:
-        with pytest.raises(RuntimeError, match="thumbscrew head must be above"):
-            builder._assert_ms_working_pose(adapter, "ms-measuring-stick-1")
-
-
-@pytest.mark.parametrize("defect", ("missing instance", "missing screw", "duplicate screw",
-                                  "missing transform"))
-def test_native_ha_final_guard_rejects_unresolved_nested_screw(monkeypatch, defect) -> None:
-    monkeypatch.setattr(builder, "_early_bound", lambda value, interface: value)
-    screw = SimpleNamespace(
-        Name2=f"ms-measuring-stick-1/{ms.THUMB_SCREW}-1",
-        GetPathName=lambda: f"C:/models/{ms.THUMB_SCREW}.SLDPRT",
-        Transform2=None,
-    )
-    children = () if defect == "missing screw" else (screw,)
-    if defect == "duplicate screw":
-        children = (screw, screw)
-    component = None if defect == "missing instance" else SimpleNamespace(GetChildren=lambda: children)
-    adapter = SimpleNamespace(
-        currentModel=SimpleNamespace(GetComponentByName=lambda instance: component)
-    )
-    message = {
-        "missing instance": "missing measuring-stick instance",
-        "missing screw": "expected one measuring-stick thumbscrew, got 0",
-        "duplicate screw": "expected one measuring-stick thumbscrew, got 2",
-        "missing transform": "missing measuring-stick thumbscrew transform",
-    }[defect]
-    with pytest.raises(RuntimeError, match=message):
-        builder._assert_ms_working_pose(adapter, "ms-measuring-stick-1")

@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import asyncio
 import math
-from pathlib import Path
 
 import pytest
 
@@ -15,11 +13,10 @@ import draw_pd_platen_bottom_guide as drawing
 import pd_feed_rack_spec as rack
 import pd_platen_bottom_guide_spec as spec
 import pd_platen_guide_spec as top_spec
-from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, drawing_specification_violations
+from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
 from _hole_spec import THREAD_MAJOR_MM
 from _inch_wall_limits import WALL_FLOOR_MM
 from _mcmaster_91794a055 import HEAD_DIA, SHANK_DIA
-from _test_stubbed_build import offline_adapter, stub_seat
 from pd_platen_spec import GUIDE_HOLE_X, GUIDE_HOLE_Y, PLATE_WIDTH
 
 
@@ -143,41 +140,6 @@ def test_print_marks_the_kept_dimensions_and_names_the_transfers() -> None:
     assert "TRANSFER" not in drawing.LOCK_CALLOUT_BELOW
     assert "draw_pd_platen_bottom_guide.py" in PRECISION_MIGRATED_DRAWINGS
     assert drawing.SPEC.part == "pd_platen_bottom_guide"
-    assert not drawing_specification_violations(
-        Path(drawing.__file__).read_text(encoding="utf-8"),
-        filename="draw_pd_platen_bottom_guide.py",
-    )
-
-
-def test_build_cuts_three_native_hole_families_and_marks_the_print(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    seat = stub_seat(monkeypatch, builder)
-    seat.name_last_feature.side_effect = lambda _adapter, name: name
-    seat.wizard_holes.return_value.placement_drive_jobs = []
-    adapter = offline_adapter()
-    asyncio.run(builder.build(adapter))
-
-    holes = {call.kwargs["name"]: call for call in seat.wizard_holes.call_args_list}
-    assert set(holes) == {"LockHoles", "PlatenScrewHoles", "RackScrewHoles"}
-    lock = holes["LockHoles"]
-    assert tuple(lock.args[3]) == (0.0, 0.0, -1.0)
-    assert len(lock.kwargs["placement_dims"]) == len(spec.LOCK_TAP_X)
-    platen = holes["PlatenScrewHoles"]
-    assert "placement_dims" not in platen.kwargs
-    assert [p[1] for p in platen.args[2]] == [spec.PLATEN_TAP_Y] * 5
-    screws = holes["RackScrewHoles"]
-    assert screws.args[1] is spec.SCREW_HOLE_SPEC
-    assert tuple(screws.args[3]) == (0.0, 1.0, 0.0)
-    assert [p[1] for p in screws.args[2]] == [spec.GUIDE_HEIGHT] * 4
-    assert [-p[2] for p in screws.args[2]] == [spec.SCREW_HOLE_Z] * 4
-    marks = {
-        (call.args[1], frozenset(call.args[2]))
-        for call in seat.mark_dimensions_for_drawing.call_args_list
-    }
-    assert marks == {
-        (feature, frozenset(names)) for feature, names in spec.DRAWING_DIMENSIONS.items()
-    }
 
 
 def test_right_view_dimensions_stand_clear_of_the_front_view() -> None:

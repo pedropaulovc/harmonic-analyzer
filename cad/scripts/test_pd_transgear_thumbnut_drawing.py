@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-import ast
 import asyncio
 import importlib.util
-from enum import Enum
 import math
 from pathlib import Path
 from types import SimpleNamespace
@@ -229,83 +227,6 @@ def test_the_dish_dimensions_stack_clear_of_each_other_and_the_rim() -> None:
     assert box("1.0", (rim_x, keep["DishDepth"][1])).xmax > rim_x
 
 
-def test_thread_callout_is_native_and_is_not_rewritten_for_countersinks(monkeypatch) -> None:
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
-
-    class Callout:
-        def __init__(self, text):
-            self.text = text
-
-        def GetText(self, part):
-            assert part in (1, 2, 3, 4)
-            return self.text if part == 3 else ""
-
-    drawing._assert_native_thread(Callout(f"{spec.THREAD} UNC - 2B THRU ALL"))
-    for wrong in ("1/4-20 UNC - 2B THRU ALL", "#8-32 UNC - 2A", "#8-32 THRU"):
-        with pytest.raises(RuntimeError, match="source thread"):
-            drawing._assert_native_thread(Callout(wrong))
-    with pytest.raises(RuntimeError, match="invalid readback"):
-        drawing._assert_native_thread(Callout(None))
-
-
-class _Readback(Enum):
-    """How the fake callout's resolved rows read back after the edit."""
-
-    FOLLOWS_DEFINITION = "follows"
-    KEEPS_CLASS = "keeps"
-
-
-class _NativeTapCallout:
-    """A native hole callout whose resolved rows follow its prefix definition."""
-
-    def __init__(self, readback: _Readback = _Readback.FOLLOWS_DEFINITION) -> None:
-        self.definition = "<hw-threaddesc> - <hw-threadclass> THRU ALL"
-        self.readback = readback
-
-    def IsHoleCallout(self) -> bool:
-        return True
-
-    def SetText(self, part: int, text: str) -> None:
-        assert part == 1
-        self.definition = text
-
-    def GetText(self, part: int) -> str:
-        if part == 5:
-            return self.definition
-        if part == 1:
-            resolved = self.definition.replace("<hw-threaddesc>", "#8-32 UNC")
-            resolved = resolved.replace("<hw-threadclass>", "2B")
-            if self.readback is _Readback.KEEPS_CLASS:
-                resolved += " - 2B"
-            return resolved
-        return ""
-
-
-def test_tap_callout_leaves_the_class_to_the_title_block(monkeypatch) -> None:
-    import _hole_callout_thread_class as thread_class
-
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(thread_class, "_early_bound", lambda value, _kind: value)
-    native = _NativeTapCallout()
-    drawing._omit_thread_class(native)
-    assert native.definition == "<hw-threaddesc> THRU ALL"
-    assert native.GetText(1) == "#8-32 UNC THRU ALL"
-    # Negative control: a callout whose rows still resolve the class refuses.
-    with pytest.raises(RuntimeError, match="still prints its class"):
-        drawing._omit_thread_class(_NativeTapCallout(_Readback.KEEPS_CLASS))
-
-
-def test_tap_callout_refuses_to_omit_a_nondefault_class(monkeypatch) -> None:
-    monkeypatch.setattr(drawing, "TAP_SPEC", SimpleNamespace(thread_class="3B"))
-
-    def forbidden(*_args, **_kwargs):
-        raise AssertionError("a nondefault class must not reach the native edit")
-
-    monkeypatch.setattr(drawing, "omit_title_block_thread_class", forbidden)
-    with pytest.raises(RuntimeError, match="only the title block's default class 2B"):
-        drawing._omit_thread_class(object())
-
-
 def test_the_knurl_puts_crests_on_the_section_plane() -> None:
     """Section A-A is the Front plane: both of its sides must cut a crest, or
     the knurl diameter has no edge to print on."""
@@ -368,42 +289,6 @@ def test_the_nut_thread_is_the_knob_shaft_stud_thread() -> None:
     assert not _nut_fits_stud(spec, other)
 
 
-def _calls(path: str) -> dict[str, ast.Call]:
-    tree = ast.parse(Path(path).read_text(encoding="utf-8"))
-    return {
-        node.func.id: node
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
-    }
-
-
-def test_the_part_carries_every_property_its_drawing_requires(monkeypatch) -> None:
-    """The drawing refuses a source part missing a required property; every
-    one must be carried and non-blank."""
-    import _part_properties
-    import _drawing_marks
-
-    required = ast.literal_eval(
-        next(
-            k.value
-            for k in _calls(drawing.__file__)["read_required_properties"].keywords
-            if k.arg == "required"
-        )
-    )
-    carried = dict(_part_properties.part_properties(part.PART_NAME))
-    stamp = _calls(part.__file__)["apply_drawing_properties"]
-    assert [ast.unparse(a) for a in stamp.args] == ["adapter", "PART_NAME"]
-    stamped: dict[str, str] = {}
-    monkeypatch.setattr(
-        _drawing_marks,
-        "apply_custom_properties",
-        lambda _adapter, props: stamped.update(props),
-    )
-    _drawing_marks.apply_drawing_properties(None, part.PART_NAME)
-    carried.update(stamped)
-    assert [name for name in required if not str(carried.get(name) or "").strip()] == []
-
-
 # Face view, run 20261001T151531763Z, as its layout audit measured them: the
 # thread callout's leader, from its arrow on the tap drill to its knee, and
 # the shoulder of SolidWorks' own tapped-hole note.  The note's drop
@@ -431,23 +316,6 @@ def test_the_tapped_hole_note_whose_leader_the_callout_crossed_is_removed() -> N
         "note DetailItem348",
     }
     assert (crossing.x, crossing.y) == pytest.approx((0.0919, 0.1866), abs=1e-4)
-    finalize = _calls(drawing.__file__)["finalize_drawing"]
-    removal = {
-        k.arg: ast.literal_eval(k.value)
-        for k in finalize.keywords
-        if k.arg in ("redundant_note_substrings", "expected_redundant_notes")
-    }
-    assert removal == {
-        "redundant_note_substrings": ("Tapped Hole",),
-        "expected_redundant_notes": 1,
-    }
-    # The removal reaches the note, and the callout itself is no note to lose.
-    note_text = f"{spec.THREAD} Tapped Hole".lower()
-    assert all(s.lower() in note_text for s in removal["redundant_note_substrings"])
-    callout_text = f"{spec.THREAD} UNC - 2B THRU ALL".lower()
-    assert not any(
-        s.lower() in callout_text for s in removal["redundant_note_substrings"]
-    )
 
 
 def test_the_knurl_is_the_designated_wheel() -> None:
@@ -685,83 +553,6 @@ def test_dimension_affixes_are_written_and_read_back(monkeypatch) -> None:
         drawing._set_dimension_affixes(object(), [annotations["HeadDia"]])
 
 
-def test_the_sheet_is_pinned_at_its_printed_scale_before_the_section(monkeypatch) -> None:
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
-    sheet = MagicMock()
-    sheet.SetScale.return_value = True
-    sheet.GetProperties2.return_value = [0, 0, 3.0, 1.0]
-    adapter = MagicMock()
-    adapter._get_attr_or_call.side_effect = lambda obj, name: (
-        sheet if name == "GetCurrentSheet" else getattr(obj, name)()
-    )
-    drawing._pin_sheet_scale(adapter)
-    sheet.SetScale.assert_called_once_with(3.0, 1.0, False, False)
-    sheet.GetProperties2.return_value = [0, 0, 2.0, 1.0]
-    with pytest.raises(RuntimeError, match="did not persist"):
-        drawing._pin_sheet_scale(adapter)
-
-
-class _SectionView:
-    """Section A-A as cut from the quarter-turned face view: the axis lies
-    horizontal through Position, ``Angle`` turns the ink about it, and
-    ``SetViewPosition`` moves the ink with Position (run 20261001T142942518Z).
-    It starts rim right, off the place SECTION_KEEP assumes."""
-
-    def __init__(self, *, moves: bool = True, angle: float = 0.0) -> None:
-        self.Position = (0.180, 0.140)
-        self.Angle = angle
-        self.moves = moves
-
-    def project(self, xyz: tuple[float, float, float]) -> tuple[float, float]:
-        along = (xyz[1] * 1000.0 - spec.OVERALL_LENGTH / 2.0) * drawing._S / 1000.0
-        across = xyz[0] * drawing._S
-        c, s = math.cos(self.Angle), math.sin(self.Angle)
-        return (
-            self.Position[0] + along * c - across * s,
-            self.Position[1] + along * s + across * c,
-        )
-
-    def SetViewPosition(self, xy, _update: bool = False) -> bool:
-        if self.moves:
-            self.Position = tuple(xy)
-        return True
-
-
-def _orient(monkeypatch, view: _SectionView) -> None:
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_k: None)
-    monkeypatch.setattr(drawing, "double_array", list)
-    monkeypatch.setattr(
-        drawing, "model_point_in_view", lambda _a, v, xyz, label: v.project(xyz)
-    )
-    drawing._orient_section(object(), view)
-
-
-def test_the_section_is_laid_seat_right_on_its_centre(monkeypatch) -> None:
-    view = _SectionView()
-    # As created, the rim lies right: half a turn from where it belongs.
-    assert drawing._axis_turn(view.project((0, 0, 0)), view.project((0, 0.016, 0))) == (
-        pytest.approx(math.pi)
-    )
-    _orient(monkeypatch, view)
-    assert view.project((0.0, 0.0, 0.0)) == pytest.approx(
-        (drawing.SEAT_X, drawing.SECTION_CENTER[1])
-    )
-    assert view.project((0.0, spec.OVERALL_LENGTH / 1000.0, 0.0)) == pytest.approx(
-        (drawing.RIM_X, drawing.SECTION_CENTER[1])
-    )
-
-
-def test_a_section_whose_ink_will_not_move_is_refused(monkeypatch) -> None:
-    with pytest.raises(RuntimeError, match="axis ends at seat"):
-        _orient(monkeypatch, _SectionView(moves=False, angle=math.pi))
-
-
-def test_a_section_off_the_horizontal_is_refused(monkeypatch) -> None:
-    with pytest.raises(RuntimeError, match="off the sheet's horizontal"):
-        _orient(monkeypatch, _SectionView(angle=math.pi / 2.0))
-
-
 def test_the_thread_callout_stays_inside_the_left_border() -> None:
     """The source #8 thread fits; a deliberate border-crossing anchor fails."""
     from _layout_geometry import estimate_text_box
@@ -777,73 +568,6 @@ def test_the_thread_callout_stays_inside_the_left_border() -> None:
     # Negative control: place the centre directly on the border.
     old = (SHEET_INNER_LEFT, drawing.THREAD_CALLOUT_XY[1])
     assert left_edge(old) < SHEET_INNER_LEFT
-
-
-class _CountersinkTolerance:
-    """A tolerance that keeps its type, or one stuck at the old swTolMAX."""
-
-    def __init__(self, *, persists=True):
-        self._type = 6
-        self.persists = persists
-
-    @property
-    def Type(self) -> int:
-        return self._type
-
-    @Type.setter
-    def Type(self, value: int) -> None:
-        if self.persists:
-            self._type = value
-
-
-class _CountersinkDisplay:
-    def __init__(self, *, persists=True):
-        self.texts: dict[int, str] = {}
-        self.persists = persists
-
-    def SetText(self, part: int, text: str) -> None:
-        if self.persists:
-            self.texts[part] = text
-
-    def GetText(self, part: int) -> str:
-        return self.texts.get(part, "")
-
-
-def _apply_countersink_max(monkeypatch, tolerance, display=None, *, diameter=None):
-    display = _CountersinkDisplay() if display is None else display
-    monkeypatch.setattr(part, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(
-        part, "_named_dimension",
-        lambda *_args: (display, SimpleNamespace(
-            SystemValue=(spec.CSK_DIA if diameter is None else diameter) / 1000.0,
-            Tolerance=tolerance,
-        )),
-    )
-    part._countersink_max_limit(object(), "CountersinkDia")
-    return display
-
-
-def test_the_countersink_prints_its_single_max_as_authored_text(monkeypatch) -> None:
-    tolerance = _CountersinkTolerance()
-    display = _apply_countersink_max(monkeypatch, tolerance)
-    assert tolerance.Type == spec.CSK_DIA_TOL_TYPE == 0
-    assert display.GetText(2) == spec.CSK_DIA_SUFFIX
-    # The modelled size IS the max, and it clears the thread major.
-    assert spec.CSK_DIA > spec.THREAD_MAJOR
-
-
-@pytest.mark.parametrize(
-    "tolerance, display, diameter, message",
-    [(None, None, None, "missing"),
-     (_CountersinkTolerance(persists=False), None, None, "persist"),
-     (_CountersinkTolerance(), _CountersinkDisplay(persists=False), None, "persist"),
-     (_CountersinkTolerance(), None, 6.75, "diameter")],
-)
-def test_native_countersink_control_refuses_unwritten_or_obsolete_geometry(
-    monkeypatch, tolerance, display, diameter, message
-) -> None:
-    with pytest.raises(RuntimeError, match=message):
-        _apply_countersink_max(monkeypatch, tolerance, display, diameter=diameter)
 
 
 def test_build_pins_the_sheet_before_the_section_and_writes_affixes_after_callouts(

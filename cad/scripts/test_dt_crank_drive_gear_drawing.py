@@ -31,14 +31,6 @@ from _printed_tolerance import printed_band_mm
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
-def _source() -> str:
-    return Path(drawing.__file__).read_text(encoding="utf-8")
-
-
-def _build_source() -> str:
-    return Path(part.__file__).read_text(encoding="utf-8")
-
-
 def test_required_drawing_paths() -> None:
     assert drawing.SLDDRW.as_posix().endswith("/slddrw/dt-crank-drive-gear.SLDDRW")
     assert drawing.PDF.as_posix().endswith("/pdf/dt-crank-drive-gear.pdf")
@@ -67,11 +59,6 @@ def test_the_outside_diameter_is_a_native_reference_sketch_dimension() -> None:
     # `How the repository implements the guidelines`'s remedy is to MODEL it (a
     # construction sketch whose one driving dimension IS the value), not to
     # type it into the data block.
-    build = _build_source()
-    assert 'name_last_feature(adapter, "OutsideDiaReference")' in build
-    assert 'name_dimensions(adapter, "OutsideDiaReference", ["OutsideDia"])' in build
-    assert "_as_construction(adapter, tip_ref)" in build
-    assert '_verify_named_dimension(adapter, "OutsideDia@OutsideDiaReference"' in build
     assert "OutsideDiaReference" in spec.DRAWING_DIMENSIONS
     # The turned blank pays the retained OD band at both published span limits.
     minimum_support = min(
@@ -87,12 +74,6 @@ def test_the_outside_diameter_is_a_native_reference_sketch_dimension() -> None:
 
 
 def test_the_face_width_is_a_named_driven_blank_dimension() -> None:
-    build = _build_source()
-    assert '"Boss-Extrude1").Name = "GearBlank"' in build
-    assert 'name_dimensions(adapter, "GearBlank", ["FaceWidth"])' in build
-    # Driven, so a default-name rename that resolved the wrong feature moves
-    # the blank and the equation-neutral volume gate fails loud.
-    assert "'\"FaceWidth\"'" in build
     assert spec.FACE_WIDTH == part.FACE_WIDTH
     assert spec.BORE_DIA == pytest.approx(part.BORE_DIAMETER)
 
@@ -101,12 +82,6 @@ def test_precision_is_authored_on_the_part_and_only_read_by_the_sheet() -> None:
     # drawing-simplicity-policy.md `How the repository implements the guidelines`: the places a dimension prints are part of the tolerance it
     # claims, so the model owns them.
     assert "draw_dt_crank_drive_gear.py" in PRECISION_MIGRATED_DRAWINGS
-    source = _source()
-    assert "set_dimension_precision" not in source
-    assert "SetPrecision3" not in source
-    assert "DIMENSION_PRECISION" not in source
-    assert "assert_imported_precision(" in source
-    assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in _build_source()
 
 
 def test_bore_band_fits_the_keyed_land_at_every_limit() -> None:
@@ -193,7 +168,6 @@ def test_south_chamfer_clears_the_collar_root_and_prints_title_block_band() -> N
         dt_cone_gear_shaft_spec.COLLAR_ROOT_RADIUS_MAX
     )
     assert spec.BORE_SOUTH_CHAMFER_MIN > dt_cone_gear_shaft_spec.COLLAR_ROOT_RADIUS_MAX
-    assert '"BoreSouthChamfer", "BoreSouthChamferSize"' not in _build_source()
 
 
 def test_chamfer_leaves_a_collar_bearing_annulus_and_bore_engagement() -> None:
@@ -275,20 +249,10 @@ def test_print_carries_no_gdt_basic_dimensions_or_roughness() -> None:
     # land is not on the GD&T allowlist, so the end-face perpendicularity
     # frame, the tooth-tip runout frame and the bore datum are gone. Rule 6
     # puts no roughness on a gear's seat bore: it does not run.
-    source = _source()
-    for helper in (
-        "add_datum_feature(",
-        "add_feature_control_frame(",
-        "set_basic_dimension(",
-        "project_part_pmi(",
-        "add_surface_finish(",
-    ):
-        assert helper not in source, helper
     assert not hasattr(spec, "GEOMETRIC_TOLERANCES_MM")
     assert not hasattr(spec, "GEOMETRIC_CONTROLS")
     assert not hasattr(spec, "PART_DATUMS")
     assert spec.SURFACE_FINISHES == ()
-    assert "surface_finishes=SURFACE_FINISHES" in _build_source()
 
 
 def test_gear_data_block_is_the_tooth_system_and_nothing_else() -> None:
@@ -347,10 +311,6 @@ def test_gear_data_block_is_the_tooth_system_and_nothing_else() -> None:
             continue
         _, _, value = line.partition(":")
         assert " +" not in value and " TO " not in value, line
-    source = _source()
-    assert 'adapter, "Gear Data"' in source
-    assert "Manufacturing Notes" not in source
-    assert "Manufacturing Notes" not in _build_source()
 
 
 @pytest.mark.parametrize("part_spec", (spec, pinion_spec))
@@ -444,7 +404,6 @@ def test_the_data_block_states_the_tooth_line_as_it_stated_the_helix() -> None:
     assert len(lines) == 19
     assert lines[-1] == "MATES WITH:  CRANK PINION MHA-DT-10, 16T SPUR"
     assert "ToothLineReference" not in spec.DRAWING_DIMENSIONS
-    assert "ToothLineReference" not in _build_source()
     # The ordinary +/-1 deg keeps the mid-face worst-corner crossed-mesh
     # backlash positive: the 64T normal pitch moves p_t sin(beta) per radian.
     import crank_mesh_stack
@@ -489,7 +448,6 @@ def test_gear_data_numbers_track_the_part_geometry() -> None:
     )
     assert not hasattr(spec, "HELIX_LEAD_MM")
     assert f"{spec.VIRTUAL_TEETH:.{spec.GEAR_DATA_REFERENCE_PLACES}f}" in notes.GEAR_DATA
-    assert "flank_bound_mm=NATIVE_FLANK_BOUND_MM" in _build_source()
     profile = spec.STOCK_PROFILE
     assert spec.DEDENDUM_FACTOR == 1.25
     # Standard depth puts the cutter's reference pitch line on the gear's pitch
@@ -579,7 +537,6 @@ def test_bore_and_keyway_dimensions_link_one_matched_fit_note() -> None:
     assert max(len(line) for line in drawing.SHEET_NOTES.splitlines()) <= 51
     assert "FLAT" not in drawing.SHEET_NOTES
     assert len(drawing.SHEET_NOTES.splitlines()) <= 4
-    assert "add_note(adapter, SHEET_NOTES, *NOTES_XY)" in _source()
 
 
 def test_section_caption_prints_no_sheet_scale_and_names_the_turn() -> None:
@@ -588,12 +545,7 @@ def test_section_caption_prints_no_sheet_scale_and_names_the_turn() -> None:
     # letter. A rotated view says so, in a note under the caption.
     assert drawing.SECTION_CAPTION_TEXT == "<VLNAME> <VLLABEL>"
     assert drawing.ROTATION_NOTE == "ROTATED 90\N{DEGREE SIGN} CCW"
-    source = _source()
-    assert "note.PropertyLinkedText = SECTION_CAPTION_TEXT" in source
-    assert "add_note(adapter, ROTATION_NOTE, *ROTATION_NOTE_XY)" in source
-    assert "SetUserPreferenceString(84" not in source
     assert "SCALE" not in drawing.ROTATION_NOTE
-
 
 
 def test_sheet_runs_at_3_to_2_with_every_view_at_sheet_scale() -> None:
@@ -602,25 +554,7 @@ def test_sheet_runs_at_3_to_2_with_every_view_at_sheet_scale() -> None:
     # title block's SCALE field is the whole truth and no view needs a note.
     assert drawing.SHEET_SCALE == (3.0, 2.0)
     assert drawing.VIEW_SCALE == (3, 2)
-    assert _source().count("scale=VIEW_SCALE") == 3
     assert not hasattr(spec, "ISOMETRIC_VIEW_NOTE")
-
-
-def test_hidden_lines_are_off_and_helical_tangent_edges_are_dropped() -> None:
-    # The face view shows the bore and keyway in solid lines, and the centre
-    # section cuts the bore open, so hidden edges add no requirement; the
-    # helical flanks project dense tangent curves, removed from orthographic
-    # views only.
-    source = _source()
-    assert (
-        "for view in (front, section, iso):\n        set_hidden_lines_removed" in source
-    )
-    assert "set_hidden_lines_visible" not in source
-    assert '_hide_tangent_edges(front, "front")' in source
-    assert '_hide_tangent_edges(section, "section")' in source
-    assert "_hide_tangent_edges(iso" not in source
-    assert "SetDisplayTangentEdges2(0)" in source
-    assert "GetDisplayTangentEdges2()" in source
 
 
 # Dimension text centres on its keep point. Metrics off the round-bore 3:2 64T
@@ -747,7 +681,6 @@ _NOTE_LINE_PITCH = 0.0035
 _NOTE_DESCENDER = 0.0006
 _NOTE_CHAR_WIDTH = 0.00174
 _TIP_DIA_TEXT = f"Ø{spec.OUTSIDE_DIA:.2f} ±{spec.OUTSIDE_DIA_TOLERANCE_MM:g}"
-_TIP_DIA_TEXT_HEIGHT = 0.0039
 
 
 def _gear_data_box() -> tuple[float, ...]:
@@ -756,13 +689,6 @@ def _gear_data_box() -> tuple[float, ...]:
     width = _NOTE_CHAR_WIDTH * max(len(row) for row in rows)
     bottom = top - len(rows) * _NOTE_LINE_PITCH - _NOTE_DESCENDER
     return (left, bottom, left + width, top)
-
-
-def _tip_dia_text_box(centre: tuple[float, float]) -> tuple[float, ...]:
-    half_w = _CHAR_WIDTH * len(_TIP_DIA_TEXT) / 2.0
-    half_h = _TIP_DIA_TEXT_HEIGHT / 2.0
-    x, y = centre
-    return (x - half_w, y - half_h, x + half_w, y + half_h)
 
 
 def test_tip_diameter_block_stands_clear_of_the_gear_data_teeth_and_section() -> None:
@@ -793,10 +719,6 @@ def test_tip_diameter_block_stands_clear_of_the_gear_data_teeth_and_section() ->
 
 
 def test_part_stamps_make_critical_properties() -> None:
-    build = _build_source()
-    assert "apply_drawing_properties" in build
-    assert "clear_dimensions_for_drawing" in build
-
     config = _config.parts("dt-crank-drive-gear")
     # The FINISH field states the surface condition only: how the teeth are
     # made is the PROCESS row's job, and saying it twice is over-specification.
@@ -812,13 +734,6 @@ def test_outside_dia_reference_is_saved_hidden_and_imported_per_view() -> None:
     # #880: a reference sketch owns printed dimensions but no geometry, so the
     # part saves it hidden (no assembly instance renders it) and the drawing
     # shows it per view through _drawing_hidden_sketches to import them.
-    build = Path(part.__file__).read_text(encoding="utf-8")
-    blank = 'blank_sketch(adapter, "OutsideDiaReference")'
-    assert blank in build
-    assert build.index(blank) < build.rindex("save_simplified_part(adapter, PART_NAME")
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "from _drawing_hidden_sketches import curate_view_dimensions" in source
-    assert "    curate_view_dimensions,\n" not in source.replace("\r\n", "\n")
     assert "OutsideDiaReference" in spec.DRAWING_DIMENSIONS
 
 

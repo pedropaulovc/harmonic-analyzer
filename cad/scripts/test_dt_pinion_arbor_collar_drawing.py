@@ -115,16 +115,11 @@ def test_collar_pin_is_the_stock_mha145_named_on_the_hole_not_a_note() -> None:
     assert "/" not in bore
     assert _config.parts("dt-pinion-arbor")["number"] in bore
     assert not hasattr(spec, "DRAWING_NOTES")
-    for script in (collar, drawing):
-        assert "Manufacturing Notes" not in Path(script.__file__).read_text(
-            encoding="utf-8"
-        )
 
 
 def test_drive_train_pins_the_collar_with_a_locked_mha145() -> None:
     """The collar pin is a modelled component on the collar's and arbor's
     common pin-hole axis, locked to the collar so it rides the p2 swing."""
-    import inspect
 
     import build_dt_drive_train_assembly as assembly
 
@@ -132,10 +127,6 @@ def test_drive_train_pins_the_collar_with_a_locked_mha145() -> None:
     # The stock pin's axis (local X) is the arbor's pin-hole axis (local Y).
     assert rows[0] == pytest.approx(assembly.ARBOR_ROWS[1])
     assert assembly.COLLAR_PIN_Z == pytest.approx(assembly.ARBOR_Z0 + arbor.PIN_Z)
-    source = inspect.getsource(assembly)
-    assert "[APINION_X, APINION_Y, COLLAR_PIN_Z]" in source
-    assert 'named_ref(f"Front Plane@{collar_pin}", "PLANE")' in source
-    assert 'label="collar spring pin locked in the collar"' in source
 
 
 def test_webs_meet_the_inch_target_at_the_printed_worst_case() -> None:
@@ -250,8 +241,6 @@ def test_turned_part_views_follow_the_machinist() -> None:
     # only the bore, a solid circle end-on, keeps its callout there.
     assert set(drawing.PROFILE_KEEP) == {"Depth", "PinHoleCz", "PinHoleDia"}
     assert set(drawing.END_KEEP) == {"BoreDia", "CollarOd"}
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "_move_dimension(\n        adapter, od_donors[0], profile" in source
     # Third angle: the end view seen from the +Z end sits left of the profile.
     assert drawing.END_CENTER[0] < drawing.PROFILE_CENTER[0]
     assert drawing.END_CENTER[1] == drawing.PROFILE_CENTER[1]

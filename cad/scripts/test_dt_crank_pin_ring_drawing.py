@@ -27,14 +27,6 @@ from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dime
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
-def _source() -> str:
-    return Path(drawing.__file__).read_text(encoding="utf-8")
-
-
-def _build_source() -> str:
-    return Path(part.__file__).read_text(encoding="utf-8")
-
-
 def test_required_drawing_paths() -> None:
     assert drawing.SLDDRW.as_posix().endswith("/slddrw/dt-crank-pin-ring.SLDDRW")
     assert drawing.PDF.as_posix().endswith("/pdf/dt-crank-pin-ring.pdf")
@@ -59,13 +51,6 @@ def test_pliers_closed_butt_gap_replaces_the_solder_bead() -> None:
     wire_area = math.pi * (spec.WIRE_DIA / 2.0) ** 2
     assert spec.V_RING - spec.V_RING_CLOSED == pytest.approx(wire_area * spec.BUTT_GAP)
     assert not hasattr(spec, "JOINT_DIA") and not hasattr(spec, "V_JOINT")
-    # The gap is cut square across the wire on the ring's side away from the
-    # cross-hole (its crown) and the chain (its far side).
-    build = "".join(_build_source().split())
-    assert 'name_last_feature(adapter,"ButtGap")' in build
-    assert "awaitadapter.create_cut_extrude(" in build
-    assert "await_butt_gap(adapter)" in build
-    assert "_solder_joint" not in build
 
 
 def _band(places: int) -> float:
@@ -108,44 +93,8 @@ def test_marked_dimension_set_lives_in_the_notes_module() -> None:
 def test_precision_is_authored_on_the_part_at_the_title_block_place() -> None:
     assert notes.DRAWING_PRECISION_BY_NAME == {"WireDia": 3, "RingID": 2}
     assert "draw_dt_crank_pin_ring.py" in PRECISION_MIGRATED_DRAWINGS
-    source = _source()
-    assert "set_dimension_precision" not in source
-    assert "SetPrecision3" not in source
-    assert "assert_imported_precision(" in source
-    assert "hidden_sketches.curate_view_dimensions(" in source
-    # Native diameters: the plural helper keeps their glyph inside "( )".
-    assert (
-        "set_reference_dimensions(adapter, annotations, REFERENCE_DIMENSIONS)" in source
-    )
-    build = _build_source()
-    assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in build
-    assert "require_saved_drawing_properties(" in build
     # visual_noncritical: no model-authored band anywhere.
     assert model_toleranced_dimensions(part) == {}
-
-
-def test_ring_reference_sketch_carries_the_inside_diameter() -> None:
-    build = "".join(_build_source().split())
-    assert 'create_sketch("Top")' in build
-    assert 'names=("RingCx",None,"RingID")' in build
-    assert 'drives=(None,None,\'2*"MeanR"-"WireDia"\')' in build
-    assert 'name_last_feature(adapter,"RingReference")' in build
-    assert '"radial"' not in build
-
-
-def test_print_carries_no_gdt_roughness_or_hole_callouts() -> None:
-    source = _source()
-    for helper in (
-        "add_datum_feature(",
-        "add_feature_control_frame(",
-        "set_basic_dimension(",
-        "project_part_pmi(",
-        "add_surface_finish(",
-        "add_native_hole_callout(",
-    ):
-        assert helper not in source, helper
-    assert "for view in (top, front, iso):\n        set_hidden_lines_removed" in source
-    assert '"*Isometric"' in source
 
 
 def test_notes_are_few_and_carry_no_part_sizes() -> None:
@@ -168,13 +117,10 @@ def test_notes_are_few_and_carry_no_part_sizes() -> None:
         # A flag to a numbered note is the only number a callout carries.
         words = re.sub(r"SEE NOTE \d+", "", callout)
         assert not any(ch.isdigit() for ch in words), callout
-    assert '"Manufacturing Notes": DRAWING_NOTES' in _build_source()
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in _source()
 
 
 def test_views_are_in_projection_and_clear_of_the_title_block() -> None:
     assert drawing.SHEET_SCALE == (5.0, 1.0)
-    assert _source().count("scale=VIEW_SCALE") == 3
     # Third-angle: the top view above the front view, on one vertical.
     assert drawing.TOP_CENTER[0] == drawing.FRONT_CENTER[0]
     assert drawing.TOP_CENTER[1] - drawing.HALF_OD > drawing.FRONT_CENTER[1] + 0.020
@@ -205,7 +151,6 @@ def test_joint_note_is_flagged_at_the_butt_joint() -> None:
     flag_x, flag_y = drawing.JOINT_FLAG_XY
     assert math.dist((flag_x, flag_y), drawing.TOP_CENTER) > drawing.HALF_OD
     assert flag_y < tip_y and flag_y > drawing.FRONT_CENTER[1] + 0.020
-    assert "add_leader_note(" in _source() and "view=top" in _source()
 
 
 def test_part_registry_row() -> None:

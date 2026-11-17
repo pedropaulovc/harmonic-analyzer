@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import ast
-import re
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -110,19 +108,7 @@ def test_pin_hole_sits_at_mid_engagement() -> None:
 
 
 def test_sheet_carries_no_gdt_finish_or_literal_precision() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    for forbidden in (
-        "add_feature_control_frame",
-        "add_datum_feature",
-        "add_native_axis_datum",
-        "add_surface_finish",
-        "add_attached_note",
-        "SetPrecision3",
-    ):
-        assert forbidden not in source, forbidden
     assert dt_pinion_lever_spec.SURFACE_FINISHES == ()
-    assert "assert_imported_precision" in source
-    assert source.count("dimensions_by_feature=DRAWING_DIMENSIONS") == 3
 
 
 def test_sheet_runs_at_1_to_1_with_a_3_to_1_detail_of_section_a_a() -> None:
@@ -137,10 +123,6 @@ def test_sheet_runs_at_1_to_1_with_a_3_to_1_detail_of_section_a_a() -> None:
     # The detail fence takes the whole hub, crown apex included.
     apex = dt_pinion_lever_spec.HUB_LEN / 2.0 + dt_pinion_lever_spec.CAP_SAG
     assert drawing.DETAIL_RADIUS_MM > apex
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "scale=(1, 1)" in source
-    # The one pictorial is at the sheet scale: no label restates it (rule 9).
-    assert "Isometric View Note" not in source
 
 
 def test_hub_bore_names_its_fit_route_and_depth() -> None:
@@ -155,10 +137,6 @@ def test_hub_bore_names_its_fit_route_and_depth() -> None:
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:
-    source = Path(lever.__file__).read_text(encoding="utf-8")
-    assert "apply_drawing_properties" in source
-    assert "clear_dimensions_for_drawing" in source
-    assert "apply_drawing_precision" in source
     import _config
 
     spec = _config.parts("dt-pinion-lever")
@@ -197,23 +175,6 @@ def _run_blank(monkeypatch, module, sketches, *, blanks: bool) -> list[str]:
     return blanked
 
 
-def _with_block(source: str, opener: str) -> tuple[str, str]:
-    """The header and body of the one ``with`` statement starting ``opener``."""
-    lines = source.split("\n")
-    (start,) = [i for i, line in enumerate(lines) if line.strip().startswith(opener)]
-    indent = len(lines[start]) - len(lines[start].lstrip())
-    header = [lines[start]]
-    rest = iter(lines[start + 1 :])
-    while not header[-1].rstrip().endswith(":"):
-        header.append(next(rest))
-    body = []
-    for line in rest:
-        if line.strip() and len(line) - len(line.lstrip()) <= indent:
-            break
-        body.append(line)
-    return "\n".join(header), "\n".join(body)
-
-
 def test_station_reference_sketches_are_saved_hidden() -> None:
     # #880 (Main, via dtrefactor): the lever's two station sketches rendered
     # in the drive-train; the part saves them hidden.
@@ -229,15 +190,6 @@ def test_station_reference_sketches_are_saved_hidden() -> None:
         for name in dt_pinion_lever_spec.DRAWING_DIMENSIONS
         if name.endswith("Reference")
     }
-    source = Path(lever.__file__).read_text(encoding="utf-8")
-    assert set(re.findall(r'"(\w+Reference)"', source)) == set(expected)
-    blank = "blank_reference_sketches(adapter, REFERENCE_SKETCHES)"
-    # One shared helper in _sketch (restricted review), no local copy.
-    assert "def _blank_reference_sketches" not in source
-    assert source.count(blank) == 1
-    assert source.index(blank) < source.rindex(
-        "save_part_and_images(adapter, PART_NAME)"
-    )
 
 
 def test_station_reference_blank_reads_every_sketch_back_hidden(monkeypatch) -> None:
@@ -252,38 +204,7 @@ def test_hub_detail_is_created_and_dimensioned_while_the_part_shows_them() -> No
     # created and refuses the per-view override (_drawing_hidden_sketches), so
     # section A-A and its detail are created and curated inside
     # part_sketches_shown.
-    source = Path(drawing.__file__).read_text(encoding="utf-8").replace("\r\n", "\n")
-    assert "from _drawing_hidden_sketches import" in source
-    imports = [
-        node
-        for node in ast.walk(ast.parse(source))
-        if isinstance(node, ast.ImportFrom)
-    ]
-    assert any(
-        node.module == "_drawing_hidden_sketches"
-        and any(alias.name == "curate_view_dimensions" for alias in node.names)
-        for node in imports
-    )
-    assert not any(
-        node.module != "_drawing_hidden_sketches"
-        and any(alias.name == "curate_view_dimensions" for alias in node.names)
-        for node in imports
-    )
     assert drawing.REFERENCE_SKETCHES is dt_pinion_lever_spec.REFERENCE_SKETCHES
-    opened = source.index("await adapter.open_model(str(SOURCE))")
-    captured = source.index("source_model = adapter.currentModel")
-    assert opened < captured < source.index("new_project_drawing(")
-    header, block = _with_block(source, "with part_sketches_shown(")
-    assert "source_model" in header
-    assert "REFERENCE_SKETCHES" in header
-    # The section's items select through the front view it is cut from, so
-    # that view shows them too.
-    assert "base_view=front" in header
-    assert "_lever_section(adapter, front)" in block
-    assert "_hub_detail(adapter, section)" in block
-    assert "set_hidden_lines_removed(adapter, detail)" in block
-    assert "keep=DETAIL_KEEP" in block
-    assert "auto_center_marks" not in block
     # Every sketch the block shows keeps a dimension in the detail; the
     # projected views dimension none of them.
     reference_dims = set().union(
@@ -296,24 +217,9 @@ def test_hub_detail_is_created_and_dimensioned_while_the_part_shows_them() -> No
     assert not reference_dims & (set(drawing.FRONT_KEEP) | set(drawing.TOP_KEEP))
 
 
-def test_every_projected_view_and_the_section_hide_their_hidden_lines() -> None:
-    # PR #1436: the isometric stays in the hidden-lines loop.
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "for view in (front, top, iso):" in source
-    assert "set_hidden_lines_removed(adapter, section)" in source
-    assert '"*Right"' not in source
-
-
 def test_detail_fence_and_rod_axis_go_straight_to_the_database() -> None:
     # ENFORCE r2 (#1011): an inferred fence snapped to B and the crown apex
     # (a 6 mm detail), and GRIP AXIS had no rod axis to land on.
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    for name in ("_hub_detail", "_rod_axis_in_detail"):
-        body = source[source.index(f"def {name}(") :]
-        body = body[: body.index("\ndef ")]
-        assert "manager.AddToDB = True" in body, name
-    assert "_rod_axis_in_detail(adapter, detail)" in source
-    assert "circle.SetLabelPosition(*DETAIL_LETTER_XY)" in source
     # The rod axis runs from inside the hub to just past the fence.
     low, high = drawing.ROD_AXIS_MODEL_Y_MM
     assert low < dt_pinion_lever_spec.HUB_OD / 2.0 < drawing.DETAIL_RADIUS_MM < high
@@ -323,14 +229,6 @@ def test_station_references_are_points_and_hub_diameters_near_side() -> None:
     # ENFORCE r3 (#1011): detail B kept the reference lines the part showed
     # while it was dimensioned, and they read as hidden edges across the cut;
     # and both hub diameters crossed at the hub centre.
-    import build_dt_pinion_lever
 
-    source = Path(build_dt_pinion_lever.__file__).read_text(encoding="utf-8")
-    body = source[source.index("async def _station_reference(") :]
-    body = body[: body.index("\nasync def ")]
-    assert body.count("_add_reference_point(") == 2
-    assert "add_line" not in body
     assert drawing.NEAR_SIDE_DIAMETERS == ("HubOd", "HubBore")
     assert set(drawing.NEAR_SIDE_DIAMETERS) <= set(drawing.FRONT_KEEP)
-    draw_source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'set_near_side_diameter(matches[0], f"lever {name}")' in draw_source

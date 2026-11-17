@@ -64,14 +64,6 @@ def test_precision_is_authored_on_the_part_and_only_read_by_the_sheet() -> None:
     # as-bought rod's fraction reference (the match-drilled hole sets the fit)
     # and the length takes the title block's grade -- no band of their own.
     assert "draw_dt_crank_pinion_pin.py" in PRECISION_MIGRATED_DRAWINGS
-    source = _source()
-    assert "set_dimension_precision" not in source
-    assert "SetPrecision3" not in source
-    assert "assert_imported_precision(" in source
-    build = _build_source()
-    assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in build
-    assert "set_dimension_bilateral_tolerance" not in build
-    assert "set_dimension_symmetric_tolerance" not in build
     assert [name for name in dir(spec) if name.endswith("_BAND")] == []
 
 
@@ -101,8 +93,6 @@ def test_sheet_carries_no_manufacturing_note() -> None:
     # drawing-guidelines.md rule 7 (notes: few, flagged, never a method) (Main, 2026-09-25): the stock is stated once, in the title-block
     # MATERIAL; a note repeating "1/8 IN DRILL ROD" put a dimension in a note.
     assert not hasattr(spec, "DRAWING_NOTES")
-    assert "Manufacturing Notes" not in _build_source()
-    assert "Manufacturing Notes" not in _source()
 
 
 def test_stock_reference_prints_no_supplier_tolerance() -> None:
@@ -111,13 +101,11 @@ def test_stock_reference_prints_no_supplier_tolerance() -> None:
     assert spec.PIN_DIA_CALLOUT == "STOCK, AS SUPPLIED"
     for token in ("\u00b1", "TOL", "DRILL ROD", "1018", "+.", "-."):
         assert token not in spec.PIN_DIA_CALLOUT, token
-    assert "callout=PIN_DIA_CALLOUT" in _source()
 
 
 def test_sheet_runs_at_8_to_1_with_every_view_at_sheet_scale() -> None:
     assert drawing.SHEET_SCALE == (8.0, 1.0)
     assert drawing.VIEW_SCALE == (8, 1)
-    assert _source().count("scale=VIEW_SCALE") == 3
 
 
 def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:

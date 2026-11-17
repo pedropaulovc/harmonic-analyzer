@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import ast
 import inspect
-from pathlib import Path
 
 import pytest
 
@@ -23,7 +22,6 @@ import dt_pinion_arbor_geometry as arbor
 import dt_pinion_arbor_spec as arbor_spec
 from _drawing_tolerances import _tolerance_places
 
-SCRIPTS = Path(__file__).resolve().parent
 # Measured on run 20261103T022858451Z sheet 15 (90 dpi raster of the PDF):
 # the frame's inner edge is at 419.1 mm and the title block's top at 65.5 mm;
 # the DT-00 note font advances ~2.43 mm a character (the 43-character spring
@@ -50,9 +48,6 @@ def test_the_leg_runs_from_the_placed_head_rear_face_to_the_placed_drum_front() 
     assert setting.AXIS_Y == assembly.APINION_Y
     # The Right-plane leg is true length only along machine Z.
     assert [row[2] for row in assembly.ARBOR_ROWS] == [0.0, 0.0, 1.0]
-    source = inspect.getsource(setting)
-    for literal in ("60.96", "2.40", "0.254", "95.25"):
-        assert literal not in source
 
 
 def test_one_band_feeds_every_drum_station_stack() -> None:

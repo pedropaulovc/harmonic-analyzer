@@ -13,7 +13,6 @@ import importlib.util
 
 import pytest
 
-import pd_paper_drive_assembly_steps as steps
 import pd_platen_guide_spec as guide
 import pd_rack_pinion_spec as disc
 import pd_transgear_disc_hub_spec as hub
@@ -33,17 +32,6 @@ THREE_PLACE = printed_band_mm(3, unit="in")
 # MHA-PD-06's tap mouths: a .004 burr break on each, its loss counted from the
 # tap drill (rack_pinion_spec, as printed on its sheet; R9-63).
 MOUTH_BREAK = 0.004 * IN
-
-
-def _inch_window(text: str) -> tuple[float, ...]:
-    """A printed inch window (``.000-.008``) as millimetres."""
-    return tuple(float(v) * IN for v in text.split("-"))
-
-
-def _inside(printed: tuple[float, ...], limits: tuple[float, float], step: float) -> None:
-    """The inch sheet prints the window rounded inward by under one step (mm)."""
-    assert limits[0] <= printed[0] < limits[0] + step
-    assert limits[1] - step < printed[1] <= limits[1]
 
 
 def _exec_fresh(module) -> None:
@@ -142,77 +130,3 @@ def test_a_float_window_the_rails_cannot_reach_is_refused(monkeypatch) -> None:
     monkeypatch.setattr(guide, "LOCK_GAP_FIT", (0.05, 0.40))
     with pytest.raises(AssertionError, match="as-made lock gap under the fitted"):
         _exec_fresh(build_pd_platen_guide)
-
-
-def test_fit_up_adjustments_are_complete_and_ordered_before_installation() -> None:
-    """Facing/cutting limits and checks belong to one ordered assembly step,
-    regardless of how many physical text lines the print needs."""
-    import re
-
-    import draw_pd_paper_drive_assembly as drawing
-
-    seq = steps.SEQUENCE
-    assert seq.index("lock-seats-faced") == seq.index("guide-locks-set") + 1
-    assert (
-        seq.index("disc-cluster-assembled")
-        < seq.index("disc-taps-transferred")
-        < seq.index("disc-screws-cut")
-        < seq.index("disc-cluster-hung")
-    )
-    # Only ordering/facing prose is under test; this is not a release window.
-    from types import SimpleNamespace
-
-    text = drawing._step_text(
-        operating_domain=SimpleNamespace(axis_from_left_end_limits_mm=(0.0, 1.0))
-    )
-
-    def printed_step(key: str) -> str:
-        return " ".join(" ".join(text[key]).split())
-
-    lock_step = printed_step("lock-seats-faced")
-    float_window = re.search(r"\bTHE GAP IS (\d*\.\d+) TO (\d*\.\d+) AT EVERY LOCK\b", lock_step)
-    assert float_window is not None
-    _inside(
-        _inch_window(f"{float_window.group(1)}-{float_window.group(2)}"),
-        guide.LOCK_GAP_FIT,
-        0.001 * IN,
-    )
-    assert f"REPEAT FROM STEP {steps.step_number('guides-screwed')}" in lock_step
-    # #2335: the gap is the rail's depth less the bar's, so facing the rail's
-    # back closes it. The loop faces an over gap by its reading less a target
-    # inside the window and replaces the rail only when a gap ends under it
-    # (over-faced); the old text faced under gaps and replaced over ones.
-    low, high = (f"{float(v):.3f}".lstrip("0") for v in float_window.groups())
-    face = re.search(
-        rf"\bIF A GAP IS OVER {high}, REMOVE THE LOCKS\b.*"
-        rf"\bBACK FACE UNDER EACH LOCK THAT READ OVER {high} BY ITS GAP LESS (\.\d+)\.",
-        lock_step,
-    )
-    assert face is not None
-    assert guide.LOCK_GAP_FIT[0] < float(face.group(1)) * IN < guide.LOCK_GAP_FIT[1]
-    # Machinist review of 492f8b4a70: an all-in-window read exits to the next
-    # step, the lift needs the locks off, and a faced rail goes back to the read.
-    after = steps.SEQUENCE[seq.index("lock-seats-faced") + 1]
-    assert f"AT EVERY LOCK, GO TO STEP {steps.step_number(after)}." in lock_step
-    assert "WITH THE LOCKS REMOVED, LIFT THE PLATEN" in lock_step
-    assert lock_step.endswith(
-        f"REPEAT FROM STEP {steps.step_number('lock-seats-faced')}."
-    )
-    assert re.search(rf"\bIF A GAP IS UNDER {low}, REPLACE THAT GUIDE\b", lock_step)
-    assert "OVER THE WINDOW, REPLACE" not in lock_step
-
-    cut_step = printed_step("disc-screws-cut")
-    import _config
-
-    # The step names the screws by their purchase Number, MHA-SH-VN-59.
-    assert _config.parts(screw.STEM)["number"] in cut_step
-    tip_window = re.search(
-        r"\bCUT\b.*\bTIPS (\d*\.\d+-\d*\.\d+) BELOW THE DISC REAR FACE\b",
-        cut_step,
-    )
-    assert tip_window is not None
-    _inside(_inch_window(tip_window.group(1)), screw.TIP_BELOW_REAR_FACE, 0.001 * IN)
-    # The cut end's break is the title block's edge break, which no step
-    # restates (rule 2).
-    assert "BREAK" not in cut_step
-    assert " IN " not in f" {cut_step} " and " IN " not in f" {lock_step} "

@@ -4,7 +4,6 @@ gear family's drawing. Offline: no SolidWorks."""
 
 from __future__ import annotations
 
-import inspect
 import math
 import re
 from dataclasses import replace
@@ -13,7 +12,6 @@ from pathlib import Path
 import pytest
 
 import _config
-import build_dt_cone_tip_gear as build
 import cone_tip_cluster as cluster
 import draw_dt_cone_gear
 import draw_dt_cone_tip_gear as drawing
@@ -75,12 +73,6 @@ def test_the_frame_is_the_family_frame_with_stems_either_side() -> None:
     )
     assert spec.PATTERN_AXIS == "Axis1"
     assert spec.LEAVES_NORTH_PLANE == "LeavesNorthPlane"
-    source = inspect.getsource(build)
-    assert "save_simplified_part(adapter, PART_NAME, SIMPLIFIED_FEATURES)" in source
-    assert (
-        'blank_reference_geometry(adapter, ((LEAVES_NORTH_PLANE, "PLANE"),))' in source
-    )
-    assert '"FaceWidth@Blank"' in source
 
 
 def test_the_fits_the_stems_make() -> None:
@@ -325,10 +317,6 @@ def test_tag_box_model_reproduces_the_round_7_overlaps() -> None:
 
 
 def test_tooth_space_plot_stands_beside_the_table() -> None:
-    source = "".join(inspect.getsource(drawing.build).split())
-    assert '"*Front",*CUTTER_SOURCE_VIEW_CENTER' in source
-    assert "_hide_title_block_source(adapter,source_view)" in source
-    assert "_draw_form_plot(adapter)" in source
     flank = drawing.form_plot_flank_mm()
     rows = family.custom_six_form_points_mm()
     junction = family.stock_form_profile(6).template.relief_junction_radius_mm

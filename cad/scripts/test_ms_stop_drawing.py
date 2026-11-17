@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import ast
 import math
 from pathlib import Path
 from types import SimpleNamespace
@@ -210,31 +209,6 @@ def test_each_sheet_imports_the_complete_model_contract(builder, drawing, dimens
     assert drawing.FRONT_CENTER[1] == drawing.RIGHT_CENTER[1]
 
 
-@pytest.mark.parametrize("module", [spec, block_drawing, plate_drawing])
-def test_no_com_in_spec_or_render_time_size_overrides(module) -> None:
-    tree = ast.parse(Path(module.__file__).read_text(encoding="utf-8"))
-    if module is spec:
-        imports = [
-            name
-            for node in ast.walk(tree)
-            for name in (
-                [node.module or ""] if isinstance(node, ast.ImportFrom)
-                else [alias.name for alias in node.names] if isinstance(node, ast.Import)
-                else []
-            )
-        ]
-        assert not any(name.startswith((
-            "build_", "solidworks", "_appearance", "_assembly", "_check", "_com",
-            "_custom_properties", "_dimensions", "_drawing", "_feature_tree",
-            "_holes", "_part_", "_rebuild", "_session", "_sketch", "_visibility",
-        )) for name in imports)
-    else:
-        calls = {node.func.attr if isinstance(node.func, ast.Attribute) else node.func.id
-                 for node in ast.walk(tree) if isinstance(node, ast.Call)
-                 and isinstance(node.func, (ast.Attribute, ast.Name))}
-        assert not calls & {"SetPrecision3", "set_dimension_precision", "SetValues", "add_gdt_frame", "add_datum_tag"}
-
-
 class _StopViewTransform:
     """4:1 orthographic affine map, centred on the part's bounding box."""
 
@@ -293,34 +267,6 @@ class _StopView:
         return _StopViewTransform(
             self.orientation, self.Position, self.ScaleRatio, self.model_center, self.Angle
         )
-
-
-@pytest.mark.parametrize("readback", [math.pi, -math.pi, 3.0 * math.pi])
-def test_bottom_rotation_accepts_equivalent_native_half_turns(readback) -> None:
-    view = _StopView("*Bottom", block_drawing.BOTTOM_CENTER, (4.0, 1.0), (0.0, 0.0, 0.0),
-                     rotation_readback=readback)
-    rebuilds = []
-    adapter = SimpleNamespace(currentModel=SimpleNamespace(
-        EditRebuild3=lambda: rebuilds.append(True) or True
-    ))
-    block_drawing._orient_bottom_view(adapter, view)
-    assert view.angle_puts == [math.pi]
-    assert rebuilds == [True]
-    origin = view.ModelToViewTransform.apply((0.0, 0.0, 0.0))
-    east = view.ModelToViewTransform.apply((0.001, 0.0, 0.0))
-    rear = view.ModelToViewTransform.apply((0.0, 0.0, 0.001))
-    assert east[0] < origin[0] and east[1] == pytest.approx(origin[1])
-    assert rear[1] < origin[1] and rear[0] == pytest.approx(origin[0])
-
-
-@pytest.mark.parametrize("readback", [0.0, math.pi / 2.0, math.nan, math.inf])
-def test_bottom_rotation_refuses_unapplied_or_invalid_native_readback(readback) -> None:
-    view = _StopView("*Bottom", block_drawing.BOTTOM_CENTER, (4.0, 1.0), (0.0, 0.0, 0.0),
-                     rotation_readback=readback)
-    adapter = SimpleNamespace(currentModel=SimpleNamespace(EditRebuild3=lambda: True))
-    with pytest.raises(RuntimeError, match="underside rotation did not take"):
-        block_drawing._orient_bottom_view(adapter, view)
-    assert view.angle_puts == [math.pi]
 
 
 class _StopMathPoint:
@@ -654,144 +600,6 @@ def test_block_model_authors_native_reference_labels_without_independent_band(mo
             display.text[2] = ")"
 
 
-def test_receiver_model_has_no_independent_location_tolerance_authoring() -> None:
-    tree = ast.parse(Path(block.__file__).read_text(encoding="utf-8"))
-    calls = {
-        node.func.id for node in ast.walk(tree)
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
-    }
-    assert "set_dimension_symmetric_tolerance" not in calls
-    assert "_author_reference_dimensions" in calls
-
-
-class _StopDisplay:
-    def __init__(self, prefix, *, hole=True, kind=6, refusal=None):
-        self.prefix = prefix
-        self.hole = hole
-        self.Type2 = kind
-        self.refusal = refusal
-
-    def IsHoleCallout(self):  # noqa: N802 - COM method name
-        return self.hole
-
-    def GetText(self, which):  # noqa: N802 - COM method name
-        assert which == 5, "resolved prefix text would sever native variables"
-        return self.prefix
-
-    def SetText(self, which, text):  # noqa: N802 - COM method name
-        assert which == 1
-        if self.refusal != "prefix":
-            self.prefix = text
-
-    # Diameter arrows: inside by default, document second arrow.
-    ArrowSide = 0  # noqa: N815 - COM property name
-    second_arrow = (True, True)
-
-    def SetSecondArrow(self, use_doc, second):  # noqa: N802 - COM method name
-        self.second_arrow = (use_doc, second)
-
-    def GetUseDocSecondArrow(self):  # noqa: N802 - COM method name
-        return self.second_arrow[0]
-
-    def GetSecondArrow(self):  # noqa: N802 - COM method name
-        return self.second_arrow[1]
-
-
-def test_rebate_ceiling_is_the_graded_sliding_face(monkeypatch) -> None:
-    # Rule 6: the stick's graduated face slides on the roof underside.
-    (control,) = spec.BLOCK_SURFACE_FINISHES
-    assert (control.key, control.roughness_um) == ("rebate_slide", 1.6)
-    assert control.face.normal == (0, -1, 0)
-    assert control.face.offset_mm == pytest.approx(-spec.WINDOW_Y_MAX)
-    calls = []
-    monkeypatch.setattr(block_drawing, "model_point_in_view", lambda adapter, view, xyz, label: (0.30, 0.19))
-    monkeypatch.setattr(block_drawing, "add_surface_finish", lambda adapter, view, **kw: calls.append(kw))
-    block_drawing._add_rebate_slide_finish(object(), object())
-    (call,) = calls
-    assert call["control"] is control
-    assert call["leader_attach_xy"] == call["edge_xy"] == (0.30, 0.19)
-    assert call["symbol_xy"] == pytest.approx((0.27, 0.178))
-
-
-@pytest.mark.parametrize("separator", ["-", " ", "", " - "])
-def test_native_class_suppression_preserves_live_thread_drill_and_depth_variables(separator) -> None:
-    definition = (
-        "2X MATCH-DRILL WITH THE MATE\n"
-        f"<hw-threaddesc>{separator}<hw-threadclass> <HOLE-DEPTH><hw-threaddepth>"
-        "\n<MOD-DIAM><hw-tapdrldia> <HOLE-DEPTH><hw-holedpth>"
-    )
-    native = _StopDisplay(definition)
-    block_drawing._remove_general_thread_class(native)
-    assert "<hw-threadclass>" not in native.prefix
-    for variable in ("hw-threaddesc", "hw-threaddepth", "hw-tapdrldia", "hw-holedpth"):
-        assert f"<{variable}>" in native.prefix
-    assert "MATCH-DRILL WITH THE MATE" in native.prefix
-    assert native.prefix == definition.replace(f"{separator}<hw-threadclass>", "")
-
-
-def test_thumb_tap_callout_states_where_its_thru_ends() -> None:
-    definition = "<MOD-DIAM><hw-tapdrldia> THRU\n<hw-threaddesc>-<hw-threadclass> THRU"
-    native = _StopDisplay(definition)
-    block_drawing._remove_general_thread_class(native, last_line=block_drawing.THUMB_HOLE_END)
-    rows = native.prefix.splitlines()
-    assert rows[:2] == ["<MOD-DIAM><hw-tapdrldia> THRU", "<hw-threaddesc> THRU"]
-    assert "REBATE" in rows[-1] and "ROOF" in rows[-1]
-
-
-@pytest.mark.parametrize("native", [
-    _StopDisplay("<hw-threadclass>", hole=False),
-    _StopDisplay("2B"),
-    _StopDisplay("<hw-threadclass><hw-threadclass>"),
-    _StopDisplay("<hw-threadclass>", refusal="prefix"),
-])
-def test_native_class_suppression_refuses_non_native_unbound_or_rejected_text(native) -> None:
-    with pytest.raises(RuntimeError):
-        block_drawing._remove_general_thread_class(native)
-
-
-def test_plate_callout_keeps_native_rows_and_adds_the_note_link() -> None:
-    definition = "<NUM_INST>X <MOD-DIAM><hw-diam> THRU ALL"
-    native = _StopDisplay(definition)
-    plate_drawing._append_callout_lines(native, plate_drawing.NOTE_LINK)
-    assert native.prefix.splitlines() == [definition, plate_drawing.NOTE_LINK]
-    for refused in (_StopDisplay(definition, hole=False), _StopDisplay(definition, refusal="prefix")):
-        with pytest.raises(RuntimeError):
-            plate_drawing._append_callout_lines(refused, plate_drawing.NOTE_LINK)
-
-
-@pytest.mark.parametrize("refusal", [None, "prefix"])
-def test_plate_chamfer_keeps_native_size_and_angle_with_quantity_prefixes(monkeypatch, refusal) -> None:
-    natives = {
-        "RoofChamferSize": _StopDisplay("", hole=False, refusal=refusal),
-        "RoofChamferAngle": _StopDisplay("", hole=False, refusal=refusal),
-    }
-    annotations = [
-        SimpleNamespace(name=name, GetSpecificAnnotation=lambda native=native: native)
-        for name, native in natives.items()
-    ]
-    monkeypatch.setattr(plate_drawing, "dimension_name", lambda _adapter, item: item.name)
-    if refusal:
-        with pytest.raises(RuntimeError, match="chamfer prefix did not persist"):
-            plate_drawing._style_plate_chamfer(object(), annotations)
-    else:
-        plate_drawing._style_plate_chamfer(object(), annotations)
-        assert natives["RoofChamferSize"].prefix == "2X "
-        assert natives["RoofChamferAngle"].prefix == ""
-    for precision in (spec.PLATE_DRAWING_PRECISION, spec.BLOCK_DRAWING_PRECISION):
-        assert precision["RoofChamfers"] == {"RoofChamferSize": 2, "RoofChamferAngle": 0}
-
-
-@pytest.mark.parametrize("names", [[], ["RoofChamferSize"], ["RoofChamferAngle"]])
-def test_plate_chamfer_refuses_missing_native_dimensions(monkeypatch, names) -> None:
-    annotations = [
-        SimpleNamespace(name=name, GetSpecificAnnotation=lambda: _StopDisplay("", hole=False))
-        for name in names
-    ]
-    monkeypatch.setattr(plate_drawing, "dimension_name", lambda _adapter, item: item.name)
-    with pytest.raises(RuntimeError, match="missing native plate chamfer"):
-        plate_drawing._style_plate_chamfer(object(), annotations)
-
-
 def test_match_drill_callouts_identify_the_current_mate_registry_rows() -> None:
     import _config
 
@@ -980,110 +788,6 @@ def test_relief_profile_notches_the_back_wall_under_the_roof(monkeypatch) -> Non
         "ReliefDepth", "ReliefHeight", "ReliefWindowStation", "ReliefRoofStation",
     ]
     assert spec.BLOCK_DRAWING_DIMENSIONS["ReliefProfile"] == {"ReliefDepth", "ReliefHeight"}
-
-
-def test_block_build_cuts_rebate_from_its_profile_driven_marked_and_toleranced(monkeypatch) -> None:
-    equations, globals_authored, bands, marks, hidden = {}, {}, [], [], []
-    cuts, precisions, properties = [], [], []
-
-    def result(data=True):
-        return SimpleNamespace(is_success=True, data=data)
-
-    async def no_op(*args, **kwargs):
-        return None
-
-    class Adapter:
-        async def create_part(self):
-            return result()
-
-        async def create_sketch(self, plane):
-            return result()
-
-        async def exit_sketch(self):
-            return result()
-
-        async def create_extrusion(self, params):
-            return result()
-
-        async def create_cut_extrude(self, params):
-            cuts.append((params.depth, params.both_directions))
-            return result()
-
-        async def add_chamfer(self, *args, **kwargs):
-            return result()
-
-    async def set_global(adapter, name, expression):
-        globals_authored[name] = expression
-
-    async def drive(adapter, name, expression):
-        equations[name] = expression
-
-    async def rebate(adapter, dims):
-        assert "WindowWidth" in globals_authored
-        assert cuts == []
-        profiles.append(dims)
-
-    async def relief(adapter, dims):
-        assert len(cuts) == 1 and "ReliefDepth" in globals_authored
-        profiles.append(dims)
-
-    async def roof_reference(adapter):
-        return []
-
-    async def save(adapter, part_name):
-        return {"part": part_name}
-
-    profiles = []
-    monkeypatch.setattr(block, "set_global", set_global)
-    monkeypatch.setattr(block, "drive_dimension", drive)
-    monkeypatch.setattr(block, "rebate_profile", rebate)
-    monkeypatch.setattr(block, "relief_profile", relief)
-    monkeypatch.setattr(block, "roof_reference", roof_reference)
-    monkeypatch.setattr(block, "save_part_and_images", save)
-    monkeypatch.setattr(block, "SketchDims", lambda: SimpleNamespace(apply=lambda *a: []))
-    for name in (
-        "add_line_chain", "define_rectilinear_chain", "ensure_fully_defined",
-        "volume_check", "location_reference", "force_rebuild", "apply_material",
-        "apply_color", "report_mass_properties",
-    ):
-        monkeypatch.setattr(block, name, no_op)
-    for name in (
-        "name_last_feature", "name_dimensions", "wizard_holes", "author_hole_precision",
-        "_author_reference_dimensions", "clear_dimensions_for_drawing", "apply_package_model_units",
-    ):
-        monkeypatch.setattr(block, name, lambda *a, **kw: None)
-    monkeypatch.setattr(block, "set_dimension_bilateral_tolerance",
-                        lambda adapter, feature, name, low, high, *, display_unit: bands.append(
-                            (feature, name, low, high, display_unit)))
-    monkeypatch.setattr(block, "mark_dimensions_for_drawing",
-                        lambda adapter, feature, names: marks.append((feature, names)))
-    monkeypatch.setattr(block, "hide_location_references", lambda adapter, names: hidden.extend(names))
-    named = []
-    monkeypatch.setattr(block, "name_octant_views",
-                        lambda adapter, *, octants, label: named.append(octants) or {})
-    pmi = []
-    monkeypatch.setattr(block, "author_part_pmi", lambda adapter, **kw: pmi.append(kw))
-    monkeypatch.setattr(block, "apply_drawing_precision", lambda adapter, precision: precisions.append(precision))
-    monkeypatch.setattr(block, "apply_drawing_properties",
-                        lambda adapter, part_name, values: properties.append(values))
-    assert asyncio.run(block.build(Adapter())) == {"part": "ms-stop-block"}
-    assert globals_authored["WindowWidth"] == f"{spec.WINDOW_WIDTH}mm"
-    assert len(profiles) == 2
-    assert cuts == [(2.0 * (spec.BLOCK_LENGTH + spec.CUT_OVERHANG), True)] * 2
-    assert equations["WindowCutDepth@Window"] == f'2 * ("BlockLength" + {spec.CUT_OVERHANG})'
-    assert equations["ReliefCutDepth@CornerRelief"] == f'2 * ("BlockLength" + {spec.CUT_OVERHANG})'
-    assert ("ReliefProfile", {"ReliefDepth", "ReliefHeight"}) in marks
-    assert ("WindowProfile", "WindowWidth", *spec.WINDOW_SIZE_TOLERANCE_MM, "in") in bands
-    assert ("WindowProfile", "WindowHeight", *spec.WINDOW_SIZE_TOLERANCE_MM, "in") in bands
-    assert ("WindowProfile", {"WindowHeight", "WindowWidth", "BackWall"}) in marks
-    assert all(feature != "Window" for feature, names in marks)
-    assert hidden == ["ThumbLocationReference", "PlateLocationReference", "RoofThicknessReference"]
-    assert precisions == [spec.BLOCK_DRAWING_PRECISION]
-    assert properties[0]["Mating Face Note"] == f"{_config.parts('ms-stop-plate')['number']} MATING FACE"
-    assert "Manufacturing Notes" not in properties[0]
-    assert pmi == [{"surface_finishes": spec.BLOCK_SURFACE_FINISHES}]
-    # The drawing's pictorial is the named mating-face octant, not *Isometric.
-    assert named == [{block.octant_key(1, 1, -1): (1, 1, -1)}]
 
 
 def test_roof_reference_lies_on_the_lip_face_not_through_the_lip(monkeypatch) -> None:

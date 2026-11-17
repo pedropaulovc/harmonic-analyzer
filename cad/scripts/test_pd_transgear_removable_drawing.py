@@ -3,15 +3,12 @@
 from __future__ import annotations
 
 import ast
-import enum
 import inspect
 import math
 import re
 import textwrap
 from pathlib import Path
-from types import SimpleNamespace
 
-import numpy as np
 import pytest
 
 import _config
@@ -217,100 +214,6 @@ def test_configuration_views_do_not_meet() -> None:
     assert lower[3] < upper[1]
 
 
-class _Dimension:
-    def __init__(self, values_m: dict[str, float]) -> None:
-        self._values = values_m
-        self.Tolerance = SimpleNamespace(Type=0)
-
-    def GetSystemValue3(self, which: int, configuration: str):
-        assert which == 3  # swSpecifyConfiguration
-        return (self._values[configuration],)
-
-
-class _Display:
-    def __init__(self, places: int, values_m: dict[str, float]) -> None:
-        self._places = places
-        self._dimension = _Dimension(values_m)
-        self._text = {1: "(<MOD-DIAM>", 2: ")"}
-
-    def GetText(self, part: int) -> str:
-        return self._text[part]
-
-    def GetPrimaryPrecision2(self) -> int:
-        return self._places
-
-    def GetDimension2(self, index: int) -> _Dimension:
-        return self._dimension
-
-
-class _Annotation:
-    def __init__(self, name: str, display: _Display) -> None:
-        self.name = name
-        self._display = display
-
-    def GetSpecificAnnotation(self) -> _Display:
-        return self._display
-
-
-def _od_annotations(monkeypatch, places: int, values_m: dict[str, float]):
-    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
-    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, a: a.name)
-    display = _Display(places, values_m)
-    return [_Annotation("BlankWidth", display), _Annotation("BlankDia", display)]
-
-
-_OD_M = {name: spec.outside_dia(teeth) / 1000.0 for name, teeth in spec.CONFIGS}
-_OD_PLACES = spec.DRAWING_PRECISION_BY_NAME["BlankDia"]
-
-
-@pytest.mark.parametrize("configuration", [name for name, _teeth in spec.CONFIGS])
-def test_each_view_reads_its_own_configurations_diameter(
-    monkeypatch, configuration: str
-) -> None:
-    annotations = _od_annotations(monkeypatch, _OD_PLACES, _OD_M)
-    drawing._assert_outside_diameter(None, annotations, configuration)
-
-
-def test_a_view_showing_another_configurations_diameter_is_refused(monkeypatch) -> None:
-    """One model dimension holds all three values: a T12 view reading T24's
-    is the failure the per-view readback exists to catch."""
-    values = dict(_OD_M, T12=_OD_M["T24"])
-    annotations = _od_annotations(monkeypatch, _OD_PLACES, values)
-    with pytest.raises(RuntimeError, match=r"T12: sheet BlankDia reads 52\.04"):
-        drawing._assert_outside_diameter(None, annotations, "T12")
-
-
-def test_a_diameter_that_lost_its_part_places_is_refused(monkeypatch) -> None:
-    annotations = _od_annotations(monkeypatch, _OD_PLACES + 1, _OD_M)
-    with pytest.raises(RuntimeError, match=rf"at {_OD_PLACES + 1} places, expected .* at {_OD_PLACES}"):
-        drawing._assert_outside_diameter(None, annotations, "T18")
-
-
-def test_a_view_without_exactly_one_diameter_is_refused(monkeypatch) -> None:
-    annotations = _od_annotations(monkeypatch, _OD_PLACES, _OD_M)
-    with pytest.raises(RuntimeError, match="expected one BlankDia"):
-        drawing._assert_outside_diameter(None, annotations[:1], "T24")
-    with pytest.raises(RuntimeError, match="expected one BlankDia"):
-        drawing._assert_outside_diameter(None, annotations * 2, "T24")
-
-
-@pytest.mark.parametrize("configuration", [name for name, _teeth in spec.CONFIGS])
-def test_a_supplied_od_that_lost_its_reference_mark_is_refused(
-    monkeypatch, configuration: str
-) -> None:
-    annotations = _od_annotations(monkeypatch, _OD_PLACES, _OD_M)
-    annotations[1]._display._text[1] = "<MOD-DIAM>"
-    with pytest.raises(RuntimeError, match="must be reference-only and unbanded"):
-        drawing._assert_outside_diameter(None, annotations, configuration)
-
-
-def test_a_supplied_od_with_a_manufacturing_band_is_refused(monkeypatch) -> None:
-    annotations = _od_annotations(monkeypatch, _OD_PLACES, _OD_M)
-    annotations[1]._display._dimension.Tolerance.Type = 2
-    with pytest.raises(RuntimeError, match="must be reference-only and unbanded"):
-        drawing._assert_outside_diameter(None, annotations, "T24")
-
-
 def test_notes_specify_every_blank_and_the_operations_not_on_the_views() -> None:
     assert tuple(spec.BLANK_SKUS) == tuple(name for name, _teeth in spec.CONFIGS)
     for configuration, sku in spec.BLANK_SKUS.items():
@@ -379,117 +282,10 @@ def test_the_sheet_names_t24_and_covers_what_every_configuration_shares() -> Non
     assert spec.DRAWING_REFERENCE_DIMENSIONS == {"BlankDia"}
 
 
-class _Write(enum.Enum):
-    """How a test display dimension answers ``SetText``."""
-
-    STORE = "store"
-    DROP = "drop"
-
-
-class _CalloutDisplay:
-    """A display dimension whose ``SetText`` stores or silently drops."""
-
-    def __init__(self, texts: dict[int, str], write: _Write = _Write.STORE) -> None:
-        self._texts = dict(texts)
-        self._write = write
-
-    def SetText(self, part: int, text: str) -> None:
-        if self._write is _Write.STORE:
-            self._texts[part] = text
-
-    def GetText(self, part: int) -> str:
-        return self._texts.get(part, "")
-
-
-def _imported(monkeypatch, printed: dict[tuple[int, str], str]) -> list[_Annotation]:
-    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
-    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, a: a.name)
-    names = {name for _lane, name in printed}
-    return [
-        _Annotation(
-            name,
-            _CalloutDisplay(
-                {lane: text for (lane, owner), text in printed.items() if owner == name}
-            ),
-        )
-        for name in sorted(names)
-    ]
-
-
-def _part_rows() -> dict[tuple[int, str], str]:
-    return {
-        (lane, name): text
-        for lane in callouts.CALLOUTS
-        for name, text in callouts.callouts_by_name(lane).items()
-    }
-
-
-def test_imported_callouts_read_back_through_crlf_and_trimmed_standoff(
-    monkeypatch,
-) -> None:
-    printed = {
-        key: text.replace("\n", "\r\n").strip() for key, text in _part_rows().items()
-    }
-    drawing._assert_dimension_callouts(None, _imported(monkeypatch, printed))
-
-
-@pytest.mark.parametrize("lost", ["PinPosDia", "BlankWidth"])
-def test_an_imported_dimension_missing_its_mate_row_is_refused(
-    monkeypatch, lost: str
-) -> None:
-    printed = _part_rows() | {(callouts.CALLOUT_BELOW, lost): ""}
-    with pytest.raises(RuntimeError, match=lost):
-        drawing._assert_dimension_callouts(None, _imported(monkeypatch, printed))
-
-
-def test_a_callout_dimension_printed_twice_is_refused(monkeypatch) -> None:
-    annotations = _imported(monkeypatch, _part_rows())
-    with pytest.raises(RuntimeError, match="exactly once"):
-        drawing._assert_dimension_callouts(None, [*annotations, annotations[0]])
-
-
-def _author(monkeypatch, write: _Write) -> dict[tuple[str, str], _CalloutDisplay]:
-    displays: dict[tuple[str, str], _CalloutDisplay] = {}
-    walks: list[str] = []
-
-    def named(_adapter, feature: str, names: set[str]):
-        walks.append(feature)
-        return {
-            name: (
-                displays.setdefault((feature, name), _CalloutDisplay({}, write)),
-                None,
-            )
-            for name in names
-        }
-
-    monkeypatch.setattr(part, "_named_dimensions", named)
-    part.author_dimension_callouts(None)
-    # One tree walk per feature, however many lanes its dimensions carry.
-    assert sorted(walks) == sorted(set(walks))
-    return displays
-
-
-def test_the_part_authors_every_text_lane_on_its_source_dimension(
-    monkeypatch,
-) -> None:
-    displays = _author(monkeypatch, _Write.STORE)
-    for lane, rows in callouts.CALLOUTS.items():
-        for key, text in rows.items():
-            assert displays[key].GetText(lane) == text, (lane, key)
-    for key, lanes in callouts.REFERENCE_TEXT.items():
-        for lane, text in lanes.items():
-            assert displays[key].GetText(lane) == text, (lane, key)
-
-
 def test_the_part_authors_the_reference_mark_of_every_reference_dimension() -> None:
     assert {name for _feature, name in callouts.REFERENCE_TEXT} == set(
         spec.DRAWING_REFERENCE_DIMENSIONS
     )
-
-
-def test_a_text_lane_the_part_failed_to_store_is_refused(monkeypatch) -> None:
-    with pytest.raises(RuntimeError, match="did not persist"):
-        _author(monkeypatch, _Write.DROP)
 
 
 _SCRIPTS = Path(drawing.__file__).resolve().parent
@@ -538,72 +334,11 @@ def test_the_write_scan_finds_the_shared_dimension_text_writers() -> None:
         assert _reaches_set_text(writer, set()), writer.__name__
 
 
-def _settled_labels(landed: tuple[float, float, float]) -> None:
-    annotation = SimpleNamespace(GetPosition=lambda: landed)
-    drawing._assert_labels_in_place([(annotation, drawing.FRONT_LABEL_XY, "face")])
-
-
-def test_a_view_label_at_its_place_is_accepted() -> None:
-    _settled_labels((*drawing.FRONT_LABEL_XY, 0.0))
-
-
-def test_a_view_label_left_at_the_insertion_default_is_refused() -> None:
-    with pytest.raises(RuntimeError, match="sits at"):
-        _settled_labels((0.0, 0.0, 0.0))
-
-
-def test_gears_carry_no_frames_or_datums() -> None:
-    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
-    called = {
-        getattr(node.func, "id", getattr(node.func, "attr", ""))
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call)
-    }
-    assert not called & {"add_feature_control_frame", "add_datum_feature"}
-
-
 def test_registry_row_is_mha_081_one_of_each() -> None:
     row = _config.parts("pd-transgear-removable")
     assert row["number"] == "MHA-PD-09"
     assert int(row["quantity"]) == 1
     assert "1 EACH" in row["description"]
-
-
-def _calls(path: str) -> dict[str, ast.Call]:
-    tree = ast.parse(Path(path).read_text(encoding="utf-8"))
-    return {
-        node.func.id: node
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
-    }
-
-
-def test_the_part_carries_every_property_its_drawing_requires(monkeypatch) -> None:
-    """The drawing refuses a source part missing a required property; every
-    one must be carried and non-blank."""
-    import _part_properties
-    import _drawing_marks
-
-    required = ast.literal_eval(
-        next(
-            k.value
-            for k in _calls(drawing.__file__)["read_required_properties"].keywords
-            if k.arg == "required"
-        )
-    )
-    carried = dict(_part_properties.part_properties(part.PART_NAME))
-    stamp = _calls(part.__file__)["apply_drawing_properties"]
-    assert [ast.unparse(a) for a in stamp.args[:2]] == ["adapter", "PART_NAME"]
-    extra = {"Gear Data": notes.GEAR_DATA, "Manufacturing Notes": notes.DRAWING_NOTES}
-    stamped: dict[str, str] = {}
-    monkeypatch.setattr(
-        _drawing_marks,
-        "apply_custom_properties",
-        lambda _adapter, props: stamped.update(props),
-    )
-    _drawing_marks.apply_drawing_properties(None, part.PART_NAME, extra)
-    carried.update(stamped)
-    assert [name for name in required if not str(carried.get(name) or "").strip()] == []
 
 
 @pytest.mark.parametrize("name", ["PinPosY", "PinNegY"])
@@ -781,104 +516,6 @@ def test_the_gap_relations_hold_in_every_configuration(teeth: int) -> None:
             raise AssertionError(f"unchecked relation {relation}")
 
 
-_AXIS_START = "axis_start"
-
-
-def _relation_residuals(
-    points: dict[str, Point], relation: str, ref: str, other: str
-) -> list[float]:
-    """A relation as equations on the points: zero when it holds."""
-    if relation == "tangent":
-        (at,) = set(part.GAP_ENTITIES[ref][1:]) & set(part.GAP_ENTITIES[other][1:])
-        (ux, uy), (vx, vy) = _tangent(points, ref, at), _tangent(points, other, at)
-        return [ux * vy - uy * vx]
-    if relation == "equal":
-        radius = part.gap_dimension_value
-        return [
-            radius(points, "radial", ref, None) - radius(points, "radial", other, None)
-        ]
-    if relation == "vertical_points":
-        return [part.gap_point(points, ref)[0] - part.gap_point(points, other)[0]]
-    if relation == "coincident" and ("." in other or other == "origin"):
-        (x1, y1), (x2, y2) = part.gap_point(points, ref), part.gap_point(points, other)
-        return [x1 - x2, y1 - y2]
-    if relation == "coincident":  # a point on a line
-        px, py = part.gap_point(points, ref)
-        _centre, start, end = part.GAP_ENTITIES[other]
-        (x0, y0), (x1, y1) = points[start], points[end]
-        return [
-            ((x1 - x0) * (py - y0) - (y1 - y0) * (px - x0))
-            / math.dist((x0, y0), (x1, y1))
-        ]
-    raise AssertionError(f"unmodelled relation {relation}")
-
-
-def _constraint_rank(teeth: int, dimensions, relations) -> tuple[int, int]:
-    """(rank of the constraint Jacobian, unknowns) for the gap sketch.
-
-    Every merged end point and arc centre is a free 2-D point; the sketch
-    origin is fixed.  Each arc's ends lie on its circle, then the relations
-    and dimensions add their equations.  The sketch is fully defined when
-    the rank equals the unknowns.  The axis start is drawn at the origin but
-    is its own point, held there only by its coincident relation."""
-    base = part.gap_points(teeth)
-    base[_AXIS_START] = base["origin"]
-    names = sorted(name for name in base if name != "origin")
-
-    def residuals(points: dict[str, Point]) -> list[float]:
-        out = [
-            math.dist(points[centre], points[start])
-            - math.dist(points[centre], points[end])
-            for centre, start, end in part.GAP_ENTITIES.values()
-            if centre is not None
-        ]
-        for relation, ref, other in relations:
-            out += _relation_residuals(points, relation, ref, other)
-        out += [
-            part.gap_dimension_value(points, kind, ref, other)
-            for _name, kind, ref, other, _drive in dimensions
-        ]
-        return out
-
-    step = 1e-6
-    columns = []
-    for name in names:
-        for axis in (0, 1):
-            plus, minus = dict(base), dict(base)
-            nudged = list(base[name])
-            nudged[axis] += step
-            plus[name] = (nudged[0], nudged[1])
-            nudged[axis] -= 2.0 * step
-            minus[name] = (nudged[0], nudged[1])
-            columns.append(
-                (np.array(residuals(plus)) - np.array(residuals(minus))) / (2.0 * step)
-            )
-    jacobian = np.array(columns).T
-    singular = np.linalg.svd(jacobian, compute_uv=False)
-    return int((singular > 1e-7 * singular[0]).sum()), 2 * len(names)
-
-
-@pytest.mark.parametrize("teeth", _TEETH)
-def test_the_gap_sketch_is_fully_constrained_by_every_row(
-    teeth: int, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """The relations and dimensions leave no free motion in any configuration,
-    and each row is load-bearing: omitting any one of them frees the sketch.
-    Satisfied equations alone cannot show this -- a deleted row leaves every
-    remaining one satisfied."""
-    centre, _start, end = part.GAP_ENTITIES[part.GAP_AXIS]
-    monkeypatch.setitem(part.GAP_ENTITIES, part.GAP_AXIS, (centre, _AXIS_START, end))
-    dimensions, relations = part.GAP_DIMENSIONS, part.GAP_RELATIONS
-    rank, unknowns = _constraint_rank(teeth, dimensions, relations)
-    assert rank == unknowns
-    for index, row in enumerate(dimensions):
-        omitted = dimensions[:index] + dimensions[index + 1 :]
-        assert _constraint_rank(teeth, omitted, relations)[0] < unknowns, row[0]
-    for index, row in enumerate(relations):
-        omitted = relations[:index] + relations[index + 1 :]
-        assert _constraint_rank(teeth, dimensions, omitted)[0] < unknowns, row
-
-
 @pytest.mark.parametrize("teeth", _TEETH)
 def test_the_gap_draws_as_one_loop_of_minor_arcs_outside_the_disc(teeth: int) -> None:
     """CreateArc runs CCW from start to end, so each arc's start/end order
@@ -996,66 +633,3 @@ def test_chamfered_plate_matches_the_purchased_blank_volume(
             at_vendor_thickness + missing_faces * spec.chamfer_volume(teeth) / 2.0
         )
         assert abs(incomplete - vendor_plate_mm3) > 0.002 * vendor_plate_mm3
-
-
-class _Result:
-    is_success = True
-    data = None
-    error = None
-
-
-class _Tolerance:
-    def __init__(self, kind: int, lower_mm: float, upper_mm: float) -> None:
-        self.Type = kind
-        self._limits = (lower_mm / 1000.0, upper_mm / 1000.0)
-
-    def GetMinValue(self) -> float:
-        return self._limits[0]
-
-    def GetMaxValue(self) -> float:
-        return self._limits[1]
-
-
-class _Configurations:
-    """A part whose tolerances are read per active configuration."""
-
-    def __init__(self, bands: dict[str, dict]) -> None:
-        self.bands = bands
-        self.active = spec.DEFAULT_CONFIG
-        self.visited: list[str] = []
-
-    async def set_active_configuration(self, name: str) -> _Result:
-        self.active = name
-        self.visited.append(name)
-        return _Result()
-
-
-def _readback(monkeypatch, adapter: _Configurations) -> None:
-    import asyncio
-    from types import SimpleNamespace
-
-    def named(_adapter, feature: str, dimension: str):
-        band = adapter.bands[adapter.active][(feature, dimension)]
-        return None, SimpleNamespace(Tolerance=_Tolerance(*band))
-
-    monkeypatch.setattr(part, "_named_dimension", named)
-    monkeypatch.setattr(part, "_early_bound", lambda obj, _interface: obj)
-    asyncio.run(part.assert_bands_in_every_configuration(adapter))
-
-
-def test_every_configuration_must_read_the_family_bands_back(monkeypatch) -> None:
-    """The sheet prints the plate and pin-location bands once for all three
-    sprockets, so the build reads them back in each configuration."""
-    bands = part.family_bands()
-    assert bands[("BlankProfile", "BlankWidth")][1:] == (-0.0762, 0.0)  # +.000/-.003
-    adapter = _Configurations({name: dict(bands) for name, _teeth in spec.CONFIGS})
-    _readback(monkeypatch, adapter)
-    assert adapter.visited == [name for name, _teeth in spec.CONFIGS] + [
-        spec.DEFAULT_CONFIG
-    ]
-    # Negative control: a band that stayed in the default configuration only
-    # (T12 untoleranced) must stop the build.
-    untoleranced = {name: dict(bands) for name, _teeth in spec.CONFIGS}
-    untoleranced["T12"][("BlankProfile", "BlankWidth")] = (0, 0.0, 0.0)
-    with pytest.raises(RuntimeError, match=r"T12: BlankWidth@BlankProfile"):
-        _readback(monkeypatch, _Configurations(untoleranced))

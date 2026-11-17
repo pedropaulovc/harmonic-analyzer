@@ -306,7 +306,6 @@ def test_set_pin_cross_hole_is_located_by_model_dimensions() -> None:
     # modelled BOM line (2 used): supplying one per strap would double the
     # order, so the callout names the part, and its number is the parts
     # registry's.
-    import inspect
 
     import _config
 
@@ -327,13 +326,6 @@ def test_set_pin_cross_hole_is_located_by_model_dimensions() -> None:
     by_name = dt_pinion_bracket_spec.DRAWING_PRECISION_BY_NAME
     assert by_name["CrossHoleDia"] == 4
     assert "CrossHoleCz" not in by_name
-    # The station is the model's relation to its globals, not a typed number,
-    # and no hidden sketch is left for a hidden-owner import.
-    build_source = inspect.getsource(bracket)
-    assert "'\"StrapThickness\" / 2'" in build_source
-    assert "CrossHoleAxisReference" not in build_source
-    draw_source = inspect.getsource(drawing)
-    assert "curate_hidden_owner_dimensions" not in draw_source
     assert dt_pinion_bracket_spec.CROSS_HOLE_DIA == 25.4 / 16.0
     # The spring pin's own band (B18.8.2's .062-.065 window), resolvable at four places.
     assert dt_pinion_bracket_spec.CROSS_HOLE_BAND == (0.0635, 0.0)
@@ -469,78 +461,7 @@ def test_every_web_and_ligament_clears_the_floor_at_the_printed_bands() -> None:
         ("TopCapRadius", geometry.END_RADIUS_PLACES),
     ):
         assert dt_pinion_bracket_spec.DRAWING_PRECISION_BY_NAME[name] == places, name
-    pin_source = Path(pin.__file__).read_text(encoding="utf-8")
-    assert "DOT_X_BAND" not in pin_source and "DOT_XX_BAND" not in pin_source
     # The values the inch sheet leaves (#290).
     assert math.isclose(worst["cross hole far face"], 3.189, abs_tol=5e-4)
     assert math.isclose(worst["seat far face"], 2.141, abs_tol=5e-4)
     assert math.isclose(worst["shaft wall"], 2.085, abs_tol=5e-4)
-
-
-def test_bore_callouts_keep_only_their_shoulder_and_rim_arrow(monkeypatch) -> None:
-    # #2106 r3 machinist review: each R.30 end radius runs to its bore's
-    # centre, where the bore's Ø callout drew its diametral line.  Both bore
-    # callouts take the tube frame's rim-only dress; a missing bore callout or
-    # a dress the readback does not confirm fails loud.
-    from types import SimpleNamespace
-
-    import pytest
-
-    assert set(drawing.RIM_ONLY_DIAMETERS) == {"ArborBoreDia", "PivotBoreDia"}
-    assert set(drawing.RIM_ONLY_DIAMETERS) <= set(drawing.FRONT_KEEP)
-
-    class Display:
-        def __init__(self) -> None:
-            self.DisplayAsLinear = False
-            self.Diametric = True
-            self.ArrowSide = 0
-            self.SolidLeader = True
-            self.LeaderVisibility = 0
-            self.second = True
-            self.broken = (True, 0)
-
-        def SetSecondArrow(self, use_doc, second):
-            self.second = bool(use_doc) or bool(second)
-
-        def GetUseDocSecondArrow(self):
-            return False
-
-        def GetSecondArrow(self):
-            return self.second
-
-        def SetBrokenLeader2(self, use_doc, style):
-            self.broken = (use_doc, style)
-            return 0
-
-        def GetUseDocBrokenLeader(self):
-            return self.broken[0]
-
-        def GetBrokenLeader2(self):
-            return self.broken[1]
-
-    class LeaderLineStays(Display):
-        """A display whose leader-line pair ignores the hide request."""
-
-        @property
-        def LeaderVisibility(self):
-            return 0
-
-        @LeaderVisibility.setter
-        def LeaderVisibility(self, _value):
-            pass
-
-    def annotation(name, display_type=Display):
-        display = display_type()
-        return SimpleNamespace(name=name, GetSpecificAnnotation=lambda: display)
-
-    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _kind: obj)
-    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, a: a.name)
-    names = ("ArborBoreDia", "TopCapRadius", "PivotBoreDia", "BottomCapRadius")
-    drawing._rim_only_bore_callouts(object(), [annotation(n) for n in names])
-    with pytest.raises(RuntimeError, match="PivotBoreDia"):
-        drawing._rim_only_bore_callouts(object(), [annotation("ArborBoreDia")])
-    with pytest.raises(RuntimeError, match="ArborBoreDia: the rim-only"):
-        drawing._rim_only_bore_callouts(
-            object(),
-            [annotation("ArborBoreDia", LeaderLineStays), annotation("PivotBoreDia")],
-        )

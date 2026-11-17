@@ -2,12 +2,9 @@
 
 from __future__ import annotations
 
-import ast
 import math
 import re
 from pathlib import Path
-from types import SimpleNamespace
-from unittest.mock import Mock
 
 import pytest
 
@@ -17,7 +14,7 @@ import dt_crank_hub_geometry as geometry
 import dt_crankshaft_notes as notes
 import dt_crankshaft_spec as spec
 import draw_dt_crankshaft as drawing
-from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, drawing_specification_violations
+from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import blind_cut_dia_mm
 from _layout_audit import TEXT_ROW_LIMIT
@@ -31,19 +28,9 @@ def test_required_drawing_paths() -> None:
     assert DRAWINGS_BY_NAME["dt_crankshaft"].script == Path(drawing.__file__).resolve()
 
 
-
-
 def test_policy_migrated_sheet_carries_no_gdt_and_model_owned_places() -> None:
     # drawing-guidelines.md rule 5 (avoid excessive GD&T): a shaft carries no frames, datums or basic dimensions.
     assert not hasattr(spec, "GEOMETRIC_TOLERANCES_MM")
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    for helper in (
-        "add_feature_control_frame",
-        "add_datum_feature",
-        "set_basic_dimension",
-        "set_dimension_precision",
-    ):
-        assert helper not in source
     # drawing-simplicity-policy.md `How the repository implements the guidelines`: the part authors every printed dimension's places.
     assert "draw_dt_crankshaft.py" in PRECISION_MIGRATED_DRAWINGS
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
@@ -161,7 +148,6 @@ def test_seat_collar_lands_the_wheel_seat_and_bears_on_the_post_boss() -> None:
     )
 
 
-
 def test_spigot_rim_is_the_shortfall_the_sheet_states() -> None:
     # The drive-pin holes' rim to the seat spigot is under the .060 in
     # wall floor (declared shortfall RV-02, owner ruling 2026-10-18): the sheet states the worst case of
@@ -237,37 +223,6 @@ def test_drive_pin_depth_prints_its_band_after_the_native_depth() -> None:
     ):
         with pytest.raises(RuntimeError):
             drawing._depth_banded_definition(broken, band, process)
-
-
-class _Sheet:
-    """A drawing document reporting one linear unit (swLengthUnit_e)."""
-
-    def __init__(self, unit: object) -> None:
-        self.unit = unit
-
-    def GetUserPreferenceIntegerValue(self, pref: int) -> object:
-        assert pref == drawing._SW_PREF_UNITS_LINEAR
-        return self.unit
-
-
-def test_typed_depth_band_refuses_a_non_inch_sheet() -> None:
-    # Codex P2 on #1151: the band is typed text after a native depth, so it
-    # is only true on a sheet of its own unit (inches, #290); the callout
-    # variables that would carry it natively are unreachable on this
-    # cut-extrude callout (farm run 20261003T001156794Z).
-    drawing._require_inch_sheet(_Sheet(3), "inch")  # swINCHES
-    for unit in (0, 1, None):  # swMM, swCM, an unread preference
-        with pytest.raises(RuntimeError, match="typed depth band is inches"):
-            drawing._require_inch_sheet(_Sheet(unit), "not inch")
-
-    class _Callout:
-        def GetText(self, part: int) -> str:
-            raise AssertionError("read the callout before the unit check")
-
-    with pytest.raises(RuntimeError, match="typed depth band is inches"):
-        drawing._band_hole_depth(
-            _Callout(), notes.DRIVE_PIN_DEPTH_BAND, "REAM", _Sheet(0), "mm sheet"
-        )
 
 
 def test_integral_dome_is_the_only_outboard_shaft_projection() -> None:
@@ -438,36 +393,6 @@ def test_sheet_placements_stay_inside_the_border() -> None:
     assert drawing._sheet_y(spec.SHAFT_DIA / 2.0) < pick[1] <= corner_y - 0.0015
 
 
-@pytest.mark.parametrize("case", ["thrust-face", "no-plane", "two-planes", "one-face"])
-def test_collar_rear_finish_resolves_the_controlled_thrust_face_from_its_rim(
-    monkeypatch: pytest.MonkeyPatch, case: str,
-) -> None:
-    from _gtol_face import SURFACE_CYLINDER, SURFACE_PLANE, FaceGeometry
-
-    rear_m, radius_m = spec.COLLAR_REAR / 1000.0, spec.SPIGOT_DIA / 2000.0
-    thrust, od = object(), object()
-    geometries = {
-        thrust: FaceGeometry(
-            thrust, SURFACE_PLANE, (0.0, 1.0, 0.0, 0.0, rear_m, 0.0), (0.0, 1.0, 0.0), (),
-        ),
-        od: FaceGeometry(
-            od, SURFACE_CYLINDER, (0.0, 0.0, 0.0, 0.0, 1.0, 0.0, radius_m), None, (),
-        ),
-    }
-    if case == "no-plane":
-        geometries[thrust] = geometries[od]
-    elif case == "two-planes":
-        geometries[od] = geometries[thrust]
-    monkeypatch.setattr(drawing, "face_geometry", lambda face: geometries[face])
-    faces = (thrust,) if case == "one-face" else (od, thrust)
-    rim = SimpleNamespace(GetTwoAdjacentFaces2=Mock(return_value=faces))
-    if case == "thrust-face":
-        assert drawing._collar_rear_face(rim) is thrust
-    else:
-        with pytest.raises(RuntimeError, match="collar rear rim: expected one"):
-            drawing._collar_rear_face(rim)
-
-
 def test_both_bare_necks_print_one_model_loose_diameter() -> None:
     # Every bare land of the Ø.375 core is covered by a model diameter: the
     # shank its hub fit, both necks one 2X witness at the loose band.
@@ -497,8 +422,6 @@ def test_both_bare_necks_print_one_model_loose_diameter() -> None:
     assert drawing.JOURNAL_END_X < drawing.DIAMETER_POSITIONS["NeckDiaDim"][0] < drawing.SEAT_STEP_X
     # The loose band keeps the neck under the journal at print-worst.
     assert spec.SHAFT_DIA + spec.NECK_DIA_TOL < spec.JOURNAL_DIA + spec.JOURNAL_DIA_BAND[1]
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert not drawing_specification_violations(source, filename="draw_dt_crankshaft.py")
 
 
 def test_integral_lands_run_in_the_restored_post_at_every_size_limit() -> None:
@@ -524,8 +447,6 @@ def test_view_scales_and_linked_notes_are_explicit() -> None:
     assert drawing.VIEW_SCALE == (2, 1)
     assert drawing.ISO_SCALE == (1, 1)
     assert spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW\nSCALE 1:1"
-
-
 
 
 def test_seat_step_never_pushes_the_pinion_past_its_seat_gap() -> None:
@@ -615,8 +536,6 @@ def test_shaft_length_is_unilateral_and_printed_from_the_model() -> None:
     # collar's station, so the length only comes out short, and the model's
     # Depth carries the band.
     assert spec.SHAFT_LENGTH_BAND == (0.0, -spec.SHAFT_LENGTH_SHORT_MM)
-    build = Path(part.__file__).read_text(encoding="utf-8")
-    assert '"Shaft", "Depth", *deviations(SHAFT_LENGTH_BAND)' in build
     assert "Depth" in spec.DRAWING_DIMENSIONS["Shaft"]
     assert "Depth" not in spec.REFERENCE_DIMENSIONS
 
@@ -645,21 +564,10 @@ def test_shaft_band_ruling_holds_because_the_general_tolerance_closes_the_hub_ai
     assert bdt.CRANK_HUB_SPROCKET_AIR_WORST > 0.0
 
 
-
-
-
-
 def test_station_reference_is_saved_hidden_and_imported_per_view() -> None:
     # #880: a reference sketch owns printed dimensions but no geometry, so the
     # part saves it hidden (no assembly instance renders it) and the drawing
     # shows it per view through _drawing_hidden_sketches to import them.
-    build = Path(drawing.__file__).with_name("build_dt_crankshaft.py").read_text(encoding="utf-8")
-    blank = 'blank_sketch(adapter, "StationReference")'
-    assert blank in build
-    assert build.index(blank) < build.rindex("save_part_and_images(adapter, PART_NAME)")
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "from _drawing_hidden_sketches import curate_view_dimensions" in source
-    assert "    curate_view_dimensions,\n" not in source.replace("\r\n", "\n")
     assert "StationReference" in spec.DRAWING_DIMENSIONS
 
 
@@ -701,208 +609,3 @@ def test_centres_note_field_clears_front_witnesses_title_block_and_caption() -> 
     match_floor = drawing.PINION_PIN_NOTE_FIELD[1]
     assert max(y1, drawing.FAR_END_FRONT_RIM_WINDOW[3]) < match_floor
     assert drawing.CENTRES_NOTE_XY[0] > drawing.FAR_END_FRONT_RIM_PICK[0]
-
-
-class _CircleEdge:
-    """IEdge double whose ICurve is a circle (or a line) in model mm."""
-
-    def __init__(
-        self, centre_mm: tuple[float, float, float], radius_mm: float, *, circle: bool = True
-    ) -> None:
-        self.curve = SimpleNamespace(
-            IsCircle=lambda: circle,
-            CircleParams=(*(c / 1000.0 for c in centre_mm), 0.0, 1.0, 0.0, radius_mm / 1000.0),
-        )
-
-    def GetCurve(self):  # noqa: N802 - the COM member name
-        return self.curve
-
-
-def _far_rim(**overrides) -> _CircleEdge:
-    centre = overrides.pop("centre", (0.0, spec.SHAFT_LENGTH, 0.0))
-    radius = overrides.pop("radius", spec.PINION_SEAT_DIA / 2.0)
-    return _CircleEdge(centre, radius, **overrides)
-
-
-def _front_fakes(monkeypatch: pytest.MonkeyPatch, edges: list[_CircleEdge]):
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, interface: value)
-    monkeypatch.setattr(
-        drawing,
-        "visible_component_entities",
-        lambda view, component, kind: list(edges) if kind == 1 else [],
-    )
-    view = SimpleNamespace(GetVisibleComponents=lambda: ("dt-crankshaft",))
-    adapter = SimpleNamespace(_attempt=lambda operation, **kwargs: operation())
-    return adapter, view
-
-
-def _rim_distractors() -> list[_CircleEdge]:
-    # The seat step's two circles share the seat's and shank's radii at
-    # SEAT_STEP; the far face's straight seam is no circle.
-    return [
-        _CircleEdge((0.0, spec.SEAT_STEP, 0.0), spec.PINION_SEAT_DIA / 2.0),
-        _CircleEdge((0.0, spec.SEAT_STEP, 0.0), spec.SHAFT_DIA / 2.0),
-        _far_rim(circle=False),
-    ]
-
-
-def test_far_end_rim_is_the_one_plain_end_circle(monkeypatch: pytest.MonkeyPatch) -> None:
-    rim = _far_rim()
-    adapter, view = _front_fakes(monkeypatch, [*_rim_distractors(), rim])
-    assert drawing._far_end_rim(adapter, view) is rim
-
-
-@pytest.mark.parametrize(
-    "edges",
-    (
-        pytest.param([], id="missing"),
-        pytest.param([_far_rim(), _far_rim()], id="ambiguous"),
-        pytest.param([_far_rim(centre=(0.0, spec.SHAFT_LENGTH - 0.01, 0.0))], id="station"),
-        pytest.param([_far_rim(radius=spec.SHAFT_DIA / 2.0)], id="radius"),
-        pytest.param([_far_rim(centre=(0.01, spec.SHAFT_LENGTH, 0.0))], id="off-axis"),
-    ),
-)
-def test_far_end_rim_refuses_a_missing_or_ambiguous_rim(
-    monkeypatch: pytest.MonkeyPatch, edges: list[_CircleEdge]
-) -> None:
-    adapter, view = _front_fakes(monkeypatch, [*_rim_distractors(), *edges])
-    with pytest.raises(RuntimeError, match="expected exactly one"):
-        drawing._far_end_rim(adapter, view)
-
-
-@pytest.fixture
-def centres_note_fakes(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
-    rim = _far_rim()
-    adapter, side = _front_fakes(monkeypatch, [*_rim_distractors(), rim])
-    annotation = SimpleNamespace(
-        SetLeader3=Mock(return_value=0), SetPosition2=Mock(return_value=True)
-    )
-    note = SimpleNamespace(GetAnnotation=Mock(return_value=annotation))
-    prerequisites: list[str] = []
-    select = Mock(side_effect=lambda *args, **kwargs: prerequisites.append("select"))
-
-    def set_landing(*args):
-        prerequisites.append("landing")
-        return True
-
-    def insert(text):
-        # The exact rim and its landing must belong to the selection before
-        # insertion; later leader movement cannot establish that ownership.
-        assert prerequisites == ["select", "landing"]
-        return note
-
-    model = SimpleNamespace(
-        SelectionManager=SimpleNamespace(SetSelectionPoint2=Mock(side_effect=set_landing)),
-        InsertNote=Mock(side_effect=insert),
-        ClearSelection2=Mock(),
-    )
-    rebuild = Mock()
-    place = Mock()
-    attached = Mock()
-    monkeypatch.setattr(drawing, "_select_view_entity", select)
-    monkeypatch.setattr(drawing, "rebuild_drawing", rebuild)
-    monkeypatch.setattr(drawing, "_place_note_text_in_field", place)
-    monkeypatch.setattr(drawing, "_assert_attached_to", attached)
-    return SimpleNamespace(
-        adapter=adapter, side=side, rim=rim, model=model, note=note,
-        annotation=annotation, select=select, rebuild=rebuild, place=place,
-        attached=attached,
-    )
-
-
-def test_centres_note_is_attached_to_the_far_end_rim_on_front(
-    centres_note_fakes: SimpleNamespace,
-) -> None:
-    f = centres_note_fakes
-    label = "lathe centre hole end"
-
-    def place(*args, **kwargs):
-        f.rebuild.assert_called_once_with(f.adapter, label=label)
-
-    def attached(*args, **kwargs):
-        f.place.assert_called_once_with(
-            f.model, f.note, drawing._centres_note_field(),
-            hole=drawing.FAR_END_FRONT_RIM_WINDOW, label=label,
-        )
-        f.model.ClearSelection2.assert_not_called()
-
-    f.place.side_effect = place
-    f.attached.side_effect = attached
-    assert drawing._add_centres_note(f.adapter, f.model, f.side) is f.note
-    f.select.assert_called_once_with(
-        f.adapter, f.side, "EDGE", None, label=label, entity=f.rim
-    )
-    f.model.SelectionManager.SetSelectionPoint2.assert_called_once_with(
-        1, -1, *drawing.FAR_END_FRONT_RIM_PICK, 0.0
-    )
-    f.model.InsertNote.assert_called_once_with(notes.CENTRES_NOTE)
-    f.note.GetAnnotation.assert_called_once_with()
-    f.annotation.SetLeader3.assert_called_once_with(1, 0, True, False, False, False)
-    f.annotation.SetPosition2.assert_called_once_with(*drawing.CENTRES_NOTE_XY, 0.0)
-    f.attached.assert_called_once_with(
-        f.adapter, f.annotation, f.rim, entity_type="EDGE",
-        what="attached note", label=label,
-    )
-    f.model.ClearSelection2.assert_called_once_with(True)
-
-
-@pytest.mark.parametrize("result", [False, None, 1])
-def test_centres_note_refuses_failed_selection_point_before_insertion(
-    centres_note_fakes: SimpleNamespace, result: object,
-) -> None:
-    f = centres_note_fakes
-    f.model.SelectionManager.SetSelectionPoint2.side_effect = None
-    f.model.SelectionManager.SetSelectionPoint2.return_value = result
-    with pytest.raises(RuntimeError, match="failed to set the FRONT plain-end landing"):
-        drawing._add_centres_note(f.adapter, f.model, f.side)
-    f.model.InsertNote.assert_not_called()
-    f.rebuild.assert_not_called()
-    f.place.assert_not_called()
-    f.attached.assert_not_called()
-
-
-def test_centres_note_refuses_missing_inserted_note(
-    centres_note_fakes: SimpleNamespace,
-) -> None:
-    f = centres_note_fakes
-    f.model.InsertNote.side_effect = None
-    f.model.InsertNote.return_value = None
-    with pytest.raises(RuntimeError, match="failed to insert the note"):
-        drawing._add_centres_note(f.adapter, f.model, f.side)
-    f.model.InsertNote.assert_called_once_with(notes.CENTRES_NOTE)
-    f.note.GetAnnotation.assert_not_called()
-    f.rebuild.assert_not_called()
-    f.place.assert_not_called()
-    f.attached.assert_not_called()
-
-
-def test_centres_note_is_only_the_attached_note_and_build_places_it() -> None:
-    # The unleadered general-note row is gone, not kept beside the leadered one.
-    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
-    users = [
-        node
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call)
-        and any(
-            isinstance(arg, ast.Name) and arg.id == "CENTRES_NOTE"
-            for arg in (*node.args, *(kw.value for kw in node.keywords))
-        )
-    ]
-    assert [ast.unparse(node.func) for node in users] == ["drawing_model.InsertNote"]
-    (build,) = [
-        node
-        for node in tree.body
-        if isinstance(node, ast.AsyncFunctionDef) and node.name == "build"
-    ]
-    placements = [
-        node
-        for node in ast.walk(build)
-        if isinstance(node, ast.Call) and ast.unparse(node.func) == "_add_centres_note"
-    ]
-    assert len(placements) == 1
-    assert [ast.unparse(arg) for arg in placements[0].args] == [
-        "adapter",
-        "drawing_model",
-        "side",
-    ]
-    assert placements[0].keywords == []

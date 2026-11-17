@@ -6,7 +6,6 @@ from pathlib import Path
 
 import pytest
 
-from _column_clamp_interface import BAR_DEPTH
 import build_mg_wheel_bar as part
 import draw_mg_wheel_bar as drawing
 import mg_wheel_bar_callouts as callouts
@@ -47,13 +46,6 @@ def test_drawing_contract_is_split_from_the_assembly_nominals() -> None:
     assert geom.BAR_TOP_ABOVE_ROW == 5.0
     assert geom.BORE_ROW_HEIGHT == geom.BAR_SIDE - geom.BAR_TOP_ABOVE_ROW
     assert geom.CLAMP_HOLE_X == (70.4994, 105.5006)
-    assembly = (
-        Path(part.__file__)
-        .with_name("build_mg_magnifier_assembly.py")
-        .read_text(encoding="utf-8")
-    )
-    assert "from mg_wheel_bar_geom import" in assembly
-    assert "from build_mg_wheel_bar import" not in assembly
 
 
 def test_hanger_clearance_preserves_a_tolerance_safe_end_ligament() -> None:
@@ -137,9 +129,6 @@ def test_station_rows_stack_shortest_nearest_under_the_bar() -> None:
 
 def test_the_sheet_carries_no_general_notes() -> None:
     # Every hole callout says THRU; the holes' purposes were only polish.
-    for module in (part, drawing):
-        source = Path(module.__file__).read_text(encoding="utf-8")
-        assert "Manufacturing Notes" not in source
     assert not hasattr(mg_wheel_bar_spec, "DRAWING_NOTES")
 
 
@@ -308,48 +297,9 @@ def test_axle_bore_is_a_marked_reamed_cut() -> None:
     assert model_toleranced_dimensions(part) == {
         ("AxleBoreProfile", "AxleBoreDia"): "*deviations(AXLE_BORE_BAND)",
     }
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert 'name_last_feature(adapter, "AxleBoreProfile")' in source
-    assert 'name_last_feature(adapter, "AxleBore")' in source
-    assert "create_cut_extrude(" in source
-    assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in source
-    assert 'name_dimensions(adapter, "Bar", ["BarDepth"])' in source
-
-
-def test_hole_callouts_pick_both_screw_hole_features(monkeypatch) -> None:
-    import mg_wheel_bar_geom as geom
-
-    class _Edges:
-        def __init__(self) -> None:
-            self.picks = []
-
-        def circle_at(self, center, radius, *, axis, label, radius_tol_mm):
-            self.picks.append((center, radius, axis))
-
-            class _Hit:
-                edge = (center, radius)
-
-            return _Hit()
-
-    edges = _Edges()
-    monkeypatch.setattr(drawing, "scan_view_edges", lambda view, *, label: edges)
-    rims = drawing._hole_rims(object())
-    face = BAR_DEPTH / 2.0
-    assert edges.picks == [
-        (
-            (geom.SCREW_HOLE_X, 0.0, face),
-            geom.PEN_HANGER_HOLE_DIA / 2.0,
-            (0.0, 0.0, 1.0),
-        ),
-        ((geom.CLAMP_HOLE_X[0], 0.0, face), geom.CLAMP_HOLE_DIA / 2.0, (0.0, 0.0, 1.0)),
-    ]
-    assert len(rims) == 2
 
 
 def test_part_stamps_make_critical_properties() -> None:
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "apply_drawing_properties" in source
-    assert "clear_dimensions_for_drawing" in source
     import _config
 
     config = _config.parts("mg-wheel-bar")

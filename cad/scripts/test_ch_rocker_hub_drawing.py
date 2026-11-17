@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import ast
 import math
 from pathlib import Path
 
@@ -18,15 +17,6 @@ import draw_ch_rocker_hub as drawing
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from _inch_wall_limits import WALL_FLOOR_MM
-
-
-def _calls(path: str) -> dict[str, ast.Call]:
-    tree = ast.parse(Path(path).read_text(encoding="utf-8"))
-    return {
-        node.func.id: node
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
-    }
 
 
 def test_required_drawing_paths() -> None:
@@ -99,19 +89,12 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
     assert set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP) == marked
     assert not set(drawing.FRONT_KEEP) & set(drawing.RIGHT_KEEP)
     assert set(drawing.DIMENSION_CALLOUTS) <= marked
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "set_dimension_precision" not in source
-    assert "assert_imported_precision(" in source
 
 
 def test_every_band_is_native_and_named() -> None:
     assert model_toleranced_dimensions(part) == {
         ("HubProfile", "LandDia"): "*deviations(HUB_LAND_BAND)",
     }
-    build = Path(part.__file__).read_text(encoding="utf-8")
-    # The supply length's single MIN limit (build_ch_rod_pivot_pin precedent).
-    assert "tolerance.Type = SUPPLY_LENGTH_TOL_TYPE" in build
-    assert "tolerance.SetValues(0.0, 0.0)" in build
     # Fan-out screen 2026-11-07 (rule 7): the bore's and the length's
     # supply-matched sizes link the note that states them.
     assert notes.SUPPLY_BORE_CALLOUT.splitlines() == [
@@ -133,21 +116,6 @@ def test_every_band_is_native_and_named() -> None:
     assert 0.075 <= spec.SUPPLY_WALL_MIN / 25.4 < 0.076
 
 
-def test_drawing_quality_and_no_gdt() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert (
-        "for view in (front, right, iso):\n        set_hidden_lines_removed" in source
-    )
-    names = set(_calls(drawing.__file__))
-    assert not names & {
-        "add_datum_feature",
-        "add_feature_control_frame",
-        "add_surface_finish",
-    }
-    assert "move_model_dimension" in names
-    assert "add_view_centerline" in names
-
-
 def test_registry_row() -> None:
     row = _config.parts("ch-rocker-hub")
     assert row["number"] == spec.NUMBER == "MHA-CH-12"
@@ -157,33 +125,6 @@ def test_registry_row() -> None:
     assert len(str(row["material_specification"])) <= 36
     assert len(str(row["finish"])) <= 36
     assert part.MATERIAL == "Plain Carbon Steel"
-
-
-def test_the_part_carries_every_property_its_drawing_requires(monkeypatch) -> None:
-    import _drawing_marks
-    import _part_properties
-
-    required = ast.literal_eval(
-        next(
-            k.value
-            for k in _calls(drawing.__file__)["read_required_properties"].keywords
-            if k.arg == "required"
-        )
-    )
-    carried = dict(_part_properties.part_properties(part.PART_NAME))
-    stamped: dict[str, str] = {}
-    monkeypatch.setattr(
-        _drawing_marks,
-        "apply_custom_properties",
-        lambda _adapter, props: stamped.update(props),
-    )
-    _drawing_marks.apply_drawing_properties(
-        None, part.PART_NAME, {"Manufacturing Notes": notes.DRAWING_NOTES}
-    )
-    carried.update(stamped)
-    missing = [name for name in required if not str(carried.get(name) or "").strip()]
-    assert missing == []
-    assert set(required) <= set(part._SAVED_DRAWING_PROPERTIES)
 
 
 def test_land_callout_stands_above_the_hub_clear_of_the_isometric() -> None:

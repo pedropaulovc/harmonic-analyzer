@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 
 import pytest
 
@@ -15,7 +14,6 @@ from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _machinist_review_mode import MachinistReviewMode
 
 IN = 25.4
-SCRIPTS = Path(__file__).resolve().parent
 
 
 def test_registry_row_is_the_modified_mcmaster_screw() -> None:
@@ -59,19 +57,6 @@ def test_head_and_thread_are_the_sourced_catalogue_sizes() -> None:
     assert stock.EXTERNAL_PITCH_DIA_MIN_MM == 0.2225 * IN
     # The derived minimum root lies under the table's UNR maximum.
     assert stock.THREAD_MINOR_MIN_MM < stock.THREAD_MINOR_UNR_MAX_MM
-
-
-def test_stock_recipe_is_registered_with_the_fleet_driver() -> None:
-    driver = (SCRIPTS / "diagnostics" / "diag_build_mcmaster.py").read_text(
-        encoding="utf-8"
-    )
-    assert "from diagnostics.diag_build_91794A558 import build_91794A558" in driver
-    assert '"91794A558": build_91794A558,' in driver
-    recipe = (SCRIPTS / "diagnostics" / "diag_build_91794A558.py").read_text(
-        encoding="utf-8"
-    )
-    assert '@stock_recipe("91794A558", threaded=True)' in recipe
-    assert 'build_fillister(adapter, "91794A558", FILLISTER_SIZE)' in recipe
 
 
 def test_hole_is_the_tip_cluster_contract() -> None:

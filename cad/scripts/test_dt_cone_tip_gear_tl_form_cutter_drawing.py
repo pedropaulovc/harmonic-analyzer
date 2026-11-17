@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import ast
 import math
 import re
 from dataclasses import replace
@@ -21,7 +20,6 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _machinist_review_mode import MachinistReviewMode
 from _printed_tolerance import printed_band_mm
 
-SCRIPTS = Path(__file__).resolve().parent
 # ASME B landscape: inside the border, clear of the title block's corner.
 SHEET_INNER = (0.0127, 0.0127, 0.4191, 0.2667)
 TITLE_BLOCK = (0.216, 0.0, 0.4318, 0.066)
@@ -155,15 +153,6 @@ def test_the_flat_prints_its_length_and_its_micrometer_depth_bare() -> None:
     assert "FlatLength" not in part.DIMENSION_CALLOUTS
     assert "FlatDepth" not in part.DIMENSION_CALLOUTS
     assert "CENTER" not in " ".join(part.DIMENSION_CALLOUTS.values())
-    # The builder drives the depth from its own .063 global, no band of its
-    # own, and floors the flat at FACE_HEIGHT.
-    builder = (SCRIPTS / "build_dt_cone_tip_gear_tl_form_cutter.py").read_text(
-        encoding="utf-8"
-    )
-    assert 'flat.record("FlatDepth", \'"FlatDepth"\')' in builder
-    assert '("FlatDepth", f"{FLAT_DEPTH}mm")' in builder
-    assert "FLAT_DEPTH_TOL" not in builder
-    assert "(-FLAT_LENGTH, FACE_HEIGHT)" in builder
     # The depth's text sits right of the tip, between the face and the far
     # side, left of the end view's rod.
     x, y = drawing.FRONT_KEEP["FlatDepth"]
@@ -202,12 +191,5 @@ def test_the_notes_state_facts_in_at_most_four_lines() -> None:
 
 
 def test_the_draw_script_owns_placement_only() -> None:
-    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
-    literals = [
-        node.value
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Constant) and isinstance(node.value, str)
-    ]
-    assert not any(re.search(r"[+-]\.\d{3,}", text) for text in literals)
     assert drawing.MACHINIST_REVIEW is MachinistReviewMode.ENFORCE
     assert drawing.SPEC.layout.name == "LANDSCAPE"

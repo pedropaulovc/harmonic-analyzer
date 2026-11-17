@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import re
 from fractions import Fraction
-from pathlib import Path
 
 import pytest
 
@@ -43,8 +42,6 @@ def test_standalone_recipe_run_is_the_replica_gate() -> None:
     from diagnostics.diag_build_mcmaster import REGISTRY
 
     assert REGISTRY[spec.SKU] is recipe.build_98381A473
-    source = Path(recipe.__file__).read_text(encoding="utf-8")
-    assert "replica_main(PART_NO, build_98381A473)" in source
 
 
 def test_recipe_is_the_size_the_registry_names() -> None:

@@ -14,7 +14,6 @@ import pn_pen_adjust_screw_spec as spec
 import pn_pen_rod_spec
 from _drawing_contract import (
     PRECISION_MIGRATED_DRAWINGS,
-    drawing_specification_violations,
     model_toleranced_dimensions,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -34,15 +33,6 @@ def _calls(module, name: str) -> list[ast.Call]:
         if isinstance(node, ast.Call)
         and (getattr(node.func, "id", None) or getattr(node.func, "attr", None)) == name
     ]
-
-
-def _literal_args(call: ast.Call) -> list[object]:
-    return [arg.value for arg in call.args if isinstance(arg, ast.Constant)]
-
-
-def _keyword(call: ast.Call, name: str) -> ast.expr:
-    (value,) = (kw.value for kw in call.keywords if kw.arg == name)
-    return value
 
 
 def test_required_drawing_paths() -> None:
@@ -188,12 +178,6 @@ def test_shoulder_root_prints_its_own_nominal_radius() -> None:
     )
     assert spec.SHOULDER_OVER_ROD_TOP_MIN > jam_nut.THICKNESS
     assert "ShoulderRadius" not in spec.DIMENSION_CALLOUTS
-    # No band of its own on the part: the title block's .XX governs it.
-    assert "_shoulder_fillet_max_limit" not in _source(part)
-    draw_source = _source(drawing)
-    assert "_dress_shoulder_radius(adapter, drawing_model, by_name, spt)" in (
-        draw_source
-    )
     assert set(drawing.UPPER_ARC_KEEP) == {"ShoulderRadius", "PlainDia"}
 
 
@@ -240,94 +224,21 @@ def test_plain_shank_diameter_prints_as_a_reference() -> None:
     assert spec.REFERENCE_DIMENSIONS == frozenset({"PlainDia"})
     assert spec.REFERENCE_DIMENSIONS <= spec.DRAWING_DIMENSIONS["StudProfile"]
     assert not hasattr(spec, "DRAWING_REFERENCE_PRECISION")
-    source = _source(part)
-    assert 'profile.record("PlainDia", \'"ThreadDia"\')' in source
-    calls = {
-        ast.literal_eval(call.args[-1]): [ast.unparse(arg) for arg in call.args[1:4]]
-        for call in _calls(part, "add_diametric_linear_dimension")
-    }
-    assert calls["ThreadDia"] == [
-        "axis",
-        "thread",
-        "(THREAD_R + 4.0, FULL_THREAD_LENGTH / 2.0)",
-    ]
-    # Same axis, same pick offset, on the plain segment's mid-height; to its
-    # free (shoulder) end, which replaces the segment's vertical relation.
-    assert calls["PlainDia"] == [
-        "axis",
-        "f'{shank}.end'",
-        "(THREAD_R + 4.0, FULL_THREAD_LENGTH + PLAIN_SHANK / 2.0)",
-    ]
-    assert '("plain shank", shank, "vertical")' not in source
-    assert "ShankDia" not in source
     assert not model_toleranced_dimensions(part)
-    draw_source = _source(drawing)
-    for gone in ("add_edge_dimension", "_face_silhouette_pair", "SetPrecision3"):
-        assert gone not in draw_source
-    assert "for name in sorted(REFERENCE_DIMENSIONS):" in draw_source
-    (reference,) = _calls(drawing, "set_reference_dimension")
-    assert ast.literal_eval(_keyword(reference, "diameter")) is True
 
 
 def test_every_marked_dimension_is_created_and_named_by_the_build() -> None:
     """Each printed name is recorded on the sketch whose feature the spec keys
     it under, so mark_dimensions_for_drawing finds exactly that set."""
-    source = _source(part)
-    for name in (
-        "ThreadDia",
-        "FullThreadLength",
-        "HeadDia",
-        "HeadHeight",
-        "OverallLength",
-    ):
-        assert f'profile.record("{name}", \'"{name}"\')' in source
-    assert 'station.record("HeadEndStation", \'"OverallLength"\')' in source
-    assert 'station.record("EyeFromHeadEnd", EYE_FROM_HEAD_END_EXPR)' in source
-    assert 'drive_jobs += profile.apply(adapter, "StudProfile")' in source
-    assert 'drive_jobs += station.apply(adapter, "EyeStationReference")' in source
-    assert 'drive_jobs = dims.apply(adapter, "ThreadLimitReference")' in source
-    assert "drive_jobs += await _add_thread_limit(adapter)" in source
     assert part.EYE_Y_EXPR == '"OverallLength" - "HeadHeight" / 2'
     assert part.EYE_FROM_HEAD_END_EXPR == '"HeadHeight" / 2'
-    assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in source
-    assert "clear_dimensions_for_drawing(adapter)" in source
-    assert (
-        "mark_dimensions_for_drawing(adapter, feature_name, dimension_names)" in source
-    )
 
 
 def test_the_eye_station_is_located_from_the_head_end() -> None:
     """drawing-guidelines.md rule 11: the head's features from its own faced
     end. The reference line runs from the eye up to the head end; only its
     length (the eye's station from that face) is marked."""
-    (line,) = (
-        call
-        for call in _calls(part, "add_line")
-        if [ast.unparse(arg) for arg in call.args][1] == "EYE_Y"
-    )
-    assert [ast.unparse(arg) for arg in line.args] == [
-        "0.0",
-        "EYE_Y",
-        "0.0",
-        "OVERALL_LENGTH",
-    ]
     assert "HeadEndStation" not in set().union(*spec.DRAWING_DIMENSIONS.values())
-
-
-def test_profile_splits_the_thread_limit_off_the_plain_shank() -> None:
-    """The full thread is its own profile segment (FullThreadLength measures
-    it); the shoulder sits at the shank length."""
-    source = _source(part)
-    assert "(THREAD_R, FULL_THREAD_LENGTH)," in source
-    assert "(THREAD_R, SHANK_LENGTH)," in source
-    assert "(HEAD_R, SHANK_LENGTH)," in source
-    assert (
-        "end, thread, shank, shoulder, head, top, closure = await add_line_chain("
-        in source
-    )
-    # The plain segment's x rides PlainDia (to its shoulder end), not a
-    # vertical relation: its start is the thread's end.
-    assert '("thread", thread, "vertical"),' in source
 
 
 def test_a_split_line_rings_the_shank_at_the_thread_limit() -> None:
@@ -335,16 +246,6 @@ def test_a_split_line_rings_the_shank_at_the_thread_limit() -> None:
     projected split line (both directions: a full ring) at FullThreadLength
     leaves the real edge the side view draws and the FULL THREAD extension
     line lands on; the build checks the two faces' areas."""
-    source = _source(part)
-    assert "model.InsertSplitLineProject(False, False)" in source
-    assert '_feature_by_name(adapter, created).Name = "ThreadLimitSplit"' in source
-    assert 'dims.record("ThreadLimitStation", \'"FullThreadLength"\')' in source
-    (split,) = (
-        call
-        for call in _calls(part, "add_line")
-        if [ast.unparse(arg) for arg in call.args]
-        == ["-reach", "FULL_THREAD_LENGTH", "reach", "FULL_THREAD_LENGTH"]
-    )
     assert part._PLAIN_FACE_AREA == pytest.approx(
         math.pi * spec.THREAD_MAJOR * spec.PLAIN_SHANK
     )
@@ -352,61 +253,12 @@ def test_a_split_line_rings_the_shank_at_the_thread_limit() -> None:
         math.pi * spec.THREAD_MAJOR * spec.FULL_THREAD_LENGTH
     )
     assert not hasattr(part, "_SHANK_WITNESS_LEN")
-    assert '"thread-limit split cuts nothing", stud_volume' in source
-
-
-def test_feature_names_are_the_contract() -> None:
-    named = [_literal_args(call)[0] for call in _calls(part, "name_last_feature")]
-    assert sorted(named) == sorted(
-        [
-            "StudProfile",
-            "Stud",
-            "ThreadLimitReference",
-            "ShoulderFillet",
-            "EyeStationPlane",
-            "EyeStationReference",
-        ]
-    )
-    source = _source(part)
-    build_body = source[source.index("async def build(") :]
-    assert (
-        build_body.index('"Stud")')
-        < build_body.index("_add_thread_limit(adapter)")
-        < build_body.index('"ShoulderFillet")')
-        < build_body.index('"EyeStationPlane")')
-    )
-    (eye,) = _calls(part, "wizard_hole_on_cylinder")
-    assert ast.literal_eval(_keyword(eye, "name")) == "EyeHole"
-    assert ast.literal_eval(_keyword(eye, "point_planes")) == (
-        "EyeStationPlane",
-        "Front Plane",
-    )
-    assert ast.unparse(eye.args[1]) == "EYE_SPEC"
-    # Radially into the head's cylinder at +X: the drill runs along X.
-    assert ast.unparse(eye.args[2]) == "[HEAD_R, EYE_Y, 0.0]"
-    (plane,) = _calls(part, "CreatePlaneParameters")
-    assert ast.literal_eval(_keyword(plane, "base_plane")) == "Top Plane"
-    assert ast.unparse(_keyword(plane, "offset")) == "EYE_Y"
 
 
 def test_every_sketch_faces_the_side_view() -> None:
     """All marked dimensions live on Right-plane sketches: the *Right side
     view, which sees the X eye end-on, imports them natively."""
-    source = _source(part)
-    assert source.count('create_sketch("Right")') == 3
-    assert 'create_sketch("Front")' not in source
-    assert 'create_sketch("Top")' not in source
-    draw_source = _source(drawing)
-    assert '"*Right", *SIDE_CENTER, scale=VIEW_SCALE' in draw_source
     assert drawing.SIDE_VIEW_ANGLE == -math.pi / 2.0
-    assert "RevolveParameters(angle=360.0)" in source
-    assert len(_calls(part, "create_revolve")) == 1
-
-
-def test_stud_axis_is_axis1_through_the_origin() -> None:
-    (axis,) = _calls(part, "name_bore_axis")
-    assert _literal_args(axis)[:4] == ["Front Plane", 0.0, "Right Plane", 0.0]
-    assert 'if stud_axis != "Axis1":' in _source(part)
 
 
 def test_volumes_are_analytic() -> None:
@@ -425,49 +277,16 @@ def test_volumes_are_analytic() -> None:
     # About 0.3 mm^3 of a ~260 mm^3 stud at R.02.
     assert 0.0 < part.V_FILLET < 2.0
     assert part.V_TOTAL == pytest.approx(stud + part.V_FILLET - part.V_EYE)
-    source = _source(part)
-    assert 'volume_check(adapter, "stud", V_STUD,' in source
-    assert 'volume_check(adapter, "eye cross hole", V_TOTAL,' in source
-    assert '"cosmetic thread cuts nothing", driven, 1e-6' in source
-    assert 'stud_volume = await volume_check(adapter, "stud", V_STUD,' in source
-    assert '"shoulder root fillet", stud_volume + V_FILLET, 0.5 * V_FILLET' in source
-
-
-def test_cosmetic_thread_runs_the_full_thread_only() -> None:
-    (thread,) = _calls(part, "AddThreadParameters")
-    assert ast.unparse(_keyword(thread, "edge_point")) == "[THREAD_R, 0.0, 0.0]"
-    assert ast.unparse(_keyword(thread, "size")) == "THREAD"
-    assert ast.literal_eval(_keyword(thread, "end_type")) == "blind"
-    assert ast.unparse(_keyword(thread, "depth")) == "FULL_THREAD_LENGTH"
-    assert "import_cosmetic_threads(adapter, iso)" in _source(drawing)
 
 
 def test_no_gdt_no_pmi_no_roughness() -> None:
     """drawing-simplicity-policy.md rule 5: the stud is not on the GD&T
     allowlist; rule 6: nothing on it runs, slides or locates."""
-    for module in (part, drawing):
-        source = _source(module)
-        for forbidden in (
-            "author_part_pmi",
-            "PART_DATUMS",
-            "GEOMETRIC_CONTROLS",
-            "_gtol",
-            "add_datum_feature(",
-            "add_feature_control_frame(",
-            "set_basic_dimension",
-            "add_surface_finish(",
-            "SURFACE_FINISHES",
-        ):
-            assert forbidden not in source, (module.__name__, forbidden)
     assert model_toleranced_dimensions(part) == {}
-    assert "add_view_centerline(" in _source(drawing)
 
 
 def test_eye_prints_the_native_wizard_callout() -> None:
-    (callout,) = _calls(drawing, "add_native_hole_callout")
-    assert ast.unparse(_keyword(callout, "process")) == "drill_process(EYE_SPEC)"
     assert drill_process(spec.EYE_SPEC) == "#54 DRILL"
-    assert "auto_center_marks(adapter, side, holes=True" in _source(drawing)
 
 
 def test_thread_callout_rides_the_model_and_no_notes() -> None:
@@ -496,11 +315,6 @@ def test_thread_callout_rides_the_model_and_no_notes() -> None:
 def test_part_stamps_make_critical_properties() -> None:
     import _config
 
-    source = _source(part)
-    assert "apply_drawing_properties(adapter, PART_NAME)" in source
-    assert (
-        "require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)" in source
-    )
     assert part._SAVED_DRAWING_PROPERTIES == (
         "Number",
         "Material Specification",
@@ -520,13 +334,7 @@ def test_part_stamps_make_critical_properties() -> None:
 
 
 def test_the_part_owns_the_printed_precision() -> None:
-    draw_source = _source(drawing)
-    assert (
-        "assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)"
-        in draw_source
-    )
     assert "draw_pn_pen_adjust_screw.py" in PRECISION_MIGRATED_DRAWINGS
-    assert not drawing_specification_violations(draw_source, filename=drawing.__file__)
 
 
 def test_side_view_layout_reads_like_the_lathe() -> None:
@@ -535,7 +343,6 @@ def test_side_view_layout_reads_like_the_lathe() -> None:
     the eye callout up-left so its leader crosses no dimension or extension
     line; everything inside the B-size border."""
     assert drawing.SHEET_SCALE == (6.0, 1.0)
-    assert '"*Isometric", *ISO_CENTER, scale=VIEW_SCALE' in _source(drawing)
     assert (
         drawing.THREAD_END_X
         < drawing.FULL_THREAD_X

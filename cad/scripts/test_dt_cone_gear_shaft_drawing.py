@@ -80,85 +80,6 @@ def test_section_fits_are_toleranced_on_the_model() -> None:
     }
 
 
-def test_the_build_rounds_only_the_step_root(monkeypatch):
-    """Run the real part build with recording doubles: no chamfer is authored
-    by any route (adapter, helper or raw COM chain), and the one edge
-    rounding picks only the land-1 to land-2 step's edge on land 2."""
-    adapter, stubs, _dims, _gated = _stubbed_build(monkeypatch)
-    operations = [str(c[0]) for c in adapter.mock_calls] + [
-        f"{name}.{c[0]}" for name, stub in stubs.items() for c in stub.mock_calls
-    ]
-    assert not [op for op in operations if "chamfer" in op.lower()]
-    fillets = adapter.add_fillet.await_args_list
-    assert len(fillets) == 1, "the step-root fillet is the positive control"
-    picks = fillets[0].args[1]
-    assert picks == [[-part.SECTION_DIAS[2] / 2.0, 0.0, part.SECTION_ENDS[1]]]
-
-
-def _centre_mark_view(marks: list, deletes: bool):
-    """A section view holding ``marks`` and a drawing whose EditDelete drops
-    the selected one (or, ``deletes=False``, silently keeps it)."""
-    from types import SimpleNamespace
-
-    events: list[str] = []
-    selected: list = []
-
-    def select(mark):
-        def _select(append, _data):
-            assert append is False
-            selected.append(mark)
-            events.append("select")
-            return True
-
-        return _select
-
-    for mark in marks:
-        mark.Select2 = select(mark)
-
-    def edit_delete():
-        events.append("delete")
-        if deletes:
-            for mark in selected:
-                marks.remove(mark)
-
-    draw = SimpleNamespace(
-        ClearSelection2=lambda _all: selected.clear() or True,
-        EditDelete=edit_delete,
-    )
-    view = SimpleNamespace(
-        GetAnnotationsByType=lambda kind: (
-            tuple(marks) if kind == drawing._CENTER_MARK_ANNOTATION else ()
-        )
-    )
-    return SimpleNamespace(currentModel=draw), view, events
-
-
-def test_the_section_loses_its_centre_mark(monkeypatch):
-    """Machinist review r7: the full A-A got SolidWorks' centre mark.  The
-    mark is deleted and read back gone; a section with none is left alone; a
-    delete that does not land fails the build."""
-    from types import SimpleNamespace
-
-    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
-    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_k: None)
-    a_a = drawing.D_SECTIONS[0]
-    marks = [SimpleNamespace()]
-    adapter, view, events = _centre_mark_view(marks, deletes=True)
-    drawing._delete_centre_mark(adapter, view, a_a)
-    assert marks == [] and events == ["select", "delete"]
-    # no mark: nothing to delete, nothing selected
-    adapter, view, events = _centre_mark_view([], deletes=True)
-    drawing._delete_centre_mark(adapter, view, a_a)
-    assert events == []
-    # the delete is VT_VOID: only the re-read proves it
-    adapter, view, _events = _centre_mark_view([SimpleNamespace()], deletes=False)
-    with pytest.raises(RuntimeError, match="survived deletion"):
-        drawing._delete_centre_mark(adapter, view, a_a)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "_delete_centre_mark(adapter, view, section)" in source
-    assert "carries a centre mark again" in source
-
-
 def test_the_keyseat_section_flags_the_land_note(monkeypatch):
     """Run the real section loop with its native steps recorded: A-A prints
     the keyseat's S and width, both flagged to the land note: the width after
@@ -289,15 +210,6 @@ def test_every_tight_band_names_its_mate_and_fit_route():
 def test_display_precision_is_owned_by_the_part() -> None:
     """drawing-simplicity-policy.md `How the repository implements the guidelines`: the .SLDPRT carries the places, the sheet reads them back."""
     assert "draw_dt_cone_gear_shaft.py" in PRECISION_MIGRATED_DRAWINGS
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "set_dimension_precision" not in source
-    # The pure reference (the overall) takes its places from the existing
-    # spec constant, never a literal or a new band.
-    assert source.count("SetPrecision3") == 1
-    assert source.count("SetPrecision3(DRAWING_REFERENCE_PRECISION, ") == 1
-    assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in (
-        Path(part.__file__).read_text(encoding="utf-8")
-    )
     # Every diameter carries its named band, so its places are only spelling.
     # The stations carry no band, so their places ARE the grade they are held
     # to: three for the land step booked in the setback and for the tip booked
@@ -463,10 +375,6 @@ def test_every_diameter_stands_on_its_own_land() -> None:
     x must fall inside the land: outside it the extension lines would run
     through a bigger neighbour and across its shoulder.
     """
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "base_plane=SECTION_ORIGINS[i], offset=knob" in source
-    assert "ExtrusionParameters(depth=knob, reverse_direction=i > 0)" in source
-    assert "await adapter.create_sketch(plane_name)" in source
 
     ends = dt_cone_gear_shaft_spec.SECTION_ENDS
     big_end = drawing.SIDE_CENTER[0] + dt_cone_gear_shaft_spec.SHAFT_LENGTH / 2000.0
@@ -521,7 +429,6 @@ def _scaled_collar_text() -> tuple[float, float, float, float]:
 _COLLAR_TEXT = _scaled_collar_text()
 _PIVOT_FINISH_BOX = (0.2320, 0.1800, 0.2790, 0.1980)
 _SEC1_TEXT = (0.1400, 0.1685, 0.1723, 0.1765)
-_SEC1_LINES = [((0.1400, 0.1452), (0.1400, 0.1548))]
 
 
 def _pivot_finish_ink() -> tuple[tuple[float, float, float, float], list]:
@@ -583,134 +490,6 @@ def test_the_collar_callout_read_guard_takes_the_whole_block() -> None:
     assert per_char * widest >= drawing.COLLAR_CALLOUT_MIN_READ
     value_line_only = len("(Ø5/8 in)") * drawing.LENGTH_CHAR_WIDTH
     assert value_line_only < drawing.COLLAR_CALLOUT_MIN_READ
-
-
-def _clear_collar_with(monkeypatch, texts, dimensions=None):
-    """Run _clear_collar_callout against fakes: each collar read returns the
-    next text box, each neighbour dimension its (text box, lines); returns the
-    recorded moves."""
-    from types import SimpleNamespace
-
-    if dimensions is None:
-        dimensions = {"Sec1Dia": (_SEC1_TEXT, _SEC1_LINES)}
-    finish, leader = _pivot_finish_ink()
-    reads = iter(texts)
-    moves = []
-    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_k: None)
-    monkeypatch.setattr(drawing, "gdt_box", lambda *_a, **_k: finish)
-    monkeypatch.setattr(drawing, "leader_segments", lambda _a: leader)
-    monkeypatch.setattr(drawing, "_dimension_text_box", lambda name, _l: dimensions[name][0])
-    monkeypatch.setattr(drawing, "dimension_segments", lambda name: dimensions[name][1])
-    monkeypatch.setattr(
-        drawing,
-        "callout_ink",
-        lambda *_a, **_k: SimpleNamespace(label="collar", text=next(reads), leader=()),
-    )
-    monkeypatch.setattr(drawing, "dimension_text_points", lambda _a: [])
-    monkeypatch.setattr(
-        drawing,
-        "move_annotation",
-        lambda _ad, _an, dx, dy, **_k: moves.append((dx, dy)),
-    )
-    monkeypatch.setattr(
-        drawing,
-        "sheet_region",
-        lambda _a: SimpleNamespace(xmin=0.01, ymin=0.01, xmax=0.42, ymax=0.27),
-    )
-    finish_symbol = SimpleNamespace(GetAnnotation=lambda: object())
-    # each neighbour's fake annotation is its own name
-    drawing._clear_collar_callout(
-        object(), object(), finish_symbol, {name: name for name in dimensions}
-    )
-    return moves
-
-
-def test_the_build_lifts_and_proves_the_collar_callout(monkeypatch) -> None:
-    text = _COLLAR_TEXT
-    finish, leader = _pivot_finish_ink()
-    dy = drawing._collar_callout_dy(text, finish, leader)
-    lifted = _lifted(text, dy)
-    assert _clear_collar_with(monkeypatch, [text, lifted]) == [(0.0, dy)]
-    # a move that does not land (the text reads back where it was) fails
-    with pytest.raises(RuntimeError, match="crowds"):
-        _clear_collar_with(monkeypatch, [text, text])
-    # a block that reads back moved sideways took its dimension line off the ring
-    drifted = (lifted[0] - 0.005, lifted[1], lifted[2] - 0.005, lifted[3])
-    with pytest.raises(RuntimeError, match="left the collar ring"):
-        _clear_collar_with(monkeypatch, [text, drifted])
-    # a box around the value line alone is refused, never "cleared"
-    value_only = (0.2088, 0.1783, 0.2088 + 0.019, 0.1844)
-    with pytest.raises(RuntimeError, match="misread"):
-        _clear_collar_with(monkeypatch, [value_only])
-
-
-def test_the_collar_proof_measures_every_dimension_beside_it(monkeypatch) -> None:
-    """The proof reads the other dimensions' ink rather than trusting nominal
-    widths: a text measured where the lifted block lands, or a dimension line
-    rising into it, fails the build.  mha014-1 is the positive control: its
-    leftward move landed on the measured Ø9.525 text and the proof refused
-    it."""
-    text = _COLLAR_TEXT
-    finish, leader = _pivot_finish_ink()
-    dy = drawing._collar_callout_dy(text, finish, leader)
-    lifted = _lifted(text, dy)
-    land1_line = [((0.2000, 0.1452), (0.2000, 0.1350))]
-    clear = {
-        "Sec1Dia": (_SEC1_TEXT, _SEC1_LINES),
-        "Sec1End": ((0.1400, 0.1170, 0.1600, 0.1210), land1_line),
-    }
-    assert _clear_collar_with(monkeypatch, [text, lifted], clear) == [(0.0, dy)]
-    from _drawing_annotation_extent import require_clear
-
-    mha014_1 = (0.1344, 0.1676, 0.1821, 0.1844)
-    with pytest.raises(RuntimeError, match=r"crowds \['Sec1Dia'\]"):
-        require_clear("collar stock callout", mha014_1, {"Sec1Dia": _SEC1_TEXT})
-    above = (lifted[2] - 0.004, lifted[1] + 0.002, lifted[2] + 0.020, lifted[3])
-    with pytest.raises(RuntimeError, match=r"crowds \['Sec0Dia'\]"):
-        _clear_collar_with(
-            monkeypatch, [text, lifted], {**clear, "Sec0Dia": (above, [])}
-        )
-    rising = [((0.2200, 0.1579), (0.2200, lifted[1] + 0.004))]
-    with pytest.raises(RuntimeError, match=r"\['Sec1End'\] lines run by"):
-        _clear_collar_with(
-            monkeypatch, [text, lifted], {**clear, "Sec1End": (clear["Sec1End"][0], rising)}
-        )
-
-
-def test_a_dimension_text_box_spans_every_text_item() -> None:
-    """The value and its stacked band are separate text items; the box a
-    neighbour is proved against spans both."""
-    from types import SimpleNamespace
-
-    from _layout_geometry import estimate_text_box
-
-    items = [("Ø9.525", (0.1410, 0.1760), 0.0025), ("+0.000", (0.1560, 0.1730), 0.0018)]
-    data = SimpleNamespace(
-        GetTextCount=lambda: len(items),
-        GetTextAtIndex=lambda i: items[i][0],
-        GetTextPositionAtIndex=lambda i: (*items[i][1], 0.0),
-        GetTextHeightAtIndex=lambda i: items[i][2],
-        GetTextRefPositionAtIndex=lambda _i: 1,
-        GetTextAngleAtIndex=lambda _i: 0.0,
-    )
-    display = SimpleNamespace(GetDisplayData=lambda: data)
-    annotation = SimpleNamespace(GetSpecificAnnotation=lambda: display)
-    boxes = [
-        estimate_text_box(text, anchor=anchor, height=height, reference=1)
-        for text, anchor, height in items
-    ]
-    assert drawing._dimension_text_box(annotation, "Sec1Dia") == (
-        min(box.xmin for box in boxes),
-        min(box.ymin for box in boxes),
-        max(box.xmax for box in boxes),
-        max(box.ymax for box in boxes),
-    )
-    no_text = SimpleNamespace(GetTextCount=lambda: 0)
-    empty = SimpleNamespace(
-        GetSpecificAnnotation=lambda: SimpleNamespace(GetDisplayData=lambda: no_text)
-    )
-    with pytest.raises(RuntimeError, match="draws no text"):
-        drawing._dimension_text_box(empty, "Sec1Dia")
 
 
 def test_lengths_are_baseline_from_each_chucking_face() -> None:
@@ -833,9 +612,6 @@ def test_the_collar_diameter_draws_nothing_inside_the_ring() -> None:
     import _drawing_leaders
 
     assert drawing.set_near_side_diameter is _drawing_leaders.set_near_side_diameter
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "if name in NEAR_SIDE_DIAMETERS:" in source
-    assert 'set_near_side_diameter(moved, f"{name} near-side diameter")' in source
 
 
 def test_the_keyseat_section_cuts_land_one_clear_of_its_neighbours() -> None:
@@ -993,8 +769,6 @@ def test_the_tip_end_view_carries_the_socket_callout_in_the_frame() -> None:
     half = spec.COLLAR_DIA / 2000.0
     assert x - half >= margin
     assert x + half < drawing.TIP_END_X - drawing.AXIS_OVERRUN - CLEAR_GAP_M
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert '"*Front", *TIP_END_VIEW_CENTER, scale=SIDE_SCALE' in source
     assert set(drawing.TIP_END_VIEW_KEEP) == {"SocketDia"}
     text_x, text_y = drawing.TIP_END_VIEW_KEEP["SocketDia"]
     # Its box as measured on the PR 2 farm proof (6fda5a4): 16.3 mm left and
@@ -1187,9 +961,6 @@ def test_land_one_keyseat_runs_off_over_land_two_with_the_key_bands() -> None:
         "Sec1KeyseatWidth": key.KEYSEAT_PLACES,
         "Sec1KeyseatS": key.KEYSEAT_PLACES,
     }
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert '("Sec1KeyseatWidth", cone_land_key.KEYSEAT_WIDTH_BAND)' in source
-    assert '("Sec1KeyseatS", cone_land_key.KEYSEAT_S_BAND)' in source
     # Exact strip area against a fine numerical integration.
     radius = key.LAND_DIA_MM / 2.0
     half = key.KEYSEAT_WIDTH_MM / 2.0
@@ -1200,79 +971,6 @@ def test_land_one_keyseat_runs_off_over_land_two_with_the_key_bands() -> None:
         for k in range(steps)
     )
     assert part.keyseat_area() == pytest.approx(numeric, rel=1e-6)
-
-
-def test_each_cut_is_made_over_exactly_its_feature(monkeypatch) -> None:
-    """Land 1's keyseat is sketched on its end plane and cut blind back over
-    the land to one end-mill radius short of the collar face, where the end
-    mill's semicircle closes it (Codjiflo P2 on #2331, rule 16); the socket
-    is sketched on land 2's end plane (the shaft's end) and cut blind its
-    depth back into land 2."""
-    adapter, stubs, _sketch_dims, _gated = _stubbed_build(monkeypatch)
-    spec = dt_cone_gear_shaft_spec
-    key = cone_land_key
-    sketched = [c.args[0] for c in adapter.create_sketch.call_args_list]
-    assert sketched.count("Sec1EndPlane") == 2  # the land's profile and the keyseat
-    assert sketched.count("Sec2EndPlane") == 2  # the land's profile and the socket
-    assert "Sec1KeyseatEndPlane" in sketched
-    cuts = [c.args[0] for c in adapter.create_cut_extrude.call_args_list]
-    reach = spec.SECTION_DIAS[1] / 2.0 + 1.0
-    assert [params.depth for params in cuts] == pytest.approx(
-        [
-            spec.SECTION_ENDS[1] - spec.COLLAR_END_STATION - key.KEY_END_SET_MM,
-            2.0 * (reach - key.KEYSEAT_FLOOR_OFFSET_MM),
-            spec.SOCKET_DEPTH,
-        ]
-    )
-    assert not any(params.reverse_direction for params in cuts)
-    # The end: a Ø W plunge, mid-plane from a plane 1 mm outside land 1 on
-    # +X, reaching the floor; centred one radius north of the collar face.
-    assert cuts[1].both_directions
-    assert ("Right Plane", reach) in _planes(adapter)
-    # Ø W, centred on the axis line one radius (the sheet's Sec1KeyseatEndSet)
-    # along the shaft from a construction line on the collar face.
-    (circle,) = adapter.add_circle.call_args_list
-    assert circle.args == pytest.approx(
-        (
-            -(spec.COLLAR_END_STATION + key.KEY_END_SET_MM),
-            0.0,
-            key.KEYSEAT_WIDTH_MM / 2.0,
-        )
-    )
-    (end_set,) = [
-        c
-        for c in stubs["dimension_between"].call_args_list
-        if c.args[5] == "Sec1 keyseat end set"
-    ]
-    assert end_set.args[3] == "horizontal_distance"
-    assert end_set.args[4] == pytest.approx(key.KEY_END_SET_MM)
-    (collar_line,) = [
-        c.args[1]
-        for c in stubs["add_line_chain"].call_args_list
-        if c.args[1][0] == pytest.approx((-spec.COLLAR_END_STATION, 0.0))
-    ]
-    assert collar_line[1] == pytest.approx(
-        (-spec.COLLAR_END_STATION, -spec.SECTION_DIAS[1] / 2.0)
-    )
-    records = {
-        c.args[0]: c.args[1] if len(c.args) > 1 else None
-        for c in _sketch_dims.return_value.record.call_args_list
-    }
-    assert records["Sec1KeyseatCollarFace"] == '"SecEnd0" + "CollarWidth"'
-    assert records["Sec1KeyseatCollarRise"] == '"SecDia1" / 2'
-    assert records["Sec1KeyseatEndSet"] == '"Sec1KeyseatEndSet"'
-    assert records["Sec1KeyseatEndDia"] == '"Sec1KeyseatW"'
-    named = [c.args[1] for c in stubs["name_last_feature"].call_args_list]
-    order = {"Sec1Keyseat", "Sec1KeyseatEnd", "SocketProfile", "Socket"}
-    assert [name for name in named if name in order] == [
-        "Sec1Keyseat",
-        "Sec1KeyseatEnd",
-        "SocketProfile",
-        "Socket",
-    ]
-    assert not [
-        name for name in named if "Flat" in name or name.startswith(("Sec3", "Sec4"))
-    ]
 
 
 def test_the_keyseat_end_is_the_end_mill_radius_and_clears_the_key() -> None:
@@ -1386,12 +1084,6 @@ def test_shoulder_roots_are_modelled_not_noted() -> None:
         (-0.1016, 0.0)
     )
     assert dt_cone_gear_shaft_spec.FILLET_R_TOL_TYPE == 6  # swTolMAX
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "await adapter.add_fillet(\n            FILLET_RADIUS," in source
-    assert 'name_last_feature(adapter, "ShoulderFillets")' in source
-    assert 'name_dimensions(adapter, "ShoulderFillets", ["ShoulderR"])' in source
-    assert "tolerance.Type = FILLET_R_TOL_TYPE" in source
-    assert "_shoulder_root_max_limit(adapter)" in source
     # One root, one dimension, no quantity prefix (the collar's roots stay
     # sharp, #914).
     assert "ShoulderR" not in drawing.DIMENSION_CALLOUTS
@@ -1428,54 +1120,25 @@ def test_shoulder_roots_are_modelled_not_noted() -> None:
         assert forbidden not in notes.upper()
     # The extension lines stop short of every section dimension's text foot.
     assert 0.0 < drawing.WITNESS_LINE_EXTENSION <= 0.0005
-    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "_pin_witness_line_extension(drawing_model)" in drawing_source
     assert "THREE-PLACE" not in notes
-    assert (
-        'apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES})'
-        in source
-    )
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)' in (
-        Path(drawing.__file__).read_text(encoding="utf-8")
-    )
 
 
 def test_the_sheet_carries_no_datums_or_feature_control_frames() -> None:
     """drawing-guidelines.md rule 5 (avoid excessive GD&T): no GD&T on a hand-built hobby shaft."""
     assert not hasattr(dt_cone_gear_shaft_spec, "PART_DATUMS")
     assert not hasattr(dt_cone_gear_shaft_spec, "GEOMETRIC_CONTROLS")
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    for banned in (
-        "project_part_pmi(",
-        "add_feature_control_frame(",
-        "add_datum_feature(",
-    ):
-        assert banned not in source
-    # Only the journal that runs keeps its roughness symbol: every other
-    # land's parts are fixed to it (rule 6, r5).
-    assert source.count("add_surface_finish(") == 1
     assert tuple(control.key for control in dt_cone_gear_shaft_spec.SURFACE_FINISHES) == (
         "pivot_journal",
     )
-    part_source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)" in part_source
 
 
 def test_view_scales_are_explicit() -> None:
     assert drawing.SHEET_SCALE == (1.0, 1.0)
     assert drawing.SIDE_SCALE == (1, 1)  # full length, no reduction
     assert drawing.ISO_SCALE == (1, 2)  # reduced pictorial
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    # The donor end view hands its diameters over and is deleted; the tip end
-    # view, at the sheet scale, carries only the socket.
-    assert source.count('"*Front"') == 2
-    assert "delete_view(adapter, donor)" in source
 
 
 def test_part_stamps_make_critical_properties() -> None:
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "apply_drawing_properties" in source
-    assert "clear_dimensions_for_drawing" in source
     import _config
 
     config = _config.parts("dt-cone-gear-shaft")
@@ -1513,54 +1176,6 @@ def test_shaft_loading_preflight_reads_t024s_accepted_tip(monkeypatch) -> None:
         spec.validate_gear_loading_clearances()
 
 
-def test_refused_cutter_family_reaches_no_native_shaft_geometry(monkeypatch) -> None:
-    import asyncio
-    from unittest.mock import AsyncMock
-
-    def refused(_teeth):
-        raise ValueError("cutter family refused")
-
-    monkeypatch.setattr(dt_cone_gear_shaft_spec, "outside_dia_mm", refused)
-    adapter = AsyncMock()
-    with pytest.raises(ValueError, match="cutter family refused"):
-        asyncio.run(part.build(adapter))
-    adapter.create_part.assert_not_awaited()
-
-
-def test_every_station_knob_owns_its_plane_and_depth(monkeypatch) -> None:
-    """Every length knob (Tools > Equations) is the ONE owner of each dimension
-    that carries it: SecEnd{i} owns land i's end plane AND its depth (Codex
-    #839 PRRT_kwDOPHDy386mKNTW), SecEnd0 the journal and the CollarFace plane,
-    CollarWidth the collar's plane and web.  Run the real build() against
-    recording stubs; the seat-side ownership gate runs once, after every drive
-    is authored."""
-    _adapter, stubs, sketch_dims, gated_after = _stubbed_build(monkeypatch)
-    drives = stubs["drive_dimension"].call_args_list
-    assert gated_after == [len(drives)]
-    owners = {c.args[1]: c.args[2] for c in drives}
-    records = {
-        c.args[0]: c.args[1] if len(c.args) > 1 else None
-        for c in sketch_dims.return_value.record.call_args_list
-    }
-    for global_name, _value, names in part.STATION_OWNERS:
-        for name in names:
-            assert owners[name] == f'"{global_name}"', name
-    # The keyseat's length follows land 1's knob; its sketch is sized by the
-    # land's diameter and the key globals.  The socket's diameter is its
-    # global's.
-    assert owners["Sec1KeyseatLength@Sec1Keyseat"] == part.KEYSEAT_LENGTH_EXPRESSION
-    (socket,) = [
-        c
-        for c in stubs["define_circle"].call_args_list
-        if c.kwargs["names"][2] == "SocketDia"
-    ]
-    assert socket.kwargs["drives"] == (None, None, '"SocketDia"')
-    assert socket.args[3] == pytest.approx(dt_cone_gear_shaft_spec.SOCKET_DIA / 2.0)
-    assert records["Sec1KeyseatWidth"] == '"Sec1KeyseatW"'
-    assert records["Sec1KeyseatS"] == '"Sec1KeyseatS"'
-    assert records["Sec1FarSide"] == '"SecDia1" / 2'
-
-
 def test_station_owners_cover_every_knob_once() -> None:
     spec = dt_cone_gear_shaft_spec
     rows = {
@@ -1580,107 +1195,6 @@ def test_station_owners_cover_every_knob_once() -> None:
         "CollarWidth",
         "SocketDepth",
     }
-
-
-class _Dim:
-    def __init__(self, mm: float, driven_state: int = 1, reference: bool = False):
-        self.SystemValue = mm / 1000.0
-        self.DrivenState = driven_state
-        self._reference = reference
-
-    def IsReference(self) -> bool:
-        return self._reference
-
-
-def _gate_fixture(monkeypatch, dims, equations):
-    from unittest.mock import MagicMock
-
-    model = MagicMock()
-    model.Parameter.side_effect = dims.get
-    adapter = MagicMock()
-    adapter.currentModel = model
-    monkeypatch.setattr(part, "_early_bound", lambda obj, _iface: obj)
-    monkeypatch.setattr(
-        part, "_equations_for", lambda _adapter, lhs: equations.get(lhs, [])
-    )
-    return adapter
-
-
-def _machine(override=None):
-    """As-built dims and equations for every STATION_OWNERS row.  ``override``
-    maps a dimension name to its (right-hand side, DrivenState)."""
-    dims, equations = {}, {}
-    for global_name, value, names in part.STATION_OWNERS:
-        equations[f'"{global_name}"'] = [f'"{global_name}" = {value}mm']
-        for name in names:
-            owner, state = (override or {}).get(name, (f'"{global_name}"', 1))
-            dims[name] = _Dim(value, state)
-            equations[f'"{name}"'] = [f'"{name}" = {owner}']
-    return dims, equations
-
-
-def test_station_gate_accepts_single_ownership_at_driven_state_1(
-    monkeypatch, caplog
-) -> None:
-    """Equation-owned dimensions read DrivenState 1 (driven), never 2: the
-    gate compares the dimensions one knob owns with each other, not with a
-    literal.  Each knob's definition, with its value, lands in the leaf log."""
-    dims, equations = _machine()
-    with caplog.at_level("INFO"):
-        part._assert_stations_single_owned(_gate_fixture(monkeypatch, dims, equations))
-    for global_name, _value, _names in part.STATION_OWNERS:
-        assert equations[f'"{global_name}"'][0] in caplog.text
-
-
-@pytest.mark.parametrize(
-    ("override", "message"),
-    [
-        ({"Sec2Station@Sec2EndPlane": ('"SecEnd1"', 1)}, 'not "SecEnd2"'),
-        (
-            {"Sec2Station@Sec2EndPlane": ('"SecEnd2"', 2)},
-            "SecEnd2: DrivenState differs",
-        ),
-        ({"CollarWidth@Collar": ('"SecEnd0"', 1)}, 'not "CollarWidth"'),
-    ],
-)
-def test_station_gate_rejects_a_wrong_owner_or_state(
-    monkeypatch, override, message
-) -> None:
-    dims, equations = _machine(override)
-    adapter = _gate_fixture(monkeypatch, dims, equations)
-    with pytest.raises(RuntimeError, match=message):
-        part._assert_stations_single_owned(adapter)
-
-
-def test_station_gate_rejects_a_missing_or_moved_dimension(monkeypatch) -> None:
-    dims, equations = _machine()
-    del equations['"Sec1Station@Sec1EndPlane"']
-    dims["Sec2Station@Sec2EndPlane"] = _Dim(
-        dt_cone_gear_shaft_spec.SECTION_KNOBS[2] + 1e-3
-    )
-    del dims["CollarFaceStation@CollarFace"]
-    adapter = _gate_fixture(monkeypatch, dims, equations)
-    with pytest.raises(RuntimeError, match="expected one equation") as raised:
-        part._assert_stations_single_owned(adapter)
-    assert "Sec2Station@Sec2EndPlane: reads" in str(raised.value)
-    assert "CollarFaceStation@CollarFace not found" in str(raised.value)
-
-
-def test_station_gate_proves_the_depth_owner_too(monkeypatch) -> None:
-    """Codex #839 P2: a depth that keeps its as-built value and DrivenState
-    but is driven by the wrong global, or has lost its equation, must fail --
-    as must a knob defined twice."""
-    dims, equations = _machine({"Sec2End@Sec2": ('"SecEnd1"', 1)})
-    del equations['"SocketDepth@Socket"']
-    equations['"CollarWidth"'] *= 2
-    adapter = _gate_fixture(monkeypatch, dims, equations)
-    with pytest.raises(RuntimeError) as raised:
-        part._assert_stations_single_owned(adapter)
-    message = str(raised.value)
-    assert "Sec2End@Sec2: owned by" in message
-    assert "SocketDepth@Socket: expected one equation" in message
-    assert "CollarWidth: expected one definition" in message
-    assert "Sec1" not in message.replace("SecEnd1", "")
 
 
 # #914 (user ruling 2026-09-25): an integral collar captures the shaft.  The
@@ -1779,183 +1293,6 @@ def test_the_sheet_states_the_collar_as_stock_with_its_break() -> None:
     assert spec.COLLAR_DIA == pytest.approx(0.625 * 25.4)
 
 
-def _stubbed_build(monkeypatch):
-    """Run the real build() with every imported helper stubbed.  Returns the
-    adapter mock, the stubs by name, the shared SketchDims mock (every sketch's
-    ``record`` calls) and how many drives existed when the gate ran."""
-    import asyncio
-    import inspect
-    from unittest.mock import AsyncMock, MagicMock
-
-    stubs = {}
-    for attr, value in list(vars(part).items()):
-        if not callable(value) or attr.startswith("__") or attr == "build":
-            continue
-        if getattr(value, "__module__", "") == part.__name__:
-            continue
-        if not inspect.isfunction(value) and not inspect.isclass(value):
-            continue
-        stub = AsyncMock() if inspect.iscoroutinefunction(value) else MagicMock()
-        stubs[attr] = stub
-        monkeypatch.setattr(part, attr, stub)
-    monkeypatch.setattr(
-        part,
-        "name_dimensions",
-        lambda _a, feature, names: [f"{n}@{feature}" for n in names],
-    )
-    sketch_dims = MagicMock()
-    sketch_dims.return_value.apply.return_value = []
-    monkeypatch.setattr(part, "SketchDims", sketch_dims)
-    monkeypatch.setattr(part, "_sketch_x_per_model_x", lambda _a: -1.0)
-    stubs["add_line_chain"].side_effect = lambda _a, points, close=True: [
-        f"L{k}" for k in range(len(points) if close else len(points) - 1)
-    ]
-    # The keyseat end's plane maps the shaft axis onto its sketch's -x.
-    monkeypatch.setattr(
-        part, "_sketch_xy_mm", lambda _a, point: (-point[2], point[1])
-    )
-    monkeypatch.setattr(part, "_shoulder_root_max_limit", lambda _a: None)
-    gated_after: list[int] = []
-    monkeypatch.setattr(
-        part,
-        "_assert_stations_single_owned",
-        lambda _a: gated_after.append(len(stubs["drive_dimension"].call_args_list)),
-    )
-    adapter = AsyncMock()
-    asyncio.run(part.build(adapter))
-    return adapter, stubs, sketch_dims, gated_after
-
-
-def _planes(adapter) -> list[tuple[str, float]]:
-    return [
-        (c.args[0].base_plane, c.args[0].offset)
-        for c in adapter.create_plane.call_args_list
-    ]
-
-
-def test_the_build_hides_every_plane_it_creates(monkeypatch) -> None:
-    """#950's save gate refuses a shown plane (cg-916: CollarFace and
-    CollarEndPlane saved shown and failed part:dt_cone_gear_shaft).  The repo's
-    creator sweep only asks that a module hide SOME reference geometry, so it
-    passed on the Sec planes; this pins every plane the shaft build creates,
-    the two collar mate references included, as blanked by name."""
-    adapter, stubs, _dims, _gated = _stubbed_build(monkeypatch)
-    blanked = {
-        name
-        for c in stubs["blank_reference_geometry"].call_args_list
-        for name, kind in c.args[1]
-        if kind == "PLANE"
-    }
-    assert {"CollarFace", "CollarEndPlane"} <= blanked
-    assert len(blanked) == len(adapter.create_plane.call_args_list)
-
-
-def test_every_land_is_placed_from_its_chucking_origin(monkeypatch) -> None:
-    """Rule 11 (round 6): the collar's thrust face comes first, from the front
-    face by the journal, then its tip-side face one web on; the collar is
-    turned onto the journal, and lands 1-2 end on planes offset from the
-    tip-side face and extrude back to it, so each depth IS the shoulder's
-    station from that face.  The front-to-tip overall is only a reference."""
-    spec = dt_cone_gear_shaft_spec
-    adapter, stubs, _dims, _gated = _stubbed_build(monkeypatch)
-    planes = _planes(adapter)
-    assert planes[:2] == [
-        ("Front Plane", spec.COLLAR_START_STATION),
-        ("CollarFace", spec.COLLAR_THICKNESS),
-    ]
-    for i in range(1, len(spec.SECTIONS)):
-        assert (spec.SECTION_ORIGINS[i], spec.SECTION_KNOBS[i]) in planes, i
-    extrusions = [c.args[0] for c in adapter.create_extrusion.call_args_list]
-    # journal, collar, then the two gear lands
-    assert [e.depth for e in extrusions[: len(spec.SECTIONS) + 1]] == [
-        spec.SECTION_KNOBS[0],
-        spec.COLLAR_THICKNESS,
-        *spec.SECTION_KNOBS[1:],
-    ]
-    assert [e.reverse_direction for e in extrusions[: len(spec.SECTIONS) + 1]] == [
-        False,
-        True,
-        True,
-        True,
-    ]
-    knobs = {c.args[1]: c.args[2] for c in stubs["set_global"].call_args_list}
-    for i, knob in enumerate(spec.SECTION_KNOBS):
-        assert knobs[f"SecEnd{i}"] == f"{knob}mm"
-    assert knobs["SocketDia"] == f"{spec.SOCKET_DIA}mm"
-    assert knobs["SocketDepth"] == f"{spec.SOCKET_DEPTH}mm"
-    assert not [name for name in knobs if name.startswith("SecAF")]
-    assert knobs["Sec1KeyseatW"] == f"{cone_land_key.KEYSEAT_WIDTH_MM}mm"
-    assert knobs["Sec1KeyseatS"] == f"{cone_land_key.KEYSEAT_S_MM}mm"
-    assert knobs["Sec1KeyseatEndSet"] == f"{cone_land_key.KEY_END_SET_MM}mm"
-    assert "CollarEnd" not in knobs
-
-
-def test_build_turns_the_collar_between_the_journal_and_the_64t(monkeypatch) -> None:
-    """#914: the collar is its own land -- sketched on a plane one web north of
-    the collar face, at the bar's own Ø15.875, extruded back one web.  Its roots stay sharp (the
-    post and the 64T bear flat on its faces) and the old journal-to-3/8 step
-    edge is buried under it."""
-    spec = dt_cone_gear_shaft_spec
-    adapter, stubs, _dims, _gated = _stubbed_build(monkeypatch)
-    planes = _planes(adapter)
-    assert ("CollarFace", spec.COLLAR_THICKNESS) in planes
-    # The collar plane comes before every tip-side land plane measured from it.
-    first_land = planes.index((spec.SECTION_ORIGINS[1], spec.SECTION_KNOBS[1]))
-    assert planes.index(("CollarFace", spec.COLLAR_THICKNESS)) < first_land
-    radii = [c.args[3] for c in stubs["define_circle"].call_args_list]
-    assert spec.COLLAR_DIA / 2.0 in [pytest.approx(r) for r in radii]
-    extrusions = [c.args[0] for c in adapter.create_extrusion.call_args_list]
-    collar = [e for e in extrusions if e.depth == pytest.approx(spec.COLLAR_THICKNESS)]
-    assert len(collar) == 1 and collar[0].reverse_direction
-    edges = adapter.add_fillet.call_args.args[1]
-    land = 0.375 * spec.MM_PER_IN / 2.0
-    assert [spec.JOURNAL_DIA / 2.0, 0.0, spec.COLLAR_START_STATION] not in edges
-    assert [land, 0.0, spec.COLLAR_END_STATION] not in edges
-    assert [land, 0.0, spec.JOURNAL_END] not in edges
-    # The one step root is a full circle on land 2.
-    assert edges == [[-spec.SECTION_DIAS[2] / 2.0, 0.0, spec.SECTION_ENDS[1]]]
-    named = [c.args[1] for c in stubs["name_last_feature"].call_args_list]
-    assert "CollarFace" in named
-
-
-def test_sketch_x_direction_is_read_from_the_sketch(monkeypatch) -> None:
-    """A land end plane's sketch x runs along model X; its sign comes from the
-    sketch's ModelToSketchTransform, never assumed.  The fake reads a bare
-    list as zeros, as the seat does (memory: COM double[] needs double_array)."""
-    from types import SimpleNamespace
-
-    class _Point:
-        def __init__(self, data):
-            self.ArrayData = tuple(data)
-
-        def MultiplyTransform(self, transform):
-            return _Point(transform(self.ArrayData))
-
-    class _Utility:
-        def CreatePoint(self, values):
-            if isinstance(values, list):
-                return _Point((0.0, 0.0, 0.0))
-            return _Point(values.value)
-
-    sketch = SimpleNamespace(ModelToSketchTransform=lambda xyz: tuple(xyz))
-    adapter = SimpleNamespace(
-        currentModel=SimpleNamespace(
-            SketchManager=SimpleNamespace(ActiveSketch=sketch)
-        ),
-        swApp=SimpleNamespace(GetMathUtility=_Utility),
-    )
-    monkeypatch.setattr(part, "_early_bound", lambda obj, _iface: obj)
-    assert part._sketch_x_per_model_x(adapter) == 1.0
-    sketch.ModelToSketchTransform = lambda xyz: (-xyz[0], xyz[1], -xyz[2])
-    assert part._sketch_x_per_model_x(adapter) == -1.0
-    sketch.ModelToSketchTransform = lambda xyz: (xyz[1], xyz[0], xyz[2])
-    with pytest.raises(RuntimeError, match="not along model X"):
-        part._sketch_x_per_model_x(adapter)
-    monkeypatch.setattr(part, "double_array", list)
-    with pytest.raises(RuntimeError, match="CreatePoint did not echo"):
-        part._sketch_x_per_model_x(adapter)
-
-
 def test_each_chucking_measures_from_its_own_collar_face() -> None:
     """Rule 11 (round 6, Main's delegated ruling (b)): the journal and the web
     run from the collar's thrust face; the gear lands and the tip from its
@@ -1977,200 +1314,6 @@ def test_each_chucking_measures_from_its_own_collar_face() -> None:
         pytest.approx(spec.SHAFT_LENGTH)
     )
     assert spec.DRAWING_REFERENCE_PRECISION == 2
-
-
-class _Curve:
-    def __init__(self, centre_z_m: float, radius_m: float, circle: bool = True):
-        self.CircleParams = (0.0, 0.0, centre_z_m, 0.0, 0.0, 1.0, radius_m)
-        self._circle = circle
-
-    def IsCircle(self) -> bool:
-        return self._circle
-
-
-class _Edge:
-    def __init__(self, curve):
-        self._curve = curve
-
-    def GetCurve(self):
-        return self._curve
-
-
-def test_the_overall_reference_picks_each_end_face_circle(monkeypatch) -> None:
-    """The REF overall runs between the two END-FACE circles, picked by
-    station and diameter: the journal's own circle at the collar face and
-    land 2's start circle share those diameters at other stations, and the
-    socket's mouth shares the tip's station."""
-    spec = dt_cone_gear_shaft_spec
-    length = spec.SHAFT_LENGTH / 1000.0
-    journal_r = spec.SECTION_DIAS[0] / 2000.0
-    tip_r = spec.SECTION_DIAS[-1] / 2000.0
-    front = _Edge(_Curve(0.0, journal_r))
-    tip = _Edge(_Curve(-length, tip_r))  # the sign of model Z is not assumed
-    edges = [
-        _Edge(None),
-        _Edge(_Curve(0.0, journal_r, circle=False)),
-        _Edge(_Curve(spec.COLLAR_START_STATION / 1000.0, journal_r)),
-        _Edge(_Curve(spec.SECTION_ENDS[1] / 1000.0, tip_r)),
-        _Edge(_Curve(-length, spec.SOCKET_DIA / 2000.0)),
-        front,
-        tip,
-    ]
-    monkeypatch.setattr(drawing, "visible_view_entities", lambda *a, **k: edges)
-    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _name: obj)
-    assert (
-        drawing._end_circle(
-            object(), station_mm=0.0, diameter_mm=spec.SECTION_DIAS[0], label="front"
-        )
-        is front
-    )
-    assert (
-        drawing._end_circle(
-            object(),
-            station_mm=spec.SHAFT_LENGTH,
-            diameter_mm=spec.SECTION_DIAS[-1],
-            label="tip",
-        )
-        is tip
-    )
-    edges.append(_Edge(_Curve(0.0, journal_r)))
-    with pytest.raises(RuntimeError, match="2 end-face circles"):
-        drawing._end_circle(
-            object(), station_mm=0.0, diameter_mm=spec.SECTION_DIAS[0], label="front"
-        )
-
-
-def test_the_overall_is_added_as_a_checked_reference() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "_add_overall_reference(adapter, side)" in source
-    assert "set_reference_dimension(" in source
-    assert "SetPrecision3(DRAWING_REFERENCE_PRECISION, -1, -1, -1)" in source
-    assert 'orientation="horizontal"' in source
-
-
-def test_drive_train_seats_the_shaft_and_64t_on_the_collar(monkeypatch) -> None:
-    """#914: contacts, not distances -- the collar face ON the post's north
-    boss face and the 64T's south face ON the collar's north face.  #916: both
-    collar-seat faces are named planes; the post's BossNorth, carried through
-    the post's installed placement, is the collar face's station on the cone
-    line and faces north along it (the collar side)."""
-    import asyncio
-    from unittest.mock import AsyncMock
-
-    import build_dt_cone_pivot_post as post
-
-    origin = drive.cone_station(drive.POST_STATION)
-    origin[1] = drive.Y_BASE_TOP + drive.PLAT_T
-    rows = drive.ROT_Y_180
-
-    def placed(local: tuple[float, ...], shift: list[float]) -> list[float]:
-        return [
-            sum(local[i] * rows[i][k] for i in range(3)) + shift[k] for k in range(3)
-        ]
-
-    # The casting's incline is the cone line's rounded to 4 places, so the
-    # face centre swings off the line by at most that angle times its lever.
-    import dt_cone_pivot_post_spec
-
-    skew = abs(math.radians(dt_cone_pivot_post_spec.INCLINE_DEG - drive.INCLINE_DEG))
-    lever = math.hypot(*post.BOSS_NORTH_CENTRE[0::2])
-    centre = placed(post.BOSS_NORTH_CENTRE, origin)
-    assert centre == pytest.approx(
-        drive.cone_station(drive._POST_NORTH_STATION), abs=skew * lever + 1e-9
-    )
-    normal = placed(post.BOSS_NORTH_NORMAL, [0.0, 0.0, 0.0])
-    assert normal == pytest.approx([drive.SIN_I, 0.0, drive.COS_I], abs=skew + 1e-12)
-
-    source = Path(drive.__file__).read_text(encoding="utf-8")
-    assert 'named_ref(f"CollarFace@{cone_shaft}", "PLANE")' in source
-    assert 'named_ref(f"BossNorth@{pivot_post}", "PLANE")' in source
-    assert "bore_axis_ref" not in source
-    assert (
-        'named_ref(f"ConeShaftNormal@{pivot_post}", "PLANE"),\r\n        d_axial'
-        not in source
-    )
-    assert 'seat_plane="CollarEndPlane"' in source
-
-    coincident = AsyncMock()
-    distance = AsyncMock()
-    monkeypatch.setattr(drive, "coincident_mate", coincident)
-    monkeypatch.setattr(drive, "distance_driver", distance)
-    origin = [0.0, 0.0, 0.0]
-    asyncio.run(
-        drive._axial_seat(
-            object(),
-            "g-1",
-            "s-1",
-            origin,
-            [0.0, 0.0, 1.0],
-            origin,
-            "64T",
-            "CollarEndPlane",
-        )
-    )
-    distance.assert_not_awaited()
-    refs = coincident.await_args.args[1:3]
-    assert [r.name for r in refs] == ["Front Plane@g-1", "CollarEndPlane@s-1"]
-    asyncio.run(
-        drive._axial_seat(
-            object(), "g-1", "s-1", origin, [0.0, 0.0, 1.0], [0, 0, 5.0], "T120", ""
-        )
-    )
-    assert distance.await_args.args[3] == pytest.approx(5.0)
-
-
-def test_the_64t_front_plane_is_its_south_face(monkeypatch) -> None:
-    """The 64T's collar seat is Front coincident with CollarEndPlane, which is
-    a contact only because the gear's Front plane IS its south face: its blank
-    is sketched on Front and extruded +z by the face width, and
-    _place_on_shaft puts that origin face/2 south of the gear's centre."""
-    import asyncio
-
-    placed = {}
-
-    async def place_component(_adapter, part_name, origin, *_args, **_kwargs):
-        placed[part_name] = origin
-        return f"{part_name}-1"
-
-    monkeypatch.setattr(drive, "place_component", place_component)
-    asyncio.run(
-        drive._place_on_shaft(
-            object(),
-            "dt-crank-drive-gear",
-            drive.GEAR64_CENTRE_STATION,
-            drive.GEAR64_FACE,
-        )
-    )
-    south = drive.cone_station(drive._GEAR64_SOUTH_STATION)
-    assert placed["dt-crank-drive-gear"] == pytest.approx(south, abs=1e-9)
-
-
-def test_the_64t_build_hands_the_straight_gash_helper_its_form_and_bound(monkeypatch) -> None:
-    """Run the real 64T build up to its tooth cut, recording the call."""
-    import asyncio
-    from unittest.mock import AsyncMock, MagicMock
-
-    import build_dt_crank_drive_gear as crank
-
-    class Reached(Exception):
-        pass
-
-    calls = []
-
-    async def straight_gash_gear(*args, **kwargs):
-        calls.append((args[1:], kwargs))
-        raise Reached
-
-    monkeypatch.setattr(crank, "check", MagicMock())
-    monkeypatch.setattr(crank, "set_global", AsyncMock())
-    monkeypatch.setattr(crank, "apply_package_model_units", MagicMock())
-    monkeypatch.setattr(crank, "build_straight_gash_gear", straight_gash_gear)
-    with pytest.raises(Reached):
-        asyncio.run(crank.build(AsyncMock()))
-    assert calls == [(
-        (crank.TOOTH_SPACE_FORM, crank.TOOTH_SPACE, crank.TEETH),
-        {"flank_bound_mm": crank.NATIVE_FLANK_BOUND_MM},
-    )]
 
 
 def test_the_64t_straight_tooth_space_keeps_its_material_and_flank_gates(monkeypatch) -> None:

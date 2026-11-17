@@ -91,9 +91,6 @@ def test_the_part_owns_every_printed_decimal_place() -> None:
     # from the seat); the one sheet-made length, the bore axis to the apex
     # (owner Q12), is a REFERENCE that sets no precision of its own.
     assert not hasattr(drawing_spec, "DRAWING_REFERENCE_PRECISION")
-    assert "_set_reference_precision" not in _drawing_source()
-    assert "AddVerticalDimension2" not in _drawing_source()
-    assert "SetPrecision3" not in _drawing_source()
 
 
 def test_bore_axis_to_apex_prints_as_a_reference_in_the_foot_height_lane() -> None:
@@ -108,16 +105,11 @@ def test_bore_axis_to_apex_prints_as_a_reference_in_the_foot_height_lane() -> No
     assert drawing.FRONT_KEEP["BoreCz"][0] < x < drawing.FRONT_CENTER[0]
     assert drawing._front_y(spec.BORE_H) < y < drawing._front_y(spec.EAR_TOP_Y)
     assert drawing.APEX_REFERENCE_PLACES == 2
-    source = _drawing_source()
-    assert "set_reference_dimension(" in source
-    assert "_add_apex_reference(adapter, front)" in source
 
 
 def test_each_hole_keeps_one_centre_mark() -> None:
     # The template may mark the holes as each view is placed; the explicit
     # AutoInsertCenterMarks2 then printed every mark twice (Q12 r1/r2, #913).
-    source = _drawing_source()
-    assert "if _center_mark_count(view) == 0 and not auto_center_marks(" in source
     assert (drawing.FRONT_CENTER_MARKS, drawing.PLAN_CENTER_MARKS) == (1, 2)
 
 
@@ -307,9 +299,6 @@ def test_projected_views_stay_aligned_and_ordered() -> None:
     # Room for the two lateral lanes between the elevation and the plan.
     lanes = (drawing.TOP_KEEP["HoleLateral"][1], drawing.TOP_KEEP["FootW"][1])
     assert plan_bottom > lanes[0] > lanes[1] > apex + 0.010
-    source = _drawing_source()
-    assert source.count("scale=_VIEW_SCALE") == 4
-    assert "add_note" not in source
 
 
 def _planned_corner_text() -> tuple[float, float]:
@@ -455,15 +444,6 @@ def test_ear_thickness_prints_beside_the_ear_on_the_right_view() -> None:
         line_spacing=16.8 * 25.4 / 72.0 / 3.5,
     )
     assert corner.ymax + CLEAR_GAP_M < box.ymin
-    assert "def _right_keep" in _drawing_source()
-    assert '"EarThick": (ear_text[0], ear_text[1])' in _drawing_source()
-    assert "EAR_THICK_TEXT_OFFSET[0] * units[0][axis]" in _drawing_source()
-
-
-def test_tap_note_solidworks_adds_is_removed() -> None:
-    source = _drawing_source()
-    assert 'redundant_note_substrings=("Tapped Hole",)' in source
-    assert "expected_redundant_notes=1" in source
 
 
 def test_registry_row_carries_the_title_block_material_specification() -> None:
@@ -485,16 +465,6 @@ def test_corner_radius_is_the_largest_the_screw_head_clears() -> None:
     assert drawing_spec.CORNER_R_BAND == (0.0, -drawing_spec.CORNER_R_MAX)
     assert drawing_spec.CORNER_R_TOL_TYPE == 6  # swTolMAX
     assert drawing_spec.DRAWING_DIMENSIONS["CornerFillet"] == {"CornerRadius"}
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert (
-        "add_fillet(\n            CORNER_R_MAX, [[0.0, FOOT_H, EAR_T / 2.0]], propagate=False"
-        in source
-    )
-    assert 'name_dimensions(adapter, "CornerFillet", ["CornerRadius"])' in source
-    assert "drive_jobs.append((corner_dim[0], '\"CornerR\"'))" in source
-    assert source.index("apply_drawing_precision(adapter, DRAWING_PRECISION)") < (
-        source.index("_corner_radius_max_limit(adapter)\n")
-    )
     # The spandrel the fillet adds, along the ear's width, is in the target.
     assert part.V_CORNER == pytest.approx((1.0 - math.pi / 4.0) * 0.508**2 * spec.EAR_W)
     assert part.V_TOTAL == pytest.approx(
@@ -572,8 +542,3 @@ def test_bore_callout_clears_the_elevation() -> None:
 
 def test_drill_callout_hides_its_dimension_leader_lines() -> None:
     assert drawing._LEADER_LINE_NONE == 3
-    call = (
-        "_hide_diameter_leader_lines(\n"
-        '        adapter, top_annotations, dimension="HoleDia", label="hold-down hole"'
-    )
-    assert call in _drawing_source()

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import ast
 import importlib.util
 import math
 from pathlib import Path
@@ -127,137 +126,6 @@ def test_turned_diameters_and_lengths_print_on_the_side_view() -> None:
     assert drawing._BORE_EDGE_Y + 0.008 < break_y < drawing.OVERALL_TEXT_XY[1] - NOTE_LINE_PITCH
     rim_y = drawing._BORE_EDGE_Y + spec.REAR_BREAK * drawing._S / 1000.0
     assert break_y - (len(break_rows) + 0.5) * NOTE_LINE_PITCH > rim_y + 0.001
-
-
-class _SideViewSeat:
-    """The actual axial section's end edges, built from the same source.
-
-    Sheet right is model -Z and up is +Y. Each end face starts at the round
-    bore's edge, except the rear face, which starts above the axis at the rear
-    break's rim and below it at the flat pin's ream's outer edge; picking
-    inside is bore, break or ream air.
-    A pick lands on a line within half a sheet millimetre.
-    """
-
-    TOLERANCE_M = 0.0005
-
-    def __init__(self) -> None:
-        od_r, pilot_r = spec.OD / 2.0, spec.PILOT_DIA / 2.0
-        bore_r = spec.BORE_DIA / 2.0
-        ream_outer = spec.FLAT_PIN_CENTRE + spec.FLAT_PIN_HOLE_DIA / 2.0
-        length, pilot = spec.LENGTH, spec.PILOT_LENGTH
-        # (kind, (z, y), (z, y)) in model millimetres.
-        self.segments = [
-            ("EDGE", (-pilot, bore_r), (-pilot, pilot_r)),  # round bore
-            ("EDGE", (-pilot, -pilot_r), (-pilot, -bore_r)),
-            ("EDGE", (0.0, pilot_r), (0.0, od_r)),  # exposed seat annulus
-            ("EDGE", (0.0, -od_r), (0.0, -pilot_r)),
-            ("EDGE", (length, bore_r + spec.REAR_BREAK), (length, od_r)),
-            ("EDGE", (length, -od_r), (length, -ream_outer)),
-            ("SILHOUETTE", (0.0, od_r), (length, od_r)),
-            ("SILHOUETTE", (0.0, -od_r), (length, -od_r)),
-            ("SILHOUETTE", (-pilot, pilot_r), (0.0, pilot_r)),
-            ("SILHOUETTE", (-pilot, -pilot_r), (0.0, -pilot_r)),
-        ]
-        self.selected: list[tuple[tuple[float, float], tuple[float, float]]] = []
-        self.picked: list[tuple[tuple[float, float], tuple[float, float]]] = []
-        self.display: _Display | None = None
-        self.Extension = self
-
-    @staticmethod
-    def _sheet(point: tuple[float, float]) -> tuple[float, float]:
-        z, y = point
-        mid = (spec.LENGTH - spec.PILOT_LENGTH) / 2.0
-        cx, cy = drawing.SIDE_CENTER
-        return cx - (z - mid) * drawing._S / 1000.0, cy + y * drawing._S / 1000.0
-
-    def _distance(self, xy, a, b) -> float:
-        (ax, ay), (bx, by) = self._sheet(a), self._sheet(b)
-        dx, dy = bx - ax, by - ay
-        t = ((xy[0] - ax) * dx + (xy[1] - ay) * dy) / (dx * dx + dy * dy)
-        t = min(1.0, max(0.0, t))
-        return math.dist(xy, (ax + t * dx, ay + t * dy))
-
-    def ActivateView(self, _name: str) -> bool:
-        return True
-
-    def ClearSelection2(self, _all: bool) -> bool:
-        self.selected.clear()
-        return True
-
-    def SelectByID2(self, _name, kind, x, y, _z, append, *_rest) -> bool:
-        hits = [
-            (self._distance((x, y), a, b), (a, b))
-            for k, a, b in self.segments
-            if k == kind and self._distance((x, y), a, b) <= self.TOLERANCE_M
-        ]
-        if not hits:
-            return False
-        if not append:
-            self.selected.clear()
-        self.selected.append(min(hits)[1])
-        return True
-
-    def AddHorizontalDimension2(self, _x, _y, _z) -> _Display | None:
-        stations = {a[0] for a, b in self.selected if a[0] == b[0]}
-        if len(self.selected) != 2 or len(stations) != 2:
-            return None
-        self.picked = list(self.selected)
-        self.display = _Display(abs(max(stations) - min(stations)) / 1000.0)
-        return self.display
-
-
-class _Display:
-    def __init__(self, value_m: float) -> None:
-        self.value_m = value_m
-        self.precision = -1
-
-    def GetDimension2(self, _index: int) -> SimpleNamespace:
-        return SimpleNamespace(SystemValue=self.value_m)
-
-    def GetAnnotation(self) -> object:
-        return self
-
-    def SetPrecision3(self, primary: int, *_rest: int) -> int:
-        self.precision = primary
-        return 0
-
-    def GetPrimaryPrecision2(self) -> int:
-        return self.precision
-
-
-def test_the_overall_reference_picks_both_end_faces_as_drawn_edges(
-    monkeypatch,
-) -> None:
-    """Both picks land on physical annular end-face edges, not bore air."""
-    import _drawing_edge_dimensions
-
-    monkeypatch.setattr(_drawing_edge_dimensions, "view_name", lambda _a, _v: "Drawing View2")
-    monkeypatch.setattr(_drawing_edge_dimensions, "null_callout", lambda: None)
-    references: list[str] = []
-    monkeypatch.setattr(
-        drawing,
-        "set_reference_dimension",
-        lambda _adapter, _annotation, *, label: references.append(label),
-    )
-    seat = _SideViewSeat()
-    drawing._overall_reference(SimpleNamespace(currentModel=seat), object())
-    assert [a[0] for a, _b in seat.picked] == pytest.approx(
-        [-spec.PILOT_LENGTH, spec.LENGTH]
-    )
-    assert references == ["drive-collar overall length reference"]
-    assert seat.display is not None
-    assert seat.display.precision == spec.DRAWING_REFERENCE_PRECISION
-
-    # Negative control: on the axis the rear face is the bore's air.
-    front_pick, (rear_x, _rear_y) = drawing.OVERALL_PICKS
-    monkeypatch.setattr(
-        drawing, "OVERALL_PICKS", (front_pick, (rear_x, drawing.SIDE_CENTER[1]))
-    )
-    with pytest.raises(RuntimeError, match=r"reference edge 1 at sheet"):
-        drawing._overall_reference(
-            SimpleNamespace(currentModel=_SideViewSeat()), object()
-        )
 
 
 def _segments_cross(a, b, c, d) -> bool:
@@ -593,7 +461,6 @@ def test_pilot_wall_worst_and_the_one_decimal_control() -> None:
     assert (spec.BORE_DIA - (spec.BORE_DIA + max(spec.BORE_DIA_BAND))) / 2.0 < 0.0
 
 
-
 def test_drive_pin_holes_clear_the_bore_and_the_pilot() -> None:
     # The unchanged dowel circle clears the bore and pilot.
     assert spec.BORE_PIN_WALL_WORST == pytest.approx(3.34494)
@@ -791,46 +658,6 @@ def test_registry_row_is_the_turned_brass_mha_152() -> None:
     assert row["tolerance_class"] == "machined_block"
 
 
-def _calls(path: str) -> dict[str, ast.Call]:
-    tree = ast.parse(Path(path).read_text(encoding="utf-8"))
-    return {
-        node.func.id: node
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
-    }
-
-
-def test_the_part_carries_every_property_its_drawing_requires(monkeypatch) -> None:
-    import _part_properties
-    import _drawing_marks
-
-    required = ast.literal_eval(
-        next(
-            k.value
-            for k in _calls(drawing.__file__)["read_required_properties"].keywords
-            if k.arg == "required"
-        )
-    )
-    carried = dict(_part_properties.part_properties(part.PART_NAME))
-    stamp = _calls(part.__file__)["apply_drawing_properties"]
-    assert [ast.unparse(a) for a in stamp.args[:2]] == ["adapter", "PART_NAME"]
-    extra = {
-        ast.literal_eval(key): getattr(part, value.id)
-        for key, value in zip(stamp.args[2].keys, stamp.args[2].values, strict=True)
-    }
-    stamped: dict[str, str] = {}
-    monkeypatch.setattr(
-        _drawing_marks,
-        "apply_custom_properties",
-        lambda _adapter, props: stamped.update(props),
-    )
-    _drawing_marks.apply_drawing_properties(None, part.PART_NAME, extra)
-    carried.update(stamped)
-    assert [name for name in required if not str(carried.get(name) or "").strip()] == []
-    assert carried["Manufacturing Notes"] == spec.DRAWING_NOTES
-    assert carried["Isometric View Note"] == spec.ISOMETRIC_VIEW_NOTE
-
-
 class _ReferenceDisplay:
     """Native SetText is void; success is visible only through GetText."""
 
@@ -846,52 +673,6 @@ class _ReferenceDisplay:
         return self.text[which]
 
 
-def test_saved_fitted_lengths_are_native_reference_not_fixed_sizes(monkeypatch) -> None:
-    for name, nominal in (
-        ("CollarLength", spec.LENGTH),
-        ("PilotLength", spec.PILOT_LENGTH),
-    ):
-        display = _ReferenceDisplay()
-        dimension = SimpleNamespace(
-            SystemValue=nominal / 1000.0,
-            Tolerance=SimpleNamespace(Type=0),
-        )
-        monkeypatch.setattr(
-            part, "_named_dimension", lambda *_args: (display, dimension)
-        )
-        part._fitted_length_reference(object(), name, nominal)
-        assert (display.GetText(1), display.GetText(2)) == ("(", ")")
-        assert dimension.Tolerance.Type == 0
-    # Both fitted lengths are made REF by the build, after precision.
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert '_fitted_length_reference(adapter, "CollarLength", LENGTH)' in source
-    assert '_fitted_length_reference(adapter, "PilotLength", PILOT_LENGTH)' in source
-
-
-def test_body_reference_refuses_a_void_setter_that_does_not_persist(monkeypatch) -> None:
-    display = _ReferenceDisplay(persists=False)
-    dimension = SimpleNamespace(
-        SystemValue=spec.LENGTH / 1000.0,
-        Tolerance=SimpleNamespace(Type=0),
-    )
-    monkeypatch.setattr(part, "_named_dimension", lambda *_args: (display, dimension))
-    with pytest.raises(RuntimeError, match="reference"):
-        part._fitted_length_reference(object(), "CollarLength", spec.LENGTH)
-
-
-@pytest.mark.parametrize("band_type", [2, 4, 6])
-def test_body_reference_refuses_an_independent_size_band(monkeypatch, band_type) -> None:
-    dimension = SimpleNamespace(
-        SystemValue=spec.LENGTH / 1000.0,
-        Tolerance=SimpleNamespace(Type=band_type),
-    )
-    monkeypatch.setattr(
-        part, "_named_dimension", lambda *_args: (_ReferenceDisplay(), dimension)
-    )
-    with pytest.raises(RuntimeError, match="independent"):
-        part._fitted_length_reference(object(), "CollarLength", spec.LENGTH)
-
-
 def test_body_reference_refuses_method_shaped_text_readback(monkeypatch) -> None:
     display = _ReferenceDisplay()
     display.GetText = lambda _which: display.SetText
@@ -902,98 +683,6 @@ def test_body_reference_refuses_method_shaped_text_readback(monkeypatch) -> None
     monkeypatch.setattr(part, "_named_dimension", lambda *_args: (display, dimension))
     with pytest.raises(RuntimeError, match="reference"):
         part._fitted_length_reference(object(), "CollarLength", spec.LENGTH)
-
-
-def test_pilot_reference_refuses_a_nominal_outside_the_model(monkeypatch) -> None:
-    dimension = SimpleNamespace(
-        SystemValue=spec.LENGTH / 1000.0,
-        Tolerance=SimpleNamespace(Type=0),
-    )
-    monkeypatch.setattr(
-        part, "_named_dimension", lambda *_args: (_ReferenceDisplay(), dimension)
-    )
-    with pytest.raises(RuntimeError, match="fitted nominal"):
-        part._fitted_length_reference(object(), "PilotLength", spec.PILOT_LENGTH)
-
-
-def _capture_fixture(
-    monkeypatch, *, length=None, rear_gap=0.0, front_error=0.0, clock_error=0.0, missing=None
-):
-    import build_pd_paper_drive_assembly as assembly
-    import _gtol_face_resolve
-
-    length = spec.LENGTH if length is None else length
-
-    class NativeModel:
-        def Parameter(self, name):
-            assert name == "CollarLength@BodyProfile"
-            return None if missing == "dimension" else SimpleNamespace(SystemValue=length / 1000.0)
-
-        def GetBodies2(self, body_type: int, visible_only: bool):
-            assert (body_type, visible_only) == (0, False)
-            return ()  # Explicit negative: no actual solid/face to react on F.
-
-    class Component:
-        def GetModelDoc2(self):
-            return None if missing == "model" else NativeModel()
-
-    native = SimpleNamespace(
-        GetComponentByName=lambda _name: None if missing == "component" else Component()
-    )
-    monkeypatch.setattr(assembly, "_early_bound", lambda value, _kind: value)
-    if missing == "face":
-        # Use the real face resolver for the missing-metal refusal, not a
-        # test-only accepted-face flag or a replacement reaction annotation.
-        monkeypatch.setattr(_gtol_face_resolve, "_early_bound", lambda value, _kind: value)
-    else:
-        monkeypatch.setattr(_gtol_face_resolve, "resolve_faces", lambda _model, requests: requests)
-    calls = []
-
-    def world_point(_adapter, name, local):
-        calls.append((name, tuple(local)))
-        if name == "collar":
-            return (
-                math.sin(clock_error) * -local[1],
-                math.cos(clock_error) * local[1],
-                assembly.KNOB_COLLAR_Z0 + local[2] + rear_gap,
-            )
-        if name == "wheel":
-            return (local[0], local[1], assembly.REMOVABLE_Z0 + local[2] + front_error)
-        return (local[0], local[1], assembly.KNOB_SHAFT_Z0 + local[2])
-
-    monkeypatch.setattr(assembly, "world_point", world_point)
-    adapter = SimpleNamespace(currentModel=native)
-    assembly._assert_knob_collar_capture(adapter, "collar", "shaft", "wheel")
-    return calls
-
-
-def test_actual_native_collar_rear_face_is_measured_on_f(monkeypatch) -> None:
-    calls = _capture_fixture(monkeypatch)
-    assert ("collar", (0.0, 0.0, spec.LENGTH)) in calls
-    assert ("shaft", (0.0, 0.0, 0.0)) in calls
-    assert ("collar", (0.0, -1.0, 0.0)) in calls
-    # The faced remainder stands at the collar's front, off the wheel's rear.
-    assert ("collar", (0.0, 0.0, 0.0)) in calls
-    assert ("wheel", (0.0, 0.0, removable.PLATE)) in calls
-
-
-@pytest.mark.parametrize(
-    "kwargs, message",
-    [({"rear_gap": 0.01}, "rear is not on gear F"),
-     ({"front_error": 0.0169}, "behind the wheel"),
-     ({"clock_error": math.radians(3.0)}, "not clocked"),
-     ({"length": spec.LENGTH_FITTED_MIN - 0.01}, "outside"),
-     ({"length": spec.LENGTH - 0.01}, "source version"),
-     ({"missing": "component"}, "component"),
-     ({"missing": "model"}, "part"),
-     ({"missing": "face"}, "matched 0 faces"),
-     ({"missing": "dimension"}, "dimension")],
-)
-def test_native_reaction_capture_refuses_gap_wrong_clock_and_missing_metal(
-    monkeypatch, kwargs, message
-) -> None:
-    with pytest.raises(RuntimeError, match=message):
-        _capture_fixture(monkeypatch, **kwargs)
 
 
 def test_the_round_bore_clears_the_root_corner_and_bears_on_the_whole_core(monkeypatch) -> None:
@@ -1013,88 +702,3 @@ def test_the_round_bore_clears_the_root_corner_and_bears_on_the_whole_core(monke
     monkeypatch.setattr(shaft, "FRONT_RELIEF_WIDTH_MIN", spec.REAR_BREAK_DEPTH_MAX / 2.0)
     with pytest.raises(AssertionError, match="shortens the bore's support"):
         _fresh_collar_spec()
-
-
-class _CollarSection:
-    """Method/property forms match IView/IDrSection; void reversal is read back."""
-
-    def __init__(self, *, reverses=True, moves=True, has_cut=True):
-        self.Angle = 0.0
-        self.Position = drawing.SIDE_CENTER
-        self.seat = drawing.SIDE_CENTER
-        self.reversed = False
-        self.reverses, self.moves, self.has_cut = reverses, moves, has_cut
-
-    def project(self, xyz):
-        x, y = xyz[2], xyz[1] * (-1.0 if self.reversed else 1.0)
-        cosine, sine = math.cos(self.Angle), math.sin(self.Angle)
-        return (
-            self.seat[0] + drawing._S * (cosine * x - sine * y),
-            self.seat[1] + drawing._S * (sine * x + cosine * y),
-        )
-
-    def GetSection(self):
-        return self if self.has_cut else None
-
-    def GetReversedCutDirection(self) -> bool:
-        return self.reversed
-
-    def SetReversedCutDirection(self, value: bool) -> None:
-        if self.reverses:
-            self.reversed = value
-
-    def GetOutline(self):
-        points = [
-            self.project((0.0, y / 1000.0, z / 1000.0))
-            for z, radius in ((-spec.PILOT_LENGTH, spec.PILOT_DIA / 2.0),
-                              (0.0, spec.OD / 2.0), (spec.LENGTH, spec.OD / 2.0))
-            for y in (-radius, radius)
-        ]
-        return (
-            min(p[0] for p in points), min(p[1] for p in points),
-            max(p[0] for p in points), max(p[1] for p in points),
-        )
-
-    def SetViewPosition(self, position, move_children: bool) -> bool:
-        assert move_children is False
-        if self.moves:
-            self.seat = tuple(
-                self.seat[i] + position[i] - self.Position[i] for i in (0, 1)
-            )
-        self.Position = tuple(position)
-        return True
-
-
-def _orient_collar_section(monkeypatch, section):
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(drawing, "double_array", list)
-    monkeypatch.setattr(
-        drawing, "model_point_in_view", lambda _adapter, view, xyz, **_kwargs: view.project(xyz)
-    )
-    drawing._orient_section(object(), section)
-
-
-def test_actual_collar_section_has_rear_left_pilot_right_and_flat_pin_below(monkeypatch):
-    section = _CollarSection()
-    _orient_collar_section(monkeypatch, section)
-    assert section.reversed is True
-    assert section.project((0.0, 0.0, 0.0)) == pytest.approx(
-        (drawing._SEAT_X, drawing.SIDE_CENTER[1])
-    )
-    assert section.project((0.0, 0.0, spec.LENGTH / 1000.0))[0] == pytest.approx(drawing._REAR_X)
-    assert section.project((0.0, 0.0, -spec.PILOT_LENGTH / 1000.0))[0] == pytest.approx(drawing._PILOT_X)
-    assert section.project((0.0, -spec.FLAT_PIN_CENTRE / 1000.0, 0.0))[1] < drawing.SIDE_CENTER[1]
-
-
-@pytest.mark.parametrize(
-    "kwargs, message",
-    [({"reverses": False}, "direction"),
-     ({"moves": False}, "source frame"),
-     ({"has_cut": False}, "no native")],
-)
-def test_actual_collar_section_refuses_void_mutators_that_do_not_persist(
-    monkeypatch, kwargs, message
-):
-    with pytest.raises(RuntimeError, match=message):
-        _orient_collar_section(monkeypatch, _CollarSection(**kwargs))

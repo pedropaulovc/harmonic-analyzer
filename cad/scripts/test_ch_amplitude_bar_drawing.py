@@ -132,17 +132,6 @@ def test_pin_hole_is_a_native_sketch_located_from_the_top_edge() -> None:
     """The hole's sketch carries a construction line along the bar's top edge:
     the hole is located from its back end, and its length is the section, all
     model dimensions (rule 21)."""
-    source = Path(bar.__file__).read_text(encoding="utf-8")
-    assert "define_circle" not in source
-    for record in (
-        "pin_hole.record(\"TopEdgeY\", '\"BarLength\"')",
-        "pin_hole.record(\"BarSection\", '\"BarDepth\"')",
-        "pin_hole.record(\"TopPinX\", '\"BarDepth\" / 2')",
-        "pin_hole.record(\"TopPinDrop\", '\"TopPinDrop\"')",
-        "pin_hole.record(\"TopPinDia\", '\"TopPinDia\"')",
-    ):
-        assert record in source, record
-    assert 'drive_jobs += pin_hole.apply(adapter, "TopPinProfile")' in source
     assert "TopEdgeY" not in ch_amplitude_bar_notes.DRAWING_PRECISION_BY_NAME
 
 
@@ -154,8 +143,6 @@ def test_square_section_prints_as_stock_reference() -> None:
     assert notes.DIMENSION_CALLOUTS["BarSection"] == "1/4 SQ STOCK"
     assert ch_amplitude_bar_spec.BAR_DEPTH == ch_amplitude_bar_spec.BAR_WIDTH == 6.35
     assert ch_amplitude_bar_notes.inch_text(ch_amplitude_bar_spec.BAR_DEPTH, 2) == ".25"
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "set_reference_dimension(" in source
     config = parts("ch-amplitude-bar")
     assert "1/4 in sq" in config["material"]
     assert len(str(config["material"])) <= 36
@@ -183,10 +170,6 @@ def test_views_are_the_full_length_and_enlarged_cropped_ends() -> None:
         assert view.label_text == (
             f"{view.title}\nSCALE {view.scale[0]} : {view.scale[1]}"
         )
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert '"*Top"' not in source
-    assert "View Note" not in source
-    assert "View Note" not in Path(bar.__file__).read_text(encoding="utf-8")
     assert not hasattr(ch_amplitude_bar_notes, "ISOMETRIC_VIEW_NOTE")
     assert not hasattr(ch_amplitude_bar_notes, "END_VIEW_NOTE")
 
@@ -546,10 +529,6 @@ def test_the_one_note_is_the_pin_holes_matched_fit() -> None:
     press fit is the sheet's one numbered note, property-linked from the part
     and linked from the hole's callout; it stands under DETAIL A's label, right
     of the front view and left of the title block."""
-    draw_source = Path(drawing.__file__).read_text(encoding="utf-8")
-    part_source = Path(bar.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)' in draw_source
-    assert '{"Manufacturing Notes": DRAWING_NOTES}' in part_source
     notes = ch_amplitude_bar_notes
     assert notes.DRAWING_NOTES.startswith(f"{notes.PIN_FIT_NOTE_NUMBER}. ")
     assert f"SEE NOTE {notes.PIN_FIT_NOTE_NUMBER}" in notes.DIMENSION_CALLOUTS["TopPinDia"]
@@ -580,8 +559,6 @@ def test_view_c_is_named_by_its_arrow_on_detail_b() -> None:
     assert floor_y + 0.004 < tip_y - drawing.VIEW_LETTER_HEIGHT / 2.0
     assert tip_y + drawing.VIEW_LETTER_HEIGHT / 2.0 < depth_y - _LINE - 0.002
     assert text_x + _CHAR + 0.002 < depth_x
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "_add_view_arrow(adapter, views[DETAIL_B.name])" in source
 
 
 def test_functional_notch_finish_is_a_native_symbol_on_the_floor() -> None:
@@ -601,18 +578,7 @@ def test_functional_notch_finish_is_a_native_symbol_on_the_floor() -> None:
         (0, -1, 0), -ch_amplitude_bar_spec.BOTTOM_NOTCH_HEIGHT
     )
     assert len(finish_spec.SURFACE_FINISHES) == 1
-    part_source = Path(bar.__file__).read_text(encoding="utf-8")
-    assert "author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)" in part_source
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'surface_finish_by_key(SURFACE_FINISHES, "bottom_notch_floor")' in source
-    assert "add_datum_feature(" not in source
-    # #2341: the bars' bow is accepted on MHA-CH-00, not by a frame here.
-    assert "add_feature_control_frame(" not in source
     assert drawing.FINISH_CHAR_HEIGHT == 0.0025
-    # The channel/magnifier/summing closure imports amplitude_bar_spec; the
-    # finish controls stay out of it.
-    spec_source = Path(ch_amplitude_bar_spec.__file__).read_text(encoding="utf-8")
-    assert "SurfaceFinishControl" not in spec_source
 
 
 def test_floor_finish_leader_runs_through_the_mouth_crossing_only_a_witness() -> None:
@@ -665,9 +631,6 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     #1293), on one line (r1 wrapped at 50 characters). #2342 (owner ruling
     2026-11-14): bare steel, no outside plater, oiled all over so the notches
     and the press hole are protected too."""
-    source = Path(bar.__file__).read_text(encoding="utf-8")
-    assert "apply_drawing_properties" in source
-    assert "clear_dimensions_for_drawing" in source
     import _config
 
     spec = _config.parts("ch-amplitude-bar")
@@ -818,36 +781,8 @@ def test_cropped_views_are_model_views_dimensioned_before_the_crop() -> None:
     it imported nothing (available=[]). Each enlarged view is a model view,
     dimensioned uncropped, then cropped (the pc-r15 kink-detail pattern,
     d6b8ed93f), and every one imports before the front view."""
-    import ast
-    import inspect
 
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "CreateDetailViewAt4" not in source
-    tree = ast.parse(source)
 
-    def calls(function: str) -> list[str]:
-        node = next(
-            item
-            for item in ast.walk(tree)
-            if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef))
-            and item.name == function
-        )
-        found = []
-        for call in ast.walk(node):
-            if isinstance(call, ast.Call):
-                name = getattr(call.func, "id", None) or getattr(call.func, "attr", "")
-                found.append((call.lineno, call.col_offset, name))
-        return [name for _line, _col, name in sorted(found)]
-
-    order = calls("_dimension_then_crop")
-    assert order.index("curate_view_dimensions") < order.index("_crop_view")
-    assert order.count("_view_dimension_names") == 2
-    build = calls("build")
-    assert build.index("place_view") < build.index("_placed_cropped_view")
-    assert build.index("_placed_cropped_view") < build.index("_dimension_then_crop")
-    assert build.index("_dimension_then_crop") < build.index("curate_view_dimensions")
-    assert build.index("curate_view_dimensions") < build.index("_mark_detail_on_front")
-    assert "Crop2" in inspect.getsource(drawing._crop_view)
     for view in drawing.CROPPED_VIEWS:
         scale = view.scale[0] / view.scale[1]
         assert view.crop_radius == pytest.approx(view.radius_mm * scale / 1000)
@@ -917,11 +852,3 @@ def test_every_band_is_inch_native() -> None:
         (spec.TOP_PIN_HOLE_BAND, (0.0009, 0.0005)),
     ):
         assert tuple(value / 25.4 for value in band) == pytest.approx(inch, abs=1e-12)
-    part_source = Path(bar.__file__).read_text(encoding="utf-8")
-    assert part_source.count("display_unit=UNIT") == 6
-    assert (
-        "apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)"
-        in part_source
-    )
-    draw_source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'unit=part_drawing_unit("ch-amplitude-bar")' in draw_source

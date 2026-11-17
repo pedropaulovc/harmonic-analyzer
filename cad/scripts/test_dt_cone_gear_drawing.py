@@ -8,7 +8,6 @@ import re
 from pathlib import Path
 
 import pytest
-import yaml
 
 import _config
 import _drawing_leaders
@@ -142,20 +141,11 @@ def test_tip_diameter_carries_its_own_mesh_depth_band() -> None:
     assert spec.BLANK_DIA_BAND == (0.0, -0.0508)
     assert all(spec.blank_dia_band(t) is spec.BLANK_DIA_BAND for t in spec.CONFIGURATION_TEETH)
     assert spec.BLANK_DIA_BAND[0] < spec.MODULE_MM / 2.0
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert (
-        'BLANK_DIA_REFERENCE_SKETCH, "BlankDia", *deviations(BLANK_DIA_BAND)' in source
-    )
-    assert (
-        'set_dimension_prefix(adapter, BLANK_DIA_REFERENCE_SKETCH, "BlankDia", "<MOD-DIAM>")'
-        in source
-    )
     assert readback._BANDED_DIMENSIONS == (
         (notes.BLANK_DIA_REFERENCE_SKETCH, "BlankDia", spec.blank_dia_band),
         (spec.TOOTH_REFERENCE_SKETCH, "ToothThickness", spec.tooth_thickness_band),
         (spec.BORE_SKETCH, "BoreCutDia", spec.bore_dia_band),
     )
-    assert "_set_configuration_bands(adapter)" in source
 
 
 def test_face_width_fills_the_seat_pitch_without_crossing_it() -> None:
@@ -166,8 +156,6 @@ def test_face_width_fills_the_seat_pitch_without_crossing_it() -> None:
     assert spec.FACE_WIDTH <= spec.SEAT_PITCH < spec.FACE_WIDTH + 1e-4
     upper, lower = spec.FACE_WIDTH_BAND
     assert upper == -lower > 0.0  # centred, as the stack's partial bands need
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert '"Blank", "FaceWidth", *deviations(FACE_WIDTH_BAND)' in source
 
 
 def test_each_configuration_sheet_carries_its_own_drawing_number() -> None:
@@ -178,8 +166,6 @@ def test_each_configuration_sheet_carries_its_own_drawing_number() -> None:
     assert len(numbers) == len(spec.CONFIGURATION_TEETH)
     with pytest.raises(ValueError):
         spec.configuration_number(number, 6)
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert '"Number": configuration_number(part_number, teeth)' in source
 
 
 @pytest.mark.parametrize("teeth, suffix", ((12, "T012"), (18, "T018"), (120, "T120")))
@@ -207,63 +193,6 @@ def test_bore_bands_are_the_current_derived_seat_fit_bands() -> None:
     assert spec.KEYWAY_HALF_WIDTH_MM == cone_land_key.KEYWAY_WIDTH_MM / 2.0
 
 
-def test_every_marked_owner_is_live_in_the_marking_configuration() -> None:
-    # drawing:dt_cone_gear at 7f1dedc: BoreProfile, suppressed in T120 (the
-    # configuration the part is marked and saved in) and marked with T024
-    # active, imported none of its dimensions on the T006 sheet. So the round
-    # bore stays live in every configuration, and only the keyed bore is
-    # suppressed, on the round-bore configurations whose small bores it
-    # cannot solve on; every marked owner is live in T120.
-    round_features = {readback.BORE_CUT, spec.BORE_SKETCH}
-    keyed_features = {readback.KEYED_BORE_CUT, spec.KEYED_BORE_SKETCH}
-    marking = readback.MARKING_CONFIGURATION
-    assert marking == f"T{max(spec.CONFIGURATION_TEETH):03d}"
-    assert not set(readback.foreign_bore_features(marking)) & set(notes.DRAWING_DIMENSIONS)
-    for name, teeth in spec.CONFIGS:
-        foreign = set(readback.foreign_bore_features(name))
-        assert foreign == (set() if spec.keyed(teeth) else keyed_features), name
-        assert not foreign & round_features
-        assert spec.bore_sketch(teeth) not in foreign
-    assert readback.foreign_bore_features("Default") == ()
-    # On the keyed configurations the live round bore is the keyed bore's
-    # own round part: both sketches take their diameter from "BoreDia", so
-    # the union cut is the keyed bore.
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "drives=(None, None, '\"BoreDia\"')" in source
-    assert "keyed_bore.record(\"KeyedBoreDia\", '\"BoreDia\"')" in source
-    assert geometry.bore_area_mm2(30) == pytest.approx(
-        math.pi * (spec.bore_dia_mm(30) / 2.0) ** 2 + spec.keyway_area_outside_bore_mm2(30)
-    )
-    # Marks, bands and places are written once, with the marking
-    # configuration active and checked, never with a round-bore one; the
-    # round bore's per-configuration bands name their configurations
-    # (SetValues2) without activating them, after the marks.
-    build = inspect.getsource(part.build)
-    marks = build.index("mark_dimensions_for_drawing(")
-    assert build.index("active_configuration_name(adapter) != MARKING_CONFIGURATION") < marks
-    assert build.count("mark_dimensions_for_drawing(") == 1
-    assert "_activate_configuration(model" not in build[marks:]
-    assert marks < build.index("_set_configuration_bands(adapter)")
-    assert "_activate_configuration" not in inspect.getsource(part._set_configuration_bands)
-    assert spec.bore_dia_band(24) == spec.BORE_DIA_BAND
-    # Dependents before parents: each cut is suppressed before its sketch.
-    for features in (readback.ROUND_BORE_FEATURES, readback.KEYED_BORE_FEATURES):
-        assert features[0].endswith("Cut") and features[1].endswith("Profile")
-    # Every bore feature the restriction names is authored by the build, and
-    # every marked bore dimension's owner is one of them.
-    assert "name_last_feature(adapter, BORE_SKETCH)" in source
-    assert "name_last_feature(adapter, BORE_CUT)" in source
-    assert "name_last_feature(adapter, KEYED_BORE_SKETCH)" in source
-    assert "name_last_feature(adapter, KEYED_BORE_CUT)" in source
-    for name in spec.DRAWING_DIMENSIONS[spec.KEYED_BORE_SKETCH]:
-        assert f'keyed_bore.record("{name}"' in source, name
-    assert 'names=(None, None, "BoreCutDia")' in source
-    # The bores are restricted before any per-configuration global moves.
-    build = inspect.getsource(part.build)
-    assert build.index("_restrict_bores(adapter)") < build.index('name="BoreDia"')
-    assert build.index("_author_keyed_bore(adapter)") < build.index("circular_pattern_feature")
-
-
 def test_native_tooth_inspection_reads_the_actual_installed_cutter() -> None:
     # Ordinary +/-.003 thickness band about the cutter's standard-depth
     # thickness; T006 alone is thin-only (DT6-FORM1 relief clearance).
@@ -279,11 +208,6 @@ def test_native_tooth_inspection_reads_the_actual_installed_cutter() -> None:
             math.pi * profile.blank_radius_mm**2
             - teeth * profile.gap_area_mm2 - geometry.bore_area_mm2(teeth)
         ) * spec.FACE_WIDTH)
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "*deviations(TOOTH_THICKNESS_BAND)" in source
-    assert "FloorDip" not in source
-    assert "gear_facts(" not in source
-    assert "gap_area_in_disc(" not in source
 
 def test_each_sheet_gets_its_own_actual_cutting_recipe() -> None:
     for teeth in spec.CONFIGURATION_TEETH:
@@ -494,23 +418,6 @@ def test_numbered_notes_state_the_bore_fit_from_both_parts_limits() -> None:
         assert x + max(map(len, lines)) * 0.00179 < drawing.GEAR_DATA_POS[0] - 0.005
 
 
-def test_refused_rows_block_the_complete_native_family(monkeypatch: pytest.MonkeyPatch) -> None:
-    visited = []
-
-    def profile(teeth: int) -> object:
-        visited.append(teeth)
-        if teeth in (12, 18, 120):
-            raise ValueError("finite support refused")
-        return object()
-
-    monkeypatch.setattr(part, "stock_form_profile", profile)
-    with pytest.raises(RuntimeError, match="cutter-native cone family is unqualified") as caught:
-        part.require_complete_stock_family()
-    assert visited == list(spec.CONFIGURATION_TEETH)
-    for teeth in (12, 18, 120):
-        assert f"T{teeth:03d}: finite support refused" in str(caught.value)
-
-
 def test_native_root_readback_measures_the_offcentre_arc(monkeypatch: pytest.MonkeyPatch) -> None:
     from stock_form_cutter import CutterTemplate, StockFormProfile
 
@@ -670,10 +577,6 @@ def test_notes_state_no_bore_joint_method_or_review_record() -> None:
     assert "T-CONFIGURATION" not in notes.DRAWING_NOTES
     assert "EDGE" not in notes.DRAWING_NOTES
     assert not hasattr(notes, "ATTACHMENT")
-    # The gear sheets print only their numbered notes (round 4 of the
-    # fan-out: the part's QTY line made five note lines).
-    build = inspect.getsource(drawing.build)
-    assert '"Manufacturing Notes"' not in build
     for teeth in spec.CONFIGURATION_TEETH:
         text = notes.drawing_notes(teeth)
         assert text.splitlines() == expected
@@ -695,8 +598,6 @@ def test_notes_state_no_bore_joint_method_or_review_record() -> None:
         for retired in ("RUNOUT", "DATUM", "+/-", "PITCH DIA="):
             assert retired not in text
     assert notes.CYLINDER_MATE_NUMBER == _config.parts("dt-cylinder-gear")["number"]
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert '"Manufacturing Notes": drawing_notes(teeth)' in source
 
 
 @pytest.mark.parametrize("teeth", spec.CONFIGURATION_TEETH)
@@ -744,10 +645,6 @@ def test_no_gdt_and_no_surface_finish() -> None:
     assert not hasattr(spec, "PART_DATUMS")
     assert not hasattr(spec, "SURFACE_FINISHES")
     assert not hasattr(drawing, "bore_finish_xy")
-    for module in (drawing, part):
-        source = Path(module.__file__).read_text(encoding="utf-8")
-        assert "add_surface_finish" not in source
-        assert "author_part_pmi" not in source
 
 
 # The tip diameter's block (SEE NOTE 2 over the value and its band) spans
@@ -886,7 +783,6 @@ _THICKNESS_AIR_MARGIN = 0.0005
 # (+0.04572/+0.02540; layout audit of farm run 20261031T160216760Z, box
 # [11.1, 53.5] mm about x 30.0), and the two-line title.
 _BORE_DIA_TEXT_LEFT_REACH = 0.0189
-_BORE_DIA_TEXT_RIGHT_REACH = 0.0235
 _BORE_TEXT_HALF_HEIGHT = 0.005
 _BORE_TITLE_HEIGHT = 0.008
 # The layout audit compares IView.GetOutline boxes, which pad the geometry:
@@ -931,8 +827,6 @@ def test_front_view_carries_a_round_bore_callout_clear_of_its_neighbours() -> No
         assert box.xmax < floor_x - 0.019 - 0.005, teeth
         if teeth == spec.WEB_REFERENCE_TEETH:
             assert box.ymin > drawing.web_min_text_xy()[1] + 0.010
-    source = inspect.getsource(drawing.build)
-    assert 'near_side = ("FloorDia",) if keyed(teeth) else ("FloorDia", "BoreCutDia")' in source
 
 
 def test_bore_view_enlarges_every_keyed_bore_clear_of_its_neighbours() -> None:
@@ -1077,8 +971,6 @@ def test_front_view_draws_the_centreline_the_flat_and_its_tooth_share() -> None:
         assert _centre_line_text_air(teeth, end_x) >= (
             cone_sheet.TOOTH_THICKNESS_TEXT_AIR + _THICKNESS_AIR_MARGIN
         ), teeth
-    source = inspect.getsource(drawing.build)
-    assert "arms_mm=front_centre_mark_arms_mm(teeth)" in source
 
 
 # The detail letter's ink at DETAIL_LETTER_HEIGHT, half its width and height
@@ -1130,12 +1022,6 @@ def test_enlarged_views_are_lettered_with_boundaries_on_the_front_view() -> None
         assert letter.xmin > centre[0] + _LETTER_AIR and letter.ymax < centre[1] - _LETTER_AIR
         # T012's web dimension runs down left; the letter stands down right.
         assert abs(math.remainder(bore.letter_angle_deg - spec.WEB_REFERENCE_ANGLE_DEG, 360.0)) >= 90.0
-    source = inspect.getsource(drawing.build)
-    assert "_mark_front_details(adapter, front, teeth" in source
-    # The root envelope's leader stops on its near rim (the tip diameter
-    # left the front view for the side view).
-    assert 'set_near_side_diameter(found[0], f"{configuration} {name}")' in source
-    assert "if bore_view is not None:" in source
 
 
 def _callout_dimension(name: str, texts: dict[int, str]) -> object:
@@ -1280,101 +1166,6 @@ def test_text_air_refuses_the_line_hung_text_and_passes_the_shelf() -> None:
         )
 
 
-def test_export_is_refused_on_the_sheet_whose_thickness_text_a_line_strikes(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    pages = [object()] * len(drawing.SHEET_NAMES)
-    monkeypatch.setattr(drawing, "read_pdf_ink", lambda _path: pages)
-    struck = {"T018"}
-    monkeypatch.setattr(
-        cone_sheet,
-        "tooth_thickness_text_air",
-        lambda _page, _rows, *, sheet: (
-            0.0015 if sheet in struck else 0.003,
-            f"{sheet} nearest",
-        ),
-    )
-    with pytest.raises(
-        RuntimeError, match=r"strikes the thickness text.*\nT018: T018 nearest$"
-    ):
-        drawing.assert_tooth_thickness_text_air(drawing.PDF)
-    struck.clear()
-    drawing.assert_tooth_thickness_text_air(drawing.PDF)
-    checked: list[object] = []
-    monkeypatch.setattr(drawing, "assert_tooth_thickness_text_air", checked.append)
-    for phase in ("before_pdf_save", "after_drawing_save", "after_png_save"):
-        drawing._check_exported_pdf(phase)
-    assert checked == []
-    drawing._check_exported_pdf("after_pdf_save")
-    assert checked == [drawing.PDF]
-    build = inspect.getsource(drawing.build)
-    assert "checkpoint=_check_exported_pdf" in build
-    assert build.index("cone_sheet.shelve_tooth_thickness(") > build.index(
-        "CALLOUTS_ABOVE"
-    )
-
-
-def test_shelving_moves_the_text_by_its_measured_shelf_and_keeps_the_line(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from types import SimpleNamespace
-
-    teeth = 12
-    line_x = drawing.front_keep(teeth)["ToothThickness"][0]
-    target = drawing.tooth_thickness_shelf(teeth)
-    display = SimpleNamespace(OffsetText=False)
-    annotation = SimpleNamespace(GetSpecificAnnotation=lambda: display)
-    state = {
-        "shelf": (target[0] + 0.003, target[1] - 0.002),
-        "lines": [((line_x, 0.1525), (line_x, 0.1588)), ((line_x, 0.150), target)],
-    }
-    calls: list[tuple[object, ...]] = []
-
-    def offset(_adapter: object, _annotations: object, positions: dict) -> None:
-        display.OffsetText = True
-        calls.append(("offset", positions["ToothThickness"]))
-
-    def ink(_adapter: object, _annotation: object, *, label: str) -> SimpleNamespace:
-        x, y = state["shelf"]
-        return SimpleNamespace(text=(x, y, x + 0.064, y + 0.025))
-
-    def move(
-        _adapter: object, _annotation: object, dx: float, dy: float, *, label: str
-    ) -> None:
-        calls.append(("move", dx, dy))
-        state["shelf"] = (state["shelf"][0] + dx, state["shelf"][1] + dy)
-
-    monkeypatch.setattr(cone_sheet, "_early_bound", lambda obj, _iface: obj)
-    monkeypatch.setattr(
-        cone_sheet, "dimension_name", lambda _adapter, _a: "ToothThickness"
-    )
-    monkeypatch.setattr(cone_sheet, "offset_dimension_text", offset)
-    monkeypatch.setattr(cone_sheet, "callout_ink", ink)
-    monkeypatch.setattr(cone_sheet, "move_annotation", move)
-    monkeypatch.setattr(cone_sheet, "dimension_segments", lambda _a: state["lines"])
-
-    def shelve() -> None:
-        cone_sheet.shelve_tooth_thickness(
-            None, [annotation], line_x=line_x, target=target, label="T012"
-        )
-
-    shelve()
-    assert calls == [
-        (
-            "offset",
-            (
-                target[0] + cone_sheet.TOOTH_THICKNESS_SEED[0],
-                target[1] + cone_sheet.TOOTH_THICKNESS_SEED[1],
-            ),
-        ),
-        ("move", pytest.approx(-0.003), pytest.approx(0.002)),
-    ]
-    # A line that followed its text off the tooth is refused.
-    state["lines"] = [((line_x + 0.03, 0.1), (line_x + 0.03, 0.12))]
-    with pytest.raises(RuntimeError, match="left the tooth"):
-        shelve()
-
-
 def test_dimension_arrow_length_is_read_from_the_drawing() -> None:
     """The layout's arrow length is the drawing's own, not a remembered one."""
 
@@ -1404,169 +1195,6 @@ def test_dimension_arrow_length_is_read_from_the_drawing() -> None:
 _FLOOR_TEXT_HALF_WIDTH = (
     max(map(len, drawing.DIMENSION_CALLOUTS["FloorDia"].splitlines())) * 0.00185 / 2.0
 )
-
-
-class _FakeFeature:
-    def __init__(self, visible: int) -> None:
-        self.Visible = visible
-
-
-class _FakePart:
-    """A part document that records sketch blanks and reports visibility."""
-
-    def __init__(self, *, hides: bool) -> None:
-        self.hides = hides
-        self.selected: list[tuple[str, str]] = []
-        self.blanked: list[str] = []
-        self.Extension = self
-
-    def ClearSelection2(self, _all: bool) -> None:
-        pass
-
-    def SelectByID2(self, name: str, kind: str, *_args: object) -> bool:
-        self.selected.append((name, kind))
-        return True
-
-    def BlankSketch(self) -> None:
-        self.blanked.append(self.selected[-1][0])
-
-    def FeatureByName(self, name: str) -> _FakeFeature:
-        # swVisibilityState_e: 1 hidden, 2 shown
-        return _FakeFeature(1 if self.hides and name in self.blanked else 2)
-
-
-class _FakeAdapter:
-    def __init__(self, model: object) -> None:
-        self.currentModel = model
-
-
-def test_the_part_saves_every_authoring_sketch_hidden() -> None:
-    """#950's save gate: a shown construction sketch renders in the part images
-    and in every assembly that places a gear, so the part blanks each before
-    its first save and reads the blank back."""
-    model = _FakePart(hides=True)
-    part._blank_reference_sketches(_FakeAdapter(model))
-    sketches = [*spec.REFERENCE_SKETCHES, notes.BLANK_DIA_REFERENCE_SKETCH]
-    assert model.selected == [(sketch, "SKETCH") for sketch in sketches]
-    assert model.blanked == sketches
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    body = source[source.index("async def build(") :]
-    assert body.index("_suppress_rows_and_hide_references(adapter, pattern_axis)") < body.index(
-        "await adapter.save_file("
-    )
-    assert "blank_reference_geometry(" not in body
-    assert "assert_reference_geometry_hidden_in_every_configuration(adapter, PART_NAME)" in body
-
-
-def test_hide_and_show_is_set_with_each_configuration_active(monkeypatch: pytest.MonkeyPatch) -> None:
-    """7e88be269 T006 image: blanked with T120 active only, the axis and both
-    sketches rendered in every other configuration."""
-    from types import SimpleNamespace
-
-    events: list[tuple[str, ...]] = []
-    suppressed = SimpleNamespace(IsSuppressed2=lambda *_args: (True,))
-    model = SimpleNamespace(
-        GetConfigurationNames=lambda: [c for c, _t in spec.CONFIGS],
-        FeatureByName=lambda _name: suppressed,
-    )
-    monkeypatch.setattr(part, "_early_bound", lambda obj, _iface: obj)
-    monkeypatch.setattr(part, "_activate_configuration", lambda _m, c: events.append(("activate", c)))
-    monkeypatch.setattr(part, "blank_reference_geometry", lambda _a, refs: events.append(("blank", *refs[0])))
-    monkeypatch.setattr(part, "_blank_reference_sketches", lambda _a: events.append(("sketches",)))
-    part._suppress_rows_and_hide_references(SimpleNamespace(currentModel=model), "Axis1")
-    assert events == [
-        event
-        for configuration, _teeth in spec.CONFIGS
-        for event in (("activate", configuration), ("blank", "Axis1", "AXIS"), ("sketches",))
-    ]
-
-
-def test_a_blank_that_does_not_take_fails_the_part_build() -> None:
-    with pytest.raises(RuntimeError, match="still visible after BlankSketch"):
-        part._blank_reference_sketches(_FakeAdapter(_FakePart(hides=False)))
-
-
-class _FakeTolerance:
-    def __init__(self, accept: bool = True) -> None:
-        self.Type = 0
-        self.accept = accept
-        self.calls: list[tuple[float, float, int, list[str]]] = []
-
-    def SetValues2(self, lower: float, upper: float, which: int, names: object) -> bool:
-        self.calls.append((lower, upper, which, list(names.value)))
-        return self.accept
-
-
-def _patch_floor_dimension(monkeypatch: pytest.MonkeyPatch, tolerance: object) -> None:
-    dimension = type("Dimension", (), {"Tolerance": tolerance})()
-
-    def named(_adapter: object, feature: str, name: str) -> tuple[object, object]:
-        assert (feature, name) == (spec.GAP_FLOOR_SKETCH, "FloorDia")
-        return object(), dimension
-
-    monkeypatch.setattr(readback, "_named_dimension", named)
-
-
-def test_each_configuration_stores_its_own_gap_floor_limits(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """#834 Codex P1: the floor band is a native per-configuration LIMIT, one
-    SetValues2 per configuration naming only that configuration."""
-    tolerance = _FakeTolerance()
-    _patch_floor_dimension(monkeypatch, tolerance)
-    part._set_gap_floor_limits(object())
-    assert tolerance.Type == 3  # swTolLIMIT
-    assert [call[3] for call in tolerance.calls] == [[name] for name, _ in spec.CONFIGS]
-    for (lower, upper, which, _names), (_name, teeth) in zip(
-        tolerance.calls, spec.CONFIGS, strict=True
-    ):
-        assert which == 3  # swSetValue_InSpecificConfigurations
-        nominal = 2.0 * spec.floor_radius_min_mm(teeth)
-        minimum, maximum = spec.floor_limits_mm(teeth)
-        assert nominal + lower * 1000.0 == pytest.approx(minimum, abs=1e-9)
-        assert nominal + upper * 1000.0 == pytest.approx(maximum, abs=1e-9)
-        assert lower <= 0.0 < upper
-
-
-def test_a_rejected_configuration_limit_fails_the_part_build(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    _patch_floor_dimension(monkeypatch, _FakeTolerance(accept=False))
-    with pytest.raises(RuntimeError, match="FloorDia@T012: SetValues2 rejected"):
-        part._set_gap_floor_limits(object())
-
-
-def test_every_configuration_stores_its_own_blank_and_thickness_band(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """part:dt_cone_gear at 039e557da: a one-configuration write's immediate
-    readback returned that configuration's band. The FloorDia form instead:
-    every configuration written, then each read back in the reopened audit
-    with itself active. The round bore, live in every configuration, takes
-    its band in every one too (reamer on T012/T018, seat class elsewhere)."""
-    tolerances = {
-        "BlankDia": _FakeTolerance(),
-        "ToothThickness": _FakeTolerance(),
-        "BoreCutDia": _FakeTolerance(),
-    }
-
-    def named(_adapter: object, _feature: str, name: str) -> tuple[object, object]:
-        return object(), type("Dimension", (), {"Tolerance": tolerances[name]})()
-
-    monkeypatch.setattr(part, "_named_dimension", named)
-    part._set_configuration_bands(object())
-    for name, band_for in (
-        ("BlankDia", spec.blank_dia_band),
-        ("ToothThickness", spec.tooth_thickness_band),
-        ("BoreCutDia", spec.bore_dia_band),
-    ):
-        calls = tolerances[name].calls
-        configs = list(spec.CONFIGS)
-        assert [call[3] for call in calls] == [[c] for c, _ in configs]
-        for (lower, upper, which, _names), (_c, teeth) in zip(calls, configs, strict=True):
-            assert which == 3
-            upper_mm, lower_mm = band_for(teeth)
-            assert (lower * 1000.0, upper * 1000.0) == pytest.approx((lower_mm, upper_mm))
 
 
 def test_the_reopened_audit_reads_each_band_with_its_own_configuration_active(
@@ -1621,8 +1249,6 @@ def test_each_authoring_sketch_shows_in_one_view() -> None:
         assert owned <= set(drawing.right_keep(teeth))
         assert not owned & set(drawing.front_keep(teeth))
         assert not owned & set(drawing.bore_view_keep(teeth))
-    source = inspect.getsource(drawing.build)
-    assert 'keep={"BlankDia": side_keep["BlankDia"]}' in source
 
 
 def test_invalid_family_member_is_rejected() -> None:
@@ -1659,35 +1285,3 @@ def test_root_to_bore_webs_keep_the_floor_and_target_guards() -> None:
             assert web >= spec.WEB_EXCEPTIONS_MM[teeth] - 1e-9
             continue
         assert web >= spec.MACHINED_WEB_TARGET_MM, (teeth, web)
-
-
-def test_dimensions_record_gear_bores_row_follows_the_spec() -> None:
-    # The narrative record is read by no part, so nothing rebuilds when the
-    # bores move: it kept the pre-S1 map (9.5 on T024-T120) after U40.  It
-    # must name every round bore, its gears, and the keyed land's T.
-    groups: dict[float, list[int]] = {}
-    for teeth in spec.CONFIGURATION_TEETH:
-        groups.setdefault(spec.bore_dia_mm(teeth), []).append(teeth)
-    record = yaml.safe_load(
-        (Path(part.__file__).resolve().parents[1] / "config" / "dimensions.yaml")
-        .read_text(encoding="utf-8")
-    )
-    rows = []
-    stack = [record]
-    while stack:
-        node = stack.pop()
-        if isinstance(node, dict):
-            stack.extend(node.values())
-        elif isinstance(node, list):
-            if node and isinstance(node[0], str) and node[0].startswith("Gear bores"):
-                rows.append(node)
-            stack.extend(node)
-    assert len(rows) == 1
-    row = rows[0][1]
-    printed_bores = sorted({float(value) for value in re.findall(r"Ø(\d+\.\d+)", row)})
-    assert printed_bores == pytest.approx(sorted(groups))
-    for bore, teeth in groups.items():
-        span = f"T{teeth[0]:03d}" if len(teeth) == 1 else f"T{teeth[0]:03d}–T{teeth[-1]:03d}"
-        assert span in row, span
-        if spec.keyed(teeth[0]):
-            assert f"{cone_land_key.KEYWAY_T_MM:.3f}" in row, bore

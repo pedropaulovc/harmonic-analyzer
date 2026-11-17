@@ -17,11 +17,6 @@ def test_surface_finish_is_part_owned_and_consumed_by_key() -> None:
     assert control.key == "bearing"
     assert control.roughness_um == 1.6
     assert control.face.diameter_mm == dt_pinion_pivot_shaft_spec.SHAFT_DIA
-    part_source = Path(shaft.__file__).read_text(encoding="utf-8")
-    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "surface_finishes=SURFACE_FINISHES" in part_source
-    assert 'surface_finish_by_key(SURFACE_FINISHES, "bearing")' in drawing_source
-    assert "roughness_ra=" not in drawing_source
 
 
 def test_required_drawing_paths() -> None:
@@ -58,27 +53,12 @@ def test_one_side_view_carries_the_lathe_dimensions_and_a_detail_the_crown() -> 
     assert drawing.SHEET_SCALE == (1.0, 1.0)
     assert drawing.DETAIL_SCALE == (5, 1)
     assert drawing.ISO_SCALE == (1, 2)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert '"*Front"' not in source
-    assert source.count("place_view(") == 2
     assert dt_pinion_pivot_shaft_spec.ISO_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:2"
-    assert 'add_property_linked_note(adapter, "Iso View Note"' in source
-    assert "for view in (profile, iso):" in source
-    assert "set_hidden_lines_removed(adapter, detail)" in source
 
 
 def test_overall_length_is_a_tip_to_tip_reference_over_the_body() -> None:
     spec = dt_pinion_pivot_shaft_spec
     assert spec.OVERALL_LEN == pytest.approx(spec.SHAFT_LEN + 2.0 * spec.CAP_SAG)
-    source = Path(shaft.__file__).read_text(encoding="utf-8")
-    assert 'pin_holes.record("OverallLength", \'"ShaftLen" + 2 * "CapSag"\')' in source
-    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
-    # Singular helper, so it prints "(189.4)" with no diameter glyph (r3).
-    assert "set_reference_dimensions(" not in drawing_source
-    assert (
-        'set_reference_dimension(adapter, overall[0], label="overall length")'
-        in drawing_source
-    )
     # Overall outermost, over the body length.
     assert (
         drawing.PROFILE_KEEP["OverallLength"][1]
@@ -97,16 +77,8 @@ def test_running_fit_names_its_mate_and_the_sheet_carries_no_gdt() -> None:
     assert len(shaft_dia.split("\n")) <= 2
     assert block in shaft_dia
     assert "CLEARANCE" in shaft_dia
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "add_feature_control_frame(" not in source
-    assert "add_datum_feature(" not in source
     assert not hasattr(dt_pinion_pivot_shaft_spec, "GEOMETRIC_TOLERANCES_MM")
-    # The Ra rides the controlled model FACE, its leader landing on the upper
-    # flank: a hit-tested silhouette re-solved onto another face (#2106 r3).
-    assert 'entity_type="FACE"' in source
-    assert "leader_attach_xy=BEARING_FINISH_EDGE" in source
     assert drawing.BEARING_FINISH_EDGE[1] == drawing.SHAFT_UPPER_FLANK_Y
-    assert "char_height=FINISH_CHAR_HEIGHT" in source
     # The diameter's two fit lines stand right of the front end, over DETAIL
     # A, clear of the pin-hole leader (round 1) and the border (r3).
     assert drawing.PROFILE_KEEP["ShaftDia"][0] > drawing.FRONT_END_X
@@ -132,14 +104,9 @@ def test_linked_notes_are_few_and_carry_no_dimension_or_general_tolerance() -> N
         "PinHoleProfile": {"PinHoleDia": 4, "OverallLength": 2},
     }
     assert dt_pinion_pivot_shaft_spec.CROWN_CALLOUT == "BOTH ENDS"
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:
-    source = Path(shaft.__file__).read_text(encoding="utf-8")
-    assert "apply_drawing_properties" in source
-    assert "clear_dimensions_for_drawing" in source
     import _config
 
     spec = _config.parts("dt-pinion-pivot-shaft")

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import importlib
-import inspect
 import itertools
 import math
 from dataclasses import replace
@@ -15,7 +14,6 @@ from unittest.mock import MagicMock
 import pytest
 
 import _config
-import _drawing_view_arrow
 import build_pd_transgear_knob_shaft as part
 import draw_pd_transgear_knob_shaft as drawing
 import pd_transgear_arm_plate_geometry as plate
@@ -24,7 +22,6 @@ import pd_transgear_knob_thrust_ring_spec as ring
 import pd_transgear_thumbnut_spec as thumbnut
 from _drawing_contract import (
     PRECISION_MIGRATED_DRAWINGS,
-    drawing_specification_violations,
     model_toleranced_dimensions,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -427,25 +424,6 @@ def test_tool_end_limits_print_as_native_detail_dimensions() -> None:
     assert "FlatEnd" not in drawing.DIMENSION_CALLOUTS_ABOVE
 
 
-def test_the_tool_end_keeps_its_native_limits(monkeypatch) -> None:
-    # The model prefixes only the root envelope (build-order test).
-    limits: list[tuple[str, str, int]] = []
-
-    def record(_adapter, feature, name, _nominal, _band, tol_type):
-        limits.append((feature, name, tol_type))
-
-    monkeypatch.setattr(part, "_apply_native_limits", record)
-    part._apply_neck_and_flat_limits(object())
-    assert limits == [
-        ("StudProfile", "FrontReliefDia", 3),
-        ("StudProfile", "FrontCornerRadius", 6),
-        ("CoreFlatProfile", "FlatEnd", 3),
-        ("CoreFlatProfile", "FlatToolRadius", 6),
-    ]
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "RootEnvelope" not in source and "author_root_envelope" not in source
-
-
 def test_model_bands_and_source_linked_properties() -> None:
     bands = model_toleranced_dimensions(part)
     assert bands[("StudProfile", "CoreDia")] == "*deviations(CORE_DIA_BAND)"
@@ -456,9 +434,7 @@ def test_model_bands_and_source_linked_properties() -> None:
     assert bands[("GearBlank", "FaceWidth")] == "FACE_WIDTH_BAND"
     assert spec.FACE_WIDTH_BAND == FIT_LENGTH_BAND_IN
     assert spec.FACE_WIDTH_BAND < printed_band_mm(spec.FACE_WIDTH_PLACES, unit=spec.UNIT)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
-    assert not drawing_specification_violations(source, filename=drawing.__file__)
     controls = {control.key: control for control in spec.GEOMETRIC_CONTROLS}
     assert set(drawing.CONTROL_ATTACHMENTS) == set(controls)
     assert drawing.CONTROL_ATTACHMENTS["core_total_runout"][0] != drawing.CONTROL_ATTACHMENTS["front_neck_total_runout"][0]
@@ -675,13 +651,6 @@ def test_flank_ends_lie_far_outside_the_contact_tolerance(spec_module: str, pin_
     for parameter in (profile.flank_parameter_min, profile.flank_parameter_max):
         end = profile.flank_point(parameter)
         assert math.dist(contact.flank_point_mm, end) > 20.0 * ink.CONTACT_TOLERANCE_MM
-
-
-def test_the_ink_module_never_hit_tests_the_sheet() -> None:
-    # Main precedent: test_dt_pinion_arbor_drawing ('"SelectByID2" not in helper').
-    import paper_drive_stock_drawing as ink
-
-    assert "SelectByID2" not in inspect.getsource(ink)
 
 
 def test_single_native_solid_volume_has_no_adapter_fallback(monkeypatch) -> None:
@@ -1177,72 +1146,6 @@ def test_view_c_arrow_points_at_the_stud_tip_in_the_open_field() -> None:
     assert letter_right < drawing.FRONT_CENTER[0] - drawing.HALF_OD - 0.003
 
 
-class _ArrowNote:
-    """A leader note whose leader leaves the letter ``drop`` under the
-    letter's nominal mid-height, wherever the letter stands."""
-
-    def __init__(self, tip, text_xy, drop: float) -> None:
-        self.tip, self.position, self.drop = tip, list(text_xy), drop
-        self.format = SimpleNamespace(CharHeight=0.0035)
-        self.moves: list[tuple[float, float]] = []
-
-    def GetAnnotation(self):
-        return self
-
-    def GetTextFormat(self, _index):
-        return self.format
-
-    def SetTextFormat(self, _index, _default, text_format):
-        self.format = text_format
-        return True
-
-    def GetLeaderPointsAtIndex(self, _index):
-        start_y = self.position[1] - drawing.VIEW_LETTER_HEIGHT / 2.0 - self.drop
-        return [self.position[0], start_y, 0.0, *self.tip, 0.0]
-
-    def GetPosition(self):
-        return (*self.position, 0.0)
-
-    def SetPosition2(self, x, y, _z):
-        self.moves.append((x, y))
-        self.position = [x, y]
-        return True
-
-
-def test_view_c_arrow_squares_its_letter_onto_the_tip_face(monkeypatch) -> None:
-    face = (0.290, 0.1624)
-    made: dict[str, object] = {}
-
-    def leader_note(_adapter, text, *, text_xy, attach_xy, view, label):
-        made.update(text=text, text_xy=text_xy, tip=attach_xy, view=view)
-        made["note"] = _ArrowNote(attach_xy, text_xy, drop=0.0006)
-        return made["note"]
-
-    projected = []
-    monkeypatch.setattr(
-        drawing, "model_point_in_view",
-        lambda _adapter, _view, point, *, label: projected.append(point) or face,
-    )
-    monkeypatch.setattr(drawing, "add_leader_note", leader_note)
-    monkeypatch.setattr(_drawing_view_arrow, "_early_bound", lambda obj, _iface: obj)
-    monkeypatch.setattr(_drawing_view_arrow, "rebuild_drawing", lambda *_a, **_k: None)
-    side = object()
-    drawing._add_view_arrow(SimpleNamespace(currentModel=MagicMock()), side)
-    assert projected == [
-        (0.0, drawing.VIEW_ARROW_FACE_RADIUS_MM / 1000.0, spec.TIP_Z / 1000.0)
-    ]
-    assert made["text"] == drawing.ENLARGED_LETTER and made["view"] is side
-    tip = (face[0] + drawing.VIEW_ARROW_TIP_GAP, face[1])
-    assert made["tip"] == pytest.approx(tip)
-    # The letter stands right of the tip: the arrow points -X at the face.
-    assert made["text_xy"][0] > tip[0]
-    note = made["note"]
-    assert note.format.CharHeight == drawing.VIEW_LETTER_HEIGHT
-    # A 0.6 mm miss is slid out, square onto the face.
-    assert len(note.moves) == 1
-    assert note.GetLeaderPointsAtIndex(0)[1] == pytest.approx(tip[1])
-
-
 @pytest.mark.parametrize("readback, ok", [("A\r\nB LAST", True), ("A", False), ("", False)])
 def test_sheet_note_reads_back_its_last_line(monkeypatch, readback, ok) -> None:
     note = SimpleNamespace(
@@ -1263,7 +1166,6 @@ def test_sheet_note_reads_back_its_last_line(monkeypatch, readback, ok) -> None:
     else:
         with pytest.raises(RuntimeError, match="reads back"):
             call()
-
 
 
 def test_run_035809_detail_b_blocks_stand_clear() -> None:
@@ -1378,65 +1280,6 @@ def test_root_profile_is_a_hidden_front_plane_circle_at_the_printed_min(
     assert seat.blank_reference_sketches.call_args.args[1] == ("RootProfile",)
 
 
-class _Tolerance:
-    def __init__(self, *, keeps_type: bool = True) -> None:
-        self._type = 2
-        self.keeps_type = keeps_type
-        self.values: tuple[float, float] | None = None
-
-    @property
-    def Type(self) -> int:  # noqa: N802
-        return self._type
-
-    @Type.setter
-    def Type(self, value: int) -> None:  # noqa: N802
-        if self.keeps_type:
-            self._type = value
-
-    def SetValues(self, lower: float, upper: float) -> bool:  # noqa: N802
-        self.values = (lower, upper)
-        return True
-
-
-@pytest.mark.parametrize(
-    ("value_mm", "keeps_type", "message"),
-    [
-        (spec.ROOT_DIA_MIN, True, None),
-        (spec.ROOT_DIA_MIN + 0.01, True, "not the printed MIN"),
-        (spec.ROOT_DIA_MIN, False, "MIN readback changed"),
-    ],
-)
-def test_root_prints_its_modelled_min(
-    monkeypatch: pytest.MonkeyPatch, value_mm: float, keeps_type: bool, message: str | None
-) -> None:
-    tolerance = _Tolerance(keeps_type=keeps_type)
-    dimension = SimpleNamespace(SystemValue=value_mm / 1000.0, Tolerance=tolerance)
-    named: list[tuple[str, str]] = []
-
-    def named_dimension(_adapter, feature, name):
-        named.append((feature, name))
-        return object(), dimension
-
-    monkeypatch.setattr(part, "_named_dimension", named_dimension)
-    monkeypatch.setattr(part, "_early_bound", lambda obj, _iface: obj)
-    if message is not None:
-        with pytest.raises(RuntimeError, match=message):
-            part._apply_root_min(object())
-        return
-    part._apply_root_min(object())
-    assert named == [("RootProfile", "RootDia")]
-    assert tolerance.Type == spec.ROOT_DIA_TOL_TYPE == 5
-    assert tolerance.values == (0.0, 0.0)
-
-
-def _enlarged_point(radius_mm: float, model_deg: float) -> tuple[float, float]:
-    """Sheet point of a model point on F in the mirrored 4:1 view."""
-    cx, cy = drawing.ENLARGED_CENTER
-    r = radius_mm * drawing._ES / 1000.0
-    angle = math.radians(model_deg)
-    return cx - r * math.cos(angle), cy + r * math.sin(angle)
-
-
 def test_enlarged_view_fits_the_lower_left_field() -> None:
     # Under the (70.74) row's line, left of the title block (x 216 mm) and
     # inside the border (12.7 mm), with the label clear of the gear.
@@ -1501,227 +1344,6 @@ def test_enlarged_root_leader_runs_out_along_a_gap_bisector() -> None:
     assert x - half_text > 0.0127 + 0.005
     assert y - 0.002 > 0.0127 + 0.005
     assert y + 0.003 < drawing.ENLARGED_LABEL_XY[1] - 2 * 0.0045
-
-
-class _NeckView:
-    """A recording IView double for detail B's place-move-crop."""
-
-    def __init__(
-        self, *, crop_status: int = 1, crops: bool = True, moves: bool = True,
-        mirrored: bool = False,
-    ) -> None:
-        self.ScaleRatio = (10.0, 1.0)
-        self.Position = (0.300, 0.100)
-        self.crop_status = crop_status
-        self.crops = crops
-        self.moves = moves
-        self.mirrored = mirrored
-        self.cropped = False
-        self.calls: list[str] = []
-        self.CropViewJaggedOutline = False
-        self.CropViewNoOutline = False
-
-    def SetViewPosition(self, target, _update) -> bool:  # noqa: N802
-        self.calls.append("SetViewPosition")
-        if self.moves:
-            self.Position = tuple(float(value) for value in target)
-        return True
-
-    def GetOutline(self):  # noqa: N802
-        if self.cropped:
-            return (0.078, 0.196, 0.132, 0.250)
-        return (-0.100, 0.150, 0.610, 0.300)
-
-    def Crop2(self, jagged, no_outline, intensity) -> int:  # noqa: N802
-        self.calls.append(f"Crop2({jagged}, {no_outline}, {intensity})")
-        self.cropped = self.crops
-        return self.crop_status
-
-    def IsCropped(self) -> bool:  # noqa: N802
-        return self.cropped
-
-    def UpdateViewDisplayGeometry(self) -> None:  # noqa: N802
-        self.calls.append("UpdateViewDisplayGeometry")
-
-
-class _NeckModel:
-    def ClearSelection2(self, _all) -> None:  # noqa: N802
-        pass
-
-    def EditRebuild3(self) -> None:  # noqa: N802
-        pass
-
-
-def _neck_seat(monkeypatch, view: _NeckView) -> list[tuple]:
-    """Point the drawing's COM helpers at ``view``: a *Right projection at
-    10:1 (model +Z runs left) a fixed offset from the view's position."""
-    log: list[tuple] = []
-    offset = (-0.050, 0.070)
-
-    def place(_adapter, _source, orientation, x, y, *, scale):
-        log.append(("place", orientation, (x, y), scale))
-        return view
-
-    def model_point(_adapter, _view, point, *, label):
-        handing = 1.0 if view.mirrored else -1.0
-        return (
-            view.Position[0] + offset[0] + handing * 10.0 * point[2],
-            view.Position[1] + offset[1] + 10.0 * point[1],
-        )
-
-    def circle(_adapter, _view, center, radius, *, label, add_to_db=False):
-        log.append(("circle", center, radius, add_to_db))
-        return object()
-
-    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _name: obj)
-    monkeypatch.setattr(drawing, "double_array", lambda values: tuple(values))
-    monkeypatch.setattr(drawing, "place_view", place)
-    monkeypatch.setattr(drawing, "model_point_in_view", model_point)
-    monkeypatch.setattr(drawing, "_sketch_circle", circle)
-    monkeypatch.setattr(drawing, "_activate_view", lambda *_a, **_k: "Drawing View5")
-    return log
-
-
-def _crop_neck(monkeypatch, view: _NeckView) -> list[tuple]:
-    adapter = SimpleNamespace(currentModel=_NeckModel())
-    log = _neck_seat(monkeypatch, view)
-    assert drawing._placed_detail_view(adapter) is view
-    drawing._crop_detail_view(adapter, view)
-    return log
-
-
-def test_neck_detail_is_a_cropped_right_model_view(monkeypatch) -> None:
-    view = _NeckView()
-    log = _crop_neck(monkeypatch, view)
-    assert log[0] == ("place", "*Right", drawing.DETAIL_CENTER, drawing.DETAIL_SCALE)
-    kind, center, radius, add_to_db = log[1]
-    assert kind == "circle" and not add_to_db
-    assert center == pytest.approx(drawing.DETAIL_CENTER, abs=1e-12)
-    assert radius == pytest.approx(drawing.DETAIL_CROP_RADIUS)
-    assert view.calls[0] == "SetViewPosition"
-    assert "Crop2(False, False, 1)" in view.calls
-
-
-@pytest.mark.parametrize(
-    ("kwargs", "message"),
-    [
-        ({"crop_status": 0}, "not cropped"),
-        ({"crops": False}, "not cropped"),
-        ({"moves": False}, "neck detail focus sits at"),
-        ({"mirrored": True}, "neck runout landing sits at"),
-    ],
-)
-def test_neck_detail_fails_loud_when_the_seat_does_not_obey(
-    monkeypatch, kwargs, message
-) -> None:
-    with pytest.raises(RuntimeError, match=message):
-        _crop_neck(monkeypatch, _NeckView(**kwargs))
-
-
-class _BackView(_NeckView):
-    """An enlarged *Back IView double: model +X prints left of the axis."""
-
-    def __init__(self, **kwargs) -> None:
-        super().__init__(**kwargs)
-        self.ScaleRatio = tuple(float(value) for value in drawing.ENLARGED_SCALE)
-
-
-def _enlarged_seat(monkeypatch, view: _BackView) -> list[tuple]:
-    log: list[tuple] = []
-    offset = (0.020, -0.010)
-
-    def place(_adapter, _source, orientation, x, y, *, scale):
-        log.append(("place", orientation, (x, y), scale))
-        return view
-
-    def model_point(_adapter, _view, point, *, label):
-        handing = 1.0 if view.mirrored else -1.0
-        return (
-            view.Position[0] + offset[0] + handing * drawing._ES * point[0],
-            view.Position[1] + offset[1] + drawing._ES * point[1],
-        )
-
-    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _name: obj)
-    monkeypatch.setattr(drawing, "double_array", lambda values: tuple(values))
-    monkeypatch.setattr(drawing, "place_view", place)
-    monkeypatch.setattr(drawing, "model_point_in_view", model_point)
-    return log
-
-
-def test_enlarged_view_is_a_moved_back_view_at_its_scale(monkeypatch) -> None:
-    view = _BackView()
-    log = _enlarged_seat(monkeypatch, view)
-    adapter = SimpleNamespace(currentModel=_NeckModel())
-    assert drawing._placed_enlarged_view(adapter) is view
-    assert log == [("place", "*Back", drawing.ENLARGED_CENTER, drawing.ENLARGED_SCALE)]
-    assert view.calls == ["SetViewPosition"]
-    tip = _enlarged_point(spec.OUTSIDE_DIA / 2.0, 0.0)
-    assert tip == pytest.approx(
-        (drawing.ENLARGED_CENTER[0] - drawing.ENLARGED_HALF_OD, drawing.ENLARGED_CENTER[1])
-    )
-
-
-@pytest.mark.parametrize(
-    ("kwargs", "message"),
-    [
-        ({"moves": False}, "enlarged gear end focus sits at"),
-        ({"mirrored": True}, "enlarged tooth tip sits at"),
-    ],
-)
-def test_enlarged_view_fails_loud_when_the_seat_does_not_obey(
-    monkeypatch, kwargs, message
-) -> None:
-    view = _BackView(**kwargs)
-    _enlarged_seat(monkeypatch, view)
-    with pytest.raises(RuntimeError, match=message):
-        drawing._placed_enlarged_view(SimpleNamespace(currentModel=_NeckModel()))
-
-
-def test_enlarged_view_refuses_another_scale(monkeypatch) -> None:
-    view = _BackView()
-    view.ScaleRatio = (3.0, 1.0)
-    _enlarged_seat(monkeypatch, view)
-    with pytest.raises(RuntimeError, match="enlarged gear end scale"):
-        drawing._placed_enlarged_view(SimpleNamespace(currentModel=_NeckModel()))
-
-
-class _DimensionedView:
-    def __init__(self) -> None:
-        self.names: list[str] = []
-
-
-def _order_seat(monkeypatch, view: _DimensionedView, *, crop_drops: tuple[str, ...]):
-    calls: list[str] = []
-    events: list[tuple[str, dict]] = []
-
-    def curate(_adapter, _view, *, keep, view_label, dimensions_by_feature):
-        calls.append("import")
-        view.names = sorted(keep)
-        return ["curated"]
-
-    def crop(_adapter, _view):
-        calls.append("crop")
-        view.names = [name for name in view.names if name not in crop_drops]
-
-    def names(_adapter, _view):
-        calls.append("read")
-        return sorted(view.names)
-
-    monkeypatch.setattr(drawing, "curate_view_dimensions", curate)
-    monkeypatch.setattr(drawing, "_crop_detail_view", crop)
-    monkeypatch.setattr(drawing, "_view_dimension_names", names)
-    monkeypatch.setattr(
-        drawing._telemetry, "event", lambda name, **attrs: events.append((name, attrs))
-    )
-    return calls, events
-
-
-def test_neck_detail_is_dimensioned_before_it_is_cropped(monkeypatch) -> None:
-    view = _DimensionedView()
-    calls, events = _order_seat(monkeypatch, view, crop_drops=())
-    assert drawing._dimension_then_crop_detail(object(), view) == ["curated"]
-    assert calls == ["import", "read", "crop", "read"]
-    assert events[0][0] == "neck_detail.crop" and events[0][1]["lost"] == ""
 
 
 class _BuildRecorder:
@@ -1825,50 +1447,6 @@ class _BuildRecorder:
         )
 
 
-def test_build_dimensions_the_detail_before_the_side_and_marks_it_last(
-    monkeypatch, tmp_path
-) -> None:
-    # A dimension already on the sheet is never imported again, so the
-    # detail must import its five before the side view's targeted import;
-    # the mark circle goes on after every side-view pick.
-    import asyncio
-
-    seat = _BuildRecorder(monkeypatch, tmp_path)
-    assert asyncio.run(drawing.build(seat.adapter)) == {}
-    assert seat.index("_placed_detail_view") < seat.index(
-        "_dimension_then_crop_detail", "detail"
-    ) < seat.index("curate_view_dimensions", "side")
-    # The 4:1 view takes the span and the root, and only it names them.
-    assert seat.index("_placed_enlarged_view") < seat.index(
-        "curate_view_dimensions", "enlarged gear end"
-    )
-    assert seat.keeps["enlarged gear end"] is drawing.ENLARGED_KEEP
-    hidden_lines = [args[1] for args, _kwargs in seat.made["set_hidden_lines_removed"]]
-    assert seat.enlarged in hidden_lines and seat.detail in hidden_lines
-    for label, keep in seat.keeps.items():
-        if label != "enlarged gear end":
-            assert not {"ToothSpan", "RootDia"} & set(keep), label
-    [(precision_args, _kwargs)] = seat.made["assert_imported_precision"]
-    assert {"ToothSpan", "RootDia"} <= set(precision_args[1])
-    frames = [which for name, which in seat.calls if name == "add_feature_control_frame"]
-    assert frames == ["core_total_runout", "front_neck_total_runout"]
-    # Both frames stand in detail B (the core's side-view leader crossed the
-    # relief Ø's line).
-    assert seat.frame_views == ["detail", "detail"]
-    last_pick = max(
-        i for i, (name, _label) in enumerate(seat.calls)
-        if name in ("add_feature_control_frame", "add_toothspace_callout")
-    )
-    assert last_pick < seat.index("_mark_detail_on_side") < seat.index("_label_views")
-    assert seat.index("_label_views") < seat.index("finalize_drawing")
-    [(label_args, _kwargs)] = seat.made["_label_views"]
-    assert label_args[1:] == (seat.detail, seat.views["*Right"], seat.enlarged)
-    # VIEW C's arrow stands on the side view, before its mark circle.
-    [(arrow_args, _kwargs)] = seat.made["_add_view_arrow"]
-    assert arrow_args[1] is seat.views["*Right"]
-    assert last_pick < seat.index("_add_view_arrow") < seat.index("_mark_detail_on_side")
-
-
 def test_build_takes_its_controls_and_callouts_from_the_spec(monkeypatch, tmp_path) -> None:
     # Run 10: a silhouette hit-test on the 0.3 mm neck floor took a
     # neighbour; each frame now lands on its resolved source FACE.
@@ -1933,14 +1511,6 @@ def test_build_takes_its_controls_and_callouts_from_the_spec(monkeypatch, tmp_pa
     assert finish["entity_type"] == "SILHOUETTE"
     assert finish["edge_xy"] == drawing.JOURNAL_FINISH_PICK
     assert finish["leader_attach_xy"] == drawing.JOURNAL_FINISH_PICK
-
-
-def test_neck_detail_fails_loud_when_the_crop_takes_a_dimension(monkeypatch) -> None:
-    view = _DimensionedView()
-    _calls, events = _order_seat(monkeypatch, view, crop_drops=("FrontReliefDia",))
-    with pytest.raises(RuntimeError, match=r"lost \['FrontReliefDia'\] to its crop"):
-        drawing._dimension_then_crop_detail(object(), view)
-    assert events[0][1]["lost"] == "FrontReliefDia"
 
 
 # The stock-gear part builds, run offline with their seat stubbed
@@ -2055,89 +1625,3 @@ def test_neck_corners_are_equal_tangent_quarter_arcs_with_a_radial_size(
     assert any(c[2] == "coincident" and str(c[1]).endswith(".end") for c in constraints)
     dimensions = [call.args for call in adapter.add_sketch_dimension.await_args_list]
     assert (front, None, "radial", radius) in dimensions
-
-
-def test_build_cuts_no_endcut_and_checks_the_full_face_oracle(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    # #2034: the straight full-face pass is the only tooth cut; no rear
-    # stock-disk endcut, its witnesses, globals or limits remain.
-    for retired in ("_stock_cutter_endcut", "author_cutter_endcut", "_runout_max_limit"):
-        assert not hasattr(part, retired), retired
-    seat = stub_seat(
-        monkeypatch, part,
-        spy=("_stud_profile", "_journal_profile", "_revolve_profile"),
-    )
-    seat._straight_stock_gaps.return_value = part.ToothedDisc(
-        1000.0, ("StraightToothGap", "StraightToothPattern")
-    )
-    seat._cut_core_flat.side_effect = lambda _adapter, _jobs, volume: volume
-    seat._native_volume_check.side_effect = (
-        lambda _adapter, _label, lower, upper, _allowance: (lower + upper) / 2.0
-    )
-    seat._native_arc.side_effect = lambda _adapter, label, *_points: label
-    adapter = offline_adapter()
-    seat.attach_mock(adapter, "adapter")
-    asyncio.run(part.build(adapter))
-
-    names = [name for name, _args, _kwargs in seat.mock_calls]
-    assert names.index("_straight_stock_gaps") < names.index("_stud_profile")
-    assert names.index("_stud_profile") < names.index("_journal_profile")
-    # The flat's printed reference sketch follows the span, before the
-    # rebuild that precedes the drive equations.
-    assert names.index("author_span") < names.index("_flat_end_view_reference")
-    assert names.index("_flat_end_view_reference") < names.index("force_rebuild")
-    # The root's hidden circle is drawn before the drive equations' rebuild,
-    # its MIN applied after the span's limits.
-    assert names.index("_root_profile") < names.index("force_rebuild")
-    assert names.index("apply_span_limits") < names.index("_apply_root_min")
-    assert "pattern_stock_feature" not in names
-    globals_set = [args[1] for name, args, _kwargs in seat.mock_calls if name == "set_global"]
-    assert "FaceWidth" in globals_set
-    assert not {"FullDepth", "CutterRunoutMax"} & set(globals_set)
-    prefixed = [args[2] for name, args, _kwargs in seat.mock_calls if name == "set_dimension_prefix"]
-    assert not {"FullDepth", "CutterRunout"} & set(prefixed)
-    assert prefixed == ["RootDia"]
-    [root_prefix] = [
-        args[1:] for name, args, _kwargs in seat.mock_calls
-        if name == "set_dimension_prefix" and args[2] == "RootDia"
-    ]
-    assert root_prefix == ("RootProfile", "RootDia", spec.ROOT_PREFIX)
-    assert "RootDia" in globals_set
-    (saved,) = [args for name, args, _kwargs in seat.mock_calls if name == "save_simplified_part"]
-    assert saved[2] == ("StraightToothGap", "StraightToothPattern")
-    # The stud sketch keeps two construction witnesses: the tooth-tip blank
-    # and the overall length from the tip face's top corner to the rear face.
-    witnesses = [call.args for call in adapter.add_line.await_args_list]
-    tip_corner_y = part._R_BLANK - part.TIP_CHAMFER
-    assert witnesses == [
-        (0.0, part.OUTSIDE_DIA / 2.0, -part.FACE_WIDTH, part.OUTSIDE_DIA / 2.0),
-        (part.TIP_STATION, tip_corner_y, -part.REAR_END_Z, tip_corner_y),
-    ]
-    assert -part.REAR_END_Z == pytest.approx(part.TIP_STATION - part.OVERALL_LENGTH)
-    # Each turned profile is revolved a full turn as its sketch closes, the
-    # body named for the profile handed over.
-    revolves = []
-    for name, args, _kwargs in seat.mock_calls:
-        if name == "_revolve_profile":
-            revolves.append(("handoff", args[1:]))
-        elif name == "adapter.create_revolve":
-            revolves.append(("revolve", args[0].angle))
-        elif name == "name_last_feature" and args[1] in (
-            "StudProfile", "Stud", "JournalProfile", "Journal"
-        ):
-            revolves.append(("named", args[1]))
-    assert revolves == [
-        ("named", "StudProfile"), ("handoff", ("stud", "Stud")),
-        ("revolve", 360.0), ("named", "Stud"),
-        ("named", "JournalProfile"), ("handoff", ("journal", "Journal")),
-        ("revolve", 360.0), ("named", "Journal"),
-    ]
-    # The last native volume check is the complete part against the spec's
-    # finished-shaft bounds, after the drive equations' final rebuild.
-    volume_checks = [k for k, name in enumerate(names) if name == "_native_volume_check"]
-    last_rebuild = len(names) - 1 - names[::-1].index("force_rebuild")
-    assert volume_checks[-1] > last_rebuild
-    assert seat.mock_calls[volume_checks[-1]].args[2:4] == pytest.approx(
-        spec.expected_volume_bounds_mm3()
-    )

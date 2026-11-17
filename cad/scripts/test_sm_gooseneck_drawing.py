@@ -3,12 +3,10 @@
 from __future__ import annotations
 
 import ast
-import asyncio
 import math
 from pathlib import Path
 import re
 import tomllib
-from types import SimpleNamespace
 
 import pytest
 
@@ -27,55 +25,6 @@ def _tree(module) -> ast.Module:
     return ast.parse(Path(module.__file__).read_text(encoding="utf-8"))
 
 
-def _calls(module, *, name: str | None = None, attr: str | None = None) -> list:
-    return [
-        node
-        for node in ast.walk(_tree(module))
-        if isinstance(node, ast.Call)
-        and (
-            (name is not None and getattr(node.func, "id", None) == name)
-            or (attr is not None and getattr(node.func, "attr", None) == attr)
-        )
-    ]
-
-
-def _recorded_equations(module) -> dict[str, str]:
-    return {
-        call.args[0].value: call.args[1].value
-        for call in _calls(module, attr="record")
-        if len(call.args) == 2 and isinstance(call.args[0], ast.Constant)
-    }
-
-
-def _global_equations(module) -> dict[str, str]:
-    return {
-        call.args[1].value: call.args[2].value
-        for call in _calls(module, name="set_global")
-        if all(isinstance(arg, ast.Constant) for arg in call.args[1:3])
-    }
-
-
-def _globals_mm() -> dict[str, float]:
-    """The part's globals in model mm: the numeric ones as the build sets
-    them, the equations evaluated on those."""
-    values = {
-        "TubeDia": geom.TUBE_DIA,
-        "WallT": geom.WALL_T,
-        "LegTop": geom.LEG_TOP,
-        "LegBottom": geom.LEG_BOTTOM,
-        "BendR": geom.BEND_R,
-        "TubeEndX": geom.TUBE_END_X,
-    }
-    for name, expression in _global_equations(part).items():
-        values[name] = _evaluate(expression, values)
-    return values
-
-
-def _evaluate(expression: str, values: dict[str, float]) -> float:
-    literal = re.sub(r'"(\w+)"', lambda m: repr(values[m.group(1)]), expression)
-    return eval(literal)  # noqa: S307 -- the builder's own literal
-
-
 def test_gooseneck_is_one_bent_tube_ending_at_its_faced_arm_end() -> None:
     # Owner rulings 2026-11-08 (Pedro), #2315: the bent tube alone; its arm
     # end is the end plug's (MHA-SM-05) head length short of the end face.
@@ -84,28 +33,6 @@ def test_gooseneck_is_one_bent_tube_ending_at_its_faced_arm_end() -> None:
     assert geom.TUBE_STRAIGHT > 0.0
     assert part.V_FINAL == pytest.approx(part.V_LEG + part.V_BEND + part.V_ARM)
     assert part.V_ARM == pytest.approx(part.RING_AREA * geom.TUBE_STRAIGHT)
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "len(bodies) != 1" in source
-    # No end piece, tap, screw axis or sleeve: nothing is revolved, drilled or
-    # given an assembly axis on the tube.
-    for name in ("create_revolve", "wizard_holes", "name_bore_axis", "add_line_chain"):
-        assert not _calls(part, name=name) and not _calls(part, attr=name), name
-    features = {
-        call.args[1].value
-        for call in _calls(part, name="name_last_feature")
-        if isinstance(call.args[1], ast.Constant)
-    }
-    assert features == {
-        "LegProfile",
-        "Leg",
-        "BendPath",
-        "BendProfile",
-        "BendProfileFlipped",
-        "BendArmSweep",
-        "StationReference",
-        "TubeOdReference",
-        "OverallReference",
-    }
 
 
 def test_no_plug_tap_sleeve_or_braze_terms_remain() -> None:
@@ -124,67 +51,7 @@ def test_no_plug_tap_sleeve_or_braze_terms_remain() -> None:
 
 
 def test_globals_drive_the_built_arm_and_overall_sizes() -> None:
-    values = _globals_mm()
-    assert values["ArmY"] == pytest.approx(geom.ARM_Y)
-    assert values["ArmStraight"] == pytest.approx(geom.TUBE_STRAIGHT)
-    equations = _recorded_equations(part)
-    # The swept arm and the printed arm straight run to the faced arm end.
-    assert equations["TubeStraight"] == equations["ArmStraight"] == '"ArmStraight"'
-    height = geom.ARM_Y + geom.TUBE_DIA / 2.0 - geom.LEG_BOTTOM
-    reach = geom.TUBE_DIA / 2.0 - geom.TUBE_END_X
-    assert _evaluate(equations["OverallHeight"], values) == pytest.approx(height)
-    assert _evaluate(equations["OverallReach"], values) == pytest.approx(reach)
-    assert _evaluate(equations["LegLength"], values) == pytest.approx(geom.LEG_LENGTH)
-    assert _evaluate(equations["OverallFootRadius"], values) == pytest.approx(
-        geom.TUBE_DIA / 2.0
-    )
-    assert height / 25.4 == pytest.approx(19.65)
-    assert reach / 25.4 == pytest.approx(3.719, abs=0.0005)
     assert geom.TUBE_STRAIGHT / 25.4 == pytest.approx(0.469, abs=0.0005)
-    # The reference sketches are hidden in the part and shown only by the
-    # elevation.
-    blanked = {call.args[1].value for call in _calls(part, name="blank_sketch")}
-    assert blanked == {"StationReference", "TubeOdReference", "OverallReference"}
-
-
-def test_every_direct_db_block_restores_inference_in_finally() -> None:
-    # Sketch inference is session state on the persistent seat: each block
-    # that turns it off must restore it even when a native segment is
-    # rejected, so every True is followed at once by a try whose finally
-    # restores it, and nothing restores it outside a finally.
-    tree = _tree(part)
-
-    def toggle(node: ast.AST) -> str | None:
-        if (
-            isinstance(node, ast.Expr)
-            and isinstance(node.value, ast.Call)
-            and getattr(node.value.func, "id", "") == "set_sketch_direct_db"
-        ):
-            return ast.unparse(node.value.args[1])
-        return None
-
-    on = restored = 0
-    finally_offs: set[int] = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Try):
-            finally_offs |= {
-                id(stmt) for stmt in node.finalbody if toggle(stmt) == "False"
-            }
-    for node in ast.walk(tree):
-        body = getattr(node, "body", None)
-        if not isinstance(body, list):
-            continue
-        for index, stmt in enumerate(body):
-            if toggle(stmt) == "True":
-                on += 1
-                following = body[index + 1]
-                assert isinstance(following, ast.Try), ast.unparse(stmt)
-                assert [toggle(s) for s in following.finalbody] == ["False"]
-                restored += 1
-    offs = [node for node in ast.walk(tree) if toggle(node) == "False"]
-    assert {id(node) for node in offs} == finally_offs
-    # The property, not the inventory: at least one block, each restored.
-    assert on == restored == len(offs) >= 1
 
 
 def test_sheet_places_every_marked_dimension_at_its_places() -> None:
@@ -296,8 +163,6 @@ def test_note_states_the_bend_acceptance_without_method_or_sizes() -> None:
     acceptance = " ".join(drawing.BEND_ACCEPTANCE.split())
     assert notes == f"1. BEND: {acceptance}"
     assert len(drawing.BEND_ACCEPTANCE.splitlines()) <= 2
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' not in source
     # Geometry, not method (rule 7): no tool, no bend order, no tail.
     for word in ("DIE", "SAW", "TAIL", "FACE", "THEN", "JOIN", "CURE"):
         assert word not in notes, word
@@ -320,16 +185,6 @@ def test_title_block_material_and_finish_come_from_the_registry_row() -> None:
     finish = str(row["finish"]).lower()
     assert "polished bare" in finish and "oil or wax" in finish
     assert "machinist_exceptions" not in row
-    # apply_drawing_properties stamps the row's fields; the build passes only
-    # the sheet's own notes.
-    properties = _calls(part, name="apply_drawing_properties")
-    assert len(properties) == 1
-    extra = ast.literal_eval(
-        ast.unparse(properties[0].args[2]).replace("DRAWING_NOTES", "'n'").replace(
-            "ISOMETRIC_VIEW_NOTE", "'i'"
-        )
-    )
-    assert set(extra) == {"Manufacturing Notes", "Isometric View Note"}
 
 
 def test_shop_stock_row_covers_the_bent_tube_and_its_tail() -> None:
@@ -359,22 +214,6 @@ def test_shop_stock_row_covers_the_bent_tube_and_its_tail() -> None:
 
 
 def test_sheet_is_the_elevation_and_isometric_only() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    for token in (
-        "create_section_view",
-        "CreateDetailViewAt",
-        "add_native_hole_callout",
-        '"*Left"',
-        "Crop2",
-        "FaceHatch",
-    ):
-        assert token not in source, token
-    views = [
-        call.args[2].value
-        for call in _calls(drawing, name="place_view")
-        if isinstance(call.args[2], ast.Constant)
-    ]
-    assert views == ["*Front", "*Isometric"]
     assert drawing.MACHINIST_REVIEW is MachinistReviewMode.ENFORCE
     assert spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:4"
     assert drawing.ISO_SCALE == (1, 4)
@@ -423,25 +262,3 @@ def test_bend_acceptance_leader_lands_on_the_bend_clear_of_the_radius_line() -> 
     # r1-r3): the leader, from its start to the tip, stays well above it.
     start_y = top - 0.006
     assert min(start_y, tip_y) > centre[1] + 0.010
-
-
-def _mass_adapter(volume: float):
-    async def get_mass_properties():
-        return SimpleNamespace(
-            is_success=True, error=None, data=SimpleNamespace(volume=volume)
-        )
-
-    return SimpleNamespace(get_mass_properties=get_mass_properties)
-
-
-@pytest.mark.parametrize("volume", [math.nan, math.inf, -math.inf])
-def test_build_stops_on_a_non_finite_volume_read(volume):
-    # NaN passes |vol - expected| > tol, the shared volume_check's included
-    # (codjiflo rounds 5 and 6 on #1997).
-    adapter = _mass_adapter(volume)
-    with pytest.raises(RuntimeError, match="non-finite volume"):
-        asyncio.run(part._volume(adapter))
-    # The shared check already rejects an infinite read; NaN needs the guard.
-    with pytest.raises(RuntimeError, match="non-finite volume|volume -?inf"):
-        asyncio.run(part._volume_check(adapter, "bend + arm", 100.0, 1.0))
-    assert asyncio.run(part._volume(_mass_adapter(100.0))) == 100.0

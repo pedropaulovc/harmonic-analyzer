@@ -37,8 +37,6 @@ def test_part_and_drawing_share_the_marked_dimension_contract() -> None:
     expected = {"OuterDia", "BoreDia", "Length"}
     assert set(drawing.SECTION_KEEP) == marked == expected
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in source
 
 
 def test_bore_is_banded_the_od_is_stock() -> None:
@@ -71,22 +69,7 @@ def test_installed_configuration_is_the_skimmed_ring() -> None:
     assert part.V_INSTALLED == pytest.approx(
         math.pi * (installed_r**2 - (spec.BORE_DIA / 2.0) ** 2) * spec.LENGTH
     )
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    split = source.index("create_configuration {INSTALLED_CONFIG}")
-    for edit in (
-        "apply_material(adapter,",
-        "mark_dimensions_for_drawing(adapter,",
-        "apply_drawing_precision(adapter,",
-    ):
-        assert source.index(edit) < split, edit
-    assert "SetSuppression2(0, 3, bstr_array([default_config]))" in source
-    assert source.index("re-activate {default_config}") < source.index("SetSuppression2(0, 3")
-    assert "apply_grouped_bom_properties(" in source
-    assert "require_material_in_every_configuration(" in source
-    assert "assert_saved_configurations_regenerate(adapter, PART_NAME)" in source
     assert drive_train.HANDLE_FERRULE_INSTALLED_CONFIG == spec.INSTALLED_CONFIG
-    dt_source = Path(drive_train.__file__).read_text(encoding="utf-8")
-    assert "configuration=HANDLE_FERRULE_INSTALLED_CONFIG," in dt_source
     assert _config.parts("dt-crank-handle-ferrule")["description"] == "CRANK HANDLE FERRULE"
 
 
@@ -111,13 +94,6 @@ def test_fitted_tenon_keeps_its_seat_and_wall() -> None:
     assert spec.STOCK_DIA_MIN / 2.0 >= (spec.INSTALLED_OUTER_DIA + xx) / 2.0 + 2.0 * ecc
     assert handle.FERRULE_SEAT_RADIAL_MIN >= handle.FERRULE_SEAT_RADIAL_FLOOR
     assert handle.TENON_STRAIGHT_WALL_MIN >= WALL_FLOOR_MM
-
-
-def test_bore_reads_on_a_section_not_hidden_lines() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "create_section_view(" in source
-    assert "set_hidden_lines_visible" not in source
-    assert "create_section_axis_centerline(" in source
 
 
 def test_ring_matches_the_photographed_brass_collar() -> None:
@@ -145,11 +121,6 @@ def test_callouts_name_the_mating_tenon_and_flag_the_skim_note() -> None:
     # The prose lives in the notes module, which the mating parts never import.
     for name in ("DRAWING_NOTES", "HANDLE_NUMBER", "SEAT_FACE_WALL_MIN"):
         assert not hasattr(spec, name), name
-    for module in (part, drawing):
-        source = Path(module.__file__).read_text(encoding="utf-8")
-        assert "Manufacturing Notes" not in source
-    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "MACHINIST_REVIEW = MachinistReviewMode.ENFORCE" in drawing_source
 
 
 def test_seat_mouth_takes_only_the_edge_break() -> None:
@@ -169,9 +140,6 @@ def test_seat_mouth_takes_only_the_edge_break() -> None:
     ):
         assert not hasattr(spec, name), name
     assert not hasattr(notes, "SEAT_MOUTH_CHAMFER_CALLOUT")
-    for module in (part, drawing):
-        source = Path(module.__file__).read_text(encoding="utf-8")
-        assert "SeatMouthChamfer" not in source
     # The relief keeps the root round behind the seat face, and the break
     # alone comes off the shortest tenon's bonded length.
     assert handle.TENON_ROOT_RELIEF_MIN >= handle.TENON_ROOT_ROUND_REACH

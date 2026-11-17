@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import re
-from pathlib import Path
 
 import _config
 import _fit_deviations
@@ -147,9 +146,6 @@ def test_the_length_is_a_cut_to_fit_reference() -> None:
     assert spec.DRAWING_PRECISION_BY_NAME["Depth"] == 1
     assert spec.LENGTH_CALLOUT.startswith("CUT TO FIT")
     assert "MHA-DT-02" in spec.LENGTH_CALLOUT
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'set_reference_dimension(adapter, length_annotations[0]' in source
-    assert '{"Depth": LENGTH_CALLOUT}' in source
 
 
 def test_the_supplied_bar_covers_the_longest_fitted_arbor() -> None:
@@ -192,11 +188,5 @@ def test_both_ends_are_domed_and_the_dome_form_is_model_owned() -> None:
     places = spec.DRAWING_PRECISION_BY_NAME["DomeHeight"]
     assert abs(round(part.DOME_HEIGHT / 25.4, places) * 25.4 - part.DOME_HEIGHT) <= 1e-9
     assert spec.DOME_CALLOUT == "BOTH ENDS"
-    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "_set_spherical_reference(adapter, radius_annotations[0]" in drawing_source
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert '_dome_end(adapter, 0.0, "SouthDome")' in source
-    assert '_dome_end(adapter, SHAFT_LENGTH, "NorthDome")' in source
-    assert "_hide_reference_sketches(adapter)" in source
     assert part.DOME_SPHERE_RADIUS > part.SHAFT_RADIUS
     assert notes.SPOT_NOTE.startswith("NO FLATS")

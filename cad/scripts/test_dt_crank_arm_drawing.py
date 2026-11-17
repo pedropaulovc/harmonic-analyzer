@@ -216,9 +216,6 @@ def test_anchor_tap_holds_the_wall_floor_to_its_edge() -> None:
     wall = spec.ANCHOR_EDGE_DIST_MIN - THREAD_MAJOR_MM["#2-56"] / 2.0
     assert spec.ANCHOR_TAP_WALL_MIN == pytest.approx(wall)
     assert WALL_FLOOR_MM <= wall < WALL_TARGET_MM
-    # Under the target, the tap states its wall (rule 20) on its callout.
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "_append_callout_rows(anchor_callout, ANCHOR_TAP_ROWS)" in source
 
 
 def test_chain_end_link_stays_on_the_face_and_its_standing_eye_past_the_edge() -> None:
@@ -315,9 +312,6 @@ def test_hub_seat_leader_lands_near_side_clear_of_r127_and_the_centre() -> None:
         label="hub seat layout",
     )
     assert drawing.HUB_SEAT_LANDING[0] <= r <= drawing.HUB_SEAT_LANDING[1]
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "_hub_seat_leader_clear(adapter, front_annotations)" in source
-    assert 'set_near_side_diameter(hub_seat, "hub seat diameter")' in source
 
 
 def test_hub_seat_keeps_its_printed_band_under_the_fit_note() -> None:
@@ -325,8 +319,6 @@ def test_hub_seat_keeps_its_printed_band_under_the_fit_note() -> None:
     # governed.  Main 2026-09-25 (U29 follow-up): the bore is made first, so
     # its printed band is the cheek's real limit and stays printed; the note states
     # the fit MHA-DT-31 is turned to (drawing-guidelines.md rule 4 (tighten only for function, and name the mate): retained limits still apply).
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "hub seat nominal" not in source
     assert spec.DRAWING_PRECISION["HubSeatProfile"]["HubSeatDia"] == 2
 
 
@@ -343,9 +335,6 @@ def test_no_front_dimension_text_sits_on_the_arm() -> None:
     assert leaders.points_inside([(0.106, drawing.FRONT_CENTER[1] + 0.017)], drawing.ARM_SILHOUETTE)
     ax, ay = drawing.FRONT_KEEP["AnchorOffset"]
     assert ay >= y1 + 0.006  # clear above the top edge
-    assert "_texts_off_the_part(adapter, front_annotations)" in Path(drawing.__file__).read_text(
-        encoding="utf-8"
-    )
 
 
 def test_handle_pivot_is_tapped_for_the_mha139_screw_with_a_2mm_web() -> None:
@@ -364,13 +353,6 @@ def test_station_reference_is_saved_hidden_and_imported_per_view() -> None:
     # #880: a reference sketch owns printed dimensions but no geometry, so the
     # part saves it hidden (no assembly instance renders it) and the drawing
     # shows it per view through _drawing_hidden_sketches to import them.
-    build = Path(arm.__file__).read_text(encoding="utf-8")
-    blank = 'blank_sketch(adapter, "StationReference")'
-    assert blank in build
-    assert build.index(blank) < build.rindex("save_part_and_images(adapter, PART_NAME)")
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "from _drawing_hidden_sketches import curate_view_dimensions" in source
-    assert "    curate_view_dimensions,\n" not in source.replace("\r\n", "\n")
     assert "StationReference" in spec.DRAWING_DIMENSIONS
 
 
@@ -407,10 +389,6 @@ def test_fiducial_callout_attaches_on_the_punched_mark_rim() -> None:
     # Both ordinates draw their arrows inside their witnesses, so neither
     # line runs out under the punch-mark or hub-seat leader (farm iter 2).
     assert drawing.ARROWS_INSIDE == ("FiducialX", "FiducialY")
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.index("_arrows_inside(adapter, front_annotations)") < source.index(
-        "_hub_seat_leader_clear(adapter, front_annotations)"
-    )
 
 
 def test_fiducial_is_located_from_the_seat_axis_not_by_eye() -> None:

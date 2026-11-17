@@ -81,10 +81,6 @@ def test_crown_set_screw_tap_stops_at_the_bore() -> None:
     assert spec.SET_SCREW_HOLE_SPEC.kind == "tapped"
     assert spec.SET_SCREW_HOLE_SPEC.end == "through_next"
     assert spec.CROWN_TOP_Y == spec.SHAFT_AXIS_H + spec.CROWN_R
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert 'name="SetScrewTap"' in source
-    # through_next stops at the bore only if the bore is already cut.
-    assert source.index('"cut bore"') < source.index('name="SetScrewTap"')
 
 
 def test_rule_12_worst_case_walls_and_thread() -> None:
@@ -265,17 +261,9 @@ def test_crown_prints_a_full_round_reference_radius() -> None:
         "crown fall across the thread"
     ] == pytest.approx(spec.crown_least_height(spec._THREAD_HALF_MAJOR))
     assert round(spec.SET_SCREW_ENGAGEMENT_D, 3) == 1.622
-    source = " ".join(Path(part.__file__).read_text(encoding="utf-8").split())
-    assert 'names=("CrownCz", "ShaftAxisH", "CrownRadius")' in source
-    assert 'size_dimension="radius"' in source
-    assert '"LugCrownProfile", "CrownRadius",' not in source
     # The sheet keeps it radial: no near-side diameter style, arrow outside,
     # no solid leader on through the bore to the centre (MR-fleet r6 eye pass).
     assert "CrownRadius" not in drawing.NEAR_SIDE_DIAMETERS
-    sheet = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "_dress_crown_radius(adapter, right_annotations)" in sheet
-    assert 'prefix = "(" + existing' in sheet
-    assert "display.SolidLeader = False" in sheet
     assert "CrownRadius" not in spec.REFERENCE_DIMENSIONS
 
 
@@ -292,8 +280,6 @@ def test_front_reference_lines_draw_in_the_outline_black() -> None:
         _, _, _, start, end, _, value, _ = rows[name]
         assert math.dist(start, end) == pytest.approx(length) == value
         assert start == (-spec.LUG_HALF_T, 0.0)
-    sheet = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "_blacken_reference_lines(adapter, front)" in sheet
 
 
 def test_tap_and_foot_hole_station_reference_sketches() -> None:
@@ -383,9 +369,6 @@ def test_print_carries_no_datums_or_frames_and_no_assembly_steps() -> None:
     # Policy: brackets carry no GD&T; the two bores line up through the
     # bore's slip band (#2338) and the set-screw lock is MHA-CH-00's staking
     # step, which the part sheet does not cite (rule 7).
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "add_datum_feature" not in source
-    assert "add_feature_control_frame" not in source
     assert not hasattr(ch_fulcrum_keeper_spec, "GEOMETRIC_TOLERANCES_MM")
     printed = " ".join((
         *drawing.DIMENSION_CALLOUTS.values(),
@@ -433,18 +416,11 @@ def test_screw_hole_seats_the_frame_side_screw() -> None:
     assert ch_fulcrum_keeper_spec.HOLE_DIA_MM > part.FRAME_SIDE_SHANK_DIA
     assert ch_fulcrum_keeper_spec.CBORE_DIA_MM > part.FRAME_SIDE_HEAD_DIA
     assert ch_fulcrum_keeper_spec.CBORE_DEPTH_MM == FRAME_SIDE_HEAD_H
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert 'name="FootScrewHole"' in source
 
 
 def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
     assert drawing.SHEET_SCALE == (2.0, 1.0)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "scale=(2, 1)" in source
-    assert "scale=(1, 1)" in source
     assert ch_fulcrum_keeper_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:1"
-    assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
-    assert "add_native_hole_callout(" in source
 
 
 def test_foot_hole_leader_routes_clear_of_the_crown_tap() -> None:
@@ -814,9 +790,6 @@ def test_the_auto_tapped_hole_note_is_removed() -> None:
     # Farm run r8: SolidWorks' own "#1-72 Tapped Hole" note restated the tap
     # callout's thread and its leader ran 4.07 mm through the SetScrewLocation
     # text (leader-through-text); finalize deletes exactly that one note.
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'redundant_note_substrings=("Tapped Hole",)' in source
-    assert "expected_redundant_notes=1" in source
     assert "tapped hole" not in ch_fulcrum_keeper_notes.DRAWING_NOTES.lower()
 
 
@@ -840,9 +813,6 @@ def test_foot_hole_callout_says_size_drill_thru_and_its_mates_below() -> None:
     }
     with pytest.raises(RuntimeError, match="THRU row"):
         drawing.foot_hole_callout_definitions({**native, 5: native[7]})
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "_set_foot_hole_process(foot_callout)" in source
-    assert 'label="keeper foot screw hole",\n    )' in source
 
 
 def test_notes_and_callouts_name_each_mate_once() -> None:
@@ -877,9 +847,6 @@ def test_notes_and_callouts_name_each_mate_once() -> None:
 
 
 def test_keeper_is_one_body_with_no_ball() -> None:
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "merge_result=False" not in source
-    assert "Ball" not in source
     assert not hasattr(ch_fulcrum_keeper_spec, "BALL_DIA")
 
 

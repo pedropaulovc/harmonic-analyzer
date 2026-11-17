@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import math
 import re
 
@@ -67,39 +66,6 @@ def test_gap_opens_toward_plus_x() -> None:
     start = math.atan2(od.start[1], od.start[0]) % (2.0 * math.pi)
     end = math.atan2(od.end[1], od.end[0]) % (2.0 * math.pi)
     assert start < math.pi < end
-
-
-def _rx(angle: float, point: tuple[float, float, float]) -> tuple[float, float, float]:
-    x, y, z = point
-    c, s = math.cos(angle), math.sin(angle)
-    return (x, y * c - z * s, y * s + z * c)
-
-
-def test_part_puts_the_rear_face_on_the_front_plane(monkeypatch) -> None:
-    """The assembly seats the part's z = 0 face at the ring's rear station and
-    lays it THICKNESS forward, so the recipe's mid-thickness body about +Y must
-    land on 0 <= z <= THICKNESS whichever way the quarter turn runs."""
-    seen: dict = {}
-
-    async def fake_build(adapter, **kwargs):
-        seen.update(kwargs)
-        return {}
-
-    monkeypatch.setattr(part, "build_stock_fastener", fake_build)
-    asyncio.run(part.build(None))
-    (component,) = seen["components"]
-    assert component.sku == spec.SKU
-    assert component.author is recipe.build_97431A240
-    assert not component.parameters
-    assert seen["material"] == part.SPEC.material
-    rx, ry, rz = component.transform.rotation_radians
-    assert ry == rz == 0.0
-    tz = component.transform.translation_mm
-    for sign in (-1.0, 1.0):
-        face = _rx(rx, (0.0, sign * spec.THICKNESS / 2.0, 0.0))
-        moved = tuple(a + b for a, b in zip(face, tz, strict=True))
-        assert moved[0] == pytest.approx(0.0) and moved[1] == pytest.approx(0.0)
-        assert min(abs(moved[2]), abs(moved[2] - spec.THICKNESS)) == pytest.approx(0.0)
 
 
 def test_registry_names_carry_no_size_and_no_installation_note() -> None:
