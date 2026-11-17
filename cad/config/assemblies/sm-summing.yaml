@@ -55,3 +55,8 @@ machinist_exceptions:
     where: "sheet 3 step 2 and sheet 1 DETAIL A: MHA-SM-VN-50 threaded bare into the MHA-SM-03 tapped boss, cut end within half a turn of flush with the boss underside, eye clocked, no lock part"
     finding: "threaded adjuster under the counter-spring pull held by a plain thread, no lock (rule 23)"
     reason: "Owner ruling 2026-11-09 (Pedro), #2326: \"these jam nuts dont actually exist in real device and must be removed ; there is no torque load on hooks so theres no need for nuts\". The spring pulls along the shank axis, which the full 19.05 boss thread carries (joint_retention.py sm-summing/boss-hook-in-lever, ruling U-MHA-SM-VN-50-no-lock). This accepts only this joint's missing lock."
+  - id: "SM-03"
+    kind: "accept"
+    where: "ASSEMBLY.MD step 3 (and 3A-3B, sheet 1 setting table row 1): the MHA-MG-01 flange clamped against the COEFFICIENT-PLATE END OF MHA-SM-03, its two holes on the REF stations of the MHA-SM-03 bracket taps"
+    finding: "'COEFFICIENT-PLATE END' is project vocabulary no sheet defines; MHA-MG-01 and the bracket-tap stations appear in no view of this package (rule 26)"
+    reason: "Owner ruling 2026-11-17 (Pedro): \"COEFFICIENT-PLATE END OF MHA-SM-03 is clear enough\". No more standard term exists: MHA-SM-03's own sheet names that end by no label (its project labels, e.g. COEFFICIENT TOP, deliberately do not print; sm_summing_lever_notes) and locates the bracket taps only by their REF stations and the SPOT THRU MHA-MG-01 AT ASSEMBLY callout, which steps 3 and 3B already cite. This accepts only step 3's naming of where the flange clamps (machinist review of farm run 20261117T155408788Z-e555aeb0), not any other step-3 setting."
