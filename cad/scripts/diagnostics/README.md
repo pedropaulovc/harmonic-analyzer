@@ -7,7 +7,8 @@ part of the build (`doit`/`dodo.py` ignores this directory) and are not maintain
 Shared helpers are imported directly from their focused modules, such as
 `_com`, `_check` and `_session`. The path-only `_script_paths.py` bootstrap
 locates `cad/scripts` for standalone entrypoints; it re-exports no helpers.
-The existing `_chain.py` shim still supports archived chain imports:
+The existing `_chain.py` shim still supports archived chain imports. Run a
+diagnostic standalone from the repo root, e.g.:
 
 ```
 C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\diagnostics\audit_unanchored_sketches.py
