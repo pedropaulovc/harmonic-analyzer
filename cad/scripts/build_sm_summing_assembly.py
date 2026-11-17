@@ -648,21 +648,17 @@ def _assert_gooseneck_leg_spans_hub_bore(
     )
 
 
-# --- assembly settings as model dimensions (MHA-SM-00 sheet 1) --------------
-# Blanked Front-plane construction sketches (sketch x = machine X, y = machine
-# Y), every vertex driven from a global; the drawing shows each sketch in the
-# one view that dimensions it and imports only its marked dimension.
+# --- assembly setting as a model dimension (MHA-SM-00 sheet 1) --------------
+# A blanked Front-plane construction sketch (sketch x = machine X, y = machine
+# Y), every vertex driven from a global; the drawing shows it in the one view
+# that dimensions it and imports only its marked dimension.
 _SETTING_GLOBALS = {
     "SmKnifeY": spec.KNIFE_POINT[1],
     "SmCounterScrewX": spec.COUNTER_SCREW_POINT[0],
     "SmCounterScrewY": spec.COUNTER_SCREW_POINT[1],
-    "SmBossX": spec.BOSS_FACE_POINT[0],
-    "SmBossFaceY": spec.BOSS_FACE_POINT[1],
-    "SmBossRockTravel": spec.BOSS_ROCK_TRAVEL,
 }
 if not (
     spec.KNIFE_POINT[0] < 0.0 < spec.KNIFE_POINT[1]
-    and spec.BOSS_FACE_POINT[0] < 0.0 < spec.BOSS_FACE_POINT[1]
     and spec.COUNTER_SCREW_POINT[0] < spec.KNIFE_POINT[0]
 ):
     raise AssertionError("summing setting drives assume x < 0 < y, screw left of knife")
@@ -694,8 +690,7 @@ def _finish_setting(
 
 def _author_settings(adapter) -> None:
     """CounterSetting: the MHA-SM-VN-56 axis above the knife contact level (the
-    gooseneck height the level setting finds). KnifeRockGauge: the boss face's
-    minimum travel at the free-rock floor, up the boss-hook axis."""
+    gooseneck height the level setting finds)."""
     for name, value in _SETTING_GLOBALS.items():
         set_global(adapter, name, f"{value}mm")
 
@@ -722,22 +717,6 @@ def _author_settings(adapter) -> None:
     )
     dims.record(spec.COUNTER_DIMENSION, '"SmCounterScrewY" - "SmKnifeY"')
     _finish_setting(adapter, spec.COUNTER_FEATURE, dims, spec.COUNTER_DIMENSION)
-
-    face = spec.BOSS_FACE_POINT
-    top = (face[0], face[1] + spec.BOSS_ROCK_TRAVEL)
-    dims = SketchDims()
-    check("create knife rock gauge sketch", adapter.create_sketch("Front"))
-    line = _construction_line(adapter, face, top, "boss rock gauge line")
-    check("rock gauge vertical", adapter.add_sketch_constraint(line, None, "vertical"))
-    anchor_point_to_origin(adapter, f"{line}.start", *face, "boss face")
-    dims.record("BossX", '-"SmBossX"')
-    dims.record("BossFaceY", '"SmBossFaceY"')
-    dimension_between(
-        adapter, f"{line}.start", f"{line}.end", "vertical_distance",
-        spec.BOSS_ROCK_TRAVEL, "boss rock travel",
-    )
-    dims.record(spec.ROCK_DIMENSION, '"SmBossRockTravel"')
-    _finish_setting(adapter, spec.ROCK_FEATURE, dims, spec.ROCK_DIMENSION)
 
     apply_drawing_precision(adapter, spec.DRAWING_PRECISION)
     for feature in spec.SETTING_FEATURES:

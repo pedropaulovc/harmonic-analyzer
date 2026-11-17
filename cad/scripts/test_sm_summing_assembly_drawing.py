@@ -19,6 +19,7 @@ from _assembly_contract import assembly_contract
 from _paths import CAD_ROOT
 from _buildgraph import module_deps_of
 from _drawing_registry import DRAWINGS_BY_NAME
+from _general_table import table_column_widths
 from _sm_summing_explode import station_of
 from _cone_axis_constants import SUMMING_Z
 import sm_summing_lever_spec
@@ -212,12 +213,102 @@ def test_setting_drives_reproduce_the_sketch_values() -> None:
     assert g["SmCounterScrewY"] - g["SmKnifeY"] == pytest.approx(
         spec.COUNTER_SCREW_RISE
     )
-    assert g["SmBossRockTravel"] == spec.BOSS_ROCK_TRAVEL
-    assert notes.DRAWING_DIMENSIONS == {
-        spec.COUNTER_FEATURE: {spec.COUNTER_DIMENSION},
-        spec.ROCK_FEATURE: {spec.ROCK_DIMENSION},
-    }
+    assert notes.DRAWING_DIMENSIONS == {spec.COUNTER_FEATURE: {spec.COUNTER_DIMENSION}}
     assert set(drawing.PRECISION) == set(notes.DIMENSION_CALLOUTS)
+
+
+def test_setting_table_carries_the_settings_no_visible_dimension_does() -> None:
+    # Rule 22 (machinist review of R5 and of farm run
+    # 20261117T143446475Z-fdea6028; delegated ruling 2026-11-17 (MainBuild),
+    # no precedent; owner review #2144): the bracket
+    # station band, the hanger bolt's cut-to-fit length, the top-seat feeler
+    # and the free-rock travel print in the sheet 1 setting table, and the
+    # steps and checks cite the row that carries their value.
+    header = notes.SETTING_TABLE_HEADER
+    rows = {
+        cells[0]: dict(zip(header, cells, strict=True))
+        for cells in notes.SETTING_TABLE_ROWS
+    }
+    assert list(rows) == [
+        notes.BRACKET_ROW,
+        notes.CUT_ROW,
+        notes.SEAT_ROW,
+        notes.ROCK_ROW,
+    ]
+    band = f"±{notes._length(notes.BRACKET_STATION_TOL_MM, 3)}"
+    assert band == "±.005"
+    assert band in rows[notes.BRACKET_ROW]["SET TO / ACCEPT"]
+    assert notes.HANGER_FIT_CUT == ".351"
+    cut = rows[notes.CUT_ROW]
+    assert cut["SET TO / ACCEPT"] == f"{notes.HANGER_STACK} + {notes.HANGER_FIT_CUT}"
+    assert cut["MEASURE FIRST"].startswith(f"{notes.HANGER_STACK} = ")
+    feeler = notes._length(notes.SEAT_FEELER_MM, 3)
+    assert feeler == ".002"
+    assert rows[notes.SEAT_ROW]["SET TO / ACCEPT"].startswith(f"{feeler} FEELER")
+    assert notes.ROCK_TRAVEL_MIN == ".295 MIN"
+    assert rows[notes.ROCK_ROW]["SET TO / ACCEPT"].startswith(notes.ROCK_TRAVEL_MIN)
+
+    def step(label: str) -> str:
+        return next(s for s in notes.ASSEMBLY_STEPS if s.startswith(label))
+
+    assert band in step("3. ") and notes.setting_row(notes.BRACKET_ROW) in step("3. ")
+    for label in ("4. ", "4A. "):
+        assert notes.setting_row(notes.CUT_ROW) in step(label)
+    assert f"PLUS {notes.HANGER_FIT_CUT} UNDER THE HEAD" in step("4A. ")
+    check = next(c for c in notes.ASSEMBLY_CHECKS if c.startswith("1. "))
+    assert feeler in check and notes.setting_row(notes.SEAT_ROW) in check
+    # Check 1 tries EACH mount's seat, so it runs once both bolts are
+    # tightened (6H), not at 5C while the rear mount is finger-tight.
+    assert "(CHECK 1" in step("6H. ") and "CHECK 1" not in step("5C. ")
+    assert notes.setting_row(notes.ROCK_ROW) in step("6G. ")
+    rock = next(c for c in notes.ASSEMBLY_CHECKS if c.startswith("2. "))
+    assert notes.ROCK_TRAVEL_MIN in rock and notes.setting_row(notes.ROCK_ROW) in rock
+    with pytest.raises(KeyError):
+        notes.setting_row("9")
+
+
+def test_setting_table_fits_the_top_border() -> None:
+    left, _bottom, right, _top = drawing.SHEET_INNER_BORDER
+    widths = table_column_widths(notes.SETTING_TABLE_HEADER, notes.SETTING_TABLE_ROWS)
+    # Cells never wrap: each column is cut to its longest cell, so the whole
+    # table must fit with room to spare.
+    assert left + drawing.SETTING_TABLE_INSET + sum(widths) < right - 0.005
+
+
+# The finished isometric's native outline at 1:3 (run
+# 20261117T150253462Z-123d40fd's layout report), metres.
+_FINISHED_OUTLINE_1_3 = (0.1137, 0.2062)
+_STANDARD_SCALES = ((1.0, 2.0), (1.0, 2.5), (1.0, 3.0), (1.0, 4.0), (1.0, 5.0))
+
+
+def _finished_box(scale: tuple[float, float]) -> tuple[float, float, float, float]:
+    grow = 3.0 * scale[0] / scale[1]
+    half_w = _FINISHED_OUTLINE_1_3[0] * grow / 2.0 + drawing.FINISHED_CLEARANCE
+    half_h = _FINISHED_OUTLINE_1_3[1] * grow / 2.0 + drawing.FINISHED_CLEARANCE
+    cx, cy = drawing.ASSEMBLY_ISO_CENTER
+    return (cx - half_w, cy - half_h, cx + half_w, cy + half_h)
+
+
+def test_finished_isometric_is_centred_at_the_largest_scale_that_fits() -> None:
+    # Machinist review of farm runs 20261117T143446475Z-fdea6028 (1:5: too
+    # small) and 20261117T150253462Z-123d40fd (1:3 left of the title block:
+    # bunched against one edge): centred over the field above the title
+    # block, at the largest standard scale whose outline, grown by the
+    # clearance, stays inside the border and clear of the title block.
+    assert drawing.SHEET_SCALES[drawing.SHEET_NAMES[2]] == drawing.FINISHED_SCALE
+    x0, y0, x1, y1 = drawing.FINISHED_FIELD
+    assert drawing.ASSEMBLY_ISO_CENTER == pytest.approx(((x0 + x1) / 2, (y0 + y1) / 2))
+    assert y0 == drawing.TITLE_BLOCK[3]
+
+    def fits(scale: tuple[float, float]) -> bool:
+        try:
+            drawing._assert_box_on_sheet(_finished_box(scale), label="finished iso")
+        except RuntimeError:
+            return False
+        return True
+
+    fitting = [scale for scale in _STANDARD_SCALES if fits(scale)]
+    assert fitting and fitting[0] == drawing.FINISHED_SCALE
 
 
 def test_layout_constants_stay_on_the_sheet() -> None:
