@@ -938,17 +938,6 @@ def _live(processors: list[Any]) -> tuple[Any, ...]:
     return tuple(dict.fromkeys(processors))
 
 
-def _flush(processors: list[Any], timeout_millis: int) -> bool:
-    """Flush each processor in turn within one overall deadline, as the SDK's own
-    multi-processors do."""
-    deadline = time.monotonic() + timeout_millis / 1000
-    for processor in _live(processors):
-        remaining = int((deadline - time.monotonic()) * 1000)
-        if remaining <= 0 or not processor.force_flush(remaining):
-            return False
-    return True
-
-
 class _SharedSpanProcessors(SpanProcessor):
     """Every provider's active span processor: forwards to :data:`_span_processors`.
 
@@ -974,7 +963,7 @@ class _SharedSpanProcessors(SpanProcessor):
             processor.shutdown()
 
     def force_flush(self, timeout_millis: int = 30000) -> bool:
-        return _flush(_span_processors, timeout_millis)
+        return all(p.force_flush(timeout_millis) for p in _live(_span_processors))
 
 
 class _SharedLogProcessors(LogRecordProcessor):
@@ -995,7 +984,7 @@ class _SharedLogProcessors(LogRecordProcessor):
             processor.shutdown()
 
     def force_flush(self, timeout_millis: int = 30000) -> bool:
-        return _flush(_log_processors, timeout_millis)
+        return all(p.force_flush(timeout_millis) for p in _live(_log_processors))
 
 
 def _new_tracer_provider(service: str, *, owner: bool = False) -> TracerProvider:

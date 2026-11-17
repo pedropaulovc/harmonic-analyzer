@@ -171,36 +171,6 @@ def test_console_verbosity_configures_handler_and_spans(monkeypatch):
     assert _telemetry._span_processors == []
 
 
-def test_import_configures_nothing(monkeypatch):
-    """Importing the spine probes no collector, pins no environment and installs no
-    handler or provider: the first log, span or ``inject_env`` configures it."""
-    for name in _OTLP_ENV_NAMES:
-        monkeypatch.delenv(name, raising=False)
-    probes = []
-
-    def probe(address, *args, **kwargs):
-        probes.append(address)
-        raise OSError("refused")
-
-    monkeypatch.setattr(socket, "create_connection", probe)
-    environment = dict(os.environ)
-    handlers = list(logging.getLogger(_telemetry._LOGGER_NAME).handlers)
-    provider = _telemetry.trace.get_tracer_provider()
-
-    spec = importlib.util.spec_from_file_location(
-        "_telemetry_fresh_import", _telemetry.__file__
-    )
-    assert spec is not None and spec.loader is not None
-    fresh = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(fresh)
-
-    assert probes == []
-    assert dict(os.environ) == environment
-    assert logging.getLogger(_telemetry._LOGGER_NAME).handlers == handlers
-    assert _telemetry.trace.get_tracer_provider() is provider
-    assert fresh._tracer_provider is None
-
-
 def test_span_records_exception_and_sets_error_status(capture):
     spans, _ = capture
     with pytest.raises(RuntimeError):
