@@ -181,11 +181,11 @@ LEVER_ROD_Y = 979.6932
 # lever rod, the clamp's thumb screw, the vertical rod, the fixture's wire hook
 # and the drum's wire lane all lie in one plane, so WIRE 1 runs straight down
 # it with no depth lean. LEVER_ROD_Z is therefore the drum lane
-# (sh_vn_music_wire_lever_geom.DRUM_END_Z, asserted below). It stays a module-level
+# (sh_vn_music_wire_lever_geom.DRUM_END_Z, checked offline). It stays a module-level
 # literal: web/scripts/native_identity_source.py reads LEVER_ROD_Y,
 # LEVER_ROD_Z and VROD_TOP_Y from this file by AST. The one-piece top-frame
 # casting's front rail imposes no depth bound (the exact-stock thumb-screw
-# reach, asserted below, keeps its head under the rail), and the quarter-inch lever's
+# reach, checked offline, keeps its head under the rail), and the quarter-inch lever's
 # clearance to the front column surface (-124.7) is now ~45.8 -- trivially
 # large. The drum route's rim/spoke/boss clearance is proved in XY by
 # sh_vn_music_wire_lever_geom.RUN_GAPS; the bracket arm reaches back to the unchanged
@@ -287,8 +287,8 @@ from mg_wheel_group import (  # noqa: E402
 
 # --- amplification wire 1 (fixture -> drum) ----------------------------------
 # Endpoints + length live in sh_vn_music_wire_lever_geom (the part's length IS the run);
-# re-derive the anchors from THIS script's layout and fail loud on drift, so a
-# layout move can never leave a floating wire.
+# test_mg_magnifier_assembly_stack re-derives the anchors from THIS script's
+# layout, so a layout move can never leave a floating wire.
 from sh_vn_music_wire_lever_geom import (  # noqa: E402
     CLEARANCE as WIRE_CLEARANCE,
     CONFIGURATION as LEVER_WIRE_CONFIGURATION,

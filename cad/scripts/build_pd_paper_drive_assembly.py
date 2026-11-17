@@ -374,6 +374,8 @@ CLAMP_Y = BAR_CY + BAR.CLAMP_TAP_Y  # 303.734
 # from the former 0.98.
 BOTTOM_RAIL_CLEARANCE = 0.98 - BOTTOM_GUIDE.TOP_RISE
 LOCK_Z0 = BAR_FRONT_Z + GUIDE_DEPTH  # -128.7: lock plates on the guide backs,
+# 0.7 behind the bar's back face -- they bridge the bar so the platen cannot
+# fall off it.
 
 # --- transgear (the real six-gear train) -------------------------------------
 from pd_rack_pinion_spec import (  # noqa: E402

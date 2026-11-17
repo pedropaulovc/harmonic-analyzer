@@ -333,7 +333,7 @@ from dt_crank_pinion_spec import UNIT as PINION_UNIT  # noqa: E402
 from dt_cone_gear_shaft_spec import FRONT_STUB as SHAFT_FRONT_STUB  # noqa: E402
 
 SHAFT_FRONT_STATION = -SHAFT_FRONT_STUB
-# = -build_dt_cone_gear_shaft FRONT_STUB (asserted below). The enlarged integral
+# = -build_dt_cone_gear_shaft FRONT_STUB (test_dt_drive_train_assembly_stack). The enlarged integral
 # journal runs through the v2 post's 42.011-mm-long inclined bore and stands
 # 1.0 mm proud of its south face.
 
@@ -410,7 +410,7 @@ PINION_TOOTH_Z = _POST_BOSS_NORTH + PINION_SEAT_FEELER + PINION_FACE / 2.0
 # (dt_crank_pinion_spec.tooth_in_gap_seed_deg).
 # gear_train.crank_mesh_phase_offset_deg is the one configured offset from
 # that standard tooth-in-gap seed; the crankshaft's matched-hole clocking
-# (dt_crank_pinion_spec.PIN_CLOCKING_DEG) is checked against it below.
+# (dt_crank_pinion_spec.PIN_CLOCKING_DEG) is checked against it offline.
 from dt_crank_pinion_spec import pitch_point_azimuths, tooth_in_gap_seed_deg  # noqa: E402
 
 PITCH_ALPHA64, PITCH_ALPHA16 = pitch_point_azimuths(
@@ -663,7 +663,7 @@ CRANK_PIN_X0 = X_CRANK - HUB_BARREL_DIA / 2.0 - PIN_PROUD
 # is concentric with the pin's machine-Z cross-hole; its bends and return reach
 # outboard toward machine -X, past the pin's big end and clear of the arm (owner
 # ruling 2026-10-15 A1; hung toward -Y it dipped into the arm). The rows turn
-# local +X onto the keeper-chain spec's RING_HANG, checked below.
+# local +X onto the keeper-chain spec's RING_HANG (checked offline).
 CRANK_RING_Y = Y_CRANK
 CRANK_RING_ROWS = [[-1.0, 0.0, 0.0], [0.0, -1.0, 0.0], [0.0, 0.0, 1.0]]
 # Keeper-chain anchor (ch11 p.14; owner ruling 2026-11-08, #2144 item 9.2): the
@@ -703,7 +703,7 @@ ANCHOR_TIP_RESERVE = ARM_THICKNESS - ANCHOR_THREAD_ENGAGEMENT
 # turned to the pinion seed so that, with the pinion seated rot_z(-seed),
 # the two holes are one. The pin lies along machine X through the shaft
 # axis, flush with the boss on both sides. The pinion and shaft consume the
-# same configured clock; their agreement is checked HERE.
+# same configured clock; test_dt_drive_train_assembly_stack checks they agree.
 from dt_crank_pinion_spec import (  # noqa: E402
     OVERALL_LENGTH as PINION_OVERALL_LENGTH,
     PIN_LENGTH as PINION_PIN_LENGTH,
@@ -746,11 +746,11 @@ _SHAFT_NORTH_END = CRANKSHAFT_Z0 + CS_SHAFT_LENGTH
 # slid at fit-up) and PIVOT_STATION from cone_line; the checks below hold
 # them to the parts.
 
-# --- platform <-> riders fit (SolidWorks-free, import-time) ------------------
+# --- platform <-> riders fit ---------------------------------------------------
 # The platform/post/block parts hardcode their envelopes in THEIR part frames;
 # they must agree with the live cone-shaft line placed here. Imported, not
-# copied (the CAM_ECC precedent), and asserted at import so a drifted anchor
-# fails before any COM work.
+# copied (the CAM_ECC precedent), and checked by test_dt_drive_train_assembly_stack
+# under check:recipe.
 from dt_cone_swing_platform_crank_axis import (  # noqa: E402
     CRANK_SEAT_ANCHOR as PLAT_SEAT_ANCHOR,
 )
@@ -2584,6 +2584,7 @@ _FPIN_S0 = STRAP_R_END - FPIN_SEAT  # 5.0: seat bottom, from the centreline
 # going west, N[1] < 0).
 _FPIN_TIP_S = _FPIN_S0 + FPIN_LEN  # 20: dome end station, from the centreline
 _S_CAM = (_FPIN_C[0] - LIFT_X) / _SPR_N[0]  # 14.9: where the pin crosses the
+# rod/cam plane x = LIFT_X
 
 # Cam z stations: CAM_PIN_STATION of the 9-long collar, from its front face.
 # U28 deleted the set-pin boss; MHA-DT-23 now has a sub-flush #2-56 set screw at
@@ -2651,7 +2652,8 @@ def _engaged_cam_gap(rotation_deg: float) -> float:
     return axis_distance - (FPIN_DIA + CAM_OD) / 2.0
 
 
-_CAM_ROT_LO, _CAM_ROT_HI = -180.0, 0.0
+CAM_ROT_BRACKET = (-180.0, 0.0)  # down/up search interval for the engaged root
+_CAM_ROT_LO, _CAM_ROT_HI = CAM_ROT_BRACKET
 for _ in range(60):
     _cam_mid = (_CAM_ROT_LO + _CAM_ROT_HI) / 2.0
     if _engaged_cam_gap(_cam_mid) > 0.0:
@@ -3899,8 +3901,8 @@ async def build(adapter) -> dict[str, str]:
         f"(axis poses +/-{CRANK_ROW_POSE_AXIAL:.4f}, cone stack floated {CONE_FLOAT_NORTH:.2f}) "
         f">= {CRANK_ROW_ENGAGEMENT_FLOOR:.0%}"
     )
-    # #893: the proud stack is an import-time assert, so a passing build would
-    # otherwise leave no record of its range in the leaf log.
+    # #893: the proud stack is checked offline (check:recipe), so the leaf log
+    # otherwise keeps no record of its range.
     _telemetry.info(
         "crankshaft end proud of the 16T north face (owner ruling D1): "
         f"{CS_SHAFT_END_PROUD_RANGE[0]:.3f}..{CS_SHAFT_END_PROUD_RANGE[1]:.3f} "
@@ -3908,7 +3910,7 @@ async def build(adapter) -> dict[str, str]:
         f"z <= {CRANK_SHAFT_END_Z_MAX:.3f}, {CRANK_SHAFT_END_NORTH_AIR_WORST:.3f} "
         f"under the {CRANK_SHAFT_END_NORTH_NEIGHBOUR}"
     )
-    # The rig's worst-case margin table (asserted at import), in the task log at
+    # The rig's worst-case margin table (checked offline), in the task log at
     # info: the farm leaf log runs at info, and a debug line never reached it
     # (pc-p1 leaf, 2026-09-25).
     for line in rig_margin_lines():
@@ -4693,7 +4695,7 @@ async def build(adapter) -> dict[str, str]:
     )
     # Axial seat vs the plate's CrankAxisSeat plane (perpendicular to the
     # crank axis, anchored at the plate's crank-anchor point -- ON the crank
-    # axis, so its machine x is X_CRANK, asserted at import): distance =
+    # axis, so its machine x is X_CRANK, checked offline): distance =
     # |Delta z| at the engaged rest pose (both are machine-z-normal planes
     # there).
     _cs_axial = cs_o[2] - _SEAT_ANCHOR_M[1]
@@ -5038,8 +5040,8 @@ async def build(adapter) -> dict[str, str]:
     # already carry) + an axial seat + a parallel anti-spin against the
     # PLATFORM (not the spinning shaft).  It stands directly on PlateTop (user
     # ruling 2026-09-29): its height falls out of the coaxial (plate + axis
-    # height = drive height, asserted at import), so the foot's contact with
-    # the plate is proven by that assert and the interference gate, not a
+    # height = drive height, checked offline), so the foot's contact with
+    # the plate is proven by that check and the interference gate, not a
     # mate.  It follows the p1 swing through the shaft.
     tb_o = _org(adapter, tip_block)
     tb_axial = sum((tb_o[k] - cone_o[k]) * cone_axis_dir[k] for k in range(3))

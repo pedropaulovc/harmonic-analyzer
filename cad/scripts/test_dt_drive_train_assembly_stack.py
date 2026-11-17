@@ -1180,7 +1180,6 @@ def _cam_engage_path(drive) -> None:
         - drive.STRAP_PIVOT_BORE / 2.0
         >= 0.15
     ), "blind pin seat cuts too close to the pivot bore"
-    # rod/cam plane x = LIFT_X
     assert drive._FPIN_TIP_S - drive._S_CAM >= 2.0, (
         "follower pin ends short of the cam axis"
     )
@@ -1220,9 +1219,9 @@ def _cam_engage_path(drive) -> None:
         "engaged pin slides off the cam axis"
     )
     assert (
-        drive._engaged_cam_gap(drive._CAM_ROT_LO)
+        drive._engaged_cam_gap(drive.CAM_ROT_BRACKET[0])
         < 0.0
-        < drive._engaged_cam_gap(drive._CAM_ROT_HI)
+        < drive._engaged_cam_gap(drive.CAM_ROT_BRACKET[1])
     ), "engaged cam-contact root is not bracketed by down/up"
     assert -85.0 < drive.CAM_ENGAGE_ROTATION_DEG < -75.0, (
         "pinion cam engage rotation left the photo-backed range"

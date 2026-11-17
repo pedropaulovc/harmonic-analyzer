@@ -818,6 +818,13 @@ def test_chain_shift_moves_the_crank_seat_hub_and_knob_seat_together(
     # builder's own chain/hub relief gate refuses it before the offline stacks.
     with pytest.raises(AssertionError, match="relief shoulder air"):
         _drive_with(monkeypatch, hub, "HUB_LENGTH", 27.0)
+    monkeypatch.undo()
+    # Negative control: the hub/sprocket air off its 0.754 contract.
+    from test_dt_drive_train_assembly_stack import _crank_hub_and_sprocket_seat
+
+    monkeypatch.setattr(drive, "CRANK_HUB_SPROCKET_AIR", drive.CRANK_HUB_SPROCKET_AIR + 0.1)
+    with pytest.raises(AssertionError, match="contracted"):
+        _crank_hub_and_sprocket_seat(drive)
 
 
 def _follower_stations() -> tuple[list[float], list[float]]:

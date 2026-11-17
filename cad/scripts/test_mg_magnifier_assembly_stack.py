@@ -4,8 +4,7 @@ These guards ran at import of ``build_mg_magnifier_assembly.py``, so a COM leaf 
 paid for them before SolidWorks opened.  They are pure functions of the
 spec modules and the builder's own placement constants, so they run here
 under ``check:recipe`` instead.  Each stack reads the values the builder
-places from; ``STACKS`` also re-checks a freshly executed builder (negative
-controls perturb an upstream spec and observe these gates).
+places from.
 """
 
 from __future__ import annotations
