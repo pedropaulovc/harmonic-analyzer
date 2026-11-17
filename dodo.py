@@ -3431,9 +3431,8 @@ def task_verify():
 
 
 # Review inputs are independent of the draw recipe and registry. The CLI
-# receives its PDF, package name and kind explicitly and forces a full review.
-# The lazy PDF diff and identity pairing are unreachable under --force.
-# Keep the non-inert forced-review import closure pinned in the leaf tests.
+# receives its PDF, package name and kind explicitly.
+# Keep the review import closure pinned in the leaf tests.
 _MACHINIST_REVIEW_MODULES = (
     "machinist_review.py",
     "machinist_review_config.py",
@@ -3460,9 +3459,6 @@ def _machinist_review_file_deps(stem: str) -> list[str]:
     excluded_prompts = {
         f"machinist_review_{other_kind}.md",
         f"machinist_review_{other_kind}_severity.md",
-        # --force bypasses the PDF diff precheck and its judge inputs.
-        "machinist_review_precheck.md",
-        "machinist_review_precheck_schema.json",
     }
     prompts = [
         path for path in (SCRIPTS_DIR / "prompts").iterdir()
@@ -3472,10 +3468,9 @@ def _machinist_review_file_deps(stem: str) -> list[str]:
         str(path.resolve())
         for path in (
             spec.outputs["pdf"],
-            # SDK/runtime dependency changes invalidate verdicts, not geometry.
-            # Hash both authorities whole rather than duplicating SDK versions.
-            REPO_ROOT / "pyproject.toml",
-            REPO_ROOT / "uv.lock",
+            # Not pyproject.toml or uv.lock: the model, effort and prompts are
+            # the verdict's inputs; an SDK or OMP release changes transport,
+            # not judgement (#2882). The OMP binary was never keyed either.
             *(
                 SCRIPTS_DIR / name
                 for name in _MACHINIST_REVIEW_MODULES
@@ -3500,7 +3495,7 @@ def _machinist_review_profile() -> ReviewProfile:
     return _MACHINIST_REVIEW_PROFILE
 
 
-def _machinist_review_digest(profile: ReviewProfile, *, pdf_ink: bool = True):
+def _machinist_review_digest(profile: ReviewProfile):
     # The config module is a real review input. Its contextual digest records
     # both its actual source and the frozen effective profile, keeping normal
     # cache-key provenance instead of adding a virtual file or a post-hoc salt.
@@ -3508,7 +3503,7 @@ def _machinist_review_digest(profile: ReviewProfile, *, pdf_ink: bool = True):
     effective = json.dumps(profile._asdict(), sort_keys=True, separators=(",", ":"))
 
     def digest(path: str) -> str:
-        if pdf_ink and Path(path).suffix.casefold() == ".pdf":
+        if Path(path).suffix.casefold() == ".pdf":
             # The reviewed sheet is keyed by the ink it prints: a rebuild that
             # prints the same sheet differs in export time, document ID and
             # font-subset tags, and must reuse its verdict (#2714). A file
@@ -3533,41 +3528,6 @@ def _machinist_review_cache_key(
     return _cache.cache_key(
         _machinist_review_file_deps(stem), _machinist_review_digest(profile), label
     )
-
-
-def _machinist_review_byte_key(stem: str, profile: ReviewProfile) -> str:
-    """The key this review had while the PDF was hashed by its bytes."""
-    return _cache.cache_key(
-        _machinist_review_file_deps(stem),
-        _machinist_review_digest(profile, pdf_ink=False),
-    )
-
-
-def _adopt_byte_keyed_review(
-    stem: str, profile: ReviewProfile, key: str, directory: Path, label: str
-) -> bool:
-    """Republish under ``key`` the verdict these exact PDF bytes already have.
-
-    Every review published before the ink key is stored under its byte key.
-    Without this the first build after the change would review every reviewed
-    sheet again (about 290 reviews, $700 and, at 7% FIX per roll on unchanged
-    ink, about 20 new FIX). Remove it under #2811 once a full build of main
-    records no ``review_adopted_byte_key`` event.
-    """
-    legacy = _machinist_review_byte_key(stem, profile)
-    if legacy == key:
-        return False
-    try:
-        if not _cache.restore(legacy, [directory], label):
-            return False
-    except _cache.RestoreLocked as error:
-        # The same drawing error policy as a locked probe of the ink key.
-        raise OSError(str(error)) from error
-    outcome = _store_reused_review(stem, key, directory, label, adopted_from=legacy)
-    _cache.record_event(
-        "review_adopted_byte_key", label, key, byte_key=legacy, store=outcome
-    )
-    return True
 
 
 def _store_reused_review(
@@ -3699,7 +3659,7 @@ def _machinist_review_command(
     return [
         sys.executable, str(SCRIPTS_DIR / "machinist_review.py"),
         "--pdf", str(spec.outputs["pdf"]), "--name", stem,
-        "--kind", spec.source_kind, "--force", "--runs", "3",
+        "--kind", spec.source_kind, "--runs", "3",
         "--report-dir", str(report_dir or _machinist_review_dir(stem)),
         "--reviewer", profile.backend, "--model", profile.model,
         "--effort", profile.effort,
@@ -3799,9 +3759,7 @@ def _machinist_review_leaf(
             return key, aggregate
     try:
         if probed == "miss" and _cache.forced_refresh(label) is None:
-            if _adopt_byte_keyed_review(
-                stem, profile, key, directory, label
-            ) or _carry_reviewed_verdict(stem, profile, key, directory, label):
+            if _carry_reviewed_verdict(stem, profile, key, directory, label):
                 probed = "hit"
         if probed != "hit":
             if probed == "locked":
@@ -4506,8 +4464,6 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         # prompt calibration, strict output schema, neutral-workdir command, pass
         # logic and the blind-review tool-event detector are pinned offline.
         SCRIPTS_DIR / "test_machinist_review.py",
-        SCRIPTS_DIR / "test_machinist_review_overlays.py",
-        SCRIPTS_DIR / "test_machinist_review_precheck.py",
         # Release-package prompt benchmarks: deterministic grading and workspace
         # contracts run offline, without reviewer/model or SolidWorks activity.
         review_bench.with_name("test_machinist_review_bench.py"),

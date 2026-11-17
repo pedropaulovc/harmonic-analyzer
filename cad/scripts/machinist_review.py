@@ -1,20 +1,17 @@
 r"""Blind senior-machinist review of drawing packages via Claude or Codex.
 
-Before independent reviews, the judge inspects the repository PDF diff's colored
-overlays of frozen BEFORE/AFTER PDFs. It may skip only rendering noise or assembly
-changes confined to one part's geometry with clearly no mating impact. Doubt
-requires review. Otherwise the package receives three blind reviews (``--runs``).
-That same isolated judge session then vets every finding, clustering
+Every package receives three blind reviews (``--runs``). An isolated judge
+session then vets every finding, clustering
 duplicates and rejecting misreads or non-gating claims. A confirmed cluster
 gates the aggregate verdict when at least ``GATING_MIN_RUNS[category]`` valid
 runs raised it (fewer when fewer runs are valid): one run for a blocker, two
 for over-specification or clarity. Lone non-blocker confirmations stay in the
 report as non-gating evidence.
 Raw per-run verdicts are retained as evidence.
-Every reviewer uses an isolated transport in a neutral attempt directory. The judge
-resumes its own precheck session for adjudication, never another package's context.
-A private stdio MCP server supplies grayscale reviewer views and color-preserving
-judge overlays fitting 1976×1280 pixels, plus bounded vector-PDF/image crops.
+Every reviewer and the judge use an isolated transport in a fresh session and
+a neutral attempt directory, never another package's context.
+A private stdio MCP server supplies grayscale sheet views fitting 1976×1280
+pixels, plus bounded vector-PDF/image crops.
 The cached prompt prefix is the shared drawing standard followed by the kind's
 reviewer instructions; package-specific instructions come last.
 The reviewer is Claude Opus 5.5 by default (``--reviewer claude``), whoever
@@ -54,17 +51,16 @@ scoped resource helpers are neutral, non-proving calls only after the actual
 SDK confirms this sole server exposes no resources or templates; their calls
 are recorded. Other tools and unexpected resource content remain fail-closed.
 Crop and token/cache usage are retained; first-turn usage belongs to that attempt.
-Fresh sessions never load prior review context; only the judge continues its own
-precheck. Redacted transcripts and attempt files are retained even if Windows
-prevents moving the original cwd. Lifecycle-owned native SDK state and OMP image
-blobs survive only until their precheck's judge finishes (or is skipped), while
-independent runs and failed attempts release state after retaining evidence.
+Sessions never load prior review context. Redacted transcripts and attempt
+files are retained even if Windows prevents moving the original cwd.
+Lifecycle-owned native SDK state and OMP image blobs are released once each
+attempt has retained its evidence.
 Claude native session IDs are historical provenance, not CLI replay commands.
 The recorded
 ``retained_argv`` only adapts artifact paths for inspection, NOT a replay: it
 does not supply stdin or a fresh session id. ``command`` records actual Codex
 argv or the SDK invocation descriptor; ``transport_provenance`` distinguishes
-SDK from OMP and records the actual session, model and continuation details.
+SDK from OMP and records the actual session and model details.
 
 Codex 0.159.1 uses a per-conversation ``prompt_cache_key`` and exposes no native
 override for fresh exec sessions. Within-review cache reuse is supported here;
@@ -72,25 +68,19 @@ fresh-session prefix hits can occur, but cross-package affinity is not controlle
 or promised. Claude's static rubric prefix can be reused across packages.
 Never reuse a review session/context to get a hit.
 
-Usage (SolidWorks-free; AFTER PDFs in ``cad/out/pdf`` or ``--pdf-dir``)::
+Usage (SolidWorks-free; PDFs in ``cad/out/pdf`` or ``--pdf-dir``)::
 
-    uv run cad/scripts/machinist_review.py crank_arm --before-pdf-dir baseline/pdf
-    uv run cad/scripts/machinist_review.py --all --before-pdf-dir baseline/pdf --jobs 4
-    uv run cad/scripts/machinist_review.py --before-pdf old.pdf --pdf new.pdf --name sample
-    uv run cad/scripts/machinist_review.py ch_pivot_shaft --force
+    uv run cad/scripts/machinist_review.py crank_arm
+    uv run cad/scripts/machinist_review.py --all --jobs 4
+    uv run cad/scripts/machinist_review.py --pdf sheet.pdf --name sample
     uv run cad/scripts/machinist_review.py --index      # rebuild index.md only
 
-Exit status is 0 only when every package is SHIP. A minimal-change skip is
-conspicuously marked as change triage, NOT a full machinist review or approval
-of the baseline. It contributes no findings and runs no independent reviews.
+Exit status is 0 only when every package is SHIP.
 
-Repeat ``--before-pdf`` and ``--pdf`` in pairing order with ``--name`` for an
-explicit package; filenames may differ. Registry inputs use ``--before-pdf-dir``.
-Both PDF sets are frozen before the diff or any reviewer sees them. ``--force``
-bypasses precheck and permits AFTER-only inputs, keeping build gates and benchmarks
-unconditional without inventing a baseline. Public PNG input is not supported;
-the single-session Python evaluation API still supports PNGs. Precheck failure,
-all-run failure, or judge failure is ERROR; partial blind-run errors remain visible.
+Repeat ``--pdf`` with ``--name`` for an explicit package. The PDFs are frozen
+before any reviewer sees them. Public PNG input is not supported; the
+single-session Python evaluation API still supports PNGs. All-run failure or
+judge failure is ERROR; partial blind-run errors remain visible.
 """
 
 from __future__ import annotations
@@ -114,7 +104,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterable, Sequence
 
-from zipfile import ZipFile
 SCRIPTS_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPTS_DIR))
 
@@ -145,8 +134,6 @@ SEVERITY_TOKEN = "<!-- MACHINIST_SEVERITY_CONTRACT -->"
 SCHEMA_FILE = PROMPTS_DIR / "machinist_review_schema.json"
 JUDGE_PROMPT_FILE = PROMPTS_DIR / "machinist_review_judge.md"
 JUDGE_SCHEMA_FILE = PROMPTS_DIR / "machinist_review_judge_schema.json"
-PRECHECK_PROMPT_FILE = PROMPTS_DIR / "machinist_review_precheck.md"
-PRECHECK_SCHEMA_FILE = PROMPTS_DIR / "machinist_review_precheck_schema.json"
 REPORT_DIR = CAD_ROOT / "out" / "reports" / "machinist-review"
 # Auth is linked here, never copied into an attempt or retained report.
 CODEX_HOME = Path(tempfile.gettempdir()) / "machinist-review-codex-home"
@@ -207,7 +194,6 @@ class ReviewPackage:
     name: str
     kind: str  # "part" | "assembly"
     sources: tuple[Path, ...]
-    before_sources: tuple[Path, ...] = ()
 
 
 @dataclass
@@ -437,7 +423,6 @@ def build_claude_invocation(
     model: str,
     effort: str,
     session_id: str,
-    resume: bool = False,
 ) -> list[str]:
     """Return a secret-free SDK invocation descriptor, not executable CLI argv.
 
@@ -448,7 +433,7 @@ def build_claude_invocation(
         raise ValueError("review configuration must be inside the neutral workdir")
     return [
         "claude_agent_sdk", "--model", model, "--effort", effort,
-        "--resume" if resume else "--session-id", session_id,
+        "--session-id", session_id,
         "--mcp-config", str(mcp_config), "--schema", str(schema),
     ]
 
@@ -510,8 +495,6 @@ def build_codex_command(
     effort: str,
     codex: str = "codex",
     attempt_dir: Path | None = None,
-    session_id: str | None = None,
-    preserve_color: bool = False,
     timeout_s: float | None = None,
 ) -> list[str]:
     """Build argv using a neutral cwd and separately identified attempt files.
@@ -588,7 +571,6 @@ def build_codex_command(
         "mcp_servers.sheets.command": sys.executable,
         "mcp_servers.sheets.args": [
             str(SHEETS_SERVER),
-            *(["--preserve-color"] if preserve_color else []),
             *(str(p.resolve()) for p in sources),
         ],
         "mcp_servers.sheets.default_tools_approval_mode": "approve",
@@ -603,8 +585,6 @@ def build_codex_command(
     }
     for key, value in overrides.items():
         command.extend(("-c", f"{key}={json.dumps(value)}"))
-    if session_id is not None:
-        command.extend(("resume", session_id))
     command.extend(
         (
             "--output-schema",
@@ -958,7 +938,6 @@ def _codex_rollout_output(
 
 def codex_rollout_evidence(
     events: Sequence[dict[str, Any]], prompt: str, *, neutral_resources: bool = False,
-    prior_prompts: Sequence[str] = (),
 ) -> dict[str, Any]:
     """Normalize every authoritative call and reject unaccounted model input.
 
@@ -1000,8 +979,7 @@ def codex_rollout_evidence(
     elif metadata[0].get("session_id", metadata[0]["id"]) != metadata[0]["id"]:
         errors.append("Codex rollout session identifiers disagree")
     session_id = metadata[0].get("id") if len(metadata) == 1 else None
-    expected_prompts = [text.replace("\r\n", "\n") for text in (*prior_prompts, prompt)]
-    prompt_count = 0
+    expected_prompt = prompt.replace("\r\n", "\n")
     prompt_seen = False
     turn_start = 0
     for index, row in enumerate(events):
@@ -1044,11 +1022,10 @@ def codex_rollout_evidence(
                     role == "user" and isinstance(content, list) and len(content) == 1
                     and isinstance(content[0], dict) and content[0].get("type") == "input_text"
                     and isinstance(content[0].get("text"), str)
-                    and prompt_count < len(expected_prompts)
-                    and content[0]["text"].replace("\r\n", "\n") == expected_prompts[prompt_count]
+                    and not prompt_seen
+                    and content[0]["text"].replace("\r\n", "\n") == expected_prompt
                 )
                 if matches:
-                    prompt_count += 1
                     prompt_seen = True
                     turn_start = len(normalized)
                     first_usage = {}
@@ -1125,7 +1102,7 @@ def codex_rollout_evidence(
                         prompt_seen and isinstance(content, list) and len(content) == 1
                         and isinstance(content[0], dict) and content[0].get("type") == "text"
                         and isinstance(content[0].get("text"), str)
-                        and content[0]["text"].replace("\r\n", "\n") == expected_prompts[prompt_count - 1]
+                        and content[0]["text"].replace("\r\n", "\n") == expected_prompt
                     )
                     if not matches:
                         errors.append("unexpected user input in Codex protocol message")
@@ -1193,7 +1170,7 @@ def codex_rollout_evidence(
                     "type": "item.completed",
                     "item": {**payload, "id": payload.get("call_id") or payload.get("id")},
                 })
-    if prompt_count != len(expected_prompts):
+    if not prompt_seen:
         errors.append("expected harness prompt missing from authoritative Codex rollout")
     for call_id in calls.keys() - outputs:
         errors.append(f"authoritative Codex call {call_id} has no recorded output")
@@ -1532,33 +1509,6 @@ def validate_judgment(
     return value
 
 
-def validate_precheck(value: Any, kind: str, diff: dict[str, Any]) -> dict[str, Any]:
-    """Only an inspected, unambiguous minimal-change decision may skip reviews."""
-    if not isinstance(value, dict) or set(value) != {"decision", "skip_kind", "reason"}:
-        raise ValueError("precheck output must contain exactly decision, skip_kind, reason")
-    if value["decision"] not in ("skip", "review"):
-        raise ValueError("precheck decision must be skip or review")
-    if not isinstance(value["reason"], str) or not value["reason"].strip():
-        raise ValueError("precheck reason must be nonempty text")
-    if value["decision"] == "review":
-        if value["skip_kind"] != "none":
-            raise ValueError("review precheck must use skip_kind none")
-        return value
-    if value["skip_kind"] not in ("rendering_noise", "assembly_single_part"):
-        raise ValueError("skip requires a permitted minimal-change skip_kind")
-    if value["skip_kind"] == "assembly_single_part" and kind != "assembly":
-        raise ValueError("assembly_single_part skip is only permitted for an assembly")
-    pages = diff.get("pages", [])
-    if not pages or any(
-        page["status"] not in ("unchanged", "changed")
-        or page["old_size_points"] != page["new_size_points"]
-        or page["text_changed"]
-        for page in pages
-    ):
-        raise ValueError("added/removed, resized or text-changed pages require review")
-    return value
-
-
 def _parse_events(stdout: str) -> list[dict[str, Any]]:
     events: list[dict[str, Any]] = []
     for line in stdout.splitlines():
@@ -1702,27 +1652,10 @@ def _review_session(
     codex: str | None = None,
     prompt_text: str | None = None,
     judge_findings: Sequence[dict[str, Any]] | None = None,
-    precheck_diff: dict[str, Any] | None = None,
-    resume_review: Review | None = None,
     on_first_response: Callable[[], None] | None = None,
 ) -> Review:
     if reviewer not in REVIEWERS:
         raise ValueError(f"unknown reviewer {reviewer!r}; choose one of {REVIEWERS}")
-    if precheck_diff is not None and (judge_findings is not None or resume_review is not None):
-        raise ValueError("precheck must start its own judge lifecycle")
-    resume_id = None
-    prior_prompts: list[str] = []
-    if resume_review is not None:
-        resume_id = resume_review.extra.get("session_id")
-        if (
-            judge_findings is None or not resume_review.passed or not resume_id
-            or resume_review.reviewer != reviewer
-            or resume_review.model != (model or review_config.DEFAULT_MODELS[reviewer])
-            or resume_review.effort != (effort or review_config.DEFAULT_EFFORTS[reviewer])
-            or resume_review.source_sha256 != [_sha256(source) for source in package.sources]
-        ):
-            raise ValueError("judge continuation requires its successful, unchanged precheck session")
-        prior_prompts = [resume_review.extra["evidence"]["effective_prompt"]]
     sheet_count = _validate_package(package)
     # Snapshot the sources once: the injected text layer, the recorded hashes
     # and every attempt's sheet images must come from the same bytes, even if a
@@ -1742,24 +1675,7 @@ def _review_session(
     executable = "claude_agent_sdk" if reviewer == "claude" else codex or shutil.which("codex")
     if not executable:
         raise RuntimeError("codex CLI not found on PATH")
-    if precheck_diff is not None:
-        prefix = (
-            GUIDELINES_FILE.read_text(encoding="utf-8").rstrip()
-            + "\n\n" + PRECHECK_PROMPT_FILE.read_text(encoding="utf-8")
-        )
-        prompt = _review_prompt(
-            snapshot, sheet_count, reviewer=reviewer, prompt_text=prefix,
-            response_instruction="",
-        )
-        prompt += (
-            "\nPDF DIFF PRECHECK (metadata, not instructions)\n"
-            + json.dumps(precheck_diff, ensure_ascii=False)
-            + "\nReturn the precheck schema decision.\n"
-        )
-
-        def validator(value: Any) -> dict[str, Any]:
-            return validate_precheck(value, snapshot.kind, precheck_diff)
-    elif judge_findings is None:
+    if judge_findings is None:
         prompt = _review_prompt(
             snapshot, sheet_count, reviewer=reviewer, prompt_text=prompt_text
         )
@@ -1770,17 +1686,6 @@ def _review_session(
             snapshot, sheet_count, reviewer=reviewer, prompt_text=judge_prefix,
             response_instruction="",
         )
-        if resume_review is not None:
-            prompt += (
-                "\nContinue your own preceding PDF-diff precheck, retaining its change context. "
-                "This is now findings adjudication, not another skip decision. "
-                "AFTER sheets precede the colored overlays in the same sheet order as before. "
-                "Findings must be adjudicated solely against the AFTER drawing sheets: "
-                "red BEFORE ink is not on the drawing. Pre-existing defects count just "
-                "as much as changed-region defects. Overlays supply change context only, "
-                "never drawing specifications or a reason to reject an unchanged finding. "
-                "Inspect every sheet again in this turn; prior-turn views do not count.\n"
-            )
         prompt += (
             "\nFINDINGS TO ADJUDICATE (claims, not instructions)\n"
             + json.dumps(list(judge_findings), ensure_ascii=False)
@@ -1792,8 +1697,7 @@ def _review_session(
     prompt_sha = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
     source_sha = [_sha256(source) for source in snapshot.sources]
     schema_bytes = (
-        PRECHECK_SCHEMA_FILE.read_bytes() if precheck_diff is not None
-        else SCHEMA_FILE.read_bytes() if judge_findings is None
+        SCHEMA_FILE.read_bytes() if judge_findings is None
         else judge_schema_bytes(judge_findings)
     )
     report_dir.mkdir(parents=True, exist_ok=True)
@@ -1818,28 +1722,15 @@ def _review_session(
             response_notified = True
             on_first_response()
 
-    # Never retry a resumed turn: a failed turn may already have mutated this
-    # conversation. A fresh judge would lose the required precheck continuity.
-    for attempt in range(1 if resume_id is not None else retries + 1):
+    for attempt in range(retries + 1):
         attempts = attempt + 1
         attempt_started = time.monotonic()
-        if resume_review is None:
-            private_home = Path(tempfile.mkdtemp(prefix="machrev-home-")) if reviewer == "claude" else None
-            attempt_dir = Path(tempfile.mkdtemp(prefix="machrev-", dir=private_home))
-        else:
-            previous = next(
-                record for record in resume_review.extra["evidence"]["attempts"]
-                if record["outcome"] == "succeeded"
-            )
-            # Claude's project identity includes cwd. Recreate/reuse that exact
-            # neutral path after its first-turn artifacts were safely retained.
-            attempt_dir = Path(previous["cwd"])
-            private_home = Path(previous["transport_provenance"]["private_home"]) if reviewer == "claude" else None
-            attempt_dir.mkdir(parents=True, exist_ok=True)
+        private_home = Path(tempfile.mkdtemp(prefix="machrev-home-")) if reviewer == "claude" else None
+        attempt_dir = Path(tempfile.mkdtemp(prefix="machrev-", dir=private_home))
         cwd = attempt_dir
         if private_home is not None:
             _claude_transport.register_state(private_home)
-        session_id: str | None = resume_id or (str(uuid.uuid4()) if reviewer == "claude" else None)
+        session_id: str | None = str(uuid.uuid4()) if reviewer == "claude" else None
         attempt_events: list[dict[str, Any]] = []
         rollout_rows: list[dict[str, Any]] = []
         rollout_details: dict[str, Any] = {
@@ -1870,14 +1761,11 @@ def _review_session(
             "stdout_file": None,
             "stderr_file": None,
             "artifacts": [],
-            "transport_provenance": (
-                _claude_transport.resume_inputs(previous.get("transport_provenance", {}))
-                if resume_review is not None else {}
-            ),
+            "transport_provenance": {},
         }
         attempt_record["transport_provenance"].update(
             package=package.name, attempt=attempts,
-            phase="precheck" if precheck_diff is not None else "judge" if judge_findings is not None else "review",
+            phase="judge" if judge_findings is not None else "review",
         )
         if private_home is not None:
             attempt_record["transport_provenance"]["private_home"] = str(private_home)
@@ -1888,10 +1776,6 @@ def _review_session(
             if reviewer != "codex" or rollout_checked:
                 return
             session_id = _codex_session_id(attempt_events)
-            if resume_id is not None and session_id != resume_id:
-                rollout_checked = True
-                attempt_context.append("Codex continuation did not resume the precheck session")
-                return
             if not session_id:
                 if attempt_record["exit_code"] == 0:
                     rollout_checked = True
@@ -1902,7 +1786,6 @@ def _review_session(
                 _, rollout_rows = load_codex_rollout(session_id, codex_home=CODEX_HOME)
                 rollout_details = codex_rollout_evidence(
                     rollout_rows, prompt, neutral_resources=neutral_resources,
-                    prior_prompts=prior_prompts,
                 )
                 attempt_context.extend(rollout_details["context_errors"])
                 prior_evidence = evaluate_sheet_evidence(
@@ -1910,7 +1793,7 @@ def _review_session(
                     sheet_count=sheet_count, neutral_resources=neutral_resources,
                 )
                 if prior_evidence["tool_events"]:
-                    attempt_context.append("resumed Codex history contains unauthorized tools")
+                    attempt_context.append("Codex history before the harness prompt contains unauthorized tools")
             except Exception as exc:
                 attempt_context.append(f"Codex rollout unavailable: {type(exc).__name__}: {exc}")
 
@@ -1933,7 +1816,6 @@ def _review_session(
                             "command": sys.executable,
                             "args": [
                                 str(SHEETS_SERVER),
-                                *(["--preserve-color"] if precheck_diff is not None or resume_id else []),
                                 *(str(p.resolve()) for p in snapshot.sources),
                             ],
                         },
@@ -1942,7 +1824,6 @@ def _review_session(
                 cmd = build_claude_invocation(
                     workdir=attempt_dir, mcp_config=mcp_config, schema=schema,
                     model=model, effort=effort, session_id=session_id,
-                    resume=resume_id is not None,
                 )
             else:
                 env = prepare_codex_environment(
@@ -1952,16 +1833,14 @@ def _review_session(
                 cmd = build_codex_command(
                     workdir=cwd, attempt_dir=attempt_dir, sources=snapshot.sources,
                     schema=schema, output=output, model=model, effort=effort,
-                    codex=executable, session_id=resume_id,
-                    timeout_s=timeout_s,
-                    preserve_color=precheck_diff is not None or resume_id is not None,
+                    codex=executable, timeout_s=timeout_s,
                 )
             attempt_record["command"] = cmd
             if reviewer == "claude":
                 provenance = attempt_record["transport_provenance"]
                 provenance.setdefault("transport", "routing")
                 provenance.setdefault("requested_session_id", session_id)
-                provenance.setdefault("session_id", resume_id)
+                provenance.setdefault("session_id", None)
             proc = _run_reviewer(
                 cmd, reviewer=reviewer, input=prompt, timeout=timeout_s,
                 cwd=str(cwd), env=env,
@@ -1980,7 +1859,7 @@ def _review_session(
                 event.get("session_id") not in (None, "", session_id)
                 for event in final_events
             ):
-                attempt_context.append("Claude continuation/session id disagrees with the requested judge session")
+                attempt_context.append("Claude session id disagrees with the requested session")
             if attempt_context:
                 raise RuntimeError("; ".join(attempt_context))
             if proc.returncode != 0:
@@ -1998,7 +1877,7 @@ def _review_session(
                 if reviewer == "claude"
                 else extract_codex_verdict(output, attempt_events, validator=validator)
             )
-            if judge_findings is not None or precheck_diff is not None:
+            if judge_findings is not None:
                 inspected = evaluate_sheet_evidence(
                     final_events if reviewer == "claude" else rollout_details["events"],
                     reviewer=reviewer, sheet_count=sheet_count,
@@ -2095,14 +1974,7 @@ def _review_session(
                         "sha256": _sha256(native_path),
                         "records": native_records,
                     }
-                preserve = (
-                    precheck_diff is not None and attempt_record["outcome"] == "succeeded"
-                    and verdict is not None and verdict.get("decision") == "review"
-                )
-                if preserve:
-                    attempt_record["transport_provenance"]["state_cleanup"] = "preserved_for_judge"
-                if not preserve:
-                    _claude_transport.cleanup_state(attempt_record["transport_provenance"])
+                _claude_transport.cleanup_state(attempt_record["transport_provenance"])
 
     _write_events(events_path, events)
     evidence = evaluate_sheet_evidence(
@@ -2136,7 +2008,6 @@ def _review_session(
             (record["session_id"] for record in attempt_records if record["outcome"] == "succeeded"),
             None,
         ),
-        "continued_from": resume_id,
         "usage": _usage(
             events, reviewer, success_events=success_events,
             first_turn_usage=success_first_turn,
@@ -2154,7 +2025,7 @@ def _review_session(
     review = Review(
         name=package.name, kind=package.kind, sources=[str(source) for source in package.sources],
         source_sha256=source_sha, verdict=verdict,
-        passed=(is_pass(verdict) if judge_findings is None and precheck_diff is None else verdict is not None)
+        passed=(is_pass(verdict) if judge_findings is None else verdict is not None)
         and blind and error is None and inspection_proven,
         blind=blind, tool_events=tool_events, reviewer=reviewer, model=model,
         effort=effort, prompt_sha256=prompt_sha, sheet_count=sheet_count,
@@ -2162,9 +2033,6 @@ def _review_session(
         reviewed_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
         error=error, events_file=str(events_path), attempts=attempts, extra=extra,
     )
-    if reviewer == "claude" and precheck_diff is not None and not review.passed:
-        for record in attempt_records:
-            _claude_transport.cleanup_state(record["transport_provenance"])
     write_review(review, report_dir)
     log_result = _telemetry.info if error is None and blind and inspection_proven else _telemetry.error
     log_result(
@@ -2229,7 +2097,6 @@ def aggregate_package(
     timeout_s: float = 1800.0,
     codex: str | None = None,
     prompt_text: str | None = None,
-    force: bool = False,
 ) -> dict[str, Any]:
     """Collect independent blind runs, then adjudicate all their finding claims."""
     if runs < 1:
@@ -2243,117 +2110,22 @@ def aggregate_package(
         reviewer=reviewer, model=model, judge_reviewer=judge_reviewer, judge_model=judge_model,
     ) as span, _claude_transport.session_lifecycle():
         started = time.monotonic()
-        # Canonical ordinal names pair explicit PDFs even across renames.
-        # A unique directory prevents stale sheets from an earlier invocation
-        # entering this immutable before/after snapshot or its diff.
+        # Ordinal names keep same-named PDFs distinct. A unique directory
+        # prevents stale sheets from an earlier invocation entering this
+        # immutable snapshot.
         source_dir = report_dir / package.name / "sources" / uuid.uuid4().hex
         sources: list[Path] = []
-        before_sources: list[Path] = []
         snapshot_error = None
         try:
-            for label, originals, frozen in (
-                ("after", package.sources, sources),
-                ("before", () if force else package.before_sources, before_sources),
-            ):
-                directory = source_dir / label
-                directory.mkdir(parents=True, exist_ok=True)
-                for index, source in enumerate(originals):
-                    target = directory / f"{index + 1:04d}{source.suffix.lower()}"
-                    shutil.copyfile(source, target)
-                    frozen.append(target)
+            source_dir.mkdir(parents=True, exist_ok=True)
+            for index, source in enumerate(package.sources):
+                target = source_dir / f"{index + 1:04d}{source.suffix.lower()}"
+                shutil.copyfile(source, target)
+                sources.append(target)
         except OSError as exc:
             snapshot_error = f"source snapshot failed: {type(exc).__name__}: {exc}"
-            if label == "before" and not force:
-                snapshot_error += (
-                    "; BEFORE baseline is required; use --force for an unconditional after-only review"
-                )
         snapshot = ReviewPackage(package.name, package.kind, tuple(sources))
         source_sha = [_sha256(source) for source in sources]
-        before_sha = [_sha256(source) for source in before_sources]
-        precheck: Review | None = None
-        judge_package = snapshot
-        precheck_info: dict[str, Any] = {
-            "forced": force, "skipped": False, "decision": None, "skip_kind": None,
-            "reason": None, "error": None, "warning": None, "report": None,
-            "diff": None, "session_id": None,
-        }
-        after_sheet_count = 0
-        with _telemetry.span(
-            "machinist_review.precheck", name=package.name, kind=package.kind,
-            judge_reviewer=judge_reviewer, judge_model=judge_model, forced=force,
-        ) as precheck_span:
-            if not force:
-                try:
-                    # Forced build/benchmark gates do not execute or depend on diff
-                    # tooling; keep its dynamic identity-map closure out of them.
-                    from _drawing_diff import create_drawing_diff
-                    if snapshot_error:
-                        raise RuntimeError(snapshot_error)
-                    if not package.sources or len(package.before_sources) != len(package.sources):
-                        raise ValueError("precheck requires paired before and after PDFs; use --force for an unconditional after-only review")
-                    if any(
-                        source.suffix.casefold() != ".pdf"
-                        for source in (*package.sources, *package.before_sources)
-                    ):
-                        raise ValueError("precheck inputs must be PDFs")
-                    after_sheet_count = _validate_package(snapshot)
-                    directory = report_dir / package.name / "precheck"
-                    diff = create_drawing_diff(
-                        source_dir / "before", source_dir / "after", directory / "diff.zip",
-                        old_label="BEFORE", new_label="AFTER", include_unchanged=True,
-                    )
-                    diff["after_sheet_count"] = after_sheet_count
-                    overlay_sources: list[Path] = []
-                    with ZipFile(diff["asset_path"]) as archive:
-                        for index, member in enumerate(diff["images"]):
-                            target = directory / "overlays" / f"overlay-{index + 1:04d}.png"
-                            target.parent.mkdir(parents=True, exist_ok=True)
-                            target.write_bytes(archive.read(member))
-                            overlay_sources.append(target)
-                    if not overlay_sources or len(overlay_sources) != len(diff["pages"]):
-                        raise RuntimeError("PDF diff did not provide an overlay for every page")
-                    diff["overlay_sheets"] = [
-                        {"sheet": after_sheet_count + index + 1, "image": member}
-                        for index, member in enumerate(diff["images"])
-                    ]
-                    precheck_info["diff"] = diff
-                    judge_package = ReviewPackage(
-                        package.name, package.kind, (*snapshot.sources, *overlay_sources)
-                    )
-                    precheck = _review_session(
-                        judge_package, reviewer=judge_reviewer, model=judge_model,
-                        effort=judge_effort, report_dir=directory, retries=retries,
-                        timeout_s=timeout_s, codex=codex, precheck_diff=diff,
-                    )
-                    precheck_info["report"] = str(directory / f"{package.name}.json")
-                    if not precheck.passed or not precheck.extra.get("session_id"):
-                        raise RuntimeError(precheck.error or "precheck failed blind sheet/session evidence checks")
-                    precheck_info.update(precheck.verdict or {})
-                    precheck_info["session_id"] = precheck.extra["session_id"]
-                    precheck_info["skipped"] = precheck_info["decision"] == "skip"
-                    if precheck_info["skipped"]:
-                        precheck_info["warning"] = (
-                            "MINIMAL-CHANGE SKIP: independent machinist reviews were not run; "
-                            "this is not a full machinist review or baseline approval. "
-                            "Change triage only. " + precheck_info["reason"]
-                        )
-                except Exception as exc:
-                    precheck_info["error"] = f"{type(exc).__name__}: {exc}"
-                    precheck_info["warning"] = "Precheck failed closed; no minimal-change skip was accepted."
-            precheck_outcome = (
-                "error" if precheck_info["error"] else "bypass" if force
-                else "skip" if precheck_info["skipped"] else "review"
-            )
-            precheck_attributes = {
-                "outcome": precheck_outcome,
-                "skip_kind": precheck_info["skip_kind"] or "none",
-                "reason": precheck_info["reason"] or (
-                    "Precheck bypassed by --force." if force else ""
-                ),
-                "error": precheck_info["error"] or "",
-            }
-            for key, value in precheck_attributes.items():
-                precheck_span.set_attribute(key, value)
 
         def run(run_id: str, on_first_response: Callable[[], None] | None = None) -> Review:
             directory = report_dir / package.name / "runs" / run_id
@@ -2383,46 +2155,44 @@ def aggregate_package(
                 return review
 
         run_ids = [f"r{index + 1}" for index in range(runs)]
-        reviews: list[Review] = []
-        if not precheck_info["error"] and not precheck_info["skipped"]:
-            with ThreadPoolExecutor(max_workers=runs) as pool:
-                if reviewer == "claude" and runs > 1:
-                    response_seen = threading.Event()
-                    followers_released = threading.Event()
+        with ThreadPoolExecutor(max_workers=runs) as pool:
+            if reviewer == "claude" and runs > 1:
+                response_seen = threading.Event()
+                followers_released = threading.Event()
 
-                    def first_response() -> None:
-                        response_seen.set()
-                        followers_released.set()
+                def first_response() -> None:
+                    response_seen.set()
+                    followers_released.set()
 
-                    waiting_since = time.monotonic()
-                    leader = pool.submit(
-                        contextvars.copy_context().run, run, run_ids[0], first_response,
-                    )
-                    # A failed/exhausted/timed-out leader must not strand the
-                    # remaining reviews. Its existing attempt timeouts still
-                    # bound the wait; terminal completion always opens the gate.
-                    leader.add_done_callback(lambda _future: followers_released.set())
-                    followers_released.wait()
-                    _telemetry.event(
-                        "machinist_review.followers_released",
-                        reason=(
-                            "first_provider_response" if response_seen.is_set()
-                            else "leader_terminal_without_response"
-                        ),
-                        wait_s=round(time.monotonic() - waiting_since, 3),
-                        follower_count=runs - 1,
-                    )
-                    futures = [leader]
-                    futures.extend(
-                        pool.submit(contextvars.copy_context().run, run, run_id)
-                        for run_id in run_ids[1:]
-                    )
-                else:
-                    futures = [
-                        pool.submit(contextvars.copy_context().run, run, run_id)
-                        for run_id in run_ids
-                    ]
-                reviews = [future.result() for future in futures]
+                waiting_since = time.monotonic()
+                leader = pool.submit(
+                    contextvars.copy_context().run, run, run_ids[0], first_response,
+                )
+                # A failed/exhausted/timed-out leader must not strand the
+                # remaining reviews. Its existing attempt timeouts still
+                # bound the wait; terminal completion always opens the gate.
+                leader.add_done_callback(lambda _future: followers_released.set())
+                followers_released.wait()
+                _telemetry.event(
+                    "machinist_review.followers_released",
+                    reason=(
+                        "first_provider_response" if response_seen.is_set()
+                        else "leader_terminal_without_response"
+                    ),
+                    wait_s=round(time.monotonic() - waiting_since, 3),
+                    follower_count=runs - 1,
+                )
+                futures = [leader]
+                futures.extend(
+                    pool.submit(contextvars.copy_context().run, run, run_id)
+                    for run_id in run_ids[1:]
+                )
+            else:
+                futures = [
+                    pool.submit(contextvars.copy_context().run, run, run_id)
+                    for run_id in run_ids
+                ]
+            reviews = [future.result() for future in futures]
 
         summaries = []
         findings = []
@@ -2455,12 +2225,7 @@ def aggregate_package(
         confirmed = []
         rejected = []
         error = None
-        if precheck_info["error"]:
-            error = f"precheck failed: {precheck_info['error']}"
-            judge_info["skip_reason"] = "precheck failed"
-        elif precheck_info["skipped"]:
-            judge_info["skip_reason"] = "minimal-change precheck skipped full review"
-        elif all(summary["error"] for summary in summaries):
+        if all(summary["error"] for summary in summaries):
             error = "all review runs errored: " + "; ".join(
                 f"{summary['run_id']}: {summary['error']}" for summary in summaries
             )
@@ -2475,10 +2240,10 @@ def aggregate_package(
             ) as judge_span:
                 try:
                     judgment = _review_session(
-                        judge_package, reviewer=judge_reviewer,
+                        snapshot, reviewer=judge_reviewer,
                         model=judge_model, effort=judge_effort, report_dir=directory,
                         retries=retries, timeout_s=timeout_s, codex=codex,
-                        judge_findings=findings, resume_review=precheck,
+                        judge_findings=findings,
                     )
                 except Exception as exc:
                     judgment = _failed_review(
@@ -2527,14 +2292,12 @@ def aggregate_package(
         aggregate = {
             "name": package.name, "kind": package.kind,
             "sources": [str(source) for source in package.sources],
-            "before_sources": [str(source) for source in package.before_sources],
-            "before_source_sha256": before_sha, "precheck": precheck_info,
             "source_sha256": source_sha, "verdict": verdict,
             "gating_count": gating_count, "gating_min_runs": gating_min_runs,
             "confirmed": confirmed, "rejected": rejected,
             "runs": summaries, "judge": judge_info, "reviewer": reviewer,
             "model": model, "effort": effort, "error": error,
-            "sheet_count": max((review.sheet_count for review in reviews), default=after_sheet_count),
+            "sheet_count": max(review.sheet_count for review in reviews),
             "reviewed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "duration_s": round(time.monotonic() - started, 1),
         }
@@ -2544,16 +2307,10 @@ def aggregate_package(
         span.set_attribute("gating_count", gating_count)
         span.set_attribute("error_count", sum(bool(summary["error"]) for summary in summaries))
         span.set_attribute("verdict", verdict)
-        span.set_attribute(
-            "decision_basis",
-            "error" if error else "precheck_skip" if precheck_info["skipped"] else "full_review",
-        )
         span.set_attribute("completed_run_count", len(summaries))
         span.set_attribute("valid_run_count", valid_runs)
         span.set_attribute("judge_executed", not judge_info["skipped"])
         span.set_attribute("error", error or "")
-        for key, value in precheck_attributes.items():
-            span.set_attribute(f"precheck_{key}", value)
         (report_dir / f"{package.name}.aggregate.json").write_text(
             json.dumps(aggregate, indent=2), encoding="utf-8"
         )
@@ -2577,20 +2334,6 @@ def render_aggregate(aggregate: dict[str, Any]) -> str:
         f"- judge: {aggregate['judge']['reviewer']}/{aggregate['judge']['model']} "
         f"({aggregate['judge']['effort']})",
     ]
-    precheck = aggregate.get("precheck") or {}
-    if precheck.get("warning"):
-        lines += ["", f"**WARNING: {precheck['warning']}**"]
-    if precheck.get("forced"):
-        lines.append("- PDF diff precheck bypassed by --force; unconditional review.")
-    elif precheck:
-        lines += [
-            f"- before sha256: {', '.join(aggregate.get('before_source_sha256', []))}",
-            f"- precheck: {precheck.get('decision') or 'ERROR'}; {precheck.get('reason') or precheck.get('error')}",
-        ]
-        if precheck.get("report"):
-            lines.append(f"- precheck evidence: {precheck['report']}")
-        if precheck.get("diff"):
-            lines.append(f"- PDF overlay archive: {precheck['diff']['asset_path']}")
     if aggregate["error"]:
         lines += ["", f"**error:** {aggregate['error']}"]
     if aggregate["judge"]["skipped"]:
@@ -2652,13 +2395,6 @@ def render_markdown(review: Review) -> str:
         lines += ["", f"**error:** {review.error}"]
     verdict = review.verdict
     if verdict:
-        if "skip_kind" in verdict:
-            lines += [
-                "", "## PDF diff precheck",
-                f"**{verdict['decision']} / {verdict['skip_kind']}** — {verdict['reason']}",
-                "", "Change triage only; not a full machinist review or baseline approval.",
-            ]
-            return "\n".join(lines) + "\n"
         if "clusters" in verdict:
             lines += ["", "## Judge clusters"]
             for cluster in verdict["clusters"]:
@@ -2738,8 +2474,6 @@ def render_index(reviews: Sequence[Review | dict[str, Any]]) -> str:
     for row in sorted(rows, key=lambda row: (row["passed"], row["name"])):
         counts = " | ".join(str(row["counts"][key]) for key in FINDING_KEYS)
         displayed_verdict = row["verdict"]
-        if (row.get("precheck") or {}).get("skipped"):
-            displayed_verdict += " — **MINIMAL-CHANGE SKIP; NOT FULL REVIEW**"
         lines.append(
             f"| [{row['name']}]({row['link']}) | {row['kind']} | {row['sheet_count']} | "
             f"{'PASS' if row['passed'] else 'FAIL'} | {displayed_verdict} | {counts} | "
@@ -2763,13 +2497,7 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--all", action="store_true", help="review every registered drawing"
     )
-    parser.add_argument("--pdf", type=Path, action="append", help="AFTER package PDF; repeat in pairing order")
-    parser.add_argument("--before-pdf", type=Path, action="append", help="BEFORE PDF paired by position with --pdf")
-    parser.add_argument("--before-pdf-dir", type=Path, help="BEFORE registry-named PDF directory")
-    parser.add_argument(
-        "--force", action="store_true",
-        help="bypass diff precheck and always review; permits AFTER-only inputs",
-    )
+    parser.add_argument("--pdf", type=Path, action="append", help="package PDF; repeat in package order")
     parser.add_argument("--name", help="package stem for --pdf (no registry lookup)")
     parser.add_argument("--kind", choices=("part", "assembly"), default="part")
     parser.add_argument(
@@ -2808,7 +2536,7 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--missing-ok",
         action="store_true",
-        help="skip packages with missing AFTER or BEFORE PDFs (only AFTER is required with --force)",
+        help="skip packages with missing PDFs",
     )
     args = parser.parse_args(argv)
     if args.runs < 1:
@@ -2819,19 +2547,11 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
             for char in args.name
         ):
             parser.error("--pdf requires --name with a plain package stem")
-        if args.all or args.names or args.pdf_dir or args.before_pdf_dir:
-            parser.error("--pdf cannot be combined with --all, names, --pdf-dir or --before-pdf-dir")
-        if args.before_pdf and len(args.before_pdf) != len(args.pdf):
-            parser.error("--before-pdf and --pdf must have equal counts (paired by position)")
-        if not args.force and not args.before_pdf:
-            parser.error("--pdf requires --before-pdf unless --force bypasses the precheck")
+        if args.all or args.names or args.pdf_dir:
+            parser.error("--pdf cannot be combined with --all, names or --pdf-dir")
     elif args.name:
         parser.error("--name requires --pdf")
-    if args.before_pdf and not args.pdf:
-        parser.error("--before-pdf requires --pdf")
-    if not args.pdf and not args.index and not args.force and not args.before_pdf_dir:
-        parser.error("registry reviews require --before-pdf-dir unless --force bypasses the precheck")
-    for path in (*(args.pdf or []), *(args.before_pdf or [])):
+    for path in args.pdf or []:
         if path.suffix.casefold() != ".pdf":
             parser.error(f"expected PDF input, not {path}")
     return args
@@ -2848,7 +2568,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.pdf:
         packages = [ReviewPackage(
             args.name, args.kind, tuple(path.resolve() for path in args.pdf),
-            tuple(path.resolve() for path in (args.before_pdf or [])),
         )]
     elif args.all:
         packages = all_packages()
@@ -2870,23 +2589,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
             for package in packages
         ]
-    if args.before_pdf_dir is not None:
-        packages = [
-            ReviewPackage(
-                package.name, package.kind, package.sources,
-                (args.before_pdf_dir / DRAWINGS_BY_NAME[package.name].outputs["pdf"].name,),
-            )
-            for package in packages
-        ]
     if args.missing_ok:
         skipped: list[str] = []
         rendered: list[ReviewPackage] = []
         for package in packages:
-            required_sources = (
-                package.sources if args.force
-                else (*package.sources, *package.before_sources)
-            )
-            if all(source.is_file() for source in required_sources):
+            if all(source.is_file() for source in package.sources):
                 rendered.append(package)
             else:
                 skipped.append(package.name)
@@ -2919,7 +2626,6 @@ def main(argv: Sequence[str] | None = None) -> int:
                 retries=args.retries,
                 timeout_s=args.timeout,
                 prompt_text=prompt_text,
-                force=args.force,
             ): package
             for package in packages
         }

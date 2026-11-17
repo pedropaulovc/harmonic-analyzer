@@ -499,7 +499,7 @@ and ships each part's hobby sheet as `travelers/<slug>-traveler.pdf` in the
 bundle (owner ruling 2026-11-14, superseding the 2026-11-11 ruling that releases
 carry no travelers). prechips still stays out of `uv.lock`
 ([#2502](https://github.com/pedropaulovc/harmonic-analyzer/issues/2502): every
-prechips release changed the lock and re-keyed every `check:machinist_review:*`).
+prechips release changed the lock, which until #2882 re-keyed every `check:machinist_review:*`).
 The plans, `cad/process/shop.toml` and the setup pictures stay in HA. The task runs
 `cad/scripts/prechips_traveler.py <stem>`, which runs prechips outside the
 project environment with uv's tool runner, always the latest PyPI release:
@@ -1129,10 +1129,7 @@ The PDF enters the key as `_pdf_ink_digest.pdf_ink_digest`: each page's size,
 printed characters and 144 dpi grayscale raster, with no tolerance. A rebuild
 that prints the same sheet differs only in export time, document `/ID` and
 font-subset tags, and reuses its verdict, `SHIP` or `FIX`; one changed pixel or
-character misses the key. A verdict published under the earlier
-byte-digest key is adopted under the ink key for the same PDF bytes instead of
-being rolled again (`review_adopted_byte_key` in `cache.jsonl`; removed under
-#2811 once a full build of main records none). On a remaining miss a reviewed
+character misses the key. On a miss a reviewed
 PDF of the same drawing under the same non-PDF inputs that prints the same
 sheet under the release drawing diff's page rule (`_drawing_diff`: BUILD/REV
 values masked, characters equal, ink within 1 px or 68 grey levels) carries its

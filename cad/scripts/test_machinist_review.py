@@ -33,8 +33,8 @@ _REAL_WHICH = shutil.which
 
 def _reviewer_which(name: str, *args: Any, **kwargs: Any) -> str | None:
     """Fake reviewer executables only. mr.shutil IS the stdlib module, so the
-    patch is process-wide: trimesh's first import probes which("blender",
-    path=...) inside precheck, and must still reach the real lookup."""
+    patch is process-wide: library probes such as trimesh's which("blender",
+    path=...) must still reach the real lookup."""
     if name in mr.REVIEWERS and not args and not kwargs:
         return f"{name}-test"
     return _REAL_WHICH(name, *args, **kwargs)
@@ -850,9 +850,8 @@ def test_sdk_clears_stale_quota_after_a_clean_assistant_response(tmp_path, sdk_t
     assert all(entry["status"] == "ready" for entry in state["keys"].values())
 
 
-@pytest.mark.parametrize("resumed_judge", [False, True])
 def test_sdk_api_retry_succeeds_without_rotation(
-    tmp_path: Path, sdk_transport, monkeypatch: pytest.MonkeyPatch, resumed_judge: bool,
+    tmp_path: Path, sdk_transport, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from machinist_review_credentials import CredentialPool
 
@@ -865,33 +864,17 @@ def test_sdk_api_retry_succeeds_without_rotation(
     monkeypatch.setattr(CredentialPool, "unavailable", unavailable)
     monkeypatch.setattr(sdk_transport.transport, "_omp", fallback)
     package = mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),))
-    first = None
-    if resumed_judge:
-        sdk_transport.verdict = {"decision": "review", "skip_kind": "none", "reason": "Review required."}
-        first = mr._review_session(
-            package, reviewer="claude", report_dir=tmp_path / "precheck", retries=0,
-            precheck_diff={"pages": [{"status": "unchanged", "old_size_points": [10, 10],
-                                     "new_size_points": [10, 10], "text_changed": False}]},
-        )
-        assert first.passed
-        sdk_transport.verdict = {"clusters": []}
     sdk_transport.api_retry = True
     review = mr._review_session(
         package, reviewer="claude", report_dir=tmp_path / "review", retries=0,
-        **({"judge_findings": [], "resume_review": first} if resumed_judge else {}),
     )
     assert review.passed
-    assert len(sdk_transport.clients) == (2 if resumed_judge else 1)
+    assert len(sdk_transport.clients) == 1
     record, = review.extra["evidence"]["attempts"]
     routes = record["transport_provenance"]["routes"]
     assert len(routes) == 1 and routes[0]["outcome"] == "succeeded"
     events = mr._parse_events(Path(record["stdout_file"]).read_text())
     assert any(event.get("subtype") == "api_retry" for event in events)
-    if resumed_judge:
-        before, after = sdk_transport.clients
-        assert after.options.resume == before.options.session_id
-        assert after.options.env["ANTHROPIC_API_KEY"] == before.options.env["ANTHROPIC_API_KEY"]
-        assert review.extra["session_id"] == first.extra["session_id"]
     state = json.loads(Path(os.environ["CODJIFLO_CLAUDE_STATE_FILE"]).read_text())
     assert all(entry["status"] == "ready" and entry["retryAt"] is None
                for entry in state["keys"].values())
@@ -1138,53 +1121,6 @@ def test_sdk_independent_native_state_is_removed_after_retaining_evidence(tmp_pa
     assert mr.evaluate_sheet_evidence(
         mr._parse_events(Path(record["stdout_file"]).read_text()), reviewer="claude", sheet_count=1,
     )["inspection_proven"]
-
-
-def test_sdk_continuation_rebinds_an_eligible_key_without_replaying_history(tmp_path, sdk_transport):
-    from machinist_review_credentials import CredentialPool
-    package = mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),))
-    sdk_transport.verdict = {"decision": "review", "skip_kind": "none", "reason": "Inspect the changed sheet."}
-    first = mr._review_session(
-        package, reviewer="claude", report_dir=tmp_path / "precheck", retries=0,
-        precheck_diff={"pages": [{"status": "unchanged", "old_size_points": [10, 10],
-                                 "new_size_points": [10, 10], "text_changed": False}]},
-    )
-    assert first.passed
-    initial, = first.extra["evidence"]["attempts"]
-    native_state = Path(sdk_transport.clients[0].options.env["CLAUDE_CONFIG_DIR"])
-    assert native_state.is_dir()
-    pool = CredentialPool()
-    selected = next(key for key in pool.credentials if key.id == initial["transport_provenance"]["credential_id"])
-    pool.unavailable(selected, {"status": "exhausted", "retryAt": None, "reason": "credit-balance"})
-    sdk_transport.verdict = {"clusters": []}
-    judgment = mr._review_session(
-        package, reviewer="claude", report_dir=tmp_path / "judge", retries=0,
-        judge_findings=[], resume_review=first,
-    )
-    assert judgment.passed and judgment.extra["session_id"] == first.extra["session_id"]
-    assert len(sdk_transport.clients) == 2
-    before, after = sdk_transport.clients
-    assert after.options.resume == before.options.session_id
-    assert after.options.env["ANTHROPIC_API_KEY"] != before.options.env["ANTHROPIC_API_KEY"]
-    assert after.options.env["CLAUDE_CONFIG_DIR"] == before.options.env["CLAUDE_CONFIG_DIR"]
-    assert not native_state.exists()
-
-
-def test_unjudged_precheck_state_is_released_by_aggregate_lifecycle(tmp_path, sdk_transport):
-    sdk_transport.verdict = {"decision": "review", "skip_kind": "none", "reason": "Review required."}
-    with sdk_transport.transport.session_lifecycle():
-        first = mr._review_session(
-            mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),)),
-            reviewer="claude", report_dir=tmp_path / "precheck", retries=0,
-            precheck_diff={"pages": [{"status": "unchanged", "old_size_points": [10, 10],
-                                     "new_size_points": [10, 10], "text_changed": False}]},
-        )
-        assert first.passed
-        record, = first.extra["evidence"]["attempts"]
-        home = Path(record["transport_provenance"]["private_home"])
-        assert home.exists()
-    assert not home.exists() and Path(record["stdout_file"]).exists()
-
 
 
 @pytest.mark.parametrize("status", ["failed", "pending"])
@@ -1666,7 +1602,7 @@ def test_sdk_redaction_failure_is_fatal_without_masking_primary(
         await transport._sdk(
             key=key, config={"mcpServers": {}, "prompt": "Review"}, schema=mr.load_schema(),
             model="test", effort="high", session_id="00000000-0000-4000-8000-000000000001",
-            continuation="fresh", cwd=str(tmp_path), remaining=lambda: 5, startup=1,
+            cwd=str(tmp_path), remaining=lambda: 5, startup=1,
             settings=mr.CLAUDE_ISOLATION_SETTINGS,
             emit=lambda event, raw: native.append(raw) if raw else None,
             diagnostics=diagnostics, provenance={"private_home": str(session_dir.parent)},
@@ -1681,7 +1617,7 @@ def test_sdk_redaction_failure_is_fatal_without_masking_primary(
     assert sdk_transport.clients[0].disconnected
 
 
-def test_sdk_redaction_skips_unchanged_files_but_scans_changed_and_new_files(
+def test_sdk_redaction_scans_every_native_transcript_file(
     tmp_path: Path, sdk_transport, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from machinist_review_credentials import CredentialPool
@@ -1706,41 +1642,18 @@ def test_sdk_redaction_skips_unchanged_files_but_scans_changed_and_new_files(
 
     monkeypatch.setattr(Path, "read_text", tracked_read)
 
-    async def invoke(continuation):
+    async def invoke():
         await transport._sdk(
             key=key, config={"mcpServers": {}, "prompt": "Review"}, schema=mr.load_schema(),
             model="test", effort="high", session_id="00000000-0000-4000-8000-000000000001",
-            continuation=continuation, cwd=str(tmp_path), remaining=lambda: 5, startup=1,
+            cwd=str(tmp_path), remaining=lambda: 5, startup=1,
             settings=mr.CLAUDE_ISOLATION_SETTINGS, emit=lambda *args: None,
             diagnostics=[], provenance=provenance,
         )
 
-    asyncio.run(invoke("fresh"))
+    asyncio.run(invoke())
     assert set(reads) == {unchanged, changed, metadata}
     assert all(read_text(path) == "[REDACTED]" for path in reads)
-    reads.clear()
-    changed.write_text("changed " + key.api_key)
-    next_key = CredentialPool().credentials[1]
-    metadata.write_text(json.dumps({"secret": key.api_key, "next_secret": next_key.api_key}))
-    new = session_dir / "new.log"
-    new.write_text(key.api_key)
-    asyncio.run(invoke("sdk_resume"))
-    assert set(reads) == {changed, metadata, new}
-    assert all(key.api_key not in read_text(path) for path in (unchanged, changed, metadata, new))
-    assert provenance["sdk_redacted_fingerprint"] == key.fingerprint
-    assert set(provenance["sdk_redacted_files"]) == {
-        str(path) for path in (unchanged, changed, metadata, new)
-    }
-    reads.clear()
-    asyncio.run(invoke("sdk_resume"))
-    assert reads == []
-    # Even unchanged files need a fresh scan after rebinding to another key.
-    assert next_key.api_key in read_text(metadata)
-    key = next_key
-    asyncio.run(invoke("sdk_resume"))
-    assert set(reads) == {unchanged, changed, metadata, new}
-    assert key.api_key not in read_text(metadata)
-    assert provenance["sdk_redacted_fingerprint"] == key.fingerprint
 
 
 def test_quota_classifier_rejects_assistant_prose_and_structured_output_failures():
@@ -1868,7 +1781,7 @@ for line in sys.stdin:
             last = replies[min(prompts, len(replies)) - 1]
             emit({"type": "message_end", "message": {"role": "assistant", "model": "test",
                   "usage": {"input": 5, "output": 1}, "content": [{"type": "text", "text": last}]}})
-        result = {"type": "prompt_result", "id": request["id"], "agentInvoked": True, "status": "failed" if mode in {"turn_failure", "failure_then_malformed"} else "completed", "sessionSettled": True}
+        result = {"type": "prompt_result", "id": request["id"], "agentInvoked": True, "status": "failed" if mode == "failure_then_malformed" else "completed", "sessionSettled": True}
         print(json.dumps(result) + ("\nnot-json-drain-canary" if mode == "failure_then_malformed" else ""), flush=True)
         continue
     elif kind == "get_last_assistant_text":
@@ -1936,7 +1849,7 @@ def test_omp_rpc_actual_session_readiness_precedes_prompt_and_reaps_on_failure(
             native.append(raw)
         if event is not None:
             normalized.append(event)
-    async def invoke(continuation="fresh"):
+    async def invoke():
         async with asyncio.timeout(5):
             await transport._omp_session(
                 executable=sys.executable, broker_env={"OMP_AUTH_BROKER_URL": "http://127.0.0.1:1", "OMP_AUTH_BROKER_TOKEN": "fixture-token"},
@@ -1944,7 +1857,7 @@ def test_omp_rpc_actual_session_readiness_precedes_prompt_and_reaps_on_failure(
                 schema={}, model="test", effort="medium", cwd=str(work),
                 remaining=lambda: 0.05 if catalog == "slow_shutdown" and (work / "completed").exists() else 5,
                 startup=startup, emit=emit, diagnostics=Diagnostics(),
-                provenance=provenance, continuation=continuation,
+                provenance=provenance,
             )
     if catalog == "slow_shutdown":
         asyncio.run(invoke())
@@ -1974,29 +1887,6 @@ def test_omp_rpc_actual_session_readiness_precedes_prompt_and_reaps_on_failure(
         assert effective["config"] == json.loads((home / "config.yml").read_text())
         assert effective["tools"] == sorted(transport.OMP_TOOLS)
         assert (home / "agent" / "blobs").is_dir()
-        before_blobs = set(provenance["image_blobs"])
-        asyncio.run(invoke("omp_resume"))
-        assert before_blobs < set(provenance["image_blobs"])
-        completed = provenance
-        completed["resolved_model"] = {"provider": "anthropic", "id": "stale-precheck-model"}
-        completed_bytes = json.dumps(completed, sort_keys=True).encode()
-        for failed_mode in ("extra", "turn_failure"):
-            provenance = transport.resume_inputs(completed)
-            catalog = failed_mode
-            with pytest.raises(RuntimeError):
-                asyncio.run(invoke("omp_resume"))
-            assert "shutdown" not in provenance and "image_blobs" not in provenance
-            assert provenance.get("resolved_model", {}).get("id") != "stale-precheck-model"
-            if failed_mode == "extra":
-                assert "resolved_model" not in provenance
-            assert json.dumps(completed, sort_keys=True).encode() == completed_bytes
-        catalog = "valid"
-        provenance = completed
-        (home / "agent" / "blobs" / next(iter(before_blobs))).unlink()
-        started = len(processes)
-        with pytest.raises(RuntimeError, match="image blob is unavailable"):
-            asyncio.run(invoke("omp_resume"))
-        assert len(processes) == started  # Missing images fail before launching a new turn.
     else:
         with pytest.raises(TimeoutError if catalog == "silent" else RuntimeError) as caught:
             asyncio.run(invoke())
@@ -2078,7 +1968,7 @@ def test_omp_repairs_malformed_verdict_in_session_without_tools(
                 config={"mcpServers": {}, "prompt": "inspect"}, schema=schema, model="test",
                 effort="medium", cwd=str(work), remaining=lambda: 10, startup=5,
                 emit=lambda event, raw: event is not None and normalized.append(event),
-                diagnostics=[], provenance=provenance, continuation="fresh",
+                diagnostics=[], provenance=provenance,
             )
     def judge(events):
         return mr.extract_claude_verdict(events, validator=lambda value: mr.validate_judgment(value, [{"id": "r1.minor.1"}]))
@@ -2208,7 +2098,7 @@ def test_judge_schema_enumerates_finding_ids_so_omp_repairs_an_invented_id(
                 config={"mcpServers": {}, "prompt": "inspect"}, schema=schema, model="test",
                 effort="medium", cwd=str(work), remaining=lambda: 10, startup=5,
                 emit=lambda event, raw: event is not None and normalized.append(event),
-                diagnostics=[], provenance=provenance, continuation="fresh",
+                diagnostics=[], provenance=provenance,
             )
     asyncio.run(invoke())
     assert all(process.returncode is not None for process in processes)
@@ -2293,8 +2183,6 @@ def test_private_pool_rotation_groups_and_replaced_key_cannot_restore_old_block(
     save()
     assert pool.unavailable(first, {"status": "exhausted", "retryAt": None, "reason": "credit-balance"}) == "stale_credential"
     assert pool.claim(["c"]).id == "a"
-    with pytest.raises(ValueError, match="rotated"):
-        pool.claim(required_id=first.id, required_fingerprint=first.fingerprint)
     assert "private-key" not in state.read_text()
 
 
@@ -4513,17 +4401,17 @@ def test_review_serialises_and_indexes(tmp_path: Path) -> None:
 
 
 def test_main_distinguishes_missing_and_unknown_names(capsys) -> None:
-    assert mr.main(["--force"]) == 2
+    assert mr.main([]) == 2
     assert capsys.readouterr().err == (
         "no drawing names given; use --all, --pdf or a name\n"
     )
 
-    assert mr.main(["--reviewer", "codex", "--force"]) == 2
+    assert mr.main(["--reviewer", "codex"]) == 2
     assert capsys.readouterr().err == (
         "no drawing names given; use --all, --pdf or a name\n"
     )
 
-    assert mr.main(["--reviewer", "codex", "not-a-drawing", "--force"]) == 2
+    assert mr.main(["--reviewer", "codex", "not-a-drawing"]) == 2
     assert capsys.readouterr().err == "unknown drawing names: ['not-a-drawing']\n"
 
 
@@ -5387,7 +5275,7 @@ def test_codex_review_and_judge_propagate_attempt_startup_budget(
     aggregate = mr.aggregate_package(
         mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),)),
         reviewer="codex", judge_reviewer="codex", runs=1, retries=0,
-        timeout_s=timeout_s, report_dir=tmp_path / "reports", force=True,
+        timeout_s=timeout_s, report_dir=tmp_path / "reports",
         codex="codex-test",
     )
     assert aggregate["verdict"] == "FIX" and aggregate["error"] is None
@@ -5431,7 +5319,7 @@ def test_aggregate_runs_are_parallel_isolated_and_share_frozen_sources(
     directory = tmp_path / "reports"
     aggregate = mr.aggregate_package(
         mr.ReviewPackage("sample", "part", (source,)), reviewer=reviewer,
-        judge_reviewer=reviewer, report_dir=directory, retries=0, force=True, codex="codex-test",
+        judge_reviewer=reviewer, report_dir=directory, retries=0, codex="codex-test",
     )
     assert aggregate["verdict"] == "FIX" and aggregate["gating_count"] == 1
     assert aggregate["source_sha256"] == [source_hash]
@@ -5489,7 +5377,6 @@ def test_aggregate_initial_request_gate_is_claude_only_with_concurrent_continuat
             config = json.loads(Path(_flag(command, "--mcp-config")).read_text())
             snapshot = Path(config["mcpServers"]["sheets"]["args"][-1])
             session_id = _flag(command, "--session-id")
-            assert "--resume" not in command
         else:
             snapshot = Path(_codex_overrides(command)["mcp_servers.sheets.args"][-1])
             session_id = None
@@ -5520,7 +5407,7 @@ def test_aggregate_initial_request_gate_is_claude_only_with_concurrent_continuat
             contextvars.copy_context().run, mr.aggregate_package,
             mr.ReviewPackage("sample", "part", (source,)), reviewer=reviewer,
             judge_reviewer=judge_reviewer, report_dir=tmp_path / "reports",
-            retries=0, force=True, codex="codex-test",
+            retries=0, codex="codex-test",
         )
         try:
             assert leader_started.wait(15)
@@ -5566,7 +5453,7 @@ def test_aggregate_single_review_does_not_require_response_notification(
     aggregate = mr.aggregate_package(
         mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),)),
         runs=1, judge_reviewer=judge_reviewer, report_dir=tmp_path / "reports",
-        retries=0, force=True, codex="codex-test",
+        retries=0, codex="codex-test",
     )
     assert aggregate["verdict"] == "FIX" and aggregate["gating_count"] == 1
     assert len(calls) == 2 and calls[0] is None and calls[1] is not None
@@ -5619,7 +5506,7 @@ def test_aggregate_claude_leader_retries_or_terminal_failure_release_followers(
     monkeypatch.setattr(mr, "_run_reviewer", reply)
     aggregate = mr.aggregate_package(
         mr.ReviewPackage("sample", "part", (source,)), report_dir=tmp_path / "reports",
-        retries=1, force=True,
+        retries=1,
     )
     assert followers.is_set() and aggregate["verdict"] == "FIX"
     assert aggregate["gating_count"] == 1 and aggregate["error"] is None
@@ -5641,7 +5528,7 @@ def test_aggregate_sdk_releases_followers_on_response_before_leader_completion(
     with mr.ThreadPoolExecutor(max_workers=1) as pool:
         future = pool.submit(
             mr.aggregate_package, mr.ReviewPackage("sample", "part", (source,)),
-            report_dir=tmp_path / "reports", retries=0, timeout_s=15, force=True,
+            report_dir=tmp_path / "reports", retries=0, timeout_s=15,
         )
         try:
             assert sdk_transport.before_response.wait(10)
@@ -5665,7 +5552,7 @@ def test_aggregate_sdk_leader_timeout_closes_before_releasing_followers(
     sdk_transport.leader_timeout = True
     aggregate = mr.aggregate_package(
         mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),)),
-        report_dir=tmp_path / "reports", retries=0, force=True,
+        report_dir=tmp_path / "reports", retries=0,
     )
     assert aggregate["verdict"] == "SHIP" and aggregate["judge"]["skipped"]
     assert "TimeoutExpired" in aggregate["runs"][0]["error"]
@@ -5720,7 +5607,7 @@ def test_judge_coverage_errors_retry_in_fresh_isolated_sessions(
     monkeypatch.setattr(mr, "_run_reviewer", reply)
     aggregate = mr.aggregate_package(
         mr.ReviewPackage("sample", "part", (source,)), runs=1,
-        judge_reviewer=judge_reviewer, report_dir=tmp_path / "reports", force=True,
+        judge_reviewer=judge_reviewer, report_dir=tmp_path / "reports",
         retries=1, codex="codex-test",
     )
     assert aggregate["verdict"] == "FIX" and aggregate["error"] is None
@@ -5750,7 +5637,7 @@ def test_aggregate_counts_unique_runs_and_only_confirmed_gating_clusters(
     monkeypatch.setattr(mr, "_run_reviewer", reply)
     aggregate = mr.aggregate_package(
         mr.ReviewPackage("sample", "part", (source,)), runs=2,
-        report_dir=tmp_path / "reports", retries=0, force=True,
+        report_dir=tmp_path / "reports", retries=0,
     )
     assert aggregate["verdict"] == "FIX" and aggregate["gating_count"] == 1
     assert [item["run_count"] for item in aggregate["confirmed"]] == [2, 1]
@@ -5786,7 +5673,7 @@ def test_aggregate_gates_blockers_on_one_run_and_other_categories_on_two(
     monkeypatch.setattr(mr, "_run_reviewer", reply)
     aggregate = mr.aggregate_package(
         mr.ReviewPackage("sample", "part", (source,)), runs=3,
-        report_dir=tmp_path / "reports", retries=0, force=True,
+        report_dir=tmp_path / "reports", retries=0,
     )
     assert aggregate["verdict"] == verdict
     assert aggregate["gating_count"] == (verdict == "FIX")
@@ -5815,7 +5702,7 @@ def test_aggregate_ship_uses_judged_category_not_raw_verdict(
     monkeypatch.setattr(mr, "_run_reviewer", reply)
     aggregate = mr.aggregate_package(
         mr.ReviewPackage("sample", "part", (source,)), runs=1,
-        report_dir=tmp_path / "reports", retries=0, force=True,
+        report_dir=tmp_path / "reports", retries=0,
     )
     assert aggregate["verdict"] == "SHIP" and aggregate["gating_count"] == 0
     assert aggregate["runs"][0]["verdict"] == "FIX"
@@ -5842,7 +5729,7 @@ def test_aggregate_zero_findings_skips_judge_and_records_partial_run_errors(
     monkeypatch.setattr(mr, "_run_reviewer", reply)
     aggregate = mr.aggregate_package(
         mr.ReviewPackage("sample", "part", (source,)), report_dir=tmp_path / "reports",
-        retries=0, force=True,
+        retries=0,
     )
     assert calls == 3
     assert aggregate["verdict"] == "SHIP" and aggregate["error"] is None
@@ -5871,7 +5758,7 @@ def test_aggregate_error_is_retained_and_never_passes(
     directory = tmp_path / "reports"
     aggregate = mr.aggregate_package(
         mr.ReviewPackage("sample", "part", (source,)), runs=1,
-        report_dir=directory, retries=1, force=True,
+        report_dir=directory, retries=1,
     )
     assert aggregate["verdict"] == "ERROR" and aggregate["error"]
     assert aggregate["gating_count"] == 0
@@ -5904,7 +5791,7 @@ def test_judge_prompt_includes_sheet_text_and_owner_exceptions(
     monkeypatch.setattr(mr, "_run_reviewer", reply)
     aggregate = mr.aggregate_package(
         mr.ReviewPackage("sample", "part", (source,)), runs=1,
-        report_dir=tmp_path / "reports", retries=0, force=True,
+        report_dir=tmp_path / "reports", retries=0,
     )
     assert aggregate["verdict"] == "SHIP"
     assert len(prompts) == 1
@@ -5934,7 +5821,7 @@ def test_main_uses_aggregate_contract_for_each_input_mode(
     monkeypatch.setattr(mr, "_run_reviewer", reply)
     monkeypatch.setattr(mr.shutil, "which", _reviewer_which)
     directory = tmp_path / "reports"
-    assert mr.main([*args, "--force", "--report-dir", str(directory)]) == 0
+    assert mr.main([*args, "--report-dir", str(directory)]) == 0
     data = json.loads((directory / f"{name}.aggregate.json").read_text(encoding="utf-8"))
     assert data["verdict"] == "SHIP" and len(data["runs"]) == 3
     assert data["judge"]["skipped"]
@@ -5944,7 +5831,7 @@ def test_main_uses_aggregate_contract_for_each_input_mode(
     ["--runs", "0"], ["--pdf", "sheet.pdf"], ["--name", "sample"],
     ["--pdf", "sheet.pdf", "--name", "../sample"],
     ["--pdf", "sheet.pdf", "--name", "sample", "--png", "sheet.png"],
-    ["--png", "sheet.png"], ["--png", "sheet.png", "--force"],
+    ["--png", "sheet.png"],
 ])
 def test_cli_rejects_invalid_ensemble_inputs(args: list[str]) -> None:
     with pytest.raises(SystemExit) as exc:
@@ -5962,56 +5849,12 @@ def test_missing_source_still_writes_an_error_aggregate(
     directory = tmp_path / "reports"
     aggregate = mr.aggregate_package(
         mr.ReviewPackage("missing", "part", (tmp_path / "missing.pdf",)),
-        report_dir=directory, runs=1, force=True,
+        report_dir=directory, runs=1,
     )
     assert aggregate["verdict"] == "ERROR"
     assert "source snapshot failed" in aggregate["error"]
     assert (directory / "missing.aggregate.json").is_file()
     assert Path(aggregate["runs"][0]["report"]).is_file()
-
-
-@pytest.mark.parametrize("failure", ["startup", "turn"])
-def test_failed_resumed_judge_does_not_reuse_completion_evidence_or_mutate_precheck(
-    tmp_path, sdk_transport, failure,
-):
-    package = mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),))
-    sdk_transport.verdict = {"decision": "review", "skip_kind": "none", "reason": "Inspect sheet."}
-    first = mr._review_session(
-        package, reviewer="claude", report_dir=tmp_path / "precheck", retries=0,
-        precheck_diff={"pages": [{"status": "unchanged", "old_size_points": [10, 10],
-                                 "new_size_points": [10, 10], "text_changed": False}]},
-    )
-    assert first.passed
-    initial, = first.extra["evidence"]["attempts"]
-    old = initial["transport_provenance"]
-    # Completion fields from either adapter must never survive as judge inputs.
-    old.update(shutdown="graceful", image_blobs=["a" * 64], omp_command=["old"],
-               session_dir="old", omp_effective_options={"old": []})
-    session_dir = Path(old["sdk_session_dir"])
-    native = session_dir / "precheck.jsonl"
-    native.write_text("precheck")
-    old["sdk_redacted_files"] = {"sentinel": [1, 2, 3, 4]}
-    before = json.dumps(first.extra, sort_keys=True).encode()
-    if failure == "startup":
-        sdk_transport.status = "failed"
-    else:
-        sdk_transport.fail = True
-    judgment = mr._review_session(
-        package, reviewer="claude", report_dir=tmp_path / "judge", retries=0,
-        judge_findings=[], resume_review=first,
-    )
-    assert judgment.error
-    record, = judgment.extra["evidence"]["attempts"]
-    current = record["transport_provenance"]
-    assert record["outcome"] == "failed"
-    assert all(name not in current for name in (
-        "resolved_model", "shutdown", "image_blobs", "omp_command", "session_dir",
-        "omp_effective_options", "omp_prompt", "omp_prompt_sha256",
-    ))
-    assert current["state_cleanup"] == "removed"
-    assert json.dumps(first.extra, sort_keys=True).encode() == before
-    assert str(native) in current["sdk_redacted_files"]
-    assert str(native) not in old["sdk_redacted_files"]
 
 
 def test_sdk_environment_preserves_sdk_owned_entrypoint_and_tracing(

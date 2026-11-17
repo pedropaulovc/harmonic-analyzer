@@ -100,19 +100,16 @@ def _validate_rect(rect: tuple[int, int, int, int], size: tuple[int, int]) -> No
         )
 
 
-def _prepare_image(
-    image: PILImage.Image, *, preserve_color: bool = False
-) -> PILImage.Image:
-    mode = "RGB" if preserve_color else "L"
+def _prepare_image(image: PILImage.Image) -> PILImage.Image:
     # Composite transparent PNGs over the same white background as PDF rendering.
     if image.mode in {"RGBA", "LA", "PA"} or "transparency" in image.info:
         with image.convert("RGBA") as rgba:
             with PILImage.new("RGBA", image.size, "white") as background:
                 background.alpha_composite(rgba)
-                result = background.convert(mode)
+                result = background.convert("L")
         result.info = image.info.copy()
         return result
-    return image.convert(mode)
+    return image.convert("L")
 
 
 def _png_dpi(image: PILImage.Image) -> tuple[tuple[float, float], bool]:
@@ -141,7 +138,6 @@ def render_sheet(
     sheet: int = 1,
     sheet_count: int = 1,
     rect: tuple[int, int, int, int] | None = None,
-    preserve_color: bool = False,
 ) -> tuple[bytes, str]:
     """Return metadata-free PNG and short text for a PDF page or original PIL image.
 
@@ -151,9 +147,7 @@ def render_sheet(
     times 72, including any subpixel rounding of the fitted bitmap. PNG DPI is
     min(display, source) per axis: display dpi is output pixels per source inch,
     and upsampling beyond source pixels interpolates without adding detail.
-    The caller retains ownership of the input page/image.
-    Images are grayscale by default; preserve_color retains overlay colors in
-    views and crops, including resizing, and renders PDFs without grayscale.
+    The caller retains ownership of the input page/image. Images are grayscale.
     """
     with PDFIUM_LOCK:
         is_png = isinstance(page_or_original_image, PILImage.Image)
@@ -189,11 +183,10 @@ def render_sheet(
                 height * y2 / view_size[1],
             )
             original = page_or_original_image
-            mode = "RGB" if preserve_color else "L"
             prepared = (
                 original
-                if original.mode == mode and "transparency" not in original.info
-                else _prepare_image(original, preserve_color=preserve_color)
+                if original.mode == "L" and "transparency" not in original.info
+                else _prepare_image(original)
             )
             try:
                 # PIL's box samples the original region, never a downsampled view.
@@ -235,7 +228,7 @@ def render_sheet(
                 for pixels in (left, full_height - bottom, full_width - right, top)
             )
             bitmap = page_or_original_image.render(
-                scale=scale, crop=trims, grayscale=not preserve_color
+                scale=scale, crop=trims, grayscale=True
             )
             try:
                 with bitmap.to_pil() as native:
@@ -640,12 +633,11 @@ class SheetStore:
     budget, including invalid rectangles, repeated cache hits and failed renders.
     """
 
-    def __init__(self, sources: Sequence[Path], *, preserve_color: bool = False):
+    def __init__(self, sources: Sequence[Path]):
         import pypdfium2 as pdfium
 
         self._lock = threading.RLock()
         self._closed = False
-        self._preserve_color = preserve_color
         self._sources: dict[Path, Any] = {}
         self._sheets: list[_Sheet] = []
         self._views: dict[int, tuple[bytes, str]] = {}
@@ -667,9 +659,7 @@ class SheetStore:
                             with PILImage.open(path) as image:
                                 if image.format != "PNG":
                                     raise ValueError("PNG sources must contain PNG images")
-                                self._sources[path] = _prepare_image(
-                                    image, preserve_color=preserve_color
-                                )
+                                self._sources[path] = _prepare_image(image)
                     opened = self._sources[path]
                     if suffix == ".pdf":
                         if len(opened) == 0:
@@ -742,7 +732,6 @@ class SheetStore:
             try:
                 return render_sheet(
                     source, sheet=sheet, sheet_count=self.sheet_count, rect=rect,
-                    preserve_color=self._preserve_color,
                 )
             finally:
                 if entry.page_index is not None:
@@ -846,19 +835,13 @@ def create_server(store: SheetStore) -> FastMCP:
     annotations = ToolAnnotations(
         readOnlyHint=True, destructiveHint=False, idempotentHint=False, openWorldHint=False
     )
-    image_mode = "color-preserving overlay" if store._preserve_color else "grayscale"
-    color_note = (
-        " Overlay mode retains red/blue/gray in views and crops."
-        if store._preserve_color
-        else ""
-    )
 
     @server.tool(
         description=(
-            f"View a 1-based sheet as a {image_mode} PNG fitted within 1976×1280 pixels. "
+            "View a 1-based sheet as a grayscale PNG fitted within 1976×1280 pixels. "
             "Sheets follow input order, expanding each PDF in page order. "
             "Call for every sheet in order before judging. The returned image's "
-            "top-left pixel coordinates define crop rectangles." + color_note
+            "top-left pixel coordinates define crop rectangles."
         ),
         annotations=ToolAnnotations(
             readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False
@@ -873,12 +856,12 @@ def create_server(store: SheetStore) -> FastMCP:
         description=(
             "Zoom a 1-based sheet using integer top-left-origin view_sheet pixels: "
             "0 <= x1 < x2 <= view width and 0 <= y1 < y2 <= view height; "
-            f"right/bottom edges are exclusive. Output fits 1976×1280 {image_mode} pixels, "
+            "right/bottom edges are exclusive. Output fits 1976×1280 grayscale pixels, "
             "at most 8× the view scale. PDF crops render vectors; PNG crops use the "
             "original image (valid source DPI metadata, otherwise 300 dpi assumed); "
             "PNG effective dpi never exceeds source dpi, as upsampling adds no detail. "
             "Budget: 40 attempted crop calls per process, including invalid calls "
-            "and repeats; repeated valid crops reuse a memoized rendering." + color_note
+            "and repeats; repeated valid crops reuse a memoized rendering."
         ),
         annotations=annotations,
         structured_output=False,
@@ -892,13 +875,9 @@ def create_server(store: SheetStore) -> FastMCP:
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--preserve-color", action="store_true",
-        help="Retain overlay colors in sheet views and crops instead of grayscale.",
-    )
     parser.add_argument("sources", type=Path, nargs="+", help="PDF or PNG sheet sources")
     args = parser.parse_args(argv)
-    with SheetStore(args.sources, preserve_color=args.preserve_color) as store:
+    with SheetStore(args.sources) as store:
         # Sources are resolved and open now. Leave the inherited per-attempt cwd
         # so an orphaned server cannot lock it against Windows rename/delete.
         os.chdir(Path(__file__).resolve().anchor)

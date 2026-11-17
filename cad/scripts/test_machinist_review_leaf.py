@@ -134,10 +134,9 @@ def _local_import_closure(entry: Path) -> set[str]:
                 names = [node.module.split(".")[0]]
             for name in names:
                 local = scripts / f"{name}.py"
-                # Registry is only used by interactive name/--all selectors.
-                # The leaf supplies PDF/kind/name and always passes --force,
-                # so the lazy _drawing_diff precheck import is unreachable too.
-                if local.is_file() and name not in {"_drawing_registry", "_drawing_diff"}:
+                # Registry is only used by interactive name/--all selectors;
+                # the leaf supplies PDF, kind and name.
+                if local.is_file() and name != "_drawing_registry":
                     pending.append(local)
     return found
 
@@ -148,19 +147,11 @@ def test_declared_review_modules_equal_the_real_import_closure(dodo):
     )
 
 
-def test_forced_leaf_never_imports_or_calls_diff(inputs, monkeypatch):
-    import builtins
+def test_leaf_command_runs_three_blind_reviews(inputs, monkeypatch):
     import sys
 
-    original_import = builtins.__import__
-
-    def no_diff_import(name, *args, **kwargs):
-        assert name != "_drawing_diff", "forced leaf imported PDF diff implementation"
-        return original_import(name, *args, **kwargs)
-
-    monkeypatch.setattr(builtins, "__import__", no_diff_import)
     spec = importlib.util.spec_from_file_location(
-        "_forced_leaf_review", REPO_ROOT / "cad" / "scripts" / "machinist_review.py"
+        "_leaf_review", REPO_ROOT / "cad" / "scripts" / "machinist_review.py"
     )
     review = importlib.util.module_from_spec(spec)
     monkeypatch.setitem(sys.modules, spec.name, review)
@@ -182,20 +173,14 @@ def test_forced_leaf_never_imports_or_calls_diff(inputs, monkeypatch):
             extra={"inspection_proven": True},
         )
 
-    def no_precheck(*args, **kwargs):
-        pytest.fail("forced leaf invoked precheck despite --force")
-
     monkeypatch.setattr(review, "review_package", clean_review)
-    monkeypatch.setattr(review, "_review_session", no_precheck)
     command = inputs.module._machinist_review_command(
         "probe", inputs.module._machinist_review_profile()
     )
     assert review.main(command[2:]) == 0
     assert len(calls) == 3
-    assert all(package.before_sources == () for package in calls)
     aggregate = inputs.module._read_machinist_aggregate("probe")
-    assert aggregate["precheck"]["forced"] is True
-    assert aggregate["precheck"]["skipped"] is False
+    assert aggregate["verdict"] == "SHIP"
     assert aggregate["error"] is None
 
 
@@ -210,7 +195,6 @@ def test_explicit_pdf_command_cannot_select_a_registry_package(dodo):
         stem,
         "--kind",
         "part",
-        "--force",
         "--runs",
         "3",
         "--report-dir",
@@ -258,8 +242,6 @@ def inputs(dodo, tmp_path, monkeypatch):
         "machinist_review_schema.json",
         "machinist_review_judge.md",
         "machinist_review_judge_schema.json",
-        "machinist_review_precheck.md",
-        "machinist_review_precheck_schema.json",
     ):
         (prompts / name).write_text("{}", encoding="utf-8")
     guidelines = root / "cad" / "docs" / "drawing-guidelines.md"
@@ -356,47 +338,28 @@ def test_rebuilt_sheet_with_the_same_ink_keeps_its_review_key(inputs):
     _export_sheet(inputs.pdf, 150, "D:20261112174226-08'00'")
     assert inputs.pdf.read_bytes() != first_bytes
     assert _review_key(dodo) == first
-    assert dodo._machinist_review_byte_key(
-        "probe", dodo._machinist_review_profile()
-    ) != first
     _export_sheet(inputs.pdf, 151, "D:20261112174226-08'00'")
     assert _review_key(dodo) != first
-
-
-@pytest.mark.parametrize("manifest", ["pyproject.toml", "uv.lock"])
-def test_dependency_manifest_edits_rekey_review(inputs, manifest):
-    dodo = inputs.module
-    path = inputs.root / manifest
-    initial = _review_key(dodo)
-    original = path.read_text(encoding="utf-8")
-    path.write_text(original.replace("0.1.0", "0.2.0"), encoding="utf-8")
-    assert _review_key(dodo) != initial
-    # Whole-manifest hashing intentionally includes non-SDK dependency edits.
-    path.write_text(original + "\n# unrelated dependency edit\n", encoding="utf-8")
-    assert _review_key(dodo) != initial
-    path.write_text(original, encoding="utf-8")
-    assert _review_key(dodo) == initial
 
 
 @pytest.mark.parametrize(
     "relative_path",
     [
+        # A dependency release changes transport, not the verdict (#2882).
+        "pyproject.toml",
+        "uv.lock",
         "cad/scripts/_drawing_diff.py",
         "cad/comparisons/tools/release_diff.py",
         "cad/config/current-identity-map.json",
         "cad/config/identity-migration-map.json",
-        "cad/scripts/prompts/machinist_review_precheck.md",
-        "cad/scripts/prompts/machinist_review_precheck_schema.json",
     ],
 )
-def test_bypassed_precheck_inputs_do_not_invalidate_forced_review_cache(
-    inputs, relative_path
-):
+def test_non_review_inputs_do_not_rekey_review(inputs, relative_path):
     dodo = inputs.module
     path = inputs.root / relative_path
     assert str(path.resolve()) not in dodo._machinist_review_file_deps("probe")
     initial = _review_key(dodo)
-    path.write_bytes(path.read_bytes() + b"\nchanged precheck dependency\n")
+    path.write_bytes(path.read_bytes() + b"\nchanged non-review input\n")
     assert _review_key(dodo) == initial
 
 
@@ -572,7 +535,7 @@ def test_reviewer_selection_does_not_rekey_real_native_leaves(
 
 
 @pytest.mark.parametrize("manifest", ["pyproject.toml", "uv.lock"])
-def test_dependency_manifest_edits_rekey_review_not_native_geometry(
+def test_dependency_manifest_edits_rekey_neither_review_nor_native_geometry(
     dodo, monkeypatch, manifest
 ):
     stem = "sm_summing_lever"
@@ -598,7 +561,7 @@ def test_dependency_manifest_edits_rekey_review_not_native_geometry(
     monkeypatch.setattr(
         dodo.ContentChecker, "_digest", staticmethod(changed_manifest_digest)
     )
-    assert _review_key(dodo, stem) != review_key
+    assert _review_key(dodo, stem) == review_key
     assert [dodo._cache_key(deps, label) for label, deps in rows] == initial
 
 
@@ -1039,7 +1002,7 @@ def test_standalone_cli_ignores_all_registered_environment_overrides(
     for suffix in ENV_FIELDS.values():
         monkeypatch.setenv(ENV_PREFIX + suffix, "invalid-for-registered-gate")
     assert review_sessions.module.main([
-        "--pdf", str(inputs.pdf), "--name", "probe", "--kind", "part", "--force",
+        "--pdf", str(inputs.pdf), "--name", "probe", "--kind", "part",
         "--report-dir", str(tmp_path / "standalone"), *flags,
     ]) == 0
     assert sorted(review_sessions.seen) == sorted([
@@ -1365,74 +1328,6 @@ def _write_aggregate(directory, verdict):
     }), encoding="utf-8")
 
 
-@pytest.mark.parametrize("verdict", ["SHIP", "FIX"])
-def test_verdict_published_under_the_byte_key_is_adopted_not_rolled_again(
-    action, monkeypatch, verdict
-):
-    dodo = action.dodo
-    byte_key = dodo._machinist_review_byte_key("probe", action.profile)
-    restored, events = [], []
-
-    def restore(key, outputs, _label):
-        restored.append(key)
-        if key != byte_key:
-            return False
-        _write_aggregate(outputs[0], verdict)
-        return True
-
-    monkeypatch.setattr(dodo._cache, "restore", restore)
-    monkeypatch.setattr(
-        dodo._cache, "record_event",
-        lambda event, label, key, **extra: events.append((event, label, key, extra)),
-    )
-    dodo._cached_machinist_review_action(
-        "probe", MachinistReviewMode.LEARN, action.profile
-    )
-    assert restored == [byte_key]
-    assert action.calls["run"] == 0
-    assert action.calls["store"] == 1
-    assert dodo._read_machinist_aggregate("probe")["verdict"] == verdict
-    assert events == [(
-        "review_adopted_byte_key", "check:machinist_review:probe", "a" * 64,
-        {"byte_key": byte_key, "store": "stored"},
-    )]
-
-
-def test_adoption_that_loses_publication_takes_the_winners_verdict(action, monkeypatch):
-    dodo = action.dodo
-    byte_key = dodo._machinist_review_byte_key("probe", action.profile)
-    restored = []
-
-    def restore(key, outputs, _label):
-        restored.append(key)
-        _write_aggregate(outputs[0], "SHIP" if key == byte_key else "FIX")
-        return True
-
-    monkeypatch.setattr(dodo._cache, "restore", restore)
-    monkeypatch.setattr(dodo._cache, "store", lambda *_args: "lost")
-    monkeypatch.setattr(dodo._cache, "record_event", lambda *_args, **_kwargs: None)
-    dodo._cached_machinist_review_action(
-        "probe", MachinistReviewMode.LEARN, action.profile
-    )
-    assert restored == [byte_key, "a" * 64]
-    assert action.calls["run"] == 0
-    assert dodo._read_machinist_aggregate("probe")["verdict"] == "FIX"
-
-
-def test_forced_refresh_does_not_adopt_the_byte_keyed_verdict(action, monkeypatch):
-    dodo = action.dodo
-    monkeypatch.setattr(dodo._cache, "forced_refresh", lambda _label: "owner asked")
-    monkeypatch.setattr(
-        dodo._cache, "restore",
-        lambda *_args: pytest.fail("forced refresh restored a cached verdict"),
-    )
-    monkeypatch.setattr(dodo._cache, "require_refresh_store", lambda _label, outcome: outcome)
-    dodo._cached_machinist_review_action(
-        "probe", MachinistReviewMode.LEARN, action.profile
-    )
-    assert action.calls["run"] == 1
-
-
 @pytest.fixture
 def carry(action, monkeypatch):
     """A cache with one reviewed PDF of probe, published under ``reviewed``."""
@@ -1484,8 +1379,7 @@ def test_sheet_printing_a_reviewed_sheet_carries_its_verdict(action, carry, verd
     dodo = action.dodo
     carry.state["verdict"] = verdict
     dodo._cached_machinist_review_action("probe", MachinistReviewMode.LEARN, action.profile)
-    byte_key = dodo._machinist_review_byte_key("probe", action.profile)
-    assert carry.restored == [byte_key, carry.reviewed]
+    assert carry.restored == [carry.reviewed]
     assert action.calls["run"] == 0
     assert action.calls["store"] == 1
     assert dodo._read_machinist_aggregate("probe")["verdict"] == verdict
@@ -1775,24 +1669,15 @@ def test_losing_review_restores_full_winner_and_rereads_verdict(
     assert cache.last_stored_key("check:machinist_review:probe") is None
 
 
-@pytest.mark.parametrize("published", ["reviewed", "byte-key"])
 @pytest.mark.parametrize("failure", ["missing", "locked", "cleanup", "invalid-aggregate"])
-def test_failed_review_adoption_is_fatal_even_in_learn(
-    action, monkeypatch, failure, published
-):
+def test_failed_review_adoption_is_fatal_even_in_learn(action, monkeypatch, failure):
     dodo = action.dodo
     directory = dodo._machinist_review_dir("probe")
     monkeypatch.setattr(dodo._cache, "store", lambda *_args: "lost")
     monkeypatch.setattr(dodo._cache, "record_event", lambda *_args, **_kwargs: None)
-    byte_key = dodo._machinist_review_byte_key("probe", action.profile)
 
     def restore(key, outputs, label):
         assert outputs == [directory]
-        if key == byte_key:
-            if published == "reviewed":
-                return False  # nothing was published under the byte key
-            _write_aggregate(directory, "SHIP")
-            return True
         if failure == "locked":
             raise dodo._cache.RestoreLocked(label, key, PermissionError("locked"))
         if failure == "invalid-aggregate":
