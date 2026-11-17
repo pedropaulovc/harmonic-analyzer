@@ -557,10 +557,14 @@ diameter, speed and feed from the part's `features.toml`, its `plan.toml` and
 the recipe. The driver writes the recipe's context to a JSON job spec and runs
 headless FreeCAD (`freecadcmd` 1.1+, from `$HARMONIC_FREECAD` or the newest
 discovered `FreeCAD <version>` install; it fails loud when there is none) on
-`_freecad_cam_runtime.py`, which builds one CAM Job per program section (one
-tool per program; a section per hand-set spindle speed, joined at an operator
-comment and `M0`) and posts with FreeCAD's `grbl` post. The driver then checks
-every file against the recipe's `expectations` (`_gcode`), logs each program's
+`_freecad_cam_runtime.py`, which builds one CAM Job per program section and
+posts with FreeCAD's `grbl` post, joining a program's sections into one file:
+`M5`, a comment and `M6 T<n>` at a new tool (CNCjs's Manual Tool Change,
+Custom Probing, expands it into the tool change and tool-setter probe), a
+`%msg` and `M0` at a hand-set speed change, and the recipe's own manual
+sections (operator stops, the base bar's touch-probe X0). The driver then
+checks every file, and every tool section (`FILE@k`), against the recipe's
+`expectations` (`_gcode`), logs each program's
 cutting / air-at-feed / rapid minutes, and writes
 `cad/out/nc/<stem>/cycle_times.json`
 and `manifest.json` (freecadcmd's console output stays in `freecadcmd.log`

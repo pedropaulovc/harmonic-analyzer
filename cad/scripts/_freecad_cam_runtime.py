@@ -124,6 +124,12 @@ def model(target_job, index=0):
     return target_job.Model.Group[index]
 
 
+# Each controller's tool label as the recipe gave it, by the controller's
+# internal name: FreeCAD suffixes a repeated Label ("...001") when two jobs
+# use the same tool, and the posted comments name the tool to the operator.
+_LABELS = {}
+
+
 def tool_controller(doc, label, number, shape, diameter, rpm, feed, plunge, flutes=None, tip_angle=None):
     """A controller for a ``shape`` bit (``endmill``, ``drill``, ...) of ``diameter``
     at ``rpm``, cutting at ``feed`` and plunging at ``plunge`` (mm/min)."""
@@ -138,6 +144,7 @@ def tool_controller(doc, label, number, shape, diameter, rpm, feed, plunge, flut
     tc.SpindleSpeed = float(rpm)
     tc.HorizFeed = f"{feed} mm/min"
     tc.VertFeed = f"{plunge} mm/min"
+    _LABELS[tc.Name] = label
     return tc
 
 
@@ -264,8 +271,9 @@ def face(target_job, tc, label, base, start, final, stepover, safe=None):
     op.ClearEdges = False
     op.ClearingPattern = "ZigZag"
     op.ZigZagAngle = 0.0
-    # StepOver is a whole percentage of the cutter diameter: round down.
-    op.StepOver = int(100 * stepover / float(tc.Tool.Diameter))
+    # StepOver is a whole percentage of the cutter diameter: round down, but
+    # not below a whole percentage the float quotient only just misses.
+    op.StepOver = int(100 * stepover / float(tc.Tool.Diameter) + 1e-6)
     _set(op, StartDepth=start, FinalDepth=final, StepDown=start - final, **({"SafeHeight": safe} if safe is not None else {}))
     return op
 
@@ -317,50 +325,93 @@ def _job_of(ops, name):
     return job
 
 
-def _postamble(lines, name):
-    if "(Begin postamble)" not in lines:
-        raise RuntimeError(f"{name}: post output has no postamble marker")
-    return lines.index("(Begin postamble)")
+def _index(lines, marker, name, start=False):
+    found = [i for i, line in enumerate(lines) if (line.startswith(marker) if start else line == marker)]
+    if not found:
+        raise RuntimeError(f"{name}: post output has no {marker!r} line")
+    return found[0]
 
 
 def post(sections, path, name, comment):
-    """Post ``sections`` (each one Job's operations, all of them, in order) to
-    ``path`` as one program with a header naming it and its tool. Sections
-    share the tool and zeros and differ only in spindle speed, which the
-    PM-30MV sets by hand: each later section is joined at an operator comment
-    and ``M0``, then its own ``M3 S`` word, without the earlier section's
-    postamble or the later one's preamble. Returns the path and the file of
-    the post the factory loaded: FreeCAD searches user post directories before
-    its own, so the name alone does not say which file posted."""
-    jobs = [_job_of(ops, name) for ops in sections]
-    controllers = [tc for job in jobs for tc in job.Tools.Group]
-    if len({(tc.ToolNumber, round(float(tc.Tool.Diameter), 6)) for tc in controllers}) != 1:
-        raise RuntimeError(f"{name}: one tool per program; a tool change is a separate program")
-    sources, body = set(), []
-    for index, job in enumerate(jobs):
+    """Post ``sections`` to ``path`` as one program with a header naming it and
+    its tools; returns the path and the file of the post the factory loaded
+    (FreeCAD searches user post directories before its own, so the name alone
+    does not say which file posted).
+
+    A section is one Job's operations, all of them, in order, under one tool
+    controller; or a manual section, a dict of its tool number and label, the
+    G-code the recipe wrote for it (operator stops, probing) and the
+    ``setting`` its tool change asks for (the spindle stays off). A single
+    section is its Job's post as
+    it is. Several are one program from the first section's tool, loaded and
+    touched off before it runs: each later tool starts at ``M5``, an operator
+    comment (the speed to set by hand, or spindle off) and ``M6 T<n>``, which
+    the sender (CNCjs, Manual Tool Change) expands into its tool change and
+    tool-setter probe. A section that keeps the tool but changes speed starts
+    at an operator comment and ``M0`` (the PM-30MV's speed is set by hand);
+    one after a manual section of its tool, or with the tool and speed
+    running, carries on. Each posted section runs from its own ``M3 S`` word;
+    earlier postambles and later preambles are dropped."""
+    tools, bodies, preamble, postamble, sources = [], [], None, None, set()
+    for index, section in enumerate(sections):
+        if isinstance(section, dict):
+            tools.append((section["tool"], section["label"], None, None, section["setting"]))
+            bodies.append(list(section["gcode"]))
+            continue
+        job = _job_of(section, name)
+        controllers = list(job.Tools.Group)
+        if len(controllers) != 1:
+            raise RuntimeError(f"{name}: section {index + 1} ({job.Label}) has {len(controllers)} tool controllers; a section is one tool")
+        tc = controllers[0]
         processor = PostProcessorFactory.get_post_processor(job, POST)
         sources.add(getattr(processor, "script_path", None) or inspect.getfile(type(processor)))
         exported = processor.export()
         if len(exported) != 1:
             raise RuntimeError(f"{name}: post returned {len(exported)} sections")
         lines = exported[0][1].splitlines()
-        if index > 0:
-            # Drop the previous section's postamble and this one's preamble,
-            # fixture and tool-change comments; keep from its M3 S word on.
-            body = body[:_postamble(body, name)]
-            start = next((i for i, line in enumerate(lines) if line.startswith("M3 ")), None)
-            if start is None:
-                raise RuntimeError(f"{name}: section {index + 1} posted no M3 spindle start")
-            (tc,) = job.Tools.Group
-            body += [f"(PAUSE: SET SPINDLE TO {float(tc.SpindleSpeed):g} RPM, THEN CYCLE START)", "M0"]
-            lines = lines[start:]
-        body += lines
+        if len(sections) == 1:
+            bodies.append(lines)
+        else:
+            if preamble is None:
+                preamble = lines[:_index(lines, "G54", name) + 1]
+                postamble = lines[_index(lines, "(Begin postamble)", name):]
+            bodies.append(lines[_index(lines, "M3 ", name, start=True):_index(lines, "(Begin postamble)", name)])
+        tools.append((tc.ToolNumber, _LABELS[tc.Name], float(tc.SpindleSpeed), float(tc.Tool.Diameter), None))
     if len(sources) != 1:
         raise RuntimeError(f"{name}: sections posted by several post files: {sorted(sources)}")
-    tc = controllers[0]
-    header = [f"({name})", f"({comment})", f"(T{tc.ToolNumber} D={float(tc.Tool.Diameter):.3f} {tc.Tool.Label})"]
+    if isinstance(sections[0], dict):
+        raise RuntimeError(f"{name}: the first section must be a posted Job (its tool is loaded before the program runs)")
+    listed = {}
+    for number, label, _rpm, dia, _setting in tools:
+        listed.setdefault(number, f"(T{number} D={dia:.3f} {label})" if dia else f"(T{number} {label})")
+    out = [f"({name})", f"({comment})", *listed.values()]
+    if len(sections) == 1:
+        out += bodies[0]
+    else:
+        out += preamble
+        previous = None
+        for index, ((number, label, rpm, _dia, manual), body) in enumerate(zip(tools, bodies)):
+            if previous is not None and number != previous[0]:
+                # The speed this tool runs at, from its first posted section, or
+                # a manual section's own setting (spindle off).
+                speed = next((t[2] for t in tools[index:] if t[0] == number and t[2] is not None), None)
+                setting = f"SET SPINDLE TO {speed:g} RPM" if speed else manual
+                # No ";" in the comment: a sender stripping ";" comments first
+                # would leave its "(" unclosed. CNCjs shows its own message at the
+                # tool change's stop, so this one is for the file view.
+                out += ["M5", f"(TOOL CHANGE: T{number} {label}, {setting})", f"M6 T{number}"]
+            elif previous is not None and rpm is not None and previous[1] is not None:
+                if rpm != previous[1]:
+                    # CNCjs shows a %msg line when the M0 pauses it; it strips
+                    # comments before sending and never shows them.
+                    out += [f"%msg PAUSE: SET SPINDLE TO {rpm:g} RPM, THEN CYCLE START", "M0"]
+                else:
+                    body = body[1:]  # the running tool and speed carry on: no second M3
+            out += body
+            previous = (number, rpm)
+        out += postamble
     with open(path, "w", encoding="utf-8", newline="\n") as handle:
-        handle.write("\n".join(header + body) + "\n")
+        handle.write("\n".join(out) + "\n")
     return path, os.path.abspath(sources.pop())
 
 
@@ -380,11 +431,18 @@ def main():
         built = _load_recipe(spec["recipe"]).build(spec["ctx"], rt)
         posted = []
         for name, keys in spec["programs"]:
-            # A program lists operation keys (one section), or lists of them
-            # (sections joined at an M0 spindle-speed stop).
-            sections = [keys] if all(isinstance(key, str) for key in keys) else keys
-            ops = [list(_flatten(built["ops"][key] for key in section)) for section in sections]
-            posted.append(post(ops, os.path.join(spec["out_dir"], f"{name}.nc"), name, spec["ctx"]["comment"]))
+            # A program lists operation keys (one Job, posted as it is), or
+            # groups of them (sections, one Job or manual section each, joined
+            # at M6 tool changes and M0 stops).
+            flat = all(isinstance(key, str) for key in keys)
+            sections = []
+            for section in [keys] if flat else keys:
+                items = [built["ops"][key] for key in section]
+                manual = [item for item in items if isinstance(item, dict)]
+                if manual and len(items) != 1:
+                    raise RuntimeError(f"{name}: a manual section stands alone: {section}")
+                sections.append(manual[0] if manual else list(_flatten(items)))
+            posted.append(post(sections, os.path.join(spec["out_dir"], f"{name}.nc"), name, spec["ctx"]["comment"]))
         sources = sorted({source for _path, source in posted})
         if len(sources) != 1:
             raise RuntimeError(f"programs posted by several post files: {sources}")
