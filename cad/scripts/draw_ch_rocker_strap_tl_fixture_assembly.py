@@ -177,9 +177,10 @@ BLANK_LABEL_OFFSET = (-0.030, -0.030)
 
 # Balloon anchors, each part's own mm on an edge the plan view shows: the
 # plate's front top edge between clamps 3 and 4; the washer's top outer rim;
-# the clamp's screw-head top rim in its counterbore; the hub screw's head
-# rim on the washer. Rim points RIM_DEG round from part +X toward -Y (the
-# plan view's lower right quarter, away from the fence).
+# the clamp screw's head-top circle (inside its chamfer: the head's full
+# radius is no edge at the top face) in its counterbore; the hub screw's
+# head rim on the washer. Rim points RIM_DEG round from part +X toward -Y
+# (the plan view's lower right quarter, away from the fence).
 RIM_DEG = -45.0
 
 
@@ -202,7 +203,10 @@ BALLOON_ANCHORS: dict[str, BalloonAnchor] = {
         point_mm=rim_point(spec.washer.OUTER_DIA / 2.0, spec.washer.THICKNESS)
     ),
     CLAMP: BalloonAnchor(
-        point_mm=rim_point(spec.clamp.SCREW_HEAD_DIA / 2.0, spec.clamp.SCREW_HEAD_TOP_Z)
+        point_mm=rim_point(
+            spec.clamp.SCREW_HEAD_DIA / 2.0 - spec.clamp.SCREW_HEAD_CHAMFER,
+            spec.clamp.SCREW_HEAD_TOP_Z,
+        )
     ),
     SCREW: BalloonAnchor(point_mm=rim_point(spec.HUB_SCREW_HEAD_DIA / 2.0, 0.0)),
     # Sheet 2's front view looks along +Y: the plug's shoulder rim on its
