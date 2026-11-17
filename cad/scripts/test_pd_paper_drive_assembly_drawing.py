@@ -1733,11 +1733,24 @@ def test_the_cluster_float_and_pin_bands_print_their_spec_ranges() -> None:
     accepted = _step_body("fitup-accepted")
     assert f"RING GAP READS {drawing.CLUSTER_FLOAT_VIEW_NAME}" in accepted
     assert "DISC TURNS FREE" in accepted
-    for key, bounds in (
-        ("collar-pins-pressed", drive_pin.PROUD_RANGE),
-        ("latch-pin-pressed", joints.LATCH_PIN_PROUD_RANGE),
+    # Each press step prints its setting detail's limits: the part specs'
+    # window rounded inward to the .001 grid and no narrower, so no
+    # conforming press-to-floor build is refused (Codjiflo, PR #3029).
+    for key, band, bounds in (
+        (
+            "collar-pins-pressed",
+            drawing.setting_details.DRIVE_PIN_PROUD_BAND,
+            drive_pin.PROUD_RANGE,
+        ),
+        (
+            "latch-pin-pressed",
+            drawing.setting_details.LATCH_PROUD_BAND,
+            joints.LATCH_PIN_PROUD_RANGE,
+        ),
     ):
-        assert f"{steps.inch_window(bounds, 3, ' TO ')} PROUD" in _step_body(key)
+        assert bounds[0] - 1e-9 <= band[0] < band[1] <= bounds[1] + 1e-9
+        assert band[0] - bounds[0] < 0.0254 and bounds[1] - band[1] < 0.0254
+        assert f"{steps.inch_window(band, 3, ' TO ')} PROUD" in _step_body(key)
 
 
 def test_the_cluster_is_shimmed_to_view_e_after_it_is_hung() -> None:
@@ -4616,3 +4629,54 @@ def test_number_binding_refuses_invalid_native_selected_config_properties(monkey
         message = "has no Number property"
     with pytest.raises(RuntimeError, match=message):
         scene.insert()
+
+
+def _sub_step_texts() -> dict[str, str]:
+    """Every printed sub-step head (``9C``, or ``16`` for a one-line step)
+    with its text."""
+    texts = drawing._step_text(operating_domain=_unit_operating_domain())
+    heads: dict[str, str] = {}
+    for key in steps.SEQUENCE:
+        for index, text in enumerate(texts[key]):
+            heads[drawing.sub_step(key, index)] = text
+        if len(texts[key]) == 1:
+            heads[str(steps.step_number(key))] = texts[key][0]
+    return heads
+
+
+def test_every_setting_row_is_cited_by_the_steps_its_step_column_names() -> None:
+    """Rule 22 (R5 machinist review): each setting-table row's STEP cell names
+    the sub-steps that set or check it, and each of them cites that row, or
+    repeats a sub-step that does ("AS 12P")."""
+    heads = _sub_step_texts()
+    rows = drawing.setting_table_rows(operating_domain=_unit_operating_domain())
+    assert len(rows) == len(drawing.SETTING_ROW_KEYS)
+    sheet = drawing.SHEET_NAMES.index(drawing.SETTING_TABLE_SHEET) + 1
+    cite = re.compile(rf"\bROWS? (\d+)(?:-(\d+))?, SHEET {sheet}\)")
+
+    def cites(text: str, number: int) -> bool:
+        return any(
+            int(low) <= number <= int(high or low) for low, high in cite.findall(text)
+        )
+
+    for number, row in enumerate(rows, start=1):
+        assert len(row) == len(drawing.SETTING_TABLE_HEADER)
+        assert row[0] == str(number)
+        for head in row[1].split(", "):
+            text = heads[head]
+            repeated = re.findall(r"\bAS (?:\d+[A-Z] AND )?(\d+[A-Z])\b", text)
+            repeated += re.findall(r"\bAS (\d+[A-Z]) AND \d+[A-Z]\b", text)
+            assert cites(text, number) or any(
+                cites(heads[other], number) for other in repeated
+            ), (head, number)
+
+
+def test_every_setting_detail_is_cited_by_its_steps() -> None:
+    """Each lettered setting detail is cited, with its sheet, by every step it
+    dimensions."""
+    texts = drawing._step_text(operating_domain=_unit_operating_domain())
+    sheet = drawing.SHEET_NAMES.index(drawing.SETTING_DETAIL_SHEET) + 1
+    for detail in drawing.setting_details.DETAILS:
+        for key in detail.step_keys:
+            body = " ".join(texts[key])
+            assert f"({detail.view_name}, SHEET {sheet})" in body, (detail.letter, key)
