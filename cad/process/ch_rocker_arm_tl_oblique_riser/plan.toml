@@ -272,7 +272,7 @@ drilling = "none"
 sizing = "other"
 instruction = "Hold 1: cutter centred on the edge; clean up the top edge, ~{{process.edge_cleanup_in:.2dot}} in .010 passes, last .005. Mark it ZERO EDGE."
 instruction_detailed = "Hold 1: one parallel only: the .24 bar is too thin to straddle a pair. Tap the bar down until the parallel will not slide. Cutter centred on the edge, clean up the top edge along X in .010 passes, last .005, ~{{process.edge_cleanup_in:.2dot}} in all, until it is milled full length: the thin bar overhangs the jaws ~{{cad.blank_centred_overhang_in:.1f}} each side, so heavier passes push it sideways. Mark it ZERO EDGE on both faces."
-settings = "riser-em-half-6061-t6511"
+settings = "jig-em-half-6061-t6511"
 milling_cuts = [
   { name = "cleanup passes", kind = "end", phase = "rough", cutter_dia_mm = "{{process.cutter_dia_mm}}", flutes = 2, axial_doc_mm = 0.254, radial_woc_mm = "{{cad.thickness_min_mm}}", rpm = 1800, feed_mm_min = 177.8, traverse_mm = [0, "{{cad.blank_max_length_mm}}"] },
   { name = "ZERO EDGE last pass", kind = "end", phase = "finish", cutter_dia_mm = "{{process.cutter_dia_mm}}", flutes = 2, axial_doc_mm = 0.127, radial_woc_mm = "{{cad.thickness_min_mm}}", rpm = 1800, feed_mm_min = 177.8, traverse_mm = [0, "{{cad.blank_max_length_mm}}"] },
@@ -285,7 +285,7 @@ drilling = "none"
 sizing = "other"
 instruction = "Hold 2: turn end-for-end, ZERO EDGE down on the parallel. Measure width w; .010 passes to .005 over, then .005 to {{cad.width_in:.3f}}."
 instruction_detailed = "Hold 2: turn end-for-end, ZERO EDGE down on the parallel. Measure the width w, touch the cutter on the top edge and set Z = w. Cutter centred on the edge, take .010 passes to Z .005 over {{cad.width_in:.3f}}, then a .005 pass to Z {{cad.width_in:.3f}}."
-settings = "riser-em-half-6061-t6511"
+settings = "jig-em-half-6061-t6511"
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.blank_max_length_mm}}"], clamp_mm = "{{cad.edges_jaw_mm}}", section_mm = { y = "{{cad.thickness_min_mm}}", z = "{{cad.width_mm}}" }, vise_left = "start", vise_hold = 2 }
 milling_cuts = [
   { name = "width rough", kind = "end", phase = "rough", cutter_dia_mm = "{{process.cutter_dia_mm}}", flutes = 2, axial_doc_mm = 0.254, radial_woc_mm = "{{cad.thickness_min_mm}}", rpm = 1800, feed_mm_min = 177.8, traverse_mm = [0, "{{cad.blank_max_length_mm}}"] },
@@ -323,7 +323,7 @@ tool = "em-half"
 drilling = "none"
 sizing = "other"
 instruction = "Hold 1: cutter .04 below the bar; clean up the left end, .02 X steps, conventional: table away from you. Mark ZERO END."
-settings = "riser-em-half-6061-t6511"
+settings = "jig-em-half-6061-t6511"
 milling_cuts = [
   { name = "ZERO END steps", kind = "side", phase = "finish", cutter_dia_mm = "{{process.cutter_dia_mm}}", flutes = 2, axial_doc_mm = "{{cad.thickness_min_mm}}", radial_woc_mm = 0.508, rpm = 1800, feed_mm_min = 177.8, stations_mm = 0 },
 ]
@@ -368,7 +368,7 @@ drilling = "none"
 sizing = "other"
 instruction = "Hold 2: slide left; re-find X0 on ZERO END. Measure cutter D. Cut the right end, .02 steps, conventional: table toward you; final X = {{cad.length_in:.3f}} + D/2."
 instruction_detailed = "Hold 2: slide left; re-find X0 on ZERO END, keep Y. Measure the cutter diameter D. Cut the right end in .02 X steps, conventional: table moving toward you; final X = {{cad.length_in:.3f}} + D/2."
-settings = "riser-em-half-6061-t6511"
+settings = "jig-em-half-6061-t6511"
 inspection = "Edge-find the cut end: DRO {{cad.length_min_in:.2f}}–{{cad.length_max_in:.2f}} from ZERO END."
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.length_mm}}"], clamp_mm = "{{cad.ends_hold2_jaw_mm}}", section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_min_mm}}" }, vise_left = "start", vise_hold = 2 }
 milling_cuts = [

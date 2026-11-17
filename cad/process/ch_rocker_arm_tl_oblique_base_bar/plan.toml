@@ -384,9 +384,14 @@ gauge_checks = [
   { gauge = "mill-x-dro", band_mm = "{{cad.slot2_x_band_mm}}" },
 ]
 # The bar is squared to length here: slot stations sit in the finished frame.
-# The jaws still grip where the blank was centred; X0 (ZERO END) is taken as
-# the blank's left end with no clean-up, the longest arm left of the jaws and
-# so the worst case for S1.
+# The probe sets X0 (ZERO END) (blank − length)/2 inside the blank's left end,
+# so the jaws really sit at cad.vise_centred_overhang_mm..vise_centred_jaw_right_mm
+# (140.63..299.30 mm). prechips ties the clamp to vise hold 1, which grips the
+# centred blank (cad.blank_centred_*, 142.12..300.79 mm): the left arm is
+# 1.49 mm long (conservative for S1), the right arm 1.49 mm short. The right
+# side still passes at the true jaw: prechips' model (0.11.4) gives S2
+# 0.0101 mm (bound 0.0097) against the 0.025 mm limit, and the spots R8
+# 0.088 mm and B3–B4 0.084 mm (bound 0.085, 0.081) against 0.1 mm.
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.length_mm}}"], clamp_mm = ["{{cad.blank_centred_overhang_mm}}", "{{cad.blank_centred_jaw_right_mm}}"], section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" }, vise_left = "start" }
 milling_cuts = [
   { name = "S1–S2 depth steps", kind = "slot", phase = "finish", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = "{{cad.slot_step_mm}}", radial_woc_mm = "{{process.half_cutter_dia_mm}}", rpm = 1250, feed_mm_min = 127.0, stations_mm = "{{cad.slot_x_mm}}" },
@@ -407,7 +412,8 @@ sizing = "other"
 instruction = "Same file, M6 T3: spot all holes Ø.125, R1–R8 and (bar 1) {{cad.bracket_range}}, at the posted stations: rail X ±{{cad.rail_station_tol_in:.4f}}, bracket X/Y ±{{cad.bracket_position_tol_in:.3f}}, rail row ±{{cad.rail_row_tol_in:.2f}}. Drill tips .125 past underside."
 rpm = 2800
 feed = "BB02/BB03 program"
-# Spotting cones are drilled away later; the jaws alone carry them.
+# Spotting cones are drilled away later; the jaws alone carry them. Clamp as
+# for the slots (right side checked at the true jaw above).
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.length_mm}}"], clamp_mm = ["{{cad.blank_centred_overhang_mm}}", "{{cad.blank_centred_jaw_right_mm}}"], section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" }, vise_left = "start" }
 milling_cuts = [
   { name = "spot R1–R4", kind = "drill", phase = "rough", cutter_dia_mm = 3.175, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = "{{cad.rail_left_x_mm}}" },

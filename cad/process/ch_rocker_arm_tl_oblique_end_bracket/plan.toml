@@ -42,12 +42,16 @@ kerf_in = 0.125                 # Hand sheet: about 1/8 in per cut.
 # Hand sheet: Y0 touched on the fixed jaw past the part. Two-up (2026-11-10)
 # that station is in the gap between the parts.
 y_touch_x_in = 3.5
-# One tap flag per face, from the tap's physical tip (centre point included),
-# as the drawing's process note measures the tip marks, in the low half of the
-# tip windows (BAR .433–.527, KP08 .492–.586) so the bottoming taps never
-# meet: at ±tap_flag_tol_in the deepest pair reaches .46 + .52 = .98, under
-# the .988 minimum width. The adapter refuses a flag ± that tolerance outside
-# its window, or a deepest pair at or past the minimum width.
+# One tap flag per face, from the tap's tip at the end of its chamfered teeth
+# (not a centre point), in the low half of the tip windows (BAR .433–.527,
+# KP08 .492–.586). The spec derives each window as full thread plus a 1–2
+# pitch lead from that tip (end_bracket_spec BAR_/KP08_TIP_MARK_LIMITS); a
+# centre point past the chamfer runs in the drilled hole and cuts no thread.
+# At ±tap_flag_tol_in the full thread starts .44 − 2p (.0625) = .3775 ≥ .370
+# (BAR) and .50 − .0625 = .4375 ≥ .429 (KP08). The bottoming taps never meet:
+# the deepest pair reaches .46 + .52 = .98, under the .988 minimum width. The
+# adapter refuses a flag ± that tolerance outside its window, or a deepest pair
+# at or past the minimum width.
 bar_tap_flag_in = 0.45
 kp08_tap_flag_in = 0.51
 tap_flag_tol_in = 0.01
@@ -231,8 +235,8 @@ speed_kind = "other"
 tool = "plug"
 drilling = "none"
 sizing = "other"
-instruction = "Start H1–H{{cad.hole_count:d}} on both parts with the plug tap flagged {{process.bar_tap_flag_in:.2dot}} from its physical tip; stop at the flag."
-instruction_detailed = "Tape a flag on the plug tap {{process.bar_tap_flag_in:.2dot}} from its physical tip (centre point included). Start H1–H{{cad.hole_count:d}} on both parts square from the drill chuck, spindle off, about 3 turns, with tap fluid; finish with the T-handle, backing off every half turn to clear chips, and stop when the flag reaches BAR SIDE."
+instruction = "Start H1–H{{cad.hole_count:d}} on both parts with the plug tap flagged {{process.bar_tap_flag_in:.2dot}} from its tip (end of the chamfered teeth); stop at the flag."
+instruction_detailed = "Tape a flag on the plug tap {{process.bar_tap_flag_in:.2dot}} from its tip (the end of the chamfered teeth, not a centre point). Start H1–H{{cad.hole_count:d}} on both parts square from the drill chuck, spindle off, about 3 turns, with tap fluid; finish with the T-handle, backing off every half turn to clear chips, and stop when the flag reaches BAR SIDE."
 feed = "hand"
 
 [[setups.operations]]
@@ -240,8 +244,8 @@ speed_kind = "other"
 tool = "bottoming"
 drilling = "none"
 sizing = "other"
-instruction = "Finish H1–H{{cad.hole_count:d}} on both parts with the bottoming tap flagged {{process.bar_tap_flag_in:.2dot}} from its physical tip; stop at the flag."
-instruction_detailed = "Tape a flag on the bottoming tap {{process.bar_tap_flag_in:.2dot}} from its physical tip (centre point included). Finish H1–H{{cad.hole_count:d}} on both parts with tap fluid, backing off every half turn, until the flag reaches BAR SIDE. The flag sits in the drawing's tip window ({{cad.bar_tip_min_in:.3f}}–{{cad.bar_tip_max_in:.3f}}), low enough that the KP08-side tap never meets this thread."
+instruction = "Finish H1–H{{cad.hole_count:d}} on both parts with the bottoming tap flagged {{process.bar_tap_flag_in:.2dot}} from its tip (end of the chamfered teeth); stop at the flag."
+instruction_detailed = "Tape a flag on the bottoming tap {{process.bar_tap_flag_in:.2dot}} from its tip (the end of the chamfered teeth, not a centre point). Finish H1–H{{cad.hole_count:d}} on both parts with tap fluid, backing off every half turn, until the flag reaches BAR SIDE. The flag sits in the drawing's tip window ({{cad.bar_tip_min_in:.3f}}–{{cad.bar_tip_max_in:.3f}}), low enough that the KP08-side tap never meets this thread."
 feed = "hand"
 inspection = "{{cad.thread}} full thread {{cad.bar_thread_min_in:.3f}}–{{cad.bar_thread_max_in:.3f}} from BAR SIDE."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.bar_thread_band_mm}}" }]
@@ -270,8 +274,8 @@ speed_kind = "other"
 tool = "plug"
 drilling = "none"
 sizing = "other"
-instruction = "Start H1–H{{cad.hole_count:d}} on both parts with the plug tap flagged {{process.kp08_tap_flag_in:.2dot}} from its physical tip; stop at the flag."
-instruction_detailed = "Tape a flag on the plug tap {{process.kp08_tap_flag_in:.2dot}} from its physical tip (centre point included). Start H1–H{{cad.hole_count:d}} on both parts square from the drill chuck, spindle off, about 3 turns, with tap fluid; finish with the T-handle, backing off every half turn, and stop when the flag reaches KP08 SIDE."
+instruction = "Start H1–H{{cad.hole_count:d}} on both parts with the plug tap flagged {{process.kp08_tap_flag_in:.2dot}} from its tip (end of the chamfered teeth); stop at the flag."
+instruction_detailed = "Tape a flag on the plug tap {{process.kp08_tap_flag_in:.2dot}} from its tip (the end of the chamfered teeth, not a centre point). Start H1–H{{cad.hole_count:d}} on both parts square from the drill chuck, spindle off, about 3 turns, with tap fluid; finish with the T-handle, backing off every half turn, and stop when the flag reaches KP08 SIDE."
 feed = "hand"
 
 [[setups.operations]]
@@ -279,8 +283,8 @@ speed_kind = "other"
 tool = "bottoming"
 drilling = "none"
 sizing = "other"
-instruction = "Finish H1–H{{cad.hole_count:d}} on both parts with the bottoming tap flagged {{process.kp08_tap_flag_in:.2dot}} from its physical tip; stop at the flag."
-instruction_detailed = "Move the flag on the bottoming tap to {{process.kp08_tap_flag_in:.2dot}} from its physical tip (centre point included). Finish H1–H{{cad.hole_count:d}} on both parts with tap fluid, backing off every half turn, until the flag reaches KP08 SIDE. The flag sits in the drawing's tip window ({{cad.kp08_tip_min_in:.3f}}–{{cad.kp08_tip_max_in:.3f}}), short of the BAR-side thread."
+instruction = "Finish H1–H{{cad.hole_count:d}} on both parts with the bottoming tap flagged {{process.kp08_tap_flag_in:.2dot}} from its tip (end of the chamfered teeth); stop at the flag."
+instruction_detailed = "Move the flag on the bottoming tap to {{process.kp08_tap_flag_in:.2dot}} from its tip (the end of the chamfered teeth, not a centre point). Finish H1–H{{cad.hole_count:d}} on both parts with tap fluid, backing off every half turn, until the flag reaches KP08 SIDE. The flag sits in the drawing's tip window ({{cad.kp08_tip_min_in:.3f}}–{{cad.kp08_tip_max_in:.3f}}), short of the BAR-side thread."
 feed = "hand"
 inspection = "Full thread {{cad.kp08_thread_min_in:.3f}}–{{cad.kp08_thread_max_in:.3f}} from KP08 SIDE."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.kp08_thread_band_mm}}" }]

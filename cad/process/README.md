@@ -331,8 +331,9 @@ What the 0.10 port and the 2026-11-13 v49 reassessment changed on the sheets:
   sheet's FRONT FACE is the plan's KP08 SIDE and its BACK FACE the BAR SIDE.
   The #29 drill runs to 1.06 below BAR SIDE so the KP08-side exit is full
   size; each face's plug and bottoming taps carry one flag (BAR .45, KP08 .51
-  from the physical tip, as the drawing measures the tip marks, in the low
-  half of the tip windows) so the two bottoming taps never meet: prechips
+  from the tip at the end of the chamfered teeth, not a centre point, which
+  the spec's full-thread-plus-lead tip windows assume; in the low half of the
+  tip windows) so the two bottoming taps never meet: prechips
   refuses a flag that, ± `tap_flag_tol_in`, leaves its window, or a pair whose
   deepest tips reach the minimum width. The end mill runs at `jig-em-half-6061-t6511`
   (owner ruling 2026-11-16: the 2026-11-05 logbook's 1800 rpm, 7 in/min, on
@@ -355,8 +356,8 @@ What the 0.10 port and the 2026-11-13 v49 reassessment changed on the sheets:
   screws through both holes at once.
 
 The carrier (`ch_rocker_arm_tl_oblique_carrier/plan.toml`, MHA-CH-06-TL-21)
-is enrolled. It needs prechips 0.11.1 (the carrier adapter with
-its `block_tolerance_in` refusal, and the `jig-carrier-*` pictures), and passes
+is enrolled. It needs prechips 0.11.4 (0.11.1 brought the carrier adapter with
+its `block_tolerance_in` refusal and the `jig-carrier-*` pictures), and passes
 both profiles under `@latest` with every check enforced. The 20.5 in plate is made flat on the table, vise off,
 on four 1-2-3 blocks under the LMS 1268 strap clamps (both owned, logbook
 2026-11-05/06), placed between hole columns, as the registry note now says
