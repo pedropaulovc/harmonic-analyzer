@@ -1290,7 +1290,7 @@ def test_shared_drawing_inputs_invalidate_freshness_and_cache_keys(
             "transitive_helper": scripts / "_drawing_common.py",
             "template": next(iter(dodo.DRAWINGS_BY_NAME["pd_platen_guide"].assets)),
         }[member]
-        path.write_bytes(path.read_bytes() + b"\n# changed shared input\n")
+        path.write_bytes(path.read_bytes() + b"\nCHANGED_SHARED_INPUT = 1\n")
     after = snapshot()
     for stem in before:
         assert all(a != b for a, b in zip(before[stem], after[stem])), stem
@@ -4826,6 +4826,37 @@ def test_prechips_rejects_unexported_enrollment(monkeypatch):
     monkeypatch.setattr(_process_plans, "TRAVELER_STEMS", ("synthetic_not_exported",))
     with pytest.raises(AssertionError, match="synthetic_not_exported"):
         list(dodo.task_prechips())
+
+
+def test_comment_edit_moves_citing_features_but_no_native_key(
+    isolated_feature_keys, monkeypatch
+):
+    import _buildgraph
+
+    dodo, root, snapshot = isolated_feature_keys
+    scripts = root / "cad" / "scripts"
+    copies = {path.resolve(): path.stem for path in scripts.rglob("*.py")}
+    monkeypatch.setattr(_buildgraph, "_module_by_path", lambda: copies)
+    source = scripts / "_rocker_interface.py"
+    citing = {
+        task["name"].removeprefix("features:")
+        for task in dodo.task_package()
+        if str(source.resolve()) in task.get("file_dep", ())
+    }
+    assert citing
+    before = snapshot()
+
+    source.write_bytes(b"# shifts every declaration down a line\n" + source.read_bytes())
+    shifted = snapshot()
+    for group in ("recipes", "assemblies", "part_recipes", "parts"):
+        assert shifted[group] == before[group], group
+    assert {
+        stem for stem in before["features"]
+        if before["features"][stem] != shifted["features"][stem]
+    } == citing
+
+    source.write_bytes(source.read_bytes() + b"\nRECIPE_REVISION = 2\n")
+    assert snapshot()["parts"] != before["parts"]
 
 
 def test_prechips_empty_enrollment_has_no_tasks(monkeypatch):

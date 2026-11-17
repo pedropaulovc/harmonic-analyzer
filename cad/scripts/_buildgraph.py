@@ -1411,6 +1411,79 @@ def clear_import_caches() -> None:
     _SOURCE_TEXT.clear()
 
 
+# --- Syntax digests of recipe sources ---------------------------------------
+# Recipe code reaches a build only as the program the interpreter runs, so the
+# cache keys fold each local module by its syntax tree rather than its bytes:
+# comments, blank lines, line breaks, quoting and number spelling move no key.
+# Docstrings are dropped as well, except in a module whose own text names
+# ``__doc__`` (``argparse.ArgumentParser(description=__doc__)``): that module
+# can read them, so it keeps them. Positions are dropped, so a leaf whose
+# OUTPUT holds source lines or source bytes (``package:features`` citations,
+# the ``cam`` manifest, the text-reading ``check:*`` gates) must also fold the
+# text: ``dodo._source_text_dep``.
+#
+# Part of every digest, so changing what the tree keeps moves every COM leaf
+# key once and nothing else (the cache epoch would also move the machinist
+# review keys and orphan their carry index).
+SOURCE_DIGEST_SCHEME = "python-ast-1"
+_DOCSTRING_OWNERS = (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
+
+
+@functools.lru_cache(maxsize=None)
+@_persisted_facts("syntax_digest")
+def _syntax_digest(text: str) -> str:
+    tree = ast.parse(text)
+    if "__doc__" not in text:
+        for node in tuple(ast.walk(tree)):
+            if not isinstance(node, _DOCSTRING_OWNERS) or not node.body:
+                continue
+            first = node.body[0]
+            if (
+                isinstance(first, ast.Expr)
+                and isinstance(first.value, ast.Constant)
+                and isinstance(first.value.value, str)
+            ):
+                del node.body[0]
+    digest = hashlib.sha256(SOURCE_DIGEST_SCHEME.encode("ascii") + b"\0")
+    digest.update(
+        ast.dump(tree, include_attributes=False).encode("utf-8", "surrogatepass")
+    )
+    return digest.hexdigest()
+
+
+def syntax_digest(path: Path) -> str | None:
+    """The digest of a local module's syntax tree, or ``None`` for any other file.
+
+    Local modules (:func:`_local_modules`) are everything a recipe can import.
+    Tests, the build-graph tooling and files outside ``cad/scripts`` are not
+    recipe code, and a module that does not parse has no tree: each keeps the
+    caller's byte digest. A missing file raises ``OSError`` as a byte read
+    would.
+    """
+    if _resolved(path) not in _module_by_path():
+        return None
+    try:
+        return _syntax_digest(read_source(path))
+    except (SyntaxError, ValueError, RecursionError):
+        return None
+
+
+@functools.lru_cache(maxsize=None)
+def _text_digest(text: str) -> str:
+    return hashlib.md5(text.encode("utf-8", "surrogatepass")).hexdigest()
+
+
+def source_text_digest(path: Path) -> str | None:
+    """The digest of a local module's text, or ``None`` for any other file:
+    what :func:`syntax_digest` leaves out, for the tasks that read it."""
+    if _resolved(path) not in _module_by_path():
+        return None
+    try:
+        return _text_digest(read_source(path))
+    except ValueError:
+        return None
+
+
 def _drawing_registry_value(node: ast.AST) -> object:
     """Read one declarative registry value, including approved enum members."""
     if (

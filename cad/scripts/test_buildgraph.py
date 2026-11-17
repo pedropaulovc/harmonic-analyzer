@@ -3084,3 +3084,62 @@ def test_feature_exporter_revision_call_keeps_config_analysis_classifiable():
     """A bare from-_config import must not widen every features leaf to '**'."""
     exporter = SCRIPTS_DIR / "export_models.py"
     assert "**" not in config_files_of(exporter)
+
+
+@pytest.fixture
+def recipe_tree(tmp_path, monkeypatch):
+    """An empty scripts root standing in for ``cad/scripts``."""
+    scripts = tmp_path / "scripts"
+    scripts.mkdir()
+    monkeypatch.setattr(bg, "SCRIPTS_DIR", scripts)
+    bg.clear_import_caches()
+    yield scripts
+    bg.clear_import_caches()
+
+
+def test_syntax_digest_moves_with_the_program_not_its_text(recipe_tree):
+    spec = recipe_tree / "widget_spec.py"
+    spec.write_text(
+        '"""Widget dimensions."""\n\nWIDTH = 3.0  # mm\n\n\n'
+        'def area(height):\n    """Face area."""\n    return WIDTH * height\n',
+        encoding="utf-8",
+    )
+    program, text = bg.syntax_digest(spec), bg.source_text_digest(spec)
+
+    spec.write_text(
+        '"""Widget dimensions, reworded."""\n# the width moved a line\nWIDTH = (\n'
+        "    3.00\n)\ndef area(height):\n    return WIDTH * height\n",
+        encoding="utf-8",
+    )
+    assert bg.syntax_digest(spec) == program
+    assert bg.source_text_digest(spec) != text
+
+    spec.write_text(
+        '"""Widget dimensions."""\n\nWIDTH = 3.1  # mm\n\n\n'
+        'def area(height):\n    """Face area."""\n    return WIDTH * height\n',
+        encoding="utf-8",
+    )
+    assert bg.syntax_digest(spec) != program
+
+
+def test_syntax_digest_keeps_docstrings_a_module_reads(recipe_tree):
+    script = recipe_tree / "draw_widget.py"
+    body = "import argparse\n\nPARSER = argparse.ArgumentParser(description=__doc__)\n"
+    script.write_text(f'"""Draw the widget."""\n{body}', encoding="utf-8")
+    described = bg.syntax_digest(script)
+    script.write_text(f'"""Draw the widget sheet."""\n{body}', encoding="utf-8")
+    assert bg.syntax_digest(script) != described
+
+
+def test_syntax_digest_covers_only_parsable_recipe_code(recipe_tree, tmp_path):
+    (recipe_tree / "test_widget.py").write_text("WIDTH = 3.0\n", encoding="utf-8")
+    (recipe_tree / "broken_spec.py").write_text("WIDTH = (\n", encoding="utf-8")
+    (tmp_path / "tool.py").write_text("WIDTH = 3.0\n", encoding="utf-8")
+    for path in (
+        recipe_tree / "test_widget.py",
+        recipe_tree / "broken_spec.py",
+        tmp_path / "tool.py",
+    ):
+        assert bg.syntax_digest(path) is None, path
+    assert bg.source_text_digest(recipe_tree / "test_widget.py") is None
+    assert bg.source_text_digest(tmp_path / "tool.py") is None
