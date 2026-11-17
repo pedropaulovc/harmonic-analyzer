@@ -457,11 +457,13 @@ def _settings(adapter: Any, view: Any) -> None:
                 f"expected {SETTINGS_EXPECTED_MM[name]:.4f}"
             )
         if name == fixture.STICK_OUT_DIMENSION:
-            _assert_stick_out_limits(dimension, label=f"{label} {name}")
+            _assert_stick_out_limits(display, dimension, label=f"{label} {name}")
 
 
-def _assert_stick_out_limits(dimension: Any, *, label: str) -> None:
-    """The imported stick-out reads the assembly's LIMIT pair: the window."""
+def _assert_stick_out_limits(display: Any, dimension: Any, *, label: str) -> None:
+    """The imported stick-out reads the assembly's LIMIT pair, the window, at
+    the assembly-authored tolerance places (the template's default would print
+    .12/.08)."""
     tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
     if int(tolerance.Type) != SW_TOL_LIMIT:
         raise RuntimeError(f"{label} reads tolerance type {int(tolerance.Type)}")
@@ -473,6 +475,12 @@ def _assert_stick_out_limits(dimension: Any, *, label: str) -> None:
     if any(abs(o - e) > 1e-6 for o, e in zip(observed, fixture.STICK_OUT_WINDOW)):
         raise RuntimeError(
             f"{label} limits read {observed} mm, expected {fixture.STICK_OUT_WINDOW}"
+        )
+    places = int(display.GetPrimaryTolPrecision2())
+    if places != fixture.SETTINGS_PLACES:
+        raise RuntimeError(
+            f"{label} limits imported at {places} places, "
+            f"expected {fixture.SETTINGS_PLACES}"
         )
 
 

@@ -8,8 +8,9 @@ sh-vn-arbor-set-screw (MHA-SH-VN-54) seated on the bit, each fixed (0 DOF) at
 ``dt_cone_tip_gear_tl_cutter_spec``'s pose. The ``_tl_`` stem keeps the
 fixture out of every machine assembly and BOM
 (``_buildgraph.is_shop_fixture``). One hidden assembly sketch on the Front
-Plane carries the stick-out and swing radius the fitter sheet prints as
-references (``build_sm_summing_assembly._author_settings``'s recipe).
+Plane carries the stick-out, which the fitter sheet prints as its LIMIT
+window, and the swing radius, which it prints as a reference
+(``build_sm_summing_assembly._author_settings``'s recipe).
 
 Run (SolidWorks already open)::
 

@@ -179,17 +179,21 @@ BOM_ITEMS = {BAR: "1", BIT: "2", SET_SCREW: "3"}
 # Item 3's cup bears on item 2's plain round: rule 23's adjustable-clamp row
 # (a member clamped at a setting along a bore that must stay adjustable,
 # light load; a flat would fix the face's setting, which that row never
-# counts), so the steps set it, then prove the clamp holds it (MainBuild
-# ruling 2026-11-17 on run 20261117T111407559Z's blocker).  Steps 2 and 6
-# set and check the stick-out to its dimension on the front view.  Ends and
-# faces go by view names (rule 22): item 1's cutting end is its bottom end in
-# the front view.
+# counts), so the steps set it, then prove the clamp holds it.  Delegated
+# ruling 2026-11-17 by the rolling-main coordinator (MainBuild), no owner
+# precedent; owner review on #2144
+# (https://github.com/pedropaulovc/harmonic-analyzer/issues/2144).  It answers
+# farm run 20261117T111407559Z's blocker (r3: the screw on the round read as
+# the bit's only axial/torque retention); step 4 names the clamp it makes.
+# Steps 2 and 6 set and check the stick-out inside its dimension's limits on
+# the front view.  Ends and faces go by view names (rule 22): item 1's
+# cutting end is its bottom end in the front view.
 ASSEMBLY_STEPS = "\n".join(
     (
         "FITTING",
         "1. SLIDE ITEM 2 INTO ITEM 1'S CROSS HOLE, FORM END RIGHT, FACE",
         "   TOWARD THE VIEWER (FRONT VIEW).",
-        "2. SET THE STICK-OUT TO ITS LIMITS ON THE FRONT VIEW (CALIPER).",
+        "2. SET THE STICK-OUT INSIDE ITS LIMITS ON THE FRONT VIEW (CALIPER).",
         "3. TURN ITEM 2 UNTIL ITS FACE IS PARALLEL TO ITEM 1'S AXIS: A",
         "   SQUARE ON ITEM 1'S BOTTOM END (FRONT VIEW) SHOWS NO LIGHT",
         "   BETWEEN ITS BLADE AND THE FACE.",

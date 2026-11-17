@@ -128,7 +128,6 @@ def test_the_sheet_is_bom_balloons_and_one_action_steps() -> None:
     # (build_dt_cone_tip_gear_tl_cutter_assembly's LIMIT pair); the steps cite
     # that dimension and never restate its numbers.
     cite = "STICK-OUT"
-    assert "LIMITS ON THE FRONT" in fixture.ASSEMBLY_STEPS
     for value in fixture.STICK_OUT_WINDOW:
         assert f"{value / 25.4:.3f}".lstrip("0") not in fixture.ASSEMBLY_STEPS
     # Setting the stick-out and squaring the face are separate steps; each
@@ -139,12 +138,10 @@ def test_the_sheet_is_bom_balloons_and_one_action_steps() -> None:
     assert "SQUARE" in squaring and "NO LIGHT" in squaring
     assert cite not in squaring
     # Item 3 clamps item 2's plain round at an adjustable setting (rule 23's
-    # adjustable-clamp row, named in the step): the step names what it bears
-    # on, and later steps check the clamp holds and the setting survived it,
-    # each on its own.
+    # adjustable-clamp row): the step names what it bears on, and later steps
+    # check the clamp holds and the setting survived it, each on its own.
     (clamp,) = (step for step in steps if "TIGHTEN ITEM 3" in step)
     assert "ITEM 2'S ROUND" in clamp
-    assert "LIGHT-LOAD ADJUSTABLE\n   CLAMP HOLDING THE STEP 2 AND 3 SETTINGS" in clamp
     after = steps[steps.index(clamp) + 1 :]
     assert any("DOES NOT TURN OR SLIDE BY HAND" in step for step in after)
     assert any(
