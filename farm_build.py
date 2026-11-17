@@ -1238,6 +1238,13 @@ def run_status(run_dir: Path) -> dict:
         if (run_dir / "leaves").is_dir()
         else []
     )
+    settled = {
+        workflow["workflow_id"]: workflow["outcome"]
+        for workflow in ((final or {}).get("cancel") or {}).get("workflows", [])
+    }
+    for leaf in leaves:
+        if leaf["state"] in ("requested", "bound") and leaf["workflow_id"] in settled:
+            leaf["state"] = settled[leaf["workflow_id"]]
     build = read_json(run_dir / "build.json") or {}
     errors = read_json(run_dir / "task-errors.json") or []
     if final:
@@ -1549,7 +1556,7 @@ def cancel(run_dir: Path, why: str, binding_wait_s: int) -> int:
                 binding_wait_s,
             )
         )
-        _event(record["run_id"], f"closed farm build {build_id}: cancelled")
+        _event(record["run_id"], f"closed farm build {build_id}")
         for outcome in outcomes:
             _event(record["run_id"], f"{outcome['outcome']} {outcome['workflow_id']}")
     for problem in errors:
