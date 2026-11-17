@@ -308,9 +308,9 @@ vise_hold = [
   { vise = "vise-pm-6", across_jaws_mm = "{{cad.width_mm}}", along_jaws_mm = "{{cad.blank_length_mm}}", part_height_mm = "{{cad.thickness_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["rest", "{{cad.overhang_max_mm}}"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" },
 ]
 # X from ZERO END; hold 1 jaws (hold 2 is an operation beam). Drills
-# in the overhang bend it as a cantilever off the jaw side. vise_left
-# "other": the beam is the finished length, the holds the blank's.
-beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.length_mm}}"], clamp_mm = "{{cad.ends_hold1_jaw_mm}}", section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" }, vise_left = "other" }
+# in the overhang bend it as a cantilever off the jaw side. The beam is the
+# finished length: each hold's grip is measured from its declared overhang.
+beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.length_mm}}"], clamp_mm = "{{cad.ends_hold1_jaw_mm}}", section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" }, vise_left = "start", vise_hold = 1 }
 
 [[setups.operations]]
 speed_kind = "spindle"
@@ -356,7 +356,7 @@ instruction = "Hold 2: slide left; re-find X0 on ZERO END. Cut the right end, .0
 instruction_detailed = "Hold 2: slide left; re-find X0 on ZERO END, keep Y. Measure the cutter diameter D. Cut the right end in .02 X steps, conventional: table moving toward you; final X = {{cad.length_in:.3f}} + D/2."
 settings = "riser-em-half-6061-t6511"
 inspection = "Edge-find the cut end: DRO {{cad.length_min_in:.2f}}–{{cad.length_max_in:.2f}} from ZERO END."
-beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.length_mm}}"], clamp_mm = "{{cad.ends_hold2_jaw_mm}}", section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
+beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.length_mm}}"], clamp_mm = "{{cad.ends_hold2_jaw_mm}}", section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" }, vise_left = "start", vise_hold = 2 }
 milling_cuts = [
   { name = "right end steps", kind = "side", phase = "finish", cutter_dia_mm = "{{process.cutter_dia_mm}}", flutes = 2, axial_doc_mm = "{{cad.thickness_mm}}", radial_woc_mm = 0.508, rpm = 1800, feed_mm_min = 203.2, stations_mm = "{{cad.length_mm}}" },
 ]
@@ -369,7 +369,7 @@ sizing = "other"
 instruction = "Spot P2 as P1."
 rpm = 2800
 feed = "hand"
-beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.length_mm}}"], clamp_mm = "{{cad.ends_hold2_jaw_mm}}", section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
+beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.length_mm}}"], clamp_mm = "{{cad.ends_hold2_jaw_mm}}", section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" }, vise_left = "start", vise_hold = 2 }
 milling_cuts = [
   { name = "P2 spot", kind = "drill", phase = "rough", cutter_dia_mm = 2.54, flutes = 2, feed_per_tooth_mm = 0.0127, stations_mm = "{{cad.p2_x_mm}}" },
 ]
@@ -381,7 +381,7 @@ sizing = { kind = "band", band_mm = "{{cad.stop_dia_band_mm}}" }
 instruction = "P2 through, beyond the right jaw side."
 rpm = 2800
 feed = "hand"
-beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.length_mm}}"], clamp_mm = "{{cad.ends_hold2_jaw_mm}}", section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
+beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.length_mm}}"], clamp_mm = "{{cad.ends_hold2_jaw_mm}}", section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" }, vise_left = "start", vise_hold = 2 }
 milling_cuts = [
   { name = "P2", kind = "drill", phase = "finish", cutter_dia_mm = 3.2639, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = "{{cad.p2_x_mm}}" },
 ]
