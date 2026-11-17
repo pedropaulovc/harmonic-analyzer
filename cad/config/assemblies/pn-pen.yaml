@@ -19,7 +19,6 @@ number: MHA-PN-00
 # free_dof (+ free_dof_per_active_channel x active channels): the operational
 #   DOF the saved model ships free (verify:soundness).
 flip_invert:
-  - hanger screw head plane
   # (was "pen rod travel snapshot" -- the label gained the PARK-driver tag
   # 2026-07-07; same mate, same learned side)
   - pen rod travel PARK driver (freed in default build)

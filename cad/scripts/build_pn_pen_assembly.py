@@ -34,7 +34,7 @@ the curve. Everything below the guides rides the rod:
 * pn-vn-hanger-screw + pn-vn-pen-hanger-nut + pn-vn-pen-hanger-jam-nut -- fasten the
   pen-hanger: the screw from behind the wheel bar through the strap's
   clearance hole, the nut on the strap front and the thin jam nut jammed
-  against it, locking it.
+  against it, locking it; all three fixed at their authored poses.
 
 The carriage layout and its plan balance live in ``pn_pen_carriage_geom``
 (pure): the rod line PEN_Z_MID and the v-block's pivot-bore station put the
@@ -105,12 +105,10 @@ from _assembly import (
     assert_component_placed,
     assert_free_dof_necessity,
     check_no_interference,
-    coincident_mate,
     component_origin,
     distance_driver,
     lock_mate,
     named_ref,
-    parallel_mate,
     place_component,
     reset_dof_manifest,
     save_assembly_and_images,
@@ -414,7 +412,7 @@ async def build(adapter) -> dict[str, str]:
     # manifest -- the travel stays live in the saved model. The carriage
     # rides the rod via Lock mates. The hanger is FIRST so the auto-fixed
     # seed is structure, not the rod.
-    hanger = await place_component(
+    await place_component(
         adapter, "pn-pen-hanger", list(HANGER_POS), [0.0, 0.0, 0.0], IDENTITY
     )
     pen_rod = await place_component(
@@ -492,60 +490,21 @@ async def build(adapter) -> dict[str, str]:
     # replayed mate (renamed DRIVE_pen_travel), then discards the model
     # unsaved.
 
-    hanger_screw = await place_component(
+    # The hanger screw, the nut on the strap front and the jam nut on the
+    # nut are static: each is fixed at its exact authored pose on the screw
+    # axis, like the hanger they clamp.
+    await place_component(
         adapter,
         "pn-vn-hanger-screw",
         list(HANGER_SCREW_POS),
         [0.0, 0.0, 0.0],
         IDENTITY,
-        ground=False,
     )
-    await coincident_mate(
-        adapter,
-        named_ref(f"ScrewAxis@{hanger_screw}", "AXIS"),
-        named_ref(f"HangerScrewAxis@{hanger}", "AXIS"),
-        label="hanger screw coaxial with strap clearance hole",
-        verify=(hanger_screw, list(HANGER_SCREW_POS)),
-    )
-    await distance_driver(
-        adapter,
-        named_ref(f"Front Plane@{hanger_screw}", "PLANE"),
-        named_ref("Front Plane", "PLANE"),
-        HANGER_SCREW_POS[2],
-        label="hanger screw head plane",
-        verify=(hanger_screw, list(HANGER_SCREW_POS)),
-    )
-    await parallel_mate(
-        adapter,
-        named_ref(f"Right Plane@{hanger_screw}", "PLANE"),
-        named_ref("Right Plane", "PLANE"),
-        label="hanger screw anti-spin",
-        verify=(hanger_screw, list(HANGER_SCREW_POS)),
-    )
-    assert_component_placed(adapter, hanger_screw, list(HANGER_SCREW_POS), IDENTITY)
-
-    # The nut on the strap front and the jam nut on the nut: each placed on
-    # the screw axis at its exact pose and locked to the fixed hanger -- one
-    # Lock mate, like the riders; a coaxial mate on top would only
-    # over-constrain the solve.
-    for stem, pos, label in (
-        ("pn-vn-pen-hanger-nut", HANGER_NUT_POS, "hanger nut locked to hanger"),
-        (
-            "pn-vn-pen-hanger-jam-nut",
-            HANGER_JAM_NUT_POS,
-            "hanger jam nut locked to hanger",
-        ),
+    for stem, pos in (
+        ("pn-vn-pen-hanger-nut", HANGER_NUT_POS),
+        ("pn-vn-pen-hanger-jam-nut", HANGER_JAM_NUT_POS),
     ):
-        nut = await place_component(
-            adapter, stem, list(pos), [0.0, 0.0, 0.0], IDENTITY, ground=False
-        )
-        await lock_mate(
-            adapter,
-            named_ref(f"Front Plane@{nut}", "PLANE"),
-            named_ref(f"Front Plane@{hanger}", "PLANE"),
-            label=label,
-        )
-        assert_component_placed(adapter, nut, list(pos), IDENTITY)
+        await place_component(adapter, stem, list(pos), [0.0, 0.0, 0.0], IDENTITY)
 
     # Certify the AS-BUILT model. Necessity only: the freed pen travel is
     # genuinely free; the lock-mated riders MUST read under-constrained WITH

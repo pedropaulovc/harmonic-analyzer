@@ -797,7 +797,7 @@ async def build(adapter) -> dict[str, str]:
     # at ONE column with a free end just past the pen hanger -- M6.8
     # 8-view pass). Span -8..+192 covers the axle (+53) and the hanger
     # strap top (+3..+19).
-    wheel_bar = await place_component(
+    await place_component(
         adapter,
         "mg-wheel-bar",
         [WHEEL_BAR_X0, WHEEL_BAR_Y, BAR_Z],
@@ -818,28 +818,19 @@ async def build(adapter) -> dict[str, str]:
             ROT_Y_POS90,
             label=f"{arc} (wheel x{COLUMN_X:.0f})",
         )
-    # One physically mated seed plus a native component pattern.  Seed at the
+    # One fixed seed plus a native component pattern.  Seed at the
     # lower-X hole so PatternAxisX FORWARD lands the generated instance on the
     # second Hole Wizard station; both stations derive from the same bar
-    # constants. The exact rigid pose is held by one lock mate.
+    # constants.
     seed_x, patterned_x = sorted(CLAMP_SCREW_X)
-    seed_target = [seed_x, WHEEL_BAR_Y, BAR_FRONT_Z]
     clamp_seed = await place_component(
         adapter,
         "sh-vn-clamp-screw",
-        seed_target,
+        [seed_x, WHEEL_BAR_Y, BAR_FRONT_Z],
         [0.0, 0.0, 0.0],
         IDENTITY,
-        ground=False,
         label=f"clamp-screw seed (wheel x{seed_x:+.1f})",
     )
-    await lock_mate(
-        adapter,
-        named_ref(f"Right Plane@{clamp_seed}", "PLANE"),
-        named_ref(f"Right Plane@{wheel_bar}", "PLANE"),
-        label="wheel clamp-screw seed fixed to bar",
-    )
-    assert_component_placed(adapter, clamp_seed, seed_target, IDENTITY)
     clamp_instances = await linear_component_pattern(
         adapter,
         [clamp_seed],
@@ -1061,40 +1052,22 @@ async def build(adapter) -> dict[str, str]:
         ROT_X_NEG90,
     )
 
-    async def _stack_part(stem: str, d: float, lock_label: str) -> str:
+    async def _stack_part(stem: str, d: float) -> None:
         """A spacer/washer/nut on the pin at stack station d (mg_wheel_group):
         the part's local +Z axis (z 0..thickness, Front Plane at z 0) turned
-        onto machine -Z by Ry(180), its back face at z BAR_FRONT_Z - d, locked
-        to the pin (the same lock the old single nut used)."""
-        target = [WHEEL_X, WHEEL_BAR_Y, BAR_FRONT_Z - d]
-        comp = await place_component(
+        onto machine -Z by Ry(180), its back face at z BAR_FRONT_Z - d, fixed
+        like the axle it sits on."""
+        await place_component(
             adapter,
             stem,
-            target,
+            [WHEEL_X, WHEEL_BAR_Y, BAR_FRONT_Z - d],
             [0.0, 180.0, 0.0],
             ROT_Y_180,
-            ground=False,
             label=f"{stem} d{d:.4g}",
         )
-        await lock_mate(
-            adapter,
-            named_ref(f"Front Plane@{comp}", "PLANE"),
-            named_ref(f"Front Plane@{ax}", "PLANE"),
-            label=lock_label,
-        )
-        assert_component_placed(adapter, comp, target, ROT_Y_180)
-        return comp
 
-    await _stack_part(
-        "mg-wheel-axle-spacer",
-        SPACER_D,
-        "wheel-axle spacer locked to the axle",
-    )
-    await _stack_part(
-        "mg-vn-wheel-axle-back-washer",
-        BACK_WASHER_D,
-        "wheel back washer locked to the axle",
-    )
+    await _stack_part("mg-wheel-axle-spacer", SPACER_D)
+    await _stack_part("mg-vn-wheel-axle-back-washer", BACK_WASHER_D)
     wh = await place_component(
         adapter,
         "mg-magnifying-wheel",
@@ -1139,15 +1112,9 @@ async def build(adapter) -> dict[str, str]:
         label="wheel drum locked to the wheel",
     )
     # Front washer, nut and locknut close the stack at the set endshake.
-    await _stack_part(
-        "mg-vn-wheel-axle-front-washer",
-        FRONT_WASHER_D,
-        "wheel front washer locked to the axle",
-    )
-    await _stack_part("mg-vn-wheel-axle-nut", NUT_D, "wheel-axle nut locked to the axle")
-    await _stack_part(
-        "mg-vn-wheel-axle-nut", LOCKNUT_D, "wheel-axle locknut locked to the axle"
-    )
+    await _stack_part("mg-vn-wheel-axle-front-washer", FRONT_WASHER_D)
+    await _stack_part("mg-vn-wheel-axle-nut", NUT_D)
+    await _stack_part("mg-vn-wheel-axle-nut", LOCKNUT_D)
     # --- amplification wire 1 (fixture -> drum) ------------------------------
     # The straight rest-pose run leaves the fixture's spigot-groove front
     # tangent and grazes the brass drum's tangent; wraps are implied. Part

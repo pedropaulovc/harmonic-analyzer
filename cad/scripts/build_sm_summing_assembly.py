@@ -40,15 +40,15 @@ boss-hook / counter-spring / gooseneck chain.
   rulings 2026-11-08 (Pedro), #2315, MHA-FR-02's hub bored to the tube).
 * sm-gooseneck-end-plug -- MHA-SM-05, bonded flush into the gooseneck's arm
   end with LOCTITE 638 (owner rulings 2026-11-08 (Pedro), #2315); its outer
-  face is the end face and it carries the plain blind #10-24 tap.  Locked to
-  the fixed gooseneck, as the bond holds it.
+  face is the end face and it carries the plain blind #10-24 tap.  Fixed,
+  like the gooseneck it is bonded to.
 * sm-vn-gooseneck-shoulder-screw -- purchased MHA-SM-VN-56 slotted shoulder
   screw, head outboard, its shoulder seated on the end plug's face and its
   10-24 thread in the plug's plain blind tap.  Owner ruling 2026-11-08
   (Pedro), #2144 item 11.4, superseding #1951's clamped eye: the supplier
   upper loop rides free on the shoulder between the end face and the head
-  (bare slotted McMaster 91829A566, washer dropped).  Locked to the end plug
-  it threads into, with no additional operational DOF.
+  (bare slotted McMaster 91829A566, washer dropped).  Fixed at its seated
+  pose, with no additional operational DOF.
 
 Cross-subassembly fits (checked at the top level): the channel springs
 (ch-channel.SLDASM) thread the summing-lever plate's O4.5 holes -- gated
@@ -101,7 +101,6 @@ from _assembly import (
     angle_driver,
     assembly_title_properties,
     assert_free_dof_necessity,
-    assert_component_placed,
     author_in_drawing_configurations,
     check_no_interference,
     coincident_mate,
@@ -1005,7 +1004,7 @@ async def build(adapter) -> dict[str, str]:
     # Ry(180): the gooseneck's overhang arm reaches from the east column toward
     # the machine centre. Its measured origin Y is inserted directly; its
     # bare leg is held in the top-frame rail-hub bore by its 1/4-20 set screw.
-    gooseneck = await place_component(
+    await place_component(
         adapter,
         "sm-gooseneck",
         [COLUMN_X, gooseneck_origin_y, SUMMING_Z],
@@ -1015,50 +1014,31 @@ async def build(adapter) -> dict[str, str]:
     # MHA-SM-05, bonded in the arm end (owner rulings 2026-11-08 (Pedro),
     # #2315): its origin is the end face's centre with the spigot along local
     # +X, so the gooseneck's own Ry(180) runs the spigot to machine -X, into
-    # the tube's faced end.  Locked to the gooseneck, as the bond holds it;
-    # no operational DOF.
+    # the tube's faced end.  Fixed, as the bond holds it to the fixed
+    # gooseneck; no operational DOF.
     end_axis_y = gooseneck_origin_y + sm_gooseneck_geom.ARM_Y
-    plug_position = [spring_mounts.GOOSENECK_END_X, end_axis_y, SUMMING_Z]
     # Literal stems, one call each: _buildgraph's source-expression contract
     # and the hanger-stack recipe count read them.
-    plug = await place_component(
+    await place_component(
         adapter,
         "sm-gooseneck-end-plug",
-        plug_position,
+        [spring_mounts.GOOSENECK_END_X, end_axis_y, SUMMING_Z],
         [0.0, 180.0, 0.0],
         ROT_Y_180,
-        ground=False,
     )
-    await lock_mate(
-        adapter,
-        named_ref(f"Front Plane@{plug}", "PLANE"),
-        named_ref(f"Front Plane@{gooseneck}", "PLANE"),
-        label="end plug bonded in gooseneck arm",
-    )
-    assert_component_placed(adapter, plug, plug_position, ROT_Y_180)
     # The shoulder screw's origin is its shoulder end face, local +Z to the
     # head; ROT_Y_POS90 maps +Z to machine +X, so the shoulder seats on the
-    # plug's end face and the thread runs into its blind tap.  Locked to the
-    # plug it threads into; the mate records the seated pose, not a
-    # mechanical screw lock; the eye rides free on the shoulder (#2144 item
-    # 11.4) and adds no operational DOF.
+    # plug's end face and the thread runs into its blind tap.  Fixed at its
+    # seated pose; the eye rides free on the shoulder (#2144 item 11.4) and
+    # adds no operational DOF.
     screw_rows = ROT_Y_POS90
-    screw_position = [spring_mounts.GOOSENECK_END_X, end_axis_y, SUMMING_Z]
-    screw_component = await place_component(
+    await place_component(
         adapter,
         "sm-vn-gooseneck-shoulder-screw",
-        screw_position,
+        [spring_mounts.GOOSENECK_END_X, end_axis_y, SUMMING_Z],
         euler_from_rows(screw_rows),
         screw_rows,
-        ground=False,
     )
-    await lock_mate(
-        adapter,
-        named_ref(f"Front Plane@{screw_component}", "PLANE"),
-        named_ref(f"Front Plane@{plug}", "PLANE"),
-        label="shoulder screw seated on end plug",
-    )
-    assert_component_placed(adapter, screw_component, screw_position, screw_rows)
 
     # Certify the AS-BUILT model.  The lever rock remains the sole intended
     # freed DOF; the exact allowed-stem set rejects any free screw, dowel, or
