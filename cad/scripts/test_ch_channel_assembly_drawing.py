@@ -1272,7 +1272,8 @@ def test_a_feeler_leaf_passes_between_every_pair_of_bars() -> None:
     assert pin.RUNNING_FLOOR <= leaf <= least
     assert leaf == pytest.approx(0.005 * 25.4)
     body = _step_body("bars-gapped")
-    assert f"THE FEELER LEAF OF {drawing.setting_row('bars-gapped')} PASSES" in body
+    cite = drawing.notes.setting_row("bars-gapped")
+    assert f"THE FEELER LEAF OF {cite} PASSES" in body
     assert "EVERY ADJACENT PAIR" in body and "TOP TO BOTTOM" in body
     assert ".005" not in body
     assert _setting_table_row("bars-gapped")[4:] == (".005 MIN", "FEELER LEAF")
@@ -1292,7 +1293,8 @@ def test_each_bar_is_proved_straight_before_it_is_pinned() -> None:
     assert asm.BAR_GAP["mid_span_bowed"] >= asm._BAR_RUNNING_FLOOR
     body = _step_body("bars-straight")
     assert "SURFACE PLATE ON EACH SIDE FACE" in body
-    assert f"THE FEELER LEAF OF {drawing.setting_row('bars-straight')} MUST NOT" in body
+    cite = drawing.notes.setting_row("bars-straight")
+    assert f"THE FEELER LEAF OF {cite} MUST NOT" in body
     assert _setting_table_row("bars-straight")[4:] == (".005 MAX", "FEELER LEAF")
     # Rule 22: the remedy is its own step and loops back to the check.
     assert "STRAIGHTEN" not in body
@@ -1319,7 +1321,7 @@ def test_the_feeler_acceptances_are_setting_table_rows_their_steps_cite() -> Non
     import ch_fulcrum_keeper_spec as keeper
     from ch_channel_lever_spec import HUB_LENGTH as LEVER_HUB, HUB_LENGTH_BAND
 
-    assert drawing.SETTING_TABLE_HEADER == (
+    assert drawing.notes.SETTING_TABLE_HEADER == (
         "ROW",
         "STEP",
         "SETTING",
@@ -1333,8 +1335,8 @@ def test_the_feeler_acceptances_are_setting_table_rows_their_steps_cite() -> Non
         str(steps.step_number(key)) for key in keys
     ]
     for key in keys:
-        assert drawing.setting_row(key) in _step_body(key)
-        assert "SHEET 6" in drawing.setting_row(key)
+        assert drawing.notes.setting_row(key) in _step_body(key)
+        assert "SHEET 6" in drawing.notes.setting_row(key)
     span_min = (
         keeper.KEEPER_INNER_FACE_SPAN_MM - 2 * keeper.KEEPER_FITUP_LOCATION_BAND_MM
     )

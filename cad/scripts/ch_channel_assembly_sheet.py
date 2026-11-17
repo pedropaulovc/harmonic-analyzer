@@ -1,20 +1,26 @@
 """Drawing-only data of the channel fitter package (MHA-CH-00).
 
-Which marked dimension the sheet shows as a reference, the BOM descriptions
-and the settings-dimension callouts the sheets print. Only
-draw_ch_channel_assembly (and its tests) import this module; no assembly
-builder may (``test_assembly_sheet_isolation`` pins it), so a wording edit
-here does not rebuild the channel assembly. No SolidWorks.
+Which marked dimension the sheet shows as a reference, the BOM descriptions,
+the settings-dimension callouts and the sheet 6 setting table the sheets
+print. Only draw_ch_channel_assembly (and its tests) import this module; no
+assembly builder may (``test_assembly_sheet_isolation`` pins it), so a
+wording edit here does not rebuild the channel assembly. No SolidWorks.
 """
 
 from __future__ import annotations
+
+import math
 
 import sh_vn_arbor_set_screw_spec as arbor_set_screw
 import ch_vn_bracket_hold_down_screw_spec as hold_down_screw
 import ch_vn_frame_side_screw_spec as frame_side_screw
 import ch_vn_fulcrum_set_screw_spec as fulcrum_set_screw
 from _inch_fraction import inch_fraction
+from _title_block_units import LENGTH_UNITS, render_number
+import ch_channel_assembly_steps as steps
 from ch_channel_assembly_spec import (
+    BAR_BOW_MAX_MM,
+    BAR_GAP,
     DIMENSION_FEATURE,
     DIMENSION_TOLERANCES,
     KEEPER_FRONT_Z_DIMENSION,
@@ -24,7 +30,17 @@ from ch_channel_assembly_spec import (
     SPRING_SET_DIMENSION,
     STACK_LENGTH_DIMENSION,
     TIP_PROUD_DIMENSION,
+    UNIT,
 )
+from ch_channel_lever_spec import (
+    HUB_LENGTH as LEVER_HUB_LENGTH,
+    HUB_LENGTH_BAND as LEVER_HUB_LENGTH_BAND,
+)
+from ch_fulcrum_keeper_spec import (
+    KEEPER_FITUP_LOCATION_BAND_MM,
+    KEEPER_INNER_FACE_SPAN_MM,
+)
+from rocker_bank_layout import COUNT
 from ch_channel_explode_spec import (
     BANK_SPRING,
     BAR,
@@ -75,6 +91,76 @@ DIMENSION_CALLOUTS = {
 }
 if set(DIMENSION_CALLOUTS) != set(DIMENSION_FEATURE):
     raise AssertionError("every marked dimension carries a callout")
+
+# --- sheet 6: the setting table ------------------------------------------------
+# R5 machinist review (rule 22): the lever bank's three feeler acceptances
+# printed only in their steps. None is one model dimension (a leaf that must
+# not enter under a bar on the plate, a leaf that must pass between bars, a
+# leaf the pushed-together levers must leave room for at the other lug), so
+# each is a row of a native general table (draw_dt_drive_train_assembly's
+# SETTING TABLE columns) the steps cite by row; every value is built from the
+# spec. The drawing places the table under view G's label and numbers each
+# row's part from its BOM.
+SETTING_TABLE_SHEET_NUMBER = 6
+SETTING_TABLE_TITLE = "SETTING TABLE"
+SETTING_TABLE_HEADER = (
+    "ROW",
+    "STEP",
+    "SETTING",
+    "MEASURE FIRST",
+    "SET TO / ACCEPT",
+    "CHECK WITH",
+)
+# A feeler leaf prints .XXX, the .001 grid a feeler set is sold in.
+FEELER_LEAF_PLACES = 3
+
+
+def _inch(mm: float) -> str:
+    return render_number(mm / LENGTH_UNITS[UNIT], UNIT, FEELER_LEAF_PLACES)
+
+
+# The lever bank is never fitted like the rocker stack: the bars on the arms
+# locate it, and twenty hubs at the top of their band still leave end play
+# between the lugs at the extremes of both inner-face bands (#1660 r2). The
+# lever-bank-slides check gauges that play on a feeler leaf: the worst case
+# rounded down to .01 in, so a bank inside its bands always passes (moved here
+# from the MHA-CH-02 hub callout, FoChFab2 round 1).
+_LEVER_STACK_MAX = COUNT * (LEVER_HUB_LENGTH + LEVER_HUB_LENGTH_BAND[0])
+_LUG_SPAN_MIN = KEEPER_INNER_FACE_SPAN_MM - 2.0 * KEEPER_FITUP_LOCATION_BAND_MM
+_END_PLAY_MIN_IN = (_LUG_SPAN_MIN - _LEVER_STACK_MAX) / LENGTH_UNITS[UNIT]
+END_PLAY_LEAF_MM = math.floor(_END_PLAY_MIN_IN * 100.0) / 100.0 * LENGTH_UNITS[UNIT]
+if END_PLAY_LEAF_MM <= 0.0:
+    raise AssertionError(
+        "the lever bank must slide between the lugs, but the longest hubs "
+        "leave no gaugeable play in the shortest lug span"
+    )
+# #2341: each bar's bow is accepted at the surface plate before it is pinned
+# (no leaf of the allowed bow enters under either side face); the bank is
+# then accepted on the bars' least running gap, at the worst case of every
+# band with each bar at that bow, floored to .001 (the assembly spec's
+# bar-gap budget): a bank inside its bands always passes.
+SETTINGS = (
+    # (step key, the part the setting names (its BOM item prefixes the
+    # setting) or None, setting, set to / accept, check with)
+    ("bars-straight", BAR, "BAR BOW", f"{_inch(BAR_BOW_MAX_MM)} MAX", "FEELER LEAF"),
+    ("bars-gapped", BAR, "BAR GAP", f"{_inch(BAR_GAP['leaf'])} MIN", "FEELER LEAF"),
+    (
+        "lever-bank-slides",
+        None,
+        "LEVER END PLAY",
+        f"{_inch(END_PLAY_LEAF_MM)} MIN",
+        "FEELER LEAF",
+    ),
+)
+_SETTING_ROW = {key: row for row, (key, *_rest) in enumerate(SETTINGS, start=1)}
+if set(_SETTING_ROW) - set(steps.SEQUENCE):
+    raise AssertionError("a setting table row names no fit-up step")
+
+
+def setting_row(key: str) -> str:
+    """How a step cites its setting table row."""
+    return f"SETTING TABLE ROW {_SETTING_ROW[key]} (SHEET {SETTING_TABLE_SHEET_NUMBER})"
+
 
 # Hand-written (components carry no Description property), keyed by family
 # stem (each pivot pin member by stem--member, its configured BOM key); the

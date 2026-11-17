@@ -103,21 +103,15 @@ from _simplified_names import simplified_name
 from _general_table import TABLE_TITLE_DROP, insert_general_table, table_column_widths
 import _telemetry
 from _printed_tolerance import printed_deviations
-from _title_block_units import LENGTH_UNITS, render_number
 import ch_channel_assembly_sheet as notes
 import ch_channel_assembly_spec as asm
 from fr_top_frame_spec import BORE_DIA as SOCKET_BORE_DIA
 import ch_channel_explode_spec as explode
 import ch_channel_assembly_steps as steps
-from ch_channel_lever_spec import (
-    HUB_LENGTH as LEVER_HUB_LENGTH,
-    HUB_LENGTH_BAND as LEVER_HUB_LENGTH_BAND,
-    LEVER_SPRING_X,
-)
+from ch_channel_lever_spec import LEVER_SPRING_X
 from ch_fulcrum_keeper_spec import (
     CROWN_TOP_Y as KEEPER_CROWN_TOP_Y,
     FULCRUM_KEEPER_CENTRE_Z,
-    KEEPER_FITUP_LOCATION_BAND_MM,
     KEEPER_FITUP_X_FROM_WEB_MM,
     KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM,
     KEEPER_INNER_FACE_SPAN_MM,
@@ -1103,76 +1097,22 @@ def flow_steps(
     return tuple(blocks)
 
 
-# A feeler leaf prints .XXX, the .001 grid a feeler set is sold in.
-FEELER_LEAF_PLACES = 3
-
-
-def _inch(mm: float) -> str:
-    return render_number(mm / LENGTH_UNITS[asm.UNIT], asm.UNIT, FEELER_LEAF_PLACES)
-
-
-# The lever bank is never fitted like the rocker stack: the bars on the arms
-# locate it, and twenty hubs at the top of their band still leave end play
-# between the lugs at the extremes of both inner-face bands (#1660 r2). The
-# lever-bank-slides check gauges that play on a feeler leaf: the worst case
-# rounded down to .01 in, so a bank inside its bands always passes (moved here
-# from the MHA-CH-02 hub callout, FoChFab2 round 1).
-_LEVER_STACK_MAX = COUNT * (LEVER_HUB_LENGTH + LEVER_HUB_LENGTH_BAND[0])
-_LUG_SPAN_MIN = KEEPER_INNER_FACE_SPAN_MM - 2.0 * KEEPER_FITUP_LOCATION_BAND_MM
-_END_PLAY_MIN_IN = (_LUG_SPAN_MIN - _LEVER_STACK_MAX) / LENGTH_UNITS[asm.UNIT]
-END_PLAY_LEAF_MM = math.floor(_END_PLAY_MIN_IN * 100.0) / 100.0 * LENGTH_UNITS[asm.UNIT]
-if END_PLAY_LEAF_MM <= 0.0:
-    raise AssertionError(
-        "the lever bank must slide between the lugs, but the longest hubs "
-        "leave no gaugeable play in the shortest lug span"
-    )
-
 # --- sheet 6: the setting table ------------------------------------------------
-# R5 machinist review (rule 22): the lever bank's three feeler acceptances
-# printed only in their steps. None is one model dimension (a leaf that must
-# not enter under a bar on the plate, a leaf that must pass between bars, a
-# leaf the pushed-together levers must leave room for at the other lug), so
-# each is a row of a native general table (draw_dt_drive_train_assembly's
-# SETTING TABLE columns) the steps cite by row; every cell is built from the
-# spec (#2341 bow and bar-gap budget, the end-play worst case above). The
-# table sits under view G's label, right of the full-height step column.
-SETTING_TABLE_SHEET = SHEET_NAMES[5]
-# #2341: each bar's bow is accepted at the surface plate before it is pinned
-# (no leaf of the allowed bow enters under either side face); the bank is
-# then accepted on the bars' least running gap, at the worst case of every
-# band with each bar at that bow, floored to .001 (the assembly spec's
-# bar-gap budget): a bank inside its bands always passes.
-SETTING_TABLE_TITLE = "SETTING TABLE"
-SETTING_TABLE_HEADER = (
-    "ROW",
-    "STEP",
-    "SETTING",
-    "MEASURE FIRST",
-    "SET TO / ACCEPT",
-    "CHECK WITH",
-)
-_FEELER = "FEELER LEAF"
-_SETTINGS = (
-    # (step key, setting, accept)
-    (
-        "bars-straight",
-        f"{item(explode.BAR)} BAR BOW",
-        f"{_inch(asm.BAR_BOW_MAX_MM)} MAX",
-    ),
-    (
-        "bars-gapped",
-        f"{item(explode.BAR)} BAR GAP",
-        f"{_inch(asm.BAR_GAP['leaf'])} MIN",
-    ),
-    ("lever-bank-slides", "LEVER END PLAY", f"{_inch(END_PLAY_LEAF_MM)} MIN"),
-)
+# ch_channel_assembly_sheet owns the rows' values; the drawing numbers each
+# row's part from its BOM and places the table under view G's label, right of
+# the full-height step column.
+SETTING_TABLE_SHEET = SHEET_NAMES[notes.SETTING_TABLE_SHEET_NUMBER - 1]
 SETTING_TABLE_ROWS = tuple(
-    (str(row), str(steps.step_number(key)), setting, "-", accept, _FEELER)
-    for row, (key, setting, accept) in enumerate(_SETTINGS, start=1)
+    (
+        str(row),
+        str(steps.step_number(key)),
+        f"{item(stem)} {setting}" if stem else setting,
+        "-",
+        accept,
+        check,
+    )
+    for row, (key, stem, setting, accept, check) in enumerate(notes.SETTINGS, start=1)
 )
-SETTING_ROW = {
-    key: row for row, (key, _setting, _accept) in enumerate(_SETTINGS, start=1)
-}
 SETTING_TABLE_XY = (0.205, _HOOKUP_LABEL_FOOT - 0.008)  # the title's top left
 SETTING_TABLE_ROW_HEIGHT = 0.0055  # a general table row at the note font
 
@@ -1181,7 +1121,7 @@ def setting_table_box() -> tuple[float, float, float, float]:
     """The setting table's planned box (x0, y0, x1, y1) under its title."""
     x, top = SETTING_TABLE_XY
     top -= TABLE_TITLE_DROP
-    width = sum(table_column_widths(SETTING_TABLE_HEADER, SETTING_TABLE_ROWS))
+    width = sum(table_column_widths(notes.SETTING_TABLE_HEADER, SETTING_TABLE_ROWS))
     height = (len(SETTING_TABLE_ROWS) + 1) * SETTING_TABLE_ROW_HEIGHT
     return (x, top - height, x + width, top)
 
@@ -1193,12 +1133,6 @@ if _planned[2] > _TEMPLATE.width_m - BORDER - 0.003:
     raise AssertionError("the setting table runs past the right border")
 if _planned[1] < _TEMPLATE.title_block_top_m + 0.003:
     raise AssertionError("the setting table runs into the title block")
-
-
-def setting_row(key: str) -> str:
-    """How a step cites its setting table row."""
-    sheet = SHEET_NAMES.index(SETTING_TABLE_SHEET) + 1
-    return f"SETTING TABLE ROW {SETTING_ROW[key]} (SHEET {sheet})"
 
 
 # The right bracket is set by DRO off a test-indicator zero on its own foot
@@ -1451,7 +1385,7 @@ def _fitup_text() -> dict[str, str]:
         ),
         "bars-straight": (
             f"LAY EACH {bar} BAR ON THE SURFACE PLATE ON EACH SIDE FACE IN TURN: "
-            f"THE FEELER LEAF OF {setting_row('bars-straight')} MUST NOT ENTER "
+            f"THE FEELER LEAF OF {notes.setting_row('bars-straight')} MUST NOT ENTER "
             "UNDER IT."
         ),
         "bar-straightened": (
@@ -1489,14 +1423,14 @@ def _fitup_text() -> dict[str, str]:
             "BELOW IT."
         ),
         "bars-gapped": (
-            f"CHECK THE FEELER LEAF OF {setting_row('bars-gapped')} PASSES "
+            f"CHECK THE FEELER LEAF OF {notes.setting_row('bars-gapped')} PASSES "
             f"BETWEEN EVERY ADJACENT PAIR OF {bar} BARS, TOP TO BOTTOM."
         ),
         "levers-swing": f"CHECK EVERY {lever} SWINGS FREE ON {fulcrum_shaft}.",
         "lever-bank-slides": (
             f"CHECK THE LEVERS SLIDE TOGETHER ALONG {fulcrum_shaft}: PUSHED "
             f"AGAINST ONE {keeper} LUG, THEY LEAVE ROOM FOR THE FEELER LEAF OF "
-            f"{setting_row('lever-bank-slides')} AT THE OTHER."
+            f"{notes.setting_row('lever-bank-slides')} AT THE OTHER."
         ),
         "fulcrum-flats-aligned": (
             f"SLIDE {fulcrum_shaft} UNTIL EACH OF ITS FLATS LIES UP, UNDER THE "
@@ -2553,8 +2487,8 @@ def _place_hookup_sheet(adapter: Any) -> None:
     _activate_sheet(adapter, SETTING_TABLE_SHEET)
     box = insert_general_table(
         adapter,
-        title=SETTING_TABLE_TITLE,
-        header=SETTING_TABLE_HEADER,
+        title=notes.SETTING_TABLE_TITLE,
+        header=notes.SETTING_TABLE_HEADER,
         rows=SETTING_TABLE_ROWS,
         top_left=SETTING_TABLE_XY,
         label="setting table",
