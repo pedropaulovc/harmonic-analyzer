@@ -18,49 +18,7 @@ number: MHA-CH-00
 #   under-constrained (verify:soundness necessity).
 # free_dof (+ free_dof_per_active_channel x active channels): the operational
 #   DOF the saved model ships free (verify:soundness).
-flip_invert:
-  - ch vn frame side screw datum x
-  - ch vn frame side screw datum y
-  - ch vn frame side screw datum z
-  - ch fulcrum shaft datum x
-  - ch fulcrum shaft datum y
-  - ch fulcrum shaft datum z
-  # MHA-CH-VN-55 keeper set screws, datum-located IDENTITY beside the keeper
-  # foot screws [INFERENCE: same learned side; confirm on the farm build].
-  - ch vn fulcrum set screw datum x
-  - ch vn fulcrum set screw datum y
-  - ch vn fulcrum set screw datum z
-  # The old pivot-ball mounts became ch-pivot-bracket 2026-09; same
-  # datum-locate idiom and learned sides, keyed by canonical component names.
-  - ch pivot bracket datum x
-  - ch pivot bracket datum y
-  - ch pivot bracket datum z
-  - ch pivot bracket datum y @npn
-  # #743 PR2: the channel's datum-located MHA-CH-VN-57 bracket hold-downs,
-  # inserted IDENTITY like the brackets whose x/y/z seeds they share
-  # (r743-4D: the channel build's first MISS was the washer's x; the
-  # hold-downs follow it in the same datum-locate loop).
-  - ch vn bracket hold down screw datum x
-  - ch vn bracket hold down screw datum y
-  - ch vn bracket hold down screw datum z
-  # #743 PR2: the thrust washers (north and south, user 2026-10-10; MHA-CH-VN-56
-  # since the owner's 2026-10-15 purchased-washer ruling), datum-located
-  # IDENTITY like the pivot brackets (r743-4D flip-seed MISS on its x); both
-  # share the one canonical signature.
-  - ch vn rocker thrust washer datum x
-  - ch vn rocker thrust washer datum y
-  - ch vn rocker thrust washer datum z
-  # #948 ruling R: the MHA-CH-VN-54 rocker bank spring, datum-located IDENTITY
-  # beside the washer [INFERENCE: same learned side; confirm on the farm build].
-  - ch vn rocker bank spring datum x
-  - ch vn rocker bank spring datum y
-  - ch vn rocker bank spring datum z
-  # User 2026-10-10: the MHA-SH-VN-54 apex set screws, datum-located IDENTITY
-  # in the bracket loop's wake [INFERENCE: same learned side as every other
-  # IDENTITY datum-located channel part; confirm on the farm build].
-  - sh vn arbor set screw datum x
-  - sh vn arbor set screw datum y
-  - sh vn arbor set screw datum z
+flip_invert: []
 allowed_free_stems:
   - ch-rocker-arm
   - ch-connecting-rod

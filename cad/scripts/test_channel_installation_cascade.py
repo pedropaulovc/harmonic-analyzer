@@ -13,7 +13,6 @@ import ch_connecting_rod_spec
 import cam_plane
 import ch_fulcrum_shaft_spec
 import rocker_bank_layout
-from _assembly import _seed_flip, activate_assembly_contract
 from _cone_axis_constants import CHANNEL_Z0, DRUM_X, MECHANISM_Z_SHIFT
 
 
@@ -87,12 +86,3 @@ def test_pivot_retention_keeps_both_washers_and_the_wave_spring() -> None:
     assert channel.ROCKER_SPRING_Z[0] < channel.ROCKER_SPRING_Z[1]
     assert len(channel.BRACKET_SCREW_XZ) == 2
     assert len(channel.PIVOT_SHAFT_FLAT_STATIONS) == 2
-
-
-def test_fulcrum_station_keeps_the_learned_inverted_datum_side() -> None:
-    # The bank-centred station is negative; the learned inversion is
-    # side-independent (the +- keeper screws share one signature), so the
-    # seed is the plain sign rule toggled.
-    activate_assembly_contract("ch-channel")
-    assert channel.FULCRUM_SHAFT_Z < 0.0
-    assert not _seed_flip("ch-fulcrum-shaft-1 datum z d=0.50", channel.FULCRUM_SHAFT_Z)

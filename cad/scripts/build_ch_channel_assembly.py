@@ -88,7 +88,8 @@ or coincident, and parts within a channel slice share an axial reference:
     the rod, the lever and the amplitude bar are seated COINCIDENT to the
     rocker's mid-plane (rod/lever Front plane / bar MidWidth plane), so a
     channel's parts share ONE Z reference;
-  * the fulcrum shaft is datum-located by orthogonal plane distances;
+  * the fulcrum shaft and the static bank hardware are fixed at their
+    authored transforms;
   * springs and lower anchors are grounded at fixed measured / threaded
     installation transforms; their actual final contacts are statically gated.
 Each of the rocker/rod/bar joints keeps its operational DOF genuinely
@@ -432,7 +433,7 @@ if any(
     )
 ):
     raise AssertionError("a pivot shaft flat is not under its ear's set screw")
-# The datum-located washers: the purchased part runs z 0..THICKNESS from its
+# The fixed washers: the purchased part runs z 0..THICKNESS from its
 # origin (the stock recipe's annulus turned axis +Z), so IDENTITY at each
 # washer's z0 puts the south one's north face on hub 0's south face, and the
 # north one between hub 19's north face and the north ear's inner face.
@@ -750,49 +751,6 @@ def _org(adapter, name: str) -> list[float]:
     """A component's current origin (mm) in the assembly frame."""
     a = component_transform(adapter, name)
     return [a[9] * 1000.0, a[10] * 1000.0, a[11] * 1000.0]
-
-
-async def _locate_to_datum(adapter, name: str) -> None:
-    """Locate a grounded structural part to the machine datum planes by three
-    orthogonal plane-distance mates -- the semantic replacement for an explicit
-    fix on a free-space part with no contact partner (the #110 frame-column
-    idiom). Three orthogonal plane pairs fully define the body: each pins one
-    translation and, by forcing the planes parallel, the rotations.
-
-    The part is inserted axis-aligned (IDENTITY parts -- shafts, ball mounts),
-    so its principal planes map same-name to the assembly planes (Right->X,
-    Top->Y, Front->Z). The live origin (read post-mirror) gives the three
-    distances, so it is mirror-agnostic; coord 0 degenerates to a coincident.
-    (The fixed measured spring bank is GROUNDED at its complete insert
-    transforms instead, and the bushings are patterned; see the bank blocks in
-    build().)
-    """
-    o = _org(adapter, name)
-    pairs = (
-        ("Right Plane", "Right Plane", o[0], "x"),
-        ("Top Plane", "Top Plane", o[1], "y"),
-        ("Front Plane", "Front Plane", o[2], "z"),
-    )
-    for part_plane, asm_plane, coord, axis in pairs:
-        part_ref = named_ref(f"{part_plane}@{name}", "PLANE")
-        asm_ref = named_ref(asm_plane, "PLANE")
-        if abs(coord) < 1e-6:
-            await coincident_mate(
-                adapter,
-                part_ref,
-                asm_ref,
-                label=f"{name} datum {axis}=0 ({part_plane}<->{asm_plane})",
-                verify=(name, o),
-            )
-            continue
-        await distance_driver(
-            adapter,
-            part_ref,
-            asm_ref,
-            coord,
-            label=f"{name} datum {axis} d={abs(coord):.2f}",
-            verify=(name, o),
-        )
 
 
 async def _revolute(
@@ -1433,11 +1391,11 @@ async def build(adapter) -> dict[str, str]:
     apply_package_model_units(adapter, assembly_contract(ASM_NAME).drawing_unit, label=ASM_NAME)
 
     # Shafts. The pivot-shaft is inserted FIRST, so SolidWorks auto-fixes it as
-    # the assembly seed (ground=False -- the one allowed fixed component, the
-    # #110 idiom). The fulcrum-shaft is free-space structure with no contact
-    # partner, so it is datum-located (three orthogonal plane distances), not
-    # fixed. The shaft axes (machine frame, crank at -X) anchor the
-    # rocker/lever concentrics.
+    # the assembly seed. The fulcrum-shaft and the rest of the static channel
+    # structure below (brackets, washers, bank spring, keepers and their
+    # screws) carry no operational DOF and have no contact partner inside this
+    # subassembly, so each is fixed at its exact authored transform. The shaft
+    # axes (machine frame, crank at -X) anchor the rocker/lever concentrics.
     pivot_shaft = await place_component(
         adapter,
         "ch-pivot-shaft",
@@ -1453,10 +1411,8 @@ async def build(adapter) -> dict[str, str]:
         [FULCRUM[0], FULCRUM[1], FULCRUM_SHAFT_Z],
         [0.0, 0.0, 0.0],
         IDENTITY,
-        ground=False,
         label="fulcrum-shaft (lever bank)",
     )
-    await _locate_to_datum(adapter, fulcrum)
     pivot_w = (PIVOT[0], PIVOT[1])  # (72.9, 253.8) machine world
     fulc_w = (FULCRUM[0], FULCRUM[1])  # (199.9, 1061.3932) machine world
     # The rockers and levers ride the shafts' named axes.  A point on a shaft's
@@ -1466,9 +1422,7 @@ async def build(adapter) -> dict[str, str]:
     pivot_axis = named_ref(f"shaft axis@{pivot_shaft}", "AXIS")
     fulcrum_axis = named_ref(f"shaft axis@{fulcrum}", "AXIS")
 
-    # Pivot brackets. Free-space structure with no contact partner inside
-    # this subassembly, so each is datum-located (three orthogonal plane
-    # distances), not fixed -- the #110 idiom. Both seat on the rocker-arm-
+    # Pivot brackets, fixed. Both seat on the rocker-arm-
     # support's top (y 228.6). The part is an L (2026-09-02, ch14 p.27/28):
     # its foot runs from the ear toward local +Z, OUTBOARD toward the support's
     # end face (2026-10-09 sketch), so the north bracket (outboard = +Z) is
@@ -1478,82 +1432,68 @@ async def build(adapter) -> dict[str, str]:
     for name in _bracket_sides.SIDES:
         mount_z = _bracket_sides.MOUNT_Z[name]
         foot_pos_z = _bracket_sides.OUTBOARD_SIGN[name] > 0.0
-        mount = await place_component(
+        await place_component(
             adapter,
             "ch-pivot-bracket",
             [PIVOT[0], SUPPORT_APEX_Y, mount_z],
             [0.0, 0.0, 0.0] if foot_pos_z else [0.0, 180.0, 0.0],
             IDENTITY if foot_pos_z else ROT_Y_180,
-            ground=False,
             label=f"pivot-bracket {name} z{mount_z:+.0f}",
         )
-        await _locate_to_datum(adapter, mount)
     # Apex set screws (MHA-SH-VN-54): one per ear, on its mid-plane, cup down on
     # the shaft's flat. Placed in the brackets' order (south first), so screw
     # n is in bracket n (_ch_channel_interference names the pairs).
     for name in _bracket_sides.SIDES:
         screw_z = _bracket_sides.MOUNT_Z[name]
-        set_screw = await place_component(
+        await place_component(
             adapter,
             "sh-vn-arbor-set-screw",
             [PIVOT[0], SET_SCREW_TIP_Y, screw_z],
             [0.0, 0.0, 0.0],
             IDENTITY,
-            ground=False,
             label=f"pivot-bracket set screw {name} z{screw_z:+.1f}",
         )
-        await _locate_to_datum(adapter, set_screw)
     # Thrust washers (MHA-CH-VN-56): south on the shaft against rocker 0's hub,
-    # north between rocker 19's hub and the north ear. Free-space structure
-    # here, datum-located like the brackets.
+    # north between rocker 19's hub and the north ear. Fixed like the brackets.
     for washer_z, side in ((SOUTH_WASHER_Z, "south"), (NORTH_WASHER_Z, "north")):
-        washer = await place_component(
+        await place_component(
             adapter,
             "ch-vn-rocker-thrust-washer",
             [PIVOT[0], PIVOT[1], washer_z[0]],
             [0.0, 0.0, 0.0],
             IDENTITY,
-            ground=False,
             label=f"rocker-thrust-washer {side}",
         )
-        await _locate_to_datum(adapter, washer)
     # Rocker bank spring (MHA-CH-VN-54, #948 ruling R): coaxial on the shaft,
     # south face on the south ear's inner face, north face on the washer.
-    rocker_spring = await place_component(
+    await place_component(
         adapter,
         "ch-vn-rocker-bank-spring",
         [PIVOT[0], PIVOT[1], ROCKER_SPRING_Z[0]],
         [0.0, 0.0, 0.0],
         IDENTITY,
-        ground=False,
         label="rocker-bank-spring south",
     )
-    await _locate_to_datum(adapter, rocker_spring)
     # Bracket hold-downs (MHA-CH-VN-57): head down on each bracket foot's top,
     # over the seat rocker_bracket_seat_layout derived from its hole.
-    # Free-space here (the support is the frame's), datum-located likewise.
+    # Fixed likewise (the support is the frame's).
     for screw_x, screw_z in BRACKET_SCREW_XZ:
-        hold_down = await place_component(
+        await place_component(
             adapter,
             "ch-vn-bracket-hold-down-screw",
             [screw_x, SUPPORT_APEX_Y + PIVOT_BRACKET_FOOT_H, screw_z],
             [0.0, 0.0, 0.0],
             IDENTITY,
-            ground=False,
             label=f"pivot-bracket hold-down z{screw_z:+.1f}",
         )
-        await _locate_to_datum(adapter, hold_down)
     # Fulcrum end keepers (MHA-CH-07): the black shaft-END brackets of the
     # ch17 p.40 closeup -- an upright lug carries the shaft in its reamed bore,
     # the outboard foot screwed down to the rail top face. Part +X points
     # outboard along the shaft: the rear (+Z) keeper maps part X -> machine +Z
     # (Ry -90), the front keeper is the same part flipped (Ry +90). The
-    # keepers are GROUNDED at their computed transform (the cosmetic-bank
-    # idiom below): _locate_to_datum assumes IDENTITY parts whose planes map
-    # same-name, which a Ry+-90 part breaks. The IDENTITY screws are
-    # datum-located like the mounts they accompany: the foot screw head-flush
-    # in its counterbore, the set screw cup-down on the shaft flat under the
-    # crown tap (its part +Y runs cup -> socket, machine +Y).
+    # keepers and their screws are fixed at their computed transforms: the
+    # foot screw head-flush in its counterbore, the set screw cup-down on the
+    # shaft flat under the crown tap (its part +Y runs cup -> socket, machine +Y).
     for sign, euler, rows in (
         (1.0, [0.0, -90.0, 0.0], ROT_Y_NEG90),
         (-1.0, [0.0, 90.0, 0.0], ROT_Y_POS90),
@@ -1564,10 +1504,9 @@ async def build(adapter) -> dict[str, str]:
             [FULCRUM[0], RAIL_TOP_Y, FULCRUM_SHAFT_Z + sign * KEEPER_Z_OFF],
             euler,
             rows,
-            ground=True,
             label=f"fulcrum-keeper z{sign * KEEPER_Z_OFF:+.0f}",
         )
-        screw = await place_component(
+        await place_component(
             adapter,
             "ch-vn-frame-side-screw",
             [
@@ -1577,20 +1516,16 @@ async def build(adapter) -> dict[str, str]:
             ],
             [0.0, 0.0, 0.0],
             IDENTITY,
-            ground=False,
             label=f"keeper foot screw z{sign * KEEPER_SCREW_Z_OFF:+.0f}",
         )
-        await _locate_to_datum(adapter, screw)
-        set_screw = await place_component(
+        await place_component(
             adapter,
             "ch-vn-fulcrum-set-screw",
             [FULCRUM[0], SET_SCREW_SEAT_Y, FULCRUM_SHAFT_Z + sign * KEEPER_Z_OFF],
             [0.0, 0.0, 0.0],
             IDENTITY,
-            ground=False,
             label=f"keeper set screw z{sign * KEEPER_Z_OFF:+.0f}",
         )
-        await _locate_to_datum(adapter, set_screw)
 
     # No spacer bushings (2026-09-02): the rocker arms and channel levers
     # carry integral hubs one PITCH long, so each channel's rocker takes its
@@ -1799,12 +1734,8 @@ async def build(adapter) -> dict[str, str]:
         # (±88 mm seesaw, ch.15). The swing is a freed DOF whose drive spec —
         # a distance from the foot axis (Axis2@bar) to the assembly Right
         # Plane, i.e. the foot's X = the amplitude position — is recorded into
-        # the DOF manifest at today's solved contact, so a transient replay
-        # reproduces `rest` bit-exact. The spec MUST stay a part↔root-plane
-        # distance (NOT part↔part): the motion study's driver classifier only
-        # recognises dims that reference one real part + the sub root. This is
-        # the explicit form of the generic foot-X spin_driver the other
-        # revolutes use.
+        # the DOF manifest at today's solved contact. This is the explicit
+        # form of the generic foot-X spin_driver the other revolutes use.
         bar_tgt = _org(adapter, bar)
         foot = world_point(adapter, bar, BAR_FOOT_LOCAL)
         amplitude = foot[0] - pivot_w[0]  # foot X relative to the rocker pivot
@@ -1828,10 +1759,8 @@ async def build(adapter) -> dict[str, str]:
         )
         # The foot-X driver is a freed operational DOF (``free_dof_key``): the
         # bar swings about its top pin = slides the foot along the rocker arc,
-        # the amplitude DOF (request #1). It stays a part<->root-plane distance
-        # (the motion study's driver classifier only recognises one real part +
-        # the sub root), so it is NOT chained off a neighbour like the rocker
-        # axial.
+        # the amplitude DOF (request #1), recorded as a part<->root-plane
+        # distance.
         await distance_driver(
             adapter,
             named_ref(f"Axis2@{bar}", "AXIS"),
