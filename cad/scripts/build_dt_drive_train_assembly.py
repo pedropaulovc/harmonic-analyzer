@@ -4781,23 +4781,6 @@ def _org(adapter, name: str) -> list[float]:
     return [a[9] * 1000.0, a[10] * 1000.0, a[11] * 1000.0]
 
 
-async def _lock_static(adapter, name: str, reference: str) -> None:
-    """Rigidly retain an authored static pose with one mate.
-
-    These base-bolted mounts have no contact partner inside this subassembly.
-    Their exact machine-frame transform is already authored at insertion, so
-    three assembly-datum distance mates only make the solver rediscover six
-    coordinates it already has. Locking each mount to the fixed seed arbor
-    preserves the same relative transform in one branch-free relationship.
-    """
-    await lock_mate(
-        adapter,
-        named_ref(f"Front Plane@{name}", "PLANE"),
-        named_ref(f"Front Plane@{reference}", "PLANE"),
-        label=f"{name} fixed to static reference",
-    )
-
-
 async def _key_to_shaft(
     adapter,
     part,
@@ -5089,10 +5072,10 @@ async def build(adapter) -> dict[str, str]:
     check("create_assembly", await adapter.create_assembly())
     apply_package_model_units(adapter, assembly_contract(ASM_NAME).drawing_unit, label=ASM_NAME)
 
-    # =================== structure (static lock + moving joints) ===========
+    # =================== structure (fixed statics + moving joints) ===========
     # The stationary arbor is the reference frame the moving train mates
-    # against. Inserted FIRST, so SolidWorks auto-fixes it as the seed (the one
-    # allowed fixed component, mirroring frame's harmonic-base) -- no explicit fix.
+    # against. Inserted FIRST, so SolidWorks auto-fixes it as the seed; the
+    # base-bolted statics below are fixed at their authored poses too.
     arbor = await place_component(
         adapter,
         "dt-cylinder-gear-shaft",
@@ -5103,70 +5086,60 @@ async def build(adapter) -> dict[str, str]:
         label="cylinder arbor (seed)",
     )
     # The arbor-pedestal is a static mount bolted to the (absent) base. With
-    # no in-subassembly contact partner, its authored machine-frame pose is
-    # retained by one lock to the fixed seed arbor. (The old separate
+    # no in-subassembly contact partner, it is fixed at its authored
+    # machine-frame pose, like every static below. (The old separate
     # crank-pedestal is GONE: the merged green
     # column below rides the swing platform.)
     # Both pedestals support the complete strap depth; their transferred base
     # seats follow the revised disc/spring stack rather than old coordinates.
-    arbor_pedestal = await place_component(
+    await place_component(
         adapter,
         "dt-arbor-pedestal",
         [X_DRUM, Y_BASE_TOP, -ARBOR_PEDESTAL_Z],
         [0.0, 0.0, 0.0],
         IDENTITY,
-        ground=False,
         label=f"arbor-pedestal z={-ARBOR_PEDESTAL_Z:g}",
     )
-    await _lock_static(adapter, arbor_pedestal, arbor)
     # NORTH pedestal (PR8, ch12 img09): the same casting rotated 180 about Y
     # so its strap face looks south at the bank's spring. Its full strap bore
     # supports the arbor, like the south one.
-    north_pedestal = await place_component(
+    await place_component(
         adapter,
         "dt-arbor-pedestal",
         [X_DRUM, Y_BASE_TOP, ARBOR_PEDESTAL_NORTH_Z],
         [0.0, 180.0, 0.0],
         [[-1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, -1.0]],
-        ground=False,
         label=f"arbor-pedestal north z={ARBOR_PEDESTAL_NORTH_Z:g}",
     )
-    await _lock_static(adapter, north_pedestal, arbor)
     # One stationary south disc, seated directly against the datum pedestal.
-    end_disc = await place_component(
+    await place_component(
         adapter,
         "dt-cylinder-end-disc",
         [X_DRUM, Y_DRIVE, END_DISC_SOUTH_Z0],
         [0.0, 0.0, 0.0],
         IDENTITY,
-        ground=False,
         label=f"cylinder south end disc z0={END_DISC_SOUTH_Z0:.3f}",
     )
-    await _lock_static(adapter, end_disc, arbor)
     # North spring: south face directly on gear 19, north face on its strap.
-    bank_spring = await place_component(
+    await place_component(
         adapter,
         "dt-vn-cylinder-bank-spring",
         [X_DRUM, Y_DRIVE, BANK_SPRING_Z0],
         [0.0, 0.0, 0.0],
         IDENTITY,
-        ground=False,
         label=f"cylinder bank spring z0={BANK_SPRING_Z0:.3f}",
     )
-    await _lock_static(adapter, bank_spring, arbor)
     # Apex set screws (MHA-SH-VN-54, #743 Q3): point down through each crown onto
     # the arbor's top at the strap's mid-depth; static like their pedestals.
     for _screw_z, _end in ((SET_SCREW_SOUTH_Z, "south"), (SET_SCREW_NORTH_Z, "north")):
-        set_screw = await place_component(
+        await place_component(
             adapter,
             "sh-vn-arbor-set-screw",
             [X_DRUM, SET_SCREW_TIP_Y, _screw_z],
             [0.0, 0.0, 0.0],
             IDENTITY,
-            ground=False,
             label=f"arbor set screw {_end} z={_screw_z:.3f}",
         )
-        await _lock_static(adapter, set_screw, arbor)
     # The cone SWING PLATFORM is the swing bracket (ch.12, p.18 "pivot"):
     # floated so the whole cone set can swing horizontally out of mesh about
     # its tip-end vertical pivot (p1). Pinned at the engaged rest pose by a
@@ -5295,49 +5268,43 @@ async def build(adapter) -> dict[str, str]:
     # plate top and its longer stud passes through the slot into the new 1/4-20
     # base seat. The plate remains the mover, sweeping around the stationary
     # stud without changing the assembly's operational swing DOF.
-    lock_knob = await place_component(
+    await place_component(
         adapter,
         "dt-vn-cone-lock-knob",
         [KNOB_X, Y_BASE_TOP + PLAT_T, KNOB_Z],
         [0.0, 0.0, 0.0],
         IDENTITY,
-        ground=False,
         label="cone-lock-knob (platform clamp, engaged end)",
     )
-    await _lock_static(adapter, lock_knob, arbor)
     # The platform pivot screw (item 2, p.18 "pivot"): a base-threaded STATIC.
     # Its shoulder bottoms on the base top, placing the head 0.25 above the
     # plate and leaving the plate free to swing; the threaded tail enters the
     # matching through #10-24 UNC-2B deck seat.
-    pivot_screw = await place_component(
+    await place_component(
         adapter,
         "dt-vn-cone-pivot-screw",
         [ppivot[0], Y_BASE_TOP + PSCREW_SHOULDER_LEN, ppivot[2]],
         [0.0, 0.0, 0.0],
         IDENTITY,
-        ground=False,
         label="cone-pivot-screw (p1 pivot pin)",
     )
-    await _lock_static(adapter, pivot_screw, arbor)
     # The canonical screw uses the foot's stock frame. Preserve the stop's
     # former local (0, PROUD_LEN, 0) body translation at this identity-rotation
     # occurrence; its head still meets the same disengaged platform edge.
-    stop_screw = await place_component(
+    await place_component(
         adapter,
         "sh-vn-fillister-screw-90280a108",
         [STOP_X, Y_BASE_TOP + STOP_PROUD_LEN, STOP_Z],
         [0.0, 0.0, 0.0],
         IDENTITY,
-        ground=False,
         component_reference="SwingStopScrew:1",
         label="swing-stop-screw (p1 travel limit)",
     )
-    await _lock_static(adapter, stop_screw, arbor)
 
     # ============ alignment pinion swing group (ch.25, p.66; p2) ============
     # Floated straps + drum, joined and parked DISENGAGED in the joints
-    # section. The pivot blocks and torque shaft are base-bolted statics
-    # (locked to the fixed seed arbor below); the lift rod is a REVOLUTE in
+    # section. The pivot blocks are base-bolted statics (fixed at their
+    # authored transforms); the lift rod is a REVOLUTE in
     # the blocks' raised west bores carrying the two eccentric cams and the
     # lever (PR8 -- all semantically mated, spinning as one family on the
     # freed pinion_cam DOF). The separate MHA-DT-15 grip crossrod is LOCKED to
@@ -5393,7 +5360,6 @@ async def build(adapter) -> dict[str, str]:
             [BLOCK_X, PIVOT_Y, z0 + BLOCK_DEPTH],
             [0.0, 180.0, 0.0],
             ROT_Y_180,
-            ground=False,
             label=f"pinion-pivot-block {tag}",
         )
         pinion_blocks.append(blk)
@@ -5418,13 +5384,12 @@ async def build(adapter) -> dict[str, str]:
         ground=False,
         label="pinion-lift-rod (in the blocks' raised west bores)",
     )
-    spring = await place_component(
+    await place_component(
         adapter,
         "dt-pinion-spring",
         [SPRING_X, Y_BASE_TOP, SPRING_Z],
         [0.0, 180.0, 0.0],
         ROT_Y_180,
-        ground=False,
         label="pinion-spring (holds the swing disengaged)",
     )
     cam_pins: dict[str, str] = {}
@@ -5526,7 +5491,6 @@ async def build(adapter) -> dict[str, str]:
         [sx, BLOCK_TOP_Y, sz],
         [0.0, 0.0, 0.0],
         IDENTITY,
-        ground=False,
         label="slotted-screw block hold-down seed",
     )
     sx, sz = _FOOT_SCREW_XZ[0]
@@ -5536,7 +5500,6 @@ async def build(adapter) -> dict[str, str]:
         [sx, Y_BASE_TOP + SPRING_T, sz],
         [0.0, 0.0, 0.0],
         IDENTITY,
-        ground=False,
         component_reference="FootScrew:1",
         label="foot-screw (spring foot)",
     )
@@ -5550,7 +5513,6 @@ async def build(adapter) -> dict[str, str]:
         [sx, Y_BASE_TOP + ARBOR_PED_FLANGE_T, sz],
         [0.0, 0.0, 0.0],
         IDENTITY,
-        ground=False,
         label="pedestal-hold-down-screw (south ledge)",
     )
 
@@ -7016,12 +6978,10 @@ async def build(adapter) -> dict[str, str]:
     # The two straps + the pinion drum swing as ONE group to mesh the cylinder
     # train (ch.25, p.66); parked DISENGAGED (p.68 "gap").  Option E-a pins
     # both straps to the torque shaft, so the shaft swings with them in the
-    # blocks' pivot bores.  Statics first: the pivot blocks are base-bolted
-    # mounts at their authored transforms -> locked once to the fixed seed
-    # arbor. The lift rod is NOT static any more (PR8): it journals in the
-    # blocks' raised west bores as a revolute below, carrying the cams + lever.
-    for blk in pinion_blocks:
-        await _lock_static(adapter, blk, arbor)
+    # blocks' pivot bores.  The pivot blocks are base-bolted statics, fixed at
+    # their authored transforms. The lift rod is NOT static any more (PR8): it
+    # journals in the blocks' raised west bores as a revolute below, carrying
+    # the cams + lever.
     # The shaft's axis sits on the blocks' pivot bores and its station is the
     # authored one (the cone-platform pivot idiom: an axis held off two
     # assembly planes); only its spin is left, and the pin tie to the front
@@ -7051,9 +7011,6 @@ async def build(adapter) -> dict[str, str]:
         label=f"torque shaft axial d={abs(ps_o[2]):.2f}",
         verify=(pivot_shaft, ps_o),
     )
-    await _lock_static(adapter, spring, arbor)
-    for scr in (block_screw, spring_foot_screw, pedestal_screw):
-        await _lock_static(adapter, scr, arbor)
     block_instances = await grid_component_pattern(
         adapter,
         [block_screw],

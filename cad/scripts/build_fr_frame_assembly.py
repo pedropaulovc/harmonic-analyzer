@@ -252,7 +252,7 @@ SUPPORT_ROWS = ROT_Y_POS90
 
 # Rocker-support hold-down: four stock 1/4-20 x 3/4 hex-head screws,
 # coaxial with the support clearance drills and through base taps via authored
-# transforms; one seed lock mate and a native grid retain that placement.
+# transforms; one fixed seed and a native grid retain that placement.
 # Stations are the foot pattern in the machine frame: local X +/-60.32,
 # Z +/-17.46 turned +90 degrees about Y -> machine x 55.44/90.36 and
 # z SUPPORT_Z +/-60.32. The screw's actual bearing face lies
