@@ -1,11 +1,12 @@
 """Drawing-only data of the summing-lever fitter package (MHA-SM-00).
 
 The drawing number, BOM order, the setting dimensions the drawing imports,
-the level tolerance, the BOM descriptions, setting callouts, detail title,
-assembled-view notes, assembly steps and checks the sheets print. Only
-draw_sm_summing_assembly (and its tests) import this module; no assembly
-builder may (``test_assembly_sheet_isolation`` pins it), so a wording edit
-here does not rebuild the summing assembly. No SolidWorks.
+the level tolerance, the BOM descriptions, setting callouts, detail title and
+assembled-view notes the sheets print, and the assembly steps and checks the
+release's ASSEMBLY.md prints (ha_assembly_package, #2889). Only
+draw_sm_summing_assembly, ha_assembly_package (and their tests) import this
+module; no assembly builder may (``test_assembly_sheet_isolation`` pins it),
+so a wording edit here does not rebuild the summing assembly. No SolidWorks.
 """
 
 from __future__ import annotations
@@ -128,7 +129,7 @@ DIMENSION_CALLOUTS = {
 }
 
 # --- Fitter package text ----------------------------------------------------------
-EXPLODED_CAPTION = "EXPLODED VIEW - ASSEMBLY SEQUENCE ON SHEETS 3-4"
+EXPLODED_CAPTION = "EXPLODED VIEW"
 ASSEMBLED_NOTES = (
     "NOTES:",
     "1. NOT SHOWN: TOP FRAME MHA-FR-02. EACH KNIFE-MOUNT TOP SEAT CLAMPS TO "
@@ -136,7 +137,7 @@ ASSEMBLED_NOTES = (
     "THE GOOSENECK POST STANDS IN THE FRAME'S GOOSENECK HUB.",
     "2. LEVER SHOWN LEVEL, RESTING ON THE KNIFE EDGE (TOP RIDGE OF EACH HEX "
     "TRUNNION) UNDER THE TOP OF EACH MOUNT BORE.",
-    f"3. LEVEL SETTING: {LEVEL_CRITERION}, SHEET 4 STEP 10.",
+    f"3. LEVEL SETTING: {LEVEL_CRITERION}, STEP 10.",
     f"4. {BOND_GRADE} BOND (STEP 1B): DEGREASE DOWEL AND HOLE; COAT THE "
     "DOWEL, NEVER THE BLIND HOLE; PRESS IT TO THE HOLE FLOOR; CURE 24 H "
     "BEFORE STEP 5. ACCEPT: IT DOES NOT TURN OR SLIDE BY HAND.",
@@ -223,7 +224,7 @@ ASSEMBLY_STEPS = (
     "THE CROSSBAR UNDERSIDE.",
     f"7. CHECK THE FREE ROCK AGAIN (CHECK 2, DETAIL {DETAIL_LETTER}) BEFORE THE "
     "COUNTER SPRING GOES ON.",
-    # One printed line: sheet 4 is full (note 5 names the compound).
+    # One line: note 5 names the compound.
     "8. BOND MHA-SM-05 INTO MHA-SM-01 PER SHEET 1 NOTE 5 (MAY BE DONE BEFORE STEP 1).",
     "8A. PASS MHA-SM-VN-56 THROUGH THE UPPER LOOP OF MHA-SM-VN-51.",
     "8B. TURN MHA-SM-VN-56 INTO MHA-SM-05 UNTIL ITS SHOULDER SEATS ON THE END "
@@ -242,8 +243,8 @@ ASSEMBLY_STEPS = (
     "10A. TIGHTEN THE HUB SET SCREW MHA-FR-VN-52 ON THE POST, "
     f"{HUB_SET_SCREW_TORQUE}.",
 )
+STEP_SECTIONS = (("ASSEMBLY SEQUENCE", ASSEMBLY_STEPS),)
 ASSEMBLY_CHECKS = (
-    "CHECKS:",
     "1. EACH MOUNT'S TOP SEAT IS FLAT TO THE CROSSBAR UNDERSIDE: A "
     f"{_length(SEAT_FEELER_MM, 3)} FEELER ENTERS NOWHERE ROUND IT; THE MOUNT "
     "DOES NOT TURN ABOUT ITS DOWEL BY HAND.",
