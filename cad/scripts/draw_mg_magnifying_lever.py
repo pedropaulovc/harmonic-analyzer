@@ -63,11 +63,13 @@ DETAIL_RADIUS_MM = 12.5
 # The .71 sits just above the rod's threaded end, short witnesses.
 DETAIL_KEEP = {"ThreadLength": (0.323, 0.209), "IncompleteLength": (0.381, 0.165)}
 # R24: end the diameter witnesses left of the unchanged finish symbol/leader;
-# keep the qualifier above the screw-seat note. The free-end SR's position is
-# its text centre; native ink (run 20261117T122606274Z) runs its shelf 1 mm past the text's left
-# end and bends 3 mm past its right, so the text sits low and right enough to
-# keep the shelf 2.5 mm inside the border and land the radial arrow on the dome.
-FRONT_KEEP = {"OverallLength": (0.115, 0.088), "RodDia": (0.055, 0.166), "DomeR": (0.022, 0.130)}
+# keep the qualifier above the screw-seat note. The free-end (SR.125) position
+# is its text centre; native ink (runs 20261117T122606274Z/123356866Z) bends
+# the radial leader 3 mm off the text's near end and runs its shelf 1 mm past
+# the far end. Its text stands right of that bend, above the rod and short of
+# the Ø dimension line, so the bend stays up-left of the sphere centre and the
+# arrow lands on the dome while nothing reaches the left border.
+FRONT_KEEP = {"OverallLength": (0.115, 0.088), "RodDia": (0.055, 0.166), "DomeR": (0.0416, 0.130)}
 DETAIL_THREAD_NOTE_XY = (0.2760, 0.172)
 # ASME Y14.6 simplified external thread, sketched in the view: a thin
 # thread-limit line across the major diameter where ThreadLength's root
