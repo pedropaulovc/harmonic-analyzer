@@ -266,7 +266,8 @@ def test_sheet_numbers_are_pinned_where_the_sheets_cite_them() -> None:
         drawing.CHECKS_SHEET,
         drawing.BANK_SETTINGS_SHEET,
     ) == (7, 8, 9, 10, 11, 12, 13, 14), "the numbered steps read in sheet order"
-    assert len(names) == drawing.SETTING_SHEET == drawing.BANK_SETTINGS_SHEET + 1
+    assert len(names) == drawing.ACCEPTANCE_SHEET == drawing.SETTING_SHEET + 1
+    assert drawing.SETTING_SHEET == drawing.BANK_SETTINGS_SHEET + 1
     assert names[drawing.FULL_DETAIL_SHEET - 1] == "FULL-DETAIL SIDE VIEW"
     assert f"FULL DETAIL: SHEET {drawing.FULL_DETAIL_SHEET}." in drawing.ASSEMBLED_HEADING
     assert names[drawing.SEQUENCE_SHEET - 1] == "ASSEMBLY SEQUENCE"
@@ -276,6 +277,7 @@ def test_sheet_numbers_are_pinned_where_the_sheets_cite_them() -> None:
     assert names[drawing.FIT_SHEET - 1] == "ASSEMBLY SEQUENCE CONT. - CYLINDER BANK + PINION RIG"
     assert names[drawing.BANK_SETTINGS_SHEET - 1] == "CYLINDER BANK + MHA-DT-01 STATION SETTINGS"
     assert names[drawing.SETTING_SHEET - 1] == "SETTING TABLES + CONE STATIONS"
+    assert names[drawing.ACCEPTANCE_SHEET - 1] == "SETTING TABLE CONT. - FITS AND ACCEPTANCES"
     assert sorted(drawing.CLUSTER_SHEETS.values()) == [3, 4, 5, 6]
     assert set(drawing.SHEET_SCALES) == set(names)
     assert "BALLOONS ON SHEETS 3-6" in drawing.BOM_REFERENCE_NOTES
@@ -766,22 +768,32 @@ def _rig_step_body(key: str) -> str:
     return _flat(RIG_STEPS[heads[index].end() : end])
 
 
+def _accept_cell(key: str) -> str:
+    """The SET TO / ACCEPT cell of one sheet 16 setting-table row."""
+    number = str(drawing.ACCEPTANCE_ROW_NUMBERS[key])
+    (row,) = (row for row in drawing.ACCEPTANCE_TABLE_ROWS if row[0] == number)
+    return row[drawing.ACCEPTANCE_TABLE_HEADER.index("SET TO / ACCEPT")]
+
+
 def test_rig_is_located_by_its_parked_tip_gap() -> None:
     import dt_drive_train_steps as steps
     import pinion_rig_tip_gap as tip_gap
 
     feeler = f"{tip_gap.TIP_GAP_SETTING_TEXT} FEELER"
+    cite = f"({drawing.acceptance_ref('tip-gap')})"
     located = _rig_step_body("rig-located")
-    for phrase in ("UNDRILLED SEATS", tip_gap.TIP_GAP_FEELER_TEXT, tip_gap.TIP_GAP_ACCEPT_TEXT):
+    for phrase in ("UNDRILLED SEATS", tip_gap.TIP_GAP_FEELER_TEXT, cite):
         assert phrase in located, phrase
     check = _flat(drawing.CHECKS)
     assert feeler in check
     assert (
-        f"{tip_gap.TIP_GAP_ACCEPT_TEXT} (SHEET {drawing.CONTINUATION_SHEET}, "
-        f"STEP {steps.step_number('rig-located')}E)"
+        f"AT GEAR 19 ({drawing.acceptance_ref('tip-gap')}, SET AT SHEET "
+        f"{drawing.CONTINUATION_SHEET}, STEP {steps.step_number('rig-located')}E)"
     ) in check
-    # The inch acceptance rounds inward, inside the spec's window.
-    printed = re.search(r"ACCEPT (\.\d{3})-(\.\d{3})", tip_gap.TIP_GAP_ACCEPT_TEXT)
+    # The inch acceptance rounds inward, inside the spec's window, and prints
+    # as the steps' sheet 16 row (R5 machinist review, rule 22).
+    assert tip_gap.TIP_GAP_ACCEPT_TEXT == f"ACCEPT {_accept_cell('tip-gap')}"
+    printed = re.fullmatch(r"(\.\d{3})-(\.\d{3})", _accept_cell("tip-gap"))
     assert printed is not None
     low, high = (float(value) * 25.4 for value in printed.groups())
     assert tip_gap.TIP_GAP_ACCEPT[0] - 1e-9 <= low < high <= tip_gap.TIP_GAP_ACCEPT[1] + 1e-9
@@ -995,6 +1007,67 @@ def test_sheet_15_tables_stack_clear_of_the_station_field_on_any_seat(
     assert bottoms[2] - drawing.INTERFACE_FIELD[1] >= 0.002
 
 
+def test_every_sheet_16_row_is_cited_by_its_step_and_fits_its_sheet(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """R5 machinist review (rule 22, 3/3 runs): each measurable fit and
+    acceptance a step or check made only in its text prints as a sheet 16
+    setting-table row, numbered on from sheet 15's, and its step cites the
+    row in place of the value.  The table clears the reference view."""
+    first_row = len(drawing.SETTING_TABLE_ROWS) + 1
+    numbers = [int(row[0]) for row in drawing.ACCEPTANCE_TABLE_ROWS]
+    assert numbers == list(range(first_row, first_row + len(numbers)))
+    printed = _flat(
+        "\n".join(
+            text
+            for field in drawing.package_note_fields(_drawing_facts())
+            for _label, text in field.blocks
+        )
+    )
+    for key, number in drawing.ACCEPTANCE_ROW_NUMBERS.items():
+        cite = f"({drawing.acceptance_ref(key)}"
+        assert printed.count(cite) == (2 if key == "tip-gap" else 1), key
+        (row,) = (row for row in drawing.ACCEPTANCE_TABLE_ROWS if row[0] == str(number))
+        # The STEP cell names the sub-step whose text carries the cite.
+        first = row[1].split(",")[0]
+        head = re.search(rf"\b{re.escape(first)}\. ((?:(?!\b\d+[A-Z]?\. ).)*)", printed)
+        assert head is not None and cite in head.group(1), (key, first)
+    assert drawing.acceptance_ref("tip-gap") in _flat(drawing.CHECKS)
+    # No cited value prints in its step any more.
+    assert "ACCEPT 5." not in printed and "END PLAY AT THE SHAFT END: ." not in printed
+
+    monkeypatch.setattr(general_table, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(drawing, "_activate_sheet", lambda *_args: None)
+    monkeypatch.setattr(drawing, "_heading", lambda *_args: None)
+    monkeypatch.setattr(drawing, "_reference_iso", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(general_table, "add_note_block", lambda *_args, **_kwargs: object())
+    monkeypatch.setattr(
+        general_table,
+        "anchor_note",
+        lambda _adapter, _note, corner, **_kwargs: (
+            corner[0],
+            corner[1] - general_table.NOTE_LINE_PITCH,
+            corner[0] + 0.08,
+            corner[1],
+        ),
+    )
+    tables: list[_SheetTable] = []
+
+    def insert(_bom, x, top, _anchor, _template, rows, columns):
+        tables.append(_SheetTable(x, top, rows, columns))
+        return tables[-1]
+
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(InsertTableAnnotation2=insert))
+    assert drawing._place_acceptance_sheet(adapter) == []
+    (table,) = tables
+    bottom = table.anchor[1] - table.RowCount * table.ROW_HEIGHT
+    right = table.anchor[0] + sum(table.widths.values())
+    left, top = drawing.ACCEPTANCE_REFERENCE_KEEP_OUT
+    assert right <= left and bottom >= top
+    # Positive control: a table reaching into the reference view is refused.
+    assert drawing.acceptance_table_violations((table.anchor[0], top - 0.001, left + 0.001, 0.2))
+
+
 def test_the_pivot_seat_is_transferred_and_trusted() -> None:
     """Owner ruling 2026-11-08 (Pedro): step 23 transfer-punches D1 through
     the MHA-DT-20 pivot bore with the cone set at its working position,
@@ -1113,10 +1186,10 @@ def test_the_spring_is_stationed_east_west_where_its_preload_is_gated() -> None:
 
     located = _rig_step_body("rig-located")
     assert drawing.SPRING_EAST_WEST in located
-    printed = re.search(r"FOOT HOLE CENTRE (\d*\.\d+) RIGHT OF THE MHA-DT-19 AXIS", located)
-    assert printed is not None
-    # The inch sheet's .XX: within half a hundredth of the gated station.
-    assert float(printed.group(1)) * 25.4 == pytest.approx(SCREW_EAST_OF_PIVOT, abs=0.127)
+    assert f"FOOT HOLE CENTRE RIGHT OF THE MHA-DT-19 AXIS ({drawing.acceptance_ref('spring-foot')})" in located
+    # The inch sheet's .XX, in its sheet 16 row: within half a hundredth of
+    # the gated station.
+    assert float(_accept_cell("spring-foot")) * 25.4 == pytest.approx(SCREW_EAST_OF_PIVOT, abs=0.127)
     assert "UNTIL ITS CREST BEARS ON THE PARKED BACK MHA-DT-14 FLANK" in located
     assert "TERMINAL FLAT" not in _flat(RIG_STEPS)
     assert "TERMINAL FLAT" not in Path(drawing.__file__).read_text(encoding="utf-8")
@@ -1154,7 +1227,8 @@ def test_torque_shaft_pins_go_in_before_the_cams() -> None:
     assert "DRIVE MHA-DT-VN-63 PINS" in _rig_step_body("straps-pinned-to-torque-shaft")
     cams = _rig_step_body("cams-and-lever-fitted")
     assert "FIT 2X MHA-DT-23" in cams and "LOOSE" in cams and "MHA-DT-30" not in cams
-    assert _flat(fitup.COLLAR_SET_STEP) in _unlettered(_rig_step_body("cam-collars-set"))
+    collar_set = drawing._reworded(fitup.COLLAR_SET_STEP, *drawing.RIG_REWORDINGS["cam-collars-set"])
+    assert _flat(collar_set) in _unlettered(_rig_step_body("cam-collars-set"))
     order = [
         steps.step_number(key)
         for key in (
