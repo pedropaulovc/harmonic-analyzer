@@ -784,7 +784,7 @@ def _assert_shared_component_references(adapter: Any, name: str) -> None:
 
 
 def _run_soundness_battery(
-    adapter: Any, name: str, report: Report, rebuilt: Any
+    adapter: Any, name: str, report: Report, rebuilt: Any, *, repaired: bool = False
 ) -> None:
     """Run the complete per-document soundness battery on the active assembly.
 
@@ -803,7 +803,13 @@ def _run_soundness_battery(
     gate bug); the expected counts survive as reference data in
     ``_COMPONENT_BAND``. channel-independence (the "no component pattern for
     moving parts" invariant) runs here because soundness already opens
-    ``ch-channel``.
+    ``ch-channel``. Spring native contacts run only where no builder proof
+    covers the bytes: on an auto-repaired document before it is saved, and on
+    a saved file without its ``.massprops.sha`` proof (the builder writes it
+    only after ``native_contact_check`` passed on the saved bytes; a verify
+    auto-repair revokes it before saving). The builder proves the stations of
+    its ``CHANNEL_COUNT``, so a debug build with that override is certified
+    for those stations only.
     """
     free_dof = _expected_free_dof(name)
     if free_dof:
@@ -856,7 +862,9 @@ def _run_soundness_battery(
             chain_mounts=_soundness_chain_mounts(name),
         ),
     )
-    if name in ("ch-channel", "sm-summing"):
+    if name in ("ch-channel", "sm-summing") and (
+        repaired or not _massprops_sidecar(name).exists()
+    ):
         report.gate(
             f"{name}:spring-native-contacts",
             lambda: assert_assembly_spring_contacts(adapter, name),
@@ -939,7 +947,7 @@ async def _verify_static_one(
 
     assembly_failures_before = len(report.failed)
 
-    _run_soundness_battery(adapter, name, report, rebuilt)
+    _run_soundness_battery(adapter, name, report, rebuilt, repaired=repaired)
 
     if repaired:
         if len(report.failed) != assembly_failures_before:
@@ -970,7 +978,9 @@ async def _verify_static_one(
                     lambda m=active: m.ForceRebuild3(False), default=None
                 )
                 child_failures_before = len(report.failed)
-                _run_soundness_battery(adapter, repaired_name, report, rebuilt_child)
+                _run_soundness_battery(
+                    adapter, repaired_name, report, rebuilt_child, repaired=True
+                )
                 if len(report.failed) != child_failures_before:
                     _telemetry.warn(
                         f"{repaired_name}: repaired child NOT saved because "
