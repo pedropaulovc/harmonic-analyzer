@@ -904,7 +904,7 @@ SHEET_SCALES = {
     "ASSEMBLY AND FIT-UP (CONT. 5)": FITUP_SCALE,
     "CHAIN FIT-UP": FITUP_SCALE,
     "SETTING DETAILS": (5.0, 1.0),
-    "SETTING TABLE": (1.0, 1.0),
+    "SETTING TABLE": FITUP_SCALE,
     "BILL OF MATERIALS": BOM_REFERENCE_SCALE,
 }
 if tuple(SHEET_SCALES) != SHEET_NAMES:
@@ -5329,6 +5329,10 @@ def _place_setting_sheets(adapter: Any, step_notes: StepNotes) -> None:
         _place_setting_parent(adapter, parent)
     for detail in setting_details.DETAILS:
         _place_setting_detail(adapter, detail)
+    # A sheet carries its title block's property links through a view: the
+    # table's sheet takes the step sheets' reference isometric (run
+    # 20261117T133502796Z-117e953f2f9746a682948215106b40a1).
+    _place_fitup_reference(adapter, SETTING_TABLE_SHEET)
     _activate_sheet(adapter, SETTING_TABLE_SHEET)
     box = insert_general_table(
         adapter,
@@ -5338,30 +5342,31 @@ def _place_setting_sheets(adapter: Any, step_notes: StepNotes) -> None:
         top_left=SETTING_TABLE_TOP_LEFT,
         label="setting table",
     )
-    template = DRAWING_TEMPLATES[SPEC.layout]
-    if box[2] > SETTING_TABLE_RIGHT_LIMIT or (
-        box[1] < template.title_block_top_m and box[2] > template.title_block_left_m
-    ):
+    # Above the reference caption (and so the title block), inside the border.
+    if box[2] > SETTING_TABLE_RIGHT_LIMIT or box[1] < FITUP_NOTE_LIMITS[0][1]:
         raise RuntimeError(f"setting table at {box!r} leaves its field")
+
+
+def _place_fitup_reference(adapter: Any, sheet_name: str) -> None:
+    """A step sheet's reference isometric at the bottom left, captioned."""
+    _activate_sheet(adapter, sheet_name)
+    view = place_view(
+        adapter, str(SOURCE), "*Isometric", *FITUP_REFERENCE_CENTER, scale=FITUP_SCALE
+    )
+    apply_view_configuration(adapter, view, label=f"{sheet_name} reference isometric")
+    _place_sheet_note(
+        adapter,
+        sheet_name,
+        FITUP_REFERENCE_CAPTION,
+        (FITUP_REFERENCE_CENTER[0] - 0.040, FITUP_NOTE_LIMITS[0][1] - 0.002),
+        label=f"{sheet_name} reference caption",
+    )
 
 
 def _place_fitup_sheets(adapter: Any, step_notes: StepNotes) -> None:
     """Sheets 5 on: a reference isometric each, then their step columns."""
     for sheet_name in dict.fromkeys(column.sheet for column in step_notes.columns[1:]):
-        _activate_sheet(adapter, sheet_name)
-        view = place_view(
-            adapter, str(SOURCE), "*Isometric", *FITUP_REFERENCE_CENTER, scale=FITUP_SCALE
-        )
-        apply_view_configuration(
-            adapter, view, label=f"{sheet_name} reference isometric"
-        )
-        _place_sheet_note(
-            adapter,
-            sheet_name,
-            FITUP_REFERENCE_CAPTION,
-            (FITUP_REFERENCE_CENTER[0] - 0.040, FITUP_NOTE_LIMITS[0][1] - 0.002),
-            label=f"{sheet_name} reference caption",
-        )
+        _place_fitup_reference(adapter, sheet_name)
     for index, column in enumerate(step_notes.columns[1:]):
         _place_sheet_note(
             adapter, column.sheet, column.text, column.xy,
