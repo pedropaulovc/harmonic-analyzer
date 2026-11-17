@@ -12,9 +12,10 @@ manifest. Typed here, because neither record carries them: the #2 centre
 drill's catalogue geometry (it sets the spot depth), the S2 strap clearance,
 the approach clearance, the drilling R plane and the facing plunge feed.
 
-Setups follow ``plan.toml``: S2 edges on 1-2-3 blocks; S3 one vise clamping
-per bar (owner ruling 2026-11-16, "merge"): face side 1, flip, face side 2,
-then without unclamping square the ends, mill the slots, spot, drill and
+Setups follow ``plan.toml``: S2 edges on 1-2-3 blocks; S3 in the vise, one
+clamping per bar from the side-2 face on (owner ruling 2026-11-16, "merge"):
+face side 1, flip, face side 2, then without unclamping square the ends, mill
+the slots, spot, drill and
 counterbore. After the side-2 face both bars sit ZERO END left, ZERO EDGE (the
 model's low side) at the back jaw, model Z0 face up (bar 1 C'BORE SIDE, bar 2
 RAIL SIDE), so every through feature is shared and only the bracket programs

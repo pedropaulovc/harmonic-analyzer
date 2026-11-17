@@ -203,9 +203,10 @@ What the 0.10 port and the 2026-11-13 v49 reassessment changed on the sheets:
   bar 2 section. The edge setup uses three 1-2-3 blocks, one at mid-length,
   and two end straps; program BB01 cuts both edges, alternating pass by pass,
   and its setup names the work offsets and the full-depth plunges beside the
-  blank ends. Setup 3 is one vise clamping per bar (owner ruling 2026-11-16,
-  "merge"): it faces both sides, squares both ends, mills both slots and then
-  spots, drills, taps and counterbores without unclamping, so the holes keep
+  blank ends. Setup 3 holds each bar in one vise clamping from the side-2
+  face on (owner ruling 2026-11-16, "merge"): after facing side 1, flipping
+  and facing side 2 it squares both ends, mills both slots and then spots,
+  drills, taps and counterbores without unclamping, so the holes keep
   the ZERO END squared and the ZERO EDGE edge-found there (2026-11-14
   traveler review: the former table-strapped end squaring left the ends on a
   221 mm cantilever, 0.057 mm under `milling_deflection`, refused). The slots

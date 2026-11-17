@@ -9,8 +9,9 @@
 2. Writes that context, the recipe's path and its programs to a JSON job spec
    in a fresh staging directory and runs ``freecadcmd`` on
    ``_freecad_cam_runtime.py``. FreeCAD imports the STEP, builds one CAM Job
-   per program and posts each with its ``grbl`` post into the staging
-   directory.
+   per program section (one tool; a section per hand-set spindle speed) and
+   posts each program with its ``grbl`` post into the staging directory,
+   joining sections at an operator comment and ``M0``.
 3. Checks every posted file against the recipe's ``expectations`` (``_gcode``):
    depths, hole positions, slot cutter-centre bounds, pass positions, steps
    and directions, spindle speeds, no rapid below the stock top and no feed
