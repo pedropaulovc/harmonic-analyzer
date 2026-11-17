@@ -634,6 +634,9 @@ def feature_release(
     monkeypatch.setattr(cut_release, "load_native_package", lambda: package)
     monkeypatch.setattr(cut_release, "stage_comparisons", lambda _stage: {})
     monkeypatch.setattr(cut_release, "stage_readout_procedure", lambda *_args: [])
+    # The fixture ships no traveler PDF or NC program, so it enrols none.
+    monkeypatch.setattr(cut_release, "TRAVELER_STEMS", ())
+    monkeypatch.setattr(cut_release._cam_programs, "CAM_STEMS", ())
     monkeypatch.setattr(
         cut_release, "_git_provenance",
         lambda _version: {"commit_short": "offline", "tree_clean": True},

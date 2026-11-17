@@ -750,3 +750,238 @@ def check_face_passes(
             f"face Y[{y[0]:.3f},{y[1]:.3f}] ±{overhang:.3f}",
         ))
     return findings
+
+
+def check_feed_out(program: Program, z_top: float) -> list[Finding]:
+    """No rapid leaves from below the stock top: a reamer (or anything else in
+    a finished bore) is fed out, never rapided out, which can score the bore."""
+    return [
+        Finding(
+            program.name,
+            "feed_out",
+            f"G0 from X{m.start[0]:.3f} Y{m.start[1]:.3f} Z{m.start[2]:.3f}, "
+            f"below the stock top {z_top:.3f}",
+        )
+        for m in program.moves
+        if m.motion is Motion.RAPID and m.start[2] < z_top - _TOL_MM
+    ]
+
+
+# Outline checks sample each feed move at most this far apart along XY.
+_SAMPLE_MM = 0.25
+# How many offending points an outline finding lists before summarising.
+_SHOWN = 3
+
+Point = Sequence[float]
+
+
+def _xy_points(m: Move, step: float = _SAMPLE_MM) -> list[tuple[float, ...]]:
+    """Points along ``m`` no more than ``step`` apart in XY, its end included, its
+    start not. A G17 arc is sampled on its circle; any other arc as its chord."""
+    if m.centre is not None and m.plane == 17:
+        a, b, radius, begin, sweep = m._arc()
+        sense = -1.0 if m.motion is Motion.ARC_CW else 1.0
+        n = max(1, math.ceil(radius * sweep / step))
+        angles = [begin + sense * sweep * k / n for k in range(1, n + 1)]
+        rise = m.end[2] - m.start[2]
+        return [
+            (
+                m.centre[a] + radius * math.cos(angle),
+                m.centre[b] + radius * math.sin(angle),
+                m.start[2] + rise * k / n,
+            )
+            for k, angle in enumerate(angles, 1)
+        ]
+    n = max(1, math.ceil(math.dist(m.start[:2], m.end[:2]) / step))
+    pairs = list(zip(m.start, m.end))
+    return [tuple(s + (e - s) * k / n for s, e in pairs) for k in range(1, n + 1)]
+
+
+def _cross(o: Point, a: Point, b: Point) -> float:
+    return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+
+
+def _element_distance(element: dict, p: Point) -> tuple[float, Point | None]:
+    """XY distance from ``p`` to an outline element (a line from ``start`` to
+    ``end``, or with ``centre`` the minor arc between them on its circle), and
+    the element's direction (start to end) where ``p`` projects onto its
+    interior; ``None`` where its nearest point is an end (a corner)."""
+    s, e = element["start"], element["end"]
+    c = element.get("centre")
+    if c is not None:
+        turn = _cross(c, s, e)
+        # Within the arc's sector: between its end radii, on the arc's side.
+        mid = (s[0] + e[0] - 2 * c[0], s[1] + e[1] - 2 * c[1])
+        bisector = (p[0] - c[0]) * mid[0] + (p[1] - c[1]) * mid[1]
+        if _cross(c, s, p) * turn > 0 and _cross(c, p, e) * turn > 0 and bisector > 0:
+            sign = 1.0 if turn > 0 else -1.0
+            tangent = (-sign * (p[1] - c[1]), sign * (p[0] - c[0]))
+            return abs(math.dist(c, p[:2]) - math.dist(c, s)), tangent
+        return min(math.dist(s, p[:2]), math.dist(e, p[:2])), None
+    dx, dy = e[0] - s[0], e[1] - s[1]
+    if dx == 0.0 and dy == 0.0:  # a Z-only move
+        return math.dist(s, p[:2]), None
+    t = ((p[0] - s[0]) * dx + (p[1] - s[1]) * dy) / (dx * dx + dy * dy)
+    clamped = max(0.0, min(1.0, t))
+    foot = (s[0] + clamped * dx, s[1] + clamped * dy)
+    return math.dist(foot, p[:2]), ((dx, dy) if 0.0 < t < 1.0 else None)
+
+
+def _element_samples(element: dict, step: float) -> list[tuple[float, float]]:
+    s, e = element["start"], element["end"]
+    c = element.get("centre")
+    if c is None:
+        n = max(1, math.ceil(math.dist(s, e) / step))
+        dx, dy = e[0] - s[0], e[1] - s[1]
+        return [(s[0] + dx * k / n, s[1] + dy * k / n) for k in range(n + 1)]
+    radius = math.dist(c, s)
+    begin = math.atan2(s[1] - c[1], s[0] - c[0])
+    end = math.atan2(e[1] - c[1], e[0] - c[0])
+    sweep = (end - begin + math.pi) % (2 * math.pi) - math.pi  # minor arc
+    n = max(1, math.ceil(radius * abs(sweep) / step))
+    angles = [begin + sweep * k / n for k in range(n + 1)]
+    return [(c[0] + radius * math.cos(a), c[1] + radius * math.sin(a)) for a in angles]
+
+
+def _report(findings: list[Finding], name: str, what: str, items: list[str]) -> None:
+    """One outline finding listing the first offending ``items``."""
+    if items:
+        shown = "; ".join(items[:_SHOWN])
+        more = f" (+{len(items) - _SHOWN} more)" if len(items) > _SHOWN else ""
+        detail = f"{len(items)} {what}: {shown}{more}"
+        findings.append(Finding(name, "outline", detail))
+
+
+def _where(p: Point) -> str:
+    return f"X{p[0]:.3f} Y{p[1]:.3f} Z{p[2]:.3f}"
+
+
+def check_outline(
+    program: Program,
+    elements: Sequence[dict],
+    passes: Sequence[dict],
+    z_top: float,
+    tabs: Sequence[Point] = (),
+    tab_clear: float = 0.0,
+    tab_top: float | None = None,
+) -> list[Finding]:
+    """Profile passes round a closed part outline. ``elements`` are its lines
+    and minor arcs (``start``, ``end``, optional ``centre``) in the order and
+    direction the cutter runs, each with a ``name`` and the ``tol`` the cutter
+    centre may stray from its offset there; each of ``passes`` is a
+    cutter-centre ``offset`` from the outline and its depth ``levels``. Below
+    the stock top ``z_top`` every feed move that moves in XY runs level at one
+    of those levels (or ``tab_top``, riding over a tab), every point of it
+    lies at a pass's offset from the nearest element (no gouge, no stray) and
+    runs the element's way (anticlockwise elements: conventional outside the
+    part with a clockwise spindle). Each pass covers the whole outline at each
+    of its levels, except near a tab (within ``tab_clear`` plus the pass
+    offset of a tab's cutter-centre point in ``tabs``) at levels below
+    ``tab_top``; :func:`check_tabs` checks the tabs themselves."""
+    name = program.name
+    findings: list[Finding] = []
+    levels = {round(z, 3) for p in passes for z in p["levels"]}
+    if tab_top is not None:
+        levels.add(round(tab_top, 3))
+    moves = [
+        m
+        for m in program.cutting
+        if min(m.start[2], m.end[2]) < z_top - _TOL_MM
+        and not (_close(m.start[0], m.end[0]) and _close(m.start[1], m.end[1]))
+    ]
+    if not moves:
+        return [Finding(name, "outline", f"no XY feed move below Z{z_top:.3f}")]
+    off_level = [
+        f"{_where(m.end)} from Z{m.start[2]:.3f}"
+        for m in moves
+        if not _close(m.start[2], m.end[2])
+        or not any(_close(m.end[2], z) for z in levels)
+    ]
+    _report(findings, name, f"XY feed moves off the levels {sorted(levels)}", off_level)
+    # (pass index, level) -> grid cell -> that pass's cutter-centre points
+    grids: dict[tuple[int, float], dict[tuple[int, int], list[Point]]] = {}
+    stray: list[str] = []
+    backward: list[str] = []
+    widest = max(p["offset"] for p in passes) + max(e["tol"] for e in elements)
+    cell = widest + _SAMPLE_MM
+    for m in moves:
+        previous = m.start
+        for point in _xy_points(m):
+            nearest = [(*_element_distance(e, point), e) for e in elements]
+            distance, tangent, element = min(nearest, key=lambda item: item[0])
+            if tangent is not None:
+                step = (point[0] - previous[0], point[1] - previous[1])
+                if step[0] * tangent[0] + step[1] * tangent[1] < 0:
+                    backward.append(_where(point))
+            previous = point
+            matched = [
+                k
+                for k, p in enumerate(passes)
+                if abs(distance - p["offset"]) <= element["tol"]
+            ]
+            if not matched:
+                where = f"{_where(point)} is {distance:.3f}"
+                stray.append(f"{where} from {element['name']}")
+            level = next((z for z in levels if _close(point[2], z)), None)
+            key = (int(point[0] // cell), int(point[1] // cell))
+            for k in matched if level is not None else ():
+                grid = grids.setdefault((k, level), {})
+                grid.setdefault(key, []).append(point[:2])
+    _report(findings, name, "cutter-centre points off every pass offset", stray)
+    _report(findings, name, "points running against the outline's way", backward)
+    samples = [(e, s) for e in elements for s in _element_samples(e, 1.0)]
+    for k, p in enumerate(passes):
+        reach = p["offset"]
+        for z in p["levels"]:
+            grid = grids.get((k, round(z, 3)), {})
+            tabbed = tab_top is not None and z < tab_top - _TOL_MM
+            uncovered = []
+            for element, s in samples:
+                limit = reach + element["tol"]
+                if tabbed and any(math.dist(s, t) < tab_clear + limit for t in tabs):
+                    continue
+                cx, cy = int(s[0] // cell), int(s[1] // cell)
+                cells = [(cx + i, cy + j) for i in (-1, 0, 1) for j in (-1, 0, 1)]
+                near = (q for c in cells for q in grid.get(c, ()))
+                if not any(math.dist(q, s) <= limit for q in near):
+                    uncovered.append(f"{element['name']} at X{s[0]:.3f} Y{s[1]:.3f}")
+            what = f"outline points the offset-{reach:.3f} pass leaves uncut at"
+            _report(findings, name, f"{what} Z{z:.3f}", uncovered)
+    return findings
+
+
+def _move_distance(m: Move, point: Point) -> float:
+    """XY distance from ``point`` to the path of move ``m``."""
+    if m.centre is not None and m.plane == 17:
+        a, b, radius, begin, sweep = m._arc()
+        sense = -1.0 if m.motion is Motion.ARC_CW else 1.0
+        dx, dy = point[0] - m.centre[a], point[1] - m.centre[b]
+        if (sense * (math.atan2(dy, dx) - begin)) % (2 * math.pi) <= sweep:
+            return abs(math.hypot(dx, dy) - radius)
+        return min(math.dist(m.start[:2], point[:2]), math.dist(m.end[:2], point[:2]))
+    return _element_distance({"start": m.start[:2], "end": m.end[:2]}, point)[0]
+
+
+def check_tabs(
+    program: Program, centres: Sequence[Point], clear: float, top: float
+) -> list[Finding]:
+    """Holding tabs a profile leaves: below the tab top ``top`` the cutter
+    centre keeps exactly ``clear`` (half the tab's width plus the cutter
+    radius) from each tab's cutter-centre point in ``centres`` (closer cuts
+    into the tab, farther leaves it wider), and a feed move at ``top`` passes
+    over each point (the tab is cut down to its top, not left full height)."""
+    findings = []
+    cutting = program.cutting
+    below = [m for m in cutting if min(m.start[2], m.end[2]) < top - _TOL_MM]
+    level = [m for m in cutting if _close(m.start[2], top) and _close(m.end[2], top)]
+    for c in centres:
+        tab = f"tab at X{c[0]:.3f} Y{c[1]:.3f}"
+        nearest = min((_move_distance(m, c) for m in below), default=math.inf)
+        if not _close(nearest, clear, _ENTRY_TOL_MM):
+            detail = f"{tab}: cutter centre {nearest:.3f} from it below Z{top:.3f}"
+            detail += f", expected {clear:.3f}"
+            findings.append(Finding(program.name, "tabs", detail))
+        if not any(_move_distance(m, c) <= _ENTRY_TOL_MM for m in level):
+            detail = f"{tab}: no feed move over it at its top Z{top:.3f}"
+            findings.append(Finding(program.name, "tabs", detail))
+    return findings

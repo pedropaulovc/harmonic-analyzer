@@ -31,8 +31,13 @@ programming the oblique base bar (2026-11-16):
   ``Direction`` "CCW" runs anticlockwise round the model, i.e. conventional
   outside the part with a clockwise spindle.
 - the ``grbl`` post expands G81/G82/G83 into G0/G1 (GRBL has no canned
-  cycles) but leaves G73 chip-breaking as a G73 block GRBL rejects, so pecks
-  are full-retract G83.
+  cycles) but leaves G73 chip-breaking and G85 (feed out) as blocks GRBL
+  rejects, so pecks are full-retract G83 and a bore fed out is a Custom
+  operation (:func:`bore`).
+- the holding-tag dressup (Path.Dressup.Tags, rocker strap 2026-11-17)
+  needs its profile's path computed when it is created, joins the job
+  before the profile instead of replacing it (both would post), and on any
+  internal error posts the profile with no tags, logging only to the console.
 """
 
 import importlib.util
@@ -45,8 +50,10 @@ import types
 import FreeCAD
 import Part
 import Path
+import Path.Dressup.Tags as PathDressupTags
 import Path.Main.Job as PathJob
 import Path.Main.Stock as PathStock
+import Path.Op.Custom as PathCustom
 import Path.Op.Drilling as PathDrilling
 import Path.Op.MillFace as PathMillFace
 import Path.Op.Profile as PathProfile
@@ -238,15 +245,19 @@ def holes(target, diameter, centres):
 
 def profile(target_job, tc, label, base, side, direction, start, final, step,
             clearance=None, safe=None, offset=0.0, passes=1, stepover=0.0, start_point=None):
-    """Profile ``base`` (edges) on ``side`` running ``direction`` from ``start``
-    down to ``final`` in levels of at most ``step``. ``offset`` moves the pass
-    beyond the cutter-radius offset; ``passes`` stations ``stepover`` apart run
-    outermost first. ``start_point`` (x, y) picks where a closed loop is entered."""
+    """Profile ``base`` (edges, or a face: its outer perimeter only, never its
+    holes) on ``side`` running ``direction`` from ``start`` down to ``final``
+    in levels of at most ``step``. ``offset`` moves the pass beyond the
+    cutter-radius offset; ``passes`` stations ``stepover`` apart run outermost
+    first. ``start_point`` (x, y) picks where a closed loop is entered."""
     op = _operation(PathProfile, target_job, tc, label)
     op.Base = [base]
     op.Side = side
     op.Direction = direction
     op.UseComp = True
+    op.processPerimeter = True
+    op.processHoles = False
+    op.processCircles = False
     op.NumPasses = passes
     op.Stepover = stepover
     op.OffsetExtra = offset
@@ -295,14 +306,61 @@ def drill(target_job, tc, label, base, top, final, retract, peck=None):
     return op
 
 
+def tags(op, positions, width, height):
+    """Holding tags on profile ``op``: FreeCAD's tag dressup with square
+    (90°) tags ``width`` wide at the cutter-centre points ``positions``
+    (x, y) on its path, ``height`` above its deepest level. Below that the
+    path lifts over each tag, keeping the cutter centre half the width plus
+    the cutter radius from the point. The dressup replaces ``op`` in its job.
+    The dressup drops every tag when it fails (a console error only), so
+    only the posted NC proves the tags (``_gcode.check_tabs``)."""
+    op.Document.recompute()  # the dressup reads the profile's path when created
+    dressup = PathDressupTags.Create(op)
+    dressup.Width = f"{width} mm"
+    dressup.Height = f"{height} mm"
+    dressup.Angle = 90.0
+    dressup.Radius = "0 mm"
+    dressup.Positions = [FreeCAD.Vector(x, y, 0) for x, y in positions]
+    dressup.Disabled = []
+    job = PathUtils.findParentJob(dressup)
+    job.Operations.Group = [o for o in job.Operations.Group if o.Name != op.Name]
+    return dressup
+
+
+def bore(target_job, tc, label, centres, final, retract, clearance):
+    """Feed in and out of each hole at ``centres``: G0 to ``retract`` (the R
+    plane), G1 down to ``final`` and back up to ``retract`` at the
+    controller's plunge feed, G0 to ``clearance`` between holes. For a
+    reamer, which a rapid retract can score; GRBL has no G85 and the grbl
+    post leaves it unexpanded."""
+    op = _operation(PathCustom, target_job, tc, label)
+    op.Source = "Text"
+    feed = tc.VertFeed.Value  # mm/s, FreeCAD's internal feed unit
+    lines = []
+    for x, y in centres:
+        lines += [
+            f"G0 Z{clearance}",
+            f"G0 X{x} Y{y}",
+            f"G0 Z{retract}",
+            f"G1 Z{final} F{feed}",
+            f"G1 Z{retract} F{feed}",
+            f"G0 Z{clearance}",
+        ]
+    op.Gcode = lines
+    return op
+
+
 def generate(doc):
     """Recompute every toolpath; fail when an operation is invalid or cut nothing."""
     doc.recompute()
     bad = []
     for target_job in [o for o in doc.Objects if isinstance(getattr(o, "Proxy", None), PathJob.ObjectJob)]:
         for op in target_job.Operations.Group:
-            if "Invalid" in op.State or not any(c.Name in _MOTION for c in op.Path.Commands):
-                bad.append(f"{target_job.Label} / {op.Label}: {list(op.State) or 'no feed move'}")
+            state = list(getattr(op, "State", ()))  # a dressup has no State
+            moved = any(c.Name in _MOTION for c in op.Path.Commands)
+            if "Invalid" in state or not moved:
+                why = state or "no feed move"
+                bad.append(f"{target_job.Label} / {op.Label}: {why}")
     if bad:
         raise RuntimeError("toolpaths not clean: " + "; ".join(bad))
 

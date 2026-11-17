@@ -280,6 +280,116 @@ def test_face_passes_must_zigzag_within_the_engagement_and_cover_the_face(tmp_pa
     assert any("clearing" in f.detail for f in _gcode.check_face_passes(_program(tmp_path, _face(gappy)), **kwargs))
 
 
+# A 10 x 10 outline whose top edge is a minor arc about (5, -20), anticlockwise
+# (conventional outside with a clockwise spindle), each element held to 0.05.
+_OUTLINE = [
+    {"name": "bottom", "start": (0.0, 0.0), "end": (10.0, 0.0), "tol": 0.05},
+    {"name": "right", "start": (10.0, 0.0), "end": (10.0, 10.0), "tol": 0.05},
+    {
+        "name": "top",
+        "start": (10.0, 10.0),
+        "end": (0.0, 10.0),
+        "centre": (5.0, -20.0),
+        "tol": 0.05,
+    },
+    {"name": "left", "start": (0.0, 10.0), "end": (0.0, 0.0), "tol": 0.05},
+]
+# The top arc's outward normal at (10, 10).
+_N = (5.0 / math.hypot(5.0, 30.0), 30.0 / math.hypot(5.0, 30.0))
+_ONE_PASS = {
+    "elements": _OUTLINE,
+    "passes": [{"offset": 1.0, "levels": [-1.0, -2.0]}],
+    "z_top": 0.0,
+}
+
+
+def _loop(z: float, bottom: str = "G1 X10 Y-1\n") -> str:
+    """One anticlockwise lap at cutter-centre offset 1 round ``_OUTLINE``, from
+    and back to (5, -1), at depth ``z``; its corners are radius-1 arcs."""
+    nx, ny = _N
+    return (
+        f"G1 X5 Y-1 Z{z} F100\n{bottom}G3 X11 Y0 I0 J1\nG1 X11 Y10\n"
+        f"G3 X{10 + nx:.4f} Y{10 + ny:.4f} I-1 J0\n"
+        f"G3 X{-nx:.4f} Y{10 + ny:.4f} I{-5 - nx:.4f} J{-30 - ny:.4f}\n"
+        f"G3 X-1 Y10 I{nx:.4f} J{-ny:.4f}\nG1 X-1 Y0\nG3 X0 Y-1 I1 J0\nG1 X5 Y-1\n"
+    )
+
+
+def _outline(tmp_path: Path, text: str, **kwargs) -> list[str]:
+    return [
+        f.detail
+        for f in _gcode.check_outline(_program(tmp_path, text), **_ONE_PASS, **kwargs)
+    ]
+
+
+def test_outline_passes_hold_their_offset_direction_levels_and_coverage(tmp_path):
+    good = "G0 X5 Y-1 Z5\n" + _loop(-1.0) + _loop(-2.0) + "G0 Z5\n"
+    assert _outline(tmp_path, good) == []
+    # The bottom run 0.2 mm into the part: a gouge, and that side left uncut.
+    first = "G1 X5 Y-1 Z-2.0 F100\nG1 X10 Y-1\nG3 X11 Y0 I0 J1"
+    gouge = good.replace(
+        first, "G1 X5 Y-0.8 Z-2.0 F100\nG1 X10 Y-0.8\nG3 X11 Y0.2 I0 J1"
+    )
+    assert any(
+        "off every pass offset" in d and "0.800 from bottom" in d
+        for d in _outline(tmp_path, gouge)
+    )
+    # The second lap clockwise round the part (climb), on the same offset path.
+    nx, ny = _N
+    clockwise = (
+        "G1 X5 Y-1 Z-2.0 F100\nG1 X0 Y-1\nG2 X-1 Y0 I0 J1\nG1 X-1 Y10\n"
+        f"G2 X{-nx:.4f} Y{10 + ny:.4f} I1 J0\n"
+        f"G2 X{10 + nx:.4f} Y{10 + ny:.4f} I{5 + nx:.4f} J{-30 - ny:.4f}\n"
+        f"G2 X11 Y10 I{-nx:.4f} J{-ny:.4f}\nG1 X11 Y0\nG2 X10 Y-1 I-1 J0\nG1 X5 Y-1\n"
+    )
+    climb = _outline(tmp_path, "G0 X5 Y-1 Z5\n" + _loop(-1.0) + clockwise + "G0 Z5\n")
+    assert len(climb) == 1 and "against the outline's way" in climb[0]
+    # A level the plan does not list, and a listed level never cut.
+    stray = _outline(tmp_path, "G0 X5 Y-1 Z5\n" + _loop(-1.0) + _loop(-1.5) + "G0 Z5\n")
+    assert any("off the levels" in d for d in stray)
+    assert any("uncut at Z-2.000" in d for d in stray)
+
+
+def test_outline_coverage_excuses_only_the_tabs(tmp_path):
+    # The deeper lap lifts to Z-1 over a tab at (7, -1), keeping 1.5 from it.
+    hop = "G1 X5.5 Y-1\nG1 Z-1\nG1 X8.5\nG1 Z-2\nG1 X10 Y-1\n"
+    text = "G0 X5 Y-1 Z5\n" + _loop(-1.0) + _loop(-2.0, bottom=hop) + "G0 Z5\n"
+    assert (
+        _outline(tmp_path, text, tabs=[(7.0, -1.0)], tab_clear=1.5, tab_top=-1.0) == []
+    )
+    assert _gcode.check_tabs(_program(tmp_path, text), [(7.0, -1.0)], 1.5, -1.0) == []
+    details = [d.split(":")[0] for d in _outline(tmp_path, text)]
+    assert details == ["3 outline points the offset-1.000 pass leaves uncut at Z-2.000"]
+
+
+def test_tabs_keep_their_width_and_are_cut_to_their_top(tmp_path):
+    def tabs(left, right, lift):
+        text = f"G0 X0 Y-1 Z5\nG1 Z-1 F100\nG1 X{left}\nG1 Z{lift}\nG1 X{right}\nG1 Z-1\nG1 X20\nG0 Z5\n"
+        return [
+            f.detail
+            for f in _gcode.check_tabs(
+                _program(tmp_path, text), [(10.0, -1.0)], 2.5, 0.5
+            )
+        ]
+
+    assert tabs(7.5, 12.5, 0.5) == []
+    # A narrower gap cuts into the tab; a lift above its top leaves it full height.
+    tab = "tab at X10.000 Y-1.000"
+    assert tabs(8, 12, 0.5) == [
+        f"{tab}: cutter centre 2.000 from it below Z0.500, expected 2.500"
+    ]
+    assert tabs(7.5, 12.5, 1.0) == [f"{tab}: no feed move over it at its top Z0.500"]
+
+
+def test_a_reamer_rapided_out_of_its_bore_is_caught(tmp_path):
+    fed = _program(tmp_path, "G0 X10 Y5 Z5\nG0 Z1\nG1 Z-7 F80\nG1 Z1 F80\nG0 Z5\n")
+    assert _gcode.check_feed_out(fed, 0.0) == []
+    rapided = _program(tmp_path, "G0 X10 Y5 Z5\nG0 Z1\nG1 Z-7 F80\nG0 Z5\n")
+    assert [f.detail for f in _gcode.check_feed_out(rapided, 0.0)] == [
+        "G0 from X10.000 Y5.000 Z-7.000, below the stock top 0.000"
+    ]
+
+
 def test_freecad_older_than_1_1_is_refused(tmp_path, monkeypatch):
     exe = tmp_path / "freecadcmd.exe"
     exe.write_text("", encoding="utf-8")
