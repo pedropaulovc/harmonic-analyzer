@@ -67,11 +67,11 @@ These examples run on a **local seat**. For the farm, replace
 (see [farm builds](../../DEVELOPING.md#farm-builds-farm_buildpy)) —
 the same task names select the same closure.
 
-Cylinder-bank retention (south disc air to the 64T and alignment pinion,
-retaining lands, rod ring bores against the eccentric cams) is proved by the
-continuous printed-tolerance clearance in `cylinder_bank_layout`
-(`SOUTH_DISC_CLEARANCE`) over all phases and tolerance extremes, analytically
-only. No gate reads that air from the saved bodies: `interference-free` catches
+Cylinder-bank retention is proved analytically only, over all phases and
+tolerance extremes, in `cylinder_bank_layout`: `SOUTH_DISC_CLEARANCE` (south disc
+air to the 64T and the engaged alignment pinion, and the disc's retaining land)
+and `RING_SLOT_MARGIN` (the thickest rod ring or shank in the thinnest cam slot).
+No gate reads that air from the saved bodies: `interference-free` catches
 overlap of the saved assembly, whose alignment pinion is parked DISENGAGED.
 
 Drive-train drawing acceptance also inspects sheet 3 for separate arbor/spring
