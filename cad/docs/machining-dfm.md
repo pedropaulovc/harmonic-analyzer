@@ -1213,8 +1213,8 @@ plates have not been checked against this list; check yours before cutting.
 | `dt-alignment-pinion` | 32 | #4 | 1 turn + 4 on 16 |
 
 T096, T102 and T114 need 5/12, 20/51 and 20/57 of a crank turn, which no stock plate gives. The
-shop-made index plate MHA-DT-03-TL-01 (`dt-cone-gear-tl-index-plate`, fitted by
-`dt-cone-gear-tl-indexing-assembly`) carries 24-, 51- and 57-hole circles for them; its sizes are
+shop-made index plate MHA-DT-03-TL-01 (`dt-cone-gear-tl-index-plate`) carries 24-, 51- and
+57-hole circles for them (10, 20 and 20 hole spaces a tooth); its sizes are
 best guesses until the BS-0 plate is measured
 ([#2157](https://github.com/pedropaulovc/harmonic-analyzer/issues/2157)). Differential indexing on a
 universal head with change gears is the alternative. Those tooth counts did not change with the

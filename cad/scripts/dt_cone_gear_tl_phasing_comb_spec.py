@@ -720,12 +720,6 @@ for _teeth, _error in PHASE_ERROR_MM.items():
             f"booked {BOND_CLOCK_TOLERANCE_MM} mm"
         )
 
-# --- Pose in the shop kit (MHA-DT-03-TL-00) -----------------------------------
-# The comb's model origin (mm) in the kit frame, in the index plate's front
-# plane under its rim, clear of it and over the kit's isometric; the kit's
-# build places it here and its sheet shows it there under item 1.
-KIT_POSITION_MM = (-17.0, -63.5, 0.0)
-
 
 # --- Model --------------------------------------------------------------------
 def blade_depth_name(teeth: int) -> str:

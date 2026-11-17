@@ -141,7 +141,6 @@ _INSERTED_SOURCES = {
     "pd_transgear_removable pd_vn_transgear_retaining_ring pd_vn_transgear_cluster_shim "
     "pd_transgear_thumbnut",
     "ms_measuring_stick": "ms_stick ms_stop_block ms_stop_plate ms_vn_stop_plate_screw sh_vn_thumb_screw",
-    "dt_cone_gear_tl_indexing": "dt_cone_gear_tl_index_plate dt_cone_gear_tl_phasing_comb",
     "dt_cone_tip_gear_tl_cutter": "dt_cone_tip_gear_tl_cutter_bar dt_cone_tip_gear_tl_form_cutter "
     "sh_vn_arbor_set_screw",
     "dt_cone_gear_tl_arbor": "dt_cone_gear_tl_keyed_arbor dt_cone_gear_tl_arbor_collar "

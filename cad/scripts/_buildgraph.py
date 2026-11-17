@@ -66,7 +66,6 @@ ASSEMBLY_ORDER = (
     "pn_pen",
     "pd_paper_drive",
     "ms_measuring_stick",
-    "dt_cone_gear_tl_indexing",
     "dt_cone_tip_gear_tl_cutter",
     "dt_cone_gear_tl_arbor",
     "ha_harmonic_analyzer",

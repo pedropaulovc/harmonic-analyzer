@@ -1000,10 +1000,9 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             },
         }
     )
-    # Every assembly resolves its own table; only the indexing and keyed-arbor
-    # fixtures, which have no intended fit, allow nothing.
+    # Every assembly resolves its own table; only the keyed-arbor fixture,
+    # which has no intended fit, allows nothing.
     assert {stem for stem in ASSEMBLY_ORDER if not _allowed(stem)} == {
-        "dt_cone_gear_tl_indexing",
         "dt_cone_gear_tl_arbor",
     }
 
