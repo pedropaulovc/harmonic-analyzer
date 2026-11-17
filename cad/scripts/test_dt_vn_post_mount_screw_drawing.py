@@ -353,18 +353,18 @@ def test_the_modelled_length_is_a_cut_the_sheet_accepts() -> None:
 
 def test_engagement_exception_is_held_by_the_model() -> None:
     """The rule-18 shortfall pending #1019 (floor 0.87D) is a model assert on the
-    chain; the sheet prints it on the cut-length callout
-    (test_engagement_minimum_prints_on_the_cut_length_callout)."""
+    chain; the sheet prints it on the cut-length note
+    (test_engagement_minimum_prints_on_the_cut_length_note)."""
     assert spec.MIN_ENGAGEMENT_DIAMETERS == 0.87
     assert spec.ENGAGEMENT_NOMINAL_MM == spec.CUT_LENGTH_MM - GRIP
     assert spec.ENGAGEMENT_NOMINAL_MM / part.SHANK_DIA >= 0.87
 
 
 def test_sheet_layout_keeps_notes_clear_of_the_view() -> None:
-    """The 1:1 Front lies head left on a horizontal axis (as sheet 2 draws
-    the supplied stock); the cut length and its one word line read below the
-    shank between its own extension lines (round 1: a wider callout was
-    struck by them, rule 14), above note 1 and the reference note."""
+    """The 1:1 Front lies head left on a horizontal axis; the cut length and
+    its one word line read below the shank between its own extension lines
+    (round 1: a wider callout was struck by them, rule 14), above note 1 and
+    the reference note."""
     head_r = part.HEAD_DIA / 2000.0
     assert drawing.FRONT_AXIS_MID[1] == drawing.FRONT_CENTER[1]
     x, y = drawing.FRONT_KEEP["CutLength"]
@@ -393,43 +393,46 @@ def test_sheet_layout_keeps_notes_clear_of_the_view() -> None:
     # The head, ~6 mm left of the under-head face, stays inside the border.
     left = drawing.FRONT_AXIS_MID[0] - spec.CUT_LENGTH_MM / 2000.0 - part.HEAD_H / 1000.0
     assert left > 0.015
-    assert not hasattr(drawing, "BREAK_TEXT")
 
 
-def test_detail_a_boundary_circles_the_head_on_the_full_view() -> None:
-    """Rule 9: the 6:1 head view is DETAIL A of the full 2:1 view, with its
-    boundary on that parent; the full view, the sheet's principal view,
-    carries no caption and no scale (it is the sheet's)."""
-    head = next(
-        row.expected_mm for row in spec.SUPPLIER_PROFILE_DIMENSIONS
-        if row.name == "SupplierHeadHeight"
-    )
-    length = next(
-        row.expected_mm for row in spec.SUPPLIER_PROFILE_DIMENSIONS
-        if row.name == "SupplierStockLength"
-    )
-    ratio = drawing.STOCK_SCALE[0] / drawing.STOCK_SCALE[1]
-    # The full view centres (L - H) / 2; the head's centre is -H / 2.
-    expected_x = drawing.STOCK_CENTER[0] + ratio * (-head / 2.0 - (length - head) / 2.0) / 1000.0
-    assert drawing.DETAIL_BOUNDARY_CENTER == pytest.approx((expected_x, drawing.STOCK_CENTER[1]))
-    assert drawing.DETAIL_BOUNDARY_RADIUS_M == pytest.approx(
-        drawing.STOCK_HEAD_RADIUS_MM * ratio / 1000.0
-    )
-    cx, cy = drawing.DETAIL_BOUNDARY_CENTER
-    r = drawing.DETAIL_BOUNDARY_RADIUS_M
-    left, bottom, right, top = drawing.STOCK_VIEW_CELL
-    assert left < cx - r and cx + r < right and bottom < cy - r and cy + r < top
-    texts = [text for text, *_ in drawing.STOCK_NOTES]
-    assert texts == [
-        spec.SUPPLIER_STOCK_TITLE, "DETAIL A  SCALE 6:1", drawing.DETAIL_LETTER,
-    ]
-    assert not any("2:1" in text or "ENVELOPE  SCALE" in text for text in texts)
-    # The letter stands outside the boundary, clear of the head view's cell.
-    _, x, y, (lx, ly, ux, uy) = drawing.STOCK_NOTES[2]
-    assert lx <= x <= ux and ly <= y <= uy
-    corners = [(px, py) for px in (lx, ux) for py in (ly, uy)]
-    assert min(math.dist(corner, (cx, cy)) for corner in corners) > r
-    assert uy < drawing.STOCK_HEAD_CELL[1]
+@pytest.mark.parametrize("initial_angle", [0.0, 0.3, -2.0])
+def test_front_turns_head_left_from_its_measured_axis(monkeypatch, initial_angle) -> None:
+    """The finished Front's turn is measured from its projected axis (under-
+    head face to cut end), whatever angle the view starts at, and the axis
+    midpoint lands on FRONT_AXIS_MID."""
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(drawing, "double_array", lambda values: list(values))
+    monkeypatch.setattr(drawing._telemetry, "info", lambda *_args: None)
+    view = SimpleNamespace(Angle=initial_angle, Position=(0.2, 0.1))
+
+    def set_position(values, _move_children):
+        view.Position = tuple(values)
+        return True
+
+    view.SetViewPosition = set_position
+    view.UpdateViewDisplayGeometry = lambda: None
+
+    def project(_adapter, actual, points, *, label):
+        assert actual is view and label
+        c, s = math.cos(actual.Angle), math.sin(actual.Angle)
+        return [
+            (actual.Position[0] + x * c - y * s, actual.Position[1] + x * s + y * c)
+            for x, y, _z in points
+        ]
+
+    monkeypatch.setattr(drawing, "model_points_in_view", project)
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(EditRebuild3=lambda: True))
+    drawing._lay_front_head_left(adapter, view)
+    length = spec.CUT_LENGTH_MM / 1000.0
+    head, tip = project(adapter, view, ((0.0, 0.0, 0.0), (0.0, -length, 0.0)), label="check")
+    assert tip[0] - head[0] == pytest.approx(length, abs=1e-12)
+    assert tip[1] == pytest.approx(head[1], abs=1e-12)
+    assert ((head[0] + tip[0]) / 2.0, head[1]) == pytest.approx(drawing.FRONT_AXIS_MID)
+
+    view.SetViewPosition = lambda *_args: False
+    view.Angle = initial_angle
+    with pytest.raises(RuntimeError, match="cannot position"):
+        drawing._lay_front_head_left(adapter, view)
 
 
 def test_stock_build_uses_its_registered_recipe() -> None:
@@ -447,68 +450,36 @@ def test_stock_build_uses_its_registered_recipe() -> None:
     assert spec.SKU in drawing.DRAWING_SUMMARY[3]
 
 
-def test_drawing_is_the_modified_stock_sheet() -> None:
-    """A cut purchased part takes a manufacturing sheet with its cut length,
-    not the dimensionless purchased reference sheet (boss hook's pattern)."""
+def test_drawing_is_the_altered_item_sheet() -> None:
+    """A cut purchased part takes an altered-item sheet with its cut length."""
     registry = DRAWINGS_BY_NAME["dt_vn_post_mount_screw"]
     assert drawing.SPEC is registry
     assert registry.artifact_stem == part.PART_NAME
     assert registry.script == Path(drawing.__file__).resolve()
 
 
-def test_full_supplier_profile_fits_its_fixed_cell_only_when_horizontal() -> None:
-    assert drawing.STOCK_SCALE == (2.0, 1.0)
-    points = drawing.SUPPLIER_PROFILE_MM
-    xmin = min(point[0] for point in points) / 1000.0
-    xmax = max(point[0] for point in points) / 1000.0
-    ymin = min(point[1] for point in points) / 1000.0
-    ymax = max(point[1] for point in points) / 1000.0
-    ratio = drawing.STOCK_SCALE[0] / drawing.STOCK_SCALE[1]
-    cx, cy = drawing.STOCK_CENTER
-    semantic_x = (xmin + xmax) / 2.0
-    horizontal = (
-        cx + ratio * (xmin - semantic_x), cy + ratio * ymin,
-        cx + ratio * (xmax - semantic_x), cy + ratio * ymax,
+def test_sheet_passes_the_drawing_owned_precision_rule() -> None:
+    violations = drawing_specification_violations(
+        Path(drawing.__file__).read_text(encoding="utf-8"),
+        filename=Path(drawing.__file__).name,
     )
-    left, bottom, right, top = drawing.STOCK_VIEW_CELL
-    assert left <= horizontal[0] < horizontal[2] <= right
-    assert bottom <= horizontal[1] < horizontal[3] <= top
-    assert ratio * (xmax - xmin) > top - bottom
+    assert violations == ()
 
 
-@pytest.mark.parametrize("fault", ["one-ulp", "duplicate"])
-def test_supplier_profile_state_matches_vertices_without_float_ordering(fault):
-    row = next(
-        row
-        for row in drawing.SUPPLIER_REFERENCE_DIMENSIONS
-        if drawing.SUPPLIER_PROFILE_MM[row.vertices[0]][0]
-        == drawing.SUPPLIER_PROFILE_MM[row.vertices[1]][0]
-        and drawing.SUPPLIER_PROFILE_MM[row.vertices[0]][1]
-        != drawing.SUPPLIER_PROFILE_MM[row.vertices[1]][1]
-    )
-    points = sorted(
-        [(*drawing.SUPPLIER_PROFILE_MM[index], 0.0) for index in row.vertices],
-        key=lambda point: point[1],
-    )
-    points = [
-        (math.nextafter(points[0][0], math.inf), *points[0][1:]),
-        (math.nextafter(points[1][0], -math.inf), *points[1][1:]),
-    ]
-    if fault == "duplicate":
-        points[1] = points[0]
-    if fault == "duplicate":
-        with pytest.raises(RuntimeError, match="source-diagram vertices"):
-            drawing._assert_supplier_profile_vertices(row, points)
-    else:
-        drawing._assert_supplier_profile_vertices(row, points)
+def test_activate_front_for_notes_activates_the_front_by_name(monkeypatch) -> None:
+    activated: list[str] = []
 
+    class _Doc:
+        def ActivateView(self, name):
+            activated.append(name)
+            return name == "Drawing View1"
 
-@pytest.mark.parametrize(
-    "actual,expected",
-    [
-        ([(0.0, 0.0, 0.0), (0.0, 0.0, 0.0)], [(0.0, 0.0, 0.0), (1.0, 0.0, 0.0)]),
-        ([(0.0, 0.0, 0.0), (1e-9, 0.0, 0.0)], [(0.0, 0.0, 0.0), (1e-9, 0.0, 0.0)]),
-    ],
-)
-def test_supplier_points_match_refuses_duplicate_or_ambiguous_points(actual, expected):
-    assert not drawing._supplier_points_match(actual, expected, tolerance=1e-8)
+    class _Adapter:
+        currentModel = _Doc()
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _name: obj)
+    monkeypatch.setattr(drawing, "view_name", lambda adapter, view: view)
+    drawing.activate_front_for_notes(_Adapter(), "Drawing View1")
+    assert activated == ["Drawing View1"]
+    with pytest.raises(RuntimeError, match="Front view"):
+        drawing.activate_front_for_notes(_Adapter(), "Detail View A (10 : 1)")
