@@ -117,8 +117,9 @@ CONE_BOSS_LENGTH = 42.011
 # The cast body below the head.  #2756 (machinist reviews of #2725 and of the
 # R5 rolling-main build): on the Ø1.65 envelope the boss ends stood .002 proud
 # of the body and lay flush or inside it at the printed limits, so no route
-# could make the pads drawn.  Delegated low-impact choice (MainBuild,
-# 2026-11-17, pending the owner on #2756): the body is cast Ø1.60 at the title
+# could make the pads drawn.  Delegated ruling 2026-11-17 (MainBuild), no owner
+# precedent (#2144; Main's 2026-11-13 interim on the same feature was itself
+# pending the owner on #2756): the body is cast Ø1.60 at the title
 # block's .XX band, so both cone bosses stand clear of it as real cast pads,
 # as on the original casting and like the integral crank boss.  It stays
 # inside the Ø1.65 envelope the swing platform, the base and the drive-train

@@ -499,17 +499,17 @@ def test_journal_rims_print_the_thrust_ring_break() -> None:
     # the novice rubric's two-line callout moved the collar's part into
     # numbered note 2, which the bore's callout flags, and fan-out r1 put the
     # short break back at the bore's leader (rule 7).  R5's machinist review
-    # read the break without its reason as over-specification, so the reason
-    # rides the row under it: one line, at most six words (rule 7).
-    assert drawing.DIMENSION_CALLOUTS["JournalBoreDia"] == (
-        f"REAM THRU, SEE NOTE 2\n{shaft.POST_JOURNAL_RIM_BREAK}\n"
-        f"{drawing.JOURNAL_RIM_BREAK_REASON}"
+    # read the break without its reason as over-specification, and the R5
+    # fix's first attempt, with the reason as a row under the break, read
+    # three lines of words on the callout (rule 7).  So the break and its
+    # reason ride linked note 2, after the collar they protect, by number.
+    assert drawing.DIMENSION_CALLOUTS["JournalBoreDia"] == "REAM THRU, SEE NOTE 2"
+    assert _note(2).endswith(
+        f"MHA-DT-04 COLLAR ON .827 FACE: {drawing.JOURNAL_RIM_BREAK_REASON}, "
+        f"{shaft.POST_JOURNAL_RIM_BREAK}."
     )
-    assert len(drawing.JOURNAL_RIM_BREAK_REASON.split()) <= 6
-    assert "COLLAR" in drawing.JOURNAL_RIM_BREAK_REASON
-    assert shaft.POST_JOURNAL_RIM_BREAK not in drawing.SHEET_NOTES
-    assert drawing.JOURNAL_RIM_BREAK_REASON not in drawing.SHEET_NOTES
-    assert "CONE SHAFT MHA-DT-04" in _note(2) and "COLLAR RUNS ON" in _note(2)
+    assert drawing.SHEET_NOTES.count(shaft.POST_JOURNAL_RIM_BREAK) == 1
+    assert "CONE SHAFT MHA-DT-04" in _note(2)
     assert f"EDGE BREAK {shaft.inch_text(break_max, 3)} MAX" in shaft.COLLAR_STOCK_CALLOUT
     ring = shaft.THRUST_RING_MIN
     assert ring - 2.0 * break_max >= shaft.THRUST_RING_FLOOR
@@ -772,9 +772,12 @@ def test_thrust_face_station_flags_note_2_which_names_the_collar() -> None:
     assert face.production_method == ""
     assert drawing._NORTH_BOSS_FINISH_OFFSET == (-0.006, 0.008)
     assert "MHA-DT-04" in _note(2)
-    # R5 machinist review (rule 7): the reason sentence keeps to six words.
-    assert "COLLAR RUNS ON .827 FACE." in _note(2)
-    assert len(drawing.SHEET_NOTES.splitlines()[2].split()) <= 6
+    # R5 fix attempt 1 (blocker): a bare COLLAR named no mate, so the collar
+    # is named by number; its place and the break's reason keep to six words.
+    line = drawing.SHEET_NOTES.splitlines()[2]
+    assert line.startswith("   MHA-DT-04 COLLAR ON .827 FACE:")
+    reason = line.split(":")[0].split() + drawing.JOURNAL_RIM_BREAK_REASON.split()
+    assert len([word for word in reason if word != "MHA-DT-04"]) <= 6
     # Above the upper extension line, below the sheet border.
     assert drawing.SECTION_KEEP["ConeBossNorthZ"][1] > 0.250
 
@@ -957,7 +960,7 @@ def test_numbered_notes_state_each_bores_fit_and_its_locations_mates() -> None:
         (
             "1. RUNNING FIT ON CRANKSHAFT MHA-DT-11 (CLEARANCE .0010-.0023).",
             "2. RUNNING FIT ON CONE SHAFT MHA-DT-04 (CLEARANCE .0010-.0023);",
-            "   COLLAR RUNS ON .827 FACE.",
+            "   MHA-DT-04 COLLAR ON .827 FACE: NARROW LAND, RIMS BREAK .004 MAX.",
             "3. 1.694 AND .842 SET MESH OF PINION MHA-DT-10 WITH GEAR MHA-DT-07.",
         )
     )
@@ -1009,7 +1012,7 @@ def test_locations_print_their_value_band_and_note_flag_only() -> None:
     for name, flag in flagged.items():
         assert callouts[name] == flag
     assert set(drawing.DIMENSION_CALLOUTS_ABOVE) == {"CrankAboveCone"}
-    assert _note(2).endswith("COLLAR RUNS ON .827 FACE.")
+    assert "MHA-DT-04 COLLAR ON .827 FACE:" in _note(2)
     assert _note(3).startswith("3. 1.694 AND .842 SET MESH")
     for name in ("JournalAxisY", "CrankAxisY", "MountWestX", "MountEastX"):
         assert name not in callouts

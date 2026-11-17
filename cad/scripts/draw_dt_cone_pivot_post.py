@@ -483,11 +483,10 @@ JOURNAL_KEEP = {
     # (screen of the novice rubric: the boss OD and the bore read as one
     # six-line callout), so its top stands under the boss OD's row and the
     # two read as separate callouts.  Its widest row, "REAM THRU, SEE NOTE
-    # 2", is about the boss OD row's width and stays inside 265.5..319.2;
-    # the rim break's shorter row and its reason sit under it (fan-out r1: a
-    # short requirement goes at its leader, not behind a note).  The block is
-    # centred on this y, so the reason's row moved it 1.5 mm up, keeping its
-    # leader shelf clear of the bore's Ra symbol below.
+    # 2", is about the boss OD row's width and stays inside 265.5..319.2.
+    # The block is centred on this y: attempt 1 of the R5 fix printed five
+    # rows about it with the leader shelf clear of the bore's Ra symbol and
+    # the top under the boss OD's row, and three rows stand inside that box.
     "JournalBoreDia": (0.292, 0.154),
 }
 
@@ -587,15 +586,23 @@ def _printed(value_mm: float, name: str) -> str:
 
 
 # The sheet's numbered notes, one block (rule 7: at most four lines).  The
-# rim break is a short requirement, so it sits at the bore's callout.
+# rim break and its reason ride note 2, which the bore's callout flags: on
+# the callout they made three lines of words (R5 fix attempt 1, all three
+# runs; rule 7 moves the overflow to the linked note, where it counts as
+# being at the callout).  The collar on the .827 face is named by its
+# drawing number, not by "ITS" or a bare COLLAR (same review, blocker).
+# Why the bore's rims take a break under the title block's: the collar's
+# land between the rim and its OD is narrow (rule 7: one reason, at most six
+# words with the collar's place).
+JOURNAL_RIM_BREAK_REASON = "NARROW LAND"
 SHEET_NOTES = "\n".join(
     (
         f"{CRANK_BORE_NOTE}. RUNNING FIT ON CRANKSHAFT MHA-DT-11 (CLEARANCE "
         f"{fit_clearance_text(crankshaft.JOURNAL_DIAMETRAL_CLEARANCE_MM)}).",
         f"{CONE_BORE_NOTE}. RUNNING FIT ON CONE SHAFT MHA-DT-04 (CLEARANCE "
         f"{fit_clearance_text(cone_shaft.JOURNAL_DIAMETRAL_CLEARANCE_MM)});",
-        f"   COLLAR RUNS ON {_printed(cone.CONE_BOSS_NORTH_STATION, 'ConeBossNorthZ')} "
-        "FACE.",
+        f"   MHA-DT-04 COLLAR ON {_printed(cone.CONE_BOSS_NORTH_STATION, 'ConeBossNorthZ')} "
+        f"FACE: {JOURNAL_RIM_BREAK_REASON}, {POST_JOURNAL_RIM_BREAK}.",
         f"{MESH_NOTE}. {_printed(cone.CRANK_ABOVE_CONE, 'CrankAboveCone')} AND "
         f"{_printed(cone.CRANK_BOSS_NORTH_FACE, 'CrankBossStartZ')} SET MESH "
         "OF PINION MHA-DT-10 WITH GEAR MHA-DT-07.",
@@ -604,17 +611,11 @@ SHEET_NOTES = "\n".join(
 # The notes' top-left corner: under the elevation's datum B frame (its
 # bottom at 57 mm) and left of the title block (x 216 mm).
 NOTES_XY = (0.020, 0.048)
-# Why the bore's rims take a break under the title block's: the collar's land
-# between the rim and its OD is narrow (rule 7: one reason, at the callout).
-JOURNAL_RIM_BREAK_REASON = "NARROW COLLAR LAND"
 DIMENSION_CALLOUTS = {
     "CrankBossDia": "CRANK BOSS",
     "CrankBossLen": "SEATS\nMHA-DT-11 COLLAR",
     "CrankBoreDia": f"REAM THRU, SEE NOTE {CRANK_BORE_NOTE}",
-    "JournalBoreDia": (
-        f"REAM THRU, SEE NOTE {CONE_BORE_NOTE}\n{POST_JOURNAL_RIM_BREAK}\n"
-        f"{JOURNAL_RIM_BREAK_REASON}"
-    ),
+    "JournalBoreDia": f"REAM THRU, SEE NOTE {CONE_BORE_NOTE}",
     # Machinist review of ecc864e1f (2 of 3 runs): "MHA-DT-04 BEARING LENGTH"
     # named again the mate note 2 names once for the bore and the .827 face.
     "ConeBossLen": f"SEE NOTE {CONE_BORE_NOTE}",
