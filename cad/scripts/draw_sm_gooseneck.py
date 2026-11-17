@@ -52,6 +52,7 @@ from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
+from _named_views import octant_view_name
 from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
@@ -68,6 +69,7 @@ from sm_gooseneck_spec import (
     DIMENSION_CALLOUTS_BY_NAME,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    ISOMETRIC_OCTANT,
     TUBE_OD_REF_Y,
 )
 
@@ -257,7 +259,13 @@ def build(adapter: Any) -> dict[str, str]:
         },
     )
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=VIEW_SCALE)
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
+    iso = place_view(
+        adapter,
+        str(SOURCE),
+        octant_view_name(*ISOMETRIC_OCTANT),
+        *ISO_CENTER,
+        scale=ISO_SCALE,
+    )
     for view in (front, iso):
         set_hidden_lines_removed(adapter, view)
 

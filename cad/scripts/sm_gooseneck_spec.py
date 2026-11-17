@@ -132,7 +132,9 @@ TUBE_OD_REF_Y = round(geom.LEG_TOP - geom.LEG_LENGTH / 4.0, 1)
 TUBE_OD_REF_SPAN = 20.0
 # Inch places (#290).  The leg length and bend radius are references at
 # their one-place sizes.  The overall reach sets the faced arm end, the
-# spring eye's station less the end plug's head: the title block's .XX.  The
+# spring eye's station less the end plug's head: the title block's .XX, which
+# holds the counter spring plumb (test_vertical_spring_anchors; owner ruling
+# 2026-11-17 (Pedro), the registry row's machinist_exceptions RV-01).  The
 # overall height prints at two places only because the snapped leg puts it
 # at 19.650, a one-place tie; its band is OVERALL_HEIGHT_TOLERANCE_MM, not the
 # .XX row's.  The arm straight (REF) prints at two places, the stock Ø (REF)
@@ -174,3 +176,9 @@ if set(DIMENSION_CALLOUTS_BY_NAME) - set(DRAWING_PRECISION_BY_NAME):
 # the original's smooth bend does not have.  It is seen by eye, not measured.
 DRAWING_NOTES = "1. BEND: NO KINKS"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"
+# The pictorial's viewer octant (_named_views signs: x, y, z).  The faced arm
+# end looks along part -X, so the built-in *Isometric (+X+Y+Z) saw only its
+# back and the tip read as solid rod against the (.065) WALL STOCK callout
+# (machinist review of a611188e85, blocker): FRONT-TOP-LEFT looks into the
+# open bore.
+ISOMETRIC_OCTANT = (-1, 1, 1)

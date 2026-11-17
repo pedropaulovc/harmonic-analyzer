@@ -184,7 +184,12 @@ def test_title_block_material_and_finish_come_from_the_registry_row() -> None:
     assert "OnlineMetals 7322" in row["material_specification"]
     finish = str(row["finish"]).lower()
     assert "polished bare" in finish and "oil or wax" in finish
-    assert "machinist_exceptions" not in row
+    # Owner ruling 2026-11-17 (Pedro): the reach's .XX is the plumb station
+    # of the counter spring, accepted against the over-specification finding.
+    (exception,) = row["machinist_exceptions"]
+    assert exception["kind"] == "accept"
+    assert "3.72" in exception["where"]
+    assert '"3.72 at .XX stays; it plumbs the vertical spring"' in exception["reason"]
 
 
 def test_shop_stock_row_covers_the_bent_tube_and_its_tail() -> None:
@@ -217,6 +222,15 @@ def test_sheet_is_the_elevation_and_isometric_only() -> None:
     assert drawing.MACHINIST_REVIEW is MachinistReviewMode.ENFORCE
     assert spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:4"
     assert drawing.ISO_SCALE == (1, 4)
+    # The pictorial looks into the faced arm end (part -X), so its open bore
+    # shows the tube the (.065) WALL STOCK callout names.
+    assert spec.ISOMETRIC_OCTANT == (-1, 1, 1)
+    for module in (part, drawing):
+        names = {
+            node.id for node in ast.walk(_tree(module)) if isinstance(node, ast.Name)
+        }
+        assert "ISOMETRIC_OCTANT" in names, module.__name__
+    assert '"*Isometric"' not in Path(drawing.__file__).read_text(encoding="utf-8")
 
 
 def test_elevation_dimensions_stand_clear_of_each_other_and_the_title_block() -> None:

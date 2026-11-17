@@ -59,6 +59,7 @@ from _drawing_precision import (
 from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _extrude import extrude_at_offset
 from _feature_tree import name_last_feature
+from _named_views import name_octant_views, octant_key
 from _part_checks import report_mass_properties, volume_check
 from _part_properties import part_drawing_unit
 from _part_save import save_part_and_images
@@ -79,6 +80,7 @@ from sm_gooseneck_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
+    ISOMETRIC_OCTANT,
     ISOMETRIC_VIEW_NOTE,
     OVERALL_HEIGHT_TOLERANCE_MM,
     REFERENCE_DIMENSIONS,
@@ -756,6 +758,12 @@ def build(adapter) -> dict[str, str]:
             "Manufacturing Notes": DRAWING_NOTES,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
+    )
+    # The sheet's pictorial looks into the faced arm end (spec ISOMETRIC_OCTANT).
+    name_octant_views(
+        adapter,
+        octants={octant_key(*ISOMETRIC_OCTANT): ISOMETRIC_OCTANT},
+        label=PART_NAME,
     )
     return save_part_and_images(adapter, PART_NAME)
 
