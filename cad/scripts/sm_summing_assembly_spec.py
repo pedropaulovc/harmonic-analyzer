@@ -1,11 +1,11 @@
-"""Pure fitting contract for sm-summing.SLDASM (MHA-SM-00): inventory and
-the three assembly settings.
+"""Pure fitting contract for sm-summing.SLDASM (MHA-SM-00): inventory, the
+assembly setting and the free-rock acceptance.
 
 Builder data only: the builder (``build_sm_summing_assembly``) places
-``QUANTITIES`` and authors the two setting sketches from these values; the
-package drawing (``draw_sm_summing_assembly``) proves the BOM against
-``QUANTITIES`` and prints the settings as those sketches' own model
-dimensions. The ``SM_EXPLODED`` presentation lives in
+``QUANTITIES`` and authors the counter setting's sketch from these values;
+the package drawing (``draw_sm_summing_assembly``) proves the BOM against
+``QUANTITIES``, prints the setting as that sketch's own model dimension and
+the rock acceptance in its setting table. The ``SM_EXPLODED`` presentation lives in
 ``sm_summing_explode_spec``. The drawing number, BOM order, the dimensions
 the drawing imports, the level tolerance, the BOM descriptions, callouts,
 notes, steps and checks the sheets print live in ``sm_summing_assembly_sheet``,
@@ -27,7 +27,6 @@ import sm_gooseneck_geom
 import sm_gooseneck_spring_joint as spring_joint
 import sm_summing_lever_spec as lever
 from spring_mount_geom import COUNTER_ANCHOR_XY, KNIFE, KNIFE_CONTACT_Y
-from top_frame_plane import TOP_FRAME_UNDERSIDE_Y
 
 ASM_NAME = "sm-summing"
 
@@ -72,33 +71,18 @@ HANGER_FIT_REACH = 8.9154  # .351
 HANGER_FIT_REACH_TOL = 0.127  # .005, the title block's three-place band
 HANGER_FIT_REACH_PLACES = 3
 
-# --- Assembly settings, as model dimensions -------------------------------------
-# Three blanked Front-plane construction sketches in the assembly (sketch x =
-# machine X, sketch y = machine Y), each driven from globals and marked for the
-# drawing, which shows each in the one view that dimensions it.
+# --- Assembly setting, as a model dimension -------------------------------------
+# One blanked Front-plane construction sketch in the assembly (sketch x =
+# machine X, sketch y = machine Y), driven from globals and marked for the
+# drawing, which shows it in the one view that dimensions it.
 #
 # CounterSetting: the MHA-SM-VN-56 axis over the counter spring, measured up the
 # spring's own axis from the knife-edge contact level. Sliding the gooseneck's
 # bare leg in the frame hub sets it until the lever is level, so it prints as
 # a reference nominal.
-#
-# KnifeRockGauge: how far the boss-hook face rises when the lever rocks the
-# free-rock floor about the knife edge -- the free-rock acceptance in a
-# distance a fitter measures at the boss, rounded up so the check is never
-# looser than the floor.
-#
-# HangerReachSetting: the cut MHA-SM-VN-52 tip's reach below its mount's top
-# seat (the crossbar underside), down the bolt axis -- the HANGER_FIT_REACH
-# the step 4A cut adds to the measured stack (rule 22: the cut-to-fit setting
-# prints on the sheet). The bolt stands on the knife-edge X at each station.
-SETTING_FEATURES = ("CounterSetting", "KnifeRockGauge", "HangerReachSetting")
-COUNTER_FEATURE, ROCK_FEATURE, HANGER_FEATURE = SETTING_FEATURES
+SETTING_FEATURES = ("CounterSetting",)
+(COUNTER_FEATURE,) = SETTING_FEATURES
 COUNTER_DIMENSION = "CounterScrewRise"
-ROCK_DIMENSION = "BossRockTravel"
-HANGER_DIMENSION = "HangerBoltReach"
-# The mount's top seat is clamped to the crossbar underside, gap 0.
-HANGER_SEAT_POINT = (KNIFE[0], TOP_FRAME_UNDERSIDE_Y)
-HANGER_TIP_POINT = (KNIFE[0], TOP_FRAME_UNDERSIDE_Y - HANGER_FIT_REACH)
 
 KNIFE_POINT = (KNIFE[0], KNIFE_CONTACT_Y)
 _COUNTER_SEAT, GOOSENECK_ORIGIN_Y = settled_spring_seats.counter_seat()
@@ -159,6 +143,12 @@ def _boss_face_rise(angle: float) -> float:
 # rounds up onto the .001 grid, the counter-screw reference prints .XX. The
 # one gauge is read each way from level, so it carries the larger of the two
 # directional travels: a fitter who sees it both ways has the floor both ways.
+# BOSS_ROCK_TRAVEL is how far the boss face rises when the lever rocks the
+# free-rock floor about the knife edge -- the free-rock acceptance in a
+# distance a fitter reads at the boss. It is a travel, not a model dimension,
+# so it prints in the drawing's setting table (machinist review of farm run
+# 20261117T143446475Z-fdea6028: as a DETAIL A dimension its upper end landed
+# on no feature).
 ROCK_PRECISION = 3
 _ROCK_GRID_MM = 25.4 / 10**ROCK_PRECISION
 BOSS_ROCK_TRAVEL = round(
@@ -171,8 +161,6 @@ BOSS_ROCK_TRAVEL = round(
 COUNTER_PRECISION = 2
 DRAWING_PRECISION = {
     COUNTER_FEATURE: {COUNTER_DIMENSION: COUNTER_PRECISION},
-    ROCK_FEATURE: {ROCK_DIMENSION: ROCK_PRECISION},
-    HANGER_FEATURE: {HANGER_DIMENSION: HANGER_FIT_REACH_PLACES},
 }
 
 assert 0.0 < COUNTER_SCREW_RISE, COUNTER_SCREW_RISE

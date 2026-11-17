@@ -213,59 +213,55 @@ def test_setting_drives_reproduce_the_sketch_values() -> None:
     assert g["SmCounterScrewY"] - g["SmKnifeY"] == pytest.approx(
         spec.COUNTER_SCREW_RISE
     )
-    assert g["SmBossRockTravel"] == spec.BOSS_ROCK_TRAVEL
-    assert g["SmHangerReach"] == spec.HANGER_FIT_REACH
-    assert g["SmHangerSeatY"] - g["SmHangerReach"] == spec.HANGER_TIP_POINT[1]
-    assert notes.DRAWING_DIMENSIONS == {
-        spec.COUNTER_FEATURE: {spec.COUNTER_DIMENSION},
-        spec.ROCK_FEATURE: {spec.ROCK_DIMENSION},
-        spec.HANGER_FEATURE: {spec.HANGER_DIMENSION},
-    }
+    assert notes.DRAWING_DIMENSIONS == {spec.COUNTER_FEATURE: {spec.COUNTER_DIMENSION}}
     assert set(drawing.PRECISION) == set(notes.DIMENSION_CALLOUTS)
 
 
-def test_hanger_reach_setting_runs_down_the_bolt_from_the_clamped_top_seat() -> None:
-    # Rule 22 (machinist review of R5, main 67ba11bf1a): step 4A's cut reach
-    # prints as DETAIL A's own model dimension, from the mount's top seat
-    # (clamped to the crossbar underside) down the bolt axis.
-    assert spec.HANGER_SEAT_POINT == (builder.KNIFE[0], builder.KNIFE_MOUNT_TOP_Y)
-    assert spec.HANGER_TIP_POINT[1] == pytest.approx(
-        builder.KNIFE_MOUNT_TOP_Y - spec.HANGER_FIT_REACH
-    )
-    # The modelled cut tip sits inside the printed band about the setting.
-    assert (
-        abs(builder.HANGER_REACH - spec.HANGER_FIT_REACH) <= spec.HANGER_FIT_REACH_TOL
-    )
-    assert drawing.PRECISION[spec.HANGER_DIMENSION] == spec.HANGER_FIT_REACH_PLACES
-    cut = next(s for s in notes.ASSEMBLY_STEPS if s.startswith("4A. "))
-    assert f"PLUS {notes.HANGER_FIT_CUT} UNDER THE HEAD" in cut
-    assert f"DETAIL {notes.DETAIL_LETTER}, SHEET 1" in cut
-
-
-def test_setting_table_carries_the_non_dimension_acceptances_the_steps_cite() -> None:
-    # Rule 22: the bracket transfer band and the top-seat feeler are no model
-    # dimension, so they print in the sheet 1 setting table; step 3 and
-    # check 1 cite the row that carries their value.
+def test_setting_table_carries_the_settings_no_visible_dimension_does() -> None:
+    # Rule 22 (machinist review of R5 and of farm run
+    # 20261117T143446475Z-fdea6028; MainBuild ruling 2026-11-17): the bracket
+    # station band, the hanger bolt's cut-to-fit length, the top-seat feeler
+    # and the free-rock travel print in the sheet 1 setting table, and the
+    # steps and checks cite the row that carries their value.
     header = notes.SETTING_TABLE_HEADER
     rows = {
         cells[0]: dict(zip(header, cells, strict=True))
         for cells in notes.SETTING_TABLE_ROWS
     }
-    assert list(rows) == [notes.BRACKET_ROW, notes.SEAT_ROW]
+    assert list(rows) == [
+        notes.BRACKET_ROW,
+        notes.CUT_ROW,
+        notes.SEAT_ROW,
+        notes.ROCK_ROW,
+    ]
     band = f"±{notes._length(notes.BRACKET_STATION_TOL_MM, 3)}"
     assert band == "±.005"
     assert band in rows[notes.BRACKET_ROW]["SET TO / ACCEPT"]
+    assert notes.HANGER_FIT_CUT == ".351"
+    cut = rows[notes.CUT_ROW]
+    assert cut["SET TO / ACCEPT"] == f"{notes.HANGER_STACK} + {notes.HANGER_FIT_CUT}"
+    assert cut["MEASURE FIRST"].startswith(f"{notes.HANGER_STACK} = ")
     feeler = notes._length(notes.SEAT_FEELER_MM, 3)
     assert feeler == ".002"
     assert rows[notes.SEAT_ROW]["SET TO / ACCEPT"].startswith(f"{feeler} FEELER")
-    bracket = next(s for s in notes.ASSEMBLY_STEPS if s.startswith("3. "))
-    assert band in bracket and notes.setting_row(notes.BRACKET_ROW) in bracket
+    assert notes.ROCK_TRAVEL_MIN == ".295 MIN"
+    assert rows[notes.ROCK_ROW]["SET TO / ACCEPT"].startswith(notes.ROCK_TRAVEL_MIN)
+
+    def step(label: str) -> str:
+        return next(s for s in notes.ASSEMBLY_STEPS if s.startswith(label))
+
+    assert band in step("3. ") and notes.setting_row(notes.BRACKET_ROW) in step("3. ")
+    for label in ("4. ", "4A. "):
+        assert notes.setting_row(notes.CUT_ROW) in step(label)
+    assert f"PLUS {notes.HANGER_FIT_CUT} UNDER THE HEAD" in step("4A. ")
     check = next(c for c in notes.ASSEMBLY_CHECKS if c.startswith("1. "))
     assert feeler in check and notes.setting_row(notes.SEAT_ROW) in check
     # The steps that draw each top seat flat send the fitter to check 1.
     for label in ("5C. ", "6H. "):
-        step = next(s for s in notes.ASSEMBLY_STEPS if s.startswith(label))
-        assert "(CHECK 1" in step
+        assert "(CHECK 1" in step(label)
+    assert notes.setting_row(notes.ROCK_ROW) in step("6G. ")
+    rock = next(c for c in notes.ASSEMBLY_CHECKS if c.startswith("2. "))
+    assert notes.ROCK_TRAVEL_MIN in rock and notes.setting_row(notes.ROCK_ROW) in rock
     with pytest.raises(KeyError):
         notes.setting_row("9")
 
@@ -273,7 +269,26 @@ def test_setting_table_carries_the_non_dimension_acceptances_the_steps_cite() ->
 def test_setting_table_fits_the_top_border() -> None:
     left, _bottom, right, _top = drawing.SHEET_INNER_BORDER
     widths = table_column_widths(notes.SETTING_TABLE_HEADER, notes.SETTING_TABLE_ROWS)
-    assert left + drawing.SETTING_TABLE_INSET + sum(widths) < right
+    # Cells never wrap: each column is cut to its longest cell, so the whole
+    # table must fit with room to spare.
+    assert left + drawing.SETTING_TABLE_INSET + sum(widths) < right - 0.005
+
+
+def test_finished_isometric_fills_the_field_left_of_the_title_block() -> None:
+    # Machinist review of farm run 20261117T143446475Z-fdea6028: the 1:5
+    # isometric was too small. Its captured 1:5 outline (71.8 x 127.7 mm),
+    # scaled to the sheet's own scale, stays inside the border and clear of
+    # the title block.
+    assert drawing.SHEET_SCALES[drawing.SHEET_NAMES[2]] == drawing.FINISHED_SCALE
+    grow = (drawing.ASSEMBLED_SCALE[1] / drawing.ASSEMBLED_SCALE[0]) / (
+        drawing.FINISHED_SCALE[1] / drawing.FINISHED_SCALE[0]
+    )
+    assert grow > 1.6
+    half_w, half_h = 0.0718 * grow / 2.0, 0.1277 * grow / 2.0
+    cx, cy = drawing.ASSEMBLY_ISO_CENTER
+    drawing._assert_box_on_sheet(
+        (cx - half_w, cy - half_h, cx + half_w, cy + half_h), label="finished iso"
+    )
 
 
 def test_layout_constants_stay_on_the_sheet() -> None:

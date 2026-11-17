@@ -2,13 +2,13 @@ r"""Create the three-sheet summing-lever fitter package (MHA-SM-00).
 
 Sheet 1 shows the assembled lever on its knife mounts (front and right) with
 the counter-spring screw height the level setting finds, a 1:1 knife-edge
-detail carrying the free-rock acceptance and the hanger bolt's cut reach, the
-setting table (the acceptances no model dimension carries) and the notes.
-Sheet 2 is the builder-owned SM_EXPLODED isometric with its BOM (vendor SKU
-added) and one balloon per BOM row. Sheet 3 is the finished isometric. The
-numbered fit-up steps and checks print in the release's ASSEMBLY.md (#2889).
-The three settings are the assembly's own sketch dimensions
-(``build_sm_summing_assembly._author_settings``), imported here; the explode
+detail showing the knife contact and the boss the free rock is read at, the
+setting table (the settings and acceptances no visible model dimension
+carries) and the notes. Sheet 2 is the builder-owned SM_EXPLODED isometric
+with its BOM (vendor SKU added) and one balloon per BOM row. Sheet 3 is the
+finished isometric at 1:3. The numbered fit-up steps and checks print in the
+release's ASSEMBLY.md (#2889). The setting is the assembly's own sketch
+dimension (``build_sm_summing_assembly._author_settings``), imported here; the explode
 comes from ``sm_summing_explode_spec`` and every printed text comes from
 ``sm_summing_assembly_sheet``.
 
@@ -29,7 +29,6 @@ from typing import Any, Callable
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
-    dimension_name,
     place_view,
     view_name,
 )
@@ -79,7 +78,6 @@ from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
 from _session import run_build
 from _simplified_names import simplified_name
-from sm_knife_mount_spec import BLK_HALF_X
 from stock_anchor_geom import ANCHOR_9490T1
 
 
@@ -108,7 +106,12 @@ if SPEC.layout is not DrawingLayout.LANDSCAPE:
 SHEET_LAYOUTS = {name: DrawingLayout.LANDSCAPE for name in SHEET_NAMES}
 ASSEMBLED_SCALE = (1.0, 5.0)
 EXPLODED_SCALE = (1.0, 4.0)
-SHEET_SCALES = dict(zip(SHEET_NAMES, (ASSEMBLED_SCALE, EXPLODED_SCALE, ASSEMBLED_SCALE)))
+# The finished isometric fills the sheet left of the title block (machinist
+# review of farm run 20261117T143446475Z-fdea6028: at 1:5 it sat small in an
+# empty sheet, its washers, dowels and bolts not identifiable). Its 1:5
+# outline, 71.8 x 127.7 mm, prints 119.6 x 212.8 at 1:3.
+FINISHED_SCALE = (1.0, 3.0)
+SHEET_SCALES = dict(zip(SHEET_NAMES, (ASSEMBLED_SCALE, EXPLODED_SCALE, FINISHED_SCALE)))
 
 # Sheet geometry, metres: the template's inner border and the title block in
 # its lower-right corner.
@@ -149,22 +152,7 @@ DETAIL_MODEL_CENTRE_MM = (
 DETAIL_RADIUS_MM = 52.0
 DETAIL_MM = DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0  # sheet metres per model mm
 DETAIL_CROP_RADIUS = DETAIL_RADIUS_MM * DETAIL_MM
-# The rock gauge's dimension line stands this far outboard of the boss's
-# outer edge, left of the crop circle. Its text sits this far under the boss
-# face, outside the gauge span: at 1:1 the span is shorter than the value
-# and callout, so text placed inside it prints on its own dimension line.
-# Outside the span SolidWorks hangs the text off a shelf to the line's
-# outboard side (r2: 35 mm wide), so the line stays close to the boss to
-# keep that text clear of the Right view.
-ROCK_TEXT_OFFSET = 0.010
-ROCK_TEXT_DROP = 0.008
 DETAIL_LABEL_GAP = 0.005
-# The hanger bolt reach (step 4A's cut) on the same detail: its dimension line
-# stands this far outboard of the knife mount's far side (away from the boss),
-# its text this far under the cut tip, hanging off the outboard shelf into the
-# open sheet right of the crop circle.
-HANGER_TEXT_OFFSET = 0.005
-HANGER_TEXT_DROP = 0.008
 DETAIL_LABEL_INSET = 0.040
 CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
 DETAIL_POSITION_TOL_M = 1e-4
@@ -176,8 +164,8 @@ DETAIL_POSITION_TOL_M = 1e-4
 DETAIL_BOUNDARY_COLOR = 0  # COLORREF black
 DETAIL_LETTER_GAP = 0.002
 DETAIL_LETTER_HALF_WIDTH = 0.0013
-# The setting table (rule 22: acceptances that are no model dimension) runs
-# along the top border, above every view on the sheet.
+# The setting table (rule 22: settings and acceptances no visible model
+# dimension carries) runs along the top border, above every view on the sheet.
 SETTING_TABLE_INSET = 0.004
 SETTING_TABLE_VIEW_GAP = 0.004
 
@@ -202,9 +190,12 @@ EXPLODED_CAPTION_OFFSET = 0.006
 EXPLODED_CAPTION_MIN_GAP = 0.004
 
 # --- Sheet 3 ------------------------------------------------------------------
-# The finished isometric, centred above the title block; the fit-up steps and
-# checks print in the release's ASSEMBLY.md (#2889).
-ASSEMBLY_ISO_CENTER = ((SHEET_INNER_BORDER[0] + SHEET_INNER_BORDER[2]) / 2.0, 0.172)
+# The finished isometric, centred in the full-height field left of the title
+# block; the fit-up steps and checks print in the release's ASSEMBLY.md (#2889).
+ASSEMBLY_ISO_CENTER = (
+    (SHEET_INNER_BORDER[0] + TITLE_BLOCK[0]) / 2.0,
+    (SHEET_INNER_BORDER[1] + SHEET_INNER_BORDER[3]) / 2.0,
+)
 
 BOM_QUANTITIES = {stem: spec.QUANTITIES[stem] for stem in notes.BOM_ORDER}
 BOM_COMPONENTS = tuple(BOM_QUANTITIES)
@@ -644,93 +635,12 @@ def _mark_detail_boundary(adapter: Any, front: Any) -> None:
     _telemetry.info(f"summing: {label} centre {centre!r} radius {radius!r}")
 
 
-def _prove_detail_setting(
-    display: Any, *, dimension: str, value_mm: float, places: int, label: str
-) -> None:
-    if abs(_dimension_value_mm(display) - value_mm) > 1e-4:
-        raise RuntimeError(f"{label} reads {_dimension_value_mm(display):g} mm")
-    if int(display.GetPrimaryPrecision2()) != places:
-        raise RuntimeError(f"{label}: precision changed")
-    _assert_callout(display, dimension)
-
-
-def _knife_detail(adapter: Any) -> Callable[[], None]:
-    """The 1:1 knife-edge detail with the boss's minimum rock travel and the
-    hanger bolt's reach below its mount's top seat (step 4A's cut)."""
+def _knife_detail(adapter: Any) -> None:
+    """The 1:1 knife-edge detail: the knife contact and the boss face the
+    setting table's rock row is read at."""
     label = notes.DETAIL_TITLE
     view = _placed_detail(adapter)
-    face, knife, seat, tip = (
-        model_point_in_view(
-            adapter, view, (x / 1000.0, y / 1000.0, 0.0), label=f"{label} {name}"
-        )
-        for name, (x, y) in (
-            ("boss face", spec.BOSS_FACE_POINT),
-            ("knife", spec.KNIFE_POINT),
-            ("hanger top seat", spec.HANGER_SEAT_POINT),
-            ("hanger tip", spec.HANGER_TIP_POINT),
-        )
-    )
-    outboard = math.copysign(1.0, face[0] - knife[0])
-    rock_xy = (
-        face[0] + outboard * ROCK_TEXT_OFFSET,
-        face[1] - ROCK_TEXT_DROP,
-    )
-    # The bolt stands on the mount's centre plane; its far side is a block
-    # half-width out, away from the boss.
-    hanger_side = math.copysign(1.0, seat[0] - face[0])
-    hanger_xy = (
-        seat[0] + hanger_side * (BLK_HALF_X * DETAIL_MM + HANGER_TEXT_OFFSET),
-        tip[1] - HANGER_TEXT_DROP,
-    )
-    settings = []
-    for feature, dimension, value_mm, places, text_xy, setting in (
-        (
-            spec.ROCK_FEATURE,
-            spec.ROCK_DIMENSION,
-            spec.BOSS_ROCK_TRAVEL,
-            spec.ROCK_PRECISION,
-            rock_xy,
-            "knife rock gauge",
-        ),
-        (
-            spec.HANGER_FEATURE,
-            spec.HANGER_DIMENSION,
-            spec.HANGER_FIT_REACH,
-            spec.HANGER_FIT_REACH_PLACES,
-            hanger_xy,
-            "hanger bolt reach",
-        ),
-    ):
-        annotation = _imported_setting(
-            adapter,
-            view,
-            feature=feature,
-            dimension=dimension,
-            text_xy=text_xy,
-            label=setting,
-        )
-        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-        settings.append(
-            (
-                display,
-                {
-                    "dimension": dimension,
-                    "value_mm": value_mm,
-                    "places": places,
-                    "label": setting,
-                },
-            )
-        )
     _crop_detail(adapter, view)
-    kept = {
-        dimension_name(adapter, _early_bound(item, "IAnnotation"))
-        for item in (_early_bound(view, "IView").GetAnnotations() or ())
-    }
-    lost = sorted({proof["dimension"] for _, proof in settings} - kept)
-    if lost:
-        raise RuntimeError(f"{label} lost {lost} to its crop; kept {sorted(kept)}")
-    for display, proof in settings:
-        _prove_detail_setting(display, **proof)
     label_xy = (
         DETAIL_CENTRE[0] - DETAIL_LABEL_INSET,
         DETAIL_CENTRE[1] - DETAIL_CROP_RADIUS - DETAIL_LABEL_GAP,
@@ -739,12 +649,6 @@ def _knife_detail(adapter: Any) -> Callable[[], None]:
     if add_note(adapter, DETAIL_LABEL, *label_xy) is None:
         raise RuntimeError(f"failed to label the {label}")
     _assert_view_on_sheet(view, label=label)
-
-    def settled() -> None:
-        for display, proof in settings:
-            _prove_detail_setting(display, **proof)
-
-    return settled
 
 
 def _place_setting_table(adapter: Any, views: dict[str, Any]) -> None:
@@ -801,17 +705,12 @@ def _place_assembled_sheet(adapter: Any) -> Callable[[], None]:
         views[name] = view
     counter_settled = _counter_setting(adapter, views["*Front"])
     _mark_detail_boundary(adapter, views["*Front"])
-    detail_settled = _knife_detail(adapter)
+    _knife_detail(adapter)
     _place_setting_table(adapter, views)
     _add_note_block(
         adapter, SHEET_NAMES[0], ASSEMBLED_NOTES, NOTES_XY, label="assembled notes"
     )
-
-    def settled() -> None:
-        counter_settled()
-        detail_settled()
-
-    return settled
+    return counter_settled
 
 
 # --- BOM ------------------------------------------------------------------------
@@ -1059,7 +958,7 @@ def _place_finished_sheet(adapter: Any) -> None:
     label = "summing finished"
     _activate_sheet(adapter, SHEET_NAMES[2])
     finished = place_view(
-        adapter, str(SOURCE), "*Isometric", *ASSEMBLY_ISO_CENTER, scale=ASSEMBLED_SCALE
+        adapter, str(SOURCE), "*Isometric", *ASSEMBLY_ISO_CENTER, scale=FINISHED_SCALE
     )
     set_high_quality_shaded_with_edges(adapter, finished, label=label)
     configuration = apply_view_configuration(

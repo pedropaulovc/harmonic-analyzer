@@ -33,8 +33,6 @@ from sm_summing_assembly_spec import (
     END_PLUG,
     GOOSENECK,
     HANGER_BOLT,
-    HANGER_DIMENSION,
-    HANGER_FEATURE,
     HANGER_FIT_REACH,
     HANGER_FIT_REACH_PLACES,
     HANGER_WASHER,
@@ -42,8 +40,6 @@ from sm_summing_assembly_spec import (
     KNIFE_MOUNT,
     LEVER,
     QUANTITIES,
-    ROCK_DIMENSION,
-    ROCK_FEATURE,
     ROCK_PRECISION,
     SPRING_SCREW,
 )
@@ -58,8 +54,6 @@ BOM_ORDER = tuple(QUANTITIES)
 # The drawing imports exactly these, each in the one view that dimensions it.
 DRAWING_DIMENSIONS = {
     COUNTER_FEATURE: {COUNTER_DIMENSION},
-    ROCK_FEATURE: {ROCK_DIMENSION},
-    HANGER_FEATURE: {HANGER_DIMENSION},
 }
 # The lever is set level to the title block's general angular tolerance: the
 # operating rock (about 1 deg) then stays well inside the free-rock floor.
@@ -124,7 +118,8 @@ KNIFE_GAUGE_BAR = (
 )
 KNIFE_GAUGE_BAR_FEEL = "IT SLIDES BY HAND WITH NO PERCEPTIBLE SHAKE"
 # The 1:1 knife-edge view is DETAIL A, circled on the sheet 1 front view
-# (rule 9: a view named only in prose is unlabelled).
+# (rule 9: a view named only in prose is unlabelled); it shows the knife
+# contact and the boss face the rock acceptance is read at.
 DETAIL_LETTER = "A"
 DETAIL_TITLE = f"DETAIL {DETAIL_LETTER}"
 BOND_GRADE = "LOCTITE 638"
@@ -134,14 +129,17 @@ BRACKET_NUMBER = "MHA-MG-01"
 # Callouts print below the value, where line breaks print.
 DIMENSION_CALLOUTS = {
     COUNTER_DIMENSION: "SET AT ASSEMBLY:\nGOOSENECK HEIGHT\nFOR LEVER LEVEL",
-    ROCK_DIMENSION: "MIN EACH WAY\nFROM LEVEL",
-    HANGER_DIMENSION: "MHA-SM-VN-52 TIP\nBELOW TOP SEAT\n(STEP 4A CUT)",
 }
 
 # --- Sheet 1 setting table -----------------------------------------------------------
-# Rule 22: an acceptance that is no single model dimension (the bracket
-# transfer's station band, the top-seat feeler) prints here, built from the
-# values the steps use; the steps and checks cite its rows.
+# Rule 22: a setting or acceptance that no visible single model dimension
+# carries prints here, built from the values the steps use, and the steps
+# and checks cite its row: the bracket transfer's station band, the hanger
+# bolt's cut-to-fit length (the measured stack plus the reach; on DETAIL A
+# the reach ran to the hidden tip inside MHA-SM-02), the top-seat feeler, and
+# the free-rock travel read at the boss (a travel, not a feature: on DETAIL
+# A its upper end landed on nothing). Machinist review of farm run
+# 20261117T143446475Z-fdea6028; MainBuild ruling 2026-11-17.
 SETTING_TABLE_TITLE = "SETTING TABLE - ASSEMBLY.MD STEPS CITE EACH ROW"
 SETTING_TABLE_HEADER = (
     "ROW",
@@ -152,23 +150,43 @@ SETTING_TABLE_HEADER = (
     "CHECK WITH",
 )
 BRACKET_ROW = "1"
-SEAT_ROW = "2"
+CUT_ROW = "2"
+SEAT_ROW = "3"
+ROCK_ROW = "4"
+# The stack step 4 measures at each hanger hole, named in the cut row.
+HANGER_STACK = "S"
 SETTING_TABLE_ROWS = (
     (
         BRACKET_ROW,
         "3",
-        f"{BRACKET_NUMBER} HOLE ON MHA-SM-03 REF STATION",
+        f"{BRACKET_NUMBER} HOLES ON MHA-SM-03 STATIONS",
         "-",
         f"ON STATION ±{_length(BRACKET_STATION_TOL_MM, 3)}",
         "CALIPERS",
     ),
     (
+        CUT_ROW,
+        "4, 4A",
+        "MHA-SM-VN-52 LENGTH UNDER HEAD",
+        f"{HANGER_STACK} = CROSSBAR UNDERSIDE TO WASHER TOP",
+        f"{HANGER_STACK} + {HANGER_FIT_CUT}",
+        "CALIPERS",
+    ),
+    (
         SEAT_ROW,
         "5C, 6H (CHECK 1)",
-        "MHA-SM-02 TOP SEAT ON MHA-FR-02 CROSSBAR",
+        "MHA-SM-02 TOP SEAT ON MHA-FR-02",
         "-",
         f"{_length(SEAT_FEELER_MM, 3)} FEELER ENTERS NOWHERE",
         "FEELER GAUGE",
+    ),
+    (
+        ROCK_ROW,
+        "6G, 7 (CHECK 2)",
+        "MHA-SM-03 BOSS TOP FACE OUTER EDGE",
+        "LEVER LEVEL (ZERO)",
+        f"{ROCK_TRAVEL_MIN} UP AND DOWN",
+        "DIAL INDICATOR",
     ),
 )
 
@@ -255,10 +273,11 @@ ASSEMBLY_STEPS = (
     "BRACKET TAP CALLOUT.",
     f"3C. SET {BRACKET_NUMBER} ASIDE; ITS TWO MHA-MG-VN-53 SCREWS FIX IT AT "
     f"{ha_steps.step_ref('magnifier-bracket-screwed')}.",
-    "4. AT EACH HANGER HOLE MEASURE CROSSBAR UNDERSIDE TO WASHER TOP.",
-    f"4A. CUT AN MHA-SM-VN-52 TO THAT PLUS {HANGER_FIT_CUT} UNDER THE HEAD "
-    f"(DETAIL {DETAIL_LETTER}, SHEET 1: ITS FULL-THREAD REACH INTO THE MHA-SM-02 "
-    "TAP, TIP CLEAR OF THE TAP BOTTOM).",
+    "4. AT EACH HANGER HOLE MEASURE CROSSBAR UNDERSIDE TO WASHER TOP: "
+    f"{HANGER_STACK} ({setting_row(CUT_ROW)}).",
+    f"4A. CUT AN MHA-SM-VN-52 TO {HANGER_STACK} PLUS {HANGER_FIT_CUT} UNDER THE "
+    f"HEAD ({setting_row(CUT_ROW)}): ITS FULL-THREAD REACH INTO THE MHA-SM-02 "
+    "TAP, TIP CLEAR OF THE TAP BOTTOM.",
     "4B. CHAMFER EACH CUT END PER MHA-SM-VN-52.",
     "5. WITHOUT THE LEVER, HANG EACH MHA-SM-02 TOP SEAT UP WITH ITS ROUND HOLE "
     "ON THE DOWEL AT ITS HANGER HOLE.",
@@ -278,11 +297,10 @@ ASSEMBLY_STEPS = (
     "6E. TURN THE REAR MOUNT'S BOLT IN BY HAND (FINGER-TIGHT).",
     "6F. CHECK: EACH TOP RIDGE RESTS UNDER THE TOP OF ITS BORE.",
     "6G. SWING THE REAR MOUNT ABOUT ITS DOWEL UNTIL THE LEVER ROCKS "
-    f"{ROCK_TRAVEL_MIN} (DETAIL {DETAIL_LETTER}) EACH WAY (CHECK 2).",
+    f"{ROCK_TRAVEL_MIN} EACH WAY, {setting_row(ROCK_ROW)} (CHECK 2).",
     "6H. TIGHTEN THE REAR MOUNT'S BOLT UNTIL ITS TOP SEAT IS DRAWN UP FLAT TO "
     "THE CROSSBAR UNDERSIDE (CHECK 1).",
-    f"7. CHECK THE FREE ROCK AGAIN (CHECK 2, DETAIL {DETAIL_LETTER}) BEFORE THE "
-    "COUNTER SPRING GOES ON.",
+    "7. CHECK THE FREE ROCK AGAIN (CHECK 2) BEFORE THE COUNTER SPRING GOES ON.",
     # One line: bond note B names the compound.
     "8. BOND MHA-SM-05 INTO MHA-SM-01 PER BOND NOTE B (MAY BE DONE BEFORE STEP 1).",
     "8A. PASS MHA-SM-VN-56 THROUGH THE UPPER LOOP OF MHA-SM-VN-51.",
@@ -309,9 +327,9 @@ ASSEMBLY_CHECKS = (
     f"({setting_row(SEAT_ROW)}); THE MOUNT DOES NOT TURN ABOUT ITS DOWEL BY "
     "HAND.",
     "2. COUNTER SPRING OFF, THE LEVER ROCKS FREELY ON ITS KNIFE EDGE: THE "
-    f"OUTER EDGE OF THE BOSS TOP FACE MOVES {ROCK_TRAVEL_MIN} "
-    f"(DETAIL {DETAIL_LETTER}) UP AND DOWN FROM LEVEL BEFORE A HEX FLANK "
-    "TOUCHES A BORE.",
+    f"OUTER EDGE OF THE BOSS TOP FACE (DETAIL {DETAIL_LETTER}) MOVES "
+    f"{ROCK_TRAVEL_MIN} UP AND DOWN FROM LEVEL BEFORE A HEX FLANK TOUCHES A "
+    f"BORE ({setting_row(ROCK_ROW)}).",
     "3. THE UPPER LOOP OF MHA-SM-VN-51 TURNS AND SLIDES FREELY ON THE SHOULDER "
     "OF MHA-SM-VN-56, UNDER ITS HEAD.",
     f"4. AFTER STEP 10A THE LEVER PLATE TOP READS {LEVEL_CRITERION} AND THE "
