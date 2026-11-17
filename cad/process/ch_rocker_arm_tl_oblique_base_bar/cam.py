@@ -196,14 +196,14 @@ def context(features: dict[str, Any], plan: dict[str, Any], shop: dict[str, Any]
     cbore_em = _shop_tool(plan, shop, "counterbore")["diameter_mm"]
     rail_drill = _shop_tool(plan, shop, "rail-drill")["diameter_mm"]
     bracket_drill = _shop_tool(plan, shop, "bracket-drill")["diameter_mm"]
-    spot_dia = _cut(plan, "spot R1–R4, B1–B2")["cutter_dia_mm"]
+    spot_dia = _cut(plan, "spot R1–R4")["cutter_dia_mm"]
     spot_depth = CENTRE_DRILL["pilot_length_mm"] + (spot_dia - CENTRE_DRILL["pilot_mm"]) / 2 / math.tan(math.radians(30))
     edge_rpm, edge_feed = _setting(shop, "em-half-hss-6061-v11-wide")
     end_rpm, end_feed = _setting(shop, "em-half-hss-6061-v11-narrow")
     slot_rpm, slot_feed = _setting(shop, "basebar-slot-rough-6061-t6511")
     face_rpm, face_feed = _setting(shop, "basebar-face-6061-t6511")
     _, slot_plunge = _plunge_feed(plan, "S1–S2 corner plunges")
-    spot_rpm, spot_feed = _plunge_feed(plan, "spot R1–R4, B1–B2")
+    spot_rpm, spot_feed = _plunge_feed(plan, "spot R1–R4")
     rail_rpm, rail_feed = _plunge_feed(plan, "R1–R4")
     bracket_rpm, bracket_feed = _plunge_feed(plan, "B1–B2")
     cbore_rpm, cbore_feed = _plunge_feed(plan, "B1–B2 counterbores")
