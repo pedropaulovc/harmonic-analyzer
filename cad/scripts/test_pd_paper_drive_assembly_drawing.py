@@ -2766,7 +2766,7 @@ def test_the_reducer_is_clocked_once_with_an_ordinary_limit() -> None:
     assert "TEST INDICATOR" in body
     # The reducer is accepted on an indicator, not on feelers in the mesh.
     assert (
-        drawing.reducer_dial_check("KNOB", "A TEST INDICATOR ON A MAGNETIC BASE") in body
+        drawing.reducer_dial_check("KNOB") in body
     )
     assert "FEELER ENTERS" not in body
     for method in ("UNCERTAINTY", "RE-ZERO", "RE-CLOCK", "ABSOLUTE", "REJECT"):
@@ -2795,15 +2795,14 @@ def test_the_reducer_dial_window_is_what_a_build_inside_its_drawings_reads() -> 
         for backlash in drawing.mesh_check.reducer_mesh(centre - closure).backlash_mm
         for tip in tips
     ]
-    low, high = drawing.REDUCER_BACKLASH_DIAL_MM
-    division = drawing.REDUCER_DIAL_STEP_MM
-    assert low <= min(readings) < low + division
-    assert high - division < max(readings) <= high
-    for bound in (low, high):
-        assert bound / division == pytest.approx(round(bound / division))
-    assert low >= division - 1e-9
+    step = drawing.REDUCER_DIAL_STEP_MM
+    high = drawing.REDUCER_SHAKE_MAX_MM
+    assert high - step < max(readings) <= high
+    assert high / step == pytest.approx(round(high / step))
+    # "Visibly": the tightest shake moves the dial at least half a division.
+    assert min(readings) >= step / 2.0
     assert drawing.REDUCER_BACKLASH_DIAL_TEXT == (
-        f"{disc.inch_text(low, 4)} TO {disc.inch_text(high, 4)}"
+        f"VISIBLY, AT MOST {disc.inch_text(high, 3)},"
     )
 
 
@@ -2912,7 +2911,7 @@ def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
     # seat, a clean, a knob stack and a disc first; the arm is rebuilt only
     # for a fault that is the same all round, the last branch.
     pose = _step_body("fitup-mesh-remedied")
-    assert drawing.reducer_dial_check("KNOB", "A TEST INDICATOR ON A MAGNETIC BASE") in _step_body(
+    assert drawing.reducer_dial_check("KNOB") in _step_body(
         "fitup-pose-set"
     )
     assert len(drawing._step_text(operating_domain=_unit_operating_domain())["fitup-pose-set"]) == 10

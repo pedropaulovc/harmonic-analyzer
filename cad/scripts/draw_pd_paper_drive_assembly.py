@@ -1797,23 +1797,22 @@ _REDUCER_CIRCULAR_BACKLASH_MM = (
     ).backlash_mm[1],
 )
 _DISC_TIP_RADII_MM = [profile.blank_radius_mm for profile in disc.manufactured_profiles()]
-# The window prints on a .0005 grid, rounded outward.
-REDUCER_DIAL_STEP_MM = 0.0005 * 25.4
-REDUCER_BACKLASH_DIAL_MM = (
-    math.floor(
-        _REDUCER_CIRCULAR_BACKLASH_MM[0] * min(_DISC_TIP_RADII_MM) / (disc.PITCH_DIA / 2.0)
-        / REDUCER_DIAL_STEP_MM + 1e-9
-    ) * REDUCER_DIAL_STEP_MM,
-    math.ceil(
-        _REDUCER_CIRCULAR_BACKLASH_MM[1] * max(_DISC_TIP_RADII_MM) / (disc.PITCH_DIA / 2.0)
-        / REDUCER_DIAL_STEP_MM - 1e-9
-    ) * REDUCER_DIAL_STEP_MM,
+# Read on one of the shop's .001 in dial indicators (shop.toml
+# gauges.dial-indicators): the loosest mesh shakes about 0.19 mm at the tip,
+# past the 1 um lever indicator's 0.14 mm range (gauges.dti, owner
+# 2026-11-17). The ceiling prints on the .001 grid, rounded up; the
+# tightest mesh still shakes most of a division, so "visibly" is its floor.
+REDUCER_DIAL_STEP_MM = 0.001 * 25.4
+REDUCER_SHAKE_MIN_MM = (
+    _REDUCER_CIRCULAR_BACKLASH_MM[0] * min(_DISC_TIP_RADII_MM) / (disc.PITCH_DIA / 2.0)
 )
-if REDUCER_BACKLASH_DIAL_MM[0] < REDUCER_DIAL_STEP_MM - 1e-9:
-    raise AssertionError("the reducer's tightest shake reads under one .0005 step")
-REDUCER_BACKLASH_DIAL_TEXT = " TO ".join(
-    steps.inch_text(bound, 4) for bound in REDUCER_BACKLASH_DIAL_MM
-)
+REDUCER_SHAKE_MAX_MM = math.ceil(
+    _REDUCER_CIRCULAR_BACKLASH_MM[1] * max(_DISC_TIP_RADII_MM) / (disc.PITCH_DIA / 2.0)
+    / REDUCER_DIAL_STEP_MM - 1e-9
+) * REDUCER_DIAL_STEP_MM
+if REDUCER_SHAKE_MIN_MM < REDUCER_DIAL_STEP_MM / 2.0:
+    raise AssertionError("the reducer's tightest shake reads under half a division")
+REDUCER_BACKLASH_DIAL_TEXT = f"VISIBLY, AT MOST {steps.inch_text(REDUCER_SHAKE_MAX_MM, 3)},"
 # The disc is read at stations round one turn: 45 degrees apart sample its
 # once-a-turn tooth-space runout within cos 22.5 (92 %) of its peak. Each
 # move turns the 15T 1.25 turns, so it is read at four phases 90 degrees
@@ -1822,13 +1821,13 @@ REDUCER_BACKLASH_DIAL_TEXT = " TO ".join(
 REDUCER_DIAL_STATIONS = 8
 
 
-def reducer_dial_check(held: str, indicator: str = "THE TEST INDICATOR") -> str:
+def reducer_dial_check(held: str) -> str:
     """The reducer's indicator acceptance, ``held`` naming what the fitter
     holds still (the bare shaft at the trial, the knob on the machine)."""
     return (
         f"CHECK: {held} PRESSED LIGHTLY TOWARD THE DISC AND HELD, THE DISC "
         "PRESSED LIGHTLY TOWARD IT AND ROCKED BY HAND SHAKES "
-        f"{REDUCER_BACKLASH_DIAL_TEXT} ON {indicator}, ITS STYLUS TANGENT "
+        f"{REDUCER_BACKLASH_DIAL_TEXT} ON A DIAL INDICATOR ON A MAGNETIC BASE, ITS PLUNGER TANGENT "
         "ON THE FLANK, AT THE TIP, OF THE DISC TOOTH NEXT TO THE "
         f"{knob_shaft.TEETH}T, AT {REDUCER_DIAL_STATIONS} PLACES "
         f"{360 // REDUCER_DIAL_STATIONS}\u00b0 APART ROUND THE DISC."
@@ -2770,7 +2769,7 @@ def _step_text(
             # The final confirmation reads the doweled reducer as the trial
             # (arm-plate-located) and the doweled re-read (arm-plate-fitted)
             # did, now on the machine (#2417).
-            reducer_dial_check("KNOB", "A TEST INDICATOR ON A MAGNETIC BASE"),
+            reducer_dial_check("KNOB"),
         ),
         # The mesh was proven before the dowels and re-read on them before
         # anything irreversible, so what usually fails here is the plate's
