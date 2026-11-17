@@ -88,6 +88,8 @@ end_cut_tip_z_mm = -1.016        # End cutter .04 in below the bar.
 # .010 finish stock, and Z is skipped because the cutter passes below the
 # underside (edge_cut_tip_z_mm). Without that declaration 4.1 reads 0.127 mm
 # along Z against the 0.1 mm rough limit (prechips 0.11.3, 170 N).
+# The 1/2 in end mill has no helix or axial_ratio source, so axial force stays
+# equal to tangential (owner ruling 2026-11-16, #2873; shop tools.basebar-em-half).
 side_max_stepdown_mm = 7.62
 drill_tip_z_mm = -3.175          # Drill tips .125 in past the underside.
 half_cutter_dia_mm = 12.7        # 1/2 in end mill; also cuts the slots.
@@ -315,6 +317,9 @@ instruction_detailed = "Per bar. Mic the blank at both ends and mid-length: ever
 # 28.448 mm bring it to ~0.0235 mm (force scales with the radial width); side
 # 2 keeps four, 35.052 mm (~0.0217 mm). Main, 2026-11-16: neither the jacks
 # (they take a push, not lift) nor a narrower blank band is credited instead.
+# The Tri Fly has no axial_ratio source (owner ruling 2026-11-16, #2873; shop
+# tools.basebar-trifly), so the configured 1.0 stands and side 1 keeps five:
+# prechips 0.11.4 still refuses four at 0.0288 mm.
 settings = "basebar-trifly-6061-t6511"
 milling_cuts = [
   { name = "side 1 face", kind = "end", phase = "finish", cutter_dia_mm = "{{process.face_cutter_dia_mm}}", flutes = 3, axial_doc_mm = 0.508, radial_woc_mm = 28.448, rpm = 2500, feed_mm_min = 762.0, traverse_mm = [0, "{{cad.blank_length_mm}}"] },

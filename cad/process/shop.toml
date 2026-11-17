@@ -125,6 +125,10 @@ vise_centre_fraction_max = 0.3333
 # 19). No entry states the blade (HA #2084).
 [tools.saw-evolution-14]
 description = "14 in Evolution metal-cutting miter saw"
+# No helix_deg or axial_ratio on the 1/2 in end mills (this one, jig-em-half,
+# block-em-half-long): no catalogue or measurement states a helix, so their
+# cuts keep prechips' configured axial_ratio 1.0 (owner ruling 2026-11-16,
+# #2873).
 [tools.basebar-em-half]
 description = "1/2 in centre-cutting 2-flute end mill; flutes ≥5/8 in"
 diameter_mm = 12.7
@@ -149,6 +153,9 @@ diameter_mm = 7.9375
 # 2 in cutting Ø, three TCGT 32.52 carbide inserts, 3/4 in shank held in the
 # 3/4 in R8 collet. https://www.shrumsolutions.com/product-page/tri-fly and
 # https://www.shrumsolutions.com/general-5 (inserts).
+# No axial_ratio: no source states one, nor the inserts' lead or rake, so its
+# cuts keep prechips' configured 1.0 and the base bar's side 1 keeps five face
+# passes (owner ruling 2026-11-16, #2873; plan Setup 3).
 [tools.basebar-trifly]
 description = "Shrum Tri Fly, 2 in, 3 TCGT 32.52 inserts, 3/4 in shank"
 diameter_mm = 50.8
