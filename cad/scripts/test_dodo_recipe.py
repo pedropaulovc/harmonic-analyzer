@@ -3013,8 +3013,7 @@ def _channel_tree(dodo, monkeypatch, root: Path) -> Path:
 
 def test_channel_spring_variants_ride_the_cache_with_their_stl(tmp_path, monkeypatch):
     # #2801: build_spring exports an STL beside each stretched variant it saves;
-    # undeclared, it was never packed or cleaned, and every reuse of
-    # assembly:ch_channel declined output_set_differs.
+    # undeclared, it was never packed or cleaned.
     dodo = _load_dodo()
     out = _channel_tree(dodo, monkeypatch, tmp_path)
     variants = []
@@ -3032,13 +3031,6 @@ def test_channel_spring_variants_ride_the_cache_with_their_stl(tmp_path, monkeyp
         if stem != "ch_channel" and dodo._assembly_discovered_on_disk(stem)
     ]
     assert set(variants) <= set(dodo._assembly_cache_outputs("ch_channel"))
-    # Judged byte for byte: neither the models nor their STL, whose bytes
-    # SolidWorks writes otherwise run to run (#2737).
-    sldasm = Path(dodo._sldasm("ch_channel"))
-    assert dodo._assembly_judged_sidecars("ch_channel") == (
-        sldasm.parent / ".ch_channel.massprops.sha",
-        sldasm.parent / ".ch_channel.dof.json",
-    )
     # Cleaning the assembly removes them with the rest.
     removed: list[Path] = []
     monkeypatch.setattr(dodo, "_force_remove", removed.append)
@@ -3069,55 +3061,6 @@ def test_a_channel_archive_without_the_spring_stl_still_restores(tmp_path, monke
     assert sldasm.read_bytes() == b"the archive's assembly"
     assert variant.read_bytes() == b"the archive's spring"
     assert not stale.exists()
-
-
-class _Attempted(Exception):
-    """Raised by a fake reuse attempt once it has seen its build."""
-
-
-def test_a_channel_reuse_on_a_clean_tree_declares_its_spring_variants_by_glob(
-    tmp_path, monkeypatch
-):
-    # A clean farm worker holds no spring variant at build start, so the
-    # inventory lists none: the reuse attempt gets the globs it is taken with,
-    # matched against the base archive's members. No other assembly has any.
-    dodo = _load_dodo()
-    out = _channel_tree(dodo, monkeypatch, tmp_path)
-    monkeypatch.setattr(dodo._replay_shadow, "OUT_ROOT", out)
-    others = [s for s in dodo.ASSEMBLY_ORDER if s != "ch_channel"]
-    assert others and not [s for s in others if dodo._assembly_discovered_outputs(s)]
-    attempted = []
-
-    @contextlib.contextmanager
-    def attempt(part):
-        attempted.append(part)
-        raise _Attempted
-        yield
-
-    monkeypatch.setattr(dodo._replay_shadow, "reuse_attempt", attempt)
-    monkeypatch.setattr(dodo, "_assembly_file_deps", lambda _stem: [])
-    monkeypatch.setattr(dodo, "_cache_key", lambda *_a: "k" * 64)
-    monkeypatch.setattr(dodo, "_probe_cache", lambda *_a: "miss")
-    monkeypatch.setattr(dodo._farm, "enabled", lambda: False)
-    monkeypatch.setattr(dodo, "explode_plan", lambda _stem: SimpleNamespace(closure=()))
-    with pytest.raises(_Attempted):
-        dodo.build_or_refresh("ch_channel", [], [], [])
-    [part] = attempted
-    assert part.discovered == dodo._CHANNEL_SPRING_VARIANTS
-    assert not [path for path in part.outputs if _SPRING_VARIANT in path.name]
-    # The archive's variants and their STL are declared, as SolidWorks names
-    # them in any case; neither the spring part itself (its own task's) nor
-    # anything below a variant's name is.
-    nested = f"sldprt/{_SPRING_VARIANT}00/nested.sldprt"
-    spring = "sldprt/ch-vn-channel-spring-installed.sldprt"
-    members = [
-        f"sldprt/{_SPRING_VARIANT}00.sldprt",
-        f"stl/{_SPRING_VARIANT}11.stl",
-        spring,
-        nested,
-    ]
-    undeclared = dodo._replay_shadow._undeclared(part.outputs, members, part.discovered)
-    assert undeclared == sorted([spring, nested])
 
 
 def test_digest_files_is_location_independent(tmp_path):
