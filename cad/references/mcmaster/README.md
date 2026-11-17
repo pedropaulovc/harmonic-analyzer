@@ -27,24 +27,24 @@ recipes:
 | 6793K17 | `pd-transgear-removable` T24 (shop-reworked blank) | Steel ANSI #25 Plain-Bore Sprocket, 24 Teeth |
 | 90114A124 | `ms-vn-stop-plate-screw`; `pd-vn-platen-clip-screw` until 2026-10-15 (catalogue-only; no vendor model) | Brass Fillister Head Slotted Screw |
 | 90114A511 | `sh-vn-brass-fillister-screw` (MHA-SH-VN-51; shared by dt, fr and pd) | Brass Fillister Head Slotted Screw |
-| 90126A211 | — (diagnostic recipe; the former `vn-knife-hanger-washer`, retired) | Zinc-Plated Steel SAE Washer |
+| 90126A211 | — (the former `vn-knife-hanger-washer`, retired; diagnostic recipe removed 2026-11-16, #2886) | Zinc-Plated Steel SAE Washer |
 | 90145A299 | `sh-vn-pivot-pin` (MHA-SH-VN-58, `RodPin` and `BarPin`; catalogue-only; no vendor model) | 18-8 Stainless Steel Dowel Pin |
 | 90145A414 | `pd-vn-transgear-collar-flat-pin` (MHA-PD-VN-70; catalogue-only; no vendor model) | 18-8 Stainless Steel Dowel Pin |
 | 90231A116 | `ch-rocker-arm-tl-vn-oblique-hub-washer` (MHA-CH-06-TL-VN-85; catalogue-only, the vendor STEP is evidence only) | Brass SAE Washer for Number 8 Screw Size |
 | 90280A108 | `sh-vn-fillister-screw-90280a108` (MHA-SH-VN-52; shared by the dt foot and swing-stop roles and the pd latch-hook screws) | Steel Narrow Fillister Head Slotted Screw |
-| 90280A194 | — (diagnostic recipe; a former `ch-vn-frame-side-screw`) | Steel Narrow Fillister Head Slotted Screw |
+| 90280A194 | — (a former `ch-vn-frame-side-screw`; diagnostic recipe removed 2026-11-16, #2886) | Steel Narrow Fillister Head Slotted Screw |
 | 90280A196 | `ch-vn-bracket-hold-down-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A197 | `dt-vn-pedestal-hold-down-screw` | Steel Narrow Fillister Head Slotted Screw |
-| 90280A199 | — (diagnostic recipe; a former `dt-vn-swing-stop-screw`) | Steel Narrow Fillister Head Slotted Screw |
+| 90280A199 | — (a former `dt-vn-swing-stop-screw`; diagnostic recipe removed 2026-11-16, #2886) | Steel Narrow Fillister Head Slotted Screw |
 | 90280A201 | `sh-vn-clamp-screw` (MHA-SH-VN-53; shared by mg and pd) | Steel Narrow Fillister Head Slotted Screw |
 | 90280A203 | `dt-vn-slotted-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A837 | `fr-vn-frame-cross-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90480A009 | `pn-vn-pen-hanger-nut` (catalogue-only; no vendor model) | Low-Strength Zinc-Plated Steel Hex Nut |
 | 90760A009 | `pn-vn-pen-hanger-jam-nut` (catalogue-only; no vendor model) | Zinc-Plated Steel Narrow-Profile Hex Nut |
 | 90760A140 | — (`sm-vn-boss-hook-jam-nut` MHA-SM-VN-55 until 2026-11-09; retired) | Zinc-Plated Steel Narrow-Profile Hex Nut |
-| 91247A720 | — (diagnostic recipe; a former `sm-vn-knife-hanger-stud`) | Medium-Strength Grade 5 Steel Hex Head Screw |
+| 91247A720 | — (a former `sm-vn-knife-hanger-stud`; diagnostic recipe removed 2026-11-16, #2886) | Medium-Strength Grade 5 Steel Hex Head Screw |
 | 91251A108 | `dt-vn-cone-tip-block-screw` (catalogue-only; no vendor model) | Black-Oxide Alloy Steel Socket Head Screw |
-| 91251A157 | — (catalogue-only diagnostic recipe; former `sm-vn-knife-hanger-stud`) | Black-Oxide Alloy Steel Socket Head Screw |
+| 91251A157 | — (former `sm-vn-knife-hanger-stud`; catalogue-only diagnostic recipe removed 2026-11-16, #2886) | Black-Oxide Alloy Steel Socket Head Screw |
 | 91251A188 | — (retired TL-VN-63, 2026-10-23; former catalogue-only diagnostic recipe removed) | Black-Oxide Alloy Steel Socket Head Screw |
 | 91251A196 | `ch-rocker-arm-tl-vn-oblique-bracket-screw` (MHA-CH-06-TL-VN-62, 8 in the final A″ stack: 4 KP08-to-bracket + 4 bracket-to-bar; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Socket Head Screw |
 | 91251A197 | `ch-rocker-arm-tl-vn-oblique-rail-screw` (MHA-CH-06-TL-VN-61, 19 in the final A″ stack: 16 rail + 3 CL/CR/HUB clamps; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Socket Head Screw |
@@ -57,8 +57,8 @@ recipes:
 | 98055A118 | — (retired TL-VN-79 source with 98055A117/98055A121, 2026-10-31; now Huyett SHIM-0375-004/-008/-020, issue #290) | DIN 988 Spring Steel Shim, 10 × 16 × 0.2 |
 | 2281A11-6410N695 | — (retired TL-VN-80 source, 2026-10-31; then 23065A855-23065A4, issue #290) | Class Z Minus Gauge Pin, Ø10.2000, 2 in supply |
 | 23065A855-23065A4 | — (retired TL-VN-80 source, 2026-11-06: TL-VN-80 retired; no recipe) | Class Z NO-GO Plug Gauge, .4000 in, 2 in supply |
-| 91255A106 | — (diagnostic recipe; a former `pd-vn-guide-lock-screw`) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
-| 91255A148 | — (diagnostic recipe; a former `dt-vn-cone-tip-block-screw`) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
+| 91255A106 | — (a former `pd-vn-guide-lock-screw`; diagnostic recipe removed 2026-11-16, #2886) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
+| 91255A148 | — (a former `dt-vn-cone-tip-block-screw`; diagnostic recipe removed 2026-11-16, #2886) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
 | 91255A150 | — (retired TL-VN-65, 2026-11-06; the KP08 screws are now 91251A196, TL-VN-62; diagnostic recipe removed) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
 | 91251A150 | — (retired TL-VN-65 source, 2026-11-04; now 91255A150, whose larger head covers the uxcell KP08's Ø5 hole; diagnostic recipe removed) | Black-Oxide Alloy Steel Socket Head Screw |
 | 91290A168 | `ch-rocker-arm-tl-vn-oblique-carriage-screw` (MHA-CH-06-TL-VN-64; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Socket Head Screw |
@@ -66,7 +66,7 @@ recipes:
 | 90325A174 | `pd-vn-transgear-pivot-screw` (catalogue-only; CAD download refused) | 18-8 Stainless Steel Precision Shoulder Screw, hex socket |
 | 91375A106 | `sh-vn-arbor-set-screw` (MHA-SH-VN-54; shared by ch, dt and pn) | Alloy Steel Cup-Tip Set Screw |
 | 91375A942 | `ch-vn-fulcrum-set-screw` (catalogue-only; no vendor model) | Alloy Steel Cup-Tip Set Screw |
-| 91410A538 | — (diagnostic recipe; `fr-vn-gooseneck-set-screw` until 2026-10-12) | Steel Square-Head Cup-Point Set Screw |
+| 91410A538 | — (`fr-vn-gooseneck-set-screw` until 2026-10-12; diagnostic recipe removed 2026-11-16, #2886) | Steel Square-Head Cup-Point Set Screw |
 | 91410A540 | `fr-vn-gooseneck-set-screw` (catalogue-only; no vendor model) | Steel Square-Head Cup-Point Set Screw |
 | 91595A452 | — (retired TL-VN-53 source, 2026-10-31; now 98381A542, issue #290; diagnostic recipe removed) | Dowel Pin |
 | 98381A542 | — (retired TL-VN-53, 2026-11-07: the CL end clamp takes the common 91251A197; catalogue-only diagnostic removed) | Alloy Steel Dowel Pin |
@@ -86,20 +86,20 @@ recipes:
 | 92443A077 | `dt-vn-keeper-chain-screw` (MHA-DT-VN-70; catalogue-only, no vendor model) | Brass Binding Head Slotted Screw |
 | 92446A077 | `pd-vn-platen-clip-screw` (catalogue-only; no vendor model) | Brass Pan Head Slotted Screw |
 | 91882A221 | `sh-vn-thumb-screw` (MHA-SH-VN-55; shared by mg and ms) | Steel Raised Knurled-Head Thumb Screw |
-| 91882A425 | — (diagnostic recipe; `dt-vn-cone-lock-knob` until 2026-09-29) | Steel Raised Knurled-Head Thumb Screw |
+| 91882A425 | — (`dt-vn-cone-lock-knob` until 2026-09-29; diagnostic recipe removed 2026-11-16, #2886) | Steel Raised Knurled-Head Thumb Screw |
 | 9275K141 | `fr-vn-tube-frame-cap` | Metal Round Cap |
 | 92671A005 | `mg-vn-wheel-axle-nut` (catalogue-only; no vendor model) | Brass Hex Nut |
 | 92671A115 | `pn-vn-pen-adjust-nut` (catalogue-only; no vendor model) | Brass Hex Nut |
 | 9414T1 | — (the purchased cone-tip collar, category MHA-VN-016, now MHA-DT-VN-54, until the 2026-10-08 terminal redesign) | Set Screw Shaft Collar for 1/16" Diameter |
 | 94355A213 | — (the set screw of `dt-vn-cone-tip-collar`, MHA-DT-VN-54, fitted as supplied; retired with the collar 2026-11-09, owner decision C1 keyed, PR #1992) | 18-8 Stainless Steel Flat-Tip Set Screw, #2-56 x 5/16" |
-| 92865A585 | — (diagnostic recipe; former `vn-hex-bolt`, MHA-VN-008 retired) | Medium-Strength Grade 5 Steel Hex Head Screw |
+| 92865A585 | — (former `vn-hex-bolt`, MHA-VN-008 retired; diagnostic recipe removed 2026-11-16, #2886) | Medium-Strength Grade 5 Steel Hex Head Screw |
 | 92916A250 | `mg-vn-wheel-axle-front-washer` (catalogue-only; no vendor model) | Brass Washer for Number 4 Screw Size |
 | 96659A104 | `sm-vn-knife-hanger-washer` (MHA-SM-VN-54; catalogue-only, no vendor model) | 18-8 Stainless Steel SAE Washer for Number 10 Screw Size |
 | 92916A480 | `mg-vn-wheel-axle-back-washer` (catalogue-only; no vendor model) | Brass Washer for Number 10 Screw Size |
-| 93075A194 | — (diagnostic recipe; `pn-vn-hanger-screw` until the 2026-10-14 through-strap nut stack) | Low-Strength Zinc-Plated Steel Hex Head Screw |
+| 93075A194 | — (`pn-vn-hanger-screw` until the 2026-10-14 through-strap nut stack; diagnostic recipe removed 2026-11-16, #2886) | Low-Strength Zinc-Plated Steel Hex Head Screw |
 | 93075A199 | `pn-vn-hanger-screw` | Low-Strength Zinc-Plated Steel Hex Head Screw |
 | 93585A190 | `dt-vn-cone-lock-knob` | Stainless Steel High-Profile Knurled-Head Thumb Screw |
-| 94025A150 | — (diagnostic recipe; `dt-vn-cone-tip-adjuster` until drawing-guidelines.md rule 18 (thread engagement) E11) | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
+| 94025A150 | — (`dt-vn-cone-tip-adjuster` until drawing-guidelines.md rule 18 (thread engagement) E11; diagnostic recipe removed 2026-11-16, #2886) | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
 | 94025A164 | — (retired MHA-DT-VN-55 `dt-vn-cone-tip-adjuster`, 2026-11-09, owner decision C1 keyed, PR #1992: the MHA-DT-39 end screw replaces it; diagnostic recipe removed) | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
 | 94773A606 | `pd-vn-transgear-cluster-shim` (MHA-PD-VN-68; catalogue-only, no vendor model) | Shim for Shortening Screw Shoulders, 18-8 Stainless Steel, 1/8" Shoulder |
 | 93600A189 | — (retired 2026-11-02, #290: MHA-PD-VN-64 takes 98381A435; recipe removed) | Passivated 316 Stainless Steel ISO 2338-m6 Dowel Pin |
@@ -109,7 +109,7 @@ recipes:
 | 9715K43 | `pd-vn-transgear-pivot-spring` (catalogue-only; no vendor model) | Curved Disc Spring |
 | 97431A240 | `pd-vn-transgear-retaining-ring` (catalogue-only; CAD download refused) | Side-Mount External Retaining Ring |
 | 97431A260 | — (retired 2026-10-31, #290: the 1/8 in pin takes 97431A240; replica recipe removed) | Side-Mount External Retaining Ring |
-| 98296A026 | — (diagnostic recipe; former `vn-transgear-collar-cross-pin`, MHA-VN-037 retired) | 1050-1095 Spring Steel Slotted Spring Pin |
+| 98296A026 | — (former `vn-transgear-collar-cross-pin`, MHA-VN-037 retired; diagnostic recipe removed 2026-11-16, #2886) | 1050-1095 Spring Steel Slotted Spring Pin |
 | 98296A027 | `dt-vn-pinion-strap-pin` | 1050-1095 Spring Steel Slotted Spring Pin |
 | 98296A031 | `pd-vn-transgear-knob-cup-pin` | 1050-1095 Spring Steel Slotted Spring Pin |
 | 98381A416 | `pd-vn-transgear-hub-key-pin` (MHA-PD-VN-69; catalogue-only; no vendor model) | Alloy Steel Dowel Pin |
@@ -538,7 +538,7 @@ Live catalogue verification on October 12, 2026:
   them with the 19.05 mm length, and `diag_build_91410A540.py` builds it
   with the law it shares with 91410A538
   (`diag_mcmaster_square_set_screw.py`). It is catalogue-only: no replica
-  gate. `diagnostics.diag_build_91410A538` stays as a diagnostic recipe.
+  gate. The `diagnostics.diag_build_91410A538` recipe was removed on 2026-11-16 (#2886).
 
 Live catalog verification on October 11, 2026:
 
@@ -659,7 +659,7 @@ Live catalogue verification on October 10, 2026:
   #4-40 tap left too thin a drawing-guidelines.md rule 17 (walls and webs) ligament under the keeper foot. The head
   and thread are the 91794A077/91794A078 rows', so the shared fillister recipe builds it
   from the length alone; no vendor SLDPRT has been harvested for it.
-  `diagnostics.diag_build_90280A194` stays as a diagnostic recipe.
+  The `diagnostics.diag_build_90280A194` recipe was removed on 2026-11-16 (#2886).
 
 Live catalog verification on October 16, 2026:
 
@@ -920,7 +920,7 @@ Catalog specifications checked on September 10, 2026:
   403): #6-32 UNC-3A, right hand, flat tip, head Ø0.262 in x 0.073 in, 5/64
   hex drive, 1/2 in under the head, fully threaded, 140 ksi, ASME B18.3 /
   ASTM F835. The catalog fixes the identity; the geometry is the vendor
-  model's own. `diag_build_91255A148.py` replays the dimensions and solved
+  model's own. `diag_build_91255A148.py` (removed 2026-11-16, #2886) replayed the dimensions and solved
   sketch geometry read from `91255A148.SLDPRT` (the read-only dump
   `cad/out/reports/mcmaster-91255A148-dump.json`): the 7/64 flat top and
   R3.941216 dome, the 10 deg edge band and its R0.09271 fillets, the 5/64
@@ -1023,7 +1023,7 @@ Catalog specifications checked on September 10, 2026:
   Each screw dropped through the MHA-FR-02 crossbar counterbore and seated
   directly on its floor, threading into the MHA-SM-02 mount's top seat.
   That route had replaced the 1/2-13 hex bolt 91247A720 and washer 90126A211;
-  all three SKUs remain historical/diagnostic records, not current hanger
+  all three SKUs remain historical records (recipes removed 2026-11-16, #2886), not current hanger
   hardware. The product page was read live in October 2026: black-oxide
   alloy steel socket head screw, 6-32 UNC class 3A, right hand, 1-1/2 in
   under the head, partially threaded with a 3/4 in minimum thread length,
@@ -1182,16 +1182,15 @@ Catalog specifications checked on September 10, 2026:
   head hex drive screw, #4-40 UNC class 3A, right hand, 1/4 in under the
   head, fully threaded, flat tip, standard-profile head Ø0.213 in x 0.059 in,
   1/16 in hex drive, 140 ksi, Rockwell C39, ASME B18.3 / ASTM F835. The page
-  gives nothing else, so `diagnostics/diag_mcmaster_button_head.py` and
-  `_button_head_dimensions.py` carry the 91255A148 vendor-measured laws over
-  in proportion: flat top 7/5 of the hex, band 0.15 of the head height at
-  10 deg, fillets 0.05, socket floor 0.55, the 60 deg countersink.
-  `_mcmaster_91255a106.py` holds its SKU dimensions. It is catalogue-only: no
-  vendor model is downloaded or kept here, so it has no replica gate, and its
-  standalone diagnostic is a catalog-only run. Lost: 91255A105 (3/16 in;
+  gives nothing else, so its button-head family builder carried the
+  91255A148 vendor-measured laws over in proportion: flat top 7/5 of the hex,
+  band 0.15 of the head height at 10 deg, fillets 0.05, socket floor 0.55, the
+  60 deg countersink. The SKU recipe, its `_mcmaster_91255a106.py` dimensions,
+  the family builder and `_button_head_dimensions.py` were removed with the
+  orphaned replicas on 2026-11-16 (#2886). Lost: 91255A105 (3/16 in;
   shortens the lock stack) and
   18-8 stainless 92949A106 (same head and length, 70 ksi, Rockwell B55;
-  the alloy screw matches the 91255A148 family whose laws the recipe uses).
+  the alloy screw matches the 91255A148 family whose laws the recipe used).
 - 91255A108 (`pd-vn-guide-lock-screw` from ruling R9-48 until October 11, 2026)
   replaced 91255A106: the 1/4 in screw engaged only 1.26D of the guide's
   blind tap at the worst case, so the guide's lock receivers became through
@@ -1214,12 +1213,12 @@ Catalog specifications checked on September 10, 2026:
   0.062-0.065 in hole. It is pressed through the knob cup and the knob
   shaft's journal in a hole match-drilled at assembly. No vendor SLDPRT has
   been harvested for it yet.
-- The three spring pins have separate data in `_mcmaster_98296a026.py`,
-  `_mcmaster_98296a027.py` and `_mcmaster_98296a031.py`, passed to
+- The spring pins have separate data in `_mcmaster_98296a027.py` and
+  `_mcmaster_98296a031.py`, passed to
   `diagnostics/diag_mcmaster_spring_pin.py`. The shared recipe models each
   as installed, a 1/16 in tube with the catalog wall, without slot or
-  chamfer; `diag_build_98296A026.py`, `diag_build_98296A027.py` and
-  `diag_build_98296A031.py` are its per-size runs.
+  chamfer; `diag_build_98296A027.py` and `diag_build_98296A031.py` are its
+  per-size runs (the 98296A026 run and data were removed on 2026-11-16, #2886).
 - [98381A417](https://www.mcmaster.com/98381A417/) (`dt-vn-locating-pin`,
   MHA-DT-VN-69, quantity one; rule-23 retention, owner ruling 2026-11-07,
   MHA-DT-00 rubric sample, PR #2248) was read live on November 7,

@@ -8,7 +8,6 @@ from types import SimpleNamespace
 import pytest
 
 from diagnostics import diag_mcmaster_lib as diag
-from diagnostics.diag_build_91247A720 import logo_ring_profile
 from diagnostics.diag_build_99607A213 import flare_profile
 from diagnostics.sketch_profile import Line
 
@@ -207,29 +206,21 @@ class _WeldedSeat:
         )
 
 
-@pytest.mark.parametrize(
-    ("label", "profile", "loops"),
-    [("flare lens", flare_profile, 1), ("logo ring", logo_ring_profile, 2)],
-)
-def test_a_profile_authors_fully_on_a_seat_that_refuses_every_merge(
-    label: str, profile, loops: int
-) -> None:
+def test_a_profile_authors_fully_on_a_seat_that_refuses_every_merge() -> None:
     """Closure must not depend on a relation a welded pair can only refuse.
 
-    Both real profiles are exercised because both really failed: the 2-segment
-    flare lens and the 9-segment logo ring, which between them cover a pair
-    count of 2 and of 9 and every line/arc adjacency the fleet authors.
+    The production flare lens is exercised because it really failed.
 
     The seat refuses every merge, so this passes only while the authoring path
     asks for none.  Reinstating the merge loop turns the first refusal into a
     ``RuntimeError`` out of ``check()`` and fails this test -- which is what
     happened on the farm.
     """
-    segments = profile()
+    segments = flare_profile()
 
     ids = asyncio.run(
-        diag.draw_closed_profile(adapter := _WeldedSeat(), segments, label=label,
-                                 loops=loops)
+        diag.draw_closed_profile(adapter := _WeldedSeat(), segments,
+                                 label="flare lens", loops=1)
     )
 
     assert len(ids) == len(segments)

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import dataclasses
 import math
 
 import pytest
@@ -19,7 +18,6 @@ import pn_vn_hanger_screw_spec as spec
 from _fastener_catalog import FASTENERS
 from _hole_spec import THREAD_MAJOR_MM
 from _test_stock_recipes import discovered_recipes
-from diagnostics import diag_build_93075A194 as family_source
 from diagnostics import diag_build_93075A199 as recipe
 from diagnostics import diag_mcmaster_hex_head as family
 from diagnostics import diag_mcmaster_lib
@@ -102,7 +100,7 @@ class _Recorder:
         self.currentModel.__dict__["FeatureManager"] = _Obj("fm")
 
     def log(self, name: str, args=(), kwargs=None) -> None:
-        self.events.append((name, _norm(args), _norm(kwargs or {})))
+        self.events.append((name, tuple(args), dict(kwargs or {})))
 
     async def _async(self, name: str, *args, **kwargs):
         self.log(name, args, kwargs)
@@ -119,38 +117,6 @@ class _Recorder:
 
     async def create_extrusion(self, *args):
         return await self._async("create_extrusion", *args)
-
-
-def _norm(value):
-    if isinstance(value, float):
-        return _Float(value)
-    if dataclasses.is_dataclass(value) and not isinstance(value, type):
-        return (type(value).__name__, _norm(dataclasses.asdict(value)))
-    if isinstance(value, dict):
-        return tuple(sorted((k, _norm(v)) for k, v in value.items()))
-    if isinstance(value, (list, tuple)):
-        return tuple(_norm(v) for v in value)
-    if isinstance(value, _Recorder):
-        return "adapter"
-    return (
-        value if isinstance(value, (int, str, bool, type(None))) else repr(type(value))
-    )
-
-
-class _Float(float):
-    """Compares equal within 1e-12 relative: 93075A194 types its frame
-    (4.953) where the family computes it ((12.7 - 2.794) / 2)."""
-
-    def __eq__(self, other) -> bool:
-        if not isinstance(other, float):
-            return NotImplemented
-        return abs(self - other) <= 1e-12 * max(1.0, abs(self), abs(other))
-
-    def __ne__(self, other) -> bool:
-        equal = self.__eq__(other)
-        return equal if equal is NotImplemented else not equal
-
-    __hash__ = float.__hash__
 
 
 def _record(monkeypatch, author) -> list[tuple]:
@@ -175,13 +141,12 @@ def _record(monkeypatch, author) -> list[tuple]:
         yield
         adapter.log("no_sketch_inference.exit")
 
-    for module in (family_source, family):
-        monkeypatch.setattr(module, "check", logger("check", True))
-        monkeypatch.setattr(module, "name_last_feature", logger("name_last_feature"))
-        monkeypatch.setattr(module, "volume_check", async_logger("volume_check"))
-        monkeypatch.setattr(module, "insert_helix", logger("insert_helix"))
-        monkeypatch.setattr(module, "offset_plane", logger("offset_plane"))
-        monkeypatch.setattr(module, "thread_sweep_cut", logger("thread_sweep_cut"))
+    monkeypatch.setattr(family, "check", logger("check", True))
+    monkeypatch.setattr(family, "name_last_feature", logger("name_last_feature"))
+    monkeypatch.setattr(family, "volume_check", async_logger("volume_check"))
+    monkeypatch.setattr(family, "insert_helix", logger("insert_helix"))
+    monkeypatch.setattr(family, "offset_plane", logger("offset_plane"))
+    monkeypatch.setattr(family, "thread_sweep_cut", logger("thread_sweep_cut"))
     monkeypatch.setattr(_sketch, "add_line_chain", async_logger("add_line_chain"))
     monkeypatch.setattr(_com, "_early_bound", lambda obj, _iface: obj)
     monkeypatch.setattr(_com, "_read_member", lambda obj, name: getattr(obj, name))
@@ -203,25 +168,6 @@ def _record(monkeypatch, author) -> list[tuple]:
     asyncio.run(author(adapter))
     adapter.log("_mcm_com_map", tuple(adapter._mcm_com_map(["x", "y", "z"])))
     return adapter.events
-
-
-def test_family_builder_replays_93075A194_call_for_call(monkeypatch) -> None:
-    """The proof the family laws are 93075A194's: at that screw's dimensions
-    the shared builder issues exactly the calls its replica-gated recipe does."""
-    dims = family.HexHeadScrew(
-        part_no="93075A194",
-        major_dia=2.0 * family_source.HX_MAJOR_R,
-        pitch=family_source.HX_PITCH,
-        length=family_source.HX_LEN,
-        head_af=family_source.HX_HW,
-        head_h=family_source.HX_HH,
-    )
-    source_calls = _record(monkeypatch, family_source.build_93075A194)
-    family_calls = _record(
-        monkeypatch, lambda adapter: family.build_hex_head_screw(adapter, dims)
-    )
-    assert len(source_calls) > 40
-    assert family_calls == source_calls
 
 
 def test_93075A199_is_the_family_at_its_catalogue_dimensions(monkeypatch) -> None:

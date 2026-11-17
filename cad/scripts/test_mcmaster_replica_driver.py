@@ -1,51 +1,11 @@
-"""Offline contracts for the McMaster replica driver (diag_build_mcmaster.py).
-
-91255A148, a #6-32 button head MHA-DT-VN-60 once used, stays in the replica
-fleet only; these driver tests keep using it as the example local-only part.
-"""
+"""Offline contracts for the McMaster replica driver (diag_build_mcmaster.py)."""
 
 from __future__ import annotations
 
 import asyncio
-import re
 from pathlib import Path
 
 import pytest
-
-from _test_stock_recipes import discovered_recipes
-
-
-def test_91255A148_is_a_diagnostic_recipe_only() -> None:
-    """MHA-DT-VN-60 is now 91251A108; no production builder imports the old
-    button head, which stays registered for the replica fleet."""
-    from diagnostics import diag_build_mcmaster as driver
-
-    scripts = Path(__file__).resolve().parent
-    importer = re.compile(r"diag_build_91255A148\s+import|import\s+diag_build_91255A148")
-    users = [
-        path.name
-        for path in scripts.glob("build_*.py")
-        if importer.search(path.read_text(encoding="utf-8"))
-    ]
-    assert users == []
-    assert "91255A148" in driver.REGISTRY
-    assert "91255A148" in discovered_recipes()
-
-
-def test_retired_front_pin_is_not_selected_but_rear_cup_pin_is(monkeypatch) -> None:
-    from diagnostics import diag_build_mcmaster as driver
-
-    assert "98296A026" not in driver.REGISTRY
-    assert "98296A026" not in discovered_recipes()
-    assert "98296A031" in driver.REGISTRY
-    assert "98296A031" in discovered_recipes()
-    monkeypatch.setattr(driver.sys, "argv", ["diag_build_mcmaster.py", "--all"])
-    selected = driver._selected_parts()
-    assert "98296A031" in selected
-    assert "98296A026" not in selected
-    monkeypatch.setattr(driver.sys, "argv", ["diag_build_mcmaster.py", "98296A026"])
-    with pytest.raises(SystemExit, match="no builder for: 98296A026"):
-        driver._selected_parts()
 
 
 def test_replica_driver_names_a_missing_local_vendor_file(
@@ -57,15 +17,15 @@ def test_replica_driver_names_a_missing_local_vendor_file(
 
     monkeypatch.setattr(driver, "MCMASTER_DIR", tmp_path / "mcmaster")
     monkeypatch.setattr(driver, "REPORTS_DIR", tmp_path / "reports")
-    why = driver._missing_inputs("91255A148")
+    why = driver._missing_inputs("90280A108")
     assert "vendor SLDPRT not present locally" in why
-    assert "https://www.mcmaster.com/91255A148/" in why
+    assert "https://www.mcmaster.com/90280A108/" in why
     (tmp_path / "mcmaster").mkdir()
-    (tmp_path / "mcmaster" / "91255A148.SLDPRT").write_bytes(b"")
-    assert "no harvest" in driver._missing_inputs("91255A148")
+    (tmp_path / "mcmaster" / "90280A108.SLDPRT").write_bytes(b"")
+    assert "no harvest" in driver._missing_inputs("90280A108")
     (tmp_path / "reports").mkdir()
-    (tmp_path / "reports" / "mcmaster-91255A148-dump.json").write_text("{}")
-    assert driver._missing_inputs("91255A148") is None
+    (tmp_path / "reports" / "mcmaster-90280A108-dump.json").write_text("{}")
+    assert driver._missing_inputs("90280A108") is None
 
 
 def test_replica_driver_skips_missing_parts_under_all(monkeypatch) -> None:
@@ -79,11 +39,11 @@ def test_replica_driver_skips_missing_parts_under_all(monkeypatch) -> None:
 
     monkeypatch.setattr(driver, "run_replica", fake_replica)
     monkeypatch.setattr(
-        driver, "_missing_inputs", lambda p: "absent" if p == "91255A148" else None
+        driver, "_missing_inputs", lambda p: "absent" if p == "90280A108" else None
     )
     monkeypatch.setattr(driver.sys, "argv", ["diag_build_mcmaster.py", "--all"])
     asyncio.run(driver.build(None))
-    assert "91255A148" not in ran and len(ran) == len(driver.REGISTRY) - 1
-    monkeypatch.setattr(driver.sys, "argv", ["diag_build_mcmaster.py", "91255A148"])
-    with pytest.raises(SystemExit, match="91255A148: absent"):
+    assert "90280A108" not in ran and len(ran) == len(driver.REGISTRY) - 1
+    monkeypatch.setattr(driver.sys, "argv", ["diag_build_mcmaster.py", "90280A108"])
+    with pytest.raises(SystemExit, match="90280A108: absent"):
         asyncio.run(driver.build(None))
