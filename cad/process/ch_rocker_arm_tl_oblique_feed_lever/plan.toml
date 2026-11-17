@@ -6,13 +6,14 @@
 # 2026-11-13, Pedro, post-v49; the hand sheet's Ø.344 5/16 clearance put the
 # drill under its minimum). 2026-11-14 blind traveler review: the saw holds the
 # 11.8 ±.1 length, so the grip end stays saw-cut (no second vise setup); all
-# spindle work in the high belt range; drill tip .2 past the bottom face.
+# spindle work on the low belt (100–2800 rpm, no belt change); drill tip .2
+# past the bottom face.
 title = "Oblique trammel feed lever"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "6061-T6511 aluminium"
 stock = "{{process.blank_thickness_in:fraction}} × {{process.blank_width_in:fraction}} × 24 in bar (OnlineMetals 1165, shared with TL-28); {{process.quantity:d}} × {{process.blank_length_in:.2f}} in blank."
-note = "Inches. Only ZERO END, two holes and two grip-end corners are machined; the grip end stays saw-cut; 1/2 and 1 in faces as bought (reference). All spindle work in the high belt range."
+note = "Inches. Only ZERO END, two holes and two grip-end corners are machined; the grip end stays saw-cut; 1/2 and 1 in faces as bought (reference). All spindle work on the low belt, 100–2800 rpm; no belt change."
 shop = "../shop.toml"
 material_key = "6061-t6511"
 

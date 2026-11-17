@@ -557,10 +557,12 @@ diameter, speed and feed from the part's `features.toml`, its `plan.toml` and
 the recipe. The driver writes the recipe's context to a JSON job spec and runs
 headless FreeCAD (`freecadcmd` 1.1+, from `$HARMONIC_FREECAD` or the newest
 discovered `FreeCAD <version>` install; it fails loud when there is none) on
-`_freecad_cam_runtime.py`, which builds one CAM Job per program and posts it
-with FreeCAD's `grbl` post. The driver then checks every file against the
-recipe's `expectations` (`_gcode`), logs each program's cutting /
-air-at-feed / rapid minutes, and writes `cad/out/nc/<stem>/cycle_times.json`
+`_freecad_cam_runtime.py`, which builds one CAM Job per program section (one
+tool per program; a section per hand-set spindle speed, joined at an operator
+comment and `M0`) and posts with FreeCAD's `grbl` post. The driver then checks
+every file against the recipe's `expectations` (`_gcode`), logs each program's
+cutting / air-at-feed / rapid minutes, and writes
+`cad/out/nc/<stem>/cycle_times.json`
 and `manifest.json` (freecadcmd's console output stays in `freecadcmd.log`
 there). Any failed check removes every output. The task's file deps include
 the feature bundle, so a CAD change re-posts the programs; the FreeCAD

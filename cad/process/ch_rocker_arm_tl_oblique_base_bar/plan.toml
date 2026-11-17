@@ -9,20 +9,22 @@
 # v48/v49 drawing: bar 1 alone carries the four #12 bracket holes. Owner
 # rulings 2026-11-16: the rail holes are drilled at their printed stations
 # (±0.05 mm from ZERO END) on the CNC, "Rail holes CNC at ±0.05 mm OK" (the
-# part yaml's RV-04): Setup 4 spots and drills R1–R8 from programs BB05 and
+# part yaml's RV-04): Setup 3 spots and drills R1–R8 from programs BB05 and
 # BB07 of cam:ch_rocker_arm_tl_oblique_base_bar, whose posted cutter
-# positions are the stations. Each bar's untrimmed rail is fitted to it, then
-# trimmed flush with both ends (MHA-CH-06-TL-00 steps 1D–1F). Bar 2 (drawing
-# sheet 2) swaps the seats: its rail seats on the face that is far in the
-# front view (up in Setup 4) and its near face seats on the mill table. The
-# manifest describes bar 1 only, so the per-bar face text below is authored
-# from the two drawing sheets, not bound.
+# positions are the stations. "merge": the facing, ends, slots and holes are
+# one clamping per bar (Setup 3), so the holes keep the ZERO END and ZERO EDGE
+# they were squared and edge-found in. Each bar's untrimmed rail is fitted to
+# it, then trimmed flush with both ends (MHA-CH-06-TL-00 steps 1D–1F). Bar 2
+# (drawing sheet 2) swaps the seats: its rail seats on the face that is far in
+# the front view (up in Setup 3 after the side-2 face) and its near face seats
+# on the mill table. The manifest describes bar 1 only, so the per-bar face
+# text below is authored from the two drawing sheets, not bound.
 title = "Oblique trammel base bar — bar 1 and bar 2"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "6061-T6511 aluminium (shop's pick; the sheet says aluminum flat bar)"
 stock = "{{process.blank_thickness_in:fraction}} × {{process.blank_width_in:fraction}} in bar; {{process.quantity:d}} × {{process.blank_length_in:fraction}} in blanks."
-note = "Inches unless mm. Finished {{cad.size_summary}}. Bar 2: no bracket holes; rail/table faces swapped. Run both bars through Setup 2 (high belt range), then Setup 3 (low range), then Setup 4 (high range): two belt changes."
+note = "Inches unless mm. Finished {{cad.size_summary}}. Bar 2: no bracket holes; rail/table faces swapped. Run both bars through Setup 2, then each bar through Setup 3, one vise clamping from the side-2 face on. All spindle work is on the PM-30MV low belt (100–2800 rpm): no belt change."
 shop = "../shop.toml"
 material_key = "6061-t6511"
 
@@ -52,8 +54,8 @@ vise_jaw_height_mm = 44.9453     # Shop workholding.vise-pm-6.jaw_height_mm.
 vise_jaw_width_mm = 158.6738     # Shop workholding.vise-pm-6.jaw_width_mm.
 # Vise holds centre the bar on the jaws, both ends out over jacks: the adapter
 # binds cad.vise_centred_overhang_mm = (finished length − jaw width)/2.
-# Jack centres (DRO X/Y), set in Setup 3 under the slot entries and kept for
-# Setup 4's end holes. Left jack centre to feature edge 1.21 in (R1), 2.07
+# Jack centres (DRO X/Y), set in Setup 3 under the slot entries and the end
+# holes. Left jack centre to feature edge 1.21 in (R1), 2.07
 # (S1), 2.15 (B2 counterbore), 1.10 (front edge); right jack 0.95 (B4
 # counterbore), 1.52 (right end). The adapter refuses a jack centre off the
 # bar or inside a hole, counterbore or slot.
@@ -90,10 +92,11 @@ drill_projection_max_mm = 112.8
 # Setup 2: one strap at mid-width ~1 in in from each blank end.
 strap_left_x_mm = 25.4           # 1 in.
 strap_right_x_mm = 417.5125      # 17.4375 in blank (442.9125) − 25.4.
-# Setup 3: the blank centred in the 6.247 in jaws.
+# Setup 3 facing: the blank centred in the 6.247 in jaws.
 face_jaw_left_x_mm = 142.11935   # (442.9125 blank − 158.6738 jaw)/2.
 face_jaw_right_x_mm = 300.79315  # face_jaw_left_x_mm + 158.6738.
-# Setup 4: the finished bar centred (cad.vise_centred_overhang_mm 140.6271).
+# Setup 3 after the ends: equal trims leave the finished bar centred in the
+# same clamping (cad.vise_centred_overhang_mm 140.6271).
 jaw_right_x_mm = 299.3009        # 140.6271 + 158.6738 jaw width.
 jack_left_x_mm = 33.02           # jack_left_x_in 1.3 × 25.4.
 jack_right_x_mm = 401.32         # jack_right_x_in 15.8 × 25.4.
@@ -159,8 +162,8 @@ machine = "PM-30MV; inch DRO"
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "Vise off; three 1-2-3 blocks flat (1 in up, 3 in across) inboard, near each end and mid-length; long edges overhang ~1.5 in. One strap at mid-width ~1 in in from each end."
-datum = "Front edge becomes ZERO EDGE. X along length; +X cutter right, +Y away; X travel ~18.5 in."
-diagram = { file = "diagrams/width.svg", alt = "Blank on three inboard 1-2-3 blocks, near each end and at mid-length, with straps at mid-width of each end; both long edges exposed. Front edge cut with the cutter moving +X makes ZERO EDGE; the opposite edge, cutter moving −X, finishes width without moving the bar." }
+datum = "Program BB01 (cam:ch_rocker_arm_tl_oblique_base_bar). X0 = the blank's left end; Y0 = the finished front edge (ZERO EDGE), ({{process.blank_width_in:.3f}} − {{cad.width_in:.3f}})/2 inside the as-bought front edge; Z0 = blank top. X along length; +X cutter right, +Y away; X travel ~18.5 in."
+diagram = { file = "diagrams/width.svg", alt = "Blank on three inboard 1-2-3 blocks, near each end and at mid-length, with straps at mid-width of each end; both long edges exposed. Program BB01 alternates the edges pass by pass without moving the bar: front edge with the cutter moving +X (makes ZERO EDGE), opposite edge with the cutter moving −X, both conventional." }
 envelope = { x_span_mm = "{{process.edge_x_travel_mm}}", y_span_mm = ["{{cad.blank_width_mm}}", "{{process.half_cutter_dia_mm}}"], work_top_mm = ["{{process.block_height_mm}}", "{{cad.blank_thickness_mm}}"], deepest_cut_mm = ["{{process.block_height_mm}}", "{{process.edge_cut_tip_z_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
 vise_hold = "other"
 # The blocks only push up; the two end straps hold the bar both ways.
@@ -170,7 +173,8 @@ beam = { axis = "x", hold = "between", extent_mm = [0, "{{cad.blank_length_mm}}"
 speed_kind = "spindle"
 tool = "em-half"
 sizing = "other"
-instruction = "1/2 in end mill out 1.92 in (48.8 mm) from the collet, as measured (dechatter v11). Cutter .04–.08 below, in two equal depth levels (≤ .30 each). Front edge, conventional, table −X (cutter +X): rough ≤ .100 radial, finish .010; note finish-pass Y; mark ZERO EDGE."
+instruction = "Run BB01: 1/2 in end mill out 1.92 in (48.8 mm) from the collet, as measured (dechatter v11). BB01 alternates the edges pass by pass, both conventional: front edge table −X (cutter +X), opposite edge table +X (cutter −X). Rough ≤ .100 radial, finish .010, two equal depth levels (≤ .30 each), cutter .04–.08 below. No stop between passes. Mark the front edge ZERO EDGE."
+instruction_detailed = "Run BB01 (cam:ch_rocker_arm_tl_oblique_base_bar). Set X0 on the blank's left end itself, Y0 on the finished front edge (({{process.blank_width_in:.3f}} − {{cad.width_in:.3f}})/2 inside the as-bought front edge) and Z0 on the blank top. BB01 assumes a {{process.blank_width_in:.3f}} wide bar: the front edge always loses that half-excess, and the opposite edge's first rough pass takes its .100 plus any width over {{process.blank_width_in:.3f}}. Caliper the blank first; more than .020 over, take the excess off the opposite edge by hand before BB01. BB01 alternates the edges pass by pass, both conventional: front edge with the table moving −X (cutter +X), opposite edge with the table moving +X (cutter −X), so no pass returns through the air. Rough passes ≤ .100 radial, then the .010 finish, at two equal depth levels (≤ .30 each) with the cutter .04–.08 below the underside. Every pass plunges to full depth beside a blank end at the edge feed: front-edge passes .10 clear of the left end, opposite-edge passes .25 clear of the right end. Check X0 and that the sawn length is no more than .15 over {{process.blank_length_in:fraction}} before the first pass: a blank end inside those clearances takes a full-depth plunge at cutting feed. Mark the front edge ZERO EDGE."
 settings = "em-half-hss-6061-v11-wide"
 milling_cuts = [
   { name = "front edge rough", kind = "side", phase = "rough", material = "aluminum_6061", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = 7.366, radial_woc_mm = 2.54, rpm = 2250, feed_mm_min = 400.05, traverse_mm = [0, "{{cad.blank_length_mm}}"] },
@@ -181,8 +185,8 @@ milling_cuts = [
 speed_kind = "spindle"
 tool = "em-half"
 sizing = "other"
-instruction = "Opposite edge, conventional, table +X (cutter −X), two equal depth levels; D = measured cutter Ø. Rough to cutter-centre Y = front-pass Y + {{cad.width_rough_in:.3f}} + D; finish at front-pass Y + {{cad.width_in:.3f}} + D."
-instruction_detailed = "Opposite edge, conventional: table moves +X (cutter −X). Measure the cutter: D. The front-pass Y is the cutter centre, D/2 outside ZERO EDGE, so this edge's cutter centre sits the width plus D beyond it. Each pass runs at two equal depth levels, ≤ .30 each. Rough passes of at most .100 radial down to cutter-centre Y = front-pass Y + {{cad.width_rough_in:.3f}} + D; caliper the width at both ends; finish in one pass at front-pass Y + {{cad.width_in:.3f}} + D. Never set the DRO to {{cad.width_in:.3f}} alone: that cuts the bar a cutter diameter narrow."
+instruction = "Opposite edge: in the same BB01 run, no caliper stop. BB01 posts for a .500 cutter: a cutter of Ø D cuts the width D − .500 narrower than {{cad.width_in:.3f}}. Caliper after the program."
+instruction_detailed = "Opposite edge: cut in the same BB01 run (above), passes alternating with the front edge, conventional with the table moving +X (cutter −X). The program has no caliper stop: measure the cutter Ø D before running, since BB01 posts for a .500 cutter and a cutter D cuts the width D − .500 narrower than {{cad.width_in:.3f}}. Caliper the width at both ends and the middle after the program."
 settings = "em-half-hss-6061-v11-wide"
 inspection = "Width at ends/middle."
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.width_band_mm}}" }]
@@ -191,23 +195,37 @@ milling_cuts = [
   { name = "opposite edge finish", kind = "side", phase = "finish", material = "aluminum_6061", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = 7.366, radial_woc_mm = 0.254, rpm = 2250, feed_mm_min = 400.05, traverse_mm = [0, "{{cad.blank_length_mm}}"] },
 ]
 
+# One clamping per bar from the side-2 face to the counterbores (owner ruling
+# 2026-11-16, "merge"): the holes keep the ZERO END squared and the ZERO EDGE
+# edge-found here, with no re-clamp or second edge-find between them.
 [[setups]]
 machine_kind = "other"
-title = "Face, square ends, mill slots in vise"
-machine = "PM-30MV / vise, swivel off"
+title = "Face, square ends, slots, drill / tap / counterbore in vise"
+# The PM-30MV is CNC-converted (GRBL, X/Y ballscrews, ±0.02 mm repeatability:
+# cad/config/shop-equipment.toml cnc.pm-30mv); its DRO still reads back.
+machine = "PM-30MV CNC (GRBL) / vise, swivel off; inch DRO"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "Vise indicated <.001 along X. On 1-3/8 in parallels inside the jaw ends; blank centred, ZERO EDGE at fixed (back) jaw; top {{cad.jaw_standout_in:.2dot}}–{{cad.jaw_standout_blank_in:.2dot}} above jaws. Jacks, touch only: X {{process.jack_left_x_in:.1f}} Y {{process.jack_left_y_in:.1f}}; X {{process.jack_right_x_in:.1f}} Y {{process.jack_right_y_in:.1f}} (X from ZERO END); kept for Setup 4."
-datum = "Z0 underside from measured thickness (slots: top face). X0 = left end squared here (ZERO END). Y0 (slots): edge-find ZERO EDGE; drawing Y becomes −Y."
-diagram = { file = "diagrams/face.svg", alt = "Bar in vise on 1-3/8 in parallels, ZERO EDGE at fixed jaw, top just above the jaws, jacks touching under both overhangs; 3/4 in end mill faces the full length, side 1 then side 2 after an end-for-end flip. Then the 1/2 in end mill squares the left end (ZERO END) and the right end to length in the same clamping, and the upper face is marked: bar 1 C'BORE SIDE, bar 2 RAIL SIDE." }
+holding = "Vise indicated <.001 along X. On 1-3/8 in parallels inside the jaw ends; blank centred, ZERO EDGE at fixed (back) jaw; top {{cad.jaw_standout_in:.2dot}}–{{cad.jaw_standout_blank_in:.2dot}} above jaws. Jacks, touch only: X {{process.jack_left_x_in:.1f}} Y {{process.jack_left_y_in:.1f}}; X {{process.jack_right_x_in:.1f}} Y {{process.jack_right_y_in:.1f}} (X from ZERO END), kept as set through the holes. After the side-2 face, do not unclamp until the counterbores are done."
+datum = "Facing: Z0 underside from measured thickness. Y0: edge-find ZERO EDGE once at the fixed jaw; it stays there through the flip. After the side-2 face, for the ends, slots and holes: X0 = ({{process.blank_length_in:.4f}} − {{cad.length_in:.4f}})/2 inside the faced blank's left end, which BB04 squares to ZERO END; Z0 = top face; drawing Y becomes −Y."
+diagram = { file = "diagrams/face.svg", alt = "Bar in vise on 1-3/8 in parallels, ZERO EDGE at fixed jaw, top just above the jaws, jacks touching under both overhangs; 3/4 in end mill faces the full length, side 1 then side 2 after an end-for-end flip. Then, without unclamping, the 1/2 in end mill squares the left end (ZERO END) and the right end to length, the upper face is marked (bar 1 C'BORE SIDE, bar 2 RAIL SIDE), the slots are milled and the holes are spotted, drilled, tapped and counterbored." }
 # The face cutter runs past both ends; the end cutter centre runs D/2 past
-# each end, .04 in below the bar.
-envelope = { x_span_mm = ["{{cad.blank_length_mm}}", "{{process.face_cutter_dia_mm}}"], y_span_mm = ["{{cad.width_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{cad.blank_thickness_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.end_cut_tip_z_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.face_mill_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
+# each end, .04 in below the bar. Deepest: the drill tips; longest tool: a
+# drill in the drill chuck; shortest: the 5/16 in counterbore in an R8 collet.
+envelope = { x_span_mm = ["{{cad.blank_length_mm}}", "{{process.face_cutter_dia_mm}}"], y_span_mm = ["{{cad.width_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{cad.blank_thickness_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.drill_tip_z_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.small_mill_projection_min_mm}}"] }
 # Both long edges were milled in Setup 2; ZERO EDGE seats on the fixed jaw.
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.width_mm}}", along_jaws_mm = "{{cad.blank_length_mm}}", part_height_mm = "{{cad.blank_thickness_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.face_jaw_left_x_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
 # The jacks only push up; the jaws alone hold against the end mills' lift.
-# Section at the faced .47 in (side 2 and the ends; side 1 is thicker).
+# Section at the faced .47 in (side 2 and the ends; side 1 is thicker). The
+# slots and holes, cut after the ends, carry the finished-bar beams below.
 beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.blank_length_mm}}"], clamp_mm = ["{{process.face_jaw_left_x_mm}}", "{{process.face_jaw_right_x_mm}}"], section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
+inspection = ["Before unclamping, DRO X from ZERO END: {{cad.rail_range}} at the hole table's X ±{{cad.rail_station_tol_in:.4f}} ({{cad.rail_first_mm:.3f}} + n × {{cad.rail_pitch_mm:.3f}} mm ±{{cad.rail_station_tol_mm:.3f}} mm); bar 1 B1–B2 {{cad.bracket_x1_min_in:.4f}}–{{cad.bracket_x1_max_in:.4f}}, B3–B4 {{cad.bracket_x2_min_in:.4f}}–{{cad.bracket_x2_max_in:.4f}}."]
+gauge_checks = [
+  { gauge = "mill-x-dro", band_mm = "{{cad.rail_first_band_mm}}" },
+  { gauge = "mill-x-dro", band_mm = "{{cad.rail_last_band_mm}}" },
+  { gauge = "mill-x-dro", band_mm = "{{cad.bracket_x1_band_mm}}" },
+  { gauge = "mill-x-dro", band_mm = "{{cad.bracket_x2_band_mm}}" },
+]
 
 [[setups.operations]]
 speed_kind = "spindle"
@@ -227,14 +245,14 @@ milling_cuts = [
 speed_kind = "spindle"
 tool = "em-half"
 sizing = "other"
-instruction = "1/2 in end mill out 1.92 in (48.8 mm), as measured. Cutter .04 below bar, in two equal depth levels. Left end, conventional (table away, cutter −Y), .020 passes: X0 here; mark ZERO END. Right end, conventional (table toward you, cutter +Y), .010 passes to cutter-centre X = {{cad.length_in:.4f}} + D/2. Mark top: bar 1 C'BORE SIDE, bar 2 RAIL SIDE."
-instruction_detailed = "Measure cutter D. Cutter .04 below bar; it runs just past the end, clear of parallels and jacks. Every pass runs at two equal depth levels, ≤ .30 each. Left end: conventional, table moving away from you (cutter −Y), .020 passes until clean; mark ZERO END both faces; cutter still touching that end, set DRO X = −D/2 (X0 = end face). Right end: conventional, table moving toward you (cutter +Y), .010 passes; read length on DRO before the last pass; final cutter-centre X = {{cad.length_in:.4f}} + D/2. With ZERO END left and ZERO EDGE at the back jaw, mark the upper face: bar 1 C'BORE SIDE, bar 2 RAIL SIDE."
+instruction = "Ends by program BB04 (spindle 2250), 1/2 in end mill out 1.92 in (48.8 mm), as measured. X0 = ({{process.blank_length_in:.4f}} − {{cad.length_in:.4f}})/2 inside the faced blank's left end. Cutter .04 below bar, two equal depth levels. Left end conventional (cutter −Y), .020 passes to X0 (ZERO END); right end conventional (cutter +Y), .010 passes to {{cad.length_in:.4f}}. At BB04's M0 stop: mark ZERO END; mark top: bar 1 C'BORE SIDE, bar 2 RAIL SIDE."
+instruction_detailed = "Ends by program BB04 (spindle 2250). Edge-find the faced blank's left end and set X0 ({{process.blank_length_in:.4f}} − {{cad.length_in:.4f}})/2 inside it: BB04 squares that end to X0, which becomes ZERO END. Measure the blank length first: BB04 assumes {{process.blank_length_in:fraction}}, and its first right-end pass takes its .010 plus any excess. More than .013 over (the .6 mm width the narrow setting was measured to), take the excess off the right end by hand first. The cutter runs .04 below the bar, just past each end, clear of parallels and jacks, at two equal depth levels, ≤ .30 each. Left end: conventional, table moving away from you (cutter −Y), .020 passes to X0. Right end: conventional, table moving toward you (cutter +Y), .010 passes to cutter-centre X = {{cad.length_in:.4f}} + .250. BB04 then stops at M0 for the slots' spindle speed: there, mark ZERO END on both faces and, with ZERO END left and ZERO EDGE at the back jaw, mark the upper face: bar 1 C'BORE SIDE, bar 2 RAIL SIDE."
 settings = "em-half-hss-6061-v11-narrow"
 inspection = "DRO X, before unclamping: right end {{cad.length_min_in:.2f}}–{{cad.length_max_in:.2f}} at both edges."
 gauge_checks = [{ gauge = "mill-x-dro", band_mm = "{{cad.length_band_mm}}" }]
 milling_cuts = [
-  { name = "left end to ZERO END", kind = "side", phase = "finish", material = "aluminum_6061", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = 6.477, radial_woc_mm = 0.508, rpm = 1250, feed_mm_min = 222.25, stations_mm = 0 },
-  { name = "right end to length", kind = "side", phase = "finish", material = "aluminum_6061", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = 6.477, radial_woc_mm = 0.254, rpm = 1250, feed_mm_min = 222.25, stations_mm = "{{cad.blank_length_mm}}" },
+  { name = "left end to ZERO END", kind = "side", phase = "finish", material = "aluminum_6061", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = 6.477, radial_woc_mm = 0.508, rpm = 2250, feed_mm_min = 400.05, stations_mm = 0 },
+  { name = "right end to length", kind = "side", phase = "finish", material = "aluminum_6061", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = 6.477, radial_woc_mm = 0.254, rpm = 2250, feed_mm_min = 400.05, stations_mm = "{{cad.blank_length_mm}}" },
 ]
 
 # Each depth step starts with a slow plunge at the cutter-centre rectangle's
@@ -246,7 +264,7 @@ milling_cuts = [
 speed_kind = "spindle"
 tool = "em-half"
 sizing = { kind = "band", band_mm = "{{cad.slot_cutter_band_mm}}" }
-instruction = "S1–S2 entries: each step, plunge at the cutter-centre corner nearest that slot's jack."
+instruction = "S1–S2 in the same BB04 run: at its M0 stop set the spindle to 1250, then cycle start. Each step plunges at the cutter-centre corner nearest that slot's jack."
 rpm = 1250
 feed = "slow hand plunge"
 beam = { axis = "x", hold = "between", extent_mm = [0, "{{cad.length_mm}}"], supports_mm = ["{{process.jack_left_x_mm}}", "{{process.jack_right_x_mm}}"], section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
@@ -280,32 +298,9 @@ milling_cuts = [
 columns = ["Slot", "X", "Arc-centre Y", "Cutter-centre X", "Cutter-centre Y"]
 rows = "{{cad.slot_rows}}"
 
-[[setups]]
-machine_kind = "other"
-title = "Drill / tap / counterbore"
-# The PM-30MV is CNC-converted (GRBL, X/Y ballscrews, ±0.02 mm repeatability:
-# cad/config/shop-equipment.toml cnc.pm-30mv); its DRO still reads back.
-machine = "PM-30MV CNC (GRBL); inch DRO"
-indexing = "none"
-machine_ref = "pm-30mv"
-holding = "As Setup 3 (re-clamp alike), jacks as set; bar 1 C'BORE SIDE up, bar 2 RAIL SIDE up."
-datum = "X0: edge-find ZERO END. Y0: edge-find ZERO EDGE; drawing Y becomes −Y. Z0 = top face."
-diagram = { file = "diagrams/holes.svg", alt = "Finished {{cad.length_in:.2f}} in bar in vise: bar 1 C'BORE SIDE up, bar 2 RAIL SIDE up, ZERO EDGE at back fixed jaw, ZERO END left, X0 Y0 back-left; rail holes {{cad.rail_range}}, counterbored {{cad.bracket_range}} (bar 1 only), slots {{cad.slot_range}} and one jack under each overhang's holes." }
-# Hole and slot centres lie inside the finished bar. Longest: a drill in the
-# drill chuck; shortest: the 5/16 in counterbore cutter in an R8 collet.
-envelope = { x_span_mm = "{{cad.length_mm}}", y_span_mm = "{{cad.width_mm}}", work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{cad.thickness_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.drill_tip_z_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.small_mill_projection_min_mm}}"] }
-vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.width_mm}}", along_jaws_mm = "{{cad.length_mm}}", part_height_mm = "{{cad.thickness_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{cad.vise_centred_overhang_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
-# End mills lift: only the jaws hold them. Drills and the counterbore plunge
-# push down, so each end's jack carries that end's hole thrust (operation beams).
-beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.length_mm}}"], clamp_mm = ["{{cad.vise_centred_overhang_mm}}", "{{process.jaw_right_x_mm}}"], section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
-inspection = ["Before unclamping, DRO X from ZERO END: {{cad.rail_range}} at the hole table's X ±{{cad.rail_station_tol_in:.4f}} ({{cad.rail_first_mm:.3f}} + n × {{cad.rail_pitch_mm:.3f}} mm ±{{cad.rail_station_tol_mm:.3f}} mm); bar 1 B1–B2 {{cad.bracket_x1_min_in:.4f}}–{{cad.bracket_x1_max_in:.4f}}, B3–B4 {{cad.bracket_x2_min_in:.4f}}–{{cad.bracket_x2_max_in:.4f}}."]
-gauge_checks = [
-  { gauge = "mill-x-dro", band_mm = "{{cad.rail_first_band_mm}}" },
-  { gauge = "mill-x-dro", band_mm = "{{cad.rail_last_band_mm}}" },
-  { gauge = "mill-x-dro", band_mm = "{{cad.bracket_x1_band_mm}}" },
-  { gauge = "mill-x-dro", band_mm = "{{cad.bracket_x2_band_mm}}" },
-]
-
+# Holes, same clamping. End mills lift: only the jaws hold them. Drills and
+# the counterbore plunge push down, so each end's jack carries that end's
+# hole thrust (operation beams).
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "spot"
@@ -314,6 +309,7 @@ instruction = "Spot all holes Ø.125: R1–R8 on the CNC by program BB05 (cam:ch
 rpm = 2800
 feed = "BB05 program (R1–R8); hand (B1–B4)"
 # Spotting cones are drilled away later; the jaws alone carry them.
+beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.length_mm}}"], clamp_mm = ["{{cad.vise_centred_overhang_mm}}", "{{process.jaw_right_x_mm}}"], section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
 milling_cuts = [
   { name = "spot R1–R4, B1–B2", kind = "drill", phase = "rough", material = "aluminum_6061", cutter_dia_mm = 3.175, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = [9.964, 69.964, 129.964, 189.964, 47.484] },
   { name = "spot R5–R8, B3–B4", kind = "drill", phase = "rough", material = "aluminum_6061", cutter_dia_mm = 3.175, flutes = 2, feed_per_tooth_mm = 0.0254, stations_mm = [249.964, 309.964, 369.964, 429.964, 428.0] },
@@ -408,7 +404,7 @@ machine_kind = "other"
 title = "Deburr / inspect both"
 machine = "Bench / clean mill table"
 indexing = "none"
-datum = "Marked end/edge. Bar 1 turned over from Setup 4: C'BORE SIDE down, rail up. Bar 2: RAIL SIDE up."
+datum = "Marked end/edge. Bar 1 turned over from Setup 3: C'BORE SIDE down, rail up. Bar 2: RAIL SIDE up."
 diagram = { file = "diagrams/inspect.svg", alt = "Finished bar 1 viewed from C'BORE SIDE, and as used on the table in a section through bracket holes {{cad.bracket_section_range}}: C'BORE SIDE down, socket heads recessed from below, HGR15 rail on top, trimmed flush with both ends; slot stud fit. Bar 2 section: rail on the marked RAIL SIDE, table seat on the opposite face." }
 envelope = "other"
 vise_hold = "other"

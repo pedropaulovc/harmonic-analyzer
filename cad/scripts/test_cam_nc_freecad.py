@@ -20,7 +20,7 @@ import cam_nc
 
 _MINI_RECIPE = '''
 STEM = "mini"
-PROGRAMS = (("P1_face", ("face",)), ("P2_edges", ("edges",)))
+PROGRAMS = (("P1_face", ("face",)), ("P2_edges", ("edges",)), ("P3_two_speeds", (("front",), ("back",))))
 
 
 def build(ctx, rt):
@@ -34,8 +34,14 @@ def build(ctx, rt):
         rt.profile(edge_job, em, name, rt.straight_edge(rt.model(edge_job), y=y, z=0), "Outside", "CCW", 0, -5, 5, clearance=60)
         for name, y in (("front", 0), ("back", 50))
     ]
+    # P3: the same tool at two spindle speeds, one job each, joined at an M0.
+    sections = {}
+    for name, y, rpm in (("front", 0, 2250), ("back", 50, 1250)):
+        job = rt.job(doc, name, [rt.box(doc, f"{name}_model", (-10, 110), (0, 50), (-10, 0))], ((0, 100), (-3, 53), (-10, 0)))
+        tc1 = rt.tool_controller(doc, "1/2 in endmill", 1, "endmill", 12.7, rpm, 400, 63.5, flutes=2)
+        sections[name] = rt.profile(job, tc1, name, rt.straight_edge(rt.model(job), y=y, z=0), "Outside", "CCW", 0, -5, 5, clearance=60)
     rt.generate(doc)
-    return {"ops": {"face": face, "edges": edges}}
+    return {"ops": {"face": face, "edges": edges, **sections}}
 '''
 
 
@@ -48,9 +54,9 @@ def test_freecad_posts_real_rapids_zigzag_faces_and_conventional_edges(tmp_path)
         pytest.skip(f"no usable FreeCAD: {exc}")
     recipe = tmp_path / "cam.py"
     recipe.write_text(_MINI_RECIPE, encoding="utf-8")
-    programs = (("P1_face", ("face",)), ("P2_edges", ("edges",)))
+    programs = (("P1_face", ("face",)), ("P2_edges", ("edges",)), ("P3_two_speeds", (("front",), ("back",))))
     result = cam_nc.run_freecad(recipe, {"comment": "positive control"}, programs, tmp_path, freecadcmd, tmp_path / "freecadcmd.log")
-    assert sorted(Path(f).name for f in result["files"]) == ["P1_face.nc", "P2_edges.nc"]
+    assert sorted(Path(f).name for f in result["files"]) == ["P1_face.nc", "P2_edges.nc", "P3_two_speeds.nc"]
     assert Path(result["post"]).name == "grbl_post.py"
     face = _gcode.read_program(tmp_path / "P1_face.nc")
     assert any(m.motion is _gcode.Motion.RAPID and m.length > 0 for m in face.moves)
@@ -61,3 +67,11 @@ def test_freecad_posts_real_rapids_zigzag_faces_and_conventional_edges(tmp_path)
     assert _gcode.check_air_feed(edges, 0.0) == []
     for final, raw, direction in ((-6.35, -9.35, 1.0), (56.35, 59.35, -1.0)):
         assert _gcode.check_side_passes(edges, "Y", final, raw, 3.0, direction, 50.0, 0.0) == [], final
+    # Two sections joined at one commented M0 above the stock, no second
+    # preamble or postamble.
+    joined = _gcode.read_program(tmp_path / "P3_two_speeds.nc")
+    assert _gcode.check_pauses(joined, 0.0, 1) == []
+    assert _gcode.check_spindle(joined, [2250, 1250]) == []
+    text = (tmp_path / "P3_two_speeds.nc").read_text(encoding="utf-8")
+    assert text.count("(Begin preamble)") == 1 and text.count("(Begin postamble)") == 1
+    assert [line for line in text.splitlines() if line.strip() == "M2"] == ["M2"]

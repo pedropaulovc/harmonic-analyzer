@@ -10,14 +10,14 @@
 # v49 sheet names the faces FRONT FACE (the KP08's, KP08 SIDE here) and BACK
 # FACE (the base bar's, BAR SIDE). 2026-11-14 blind traveler review: drill
 # fully through before tapping from the exit, one tap flag per face so the two
-# bottoming taps never meet, 1/8 in parallels, end-mill speed in the high belt
-# range, conventional cuts named by table motion.
+# bottoming taps never meet, 1/8 in parallels, the end-mill speed,
+# conventional cuts named by table motion.
 title = "Oblique trammel end bracket — {{process.quantity:d}} identical"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "6061-T6511 aluminium"
 stock = "{{process.blank_thickness_in:fraction}} × {{process.blank_width_in:fraction}} in bar (OnlineMetals 1165, shared with TL-26); {{process.quantity:d}} × {{process.blank_length_in:.2f}} in blanks."
-note = "Inches unless mm. Finished length {{cad.length_min_in:.3f}}–{{cad.length_max_in:.3f}}; 1/2 and 1 in faces as bought (reference). Both pieces in the vise together, one at each jaw end; each op on both before the next tool. All spindle work in the high belt range."
+note = "Inches unless mm. Finished length {{cad.length_min_in:.3f}}–{{cad.length_max_in:.3f}}; 1/2 and 1 in faces as bought (reference). Both pieces in the vise together, one at each jaw end; each op on both before the next tool. All spindle work on the low belt, 100–2800 rpm; no belt change."
 shop = "../shop.toml"
 material_key = "6061-t6511"
 

@@ -163,7 +163,7 @@ end bracket pass both on the v49 manifests. The base-bar and feed-lever plans
 need 0.10.1: they read its adapter bindings `cad.vise_centred_overhang_mm`
 (centred overhang from the CAD length and `vise_jaw_width_mm`) and
 `cad.overhang_mm` (from the lever's one `overhang_in`), and the base-bar adapter
-refuses a Setup 4 jack centre off the bar or inside a rail-hole, counterbore or
+refuses a Setup 3 jack centre off the bar or inside a rail-hole, counterbore or
 slot outline. Since owner ruling 2026-11-16 the base-bar plan needs the first
 prechips release after 0.11.2, which carries pedropaulovc/prechips#427: 0.11.2
 refuses the manifest's banded rail stations, and the plan reads that release's
@@ -199,22 +199,28 @@ What the 0.10 port and the 2026-11-13 v49 reassessment changed on the sheets:
 
 - Base bar: bar 2 is the opposite hand of bar 1 (rail and table faces
   swapped), so Setup 3 marks bar 1 C'BORE SIDE and bar 2 RAIL SIDE, and Setup
-  5 pictures bar 1 turned over (C'BORE SIDE down on the table, rail up) and a
+  4 pictures bar 1 turned over (C'BORE SIDE down on the table, rail up) and a
   bar 2 section. The edge setup uses three 1-2-3 blocks, one at mid-length,
-  and two end straps. Setup 3 faces both sides, squares both ends and mills
-  both slots in one vise clamping (2026-11-14 traveler review: the former
-  table-strapped end squaring left the ends on a 221 mm cantilever, 0.057 mm
-  under `milling_deflection`, refused); the slots take .05 depth steps on the
-  jaws' cantilever. Vise setups print the bar's stand-out above the jaws, keep
-  the 1-3/8 in parallels and two screw jacks (touch only; Setup 4 gives their
-  DRO positions and its drill and counterbore operations split by end, each
-  over its jack). Facing runs full length at 850 rpm, 6.8 in/min (owner ruling
-  2026-11-11, `settings.basebar-face-6061-t6511`), one pass per side. The
-  edges and ends use the dechatter v11 records
-  (`settings.em-half-hss-6061-v11-wide`/`-narrow`, at most 7.62 mm per depth
-  level, 48.8 mm stickout): Setup 2 runs in the high belt range (2250 rpm),
-  Setup 3 in the low range (facing 850, ends and slots 1250) and Setup 4 in
-  the high range, so both bars take two belt changes. The rail
+  and two end straps; program BB01 cuts both edges, alternating pass by pass,
+  and its setup names the work offsets and the full-depth plunges beside the
+  blank ends. Setup 3 holds each bar in one vise clamping from the side-2
+  face on (owner ruling 2026-11-16, "merge"): after facing side 1, flipping
+  and facing side 2 it squares both ends, mills both slots and then spots,
+  drills, taps and counterbores without unclamping, so the holes keep
+  the ZERO END squared and the ZERO EDGE edge-found there (2026-11-14
+  traveler review: the former table-strapped end squaring left the ends on a
+  221 mm cantilever, 0.057 mm under `milling_deflection`, refused). The slots
+  take .05 depth steps on the jaws' cantilever. Setup 3 prints the bar's
+  stand-out above the jaws, keeps the 1-3/8 in parallels and two screw jacks
+  (touch only, at the DRO positions it gives) as set, and splits its drill and
+  counterbore operations by end, each over its jack. Facing runs full length
+  at 850 rpm, 6.8 in/min (owner ruling 2026-11-11,
+  `settings.basebar-face-6061-t6511`). The edges and ends use the dechatter
+  v11 records (`settings.em-half-hss-6061-v11-wide`/`-narrow`, at most
+  7.62 mm per depth level, 48.8 mm stickout), both at 2250 rpm: the narrow
+  column was stable at every speed measured, and the ends no longer share the
+  slots' 1250. Every speed is on the PM-30MV's low belt, 100–2800 rpm (owner
+  ruling 2026-11-16, "2800 max with low belty"): no belt change. The rail
   holes are drilled at their printed stations, ±0.05 mm from ZERO END, on
   the CNC by programs BB05 (spot) and BB07 (#29 drill) of
   `cam:ch_rocker_arm_tl_oblique_base_bar` (owner rulings 2026-11-16,
@@ -365,7 +371,12 @@ minutes, and leaves freecadcmd's console output in `freecadcmd.log` there.
 A recipe has four parts:
 
 - `PROGRAMS`: the file names, each listing its operations. Each program is one
-  FreeCAD Job with one tool, because GRBL has no tool changer.
+  tool, because GRBL has no tool changer, and one FreeCAD Job per spindle
+  speed. The PM-30MV's speed is set by hand on the knob, so a program whose
+  operations are grouped runs each group after an operator comment and `M0`
+  (the base bar's BB04: ends at 2250 rpm, then slots at 1250); `_gcode`
+  checks each stop is retracted above the stock and commented, and each
+  section's S word.
 - `context(features, plan, shop, step)`: a pure function. It reads every part
   dimension from the part's `features.toml`. Blank size, cutter tip depths,
   radial steps and jack positions come from the part's `plan.toml`
@@ -406,17 +417,18 @@ the plan's strategy. Edge and end passes plunge beside the stock, so they
 plunge at their cutting feed; only the slot corners plunge into metal at the
 plan's slow feed. With the rapid rate assumed at 100 in/min
 (`_gcode.RAPID_MM_MIN`, until the controller's `$110`/`$111` are read), one
-bar's nine programs fell from about 207 to 96 minutes.
+bar's programs fell from about 207 to 86 minutes.
 
 FreeCAD's `grbl` post expands G81/G82/G83 into G0/G1 but not G73, so the
 drilled holes peck with full retracts (G83), one drill diameter each, as the
 traveler says; FreeCAD measures each peck from the R plane, which is why the
 R plane sits just above the stock.
 
-For the base bar, S3 and S4 put X0 at ZERO END and Y0 at ZERO EDGE, against the
-back jaw. The bar lies at −Y, so drawing Y becomes −Y, and Z0 is the top face.
-Bar 1's C'BORE SIDE and bar 2's RAIL SIDE are the model's Z0 face, so one set
-of S3 and S4 programs serves both hands; `_bar1` programs are bar 1 only. S2
-is different: X0 is the blank's left end, Y0 the finished front edge with the
-bar at +Y, and Z0 the blank's top. Posted NC is not machining approval: prove
-each program in air and check the setup against the traveler first.
+For the base bar, S3 after the side-2 face (S3c) puts X0 at ZERO END and Y0
+at ZERO EDGE, against the back jaw. The bar lies at −Y, so drawing Y becomes
+−Y, and Z0 is the top face. Bar 1's C'BORE SIDE and bar 2's RAIL SIDE are the
+model's Z0 face, so one set of S3 programs serves both hands; `_bar1` programs
+are bar 1 only. S2 is different: X0 is the blank's left end, Y0 the finished
+front edge with the bar at +Y, and Z0 the blank's top. Posted NC is not
+machining approval: prove each program in air and check the setup against the
+traveler first.

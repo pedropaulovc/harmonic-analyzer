@@ -24,7 +24,7 @@
 # rpm = 12 × 165 / (π × D in), rounded down to 50, capped at the PM-30MV's
 # 2800 (owner 2026-11-16; #15 3501 → 2800; F 2452 → 2450; 5/16 2017 → 2000; 3/8 1680 → 1650).
 # Both 1/2 in end mills run 1800 rpm, 8 in/min (.0022 in/tooth). Every speed
-# lies in the high belt range (1400-2800), so the belt never moves.
+# is on the low belt, 100–2800 rpm; no belt change.
 title = "Oblique trammel feed block"
 part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
