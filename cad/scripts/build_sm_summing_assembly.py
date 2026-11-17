@@ -749,13 +749,19 @@ def _author_settings(adapter) -> None:
     dims = SketchDims()
     check("create hanger reach sketch", adapter.create_sketch("Front"))
     line = _construction_line(adapter, seat, tip, "hanger reach line")
-    check("hanger reach vertical", adapter.add_sketch_constraint(line, None, "vertical"))
+    check(
+        "hanger reach vertical", adapter.add_sketch_constraint(line, None, "vertical")
+    )
     anchor_point_to_origin(adapter, f"{line}.start", *seat, "hanger top seat")
     dims.record("HangerX", '-"SmHangerX"')
     dims.record("HangerSeatY", '"SmHangerSeatY"')
     dimension_between(
-        adapter, f"{line}.start", f"{line}.end", "vertical_distance",
-        spec.HANGER_FIT_REACH, "hanger bolt reach",
+        adapter,
+        f"{line}.start",
+        f"{line}.end",
+        "vertical_distance",
+        spec.HANGER_FIT_REACH,
+        "hanger bolt reach",
     )
     dims.record(spec.HANGER_DIMENSION, '"SmHangerReach"')
     _finish_setting(adapter, spec.HANGER_FEATURE, dims, spec.HANGER_DIMENSION)

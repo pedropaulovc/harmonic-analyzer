@@ -233,7 +233,9 @@ def test_hanger_reach_setting_runs_down_the_bolt_from_the_clamped_top_seat() -> 
         builder.KNIFE_MOUNT_TOP_Y - spec.HANGER_FIT_REACH
     )
     # The modelled cut tip sits inside the printed band about the setting.
-    assert abs(builder.HANGER_REACH - spec.HANGER_FIT_REACH) <= spec.HANGER_FIT_REACH_TOL
+    assert (
+        abs(builder.HANGER_REACH - spec.HANGER_FIT_REACH) <= spec.HANGER_FIT_REACH_TOL
+    )
     assert drawing.PRECISION[spec.HANGER_DIMENSION] == spec.HANGER_FIT_REACH_PLACES
     cut = next(s for s in notes.ASSEMBLY_STEPS if s.startswith("4A. "))
     assert f"PLUS {notes.HANGER_FIT_CUT} UNDER THE HEAD" in cut
@@ -245,7 +247,10 @@ def test_setting_table_carries_the_non_dimension_acceptances_the_steps_cite() ->
     # dimension, so they print in the sheet 1 setting table; step 3 and
     # check 1 cite the row that carries their value.
     header = notes.SETTING_TABLE_HEADER
-    rows = {cells[0]: dict(zip(header, cells, strict=True)) for cells in notes.SETTING_TABLE_ROWS}
+    rows = {
+        cells[0]: dict(zip(header, cells, strict=True))
+        for cells in notes.SETTING_TABLE_ROWS
+    }
     assert list(rows) == [notes.BRACKET_ROW, notes.SEAT_ROW]
     band = f"±{notes._length(notes.BRACKET_STATION_TOL_MM, 3)}"
     assert band == "±.005"
