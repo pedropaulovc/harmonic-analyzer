@@ -88,6 +88,7 @@ from _drawing_leader_notes import add_leader_note
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_types import DRAWING_TEMPLATES, DrawingLayout
+from _drawing_detail_crop import native_circle_geometry
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import assert_imported_precision
 from _drawing_hidden_sketches import _show_base_view_sketches
@@ -151,7 +152,6 @@ import transgear_hanger_joints as joints
 import pd_vn_transgear_arm_plate_screw_spec as plate_screw
 import pd_transgear_disc_screw_spec as disc_screw
 import pd_vn_transgear_knob_cup_pin_spec as cup_pin
-import pd_vn_transgear_knob_drive_pin_spec as drive_pin
 import pd_vn_transgear_pivot_screw_spec as pivot_screw
 import pd_vn_transgear_pivot_spring_spec as spring
 import _gear_quality as quality
@@ -2065,8 +2065,10 @@ def _step_text(
 ) -> dict[str, tuple[str, ...]]:
     """Each step's sub-steps, one action or one check each."""
     n = _N
-    pin_window = steps.inch_window(joints.LATCH_PIN_PROUD_RANGE, 3, " TO ")
-    drive_window = steps.inch_window(drive_pin.PROUD_RANGE, 3, " TO ")
+    # The windows DETAILS L and F dimension (rule 4's plain bands, inside
+    # the part specs' press windows), so step and detail read alike.
+    pin_window = steps.inch_window(setting_details.LATCH_PROUD_BAND, 3, " TO ")
+    drive_window = steps.inch_window(setting_details.DRIVE_PIN_PROUD_BAND, 3, " TO ")
     knob_window = KNOB_END_FLOAT_WINDOW
     lock_gap = LOCK_GAP_WINDOW
     lock_gap_min, lock_gap_max = lock_gap.split(" TO ")
@@ -3552,11 +3554,19 @@ def _steps_label(keys: tuple[str, ...]) -> str:
     return "STEPS " + ", ".join(str(number) for number in numbers)
 
 
+# A caption line is at most 26 characters (about 71 mm): the details stand
+# 85 mm apart, and the review of run
+# 20261117T144118108Z-771678f99db440ccbcec03874c9b1aca found one-line titles
+# printing over the next caption and through the border.
+SETTING_CAPTION_WIDTH = 26
 SETTING_DETAIL_CAPTIONS = {
-    detail.letter: (
-        f"{detail.view_name}"
-        f"{_scale_suffix(detail.scale, SHEET_SCALES[SETTING_DETAIL_SHEET])} "
-        f"({_steps_label(detail.step_keys)})\n{detail.title}"
+    detail.letter: "\n".join(
+        (
+            f"{detail.view_name}"
+            f"{_scale_suffix(detail.scale, SHEET_SCALES[SETTING_DETAIL_SHEET])} "
+            f"({_steps_label(detail.step_keys)})",
+            *textwrap.wrap(detail.title, SETTING_CAPTION_WIDTH),
+        )
     )
     for detail in setting_details.DETAILS
 }
@@ -4793,10 +4803,21 @@ def _place_pivot_view(adapter: Any, items: dict[str, str]) -> None:
 
 
 def _sketch_view_circle(
-    adapter: Any, view: Any, centre: tuple[float, float], radius: float, *, label: str
+    adapter: Any,
+    view: Any,
+    centre: tuple[float, float],
+    radius: float,
+    *,
+    label: str,
+    direct: bool = False,
 ) -> None:
     """Sketch a sheet circle in ``view``'s own sketch, left selected
-    (draw_mg_magnifier_assembly's detail crop)."""
+    (draw_mg_magnifier_assembly's detail crop).
+
+    ``direct`` writes it straight to the sketch database, read back: screen-
+    space inference snapped a detail boundary drawn over model edges to a
+    smaller circle (DETAIL H) or none at all (DETAIL L) in run
+    20261117T144118108Z-771678f99db440ccbcec03874c9b1aca."""
     view = _early_bound(view, "IView")
     if not _early_bound(adapter.currentModel, "IDrawingDoc").ActivateView(
         view_name(adapter, view)
@@ -4815,13 +4836,24 @@ def _sketch_view_circle(
         points.append(tuple(float(value) for value in projected.ArrayData))
     manager = _early_bound(adapter.currentModel.SketchManager, "ISketchManager")
     previous = bool(manager.AddToDB)
-    manager.AddToDB = False
+    manager.AddToDB = direct
     try:
         circle = manager.CreateCircle(*points[0], *points[1])
     finally:
         manager.AddToDB = previous
     if circle is None:
         raise RuntimeError(f"{label}: failed to sketch the circle")
+    if direct:
+        drawn_centre, drawn_radius = native_circle_geometry(circle, label=label)
+        intended = math.dist(points[0][:2], points[1][:2])
+        if (
+            math.dist(drawn_centre[:2], points[0][:2]) > 1e-3 * intended
+            or abs(drawn_radius - intended) > 1e-3 * intended
+        ):
+            raise RuntimeError(
+                f"{label}: circle drew at {drawn_centre!r} r {drawn_radius}, "
+                f"not {points[0]!r} r {intended}"
+            )
 
 
 def _crop_to_circle(
@@ -5292,7 +5324,7 @@ def _place_setting_parent(adapter: Any, parent: SettingParent) -> None:
         radius = _boundary_radius(detail, parent.scale)
         if math.dist(middle, parent.centre) + radius > parent.radius:
             raise RuntimeError(f"{boundary} at {middle!r} leaves the crop")
-        _sketch_view_circle(adapter, view, middle, radius, label=boundary)
+        _sketch_view_circle(adapter, view, middle, radius, label=boundary, direct=True)
         adapter.currentModel.ClearSelection2(True)
         adapter.currentModel.EditRebuild3()
         reach = math.dist(middle, parent.centre)

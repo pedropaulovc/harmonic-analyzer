@@ -1733,11 +1733,22 @@ def test_the_cluster_float_and_pin_bands_print_their_spec_ranges() -> None:
     accepted = _step_body("fitup-accepted")
     assert f"RING GAP READS {drawing.CLUSTER_FLOAT_VIEW_NAME}" in accepted
     assert "DISC TURNS FREE" in accepted
-    for key, bounds in (
-        ("collar-pins-pressed", drive_pin.PROUD_RANGE),
-        ("latch-pin-pressed", joints.LATCH_PIN_PROUD_RANGE),
+    # Rule 4: each press step prints its setting detail's plain band, which
+    # lies inside the part specs' window.
+    for key, band, bounds in (
+        (
+            "collar-pins-pressed",
+            drawing.setting_details.DRIVE_PIN_PROUD_BAND,
+            drive_pin.PROUD_RANGE,
+        ),
+        (
+            "latch-pin-pressed",
+            drawing.setting_details.LATCH_PROUD_BAND,
+            joints.LATCH_PIN_PROUD_RANGE,
+        ),
     ):
-        assert f"{steps.inch_window(bounds, 3, ' TO ')} PROUD" in _step_body(key)
+        assert bounds[0] - 1e-9 <= band[0] < band[1] <= bounds[1] + 1e-9
+        assert f"{steps.inch_window(band, 3, ' TO ')} PROUD" in _step_body(key)
 
 
 def test_the_cluster_is_shimmed_to_view_e_after_it_is_hung() -> None:

@@ -24,7 +24,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pd_rack_pinion_spec import MM_PER_IN, inch_ceil_mm, inch_floor_mm, inch_text
+from pd_rack_pinion_spec import MM_PER_IN, inch_text
 
 from _cone_axis_constants import FRAME_FRONT_COLUMN_Z
 from _column_clamp_interface import ARC_DEPTH, BAR_DEPTH
@@ -157,15 +157,33 @@ LATCH_MOUTH_XY = on_arm(arm.TIP_STATION)
 LATCH_PROUD_MODEL = latch_pin.PROUD
 
 
-# --- the bands the steps print ------------------------------------------------
-# Each band is the step's own inch window (pd_paper_drive_assembly_steps.
-# inch_window rounds inward), so the dimension and the step read alike.
-def _inward(limits_mm: tuple[float, float]) -> tuple[float, float]:
-    return (inch_ceil_mm(limits_mm[0], PLACES), inch_floor_mm(limits_mm[1], PLACES))
+# --- the bands the details and steps print ----------------------------------
+# Rule 4 (review of run 20261117T144118108Z-771678f99db440ccbcec03874c9b1aca):
+# an explicit band is a plain inch step, and converted limits such as
+# .094 +.004/-.003 read as nobody's choice. A press window prints the widest
+# plain symmetric band about its grid nominal that lies inside the part
+# specs' window, and the step prints that band's limits.
+PLAIN_STEPS_IN = (0.030, 0.025, 0.020, 0.015, 0.010, 0.005, 0.003, 0.002, 0.001)
 
 
-LATCH_PROUD_BAND = _inward(joints.LATCH_PIN_PROUD_RANGE)
-DRIVE_PIN_PROUD_BAND = _inward(drive_pin.PROUD_RANGE)
+def plain_band(
+    nominal_mm: float, window_mm: tuple[float, float]
+) -> tuple[float, float]:
+    """``nominal_mm`` +/- the widest plain inch step inside ``window_mm``."""
+    for step_in in PLAIN_STEPS_IN:
+        half = step_in * 25.4
+        if (
+            window_mm[0] - 1e-9 <= nominal_mm - half
+            and nominal_mm + half <= window_mm[1] + 1e-9
+        ):
+            return (nominal_mm - half, nominal_mm + half)
+    raise AssertionError(f"no plain band about {nominal_mm} fits {window_mm}")
+
+
+DRIVE_PIN_PROUD_NOMINAL = _grid_in(collar.DRIVE_PIN_PROUD)
+DRIVE_PIN_PROUD_BAND = plain_band(DRIVE_PIN_PROUD_NOMINAL, drive_pin.PROUD_RANGE)
+LATCH_PROUD_NOMINAL = _grid_in(latch_pin.PROUD)
+LATCH_PROUD_BAND = plain_band(LATCH_PROUD_NOMINAL, joints.LATCH_PIN_PROUD_RANGE)
 RACK_FRONT_BAND = (
     feed_rack.FRONT_BEHIND_PLATEN - feed_rack.FRONT_SET_BAND,
     feed_rack.FRONT_BEHIND_PLATEN + feed_rack.FRONT_SET_BAND,
@@ -280,8 +298,11 @@ RACK_SETTINGS = SettingDetail(
             end=(_RACK_SIDE_X, RACK_TOP_Y, RACK_FRONT_Z),
             length_mm=feed_rack.FRONT_BEHIND_PLATEN,
             band_mm=RACK_FRONT_BAND,
-            # Under the rack's crests.
-            text=(_RACK_SIDE_X, placement.RACK_TIP_Y - 1.6, RACK_FRONT_Z - 0.5),
+            # Under the rack's crests, in front of both extension lines: the
+            # value is wider than the 1 mm leg (centred on it, the guide's
+            # extension line ran through it; run
+            # 20261117T144118108Z-771678f99db440ccbcec03874c9b1aca).
+            text=(_RACK_SIDE_X, placement.RACK_TIP_Y - 1.6, BAR_FRONT_Z - 3.0),
         ),
     ),
     step_keys=("rack-screwed", "guides-screwed"),
@@ -290,7 +311,7 @@ RACK_SETTINGS = SettingDetail(
 
 _LATCH_LENGTH = _grid_in(LATCH_PROUD_MODEL)
 _LATCH_END_XY = on_arm(arm.TIP_STATION + _LATCH_LENGTH)
-_LATCH_MID_XY = on_arm(arm.TIP_STATION + _LATCH_LENGTH / 2.0, 1.5)
+_LATCH_MID_XY = on_arm(arm.TIP_STATION + _LATCH_LENGTH / 2.0, 3.0)
 LATCH_DOWEL = SettingDetail(
     letter="L",
     feature="LatchDowelSetting",
@@ -308,8 +329,11 @@ LATCH_DOWEL = SettingDetail(
             end=(*_LATCH_END_XY, arm.PIN_MACHINE_Z),
             length_mm=_LATCH_LENGTH,
             band_mm=LATCH_PROUD_BAND,
+            # Far enough off the dowel that the stacked limits clear its edge
+            # (at 5.0 the dowel's edge crossed '+.025'; run
+            # 20261117T144118108Z-771678f99db440ccbcec03874c9b1aca).
             text=(
-                *on_arm(arm.TIP_STATION + _LATCH_LENGTH / 2.0, 5.0),
+                *on_arm(arm.TIP_STATION + _LATCH_LENGTH / 2.0, 9.0),
                 arm.PIN_MACHINE_Z,
             ),
             via=(*LATCH_FLOOR_XY, arm.PIN_MACHINE_Z),
