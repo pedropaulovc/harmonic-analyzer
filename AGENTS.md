@@ -1569,8 +1569,8 @@ enforces it, and derives its scope from that one constant:
    `_drawing_common.read_required_properties` (`capture_missing_properties`),
    `_drawing_selection._select_view_entity` (`capture_pick_miss`, a sheet-point
    pick that selected nothing),
-   `_drawing_common.new_project_drawing` (`record_drawing_display`,
-   read-only) and `package_native._release_seat`.
+   `_drawing_common.new_project_drawing` (`record_drawing_display`, a no-op
+   awaiting removal with the next drawing re-key) and `package_native._release_seat`.
    The pinned failure captures never return, but a caller can catch their
    exceptions and continue: `draw_rocker_arm` retries a missed pivot-bore pick. Therefore
    `capture_pick_miss` preserves the pick's `RuntimeError` and logs WARN, not a
@@ -1605,7 +1605,7 @@ If you need a new inert entry point, add it to the gate's `CALL_SITES` only if
 it runs after the save or provably reads nothing into the model. Otherwise put
 the code in a tracked module.
 
-Drawing-display and pick-miss records preserve each unreadable probe as
+Pick-miss records preserve each unreadable probe as
 `display_capture_error` or `seat_capture_error`, so simultaneous failures
 still emit both causes in the event and log. The console summary labels
 session 0 as a noninteractive service session while retaining its session ID
