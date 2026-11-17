@@ -296,7 +296,11 @@ SOCKET_FEATURE = "ScrewSocket"
 # FRONT view shows. Top plane: sketch (x, y) = part (X, -Z), the TOP view
 # (looking at the knife; third-angle, so the clamp's base is up). Each line
 # lies on a silhouette edge of its view (A and C on the side faces, F on the
-# knife edge, B and D on a side face, the 4-40 chord on the screw's tip).
+# heel line, B and D on a side face, the 4-40 chord on the screw's tip).
+# Within one sketch a line may share at most one end with the lines before
+# it: ``_linear`` anchors any free end, so a line welded at both ends (F on
+# the knife edge closed A-F-C into a U) over-defines the sketch (farm r2,
+# run 20261117T234918780Z). F on the heel line touches only C's start.
 D_REFERENCE = CATALOG_D_IN * INCH
 B_REFERENCE = CATALOG_B_IN * INCH
 SUPPLIER_REFERENCE_DIMENSIONS = (
@@ -310,7 +314,7 @@ SUPPLIER_REFERENCE_DIMENSIONS = (
 SUPPLIER_REFERENCE_STARTS = {
     "SupplierA": (-WIDTH / 2.0, 0.0),
     "SupplierC": (WIDTH / 2.0, HEEL_Y),
-    "SupplierF": (-WIDTH / 2.0, KNIFE_Y),
+    "SupplierF": (-WIDTH / 2.0, HEEL_Y),
     "SupplierB": (WIDTH / 2.0, 0.0),
     "SupplierD": (WIDTH / 2.0, -B_REFERENCE),
     "SupplierThreadDiameter": (-SCREW_MAJOR_DIA / 2.0, -SCREW_TIP_Z),
@@ -323,7 +327,7 @@ SUPPLIER_REFERENCE_PLANES = {
 SUPPLIER_REFERENCE_SIDES = {
     "SupplierA": "left",
     "SupplierC": "right",
-    "SupplierF": "top",
+    "SupplierF": "bottom",
     "SupplierB": "right",
     "SupplierD": "right",
     "SupplierThreadDiameter": "top",

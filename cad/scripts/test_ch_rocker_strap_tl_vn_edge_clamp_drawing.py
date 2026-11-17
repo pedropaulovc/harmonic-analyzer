@@ -413,13 +413,13 @@ def test_sheet_prints_the_catalogue_letters_on_silhouette_lines() -> None:
         "SupplierThreadDiameter": "4-40",
     }
     half = spec.WIDTH / 2.0
-    # Front (plan, sketch = part X, Y): A and C on the side faces, F on the knife.
+    # Front (plan, sketch = part X, Y): A and C on the side faces, F on the heel.
     (a0, a1) = _reference_line("SupplierA")
     assert a0 == (-half, 0.0) and a1 == pytest.approx((-half, spec.KNIFE_Y))
     (c0, c1) = _reference_line("SupplierC")
     assert c0 == (half, spec.HEEL_Y) and c1 == pytest.approx((half, spec.KNIFE_Y))
     (f0, f1) = _reference_line("SupplierF")
-    assert f0 == (-half, spec.KNIFE_Y) and f1 == pytest.approx((half, spec.KNIFE_Y))
+    assert f0 == (-half, spec.HEEL_Y) and f1 == pytest.approx((half, spec.HEEL_Y))
     # Top (sketch = part X, -Z): B then D up a side face from the heel line.
     (b0, b1) = _reference_line("SupplierB")
     (d0, d1) = _reference_line("SupplierD")
@@ -431,6 +431,24 @@ def test_sheet_prints_the_catalogue_letters_on_silhouette_lines() -> None:
     assert -t0[1] == pytest.approx(spec.SCREW_TIP_Z)
     assert t1[0] - t0[0] == pytest.approx(spec.SCREW_MAJOR_DIA)
     assert t0[0] == pytest.approx(-spec.SCREW_MAJOR_DIA / 2.0)
+
+
+def test_no_reference_line_is_welded_at_both_ends() -> None:
+    """``_supplier_screw_reference._linear`` relies on each new line sharing
+    at most one end with the lines authored before it in its sketch: a line
+    joining two earlier lines closes a loop whose orientation relation is
+    redundant, and SolidWorks reports the sketch over-defined (farm r2, run
+    20261117T234918780Z: F on the knife edge closed A-F-C)."""
+    earlier: dict[str, list[tuple[float, float]]] = {}
+    for name, _, _ in spec.SUPPLIER_REFERENCE_DIMENSIONS:
+        plane = spec.SUPPLIER_REFERENCE_PLANES.get(name, "Front")
+        ends = _reference_line(name)
+        points = earlier.setdefault(plane, [])
+        shared = [
+            end for end in ends if any(math.dist(end, point) < 1e-6 for point in points)
+        ]
+        assert len(shared) <= 1, name
+        points.extend(ends)
 
 
 def test_footer_item_and_operating_data_fit() -> None:
