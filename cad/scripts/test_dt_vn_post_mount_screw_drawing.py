@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 import re
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -17,6 +18,7 @@ import dt_cone_swing_platform_spec as platform
 import draw_dt_vn_post_mount_screw as drawing
 from _fit_deviations import deviations
 import dt_vn_post_mount_screw_spec as spec
+from _drawing_contract import drawing_specification_violations
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import THREAD_MAJOR_MM
 from _test_stock_recipes import discovered_recipes
