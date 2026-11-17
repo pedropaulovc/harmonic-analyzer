@@ -2183,13 +2183,12 @@ def _data_literals(text: str) -> tuple[str, ...]:
 # or dynamic tokens -- ``"machine/*"`` (whole machine family, for a dynamic
 # subsystem), ``"tolerances/*"`` (whole tolerance family for dynamic/unknown fit
 # groups or escaped fit references), ``"parts/*"`` (whole registry, for the part
-# name in ``_part_properties.part_properties``), ``"title_block"`` (title_block.yaml,
-# but only for tasks that stamp part properties), ``"assemblies/*"`` (the
+# name in ``_part_properties.part_properties``), ``"assemblies/*"`` (the
 # per-assembly contracts, for any closure reaching ``_assembly_contract``),
 # ``"**"`` (whole config, the fallback). dodo.py expands these, narrowing
-# ``"parts/*"``/``"title_block"`` per task: a part to its OWN row, an assembly
-# to the rows it actually stamps; and ``"assemblies/*"`` to an assembly's OWN
-# contract (see _config_deps in dodo.py).
+# ``"parts/*"`` per task: a part to its OWN row, an assembly to the rows it
+# actually stamps; and ``"assemblies/*"`` to an assembly's OWN contract (see
+# _config_deps in dodo.py).
 
 # Accessors that read a FIXED file (no argument resolution needed). Derived from
 # _config.py; kept in sync by test_config_accessor_coverage. Note active_count
@@ -2203,15 +2202,7 @@ _FIXED_ACCESSOR_TOKENS: dict[str, frozenset[str]] = {
     "active_count": frozenset({"machine/channels.yaml"}),
     "active_channels": frozenset({"channels.yaml", "machine/channels.yaml"}),
     "release_revision": frozenset({"release.yaml"}),
-    # title_block is read by the TOL_* stamping (_part_properties.part_properties,
-    # _assembly.assembly_title_properties) and, for geometry, by the modules in
-    # TITLE_BLOCK_GEOMETRY_MODULES (worst-case stacks sized from the printed
-    # rows).  It emits a DYNAMIC token dodo narrows per task exactly like
-    # "parts/*": parts, stamping assemblies and geometry readers ->
-    # title_block.yaml; any other assembly drops it (a title-block edit
-    # re-stamps the parts, whose new digests REFRESH the assembly — folding it
-    # into the assembly recipe would escalate to a spurious ~500 s FULL rebuild).
-    "title_block": frozenset({"title_block"}),
+    "title_block": frozenset({"title_block.yaml"}),
     "materials": frozenset({"materials.yaml"}),
     "palette": frozenset({"materials.yaml"}),
 }
@@ -2517,95 +2508,18 @@ def part_row_files(dashed_name: str) -> list[str]:
     return sorted({str(_resolved(row)), str(_resolved(defaults))})
 
 
-# A generic custom-property write says nothing about registry ownership.  Part
-# generation and assembly-title stamping therefore have distinct primitives.
+# A generic custom-property write says nothing about registry ownership: only
+# these calls generate and stamp a registry-owned part.
 _PART_STAMP_PRIMITIVES = frozenset({"part_properties", "save_part_and_images"})
-_TITLE_BLOCK_STAMP_PRIMITIVES = frozenset(
-    {*_PART_STAMP_PRIMITIVES, "assembly_title_properties"}
-)
-
-
-def _module_sources() -> tuple[tuple[str, str | None], ...]:
-    """Every local module stem paired with its source text, READ FRESH -- ``None``
-    where the file cannot be read.
-
-    Deliberately NOT cached. The original scan re-read every file on each
-    :func:`_stamping_modules` cache miss, so a source rewritten in-process
-    between the part and the title-block classification was visible to the
-    second one. This snapshot is the key of :func:`_module_call_graph`, which
-    keeps exactly that miss semantics: identical text reuses the previous scan,
-    changed text cannot be answered from it. Unreadable modules are kept in the
-    snapshot so they still count as local import TARGETS, as before.
-    """
-    sources: list[tuple[str, str | None]] = []
-    for stem, path in _local_modules().items():
-        try:
-            sources.append((stem, path.read_text(encoding="utf-8")))
-        except OSError:
-            sources.append((stem, None))
-    return tuple(sources)
 
 
 @functools.lru_cache(maxsize=1)
-def _module_call_graph(
-    sources: tuple[tuple[str, str | None], ...],
-) -> tuple[
-    dict[tuple[str, str], tuple[frozenset[str], frozenset[tuple[str, str]]]],
-    dict[str, dict[str, tuple[str, str]]],
-    dict[str, dict[str, str]],
-]:
-    """The whole-program, function-level call graph of every local module:
-    ``(stem, function) -> called names``, plus each module's local import
-    bindings (``name -> (module, original)`` and ``alias -> module``).
+def _stamping_modules() -> frozenset[str]:
+    """Module stems that contain a function which TRANSITIVELY calls a part
+    stamping primitive -- a whole-program, function-level call graph over every
+    local module.
 
-    Split out of :func:`_stamping_modules` because the scan does not depend on
-    the property contract being classified: part and title-block stamping differ
-    only in the fixpoint's primitive set, yet each used to re-parse and re-walk
-    all ~570 local modules. ``sources`` is the CONTENT snapshot from
-    :func:`_module_sources`, so neither a rebuilt module set (a monkeypatched
-    scripts root) nor an in-process source rewrite can be answered from the
-    previous scan; ``maxsize=1`` retains exactly the live one.
-
-    The returned mappings are shared, not copied -- read them, never mutate them.
-    A module that fails to read or parse contributes nothing (as before), so the
-    fixpoint never indexes an import map for it.
-    """
-    local_names = frozenset(stem for stem, _ in sources)
-    func_calls: dict[
-        tuple[str, str], tuple[frozenset[str], frozenset[tuple[str, str]]]
-    ] = {}
-    imp_name: dict[str, dict[str, tuple[str, str]]] = {}  # stem -> name -> (mod, orig)
-    imp_alias: dict[str, dict[str, str]] = {}  # stem -> alias -> mod
-    for stem, text in sources:
-        if text is None:
-            continue
-        try:
-            syntax = _module_syntax(text)
-        except SyntaxError:
-            continue
-        n2q: dict[str, tuple[str, str]] = {}
-        a2m: dict[str, str] = {}
-        for level, module, names in syntax.from_imports:
-            if level == 0 and module in local_names:
-                for name, asname in names:
-                    n2q[asname or name] = (module, name)
-        for name, asname in syntax.imports:
-            if name in local_names:
-                a2m[asname or name] = name
-        imp_name[stem], imp_alias[stem] = n2q, a2m
-        for function, simple, attrs in syntax.functions:
-            func_calls[(stem, function)] = (simple, attrs)
-    return func_calls, imp_name, imp_alias
-
-
-@functools.lru_cache(maxsize=None)
-def _stamping_modules(primitives: frozenset[str]) -> frozenset[str]:
-    """Module stems that contain a function which TRANSITIVELY calls a stamping
-    primitive -- a whole-program, function-level call graph over every local
-    module. ``primitives`` selects the property contract being classified.
-
-    For part-registry classification this is precise where a module-level
-    "is it imported" test is not: an assembly
+    This is precise where a module-level "is it imported" test is not: an assembly
     that imports a part builder only for CONSTANTS (``build_summing_assembly`` <-
     ``build_boss_hook`` values), or that calls only a builder's MATH helpers
     (``build_paper_drive_assembly`` -> ``_gear`` -> ``build_cone_gear.gap_area_in_disc``),
@@ -2614,8 +2528,31 @@ def _stamping_modules(primitives: frozenset[str]) -> frozenset[str]:
     no FULL (codex review). An assembly that genuinely generates+stamps an in-script
     part (``build_channel_assembly`` -> ``_spring.build_spring`` ->
     ``save_part_and_images``) IS a stamper. Stamping is always a by-name call, so
-    name-based edges capture every real path (no under-detection)."""
-    func_calls, imp_name, imp_alias = _module_call_graph(_module_sources())
+    name-based edges capture every real path (no under-detection). A module that
+    fails to read or parse contributes no function but stays an import target."""
+    local = _local_modules()
+    func_calls: dict[
+        tuple[str, str], tuple[frozenset[str], frozenset[tuple[str, str]]]
+    ] = {}
+    imp_name: dict[str, dict[str, tuple[str, str]]] = {}  # stem -> name -> (mod, orig)
+    imp_alias: dict[str, dict[str, str]] = {}  # stem -> alias -> mod
+    for stem, path in local.items():
+        try:
+            syntax = _module_syntax(path.read_text(encoding="utf-8"))
+        except (OSError, SyntaxError):
+            continue
+        n2q: dict[str, tuple[str, str]] = {}
+        a2m: dict[str, str] = {}
+        for level, module, names in syntax.from_imports:
+            if level == 0 and module in local:
+                for name, asname in names:
+                    n2q[asname or name] = (module, name)
+        for name, asname in syntax.imports:
+            if name in local:
+                a2m[asname or name] = name
+        imp_name[stem], imp_alias[stem] = n2q, a2m
+        for function, simple, attrs in syntax.functions:
+            func_calls[(stem, function)] = (simple, attrs)
 
     # Fixpoint: a function stamps if it calls a primitive, a stamping function in
     # its own module, or an imported name that resolves to a stamping function.
@@ -2627,7 +2564,7 @@ def _stamping_modules(primitives: frozenset[str]) -> frozenset[str]:
             if key in stamping:
                 continue
             stem, _ = key
-            hit = bool(simple & primitives)
+            hit = bool(simple & _PART_STAMP_PRIMITIVES)
             if not hit:
                 for s in simple:
                     if (stem, s) in stamping or imp_name[stem].get(s) in stamping:
@@ -2645,70 +2582,13 @@ def _stamping_modules(primitives: frozenset[str]) -> frozenset[str]:
     return frozenset(stem for stem, _ in stamping)
 
 
-def _clear_stamping_caches(
-    _fixpoint=_stamping_modules.cache_clear,
-    _scan=_module_call_graph.cache_clear,
-) -> None:
-    """Clearing the classification also drops the SHARED scan behind it.
-
-    Freshness does not depend on this -- the scan is keyed on a fresh content
-    snapshot, so it cannot answer for changed sources. It is here so that an
-    explicit clear really releases the memory (the retained snapshot holds every
-    module's source text), and so callers keep the single existing entry point.
-    """
-    _fixpoint()
-    _scan()
-
-
-_stamping_modules.cache_clear = _clear_stamping_caches
-
-
 def stamps_part_properties(script: Path) -> bool:
     """True when this script generates and stamps a part-registry-owned part.
 
-    For assemblies this is intentionally narrower than title-block stamping:
-    only channel generates stretched spring variants in-script.  The predicate
-    controls referenced part-row and part-template recipe dependencies.
+    Among assemblies only channel does, for its stretched spring variants. The
+    predicate controls referenced part-row and part-template recipe dependencies.
     """
-    return script.stem in _stamping_modules(_PART_STAMP_PRIMITIVES)
-
-
-def stamps_title_block_properties(script: Path) -> bool:
-    """True when this script stamps the general-tolerance title-block fields."""
-    return script.stem in _stamping_modules(_TITLE_BLOCK_STAMP_PRIMITIVES)
-
-
-# Modules that read title_block.yaml for GEOMETRY -- a worst-case stack that
-# sizes or places a part from the printed rows, or a part dimension set to a
-# printed band -- rather than for the TOL_* stamping.  A title-block edit moves
-# those, so a build importing one keeps title_block.yaml even when it stamps
-# nothing (Codex #854 review).  Every module that calls the accessor and is not
-# a stamper or a drawing script is listed here (test_dodo_recipe pins it); a
-# module that reads the rows through _printed_tolerance is covered by its import
-# closure (reads_title_block_geometry).  The TOL_* text renderer
-# (_title_block_units) is stamping, not geometry, so it stays out.
-TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
-    {
-        "_printed_tolerance",
-        "sm_vn_boss_hook_spec",
-        "error_budget",
-        "export_features",
-        # Angular row sets the lever-level acceptance the summing sheet prints,
-        # held inside the knife edge's free-rock floor.
-        "sm_summing_assembly_sheet",
-    }
-)
-
-
-def reads_title_block_geometry(script: Path) -> bool:
-    """True when this script, or its import closure, sizes geometry from the
-    title block.  ``module_deps_of`` lists imports only, so the root script is
-    checked by its own stem (Codex #1035, PRRT_kwDOPHDy386mV11b)."""
-    if Path(script).stem in TITLE_BLOCK_GEOMETRY_MODULES:
-        return True
-    return any(
-        Path(dep).stem in TITLE_BLOCK_GEOMETRY_MODULES for dep in module_deps_of(script)
-    )
+    return script.stem in _stamping_modules()
 
 
 def dependents_of(stem: str) -> list[str]:

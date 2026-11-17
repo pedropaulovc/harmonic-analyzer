@@ -3,11 +3,9 @@
 Worst-case stacks, fits and part dimensions that size from the printed general
 tolerances read them here, in millimetres (degrees for the angular row),
 whatever unit a row is printed in; ``_title_block_units`` converts inches at
-25.4 mm/in and refuses a unitless, unknown-unit or non-numeric entry.  This
-module is listed in ``_buildgraph.TITLE_BLOCK_GEOMETRY_MODULES``, so any build
-whose import closure reaches it keeps ``title_block.yaml`` in its recipe.  The
-TOL_* text lives in ``_title_block_units`` so the stamping stays out of that
-classification.
+25.4 mm/in and refuses a unitless, unknown-unit or non-numeric entry.  Any
+build whose import closure reaches this module keeps ``title_block.yaml`` in
+its recipe.  The TOL_* text lives in ``_title_block_units``.
 
 An accepted part is checked against the number its sheet prints and the title
 block's row for that many places, not the inch grade behind the row (Codex P2
