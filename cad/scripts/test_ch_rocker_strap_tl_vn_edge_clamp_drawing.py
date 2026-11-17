@@ -284,7 +284,10 @@ def test_recipe_features_and_volumes(recorded) -> None:
     assert body.depth == pytest.approx(spec.WIDTH) and body.both_directions
     assert counterbore.depth == pytest.approx(spec.COUNTERBORE_CUT_DEPTH)
     assert counterbore.both_directions and counterbore.end_condition == "Blind"
-    assert slot.end_condition == "ThroughAll" and slot.both_directions
+    # Blind both ways past the full height (FeatureCut3 refuses ThroughAll
+    # both ways): each side reaches past the body.
+    assert slot.end_condition == "Blind" and slot.both_directions
+    assert slot.depth > spec.TOP_Z
     assert screw.angle == 360.0 and screw.merge_result is False and not screw.is_cut
     assert socket.depth == pytest.approx(spec.SCREW_SOCKET_CUT_DEPTH)
     assert socket.both_directions
