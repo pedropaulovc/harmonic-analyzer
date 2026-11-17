@@ -185,8 +185,7 @@ feed = "6.8 in/min"
 # Source: end-bracket.toml and feed-lever.toml; hand travelers dated
 # 2026-11-02 (MHA-CH-06-TL-28/TL-26 v47), the v48 manifest notes (#29 tap
 # drill, plug-start then bottoming-finish taps) and the archived
-# taps-unc-hand 8-32 plug/bottoming records. Speeds are the hand sheets'
-# LittleMachineShop 6061-T6 row: 165 ft/min milling -> 1250 rpm.
+# taps-unc-hand 8-32 plug/bottoming records.
 [tools.jig-saw]
 description = "Miter saw or bandsaw"
 [tools.jig-em-half]
@@ -209,11 +208,17 @@ diameter_mm = 8.73125
 [tools.jig-files]
 description = "10 in mill second-cut and 8 in smooth files; bench vise with soft jaws"
 
+# TL-26/TL-28 end mill (owner ruling 2026-11-16, prechips #436): the speed and
+# feed the owner ran a 1/2 in 2-flute HSS end mill at on the PM-30MV, facing
+# the base bar's long edge (harmonic-analyzer
+# logbook/entries/2026-11-05-base-bar-on-the-table.md, op 3: 1800 rpm,
+# 7 in/min), on the low belt. 1800 rpm = 236 ft/min; 7 / (1800 x 2) =
+# .0019 in/tooth.
 [settings.jig-em-half-6061-t6511]
 tool = "jig-em-half"
 material = "6061-t6511"
-rpm = 1250
-feed = "3 in/min"
+rpm = 1800
+feed = "7 in/min"
 
 # HA: the rocker arm's strap profile cutter on its low-carbon steel (the oblique
 # trammel jig's normal cutting force reads this chip load:
