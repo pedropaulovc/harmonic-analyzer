@@ -16,13 +16,12 @@ def test_every_purchased_part_has_a_tier_and_every_tier_names_a_part():
     assert tiered <= set(_config.parts())
 
 
-def test_schedule_rows_are_exactly_the_tier_one_parts():
-    standard = {
-        stem
-        for stem, (tier, _reason) in schedule.TIERS.items()
-        if tier is schedule.Tier.STANDARD
-    }
-    assert set(schedule.SCHEDULE) == standard
+def test_only_tier_one_rows_carry_a_designation():
+    for stem, row in schedule.TIERS.items():
+        assert row["tier"] in (1, 2, 3), stem
+        assert row["why"], stem
+        scheduled = {"designation", "standard"} <= set(row)
+        assert scheduled == (row["tier"] == 1), stem
 
 
 def test_release_ships_the_schedule(tmp_path, monkeypatch):
@@ -34,6 +33,6 @@ def test_release_ships_the_schedule(tmp_path, monkeypatch):
     for stem, row in schedule.SCHEDULE.items():
         part = _config.parts(stem)
         assert part["number"] in text
-        assert row.designation in text
+        assert row["designation"] in text
         for sku in part["supplier_skus"]:
             assert str(sku) in text

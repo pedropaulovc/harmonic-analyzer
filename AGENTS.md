@@ -1138,9 +1138,9 @@ major diameter: declare `threaded=False` and sweep no `ThreadGroove`, and do not
 clone the vendor B-rep through the `diag_mcmaster_lib` replica gate. Existing
 threaded SKUs keep their grooves, because assembly `ALLOWED_PAIRS` overlap
 budgets and `_stock_fastener`'s declared-thread check are calibrated against
-them. Give every new purchased part its COTS tier in `hardware_schedule.TIERS`;
-a tier-1 (standard) part also takes a `SCHEDULE` row, which the release prints
-as `HARDWARE.md`.
+them. Give every new purchased part its COTS tier in `cad/config/hardware.yaml`;
+a tier-1 (standard) part also takes its designation, standard and envelope
+sources there, which `hardware_schedule.py` prints as the release's `HARDWARE.md`.
 
 Simplified configuration helpers are separated by their real consumers:
 `_simplified_names` is naming only, `_simplified_identity` fingerprints assembly
