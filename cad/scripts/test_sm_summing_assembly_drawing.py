@@ -266,16 +266,17 @@ def test_a_caption_pushed_into_the_title_block_is_refused() -> None:
 
 def test_the_shoulder_screw_goes_in_after_the_end_plug_bond() -> None:
     # Owner rulings 2026-11-08 (Pedro), #2315: step 8 bonds the end plug per
-    # sheet 1 note 5, so the shoulder screw goes in at 8A-8B.
+    # bond note B, so the shoulder screw goes in at 8A-8B.
     steps = {step.split(". ", 1)[0]: step for step in notes.ASSEMBLY_STEPS}
-    assert steps["8"].startswith("8. BOND MHA-SM-05 INTO MHA-SM-01 PER SHEET 1 NOTE 5")
+    assert steps["8"].startswith("8. BOND MHA-SM-05 INTO MHA-SM-01 PER BOND NOTE B")
     assert steps["8A"].startswith("8A. PASS MHA-SM-VN-56")
     assert steps["8B"].startswith("8B. TURN MHA-SM-VN-56 INTO MHA-SM-05")
     assert steps["10A"].startswith("10A. TIGHTEN THE HUB SET SCREW MHA-FR-VN-52")
     assert "SNUG, 9 IN-LB MAX" in steps["10A"]
-    (bond_note,) = [n for n in notes.ASSEMBLED_NOTES if n.startswith("5. LOCTITE 638")]
+    bond_note = notes.BOND_NOTE_B
+    assert bond_note in notes.ASSEMBLY_CHECKS
     assert "CURE 24 H BEFORE STEP 8A" in bond_note
-    # Bench acceptance, as note 4's dowel bond (machinist review, run
+    # Bench acceptance, as bond note A's dowel bond (machinist review, run
     # 20261109T142156827Z, rule 23).
     assert bond_note.endswith("ACCEPT: IT DOES NOT TURN OR PULL OUT BY HAND.")
 

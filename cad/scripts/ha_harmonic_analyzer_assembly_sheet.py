@@ -188,7 +188,7 @@ _STEP_TEXT: dict[str, tuple[str, ...]] = {
     ),
     "drive-train-built": _BUILT_APART,
     "summing-hung": (
-        f"SUMMING LEVER: BUILD MHA-SM-00 STEPS 1-{SM_LAST_BENCH_STEP} UNDER THE "
+        f"SUMMING LEVER: BUILD MHA-SM-00 STEPS 1-{SM_LAST_BENCH_STEP} (ASSEMBLY.MD) UNDER THE "
         "TOP-FRAME CROSSBAR, THE MHA-SM-01 POST OUT OF ITS HUB.",
     ),
     "channel-built": (
