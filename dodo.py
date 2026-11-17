@@ -719,16 +719,6 @@ def _external_console_level() -> str:
 _COM_ENV_PINS = {"PYTHONHASHSEED": "0"}
 
 
-def _read_guard_env(task: str) -> dict[str, str | None]:
-    """The read guards a subprocess working for ``task`` gets (None: unset):
-    the catalog rows its cache key folds (`fastener` refuses others) and the
-    fit groups it may read."""
-    return {
-        "HARMONIC_FASTENER_ROWS": _fastener_rows_env(task),
-        "HARMONIC_FIT_GROUPS": _fit_groups_env(task),
-    }
-
-
 def _run_subprocess(
     cmd: list[str],
     label: str,
@@ -743,18 +733,17 @@ def _run_subprocess(
 
     ``label`` is the display name; ``task`` is the doit task the subprocess works
     for (default: ``label``, which already is one for most callers). The
-    fastener, fit-group and shop-record guards are keyed on ``task``, so a
-    FULL/REFRESH/hook subprocess with a display label still gets its assembly's
-    read sets. ``env_pins`` are set over everything else (:data:`_COM_ENV_PINS`
-    for COM subprocesses)."""
+    fastener-row guard is keyed on ``task``, so a FULL/REFRESH/hook subprocess
+    with a display label still gets its assembly's rows. ``env_pins`` are set
+    over everything else (:data:`_COM_ENV_PINS` for COM subprocesses)."""
     _telemetry.info(f">> {label}: {' '.join(cmd)}")
     env = _telemetry.inject_env()
     env["OTEL_SERVICE_NAME"] = _stage_name(label)
-    # The catalog rows, fit groups and shop records this task's cache key folds.
-    for name, value in _read_guard_env(task or label).items():
-        env.pop(name, None)
-        if value is not None:
-            env[name] = value
+    # The catalog rows this task's cache key folds; `fastener` refuses others.
+    rows = _fastener_rows_env(task or label)
+    env.pop("HARMONIC_FASTENER_ROWS", None)
+    if rows is not None:
+        env["HARMONIC_FASTENER_ROWS"] = rows
     # The MCP adapter uses Loguru directly. Keep its console sink aligned with
     # the build's warning-by-default policy while preserving an explicit override.
     env.setdefault("LOGURU_LEVEL", _external_console_level())
@@ -1964,35 +1953,6 @@ def _fastener_rows_env(task: str) -> str | None:
     return None if rows is None else ",".join(sorted(rows))
 
 
-def _fit_groups_env(task: str) -> str | None:
-    """Guard fit reads with the same concrete config files folded by the task.
-
-    Like the fastener guard, recompute in doit workers and leave unnarrowed
-    tasks unrestricted. Empty selections refuse every fit group.
-    """
-    if not task or any(ch.isspace() for ch in task):
-        raise ValueError(f"{task!r} is not a doit task name; its fit groups are unknown")
-    family, _, stem = task.partition(":")
-    if family == "part" and stem in part_stems():
-        deps = _part_file_deps(SCRIPTS_DIR / f"build_{stem}.py", stem)
-    elif family == "assembly" and stem in ASSEMBLY_ORDER:
-        deps = _recipe_files(stem)
-    elif family == "drawing" and stem in DRAWINGS_BY_NAME:
-        deps = _drawing_file_deps(stem)
-    elif task.startswith("package:features:"):
-        deps = _feature_export_file_deps(task.removeprefix("package:features:"))
-    elif family in ("part", "assembly", "drawing"):
-        raise ValueError(f"{task!r} names no {family} task; its fit groups are unknown")
-    else:
-        return None
-    tolerance_dir = _resolved(CONFIG_DIR / "tolerances")
-    groups = {
-        Path(dep).stem for dep in deps
-        if _resolved(Path(dep).parent) == tolerance_dir and Path(dep).stem != "_base"
-    }
-    return ",".join(sorted(groups))
-
-
 def _drawing_file_deps(stem: str) -> list[str]:
     """Inputs for both doit freshness and the shared drawing-cache key.
 
@@ -2084,10 +2044,8 @@ def _soundness_file_deps(stem: str) -> list[str]:
     allowed-interference table with its import closure (verify.py resolves it
     by name at run time, so no import edge exposes it; it decides gate
     OUTCOMES, so an edit must re-run this gate even when no geometry moved,
-    while another assembly's table never does), the assembly itself with
-    its execution token, and the shop records the gate's closure reads plus
-    those of its assembly's recipe (verify.py imports the assembly's own spec
-    modules lazily, e.g. the jig's spec for its member counts)."""
+    while another assembly's table never does), and the assembly itself with
+    its execution token."""
     interference = interference_contract_file(stem)
     deps = [
         str(VERIFY_PY),

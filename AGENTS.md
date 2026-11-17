@@ -1233,12 +1233,6 @@ whole config — so it can only over-rebuild, never skip a real change. Don't ad
 new `_config` accessor without mapping it in `_buildgraph` (`check:graph`'s
 coverage test fails loud otherwise).
 
-Under doit, `HARMONIC_FIT_GROUPS` carries the fit groups covered by the task's
-config dependencies; `_config.fit` refuses a group outside that set. The
-launcher clears inherited restrictions for unnarrowed tasks, mirroring the
-fastener-row guard. This makes a hidden read fail rather than reuse an artefact
-whose cache key omits the group's input.
-
 Fit helpers are file-granular too: `_fit_deviations.py` owns numerical bands
 and validation; `_fit_ream_slide.py`, `_fit_shaft_h.py`, and `_fit_ream_h7.py`
 own the individual fit classes. Geometry imports numerical helpers, and a
