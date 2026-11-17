@@ -246,8 +246,21 @@ def compose_prompt(kind: str, ref: str | None = None, repo: Path = REPO_ROOT) ->
     # gate does; earlier refs had none and sent the whole file.
     if text.startswith("---\n"):
         text = mr.review_config.split_drawing_guidelines(text)[1]
-    return f"{text.rstrip()}\n\n{template}"
-
+    text = text.rstrip()
+    if kind == "traveler":
+        traveler_guidelines = show("cad/docs/traveler-guidelines.md")
+        if traveler_guidelines.returncode:
+            raise ValueError(
+                f"cannot load traveler guidelines from {ref}: "
+                f"{traveler_guidelines.stderr.strip()}"
+            )
+        traveler_text = traveler_guidelines.stdout
+        if traveler_text.startswith("---\n"):
+            traveler_text = mr.review_config.split_traveler_guidelines(
+                traveler_text
+            )[1]
+        text = f"{text}\n\n{traveler_text.rstrip()}"
+    return f"{text}\n\n{template}"
 
 def _metadata(case: dict[str, Any]) -> dict[str, Any]:
     return {

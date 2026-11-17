@@ -121,13 +121,16 @@ from machinist_review_sheets_mcp import (  # noqa: E402
 
 PROMPTS_DIR = SCRIPTS_DIR / "prompts"
 GUIDELINES_FILE = CAD_ROOT / "docs" / "drawing-guidelines.md"
+TRAVELER_GUIDELINES_FILE = CAD_ROOT / "docs" / "traveler-guidelines.md"
 PROMPT_FILES = {
     "part": PROMPTS_DIR / "machinist_review_part.md",
     "assembly": PROMPTS_DIR / "machinist_review_assembly.md",
+    "traveler": PROMPTS_DIR / "machinist_review_traveler.md",
 }
 SEVERITY_FILES = {
     "part": PROMPTS_DIR / "machinist_review_part_severity.md",
     "assembly": PROMPTS_DIR / "machinist_review_assembly_severity.md",
+    "traveler": PROMPTS_DIR / "machinist_review_traveler_severity.md",
 }
 SEVERITY_TOKEN = "<!-- MACHINIST_SEVERITY_CONTRACT -->"
 SCHEMA_FILE = PROMPTS_DIR / "machinist_review_schema.json"
@@ -192,9 +195,9 @@ _TOOL_EVENT_MARKERS = (
 @dataclass(frozen=True)
 class ReviewPackage:
     name: str
-    kind: str  # "part" | "assembly"
+    kind: str  # "part" | "assembly" | "traveler"
     sources: tuple[Path, ...]
-
+    traveler_html: Path | None = None
 
 @dataclass
 class Review:
@@ -254,13 +257,17 @@ def load_prompt(kind: str, *, judge: bool = False) -> str:
     guidelines = review_config.split_drawing_guidelines(
         GUIDELINES_FILE.read_text(encoding="utf-8")
     )[1].rstrip()
+    if kind == "traveler":
+        traveler_guidelines = review_config.split_traveler_guidelines(
+            TRAVELER_GUIDELINES_FILE.read_text(encoding="utf-8")
+        )[1].rstrip()
+        guidelines = f"{guidelines}\n\n{traveler_guidelines}"
     template = JUDGE_PROMPT_FILE if judge else PROMPT_FILES[kind]
     instructions = expand_severity_contract(
         template.read_text(encoding="utf-8"),
         SEVERITY_FILES[kind].read_text(encoding="utf-8"),
     )
     return f"{guidelines}\n\n{instructions}"
-
 
 def load_schema() -> dict[str, Any]:
     return json.loads(SCHEMA_FILE.read_text(encoding="utf-8"))
@@ -367,6 +374,122 @@ def _text_layers(package: ReviewPackage) -> str:
                 documents.append(document)
     return "\n\n".join(documents)
 
+def extract_traveler_html_text(html_text: str) -> str:
+    """Extract exact structured text from a prechips HTML traveler.
+
+    Headless Chromium PDF printing splits kerning pairs and SVG labels in the
+    PDF text layer (for example ``ToTools``, ``off ff`` or ``Z .1 165``). When
+    the source HTML is supplied, this structured transcription gives reviewers
+    and the judge exact Setup/Op/Check text without exposing authoring files.
+    """
+    from html.parser import HTMLParser
+    import re
+
+    class _Extractor(HTMLParser):
+        _SKIP = {"style", "script", "svg"}
+
+        def __init__(self) -> None:
+            super().__init__(convert_charrefs=True)
+            self._skip = 0
+            self._lines: list[str] = []
+            self._buf: list[str] = []
+            self._in_tr = False
+            self._in_cell = False
+            self._cells: list[str] = []
+            self._in_heading = False
+
+        def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+            if tag in self._SKIP:
+                self._skip += 1
+                return
+            if self._skip:
+                return
+            attr_map = dict(attrs)
+            if tag == "img":
+                alt = (attr_map.get("alt") or "").strip()
+                if alt:
+                    self._flush()
+                    self._lines.append(f"[Diagram alt: {alt}]")
+            elif tag == "tr":
+                self._flush()
+                self._in_tr = True
+                self._cells = []
+            elif tag in ("th", "td") and self._in_tr:
+                self._in_cell = True
+                self._buf = []
+            elif tag == "span" and self._in_heading and self._buf:
+                self._buf.append(" — ")
+            elif tag in ("h1", "h2"):
+                self._flush()
+                self._in_heading = True
+            elif tag in ("p", "dt", "dd", "li", "div"):
+                if self._in_cell and self._buf:
+                    self._buf.append(" / ")
+                elif not self._in_cell and tag != "div":
+                    self._flush()
+
+        def handle_endtag(self, tag: str) -> None:
+            if tag in self._SKIP:
+                self._skip = max(0, self._skip - 1)
+                return
+            if self._skip:
+                return
+            if tag in ("th", "td") and self._in_cell:
+                cell = re.sub(r"\s+", " ", "".join(self._buf)).strip(" /")
+                if cell:
+                    self._cells.append(cell)
+                self._buf = []
+                self._in_cell = False
+            elif tag == "tr" and self._in_tr:
+                if self._cells:
+                    self._lines.append(" | ".join(self._cells))
+                self._in_tr = False
+                self._cells = []
+            elif tag in ("h1", "h2"):
+                self._in_heading = False
+                self._flush()
+            elif tag in ("p", "dd", "li") and not self._in_cell:
+                self._flush()
+
+        def handle_data(self, data: str) -> None:
+            if not self._skip:
+                self._buf.append(data)
+
+        def _flush(self) -> None:
+            text = re.sub(r"\s+", " ", "".join(self._buf)).strip()
+            self._buf = []
+            if text:
+                self._lines.append(text)
+
+        def result(self) -> str:
+            self._flush()
+            return "\n".join(self._lines)
+
+    parser = _Extractor()
+    parser.feed(html_text)
+    return parser.result()
+
+
+def _traveler_document_roles(package: ReviewPackage) -> str:
+    """Describe traveler vs. reference-drawing sheet ranges when paired."""
+    if package.kind != "traveler" or len(package.sources) < 2:
+        return ""
+    with SheetStore((package.sources[0],)) as first:
+        traveler_sheets = first.sheet_count
+    with SheetStore(package.sources) as total:
+        all_sheets = total.sheet_count
+    if all_sheets <= traveler_sheets:
+        return ""
+    return (
+        "\nDOCUMENT ROLES\n"
+        f"- Sheets 1..{traveler_sheets}: process traveler under review.\n"
+        f"- Sheets {traveler_sheets + 1}..{all_sheets}: companion part drawing "
+        "(reference specification authority ONLY — check traveler completeness "
+        "and agreement against it under rules T1, T2 and T14, and NEVER file "
+        "findings against the part drawing's own tolerances, notes or layout).\n"
+    )
+
+
 
 def _fitup_section(package: ReviewPackage) -> str:
     """The package's ASSEMBLY.md fit-up section when its steps print there
@@ -403,6 +526,19 @@ def _review_prompt(
         prompt += (
             "Compare every sheet against every other sheet before accepting SHIP.\n"
         )
+    prompt += _traveler_document_roles(package)
+    if package.kind == "traveler" and package.traveler_html is not None:
+        html_text = extract_traveler_html_text(
+            package.traveler_html.read_text(encoding="utf-8")
+        )
+        if html_text:
+            prompt += (
+                "\nTRAVELER HTML TEXT\n"
+                "Exact structured text from the traveler HTML source (headings, "
+                "holding, datum, operation rows and checks). Confirm visual "
+                "layout, diagram leaders and line counts on view_sheet and crop.\n"
+                f"{html_text}\n"
+            )
     layers = _text_layers(package)
     if layers:
         prompt += (
@@ -1691,11 +1827,24 @@ def _review_session(
     snapshot_dir = report_dir / f"{package.name}.sources"
     snapshot_dir.mkdir(parents=True, exist_ok=True)
     snapshot_sources = []
-    for source in package.sources:
-        target = snapshot_dir / source.name
+    seen_names: set[str] = set()
+    for index, source in enumerate(package.sources):
+        name = source.name if source.name not in seen_names else f"{index + 1:04d}-{source.name}"
+        seen_names.add(name)
+        target = snapshot_dir / name
         shutil.copyfile(source, target)
         snapshot_sources.append(target)
-    snapshot = ReviewPackage(package.name, package.kind, tuple(snapshot_sources))
+    snapshot_html: Path | None = None
+    if package.traveler_html is not None:
+        if not package.traveler_html.is_file():
+            raise FileNotFoundError(
+                f"{package.name}: traveler HTML missing: {package.traveler_html}"
+            )
+        snapshot_html = snapshot_dir / f"traveler-{package.traveler_html.name}"
+        shutil.copyfile(package.traveler_html, snapshot_html)
+    snapshot = ReviewPackage(
+        package.name, package.kind, tuple(snapshot_sources), snapshot_html
+    )
     mcp_catalog = _sheet_resource_manifest(snapshot.sources)
     neutral_resources = reviewer == "codex" and _resource_neutrality_permitted(mcp_catalog)
     model = model or review_config.DEFAULT_MODELS[reviewer]
@@ -2143,6 +2292,7 @@ def aggregate_package(
         # immutable snapshot.
         source_dir = report_dir / package.name / "sources" / uuid.uuid4().hex
         sources: list[Path] = []
+        snapshot_html: Path | None = None
         snapshot_error = None
         try:
             source_dir.mkdir(parents=True, exist_ok=True)
@@ -2150,11 +2300,17 @@ def aggregate_package(
                 target = source_dir / f"{index + 1:04d}{source.suffix.lower()}"
                 shutil.copyfile(source, target)
                 sources.append(target)
+            if package.traveler_html is not None:
+                snapshot_html = source_dir / "traveler.html"
+                shutil.copyfile(package.traveler_html, snapshot_html)
         except OSError as exc:
             snapshot_error = f"source snapshot failed: {type(exc).__name__}: {exc}"
-        snapshot = ReviewPackage(package.name, package.kind, tuple(sources))
+        snapshot = ReviewPackage(
+            package.name, package.kind, tuple(sources), snapshot_html
+        )
         source_sha = [_sha256(source) for source in sources]
-
+        if snapshot_html is not None and snapshot_html.is_file():
+            source_sha.append(_sha256(snapshot_html))
 
         def run(run_id: str, on_first_response: Callable[[], None] | None = None) -> Review:
             directory = report_dir / package.name / "runs" / run_id
@@ -2527,8 +2683,13 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--all", action="store_true", help="review every registered drawing"
     )
     parser.add_argument("--pdf", type=Path, action="append", help="package PDF; repeat in package order")
+    parser.add_argument(
+        "--traveler-html",
+        type=Path,
+        help="optional prechips HTML source for exact text alongside --kind traveler",
+    )
     parser.add_argument("--name", help="package stem for --pdf (no registry lookup)")
-    parser.add_argument("--kind", choices=("part", "assembly"), default="part")
+    parser.add_argument("--kind", choices=tuple(PROMPT_FILES), default="part")
     parser.add_argument(
         "--pdf-dir",
         type=Path,
@@ -2583,6 +2744,11 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     for path in args.pdf or []:
         if path.suffix.casefold() != ".pdf":
             parser.error(f"expected PDF input, not {path}")
+    if args.traveler_html is not None:
+        if args.kind != "traveler" or not args.pdf:
+            parser.error("--traveler-html requires --kind traveler and --pdf")
+        if args.traveler_html.suffix.casefold() not in (".html", ".htm"):
+            parser.error(f"expected HTML input for --traveler-html, not {args.traveler_html}")
     return args
 
 
@@ -2596,7 +2762,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     packages: list[ReviewPackage]
     if args.pdf:
         packages = [ReviewPackage(
-            args.name, args.kind, tuple(path.resolve() for path in args.pdf),
+            args.name,
+            args.kind,
+            tuple(path.resolve() for path in args.pdf),
+            args.traveler_html.resolve() if args.traveler_html is not None else None,
         )]
     elif args.all:
         packages = all_packages()

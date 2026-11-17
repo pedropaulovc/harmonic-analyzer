@@ -387,11 +387,15 @@ order. PNG CLI input is not supported. Every review is unconditional.
 Each package runs three independent blind senior-machinist
 reviews (`--runs N` changes the count). An isolated judge session then merges
 their findings; independent reviewers never receive another session's context.
-Each run receives `drawing-guidelines.md` without its frontmatter,
-followed by the reviewer
-instructions for the package kind (`cad/scripts/prompts/machinist_review_part.md`
-or `machinist_review_assembly.md`), with its classification slot expanded from
-the matching `machinist_review_<kind>_severity.md` contract. The isolated
+Each run receives `drawing-guidelines.md` without its frontmatter (and, for a
+`--kind traveler` package, `traveler-guidelines.md` without its frontmatter),
+followed by the reviewer instructions for the package kind
+(`cad/scripts/prompts/machinist_review_part.md`,
+`machinist_review_assembly.md`, or `machinist_review_traveler.md`), with its
+classification slot expanded from the matching
+`machinist_review_<kind>_severity.md` contract. Per-kind prompt inclusion keeps
+`traveler` prompts and `cad/process/<stem>/machinist_exceptions.yaml` out of
+part and assembly review keys. The isolated
 judge inspects the after sheets and receives that same kind-specific classification
 and evidence contract, not the reviewer's detection or report instructions.
 It vets every finding against the guidelines, text layer and owner exceptions,

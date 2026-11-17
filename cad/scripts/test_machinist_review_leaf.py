@@ -260,8 +260,10 @@ def inputs(dodo, tmp_path, monkeypatch):
     for name in (
         "machinist_review_part.md",
         "machinist_review_assembly.md",
+        "machinist_review_traveler.md",
         "machinist_review_part_severity.md",
         "machinist_review_assembly_severity.md",
+        "machinist_review_traveler_severity.md",
         "machinist_review_schema.json",
         "machinist_review_judge.md",
         "machinist_review_judge_schema.json",
@@ -271,6 +273,11 @@ def inputs(dodo, tmp_path, monkeypatch):
     guidelines.parent.mkdir()
     guidelines.write_text(
         "---\nmajor_version: 1\n---\n# Guidelines\n\nRule 1.\n", encoding="utf-8"
+    )
+    traveler_guidelines = root / "cad" / "docs" / "traveler-guidelines.md"
+    traveler_guidelines.write_text(
+        "---\nmajor_version: 1\n---\n# Traveler Guidelines\n\nRule T1.\n",
+        encoding="utf-8",
     )
     config = root / "cad" / "config"
     (config / "parts").mkdir(parents=True)
@@ -304,6 +311,7 @@ def inputs(dodo, tmp_path, monkeypatch):
         scripts=scripts,
         pdf=pdf,
         guidelines=guidelines,
+        traveler_guidelines=traveler_guidelines,
         exception=exception,
         prompts=prompts,
         draw=draw,
@@ -387,6 +395,33 @@ def test_bumped_guidelines_rekey_every_review(inputs):
     after = {stem: _review_key(dodo, stem) for stem in stems}
     assert all(after[stem] != before[stem] for stem in stems)
 
+
+
+def test_traveler_prompts_and_guidelines_do_not_rekey_drawing_reviews(inputs):
+    dodo = inputs.module
+    before = _review_key(dodo, "probe")
+    (inputs.prompts / "machinist_review_traveler.md").write_text(
+        "updated traveler reviewer prompt\n", encoding="utf-8"
+    )
+    (inputs.prompts / "machinist_review_traveler_severity.md").write_text(
+        "updated traveler severity\n", encoding="utf-8"
+    )
+    inputs.traveler_guidelines.write_text(
+        "---\nmajor_version: 2\n---\n# Traveler v2\n", encoding="utf-8"
+    )
+    assert _review_key(dodo, "probe") == before
+
+    traveler_dir = inputs.root / "cad" / "out" / "travelers" / "probe"
+    traveler_dir.mkdir(parents=True)
+    (traveler_dir / "probe-traveler.pdf").write_bytes(b"PDF traveler")
+    (traveler_dir / "traveler-hobby.html").write_text("<html></html>\n", encoding="utf-8")
+    deps = dodo._machinist_review_traveler_file_deps("probe")
+    traveler_sidecar = str(Path(dodo._traveler_guidelines_version_dep()))
+    drawing_sidecar = str(Path(dodo._drawing_guidelines_version_dep()))
+    assert traveler_sidecar in deps and drawing_sidecar in deps
+    assert str(inputs.prompts / "machinist_review_traveler.md") in deps
+    assert str(inputs.prompts / "machinist_review_part.md") not in deps
+    assert str(inputs.prompts / "machinist_review_assembly.md") not in deps
 
 @pytest.mark.parametrize(
     "head",

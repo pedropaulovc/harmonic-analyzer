@@ -150,6 +150,7 @@ from machinist_review_config import (  # noqa: E402
     ReviewProfile,
     registered_review_profile,
     split_drawing_guidelines,
+    split_traveler_guidelines,
     validate_review_profile,
 )
 
@@ -3113,6 +3114,36 @@ def _drawing_guidelines_version_dep() -> str:
         f"major_version={version}",
     )
 
+def _traveler_guidelines_version_dep() -> str:
+    """The traveler review's dependency on ``traveler-guidelines.md``: a sidecar
+    holding only its frontmatter ``major_version``."""
+    version, _body = split_traveler_guidelines(
+        (SCRIPTS_DIR.parent / "docs" / "traveler-guidelines.md").read_text(
+            encoding="utf-8"
+        )
+    )
+    return _write_digest_sidecar(
+        CAD_OUT / ".machinist-review" / "traveler-guidelines-major-version.digest",
+        f"major_version={version}",
+    )
+
+
+def _machinist_review_prompts(kind: str) -> list[Path]:
+    """Explicit per-kind prompt and schema inclusion list.
+
+    Including only this kind's reviewer/severity files plus the shared judge
+    prompt and schemas ensures adding or editing another kind's prompts
+    (such as ``traveler``) never re-keys unrelated reviews."""
+    prompts_dir = SCRIPTS_DIR / "prompts"
+    names = (
+        f"machinist_review_{kind}.md",
+        f"machinist_review_{kind}_severity.md",
+        "machinist_review_judge.md",
+        "machinist_review_schema.json",
+        "machinist_review_judge_schema.json",
+    )
+    return [prompts_dir / name for name in names]
+
 
 def _machinist_review_file_deps(stem: str) -> list[str]:
     spec = DRAWINGS_BY_NAME[stem]
@@ -3125,15 +3156,7 @@ def _machinist_review_file_deps(stem: str) -> list[str]:
         )
     # Selecting this kind's reviewer and severity contract also keys --kind
     # without hashing the registry. Judge instructions and schemas are shared.
-    other_kind = "assembly" if spec.source_kind == "part" else "part"
-    excluded_prompts = {
-        f"machinist_review_{other_kind}.md",
-        f"machinist_review_{other_kind}_severity.md",
-    }
-    prompts = [
-        path for path in (SCRIPTS_DIR / "prompts").iterdir()
-        if path.is_file() and path.name not in excluded_prompts
-    ]
+    prompts = _machinist_review_prompts(spec.source_kind)
     fitup = _machinist_review_fitup_text(stem)
     return sorted({
         str(path.resolve())
@@ -3155,6 +3178,35 @@ def _machinist_review_file_deps(stem: str) -> list[str]:
         )
     })
 
+
+def _machinist_review_traveler_file_deps(stem: str) -> list[str]:
+    """Inputs for a traveler machinist review: traveler hobby PDF + HTML,
+    companion part drawing PDF, both versioned guidelines sidecars, traveler
+    prompts, shared judge/schemas, review modules, and traveler exceptions."""
+    import _process_plans
+
+    spec = DRAWINGS_BY_NAME[stem]
+    traveler_dir = _process_plans.traveler_dir(stem, CAD_OUT)
+    traveler_pdf = _process_plans.traveler_pdf_path(stem, CAD_OUT)
+    traveler_html = traveler_dir / "traveler-hobby.html"
+    exceptions = _process_plans.PROCESS_ROOT / stem / "machinist_exceptions.yaml"
+    return sorted({
+        str(path.resolve())
+        for path in (
+            traveler_pdf,
+            traveler_html,
+            spec.outputs["pdf"],
+            *(
+                SCRIPTS_DIR / name
+                for name in _MACHINIST_REVIEW_MODULES
+                if name not in RECIPE_SKIP_MODULES
+            ),
+            *_machinist_review_prompts("traveler"),
+            Path(_drawing_guidelines_version_dep()),
+            Path(_traveler_guidelines_version_dep()),
+            *([exceptions] if exceptions.is_file() else []),
+        )
+    })
 
 def _machinist_review_key_deps(stem: str) -> list[str]:
     """``_machinist_review_file_deps`` once the fit-up section they name is
@@ -3865,6 +3917,7 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
     machinist_review_contract_deps = [
         # Reviewer and judge prompts/schemas are read at runtime.
         SCRIPTS_DIR.parent / "docs" / "drawing-guidelines.md",
+        SCRIPTS_DIR.parent / "docs" / "traveler-guidelines.md",
         *(path for path in (SCRIPTS_DIR / "prompts").iterdir() if path.is_file()),
         # test_dt_cone_pivot_post_drawing reads the policy's GD&T allowlist;
         # allowlist edits must rerun its frame-ownership contract.

@@ -386,7 +386,9 @@ are gear data, not narration.
   `CAST`, `MILL FROM SOLID` are not requirements; the dimensioned feature is. A
   process word appears only where it is the requirement: REAM for a fit bore, a
   tap-drill depth that matters, matched fitting to an identified mate,
-  match-drill at assembly.
+  match-drill at assembly. Setups, workholding, CNC offsets, speeds, feeds and
+  in-process checks live in the part's traveler, reviewed against
+  `traveler-guidelines.md`.
 - **A missing view is not cured by a note.** Where something cannot be read off
   the views, add a view (a section for an internal web). A mirrored part is
   drawn in its own hand, never left to "LH OPPOSITE".
