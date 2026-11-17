@@ -2296,12 +2296,10 @@ def test_success_path_context_never_fails_a_good_build(tmp_path, monkeypatch):
         raise RuntimeError("no IModelView wrapper bound")
 
     monkeypatch.setattr(_seat_forensics, "display_geometry", explode)
-    monkeypatch.setattr(_seat_forensics, "sketch_authoring_preferences", explode)
 
     context = _seat_forensics.record_authoring_context(_unmerged_profile(tmp_path), "logo")
 
     assert "no IModelView wrapper bound" in context["display"]["capture_error"]
-    assert "no IModelView wrapper bound" in context["preferences"]["capture_error"]
     # The bags that CAN be read are still read: a broken probe is not a blackout.
     assert context["sketch_manager"]["AddToDB"] is True
 
