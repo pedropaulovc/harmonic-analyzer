@@ -117,9 +117,16 @@ reserved:
     allowance_pct: 0.30
   knife:                           # fixed reversal displacement, evaluated at each input's
                                    # actual ordinate scale and available magnifier range
-    rolling_resistance_mm: 0.005   # soft parent-metal edge (#1611) on a 28-32 HRC 4140 HT seat
-                                   # (owner ruling 2026-11-10, #2334 B1); value unchanged until
-                                   # measured (#1611 pendulum coupon); MEASURE as trace width on reversal
+    rolling_resistance_mm: 0.005   # integral gray-iron edge (ASTM A48 class 40, as machined, not
+                                   # hardened: #1611 delegated ruling 2026-11-17, option A) on a
+                                   # 28-32 HRC 4140 HT seat (owner ruling 2026-11-10, #2334 B1).
+                                   # Hertz line contact at the worst stationary load (rect_half:
+                                   # 134.8 N, about 68 N on the rear mount over .55 in, 4.85 N/mm),
+                                   # R.004 ridge in the Ø.4720 bore, E 117/205 GPa: 1.10 GPa peak,
+                                   # 2.8 um half-width, under this 0.005 and the 0.0073 mm the
+                                   # budget still closes at (pair gate fails at 0.0074). Value
+                                   # unchanged until measured (#1611 option D pendulum coupon);
+                                   # MEASURE as trace width on reversal
     allowance_pct: 0.45
     # Both spring banks pull upward on opposite sides of the knife.
     # Stock rates/initial tensions and loaded perpendicular arms govern the

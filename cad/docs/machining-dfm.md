@@ -546,8 +546,9 @@ The analytic section adds material only. Receiver wall proofs therefore take
 and connected-material gates.
 
 There is no end ledge or reference-only **(0.44)** contract: the former
-pad-step scope and RV-04 ledge exception are removed. Knife
-material/hardness remains #1611.
+pad-step scope and RV-04 ledge exception are removed. The lever is gray iron,
+ASTM A48 class 40, with its knife edges as machined, not hardened (#1611
+delegated ruling 2026-11-17, option A).
 
 The screw/grip, engagement, tip-gap and bottoming-tap-lead guards are retained.
 The bounded **.26 ±.01 in** drill (6.604 mm model depth) now runs into the connected coefficient

@@ -956,3 +956,16 @@ def test_radius_nominal_readback_has_one_nanometre_budget(
     else:
         with pytest.raises(RuntimeError):
             check_radius(object(), [annotation])
+
+
+def test_registry_names_the_gray_iron_knife_unhardened() -> None:
+    # #1611 delegated ruling 2026-11-17, option A: one gray-iron grade, no
+    # low-carbon-steel alternative, and the integral knife edges named as
+    # machined, not hardened (soft edge on the harder #2334 B1 4140 HT seat).
+    row = _config.parts("sm-summing-lever")
+    assert row["material"] == row["material_specification"] == (
+        "GRAY IRON, ASTM A48 CLASS 40"
+    )
+    assert "STEEL" not in row["material"]
+    assert row["finish"].endswith("KNIFE EDGES AS MACHINED, NOT HARDENED")
+    assert lever_build.MATERIAL == "Gray Cast Iron"
