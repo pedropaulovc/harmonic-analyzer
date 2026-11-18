@@ -423,6 +423,20 @@ flutes = [2, 4]
 [tools.taps-unc-hand.members.8-32-plug]
 flute_len_in = { value = 0.75, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers, cutting length from point to flute or countersink boundary" } }
 
+# Owner (Pedro) 2026-11-17, verbatim: "it was a mt3 dead center that had a
+# straight part at the end i gripped with a 3/4 collet". Used in the PM-30MV
+# as a tap guide, held by its straight end in the 3/4 in collet of
+# holders.r8-collets-south-bend-sb1280. About 7.5 in tip to collet face
+# (owner, relayed by Main), not measured. Its prechips description is
+# cad/process/shop.toml, same key.
+[tools.mill-dead-centre-mt3]
+name = "MT3 dead centre with a straight end, held in the 3/4 in R8 collet"
+kind = "dead_centre"
+present = true
+use = "Tap guide in the PM-30MV spindle"
+tip_to_collet_face_in = 7.5
+cite = ["Owner (Pedro) 2026-11-17: \"it was a mt3 dead center that had a straight part at the end i gripped with a 3/4 collet\"; about 7.5 in tip to holder face (owner, relayed by Main)"]
+
 # Owner ruling 2026-11-16 (Pedro), #2837: "Require a spring tap guide in the
 # spindle (tap squared to the quill), and add a squareness term to the
 # stack." The base bar's eight rail taps are cut in it; squareness_deg is the
