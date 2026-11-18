@@ -2,8 +2,8 @@
   <rect class="paper" x="0" y="0" width="760" height="450"/>
   <text class="title" x="20" y="18">SP02, plan (fixed jaw at the top): everything on the top in one clamping</text>
   <!-- Vise jaws, the plate centred on them. -->
-  <rect class="fixture-vise" x="211.5" y="30" width="317.4" height="30"/>
-  <rect class="fixture-vise" x="211.5" y="212.4" width="317.4" height="30"/>
+  <rect class="clamp" x="211.5" y="30" width="317.4" height="30"/>
+  <rect class="clamp" x="211.5" y="212.4" width="317.4" height="30"/>
   <!-- The plate; this setup removes the plate top round the fence and stop,
        the notches, pockets, counterbore and holes. -->
   <rect class="part-kept" x="40" y="60" width="660" height="152.4"/>
@@ -27,20 +27,25 @@
   <text class="datum-label" x="70" y="104">X0 Y0</text>
   <text class="label-halo" x="150" y="76">fence, .074 above Z0</text>
   <text class="label-halo" x="42" y="140">stop</text>
+  <line class="leader" x1="398" y1="136.2" x2="383" y2="136.2"/>
   <text class="label-halo" x="400" y="140">counterbore .500 × .185, 1/4-20 thru</text>
-  <text class="label-halo" x="300" y="205">4 clamp pockets, 4-40 thru</text>
+  <line class="leader" x1="266" y1="148" x2="274" y2="161.6"/>
+  <text class="label-halo" x="262" y="150" text-anchor="end">4 clamp pockets, 4-40 thru</text>
   <text class="label-halo" x="66" y="74">notch</text>
   <text class="label-halo" x="640" y="74">notch</text>
   <!-- Section across the jaws: the plate on the stacked parallels. -->
-  <text class="title" x="20" y="290">Section across the jaws (front at the left)</text>
-  <rect class="fixture-vise" x="200" y="330.1" width="40" height="89.9"/>
-  <rect class="fixture-vise" x="392.4" y="330.1" width="40" height="89.9"/>
-  <rect class="fixture-support" x="240" y="343.8" width="12" height="76.2"/>
-  <rect class="fixture-support" x="380.4" y="343.8" width="12" height="76.2"/>
-  <polygon class="part-kept" points="240,343.8 240,322.67 367,322.67 367,318.91 392.4,318.91 392.4,343.8"/>
-  <polygon class="part-removed" points="240,318.15 392.4,318.15 392.4,318.91 367,318.91 367,322.67 240,322.67"/>
-  <line class="fixture-table" x1="180" y1="420" x2="460" y2="420"/>
-  <text class="label" x="450" y="330">Z0 .146 above the jaws</text>
-  <text class="label" x="450" y="350">1 in + 1/2 in parallels stacked</text>
-  <text class="label" x="450" y="370">plate gripped on its milled edges, .27 in the jaws</text>
+  <text class="title" x="20" y="268">Section across the jaws, 1.5× the plan's scale (front at the left)</text>
+  <rect class="clamp" x="180" y="305.2" width="40" height="134.8"/>
+  <rect class="clamp" x="448.6" y="305.2" width="40" height="134.8"/>
+  <rect class="fixture-support" x="220" y="325.7" width="18" height="114.3"/>
+  <rect class="fixture-support" x="430.6" y="325.7" width="18" height="114.3"/>
+  <polygon class="part-kept" points="220,325.7 220,294 410.5,294 410.5,288.36 448.6,288.36 448.6,325.7"/>
+  <polygon class="part-removed" points="220,287.2 448.6,287.2 448.6,288.36 410.5,288.36 410.5,294 220,294"/>
+  <line class="fixture-table" x1="160" y1="440" x2="510" y2="440"/>
+  <line class="leader" x1="498" y1="299" x2="450" y2="305.2"/>
+  <text class="label" x="502" y="303">Z0 .146 above the jaws</text>
+  <line class="leader" x1="498" y1="380" x2="440" y2="380"/>
+  <text class="label" x="502" y="384">1 in + 1/2 in parallels stacked</text>
+  <text class="label" x="502" y="404">plate gripped on its milled edges,</text>
+  <text class="label" x="502" y="420">.27 in the jaws, underside down</text>
 </svg>

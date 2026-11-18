@@ -5,10 +5,10 @@
   <rect class="part-kept" x="30" y="90" width="330" height="120"/>
   <rect class="part-rest" x="366" y="90" width="374" height="120"/>
   <rect class="cutter" x="360" y="70" width="6" height="160"/>
-  <line class="dims" x1="30" y1="230" x2="360" y2="230"/>
-  <line class="dims" x1="30" y1="222" x2="30" y2="238"/>
-  <line class="dims" x1="360" y1="222" x2="360" y2="238"/>
-  <text class="label" x="150" y="250">13.0 ±.1 in</text>
+  <line class="dims" x1="30" y1="222" x2="360" y2="222"/>
+  <line class="dims" x1="30" y1="214" x2="30" y2="230"/>
+  <line class="dims" x1="360" y1="214" x2="360" y2="230"/>
+  <text class="label" x="150" y="242">13.0 ±.1 in</text>
   <text class="label" x="120" y="155">this length: the plate</text>
   <text class="label" x="490" y="155">rest of bar</text>
   <text class="label" x="372" y="66">saw blade</text>
