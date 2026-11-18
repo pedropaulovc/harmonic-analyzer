@@ -436,8 +436,10 @@ def _pockets(adapter: Any, drive_jobs: list[tuple[str, str]], volume: float) -> 
         )
     # Every location from the origin: each pocket's left end from X0 (an
     # equation of its station, so the station prints once, on its tap), the
-    # walls from Y0 on pocket 1, the length on pocket 1 (the drawing prints it
-    # above pocket 1, clear of the taps' X extension lines).
+    # walls from Y0 on pocket 1, the length on pocket 2 (the drawing prints it
+    # over the back edge, the open room under the hub's callout, clear of the
+    # taps' X extension lines and of the notch's rows over pocket 1: machinist
+    # review r24 read it inside the outline as convenience, rule 14).
     for index, ((_back, _right, near_wall, _left), station) in enumerate(
         zip(pockets, spec.CLAMP_STATIONS, strict=True), 1
     ):
@@ -469,10 +471,11 @@ def _pockets(adapter: Any, drive_jobs: list[tuple[str, str]], volume: float) -> 
                 "pocket back wall",
             )
             dims.record("PocketBackWallY", '"PocketBackWallY"')
+    second_near = pockets[1][2]
     dimension_between(
         adapter,
-        f"{first_near}.start",
-        f"{first_near}.end",
+        f"{second_near}.start",
+        f"{second_near}.end",
         "horizontal_distance",
         spec.POCKET_LENGTH,
         "pocket length",

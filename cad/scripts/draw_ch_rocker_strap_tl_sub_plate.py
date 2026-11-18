@@ -103,8 +103,9 @@ TOP_ORIGIN = (0.075 - spec.LEFT_END_X * _T, 0.204)
 # caption says so (drawing-guidelines: a rotated view says so; machinist
 # review r23) in its native custom scale text, draw_fr_harmonic_base's
 # SECTION_LABEL_SCALE_TEXT (a second free note beside the view read as the
-# section labelled twice).
-SECTION_LABEL_SCALE_TEXT = "ROTATED 90 DEG CCW  SCALE"
+# section labelled twice), its angle with the degree sign (rule 26; machinist
+# review r24: "90 DEG" is a spelling slip; draw_dt_crank_drive_gear's form).
+SECTION_LABEL_SCALE_TEXT = "ROTATED 90\N{DEGREE SIGN} CCW  SCALE"
 SECTION_A_ORIGIN = (0.070, 0.085)
 SECTION_B_ORIGIN = (0.266, 0.1088)
 # The cutting lines (model X, Y), each from 12 mm behind the back edge to 12
@@ -168,10 +169,11 @@ _FENCE_TOP_B = section_b_xy(0.0, spec.FENCE_HEIGHT)[1]
 # span; clamp 1's tap, its text high in its span, under the hub's text and
 # clear of its own lower arrow (machinist review mr5: centred between the
 # hub's and the tap's levels, the arrow ran through its '6'); the overall
-# width outermost, its text low in its span, under clamp 1's. The pocket length
-# over pocket 1, right of its span, midway between the hub's Y extension
-# line and the fence face; the radii right of the plate, each leader running
-# out level from its feature.
+# width outermost, its text low in its span, under clamp 1's. The pocket
+# length on pocket 2 over the back edge, its text left of its span under
+# the hub hole's callout (machinist review r24: inside the outline over
+# pocket 1 it was text on the part by convenience, rule 14); the radii
+# right of the plate, each leader running out level from its feature.
 TOP_KEEP: dict[str, tuple[float, float]] = {
     # Farm run r21: the notch start's (.92) outside dimension line ran into
     # the hub callout's drill row; it and the stock end drop under the
@@ -194,8 +196,8 @@ TOP_KEEP: dict[str, tuple[float, float]] = {
     "NotchDepth": (_LEFT_X - 0.002, top_xy(0.0, 0.0)[1] - 0.0045),
     "PlateWidth": (_LEFT_X - 0.055, _FRONT_Y + 0.00675),
     "PocketLength": (
-        top_xy(_STATIONS[0], 0.0)[0] + 0.0135,
-        top_xy(0.0, spec.HUB_Y / 2.0)[1],
+        top_xy(_STATIONS[1] - spec.POCKET_LENGTH / 2.0, 0.0)[0] - 0.0113,
+        _BACK_Y + 0.0055,
     ),
     "NotchCornerR": (_RIGHT_X + 0.022, top_xy(0.0, spec.NOTCH_DEPTH / 2.0)[1]),
     "PocketCornerR": (

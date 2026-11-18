@@ -225,15 +225,17 @@ def test_explicit_bands_are_the_only_model_tolerances() -> None:
         *spec.DIMENSION_PREFIXES,
     ):
         assert name in spec.DRAWING_DIMENSIONS[feature], (feature, name)
-    # Every tight or three-place size states its mate or reason (rule 3).
+    # Every tight or three-place size states its mate or reason (rule 3);
+    # routine tap locations print at two places (machinist review r24).
     three_place = {
         name for name, places in spec.DRAWING_PRECISION_BY_NAME.items() if places == 3
     }
     explained = set(spec.DIMENSION_CALLOUTS) | {
         name for _f, name in spec.SYMMETRIC_BANDS
     }
-    located = {"HubX", "HubY", "ClampTapY", *spec.CLAMP_TAP_X_NAMES}
-    assert three_place - located <= explained
+    assert three_place <= explained
+    for name in ("ClampTapY", *spec.CLAMP_TAP_X_NAMES):
+        assert spec.DRAWING_PRECISION_BY_NAME[name] == 2, name
 
 
 def test_every_drive_expression_names_a_global() -> None:
@@ -709,8 +711,8 @@ def _sheet() -> _Sheet:
         ("PlateWidth", (left, back), (left, front), "y"),
         (
             "PocketLength",
-            (tap1[0] + half, s.POCKET_NEAR_WALL_Y),
-            (tap1[0] - half, s.POCKET_NEAR_WALL_Y),
+            (s.CLAMP_STATIONS[1] + half, s.POCKET_NEAR_WALL_Y),
+            (s.CLAMP_STATIONS[1] - half, s.POCKET_NEAR_WALL_Y),
             "x",
         ),
     ):
@@ -989,7 +991,7 @@ def test_each_section_caption_states_its_turn_from_projection() -> None:
         step = [b - a for a, b in zip(view(0.0, 0.0), view(1.0, 0.0))]
         turn = math.remainder(math.atan2(step[1], step[0]) - projected, 2.0 * math.pi)
         assert math.degrees(turn) == pytest.approx(90.0)
-    assert drawing.SECTION_LABEL_SCALE_TEXT == "ROTATED 90 DEG CCW  SCALE"
+    assert drawing.SECTION_LABEL_SCALE_TEXT == "ROTATED 90° CCW  SCALE"
 
 
 class _Extension:

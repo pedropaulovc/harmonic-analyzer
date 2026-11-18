@@ -287,12 +287,12 @@ PRINTED_PLACES: tuple[tuple[float, int], ...] = (
     (NOTCH_RIGHT_START, 2),
     (NOTCH_DEPTH, 2),
     (CORNER_RADIUS, 2),
-    *((station, 3) for station in CLAMP_STATIONS),
+    *((station, 2) for station in CLAMP_STATIONS),
     (POCKET_LENGTH, 2),
     (-POCKET_BACK_WALL_Y, 3),
     (-POCKET_NEAR_WALL_Y, 2),
     (POCKET_DEPTH, 3),
-    (-CLAMP_SCREW_Y, 3),
+    (-CLAMP_SCREW_Y, 2),
     (HUB_X, 3),
     (-HUB_Y, 3),
     (HUB_CBORE_DIA, 3),
@@ -407,7 +407,9 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PocketProfile": {"PocketLength": 2},
     "PocketCorners": {"PocketCornerR": 2},
     "HubHole": {"HubX": 3, "HubY": 3},
-    "ClampTaps": {**{name: 3 for name in CLAMP_TAP_X_NAMES}, "ClampTapY": 3},
+    # Routine tap locations at two places (rule 3; machinist review r24:
+    # three places with no band or function were over-specification).
+    "ClampTaps": {**{name: 2 for name in CLAMP_TAP_X_NAMES}, "ClampTapY": 2},
     SECTION_A_REFERENCE: {
         "PocketNearWallY": 2,
         "PocketBackWallY": 3,
