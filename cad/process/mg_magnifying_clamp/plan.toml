@@ -402,8 +402,8 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "Length over {{cad.block_height_max_in:.3dot}}: abort, lower G54 Z by the excess and run MC04_top again. Under {{cad.block_height_min_in:.3dot}}: the clamp is scrap."
-instruction_detailed = "Length over {{cad.block_height_max_in:.3dot}}: abort; send $# and note the G54 line's Z; G10 L2 P1 Z(that Z − the excess in inches × 25.4): .004 over is 0.102 less. Run MC04_top again. Under {{cad.block_height_min_in:.3dot}}: the clamp is scrap."
+instruction = "Length over {{cad.block_height_max_in:.3dot}}: abort, lower G54 Z by the reading less {{cad.block_height_mm:in.3dot}}, run MC04_top again and re-check. Under {{cad.block_height_min_in:.3dot}}: the clamp is scrap."
+instruction_detailed = "Length over {{cad.block_height_max_in:.3dot}}: abort; send $# and note the G54 line's Z; G10 L2 P1 Z(that Z − (the reading − {{cad.block_height_mm:in.3dot}}) × 25.4): a 1.174 reading is 0.356 less. Run MC04_top again and check the length again at its M6 T2 stop. Under {{cad.block_height_min_in:.3dot}}: the clamp is scrap."
 feed = "hand"
 
 [[setups.operations]]
@@ -464,7 +464,7 @@ diagram = { file = "diagrams/inspect.svg", alt = "The finished clamp: length end
 envelope = "other"
 vise_hold = "other"
 beam = "other"
-inspection = ["Length accepted at the MC04 stop. Each position below is a height over a parallel laid flat on the bench, read with the calipers' depth rod: the beam's end on top of a drill shank where it stands out of the clamp, the rod down past the clamp to the parallel; less the shank's miked Ø/2. Bore height {{cad.bore_height_min_in:.3dot}}–{{cad.bore_height_max_in:.3dot}}: the clamp standing on its bottom end, the F drill's shank through the bore. Bore from a flat parallel to the bore (one of the pair gripped in Setup 4) {{cad.bore_flat_location_min_in:.3dot}}–{{cad.bore_flat_location_max_in:.3dot}}: the clamp lying on that flat, the same shank. Each tapped hole from that same flat {{cad.tap_location_min_in:.3dot}}–{{cad.tap_location_max_in:.3dot}}: still on that flat, the #43 drill's shank in the hole; and the same lying on the hole's own diagonal flat beside it. Both threads: a 4-40 screw runs in by hand. Edges R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max, except the bottom end's rod-hole mouth: no chamfer or spotface (MHA-MG-04 seat), burr only."]
+inspection = ["Length accepted at the MC04 stop. Each position below is a height over a parallel laid flat on the bench, read with the calipers' depth rod: the beam's end on top of a drill shank where it stands out of the clamp, the rod down past the clamp to the parallel; less the shank's miked Ø/2. Bore height {{cad.bore_height_min_in:.3dot}}–{{cad.bore_height_max_in:.3dot}}: the clamp standing on its bottom end, the F drill's shank through the bore. Bore from a flat parallel to the bore (one of the pair gripped in Setup 4) {{cad.bore_flat_location_min_in:.3dot}}–{{cad.bore_flat_location_max_in:.3dot}}: the clamp lying on that flat, the same shank. Each tapped hole from that same flat {{cad.tap_location_min_in:.3dot}}–{{cad.tap_location_max_in:.3dot}}: still on that flat, the #43 drill's shank in the hole; then the same lying on either flat next to it (60° from it). Both threads: a 4-40 screw runs in by hand. Edges R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max, except the bottom end's rod-hole mouth: no chamfer or spotface (MHA-MG-04 seat), burr only."]
 gauge_checks = [
   { gauge = "calipers", band_mm = "{{cad.bore_height_band_mm}}" },
   { gauge = "calipers", band_mm = "{{cad.bore_flat_location_band_mm}}" },
