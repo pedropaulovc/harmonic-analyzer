@@ -17,7 +17,12 @@ from _gtol_cylinder import CylinderFace
 from _hole_spec import HoleSpec, blind_cut_dia_mm
 from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _package_units import drawing_unit
-from _printed_tolerance import drilled_oversize_mm, printed_band_mm
+from _printed_tolerance import (
+    drilled_oversize_mm,
+    edge_break_chamfer_mm,
+    edge_break_radius_mm,
+    printed_band_mm,
+)
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 # #290: the sheet prints decimal inch (the row's ``drawing_unit``). Lengths
@@ -62,13 +67,15 @@ SPRING_EYE_HOLE_SPEC = HoleSpec("drilled_number", "#21")
 # linearly to nothing at the spring. The taper starts at its own printed
 # station (.XX from the fulcrum bore), not on the bar pin's centreline: a
 # kink on the hole line could only be named in words (#3113 machinist
-# review, 3/3 runs). Owner ruling 2026-11-18 (#3113, the photo ratio): the
-# tip radius leaves the #21 hole a wall under the .080 target, above the
-# .060 floor (MHA-CH-02 RV-04). It prints at three places because .15 at two
-# would fall through the floor.
+# review, 3/3 runs). Owner ruling 2026-11-18 (#3113): the tip radius holds
+# the #21 hole's finished wall (both .010 edge breaks charged) at the .060
+# floor, under the .080 target (MHA-CH-02 RV-04). The photo ratio (~0.8)
+# would have left that wall under the floor; the owner chose the blunter
+# R.167. It prints at three places because .17 at two would take the wall
+# below the target, and the sheet states the wall it holds.
 TAPER_START_X = 139.7  # 5.50: full depth inboard of it
 TIP_ARC_CX = LEVER_SPRING_X
-TIP_RADIUS = 3.81  # R.150: tip depth 7.62, 0.81 of BAR_TALL
+TIP_RADIUS = 4.2418  # R.167: tip depth 8.48, 0.90 of BAR_TALL
 
 
 def taper_tangent_point() -> tuple[float, float]:
@@ -82,7 +89,7 @@ def taper_tangent_point() -> tuple[float, float]:
 
 # --- Derived spans. ---
 NOSE_RADIUS = BAR_TALL / 2.0  # 4.699 fulcrum nose (inside the hub)
-TIP_END_X = TIP_ARC_CX + TIP_RADIUS  # 178.86 tip from the fulcrum axis
+TIP_END_X = TIP_ARC_CX + TIP_RADIUS  # 179.29 tip from the fulcrum axis
 if not TIP_RADIUS < BAR_TALL / 2.0:
     raise AssertionError("the end must taper toward the tip")
 
@@ -130,26 +137,36 @@ PLATE_OFFSET_TOLERANCE = 0.0508  # +/-.002
 
 # drawing-guidelines.md rule 17 (walls and webs): every wall the holes leave,
 # at the worst case of the printed bands (the bar height and the hub both
-# print .XX; drilled holes +.004/0; the reamed bore at its top), against the
-# .080 target.
+# print .XX; drilled holes +.004/0; the reamed bore at its top), less the
+# title block's edge break at each of its two edges (the hole mouth and the
+# outside edge), against the .080 target.
 _LINEAR_2PL = printed_band_mm(2, unit=UNIT)
 _LINEAR_3PL = printed_band_mm(3, unit=UNIT)
 _DRILL_PLUS = drilled_oversize_mm(unit=UNIT)
+_EDGE_BREAK = max(edge_break_radius_mm(unit=UNIT), edge_break_chamfer_mm(unit=UNIT))
 _SPRING_HOLE_R_MAX = (blind_cut_dia_mm(SPRING_EYE_HOLE_SPEC) + _DRILL_PLUS) / 2.0
 _BAR_PIN_HOLE_R_MAX = (blind_cut_dia_mm(BAR_PIN_HOLE_SPEC) + _DRILL_PLUS) / 2.0
 WALL_MIN = {
-    "spring hole to tip and edges": TIP_RADIUS - _LINEAR_3PL - _SPRING_HOLE_R_MAX,
-    "bar-pin hole to edges": (BAR_TALL - _LINEAR_2PL) / 2.0 - _BAR_PIN_HOLE_R_MAX,
-    "fulcrum bore to hub": (HUB_DIA - _LINEAR_2PL) / 2.0
-    - (PIVOT_HOLE_DIA + PIVOT_HOLE_BAND[0]) / 2.0,
+    wall: printed - 2.0 * _EDGE_BREAK
+    for wall, printed in {
+        "spring hole to tip and edges": TIP_RADIUS - _LINEAR_3PL - _SPRING_HOLE_R_MAX,
+        "bar-pin hole to edges": (BAR_TALL - _LINEAR_2PL) / 2.0 - _BAR_PIN_HOLE_R_MAX,
+        "fulcrum bore to hub": (HUB_DIA - _LINEAR_2PL) / 2.0
+        - (PIVOT_HOLE_DIA + PIVOT_HOLE_BAND[0]) / 2.0,
+    }.items()
 }
-# The tapered tip's wall is owner-accepted between the floor and the target
-# (#3113, MHA-CH-02 RV-04); every other wall meets the target.
+# The tapered tip's finished wall is owner-accepted between the floor and the
+# target (#3113, MHA-CH-02 RV-04); every other wall meets the target.
 WALL_SHORTFALL_ACCEPTED = frozenset({"spring hole to tip and edges"})
 for _wall, _value in WALL_MIN.items():
     _limit = WALL_FLOOR_MM if _wall in WALL_SHORTFALL_ACCEPTED else WALL_TARGET_MM
-    if _value < _limit:
+    if _value < _limit - 1e-9:
         raise AssertionError(f"{_wall} wall {_value:.3f} < {_limit} limit")
+# Rules 3 and 20: the three-place tip radius states, once, the wall it holds.
+_TIP_WALL_IN = (
+    math.floor(round(WALL_MIN["spring hole to tip and edges"] / 25.4, 4) * 1000) / 1000
+)
+TIP_WALL_TEXT = f"HOLDS WALL {_TIP_WALL_IN:.3f}".replace(" 0.", " .") + " MIN"
 
 # drawing-guidelines.md rule 6: the fulcrum bore is the one running surface.
 SURFACE_FINISHES = (

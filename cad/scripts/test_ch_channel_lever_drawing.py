@@ -97,13 +97,15 @@ def test_walls_clear_the_floor_at_worst_case() -> None:
     assert any("#21" in item["where"] and item["kind"] == "minor" for item in exceptions)
 
 
-def test_the_end_tapers_from_the_bar_pin_to_a_tangent_tip() -> None:
-    """#3113: full depth through the bar pin and the bar's notch, then straight
-    edges tangent to the tip."""
+def test_the_end_tapers_from_its_own_station_to_a_tangent_tip() -> None:
+    """#3113: full depth through the bar pin and the bar's notch to the 5.50
+    taper start, outboard of the bar pin, then straight edges tangent to the tip."""
     assert spec.TAPER_START_X - spec.BAR_PIN_X >= ch_amplitude_bar_spec.BAR_DEPTH / 2.0
     assert spec.BAR_TALL == pytest.approx(9.398)
     tip_depth = 2.0 * spec.TIP_RADIUS
-    assert tip_depth / spec.BAR_TALL == pytest.approx(0.81, abs=0.01)
+    # Owner ruling 2026-11-18: R.167, blunter than the photo's ~0.8, so the
+    # finished #21 wall meets the floor.
+    assert tip_depth / spec.BAR_TALL == pytest.approx(0.90, abs=0.01)
     x, y = spec.taper_tangent_point()
     # The edge from the taper start meets the tip circle at right angles to
     # its radius there.
@@ -146,7 +148,6 @@ def test_plate_is_located_from_one_hub_face() -> None:
 def test_draw_view_math_matches_the_spec() -> None:
     assert drawing._BAR_PIN_DIA == blind_cut_dia_mm(spec.BAR_PIN_HOLE_SPEC)
     assert drawing._SPRING_HOLE_DIA == blind_cut_dia_mm(spec.SPRING_EYE_HOLE_SPEC)
-    assert spec.TIP_END_X == pytest.approx(178.86)
 
 
 def test_sheet_runs_at_1_to_1_with_1_to_2_isometric() -> None:

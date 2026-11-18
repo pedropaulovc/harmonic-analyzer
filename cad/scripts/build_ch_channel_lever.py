@@ -27,8 +27,8 @@ The p.39 close-up also shows the bar pin only ~4-5 bar-heights from the
 tip (50.8/9.5 = 5.3 fits; 127/9.5 = 13 does not). The p.39 close-up also
 shows the bar running to a rounded end with the hook hole in it: the end
 is a full round about the spring hole (the former 6.0 stepped tab left 0.98
-of wall beside the hole), reached by straight edges tapering from the bar
-pin (#3113).
+of wall beside the hole), reached by straight edges tapering from the 5.50
+taper start, outboard of the bar pin (#3113).
 
 Dimensions: cad/DIMENSIONS.md "Chapter 17" - lengths/section derived in
 M6.3/M6.4 (med), hole diameters low.

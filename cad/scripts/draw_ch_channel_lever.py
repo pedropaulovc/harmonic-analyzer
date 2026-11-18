@@ -7,8 +7,8 @@ placement of those dimensions, the function each tight band serves, the hole
 callouts, the bore's roughness and one reference overall length.
 Sheet/template and export behaviour lives in ``_drawing_common``.
 
-The lever is a long thin third-class lever (7.28 in over the hub, .37 in
-tall to a 5.50 taper start, then tapering to an R.150 tip, .118 in thick); the sheet
+The lever is a long thin third-class lever (7.29 in over the hub, .37 in
+tall to a 5.50 taper start, then tapering to an R.167 tip, .118 in thick); the sheet
 prints decimal inch (the part's ``drawing_unit: in``).  The sheet runs at
 1:1: the front view carries the profile, bore, hub, both arms from the
 fulcrum bore and the overall length; the top view the plate thickness and
@@ -55,7 +55,7 @@ from _drawing_dimensions import (
     set_reference_dimension,
 )
 from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
-from _drawing_edges import visible_view_entities
+from _drawing_edges import scan_view_edges
 from _drawing_finish import add_surface_finish
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_leaders import set_near_side_diameter
@@ -76,7 +76,9 @@ from ch_channel_lever_spec import (
     BAR_PIN_X,
     BAR_TALL,
     HUB_DIA,
+    HUB_LENGTH,
     LEVER_SPRING_X,
+    LEVER_THICKNESS,
     PIVOT_HOLE_BAND,
     PIVOT_HOLE_DIA,
     SPRING_EYE_HOLE_SPEC,
@@ -85,6 +87,8 @@ from ch_channel_lever_spec import (
     TIP_ARC_CX,
     TIP_END_X,
     TIP_RADIUS,
+    TIP_WALL_TEXT,
+    taper_tangent_point,
 )
 from ch_fulcrum_shaft_spec import SHAFT_DIA, SHAFT_DIA_BAND
 
@@ -139,75 +143,63 @@ def _name_hole_mate(display: Any, *, label: str) -> None:
         )
 
 
-def _add_bar_centerline(adapter: Any, view: Any) -> None:
-    """Draw the bar's longitudinal centreline between its two long edges.
-
-    The fulcrum bore, the bar-pin hole and the spring-eye hole lie on the
-    bar's mid-height axis; the line through their centre marks prints that,
-    and the .37 bar symmetric about it, so the holes' cross-bar position is
-    drawn, not implied (r5 machinist review, clarity). draw_dt_crank_arm's
-    recipe: InsertCenterLine2 on the two long edges, picked between the hub
-    and the bar-pin hole, where the full-depth edges run parallel (outboard
-    of the taper start they taper to the tip), bisects them.
-    """
+def _add_centerline(
+    adapter: Any, view: Any, points: tuple[tuple[float, float], ...], label: str
+) -> None:
+    """InsertCenterLine2 on the two edges through ``points`` (part mm)."""
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
     if not ddoc.ActivateView(view_name(adapter, view)):
-        raise RuntimeError("failed to activate the front view for its centreline")
+        raise RuntimeError(f"failed to activate the front view for the {label}")
     draw.ClearSelection2(True)
-    mid_x = BAR_PIN_X / 2000.0
-    for index, side in enumerate((-1.0, 1.0)):
+    for index, (mx, my) in enumerate(points):
         x, y = model_point_in_view(
             adapter,
             view,
-            (mid_x, side * BAR_TALL / 2000.0, 0.0),
-            label=f"bar long edge {index + 1}",
+            (mx / 1000.0, my / 1000.0, 0.0),
+            label=f"{label} edge {index + 1}",
         )
         if not draw.Extension.SelectByID2(
             "", "EDGE", x, y, 0.0, index > 0, 0, null_callout(), 0
         ):
-            raise RuntimeError("failed to select a bar long edge for its centreline")
+            raise RuntimeError(f"failed to select {label} edge {index + 1}")
     centerline = ddoc.InsertCenterLine2()
     draw.ClearSelection2(True)
     draw.EditRebuild3()
     if centerline is None:
-        raise RuntimeError("failed to insert the bar centreline between its edges")
-    count = int(_early_bound(view, "IView").GetCenterLineCount())
-    if count != 1:
-        raise RuntimeError(f"front view carries {count} centrelines, expected 1")
+        raise RuntimeError(f"failed to insert the {label} between its edges")
 
 
-@_telemetry.traced("drawing.channel_lever.front_arc_edge")
-def _front_arc_edge(view: Any, centre_x: float, radius: float, label: str) -> Any:
-    """One front-view arc on the lever's axis, as a part edge.
+def _add_bar_centerlines(adapter: Any, view: Any) -> None:
+    """Draw the lever's longitudinal axis from the hub to the tip.
 
-    Matched on the part's own geometry (centre and radius, part millimetres),
-    not a sheet pick: the tapered tip is concentric with the #21 hole and only
-    1.79 mm outside its rim, so a pick on the tip's extreme hit-tests the hole
-    (#3113 first farm run: 183.038 for 184.829), and a coordinate pick mixed
-    with an explicit entity added a third selection (second run). The near
-    face's copy (largest z) is taken.
+    The fulcrum bore, the bar-pin hole and the spring-eye hole lie on the
+    bar's mid-height axis; the line through their centre marks prints that,
+    and the .37 bar and the taper symmetric about it, so the three holes'
+    cross-bar position is drawn, not implied (r5 machinist review, clarity).
+    draw_dt_crank_arm's recipe, twice: InsertCenterLine2 on the two
+    full-depth edges (between the hub and the bar-pin hole) bisects them up
+    to the 5.50 taper start, and on the two taper edges (symmetric about the
+    same axis) carries it on to the #21 hole (#3113 code review).
     """
-    matches: list[tuple[float, Any]] = []
-    for raw_edge in visible_view_entities(view, 1, label=f"channel lever {label}"):
-        curve = _early_bound(raw_edge, "IEdge").GetCurve()
-        if curve is None:
-            continue
-        curve = _early_bound(curve, "ICurve")
-        if not curve.IsCircle():
-            continue
-        params = tuple(float(value) for value in curve.CircleParams)
-        cx, cy, cz = (value * 1000.0 for value in params[:3])
-        found_radius = params[6] * 1000.0
-        if (
-            abs(cx - centre_x) <= 1e-3
-            and abs(cy) <= 1e-3
-            and abs(found_radius - radius) <= 1e-3
-        ):
-            matches.append((cz, raw_edge))
-    if not matches:
-        raise RuntimeError(f"front view shows no {label}")
-    return max(matches, key=lambda item: item[0])[1]
+    _add_centerline(
+        adapter,
+        view,
+        tuple((BAR_PIN_X / 2.0, side * BAR_TALL / 2.0) for side in (-1.0, 1.0)),
+        "bar centreline",
+    )
+    tangent_x, tangent_y = taper_tangent_point()
+    mid_x = (TAPER_START_X + tangent_x) / 2.0
+    mid_y = (BAR_TALL / 2.0 + tangent_y) / 2.0
+    _add_centerline(
+        adapter,
+        view,
+        tuple((mid_x, side * mid_y) for side in (-1.0, 1.0)),
+        "taper centreline",
+    )
+    count = int(_early_bound(view, "IView").GetCenterLineCount())
+    if count != 2:
+        raise RuntimeError(f"front view carries {count} centrelines, expected 2")
 
 
 def _sheet_x(mx: float) -> float:
@@ -241,8 +233,10 @@ FRONT_CALLOUTS = {
         f"(CLEARANCE {_inch(_CLEARANCE_LEAST)}-{_inch(_CLEARANCE_MOST)} REF)"
     ),
     # The taper is drawn and dimensioned, not narrated (#3113 r4 review): the
-    # .37 sits on the kink and the kink has its own location.
-    "TipRadius": "TANGENT TO EDGES",
+    # .37 sits on the kink and the kink has its own location. The radius
+    # prints three places for the #21 hole's wall, so it states that wall
+    # once (rules 3 and 20; MHA-CH-02 RV-04).
+    "TipRadius": f"TANGENT TO EDGES\n{TIP_WALL_TEXT}",
 }
 # What engages each drilled hole rides its own hole callout (machinist r5:
 # on the arm's location it did not say the hole is a running bore).
@@ -286,8 +280,9 @@ FRONT_KEEP = {
     # shelf above.
     "BarHeight": (_sheet_x(TAPER_START_X), 0.168),
     # Above and right of the tip it measures, clear of the spring-hole
-    # location's extension line below the tip (#3113 r3).
-    "TipRadius": (0.262, 0.168),
+    # location's extension line below the tip (#3113 r3) and, with its wall
+    # line, of the tip itself.
+    "TipRadius": (0.272, 0.172),
     "BarPinCx": (_sheet_x(BAR_PIN_X / 2.0), 0.126),
     # The taper start's row between the bar-pin and spring-hole rows.
     "TaperStartX": (_sheet_x(TAPER_START_X / 2.0), 0.115),
@@ -415,11 +410,20 @@ def build(adapter: Any) -> dict[str, str]:
     # Overall length over the hub and the full-round tip, for the stock cut:
     # a reference (the hub, the spring-hole location and the bar's full round
     # set it).  Both ends are arcs in the front view, each selected as its own
-    # edge (see _front_arc_edge) and re-anchored to its extreme (an arc
-    # dimension resolves to the centre by default and would read the 175.05
-    # spring arm).
-    hub_arc = _front_arc_edge(front, 0.0, _HUB_R, "hub circle")
-    tip_arc = _front_arc_edge(front, TIP_ARC_CX, TIP_RADIUS, "full-round tip arc")
+    # edge on the part's geometry (the tip is concentric with the #21 hole and
+    # just outside its rim, so a sheet pick hit-tests the hole: #3113 first
+    # farm run) and re-anchored to its extreme (an arc dimension resolves to
+    # the centre by default and would read the 175.05 spring arm).
+    front_edges = scan_view_edges(front, label="channel lever front")
+    hub_arc = front_edges.circle_at(
+        (0.0, 0.0, HUB_LENGTH / 2.0), _HUB_R, axis=(0.0, 0.0, 1.0), label="hub circle"
+    ).edge
+    tip_arc = front_edges.circle_at(
+        (TIP_ARC_CX, 0.0, LEVER_THICKNESS / 2.0),
+        TIP_RADIUS,
+        axis=(0.0, 0.0, 1.0),
+        label="full-round tip arc",
+    ).edge
     overall = add_edge_dimension(
         adapter,
         front,
@@ -431,11 +435,12 @@ def build(adapter: Any) -> dict[str, str]:
         entities=(hub_arc, tip_arc),
     )
     set_arc_endpoints_to_max(adapter, overall, label="overall length")
-    # Value-only: the far-extreme sum is the one value a centre-anchored
-    # mistake (175.05, 181.02, 178.86) or the concentric #21 hole's rim
-    # (183.04) cannot produce.
     assert_dimension_measures(
-        adapter, overall, expected_mm=_HUB_R + TIP_END_X, label="overall length"
+        adapter,
+        overall,
+        expected_mm=_HUB_R + TIP_END_X,
+        label="overall length",
+        entities=(hub_arc, tip_arc),
     )
     overall = _sw_type_info.early_bound_or_flag(
         overall, "IDisplayDimension", "GetAnnotation"
@@ -484,7 +489,7 @@ def build(adapter: Any) -> dict[str, str]:
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
-    _add_bar_centerline(adapter, front)
+    _add_bar_centerlines(adapter, front)
 
     # The reamed fulcrum bore is the one running surface (rule 6): Ra on its
     # rim at 300 degrees, the symbol below-right of the hub: between the REAM
