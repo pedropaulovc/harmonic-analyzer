@@ -584,6 +584,33 @@ def test_step_one_sets_the_64t_against_the_shaft_collar() -> None:
     assert shaft_number in line and "COLLAR" in line
 
 
+def test_crank_mesh_is_accepted_by_hand_with_a_pinion_recut_remedy() -> None:
+    """Delegated ruling 2026-11-17 on #2481 (option B): 4N's full turn by
+    hand, before the 16T is pinned, is the crank mesh's acceptance; a pair
+    that binds in its teeth has the 16T recut at the same depth, the cutter
+    moved sideways, and the step is redone from the slide-on."""
+    number = drawing.steps.step_number("crank-mesh-checked")
+    step = drawing.CONE_CRANK_STEPS.split(f"\n{number}. ", 1)[1]
+    step = " ".join(step.split(f"\n{number + 1}. ")[0].split())
+    (turn,) = re.findall(rf"{number}N\. [^.]*\.", step)
+    assert "ONE FULL REVOLUTION BY HAND" in turn and "MUST NEVER BIND" in turn
+    (recut,) = re.findall(rf"{number}Q\. .*?SAME DEPTH\.", step)
+    assert recut == (
+        f"{number}Q. IF THE TEETH BIND, RECUT MHA-DT-10: EVERY TOOTH GAP .004 WIDER, "
+        "CUTTER MOVED SIDEWAYS, SAME DEPTH."
+    )
+    assert f"{number}R. REPEAT FROM {number}D." in step
+    assert f"{number}D. SLIDE MHA-DT-10 ON WITHOUT ITS PIN" in step
+    order = [
+        step.index(turn),
+        step.index(f"{number}P. IF IT BINDS"),
+        step.index(recut),
+        step.index(f"{number}R. REPEAT"),
+        step.index("MATCH-DRILL"),
+    ]
+    assert order == sorted(order), step
+
+
 def test_cone_swing_check_stops_disengaged_at_the_swing_stop() -> None:
     """MHA-SH-VN-52 bounds the DISENGAGE swing; the engaged mesh is set by
     feel at assembly (owner direction 2026-11-11, #2365; cone_set_stack):

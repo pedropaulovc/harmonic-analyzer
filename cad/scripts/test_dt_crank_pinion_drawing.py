@@ -193,7 +193,7 @@ def test_pin_hole_callout_links_the_pins_drive_fit_note() -> None:
     for text in (notes.DRAWING_NOTES, *drawing.DIMENSION_CALLOUTS.values()):
         assert "LIGHT HAMMER FIT" not in text and "FLUSH" not in text
     assert "FLUSH BOTH SIDES" in spec.PIN_FIT_LINES[1]
-    # MHA-DT-00's 4S-4U: tapped in flush, then the hand check its remedy needs.
+    # MHA-DT-00's 4U-4W: tapped in flush, then the hand check its remedy needs.
     assert f"TAP {spec.PIN_NUMBER} IN FLUSH BOTH SIDES." in assembly.CONE_CRANK_STEPS
     assert f"CHECK THAT {spec.PIN_NUMBER} IS NOT REMOVABLE BY HAND." in assembly.CONE_CRANK_STEPS
     assert drawing.REFERENCE_DIMENSIONS == ("PinHoleDia",)
@@ -394,6 +394,11 @@ def test_tooth_system_and_pair_acceptance_match_current_geometry() -> None:
     )
     mate_label = notes.BACKLASH_LABEL.replace(spec.MESH_GEAR_NUMBER, spec.PINION_NUMBER)
     assert mate_data[mate_label].strip() == backlash
+    # Delegated ruling 2026-11-17 on #2481 (option B): the mesh is accepted by
+    # hand at assembly, stated as a reference line beside the backlash row.
+    assert labels.index(notes.MESH_ACCEPTANCE_LABEL) == labels.index(notes.BACKLASH_LABEL) + 1
+    assert notes.MESH_ACCEPTANCE_LABEL == f"MESH WITH {spec.MESH_GEAR_NUMBER} (REF)"
+    assert data[notes.MESH_ACCEPTANCE_LABEL].strip() == "ACCEPTED BY HAND AT ASSEMBLY"
     assert not any("ACCEPT ON THIS PART" in row for row in rows)
     width_row = next(line for line in notes.GEAR_DATA.splitlines() if "CIRCULAR PITCH THICKNESS" in line)
     assert "REF" in width_row and "ACCEPT" not in width_row

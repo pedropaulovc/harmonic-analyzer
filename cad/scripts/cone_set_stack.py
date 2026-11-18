@@ -31,12 +31,14 @@ that hold it, none held further above standard than the highest first bind
 of any pair (``SET_OFFSET_MAX_MM``). That is an assumption, not a guarantee:
 the holding pairs are wherever the binds fall, and a gear past a hold lies on
 the line's extension, higher by the line's slope times its overhang. Its
-function (gears that do not come loose) is the open owner question on
-#2584; no allowance is booked for it here. A pair then runs looser than
-that at the far phase of its running runout, the cone and the drum each
-``TOOTH_RUNOUT_TIR_MM`` about their bores. The seat floats, the pivot's
-translation and the arbor's float are taken up the same way under the mesh
-load at the set as in running, so they do not move a pair off its set.
+function (gears that do not come loose) was ruled on #2584 (owner ruling
+2026-11-14, option A: accepted and stated on the sheet, exception DT-08 in
+assemblies/dt-drive-train.yaml); no allowance is booked for it here. A pair
+then runs looser than that at the far phase of its running runout, the cone
+and the drum each ``TOOTH_RUNOUT_TIR_MM`` about their bores. The seat floats,
+the pivot's translation and the arbor's float are taken up the same way under
+the mesh load at the set as in running, so they do not move a pair off its
+set.
 
 The CAD places the cone line ``SET_ABOVE_STANDARD_MM`` above standard at
 every cone; the feel set runs T120 tighter than that, by
@@ -171,8 +173,8 @@ def first_bind_offsets_mm(teeth: int) -> tuple[float, ...]:
 # The highest first bind of any pair: check 4 lays the arbor line on a bind
 # near each end and swings the set in to the first bind.  Every pair taken to
 # lie between the pairs that hold the line sits no higher than this at its
-# tightest phase; a gear past a hold is the open owner question (#2584, see
-# the module docstring).
+# tightest phase; a gear past a hold is accepted by the owner's #2584 ruling
+# (option A, exception DT-08; see the module docstring).
 SET_OFFSET_MAX_MM = max(max(first_bind_offsets_mm(t)) for t in cone.CONE_TEETH)
 # The far phase of the running runout: the set is felt at the tightest phase
 # of a full turn, and the cone's and the drum's eccentricities (TIR/2 each)

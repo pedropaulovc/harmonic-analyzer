@@ -150,10 +150,13 @@ VIRTUAL_TEETH = TEETH / _COS_INCLINE**3
 # normal pitch by p_t sin(beta) d(beta), 0.013 mm at 1 deg, inside the
 # crossed mesh's mid-face worst-corner backlash (crank_mesh_stack.
 # standard_check). Across the face it also turns the tooth line against the
-# 16T, which no gate books yet: crank_mesh_stack.station_checks reports the
+# 16T, which no gate books: crank_mesh_stack.station_checks reports the
 # per-station centre, and with the title block's +/-1 deg the south-face
 # closing corner reads negative for the helix this replaced as for these
-# teeth (#2332 study; owner ruling pending on #2481).
+# teeth (#2332 study). Delegated ruling 2026-11-17 on #2481 (option B, for the
+# owner's after-the-fact review): the band stays; the mesh is accepted by hand
+# at assembly (MHA-DT-00's full turn before the 16T is pinned), and a pair that
+# binds has its 16T recut, every tooth gap .004 in wider at the same depth.
 TOOTH_INCLINATION_TOLERANCE_DEG = 1.0
 TOOTH_INCLINATION_PLACES = 1
 GEAR_DATA_REFERENCE_PLACES = 3

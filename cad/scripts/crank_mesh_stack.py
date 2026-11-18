@@ -18,8 +18,10 @@ sideways off its radial line away from the crossing station, which thickens
 the tooth on the pitch circle and raises the root. Off the pitch circle the
 same shift leans each flank against the screw form, one flank's way at the
 tip and the other's at the root, so the two flanks' contact radii decide what
-it costs. ``station_checks`` reports all of it per face station, NOT gated
-(the margin it shows awaits an owner ruling, #2481).
+it costs. ``station_checks`` reports all of it per face station, NOT gated:
+the pair is accepted by hand at assembly, MHA-DT-00's full turn before the 16T
+is pinned, with a 16T recut as the remedy (delegated ruling 2026-11-17 on
+#2481, option B, for the owner's after-the-fact review).
 """
 from __future__ import annotations
 
@@ -355,7 +357,8 @@ def station_checks() -> tuple[StationCheck, ...]:
     clearance the root's rise; the interference margin keeps the
     crossing-station tooth form. The lean is reported beside the backlash and
     is not taken from it: it is a plane-model figure, and on the real crossed
-    axes it does not simply add to the other terms (#2481)."""
+    axes it does not simply add to the other terms. The pair is accepted by
+    hand at assembly (#2481, option B)."""
     grow = EQUIVALENT_RADIUS_GROWTH_64
     alpha = math.radians(gear64.CUTTER_PRESSURE_ANGLE_DEG)
     pins = [plane_gear(profile, pinion.MODULE_MM) for _, profile in pinion.STOCK_PROFILE_CORNERS]
