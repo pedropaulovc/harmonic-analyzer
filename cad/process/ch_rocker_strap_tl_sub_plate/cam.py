@@ -72,8 +72,18 @@ PROGRAMS: tuple[tuple[str, tuple[Any, ...]], ...] = (
             ("drill_7",),
         ),
     ),
-    *((f"SP03_tap_{hole}", (f"tap_{hole}",)) for hole in TAP_HOLES),
+    # A literal (``_cam_programs.program_names`` reads it by AST): one per
+    # TAP_HOLES entry, in order.
+    ("SP03_tap_clamp_1", ("tap_clamp_1",)),
+    ("SP03_tap_clamp_2", ("tap_clamp_2",)),
+    ("SP03_tap_clamp_3", ("tap_clamp_3",)),
+    ("SP03_tap_clamp_4", ("tap_clamp_4",)),
+    ("SP03_tap_hub", ("tap_hub",)),
 )
+if tuple(name for name, _ops in PROGRAMS[2:]) != tuple(
+    f"SP03_tap_{hole}" for hole in TAP_HOLES
+):
+    raise ValueError("PROGRAMS must list one SP03_tap_* file per TAP_HOLES entry")
 # Every program loads its own first tool (M6, the tool setter): SP01 runs
 # once per plate on whatever the mill last held, SP02 after a vise setup,
 # each tap file before its retract (the dead centre).

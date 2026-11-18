@@ -22,7 +22,7 @@ from export_features import OUT as CAD_OUT, bundle_paths
 
 # The parts milled on the CNC mill, enrolled by the CNC migration; each one's
 # programs are posted by every build and shipped by every release.
-CAM_STEMS: tuple[str, ...] = ("ch_rocker_strap", "mg_magnifying_clamp")
+CAM_STEMS: tuple[str, ...] = ("ch_rocker_strap", "mg_magnifying_clamp", "ch_rocker_strap_tl_sub_plate")
 PROCESS_ROOT = Path(__file__).resolve().parents[1] / "process"
 SCRIPTS_DIR = Path(__file__).resolve().parent
 # Executed by freecadcmd, never imported on the host: an input of every cam task.

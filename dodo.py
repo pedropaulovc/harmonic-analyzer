@@ -3941,12 +3941,6 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
                 for stem in _cam_programs.CAM_STEMS
                 for path in (_cam_programs.recipe_path(stem), _cam_programs.PROCESS_ROOT / stem / "plan.toml")
             ),
-            # The strap sub-plate's process test reads its plan and loads its
-            # recipe at runtime before the stem is enrolled in CAM_STEMS.
-            *(
-                str((_cam_programs.PROCESS_ROOT / "ch_rocker_strap_tl_sub_plate" / name).resolve())
-                for name in ("plan.toml", "cam.py")
-            ),
             # module_deps_of only walks cad/scripts; comparison tests import
             # sibling tools (and load render_diff via importlib) outside it.
             *(
