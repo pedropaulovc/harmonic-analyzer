@@ -1040,7 +1040,7 @@ def build(adapter) -> dict[str, str]:
     )
 
     # Hanger pivot: the #8-32 tap runs THROUGH, so the MHA-PD-VN-57 tip can be
-    # faced below the front face and staked at its mouth. A plain cut from the
+    # faced below the front face. A plain cut from the
     # back face, mid-plane past both faces, keeps the print's own TAP callout
     # on the drill diameter.
     check(

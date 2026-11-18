@@ -4,8 +4,8 @@ The hanger arm (MHA-PD-18) swings on the shoulder: the head sits in the
 arm's rear spot face, the shoulder runs through the arm and the pivot spacer
 (MHA-PD-20), and the shoulder end bears on the support bar's (MHA-PD-07)
 back face with the thread in the bar's THROUGH #8-32 tap.  At fit-up the tip
-is faced to stand TIP_RECESS below the bar's front face and staked there
-(``pd_vn_transgear_pivot_screw_spec``).
+is faced to stand TIP_RECESS below the bar's front face; the joint carries no
+lock (``pd_vn_transgear_pivot_screw_spec``).
 
 Frame (the stock recipe's): axis +Y, head up, the under-head shoulder face at
 y = 0 (Top Plane), the faced tip at TIP_Y.  The assembly mates the screw axis

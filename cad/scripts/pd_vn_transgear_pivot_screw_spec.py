@@ -4,13 +4,13 @@ The catalogue inputs live in ``_mcmaster_90325a174`` (the stock recipe reads
 only those).  This module adds the modified part.
 
 The user's 2026-10-15 rulings: the screw seats shoulder-hard in the MHA-PD-07
-bar's THROUGH #8-32 tap, its thread tip is faced at fit-up to stand
+bar's THROUGH #8-32 tap and its thread tip is faced at fit-up to stand
 TIP_RECESS below the bar's FRONT face (never proud: the platen slides across
-that face) and the tip is staked at the tap's front mouth (drawing-guidelines
-rule 23, staked end).  The length is a rule-19 fit-up: the tip is faced to the
-actual bar, so the sheet prints the thread length as a REFERENCE nominal (the
-nominal bar less the recess window's middle) and the recess as the matched
-fit.  Threadlocker is optional.
+that face).  The joint is unlocked by design, as on the original: no stake,
+no threadlocker (owner ruling 2026-11-17, U-MHA-PD-VN-57-no-lock, #1194).
+The length is a rule-19 fit-up: the tip is faced to the actual bar, so the
+sheet prints the thread length as a REFERENCE nominal (the nominal bar less
+the recess window's middle) and the recess as the matched fit.
 
 Facing to fit leaves at most one pitch of incomplete thread at the new tip
 (the repo's precedent charge, ``sm_vn_knife_hanger_stud_spec``), and the thread
@@ -59,8 +59,7 @@ UNIT = drawing_unit(
 )
 
 # The faced tip's recess below the bar's front face, as fitted (user ruling
-# 2026-10-15): never proud of the platen's slide face, close enough for the
-# stake at the tap's mouth to close the thread over the tip.  .008-.020 (#290).
+# 2026-10-15): never proud of the platen's slide face.  .008-.020 (#290).
 TIP_RECESS = (0.2032, 0.508)
 # The printed REFERENCE thread length: the nominal .374 bar
 # (_column_clamp_interface.BAR_DEPTH, 9.4996) less the recess window's

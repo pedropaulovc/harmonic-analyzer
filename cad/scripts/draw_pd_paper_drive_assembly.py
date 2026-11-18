@@ -338,8 +338,7 @@ if (pivot_screw.HEAD_H - PIVOT_FRONT_FACE_Y) / 2.0 + 1.0 > PIVOT_FRAME_RADIUS_MM
 # rim on the spot-face floor); the arm from that floor to its front face on the
 # spacer; the spacer on the shoulder; and the bar from its back face at
 # -SHOULDER_LEN to its front face. Sides alternate down the stack, so each
-# column's leaders are in the same order as their tips. The bar's balloon
-# stays left, clear of the stake note right of the axis at the front face.
+# column's leaders are in the same order as their tips.
 _PIVOT_FLOOR_Y = -spring.MODEL_HEIGHT
 _PIVOT_ARM_FRONT_Y = -(pivot_screw.SHOULDER_LEN - joints.SPACER.LENGTH)
 PIVOT_BALLOON_TIPS = (
@@ -405,9 +404,6 @@ PIVOT_VIEW_REF = (
     f"SECTION {PIVOT_SECTION_LABEL}-{PIVOT_SECTION_LABEL}, "
     f"SHEET {SHEET_NAMES.index('TRANSGEAR VIEWS') + 1}"
 )
-# Two stake points, opposite across the tap so the cut plane through the axis
-# shows both: the section's leader names the one right of the axis.
-PIVOT_STAKE_POINTS_TEXT = "2 OPPOSITE POINTS"
 # The 1:1 locator that carries the cutting line: a *Top view, so it takes a
 # letter, and sheet 1's front view carries its viewing arrow.
 PIVOT_LOCATOR_LETTER = "B"
@@ -418,42 +414,6 @@ PIVOT_LOCATOR_CAPTION_XY = (
     PIVOT_LOCATOR_CENTER[0] - PIVOT_LOCATOR_RADIUS - 0.030,
     PIVOT_LOCATOR_CENTER[1] + 0.002,
 )
-# The lock in the view (rule 23; the r5 machinist review of SECTION A-A): a
-# pointer into the bar's cut face at the tap's front mouth, right of the axis,
-# 0.5 mm in from the front face and 0.6 mm outside the countersink's rim, so
-# it lands in the metal the punch moves. (y, r) in the screw's frame (mm).
-PIVOT_STAKE_TIP = (
-    PIVOT_FRONT_FACE_Y + 0.5,
-    support_bar.PIVOT_TAP_CSK_DIA / 2.0 + 0.6,
-)
-PIVOT_STAKE_NOTE = f"STAKE TAP MOUTH,\n{PIVOT_STAKE_POINTS_TEXT}"
-# The note stands just outside the section's circle at the front-face end,
-# its left edge PIVOT_STAKE_NOTE_SIDE_GAP right of the tip, so its leader
-# leaves the text's left end and runs up (or down) and left to the tip without
-# crossing it. Farm r6 review: centred on the axis, with the tip right of
-# centre, SolidWorks attached the leader at the text's right end and the
-# leader ran back through "MOUTH,". The note's top-left is the INote position
-# (r6: 0.073, 0.086 asked, text top-left at 0.0731, 0.0860).
-PIVOT_STAKE_NOTE_SIDE_GAP = 0.006
-PIVOT_STAKE_NOTE_GAP = 0.004
-PIVOT_STAKE_NOTE_LINE_PITCH = 0.0045
-
-
-def pivot_stake_note_xy(tip_x: float, front_side: float) -> tuple[float, float]:
-    """Top-left sheet point of the stake note: right of the leader's tip at
-    sheet x ``tip_x``, just outside the section's circle on the front face's
-    side (``front_side`` +1.0 when the front face is above the circle's
-    centre on the sheet, -1.0 below)."""
-    if front_side not in (1.0, -1.0):
-        raise ValueError(f"front_side must be +1.0 or -1.0, not {front_side!r}")
-    offset = PIVOT_SECTION_RADIUS + PIVOT_STAKE_NOTE_GAP
-    if front_side > 0.0:
-        lines = PIVOT_STAKE_NOTE.count("\n") + 1
-        top = PIVOT_SECTION_CENTER[1] + offset + lines * PIVOT_STAKE_NOTE_LINE_PITCH
-    else:
-        top = PIVOT_SECTION_CENTER[1] - offset
-    return (tip_x + PIVOT_STAKE_NOTE_SIDE_GAP, top)
-
 
 CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
 
@@ -2107,11 +2067,13 @@ def _step_text(
         math.ceil(cluster_fit.UNSHIMMED_FLOAT_RANGE[1] / 25.4 * 1000.0 - 1e-9) / 1000.0,
     )
     bare_gap = " TO ".join(steps.inch_text(limit * 25.4, 3) for limit in _bare_in)
-    # Remedies that run back through joints made permanent by then (15J
-    # stake, 22D/22E cross-pin, 9G-9K tapped disc) release and renew named
-    # parts. Owner ruling 2026-11-08 (auto-selected after timeout), pending
-    # owner confirmation (#2144): renew, the bar's staked tap re-chased and
-    # re-staked on fresh metal, 31E's cluster re-faced without renewal.
+    # Remedies that run back through joints made permanent by then (22D/22E
+    # cross-pin, 9G-9K tapped disc) release and renew named parts. Owner
+    # ruling 2026-11-08 (auto-selected after timeout), pending owner
+    # confirmation (#2144): renew, 31E's cluster re-faced without renewal.
+    # The pivot screw is unlocked (owner ruling U-MHA-PD-VN-57-no-lock,
+    # #1194); it comes out with the spacer pressed on its shoulder, and a
+    # rebuild renews both.
     knob_stack_off = (
         f"REMOVE THE {n['pd-transgear-thumbnut']} THUMBNUT, {knob_short} AND "
         "COLLAR."
@@ -2122,15 +2084,12 @@ def _step_text(
         f"DRAW THE {n['pd-transgear-knob-shaft']} SHAFT OUT FORWARD.",
     )
     pivot_unscrewed = (
-        f"PLATEN SLID CLEAR, UNSCREW THE {n['pd-vn-transgear-pivot-screw']} SCREW "
-        "THROUGH ITS STAKES.",
+        f"UNSCREW THE {n['pd-vn-transgear-pivot-screw']} SCREW.",
         "LIFT THE ARM OFF.",
     )
-    pivot_tap_chased = f"RE-CHASE THE {n['pd-support-bar']} BAR'S PIVOT TAP FROM THE FRONT."
-    fresh_stake = f"STAKING FRESH METAL AT {s('hanger-pivoted', 8)}"
-    # The pivot screw's replacement, written once at 15N-15R (its stake's
+    # The pivot screw's replacement, written once at 15L-15N (its seat's
     # remedy) and done from 28 and 33 (the step-line budget).
-    pivot_replaced = f"{s('hanger-pivoted', 12)}-{s('hanger-pivoted', 15)}"
+    pivot_replaced = f"{s('hanger-pivoted', 10)}-{s('hanger-pivoted', 12)}"
     # #2409: the hub is keyed to the sleeve's flat by its MHA-PD-VN-69 pin,
     # pressed along a chord of the hub to its ream's stop before the hub is
     # fitted, its side lying over the flat. The flat runs out at the nose, so
@@ -2459,7 +2418,7 @@ def _step_text(
             "NO SHAKE ON THE DOWELS AND NO DAYLIGHT UNDER IT.",
             "IF IT SHAKES OR SHOWS DAYLIGHT, CLEAN AND DEBURR THE FACES AND "
             f"DOWELS AND REPEAT {s('arm-plate-fitted', 13)}-{s('arm-plate-fitted', 17)}.",
-            # The doweled plate is read before the pivot is staked, the cup
+            # The doweled plate is read before the pivot spacer is pressed, the cup
             # cross-pinned or the hook drilled, so a setting the dowels lost
             # costs only the arm's own parts. The uncut plate screws stand
             # under the disc with room to spare
@@ -2500,8 +2459,9 @@ def _step_text(
         # R9-71: the spacer is pressed on the shoulder, so its faces' tilt is
         # fixed in the bar; the MHA-PD-VN-63 spring holds the arm on it. The
         # screw's tip is faced below the bar's front face, where the platen
-        # slides, and staked there (rule 23); the spot-face floor sets the
-        # spring room (transgear_hanger_joints).
+        # slides; the screw is unlocked, held by its shoulder seated on the
+        # bar's back face (owner ruling U-MHA-PD-VN-57-no-lock, #1194). The
+        # spot-face floor sets the spring room (transgear_hanger_joints).
         "hanger-pivoted": (
             f"FIT THE {n['pd-vn-transgear-pivot-spring']} SPRING ON THE "
             f"{n['pd-vn-transgear-pivot-screw']} SHOULDER SCREW THE ARM'S PIVOT BORE "
@@ -2516,26 +2476,19 @@ def _step_text(
             "BAR'S THROUGH TAP, IT STANDS "
             f"{steps.inch_window(pivot_screw.TIP_RECESS, 3, ' TO ')} BELOW THE "
             f"BAR'S FRONT FACE, CALIPER DEPTH ROD {row_cite('pivot-tip')}.",
-            "SEAT THE SCREW.",
-            "CHECK: RAISED AND RELEASED, THE ARM FALLS FREELY.",
-            "IF IT STICKS, CLEAN AND OIL THE ARM'S BORE AND THE SHOULDER AND "
-            f"REPEAT {s('hanger-pivoted', 5)}-{s('hanger-pivoted', 6)}.",
-            "PLATEN SLID CLEAR, STAKE THE TAP MOUTH AT THE BAR FRONT ONTO THE TIP "
-            f"AT {PIVOT_STAKE_POINTS_TEXT}, NOTHING PROUD OF THE FACE "
+            "SEAT THE SCREW, ITS SHOULDER TIGHT ON THE BAR'S BACK FACE "
             f"({PIVOT_VIEW_REF}).",
-            # A 1-of-3 machinist review blocker (Pd00Wedge's run of this
-            # sheet): the stake had no bench acceptance. It holds the screw,
-            # so the screw must not back out, and it must not have closed the
-            # arm's swing on the shoulder.
-            "CHECK: TURNED BY HAND WITH A HEX KEY TO LOOSEN, THE SCREW HOLDS.",
-            "CHECK: RAISED AND RELEASED, THE ARM STILL FALLS FREELY.",
+            "CHECK: NO DAYLIGHT BETWEEN THE SPACER AND THE BAR'S BACK FACE.",
+            "CHECK: RAISED AND RELEASED, THE ARM FALLS FREELY.",
+            "IF A CHECK FAILS, CLEAN THE SHOULDER, THE SPACER AND THE ARM'S BORE, "
+            f"OIL THE BORE AND REPEAT {s('hanger-pivoted', 5)}-"
+            f"{s('hanger-pivoted', 7)}.",
             f"IF BOTH CHECKS PASS, SKIP {pivot_replaced}.",
             pivot_unscrewed[0],
             pivot_unscrewed[1],
-            pivot_tap_chased,
             f"REPEAT FROM {s('hanger-pivoted', 0)} WITH A NEW "
             f"{n['pd-vn-transgear-pivot-screw']} SCREW AND "
-            f"{n['pd-transgear-pivot-spacer']} SPACER, {fresh_stake}.",
+            f"{n['pd-transgear-pivot-spacer']} SPACER.",
         ),
         "disc-cluster-assembled": (
             f"PRESS THE {hub_pin} PIN INTO THE {n['pd-transgear-disc-hub']} HUB'S "
@@ -2859,9 +2812,10 @@ def _step_text(
         # is in the arm's setting, and still takes the whole-transgear
         # rebuild (delegated ruling 2026-11-07 (Main), no precedent; owner
         # review #2144; pending owner confirmation), now from the latch
-        # pin with the cluster reused. Releasing the cross-pin or the
-        # stake renews every part they fix (owner ruling 2026-11-08,
-        # pending owner confirmation, #2144). One action per sub-step
+        # pin with the cluster reused. Releasing the cross-pin renews every
+        # part it fixes (owner ruling 2026-11-08, pending owner
+        # confirmation, #2144); the pivot screw comes out with its pressed
+        # spacer and both are renewed. One action per sub-step
         # (machinist review, #2417): the turn only finds the fault's period;
         # each remedy branch names it.
         "fitup-mesh-remedied": (
@@ -2899,7 +2853,7 @@ def _step_text(
             "HOOK.",
             f"STRIP THE CLUSTER ({s('disc-cluster-hung', 4)} BACK TO "
             f"{s('disc-cluster-hung', 1)}), KEEPING ITS SHIMS.",
-            f"DO {s('hanger-pivoted', 12)}-{s('hanger-pivoted', 14)}.",
+            f"DO {s('hanger-pivoted', 10)}-{s('hanger-pivoted', 11)}.",
             f"REBUILD FROM STEP {steps.step_number('latch-pin-pressed')} WITH A NEW "
             f"{n['pd-transgear-arm']} ARM, {n['pd-transgear-arm-plate']} PLATE, "
             f"{n['pd-transgear-pin']} PIN, {n['pd-transgear-pivot-spacer']} SPACER, "
@@ -2910,7 +2864,7 @@ def _step_text(
             f"{TRANSGEAR_QUANTITIES['pd-vn-transgear-arm-plate-screw']} "
             f"{n['pd-vn-transgear-arm-plate-screw']} SCREWS, "
             f"{n['pd-vn-transgear-pivot-screw']} SCREW AND "
-            f"{n['pd-vn-transgear-knob-cup-pin']} PIN, {fresh_stake}.",
+            f"{n['pd-vn-transgear-knob-cup-pin']} PIN.",
             # The cluster, the collar and the bar's hook taps are reused.
             f"SKIP STEPS {steps.step_number('disc-screws-cut')}-"
             f"{steps.step_number('oil-hole-drilled')}, "
@@ -3665,7 +3619,6 @@ def sheet_texts(notes: StepNotes) -> tuple[str, ...]:
         FITUP_REFERENCE_CAPTION,
         BOM_REFERENCE_CAPTION,
         PIVOT_LOCATOR_CAPTION,
-        PIVOT_STAKE_NOTE,
         SETTING_TABLE_TITLE,
         *SETTING_DETAIL_CAPTIONS.values(),
         *SETTING_PARENT_CAPTIONS.values(),
@@ -4625,47 +4578,6 @@ def _pivot_section_cut_points(
     return _pivot_sheet_points(adapter, section, points, label=label)
 
 
-def _note_pivot_stake(
-    adapter: Any,
-    section: Any,
-    head: tuple[float, float],
-    front: tuple[float, float],
-    *,
-    label: str,
-) -> None:
-    """Point the stake note at the tap's front mouth in SECTION A-A
-    (PIVOT_STAKE_TIP), the note outside the circle at the front face's end,
-    right of the tip so its leader leaves the text's left end."""
-    (tip,) = _pivot_section_cut_points(
-        adapter, section, (("right", *PIVOT_STAKE_TIP),), label=label
-    )
-    if tip[0] <= PIVOT_SECTION_CENTER[0]:
-        raise RuntimeError(f"{label}: the stake tip {tip!r} is not right of the axis")
-    text_xy = pivot_stake_note_xy(tip[0], 1.0 if front[1] > head[1] else -1.0)
-    note = _early_bound(
-        add_leader_note(
-            adapter,
-            PIVOT_STAKE_NOTE,
-            text_xy=text_xy,
-            attach_xy=tip,
-            label=label,
-            view=section,
-        ),
-        "INote",
-    )
-    # The leader's first point is its end on the note: it must leave the
-    # text's left end, not its far side (farm r6 review).
-    points = list(
-        _early_bound(note.GetAnnotation(), "IAnnotation").GetLeaderPointsAtIndex(0)
-        or ()
-    )
-    if len(points) < 6 or float(points[0]) > text_xy[0] + 0.001:
-        raise RuntimeError(
-            f"{label}: the leader leaves the note at {points[:2]!r}, "
-            f"not its left end at x {text_xy[0]:.4f}"
-        )
-
-
 def _balloon_pivot_section(
     adapter: Any, section: Any, items: dict[str, str], *, label: str
 ) -> None:
@@ -4793,9 +4705,6 @@ def _place_pivot_view(adapter: Any, items: dict[str, str]) -> None:
     )
     _balloon_pivot_section(
         adapter, section, items, label="paper-drive hanger pivot balloons"
-    )
-    _note_pivot_stake(
-        adapter, section, head, front, label="paper-drive hanger pivot stake note"
     )
     _place_sheet_note(
         adapter,
