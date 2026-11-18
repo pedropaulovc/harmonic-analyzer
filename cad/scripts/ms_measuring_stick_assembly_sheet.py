@@ -142,11 +142,14 @@ ASSEMBLY_STEPS = (
     f"{_ref(spec.STICK)}.",
     # #2434: the stop's end face nearer the 10 both reads the stick and bears
     # on the rocker arm's tip land 8.94 mm below the reading edge, so it is
-    # fitted square at assembly, not toleranced on MHA-MS-02 (delegated choice
-    # 2026-11-18, precedent the owner's fit-at-assembly rulings #2365, #2416,
-    # #2481; drawing-simplicity rule 5; #2144). error_budget's
-    # stop_face_square books the checked .002.
-    f"10A. CHECK: WITH A MACHINIST'S SQUARE ON THE GRADUATED FACE OF "
+    # fitted square at assembly, not toleranced on MHA-MS-02 (delegated ruling
+    # 2026-11-18, owner precedents #2365 and #2416, fit at assembly;
+    # drawing-simplicity rule 5; #2144). error_budget's stop_face_square books
+    # the checked .002. The square stands on the stick's top face (the one
+    # item 4 clamps) so its blade spans the floor side of that end face, the
+    # side that bears on the land; the roof side is about 1.3 mm of flat
+    # (Codjiflo r2 on PR #3099).
+    f"10A. CHECK: WITH A MACHINIST'S SQUARE ON THE TOP FACE OF "
     f"{_ref(spec.STICK)}, A {STOP_FACE_FEELER} FEELER DOES NOT ENTER ALONG THE "
     f"END FACE OF {_ref(spec.BLOCK)} NEARER THE 10 (SHEET 1).",
     f"10B. IF IT ENTERS, STONE THAT END FACE OF {_ref(spec.BLOCK)} SQUARE, THEN "
@@ -157,8 +160,8 @@ ASSEMBLY_STEPS = (
 # machinist review run 20261118T102641481Z-bfd27b57).
 STOP_FACE_NOTE = (
     f"{STOP_FACE_FEELER} FEELER DOES NOT ENTER\n"
-    f"UNDER A SQUARE ON {_ref(spec.STICK)}\n"
-    "GRADUATED FACE\n"
+    "UNDER A SQUARE ON THE\n"
+    f"TOP FACE OF {_ref(spec.STICK)}\n"
     "(ASSEMBLY.MD STEP 10A)"
 )
 # At MHA-HA-00: setting a bar (#2434). The stop is turned over from the

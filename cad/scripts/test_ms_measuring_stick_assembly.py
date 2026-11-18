@@ -977,6 +977,11 @@ def test_stop_face_check_prints_at_the_end_face_nearer_the_10(monkeypatch) -> No
     # 33-character first line of run 20261118T102641481Z-bfd27b57 crossed it).
     assert max(len(line) for line in sheet.STOP_FACE_NOTE.splitlines()) <= 26
     assert sheet.ASSEMBLY_STEPS[11].endswith("NEARER THE 10 (SHEET 1).")
+    # The square stands on the face item 4 clamps, so its blade spans the
+    # floor side of the end face, the side that bears on the land (Codjiflo r2).
+    assert "SQUARE ON THE TOP FACE OF ITEM 3" in sheet.ASSEMBLY_STEPS[11]
+    assert "TOP FACE OF ITEM 3" in sheet.STOP_FACE_NOTE
+    assert "TOP FACE OF ITEM 3" in sheet.ASSEMBLY_STEPS[10]  # step 10 names it
 
 
 @pytest.mark.parametrize(
