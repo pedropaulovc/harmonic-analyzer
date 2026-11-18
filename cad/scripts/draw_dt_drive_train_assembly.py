@@ -1395,6 +1395,16 @@ def acceptance_ref(key: str) -> str:
 SLIP_FIT_BOND = "BOND IT IN WITH LOCTITE 638 PER THE SHEET 1 NOTE."
 # MHA-DT-29's acceptance and flush condition, as both part sheets print them.
 PIN_FIT_ACCEPTANCE, PIN_FIT_FLUSH = pinion.PIN_FIT_LINES[1].split(", ")
+# #2481 option B (delegated ruling 2026-11-17, owner review on #2144): a crank
+# pair that binds in its teeth at step 4N has the still-unpinned MHA-DT-10
+# recut, every tooth gap this much wider (.004), the cutter moved sideways at
+# the same depth: the spec refuses a deeper cut on the same blank, because the
+# cutter's form runs out before the tip.  The ruling's owner pack computed the
+# whole-face print-worst closure at 0.081 mm (cutters' forms) / 0.097 mm
+# (ideal involutes) and this pass clearing it (+0.022 / +0.005);
+# test_dt_drive_train_assembly_drawing holds the value to those figures and to
+# the 16T's least tip land.
+PINION_RECUT_GAP_WIDENING_MM = 0.1016
 
 
 # Every step does one thing in six printed lines or fewer, and a check and its
@@ -1580,8 +1590,8 @@ CONE_CRANK_STEPS = _note_text(
         "3F. CHECK THAT MHA-DT-39 DOES NOT TURN IN MHA-DT-21 BY HAND.",
         # User ruling 2026-09-28: the crank journal runs directly in the post;
         # the centres are fixed, and the only mesh requirement is no binding.
-        # Delegated ruling 2026-11-17 on #2481 (option B, for the owner's
-        # after-the-fact review; precedent #2365 and #2416): 4N's full turn by
+        # Delegated ruling 2026-11-17 on #2481 (option B; precedent #2365 and
+        # #2416; owner reviews it after the fact on #2144): 4N's full turn by
         # hand is the mesh's acceptance, and 4Q-4R its tooth remedy.
         # CONTRACT-crank: MHA-DT-VN-67 press to the blind-hole floor.  Owner
         # ruling D1 (2026-10-15): no crank-seat washer -- the collar is held
@@ -1616,16 +1626,16 @@ CONE_CRANK_STEPS = _note_text(
         "4M. REPEAT 4E-4J UNTIL THE FEELER PASSES BOTH.",
         "4N. TURN MHA-DT-07 ONE FULL REVOLUTION BY HAND: IT MUST NEVER BIND.",
         # Rubric sample round 4: the bind remedy names what to check and how;
-        # round 10 (rule 22): one action, the correction.
-        "4P. IF IT BINDS, CORRECT AS 4K-4M WHERE THE 4H-4J FEELER STOPS.",
-        # #2481 option B (delegated ruling 2026-11-17): a pair that binds in
-        # its teeth has the still-unpinned 16T recut at the same depth, the
-        # cutter moved sideways (the spec refuses a deeper cut on the same
-        # blank); .004 is computed to clear the worst printed corner.  The
-        # ruling's "THEN REPEAT FROM 4D" is its own step (rule 22).
-        "4Q. IF THE TEETH BIND, RECUT MHA-DT-10: EVERY TOOTH GAP .004 WIDER, CUTTER MOVED "
-        "SIDEWAYS, SAME DEPTH.",
-        "4R. REPEAT FROM 4D.",
+        # round 10 (rule 22): one action, the correction.  Codjiflo r1 on
+        # #3090: each 4N remedy names the bind it answers, the band or
+        # shoulder on T120 (4P) or the teeth (4Q).
+        "4P. IF THE BAND OR SHOULDER RUBS T120, CORRECT AS 4K-4M WHERE THE 4H-4J FEELER "
+        "STOPS.",
+        # The ruling's wording; its "THEN REPEAT FROM 4D" is 4R, one action a
+        # step (rule 22), conditioned on the recut so a free pair goes on.
+        f"4Q. IF THE TEETH BIND, RECUT MHA-DT-10: EVERY TOOTH GAP "
+        f"{inch_text(PINION_RECUT_GAP_WIDENING_MM, 3)} WIDER, CUTTER MOVED SIDEWAYS, SAME DEPTH.",
+        "4R. AFTER A RECUT, REPEAT FROM 4D.",
         "4S. MATCH-DRILL THE MHA-DT-10 BOSS AT MID-LENGTH INTO MHA-DT-11.",
         # Rule 4 (8a1a516): a standard fit name; the part sheets' shared
         # "LIGHT HAMMER FIT" (pinion.PIN_FIT_LINES) is a drive fit.

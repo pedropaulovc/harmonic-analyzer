@@ -77,13 +77,14 @@ DRAWING_NOTES = "\n".join(
 # agree).
 SPAN_LABEL = f"BASE TANGENT SPAN OVER {spec.BASE_TANGENT_SPAN_TEETH} TEETH (REF)"
 BACKLASH_LABEL = f"TRANSVERSE BACKLASH WITH {spec.MESH_GEAR_NUMBER}, ACCEPT AT ASSEMBLY"
-# Delegated ruling 2026-11-17 on #2481 (option B, for the owner's
-# after-the-fact review; precedent #2365 and #2416): the fixed-centre mesh is
-# accepted by hand at assembly, MHA-DT-00's full turn before the pin is
-# drilled, not by the prints' tightest corner. A reference line, as the
-# ruling asks; the part sheet names no step (rule 7).
-MESH_ACCEPTANCE_LABEL = f"MESH WITH {spec.MESH_GEAR_NUMBER} (REF)"
-MESH_ACCEPTANCE = "ACCEPTED BY HAND AT ASSEMBLY"
+# Delegated ruling 2026-11-17 on #2481 (option B; precedent #2365 and #2416;
+# owner reviews it after the fact on #2144): the fixed-centre mesh is accepted
+# by hand at assembly, MHA-DT-00's full turn before the pin is drilled, not by
+# the prints' tightest corner. A reference line, as the ruling asks, stated as
+# the plain fact (rule 20 keeps governance words off the sheet); the part
+# sheet names no step (rule 7).
+MESH_CHECK_LABEL = f"MESH WITH {spec.MESH_GEAR_NUMBER} (REF)"
+MESH_CHECK = "TURNS FREE BY HAND AT ASSEMBLY"
 # Section A-A cuts through a tooth, so the band reads as a solid ring and the
 # spaces seem to stop against it (machinist review of the stack build). They
 # do not: the band is the teeth turned down, and the spaces run the whole face
@@ -121,7 +122,7 @@ GEAR_DATA = mate_notes.gear_data_note(
         ("NORMAL TOOL PLUNGE (REF)", inch_text(spec.TOOL_PLUNGE_MM, 4)),
         (SPAN_LABEL, mate_notes.accept_limits_text(spec.BASE_TANGENT_SPAN_LIMITS_MM, 4)),
         (BACKLASH_LABEL, mate_notes.accept_limits_text(mate_notes.GEAR_MESH_BACKLASH_MM, 3)),
-        (MESH_ACCEPTANCE_LABEL, MESH_ACCEPTANCE),
+        (MESH_CHECK_LABEL, MESH_CHECK),
         (
             "ACTUAL CIRCULAR PITCH THICKNESS (REF)",
             inch_text(spec.TRANSVERSE_CIRCULAR_TOOTH_THICKNESS, 4),

@@ -154,8 +154,10 @@ a feel set leaves (`cone_set_stack`, `dt_mesh_checks`,
   wider with the cutter moved sideways at the same depth (delegated ruling
   2026-11-17 on
   [#2481](https://github.com/pedropaulovc/harmonic-analyzer/issues/2481#issuecomment-6970972065),
-  option B, for the owner's after-the-fact review; precedent #2365 and
-  #2416). The mid-face closed form (`crank_mesh_stack.standard_check`) is
+  option B; precedent #2365 and #2416; the owner reviews it after the fact on
+  [#2144](https://github.com/pedropaulovc/harmonic-analyzer/issues/2144);
+  machinist exception DT-10 on MHA-DT-00). The mid-face closed form
+  (`crank_mesh_stack.standard_check`) is
   still gated against binding at every printed corner; the per-station
   figures, which close by about 0.08 mm at the tightest whole-face corner,
   are reference. Its open-corner ratio is reference only.

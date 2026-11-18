@@ -154,7 +154,7 @@ VIRTUAL_TEETH = TEETH / _COS_INCLINE**3
 # per-station centre, and with the title block's +/-1 deg the south-face
 # closing corner reads negative for the helix this replaced as for these
 # teeth (#2332 study). Delegated ruling 2026-11-17 on #2481 (option B, for the
-# owner's after-the-fact review): the band stays; the mesh is accepted by hand
+# owner's after-the-fact review on #2144): the band stays; the mesh is accepted by hand
 # at assembly (MHA-DT-00's full turn before the 16T is pinned), and a pair that
 # binds has its 16T recut, every tooth gap .004 in wider at the same depth.
 TOOTH_INCLINATION_TOLERANCE_DEG = 1.0

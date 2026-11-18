@@ -588,27 +588,65 @@ def test_crank_mesh_is_accepted_by_hand_with_a_pinion_recut_remedy() -> None:
     """Delegated ruling 2026-11-17 on #2481 (option B): 4N's full turn by
     hand, before the 16T is pinned, is the crank mesh's acceptance; a pair
     that binds in its teeth has the 16T recut at the same depth, the cutter
-    moved sideways, and the step is redone from the slide-on."""
+    moved sideways, and the step is redone from the slide-on.  Each 4N
+    remedy names the bind it answers, and only a recut sends the fitter back
+    (Codjiflo r1 on #3090)."""
     number = drawing.steps.step_number("crank-mesh-checked")
     step = drawing.CONE_CRANK_STEPS.split(f"\n{number}. ", 1)[1]
     step = " ".join(step.split(f"\n{number + 1}. ")[0].split())
     (turn,) = re.findall(rf"{number}N\. [^.]*\.", step)
     assert "ONE FULL REVOLUTION BY HAND" in turn and "MUST NEVER BIND" in turn
+    (rub,) = re.findall(rf"{number}P\. [^.]*\.", step)
+    assert rub.startswith(f"{number}P. IF THE BAND OR SHOULDER RUBS T120,")
     (recut,) = re.findall(rf"{number}Q\. .*?SAME DEPTH\.", step)
     assert recut == (
         f"{number}Q. IF THE TEETH BIND, RECUT MHA-DT-10: EVERY TOOTH GAP .004 WIDER, "
         "CUTTER MOVED SIDEWAYS, SAME DEPTH."
     )
-    assert f"{number}R. REPEAT FROM {number}D." in step
+    redo = f"{number}R. AFTER A RECUT, REPEAT FROM {number}D."
+    assert redo in step
     assert f"{number}D. SLIDE MHA-DT-10 ON WITHOUT ITS PIN" in step
     order = [
         step.index(turn),
-        step.index(f"{number}P. IF IT BINDS"),
+        step.index(rub),
         step.index(recut),
-        step.index(f"{number}R. REPEAT"),
+        step.index(redo),
         step.index("MATCH-DRILL"),
     ]
     assert order == sorted(order), step
+
+
+# The #2481 owner pack (2026-11-15, issuecomment-6889258234): whole-face
+# print-worst free play of the crank pair on main's .300 in pitch geometry, mm
+# on the 16T pitch circle, cutters' forms / ideal involutes, from #2591's 3D
+# sampler (crank_mesh_free_play.print_worst_mm), and the same with the 16T's
+# flanks moved in 0.10 mm.  No merged module reproduces them; they are
+# recorded here as STRAIGHT_TOOTH_LEAN_3D_MM is in test_standard_mesh_checks.
+CRANK_PRINT_WORST_FREE_PLAY_MM = (-0.0809, -0.0971)
+CRANK_PRINT_WORST_FREE_PLAY_THINNED_0_10_MM = (0.0215, 0.0050)
+# A sideways pass at full depth takes the same width off the tooth at every
+# radius, so the least tip land loses the whole widening.  Floor: a quarter
+# module, the usual minimum top land for an unhardened cut gear.
+RECUT_TIP_LAND_MODULE_FRACTION_MIN = 0.25
+
+
+def test_pinion_recut_clears_the_print_worst_corner_and_keeps_a_tip_land() -> None:
+    """The recut 4Q prints is sized against the owner pack's figures (#2481
+    option B) and checked against the 16T's own finite-form tooth."""
+    import dt_crank_pinion_spec as pinion
+
+    widening = drawing.PINION_RECUT_GAP_WIDENING_MM
+    assert drawing.inch_text(widening, 3) == ".004"
+    # It closes the worst corner in both tooth models ...
+    assert all(widening > -closure for closure in CRANK_PRINT_WORST_FREE_PLAY_MM)
+    # ... at least as well as the sampled 0.10 mm thinning did.
+    assert widening >= 0.10
+    assert all(play > 0.0 for play in CRANK_PRINT_WORST_FREE_PLAY_THINNED_0_10_MM)
+    least_tip_land = min(profile.tip_land_mm for _, profile in pinion.STOCK_PROFILE_CORNERS)
+    assert (
+        least_tip_land - widening
+        >= RECUT_TIP_LAND_MODULE_FRACTION_MIN * pinion.MODULE_MM
+    ), f"recut 16T tip land {least_tip_land - widening:.3f} mm"
 
 
 def test_cone_swing_check_stops_disengaged_at_the_swing_stop() -> None:

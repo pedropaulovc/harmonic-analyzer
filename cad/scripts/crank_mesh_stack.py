@@ -21,7 +21,7 @@ tip and the other's at the root, so the two flanks' contact radii decide what
 it costs. ``station_checks`` reports all of it per face station, NOT gated:
 the pair is accepted by hand at assembly, MHA-DT-00's full turn before the 16T
 is pinned, with a 16T recut as the remedy (delegated ruling 2026-11-17 on
-#2481, option B, for the owner's after-the-fact review).
+#2481, option B, for the owner's after-the-fact review on #2144).
 """
 from __future__ import annotations
 
