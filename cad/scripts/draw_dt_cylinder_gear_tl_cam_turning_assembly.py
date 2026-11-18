@@ -454,7 +454,7 @@ SETTING_TABLE_ROWS = (
     (
         "CHECK",
         "CALIPER DEPTH ROD",
-        f"DTI ±{fixture.THROW_READING_BAND_TEXT} ON "
+        f"DTI WITHIN {fixture.THROW_READING_BAND_TEXT} ON "
         f"{fixture.THROW_STACK_TOTAL_TEXT} BLOCKS",
     ),
 )
