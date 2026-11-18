@@ -243,6 +243,8 @@ present = true
 name = "Torque screwdriver reading in-lb"
 kind = "torque_screwdriver"
 present = false
+status = "not owned: to buy"
+use = "MHA-CH-13 Setups 2-4: the TL-VN-50 edge clamps at 6 in-lb"
 
 [tools.pliers]
 name = "Pliers"
@@ -1528,8 +1530,9 @@ cite = ["Mitee-Bite Pitbull Clamp inch instructions 0426, table row 26000 (A .15
 name = ".4000 in HSS straight-flute chucking reamer"
 kind = "reamer"
 present = false
+status = "not owned: to buy"
 purchase = "One .4000 in (decimal size) HSS straight-flute straight-shank chucking reamer; ANSI B94.2 cutting band .4001-.4005."
-note = "Cuts the MHA-CH-13 hub hole in 1018 after a 25/64 drill, 400 rpm, cutting oil, fed in and out. Checked with the go/no-go pair gauges.plug-gauges-4000-4005 (first hole before the lot, then every part): the pin-gauge set's .001 in steps cannot resolve the .0005 in band, and a telescoping gauge read on the micrometer repeats to about the whole band."
+note = "Cuts the MHA-CH-13 hub hole in 1018 after a 25/64 drill, 400 rpm, cutting oil, fed in and out. Checked with the go/no-go pair gauges.plug-gauges-4000-4005 (first hole before the lot, then every part): the shop owns no pin gauges (owner 2026-11-17), and the owned Starrett telescoping gauges read on the micrometer repeat to about the whole .0005 in band."
 
 # Hub-hole acceptance for MHA-CH-13, Ø.4000-.4005 (codjiflo PR #3049): a
 # fixed-limit pair, .4000 GO and .4005 NO-GO. Vermont Gage's standard Class X

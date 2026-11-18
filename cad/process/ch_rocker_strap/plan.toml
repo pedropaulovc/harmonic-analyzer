@@ -33,7 +33,7 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "1018 cold-finished flat, 1/8 × 1-1/2 in (OnlineMetals 4807)"
 stock = "{{process.blank_thickness_in:fraction}} × {{process.blank_width_in:fraction}} in flat; {{process.quantity:d}} × {{process.blank_length_in:g}} in blanks."
-note = "Inches unless mm. Finished {{cad.thickness_min_in:.3dot}}–{{cad.thickness_max_in:.3dot}} thick, ({{cad.overall_length_in:.2f}}) long. One blank at a time through Setups 2–5, on the fixture MHA-CH-13-TL-00 (made beforehand to its drawings); the sub-plate stays in the vise. All spindle work is on the PM-30MV low belt (100–2800 rpm): no belt change."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished {{cad.thickness_min_in:.3dot}}–{{cad.thickness_max_in:.3dot}} thick, ({{cad.overall_length_in:.2f}}) long. One blank at a time through Setups 2–5, on the fixture MHA-CH-13-TL-00 (made beforehand to its drawings); the sub-plate stays in the vise. All spindle work is on the PM-30MV low belt (100–2800 rpm): no belt change."
 shop = "../shop.toml"
 material_key = "rocker-1018-cold-finished"
 milling_material = "steel_1018"
@@ -304,7 +304,7 @@ title = "Rough both faces on the sub-plate"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "Sub-plate MHA-CH-13-TL-01 in the vise on 1 in parallels, centred, the fence indicated <.001 along X and the plate top indicated within .0003 over the 12 in under the blank; it stays there for every blank. Blank flat on the plate, one long edge against the fence, its left end against the end stop, pushed by the Mitee-Bite Pitbull 26000 (4-40) edge clamps TL-VN-50 at X {{cad.clamp_stations_in}} from the end stop, each tightened to {{process.clamp_torque_in_lb:g}} in-lb. Clamp noses, fence and end-stop tops at most {{process.fence_height_mm:in.3dot}} above the plate, below the cut."
+holding = "Sub-plate MHA-CH-13-TL-01 in the vise on 1 in parallels, centred, the fence indicated <.001 along X and the plate top indicated within .001 over the 12 in under the blank; it stays there for every blank. Blank flat on the plate, one long edge against the fence, its left end against the end stop, pushed by the Mitee-Bite Pitbull 26000 (4-40) edge clamps TL-VN-50 at X {{cad.clamp_stations_in}} from the end stop, each tightened to {{process.clamp_torque_in_lb:g}} in-lb. Clamp noses, fence and end-stop tops at most {{process.fence_height_mm:in.3dot}} above the plate, below the cut."
 datum = "Program RS01_rough_faces (cam:ch_rocker_strap). One G54 while the plate stays put: Z0 = the plate top, Y0 = the fence face (blank at −Y), X0 = the end stop's face, set in Op 30; set again after the plate moves, a stall or an E-stop. Each M6 measures its tool on the tool setter against T1's length when Z0 was set; every file (RS01–RS04) starts with an M6, so none runs on the length the last file left, even re-run or restarted."
 diagram = { file = "diagrams/rough.svg", alt = "Plan of the sub-plate: fence along the back, blank against it and against the end stop at its left end, edge clamps at the front at X {{cad.clamp_stations_in}}; the 1/2 in end mill faces the full blank, one face, then the other after the flip." }
 envelope = { x_span_mm = ["{{cad.blank_length_mm}}", "{{process.face_cutter_dia_mm}}"], y_span_mm = ["{{cad.blank_width_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_top_height_mm}}", "{{cad.blank_thickness_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_top_height_mm}}", "{{cad.thickness_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
@@ -315,17 +315,20 @@ beam = { axis = "x", hold = "plate", extent_mm = [0, "{{cad.blank_length_mm}}"],
 
 # The plate top's tilt along X is a thickness wedge: face 1 is cut parallel
 # to the table, then lies on the tilted top for face 2, so the strap ends up
-# thicker at one end by the top's run-out over the blank. .0003 keeps that
-# to under a third of the ±.001 thickness band.
+# thicker at one end by the top's run-out over the blank. .001, the shop's
+# flatness/parallelism row, keeps that to half the .002 thickness band; the
+# per-blank thickness check at RS03's M6 T3 catches the rest. A shim between
+# the parallels and the plate's low end levels a plate whose top and
+# underside are not parallel; the fence and end-stop heights do not change.
 [[setups.operations]]
 steps = [
-  { kind = "check", text = "Once per vise setup, no blank in: the lever indicator along the plate top over X 0–12 reads within .0003." },
-  { kind = "stop", text = "Over: reseat the plate on the parallels and indicate again." },
+  { kind = "check", text = "Once per vise setup, no blank in: the lever indicator along the plate top over X 0–12 reads within .001." },
+  { kind = "stop", text = "Over: reseat the plate on the parallels and indicate again. Still over: a feeler-gauge leaf between the parallels and the plate's low end, then indicate again." },
 ]
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Console M6 T1 (the 1/2 in end mill, measured on the tool setter). T1, spindle off, just dragging on a .200 gauge block on the plate top: G10 L20 P1 Z.200. The .200 edge finder at 900 rpm on the fence face: G10 L20 P1 Y-.100; on the end stop's face: G10 L20 P1 X.100."
+instruction = "Console M6 T1 (the 1/2 in end mill, measured on the tool setter). T1, spindle off, just dragging on a .200 gauge block on the plate top: G10 L20 P1 Z5.080. The .200 edge finder at 900 rpm on the fence face: G10 L20 P1 Y-2.540; on the end stop's face: G10 L20 P1 X2.540 (its 2.540 mm radius)."
 feed = "hand"
 
 # Prove-out: the clamps, fence and end stop stand about .02 under the finish
@@ -333,7 +336,7 @@ feed = "hand"
 # drawing's high limit on the fence and end stop.
 [[setups.operations]]
 steps = [
-  { kind = "action", text = "First blank only, before it goes in: prove RS01–RS04 in air. Edge finder out; console M6 T1 (measured on the tool setter); on the .200 block: G10 L20 P1 Z-.800 (Z0 1.000 high). Run each file single block through its first plunges. Then M6 T1 and G10 L20 P1 Z.200 on the block again." },
+  { kind = "action", text = "First blank only, before it goes in: prove RS01–RS04 in air. Edge finder out; console M6 T1 (measured on the tool setter); on the .200 block: G10 L20 P1 Z-20.320 (Z0 25.4 mm, 1.000 in, high). Run each file single block through its first plunges. Then M6 T1 and G10 L20 P1 Z5.080 on the block again." },
 ]
 feed = "hand"
 
@@ -512,7 +515,7 @@ beam = { axis = "x", hold = "plate", extent_mm = [0, "{{cad.blank_length_mm}}"],
 # tape and the plug pilot next: it comes off here, the edges kept sharp.
 [[setups.operations]]
 steps = [
-  { kind = "action", text = "Per blank. Rub each face of the reamed blank flat across the hub hole on a fine stone: the burr off, both edges left sharp." },
+  { kind = "action", text = "Per blank. Rub each face of the reamed blank flat across the hub hole on the 320-grit face of the two-grit sharpening stone: the burr off, both edges left sharp." },
   { kind = "check", text = "Hub hole: both edges sharp, no burr." },
   { kind = "stop", text = "Burr: stone it off flat again and check again. An edge rounded over: the blank is scrap, before it is taped." },
 ]
@@ -623,7 +626,7 @@ gauge_checks = [
 [[setups.operations]]
 steps = [
   { kind = "action", text = "First article only, strap still on the plate (diagnostic, REF): calipers across the two edges at the hub and 4.7 in either side, about {{cad.width_mm:in.3dot}} each (the arcs' spacing); write them down." },
-  { kind = "check", text = "A .124 pin gauge passes along the slot all round." },
+  { kind = "check", text = "A .124 gauge block from the 81-piece set slides along the slot all round." },
   { kind = "stop", text = "Tight: a waste piece has moved toward the strap; once the strap is freed, check that edge against the inspection bands." },
 ]
 feed = "hand"
