@@ -69,11 +69,12 @@ ISO_SCALE = spec.ISOMETRIC_VIEW_SCALE
 if tuple(ISO_SCALE) == VIEW_SCALE:
     raise AssertionError("the isometric's label would repeat the sheet scale")
 _S = VIEW_SCALE[0] / VIEW_SCALE[1] / 1000.0  # sheet metres per model mm
-# Farm r1 (20261117T234245842Z, layout audit): the end view moves down-left
-# so the pilot's block owns the top-left corner alone, the side view right
-# of it with room under it for the two lengths.
-END_CENTER = (0.060, 0.120)
+# Farm r1 (20261117T234245842Z, layout audit): the pilot's block owns the
+# top-left corner alone, the side view right of it with room under it for
+# the two lengths. Machinist review r9 (rule 15): the end view, a left view,
+# stands level with the side view's axis, left of it.
 SIDE_CENTER = (0.200, 0.170)
+END_CENTER = (0.060, SIDE_CENTER[1])
 ISO_CENTER = (0.370, 0.135)
 ISO_NOTE_XY = (0.335, 0.095)
 BODY_HALF = spec.BODY_DIA / 2.0 * _S
@@ -104,12 +105,13 @@ LENGTH_BLOCK_HALF_WIDTH = 0.021
 BLOCK_BELOW = 0.008
 BLOCK_ABOVE = 0.009
 
-# The end view keeps the bore, its rows up and right of the circles; the two
-# diameters import there too and are parked below it until they move.
+# The end view keeps the bore, its rows down and right of the circles, under
+# the pilot's block and left of the overall length's; the two diameters
+# import there too and are parked further down until they move.
 END_KEEP = {
-    "BoreDia": (END_CENTER[0] + BODY_HALF + 0.020, END_CENTER[1] + BODY_HALF + 0.015),
-    "BodyDia": (END_CENTER[0] - 0.020, END_CENTER[1] - BODY_HALF - 0.012),
-    "PilotDia": (END_CENTER[0] + 0.020, END_CENTER[1] - BODY_HALF - 0.012),
+    "BoreDia": (END_CENTER[0] + BODY_HALF + 0.020, END_CENTER[1] - BODY_HALF - 0.015),
+    "BodyDia": (END_CENTER[0] - 0.020, END_CENTER[1] - BODY_HALF - 0.035),
+    "PilotDia": (END_CENTER[0] + 0.010, END_CENTER[1] - BODY_HALF - 0.035),
 }
 # The side view (r1: the .170 block sat on the .272 and both extension lines
 # ran through their own text). Each length's block stands OUTSIDE its

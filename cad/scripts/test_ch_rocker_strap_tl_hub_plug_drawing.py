@@ -333,6 +333,15 @@ def _sheet_boxes() -> dict[str, Box]:
     }
 
 
+def test_the_end_view_projects_level_with_the_side_view() -> None:
+    """Machinist review r9 (rule 15, third angle): the end view looks at the
+    pilot's top, which stands at the side view's left end, so it is a left
+    view: level with the side view's axis and left of it."""
+    assert drawing.END_CENTER[1] == drawing.SIDE_CENTER[1]
+    body_half = spec.BODY_DIA / 2.0 * drawing._S
+    assert drawing.END_CENTER[0] + body_half < drawing.TOP_X
+
+
 def test_no_two_blocks_or_views_overlap_and_all_stand_on_the_sheet() -> None:
     """Farm r1 defects 1-3: the body's block on the side view, the .170 on
     the .272, the pilot's block on the bore's. B landscape 0.4318 x 0.2794,
