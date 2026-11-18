@@ -196,7 +196,9 @@ TOP_KEEP: dict[str, tuple[float, float]] = {
     "HubY": (_LEFT_X - 0.0275, top_xy(0.0, spec.HUB_Y / 2.0)[1]),
     "FenceWidth": (_LEFT_X - 0.013, top_xy(0.0, spec.BACK_EDGE_Y / 2.0)[1]),
     "ClampTapY": (_LEFT_X - 0.045, top_xy(0.0, spec.HUB_Y)[1] - 0.0013),
-    "NotchDepth": (_LEFT_X - 0.002, _BACK_Y + 0.0076),
+    # Farm run r27: the fence width's outside line rises 6.3 mm over the
+    # back edge, through the text 2.9 mm lower.
+    "NotchDepth": (_LEFT_X - 0.002, _BACK_Y + 0.0105),
     "PlateWidth": (_LEFT_X - 0.055, _FRONT_Y + 0.00675),
     "PocketLength": (
         top_xy(_STATIONS[1] - spec.POCKET_LENGTH / 2.0, 0.0)[0] - 0.0113,

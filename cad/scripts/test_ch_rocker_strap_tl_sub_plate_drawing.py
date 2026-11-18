@@ -331,6 +331,7 @@ _ROW_PITCH = 5.6
 _SECTION_ARROW = 12.0
 _SHORT_SPAN = 8.0
 _ARROW = 3.5
+_OUTSIDE_LINE = 6.3
 _OWN_ARROW_GAP = 1.0
 _BESIDE_LINE = {1: 1.4, 2: 0.3}
 _LETTER = (13.9, 19.6, -1.35, 5.0)
@@ -576,9 +577,11 @@ class _Sheet:
             inline = along == "y" and not past and out > 0.0
             self.dim_arrows.append((name, (tuple(tip), tuple(tail)), inline))
         if out < 0.0:
-            # Too short for its arrows: they stand outside, an arrow's
-            # length past each end.
-            lo, hi = lo - _ARROW, hi + _ARROW
+            # Too short for its arrows: they stand outside, and the line runs
+            # 6.3 mm past each end (farm run r27: FenceWidth's line rose
+            # 6.3 mm over the back edge into NotchDepth's text; r26 drew
+            # NotchDepth's own the same).
+            lo, hi = lo - _OUTSIDE_LINE, hi + _OUTSIDE_LINE
         if along == "y" and past:
             # Beside its line, away from its points, the line rising (or
             # falling) to the near row and running under it.
