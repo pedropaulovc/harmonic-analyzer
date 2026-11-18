@@ -25,9 +25,10 @@ model dimension located from X0, Y0 or Z0:
   floor.
 * ``SectionAPlane`` / ``SectionAReference`` and ``SectionBPlane`` /
   ``SectionBReference``: hidden construction-only sketches in the two
-  sections' cutting planes, owning the heights the sections print
-  (FenceHeight, PlateThickness, PocketDepth; HubCboreDepth), each driven by
-  the same global as the feature depth it states.
+  sections' cutting planes (Right-parallel, across the plate), owning every
+  size the sections print (PocketNearWallY, PocketBackWallY, PocketDepth;
+  FenceWidth, PlateWidth, FenceHeight, PlateThickness, HubCboreDepth), each
+  driven by the same global as the feature size it states.
 
 Run (SolidWorks already open)::
 
@@ -66,6 +67,7 @@ from _sketch import (
     SketchDims,
     add_line_chain,
     anchor_point_to_origin,
+    anchor_point_to_point,
     blank_reference_sketches,
     dimension_between,
     ensure_fully_defined,
@@ -378,15 +380,19 @@ def _notches(adapter: Any, drive_jobs: list[tuple[str, str]], volume: float) -> 
     volume -= spec.V_NOTCHES
     volume = volume_check(adapter, "fence notches", volume, _V_TOL)
 
+    # The right notch's corner first: the drawing's radius attaches to the
+    # first edge, and the right corner's leader runs out through the open
+    # notch (farm run 20261118T001932117Z: off the left corner it crossed the
+    # whole top view).
     z = spec.FENCE_HEIGHT / 2.0
     check(
         "round notch back corners",
         adapter.add_fillet(
             spec.CORNER_RADIUS,
             [
+                [spec.NOTCH_RIGHT_START, depth, z],
                 [0.0, depth, z],
                 [spec.NOTCH_LEFT_END, depth, z],
-                [spec.NOTCH_RIGHT_START, depth, z],
             ],
             propagate=False,
         ),
@@ -417,7 +423,6 @@ def _pockets(adapter: Any, drive_jobs: list[tuple[str, str]], volume: float) -> 
         for index, s in enumerate(spec.CLAMP_STATIONS, 1)
     ]
     first_back, _r, first_near, first_left = pockets[0]
-    last_near = pockets[-1][2]
     for index, (back_wall, _right, near_wall, _left) in enumerate(pockets[1:], 2):
         for ours, theirs, label in (
             (back_wall, first_back, "back wall"),
@@ -427,14 +432,15 @@ def _pockets(adapter: Any, drive_jobs: list[tuple[str, str]], volume: float) -> 
                 f"pocket {index} {label} collinear",
                 adapter.add_sketch_constraint(ours, theirs, "collinear"),
             )
-    for index, (_back, _right, near_wall, _left) in enumerate(pockets[:-1], 1):
+    for index, (_back, _right, near_wall, _left) in enumerate(pockets[1:], 2):
         check(
             f"pocket {index} length equal",
-            adapter.add_sketch_constraint(near_wall, last_near, "equal"),
+            adapter.add_sketch_constraint(near_wall, first_near, "equal"),
         )
     # Every location from the origin: each pocket's left end from X0 (an
     # equation of its station, so the station prints once, on its tap), the
-    # walls from Y0 on pocket 1, the length on pocket 4.
+    # walls from Y0 on pocket 1, the length on pocket 1 (the drawing prints it
+    # above pocket 1, clear of the taps' X extension lines).
     for index, ((_back, _right, near_wall, _left), station) in enumerate(
         zip(pockets, spec.CLAMP_STATIONS, strict=True), 1
     ):
@@ -468,8 +474,8 @@ def _pockets(adapter: Any, drive_jobs: list[tuple[str, str]], volume: float) -> 
             dims.record("PocketBackWallY", '"PocketBackWallY"')
     dimension_between(
         adapter,
-        f"{last_near}.start",
-        f"{last_near}.end",
+        f"{first_near}.start",
+        f"{first_near}.end",
         "horizontal_distance",
         spec.POCKET_LENGTH,
         "pocket length",
@@ -489,19 +495,21 @@ def _pockets(adapter: Any, drive_jobs: list[tuple[str, str]], volume: float) -> 
     volume -= spec.V_POCKETS
     volume = volume_check(adapter, "clamp pockets", volume, _V_TOL)
 
+    # Pocket 4's right back corner first: the drawing's radius attaches to the
+    # first edge and prints right of the plate (farm run 20261118T001932117Z:
+    # off pocket 1 its text sat on clamp 1's X extension line).
     z = -spec.POCKET_DEPTH / 2.0
+    corners = [
+        [s + side * half, wall, z]
+        for s in spec.CLAMP_STATIONS
+        for side in (-1.0, 1.0)
+        for wall in (back, near)
+    ]
+    first = [spec.CLAMP_STATIONS[-1] + half, back, z]
+    corners.remove(first)
     check(
         "round pocket corners",
-        adapter.add_fillet(
-            spec.CORNER_RADIUS,
-            [
-                [s + side * half, wall, z]
-                for s in spec.CLAMP_STATIONS
-                for side in (-1.0, 1.0)
-                for wall in (back, near)
-            ],
-            propagate=False,
-        ),
+        adapter.add_fillet(spec.CORNER_RADIUS, [first, *corners], propagate=False),
     )
     name_last_feature(adapter, "PocketCorners")
     (radius,) = name_dimensions(adapter, "PocketCorners", ["PocketCornerR"])
@@ -578,29 +586,29 @@ def _taps(adapter: Any, drive_jobs: list[tuple[str, str]], volume: float) -> flo
     return volume_check(adapter, "hub tap", volume, _V_TOL)
 
 
-def _section_plane(adapter: Any, name: str, y_mm: float) -> None:
-    """A cutting plane parallel to the Top Plane at model Y ``y_mm``, read back
-    against it (build_pd_platen._cbore_section_plane): the same rotation, so
-    a sketch on it keeps Top's (u, v) = model (X, -Z), and an origin shifted
-    by exactly ``y_mm`` along Y. A negative offset lies on Top's -Y side."""
+def _section_plane(adapter: Any, name: str, x_mm: float) -> None:
+    """A cutting plane parallel to the Right Plane at model X ``x_mm``, read
+    back against it (build_pd_platen._cbore_section_plane): the same rotation,
+    so a sketch on it keeps Right's (u, v) = model (-Z, Y), and an origin
+    shifted by exactly ``x_mm`` along X."""
     from solidworks_mcp.adapters.base import CreatePlaneParameters
 
     check(
         f"create plane {name}",
         adapter.create_plane(
-            CreatePlaneParameters(mode="offset", base_plane="Top Plane", offset=y_mm)
+            CreatePlaneParameters(mode="offset", base_plane="Right Plane", offset=x_mm)
         ),
     )
     name_last_feature(adapter, name)
-    top_rotation, top_origin = _plane_frame(adapter, "Top Plane")
+    right_rotation, right_origin = _plane_frame(adapter, "Right Plane")
     rotation, origin = _plane_frame(adapter, name)
-    shift = tuple(o - t for o, t in zip(origin, top_origin, strict=True))
+    shift = tuple(o - r for o, r in zip(origin, right_origin, strict=True))
     if any(
-        abs(a - b) > 1e-9 for a, b in zip(rotation, top_rotation, strict=True)
-    ) or any(abs(s - e) > 1e-6 for s, e in zip(shift, (0.0, y_mm, 0.0), strict=True)):
+        abs(a - b) > 1e-9 for a, b in zip(rotation, right_rotation, strict=True)
+    ) or any(abs(s - e) > 1e-6 for s, e in zip(shift, (x_mm, 0.0, 0.0), strict=True)):
         raise RuntimeError(
             f"{name}: rotation {rotation} / origin shift {shift} mm, expected the "
-            f"Top plane's {top_rotation} shifted (0, {y_mm}, 0)"
+            f"Right plane's {right_rotation} shifted ({x_mm}, 0, 0)"
         )
 
 
@@ -616,124 +624,139 @@ def _plane_frame(
     return tuple(data[0:9]), tuple(v * 1000.0 for v in data[9:12])
 
 
-def _reference_line(
-    adapter: Any,
-    dims: SketchDims,
-    *,
-    x_mm: float,
-    z_from_mm: float,
-    z_to_mm: float,
-    x_drive: str | None,
-    z_from_drive: str | None,
-    name: str,
-    drive: str,
-) -> None:
-    """One construction line along Z in a Top-parallel sketch, from model Z
-    ``z_from_mm`` to ``z_to_mm`` at model X ``x_mm``; its length is the named
-    printed dimension, its start located from the origin by driven
-    (unprinted) dimensions. Top's sketch v is model -Z."""
-    start = (x_mm, -z_from_mm)
+def _chord(
+    adapter: Any, *, y_mm: float, z_from_mm: float, z_to_mm: float, label: str
+) -> str:
+    """One construction chord along Z in a Right-parallel sketch, at model Y
+    ``y_mm`` from model Z ``z_from_mm`` to ``z_to_mm``, held horizontal
+    (Right's sketch u is model -Z). The caller locates and sizes it."""
     set_sketch_direct_db(adapter, True)
     line = check(
-        f"{name} reference line",
-        adapter.add_line(start[0], start[1], x_mm, -z_to_mm),
+        f"{label} chord",
+        adapter.add_line(-z_from_mm, y_mm, -z_to_mm, y_mm),
     )
     set_sketch_direct_db(adapter, False)
     segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
     segment.ConstructionGeometry = True
     if not bool(segment.ConstructionGeometry):
-        raise RuntimeError(f"{name} reference line did not take the construction flag")
+        raise RuntimeError(f"{label} chord did not take the construction flag")
     check(
-        f"{name} reference vertical",
-        adapter.add_sketch_constraint(line, None, "vertical"),
+        f"{label} chord horizontal",
+        adapter.add_sketch_constraint(line, None, "horizontal"),
     )
-    anchor_point_to_origin(
-        adapter, f"{line}.start", start[0], start[1], f"{name} start"
-    )
-    # anchor_point_to_origin emits the horizontal distance first, then the
-    # vertical, and none for a zero coordinate.
-    if abs(start[0]) >= 1e-9:
-        dims.record(f"{name}RefX", x_drive)
-    if abs(start[1]) >= 1e-9:
-        dims.record(f"{name}RefZ", z_from_drive)
+    return line
+
+
+def _length(
+    adapter: Any, dims: SketchDims, line: str, length_mm: float, name: str, drive: str
+) -> None:
     dimension_between(
-        adapter,
-        f"{line}.start",
-        f"{line}.end",
-        "vertical_distance",
-        abs(z_to_mm - z_from_mm),
-        name,
+        adapter, f"{line}.start", f"{line}.end", "horizontal_distance", length_mm, name
     )
     dims.record(name, drive)
 
 
 def _section_references(adapter: Any, drive_jobs: list[tuple[str, str]]) -> None:
-    """The heights the sections print, in hidden construction-only sketches
-    on each cutting plane (a section imports no extrusion depth): A-A the
-    fence height on the stop face, the overall thickness on the left end and
-    the pocket depth on pocket 1's right end; B-B the counterbore depth on
-    its left wall. Every line runs along Z, so the top view sees it end-on."""
-    _section_plane(adapter, spec.SECTION_A_PLANE, spec.SECTION_A_Y)
+    """The sizes the sections print, in hidden construction-only sketches on
+    each cutting plane (a section imports no sketch or extrusion size): every
+    chord lies on an edge its section draws and runs along Z, so the top view
+    sees it end-on; each Y size runs from the sketch origin (the fence face's
+    foot) to a chord's start, each height is a chord's length.
+
+    A-A (pocket 3): a chord down each pocket wall, the near wall's from Y0
+    (PocketNearWallY) and the back wall's from Y0 (PocketBackWallY) and long
+    PocketDepth. B-B (the counterbore): the back face, its top corner from Y0
+    (FenceWidth) and long PlateThickness; the fence face up from the origin
+    (FenceHeight); the front face, its foot PlateWidth in front of the back
+    face's; the counterbore's front wall, long HubCboreDepth."""
+    _section_plane(adapter, spec.SECTION_A_PLANE, spec.SECTION_A_X)
     dims = SketchDims()
     check(
         "create_sketch section A-A reference",
         adapter.create_sketch(spec.SECTION_A_PLANE),
     )
-    _reference_line(
-        adapter,
-        dims,
-        x_mm=spec.FENCE_HEIGHT_REFERENCE_X,
-        z_from_mm=spec.PLATE_TOP_Z,
-        z_to_mm=spec.FENCE_HEIGHT,
-        x_drive=None,
-        z_from_drive=None,
-        name="FenceHeight",
-        drive='"FenceHeight"',
-    )
-    _reference_line(
-        adapter,
-        dims,
-        x_mm=spec.THICKNESS_REFERENCE_X,
-        z_from_mm=spec.FENCE_HEIGHT,
-        z_to_mm=spec.UNDERSIDE_Z,
-        x_drive='"LeftEnd"',
-        z_from_drive='"FenceHeight"',
-        name="PlateThickness",
-        drive='"PlateThickness"',
-    )
-    _reference_line(
-        adapter,
-        dims,
-        x_mm=spec.POCKET_DEPTH_REFERENCE_X,
-        z_from_mm=spec.PLATE_TOP_Z,
-        z_to_mm=spec.POCKET_FLOOR_Z,
-        x_drive='"ClampStation1" + "PocketLength" / 2',
-        z_from_drive=None,
-        name="PocketDepth",
-        drive='"PocketDepth"',
-    )
+    for wall_y, name, chord_name, chord_drive in (
+        (spec.POCKET_NEAR_WALL_Y, "PocketNearWallY", "NearWallChord", '"PocketDepth"'),
+        (spec.POCKET_BACK_WALL_Y, "PocketBackWallY", "PocketDepth", '"PocketDepth"'),
+    ):
+        wall = _chord(
+            adapter,
+            y_mm=wall_y,
+            z_from_mm=spec.PLATE_TOP_Z,
+            z_to_mm=spec.POCKET_FLOOR_Z,
+            label=name,
+        )
+        anchor_point_to_origin(adapter, f"{wall}.start", 0.0, wall_y, name)
+        dims.record(name, f'"{name}"')
+        _length(adapter, dims, wall, spec.POCKET_DEPTH, chord_name, chord_drive)
     ensure_fully_defined(adapter, "section A-A reference sketch")
     check("exit_sketch section A-A reference", adapter.exit_sketch())
     name_last_feature(adapter, spec.SECTION_A_REFERENCE)
     _require_parent(adapter, spec.SECTION_A_REFERENCE, spec.SECTION_A_PLANE)
     drive_jobs += dims.apply(adapter, spec.SECTION_A_REFERENCE)
 
-    _section_plane(adapter, spec.SECTION_B_PLANE, spec.SECTION_B_Y)
+    _section_plane(adapter, spec.SECTION_B_PLANE, spec.SECTION_B_X)
     dims = SketchDims()
     check(
         "create_sketch section B-B reference",
         adapter.create_sketch(spec.SECTION_B_PLANE),
     )
-    _reference_line(
+    back = _chord(
         adapter,
-        dims,
-        x_mm=spec.CBORE_DEPTH_REFERENCE_X,
+        y_mm=spec.BACK_EDGE_Y,
+        z_from_mm=spec.FENCE_HEIGHT,
+        z_to_mm=spec.UNDERSIDE_Z,
+        label="back face",
+    )
+    # anchor_point_to_origin emits the horizontal (u, -Z) distance, then the
+    # vertical (v, Y) one.
+    anchor_point_to_origin(
+        adapter, f"{back}.start", -spec.FENCE_HEIGHT, spec.BACK_EDGE_Y, "back face"
+    )
+    dims.record("BackFaceTopZ", '"FenceHeight"')
+    dims.record("FenceWidth", '"FenceWidth"')
+    _length(
+        adapter, dims, back, spec.PLATE_THICKNESS, "PlateThickness", '"PlateThickness"'
+    )
+    fence = _chord(
+        adapter,
+        y_mm=0.0,
+        z_from_mm=spec.PLATE_TOP_Z,
+        z_to_mm=spec.FENCE_HEIGHT,
+        label="fence face",
+    )
+    anchor_point_to_origin(adapter, f"{fence}.start", 0.0, 0.0, "fence face")
+    _length(adapter, dims, fence, spec.FENCE_HEIGHT, "FenceHeight", '"FenceHeight"')
+    front = _chord(
+        adapter,
+        y_mm=spec.FRONT_EDGE_Y,
+        z_from_mm=spec.UNDERSIDE_Z,
+        z_to_mm=spec.PLATE_TOP_Z,
+        label="front face",
+    )
+    anchor_point_to_point(
+        adapter, f"{back}.end", f"{front}.start", 0.0, -spec.PLATE_WIDTH, "plate width"
+    )
+    dims.record("PlateWidth", '"PlateWidth"')
+    check(
+        "front face chord top on Z0",
+        adapter.add_sketch_constraint(f"{front}.end", "origin", "vertical_points"),
+    )
+    wall = _chord(
+        adapter,
+        y_mm=spec.CBORE_SECTION_WALL_Y,
         z_from_mm=spec.PLATE_TOP_Z,
         z_to_mm=spec.COUNTERBORE_FLOOR_Z,
-        x_drive='"HubX" - "HubCboreDia" / 2',
-        z_from_drive=None,
-        name="HubCboreDepth",
-        drive='"HubCboreDepth"',
+        label="counterbore wall",
+    )
+    # Where the plane meets the counterbore's wall is the plane's offset's
+    # geometry, not a printed size: undriven.
+    anchor_point_to_origin(
+        adapter, f"{wall}.start", 0.0, spec.CBORE_SECTION_WALL_Y, "counterbore wall"
+    )
+    dims.record("CboreWallY")
+    _length(
+        adapter, dims, wall, spec.HUB_CBORE_DEPTH, "HubCboreDepth", '"HubCboreDepth"'
     )
     ensure_fully_defined(adapter, "section B-B reference sketch")
     check("exit_sketch section B-B reference", adapter.exit_sketch())
@@ -797,7 +820,7 @@ def build(adapter: Any) -> dict[str, str]:
     # the shop holds"); the tolerance carries the nominal's three places.
     set_dimension_symmetric_tolerance(
         adapter,
-        "PocketProfile",
+        spec.SECTION_A_REFERENCE,
         "PocketBackWallY",
         spec.POCKET_BACK_WALL_TOL,
         places=spec.DRAWING_PRECISION_BY_NAME["PocketBackWallY"],

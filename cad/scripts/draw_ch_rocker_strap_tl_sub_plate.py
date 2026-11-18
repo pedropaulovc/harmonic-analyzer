@@ -1,13 +1,15 @@
 r"""Manufacturing drawing of the rocker-strap sub-plate (MHA-CH-13-TL-01).
 
-Shop tooling (owner ask 2026-11-17). One B sheet at 1:2, laid as the plate
-sits in the vise (rule 11): the top view with the fence along the top and
-the end stop at the left, every X from the stop face (X0) above and below
-it and every Y from the fence face (Y0) to its left; partial section A-A
-through clamp pocket 1 and its #4-40 tap, carrying the fence height, the
-overall thickness, the pocket depth and the clamp taps' callout; partial
-section B-B through the hub, carrying the counterbore's depth and the hub
-tap's callout with its stated engagement; the isometric at 1:4. Every number
+Shop tooling (owner ask 2026-11-17). One B sheet, laid as the plate sits in
+the vise (rule 11): the top view at 1:2 across the top, the fence along its
+top and the end stop at its left, every X from the stop face (X0) above and
+below it, the hub's and the clamp taps' Y from the fence face (Y0) to its
+left, both taps' callouts on it; under it two sections cut across the plate
+at 2:1, each carrying its Y sizes as rows from Y0 over the cut (farm run
+20261118T001932117Z: seven Y lanes beside the top view piled their texts):
+partial section A-A through clamp pocket 3, its walls from Y0 and its depth;
+section B-B through the hub counterbore, the fence, the overall width and
+thickness and the counterbore's depth; the isometric at 1:4. Every number
 is the part's own (``ch_rocker_strap_tl_sub_plate_spec``), imported from the
 model.
 """
@@ -41,6 +43,7 @@ from _drawing_common import (
 )
 from _drawing_dimension_import import import_cosmetic_threads
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_edges import visible_view_entities
 from _drawing_hidden_sketches import curate_view_dimensions, part_sketches_shown
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_notes import add_property_linked_note
@@ -54,6 +57,7 @@ from _gtol_planar import PlanarFace
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _printed_limits import limits
+from _section_axis import position_section_caption
 from _session import run_build
 
 # Learn-mode machinist review: findings are recorded, the build does not fail.
@@ -72,25 +76,44 @@ _P = spec.DRAWING_PRECISION_BY_NAME
 # 1:2 prints the 13 in plate 165 mm long; the sections at 2:1 print the .140
 # pocket 7 mm deep. The title block holds the lower right (x >= 0.216,
 # y <= 0.066); the inner border runs 0.0127..0.4191 x 0.0127..0.2667.
+# Farm run 20261118T001932117Z's audit sets the spacing: text 3.6 mm tall
+# needs 3.57 mm to the next text (rows 8 mm apart, not 7) and 2 mm to any
+# extension line; a cutting line's letter stands 15.75..21.9 mm past the
+# line's end along its arrow, 6.1 mm across.
 SHEET_SCALE = (1.0, 2.0)
 TOP_SCALE = (1, 2)
 SECTION_SCALE = (2, 1)
 ISO_SCALE = (1, 4)
 _T = TOP_SCALE[0] / TOP_SCALE[1] / 1000.0
 _S = SECTION_SCALE[0] / SECTION_SCALE[1] / 1000.0
-# The top view's model origin (X0, Y0): the plate's centre at (0.175, 0.195).
-TOP_ORIGIN = (
-    0.175 - (spec.LEFT_END_X + spec.PLATE_LENGTH / 2.0) * _T,
-    0.195 - (spec.BACK_EDGE_Y + spec.FRONT_EDGE_Y) / 2.0 * _T,
+# The top view's model origin (X0, Y0): the plate's left end at x 0.075, Y0
+# at y 0.204 (the back edge at 0.210, the front edge at 0.172), low enough
+# that the hub tap's callout and the X rows above it fit under the border.
+TOP_ORIGIN = (0.075 - spec.LEFT_END_X * _T, 0.204)
+# Each section prints model +Z up and +Y to the left: its arrows point +X,
+# so each letter stands right of its line. Its origin is the sheet point of
+# its plane's (Y0, Z0), the fence face's foot.
+SECTION_A_ORIGIN = (0.070, 0.085)
+SECTION_B_ORIGIN = (0.266, 0.1018)
+# The cutting lines (model X, Y), each from 12 mm behind the back edge (its
+# letter 3 mm over the back edge, under the hub tap's callout); A-A's stops
+# in the floor 4.4 mm past pocket 3's back wall (a partial section: its
+# letter inside the plate, clear of every line), B-B's runs 12 mm past the
+# front edge (its letter over the X rows, 2.2 mm clear of clamp 3's
+# extension).
+SECTION_A_END_Y = -52.0
+SECTION_A_LINE = (
+    (spec.SECTION_A_X, spec.BACK_EDGE_Y + 12.0),
+    (spec.SECTION_A_X, SECTION_A_END_Y),
 )
-# Each section prints model +X to the sheet's right and +Z up, its anchor
-# (on the cutting plane, at Z0) on its origin.
-SECTION_A_ANCHOR = (0.0, spec.CLAMP_SCREW_Y, 0.0)
-SECTION_A_ORIGIN = (0.075, 0.105)
-SECTION_A_SPAN = (-20.0, 40.0)
-SECTION_B_ANCHOR = (spec.HUB_X, spec.HUB_Y, 0.0)
-SECTION_B_ORIGIN = (0.300, 0.110)
-SECTION_B_SPAN = (spec.HUB_X - 12.5, spec.HUB_X + 12.5)
+SECTION_B_LINE = (
+    (spec.SECTION_B_X, spec.BACK_EDGE_Y + 12.0),
+    (spec.SECTION_B_X, spec.FRONT_EDGE_Y - 12.0),
+)
+# The captions under section A-A and over section B-B (the title block
+# holds the space under B-B); each point is the caption's top centre.
+SECTION_A_CAPTION_XY = (0.112, 0.058)
+SECTION_B_CAPTION_XY = (0.340, 0.152)
 ISO_CENTER = (0.365, 0.232)
 ISO_NOTE_XY = (0.335, 0.196)
 
@@ -100,20 +123,14 @@ def top_xy(x_mm: float, y_mm: float) -> tuple[float, float]:
     return (TOP_ORIGIN[0] + x_mm * _T, TOP_ORIGIN[1] + y_mm * _T)
 
 
-def section_a_xy(x_mm: float, z_mm: float) -> tuple[float, float]:
-    """Section A-A's sheet point of model (x, z) on its cutting plane."""
-    return (
-        SECTION_A_ORIGIN[0] + (x_mm - SECTION_A_ANCHOR[0]) * _S,
-        SECTION_A_ORIGIN[1] + (z_mm - SECTION_A_ANCHOR[2]) * _S,
-    )
+def section_a_xy(y_mm: float, z_mm: float) -> tuple[float, float]:
+    """Section A-A's sheet point of model (y, z) on its cutting plane."""
+    return (SECTION_A_ORIGIN[0] - y_mm * _S, SECTION_A_ORIGIN[1] + z_mm * _S)
 
 
-def section_b_xy(x_mm: float, z_mm: float) -> tuple[float, float]:
-    """Section B-B's sheet point of model (x, z) on its cutting plane."""
-    return (
-        SECTION_B_ORIGIN[0] + (x_mm - SECTION_B_ANCHOR[0]) * _S,
-        SECTION_B_ORIGIN[1] + (z_mm - SECTION_B_ANCHOR[2]) * _S,
-    )
+def section_b_xy(y_mm: float, z_mm: float) -> tuple[float, float]:
+    """Section B-B's sheet point of model (y, z) on its cutting plane."""
+    return (SECTION_B_ORIGIN[0] - y_mm * _S, SECTION_B_ORIGIN[1] + z_mm * _S)
 
 
 _FRONT_Y = top_xy(0.0, spec.FRONT_EDGE_Y)[1]
@@ -121,86 +138,103 @@ _BACK_Y = top_xy(0.0, spec.BACK_EDGE_Y)[1]
 _LEFT_X = top_xy(spec.LEFT_END_X, 0.0)[0]
 _RIGHT_X = top_xy(spec.RIGHT_END_X, 0.0)[0]
 _STATIONS = spec.CLAMP_STATIONS
-# Top view: X sizes from X0 stacked above (notches, ends, overall) and below
-# (clamp stations and the hub, nearest first); Y sizes from Y0 stacked to the
-# left, nearest first; the pocket set's length and corner radius below the
-# front edge, the notch corner right of the plate, the counterbore's Ø below
-# right of it.
+_FENCE_TOP_A = section_a_xy(0.0, spec.FENCE_HEIGHT)[1]
+_FENCE_TOP_B = section_b_xy(0.0, spec.FENCE_HEIGHT)[1]
+# Top view: X sizes from X0 in rows at least 8 mm apart, above (the ends and
+# notch 12 mm over the back edge; over the hub tap's callout the notch start
+# and the overall length) and below (clamp 1's text right of its span, which
+# is narrower than it; under the cutting lines' letters). Y sizes from Y0 to
+# the left, the shortest span innermost so no extension line crosses
+# another's dimension line: the hub, then clamp 1's tap with its text
+# between the hub's and the tap's levels, then the notch depth with its text
+# above. The pocket length over pocket 1, right of its span, midway between
+# the hub's Y extension line and the fence face; the radii and the
+# counterbore's Ø right of the plate, each leader running out level from its
+# feature.
 TOP_KEEP: dict[str, tuple[float, float]] = {
-    "NotchLeftEnd": (top_xy(spec.NOTCH_LEFT_END / 2.0, 0.0)[0], _BACK_Y + 0.008),
-    "LeftEnd": (_LEFT_X - 0.010, _BACK_Y + 0.015),
-    "NotchRightStart": (top_xy(spec.NOTCH_RIGHT_START / 2.0, 0.0)[0], _BACK_Y + 0.015),
+    "LeftEnd": (_LEFT_X - 0.007, _BACK_Y + 0.012),
+    "NotchLeftEnd": (top_xy(spec.NOTCH_LEFT_END / 2.0, 0.0)[0], _BACK_Y + 0.012),
+    "NotchRightStart": (top_xy(spec.NOTCH_RIGHT_START / 2.0, 0.0)[0], _BACK_Y + 0.030),
     "PlateLength": (
         top_xy(spec.LEFT_END_X + spec.PLATE_LENGTH / 2.0, 0.0)[0],
-        _BACK_Y + 0.022,
+        _BACK_Y + 0.038,
     ),
-    "ClampTapX1": (top_xy(_STATIONS[0] / 2.0, 0.0)[0], _FRONT_Y - 0.009),
-    "ClampTapX2": (top_xy(_STATIONS[1] / 2.0, 0.0)[0], _FRONT_Y - 0.016),
-    "HubX": (top_xy(spec.HUB_X / 2.0, 0.0)[0], _FRONT_Y - 0.023),
-    "ClampTapX3": (top_xy(_STATIONS[2] / 2.0, 0.0)[0], _FRONT_Y - 0.030),
-    "ClampTapX4": (top_xy(_STATIONS[3] / 2.0, 0.0)[0], _FRONT_Y - 0.037),
-    "NotchDepth": (_LEFT_X - 0.006, top_xy(0.0, spec.NOTCH_DEPTH / 2.0)[1]),
-    "FenceWidth": (_LEFT_X - 0.013, top_xy(0.0, spec.FENCE_WIDTH / 2.0)[1]),
-    "HubY": (_LEFT_X - 0.020, top_xy(0.0, spec.HUB_Y / 2.0)[1]),
-    "PocketNearWallY": (_LEFT_X - 0.027, top_xy(0.0, spec.POCKET_NEAR_WALL_Y / 2.0)[1]),
-    "ClampTapY": (_LEFT_X - 0.034, top_xy(0.0, spec.CLAMP_SCREW_Y / 2.0)[1]),
-    "PocketBackWallY": (_LEFT_X - 0.044, top_xy(0.0, spec.POCKET_BACK_WALL_Y / 2.0)[1]),
-    "PlateWidth": (
-        _LEFT_X - 0.056,
-        top_xy(0.0, (spec.BACK_EDGE_Y + spec.FRONT_EDGE_Y) / 2.0)[1],
+    "ClampTapX1": (top_xy(_STATIONS[0], 0.0)[0] + 0.008, _FRONT_Y - 0.013),
+    "ClampTapX2": (top_xy(_STATIONS[1] / 2.0, 0.0)[0], _FRONT_Y - 0.021),
+    "HubX": (top_xy(spec.HUB_X / 2.0, 0.0)[0], _FRONT_Y - 0.029),
+    "ClampTapX3": (top_xy(_STATIONS[2] / 2.0, 0.0)[0], _FRONT_Y - 0.037),
+    "ClampTapX4": (top_xy(_STATIONS[3] / 2.0, 0.0)[0], _FRONT_Y - 0.045),
+    "HubY": (_LEFT_X - 0.014, top_xy(0.0, spec.HUB_Y / 2.0)[1]),
+    "ClampTapY": (
+        _LEFT_X - 0.031,
+        top_xy(0.0, (spec.HUB_Y + spec.CLAMP_SCREW_Y) / 2.0)[1],
     ),
-    "PocketLength": (top_xy(_STATIONS[3], 0.0)[0] + 0.012, _FRONT_Y - 0.004),
-    "PocketCornerR": (top_xy(_STATIONS[0], 0.0)[0] + 0.012, _FRONT_Y - 0.004),
-    # In the open right notch's band, right of the plate's end: the leader
-    # leaves the corner through the notch and the shoulder stays below where
-    # PlateLength's extension line starts (the back edge). Farm run
-    # 20261118T000915664Z: at the back edge +4 mm the shoulder crossed it.
+    "NotchDepth": (_LEFT_X - 0.047, _BACK_Y + 0.0012),
+    "PocketLength": (
+        top_xy(_STATIONS[0], 0.0)[0] + 0.0135,
+        top_xy(0.0, spec.HUB_Y / 2.0)[1],
+    ),
     "NotchCornerR": (_RIGHT_X + 0.022, top_xy(0.0, spec.NOTCH_DEPTH / 2.0)[1]),
-    "HubCboreDia": (top_xy(spec.HUB_X, 0.0)[0] + 0.025, _FRONT_Y - 0.004),
-}
-# Section A-A: the fence height right of the stop face over the floor, the
-# overall thickness left of the plate's end, the pocket depth right of the
-# pocket. Each prints from its hidden reference line in the cutting plane
-# (ch_rocker_strap_tl_sub_plate_spec.SECTION_A_REFERENCE).
-SECTION_A_KEEP: dict[str, tuple[float, float]] = {
-    "FenceHeight": (
-        section_a_xy(spec.FENCE_HEIGHT_REFERENCE_X + 6.0, 0.0)[0],
-        section_a_xy(0.0, spec.FENCE_HEIGHT + 3.0)[1],
+    "HubCboreDia": (_RIGHT_X + 0.024, top_xy(0.0, spec.HUB_Y)[1] + 0.0015),
+    "PocketCornerR": (
+        _RIGHT_X + 0.022,
+        top_xy(0.0, spec.POCKET_BACK_WALL_Y)[1] - 0.0012,
     ),
-    "PlateThickness": (
-        section_a_xy(spec.LEFT_END_X, 0.0)[0] - 0.020,
-        section_a_xy(0.0, (spec.FENCE_HEIGHT + spec.UNDERSIDE_Z) / 2.0)[1],
+}
+# Section A-A: the pocket walls from Y0 in two rows over the cut, the back
+# wall's (with its seat's words under its value) 14 mm over the near wall's;
+# the pocket depth right of the partial cut's end, its two rows under the
+# floor's level so neither extension line runs through them (farm run
+# 20261118T001932117Z: centred on its span, the floor's line struck it).
+SECTION_A_KEEP: dict[str, tuple[float, float]] = {
+    "PocketNearWallY": (
+        section_a_xy(spec.POCKET_NEAR_WALL_Y / 2.0, 0.0)[0],
+        _FENCE_TOP_A + 0.0085,
+    ),
+    "PocketBackWallY": (
+        section_a_xy(spec.POCKET_BACK_WALL_Y / 2.0, 0.0)[0],
+        _FENCE_TOP_A + 0.0225,
     ),
     "PocketDepth": (
-        section_a_xy(SECTION_A_SPAN[1], 0.0)[0] + 0.010,
-        section_a_xy(0.0, spec.POCKET_FLOOR_Z / 2.0)[1],
+        section_a_xy(SECTION_A_END_Y, 0.0)[0] + 0.0195,
+        section_a_xy(0.0, spec.POCKET_FLOOR_Z)[1] - 0.0075,
     ),
 }
-# Section B-B: the counterbore's depth left of the hub.
+# Section B-B: the thickness left of the back face; the fence width over the
+# fence; the fence height's two rows over the floor right of the fence face,
+# 2 mm over its extension lines; the counterbore depth's two rows above
+# those, right of the fence height's dimension line; the overall width under
+# the cut.
 SECTION_B_KEEP: dict[str, tuple[float, float]] = {
+    "PlateThickness": (
+        section_b_xy(spec.BACK_EDGE_Y, 0.0)[0] - 0.008,
+        section_b_xy(0.0, (spec.FENCE_HEIGHT + spec.UNDERSIDE_Z) / 2.0)[1],
+    ),
+    "FenceWidth": (section_b_xy(spec.BACK_EDGE_Y / 2.0, 0.0)[0], _FENCE_TOP_B + 0.008),
+    "FenceHeight": (section_b_xy(-18.0, 0.0)[0], _FENCE_TOP_B + 0.0066),
     "HubCboreDepth": (
-        section_b_xy(SECTION_B_SPAN[0], 0.0)[0] - 0.010,
-        section_b_xy(0.0, spec.COUNTERBORE_FLOOR_Z / 2.0)[1],
+        section_b_xy(spec.CBORE_SECTION_WALL_Y - 7.0, 0.0)[0],
+        _FENCE_TOP_B + 0.0195,
+    ),
+    "PlateWidth": (
+        section_b_xy((spec.BACK_EDGE_Y + spec.FRONT_EDGE_Y) / 2.0, 0.0)[0],
+        section_b_xy(0.0, spec.UNDERSIDE_Z)[1] - 0.008,
     ),
 }
-# The taps' callouts right of their drill walls, so each leader runs away
-# from its section's caption (centred under the view): farm run
-# 20261118T000915664Z put both texts left of or over the caption and both
-# leaders ran through "SECTION A-A" / "SECTION B-B". The clamp callout's text
-# starts right of the wall below section A-A; the hub callout's rises from
-# the wall's foot to the right of section B-B, above its caption.
-CLAMP_TAP_EDGE_MODEL = (
-    _STATIONS[0] + spec.CLAMP_TAP_DRILL / 2.0,
-    spec.CLAMP_SCREW_Y,
-    (spec.POCKET_FLOOR_Z + spec.UNDERSIDE_Z) / 2.0,
-)
-CLAMP_TAP_CALLOUT_XY = (0.180, 0.074)
-HUB_TAP_EDGE_MODEL = (
-    spec.HUB_X + spec.HUB_TAP_DRILL / 2.0,
-    spec.HUB_Y,
-    (spec.COUNTERBORE_FLOOR_Z + spec.UNDERSIDE_Z) / 2.0,
-)
-HUB_TAP_CALLOUT_XY = (0.372, 0.100)
+# Both taps' callouts on the top view (neither section cuts a tap). The clamp
+# set's on clamp 4's drill, its text below right of the plate. The hub's on
+# its drill, its text over B-B's cutting line's end (clear of its arrow and
+# letter) and right of the notch's extension line, under the notch start's
+# row: its leader rises across the back edge, the hub's shortest way out,
+# right of B-B's line (farm run 20261118T001932117Z: led off section B-B, it
+# ran 20 mm over the part).
+CLAMP_TAP_CENTRE_MM = (_STATIONS[-1], spec.CLAMP_SCREW_Y)
+CLAMP_TAP_CALLOUT_XY = (0.254, 0.165)
+HUB_TAP_CENTRE_MM = (spec.HUB_X, spec.HUB_Y)
+HUB_TAP_CALLOUT_XY = (0.1283, 0.2273)
+# A drill circle's centre and radius read back from the view (mm).
+_RIM_CENTRE_TOLERANCE_MM = 0.02
+_RIM_RADIUS_TOLERANCE_MM = 0.01
 
 
 def sheet_dimension_names() -> set[str]:
@@ -316,7 +350,7 @@ requirement(
         "plane": (_plane("z", spec.FENCE_HEIGHT), ("__frame__", "FENCE_HEIGHT")),
         "height": (
             limits(spec.FENCE_HEIGHT, _P["FenceHeight"], unit=UNIT),
-            ("FENCE_HEIGHT", _SEC_A),
+            ("FENCE_HEIGHT", _SEC_B),
         ),
         "height_max_for": (
             "strap face cut",
@@ -334,7 +368,7 @@ requirement(
         "plane": (_plane("z", spec.UNDERSIDE_Z), ("__frame__", "UNDERSIDE_Z")),
         "thickness": (
             limits(spec.PLATE_THICKNESS, _P["PlateThickness"], unit=UNIT),
-            ("PLATE_THICKNESS", _SEC_A),
+            ("PLATE_THICKNESS", _SEC_B),
         ),
         "finish": ("as received", ("__frame__",)),
     },
@@ -363,7 +397,7 @@ requirement(
         "plane": (_plane("y", spec.FRONT_EDGE_Y), ("FRONT_EDGE_Y",)),
         "width": (
             limits(spec.PLATE_WIDTH, _P["PlateWidth"], unit=UNIT),
-            ("PLATE_WIDTH", _TOP),
+            ("PLATE_WIDTH", _SEC_B),
         ),
     },
     precision={"width": _P["PlateWidth"]},
@@ -377,7 +411,7 @@ requirement(
         "plane": (_plane("y", spec.BACK_EDGE_Y), ("BACK_EDGE_Y",)),
         "y": (
             limits(spec.FENCE_WIDTH, _P["FenceWidth"], unit=UNIT),
-            ("FENCE_WIDTH", _TOP),
+            ("FENCE_WIDTH", _SEC_B),
         ),
     },
     precision={"y": _P["FenceWidth"]},
@@ -451,11 +485,11 @@ for _index, _station in enumerate(_STATIONS, 1):
                 limits(
                     -spec.POCKET_BACK_WALL_Y, _P["PocketBackWallY"], _BAND, unit=UNIT
                 ),
-                ("POCKET_BACK_WALL_Y", "POCKET_BACK_WALL_TOL", _TOP),
+                ("POCKET_BACK_WALL_Y", "POCKET_BACK_WALL_TOL", _SEC_A),
             ),
             "near_wall_y": (
                 limits(-spec.POCKET_NEAR_WALL_Y, _P["PocketNearWallY"], unit=UNIT),
-                ("POCKET_NEAR_WALL_Y", _TOP),
+                ("POCKET_NEAR_WALL_Y", _SEC_A),
             ),
             "length": (
                 limits(spec.POCKET_LENGTH, _P["PocketLength"], unit=UNIT),
@@ -623,16 +657,17 @@ def _orient_section(
     adapter: Any, section: Any, anchor_mm: tuple[float, float, float], *, label: str
 ) -> None:
     """Turn ``section`` until model +Z runs up the sheet, then look the cut
-    the way that prints model +X to the right (the top view's way)."""
+    the way that prints model +Y to the left: looking along +X, so the arrows
+    point +X and each letter stands right of its cutting line."""
     native = _early_bound(section, "IView")
     cut = _early_bound(native.GetSection(), "IDrSection")
     cut.SetDisplayOnlySurfaceCut(True)
     for attempt in range(4):
-        east, _north, up = _sheet_steps(
+        _east, north, up = _sheet_steps(
             adapter, native, anchor_mm, label=f"{label} axes"
         )
-        if up[1] > 0.0 and abs(up[0]) <= 1e-7 and east[0] > 0.0:
-            _telemetry.info(f"{label}: +X right, +Z up after {attempt} step(s)")
+        if up[1] > 0.0 and abs(up[0]) <= 1e-7 and north[0] < 0.0:
+            _telemetry.info(f"{label}: +Y left, +Z up after {attempt} step(s)")
             return
         if up[1] > 0.0 and abs(up[0]) <= 1e-7:
             reversed_cut = not bool(cut.GetReversedCutDirection())
@@ -641,7 +676,7 @@ def _orient_section(
             continue
         native.Angle = float(native.Angle) + math.pi / 2.0 - math.atan2(up[1], up[0])
         rebuild_drawing(adapter, label=f"{label} turned")
-    raise RuntimeError(f"{label} does not print +X right and +Z up: {east!r}, {up!r}")
+    raise RuntimeError(f"{label} does not print +Y left and +Z up: {north!r}, {up!r}")
 
 
 def _section(
@@ -650,31 +685,32 @@ def _section(
     top: Any,
     *,
     letter: str,
-    anchor_mm: tuple[float, float, float],
-    span_mm: tuple[float, float],
+    line_mm: tuple[tuple[float, float], tuple[float, float]],
     origin: tuple[float, float],
     reference: str,
     keep: dict[str, tuple[float, float]],
+    caption_xy: tuple[float, float],
     label: str,
 ) -> tuple[Any, list[Any]]:
-    """A partial section on the cutting line through ``anchor_mm`` along X
-    across ``span_mm``, oriented and placed with its anchor on ``origin``,
-    and its heights imported from ``reference``.
+    """A section on the cutting line ``line_mm`` (model X, Y at Z0) across
+    the plate, oriented and placed with its plane's (Y0, Z0) on ``origin``,
+    its sizes imported from ``reference`` and its caption at ``caption_xy``.
 
-    A section imports no extrusion depth (farm run 20261117T234245842Z), so
-    each height is owned by a hidden reference sketch lying in the cutting
-    plane. A derived view takes that sketch as the part shows it when cut and
-    selects it through its base view, so the section is cut and curated while
-    the part shows it (draw_pd_platen's ``_floor_section``). The sketch's
-    lines run along Z, so the top view, which keeps it shown, sees each one
-    end-on."""
-    _, y, z = anchor_mm
+    A section imports no sketch or extrusion size (farm run
+    20261117T234245842Z), so each is owned by a hidden reference sketch lying
+    in the cutting plane. A derived view takes that sketch as the part shows
+    it when cut and selects it through its base view, so the section is cut
+    and curated while the part shows it (draw_pd_platen's ``_floor_section``).
+    The sketch's chords run along Z, so the top view, which keeps it shown,
+    sees each one end-on."""
+    (x0, y0), (x1, y1) = line_mm
     start = model_point_in_view(
-        adapter, top, _metres((span_mm[0], y, z)), label=f"{label} start"
+        adapter, top, _metres((x0, y0, 0.0)), label=f"{label} start"
     )
     end = model_point_in_view(
-        adapter, top, _metres((span_mm[1], y, z)), label=f"{label} end"
+        adapter, top, _metres((x1, y1, 0.0)), label=f"{label} end"
     )
+    anchor_mm = (x0, 0.0, 0.0)
     with part_sketches_shown(
         adapter, source_model, (reference,), label=f"{label} reference", base_view=top
     ):
@@ -699,7 +735,34 @@ def _section(
             view_label=label,
             dimensions_by_feature=spec.DRAWING_DIMENSIONS,
         )
+    position_section_caption(adapter, section, caption_xy, label=label)
     return section, annotations
+
+
+def _drill_rim(
+    view: Any, centre_mm: tuple[float, float], diameter_mm: float, *, label: str
+) -> Any:
+    """A tap's drill circle in the top view, found among the view's visible
+    circles by centre and radius (draw_pd_platen's ``_front_hole_rims``: at
+    1:2 a coordinate pick can take the concentric thread or counterbore)."""
+    found = []
+    for raw in visible_view_entities(view, 1, label=f"{label} rims"):
+        edge = _early_bound(raw, "IEdge")
+        raw_curve = edge.GetCurve()
+        if raw_curve is None:
+            continue
+        curve = _early_bound(raw_curve, "ICurve")
+        if not curve.IsCircle():
+            continue
+        params = tuple(float(value) * 1000.0 for value in curve.CircleParams)
+        if (
+            math.dist(params[:2], centre_mm) <= _RIM_CENTRE_TOLERANCE_MM
+            and abs(params[6] - diameter_mm / 2.0) <= _RIM_RADIUS_TOLERANCE_MM
+        ):
+            found.append(edge)
+    if len(found) != 1:
+        raise RuntimeError(f"{label}: {len(found)} drill circles at {centre_mm!r}")
+    return found[0]
 
 
 def _rewrite_callout_definitions(
@@ -721,21 +784,24 @@ def _rewrite_callout_definitions(
 
 def _tap_callout(
     adapter: Any,
-    view: Any,
-    edge_model_mm: tuple[float, float, float],
+    top: Any,
+    centre_mm: tuple[float, float],
+    drill_mm: float,
     callout_xy: tuple[float, float],
     rewrite: Callable[[dict[int, str]], dict[int, str]],
     *,
     label: str,
 ) -> str:
-    """The native tap callout on its drill wall in ``view``, rewritten."""
-    edge_xy = model_point_in_view(
-        adapter, view, _metres(edge_model_mm), label=f"{label} wall"
-    )
+    """The native tap callout on its drill circle in the top view, picked on
+    the rim's side toward ``callout_xy``, rewritten."""
+    centre = top_xy(*centre_mm)
+    angle = math.atan2(callout_xy[1] - centre[1], callout_xy[0] - centre[0])
+    rim = drill_mm / 2.0 * _T
     display = add_native_hole_callout(
         adapter,
-        view,
-        edge_xy=(float(edge_xy[0]), float(edge_xy[1])),
+        top,
+        edge_xy=(centre[0] + rim * math.cos(angle), centre[1] + rim * math.sin(angle)),
+        edge=_drill_rim(top, centre_mm, drill_mm, label=label),
         callout_xy=callout_xy,
         label=label,
     )
@@ -798,11 +864,11 @@ def build(adapter: Any) -> dict[str, str]:
         source_model,
         top,
         letter="A",
-        anchor_mm=SECTION_A_ANCHOR,
-        span_mm=SECTION_A_SPAN,
+        line_mm=SECTION_A_LINE,
         origin=SECTION_A_ORIGIN,
         reference=spec.SECTION_A_REFERENCE,
         keep=SECTION_A_KEEP,
+        caption_xy=SECTION_A_CAPTION_XY,
         label="section A-A",
     )
     section_b, section_b_dims = _section(
@@ -810,11 +876,11 @@ def build(adapter: Any) -> dict[str, str]:
         source_model,
         top,
         letter="B",
-        anchor_mm=SECTION_B_ANCHOR,
-        span_mm=SECTION_B_SPAN,
+        line_mm=SECTION_B_LINE,
         origin=SECTION_B_ORIGIN,
         reference=spec.SECTION_B_REFERENCE,
         keep=SECTION_B_KEEP,
+        caption_xy=SECTION_B_CAPTION_XY,
         label="section B-B",
     )
     annotations += section_a_dims + section_b_dims
@@ -833,8 +899,9 @@ def build(adapter: Any) -> dict[str, str]:
     adapter.currentModel.GraphicsRedraw2()
     clamp = _tap_callout(
         adapter,
-        section_a,
-        CLAMP_TAP_EDGE_MODEL,
+        top,
+        CLAMP_TAP_CENTRE_MM,
+        spec.CLAMP_TAP_DRILL,
         CLAMP_TAP_CALLOUT_XY,
         clamp_tap_definitions,
         label="clamp taps",
@@ -843,8 +910,9 @@ def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError(f"clamp tap callout does not open with its count: {clamp!r}")
     hub = _tap_callout(
         adapter,
-        section_b,
-        HUB_TAP_EDGE_MODEL,
+        top,
+        HUB_TAP_CENTRE_MM,
+        spec.HUB_TAP_DRILL,
         HUB_TAP_CALLOUT_XY,
         hub_tap_definitions,
         label="hub tap",

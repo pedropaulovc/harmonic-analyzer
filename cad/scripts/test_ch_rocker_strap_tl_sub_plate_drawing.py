@@ -178,12 +178,19 @@ def test_printed_dimensions_sit_on_their_inch_grid() -> None:
 
 
 def test_explicit_bands_are_the_only_model_tolerances() -> None:
-    assert model_toleranced_dimensions(part) == {
-        ("PocketProfile", "PocketBackWallY"): "spec.POCKET_BACK_WALL_TOL",
+    bands = model_toleranced_dimensions(part)
+    assert bands == {
+        ("spec.SECTION_A_REFERENCE", "PocketBackWallY"): "spec.POCKET_BACK_WALL_TOL",
         ("HubCboreProfile", "HubX"): "spec.HUB_LOCATION_TOL",
         ("HubCboreProfile", "HubY"): "spec.HUB_LOCATION_TOL",
     }
-    assert set(spec.SYMMETRIC_BANDS) == set(model_toleranced_dimensions(part))
+    resolved = {
+        (getattr(spec, feature.removeprefix("spec.")), name)
+        if feature.startswith("spec.")
+        else (feature, name)
+        for feature, name in bands
+    }
+    assert set(spec.SYMMETRIC_BANDS) == resolved
     for feature, name in (
         *spec.SYMMETRIC_BANDS,
         *spec.MAX_RADII,
@@ -215,10 +222,12 @@ def test_every_drive_expression_names_a_global() -> None:
         assert f"ClampStation{index}" in part.GLOBALS
 
 
-def test_section_heights_live_in_hidden_reference_sketches_on_each_cut() -> None:
-    """A section imports no extrusion depth (farm run 20261117T234245842Z),
-    so each printed height is a reference line in its cutting plane, standing
-    on a section edge inside the cut's span, and saved hidden."""
+def test_section_sizes_live_in_hidden_reference_sketches_on_each_cut() -> None:
+    """A section imports no sketch or extrusion size (farm run
+    20261117T234245842Z), so each size a section prints is a reference
+    chord's length or start in its cutting plane, and the sketch is saved
+    hidden. Both planes cut across the plate (Right-parallel), each beside its
+    tap: A-A inside pocket 3's straight walls, B-B through the counterbore."""
     assert spec.DRAWING_DIMENSIONS[spec.SECTION_A_REFERENCE] == set(
         drawing.SECTION_A_KEEP
     )
@@ -227,25 +236,20 @@ def test_section_heights_live_in_hidden_reference_sketches_on_each_cut() -> None
     )
     for feature in ("Plate", "PlateTop", "ClampPockets", "HubCbore"):
         assert feature not in spec.DRAWING_DIMENSIONS, feature
-    assert spec.SECTION_A_Y == drawing.SECTION_A_ANCHOR[1] == spec.CLAMP_SCREW_Y
-    assert spec.SECTION_B_Y == drawing.SECTION_B_ANCHOR[1] == spec.HUB_Y
-    lo, hi = drawing.SECTION_A_SPAN
-    for x in (
-        spec.FENCE_HEIGHT_REFERENCE_X,
-        spec.THICKNESS_REFERENCE_X,
-        spec.POCKET_DEPTH_REFERENCE_X,
-    ):
-        assert lo < x < hi, x
-    assert spec.FENCE_HEIGHT_REFERENCE_X == 0.0  # the stop face
-    assert spec.THICKNESS_REFERENCE_X == spec.LEFT_END_X
-    assert spec.POCKET_DEPTH_REFERENCE_X == pytest.approx(
-        spec.CLAMP_STATIONS[0] + spec.POCKET_LENGTH / 2.0
-    )
-    lo, hi = drawing.SECTION_B_SPAN
-    assert lo < spec.CBORE_DEPTH_REFERENCE_X < hi
-    assert spec.CBORE_DEPTH_REFERENCE_X == pytest.approx(
-        spec.HUB_X - spec.HUB_CBORE_DIA / 2.0
-    )
+    station = spec.CLAMP_STATIONS[2]
+    straight = spec.POCKET_LENGTH / 2.0 - spec.CORNER_RADIUS
+    assert THREAD_MAJOR_MM["#4-40"] / 2.0 < spec.SECTION_A_X - station < straight
+    offset = spec.HUB_X - spec.SECTION_B_X
+    assert THREAD_MAJOR_MM["1/4-20"] / 2.0 < offset < spec.HUB_CBORE_DIA / 2.0
+    assert spec.CBORE_SECTION_WALL_Y == pytest.approx(-1.2 * INCH)
+    # Each cutting line lies on its plane, A-A's stopping in the floor past
+    # pocket 3's back wall, B-B's past both long edges.
+    (a0, a1), (b0, b1) = drawing.SECTION_A_LINE, drawing.SECTION_B_LINE
+    assert a0[0] == a1[0] == spec.SECTION_A_X
+    assert b0[0] == b1[0] == spec.SECTION_B_X
+    assert a0[1] > spec.BACK_EDGE_Y and b0[1] > spec.BACK_EDGE_Y
+    assert spec.FRONT_EDGE_Y < a1[1] < spec.POCKET_BACK_WALL_Y - 2.0
+    assert b1[1] < spec.FRONT_EDGE_Y
     tree = ast.parse(Path(part.__file__).read_text(encoding="utf-8"))
     blanked = [
         ast.unparse(node.args[1])
@@ -257,150 +261,516 @@ def test_section_heights_live_in_hidden_reference_sketches_on_each_cut() -> None
     assert blanked == ["(spec.SECTION_A_REFERENCE, spec.SECTION_B_REFERENCE)"]
 
 
-def test_every_marked_dimension_prints_once_on_the_sheet_in_bounds() -> None:
+# --- The sheet, modelled offline (sheet mm) ------------------------------------------
+# Calibrated on farm run 20261118T001932117Z's layout audit (its 41 gating
+# findings): a text row 3.6 mm tall, about 2.2 mm a digit, sign or lower-case
+# letter and 2.8 mm a capital; a two-row dimension's rows 5.5 mm apart, the
+# block centred on its text point; extension lines from 1 mm off their point
+# to 1.5 mm past the dimension line; a cutting line's arrows 12 mm long, its
+# letter 15.75..21.9 mm past the line's end along its arrow, 6.1 mm across;
+# a hole callout's leader ending 1.1 mm under its block, 1.5 mm out from the
+# side facing its arrow; a caption 45.6 mm wide and 15.6 mm tall under its
+# point. The limits (_layout_audit.GATING_KINDS, with the reported
+# text-separation and extension-near-text held too): 3.57 mm between texts,
+# 2 mm from an extension line or an arrow to another's text, no text on a
+# line, no leader across a line, a cutting line or another leader, no
+# dimension line across another's extension line, a hole callout's leader at
+# most 10 mm further over the part than its feature's shortest way out.
+_ROW = 3.6
+_ROW_PITCH = 5.5
+_SECTION_ARROW = 12.0
+_LETTER_ALONG = (15.75, 21.9)
+_LETTER_ACROSS = 3.05
+_CAPTION = (22.8, 15.6)
+_TEXT_GAP = 3.57
+_LINE_GAP = 2.0
+_DETOUR_LIMIT = 10.0
+# r7 measured text widths (mm) and the model's.
+_R7_WIDTHS = {
+    "1.875 ±.002": 23.8,
+    "1.000 ±.002": 23.8,
+    "1.650": 10.8,
+    "1.000": 10.8,
+    "4.250": 11.4,
+    ".17": 6.0,
+    "13.0": 8.3,
+    "11.08": 10.8,
+    "16X .07 max.": 27.2,
+    "4X .140": 15.5,
+    "CLEARS MHA-CH-13 DRILL AND REAMER": 88.4,
+}
+
+
+def _width(text: str) -> float:
+    return sum(2.8 if char.isupper() or char == "Ø" else 2.2 for char in text)
+
+
+def _mm(point_m: tuple[float, float]) -> tuple[float, float]:
+    return (point_m[0] * 1000.0, point_m[1] * 1000.0)
+
+
+def _block(centre_mm: tuple[float, float], rows: list[str]) -> tuple[float, ...]:
+    half_w = max(_width(row) for row in rows) / 2.0
+    half_h = (_ROW + _ROW_PITCH * (len(rows) - 1)) / 2.0
+    x, y = centre_mm
+    return (x - half_w, y - half_h, x + half_w, y + half_h)
+
+
+def _cross(o, a, b) -> float:
+    return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+
+
+def _point_segment(p, a, b) -> float:
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    length2 = dx * dx + dy * dy
+    t = 0.0 if length2 == 0.0 else ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / length2
+    t = min(1.0, max(0.0, t))
+    return math.dist(p, (a[0] + t * dx, a[1] + t * dy))
+
+
+def _segments_meet(a, b, c, d) -> bool:
+    d1, d2 = _cross(c, d, a), _cross(c, d, b)
+    d3, d4 = _cross(a, b, c), _cross(a, b, d)
+    return d1 * d2 <= 0.0 and d3 * d4 <= 0.0 and (d1, d2, d3, d4) != (0.0,) * 4
+
+
+def _segment_distance(a, b, c, d) -> float:
+    if _segments_meet(a, b, c, d):
+        return 0.0
+    return min(
+        _point_segment(a, c, d),
+        _point_segment(b, c, d),
+        _point_segment(c, a, b),
+        _point_segment(d, a, b),
+    )
+
+
+def _box_edges(box):
+    x0, y0, x1, y1 = box
+    corners = ((x0, y0), (x1, y0), (x1, y1), (x0, y1))
+    return [(corners[i], corners[(i + 1) % 4]) for i in range(4)]
+
+
+def _segment_box(segment, box) -> float:
+    (a, b), (x0, y0, x1, y1) = segment, box
+    if any(x0 <= p[0] <= x1 and y0 <= p[1] <= y1 for p in (a, b)):
+        return 0.0
+    return min(_segment_distance(a, b, *edge) for edge in _box_edges(box))
+
+
+def _box_gap(a, b) -> float:
+    dx = max(b[0] - a[2], a[0] - b[2], 0.0)
+    dy = max(b[1] - a[3], a[1] - b[3], 0.0)
+    return math.hypot(dx, dy)
+
+
+def _rows(name: str) -> list[str]:
+    """A dimension's printed rows: prefix, value, band or limit, mate."""
+    places = spec.DRAWING_PRECISION_BY_NAME[name]
+    value = spec.inch_text(spec.DIMENSION_VALUES[name], places)
+    prefixes = {n: p for (_f, n), p in spec.DIMENSION_PREFIXES.items()}
+    prefix = "Ø" if name == "HubCboreDia" else prefixes.get(name, "")
+    if any(n == name for _f, n in spec.SYMMETRIC_BANDS):
+        value += " ±.002"
+    if any(n == name for _f, n in spec.MAX_RADII):
+        value += " max."
+    callout = spec.DIMENSION_CALLOUTS.get(name)
+    return [prefix + value, *([callout] if callout else [])]
+
+
+def _top(x, y):
+    return _mm(drawing.top_xy(x, y))
+
+
+def _sec_a(y, z):
+    return _mm(drawing.section_a_xy(y, z))
+
+
+def _sec_b(y, z):
+    return _mm(drawing.section_b_xy(y, z))
+
+
+def _polyline(view, points, closed=True):
+    sheet = [view(*p) for p in points]
+    pairs = list(zip(sheet, sheet[1:] + sheet[:1] if closed else sheet[1:]))
+    return [pair for pair in pairs if pair[0] != pair[1]]
+
+
+def _circle(centre, radius, count=24):
+    return [
+        (
+            (
+                centre[0] + radius * math.cos(2 * math.pi * i / count),
+                centre[1] + radius * math.sin(2 * math.pi * i / count),
+            ),
+            (
+                centre[0] + radius * math.cos(2 * math.pi * (i + 1) / count),
+                centre[1] + radius * math.sin(2 * math.pi * (i + 1) / count),
+            ),
+        )
+        for i in range(count)
+    ]
+
+
+class _Sheet:
+    """Texts, extension lines, dimension lines and leaders by owner, and the
+    lines the views draw."""
+
+    def __init__(self) -> None:
+        self.texts: dict[str, tuple[float, ...]] = {}
+        self.extensions: list[tuple[str, tuple]] = []
+        self.dim_lines: list[tuple[str, tuple]] = []
+        self.leaders: list[tuple[str, tuple]] = []
+        self.geometry: list[tuple] = []
+        self.cutting: list[tuple] = []
+        self.arrows: list[tuple] = []
+
+    def linear(self, name, view, keep_m, p1, p2, along) -> None:
+        """A linear dimension between model points ``p1``, ``p2`` measured
+        along the sheet's ``along`` axis ("x": extension lines vertical)."""
+        text = _block(_mm(keep_m), _rows(name))
+        self.texts[name] = text
+        line = _mm(keep_m)[1 if along == "x" else 0]
+        axis, across = (0, 1) if along == "x" else (1, 0)
+        ends = []
+        for point in (view(*p1), view(*p2)):
+            side = math.copysign(1.0, line - point[across])
+            start, stop = list(point), list(point)
+            start[across] += side * 1.0
+            stop[across] = line + side * 1.5
+            if abs(line - point[across]) > 1.0:
+                self.extensions.append((name, (tuple(start), tuple(stop))))
+            ends.append(point[axis])
+        lo, hi = min(ends), max(ends)
+        lo, hi = min(lo, text[axis + 2]), max(hi, text[axis])
+        a, b = [0.0, 0.0], [0.0, 0.0]
+        a[axis], b[axis], a[across], b[across] = lo, hi, line, line
+        self.dim_lines.append((name, (tuple(a), tuple(b))))
+
+    def leader(self, name, start, keep_m) -> None:
+        """A radius or Ø dimension's leader from ``start`` to its text's side."""
+        text = _block(_mm(keep_m), _rows(name))
+        self.texts[name] = text
+        end = (text[0] if text[0] > start[0] else text[2], _mm(keep_m)[1])
+        self.dim_lines.append((name, (start, end)))
+
+    def callout(self, name, centre, drill_mm, callout_m, rows) -> tuple:
+        text = _block(_mm(callout_m), rows)
+        self.texts[name] = text
+        middle = (text[0] + text[2]) / 2.0
+        end = (
+            text[0] - 1.5 if centre[0] < middle else text[2] + 1.5,
+            text[1] - 1.1,
+        )
+        angle = math.atan2(end[1] - centre[1], end[0] - centre[0])
+        rim = drill_mm / 4.0  # radius at 1:2
+        start = (centre[0] + rim * math.cos(angle), centre[1] + rim * math.sin(angle))
+        self.leaders.append((name, (start, end)))
+        return start, end
+
+    def cutting_line(self, letter, line_mm) -> None:
+        (x0, y0), (x1, y1) = line_mm
+        a, b = _top(x0, y0), _top(x1, y1)
+        self.geometry.append((a, b))
+        self.cutting.append((a, b))
+        for index, (x, y) in enumerate((a, b)):
+            self.arrows.append(((x, y), (x + _SECTION_ARROW, y)))
+            self.texts[f"letter {letter}{index}"] = (
+                x + _LETTER_ALONG[0],
+                y - _LETTER_ACROSS,
+                x + _LETTER_ALONG[1],
+                y + _LETTER_ACROSS,
+            )
+
+    def caption(self, name, point_m) -> None:
+        x, y = _mm(point_m)
+        self.texts[name] = (x - _CAPTION[0], y - _CAPTION[1], x + _CAPTION[0], y)
+
+
+def _sheet() -> _Sheet:
+    sheet = _Sheet()
+    s = spec
+    half, r = s.POCKET_LENGTH / 2.0, s.CORNER_RADIUS
+    top, a_keep, b_keep = (
+        drawing.TOP_KEEP,
+        drawing.SECTION_A_KEEP,
+        drawing.SECTION_B_KEEP,
+    )
+    # Top view geometry: the outline, the fence face and notches, the stop
+    # face, the pockets, the counterbore.
+    left, right, back, front = (
+        s.LEFT_END_X,
+        s.RIGHT_END_X,
+        s.BACK_EDGE_Y,
+        s.FRONT_EDGE_Y,
+    )
+    nle, nrs, nd = s.NOTCH_LEFT_END, s.NOTCH_RIGHT_START, s.NOTCH_DEPTH
+    sheet.geometry += _polyline(
+        _top, [(left, front), (right, front), (right, back), (left, back)]
+    )
+    for chain in (
+        [
+            (0.0, front),
+            (0.0, nd),
+            (nle, nd),
+            (nle, 0.0),
+            (nrs, 0.0),
+            (nrs, nd),
+            (right, nd),
+        ],
+    ):
+        sheet.geometry += _polyline(_top, chain, closed=False)
+    for station in s.CLAMP_STATIONS:
+        sheet.geometry += _polyline(
+            _top,
+            [
+                (station - half, s.POCKET_BACK_WALL_Y),
+                (station + half, s.POCKET_BACK_WALL_Y),
+                (station + half, s.POCKET_NEAR_WALL_Y),
+                (station - half, s.POCKET_NEAR_WALL_Y),
+            ],
+        )
+    sheet.geometry += _circle(_top(s.HUB_X, s.HUB_Y), s.HUB_CBORE_DIA / 4.0)
+    origin = (0.0, 0.0)
+    tap1 = (s.CLAMP_STATIONS[0], s.CLAMP_SCREW_Y)
+    hub = (s.HUB_X, s.HUB_Y)
+    for name, p1, p2, along in (
+        ("LeftEnd", (left, back), origin, "x"),
+        ("NotchLeftEnd", origin, (nle, nd), "x"),
+        ("NotchRightStart", origin, (nrs, -part.CUT_OVERRUN), "x"),
+        ("PlateLength", (right, back), (left, back), "x"),
+        *(
+            (name, origin, (station, s.CLAMP_SCREW_Y), "x")
+            for name, station in zip(s.CLAMP_TAP_X_NAMES, s.CLAMP_STATIONS, strict=True)
+        ),
+        ("HubX", origin, hub, "x"),
+        ("HubY", origin, hub, "y"),
+        ("ClampTapY", origin, tap1, "y"),
+        ("NotchDepth", origin, (0.0, nd), "y"),
+        (
+            "PocketLength",
+            (tap1[0] + half, s.POCKET_NEAR_WALL_Y),
+            (tap1[0] - half, s.POCKET_NEAR_WALL_Y),
+            "x",
+        ),
+    ):
+        sheet.linear(name, _top, top[name], p1, p2, along)
+    sheet.leader("NotchCornerR", _top(nrs + r, nd - r), top["NotchCornerR"])
+    sheet.leader(
+        "PocketCornerR",
+        _top(s.CLAMP_STATIONS[-1] + half, s.POCKET_BACK_WALL_Y),
+        top["PocketCornerR"],
+    )
+    hub_xy = _top(*hub)
+    sheet.leader(
+        "HubCboreDia",
+        (hub_xy[0] + s.HUB_CBORE_DIA / 4.0, hub_xy[1]),
+        top["HubCboreDia"],
+    )
+    sheet.cutting_line("A", drawing.SECTION_A_LINE)
+    sheet.cutting_line("B", drawing.SECTION_B_LINE)
+    # Section A-A (partial, to SECTION_A_END_Y) and B-B profiles at their
+    # planes, (model Y, Z).
+    zf, zu, zp = s.FENCE_HEIGHT, s.UNDERSIDE_Z, s.POCKET_FLOOR_Z
+    near, wall = s.POCKET_NEAR_WALL_Y, s.POCKET_BACK_WALL_Y
+    end = drawing.SECTION_A_END_Y
+    sheet.geometry += _polyline(
+        _sec_a,
+        [
+            (back, zf),
+            (0, zf),
+            (0, 0),
+            (near, 0),
+            (near, zp),
+            (wall, zp),
+            (wall, 0),
+            (end, 0),
+            (end, zu),
+            (back, zu),
+        ],
+    )
+    cbore_back = 2.0 * s.HUB_Y - s.CBORE_SECTION_WALL_Y
+    cb_wall, cz = s.CBORE_SECTION_WALL_Y, s.COUNTERBORE_FLOOR_Z
+    sheet.geometry += _polyline(
+        _sec_b,
+        [
+            (back, zf),
+            (0, zf),
+            (0, 0),
+            (cbore_back, 0),
+            (cbore_back, cz),
+            (cb_wall, cz),
+            (cb_wall, 0),
+            (front, 0),
+            (front, zu),
+            (back, zu),
+        ],
+    )
+    for name, p1, p2, along in (
+        ("PocketNearWallY", origin, (near, 0.0), "x"),
+        ("PocketBackWallY", origin, (wall, 0.0), "x"),
+        ("PocketDepth", (wall, 0.0), (wall, zp), "y"),
+    ):
+        sheet.linear(name, _sec_a, a_keep[name], p1, p2, along)
+    for name, p1, p2, along in (
+        ("FenceWidth", origin, (back, zf), "x"),
+        ("PlateWidth", (back, zu), (front, zu), "x"),
+        ("FenceHeight", origin, (0.0, zf), "y"),
+        ("PlateThickness", (back, zf), (back, zu), "y"),
+        ("HubCboreDepth", (cb_wall, 0.0), (cb_wall, cz), "y"),
+    ):
+        sheet.linear(name, _sec_b, b_keep[name], p1, p2, along)
+    sheet.caption("caption A", drawing.SECTION_A_CAPTION_XY)
+    sheet.caption("caption B", drawing.SECTION_B_CAPTION_XY)
+    sheet.callout(
+        "clamp taps",
+        _top(*drawing.CLAMP_TAP_CENTRE_MM),
+        s.CLAMP_TAP_DRILL,
+        drawing.CLAMP_TAP_CALLOUT_XY,
+        ["4X 4-40 UNC THRU ALL", "Ø.089 DRILL THRU ALL"],
+    )
+    sheet.callout(
+        "hub tap",
+        _top(*drawing.HUB_TAP_CENTRE_MM),
+        s.HUB_TAP_DRILL,
+        drawing.HUB_TAP_CALLOUT_XY,
+        ["Ø.201 DRILL THRU ALL", "1/4-20 UNC THRU ALL", s.HUB_ENGAGEMENT_STATEMENT],
+    )
+    return sheet
+
+
+def test_sheet_model_reproduces_the_r7_audit() -> None:
+    """Farm run 20261118T001932117Z's boxes: the model's text widths match
+    the measured ones, and its checks flag the run's findings."""
+    for text, measured in _R7_WIDTHS.items():
+        assert _width(text) == pytest.approx(measured, abs=1.5), text
+    # 'section-line A' crossed by the Y extension lines leaving Y0.
+    letter = (86.0, 202.5, 91.9, 208.6)
+    assert _segment_box(((97.8, 207.7), (57.5, 207.7)), letter) == 0.0
+    assert letter[1] - 186.745 == pytest.approx(_LETTER_ALONG[0], abs=0.01)
+    # '4X .140' run through by its own extension line.
+    assert (
+        _segment_box(((141.0, 105.0), (166.0, 105.0)), (157.2, 102.4, 172.7, 105.9))
+        == 0.0
+    )
+    # Rows 7 mm apart read as one callout.
+    assert (
+        _box_gap((124.9, 151.1, 149.0, 154.7), (120.1, 158.1, 131.5, 161.7)) < _TEXT_GAP
+    )
+    # A dimension line across another's extension line (PocketLength, clamp 4).
+    assert _segments_meet(
+        (242.1, 169.2), (234.9, 169.2), (238.5, 183.9), (238.5, 135.2)
+    )
+
+
+def test_no_text_crowds_another_or_sits_on_a_line() -> None:
+    sheet = _sheet()
+    names = sorted(sheet.texts)
+    for i, a in enumerate(names):
+        for b in names[i + 1 :]:
+            gap = _box_gap(sheet.texts[a], sheet.texts[b])
+            assert gap >= _TEXT_GAP, (a, b, gap)
+    for name, box in sheet.texts.items():
+        for segment in sheet.geometry:
+            assert _segment_box(segment, box) > 0.0, (name, segment)
+        for arrow in sheet.arrows:
+            assert _segment_box(arrow, box) >= _LINE_GAP, (name, arrow)
+
+
+def _meet_point(a, b, c, d):
+    """Where lines a-b and c-d meet (None when parallel)."""
+    denominator = (b[0] - a[0]) * (d[1] - c[1]) - (b[1] - a[1]) * (d[0] - c[0])
+    if denominator == 0.0:
+        return None
+    t = _cross(c, d, a) / denominator
+    return (a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1]))
+
+
+def test_no_extension_line_runs_near_another_text_or_under_a_dimension_line() -> None:
+    sheet = _sheet()
+    for owner, segment in sheet.extensions:
+        for name, box in sheet.texts.items():
+            distance = _segment_box(segment, box)
+            if name == owner:
+                assert distance > 0.0, (owner, segment)
+            else:
+                assert distance >= _LINE_GAP, (owner, name, distance)
+        for name, line in sheet.dim_lines + sheet.leaders:
+            if name == owner or not _segments_meet(*segment, *line):
+                continue
+            # Only where the dimension line ends, or on its own extension
+            # line that this one overlays (both rising from one corner).
+            point = _meet_point(*line, *segment)
+            assert point is not None, (owner, name)
+            own = [s for o, s in sheet.extensions if o == name]
+            assert any(_point_segment(point, *s) < 0.01 for s in own) or any(
+                math.dist(point, end) < 0.01 for end in line
+            ), (owner, name, point)
+    for owner, line in sheet.dim_lines + sheet.leaders:
+        for name, box in sheet.texts.items():
+            if name != owner:
+                assert _segment_box(line, box) >= _LINE_GAP, (owner, name)
+
+
+def test_tap_callout_leaders_take_their_hole_s_shortest_way_off_the_plate() -> None:
+    """Farm run 20261118T001932117Z: the hub tap's leader ran 20 mm over the
+    part (led off section B-B); on the top view each leader crosses the edge
+    nearest its hole."""
+    sheet = _sheet()
+    x0, y0 = _top(spec.LEFT_END_X, spec.FRONT_EDGE_Y)
+    x1, y1 = _top(spec.RIGHT_END_X, spec.BACK_EDGE_Y)
+    for name, (start, end) in sheet.leaders:
+        shortest = min(start[0] - x0, x1 - start[0], start[1] - y0, y1 - start[1])
+        steps = 2000
+        inside = sum(
+            1
+            for i in range(steps)
+            if x0 < start[0] + (end[0] - start[0]) * (i + 0.5) / steps < x1
+            and y0 < start[1] + (end[1] - start[1]) * (i + 0.5) / steps < y1
+        )
+        over = math.dist(start, end) * inside / steps
+        assert over - shortest <= _DETOUR_LIMIT - 2.0, (name, over, shortest)
+        # No leader crosses a cutting line, another annotation's line or
+        # another leader (each gates).
+        others = [
+            *sheet.cutting,
+            *(s for _o, s in sheet.extensions),
+            *(s for _o, s in sheet.dim_lines),
+            *(s for o, s in sheet.leaders if o != name),
+        ]
+        for line in others:
+            assert not _segments_meet(start, end, *line), (name, line)
+
+
+def test_every_marked_dimension_prints_once_inside_the_border() -> None:
     keeps = (drawing.TOP_KEEP, drawing.SECTION_A_KEEP, drawing.SECTION_B_KEEP)
     names = [name for keep in keeps for name in keep]
     assert sorted(names) == sorted(drawing.sheet_dimension_names())
-    points = [xy for keep in keeps for xy in keep.values()]
-    points += [
-        drawing.CLAMP_TAP_CALLOUT_XY,
-        drawing.HUB_TAP_CALLOUT_XY,
-        drawing.ISO_CENTER,
-        drawing.ISO_NOTE_XY,
-        drawing.SECTION_A_ORIGIN,
-        drawing.SECTION_B_ORIGIN,
-    ]
-    for x, y in points:
-        assert BORDER[0] < x < BORDER[2] and BORDER[1] < y < BORDER[3], (x, y)
-        assert not (x > TITLE_BLOCK[0] and y < TITLE_BLOCK[1] + 0.006), (x, y)
+    border = tuple(value * 1000.0 for value in BORDER)
+    title_left, title_top = (value * 1000.0 for value in TITLE_BLOCK)
+    for name, box in _sheet().texts.items():
+        assert box[0] > border[0] + 2.0 and box[1] > border[1] + 2.0, name
+        assert box[2] < border[2] - 2.0 and box[3] < border[3] - 2.0, name
+        assert box[2] < title_left - 2.0 or box[1] > title_top + 2.0, name
 
 
-# Farm run 20261118T000915664Z's layout audit, in sheet mm relative to what
-# placed each item (the sections and the callout points have not moved since):
-# each section caption's box from its section's origin; each hole callout's
-# leader end from its callout point (the text's lower left, about half the
-# text's width left of the point); NotchCornerR's shoulder from its text point.
-_CAPTION_A = ((4.6, 50.0), (-31.4, -25.0))
-_CAPTION_B = ((-21.9, 21.8), (-31.4, -24.9))
-_CLAMP_LEADER_END = (-26.6, -5.6)
-_HUB_LEADER_END = (-34.0, -8.4)
-_NOTCH_R_SHOULDER = (-15.7, 14.0)
-
-
-def _mm(point: tuple[float, float]) -> tuple[float, float]:
-    return (point[0] * 1000.0, point[1] * 1000.0)
-
-
-def _box(origin_m, offsets):
-    (x0, x1), (y0, y1) = offsets
-    ox, oy = _mm(origin_m)
-    return (ox + x0, oy + y0, ox + x1, oy + y1)
-
-
-def _segment_hits_box(a, b, box, margin=1.0) -> bool:
-    """Whether segment a-b enters ``box`` (x0, y0, x1, y1) grown by ``margin``."""
-    x0, y0, x1, y1 = box[0] - margin, box[1] - margin, box[2] + margin, box[3] + margin
-    steps = 400
-    for i in range(steps + 1):
-        t = i / steps
-        x, y = a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t
-        if x0 <= x <= x1 and y0 <= y <= y1:
-            return True
-    return False
-
-
-def _leader(wall_xy_m, callout_xy_m, end_offset):
-    end = _mm(callout_xy_m)
-    return _mm(wall_xy_m), (end[0] + end_offset[0], end[1] + end_offset[1])
-
-
-def test_tap_callout_leaders_run_clear_of_the_section_captions() -> None:
-    """r5: both leaders ran through their section's caption."""
-    clamp_wall = drawing.section_a_xy(drawing.CLAMP_TAP_EDGE_MODEL[0], spec.UNDERSIDE_Z)
-    hub_wall = drawing.section_b_xy(drawing.HUB_TAP_EDGE_MODEL[0], spec.UNDERSIDE_Z)
-    caption_a = _box(drawing.SECTION_A_ORIGIN, _CAPTION_A)
-    caption_b = _box(drawing.SECTION_B_ORIGIN, _CAPTION_B)
-    # The r5 placements reproduce the audit's findings (the check bites).
-    assert _segment_hits_box(
-        *_leader(clamp_wall, (0.150, 0.078), _CLAMP_LEADER_END), caption_a
-    )
-    assert _segment_hits_box(
-        *_leader(hub_wall, (0.360, 0.088), _HUB_LEADER_END), caption_b
-    )
-    clamp = _leader(clamp_wall, drawing.CLAMP_TAP_CALLOUT_XY, _CLAMP_LEADER_END)
-    hub = _leader(hub_wall, drawing.HUB_TAP_CALLOUT_XY, _HUB_LEADER_END)
-    for leader in (clamp, hub):
-        for caption in (caption_a, caption_b):
-            assert not _segment_hits_box(*leader, caption), (leader, caption)
-    # Each text (about twice its half width) stays inside the border and off
-    # the title block, and starts right of its drill wall.
-    for (start, end), half in (
-        (clamp, -_CLAMP_LEADER_END[0]),
-        (hub, -_HUB_LEADER_END[0]),
-    ):
-        assert end[0] > start[0]
-        assert end[0] + 2.0 * half < BORDER[2] * 1000.0 - 2.0
-        assert (
-            end[1] > TITLE_BLOCK[1] * 1000.0
-            or end[0] + 2.0 * half < TITLE_BLOCK[0] * 1000.0
-        )
-    # The clamp text's top (as far above its point as the leader end is
-    # below) stays under section A-A; the hub text starts right of B-B.
-    section_a_bottom = drawing.section_a_xy(0.0, spec.UNDERSIDE_Z)[1] * 1000.0
-    assert (
-        drawing.CLAMP_TAP_CALLOUT_XY[1] * 1000.0 - _CLAMP_LEADER_END[1]
-        < section_a_bottom
-    )
-    section_b_right = drawing.section_b_xy(drawing.SECTION_B_SPAN[1], 0.0)[0] * 1000.0
-    assert hub[1][0] > section_b_right + 5.0
-
-
-def test_notch_radius_shoulder_clears_the_overall_length_extension() -> None:
-    """r5: the shoulder at the back edge +4 mm crossed PlateLength's
-    extension line, which rises from the plate's right end at the back edge."""
-    right = drawing.top_xy(spec.RIGHT_END_X, 0.0)[0] * 1000.0
-    back = drawing.top_xy(0.0, spec.BACK_EDGE_Y)[1] * 1000.0
-
-    def crosses(text_xy_m) -> bool:
-        x, y = _mm(text_xy_m)
-        left, right_end = x + _NOTCH_R_SHOULDER[0], x + _NOTCH_R_SHOULDER[1]
-        return left - 1.0 <= right <= right_end + 1.0 and y >= back - 1.0
-
-    assert crosses(
-        (drawing.top_xy(spec.RIGHT_END_X, 0.0)[0] + 0.014, back / 1000.0 + 0.004)
-    )
-    keep = drawing.TOP_KEEP["NotchCornerR"]
-    assert not crosses(keep)
-    # The text sits in the open right notch's band, right of the plate's end.
-    assert (
-        drawing.top_xy(0.0, 0.0)[1] < keep[1] < drawing.top_xy(0.0, spec.NOTCH_DEPTH)[1]
-    )
-    assert keep[0] * 1000.0 + _NOTCH_R_SHOULDER[0] > right
-
-
-def test_top_view_stacks_x_above_and_below_and_y_to_the_left() -> None:
+def test_top_view_keeps_three_y_lanes_and_the_sections_carry_the_rest() -> None:
+    """r7 stacked seven Y lanes from Y0 left of the top view; the Y sizes of
+    the fence, the plate and the pocket walls print over the sections."""
     top = drawing.TOP_KEEP
     left = drawing.top_xy(spec.LEFT_END_X, 0.0)[0]
     front = drawing.top_xy(0.0, spec.FRONT_EDGE_Y)[1]
     back = drawing.top_xy(0.0, spec.BACK_EDGE_Y)[1]
+    lanes = [name for name, (x, y) in top.items() if x < left and y < back + 0.002]
+    assert sorted(lanes) == ["ClampTapY", "HubY", "NotchDepth"]
+    # Shortest span innermost: no extension line crosses a lane's line.
+    assert top["HubY"][0] > top["ClampTapY"][0] > top["NotchDepth"][0]
     for name in ("NotchLeftEnd", "NotchRightStart", "PlateLength", "LeftEnd"):
         assert top[name][1] > back, name
     below = ("ClampTapX1", "ClampTapX2", "HubX", "ClampTapX3", "ClampTapX4")
     rows = [top[name][1] for name in below]
     assert all(row < front for row in rows)
     assert rows == sorted(rows, reverse=True)
-    beside = (
-        "NotchDepth",
-        "FenceWidth",
-        "HubY",
-        "PocketNearWallY",
-        "ClampTapY",
-        "PocketBackWallY",
-        "PlateWidth",
-    )
-    columns = [top[name][0] for name in beside]
-    assert all(column < left for column in columns)
-    assert columns == sorted(columns, reverse=True)
     # The plate at 1:2 stands clear of the isometric.
     right = drawing.top_xy(spec.RIGHT_END_X, 0.0)[0]
     assert right < drawing.ISO_CENTER[0] - 0.06

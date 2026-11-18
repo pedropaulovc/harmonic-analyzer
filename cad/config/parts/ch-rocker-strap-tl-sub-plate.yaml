@@ -14,7 +14,7 @@ ch-rocker-strap-tl-sub-plate:
   quantity: 1
   tolerance_class: machined_block
   drawing_unit: in
-  process: "saw one 13 in length from the owned 1/2 x 6 in 6061-T6511 flat and mill a 3.00 in strip off it; CNC: mill both long edges for the vise jaws, face the top, then in one vise setup mill the plate top (Z0) down around the integral fence and end stop, their faces (Y0, X0), the fence notches, the clamp pockets and the hub counterbore; spot, drill and hand-tap the 4-40 and 5/16-18 holes; break edges"
+  process: "saw one 13 in length from the owned 1/2 x 6 in 6061-T6511 flat and mill a 3.00 in strip off it; CNC: mill both long edges for the vise jaws, face the top, then in one vise setup mill the plate top (Z0) down around the integral fence and end stop, their faces (Y0, X0), the fence notches, the clamp pockets and the hub counterbore; spot, drill and hand-tap the 4-40 and 1/4-20 holes; break edges"
   machinist_exceptions:
     - id: "RV-01"
       kind: "accept"
