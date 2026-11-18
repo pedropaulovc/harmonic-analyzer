@@ -280,10 +280,13 @@ FRONT_KEEP = {
     # and of the REAM leader, which lands from the upper right.
     "HubDia": (0.033, 0.165),
     "FulcrumDia": (0.050, 0.190),
-    # Just outboard of the taper start it measures, above the bar.
-    "BarHeight": (0.205, 0.172),
-    # Below and right of the tip it measures.
-    "TipRadius": (0.262, 0.140),
+    # Below the bar, outboard of the taper start it measures: between the
+    # bar-pin and spring-hole extension lines, clear of the #21 leader that
+    # rises over the bar (#3113 r3: above the bar that leader crossed it).
+    "BarHeight": (0.198, 0.140),
+    # Above and right of the tip it measures, clear of the spring-hole
+    # location's extension line below the tip (#3113 r3).
+    "TipRadius": (0.262, 0.168),
     "BarPinCx": (_sheet_x(BAR_PIN_X / 2.0), 0.126),
     "SpringCx": (_sheet_x(LEVER_SPRING_X / 2.0 + 25.0), 0.104),
 }
