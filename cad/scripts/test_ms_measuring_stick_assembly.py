@@ -973,6 +973,9 @@ def test_stop_face_check_prints_at_the_end_face_nearer_the_10(monkeypatch) -> No
     assert tx > 0.1294 and ty > 0.1867
     assert f"{sheet.STOP_FACE_FEELER} FEELER DOES NOT ENTER" in sheet.STOP_FACE_NOTE
     assert "(ASSEMBLY.MD STEP 10A)" in sheet.STOP_FACE_NOTE
+    # Rule 14: the lines end left of the (8.0) right extension line (the
+    # 33-character first line of run 20261118T102641481Z-bfd27b57 crossed it).
+    assert max(len(line) for line in sheet.STOP_FACE_NOTE.splitlines()) <= 26
     assert sheet.ASSEMBLY_STEPS[11].endswith("NEARER THE 10 (SHEET 1).")
 
 

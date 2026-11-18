@@ -152,10 +152,13 @@ ASSEMBLY_STEPS = (
     f"10B. IF IT ENTERS, STONE THAT END FACE OF {_ref(spec.BLOCK)} SQUARE, THEN "
     "REPEAT 10A.",
 )
-# Step 10A's acceptance, printed at that end face on sheet 1 (rule 22).
+# Step 10A's acceptance, printed at that end face on sheet 1 (rule 22). Short
+# lines end left of the (8.0) reference's right extension line (rule 14;
+# machinist review run 20261118T102641481Z-bfd27b57).
 STOP_FACE_NOTE = (
-    f"{STOP_FACE_FEELER} FEELER DOES NOT ENTER UNDER A\n"
-    f"SQUARE ON {_ref(spec.STICK)} GRADUATED FACE\n"
+    f"{STOP_FACE_FEELER} FEELER DOES NOT ENTER\n"
+    f"UNDER A SQUARE ON {_ref(spec.STICK)}\n"
+    "GRADUATED FACE\n"
     "(ASSEMBLY.MD STEP 10A)"
 )
 # At MHA-HA-00: setting a bar (#2434). The stop is turned over from the

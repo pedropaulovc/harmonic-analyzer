@@ -174,7 +174,7 @@ EXAMPLE_NOTE_WIDTH = 52  # characters; default-format note text
 # stop's end face nearer the 10 (#2434): its tip on that face above the stick,
 # its text right of the block, clear of the stick and of section A's marker.
 STOP_FACE_NOTE_TIP_MM = (stop.BLOCK_LENGTH, -4.0, 0.0)
-STOP_FACE_NOTE_OFFSET = (0.030, 0.024)
+STOP_FACE_NOTE_OFFSET = (0.025, 0.030)
 
 # Sheet 2 alone is portrait: the native full-size exploded outline plus its
 # unchanged 24 mm balloon ring is 202.0739 mm high; landscape has 200.7 mm
