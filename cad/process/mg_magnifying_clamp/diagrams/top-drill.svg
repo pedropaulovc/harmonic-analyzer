@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Setup 4: upright, top end up; MC04 faces to length, spots and drills the thumb hole into the bore. Shell: prechips.hex_diagrams; styles: prechips.palette. -->
+<svg xmlns="http://www.w3.org/2000/svg" data-cad-template="hex-block" data-step="upright" data-end="top" data-work="drill"/>
