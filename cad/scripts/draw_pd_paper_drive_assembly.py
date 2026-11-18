@@ -3605,15 +3605,20 @@ SETTING_DETAIL_CAPTIONS = {
 
 @dataclass(frozen=True)
 class SettingParent:
-    """A cropped reference view carrying the boundaries of ``letters``."""
+    """A cropped reference view carrying the boundaries of ``letters``; it is
+    itself DETAIL ``letter`` of sheet 1's view in its orientation, whose
+    boundary letter stands at ``sheet1_letter_offset`` from that circle's
+    centre (rule 9; #3110)."""
 
     name: str
+    letter: str
     orientation: str
     scale: tuple[float, float]
     centre: tuple[float, float]
     radius: float
     model_centre: tuple[float, float, float]
     letters: tuple[str, ...]
+    sheet1_letter_offset: tuple[float, float]
 
 
 def _view_plane_mm(orientation: str, point: tuple[float, float, float]) -> tuple[float, float]:
@@ -3633,6 +3638,7 @@ _SIDE_CENTRES = [
 SETTING_PARENTS = (
     SettingParent(
         name="RIGHT SIDE",
+        letter="M",
         orientation="*Right",
         scale=(1.0, 1.0),
         centre=(0.075, 0.200),
@@ -3643,15 +3649,20 @@ SETTING_PARENTS = (
             (min(u for u, _v in _SIDE_CENTRES) + max(u for u, _v in _SIDE_CENTRES)) / 2.0,
         ),
         letters=("F", "H", "J"),
+        # In the gap right of the knob stack, between its two bosses.
+        sheet1_letter_offset=(0.016, 0.0),
     ),
     SettingParent(
         name="FRONT",
+        letter="P",
         orientation="*Front",
         scale=(1.0, 2.0),
         centre=(0.075, 0.090),
         radius=0.025,
         model_centre=(*setting_details.on_arm(105.0), arm_geometry.PIN_MACHINE_Z),
         letters=("L",),
+        # Left of the arm tip, clear of the bar and the crank lead.
+        sheet1_letter_offset=(-0.020, 0.0),
     ),
 )
 SETTING_LETTER_GAP = 0.005
@@ -3669,12 +3680,23 @@ for _parent in SETTING_PARENTS:
             raise AssertionError(f"DETAIL {_letter}'s boundary leaves its parent's crop")
 SETTING_PARENT_CAPTIONS = {
     parent.name: (
-        f"{parent.name}{_scale_suffix(parent.scale, SHEET_SCALES[SETTING_DETAIL_SHEET])} "
+        f"DETAIL {parent.letter}"
+        f"{_scale_suffix(parent.scale, SHEET_SCALES[SETTING_DETAIL_SHEET])} "
         f"(REFERENCE): {'DETAILS' if len(parent.letters) > 1 else 'DETAIL'} "
         + ", ".join(parent.letters)
     )
     for parent in SETTING_PARENTS
 }
+
+
+def setting_parent_sheet1_radius(parent: SettingParent) -> float:
+    """A reference view's crop circle on sheet 1's 1:4 views (sheet m)."""
+    return max(
+        PARENT_BOUNDARY_MIN_RADIUS,
+        parent.radius * parent.scale[1] / parent.scale[0] * 1000.0 * _ASSEMBLED_M_PER_MM,
+    )
+
+
 # The setting table hangs from the sheet's top-left note corner and must stand
 # inside the inner border's width.
 SETTING_TABLE_TOP_LEFT = (0.018, 0.262)
@@ -4862,24 +4884,36 @@ def _crop_to_circle(
 
 def _mark_parent_views(adapter: Any, front: Any, right: Any) -> None:
     """Sheet 1's front and right views locate the lettered views: DETAIL K's
-    boundary on the front view, DETAIL E's on the right view, each lettered
-    in clear sheet with a pointer to its rim; VIEW B's viewing arrow points
-    down onto the arm's pivot in the front view."""
-    for parent, letter, model_mm, radius, offset in (
+    and DETAIL P's boundaries on the front view, DETAIL E's and DETAIL M's on
+    the right view, each lettered in clear sheet with a pointer to its rim;
+    VIEW B's viewing arrow points down onto the arm's pivot in the front
+    view. M and P are the SETTING DETAILS sheet's reference views (#3110);
+    their circles, drawn over model edges, go straight to the sketch database
+    (_sketch_view_circle)."""
+    views = {"*Front": front, "*Right": right}
+    for parent, letter, model_mm, radius, offset, direct in (
         (
             front, KNOB_SETTING_VIEW_NAME[-1], KNOB_SETTING_MODEL_CENTRE,
-            KNOB_SETTING_PARENT_RADIUS, KNOB_SETTING_LETTER_OFFSET,
+            KNOB_SETTING_PARENT_RADIUS, KNOB_SETTING_LETTER_OFFSET, False,
         ),
         (
             right, CLUSTER_FLOAT_VIEW_NAME[-1], CLUSTER_FLOAT_MODEL_CENTRE,
-            CLUSTER_FLOAT_PARENT_RADIUS, CLUSTER_FLOAT_LETTER_OFFSET,
+            CLUSTER_FLOAT_PARENT_RADIUS, CLUSTER_FLOAT_LETTER_OFFSET, False,
+        ),
+        *(
+            (
+                views[reference.orientation], reference.letter, reference.model_centre,
+                setting_parent_sheet1_radius(reference), reference.sheet1_letter_offset,
+                True,
+            )
+            for reference in SETTING_PARENTS
         ),
     ):
         label = f"sheet 1 view {letter} boundary"
         centre = model_point_in_view(
             adapter, parent, tuple(value / 1000.0 for value in model_mm), label=label
         )
-        _sketch_view_circle(adapter, parent, centre, radius, label=label)
+        _sketch_view_circle(adapter, parent, centre, radius, label=label, direct=direct)
         adapter.currentModel.ClearSelection2(True)
         adapter.currentModel.EditRebuild3()
         text, tip = detail_letter_pointer(centre, radius, offset)

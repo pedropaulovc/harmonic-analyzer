@@ -4717,3 +4717,36 @@ def test_every_setting_detail_is_cited_by_its_steps() -> None:
         for key in detail.step_keys:
             body = " ".join(texts[key])
             assert f"({detail.view_name}, SHEET {sheet})" in body, (detail.letter, key)
+
+
+def test_setting_reference_views_are_lettered_details_of_sheet_1() -> None:
+    """#3110 (rule 9): each SETTING DETAILS reference view is a lettered
+    DETAIL whose boundary sits on sheet 1's view in its orientation, with a
+    letter used by no other view, outside its circle."""
+    taken = {
+        "A", drawing.PIVOT_LOCATOR_LETTER, drawing.KNOB_BORE_LETTER,
+        drawing.KNOB_SETTING_VIEW_NAME[-1], drawing.CLUSTER_FLOAT_VIEW_NAME[-1],
+        *drawing.SETTING_DETAILS_BY_LETTER,
+    }
+    letters = [parent.letter for parent in drawing.SETTING_PARENTS]
+    assert len(set(letters)) == len(letters)
+    assert not taken & set(letters)
+    assert not {"I", "O", "Q"} & set(letters)
+    for parent in drawing.SETTING_PARENTS:
+        caption = drawing.SETTING_PARENT_CAPTIONS[parent.name]
+        assert caption.startswith(f"DETAIL {parent.letter} "), caption
+        radius = drawing.setting_parent_sheet1_radius(parent)
+        assert radius == pytest.approx(
+            parent.radius * parent.scale[1] / parent.scale[0]
+            * drawing.ASSEMBLED_SCALE[0] / drawing.ASSEMBLED_SCALE[1]
+        )
+        assert math.hypot(*parent.sheet1_letter_offset) > radius + 0.003
+
+
+def test_detail_h_text_stands_clear_of_its_extension_lines() -> None:
+    """#3110 (rule 14): DETAIL H's .067 stands past the dowel's end, so
+    neither the arm's rear-face line nor the dowel-end line runs through it
+    (half an .067 at 5:1 is under 5 mm on the sheet, 1 mm of model)."""
+    line = drawing.SETTING_DETAILS_BY_LETTER["H"].lines[0]
+    assert line.end[2] > line.start[2]
+    assert line.text[2] - line.end[2] >= 1.0 + 1.0

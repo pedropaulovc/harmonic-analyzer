@@ -232,10 +232,13 @@ LOCATING_DOWELS = SettingDetail(
             length_mm=locating.PROUD_MM,
             # The title block's .XXX +/-.005 is the proud's band (#2630).
             band_mm=None,
+            # Beyond the dowel's end, clear of both extension lines: a
+            # mid-span .067 is wider than the 1.7 mm span at 5:1 and its
+            # point sat on the arm's rear-face line (#3110, rule 14).
             text=(
                 LOCATOR_XY[0],
                 LOCATOR_XY[1] + 3.2,
-                ARM_REAR_Z + locating.PROUD_MM / 2.0,
+                ARM_REAR_Z + locating.PROUD_MM + 2.5,
             ),
         ),
     ),
