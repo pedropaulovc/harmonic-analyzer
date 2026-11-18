@@ -342,7 +342,7 @@ speed_kind = "spindle"
 tool = "drill-f"
 drilling = "twist_drill"
 sizing = { kind = "band", band_mm = "{{cad.bore_dia_band_mm}}" }
-instruction = "Same file, M6 T4: F drill through both corners, no peck, its full diameter {{process.cross_drill_past_mm:in.3dot}} past the lower corner, into the air between the parallels; set 2400. A drop of Tapmatic Gold."
+instruction = "Same file, M6 T4: F drill through both corners, no peck, its full diameter {{process.cross_drill_past_mm:in.3dot}} past the lower corner, into the air past the parallels' ends; set 2400. A drop of Tapmatic Gold."
 settings = "clamp-drill-f-brass"
 hole_depth_mm = "{{cad.ac_mm}}"
 peck = "none"
@@ -480,7 +480,7 @@ instruction = "Deburr: the bore's ends at both corners and inside, the top tap's
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Tag the clamp AWAITING BRASS BLACK unless the blackening setup follows now. Owner, 2026-11-17: \"The clamp is machined now and blackened later. The traveler may end at bare machined with the part tagged awaiting brass black.\""
+instruction = "Tag the clamp AWAITING BRASS BLACK unless Setup 6 follows now."
 feed = "hand"
 
 [[setups]]
