@@ -162,7 +162,7 @@ ref = "mill-dead-centre-mt3"
 [[tools]]
 id = "tap-4-40"
 name = "4-40 plug tap"
-ref = "jig-tap-4-40-plug"
+ref = "clamp-tap-4-40-plug"
 [[tools]]
 id = "saw"
 name = "Evolution miter saw"
@@ -261,6 +261,10 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
+instruction = "Wrench check before the first tap file: the T-handle tap wrench holding the 4-40 tap must have a centre hole in its top, the seat for the dead centre's point. None: stop; do not tap on the mill."
+feed = "hand"
+
+[[setups.operations]]
 instruction = "Stop check before the first tap file: measure the dead centre from its tip to the collet's face and the 4-40 tap in the T-handle wrench from its point to the wrench's centre hole (calipers, or the combination square's 12 in blade). The two together must be at most {{process.tap_stack_max_mm:in.2f}} in (the mill's 17 in opening less the vise, the parallels, this clamp, the collet and 1 in to bring the point down onto the wrench). Over: stop; do not tap on this setup."
 feed = "hand"
 
@@ -304,13 +308,17 @@ vise_hold = "other"
 beam = { axis = "x", hold = "solid", extent_mm = [0, "{{cad.block_height_mm}}"], seat = "gripped full length in the vise jaws, the bottom end on the parallels' edges", seat_mm = [0, "{{cad.block_height_mm}}"] }
 
 [[setups.operations]]
+instruction = "Bore gauges, before the setup: mic the F drill's shank, .2570–.2575 makes it the GO; mic the G drill's shank, .2600–.2610 makes it the NO-GO (each sits inside the band, as fixed gauges do; no pin gauges are owned). F under .2570: no GO; the NO-GO alone gauges the bore, and the tag says so."
+feed = "hand"
+
+[[setups.operations]]
 instruction = "Home the mill first ($H). G54 X0 the faced bottom end; Y0 the hex axis, half the miked across flats from the fixed jaw."
 instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm) on the fixed jaw's face: G10 L20 P1 Y(half your across-flats reading in mm − 2.540); for .500, Y3.810. On the clamp's faced bottom end from the left: G10 L20 P1 X-2.540."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "G54 Z0: the top corner."
-instruction_detailed = "Console M6 T1 (1/2 in end mill; the tool setter measures it). Spindle stopped, its tip just dragging a .002 feeler leaf on the top corner: G10 L20 P1 Z0.051."
+instruction = "G54 Z0: the top corner, touched with the centre drill at the bore's station (the 1/2 in end mill is too wide to go between the jaws)."
+instruction_detailed = "Console M6 T2 (#2 centre drill; the tool setter measures it). MDI G0 X{{cad.bore_height_mm:.3f}} Y0. Spindle stopped, its point just dragging a .002 feeler leaf on the top corner: G10 L20 P1 Z0.051."
 feed = "hand"
 
 [[setups.operations]]
@@ -341,7 +349,7 @@ peck = "none"
 milling_cuts = [
   { name = "cross drill", kind = "drill", phase = "rough", cutter_dia_mm = 6.5278, flutes = 2, rpm = 2400, feed_mm_min = "{{process.drill_f_feed_per_min_mm}}", stations_mm = "{{cad.bore_height_mm}}" },
 ]
-inspection = "Bore Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}} by drill shanks, before unclamping (no pin gauges are owned). Mic the F drill's shank: .2570–.2575 to use it as the GO. Mic the G drill's shank: .2600–.2610 to use it as the NO-GO. Accept: the GO enters and the NO-GO does not. As with any fixed gauge, each shank sits inside the band, so it can reject a bore within .0005 (GO) or .0010 (NO-GO) of a limit. An F shank under .2570 cannot be the GO: then accept on the NO-GO alone, the lower limit held by the F drill, and write that on the tag. If the MHA-MG-03 lever is at hand, its 1/4 in body must slide through."
+inspection = "Bore Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}}, before unclamping: the GO shank enters, the NO-GO shank does not. If the MHA-MG-03 lever is at hand, its 1/4 in body slides through."
 gauge_checks = [{ gauge = "clamp-bore-drill-shanks", band_mm = "{{cad.bore_dia_band_mm}}" }]
 
 [[setups.operations]]
@@ -480,7 +488,7 @@ machine_kind = "other"
 title = "Blacken (once the Brass Black is bought)"
 machine = "Bench, ventilated"
 indexing = "none"
-diagram = { file = "diagrams/inspect.svg", alt = "The finished clamp, every surface to be blackened: both ends, the six flats, the cross bore and the two tapped holes." }
+diagram = { file = "diagrams/surfaces.svg", alt = "The finished clamp, every surface to be blackened: both ends, the six flats, the cross bore and the two tapped holes." }
 envelope = "other"
 vise_hold = "other"
 beam = "other"

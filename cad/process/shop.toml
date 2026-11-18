@@ -651,6 +651,11 @@ feed = "9.6 in/min"
 [tools.clamp-drill-g]
 description = "G (.261 in) drill, 115-piece index; its shank the bore's NO-GO"
 diameter_mm = 6.6294
+# The clamp's 4-40 plug tap, turned by hand on the dead centre in the
+# spindle: its wrench needs a centre hole in its top for the centre's point.
+[tools.clamp-tap-4-40-plug]
+description = "4-40 UNC plug tap; T-handle tap wrench with a centre hole in its top"
+tap_drill_mm = 2.2606
 [gauges.clamp-bore-drill-shanks]
 range_mm = [6.5278, 6.6294]
 resolution_mm = 0.00254
