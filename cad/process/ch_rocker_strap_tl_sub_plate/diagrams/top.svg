@@ -22,6 +22,7 @@
   <circle class="part-threads" cx="370.2" cy="136.2" r="5.1"/>
   <circle class="cutter" cx="719" cy="205" r="12.7"/>
   <line class="arrow" x1="700" y1="190" x2="90" y2="190"/>
+  <text class="label-halo" x="480" y="205">cutter path: plate top, zigzag along X</text>
   <line class="datum" x1="65.4" y1="72" x2="65.4" y2="100"/>
   <line class="datum" x1="52" y1="85.4" x2="80" y2="85.4"/>
   <text class="datum-label" x="70" y="104">X0 Y0</text>
@@ -42,8 +43,8 @@
   <polygon class="part-kept" points="220,325.7 220,294 410.5,294 410.5,288.36 448.6,288.36 448.6,325.7"/>
   <polygon class="part-removed" points="220,287.2 448.6,287.2 448.6,288.36 410.5,288.36 410.5,294 220,294"/>
   <line class="fixture-table" x1="160" y1="440" x2="510" y2="440"/>
-  <line class="leader" x1="498" y1="299" x2="450" y2="305.2"/>
-  <text class="label" x="502" y="303">Z0 .146 above the jaws</text>
+  <line class="leader" x1="498" y1="276" x2="400" y2="294"/>
+  <text class="label" x="502" y="280">Z0 (plate top) .146 above the jaws</text>
   <line class="leader" x1="498" y1="380" x2="440" y2="380"/>
   <text class="label" x="502" y="384">1 in + 1/2 in parallels stacked</text>
   <text class="label" x="502" y="404">plate gripped on its milled edges,</text>

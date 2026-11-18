@@ -4,10 +4,10 @@
 part's exported ``features.toml`` and the plan/shop TOML, then runs
 :func:`build` inside headless FreeCAD (``freecadcmd``) with that context and
 checks the posted G-code against :func:`expectations`. The plate's sizes come
-from the feature export (planes, notches, pockets, counterbore, holes; the
-plate length from the right notch's end and the plan's length, which build
-checks against the STEP); the blank, the edge stock, levels, widths of cut and
-the holding from ``plan.toml`` ``[parameters]`` and ``milling_cuts``; cutter
+from the feature export (planes, sawn ends, notches, pockets, counterbore,
+holes), the same manifest the traveler's ``fence_plate`` adapter binds; the
+blank, the edge stock, levels, widths of cut, hole depths and the holding
+from ``plan.toml`` ``[parameters]`` and ``milling_cuts``; cutter
 diameters, speeds and feeds from ``shop.toml``. Every path is written here
 (``rt.custom``): straight lines a recipe can state exactly. Typed here,
 because neither record carries them: the #2 centre drill's catalogue geometry
@@ -318,8 +318,11 @@ def context(
             f"stop face X {x0}, fence face Y {y0}, plate top Z {z0}: the programs' G54 is the model frame's origin"
         )
     notch_l, notch_r = f["fence_notch_left"], f["fence_notch_right"]
-    x_right = notch_r["x"][1]
-    x_left = x_right - p["plate_length_mm"]
+    x_left, x_right = plane("left_end", "x"), plane("right_end", "x")
+    if notch_r["x"][1] != x_right:
+        raise ValueError(
+            f"right notch ends at X {notch_r['x'][1]}, the right end is X {x_right}"
+        )
     pockets = [
         f[k]
         for k in sorted(
@@ -338,39 +341,14 @@ def context(
     if len(pockets) != len(taps) or not pockets:
         raise ValueError(f"{len(pockets)} clamp pockets, {len(taps)} clamp taps")
 
-    # The plan's literal sizes (its traveler prints them; no adapter reads
-    # this export) must be the model's.
+    # The traveler binds every printed size and band through the fence_plate
+    # adapter; the hole depths are the plan's (its drill ops print them).
     def agree(name: str, value: float) -> None:
         if not math.isclose(p[name], value, abs_tol=1e-4):
             raise ValueError(f"process.{name} {p[name]} is not the model's {value:.4f}")
 
-    agree("plate_width_mm", y_back - y_front)
-    agree("plate_thickness_mm", z_face - z_under)
-    agree("plate_top_height_mm", z0 - z_under)
-    agree("fence_height_mm", z_face - z0)
-    agree("hub_x_mm", cbore["at"][0])
-    agree("hub_y_mm", -cbore["at"][1])
     agree("clamp_hole_depth_mm", taps[0]["at"][2] - z_under)
     agree("hub_hole_depth_mm", hub_tap["at"][2] - z_under)
-    for prefix, band in (
-        ("plate_width", f["front_edge"]["width"]),
-        ("plate_thickness", f["underside"]["thickness"]),
-        ("fence_height", f["faced_top"]["height"]),
-        ("pocket_back_wall", pockets[0]["back_wall_y"]),
-        ("hub_x", cbore["x"]),
-        ("hub_y", cbore["y"]),
-        ("counterbore_dia", cbore["dia"]),
-        ("counterbore_depth", cbore["depth"]),
-        ("notch_depth", notch_l["depth"]),
-    ):
-        agree(f"{prefix}_min_mm", band[0])
-        agree(f"{prefix}_max_mm", band[1])
-    if notch_r["depth"] != notch_l["depth"] or any(
-        q["back_wall_y"] != pockets[0]["back_wall_y"] for q in pockets
-    ):
-        raise ValueError(
-            "the notches, or the pockets, differ: the plan prints one band for each"
-        )
 
     names = {t["id"]: t["name"] for t in plan["tools"]}
     numbers = {
@@ -578,7 +556,7 @@ def context(
             ),
         ]
     sp1 = PROGRAMS[0][0]
-    span = p["plate_length_mm"] / 2
+    span = (x_right - x_left) / 2
     expect: list[list[Any]] = [
         [sp1, "spindle", {"rpm": [[rpm_e, rpm_s, rpm_b]]}],
         [

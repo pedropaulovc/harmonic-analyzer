@@ -27,8 +27,8 @@
   <line class="datum" x1="65.4" y1="215.77" x2="65.4" y2="235.77"/>
   <line class="datum" x1="55" y1="225.77" x2="76" y2="225.77"/>
   <text class="datum-label" x="44" y="249">X0 Y0</text>
-  <text class="label" x="290" y="400">front edge: .030 rough + .010 finish, cutter moving +X</text>
-  <text class="label-halo" x="260" y="182">slot .50 through, levels alternate; then the back edge .010, −X</text>
+  <text class="label" x="250" y="400">cutter path, front edge: .030 rough + .010 finish, cutter moving +X</text>
+  <text class="label-halo" x="200" y="182">cutter path: slot .50 through, levels alternate; then the back edge .010, −X</text>
   <text class="label-halo" x="300" y="280">plate, 3.00 wide</text>
   <text class="label-halo" x="300" y="116">bar remainder</text>
   <text class="label" x="44" y="432">LEFT end: X0 is .500 in in from it. Blocks under each piece; no step clamp over an edge the cutter runs along.</text>

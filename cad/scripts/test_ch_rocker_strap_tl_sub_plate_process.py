@@ -1,17 +1,21 @@
 """The sub-plate's traveler and CAM recipe agree with its model.
 
-``cad/process/ch_rocker_strap_tl_sub_plate/plan.toml`` is a literal plan (no
-prechips adapter reads the plate's feature export): its sizes, printed bands
-and milling-cut stations are [parameters] and numbers, held here to the
-drawing's requirement manifest and the plate spec. The recipe's ``context``
-runs on the manifest (the features the plate's export binds) with no FreeCAD:
-it refuses any plan size, band or cut width that disagrees with the model.
-The FreeCAD post is ``test_ch_rocker_strap_tl_sub_plate_cam_freecad.py``.
+``cad/process/ch_rocker_strap_tl_sub_plate/plan.toml`` is a prechips
+``fence_plate`` adapter plan: the adapter binds every printed size, band,
+station, the drawing number and revision from the plate's feature export, so
+the plan's [parameters] carry only process values (prechips is not an HA
+dependency; the adapter's own tests hold its bindings). Here the plan's cut
+stations and the holding values derived from the plate are held to the plate
+spec, and the recipe's ``context`` runs on the drawing's requirement manifest
+(the features the plate's export binds) with no FreeCAD: it refuses a hole
+depth or cut width that disagrees with the model. The FreeCAD post is
+``test_ch_rocker_strap_tl_sub_plate_cam_freecad.py``.
 """
 
 from __future__ import annotations
 
 import math
+import re
 import tomllib
 
 import pytest
@@ -46,9 +50,9 @@ def ctx() -> dict:
     return recipe.context(features, PLAN, SHOP, "plate.step")
 
 
-def test_context_accepts_the_plans_sizes_and_bands(ctx) -> None:
-    # context() refuses a plan size, band, hole depth or cut width that is not
-    # the model's; the bounding box it hands build is the plate spec's.
+def test_context_accepts_the_plans_hole_depths_and_widths(ctx) -> None:
+    # context() refuses a plan hole depth or cut width that is not the
+    # model's; the bounding box it hands build is the plate spec's.
     expected = [
         [spec.LEFT_END_X, spec.LEFT_END_X + spec.PLATE_LENGTH],
         [spec.BACK_EDGE_Y - spec.PLATE_WIDTH, spec.BACK_EDGE_Y],
@@ -58,45 +62,58 @@ def test_context_accepts_the_plans_sizes_and_bands(ctx) -> None:
         assert got == pytest.approx(want)
 
 
-def test_plan_plate_is_the_spec() -> None:
-    assert P["plate_length_mm"] == spec.PLATE_LENGTH
-    assert P["plate_width_mm"] == spec.PLATE_WIDTH
-    assert P["plate_thickness_mm"] == spec.PLATE_THICKNESS
-    assert P["plate_top_height_mm"] == pytest.approx(-spec.UNDERSIDE_Z)
-    assert P["fence_height_mm"] == spec.FENCE_HEIGHT
-    assert (P["hub_x_mm"], -P["hub_y_mm"]) == (spec.HUB_X, spec.HUB_Y)
+def test_plan_binds_the_plate_from_its_feature_export() -> None:
+    assert PLAN["cad"] == {
+        "file": f"../../out/features/{STEM}/features.toml",
+        "adapter": "fence_plate",
+        "part": "ch-rocker-strap-tl-sub-plate",
+    }
+    assert (PLAN["part"], PLAN["revision"]) == (
+        "{{cad.drawing_number}}",
+        "{{cad.revision}}",
+    )
+    # No drawn size or band is restated as a process value: the sheet prints
+    # the adapter's, and every process binding names a [parameters] entry.
+    text = _process_plans.plan_path(STEM).read_text(encoding="utf-8")
+    assert not [k for k in P if k.startswith("plate_") and k != "plate_overhang_mm"]
+    drawn = (
+        "width", "thickness", "fence_height", "fence_width", "notch_depth",
+        "pocket_back_wall", "pocket_length", "pocket_depth", "counterbore_dia",
+        "counterbore_depth", "hub_x", "hub_y", "length",
+    )
+    assert not [k for k in P if re.fullmatch(rf"({'|'.join(drawn)})_(min_|max_)?mm", k)]
+    assert set(re.findall(r"\{\{process\.(\w+)", text)) <= set(P)
+
+
+def test_plan_holding_and_hole_depths_are_the_spec() -> None:
     assert P["clamp_hole_depth_mm"] == pytest.approx(spec.CLAMP_THREAD_LENGTH)
     assert P["hub_hole_depth_mm"] == pytest.approx(spec.HUB_THREAD_LENGTH)
     # SP02 cantilevers the plate from the vise, centred on the jaws.
     assert P["plate_overhang_mm"] == pytest.approx(
-        (P["plate_length_mm"] - P["vise_jaw_width_mm"]) / 2
+        (spec.PLATE_LENGTH - P["vise_jaw_width_mm"]) / 2
     )
     assert P["jaw_right_x_mm"] == pytest.approx(
         P["plate_overhang_mm"] + P["vise_jaw_width_mm"]
     )
     assert P["strap_right_x_mm"] == pytest.approx(
-        P["plate_length_mm"] - P["strap_inset_mm"]
+        spec.PLATE_LENGTH - P["strap_inset_mm"]
     )
 
 
 def test_plan_stations_are_the_plates_features() -> None:
-    stations = [s + STATION_OFFSET for s in spec.CLAMP_STATIONS]
+    # The pockets', hub's and notches' beam stations are the adapter's (from
+    # the plate's left sawn end); the stations it does not bind are the spec's.
     for name in ("pocket plunges", "clamp spots", "clamp holes"):
-        assert _cut(name)["stations_mm"] == pytest.approx(stations), name
+        assert _cut(name)["stations_mm"] == "{{cad.pocket_beam_x_mm}}", name
+    for name in ("counterbore", "hub tap spot", "hub hole"):
+        assert _cut(name)["stations_mm"] == "{{cad.hub_beam_x_mm}}", name
+    assert _cut("left notch")["traverse_mm"] == "{{cad.notch_left_beam_x_mm}}"
+    assert _cut("right notch")["traverse_mm"] == "{{cad.notch_right_beam_x_mm}}"
+    stations = [s + STATION_OFFSET for s in spec.CLAMP_STATIONS]
     inset = spec.POCKET_LENGTH / 2 - spec.CORNER_CUTTER_RADIUS
     lines = sorted(s + side * inset for s in stations for side in (-1, 1))
     for name in ("pocket centre lines", "pocket walls"):
         assert _cut(name)["stations_mm"] == pytest.approx(lines, abs=1e-3), name
-    for name in ("counterbore", "hub tap spot", "hub hole"):
-        assert _cut(name)["stations_mm"] == pytest.approx(
-            spec.HUB_X + STATION_OFFSET
-        ), name
-    assert _cut("left notch")["traverse_mm"] == pytest.approx(
-        [STATION_OFFSET, spec.NOTCH_LEFT_END + STATION_OFFSET]
-    )
-    assert _cut("right notch")["traverse_mm"][0] == pytest.approx(
-        spec.NOTCH_RIGHT_START + STATION_OFFSET
-    )
     plunge = (
         spec.NOTCH_RIGHT_START
         + math.ceil(spec.CORNER_CUTTER_RADIUS * 1000) / 1000

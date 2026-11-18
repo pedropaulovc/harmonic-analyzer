@@ -22,10 +22,11 @@
 # FluidNC refuses jogs while an M0 holds the program
 # (wiki.fluidnc.com/en/features/single_block_mode).
 #
-# Literal plan: no prechips adapter reads this part's features.toml yet, so
-# the sizes the sheet prints are [parameters] here, each the plate spec's
-# value (asserted by cad/scripts/test_ch_rocker_strap_tl_sub_plate_process.py),
-# and the revision is not bound. cam.py reads the part's feature export.
+# Adapter plan: prechips' fence_plate adapter binds every printed size, band,
+# station, the drawing number and the revision from the plate's feature
+# export ([cad] file); [parameters] hold only the process's own values (the
+# blank, work-zero entries, levels, widths of cut, feeds, hole depths and the
+# holding). cam.py reads the same export.
 #
 # The programs work in the plate's model frame, the strap programs' G54:
 # X0 the end-stop face (.5 in from the left sawn end), Y0 the fence face (the
@@ -35,14 +36,19 @@
 # among the mill's tools: T1 1/2 in end mill, T2 1/8 in end mill, T3 centre
 # drill, T4 #43, T5 #7, T6 the MT3 dead centre (the taps are turned by hand).
 title = "Rocker-strap sub-plate"
-part = "MHA-CH-13-TL-01"
-revision = "as released with this traveler"
+part = "{{cad.drawing_number}}"
+revision = "{{cad.revision}}"
 material = "6061-T6511 aluminium flat, 1/2 × 6 in (OnlineMetals 1173, owned)"
 stock = "{{process.blank_thickness_in:fraction}} × {{process.blank_width_in:g}} in bar; {{process.quantity:d}} × {{process.blank_length_in:.1f}} in length."
-note = "Inches unless mm; G-code and console entries in mm. Finished 13.0 × {{process.plate_width_mm:in.2f}} × {{process.plate_thickness_mm:in.2dot}}, a fixture for MHA-CH-13. Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Each CNC file is proved once in air, Z0 raised 1.000 in, before it cuts metal (ops 30 and 80). After any controller reset, stall or E-stop, home ($H) and touch off G54 again before Cycle Start: a reset loses home (logbook 2026-11-06)."
+note = "Inches unless mm; G-code and console entries in mm. Finished {{cad.length_in:.1f}} × {{cad.width_in:.2f}} × {{cad.thickness_in:.2dot}}, a fixture for MHA-CH-13. Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Each CNC file is proved once in air, Z0 raised 1.000 in, before it cuts metal (ops 30 and 80). After any controller reset, stall or E-stop, home ($H) and touch off G54 again before Cycle Start: a reset loses home (logbook 2026-11-06)."
 shop = "../shop.toml"
 material_key = "6061-t6511"
 milling_material = "aluminum_6061"
+
+[cad]
+file = "../../out/features/ch_rocker_strap_tl_sub_plate/features.toml"
+adapter = "fence_plate"
+part = "ch-rocker-strap-tl-sub-plate"
 
 [parameters]
 quantity = 1
@@ -58,35 +64,6 @@ blank_thickness_in = 0.5
 # band, stop.
 blank_thickness_min_in = 0.495
 blank_thickness_max_in = 0.505
-# The plate as drawn (ch_rocker_strap_tl_sub_plate_spec; mm, model frame).
-plate_length_mm = 330.2
-plate_width_mm = 76.2
-plate_thickness_mm = 12.446
-# Z0 above the underside, and the fence and stop tops above Z0.
-plate_top_height_mm = 10.5664
-fence_height_mm = 1.8796
-hub_x_mm = 152.4
-hub_y_mm = 25.4
-# Printed limits the inspections check (mm): .XX ±.01, .XXX ±.005, the
-# explicit ±.002 on the hub position and the pockets' back walls.
-plate_width_min_mm = 75.946
-plate_width_max_mm = 76.454
-plate_thickness_min_mm = 12.192
-plate_thickness_max_mm = 12.7
-fence_height_min_mm = 1.7526
-fence_height_max_mm = 2.0066
-pocket_back_wall_min_mm = 47.5742
-pocket_back_wall_max_mm = 47.6758
-hub_x_min_mm = 152.3492
-hub_x_max_mm = 152.4508
-hub_y_min_mm = 25.3492
-hub_y_max_mm = 25.4508
-counterbore_dia_min_mm = 12.573
-counterbore_dia_max_mm = 12.827
-counterbore_depth_min_mm = 4.572
-counterbore_depth_max_mm = 4.826
-notch_depth_min_mm = 4.064
-notch_depth_max_mm = 4.572
 # Work-zero entries (mm, model frame): the .200 in edge finder's centre half
 # its Ø off the edge it finds; T1's tip on a .002 in feeler leaf on the table
 # beside the bar (SP01: 1-2-3 block and Z0 above the underside over it) or on
@@ -248,8 +225,8 @@ speed_kind = "other"
 tool = "saw"
 drilling = "none"
 sizing = "other"
-instruction = "Saw {{process.quantity:d}} × {{process.blank_length_in:.1f}} in (±.1, the plate's finished length) from the {{process.blank_thickness_in:fraction}} × {{process.blank_width_in:g}} in bar, flat on the saw bed. Deburr both sawn ends. Mic the thickness at both ends: every reading {{process.blank_thickness_min_in:.3dot}}–{{process.blank_thickness_max_in:.3dot}}, else stop (the programs are posted for that band)."
-inspection = "Thickness {{process.blank_thickness_min_in:.3dot}}–{{process.blank_thickness_max_in:.3dot}} at both ends."
+instruction = "Saw {{process.quantity:d}} × {{process.blank_length_in:.1f}} in from the {{process.blank_thickness_in:fraction}} × {{process.blank_width_in:g}} in bar, flat on the saw bed; the sawn length is the plate's finished length. Deburr both sawn ends. Mic the thickness at both ends: every reading {{process.blank_thickness_min_in:.3dot}}–{{process.blank_thickness_max_in:.3dot}}, else stop (the programs are posted for that band)."
+inspection = "Length {{cad.length_min_in:.1f}}–{{cad.length_max_in:.1f}} (tape measure). Thickness {{process.blank_thickness_min_in:.3dot}}–{{process.blank_thickness_max_in:.3dot}} at both ends (micrometer)."
 gauge_checks = [{ gauge = "micrometers", band_mm = [12.573, 12.827] }]
 feed = "hand"
 
@@ -264,17 +241,18 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / table,
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "Vise off. Either broad face down on four 1-2-3 blocks lying flat (1 in up, 3 in along X, 1 in in from the bar's ends): two centred under the front 3 in of the bar (the plate), two flush with the bar's back edge. Four step clamps (LMS 1268 kit) along X from studs beyond the bar's ends, one over the middle of each block (2-1/2 in in from the end). The front blocks stay 1/2 in clear of the front edge and the slot line, the back blocks .45 in clear of the slot line; no step clamp over an edge the cutter runs along."
-datum = "Program SP01_split_edges (cam:ch_rocker_strap_tl_sub_plate), in the plate's frame: X0 .500 in in from the bar's left sawn end; Y0 2.540 in behind the bar's as-received front edge (the plate's fence face, cut in Setup 3); Z0 {{process.plate_top_height_mm:in.3dot}} above the underside. +Y toward the back of the table. Tool length from the tool setter at the file's M6 T1. After any move of the bar, a controller reset, a stall or an E-stop: home ($H) and touch off X, Y and Z again as the first operation does; once the front edge is cut, Y on it is G10 L20 P1 Y-66.040."
+datum = "Program SP01_split_edges (cam:ch_rocker_strap_tl_sub_plate), in the plate's frame: X0 {{cad.stop_width_mm:in.3dot}} in in from the bar's left sawn end; Y0 2.540 in behind the bar's as-received front edge (the plate's fence face, cut in Setup 3); Z0 {{cad.plate_top_height_mm:in.3dot}} above the underside. +Y toward the back of the table. Tool length from the tool setter at the file's M6 T1. After any move of the bar, a controller reset, a stall or an E-stop: home ($H) and touch off X, Y and Z again as the first operation does; once the front edge is cut, Y on it is G10 L20 P1 Y-66.040."
 diagram = { file = "diagrams/split.svg", alt = "Plan of the bar on the table: four 1-2-3 blocks and four step clamps along X; the plate is the front 3 in strip; the 1/2 in end mill mills the front edge, cuts the slot through behind the strip and finishes the strip's back edge." }
-envelope = { x_span_mm = ["{{process.plate_length_mm}}", "{{process.half_cutter_dia_mm}}", 5.08], y_span_mm = [152.4, "{{process.half_cutter_dia_mm}}"], work_top_mm = ["{{process.block_height_mm}}", "{{process.bar_top_max_mm}}"], deepest_cut_mm = ["{{process.block_height_mm}}", -1.016], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
+envelope = { x_span_mm = ["{{cad.length_mm}}", "{{process.half_cutter_dia_mm}}", 5.08], y_span_mm = [152.4, "{{process.half_cutter_dia_mm}}"], work_top_mm = ["{{process.block_height_mm}}", "{{process.bar_top_max_mm}}"], deepest_cut_mm = ["{{process.block_height_mm}}", -1.016], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
 vise_hold = "other"
 # The plate strip between its two straps (the blocks only push up), at its
 # drawn thickness; the front edge is cut before the slot, on the whole bar,
 # so this is the lighter section.
-beam = { axis = "x", hold = "between", extent_mm = [0, "{{process.plate_length_mm}}"], supports_mm = ["{{process.strap_inset_mm}}", "{{process.strap_right_x_mm}}"], section_mm = { y = "{{process.plate_width_mm}}", z = "{{process.plate_thickness_mm}}" } }
+beam = { axis = "x", hold = "between", extent_mm = [0, "{{cad.length_mm}}"], supports_mm = ["{{process.strap_inset_mm}}", "{{process.strap_right_x_mm}}"], section_mm = { y = "{{cad.width_mm}}", z = "{{cad.thickness_mm}}" } }
 
 [[setups.operations]]
-instruction = "Once per table setup, the bar clamped. Home the mill first ($H): a FluidNC reset loses home (logbook 2026-11-06), so no offset from an earlier session is trusted. Console M6 T1 (1/2 in end mill, {{process.half_mill_projection_mm:in.2f}} out of the collet). Its tip just dragging a .002 feeler leaf on the table beside the bar: G10 L20 P1 Z{{process.sp01_z_set_mm:.3f}}. Edge finder (900 rpm) on the bar's left end: G10 L20 P1 X{{process.sp01_x_set_mm:.3f}}; on its front edge: G10 L20 P1 Y{{process.sp01_y_set_mm:.3f}}."
+instruction = "Once per table setup, the bar clamped. Home first ($H): a reset loses home. Console M6 T1 (1/2 in end mill, {{process.half_mill_projection_mm:in.2f}} out of the collet). Its tip just dragging a .002 feeler leaf on the table beside the bar: G10 L20 P1 Z{{process.sp01_z_set_mm:.3f}}. Edge finder on the bar's left end: G10 L20 P1 X{{process.sp01_x_set_mm:.3f}}; on its front edge: G10 L20 P1 Y{{process.sp01_y_set_mm:.3f}}."
+instruction_detailed = "Once per table setup, the bar clamped. Home first ($H): a reset loses home. Console M6 T1 (1/2 in end mill, {{process.half_mill_projection_mm:in.2f}} out of the collet). Its tip just dragging a .002 feeler leaf on the table beside the bar: G10 L20 P1 Z{{process.sp01_z_set_mm:.3f}}. Edge finder (900 rpm) on the bar's left end: G10 L20 P1 X{{process.sp01_x_set_mm:.3f}}; on its front edge: G10 L20 P1 Y{{process.sp01_y_set_mm:.3f}} (entries allow for its .100 radius)."
 feed = "hand"
 
 [[setups.operations]]
@@ -289,8 +267,8 @@ sizing = "other"
 instruction = "Run SP01_split_edges (M6 T1, 1/2 in end mill; set 2250). Front edge, cutter moving +X (conventional), two equal levels, tip {{process.cutter_tip_below_mm:in.2dot}} under the bar: rough {{process.edge_rough_woc_mm:in.3dot}}, finish {{process.edge_finish_mm:in.3dot}}."
 settings = "em-half-hss-6061-v11-wide"
 milling_cuts = [
-  { name = "front edge rough", kind = "side", phase = "rough", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = "{{process.side_max_stepdown_mm}}", radial_woc_mm = "{{process.edge_rough_woc_mm}}", rpm = 2250, feed_mm_min = 400.05, traverse_mm = [0, "{{process.plate_length_mm}}"], finish_cut = "front edge finish", finish_stock_mm = { y = "{{process.edge_finish_mm}}", z = "through" }, max_deflection_mm = 0.1 },
-  { name = "front edge finish", kind = "side", phase = "finish", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = "{{process.side_max_stepdown_mm}}", radial_woc_mm = "{{process.edge_finish_mm}}", rpm = 2250, feed_mm_min = 400.05, traverse_mm = [0, "{{process.plate_length_mm}}"] },
+  { name = "front edge rough", kind = "side", phase = "rough", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = "{{process.side_max_stepdown_mm}}", radial_woc_mm = "{{process.edge_rough_woc_mm}}", rpm = 2250, feed_mm_min = 400.05, traverse_mm = [0, "{{cad.length_mm}}"], finish_cut = "front edge finish", finish_stock_mm = { y = "{{process.edge_finish_mm}}", z = "through" }, max_deflection_mm = 0.1 },
+  { name = "front edge finish", kind = "side", phase = "finish", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = "{{process.side_max_stepdown_mm}}", radial_woc_mm = "{{process.edge_finish_mm}}", rpm = 2250, feed_mm_min = 400.05, traverse_mm = [0, "{{cad.length_mm}}"] },
 ]
 
 [[setups.operations]]
@@ -301,7 +279,7 @@ sizing = "other"
 instruction = "Same file, at its M0 set 1250: the slot through, {{process.edge_finish_mm:in.3dot}} behind the plate's back edge, full width, alternate directions, levels ≤ {{process.slot_step_mm:in.3dot}}, tip {{process.cutter_tip_below_mm:in.2dot}} under the bar. The plate is free of the rest of the bar after the last level."
 settings = "basebar-slot-rough-6061-t6511"
 milling_cuts = [
-  { name = "slot", kind = "slot", phase = "rough", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = "{{process.slot_step_mm}}", radial_woc_mm = "{{process.half_cutter_dia_mm}}", rpm = 1250, feed_mm_min = 127.0, traverse_mm = [0, "{{process.plate_length_mm}}"] },
+  { name = "slot", kind = "slot", phase = "rough", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = "{{process.slot_step_mm}}", radial_woc_mm = "{{process.half_cutter_dia_mm}}", rpm = 1250, feed_mm_min = 127.0, traverse_mm = [0, "{{cad.length_mm}}"] },
 ]
 
 [[setups.operations]]
@@ -311,10 +289,10 @@ drilling = "none"
 sizing = "other"
 instruction = "Same file, at its M0 set 2250: the plate's back edge, {{process.edge_finish_mm:in.3dot}}, cutter moving −X (conventional), two levels. After the file: caliper the width; mark the front edge FRONT and the left end LEFT; file the burrs off both long edges and the underside's edges (they seat in the vise next)."
 settings = "em-half-hss-6061-v11-narrow"
-inspection = "Width {{process.plate_width_min_mm:in.3dot}}–{{process.plate_width_max_mm:in.3dot}} (calipers) at both ends and the middle, else stop."
-gauge_checks = [{ gauge = "calipers", band_mm = ["{{process.plate_width_min_mm}}", "{{process.plate_width_max_mm}}"] }]
+inspection = "Width {{cad.width_min_in:.3dot}}–{{cad.width_max_in:.3dot}} (calipers) at both ends and the middle, else stop."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.width_band_mm}}" }]
 milling_cuts = [
-  { name = "back edge finish", kind = "side", phase = "finish", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = "{{process.side_max_stepdown_mm}}", radial_woc_mm = "{{process.edge_finish_mm}}", rpm = 2250, feed_mm_min = 400.05, traverse_mm = [0, "{{process.plate_length_mm}}"] },
+  { name = "back edge finish", kind = "side", phase = "finish", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = "{{process.side_max_stepdown_mm}}", radial_woc_mm = "{{process.edge_finish_mm}}", rpm = 2250, feed_mm_min = 400.05, traverse_mm = [0, "{{cad.length_mm}}"] },
 ]
 
 # SP02, one vise clamping for everything on the top. Beam stations are from
@@ -327,20 +305,21 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, 
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "Vise indicated <.001 along X. The 1 in and 1/2 in parallels of the owned set stacked under each jaw (1.5 in), against the jaws, clear of the holes (the nearest is .85 in in from an edge). The plate on them, underside down, FRONT edge at the moving jaw, gripped on its two milled long edges (.27 in the jaws), centred on the jaws (LEFT end at the left); its top (Z0) stands .146 above the jaw tops. Nothing to the right of or in front of the plate stands above the jaws: the end mill runs out past the right end and the front edge."
-datum = "Program SP02_top, the plate's frame (the G54 of the MHA-CH-13 programs): X0 the end-stop face it cuts, .500 in in from the LEFT end; Y0 the fence face it cuts, .500 in in front of the back edge (fixed jaw), +Y toward the fixed jaw; Z0 the plate top it cuts, {{process.plate_top_height_mm:in.3dot}} above the underside. Tool lengths from the tool setter at each M6. After a controller reset, a stall or an E-stop: home ($H), then check G54 before Cycle Start: the edge finder (900 rpm) on the LEFT end reads X {{process.sp02_x_set_mm:.3f}}, on the FRONT edge Y -66.040; once the tops are faced, T1's tip on a .002 leaf on the fence top reads Z {{process.sp02_z_check_mm:.3f}}. Off by more than 0.025 mm: G10 L20 P1 that axis to the value given here. Before the tops are faced: unclamp and run the first operation again."
+datum = "Program SP02_top, the plate's frame (the G54 of the MHA-CH-13 programs): X0 the end-stop face it cuts, {{cad.stop_width_mm:in.3dot}} in in from the LEFT end; Y0 the fence face it cuts, {{cad.fence_width_in:.3dot}} in in front of the back edge (fixed jaw), +Y toward the fixed jaw; Z0 the plate top it cuts, {{cad.plate_top_height_mm:in.3dot}} above the underside. Tool lengths from the tool setter at each M6; at each M6 the file has stopped the spindle (M5) and lifted the tool clear. After a controller reset, a stall or an E-stop: home ($H), then check G54 before Cycle Start: the edge finder on the LEFT end reads X {{process.sp02_x_set_mm:.3f}}; once the fence face is cut, the finder on it from the front reads Y -2.540; once the tops are faced, T1's tip on a .002 leaf on the fence top reads Z {{process.sp02_z_check_mm:.3f}}. Off by more than 0.025 mm: G10 L20 P1 that axis to the value given here. Before the fence face is cut: unclamp and run the first operation again."
 diagram = { file = "diagrams/top.svg", alt = "Plan of the plate in the vise: fence along the back edge at the fixed jaw, end stop at the left end, the plate top milled down round them; the fence notched at both ends, four clamp pockets with 4-40 holes along the front, the hub counterbore with its 1/4-20 hole; section showing the stacked parallels and the plate top above the jaws." }
-envelope = { x_span_mm = ["{{process.plate_length_mm}}", "{{process.half_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.plate_width_mm}}", "{{process.half_cutter_dia_mm}}", 5.08], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.bar_top_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.drill_tip_below_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.eighth_mill_projection_min_mm}}"] }
-vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.plate_width_mm}}", along_jaws_mm = "{{process.plate_length_mm}}", part_height_mm = "{{process.bar_top_max_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.plate_overhang_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
-beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{process.plate_length_mm}}"], clamp_mm = ["{{process.plate_overhang_mm}}", "{{process.jaw_right_x_mm}}"], section_mm = { y = "{{process.plate_width_mm}}", z = "{{process.plate_top_height_mm}}" }, vise_left = "start" }
-inspection = ["After the file, before unclamping; send G20 so the DRO reads inches, G21 after. Spindle on (MDI M3; set 900 rpm by hand): the edge finder on each pocket's far wall (the one farthest from the fence) from inside the pocket, DRO Y (G54) less the finder's .100 radius −{{process.pocket_back_wall_min_mm:in.4dot}} to −{{process.pocket_back_wall_max_mm:in.4dot}}. M5, spindle stopped: edge finder out, DTI in, swept round the counterbore turning the spindle by hand; its centre at DRO X {{process.hub_x_min_mm:in.4dot}}–{{process.hub_x_max_mm:in.4dot}}, Y −{{process.hub_y_min_mm:in.4dot}} to −{{process.hub_y_max_mm:in.4dot}}. Out of band: stop, the plate is scrap."]
+envelope = { x_span_mm = ["{{cad.length_mm}}", "{{process.half_cutter_dia_mm}}", 5.08], y_span_mm = ["{{cad.width_mm}}", "{{process.half_cutter_dia_mm}}", 5.08], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.bar_top_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.drill_tip_below_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.eighth_mill_projection_min_mm}}"] }
+vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.width_mm}}", along_jaws_mm = "{{cad.length_mm}}", part_height_mm = "{{process.bar_top_max_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.plate_overhang_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
+beam = { axis = "x", hold = "cantilever", extent_mm = [0, "{{cad.length_mm}}"], clamp_mm = ["{{process.plate_overhang_mm}}", "{{process.jaw_right_x_mm}}"], section_mm = { y = "{{cad.width_mm}}", z = "{{cad.plate_top_height_mm}}" }, vise_left = "start" }
+inspection = ["After the file, before unclamping (ops 230–250), DRO in inches (G20), X0 and Y0 picked up again on the cut stop and fence faces (op 230): the pockets' far walls at Y −{{cad.pocket_back_wall_min_in:.4dot}} to −{{cad.pocket_back_wall_max_in:.4dot}} in, the wall's position (the edge finder's DRO reading less its .100 radius); the counterbore's centre at X {{cad.hub_x_min_in:.4dot}}–{{cad.hub_x_max_in:.4dot}}, Y −{{cad.hub_y_min_in:.4dot}} to −{{cad.hub_y_max_in:.4dot}} in (DTI, DRO). Out of band: stop, the plate is scrap. Not gauged, the program's path: the pockets' length and depth, the notches, the fence's width."]
 gauge_checks = [
-  { gauge = "mill-y-dro", band_mm = ["{{process.pocket_back_wall_min_mm}}", "{{process.pocket_back_wall_max_mm}}"] },
-  { gauge = "mill-x-dro", band_mm = ["{{process.hub_x_min_mm}}", "{{process.hub_x_max_mm}}"] },
-  { gauge = "mill-y-dro", band_mm = ["{{process.hub_y_min_mm}}", "{{process.hub_y_max_mm}}"] },
+  { gauge = "mill-y-dro", band_mm = "{{cad.pocket_back_wall_band_mm}}" },
+  { gauge = "mill-x-dro", band_mm = "{{cad.hub_x_band_mm}}" },
+  { gauge = "mill-y-dro", band_mm = "{{cad.hub_y_band_mm}}" },
 ]
 
 [[setups.operations]]
-instruction = "Once per vise setup, no plate in. Home the mill first ($H): a FluidNC reset loses home (logbook 2026-11-06), so no offset from an earlier session is trusted. Console M6 T1 (1/2 in end mill, {{process.half_mill_projection_mm:in.2f}} out). Its tip just dragging a .002 feeler leaf on the top parallel: G10 L20 P1 Z{{process.sp02_z_set_mm:.3f}}. Edge finder (900 rpm) on the fixed jaw's face: G10 L20 P1 Y{{process.sp02_y_set_mm:.3f}}. Clamp the plate; edge finder on its LEFT end: G10 L20 P1 X{{process.sp02_x_set_mm:.3f}}."
+instruction = "Once per vise setup, no plate in. Home first ($H): a reset loses home. Console M6 T1 (1/2 in end mill, {{process.half_mill_projection_mm:in.2f}} out). Its tip just dragging a .002 feeler leaf on the top parallel: G10 L20 P1 Z{{process.sp02_z_set_mm:.3f}}. Edge finder on the fixed jaw's face: G10 L20 P1 Y{{process.sp02_y_set_mm:.3f}}. Clamp the plate; edge finder on its LEFT end: G10 L20 P1 X{{process.sp02_x_set_mm:.3f}}."
+instruction_detailed = "Once per vise setup, no plate in. Home first ($H): a reset loses home. Console M6 T1 (1/2 in end mill, {{process.half_mill_projection_mm:in.2f}} out). Its tip just dragging a .002 feeler leaf on the top parallel: G10 L20 P1 Z{{process.sp02_z_set_mm:.3f}}. Edge finder (900 rpm) on the fixed jaw's face: G10 L20 P1 Y{{process.sp02_y_set_mm:.3f}}. Clamp the plate; edge finder on its LEFT end: G10 L20 P1 X{{process.sp02_x_set_mm:.3f}} (entries allow for its .100 radius)."
 feed = "hand"
 
 [[setups.operations]]
@@ -352,10 +331,10 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Run SP02_top (M6 T1, 1/2 in end mill; set 2250). The fence top (passes along X) and the end-stop top (passes along Y) faced to {{process.fence_height_mm:in.3dot}} above Z0 (Z{{process.fence_height_mm:.3f}} in the file), three zigzag passes each."
+instruction = "Run SP02_top (M6 T1, 1/2 in end mill; set 2250). The fence top (passes along X) and the end-stop top (passes along Y) faced to {{cad.fence_height_in:.3dot}} above Z0 (Z{{cad.fence_height_mm:.3f}} in the file), three zigzag passes each."
 settings = "em-half-hss-6061-v11-wide"
 milling_cuts = [
-  { name = "fence and stop tops", kind = "end", phase = "finish", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = "{{process.face_depth_max_mm}}", radial_woc_mm = "{{process.face_woc_mm}}", rpm = 2250, feed_mm_min = 400.05, traverse_mm = [0, "{{process.plate_length_mm}}"] },
+  { name = "fence and stop tops", kind = "end", phase = "finish", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = "{{process.face_depth_max_mm}}", radial_woc_mm = "{{process.face_woc_mm}}", rpm = 2250, feed_mm_min = 400.05, traverse_mm = [0, "{{cad.length_mm}}"] },
 ]
 
 [[setups.operations]]
@@ -366,7 +345,7 @@ sizing = "other"
 instruction = "Same file: the plate top milled to Z0 in one level, fifteen zigzag passes along X from the front edge back, each in from the right end to {{process.wall_finish_mm:in.3dot}} off the stop face, stepping over along it."
 settings = "em-half-hss-6061-v11-wide"
 milling_cuts = [
-  { name = "plate top", kind = "end", phase = "finish", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = "{{process.floor_depth_max_mm}}", radial_woc_mm = "{{process.floor_woc_mm}}", rpm = 2250, feed_mm_min = 400.05, traverse_mm = [12.7, "{{process.plate_length_mm}}"] },
+  { name = "plate top", kind = "end", phase = "finish", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = "{{process.floor_depth_max_mm}}", radial_woc_mm = "{{process.floor_woc_mm}}", rpm = 2250, feed_mm_min = 400.05, traverse_mm = [12.7, "{{cad.length_mm}}"] },
 ]
 
 [[setups.operations]]
@@ -374,29 +353,29 @@ speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
 sizing = "other"
-instruction = "Same file: the stop face (X0, cutter moving +Y) and on round the corner the fence face (Y0, cutter moving +X), {{process.wall_finish_mm:in.3dot}}, the full .074 in one level."
+instruction = "Same file: the stop face (X0, cutter moving +Y) and on round the corner the fence face (Y0, cutter moving +X), {{process.wall_finish_mm:in.3dot}}, the full {{cad.fence_height_in:.3dot}} in one level."
 settings = "em-half-hss-6061-v11-narrow"
-inspection = "At the M6 T2 stop: fence and stop tops {{process.fence_height_min_mm:in.3dot}}–{{process.fence_height_max_mm:in.3dot}} above the plate top (calipers' depth rod), at both ends of the fence and on the stop. Out of band: stop."
-gauge_checks = [{ gauge = "calipers", band_mm = ["{{process.fence_height_min_mm}}", "{{process.fence_height_max_mm}}"] }]
+inspection = "At the M6 T2 stop (spindle stopped, T1 lifted clear): fence and stop tops {{cad.fence_height_min_in:.3dot}}–{{cad.fence_height_max_in:.3dot}} above the plate top (calipers' depth rod), at both ends of the fence and on the stop. Out of band: stop."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.fence_height_band_mm}}" }]
 milling_cuts = [
-  { name = "stop and fence faces", kind = "side", phase = "finish", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = "{{process.fence_height_mm}}", radial_woc_mm = "{{process.wall_finish_mm}}", rpm = 2250, feed_mm_min = 400.05, traverse_mm = [12.7, "{{process.plate_length_mm}}"] },
+  { name = "stop and fence faces", kind = "side", phase = "finish", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, axial_doc_mm = "{{cad.fence_height_mm}}", radial_woc_mm = "{{process.wall_finish_mm}}", rpm = 2250, feed_mm_min = 400.05, traverse_mm = [12.7, "{{cad.length_mm}}"] },
 ]
 
 [[setups.operations]]
 speed_kind = "spindle"
 tool = "em-half"
 drilling = "none"
-sizing = { kind = "band", band_mm = ["{{process.counterbore_dia_min_mm}}", "{{process.counterbore_dia_max_mm}}"] }
-instruction = "Same file: the hub counterbore, T1 plunged {{process.counterbore_depth_min_mm:in.3dot}}–{{process.counterbore_depth_max_mm:in.3dot}} deep at X {{process.hub_x_mm:in.3f}}, Y −{{process.hub_y_mm:in.3f}}."
+sizing = { kind = "band", band_mm = "{{cad.counterbore_dia_band_mm}}" }
+instruction = "Same file: the hub counterbore, T1 plunged {{cad.counterbore_depth_min_in:.3dot}}–{{cad.counterbore_depth_max_in:.3dot}} deep at X {{cad.hub_x_in:.3f}}, Y −{{cad.hub_y_in:.3f}}."
 rpm = 2250
 feed = "{{process.cbore_plunge_feed_per_min_mm:in.1f}} in/min plunge"
-inspection = "At the M6 T2 stop: counterbore Ø {{process.counterbore_dia_min_mm:in.3dot}}–{{process.counterbore_dia_max_mm:in.3dot}} (telescoping gauge on the micrometer); write the reading on the plate's tag for TL-02, which is turned to it. Depth {{process.counterbore_depth_min_mm:in.3dot}}–{{process.counterbore_depth_max_mm:in.3dot}} below the plate top (calipers' depth rod). Out of band: stop."
+inspection = "At the M6 T2 stop (spindle stopped): counterbore Ø {{cad.counterbore_dia_min_in:.3dot}}–{{cad.counterbore_dia_max_in:.3dot}} (telescoping gauge on the micrometer); write the reading on the plate's tag for TL-02, which is turned to it. Depth {{cad.counterbore_depth_min_in:.3dot}}–{{cad.counterbore_depth_max_in:.3dot}} below the plate top (calipers' depth rod). Out of band: stop."
 gauge_checks = [
-  { gauge = "micrometers", band_mm = ["{{process.counterbore_dia_min_mm}}", "{{process.counterbore_dia_max_mm}}"] },
-  { gauge = "calipers", band_mm = ["{{process.counterbore_depth_min_mm}}", "{{process.counterbore_depth_max_mm}}"] },
+  { gauge = "micrometers", band_mm = "{{cad.counterbore_dia_band_mm}}" },
+  { gauge = "calipers", band_mm = "{{cad.counterbore_depth_band_mm}}" },
 ]
 milling_cuts = [
-  { name = "counterbore", kind = "plunge", phase = "finish", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, rpm = 2250, feed_mm_min = "{{process.cbore_plunge_feed_per_min_mm}}", stations_mm = 165.1 },
+  { name = "counterbore", kind = "plunge", phase = "finish", cutter_dia_mm = "{{process.half_cutter_dia_mm}}", flutes = 2, rpm = 2250, feed_mm_min = "{{process.cbore_plunge_feed_per_min_mm}}", stations_mm = "{{cad.hub_beam_x_mm}}" },
 ]
 
 [[setups.operations]]
@@ -404,11 +383,11 @@ speed_kind = "spindle"
 tool = "em-eighth"
 drilling = "none"
 sizing = "other"
-instruction = "Same file, M6 T2 (1/8 in carbide end mill, {{process.eighth_mill_projection_min_mm:in.2dot}}–{{process.eighth_mill_projection_max_mm:in.2dot}} out; set 2800): both fence notches .17 back from Y0 down to Z0, and the stop face over the left notch, levels ≤ {{process.eighth_step_mm:in.3dot}}; corners R.0625, the cutter's. Notches not gauged: the program's path."
+instruction = "Same file, M6 T2 (1/8 in carbide end mill, {{process.eighth_mill_projection_min_mm:in.2dot}}–{{process.eighth_mill_projection_max_mm:in.2dot}} out; set 2800): both fence notches {{cad.notch_depth_in:.2dot}} back from Y0 down to Z0, inner ends at X {{cad.notch_left_end_x_in:.2f}} and X {{cad.notch_right_end_x_in:.2f}}, and the stop face over the left notch, levels ≤ {{process.eighth_step_mm:in.3dot}}; corners R.0625, the cutter's (R{{cad.corner_radius_max_in:.2dot}} max). Notches not gauged: the program's path."
 settings = "endmill-carbide-3fl-1-8-6061"
 milling_cuts = [
-  { name = "left notch", kind = "slot", phase = "finish", cutter_dia_mm = "{{process.eighth_cutter_dia_mm}}", flutes = 3, axial_doc_mm = "{{process.eighth_step_mm}}", radial_woc_mm = "{{process.eighth_cutter_dia_mm}}", traverse_mm = [12.7, 36.068] },
-  { name = "right notch", kind = "slot", phase = "finish", cutter_dia_mm = "{{process.eighth_cutter_dia_mm}}", flutes = 3, axial_doc_mm = "{{process.eighth_step_mm}}", radial_woc_mm = "{{process.eighth_cutter_dia_mm}}", traverse_mm = [294.132, "{{process.plate_length_mm}}"] },
+  { name = "left notch", kind = "slot", phase = "finish", cutter_dia_mm = "{{process.eighth_cutter_dia_mm}}", flutes = 3, axial_doc_mm = "{{process.eighth_step_mm}}", radial_woc_mm = "{{process.eighth_cutter_dia_mm}}", traverse_mm = "{{cad.notch_left_beam_x_mm}}" },
+  { name = "right notch", kind = "slot", phase = "finish", cutter_dia_mm = "{{process.eighth_cutter_dia_mm}}", flutes = 3, axial_doc_mm = "{{process.eighth_step_mm}}", radial_woc_mm = "{{process.eighth_cutter_dia_mm}}", traverse_mm = "{{cad.notch_right_beam_x_mm}}" },
 ]
 
 # T2's straight plunges: each pocket level starts with one at the pocket's
@@ -419,12 +398,12 @@ speed_kind = "spindle"
 tool = "em-eighth"
 drilling = "none"
 sizing = "other"
-instruction = "Same file, T2: the four clamp pockets .56 × .375 × .140 deep, their far walls at Y −1.875 (1.875 in front of Y0). Each pocket level, and each level of the right notch at its closed end, starts with a straight plunge, 4.6 in/min."
+instruction = "Same file, T2: the {{cad.pocket_count:d}} clamp pockets at X {{cad.pocket_stations_in}}, {{cad.pocket_length_in:.2dot}} × {{cad.pocket_width_mm:in.3dot}} × {{cad.pocket_depth_in:.3dot}} deep, their far walls at Y −{{cad.pocket_back_wall_in:.3f}}. Each pocket level, and each level of the right notch at its closed end, starts with a straight plunge, 4.6 in/min."
 rpm = 2800
 feed = "4.6 in/min plunge"
 milling_cuts = [
-  { name = "pocket plunges", kind = "plunge", phase = "rough", cutter_dia_mm = "{{process.eighth_cutter_dia_mm}}", flutes = 3, feed_per_tooth_mm = "{{process.eighth_plunge_chip_mm}}", stations_mm = [38.1, 120.65, 209.55, 292.1] },
-  { name = "hub tap spot", kind = "plunge", phase = "rough", cutter_dia_mm = "{{process.eighth_cutter_dia_mm}}", flutes = 3, feed_per_tooth_mm = "{{process.eighth_plunge_chip_mm}}", stations_mm = 165.1 },
+  { name = "pocket plunges", kind = "plunge", phase = "rough", cutter_dia_mm = "{{process.eighth_cutter_dia_mm}}", flutes = 3, feed_per_tooth_mm = "{{process.eighth_plunge_chip_mm}}", stations_mm = "{{cad.pocket_beam_x_mm}}" },
+  { name = "hub tap spot", kind = "plunge", phase = "rough", cutter_dia_mm = "{{process.eighth_cutter_dia_mm}}", flutes = 3, feed_per_tooth_mm = "{{process.eighth_plunge_chip_mm}}", stations_mm = "{{cad.hub_beam_x_mm}}" },
   { name = "notch plunge", kind = "plunge", phase = "rough", cutter_dia_mm = "{{process.eighth_cutter_dia_mm}}", flutes = 3, feed_per_tooth_mm = "{{process.eighth_plunge_chip_mm}}", stations_mm = 295.72 },
 ]
 
@@ -433,11 +412,11 @@ speed_kind = "spindle"
 tool = "em-eighth"
 drilling = "none"
 sizing = "other"
-instruction = "Same file, T2: after each plunge the pocket's centre line, then its walls round it (conventional), levels ≤ {{process.eighth_step_mm:in.3dot}}. Last, T2 plunges the hub tap's spot {{process.hub_spot_depth_mm:in.3dot}} into the counterbore floor. The pockets' far walls are checked after the file (Setup 3's inspection)."
+instruction = "Same file, T2: after each plunge the pocket's centre line, then its walls round it (conventional), levels ≤ {{process.eighth_step_mm:in.3dot}}: the ring cuts the full cutter width on the long legs. Last, T2 plunges the hub tap's spot {{process.hub_spot_depth_mm:in.3dot}} into the counterbore floor."
 settings = "endmill-carbide-3fl-1-8-6061"
 milling_cuts = [
   { name = "pocket centre lines", kind = "slot", phase = "rough", cutter_dia_mm = "{{process.eighth_cutter_dia_mm}}", flutes = 3, axial_doc_mm = "{{process.eighth_step_mm}}", radial_woc_mm = "{{process.eighth_cutter_dia_mm}}", stations_mm = [32.5755, 43.6245, 115.1255, 126.1745, 204.0255, 215.0745, 286.5755, 297.6245] },
-  { name = "pocket walls", kind = "side", phase = "finish", cutter_dia_mm = "{{process.eighth_cutter_dia_mm}}", flutes = 3, axial_doc_mm = "{{process.eighth_step_mm}}", radial_woc_mm = 1.5875, stations_mm = [32.5755, 43.6245, 115.1255, 126.1745, 204.0255, 215.0745, 286.5755, 297.6245] },
+  { name = "pocket walls", kind = "slot", phase = "finish", cutter_dia_mm = "{{process.eighth_cutter_dia_mm}}", flutes = 3, axial_doc_mm = "{{process.eighth_step_mm}}", radial_woc_mm = "{{process.eighth_cutter_dia_mm}}", stations_mm = [32.5755, 43.6245, 115.1255, 126.1745, 204.0255, 215.0745, 286.5755, 297.6245] },
 ]
 
 [[setups.operations]]
@@ -445,11 +424,11 @@ speed_kind = "spindle"
 tool = "spot"
 drilling = "none"
 sizing = "other"
-instruction = "Same file, M6 T3 (#2 centre drill; set 2800): spot the four 4-40 holes Ø{{process.spot_dia_mm:in.3dot}} on the pocket floors, at Y −1.650."
+instruction = "Same file, M6 T3 (#2 centre drill; set 2800): spot the {{cad.pocket_count:d}} clamp holes ({{cad.clamp_thread}}) Ø{{process.spot_dia_mm:in.3dot}} on the pocket floors, at Y −{{cad.clamp_tap_y_mm:in.3f}}."
 rpm = 2800
 feed = "{{process.spot_feed_per_min_mm:in.1f}} in/min"
 milling_cuts = [
-  { name = "clamp spots", kind = "drill", phase = "rough", cutter_dia_mm = "{{process.spot_dia_mm}}", flutes = 2, rpm = 2800, feed_mm_min = "{{process.spot_feed_per_min_mm}}", stations_mm = [38.1, 120.65, 209.55, 292.1] },
+  { name = "clamp spots", kind = "drill", phase = "rough", cutter_dia_mm = "{{process.spot_dia_mm}}", flutes = 2, rpm = 2800, feed_mm_min = "{{process.spot_feed_per_min_mm}}", stations_mm = "{{cad.pocket_beam_x_mm}}" },
 ]
 
 [[setups.operations]]
@@ -457,13 +436,13 @@ speed_kind = "spindle"
 tool = "drill-43"
 drilling = "twist_drill"
 sizing = { kind = "tap_drill", tap = "tap-4-40" }
-instruction = "Same file, M6 T4 (#43 drill; set 2800): the four clamp holes through the plate, full-retract pecks every {{process.peck_43_mm:in.3dot}}. Cutting oil."
+instruction = "Same file, M6 T4 (#43 drill; set 2800): the {{cad.pocket_count:d}} clamp holes through the plate, full-retract pecks every {{process.peck_43_mm:in.3dot}}. Cutting oil."
 rpm = 2800
 feed = "{{process.drill_43_feed_per_min_mm:in.1f}} in/min"
 hole_depth_mm = "{{process.clamp_hole_depth_mm}}"
 peck = { step_mm = "{{process.peck_43_mm}}", retract = "full" }
 milling_cuts = [
-  { name = "clamp holes", kind = "drill", phase = "finish", cutter_dia_mm = 2.2606, flutes = 2, rpm = 2800, feed_mm_min = "{{process.drill_43_feed_per_min_mm}}", stations_mm = [38.1, 120.65, 209.55, 292.1] },
+  { name = "clamp holes", kind = "drill", phase = "finish", cutter_dia_mm = 2.2606, flutes = 2, rpm = 2800, feed_mm_min = "{{process.drill_43_feed_per_min_mm}}", stations_mm = "{{cad.pocket_beam_x_mm}}" },
 ]
 
 [[setups.operations]]
@@ -477,7 +456,7 @@ feed = "{{process.drill_7_feed_per_min_mm:in.1f}} in/min"
 hole_depth_mm = "{{process.hub_hole_depth_mm}}"
 peck = "none"
 milling_cuts = [
-  { name = "hub hole", kind = "drill", phase = "finish", cutter_dia_mm = 5.1054, flutes = 2, rpm = 2800, feed_mm_min = "{{process.drill_7_feed_per_min_mm}}", stations_mm = 165.1 },
+  { name = "hub hole", kind = "drill", phase = "finish", cutter_dia_mm = 5.1054, flutes = 2, rpm = 2800, feed_mm_min = "{{process.drill_7_feed_per_min_mm}}", stations_mm = "{{cad.hub_beam_x_mm}}" },
 ]
 
 # The holes are tapped in this clamping (their XY are the drills'), one file
@@ -485,10 +464,27 @@ milling_cuts = [
 # program assumes its length.
 [[setups.operations]]
 speed_kind = "other"
+tool = "dead-centre"
+drilling = "none"
+sizing = "other"
+instruction = "Stop check before SP03_tap_clamp_1: the dead centre's reach (tip to collet face) plus each tap's (point to the T-handle wrench's centre hole), calipers or rule, at most {{process.tap_stack_max_mm:in.2f}} in. Over: stop; do not tap on this setup."
+instruction_detailed = "Stop check before SP03_tap_clamp_1: the dead centre's reach (tip to collet face) plus each tap's (point to the T-handle wrench's centre hole), calipers or rule, at most {{process.tap_stack_max_mm:in.2f}} in: the mill's 17 in opening less the vise, the parallels, the plate up to the pocket floors, the collet, and 1 in to bring the point down onto the wrench. Over: stop; do not tap on this setup."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
 tool = "tap-4-40"
 drilling = "none"
 sizing = "other"
-instruction = "Before SP03_tap_clamp_1, stop check: measure the dead centre from its tip to the collet's face, and each tap in the T-handle wrench from its point to the wrench's centre hole (calipers or rule). The centre's reach plus each tap's must be at most {{process.tap_stack_max_mm:in.2f}} in (the mill's 17 in opening less the vise, the parallels, the plate up to the pocket floors, the collet, and 1 in to bring the point down onto the wrench). Over: stop; do not tap on this setup. Then load and run SP03_tap_clamp_1, _2, _3, _4, one file per hole. Each: M6 T6 (the dead centre in its collet, spindle stays off), Z to the top, over its hole, end. The 4-40 tap in the T-handle wrench in the hole, tap fluid; jog Z down until the dead centre's point sits in the wrench's centre hole, light pressure only: the point guides, it does not push. Turn the wrench, backing off to clear chips, jogging Z down to keep the point seated, until the tap is through. Back the tap out; jog Z up clear of the wrench before loading the next file."
+instruction = "Load and run SP03_tap_clamp_1, then _2, _3, _4, one file per hole: each loads T6 (M6; the dead centre in its collet, spindle stays off), goes to Z top over its hole and ends. 4-40 tap in the T-handle wrench in the hole, tap fluid; jog Z down until the dead centre's point sits in the wrench's centre hole, light pressure only: the point guides, it does not push."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "tap-4-40"
+drilling = "none"
+sizing = "other"
+instruction = "Turn the wrench, backing off to clear chips, jogging Z down to keep the point seated, until the tap is through. Back the tap out; jog Z up clear of the wrench before loading the next file."
 feed = "hand"
 
 [[setups.operations]]
@@ -497,6 +493,21 @@ tool = "tap-1-4-20"
 drilling = "none"
 sizing = "other"
 instruction = "Load and run SP03_tap_hub: the same, the 1/4-20 tap in the hub hole from the counterbore floor. Jog Z up clear of the wrench at the end."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Before unclamping: pick up X0 and Y0 again on the cut stop and fence faces (edge finder): the drawing dimensions the walls and hub from them."
+instruction_detailed = "Before unclamping. Spindle off: dead centre out, the edge finder in the collet; MDI M3, set 900 rpm by hand. Finder on the cut fence face from the front: G10 L20 P1 Y-2.540; on the cut stop face from the right: G10 L20 P1 X2.540 (its .100 radius). The drawing dimensions the walls and hub from these faces."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "The pockets' far walls (edge finder), against this setup's Inspection."
+instruction_detailed = "Send G20 so the DRO reads inches. The finder into each pocket and onto its far wall (the one farthest from the fence): DRO Y less the finder's .100 radius is the wall. Band: this setup's Inspection."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Before unclamping: the counterbore's centre (DTI), against this setup's Inspection; then G21."
+instruction_detailed = "M5, spindle stopped: edge finder out, DTI in. Sweep it round the counterbore, turning the spindle by hand, and jog until it reads even: DRO X and Y are its centre. Band: this setup's Inspection. Send G21."
 feed = "hand"
 
 [[setups]]
@@ -508,8 +519,8 @@ diagram = { file = "diagrams/inspect.svg", alt = "The finished plate: fence alon
 envelope = "other"
 vise_hold = "other"
 beam = "other"
-inspection = ["Overall thickness {{process.plate_thickness_min_mm:in.3dot}}–{{process.plate_thickness_max_mm:in.3dot}} (micrometer) over the fence at both ends. Threads: a 4-40 and a 1/4-20 screw run in by hand through each tapped hole."]
-gauge_checks = [{ gauge = "micrometers", band_mm = ["{{process.plate_thickness_min_mm}}", "{{process.plate_thickness_max_mm}}"] }]
+inspection = ["Overall thickness {{cad.thickness_min_in:.3dot}}–{{cad.thickness_max_in:.3dot}} (micrometer) over the fence at both ends. Threads: a {{cad.clamp_thread}} and a {{cad.hub_thread}} screw run in by hand through each tapped hole."]
+gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.thickness_band_mm}}" }]
 
 [[setups.operations]]
 speed_kind = "other"
