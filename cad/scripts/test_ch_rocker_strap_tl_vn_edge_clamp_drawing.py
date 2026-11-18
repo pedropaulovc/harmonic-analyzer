@@ -469,12 +469,25 @@ def test_no_reference_line_is_welded_at_both_ends() -> None:
 OUTLINE_PAD = 0.00559
 # r3's 4:1 isometric outline, 74.2 x 78.6 mm, less its pads, per unit scale.
 ISO_MODEL = ((0.0742 - 2 * OUTLINE_PAD) / 4.0, (0.0786 - 2 * OUTLINE_PAD) / 4.0)
-# A reference's value over its letter (r3's audit and render; the lock
-# knob's 4:1 Ø.625): ~10.2 mm tall, (.140) ~11.2 mm and (Ø.112) ~17.3 mm wide.
-TEXT_H = 0.0102
-TEXT_W = {"SupplierThreadDiameter": 0.0173}
-TEXT_W_DEFAULT = 0.0112
-WITNESS_OVERSHOOT = 0.002
+# Native reference ink, sheet metres, from farm r3's layout audit (1:1, all
+# shelved) and r7's failure (4:1). Value over letter, Century Gothic 3.5 mm:
+# (.150) 12.5 mm wide, D MIN 13.6 mm, (Ø.112) ~16 mm.
+TEXT_W = {"SupplierD": 0.0136, "SupplierThreadDiameter": 0.0165}
+TEXT_W_DEFAULT = 0.0125
+TEXT_H = 0.0095  # value's caps 3.5 mm over the letter's baseline 5.55 mm below
+# A horizontal reference's position is its value's baseline: caps 3.8 mm
+# above it, the letter's baseline 5.55 mm below, line and arrows inked to
+# 6.55 mm below (r7: SupplierF at y .0976393 inked down to .091085).
+VALUE_ABOVE = 0.0038
+LETTER_BELOW = 0.00555
+INK_BELOW = 0.006554
+# A vertical reference's line stands on its position; witnesses overshoot it
+# 1.0 mm; arrows outside a short span run the line 6.35 mm past each witness;
+# a shelf starts 2.2 mm past the outermost line (r3: A, D, the 4-40 chord).
+WITNESS_OVERSHOOT = 0.001
+ARROW_RUN = 0.00635
+SHELF_GAP = 0.0022
+ARROW_HALF = 0.000381
 TITLE_BLOCK = (0.216, 0.4191, 0.0127, 0.066)
 SHEET = (0.0127, 0.4191, 0.0127, 0.2667)
 
@@ -565,9 +578,10 @@ def _layout():
     return outer, scales, views, caption_y
 
 
-def _reference_texts(views, scales) -> dict[str, tuple[Box, Box]]:
-    """Each reference's text box and its outer view's name, as the shared
-    lane plan, this sheet's lane moves and the builder's shelving place it."""
+def _reference_ink(views, scales) -> dict[str, tuple[Box, Box, str]]:
+    """Each reference's (text box, whole ink box, view) as the shared lane
+    plan and the builder's shelving place it. A short span's arrows are taken
+    as outside (its line run past both witnesses)."""
     from _drawing_annotation_extent import CLEAR_GAP_M
 
     plan = supplier_screw_lane_plan(
@@ -576,7 +590,7 @@ def _reference_texts(views, scales) -> dict[str, tuple[Box, Box]]:
         sides=spec.SUPPLIER_REFERENCE_SIDES,
     )
     extents = _model_extent()
-    texts = {}
+    ink = {}
     for name, (side, offset) in plan.items():
         view = f"*{spec.SUPPLIER_REFERENCE_PLANES.get(name, 'Front')}"
         box = views[view]
@@ -589,31 +603,55 @@ def _reference_texts(views, scales) -> dict[str, tuple[Box, Box]]:
             for x, y in (p0, p1)
         ]
         width = TEXT_W.get(name, TEXT_W_DEFAULT)
-        _, dy = drawing.LANE_MOVES.get(name, (0.0, 0.0))
         if side in ("left", "right"):
             lane = box[0] - offset if side == "left" else box[1] + offset
             lo, hi = sorted(y for _, y in ends)
+            mid = (lo + hi) / 2
+            text_y = (mid - TEXT_H / 2, mid + TEXT_H / 2)
+            line = (
+                lane - ARROW_HALF,
+                lane + ARROW_HALF,
+                lo - ARROW_RUN,
+                hi + ARROW_RUN,
+            )
             if TEXT_H + 2 * CLEAR_GAP_M < hi - lo:
                 text = (lane - width / 2, lane + width / 2)
-                text_y = ((lo + hi - TEXT_H) / 2, (lo + hi + TEXT_H) / 2)
             else:  # shelved outward past its witnesses' ends
-                reach = WITNESS_OVERSHOOT + CLEAR_GAP_M
+                reach = WITNESS_OVERSHOOT + SHELF_GAP
                 text = (
                     (lane - reach - width, lane - reach)
                     if side == "left"
                     else (lane + reach, lane + reach + width)
                 )
-                text_y = ((lo + hi - TEXT_H) / 2, (lo + hi + TEXT_H) / 2)
         else:
-            lane = (box[2] - offset if side == "bottom" else box[3] + offset) + dy
+            lane = box[2] - offset if side == "bottom" else box[3] + offset
             lo, hi = sorted(x for x, _ in ends)
+            line = (lo - ARROW_RUN, hi + ARROW_RUN, lane - INK_BELOW, lane)
             if width + 2 * CLEAR_GAP_M < hi - lo:
                 text = ((lo + hi - width) / 2, (lo + hi + width) / 2)
-            else:  # a centred span shelves right of its right witness
-                text = (hi + CLEAR_GAP_M, hi + CLEAR_GAP_M + width)
-            text_y = (lane, lane + TEXT_H)  # value and letter above the line
-        texts[name] = ((text[0], text[1], text_y[0], text_y[1]), view)
-    return texts
+            else:  # a centred span shelves right of its line's end
+                start = hi + ARROW_RUN + SHELF_GAP
+                text = (start, start + width)
+            text_y = (lane - LETTER_BELOW, lane + VALUE_ABOVE)
+        text_box = (text[0], text[1], text_y[0], text_y[1])
+        whole = (
+            min(text_box[0], line[0]),
+            max(text_box[1], line[1]),
+            min(text_box[2], line[2]),
+            max(text_box[3], line[3]),
+        )
+        ink[name] = (text_box, whole, view)
+    return ink
+
+
+def test_the_ink_model_reproduces_r7s_fall_out_of_front() -> None:
+    """r7 (run 20261118T001932117Z) dropped F 8 mm: its annotation stood at
+    y .0976393 and its ink reached .091085, 2.9 mm under FRONT's .094 cell."""
+    assert 0.0976393 - INK_BELOW == pytest.approx(0.091085, abs=1e-6)
+    outer, scales, views, _ = _layout()
+    assert outer["*Front"][1] == pytest.approx(0.094)
+    _, (_, _, bottom, _), _ = _reference_ink(views, scales)["SupplierF"]
+    assert bottom >= outer["*Front"][1] + 0.001
 
 
 def test_orthographic_views_fit_at_four_to_one_with_the_isometric_no_larger() -> None:
@@ -627,15 +665,23 @@ def test_orthographic_views_fit_at_four_to_one_with_the_isometric_no_larger() ->
 def test_margins_reserve_only_the_annotated_sides() -> None:
     margins = drawing.supplier_margins()
     assert set(margins) == {"*Front", "*Top"}
+    side = 0.006 + drawing.TEXT_BESIDE_M
     left, bottom, right, top = margins["*Front"]
-    assert top == 0.0 and left == right == pytest.approx(0.024)
-    assert bottom == pytest.approx(0.006 + drawing.F_DROP_M + drawing.LINE_BELOW_M)
+    assert left == right == pytest.approx(side)
+    assert bottom == pytest.approx(0.006 + drawing.INK_BELOW_M)
+    assert top == drawing.ARROW_OVERSHOOT_M
     left, bottom, right, top = margins["*Top"]
-    assert bottom == 0.0 and left == right == pytest.approx(0.024)
+    assert left == right == pytest.approx(side)
+    assert bottom == drawing.ARROW_OVERSHOOT_M
     assert top == pytest.approx(0.006 + drawing.TEXT_ABOVE_M)
-    # F's two text lines stand above its line, between it and FRONT's outline.
-    assert 0.006 + drawing.F_DROP_M - TEXT_H >= 0.003
-    assert TEXT_H < drawing.TEXT_ABOVE_M
+    # The measured ink each allowance covers.
+    assert INK_BELOW < drawing.INK_BELOW_M
+    assert VALUE_ABOVE < drawing.TEXT_ABOVE_M
+    shelf = WITNESS_OVERSHOOT + SHELF_GAP + max(TEXT_W.values())
+    assert shelf < drawing.TEXT_BESIDE_M
+    assert ARROW_RUN + 0.056 * 4 / 1000 - OUTLINE_PAD < drawing.ARROW_OVERSHOOT_M
+    # F's value stands clear under FRONT's outline (r7 dropped it 8 mm more).
+    assert 0.006 - VALUE_ABOVE >= 0.002
 
 
 def test_no_two_blocks_or_views_overlap_and_all_stand_on_the_sheet() -> None:
@@ -651,14 +697,20 @@ def test_no_two_blocks_or_views_overlap_and_all_stand_on_the_sheet() -> None:
     )
 
     outer, scales, views, _ = _layout()
-    texts = _reference_texts(views, scales)
-    boxes: dict[str, Box] = {f"view {n}": b for n, b in views.items()}
-    for name, (box, view) in texts.items():
-        boxes[name] = box
+    ink = _reference_ink(views, scales)
+    # Each view's geometry, its outline less the pad, grown by the audit's
+    # 2 mm of air: no text on geometry or within 2 mm of it.
+    air = OUTLINE_PAD - 0.002
+    boxes: dict[str, Box] = {
+        f"view {n}": (b[0] + air, b[1] - air, b[2] + air, b[3] - air)
+        for n, b in views.items()
+    }
+    for name, (text, whole, view) in ink.items():
+        boxes[name] = text
         cell = outer[view]
         # The builder's settled guard: reference ink inside its outer cell.
-        assert cell[0] <= box[0] and box[1] <= cell[2], name
-        assert cell[1] <= box[2] and box[3] <= cell[3], name
+        assert cell[0] <= whole[0] and whole[1] <= cell[2], name
+        assert cell[1] <= whole[2] and whole[3] <= cell[3], name
     sheet_scale = scales["*Front"]
     for name, cell in outer.items():
         caption = name[1:].upper()
@@ -692,8 +744,7 @@ def test_the_thread_callout_and_the_short_references_read_at_scale() -> None:
     k = scales["*Top"][0] / scales["*Top"][1]
     assert spec.SCREW_MAJOR_DIA * k >= 11.0  # mm of dimension line
     assert spec.D_REFERENCE * k >= 7.5
-    texts = _reference_texts(views, scales)
-    thread, _ = texts["SupplierThreadDiameter"]
+    thread, _, _ = _reference_ink(views, scales)["SupplierThreadDiameter"]
     assert thread[2] >= views["*Top"][3]  # above TOP, clear of the shank
 
 

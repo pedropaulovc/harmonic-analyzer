@@ -24,13 +24,10 @@ text takes, and only on the sides that carry one.
 from __future__ import annotations
 
 import argparse
-import math
 import sys
 from typing import Any
 
 import _telemetry
-from _com import _early_bound
-from _drawing_common import rebuild_drawing
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
 from _machinist_review_mode import MachinistReviewMode
@@ -52,22 +49,25 @@ from ch_rocker_strap_tl_vn_edge_clamp_spec import (
 MACHINIST_REVIEW = MachinistReviewMode.LEARN
 SPEC = DRAWINGS_BY_NAME["ch_rocker_strap_tl_vn_edge_clamp"]
 
-# A horizontal reference prints its value and letter as two lines (~10.2 mm)
-# above its dimension line. On FRONT's bottom lane, 6 mm under the outline's
-# 5.6 mm pad, F's text would stand ~1.6 mm under the heel; dropping the whole
-# dimension 8 mm leaves ~4 mm of paper between its text and the outline.
-F_DROP_M = 0.008
-# name -> (dx, dy) sheet metres, applied to the whole dimension before the
-# purchased builder shelves struck text (the pivot screw's lane moves).
-LANE_MOVES = {"SupplierF": (0.0, -F_DROP_M)}
-# Pre-fit room past each lane, sheet metres. A vertical reference's text is
-# ~11.2 mm wide: centred on its lane, or (D, a 7.6 mm span at 4:1) shelved
-# past its witnesses' ends, ~14 mm out. A top lane's two text lines stand
-# above its line; a bottom lane's sit between its line and the view, so only
-# the line, arrows and witness overshoot pass it.
-TEXT_BESIDE_M = 0.018
-TEXT_ABOVE_M = 0.012
-LINE_BELOW_M = 0.002
+# Pre-fit room past each lane, sheet metres, from the native ink of farm r3
+# (1:1, every text shelved) and r7 (4:1). The shared plan sets each lane's
+# annotation position 6 mm past the view outline. A vertical reference's line
+# stands on that position and its text is 12.5-13.6 mm wide: centred on the
+# line, or (D, a 7.6 mm span at 4:1) shelved 3.2 mm past it, ~17 mm out. A
+# horizontal reference's position is its value's baseline: the value's caps
+# stand 3.8 mm above it, the letter's baseline 5.6 mm below, and the line and
+# arrows ink 6.55 mm below (r7: F at y .097639 inked to .091085). r7 also
+# dropped F a further 8 mm, which put that ink 2.9 mm under FRONT's cell;
+# undropped, F's value stands 2.2 mm under the outline, 7.8 mm under the heel.
+TEXT_BESIDE_M = 0.022
+TEXT_ABOVE_M = 0.006
+INK_BELOW_M = 0.008
+# A span too short for its text and arrows draws them outside, the dimension
+# line running 6.35 mm past each witness (r3). A ends on the knife and D
+# .002 in past the top, so their lines can pass the outlines' 5.59 mm pads by
+# ~0.8 and ~1.0 mm at 4:1: each view with a side lane keeps room past both
+# ends of it.
+ARROW_OVERSHOOT_M = 0.0015
 _SIDE_INDEX = {"left": 0, "bottom": 1, "right": 2, "top": 3}
 
 
@@ -79,43 +79,25 @@ def supplier_margins() -> dict[str, tuple[float, float, float, float]]:
         planes=SUPPLIER_REFERENCE_PLANES,
         sides=SUPPLIER_REFERENCE_SIDES,
     )
+    room_past = {
+        "left": TEXT_BESIDE_M,
+        "right": TEXT_BESIDE_M,
+        "top": TEXT_ABOVE_M,
+        "bottom": INK_BELOW_M,
+    }
     margins: dict[str, list[float]] = {}
     for name, (side, offset) in plan.items():
         view = f"*{SUPPLIER_REFERENCE_PLANES.get(name, 'Front')}"
         room = margins.setdefault(view, [0.0] * 4)
-        _, drop = LANE_MOVES.get(name, (0.0, 0.0))
+        index = _SIDE_INDEX[side]
+        room[index] = max(room[index], offset + room_past[side])
         if side in ("left", "right"):
-            need = offset + TEXT_BESIDE_M
-        elif side == "top":
-            need = offset + TEXT_ABOVE_M
-        else:
-            need = offset - drop + LINE_BELOW_M
-        room[_SIDE_INDEX[side]] = max(room[_SIDE_INDEX[side]], need)
+            for end in ("bottom", "top"):
+                index = _SIDE_INDEX[end]
+                room[index] = max(room[index], ARROW_OVERSHOOT_M)
     return {
         view: (room[0], room[1], room[2], room[3]) for view, room in margins.items()
     }
-
-
-def _move_lanes(adapter: Any, displays: dict[str, Any]) -> None:
-    """Move each whole dimension (line and text) by its sheet offset."""
-    targets = {}
-    for name, (dx, dy) in LANE_MOVES.items():
-        display = _early_bound(displays[name], "IDisplayDimension")
-        # A model annotation may inherit offset mode; move the line, not text alone.
-        display.OffsetText = False
-        annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
-        x, y, _z = (float(value) for value in annotation.GetPosition())
-        targets[name] = (annotation, (x + dx, y + dy))
-        if not annotation.SetPosition2(*targets[name][1], 0.0):
-            raise RuntimeError(f"26000: failed to move {name} to its lane")
-    rebuild_drawing(adapter, label="26000 supplier lanes")
-    for name, (annotation, target) in targets.items():
-        moved = tuple(float(value) for value in annotation.GetPosition())[:2]
-        if not all(
-            math.isclose(a, b, rel_tol=0.0, abs_tol=5e-4)
-            for a, b in zip(moved, target, strict=True)
-        ):
-            raise RuntimeError(f"26000: {name} lane read back at {moved!r}")
 
 
 def build(adapter: Any) -> dict[str, str]:
@@ -128,7 +110,7 @@ def build(adapter: Any) -> dict[str, str]:
         callback_count += 1
         if callback_count != 1:
             raise RuntimeError("supplier dimensions callback must run exactly once")
-        displays = annotate_supplier_screw(
+        annotate_supplier_screw(
             adapter,
             views_by_orientation,
             dimensions=SUPPLIER_REFERENCE_DIMENSIONS,
@@ -138,7 +120,6 @@ def build(adapter: Any) -> dict[str, str]:
             sides=SUPPLIER_REFERENCE_SIDES,
             settled_checks=supplier_checks,
         )
-        _move_lanes(adapter, displays)
 
     def assert_supplier_dimensions_settled():
         nonlocal settled
