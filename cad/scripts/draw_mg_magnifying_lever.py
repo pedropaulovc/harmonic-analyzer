@@ -4,8 +4,8 @@ The sheet prints decimal inch; the as-bought rod's diameter is its REF stock
 fraction. The independent model detail imports its dimensions before its
 circular crop, as on MHA-MG-04. Native diameters/lengths/limits remain
 associative. The model retains UNC-2A metadata; drawing instances defer the
-default class to the title. Only the free end domes; its native SR model
-dimension sizes it.
+default class to the title. Only the free end domes; its native model
+dimension prints as the spherical reference (SR.125).
 """
 
 from __future__ import annotations
@@ -64,9 +64,9 @@ DETAIL_RADIUS_MM = 12.5
 DETAIL_KEEP = {"ThreadLength": (0.323, 0.209), "IncompleteLength": (0.381, 0.165)}
 # R24: end the diameter witnesses left of the unchanged finish symbol/leader;
 # keep the qualifier above the screw-seat note. The free-end (SR.125) position
-# is its text centre; native ink (runs 20261117T122606274Z/123356866Z) bends
-# the radial leader 3 mm off the text's near end and runs its shelf 1 mm past
-# the far end. Its text stands right of that bend, above the rod and short of
+# is its text centre; native ink (run 20261118T063541700Z) bends the radial
+# leader 3.5 mm off the text's near end and runs its shelf 2 mm past the far
+# end. Its text stands right of that bend, above the rod and short of
 # the Ø dimension line, so the bend stays up-left of the sphere centre and the
 # arrow lands on the dome while nothing reaches the left border.
 FRONT_KEEP = {"OverallLength": (0.115, 0.088), "RodDia": (0.055, 0.166), "DomeR": (0.0416, 0.130)}

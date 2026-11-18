@@ -607,18 +607,17 @@ def _assert_finish_ink_routes(annotations, finish, seat_note_xy, project, front)
         label="parent A", kind="note", owner="front",
         text_boxes=(Box(0.203362, 0.1324876, 0.2065895, 0.1358896),), exact=True,
     )
-    # The free-end (SR.125), from its native ink (runs 20261117T122606274Z and
-    # 20261117T123356866Z, text left of the dome): 3.44 mm glyphs, 13.9 mm for
-    # "SR.125"; the shelf sits 2.6 mm under the text centre, the radial leader
-    # bends 3 mm off the text's near end and the shelf runs 1 mm past its far
-    # end; the leader runs from the bend toward the sphere centre and its
-    # arrow stops on the dome. Text left of the dome put the shelf on the
-    # border (first run) or left room only for .XX (second run); the
-    # reference's text stands right of its bend instead.
+    # The free-end (SR.125), from its native ink (run
+    # 20261118T063541700Z, text right of its bend): 16.3 mm for "(SR.125)"
+    # (the parentheses ink narrower than digits); the shelf sits 2.6 mm under
+    # the text centre, the radial leader bends 3.5 mm off the text's near end
+    # and the shelf runs 2 mm past its far end; the leader runs from the bend
+    # toward the sphere centre and its arrow stops on the dome. Text left of
+    # the dome (runs 20261117T122606274Z, 20261117T123356866Z) put the shelf
+    # on the border or left room only for .XX.
     sx, sy, _z = annotations["DomeR"].GetPosition()
-    # Parentheses counted as full glyphs: an upper bound on the width.
-    width, half_height = 0.0139 * len("(SR.125)") / len("SR.125"), 0.00172
-    shelf_y, bend_x, shelf_right = sy - 0.0026, sx - width / 2.0 - 0.003, sx + width / 2.0 + 0.001
+    width, half_height = 0.0163, 0.00172
+    shelf_y, bend_x, shelf_right = sy - 0.0026, sx - width / 2.0 - 0.0035, sx + width / 2.0 + 0.002
     sphere_x, sphere_y = project(None, front, (diameter / 2.0, 0.0, 0.0))
     reach = math.hypot(bend_x - sphere_x, shelf_y - sphere_y)
     arrow = (

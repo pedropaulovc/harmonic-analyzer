@@ -148,12 +148,12 @@ def test_configured_family_members_and_prior_current_aliases(stem, number, neutr
 
 def test_shared_vendor_groups_name_the_registry_supplier_sku():
     # #2709: a SKU change in the part registry must reach the current map.
-    # A configured kit (sh-vn-clamping-kit-hardware) is no part row.
+    # The oblique jig's clamping kit is the one group with no part row.
     payload = json.loads(IDENTITY_MAP.read_text(encoding="utf-8"))
     parts = _config.parts()
-    groups = [group for group in payload["shared_vendor_groups"] if group["stem"] in parts]
-    assert groups
-    for group in groups:
+    for group in payload["shared_vendor_groups"]:
+        if group["stem"] == "sh-vn-clamping-kit-hardware":
+            continue
         skus = [str(sku) for sku in parts[group["stem"]]["supplier_skus"]]
         assert group["supplier_sku"] in skus, group["stem"]
 

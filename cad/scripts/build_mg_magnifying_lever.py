@@ -190,11 +190,13 @@ def build(adapter) -> dict[str, str]:
     # The tangent hemisphere follows from the stock diameter, so its radius
     # prints as a spherical reference, (SR.125), not a toleranced size.
     set_dimension_prefix(adapter, "RodProfile", "DomeR", "(SR")
-    dome_display, _ = _named_dimension(adapter, "RodProfile", "DomeR")
+    dome_display, dome_dimension = _named_dimension(adapter, "RodProfile", "DomeR")
     dome_display = _early_bound(dome_display, "IDisplayDimension")
     dome_display.SetText(2, ")")  # swDimensionTextSuffix; void, read back
-    if str(dome_display.GetText(2) or "") != ")":
-        raise RuntimeError("DomeR@RodProfile: reference suffix did not persist")
+    dome_tolerance = _early_bound(dome_dimension.Tolerance, "IDimensionTolerance")
+    dome_tolerance.Type = 0  # swTolType_e.swTolNONE; property put, read back
+    if str(dome_display.GetText(2) or "") != ")" or int(dome_tolerance.Type) != 0:
+        raise RuntimeError("DomeR@RodProfile: reference suffix or no-tolerance did not persist")
     # The hidden native distance owns the footer ceiling without changing the
     # nominal profile. The joint separately charges the ordinary angle band.
     _, chamfer_dimension = _named_dimension(adapter, "RodProfile", "TipChamfer")
