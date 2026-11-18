@@ -39,7 +39,7 @@ def test_mirrors_agree_with_the_strap_plan_and_the_rocker_arm(plan: dict) -> Non
     assert spec.TAPE == plan["tape_thickness_mm"]
     assert spec.CLAMP_TORQUE_FT_LB == plan["clamp_torque_ft_lb"]
     assert plan["parallel_height_mm"] == pytest.approx(1.0 * INCH)
-    assert "ON 1 IN PARALLELS" in spec.ASSEMBLY_STEPS.replace("\n", " ")
+    assert "ON 1.00 IN PARALLELS" in spec.ASSEMBLY_STEPS.replace("\n", " ")
     assert spec.STRAP_THICKNESS == pytest.approx(arm.ARM_THICKNESS)
 
 
@@ -128,6 +128,10 @@ def test_steps_number_on_from_sheet_one_and_each_check_has_its_remedy() -> None:
         assert re.search(rf"(?<!\d){number + 1}\. IF STEP {number} FAILS", text), number
     assert spec.TAPE_NAME in text and "MHA-CH-13 TRAVELER" in text
     assert "STRAP TRAVELER" not in text
+    # Machine-neutral words only (rule 26): no controller codes, no maker's
+    # private face names.
+    for private in ("G54", "KNIFE", "HEEL", "FT-LB"):
+        assert private not in text, private
 
 
 def test_every_step_prints_in_at_most_six_lines() -> None:

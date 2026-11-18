@@ -285,7 +285,7 @@ EXPLODED_LABELS: dict[str, str] = {
     PLATE: f"ITEM {BOM_ITEMS[PLATE]}, FENCE AT THE BACK",
     PLUG: f"ITEM {BOM_ITEMS[PLUG]}, PILOT UP",
     WASHER: f"ITEM {BOM_ITEMS[WASHER]}",
-    CLAMP: f"ITEM {BOM_ITEMS[CLAMP]} (4 PLACES), KNIFE TOWARD THE FENCE",
+    CLAMP: f"ITEM {BOM_ITEMS[CLAMP]}, 4X, CLAMPING EDGE TOWARD THE FENCE",
     SCREW: f"ITEM {BOM_ITEMS[SCREW]}",
 }
 # Each leader's tip, seated assembly mm, on a face the view shows: item 1's

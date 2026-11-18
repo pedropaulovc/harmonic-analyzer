@@ -104,6 +104,8 @@ if plate.COUNTERBORE_FLOOR_Z + plug.OVERALL_LENGTH <= TAPE:
 CLAMP_TORQUE_FT_LB = 0.5
 if CLAMP_TORQUE_FT_LB >= clamp.MAX_TORQUE_FT_LB:
     raise AssertionError("the clamp torque reaches the maker's maximum")
+# Printed in in-lb, the unit a torque screwdriver for a #4-40 reads.
+CLAMP_TORQUE_IN_LB = CLAMP_TORQUE_FT_LB * 12.0
 # The fence is indicated parallel to the table's X travel with a test
 # indicator in the spindle (rule 22: a setting finer than .XXX names its
 # indicator), over the fence face between its notches.
@@ -151,7 +153,7 @@ SCREW_TABLE_ROWS: tuple[tuple[str, ...], ...] = (
         "CLAMP SCREW",
         str(QUANTITIES[CLAMP]),
         clamp.SCREW_THREAD.upper(),
-        f"{CLAMP_TORQUE_FT_LB:g} FT-LB",
+        f"{CLAMP_TORQUE_IN_LB:g} IN-LB",
     ),
     (
         BOM_ITEMS[SCREW],
@@ -174,7 +176,7 @@ SCREW_TABLE_ROWS: tuple[tuple[str, ...], ...] = (
 _P, _G, _W, _C, _S = (BOM_ITEMS[s] for s in BOM_ORDER)
 _READING = f"{FENCE_READING_IN:.3f}".removeprefix("0")
 _STEPS: tuple[str, ...] = (
-    f"SET ITEM {_P} ON 1 IN PARALLELS UNDER ITS LONG EDGES IN THE 6 IN VISE, "
+    f"SET ITEM {_P} ON 1.00 IN PARALLELS UNDER ITS LONG EDGES IN THE 6 IN VISE, "
     "CENTRED, THE FENCE TOWARD THE FIXED JAW.",
     f"TIGHTEN THE VISE ON ITEM {_P}'S LONG EDGES.",
     "SWEEP THE FENCE FACE ALONG X BETWEEN THE FENCE NOTCHES WITH A TEST "
@@ -185,10 +187,10 @@ _CHECK_STEP = len(_STEPS)
 _STEPS += (
     f"IF STEP {_CHECK_STEP} FAILS, LOOSEN THE VISE, TAP ITEM {_P} ROUND AND "
     "REPEAT FROM STEP 2.",
-    "SET THE WORK ZERO (G54): X0 ON THE END-STOP FACE, Y0 ON THE FENCE FACE, "
-    "Z0 ON THE PLATE TOP.",
-    f"SET EACH ITEM {_C} IN ITS POCKET, KNIFE TOWARD THE FENCE, HEEL ON THE "
-    "POCKET WALL FARTHEST FROM THE FENCE.",
+    "SET THE WORK ZERO: X0 ON THE END-STOP FACE, Y0 ON THE FENCE FACE, Z0 ON "
+    "THE PLATE TOP.",
+    f"SET EACH ITEM {_C} IN ITS POCKET, CLAMPING EDGE TOWARD THE FENCE, BACK "
+    "FACE ON THE POCKET WALL FARTHEST FROM THE FENCE.",
     f"RUN EACH ITEM {_C} SCREW IN FINGER TIGHT.",
 )
 ASSEMBLY_STEPS = "\n".join(
@@ -197,7 +199,7 @@ ASSEMBLY_STEPS = "\n".join(
 
 _CLAMPED: tuple[str, ...] = (
     "SEAT THE BLANK ON THE PLATE TOP AGAINST THE FENCE AND THE END STOP.",
-    f"TIGHTEN EVERY ITEM {_C} SCREW TO {CLAMP_TORQUE_FT_LB:g} FT-LB (SCREW SCHEDULE).",
+    f"TIGHTEN EVERY ITEM {_C} SCREW TO {CLAMP_TORQUE_IN_LB:g} IN-LB (SCREW SCHEDULE).",
     "CHECK: THE BLANK DOES NOT MOVE BY HAND.",
 )
 _FIRST = len(_STEPS) + 1
