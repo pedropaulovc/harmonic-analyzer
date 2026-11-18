@@ -50,7 +50,10 @@ file in the plan directory is an input to the traveler task.
 Parts are enrolled by the CNC migration. The rocker strap (`ch_rocker_strap`,
 MHA-CH-13) is the first: faced and bored in edge clamps on a shop-made
 sub-plate, then bonded to it on tape and screwed down at the hub for the
-outline. The oblique trammel jig's eight parts,
+outline. The magnifying clamp (`mg_magnifying_clamp`, MHA-MG-02) stands
+upright on parallels in the vise for both ends and lies corner up between them
+for its cross bore; its holes are tapped by hand on a dead centre in the
+spindle, one Idle-ending NC file per hole. The oblique trammel jig's eight parts,
 enrolled before it was deleted (owner ruling 2026-11-17, #2885), left their
 plans, diagrams and the base bar's CAM recipe at
 `ebd3bf3b44:cad/process/ch_rocker_arm_tl_oblique_*/` and
