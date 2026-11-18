@@ -26,6 +26,7 @@ from typing import Any, Callable
 
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     dimension_name,
     place_view,
     remove_notes_matching,
@@ -55,6 +56,7 @@ from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
 from _feature_requirements import part_metadata, requirement
 from _gtol_cylinder import CylinderFace
+from _layout_audit import TEXT_ROW_LIMIT
 from _gtol_planar import PlanarFace
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
@@ -116,6 +118,9 @@ SECTION_A_CAPTION_XY = (0.112, 0.058)
 SECTION_B_CAPTION_XY = (0.317, 0.084)
 ISO_CENTER = (0.365, 0.232)
 ISO_NOTE_XY = (0.335, 0.196)
+# Note 1, the pocket's seat, by its upper-left corner: right of A-A's
+# caption, under the view and left of the title block.
+POCKET_SEAT_NOTE_XY = (0.142, 0.054)
 
 
 def top_xy(x_mm: float, y_mm: float) -> tuple[float, float]:
@@ -142,7 +147,7 @@ _FENCE_TOP_A = section_a_xy(0.0, spec.FENCE_HEIGHT)[1]
 _FENCE_TOP_B = section_b_xy(0.0, spec.FENCE_HEIGHT)[1]
 # Top view: X sizes from X0 in rows at least 8 mm apart, above (the left end
 # 12 mm over the back edge, the notch's end 20 mm, clear of the left end's
-# outside arrow at X0, beside the hub tap's callout; over the callout the
+# outside arrow at X0, beside the hub hole's callout; over its four rows the
 # notch start and the overall length) and below (clamp 1's text right of its
 # span, which is narrower than it; under the cutting lines' letters). Y sizes
 # from Y0 to the left in five lanes, a span inner to every span holding one
@@ -156,15 +161,15 @@ _FENCE_TOP_B = section_b_xy(0.0, spec.FENCE_HEIGHT)[1]
 # hub's and the tap's levels, the arrow ran through its '6'); the overall
 # width outermost, its text low in its span, under clamp 1's. The pocket length
 # over pocket 1, right of its span, midway between the hub's Y extension
-# line and the fence face; the radii and the counterbore's Ø right of the
-# plate, each leader running out level from its feature.
+# line and the fence face; the radii right of the plate, each leader running
+# out level from its feature.
 TOP_KEEP: dict[str, tuple[float, float]] = {
     "LeftEnd": (_LEFT_X - 0.007, _BACK_Y + 0.012),
     "NotchLeftEnd": (top_xy(spec.NOTCH_LEFT_END / 2.0, 0.0)[0], _BACK_Y + 0.020),
-    "NotchRightStart": (top_xy(spec.NOTCH_RIGHT_START / 2.0, 0.0)[0], _BACK_Y + 0.030),
+    "NotchRightStart": (top_xy(spec.NOTCH_RIGHT_START / 2.0, 0.0)[0], _BACK_Y + 0.0355),
     "PlateLength": (
         top_xy(spec.LEFT_END_X + spec.PLATE_LENGTH / 2.0, 0.0)[0],
-        _BACK_Y + 0.038,
+        _BACK_Y + 0.0435,
     ),
     "ClampTapX1": (top_xy(_STATIONS[0], 0.0)[0] + 0.008, _FRONT_Y - 0.013),
     "ClampTapX2": (top_xy(_STATIONS[1] / 2.0, 0.0)[0], _FRONT_Y - 0.021),
@@ -181,14 +186,13 @@ TOP_KEEP: dict[str, tuple[float, float]] = {
         top_xy(0.0, spec.HUB_Y / 2.0)[1],
     ),
     "NotchCornerR": (_RIGHT_X + 0.022, top_xy(0.0, spec.NOTCH_DEPTH / 2.0)[1]),
-    "HubCboreDia": (_RIGHT_X + 0.024, top_xy(0.0, spec.HUB_Y)[1] + 0.0015),
     "PocketCornerR": (
         _RIGHT_X + 0.022,
         top_xy(0.0, spec.POCKET_BACK_WALL_Y)[1] - 0.0012,
     ),
 }
 # Section A-A: the pocket walls from Y0 in two rows over the cut, the back
-# wall's (with its seat's words under its value) 14 mm over the near wall's;
+# wall's (its flag to note 1 under its value) 14 mm over the near wall's;
 # the pocket depth 4 mm right of the plate's front face, its two rows beside
 # its line over the top's level, clear of the title block (farm run r15) and
 # off both its extension lines (farm run 20261118T001932117Z: centred on its
@@ -212,31 +216,24 @@ SECTION_A_KEEP: dict[str, tuple[float, float]] = {
         section_a_xy(0.0, (spec.FENCE_HEIGHT + spec.UNDERSIDE_Z) / 2.0)[1],
     ),
 }
-# Section B-B: the counterbore depth's two rows over the fence's top,
-# beside its line in the counterbore's mouth, 2 mm off its back wall, clear
-# of the tap's thread, running right inside the border; the fence height's
-# two rows above those, beside its line right of the fence face, the line
-# passing left of the depth's text (farm run r15: the depth's line ran up
-# through the fence height's text, and the depth's text off the right
-# border, from the front wall).
+# Section B-B: the fence height's two rows over the fence's top, beside its
+# line right of the fence face, over the counterbore's mouth (the hub hole's
+# sizes are its callout's: drawing-guidelines, "a depth is never deferred to
+# a view").
 SECTION_B_KEEP: dict[str, tuple[float, float]] = {
-    "HubCboreDepth": (
-        section_b_xy(spec.CBORE_SECTION_WALL_Y - 2.0, 0.0)[0],
-        _FENCE_TOP_B + 0.0095,
-    ),
-    "FenceHeight": (section_b_xy(-18.0, 0.0)[0], _FENCE_TOP_B + 0.0255),
+    "FenceHeight": (section_b_xy(-18.0, 0.0)[0], _FENCE_TOP_B + 0.0066),
 }
-# Both taps' callouts on the top view. The clamp set's on clamp 4's drill,
-# its text below right of the plate. The hub's on its drill, its text left
-# of B-B's cutting line's end (clear of its arrow and letter) and right of
-# the notch's extension line, under the notch start's row: its leader rises
-# across the back edge, the hub's shortest way out, right of B-B's line,
-# which runs through the hub's axis (farm run 20261118T001932117Z: led off
-# section B-B, it ran 20 mm over the part).
+# Both holes' callouts on the top view. The clamp taps' on clamp 4's drill,
+# its text below right of the plate. The hub hole's on its counterbore's rim,
+# its text left of B-B's cutting line's end (clear of its arrow and letter)
+# and right of the notch's extension line, under the notch start's row: its
+# leader rises across the back edge, the hub's shortest way out, right of
+# B-B's line, which runs through the hub's axis (farm run
+# 20261118T001932117Z: led off section B-B, it ran 20 mm over the part).
 CLAMP_TAP_CENTRE_MM = (_STATIONS[-1], spec.CLAMP_SCREW_Y)
 CLAMP_TAP_CALLOUT_XY = (0.254, 0.165)
 HUB_TAP_CENTRE_MM = (spec.HUB_X, spec.HUB_Y)
-HUB_TAP_CALLOUT_XY = (0.1323, 0.2273)
+HUB_TAP_CALLOUT_XY = (0.1323, 0.2301)
 # A drill circle's centre and radius read back from the view (mm).
 _RIM_CENTRE_TOLERANCE_MM = 0.02
 _RIM_RADIUS_TOLERANCE_MM = 0.01
@@ -254,13 +251,15 @@ if sorted(name for keep in _KEEPS for name in keep) != sorted(sheet_dimension_na
 # Native Hole Wizard THRU tap rows (draw_ch_fulcrum_keeper's layout: the
 # thread in part 5, the drill in part 7) kept in their order: the thread
 # without its class (the title block states 2B), then the drill's Ø and
-# DRILL. The clamp set's count opens the callout as one nX (rule 10); the hub
-# tap's engagement is its last row (rule 20: the worst case as a plain fact).
+# DRILL. The clamp set's count opens the callout as one nX (rule 10).
 DRILL_PROCESS = "DRILL"
 _DRILL_TOKENS = ("<hw-tapdrldia>", "<hw-thrutapdrldia>")
 _NATIVE_COUNT = re.compile(r"<NUM_INST>\s*X\s*")
 _THREAD_CLASS = re.compile(r"\s*(?:-\s*)?<hw-threadclass>\s*", re.IGNORECASE)
 TAP_PRECISION_PLACES = 3
+_THRU_TOKEN = "<hw-thru>"
+_CBORE_TOKEN = re.compile(r"<hw-cb[a-z]*>", re.IGNORECASE)
+_HW_VARIABLE = re.compile(r"<(hw-[a-z]+)>", re.IGNORECASE)
 
 
 def tap_callout_definitions(
@@ -313,8 +312,66 @@ def clamp_tap_definitions(definitions: dict[int, str]) -> dict[int, str]:
     return tap_callout_definitions(definitions, count=spec.CLAMP_TAP_COUNT)
 
 
-def hub_tap_definitions(definitions: dict[int, str]) -> dict[int, str]:
-    return tap_callout_definitions(definitions, last_row=spec.HUB_ENGAGEMENT_STATEMENT)
+def hub_hole_definitions(definitions: dict[int, str]) -> dict[int, str]:
+    """The native counterbore callout's parts (5..8) in the shop's form
+    (draw_ch_fulcrum_keeper.foot_hole_callout_definitions): its through row
+    (part 7, printed first) the drill's Ø, DRILL and the native extent, then
+    the thread on the same extent (spec.HUB_THREAD_ROW: the drill is the
+    1/4-20's, its thread cosmetic); the counterbore row (part 5, Ø and depth
+    as native variables) closing with the plug it locates; the thread's
+    stated shortfall below (part 8, rule 20). Four rows, the audit's limit."""
+    if set(definitions) != {5, 6, 7, 8}:
+        raise RuntimeError(f"unexpected hub hole callout parts: {definitions!r}")
+    joined = "\n".join(definitions.values())
+    if DRILL_PROCESS in joined or spec.HUB_THREAD_ROW in joined:
+        raise RuntimeError(
+            f"hub hole callout already carries its rows: {definitions!r}"
+        )
+    thru = [part for part, text in definitions.items() if _THRU_TOKEN in text]
+    cbore = [part for part, text in definitions.items() if _CBORE_TOKEN.search(text)]
+    if (
+        len(thru) != 1
+        or thru[0] == 8
+        or definitions[thru[0]].count(_THRU_TOKEN) != 1
+        or len(cbore) != 1
+        or cbore[0] in (thru[0], 8)
+    ):
+        raise RuntimeError(f"unexpected hub hole callout layout: {definitions!r}")
+    below = definitions[8].rstrip()
+    updated = {
+        **definitions,
+        thru[0]: definitions[thru[0]].replace(
+            _THRU_TOKEN,
+            f"{DRILL_PROCESS} {_THRU_TOKEN}\n{spec.HUB_THREAD_ROW} {_THRU_TOKEN}",
+        ),
+        cbore[0]: f"{definitions[cbore[0]].rstrip()} {spec.HUB_CBORE_MATE}",
+        8: (
+            f"{below}\n{spec.HUB_ENGAGEMENT_STATEMENT}"
+            if below
+            else spec.HUB_ENGAGEMENT_STATEMENT
+        ),
+    }
+    rows = [
+        row for text in updated.values() for row in text.splitlines() if row.strip()
+    ]
+    if len(rows) > TEXT_ROW_LIMIT:
+        raise RuntimeError(f"hub hole callout prints {len(rows)} rows: {updated!r}")
+    return updated
+
+
+def hub_hole_precision(definitions: dict[int, str]) -> dict[str, int]:
+    """Each native length variable the hub hole's callout prints (the drill's
+    and the counterbore's Ø, its depth), at three places: .201's drill band,
+    the Ø.500 the first half of TL-02's slip fit, the .185 the depth that
+    clears the tools through the strap's hub hole (spec)."""
+    names = {
+        match.group(1)
+        for text in definitions.values()
+        for match in _HW_VARIABLE.finditer(text)
+    } - {_THRU_TOKEN.strip("<>")}
+    if not names:
+        raise RuntimeError(f"hub hole callout prints no sizes: {definitions!r}")
+    return {name: spec.HUB_CALLOUT_PLACES for name in sorted(names)}
 
 
 # --- Feature requirements (out/features/ch_rocker_strap_tl_sub_plate) ------------------
@@ -322,6 +379,7 @@ _SELF = "draw_ch_rocker_strap_tl_sub_plate"
 _TOP = (_SELF, "TOP_KEEP")
 _SEC_A = (_SELF, "SECTION_A_KEEP")
 _SEC_B = (_SELF, "SECTION_B_KEEP")
+_HUB_CALLOUT = (_SELF, "HUB_TAP_CALLOUT_XY")
 _BAND = (spec.POCKET_BACK_WALL_TOL, -spec.POCKET_BACK_WALL_TOL)
 _HUB_BAND = (spec.HUB_LOCATION_TOL, -spec.HUB_LOCATION_TOL)
 
@@ -571,12 +629,12 @@ requirement(
             ("HUB_Y", "HUB_LOCATION_TOL", _TOP),
         ),
         "dia": (
-            limits(spec.HUB_CBORE_DIA, _P["HubCboreDia"], unit=UNIT),
-            ("HUB_CBORE_DIA", _TOP),
+            limits(spec.HUB_CBORE_DIA, spec.HUB_CALLOUT_PLACES, unit=UNIT),
+            ("HUB_CBORE_DIA", "HUB_HOLE_SPEC", "HUB_CALLOUT_PLACES", _HUB_CALLOUT),
         ),
         "depth": (
-            limits(spec.HUB_CBORE_DEPTH, _P["HubCboreDepth"], unit=UNIT),
-            ("HUB_CBORE_DEPTH", _SEC_B),
+            limits(spec.HUB_CBORE_DEPTH, spec.HUB_CALLOUT_PLACES, unit=UNIT),
+            ("HUB_CBORE_DEPTH", "HUB_HOLE_SPEC", "HUB_CALLOUT_PLACES", _HUB_CALLOUT),
         ),
         "floor_z": (spec.COUNTERBORE_FLOOR_Z, ("COUNTERBORE_FLOOR_Z",)),
         "locates": (spec.PLUG_NUMBER, ("PLUG_NUMBER",)),
@@ -584,8 +642,8 @@ requirement(
     precision={
         "x": _P["HubX"],
         "y": _P["HubY"],
-        "dia": _P["HubCboreDia"],
-        "depth": _P["HubCboreDepth"],
+        "dia": spec.HUB_CALLOUT_PLACES,
+        "depth": spec.HUB_CALLOUT_PLACES,
     },
 )
 requirement(
@@ -601,7 +659,7 @@ requirement(
         "axis": ((0.0, 0.0, 1.0), ("__frame__",)),
         "thread": (spec.HUB_TAP_THREAD, ("HUB_TAP_THREAD",)),
         "drill_dia": (spec.HUB_TAP_DRILL, ("HUB_TAP_DRILL",)),
-        "thru": (True, ("HUB_TAP_SPEC",)),
+        "thru": (True, ("HUB_HOLE_SPEC", "HUB_THREAD_LABEL")),
         "engagement_nominal": (spec.HUB_THREAD_LENGTH, ("HUB_THREAD_LENGTH",)),
         "engagement_min": (
             spec.HUB_THREAD_LENGTH_MIN,
@@ -769,7 +827,7 @@ def _section(
 def _drill_rim(
     view: Any, centre_mm: tuple[float, float], diameter_mm: float, *, label: str
 ) -> Any:
-    """A tap's drill circle in the top view, found among the view's visible
+    """A hole's rim circle in the top view, found among the view's visible
     circles by centre and radius (draw_pd_platen's ``_front_hole_rims``: at
     1:2 a coordinate pick can take the concentric thread or counterbore)."""
     found = []
@@ -809,40 +867,90 @@ def _rewrite_callout_definitions(
     return "\n".join(str(native.GetText(key) or "") for key in (1, 2, 3, 4))
 
 
-def _tap_callout(
+def _callout_definitions(display: Any) -> dict[int, str]:
+    native = _early_bound(display, "IDisplayDimension")
+    return {key: str(native.GetText(key) or "") for key in (5, 6, 7, 8)}
+
+
+def _hole_callout(
     adapter: Any,
     top: Any,
     centre_mm: tuple[float, float],
-    drill_mm: float,
+    rim_dia_mm: float,
     callout_xy: tuple[float, float],
     rewrite: Callable[[dict[int, str]], dict[int, str]],
     *,
     label: str,
-) -> str:
-    """The native tap callout on its drill circle in the top view, picked on
-    the rim's side toward ``callout_xy``, rewritten."""
+) -> tuple[Any, str]:
+    """The native hole callout on its rim circle (Ø ``rim_dia_mm``) in the
+    top view, picked on the rim's side toward ``callout_xy``, rewritten; the
+    display and its resolved text."""
     centre = top_xy(*centre_mm)
     angle = math.atan2(callout_xy[1] - centre[1], callout_xy[0] - centre[0])
-    rim = drill_mm / 2.0 * _T
+    rim = rim_dia_mm / 2.0 * _T
     display = add_native_hole_callout(
         adapter,
         top,
         edge_xy=(centre[0] + rim * math.cos(angle), centre[1] + rim * math.sin(angle)),
-        edge=_drill_rim(top, centre_mm, drill_mm, label=label),
+        edge=_drill_rim(top, centre_mm, rim_dia_mm, label=label),
         callout_xy=callout_xy,
         label=label,
     )
-    resolved = _rewrite_callout_definitions(display, rewrite)
+    return display, _rewrite_callout_definitions(display, rewrite)
+
+
+def _clamp_tap_callout(adapter: Any, top: Any) -> str:
+    """The clamp taps' callout on clamp 4's drill: its count first, the drill
+    at three places."""
+    label = "clamp taps"
+    display, resolved = _hole_callout(
+        adapter,
+        top,
+        CLAMP_TAP_CENTRE_MM,
+        spec.CLAMP_TAP_DRILL,
+        CLAMP_TAP_CALLOUT_XY,
+        clamp_tap_definitions,
+        label=label,
+    )
     if (
         resolved.count(DRILL_PROCESS) != 1
         or "2B" in resolved
         or "<NUM_INST>" in resolved
+        or not resolved.lstrip().startswith(f"{spec.CLAMP_TAP_COUNT} ")
     ):
         raise RuntimeError(f"{label} callout text did not resolve: {resolved!r}")
-    native = _early_bound(display, "IDisplayDimension")
-    definition = "\n".join(str(native.GetText(part) or "") for part in (5, 6, 7, 8))
+    definition = "\n".join(_callout_definitions(display).values())
     names = [token.strip("<>") for token in _DRILL_TOKENS if token in definition]
     set_hole_callout_precision(display, {names[0]: TAP_PRECISION_PLACES}, label=label)
+    return resolved
+
+
+def _hub_hole_callout(adapter: Any, top: Any) -> str:
+    """The hub hole's callout on its counterbore's rim: drill, thread,
+    counterbore and depth, the shortfall (hub_hole_definitions), each size a
+    native variable at three places (hub_hole_precision)."""
+    label = "hub hole"
+    display, resolved = _hole_callout(
+        adapter,
+        top,
+        HUB_TAP_CENTRE_MM,
+        spec.HUB_CBORE_DIA,
+        HUB_TAP_CALLOUT_XY,
+        hub_hole_definitions,
+        label=label,
+    )
+    if resolved.count(DRILL_PROCESS) != 1 or any(
+        row not in resolved
+        for row in (
+            spec.HUB_THREAD_ROW,
+            spec.HUB_CBORE_MATE,
+            spec.HUB_ENGAGEMENT_STATEMENT,
+        )
+    ):
+        raise RuntimeError(f"{label} callout text did not resolve: {resolved!r}")
+    set_hole_callout_precision(
+        display, hub_hole_precision(_callout_definitions(display)), label=label
+    )
     return resolved
 
 
@@ -924,37 +1032,20 @@ def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, annotations, spec.DIMENSION_CALLOUTS)
 
     adapter.currentModel.GraphicsRedraw2()
-    clamp = _tap_callout(
-        adapter,
-        top,
-        CLAMP_TAP_CENTRE_MM,
-        spec.CLAMP_TAP_DRILL,
-        CLAMP_TAP_CALLOUT_XY,
-        clamp_tap_definitions,
-        label="clamp taps",
-    )
-    if not clamp.lstrip().startswith(f"{spec.CLAMP_TAP_COUNT} "):
-        raise RuntimeError(f"clamp tap callout does not open with its count: {clamp!r}")
-    hub = _tap_callout(
-        adapter,
-        top,
-        HUB_TAP_CENTRE_MM,
-        spec.HUB_TAP_DRILL,
-        HUB_TAP_CALLOUT_XY,
-        hub_tap_definitions,
-        label="hub tap",
-    )
-    if spec.HUB_ENGAGEMENT_STATEMENT not in hub:
-        raise RuntimeError(f"hub tap callout lost its engagement row: {hub!r}")
+    _clamp_tap_callout(adapter, top)
+    _hub_hole_callout(adapter, top)
     for view in (top, section_a, section_b):
         set_hidden_lines_removed(adapter, view)
 
     drawing.ClearSelection2(True)
     _early_bound(drawing, "IDrawingDoc").EditSheet()
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
-    # Each tap is stated once, on its native callout: SolidWorks' automatic
-    # "Tapped Hole" labels on the cosmetic threads go, and the final sweep
-    # fails on any that appear later (draw_dt_cone_tip_gear_tl_cutter_bar).
+    if add_note(adapter, spec.POCKET_SEAT_NOTE, *POCKET_SEAT_NOTE_XY) is None:
+        raise RuntimeError("failed to create the pocket seat note")
+    # Each thread is stated once, on its native callout: the "Tapped Hole"
+    # labels on the cosmetic threads (SolidWorks' on the clamp taps, the hub
+    # thread's own spec.HUB_THREAD_LABEL) go, and the final sweep fails on
+    # any that appear later (draw_dt_cone_tip_gear_tl_cutter_bar).
     import_cosmetic_threads(adapter, iso)
     removed_tap_labels = remove_notes_matching(adapter, "Tapped Hole")
     _telemetry.info(f"removed {removed_tap_labels} automatic tapped-hole label(s)")

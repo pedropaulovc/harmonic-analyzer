@@ -19,16 +19,17 @@ model dimension located from X0, Y0 or Z0:
   the right one open at the right end; their three back corners R MAX.
 * ``PocketProfile`` / ``ClampPockets`` / ``PocketCorners``: the four clamp
   pockets cut PocketDepth down from Z0, their corners R MAX.
-* ``HubCboreProfile`` / ``HubCbore``: the hub counterbore down from Z0.
+* ``HubHole``: one native Hole Wizard counterbore down from Z0 (Ø.500 x
+  .185 over the 1/4-20's #7 drill THRU), placed by HubX and HubY;
+  ``HubThread``: the 1/4-20 cosmetic thread on its drill, THRU.
 * ``ClampTaps``: one native #4-40 THRU wizard feature, four instances on the
-  pocket floors; ``HubTap``: the native 1/4-20 THRU from the counterbore
-  floor.
+  pocket floors.
 * ``SectionAPlane`` / ``SectionAReference`` and ``SectionBPlane`` /
   ``SectionBReference``: hidden construction-only sketches in the two
   sections' cutting planes (Right-parallel, across the plate), owning every
-  size the sections print (PocketNearWallY, PocketBackWallY, PocketDepth;
-  FenceWidth, PlateWidth, FenceHeight, PlateThickness, HubCboreDepth), each
-  driven by the same global as the feature size it states.
+  size the sections print (PocketNearWallY, PocketBackWallY, PocketDepth,
+  PlateThickness; FenceHeight), each driven by the same global as the
+  feature size it states.
 
 Run (SolidWorks already open)::
 
@@ -55,6 +56,7 @@ from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_prefix import set_dimension_prefix
 from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _feature_tree import _feature_by_name, name_last_feature
+from _hole_spec import THREAD_MAJOR_MM
 from _holes import SharedCoordinate, wizard_holes
 from _part_checks import bbox_extent_check, report_mass_properties, volume_check
 from _part_properties import part_drawing_unit
@@ -71,7 +73,6 @@ from _sketch import (
     ensure_fully_defined,
     set_sketch_direct_db,
 )
-from _sketch_circle import define_circle
 from _visibility import blank_reference_geometry
 
 PART_NAME = "ch-rocker-strap-tl-sub-plate"
@@ -117,8 +118,6 @@ GLOBALS: dict[str, float] = {
     "ClampTapY": -spec.CLAMP_SCREW_Y,
     "HubX": spec.HUB_X,
     "HubY": -spec.HUB_Y,
-    "HubCboreDia": spec.HUB_CBORE_DIA,
-    "HubCboreDepth": spec.HUB_CBORE_DEPTH,
 }
 _RIGHT_OF_X0 = '"PlateLength" - "LeftEnd" + "CutOverrun"'
 _FRONT_OF_Y0 = '"PlateWidth" - "FenceWidth" + "CutOverrun"'
@@ -517,40 +516,66 @@ def _pockets(adapter: Any, drive_jobs: list[tuple[str, str]], volume: float) -> 
 
 
 def _hub(adapter: Any, drive_jobs: list[tuple[str, str]], volume: float) -> float:
-    """The hub counterbore down from Z0, located from X0 and Y0."""
-    from solidworks_mcp.adapters.base import ExtrusionParameters
+    """The hub hole down from Z0, one native Hole Wizard counterbore located
+    from X0 and Y0 (HubX, HubY), its Ø.500 x .185 counterbore over the tap's
+    #7 drill through (spec.HUB_HOLE_SPEC), then the 1/4-20 cosmetic thread on
+    the drill (HubThread). Its callout prints drill, counterbore and depth
+    together (draw_ch_fulcrum_keeper's foot hole)."""
+    from solidworks_mcp.adapters.base import AddThreadParameters
 
-    dims = SketchDims()
-    check("create_sketch hub counterbore", adapter.create_sketch("Front"))
-    define_circle(
+    hub = wizard_holes(
         adapter,
-        spec.HUB_X,
-        spec.HUB_Y,
-        spec.HUB_CBORE_DIA / 2.0,
-        "hub counterbore",
-        dims=dims,
-        names=("HubX", "HubY", "HubCboreDia"),
-        drives=('"HubX"', '"HubY"', '"HubCboreDia"'),
+        spec.HUB_HOLE_SPEC,
+        [[spec.HUB_X, spec.HUB_Y, spec.PLATE_TOP_Z]],
+        (0.0, 0.0, 1.0),
+        "hub hole (Ø.500 counterbore over #7 thru)",
+        name="HubHole",
+        expect_dia_mm=spec.HUB_TAP_DRILL,
+        placement_dims=[(("HubX", '"HubX"'), ("HubY", '"HubY"'))],
     )
-    ensure_fully_defined(adapter, "hub counterbore sketch")
-    check("exit_sketch hub counterbore", adapter.exit_sketch())
-    name_last_feature(adapter, "HubCboreProfile")
-    drive_jobs += dims.apply(adapter, "HubCboreProfile")
+    for label, actual, nominal in (
+        ("counterbore Ø", hub.cbore_dia_mm, spec.HUB_CBORE_DIA),
+        ("counterbore depth", hub.cbore_depth_mm, spec.HUB_CBORE_DEPTH),
+    ):
+        if abs(actual - nominal) > 0.005:
+            raise RuntimeError(f"hub hole {label} {actual:.4f} != {nominal:.4f} mm")
+    drive_jobs += hub.placement_drive_jobs
+    volume -= spec.V_HUB_CBORE + spec.V_HUB_TAP
+    volume = volume_check(adapter, "hub hole", volume, _V_TOL)
+
+    major = THREAD_MAJOR_MM[spec.HUB_TAP_THREAD]
     check(
-        "cut hub counterbore",
-        adapter.create_cut_extrude(ExtrusionParameters(depth=spec.HUB_CBORE_DEPTH)),
+        "hub thread (1/4-20 thru)",
+        adapter.add_thread(
+            AddThreadParameters(
+                edge_point=[
+                    spec.HUB_X + spec.HUB_TAP_DRILL / 2.0,
+                    spec.HUB_Y,
+                    spec.COUNTERBORE_FLOOR_Z,
+                ],
+                standard="ansi_inch",
+                size=spec.HUB_TAP_THREAD,
+                diameter=major,
+                end_type="through",
+                note=spec.HUB_THREAD_LABEL,
+            )
+        ),
     )
-    name_last_feature(adapter, "HubCbore")
-    (depth,) = name_dimensions(adapter, "HubCbore", ["CboreCutDepth"])
-    drive_jobs.append((depth, '"HubCboreDepth"'))
-    volume -= spec.V_HUB_CBORE
-    return volume_check(adapter, "hub counterbore", volume, _V_TOL)
+    name_last_feature(adapter, "HubThread")
+    thread = _early_bound(_feature_by_name(adapter, "HubThread"), "IFeature")
+    definition = _early_bound(thread.GetDefinition(), "ICosmeticThreadFeatureData")
+    # swCosmeticEndConditions_e.swEndConditionThrough = 2.
+    if str(definition.Size) != spec.HUB_TAP_THREAD or int(definition.EndCondition) != 2:
+        raise RuntimeError(
+            "hub thread did not read back as 1/4-20 THRU: "
+            f"{definition.Size!r}, {definition.EndCondition!r}"
+        )
+    return volume_check(adapter, "hub thread (cosmetic)", volume, _V_TOL)
 
 
 def _taps(adapter: Any, drive_jobs: list[tuple[str, str]], volume: float) -> float:
     """The four #4-40 clamp taps through from the pocket floors (one native
-    feature, the stations driven by the same globals as the pockets) and the
-    1/4-20 hub tap through from the counterbore floor."""
+    feature, the stations driven by the same globals as the pockets)."""
     clamp = wizard_holes(
         adapter,
         spec.CLAMP_TAP_SPEC,
@@ -568,20 +593,7 @@ def _taps(adapter: Any, drive_jobs: list[tuple[str, str]], volume: float) -> flo
     )
     drive_jobs += clamp.placement_drive_jobs
     volume -= spec.V_CLAMP_TAPS
-    volume = volume_check(adapter, "clamp taps", volume, _V_TOL)
-
-    hub = wizard_holes(
-        adapter,
-        spec.HUB_TAP_SPEC,
-        [[spec.HUB_X, spec.HUB_Y, spec.COUNTERBORE_FLOOR_Z]],
-        (0.0, 0.0, 1.0),
-        "hub tap (1/4-20 thru)",
-        name="HubTap",
-        placement_dims=[(("HubTapX", '"HubX"'), ("HubTapY", '"HubY"'))],
-    )
-    drive_jobs += hub.placement_drive_jobs
-    volume -= spec.V_HUB_TAP
-    return volume_check(adapter, "hub tap", volume, _V_TOL)
+    return volume_check(adapter, "clamp taps", volume, _V_TOL)
 
 
 def _section_plane(adapter: Any, name: str, x_mm: float) -> None:
@@ -662,7 +674,7 @@ def _section_references(adapter: Any, drive_jobs: list[tuple[str, str]]) -> None
     (or on the origin itself); its length is the other size.
 
     Farm runs r13 and r14 (20261118T012253828Z and its successor): B-B
-    imported FenceHeight and HubCboreDepth but never FenceWidth,
+    imported FenceHeight and the counterbore's depth but never FenceWidth,
     PlateThickness or PlateWidth from chords on the back and front faces,
     anchored off the axes (r13) or on them (r14). So the widths print on the
     top view from PlateProfile, and the thickness runs down the fence face's
@@ -672,8 +684,8 @@ def _section_references(adapter: Any, drive_jobs: list[tuple[str, str]]) -> None
     (PocketNearWallY, PocketBackWallY), the back wall's long PocketDepth; a
     chord on Y0 from the fence's top (its height from the origin) through the
     material to the underside, long PlateThickness. B-B (the hub, on its
-    axis): the fence face up from the origin (FenceHeight); the counterbore's
-    back wall (nearer the fence) from Z0, long HubCboreDepth."""
+    axis): the fence face up from the origin (FenceHeight); the hub hole's
+    sizes are its wizard callout's."""
     _section_plane(adapter, spec.SECTION_A_PLANE, spec.SECTION_A_X)
     dims = SketchDims()
     check(
@@ -734,22 +746,6 @@ def _section_references(adapter: Any, drive_jobs: list[tuple[str, str]]) -> None
     )
     anchor_point_to_origin(adapter, f"{fence}.start", 0.0, 0.0, "fence face")
     _length(adapter, dims, fence, spec.FENCE_HEIGHT, "FenceHeight", '"FenceHeight"')
-    wall = _chord(
-        adapter,
-        y_mm=spec.CBORE_SECTION_WALL_Y,
-        z_from_mm=spec.PLATE_TOP_Z,
-        z_to_mm=spec.COUNTERBORE_FLOOR_Z,
-        label="counterbore wall",
-    )
-    # Where the plane meets the counterbore's wall is the hub's location and
-    # the counterbore's radius, not a printed size: undriven.
-    anchor_point_to_origin(
-        adapter, f"{wall}.start", 0.0, spec.CBORE_SECTION_WALL_Y, "counterbore wall"
-    )
-    dims.record("CboreWallY")
-    _length(
-        adapter, dims, wall, spec.HUB_CBORE_DEPTH, "HubCboreDepth", '"HubCboreDepth"'
-    )
     ensure_fully_defined(adapter, "section B-B reference sketch")
     check("exit_sketch section B-B reference", adapter.exit_sketch())
     name_last_feature(adapter, spec.SECTION_B_REFERENCE)
@@ -845,7 +841,7 @@ def build(adapter: Any) -> dict[str, str]:
     )
     set_dimension_symmetric_tolerance(
         adapter,
-        "HubCboreProfile",
+        "HubHole",
         "HubX",
         spec.HUB_LOCATION_TOL,
         places=spec.DRAWING_PRECISION_BY_NAME["HubX"],
@@ -853,7 +849,7 @@ def build(adapter: Any) -> dict[str, str]:
     )
     set_dimension_symmetric_tolerance(
         adapter,
-        "HubCboreProfile",
+        "HubHole",
         "HubY",
         spec.HUB_LOCATION_TOL,
         places=spec.DRAWING_PRECISION_BY_NAME["HubY"],

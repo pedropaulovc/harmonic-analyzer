@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import inspect
 import math
 import re
 import sys
@@ -25,6 +26,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_types import DrawingLayout
 from _gtol_face import FaceGeometry
 from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM
+from _layout_audit import TEXT_ROW_LIMIT
 from _machinist_review_mode import MachinistReviewMode
 from _printed_tolerance import printed_band_mm
 
@@ -145,6 +147,31 @@ def test_the_counterbore_is_what_the_plug_mirrors() -> None:
     assert plug.COUNTERBORE_DEPTH == spec.HUB_CBORE_DEPTH
 
 
+def test_the_hub_is_one_wizard_counterbore_over_its_tap_drill() -> None:
+    """mr5, mr7: the counterbore's Ø and depth print on its callout with the
+    drill (drawing-guidelines: "a depth is never deferred to a view"), so
+    the hub is one Hole Wizard counterbore whose drill is the 1/4-20's, the
+    thread a cosmetic thread on it, THRU."""
+    hole = spec.HUB_HOLE_SPEC
+    assert hole.kind == "counterbore_socket"
+    assert hole.end == "through_all"
+    assert hole.overrides_mm == {
+        "HoleDiameter": spec.HUB_TAP_DRILL,
+        "CounterBoreDiameter": spec.HUB_CBORE_DIA,
+        "CounterBoreDepth": spec.HUB_CBORE_DEPTH,
+    }
+    assert spec.HUB_THREAD_ROW == "1/4-20 UNC"
+    assert "Tapped Hole" in spec.HUB_THREAD_LABEL
+    source = inspect.getsource(part._hub)
+    assert "spec.HUB_HOLE_SPEC" in source
+    assert 'name="HubHole"' in source
+    assert "adapter.add_thread(" in source
+    assert 'end_type="through"' in source
+    assert "create_cut_extrude" not in source
+    assert "HUB_" not in inspect.getsource(part._taps)
+    assert spec.DRAWING_DIMENSIONS["HubHole"] == {"HubX", "HubY"}
+
+
 def test_the_frame_stacks_from_the_faced_top_to_the_underside() -> None:
     assert spec.PLATE_LENGTH == pytest.approx(13.0 * INCH)
     assert spec.RIGHT_END_X == pytest.approx(spec.LEFT_END_X + spec.PLATE_LENGTH)
@@ -181,8 +208,8 @@ def test_explicit_bands_are_the_only_model_tolerances() -> None:
     bands = model_toleranced_dimensions(part)
     assert bands == {
         ("spec.SECTION_A_REFERENCE", "PocketBackWallY"): "spec.POCKET_BACK_WALL_TOL",
-        ("HubCboreProfile", "HubX"): "spec.HUB_LOCATION_TOL",
-        ("HubCboreProfile", "HubY"): "spec.HUB_LOCATION_TOL",
+        ("HubHole", "HubX"): "spec.HUB_LOCATION_TOL",
+        ("HubHole", "HubY"): "spec.HUB_LOCATION_TOL",
     }
     resolved = {
         (getattr(spec, feature.removeprefix("spec.")), name)
@@ -235,13 +262,12 @@ def test_section_sizes_live_in_hidden_reference_sketches_on_each_cut() -> None:
     assert spec.DRAWING_DIMENSIONS[spec.SECTION_B_REFERENCE] == set(
         drawing.SECTION_B_KEEP
     )
-    for feature in ("Plate", "PlateTop", "ClampPockets", "HubCbore"):
+    for feature in ("Plate", "PlateTop", "ClampPockets", "HubThread"):
         assert feature not in spec.DRAWING_DIMENSIONS, feature
     station = spec.CLAMP_STATIONS[2]
     straight = spec.POCKET_LENGTH / 2.0 - spec.CORNER_RADIUS
     assert THREAD_MAJOR_MM["#4-40"] / 2.0 < spec.SECTION_A_X - station < straight
     assert spec.SECTION_B_X == spec.HUB_X
-    assert spec.CBORE_SECTION_WALL_Y == pytest.approx(-0.75 * INCH)
     # Each cutting line lies on its plane and runs past both long edges (mr5:
     # A-A stopping in the floor read as a part 2.55 wide).
     for start, end in (drawing.SECTION_A_LINE, drawing.SECTION_B_LINE):
@@ -462,6 +488,38 @@ def _circle(centre, radius, count=24):
     ]
 
 
+# The native counterbore callout's parts as SolidWorks writes them
+# (draw_ch_fulcrum_keeper's foot hole), printed through row (7) first, the
+# counterbore row (5), then the rows below (8).
+_NATIVE_CBORE_PARTS = {
+    5: "<HOLE-SPOT><MOD-DIAM><hw-cbdiam> <HOLE-DEPTH><hw-cbdepth>",
+    6: "",
+    7: "<MOD-DIAM><hw-diam> <hw-thru>",
+    8: "",
+}
+_CALLOUT_PRINT_ORDER = (7, 5, 6, 8)
+
+
+def _hub_callout_rows() -> list[str]:
+    """The hub hole's callout as it prints: hub_hole_definitions over the
+    native parts, each variable at its three places, THRU as THRU ALL."""
+    places = spec.HUB_CALLOUT_PLACES
+    values = {
+        "<hw-diam>": spec.inch_text(spec.HUB_TAP_DRILL, places),
+        "<hw-cbdiam>": spec.inch_text(spec.HUB_CBORE_DIA, places),
+        "<hw-cbdepth>": spec.inch_text(spec.HUB_CBORE_DEPTH, places),
+        "<hw-thru>": "THRU ALL",
+    }
+    parts = drawing.hub_hole_definitions(dict(_NATIVE_CBORE_PARTS))
+    rows = []
+    for key in _CALLOUT_PRINT_ORDER:
+        text = parts[key]
+        for token, value in values.items():
+            text = text.replace(token, value)
+        rows += [row for row in _printed(text).split("\n") if row.strip()]
+    return rows
+
+
 class _Sheet:
     """Texts, extension lines, dimension lines and leaders by owner, and the
     lines the views draw."""
@@ -648,12 +706,6 @@ def _sheet() -> _Sheet:
         _top(s.CLAMP_STATIONS[-1] + half, s.POCKET_BACK_WALL_Y),
         top["PocketCornerR"],
     )
-    hub_xy = _top(*hub)
-    sheet.leader(
-        "HubCboreDia",
-        (hub_xy[0] + s.HUB_CBORE_DIA / 4.0, hub_xy[1]),
-        top["HubCboreDia"],
-    )
     sheet.cutting_line("A", drawing.SECTION_A_LINE)
     sheet.cutting_line("B", drawing.SECTION_B_LINE)
     # Sections A-A and B-B across the full width at their planes, (model Y,
@@ -676,7 +728,7 @@ def _sheet() -> _Sheet:
             (back, zu),
         ],
     )
-    cb_wall, cz = s.CBORE_SECTION_WALL_Y, s.COUNTERBORE_FLOOR_Z
+    cb_wall, cz = s.HUB_Y + s.HUB_CBORE_DIA / 2.0, s.COUNTERBORE_FLOOR_Z
     cbore_front = 2.0 * s.HUB_Y - cb_wall
     drill, major = s.HUB_TAP_DRILL / 2.0, THREAD_MAJOR_MM["1/4-20"] / 2.0
     sheet.geometry += _polyline(
@@ -716,13 +768,12 @@ def _sheet() -> _Sheet:
         ("PlateThickness", (0.0, zf), (0.0, zu), "y"),
     ):
         sheet.linear(name, _sec_a, a_keep[name], p1, p2, along)
-    for name, p1, p2, along in (
-        ("FenceHeight", origin, (0.0, zf), "y"),
-        ("HubCboreDepth", (cb_wall, 0.0), (cb_wall, cz), "y"),
-    ):
-        sheet.linear(name, _sec_b, b_keep[name], p1, p2, along)
+    sheet.linear("FenceHeight", _sec_b, b_keep["FenceHeight"], origin, (0.0, zf), "y")
     sheet.caption("caption A", drawing.SECTION_A_CAPTION_XY)
     sheet.caption("caption B", drawing.SECTION_B_CAPTION_XY)
+    # Note 1 by its upper-left corner, one row.
+    x, y = _mm(drawing.POCKET_SEAT_NOTE_XY)
+    sheet.texts["note 1"] = (x, y - _ROW, x + _width(spec.POCKET_SEAT_NOTE), y)
     sheet.callout(
         "clamp taps",
         _top(*drawing.CLAMP_TAP_CENTRE_MM),
@@ -731,11 +782,11 @@ def _sheet() -> _Sheet:
         ["4X 4-40 UNC THRU ALL", "Ø.089 DRILL THRU ALL"],
     )
     sheet.callout(
-        "hub tap",
+        "hub hole",
         _top(*drawing.HUB_TAP_CENTRE_MM),
-        s.HUB_TAP_DRILL,
+        s.HUB_CBORE_DIA,
         drawing.HUB_TAP_CALLOUT_XY,
-        ["Ø.201 DRILL THRU ALL", "1/4-20 UNC THRU ALL", s.HUB_ENGAGEMENT_STATEMENT],
+        _hub_callout_rows(),
     )
     return sheet
 
@@ -914,12 +965,13 @@ def test_each_section_caption_stands_under_its_view() -> None:
 
 def test_counterbore_and_radii_print_their_symbols_on_model_dimensions() -> None:
     """Machinist review mr5: the counterbore's Ø.500 printed without ⌴ and
-    its .185 without ↧, the radii without R and with "max.". Each is the
-    model's own dimension (PR #1388), its symbol a native prefix and the MAX
-    limit word a suffix: "⌴ Ø.500", "↧ .185", "3X R.07 MAX"."""
+    its .185 without ↧, the radii without R and with "max.". The counterbore
+    prints on its wizard callout's native row (⌴Ø.500 ↧.185, mr7: drill,
+    counterbore and depth on one callout); each radius is the model's own
+    dimension (PR #1388), its symbol a native prefix and the MAX limit word
+    a suffix: "3X R.07 MAX"."""
     prefixes = {name: p for (_f, name), p in spec.DIMENSION_PREFIXES.items()}
-    assert _rows("HubCboreDia")[0] == "⌴ Ø.500"
-    assert _rows("HubCboreDepth")[0] == "↧ .185"
+    assert _hub_callout_rows()[2].startswith("⌴Ø.500 ↧.185")
     assert _rows("NotchCornerR")[0] == "3X R.07 MAX"
     assert _rows("PocketCornerR")[0] == "16X R.07 MAX"
     for _feature, name in spec.MAX_RADII:
@@ -934,17 +986,8 @@ def test_each_three_place_section_size_names_the_strap_feature_it_serves() -> No
     REAMER" named no part feature. Each now names the strap (MHA-CH-13) and
     its feature, and its third place is what holds its limit (the spec's
     checks: .XX's band would break it). mr6: one line of six words or fewer
-    besides the drawing number, in rule 3's "CLEARS ..." form; the clamp is
-    named once, its 1.875 location bare (rule 7)."""
-    assert "PocketBackWallY" not in spec.DIMENSION_CALLOUTS
-    assert (
-        sum(spec.CLAMP_NUMBER in words for words in spec.DIMENSION_CALLOUTS.values())
-        == 1
-    )
-    for name, feature in (
-        ("FenceHeight", "TOP FACE"),
-        ("HubCboreDepth", "HUB HOLE"),
-    ):
+    besides the drawing number, in rule 3's "CLEARS ..." form."""
+    for name, feature in (("FenceHeight", "TOP FACE"),):
         words = spec.DIMENSION_CALLOUTS[name]
         assert spec.STRAP_NUMBER in words and feature in words, name
         assert words.startswith("CLEARS ") and "\n" not in words, name
@@ -957,6 +1000,23 @@ def test_each_three_place_section_size_names_the_strap_feature_it_serves() -> No
         + max(spec.PLAN_DRILL_TIP_Z, spec.PLAN_REAM_TIP_Z)
         < spec.PLAN_RELIEF_FLOOR_CLEARANCE
     )
+
+
+def test_the_pocket_s_tight_sizes_flag_one_note_naming_the_clamp() -> None:
+    """Machinist review mr7: the 1.875 ±.002 named no mate; TL-VN-50 stood
+    only on the .140. Rule 4: one feature with several tight dimensions
+    names its mate once, on one numbered note each of them flags (rule 7's
+    SEE NOTE n, draw_ch_channel_lever's PLATE_OFFSET_NOTE); the values stay
+    the model's own dimensions."""
+    flag = f"SEE NOTE {spec.POCKET_SEAT_NOTE_NUMBER}"
+    assert spec.DIMENSION_CALLOUTS["PocketBackWallY"] == flag
+    assert spec.DIMENSION_CALLOUTS["PocketDepth"] == flag
+    assert spec.POCKET_SEAT_NOTE.startswith(f"{spec.POCKET_SEAT_NOTE_NUMBER}. ")
+    words = [*spec.DIMENSION_CALLOUTS.values(), spec.POCKET_SEAT_NOTE]
+    assert sum(spec.CLAMP_NUMBER in text for text in words) == 1
+    assert spec.CLAMP_NUMBER in spec.POCKET_SEAT_NOTE
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "add_note(adapter, spec.POCKET_SEAT_NOTE, *POCKET_SEAT_NOTE_XY)" in source
 
 
 def test_top_view_keeps_four_y_lanes_and_the_sections_carry_the_rest() -> None:
@@ -1011,19 +1071,59 @@ def test_tap_callouts_open_with_the_count_then_thread_then_drill() -> None:
         7: "<MOD-DIAM><hw-thrutapdrldia> DRILL <hw-thru>",
         8: "",
     }
-    hub = drawing.hub_tap_definitions(native)
-    assert hub[5] == "<hw-threaddesc> <hw-thru>"
-    assert hub[7] == "<MOD-DIAM><hw-thrutapdrldia> DRILL <hw-thru>"
-    assert hub[8] == spec.HUB_ENGAGEMENT_STATEMENT
     countless = {**native, 7: "<MOD-DIAM><hw-thrutapdrldia> <hw-thru>"}
     assert drawing.clamp_tap_definitions(countless) == clamp
-    assert "<NUM_INST>" not in "".join(drawing.hub_tap_definitions(countless).values())
     with pytest.raises(RuntimeError):
         drawing.clamp_tap_definitions(clamp)
     with pytest.raises(RuntimeError):
         drawing.tap_callout_definitions({5: "", 6: "", 7: "", 8: ""})
     with pytest.raises(RuntimeError):
         drawing.clamp_tap_definitions({**native, 5: "<NUM_INST>X " + native[5]})
+
+
+def test_the_hub_hole_callout_prints_drill_thread_counterbore_and_shortfall() -> None:
+    """mr7: the counterbore's depth printed alone in B-B. The wizard
+    counterbore's native callout carries the drill, the thread on the same
+    THRU, the counterbore's Ø and depth (native variables, ⌴ and ↧) with the
+    plug it locates (rule 4: TL-02 mirrors both), and the engagement
+    shortfall: four rows, the audit's tall-block limit."""
+    hub = drawing.hub_hole_definitions(dict(_NATIVE_CBORE_PARTS))
+    assert hub == {
+        5: "<HOLE-SPOT><MOD-DIAM><hw-cbdiam> <HOLE-DEPTH><hw-cbdepth> LOCATES TL-02",
+        6: "",
+        7: "<MOD-DIAM><hw-diam> DRILL <hw-thru>\n1/4-20 UNC <hw-thru>",
+        8: spec.HUB_ENGAGEMENT_STATEMENT,
+    }
+    assert _hub_callout_rows() == [
+        "Ø.201 DRILL THRU ALL",
+        "1/4-20 UNC THRU ALL",
+        "⌴Ø.500 ↧.185 LOCATES TL-02",
+        "ENGAGEMENT .21 MIN (.84D)",
+    ]
+    assert len(_hub_callout_rows()) <= TEXT_ROW_LIMIT
+    assert drawing.hub_hole_precision(hub) == {
+        "hw-cbdepth": 3,
+        "hw-cbdiam": 3,
+        "hw-diam": 3,
+    }
+    # The plug mirrors the counterbore's Ø and depth: one mate for both.
+    import ch_rocker_strap_tl_hub_plug_spec as plug
+
+    assert (plug.COUNTERBORE_DIA, plug.COUNTERBORE_DEPTH) == (
+        spec.HUB_CBORE_DIA,
+        spec.HUB_CBORE_DEPTH,
+    )
+    # No separate counterbore dimension prints anywhere.
+    assert not {"HubCboreDia", "HubCboreDepth"} & drawing.sheet_dimension_names()
+    for bad in (
+        hub,
+        {**_NATIVE_CBORE_PARTS, 7: "<MOD-DIAM><hw-diam>"},
+        {**_NATIVE_CBORE_PARTS, 5: "<MOD-DIAM><hw-diam> <hw-thru>"},
+        {5: "", 6: "", 7: ""},
+        {**_NATIVE_CBORE_PARTS, 8: "<NOTE>\n<NOTE>"},
+    ):
+        with pytest.raises(RuntimeError):
+            drawing.hub_hole_definitions(dict(bad))
 
 
 def test_drawing_owns_no_manufacturing_literals() -> None:

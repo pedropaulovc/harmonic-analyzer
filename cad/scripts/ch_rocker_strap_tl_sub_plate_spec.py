@@ -133,8 +133,27 @@ COUNTERBORE_FLOOR_Z = PLATE_TOP_Z - HUB_CBORE_DEPTH
 # Owner ruling 2026-11-17: a 1/4-20 hub screw, its tap through the plate from
 # the counterbore floor.
 HUB_TAP_THREAD = "1/4-20"
-HUB_TAP_SPEC = HoleSpec("tapped", HUB_TAP_THREAD, end="through_all")
 HUB_TAP_DRILL = TAP_DRILL_MM[HUB_TAP_THREAD]  # #7, .201
+# The counterbore and its drill are ONE Hole Wizard counterbore (the fleet's
+# counterbored holes: draw_ch_fulcrum_keeper), whose native callout prints
+# the drill, the counterbore's Ø and its depth together (drawing-guidelines:
+# "a depth is never deferred to a view"; machinist reviews mr5 and mr7). Its
+# drill is the tap's: the thread is a cosmetic thread on it, and the
+# callout's thread row names it (HUB_THREAD_ROW).
+HUB_HOLE_SPEC = HoleSpec(
+    "counterbore_socket",
+    "1/4",
+    overrides_mm={
+        "HoleDiameter": HUB_TAP_DRILL,
+        "CounterBoreDiameter": HUB_CBORE_DIA,
+        "CounterBoreDepth": HUB_CBORE_DEPTH,
+    },
+)
+HUB_THREAD_ROW = f"{HUB_TAP_THREAD} UNC"
+# The cosmetic thread's own label, SolidWorks' form for a wizard tap's
+# thread ("1/4-20 Tapped Hole"), which the drawing's sweep deletes as it does
+# the clamp taps'.
+HUB_THREAD_LABEL = f"{HUB_TAP_THREAD} Tapped Hole"
 
 # --- Strap-plan mirrors (asserted against plan.toml in the plan test) -------------
 PLAN_HUB_X = 152.4
@@ -321,8 +340,9 @@ V_FINISHED = (
 # PlateProfile/Plate the stock blank (faced top down to the underside),
 # PlateTopProfile/PlateTop the Z0 floor milled down round the fence and stop,
 # NotchProfile/FenceNotches and NotchCorners, PocketProfile/ClampPockets and
-# PocketCorners, HubCboreProfile/HubCbore, and the wizard taps ClampTaps and
-# HubTap. The faced top is the reference plane FacedTopPlane, FENCE_HEIGHT
+# PocketCorners, the wizard taps ClampTaps and the wizard counterbore
+# HubHole (its 1/4-20 cosmetic thread HubThread). The faced top is the
+# reference plane FacedTopPlane, FENCE_HEIGHT
 # above the Front Plane (Z0).
 FACED_TOP_PLANE = "FacedTopPlane"
 # A section imports no sketch or extrusion size (farm run 20261117T234245842Z:
@@ -341,8 +361,8 @@ FACED_TOP_PLANE = "FacedTopPlane"
 # depth, and the overall thickness on a chord down the fence face's line.
 # Section B-B cuts the hub on its axis (mr5: .15 off the axis it missed the
 # tapped hole and drew a solid floor under the counterbore), showing the
-# counterbore, its floor and the tap through: the fence height and the
-# counterbore depth. The fence and overall widths print on the top view
+# counterbore, its floor and the tap through: the fence height (the hub's
+# sizes are its callout's). The fence and overall widths print on the top view
 # from the plate's own sketch: farm runs r13 and r14 (20261118T012253828Z
 # and its successor) imported neither them nor the thickness from B-B's
 # chords on the back and front faces, however anchored. Each tap's callout
@@ -361,11 +381,6 @@ if not (
     < POCKET_LENGTH / 2.0 - CORNER_RADIUS
 ):
     raise AssertionError("section A-A cuts pocket 3's tap or a corner radius")
-# Section B-B's counterbore wall: its back wall (nearer the fence) on the
-# plane through the axis, so the depth's dimension line stands in the
-# counterbore's mouth with its text running right, inside the border (farm
-# run r15: off the front wall, its text crossed the right border by 10.7 mm).
-CBORE_SECTION_WALL_Y = HUB_Y + HUB_CBORE_DIA / 2.0
 CLAMP_TAP_X_NAMES: tuple[str, ...] = tuple(
     f"ClampTapX{index}" for index in range(1, len(CLAMP_STATIONS) + 1)
 )
@@ -375,7 +390,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "NotchCorners": {"NotchCornerR"},
     "PocketProfile": {"PocketLength"},
     "PocketCorners": {"PocketCornerR"},
-    "HubCboreProfile": {"HubX", "HubY", "HubCboreDia"},
+    "HubHole": {"HubX", "HubY"},
     "ClampTaps": {*CLAMP_TAP_X_NAMES, "ClampTapY"},
     SECTION_A_REFERENCE: {
         "PocketNearWallY",
@@ -383,7 +398,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "PocketDepth",
         "PlateThickness",
     },
-    SECTION_B_REFERENCE: {"FenceHeight", "HubCboreDepth"},
+    SECTION_B_REFERENCE: {"FenceHeight"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PlateProfile": {"LeftEnd": 1, "PlateLength": 1, "FenceWidth": 2, "PlateWidth": 2},
@@ -391,7 +406,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "NotchCorners": {"NotchCornerR": 2},
     "PocketProfile": {"PocketLength": 2},
     "PocketCorners": {"PocketCornerR": 2},
-    "HubCboreProfile": {"HubX": 3, "HubY": 3, "HubCboreDia": 3},
+    "HubHole": {"HubX": 3, "HubY": 3},
     "ClampTaps": {**{name: 3 for name in CLAMP_TAP_X_NAMES}, "ClampTapY": 3},
     SECTION_A_REFERENCE: {
         "PocketNearWallY": 2,
@@ -399,7 +414,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "PocketDepth": 3,
         "PlateThickness": 2,
     },
-    SECTION_B_REFERENCE: {"FenceHeight": 3, "HubCboreDepth": 3},
+    SECTION_B_REFERENCE: {"FenceHeight": 3},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places for dims in DRAWING_PRECISION.values() for name, places in dims.items()
@@ -428,8 +443,6 @@ DIMENSION_VALUES: dict[str, float] = {
     "PocketCornerR": CORNER_RADIUS,
     "HubX": HUB_X,
     "HubY": -HUB_Y,
-    "HubCboreDia": HUB_CBORE_DIA,
-    "HubCboreDepth": HUB_CBORE_DEPTH,
     **dict(zip(CLAMP_TAP_X_NAMES, CLAMP_STATIONS, strict=True)),
     "ClampTapY": -CLAMP_SCREW_Y,
 }
@@ -440,8 +453,8 @@ if set(DIMENSION_VALUES) != set(DRAWING_PRECISION_BY_NAME):
 # places. The build sets each one (build_ch_rocker_strap_tl_sub_plate).
 SYMMETRIC_BANDS: dict[tuple[str, str], float] = {
     (SECTION_A_REFERENCE, "PocketBackWallY"): POCKET_BACK_WALL_TOL,
-    ("HubCboreProfile", "HubX"): HUB_LOCATION_TOL,
-    ("HubCboreProfile", "HubY"): HUB_LOCATION_TOL,
+    ("HubHole", "HubX"): HUB_LOCATION_TOL,
+    ("HubHole", "HubY"): HUB_LOCATION_TOL,
 }
 # Single-limit (MAX) corner radii: the model value is the limit itself, the
 # limit word the value's suffix with no native tolerance, since swTolMAX
@@ -456,11 +469,9 @@ MAX_SUFFIX = " MAX"
 # Counts on the pocket set and the corner radii (rule 10: identical features
 # take one nX callout); each tight or three-place feature's mate or reason
 # once, on its own dimension (rules 3, 4, 7). A prefix replaces SolidWorks'
-# own radius "R" and diameter "Ø", so each carries its symbol (mr5: the
-# radii printed bare). The counterbore's Ø and depth carry the counterbore
-# and depth symbols (rule 26): ⌴ Ø.500 on the top view, ↧ .185 in B-B, each
-# the model's own dimension (PR #1388: a printed size is an associative
-# model dimension, so no callout row retypes them).
+# own radius "R", so each radius carries it (mr5: the radii printed bare).
+# The hub hole's sizes are its wizard callout's native variables, three
+# places each (HUB_CALLOUT_PLACES).
 POCKET_COUNT = len(CLAMP_STATIONS)
 NOTCH_CORNER_COUNT = 3
 DIMENSION_PREFIXES: dict[tuple[str, str], str] = {
@@ -468,9 +479,8 @@ DIMENSION_PREFIXES: dict[tuple[str, str], str] = {
     (SECTION_A_REFERENCE, "PocketDepth"): f"{POCKET_COUNT}X ",
     ("PocketCorners", "PocketCornerR"): f"{4 * POCKET_COUNT}X R",
     ("NotchCorners", "NotchCornerR"): f"{NOTCH_CORNER_COUNT}X R",
-    ("HubCboreProfile", "HubCboreDia"): "<HOLE-SPOT> <MOD-DIAM>",
-    (SECTION_B_REFERENCE, "HubCboreDepth"): "<HOLE-DEPTH> ",
 }
+HUB_CALLOUT_PLACES = 3
 CLAMP_NUMBER = "TL-VN-50"
 PLUG_NUMBER = "TL-02"
 STRAP_NUMBER = "MHA-CH-13"
@@ -488,16 +498,24 @@ if (
     >= PLAN_RELIEF_FLOOR_CLEARANCE
 ):
     raise AssertionError("the counterbore depth's third place is not needed")
-# The clamp is named once, on the pocket's depth; its 1.875 location stays
-# bare (rule 7).
+# The pocket's tight back-wall location (1.875 +/-.002) and its depth both
+# serve the clamp's seat, so the clamp is named once, on one numbered note
+# both dimensions flag (rule 4: one feature with several tight dimensions
+# names its mate once; rule 7: SEE NOTE n links it; machinist review mr7:
+# named only on the depth, the 1.875's mate read as missing).
+POCKET_SEAT_NOTE_NUMBER = 1
+POCKET_SEAT_NOTE = f"{POCKET_SEAT_NOTE_NUMBER}. POCKETS SEAT {CLAMP_NUMBER}."
+POCKET_SEAT_FLAG = f"SEE NOTE {POCKET_SEAT_NOTE_NUMBER}"
 DIMENSION_CALLOUTS: dict[str, str] = {
-    "PocketDepth": f"{CLAMP_NUMBER} SEAT",
+    "PocketBackWallY": POCKET_SEAT_FLAG,
+    "PocketDepth": POCKET_SEAT_FLAG,
     "FenceHeight": f"CLEARS {STRAP_NUMBER} STRAP TOP FACE",
-    "HubCboreDia": f"LOCATES {PLUG_NUMBER}",
-    "HubCboreDepth": f"CLEARS TOOLS THRU {STRAP_NUMBER} HUB HOLE",
 }
-# The taps' native callouts: DRILL after the drill's Ø, the clamp taps' count,
-# the hub tap's stated shortfall as its last row.
+# The taps' native callouts: DRILL after the drill's Ø, the clamp taps'
+# count. The hub hole's, four rows (the audit's limit): its drill, its
+# thread, its counterbore with the plug it locates (rule 4: the Ø.500 is the
+# first-made half of TL-02's slip fit), the thread's stated shortfall.
 CLAMP_TAP_COUNT = f"{POCKET_COUNT}X"
+HUB_CBORE_MATE = f"LOCATES {PLUG_NUMBER}"
 DRAWING_NOTES = ""
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"
