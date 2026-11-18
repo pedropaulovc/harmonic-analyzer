@@ -535,7 +535,10 @@ posts with FreeCAD's `grbl` post, joining a program's sections into one file:
 `M5`, a `%msg` and `M6 T<n>` at a new tool (CNCjs's Manual Tool Change,
 Custom Probing, expands it into the tool change and tool-setter probe), a
 `%msg` and `M0` at a hand-set speed change, and the recipe's own manual
-sections (operator stops, touch-probe zeroing). The driver then
+sections (operator stops, touch-probe zeroing). A file may also be one
+manual section alone, a hand-tap stop: it loads its tool first (`M6`), retracts
+with `G53 G0 Z`, rapids over the hole and ends `M30` so the controller is Idle
+where FluidNC allows jogging, proved by `_gcode.check_tap_stop`. The driver then
 checks every file, and every tool section (`FILE@k`), against the recipe's
 `expectations` (`_gcode`), logs each program's
 cutting / air-at-feed / rapid minutes, and writes

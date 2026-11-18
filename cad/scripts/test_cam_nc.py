@@ -123,6 +123,8 @@ _TAP_STOP = (
         ("no M30", ("M30\n", "M2\n"), "last command is not M30"),
         ("the wrong hole", ("X25.400", "X26.400"), "expected over"),
         ("the spindle on", ("M6 T6\n", "M6 T6\nM3 S900\n"), "the spindle stays off"),
+        ("a bare M3", ("M6 T6\n", "M6 T6\nM3\n"), "M3/M4 starts the spindle"),
+        ("a bare G28", ("M30\n", "G28\nM30\n"), "G28/G30 moves the guide"),
         ("the wrong tool", ("M6 T6", "M6 T5"), "M6 calls [5]"),
     ],
 )
@@ -133,6 +135,12 @@ def test_a_tap_stop_file_ends_idle_over_its_hole_after_a_machine_retract(tmp_pat
     bad = _program(tmp_path, _TAP_STOP.replace(seeded[0], seeded[1]))
     found = [f.detail for f in _gcode.check_tap_stop(bad, 6, (25.4, -41.91), 0.0)]
     assert any(detail in f for f in found), (fault, found)
+
+
+def test_text_left_outside_a_nested_comment_is_refused(tmp_path):
+    nested = _TAP_STOP.replace("(4-40 TAP IN CLAMP HOLE 1)", "(4-40 TAP IN CLAMP HOLE 1 (TOP END): JOG Z DOWN)")
+    with pytest.raises(ValueError, match="text outside a comment"):
+        _program(tmp_path, nested)
 
 
 def test_a_tap_stop_retract_must_reach_the_machine_top(tmp_path):

@@ -585,8 +585,8 @@ def context(
     # so the operator can jog the dead centre down onto the wrench.
     manual = {}
     for key, what in (
-        ("tap_rod", "THE ROD HOLE (BOTTOM END)"),
-        ("tap_thumb", "THE THUMB HOLE (TOP END)"),
+        ("tap_rod", "THE ROD HOLE, BOTTOM END"),
+        ("tap_thumb", "THE THUMB HOLE, TOP END"),
     ):
         manual[key] = {
             "tool": numbers["dead-centre"],
@@ -595,8 +595,8 @@ def context(
             "gcode": [
                 f"G53 G0 Z{MACHINE_Z_TOP_MM:.3f}",
                 f"G0 X{centre[0]:.3f} Y{centre[1]:.3f}",
-                f"(4-40 TAP IN {what}: JOG Z DOWN ONTO THE WRENCH, LIGHT PRESSURE;"
-                " TAP BY HAND TO THE FLAG, JOGGING Z TO KEEP THE POINT SEATED; JOG Z UP CLEAR)",
+                f"(4-40 TAP IN {what}. JOG Z DOWN ONTO THE WRENCH, LIGHT PRESSURE."
+                " TAP BY HAND TO THE NOTED DRO Z, JOGGING Z TO KEEP THE POINT SEATED. JOG Z UP CLEAR)",
                 "M30",
             ],
             "at": centre,

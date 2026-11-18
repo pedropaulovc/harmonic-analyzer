@@ -1639,7 +1639,7 @@ kind = "tap_die_set"
 present = true
 sizes = ["4-36", "6-32", "8-32", "10-32", "10-24", "12-24", "1/4-20", "1/4-28", "5/16-18", "3/8-16", "7/16-20", "7/16-14", "5/16-24", "3/8-24", "1/2-20", "1/2-13"]
 included = ["one tap and one die in each size", "1/8 pipe tap", "long-handle adjustable tap wrench", "T-handle tap wrench", "die handle", "screwdriver", "screw pitch gauge"]
-note = "Taps and dies not trusted for project work (owner ruling 2026-11-06, PR #2222); the wrenches and die handle are used."
+note = "Taps and dies not trusted for project work (owner ruling 2026-11-06, PR #2222); the wrenches and die handle are used. One of the owned T-handle tap wrenches, this set's or holders.tap-wrench-t-small, has a centre hole in its top for a dead centre's point (owner, 2026-11-17: \"y\"; not measured); the owner did not say which."
 cite = ["Photo 20250628_224315797_iOS.heic, 2025-06-28: lid label \"40 PIECE TAP AND DIE SET / CONTAINING ONE TAP AND DIE IN EACH OF THE FOLLOWING SIZES\" and the PLUS list", "Owner (Pedro) 2026-11-17: the photo shows owned tools"]
 
 # Photo 20250628_224109095_iOS.heic (2025-06-28): a metric tap and drill set
@@ -1661,8 +1661,8 @@ M12 = { tap = "M12 x 1.75", tap_drill_mm = 10.20 }
 name = "Small T-handle tap wrench (size range not legible)"
 kind = "tap_wrench"
 present = true
-centre_hole_top = true
-cite = ["Photo 20250628_224109095_iOS.heic, 2025-06-28, beside the metric tap set", "Owner (Pedro) 2026-11-17: the photo shows owned tools", "Owner (Pedro) 2026-11-17, asked whether the T-handle tap wrench he will use for the clamp's 4-40 tap has a centre hole in its top for the dead centre's point: \"y\". Owner-confirmed, not measured; which owned T-handle wrench (this one or the 40-piece set's) was not stated."]
+note = "One of the owned T-handle tap wrenches, this one or the 40-piece set's (tools.tap-die-set-40), has a centre hole in its top for a dead centre's point; the owner did not say which."
+cite = ["Photo 20250628_224109095_iOS.heic, 2025-06-28, beside the metric tap set", "Owner (Pedro) 2026-11-17: the photo shows owned tools", "Owner (Pedro) 2026-11-17, asked whether the T-handle tap wrench he will use for the clamp's 4-40 tap has a centre hole in its top for the dead centre's point: \"y\". Owner-confirmed, not measured."]
 
 # Photo 20250628_223528049_iOS.heic (2025-06-28): a yellow-bin organiser of
 # loose hand taps and twist drills. Legible markings: "BESLY USA" and

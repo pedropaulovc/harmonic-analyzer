@@ -245,7 +245,11 @@ A recipe has five parts:
 - `PROGRAMS`: the file names, each listing its operations, flat (one FreeCAD
   Job, posted as it is) or in sections (one Job per tool and spindle speed,
   or a manual section: G-code the recipe writes itself, such as an operator
-  stop or a probing cycle). Sections join into one file. A new tool starts at
+  stop or a probing cycle). Sections join into one file. A file may be one
+  manual section alone, a hand-tap stop: it must load its tool first (`M6`,
+  so the guide's length is set), retract with `G53 G0 Z` to the machine top,
+  rapid over the hole and end `M30`, so the controller is Idle where FluidNC
+  allows jogging; `_gcode.check_tap_stop` proves it. A new tool starts at
   `M5`, a `%msg` naming it and the speed to set, and `M6 T<n>`, which CNCjs
   (Manual Tool Change, Custom Probing) expands into its tool change and
   tool-setter probe; FluidNC 3.7.8 has no tool change of its own. The

@@ -234,6 +234,10 @@ def read_program(path: Path) -> Program:
             continue
         line = _COMMENT.sub("", raw).strip().upper()
         words = [(letter, float(value)) for letter, value in _WORD.findall(line)]
+        if line and not words:
+            # Text left outside a comment (comments do not nest: the first ")"
+            # ends one) reaches the controller as code, which refuses it.
+            raise ValueError(f"{Path(path).name}:{number}: text outside a comment, sent as code: {raw.strip()}")
         codes = {value for letter, value in words if letter == "G"}
         mcodes = {value for letter, value in words if letter == "M"}
         for kind, code in (("M0", 0), ("M6", 6)):
@@ -509,6 +513,11 @@ def check_tap_stop(program: Program, tool: int, at: tuple[float, float], machine
             g = {v for letter, v in words if letter == "G"}
             m = {v for letter, v in words if letter == "M"}
             commands.append((number, g, m, {k: v for k, v in words if k in "XYZ"}))
+    for number, g, m, _axes in commands:
+        if m & {3, 4}:
+            fail(f"line {number}: M3/M4 starts the spindle; the spindle stays off")
+        if g & {28, 30}:
+            fail(f"line {number}: G28/G30 moves the guide to a stored position")
     m6 = next((number for number, _g, m, _a in commands if 6 in m), None)
     motions = [(number, g, axes) for number, g, _m, axes in commands if axes]
     if m6 is None or (motions and motions[0][0] < m6):
