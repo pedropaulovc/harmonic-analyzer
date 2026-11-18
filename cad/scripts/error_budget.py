@@ -59,6 +59,7 @@ import sh_vn_music_wire_lever_geom
 import mg_magnifying_lever_geom
 import mg_output_fixture_geom
 import ms_stick_geom
+import ms_stick_registration as registration
 import paper_drive_geom
 import _rocker_interface as rocker_interface
 import _mg_wheel_rim_geometry
@@ -2300,8 +2301,9 @@ def calibration_table(
 ) -> list[tuple[float, float, float]]:
     """(station mm, read ordinate, kappa) per station from the pivot zero to
     full scale: the ordinate -> stick-reading lookup and the second-harmonic
-    table the operator uses. The stick itself is engraved LINEAR in station
-    (``STICK_DIVISION_MM`` per numbered division); the table converts. ``read
+    table the operator uses. The stick is engraved linear
+    (``STICK_DIVISION_MM`` per numbered division) but its zero is not at the
+    pivot (``ms_stick_registration``); the table converts. ``read
     ordinate`` is the channel's fundamental as a fraction of a full-scale bar's
     (signed -- the machine-hand drive reads a +X bar negative, which the
     operator absorbs as a sign convention); ``kappa`` is c2/c1."""
@@ -2378,8 +2380,11 @@ def readout_procedure(r: dict[str, Any]) -> str:
     tol = r["station_setting_tolerance_mm"]
     at_zero = read_ordinate(tol / 2.0, nom)
     at_stop = read_ordinate(nom.d_max - tol / 2.0, nom)
+    # The stop reading that sets each station, Michelson's way with the stick
+    # as drawn (#2434, delegated ruling 2026-11-17, option 2): it carries the
+    # stick zero's offset from the pivot.
     table = "\n".join(
-        f"| {d:6.1f} | {d / STICK_DIVISION_MM:6.3f} | {x:+.4f} | {k * 100:6.2f} % |"
+        f"| {d:6.1f} | {registration.stick_reading(d):6.3f} | {x:+.4f} | {k * 100:6.2f} % |"
         for d, x, k in rows
     )
     home = r["cam_home_phase"]
@@ -2433,12 +2438,22 @@ flowchart LR
 
 ## 1. Set the bars linearly; record what each one reads
 
-The stick's 0 tick sits at the rocker pivot axis (`channels.rocker_pivot_xy_mm`,
-the datum the stick's scale span is ruled from); every
-station is on the lifting side. Set bar $i$ to the **linear station**
-$d_i = f\\,x_i \\cdot {nom.d_max:.0f}$ mm ($= f\\,x_i \\cdot {nom.d_max / STICK_DIVISION_MM:.3f}$
-divisions on the engraved {STICK_DIVISION_MM:.2f} mm/division scale), reading
-to 1/5 minor division (setting error +/-{tol:.2f} mm max per bar). Then look up,
+Every station is the bar's distance from the rocker pivot axis
+(`channels.rocker_pivot_xy_mm`), on the lifting side. Set bar $i$ to the
+**linear station** $d_i = f\\,x_i \\cdot {nom.d_max:.0f}$ mm with the MHA-MS-00
+measuring stick, Michelson's way (MHA-MS-00 steps 11-13A in ASSEMBLY.md):
+clamp the stop at the table's **stick reading** for $d_i$ (interpolate between
+rows), lay the stick graduations up on that bar's rocker arm with the stop's
+end face against the arm's outer tip, and slide the bar out to the stick's
+10 end. The stick reading already includes the
+{registration.MEAN_OFFSET_MM:.2f} mm from the pivot to the stick's zero: the
+stick's 0 tick does NOT sit at the pivot, so the reading is about
+$(d_i + {registration.MEAN_OFFSET_MM:.2f})/{STICK_DIVISION_MM:.1f}$ divisions
+on the engraved {STICK_DIVISION_MM:.2f} mm/division scale, and the column
+holds the exact value (within {registration.OFFSET_SPREAD_MM:.2f} mm of that, as
+the stick rides the arm's curved top edge). A bar at zero is the stop on the
+{registration.ZERO_TICK_TEXT} tick. Read the stop to 1/5 minor division
+(setting error +/-{tol:.2f} mm max per bar). Then look up,
 in the table, the ordinate that station actually contributes (interpolate
 between rows), **divide it by the trial's scale $f$** (below; $f = 1$ unless
 the function had to be scaled down to fit the pen) and record the quotient as
@@ -2454,8 +2469,8 @@ ${rows[0][1]:.4f}/f$ of the function's unit -- at $f = {scale_all:.3f}$ that is
 {rows[0][1] / scale_all:+.4f}, which is why a scaled-down trial pays more for
 its idle bars.
 
-**Bars at the ends of the scale are biased, not centred.** A bar set at the
-stick zero cannot sit below the pivot, so its setting error is one-sided,
+**Bars at the ends of the scale are biased, not centred.** A bar set at
+zero cannot sit below the pivot, so its setting error is one-sided,
 $[0, +{tol:.2f}]$ mm, and on average it stands at $+{tol / 2:.3f}$ mm, not 0;
 a bar at the travel stop is the mirror, $[-{tol:.2f}, 0]$, on average at
 ${nom.d_max - tol / 2:.3f}$ mm. Record those mean stations' table rows -- ordinate (divided by $f$ like

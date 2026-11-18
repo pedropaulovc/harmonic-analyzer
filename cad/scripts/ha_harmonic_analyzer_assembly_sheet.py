@@ -164,6 +164,10 @@ def sub_step(key: str, index: int) -> str:
 # imports this package's step numbers, so the number is stated here and
 # test_ha_assembly_package holds it to the MHA-SM-00 sequence).
 SM_LAST_BENCH_STEP = "8B"
+# MHA-MS-00's in-use steps that set a bar with the stick (#2434, delegated
+# ruling 2026-11-17, option 2), stated as SM_LAST_BENCH_STEP is and held to
+# the MHA-MS-00 sequence by test_ha_assembly_package.
+MS_SETTING_STEPS = "11-13A"
 # Steps 1, 2 and 4 print the master build order (ha_build_sequence, #2391):
 # the sub-assembly sheets' own steps in runs, the frame apart from MHA-FR-00's
 # drilling lift until the mill work on MHA-FR-01 and MHA-FR-02 is done.
@@ -220,8 +224,8 @@ _STEP_TEXT: dict[str, tuple[str, ...]] = {
     "summing-levelled": (
         f"DROP THE MHA-SM-01 POST INTO THE {_TOP_FRAME} TOP FRAME'S GOOSENECK HUB.",
         "HOOK THE MHA-SM-VN-51 LOWER LOOP INTO THE MHA-SM-VN-50 EYE.",
-        f"SET EVERY {_AMPLITUDE_BAR} AMPLITUDE BAR TO ZERO ON THE MHA-MS-00 "
-        "STICK'S SCALE.",
+        f"SET EVERY {_AMPLITUDE_BAR} AMPLITUDE BAR TO ZERO WITH MHA-MS-00, PER "
+        f"ITS STEPS {MS_SETTING_STEPS} (ASSEMBLY.MD).",
         "SLIDE THE POST IN ITS HUB UNTIL A DIGITAL ANGLE GAUGE ACROSS THE "
         f"MHA-SM-03 PLATE TOP READS {LEVEL_ACCEPTANCE} ({SETTING_TABLE_REF}).",
         # One printed line (the columns are full): the bare leg's set-screw

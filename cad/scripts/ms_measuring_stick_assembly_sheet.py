@@ -14,6 +14,13 @@ clamps anywhere along the stick. The saved pose (STOP_MARK on the thumbscrew
 axis) and its sheet-1 near-face reference only show an example position, and
 the sheet-1 note says so. Printed lengths are in the assembly contract's
 ``drawing_unit``.
+
+Issue #2434 (delegated ruling 2026-11-17, option 2, for the owner's
+after-the-fact review; issue comment 6970972423): the stick sets a bar
+Michelson's way, as drawn. Steps 11-13 and sheet 4 show it: the stop's end
+face nearer the 10 end on the MHA-CH-06 rocker arm's outer tip land, the
+stick graduations up along the arm's top edge, the MHA-CH-01 bar slid out to
+the 10 end. Zero is the stop on the 0.2 tick (``ms_stick_registration``).
 """
 
 from __future__ import annotations
@@ -22,6 +29,7 @@ from fractions import Fraction
 
 import _config
 import ms_measuring_stick_assembly_spec as spec
+import ms_stick_registration as registration
 import ms_stop_spec as stop
 import _mcmaster_90114a124 as plate_screw
 import sh_vn_thumb_screw_spec as thumb
@@ -132,7 +140,36 @@ ASSEMBLY_STEPS = (
     f"TURN THE {_THUMB} IN BY HAND UNTIL ITS TIP CLAMPS THE TOP FACE OF "
     f"{_ref(spec.STICK)}.",
 )
-STEP_SECTIONS = (("ASSEMBLY SEQUENCE", ASSEMBLY_STEPS),)
+# At MHA-HA-00: setting a bar (#2434). The stop is turned over from the
+# fitted pose (item 4 below, the graduated face up), its end face nearer the
+# stick's 10 end both reads the stick and bears on the rocker arm's tip.
+_ROCKER_ARM = str(_config.parts("ch-rocker-arm")["number"])
+_AMPLITUDE_BAR = str(_config.parts("ch-amplitude-bar")["number"])
+IN_USE_SHEET = 4
+_IN_USE_VIEW = f"SHEET {IN_USE_SHEET}"
+ZERO_TICK_TEXT = registration.ZERO_TICK_TEXT
+USE_STEPS = (
+    f"11. TO SET AN {_AMPLITUDE_BAR} AMPLITUDE BAR, HOLD THE STOP WITH "
+    f"{_ref(spec.THUMB_SCREW)} BELOW AND THE GRADUATIONS OF {_ref(spec.STICK)} "
+    f"UP ({_IN_USE_VIEW}).",
+    f"11A. SLACKEN {_ref(spec.THUMB_SCREW)}; SLIDE {_BLOCK} UNTIL ITS END FACE "
+    f"NEARER THE 10 END OF {_ref(spec.STICK)} STANDS ON THE STICK READING FOR "
+    f"THE BAR'S STATION (READOUT.MD STEP 1; ZERO IS THE {ZERO_TICK_TEXT} TICK).",
+    f"11B. TIGHTEN {_ref(spec.THUMB_SCREW)} BY HAND.",
+    "12. TURN THE MHA-HA-00 CRANK UNTIL THE OUTER TIPS OF ALL 20 "
+    f"{_ROCKER_ARM} ROCKER ARMS (THE ENDS AWAY FROM THE CONNECTING RODS) "
+    "LINE UP.",
+    f"12A. LAY {_STICK} ON THE TOP EDGE OF THAT BAR'S {_ROCKER_ARM} ROCKER "
+    "ARM, 10 END TOWARD THE PIVOT, AND SLIDE IT OUT UNTIL THE END FACE OF "
+    f"{_ref(spec.BLOCK)} BEARS ON THE ARM'S OUTER TIP ({_IN_USE_VIEW}).",
+    f"13. SLIDE THE {_AMPLITUDE_BAR} BAR OUT UNTIL ITS OUTBOARD FACE TOUCHES "
+    f"THE 10-END FACE OF {_ref(spec.STICK)} ({_IN_USE_VIEW}).",
+    f"13A. LIFT {_ref(spec.STICK)} OFF WITHOUT MOVING THE BAR.",
+)
+STEP_SECTIONS = (
+    ("ASSEMBLY SEQUENCE", ASSEMBLY_STEPS),
+    ("IN USE AT MHA-HA-00: SETTING AN AMPLITUDE BAR", USE_STEPS),
+)
 ASSEMBLY_CHECKS = (
     f"CHECK: WITH {_ref(spec.THUMB_SCREW)} BACKED OFF, {_STICK} SLIDES FREELY "
     "IN THE WINDOW.",
@@ -146,6 +183,23 @@ EXAMPLE_POSE_NOTE = (
     f"STOP SHOWN CLAMPED AT AN EXAMPLE POSITION. {_ref(spec.BLOCK)} CLAMPS "
     f"AT ANY POSITION ALONG {_ref(spec.STICK)} (ASSEMBLY.MD STEP 10)."
 )
+# Sheet 4: the stop turned over and laid on a rocker arm (steps 11-13), the
+# arm and the bar in phantom. The drawn stop is the sheet-1 example pose, so
+# the arm and bar stand where that reading puts them.
+IN_USE_CAPTION = (
+    f"IN USE AT MHA-HA-00 (ASSEMBLY.MD STEPS 11-13): {_ref(spec.STICK)} "
+    f"GRADUATIONS UP, {_ref(spec.THUMB_SCREW)} BELOW. ROCKER ARM AND "
+    "AMPLITUDE BAR IN PHANTOM. STOP SHOWN AT AN EXAMPLE READING; ZERO IS "
+    f"THE STOP ON THE {ZERO_TICK_TEXT} TICK."
+)
+IN_USE_LABELS = {
+    "rocker": f"{_ROCKER_ARM} ROCKER ARM TOP EDGE",
+    "tip": f"{_ref(spec.BLOCK)} END FACE ON THE ARM'S OUTER TIP LAND",
+    "reading": f"READ {_ref(spec.STICK)} AT THIS END FACE",
+    "ten_end": f"10-END FACE OF {_ref(spec.STICK)} ON THE BAR'S OUTBOARD FACE",
+    "bar": f"{_AMPLITUDE_BAR} AMPLITUDE BAR",
+    "pivot": "ROCKER PIVOT AXIS",
+}
 
 # Both dimensions are reference: the assembly pose, not component sizes.
 REFERENCE_OVERALL_LENGTH = spec.STICK_X_MAX - spec.STICK_X_MIN

@@ -16,10 +16,15 @@ square-bottom .016-.024 groove.
 Issue #290: the sheet prints decimal inch (``drawing_unit: in``). Lengths stay
 physical millimetres, each the exact decimal of the inch value it prints (see
 the trailing comments). Exempt (owner ruling, calibration geometry): the
-configured 14.2 / 1.42 mm pitch and the 56.5 mm scale zero print rounded
-(.559, .0559, 2.224) at their own +/-.002; the minor pitch prints four places
-so ten printed minor pitches equal the printed full pitch. The 7.95 length is
-.XX because the last groove's rule-17 land reads it; nothing prints .X. The
+configured 14.2 / 1.42 mm pitch and the 3.43 mm 10-tick land print rounded
+(.559, .0559, .135) at their own +/-.002; the minor pitch prints four places
+so ten printed minor pitches equal the printed full pitch. Issue #2434
+(delegated ruling 2026-11-17, option 2): the 10-end face bears on the
+amplitude bar when the stick sets it, so it is the graduations' datum; the
+.135 locates the 10 tick from it and the station table every other
+graduation from that tick, so the length's .XX band never moves a station.
+This is dimensioning only: the 2026-10-10 scale position is unchanged. The
+7.95 length stays .XX; nothing prints .X. The
 unprinted 0.24 stroke width at the face is the modelled near-sharp V and
 stays (owner ruling). The listed .005-tip bit at the .016 MIN numeral depth
 cuts strokes about 0.35 wide: stroke width is unprinted, the extra 0.05 a side
@@ -57,14 +62,14 @@ def inch_text(value_mm: float, places: int) -> str:
 BODY_LENGTH = 201.93  # 7.95
 BODY_WIDTH = 8.001  # .315
 BODY_THICKNESS = 2.9972  # .118
-# Unprinted: the bar beyond the last full tick. The model derives scale zero
-# from the length, the configured span and this margin, which the 7.95 length
-# sets to 3.43 so scale zero stays put.
+# The bar beyond the last full tick: the model derives scale zero from the
+# length, the configured span and this land, which the 7.95 length sets to
+# 3.43 so scale zero stays put. It prints, at the stations' +/-.002, as the
+# 10 tick's distance from the 10-end face, the graduations' datum (#2434).
 SCALE_END_MARGIN = 3.43
 # Exempt with the pitch (calibration): scale zero stays at 56.5 where the
 # 2026-10-10 Option B ruling put it, so every graduation the assembly sets the
-# stop and the bar stations against is unmoved; it prints 2.224 at the
-# stations' +/-.002.
+# stop and the bar stations against is unmoved.
 SCALE_START_X = BODY_LENGTH - SCALE_SPAN - SCALE_END_MARGIN
 # The face width .016 MIN (.024 MAX below) at the face of a 30-degree V
 # .020 MIN deep: the drafted walls leave TICK_TIP_FLAT_MM at the root, as a
@@ -145,10 +150,10 @@ NUMERAL_FINAL_MIN_STROKE_MM3 = 0.0058
 
 # Width and thickness give the sliding clearance in the .330 x .134 stop
 # rebate at the title block's .XXX; graduation positions set the
-# amplitude-bar stations through the linear READOUT table, at their own
-# +/-.002: the zero tick's dimension from the end face carries it, and the
-# drawing's station table holds every other graduation to it from zero (the
-# pitches print as references). The overall length (.XX), tick lengths and
+# amplitude-bar stations through the READOUT table, at their own +/-.002:
+# the 10 tick's dimension from the 10-end face carries it, and the drawing's
+# station table holds every other graduation to that tick (the pitches print
+# as references). The overall length (.XX), tick lengths and
 # numeral layout take the title block. Graduation width and both engraving
 # depths name no mate, so
 # they are single ".nnn MIN" limits (coordinator ruling 2026-10-23); the
@@ -175,10 +180,11 @@ MIN_LIMIT_DEVIATIONS_MM = {
 }
 
 # Construction chords use the actual finished edge and actual groove/glyph
-# extents. ScaleStartX and both pitch chords terminate at true groove centres,
-# never at either side of the finite-width cut. ScaleEndMargin stays unprinted.
+# extents. The 10-tick land and both pitch chords terminate at true groove
+# centres, never at either side of the finite-width cut. ScaleStartX stays
+# unprinted: the scale's datum is the 10-end face (#2434).
 REFERENCE_DIMENSIONS = {
-    "ScaleStartReference": ("ScaleStartX", (0.0, BODY_WIDTH), (SCALE_START_X, BODY_WIDTH)),
+    "ScaleEndReference": ("Tick10FromEnd", (SCALE_START_X + SCALE_SPAN, BODY_WIDTH), (BODY_LENGTH, BODY_WIDTH)),
     "FullLengthReference": ("FullTickLength", (SCALE_START_X, BODY_WIDTH - TICK_LENGTH), (SCALE_START_X, BODY_WIDTH)),
     "MinorLengthReference": ("MinorTickLength", (SCALE_START_X + MINOR_SPACING, BODY_WIDTH - MINOR_TICK_LENGTH), (SCALE_START_X + MINOR_SPACING, BODY_WIDTH)),
     "HalfLengthReference": ("HalfTickLength", (SCALE_START_X + DIVISION_SPACING / 2.0, BODY_WIDTH - HALF_TICK_LENGTH), (SCALE_START_X + DIVISION_SPACING / 2.0, BODY_WIDTH)),
@@ -219,10 +225,11 @@ DRAWING_PRECISION_BY_NAME = {
     name: places for dims in DRAWING_PRECISION.values() for name, places in dims.items()
 }
 # The model's own bands, beyond the title block's rows (physical mm, printed
-# in inch): the zero tick's +/-.002. The station table prints the same band
-# for every graduation from zero; detail A's pitches are references.
+# in inch): the 10 tick's +/-.002 from the 10-end face. The station table
+# prints the same band for every graduation from that tick; detail A's
+# pitches are references.
 DRAWING_TOLERANCES = {
-    "ScaleStartX": GRADUATION_POSITION_TOLERANCE_MM,
+    "Tick10FromEnd": GRADUATION_POSITION_TOLERANCE_MM,
 }
 
 DRAWING_VALUES_BY_NAME = {

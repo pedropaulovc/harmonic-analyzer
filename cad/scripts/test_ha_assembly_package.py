@@ -117,3 +117,19 @@ def test_summing_lever_step_stops_before_its_final_assembly_step():
     last = numbers.index(ha_sheet.SM_LAST_BENCH_STEP)
     assert "AT FINAL ASSEMBLY" in sm_sheet.ASSEMBLY_STEPS[last + 1]
     assert not any("FINAL ASSEMBLY" in step for step in sm_sheet.ASSEMBLY_STEPS[: last + 1])
+
+
+def test_bar_zero_step_cites_the_measuring_stick_setting_steps():
+    """#2434: HA-00 sets every bar to zero by MHA-MS-00's in-use steps, whose
+    numbers HA-00 states; they must be that section's first and last, and
+    the zero reading prints there (an HA-00 step prints no setting value)."""
+    import ha_harmonic_analyzer_assembly_sheet as ha_sheet
+    import ms_measuring_stick_assembly_sheet as ms_sheet
+    import ms_stick_registration as registration
+
+    heads = [step.split(". ", 1)[0] for step in ms_sheet.USE_STEPS]
+    assert ha_sheet.MS_SETTING_STEPS == f"{heads[0]}-{heads[-1]}"
+    assert ms_sheet.STEP_SECTIONS[-1][1] == ms_sheet.USE_STEPS
+    lines = " ".join(ha_sheet.step_lines("summing-levelled"))
+    assert f"WITH MHA-MS-00, PER ITS STEPS {ha_sheet.MS_SETTING_STEPS} (ASSEMBLY.MD)" in lines
+    assert any(f"ZERO IS THE {registration.ZERO_TICK_TEXT} TICK" in step for step in ms_sheet.USE_STEPS)

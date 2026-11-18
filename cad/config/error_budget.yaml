@@ -246,4 +246,4 @@ critical_features:
     nominal: null
     quantity: ordinate
     class: setup
-    holds: "measuring-stick reading: interpolate to 1/5 of the 1.42 minor division (0.28 step, +/-0.14 rounding) plus eye/parallax -- stick drawing note 5; the 0 tick sits at the rocker pivot axis (every station >= 0) and the measured null lift vector is subtracted from every trial (tolerance-policy.md)"
+    holds: "measuring-stick reading: interpolate to 1/5 of the 1.42 minor division (0.28 step, +/-0.14 rounding) plus eye/parallax, at the stop's end face -- READOUT.md step 1 and MHA-MS-00 steps 11-13 (ASSEMBLY.md): stop on the rocker arm's outer tip, bar out to the stick's 10 end (#2434, delegated ruling 2026-11-17, option 2); the table's stick reading carries the stick zero's offset from the rocker pivot axis, zero is the stop on the 0.2 tick (every station >= 0), and the measured null lift vector is subtracted from every trial (tolerance-policy.md)"

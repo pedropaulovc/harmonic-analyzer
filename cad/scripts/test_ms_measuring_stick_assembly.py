@@ -367,11 +367,13 @@ def test_fitter_package_covers_rule_9() -> None:
         "ASSEMBLED + CLAMPED SETUP",
         "EXPLODED VIEW + BOM",
         "FINISHED ASSEMBLY",
+        "IN USE: SETTING A BAR",
     )
     assert drawing.SPEC.layout is drawing.DrawingLayout.LANDSCAPE
     assert tuple(drawing.SHEET_LAYOUTS[name] for name in drawing.SHEET_NAMES) == (
         drawing.DrawingLayout.LANDSCAPE,
         drawing.DrawingLayout.PORTRAIT,
+        drawing.DrawingLayout.LANDSCAPE,
         drawing.DrawingLayout.LANDSCAPE,
     )
     assert all(scale == (1.0, 1.0) for scale in drawing.SHEET_SCALES.values())
@@ -423,6 +425,45 @@ def test_fitter_package_covers_rule_9() -> None:
     assert not any("BLACKEN" in step or "FINISH" in step for step in sheet.ASSEMBLY_STEPS)
     for obsolete in ("FINISH_NOTE", "FINISH_NOTE_TEXT", "FINISH_NOTE_XY", "_BLOCK_FINISH"):
         assert not hasattr(drawing, obsolete)
+
+
+def test_in_use_sheet_registers_the_drawn_stop_on_a_rocker_arm() -> None:
+    """#2434 (delegated ruling 2026-11-17, option 2): sheet 4 lays the drawn
+    stop on a rocker arm Michelson's way; the phantom arm and bar stand where
+    the drawn reading puts them, and the in-use steps cite that sheet."""
+    import ms_stick_registration as registration
+
+    assert drawing.SHEET_NAMES[sheet.IN_USE_SHEET - 1] == "IN USE: SETTING A BAR"
+    # The drawn stop's end face nearer the 10 end reads between 2 and 3 and
+    # sets a bar about 36 mm out; it stands on the arm's tip land.
+    assert 2.0 < drawing.IN_USE_READING < 3.0
+    assert drawing.IN_USE_STATION_MM == pytest.approx(
+        stick.DIVISION_SPACING * drawing.IN_USE_READING - registration.MEAN_OFFSET_MM,
+        abs=registration.OFFSET_SPREAD_MM,
+    )
+    assert drawing.in_use_point(registration.LAND_BOTTOM)[0] == pytest.approx(stop.BLOCK_LENGTH)
+    g = registration.register(drawing.IN_USE_STATION_MM)
+    corner = drawing.in_use_point(g.ten_end_top)
+    assert corner[:2] == pytest.approx((spec.STICK_X_MAX, spec.STICK_BOTTOM_Y))
+    # The arm's top edge runs from the tip corner (under the stick's resting
+    # face) inboard past the pivot; the stick rests on it at both ends.
+    tip = drawing.in_use_point(registration.TIP_CORNER)
+    assert tip[1] == pytest.approx(spec.STICK_TOP_Y)
+    assert drawing.in_use_point(g.ten_end_bottom)[:2] == pytest.approx(
+        (spec.STICK_X_MAX, spec.STICK_TOP_Y))
+    arc = [key for key in drawing.IN_USE_PHANTOM if key.startswith("arm top edge")]
+    assert len(arc) == drawing.IN_USE_ARC_SEGMENTS
+    assert drawing.IN_USE_PHANTOM[arc[-1]][1][0] < registration.PIVOT[0]
+    assert set(drawing.IN_USE_LABEL_TIPS) | {"reading"} == set(sheet.IN_USE_LABELS)
+    for text in sheet.USE_STEPS[:3] + sheet.USE_STEPS[4:]:
+        assert "ITEM " in text, text
+    assert sum(f"SHEET {sheet.IN_USE_SHEET}" in step for step in sheet.USE_STEPS) == 3
+    assert f"ZERO IS THE {registration.ZERO_TICK_TEXT} TICK" in sheet.USE_STEPS[1]
+    assert all(
+        len(line) <= drawing.IN_USE_CAPTION_WIDTH for line in drawing.IN_USE_CAPTION.splitlines()
+    )
+    for step in sheet.USE_STEPS:
+        assert len(textwrap.wrap(step, width=100, subsequent_indent="   ")) <= 6, step
 
 
 def test_bom_prints_registry_identity_and_vendor_sku_only() -> None:
@@ -715,7 +756,7 @@ def test_mixed_sheets_copy_real_templates_and_close_donors(monkeypatch, defect) 
         assert tuple(target.GetSheetNames()) == drawing.SHEET_NAMES
         assert tuple(sheet.layout for sheet in target.sheets) == (
             drawing.DrawingLayout.LANDSCAPE, drawing.DrawingLayout.PORTRAIT,
-            drawing.DrawingLayout.LANDSCAPE,
+            drawing.DrawingLayout.LANDSCAPE, drawing.DrawingLayout.LANDSCAPE,
         )
     else:
         message = {
