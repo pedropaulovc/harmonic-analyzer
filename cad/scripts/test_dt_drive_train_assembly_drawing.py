@@ -639,14 +639,17 @@ def test_pinion_recut_clears_the_print_worst_corner_and_keeps_a_tip_land() -> No
     assert drawing.inch_text(widening, 3) == ".004"
     # It closes the worst corner in both tooth models ...
     assert all(widening > -closure for closure in CRANK_PRINT_WORST_FREE_PLAY_MM)
-    # ... at least as well as the sampled 0.10 mm thinning did.
-    assert widening >= 0.10
-    assert all(play > 0.0 for play in CRANK_PRINT_WORST_FREE_PLAY_THINNED_0_10_MM)
-    least_tip_land = min(profile.tip_land_mm for _, profile in pinion.STOCK_PROFILE_CORNERS)
-    assert (
-        least_tip_land - widening
-        >= RECUT_TIP_LAND_MODULE_FRACTION_MIN * pinion.MODULE_MM
-    ), f"recut 16T tip land {least_tip_land - widening:.3f} mm"
+    # ... and free play grows about one-for-one with the widening (the pack's
+    # 0.05 -> 0.10 mm step gained 0.051 mm), so from the sampled 0.10 mm
+    # thinning the printed pass still leaves positive free play.
+    assert all(
+        play + (widening - 0.10) > 0.0 for play in CRANK_PRINT_WORST_FREE_PLAY_THINNED_0_10_MM
+    )
+    # The least finite-form tip land, less the shared helper's error bound,
+    # keeps the floor after one pass.
+    floor = RECUT_TIP_LAND_MODULE_FRACTION_MIN * pinion.MODULE_MM
+    for _, profile in pinion.STOCK_PROFILE_CORNERS:
+        profile.require_tip_land(floor + widening)
 
 
 def test_cone_swing_check_stops_disengaged_at_the_swing_stop() -> None:

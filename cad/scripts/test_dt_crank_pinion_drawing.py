@@ -395,11 +395,20 @@ def test_tooth_system_and_pair_acceptance_match_current_geometry() -> None:
     mate_label = notes.BACKLASH_LABEL.replace(spec.MESH_GEAR_NUMBER, spec.PINION_NUMBER)
     assert mate_data[mate_label].strip() == backlash
     # Delegated ruling 2026-11-17 on #2481 (option B): the mesh is accepted by
-    # hand at assembly, stated as a plain-fact reference line beside the
-    # backlash row (rule 20: no governance word such as ACCEPTED).
-    assert labels.index(notes.MESH_CHECK_LABEL) == labels.index(notes.BACKLASH_LABEL) + 1
-    assert notes.MESH_CHECK_LABEL == f"MESH WITH {spec.MESH_GEAR_NUMBER} (REF)"
-    assert data[notes.MESH_CHECK_LABEL].strip() == "TURNS FREE BY HAND AT ASSEMBLY"
+    # hand at assembly, stated as a plain REF fact on the mate row, the last
+    # (rule 20: no governance word such as ACCEPTED; machinist review of
+    # #3090: no separate row naming the mate again).
+    assert rows[-1] == (
+        f"MATES WITH:  CRANK DRIVE GEAR {spec.MESH_GEAR_NUMBER}, 64T; TURNS FREE BY HAND (REF)"
+    )
+    assert not any(label.startswith("MESH WITH") for label in labels)
+    # The tooth runout is a finished-part requirement worded as the 64T's
+    # row, never a setup (rule 25; machinist review of #3090).
+    assert "ACCEPT AT SETUP" not in notes.GEAR_DATA
+    mate_runout = mate_data["TOOTH RUNOUT TO BORE"].strip()
+    assert data["TOOTH RUNOUT TO BORE"].strip() == mate_runout.replace(
+        spec.PINION_NUMBER, spec.MESH_GEAR_NUMBER
+    )
     assert not any("ACCEPT ON THIS PART" in row for row in rows)
     width_row = next(line for line in notes.GEAR_DATA.splitlines() if "CIRCULAR PITCH THICKNESS" in line)
     assert "REF" in width_row and "ACCEPT" not in width_row
