@@ -170,6 +170,11 @@ OVERALL_LENGTH_TEXT_Y = 0.257
 # The note sits under the bottom view, where the deleted setup note stood.
 EXAMPLE_NOTE_XY = (0.030, 0.100)
 EXAMPLE_NOTE_WIDTH = 52  # characters; default-format note text
+# Rule 22: step 10A's acceptance prints on the sheet too, a leader note at the
+# stop's end face nearer the 10 (#2434): its tip on that face above the stick,
+# its text right of the block, clear of the stick and of section A's marker.
+STOP_FACE_NOTE_TIP_MM = (stop.BLOCK_LENGTH, -4.0, 0.0)
+STOP_FACE_NOTE_OFFSET = (0.030, 0.024)
 
 # Sheet 2 alone is portrait: the native full-size exploded outline plus its
 # unchanged 24 mm balloon ring is 202.0739 mm high; landscape has 200.7 mm
@@ -1037,10 +1042,26 @@ def _place_clamped_sheet(adapter: Any) -> Callable[[], None]:
     _assert_view_on_sheet(section, label="thumbscrew clamp section")
     settled = _add_assembly_dimensions(adapter, front)
     _add_view_b_arrow(adapter, underside)
+    _add_stop_face_note(adapter, front)
     _add_note_block(
         adapter, SHEET_NAMES[0], EXAMPLE_NOTE, EXAMPLE_NOTE_XY, label="example-pose note"
     )
     return settled
+
+
+def _add_stop_face_note(adapter: Any, front: Any) -> None:
+    """Step 10A's acceptance at the stop's end face nearer the 10 (rule 22:
+    a measurable acceptance prints on the sheets as well as in ASSEMBLY.md)."""
+    label = "stop end face check note"
+    tip = model_point_in_view(
+        adapter, front, tuple(value / 1000.0 for value in STOP_FACE_NOTE_TIP_MM), label=label,
+    )
+    tip_xy = (float(tip[0]), float(tip[1]))
+    add_leader_note(
+        adapter, sheet.STOP_FACE_NOTE,
+        text_xy=(tip_xy[0] + STOP_FACE_NOTE_OFFSET[0], tip_xy[1] + STOP_FACE_NOTE_OFFSET[1]),
+        attach_xy=tip_xy, view=front, label=label,
+    )
 
 
 def _add_view_b_arrow(adapter: Any, underside: Any) -> None:

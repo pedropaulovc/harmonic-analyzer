@@ -114,9 +114,11 @@ EXTENT_MAX = (
 # --- Clamped setting (a construction sketch in the .SLDASM) ------------------
 # A reference to the saved pose, not an acceptance band: STOP_MARK places the
 # block on a calibrated graduation and no fit consumes this span. It prints
-# parenthesized, at three decimal-inch places.
+# parenthesized at one place, as the (8.0) overall does: the stop clamps
+# anywhere (owner ruling 2026-11-06, #2230 option C), so three places would
+# read as a setting (machinist review run 20261118T100837391Z-e6263d9b).
 SETTING_NEAR_FACE_MM = BLOCK_ORIGIN[0] - STICK_X_MIN
-SETTING_PRECISION = 3
+SETTING_PRECISION = 1
 SETTING_FEATURE = "ClampedSetting"
 SETTING_DIMENSION = "NearFaceFromStickEnd"
 DRAWING_PRECISION = {SETTING_FEATURE: {SETTING_DIMENSION: SETTING_PRECISION}}

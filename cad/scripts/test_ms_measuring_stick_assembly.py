@@ -120,7 +120,7 @@ def test_clamped_setting_authors_its_globals_and_drives(monkeypatch) -> None:
         f"SettingContactY@{feature}": '-"SettingContact"',
         f"{spec.SETTING_DIMENSION}@{feature}": '"SettingBlockFace" - "SettingStickLeft"',
     }
-    # A parenthesized, unbanded reference: "(2.923)", not "2.923 ±.004".
+    # A parenthesized, unbanded reference: "(2.9)", not "2.923 ±.004".
     assert tolerance.Type == 0
     assert reference_text == {1: "(", 2: ")"}
     assert display.ShowParenthesis is False
@@ -208,8 +208,8 @@ def test_stop_mark_division_sits_on_the_thumbscrew_axis() -> None:
     assert spec.STICK_ORIGIN[0] == pytest.approx(-74.232)
     assert spec.STICK_X_MIN == pytest.approx(-74.232)
     assert spec.SETTING_NEAR_FACE_MM == pytest.approx(74.232)
-    # Printed at its three inch places as the "(2.923)" reference.
-    assert f"{spec.SETTING_NEAR_FACE_MM / 25.4:.{spec.SETTING_PRECISION}f}" == "2.923"
+    # Printed at one place as the "(2.9)" reference: the pose is an example.
+    assert f"{spec.SETTING_NEAR_FACE_MM / 25.4:.{spec.SETTING_PRECISION}f}" == "2.9"
     assert spec.STICK_X_MAX == pytest.approx(127.698)  # 7.95 bar, stations fixed
     assert spec.STICK_X_MIN < 0.0 and spec.STICK_X_MAX > stop.BLOCK_LENGTH
 
@@ -469,7 +469,10 @@ def test_in_use_sheet_registers_the_drawn_stop_on_a_rocker_arm() -> None:
         assert "ITEM " in text, text
     view_b = f"VIEW {sheet.IN_USE_VIEW_LETTER}, SHEET {sheet.IN_USE_SHEET}"
     assert sum(view_b in step for step in sheet.USE_STEPS) == 3
-    assert f"ZERO IS THE {registration.ZERO_TICK_TEXT} TICK" in sheet.USE_STEPS[2]
+    assert f"(FOR A BAR AT ZERO, GRADUATION {registration.ZERO_TICK_TEXT})" in sheet.USE_STEPS[2]
+    assert f"FOR A BAR AT ZERO THE STOP STANDS ON GRADUATION {registration.ZERO_TICK_TEXT}" in (
+        " ".join(sheet.IN_USE_CAPTION.split())
+    )
     # Rule 22: one action a step; no step chains two with ';' or 'AND SLIDE'.
     for step in sheet.USE_STEPS:
         assert "; SLIDE" not in step and "AND SLIDE" not in step, step
@@ -874,6 +877,8 @@ def test_clamped_sheet_places_section_clear_of_setting(monkeypatch, defect) -> N
     monkeypatch.setattr(drawing, "_add_assembly_dimensions", lambda *a: settled)
     arrows = []
     monkeypatch.setattr(drawing, "_add_view_b_arrow", lambda adapter, view: arrows.append(view))
+    face_notes = []
+    monkeypatch.setattr(drawing, "_add_stop_face_note", lambda adapter, view: face_notes.append(view))
     if defect is not None:
         message = {
             "style-set": "failed to set connected",
@@ -893,6 +898,7 @@ def test_clamped_sheet_places_section_clear_of_setting(monkeypatch, defect) -> N
     assert cut["view_xy"] == drawing.CLAMP_SECTION_CENTER
     assert cut["scale"] == drawing.CLAMP_SECTION_SCALE
     assert arrows == [underside]
+    assert face_notes == [front]
 
 
 @pytest.mark.parametrize("defect", (None, "mirrored", "upward"))
@@ -941,6 +947,33 @@ def test_view_b_arrow_points_down_onto_the_bottom_views_front_edge(monkeypatch, 
     assert calls["square"]["letter_height"] == drawing.VIEW_B_LETTER_HEIGHT
     # Over the bare stick, clear of the clamp the section cuts.
     assert drawing.VIEW_B_ARROW_MODEL_X_MM > stop.BLOCK_LENGTH + 20.0
+
+
+def test_stop_face_check_prints_at_the_end_face_nearer_the_10(monkeypatch) -> None:
+    """Rule 22: step 10A's acceptance prints on sheet 1 at the stop's end face
+    nearer the 10, above the stick, its text up and to the right."""
+    front, calls = object(), {}
+
+    def project(adapter, view, point, **kwargs):
+        assert view is front
+        calls["point"] = point
+        return (0.1294, 0.1867)
+
+    monkeypatch.setattr(drawing, "model_point_in_view", project)
+    monkeypatch.setattr(
+        drawing, "add_leader_note", lambda adapter, text, **kw: calls.update(text=text, kw=kw)
+    )
+    drawing._add_stop_face_note(object(), front)
+    x, y, _z = calls["point"]
+    assert x == pytest.approx(stop.BLOCK_LENGTH / 1000.0)
+    assert spec.STICK_TOP_Y / 1000.0 < y < 0.0  # on the block, above the stick
+    assert calls["text"] == sheet.STOP_FACE_NOTE and calls["kw"]["view"] is front
+    assert calls["kw"]["attach_xy"] == pytest.approx((0.1294, 0.1867))
+    tx, ty = calls["kw"]["text_xy"]
+    assert tx > 0.1294 and ty > 0.1867
+    assert f"{sheet.STOP_FACE_FEELER} FEELER DOES NOT ENTER" in sheet.STOP_FACE_NOTE
+    assert "(ASSEMBLY.MD STEP 10A)" in sheet.STOP_FACE_NOTE
+    assert sheet.ASSEMBLY_STEPS[11].endswith("NEARER THE 10 (SHEET 1).")
 
 
 @pytest.mark.parametrize(

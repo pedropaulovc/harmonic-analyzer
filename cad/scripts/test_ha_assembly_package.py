@@ -132,4 +132,7 @@ def test_bar_zero_step_cites_the_measuring_stick_setting_steps():
     assert ms_sheet.STEP_SECTIONS[-1][1] == ms_sheet.USE_STEPS
     lines = " ".join(ha_sheet.step_lines("summing-levelled"))
     assert f"WITH MHA-MS-00, PER ITS STEPS {ha_sheet.MS_SETTING_STEPS} (ASSEMBLY.MD)" in lines
-    assert any(f"ZERO IS THE {registration.ZERO_TICK_TEXT} TICK" in step for step in ms_sheet.USE_STEPS)
+    assert any(
+        f"FOR A BAR AT ZERO, GRADUATION {registration.ZERO_TICK_TEXT}" in step
+        for step in ms_sheet.USE_STEPS
+    )
