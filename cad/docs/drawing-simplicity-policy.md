@@ -393,9 +393,13 @@ followed by the reviewer instructions for the package kind
 (`cad/scripts/prompts/machinist_review_part.md`,
 `machinist_review_assembly.md`, or `machinist_review_traveler.md`), with its
 classification slot expanded from the matching
-`machinist_review_<kind>_severity.md` contract. Per-kind prompt inclusion keeps
-`traveler` prompts and `cad/process/<stem>/machinist_exceptions.yaml` out of
-part and assembly review keys. The isolated
+`machinist_review_<kind>_severity.md` contract. Traveler prompts and
+guidelines, `cad/process/<stem>/machinist_exceptions.yaml` and the
+traveler-only code (`machinist_review_traveler.py`, imported only for
+`--kind traveler`) stay out of part and assembly review keys. A traveler is
+reviewed from the CLI (`--kind traveler --pdf <traveler> [--companion-pdf
+<drawing>] [--traveler-html <html>]`); no build task reviews travelers yet.
+The isolated
 judge inspects the after sheets and receives that same kind-specific classification
 and evidence contract, not the reviewer's detection or report instructions.
 It vets every finding against the guidelines, text layer and owner exceptions,

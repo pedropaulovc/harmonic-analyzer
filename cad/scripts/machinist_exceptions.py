@@ -60,28 +60,27 @@ def _entry(value: object, path: Path, index: int) -> MachinistException:
 
 
 def load_exceptions(config_root: Path, name: str, kind: str) -> tuple[MachinistException, ...]:
-    """The package's declared exceptions; () when the package declares none.
+    """A part or assembly package's declared exceptions; () when the package
+    declares none. Traveler declarations are found by
+    ``machinist_review_traveler.load_exceptions``.
 
-    Part and assembly declarations live under ``config_root``; traveler
-    declarations live beside their process plan at
-    ``<cad_root>/process/<underscore_stem>/machinist_exceptions.yaml`` so a
-    traveler exception never re-keys the part drawing's review.
     A missing config file is not an error: most packages declare nothing.
     A malformed declaration is an error — a typo must never silently widen
     or narrow what the reviewer ignores.
     """
     dashed = name.replace("_", "-")
-    if kind == "traveler":
-        stem = name.replace("-", "_")
-        path = config_root.parent / "process" / stem / "machinist_exceptions.yaml"
-    elif kind == "part":
-        path = config_root / "parts" / f"{dashed}.yaml"
-        stem = dashed
+    if kind == "part":
+        subdir, stem = "parts", dashed
     else:
         # Assembly drawings keep the "-assembly" suffix; their config is the
         # assembly's contract, named by the bare stem (BUILDING.md).
-        stem = dashed.removesuffix("-assembly")
-        path = config_root / "assemblies" / f"{stem}.yaml"
+        subdir, stem = "assemblies", dashed.removesuffix("-assembly")
+    return load_exceptions_file(config_root / subdir / f"{stem}.yaml", stem)
+
+
+def load_exceptions_file(path: Path, stem: str) -> tuple[MachinistException, ...]:
+    """The ``machinist_exceptions`` declared in ``path``, under ``stem`` or at
+    top level; () when the file is absent or declares none."""
     if not path.is_file():
         return ()
     doc = yaml.safe_load(path.read_text(encoding="utf-8")) or {}

@@ -142,8 +142,3 @@ def split_versioned_guidelines(
 def split_drawing_guidelines(text: str) -> tuple[int, str]:
     """``(major_version, body)`` of ``cad/docs/drawing-guidelines.md``."""
     return split_versioned_guidelines(text, label="drawing guidelines")
-
-
-def split_traveler_guidelines(text: str) -> tuple[int, str]:
-    """``(major_version, body)`` of ``cad/docs/traveler-guidelines.md``."""
-    return split_versioned_guidelines(text, label="traveler guidelines")

@@ -137,8 +137,11 @@ def _local_import_closure(entry: Path) -> set[str]:
                 # Registry is only used by interactive name/--all selectors;
                 # the leaf supplies PDF, kind and name. The ASSEMBLY.md
                 # generator keys a review by the section it renders, through
-                # dodo._machinist_review_fitup_text (rule 22).
-                if local.is_file() and name not in {"_drawing_registry", "ha_assembly_package"}:
+                # dodo._machinist_review_fitup_text (rule 22). The traveler
+                # module runs only for --kind traveler, which keys no drawing.
+                if local.is_file() and name not in {
+                    "_drawing_registry", "ha_assembly_package", "machinist_review_traveler",
+                }:
                     pending.append(local)
     return found
 
@@ -396,8 +399,7 @@ def test_bumped_guidelines_rekey_every_review(inputs):
     assert all(after[stem] != before[stem] for stem in stems)
 
 
-
-def test_traveler_prompts_and_guidelines_do_not_rekey_drawing_reviews(inputs):
+def test_traveler_inputs_do_not_rekey_drawing_reviews(inputs):
     dodo = inputs.module
     before = _review_key(dodo, "probe")
     (inputs.prompts / "machinist_review_traveler.md").write_text(
@@ -409,19 +411,27 @@ def test_traveler_prompts_and_guidelines_do_not_rekey_drawing_reviews(inputs):
     inputs.traveler_guidelines.write_text(
         "---\nmajor_version: 2\n---\n# Traveler v2\n", encoding="utf-8"
     )
+    traveler_module = inputs.scripts / "machinist_review_traveler.py"
+    traveler_module.write_text("# traveler-only review code, edited\n", encoding="utf-8")
+    deps = dodo._machinist_review_file_deps("probe")
+    assert str(traveler_module.resolve()) not in deps
     assert _review_key(dodo, "probe") == before
 
-    traveler_dir = inputs.root / "cad" / "out" / "travelers" / "probe"
-    traveler_dir.mkdir(parents=True)
-    (traveler_dir / "probe-traveler.pdf").write_bytes(b"PDF traveler")
-    (traveler_dir / "traveler-hobby.html").write_text("<html></html>\n", encoding="utf-8")
-    deps = dodo._machinist_review_traveler_file_deps("probe")
-    traveler_sidecar = str(Path(dodo._traveler_guidelines_version_dep()))
-    drawing_sidecar = str(Path(dodo._drawing_guidelines_version_dep()))
-    assert traveler_sidecar in deps and drawing_sidecar in deps
-    assert str(inputs.prompts / "machinist_review_traveler.md") in deps
-    assert str(inputs.prompts / "machinist_review_part.md") not in deps
-    assert str(inputs.prompts / "machinist_review_assembly.md") not in deps
+
+def test_traveler_module_stays_off_the_drawing_review_path():
+    """The traveler module is excluded from _MACHINIST_REVIEW_MODULES (it
+    keys no drawing review), so machinist_review.py may import it only inside
+    a function body, on the traveler path."""
+    source = REPO_ROOT / "cad" / "scripts" / "machinist_review.py"
+    tree = ast.parse(source.read_text(encoding="utf-8"))
+    top_level = set()
+    for node in tree.body:
+        if isinstance(node, ast.Import):
+            top_level.update(alias.name.split(".")[0] for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            top_level.add(node.module.split(".")[0])
+    assert "machinist_review_traveler" not in top_level
+
 
 @pytest.mark.parametrize(
     "head",

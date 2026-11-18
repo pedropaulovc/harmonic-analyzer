@@ -11,8 +11,8 @@ strictly against `drawing-guidelines.md` and `traveler-guidelines.md` above.
 Cite the rule every finding breaks (`rule T10 (every check can be done as
 written)` or `rule 26 (standard forms only)`).
 
-When the package input includes **companion part drawing sheets** after the
-traveler sheets, those drawing sheets are **reference specification authority
+When the package input marks **companion part drawing sheets** (DOCUMENT
+ROLES) after the traveler sheets, those drawing sheets are **reference specification authority
 only**: use them to verify that every feature, tolerance band, datum, edge
 requirement, material and revision on the drawing is faithfully made and
 accepted by the traveler (rules T1, T2, T14). **Never** file findings against
@@ -23,7 +23,7 @@ the traveler sheets alone without flagging the absent drawing as missing.
 
 The sheet images are available only through `view_sheet` and `crop`; inspect
 every sheet in order. Where the prompt carries a `TRAVELER HTML TEXT` section
-(exact structured text from the HTML source) or a `SHEET TEXT LAYER` section,
+(structured text from the HTML source) or a `SHEET TEXT LAYER` section,
 treat them as transcription aids, never proof of visual rendering: confirm
 printed layout, leaders, fills and line counts on `view_sheet` and `crop`.
 Headless browser PDF printing often splits or duplicates glyphs in `SHEET TEXT
@@ -44,7 +44,8 @@ Pass 1 — detection. Find every candidate item; classify nothing yet.
    - **Prerequisites & stock gate (rules T3, T4):** Is every shop-made fixture,
      plug, soft jaw or template either given a drawing/make reference or
      dimensioned well enough to build/verify? Are clearance-critical clamps/screws
-     and bond/tape grades named by product/size (`3M VHB 5906`, `Pitbull 26000`)?
+     and bond/tape grades named by product/size (tape product and thickness,
+     clamp make and model)?
      Does a fixed-Z cut gate incoming stock thickness/size first?
    - **Holding, `G54` / DRO zero & flip tracking (rules T5, T6, T7):** Trace
      `face 1` / `face 2`, ends and edges through every flip, reseat and tape
@@ -56,11 +57,12 @@ Pass 1 — detection. Find every candidate item; classify nothing yet.
      and `M0` for tool number, stickout (where critical), manual RPM setting,
      hands-in safety, and `Cycle Start`, plus a first-article NC prove-out step.
    - **Sequence & handling traps (rule T9):** Focus on qualitative shop traps
-     that `prechips` / `_gcode` do not model: thin-bar hogging without stress
+     the build gates do not model: thin-bar hogging without stress
      release, live edge clamps pinching parted waste into small end mills,
      prying a thin taped part from one end, deburring before datum seating,
      sparing `SHARP` edges, or printed text contradictions (such as leaving a
-     plug in a relief bore while drilling through into it).
+     plug in a relief bore while drilling through into it, or a hands-in step
+     at an `M0` the sheet does not say is retracted with the spindle off).
    - **Checks, measurability & over-inspection (rules T10, T11, T15):** Flag
      **over-inspection** (this is a hobby shop, not aerospace QA: per-piece
      gauging across a multi-piece lot on CNC-repeated `.X`/`.XX` features that
@@ -73,7 +75,7 @@ Pass 1 — detection. Find every candidate item; classify nothing yet.
      slant distance vs. horizontal projection from a bore centre).
    - **Op readability & setup diagrams (rules T12, T13):** Count printed lines
      per op cell on `view_sheet` (max 6 printed lines per op), check double-meaning
-     words (`strap` part vs. `strap` clamp in legend), and `crop` every setup
+     words (a Picture Key word that is also the part's name), and `crop` every setup
      and inspection diagram to check leader landings (including whether an edge
      height leader lands on the centreline station where the band applies),
      legend fill consistency, clipping and overlaps.
@@ -93,12 +95,12 @@ DO NOT ASK FOR
   ("geometry, not method") or rule 24 against a traveler, and do not flag brief
   one-clause shop explanations on an op (`the rough passes' stress is let go`,
   `no rapid leaves the bore`) as narration.
-- **Deterministic-gated numbers & clearances:** do not recompute or
-  second-guess spindle RPM, surface speed, feed rate, chip load, axial/radial
-  DOC, tool deflection, vise jaw grip, adhesive bond shear/peel capacity,
-  machine axis travel, pecking, parametric clamp/flange/relief-floor/breakthrough
-  clearances or declared gauge resolution (`prechips` and `_gcode` verify
-  these), UNLESS two printed statements directly contradict each other.
+- **Numbers the build gates check:** do not recompute or second-guess spindle
+  RPM, surface speed, chip load, tool deflection, vise or chuck holding,
+  machine axis travel, pecking, declared gauge resolution against a band, or
+  posted depths and retract heights (`prechips` and `cam:<stem>` check these,
+  traveler guidelines "Division of labour"). Still report any printed step
+  that contradicts itself, the drawing or a safe stop.
 - **Posted G-code internals:** do not ask for raw G-code listings, line
   numbers, lead-in/ramp coordinates, zigzag pass counts, safe-Z numbers or CAM
   simulations on the sheet.
@@ -115,10 +117,9 @@ DO NOT ASK FOR
   apply rules 8–15 (isometric, third-angle alignment, hidden lines) to
   schematic setup diagrams, do not object to process WCS datums differing from
   drawing datums when final inspection checks drawing requirements, do not
-  object to `.0001 in` micrometers reading telescoping gauges on a `.0005 in`
-  reamed bore, do not ask for tolerances on rough-sawn blank lengths unless
-  arithmetic proves `±1/16 in` breaks a setup, and never report PDF text-layer
-  glyph-splitting artefacts.
+  ask for tolerances on rough-sawn blank lengths unless arithmetic proves
+  `±1/16 in` breaks a setup, and never report PDF text-layer glyph-splitting
+  artefacts.
 
 REPORT (structured JSON per the schema; terse and concrete; name the sheet,
 setup and op or diagram for every finding, and say the fix):

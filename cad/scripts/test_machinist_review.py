@@ -2460,7 +2460,9 @@ def synthetic_prompt_sources(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     for path in contracts.values():
         path.write_text("Synthetic contract.\n", encoding="utf-8")
     monkeypatch.setattr(mr, "GUIDELINES_FILE", guidelines)
-    monkeypatch.setattr(mr, "TRAVELER_GUIDELINES_FILE", traveler_guidelines)
+    import machinist_review_traveler
+
+    monkeypatch.setattr(machinist_review_traveler, "GUIDELINES_FILE", traveler_guidelines)
     monkeypatch.setattr(mr, "PROMPT_FILES", templates)
     monkeypatch.setattr(mr, "JUDGE_PROMPT_FILE", judge_template)
     monkeypatch.setattr(mr, "SEVERITY_FILES", contracts)
@@ -2733,24 +2735,27 @@ def test_prompts_define_the_classification_contract() -> None:
 
 
 def test_traveler_html_extraction_and_document_roles(tmp_path: Path) -> None:
-    traveler_pdf = _text_pdf(tmp_path / "strap-traveler.pdf", [(80, 400, "Setup 1")])
-    drawing_pdf = _text_pdf(tmp_path / "strap.pdf", [(80, 400, "FRONT 1:1")])
+    traveler_pdf = _text_pdf(tmp_path / "part-traveler.pdf", [(80, 400, "Setup 1")])
+    drawing_pdf = _text_pdf(tmp_path / "part.pdf", [(80, 400, "FRONT 1:1")])
     html_file = tmp_path / "traveler-hobby.html"
     html_file.write_text(
         "<!doctype html><html><head><style>body{color:#000}</style></head><body>"
-        "<h1>Rocker strap</h1><p>MHA-CH-13; v50</p>"
+        "<h1>Probe part</h1><p>MHA-XX-01; v50</p>"
         '<div class="setup-heading"><h2>Setup 2 — Rough faces<span class="machine">PM-30MV CNC</span></h2></div>'
         '<figure><img src="data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=" alt="Sub-plate plan."></figure>'
+        "<div>Holding: vise</div><div>Datum: X0 fixed jaw</div>"
+        "<dl><dt>Gate</dt><dd>.nnn<br>.mmm</dd></dl>"
         "<table><tr><th>Op</th><th>Work</th><th>Tool</th></tr>"
-        "<tr><td>30</td><td><div>Mic .122–.126</div><div><strong>Check:</strong> .097–.099</div></td><td>1/2 EM</td></tr>"
+        "<tr><td>30</td><td><div>Mic .nnn–.mmm</div><div><strong>Check:</strong> .ppp–.qqq</div></td><td>1/2 EM</td></tr>"
         "</table></body></html>",
         encoding="utf-8",
     )
     package = mr.ReviewPackage(
-        "ch_rocker_strap",
+        "probe_part",
         "traveler",
         (traveler_pdf, drawing_pdf),
         traveler_html=html_file,
+        companion_count=1,
     )
     prompt = mr._review_prompt(package, 2)
     assert "\nDOCUMENT ROLES\n" in prompt
@@ -2759,8 +2764,26 @@ def test_traveler_html_extraction_and_document_roles(tmp_path: Path) -> None:
     assert "\nTRAVELER HTML TEXT\n" in prompt
     assert "Setup 2 — Rough faces — PM-30MV CNC" in prompt
     assert "[Diagram alt: Sub-plate plan.]" in prompt
-    assert "30 | Mic .122–.126 / Check: .097–.099 | 1/2 EM" in prompt
+    assert "\nHolding: vise\nDatum: X0 fixed jaw\n" in prompt
+    assert "\nGate\n.nnn\n.mmm\n" in prompt
+    assert "30 | Mic .nnn–.mmm / Check: .ppp–.qqq | 1/2 EM" in prompt
     assert "body{color:#000}" not in prompt
+    # Without --companion-pdf every PDF is the traveler: no sheet is shielded.
+    unpaired = mr.ReviewPackage("probe_part", "traveler", (traveler_pdf, drawing_pdf))
+    assert "DOCUMENT ROLES" not in mr._review_prompt(unpaired, 2)
+
+
+def test_companion_pdf_requires_a_traveler_package(tmp_path: Path) -> None:
+    traveler, drawing = tmp_path / "t.pdf", tmp_path / "d.pdf"
+    args = mr._parse_args([
+        "--pdf", str(traveler), "--companion-pdf", str(drawing),
+        "--name", "probe", "--kind", "traveler",
+    ])
+    assert args.companion_pdf == [drawing]
+    with pytest.raises(SystemExit):
+        mr._parse_args([
+            "--pdf", str(traveler), "--companion-pdf", str(drawing), "--name", "probe",
+        ])
 
 
 # --- owner-declared machinist exceptions -------------------------------------
@@ -2853,35 +2876,36 @@ def test_assembly_declarations_load_from_the_assemblys_contract(tmp_path: Path) 
 
 
 
-def test_traveler_declarations_load_from_process_directory(tmp_path: Path) -> None:
+def test_traveler_declarations_load_from_process_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     import yaml
     import machinist_exceptions
+    import machinist_review_traveler
 
     config_root = tmp_path / "config"
     config_root.mkdir()
-    process_dir = tmp_path / "process" / "ch_rocker_strap"
+    process_dir = tmp_path / "process" / "probe_part"
     process_dir.mkdir(parents=True)
     entry = {
         "id": "TR-01",
         "where": "Setup 1, Picture key",
-        "finding": "legend word 'strap' collides with part name (rule T13)",
-        "reason": "prechips built-in legend pending upstream rename",
+        "finding": "a legend word is also the part's name (rule T12)",
+        "reason": "owner accepts the generator's legend",
         "kind": "accept",
     }
     (process_dir / "machinist_exceptions.yaml").write_text(
         yaml.safe_dump({"machinist_exceptions": [entry]}),
         encoding="utf-8",
     )
+    monkeypatch.setattr(machinist_review_traveler, "PROCESS_ROOT", tmp_path / "process")
     # Part exceptions in config/parts/ do not bleed into traveler reviews and vice versa.
-    _write_exceptions_config(config_root, "ch_rocker_strap", [dict(entry, id="RV-99")])
-    (loaded,) = machinist_exceptions.load_exceptions(
-        config_root, "ch_rocker_strap", "traveler"
-    )
+    _write_exceptions_config(config_root, "probe_part", [dict(entry, id="RV-99")])
+    (loaded,) = machinist_review_traveler.load_exceptions("probe_part")
     assert (loaded.id, loaded.kind) == ("TR-01", "accept")
-    (part_loaded,) = machinist_exceptions.load_exceptions(
-        config_root, "ch_rocker_strap", "part"
-    )
+    (part_loaded,) = machinist_exceptions.load_exceptions(config_root, "probe_part", "part")
     assert part_loaded.id == "RV-99"
+
 
 def test_review_prompt_injects_declared_exceptions(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch

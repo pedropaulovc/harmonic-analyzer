@@ -34,13 +34,17 @@ drawings"), plus the shop's process equipment:
 - **Manual lathe:** a PM-1127VF-LB lathe (`70–380` and `380–2000 rpm`) with a
   two-axis DRO, chucks, live/dead centres and lathe boring bars; there is no
   milling boring head and no CNC lathe.
-- **Bench, hand tools and bore transfer:** assume a well-equipped home shop —
+- **Bench, hand tools and bore checks:** assume a well-equipped home shop —
   most ordinary hand tools (files, stones, abrasive rolls, scrapers, blades,
   squares, clamps, hex keys, wrenches, torque wrenches / torque screwdriver,
   soft-jaw bench vise, miter saw or bandsaw, spring-loaded spindle tap guide,
-  telescoping and small-hole gauges read on the `.0001 in` outside micrometers,
-  feeler leaves) are available even when not itemized on the Tools table; a
-  CMM, optical comparator, air gauge or production metrology lab is not.
+  feeler leaves) are available even when not itemized on the Tools table. Bores
+  are checked as "What the shop holds" says: pin gauges, or a GO / NO-GO plug
+  gauge pair the traveler names for a band the pin-gauge steps cannot resolve.
+  The shop also owns telescoping gauges read on the `.0001 in` outside
+  micrometers (see rule T11 for what they cannot accept). A CMM, optical
+  comparator, air gauge, bore micrometer, small-hole gauge or production
+  metrology lab is not in the shop.
 
 How `drawing-guidelines.md` applies to a traveler review:
 
@@ -61,31 +65,32 @@ How `drawing-guidelines.md` applies to a traveler review:
 
 ### Division of labour with deterministic build gates
 
-Before a traveler reaches machinist review, automated build checks have already
-verified:
+For a part enrolled in the CNC build, `build` and `release` run two
+deterministic gates on the same plan the traveler prints from:
 
-- **CAD bindings (`{{cad.*}}`):** bound part limits, hole coordinates, Z cut
-  levels and blank-fit envelopes come directly from the part's exported
-  `features.toml`.
-- **`prechips` physics and shop screens:** `stock_fit`, `cutting_speeds`
-  (RPM/SFM and chip load), `milling_deflection`, `turning_deflection`,
-  `tool_sizing` (nominal cutter/drill/reamer vs. band), `gauge_capability`
-  (declared gauge resolution vs. band), `vise_holding` and `lathe_holding`,
-  adhesive bond shear/tensile derating per piece and depth step,
-  `machine_capacity` (axis travels, Z stack and tool stickout), `drill_pecking`
-  and `indexing`.
-- **Posted NC verification (`_gcode` / `cam:<stem>`):** posted toolpath depths
-  and profiles against the STEP model, rapid-above-stock and plunge-feed
-  safety, spindle-off retracts above stock before every `M0` and `M6`, and
-  probe `G38.2` / `G10 L20 P1` sequences.
+- **`prechips:<stem>`** renders the traveler and refuses it (no sheet at all)
+  on a failed enforced check: `stock_fit`, `cutting_speeds`,
+  `milling_deflection`, `turning_deflection`, `tool_sizing`,
+  `gauge_capability`, `vise_holding`, `lathe_holding`, `machine_capacity`,
+  `drill_pecking` and `indexing`. Its CAD values (`{{cad.*}}`) come from the
+  part's exported `features.toml`.
+- **`cam:<stem>`** posts the NC programs and checks each against the checks
+  its recipe selects: cut depths and hole bottoms, spindle speeds per tool
+  section (a speed change needs an `M0`), `M0` stops and `M6` tool changes
+  with the tool retracted above the stock top, the spindle stopped where the
+  recipe asks and an operator comment before each, a single probed work zero
+  (`G38.2` then `G10 L20 P1`, spindle off), rapids above the stock top,
+  program bounds and keep-out regions.
 
-Do not re-derive cutting forces, chatter, deflection, bond stress, spindle
-power, chip load, machine-envelope or declared Z/breakthrough math to
-second-guess gated numbers (`prechips` and `cam.py` own parametric clearance,
-drill-tip floor/breakthrough and requirement-coverage checks). Judge physical
-sequence only for **qualitative or printed-text contradictions** the schema
-cannot see, and show arithmetic from printed numbers whenever claiming two
-printed values collide or fail to clean up.
+Do not recompute what those checks own: cutting speeds and chip load,
+deflection, vise or chuck holding, machine travel, pecking, gauge resolution
+against a band, or posted depths and retract heights. A traveler sheet is not
+proof that the gates ran for it, and a gate does not read the sheet: still
+report any step the sheet prints that contradicts itself, the drawing or a
+safe stop (for example a hands-in step at an `M0` the sheet does not say is
+retracted with the spindle off), and show arithmetic from printed numbers
+whenever claiming two printed values collide or fail to clean up. Adhesive
+and tape bond strength is not gated; judge it under rule T3.
 
 ---
 
@@ -109,8 +114,8 @@ printed values collide or fail to clean up.
 - Every manufactured feature on the part drawing (faces, profiles, holes,
   reams, threads, slots, grooves, chamfers, reliefs) is produced by an
   operation on the traveler, unless the drawing or traveler explicitly defers
-  it to assembly or a joined parent part (`finished after joining MHA-CH-06`,
-  `drilled at assembly`).
+  it to assembly or a joined parent part (`finished after joining its parent
+  part`, `drilled at assembly`).
 - **Inspect what matters, not every dimension on the print.** This is a hobby
   machining process, not aerospace part manufacture: a CNC program or fixed
   tooling already holds interpolated contours, routine clearance-hole pitches
@@ -143,12 +148,12 @@ printed values collide or fail to clean up.
     zeros and pilot fits depend on unprinted plate/plug geometry leaves the
     builder unable to build or verify the setup.
 - Purchased workholding and hold-down hardware whose **envelope or height
-  governs cutter clearance or clamping** is named specifically (`Mitee-Bite
-  Pitbull 26000 (4-40)`, `5/16-18 × 5/8 button-head screw` with washer OD), not
-  merely "edge clamps" or "washer and screw".
+  governs cutter clearance or clamping** is named specifically (the edge
+  clamp's make, model and thread; the screw's thread, length and head type
+  with its washer OD), not merely "edge clamps" or "washer and screw".
 - Any adhesive, tape, wax, retaining compound or solvent whose bond strength,
-  thickness or residue removal the route depends on is named by product/grade
-  and critical size (`3M VHB 5906, .006 in`), just as rule 23 names a Loctite
+  thickness or residue removal the route depends on is named by product,
+  grade and critical thickness, just as rule 23 names a Loctite
   grade. Ordinary cutting oil needs no brand name unless a specific fluid is
   required.
 
@@ -159,8 +164,10 @@ printed values collide or fail to clean up.
   assumes the arriving blank sits within a size window (so a thin blank would
   miss cleanup or a thick blank would overload the cutter or leave the part
   thick), an operation before the cut measures the blank, prints the acceptable
-  range and states the stop action (`mic it, .125 nominal, every reading
-  .122–.126, else stop`).
+  range and states the stop action (`mic it, .nnn nominal, every reading
+  .nnn–.nnn, else stop`). This incoming-stock gate is required even when the
+  stock size is a REF or untoleranced size on the drawing; it is not the
+  over-inspection rule T10 lists.
 - Rough-sawn blank lengths and other supply sizes carry no tolerance band
   unless printed arithmetic shows that ordinary sawing variation (`±1/16 in`)
   breaks clamping, stop contact or stock cleanup in a later setup.
@@ -227,14 +234,14 @@ printed values collide or fail to clean up.
 
 ### Rule T8 — CNC program handoffs (`M0` / `M6`) and prove-out
 
-- Every CNC operation names the program file it runs (`RS01_rough_faces`, or
+- Every CNC operation names the program file it runs (`Pnn_rough_faces`, or
   `Same file` for subsequent sections of one multi-tool program).
 - Because spindle RPM is set manually on the PM-30MV and CNCjs pauses at tool
   changes and stops, every `M6` and `M0` handoff states:
   - the tool number (`T1`, `T2`, …) and tool description (matching the Tools
     table), plus collet stickout range where clearance or flute reach requires
-    it (`.47–.50 out of the collet`);
-  - the spindle speed to set by hand (`set 2650`), cutting oil/air where used,
+    it (`.nn–.nn out of the collet`);
+  - the spindle speed to set by hand (`set nnnn`), cutting oil/air where used,
     and any special retract behavior worth knowing (`feeds in and out, spindle
     running: no rapid leaves the bore`);
   - every physical action the operator performs while stopped (mic thickness,
@@ -249,9 +256,10 @@ printed values collide or fail to clean up.
 
 ### Rule T9 — Sequence and handling traps that code gates do not model
 
-Parametric depth, breakthrough, clamp/flange clearance, deflection and bond
-capacity belong to `prechips` and `_gcode`, not to manual re-calculation here.
-Focus sequence review on qualitative shop-floor traps in the written steps:
+Parametric depth, clamp clearance, deflection and holding belong to
+`prechips` and `cam:<stem>` as listed above, not to manual re-calculation
+here. Focus sequence review on qualitative shop-floor traps in the written
+steps:
 
 - **Thin-bar distortion and stress release:** hogging one side of cold-finished
   bar bows thin parts; roughing both faces, releasing clamps to let stress
@@ -296,7 +304,9 @@ defect** (`over_specification`, rule T15) just as a broken check is:
   - multi-step surface-plate / sine-bar / gauge-block metrology setups on loose
     title-block bands where calipers, a rule, a mating part or the CNC program
     itself suffices;
-  - checking un-toleranced or reference `(REF)` dimensions as pass/fail gates.
+  - checking un-toleranced or reference `(REF)` dimensions as pass/fail final
+    acceptance (a T4 incoming-stock gate and a labelled in-process target are
+    not over-inspection).
 - **Every kept check is doable as written:** each in-process or final check
   states **what** is measured, **from what reference and in what direction**
   (where slant vs. projected distance differs), **with which declared shop
@@ -318,13 +328,13 @@ defect** (`over_specification`, rule T15) just as a broken check is:
 ### Rule T11 — Instruments stay within the declared shop
 
 - Inspections use only gauges and tools in T0. Requiring a CMM, optical
-  comparator, air gauge or unowned bore micrometer is a defect.
+  comparator, air gauge, bore micrometer or small-hole gauge is a defect.
 - Do not argue gauge resolution against a tolerance band when `prechips`
-  `gauge_capability` owns it, EXCEPT when the prose names a transfer tool (such
-  as telescoping gauges + micrometer, or calipers on a `.001` band) that
-  contradicts how the check is physically read — note that `.0001 in`
-  micrometers reading a telescoping gauge **is** this shop's accepted method for
-  a `.0005 in` reamed bore when `.001 in`-step pin gauges are too coarse.
+  `gauge_capability` owns it, EXCEPT when the prose names a transfer tool that
+  contradicts how the check is physically read. A telescoping gauge read on a
+  micrometer repeats to about `.0005 in`, so it does not accept a bore band of
+  `.0005 in` or similar; that bore needs pin gauges or a named GO / NO-GO plug
+  gauge pair. Calipers on a `.001 in` band are the same defect.
 
 ### Rule T12 — Operations read cleanly at the machine
 
@@ -335,12 +345,11 @@ defect** (`over_specification`, rule T15) just as a broken check is:
   essays into separate numbered ops.
 - Program sub-sections that run continuously inside one NC file without operator
   intervention (such as roughing, finishing and cutting through an outline in
-  one `RS04` run) should make clear they are stages of that running file rather
+  one `Pnn` run) should make clear they are stages of that running file rather
   than separate manual Cycle Starts.
 - Follow the project's inch and shop notation (rule 26): no private slang, and
   avoid giving one word two conflicting meanings on the same sheet (for example,
-  using `strap` in the Picture Key for a strap clamp on a traveler whose part
-  is itself named `Rocker strap`).
+  a Picture Key word that is also the part's own name).
 
 ### Rule T13 — Setup diagrams and printed layout
 
@@ -354,8 +363,8 @@ defect** (`over_specification`, rule T15) just as a broken check is:
     an off-centre station on a curved edge whose height there lies outside the
     stated centreline band;
   - Picture Key fills, hatches and labels must remain distinguishable in
-    grayscale print and match how the setup diagrams use them (do not draw
-    screw/washer hardware in a clamp fill whose legend calls it a strap);
+    grayscale print and match how the setup diagrams use them (do not draw one
+    kind of hardware in a fill whose legend names another);
   - clamps backed off or plugs removed in a setup must match the diagram;
   - no unresolved template tokens (`{{…}}`, `?`, `NaN`), clipped text, colliding
     labels or mid-row page splits may appear on the rendered PDF pages.

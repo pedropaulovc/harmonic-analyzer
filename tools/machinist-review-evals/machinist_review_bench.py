@@ -256,9 +256,9 @@ def compose_prompt(kind: str, ref: str | None = None, repo: Path = REPO_ROOT) ->
             )
         traveler_text = traveler_guidelines.stdout
         if traveler_text.startswith("---\n"):
-            traveler_text = mr.review_config.split_traveler_guidelines(
-                traveler_text
-            )[1]
+            import machinist_review_traveler
+
+            traveler_text = machinist_review_traveler.split_guidelines(traveler_text)[1]
         text = f"{text}\n\n{traveler_text.rstrip()}"
     return f"{text}\n\n{template}"
 
