@@ -11,6 +11,8 @@ from zipfile import ZipFile
 import pytest
 import trimesh
 
+import _config
+
 TOOLS = Path(__file__).resolve().parents[1] / "comparisons" / "tools"
 sys.path.insert(0, str(TOOLS))
 
@@ -142,6 +144,18 @@ def test_configured_family_members_and_prior_current_aliases(stem, number, neutr
         assert paired_keys([prior], current, mapping) == {
             mesh_key(stem, configuration): (prior,)
         }
+
+
+def test_shared_vendor_groups_name_the_registry_supplier_sku():
+    # #2709: a SKU change in the part registry must reach the current map.
+    # A configured kit (sh-vn-clamping-kit-hardware) is no part row.
+    payload = json.loads(IDENTITY_MAP.read_text(encoding="utf-8"))
+    parts = _config.parts()
+    groups = [group for group in payload["shared_vendor_groups"] if group["stem"] in parts]
+    assert groups
+    for group in groups:
+        skus = [str(sku) for sku in parts[group["stem"]]["supplier_skus"]]
+        assert group["supplier_sku"] in skus, group["stem"]
 
 
 def _kit_map(tmp_path, mutate):

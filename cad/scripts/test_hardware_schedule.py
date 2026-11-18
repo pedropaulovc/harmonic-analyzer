@@ -4,10 +4,29 @@ schedule (#2886)."""
 
 from __future__ import annotations
 
+from pathlib import Path
+
+import yaml
+
 import _config
 import cut_release
 import error_budget
 import hardware_schedule as schedule
+
+ASSEMBLIES = Path(__file__).resolve().parents[1] / "config" / "assemblies"
+
+
+def test_music_wire_row_cuts_and_forms_at_the_assemblies_that_fit_it():
+    # Delegated ruling on #1459 (2026-11-17): the wire is bought as coil and
+    # cut to length and formed at assembly; its purchase row says so and
+    # names the assembly drawings whose steps hook, wrap and tie it.
+    designation = schedule.SCHEDULE["sh-vn-music-wire"]["designation"]
+    assert "cut to length and form at assembly" in designation
+    for assembly in ("mg-magnifier", "pn-pen", "ha-harmonic-analyzer"):
+        number = yaml.safe_load(
+            (ASSEMBLIES / f"{assembly}.yaml").read_text(encoding="utf-8")
+        )["number"]
+        assert number in designation, assembly
 
 
 def test_every_purchased_part_has_a_tier_and_every_tier_names_a_part():
