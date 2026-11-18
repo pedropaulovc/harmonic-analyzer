@@ -194,12 +194,13 @@ BLANK_LABEL_OFFSET = (0.0, -0.045)
 # plate's front top edge between the hub and clamp 3 goes down and right;
 # the hub screw's head rim where its side meets the dome (its bearing rim
 # lies under the head's own side) goes up and right; the washer's top outer
-# rim, outside the screw head, goes up and left. The clamp's anchor is its
+# rim, outside the screw head, goes straight up (r8: at 135 deg the shallow
+# leader clipped its own balloon's text box). The clamp's anchor is its
 # screw's head-top circle (inside the chamfer: the head's full radius is no
 # edge at the top face). Rim angles run from part +X toward +Y.
 CLAMP_RIM_DEG = -45.0
 SCREW_RIM_DEG = 45.0
-WASHER_RIM_DEG = 135.0
+WASHER_RIM_DEG = 90.0
 
 
 def rim_point(radius: float, z: float, degrees: float) -> Point3:
