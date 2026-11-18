@@ -11,9 +11,12 @@ import pytest
 
 import build_mg_magnifying_clamp as part
 import draw_mg_magnifying_clamp as drawing
+import export_features
+import mg_magnifying_clamp_geom as geom
 import mg_magnifying_clamp_spec as spec
 import mg_rod_clamp_joint as joint
 from _drawing_registry import DRAWINGS_BY_NAME
+from _gtol_face import FaceGeometry
 
 
 def test_no_surface_finish_on_the_clamped_bore() -> None:
@@ -812,3 +815,88 @@ def test_group_visibility_and_source_proof_remain_strict_after_native_rebuild(mo
         fixture.lines[0].GetStartPoint2().relations.clear()
     with pytest.raises(RuntimeError):
         drawing._assert_grouped_flat_locations(drawing._flat_group_annotations(fixture.adapter, view, annotations))
+
+
+_FEATURE_KINDS = {
+    "bottom_face": "face",
+    "top_face": "face",
+    "hex_flats": "stock",
+    "lever_bore": "hole",
+    "thumb_tap": "threaded_hole",
+    "rod_tap": "threaded_hole",
+}
+
+
+def _plane(normal: tuple[float, float, float], offset_mm: float) -> FaceGeometry:
+    point = tuple(value * offset_mm / 1000 for value in normal)
+    return FaceGeometry(None, 4001, (*normal, *point), normal, ())
+
+
+def _cylinder(dia_mm: float, axis: tuple[float, float, float], box_mm: tuple[float, ...]) -> FaceGeometry:
+    return FaceGeometry(None, 4002, (0.0, 0.0, 0.0, *axis, dia_mm / 2000), None, tuple(v / 1000 for v in box_mm))
+
+
+def _owners(geometry: FaceGeometry) -> list[str]:
+    selectors = export_features.feature_selectors("mg_magnifying_clamp")
+    return [name for name, specs in selectors.items() if any(spec.matches(geometry) for spec in specs)]
+
+
+def test_the_clamp_is_a_feature_export_part_with_one_owner_per_face() -> None:
+    assert "mg_magnifying_clamp" in export_features.SUPPORTED_PARTS
+    manifest = export_features.requirement_manifest("mg_magnifying_clamp")
+    assert {name: feature["kind"] for name, feature in manifest["features"].items()} == _FEATURE_KINDS
+    assert manifest["construction"] == "one_piece"
+    assert manifest["notes"]["manufacturing"] == []
+    h, r_tap = geom.BLOCK_HEIGHT, spec.ROD_TAP_DRILL_DIA / 2
+    bore_r = geom.LEVER_BORE_DIA / 2
+    thumb_low = geom.LEVER_BORE_Y + math.sqrt(bore_r**2 - r_tap**2)
+    expected = {
+        "bottom_face": [_plane((0.0, -1.0, 0.0), 0.0)],
+        "top_face": [_plane((0.0, 1.0, 0.0), h)],
+        "hex_flats": [
+            _plane((math.sin(math.radians(a)), 0.0, math.cos(math.radians(a))), geom.HEX_AF / 2)
+            for a in range(0, 360, 60)
+        ],
+        "lever_bore": [
+            _cylinder(geom.LEVER_BORE_DIA, (1.0, 0.0, 0.0), (-geom.HEX_AC / 2, geom.LEVER_BORE_Y - bore_r, -bore_r, geom.HEX_AC / 2, geom.LEVER_BORE_Y + bore_r, bore_r))
+        ],
+        "thumb_tap": [
+            _cylinder(spec.ROD_TAP_DRILL_DIA, (0.0, -1.0, 0.0), (-r_tap, thumb_low, -r_tap, r_tap, h, r_tap))
+        ],
+        "rod_tap": [
+            _cylinder(spec.ROD_TAP_DRILL_DIA, (0.0, 1.0, 0.0), (-r_tap, 0.0, -r_tap, r_tap, joint.ROD_TAP_DRILL_DEPTH, r_tap))
+        ],
+    }
+    for name, faces in expected.items():
+        for face in faces:
+            assert _owners(face) == [name], name
+
+
+def test_clamp_feature_bands_are_the_printed_ones() -> None:
+    features = export_features.requirement_manifest("mg_magnifying_clamp")["features"]
+    inch = 25.4
+    for name in ("bottom_face", "top_face"):
+        assert features[name]["height"] == pytest.approx([1.15 * inch, 1.17 * inch])
+    bore = features["lever_bore"]
+    # The F drill at the title block's DRILLED HOLES +.004/0.
+    assert bore["dia"] == pytest.approx([0.257 * inch, 0.261 * inch])
+    assert bore["height"] == pytest.approx([0.78 * inch, 0.80 * inch])
+    assert bore["thru"] is True and bore["axis"] == [1.0, 0.0, 0.0]
+    for name in ("lever_bore", "thumb_tap", "rod_tap"):
+        assert features[name]["location_from_z_flat"] == pytest.approx([0.24 * inch, 0.26 * inch])
+    thumb, rod = features["thumb_tap"], features["rod_tap"]
+    for tap in (thumb, rod):
+        assert tap["thread"] == "#4-40 UNC-2B"
+        assert tap["dia"] == pytest.approx([0.089 * inch, 0.093 * inch], abs=1e-3)
+        assert tap["plug_tap_lead"] == pytest.approx(5 * inch / 40)
+    assert thumb["drill_depth"] == pytest.approx([0.36 * inch, 0.38 * inch])
+    assert thumb["thread_depth_ref"] == pytest.approx(geom.THUMB_TAP_LENGTH)
+    assert rod["thread_depth"] == pytest.approx([0.32 * inch, 0.34 * inch])
+    assert rod["drill_depth"] == pytest.approx([0.47 * inch, 0.49 * inch])
+    # The thumb plug tap's stop window: full thread through the wall, short
+    # of the far bore wall, inside the tap's reach.
+    low, high = thumb["tap_reach"]
+    assert low == pytest.approx(spec.TAP_REACH_NEEDED) and high == pytest.approx(spec.FAR_WALL_NEAREST)
+    assert 0 < low < high < spec.PLUG_TAP_USABLE_LENGTH
+    flats = features["hex_flats"]
+    assert flats["af_ref"] == geom.HEX_AF and flats["requirements"] == []
