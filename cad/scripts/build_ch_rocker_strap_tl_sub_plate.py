@@ -544,7 +544,7 @@ def _hub(adapter: Any, drive_jobs: list[tuple[str, str]], volume: float) -> floa
     volume = volume_check(adapter, "hub hole", volume, _V_TOL)
 
     major = THREAD_MAJOR_MM[spec.HUB_TAP_THREAD]
-    check(
+    created = check(
         "hub thread (1/4-20 thru)",
         adapter.add_thread(
             AddThreadParameters(
@@ -561,11 +561,25 @@ def _hub(adapter: Any, drive_jobs: list[tuple[str, str]], volume: float) -> floa
             )
         ),
     )
-    name_last_feature(adapter, "HubThread")
-    thread = _early_bound(_feature_by_name(adapter, "HubThread"), "IFeature")
+    # The thread is a sub-feature of HubHole, not the newest top-level
+    # feature (farm run r19: name_last_feature renamed HubHole itself), so it
+    # is found by the name add_thread returns, as the magnifying lever does.
+    created_name = created.get("name")
+    if type(created_name) is not str or not created_name:
+        raise RuntimeError("hub thread returned no feature name")
+    thread = _early_bound(
+        _early_bound(adapter.currentModel, "IPartDoc").FeatureByName(created_name),
+        "IFeature",
+    )
+    if thread is None:
+        raise RuntimeError(f"hub thread {created_name!r} not found")
+    thread.Name = "HubThread"
     definition = _early_bound(thread.GetDefinition(), "ICosmeticThreadFeatureData")
     # swCosmeticEndConditions_e.swEndConditionThrough = 2.
-    if str(definition.Size) != spec.HUB_TAP_THREAD or int(definition.EndCondition) != 2:
+    if (
+        spec.HUB_TAP_THREAD not in str(definition.Size)
+        or int(definition.EndCondition) != 2
+    ):
         raise RuntimeError(
             "hub thread did not read back as 1/4-20 THRU: "
             f"{definition.Size!r}, {definition.EndCondition!r}"
