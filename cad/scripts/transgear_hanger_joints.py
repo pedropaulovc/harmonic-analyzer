@@ -7,8 +7,8 @@ paper-drive assembly may import it; no part build does.
 
 * MHA-PD-VN-57 pivot screw (90325A174, faced to fit) in the MHA-PD-07 bar's
   THROUGH #8-32 tap (user rulings 2026-10-15): the tip is faced at fit-up to
-  stand TIP_RECESS below the bar's front face and staked at the tap's front
-  mouth (rule 23, staked end).  Engagement runs from the vendor neck's full
+  stand TIP_RECESS below the bar's front face; no lock (owner ruling
+  U-MHA-PD-VN-57-no-lock, #1194).  Engagement runs from the vendor neck's full
   thread start to the faced tip less one pitch (the repo's charge at a faced
   tip); the thinnest bar at the deepest recess is the worst, >= 1.5 D.  The
   back countersink lies inside the neck zone (R9-63); the front one lies

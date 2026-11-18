@@ -15,7 +15,7 @@ Ch. 23 hanger holes (contract §5), all entering the BACK face:
 * the MHA-PD-VN-57 pivot screw's #8-32 THROUGH tap at the arm pivot P, machine
   (-58, 303.234), countersunk .169 max both faces: the shoulder's end ring
   still bears outside the back one, and the screw's faced tip stays below
-  the front face the platen slides on, staked at the front mouth;
+  the front face the platen slides on;
 * the latch hook's (MHA-PD-14) two #4-40 THROUGH taps for its base screws
   (MHA-SH-VN-52) at machine x 65.0 and 72.0 on the same line, countersunk .122
   max both faces (their exits on the front face lie under the platen

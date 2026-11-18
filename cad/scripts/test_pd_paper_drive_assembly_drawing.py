@@ -1327,19 +1327,18 @@ def test_the_knob_stack_goes_on_front_to_rear() -> None:
     assert positions == sorted(positions)
 
 
-def test_the_pivot_screw_is_staked_and_the_spacer_pressed_as_made() -> None:
-    """Rule 23: MHA-PD-VN-57 runs through the bar, its tip faced below the
-    front face and staked there, shown in the pivot view; threadlocker is
-    optional. R9-6 never faces MHA-PD-20.  R9-71: the spacer is pressed on
-    the shoulder flush with its end, and the MHA-PD-VN-63 spring under the
-    head holds the arm on it."""
+def test_the_pivot_screw_is_unlocked_and_the_spacer_pressed_as_made() -> None:
+    """MHA-PD-VN-57 runs through the bar, its tip faced below the front face,
+    and carries no lock (owner ruling U-MHA-PD-VN-57-no-lock, #1194): no
+    stake, no threadlocker. The seat is shown in the pivot view. R9-6 never
+    faces MHA-PD-20.  R9-71: the spacer is pressed on the shoulder flush with
+    its end, and the MHA-PD-VN-63 spring under the head holds the arm on it."""
     body = _step_body("hanger-pivoted")
     window = steps.inch_window(pivot_screw.TIP_RECESS, 3, " TO ")
-    # The tip is staked; no threadlocker (the standing no-threadlocker rule).
     assert "THREADLOCKER" not in body
+    assert "STAKE" not in body
     assert "BLIND" not in body
     assert f"{window} BELOW THE BAR'S FRONT FACE" in body
-    assert drawing.PIVOT_STAKE_POINTS_TEXT in body
     assert "ANOTHER SCREW" not in body
     assert drawing.PIVOT_VIEW_REF in body
     assert _number("pd-vn-transgear-pivot-screw") in body
@@ -1462,73 +1461,6 @@ def test_each_pivot_section_balloon_points_into_its_own_cut_face() -> None:
     assert [side for side, _y, _r in order] == ["left", "right", "left", "right", "left"]
 
 
-def test_the_pivot_stake_note_points_at_the_front_mouth_clear_of_the_balloons() -> None:
-    """Rule 23: SECTION A-A shows where the lock is, its pointer in the bar's
-    metal at the front tap mouth and its text off the section and balloons."""
-    y, r = drawing.PIVOT_STAKE_TIP
-    front = -(pivot_screw.SHOULDER_LEN + BAR_DEPTH)
-    csk_rim = assembly.BAR.PIVOT_TAP_CSK_DIA / 2.0
-    # In the bar, under 1 mm from the front face and the countersink's rim.
-    assert front < y < front + 1.0
-    assert csk_rim < r < csk_rim + 1.0
-    centre_y = drawing.PIVOT_VIEW_CENTRE_MM[1]
-    assert math.hypot(r, y - centre_y) < drawing.PIVOT_FRAME_RADIUS_MM
-    # Its tip is right of the axis; the bar's balloon points left.
-    sides = {stem: side for stem, side, *_ in drawing.PIVOT_BALLOON_TIPS}
-    assert sides["pd-support-bar"] == "left"
-    assert drawing.PIVOT_STAKE_POINTS_TEXT in drawing.PIVOT_STAKE_NOTE
-    assert drawing.PIVOT_LOCATOR_CAPTION in drawing.sheet_texts(_unit_step_notes())
-    assert drawing.PIVOT_STAKE_NOTE in drawing.sheet_texts(_unit_step_notes())
-
-    lines = drawing.PIVOT_STAKE_NOTE.splitlines()
-    width = max(map(len, lines)) * NOTE_CHAR_WIDTH
-    height = len(lines) * NOTE_LINE_PITCH
-    sx, sy = drawing.PIVOT_SECTION_CENTER
-    radius = drawing.PIVOT_SECTION_RADIUS
-    scale = drawing.PIVOT_SECTION_SCALE[0] / drawing.PIVOT_SECTION_SCALE[1] / 1000.0
-    # The section is centred on the stack with its axis vertical, so the tip
-    # stands r right of the circle's centre.
-    tip_x = sx + r * scale
-    column_x = sx + radius + drawing.PIVOT_BALLOON_GAP
-    field_right = drawing.SHEET_TWO_RING_LIMITS[0]
-    caption_y = drawing.PIVOT_SECTION_CAPTION_XY[1]
-    right_tips = [
-        tip_y
-        for _stem, side, tip_y, _r in drawing.PIVOT_BALLOON_TIPS
-        if side == "right"
-    ]
-    for front_side in (1.0, -1.0):
-        left, top = drawing.pivot_stake_note_xy(tip_x, front_side)
-        bottom = top - height
-        # The whole text right of the tip: the leader leaves its left end.
-        assert left - tip_x >= 0.005
-        assert left + width < field_right
-        # Outside the circle at the front face's end, the tip beyond the
-        # text's near edge, so the leader runs away from the text.
-        tip_y = sy - front_side * (y - centre_y) * scale
-        if front_side > 0:
-            assert bottom > sy + radius
-            assert sy < tip_y < bottom
-        else:
-            assert top < sy - radius
-            assert top < tip_y < sy
-            # Above the native section caption with a line to spare.
-            assert bottom - NOTE_LINE_PITCH > caption_y
-        near = top if front_side < 0 else bottom
-        assert math.hypot(left - tip_x, tip_y - near) < 0.015
-        # Clear of the right balloon column, whichever way the axis runs.
-        ys = sorted(
-            (sy - front_side * (tip - centre_y) * scale for tip in right_tips),
-            reverse=True,
-        )
-        for balloon_y in drawing.spread_balloon_column(ys, drawing.PIVOT_BALLOON_PITCH):
-            dx = max(left - column_x, 0.0, column_x - (left + width))
-            dy = max(bottom - balloon_y, 0.0, balloon_y - top)
-            assert math.hypot(dx, dy) > BALLOON_RADIUS + 0.002
-    with pytest.raises(ValueError):
-        drawing.pivot_stake_note_xy(tip_x, 0.0)
-
-
 def test_pivot_section_balloon_columns_keep_order_and_pitch() -> None:
     pitch = drawing.PIVOT_BALLOON_PITCH
     assert drawing.spread_balloon_column([0.05, 0.0, -0.05], pitch) == [
@@ -1586,11 +1518,15 @@ def test_the_actual_collar_disc_overlap_is_checked_before_final_platen_installat
     ]
     feeler = steps.COLLAR_DISC_AIR_TEXT.split()[0]
     assert texts[2].startswith(f"CHECK: A {feeler} FEELER ENTERS ")
+    # #2629: a pass exit to the platen's refit leads the re-face branch.
     assert texts[3] == (
-        "IF SHORT, READ THE THICKEST FEELER THAT ENTERS ALL ROUND THE OVERLAP "
-        "(NONE: READ 0)."
+        f"IF {drawing.sub_step('collar-disc-air-inspected', 2)} PASSES, SKIP "
+        f"{drawing.sub_step('collar-disc-air-inspected', 4)}-"
+        f"{drawing.sub_step('collar-disc-air-inspected', 14)}."
     )
-    read = drawing.sub_step("collar-disc-air-inspected", 3)
+    assert texts[4] == "READ THE THICKEST FEELER ENTERING ALL ROUND (NONE: READ 0)."
+    assert texts[15] == "REFIT THE PLATEN."
+    read = drawing.sub_step("collar-disc-air-inspected", 4)
     assert (
         f"RE-FACE THE {_number('pd-transgear-feed-pinion')} STEP FACE SQUARE BY "
         f"{feeler} LESS THE {read} READING;" in flat
@@ -1604,9 +1540,12 @@ def test_the_actual_collar_disc_overlap_is_checked_before_final_platen_installat
     assert setup == sorted(setup)
     assert "BETWEEN CENTRES" not in flat
     assert "READ SHORT" not in flat
-    assert texts[-1].startswith(
+    assert texts[-3] == (
         f"REPEAT {drawing.sub_step('collar-disc-air-inspected', 1)}-"
-        f"{drawing.sub_step('collar-disc-air-inspected', 2)} AND "
+        f"{drawing.sub_step('collar-disc-air-inspected', 3)}."
+    )
+    assert texts[-1].startswith(
+        f"IF {drawing.sub_step('collar-disc-air-inspected', 9)} RE-FACED THE STEP, REPEAT "
     )
     assert steps.COLLAR_DISC_AIR_MIN == collar.COLLAR_DISC_AIR_MIN
     assert steps.COLLAR_DISC_AIR_TEXT in _step_body("fitup-accepted")
@@ -1687,7 +1626,7 @@ def test_the_fitted_collar_rear_face_reacts_on_the_actual_gear_shoulder() -> Non
     ) in faced
     seated = _step_body("collar-shoulder-seated")
     assert "COLLAR ON THE SHAFT, ITS PIN ON THE D-FLAT" in seated
-    assert f"{_number('pd-transgear-knob-shaft')} 15T FRONT FACE" in seated
+    assert f"{_number('pd-transgear-knob-shaft')} PINION'S FRONT FACE" in seated
     assert "ON THE DRIVE DOWELS" in seated
     assert collar.BODY_REAR_FACE_FROM_F == 0.0
     assert collar.LENGTH_FITTED_MIN <= collar.LENGTH <= collar.LENGTH_FITTED_MAX
@@ -2448,11 +2387,13 @@ def test_no_step_solders_and_the_rack_rework_resets_its_guide() -> None:
     assert level in rework
 
 
-def test_every_screwed_or_staked_setting_has_a_holding_check() -> None:
+def test_every_screwed_setting_has_a_holding_check() -> None:
     """Machinist review r8 and a run of this sheet for #2824 (rule 23): the
-    guide locks, the refitted plate screws, the staked pivot screw and the
-    hook each get a bench check after they are tightened or staked, with a
-    remedy, as 2M, 3N and 4C already had."""
+    guide locks, the refitted plate screws, the seated pivot screw and the
+    hook each get a bench check after they are tightened or seated, with a
+    remedy, as 2M, 3N and 4C already had. The pivot screw is unlocked
+    (U-MHA-PD-VN-57-no-lock): its checks are the shoulder's seat and the
+    arm's free fall."""
     texts = drawing._step_text(operating_domain=_unit_operating_domain())
     locks = texts["guide-locks-set"]
     assert locks[3] == "CHECK: PUSHED FIRMLY BY HAND, NO LOCK MOVES ON ITS GUIDE."
@@ -2461,18 +2402,57 @@ def test_every_screwed_or_staked_setting_has_a_holding_check() -> None:
     assert plate[4] == "CHECK: ROCKED BY HAND, THE PLATE HAS NO SHAKE AND NO DAYLIGHT."
     assert plate[5] == "IF IT SHAKES OR SHOWS DAYLIGHT, DO 13U AND REPEAT 14E."
     pivot = texts["hanger-pivoted"]
-    assert pivot[8].startswith("PLATEN SLID CLEAR, STAKE THE TAP MOUTH")
-    assert "HEX KEY TO LOOSEN, THE SCREW HOLDS" in pivot[9]
-    assert "THE ARM STILL FALLS FREELY" in pivot[10]
-    assert pivot[11] == "IF BOTH CHECKS PASS, SKIP 15N-15R."
-    assert "UNSCREW" in pivot[12] and "THROUGH ITS STAKES" in pivot[12]
-    assert pivot[15].startswith("REPEAT FROM 15A WITH A NEW ")
-    assert "STAKING FRESH METAL AT 15J" in pivot[15]
+    assert pivot[5].startswith("SEAT THE SCREW, ITS SHOULDER TIGHT ON THE BAR'S BACK FACE")
+    assert pivot[6] == "CHECK: NO DAYLIGHT BETWEEN THE SPACER AND THE BAR'S BACK FACE."
+    assert pivot[7] == "CHECK: A HEX KEY BY HAND DOES NOT LOOSEN THE SCREW."
+    assert pivot[8] == "CHECK: RAISED AND RELEASED, THE ARM FALLS FREELY."
+    assert pivot[9] == "IF ALL THREE CHECKS PASS, SKIP 15L-15S."
+    # The remedy takes the captured arm off before anything is cleaned.
+    assert pivot[10].startswith("UNSCREW ") and pivot[11] == "LIFT THE ARM OFF."
+    assert pivot[12].startswith("FLUSH OIL INTO THE ARM'S BORE")
+    assert "BAR'S BACK FACE" in pivot[13]
+    assert pivot[14] == "REPEAT 15F-15J."
+    assert pivot[15] == "IF ALL THREE CHECKS NOW PASS, SKIP 15S."
+    assert pivot[16].startswith("DO 15L-15M AND REPEAT FROM 15A WITH A NEW ")
+    assert len(pivot) == 17
+    assert not any("STAKE" in line for line in pivot)
     accepted = texts["fitup-accepted"]
-    assert "ARM UNLATCHED, DO 15N-15R." in " ".join(accepted)
+    assert "ARM UNLATCHED, DO 15L-15S." in " ".join(accepted)
     hook = texts["hook-pin-hole-match-drilled"]
     assert hook[5] == "TIGHTEN THE HOOK SCREWS."
     assert hook[6] == "CHECK: PUSHED FIRMLY BY HAND, THE HOOK DOES NOT MOVE ON THE BAR."
+
+
+def test_every_failure_branch_has_a_pass_exit() -> None:
+    """#2629 (machinist rule 22): a builder whose checks pass never reads on
+    into a plain remedy command; each branch after the exit carries its
+    condition."""
+    texts = drawing._step_text(operating_domain=_unit_operating_domain())
+    s = drawing.sub_step
+    mesh = texts["fitup-mesh-remedied"]
+    pose_checks = f"{s('fitup-pose-set', 7)}-{s('fitup-pose-set', 9)}"
+    after = steps.step_number("collar-rear-faced-to-fit")
+    assert mesh[0] == f"IF EVERY {pose_checks} CHECK PASSES, GO TO STEP {after}."
+    assert mesh[4] == f"IF EVERY {pose_checks} CHECK NOW PASSES, GO TO STEP {after}."
+    branches = mesh[mesh.index(next(r for r in mesh if r.startswith("FOR A FAULT ONCE"))):]
+    assert all(
+        row.startswith(("FOR ", "REFIT A LOOSE PLATE", "SKIP STEPS")) for row in branches
+    )
+    accepted = texts["fitup-accepted"]
+    exit_row = f"IF EVERY CHECK PASSES, GO TO STEP {steps.step_number('chain-closed')}."
+    remedies = accepted[accepted.index(exit_row) + 1:]
+    assert remedies and all(row.startswith(("IF ", "FOR ")) for row in remedies)
+    run = texts["chain-run-accepted"]
+    assert run[3] == (
+        f"IF BOTH CHECKS PASS, SKIP {s('chain-run-accepted', 4)}-"
+        f"{s('chain-run-accepted', 6)}."
+    )
+    located = texts["arm-plate-located"]
+    assert located[16] == (
+        f"IF {s('arm-plate-located', 11)} AND {s('arm-plate-located', 12)} PASSED, GO TO STEP "
+        f"{steps.step_number('arm-plate-fitted')}."
+    )
+    assert located[17].startswith("IF NOT, INSPECT THE ")
 
 
 def test_the_lock_taps_are_the_even_taps_counted_from_either_end() -> None:
@@ -2865,10 +2845,16 @@ def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
     # A failed trial inspects the gears and the two running fits the window
     # charges before it blames the arm.
     assert (
-        f"THE {_number('pd-transgear-knob-shaft')} JOURNAL AND "
+        f"{_number('pd-transgear-knob-shaft')} JOURNAL AND "
         f"{_number('pd-transgear-arm-plate')} AND "
         f"{_number('pd-transgear-feed-pinion')} BORES TO THEIR SHEETS."
         in located
+    )
+    # #2629: the inspection opens on the trial's pass exit.
+    assert (
+        f"IF {drawing.sub_step('arm-plate-located', 11)} AND "
+        f"{drawing.sub_step('arm-plate-located', 12)} PASSED, GO TO STEP "
+        f"{steps.step_number('arm-plate-fitted')}. IF NOT, INSPECT" in located
     )
     # The restart follows the part, one sub-step each: a new plate is set
     # again from 12A, a new disc or sleeve is centred again before the trial
@@ -2883,7 +2869,7 @@ def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
         f"AND REPEAT FROM {trial}.",
         "SLIDE THE HUB AND DISC AS ONE OFF A "
         f"{_number('pd-transgear-feed-pinion')} FOUND OUTSIDE, THE PIN RIDING THE FLAT.",
-        f"WITH THE {_number(explode.DISC_SCREW)} SCREWS SLACKENED, REPEAT "
+        f"WITH THEM OFF AND THE {_number(explode.DISC_SCREW)} SCREWS SLACKENED, REPEAT "
         f"{drawing.sub_step('disc-cluster-assembled', 3)}-"
         f"{drawing.sub_step('disc-cluster-assembled', 4)}, "
         f"{drawing.sub_step('disc-taps-transferred', 0)}-"
@@ -2900,7 +2886,7 @@ def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
         drawing.SUB_STEP_LETTERS
     )
     fitted = _step_body("arm-plate-fitted")
-    assert "AS 12N AND 12P" in fitted
+    assert "AS 12M AND 12N" in fitted
     # The dowel-press remedy renews what is fixed to or reamed to the arm.
     assert (
         f"IF A DOWEL SLIDES IN BY HAND, REPEAT FROM STEP {steps.step_number('latch-pin-pressed')} "
@@ -2922,7 +2908,7 @@ def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
         "fitup-pose-set"
     )
     assert len(drawing._step_text(operating_domain=_unit_operating_domain())["fitup-pose-set"]) == 10
-    rebuild = pose.index("FOR A FAULT ALL ROUND (THE ARM'S SETTING)")
+    rebuild = pose.index("FOR A FAULT ALL ROUND (ARM SETTING)")
     assert pose.index(f"NEW {_number('pd-transgear-arm')} ARM") > rebuild
     for part, name in (("pd-transgear-arm-plate", "PLATE"), ("pd-latch-hook", "HOOK")):
         assert f"{_number(part)} {name}," in pose[rebuild:]
@@ -2931,9 +2917,10 @@ def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
         < pose.index("FOR A LOOSE PLATE OR A FAULT EVERY KNOB TURN")
         < rebuild
     )
-    # The turn only finds the period; the fresh stake rides on the rebuild.
+    # The turn only finds the period; nothing on the rebuild is staked.
     assert "TURN THE DISC ONE FULL TURN BY THE COLLAR, NOTING WHERE THE FAULT RECURS." in pose
-    assert f"STAKING FRESH METAL AT {drawing.sub_step('hanger-pivoted', 8)}" in pose[rebuild:]
+    assert "STAKING" not in pose
+    assert f"DO {drawing.sub_step('hanger-pivoted', 10)}-{drawing.sub_step('hanger-pivoted', 11)}." in pose[rebuild:]
     # A new disc takes new screws, cut again to its own rear face, on the
     # same hub, its key pin left in (#2409).
     assert (
@@ -2973,7 +2960,7 @@ def test_the_hub_key_pin_and_collar_flat_pin_are_fitted_and_kept() -> None:
     assert len(texts["oil-hole-drilled"]) == 1
     for key in ("fitup-mesh-remedied", "collar-disc-air-inspected"):
         rows = texts[key]
-        slide = next(i for i, row in enumerate(rows) if row.startswith("SLIDE THE HUB AND DISC"))
+        slide = next(i for i, row in enumerate(rows) if "SLIDE THE HUB AND DISC" in row)
         assert "NOSE AS ONE" in rows[slide] and "PIN RIDING THE FLAT" in rows[slide], key
         assert not any("BACK THE" in row or "SET SCREW" in row for row in rows), key
         assert not any("STAKING FRESH METAL AS" in row for row in rows), key
@@ -4647,7 +4634,7 @@ def _sub_step_texts() -> dict[str, str]:
 def test_every_setting_row_is_cited_by_the_steps_its_step_column_names() -> None:
     """Rule 22 (R5 machinist review): each setting-table row's STEP cell names
     the sub-steps that set or check it, and each of them cites that row, or
-    repeats a sub-step that does ("AS 12P")."""
+    repeats a sub-step that does ("AS 12N")."""
     heads = _sub_step_texts()
     rows = drawing.setting_table_rows(operating_domain=_unit_operating_domain())
     assert len(rows) == len(drawing.SETTING_ROW_KEYS)

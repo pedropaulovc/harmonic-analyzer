@@ -401,7 +401,7 @@ def test_registry_row_is_the_faced_stock_without_sheet_instructions() -> None:
     assert note.startswith(f"PURCHASED SCREW McMASTER {screw.SKU}")
     assert "\n" not in note
     assert not any(character.isdigit() for character in note.replace(screw.SKU, ""))
-    # The fit-up, stake and optional threadlocker are assembly-sheet steps.
+    # The fit-up is an assembly-sheet step; the joint carries no lock.
     assert "installation_notes" not in row
     spec = DRAWINGS_BY_NAME["pd_vn_transgear_pivot_screw"]
     assert drawing.SPEC is spec

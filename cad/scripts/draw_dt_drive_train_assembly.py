@@ -1212,7 +1212,8 @@ PEDESTAL_RECHECK_ROWS = (
 HANDLE_EPOXY = "30-MINUTE EPOXY"
 HANDLE_RELEASE = "PASTE WAX"
 # Rule 23 (#1174): MHA-DT-32's lock is the arm's tap mouth staked onto the
-# filed tip, after the MHA-PD-VN-57 pivot (user ruling 2026-10-15).
+# filed tip. It stands on its own: the MHA-PD-VN-57 pivot stake it once
+# followed is retired (owner ruling U-MHA-PD-VN-57-no-lock, #1194).
 HANDLE_STAKE_POINTS = "2 OPPOSITE POINTS"
 HANDLE_STAKE_NOTE = "\n".join(
     (
