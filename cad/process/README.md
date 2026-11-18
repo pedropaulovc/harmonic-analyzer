@@ -106,8 +106,11 @@ Facts prechips has no field for, but which CAD specs and tests read, live in
   `test_ms_stick_drawing.py` reads both against the printed groove limits
   (#2433);
 - the PM 6-in vise's make, SKU and source;
-- three `[[stock]]` rows: OnlineMetals 4807 strap and 1173 bar, and McMaster
-  8663K55 acetal;
+- a `[[stock]]` row for every bought bar, tube, wire and ball, each quoting
+  its order line and allocation: Online Metals orders 1021704672 and
+  1021751700, Metal Supermarkets invoice EC234347, McMaster-Carr PO
+  0803PCAMPOS and McMaster 8663K55 acetal (owner 2026-11-17: all on hand but
+  the platen's C360 plate);
 - the MHA-FR-02 top-frame casting to buy (owner ruling 2026-11-10 (Pedro),
   #2333): a gray-iron ASTM A48 class 25B `[[stock]]` row of form `casting`,
   with its pattern, datum-target and as-cast mass notes; not quoted or ordered;
