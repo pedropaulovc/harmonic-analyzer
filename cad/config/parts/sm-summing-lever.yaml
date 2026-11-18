@@ -12,7 +12,10 @@ sm-summing-lever:
   # (e.g. Dura-Bar G2), and A48 assigns bar C to 1.01-2.00 in sections.
   material: GRAY IRON, ASTM A48 CLASS 40C
   material_specification: GRAY IRON, ASTM A48 CLASS 40C
-  finish: GREEN ENAMEL; MASK KNIFE EDGES AND TAPPED HOLES; OIL BARE FACES; KNIFE EDGES AS MACHINED, NOT HARDENED
+  # The Finish cell holds two lines (~44 capitals each); the knife condition
+  # rides the masking clause so the statement fits (machinist review of farm
+  # run 20261118T064843854Z-76ae9b13e9cf: three lines overran the cell).
+  finish: GREEN ENAMEL; MASK TAPPED HOLES, KNIFE EDGES (AS MACHINED, NOT HARDENED); OIL BARE FACES
   quantity: 1
   tolerance_class: machined_block
   drawing_unit: in

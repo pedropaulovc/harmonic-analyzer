@@ -968,4 +968,4 @@ def test_title_block_and_mass_material_name_one_gray_iron() -> None:
     assert " OR " not in row["material"]
     assert "GRAY IRON" in row["material"]
     assert "Gray" in lever_build.MATERIAL
-    assert "KNIFE EDGES AS MACHINED, NOT HARDENED" in row["finish"]
+    assert "KNIFE EDGES (AS MACHINED, NOT HARDENED)" in row["finish"]
