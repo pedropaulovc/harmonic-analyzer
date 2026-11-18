@@ -211,6 +211,8 @@ individual PR or stack does not need a successful full `build` before merging.
    three isolated blind reviews (Claude staggers the initial request, then
    continues concurrently; Codex starts in parallel), then a judge vets every
    finding against the sheet; the aggregate of confirmed findings is the verdict.
+   A confirmed finding gates only when at least two of the three runs raised it,
+   blockers included (owner ruling 2026-11-17).
    This replaces the hand-run review command as the pipeline gate, with reports at
    `cad/out/reports/machinist-review/<stem>/<stem>.aggregate.{json,md}`.
    Review is opt-in: a drawing script's module-level
@@ -1095,7 +1097,14 @@ drawing PDF's ink, the package's existing `cad/config/parts/<dashed>.yaml` (or a
 contract with the `-assembly` suffix removed), the review/exception/sheet-server
 code and its pinned local-import closure, the selected kind's reviewer template
 and shared reviewer/judge severity contract, shared judge instructions/schemas,
-and `cad/docs/drawing-guidelines.md`. The other kind's template and severity
+and the integer `major_version` in `cad/docs/drawing-guidelines.md`'s YAML
+frontmatter, not the file's bytes (dodo writes it to a sidecar under
+`cad/out/.machinist-review/`, which both the key and doit read; owner ruling
+2026-11-17). Bump it when a guidelines edit should change review verdicts.
+Any other edit re-keys nothing: cached verdicts are reused unchanged, and only
+reviews that run anyway see the new text. A missing or non-integer version
+fails graph load. Reviewers receive
+the guidelines without the frontmatter. The other kind's template and severity
 contract are excluded. Reviewer and judge defaults live in the hashed review
 code; there are no model/effort environment overrides. `_drawing_registry.py` is
 intentionally excluded because

@@ -1,15 +1,22 @@
+---
+# Bump major_version when an edit should change machinist-review verdicts;
+# other edits do not re-run cached reviews.
+major_version: 1
+---
 # Drawing guidelines
 
 The standard every part and assembly drawing package in this project is
 drawn to and reviewed against. Authors follow it. Each blind machinist review
-receives this file verbatim, followed by its own reviewer instructions.
+receives this file from its title down, verbatim, followed by its own reviewer
+instructions.
 
 Cite a rule by number and title, for example "rule 5 (avoid excessive GD&T)".
 
 ## Who reads these drawings
 
-One builder, a first-time hobby machinist, making one of each part. The parts
-are cut on a manual mill and lathe with DROs and assembled at a bench with
+One builder, a first-time hobby machinist, making one of each part. Milled
+features are cut on a CNC mill, turned ones on a manual lathe with a DRO; the
+parts are assembled at a bench with
 hand tools. Inspection and setting use what a well-equipped hobby shop owns:
 rule, calipers, micrometers, pin, feeler and thread gauges, a square, a granite
 surface plate with a height gauge and dial or test indicators, V-blocks, a sine
@@ -107,7 +114,7 @@ metric grades until their package is converted.
 - The surface row is a process statement (`CAST/MACHINED`), not a roughness
   grade: a face with no roughness symbol may be left as cast or as machined,
   the builder's choice. As-cast skin can never meet a number, and "as
-  machined" on a manual machine already lands where a general grade would.
+  machined" on the mill or the lathe already lands where a general grade would.
 - Where the material is not critical, the material field names the acceptable
   families as explicit alternatives (`LOW-CARBON STEEL OR GRAY IRON`). Do not
   force an unsupported grade or write "material not critical". A specific
@@ -340,15 +347,20 @@ are gear data, not narration.
   FITTED .153–.271 AT ASSEMBLY`); it then counts as being at the callout, and
   the feature carries no second controlling value. Other part numbers appear
   only to identify a mate.
-- **Say why in a few words, once.** A short functional reason is welcome
-  where a tight band, a roughness symbol or a hardness would otherwise look
-  arbitrary: `BEARING SURFACE`, `KNIFE-EDGE SEAT`, `SETS MESH BACKLASH`,
-  `SLIDING FIT ON MHA-CH-05`. A reason is one line of at most six words,
-  beyond the mate's drawing number, on the callout it explains, once per
-  feature or pattern. A matched-fit statement (rule 4) and a stated shortfall
-  (rule 20) have their own forms and are not counted. Anything beyond that is
-  narration and is over-specification: design rationale (`HOLDS … SCREWS
-  CLEAR OF ITS CUT EDGES`, `MAX KEEPS D AT ENTRY`, `MIRRORS CL STATION`), a
+- **Say why in a few words, once.** The test: a short functional statement
+  that answers a question the builder would foreseeably ask at the machine
+  is not over-specification. It is welcome where a tight band, a roughness
+  symbol or a hardness would otherwise look arbitrary (`BEARING SURFACE`,
+  `KNIFE-EDGE SEAT`, `SETS MESH BACKLASH`, `SLIDING FIT ON MHA-CH-05`) and
+  where the views leave a feature's purpose unclear (`WHEEL BEARING
+  SURFACE`). A reason is one line of at most six
+  words, beyond the mate's drawing number, on the callout it explains, once
+  per feature or pattern. A matched-fit statement (rule 4) and a stated
+  shortfall (rule 20) have their own forms and are not counted. Anything
+  beyond that is narration and is over-specification: a method or procedure
+  (below), design rationale that answers no builder question (`HOLDS …
+  SCREWS CLEAR OF ITS CUT EDGES`, `MAX KEEPS D AT ENTRY`, `MIRRORS CL
+  STATION`), a rationale paragraph, a dimension written into a reason, a
   second reason on one feature, the same reason repeated on several
   dimensions, a reason on an overall or stock size that has no band of its
   own (an overall with an explicit tight band that sets a stack names that
@@ -374,7 +386,9 @@ are gear data, not narration.
   `CAST`, `MILL FROM SOLID` are not requirements; the dimensioned feature is. A
   process word appears only where it is the requirement: REAM for a fit bore, a
   tap-drill depth that matters, matched fitting to an identified mate,
-  match-drill at assembly.
+  match-drill at assembly. Setups, workholding, CNC offsets, speeds, feeds and
+  in-process checks live in the part's traveler, reviewed against
+  `traveler-guidelines.md`.
 - **A missing view is not cured by a note.** Where something cannot be read off
   the views, add a view (a section for an internal web). A mirrored part is
   drawn in its own hand, never left to "LH OPPOSITE".

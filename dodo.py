@@ -149,6 +149,7 @@ from _buildgraph import (  # noqa: E402
 from machinist_review_config import (  # noqa: E402
     ReviewProfile,
     registered_review_profile,
+    split_drawing_guidelines,
     validate_review_profile,
 )
 
@@ -3091,6 +3092,45 @@ def _machinist_review_fitup_task(stem: str, target: Path) -> dict[str, Any]:
     }
 
 
+def _drawing_guidelines_version_dep() -> str:
+    """The review's dependency on ``drawing-guidelines.md``: a sidecar holding
+    only its frontmatter ``major_version``. Its review key and doit freshness
+    both read this one file, so an edit that keeps the version re-keys no
+    review and leaves every one fresh, and a bump re-keys them all. A missing
+    or non-integer version fails the graph load. Other tasks that read the
+    guidelines (``check:recipe``) keep hashing the whole file.
+
+    Owner ruling 2026-11-17: "add a major version frontmatter to md file then
+    rekey only when major version changes". A body edit without a bump is seen
+    only by reviews that run for another reason; cached verdicts stand."""
+    version, _body = split_drawing_guidelines(
+        (SCRIPTS_DIR.parent / "docs" / "drawing-guidelines.md").read_text(
+            encoding="utf-8"
+        )
+    )
+    return _write_digest_sidecar(
+        CAD_OUT / ".machinist-review" / "drawing-guidelines-major-version.digest",
+        f"major_version={version}",
+    )
+
+
+def _machinist_review_prompts(kind: str) -> list[Path]:
+    """Explicit per-kind prompt and schema inclusion list.
+
+    Including only this kind's reviewer/severity files plus the shared judge
+    prompt and schemas ensures adding or editing another kind's prompts
+    (such as ``traveler``) never re-keys unrelated reviews."""
+    prompts_dir = SCRIPTS_DIR / "prompts"
+    names = (
+        f"machinist_review_{kind}.md",
+        f"machinist_review_{kind}_severity.md",
+        "machinist_review_judge.md",
+        "machinist_review_schema.json",
+        "machinist_review_judge_schema.json",
+    )
+    return [prompts_dir / name for name in names]
+
+
 def _machinist_review_file_deps(stem: str) -> list[str]:
     spec = DRAWINGS_BY_NAME[stem]
     dashed = stem.replace("_", "-")
@@ -3102,15 +3142,7 @@ def _machinist_review_file_deps(stem: str) -> list[str]:
         )
     # Selecting this kind's reviewer and severity contract also keys --kind
     # without hashing the registry. Judge instructions and schemas are shared.
-    other_kind = "assembly" if spec.source_kind == "part" else "part"
-    excluded_prompts = {
-        f"machinist_review_{other_kind}.md",
-        f"machinist_review_{other_kind}_severity.md",
-    }
-    prompts = [
-        path for path in (SCRIPTS_DIR / "prompts").iterdir()
-        if path.is_file() and path.name not in excluded_prompts
-    ]
+    prompts = _machinist_review_prompts(spec.source_kind)
     fitup = _machinist_review_fitup_text(stem)
     return sorted({
         str(path.resolve())
@@ -3125,7 +3157,8 @@ def _machinist_review_file_deps(stem: str) -> list[str]:
                 if name not in RECIPE_SKIP_MODULES
             ),
             *prompts,
-            SCRIPTS_DIR.parent / "docs" / "drawing-guidelines.md",
+            # The rubric is keyed by its major version, not its bytes.
+            Path(_drawing_guidelines_version_dep()),
             *([exceptions] if exceptions.is_file() else []),
             *([fitup] if fitup else []),
         )
@@ -3841,6 +3874,7 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
     machinist_review_contract_deps = [
         # Reviewer and judge prompts/schemas are read at runtime.
         SCRIPTS_DIR.parent / "docs" / "drawing-guidelines.md",
+        SCRIPTS_DIR.parent / "docs" / "traveler-guidelines.md",
         *(path for path in (SCRIPTS_DIR / "prompts").iterdir() if path.is_file()),
         # test_dt_cone_pivot_post_drawing reads the policy's GD&T allowlist;
         # allowlist edits must rerun its frame-ownership contract.

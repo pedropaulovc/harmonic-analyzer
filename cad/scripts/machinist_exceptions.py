@@ -60,7 +60,9 @@ def _entry(value: object, path: Path, index: int) -> MachinistException:
 
 
 def load_exceptions(config_root: Path, name: str, kind: str) -> tuple[MachinistException, ...]:
-    """The package's declared exceptions; () when the package declares none.
+    """A part or assembly package's declared exceptions; () when the package
+    declares none. Traveler declarations are found by
+    ``machinist_review_traveler.load_exceptions``.
 
     A missing config file is not an error: most packages declare nothing.
     A malformed declaration is an error — a typo must never silently widen
@@ -73,7 +75,12 @@ def load_exceptions(config_root: Path, name: str, kind: str) -> tuple[MachinistE
         # Assembly drawings keep the "-assembly" suffix; their config is the
         # assembly's contract, named by the bare stem (BUILDING.md).
         subdir, stem = "assemblies", dashed.removesuffix("-assembly")
-    path = config_root / subdir / f"{stem}.yaml"
+    return load_exceptions_file(config_root / subdir / f"{stem}.yaml", stem)
+
+
+def load_exceptions_file(path: Path, stem: str) -> tuple[MachinistException, ...]:
+    """The ``machinist_exceptions`` declared in ``path``, under ``stem`` or at
+    top level; () when the file is absent or declares none."""
     if not path.is_file():
         return ()
     doc = yaml.safe_load(path.read_text(encoding="utf-8")) or {}

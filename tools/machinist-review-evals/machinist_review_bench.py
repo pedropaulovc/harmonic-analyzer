@@ -239,12 +239,28 @@ def compose_prompt(kind: str, ref: str | None = None, repo: Path = REPO_ROOT) ->
             )
         template = mr.expand_severity_contract(template, fragment.stdout)
     guidelines = show("cad/docs/drawing-guidelines.md")
-    return (
-        f"{guidelines.stdout.rstrip()}\n\n{template}"
-        if guidelines.returncode == 0
-        else template
-    )
+    if guidelines.returncode:
+        return template
+    text = guidelines.stdout
+    # Refs since the frontmatter's introduction send only the body, as the
+    # gate does; earlier refs had none and sent the whole file.
+    if text.startswith("---\n"):
+        text = mr.review_config.split_drawing_guidelines(text)[1]
+    text = text.rstrip()
+    if kind == "traveler":
+        traveler_guidelines = show("cad/docs/traveler-guidelines.md")
+        if traveler_guidelines.returncode:
+            raise ValueError(
+                f"cannot load traveler guidelines from {ref}: "
+                f"{traveler_guidelines.stderr.strip()}"
+            )
+        traveler_text = traveler_guidelines.stdout
+        if traveler_text.startswith("---\n"):
+            import machinist_review_traveler
 
+            traveler_text = machinist_review_traveler.split_guidelines(traveler_text)[1]
+        text = f"{text}\n\n{traveler_text.rstrip()}"
+    return f"{text}\n\n{template}"
 
 def _metadata(case: dict[str, Any]) -> dict[str, Any]:
     return {

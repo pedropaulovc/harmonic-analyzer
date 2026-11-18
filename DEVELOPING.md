@@ -115,7 +115,9 @@ filesystem call. Git probes have a separate 15-second timeout each.
 every drawing that opts in, included in `build` and `release` under both executors.
 It waits for the drawing PDF, runs three parallel blind reviews and a
 sheet-grounded judge on a cache miss, then caches the complete per-drawing report
-directory at `cad/out/reports/machinist-review/<stem>/`. The aggregate JSON and
+directory at `cad/out/reports/machinist-review/<stem>/`. A confirmed finding in
+any gating category, blockers included, gates only when at least two of the
+three runs raised it. The aggregate JSON and
 Markdown are named `<stem>.aggregate.{json,md}`; per-run JSON and retained attempt
 evidence remain alongside them. A cache hit evaluates the same verdict without
 calling a model.
@@ -131,7 +133,8 @@ provider/runner errors are never cached or freshness-stamped. An explicitly forc
 refresh that produces no cacheable verdict fails even in LEARN mode, without
 caching the error. Review keys hash the PDF's ink, package exceptions, review code/import
 closure, the selected kind's reviewer/severity prompts, shared reviewer/judge
-prompts/schemas, shared drawing guidelines and the effective reviewer and judge
+prompts/schemas, the drawing guidelines' frontmatter `major_version` (not the
+file's bytes; bump it when an edit should change verdicts) and the effective reviewer and judge
 selections below, not the registry, enforcement declaration, recipe-skipped
 infrastructure such as telemetry, or `pyproject.toml`/`uv.lock`: a dependency
 release changes transport, not the verdict's inputs (#2882).

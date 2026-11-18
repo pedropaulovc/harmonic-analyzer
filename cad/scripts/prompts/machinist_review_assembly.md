@@ -69,6 +69,14 @@ Pass 1 — detection. Find every candidate item; classify nothing yet.
 Record each candidate with its where, the defect, its evidence (text layer
 line or crop), and the fix.
 
+A finding that a named fastener, pin or purchased item cannot reach, engage,
+fit or assemble states its arithmetic in `issue`: the values printed on the
+sheets, the hardware type they name, and the result. Work every ordinary
+configuration of that hardware first; if any one works, there is no finding.
+For example, a headless set screw is driven below flush, so a screw of length
+L in a tapped wall of thickness t > L still reaches the bore, with t − L of
+thread left above it.
+
 <!-- MACHINIST_SEVERITY_CONTRACT -->
 
 DO NOT ASK FOR

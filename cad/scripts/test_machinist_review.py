@@ -2435,12 +2435,21 @@ def test_relink_codex_auth_never_overwrites_a_newer_user_login(
 @pytest.fixture
 def synthetic_prompt_sources(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     guidelines = tmp_path / "guidelines.md"
-    guidelines.write_text("Synthetic guidelines.\n", encoding="utf-8")
+    guidelines.write_text(
+        "---\n# bump note\nmajor_version: 1\n---\nSynthetic guidelines.\n",
+        encoding="utf-8",
+    )
+    traveler_guidelines = tmp_path / "traveler-guidelines.md"
+    traveler_guidelines.write_text(
+        "---\n# traveler bump\nmajor_version: 1\n---\nSynthetic traveler guidelines.\n",
+        encoding="utf-8",
+    )
     templates = {
-        kind: tmp_path / f"{kind}.md" for kind in ("part", "assembly")
+        kind: tmp_path / f"{kind}.md" for kind in ("part", "assembly", "traveler")
     }
     contracts = {
-        kind: tmp_path / f"{kind}_severity.md" for kind in ("part", "assembly")
+        kind: tmp_path / f"{kind}_severity.md"
+        for kind in ("part", "assembly", "traveler")
     }
     judge_template = tmp_path / "judge.md"
     for path in (*templates.values(), judge_template):
@@ -2451,13 +2460,19 @@ def synthetic_prompt_sources(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     for path in contracts.values():
         path.write_text("Synthetic contract.\n", encoding="utf-8")
     monkeypatch.setattr(mr, "GUIDELINES_FILE", guidelines)
+    import machinist_review_traveler
+
+    monkeypatch.setattr(machinist_review_traveler, "GUIDELINES_FILE", traveler_guidelines)
     monkeypatch.setattr(mr, "PROMPT_FILES", templates)
     monkeypatch.setattr(mr, "JUDGE_PROMPT_FILE", judge_template)
     monkeypatch.setattr(mr, "SEVERITY_FILES", contracts)
     return SimpleNamespace(
-        templates=templates, contracts=contracts, judge_template=judge_template
+        templates=templates,
+        contracts=contracts,
+        judge_template=judge_template,
+        guidelines=guidelines,
+        traveler_guidelines=traveler_guidelines,
     )
-
 
 @pytest.mark.parametrize("judge", [False, True], ids=["reviewer", "judge"])
 def test_load_prompt_rejects_unsupported_kind(synthetic_prompt_sources, judge) -> None:
@@ -2465,7 +2480,57 @@ def test_load_prompt_rejects_unsupported_kind(synthetic_prompt_sources, judge) -
         mr.load_prompt("unsupported", judge=judge)
 
 
-@pytest.mark.parametrize("kind", ["part", "assembly"])
+@pytest.mark.parametrize("judge", [False, True], ids=["reviewer", "judge"])
+def test_prompt_carries_the_guidelines_body_without_frontmatter(
+    synthetic_prompt_sources, judge
+) -> None:
+    prompt = mr.load_prompt("part", judge=judge)
+    assert prompt.startswith("Synthetic guidelines.\n")
+    assert "major_version" not in prompt and "bump note" not in prompt
+
+
+
+@pytest.mark.parametrize("judge", [False, True], ids=["reviewer", "judge"])
+def test_traveler_prompt_stacks_drawing_and_traveler_guidelines_without_frontmatter(
+    synthetic_prompt_sources, judge
+) -> None:
+    prompt = mr.load_prompt("traveler", judge=judge)
+    assert prompt.startswith(
+        "Synthetic guidelines.\n\nSynthetic traveler guidelines.\n\nSynthetic introduction."
+    )
+    assert "major_version" not in prompt
+    assert "traveler bump" not in prompt
+    assert "Synthetic traveler guidelines." not in mr.load_prompt("part", judge=judge)
+
+
+def test_traveler_prompt_refuses_invalid_traveler_frontmatter(
+    synthetic_prompt_sources,
+) -> None:
+    synthetic_prompt_sources.traveler_guidelines.write_text(
+        "---\nmajor_version: 0\n---\nSynthetic traveler guidelines.\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="traveler guidelines"):
+        mr.load_prompt("traveler")
+
+@pytest.mark.parametrize(
+    "head",
+    ["", "---\n---\n", "---\nmajor_version: one\n---\n", "---\nmajor_version: 1.5\n---\n",
+     "---\nmajor_version: true\n---\n", "---\nmajor_version: 0\n---\n",
+     "---\nmajor_version: 1\n"],
+    ids=["absent", "empty", "word", "float", "bool", "zero", "unclosed"],
+)
+def test_prompt_refuses_guidelines_without_an_integer_major_version(
+    synthetic_prompt_sources, head
+) -> None:
+    synthetic_prompt_sources.guidelines.write_text(
+        head + "Synthetic guidelines.\n", encoding="utf-8"
+    )
+    with pytest.raises(ValueError, match="frontmatter"):
+        mr.load_prompt("part")
+
+
+@pytest.mark.parametrize("kind", ["part", "assembly", "traveler"])
 @pytest.mark.parametrize("judge", [False, True], ids=["reviewer", "judge"])
 def test_load_prompt_rejects_missing_severity_contract(
     synthetic_prompt_sources, kind, judge
@@ -2475,7 +2540,7 @@ def test_load_prompt_rejects_missing_severity_contract(
         mr.load_prompt(kind, judge=judge)
 
 
-@pytest.mark.parametrize("kind", ["part", "assembly"])
+@pytest.mark.parametrize("kind", ["part", "assembly", "traveler"])
 @pytest.mark.parametrize("judge", [False, True], ids=["reviewer", "judge"])
 @pytest.mark.parametrize("invalid", ["empty", "whitespace", "recursive"])
 def test_load_prompt_rejects_invalid_severity_contract(
@@ -2493,7 +2558,7 @@ def test_load_prompt_rejects_invalid_severity_contract(
         mr.load_prompt(kind, judge=judge)
 
 
-@pytest.mark.parametrize("kind", ["part", "assembly"])
+@pytest.mark.parametrize("kind", ["part", "assembly", "traveler"])
 @pytest.mark.parametrize("judge", [False, True], ids=["reviewer", "judge"])
 @pytest.mark.parametrize(
     "invalid",
@@ -2521,7 +2586,7 @@ def test_load_prompt_rejects_invalid_severity_template(
         mr.load_prompt(kind, judge=judge)
 
 
-@pytest.mark.parametrize("kind", ["part", "assembly"])
+@pytest.mark.parametrize("kind", ["part", "assembly", "traveler"])
 @pytest.mark.parametrize("inline", [False, True], ids=["whole-line", "inline"])
 def test_review_prompt_rejects_reserved_token_before_reading_sheet_text(
     monkeypatch: pytest.MonkeyPatch, kind, inline
@@ -2540,7 +2605,7 @@ def test_review_prompt_rejects_reserved_token_before_reading_sheet_text(
         mr._review_prompt(package, 1, prompt_text=override)
 
 
-@pytest.mark.parametrize("kind", ["part", "assembly"])
+@pytest.mark.parametrize("kind", ["part", "assembly", "traveler"])
 def test_review_prompt_allows_reserved_token_in_sheet_text(
     monkeypatch: pytest.MonkeyPatch, kind
 ) -> None:
@@ -2658,12 +2723,67 @@ def test_review_prompt_injects_the_sheet_text_layer(tmp_path: Path) -> None:
 
 
 def test_prompts_define_the_classification_contract() -> None:
-    for kind in ("part", "assembly"):
+    for kind in ("part", "assembly", "traveler"):
         prompt = re.sub(r"\s+", " ", mr.load_prompt(kind))
         assert "contradiction > missing > unbuildable > over_specification" in prompt
         assert "FIX if and only if blockers" in prompt
         assert 'never invent a hybrid category such as "minor clarity"' in prompt
         assert "use this precedence only when one defect meets more than one type" in prompt
+    traveler_prompt = mr.load_prompt("traveler")
+    assert "# Traveler guidelines" in traveler_prompt
+    assert "Rule T10" in traveler_prompt
+
+
+def test_traveler_html_extraction_and_document_roles(tmp_path: Path) -> None:
+    traveler_pdf = _text_pdf(tmp_path / "part-traveler.pdf", [(80, 400, "Setup 1")])
+    drawing_pdf = _text_pdf(tmp_path / "part.pdf", [(80, 400, "FRONT 1:1")])
+    html_file = tmp_path / "traveler-hobby.html"
+    html_file.write_text(
+        "<!doctype html><html><head><style>body{color:#000}</style></head><body>"
+        "<h1>Probe part</h1><p>MHA-XX-01; v50</p>"
+        '<div class="setup-heading"><h2>Setup 2 — Rough faces<span class="machine">PM-30MV CNC</span></h2></div>'
+        '<figure><img src="data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=" alt="Sub-plate plan."></figure>'
+        "<div>Holding: vise</div><div>Datum: X0 fixed jaw</div>"
+        "<dl><dt>Gate</dt><dd>.nnn<br>.mmm</dd></dl>"
+        "<table><tr><th>Op</th><th>Work</th><th>Tool</th></tr>"
+        "<tr><td>30</td><td><div>Mic .nnn–.mmm</div><div><strong>Check:</strong> .ppp–.qqq</div></td><td>1/2 EM</td></tr>"
+        "</table></body></html>",
+        encoding="utf-8",
+    )
+    package = mr.ReviewPackage(
+        "probe_part",
+        "traveler",
+        (traveler_pdf, drawing_pdf),
+        traveler_html=html_file,
+        companion_count=1,
+    )
+    prompt = mr._review_prompt(package, 2)
+    assert "\nDOCUMENT ROLES\n" in prompt
+    assert "Sheets 1..1: process traveler under review." in prompt
+    assert "Sheets 2..2: companion part drawing (reference specification authority ONLY" in prompt
+    assert "\nTRAVELER HTML TEXT\n" in prompt
+    assert "Setup 2 — Rough faces — PM-30MV CNC" in prompt
+    assert "[Diagram alt: Sub-plate plan.]" in prompt
+    assert "\nHolding: vise\nDatum: X0 fixed jaw\n" in prompt
+    assert "\nGate\n.nnn\n.mmm\n" in prompt
+    assert "30 | Mic .nnn–.mmm / Check: .ppp–.qqq | 1/2 EM" in prompt
+    assert "body{color:#000}" not in prompt
+    # Without --companion-pdf every PDF is the traveler: no sheet is shielded.
+    unpaired = mr.ReviewPackage("probe_part", "traveler", (traveler_pdf, drawing_pdf))
+    assert "DOCUMENT ROLES" not in mr._review_prompt(unpaired, 2)
+
+
+def test_companion_pdf_requires_a_traveler_package(tmp_path: Path) -> None:
+    traveler, drawing = tmp_path / "t.pdf", tmp_path / "d.pdf"
+    args = mr._parse_args([
+        "--pdf", str(traveler), "--companion-pdf", str(drawing),
+        "--name", "probe", "--kind", "traveler",
+    ])
+    assert args.companion_pdf == [drawing]
+    with pytest.raises(SystemExit):
+        mr._parse_args([
+            "--pdf", str(traveler), "--companion-pdf", str(drawing), "--name", "probe",
+        ])
 
 
 # --- owner-declared machinist exceptions -------------------------------------
@@ -2753,6 +2873,38 @@ def test_assembly_declarations_load_from_the_assemblys_contract(tmp_path: Path) 
     _write_exceptions_config(tmp_path, "xx_bank", [dict(entry, id="RV-09")])
     assert [e.id for e in load(tmp_path, "xx_bank", "part")] == ["RV-09"]
     assert load(tmp_path, "xx_bank_assembly", "part") == ()
+
+
+
+def test_traveler_declarations_load_from_process_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import yaml
+    import machinist_exceptions
+    import machinist_review_traveler
+
+    config_root = tmp_path / "config"
+    config_root.mkdir()
+    process_dir = tmp_path / "process" / "probe_part"
+    process_dir.mkdir(parents=True)
+    entry = {
+        "id": "TR-01",
+        "where": "Setup 1, Picture key",
+        "finding": "a legend word is also the part's name (rule T12)",
+        "reason": "owner accepts the generator's legend",
+        "kind": "accept",
+    }
+    (process_dir / "machinist_exceptions.yaml").write_text(
+        yaml.safe_dump({"machinist_exceptions": [entry]}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(machinist_review_traveler, "PROCESS_ROOT", tmp_path / "process")
+    # Part exceptions in config/parts/ do not bleed into traveler reviews and vice versa.
+    _write_exceptions_config(config_root, "probe_part", [dict(entry, id="RV-99")])
+    (loaded,) = machinist_review_traveler.load_exceptions("probe_part")
+    assert (loaded.id, loaded.kind) == ("TR-01", "accept")
+    (part_loaded,) = machinist_exceptions.load_exceptions(config_root, "probe_part", "part")
+    assert part_loaded.id == "RV-99"
 
 
 def test_review_prompt_injects_declared_exceptions(
@@ -5317,7 +5469,10 @@ def test_aggregate_runs_are_parallel_isolated_and_share_frozen_sources(
         inputs = _judge_inputs(kwargs["input"])
         if inputs is not None:
             judged.append(inputs)
-            assert kwargs["input"].startswith(mr.GUIDELINES_FILE.read_text(encoding="utf-8").rstrip())
+            guidelines = mr.GUIDELINES_FILE.read_text(encoding="utf-8")
+            body = mr.review_config.split_drawing_guidelines(guidelines)[1]
+            assert kwargs["input"].startswith(body.rstrip())
+            assert "major_version" not in kwargs["input"]
             value = {"clusters": [_judge_cluster([item["id"] for item in inputs])]}
             return _session_reply(command, kwargs, value)
         if reviewer == "claude":
@@ -5668,13 +5823,15 @@ def test_aggregate_counts_unique_runs_and_only_confirmed_gating_clusters(
 @pytest.mark.parametrize(
     ("members", "category", "verdict"),
     [
-        (["r1.blockers.1"], "blockers", "FIX"),
+        # dt_pinion_cam, 2026-11-17: r1 and r2 SHIP, r3 alone raised a blocker.
+        (["r3.blockers.1"], "blockers", "SHIP"),
+        (["r1.blockers.1", "r2.blockers.1"], "blockers", "FIX"),
         (["r1.blockers.1"], "clarity", "SHIP"),
         (["r1.blockers.1"], "over_specification", "SHIP"),
         (["r1.blockers.1", "r3.blockers.1"], "clarity", "FIX"),
     ],
 )
-def test_aggregate_gates_blockers_on_one_run_and_other_categories_on_two(
+def test_aggregate_gates_every_category_on_two_of_three_runs(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, members: list[str], category: str,
     verdict: str,
 ) -> None:
@@ -5701,6 +5858,8 @@ def test_aggregate_gates_blockers_on_one_run_and_other_categories_on_two(
     assert [item["gating"] for item in aggregate["confirmed"]] == [verdict == "FIX"]
     report = (tmp_path / "reports" / "sample.aggregate.md").read_text(encoding="utf-8")
     assert ("non-gating" in report) == (verdict == "SHIP")
+    assert "blockers 2+ runs" in report
+    assert aggregate["gating_min_runs"]["blockers"] == 2
 
 
 

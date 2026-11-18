@@ -449,6 +449,29 @@ def test_ref_prompt_uses_historical_guidelines_and_kind(
     assert "UNCOMMITTED" not in prompt
 
 
+def test_ref_prompt_sends_versioned_guidelines_without_frontmatter(
+    prompt_repo: Path,
+) -> None:
+    guidelines = prompt_repo / "cad" / "docs" / "drawing-guidelines.md"
+    guidelines.write_text(
+        "---\nmajor_version: 3\n---\nVERSIONED guidelines\n", encoding="utf-8"
+    )
+    _git(prompt_repo, "add", "cad/docs/drawing-guidelines.md")
+    _git(
+        prompt_repo,
+        "-c",
+        "user.name=Offline test",
+        "-c",
+        "user.email=offline@example.invalid",
+        "commit",
+        "-m",
+        "versioned",
+    )
+    prompt = evaluation.compose_prompt("part", ref="HEAD", repo=prompt_repo)
+    assert prompt.startswith("VERSIONED guidelines\n")
+    assert "major_version" not in prompt
+
+
 @pytest.mark.parametrize("kind", ["part", "assembly"])
 def test_legacy_ref_prompt_does_not_inherit_current_guidelines(
     prompt_repo: Path, kind: str

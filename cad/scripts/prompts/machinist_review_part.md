@@ -66,6 +66,14 @@ JUDGING THE PART AS DRAWN
 - The thread-engagement and wall minimums and the "What the shop holds" table
   are design rules for a first-time machinist. Apply them as printed; use no
   other numeric cutoff for capability.
+- A finding that a named fastener, pin or purchased item cannot reach,
+  engage, fit or assemble states its arithmetic in `issue`: the values
+  printed on the sheet, the hardware type the sheet names, and the result.
+  Work every ordinary configuration of that hardware first; if any one
+  works, there is no finding. For example, a headless set screw is driven
+  below flush, so a screw of length L in a tapped wall of thickness t > L
+  still reaches the bore, with t − L of thread left above it. Rule 16
+  cutter-access and trapped-geometry findings are judged by that rule.
 - Do not ask for an inspection plan, a tolerance study, material certs, a full
   production package, position frames on ordinary holes (a pattern that
   matches its mate or repeats across the channel parts is not ordinary; rule

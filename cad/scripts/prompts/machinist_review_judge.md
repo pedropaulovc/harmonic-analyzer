@@ -21,6 +21,14 @@ invented ones: confirm a finding that applies them by counting or reading the
 sheet yourself.
 A confirmed step-limit cluster's `where` lists every offending step you
 counted, by number, never a sample or "and similar".
+A claim that a named fastener, pin or purchased item cannot reach, engage, fit
+or assemble is confirmed only on arithmetic. Work it yourself from the values
+printed on the sheet and the hardware type the sheet names, and show the
+calculation in `reason`. If any ordinary configuration of that hardware works,
+the claim is `misread`. For example, a headless set screw is driven below
+flush, so a screw of length L in a tapped wall of thickness t > L still reaches
+the bore, with t − L of thread left above it. Other unbuildable claims, such
+as rule 16 cutter access or trapped geometry, are judged by the rule they cite.
 
 Classify each sheet-supported issue using this package kind's contract:
 
@@ -66,7 +74,7 @@ cluster's reason notes the other defects it bundled.
 
 `blockers`, `over_specification`, and `clarity` are gating categories; `minor`
 is not. Confirm each supported issue without regard to how many runs raised it.
-The aggregator applies the run threshold: a confirmed blocker gates when one run
-raised it, a confirmed over_specification or clarity issue when two runs did.
+The aggregator applies the run threshold: a confirmed issue in any gating
+category gates when two runs raised it.
 Never merge different issues to reach that threshold. Return only the
 schema-conforming JSON object, not a SHIP/FIX verdict or a reviewer summary.
