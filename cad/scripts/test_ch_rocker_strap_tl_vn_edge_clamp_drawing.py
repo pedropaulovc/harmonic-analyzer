@@ -420,10 +420,22 @@ def test_sheet_prints_the_catalogue_letters_on_silhouette_lines() -> None:
     assert c0 == (half, spec.HEEL_Y) and c1 == pytest.approx((half, spec.KNIFE_Y))
     (f0, f1) = _reference_line("SupplierF")
     assert f0 == (-half, spec.HEEL_Y) and f1 == pytest.approx((half, spec.HEEL_Y))
-    # Top (sketch = part X, -Z): B then D up a side face from the heel line.
+    # Top (sketch = part X, -Z): B up the right face from the heel line, D on
+    # the left face from B's height to the top, each in a lane of its own.
     (b0, b1) = _reference_line("SupplierB")
     (d0, d1) = _reference_line("SupplierD")
-    assert b0 == (half, 0.0) and b1 == pytest.approx(d0)
+    assert b0 == (half, 0.0) and d0 == (-half, pytest.approx(b1[1]))
+    sides = {name: side for name, (side, _) in plan.items()}
+    assert (sides["SupplierB"], sides["SupplierD"]) == ("right", "left")
+    assert (
+        len(
+            {
+                (spec.SUPPLIER_REFERENCE_PLANES.get(n, "Front"), s)
+                for n, s in sides.items()
+            }
+        )
+        == 6
+    )
     assert -d1[1] == pytest.approx((spec.CATALOG_B_IN + spec.CATALOG_D_IN) * IN)
     assert -d1[1] - spec.TOP_Z < 0.06  # D's catalogue end stands .002 past the top
     # The 4-40 chord spans the shank's flat tip.
@@ -449,6 +461,240 @@ def test_no_reference_line_is_welded_at_both_ends() -> None:
         ]
         assert len(shared) <= 1, name
         points.extend(ends)
+
+
+# --- the sheet's layout, simulated with the shared builder's own cells --------
+# GetOutline pads a view's model box by a fixed 5.59 mm a side (farm r3: the
+# 1:1 FRONT 20.70 mm across the 9.525 mm plan, TOP 23.9 mm over 12.75 mm).
+OUTLINE_PAD = 0.00559
+# r3's 4:1 isometric outline, 74.2 x 78.6 mm, less its pads, per unit scale.
+ISO_MODEL = ((0.0742 - 2 * OUTLINE_PAD) / 4.0, (0.0786 - 2 * OUTLINE_PAD) / 4.0)
+# A reference's value over its letter (r3's audit and render; the lock
+# knob's 4:1 Ø.625): ~10.2 mm tall, (.140) ~11.2 mm and (Ø.112) ~17.3 mm wide.
+TEXT_H = 0.0102
+TEXT_W = {"SupplierThreadDiameter": 0.0173}
+TEXT_W_DEFAULT = 0.0112
+WITNESS_OVERSHOOT = 0.002
+TITLE_BLOCK = (0.216, 0.4191, 0.0127, 0.066)
+SHEET = (0.0127, 0.4191, 0.0127, 0.2667)
+
+
+Box = tuple[float, float, float, float]  # x0, x1, y0, y1 (sheet metres)
+
+
+def _overlap(a: Box, b: Box) -> bool:
+    return a[0] < b[1] and b[0] < a[1] and a[2] < b[3] and b[2] < a[3]
+
+
+def _model_extent() -> dict[str, tuple[tuple[float, float], tuple[float, float]]]:
+    """Each view's model box in its own sketch frame, metres: (x range, y range)."""
+    x = (-spec.WIDTH / 2000.0, spec.WIDTH / 2000.0)
+    plan_y = (spec.HEEL_Y / 1000.0, spec.KNIFE_Y / 1000.0)
+    top_y = (-spec.TOP_Z / 1000.0, -spec.SCREW_TIP_Z / 1000.0)
+    return {
+        "*Front": (x, plan_y),
+        "*Top": (x, top_y),
+        "*Right": ((spec.SCREW_TIP_Z / 1000.0, spec.TOP_Z / 1000.0), plan_y),
+        "*Isometric": ((0.0, ISO_MODEL[0]), (0.0, ISO_MODEL[1])),
+    }
+
+
+def _size(name: str, scale: tuple[int, int]) -> tuple[float, float]:
+    (x0, x1), (y0, y1) = _model_extent()[name]
+    k = scale[0] / scale[1]
+    return (x1 - x0) * k + 2 * OUTLINE_PAD, (y1 - y0) * k + 2 * OUTLINE_PAD
+
+
+def _layout():
+    """The builder's row split and per-group fit (``_top_lowering``,
+    ``_fit_group``) over its own cells, with modelled native outlines."""
+    from _purchased_fastener_drawing import (
+        _ISOMETRIC,
+        _SCALES,
+        _project_from_front,
+        fastener_view_cells,
+        supplier_fit_cells,
+        view_band_bottom,
+    )
+
+    notes = str(_config.parts(STEM).get("installation_notes", ""))
+    caption_y = view_band_bottom(notes, label=STEM, supplier_data=spec.SUPPLIER_DATA)
+    margins = drawing.supplier_margins()
+
+    def cells(lower: float):
+        outer = fastener_view_cells(caption_y, lower=lower)
+        fit = _project_from_front(supplier_fit_cells(outer, margins, label=STEM))
+        return {n: c for n, _, c in outer}, {n: c for n, _, c in fit}
+
+    outer, fit = cells(0.0)
+    lowering = 0.0
+    for scale in _SCALES:
+        spare = {}
+        for name in ("*Front", "*Top", "*Right"):
+            w, h = _size(name, scale)
+            c = fit[name]
+            spare[name] = ((c[2] - c[0]) - w, (c[3] - c[1]) - h)
+        row = min(spare["*Front"][1], spare["*Right"][1])
+        short = -spare["*Top"][1]
+        if min(s[0] for s in spare.values()) < 0.0 or row < 0.0:
+            continue
+        if short <= 0.0:
+            break
+        if short <= row:
+            lowering = (short + row) / 2
+            break
+    if lowering:
+        outer, fit = cells(lowering)
+
+    def fits(names, scale) -> bool:
+        return all(
+            _size(n, scale)[0] <= fit[n][2] - fit[n][0]
+            and _size(n, scale)[1] <= fit[n][3] - fit[n][1]
+            for n in names
+        )
+
+    orthographic = ("*Front", "*Top", "*Right")
+    ortho = next(s for s in _SCALES if fits(orthographic, s))
+    iso = next(s for s in _SCALES if fits((_ISOMETRIC,), s))
+    scales = {**dict.fromkeys(orthographic, ortho), _ISOMETRIC: iso}
+    views = {}
+    for name, c in fit.items():
+        cx, cy = (c[0] + c[2]) / 2, (c[1] + c[3]) / 2
+        w, h = _size(name, scales[name])
+        views[name] = (cx - w / 2, cx + w / 2, cy - h / 2, cy + h / 2)
+    return outer, scales, views, caption_y
+
+
+def _reference_texts(views, scales) -> dict[str, tuple[Box, Box]]:
+    """Each reference's text box and its outer view's name, as the shared
+    lane plan, this sheet's lane moves and the builder's shelving place it."""
+    from _drawing_annotation_extent import CLEAR_GAP_M
+
+    plan = supplier_screw_lane_plan(
+        spec.SUPPLIER_REFERENCE_DIMENSIONS,
+        planes=spec.SUPPLIER_REFERENCE_PLANES,
+        sides=spec.SUPPLIER_REFERENCE_SIDES,
+    )
+    extents = _model_extent()
+    texts = {}
+    for name, (side, offset) in plan.items():
+        view = f"*{spec.SUPPLIER_REFERENCE_PLANES.get(name, 'Front')}"
+        box = views[view]
+        (mx0, mx1), (my0, my1) = extents[view]
+        k = scales[view][0] / scales[view][1] / 1000.0
+        cx, cy = (box[0] + box[1]) / 2, (box[2] + box[3]) / 2
+        (p0, p1) = _reference_line(name)
+        ends = [
+            (cx + (x - (mx0 + mx1) * 500.0) * k, cy + (y - (my0 + my1) * 500.0) * k)
+            for x, y in (p0, p1)
+        ]
+        width = TEXT_W.get(name, TEXT_W_DEFAULT)
+        _, dy = drawing.LANE_MOVES.get(name, (0.0, 0.0))
+        if side in ("left", "right"):
+            lane = box[0] - offset if side == "left" else box[1] + offset
+            lo, hi = sorted(y for _, y in ends)
+            if TEXT_H + 2 * CLEAR_GAP_M < hi - lo:
+                text = (lane - width / 2, lane + width / 2)
+                text_y = ((lo + hi - TEXT_H) / 2, (lo + hi + TEXT_H) / 2)
+            else:  # shelved outward past its witnesses' ends
+                reach = WITNESS_OVERSHOOT + CLEAR_GAP_M
+                text = (
+                    (lane - reach - width, lane - reach)
+                    if side == "left"
+                    else (lane + reach, lane + reach + width)
+                )
+                text_y = ((lo + hi - TEXT_H) / 2, (lo + hi + TEXT_H) / 2)
+        else:
+            lane = (box[2] - offset if side == "bottom" else box[3] + offset) + dy
+            lo, hi = sorted(x for x, _ in ends)
+            if width + 2 * CLEAR_GAP_M < hi - lo:
+                text = ((lo + hi - width) / 2, (lo + hi + width) / 2)
+            else:  # a centred span shelves right of its right witness
+                text = (hi + CLEAR_GAP_M, hi + CLEAR_GAP_M + width)
+            text_y = (lane, lane + TEXT_H)  # value and letter above the line
+        texts[name] = ((text[0], text[1], text_y[0], text_y[1]), view)
+    return texts
+
+
+def test_orthographic_views_fit_at_four_to_one_with_the_isometric_no_larger() -> None:
+    """Owner review of r3 (run 20261117T235437892Z): FRONT, TOP and RIGHT at
+    1:1 under a 4:1 isometric. The pre-fit margins now let them fit at 4:1."""
+    _, scales, _, _ = _layout()
+    assert scales["*Front"] == scales["*Top"] == scales["*Right"] == (4, 1)
+    assert scales["*Isometric"][0] / scales["*Isometric"][1] <= 4
+
+
+def test_margins_reserve_only_the_annotated_sides() -> None:
+    margins = drawing.supplier_margins()
+    assert set(margins) == {"*Front", "*Top"}
+    left, bottom, right, top = margins["*Front"]
+    assert top == 0.0 and left == right == pytest.approx(0.024)
+    assert bottom == pytest.approx(0.006 + drawing.F_DROP_M + drawing.LINE_BELOW_M)
+    left, bottom, right, top = margins["*Top"]
+    assert bottom == 0.0 and left == right == pytest.approx(0.024)
+    assert top == pytest.approx(0.006 + drawing.TEXT_ABOVE_M)
+    # F's two text lines stand above its line, between it and FRONT's outline.
+    assert 0.006 + drawing.F_DROP_M - TEXT_H >= 0.003
+    assert TEXT_H < drawing.TEXT_ABOVE_M
+
+
+def test_no_two_blocks_or_views_overlap_and_all_stand_on_the_sheet() -> None:
+    """r3 defects 2-4: (.075) D MIN on (.140) B and on TOP's outline; every
+    view, reference text, caption, the notes block and the title block clear
+    of one another after the 4:1 rescale. B landscape 0.4318 x 0.2794,
+    border 0.0127; title block x >= 0.216 below y 0.066."""
+    from _purchased_fastener_drawing import (
+        _CAPTION_BELOW,
+        _CAPTION_TO_CELL,
+        _FOOTER_RIGHT,
+        footer_top,
+    )
+
+    outer, scales, views, _ = _layout()
+    texts = _reference_texts(views, scales)
+    boxes: dict[str, Box] = {f"view {n}": b for n, b in views.items()}
+    for name, (box, view) in texts.items():
+        boxes[name] = box
+        cell = outer[view]
+        # The builder's settled guard: reference ink inside its outer cell.
+        assert cell[0] <= box[0] and box[1] <= cell[2], name
+        assert cell[1] <= box[2] and box[3] <= cell[3], name
+    sheet_scale = scales["*Front"]
+    for name, cell in outer.items():
+        caption = name[1:].upper()
+        if scales[name] != sheet_scale:
+            caption += f"  {scales[name][0]}:{scales[name][1]}"
+        half = 0.00125 * len(caption)
+        at = cell[1] - _CAPTION_TO_CELL
+        centre = (cell[0] + cell[2]) / 2
+        boxes[f"caption {caption}"] = (
+            centre - half,
+            centre + half,
+            at - _CAPTION_BELOW,
+            at + 0.001,
+        )
+    notes = str(_config.parts(STEM).get("installation_notes", ""))
+    top = footer_top(notes, label=STEM, supplier_data=spec.SUPPLIER_DATA)
+    boxes["notes"] = (0.015, _FOOTER_RIGHT, SHEET[2], top + 0.001)
+    boxes["title block"] = TITLE_BLOCK
+    names = sorted(boxes)
+    for i, a in enumerate(names):
+        for b in names[i + 1 :]:
+            assert not _overlap(boxes[a], boxes[b]), (a, b)
+    for name, box in boxes.items():
+        assert SHEET[0] <= box[0] and box[1] <= SHEET[1], name
+        assert SHEET[2] <= box[2] and box[3] <= SHEET[3], name
+
+
+def test_the_thread_callout_and_the_short_references_read_at_scale() -> None:
+    """r3 defect 3: the (Ø.112) 4-40 line and D's span were ~3 mm on paper."""
+    _, scales, views, _ = _layout()
+    k = scales["*Top"][0] / scales["*Top"][1]
+    assert spec.SCREW_MAJOR_DIA * k >= 11.0  # mm of dimension line
+    assert spec.D_REFERENCE * k >= 7.5
+    texts = _reference_texts(views, scales)
+    thread, _ = texts["SupplierThreadDiameter"]
+    assert thread[2] >= views["*Top"][3]  # above TOP, clear of the shank
 
 
 def test_footer_item_and_operating_data_fit() -> None:
