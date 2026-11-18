@@ -62,6 +62,27 @@ dt-cone-gear-tl-vn-arbor-nut:
   envelope:
     "AC": "_mcmaster_95462a505 1.1547005383792515*ACROSS_FLATS"
     "T": "_mcmaster_95462a505 THICKNESS"
+dt-cylinder-gear-tl-vn-cam-clamp-screw:
+  tier: 1
+  why: "ASME B18.3 socket head cap screw, used as supplied"
+  designation: "#10-32 UNF-3A x 5/16 hex socket head cap screw, black-oxide alloy steel"
+  standard: "ASME B18.3"
+  envelope:
+    "head Ø": "_mcmaster_91251a337 DIMS.head_dia"
+    "head H": "_mcmaster_91251a337 DIMS.head_h"
+dt-cylinder-gear-tl-vn-cam-clamp-washer:
+  tier: 1
+  why: "commodity flat washer defined by ID, OD and thickness"
+  designation: "#10 flat washer, 18-8 stainless"
+  standard: "—"
+  envelope:
+    "OD": "_mcmaster_92141a011 OD"
+    "T": "_mcmaster_92141a011 THICKNESS_MAX"
+dt-cylinder-gear-tl-vn-cam-stub:
+  tier: 1
+  why: "ASME B18.8.2 pull-out dowel pin, used as supplied"
+  designation: "Ø3/8 x 3/4 pull-out dowel pin, #10-32 tapped, hardened alloy steel"
+  standard: "ASME B18.8.2"
 dt-vn-cone-tip-block-screw:
   tier: 1
   why: "ASME B18.3 socket head cap screw, used as supplied"
@@ -405,6 +426,9 @@ ch-vn-spring-hook:
 dt-cone-tip-end-screw:
   tier: 3
   why: "fillister screw drilled and reamed (MHA-DT-39)"
+dt-cylinder-gear-tl-vn-cam-clock-pin:
+  tier: 3
+  why: "gauge pin cut to length (MHA-DT-12-TL-VN-51)"
 dt-vn-cone-shaft-key:
   tier: 3
   why: "key stock cut to length"

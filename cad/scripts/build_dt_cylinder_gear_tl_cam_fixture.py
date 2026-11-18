@@ -145,14 +145,14 @@ def _sketch_mapper(
 
 
 @_telemetry.traced("part.cam_fixture_pin_hole")
-async def _pin_hole(adapter: Any) -> list[tuple[str, str]]:
+def _pin_hole(adapter: Any) -> list[tuple[str, str]]:
     """The clock pin's press ream: a circle on the front-face plane at
     (PIN_X, PIN_Y), cut blind into the body."""
     from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
     check(
         f"create_plane {FRONT_FACE_PLANE}",
-        await adapter.create_plane(
+        adapter.create_plane(
             CreatePlaneParameters(
                 mode="offset", base_plane="Front Plane", offset=THICKNESS
             )
@@ -167,12 +167,12 @@ async def _pin_hole(adapter: Any) -> list[tuple[str, str]]:
     ]
     blank_reference_geometry(adapter, ((FRONT_FACE_PLANE, "PLANE"),))
     dims = SketchDims()
-    check("create_sketch pin hole", await adapter.create_sketch(FRONT_FACE_PLANE))
+    check("create_sketch pin hole", adapter.create_sketch(FRONT_FACE_PLANE))
     to_sketch = _sketch_mapper(adapter, u_axis=0, v_axis=1, label="pin hole")
     if to_sketch((0.0, 0.0, THICKNESS)) != (0.0, 0.0):
         raise RuntimeError("pin hole: the register axis is not the sketch origin")
     centre = to_sketch((PIN_X, PIN_Y, THICKNESS))
-    await define_circle(
+    define_circle(
         adapter,
         *centre,
         PIN_HOLE_DIA / 2.0,
@@ -181,13 +181,13 @@ async def _pin_hole(adapter: Any) -> list[tuple[str, str]]:
         names=("PinX", "PinY", "PinHoleDia"),
         drives=('"PinX"', '"PinY"', '"PinHoleDia"'),
     )
-    await ensure_fully_defined(adapter, "pin hole sketch")
-    check("exit_sketch pin hole", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "pin hole sketch")
+    check("exit_sketch pin hole", adapter.exit_sketch())
     name_last_feature(adapter, "PinHoleProfile")
     jobs += dims.apply(adapter, "PinHoleProfile")
     check(
         "cut pin hole",
-        await adapter.create_cut_extrude(ExtrusionParameters(depth=PIN_HOLE_DEPTH)),
+        adapter.create_cut_extrude(ExtrusionParameters(depth=PIN_HOLE_DEPTH)),
     )
     name_last_feature(adapter, "PinHole")
     jobs.append(
@@ -196,20 +196,20 @@ async def _pin_hole(adapter: Any) -> list[tuple[str, str]]:
     return jobs
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
     # The mm suffix is load-bearing: the equation manager reads bare numbers
     # in document units, and this is an inch document.
     for name, value in GLOBALS.items():
-        await set_global(adapter, name, f"{value}mm")
+        set_global(adapter, name, f"{value}mm")
 
     # --- Body: the register about the origin, extruded +Z ---------------------
     body = SketchDims()
-    check("create_sketch body", await adapter.create_sketch("Front"))
-    await define_circle(
+    check("create_sketch body", adapter.create_sketch("Front"))
+    define_circle(
         adapter,
         0.0,
         0.0,
@@ -219,24 +219,24 @@ async def build(adapter: Any) -> dict[str, str]:
         names=(None, None, "BodyDia"),
         drives=(None, None, '"BodyDia"'),
     )
-    await ensure_fully_defined(adapter, "body profile")
-    check("exit_sketch body", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "body profile")
+    check("exit_sketch body", adapter.exit_sketch())
     name_last_feature(adapter, "BodyProfile")
     drive_jobs = body.apply(adapter, "BodyProfile")
     check(
         "extrude body",
-        await adapter.create_extrusion(ExtrusionParameters(depth=THICKNESS)),
+        adapter.create_extrusion(ExtrusionParameters(depth=THICKNESS)),
     )
     name_last_feature(adapter, "Body")
     drive_jobs.append(
         (name_dimensions(adapter, "Body", ["BodyThick"])[0], '"BodyThick"')
     )
-    volume = await volume_check(adapter, "body", V_BODY, 0.002 * V_BODY)
+    volume = volume_check(adapter, "body", V_BODY, 0.002 * V_BODY)
 
     # --- Stub press ream: on -Y at the throw, through ---------------------------
     stub = SketchDims()
-    check("create_sketch stub hole", await adapter.create_sketch("Front"))
-    await define_circle(
+    check("create_sketch stub hole", adapter.create_sketch("Front"))
+    define_circle(
         adapter,
         0.0,
         -STUB_OFFSET,
@@ -246,33 +246,33 @@ async def build(adapter: Any) -> dict[str, str]:
         names=(None, "StubOffset", "StubHoleDia"),
         drives=(None, '"StubOffset"', '"StubHoleDia"'),
     )
-    await ensure_fully_defined(adapter, "stub hole sketch")
-    check("exit_sketch stub hole", await adapter.exit_sketch())
+    ensure_fully_defined(adapter, "stub hole sketch")
+    check("exit_sketch stub hole", adapter.exit_sketch())
     name_last_feature(adapter, "StubHoleProfile")
     drive_jobs += stub.apply(adapter, "StubHoleProfile")
     check(
         "cut stub hole",
-        await adapter.create_cut_extrude(
+        adapter.create_cut_extrude(
             ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
         ),
     )
     name_last_feature(adapter, "StubHole")
-    volume = await volume_check(
+    volume = volume_check(
         adapter, "stub hole", volume - V_STUB_HOLE, 0.01 * V_STUB_HOLE
     )
 
     # --- Clock pin press ream: blind from the front face -------------------------
-    drive_jobs += await _pin_hole(adapter)
-    volume = await volume_check(
+    drive_jobs += _pin_hole(adapter)
+    volume = volume_check(
         adapter, "clock pin hole", volume - V_PIN_HOLE, 0.05 * V_PIN_HOLE + 0.05
     )
     _require_one_solid_body(adapter, label="cam fixture")
 
-    await force_rebuild(adapter)
+    force_rebuild(adapter)
     for dimension_name, expression in drive_jobs:
-        await drive_dimension(adapter, dimension_name, expression)
-    await force_rebuild(adapter)
-    await volume_check(
+        drive_dimension(adapter, dimension_name, expression)
+    force_rebuild(adapter)
+    volume_check(
         adapter, "driven cam fixture (equations neutral)", V_FINISHED, 0.002 * V_BODY
     )
     _require_one_solid_body(adapter, label="driven cam fixture")
@@ -288,8 +288,8 @@ async def build(adapter: Any) -> dict[str, str]:
             places=DRAWING_PRECISION[feature_name][dimension_name],
             display_unit=UNIT,
         )
-    await apply_material(adapter, MATERIAL)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    report_mass_properties(adapter)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
@@ -297,7 +297,7 @@ async def build(adapter: Any) -> dict[str, str]:
     apply_drawing_properties(
         adapter, PART_NAME, {"Isometric View Note": ISOMETRIC_VIEW_NOTE}
     )
-    artefacts = await save_part_and_images(adapter, PART_NAME)
+    artefacts = save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
     return artefacts
 

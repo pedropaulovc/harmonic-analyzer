@@ -47,17 +47,17 @@ from dt_cylinder_gear_tl_cam_fixture_spec import (
 ASM_NAME = "dt-cylinder-gear-tl-cam-turning"
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     # Free-DOF contract: cad/config/assemblies/<ASM_NAME>.yaml.
     activate_assembly_contract(ASM_NAME)
-    check("create_assembly", await adapter.create_assembly())
+    check("create_assembly", adapter.create_assembly())
     apply_package_model_units(
         adapter, assembly_contract(ASM_NAME).drawing_unit, label=ASM_NAME
     )
 
     # The body: its +Z (the register axis, front face out) to the kit's +Y.
     body_rows = [list(row) for row in ROT_X_NEG90]
-    await place_component(
+    place_component(
         adapter,
         "dt-cylinder-gear-tl-cam-fixture",
         [0.0, 0.0, 0.0],
@@ -67,28 +67,28 @@ async def build(adapter) -> dict[str, str]:
     # The bought parts keep their part frames: axis +Y, pressed or bearing
     # face at their local origin.
     rows = [list(row) for row in IDENTITY]
-    await place_component(
+    place_component(
         adapter,
         "dt-cylinder-gear-tl-vn-cam-stub",
         list(STUB_BASE),
         euler_from_rows(rows),
         rows,
     )
-    await place_component(
+    place_component(
         adapter,
         "dt-cylinder-gear-tl-vn-cam-clock-pin",
         list(PIN_BASE),
         euler_from_rows(rows),
         rows,
     )
-    await place_component(
+    place_component(
         adapter,
         "dt-cylinder-gear-tl-vn-cam-clamp-washer",
         list(WASHER_BASE),
         euler_from_rows(rows),
         rows,
     )
-    await place_component(
+    place_component(
         adapter,
         "dt-cylinder-gear-tl-vn-cam-clamp-screw",
         list(SCREW_SEAT),
@@ -115,7 +115,7 @@ async def build(adapter) -> dict[str, str]:
             "Drawn By": DRAWN_BY,
         },
     )
-    return await save_assembly_and_images(adapter, ASM_NAME)
+    return save_assembly_and_images(adapter, ASM_NAME)
 
 
 if __name__ == "__main__":

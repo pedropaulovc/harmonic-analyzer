@@ -69,27 +69,27 @@ def dowel_volume() -> float:
 
 
 @stock_recipe("97175A344", threaded=False)
-async def build_97175A344(adapter, truth=None):
+def build_97175A344(adapter, truth=None):
     from solidworks_mcp.adapters.base import RevolveParameters
 
-    check("create_sketch dowel section", await adapter.create_sketch("Front"))
+    check("create_sketch dowel section", adapter.create_sketch("Front"))
     sk_mgr = adapter.currentSketchManager
     with no_sketch_inference(adapter):
         if sk_mgr.CreateCenterLine(0.0, 0.0, 0.0, 0.0, LENGTH / 1000.0, 0.0) is None:
             raise RuntimeError(f"{PART_NO} dowel section: CreateCenterLine failed")
-        await add_line_chain(adapter, dowel_section())
-    check("exit_sketch dowel section", await adapter.exit_sketch())
+        add_line_chain(adapter, dowel_section())
+    check("exit_sketch dowel section", adapter.exit_sketch())
     name_last_feature(adapter, "PinProfile")
     check(
         "revolve dowel",
-        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=False)),
+        adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=False)),
     )
     name_last_feature(adapter, "PinBody")
     volume = dowel_volume()
-    await volume_check(adapter, "pull-out dowel", volume, 0.005 * volume)
+    volume_check(adapter, "pull-out dowel", volume, 0.005 * volume)
 
 
-async def build_catalog(adapter) -> dict[str, str]:
+def build_catalog(adapter) -> dict[str, str]:
     """Catalog-only run: build the recipe and save it, no vendor truth."""
     import _telemetry
     from diagnostics.diag_mcmaster_lib import (
@@ -101,21 +101,21 @@ async def build_catalog(adapter) -> dict[str, str]:
     )
 
     with _telemetry.span("catalog.build", label=PART_NO):
-        check(f"create_part {PART_NO}", await adapter.create_part())
+        check(f"create_part {PART_NO}", adapter.create_part())
         assert_seat_sketch_baseline(adapter, PART_NO)
-        await build_97175A344(adapter)
+        build_97175A344(adapter)
         props = mass_properties(adapter)
         if not props["volume_mm3"] > 0.0:
             raise RuntimeError(f"{PART_NO} catalog build has no solid volume")
         OUT_DIR.mkdir(parents=True, exist_ok=True)
         path = OUT_DIR / f"{PART_NO}-catalog.SLDPRT"
-        check(f"save -> {path}", await adapter.save_file(str(path.resolve())))
+        check(f"save -> {path}", adapter.save_file(str(path.resolve())))
         artefacts = {"sldprt": str(path)}
-        artefacts.update(await export_views(adapter, f"{PART_NO}-catalog"))
+        artefacts.update(export_views(adapter, f"{PART_NO}-catalog"))
         _telemetry.success(
             f"{PART_NO} catalog build saved: volume {props['volume_mm3']:.4f} mm^3"
         )
-        await close_all(adapter)
+        close_all(adapter)
     return artefacts
 
 

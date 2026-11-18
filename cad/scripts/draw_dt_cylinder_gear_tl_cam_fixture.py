@@ -180,10 +180,10 @@ def _centre_mark_face(adapter: Any, view: Any) -> None:
     )
 
 
-async def build(adapter: Any) -> dict[str, str]:
+def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source cam fixture missing: {SOURCE}")
-    check("open cam fixture", await adapter.open_model(str(SOURCE)))
+    check("open cam fixture", adapter.open_model(str(SOURCE)))
     required = (
         "Number",
         "Material Specification",
@@ -249,7 +249,7 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (face, edge, iso):
         set_hidden_lines_removed(adapter, view)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
-    return await finalize_drawing(
+    return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Cylinder Gear Cam Turning Fixture Drawing",

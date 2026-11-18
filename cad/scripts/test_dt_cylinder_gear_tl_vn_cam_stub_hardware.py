@@ -12,8 +12,8 @@ import _mcmaster_97175a344 as dims
 import build_dt_cylinder_gear_tl_vn_cam_stub as part
 import dt_cylinder_gear_tl_cam_fixture_spec as fixture
 import dt_cylinder_gear_tl_vn_cam_stub_spec as spec
+import hardware_schedule
 from _drawing_registry import DRAWINGS_BY_NAME
-from _drawing_types import DRAWING_TEMPLATES
 from _fastener_catalog import FASTENERS
 from _hole_spec import TAP_DRILL_MM
 from _stock_recipe import recipe_declaration
@@ -74,12 +74,12 @@ def test_standalone_recipe_run_is_catalog_only() -> None:
     assert "replica_main" not in source
 
 
-def test_purchased_sheet_documents_the_built_part() -> None:
-    import draw_dt_cylinder_gear_tl_vn_cam_stub as drawing
-
-    sheet = DRAWINGS_BY_NAME["dt_cylinder_gear_tl_vn_cam_stub"]
-    assert drawing.SPEC is sheet
-    assert sheet.script.is_file()
-    assert sheet.source_kind == "part"
-    assert sheet.source.stem == part.PART_NAME == sheet.artifact_stem
-    assert sheet.layout in DRAWING_TEMPLATES
+def test_tier_one_schedule_row_and_no_sheet() -> None:
+    # Standard hardware is its HARDWARE.md row, not a sheet (owner, #2886); a
+    # pin's size is a fit fixed by its designation, so it carries no envelope.
+    row = hardware_schedule.SCHEDULE[STEM]
+    assert row["standard"] == "ASME B18.8.2"
+    assert row["designation"].startswith("Ø3/8 x 3/4 pull-out dowel pin, #10-32 tapped")
+    assert "envelope" not in row
+    assert all(sheet.part != STEM.replace("-", "_") for sheet in DRAWINGS_BY_NAME.values())
+    assert not Path(part.__file__).with_name("draw_" + Path(part.__file__).name[6:]).exists()

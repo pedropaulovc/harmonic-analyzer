@@ -10,8 +10,8 @@ import _config
 import _mcmaster_91251a337 as dims
 import build_dt_cylinder_gear_tl_vn_cam_clamp_screw as part
 import dt_cylinder_gear_tl_vn_cam_clamp_screw_spec as spec
+import hardware_schedule
 from _drawing_registry import DRAWINGS_BY_NAME
-from _drawing_types import DRAWING_TEMPLATES
 from _fastener_catalog import FASTENERS
 from _stock_recipe import recipe_declaration
 from diagnostics import diag_build_91251A337 as recipe
@@ -63,13 +63,16 @@ def test_standalone_recipe_run_is_catalog_only() -> None:
     assert "replica_main" not in source
 
 
-def test_purchased_sheet_documents_the_built_part() -> None:
-    import draw_dt_cylinder_gear_tl_vn_cam_clamp_screw as drawing
-
-    sheet = DRAWINGS_BY_NAME["dt_cylinder_gear_tl_vn_cam_clamp_screw"]
-    assert drawing.SPEC is sheet
-    assert drawing.ITEM == spec.CALLOUT
-    assert sheet.script.is_file()
-    assert sheet.source_kind == "part"
-    assert sheet.source.stem == part.PART_NAME == sheet.artifact_stem
-    assert sheet.layout in DRAWING_TEMPLATES
+def test_tier_one_schedule_row_and_no_sheet() -> None:
+    # Standard hardware is its HARDWARE.md row, not a sheet (owner, #2886).
+    row = hardware_schedule.SCHEDULE[STEM]
+    assert row["standard"] == "ASME B18.3"
+    assert row["designation"].startswith("#10-32 UNF-3A x 5/16")
+    assert hardware_schedule.envelope_mm(row["envelope"]["head Ø"]) == pytest.approx(
+        dims.DIMS.head_dia
+    )
+    assert hardware_schedule.envelope_mm(row["envelope"]["head H"]) == pytest.approx(
+        dims.DIMS.head_h
+    )
+    assert all(sheet.part != STEM.replace("-", "_") for sheet in DRAWINGS_BY_NAME.values())
+    assert not Path(part.__file__).with_name("draw_" + Path(part.__file__).name[6:]).exists()

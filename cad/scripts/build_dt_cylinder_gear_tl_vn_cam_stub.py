@@ -32,13 +32,13 @@ MATERIAL = SPEC.material
 
 
 @wraps(build_97175A344)
-async def _build_stub_with_supplier_references(adapter, truth=None):
-    await build_97175A344(adapter, truth)
-    await author_supplier_dowel_references(adapter, SUPPLIER_REFERENCE)
+def _build_stub_with_supplier_references(adapter, truth=None):
+    build_97175A344(adapter, truth)
+    author_supplier_dowel_references(adapter, SUPPLIER_REFERENCE)
 
 
-async def build(adapter) -> dict[str, str]:
-    return await build_stock_fastener(
+def build(adapter) -> dict[str, str]:
+    return build_stock_fastener(
         adapter,
         part_name=PART_NAME,
         components=(

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import contextlib
 import math
 from pathlib import Path
@@ -13,8 +12,8 @@ import _config
 import _mcmaster_92141a011 as dims
 import build_dt_cylinder_gear_tl_vn_cam_clamp_washer as part
 import dt_cylinder_gear_tl_vn_cam_clamp_washer_spec as spec
+import hardware_schedule
 from _drawing_registry import DRAWINGS_BY_NAME
-from _drawing_types import DRAWING_TEMPLATES
 from _fastener_catalog import FASTENERS
 from _stock_recipe import recipe_declaration
 from diagnostics import diag_build_92141A011 as recipe
@@ -50,26 +49,26 @@ def test_recipe_extrudes_the_annulus_from_y0(monkeypatch) -> None:
         def __init__(self) -> None:
             self.calls: list[tuple[str, object]] = []
 
-        async def create_sketch(self, plane):
+        def create_sketch(self, plane):
             self.calls.append(("sketch", plane))
             return "ok"
 
-        async def exit_sketch(self):
+        def exit_sketch(self):
             self.calls.append(("exit", None))
             return "ok"
 
-        async def create_extrusion(self, params):
+        def create_extrusion(self, params):
             self.calls.append(("extrude", params.depth))
             return "ok"
 
     circles: list[float] = []
     volumes: list[float] = []
 
-    async def circle(_adapter, x, y, radius, _label, **_kwargs):
+    def circle(_adapter, x, y, radius, _label, **_kwargs):
         assert (x, y) == (0.0, 0.0)
         circles.append(radius)
 
-    async def volume(_adapter, _label, expected, tolerance):
+    def volume(_adapter, _label, expected, tolerance):
         volumes.append(expected)
 
     @contextlib.contextmanager
@@ -82,7 +81,7 @@ def test_recipe_extrudes_the_annulus_from_y0(monkeypatch) -> None:
     monkeypatch.setattr(recipe, "volume_check", volume)
     monkeypatch.setattr(recipe, "name_last_feature", lambda *_args: None)
     monkeypatch.setattr(recipe, "no_sketch_inference", no_inference)
-    asyncio.run(recipe.build_92141A011(adapter))
+    recipe.build_92141A011(adapter)
     assert adapter.calls == [
         ("sketch", "Top"),
         ("exit", None),
@@ -100,12 +99,13 @@ def test_standalone_recipe_run_is_catalog_only() -> None:
     assert "replica_main" not in source
 
 
-def test_purchased_sheet_documents_the_built_part() -> None:
-    import draw_dt_cylinder_gear_tl_vn_cam_clamp_washer as drawing
-
-    sheet = DRAWINGS_BY_NAME["dt_cylinder_gear_tl_vn_cam_clamp_washer"]
-    assert drawing.SPEC is sheet
-    assert sheet.script.is_file()
-    assert sheet.source_kind == "part"
-    assert sheet.source.stem == part.PART_NAME == sheet.artifact_stem
-    assert sheet.layout in DRAWING_TEMPLATES
+def test_tier_one_schedule_row_and_no_sheet() -> None:
+    # Standard hardware is its HARDWARE.md row, not a sheet (owner, #2886).
+    row = hardware_schedule.SCHEDULE[STEM]
+    assert row["designation"].startswith("#10 flat washer")
+    assert hardware_schedule.envelope_mm(row["envelope"]["OD"]) == pytest.approx(dims.OD)
+    assert hardware_schedule.envelope_mm(row["envelope"]["T"]) == pytest.approx(
+        dims.THICKNESS_MAX
+    )
+    assert all(sheet.part != STEM.replace("-", "_") for sheet in DRAWINGS_BY_NAME.values())
+    assert not Path(part.__file__).with_name("draw_" + Path(part.__file__).name[6:]).exists()

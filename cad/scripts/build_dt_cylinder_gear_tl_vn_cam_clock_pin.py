@@ -54,32 +54,32 @@ PIN_R = PIN_DIA / 2.0
 V_PIN = math.pi * PIN_R**2 * PIN_LEN
 
 
-async def build(adapter) -> dict[str, str]:
+def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import RevolveParameters
 
-    check("create_part", await adapter.create_part())
+    check("create_part", adapter.create_part())
     apply_package_model_units(adapter, UNIT, label=PART_NAME)
-    await set_global(adapter, "PinDia", f"{PIN_DIA}mm")
-    await set_global(adapter, "PinLen", f"{PIN_LEN}mm")
+    set_global(adapter, "PinDia", f"{PIN_DIA}mm")
+    set_global(adapter, "PinLen", f"{PIN_LEN}mm")
 
     pin = SketchDims()
-    check("create_sketch pin", await adapter.create_sketch("Front"))
+    check("create_sketch pin", adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     axis = check(
-        "axis centerline", await adapter.add_centerline(0.0, 0.0, 0.0, PIN_LEN)
+        "axis centerline", adapter.add_centerline(0.0, 0.0, 0.0, PIN_LEN)
     )
     points = [(0.0, 0.0), (PIN_R, 0.0), (PIN_R, PIN_LEN), (0.0, PIN_LEN)]
-    lines = await add_line_chain(adapter, points)
+    lines = add_line_chain(adapter, points)
     set_sketch_direct_db(adapter, False)
     for index, line in enumerate(lines):
         (_, y0), (_, y1) = points[index], points[(index + 1) % len(lines)]
         relation = "horizontal" if y0 == y1 else "vertical"
         check(
             f"pin {relation} {line}",
-            await adapter.add_sketch_constraint(line, None, relation),
+            adapter.add_sketch_constraint(line, None, relation),
         )
     outline = lines[1]
-    await dimension_between(
+    dimension_between(
         adapter,
         f"{outline}.start",
         f"{outline}.end",
@@ -88,35 +88,35 @@ async def build(adapter) -> dict[str, str]:
         "pin length",
     )
     pin.record("PinLen", '"PinLen"')
-    await add_diametric_linear_dimension(
+    add_diametric_linear_dimension(
         adapter, axis, outline, (PIN_R + 2.0, PIN_LEN / 2.0), "PinDia"
     )
     pin.record("PinDia", '"PinDia"')
-    await anchor_point_to_origin(adapter, f"{lines[0]}.start", 0.0, 0.0, "pin anchor")
-    await ensure_fully_defined(adapter, "pin sketch")
-    check("exit_sketch pin", await adapter.exit_sketch())
+    anchor_point_to_origin(adapter, f"{lines[0]}.start", 0.0, 0.0, "pin anchor")
+    ensure_fully_defined(adapter, "pin sketch")
+    check("exit_sketch pin", adapter.exit_sketch())
     name_last_feature(adapter, "PinProfile")
     drive_jobs = pin.apply(adapter, "PinProfile")
-    check("revolve pin", await adapter.create_revolve(RevolveParameters(angle=360.0)))
+    check("revolve pin", adapter.create_revolve(RevolveParameters(angle=360.0)))
     name_last_feature(adapter, "Pin")
-    volume = await volume_check(adapter, "clock pin", V_PIN, 0.005 * V_PIN)
+    volume = volume_check(adapter, "clock pin", V_PIN, 0.005 * V_PIN)
 
-    await name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0, "pin axis")
-    await force_rebuild(adapter)
+    name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0, "pin axis")
+    force_rebuild(adapter)
     for dimension, expression in drive_jobs:
-        await drive_dimension(adapter, dimension, expression)
-    await force_rebuild(adapter)
-    await volume_check(adapter, "driven clock pin", volume, 0.005 * V_PIN)
+        drive_dimension(adapter, dimension, expression)
+    force_rebuild(adapter)
+    volume_check(adapter, "driven clock pin", volume, 0.005 * V_PIN)
 
-    await apply_material(adapter, MATERIAL)
-    await apply_color(adapter, POLISHED_STEEL)
-    await report_mass_properties(adapter)
+    apply_material(adapter, MATERIAL)
+    apply_color(adapter, POLISHED_STEEL)
+    report_mass_properties(adapter)
     clear_dimensions_for_drawing(adapter)
     for feature, dimensions in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature, dimensions)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES})
-    return await save_part_and_images(adapter, PART_NAME)
+    return save_part_and_images(adapter, PART_NAME)
 
 
 if __name__ == "__main__":
