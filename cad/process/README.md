@@ -113,7 +113,14 @@ Facts prechips has no field for, but which CAD specs and tests read, live in
   its order line and allocation: Online Metals orders 1021704672 and
   1021751700, Metal Supermarkets invoice EC234347, McMaster-Carr PO
   0803PCAMPOS and McMaster 8663K55 acetal (owner 2026-11-17: all on hand but
-  the platen's C360 plate);
+  the platen's C360 plate). Every row carries `status` (`on_hand`,
+  `not_received` or `to_order`) and `allocated_to`, the registry stems it is
+  cut for now (empty when its part is retired or none was named).
+  `uv run --frozen python cad/scripts/stock_bom.py [--format md|csv]` joins
+  these rows to the part registry: one line per made part with its stock and
+  status (`no_stock_record` when no row serves it, `vendor_sku` for reworked
+  bought hardware), then the unallocated rows. It exits 2 when a row names an
+  unknown or purchased stem;
 - the MHA-FR-02 top-frame casting to buy (owner ruling 2026-11-10 (Pedro),
   #2333): a gray-iron ASTM A48 class 25B `[[stock]]` row of form `casting`,
   with its pattern, datum-target and as-cast mass notes; not quoted or ordered;
