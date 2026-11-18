@@ -964,7 +964,12 @@ CALLOUT_TEXT_PART = 3  # swDimensionTextCalloutAbove
 REFERENCE_PREFIX_PART = 1  # swDimensionTextPrefix
 REFERENCE_SUFFIX_PART = 2  # swDimensionTextSuffix
 BROKEN_LINE_ALIGNED_TEXT = 3  # swDisplayDimensionLeaderText_e.swBrokenLeaderAlignedText
-if any("\n" in text for text in notes.DIMENSION_CALLOUTS.values()):
+# The sheet module's callouts, the arm named by its BOM item.
+DIMENSION_CALLOUTS = {
+    name: text.format(arm=item("ch-rocker-arm"))
+    for name, text in notes.DIMENSION_CALLOUTS.items()
+}
+if any("\n" in text for text in DIMENSION_CALLOUTS.values()):
     raise AssertionError("an above-callout with a line break does not print")
 
 
@@ -1195,11 +1200,19 @@ def _fitup_text() -> dict[str, str]:
         ),
         # The end-hub check runs while the right bracket is only clamped, so a
         # failed check is re-set before anything is drilled, tapped or staked
-        # (machinist review, PR #1605). The rods are in their cams, so each end
-        # arm stands where its rod puts it.
+        # (machinist review, PR #1605). The rods are in their cams, but each
+        # end arm floats by its rod's ring and fork play, so a leaf pushed
+        # into a tight gap would slide the arm away and pass a mis-set ear:
+        # the arm is first pushed toward its ear until its rod stops it, the
+        # extreme rocker_bank_layout.END_CLEARANCE_MIN charges, and gauged
+        # held there (Codjiflo, PR #3116).
+        "end-arms-pushed-to-ears": (
+            f"PUSH EACH END {arm} TOWARD ITS EAR UNTIL {rod} STOPS IT."
+        ),
         "end-hubs-clear": (
             f"CHECK THE FEELER LEAF OF {notes.setting_row('end-hubs-clear')} "
-            f"PASSES BETWEEN EACH END {arm} HUB AND ITS {bracket} EAR ({detail})."
+            f"PASSES BETWEEN EACH END {arm} HUB, HELD AS AT STEP "
+            f"{n('end-arms-pushed-to-ears')}, AND ITS {bracket} EAR ({detail})."
         ),
         # Each end its own remedy block (rule 22: one action a step), both
         # back to the bare shaft; the block opens with its condition and every
@@ -2316,7 +2329,7 @@ def _assert_settings(displays: dict[str, Any]) -> None:
                     f"{name}: band is not {asm.DIMENSION_TOLERANCES[name]}"
                 )
         text = str(display.GetText(CALLOUT_TEXT_PART) or "").replace("\r\n", "\n")
-        if text != notes.DIMENSION_CALLOUTS[name]:
+        if text != DIMENSION_CALLOUTS[name]:
             raise RuntimeError(f"{name}: callout reads {text!r}")
 
 
@@ -2351,7 +2364,7 @@ def _place_fitup_sheets(adapter: Any) -> Callable[[], None]:
     )
     _place_steps(adapter, SHEET_NAMES[4])
 
-    for name, text in notes.DIMENSION_CALLOUTS.items():
+    for name, text in DIMENSION_CALLOUTS.items():
         set_dimension_callouts(adapter, annotations, {name: text}, location="above")
     displays = _displays(adapter, annotations)
     for annotation in annotations:

@@ -68,11 +68,14 @@ def _screw(thread: str, length_mm: float, kind: str) -> str:
     return f"{thread} X {inch_fraction(length_mm, what=kind)} {kind}"
 
 
+# A callout's ``{arm}`` is the rocker arm's BOM item, which the drawing fills
+# in from its BOM (as it numbers the setting table's parts).
 DIMENSION_CALLOUTS = {
     # Set by DRO off the left bracket's ear (the right-bracket span step):
     # the ears' inner faces, between which the arms float, each located by
-    # its rod (#3114).
-    EAR_SPAN_DIMENSION: "EAR SPAN, INNER FACES",
+    # its rod (#3114). What the band protects (rule 4): each end arm's hub,
+    # following its rod, stays clear of its ear (the end-hubs-clear check).
+    EAR_SPAN_DIMENSION: "EAR SPAN, INNER FACES: END {arm} HUBS CLEAR",
     # View D's left tip off the left ear's outer face (the shaft-set step,
     # caliper depth rod); R5 machinist review, rule 22: the setting prints on
     # the view, not in the step.

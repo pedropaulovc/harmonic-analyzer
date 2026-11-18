@@ -21,9 +21,6 @@ DRAWING_NUMBER = "MHA-CH-00"
 # so the pointer follows any renumbering of MHA-DT-00.
 NORTH_BRACKET_SET_KEY = "north-pivot-bracket-set"
 NORTH_BRACKET_SET_REF = dt_drive_train_steps.step_ref(NORTH_BRACKET_SET_KEY)
-# Its printed number, for the sub-steps (10B, 10E, 10F) the left-hub remedy
-# re-runs.
-NORTH_BRACKET_SET_NUMBER = dt_drive_train_steps.step_number(NORTH_BRACKET_SET_KEY)
 # Each rod's ring is captured in its closed cam slot as the cylinder stack goes
 # together (MHA-DT-00 BANK_STEPS), and the rod's fork is pinned to its arm with
 # a pin pressed at the bench, so the rod + arm pair must be pinned BEFORE that
@@ -64,13 +61,15 @@ HA_ANCHORS_SET_REF = "MHA-HA-00 STEP 5"
 # ears' inner-face span while the shaft runs bare through both ears (with the
 # arms on it each inner face is only .05 from its end hub, out of the edge
 # finder's reach). It stays only clamped while the shaft is drawn back, the
-# arms are threaded on and the end hubs are checked clear of the ears
-# (machinist review, PR #1605: a failed check re-sets a bracket that can
-# still move). Each end has its own remedy block, one action a step (rule
-# 22): the left bracket, set and screwed at MHA-DT-00, is reset per its own
-# sub-steps; both blocks return to the bare shaft. The foot hole is
-# transferred and the bracket screwed down only once that check has passed.
-# The arms are checked to slide freely with their rods once the shaft is held.
+# arms are threaded on, each end arm is pushed toward its ear as far as its
+# rod lets it (a floating arm would slide away from the leaf) and the end
+# hubs are checked clear of the ears (machinist review, PR #1605: a failed
+# check re-sets a bracket that can still move). Each end has its own remedy
+# block, one action a step (rule 22): the left bracket, set and screwed at
+# MHA-DT-00, is reset per its own sub-steps; both blocks return to the bare
+# shaft. The foot hole is transferred and the bracket screwed down only once
+# that check has passed. The arms are checked to slide freely with their
+# rods once the shaft is held.
 LEFT_HUB_REMEDY: tuple[str, ...] = (
     "left-hub-shaft-drawn-back",
     "left-hub-clamp-eased",
@@ -111,6 +110,7 @@ ROCKER_SEQUENCE: tuple[str, ...] = (
     "shaft-drawn-back",
     "arms-swung-up",
     "rocker-hubs-threaded",
+    "end-arms-pushed-to-ears",
     "end-hubs-clear",
     *LEFT_HUB_REMEDY,
     *RIGHT_HUB_REMEDY,

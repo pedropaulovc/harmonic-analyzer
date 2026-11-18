@@ -288,7 +288,7 @@ def test_no_compass_or_private_words_print() -> None:
             *(view.label_text for view in drawing.LETTERED_VIEWS),
             *(text for text, _, _ in drawing.DETAIL_POINTERS),
             *(text for text, _, _ in drawing.PLAN_POINTERS),
-            *drawing.notes.DIMENSION_CALLOUTS.values(),
+            *drawing.DIMENSION_CALLOUTS.values(),
         )
     )
     for word in ("NORTH", "SOUTH", "STRAP", "APEX", "CROWN", "CLOSED UP", "HUB 0", "SPLIT OF"):
@@ -332,8 +332,11 @@ def test_the_right_bracket_is_set_to_the_ear_span_and_the_end_hubs_checked() -> 
     span = _step_body("south-bracket-span-set")
     assert "EDGE FINDER" in span and "DRO" in span
     assert f"{drawing.ROCKER_BANK.title} EAR SPAN" in span
-    callout = drawing.notes.DIMENSION_CALLOUTS[asm.EAR_SPAN_DIMENSION]
-    assert callout.startswith("EAR SPAN")
+    # Rule 4 (Codjiflo, PR #3116): the callout names the faces and what the
+    # band protects, the arm by its BOM item; one line (an above-callout).
+    assert drawing.DIMENSION_CALLOUTS[asm.EAR_SPAN_DIMENSION] == (
+        f"EAR SPAN, INNER FACES: END {arm} HUBS CLEAR"
+    )
     nominal = asm.PIVOT_CHAIN_Z[1] - asm.PIVOT_CHAIN_Z[0]
     assert nominal == pytest.approx(bank.EAR_INNER_SPAN)
     for text in (f"{nominal / 25.4:.3f}", f"{nominal / 25.4:.2f}"):
@@ -344,9 +347,19 @@ def test_the_right_bracket_is_set_to_the_ear_span_and_the_end_hubs_checked() -> 
     )
     assert asm.DRAWING_PRECISION[asm.PIVOT_FEATURE][asm.EAR_SPAN_DIMENSION] == 3
     assert f"THE RIGHT {bracket} EAR" in _step_body("rocker-hubs-threaded")
+    # Codjiflo, PR #3116: a floating end arm would slide away from the leaf
+    # and pass a mis-set ear, so one step first pushes each end arm toward
+    # its ear until its rod stops it (the extreme END_CLEARANCE_MIN charges)
+    # and the check gauges it held there.
+    pushed = steps.step_number("end-arms-pushed-to-ears")
+    assert pushed == steps.step_number("end-hubs-clear") - 1
+    assert _step_body("end-arms-pushed-to-ears") == (
+        f"PUSH EACH END {arm} TOWARD ITS EAR UNTIL "
+        f"{drawing.item(drawing.explode.ROD)} STOPS IT."
+    )
     clear = _step_body("end-hubs-clear")
     assert drawing.notes.setting_row("end-hubs-clear") in clear
-    assert f"EACH END {arm} HUB" in clear
+    assert f"EACH END {arm} HUB, HELD AS AT STEP {pushed}, AND ITS" in clear
     assert f"({drawing.SOUTH_END.title}, SHEET 4)" in clear
     assert drawing.SHEET_NAMES.index(drawing.DETAIL_SHEET) == 3
     # One remedy block per end, one action a step, each back to the bare
@@ -356,7 +369,7 @@ def test_the_right_bracket_is_set_to_the_ear_span_and_the_end_hubs_checked() -> 
     # their rods: no step swings them down.
     hold_down = drawing.item(drawing.explode.BRACKET_HOLD_DOWN)
     assert f"LOOSEN THE LEFT {hold_down}." in _step_body("left-hub-hold-down-loosened")
-    number = steps.NORTH_BRACKET_SET_NUMBER
+    number = dt_drive_train_steps.step_number(steps.NORTH_BRACKET_SET_KEY)
     for key, letter, action in (
         ("left-hub-bracket-reset", "B", f"RESET THE LEFT {bracket}"),
         ("left-hub-hold-down-tightened", "E", f"TIGHTEN THE LEFT {hold_down}"),
@@ -390,6 +403,7 @@ def test_the_right_bracket_is_set_to_the_ear_span_and_the_end_hubs_checked() -> 
         "shaft-drawn-back",
         "arms-swung-up",
         "rocker-hubs-threaded",
+        "end-arms-pushed-to-ears",
         "end-hubs-clear",
         *steps.LEFT_HUB_REMEDY,
         *steps.RIGHT_HUB_REMEDY,
@@ -574,6 +588,11 @@ def test_the_package_sheets_and_settings_contract() -> None:
         drawing.ROCKER_BANK.sheet_xy(z, 0.0)[0] for z in asm.PIVOT_CHAIN_Z[:2]
     ]
     assert span_x == pytest.approx(sum(span_ends) / 2.0)
+    # Its one-line callout stands between the span's two extension lines.
+    span_callout = drawing.DIMENSION_CALLOUTS[asm.EAR_SPAN_DIMENSION]
+    assert len(span_callout) * NOTE_CHAR_WIDTH / 2.0 + 0.003 < (
+        abs(span_ends[0] - span_ends[1]) / 2.0
+    )
     # Detail A, right of sheet 4's left column, is centred on the air between
     # the right ear's inner face and the end hub, both inside its circle.
     detail = drawing.SOUTH_END
