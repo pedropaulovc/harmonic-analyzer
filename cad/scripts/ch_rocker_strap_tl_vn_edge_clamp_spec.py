@@ -60,9 +60,6 @@ CATALOG_E_IN = (
 )
 CATALOG_F_IN = 0.375  # clamp width
 MAX_TORQUE_FT_LB = 1.30
-HOLDING_FORCE_LB = 650
-THROW_IN = 0.0075
-PER_PACKAGE = 8
 O_RING_SKU = "26008"
 SCREW_THREAD = "#4-40 UNC x 3/8"
 
@@ -356,11 +353,15 @@ for _name, _inch in CATALOG_LETTERS.items():
     if not math.isclose(_value, _inch * INCH, abs_tol=1e-9):
         raise AssertionError(f"{_name} does not print catalogue {_inch}")
 
-ITEM = "PITBULL CLAMP 26000, TOOL STEEL, KNIFE EDGE, 4-40 X 3/8 SHCS"
+# The footer: with the sheet's PURCHASED PART line, rule 7's four short lines.
+# The supplier's document, its torque limit (the fixture's own setting prints
+# on the assembly that installs the clamp) and the O-ring as a member of this
+# item; no holding force, throw or package count (r8 LEARN review).
+NUMBER = "MHA-CH-13-TL-VN-50"
+ITEM = "PITBULL CLAMP 26000, KNIFE EDGE, 4-40 X 3/8 SHCS"
 SUPPLIER_DATA = (
-    "MITEE-BITE PITBULL-INST-0426 ROW 26000 GOVERNS; A-F AS LETTERED.",
-    f"SHCS 4-40 TORQUE {MAX_TORQUE_FT_LB:.2f} FT-LB MAX; FIXTURE USES 0.5 FT-LB.",
-    f"HOLDS {HOLDING_FORCE_LB} LB; THROW {THROW_IN:.4f}".replace(" 0.", " .")
-    + f"; {PER_PACKAGE} PER PACKAGE.",
-    f"O-RING {O_RING_SKU} SUPPLIED UNDER THE BODY; NOT SHOWN.",
+    # Mitee-Bite prints on the footer's SUPPLIER row.
+    "PITBULL-INST-0426 ROW 26000 GOVERNS; A-D, F AS LETTERED.",
+    f"SHCS 4-40 TORQUE {MAX_TORQUE_FT_LB:.2f} FT-LB MAX.",
+    f"O-RING ({O_RING_SKU}) OF {NUMBER} UNDER THE BODY; NOT SHOWN.",
 )

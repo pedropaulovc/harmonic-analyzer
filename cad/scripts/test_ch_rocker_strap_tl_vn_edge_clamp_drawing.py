@@ -82,9 +82,6 @@ def test_catalogue_facts() -> None:
         spec.CATALOG_F_IN,
     ) == (0.150, 0.140, 0.375, 0.075, 0.375)
     assert spec.MAX_TORQUE_FT_LB == 1.30
-    assert spec.HOLDING_FORCE_LB == 650
-    assert spec.THROW_IN == 0.0075
-    assert spec.PER_PACKAGE == 8
     assert spec.O_RING_SKU == "26008"
     assert spec.SCREW_THREAD == "#4-40 UNC x 3/8"
 
@@ -646,12 +643,13 @@ def _reference_ink(views, scales) -> dict[str, tuple[Box, Box, str]]:
 
 def test_the_ink_model_reproduces_r7s_fall_out_of_front() -> None:
     """r7 (run 20261118T001932117Z) dropped F 8 mm: its annotation stood at
-    y .0976393 and its ink reached .091085, 2.9 mm under FRONT's .094 cell."""
+    y .0976393 and its ink reached .091085, 2.9 mm under FRONT's .094 cell.
+    Undropped, F's whole ink stays a millimetre inside its cell."""
     assert 0.0976393 - INK_BELOW == pytest.approx(0.091085, abs=1e-6)
     outer, scales, views, _ = _layout()
-    assert outer["*Front"][1] == pytest.approx(0.094)
     _, (_, _, bottom, _), _ = _reference_ink(views, scales)["SupplierF"]
     assert bottom >= outer["*Front"][1] + 0.001
+    assert bottom - 0.008 < outer["*Front"][1]  # r7's drop would still fall out
 
 
 def test_orthographic_views_fit_at_four_to_one_with_the_isometric_no_larger() -> None:
@@ -749,19 +747,29 @@ def test_the_thread_callout_and_the_short_references_read_at_scale() -> None:
 
 
 def test_footer_item_and_operating_data_fit() -> None:
+    """r8 LEARN review (FIX): rule 7's four short lines with the PURCHASED
+    PART line; the letters the note names are the letters printed; no
+    assembly torque; the O-ring a member of this item; the material only in
+    the title block."""
     assert check_item(spec.ITEM, label=STEM) == spec.ITEM
     lines = _supplier_data_lines(spec.SUPPLIER_DATA, label=STEM)
     assert lines[0] == "SUPPLIER OPERATING DATA (REFERENCE):"
+    assert not str(_config.parts(STEM).get("installation_notes", "")).strip()
+    assert 1 + len(spec.SUPPLIER_DATA) <= 4
     text = " ".join(spec.SUPPLIER_DATA)
-    for fact in (
-        "26000",
-        "1.30 FT-LB",
-        "650 LB",
-        "THROW .0075",
-        "8 PER PACKAGE",
-        "26008",
-    ):
+    for fact in ("26000", "1.30 FT-LB MAX", f"(26008) OF {NUMBER}"):
         assert fact in text
+    for gone in ("FIXTURE", "0.5 FT-LB", "650 LB", "THROW", "PACKAGE"):
+        assert gone not in text
+    assert spec.NUMBER == NUMBER == _config.parts(STEM)["number"]
+    printed = sorted(
+        callout[0]
+        for *_, callout in spec.SUPPLIER_REFERENCE_FORMATS.values()
+        if callout[0].isalpha()
+    )
+    assert printed == ["A", "B", "C", "D", "F"]
+    assert "; A-D, F AS LETTERED." in spec.SUPPLIER_DATA[0]
+    assert "STEEL" not in spec.ITEM
 
 
 def test_drawing_passes_the_spec_rows_to_the_shared_purchased_sheet() -> None:
@@ -794,7 +802,7 @@ def test_plan_agrees_with_the_clamp() -> None:
     """cad/process/ch_rocker_strap/plan.toml, read here and never by a leaf."""
     parameters = tomllib.loads(PLAN.read_text(encoding="utf-8"))["parameters"]
     assert 0.0 < parameters["clamp_torque_ft_lb"] <= spec.MAX_TORQUE_FT_LB
-    assert "0.5 FT-LB" in spec.SUPPLIER_DATA[1]
+    # The fixture's 0.5 FT-LB prints on the assembly, under the clamp's limit.
     assert parameters["clamp_torque_ft_lb"] == 0.5
     assert parameters["clamp_height_mm"] == pytest.approx(spec.CATALOG_D_IN * IN)
     # Seated on a B-deep pocket floor the modelled clamp stays under the
