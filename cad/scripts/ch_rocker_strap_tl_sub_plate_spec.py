@@ -361,9 +361,12 @@ if not (
     raise AssertionError("section A-A cuts pocket 3's tap or a corner radius")
 if not THREAD_MAJOR_MM[HUB_TAP_THREAD] / 2.0 < SECTION_B_OFFSET < HUB_CBORE_DIA / 2.0:
     raise AssertionError("section B-B cuts the hub tap or misses the counterbore")
-# Section B-B's counterbore wall: the front end of the chord its plane cuts
-# (a 3-4-5 triangle: .150 off the axis, .200 along the cut, the .250 radius).
-CBORE_SECTION_WALL_Y = HUB_Y - math.sqrt(
+# Section B-B's counterbore wall: the back end of the chord its plane cuts
+# (a 3-4-5 triangle: .150 off the axis, .200 along the cut, the .250 radius),
+# so the depth's dimension line stands in the counterbore's mouth with its
+# text running right, inside the border (farm run r15: off the front wall,
+# its text crossed the right border by 10.7 mm).
+CBORE_SECTION_WALL_Y = HUB_Y + math.sqrt(
     (HUB_CBORE_DIA / 2.0) ** 2 - SECTION_B_OFFSET**2
 )
 CLAMP_TAP_X_NAMES: tuple[str, ...] = tuple(

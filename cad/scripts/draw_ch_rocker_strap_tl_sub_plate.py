@@ -96,7 +96,7 @@ TOP_ORIGIN = (0.075 - spec.LEFT_END_X * _T, 0.204)
 # so each letter stands right of its line. Its origin is the sheet point of
 # its plane's (Y0, Z0), the fence face's foot.
 SECTION_A_ORIGIN = (0.070, 0.085)
-SECTION_B_ORIGIN = (0.266, 0.1018)
+SECTION_B_ORIGIN = (0.266, 0.1088)
 # The cutting lines (model X, Y), each from 12 mm behind the back edge (its
 # letter 3 mm over the back edge, under the hub tap's callout); A-A's stops
 # in the floor 4.4 mm past pocket 3's back wall (a partial section: its
@@ -112,10 +112,11 @@ SECTION_B_LINE = (
     (spec.SECTION_B_X, spec.BACK_EDGE_Y + 12.0),
     (spec.SECTION_B_X, spec.FRONT_EDGE_Y - 12.0),
 )
-# The captions under section A-A and over section B-B (the title block
-# holds the space under B-B); each point is the caption's top centre.
+# Each section's caption under its view; each point is the caption's top
+# centre. B-B's view stands 7 mm higher than r15's so its caption clears
+# the title block (farm run r15: over the view, 40 mm off).
 SECTION_A_CAPTION_XY = (0.112, 0.058)
-SECTION_B_CAPTION_XY = (0.340, 0.152)
+SECTION_B_CAPTION_XY = (0.317, 0.084)
 ISO_CENTER = (0.365, 0.232)
 ISO_NOTE_XY = (0.335, 0.196)
 
@@ -176,7 +177,7 @@ TOP_KEEP: dict[str, tuple[float, float]] = {
         _LEFT_X - 0.045,
         top_xy(0.0, (spec.HUB_Y + spec.CLAMP_SCREW_Y) / 2.0)[1],
     ),
-    "NotchDepth": (_LEFT_X - 0.006, top_xy(0.0, 0.0)[1] - 0.0045),
+    "NotchDepth": (_LEFT_X - 0.003, top_xy(0.0, 0.0)[1] - 0.0045),
     "PlateWidth": (_LEFT_X - 0.055, _FRONT_Y + 0.00675),
     "PocketLength": (
         top_xy(_STATIONS[0], 0.0)[0] + 0.0135,
@@ -191,7 +192,8 @@ TOP_KEEP: dict[str, tuple[float, float]] = {
 }
 # Section A-A: the pocket walls from Y0 in two rows over the cut, the back
 # wall's (with its seat's words under its value) 14 mm over the near wall's;
-# the pocket depth right of the partial cut's end, its two rows under the
+# the pocket depth 4 mm right of the partial cut's end, its two rows beside
+# its line (left clear of the title block, farm run r15) and under the
 # floor's level so neither extension line runs through them (farm run
 # 20261118T001932117Z: centred on its span, the floor's line struck it); the
 # overall thickness left of the back face, its extension lines along the
@@ -206,7 +208,7 @@ SECTION_A_KEEP: dict[str, tuple[float, float]] = {
         _FENCE_TOP_A + 0.0225,
     ),
     "PocketDepth": (
-        section_a_xy(SECTION_A_END_Y, 0.0)[0] + 0.0195,
+        section_a_xy(SECTION_A_END_Y, 0.0)[0] + 0.004,
         section_a_xy(0.0, spec.POCKET_FLOOR_Z)[1] - 0.0075,
     ),
     "PlateThickness": (
@@ -214,15 +216,18 @@ SECTION_A_KEEP: dict[str, tuple[float, float]] = {
         section_a_xy(0.0, (spec.FENCE_HEIGHT + spec.UNDERSIDE_Z) / 2.0)[1],
     ),
 }
-# Section B-B: the fence height's two rows over the floor right of the fence
-# face, 2 mm over its extension lines; the counterbore depth's two rows
-# above those, right of the fence height's dimension line.
+# Section B-B: the counterbore depth's two rows over the floor, beside its
+# line in the counterbore's mouth, running right inside the border; the
+# fence height's two rows above those, beside its line right of the fence
+# face, the line passing left of the depth's text (farm run r15: the depth's
+# line ran up through the fence height's text, and the depth's text off the
+# right border, from the front wall).
 SECTION_B_KEEP: dict[str, tuple[float, float]] = {
-    "FenceHeight": (section_b_xy(-18.0, 0.0)[0], _FENCE_TOP_B + 0.0066),
     "HubCboreDepth": (
-        section_b_xy(spec.CBORE_SECTION_WALL_Y - 7.0, 0.0)[0],
-        _FENCE_TOP_B + 0.0195,
+        section_b_xy(spec.CBORE_SECTION_WALL_Y - 2.5, 0.0)[0],
+        _FENCE_TOP_B + 0.0066,
     ),
+    "FenceHeight": (section_b_xy(-18.0, 0.0)[0], _FENCE_TOP_B + 0.0195),
 }
 # Both taps' callouts on the top view (neither section cuts a tap). The clamp
 # set's on clamp 4's drill, its text below right of the plate. The hub's on

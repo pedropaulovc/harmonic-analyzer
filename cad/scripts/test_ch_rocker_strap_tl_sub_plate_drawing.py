@@ -241,7 +241,7 @@ def test_section_sizes_live_in_hidden_reference_sketches_on_each_cut() -> None:
     assert THREAD_MAJOR_MM["#4-40"] / 2.0 < spec.SECTION_A_X - station < straight
     offset = spec.HUB_X - spec.SECTION_B_X
     assert THREAD_MAJOR_MM["1/4-20"] / 2.0 < offset < spec.HUB_CBORE_DIA / 2.0
-    assert spec.CBORE_SECTION_WALL_Y == pytest.approx(-1.2 * INCH)
+    assert spec.CBORE_SECTION_WALL_Y == pytest.approx(-0.8 * INCH)
     # Each cutting line lies on its plane, A-A's stopping in the floor past
     # pocket 3's back wall, B-B's past both long edges.
     (a0, a1), (b0, b1) = drawing.SECTION_A_LINE, drawing.SECTION_B_LINE
@@ -262,52 +262,80 @@ def test_section_sizes_live_in_hidden_reference_sketches_on_each_cut() -> None:
 
 
 # --- The sheet, modelled offline (sheet mm) ------------------------------------------
-# Calibrated on farm run 20261118T001932117Z's layout audit (its 41 gating
-# findings): a text row 3.6 mm tall, about 2.2 mm a digit, sign or lower-case
-# letter and 2.8 mm a capital; a two-row dimension's rows 5.5 mm apart, the
-# block centred on its text point; extension lines from 1 mm off their point
-# to 1.5 mm past the dimension line; a cutting line's arrows 12 mm long, its
-# letter 15.75..21.9 mm past the line's end along its arrow, 6.1 mm across;
-# a hole callout's leader ending 1.1 mm under its block, 1.5 mm out from the
-# side facing its arrow; a caption 45.6 mm wide and 15.6 mm tall under its
-# point. The limits (_layout_audit.GATING_KINDS, with the reported
-# text-separation and extension-near-text held too): 3.57 mm between texts,
-# 2 mm from an extension line or an arrow to another's text, no text on a
-# line, no leader across a line, a cutting line or another leader, no
-# dimension line across another's extension line, a hole callout's leader at
-# most 10 mm further over the part than its feature's shortest way out.
+# Calibrated on farm run 20261118T015112413Z (r15), the first to build the
+# sheet whole, from its COM text widths and the audit's ink boxes; the
+# primitives' checks against farm run 20261118T001932117Z's (r7) findings.
+# Text: Century Gothic, rows 3.5 mm tall printing 3.6 mm of ink, 5.6 mm
+# apart, a block centred on its text point; per character about 3.0-4.2 mm
+# a wide capital, 2.4 a narrow one, 1.2 an I, 2.6 a digit, 1.3 a point or a
+# space, 5.3 the Ø symbol (_GLYPH). A dimension measured up the sheet whose
+# text stands past its span prints the text beside its dimension line, on
+# the side away from its points: from 0.3 mm (two rows) or 1.4 mm (one row)
+# off the line, its dimension line rising to the bottom row and running under
+# it (r15's FenceHeight, HubCboreDepth, PocketDepth, NotchDepth). Extension
+# lines from 1 mm off their point to 1.5 mm past the dimension line; a span
+# under 8 mm carries its arrows outside, about 3.5 mm past each end; a
+# cutting line's arrows 12 mm long, its letter 15.75..21.9 mm past the line's
+# end along its arrow, 6.1 mm across; a hole callout's leader ending 1.1 mm
+# under its block, 1.5 mm out from the side facing its arrow; a caption 45.6
+# mm wide and 15.6 mm tall under its point. The limits
+# (_layout_audit.GATING_KINDS, with the reported text-separation and
+# extension-near-text held too): 3.57 mm between texts, 2 mm from an
+# extension line or an arrow to another's text, no text on a line, no leader
+# across a line, a cutting line or another leader, no dimension line across
+# another's extension line, a hole callout's leader at most 10 mm further
+# over the part than its feature's shortest way out, everything inside the
+# border and off the title block.
 _ROW = 3.6
-_ROW_PITCH = 5.5
+_ROW_PITCH = 5.6
 _SECTION_ARROW = 12.0
-# A span under 8 mm carries its arrows outside, about 3.5 mm past each end
-# (the template's arrowhead and a stub); the arrows' 2 mm to foreign text
-# gates (arrow-near-text).
 _SHORT_SPAN = 8.0
 _ARROW = 3.5
+_BESIDE_LINE = {1: 1.4, 2: 0.3}
 _LETTER_ALONG = (15.75, 21.9)
 _LETTER_ACROSS = 3.05
 _CAPTION = (22.8, 15.6)
 _TEXT_GAP = 3.57
 _LINE_GAP = 2.0
 _DETOUR_LIMIT = 10.0
-# r7 measured text widths (mm) and the model's.
-_R7_WIDTHS = {
-    "1.875 ±.002": 23.8,
-    "1.000 ±.002": 23.8,
-    "1.650": 10.8,
-    "1.000": 10.8,
-    "4.250": 11.4,
-    ".17": 6.0,
-    "13.0": 8.3,
-    "11.08": 10.8,
-    "16X .07 max.": 27.2,
-    "4X .140": 15.5,
-    "CLEARS MHA-CH-13 DRILL AND REAMER": 88.4,
+_GLYPH = {
+    **dict.fromkeys("MW", 4.2),
+    **dict.fromkeys("GOQ", 3.6),
+    **dict.fromkeys("CD", 3.4),
+    **dict.fromkeys("ABHKNRUVXY", 3.2),
+    **dict.fromkeys("EFLPSTZJ", 2.4),
+    "I": 1.2,
+    "m": 3.6,
+    **dict.fromkeys("0123456789±", 2.6),
+    **dict.fromkeys(". ()/:", 1.3),
+    "-": 1.6,
+    "Ø": 5.3,
+}
+# r15's widths (mm): each text's COM width, a one-row dimension's less the
+# 2.6 mm of the spaces round its value.
+_R15_WIDTHS = {
+    ".074": 9.1,
+    "CLEARS MHA-CH-13 FACE CUT": 68.0,
+    "CLEARS MHA-CH-13 DRILL AND REAMER": 88.9,
+    "ENGAGEMENT .21 MIN (.84D)": 64.8,
+    "SEATS TL-VN-50 HEEL": 44.7,
+    "TL-VN-50 SEAT": 30.7,
+    "4X .140": 15.8,
+    "1.875 ±.002": 24.5,
+    "4X 4-40 UNC THRU ALL": 49.0,
+    "Ø.089 DRILL THRU ALL": 50.0,
+    "1/4-20 UNC THRU ALL": 46.9,
+    "LOCATES TL-02": 32.4,
+    "1.000 ±.002": 24.5,
+    "16X .07 max.": 28.2,
+    "3X .07 max.": 25.6,
+    "11.000": 14.2,
+    "1.650": 11.6,
 }
 
 
 def _width(text: str) -> float:
-    return sum(2.8 if char.isupper() or char == "Ø" else 2.2 for char in text)
+    return sum(_GLYPH.get(char, 2.3) for char in text)
 
 
 def _mm(point_m: tuple[float, float]) -> tuple[float, float]:
@@ -433,11 +461,12 @@ class _Sheet:
     def linear(self, name, view, keep_m, p1, p2, along) -> None:
         """A linear dimension between model points ``p1``, ``p2`` measured
         along the sheet's ``along`` axis ("x": extension lines vertical)."""
-        text = _block(_mm(keep_m), _rows(name))
-        self.texts[name] = text
-        line = _mm(keep_m)[1 if along == "x" else 0]
+        rows = _rows(name)
+        centre = _mm(keep_m)
+        text = _block(centre, rows)
+        line = centre[1 if along == "x" else 0]
         axis, across = (0, 1) if along == "x" else (1, 0)
-        ends = []
+        ends, feet = [], []
         for point in (view(*p1), view(*p2)):
             side = math.copysign(1.0, line - point[across])
             start, stop = list(point), list(point)
@@ -446,12 +475,31 @@ class _Sheet:
             if abs(line - point[across]) > 1.0:
                 self.extensions.append((name, (tuple(start), tuple(stop))))
             ends.append(point[axis])
+            feet.append(point[across])
         lo, hi = min(ends), max(ends)
+        past = not lo <= centre[axis] <= hi
+        above = centre[axis] > hi
         if hi - lo < _SHORT_SPAN:
             # Too short for its arrows: they stand outside, an arrow's
             # length past each end.
             lo, hi = lo - _ARROW, hi + _ARROW
-        lo, hi = min(lo, text[axis + 2]), max(hi, text[axis])
+        if along == "y" and past:
+            # Beside its line, away from its points, the line rising (or
+            # falling) to the near row and running under it.
+            width = text[2] - text[0]
+            gap = _BESIDE_LINE[min(len(rows), 2)]
+            if line > sum(feet) / 2.0:
+                text = (line + gap, text[1], line + gap + width, text[3])
+                far = text[2]
+            else:
+                text = (line - gap - width, text[1], line - gap, text[3])
+                far = text[0]
+            shoulder = text[1] if above else text[3] - _ROW
+            lo, hi = min(lo, shoulder), max(hi, shoulder)
+            self.dim_lines.append((name, ((line, shoulder), (far, shoulder))))
+        else:
+            lo, hi = min(lo, text[axis + 2]), max(hi, text[axis])
+        self.texts[name] = text
         a, b = [0.0, 0.0], [0.0, 0.0]
         a[axis], b[axis], a[across], b[across] = lo, hi, line, line
         self.dim_lines.append((name, (tuple(a), tuple(b))))
@@ -600,18 +648,18 @@ def _sheet() -> _Sheet:
             (back, zu),
         ],
     )
-    cbore_back = 2.0 * s.HUB_Y - s.CBORE_SECTION_WALL_Y
     cb_wall, cz = s.CBORE_SECTION_WALL_Y, s.COUNTERBORE_FLOOR_Z
+    cbore_front = 2.0 * s.HUB_Y - cb_wall
     sheet.geometry += _polyline(
         _sec_b,
         [
             (back, zf),
             (0, zf),
             (0, 0),
-            (cbore_back, 0),
-            (cbore_back, cz),
-            (cb_wall, cz),
             (cb_wall, 0),
+            (cb_wall, cz),
+            (cbore_front, cz),
+            (cbore_front, 0),
             (front, 0),
             (front, zu),
             (back, zu),
@@ -651,11 +699,19 @@ def _sheet() -> _Sheet:
     return sheet
 
 
-def test_sheet_model_reproduces_the_r7_audit() -> None:
-    """Farm run 20261118T001932117Z's boxes: the model's text widths match
-    the measured ones, and its checks flag the run's findings."""
-    for text, measured in _R7_WIDTHS.items():
-        assert _width(text) == pytest.approx(measured, abs=1.5), text
+def test_sheet_model_reproduces_the_r15_widths_and_r7_findings() -> None:
+    """Farm run r15's text widths within 3 mm (5 % on the long rows), and
+    farm run 20261118T001932117Z's (r7) findings flagged by the model's
+    checks."""
+    for text, measured in _R15_WIDTHS.items():
+        tolerance = max(3.0, 0.05 * measured)
+        assert _width(text) == pytest.approx(measured, abs=tolerance), text
+    # r15's FenceHeight text, beside its line at x 302 away from its points,
+    # its second row's ink [302.3, 369.9]: struck by HubCboreDepth's line.
+    assert (
+        _segment_box(((341.0, 119.5), (341.0, 101.8)), (302.3, 107.5, 369.9, 111.1))
+        == 0.0
+    )
     # 'section-line A' crossed by the Y extension lines leaving Y0.
     letter = (86.0, 202.5, 91.9, 208.6)
     assert _segment_box(((97.8, 207.7), (57.5, 207.7)), letter) == 0.0
@@ -780,6 +836,23 @@ def test_every_marked_dimension_prints_once_inside_the_border() -> None:
         assert box[0] > border[0] + 2.0 and box[1] > border[1] + 2.0, name
         assert box[2] < border[2] - 2.0 and box[3] < border[3] - 2.0, name
         assert box[2] < title_left - 2.0 or box[1] > title_top + 2.0, name
+
+
+def test_each_section_caption_stands_under_its_view() -> None:
+    """r15 printed B-B's caption 40 mm over its view and A-A's under its
+    own: both under their views, within their spans."""
+    for view, caption_m, span in (
+        (
+            _sec_a,
+            drawing.SECTION_A_CAPTION_XY,
+            (spec.BACK_EDGE_Y, drawing.SECTION_A_END_Y),
+        ),
+        (_sec_b, drawing.SECTION_B_CAPTION_XY, (spec.BACK_EDGE_Y, spec.FRONT_EDGE_Y)),
+    ):
+        x, top = _mm(caption_m)
+        underside = view(0.0, spec.UNDERSIDE_Z)[1]
+        assert underside - _TEXT_GAP > top > underside - 3.0 * _TEXT_GAP
+        assert view(span[0], 0.0)[0] < x < view(span[1], 0.0)[0]
 
 
 def test_top_view_keeps_four_y_lanes_and_the_sections_carry_the_rest() -> None:

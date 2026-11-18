@@ -673,8 +673,8 @@ def _section_references(adapter: Any, drive_jobs: list[tuple[str, str]]) -> None
     (PocketNearWallY, PocketBackWallY), the back wall's long PocketDepth; a
     chord on Y0 from the fence's top (its height from the origin) through the
     material to the underside, long PlateThickness. B-B (the counterbore):
-    the fence face up from the origin (FenceHeight); the counterbore's front
-    wall from Z0, long HubCboreDepth."""
+    the fence face up from the origin (FenceHeight); the counterbore's back
+    wall (nearer the fence) from Z0, long HubCboreDepth."""
     _section_plane(adapter, spec.SECTION_A_PLANE, spec.SECTION_A_X)
     dims = SketchDims()
     check(
