@@ -643,9 +643,11 @@ feed = "9.6 in/min"
 # drill's shank the NO-GO, each miked first. G (.261 in) is a member of the
 # owned 115-piece index (letter drills A-Z among its 115, as jig-drill-f);
 # diameter_mm is its nominal × 25.4. The pair reads no scale: its
-# resolution is the micrometers' (gauges.micrometers) reading of each shank.
-# A shank is not ground to a gauge class, so the lower limit is held by the
-# F drill and only checked to the miked F shank's size.
+# resolution is the micrometers' (gauges.micrometers) reading of each shank;
+# its range is the drawing band: the traveler accepts an F shank of
+# .2570-.2575 as the GO and a G shank of .2600-.2610 as the NO-GO.
+# A shank is not ground to a gauge class; an F shank under .2570 cannot be
+# the GO, and the lower limit then rests on the F drill alone.
 [tools.clamp-drill-g]
 description = "G (.261 in) drill, 115-piece index; its shank the bore's NO-GO"
 diameter_mm = 6.6294

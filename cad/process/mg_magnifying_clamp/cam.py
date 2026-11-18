@@ -377,11 +377,16 @@ def context(
         raise ValueError("the thumb drill's full diameter does not break into the bore")
     _agree(plan, "rod_tip_height_mm", blank_min - skim + rod_tip)
     _agree(plan, "thumb_tip_height_mm", thumb_tip)
-    for name, depth in (("rod drill", rod_depth), ("thumb drill", thumb_depth)):
+    # The plan's pecking check reads the depth this recipe drills: the
+    # adapter's binding of the export's drill_depth_nominal.
+    for name, binding in (
+        ("rod drill", "{{cad.rod_drill_depth_mm}}"),
+        ("thumb drill", "{{cad.thumb_drill_depth_mm}}"),
+    ):
         stated = _op_with_cut(plan, name)[0]["hole_depth_mm"]
-        if not math.isclose(stated, depth, abs_tol=1e-3):
+        if stated != binding:
             raise ValueError(
-                f"'{name}' operation hole_depth_mm {stated}, the export's {depth}"
+                f"'{name}' operation hole_depth_mm {stated!r}, not {binding}"
             )
     peck = p["peck_43_mm"]
     for name in ("rod drill", "thumb drill"):
