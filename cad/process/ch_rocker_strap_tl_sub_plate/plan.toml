@@ -15,27 +15,31 @@
 # the vise grips them. SP02 then cuts everything on the top in one vise
 # clamping: the fence and stop tops faced, the plate top (Z0) milled down
 # round them, its walls (the fence face Y0, the stop face X0), the hub
-# counterbore, the fence notches and clamp pockets (1/8 in end mill), the
-# holes, and a stop over each hole for the tap in the spring tap guide.
+# counterbore, the fence notches and clamp pockets (1/8 in end mill), and
+# the holes, then taps them by hand in the same clamping, the T-handle
+# wrench's centre hole on a dead centre in the spindle (owner, Pedro,
+# 2026-11-17): one short file per hole that ends Idle (M30) over it, because
+# FluidNC refuses jogs while an M0 holds the program
+# (wiki.fluidnc.com/en/features/single_block_mode).
 #
 # Literal plan: no prechips adapter reads this part's features.toml yet, so
 # the sizes the sheet prints are [parameters] here, each the plate spec's
 # value (asserted by cad/scripts/test_ch_rocker_strap_tl_sub_plate_process.py),
 # and the revision is not bound. cam.py reads the part's feature export.
 #
-# Both programs work in the plate's model frame, the strap programs' G54:
+# The programs work in the plate's model frame, the strap programs' G54:
 # X0 the end-stop face (.5 in from the left sawn end), Y0 the fence face (the
 # plate at -Y, its back edge at Y +12.7), Z0 the plate top, .416 above the
 # underside. Program names, the [parameters] and the milling_cuts names are a
 # contract with that recipe. Tool numbers are the places in the tools list
 # among the mill's tools: T1 1/2 in end mill, T2 1/8 in end mill, T3 centre
-# drill, T4 #43, T5 #7, T6 4-40 tap, T7 1/4-20 tap.
+# drill, T4 #43, T5 #7, T6 the MT3 dead centre (the taps are turned by hand).
 title = "Rocker-strap sub-plate"
 part = "MHA-CH-13-TL-01"
 revision = "as released with this traveler"
 material = "6061-T6511 aluminium flat, 1/2 × 6 in (OnlineMetals 1173, owned)"
 stock = "{{process.blank_thickness_in:fraction}} × {{process.blank_width_in:g}} in bar; {{process.quantity:d}} × {{process.blank_length_in:.1f}} in length."
-note = "Inches unless mm; G-code and console entries in mm. Finished 13.0 × {{process.plate_width_mm:in.2f}} × {{process.plate_thickness_mm:in.2dot}}, a fixture for MHA-CH-13. Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Each CNC file is proved once in air, Z0 raised 1.000 in, before it cuts metal (ops 30 and 80). Buy a 1/4-20 UNC plug tap before Setup 3 (not owned)."
+note = "Inches unless mm; G-code and console entries in mm. Finished 13.0 × {{process.plate_width_mm:in.2f}} × {{process.plate_thickness_mm:in.2dot}}, a fixture for MHA-CH-13. Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Each CNC file is proved once in air, Z0 raised 1.000 in, before it cuts metal (ops 30 and 80). After any controller reset, stall or E-stop, home ($H) and touch off G54 again before Cycle Start: a reset loses home (logbook 2026-11-06)."
 shop = "../shop.toml"
 material_key = "6061-t6511"
 milling_material = "aluminum_6061"
@@ -93,6 +97,19 @@ sp01_z_set_mm = -35.9156
 sp02_x_set_mm = -15.24
 sp02_y_set_mm = 10.16
 sp02_z_set_mm = -10.5156
+# The fence top, faced, plus the .002 in leaf: SP02's Z check after a reset.
+sp02_z_check_mm = 1.9304
+# Tapping on the dead centre, on Setup 3's 1.5 in parallels: neither the
+# centre's reach out of its collet nor a tap's reach in its wrench is on
+# record (the owner's 7.5 in was a guess, 2026-11-17), so the traveler stops
+# at the first tap file unless the two together, dead-centre tip to collet
+# face plus tap point to the wrench's centre hole, are at most
+# tap_stack_max_mm: the spindle-to-table maximum (shop machines.pm-30mv,
+# 431.8) less 25.0 to bring the point down onto the wrench (the shop's
+# tool-change clearance), the vise bed, the parallels, the higher hole mouth
+# above the underside (the pocket floors, clamp_hole_depth_mm) and the
+# collet gauge: 282.085, rounded down to .01 in.
+tap_stack_max_mm = 281.94
 # SP01, on the table. The front edge loses edge_stock_mm off the as-received
 # bar edge (an extruded edge; .040 in cleans its corner radius and width
 # spread, the author's allowance): a rough pass edge_rough_woc_mm and a
@@ -196,6 +213,10 @@ id = "drill-7"
 name = "#7 drill"
 ref = "jig-drill-7"
 [[tools]]
+id = "dead-centre"
+name = "MT3 dead centre"
+ref = "mill-dead-centre-mt3"
+[[tools]]
 id = "tap-4-40"
 name = "4-40 tap"
 ref = "jig-tap-4-40-plug"
@@ -243,7 +264,7 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / table,
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "Vise off. Either broad face down on four 1-2-3 blocks lying flat (1 in up, 3 in along X, 1 in in from the bar's ends): two centred under the front 3 in of the bar (the plate), two flush with the bar's back edge. Four step clamps (LMS 1268 kit) along X from studs beyond the bar's ends, one over the middle of each block (2-1/2 in in from the end). The front blocks stay 1/2 in clear of the front edge and the slot line, the back blocks .45 in clear of the slot line; no step clamp over an edge the cutter runs along."
-datum = "Program SP01_split_edges (cam:ch_rocker_strap_tl_sub_plate), in the plate's frame: X0 .500 in in from the bar's left sawn end; Y0 2.540 in behind the bar's as-received front edge (the plate's fence face, cut in Setup 3); Z0 {{process.plate_top_height_mm:in.3dot}} above the underside. +Y toward the back of the table. Tool length from the tool setter at the file's M6 T1. Pick G54 up again after any move of the bar, a controller reset, a stall or an E-stop."
+datum = "Program SP01_split_edges (cam:ch_rocker_strap_tl_sub_plate), in the plate's frame: X0 .500 in in from the bar's left sawn end; Y0 2.540 in behind the bar's as-received front edge (the plate's fence face, cut in Setup 3); Z0 {{process.plate_top_height_mm:in.3dot}} above the underside. +Y toward the back of the table. Tool length from the tool setter at the file's M6 T1. After any move of the bar, a controller reset, a stall or an E-stop: home ($H) and touch off X, Y and Z again as the first operation does; once the front edge is cut, Y on it is G10 L20 P1 Y-66.040."
 diagram = { file = "diagrams/split.svg", alt = "Plan of the bar on the table: four 1-2-3 blocks and four step clamps along X; the plate is the front 3 in strip; the 1/2 in end mill mills the front edge, cuts the slot through behind the strip and finishes the strip's back edge." }
 envelope = { x_span_mm = ["{{process.plate_length_mm}}", "{{process.half_cutter_dia_mm}}", 5.08], y_span_mm = [152.4, "{{process.half_cutter_dia_mm}}"], work_top_mm = ["{{process.block_height_mm}}", "{{process.bar_top_max_mm}}"], deepest_cut_mm = ["{{process.block_height_mm}}", -1.016], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_mm}}"] }
 vise_hold = "other"
@@ -253,7 +274,7 @@ vise_hold = "other"
 beam = { axis = "x", hold = "between", extent_mm = [0, "{{process.plate_length_mm}}"], supports_mm = ["{{process.strap_inset_mm}}", "{{process.strap_right_x_mm}}"], section_mm = { y = "{{process.plate_width_mm}}", z = "{{process.plate_thickness_mm}}" } }
 
 [[setups.operations]]
-instruction = "Once per table setup, the bar clamped. Console M6 T1 (1/2 in end mill, {{process.half_mill_projection_mm:in.2f}} out of the collet). Its tip just dragging a .002 feeler leaf on the table beside the bar: G10 L20 P1 Z{{process.sp01_z_set_mm:.3f}}. Edge finder (900 rpm) on the bar's left end: G10 L20 P1 X{{process.sp01_x_set_mm:.3f}}; on its front edge: G10 L20 P1 Y{{process.sp01_y_set_mm:.3f}}."
+instruction = "Once per table setup, the bar clamped. Home the mill first ($H): a FluidNC reset loses home (logbook 2026-11-06), so no offset from an earlier session is trusted. Console M6 T1 (1/2 in end mill, {{process.half_mill_projection_mm:in.2f}} out of the collet). Its tip just dragging a .002 feeler leaf on the table beside the bar: G10 L20 P1 Z{{process.sp01_z_set_mm:.3f}}. Edge finder (900 rpm) on the bar's left end: G10 L20 P1 X{{process.sp01_x_set_mm:.3f}}; on its front edge: G10 L20 P1 Y{{process.sp01_y_set_mm:.3f}}."
 feed = "hand"
 
 [[setups.operations]]
@@ -306,7 +327,7 @@ machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, 
 indexing = "none"
 machine_ref = "pm-30mv"
 holding = "Vise indicated <.001 along X. The 1 in and 1/2 in parallels of the owned set stacked under each jaw (1.5 in), against the jaws, clear of the holes (the nearest is .85 in in from an edge). The plate on them, underside down, FRONT edge at the moving jaw, gripped on its two milled long edges (.27 in the jaws), centred on the jaws (LEFT end at the left); its top (Z0) stands .146 above the jaw tops. Nothing to the right of or in front of the plate stands above the jaws: the end mill runs out past the right end and the front edge."
-datum = "Program SP02_top, the plate's frame (the G54 of the MHA-CH-13 programs): X0 the end-stop face it cuts, .500 in in from the LEFT end; Y0 the fence face it cuts, .500 in in front of the back edge (fixed jaw), +Y toward the fixed jaw; Z0 the plate top it cuts, {{process.plate_top_height_mm:in.3dot}} above the underside. Tool lengths from the tool setter at each M6. Pick G54 up again after any vise move, a controller reset, a stall or an E-stop."
+datum = "Program SP02_top, the plate's frame (the G54 of the MHA-CH-13 programs): X0 the end-stop face it cuts, .500 in in from the LEFT end; Y0 the fence face it cuts, .500 in in front of the back edge (fixed jaw), +Y toward the fixed jaw; Z0 the plate top it cuts, {{process.plate_top_height_mm:in.3dot}} above the underside. Tool lengths from the tool setter at each M6. After a controller reset, a stall or an E-stop: home ($H), then check G54 before Cycle Start: the edge finder (900 rpm) on the LEFT end reads X {{process.sp02_x_set_mm:.3f}}, on the FRONT edge Y -66.040; once the tops are faced, T1's tip on a .002 leaf on the fence top reads Z {{process.sp02_z_check_mm:.3f}}. Off by more than 0.025 mm: G10 L20 P1 that axis to the value given here. Before the tops are faced: unclamp and run the first operation again."
 diagram = { file = "diagrams/top.svg", alt = "Plan of the plate in the vise: fence along the back edge at the fixed jaw, end stop at the left end, the plate top milled down round them; the fence notched at both ends, four clamp pockets with 4-40 holes along the front, the hub counterbore with its 1/4-20 hole; section showing the stacked parallels and the plate top above the jaws." }
 envelope = { x_span_mm = ["{{process.plate_length_mm}}", "{{process.half_cutter_dia_mm}}", 5.08], y_span_mm = ["{{process.plate_width_mm}}", "{{process.half_cutter_dia_mm}}", 5.08], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.bar_top_max_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.drill_tip_below_mm}}"], longest_tool_mm = ["{{process.drill_chuck_gauge_mm}}", "{{process.drill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.eighth_mill_projection_min_mm}}"] }
 vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{process.plate_width_mm}}", along_jaws_mm = "{{process.plate_length_mm}}", part_height_mm = "{{process.bar_top_max_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = ["{{process.plate_overhang_mm}}", "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "flat" }
@@ -319,11 +340,11 @@ gauge_checks = [
 ]
 
 [[setups.operations]]
-instruction = "Once per vise setup, no plate in. Console M6 T1 (1/2 in end mill, {{process.half_mill_projection_mm:in.2f}} out). Its tip just dragging a .002 feeler leaf on the top parallel: G10 L20 P1 Z{{process.sp02_z_set_mm:.3f}}. Edge finder (900 rpm) on the fixed jaw's face: G10 L20 P1 Y{{process.sp02_y_set_mm:.3f}}. Clamp the plate; edge finder on its LEFT end: G10 L20 P1 X{{process.sp02_x_set_mm:.3f}}."
+instruction = "Once per vise setup, no plate in. Home the mill first ($H): a FluidNC reset loses home (logbook 2026-11-06), so no offset from an earlier session is trusted. Console M6 T1 (1/2 in end mill, {{process.half_mill_projection_mm:in.2f}} out). Its tip just dragging a .002 feeler leaf on the top parallel: G10 L20 P1 Z{{process.sp02_z_set_mm:.3f}}. Edge finder (900 rpm) on the fixed jaw's face: G10 L20 P1 Y{{process.sp02_y_set_mm:.3f}}. Clamp the plate; edge finder on its LEFT end: G10 L20 P1 X{{process.sp02_x_set_mm:.3f}}."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "First run only: prove SP02_top in air. Send $# and note the G54 line's Z; G10 L2 P1 Z(that Z + 25.400) raises Z0 1.000 in. Run the file through every M6 and M0, the taps out; then G10 L2 P1 Z(the noted Z) puts Z0 back."
+instruction = "First run only: prove SP02_top in air. Send $# and note the G54 line's Z; G10 L2 P1 Z(that Z + 25.400) raises Z0 1.000 in. Run the file through every M6; then G10 L2 P1 Z(the noted Z) puts Z0 back."
 feed = "hand"
 
 [[setups.operations]]
@@ -459,12 +480,15 @@ milling_cuts = [
   { name = "hub hole", kind = "drill", phase = "finish", cutter_dia_mm = 5.1054, flutes = 2, rpm = 2800, feed_mm_min = "{{process.drill_7_feed_per_min_mm}}", stations_mm = 165.1 },
 ]
 
+# The holes are tapped in this clamping (their XY are the drills'), one file
+# per hole; the tool setter measures the dead centre at each file's M6, so no
+# program assumes its length.
 [[setups.operations]]
 speed_kind = "other"
 tool = "tap-4-40"
 drilling = "none"
 sizing = "other"
-instruction = "Same file, M6 T6 (spindle stays off): the spring tap guide in the spindle, its point tool-set. At each clamp hole's M0 the guide's point stands about 1.6 in above the pocket floor: 4-40 tap in its wrench in the hole, the point in the wrench; tap through by hand with tap fluid, backing off to clear chips; back it out, Cycle Start."
+instruction = "Before SP03_tap_clamp_1, stop check: measure the dead centre from its tip to the collet's face, and each tap in the T-handle wrench from its point to the wrench's centre hole (calipers or rule). The centre's reach plus each tap's must be at most {{process.tap_stack_max_mm:in.2f}} in (the mill's 17 in opening less the vise, the parallels, the plate up to the pocket floors, the collet, and 1 in to bring the point down onto the wrench). Over: stop; do not tap on this setup. Then load and run SP03_tap_clamp_1, _2, _3, _4, one file per hole. Each: M6 T6 (the dead centre in its collet, spindle stays off), Z to the top, over its hole, end. The 4-40 tap in the T-handle wrench in the hole, tap fluid; jog Z down until the dead centre's point sits in the wrench's centre hole, light pressure only: the point guides, it does not push. Turn the wrench, backing off to clear chips, jogging Z down to keep the point seated, until the tap is through. Back the tap out; jog Z up clear of the wrench before loading the next file."
 feed = "hand"
 
 [[setups.operations]]
@@ -472,7 +496,7 @@ speed_kind = "other"
 tool = "tap-1-4-20"
 drilling = "none"
 sizing = "other"
-instruction = "Same file, M6 T7 (spindle stays off; the guide stays in). At the hub hole's M0 the guide's point stands about 2.25 in above the counterbore floor: 1/4-20 tap through by hand with tap fluid, back it out, Cycle Start. The file ends."
+instruction = "Load and run SP03_tap_hub: the same, the 1/4-20 tap in the hub hole from the counterbore floor. Jog Z up clear of the wrench at the end."
 feed = "hand"
 
 [[setups]]

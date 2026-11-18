@@ -130,12 +130,22 @@ def test_plan_tools_cut_the_drawn_features() -> None:
 
 
 def test_programs_cut_through_and_stop_for_each_tap(ctx) -> None:
-    sp2 = [
-        kw
+    stops = {
+        program: kw["at"] for program, check, kw in ctx["expect"] if check == "tap_stop"
+    }
+    # One file per hole to tap, each ending Idle over its hole; SP02 no M0.
+    assert list(stops) == [
+        *(f"SP03_tap_clamp_{k}" for k in range(1, len(spec.CLAMP_STATIONS) + 1)),
+        "SP03_tap_hub",
+    ]
+    assert [xy[0] for xy in stops.values()] == pytest.approx(
+        [*spec.CLAMP_STATIONS, spec.HUB_X]
+    )
+    assert [
+        kw["count"]
         for program, check, kw in ctx["expect"]
         if program == "SP02_top" and check == "pauses"
-    ]
-    assert sp2[0]["count"] == len(spec.CLAMP_STATIONS) + 1
+    ] == [0]
     depth = {
         program: kw["z_min"]
         for program, check, kw in ctx["expect"]

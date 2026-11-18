@@ -675,11 +675,11 @@ feed_unit = "in/min"
 
 # The 1/4-20 hub tap's drill: #7 (.201 in) is a member of the owned 115-piece
 # index (number drills #1-#60 among its 115, as jig-drill-11-32); nominal ×
-# 25.4. The 1/4-20 plug tap is not owned (cad/config/shop-equipment.toml
-# tools.jig-tap-1-4-20-plug, to buy).
+# 25.4. The 1/4-20 tap is owned (cad/config/shop-equipment.toml
+# tools.jig-tap-1-4-20-plug).
 [tools.jig-drill-7]
 description = "#7 (.201 in) drill, 115-piece index"
 diameter_mm = 5.1054
 [tools.jig-tap-1-4-20-plug]
-description = "1/4-20 UNC plug tap; T-handle wrench"
+description = "1/4-20 UNC hand tap; T-handle wrench"
 tap_drill_mm = 5.1054
