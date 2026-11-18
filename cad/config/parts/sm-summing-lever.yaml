@@ -1,15 +1,17 @@
 sm-summing-lever:
   number: MHA-SM-03
-  # #1611 delegated ruling 2026-11-17, option A (agent decision under the
-  # owner's delegation rule, for the owner's after-the-fact review:
-  # https://github.com/pedropaulovc/harmonic-analyzer/issues/1611#issuecomment-6970973084):
-  # the knife edges stay integral and are named, not hardened. Gray iron, the
-  # original's cast-iron lever, replaces the ferrous_noncritical family; its
-  # low-carbon-steel alternative is softer still. Stock: continuous-cast class 40
-  # bar (e.g. Dura-Bar G2). The soft edge rides the harder 28-32 HRC 4140 HT
-  # MHA-SM-02 seat, the owner's #2334 B1 premise.
-  material: GRAY IRON, ASTM A48 CLASS 40
-  material_specification: GRAY IRON, ASTM A48 CLASS 40
+  # Delegated ruling 2026-11-17 (#1611 option A,
+  # https://github.com/pedropaulovc/harmonic-analyzer/issues/1611#issuecomment-6970973084),
+  # for the owner's after-the-fact review on
+  # https://github.com/pedropaulovc/harmonic-analyzer/issues/2144. Precedent:
+  # owner ruling 2026-11-10, #2334 B1 (a soft lever knife in the harder
+  # 28-32 HRC 4140 HT MHA-SM-02 seat). The knife edges stay integral and are
+  # named as machined, not hardened. Gray iron, the original's cast-iron lever,
+  # replaces the ferrous_noncritical family; its low-carbon-steel alternative is
+  # softer still. Test bar C: the lever is cut from 1-1/2 in continuous-cast bar
+  # (e.g. Dura-Bar G2), and A48 assigns bar C to 1.01-2.00 in sections.
+  material: GRAY IRON, ASTM A48 CLASS 40C
+  material_specification: GRAY IRON, ASTM A48 CLASS 40C
   finish: GREEN ENAMEL; MASK KNIFE EDGES AND TAPPED HOLES; OIL BARE FACES; KNIFE EDGES AS MACHINED, NOT HARDENED
   quantity: 1
   tolerance_class: machined_block

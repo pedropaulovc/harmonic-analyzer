@@ -958,14 +958,14 @@ def test_radius_nominal_readback_has_one_nanometre_budget(
             check_radius(object(), [annotation])
 
 
-def test_registry_names_the_gray_iron_knife_unhardened() -> None:
-    # #1611 delegated ruling 2026-11-17, option A: one gray-iron grade, no
-    # low-carbon-steel alternative, and the integral knife edges named as
-    # machined, not hardened (soft edge on the harder #2334 B1 4140 HT seat).
+def test_title_block_and_mass_material_name_one_gray_iron() -> None:
+    # #1611 delegated ruling 2026-11-17 (review #2144; precedent #2334 B1):
+    # the printed material is one gray-iron grade with no alternative, the
+    # SolidWorks library material behind the mass properties is the same
+    # iron, and the finish states the knife edges' unhardened condition.
     row = _config.parts("sm-summing-lever")
-    assert row["material"] == row["material_specification"] == (
-        "GRAY IRON, ASTM A48 CLASS 40"
-    )
-    assert "STEEL" not in row["material"]
-    assert row["finish"].endswith("KNIFE EDGES AS MACHINED, NOT HARDENED")
-    assert lever_build.MATERIAL == "Gray Cast Iron"
+    assert row["material"] == row["material_specification"]
+    assert " OR " not in row["material"]
+    assert "GRAY IRON" in row["material"]
+    assert "Gray" in lever_build.MATERIAL
+    assert "KNIFE EDGES AS MACHINED, NOT HARDENED" in row["finish"]

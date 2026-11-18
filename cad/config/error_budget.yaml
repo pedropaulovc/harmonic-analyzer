@@ -117,14 +117,18 @@ reserved:
     allowance_pct: 0.30
   knife:                           # fixed reversal displacement, evaluated at each input's
                                    # actual ordinate scale and available magnifier range
-    rolling_resistance_mm: 0.005   # integral gray-iron edge (ASTM A48 class 40, as machined, not
-                                   # hardened: #1611 delegated ruling 2026-11-17, option A) on a
-                                   # 28-32 HRC 4140 HT seat (owner ruling 2026-11-10, #2334 B1).
-                                   # Hertz line contact at the worst stationary load (rect_half:
-                                   # 134.8 N, about 68 N on the rear mount over .55 in, 4.85 N/mm),
-                                   # R.004 ridge in the Ø.4720 bore, E 117/205 GPa: 1.10 GPa peak,
-                                   # 2.8 um half-width, under this 0.005 and the 0.0073 mm the
-                                   # budget still closes at (pair gate fails at 0.0074). Value
+    rolling_resistance_mm: 0.005   # integral gray-iron edge (ASTM A48 class 40C, as machined, not
+                                   # hardened; delegated ruling 2026-11-17, #1611 option A, owner
+                                   # review on #2144; precedent owner ruling 2026-11-10, #2334 B1)
+                                   # on a 28-32 HRC 4140 HT seat. Worst stationary load (rect_half,
+                                   # 134.8 N): about 68 N on the rear mount over .55 in, 4.85 N/mm.
+                                   # At the R.004 MAX ridge in the Ø.4720 bore, Hertz line contact
+                                   # (E 117/205 GPa) peaks at 1.10 GPa over a 2.8 um half-width.
+                                   # That peak and any sharper conforming edge exceed class 40's
+                                   # ~0.97 GPa compressive strength, so the edge beds in at first
+                                   # load to a land of 4.85 N/mm / 0.97 GPa = 5.0 um (1.6 um deep
+                                   # on the 115 deg ridge), then rolls on it: contact half-width
+                                   # <= 2.8 um at every conforming radius, under this 0.005. Value
                                    # unchanged until measured (#1611 option D pendulum coupon);
                                    # MEASURE as trace width on reversal
     allowance_pct: 0.45
