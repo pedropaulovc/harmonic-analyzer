@@ -226,8 +226,9 @@ def test_section_sizes_live_in_hidden_reference_sketches_on_each_cut() -> None:
     """A section imports no sketch or extrusion size (farm run
     20261117T234245842Z), so each size a section prints is a reference
     chord's length or start in its cutting plane, and the sketch is saved
-    hidden. Both planes cut across the plate (Right-parallel), each beside its
-    tap: A-A inside pocket 3's straight walls, B-B through the counterbore."""
+    hidden. Both planes cut across the plate's full width (Right-parallel):
+    A-A beside pocket 3's tap inside its straight walls, B-B on the hub's
+    axis (machinist review mr5: .15 off it, B-B missed the tapped hole)."""
     assert spec.DRAWING_DIMENSIONS[spec.SECTION_A_REFERENCE] == set(
         drawing.SECTION_A_KEEP
     )
@@ -239,17 +240,15 @@ def test_section_sizes_live_in_hidden_reference_sketches_on_each_cut() -> None:
     station = spec.CLAMP_STATIONS[2]
     straight = spec.POCKET_LENGTH / 2.0 - spec.CORNER_RADIUS
     assert THREAD_MAJOR_MM["#4-40"] / 2.0 < spec.SECTION_A_X - station < straight
-    offset = spec.HUB_X - spec.SECTION_B_X
-    assert THREAD_MAJOR_MM["1/4-20"] / 2.0 < offset < spec.HUB_CBORE_DIA / 2.0
-    assert spec.CBORE_SECTION_WALL_Y == pytest.approx(-0.8 * INCH)
-    # Each cutting line lies on its plane, A-A's stopping in the floor past
-    # pocket 3's back wall, B-B's past both long edges.
-    (a0, a1), (b0, b1) = drawing.SECTION_A_LINE, drawing.SECTION_B_LINE
-    assert a0[0] == a1[0] == spec.SECTION_A_X
-    assert b0[0] == b1[0] == spec.SECTION_B_X
-    assert a0[1] > spec.BACK_EDGE_Y and b0[1] > spec.BACK_EDGE_Y
-    assert spec.FRONT_EDGE_Y < a1[1] < spec.POCKET_BACK_WALL_Y - 2.0
-    assert b1[1] < spec.FRONT_EDGE_Y
+    assert spec.SECTION_B_X == spec.HUB_X
+    assert spec.CBORE_SECTION_WALL_Y == pytest.approx(-0.75 * INCH)
+    # Each cutting line lies on its plane and runs past both long edges (mr5:
+    # A-A stopping in the floor read as a part 2.55 wide).
+    for start, end in (drawing.SECTION_A_LINE, drawing.SECTION_B_LINE):
+        assert start[0] == end[0]
+        assert start[1] > spec.BACK_EDGE_Y and end[1] < spec.FRONT_EDGE_Y
+    assert drawing.SECTION_A_LINE[0][0] == spec.SECTION_A_X
+    assert drawing.SECTION_B_LINE[0][0] == spec.SECTION_B_X
     tree = ast.parse(Path(part.__file__).read_text(encoding="utf-8"))
     blanked = [
         ast.unparse(node.args[1])
@@ -268,17 +267,22 @@ def test_section_sizes_live_in_hidden_reference_sketches_on_each_cut() -> None:
 # Text: Century Gothic, rows 3.5 mm tall printing 3.6 mm of ink, 5.6 mm
 # apart, a block centred on its text point; per character about 3.0-4.2 mm
 # a wide capital, 2.4 a narrow one, 1.2 an I, 2.6 a digit, 1.3 a point or a
-# space, 5.3 the Ø symbol (_GLYPH). A dimension measured up the sheet whose
+# space, 5.3 the Ø symbol (_GLYPH), the ⌴ and ↧ symbols taken at 4.0 and
+# 2.6 (r16 printed neither). A dimension measured up the sheet whose
 # text stands past its span prints the text beside its dimension line, on
-# the side away from its points: from 0.3 mm (two rows) or 1.4 mm (one row)
-# off the line, its dimension line rising to the bottom row and running under
-# it (r15's FenceHeight, HubCboreDepth, PocketDepth, NotchDepth). Extension
-# lines from 1 mm off their point to 1.5 mm past the dimension line; a span
-# under 8 mm carries its arrows outside, about 3.5 mm past each end; a
-# cutting line's arrows 12 mm long, its letter 15.75..21.9 mm past the line's
-# end along its arrow, 6.1 mm across; a hole callout's leader ending 1.1 mm
-# under its block, 1.5 mm out from the side facing its arrow; a caption 45.6
-# mm wide and 15.6 mm tall under its point. The limits
+# the side away from its points: from 0.3 mm (two rows or more) or 1.4 mm
+# (one row) off the line, its dimension line rising to the bottom row and
+# running under it (r15's FenceHeight, HubCboreDepth, PocketDepth,
+# NotchDepth). Extension lines from 1 mm off their point to 1.5 mm past the
+# dimension line; arrows 3.5 mm long inside each end, or outside a span
+# under 8 mm; a text inside its span 1 mm clear of its own arrows
+# (machinist review mr5: ClampTapY's arrow ran through its '6'). A cutting
+# line's arrows 12 mm long, pointing +X, its letter 6.35 mm tall from 1.35
+# mm under the line's end, 13.9..19.6 mm right of it (farm run
+# 20261118T020401122Z, r16: GetTextInfo's origins 13.9 and 14.6 mm right of
+# A's and B's ends, 5.0 mm over them); a hole callout's leader ending 1.1 mm
+# under its block, 1.5 mm out from the side facing its arrow; a caption
+# 45.6 mm wide and 15.6 mm tall under its point. The limits
 # (_layout_audit.GATING_KINDS, with the reported text-separation and
 # extension-near-text held too): 3.57 mm between texts, 2 mm from an
 # extension line or an arrow to another's text, no text on a line, no leader
@@ -291,9 +295,9 @@ _ROW_PITCH = 5.6
 _SECTION_ARROW = 12.0
 _SHORT_SPAN = 8.0
 _ARROW = 3.5
+_OWN_ARROW_GAP = 1.0
 _BESIDE_LINE = {1: 1.4, 2: 0.3}
-_LETTER_ALONG = (15.75, 21.9)
-_LETTER_ACROSS = 3.05
+_LETTER = (13.9, 19.6, -1.35, 5.0)
 _CAPTION = (22.8, 15.6)
 _TEXT_GAP = 3.57
 _LINE_GAP = 2.0
@@ -310,6 +314,8 @@ _GLYPH = {
     **dict.fromkeys(". ()/:", 1.3),
     "-": 1.6,
     "Ø": 5.3,
+    "⌴": 4.0,
+    "↧": 2.6,
 }
 # r15's widths (mm): each text's COM width, a one-row dimension's less the
 # 2.6 mm of the spaces round its value.
@@ -397,18 +403,29 @@ def _box_gap(a, b) -> float:
     return math.hypot(dx, dy)
 
 
+# SolidWorks' symbol tokens as they print.
+_SYMBOLS = {"<HOLE-SPOT>": "⌴", "<MOD-DIAM>": "Ø", "<HOLE-DEPTH>": "↧"}
+
+
+def _printed(text: str) -> str:
+    for token, glyph in _SYMBOLS.items():
+        text = text.replace(token, glyph)
+    return text
+
+
 def _rows(name: str) -> list[str]:
-    """A dimension's printed rows: prefix, value, band or limit, mate."""
+    """A dimension's printed rows: prefix, value, band or limit, mate. A
+    prefix replaces SolidWorks' own R or Ø, so each carries its symbol."""
     places = spec.DRAWING_PRECISION_BY_NAME[name]
     value = spec.inch_text(spec.DIMENSION_VALUES[name], places)
     prefixes = {n: p for (_f, n), p in spec.DIMENSION_PREFIXES.items()}
-    prefix = "Ø" if name == "HubCboreDia" else prefixes.get(name, "")
+    prefix = _printed(prefixes.get(name, ""))
     if any(n == name for _f, n in spec.SYMMETRIC_BANDS):
         value += " ±.002"
     if any(n == name for _f, n in spec.MAX_RADII):
-        value += " max."
+        value += spec.MAX_SUFFIX
     callout = spec.DIMENSION_CALLOUTS.get(name)
-    return [prefix + value, *([callout] if callout else [])]
+    return [prefix + value, *(callout.split("\n") if callout else [])]
 
 
 def _top(x, y):
@@ -456,7 +473,9 @@ class _Sheet:
         self.leaders: list[tuple[str, tuple]] = []
         self.geometry: list[tuple] = []
         self.cutting: list[tuple] = []
-        self.arrows: list[tuple] = []
+        self.arrows: list[tuple[str, tuple]] = []
+        # Each dimension's arrows (owner, segment, its text inside its span).
+        self.dim_arrows: list[tuple[str, tuple, bool]] = []
 
     def linear(self, name, view, keep_m, p1, p2, along) -> None:
         """A linear dimension between model points ``p1``, ``p2`` measured
@@ -479,7 +498,15 @@ class _Sheet:
         lo, hi = min(ends), max(ends)
         past = not lo <= centre[axis] <= hi
         above = centre[axis] > hi
-        if hi - lo < _SHORT_SPAN:
+        out = -1.0 if hi - lo < _SHORT_SPAN else 1.0
+        for end, inward in ((lo, 1.0), (hi, -1.0)):
+            tip, tail = [0.0, 0.0], [0.0, 0.0]
+            tip[axis], tail[axis] = end, end + inward * out * _ARROW
+            tip[across] = tail[across] = line
+            # A vertical span's text breaks its line between its arrows.
+            inline = along == "y" and not past and out > 0.0
+            self.dim_arrows.append((name, (tuple(tip), tuple(tail)), inline))
+        if out < 0.0:
             # Too short for its arrows: they stand outside, an arrow's
             # length past each end.
             lo, hi = lo - _ARROW, hi + _ARROW
@@ -531,12 +558,13 @@ class _Sheet:
         self.geometry.append((a, b))
         self.cutting.append((a, b))
         for index, (x, y) in enumerate((a, b)):
-            self.arrows.append(((x, y), (x + _SECTION_ARROW, y)))
+            owner = f"letter {letter}{index}"
+            self.arrows.append((owner, ((x, y), (x + _SECTION_ARROW, y))))
             self.texts[f"letter {letter}{index}"] = (
-                x + _LETTER_ALONG[0],
-                y - _LETTER_ACROSS,
-                x + _LETTER_ALONG[1],
-                y + _LETTER_ACROSS,
+                x + _LETTER[0],
+                y + _LETTER[2],
+                x + _LETTER[1],
+                y + _LETTER[3],
             )
 
     def caption(self, name, point_m) -> None:
@@ -628,11 +656,11 @@ def _sheet() -> _Sheet:
     )
     sheet.cutting_line("A", drawing.SECTION_A_LINE)
     sheet.cutting_line("B", drawing.SECTION_B_LINE)
-    # Section A-A (partial, to SECTION_A_END_Y) and B-B profiles at their
-    # planes, (model Y, Z).
+    # Sections A-A and B-B across the full width at their planes, (model Y,
+    # Z); B-B through the hub's axis: the counterbore, then the tap's drill
+    # through to the underside, its thread's lines at the major diameter.
     zf, zu, zp = s.FENCE_HEIGHT, s.UNDERSIDE_Z, s.POCKET_FLOOR_Z
     near, wall = s.POCKET_NEAR_WALL_Y, s.POCKET_BACK_WALL_Y
-    end = drawing.SECTION_A_END_Y
     sheet.geometry += _polyline(
         _sec_a,
         [
@@ -643,13 +671,14 @@ def _sheet() -> _Sheet:
             (near, zp),
             (wall, zp),
             (wall, 0),
-            (end, 0),
-            (end, zu),
+            (front, 0),
+            (front, zu),
             (back, zu),
         ],
     )
     cb_wall, cz = s.CBORE_SECTION_WALL_Y, s.COUNTERBORE_FLOOR_Z
     cbore_front = 2.0 * s.HUB_Y - cb_wall
+    drill, major = s.HUB_TAP_DRILL / 2.0, THREAD_MAJOR_MM["1/4-20"] / 2.0
     sheet.geometry += _polyline(
         _sec_b,
         [
@@ -658,13 +687,25 @@ def _sheet() -> _Sheet:
             (0, 0),
             (cb_wall, 0),
             (cb_wall, cz),
+            (s.HUB_Y + drill, cz),
+            (s.HUB_Y + drill, zu),
+            (back, zu),
+        ],
+    )
+    sheet.geometry += _polyline(
+        _sec_b,
+        [
+            (s.HUB_Y - drill, cz),
             (cbore_front, cz),
             (cbore_front, 0),
             (front, 0),
             (front, zu),
-            (back, zu),
+            (s.HUB_Y - drill, zu),
         ],
     )
+    for side in (1.0, -1.0):
+        y = s.HUB_Y + side * major
+        sheet.geometry.append((_sec_b(y, cz), _sec_b(y, zu)))
     # A-A's thickness chord runs down Y0 from the fence's top through the
     # material; the shown reference sketch prints it.
     sheet.geometry.append((_sec_a(0.0, zf), _sec_a(0.0, zu)))
@@ -715,7 +756,17 @@ def test_sheet_model_reproduces_the_r15_widths_and_r7_findings() -> None:
     # 'section-line A' crossed by the Y extension lines leaving Y0.
     letter = (86.0, 202.5, 91.9, 208.6)
     assert _segment_box(((97.8, 207.7), (57.5, 207.7)), letter) == 0.0
-    assert letter[1] - 186.745 == pytest.approx(_LETTER_ALONG[0], abs=0.01)
+    # r16's letters: each GetTextInfo origin (upper left) on the model's box.
+    for end, origin in (
+        ((181.9975, 216.35), (195.9038, 221.354)),
+        ((155.645, 166.25), (170.2661, 171.254)),
+    ):
+        assert origin[0] - end[0] == pytest.approx(_LETTER[0], abs=0.75)
+        assert origin[1] - end[1] == pytest.approx(_LETTER[3], abs=0.01)
+    # r16's ClampTapY, centred between the hub's and the tap's levels: its
+    # lower arrow ran through its '6' (mr5).
+    text = _block((30.0, 187.17), ["1.650"])
+    assert _segment_box(((30.0, 183.05), (30.0, 186.55)), text) < _OWN_ARROW_GAP
     # '4X .140' run through by its own extension line.
     assert (
         _segment_box(((141.0, 105.0), (166.0, 105.0)), (157.2, 102.4, 172.7, 105.9))
@@ -741,8 +792,18 @@ def test_no_text_crowds_another_or_sits_on_a_line() -> None:
     for name, box in sheet.texts.items():
         for segment in sheet.geometry:
             assert _segment_box(segment, box) > 0.0, (name, segment)
-        for arrow in sheet.arrows:
+        for owner, arrow in sheet.arrows:
+            if owner == name:
+                continue
             assert _segment_box(arrow, box) >= _LINE_GAP, (name, arrow)
+    # Every dimension's arrows 2 mm from another's text (arrow-near-text
+    # gates), and 1 mm from its own text inside its span.
+    for owner, arrow, inline in sheet.dim_arrows:
+        for name, box in sheet.texts.items():
+            if name != owner:
+                assert _segment_box(arrow, box) >= _LINE_GAP, (owner, name)
+            elif inline:
+                assert _segment_box(arrow, box) >= _OWN_ARROW_GAP, owner
 
 
 def _meet_point(a, b, c, d):
@@ -841,18 +902,52 @@ def test_every_marked_dimension_prints_once_inside_the_border() -> None:
 def test_each_section_caption_stands_under_its_view() -> None:
     """r15 printed B-B's caption 40 mm over its view and A-A's under its
     own: both under their views, within their spans."""
-    for view, caption_m, span in (
-        (
-            _sec_a,
-            drawing.SECTION_A_CAPTION_XY,
-            (spec.BACK_EDGE_Y, drawing.SECTION_A_END_Y),
-        ),
-        (_sec_b, drawing.SECTION_B_CAPTION_XY, (spec.BACK_EDGE_Y, spec.FRONT_EDGE_Y)),
+    for view, caption_m in (
+        (_sec_a, drawing.SECTION_A_CAPTION_XY),
+        (_sec_b, drawing.SECTION_B_CAPTION_XY),
     ):
         x, top = _mm(caption_m)
         underside = view(0.0, spec.UNDERSIDE_Z)[1]
         assert underside - _TEXT_GAP > top > underside - 3.0 * _TEXT_GAP
-        assert view(span[0], 0.0)[0] < x < view(span[1], 0.0)[0]
+        assert view(spec.BACK_EDGE_Y, 0.0)[0] < x < view(spec.FRONT_EDGE_Y, 0.0)[0]
+
+
+def test_counterbore_and_radii_print_their_symbols_on_model_dimensions() -> None:
+    """Machinist review mr5: the counterbore's Ø.500 printed without ⌴ and
+    its .185 without ↧, the radii without R and with "max.". Each is the
+    model's own dimension (PR #1388), its symbol a native prefix and the MAX
+    limit word a suffix: "⌴ Ø.500", "↧ .185", "3X R.07 MAX"."""
+    prefixes = {name: p for (_f, name), p in spec.DIMENSION_PREFIXES.items()}
+    assert _rows("HubCboreDia")[0] == "⌴ Ø.500"
+    assert _rows("HubCboreDepth")[0] == "↧ .185"
+    assert _rows("NotchCornerR")[0] == "3X R.07 MAX"
+    assert _rows("PocketCornerR")[0] == "16X R.07 MAX"
+    for _feature, name in spec.MAX_RADII:
+        assert prefixes[name].endswith("X R"), name
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "set_single_limit" not in source and "SW_TOL_MAX" not in source
+    assert "_max_radius(adapter, feature_name, dimension_name)" in source
+
+
+def test_each_three_place_section_size_names_the_strap_feature_it_serves() -> None:
+    """Machinist review mr5: "CLEARS MHA-CH-13 FACE CUT" and "... DRILL AND
+    REAMER" named no part feature. Each now names the strap (MHA-CH-13) and
+    its feature, and its third place is what holds its limit (the spec's
+    checks: .XX's band would break it)."""
+    for name, feature in (
+        ("FenceHeight", "TOP FACE"),
+        ("HubCboreDepth", "HUB HOLE"),
+    ):
+        words = spec.DIMENSION_CALLOUTS[name]
+        assert f"{spec.STRAP_NUMBER} STRAP" in words and feature in words, name
+        assert "FACE CUT" not in words and spec.DRAWING_PRECISION_BY_NAME[name] == 3
+    assert spec.FENCE_HEIGHT + spec.XX > spec.FENCE_TOP_LIMIT
+    assert (
+        spec.HUB_CBORE_DEPTH
+        - spec.XX
+        + max(spec.PLAN_DRILL_TIP_Z, spec.PLAN_REAM_TIP_Z)
+        < spec.PLAN_RELIEF_FLOOR_CLEARANCE
+    )
 
 
 def test_top_view_keeps_four_y_lanes_and_the_sections_carry_the_rest() -> None:

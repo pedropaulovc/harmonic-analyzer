@@ -5,15 +5,15 @@ the vise (rule 11): the top view at 1:2 across the top, the fence along its
 top and the end stop at its left, every X from the stop face (X0) above and
 below it, the notch depth, the hub's and the clamp taps' Y, the fence width
 and the overall width from the fence face (Y0) to its left, both taps'
-callouts on it; under it two sections cut across the plate at 2:1, the
-pocket walls as rows from Y0 over the cut (farm run 20261118T001932117Z:
-seven Y lanes beside the top view piled their texts): partial section A-A
-through clamp pocket 3, its walls from Y0, its depth and the overall
-thickness; section B-B through the hub counterbore, the fence height and the
-counterbore's depth (farm runs r13 and r14: B-B never imported the widths or
-the thickness from chords on the back and front faces); the isometric at
-1:4. Every number is the part's own (``ch_rocker_strap_tl_sub_plate_spec``),
-imported from the model.
+callouts on it; under it two sections cut across the plate's full width at
+2:1, the pocket walls as rows from Y0 over the cut (farm run
+20261118T001932117Z: seven Y lanes beside the top view piled their texts):
+section A-A through clamp pocket 3, its walls from Y0, its depth and the
+overall thickness; section B-B through the hub on its axis, the fence height
+and the counterbore's depth (farm runs r13 and r14: B-B never imported the
+widths or the thickness from chords on the back and front faces); the
+isometric at 1:4. Every number is the part's own
+(``ch_rocker_strap_tl_sub_plate_spec``), imported from the model.
 """
 
 from __future__ import annotations
@@ -97,16 +97,13 @@ TOP_ORIGIN = (0.075 - spec.LEFT_END_X * _T, 0.204)
 # its plane's (Y0, Z0), the fence face's foot.
 SECTION_A_ORIGIN = (0.070, 0.085)
 SECTION_B_ORIGIN = (0.266, 0.1088)
-# The cutting lines (model X, Y), each from 12 mm behind the back edge (its
-# letter 3 mm over the back edge, under the hub tap's callout); A-A's stops
-# in the floor 4.4 mm past pocket 3's back wall (a partial section: its
-# letter inside the plate, clear of every line), B-B's runs 12 mm past the
-# front edge (its letter over the X rows, 2.2 mm clear of clamp 3's
-# extension).
-SECTION_A_END_Y = -52.0
+# The cutting lines (model X, Y), each from 12 mm behind the back edge to 12
+# mm past the front edge (machinist review mr5: A-A stopping inside the
+# plate read as a part 2.55 wide), its letter right of each end, 3 mm over
+# the back edge (under the hub tap's callout) and over the X rows.
 SECTION_A_LINE = (
     (spec.SECTION_A_X, spec.BACK_EDGE_Y + 12.0),
-    (spec.SECTION_A_X, SECTION_A_END_Y),
+    (spec.SECTION_A_X, spec.FRONT_EDGE_Y - 12.0),
 )
 SECTION_B_LINE = (
     (spec.SECTION_B_X, spec.BACK_EDGE_Y + 12.0),
@@ -150,14 +147,17 @@ _FENCE_TOP_B = section_b_xy(0.0, spec.FENCE_HEIGHT)[1]
 # span, which is narrower than it; under the cutting lines' letters). Y sizes
 # from Y0 to the left in five lanes, a span inner to every span holding one
 # of its extension lines so no extension line crosses another's dimension
-# line: the notch depth innermost, its text under its span (over it the fence
-# width's and overall width's extension lines from the back corner); the
-# fence width; the hub, its text low in its span, clear of the fence width's
-# outside arrow; clamp 1's tap, its text between the hub's and the tap's
-# levels; the overall width outermost, its text low in its span, under clamp
-# 1's. The pocket length over pocket 1, right of its span, midway between the
-# hub's Y extension line and the fence face; the radii and the counterbore's
-# Ø right of the plate, each leader running out level from its feature.
+# line: the notch depth innermost, 2 mm off the plate's left end, its text
+# under its span (over it the fence width's and overall width's extension
+# lines from the back corner); the fence width, its outside arrows clear of
+# the notch depth's and the hub's texts; the hub, its text centred in its
+# span; clamp 1's tap, its text high in its span, under the hub's text and
+# clear of its own lower arrow (machinist review mr5: centred between the
+# hub's and the tap's levels, the arrow ran through its '6'); the overall
+# width outermost, its text low in its span, under clamp 1's. The pocket length
+# over pocket 1, right of its span, midway between the hub's Y extension
+# line and the fence face; the radii and the counterbore's Ø right of the
+# plate, each leader running out level from its feature.
 TOP_KEEP: dict[str, tuple[float, float]] = {
     "LeftEnd": (_LEFT_X - 0.007, _BACK_Y + 0.012),
     "NotchLeftEnd": (top_xy(spec.NOTCH_LEFT_END / 2.0, 0.0)[0], _BACK_Y + 0.020),
@@ -171,13 +171,10 @@ TOP_KEEP: dict[str, tuple[float, float]] = {
     "HubX": (top_xy(spec.HUB_X / 2.0, 0.0)[0], _FRONT_Y - 0.029),
     "ClampTapX3": (top_xy(_STATIONS[2] / 2.0, 0.0)[0], _FRONT_Y - 0.037),
     "ClampTapX4": (top_xy(_STATIONS[3] / 2.0, 0.0)[0], _FRONT_Y - 0.045),
-    "HubY": (_LEFT_X - 0.027, top_xy(0.0, spec.HUB_Y)[1] + 0.0037),
-    "FenceWidth": (_LEFT_X - 0.015, top_xy(0.0, spec.BACK_EDGE_Y / 2.0)[1]),
-    "ClampTapY": (
-        _LEFT_X - 0.045,
-        top_xy(0.0, (spec.HUB_Y + spec.CLAMP_SCREW_Y) / 2.0)[1],
-    ),
-    "NotchDepth": (_LEFT_X - 0.003, top_xy(0.0, 0.0)[1] - 0.0045),
+    "HubY": (_LEFT_X - 0.0275, top_xy(0.0, spec.HUB_Y / 2.0)[1]),
+    "FenceWidth": (_LEFT_X - 0.013, top_xy(0.0, spec.BACK_EDGE_Y / 2.0)[1]),
+    "ClampTapY": (_LEFT_X - 0.045, top_xy(0.0, spec.HUB_Y)[1] - 0.0013),
+    "NotchDepth": (_LEFT_X - 0.002, top_xy(0.0, 0.0)[1] - 0.0045),
     "PlateWidth": (_LEFT_X - 0.055, _FRONT_Y + 0.00675),
     "PocketLength": (
         top_xy(_STATIONS[0], 0.0)[0] + 0.0135,
@@ -192,12 +189,11 @@ TOP_KEEP: dict[str, tuple[float, float]] = {
 }
 # Section A-A: the pocket walls from Y0 in two rows over the cut, the back
 # wall's (with its seat's words under its value) 14 mm over the near wall's;
-# the pocket depth 4 mm right of the partial cut's end, its two rows beside
-# its line (left clear of the title block, farm run r15) and under the
-# floor's level so neither extension line runs through them (farm run
-# 20261118T001932117Z: centred on its span, the floor's line struck it); the
-# overall thickness left of the back face, its extension lines along the
-# fence's top and the underside.
+# the pocket depth 4 mm right of the plate's front face, its two rows beside
+# its line over the top's level, clear of the title block (farm run r15) and
+# off both its extension lines (farm run 20261118T001932117Z: centred on its
+# span, the floor's line struck it); the overall thickness left of the back
+# face, its extension lines along the fence's top and the underside.
 SECTION_A_KEEP: dict[str, tuple[float, float]] = {
     "PocketNearWallY": (
         section_a_xy(spec.POCKET_NEAR_WALL_Y / 2.0, 0.0)[0],
@@ -208,38 +204,39 @@ SECTION_A_KEEP: dict[str, tuple[float, float]] = {
         _FENCE_TOP_A + 0.0225,
     ),
     "PocketDepth": (
-        section_a_xy(SECTION_A_END_Y, 0.0)[0] + 0.004,
-        section_a_xy(0.0, spec.POCKET_FLOOR_Z)[1] - 0.0075,
+        section_a_xy(spec.FRONT_EDGE_Y, 0.0)[0] + 0.004,
+        section_a_xy(0.0, spec.PLATE_TOP_Z)[1] + 0.0066,
     ),
     "PlateThickness": (
         section_a_xy(spec.BACK_EDGE_Y, 0.0)[0] - 0.008,
         section_a_xy(0.0, (spec.FENCE_HEIGHT + spec.UNDERSIDE_Z) / 2.0)[1],
     ),
 }
-# Section B-B: the counterbore depth's two rows over the floor, beside its
-# line in the counterbore's mouth, running right inside the border; the
-# fence height's two rows above those, beside its line right of the fence
-# face, the line passing left of the depth's text (farm run r15: the depth's
-# line ran up through the fence height's text, and the depth's text off the
-# right border, from the front wall).
+# Section B-B: the counterbore depth's three rows over the fence's top,
+# beside its line in the counterbore's mouth, 2 mm off its back wall, clear
+# of the tap's thread, running right inside the border; the fence height's
+# two rows above those, beside its line right of the fence face, the line
+# passing left of the depth's text (farm run r15: the depth's line ran up
+# through the fence height's text, and the depth's text off the right
+# border, from the front wall).
 SECTION_B_KEEP: dict[str, tuple[float, float]] = {
     "HubCboreDepth": (
-        section_b_xy(spec.CBORE_SECTION_WALL_Y - 2.5, 0.0)[0],
-        _FENCE_TOP_B + 0.0066,
+        section_b_xy(spec.CBORE_SECTION_WALL_Y - 2.0, 0.0)[0],
+        _FENCE_TOP_B + 0.0095,
     ),
-    "FenceHeight": (section_b_xy(-18.0, 0.0)[0], _FENCE_TOP_B + 0.0195),
+    "FenceHeight": (section_b_xy(-18.0, 0.0)[0], _FENCE_TOP_B + 0.0255),
 }
-# Both taps' callouts on the top view (neither section cuts a tap). The clamp
-# set's on clamp 4's drill, its text below right of the plate. The hub's on
-# its drill, its text over B-B's cutting line's end (clear of its arrow and
-# letter) and right of the notch's extension line, under the notch start's
-# row: its leader rises across the back edge, the hub's shortest way out,
-# right of B-B's line (farm run 20261118T001932117Z: led off section B-B, it
-# ran 20 mm over the part).
+# Both taps' callouts on the top view. The clamp set's on clamp 4's drill,
+# its text below right of the plate. The hub's on its drill, its text left
+# of B-B's cutting line's end (clear of its arrow and letter) and right of
+# the notch's extension line, under the notch start's row: its leader rises
+# across the back edge, the hub's shortest way out, right of B-B's line,
+# which runs through the hub's axis (farm run 20261118T001932117Z: led off
+# section B-B, it ran 20 mm over the part).
 CLAMP_TAP_CENTRE_MM = (_STATIONS[-1], spec.CLAMP_SCREW_Y)
 CLAMP_TAP_CALLOUT_XY = (0.254, 0.165)
 HUB_TAP_CENTRE_MM = (spec.HUB_X, spec.HUB_Y)
-HUB_TAP_CALLOUT_XY = (0.1283, 0.2273)
+HUB_TAP_CALLOUT_XY = (0.1323, 0.2273)
 # A drill circle's centre and radius read back from the view (mm).
 _RIM_CENTRE_TOLERANCE_MM = 0.02
 _RIM_RADIUS_TOLERANCE_MM = 0.01

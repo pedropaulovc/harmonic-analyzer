@@ -51,7 +51,7 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_precision import apply_drawing_precision
+from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_prefix import set_dimension_prefix
 from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _feature_tree import _feature_by_name, name_last_feature
@@ -62,7 +62,6 @@ from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _saved_part_guard import require_saved_drawing_properties
 from _session import run_build
-from _single_limit_tolerance import SW_TOL_MAX, set_single_limit
 from _sketch import (
     SketchDims,
     add_line_chain,
@@ -672,9 +671,9 @@ def _section_references(adapter: Any, drive_jobs: list[tuple[str, str]]) -> None
     A-A (pocket 3): a chord down each pocket wall from Z0, its foot from Y0
     (PocketNearWallY, PocketBackWallY), the back wall's long PocketDepth; a
     chord on Y0 from the fence's top (its height from the origin) through the
-    material to the underside, long PlateThickness. B-B (the counterbore):
-    the fence face up from the origin (FenceHeight); the counterbore's back
-    wall (nearer the fence) from Z0, long HubCboreDepth."""
+    material to the underside, long PlateThickness. B-B (the hub, on its
+    axis): the fence face up from the origin (FenceHeight); the counterbore's
+    back wall (nearer the fence) from Z0, long HubCboreDepth."""
     _section_plane(adapter, spec.SECTION_A_PLANE, spec.SECTION_A_X)
     dims = SketchDims()
     check(
@@ -742,8 +741,8 @@ def _section_references(adapter: Any, drive_jobs: list[tuple[str, str]]) -> None
         z_to_mm=spec.COUNTERBORE_FLOOR_Z,
         label="counterbore wall",
     )
-    # Where the plane meets the counterbore's wall is the plane's offset's
-    # geometry, not a printed size: undriven.
+    # Where the plane meets the counterbore's wall is the hub's location and
+    # the counterbore's radius, not a printed size: undriven.
     anchor_point_to_origin(
         adapter, f"{wall}.start", 0.0, spec.CBORE_SECTION_WALL_Y, "counterbore wall"
     )
@@ -768,6 +767,31 @@ def _require_parent(adapter: Any, sketch: str, plane: str) -> None:
     ]
     if plane not in parents:
         raise RuntimeError(f"{sketch} is not on {plane}: parents {parents}")
+
+
+_TOL_NONE = 0  # swTolType_e.swTolNONE
+_TEXT_SUFFIX = 2  # swDimensionTextParts_e.swDimensionTextSuffix
+
+
+def _max_radius(adapter: Any, feature_name: str, dimension_name: str) -> None:
+    """A cutter-formed corner as the single limit "R.07 MAX": the model value
+    is the limit itself, the limit word its suffix with no native tolerance
+    (build_pd_support_bar._max_limit), since swTolMAX prints a lowercase
+    "max." (machinist review mr5)."""
+    label = f"{dimension_name}@{feature_name}"
+    display, dimension = _named_dimension(adapter, feature_name, dimension_name)
+    value = float(dimension.SystemValue) * 1000.0
+    if abs(value - spec.CORNER_RADIUS) > 1e-6:
+        raise RuntimeError(f"{label}: nominal {value:.7f} is not the MAX limit")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = _TOL_NONE
+    display = _early_bound(display, "IDisplayDimension")
+    display.SetText(_TEXT_SUFFIX, spec.MAX_SUFFIX)  # void; the readback proves it
+    if (
+        int(tolerance.Type) != _TOL_NONE
+        or str(display.GetText(_TEXT_SUFFIX) or "") != spec.MAX_SUFFIX
+    ):
+        raise RuntimeError(f"{label}: the MAX suffix did not persist")
 
 
 def build(adapter: Any) -> dict[str, str]:
@@ -838,14 +862,7 @@ def build(adapter: Any) -> dict[str, str]:
     # Cutter-formed inside corners: the modelled radius is the MAX limit
     # (sharp up to it), above the title block's inside-corner row.
     for feature_name, dimension_name in spec.MAX_RADII:
-        set_single_limit(
-            adapter,
-            feature_name,
-            dimension_name,
-            limit=spec.CORNER_RADIUS,
-            band=(0.0, -spec.CORNER_RADIUS),
-            tol_type=SW_TOL_MAX,
-        )
+        _max_radius(adapter, feature_name, dimension_name)
     for (feature_name, dimension_name), prefix in spec.DIMENSION_PREFIXES.items():
         set_dimension_prefix(adapter, feature_name, dimension_name, prefix)
     apply_drawing_precision(adapter, spec.DRAWING_PRECISION)

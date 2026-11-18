@@ -335,23 +335,25 @@ FACED_TOP_PLANE = "FacedTopPlane"
 # Both sections cut across the plate along Y, so the pocket walls print as
 # rows over a section instead of a stack of lanes beside the top view (farm
 # run 20261118T001932117Z: seven Y lanes from Y0 piled their texts on one
-# another). Section A-A cuts pocket 3 beside its tap: the pocket walls from
-# Y0, the pocket depth, and the overall thickness on a chord down the fence
-# face's line. Section B-B cuts the counterbore beside the hub tap: the fence
-# height and the counterbore depth. The fence and overall widths print on
-# the top view from the plate's own sketch: farm runs r13 and r14
-# (20261118T012253828Z and its successor) imported neither them nor the
-# thickness from B-B's chords on the back and front faces, however anchored.
-# Neither section cuts a tap, so each tap's callout stands on the top view;
-# the offsets keep each plane clear of its tap's thread and, A-A, inside the
-# pocket's straight walls.
+# another). Section A-A cuts pocket 3 beside its tap, across the plate's
+# full width (machinist review mr5: a partial section without a break line
+# read 2.55 wide against the 3.00): the pocket walls from Y0, the pocket
+# depth, and the overall thickness on a chord down the fence face's line.
+# Section B-B cuts the hub on its axis (mr5: .15 off the axis it missed the
+# tapped hole and drew a solid floor under the counterbore), showing the
+# counterbore, its floor and the tap through: the fence height and the
+# counterbore depth. The fence and overall widths print on the top view
+# from the plate's own sketch: farm runs r13 and r14 (20261118T012253828Z
+# and its successor) imported neither them nor the thickness from B-B's
+# chords on the back and front faces, however anchored. Each tap's callout
+# stands on the top view; A-A's offset keeps its plane clear of its tap's
+# thread and inside the pocket's straight walls.
 SECTION_A_PLANE = "SectionAPlane"
 SECTION_A_OFFSET = 4.445  # .175 right of pocket 3's tap
 SECTION_A_X = CLAMP_STATIONS[2] + SECTION_A_OFFSET
 SECTION_A_REFERENCE = "SectionAReference"
 SECTION_B_PLANE = "SectionBPlane"
-SECTION_B_OFFSET = 3.81  # .150 left of the hub tap
-SECTION_B_X = HUB_X - SECTION_B_OFFSET
+SECTION_B_X = HUB_X
 SECTION_B_REFERENCE = "SectionBReference"
 if not (
     THREAD_MAJOR_MM[CLAMP_TAP_THREAD] / 2.0
@@ -359,16 +361,11 @@ if not (
     < POCKET_LENGTH / 2.0 - CORNER_RADIUS
 ):
     raise AssertionError("section A-A cuts pocket 3's tap or a corner radius")
-if not THREAD_MAJOR_MM[HUB_TAP_THREAD] / 2.0 < SECTION_B_OFFSET < HUB_CBORE_DIA / 2.0:
-    raise AssertionError("section B-B cuts the hub tap or misses the counterbore")
-# Section B-B's counterbore wall: the back end of the chord its plane cuts
-# (a 3-4-5 triangle: .150 off the axis, .200 along the cut, the .250 radius),
-# so the depth's dimension line stands in the counterbore's mouth with its
-# text running right, inside the border (farm run r15: off the front wall,
-# its text crossed the right border by 10.7 mm).
-CBORE_SECTION_WALL_Y = HUB_Y + math.sqrt(
-    (HUB_CBORE_DIA / 2.0) ** 2 - SECTION_B_OFFSET**2
-)
+# Section B-B's counterbore wall: its back wall (nearer the fence) on the
+# plane through the axis, so the depth's dimension line stands in the
+# counterbore's mouth with its text running right, inside the border (farm
+# run r15: off the front wall, its text crossed the right border by 10.7 mm).
+CBORE_SECTION_WALL_Y = HUB_Y + HUB_CBORE_DIA / 2.0
 CLAMP_TAP_X_NAMES: tuple[str, ...] = tuple(
     f"ClampTapX{index}" for index in range(1, len(CLAMP_STATIONS) + 1)
 )
@@ -446,32 +443,59 @@ SYMMETRIC_BANDS: dict[tuple[str, str], float] = {
     ("HubCboreProfile", "HubX"): HUB_LOCATION_TOL,
     ("HubCboreProfile", "HubY"): HUB_LOCATION_TOL,
 }
-# Single-limit (MAX) corner radii: the model value is the limit itself.
+# Single-limit (MAX) corner radii: the model value is the limit itself, the
+# limit word the value's suffix with no native tolerance, since swTolMAX
+# prints a lowercase "max." (machinist review mr5: "3X .07 max.").
 MAX_RADII: tuple[tuple[str, str], ...] = (
     ("NotchCorners", "NotchCornerR"),
     ("PocketCorners", "PocketCornerR"),
 )
+MAX_SUFFIX = " MAX"
 
 # --- Sheet words -------------------------------------------------------------------
 # Counts on the pocket set and the corner radii (rule 10: identical features
 # take one nX callout); each tight or three-place feature's mate or reason
-# once, on its own dimension (rules 3, 4, 7).
+# once, on its own dimension (rules 3, 4, 7). A prefix replaces SolidWorks'
+# own radius "R" and diameter "Ø", so each carries its symbol (mr5: the
+# radii printed bare). The counterbore's Ø and depth carry the counterbore
+# and depth symbols (rule 26): ⌴ Ø.500 on the top view, ↧ .185 in B-B, each
+# the model's own dimension (PR #1388: a printed size is an associative
+# model dimension, so no callout row retypes them).
 POCKET_COUNT = len(CLAMP_STATIONS)
 NOTCH_CORNER_COUNT = 3
 DIMENSION_PREFIXES: dict[tuple[str, str], str] = {
     ("PocketProfile", "PocketLength"): f"{POCKET_COUNT}X ",
     (SECTION_A_REFERENCE, "PocketDepth"): f"{POCKET_COUNT}X ",
-    ("PocketCorners", "PocketCornerR"): f"{4 * POCKET_COUNT}X ",
-    ("NotchCorners", "NotchCornerR"): f"{NOTCH_CORNER_COUNT}X ",
+    ("PocketCorners", "PocketCornerR"): f"{4 * POCKET_COUNT}X R",
+    ("NotchCorners", "NotchCornerR"): f"{NOTCH_CORNER_COUNT}X R",
+    ("HubCboreProfile", "HubCboreDia"): "<HOLE-SPOT> <MOD-DIAM>",
+    (SECTION_B_REFERENCE, "HubCboreDepth"): "<HOLE-DEPTH> ",
 }
 CLAMP_NUMBER = "TL-VN-50"
 PLUG_NUMBER = "TL-02"
+STRAP_NUMBER = "MHA-CH-13"
+# Each three-place reason holds only at .XXX (rule 3), checked here: the
+# fence's top stays at or under the shop record's .079 (FENCE_TOP_LIMIT),
+# which .XX's band would break, and under the strap's finished top face, so
+# the face mill clears it (FACE_CUT_CLEARANCE_MIN); at .XX's band the drill
+# and reamer points through the strap's hub hole would stop short of
+# PLAN_RELIEF_FLOOR_CLEARANCE over the counterbore's floor.
+FENCE_TOP_LIMIT = 0.079 * INCH
+if not FENCE_HEIGHT + XXX <= FENCE_TOP_LIMIT + 1e-9 < FENCE_HEIGHT + XX:
+    raise AssertionError("the fence height's third place is not what holds .079")
+if (
+    HUB_CBORE_DEPTH - XX + max(PLAN_DRILL_TIP_Z, PLAN_REAM_TIP_Z)
+    >= PLAN_RELIEF_FLOOR_CLEARANCE
+):
+    raise AssertionError("the counterbore depth's third place is not needed")
 DIMENSION_CALLOUTS: dict[str, str] = {
     "PocketBackWallY": f"SEATS {CLAMP_NUMBER} HEEL",
     "PocketDepth": f"{CLAMP_NUMBER} SEAT",
-    "FenceHeight": "CLEARS MHA-CH-13 FACE CUT",
+    "FenceHeight": f"UNDER {STRAP_NUMBER} STRAP TOP FACE",
     "HubCboreDia": f"LOCATES {PLUG_NUMBER}",
-    "HubCboreDepth": "CLEARS MHA-CH-13 DRILL AND REAMER",
+    "HubCboreDepth": (
+        f"CLEARS DRILL AND REAMER POINTS\nTHRU {STRAP_NUMBER} STRAP HUB HOLE"
+    ),
 }
 # The taps' native callouts: DRILL after the drill's Ø, the clamp taps' count,
 # the hub tap's stated shortfall as its last row.
