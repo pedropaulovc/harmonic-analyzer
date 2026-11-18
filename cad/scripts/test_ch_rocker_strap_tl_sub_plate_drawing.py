@@ -613,7 +613,7 @@ def _sheet() -> _Sheet:
     ):
         sheet.linear(name, _sec_a, a_keep[name], p1, p2, along)
     for name, p1, p2, along in (
-        ("FenceWidth", origin, (back, zf), "x"),
+        ("FenceWidth", origin, (back, 0.0), "x"),
         ("PlateWidth", (back, zu), (front, zu), "x"),
         ("FenceHeight", origin, (0.0, zf), "y"),
         ("PlateThickness", (back, zf), (back, zu), "y"),

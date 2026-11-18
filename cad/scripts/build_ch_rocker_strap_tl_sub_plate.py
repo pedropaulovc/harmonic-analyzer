@@ -660,15 +660,25 @@ def _section_references(adapter: Any, drive_jobs: list[tuple[str, str]]) -> None
     """The sizes the sections print, in hidden construction-only sketches on
     each cutting plane (a section imports no sketch or extrusion size): every
     chord lies on an edge its section draws and runs along Z, so the top view
-    sees it end-on; each Y size runs from the sketch origin (the fence face's
-    foot) to a chord's start, each height is a chord's length.
+    sees it end-on. Every chain starts at a chord foot on Z0 held on the
+    origin's axis (a vertical-points relation plus one Y distance from the
+    origin) or on the origin itself; every other point hangs off it by
+    relations and one length.
 
-    A-A (pocket 3): a chord down each pocket wall, the near wall's from Y0
-    (PocketNearWallY) and the back wall's from Y0 (PocketBackWallY) and long
-    PocketDepth. B-B (the counterbore): the back face, its top corner from Y0
-    (FenceWidth) and long PlateThickness; the fence face up from the origin
-    (FenceHeight); the front face, its foot PlateWidth in front of the back
-    face's; the counterbore's front wall, long HubCboreDepth."""
+    Farm run r13 (20261118T012253828Z): B-B imported FenceHeight and
+    HubCboreDepth (chords anchored that way) but not FenceWidth,
+    PlateThickness or PlateWidth, all three on a back-face chord whose top
+    corner was placed by two distances from the origin, off both axes.
+    A-A, built only on axis anchors, imported all three of its sizes.
+
+    A-A (pocket 3): a chord down each pocket wall from Z0, its foot from Y0
+    (PocketNearWallY, PocketBackWallY), the back wall's long PocketDepth.
+    B-B (the counterbore): the fence face up from the origin (FenceHeight);
+    the back face up from its foot on Z0, the foot FenceWidth from Y0; the
+    back face from its top corner to the underside (PlateThickness); the
+    front face up from its foot, the foot PlateWidth in front of the back
+    face's, its top on Z0; the counterbore's front wall from Z0, long
+    HubCboreDepth."""
     _section_plane(adapter, spec.SECTION_A_PLANE, spec.SECTION_A_X)
     dims = SketchDims()
     check(
@@ -701,23 +711,6 @@ def _section_references(adapter: Any, drive_jobs: list[tuple[str, str]]) -> None
         "create_sketch section B-B reference",
         adapter.create_sketch(spec.SECTION_B_PLANE),
     )
-    back = _chord(
-        adapter,
-        y_mm=spec.BACK_EDGE_Y,
-        z_from_mm=spec.FENCE_HEIGHT,
-        z_to_mm=spec.UNDERSIDE_Z,
-        label="back face",
-    )
-    # anchor_point_to_origin emits the horizontal (u, -Z) distance, then the
-    # vertical (v, Y) one.
-    anchor_point_to_origin(
-        adapter, f"{back}.start", -spec.FENCE_HEIGHT, spec.BACK_EDGE_Y, "back face"
-    )
-    dims.record("BackFaceTopZ", '"FenceHeight"')
-    dims.record("FenceWidth", '"FenceWidth"')
-    _length(
-        adapter, dims, back, spec.PLATE_THICKNESS, "PlateThickness", '"PlateThickness"'
-    )
     fence = _chord(
         adapter,
         y_mm=0.0,
@@ -727,6 +720,32 @@ def _section_references(adapter: Any, drive_jobs: list[tuple[str, str]]) -> None
     )
     anchor_point_to_origin(adapter, f"{fence}.start", 0.0, 0.0, "fence face")
     _length(adapter, dims, fence, spec.FENCE_HEIGHT, "FenceHeight", '"FenceHeight"')
+    back_top = _chord(
+        adapter,
+        y_mm=spec.BACK_EDGE_Y,
+        z_from_mm=spec.PLATE_TOP_Z,
+        z_to_mm=spec.FENCE_HEIGHT,
+        label="back face over Z0",
+    )
+    anchor_point_to_origin(
+        adapter, f"{back_top}.start", 0.0, spec.BACK_EDGE_Y, "FenceWidth"
+    )
+    dims.record("FenceWidth", '"FenceWidth"')
+    _length(adapter, dims, back_top, spec.FENCE_HEIGHT, "BackFaceTop", '"FenceHeight"')
+    back = _chord(
+        adapter,
+        y_mm=spec.BACK_EDGE_Y,
+        z_from_mm=spec.FENCE_HEIGHT,
+        z_to_mm=spec.UNDERSIDE_Z,
+        label="back face",
+    )
+    check(
+        "back face chord from the fence's top back corner",
+        adapter.add_sketch_constraint(f"{back_top}.end", f"{back}.start", "coincident"),
+    )
+    _length(
+        adapter, dims, back, spec.PLATE_THICKNESS, "PlateThickness", '"PlateThickness"'
+    )
     front = _chord(
         adapter,
         y_mm=spec.FRONT_EDGE_Y,
@@ -735,7 +754,7 @@ def _section_references(adapter: Any, drive_jobs: list[tuple[str, str]]) -> None
         label="front face",
     )
     anchor_point_to_point(
-        adapter, f"{back}.end", f"{front}.start", 0.0, -spec.PLATE_WIDTH, "plate width"
+        adapter, f"{back}.end", f"{front}.start", 0.0, -spec.PLATE_WIDTH, "PlateWidth"
     )
     dims.record("PlateWidth", '"PlateWidth"')
     check(
