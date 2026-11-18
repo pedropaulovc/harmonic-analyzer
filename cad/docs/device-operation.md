@@ -88,7 +88,11 @@ Overview: Analysis"; p. 8):
    station (the rocker pin rides an arc, the bar's foot rides another), and
    Michelson's answer was to stamp the stick where the machine actually reads each
    ordinate. This reconstruction keeps the stick linear (14.20 mm per division, so it
-   can be inspected against a rule) and moves the same correction into a table.
+   can be inspected against a rule) and moves the same correction into a table. It
+   sets a bar Michelson's way (MHA-MS-00 steps 11–13A: the stop on the rocker arm's
+   outer tip, the bar slid out to the stick's 10 end), so the stick's zero lies about
+   2.7 mm from the pivot; the table's stick-reading column carries that offset and
+   zero is the stop on the 0.2 tick (#2434).
 
 So the analysis mode has always been: set, crank, **read, normalise**. The
 reconstruction adds two small **corrections** after the normalisation, both of which
