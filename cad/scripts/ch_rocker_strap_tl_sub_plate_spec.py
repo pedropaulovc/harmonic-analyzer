@@ -332,14 +332,18 @@ FACED_TOP_PLANE = "FacedTopPlane"
 # short chords along Z lying on edges the section draws, the top view they
 # are cut from seeing each end-on, every printed size a chord's length or a
 # chord's start from the sketch origin (the fence face's foot, Y0 Z0).
-# Both sections cut across the plate along Y, so the Y sizes print as rows
-# over a section instead of a stack of lanes beside the top view (farm run
-# 20261118T001932117Z: seven Y lanes from Y0 piled their texts on one
+# Both sections cut across the plate along Y, so the pocket walls print as
+# rows over a section instead of a stack of lanes beside the top view (farm
+# run 20261118T001932117Z: seven Y lanes from Y0 piled their texts on one
 # another). Section A-A cuts pocket 3 beside its tap: the pocket walls from
-# Y0 and the pocket depth. Section B-B cuts the counterbore beside the hub
-# tap: the fence, the overall width and thickness, and the counterbore depth.
-# Neither cuts a tap, so each tap's callout stands on the top view; the
-# offsets keep each plane clear of its tap's thread and, A-A, inside the
+# Y0, the pocket depth, and the overall thickness on a chord down the fence
+# face's line. Section B-B cuts the counterbore beside the hub tap: the fence
+# height and the counterbore depth. The fence and overall widths print on
+# the top view from the plate's own sketch: farm runs r13 and r14
+# (20261118T012253828Z and its successor) imported neither them nor the
+# thickness from B-B's chords on the back and front faces, however anchored.
+# Neither section cuts a tap, so each tap's callout stands on the top view;
+# the offsets keep each plane clear of its tap's thread and, A-A, inside the
 # pocket's straight walls.
 SECTION_A_PLANE = "SectionAPlane"
 SECTION_A_OFFSET = 4.445  # .175 right of pocket 3's tap
@@ -366,38 +370,36 @@ CLAMP_TAP_X_NAMES: tuple[str, ...] = tuple(
     f"ClampTapX{index}" for index in range(1, len(CLAMP_STATIONS) + 1)
 )
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "PlateProfile": {"LeftEnd", "PlateLength"},
+    "PlateProfile": {"LeftEnd", "PlateLength", "FenceWidth", "PlateWidth"},
     "NotchProfile": {"NotchLeftEnd", "NotchRightStart", "NotchDepth"},
     "NotchCorners": {"NotchCornerR"},
     "PocketProfile": {"PocketLength"},
     "PocketCorners": {"PocketCornerR"},
     "HubCboreProfile": {"HubX", "HubY", "HubCboreDia"},
     "ClampTaps": {*CLAMP_TAP_X_NAMES, "ClampTapY"},
-    SECTION_A_REFERENCE: {"PocketNearWallY", "PocketBackWallY", "PocketDepth"},
-    SECTION_B_REFERENCE: {
-        "FenceWidth",
-        "PlateWidth",
-        "FenceHeight",
+    SECTION_A_REFERENCE: {
+        "PocketNearWallY",
+        "PocketBackWallY",
+        "PocketDepth",
         "PlateThickness",
-        "HubCboreDepth",
     },
+    SECTION_B_REFERENCE: {"FenceHeight", "HubCboreDepth"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "PlateProfile": {"LeftEnd": 1, "PlateLength": 1},
+    "PlateProfile": {"LeftEnd": 1, "PlateLength": 1, "FenceWidth": 2, "PlateWidth": 2},
     "NotchProfile": {"NotchLeftEnd": 2, "NotchRightStart": 2, "NotchDepth": 2},
     "NotchCorners": {"NotchCornerR": 2},
     "PocketProfile": {"PocketLength": 2},
     "PocketCorners": {"PocketCornerR": 2},
     "HubCboreProfile": {"HubX": 3, "HubY": 3, "HubCboreDia": 3},
     "ClampTaps": {**{name: 3 for name in CLAMP_TAP_X_NAMES}, "ClampTapY": 3},
-    SECTION_A_REFERENCE: {"PocketNearWallY": 2, "PocketBackWallY": 3, "PocketDepth": 3},
-    SECTION_B_REFERENCE: {
-        "FenceWidth": 2,
-        "PlateWidth": 2,
-        "FenceHeight": 3,
+    SECTION_A_REFERENCE: {
+        "PocketNearWallY": 2,
+        "PocketBackWallY": 3,
+        "PocketDepth": 3,
         "PlateThickness": 2,
-        "HubCboreDepth": 3,
     },
+    SECTION_B_REFERENCE: {"FenceHeight": 3, "HubCboreDepth": 3},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places for dims in DRAWING_PRECISION.values() for name, places in dims.items()

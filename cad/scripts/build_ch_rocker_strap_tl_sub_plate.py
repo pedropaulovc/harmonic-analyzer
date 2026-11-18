@@ -67,7 +67,6 @@ from _sketch import (
     SketchDims,
     add_line_chain,
     anchor_point_to_origin,
-    anchor_point_to_point,
     blank_reference_sketches,
     dimension_between,
     ensure_fully_defined,
@@ -659,26 +658,23 @@ def _length(
 def _section_references(adapter: Any, drive_jobs: list[tuple[str, str]]) -> None:
     """The sizes the sections print, in hidden construction-only sketches on
     each cutting plane (a section imports no sketch or extrusion size): every
-    chord lies on an edge its section draws and runs along Z, so the top view
-    sees it end-on. Every chain starts at a chord foot on Z0 held on the
-    origin's axis (a vertical-points relation plus one Y distance from the
-    origin) or on the origin itself; every other point hangs off it by
-    relations and one length.
+    chord runs along Z, so the top view sees it end-on, and each is held on
+    one of the origin's axes by a relation plus one distance from the origin
+    (or on the origin itself); its length is the other size.
 
-    Farm run r13 (20261118T012253828Z): B-B imported FenceHeight and
-    HubCboreDepth (chords anchored that way) but not FenceWidth,
-    PlateThickness or PlateWidth, all three on a back-face chord whose top
-    corner was placed by two distances from the origin, off both axes.
-    A-A, built only on axis anchors, imported all three of its sizes.
+    Farm runs r13 and r14 (20261118T012253828Z and its successor): B-B
+    imported FenceHeight and HubCboreDepth but never FenceWidth,
+    PlateThickness or PlateWidth from chords on the back and front faces,
+    anchored off the axes (r13) or on them (r14). So the widths print on the
+    top view from PlateProfile, and the thickness runs down the fence face's
+    line in A-A, where the fence face's own chord imported in B-B.
 
     A-A (pocket 3): a chord down each pocket wall from Z0, its foot from Y0
-    (PocketNearWallY, PocketBackWallY), the back wall's long PocketDepth.
-    B-B (the counterbore): the fence face up from the origin (FenceHeight);
-    the back face up from its foot on Z0, the foot FenceWidth from Y0; the
-    back face from its top corner to the underside (PlateThickness); the
-    front face up from its foot, the foot PlateWidth in front of the back
-    face's, its top on Z0; the counterbore's front wall from Z0, long
-    HubCboreDepth."""
+    (PocketNearWallY, PocketBackWallY), the back wall's long PocketDepth; a
+    chord on Y0 from the fence's top (its height from the origin) through the
+    material to the underside, long PlateThickness. B-B (the counterbore):
+    the fence face up from the origin (FenceHeight); the counterbore's front
+    wall from Z0, long HubCboreDepth."""
     _section_plane(adapter, spec.SECTION_A_PLANE, spec.SECTION_A_X)
     dims = SketchDims()
     check(
@@ -699,6 +695,25 @@ def _section_references(adapter: Any, drive_jobs: list[tuple[str, str]]) -> None
         anchor_point_to_origin(adapter, f"{wall}.start", 0.0, wall_y, name)
         dims.record(name, f'"{name}"')
         _length(adapter, dims, wall, spec.POCKET_DEPTH, chord_name, chord_drive)
+    thickness = _chord(
+        adapter,
+        y_mm=0.0,
+        z_from_mm=spec.FENCE_HEIGHT,
+        z_to_mm=spec.UNDERSIDE_Z,
+        label="PlateThickness",
+    )
+    anchor_point_to_origin(
+        adapter, f"{thickness}.start", -spec.FENCE_HEIGHT, 0.0, "PlateThickness top"
+    )
+    dims.record("ThicknessTopZ", '"FenceHeight"')
+    _length(
+        adapter,
+        dims,
+        thickness,
+        spec.PLATE_THICKNESS,
+        "PlateThickness",
+        '"PlateThickness"',
+    )
     ensure_fully_defined(adapter, "section A-A reference sketch")
     check("exit_sketch section A-A reference", adapter.exit_sketch())
     name_last_feature(adapter, spec.SECTION_A_REFERENCE)
@@ -720,47 +735,6 @@ def _section_references(adapter: Any, drive_jobs: list[tuple[str, str]]) -> None
     )
     anchor_point_to_origin(adapter, f"{fence}.start", 0.0, 0.0, "fence face")
     _length(adapter, dims, fence, spec.FENCE_HEIGHT, "FenceHeight", '"FenceHeight"')
-    back_top = _chord(
-        adapter,
-        y_mm=spec.BACK_EDGE_Y,
-        z_from_mm=spec.PLATE_TOP_Z,
-        z_to_mm=spec.FENCE_HEIGHT,
-        label="back face over Z0",
-    )
-    anchor_point_to_origin(
-        adapter, f"{back_top}.start", 0.0, spec.BACK_EDGE_Y, "FenceWidth"
-    )
-    dims.record("FenceWidth", '"FenceWidth"')
-    _length(adapter, dims, back_top, spec.FENCE_HEIGHT, "BackFaceTop", '"FenceHeight"')
-    back = _chord(
-        adapter,
-        y_mm=spec.BACK_EDGE_Y,
-        z_from_mm=spec.FENCE_HEIGHT,
-        z_to_mm=spec.UNDERSIDE_Z,
-        label="back face",
-    )
-    check(
-        "back face chord from the fence's top back corner",
-        adapter.add_sketch_constraint(f"{back_top}.end", f"{back}.start", "coincident"),
-    )
-    _length(
-        adapter, dims, back, spec.PLATE_THICKNESS, "PlateThickness", '"PlateThickness"'
-    )
-    front = _chord(
-        adapter,
-        y_mm=spec.FRONT_EDGE_Y,
-        z_from_mm=spec.UNDERSIDE_Z,
-        z_to_mm=spec.PLATE_TOP_Z,
-        label="front face",
-    )
-    anchor_point_to_point(
-        adapter, f"{back}.end", f"{front}.start", 0.0, -spec.PLATE_WIDTH, "PlateWidth"
-    )
-    dims.record("PlateWidth", '"PlateWidth"')
-    check(
-        "front face chord top on Z0",
-        adapter.add_sketch_constraint(f"{front}.end", "origin", "vertical_points"),
-    )
     wall = _chord(
         adapter,
         y_mm=spec.CBORE_SECTION_WALL_Y,

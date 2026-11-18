@@ -3,15 +3,17 @@ r"""Manufacturing drawing of the rocker-strap sub-plate (MHA-CH-13-TL-01).
 Shop tooling (owner ask 2026-11-17). One B sheet, laid as the plate sits in
 the vise (rule 11): the top view at 1:2 across the top, the fence along its
 top and the end stop at its left, every X from the stop face (X0) above and
-below it, the hub's and the clamp taps' Y from the fence face (Y0) to its
-left, both taps' callouts on it; under it two sections cut across the plate
-at 2:1, each carrying its Y sizes as rows from Y0 over the cut (farm run
-20261118T001932117Z: seven Y lanes beside the top view piled their texts):
-partial section A-A through clamp pocket 3, its walls from Y0 and its depth;
-section B-B through the hub counterbore, the fence, the overall width and
-thickness and the counterbore's depth; the isometric at 1:4. Every number
-is the part's own (``ch_rocker_strap_tl_sub_plate_spec``), imported from the
-model.
+below it, the notch depth, the hub's and the clamp taps' Y, the fence width
+and the overall width from the fence face (Y0) to its left, both taps'
+callouts on it; under it two sections cut across the plate at 2:1, the
+pocket walls as rows from Y0 over the cut (farm run 20261118T001932117Z:
+seven Y lanes beside the top view piled their texts): partial section A-A
+through clamp pocket 3, its walls from Y0, its depth and the overall
+thickness; section B-B through the hub counterbore, the fence height and the
+counterbore's depth (farm runs r13 and r14: B-B never imported the widths or
+the thickness from chords on the back and front faces); the isometric at
+1:4. Every number is the part's own (``ch_rocker_strap_tl_sub_plate_spec``),
+imported from the model.
 """
 
 from __future__ import annotations
@@ -140,20 +142,24 @@ _RIGHT_X = top_xy(spec.RIGHT_END_X, 0.0)[0]
 _STATIONS = spec.CLAMP_STATIONS
 _FENCE_TOP_A = section_a_xy(0.0, spec.FENCE_HEIGHT)[1]
 _FENCE_TOP_B = section_b_xy(0.0, spec.FENCE_HEIGHT)[1]
-# Top view: X sizes from X0 in rows at least 8 mm apart, above (the ends and
-# notch 12 mm over the back edge; over the hub tap's callout the notch start
-# and the overall length) and below (clamp 1's text right of its span, which
-# is narrower than it; under the cutting lines' letters). Y sizes from Y0 to
-# the left, the shortest span innermost so no extension line crosses
-# another's dimension line: the hub, then clamp 1's tap with its text
-# between the hub's and the tap's levels, then the notch depth with its text
-# above. The pocket length over pocket 1, right of its span, midway between
-# the hub's Y extension line and the fence face; the radii and the
-# counterbore's Ø right of the plate, each leader running out level from its
-# feature.
+# Top view: X sizes from X0 in rows at least 8 mm apart, above (the left end
+# 12 mm over the back edge, the notch's end 20 mm, clear of the left end's
+# outside arrow at X0, beside the hub tap's callout; over the callout the
+# notch start and the overall length) and below (clamp 1's text right of its
+# span, which is narrower than it; under the cutting lines' letters). Y sizes
+# from Y0 to the left in five lanes, a span inner to every span holding one
+# of its extension lines so no extension line crosses another's dimension
+# line: the notch depth innermost, its text under its span (over it the fence
+# width's and overall width's extension lines from the back corner); the
+# fence width; the hub, its text low in its span, clear of the fence width's
+# outside arrow; clamp 1's tap, its text between the hub's and the tap's
+# levels; the overall width outermost, its text low in its span, under clamp
+# 1's. The pocket length over pocket 1, right of its span, midway between the
+# hub's Y extension line and the fence face; the radii and the counterbore's
+# Ø right of the plate, each leader running out level from its feature.
 TOP_KEEP: dict[str, tuple[float, float]] = {
     "LeftEnd": (_LEFT_X - 0.007, _BACK_Y + 0.012),
-    "NotchLeftEnd": (top_xy(spec.NOTCH_LEFT_END / 2.0, 0.0)[0], _BACK_Y + 0.012),
+    "NotchLeftEnd": (top_xy(spec.NOTCH_LEFT_END / 2.0, 0.0)[0], _BACK_Y + 0.020),
     "NotchRightStart": (top_xy(spec.NOTCH_RIGHT_START / 2.0, 0.0)[0], _BACK_Y + 0.030),
     "PlateLength": (
         top_xy(spec.LEFT_END_X + spec.PLATE_LENGTH / 2.0, 0.0)[0],
@@ -164,12 +170,14 @@ TOP_KEEP: dict[str, tuple[float, float]] = {
     "HubX": (top_xy(spec.HUB_X / 2.0, 0.0)[0], _FRONT_Y - 0.029),
     "ClampTapX3": (top_xy(_STATIONS[2] / 2.0, 0.0)[0], _FRONT_Y - 0.037),
     "ClampTapX4": (top_xy(_STATIONS[3] / 2.0, 0.0)[0], _FRONT_Y - 0.045),
-    "HubY": (_LEFT_X - 0.014, top_xy(0.0, spec.HUB_Y / 2.0)[1]),
+    "HubY": (_LEFT_X - 0.027, top_xy(0.0, spec.HUB_Y)[1] + 0.0037),
+    "FenceWidth": (_LEFT_X - 0.015, top_xy(0.0, spec.BACK_EDGE_Y / 2.0)[1]),
     "ClampTapY": (
-        _LEFT_X - 0.031,
+        _LEFT_X - 0.045,
         top_xy(0.0, (spec.HUB_Y + spec.CLAMP_SCREW_Y) / 2.0)[1],
     ),
-    "NotchDepth": (_LEFT_X - 0.047, _BACK_Y + 0.0012),
+    "NotchDepth": (_LEFT_X - 0.006, top_xy(0.0, 0.0)[1] - 0.0045),
+    "PlateWidth": (_LEFT_X - 0.055, _FRONT_Y + 0.00675),
     "PocketLength": (
         top_xy(_STATIONS[0], 0.0)[0] + 0.0135,
         top_xy(0.0, spec.HUB_Y / 2.0)[1],
@@ -185,7 +193,9 @@ TOP_KEEP: dict[str, tuple[float, float]] = {
 # wall's (with its seat's words under its value) 14 mm over the near wall's;
 # the pocket depth right of the partial cut's end, its two rows under the
 # floor's level so neither extension line runs through them (farm run
-# 20261118T001932117Z: centred on its span, the floor's line struck it).
+# 20261118T001932117Z: centred on its span, the floor's line struck it); the
+# overall thickness left of the back face, its extension lines along the
+# fence's top and the underside.
 SECTION_A_KEEP: dict[str, tuple[float, float]] = {
     "PocketNearWallY": (
         section_a_xy(spec.POCKET_NEAR_WALL_Y / 2.0, 0.0)[0],
@@ -199,26 +209,19 @@ SECTION_A_KEEP: dict[str, tuple[float, float]] = {
         section_a_xy(SECTION_A_END_Y, 0.0)[0] + 0.0195,
         section_a_xy(0.0, spec.POCKET_FLOOR_Z)[1] - 0.0075,
     ),
-}
-# Section B-B: the thickness left of the back face; the fence width over the
-# fence; the fence height's two rows over the floor right of the fence face,
-# 2 mm over its extension lines; the counterbore depth's two rows above
-# those, right of the fence height's dimension line; the overall width under
-# the cut.
-SECTION_B_KEEP: dict[str, tuple[float, float]] = {
     "PlateThickness": (
-        section_b_xy(spec.BACK_EDGE_Y, 0.0)[0] - 0.008,
-        section_b_xy(0.0, (spec.FENCE_HEIGHT + spec.UNDERSIDE_Z) / 2.0)[1],
+        section_a_xy(spec.BACK_EDGE_Y, 0.0)[0] - 0.008,
+        section_a_xy(0.0, (spec.FENCE_HEIGHT + spec.UNDERSIDE_Z) / 2.0)[1],
     ),
-    "FenceWidth": (section_b_xy(spec.BACK_EDGE_Y / 2.0, 0.0)[0], _FENCE_TOP_B + 0.008),
+}
+# Section B-B: the fence height's two rows over the floor right of the fence
+# face, 2 mm over its extension lines; the counterbore depth's two rows
+# above those, right of the fence height's dimension line.
+SECTION_B_KEEP: dict[str, tuple[float, float]] = {
     "FenceHeight": (section_b_xy(-18.0, 0.0)[0], _FENCE_TOP_B + 0.0066),
     "HubCboreDepth": (
         section_b_xy(spec.CBORE_SECTION_WALL_Y - 7.0, 0.0)[0],
         _FENCE_TOP_B + 0.0195,
-    ),
-    "PlateWidth": (
-        section_b_xy((spec.BACK_EDGE_Y + spec.FRONT_EDGE_Y) / 2.0, 0.0)[0],
-        section_b_xy(0.0, spec.UNDERSIDE_Z)[1] - 0.008,
     ),
 }
 # Both taps' callouts on the top view (neither section cuts a tap). The clamp
@@ -368,7 +371,7 @@ requirement(
         "plane": (_plane("z", spec.UNDERSIDE_Z), ("__frame__", "UNDERSIDE_Z")),
         "thickness": (
             limits(spec.PLATE_THICKNESS, _P["PlateThickness"], unit=UNIT),
-            ("PLATE_THICKNESS", _SEC_B),
+            ("PLATE_THICKNESS", _SEC_A),
         ),
         "finish": ("as received", ("__frame__",)),
     },
@@ -397,7 +400,7 @@ requirement(
         "plane": (_plane("y", spec.FRONT_EDGE_Y), ("FRONT_EDGE_Y",)),
         "width": (
             limits(spec.PLATE_WIDTH, _P["PlateWidth"], unit=UNIT),
-            ("PLATE_WIDTH", _SEC_B),
+            ("PLATE_WIDTH", _TOP),
         ),
     },
     precision={"width": _P["PlateWidth"]},
@@ -411,7 +414,7 @@ requirement(
         "plane": (_plane("y", spec.BACK_EDGE_Y), ("BACK_EDGE_Y",)),
         "y": (
             limits(spec.FENCE_WIDTH, _P["FenceWidth"], unit=UNIT),
-            ("FENCE_WIDTH", _SEC_B),
+            ("FENCE_WIDTH", _TOP),
         ),
     },
     precision={"y": _P["FenceWidth"]},

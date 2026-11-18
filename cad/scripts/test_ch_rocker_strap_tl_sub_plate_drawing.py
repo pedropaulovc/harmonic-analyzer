@@ -279,6 +279,11 @@ def test_section_sizes_live_in_hidden_reference_sketches_on_each_cut() -> None:
 _ROW = 3.6
 _ROW_PITCH = 5.5
 _SECTION_ARROW = 12.0
+# A span under 8 mm carries its arrows outside, about 3.5 mm past each end
+# (the template's arrowhead and a stub); the arrows' 2 mm to foreign text
+# gates (arrow-near-text).
+_SHORT_SPAN = 8.0
+_ARROW = 3.5
 _LETTER_ALONG = (15.75, 21.9)
 _LETTER_ACROSS = 3.05
 _CAPTION = (22.8, 15.6)
@@ -442,6 +447,10 @@ class _Sheet:
                 self.extensions.append((name, (tuple(start), tuple(stop))))
             ends.append(point[axis])
         lo, hi = min(ends), max(ends)
+        if hi - lo < _SHORT_SPAN:
+            # Too short for its arrows: they stand outside, an arrow's
+            # length past each end.
+            lo, hi = lo - _ARROW, hi + _ARROW
         lo, hi = min(lo, text[axis + 2]), max(hi, text[axis])
         a, b = [0.0, 0.0], [0.0, 0.0]
         a[axis], b[axis], a[across], b[across] = lo, hi, line, line
@@ -547,6 +556,8 @@ def _sheet() -> _Sheet:
         ("HubY", origin, hub, "y"),
         ("ClampTapY", origin, tap1, "y"),
         ("NotchDepth", origin, (0.0, nd), "y"),
+        ("FenceWidth", origin, (left, back), "y"),
+        ("PlateWidth", (left, back), (left, front), "y"),
         (
             "PocketLength",
             (tap1[0] + half, s.POCKET_NEAR_WALL_Y),
@@ -606,17 +617,18 @@ def _sheet() -> _Sheet:
             (back, zu),
         ],
     )
+    # A-A's thickness chord runs down Y0 from the fence's top through the
+    # material; the shown reference sketch prints it.
+    sheet.geometry.append((_sec_a(0.0, zf), _sec_a(0.0, zu)))
     for name, p1, p2, along in (
         ("PocketNearWallY", origin, (near, 0.0), "x"),
         ("PocketBackWallY", origin, (wall, 0.0), "x"),
         ("PocketDepth", (wall, 0.0), (wall, zp), "y"),
+        ("PlateThickness", (0.0, zf), (0.0, zu), "y"),
     ):
         sheet.linear(name, _sec_a, a_keep[name], p1, p2, along)
     for name, p1, p2, along in (
-        ("FenceWidth", origin, (back, 0.0), "x"),
-        ("PlateWidth", (back, zu), (front, zu), "x"),
         ("FenceHeight", origin, (0.0, zf), "y"),
-        ("PlateThickness", (back, zf), (back, zu), "y"),
         ("HubCboreDepth", (cb_wall, 0.0), (cb_wall, cz), "y"),
     ):
         sheet.linear(name, _sec_b, b_keep[name], p1, p2, along)
@@ -686,15 +698,31 @@ def _meet_point(a, b, c, d):
     return (a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1]))
 
 
+def _overlays(segment, own) -> bool:
+    """Whether ``segment`` lies on the same line as, and overlaps, one of
+    ``own``: two extension lines from one point print as one ink."""
+    for other in own:
+        if (
+            _point_segment(other[0], *segment) < 0.01
+            or _point_segment(segment[0], *other) < 0.01
+        ):
+            if abs(_cross(segment[0], segment[1], other[1])) < 0.01:
+                return True
+    return False
+
+
 def test_no_extension_line_runs_near_another_text_or_under_a_dimension_line() -> None:
     sheet = _sheet()
     for owner, segment in sheet.extensions:
         for name, box in sheet.texts.items():
             distance = _segment_box(segment, box)
+            own = [s for o, s in sheet.extensions if o == name]
             if name == owner:
                 assert distance > 0.0, (owner, segment)
-            else:
+            elif not _overlays(segment, own):
                 assert distance >= _LINE_GAP, (owner, name, distance)
+            else:
+                assert distance > 0.0, (owner, name)
         for name, line in sheet.dim_lines + sheet.leaders:
             if name == owner or not _segments_meet(*segment, *line):
                 continue
@@ -754,17 +782,31 @@ def test_every_marked_dimension_prints_once_inside_the_border() -> None:
         assert box[2] < title_left - 2.0 or box[1] > title_top + 2.0, name
 
 
-def test_top_view_keeps_three_y_lanes_and_the_sections_carry_the_rest() -> None:
-    """r7 stacked seven Y lanes from Y0 left of the top view; the Y sizes of
-    the fence, the plate and the pocket walls print over the sections."""
+def test_top_view_keeps_four_y_lanes_and_the_sections_carry_the_rest() -> None:
+    """r7 stacked seven Y lanes from Y0 left of the top view; the pocket
+    walls print over A-A. The widths stay on the top view (r13/r14: B-B
+    never imported them), in four lanes, no extension line crossing a lane's
+    dimension line: each span inner to every span holding one of its
+    extension lines."""
     top = drawing.TOP_KEEP
     left = drawing.top_xy(spec.LEFT_END_X, 0.0)[0]
     front = drawing.top_xy(0.0, spec.FRONT_EDGE_Y)[1]
     back = drawing.top_xy(0.0, spec.BACK_EDGE_Y)[1]
-    lanes = [name for name, (x, y) in top.items() if x < left and y < back + 0.002]
-    assert sorted(lanes) == ["ClampTapY", "HubY", "NotchDepth"]
-    # Shortest span innermost: no extension line crosses a lane's line.
-    assert top["HubY"][0] > top["ClampTapY"][0] > top["NotchDepth"][0]
+    lanes = [name for name, (x, y) in top.items() if x < left and y < back]
+    assert sorted(lanes) == [
+        "ClampTapY",
+        "FenceWidth",
+        "HubY",
+        "NotchDepth",
+        "PlateWidth",
+    ]
+    assert (
+        top["NotchDepth"][0]
+        > top["FenceWidth"][0]
+        > top["HubY"][0]
+        > top["ClampTapY"][0]
+        > top["PlateWidth"][0]
+    )
     for name in ("NotchLeftEnd", "NotchRightStart", "PlateLength", "LeftEnd"):
         assert top[name][1] > back, name
     below = ("ClampTapX1", "ClampTapX2", "HubX", "ClampTapX3", "ClampTapX4")
