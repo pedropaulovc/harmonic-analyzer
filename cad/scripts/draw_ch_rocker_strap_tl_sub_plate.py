@@ -96,7 +96,15 @@ _S = SECTION_SCALE[0] / SECTION_SCALE[1] / 1000.0
 TOP_ORIGIN = (0.075 - spec.LEFT_END_X * _T, 0.204)
 # Each section prints model +Z up and +Y to the left: its arrows point +X,
 # so each letter stands right of its line. Its origin is the sheet point of
-# its plane's (Y0, Z0), the fence face's foot.
+# its plane's (Y0, Z0), the fence face's foot. Projected, a section off a
+# vertical cutting line keeps the line's +Y up; both print it left, turned
+# 90 deg counter-clockwise: upright at 2:1 the 3.00 width stands 152 mm,
+# taller than the room under the top view or beside it under the iso. Each
+# caption says so (drawing-guidelines: a rotated view says so; machinist
+# review r23) in its native custom scale text, draw_fr_harmonic_base's
+# SECTION_LABEL_SCALE_TEXT (a second free note beside the view read as the
+# section labelled twice).
+SECTION_LABEL_SCALE_TEXT = "ROTATED 90 DEG CCW  SCALE"
 SECTION_A_ORIGIN = (0.070, 0.085)
 SECTION_B_ORIGIN = (0.266, 0.1088)
 # The cutting lines (model X, Y), each from 12 mm behind the back edge to 12
@@ -118,9 +126,10 @@ SECTION_A_CAPTION_XY = (0.112, 0.058)
 SECTION_B_CAPTION_XY = (0.317, 0.084)
 ISO_CENTER = (0.365, 0.232)
 ISO_NOTE_XY = (0.335, 0.196)
-# Note 1, the pocket's seat, by its upper-left corner: right of A-A's
-# caption, under the view and left of the title block.
-POCKET_SEAT_NOTE_XY = (0.142, 0.054)
+# Note 1, the pocket's fit, by its upper-left corner: right of A-A's
+# caption, under the view and left of the title block, its bottom over the
+# caption's scale row (which the turn widens under it) by more than a row.
+POCKET_SEAT_NOTE_XY = (0.142, 0.0565)
 
 
 def top_xy(x_mm: float, y_mm: float) -> tuple[float, float]:
@@ -747,7 +756,10 @@ def _orient_section(
 ) -> None:
     """Turn ``section`` until model +Z runs up the sheet, then look the cut
     the way that prints model +Y to the left: looking along +X, so the arrows
-    point +X and each letter stands right of its cutting line."""
+    point +X and each letter stands right of its cutting line. The top view
+    prints +Y up (_check_top_view) and a projected section keeps its cutting
+    line's direction, so +Y left is the 90 deg counter-clockwise turn
+    SECTION_LABEL_SCALE_TEXT prints; any other reading fails here."""
     native = _early_bound(section, "IView")
     cut = _early_bound(native.GetSection(), "IDrSection")
     cut.SetDisplayOnlySurfaceCut(True)
@@ -755,7 +767,12 @@ def _orient_section(
         _east, north, up = _sheet_steps(
             adapter, native, anchor_mm, label=f"{label} axes"
         )
-        if up[1] > 0.0 and abs(up[0]) <= 1e-7 and north[0] < 0.0:
+        if (
+            up[1] > 0.0
+            and abs(up[0]) <= 1e-7
+            and north[0] < 0.0
+            and abs(north[1]) <= 1e-7
+        ):
             _telemetry.info(f"{label}: +Y left, +Z up after {attempt} step(s)")
             return
         if up[1] > 0.0 and abs(up[0]) <= 1e-7:
@@ -826,6 +843,69 @@ def _section(
         )
     position_section_caption(adapter, section, caption_xy, label=label)
     return section, annotations
+
+
+def _set_section_label_text(adapter: Any) -> None:
+    """Print SECTION_LABEL_SCALE_TEXT in each section caption's scale row
+    (draw_fr_harmonic_base): swDetailingSectionViewLabels_PerStandard (242)
+    off, _Scale (247) the custom text (3), _CustomScale (84) the text, each
+    read back before any section exists."""
+    extension = _early_bound(adapter.currentModel.Extension, "IModelDocExtension")
+    if not extension.SetUserPreferenceToggle(242, 0, False):
+        raise RuntimeError("failed to release the standard section-label defaults")
+    if not extension.SetUserPreferenceInteger(247, 0, 3):
+        raise RuntimeError("failed to select custom section-label scale text")
+    if not extension.SetUserPreferenceString(84, 0, SECTION_LABEL_SCALE_TEXT):
+        raise RuntimeError("failed to write the section-label scale text")
+    if (
+        extension.GetUserPreferenceToggle(242, 0)
+        or int(extension.GetUserPreferenceInteger(247, 0)) != 3
+        or str(extension.GetUserPreferenceString(84, 0)) != SECTION_LABEL_SCALE_TEXT
+    ):
+        raise RuntimeError("native section-label scale text did not persist")
+
+
+# Section B-B cuts the hub's 1/4-20 on its axis: SolidWorks printed its
+# cosmetic thread's major Ø dashed inside the hatching (machinist review
+# r23; rule 9: a section never carries hidden lines). It moves onto a
+# visible thin continuous layer, the section's own thread line
+# (draw_sm_knife_mount's and draw_mg_magnifying_clamp's section threads).
+SECTION_THREAD_LAYER = "TAP-THREAD-SECTION"
+_COSMETIC_THREAD_ANNOTATION = 1  # swAnnotationType_e.swCosmeticThread
+
+
+def _show_section_cosmetic_threads(adapter: Any, view: Any, *, label: str) -> int:
+    """Move ``view``'s cosmetic-thread annotations onto SECTION_THREAD_LAYER,
+    created visible thin continuous; the layer state and every annotation's
+    layer are read back, and a section with no thread to move fails."""
+    manager = _early_bound(adapter.currentModel.GetLayerManager(), "ILayerMgr")
+    layer = manager.GetLayer(SECTION_THREAD_LAYER)
+    if layer is None:
+        # COLORREF black, swLineCONTINUOUS (0), swLW_THIN (0).
+        if int(manager.AddLayer(SECTION_THREAD_LAYER, label, 0, 0, 0)) != 1:
+            raise RuntimeError(f"{label}: failed to add layer {SECTION_THREAD_LAYER}")
+        layer = manager.GetLayer(SECTION_THREAD_LAYER)
+    layer = _early_bound(layer, "ILayer")
+    layer.Visible = True
+    if not bool(layer.Visible) or int(layer.Style) != 0 or int(layer.Width) != 0:
+        raise RuntimeError(
+            f"{label}: layer {SECTION_THREAD_LAYER} is not visible thin continuous: "
+            f"visible={layer.Visible!r}, style={layer.Style!r}, width={layer.Width!r}"
+        )
+    shown = 0
+    for raw_annotation in _early_bound(view, "IView").GetAnnotations() or ():
+        annotation = _early_bound(raw_annotation, "IAnnotation")
+        if int(annotation.GetType()) != _COSMETIC_THREAD_ANNOTATION:
+            continue
+        annotation.Layer = SECTION_THREAD_LAYER
+        if str(annotation.Layer or "") != SECTION_THREAD_LAYER:
+            raise RuntimeError(f"{label}: a cosmetic thread refused its layer")
+        shown += 1
+    if not shown:
+        raise RuntimeError(f"{label} carries no cosmetic thread; the hub tap moved?")
+    rebuild_drawing(adapter, label=f"{label} cosmetic threads solid")
+    _telemetry.info(f"{label}: {shown} cosmetic thread(s) on {SECTION_THREAD_LAYER}")
+    return shown
 
 
 def _drill_rim(
@@ -987,6 +1067,7 @@ def build(adapter: Any) -> dict[str, str]:
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
+    _set_section_label_text(adapter)
     top = place_view(adapter, str(SOURCE), "*Front", *TOP_ORIGIN, scale=TOP_SCALE)
     _check_top_view(adapter, top)
     _place_point(adapter, top, (0.0, 0.0, 0.0), TOP_ORIGIN, label="top view")
@@ -1040,6 +1121,7 @@ def build(adapter: Any) -> dict[str, str]:
     _hub_hole_callout(adapter, top)
     for view in (top, section_a, section_b):
         set_hidden_lines_removed(adapter, view)
+    _show_section_cosmetic_threads(adapter, section_b, label="section B-B")
 
     drawing.ClearSelection2(True)
     _early_bound(drawing, "IDrawingDoc").EditSheet()

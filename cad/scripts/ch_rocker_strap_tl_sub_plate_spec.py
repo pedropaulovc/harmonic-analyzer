@@ -502,9 +502,12 @@ if (
 # serve the clamp's seat, so the clamp is named once, on one numbered note
 # both dimensions flag (rule 4: one feature with several tight dimensions
 # names its mate once; rule 7: SEE NOTE n links it; machinist review mr7:
-# named only on the depth, the 1.875's mate read as missing).
+# named only on the depth, the 1.875's mate read as missing). Rule 4 names
+# the fit: the back wall locates the clamp's heel and the floor its height,
+# so the clamp sits on a locating fit (machinist review r23: "SEAT" is no
+# standard fit name).
 POCKET_SEAT_NOTE_NUMBER = 1
-POCKET_SEAT_NOTE = f"{POCKET_SEAT_NOTE_NUMBER}. POCKETS SEAT {CLAMP_NUMBER}."
+POCKET_SEAT_NOTE = f"{POCKET_SEAT_NOTE_NUMBER}. LOCATING FIT ON {CLAMP_NUMBER}."
 POCKET_SEAT_FLAG = f"SEE NOTE {POCKET_SEAT_NOTE_NUMBER}"
 DIMENSION_CALLOUTS: dict[str, str] = {
     "PocketBackWallY": POCKET_SEAT_FLAG,

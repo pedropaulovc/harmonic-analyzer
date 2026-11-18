@@ -8,6 +8,7 @@ import math
 import re
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -307,8 +308,9 @@ def test_section_sizes_live_in_hidden_reference_sketches_on_each_cut() -> None:
 # mm under the line's end, 13.9..19.6 mm right of it (farm run
 # 20261118T020401122Z, r16: GetTextInfo's origins 13.9 and 14.6 mm right of
 # A's and B's ends, 5.0 mm over them); a hole callout's leader ending 1.1 mm
-# under its block, 1.5 mm out from the side facing its arrow; a caption
-# 45.6 mm wide and 15.6 mm tall under its point. The limits
+# under its block, 1.5 mm out from the side facing its arrow; a caption's
+# title row 45.6 mm wide and 6.5 mm tall under its point, its scale row
+# (r23: 11.1..14.7 mm under it) as wide as its text. The limits
 # (_layout_audit.GATING_KINDS, with the reported text-separation and
 # extension-near-text held too): 3.57 mm between texts, 2 mm from an
 # extension line or an arrow to another's text, no text on a line, no leader
@@ -324,7 +326,8 @@ _ARROW = 3.5
 _OWN_ARROW_GAP = 1.0
 _BESIDE_LINE = {1: 1.4, 2: 0.3}
 _LETTER = (13.9, 19.6, -1.35, 5.0)
-_CAPTION = (22.8, 15.6)
+_CAPTION_TITLE = (22.8, 6.5)
+_CAPTION_SCALE_ROW = (11.1, 15.6)
 _TEXT_GAP = 3.57
 _LINE_GAP = 2.0
 _DETOUR_LIMIT = 10.0
@@ -627,7 +630,19 @@ class _Sheet:
 
     def caption(self, name, point_m) -> None:
         x, y = _mm(point_m)
-        self.texts[name] = (x - _CAPTION[0], y - _CAPTION[1], x + _CAPTION[0], y)
+        self.texts[name] = (
+            x - _CAPTION_TITLE[0],
+            y - _CAPTION_TITLE[1],
+            x + _CAPTION_TITLE[0],
+            y,
+        )
+        half = _width(f"{drawing.SECTION_LABEL_SCALE_TEXT} 2 : 1") / 2.0
+        self.texts[f"{name} scale"] = (
+            x - half,
+            y - _CAPTION_SCALE_ROW[1],
+            x + half,
+            y - _CAPTION_SCALE_ROW[0],
+        )
 
 
 def _sheet() -> _Sheet:
@@ -961,6 +976,110 @@ def test_each_section_caption_stands_under_its_view() -> None:
         underside = view(0.0, spec.UNDERSIDE_Z)[1]
         assert underside - _TEXT_GAP > top > underside - 3.0 * _TEXT_GAP
         assert view(spec.BACK_EDGE_Y, 0.0)[0] < x < view(spec.FRONT_EDGE_Y, 0.0)[0]
+
+
+def test_each_section_caption_states_its_turn_from_projection() -> None:
+    """Machinist review r23: both sections lie turned 90 deg from where they
+    project and their captions did not say so. Projected, a section keeps
+    its cutting line's +Y up as the top view prints it; each prints +Y left,
+    the counter-clockwise quarter turn its native caption states."""
+    north = [b - a for a, b in zip(drawing.top_xy(0.0, 0.0), drawing.top_xy(0.0, 1.0))]
+    projected = math.atan2(north[1], north[0])
+    for view in (drawing.section_a_xy, drawing.section_b_xy):
+        step = [b - a for a, b in zip(view(0.0, 0.0), view(1.0, 0.0))]
+        turn = math.remainder(math.atan2(step[1], step[0]) - projected, 2.0 * math.pi)
+        assert math.degrees(turn) == pytest.approx(90.0)
+    assert drawing.SECTION_LABEL_SCALE_TEXT == "ROTATED 90 DEG CCW  SCALE"
+
+
+class _Extension:
+    def __init__(self) -> None:
+        self.values: dict[tuple[str, int], object] = {}
+
+    def SetUserPreferenceToggle(self, key, _option, value):
+        self.values["toggle", key] = value
+        return True
+
+    def GetUserPreferenceToggle(self, key, _option):
+        return self.values["toggle", key]
+
+    def SetUserPreferenceInteger(self, key, _option, value):
+        self.values["integer", key] = value
+        return True
+
+    def GetUserPreferenceInteger(self, key, _option):
+        return self.values["integer", key]
+
+    def SetUserPreferenceString(self, key, _option, value):
+        self.values["string", key] = value
+        return True
+
+    def GetUserPreferenceString(self, key, _option):
+        return self.values["string", key]
+
+
+def test_section_captions_take_the_custom_scale_text() -> None:
+    extension = _Extension()
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(Extension=extension))
+    drawing._set_section_label_text(adapter)
+    assert extension.values == {
+        ("toggle", 242): False,
+        ("integer", 247): 3,
+        ("string", 84): drawing.SECTION_LABEL_SCALE_TEXT,
+    }
+    source = inspect.getsource(drawing.build)
+    assert source.index("_set_section_label_text(adapter)") < source.index("_section(")
+
+
+class _Layer:
+    Visible = False
+    Style = 0
+    Width = 0
+
+
+class _LayerManager:
+    def __init__(self) -> None:
+        self.layers: dict[str, _Layer] = {}
+
+    def GetLayer(self, name):
+        return self.layers.get(name)
+
+    def AddLayer(self, name, _description, _colour, style, width):
+        self.layers[name] = _Layer()
+        self.layers[name].Style, self.layers[name].Width = style, width
+        return 1
+
+
+class _Annotation:
+    def __init__(self, kind: int) -> None:
+        self.kind, self.Layer = kind, ""
+
+    def GetType(self):
+        return self.kind
+
+
+def test_section_b_prints_the_hub_thread_solid(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Machinist review r23: the hub's 1/4-20 printed dashed inside B-B's
+    hatching (rule 9). Its cosmetic thread moves onto a visible thin
+    continuous layer; other annotations stay put, and a section with no
+    thread fails."""
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_k: None)
+    manager = _LayerManager()
+    adapter = SimpleNamespace(
+        currentModel=SimpleNamespace(GetLayerManager=lambda: manager)
+    )
+    thread, note = _Annotation(1), _Annotation(6)
+    view = SimpleNamespace(GetAnnotations=lambda: (thread, note))
+    assert drawing._show_section_cosmetic_threads(adapter, view, label="B-B") == 1
+    layer = manager.layers[drawing.SECTION_THREAD_LAYER]
+    assert layer.Visible and (layer.Style, layer.Width) == (0, 0)
+    assert (thread.Layer, note.Layer) == (drawing.SECTION_THREAD_LAYER, "")
+    bare = SimpleNamespace(GetAnnotations=lambda: (note,))
+    with pytest.raises(RuntimeError, match="no cosmetic thread"):
+        drawing._show_section_cosmetic_threads(adapter, bare, label="B-B")
+    source = inspect.getsource(drawing.build)
+    call = '_show_section_cosmetic_threads(adapter, section_b, label="section B-B")'
+    assert call in source
 
 
 def test_counterbore_and_radii_print_their_symbols_on_model_dimensions() -> None:
