@@ -93,17 +93,20 @@ PLATE, PLUG, WASHER, CLAMP, SCREW = BOM_COMPONENTS
 # --- Sheet 1 (sheet metres) -----------------------------------------------------
 # The plan view's model origin (X0 end-stop face, Y0 fence face) top left,
 # the plate running 317.5 mm right of it (159 mm at 1:2) and 63.5 mm toward
-# the viewer's bottom (32 mm); the isometric under it; the screw schedule
-# under the isometric, left of the title block (x < 0.216 m); the parts list
-# and the fitting steps in the right half, above the title block (y > 0.066).
-PLAN_ORIGIN = (0.035, 0.232)
-ISO_CENTER = (0.105, 0.140)
+# the viewer's bottom (32 mm), far enough right that the balloon ring's left
+# end stays inside the border; the isometric under it; the fitting steps
+# top right, right of the plan view's outline (x 0.228); the parts list
+# (220 mm wide, so it starts no further right than 0.198) under the steps,
+# above the title block (y > 0.066). Every view is at 1:2, so the title
+# block's SCALE carries it and no view note does. The screw schedule is on
+# sheet 2, under the exploded view, left of the title block (x < 0.216 m).
+PLAN_ORIGIN = (0.064, 0.232)
+ISO_CENTER = (0.105, 0.135)
 ISO_POINT_MM = (spec.plate.HUB_X, spec.plate.HUB_Y, 0.0)
-ISO_NOTE_XY = (0.020, 0.105)
-ISO_NOTE = f"ISOMETRIC VIEW SCALE {ISO_SCALE[0]:g}:{ISO_SCALE[1]:g}"
-BOM_ANCHOR = (0.219, 0.262)
-STEPS_XY = (0.219, 0.222)
-TABLE_XY = (0.017, 0.094)  # the schedule title's top left; the table under it
+STEPS_XY = (0.240, 0.264)
+BOM_ANCHOR = (0.198, 0.144)
+BOM_HEIGHT = 0.0665  # r6's native parts list: 195.7..262.0 mm
+TABLE_XY = (0.017, 0.080)  # the schedule title's top left; the table under it
 TABLE_CHAR_WIDTH = 0.0028
 TABLE_CELL_PAD = 0.003
 TABLE_ROW_HEIGHT = 0.0055
@@ -112,6 +115,7 @@ SHEET_CLEARANCE = 0.003  # visible air at the border and the title block
 SHEET_INNER_LEFT = 0.0127
 SHEET_INNER_BOTTOM = 0.0127
 TITLE_BLOCK_LEFT = 0.216
+TITLE_BLOCK_TOP = 0.066
 BALLOON_MARGIN = 0.012
 CHAR_WIDTH = 0.00255  # default-format note text, per character
 LINE_PITCH = 0.0046
@@ -144,8 +148,13 @@ if _planned[2] > TITLE_BLOCK_LEFT - SHEET_CLEARANCE:
 if _planned[1] < SHEET_INNER_BOTTOM + SHEET_CLEARANCE:
     raise AssertionError("the screw schedule runs past the bottom border")
 _steps_bottom = STEPS_XY[1] - len(spec.ASSEMBLY_STEPS.splitlines()) * LINE_PITCH
-if _steps_bottom < 0.066 + SHEET_CLEARANCE:
-    raise AssertionError("the fitting steps run into the title block")
+if _steps_bottom < BOM_ANCHOR[1] + 2.0 * SHEET_CLEARANCE:
+    raise AssertionError("the fitting steps run into the parts list")
+if BOM_ANCHOR[1] - BOM_HEIGHT < TITLE_BLOCK_TOP + SHEET_CLEARANCE:
+    raise AssertionError("the parts list runs into the title block")
+_plan_right = PLAN_ORIGIN[0] + spec.plate.RIGHT_END_X * _S1
+if STEPS_XY[0] < _plan_right + 0.010:
+    raise AssertionError("the fitting steps crowd the plan view")
 
 # --- The strap blank in phantom (spec.BLANK_*) ----------------------------------
 # Drawn in the plan view's own sketch as the arbor kit draws its blank (thin
@@ -172,8 +181,10 @@ BLANK_TIP_MM: Point3 = (
     -spec.BLANK_WIDTH,
     _BZ,
 )
-# The label under the plate, left of its tip, clear of the clamp balloons.
-BLANK_LABEL_OFFSET = (-0.030, -0.030)
+# The label straight under its tip, below the plate, its leader leaving the
+# label's left end upward: clear of its own text and of the plate's balloon
+# (down right of the hub).
+BLANK_LABEL_OFFSET = (0.0, -0.045)
 
 # Balloon anchors, each part's own mm on an edge the plan view shows. The
 # ring (_drawing_balloons._spread_balloons) puts each balloon at its
@@ -238,23 +249,29 @@ BALLOON_ANCHORS: dict[str, BalloonAnchor] = {
 # One front view (SolidWorks *Bottom: looking along +Y, model X right, Z
 # up) per item family at 1:1, each isolated to its family, placed where its
 # explode offset lands in item 1's view. Every loose item goes straight up
-# along its own axis, EXPLODE_GAP clear of what it goes on: item 2 out of
-# the counterbore, the blank's place (the strap traveler lays it), item 3
-# and item 5 above it, in fitting order; the four item 4 up out of their
-# pockets, each screw's tip clear of the plate top. Assembly mm.
+# along its own axis, in bands: the four item 4 up out of their pockets,
+# each screw's tip over the fence; then, over the clamps, item 2 out of the
+# counterbore, item 3 and item 5 above it, in fitting order. A view's
+# outline stands VIEW_PAD_MM (r3's native measure) beyond its ink, and the
+# layout audit counts any ink inside a view's outline as that view's, so
+# each band starts VIEW_PAD_MM + BAND_AIR_MM above the last one's ink.
+# Assembly mm.
 EXPLODED_ORIGIN = (0.050, 0.112)  # item 1's X0, Z0, sheet m
-EXPLODE_GAP = 6.0
-_PLUG_DZ = -spec.plate.COUNTERBORE_FLOOR_Z + EXPLODE_GAP
-_PLUG_TOP_Z = spec.PLUG_POSITION[2] + _PLUG_DZ + spec.plug.OVERALL_LENGTH
-_WASHER_DZ = _PLUG_TOP_Z + EXPLODE_GAP - spec.WASHER_POSITION[2]
-_WASHER_TOP_Z = spec.WASHER_POSITION[2] + _WASHER_DZ + spec.washer.THICKNESS
-_SCREW_DZ = _WASHER_TOP_Z + EXPLODE_GAP + spec.HUB_SCREW_LENGTH - spec.SCREW_POSITION[2]
+VIEW_PAD_MM = 5.6
+BAND_AIR_MM = 3.0
+EXPLODE_GAP = VIEW_PAD_MM + BAND_AIR_MM
 _CLAMP_DZ = (
     spec.plate.FENCE_HEIGHT
     + EXPLODE_GAP
     + spec.clamp.SCREW_TIP_DEPTH
     - spec.plate.POCKET_FLOOR_Z
 )
+_CLAMP_TOP_Z = spec.CLAMP_POSITIONS[0][2] + _CLAMP_DZ + spec.clamp.TOP_Z
+_PLUG_DZ = _CLAMP_TOP_Z + EXPLODE_GAP - spec.PLUG_POSITION[2]
+_PLUG_TOP_Z = spec.PLUG_POSITION[2] + _PLUG_DZ + spec.plug.OVERALL_LENGTH
+_WASHER_DZ = _PLUG_TOP_Z + EXPLODE_GAP - spec.WASHER_POSITION[2]
+_WASHER_TOP_Z = spec.WASHER_POSITION[2] + _WASHER_DZ + spec.washer.THICKNESS
+_SCREW_DZ = _WASHER_TOP_Z + EXPLODE_GAP + spec.HUB_SCREW_LENGTH - spec.SCREW_POSITION[2]
 EXPLODE_OFFSETS_MM: dict[str, Point3] = {
     PLATE: (0.0, 0.0, 0.0),
     PLUG: (0.0, 0.0, _PLUG_DZ),
@@ -303,18 +320,18 @@ LABEL_TIPS_MM: dict[str, Point3] = {
 }
 # Each label's upper-left corner from its tip, sheet m: wholly to one side
 # of its tip, so its leader leaves the text's end, clear of the letters.
+# Item 4 above the clamps, left of the hub stack; items 2 and 3 left of the
+# stack, item 2's balloon on its right; item 5 right of its head.
 LABEL_OFFSETS: dict[str, tuple[float, float]] = {
     PLATE: (0.010, -0.010),
-    PLUG: (-0.075, 0.030),
-    # Right of the hub, between clamp 3 and the screw's label, clear of the
-    # clamp label's row (r5 merged the two at -0.040, 0.040).
-    WASHER: (0.020, 0.012),
+    PLUG: (-0.050, 0.002),
+    WASHER: (-0.040, 0.006),
     CLAMP: (-0.010, 0.050),
     SCREW: (0.012, 0.015),
 }
 EXPLODED_CAPTION = "\n".join(
     (
-        "EXPLODED FRONT VIEW SCALE 1:1",
+        "EXPLODED FRONT VIEW",
         "FITTING STEPS ON SHEET 1; THE STRAP TRAVELER LAYS EACH BLANK",
     )
 )
@@ -341,7 +358,7 @@ def _place_screw_table(adapter: Any) -> None:
     every cell read back; its read-back box must clear the border and the
     title block (draw_dt_cone_gear_tl_arbor_assembly._place_setup_table)."""
     label = "strap-fixture screw schedule"
-    _activate_sheet(adapter, SHEET_NAMES[0])
+    _activate_sheet(adapter, SHEET_NAMES[1])
     _add_note(adapter, spec.SCREW_TABLE_TITLE, TABLE_XY, label=f"{label} title")
     header, rows = spec.SCREW_TABLE_HEADER, SCREW_TABLE_ROWS
     x, _y0, _x1, top = screw_table_box()
@@ -603,12 +620,7 @@ def _place_sheet(adapter: Any) -> tuple[Callable[[], None], list[BalloonLanding]
             f"strap-fixture plan view carries {len(landings)} balloons, "
             f"expected {len(PLAN_ITEMS)}"
         )
-    _place_screw_table(adapter)
-    for text, xy, note_label in (
-        (ISO_NOTE, ISO_NOTE_XY, "isometric scale note"),
-        (spec.ASSEMBLY_STEPS, STEPS_XY, "fitting steps"),
-    ):
-        _add_note(adapter, text, xy, label=note_label)
+    _add_note(adapter, spec.ASSEMBLY_STEPS, STEPS_XY, label="fitting steps")
     blank_settled = _draw_blank(adapter, plan)
 
     def settled() -> None:
@@ -694,6 +706,7 @@ def _place_exploded_sheet(
         )
     _activate_sheet(adapter, SHEET_NAMES[1])
     _add_note(adapter, EXPLODED_CAPTION, CAPTION_XY, label="exploded view caption")
+    _place_screw_table(adapter)
 
     def settled() -> None:
         for stem, view in views.items():
