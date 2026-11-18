@@ -23,8 +23,11 @@
 kind = "dial_test_indicator"
 
 # Grade only; its range and resolution are cad/process/shop.toml gauges.pin-gauges.
+# Not owned (owner, Pedro, 2026-11-17, answering what is physically in the
+# shop: the pin-gauge set was not ticked): a candidate to buy.
 [gauges.pin-gauges]
 note = "illustrative example item: class ZZ minus pin gauges (three boxes)"
+present = false
 
 # Owned by the shop (Pedro, 2026-11-08): a Mitutoyo shop-grade 81-piece inch gauge
 # block set, for setting DRO stations and indicator zeros against a wrung stack.
@@ -420,6 +423,21 @@ flutes = [2, 4]
 [tools.taps-unc-hand.members.8-32-plug]
 flute_len_in = { value = 0.75, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers, cutting length from point to flute or countersink boundary" } }
 
+# Owner (Pedro) 2026-11-17, verbatim: "it was a mt3 dead center that had a
+# straight part at the end i gripped with a 3/4 collet". Used in the PM-30MV
+# as a tap guide, held by its straight end in the 3/4 in collet of
+# holders.r8-collets-south-bend-sb1280. Its stickout (tip to collet face) is
+# not measured: the 7.5 in first relayed was a guess (owner, 2026-11-17: "7.5
+# is a guess dead center had plenty of space with wrench"), so no length is
+# recorded; the tool setter measures it at M6. Its prechips description is
+# cad/process/shop.toml, same key.
+[tools.mill-dead-centre-mt3]
+name = "MT3 dead centre with a straight end, held in the 3/4 in R8 collet"
+kind = "dead_centre"
+present = true
+use = "Tap guide in the PM-30MV spindle"
+cite = ["Owner (Pedro) 2026-11-17: \"it was a mt3 dead center that had a straight part at the end i gripped with a 3/4 collet\"; stickout unmeasured (\"7.5 is a guess dead center had plenty of space with wrench\")"]
+
 # Owner ruling 2026-11-16 (Pedro), #2837: "Require a spring tap guide in the
 # spindle (tap squared to the quill), and add a squareness term to the
 # stack." The base bar's eight rail taps are cut in it; squareness_deg is the
@@ -427,6 +445,9 @@ flute_len_in = { value = 0.75, measured = { status = "measured", by = "placehold
 [tools.spring-tap-guide]
 name = "Spring-loaded tap guide held in the mill spindle, tap squared to the quill"
 kind = "tap_guide"
+# Not owned (owner, Pedro, 2026-11-17, answering what is physically in the
+# shop: not ticked): a candidate to buy; the ruling's 0.05° is its target.
+present = false
 squareness_deg = 0.05
 cite = [
   "Owner ruling 2026-11-16 (Pedro), relayed by Main: spring tap guide in the spindle required; tilt 0.05° (owner value).",
@@ -786,6 +807,11 @@ use = "Op 30 and A4: under the overhanging end"
 
 # --- stock ------------------------------------------------------------------
 
+# on_hand: owner (Pedro) 2026-11-17, "assume all stock bought is on hand
+# except for platen c360 brass bar": every row below with an order is on
+# hand; rows still to order stay as they were. The platen's C360 brass bar
+# (Metal Supermarkets invoice EC234347, below) is not on hand.
+
 # Rocker route v3 stock purchase: catalogue nominals, not receipt measurements.
 [[stock]]
 form = "flat_bar"
@@ -794,7 +820,7 @@ note = "Ordered 2026-11-03 (OnlineMetals order 1021751700): 1/8 x 1-1/2 in 1018 
 # OnlineMetals 4807 catalogue nominal .125 x 1.5 in = [38.1, 3.175] mm and 72 x 25.4 = 1828.8 mm; not metrology.
 section_mm = [38.1, 3.175]
 length_mm = 1828.8
-on_hand = false
+on_hand = true
 cite = ["OnlineMetals part 4807 https://www.onlinemetals.com/en/buy/x/pid/4807 ordered 2026-11-03"]
 
 # Oblique-trammel stock: owner-reported purchase (2026-10-23), not metrology.
@@ -819,7 +845,7 @@ note = "Black acetal (Delrin) bar, 1/4 x 1-3/4 in, oversized tolerance, 2 ft (Mc
 # Catalogue nominals 1/4 x 1-3/4 in x 24 in = [44.45, 6.35] x 609.6 mm; oversized tolerance. Not metrology.
 section_mm = [44.45, 6.35]
 length_mm = 609.6
-on_hand = false
+on_hand = true
 cite = ["McMaster-Carr 8663K55 https://www.mcmaster.com/8663K55/ ordered 2026-11-03", "Original requirement: harmonic-analyzer issue 1619 https://github.com/pedropaulovc/harmonic-analyzer/issues/1619"]
 
 [[stock]]
@@ -829,8 +855,41 @@ note = "Ordered 2026-11-03: 1 x 3 in 6061-T6511 flat, 12 in (standard length). A
 # Catalogue nominals 1 x 3 in x 12 in = [76.2, 25.4] x 304.8 mm. Not metrology.
 section_mm = [76.2, 25.4]
 length_mm = 304.8
-on_hand = false
+on_hand = true
 cite = ["OnlineMetals part 1187 https://www.onlinemetals.com/en/buy/x/pid/1187 ordered 2026-11-03"]
+
+# Metal Supermarkets Kent invoice EC234347, ordered 2026-11-03, pick-up (PDF
+# in the owner's Downloads). Job comment on the invoice: "C360 0.250x6.000 x
+# 11in: pd-platen (MHA-PD-02) + pd-platen-rack backer (MHA-PD-05). DOM
+# 1.000x0.120 5 x 41in: fr-tube-frame (MHA-FR-03)". Invoice nominals, not
+# metrology.
+[[stock]]
+form = "flat_bar"
+material = "C360 brass"
+note = "Bought (Metal Supermarkets invoice EC234347): brass flat bar C360 0.250 x 6.000 in, 1 piece x 11.000 in, $168.60. Allocation as invoiced: pd-platen (MHA-PD-02) and the pd-platen-rack backer (MHA-PD-05, since retired). Not on hand (owner, 2026-11-17)."
+section_mm = [152.4, 6.35]
+length_mm = 279.4
+on_hand = false
+cite = ["Metal Supermarkets Kent invoice EC234347, date ordered 03 Nov 2026, line Brass Flat Bar C360 0.250 X 6.000, qty 1 @ 11.000 in"]
+
+[[stock]]
+form = "round_tube"
+material = "1020 DOM mild steel tube"
+note = "Bought (Metal Supermarkets invoice EC234347): mild steel round tube 1020 (DOM) 1.000 x 0.120 in, 5 pieces x 41.000 in, $187.70. Allocation as invoiced: fr-tube-frame (MHA-FR-03)."
+od_mm = 25.4
+wall_mm = 3.048
+length_mm = 1041.4
+on_hand = true
+cite = ["Metal Supermarkets Kent invoice EC234347, date ordered 03 Nov 2026, line Mild Steel Round Tube 1020 (DOM) 1.000 X 0.120, qty 5 @ 41.000 in"]
+
+[[stock]]
+form = "round_bar"
+material = "4140 cold-drawn alloy steel, heat treated"
+note = "Bought (Metal Supermarkets invoice EC234347): alloy steel round bar 4140 CD heat treated 0.500 in, 1 piece x 4.000 in, $20.27. The invoice's job comment names no part for it."
+dia_in = [0.5]
+length_in = [4.0]
+on_hand = true
+cite = ["Metal Supermarkets Kent invoice EC234347, date ordered 03 Nov 2026, line Alloy Steel Round Bar 4140 CD Heat Treated 0.500, qty 1 @ 4.000 in"]
 
 # Not ordered: stock still to buy.
 
@@ -929,7 +988,7 @@ name = "MHA-PD-06 disc cutting arbor with two Ø3.00 backing discs, shop-made"
 kind = "gear_blank_arbor"
 present = false
 shop_made = true
-purchase = "Make from 1018 CF or 12L14 round (arbor) and 1/4 in 6061 plate (two discs). Arbor: Ø.75 body held in the BS-0 chuck, a square shoulder, then a Ø.501 journal .60 long turned in one setup with the shoulder and slid into a trial ream of the owned .501 reamer (a slide fit with no shake), then 1/2-20 UNF thread .50 long and a 60° centre in the end for the tailstock. Backing discs: Ø3.00 x .25, bored with the .501 reamer, both faces faced in one setup per disc. One 1/2-20 hex nut and flat washer clamp the stack."
+purchase = "Make from 1018 CF or 12L14 round (arbor) and 1/4 in 6061 plate (two discs). Arbor: Ø.75 body held in the BS-0 chuck, a square shoulder, then a Ø.501 journal .60 long turned in one setup with the shoulder and slid into a trial ream of a .501 reamer (a slide fit with no shake), then 1/2-20 UNF thread .50 long and a 60° centre in the end for the tailstock. Backing discs: Ø3.00 x .25, bored with the .501 reamer, both faces faced in one setup per disc. One 1/2-20 hex nut and flat washer clamp the stack. The .501 reamer is not owned (owner inventory 2026-11-17: the shop's only reamers are tools.reamers-adjustable-lms-5948, .250-.375 in, and tools.reamer-0376); to buy, #3073."
 note = "Workholding for cutting the MHA-PD-06 teeth (pd-rack-pinion.yaml process; machining-dfm.md, Paper drive): backing disc, disc blank, backing disc and nut on the journal, the arbor in the BS-0 chuck with the tailstock centre in its end. Indicate the backing disc rim within .001 TIR before cutting. The Ø3.00 discs stop .036 under the disc's least root Ø3.0719 (radius), so the #1 cutter reaches whole depth without touching them; they back the .118 web to within .036 of the tooth spaces on both faces."
 pieces = 3
 backing_disc_dia_in = 3.00
@@ -980,7 +1039,7 @@ use = "MHA-CH-06-TL-21 carrier and TL-20 base bar table setups"
 name = ".3760 in over reamer (3/8 in, REAM_SLIDE)"
 kind = "reamer"
 present = true
-use = "MHA-CH-06-TL-21 carrier A1, B1, A2, B2 .3760-.3770 REAM THRU (owner ruling 2026-11-13: checked .376 GO / .377 NO-GO with the owned pin-gauge set)"
+use = "MHA-CH-06-TL-21 carrier A1, B1, A2, B2 .3760-.3770 REAM THRU (owner ruling 2026-11-13: checked .376 GO / .377 NO-GO with pin gauges; the pin-gauge set is not owned, owner inventory 2026-11-17, gauges.pin-gauges)"
 
 # Plug taps the carrier plan names besides the 8-32 (tools.taps-unc-hand).
 [tools.jig-tap-4-40-plug]
@@ -1512,3 +1571,120 @@ dynamic_shear_kpa = 690
 purchase = "One roll, 1-1/2 in wide or two 3/4 in strips side by side: 12 in per strap, 20 ft for the lot of 20. No price or stock read."
 use = "MHA-CH-13 Setup 5: bonds the faced blank to the sub-plate under its whole face while the outline is cut"
 cite = ["3M VHB Tapes Technical Data, November 2015, Typical Performance Characteristics, 5906: thickness .006 in (0.15 mm); 90 degree peel 9 lb/in (16 N/cm); normal tensile (ASTM D-897, to aluminium, 72 h dwell) 100 lb/in2 (690 kPa); dynamic overlap shear (ASTM D-1002, to stainless steel, 72 h dwell) 100 lb/in2 (690 kPa); Application Techniques: clean with 50:50 isopropyl alcohol and water, about 15 psi application pressure, about 50% of ultimate bond strength after 20 minutes, 90% after 24 hours, 100% after 72 hours. Read 2026-11-17 from a distributor's copy (3M's own link refused the fetch): https://www.tspinc.com/pdf/3M-VHB-Tapes-Technical-Data.pdf"]
+
+# --- Owner inventory 2026-11-17: Zoro order, shop photos, reamers ----------
+
+# Owner (Pedro) 2026-11-17, answering what is physically in the shop:
+# "everything in the zoro order that should be recorded". Zoro order
+# WB7365521946, placed and paid by Pedro 2026-11-06. No order confirmation or
+# invoice document was found on the workstation; the lines are the order as
+# recorded in this repository when it was placed (commit a6e95cece9, PR
+# #2222, "shop: record purchased Zoro taps and dies and owned kit", dropped
+# from the inventory at the shop-file split 02fdd651e0). HSS hand taps,
+# straight flute, square drive, as ordered; flutes, coating and dimensions
+# not verified on receipt. Member keys are the Zoro item numbers.
+[tools.taps-zoro-wb7365521946]
+name = "Hand taps, Zoro order WB7365521946 (OSG and Regal)"
+kind = "tap_set"
+present = true
+purchase = "Zoro order WB7365521946, 2026-11-06, merchandise subtotal USD 417.33 (taps, dies and die stock)"
+cite = ["Owner (Pedro) 2026-11-17: \"everything in the zoro order that should be recorded\"", "Zoro order WB7365521946 as recorded at commit a6e95cece9 (PR #2222)"]
+
+[tools.taps-zoro-wb7365521946.members]
+G9665914 = { thread = "#0-80 UNF", style = "plug", make = "OSG", mfr_no = "1000100", qty = 2 }
+G9665652 = { thread = "#1-72 UNF", style = "plug", make = "OSG", mfr_no = "1010700", qty = 2 }
+G9665616 = { thread = "#2-56 UNC", style = "plug", make = "OSG", mfr_no = "1011008", qty = 2 }
+G9665591 = { thread = "#2-56 UNC", style = "bottoming", make = "OSG", mfr_no = "1011108", qty = 2 }
+G9173875 = { thread = "#4-40 UNC", style = "plug", make = "OSG", mfr_no = "1012200", qty = 5 }
+G7511786 = { thread = "#6-32 UNC", style = "plug", make = "OSG", mfr_no = "1023700", qty = 3 }
+G7562843 = { thread = "#8-32 UNC", style = "plug", make = "OSG", mfr_no = "1024300", qty = 4 }
+G7530616 = { thread = "#8-32 UNC", style = "bottoming", make = "OSG", mfr_no = "1024400", qty = 1 }
+G7514683 = { thread = "#10-24 UNC", style = "plug", make = "OSG", mfr_no = "1024901", qty = 1 }
+G7555536 = { thread = "#10-24 UNC", style = "bottoming", make = "OSG", mfr_no = "1025000", qty = 1 }
+G7618432 = { thread = "#10-32 UNF", style = "plug", make = "OSG", mfr_no = "1025200", qty = 1 }
+G2771119 = { thread = "#10-32 UNF", style = "bottoming", make = "OSG", mfr_no = "1025308", qty = 1 }
+G8337420 = { thread = "#10-32 UNF", style = "bottoming pulley tap, 6 in OAL, 4 flutes", make = "Regal Cutting Tools", mfr_no = "015326AS", qty = 2 }
+# The 1/4-20 tap the owner lists as owned (2026-11-17, type not stated).
+G7437939 = { thread = "1/4-20 UNC", style = "plug", make = "Regal", mfr_no = "008320AS", qty = 2 }
+G1960990 = { thread = "1/4-28 UNF", style = "plug", make = "OSG", mfr_no = "1120408", qty = 1 }
+G7559736 = { thread = "1/4-28 UNF", style = "bottoming", make = "OSG", mfr_no = "1120500", qty = 1 }
+G2669703 = { thread = "5/16-18 UNC", style = "plug", make = "OSG", mfr_no = "1120700", qty = 1 }
+
+[tools.dies-zoro-wb7365521946]
+name = "Round adjustable split dies, HSS, 13/16 in OD, Zoro order WB7365521946 (Drill America)"
+kind = "die_set"
+present = true
+cite = ["Owner (Pedro) 2026-11-17: \"everything in the zoro order that should be recorded\"", "Zoro order WB7365521946 as recorded at commit a6e95cece9 (PR #2222)"]
+
+[tools.dies-zoro-wb7365521946.members]
+G1809327 = { thread = "#0-80 UNF", make = "Drill America", mfr_no = "DWTH1316-080", qty = 1 }
+G1817508 = { thread = "#4-40 UNC", make = "Drill America", mfr_no = "DWTH1316-440", qty = 1 }
+
+[holders.die-stock-13-16]
+name = "Die stock for 13/16 in round dies (Drillco 3000DS1)"
+kind = "die_stock"
+make = "Drillco"
+sku = "G910373383"
+present = true
+cite = ["Owner (Pedro) 2026-11-17: \"everything in the zoro order that should be recorded\"", "Zoro order WB7365521946 as recorded at commit a6e95cece9 (PR #2222): Drillco 3000DS1, quantity 1"]
+
+# Photo 20250628_224315797_iOS.heic (owner's camera roll, 2025-06-28): an
+# open steel case, lid label "40 PIECE TAP AND DIE SET", contents as the label
+# lists them; make not shown; some dies stamped JAPAN. Owner ruling
+# 2026-11-06 (PR #2222): its taps and dies are not trusted for project work;
+# its wrenches and die handle are used.
+[tools.tap-die-set-40]
+name = "40-piece tap and die set (make not shown)"
+kind = "tap_die_set"
+present = true
+sizes = ["4-36", "6-32", "8-32", "10-32", "10-24", "12-24", "1/4-20", "1/4-28", "5/16-18", "3/8-16", "7/16-20", "7/16-14", "5/16-24", "3/8-24", "1/2-20", "1/2-13"]
+included = ["one tap and one die in each size", "1/8 pipe tap", "long-handle adjustable tap wrench", "T-handle tap wrench", "die handle", "screwdriver", "screw pitch gauge"]
+note = "Taps and dies not trusted for project work (owner ruling 2026-11-06, PR #2222); the wrenches and die handle are used."
+cite = ["Photo 20250628_224315797_iOS.heic, 2025-06-28: lid label \"40 PIECE TAP AND DIE SET / CONTAINING ONE TAP AND DIE IN EACH OF THE FOLLOWING SIZES\" and the PLUS list", "Owner (Pedro) 2026-11-17: the photo shows owned tools"]
+
+# Photo 20250628_224109095_iOS.heic (2025-06-28): a metric tap and drill set
+# in a black steel case, card "TAP SIZE / TAP DRILL ... METRIC I.S.O. 529
+# 1975", make not shown, beside a small T-handle tap wrench.
+[tools.metric-tap-drill-set]
+name = "Metric tap and tap-drill set, M8, M10, M12 (make not shown)"
+kind = "tap_set"
+present = true
+pieces = 6
+cite = ["Photo 20250628_224109095_iOS.heic, 2025-06-28: case card \"TAP SIZE M 8.0 x 1.25, M10.0 x 1.50, M12.0 x 1.75 / TAP DRILL 6.70mm, 8.50mm, 10.20mm / METRIC I.S.O. 529 1975\"", "Owner (Pedro) 2026-11-17: the photo shows owned tools"]
+
+[tools.metric-tap-drill-set.members]
+M8 = { tap = "M8 x 1.25", tap_drill_mm = 6.70 }
+M10 = { tap = "M10 x 1.50", tap_drill_mm = 8.50 }
+M12 = { tap = "M12 x 1.75", tap_drill_mm = 10.20 }
+
+[holders.tap-wrench-t-small]
+name = "Small T-handle tap wrench (size range not legible)"
+kind = "tap_wrench"
+present = true
+cite = ["Photo 20250628_224109095_iOS.heic, 2025-06-28, beside the metric tap set", "Owner (Pedro) 2026-11-17: the photo shows owned tools"]
+
+# Photo 20250628_223528049_iOS.heic (2025-06-28): a yellow-bin organiser of
+# loose hand taps and twist drills. Legible markings: "BESLY USA" and
+# "X-PRESS" on several taps, and the thread on two, "5/8-18 NF" and
+# "5/8-24 NS". The other taps and the drills show no legible size, so none
+# is recorded.
+[tools.taps-loose-organiser]
+name = "Organiser of assorted loose hand taps (Besly X-Press among them) and twist drills"
+kind = "tap_assortment"
+present = true
+legible = ["5/8-18 NF tap", "5/8-24 NS tap", "Besly USA X-Press taps (sizes not legible)"]
+cite = ["Photo 20250628_223528049_iOS.heic, 2025-06-28", "Owner (Pedro) 2026-11-17: the photo shows owned tools"]
+
+# Owner (Pedro) 2026-11-17: this set and tools.reamer-0376 are the shop's only
+# reamers. Per-reamer ranges are not on the listing; the set covers
+# .250-.375 in overall.
+[tools.reamers-adjustable-lms-5948]
+name = "LittleMachineShop 5948 adjustable reamer set, 4 pieces, #8 to #5, HSS black oxide, wooden box"
+kind = "adjustable_reamer_set"
+make = "LittleMachineShop"
+sku = "5948"
+source = "https://littlemachineshop.com/products/reamer-set-adjustable-4-piece-8-5"
+present = true
+pieces = 4
+range_in = [0.25, 0.375]
+cite = ["LittleMachineShop listing read 2026-11-17: SKU 5948, \"Reamers in this set are adjustable from 0.250\" to 0.375\"\", \"4 Piece Set Sizes #8 - #5\", HSS, black oxide, wooden storage box, $69.95", "Owner (Pedro) 2026-11-17: owned; with the .3760 reamer, the only reamers"]

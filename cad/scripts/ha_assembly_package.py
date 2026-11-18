@@ -255,7 +255,13 @@ TOOLS: tuple[Tool, ...] = (
         r"GAUGE BLOCKS?|\bBLOCKS ON THAT STOP",
         ("shop-equipment.toml:gauges.gauge-blocks-mitutoyo",),
     ),
-    Tool("Pin gauges", r"GAUGE PINS?|PIN GAUGES?", ("shop.toml:gauges.pin-gauges",)),
+    # Presence is the shop-equipment record's (not owned, owner 2026-11-17);
+    # the range and resolution are shop.toml's.
+    Tool(
+        "Pin gauges",
+        r"GAUGE PINS?|PIN GAUGES?",
+        ("shop.toml:gauges.pin-gauges", "shop-equipment.toml:gauges.pin-gauges"),
+    ),
     Tool("Height gauge", r"HEIGHT GAUGE", ("shop.toml:gauges.height-gauge",)),
     Tool(
         "Depth micrometer or depth gauge",
@@ -330,6 +336,13 @@ TOOLS: tuple[Tool, ...] = (
         "Taper-pin reamer, 1:48",
         r"TAPER-REAM(?: 1:48)?",
         ("shop-equipment.toml:tools.taper-pin-reamer",),
+    ),
+    # The owned #10-32 bottoming taps (Zoro order WB7365521946, owner
+    # 2026-11-17) claim their size before the general row below.
+    Tool(
+        "#10-32 bottoming taps",
+        r"#10-32 BOTTOMING TAPS?",
+        ("shop-equipment.toml:tools.taps-zoro-wb7365521946",),
     ),
     Tool(
         "Bottoming taps",

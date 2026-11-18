@@ -182,6 +182,11 @@ diameter_mm = 50.8
 # cad/config/shop-equipment.toml gauges.touch-probe-diy0-tp05.
 [tools.basebar-probe]
 description = "DIY0 TP05 3D touch probe, 6 mm shank"
+# Owner's MT3 dead centre with a straight end, gripped in the 3/4 in R8
+# collet and used as a tap guide on the PM-30MV; ownership and setting are
+# cad/config/shop-equipment.toml, same key.
+[tools.mill-dead-centre-mt3]
+description = "MT3 dead centre, straight end held in the 3/4 in R8 collet, used as a spindle tap guide"
 
 [settings.basebar-edge-6061-t6511]
 tool = "basebar-em-half"
