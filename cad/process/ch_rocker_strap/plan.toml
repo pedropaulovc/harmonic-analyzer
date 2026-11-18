@@ -80,9 +80,9 @@ clamp_4_x_mm = 279.4
 # the torque screwdriver.
 clamp_torque_in_lb = 6
 # Sub-plate MHA-CH-13-TL-01 (drawing ch_rocker_strap_tl_sub_plate), 13 × 3 ×
-# .490 in 6061: top faced in place (Z0), with an integral fence along its
-# back and an end stop at the blank's left end standing .074 ±.005 above it,
-# so the plate under Z0 is .416 in (plate_top_height_mm): the height every
+# .490 in 6061: top flat and parallel to its drawing, with an integral fence
+# along its back and an end stop at the blank's left end standing .074 ±.005
+# above it, so the plate under Z0 is .416 in (plate_top_height_mm): the height every
 # Z stack above the vise bed uses, and the vise's grip (the front face, the
 # lower of the two the jaws hold).
 plate_start_x_mm = -12.7
@@ -94,7 +94,9 @@ fence_width_mm = 12.7
 # finished thickness, so the face cutter clears them. Fence and end stop: the
 # drawing's .074 +.005, .079. Clamp: the Pitbull 26000's minimum clamped
 # height, .075 in (shop-equipment
-# fixtures.edge-clamps-low-profile.min_clamp_height_mm).
+# fixtures.edge-clamps-low-profile.min_clamp_height_mm), a catalogue nominal
+# rather than a limit: the prove-out holds the noses to the fence's .079,
+# which cam.py proves under the faced top as well.
 fence_height_mm = 2.0066
 end_stop_height_mm = 2.0066
 clamp_height_mm = 1.905
@@ -221,7 +223,7 @@ eighth_mill_projection_max_mm = 12.7
 # each as a distance along the strap (model X) from the hub centre, but both
 # points stand above the hub centre, so calipers from the hub read the slant.
 # From features.toml (mm): hub_hole.at y 8.000; tip_land_pos_x.corner
-# (145.978, 23.887), 15.887 (.6255 in) above the hub; end_face_pos_x.foot
+# (145.978, 23.887), 15.887 (.62546 in) above the hub; end_face_pos_x.foot
 # (132.638, 11.110), 3.110 (.1224 in) above it. Slant = √(station² + rise²):
 # corners 5.74–5.76 → √(5.74² + .6255²) = 5.7740 to √(5.76² + .6255²) =
 # 5.7939, printed 5.774–5.794; feet 5.21–5.23 → √(5.21² + .1224²) = 5.2114
@@ -229,8 +231,9 @@ eighth_mill_projection_max_mm = 12.7
 # .001, within the calipers' .0005 of the exact limit. The rises are the
 # program's path: a .010 change in the corner's rise moves its slant .0011,
 # the foot's .0002. Typed here because the arc_strap adapter binds neither
-# rise; a CAD change to the strap's ends must re-derive them.
-corner_rise_in = 0.626
+# rise; cam.py re-derives all six from features.toml and fails the post when
+# one is more than .0005 off.
+corner_rise_in = 0.625
 corner_slant_min_in = 5.774
 corner_slant_max_in = 5.794
 foot_rise_in = 0.122
@@ -301,8 +304,8 @@ title = "Rough both faces on the sub-plate"
 machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
 indexing = "none"
 machine_ref = "pm-30mv"
-holding = "Sub-plate MHA-CH-13-TL-01 in the vise on 1 in parallels, centred, the fence indicated <.001 along X; it stays there for every blank. Blank flat on the plate, one long edge against the fence, its left end against the end stop, pushed by the Mitee-Bite Pitbull 26000 (4-40) edge clamps TL-VN-50 at X {{cad.clamp_stations_in}} from the end stop, each tightened to {{process.clamp_torque_in_lb:g}} in-lb. Clamp noses {{process.clamp_height_mm:in.3dot}} and the fence and end-stop tops {{process.fence_height_mm:in.3dot}} above the plate stay below the cut."
-datum = "Program RS01_rough_faces (cam:ch_rocker_strap). One G54 while the plate stays put: Z0 = the plate top, Y0 = the fence face (blank at −Y), X0 = the end stop's face, set in Op 20; set again after the plate moves, a stall or an E-stop. Each M6 measures its tool on the tool setter against T1's length when Z0 was set; every file (RS01–RS04) starts with an M6, so none runs on the length the last file left, even re-run or restarted."
+holding = "Sub-plate MHA-CH-13-TL-01 in the vise on 1 in parallels, centred, the fence indicated <.001 along X and the plate top indicated within .0003 over the 12 in under the blank; it stays there for every blank. Blank flat on the plate, one long edge against the fence, its left end against the end stop, pushed by the Mitee-Bite Pitbull 26000 (4-40) edge clamps TL-VN-50 at X {{cad.clamp_stations_in}} from the end stop, each tightened to {{process.clamp_torque_in_lb:g}} in-lb. Clamp noses, fence and end-stop tops at most {{process.fence_height_mm:in.3dot}} above the plate, below the cut."
+datum = "Program RS01_rough_faces (cam:ch_rocker_strap). One G54 while the plate stays put: Z0 = the plate top, Y0 = the fence face (blank at −Y), X0 = the end stop's face, set in Op 30; set again after the plate moves, a stall or an E-stop. Each M6 measures its tool on the tool setter against T1's length when Z0 was set; every file (RS01–RS04) starts with an M6, so none runs on the length the last file left, even re-run or restarted."
 diagram = { file = "diagrams/rough.svg", alt = "Plan of the sub-plate: fence along the back, blank against it and against the end stop at its left end, edge clamps at the front at X {{cad.clamp_stations_in}}; the 1/2 in end mill faces the full blank, one face, then the other after the flip." }
 envelope = { x_span_mm = ["{{cad.blank_length_mm}}", "{{process.face_cutter_dia_mm}}"], y_span_mm = ["{{cad.blank_width_mm}}", "{{process.face_cutter_dia_mm}}"], work_top_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_top_height_mm}}", "{{cad.blank_thickness_mm}}"], deepest_cut_mm = ["{{process.vise_bed_height_mm}}", "{{process.parallel_height_mm}}", "{{process.plate_top_height_mm}}", "{{cad.thickness_mm}}"], longest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_max_mm}}"], shortest_tool_mm = ["{{process.r8_collet_gauge_mm}}", "{{process.half_mill_projection_min_mm}}"] }
 # The vise grips the sub-plate, not the blank: every size here is the plate's.
@@ -310,16 +313,28 @@ vise_hold = { vise = "vise-pm-6", grips = "plate", across_jaws_mm = "{{process.p
 # Section at the finished thickness, the thinnest the blank gets.
 beam = { axis = "x", hold = "plate", extent_mm = [0, "{{cad.blank_length_mm}}"], seat = "faced sub-plate", seat_mm = "{{cad.plate_x_mm}}", clamps_mm = "{{cad.clamp_x_mm}}", section_mm = { y = "{{cad.blank_width_mm}}", z = "{{cad.thickness_mm}}" } }
 
+# The plate top's tilt along X is a thickness wedge: face 1 is cut parallel
+# to the table, then lies on the tilted top for face 2, so the strap ends up
+# thicker at one end by the top's run-out over the blank. .0003 keeps that
+# to under a third of the ±.001 thickness band.
 [[setups.operations]]
-instruction = "Once per vise setup, no blank in. Console M6 T1 (the 1/2 in end mill, measured on the tool setter). T1, spindle off, just dragging on a .200 gauge block on the plate top: G10 L20 P1 Z.200. The .200 edge finder at 900 rpm on the fence face: G10 L20 P1 Y-.100; on the end stop's face: G10 L20 P1 X.100."
+steps = [
+  { kind = "check", text = "Once per vise setup, no blank in: the lever indicator along the plate top over X 0–12 reads within .0003." },
+  { kind = "stop", text = "Over: reseat the plate on the parallels and indicate again." },
+]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Console M6 T1 (the 1/2 in end mill, measured on the tool setter). T1, spindle off, just dragging on a .200 gauge block on the plate top: G10 L20 P1 Z.200. The .200 edge finder at 900 rpm on the fence face: G10 L20 P1 Y-.100; on the end stop's face: G10 L20 P1 X.100."
 feed = "hand"
 
 # Prove-out: the clamps, fence and end stop stand about .02 under the finish
-# face, and their heights are set by hand.
+# face, and their heights are set by hand. One limit for all three, the
+# drawing's high limit on the fence and end stop.
 [[setups.operations]]
 steps = [
-  { kind = "action", text = "First blank only, before it goes in: prove RS01–RS04 in air. T1 on the .200 block: G10 L20 P1 Z-.800 (Z0 1.000 high). Run each file single block through its first plunges. Then M6 T1 and G10 L20 P1 Z.200 on the block again." },
-  { kind = "check", text = "Calipers' depth rod: clamp noses ≤ {{process.clamp_height_mm:in.3dot}}, fence and end-stop tops ≤ {{process.fence_height_mm:in.3dot}} above the plate." },
+  { kind = "action", text = "First blank only, before it goes in: prove RS01–RS04 in air. Edge finder out; console M6 T1 (measured on the tool setter); on the .200 block: G10 L20 P1 Z-.800 (Z0 1.000 high). Run each file single block through its first plunges. Then M6 T1 and G10 L20 P1 Z.200 on the block again." },
+  { kind = "check", text = "Calipers' depth rod: clamp noses, fence and end-stop tops each ≤ {{process.fence_height_mm:in.3dot}} above the plate." },
   { kind = "stop", text = "Over: no blank goes in. Reseat the clamp, or bring the fence or end stop to its drawing height, and check again." },
 ]
 feed = "hand"
@@ -585,13 +600,14 @@ envelope = "other"
 vise_hold = "other"
 beam = "other"
 inspection = [
-  "Thickness: accepted on every blank at RS03's M6 T3 stop.",
-  "First article only, from the hub centre: calipers over the .4000 GO plug gauge in the hub hole, the reading less .200. Top edge {{cad.top_height_min_in:.3dot}}–{{cad.top_height_max_in:.3dot}} above and bottom edge {{cad.bottom_height_min_in:.3dot}}–{{cad.bottom_height_max_in:.3dot}} below, on the hub centreline.",
+  "Thickness {{cad.thickness_min_in:.3dot}}–{{cad.thickness_max_in:.3dot}}, micrometer, every strap: again after the stoning, freeing and straightening, any of which can move it (RS03's reading gated the machining).",
+  "Every strap, from the hub centre: calipers over the .4000 GO plug gauge in the hub hole, the reading less .200. Top edge {{cad.top_height_min_in:.3dot}}–{{cad.top_height_max_in:.3dot}} above and bottom edge {{cad.bottom_height_min_in:.3dot}}–{{cad.bottom_height_max_in:.3dot}} below, on the hub centreline: the check that the strap stayed on its tape and plug.",
   "First article only, the same way, at both ends: the top corner, where the short tip land meets the angled end face, and the bottom corner, where the end face meets the bottom edge. The drawing's {{cad.corner_station_min_in:.2f}}–{{cad.corner_station_max_in:.2f}} and {{cad.foot_station_min_in:.2f}}–{{cad.foot_station_max_in:.2f}} run along the strap, but the top corner stands {{process.corner_rise_in:.3dot}} and the bottom corner {{process.foot_rise_in:.3dot}} above the hub centre, so the calipers read the slant: top corners {{process.corner_slant_min_in:.3f}}–{{process.corner_slant_max_in:.3f}}, bottom corners {{process.foot_slant_min_in:.3f}}–{{process.foot_slant_max_in:.3f}}.",
   "First article only: tip lands {{cad.tip_length_min_in:.2dot}}–{{cad.tip_length_max_in:.2dot}} long, from the top edge to the top corner, calipers along the land.",
   "Not gauged, the program's interpolated path: arc radii R{{cad.top_radius_min_in:.1f}}–{{cad.top_radius_max_in:.1f}} top and R{{cad.bottom_radius_min_in:.1f}}–{{cad.bottom_radius_max_in:.1f}} bottom, tip-land angle {{cad.tip_angle_min_deg:.1f}}–{{cad.tip_angle_max_deg:.1f}}°.",
 ]
 gauge_checks = [
+  { gauge = "micrometers", band_mm = "{{cad.thickness_band_mm}}" },
   { gauge = "calipers", band_mm = "{{cad.top_height_band_mm}}" },
   { gauge = "calipers", band_mm = "{{cad.bottom_height_band_mm}}" },
   { gauge = "calipers", band_mm = "{{cad.corner_station_band_mm}}" },
