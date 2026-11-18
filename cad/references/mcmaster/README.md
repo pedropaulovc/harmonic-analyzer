@@ -60,6 +60,7 @@ recipes:
 | 91255A106 | — (a former `pd-vn-guide-lock-screw`; diagnostic recipe removed 2026-11-16, #2886) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
 | 91255A148 | — (a former `dt-vn-cone-tip-block-screw`; diagnostic recipe removed 2026-11-16, #2886) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
 | 91255A150 | — (retired TL-VN-65, 2026-11-06; the KP08 screws are now 91251A196, TL-VN-62; diagnostic recipe removed) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
+| 91255A539 | `ch-rocker-strap-tl-vn-hub-screw` (MHA-CH-13-TL-VN-51; tier 1; vendor STEP probed, not kept) | Black-Oxide Button Head Hex-Drive Screw |
 | 91251A150 | — (retired TL-VN-65 source, 2026-11-04; now 91255A150, whose larger head covers the uxcell KP08's Ø5 hole; diagnostic recipe removed) | Black-Oxide Alloy Steel Socket Head Screw |
 | 91290A168 | — (retired TL-VN-64, 2026-11-17: oblique jig deleted; spec and diagnostic removed) | Socket Head Screw |
 | 91355A581 | — (retired TL-VN-66 source, 2026-11-04: TL-VN-66 retired; the TL-VN-84 kit's feed nut uses TL-VN-67's 91771A112; diagnostic recipe removed) | Black-Oxide Flanged Button Head Hex-Drive Screw, Alloy Steel |
@@ -1018,6 +1019,24 @@ Catalog specifications checked on September 10, 2026:
   minimum key engagement, 0.055 in, and a plain cylindrical head. It is
   catalogue-only: no vendor model is downloaded or kept here, so it has no
   replica gate, and its standalone diagnostic is a catalog-only run.
+- [91255A539](https://www.mcmaster.com/91255A539/) (`ch-rocker-strap-tl-vn-hub-screw`,
+  MHA-CH-13-TL-VN-51) snugs the rocker-strap blank's hub on the sub-plate
+  MHA-CH-13-TL-01 through the hub washer (owner ruling 2026-11-17, replacing
+  a 5/16-18 screw). Read live on 2026-11-17: black-oxide button head hex
+  drive screw, alloy steel, 1/4-20 UNC class 3A, right hand, 5/8 in under
+  the head, fully threaded, flat tip, head Ø0.437 in × 0.132 in, 5/32 in
+  hex drive, 140 ksi, Rockwell C39, ASME B18.3 and ASTM F835; $11.55 per
+  pack of 50. The product page's STEP
+  (`91255A539_Button Head Hex Drive Screw.STEP`, SHA-256
+  `e5ad67ac57f6a19f305dbff32b7193b726915b749f5ad85caa698b9f125d7667`) was
+  probed headless with FreeCAD 1.1 and not kept: spherical dome R 6.13936
+  about a centre 2.12203 below the bearing face, socket 1.844 deep, 45°
+  tip chamfer to Ø4.445; 592.448 mm³ with its thread. `_mcmaster_91255a539.py`
+  records those values and `diag_build_91255A539.py` models the head with a
+  plain shank at the major; the model contains the vendor solid to
+  0.19 mm³. Tier 1: a HARDWARE.md row, no sheet. Rejected: 91255A583
+  (5/16-18 × 1 in, the unverified first candidate) and 91255A580 (5/16-18
+  × 5/8 in, the pre-ruling size).
 - [91251A157](https://www.mcmaster.com/91251A157/) formerly supplied
   `sm-vn-knife-hanger-stud`, MHA-SM-VN-52, two, in the superseded #6-32 route.
   Each screw dropped through the MHA-FR-02 crossbar counterbore and seated

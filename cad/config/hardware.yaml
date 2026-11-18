@@ -17,6 +17,14 @@
 # the row names one, its standard; they print "per <standard>" or "per
 # designation". A part the assembly steps cut or face keeps its tier-1 row when
 # its `why` names that step.
+ch-rocker-strap-tl-vn-hub-screw:
+  tier: 1
+  why: "ASME B18.3 socket button head screw, used as supplied"
+  designation: "1/4-20 UNC-3A x 5/8 hex socket button head screw, black-oxide alloy steel"
+  standard: "ASME B18.3"
+  envelope:
+    "head Ø": "_mcmaster_91255a539 HEAD_DIA"
+    "head H": "_mcmaster_91255a539 HEAD_HEIGHT"
 ch-vn-bracket-hold-down-screw:
   tier: 1
   why: "ASME B18.6.3 slotted machine screw, used as supplied"
@@ -344,6 +352,9 @@ sm-vn-knife-mount-dowel:
   why: "ASME B18.8.2 hardened dowel pin, used as supplied"
   designation: "Ø1/8 x 3/4 hardened dowel pin, alloy steel"
   standard: "ASME B18.8.2"
+ch-rocker-strap-tl-vn-edge-clamp:
+  tier: 2
+  why: "proprietary edge clamp (Mitee-Bite Pitbull 26000): its catalogue A-F, throw and torque govern"
 ch-vn-channel-spring-installed:
   tier: 2
   why: "extension spring: rate, free length, hook form and max OD govern"

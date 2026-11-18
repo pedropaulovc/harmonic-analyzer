@@ -656,3 +656,30 @@ diameter_mm = 6.6294
 [gauges.clamp-bore-drill-shanks]
 range_mm = [6.5278, 6.6294]
 resolution_mm = 0.00254
+
+# --- MHA-CH-13-TL-01 rocker-strap sub-plate (cad/process/ch_rocker_strap_tl_sub_plate/plan.toml) ---
+# The 1/8 in carbide end mill on 6061 (fence notches, clamp pockets): The
+# Carbide End Mill Store "Carbide End Mill Speeds and Feeds, General Purpose,
+# Uncoated" (6gtools.com, the PDF the 1018 settings above cite, read
+# 2026-11-17), row Non-Ferrous N, Al/Al Alloys: 500 SFM, 1/8 in .0011 in/tooth
+# (.028 mm). 500 SFM on 1/8 in is 15,280 rpm; the spindle tops out at 2800
+# (machines.pm-30mv), 92 ft/min. Chip load at the table's chip-load factor
+# 1.0 (50 % radial engagement and more): 2800 × 3 × .0011 = 9.2 in/min.
+[settings.endmill-carbide-3fl-1-8-6061]
+tool = "endmill-carbide-3fl-1-8"
+material = "6061-t6511"
+rpm = 2800
+chip_load_mm_per_tooth = 0.02794  # .0011 in
+flutes = 3
+feed_unit = "in/min"
+
+# The 1/4-20 hub tap's drill: #7 (.201 in) is a member of the owned 115-piece
+# index (number drills #1-#60 among its 115, as jig-drill-11-32); nominal ×
+# 25.4. The 1/4-20 tap is owned (cad/config/shop-equipment.toml
+# tools.jig-tap-1-4-20-plug).
+[tools.jig-drill-7]
+description = "#7 (.201 in) drill, 115-piece index"
+diameter_mm = 5.1054
+[tools.jig-tap-1-4-20-plug]
+description = "1/4-20 UNC hand tap; T-handle wrench"
+tap_drill_mm = 5.1054

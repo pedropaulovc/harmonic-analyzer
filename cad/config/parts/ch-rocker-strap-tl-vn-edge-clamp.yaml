@@ -1,0 +1,20 @@
+ch-rocker-strap-tl-vn-edge-clamp:
+  title: Rocker Strap Edge Clamp
+  # Shop tooling: the parent MHA-CH-13 Number plus -TL-VN-nn (subsystem-identities.md).
+  # 2026-11-17: Mitee-Bite Pitbull edge clamp 26000, installed with the 4-40 x
+  # 3/8 socket head cap screw it is supplied with: one installed form, so the
+  # clamp body and its screw are one part (two bodies). The supplied O-ring
+  # (26008) is not modelled. Pack of 8; the fixture uses 4.
+  # Mitee-Bite PITBULL-INST-0426 (read 2026-11-17) lists 26000 as "Tool Steel,
+  # Knife Edge".
+  number: MHA-CH-13-TL-VN-50
+  stock_name: "Pitbull Clamp 26000, #4-40"
+  supplier: Mitee-Bite Products
+  supplier_skus: ["26000"]
+  material: Tool Steel
+  material_specification: "Mitee-Bite Pitbull edge clamp 26000, tool steel, knife edge, with its #4-40 x 3/8 socket head cap screw, as supplied; Mitee-Bite 26000"
+  finish: as supplied
+  quantity: 4
+  tolerance_class: machined_block
+  process: purchased
+  drawing_unit: in

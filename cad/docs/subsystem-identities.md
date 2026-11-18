@@ -418,6 +418,11 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | new tooling part (2026-11-12) | — | — | — | — | `dt-cone-gear-tl-arbor-collar` | MHA-DT-03-TL-04 |
 | new tooling part (2026-11-12) | — | — | — | — | `dt-cone-gear-tl-arbor-key` | MHA-DT-03-TL-06 |
 | new tooling vendor part (2026-11-12) | — | — | — | — | `dt-cone-gear-tl-vn-arbor-nut` | MHA-DT-03-TL-VN-50 |
+| new tooling part (2026-11-17) | — | — | — | — | `ch-rocker-strap-tl-sub-plate` | MHA-CH-13-TL-01 |
+| new tooling part (2026-11-17) | — | — | — | — | `ch-rocker-strap-tl-hub-plug` | MHA-CH-13-TL-02 |
+| new tooling part (2026-11-17) | — | — | — | — | `ch-rocker-strap-tl-hub-washer` | MHA-CH-13-TL-03 |
+| new tooling vendor part (2026-11-17) | — | — | — | — | `ch-rocker-strap-tl-vn-edge-clamp` | MHA-CH-13-TL-VN-50 |
+| new tooling vendor part (2026-11-17) | — | — | — | — | `ch-rocker-strap-tl-vn-hub-screw` | MHA-CH-13-TL-VN-51 |
 | assembly | `frame` | MHA-A04 | `fr-frame` | MHA-FR-000 | `fr-frame` | MHA-FR-00 |
 | assembly | `drive-train` | MHA-A03 | `dt-drive-train` | MHA-DT-000 | `dt-drive-train` | MHA-DT-00 |
 | assembly | `channel` | MHA-A02 | `ch-channel` | MHA-CH-000 | `ch-channel` | MHA-CH-00 |
@@ -431,6 +436,7 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | retired tooling assembly (added 2026-11-02) | — | — | `dt-cone-gear-tl-indexing` | — | — | MHA-DT-03-TL-00 (retired 2026-11-17; never reissued) |
 | new tooling assembly (2026-11-12) | — | — | — | — | `dt-cone-tip-gear-tl-cutter` | MHA-DT-37-TL-00 |
 | new tooling assembly (2026-11-12) | — | — | — | — | `dt-cone-gear-tl-arbor` | MHA-DT-03-TL-05 |
+| new tooling assembly (2026-11-17) | — | — | — | — | `ch-rocker-strap-tl-fixture` | MHA-CH-13-TL-00 |
 
 ### Shared vendor families
 
@@ -628,6 +634,12 @@ A retired Number is never reused. A family added after a cutover takes the next 
 | added | `dt-cone-gear-tl-arbor` | MHA-DT-03-TL-05 | Issue #2465: tooling assembly holding the keyed arbor, its key, the three collars and the nut, so they belong to a registered fixture kit; never in a machine assembly or BOM |
 | added | `dt-cone-gear-tl-arbor-key` | MHA-DT-03-TL-06 | Issue #2465: 1/16 square undersized key stock cut to .15 and bonded in the arbor's keyseat; a made part because McMaster's only undersized 1/16 stock, 98830A511, is already MHA-DT-VN-71's SKU; never in a machine assembly or BOM |
 | added | `dt-cone-gear-tl-vn-arbor-nut` | MHA-DT-03-TL-VN-50 | Issue #2465: McMaster 95462A505 grade 5 zinc-plated 1/4-28 hex nut clamping the arbor's collar and blank; never in a machine assembly or BOM |
+| added | `ch-rocker-strap-tl-sub-plate` | MHA-CH-13-TL-01 | 2026-11-17 owner ask: 6061-T6511 sub-plate holding one MHA-CH-13 strap blank on tape for its NC programs; fence and end stop milled integral (Y0, X0 of the strap's G54), hub counterbore and four edge-clamp pockets; enrolled in `ch-rocker-strap-tl-fixture`; never in a machine assembly or BOM |
+| added | `ch-rocker-strap-tl-hub-plug` | MHA-CH-13-TL-02 | 2026-11-17: stepped turned plug in TL-01's counterbore whose pilot locates the blank's reamed hub hole; never in a machine assembly or BOM |
+| added | `ch-rocker-strap-tl-hub-washer` | MHA-CH-13-TL-03 | 2026-11-17: turned washer under the hub screw, sized inside the strap programs' hub keep-out; never in a machine assembly or BOM |
+| added | `ch-rocker-strap-tl-vn-edge-clamp` | MHA-CH-13-TL-VN-50 | 2026-11-17: Mitee-Bite Pitbull 26000 edge clamp with its supplied 4-40 x 3/8 socket head cap screw, one installed form (x4); never in a machine assembly or BOM |
+| added | `ch-rocker-strap-tl-vn-hub-screw` | MHA-CH-13-TL-VN-51 | 2026-11-17 (owner ruling: "Use a 1/4-20 hub screw"): McMaster 91255A539 1/4-20 x 5/8 button head socket cap screw clamping the blank's hub through TL-03 into TL-01; never in a machine assembly or BOM |
+| added | `ch-rocker-strap-tl-fixture` | MHA-CH-13-TL-00 | 2026-11-17: tooling assembly holding TL-01, TL-02, TL-03, four TL-VN-50 and TL-VN-51, so they belong to a registered fixture kit; never in a machine assembly or BOM |
 | changed | `dt-cone-gear-tl-phasing-comb` | MHA-DT-03-TL-02 | Owner ruling 2026-11-13 ("gear phasing comb is overengineered; should be cut to shape from single sheet of brass or other metal"): one .020 in shim sheet cut to shape, the stock's thickness the blades' thickness, every size at the title block (was a 3/32 in 1018 plate with blades milled thin from both faces at shop-row bands); owner, 2026-11-14 (#2734): the cone stands on its journal and the sheet is a flat U clipped over its tip, both arms on T036, a spring arm's second T030 blade holding it from leaning; .020 in half-hard C26000 brass (owner ruling 2026-11-14: ".020 half-hard brass"; OnlineMetals 1589) |
 | retired | `ch-rocker-arm-tl-vn-oblique-leadscrew-nut` | MHA-CH-06-TL-VN-55 | 2026-11-01 owner ruling (item 4): the shop-made TL-27 feed nut replaces the bought flange nut, so TL-32's lug needs no spigot recess; no registry, builder or drawing; Number never reissued |
 | added | `ch-rocker-arm-tl-oblique-feed-nut` | MHA-CH-06-TL-27 | 2026-11-01 shop-made Tr8x2 RH nut from brass 360-H02 3/4 × 1-1/4 in bar, faced to .40, on two TL-VN-66 screws into TL-32's lug |

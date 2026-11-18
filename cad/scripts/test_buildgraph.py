@@ -144,6 +144,9 @@ _INSERTED_SOURCES = {
     "sh_vn_arbor_set_screw",
     "dt_cone_gear_tl_arbor": "dt_cone_gear_tl_keyed_arbor dt_cone_gear_tl_arbor_collar "
     "dt_cone_gear_tl_arbor_key dt_cone_gear_tl_vn_arbor_nut",
+    "ch_rocker_strap_tl_fixture": "ch_rocker_strap_tl_sub_plate ch_rocker_strap_tl_hub_plug "
+    "ch_rocker_strap_tl_hub_washer ch_rocker_strap_tl_vn_edge_clamp "
+    "ch_rocker_strap_tl_vn_hub_screw",
     "ha_harmonic_analyzer": "fr_frame dt_drive_train ch_channel sm_summing mg_magnifier pn_pen "
     "pd_paper_drive ms_measuring_stick",
 }

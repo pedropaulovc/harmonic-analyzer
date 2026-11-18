@@ -20,6 +20,7 @@ import draw_ch_channel_assembly
 import draw_dt_drive_train_assembly
 import draw_dt_cone_tip_gear_tl_cutter_assembly
 import draw_dt_cone_gear_tl_arbor_assembly
+import draw_ch_rocker_strap_tl_fixture_assembly
 import draw_fr_frame_assembly
 import draw_ha_harmonic_analyzer_assembly
 import draw_mg_magnifier_assembly
@@ -52,6 +53,7 @@ ASSEMBLY_DRAWINGS = (
     draw_ms_measuring_stick_assembly,
     draw_dt_cone_tip_gear_tl_cutter_assembly,
     draw_dt_cone_gear_tl_arbor_assembly,
+    draw_ch_rocker_strap_tl_fixture_assembly,
     draw_ha_harmonic_analyzer_assembly,
 )
 
@@ -80,6 +82,7 @@ SIMPLE_ASSEMBLY_DRAWINGS = tuple(
         draw_ms_measuring_stick_assembly,
         draw_dt_cone_tip_gear_tl_cutter_assembly,
         draw_dt_cone_gear_tl_arbor_assembly,
+        draw_ch_rocker_strap_tl_fixture_assembly,
         draw_mg_magnifier_assembly,
         draw_pn_pen_assembly,
         draw_sm_summing_assembly,
@@ -264,6 +267,12 @@ def test_registry_task_names_outputs_and_assembly_dependencies_are_preserved() -
             scripts_dir = Path(drawing.__file__).resolve().parent
             # The kit spec whose BOM order, poses and steps the sheet prints.
             assert str(scripts_dir / "dt_cone_gear_tl_arbor_assembly_spec.py") in deps
+            assert str(Path(_assembly_drawing.__file__).resolve()) not in deps
+        elif drawing is draw_ch_rocker_strap_tl_fixture_assembly:
+            scripts_dir = Path(drawing.__file__).resolve().parent
+            # The fixture spec whose BOM order, poses, screw schedule and
+            # steps the sheets print.
+            assert str(scripts_dir / "ch_rocker_strap_tl_fixture_spec.py") in deps
             assert str(Path(_assembly_drawing.__file__).resolve()) not in deps
         else:
             assert str(Path(_assembly_drawing.__file__).resolve()) in deps

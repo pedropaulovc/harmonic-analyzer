@@ -1,0 +1,16 @@
+ch-rocker-strap-tl-hub-plug:
+  title: Rocker Strap Hub Plug
+  # Shop tooling: the parent MHA-CH-13 Number plus -TL-nn (subsystem-identities.md).
+  # 2026-11-17: stepped plug seated in MHA-CH-13-TL-01's counterbore; its pilot
+  # locates the strap blank's reamed hub hole before the hub screw clamps it.
+  number: MHA-CH-13-TL-02
+  # One material, so the title block's MATERIAL cell holds one line (LEARN
+  # machinist review r5): 6061, as the plug only locates and carries no clamp
+  # load (its pilot top stands below the strap's top under the washer).
+  material: 6061 ALUMINUM
+  material_specification: 6061 aluminum round, 9/16 in or over
+  finish: as machined
+  quantity: 1
+  tolerance_class: machined_block
+  drawing_unit: in
+  process: "manual lathe: from round bar on hand, turn the body and pilot diameters and face the shoulder in one chucking, drill the bore through, part off and face to length; break edges"

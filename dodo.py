@@ -3815,6 +3815,7 @@ _UNGATED = frozenset(
     {
         # Runs the local FreeCAD install, which no build dependency tracks.
         "cad/scripts/test_cam_nc_freecad.py",
+        "cad/scripts/test_ch_rocker_strap_tl_sub_plate_cam_freecad.py",
     }
 )
 _GATE_TESTS: dict[str, tuple[str, ...]] = {
