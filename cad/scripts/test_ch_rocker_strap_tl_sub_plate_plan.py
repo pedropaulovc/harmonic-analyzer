@@ -39,10 +39,11 @@ def test_envelope_is_the_plans_plate() -> None:
     assert spec.LEFT_END_X == PLAN["plate_start_x_mm"]
     assert spec.PLATE_LENGTH == PLAN["plate_length_mm"]
     assert spec.PLATE_WIDTH == PLAN["plate_width_mm"]
-    # The strap plan's own correction to this plate's .49 overall and .416
-    # top height is made in the strap traveler's PR (#3059/#3060); here the
-    # plate only has to fit inside the plan's envelope.
-    assert spec.PLATE_THICKNESS <= PLAN["plate_thickness_mm"]
+    # The strap plan stacks Z on the plate's top height (.416 under Z0) and
+    # holds the fence and end-stop tops to this plate's .074 +.005 limit.
+    assert -spec.UNDERSIDE_Z == pytest.approx(PLAN["plate_top_height_mm"])
+    assert spec.FENCE_HEIGHT_MAX == pytest.approx(PLAN["fence_height_mm"])
+    assert spec.FENCE_HEIGHT_MAX == pytest.approx(PLAN["end_stop_height_mm"])
     assert spec.FENCE_WIDTH == PLAN["fence_width_mm"]
 
 

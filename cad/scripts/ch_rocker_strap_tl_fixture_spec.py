@@ -18,7 +18,7 @@ its pocket, its heel on the pocket's back wall. Every part is fixed (0 DOF).
 
 The shop TOMLs and the strap plan are never read here (they are not COM-leaf
 inputs): the clamp torque below mirrors the strap plan's
-``clamp_torque_ft_lb``, and ``test_ch_rocker_strap_tl_fixture_assembly``
+``clamp_torque_in_lb``, and ``test_ch_rocker_strap_tl_fixture_assembly``
 asserts the two agree.
 """
 
@@ -99,8 +99,8 @@ if plate.COUNTERBORE_FLOOR_Z + plug.OVERALL_LENGTH <= TAPE:
     raise AssertionError("the plug's pilot does not reach into the blank's hub hole")
 
 # --- Sheet words ------------------------------------------------------------
-# Torque: the strap plan's clamp_torque_ft_lb, reduced from the maker's 1.3
-# ft-lb maximum so the edge clamps do not bow the thin blank.
+# Torque: the strap plan's clamp_torque_in_lb (6, 0.5 ft-lb), reduced from the
+# maker's 1.3 ft-lb maximum so the edge clamps do not bow the thin blank.
 CLAMP_TORQUE_FT_LB = 0.5
 if CLAMP_TORQUE_FT_LB >= clamp.MAX_TORQUE_FT_LB:
     raise AssertionError("the clamp torque reaches the maker's maximum")

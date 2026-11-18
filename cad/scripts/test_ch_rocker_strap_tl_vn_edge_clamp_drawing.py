@@ -801,9 +801,10 @@ def test_drawing_passes_the_spec_rows_to_the_shared_purchased_sheet() -> None:
 def test_plan_agrees_with_the_clamp() -> None:
     """cad/process/ch_rocker_strap/plan.toml, read here and never by a leaf."""
     parameters = tomllib.loads(PLAN.read_text(encoding="utf-8"))["parameters"]
-    assert 0.0 < parameters["clamp_torque_ft_lb"] <= spec.MAX_TORQUE_FT_LB
-    # The fixture's 0.5 FT-LB prints on the assembly, under the clamp's limit.
-    assert parameters["clamp_torque_ft_lb"] == 0.5
+    assert 0.0 < parameters["clamp_torque_in_lb"] <= spec.MAX_TORQUE_FT_LB * 12.0
+    # The fixture's 6 in-lb (0.5 ft-lb) prints on the assembly, under the
+    # clamp's limit.
+    assert parameters["clamp_torque_in_lb"] == 6
     assert parameters["clamp_height_mm"] == pytest.approx(spec.CATALOG_D_IN * IN)
     # Seated on a B-deep pocket floor the modelled clamp stays under the
     # plan's clamp-nose keep-out.
