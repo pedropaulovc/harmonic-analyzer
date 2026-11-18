@@ -22,10 +22,12 @@ from _assembly import (
     activate_assembly_contract,
     assembly_title_properties,
     assert_components_fully_defined,
+    check_no_interference,
     place_component,
     save_assembly_and_images,
 )
 from _assembly_contract import assembly_contract
+from _ch_rocker_strap_tl_fixture_interference import ALLOWED_PAIRS
 from _check import check
 from _custom_properties import apply_custom_properties
 from _document_units import apply_package_model_units
@@ -76,6 +78,9 @@ def build(adapter) -> dict[str, str]:
         rows,
     )
     assert_components_fully_defined(adapter)
+    # Only the clamp and hub screws' thread envelopes in their tapped holes
+    # may overlap the plate; every other pair is clearance or contact.
+    check_no_interference(adapter, allowed_pairs=ALLOWED_PAIRS)
 
     # Title-block identity for the fitting sheet
     # (draw_ch_rocker_strap_tl_fixture_assembly.py); material and finish

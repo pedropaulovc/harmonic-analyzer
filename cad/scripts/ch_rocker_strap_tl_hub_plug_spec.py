@@ -53,9 +53,12 @@ from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 from ch_rocker_hub_fit import STRAP_HOLE_BAND
 
 PART_NAME = "ch-rocker-strap-tl-hub-plug"
-_ROW = _config.parts(PART_NAME)
+# Literal row names, so the recipe tracks exactly this registry row.
+_ROW = _config.parts("ch-rocker-strap-tl-hub-plug")
+if PART_NAME != "ch-rocker-strap-tl-hub-plug":
+    raise AssertionError("PART_NAME and the registry row it reads disagree")
 PART_NUMBER = str(_ROW["number"])
-UNIT = drawing_unit(f"parts/{PART_NAME}", _ROW)
+UNIT = drawing_unit("parts/ch-rocker-strap-tl-hub-plug", _ROW)
 INCH = 25.4
 
 STRAP_NUMBER = "MHA-CH-13"

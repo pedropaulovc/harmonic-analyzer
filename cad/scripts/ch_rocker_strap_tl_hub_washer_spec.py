@@ -44,9 +44,12 @@ from _package_units import drawing_unit
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 
 PART_NAME = "ch-rocker-strap-tl-hub-washer"
-_ROW = _config.parts(PART_NAME)
+# Literal row names, so the recipe tracks exactly this registry row.
+_ROW = _config.parts("ch-rocker-strap-tl-hub-washer")
+if PART_NAME != "ch-rocker-strap-tl-hub-washer":
+    raise AssertionError("PART_NAME and the registry row it reads disagree")
 PART_NUMBER = str(_ROW["number"])
-UNIT = drawing_unit(f"parts/{PART_NAME}", _ROW)
+UNIT = drawing_unit("parts/ch-rocker-strap-tl-hub-washer", _ROW)
 INCH = 25.4
 
 XX = printed_band_mm(2, unit=UNIT)
