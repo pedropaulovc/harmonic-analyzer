@@ -160,9 +160,13 @@ CAM_FINISH_SYMBOL = (0.152, 0.303)
 DIMENSION_CALLOUTS = {
     "BoreDia": BORE_FIT_CALLOUT,
     "OutsideDia": "MESHES WITH CONE\nGEARS MHA-DT-03",
-    "FaceWidth": "SETS ROD-RING SLOT\nFOR MHA-CH-03",
+    # Within the .300 stack, the rim width leaves the cam its length, the
+    # axial room MHA-CH-03 runs in (machinist review of #2712: "ROD-RING
+    # SLOT" was a private phrase, rule 26). Rows <= 18 characters.
+    "FaceWidth": "SETS CAM LENGTH\nFOR MHA-CH-03",
     "CamDia": "RUNNING FIT IN MHA-CH-03;\nTHROW SETS CHANNEL GAIN",
-    "NotchWidth": "ALIGNMENT NOTCH\nCAM PHASE FOR MHA-DT-03 MESH",
+    # "CAM PHASE" was a private phrase too (same review, rule 26).
+    "NotchWidth": "ALIGNMENT NOTCH\nSETS CAM ANGLE TO MHA-DT-03",
 }
 # The crescent wall's stated minimum (rule 20) lands on the cam OD at the
 # thin side, 10 degrees off the -Y axis so the pick misses the bore's centre
