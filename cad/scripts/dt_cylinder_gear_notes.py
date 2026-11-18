@@ -52,8 +52,8 @@ GEAR_DATA = "\n".join(
         f"PITCH TOOTH THICKNESS (REF):  {inch_text(spec.PITCH_TOOTH_THICKNESS_MM, 4)}",
         f"TOOTH FORM:  {TOOTH_FORM_NOTE}",
         # A finished-part requirement, not a setup check (machinist review of
-        # #2712; the crank drive gear's precedent, PR #2331 round 9).
-        f"TOOTH RUNOUT TO BORE:  {inch_text(TOOTH_RUNOUT_TIR_MM, 3)} TIR MAX, "
-        "SETS BACKLASH WITH MHA-DT-03",
+        # #2712; the crank drive gear's precedent, PR #2331 round 9). Its
+        # reason is the CUTTER PLUNGE row's, printed once there (rule 7).
+        f"TOOTH RUNOUT TO BORE:  {inch_text(TOOTH_RUNOUT_TIR_MM, 3)} TIR MAX",
     )
 )

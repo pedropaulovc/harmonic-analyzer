@@ -95,7 +95,7 @@ def test_drum_prints_the_tooth_runout_the_cone_mesh_stack_books() -> None:
 
     assert notes.TOOTH_RUNOUT_TIR_MM == cone_set_stack.TOOTH_RUNOUT_TIR_MM
     printed = notes.inch_text(cone_set_stack.TOOTH_RUNOUT_TIR_MM, 3)
-    assert f"TOOTH RUNOUT TO BORE:  {printed} TIR MAX" in notes.GEAR_DATA
+    assert f"TOOTH RUNOUT TO BORE:  {printed} TIR MAX" in notes.GEAR_DATA.splitlines()
     assert "ACCEPT AT SETUP" not in notes.GEAR_DATA
     assert float(printed) * 25.4 == pytest.approx(cone_set_stack.TOOTH_RUNOUT_TIR_MM)
 

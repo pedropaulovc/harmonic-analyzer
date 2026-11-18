@@ -65,6 +65,7 @@ from _drawing_view_configuration import (
     assert_full_detail_view,
 )
 from _drawing_view_display import set_hidden_lines_removed
+from _general_table import insert_general_table, table_column_widths
 from _machinist_review_mode import MachinistReviewMode
 from _mcmaster_91251a337 import DIMS as SCREW
 from _session import run_build
@@ -228,7 +229,7 @@ def _slip_reject(item: int, pressed: str) -> str:
 
 _KIT: tuple[str, ...] = (
     "PRESS ITEM 2 INTO ITEM 1 FROM THE FACE SEEN IN THE TOP VIEW, TAPPED END "
-    f"OUT, TO STAND {fixture.STUB_STAND_TEXT} ABOVE THE FACE (CALIPER DEPTH ROD).",
+    f"OUT, TO STAND {fixture.STUB_STAND_TEXT} ABOVE THE FACE (SETTING TABLE, SHEET 2).",
     _slip_reject(2, fixture.STUB_NUMBER),
     "CHECK: ITEM 2 DOES NOT MOVE BY HAND.",
     "PRESS ITEM 3 TO THE FLOOR OF ITS HOLE.",
@@ -248,7 +249,7 @@ _KIT += (
     f"HOLD WRUNG GAUGE BLOCKS {fixture.THROW_STACK_TEXT} "
     f"({fixture.THROW_STACK_TOTAL_TEXT}) BETWEEN ITEM 2 AND THE INDICATOR'S STYLUS.",
     "CHECK: ROCKING THE CHUCK AND THE BLOCKS, THE READING TURNS BACK WITHIN "
-    f"{fixture.THROW_READING_BAND_TEXT} OF ZERO.",
+    f"{fixture.THROW_READING_BAND_TEXT} OF ZERO (SETTING TABLE, SHEET 2).",
 )
 THROW_CHECK_STEP = len(_KIT)
 # Moving the pair leaves all four jaws tight, so the check that follows is
@@ -422,6 +423,48 @@ GEAR_STEPS_XY = (0.030, 0.244)
 LABEL_GAP = 0.006
 CHAR_WIDTH = 0.00255  # default-format note text, per character
 LINE_PITCH = 0.0046
+
+# Rule 22: the two measurable kit settings, item 2's stand (step 1) and its
+# throw (steps 9-14), print in a setting table as well as in the steps
+# (run 20261118T083019774Z's review: printed only in step text). Sheet 1 is
+# full, so the table stands at sheet 2's top right: right of the steps for
+# each gear (78 characters from x .030 end by about x .221), above the label
+# column (item 5's label at about y .19), inside the right border. The
+# helper cuts each column to its longest cell at 2.8 mm a character; a cell
+# that prints wider wraps onto a taller row, which this table's 60 mm of
+# free height absorbs, and the read-back box is checked.
+SETTING_TABLE_XY = (0.228, 0.262)
+SETTING_TABLE_FLOOR = 0.200
+SETTING_TABLE_CLEARANCE = 0.003
+GEAR_STEPS_RIGHT = GEAR_STEPS_XY[0] + STEP_WIDTH * 0.00245
+SETTING_TABLE_TITLE = (
+    f"SETTINGS FOR STEPS 1 AND {THROW_ZERO_STEP - 1}-{THROW_CHECK_STEP + 1} (SHEET 1)"
+)
+SETTING_TABLE_HEADER = (
+    "SETTING",
+    "ITEM 2 STAND (STEP 1)",
+    f"ITEM 2 THROW (STEPS {THROW_ZERO_STEP - 1}-{THROW_CHECK_STEP + 1})",
+)
+SETTING_TABLE_ROWS = (
+    (
+        "VALUE",
+        f"{fixture.STUB_STAND_TEXT} ABOVE ITEM 1",
+        f"{fixture.inch_text(fixture.STUB_OFFSET, 4)} FROM SPINDLE AXIS",
+    ),
+    (
+        "CHECK",
+        "CALIPER DEPTH ROD",
+        f"DTI ±{fixture.THROW_READING_BAND_TEXT} ON "
+        f"{fixture.THROW_STACK_TOTAL_TEXT} BLOCKS",
+    ),
+)
+_table_right = SETTING_TABLE_XY[0] + sum(
+    table_column_widths(SETTING_TABLE_HEADER, SETTING_TABLE_ROWS)
+)
+if _table_right > SHEET_INNER_BORDER[2] - SETTING_TABLE_CLEARANCE:
+    raise AssertionError("the setting table runs past the right border")
+if SETTING_TABLE_XY[0] < GEAR_STEPS_RIGHT + SETTING_TABLE_CLEARANCE:
+    raise AssertionError("the setting table runs into the steps for each gear")
 
 
 def _add_note(adapter: Any, text: str, xy: tuple[float, float], *, label: str) -> None:
@@ -722,7 +765,29 @@ def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
     _activate_sheet(adapter, SHEET_NAMES[1])
     _add_note(adapter, EXPLODED_CAPTION, positions[EXPLODED_CAPTION], label="caption")
     _add_note(adapter, GEAR_STEPS, GEAR_STEPS_XY, label="steps for each gear")
+    _place_setting_table(adapter)
     return lambda: assert_lines("settled")
+
+
+def _place_setting_table(adapter: Any) -> None:
+    """Sheet 2's setting table, its read-back box inside the border, right of
+    the steps for each gear and above the label column."""
+    label = "cam turning kit setting table"
+    _activate_sheet(adapter, SHEET_NAMES[1])
+    box = insert_general_table(
+        adapter,
+        title=SETTING_TABLE_TITLE,
+        header=SETTING_TABLE_HEADER,
+        rows=SETTING_TABLE_ROWS,
+        top_left=SETTING_TABLE_XY,
+        label=label,
+    )
+    if box[2] > SHEET_INNER_BORDER[2] - SETTING_TABLE_CLEARANCE:
+        raise RuntimeError(f"{label}: runs past the right border at {box!r}")
+    if box[1] < SETTING_TABLE_FLOOR:
+        raise RuntimeError(f"{label}: runs down into the labels at {box!r}")
+    if box[0] < GEAR_STEPS_RIGHT + SETTING_TABLE_CLEARANCE:
+        raise RuntimeError(f"{label}: runs into the steps for each gear at {box!r}")
 
 
 @_telemetry.traced("drawing.dt_cylinder_gear_tl_cam_turning_assembly")

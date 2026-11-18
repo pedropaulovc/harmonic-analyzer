@@ -136,6 +136,29 @@ def test_top_and_front_views_are_one_projected_pair_and_labels_omit_the_sheet_sc
     )
 
 
+def test_kit_settings_print_in_a_setting_table_the_steps_cite() -> None:
+    # Rule 22 (run 20261118T083019774Z's review): item 2's stand and throw,
+    # measurable settings, print in a table as well as in their steps.
+    rows = {row[0]: row[1:] for row in sheet.SETTING_TABLE_ROWS}
+    stand, throw = zip(*rows.values(), strict=True)
+    assert fixture.STUB_STAND_TEXT in stand[0]
+    assert fixture.inch_text(fixture.STUB_OFFSET, 4) in throw[0]
+    assert fixture.THROW_STACK_TOTAL_TEXT in throw[1]
+    assert fixture.THROW_READING_BAND_TEXT in throw[1]
+    assert abs(fixture.THROW_STACK - 2.0 * fixture.STUB_OFFSET) < 1e-9
+    assert "STEP 1)" in sheet.SETTING_TABLE_HEADER[1]
+    first, last = sheet.THROW_ZERO_STEP - 1, sheet.THROW_CHECK_STEP + 1
+    assert f"STEPS {first}-{last})" in sheet.SETTING_TABLE_HEADER[2]
+    for number in (1, sheet.THROW_CHECK_STEP):
+        assert "SETTING TABLE, SHEET 2" in _step(number)
+    # The table stands right of the steps for each gear and above the labels.
+    each = sheet.GEAR_STEPS.splitlines()
+    assert (
+        sheet.GEAR_STEPS_XY[0] + max(map(len, each)) * 0.00245 <= sheet.GEAR_STEPS_RIGHT
+    )
+    assert sheet.SETTING_TABLE_FLOOR < sheet.SETTING_TABLE_XY[1] - 0.040
+
+
 def _step(number: int) -> str:
     return sheet.STEPS[number - 1]
 
