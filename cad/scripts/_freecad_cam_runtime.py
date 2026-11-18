@@ -421,9 +421,17 @@ def post(sections, path, name, comment, load_first=False):
                 postamble = lines[_index(lines, "(Begin postamble)", name):]
             bodies.append(lines[_index(lines, "M3 ", name, start=True):_index(lines, "(Begin postamble)", name)])
         tools.append((tc.ToolNumber, _LABELS[tc.Name], float(tc.SpindleSpeed), float(tc.Tool.Diameter), None))
-    if len(sources) != 1:
+    manual_only = all(isinstance(section, dict) for section in sections)
+    if manual_only:
+        # A program of manual sections only (a hand-tap stop): no Job posted
+        # it, so it takes the Grbl post's own preamble words and ends with its
+        # section's own last line (M30, the controller Idle).
+        if not load_first:
+            raise RuntimeError(f"{name}: a program of manual sections must load its first tool")
+        preamble, postamble = ["(Begin preamble)", "G17 G90", "G21", "G54"], []
+    elif len(sources) != 1:
         raise RuntimeError(f"{name}: sections posted by several post files: {sorted(sources)}")
-    if isinstance(sections[0], dict):
+    elif isinstance(sections[0], dict):
         raise RuntimeError(f"{name}: the first section must be a posted Job (it sets the program's first tool and speed)")
     listed = {}
     for number, label, _rpm, dia, _setting in tools:
@@ -453,7 +461,7 @@ def post(sections, path, name, comment, load_first=False):
     out += postamble or []
     with open(path, "w", encoding="utf-8", newline="\n") as handle:
         handle.write("\n".join(out) + "\n")
-    return path, os.path.abspath(sources.pop())
+    return path, None if manual_only else os.path.abspath(sources.pop())
 
 
 def _load_recipe(path):
@@ -491,7 +499,8 @@ def main():
                 sections.append(manual[0] if manual else list(_flatten(items)))
             path = os.path.join(spec["out_dir"], f"{name}.nc")
             posted.append(post(sections, path, name, spec["ctx"]["comment"], load_first=name in loads))
-        sources = sorted({source for _path, source in posted})
+        # A program of manual sections only names no post file.
+        sources = sorted({source for _path, source in posted if source is not None})
         if len(sources) != 1:
             raise RuntimeError(f"programs posted by several post files: {sources}")
         result = {"freecad_version": ".".join(FreeCAD.Version()[:3]), "post": sources[0], "files": [p for p, _s in posted]}

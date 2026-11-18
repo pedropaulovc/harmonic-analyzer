@@ -70,7 +70,11 @@ from _drawing_notes import add_property_linked_note
 from _drawing_precision import _named_dimension
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
+from _feature_requirements import part_metadata, requirement
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _part_properties import part_drawing_unit
+from _printed_limits import drilled_limits, limits
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
 from _gear_drawing_entities import visible_circle_edge
@@ -93,12 +97,19 @@ from build_mg_magnifying_clamp import (
     _segment_identity,
     _sketch_owners,
 )
+from mg_magnifying_clamp_geom import (
+    LOCATION_FROM_FLAT,
+    THUMB_TAP_DRILL_DEPTH,
+    THUMB_TAP_LENGTH,
+    UNIT,
+)
 from mg_magnifying_clamp_spec import (
     AREA_HATCH_STYLE_PATTERN,
     BLOCK_HEIGHT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     DIMENSION_GROUPS,
+    FAR_WALL_NEAREST,
     GROUPED_HIDDEN_DIMENSIONS,
     Z_FLAT_DIMENSIONS,
     VISIBLE_DIMENSIONS,
@@ -115,8 +126,16 @@ from mg_magnifying_clamp_spec import (
     SECTION_HATCH_PATTERN,
     STOCK_REFERENCE_DIMENSION,
     TAP_CALLOUT_PRECISION,
+    TAP_DRILL_DIA_VARIABLE,
     TAP_DRILL_DEPTH_VARIABLE,
+    TAP_REACH_NEEDED,
     TAP_THREAD_DEPTH_VARIABLE,
+)
+from mg_rod_clamp_joint import (
+    PLUG_TAP_LEAD,
+    ROD_TAP_DRILL_DEPTH,
+    ROD_TAP_THREAD_DEPTH,
+    THREAD_CALLOUT,
 )
 
 
@@ -235,6 +254,241 @@ THUMB_TAP_CALLOUT_XY = (0.165, TOP_CENTER[1] + 0.010)
 ROD_TAP_CALLOUT_XY = (0.150, BOTTOM_CENTER[1] + 0.008)
 # SolidWorks' own descriptive note for a Hole Wizard tap ("#4-40 Tapped Hole").
 TAPPED_HOLE_NOTE = "Tapped Hole"
+
+# Feature-export declarations (export_features; cad/docs/pipeline/
+# features-travelers.md): what this sheet prints, beside the constants of the
+# code that prints it, in the part frame (mg_magnifying_clamp_geom: origin at
+# the bottom-face centre, hex axis +Y, corners on +/-X, the Z flats square to
+# +/-Z). A band is the title block's row for the places the sheet prints
+# (DRAWING_PRECISION_BY_NAME, TAP_CALLOUT_PRECISION) on the printed nominal;
+# the drilled holes take the DRILLED HOLES row. The declarations print
+# nothing.
+_P = DRAWING_PRECISION_BY_NAME
+_CALLOUT_SOURCES = (
+    ("mg_magnifying_clamp_spec", "TAP_CALLOUT_PRECISION"),
+    ("draw_mg_magnifying_clamp", "build"),
+)
+part_metadata(
+    model_sources=(("mg_magnifying_clamp_geom", "HEX_AF"), ("mg_magnifying_clamp_geom", "BLOCK_HEIGHT")),
+    precision_sources=(
+        ("mg_magnifying_clamp_spec", "DRAWING_PRECISION"),
+        ("mg_magnifying_clamp_spec", "DRAWING_PRECISION_BY_NAME"),
+        ("mg_magnifying_clamp_spec", "TAP_CALLOUT_PRECISION"),
+    ),
+)
+# Both faced ends: the block height (RIGHT_KEEP "Height") between them; the
+# bottom is the MHA-MG-04 shoulder seat (SEAT_NOTE, flagged on section A-A).
+_HEIGHT = (
+    limits(BLOCK_HEIGHT, _P["Height"], unit=UNIT),
+    (
+        ("mg_magnifying_clamp_geom", "BLOCK_HEIGHT"),
+        ("mg_magnifying_clamp_geom", "UNIT"),
+        ("draw_mg_magnifying_clamp", "RIGHT_KEEP"),
+    ),
+)
+for _name, _sign, _y in (("bottom_face", -1, 0.0), ("top_face", 1, BLOCK_HEIGHT)):
+    requirement(
+        _name,
+        kind="face",
+        faces=(PlanarFace((0, _sign, 0), _sign * _y),),
+        requirements=("height",),
+        fields={
+            "height": _HEIGHT,
+            "height_nominal": (BLOCK_HEIGHT, (("mg_magnifying_clamp_geom", "BLOCK_HEIGHT"),)),
+            "plane": (
+                {"frame": "model", "axis": "y", "value": _y},
+                (("mg_magnifying_clamp_geom", "BLOCK_HEIGHT"),),
+            ),
+            **(
+                {"note": (SEAT_NOTE, (("draw_mg_magnifying_clamp", "SEAT_NOTE"),))}
+                if _sign < 0
+                else {}
+            ),
+        },
+        precision={"height": _P["Height"]},
+    )
+
+# The six flats as bought: the (1/2) HEX STOCK REF (TOP_KEEP "HexAf",
+# HEX_AF_REFERENCE), untoleranced, so no acceptance band; across the corners
+# is the nominal hexagon's.
+_FLAT_NORMALS = tuple(
+    (round(math.sin(math.radians(angle)), 12), 0.0, round(math.cos(math.radians(angle)), 12))
+    for angle in range(0, 360, 60)
+)
+requirement(
+    "hex_flats",
+    kind="stock",
+    faces=tuple(PlanarFace(normal, HEX_AF / 2.0) for normal in _FLAT_NORMALS),
+    requirements=(),
+    fields={
+        "af_ref": (
+            HEX_AF,
+            (
+                ("mg_magnifying_clamp_geom", "HEX_AF"),
+                ("mg_magnifying_clamp_spec", "HEX_AF_CALLOUT"),
+                ("draw_mg_magnifying_clamp", "TOP_KEEP"),
+            ),
+        ),
+        "ac_nominal": (HEX_AC, (("mg_magnifying_clamp_geom", "HEX_AC"),)),
+        "stock_form": (HEX_AF_CALLOUT, (("mg_magnifying_clamp_spec", "HEX_AF_CALLOUT"),)),
+        "flat_normals": (
+            [list(normal) for normal in _FLAT_NORMALS],
+            (("mg_magnifying_clamp_geom", "HEX_AF"),),
+        ),
+    },
+)
+
+# The lever bore across the corners (RIGHT_KEEP "LeverBoreDiaDim" with
+# LEVER_BORE_CALLOUT, "LeverBoreYDim"), and the one common-flat .25 the bore
+# and both taps are located from (RIGHT_LOCATION_KEEP, grouped).
+_Z_FLAT_LOCATION = (
+    limits(LOCATION_FROM_FLAT, _P["LeverBoreFromZFlat"], unit=UNIT),
+    (
+        ("mg_magnifying_clamp_geom", "LOCATION_FROM_FLAT"),
+        ("mg_magnifying_clamp_geom", "UNIT"),
+        ("mg_magnifying_clamp_spec", "Z_FLAT_DIMENSIONS"),
+        ("draw_mg_magnifying_clamp", "RIGHT_LOCATION_KEEP"),
+    ),
+)
+requirement(
+    "lever_bore",
+    kind="hole",
+    faces=(CylinderFace(LEVER_BORE_DIA),),
+    requirements=("dia", "thru", "height", "location_from_z_flat"),
+    fields={
+        "at": ([0.0, LEVER_BORE_Y, 0.0], (("mg_magnifying_clamp_geom", "LEVER_BORE_Y"),)),
+        "axis": ((1.0, 0.0, 0.0), (("mg_magnifying_clamp_geom", "BLOCK_DEPTH"),)),
+        "dia": (
+            drilled_limits(LEVER_BORE_DIA, _P["LeverBoreDiaDim"], unit=UNIT),
+            (
+                ("mg_magnifying_clamp_geom", "LEVER_BORE_DIA"),
+                ("mg_magnifying_clamp_geom", "UNIT"),
+                ("draw_mg_magnifying_clamp", "RIGHT_KEEP"),
+            ),
+        ),
+        "nominal_dia": (LEVER_BORE_DIA, (("mg_magnifying_clamp_geom", "LEVER_BORE_DIA"),)),
+        "thru": (True, (("draw_mg_magnifying_clamp", "LEVER_BORE_CALLOUT"),)),
+        "process": ("drill", (("draw_mg_magnifying_clamp", "LEVER_BORE_CALLOUT"),)),
+        "callout": (LEVER_BORE_CALLOUT, (("draw_mg_magnifying_clamp", "LEVER_BORE_CALLOUT"),)),
+        "height": (
+            limits(LEVER_BORE_Y, _P["LeverBoreYDim"], unit=UNIT),
+            (
+                ("mg_magnifying_clamp_geom", "LEVER_BORE_Y"),
+                ("mg_magnifying_clamp_geom", "UNIT"),
+                ("draw_mg_magnifying_clamp", "RIGHT_KEEP"),
+            ),
+        ),
+        "height_from": ("bottom_face", (("draw_mg_magnifying_clamp", "RIGHT_KEEP"),)),
+        "location_from_z_flat": _Z_FLAT_LOCATION,
+    },
+    precision={
+        "dia": _P["LeverBoreDiaDim"],
+        "height": _P["LeverBoreYDim"],
+        "location_from_z_flat": _P["LeverBoreFromZFlat"],
+    },
+)
+
+# Both #4-40 taps on the hex axis (THUMB_TAP_CALLOUT_XY, ROD_TAP_CALLOUT_XY):
+# each native callout prints its #43 tap drill at .XXX (DRILLED HOLES row) and
+# its depths at .XX. The thumb tap's thread depth prints (REF): the bore ends
+# it. The plug tap's lead and the spec's reach window are process facts the
+# sheet does not print (mg_magnifying_clamp_spec: a stock plug tap makes the
+# part); the thumb tap is run until its lead is in the bore, short of the far
+# wall.
+_TAP_DRILL = (
+    drilled_limits(ROD_TAP_DRILL_DIA, TAP_CALLOUT_PRECISION[TAP_DRILL_DIA_VARIABLE], unit=UNIT),
+    (
+        ("mg_rod_clamp_joint", "ROD_TAP_MINOR_DIA"),
+        ("mg_magnifying_clamp_geom", "UNIT"),
+        *_CALLOUT_SOURCES,
+    ),
+)
+_DEPTH_PLACES = TAP_CALLOUT_PRECISION[TAP_DRILL_DEPTH_VARIABLE]
+_THREAD = (f"{THREAD_CALLOUT}-2B", (("mg_rod_clamp_joint", "THREAD_CALLOUT"), *_CALLOUT_SOURCES))
+_LEAD = (PLUG_TAP_LEAD, (("mg_rod_clamp_joint", "PLUG_TAP_LEAD"),))
+requirement(
+    "thumb_tap",
+    kind="threaded_hole",
+    faces=(CylinderFace(ROD_TAP_DRILL_DIA, contains_y_mm=(BLOCK_HEIGHT + LEVER_BORE_Y) / 2.0 + LEVER_BORE_DIA / 4.0),),
+    requirements=("thread", "dia", "drill_depth", "location_from_z_flat"),
+    fields={
+        "at": ([0.0, BLOCK_HEIGHT, 0.0], (("mg_magnifying_clamp_geom", "BLOCK_HEIGHT"),)),
+        "axis": ((0.0, -1.0, 0.0), (("mg_magnifying_clamp_geom", "THUMB_TAP_SPEC"),)),
+        "thread": _THREAD,
+        "dia": _TAP_DRILL,
+        "drill_depth": (
+            limits(THUMB_TAP_DRILL_DEPTH, _DEPTH_PLACES, unit=UNIT),
+            (
+                ("mg_magnifying_clamp_geom", "THUMB_TAP_DRILL_DEPTH"),
+                ("mg_magnifying_clamp_geom", "UNIT"),
+                *_CALLOUT_SOURCES,
+            ),
+        ),
+        "drill_depth_nominal": (THUMB_TAP_DRILL_DEPTH, (("mg_magnifying_clamp_geom", "THUMB_TAP_DRILL_DEPTH"),)),
+        "thread_depth_ref": (
+            THUMB_TAP_LENGTH,
+            (
+                ("mg_magnifying_clamp_geom", "THUMB_TAP_LENGTH"),
+                ("draw_mg_magnifying_clamp", "reference_thread_depth_definitions"),
+            ),
+        ),
+        "into": ("lever_bore", (("mg_magnifying_clamp_geom", "THUMB_TAP_DRILL_DEPTH"),)),
+        "location_from_z_flat": _Z_FLAT_LOCATION,
+        "mates": (THUMB_TAP_MATE, (("draw_mg_magnifying_clamp", "THUMB_TAP_MATE"),)),
+        "plug_tap_lead": _LEAD,
+        "tap_reach": (
+            [TAP_REACH_NEEDED, FAR_WALL_NEAREST],
+            (
+                ("mg_magnifying_clamp_spec", "TAP_REACH_NEEDED"),
+                ("mg_magnifying_clamp_spec", "FAR_WALL_NEAREST"),
+            ),
+        ),
+    },
+    precision={
+        "dia": TAP_CALLOUT_PRECISION[TAP_DRILL_DIA_VARIABLE],
+        "drill_depth": _DEPTH_PLACES,
+        "location_from_z_flat": _P["ThumbTapFromZFlat"],
+    },
+)
+requirement(
+    "rod_tap",
+    kind="threaded_hole",
+    faces=(CylinderFace(ROD_TAP_DRILL_DIA, contains_y_mm=ROD_TAP_THREAD_DEPTH / 2.0),),
+    requirements=("thread", "dia", "thread_depth", "drill_depth", "location_from_z_flat"),
+    fields={
+        "at": ([0.0, 0.0, 0.0], (("mg_magnifying_clamp_geom", "BLOCK_HEIGHT"),)),
+        "axis": ((0.0, 1.0, 0.0), (("mg_rod_clamp_joint", "ROD_TAP_SPEC"),)),
+        "thread": _THREAD,
+        "dia": _TAP_DRILL,
+        "thread_depth": (
+            limits(ROD_TAP_THREAD_DEPTH, TAP_CALLOUT_PRECISION[TAP_THREAD_DEPTH_VARIABLE], unit=UNIT),
+            (
+                ("mg_rod_clamp_joint", "ROD_TAP_THREAD_DEPTH"),
+                ("mg_magnifying_clamp_geom", "UNIT"),
+                *_CALLOUT_SOURCES,
+            ),
+        ),
+        "thread_depth_nominal": (ROD_TAP_THREAD_DEPTH, (("mg_rod_clamp_joint", "ROD_TAP_THREAD_DEPTH"),)),
+        "drill_depth": (
+            limits(ROD_TAP_DRILL_DEPTH, _DEPTH_PLACES, unit=UNIT),
+            (
+                ("mg_rod_clamp_joint", "ROD_TAP_DRILL_DEPTH"),
+                ("mg_magnifying_clamp_geom", "UNIT"),
+                *_CALLOUT_SOURCES,
+            ),
+        ),
+        "drill_depth_nominal": (ROD_TAP_DRILL_DEPTH, (("mg_rod_clamp_joint", "ROD_TAP_DRILL_DEPTH"),)),
+        "location_from_z_flat": _Z_FLAT_LOCATION,
+        "seat_note": (SEAT_NOTE, (("draw_mg_magnifying_clamp", "SEAT_NOTE"),)),
+        "plug_tap_lead": _LEAD,
+    },
+    precision={
+        "dia": TAP_CALLOUT_PRECISION[TAP_DRILL_DIA_VARIABLE],
+        "thread_depth": TAP_CALLOUT_PRECISION[TAP_THREAD_DEPTH_VARIABLE],
+        "drill_depth": _DEPTH_PLACES,
+        "location_from_z_flat": _P["RodTapFromZFlat"],
+    },
+)
 
 # The section's cutting line: vertical through the hex axis on the front view,
 # past the block top and bottom.

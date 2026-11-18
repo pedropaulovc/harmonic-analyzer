@@ -1639,7 +1639,7 @@ kind = "tap_die_set"
 present = true
 sizes = ["4-36", "6-32", "8-32", "10-32", "10-24", "12-24", "1/4-20", "1/4-28", "5/16-18", "3/8-16", "7/16-20", "7/16-14", "5/16-24", "3/8-24", "1/2-20", "1/2-13"]
 included = ["one tap and one die in each size", "1/8 pipe tap", "long-handle adjustable tap wrench", "T-handle tap wrench", "die handle", "screwdriver", "screw pitch gauge"]
-note = "Taps and dies not trusted for project work (owner ruling 2026-11-06, PR #2222); the wrenches and die handle are used."
+note = "Taps and dies not trusted for project work (owner ruling 2026-11-06, PR #2222); the wrenches and die handle are used. One of the owned T-handle tap wrenches, this set's or holders.tap-wrench-t-small, has a centre hole in its top for a dead centre's point (owner, 2026-11-17: \"y\"; not measured); the owner did not say which."
 cite = ["Photo 20250628_224315797_iOS.heic, 2025-06-28: lid label \"40 PIECE TAP AND DIE SET / CONTAINING ONE TAP AND DIE IN EACH OF THE FOLLOWING SIZES\" and the PLUS list", "Owner (Pedro) 2026-11-17: the photo shows owned tools"]
 
 # Photo 20250628_224109095_iOS.heic (2025-06-28): a metric tap and drill set
@@ -1661,7 +1661,8 @@ M12 = { tap = "M12 x 1.75", tap_drill_mm = 10.20 }
 name = "Small T-handle tap wrench (size range not legible)"
 kind = "tap_wrench"
 present = true
-cite = ["Photo 20250628_224109095_iOS.heic, 2025-06-28, beside the metric tap set", "Owner (Pedro) 2026-11-17: the photo shows owned tools"]
+note = "One of the owned T-handle tap wrenches, this one or the 40-piece set's (tools.tap-die-set-40), has a centre hole in its top for a dead centre's point; the owner did not say which."
+cite = ["Photo 20250628_224109095_iOS.heic, 2025-06-28, beside the metric tap set", "Owner (Pedro) 2026-11-17: the photo shows owned tools", "Owner (Pedro) 2026-11-17, asked whether the T-handle tap wrench he will use for the clamp's 4-40 tap has a centre hole in its top for the dead centre's point: \"y\". Owner-confirmed, not measured."]
 
 # Photo 20250628_223528049_iOS.heic (2025-06-28): a yellow-bin organiser of
 # loose hand taps and twist drills. Legible markings: "BESLY USA" and
@@ -1688,3 +1689,74 @@ present = true
 pieces = 4
 range_in = [0.25, 0.375]
 cite = ["LittleMachineShop listing read 2026-11-17: SKU 5948, \"Reamers in this set are adjustable from 0.250\" to 0.375\"\", \"4 Piece Set Sizes #8 - #5\", HSS, black oxide, wooden storage box, $69.95", "Owner (Pedro) 2026-11-17: owned; with the .3760 reamer, the only reamers"]
+
+# --- MHA-MG-02 magnifying clamp: brass black (owner ruling 2026-11-17) -------
+
+# Owner (Pedro) 2026-11-17, relayed by Main: the clamp is blackened as the
+# registry says; buy a brass-black solution (no product preference). "The
+# clamp is machined now and blackened later. The traveler may end at bare
+# machined with the part tagged awaiting brass black." The traveler's
+# blackening setup (cad/process/mg_magnifying_clamp) is gated on these
+# records. Birchwood Casey's own site (birchwoodcasey.com) refused the fetch
+# (Incapsula bot wall, 2026-11-17); its directions are read from the brand's
+# EU site, which names D-TOC GmbH as the EU responsible person.
+[consumables.brass-black-birchwood-casey]
+name = "Birchwood Casey Brass Black metal finish, 3 fl oz"
+kind = "blackening_solution"
+make = "Birchwood Casey"
+sku = "15225"
+source = "https://www.micro-tools.com/products/15225-f"
+present = false
+status = "not owned: to buy"
+purchase = "Micro-Tools 15225-F (MPN 15208), $9.70, read 2026-11-17; ships by ground only, US 48 states. Also Brownells #167-005-200."
+use = "MHA-MG-02 magnifying clamp: chemical blackening, its last setup"
+cite = [
+  "Birchwood Casey Deutschland, Brass Black Brünierung, Artikelnummer 15225, read 2026-11-17 (https://www.birchwoodcasey-deutschland.de/bruenierung-fuer-messing-kupfer-bronze.html), directions translated: 1. clean the parts with Birchwood Casey Cleaner-Degreaser; 3. treat the surfaces lightly with steel wool (grade 00) or abrasive paper; 4. clean again with the degreaser and rinse with clear water; 5. apply with a suitable applicator and let it act about one minute, then rinse the parts with cold water and carefully pat them dry; 6.-7. for a deeper colour polish lightly with fine steel wool (0000) and repeat steps 4-6; 8. preserve the surface with Birchwood Casey Barricade oil, leave it overnight, then wipe off excess oil. Step 2 (remove an old finish and rust) does not apply to fresh brass. 'causes no material change' (verursacht keine Materialveränderungen); FAQ: for brass, copper and bronze. Hazard: H302, H314 (severe skin burns and eye damage), H410; P280 wear protective gloves, clothing, eye and face protection.",
+  "Micro-Tools 15225-F listing, read 2026-11-17: 'chemically reacts with the metal surface to create a darkened finish without dimensional change'; colour deep grey to black depending on the alloy; room temperature.",
+  "Brownells Bluing Supplies booklet 076-200-040 (https://feeds.brownells.com/userdocs/learn/076-200-040_Bluing_Booklet.pdf), Birchwood Casey metal finishing products: 'BRASS BLACK - Use for touch-up or complete refinishing. For sights, screws, swivels - copper or brass.'",
+]
+
+[consumables.cleaner-degreaser-birchwood-casey]
+name = "Birchwood Casey Cleaner-Degreaser"
+kind = "solvent"
+make = "Birchwood Casey"
+present = false
+status = "not owned: to buy"
+purchase = "The degreaser Brass Black's directions name; no size, price or stock read."
+use = "MHA-MG-02 blackening: degrease before and after the light abrading"
+cite = ["Birchwood Casey Deutschland, Brass Black directions steps 1 and 4 (see consumables.brass-black-birchwood-casey)"]
+
+[consumables.barricade-birchwood-casey]
+name = "Birchwood Casey Barricade rust protection oil"
+kind = "oil"
+make = "Birchwood Casey"
+present = false
+status = "not owned: to buy"
+purchase = "The oil Brass Black's directions name to preserve the finish; no size, price or stock read."
+use = "MHA-MG-02 blackening: preserve the blackened surface, overnight"
+cite = ["Birchwood Casey Deutschland, Brass Black directions step 8 (see consumables.brass-black-birchwood-casey)"]
+
+[consumables.chemical-gloves-eye-protection]
+name = "Chemical-resistant gloves and safety glasses"
+kind = "ppe"
+present = false
+status = "not owned: to buy (none on record)"
+use = "Handling Brass Black (H314: severe skin burns and eye damage)"
+cite = ["Birchwood Casey Deutschland, Brass Black hazard labelling: P280 wear protective gloves, protective clothing, eye protection, face protection"]
+
+# Owner (Pedro) 2026-11-17: "i have oxpho blue". A cold blue for steel: the
+# maker's instructions and catalogue name guns, tools and steel, never brass,
+# and the same catalogue sells Brass Black for brass. Not used on the brass
+# clamp. Brownells' product page refused the fetch (HTTP 403, Cloudflare,
+# 2026-11-17); the size owned is not recorded.
+[consumables.oxpho-blue]
+name = "Brownells Oxpho-Blue liquid gun blue (cold blue)"
+kind = "cold_blue"
+make = "Brownells"
+present = true
+use = "Steel parts only; not the brass clamp"
+cite = [
+  "Owner (Pedro) 2026-11-17: \"i have oxpho blue\"",
+  "Brownells instruction sheet 076-200-546 (https://feeds.brownells.com/userdocs/learn/Inst-546forWeb.pdf), read 2026-11-17: 'Oxpho-Blue is an easily applied, highly rust resistant, bright phosphatizing chemical for touching-up or bluing guns, tools and instruments.' Contains phosphoric acid, cupric sulfate and selenious acid. No metal other than the gun is named.",
+  "Brownells Bluing Supplies booklet 076-200-040, read 2026-11-17: 'The chemical goes through the oil on the gun, removes thin rust and blues the steel underneath.' Oxpho-Blue Creme: 'use Oxpho Creme anywhere you need to give steel a quick, uniform, blue/black finish'.",
+]

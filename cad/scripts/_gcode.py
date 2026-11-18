@@ -234,6 +234,10 @@ def read_program(path: Path) -> Program:
             continue
         line = _COMMENT.sub("", raw).strip().upper()
         words = [(letter, float(value)) for letter, value in _WORD.findall(line)]
+        if line and not words:
+            # Text left outside a comment (comments do not nest: the first ")"
+            # ends one) reaches the controller as code, which refuses it.
+            raise ValueError(f"{Path(path).name}:{number}: text outside a comment, sent as code: {raw.strip()}")
         codes = {value for letter, value in words if letter == "G"}
         mcodes = {value for letter, value in words if letter == "M"}
         for kind, code in (("M0", 0), ("M6", 6)):
@@ -473,6 +477,69 @@ def check_tool_changes(
                 ))
     if program.machine_moves:
         findings.append(Finding(program.name, "tools", f"machine-coordinate moves (G28/G30/G53) on lines {list(program.machine_moves)}"))
+    return findings
+
+
+def check_tap_stop(program: Program, tool: int, at: tuple[float, float], machine_top: float) -> list[Finding]:
+    """A hand-tap stop file: the controller ends Idle over one hole so the
+    operator can jog Z (FluidNC, like Grbl, refuses jogs in the Hold an M0
+    leaves). Its one ``M6`` calls ``tool`` (the guide) before any motion; its
+    first motion is ``G53 G0`` naming Z alone (the top, in machine
+    coordinates: Z was left jogged down by the operator); then only rapids
+    in X and Y, ending over ``at``; no feed move, no spindle word, no Z move
+    in part coordinates (nothing lowers the guide but the operator's jog);
+    the last command is ``M30``. ``machine_top`` is the lowest machine Z the
+    retract may name."""
+    findings: list[Finding] = []
+
+    def fail(detail: str) -> None:
+        findings.append(Finding(program.name, "tap_stop", detail))
+
+    if program.section is not None:
+        fail("a tap stop is a whole file, not a tool section")
+        return findings
+    if [stop.tool for stop in program.tool_changes] != [tool]:
+        fail(f"M6 calls {[stop.tool for stop in program.tool_changes]}, expected [{tool}]")
+    if program.pauses:
+        fail(f"M0 on lines {[p.line for p in program.pauses]}: an M0 holds the controller, where jogging is refused")
+    if program.spindle:
+        fail(f"spindle words on lines {[line for line, _rpm in program.spindle]}: the spindle stays off")
+    commands: list[tuple[int, set[float], set[float], dict[str, float]]] = []
+    for number, raw in enumerate(Path(program.path).read_text(encoding="utf-8").splitlines(), 1):
+        if raw.strip().startswith("%"):
+            continue
+        words = [(letter, float(value)) for letter, value in _WORD.findall(_COMMENT.sub("", raw).strip().upper())]
+        if words:
+            g = {v for letter, v in words if letter == "G"}
+            m = {v for letter, v in words if letter == "M"}
+            commands.append((number, g, m, {k: v for k, v in words if k in "XYZ"}))
+    for number, g, m, _axes in commands:
+        if m & {3, 4}:
+            fail(f"line {number}: M3/M4 starts the spindle; the spindle stays off")
+        if g & {28, 30}:
+            fail(f"line {number}: G28/G30 moves the guide to a stored position")
+    m6 = next((number for number, _g, m, _a in commands if 6 in m), None)
+    motions = [(number, g, axes) for number, g, _m, axes in commands if axes]
+    if m6 is None or (motions and motions[0][0] < m6):
+        fail("motion before the M6: the guide's length is not set")
+    if not motions or not (53 in motions[0][1] and 0 in motions[0][1] and set(motions[0][2]) == {"Z"}):
+        fail("the first motion is not a G53 G0 Z retract to the top")
+    xy = None
+    for number, g, axes in motions[1:]:
+        if g & {1, 2, 3} or g & {28, 30, 53}:
+            fail(f"line {number}: only G0 in part coordinates may follow the retract")
+        if "Z" in axes:
+            fail(f"line {number}: a Z move in part coordinates; the operator jogs the guide down")
+        if "X" in axes and "Y" in axes:
+            xy = (axes["X"], axes["Y"])
+    if program.cutting:
+        fail(f"{len(program.cutting)} feed moves")
+    if xy is None or not (_close(xy[0], at[0]) and _close(xy[1], at[1])):
+        fail(f"ends over {xy}, expected over {tuple(at)}")
+    if not commands or 30 not in commands[-1][2]:
+        fail("the last command is not M30 (the controller must end Idle)")
+    if 53 in (motions[0][1] if motions else set()) and motions[0][2].get("Z", -math.inf) < machine_top:
+        fail(f"the G53 retract names Z{motions[0][2]['Z']:.3f}, below the machine top {machine_top:.3f}")
     return findings
 
 

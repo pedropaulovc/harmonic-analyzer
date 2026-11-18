@@ -104,6 +104,51 @@ def test_a_program_that_loads_its_first_tool_does_so_before_any_move(tmp_path):
     assert len(_gcode.check_tool_changes(early, 12.0, [1], loads_first=True)) == 1
 
 
+_TAP_STOP = (
+    "(SP03_tap_clamp_1)\n(T6 MT3 dead centre)\n(Begin preamble)\nG17 G90\nG21\nG54\n"
+    "M5\n%msg TOOL CHANGE: T6 MT3 dead centre, SPINDLE STAYS OFF. NEXT: 4-40 TAP IN CLAMP HOLE 1\n"
+    "M6 T6\nG53 G0 Z0.000\nG0 X25.400 Y-41.910\n(4-40 TAP IN CLAMP HOLE 1)\nM30\n"
+)
+
+
+@pytest.mark.parametrize(
+    ("fault", "seeded", "detail"),
+    [
+        ("no retract", ("G53 G0 Z0.000\n", ""), "first motion is not a G53 G0 Z retract"),
+        ("XY before the retract", ("G53 G0 Z0.000\nG0 X25.400 Y-41.910\n", "G0 X25.400 Y-41.910\nG53 G0 Z0.000\n"), "first motion is not a G53"),
+        ("motion before the M6", ("M5\n", "G0 X0 Y0\nM5\n"), "motion before the M6"),
+        ("a part-coordinate Z", ("(4-40", "G0 Z5\n(4-40"), "a Z move in part coordinates"),
+        ("a feed move", ("G0 X25.400 Y-41.910\n", "G0 X25.400 Y-41.910 Z1\nG1 X26 Y-41.910 Z1 F100\n"), "only G0 in part coordinates"),
+        ("an M0 stop", ("M30\n", "M0\nM30\n"), "an M0 holds the controller"),
+        ("no M30", ("M30\n", "M2\n"), "last command is not M30"),
+        ("the wrong hole", ("X25.400", "X26.400"), "expected over"),
+        ("the spindle on", ("M6 T6\n", "M6 T6\nM3 S900\n"), "the spindle stays off"),
+        ("a bare M3", ("M6 T6\n", "M6 T6\nM3\n"), "M3/M4 starts the spindle"),
+        ("a bare G28", ("M30\n", "G28\nM30\n"), "G28/G30 moves the guide"),
+        ("the wrong tool", ("M6 T6", "M6 T5"), "M6 calls [5]"),
+    ],
+)
+def test_a_tap_stop_file_ends_idle_over_its_hole_after_a_machine_retract(tmp_path, fault, seeded, detail):
+    good = _program(tmp_path, _TAP_STOP)
+    assert _gcode.check_tap_stop(good, 6, (25.4, -41.91), 0.0) == []
+    assert _TAP_STOP.count(seeded[0]) == 1, fault
+    bad = _program(tmp_path, _TAP_STOP.replace(seeded[0], seeded[1]))
+    found = [f.detail for f in _gcode.check_tap_stop(bad, 6, (25.4, -41.91), 0.0)]
+    assert any(detail in f for f in found), (fault, found)
+
+
+def test_text_left_outside_a_nested_comment_is_refused(tmp_path):
+    nested = _TAP_STOP.replace("(4-40 TAP IN CLAMP HOLE 1)", "(4-40 TAP IN CLAMP HOLE 1 (TOP END): JOG Z DOWN)")
+    with pytest.raises(ValueError, match="text outside a comment"):
+        _program(tmp_path, nested)
+
+
+def test_a_tap_stop_retract_must_reach_the_machine_top(tmp_path):
+    low = _program(tmp_path, _TAP_STOP.replace("G53 G0 Z0.000", "G53 G0 Z-50.000"))
+    found = [f.detail for f in _gcode.check_tap_stop(low, 6, (25.4, -41.91), 0.0)]
+    assert found == ["the G53 retract names Z-50.000, below the machine top 0.000"]
+
+
 def test_probe_sets_one_work_zero_after_a_touch_along_its_axis(tmp_path):
     probe = (
         "G0 X0 Y0 Z20\nM5\n(TOOL CHANGE: T8 PROBE, SPINDLE OFF - PROBE IN)\nM6 T8\nG0 Z17\nG0 X-22 Y-70\n"
