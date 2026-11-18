@@ -3098,7 +3098,11 @@ def _drawing_guidelines_version_dep() -> str:
     both read this one file, so an edit that keeps the version re-keys no
     review and leaves every one fresh, and a bump re-keys them all. A missing
     or non-integer version fails the graph load. Other tasks that read the
-    guidelines (``check:recipe``) keep hashing the whole file."""
+    guidelines (``check:recipe``) keep hashing the whole file.
+
+    Owner ruling 2026-11-17: "add a major version frontmatter to md file then
+    rekey only when major version changes". A body edit without a bump is seen
+    only by reviews that run for another reason; cached verdicts stand."""
     version, _body = split_drawing_guidelines(
         (SCRIPTS_DIR.parent / "docs" / "drawing-guidelines.md").read_text(
             encoding="utf-8"

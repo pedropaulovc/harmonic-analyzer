@@ -1099,9 +1099,11 @@ code and its pinned local-import closure, the selected kind's reviewer template
 and shared reviewer/judge severity contract, shared judge instructions/schemas,
 and the integer `major_version` in `cad/docs/drawing-guidelines.md`'s YAML
 frontmatter, not the file's bytes (dodo writes it to a sidecar under
-`cad/out/.machinist-review/`, which both the key and doit read). Bump it when
-a guidelines edit should change review verdicts; other edits re-run no cached
-review. A missing or non-integer version fails graph load. Reviewers receive
+`cad/out/.machinist-review/`, which both the key and doit read; owner ruling
+2026-11-17). Bump it when a guidelines edit should change review verdicts.
+Any other edit re-keys nothing: cached verdicts are reused unchanged, and only
+reviews that run anyway see the new text. A missing or non-integer version
+fails graph load. Reviewers receive
 the guidelines without the frontmatter. The other kind's template and severity
 contract are excluded. Reviewer and judge defaults live in the hashed review
 code; there are no model/effort environment overrides. `_drawing_registry.py` is

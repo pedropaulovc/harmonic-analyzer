@@ -248,6 +248,9 @@ def load_prompt(kind: str, *, judge: bool = False) -> str:
     """Compose either stage with the same kind-specific severity contract."""
     if kind not in PROMPT_FILES:
         raise ValueError(f"unknown review kind: {kind}")
+    # Reviewers read the body live, but cached verdicts are keyed only by the
+    # frontmatter's major_version (owner ruling 2026-11-17; dodo's
+    # _drawing_guidelines_version_dep).
     guidelines = review_config.split_drawing_guidelines(
         GUIDELINES_FILE.read_text(encoding="utf-8")
     )[1].rstrip()

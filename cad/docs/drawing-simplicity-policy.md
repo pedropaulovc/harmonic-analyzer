@@ -68,9 +68,13 @@ millimetre title-block rows and metric grades. Supplier fractions remain exact
 REF values through `_supplier_dimensions` with `RoundToFraction=False`; no
 fractional tolerance grade applies. Cached machinist reviews are keyed by the
 integer `major_version` in `drawing-guidelines.md`'s frontmatter, not its
-bytes: bump it when an edit should change review verdicts, which re-keys every
-review once; other edits re-key none. Editing a reviewer prompt re-keys the
-reviews that read it. This policy file is not a review input.
+bytes (owner ruling 2026-11-17: "add a major version frontmatter to md file
+then rekey only when major version changes"). Bump it when an edit should
+change review verdicts, which re-keys every review once. Any other edit
+re-keys none: cached verdicts stay as they were, and only reviews that run
+anyway (a changed sheet, a forced refresh, a bump) see the new text. Editing a
+reviewer prompt re-keys the reviews that read it. This policy file is not a
+review input.
 
 - **The model owns tolerance and precision (rules 3 and 4).** A band goes on
   the dimension as a native model tolerance
@@ -409,10 +413,11 @@ round to round while the sheet itself converged. The owner ruling of
 that only one run had raised; the owner ruling of 2026-11-17 restored the
 two-run rule for blockers after a lone blocker failed `dt_pinion_cam` (r1 and
 r2 SHIP, r3 one blocker). A lone confirmation stays in the report as
-non-gating evidence. A blocker claiming that something cannot reach,
-assemble, be made or fit must show its arithmetic from printed values and the
-named hardware; the judge works the same numbers and rejects it when any
-ordinary configuration of that hardware works.
+non-gating evidence. A blocker claiming that a named fastener, pin or
+purchased item cannot reach, engage, fit or assemble must show its arithmetic
+from printed values and that hardware; the judge works the same numbers and
+rejects it when any ordinary configuration of that hardware works. Rule 16
+cutter-access and trapped-geometry blockers are judged by that rule.
 
 The gate covers every sheet whose rendered output a PR changes, including a
 sheet that changes only because CAD geometry, config or a helper it reads

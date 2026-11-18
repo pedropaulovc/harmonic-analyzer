@@ -21,13 +21,14 @@ invented ones: confirm a finding that applies them by counting or reading the
 sheet yourself.
 A confirmed step-limit cluster's `where` lists every offending step you
 counted, by number, never a sample or "and similar".
-A claim that something cannot reach, cannot assemble, cannot be made or does
-not fit is confirmed only on arithmetic. Work it yourself from the values
+A claim that a named fastener, pin or purchased item cannot reach, engage, fit
+or assemble is confirmed only on arithmetic. Work it yourself from the values
 printed on the sheet and the hardware type the sheet names, and show the
 calculation in `reason`. If any ordinary configuration of that hardware works,
 the claim is `misread`. For example, a headless set screw is driven below
-flush, so a 3/16 in screw in a .238 in wall reaches the bore with about .05 in
-of thread above it.
+flush, so a screw of length L in a tapped wall of thickness t > L still reaches
+the bore, with t − L of thread left above it. Other unbuildable claims, such
+as rule 16 cutter access or trapped geometry, are judged by the rule they cite.
 
 Classify each sheet-supported issue using this package kind's contract:
 

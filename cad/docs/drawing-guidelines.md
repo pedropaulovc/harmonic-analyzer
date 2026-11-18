@@ -114,7 +114,7 @@ metric grades until their package is converted.
 - The surface row is a process statement (`CAST/MACHINED`), not a roughness
   grade: a face with no roughness symbol may be left as cast or as machined,
   the builder's choice. As-cast skin can never meet a number, and "as
-  machined" on a manual machine already lands where a general grade would.
+  machined" on the mill or the lathe already lands where a general grade would.
 - Where the material is not critical, the material field names the acceptable
   families as explicit alternatives (`LOW-CARBON STEEL OR GRAY IRON`). Do not
   force an unsupported grade or write "material not critical". A specific
