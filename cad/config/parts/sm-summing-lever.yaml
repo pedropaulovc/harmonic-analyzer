@@ -1,7 +1,21 @@
 sm-summing-lever:
   number: MHA-SM-03
-  material_family: ferrous_noncritical
-  finish: green enamel; mask knife edges and tapped holes; oil bare machined surfaces
+  # Delegated ruling 2026-11-17 (#1611 option A,
+  # https://github.com/pedropaulovc/harmonic-analyzer/issues/1611#issuecomment-6970973084),
+  # for the owner's after-the-fact review on
+  # https://github.com/pedropaulovc/harmonic-analyzer/issues/2144. Precedent:
+  # owner ruling 2026-11-10, #2334 B1 (a soft lever knife in the harder
+  # 28-32 HRC 4140 HT MHA-SM-02 seat). The knife edges stay integral and are
+  # named as machined, not hardened. Gray iron, the original's cast-iron lever,
+  # replaces the ferrous_noncritical family; its low-carbon-steel alternative is
+  # softer still. Test bar C: the lever is cut from 1-1/2 in continuous-cast bar
+  # (e.g. Dura-Bar G2), and A48 assigns bar C to 1.01-2.00 in sections.
+  material: GRAY IRON, ASTM A48 CLASS 40C
+  material_specification: GRAY IRON, ASTM A48 CLASS 40C
+  # The Finish cell holds two lines (~44 capitals each); the knife condition
+  # rides the masking clause so the statement fits (machinist review of farm
+  # run 20261118T064843854Z-76ae9b13e9cf: three lines overran the cell).
+  finish: GREEN ENAMEL; MASK TAPPED HOLES, KNIFE EDGES (AS MACHINED, NOT HARDENED); OIL BARE FACES
   quantity: 1
   tolerance_class: machined_block
   drawing_unit: in
@@ -21,7 +35,6 @@ sm-summing-lever:
   # is Ø.010 (#2326).
   # The .354 receiver extends inward only; entry face and axes stay fixed.
   # Pad/ledge and sharp-junction (former RV-02) exceptions are eliminated.
-  # Knife hardness debt (#1611) stays separate.
   # Native drawing contains six views on two sheets, reduced from nine views.
   # Native underside/swept-clearance and measured installed balance remain open.
   machinist_exceptions:

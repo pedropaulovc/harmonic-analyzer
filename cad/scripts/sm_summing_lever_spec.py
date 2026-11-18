@@ -102,7 +102,7 @@ KNIFE_RIDGE_TANGENT_XY = (
 # toleranced explicitly; HexWidth becomes a reference.  The worst shoulder is
 # the farthest from the ridge with the flattest flank: KNIFE_SHOULDER_X_MAX
 # out and KNIFE_SHOULDER_DROP_MIN down, on a flank KNIFE_FLANK_HALF_MAX_DEG
-# off the vertical.  The edge's hardness is still unspecified (#1611).
+# off the vertical.  The edge is gray iron as machined, not hardened (#1611).
 KNIFE_FLANK_TO_SIDE_DEG = round(180.0 - RIDGE_ANGLE_DEG / 2.0, 1)  # 122.4 printed
 KNIFE_FLANK_TO_SIDE_TOL_DEG = 0.5
 RIDGE_FROM_SIDE = HEX_W / 2.0  # 4.040 from each side face, printed .159
