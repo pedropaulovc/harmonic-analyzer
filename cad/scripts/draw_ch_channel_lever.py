@@ -279,10 +279,11 @@ FRONT_KEEP = {
     # the slope), clear of the #47 leader to its left and the #21 leader's
     # shelf above.
     "BarHeight": (_sheet_x(TAPER_START_X), 0.168),
-    # Above and right of the tip it measures, clear of the spring-hole
-    # location's extension line below the tip (#3113 r3) and, with its wall
-    # line, of the tip itself.
-    "TipRadius": (0.272, 0.172),
+    # Right of and below the #21 callout's shelf (the three-line text grows
+    # up from here; at (0.272, 0.172) the shelf ran into "R.167", R.167
+    # review 3/3), clear of the spring-hole location's extension line below
+    # the tip (#3113 r3) and of the isometric label to its right.
+    "TipRadius": (0.285, 0.166),
     "BarPinCx": (_sheet_x(BAR_PIN_X / 2.0), 0.126),
     # The taper start's row between the bar-pin and spring-hole rows.
     "TaperStartX": (_sheet_x(TAPER_START_X / 2.0), 0.115),
