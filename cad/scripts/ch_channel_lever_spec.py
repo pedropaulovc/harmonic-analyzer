@@ -37,7 +37,7 @@ UNIT = drawing_unit("parts/ch-channel-lever", _config.parts("ch-channel-lever"))
 # below the +/-0.127 hook-arm allocation (error_budget.yaml), hence the flat
 # nominal.  Was 177.8 (7"), which left the spring leaning 2.75 mm off plumb.
 LEVER_SPRING_X = 175.05  # fulcrum -> spring-hole c2c, plumb over the anchor
-# Bar height from the hub out to the bar pin; the end carries the spring hole.
+# Bar height from the hub out to the taper start; the end carries the spring hole.
 # Owner ruling 2026-11-18 (#3113): the original's depth, the 9.5 photo read
 # (dimensions.yaml ch. 17), at the sheet's two places. The 10.9 deepening for
 # the retired gray-iron ruling (2026-10-15) is undone. Its lower edge clears
@@ -55,14 +55,18 @@ SPRING_EYE_HOLE_SPEC = HoleSpec("drilled_number", "#21")
 
 # The end tapers, as the original's does (#3113; ch17 page001_img01 and the
 # squarer page001_img02 side view read the tip at about 0.8 of the depth at
-# the bar pin). Both edges run straight from the bar pin, where the bending
-# moment of this third-class lever peaks, to tangency with a full-round tip
-# concentric with the spring hole; outboard of the pin the moment falls
-# linearly to nothing at the spring. Owner ruling 2026-11-18 (#3113, the
-# photo ratio): the tip radius leaves the #21 hole a wall under the .080
-# target, above the .060 floor (MHA-CH-02 RV-04). It prints at three places
-# because .15 at two would fall through the floor.
-TAPER_START_X = BAR_PIN_X  # full depth inboard of the bar-pin hole's centreline
+# the bar pin). The bar keeps full depth through the bar pin, where the
+# bending moment of this third-class lever peaks, and past the amplitude
+# bar's top notch; from the taper start both edges run straight to tangency
+# with a full-round tip concentric with the spring hole, as the moment falls
+# linearly to nothing at the spring. The taper starts at its own printed
+# station (.XX from the fulcrum bore), not on the bar pin's centreline: a
+# kink on the hole line could only be named in words (#3113 machinist
+# review, 3/3 runs). Owner ruling 2026-11-18 (#3113, the photo ratio): the
+# tip radius leaves the #21 hole a wall under the .080 target, above the
+# .060 floor (MHA-CH-02 RV-04). It prints at three places because .15 at two
+# would fall through the floor.
+TAPER_START_X = 139.7  # 5.50: full depth inboard of it
 TIP_ARC_CX = LEVER_SPRING_X
 TIP_RADIUS = 3.81  # R.150: tip depth 7.62, 0.81 of BAR_TALL
 

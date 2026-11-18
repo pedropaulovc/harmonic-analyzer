@@ -11,7 +11,7 @@ pitch cap the thickness (the M2 12.5 "width" violated the pitch), and
 owner's 2026-10-15 gray-iron ruling deepened the arm to 10.9; the
 2026-11-03 ruling made it 1018 steel from 5/16 x 1 in flat, and the
 2026-11-18 ruling (#3113) returns it to the original's 9.5 photo read
-(.37) with the original's taper from the bar pin to the spring tip.
+(.37) with the original's taper toward the spring tip, from a 5.50 station.
 
 The earlier 254 (10", "clean 2:1") length is REFUTED by the calibrated
 ch. 30 front view: the lever bank ends at x ~ -30 (not +54), the
@@ -131,8 +131,6 @@ HALF_BAR = BAR_TALL / 2.0
 THROUGH_CUT_DEPTH = 40.0  # mid-plane total; > extrude width
 if TIP_ARC_CX != LEVER_SPRING_X:
     raise AssertionError("the full-round tip must be concentric with the spring hole")
-if TAPER_START_X != BAR_PIN_X:
-    raise AssertionError("the taper starts on the bar-pin hole's centreline")
 
 
 def outline_area() -> float:
@@ -262,6 +260,7 @@ def build(adapter) -> dict[str, str]:
     set_global(adapter, "LeverSpringX", f"{LEVER_SPRING_X}mm")
     set_global(adapter, "BarTall", f"{BAR_TALL}mm")
     set_global(adapter, "TipRadius", f"{TIP_RADIUS}mm")
+    set_global(adapter, "TaperStartX", f"{TAPER_START_X}mm")
     set_global(adapter, "LeverThickness", f"{LEVER_THICKNESS}mm")
     set_global(adapter, "PivotHoleDia", f"{PIVOT_HOLE_DIA}mm")
     set_global(adapter, "BarPinX", f"{BAR_PIN_X}mm")
@@ -275,7 +274,7 @@ def build(adapter) -> dict[str, str]:
     # resolve against the finished model + a rebuild).
     drive_jobs: list[tuple[str, str]] = []
 
-    # Side profile: round fulcrum nose, full-depth bar to the bar pin, straight
+    # Side profile: round fulcrum nose, full-depth bar to the taper start, straight
     # taper edges tangent to a full-round tip about the spring hole (two arcs
     # + four lines). The manual constraints/dims below define the sketch; each
     # driving dim is record()ed into ``outline`` in the exact order it is
@@ -334,14 +333,13 @@ def build(adapter) -> dict[str, str]:
             f"{lower_taper}.start", f"{upper_taper}.end", "vertical_points"
         ),
     )
-    # Dim 2: the taper start from the fulcrum axis, on the bar-pin hole's
-    # centreline (driven by the bar pin's own global, never printed: the
-    # print's bar-pin location states it).
+    # Dim 2: the taper start from the fulcrum axis, its own printed station
+    # outboard of the bar pin.
     dimension_between(
         adapter, f"{lower_taper}.start", "origin", "horizontal_distance",
         TAPER_START_X, "taper start",
     )
-    outline.record("TaperStartX", '"BarPinX"')
+    outline.record("TaperStartX", '"TaperStartX"')
     # Dim 3: bar height, across the two taper starts.
     dimension_between(
         adapter, f"{lower_taper}.start", f"{upper_taper}.end", "vertical_distance",

@@ -8,7 +8,7 @@ callouts, the bore's roughness and one reference overall length.
 Sheet/template and export behaviour lives in ``_drawing_common``.
 
 The lever is a long thin third-class lever (7.28 in over the hub, .37 in
-tall to the bar pin and tapering to an R.150 tip, .118 in thick); the sheet
+tall to a 5.50 taper start, then tapering to an R.150 tip, .118 in thick); the sheet
 prints decimal inch (the part's ``drawing_unit: in``).  The sheet runs at
 1:1: the front view carries the profile, bore, hub, both arms from the
 fulcrum bore and the overall length; the top view the plate thickness and
@@ -81,6 +81,7 @@ from ch_channel_lever_spec import (
     PIVOT_HOLE_DIA,
     SPRING_EYE_HOLE_SPEC,
     SURFACE_FINISHES,
+    TAPER_START_X,
     TIP_ARC_CX,
     TIP_END_X,
     TIP_RADIUS,
@@ -147,7 +148,7 @@ def _add_bar_centerline(adapter: Any, view: Any) -> None:
     drawn, not implied (r5 machinist review, clarity). draw_dt_crank_arm's
     recipe: InsertCenterLine2 on the two long edges, picked between the hub
     and the bar-pin hole, where the full-depth edges run parallel (outboard
-    of the bar pin they taper to the tip), bisects them.
+    of the taper start they taper to the tip), bisects them.
     """
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
@@ -239,9 +240,8 @@ FRONT_CALLOUTS = {
         f"REAM THRU\nRUNNING FIT ON {SHAFT_NUMBER}\n"
         f"(CLEARANCE {_inch(_CLEARANCE_LEAST)}-{_inch(_CLEARANCE_MOST)} REF)"
     ),
-    # Full depth to the bar-pin hole, straight taper from there to the tip
-    # radius, tangent (#3113): the taper start is the bar pin's own location.
-    "BarHeight": "TAPERS FROM\nBAR-PIN HOLE CL",
+    # The taper is drawn and dimensioned, not narrated (#3113 r4 review): the
+    # .37 sits on the kink and the kink has its own location.
     "TipRadius": "TANGENT TO EDGES",
 }
 # What engages each drilled hole rides its own hole callout (machinist r5:
@@ -280,14 +280,17 @@ FRONT_KEEP = {
     # and of the REAM leader, which lands from the upper right.
     "HubDia": (0.033, 0.165),
     "FulcrumDia": (0.050, 0.190),
-    # Below the bar, outboard of the taper start it measures: between the
-    # bar-pin and spring-hole extension lines, clear of the #21 leader that
-    # rises over the bar (#3113 r3: above the bar that leader crossed it).
-    "BarHeight": (0.198, 0.140),
+    # Above the bar on the taper start it measures, so its extension lines are
+    # the kink's own vertices (#3113 r4 review: offset, it read as measured on
+    # the slope), clear of the #47 leader to its left and the #21 leader's
+    # shelf above.
+    "BarHeight": (_sheet_x(TAPER_START_X), 0.168),
     # Above and right of the tip it measures, clear of the spring-hole
     # location's extension line below the tip (#3113 r3).
     "TipRadius": (0.262, 0.168),
     "BarPinCx": (_sheet_x(BAR_PIN_X / 2.0), 0.126),
+    # The taper start's row between the bar-pin and spring-hole rows.
+    "TaperStartX": (_sheet_x(TAPER_START_X / 2.0), 0.115),
     "SpringCx": (_sheet_x(LEVER_SPRING_X / 2.0 + 25.0), 0.104),
 }
 TOP_KEEP = {

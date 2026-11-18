@@ -98,8 +98,9 @@ def test_walls_clear_the_floor_at_worst_case() -> None:
 
 
 def test_the_end_tapers_from_the_bar_pin_to_a_tangent_tip() -> None:
-    """#3113: full depth to the bar pin, straight edges tangent to the tip."""
-    assert spec.TAPER_START_X == spec.BAR_PIN_X
+    """#3113: full depth through the bar pin and the bar's notch, then straight
+    edges tangent to the tip."""
+    assert spec.TAPER_START_X - spec.BAR_PIN_X >= ch_amplitude_bar_spec.BAR_DEPTH / 2.0
     assert spec.BAR_TALL == pytest.approx(9.398)
     tip_depth = 2.0 * spec.TIP_RADIUS
     assert tip_depth / spec.BAR_TALL == pytest.approx(0.81, abs=0.01)
@@ -168,7 +169,7 @@ def test_one_centreline_joins_the_holes_along_the_bar() -> None:
     long edges prints their cross-bar position and the .37 bar symmetric
     about it. The edges are picked inboard of the bar pin, where the
     full-depth edges run parallel (#3113: outboard they taper)."""
-    assert spec.TAPER_START_X == spec.BAR_PIN_X
+    assert spec.BAR_PIN_X / 2.0 < spec.BAR_PIN_X < spec.TAPER_START_X
     assert spec.NOSE_RADIUS == spec.BAR_TALL / 2.0
 
 
