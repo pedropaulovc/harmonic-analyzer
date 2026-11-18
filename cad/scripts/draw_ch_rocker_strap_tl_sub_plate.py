@@ -168,7 +168,7 @@ TOP_KEEP: dict[str, tuple[float, float]] = {
     # the hub callout's drill row; it and the stock end drop under the
     # callout, and the callout and the two long rows rise over it.
     "LeftEnd": (_LEFT_X - 0.007, _BACK_Y + 0.006),
-    "NotchLeftEnd": (top_xy(spec.NOTCH_LEFT_END / 2.0, 0.0)[0], _BACK_Y + 0.013),
+    "NotchLeftEnd": (top_xy(spec.NOTCH_LEFT_END / 2.0, 0.0)[0], _BACK_Y + 0.0122),
     "NotchRightStart": (top_xy(spec.NOTCH_RIGHT_START / 2.0, 0.0)[0], _BACK_Y + 0.039),
     "PlateLength": (
         top_xy(spec.LEFT_END_X + spec.PLATE_LENGTH / 2.0, 0.0)[0],
