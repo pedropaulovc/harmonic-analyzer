@@ -176,18 +176,19 @@ def _add_bar_centerline(adapter: Any, view: Any) -> None:
         raise RuntimeError(f"front view carries {count} centrelines, expected 1")
 
 
-@_telemetry.traced("drawing.channel_lever.tip_arc_edge")
-def _tip_arc_edge(view: Any) -> Any:
-    """The front view's full-round tip arc, as a part edge.
+@_telemetry.traced("drawing.channel_lever.front_arc_edge")
+def _front_arc_edge(view: Any, centre_x: float, radius: float, label: str) -> Any:
+    """One front-view arc on the lever's axis, as a part edge.
 
     Matched on the part's own geometry (centre and radius, part millimetres),
     not a sheet pick: the tapered tip is concentric with the #21 hole and only
     1.79 mm outside its rim, so a pick on the tip's extreme hit-tests the hole
-    (#3113 first farm run: 183.038 for 184.829). The plate's two faces each
-    carry the arc; the near face's (largest z) is taken.
+    (#3113 first farm run: 183.038 for 184.829), and a coordinate pick mixed
+    with an explicit entity added a third selection (second run). The near
+    face's copy (largest z) is taken.
     """
     matches: list[tuple[float, Any]] = []
-    for raw_edge in visible_view_entities(view, 1, label="channel lever front arcs"):
+    for raw_edge in visible_view_entities(view, 1, label=f"channel lever {label}"):
         curve = _early_bound(raw_edge, "IEdge").GetCurve()
         if curve is None:
             continue
@@ -196,15 +197,15 @@ def _tip_arc_edge(view: Any) -> Any:
             continue
         params = tuple(float(value) for value in curve.CircleParams)
         cx, cy, cz = (value * 1000.0 for value in params[:3])
-        radius = params[6] * 1000.0
+        found_radius = params[6] * 1000.0
         if (
-            abs(cx - TIP_ARC_CX) <= 1e-3
+            abs(cx - centre_x) <= 1e-3
             and abs(cy) <= 1e-3
-            and abs(radius - TIP_RADIUS) <= 1e-3
+            and abs(found_radius - radius) <= 1e-3
         ):
             matches.append((cz, raw_edge))
     if not matches:
-        raise RuntimeError("front view shows no full-round tip arc")
+        raise RuntimeError(f"front view shows no {label}")
     return max(matches, key=lambda item: item[0])[1]
 
 
@@ -407,23 +408,21 @@ def build(adapter: Any) -> dict[str, str]:
 
     # Overall length over the hub and the full-round tip, for the stock cut:
     # a reference (the hub, the spring-hole location and the bar's full round
-    # set it).  Both ends are arcs in the front view, each re-anchored to its
-    # extreme (a horizontal arc pick resolves to the centre by default and
-    # would read the 175.05 spring arm). The hub is picked on its extreme; the
-    # tip is selected as its own edge (see _tip_arc_edge).
-    hub_end, tip_end = (
-        model_point_in_view(adapter, front, (x / 1000.0, 0.0, 0.0), label=label)
-        for x, label in ((-_HUB_R, "hub extreme"), (TIP_END_X, "tip extreme"))
-    )
+    # set it).  Both ends are arcs in the front view, each selected as its own
+    # edge (see _front_arc_edge) and re-anchored to its extreme (an arc
+    # dimension resolves to the centre by default and would read the 175.05
+    # spring arm).
+    hub_arc = _front_arc_edge(front, 0.0, _HUB_R, "hub circle")
+    tip_arc = _front_arc_edge(front, TIP_ARC_CX, TIP_RADIUS, "full-round tip arc")
     overall = add_edge_dimension(
         adapter,
         front,
-        p0=hub_end,
-        p1=tip_end,
+        p0=(0.0, 0.0),
+        p1=(0.0, 0.0),
         text_xy=OVERALL_TEXT_XY,
         label="overall length",
         orientation="horizontal",
-        entities=(None, _tip_arc_edge(front)),
+        entities=(hub_arc, tip_arc),
     )
     set_arc_endpoints_to_max(adapter, overall, label="overall length")
     # Value-only: the far-extreme sum is the one value a centre-anchored
