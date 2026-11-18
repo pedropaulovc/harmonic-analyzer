@@ -165,7 +165,8 @@ def sub_step(key: str, index: int) -> str:
 # test_ha_assembly_package holds it to the MHA-SM-00 sequence).
 SM_LAST_BENCH_STEP = "8B"
 # MHA-MS-00's in-use steps that set a bar with the stick (#2434, delegated
-# ruling 2026-11-17, option 2), stated as SM_LAST_BENCH_STEP is and held to
+# ruling 2026-11-17, no precedent, option 2, owner review on #2144), stated
+# as SM_LAST_BENCH_STEP is and held to
 # the MHA-MS-00 sequence by test_ha_assembly_package.
 MS_SETTING_STEPS = "11-13A"
 # Steps 1, 2 and 4 print the master build order (ha_build_sequence, #2391):

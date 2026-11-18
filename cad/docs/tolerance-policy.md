@@ -455,9 +455,10 @@ operator forms from step 1; the table is the only data the procedure needs beyon
 
 1. **Set each bar to its linear station** $x_i \cdot 88$ mm from the rocker pivot (every
    station ≥ 0, the only side the CAD builds) with the measuring stick, Michelson's way
-   (MHA-MS-00 steps 11–13: the stop clamped at the station's stick reading, its end face on
+   (MHA-MS-00 steps 11–13A: the stop clamped at the station's stick reading, its end face on
    the rocker arm's outer tip, the bar slid out to the stick's 10 end; #2434, delegated ruling
-   2026-11-17, option 2). The stick's zero is not at the pivot: `READOUT.md`'s stick-reading
+   2026-11-17, no precedent, option 2, owner review on #2144). The stick's zero is not at the
+   pivot: `READOUT.md`'s stick-reading
    column carries its ≈2.7 mm offset (`ms_stick_registration`), and zero is the stop on the
    0.2 tick. Then **record the ordinate it actually reads** from the station table in the shipped
    `READOUT.md` (verify the table on the assembled machine from single-channel runs: one bar

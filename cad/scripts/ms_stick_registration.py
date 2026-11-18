@@ -1,14 +1,17 @@
 """Where the MHA-MS-00 stick reads when it sets an amplitude bar (#2434).
 
-Michelson's method, the stick as drawn (delegated ruling 2026-11-17, option
-2, issue #2434 comment 6970972423; book ch. 16 p. 36): the stop is clamped
+Michelson's method, the stick as drawn (delegated ruling 2026-11-17, no
+precedent, option 2, for the owner's review on #2144; issue #2434 comment
+6970972423; book ch. 16 p. 36): the stop is clamped
 on a graduation, the stick lies graduations up along the MHA-CH-06 rocker
 arm's top edge with its 10 end toward the pivot, the stop's end face nearer
 the 10 end bears on the arm's outer tip land (the end away from the
 connecting rod), and the MHA-CH-01 bar is slid out until its outboard face
-touches the stick's 10-end face. The reading at the stop's end face then
-sets the bar's station: the stick's scale zero is not at the pivot, so the
-reading for station d is about (d + 2.74 mm) / 14.2 and zero is the 0.2 tick.
+touches the stick's end face nearest the 10. The reading at the stop's end
+face then sets the bar's station: the stick's 0 tick is not at the pivot, so
+the reading for station d is about (d + 2.72 mm) / 14.2 and zero is the 0.2
+tick. The arm land's and the stop face's own deviations are booked in
+error_budget.yaml (rocker_tip_land, stop_face_square).
 
 2-D, in the rocker's plane (machine X out along the lifting side, Y up), at
 the authored level rest pose (channel_kinematics: crank home, every rocker

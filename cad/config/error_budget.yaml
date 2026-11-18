@@ -241,9 +241,25 @@ critical_features:
   # cone_land_clock (MHA-DT-04 land flats clocked off the keyseat) and
   # cone_flat_play (the D-bore across-flat fit) retired with the flats:
   # owner decision C1 keyed, 2026-11-09, PR #1992.
+  # #2434 (delegated ruling 2026-11-17, no precedent, for the owner's review
+  # on #2144): the stick sets a bar from the rocker arm's outer tip land, so
+  # the land's and the stop face's own deviations move the station the
+  # nominal table row assumes (Codjiflo r1 on PR #3099).
+  rocker_tip_land:
+    tolerance: 0.254
+    nominal: null
+    quantity: ordinate
+    class: channel
+    holds: "MHA-CH-06 outer tip land, located BASIC inside the J-K surface profile .020 to A|B|C (+/-.010 in): the MHA-MS-00 stop bears on it to set that channel's bar (MHA-MS-00 steps 11-13A), so each arm's land deviation along the stick moves its bar's every station; READOUT's stick-reading column is the nominal registration (ms_stick_registration), so no procedure step removes it. Allowable check (error_budget.py, 2026-11-18, PR #3099): alone at 0.254 MAE 0.068 / pair p99 1.137 against an equal-share allowable of 0.112, so it takes more than its equal share, as station_setting does; the combined budget closes (pair expected worst 1.959 < 2.0, total MAE 0.497)"
+  stop_face_square:
+    tolerance: 0.0508
+    nominal: null
+    quantity: ordinate
+    class: channel
+    holds: "MHA-MS-02 stop-block end face nearer the 10: it reads the stick at the graduated face and bears on the land 8.94 mm down (ms_stick_registration.STOP_FACE_DEPTH_MM), so its squareness to the stick is a station offset along the stick. MHA-MS-02 leaves it to the title block's +/-1 deg (0.156 mm over the face); MHA-MS-00 steps 10A-10B (ASSEMBLY.md) fit it square at assembly instead: a .002 feeler does not enter along it under a machinist's square on the stick, else it is stoned (0.0508 mm over the face). Delegated choice 2026-11-18 for #2434, precedent the owner's fit-at-assembly rulings (#2365, #2416, #2481), drawing-simplicity rule 5 keeping the frame off MHA-MS-02; owner review on #2144. One stop sets every bar, so error_budget draws one offset per machine, common to all 20 channels"
   station_setting:
     tolerance: 0.25
     nominal: null
     quantity: ordinate
     class: setup
-    holds: "measuring-stick reading: interpolate to 1/5 of the 1.42 minor division (0.28 step, +/-0.14 rounding) plus eye/parallax, at the stop's end face -- READOUT.md step 1 and MHA-MS-00 steps 11-13 (ASSEMBLY.md): stop on the rocker arm's outer tip, bar out to the stick's 10 end (#2434, delegated ruling 2026-11-17, option 2); the table's stick reading carries the stick zero's offset from the rocker pivot axis, zero is the stop on the 0.2 tick (every station >= 0), and the measured null lift vector is subtracted from every trial (tolerance-policy.md)"
+    holds: "measuring-stick reading: interpolate to 1/5 of the 1.42 minor division (0.28 step, +/-0.14 rounding) plus eye/parallax, at the stop's end face -- READOUT.md step 1 and MHA-MS-00 steps 11-13A (ASSEMBLY.md): stop on the rocker arm's outer tip, bar out to the stick's 10 end (#2434, delegated ruling 2026-11-17, no precedent, option 2, owner review on #2144); the table's stick reading carries the offset of the stick's 0 tick from the rocker pivot axis, zero is the stop on the 0.2 tick (every station >= 0), and the null lift vector is subtracted from every trial (tolerance-policy.md); the land and stop face the stick registers on are booked as rocker_tip_land and stop_face_square"

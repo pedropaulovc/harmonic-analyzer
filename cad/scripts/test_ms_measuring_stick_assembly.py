@@ -390,7 +390,7 @@ def test_fitter_package_covers_rule_9() -> None:
         assert len(textwrap.wrap(step, width=100, subsequent_indent="   ")) <= 6, step
     # Owner ruling 2026-11-06 (option C): no as-shipped setting. The clamp
     # step sets no position, and sheet 1 labels its drawn pose an example.
-    clamp = sheet.ASSEMBLY_STEPS[-1]
+    clamp = sheet.ASSEMBLY_STEPS[10]
     assert clamp.startswith("10. WITH ITEM 1 AT ANY POSITION ALONG ITEM 3")
     assert "THUMBSCREW" in clamp
     for gone in ("NEAR_FACE_MARK", "NEAR_FACE_WINDOW"):
@@ -402,6 +402,12 @@ def test_fitter_package_covers_rule_9() -> None:
     assert "CLAMP" in sheet.ASSEMBLY_STEPS[10] and sheet.ASSEMBLY_STEPS[10].startswith("10. ")
     # Rule 22: one action a step, so the plate's fit and its screws are two.
     assert [step.split(".")[0] for step in sheet.ASSEMBLY_STEPS[8:10]] == ["9", "9A"]
+    # #2434: the stop's end face is fitted square at assembly (delegated
+    # choice, owner fit-at-assembly precedent), the check then its remedy.
+    check, remedy = sheet.ASSEMBLY_STEPS[11:]
+    assert check.startswith("10A. CHECK: WITH A MACHINIST'S SQUARE")
+    assert f"A {sheet.STOP_FACE_FEELER} FEELER DOES NOT ENTER" in check
+    assert remedy.startswith("10B. IF IT ENTERS, STONE") and remedy.endswith("REPEAT 10A.")
     assert all(
         len(line) <= drawing.EXAMPLE_NOTE_WIDTH for line in drawing.EXAMPLE_NOTE.splitlines()
     )
@@ -467,6 +473,11 @@ def test_in_use_sheet_registers_the_drawn_stop_on_a_rocker_arm() -> None:
     # Rule 22: one action a step; no step chains two with ';' or 'AND SLIDE'.
     for step in sheet.USE_STEPS:
         assert "; SLIDE" not in step and "AND SLIDE" not in step, step
+    # The stick and stop overbalance outboard past about 36 mm, so the 10 end
+    # is held down on the arm before the bar comes out against it.
+    heads = [step.split(".")[0] for step in sheet.USE_STEPS]
+    hold = sheet.USE_STEPS[heads.index("12C")]
+    assert "HOLD THE 10 END" in hold and heads.index("12C") + 1 == heads.index("13")
     # Rules 9 and 26: a letter label, a viewing arrow on sheet 1's bottom
     # view, the rotation stated; the caption keeps only what the view can't.
     assert sheet.IN_USE_VIEW_LETTER != drawing.CLAMP_SECTION_LABEL

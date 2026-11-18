@@ -15,9 +15,9 @@ axis) and its sheet-1 near-face reference only show an example position, and
 the sheet-1 note says so. Printed lengths are in the assembly contract's
 ``drawing_unit``.
 
-Issue #2434 (delegated ruling 2026-11-17, option 2, for the owner's
-after-the-fact review; issue comment 6970972423): the stick sets a bar
-Michelson's way, as drawn. Steps 11-13 and sheet 4 show it: the stop's end
+Issue #2434 (delegated ruling 2026-11-17, no precedent, option 2, for the
+owner's review on #2144; issue comment 6970972423): the stick sets a bar
+Michelson's way, as drawn. Steps 11-13A and sheet 4 show it: the stop's end
 face nearer the 10 end on the MHA-CH-06 rocker arm's outer tip land, the
 stick graduations up along the arm's top edge, the MHA-CH-01 bar slid out to
 the 10 end. Zero is the stop on the 0.2 tick (``ms_stick_registration``).
@@ -113,6 +113,7 @@ DRAWING_DIMENSIONS = {spec.SETTING_FEATURE: {spec.SETTING_DIMENSION}}
 # steps 3 and 5 point to it instead of restating them.
 _BLOCK, _PLATE, _STICK = _item(spec.BLOCK), _item(spec.PLATE), _item(spec.STICK)
 _THUMB, _SCREWS = _item(spec.THUMB_SCREW), _item(spec.PLATE_SCREW)
+STOP_FACE_FEELER = ".002"
 ASSEMBLY_STEPS = (
     f"1. LAY OUT THE TWO HOLES OF {_PLATE} PER {PLATE_DRAWING_NUMBER}; "
     "DO NOT DRILL THEM YET.",
@@ -139,11 +140,25 @@ ASSEMBLY_STEPS = (
     f"10. WITH {_ref(spec.BLOCK)} AT ANY POSITION ALONG {_ref(spec.STICK)}, "
     f"TURN THE {_THUMB} IN BY HAND UNTIL ITS TIP CLAMPS THE TOP FACE OF "
     f"{_ref(spec.STICK)}.",
+    # #2434: the stop's end face nearer the 10 both reads the stick and bears
+    # on the rocker arm's tip land 8.94 mm below the reading edge, so it is
+    # fitted square at assembly, not toleranced on MHA-MS-02 (delegated choice
+    # 2026-11-18, precedent the owner's fit-at-assembly rulings #2365, #2416,
+    # #2481; drawing-simplicity rule 5; #2144). error_budget's
+    # stop_face_square books the checked .002.
+    f"10A. CHECK: WITH A MACHINIST'S SQUARE ON THE GRADUATED FACE OF "
+    f"{_ref(spec.STICK)}, A {STOP_FACE_FEELER} FEELER DOES NOT ENTER ALONG THE "
+    f"END FACE OF {_ref(spec.BLOCK)} NEARER THE 10.",
+    f"10B. IF IT ENTERS, STONE THAT END FACE OF {_ref(spec.BLOCK)} SQUARE, THEN "
+    "REPEAT 10A.",
 )
 # At MHA-HA-00: setting a bar (#2434). The stop is turned over from the
 # fitted pose (item 4 below, the graduated face up), its end face nearer the
 # stick's 10 end both reads the stick and bears on the rocker arm's tip.
-# One action a step (rule 22).
+# One action a step (rule 22). Past about 36 mm the stick and stop
+# overbalance outboard about the land (stick and stop brass, the stop hanging
+# outboard of the tip), so step 12C holds the 10 end down while the bar comes
+# out (Codjiflo r1 on PR #3099).
 _ROCKER_ARM = str(_config.parts("ch-rocker-arm")["number"])
 _AMPLITUDE_BAR = str(_config.parts("ch-amplitude-bar")["number"])
 IN_USE_SHEET = 4
@@ -171,6 +186,7 @@ USE_STEPS = (
     "ARM, ITS 10 TOWARD THE PIVOT.",
     f"12B. SLIDE {_ref(spec.STICK)} OUT UNTIL THE END FACE OF "
     f"{_ref(spec.BLOCK)} BEARS ON THE ARM'S OUTER TIP ({_IN_USE_VIEW}).",
+    f"12C. HOLD THE 10 END OF {_ref(spec.STICK)} DOWN ON THE ARM'S TOP EDGE.",
     f"13. SLIDE THE {_AMPLITUDE_BAR} BAR OUT UNTIL ITS OUTBOARD FACE TOUCHES "
     f"THE {_TEN_END_FACE} ({_IN_USE_VIEW}).",
     f"13A. LIFT {_ref(spec.STICK)} OFF WITHOUT MOVING THE BAR.",

@@ -785,7 +785,7 @@ def setting_bias_station(
     x: np.ndarray, setting_tol: float, scale: float = 1.0
 ) -> np.ndarray:
     """The mean station offset (mm) a one-sided setting band leaves on each
-    bar: a bar set at the stick zero cannot go below the pivot, so its setting
+    bar: a bar set at zero cannot go below the pivot, so its setting
     error is uniform on [0, +tol] with mean +tol/2 -- it stands at station
     tol/2, not 0 -- and a bar at the stop is uniform on [-tol, 0], mean -tol/2.
     Bars in between are two-sided (mean 0). The procedure tells the operator
@@ -1253,6 +1253,14 @@ def _channel_model(
             if key in columns:
                 v = v[..., columns[key]]
             phi += v * per_unit + residual
+        elif key == "rocker_tip_land":
+            # #2434: the stop bears on the arm's outer tip land, so each
+            # arm's land deviation along the stick moves its bar's every
+            # station by the same amount; the table row is nominal.
+            d = np.clip(d + v, 0.0, nom.d_max)
+        elif key == "stop_face_square":
+            # One stop sets every bar: a machine's draw, common to all 20.
+            d = np.clip(d + v[..., :1], 0.0, nom.d_max)
         elif key == "station_setting":
             # A bar can be set neither below the pivot (build_ch_channel_assembly
             # rejects amplitude_mm < 0) nor past amplitude.max_travel_mm (the
@@ -2381,8 +2389,8 @@ def readout_procedure(r: dict[str, Any]) -> str:
     at_zero = read_ordinate(tol / 2.0, nom)
     at_stop = read_ordinate(nom.d_max - tol / 2.0, nom)
     # The stop reading that sets each station, Michelson's way with the stick
-    # as drawn (#2434, delegated ruling 2026-11-17, option 2): it carries the
-    # stick zero's offset from the pivot.
+    # as drawn (#2434, delegated ruling 2026-11-17, no precedent, option 2,
+    # owner review on #2144): it carries the 0 tick's offset from the pivot.
     table = "\n".join(
         f"| {d:6.1f} | {registration.stick_reading(d):6.3f} | {x:+.4f} | {k * 100:6.2f} % |"
         for d, x, k in rows

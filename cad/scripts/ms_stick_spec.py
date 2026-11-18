@@ -16,15 +16,22 @@ square-bottom .016-.024 groove.
 Issue #290: the sheet prints decimal inch (``drawing_unit: in``). Lengths stay
 physical millimetres, each the exact decimal of the inch value it prints (see
 the trailing comments). Exempt (owner ruling, calibration geometry): the
-configured 14.2 / 1.42 mm pitch and the 3.43 mm 10-tick land print rounded
-(.559, .0559, .135); the minor pitch prints four places so ten printed minor
-pitches equal the printed full pitch. Issue #2434 (delegated ruling
-2026-11-17, option 2): the end face nearest the 10 bears on the amplitude bar
-when the stick sets it, so it is the graduations' datum: the station table
-locates every graduation from it at +/-.002 (rule 10, one baseline) and sheet
-1 shows the 10 tick's .135 from it as a reference, so the length's .XX band
-never moves a station. This is dimensioning only: the 2026-10-10 scale
-position is unchanged. The 7.95 length stays .XX; nothing prints .X. The
+configured 14.2 / 1.42 mm pitch prints rounded (.559, .0559) at its own
++/-.002, as the 56.5 mm scale zero (2.224 from the 0 end) did until #2434;
+the minor pitch prints four places so ten printed minor pitches equal the
+printed full pitch. Issue #2434 (delegated ruling 2026-11-17, option 2, for
+the owner's review on #2144): the end face nearest the 10 bears on the
+amplitude bar when the stick sets it, so it is the graduations' datum: the
+station table locates every graduation from it at +/-.002 (rule 10, one
+baseline) and sheet 1 shows the 10 tick's .135 from it as a reference, so the
+length's .XX band never moves a station. Every row adds the 3.43 mm 10-tick
+land (.13504) to the pitches and prints rounded: that rounding is the
+delegated ruling's, not a new owner exemption; its precedent is the owner
+exemption above for the scale's datum distance at the 0 end (2.224 for
+56.5 mm, rounded at the stations' +/-.002).
+This is
+dimensioning only: the 2026-10-10 scale position is unchanged. The 7.95
+length stays .XX; nothing prints .X. The
 unprinted 0.24 stroke width at the face is the modelled near-sharp V and
 stays (owner ruling). The listed .005-tip bit at the .016 MIN numeral depth
 cuts strokes about 0.35 wide: stroke width is unprinted, the extra 0.05 a side
