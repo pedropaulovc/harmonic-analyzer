@@ -12,7 +12,6 @@ import _supplier_extension_spring as extension
 import _supplier_spring_drawing as layout
 import _supplier_spring_reference as refs
 import ch_vn_channel_spring_installed_spec as channel
-import ch_vn_rocker_bank_spring_spec as rocker
 import dt_vn_cylinder_bank_spring_spec as cylinder
 import pd_vn_transgear_pivot_spring_spec as pivot
 import sm_vn_counter_spring_spec as counter
@@ -158,7 +157,7 @@ def _disc_views(spec):
     return views
 
 
-@pytest.mark.parametrize("spec,count", [(cylinder, 6), (rocker, 4), (pivot, 6)])
+@pytest.mark.parametrize("spec,count", [(cylinder, 6), (pivot, 6)])
 @pytest.mark.parametrize(
     "corruption", ["owner", "config", "value", "missing", "extra", "band"]
 )
@@ -211,7 +210,6 @@ def test_disc_final_checks_reacquire_source_and_application_gauges(
                 "WORKING_DEFLECTION": 0.026,
             },
         ),
-        (rocker, {"OD": 0.367, "ID": 0.265, "FREE_HEIGHT": 0.03, "THICKNESS": 0.006}),
         (
             pivot,
             {
@@ -234,11 +232,6 @@ def test_exact_nominal_source_inventory_never_uses_installed_height(spec, expect
         assert spec.SUPPLIER_DRAWING_PRECISION["THICKNESS"] == 3
         assert spec.SUPPLIER_DRAWING_PRECISION["ID"] == 1
         assert spec.SUPPLIER_DRAWING_PRECISION["SHAFT_DIA"] == 2
-    elif spec is rocker:
-        assert (
-            spec.OD_BAND == spec.ID_BAND == pytest.approx((0.010 * 25.4, -0.020 * 25.4))
-        )
-        assert spec.SUPPLIER_DRAWING_PRECISION["FREE_HEIGHT"] == 2
     else:
         assert (
             spec.OD_BAND == spec.ID_BAND == pytest.approx((0.010 * 25.4, -0.010 * 25.4))
@@ -246,7 +239,6 @@ def test_exact_nominal_source_inventory_never_uses_installed_height(spec, expect
 
 
 def test_nominal_disc_datums_and_application_gauges_are_not_loaded_shapes():
-    assert stock.source_free_height_limits(rocker) == pytest.approx((-0.0762, 0.6858))
     for spec in (cylinder, pivot):
         baseline, compressed, free_upper = stock.supplier_application_planes(spec)
         assert compressed - baseline == pytest.approx(spec.WORKING_HEIGHT)
@@ -293,7 +285,7 @@ def test_disc_segments_are_construction_only_and_exact(monkeypatch):
 
 
 @pytest.mark.parametrize(
-    "spec", [cylinder, rocker, pivot], ids=["9714K392", "9714K24", "9715K43"]
+    "spec", [cylinder, pivot], ids=["9714K392", "9715K43"]
 )
 def test_disc_stock_and_application_positions_follow_actual_native_ink(
     monkeypatch, spec
@@ -358,7 +350,7 @@ def test_disc_stock_and_application_positions_follow_actual_native_ink(
 
 
 @pytest.mark.parametrize(
-    "spec", [cylinder, rocker, pivot], ids=["9714K392", "9714K24", "9715K43"]
+    "spec", [cylinder, pivot], ids=["9714K392", "9715K43"]
 )
 def test_disc_thickness_text_side_is_the_strip_side(spec):
     # Thickness witnesses run from the strip; on the far side they would
@@ -369,7 +361,7 @@ def test_disc_thickness_text_side_is_the_strip_side(spec):
     assert disc.TEXT_SIDES["FREE_HEIGHT"] == -1
 
 
-@pytest.mark.parametrize("spec", [rocker, pivot], ids=["9714K24", "9715K43"])
+@pytest.mark.parametrize("spec", [pivot], ids=["9715K43"])
 def test_disc_edge_views_drop_their_centre_cross_and_keep_it_dropped(monkeypatch, spec):
     views = _disc_views(spec)
     _readback_environment(monkeypatch, disc, views)
@@ -405,7 +397,6 @@ def test_disc_edge_views_drop_their_centre_cross_and_keep_it_dropped(monkeypatch
                 "free_right": (12.7, 1.27),
             },
         ),
-        (rocker, {"free_front": (9.3218, 0.762), "free_top": (9.3218, 9.3218)}),
         (
             pivot,
             {
@@ -415,7 +406,7 @@ def test_disc_edge_views_drop_their_centre_cross_and_keep_it_dropped(monkeypatch
             },
         ),
     ],
-    ids=["9714K392", "9714K24", "9715K43"],
+    ids=["9714K392", "9715K43"],
 )
 @pytest.mark.parametrize(
     "source_error_m,rejected",

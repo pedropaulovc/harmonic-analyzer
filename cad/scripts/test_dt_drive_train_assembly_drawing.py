@@ -33,14 +33,12 @@ FOOT_NAME = f"{SCREW_STEM}__FootScrew-42"
 # The rig's steps at the built assembly's counts.
 RIG_STEPS = drawing.rig_steps(pivot_blocks=2, cams=2, slotted=4)
 # Installation interfaces the package may cite without owning a BOM row.
-# Step 10 sets the channel's north MHA-CH-08 on the frame's MHA-FR-05 (#936 P1 b),
-# offset by the miced north MHA-CH-VN-56 washer (user, 2026-10-10).
+# Step 10 sets the channel's north MHA-CH-08 on the frame's MHA-FR-05 (#936 P1 b).
 EXTERNAL_NUMBERS = frozenset(
     {
         "MHA-FR-01",
         "MHA-FR-05",
         "MHA-CH-08",
-        "MHA-CH-VN-56",
         drawing.NORTH_BRACKET_SCREW,
         # Step 5's paper-drive T12, named on sheet 12's interface line.
         drawing.CRANK_CHAIN_WHEEL,

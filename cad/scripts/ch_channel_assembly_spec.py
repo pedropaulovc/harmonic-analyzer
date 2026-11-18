@@ -11,12 +11,12 @@ Settings: two construction sketches on the Right plane (sketch x is machine
 -z, sketch y machine y), one per bank view, so each 1:1 view shows only the
 chain on its own axis (the other lies 808 mm off it, off the sheet).
 ``PIVOT_FEATURE`` is a chain along the pivot axis -- south ear inner face,
-south washer south face, hub 0 south face, hub 19 north face, north ear
-outer face, the shaft's north tip;
+north ear inner face, north ear outer face, the shaft's north tip;
 ``FULCRUM_FEATURE`` one leg on the fulcrum axis between the keeper lugs'
-inner faces. The spring set, the closed-up stack length and the shaft's
-tip set proud of the north ear are the rocker bank's settings
-(rocker_bank_layout); the lug span is shown as a reference, the
+inner faces. The ears' inner-face span and the shaft's tip set proud of the
+north ear are the rocker bank's settings (rocker_bank_layout: the arms
+float between the ears, each located by its rod, #3114); the lug span is
+shown as a reference, the
 pair being set off the top frame. ``KEEPER_PLAN_FEATURE``, on the Top plane
 (sketch x is machine x, sketch y machine -z), is that setting: the
 MHA-FR-02 features it is set from, in phantom (the frame is not in this
@@ -60,17 +60,13 @@ from fr_top_frame_spec import WEB_T as RAIL_WEB_T
 from frame_column_stations import COLUMN_X
 from ch_pivot_shaft_spec import DOME_HEIGHT as SHAFT_DOME_HEIGHT
 from rocker_bank_layout import (
-    HUB0_SOUTH_FACE_Z,
-    HUB19_NORTH_FACE_Z,
+    EAR_INNER_SPAN,
+    EAR_SPAN_BAND,
+    NORTH_EAR_INNER_Z,
     NORTH_EAR_OUTER_Z,
     PIVOT_SHAFT_NORTH_Z,
-    ROCKER_SPRING_SET,
-    ROCKER_SPRING_SET_BAND,
     SHAFT_TIP_SET_BAND,
     SOUTH_EAR_INNER_Z,
-    SOUTH_WASHER_Z,
-    STACK_L20_ACCEPT,
-    STACK_L20_ACCEPT_BAND,
 )
 
 # The sheets print the assembly contract's drawing_unit (decimal inch, #290).
@@ -81,8 +77,7 @@ PIVOT_FEATURE = "RockerBankSettingsReference"
 FULCRUM_FEATURE = "LeverBankSettingsReference"
 KEEPER_PLAN_FEATURE = "KeeperPlanSettingsReference"
 FEATURES = (PIVOT_FEATURE, FULCRUM_FEATURE, KEEPER_PLAN_FEATURE)
-SPRING_SET_DIMENSION = "RockerSpringSet"
-STACK_LENGTH_DIMENSION = "RockerStackLength"
+EAR_SPAN_DIMENSION = "RockerEarSpan"
 TIP_PROUD_DIMENSION = "PivotTipProud"
 LUG_SPAN_DIMENSION = "KeeperLugSpan"
 KEEPER_X_DIMENSION = "KeeperLugX"
@@ -94,9 +89,7 @@ KEEPER_REAR_Z_DIMENSION = "KeeperRearFaceZ"
 # ear's outer face at fit-up (rocker_bank_layout): the model's dome apex.
 PIVOT_CHAIN_Z = (
     SOUTH_EAR_INNER_Z,
-    SOUTH_WASHER_Z[0],
-    HUB0_SOUTH_FACE_Z,
-    HUB19_NORTH_FACE_Z,
+    NORTH_EAR_INNER_Z,
     NORTH_EAR_OUTER_Z,
     PIVOT_SHAFT_NORTH_Z + SHAFT_DOME_HEIGHT,
 )
@@ -180,18 +173,16 @@ if not (
 ):
     raise AssertionError("the front keeper no longer covers just the outer web face")
 
-if abs(PIVOT_CHAIN_Z[1] - PIVOT_CHAIN_Z[0] - ROCKER_SPRING_SET) > 1e-9:
-    raise AssertionError("the spring-set leg is not ROCKER_SPRING_SET")
-if abs(PIVOT_CHAIN_Z[3] - PIVOT_CHAIN_Z[2] - STACK_L20_ACCEPT[0]) > 1e-9:
-    raise AssertionError("the stack leg is not the closed-up stack length")
-if abs(PIVOT_CHAIN_Z[5] - PIVOT_CHAIN_Z[4] - SHAFT_DOME_HEIGHT) > 1e-9:
+if abs(PIVOT_CHAIN_Z[1] - PIVOT_CHAIN_Z[0] - EAR_INNER_SPAN) > 1e-9:
+    raise AssertionError("the ear leg is not the ears' inner-face span")
+if abs(PIVOT_CHAIN_Z[3] - PIVOT_CHAIN_Z[2] - SHAFT_DOME_HEIGHT) > 1e-9:
     raise AssertionError("the tip leg is not the shaft's dome set proud of the ear")
 if abs(LUG_INNER_FACE_Z[1] - LUG_INNER_FACE_Z[0] - KEEPER_INNER_FACE_SPAN_MM) > 1e-9:
     raise AssertionError("the lug leg is not the keeper inner-face span")
 
 # Marked for the drawing: the settings and the reference span.
 DRAWING_DIMENSIONS = {
-    PIVOT_FEATURE: {SPRING_SET_DIMENSION, STACK_LENGTH_DIMENSION, TIP_PROUD_DIMENSION},
+    PIVOT_FEATURE: {EAR_SPAN_DIMENSION, TIP_PROUD_DIMENSION},
     FULCRUM_FEATURE: {LUG_SPAN_DIMENSION},
     KEEPER_PLAN_FEATURE: {
         KEEPER_X_DIMENSION,
@@ -199,19 +190,17 @@ DRAWING_DIMENSIONS = {
         KEEPER_REAR_Z_DIMENSION,
     },
 }
-# Inch places per setting. The spring set (.0236) is a closure the inch grid
-# does not snap (the spring's installed height), so it prints to the four
-# places that state its exact nominal within its band; so do the lug inner
-# faces (1.3702, 7.4102), set off the kinematic fulcrum line. The closed-up
-# stack is twenty .300 hubs, exactly 6.000 in, so it prints on the plain inch
-# grid at its +.004/.000 band's three places (the four-place converted-mm
-# print of the 7.0565 pitch, ch-channel RV-03, is gone); three for the lug
+# Inch places per setting. The ears' inner-face span is 6.094 (nineteen .300
+# pitches and the two ear stand-offs, .189 and .205), on the plain inch grid
+# at its +/-.004 band's three places. The lug inner faces (1.3702, 7.4102),
+# set off the kinematic fulcrum line, are closures the inch grid does not
+# snap, so they print to the four places that state their exact nominal
+# within their band; three for the lug
 # centre (.114, band .004). The reference lug span is on the .XX grid (6.04).
 # The tip set prints .XXX (.060 ±.010), read with a caliper's depth rod.
 DRAWING_PRECISION = {
     PIVOT_FEATURE: {
-        SPRING_SET_DIMENSION: 4,
-        STACK_LENGTH_DIMENSION: 3,
+        EAR_SPAN_DIMENSION: 3,
         TIP_PROUD_DIMENSION: 3,
     },
     FULCRUM_FEATURE: {LUG_SPAN_DIMENSION: 2},
@@ -230,14 +219,13 @@ TOLERANCE_PRECISION = {
     for places_by_name in DRAWING_PRECISION.values()
     for name, places in places_by_name.items()
 }
-# (lower, upper) deviations; the stack accepts only long (STACK_L20_ACCEPT).
+# (lower, upper) deviations.
 # The keeper plan's three each carry their fit-up band on their own
 # dimension (owner ruling X1+B1, 2026-10-18): each inner face off the socket
 # line the location band, the lug centre off the web centre its own looser
 # band (owner ruling X-A, 2026-10-18).
 DIMENSION_TOLERANCES = {
-    SPRING_SET_DIMENSION: (-ROCKER_SPRING_SET_BAND, ROCKER_SPRING_SET_BAND),
-    STACK_LENGTH_DIMENSION: (-STACK_L20_ACCEPT_BAND[1], STACK_L20_ACCEPT_BAND[0]),
+    EAR_SPAN_DIMENSION: (-EAR_SPAN_BAND, EAR_SPAN_BAND),
     TIP_PROUD_DIMENSION: (-SHAFT_TIP_SET_BAND, SHAFT_TIP_SET_BAND),
     KEEPER_X_DIMENSION: (-KEEPER_FITUP_X_BAND_MM, KEEPER_FITUP_X_BAND_MM),
     **{
@@ -269,8 +257,9 @@ def bar_gap_budget() -> dict[str, float]:
 
     ``top``: the bar pivot pin joint's ``neighbour_clearance_min``
     (``sh_vn_pivot_pin_bar_spec``). ``foot``: the same
-    form on the foot notch and the real MHA-CH-06 strap (.098 +/-.001): the
-    pitch the rocker hubs set (never short), the widest stock, the foot
+    form on the foot notch and the real MHA-CH-06 strap (.098 +/-.001): two
+    neighbouring arms closed up hub on hub at the hubs' least length (the
+    arms float on the shaft, #3114), the widest stock, the foot
     notch's float on the thinnest strap, both ledges' bands, and the strap's
     position zone to its hub (each strap half the zone off its hub's
     mid-plane, two neighbours toward each other). ``mid_span``: two straight
@@ -281,7 +270,7 @@ def bar_gap_budget() -> dict[str, float]:
     .001 in a feeler set is sold in, so a bank inside its bands always
     passes it.
     """
-    pitch_min = _arm.HUB_LENGTH  # the arms stack hub on hub at the pitch
+    pitch_min = _arm.HUB_LENGTH_MIN  # two floating arms closed up hub on hub
     w_max = _bar.BAR_WIDTH
     notch_max = _bar.BOTTOM_NOTCH_WIDTH + _bar.BOTTOM_NOTCH_WIDTH_BAND[0]
     strap_min = _arm.ARM_THICKNESS + _arm.ARM_THICKNESS_BAND[1]

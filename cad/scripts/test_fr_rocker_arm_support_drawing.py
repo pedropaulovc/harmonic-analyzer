@@ -108,7 +108,7 @@ def test_support_finish_masks_both_mating_faces() -> None:
     # #2108 review: the base underside seats on the harmonic base and the
     # top face under the MHA-CH-08 feet; the finish names both.
     assert _config.parts(support.PART_NAME)["finish"] == (
-        "GREEN ENAMEL; MASK FOOT UNDERSIDE AND MHA-CH-08 SEAT; OIL BARE FACES"
+        "GREEN ENAMEL; MASK FOOT UNDERSIDE AND TOP FACE; OIL BARE FACES"
     )
     assert support.HOLE_SPEC.kind == "drilled_fractional"
     assert support.HOLE_SPEC.size == "5/16"
@@ -675,9 +675,9 @@ def test_the_end_faces_top_edges_skip_the_rim_chamfer_to_keep_the_seat_end_wall(
     None
 ):
     """#1038 review: the .06 leg on an end face's top edge left the bracket
-    seat's thread about 1.51 mm from the break's top edge at the worst case
+    seat's thread about 1.50 mm from the break's top edge at the worst case
     (under the .060 floor). Neither top edge is chamfered, so the edge keeps
-    the title block's break and the seats keep 2.77 (S) and 4.37 (N)."""
+    the title block's break and the seats keep 2.76 (S) and 4.17 (N)."""
     from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
     from _printed_tolerance import edge_break_chamfer_mm
 
@@ -687,11 +687,11 @@ def test_the_end_faces_top_edges_skip_the_rim_chamfer_to_keep_the_seat_end_wall(
         assert [sign * half, 0.0, 0.0] not in support.CHAMFER_FACES
     title_break = edge_break_chamfer_mm(unit=placement.UNIT)
     walls = [_end_wall_past_top_edge_break(w, title_break) for w in seats.END_WALL_MIN]
-    assert walls == pytest.approx([2.768, 4.372], abs=0.001)
+    assert walls == pytest.approx([2.759, 4.169], abs=0.001)
     assert min(walls) >= WALL_TARGET_MM
     south = min(seats.END_WALL_MIN)
     chamfered = _end_wall_past_top_edge_break(south, support.CHAMFER)
-    assert chamfered == pytest.approx(1.508, abs=0.001)
+    assert chamfered == pytest.approx(1.499, abs=0.001)
     assert chamfered < WALL_FLOOR_MM
 
 
@@ -1062,14 +1062,17 @@ def test_seat_station_texts_stand_above_view_b_outboard_of_its_ends() -> None:
     end_run = support.BOSS_DEPTH / 2.0 * scale
     east = _text_box(
         _inch_ref((support.BOSS_DEPTH / 2.0 - max(seats.SEAT_LOCAL_X)) / 25.4),
-        drawing.VIEW_B_KEEP["SeatEastStation"],
+        drawing.VIEW_B_REF_TEXT_XY["SeatEastStation"],
     )
     west = _text_box(
         _inch_ref((support.BOSS_DEPTH / 2.0 + min(seats.SEAT_LOCAL_X)) / 25.4),
-        drawing.VIEW_B_KEEP["SeatWestStation"],
+        drawing.VIEW_B_REF_TEXT_XY["SeatWestStation"],
     )
+    # Each text rides a leader, above the tops of its extension lines.
+    assert set(drawing.VIEW_B_REF_TEXT_XY) == set(drawing.VIEW_B_KEEP)
+    line_y = fence_top + drawing.VIEW_B_REF_RISE
     for box in (east, west):
-        assert box[1] > fence_top + 0.002
+        assert box[1] > line_y + 0.002
     assert drawing.VIEW_B_KEEP["SeatEastStation"][0] > centre_x + end_run
     assert drawing.VIEW_B_KEEP["SeatWestStation"][0] < centre_x - end_run
     # East: left of the hole table. West: right of the front view's pocket

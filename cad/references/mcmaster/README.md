@@ -15,7 +15,6 @@ recipes:
 
 | part number | production part stem(s) | stock item |
 |---|---|---|
-| 3088A429 | `ch-vn-rocker-thrust-washer` (MHA-CH-VN-56; catalogue-only, vendor model refused) | Carbon Steel Round Shim, 1/4" ID x 3/8" OD, 0.031" Thick |
 | 3603T354 | `dt-vn-keeper-chain` (MHA-DT-VN-65; modelled from the catalogue, the reference STEP is evidence only) | Jack Chain, Brass, Trade Size 18 |
 | 3606T118 | — (`dt-vn-keeper-chain` until 2026-11-08; replaced by 3603T354) | Bead Chain, Unfinished Brass, Trade Size 3 |
 | 3606T811 | — (`dt-vn-keeper-chain-link` MHA-DT-VN-66 until 2026-11-08; retired) | Loop Link for Brass Trade Size 3 Bead Chain |
@@ -109,7 +108,6 @@ recipes:
 | 94773A606 | `pd-vn-transgear-cluster-shim` (MHA-PD-VN-68; catalogue-only, no vendor model) | Shim for Shortening Screw Shoulders, 18-8 Stainless Steel, 1/8" Shoulder |
 | 93600A189 | — (retired 2026-11-02, #290: MHA-PD-VN-64 takes 98381A435; recipe removed) | Passivated 316 Stainless Steel ISO 2338-m6 Dowel Pin |
 | 9666K142 | `sh-vn-music-wire` (MHA-SH-VN-56; `LeverWire` and `PenWire` configurations cut from one coil; catalogue-only, no vendor model) | Lubricated 1080 Spring Steel Wire, 0.008 in, 1/4 lb coil |
-| 9714K24 | `ch-vn-rocker-bank-spring` (catalogue-only; no vendor model) | Wave Disc Spring |
 | 9714K392 | `dt-vn-cylinder-bank-spring` (catalogue-only; no vendor model) | Wave Disc Spring |
 | 9715K43 | `pd-vn-transgear-pivot-spring` (catalogue-only; no vendor model) | Curved Disc Spring |
 | 97431A240 | `pd-vn-transgear-retaining-ring` (catalogue-only; CAD download refused) | Side-Mount External Retaining Ring |
@@ -1547,43 +1545,11 @@ Catalog specifications checked on September 10, 2026:
   10, $11.18. The page states no rate and no wave count (the spec's rate is
   the working point taken as linear [INFERENCE]); the part carries the
   library's `Plain Carbon Steel`.
-- [9714K24](https://www.mcmaster.com/9714K24/) (`ch-vn-rocker-bank-spring`,
-  MHA-CH-VN-54, one) sits on the MHA-CH-05 pivot shaft between the south
-  MHA-CH-VN-56 washer and the south MHA-CH-08 ear, set by a 0.60 blade, and holds the
-  20-hub stack north on its datum. Its page was read live on October 9, 2026:
-  Wave Disc Spring, high-carbon steel, stackable; ID 0.265 in -0.02/+0.01, OD
-  0.367 in -0.02/+0.01, thickness 0.006 in, height 0.03 in (free); compressed
-  height 0.015 in and deflection 0.015 in at the 3 lb working load; pack of 25,
-  $16.31. The page states no rate, no wave count and no shaft size. The
-  catalogue's minimum ID (6.22 mm) is under the 6.35 mm shaft, so each spring
-  is slid onto MHA-CH-05 first and one that does not run free is rejected.
-- Both are modelled as their installed envelope: `diag_build_9714K392.py` and
-  `diag_build_9714K24.py` extrude the ID x OD annulus to the installed height
-  (the set-blade gap) [INFERENCE: the waves are not modelled]. A 3-D
-  SolidWorks model is offered on each page, but none was fetched or kept
-  here, so both are catalogue-only: no replica gate, and their standalone
-  diagnostics are catalog-only runs.
-- [3088A429](https://www.mcmaster.com/3088A429/) (`ch-vn-rocker-thrust-washer`,
-  MHA-CH-VN-56, two) rides the MHA-CH-05 pivot shaft at each end of the rocker
-  bank: the north one between hub 19 and the datum MHA-CH-08 ear, the south
-  one between hub 0 and the MHA-CH-VN-54 spring. It replaced the custom
-  MHA-CH-09 sheet washer (owner, 2026-10-15: every washer is a purchased
-  part). The product page renders no spec table to a scraper, so the row was
-  read live on October 15, 2026 from the round-shim family table
-  (https://www.mcmaster.com/products/shims/shims-1~~/, Carbon Steel, 1/4" ID x
-  3/8" OD): thickness 0.031 in +/-0.002 in, ID tolerance 0 to +0.011 in, OD
-  tolerance -0.002 to +0.002 in, Rockwell B65 minimum, pack of 10. The
-  0.031 in nominal keeps the bank's stand-offs within 0.003 of the retired
-  0.79 washer; 3/8 OD is the only family OD under the Ø10.2 hub and the bar
-  foot's cheeks, and the bore's 1/4 in floor is the shaft's maximum, so the
-  shim slides on at worst line on line. The spring-steel 90482A512 (same size,
-  0.032 in, Rockwell C44) was read live the same day and passed over because
-  its 0.813 nominal moves both ears a further 0.023. `diag_build_3088A429.py`
-  extrudes the ID x OD annulus at the 0.031 in nominal, with the bore at its
-  band's middle (6.49) so the model does not sit line on line with the
-  shaft. The page's CAD download was refused (HTTP 403), so it is
-  catalogue-only: no replica gate, and its standalone diagnostic is a
-  catalog-only run.
+- It is modelled as its installed envelope: `diag_build_9714K392.py` extrudes
+  the ID x OD annulus to the installed height (the set-blade gap)
+  [INFERENCE: the waves are not modelled]. A 3-D SolidWorks model is offered
+  on the page, but none was fetched or kept here, so it is catalogue-only:
+  no replica gate, and its standalone diagnostic is a catalog-only run.
 
 - [92671A005](https://www.mcmaster.com/92671A005/) (`mg-vn-wheel-axle-nut`,
   MHA-MG-VN-52, two), [92916A480](https://www.mcmaster.com/92916A480/)

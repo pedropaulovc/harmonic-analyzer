@@ -39,8 +39,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "StrapProfile": {"TopRadius", "BottomRadius", "RodTipLen", "TipLandAngle"},
     "PivotHoleProfile": {"PivotDia"},
     "HubProfile": {"HubDia"},
-    # #743 PR2: the hub length carries its +.0020/0 band natively; the 20-arm
-    # stack acceptance (rocker_bank_layout) caps the sum.
+    # The hub length carries its +/-.002 band natively (#3114: the arms float
+    # on the pivot shaft, so no stack sums the hubs).
     "Hub": {"HubLength"},
     # The top edge's height over the pivot axis, +.020/0 natively (Codex #936
     # PRRT_kwDOPHDy386mV3AO). Only this one of the sketch's two dimensions
@@ -63,7 +63,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # Decimal classes already authored by the part; shared with the offline
 # requirement exporter. Decimal inch (#290): the BASIC arc radii and the
 # pivot-to-edge height print the places their kinematic values need, the
-# reamed bore and the hub length (the station pitch) four; the remaining
+# reamed bore four and the hub length three (its +/-.002 band); the remaining
 # dimensions take the sheet's default.
 DEFAULT_DRAWING_PRECISION = 2
 DRAWING_PRECISION = {
@@ -73,7 +73,7 @@ DRAWING_PRECISION = {
         "BottomRadius": 3,
     },
     "PivotHoleProfile": {"PivotDia": 4},
-    "Hub": {"HubLength": 4},
+    "Hub": {"HubLength": 3},
     "HubProfile": {"HubDia": DEFAULT_DRAWING_PRECISION},
     "TopEdgeReference": {"TopAbovePivot": 3},
     "BottomEdgeReference": {"BottomBelowPivot": 3},
@@ -171,11 +171,13 @@ PIVOT_FIT_CALLOUT = (
 )
 # Under the strap thickness in view F.
 STRAP_FIT_CALLOUT = "SLIDING FIT IN\nMHA-CH-03 FORK"
-# Integral hub length, not spacers, sets channel pitch: the hubs stack face to
-# face on the pivot shaft (rocker_bank_layout). Below-text rows (above-text
-# line breaks print as one run). No "20X" here: on one length it reads as a
+# The arms float on the pivot shaft, each located by its own rod (#3114): the
+# hub's end faces only bound how close two neighbours can come, which the rod
+# forks and the amplitude bars between them rely on (sh_vn_pivot_pin_rod_spec,
+# ch_channel_assembly_spec.bar_gap_budget). Below-text rows (above-text line
+# breaks print as one run). No "20X" here: on one length it reads as a
 # feature count (rule 26; ch-fab-2 r3); the count is MHA-CH-00's.
-HUB_LENGTH_CALLOUT = "SETS STACK PITCH\nON MHA-CH-05"
+HUB_LENGTH_CALLOUT = "KEEPS ADJACENT\nMHA-CH-06 APART"
 # The amplitude bar's foot rides the top edge (ch_rocker_arm_spec
 # TOP_EDGE_BAND): the one profile frame names it below the frame.
 TOP_EDGE_MATE_CALLOUT = "MHA-CH-01 FOOT TRACK"

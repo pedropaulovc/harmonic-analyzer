@@ -343,7 +343,7 @@ Tier: **T1** = spend the budget here · **T2** = moderate · **T3** = leave loos
 | **Summing lever** `sm-summing-lever`, `sm-knife-mount` | **T1** | knife-edge **straightness + ⟂ to motion plane**; **parallelism/equal height** of the two mounts; `precision` on the seat; `bearing` finish on edge + seat. **Material:** the lever is gray iron, ASTM A48 class 40C, its knife edges integral and **as machined, not hardened**; each rides a reamed seat in a 4140 HT (28-32 HRC) mount, harder than the edge (delegated ruling 2026-11-17, #1611 option A, owner review on [#2144](https://github.com/pedropaulovc/harmonic-analyzer/issues/2144); precedent: owner ruling 2026-11-10, #2334 B1). At the worst stationary load (about 68 N per mount, 4.85 N/mm) the edge beds in at first load to a land about 5 µm wide and then rolls on it, at every conforming radius up to R.004 MAX; the contact half-width stays under the budget's 0.005 mm rolling resistance (`error_budget.yaml` knife), so no insert or heat treatment is specified. *Least forgiving interface in the machine.* |
 | **Cylinder gears + cams** `dt-cylinder-gear`, `ch-connecting-rod` | **T1** | cam **eccentricity = amplitude** (hold it), **runout of cam OD to gear bore** ≤0.05 mm; **angular phasing to the ~3 mm alignment notch** (per-channel phase datum — set at assembly); `precision` on bore; cam OD `bearing` finish; **rod cam-bore (the `cam_follower_contact` surface) `bearing`; rod *body* `none`** (book: rough — the exemption is the visible body, not the bearing bore). *The 20 cams are the function generators.* |
 | **Cone gears** `dt-cone-gear`, `dt-cone-gear-shaft` | **T1** | tooth-cutting setup within **0.05 mm TIR** of the finished bore; ordinary bands (OD +0/−0.05, tooth thickness ±0.075; T006 thin-only); **48DP / 20° PA shared across the whole cone↔cylinder train** (its own domain — Finding 3); flag **T006 0.64 mm minimum web on its 1/32 in bore** + harder tip metal (Finding 4); `precision` on bore. The centre distance is **set at assembly** on T120's feeler and locked by the cone-lock knob (MHA-DT-VN-51), so the mesh is gated at nominal plus an RSS corner, not at the arithmetic worst case ([`gear-standard.md`](./gear-standard.md#how-the-meshes-are-accepted)). |
-| **Pivots & hubs** `ch-pivot-shaft`, `ch-fulcrum-shaft`, `ch-rocker-hub`, the `ch-channel-lever` hubs | **T1** | reconcile the **0.15 vs 0.025–0.075 mm** fit (Finding 2); `precision` on bore + journal; `bearing` finish; **all 20 integral hubs one length, one setup** (they stack face to face at the 7.62 mm channel pitch; the 19 spacers are retired); shaft straightness. |
+| **Pivots & hubs** `ch-pivot-shaft`, `ch-fulcrum-shaft`, `ch-rocker-hub`, the `ch-channel-lever` hubs | **T1** | reconcile the **0.15 vs 0.025–0.075 mm** fit (Finding 2); `precision` on bore + journal; `bearing` finish; **all 20 lever hubs one length, one setup** (they stack face to face at the 7.62 mm channel pitch; the 19 spacers are retired); the rocker hubs are shorter than the pitch and float, each arm located by its rod (#3114); shaft straightness. |
 | **Rocker arms** `ch-rocker-arm`, `fr-rocker-arm-support` | **T1** | **concave radius R800 nominal** (form, ±0.5 mm; book ch.14 says "= bar length" = 812.8 mm — **reconcile, Finding 5**; stamp the model's R800, never the bar length). Pivot bore **square** to face; slide surface `bearing` finish. |
 | **Amplitude bars** `ch-amplitude-bar` | **T2** | preserve **length** (~80 cm — it linearizes the transfer; don't shorten); notch fit snug-sliding (`sliding_amplitude_bar_on_rocker`); straightness mild; **notch foot (the sliding-contact surface) `bearing`; bar *body* `none`**. Precision here is **position repeatability**, not part geometry. |
 | **Drive train** `crankshaft`, `dt-crank-pin`, `dt-crank-drive-gear`, `dt-crank-pinion`, `dt-crank-arm`, `dt-crank-handle` | **T2** | **taper-pin** crank-to-shaft index (repeatable, zero-backlash angular registration) — ream matching taper; gear bores `precision` + runout; handle/arm loose. |
@@ -362,9 +362,10 @@ Express these as **consistency + fit-at-assembly**, not absolute position — th
 error model and how the machine was actually built and trimmed.
 
 - **Channel pitch & coplanarity (the real assembly precision):** the 7.62 mm (.300 in) channel spacing and
-  the coplanarity of the 20 rockers / 20 levers are set by the **integral hub lengths** (each
-  set's 20 hubs stack face to face; the 19 bushing spacers are retired) and the
-  **pivot-shaft straightness**, not by 20 independently located holes. → face each set's hubs
+  the coplanarity of the 20 levers are set by their **integral hub lengths** (the 20 hubs stack
+  face to face; the 19 bushing spacers are retired) and the **shaft straightness**, not by 20
+  independently located holes. The 20 rockers take their spacing from the cylinder gears: each
+  floats on the pivot shaft and follows its rod, whose ring slides in its cam slot (#3114). → face the lever hubs
   in one setup; ream the pivot bores through a common fixture/stack. This is where "channel-to-channel
   consistency" is won or lost.
 - **Gear mesh centre distances:** **set at assembly by feel** for light backlash; the cone set
@@ -562,7 +563,7 @@ against the actual audience and the toolchain, each is now a decision, not a def
 **Toolchain (corrected).** The build is **manual-primary by deliberate choice** — manual mill +
 lathe with DROs, chosen for fidelity to a hand-built 1898 machine — **with a PM-30MV CNC available
 for the repetitive, high-count parts**: the **20 cams**, the **20+20 integral hubs** (the
-`ch-rocker-hub` and `ch-channel-lever` hub banks, each 20 hubs at the .300 channel pitch), and the
+`ch-rocker-hub` and `ch-channel-lever` hubs, 20 of each), and the
 **cone/cylinder gear train**. That is exactly where channel-to-channel *consistency* (§2's expensive
 error mode) is hardest to hold by hand, so CNC is the right tool there even though manual remains the
 main path for one-off parts. An earlier draft of this section wrongly called the toolchain

@@ -2,7 +2,7 @@ r"""Reproduction script: connecting rod (book ch. 13 pp. 22-25 / ch. 14 p. 29; 2
 
 Black rod machined from 1/4 x 2 1018 cold-finished flat, converting each cam's
 rotation into the rocker arm's see-saw: a full ring (strap) riding the
-eccentric cam (cast integral with each cylinder gear), a thin flat shank, and a
+eccentric cam (cast integral with each cylinder gear), a flat shank, and a
 U-shaped FORK (clevis; the Y-shaped upper end of the ch14 fan photo) whose two
 tines straddle the rocker arm's strap and carry the pressed pivot pin
 (MHA-SH-VN-58 RodPin, sh_vn_pivot_pin_rod_spec) through the arm's rod-pin hole near its
@@ -11,13 +11,20 @@ level rocker's pin, including the common raised drive-axis height. The ch14
 end views show the 0-crank tip row level (cos-mode home = top of stroke, cam
 lobe UP); the rod length closes that link without moving the rocker bank.
 
-The rod is FLAT: ring, shank and fork share one mid-plane, which is the cam
+The rod is FLAT: ring and fork share one mid-plane, which is the cam
 plane and the arm plane (rocker_bank_layout.ARM_MID_DZ = CAM_MID_DZ), so the
-arm runs centred in the fork slot. The fork is .39 wide with a full-round
-crown on the pin; its two .067 +/-.002 tines straddle a .106 +/-.002 slot
-(Main ruling 2026-10, option b): each inter-arm gap holds one tine of each
-neighbouring rod, so tines, slot and the ring/shank faces are model bands
-located from one finished fork face (#982). The pin is pressed into a
+arm runs centred in the fork slot. Ring and shank keep the original's
+proportions (owner ruling 2026-11-18, #3114): the ring .170 +/-.002 thick, a
+sliding fit between the two tooth discs of its cam slot, which locates the
+rod along the bank; the shank .13, its near face .05 from the fork's datum
+face (two-place sizes, so its mid-plane stands .005 off the ring's toward
+that face), stepped in on both faces so the ring alone meets the discs. The
+fork is .39 wide with a full-round crown on the
+pin; its two .067 +/-.002 tines straddle a .106 +/-.002 slot (Main ruling
+2026-10, option b): each inter-arm gap holds one tine of each neighbouring
+rod, so tines, slot and the ring's faces are model bands located from one
+finished fork face (#982), and the rocker arm, floating on its shaft, follows
+the fork. The pin is pressed into a
 hole reamed through both tines and dressed flush (user ruling 2026-10-09, PR
 #1292 review F1, reversing the #746 reconstruction choice of peening it into
 countersinks): the photos show two rod cheeks round each rocker, not the
@@ -29,10 +36,11 @@ overlay (med), fork proportions photo-scaled vs the 16 mm arm-depth callout
 and sized to the joint budget (sh_vn_pivot_pin_rod_spec), everything else
 photo-scaled (low).
 
-Layout: ring centre at the origin, shank rising +Y to the fork; thicknesses
-extruded mid-plane in Z. Build order matters: the plate (ring and shank, one
-outline) and the fork are bossed first, the slot is cut through the fork,
-then the bore.
+Layout: ring centre at the origin, shank rising +Y to the fork; ring and
+fork centred on the Front plane (z = 0). Build order matters: the ring
+disc, the shank (its foot buried in the ring's wall) and the fork are bossed
+first, the slot is cut through the fork, the inside corners are rounded, then
+the bore and the pin hole.
 
 Run (SolidWorks already open)::
 
@@ -59,6 +67,7 @@ from _sketch import (
     SketchDims,
     add_line_chain,
     anchor_point_to_origin,
+    blank_reference_sketches,
     dimension_between,
     ensure_fully_defined,
     set_sketch_direct_db,
@@ -95,6 +104,7 @@ from ch_connecting_rod_spec import (
     RING_THICKNESS,
     RING_THICKNESS_BAND,
     RING_WALL,
+    SHANK_FACE_NEAR,
     SHANK_THICKNESS,
     SHANK_WIDTH,
     SURFACE_FINISHES,
@@ -127,12 +137,40 @@ MATERIAL = "Plain Carbon Steel"
 # the slot cut runs out SLOT_RUNOUT above the crown so the crown alone shapes
 # the tine tops.
 SLOT_RUNOUT = 1.0  # unprinted
-# The ring/shank near-face reference runs this far down the shank from the
-# fork root, so its ordinate prints below the fork in its side detail.
-RING_FACE_REF_RUN = 2.0  # unprinted
+# The shank's near-face reference runs this far down the shank from the fork
+# root, so its ordinate prints below the fork in its side detail.
+SHANK_FACE_REF_RUN = 2.0  # unprinted
+# The shank's foot stands in the middle of the ring's wall: inside the ring
+# disc, which is the thicker, so the foot leaves no edge on either ring face.
+SHANK_FOOT_Y = RING_OUTER_RADIUS - RING_WALL / 2.0  # unprinted
+if math.hypot(SHANK_WIDTH / 2.0, SHANK_FOOT_Y) >= RING_OUTER_RADIUS:
+    raise AssertionError("the shank's foot must stand inside the ring disc")
+# The shank's two faces in its Right-plane sketch (sketch x = model -Z, the
+# fork's datum face at +FORK_THICKNESS / 2): the near face SHANK_FACE_NEAR in
+# from the datum face, the far face the shank's thickness beyond it. The two
+# are two-place sizes, so the shank is not centred on the rod's mid-plane
+# (ch_connecting_rod_spec).
+SHANK_NEAR_X = FORK_THICKNESS / 2.0 - SHANK_FACE_NEAR
+SHANK_FAR_X = SHANK_NEAR_X - SHANK_THICKNESS
+# (near, far) how far each ring face stands over its shank face (#3114): the
+# shank lies inside the ring on both sides, which boss_volume relies on. The
+# two corners where a shank face meets the ring's OD wall stay sharp in the
+# model, inside the title block's INSIDE CORNERS R.040 MAX like every other
+# inside corner: the near step is shallower than the modelled corner radius,
+# so a fillet has no seat there, and the far step would seat one only at
+# nominal (the printed bands take it down to .001).
+RING_STEPS = (
+    RING_THICKNESS / 2.0 - SHANK_NEAR_X,
+    SHANK_FAR_X + RING_THICKNESS / 2.0,
+)
+if min(RING_STEPS) <= 0.0:
+    raise AssertionError("each shank face must lie inside its ring face (boss_volume)")
 # The rocker pivot pin hole is a reamed press hole; its size and band live in
 # ch_connecting_rod_spec.
 THROUGH_CUT_DEPTH = 20.0  # mid-plane total; > any local thickness or width
+# How far RingFaceReference's line on the fork's datum face runs up that face
+# from its root step: unprinted, well inside the fork's height.
+DATUM_FACE_REF_RUN = 2.0
 
 FORK_BOSS_LENGTH = FORK_TOP_Y - FORK_BASE_Y  # crown top -> root step (.71)
 SLOT_DEPTH = FORK_TOP_Y - FORK_CROTCH_Y  # crown top -> slot floor (.58)
@@ -152,15 +190,25 @@ def fork_outline_area(from_y: float) -> float:
     return FORK_WIDTH * (CENTER_DISTANCE - from_y) + math.pi * FORK_CROWN_RADIUS**2 / 2.0
 
 
-def boss_volume() -> float:
-    """Plate (ring disc and shank, one outline) + fork boss before any cut:
-    the shank counts only its run from the ring OD to the fork root."""
+def ring_volume() -> float:
+    """The ring disc before its bore."""
+    return math.pi * RING_OUTER_RADIUS**2 * RING_THICKNESS
+
+
+def shank_volume() -> float:
+    """The shank's run from the ring's OD to the fork root. Its foot inside
+    the ring adds nothing: the shank lies inside both ring faces."""
     shank_area = SHANK_WIDTH * FORK_BASE_Y - _circle_cap_area(
         RING_OUTER_RADIUS, SHANK_WIDTH / 2.0
     )
+    return shank_area * SHANK_THICKNESS
+
+
+def boss_volume() -> float:
+    """Ring disc, shank and fork boss before any cut."""
     return (
-        math.pi * RING_OUTER_RADIUS**2 * RING_THICKNESS
-        + shank_area * SHANK_THICKNESS
+        ring_volume()
+        + shank_volume()
         + fork_outline_area(FORK_BASE_Y) * FORK_THICKNESS
     )
 
@@ -171,6 +219,8 @@ def slot_volume() -> float:
 
 
 def strap_bore_volume() -> float:
+    """The bore runs through the ring's thickness (the shank's foot stands
+    in the ring's wall, clear of it)."""
     return math.pi * (RING_BORE_DIA / 2.0) ** 2 * RING_THICKNESS
 
 
@@ -194,8 +244,9 @@ def inside_corner_volume() -> float:
     """The inside-corner fillets: the slot floor's two corners across the
     fork's width, the root step's loop round the shank's end (two corners
     across its width, two through its thickness), and the shank's two
-    flanks onto the ring through the plate. The loop's four meeting corners
-    add only an R^3 sliver, inside the gate's allowance."""
+    flanks onto the ring's OD through the shank's thickness (the ring is
+    the thicker, so each fillet ends flat on a shank face). The loop's four
+    meeting corners add only an R^3 sliver, inside the gate's allowance."""
     square = _fillet_area(INSIDE_CORNER_R, math.pi / 2.0)
     straight = 2.0 * FORK_WIDTH + 2.0 * SHANK_WIDTH + 2.0 * SHANK_THICKNESS
     ring = _fillet_area(INSIDE_CORNER_R, SHANK_RING_OPENING) * 2.0 * SHANK_THICKNESS
@@ -220,8 +271,9 @@ def build(adapter) -> dict[str, str]:
     apply_package_model_units(adapter, part_drawing_unit(PART_NAME), label=PART_NAME)
 
     # Editable knobs (Tools > Equations) for every module constant; derived spans
-    # (ring outer radius, the shank/block start heights) are equations of those
-    # primitives, so a knob edit keeps the strap-to-pin geometry consistent. The
+    # (ring outer radius, the shank's foot and root heights, the two near-face
+    # ordinates) are equations of those primitives, so a knob edit keeps the
+    # strap-to-pin geometry consistent. The
     # mm suffix is load-bearing -- this is an INCH document and the equation
     # manager reads BARE numbers in document units (an unsuffixed 127 = 127 in,
     # blowing the part up 25.4x).
@@ -245,6 +297,8 @@ def build(adapter) -> dict[str, str]:
     set_global(
         adapter, "RingFaceNear", '("ForkThickness" - "RingThickness") / 2'
     )
+    set_global(adapter, "ShankFaceNear", f"{SHANK_FACE_NEAR}mm")
+    set_global(adapter, "ShankFootY", '"RingOuterRadius" - "RingWall" / 2')
 
     # Each sketch records its dim names + drive equations into a per-sketch
     # SketchDims in helper emission order; the drives are collected and applied in
@@ -252,82 +306,100 @@ def build(adapter) -> dict[str, str]:
     # model).
     drive_jobs: list[tuple[str, str]] = []
 
-    # Plate: the ring disc and the shank as ONE closed outline extruded once
-    # -- the ring OD's major arc from the shank's left flank round the bottom
-    # to its right flank, the flanks up to the fork's root step, and the root
-    # line. Two coplanar bosses (a disc, then a shank dipping into it) left
-    # the shank's flanks as seams across the ring's faces in the front view
-    # (#982 review r2), reading as a step the side view does not show. Dim
-    # EMISSION ORDER: ring OD, shank width, root height, right flank x; the
-    # arc centre is a coincident relation. 9 DOF (arc 5, the root's two
-    # corners 4) = 3 relations + 4 dims + the centre's 2, the flanks' feet
-    # held to the arc's ends by coincident relations.
-    plate = SketchDims()
-    check("create_sketch plate", adapter.create_sketch("Front"))
-    shank_x = SHANK_WIDTH / 2.0
-    junction_y = math.sqrt(RING_OUTER_RADIUS**2 - shank_x**2)
-    set_sketch_direct_db(adapter, True)
-    ring_arc = check(
-        "ring OD major arc",
-        adapter.add_arc(0.0, 0.0, -shank_x, junction_y, shank_x, junction_y),
+    # Ring: a full disc on the Front plane, extruded mid-plane to the ring's
+    # thickness (#3114: .170, the sliding fit in the cam slot). On-origin
+    # circle: the diameter is its one dimension.
+    ring_sd = SketchDims()
+    check("create_sketch ring", adapter.create_sketch("Front"))
+    define_circle(
+        adapter, 0.0, 0.0, RING_OUTER_RADIUS, "ring OD", dims=ring_sd,
+        names=(None, None, "RingOuterDia"),
+        drives=(None, None, '2 * "RingOuterRadius"'),
     )
-    flank_r, root, flank_l = add_line_chain(
-        adapter,
-        [
-            (shank_x, junction_y),
-            (shank_x, FORK_BASE_Y),
-            (-shank_x, FORK_BASE_Y),
-            (-shank_x, junction_y),
-        ],
-        close=False,
-    )
-    set_sketch_direct_db(adapter, False)
-    for label, first, second, relation in (
-        ("ring centre", f"{ring_arc}.center", "origin", "coincident"),
-        ("right flank foot", f"{flank_r}.start", f"{ring_arc}.end", "coincident"),
-        ("left flank foot", f"{flank_l}.end", f"{ring_arc}.start", "coincident"),
-        ("right flank", flank_r, None, "vertical"),
-        ("left flank", flank_l, None, "vertical"),
-        ("shank root", root, None, "horizontal"),
-    ):
-        check(f"plate {label}", adapter.add_sketch_constraint(first, second, relation))
+    ensure_fully_defined(adapter, "ring sketch")
+    check("exit_sketch ring", adapter.exit_sketch())
+    name_last_feature(adapter, "RingProfile")
+    drive_jobs += ring_sd.apply(adapter, "RingProfile")
     check(
-        "ring outer diameter",
-        adapter.add_sketch_dimension(
-            ring_arc, None, "diameter", 2.0 * RING_OUTER_RADIUS
-        ),
-    )
-    plate.record("RingOuterDia", '2 * "RingOuterRadius"')
-    check(
-        "shank width",
-        adapter.add_sketch_dimension(root, None, "linear", SHANK_WIDTH),
-    )
-    plate.record("ShankWidthDim", '"ShankWidth"')
-    dimension_between(
-        adapter, f"{root}.start", "origin", "vertical_distance", FORK_BASE_Y,
-        "shank root height",
-    )
-    plate.record("ShankRootY", '"ForkBaseY"')
-    dimension_between(
-        adapter, f"{flank_r}.start", "origin", "horizontal_distance", shank_x,
-        "shank right flank x",
-    )
-    plate.record("ShankSideX", '"ShankWidth" / 2')
-    ensure_fully_defined(adapter, "plate sketch")
-    check("exit_sketch plate", adapter.exit_sketch())
-    name_last_feature(adapter, "PlateProfile")
-    drive_jobs += plate.apply(adapter, "PlateProfile")
-    check(
-        "extrude plate",
+        "extrude ring",
         adapter.create_extrusion(
             ExtrusionParameters(depth=RING_THICKNESS, both_directions=True)
         ),
     )
-    name_last_feature(adapter, "Plate")
-    # The plate's thickness prints at the ring in the side view (#982 review
+    name_last_feature(adapter, "Ring")
+    # The ring's thickness prints at the ring in the side view (#982 review
     # r1): named so its band and the drawing select it by name.
-    ring_thick_dim = name_dimensions(adapter, "Plate", ["RingThick"])
+    ring_thick_dim = name_dimensions(adapter, "Ring", ["RingThick"])
     drive_jobs.append((ring_thick_dim[0], '"RingThickness"'))
+
+    # Shank: its side section on the Right plane (sketch x = model -Z), a
+    # rectangle the shank's thickness wide from its foot in the ring's wall
+    # up to the fork's root step, extruded mid-plane to the shank's width. Its
+    # near face stands SHANK_FACE_NEAR in from the fork's datum face, so the
+    # rectangle is not centred on the sketch origin. The shank lies inside the
+    # ring on both faces, so the foot is buried in the disc and no flank runs
+    # across a ring face (two coplanar bosses left such seams, #982 review
+    # r2). Sketched from the side so the thickness is a sketch dimension on
+    # the root line, whose ends the fork's side detail shows; the width is the
+    # extrusion's depth. Dim EMISSION ORDER: thickness, root height, near
+    # face z, foot height. 8 DOF (four corners) = 4 relations + 4 dims.
+    shank_sd = SketchDims()
+    check("create_sketch shank", adapter.create_sketch("Right"))
+    set_sketch_direct_db(adapter, True)
+    shank_root, shank_far, shank_foot, shank_near = add_line_chain(
+        adapter,
+        [
+            (SHANK_NEAR_X, FORK_BASE_Y),
+            (SHANK_FAR_X, FORK_BASE_Y),
+            (SHANK_FAR_X, SHANK_FOOT_Y),
+            (SHANK_NEAR_X, SHANK_FOOT_Y),
+        ],
+    )
+    set_sketch_direct_db(adapter, False)
+    for label, line, relation in (
+        ("root", shank_root, "horizontal"),
+        ("far face", shank_far, "vertical"),
+        ("foot", shank_foot, "horizontal"),
+        ("near face", shank_near, "vertical"),
+    ):
+        check(f"shank {label}", adapter.add_sketch_constraint(line, None, relation))
+    check(
+        "shank thickness",
+        adapter.add_sketch_dimension(shank_root, None, "linear", SHANK_THICKNESS),
+    )
+    shank_sd.record("ShankThick", '"ShankThickness"')
+    dimension_between(
+        adapter, f"{shank_root}.start", "origin", "vertical_distance", FORK_BASE_Y,
+        "shank root height",
+    )
+    shank_sd.record("ShankRootY", '"ForkBaseY"')
+    dimension_between(
+        adapter, f"{shank_root}.start", "origin", "horizontal_distance",
+        SHANK_NEAR_X, "shank near face z",
+    )
+    shank_sd.record("ShankFaceZ", '"ForkThickness" / 2 - "ShankFaceNear"')
+    dimension_between(
+        adapter, f"{shank_foot}.start", "origin", "vertical_distance", SHANK_FOOT_Y,
+        "shank foot height",
+    )
+    shank_sd.record("ShankFootY", '"ShankFootY"')
+    ensure_fully_defined(adapter, "shank sketch")
+    check("exit_sketch shank", adapter.exit_sketch())
+    name_last_feature(adapter, "ShankProfile")
+    drive_jobs += shank_sd.apply(adapter, "ShankProfile")
+    check(
+        "extrude shank",
+        adapter.create_extrusion(
+            ExtrusionParameters(depth=SHANK_WIDTH, both_directions=True)
+        ),
+    )
+    name_last_feature(adapter, "Shank")
+    # The shank's width prints across its flanks in the front view: named so
+    # the precision and the drawing select it by name.
+    shank_width_dim = name_dimensions(adapter, "Shank", ["ShankWidthDim"])
+    drive_jobs.append((shank_width_dim[0], '"ShankWidth"'))
+    v_expected = ring_volume() + shank_volume()
+    volume_check(adapter, "ring and shank bosses", v_expected, 0.002 * v_expected)
 
     # Fork boss: a tombstone outline -- the root step at FORK_BASE_Y, two
     # vertical sides, and a semicircular crown centred on the pin (R =
@@ -424,16 +496,18 @@ def build(adapter) -> dict[str, str]:
     # outer face at sketch +x (model -Z; the left face in the side view): a
     # construction line on that face, from the fork's root step to its crown
     # top, carries the boss length and the slot depth from the crown top, the
-    # near tine (face to slot wall) and the plate's near-face ordinate. A
-    # short construction line on the plate's near face runs down the shank
-    # from the root step, so that ordinate prints below the fork; the plate's
-    # thickness prints at the ring (RingThick@Plate). Every reference is
-    # driven by the same knobs as the solid features, so it always lies on the
-    # modelled face. Dim EMISSION ORDER: face x and root height (general
-    # anchor, TWO dims), boss length, slot width, cut height, near tine, slot
-    # depth, then the near face's ordinate and its run.
+    # near tine (face to slot wall) and the near-face ordinate of the shank.
+    # A short construction line on the shank's near face runs down the shank
+    # from the root step, so its ordinate prints below the fork. The ring's
+    # near face is located from the same datum face in its own sketch
+    # (RingFaceReference, below), because the side view prints it and the
+    # fork's detail prints these. Every reference is driven by the same knobs
+    # as the solid features, so it always lies on the modelled face. Dim
+    # EMISSION ORDER: face x and root height (general anchor, TWO dims), boss
+    # length, slot width, cut height, near tine, slot depth, then the shank
+    # face's ordinate and its run.
     # 16 DOF = face line: vertical + 2 anchor dims + boss length; rectangle:
-    # four relations + 4 dims; the near-face line: vertical + level with the
+    # four relations + 4 dims; the shank-face line: vertical + level with the
     # face line's root end + ordinate + run.
     slot_sd = SketchDims()
     check("create_sketch fork slot", adapter.create_sketch("Right"))
@@ -451,13 +525,13 @@ def build(adapter) -> dict[str, str]:
         (-sh, FORK_CROTCH_Y + SLOT_CUT_HEIGHT),
     ]
     slot = add_line_chain(adapter, slot_rect)
-    ring_face = check(
-        "ring face reference",
+    shank_face = check(
+        "shank face reference",
         adapter.add_centerline(
-            RING_THICKNESS / 2.0,
+            SHANK_NEAR_X,
             FORK_BASE_Y,
-            RING_THICKNESS / 2.0,
-            FORK_BASE_Y - RING_FACE_REF_RUN,
+            SHANK_NEAR_X,
+            FORK_BASE_Y - SHANK_FACE_REF_RUN,
         ),
     )
     set_sketch_direct_db(adapter, False)
@@ -511,25 +585,25 @@ def build(adapter) -> dict[str, str]:
     )
     slot_sd.record("SlotDepth", '"ForkWidth" / 2 + "ForkCrotchBelowPin"')
     check(
-        "RingFaceNear reference vertical",
-        adapter.add_sketch_constraint(ring_face, None, "vertical"),
+        "ShankFaceNear reference vertical",
+        adapter.add_sketch_constraint(shank_face, None, "vertical"),
     )
     check(
-        "RingFaceNear reference level with the fork root",
+        "ShankFaceNear reference level with the fork root",
         adapter.add_sketch_constraint(
-            f"{ring_face}.start", f"{face_ref}.start", "horizontal_points"
+            f"{shank_face}.start", f"{face_ref}.start", "horizontal_points"
         ),
     )
     dimension_between(
-        adapter, f"{face_ref}.start", f"{ring_face}.end", "horizontal_distance",
-        RING_FACE_NEAR, "RingFaceNear",
+        adapter, f"{face_ref}.start", f"{shank_face}.end", "horizontal_distance",
+        SHANK_FACE_NEAR, "ShankFaceNear",
     )
-    slot_sd.record("RingFaceNear", '"RingFaceNear"')
+    slot_sd.record("ShankFaceNear", '"ShankFaceNear"')
     dimension_between(
-        adapter, f"{ring_face}.start", f"{ring_face}.end", "vertical_distance",
-        RING_FACE_REF_RUN, "RingFaceNear reference run",
+        adapter, f"{shank_face}.start", f"{shank_face}.end", "vertical_distance",
+        SHANK_FACE_REF_RUN, "ShankFaceNear reference run",
     )
-    slot_sd.record("RingFaceNearRun")
+    slot_sd.record("ShankFaceNearRun")
     ensure_fully_defined(adapter, "fork slot sketch")
     check("exit_sketch fork slot", adapter.exit_sketch())
     name_last_feature(adapter, "ForkSlotProfile")
@@ -544,21 +618,24 @@ def build(adapter) -> dict[str, str]:
     v_expected -= slot_volume()
     volume_check(adapter, "fork slot", v_expected, 0.01 * slot_volume() + 0.05)
 
-    # Every inside corner gets the one modelled radius, inside the title
-    # block's INSIDE CORNERS R1.0 MAX, which governs it on the print
-    # (ch_connecting_rod_spec): the shank's two flanks onto the ring, the
-    # root step's loop round the shank's end (the flanks' corners, then the
-    # plate faces'), and the slot floor's two corners.
+    # Every inside corner an R of this size can seat in gets the one modelled
+    # radius, inside the title block's INSIDE CORNERS R.040 MAX, which governs
+    # it on the print (ch_connecting_rod_spec): the shank's two flanks onto
+    # the ring's OD (through the shank's thickness), the root step's loop
+    # round the shank's end (the flanks' corners, then the shank faces'), and
+    # the slot floor's two corners. The two corners where a shank face meets
+    # the ring's OD stay sharp (RING_STEPS). Points are model coordinates:
+    # model z is the Right-plane sketch's -x, and z = 0 lies on every flank
+    # edge, between the shank's two faces.
     shank_x = SHANK_WIDTH / 2.0
     junction_y = math.sqrt(RING_OUTER_RADIUS**2 - shank_x**2)
-    plate_z = SHANK_THICKNESS / 2.0
     corner_edges = [
         [shank_x, junction_y, 0.0],
         [-shank_x, junction_y, 0.0],
         [shank_x, FORK_BASE_Y, 0.0],
         [-shank_x, FORK_BASE_Y, 0.0],
-        [0.0, FORK_BASE_Y, plate_z],
-        [0.0, FORK_BASE_Y, -plate_z],
+        [0.0, FORK_BASE_Y, -SHANK_NEAR_X],
+        [0.0, FORK_BASE_Y, -SHANK_FAR_X],
         [0.0, FORK_CROTCH_Y, FORK_SLOT_WIDTH / 2.0],
         [0.0, FORK_CROTCH_Y, -FORK_SLOT_WIDTH / 2.0],
     ]
@@ -628,6 +705,76 @@ def build(adapter) -> dict[str, str]:
         adapter, "pin hole through both tines", v_expected, 0.03 * v_pin + 0.05
     )
 
+    # RingFaceReference: the ring's near face from the fork's datum face, in
+    # a sketch of its own on the Right plane (sketch x = model -Z) that no
+    # feature consumes. The side view prints this one ordinate at the ring and
+    # imports this sketch alone; the fork's detail imports ForkSlotProfile
+    # alone. Two construction lines, each lying on a face's edge in the side
+    # view: one on the datum face, running up it from the fork's root step,
+    # and one on the ring's near face, running down the ring's wall to the
+    # ring's bottom. The ordinate runs from the datum line's root end to the
+    # ring line's bottom end, so one witness drops from the fork's root corner
+    # and the other from the ring's bottom corner. Dim EMISSION ORDER: datum
+    # face x and root height (general anchor, TWO dims), the datum line's run,
+    # the ring face's ordinate, its bottom end's depth below the bore axis and
+    # its run. 8 DOF = two lines, each vertical + 3 dims.
+    ring_ref = SketchDims()
+    check("create_sketch ring face reference", adapter.create_sketch("Right"))
+    set_sketch_direct_db(adapter, True)
+    datum_face = check(
+        "datum face reference",
+        adapter.add_centerline(
+            face_x, FORK_BASE_Y, face_x, FORK_BASE_Y + DATUM_FACE_REF_RUN
+        ),
+    )
+    ring_face = check(
+        "ring face reference",
+        adapter.add_centerline(
+            RING_THICKNESS / 2.0,
+            RING_WALL - RING_OUTER_RADIUS,
+            RING_THICKNESS / 2.0,
+            -RING_OUTER_RADIUS,
+        ),
+    )
+    set_sketch_direct_db(adapter, False)
+    check(
+        "datum face reference vertical",
+        adapter.add_sketch_constraint(datum_face, None, "vertical"),
+    )
+    anchor_point_to_origin(
+        adapter, f"{datum_face}.start", face_x, FORK_BASE_Y, "datum face reference"
+    )
+    ring_ref.record("DatumFaceX", '"ForkThickness" / 2')
+    ring_ref.record("DatumRootY", '"ForkBaseY"')
+    dimension_between(
+        adapter, f"{datum_face}.start", f"{datum_face}.end", "vertical_distance",
+        DATUM_FACE_REF_RUN, "datum face reference run",
+    )
+    ring_ref.record("DatumFaceRun")
+    check(
+        "RingFaceNear reference vertical",
+        adapter.add_sketch_constraint(ring_face, None, "vertical"),
+    )
+    dimension_between(
+        adapter, f"{datum_face}.start", f"{ring_face}.end", "horizontal_distance",
+        RING_FACE_NEAR, "RingFaceNear",
+    )
+    ring_ref.record("RingFaceNear", '"RingFaceNear"')
+    dimension_between(
+        adapter, f"{ring_face}.end", "origin", "vertical_distance",
+        RING_OUTER_RADIUS, "RingFaceNear reference bottom",
+    )
+    ring_ref.record("RingFaceNearBottom", '"RingOuterRadius"')
+    dimension_between(
+        adapter, f"{ring_face}.start", f"{ring_face}.end", "vertical_distance",
+        RING_WALL, "RingFaceNear reference run",
+    )
+    ring_ref.record("RingFaceNearRun", '"RingWall"')
+    ensure_fully_defined(adapter, "ring face reference sketch")
+    check("exit_sketch ring face reference", adapter.exit_sketch())
+    name_last_feature(adapter, "RingFaceReference")
+    drive_jobs += ring_ref.apply(adapter, "RingFaceReference")
+
     # Named bore axes for assembly mates (view-independent name selection):
     # Axis1 = strap bore on the cam (origin), Axis2 = pivot pin bore (0, CD).
     name_bore_axis(adapter, "Right Plane", 0.0, "Top Plane", 0.0, "strap bore")
@@ -653,6 +800,10 @@ def build(adapter) -> dict[str, str]:
     volume_check(
         adapter, "driven connecting rod (equations neutral)", v_built, 0.001 * v_built
     )
+    # Saved shown, the reference lines would print in every assembly render
+    # (#880); the drawing shows the sketch in its side view to import its
+    # ordinate (_drawing_hidden_sketches).
+    blank_reference_sketches(adapter, ("RingFaceReference",))
     # The bands are millimetres; UNIT prints them in inches.
     set_dimension_bilateral_tolerance(
         adapter,
@@ -662,12 +813,15 @@ def build(adapter) -> dict[str, str]:
         display_unit=UNIT,
     )
     # The fork straddles the rocker strap inside one station pitch (Main
-    # ruling 2026-10, option b), and the ring must ride its cam slot while the
-    # fork rides the arm (test_channel_axial_budget): the near tine, the slot
-    # and the plate's near face print natively, located from the fork's datum
-    # face, and the plate's thickness at the ring, each band symmetric so it
-    # prints +/-. The fork over the tines is a reference (two tines and the
-    # slot set it).
+    # ruling 2026-10, option b), and the ring slides in its cam slot and
+    # carries the fork, and the arm with it, along the bank (#3114,
+    # test_channel_axial_budget): the near tine, the slot and the ring's near
+    # face print natively, located from the fork's datum face, and the ring's
+    # thickness at the ring, each band symmetric so it prints +/-. The fork
+    # over the tines is a reference (two tines and the slot set it). The
+    # shank's near face and thickness carry no model band: they print at
+    # two places and take the title block's .XX
+    # (ch_connecting_rod_spec.SHANK_FACE_BAND, SHANK_THICKNESS_BAND).
     tine_lower, tine_upper = deviations(TINE_BAND)
     slot_lower, slot_upper = deviations(FORK_SLOT_BAND)
     face_lower, face_upper = deviations(RING_FACE_BAND)
@@ -683,10 +837,10 @@ def build(adapter) -> dict[str, str]:
         adapter, "ForkSlotProfile", "SlotWidth", slot_upper, display_unit=UNIT
     )
     set_dimension_symmetric_tolerance(
-        adapter, "ForkSlotProfile", "RingFaceNear", face_upper, display_unit=UNIT
+        adapter, "RingFaceReference", "RingFaceNear", face_upper, display_unit=UNIT
     )
     set_dimension_symmetric_tolerance(
-        adapter, "Plate", "RingThick", thick_upper, display_unit=UNIT
+        adapter, "Ring", "RingThick", thick_upper, display_unit=UNIT
     )
     # The reamed press hole's band rides natively on its diameter; the front
     # view imports the .077 nominal at four places (DRAWING_PRECISION), its

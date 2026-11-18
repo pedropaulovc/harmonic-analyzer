@@ -618,7 +618,7 @@ def _set_stock_text(adapter: Any, annotations: list[Any]) -> None:
     the stock's tolerance governs the thickness, not the .XX row.  Prefix and
     suffix, not a whole-text override: the value between them stays the
     model's dimension at its model-owned places, and the parentheses mark it
-    as reference (the rocker thrust washer's idiom). The text stands off its
+    as reference. The text stands off its
     dimension line on a leader (``STOCK_TEXT_XY``), clear of both extension
     lines.
     """

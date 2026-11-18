@@ -9,8 +9,9 @@ re-key them.
 Each MHA-CH-08 bracket is held by one MHA-CH-VN-57 (McMaster 90280A196, #8-32 x
 5/8 slotted fillister; owner Q13c, 2026-10-16) through its #8 close-clearance
 foot hole into a bottoming-tapped seat in the support's top face, transferred
-from the set bracket at assembly (the south bracket is blade-set off the
-preload spring's washer, so its seat cannot be cast or pre-drilled). The 5/8
+from the set bracket at assembly (the north bracket is DRO-located and the
+south one set from it to the ears' span, so neither seat can be cast or
+pre-drilled). The 5/8
 length keeps 1.5D in the cast iron at worst case with the shallowest seat.
 
 The brackets' feet run outboard toward the support's end faces (user-approved
@@ -172,15 +173,15 @@ WEB_WALL_MIN = (
 # edges carry only the title block's EDGE_BREAK (the RimChamfer skips them,
 # build_fr_rocker_arm_support.CHAMFER_EDGES). The thread's crest starts below
 # its own mouth break, so at the top the wall runs from that crest point to
-# the break's top edge: hypot(wall - EDGE_BREAK, EDGE_BREAK), S 2.77, N 4.37,
-# both over the target (with the .06 leg there the south one was 1.51).
+# the break's top edge: hypot(wall - EDGE_BREAK, EDGE_BREAK), S 2.76, N 4.17,
+# both over the target (with the .06 leg there the south one would be 1.50).
 END_WALL_MIN = tuple(
     (SUPPORT_HALF_MACHINE_Z - abs(x))
     - SCREW_MAJOR_DIA / 2.0
     - _bracket.STATION_BAND
     - LINEAR_2PL / 2.0
     for x in SEAT_LOCAL_X
-)  # S 3.01, N 4.62
+)  # S 3.00, N 4.42
 
 if ENGAGEMENT_MIN < 1.5 * SCREW_MAJOR_DIA:
     raise AssertionError(

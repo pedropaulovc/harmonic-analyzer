@@ -7,9 +7,9 @@ it. Kept apart from ``ch_pivot_bracket_spec`` because it reads the bank
 layout, which itself imports that spec for the ear.
 
 Both brackets keep their ears at ``rocker_bank_layout.PIVOT_BRACKET_Z`` and
-turn their feet OUTBOARD, away from the rocker stack (user-approved sketch,
+turn their feet OUTBOARD, away from the rocker bank (user-approved sketch,
 2026-10-09): the south bracket is placed Ry180 (part +Z -> machine -Z), the
-north one IDENTITY. The ears sit 0.8 apart from mid-support, so the two
+north one IDENTITY. The ears sit 0.7 apart from mid-support, so the two
 support end faces lie at different distances from them; one part serves both
 sides (#1341, option A): its foot ``FOOT_Z1`` ends at the nearer end face --
 the south one -- its length taken down to the printed .XX grid, and short of
@@ -126,7 +126,7 @@ if not _foot_fits(SUPPORT_LENGTH):
         f"the rocker-arm support's {SUPPORT_LENGTH:.1f} length leaves the"
         " pivot-bracket foot no hold-down station keeping its walls"
     )
-SUPPORT_END_Z = _support_end_z(SUPPORT_LENGTH)  # S 13.857, N 15.465
+SUPPORT_END_Z = _support_end_z(SUPPORT_LENGTH)  # S 13.847, N 15.261
 _NEAR_END_Z = min(SUPPORT_END_Z.values())
 FOOT_Z1 = _foot_z1(_NEAR_END_Z)
 FOOT_LEN = FOOT_Z1 - _bracket.FOOT_Z0  # .70
@@ -148,7 +148,7 @@ if not HOLE_Z_MIN <= HOLE_Z <= HOLE_Z_MAX:
     )
 
 if sorted(OUTBOARD_SIGN.values()) != [-1.0, 1.0]:
-    raise AssertionError("the two brackets must sit either side of the rocker stack")
+    raise AssertionError("the two brackets must sit either side of the rocker bank")
 if not _bracket.EAR_T / 2.0 + _bracket.HOLE_DIA / 2.0 < HOLE_Z < FOOT_Z1:
     raise AssertionError("the hold-down hole must lie in the foot's free run")
 for _where, _ligament in HOLE_LIGAMENTS_MIN.items():

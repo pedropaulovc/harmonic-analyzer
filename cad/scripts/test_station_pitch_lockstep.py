@@ -17,7 +17,6 @@ import _cone_axis_constants as cone_axis
 import cam_plane
 import ch_channel_lever_spec as lever
 import ch_fulcrum_keeper_spec as keeper
-import ch_rocker_arm_spec as rocker
 import cone_pitch
 import dt_cylinder_gear_spec as cylinder_gear
 import sm_summing_lever_spec as summing
@@ -27,7 +26,6 @@ STATION_Z0 = _config.machine("channels", "station_z0_mm")
 
 # The parts whose stacking length IS the pitch, and the stations laid out on it.
 RESTATED_PITCHES = {
-    "ch_rocker_arm_spec.HUB_LENGTH": rocker.HUB_LENGTH,
     "ch_channel_lever_spec.HUB_LENGTH": lever.HUB_LENGTH,
     "ch_fulcrum_keeper_spec._STATION_PITCH": keeper._STATION_PITCH,
     "sm_summing_lever_spec.CHANNEL_PITCH": summing.CHANNEL_PITCH,

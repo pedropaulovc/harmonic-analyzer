@@ -25,8 +25,8 @@ NORTH_BRACKET_SET_REF = dt_drive_train_steps.step_ref(NORTH_BRACKET_SET_KEY)
 # together (MHA-DT-00 BANK_STEPS), and the rod's fork is pinned to its arm with
 # a pin pressed at the bench, so the rod + arm pair must be pinned BEFORE that
 # step: the pinning step points there by key, and that drive-train step points
-# back at the pinning step (RODS_PINNED_KEY). The hub stack is proved on the
-# shaft first, while the arms are still loose.
+# back at the pinning step (RODS_PINNED_KEY). The arms float on the pivot
+# shaft, each located along it by its rod (#3114).
 CYLINDER_STACK_KEY = "cylinder-stack-accepted"
 CYLINDER_STACK_REF = dt_drive_train_steps.step_ref(CYLINDER_STACK_KEY)
 RODS_PINNED_KEY = "rod-forks-pinned"
@@ -57,44 +57,63 @@ SPRINGS_HOOKED_KEY = "springs-hooked"
 # test_ha_harmonic_analyzer_assembly_drawing proves it against that registry.
 HA_ANCHORS_SET_REF = "MHA-HA-00 STEP 5"
 
-# The spring-back acceptance runs while the south bracket is still only
-# clamped (machinist review, PR #1605), so its remedy re-sets a bracket that
-# can still move; the foot hole is transferred and the bracket screwed down
-# only once that check has passed.
-# The south bracket is set by DRO off an indicator zero taken on its foot end
-# with its ear on the south washer, before the wave spring goes on (#2337: the
-# spring covers the washer face, so no feeler leaf can bear on it beside the
-# spring); the bracket comes off the shaft for the spring, goes back on under
-# a light clamp and is tapped to that zero at the DRO's spring-set offset.
+# The south bracket is set by edge finder and DRO off the north one to the
+# ears' inner-face span while the shaft runs bare through both ears (with the
+# arms on it each inner face is only .05 from its end hub, out of the edge
+# finder's reach). It stays only clamped while the shaft is drawn back, the
+# arms are threaded on, each end arm is pushed toward its ear as far as its
+# rod lets it (a floating arm would slide away from the leaf) and the end
+# hubs are checked clear of the ears (machinist review, PR #1605: a failed
+# check re-sets a bracket that can still move). Each end has its own remedy
+# block, one action a step (rule 22): the left bracket, set and screwed at
+# MHA-DT-00, is reset per its own sub-steps; both blocks return to the bare
+# shaft. The foot hole is transferred and the bracket screwed down only once
+# that check has passed. The arms are checked to slide freely with their
+# rods once the shaft is held.
+LEFT_HUB_REMEDY: tuple[str, ...] = (
+    "left-hub-shaft-drawn-back",
+    "left-hub-clamp-eased",
+    "left-hub-hold-down-loosened",
+    "left-hub-bracket-reset",
+    "left-hub-hold-down-tightened",
+    "left-hub-bracket-rechecked",
+    "left-hub-return",
+)
+RIGHT_HUB_REMEDY: tuple[str, ...] = (
+    "right-hub-shaft-drawn-back",
+    "right-hub-clamp-eased",
+    "right-hub-return",
+)
+# A pin that slid in by hand: pressed out, its host replaced, back to the
+# step named, one action a step (rule 22).
+ROD_PIN_REMEDY: tuple[str, ...] = (
+    "rod-pin-pressed-out",
+    "rod-replaced",
+    "rod-pin-return",
+)
+BAR_PIN_REMEDY: tuple[str, ...] = (
+    "bar-pin-pressed-out",
+    "bar-replaced",
+    "bar-pin-return",
+)
 ROCKER_SEQUENCE: tuple[str, ...] = (
-    "rocker-stack-accepted",
-    "rocker-stack-measured",
-    "rocker-stack-refaced",
-    "rocker-stack-short",
-    "rockers-kept-in-order",
     RODS_PINNED_KEY,
     "rod-pins-dressed",
     "rod-pins-held",
     "rod-arms-swing",
-    "rod-pin-remade",
+    *ROD_PIN_REMEDY,
     "north-bracket-held",
-    "arms-swung-up",
-    "north-ear-datum",
-    "rocker-hubs-threaded",
-    "south-washer-fitted",
-    "south-bracket-on-washer",
-    "south-bracket-zeroed",
-    "south-bracket-dro-zeroed",
-    "south-bracket-slid-off",
-    "bank-spring-checked",
-    "bank-spring-replaced",
-    "bank-spring-fitted",
-    "south-bracket-refitted",
-    "south-bracket-clamped-lightly",
-    "south-bracket-spring-set",
+    "south-bracket-stood",
+    "bare-shaft-through-ears",
+    "south-bracket-span-set",
     "south-bracket-clamped",
-    "spring-back-checked",
-    "south-bracket-reset",
+    "shaft-drawn-back",
+    "arms-swung-up",
+    "rocker-hubs-threaded",
+    "end-arms-pushed-to-ears",
+    "end-hubs-clear",
+    *LEFT_HUB_REMEDY,
+    *RIGHT_HUB_REMEDY,
     "south-foot-transferred",
     "south-foot-tapped",
     "south-bracket-screwed",
@@ -104,9 +123,11 @@ ROCKER_SEQUENCE: tuple[str, ...] = (
     "set-screws-driven",
     PIVOT_SET_SCREWS_STAKED_KEY,
     "pivot-shaft-held",
+    "arms-follow-rods",
 )
 LEVER_SEQUENCE: tuple[str, ...] = (
     "keepers-on-frame",
+    "fulcrum-shaft-through-keepers",
     KEEPERS_SET_KEY,
     "keeper-faces-set",
     "keepers-clamped-on-frame",
@@ -118,12 +139,13 @@ LEVER_SEQUENCE: tuple[str, ...] = (
     "keeper-bores-checked",
     "bars-straight",
     "bar-straightened",
+    "bar-straightened-return",
     "bar-notches-set",
     BARS_PINNED_KEY,
     "bar-pins-dressed",
     "bar-pins-held",
     "bars-swing",
-    "bar-pin-remade",
+    *BAR_PIN_REMEDY,
     "fulcrum-shaft-withdrawn",
     LEVER_BANK_THREADED_KEY,
     "bar-feet-seated",

@@ -59,8 +59,6 @@ SUPPLIER_DIMENSIONS_BY_FEATURE = {
 
 def source_free_height_limits(spec: Any) -> tuple[float, float]:
     """Supplier axial datums retained by the nominal free-height envelope."""
-    if spec.SKU == "9714K24":
-        return -spec.THICKNESS / 2.0, spec.FREE_HEIGHT - spec.THICKNESS / 2.0
     if spec.SKU in ("9714K392", "9715K43"):
         return -spec.FREE_HEIGHT / 2.0, spec.FREE_HEIGHT / 2.0
     raise ValueError(f"unsupported supplier disc spring {spec.SKU!r}")
@@ -83,15 +81,10 @@ def _nominal_side_profiles(spec: Any) -> tuple[
     """Envelope and flat-strip bounds used by both authoring and view fitting."""
     low, high = source_free_height_limits(spec)
     envelope = ((-spec.OD / 2.0, low), (spec.OD / 2.0, high))
-    if spec.SKU == "9714K24":
-        # Source strip datum: .2286 -> .381 mm, not the envelope baseline.
-        middle = (spec.FREE_HEIGHT - spec.THICKNESS) / 2.0
-        left, strip_low = spec.ID / 2.0, middle - spec.THICKNESS / 2.0
-    else:
-        left, strip_low = 0.0, -spec.THICKNESS / 2.0
+    strip_low = -spec.THICKNESS / 2.0
     strip = (
-        (left, strip_low),
-        (left + (spec.OD - spec.ID) / 2.0, strip_low + spec.THICKNESS),
+        (0.0, strip_low),
+        ((spec.OD - spec.ID) / 2.0, strip_low + spec.THICKNESS),
     )
     return envelope, strip
 

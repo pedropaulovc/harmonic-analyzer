@@ -29,7 +29,7 @@ Components of a built-up part are the detail parts a finished part may be made f
 | Prefix | Category | Fabricated parts | Vendor parts |
 |---|---|---:|---:|
 | `ha` / `HA` | Harmonic analyzer | 0 | 0 |
-| `ch` / `CH` | Channel | 10 | 7 |
+| `ch` / `CH` | Channel | 10 | 5 |
 | `dt` / `DT` | Drive train | 37 | 14 |
 | `fr` / `FR` | Frame | 5 | 4 |
 | `mg` / `MG` | Magnifier | 10 | 4 |
@@ -40,6 +40,7 @@ Components of a built-up part are the detail parts a finished part may be made f
 | `sh` / `SH` | Shared parts | 2 | 9 |
 
 The vendor column counts machine vendor families. The 2026-10-20 shared-vendor consolidation moved nineteen parent-scoped vendor identities into eight shared ones: CH lost 1 (8 to 7), DT lost 4 (19 to 15), FR lost 1 (5 to 4), MG lost 3 (7 to 4), PD lost 5 (18 to 13), PN lost 1 (8 to 7) and MS lost 1 (2 to 1); SM is unchanged. SH gained seven machine vendor families (MHA-SH-VN-50 to MHA-SH-VN-56) plus one tooling-only family, `sh-vn-clamping-kit-hardware` (MHA-SH-VN-57), which replaced three oblique-jig fixture identities and was never counted as a machine vendor family; it retired with the jig on 2026-11-17. The 2026-10-31 retirement of the MHA-PD-VN-67 pivot shim took PD from 13 to 12. The 2026-11-08 keeper-chain ruling (#2144 item 9.2) retired the MHA-DT-28 anchor eye and the MHA-DT-VN-66 loop link and added the MHA-DT-VN-70 keeper-chain screw: DT parts went from 35 to 34, and DT vendor families stayed at 15. The 2026-11-08 gooseneck ruling (#2144 item 11.4) retired MHA-SM-04 and added the MHA-SM-VN-56 shoulder screw (SM 3 parts, 7 vendor families). The 2026-11-09 spring-hook ruling (#2326) retired the MHA-CH-14 and MHA-SM-VN-55 jam nuts: CH parts went from 13 to 12 and SM vendor families from 7 to 6. The 2026-11-08 gooseneck end-plug rulings (#2315) added the MHA-SM-05 end plug: SM parts went from 3 to 4. The 2026-11-11 bought-pin change (#2339) retired the shop-made MHA-CH-10 rod and MHA-CH-11 bar pivot pins into the `RodPin` and `BarPin` members of one purchased dowel, `sh-vn-pivot-pin` (MHA-SH-VN-58, McMaster 90145A299): CH fabricated parts went from 12 to 10 and SH machine vendor families from 7 to 8. The 2026-11-11 Main ruling on #2409 added the MHA-PD-VN-69 hub key pin and the MHA-PD-VN-70 collar flat pin: PD vendor families went from 13 to 15. The 2026-11-13 platen-rack rulings (#2410) retired the MHA-PD-05 soldered rack and backer and added the MHA-PD-26 feed rack and the MHA-PD-27 bottom guide rail: PD parts went from 23 to 24. The 2026-11-14 rack-screw change (#2410) put the same McMaster 91794A055 #0-80 x 1/4 fillister in a second modelled form, so the MHA-PD-VN-55 disc screws retired into the `DiscScrew` member of the shared `sh-vn-fillister-screw-91794a055` (MHA-SH-VN-59), beside its `RackScrew` member: PD vendor families went from 15 to 14 and SH machine vendor families from 8 to 9.
+The 2026-11-18 floating-rocker ruling (#3114) retired the MHA-CH-VN-54 rocker bank spring and the MHA-CH-VN-56 rocker thrust washer: CH vendor families went from 7 to 5.
 
 SH contains fabricated parts used directly by several assemblies, currently the front and back column clamps, `sh-column-clamp-front` (MHA-SH-01) and `sh-column-clamp-back` (MHA-SH-02), and the shared vendor parts listed under [Shared vendor families](#shared-vendor-families). Each keeps one shared identity. The wheel axle nut, `mg-vn-wheel-axle-nut`, is a vendor part by commercial-process evidence. HA holds the top assembly only: its two former parts, the measuring stick and its stop, moved into the MS category on 2026-10-09 when the stop was re-derived as a block, a plate and stock screws inside their own `ms-measuring-stick` sub-assembly.
 
@@ -305,7 +306,7 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | part | — | — | `vn-magnifying-bracket-screw` | MHA-VN-050 | `mg-vn-magnifying-bracket-screw` | MHA-MG-VN-53 |
 | part | — | — | `vn-knife-mount-dowel` | MHA-VN-051 | `sm-vn-knife-mount-dowel` | MHA-SM-VN-53 |
 | part | — | — | `vn-cylinder-bank-spring` | MHA-VN-052 | `dt-vn-cylinder-bank-spring` | MHA-DT-VN-68 |
-| part | — | — | `vn-rocker-bank-spring` | MHA-VN-053 | `ch-vn-rocker-bank-spring` | MHA-CH-VN-54 |
+| retired vendor part | — | — | `vn-rocker-bank-spring` | MHA-VN-053 | — | MHA-CH-VN-54 (retired 2026-11-18; never reissued) |
 | part | — | — | `vn-ms-stop-plate-screw` | MHA-VN-054 | `ms-vn-stop-plate-screw` | MHA-MS-VN-51 |
 | part | — | — | `vn-fulcrum-set-screw` | MHA-VN-055 | `ch-vn-fulcrum-set-screw` | MHA-CH-VN-55 |
 | part | — | — | `vn-transgear-arm-plate-locating-pin` | MHA-VN-056 | `pd-vn-transgear-arm-plate-locating-pin` | MHA-PD-VN-64 |
@@ -320,7 +321,7 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | part | — | — | `vn-lever-wire` | MHA-VN-066 | `sh-vn-music-wire` (`LeverWire`) | MHA-SH-VN-56 |
 | part | — | — | `vn-pen-wire` | MHA-VN-067 | `sh-vn-music-wire` (`PenWire`) | MHA-SH-VN-56 |
 | retired vendor part | — | — | `vn-transgear-pivot-shim` | MHA-VN-069 | — | MHA-PD-VN-67 (retired 2026-10-31; never reissued) |
-| part | — | — | `vn-rocker-thrust-washer` | MHA-VN-070 | `ch-vn-rocker-thrust-washer` | MHA-CH-VN-56 |
+| retired vendor part | — | — | `vn-rocker-thrust-washer` | MHA-VN-070 | — | MHA-CH-VN-56 (retired 2026-11-18; never reissued) |
 | part | — | — | `vn-bracket-hold-down-screw` | MHA-VN-071 | `ch-vn-bracket-hold-down-screw` | MHA-CH-VN-57 |
 | retired vendor part | — | — | `vn-boss-hook-jam-nut` | MHA-VN-072 | — | MHA-SM-VN-55 (retired 2026-11-09; never reissued) |
 | part | — | — | — | — | `sm-vn-gooseneck-shoulder-screw` | MHA-SM-VN-56 |
@@ -706,3 +707,5 @@ A retired Number is never reused. A family added after a cutover takes the next 
 | retired | `ch-rocker-arm-tl-vn-oblique-*` | MHA-CH-06-TL-VN-56, VN-57, VN-61, VN-62, VN-64, VN-67, VN-69, VN-71, VN-77, VN-78, VN-79, VN-83, VN-84, VN-85 | Owner ruling 2026-11-17 (#2885): the jig's purchased parts; no registry, builder or drawing; Numbers never reissued |
 | retired | `sh-vn-clamping-kit-hardware` | MHA-SH-VN-57 | Owner ruling 2026-11-17 (#2885): the Precision Matthews clamping kit served only the jig; no registry, builder or drawing; Number never reissued |
 | retired | `dt-cone-gear-tl-indexing` | MHA-DT-03-TL-00 | Owner ruling 2026-11-17 (#2885): a shop tool may stand alone, so the one-sheet wrapper that existed only to give the index plate (and the phasing comb) a registered assembly is deleted; the index plate MHA-DT-03-TL-01 and comb MHA-DT-03-TL-02 stay as standalone shop tools; no registry, builder or drawing; Number never reissued |
+| retired | `ch-vn-rocker-bank-spring` | MHA-CH-VN-54 | Owner ruling 2026-11-18 ([#3114](https://github.com/pedropaulovc/harmonic-analyzer/issues/3114)): each MHA-CH-06 rocker arm floats on the MHA-CH-05 pivot shaft and is located along the bank by its own MHA-CH-03 connecting rod, so the hub stack is no longer preloaded and the McMaster-Carr 9714K24 wave disc spring is not needed; no registry, builder or drawing; stem and Number never reissued |
+| retired | `ch-vn-rocker-thrust-washer` | MHA-CH-VN-56 | Owner ruling 2026-11-18 ([#3114](https://github.com/pedropaulovc/harmonic-analyzer/issues/3114)): with the arms floating, no hub bears on an MHA-CH-08 ear, so both McMaster-Carr 3088A429 ring shims are not needed; no registry, builder or drawing; stem and Number never reissued |

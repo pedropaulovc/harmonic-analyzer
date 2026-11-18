@@ -5,20 +5,17 @@ output: connecting rods riding the integral cams, the rocker-arm seesaw
 bank on its pivot shaft, the amplitude bars running UP the spine, and the
 top-lever bank on its fulcrum shaft with the channel springs hanging from
 the lever tips, each retained by a stock eyebolt threaded into the plate.
-177 components (8 * CHANNELS + 17):
+174 components (8 * CHANNELS + 14):
 
 Coordinates are machine frame (#151: crank at machine -X, output side -Z;
 the M6.8 mirror layer is gone).
 
 * pivot-shaft x1 (rocker bank at (72.9, 253.8), along Z; a plain rod whose
   cylinder spans both ears' outer faces, each end domed, held axially and in
-  rotation by two set screws on flats milled at the ears -- rocker_bank_layout)
-* ch-vn-rocker-thrust-washer x2 (MHA-CH-VN-56, McMaster 3088A429: north, between
-  rocker 19's hub and the
-  north ear, the bank's datum; south, on rocker 0's hub) +
-  ch-vn-rocker-bank-spring x1 (MHA-CH-VN-54, the wave disc spring between the
-  south washer and the south ear that preloads the bank north; #948 ruling R)
-  + fulcrum-shaft x1 (lever bank at (199.9, 1061.3932); plain Ø6.35 x 166.4,
+  rotation by two set screws on flats milled at the ears -- rocker_bank_layout;
+  the arms float on it between the ears, each located by its rod, with no
+  spring or thrust washers, #3114) +
+  fulcrum-shaft x1 (lever bank at (199.9, 1061.3932); plain Ø6.35 x 166.4,
   domed 1.025 proud of each keeper lug, set-screw flats up)
 * pivot-bracket x2 (2026-09 photo re-derive, ch14 page002_img01/img07: the
   black foot-and-ear brackets on the rocker-arm-support's top, at the
@@ -40,8 +37,9 @@ the M6.8 mirror layer is gone).
   at STACK_MID_Z +- 83.0 (the lever-bank mid-plane, z -0.504); replaces
   the photo-refuted chrome baluster lever pair, 2026-08-02)
 * rocker-arm x20, connecting-rod x20, amplitude-bar x20, channel-lever
-  x20 (2026-09-02: the arms and levers carry INTEGRAL hubs whose faces
-  set the station pitch -- the 19 + 19 spacer bushings are retired),
+  x20 (2026-09-02: the arms and levers carry INTEGRAL hubs -- the 19 + 19
+  spacer bushings are retired; the lever hubs set the station pitch face on
+  face, the shorter rocker hubs stand apart on their stations, #3114),
   sh-vn-pivot-pin x40 (MHA-SH-VN-58, McMaster 90145A299 5/64 dowels; per
   channel one RodPin pressed through the rod's fork tines and running in its
   arm's #47 rod hole, lock-mated to the rod, then one BarPin pressed through
@@ -84,7 +82,7 @@ or coincident, and parts within a channel slice share an axial reference:
     axis on the named bore axes (the revolute radials);
   * the rocker is each channel's Z ANCHOR: channel 0 sits on the Front
     datum; every other rocker is j * PITCH off channel 0's rocker
-    mid-plane (hub face on hub face);
+    mid-plane (its station; the hubs do not touch, #3114);
     the rod, the lever and the amplitude bar are seated COINCIDENT to the
     rocker's mid-plane (rod/lever Front plane / bar MidWidth plane), so a
     channel's parts share ONE Z reference;
@@ -382,23 +380,21 @@ from ch_channel_lever_spec import (  # noqa: E402
 # --- supports / mounts ------------------------------------------------------
 SUPPORT_APEX_Y = 228.6
 CHANNEL_BANK_REAR_SHIFT = MECHANISM_Z_SHIFT
-# Rocker pivot brackets, shaft, washers, spring and set screws (#948 ruling R,
-# PR #1292; user, 2026-10-10): the rocker bank's retention stack, from
-# rocker_bank_layout. Hub 19 bears on the north MHA-CH-VN-56 washer, which bears
-# on the north ear's inner face, the bank's datum; the MHA-CH-VN-54 spring
-# between the south ear and the south washer on hub 0 preloads the bank north
-# onto it. The plain shaft is held by one MHA-SH-VN-54 set screw per ear on a
-# flat. Feet outboard to the rocker-arm-support's +-90.25 end faces (it is the
-# only stand; the old south "A-frame" is gone).
+# Rocker pivot brackets, shaft and set screws (#948, PR #1292; user,
+# 2026-10-10; #3114): the rocker bank's ends, from rocker_bank_layout. The
+# arms float on the shaft, each located along the bank by its own rod, so
+# nothing bears on an ear: each end hub stands clear of its ear's inner face
+# (END_FLOAT). The plain shaft is held by one MHA-SH-VN-54 set screw per ear
+# on a flat. Feet outboard to the rocker-arm-support's +-90.25 end faces (it
+# is the only stand; the old south "A-frame" is gone).
 from rocker_bank_layout import (  # noqa: E402
     NORTH_EAR_INNER_Z,
-    NORTH_WASHER_Z,
     PIVOT_BRACKET_Z,
     PIVOT_SHAFT_FLAT_STATIONS,
     PIVOT_SHAFT_NORTH_Z,
-    ROCKER_SPRING_Z,
+    RUNNING_FLOOR as _ROCKER_RUNNING_FLOOR,
+    SOUTH_EAR_INNER_Z,
     SOUTH_END_INSET as _SHAFT_SOUTH_END_INSET,
-    SOUTH_WASHER_Z,
     STACK_MID_Z as _STACK_MID_Z,
     hub_mid_z,
 )
@@ -433,37 +429,18 @@ if any(
     )
 ):
     raise AssertionError("a pivot shaft flat is not under its ear's set screw")
-# The fixed washers: the purchased part runs z 0..THICKNESS from its
-# origin (the stock recipe's annulus turned axis +Z), so IDENTITY at each
-# washer's z0 puts the south one's north face on hub 0's south face, and the
-# north one between hub 19's north face and the north ear's inner face.
+# The end arms, placed on their stations, clear the ears placed at
+# PIVOT_BRACKET_Z: no hub bears on an ear (#3114).
 from ch_rocker_arm_spec import HUB_LENGTH as _ROCKER_HUB_LENGTH  # noqa: E402
-from ch_vn_rocker_thrust_washer_spec import THICKNESS as _WASHER_THICK  # noqa: E402
 
-for _washer_z in (SOUTH_WASHER_Z, NORTH_WASHER_Z):
-    if abs(_washer_z[1] - _washer_z[0] - _WASHER_THICK) > 1e-9:
-        raise AssertionError(
-            "a thrust washer is not ch_vn_rocker_thrust_washer_spec's thickness"
-        )
-if abs(SOUTH_WASHER_Z[1] - (hub_mid_z(0) - _ROCKER_HUB_LENGTH / 2.0)) > 1e-9:
-    raise AssertionError(
-        "south thrust washer's north face is not on hub 0's south face"
-    )
 if (
-    abs(NORTH_WASHER_Z[0] - (hub_mid_z(19) + _ROCKER_HUB_LENGTH / 2.0)) > 1e-9
-    or abs(NORTH_WASHER_Z[1] - NORTH_EAR_INNER_Z) > 1e-9
-):
-    raise AssertionError(
-        "north thrust washer is not between hub 19 and the north ear"
+    min(
+        hub_mid_z(0) - _ROCKER_HUB_LENGTH / 2.0 - SOUTH_EAR_INNER_Z,
+        NORTH_EAR_INNER_Z - (hub_mid_z(19) + _ROCKER_HUB_LENGTH / 2.0),
     )
-# The spring's part runs z 0..MODEL_HEIGHT from its origin (axis +Z), so
-# IDENTITY at ROCKER_SPRING_Z[0] fills the south ear to washer envelope.
-import ch_vn_rocker_bank_spring_spec as _rocker_spring  # noqa: E402
-
-if abs(ROCKER_SPRING_Z[1] - ROCKER_SPRING_Z[0] - _rocker_spring.MODEL_HEIGHT) > 1e-9:
-    raise AssertionError("rocker bank spring is not its installed envelope")
-if abs(ROCKER_SPRING_Z[1] - SOUTH_WASHER_Z[0]) > 1e-9:
-    raise AssertionError("rocker bank spring's north face is not on the washer")
+    < _ROCKER_RUNNING_FLOOR
+):
+    raise AssertionError("an end rocker hub does not clear its bracket ear")
 # Apex set screws (MHA-SH-VN-54, user 2026-10-10): the part's cup end is its
 # origin and its axis +Y (build_sh_vn_arbor_set_screw, the drive train's IDENTITY
 # placement), so IDENTITY at the flat's height drops each one down through its
@@ -610,7 +587,6 @@ from stock_anchor_geom import ANCHOR_9489T111  # noqa: E402
 # face is the unambiguous concentric reference -- it is the only geometry at this
 # radius in the inter-channel gap (the shaft is Ø6.35, the OD Ø10/Ø12).
 from _hole_spec import blind_cut_dia_mm  # noqa: E402
-from ch_rocker_arm_spec import HUB_LENGTH as ROCKER_HUB_LENGTH  # noqa: E402
 from ch_channel_lever_spec import HUB_LENGTH as LEVER_HUB_LENGTH  # noqa: E402
 from ch_pivot_bracket_spec import FOOT_H as PIVOT_BRACKET_FOOT_H  # noqa: E402
 
@@ -973,7 +949,9 @@ def _finish_settings_feature(adapter, feature: str, dims: SketchDims) -> list:
 def _author_settings_reference(adapter) -> None:
     """The fit-up's settings as model dimensions: no solid or pose edits, one
     construction sketch per bank view (ch_channel_assembly_spec) -- a chain on
-    leg on the fulcrum axis between the keeper lugs' inner faces -- and one
+    the pivot axis from the south ear's inner face through the north ear to
+    the shaft's north tip, and one leg on the fulcrum axis between the keeper
+    lugs' inner faces -- and one
     for the keeper plan view (the MHA-FR-02 socket bore and boss, the boss's
     keeper relief step, socket line, web centre line, the lug centre line
     and the two inner-face stations, plus the inner web face as its only
@@ -986,17 +964,15 @@ def _author_settings_reference(adapter) -> None:
     spec = settings_spec
     pivot_xs = [-z for z in spec.PIVOT_CHAIN_Z]
     lug_xs = [-z for z in spec.LUG_INNER_FACE_Z]
-    washer_t = spec.PIVOT_CHAIN_Z[2] - spec.PIVOT_CHAIN_Z[1]
+    north_ear_t = spec.PIVOT_CHAIN_Z[2] - spec.PIVOT_CHAIN_Z[1]
     socket_x, socket_y = spec.KEEPER_SOCKET_XZ[0], -spec.KEEPER_SOCKET_XZ[1]
     face_ys = [-z for z in spec.LUG_INNER_FACE_Z]
     for name, value in (
         ("ChSouthEarInnerX", pivot_xs[0]),
         ("ChPivotAxisY", spec.PIVOT_Y),
-        ("ChRockerSpringSet", spec.PIVOT_CHAIN_Z[1] - spec.PIVOT_CHAIN_Z[0]),
-        ("ChSouthWasherThickness", washer_t),
-        ("ChRockerStackLength", spec.PIVOT_CHAIN_Z[3] - spec.PIVOT_CHAIN_Z[2]),
-        ("ChNorthHubToEarOuter", spec.PIVOT_CHAIN_Z[4] - spec.PIVOT_CHAIN_Z[3]),
-        ("ChPivotTipProud", spec.PIVOT_CHAIN_Z[5] - spec.PIVOT_CHAIN_Z[4]),
+        ("ChRockerEarSpan", spec.PIVOT_CHAIN_Z[1] - spec.PIVOT_CHAIN_Z[0]),
+        ("ChNorthEarThickness", north_ear_t),
+        ("ChPivotTipProud", spec.PIVOT_CHAIN_Z[3] - spec.PIVOT_CHAIN_Z[2]),
         ("ChSouthLugInnerX", lug_xs[0]),
         ("ChFulcrumAxisY", spec.FULCRUM_Y),
         ("ChKeeperLugSpan", spec.LUG_INNER_FACE_Z[1] - spec.LUG_INNER_FACE_Z[0]),
@@ -1028,10 +1004,8 @@ def _author_settings_reference(adapter) -> None:
         pivot_legs,
         (x0 - x1 for x0, x1 in zip(pivot_xs, pivot_xs[1:])),
         (
-            (spec.SPRING_SET_DIMENSION, '"ChRockerSpringSet"'),
-            ("SouthWasherThickness", '"ChSouthWasherThickness"'),
-            (spec.STACK_LENGTH_DIMENSION, '"ChRockerStackLength"'),
-            ("NorthHubToEarOuter", '"ChNorthHubToEarOuter"'),
+            (spec.EAR_SPAN_DIMENSION, '"ChRockerEarSpan"'),
+            ("NorthEarThickness", '"ChNorthEarThickness"'),
             (spec.TIP_PROUD_DIMENSION, '"ChPivotTipProud"'),
         ),
         strict=True,
@@ -1396,7 +1370,7 @@ def build(adapter) -> dict[str, str]:
 
     # Shafts. The pivot-shaft is inserted FIRST, so SolidWorks auto-fixes it as
     # the assembly seed. The fulcrum-shaft and the rest of the static channel
-    # structure below (brackets, washers, bank spring, keepers and their
+    # structure below (brackets, keepers and their
     # screws) carry no operational DOF and have no contact partner inside this
     # subassembly, so each is fixed at its exact authored transform. The shaft
     # axes (machine frame, crank at -X) anchor the rocker/lever concentrics.
@@ -1457,27 +1431,6 @@ def build(adapter) -> dict[str, str]:
             IDENTITY,
             label=f"pivot-bracket set screw {name} z{screw_z:+.1f}",
         )
-    # Thrust washers (MHA-CH-VN-56): south on the shaft against rocker 0's hub,
-    # north between rocker 19's hub and the north ear. Fixed like the brackets.
-    for washer_z, side in ((SOUTH_WASHER_Z, "south"), (NORTH_WASHER_Z, "north")):
-        place_component(
-            adapter,
-            "ch-vn-rocker-thrust-washer",
-            [PIVOT[0], PIVOT[1], washer_z[0]],
-            [0.0, 0.0, 0.0],
-            IDENTITY,
-            label=f"rocker-thrust-washer {side}",
-        )
-    # Rocker bank spring (MHA-CH-VN-54, #948 ruling R): coaxial on the shaft,
-    # south face on the south ear's inner face, north face on the washer.
-    place_component(
-        adapter,
-        "ch-vn-rocker-bank-spring",
-        [PIVOT[0], PIVOT[1], ROCKER_SPRING_Z[0]],
-        [0.0, 0.0, 0.0],
-        IDENTITY,
-        label="rocker-bank-spring south",
-    )
     # Bracket hold-downs (MHA-CH-VN-57): head down on each bracket foot's top,
     # over the seat rocker_bracket_seat_layout derived from its hole.
     # Fixed likewise (the support is the frame's).
@@ -1532,20 +1485,22 @@ def build(adapter) -> dict[str, str]:
         )
 
     # No spacer bushings (2026-09-02): the rocker arms and channel levers
-    # carry integral hubs one PITCH long, so each channel's rocker takes its
-    # axial (Z) seat as a PITCH distance off the PREVIOUS channel's rocker
-    # mid-plane (hub face on hub face, the #110 neighbour idiom), and the
-    # lever rides coincident to its own rocker. rocker_by_channel[j] is the
-    # rocker instance every later neighbour seat refers to; rod_by_channel[j]
-    # is the rod each rod-pivot pin is locked into.
+    # carry integral hubs, so each channel's rocker takes its axial (Z) seat
+    # as a distance off channel 0's rocker mid-plane (the #110 neighbour
+    # idiom), and the lever rides coincident to its own rocker. The lever
+    # hubs are one PITCH long, face on face; the rocker hubs are shorter and
+    # stand HUB_GAP apart on their stations, each arm floating on the shaft
+    # with its rod (#3114). rocker_by_channel[j] is the rocker instance every
+    # later neighbour seat refers to; rod_by_channel[j] is the rod each
+    # rod-pivot pin is locked into.
     rocker_by_channel: dict[int, str] = {}
     # The bar and lever each channel's BarPin joins (inserted once
     # every chain is landed, outside the CopyWithMates slice).
     bar_by_channel: dict[int, str] = {}
     lever_by_channel: dict[int, str] = {}
     rod_by_channel: dict[int, str] = {}
-    if abs(ROCKER_HUB_LENGTH - PITCH) > 1e-6 or abs(LEVER_HUB_LENGTH - PITCH) > 1e-6:
-        raise RuntimeError("hub lengths must equal the station pitch")
+    if abs(LEVER_HUB_LENGTH - PITCH) > 1e-6:
+        raise RuntimeError("the lever hub length must equal the station pitch")
     # The feet run outboard from the ears' inner faces, so no rocker hub
     # stands over them; the pivot shaft's domed ends past the ears do.
     _shaft_bottom = PIVOT[1] - _PIVOT_SHAFT_DIA / 2.0
@@ -1647,8 +1602,9 @@ def build(adapter) -> dict[str, str]:
             label=f"channel-lever ch{j:02d}",
         )
 
-        # J1 rocker revolute (shaft OD ↔ pivot bore). Axial Z: the hubs stack
-        # face to face from channel 0's rocker (integral hubs, 2026-09-02), so
+        # J1 rocker revolute (shaft OD ↔ pivot bore). Axial Z: each arm stands
+        # on its station (rocker_bank_layout.hub_mid_z; it floats there with
+        # its rod, #3114), so
         # rocker j sits j * PITCH off CHANNEL 0's rocker mid-plane -- always the
         # authored anchor, never a copied slice's own rocker: CopyWithMates2
         # re-binds any reference to a copied component onto the copy, so a
@@ -1929,14 +1885,14 @@ def build(adapter) -> dict[str, str]:
         slice_info = slots_by_seed[seed_j]
         n_slice, dim_slot = slice_info["n"], slice_info["dim_slot"]
         seed_arrays = slice_info["arrays"]
-        # Re-point ONLY the J1a slot to channel 0's rocker (the hub-stack anchor;
+        # Re-point ONLY the J1a slot to channel 0's rocker (the bank's Z anchor;
         # Repeat=false + NewEntityToMateTo) at j * PITCH -- exactly
         # the authored #110 neighbour idiom -- honouring the seed's side via
         # flips[dim_slot]. The other two external slots (J1 radial on the shared
         # pivot-shaft) keep the seed's references (Repeat=true), the measured
         # mixed-array idiom. This drops the old cumulative always-positive ladder
         # off the seed's bushing (see _cwm.py module doc).
-        prev_rocker = rocker_by_channel[0]  # the hub-stack anchor (authored channel 0)
+        prev_rocker = rocker_by_channel[0]  # the bank's Z anchor (authored channel 0)
         values = [0.0] * n_slice
         values[dim_slot] = (j * PITCH) / 1000.0
         repeat = [True] * n_slice

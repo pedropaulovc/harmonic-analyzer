@@ -110,26 +110,26 @@ def _far_cheek_min(
     return _floor_inch(wall)
 
 
-# drawing-guidelines.md rule 20: the notch cheeks fall short of the .080 wall
-# target and the .060 floor (#1038; the book's 1/4 bar straddling its .098
-# rocker arm leaves cheeks under .076 nominal). The shortfall is stated at
-# each notch's width (MHA-CH-01 RV-04).
-# Owner ruling 2026-10-15 (#1293/#1038): the stated cheek walls are approved
-# exceptions at or above 1.17 mm (top) and 1.21 mm (foot) MIN.
+# drawing-guidelines.md rule 20: both far cheeks fall short of the .080 wall
+# target, and each states its worst case at its notch's width. The top
+# notch's (.124 +.007 on the lever, #1038) also falls under the .060 floor:
+# owner ruling 2026-10-15 (#1293/#1038) approves it at or above 1.17 mm MIN
+# (MHA-CH-01 RV-04). The foot notch's (.104 +.006 on the .098 strap, #3114)
+# holds the floor at .063 (MHA-CH-01 RV-05).
 TOP_CHEEK_WALL_MIN = _far_cheek_min(
     bar.TOP_NOTCH_WIDTH, bar.TOP_NOTCH_WIDTH_BAND, bar.TOP_NOTCH_OFFSET
 )
 BOTTOM_CHEEK_WALL_MIN = _far_cheek_min(
     bar.BOTTOM_NOTCH_WIDTH, bar.BOTTOM_NOTCH_WIDTH_BAND, bar.BOTTOM_NOTCH_OFFSET
 )
-CHEEK_WALL_APPROVED_MIN = {"top": 1.17, "bottom": 1.21}
-if (
-    TOP_CHEEK_WALL_MIN < CHEEK_WALL_APPROVED_MIN["top"]
-    or BOTTOM_CHEEK_WALL_MIN < CHEEK_WALL_APPROVED_MIN["bottom"]
-):
-    raise AssertionError("a notch cheek fell under its approved minimum")
-# The near cheek is the printed ledge itself: .063 +/-.002 leaves .061, over
-# the .060 floor and under the .080 target (MHA-CH-01 RV-05).
+CHEEK_WALL_APPROVED_MIN = {"top": 1.17}
+if TOP_CHEEK_WALL_MIN < CHEEK_WALL_APPROVED_MIN["top"]:
+    raise AssertionError("the top notch's cheek fell under its approved minimum")
+if BOTTOM_CHEEK_WALL_MIN < WALL_FLOOR_MM - 1e-9:
+    raise AssertionError("the foot notch's cheek fell under the .060 floor")
+# The near cheek is the printed ledge itself. The thinner is the top notch's:
+# .063 +/-.002 leaves .061, over the .060 floor and under the .080 target
+# (the foot's .073 +/-.002 leaves .071; MHA-CH-01 RV-05).
 LEDGE_CHEEK_MIN = min(bar.TOP_NOTCH_OFFSET, bar.BOTTOM_NOTCH_OFFSET) - (
     bar.NOTCH_OFFSET_TOLERANCE_MM
 )

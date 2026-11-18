@@ -891,13 +891,6 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
-        name="ch_vn_rocker_bank_spring",
-        part="ch_vn_rocker_bank_spring",
-        artifact_stem="ch-vn-rocker-bank-spring",
-        script_name="draw_ch_vn_rocker_bank_spring.py",
-        layout=DrawingLayout.LANDSCAPE,
-    ),
-    DrawingSpec(
         name="pd_transgear_arm",
         part="pd_transgear_arm",
         artifact_stem="pd-transgear-arm",

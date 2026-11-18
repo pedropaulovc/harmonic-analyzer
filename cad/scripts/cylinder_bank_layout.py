@@ -262,16 +262,21 @@ G19_BACK_FACE_BAND = (STACK_L20_ACCEPT_BAND[1], STACK_L20_ACCEPT_BAND[0])
 SLOT_MIN = OVERALL_THICKNESS + OVERALL_THICKNESS_BAND[1] - (
     FACE_WIDTH + FACE_WIDTH_TOLERANCE_MM
 )
-# The thinnest in-band cam still holds the thickest ring with the novice spare
-# (the restated "keep T +/0": a thin gear is in band only while this holds).
-# The shank passes between the same two tooth discs, so it must clear too.
+# The cam slot locates the rod along the bank (owner ruling 2026-11-18,
+# #3114: the ring at the original's .170 nearly fills it, and the rocker arm
+# floats on its shaft and follows the rod), so the ring is a sliding fit
+# between the two tooth discs: the thinnest in-band cam still passes the
+# thickest ring with the running floor (the restated "keep T +/0": a thin
+# gear is in band only while this holds). The shank passes between the same
+# two tooth discs and is the thinner (ch_connecting_rod_spec).
+RUNNING_FLOOR = 0.10  # least running air between oiled steel faces
 RING_MAX = _rod.RING_THICKNESS + _rod.RING_THICKNESS_BAND[0]
 SHANK_MAX = _rod.SHANK_THICKNESS + _rod.SHANK_THICKNESS_BAND[0]
 RING_SLOT_MARGIN = SLOT_MIN - max(RING_MAX, SHANK_MAX)
-if RING_SLOT_MARGIN < MARGIN_SPARE:
+if RING_SLOT_MARGIN < RUNNING_FLOOR:
     raise AssertionError(
         f"the thinnest cam slot {SLOT_MIN:.4f} holds the thickest ring/shank "
-        f"{max(RING_MAX, SHANK_MAX):.3f} by {RING_SLOT_MARGIN:.3f} < {MARGIN_SPARE}"
+        f"{max(RING_MAX, SHANK_MAX):.3f} by {RING_SLOT_MARGIN:.3f} < {RUNNING_FLOOR}"
     )
 
 # --- datum chain for the cone-mesh and channel axial budgets ----------------

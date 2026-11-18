@@ -8,16 +8,16 @@ at one END of the foot, and the foot is only as wide as the support's apex.
 shaft's own domed end, not a brazed-on ball, so the ear is a plain plate
 arched EAR_W/2 over the O.256 cross-bore, its apex EAR_TOP_Y over the seat
 (#1371: the arch's centre stands ARCH_LIFT over the bore so the apex tap
-keeps 1.5D of full thread). The north ear's inner face is the
-rocker bank's axial datum (the north thrust washer behind hub 19 bears on
-it); the south one is set off the MHA-CH-VN-54 preload spring
-(``rocker_bank_layout``). One MHA-CH-VN-53 #4-40 set screw
+keeps 1.5D of full thread). Fit-up locates the north ear's inner face by DRO
+and sets the south one from it to the ears' inner-face span
+(``rocker_bank_layout.EAR_INNER_SPAN``); nothing bears on either face
+(#3114: the rocker arms float). One MHA-CH-VN-53 #4-40 set screw
 drops through each ear's arch apex onto the pivot shaft's flat (user,
 2026-10-10).
 
 The channel assembly inserts the NORTH bracket as IDENTITY and the SOUTH one
 turned Ry(180) about its bore axis, so both feet run OUTBOARD, away from the
-rocker stack (user-approved sketch, 2026-10-09). One part serves both sides
+rocker bank (user-approved sketch, 2026-10-09). One part serves both sides
 (#1341, option A): its foot ends flush with the south support end face and
 short of the north one (``ch_pivot_bracket_sides`` derives the foot end
 ``FootZ1`` and hole station ``HoleZ`` from both sides).

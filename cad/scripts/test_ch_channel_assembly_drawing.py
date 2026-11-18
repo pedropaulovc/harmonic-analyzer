@@ -12,7 +12,7 @@ import _config
 import ch_channel_assembly_steps as steps
 import draw_ch_channel_assembly as drawing
 import dt_drive_train_steps
-from ch_rocker_arm_spec import HUB_LENGTH, HUB_LENGTH_BAND
+from ch_rocker_arm_spec import HUB_LENGTH
 import pytest
 import rocker_bank_layout as bank
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -122,6 +122,11 @@ def test_every_cross_sheet_step_pointer_lands_on_the_step_it_names() -> None:
         # The rod rings go onto their cams in the cylinder stack, so the
         # bench-pinned rod + arm pairs must exist by then.
         (channel_number, stack_ref): "AS EACH GEAR GOES ON",
+        # The left-hub remedy resets the left bracket by the drive train's own
+        # ear-setting sub-step, then its screw and recheck sub-steps.
+        (channel_number, f"{north_ref}B"): "SET THE EAR INNER FACE TO ITS Y",
+        (channel_number, f"{north_ref}E"): f"SCREW THE {bracket} DOWN",
+        (channel_number, f"{north_ref}F"): "RECHECK Y",
         # ... and that drive-train step names the pinning step it relies on.
         (fitup_number, steps.RODS_PINNED_REF): "ROD FORK",
         # The support is screwed down before the north bracket is set on it.
@@ -129,9 +134,6 @@ def test_every_cross_sheet_step_pointer_lands_on_the_step_it_names() -> None:
             fitup_number,
             frame_steps.step_ref(frame_steps.SUPPORT_SCREWED_KEY),
         ): f"THROUGH ITEM {frame.ITEM_NUMBERS['fr-rocker-arm-support']} INTO",
-        # The drive-train step that sets the north bracket keeps the miced
-        # washer for the channel sheet's threading of the shaft.
-        (fitup_number, steps.step_ref("north-ear-datum")): "PUSH",
     }
     found = set()
     # MHA-HA-00's sequence is not on this branch's base: its pointers are
@@ -168,12 +170,11 @@ def test_every_cross_sheet_step_pointer_lands_on_the_step_it_names() -> None:
     assert "SET THE EAR INNER FACE TO ITS Y" in north
     assert f"{drive_train.DRO_ZERO_STEP} ZERO" in north
     # The plain shaft threads through the set ear: the bracket stays down,
-    # and the channel sheet threads the shaft and the washer measured there.
+    # and nothing is miced there for the channel sheet (#3114: no washer).
     assert "LIFT IT OFF" not in north
-    assert "MIC THE MHA-CH-VN-56: ITS THICKNESS IS W" in north
+    assert "MIC THE" not in north
     # Rule 23 (rubric sample round 9): the one-screw bracket's bench check.
     assert "CHECK THAT THE MHA-CH-08 DOES NOT TURN ON MHA-FR-05 BY HAND" in north
-    assert steps.NORTH_BRACKET_SET_REF in _step_body("north-ear-datum")
     assert steps.NORTH_BRACKET_SET_REF in _step_body("north-bracket-held")
     # The fitter leaves this list for the drive train's cylinder stack through
     # its north-bracket set and comes back at this check (rule 22 hand-off).
@@ -211,20 +212,49 @@ def test_the_printed_step_heads_are_the_registry_in_order() -> None:
 
 def test_every_step_is_one_action_of_at_most_six_lines() -> None:
     """drawing-guidelines.md rule 22: one action per step, at most six
-    printed lines; every remedy loops back to the step it repeats."""
+    printed lines; every remedy block ends on a step of its own that loops
+    back to the step it repeats (machinist review of PR #3116: no step joins
+    actions with commas or AND, none ends "... AND RETURN TO STEP n")."""
     for key in steps.SEQUENCE:
         assert len(drawing._wrapped_step(key, drawing.FITUP_TEXT[key])) <= 6
-    for key, target in (
-        ("rocker-stack-refaced", "rocker-stack-measured"),
-        ("rocker-stack-short", "rocker-stack-measured"),
-        ("rod-pin-remade", steps.RODS_PINNED_KEY),
-        ("bank-spring-replaced", "bank-spring-checked"),
-        ("south-bracket-reset", "south-bracket-spring-set"),
-        ("bar-pin-remade", "bars-straight"),
-        ("bar-straightened", "bars-straight"),
-    ):
+    returns = {
+        "rod-pin-return": steps.RODS_PINNED_KEY,
+        "left-hub-return": "bare-shaft-through-ears",
+        "right-hub-return": "bare-shaft-through-ears",
+        "bar-pin-return": "bars-straight",
+        "bar-straightened-return": "bars-straight",
+    }
+    for key, target in returns.items():
         assert steps.step_number(target) < steps.step_number(key)
-        assert f"STEP {steps.step_number(target)}." in _step_body(key)
+        body = _step_body(key)
+        assert re.search(rf"RETURN TO STEP {steps.step_number(target)}\b", body), key
+        # The return is the whole step: nothing but its block prefix before it.
+        assert re.fullmatch(r"((LEFT|RIGHT) HUB: )?RETURN TO STEP .*", body), key
+    for key in steps.SEQUENCE:
+        assert ("RETURN TO STEP" in _step_body(key)) == (key in returns), key
+    # Each remedy block is consecutive, in order, right after its check.
+    for check, block in (
+        ("rod-arms-swing", steps.ROD_PIN_REMEDY),
+        ("end-hubs-clear", steps.LEFT_HUB_REMEDY + steps.RIGHT_HUB_REMEDY),
+        ("bars-straight", ("bar-straightened", "bar-straightened-return")),
+        ("bars-swing", steps.BAR_PIN_REMEDY),
+    ):
+        first = steps.SEQUENCE.index(check) + 1
+        assert steps.SEQUENCE[first : first + len(block)] == block, check
+    # Each hub block opens with its condition; every later step of the block
+    # carries the block's prefix, so none reads as part of the main flow.
+    for side, block in (
+        ("LEFT", steps.LEFT_HUB_REMEDY),
+        ("RIGHT", steps.RIGHT_HUB_REMEDY),
+    ):
+        assert _step_body(block[0]).startswith(
+            f"{side} HUB, IF THE LEAF DID NOT PASS THERE: "
+        )
+        for key in block[1:]:
+            assert _step_body(key).startswith(f"{side} HUB: "), key
+    for prefix in ("rod", "bar"):
+        assert _step_body(f"{prefix}-pin-pressed-out").startswith("IF AN ITEM ")
+        assert _step_body(f"{prefix}-replaced").startswith("REPLACE THAT ITEM ")
 
 
 def test_the_steps_name_parts_by_bom_item() -> None:
@@ -237,14 +267,14 @@ def test_the_steps_name_parts_by_bom_item() -> None:
     for stem in drawing.BOM_COMPONENTS:
         assert drawing.item(stem) in drawing.FITUP_STEPS, stem
     # A part number prints only where a step sends the fitter to that part's
-    # own drawing (the rocker arm's datum G, the keeper's finished top).
+    # own drawing (the keeper's finished top).
     for stem, number in drawing.BOM_PART_NUMBERS.items():
-        if stem not in ("ch-rocker-arm", drawing.explode.KEEPER):
+        if stem != drawing.explode.KEEPER:
             assert number not in drawing.FITUP_STEPS, stem
-    assert drawing.items_text(drawing.NORTH_KEEPER_DETAIL.stems) == "ITEMS 8, 9 AND 10"
-    assert drawing.NORTH_KEEPER_DETAIL.parts == "ITEMS 8,9,10"
-    assert drawing.NORTH_BRACKET_DETAIL.parts == "ITEMS 3,4,5,7"
-    assert "ITEMS 8, 9 AND 10 ARE BALLOONED IN DETAIL C." in drawing.EXPLODED_CAPTION
+    assert drawing.items_text(drawing.NORTH_KEEPER_DETAIL.stems) == "ITEMS 6, 7 AND 8"
+    assert drawing.NORTH_KEEPER_DETAIL.parts == "ITEMS 6,7,8"
+    assert drawing.NORTH_BRACKET_DETAIL.parts == "ITEMS 3,4,5"
+    assert "ITEMS 6, 7 AND 8 ARE BALLOONED IN DETAIL C." in drawing.EXPLODED_CAPTION
 
 
 def test_no_compass_or_private_words_print() -> None:
@@ -258,7 +288,7 @@ def test_no_compass_or_private_words_print() -> None:
             *(view.label_text for view in drawing.LETTERED_VIEWS),
             *(text for text, _, _ in drawing.DETAIL_POINTERS),
             *(text for text, _, _ in drawing.PLAN_POINTERS),
-            *drawing.notes.DIMENSION_CALLOUTS.values(),
+            *drawing.DIMENSION_CALLOUTS.values(),
         )
     )
     for word in ("NORTH", "SOUTH", "STRAP", "APEX", "CROWN", "CLOSED UP", "HUB 0", "SPLIT OF"):
@@ -278,93 +308,133 @@ def test_each_lettered_view_has_a_viewing_arrow_letter() -> None:
     assert drawing.KEEPER_PLAN.label_text.endswith("SCALE 1 : 2")
 
 
-def test_the_spring_set_is_dro_set_off_an_indicator_zero_on_the_washer() -> None:
-    """#2337: the wave spring covers all but .004 of the right washer's face,
-    so no feeler leaf can set the right bracket beside it. The bracket's foot
-    end is indicator- and DRO-zeroed with its ear on the washer before the
-    spring goes on; it comes off for the spring, goes back on under a light
-    clamp and is tapped to that zero with the DRO at detail A's spring set
-    (Codjiflo r1 on #2489: something must hold it there). The acceptance is
-    the spring-back, checked while the bracket is only clamped (machinist
-    review, PR #1605)."""
-    import tomllib
+def test_the_right_bracket_is_set_to_the_ear_span_and_the_end_hubs_checked() -> None:
+    """#3114: the arms float on the shaft, each located by its rod, so there is
+    no washer, spring or hub stack to set. The right bracket is set by edge
+    finder and DRO off the left one to view D's ear inner-face span (named,
+    never restated) while the shaft runs bare through both ears (Codjiflo on
+    PR #3116: with the arms on, each inner face is .05 from its hub, out of an
+    edge finder's reach). The end hubs are then checked clear of their ears
+    on a feeler leaf while it is only clamped (machinist review, PR #1605),
+    each end with its own remedy block (rule 22), and the arms are checked to slide
+    with their rods once the shaft is held."""
+    import draw_dt_drive_train_assembly as drive_train
 
-    from _paths import CAD_ROOT
-    from _process_plans import SHOP_PATH
-
-    explode = drawing.explode
-    washer, spring = drawing.item(explode.WASHER), drawing.item(explode.BANK_SPRING)
-    on_washer = _step_body("south-bracket-on-washer")
-    assert f"EAR PUSHING {washer}" in on_washer
-    assert steps.NORTH_BRACKET_SET_REF in on_washer
-    assert spring not in on_washer
-    # The spring set's DRO offset counts from the step that zeroes the DRO.
-    assert "DRO" in _step_body("south-bracket-dro-zeroed")
-    setting = _step_body("south-bracket-spring-set")
-    assert f"SPRING SET OF {drawing.SOUTH_END.title}, SHEET 4" in setting
-    assert f"STEP {steps.step_number('south-bracket-dro-zeroed')} ZERO" in setting
-    assert "INDICATOR READS ZERO" in setting
-    assert drawing.SHEET_NAMES.index(drawing.DETAIL_SHEET) == 3
-    callout = drawing.notes.DIMENSION_CALLOUTS[drawing.asm.SPRING_SET_DIMENSION]
-    assert callout == "SPRING SET"
-    # No step sets anything on a feeler leaf beside the spring.
-    for key in steps.ROCKER_SEQUENCE:
-        assert "FEELER" not in _step_body(key), key
-    # The set error (two indicator nulls on one face, half a division each,
-    # and the DRO over the move) is inside detail A's band, on the shop's own
-    # indicator (shop.toml gauges.dti) and the DRO's vendor-stated accuracy
-    # (shop-equipment.toml dro.pm-30mv).
-    shop = tomllib.loads(SHOP_PATH.read_text(encoding="utf-8"))
-    equipment = tomllib.loads(
-        (CAD_ROOT / "config" / "shop-equipment.toml").read_text(encoding="utf-8")
+    asm = drawing.asm
+    arm = drawing.item("ch-rocker-arm")
+    shaft = drawing.item("ch-pivot-shaft")
+    bracket = drawing.item(drawing.explode.BRACKET)
+    stood = _step_body("south-bracket-stood")
+    assert steps.NORTH_BRACKET_SET_REF in stood
+    assert shaft not in stood
+    bare = _step_body("bare-shaft-through-ears")
+    assert f"THE RIGHT {bracket} EAR" in bare and "HUB" not in bare
+    span = _step_body("south-bracket-span-set")
+    assert "EDGE FINDER" in span and "DRO" in span
+    assert f"{drawing.ROCKER_BANK.title} EAR SPAN" in span
+    # Rule 4 (Codjiflo, PR #3116): the callout names the faces and what the
+    # band protects, the arm by its BOM item; one line (an above-callout).
+    assert drawing.DIMENSION_CALLOUTS[asm.EAR_SPAN_DIMENSION] == (
+        f"EAR SPAN, INNER FACES: END {arm} HUBS CLEAR"
     )
-    (stated,) = [
-        float(match.group(1))
-        for cite in equipment["dro"]["pm-30mv"]["cite"]
-        if cite.startswith("DRO accuracy")
-        for match in [re.search(r"(\.\d+)” Accuracy", cite)]
-        if match
-    ]
-    assert drawing.DRO_ACCURACY_MM == pytest.approx(stated * 25.4)
-    division = shop["gauges"]["dti"]["resolution_mm"]
-    assert drawing.INDICATOR_DIVISION_MM == pytest.approx(division)
-    assert drawing.SPRING_SET_ERROR_MM == pytest.approx(division + stated * 25.4)
-    assert drawing.SPRING_SET_ERROR_MM < bank.ROCKER_SPRING_SET_BAND
+    nominal = asm.PIVOT_CHAIN_Z[1] - asm.PIVOT_CHAIN_Z[0]
+    assert nominal == pytest.approx(bank.EAR_INNER_SPAN)
+    for text in (f"{nominal / 25.4:.3f}", f"{nominal / 25.4:.2f}"):
+        assert text not in drawing.FITUP_STEPS
+    assert asm.DIMENSION_TOLERANCES[asm.EAR_SPAN_DIMENSION] == (
+        -bank.EAR_SPAN_BAND,
+        bank.EAR_SPAN_BAND,
+    )
+    assert asm.DRAWING_PRECISION[asm.PIVOT_FEATURE][asm.EAR_SPAN_DIMENSION] == 3
+    assert f"THE RIGHT {bracket} EAR" in _step_body("rocker-hubs-threaded")
+    # Codjiflo, PR #3116: a floating end arm would slide away from the leaf
+    # and pass a mis-set ear, so one step first pushes each end arm toward
+    # its ear until its rod stops it (the extreme END_CLEARANCE_MIN charges)
+    # and the check gauges it held there.
+    pushed = steps.step_number("end-arms-pushed-to-ears")
+    assert pushed == steps.step_number("end-hubs-clear") - 1
+    assert _step_body("end-arms-pushed-to-ears") == (
+        f"PUSH EACH END {arm} TOWARD ITS EAR UNTIL "
+        f"{drawing.item(drawing.explode.ROD)} STOPS IT."
+    )
+    clear = _step_body("end-hubs-clear")
+    assert drawing.notes.setting_row("end-hubs-clear") in clear
+    assert f"EACH END {arm} HUB, HELD AS AT STEP {pushed}, AND ITS" in clear
+    assert f"({drawing.SOUTH_END.title}, SHEET 4)" in clear
+    assert drawing.SHEET_NAMES.index(drawing.DETAIL_SHEET) == 3
+    # One remedy block per end, one action a step, each back to the bare
+    # shaft with the right bracket still only clamped; the left one re-runs
+    # the drive train's set, screw and recheck sub-steps (positive control on
+    # their wording). Drawn out of the hubs, the shaft lets the arms hang on
+    # their rods: no step swings them down.
+    hold_down = drawing.item(drawing.explode.BRACKET_HOLD_DOWN)
+    assert f"LOOSEN THE LEFT {hold_down}." in _step_body("left-hub-hold-down-loosened")
+    number = dt_drive_train_steps.step_number(steps.NORTH_BRACKET_SET_KEY)
+    for key, letter, action in (
+        ("left-hub-bracket-reset", "B", f"RESET THE LEFT {bracket}"),
+        ("left-hub-hold-down-tightened", "E", f"TIGHTEN THE LEFT {hold_down}"),
+        ("left-hub-bracket-rechecked", "F", "RECHECK"),
+    ):
+        assert _step_body(key).endswith(
+            f"{action} PER {steps.NORTH_BRACKET_SET_REF}{letter}."
+        ), key
+    dt_steps = _sequence_steps(
+        "\n".join((drive_train.CONE_CRANK_STEPS, drive_train.BANK_STEPS))
+    )
+    assert "SET THE EAR INNER FACE" in dt_steps[f"{number}B"]
+    assert "SCREW THE MHA-CH-08 DOWN" in dt_steps[f"{number}E"]
+    assert "RECHECK" in dt_steps[f"{number}F"]
+    drawn = f"DRAW {shaft} BACK AS AT STEP {steps.step_number('shaft-drawn-back')}."
+    for side in ("left", "right"):
+        assert _step_body(f"{side}-hub-shaft-drawn-back").endswith(drawn)
+        assert _step_body(f"{side}-hub-clamp-eased").endswith(
+            f"EASE THE CLAMP ON THE RIGHT {bracket}."
+        )
+    assert not re.search(r"SWING [A-Z0-9 ]*DOWN", drawing.FITUP_STEPS)
+    follow = _step_body("arms-follow-rods")
+    assert arm in follow and drawing.item(drawing.explode.ROD) in follow
+    assert "WASHER" not in _step_body("rocker-hubs-threaded")
     order = [
-        "south-washer-fitted",
-        "south-bracket-on-washer",
-        "south-bracket-zeroed",
-        "south-bracket-dro-zeroed",
-        "south-bracket-slid-off",
-        "bank-spring-checked",
-        "bank-spring-fitted",
-        "south-bracket-refitted",
-        "south-bracket-clamped-lightly",
-        "south-bracket-spring-set",
+        "north-bracket-held",
+        "south-bracket-stood",
+        "bare-shaft-through-ears",
+        "south-bracket-span-set",
         "south-bracket-clamped",
-        "spring-back-checked",
-        "south-bracket-reset",
+        "shaft-drawn-back",
+        "arms-swung-up",
+        "rocker-hubs-threaded",
+        "end-arms-pushed-to-ears",
+        "end-hubs-clear",
+        *steps.LEFT_HUB_REMEDY,
+        *steps.RIGHT_HUB_REMEDY,
         "south-foot-transferred",
         "south-bracket-screwed",
         "south-bracket-held",
         "shaft-set",
         "set-screws-driven",
+        "pivot-shaft-held",
+        "arms-follow-rods",
     ]
     numbers = [steps.step_number(key) for key in order]
     assert numbers == sorted(numbers)
-    assert f"{bank.STACK_L20_ACCEPT[0]:.2f}" not in _step_body("rocker-stack-measured")
 
 
-def test_the_stack_measuring_step_names_the_view_whose_dimension_carries_the_band() -> None:
-    """r5 Opus C2 (rule 19): the fitter package prints the stack acceptance
-    band on view D's native stack dimension (drawing policy: no limits in
-    note text), so the measuring step names that view and the dimension
-    carries STACK_L20_ACCEPT."""
-    assert drawing.ROCKER_BANK.title in drawing.FITUP_TEXT["rocker-stack-measured"]
-    asm = drawing.asm
-    lower, upper = asm.DIMENSION_TOLERANCES[asm.STACK_LENGTH_DIMENSION]
-    nominal = asm.PIVOT_CHAIN_Z[3] - asm.PIVOT_CHAIN_Z[2]
-    assert (nominal + lower, nominal + upper) == pytest.approx(bank.STACK_L20_ACCEPT)
+def test_the_end_hub_leaf_is_the_least_worst_case_air_floored() -> None:
+    """#3114: the end-hub feeler leaf is rocker_bank_layout's least worst-case
+    air between an end hub and its ear, floored to the .001 a feeler set is
+    sold in and never under the running floor (.004)."""
+    notes = drawing.notes
+    leaf_in = notes.END_HUB_LEAF_MM / 25.4
+    least_in = min(bank.END_CLEARANCE_MIN) / 25.4
+    assert leaf_in == pytest.approx(math.floor(least_in * 1000.0) / 1000.0)
+    assert leaf_in <= least_in
+    assert notes.END_HUB_LEAF_MM >= bank.RUNNING_FLOOR
+    assert _setting_table_row("end-hubs-clear")[2:] == (
+        f"{drawing.item('ch-rocker-arm')} HUB TO EAR",
+        "-",
+        ".011 MIN",
+        "FEELER LEAF",
+    )
 
 
 def test_each_stake_step_names_the_view_that_points_at_its_tap_mouth() -> None:
@@ -378,7 +448,7 @@ def test_each_stake_step_names_the_view_that_points_at_its_tap_mouth() -> None:
             steps.PIVOT_SET_SCREWS_STAKED_KEY,
             drawing.ROCKER_BANK,
             drawing.ROCKER_POINTERS,
-            drawing.STACK_KEEP,
+            drawing.EAR_SPAN_KEEP,
             "ch-pivot-shaft",
         ),
         (
@@ -405,17 +475,6 @@ def test_each_stake_step_names_the_view_that_points_at_its_tap_mouth() -> None:
         # The tip is on the right-hand (south) part, below its text.
         assert tx < px < drawing.STEPS_RIGHT_X - 0.010
         assert view.centre[1] < py < ty - len(lines) * NOTE_LINE_PITCH
-
-
-def test_the_stack_step_says_which_way_and_where_to_re_face() -> None:
-    """Machinist review (PR #1605): the hub band is upper-only, so the
-    shortest stack meets the acceptance's low limit; the re-face loops back
-    to the measurement."""
-    assert HUB_LENGTH_BAND[1] == 0.0
-    assert bank.COUNT * (HUB_LENGTH + HUB_LENGTH_BAND[1]) >= bank.STACK_L20_ACCEPT[0] - 1e-9
-    refaced = _step_body("rocker-stack-refaced")
-    assert "DATUM G" in refaced
-    assert f"{HUB_LENGTH:.2f}" not in refaced
 
 
 def test_each_step_column_fits_its_field() -> None:
@@ -496,59 +555,60 @@ def test_the_package_sheets_and_settings_contract() -> None:
     asm = drawing.asm
     explode = drawing.explode
     kept = {
-        **drawing.STACK_KEEP,
+        **drawing.EAR_SPAN_KEEP,
         **drawing.TIP_KEEP,
-        **drawing.SPRING_KEEP,
         **drawing.LUG_KEEP,
         **drawing.PLAN_KEEP,
     }
-    assert drawing.ROCKER_KEEP == {**drawing.STACK_KEEP, **drawing.TIP_KEEP}
+    assert drawing.ROCKER_KEEP == {**drawing.EAR_SPAN_KEEP, **drawing.TIP_KEEP}
     assert sorted(kept) == sorted(asm.DIMENSION_FEATURE)
     # Each bank view shows only its own axis's sketch.
     assert {asm.DIMENSION_FEATURE[name] for name in drawing.LUG_KEEP} == {
         asm.FULCRUM_FEATURE
     }
-    assert {
-        asm.DIMENSION_FEATURE[name] for name in (*drawing.ROCKER_KEEP, *drawing.SPRING_KEEP)
-    } == {asm.PIVOT_FEATURE}
+    assert {asm.DIMENSION_FEATURE[name] for name in drawing.ROCKER_KEEP} == {
+        asm.PIVOT_FEATURE
+    }
     assert {asm.DIMENSION_FEATURE[name] for name in drawing.PLAN_KEEP} == {
         asm.KEEPER_PLAN_FEATURE
     }
     assert set(drawing.notes.DIMENSION_CALLOUTS) == set(kept)
     assert drawing.notes.REFERENCE_DIMENSIONS == {asm.LUG_SPAN_DIMENSION}
     assert set(asm.DIMENSION_TOLERANCES) == set(kept) - drawing.notes.REFERENCE_DIMENSIONS
-    lower, upper = asm.DIMENSION_TOLERANCES[asm.SPRING_SET_DIMENSION]
-    assert (lower, upper) == (-bank.ROCKER_SPRING_SET_BAND, bank.ROCKER_SPRING_SET_BAND)
-    # Every kept dimension text lands on its own sheet, inside the border:
-    # the bank views' left of the right column, detail A's right of sheet 4's
-    # left column.
+    # Every kept dimension text lands on view D, E or F, inside the border,
+    # left of the right column.
     left_column_right = drawing.STEPS_LEFT_X + drawing.STEPS_LINE_WIDTH * NOTE_CHAR_WIDTH
     right = drawing._TEMPLATE.width_m - drawing.BORDER
-    for name, (x, y) in kept.items():
-        if name in drawing.SPRING_KEEP:
-            assert left_column_right < x < right
-        else:
-            assert drawing.BORDER < x < drawing.STEPS_RIGHT_X
+    for x, y in kept.values():
+        assert drawing.BORDER < x < drawing.STEPS_RIGHT_X
         assert drawing.BORDER < y < drawing._TEMPLATE.height_m - drawing.BORDER
-    # The right-end detail's spring-set text sits above its crop circle,
-    # clear of the arc (r7 layout audit: inside it, the arc crossed the text).
+    # The ear span's text sits over the middle of the span it dimensions.
+    (span_x, _), = drawing.EAR_SPAN_KEEP.values()
+    span_ends = [
+        drawing.ROCKER_BANK.sheet_xy(z, 0.0)[0] for z in asm.PIVOT_CHAIN_Z[:2]
+    ]
+    assert span_x == pytest.approx(sum(span_ends) / 2.0)
+    # Its one-line callout stands between the span's two extension lines.
+    span_callout = drawing.DIMENSION_CALLOUTS[asm.EAR_SPAN_DIMENSION]
+    assert len(span_callout) * NOTE_CHAR_WIDTH / 2.0 + 0.003 < (
+        abs(span_ends[0] - span_ends[1]) / 2.0
+    )
+    # Detail A, right of sheet 4's left column, is centred on the air between
+    # the right ear's inner face and the end hub, both inside its circle.
     detail = drawing.SOUTH_END
-    x, y = drawing.SPRING_KEEP[asm.SPRING_SET_DIMENSION]
     radius = detail.crop_radius_mm * detail.mm
-    assert y > detail.centre[1] + radius
     assert detail.centre[0] - radius > left_column_right + 0.010
+    assert detail.centre[0] + radius < right
     assert detail.crop_label_xy[1] - 3 * NOTE_LINE_PITCH > drawing._TEMPLATE.title_block_top_m
-    # ...and wholly right of the ear-side extension line (b9ae review:
-    # centred on the gap, the text sat on its own dimension and extension
-    # lines).
-    ear_x, _ = detail.sheet_xy(asm.PIVOT_CHAIN_Z[0], 0.0)
-    callout = drawing.notes.DIMENSION_CALLOUTS[asm.SPRING_SET_DIMENSION]
-    assert x - len(callout) * NOTE_CHAR_WIDTH / 2.0 > ear_x
-    # Detail A names the four bodies the spring set is read against, each pointer
-    # tip inside the crop circle and each text outside it.
+    ear_z, hub_z = asm.PIVOT_CHAIN_Z[0], bank.HUB0_SOUTH_FACE_Z
+    assert detail.centre_xyz[2] == pytest.approx((ear_z + hub_z) / 2.0)
+    assert hub_z - ear_z == pytest.approx(bank.END_FLOAT[0])
+    assert hub_z - ear_z < detail.crop_radius_mm
+    assert detail.stems >= {explode.BRACKET, "ch-rocker-arm", "ch-pivot-shaft"}
+    # Detail A names the two bodies the end-hub check is read between, each
+    # pointer tip inside the crop circle and each text outside it.
     assert [text.split()[0] for text, _, _ in drawing.DETAIL_POINTERS] == [
-        drawing.BOM_PART_NUMBERS[stem]
-        for stem in ("ch-rocker-arm", explode.WASHER, explode.BANK_SPRING, explode.BRACKET)
+        drawing.BOM_PART_NUMBERS[stem] for stem in ("ch-rocker-arm", explode.BRACKET)
     ]
     for text, (tx, ty), (px, py) in drawing.DETAIL_POINTERS:
         assert (px - detail.centre[0]) ** 2 + (py - detail.centre[1]) ** 2 < radius**2
@@ -559,7 +619,7 @@ def test_the_package_sheets_and_settings_contract() -> None:
         near_y = min(max(detail.centre[1], bottom), ty)
         assert math.dist((near_x, near_y), detail.centre) > radius
         assert left_column_right < tx and tx + width < right
-        assert ty < y - NOTE_LINE_PITCH
+        assert ty < drawing._TEMPLATE.height_m - drawing.BORDER
     # The parent view D carries the detail's boundary, about the same model
     # point the detail is centred on, lettered outside it.
     (cx, cy), parent_radius = drawing.detail_boundary(drawing.ROCKER_BANK, detail)
@@ -589,7 +649,6 @@ def test_the_exploded_details_enlarge_the_north_hardware_beside_the_bom() -> Non
     # (r11) between the bank and the north-most channel pulled out of it.
     assert drawing.exploded_offset(explode.BRACKET, north) == (0.0, 570.0, 90.0)
     assert drawing.exploded_offset(explode.BRACKET_SET_SCREW, north) == (0.0, 595.0, 90.0)
-    assert drawing.exploded_offset(explode.WASHER, north) == (0.0, 570.0, 50.0)
     assert drawing.exploded_offset(explode.KEEPER_FOOT_SCREW, north) == (0.0, 50.0, 50.0)
     assert drawing.exploded_offset(explode.BRACKET_HOLD_DOWN, north) == (0.0, 630.0, 90.0)
     assert drawing.exploded_offset(explode.BRACKET, "south") == (0.0, 0.0, -60.0)
@@ -615,14 +674,12 @@ def test_the_exploded_details_enlarge_the_north_hardware_beside_the_bom() -> Non
         drawing.letter_xy(centre, radius, keeper.letter_corner)[0]
     )
     # Each cluster member's exploded reference point projects inside its
-    # circle with room for the part round it: the washer (Ø10.2), the set
-    # screw above the ear apex, the hold-down over its foot hole.
+    # circle with room for the part round it: the set screw above the ear
+    # apex, the hold-down over its foot hole.
     pivot_x, pivot_y = drawing.ROCKER_PIVOT_XY
     ear_z = bank.PIVOT_BRACKET_Z[1]
-    washer_z = sum(bank.NORTH_WASHER_Z) / 2.0
     members = {
         bracket: (
-            drawing._exploded((pivot_x, pivot_y, washer_z), explode.WASHER, north),
             drawing._exploded(
                 (pivot_x, pivot_y + 15.0, ear_z), explode.BRACKET_SET_SCREW, north
             ),
@@ -853,7 +910,7 @@ def test_the_fulcrum_shaft_balloon_lands_on_its_bare_run_past_the_south_keeper()
 
 
 def test_the_bom_covers_every_family_once_with_its_sku() -> None:
-    assert len(drawing.BOM_COMPONENTS) == 18
+    assert len(drawing.BOM_COMPONENTS) == 16
     assert set(drawing.BOM_PART_NUMBERS) == set(drawing.BOM_COMPONENTS)
     # One Number per native file: the bought pivot pin's two member rows
     # share MHA-SH-VN-58 and bind by (file, member) instead.
@@ -882,7 +939,9 @@ def test_the_bom_covers_every_family_once_with_its_sku() -> None:
         )
         assert drawing.BOM_DESCRIPTIONS[stem]
     assert drawing.BOM_QUANTITIES[drawing.SPRING_STEM] == drawing.CHANNELS
-    assert sum(drawing.BOM_QUANTITIES.values()) == 2 + 7 * 2 + 1 + 8 * drawing.CHANNELS
+    # Two shafts, six pairs of end hardware and eight parts per channel: the
+    # builder's 8 * CHANNELS + 14 components (#3114: no washers, no spring).
+    assert sum(drawing.BOM_QUANTITIES.values()) == 2 + 6 * 2 + 8 * drawing.CHANNELS
     # The anchor is MHA-HA-00's to set: the channel sheet leaves the spring's
     # bottom loop free and cites that step.
     body = _step_body("spring-bottom-loops-left")
@@ -983,6 +1042,7 @@ def test_the_fulcrum_keepers_are_set_by_dro_checked_and_staked() -> None:
     assert steps.LEVER_SEQUENCE[0] == "keepers-on-frame"
     order = [
         "keepers-on-frame",
+        "fulcrum-shaft-through-keepers",
         steps.KEEPERS_SET_KEY,
         "keepers-clamped-on-frame",
         "keeper-feet-transferred",
@@ -1069,24 +1129,19 @@ def test_the_fulcrum_keepers_are_set_by_dro_checked_and_staked() -> None:
 def test_each_rod_fork_is_pinned_to_its_arm_at_the_bench_first() -> None:
     """The rod ring is captured in its closed cam slot during the cylinder
     stack, and a pressed pin needs its far tine backed on the press, so the
-    pin goes in at the bench, before that drive-train step -- after the hub
-    stack is proved on the shaft and the rockers come off in order. User
-    ruling 2026-10-09 (PR #1292 review F1): pressed, ends dressed flush. The
-    pin is bought (#2339), so a pin that slides in by hand condemns the fork
-    hole: the rod is replaced (rule 23)."""
+    pin goes in at the bench, before that drive-train step: the rocker steps
+    open with it (#3114: no hub stack to prove first). User ruling
+    2026-10-09 (PR #1292 review F1): pressed, ends dressed flush. The pin is
+    bought (#2339), so a pin that slides in by hand condemns the fork hole:
+    the rod is replaced (rule 23)."""
     from sh_vn_pivot_pin_rod_spec import PIN_END_PROUD_MAX
 
     order = [
-        "rocker-stack-accepted",
-        "rocker-stack-measured",
-        "rocker-stack-refaced",
-        "rocker-stack-short",
-        "rockers-kept-in-order",
         steps.RODS_PINNED_KEY,
         "rod-pins-dressed",
         "rod-pins-held",
         "rod-arms-swing",
-        "rod-pin-remade",
+        *steps.ROD_PIN_REMEDY,
         "north-bracket-held",
     ]
     assert list(steps.SEQUENCE[: len(order)]) == order
@@ -1101,30 +1156,36 @@ def test_each_rod_fork_is_pinned_to_its_arm_at_the_bench_first() -> None:
         steps.RODS_PINNED_KEY,
         "rod-pins-dressed",
         "rod-pins-held",
-        "rod-pin-remade",
+        "rod-pin-pressed-out",
     }
     pressing = {
         steps.RODS_PINNED_KEY,
         steps.BARS_PINNED_KEY,
-        "rod-pin-remade",
-        "bar-pin-remade",
+        "rod-pin-pressed-out",
+        "bar-pin-pressed-out",
     }
     pin = drawing.item(drawing.explode.ROD_PIN)
     for key in steps.SEQUENCE:
         body = _step_body(key)
         assert (re.search(rf"\b{pin}\b", body) is not None) == (key in pin_steps), key
         assert ("PRESS" in body) == (key in pressing), key
-    # A bought pin cannot be remade: each remedy replaces the part whose
-    # reamed hole let the pin slide, and sends the fitter back to its press;
-    # a replacement bar first passes the straightness check (#2341).
-    for remedy, host, pinned in (
-        ("rod-pin-remade", drawing.explode.ROD, steps.RODS_PINNED_KEY),
-        ("bar-pin-remade", drawing.explode.BAR, "bars-straight"),
+    # A bought pin cannot be remade: each remedy presses the pin out, replaces
+    # the part whose reamed hole let it slide, and sends the fitter back to
+    # its press, one action a step (rule 22); a replacement bar first passes
+    # the straightness check (#2341).
+    for prefix, host_pin, host, pinned in (
+        ("rod", drawing.explode.ROD_PIN, drawing.explode.ROD, steps.RODS_PINNED_KEY),
+        ("bar", drawing.explode.BAR_PIN, drawing.explode.BAR, "bars-straight"),
     ):
-        body = _step_body(remedy)
-        assert f"REPLACE THE {drawing.item(host)} " in body, remedy
-        assert f"RETURN TO STEP {steps.step_number(pinned)}." in body, remedy
-        assert "REMAKE" not in body, remedy
+        out = _step_body(f"{prefix}-pin-pressed-out")
+        assert out.startswith(f"IF AN {drawing.item(host_pin)} SLID IN BY HAND,")
+        assert out.endswith("IS OVER SIZE: PRESS THAT PIN OUT.")
+        assert _step_body(f"{prefix}-replaced") == f"REPLACE THAT {drawing.item(host)}."
+        assert _step_body(f"{prefix}-pin-return") == (
+            f"RETURN TO STEP {steps.step_number(pinned)} WITH THE NEW "
+            f"{drawing.item(host)}."
+        )
+        assert "REMAKE" not in drawing.FITUP_STEPS
 
 
 def test_the_finished_shaft_is_set_by_its_tip_before_the_screws() -> None:
@@ -1152,9 +1213,9 @@ def test_the_finished_shaft_is_set_by_its_tip_before_the_screws() -> None:
     # dimension, the dome's height off the left (north) ear's outer face; the
     # step names the view and carries no number.
     asm = drawing.asm
-    nominal = asm.PIVOT_CHAIN_Z[5] - asm.PIVOT_CHAIN_Z[4]
+    nominal = asm.PIVOT_CHAIN_Z[3] - asm.PIVOT_CHAIN_Z[2]
     assert nominal == pytest.approx(shaft.DOME_HEIGHT)
-    assert asm.PIVOT_CHAIN_Z[4] == pytest.approx(bank.NORTH_EAR_OUTER_Z)
+    assert asm.PIVOT_CHAIN_Z[2] == pytest.approx(bank.NORTH_EAR_OUTER_Z)
     lower, upper = asm.DIMENSION_TOLERANCES[asm.TIP_PROUD_DIMENSION]
     assert (lower, upper) == (-bank.SHAFT_TIP_SET_BAND, bank.SHAFT_TIP_SET_BAND)
     assert asm.TOLERANCE_PRECISION[asm.TIP_PROUD_DIMENSION] == 3
@@ -1164,15 +1225,15 @@ def test_the_finished_shaft_is_set_by_its_tip_before_the_screws() -> None:
     assert low not in body and high not in body
     # The text stands wholly right of the ear-face extension line (centred on
     # the 1.5 mm gap both lines struck its digits, rule 14), inside the
-    # border, and over the stack's callout line.
+    # border, and over the ear span's callout line.
     ((x, y),) = drawing.TIP_KEEP.values()
     half = len(".060 ±.010") * NOTE_CHAR_WIDTH / 2.0
-    ear_x, _ = drawing.ROCKER_BANK.sheet_xy(asm.PIVOT_CHAIN_Z[4], 0.0)
-    tip_x, _ = drawing.ROCKER_BANK.sheet_xy(asm.PIVOT_CHAIN_Z[5], 0.0)
+    ear_x, _ = drawing.ROCKER_BANK.sheet_xy(asm.PIVOT_CHAIN_Z[2], 0.0)
+    tip_x, _ = drawing.ROCKER_BANK.sheet_xy(asm.PIVOT_CHAIN_Z[3], 0.0)
     assert tip_x < ear_x < x - half - 0.003
     assert x - half > drawing.BORDER + 0.003
-    ((_, stack_y),) = drawing.STACK_KEEP.values()
-    assert y > stack_y + 3 * NOTE_LINE_PITCH
+    ((_, span_y),) = drawing.EAR_SPAN_KEEP.values()
+    assert y > span_y + 3 * NOTE_LINE_PITCH
     # Positive control: no other step sets the tip.
     for other in steps.SEQUENCE:
         if other != key:
@@ -1182,11 +1243,11 @@ def test_the_finished_shaft_is_set_by_its_tip_before_the_screws() -> None:
 def test_the_set_screws_go_in_after_the_shaft_is_set() -> None:
     """User, 2026-10-10: one MHA-SH-VN-54 down each ear's tap onto the plain
     shaft's flat, once the shaft is set; each tap mouth is then staked, a
-    step of its own, and the shaft checked held. The preload is accepted
-    before (machinist review, PR #1605)."""
+    step of its own, and the shaft checked held. The end hubs are accepted
+    clear of the ears before (machinist review, PR #1605)."""
     set_screw = drawing.item(drawing.explode.BRACKET_SET_SCREW)
     order = [
-        "south-bracket-spring-set",
+        "end-hubs-clear",
         "shaft-set",
         "set-screws-driven",
         steps.PIVOT_SET_SCREWS_STAKED_KEY,
@@ -1287,7 +1348,7 @@ def test_each_bar_is_proved_straight_before_it_is_pinned() -> None:
     neighbours each at that bow keep the mid-span running floor."""
     asm = drawing.asm
     straight = steps.step_number("bars-straight")
-    assert straight == steps.step_number("bar-notches-set") - 2
+    assert straight == steps.step_number("bar-notches-set") - 3
     assert straight < steps.step_number(steps.BARS_PINNED_KEY)
     assert asm.BAR_BOW_MAX_MM == pytest.approx(0.005 * 25.4)
     assert asm.BAR_GAP["mid_span_bowed"] >= asm._BAR_RUNNING_FLOOR
@@ -1296,12 +1357,16 @@ def test_each_bar_is_proved_straight_before_it_is_pinned() -> None:
     cite = drawing.notes.setting_row("bars-straight")
     assert f"THE FEELER LEAF OF {cite} MUST NOT" in body
     assert _setting_table_row("bars-straight")[4:] == (".005 MAX", "FEELER LEAF")
-    # Rule 22: the remedy is its own step and loops back to the check.
+    # Rule 22: the remedy is its own step, and so is the loop back to the check.
     assert "STRAIGHTEN" not in body
     assert steps.step_number("bar-straightened") == straight + 1
     remedy = _step_body("bar-straightened")
     assert "STRAIGHTEN BY HAND, OR EXCHANGE" in remedy
-    assert f"RETURN TO STEP {straight}." in remedy
+    assert "RETURN" not in remedy
+    assert steps.step_number("bar-straightened-return") == straight + 2
+    assert _step_body("bar-straightened-return").startswith(
+        f"RETURN TO STEP {straight} WITH EACH "
+    )
 
 
 def _setting_table_row(key: str) -> tuple[str, ...]:
@@ -1314,10 +1379,10 @@ def _setting_table_row(key: str) -> tuple[str, ...]:
 
 
 def test_the_feeler_acceptances_are_setting_table_rows_their_steps_cite() -> None:
-    """R5 machinist review (rule 22): the lever bank's three feeler
-    acceptances printed only in their steps. Each is a setting table row on
-    sheet 6, cited by its step, which carries no number; the end-play leaf is
-    the worst case floored to .01 in."""
+    """R5 machinist review (rule 22): the feeler acceptances printed only in
+    their steps. Each is a setting table row on sheet 6, cited by its step,
+    which carries no number; the end-play leaf is the worst case floored to
+    .01 in."""
     import ch_fulcrum_keeper_spec as keeper
     from ch_channel_lever_spec import HUB_LENGTH as LEVER_HUB, HUB_LENGTH_BAND
 
@@ -1329,8 +1394,8 @@ def test_the_feeler_acceptances_are_setting_table_rows_their_steps_cite() -> Non
         "SET TO / ACCEPT",
         "CHECK WITH",
     )
-    keys = ("bars-straight", "bars-gapped", "lever-bank-slides")
-    assert [row[0] for row in drawing.SETTING_TABLE_ROWS] == ["1", "2", "3"]
+    keys = ("end-hubs-clear", "bars-straight", "bars-gapped", "lever-bank-slides")
+    assert [row[0] for row in drawing.SETTING_TABLE_ROWS] == ["1", "2", "3", "4"]
     assert [row[1] for row in drawing.SETTING_TABLE_ROWS] == [
         str(steps.step_number(key)) for key in keys
     ]

@@ -228,14 +228,6 @@ NOT_FIT_BANDS: dict[tuple[str, str], str] = {
         "McMaster 9714K392's catalogue OD tolerance (plus, minus): indexed for "
         "its seat on the washer and strap faces"
     ),
-    ("ch_vn_rocker_bank_spring_spec", "ID_BAND"): (
-        "McMaster 9714K24's catalogue ID tolerance (plus, minus): indexed to show "
-        "it reaches under the pivot shaft (the slide-free check at fit-up)"
-    ),
-    ("ch_vn_rocker_bank_spring_spec", "OD_BAND"): (
-        "McMaster 9714K24's catalogue OD tolerance (plus, minus): indexed for "
-        "the largest spring under the hub's O10.2"
-    ),
     ("mg_magnifying_vertical_rod_geom", "ROD_DIA_BAND"): (
         "as-bought 7/32 brass rod's supplier tolerance (upper, lower): indexed "
         "for the fixture cross-bore clearance and the turned relief"
@@ -311,9 +303,14 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "air and the chain envelope's reach"
     ),
     ("ch_connecting_rod_spec", "RING_THICKNESS_BAND"): (
-        "the 2.175 plate's thickness, printed at the ring (#982 review r1), "
-        "indexed by cylinder_bank_layout for the thickest ring its cam slot "
-        "holds"
+        "the ring's .170 thickness, a size printed at the ring (#982 review "
+        "r1; #3114), indexed by cylinder_bank_layout for the thickest ring "
+        "its cam slot holds"
+    ),
+    ("ch_connecting_rod_spec", "SHANK_FACE_BAND"): (
+        "the shank's near face from the fork's datum face at the title "
+        "block's .XX (#3114), indexed by ch_connecting_rod_spec to keep each "
+        "shank face inside its ring face"
     ),
     ("ch_connecting_rod_spec", "FORK_THICKNESS_BAND"): (
         "the fork over the tines, a reference: two TINE_BANDs and the "
@@ -324,8 +321,9 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "indexed into the cylinder gear-data whole-depth limits"
     ),
     ("ch_connecting_rod_spec", "SHANK_THICKNESS_BAND"): (
-        "same 2.175 plate as the ring (#982), indexed by cylinder_bank_layout "
-        "for the thickest shank its cam slot holds"
+        "the shank's .13 thickness at the title block's .XX (#3114), "
+        "indexed by ch_connecting_rod_spec to keep each shank face inside "
+        "its ring face and by cylinder_bank_layout for the thickest shank"
     ),
     ("dt_cylinder_gear_spec", "OVERALL_THICKNESS_BAND"): (
         "centred (cylinder_bank_layout asserts it): indexed as the symmetric "

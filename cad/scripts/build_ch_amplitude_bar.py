@@ -11,7 +11,8 @@ length legacy 32" = 812.8 mm SHORTENED at the top by the fulcrum keepers' drop
 from the legacy frame top (2026-08-02 top-frame rederive: 4.5, to 808.3; #290
 plane snap: 808.2932, ch_amplitude_bar_spec); foot/arc contact unchanged,
 d=0 rest pose preserved;
-notch sizes are uncontradicted legacy values; top pin hole derived (M6.3).
+notch widths are ch_amplitude_bar_spec's (each on the plate it straddles;
+the foot's .104 on the .098 rocker strap, #3114); top pin hole derived (M6.3).
 Audit verdict: PASS. The sheet prints decimal inch (#290, ``drawing_unit:
 in``).
 
@@ -91,7 +92,9 @@ MATERIAL = "Plain Carbon Steel"  # see _appearance.apply_material docstring
 BAR_WIDTH = 0.25 * IN  # 6.35   DIMENSIONS.md ch15: annotated (high)
 BAR_DEPTH = 0.25 * IN  # 6.35   DIMENSIONS.md ch15: legacy, square section (med)
 # Notch widths: ch_amplitude_bar_spec derives each from the plate it straddles
-# (was the legacy 1/8" = 3.175; user ruling 2026-09-27, #1038).
+# (was the legacy 1/8" = 3.175; user ruling 2026-09-27, #1038): the top .124
+# on the lever, the foot .104 on the rocker strap (#3114), each centred, so
+# the foot's ledges are .073 and the top's .063.
 BOTTOM_NOTCH_HEIGHT = 0.09375 * IN  # 2.381  DIMENSIONS.md ch15: legacy 3/32" (med)
 # TOP_NOTCH_HEIGHT (.55, was the legacy 1/2") is the spec's: it clears the
 # lever's lower edge (ch_amplitude_bar_spec).

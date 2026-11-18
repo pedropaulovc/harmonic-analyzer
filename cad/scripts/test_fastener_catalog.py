@@ -57,8 +57,6 @@ _STOCK_REQUIREMENTS = {
     "pd-vn-transgear-cluster-shim": (("94773A606",), "MHA-PD-VN-68", 5),
     "pd-vn-transgear-pivot-spring": (("9715K43",), "MHA-PD-VN-63", 1),
     "dt-vn-cylinder-bank-spring": (("9714K392",), "MHA-DT-VN-68", 1),
-    "ch-vn-rocker-bank-spring": (("9714K24",), "MHA-CH-VN-54", 1),
-    "ch-vn-rocker-thrust-washer": (("3088A429",), "MHA-CH-VN-56", 2),
     "mg-vn-wheel-axle-nut": (("92671A005",), "MHA-MG-VN-52", 2),
     "mg-vn-wheel-axle-back-washer": (("92916A480",), "MHA-MG-VN-54", 1),
     "mg-vn-wheel-axle-front-washer": (("92916A250",), "MHA-MG-VN-55", 1),

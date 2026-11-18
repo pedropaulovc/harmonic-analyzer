@@ -2,8 +2,8 @@ r"""Pure-data dimensional contract shared by the rocker pivot shaft (MHA-CH-05)
 and its drawing.
 
 A plain O.250 rod (user, 2026-10-10: the old turned shoulder and its reliefs
-are gone). Hub 19 bears through a MHA-CH-VN-56 thrust washer on the north ear's
-inner face and the MHA-CH-VN-54 spring pushes the bank north from the south ear
+are gone). The 20 rocker arms float on it (#3114): each follows its own
+connecting rod, no hub bears on an ear and nothing preloads the bank
 (``rocker_bank_layout``); the
 shaft itself is held, axially and in rotation, by one #4-40 set screw down
 through each MHA-CH-08 ear's arch apex, each biting a FLAT milled on the

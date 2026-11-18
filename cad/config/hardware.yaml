@@ -46,14 +46,6 @@ ch-vn-fulcrum-set-screw:
   why: "ASME B18.3 socket set screw, used as supplied"
   designation: "#1-72 UNF-3A x 5/32 hex socket set screw, cup point, alloy steel"
   standard: "ASME B18.3"
-ch-vn-rocker-thrust-washer:
-  tier: 1
-  why: "commodity ring shim defined by ID, OD and thickness"
-  designation: "Ring shim 1/4 ID x 3/8 OD x .031, carbon steel"
-  standard: "—"
-  envelope:
-    "OD": "_mcmaster_3088a429 DIMS.od_max"
-    "T": "_mcmaster_3088a429 DIMS.thickness_max"
 dt-cone-gear-tl-vn-arbor-nut:
   tier: 1
   why: "ASME B18.2.2 hex nut, used as supplied"
@@ -384,9 +376,6 @@ ch-rocker-strap-tl-vn-edge-clamp:
 ch-vn-channel-spring-installed:
   tier: 2
   why: "extension spring: rate, free length, hook form and max OD govern"
-ch-vn-rocker-bank-spring:
-  tier: 2
-  why: "wave disc spring: load at working height, ID/OD govern"
 dt-vn-cone-lock-knob:
   tier: 2
   why: "knurled thumb screw: no dimensional standard; head and thread govern"

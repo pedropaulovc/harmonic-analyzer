@@ -79,7 +79,7 @@ FRAME_CHECKED = Run(fr_steps, "columns-seated-checked")
 # base is on the mill (its step 8 puts it there).
 DT_BENCH = Run(dt_steps, dt_steps.SEQUENCE[0], ch_steps.CYLINDER_STACK_KEY)
 DT_BASE_ON_MILL = Run(dt_steps, ch_steps.CYLINDER_STACK_KEY)
-# MHA-CH-00: the rocker stack and rod pins at the bench (before MHA-DT-00
+# MHA-CH-00: the rod pins at the bench (before MHA-DT-00
 # step 8 sets the rods on the cams); the rocker bank on the base, still on the
 # mill; the keepers, finished to their own print, on MHA-FR-02 on the mill;
 # the lever bank once the frame is up (its bars' feet straddle the rocker

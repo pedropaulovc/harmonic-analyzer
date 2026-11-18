@@ -23,12 +23,11 @@ from ch_channel_assembly_spec import (
     BAR_GAP,
     DIMENSION_FEATURE,
     DIMENSION_TOLERANCES,
+    EAR_SPAN_DIMENSION,
     KEEPER_FRONT_Z_DIMENSION,
     KEEPER_REAR_Z_DIMENSION,
     KEEPER_X_DIMENSION,
     LUG_SPAN_DIMENSION,
-    SPRING_SET_DIMENSION,
-    STACK_LENGTH_DIMENSION,
     TIP_PROUD_DIMENSION,
     UNIT,
 )
@@ -40,9 +39,9 @@ from ch_fulcrum_keeper_spec import (
     KEEPER_FITUP_LOCATION_BAND_MM,
     KEEPER_INNER_FACE_SPAN_MM,
 )
-from rocker_bank_layout import COUNT
+from rocker_bank_layout import COUNT, END_CLEARANCE_MIN, RUNNING_FLOOR
 from ch_channel_explode_spec import (
-    BANK_SPRING,
+    ARM,
     BAR,
     BAR_PIN,
     BRACKET,
@@ -55,7 +54,6 @@ from ch_channel_explode_spec import (
     KEEPER_SET_SCREW,
     ROD,
     ROD_PIN,
-    WASHER,
 )
 
 # The lug span prints as a reference: the pair is set off the top frame.
@@ -70,14 +68,14 @@ def _screw(thread: str, length_mm: float, kind: str) -> str:
     return f"{thread} X {inch_fraction(length_mm, what=kind)} {kind}"
 
 
+# A callout's ``{arm}`` is the rocker arm's BOM item, which the drawing fills
+# in from its BOM (as it numbers the setting table's parts).
 DIMENSION_CALLOUTS = {
-    # Set by DRO off the right bracket's indicator zero (the right-bracket
-    # spring-set step; #2337: no feeler leaf fits beside the spring).
-    SPRING_SET_DIMENSION: "SPRING SET",
-    # The accepted stack caps the hubs' summed excess, so each arm stays on
-    # its rod's cam plane and under its bar's foot notch (test_channel_axial_
-    # budget); r10 machinist review: name what the tight band sets (rule 4).
-    STACK_LENGTH_DIMENSION: "HUB STACK, HUBS IN CONTACT: SETS ARM PITCH",
+    # Set by DRO off the left bracket's ear (the right-bracket span step):
+    # the ears' inner faces, between which the arms float, each located by
+    # its rod (#3114). What the band protects (rule 4): each end arm's hub,
+    # following its rod, stays clear of its ear (the end-hubs-clear check).
+    EAR_SPAN_DIMENSION: "EAR SPAN, INNER FACES: END {arm} HUBS CLEAR",
     # View D's left tip off the left ear's outer face (the shaft-set step,
     # caliper depth rod); R5 machinist review, rule 22: the setting prints on
     # the view, not in the step.
@@ -93,14 +91,14 @@ if set(DIMENSION_CALLOUTS) != set(DIMENSION_FEATURE):
     raise AssertionError("every marked dimension carries a callout")
 
 # --- sheet 6: the setting table ------------------------------------------------
-# R5 machinist review (rule 22): the lever bank's three feeler acceptances
-# printed only in their steps. None is one model dimension (a leaf that must
-# not enter under a bar on the plate, a leaf that must pass between bars, a
-# leaf the pushed-together levers must leave room for at the other lug), so
-# each is a row of a native general table (draw_dt_drive_train_assembly's
-# SETTING TABLE columns) the steps cite by row; every value is built from the
-# spec. The drawing places the table under view G's label and numbers each
-# row's part from its BOM.
+# R5 machinist review (rule 22): the feeler acceptances printed only in their
+# steps. None is one model dimension (a leaf that must pass between each end
+# rocker hub and its ear, a leaf that must not enter under a bar on the
+# plate, a leaf that must pass between bars, a leaf the pushed-together
+# levers must leave room for at the other lug), so each is a row of a native
+# general table (draw_dt_drive_train_assembly's SETTING TABLE columns) the
+# steps cite by row; every value is built from the spec. The drawing places
+# the table under view G's label and numbers each row's part from its BOM.
 SETTING_TABLE_SHEET_NUMBER = 6
 SETTING_TABLE_TITLE = "SETTING TABLE"
 SETTING_TABLE_HEADER = (
@@ -119,7 +117,7 @@ def _inch(mm: float) -> str:
     return render_number(mm / LENGTH_UNITS[UNIT], UNIT, FEELER_LEAF_PLACES)
 
 
-# The lever bank is never fitted like the rocker stack: the bars on the arms
+# The lever bank is never set to its lugs: the bars on the arms
 # locate it, and twenty hubs at the top of their band still leave end play
 # between the lugs at the extremes of both inner-face bands (#1660 r2). The
 # lever-bank-slides check gauges that play on a feeler leaf: the worst case
@@ -134,6 +132,20 @@ if END_PLAY_LEAF_MM <= 0.0:
         "the lever bank must slide between the lugs, but the longest hubs "
         "leave no gaugeable play in the shortest lug span"
     )
+# #3114: the rocker arms float, each located by its rod, so the ears' span is
+# the bank's only setting; each end hub is accepted clear of its ear on a
+# feeler leaf, the least worst-case air (rocker_bank_layout.END_CLEARANCE_MIN:
+# the end arm following its rod at the extreme of every band) floored to
+# .001, never under the running floor: a bank inside its bands always passes.
+END_HUB_LEAF_MM = (
+    math.floor(round(min(END_CLEARANCE_MIN) / LENGTH_UNITS[UNIT] * 1000.0, 9))
+    / 1000.0
+    * LENGTH_UNITS[UNIT]
+)
+if END_HUB_LEAF_MM < RUNNING_FLOOR:
+    raise AssertionError(
+        "an end rocker hub may close on its ear below the running floor"
+    )
 # #2341: each bar's bow is accepted at the surface plate before it is pinned
 # (no leaf of the allowed bow enters under either side face); the bank is
 # then accepted on the bars' least running gap, at the worst case of every
@@ -142,6 +154,13 @@ if END_PLAY_LEAF_MM <= 0.0:
 SETTINGS = (
     # (step key, the part the setting names (its BOM item prefixes the
     # setting) or None, setting, set to / accept, check with)
+    (
+        "end-hubs-clear",
+        ARM,
+        "HUB TO EAR",
+        f"{_inch(END_HUB_LEAF_MM)} MIN",
+        "FEELER LEAF",
+    ),
     ("bars-straight", BAR, "BAR BOW", f"{_inch(BAR_BOW_MAX_MM)} MAX", "FEELER LEAF"),
     ("bars-gapped", BAR, "BAR GAP", f"{_inch(BAR_GAP['leaf'])} MIN", "FEELER LEAF"),
     (
@@ -172,8 +191,6 @@ BOM_DESCRIPTIONS = {
     BRACKET_SET_SCREW: _screw(
         arbor_set_screw.THREAD, arbor_set_screw.LENGTH, "CUP-POINT SET SCREW"
     ),
-    WASHER: "ROCKER BANK THRUST WASHER",
-    BANK_SPRING: "WAVE DISC SPRING",
     BRACKET_HOLD_DOWN: _screw(
         hold_down_screw.THREAD, hold_down_screw.SHANK_LEN, "FILLISTER HEAD SCREW"
     ),

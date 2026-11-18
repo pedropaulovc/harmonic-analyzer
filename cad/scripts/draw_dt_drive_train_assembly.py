@@ -97,12 +97,7 @@ import _seat_forensics
 from _session import run_build
 from _simplified_names import simplified_name
 import _telemetry
-from ch_channel_assembly_steps import (
-    NORTH_BRACKET_SET_KEY,
-    RODS_PINNED_REF,
-    step_ref as channel_step_ref,
-)
-import ch_vn_rocker_thrust_washer_spec as rocker_washer
+from ch_channel_assembly_steps import NORTH_BRACKET_SET_KEY, RODS_PINNED_REF
 import cone_line
 from cone_stack_end_play import STACK_FEELER
 import cylinder_bank_layout as bank
@@ -997,14 +992,12 @@ FRONT_STRAP_Y_WINDOW = _plus_w_window(
     BANK_WASHER_THICK,
     +1,
 )
-# Hub 19 bears on the miced washer against the ear, so the ear moves back
-# (LESS Y) by the washer's excess over nominal.
+# Nothing bears on the ear (#3114: the rocker arms float on their shaft), so
+# its inner face is a plain DRO target.
 _NORTH_EAR_Y = base.BOTTOM_REAR_Z - rockers.NORTH_EAR_INNER_Z
-NORTH_EAR_Y_WINDOW = _plus_w_window(
+NORTH_EAR_Y_LIMITS = _inward_limits(
     _NORTH_EAR_Y - rockers.NORTH_EAR_LOCATE_BAND,
     _NORTH_EAR_Y + rockers.NORTH_EAR_LOCATE_BAND,
-    rocker_washer.THICKNESS,
-    -1,
 )
 # The closed gear stack's acceptance, gear 0 cam face to gear 19 back face.
 _STACK_LENGTH = bank.G19_BACK_FACE_Z - bank.G0_CAM_FACE_Z
@@ -1079,10 +1072,10 @@ SETTING_TABLE_ROWS = (
     ),
     (
         "5",
-        _step_ref(NORTH_BRACKET_SET_KEY, "C"),
+        _step_ref(NORTH_BRACKET_SET_KEY, "B"),
         "BACK MHA-CH-08 EAR INNER FACE, DRO Y",
-        "W = MHA-CH-VN-56 THICKNESS",
-        NORTH_EAR_Y_WINDOW,
+        "-",
+        NORTH_EAR_Y_LIMITS,
         "DRO, EDGE FINDER",
     ),
 )
@@ -1827,26 +1820,23 @@ BANK_STEPS = _note_text(
         # bench check covers all three.
         "9Y. CHECK BY HAND THAT MHA-DT-13 AND BOTH MHA-DT-02 DO NOT MOVE.",
         # #936 P1 b, option A (user ruling 2026-09-26): the back MHA-CH-08 ear
-        # is the rocker bank's axial datum (rocker_bank_layout), set on the
-        # DRO zero so the cams and the rocker stations share one datum.  Hub
-        # 19 bears on the back MHA-CH-VN-56 washer against that face (user,
-        # 2026-10-10), so the target moves back (LESS Y) by the miced washer's
-        # excess.  Channel assembly MHA-CH-00 cites this step by key
+        # is DRO-located (rocker_bank_layout.NORTH_EAR_LOCATE_BAND) on the
+        # DRO zero, so the cams and the rocker stations share one datum.
+        # Nothing bears on it (#3114: the rocker arms float on their shaft
+        # and follow their rods); MHA-CH-00 sets the front bracket from it to
+        # the ears' span.  Channel assembly MHA-CH-00 cites this step by key
         # (channel_steps.NORTH_BRACKET_SET_REF).  The bracket is a one-screw
-        # static clamp: 10H is its rule-23 bench check (rubric sample round 9).
-        f"{steps.step_number(NORTH_BRACKET_SET_KEY)}. TAKE THE BACK MHA-CH-08, ONE {NORTH_BRACKET_SCREW} AND ONE MHA-CH-VN-56",
+        # static clamp: 10G is its rule-23 bench check (rubric sample round 9).
+        f"{steps.step_number(NORTH_BRACKET_SET_KEY)}. TAKE THE BACK MHA-CH-08 AND ONE {NORTH_BRACKET_SCREW}",
         "   FROM MHA-CH-00 (MHA-FR-05 IS ON THE BASE, "
         f"{fr_frame_assembly_steps.step_ref(fr_frame_assembly_steps.SUPPORT_SCREWED_KEY)}).",
         f"{steps.step_number(NORTH_BRACKET_SET_KEY)}A. STAND THE MHA-CH-08 ON THE MHA-FR-05 RAIL, FOOT TO THE BACK.",
-        f"{steps.step_number(NORTH_BRACKET_SET_KEY)}B. MIC THE MHA-CH-VN-56: ITS THICKNESS IS W (SETTING TABLE ROW 5).",
-        f"{steps.step_number(NORTH_BRACKET_SET_KEY)}C. SET THE EAR INNER FACE TO ITS Y (SETTING TABLE ROW 5, {DRO_ZERO_STEP} ZERO).",
-        f"{steps.step_number(NORTH_BRACKET_SET_KEY)}D. CLAMP IT.",
-        f"{steps.step_number(NORTH_BRACKET_SET_KEY)}E. DRILL AND TAP THE RAIL THROUGH THE FOOT PER MHA-FR-05 VIEW B.",
-        f"{steps.step_number(NORTH_BRACKET_SET_KEY)}F. SCREW THE MHA-CH-08 DOWN WITH THE {NORTH_BRACKET_SCREW}.",
-        f"{steps.step_number(NORTH_BRACKET_SET_KEY)}G. RECHECK Y.",
-        f"{steps.step_number(NORTH_BRACKET_SET_KEY)}H. CHECK THAT THE MHA-CH-08 DOES NOT TURN ON MHA-FR-05 BY HAND.",
-        f"{steps.step_number(NORTH_BRACKET_SET_KEY)}J. KEEP THAT MHA-CH-VN-56 FOR THE BACK END OF "
-        f"{channel_step_ref('north-ear-datum')}.",
+        f"{steps.step_number(NORTH_BRACKET_SET_KEY)}B. SET THE EAR INNER FACE TO ITS Y (SETTING TABLE ROW 5, {DRO_ZERO_STEP} ZERO).",
+        f"{steps.step_number(NORTH_BRACKET_SET_KEY)}C. CLAMP IT.",
+        f"{steps.step_number(NORTH_BRACKET_SET_KEY)}D. DRILL AND TAP THE RAIL THROUGH THE FOOT PER MHA-FR-05 VIEW B.",
+        f"{steps.step_number(NORTH_BRACKET_SET_KEY)}E. SCREW THE MHA-CH-08 DOWN WITH THE {NORTH_BRACKET_SCREW}.",
+        f"{steps.step_number(NORTH_BRACKET_SET_KEY)}F. RECHECK Y.",
+        f"{steps.step_number(NORTH_BRACKET_SET_KEY)}G. CHECK THAT THE MHA-CH-08 DOES NOT TURN ON MHA-FR-05 BY HAND.",
     )
 )
 
@@ -2316,7 +2306,7 @@ INTERFACE_NOTES = _note_text(
         "CHANNEL ASSEMBLY MHA-CH-00:",
         f"   ITS {CONNECTING_ROD} CONNECTING RODS AND {ROCKER_ARM} ROCKER ARMS ARE SET ON THE "
         f"MHA-DT-12 CAMS AT STEP {CHANNEL_RODS_SET_AT}.",
-        f"   ITS BACK MHA-CH-08, ONE MHA-CH-VN-56 AND ONE {NORTH_BRACKET_SCREW} ARE SET "
+        f"   ITS BACK MHA-CH-08 AND ONE {NORTH_BRACKET_SCREW} ARE SET "
         f"AT STEP {steps.step_number(NORTH_BRACKET_SET_KEY)}.",
     )
 )

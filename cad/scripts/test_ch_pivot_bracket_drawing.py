@@ -214,10 +214,12 @@ def test_every_banded_length_says_what_its_band_holds() -> None:
     location, rule 7) on the tap's own callout."""
     banded = {name for _feature, name in model_toleranced_dimensions(part)}
     assert banded - {"SetScrewLocation"} <= set(drawing.DIMENSION_CALLOUTS)
-    washer = _config.parts("ch-vn-rocker-thrust-washer")["number"]
-    assert washer == "MHA-CH-VN-56"
-    assert drawing.DIMENSION_CALLOUTS["EarThick"] == f"THRUST FACES ON {washer}"
     shaft = _config.parts("ch-pivot-shaft")["number"]
+    # #3114: nothing bears on an ear, so its thickness band holds the shaft's
+    # flat under the apex tap (the shaft is set off the outboard face, the
+    # tap stands off the inboard one).
+    assert shaft == "MHA-CH-05"
+    assert drawing.DIMENSION_CALLOUTS["EarThick"] == f"LOCATES FLAT OF {shaft}"
     # Rule 7: the tap's station is a location, so its mate rides the tap.
     assert "SetScrewLocation" not in drawing.DIMENSION_CALLOUTS
     assert shaft in drawing.SET_SCREW_MATE
@@ -412,7 +414,7 @@ def test_plan_stations_each_print_at_their_own_arrows_near_the_plan() -> None:
 
 def test_ear_thickness_prints_beside_the_ear_on_the_right_view() -> None:
     """Machinist review FIX: the ear thickness reads true between its two
-    thrust faces on the right view. Its block stands out past the outboard
+    faces on the right view. Its block stands out past the outboard
     face, so neither extension line rises into its letters (r1 FIX when it
     stood centred over the span), under the plan's bottom edge (the foot
     length's lower extension line), and above the R MAX block."""
