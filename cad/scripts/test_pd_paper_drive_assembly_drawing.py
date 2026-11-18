@@ -1522,10 +1522,10 @@ def test_the_actual_collar_disc_overlap_is_checked_before_final_platen_installat
     assert texts[3] == (
         f"IF {drawing.sub_step('collar-disc-air-inspected', 2)} PASSES, SKIP "
         f"{drawing.sub_step('collar-disc-air-inspected', 4)}-"
-        f"{drawing.sub_step('collar-disc-air-inspected', 14)}."
+        f"{drawing.sub_step('collar-disc-air-inspected', 15)}."
     )
     assert texts[4] == "READ THE THICKEST FEELER ENTERING ALL ROUND (NONE: READ 0)."
-    assert texts[15] == "REFIT THE PLATEN."
+    assert texts[16] == "REFIT THE PLATEN."
     read = drawing.sub_step("collar-disc-air-inspected", 4)
     assert (
         f"RE-FACE THE {_number('pd-transgear-feed-pinion')} STEP FACE SQUARE BY "
@@ -1540,9 +1540,14 @@ def test_the_actual_collar_disc_overlap_is_checked_before_final_platen_installat
     assert setup == sorted(setup)
     assert "BETWEEN CENTRES" not in flat
     assert "READ SHORT" not in flat
-    assert texts[-3] == (
+    assert texts[-4] == (
         f"REPEAT {drawing.sub_step('collar-disc-air-inspected', 1)}-"
-        f"{drawing.sub_step('collar-disc-air-inspected', 3)}."
+        f"{drawing.sub_step('collar-disc-air-inspected', 2)}."
+    )
+    # #3107: a still-short air is read and re-faced again, never refitted.
+    assert texts[-3] == (
+        f"IF {drawing.sub_step('collar-disc-air-inspected', 2)} STILL FAILS, REPEAT FROM "
+        f"{read}."
     )
     assert texts[-1].startswith(
         f"IF {drawing.sub_step('collar-disc-air-inspected', 9)} RE-FACED THE STEP, REPEAT "
@@ -2406,21 +2411,66 @@ def test_every_screwed_setting_has_a_holding_check() -> None:
     assert pivot[6] == "CHECK: NO DAYLIGHT BETWEEN THE SPACER AND THE BAR'S BACK FACE."
     assert pivot[7] == "CHECK: A HEX KEY BY HAND DOES NOT LOOSEN THE SCREW."
     assert pivot[8] == "CHECK: RAISED AND RELEASED, THE ARM FALLS FREELY."
-    assert pivot[9] == "IF ALL THREE CHECKS PASS, SKIP 15L-15S."
+    assert pivot[9] == "IF ALL THREE CHECKS PASS, SKIP 15L-15W."
     # The remedy takes the captured arm off before anything is cleaned.
     assert pivot[10].startswith("UNSCREW ") and pivot[11] == "LIFT THE ARM OFF."
     assert pivot[12].startswith("FLUSH OIL INTO THE ARM'S BORE")
-    assert "BAR'S BACK FACE" in pivot[13]
+    assert "BAR BACK FACE" in pivot[13]
     assert pivot[14] == "REPEAT 15F-15J."
-    assert pivot[15] == "IF ALL THREE CHECKS NOW PASS, SKIP 15S."
-    assert pivot[16].startswith("DO 15L-15M AND REPEAT FROM 15A WITH A NEW ")
-    assert len(pivot) == 17
+    assert pivot[15] == "IF ALL THREE CHECKS NOW PASS, SKIP 15S-15W."
+    # #3107: the screw and spacer are renewed once; a second failure sends
+    # the bar and the arm to their sheets, and every outcome has a route: a
+    # bar outside (with the arm if it is outside too), an arm outside or all
+    # inside, one action a step (rule 22).
+    bar = _number("pd-support-bar")
+    assert pivot[16:20] == (
+        "DO 15L-15M.",
+        f"IF NOT YET RENEWED, REPEAT FROM 15A WITH A NEW "
+        f"{_number('pd-vn-transgear-pivot-screw')} SCREW AND "
+        f"{_number('pd-transgear-pivot-spacer')} SPACER.",
+        f"IF ALREADY RENEWED, INSPECT THE {bar} BAR'S TAP AND BACK FACE AND THE "
+        f"{_number('pd-transgear-arm')} ARM'S BORE TO THEIR SHEETS.",
+        f"FOR A BAR FOUND OUTSIDE, MAKE A NEW {bar} BAR AND REBUILD FROM STEP "
+        f"{steps.step_number('bar-clamped')}, WITH 15W'S PARTS IF THE ARM IS ALSO OUTSIDE.",
+    )
+    assert pivot[20].startswith(
+        "FOR AN ARM FOUND OUTSIDE, OR IF ALL ARE INSIDE, REPEAT FROM STEP "
+        f"{steps.step_number('latch-pin-pressed')} WITH A NEW {_number('pd-transgear-arm')} ARM,"
+    )
+    # Only the parts fitted by step 15 are renewed (Codjiflo P3 on f92995b8e6).
+    for later in ("pd-transgear-knob-shaft", "pd-transgear-knob-cup", "pd-latch-hook"):
+        assert _number(later) not in pivot[20]
+    assert len(pivot) == 21
     assert not any("STAKE" in line for line in pivot)
     accepted = texts["fitup-accepted"]
-    assert "ARM UNLATCHED, DO 15L-15S." in " ".join(accepted)
+    # From 33 the reseat runs; a repeat failure takes the knob stack off
+    # (28G) and rebuilds the arm as 28Q-28U, whose step 15 carries the
+    # renewal and the inspection (Codjiflo P2 on e8b4e199aa).
+    assert "IF 33F FAILS, ARM UNLATCHED, DO 15L-15Q." in accepted
+    assert "IF A 15G-15J CHECK THEN FAILS, DO 28G AND 28Q-28U." in accepted
+    assert texts["fitup-mesh-remedied"][6].startswith("REMOVE THE ")
+    assert texts["fitup-mesh-remedied"][14].startswith("FOR A FAULT ALL ROUND (ARM SETTING)")
+    assert texts["fitup-mesh-remedied"][18].startswith("SKIP STEPS ")
     hook = texts["hook-pin-hole-match-drilled"]
     assert hook[5] == "TIGHTEN THE HOOK SCREWS."
     assert hook[6] == "CHECK: PUSHED FIRMLY BY HAND, THE HOOK DOES NOT MOVE ON THE BAR."
+
+
+def test_no_bare_pinion_names_two_gears() -> None:
+    """#3107 (Codjiflo P3 on 3e6318a026; rules 25 and 26): the MHA-PD-10
+    sleeve is the Feed Pinion Sleeve, so the steps and the setting table never
+    print a bare PINION: the knob shaft's gear is the KNOB PINION or the
+    MHA-PD-08 PINION, the sleeve's the FEED PINION."""
+    domain = _unit_operating_domain()
+    rows = [row for rows in drawing._step_text(operating_domain=domain).values() for row in rows]
+    rows += [" ".join(row) for row in drawing.setting_table_rows(operating_domain=domain)]
+    qualified = re.compile(
+        rf"\b(?:KNOB|FEED|{re.escape(_number('pd-transgear-knob-shaft'))}) PINION\b"
+    )
+    bare = [row for row in rows if re.search(r"\bPINION\b", qualified.sub("", row))]
+    assert not bare
+    assert drawing.KNOB_PINION == "KNOB PINION"
+    assert drawing.FEED_PINION == "FEED PINION"
 
 
 def test_every_failure_branch_has_a_pass_exit() -> None:
@@ -2865,7 +2915,7 @@ def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
         "REPLACE A DISC FOUND OUTSIDE THROUGH STEPS "
         f"{steps.step_number('disc-cluster-assembled')}-"
         f"{steps.step_number('disc-taps-transferred')} ON THE SAME HUB, ITS "
-        f"{_number('pd-vn-transgear-hub-key-pin')} PIN LEFT IN AND RIDING THE FLAT, "
+        f"{_number('pd-vn-transgear-hub-key-pin')} PIN RIDING THE FLAT, "
         f"AND REPEAT FROM {trial}.",
         "SLIDE THE HUB AND DISC AS ONE OFF A "
         f"{_number('pd-transgear-feed-pinion')} FOUND OUTSIDE, THE PIN RIDING THE FLAT.",
@@ -2918,7 +2968,7 @@ def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
         < rebuild
     )
     # The turn only finds the period; nothing on the rebuild is staked.
-    assert "TURN THE DISC ONE FULL TURN BY THE COLLAR, NOTING WHERE THE FAULT RECURS." in pose
+    assert "TURN THE DISC ONE TURN BY THE COLLAR, NOTING WHERE IT FAULTS." in pose
     assert "STAKING" not in pose
     assert f"DO {drawing.sub_step('hanger-pivoted', 10)}-{drawing.sub_step('hanger-pivoted', 11)}." in pose[rebuild:]
     # A new disc takes new screws, cut again to its own rear face, on the
