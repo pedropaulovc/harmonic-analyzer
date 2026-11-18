@@ -175,19 +175,25 @@ BLANK_TIP_MM: Point3 = (
 # The label under the plate, left of its tip, clear of the clamp balloons.
 BLANK_LABEL_OFFSET = (-0.030, -0.030)
 
-# Balloon anchors, each part's own mm on an edge the plan view shows: the
-# plate's front top edge between clamps 3 and 4; the washer's top outer rim;
-# the clamp screw's head-top circle (inside its chamfer: the head's full
-# radius is no edge at the top face) in its counterbore; the hub screw's
-# head rim where its side meets the dome (its bearing rim lies under the
-# head's own side). Rim points RIM_DEG round from part +X toward -Y (the
-# plan view's lower right quarter, away from the fence).
-RIM_DEG = -45.0
+# Balloon anchors, each part's own mm on an edge the plan view shows. The
+# ring (_drawing_balloons._spread_balloons) puts each balloon at its
+# attachment's angle from the view's centre, stretched onto a wide ellipse,
+# so an attachment near the centre swings far: each family is aimed at its
+# own quarter so no two leaders cross. Clamp 1 (left end) goes left; the
+# plate's front top edge between the hub and clamp 3 goes down and right;
+# the hub screw's head rim where its side meets the dome (its bearing rim
+# lies under the head's own side) goes up and right; the washer's top outer
+# rim, outside the screw head, goes up and left. The clamp's anchor is its
+# screw's head-top circle (inside the chamfer: the head's full radius is no
+# edge at the top face). Rim angles run from part +X toward +Y.
+CLAMP_RIM_DEG = -45.0
+SCREW_RIM_DEG = 45.0
+WASHER_RIM_DEG = 135.0
 
 
-def rim_point(radius: float, z: float) -> Point3:
-    """Part millimetres of the rim of ``radius`` at ``z``, RIM_DEG round."""
-    angle = math.radians(RIM_DEG)
+def rim_point(radius: float, z: float, degrees: float) -> Point3:
+    """Part millimetres of the rim of ``radius`` at ``z``, ``degrees`` round."""
+    angle = math.radians(degrees)
     return (radius * math.cos(angle), radius * math.sin(angle), z)
 
 
@@ -195,22 +201,27 @@ PLAN_ITEMS = (PLATE, WASHER, CLAMP, SCREW)
 BALLOON_ANCHORS: dict[str, BalloonAnchor] = {
     PLATE: BalloonAnchor(
         point_mm=(
-            (spec.CLAMP_POSITIONS[2][0] + spec.CLAMP_POSITIONS[3][0]) / 2.0,
+            (spec.plate.HUB_X + spec.CLAMP_POSITIONS[2][0]) / 2.0,
             spec.plate.FRONT_EDGE_Y,
             0.0,
         )
     ),
     WASHER: BalloonAnchor(
-        point_mm=rim_point(spec.washer.OUTER_DIA / 2.0, spec.washer.THICKNESS)
+        point_mm=rim_point(
+            spec.washer.OUTER_DIA / 2.0, spec.washer.THICKNESS, WASHER_RIM_DEG
+        )
     ),
     CLAMP: BalloonAnchor(
         point_mm=rim_point(
             spec.clamp.SCREW_HEAD_DIA / 2.0 - spec.clamp.SCREW_HEAD_CHAMFER,
             spec.clamp.SCREW_HEAD_TOP_Z,
+            CLAMP_RIM_DEG,
         )
     ),
     SCREW: BalloonAnchor(
-        point_mm=rim_point(spec.HUB_SCREW_HEAD_DIA / 2.0, spec.hub_screw.SIDE_TOP_Y)
+        point_mm=rim_point(
+            spec.HUB_SCREW_HEAD_DIA / 2.0, spec.hub_screw.SIDE_TOP_Y, SCREW_RIM_DEG
+        )
     ),
     # Sheet 2's front view looks along +Y: the plug's shoulder rim on its
     # viewer's side, a third of the way round from +X.
@@ -295,7 +306,9 @@ LABEL_TIPS_MM: dict[str, Point3] = {
 LABEL_OFFSETS: dict[str, tuple[float, float]] = {
     PLATE: (0.010, -0.010),
     PLUG: (-0.075, 0.030),
-    WASHER: (-0.040, 0.040),
+    # Right of the hub, between clamp 3 and the screw's label, clear of the
+    # clamp label's row (r5 merged the two at -0.040, 0.040).
+    WASHER: (0.020, 0.012),
     CLAMP: (-0.010, 0.050),
     SCREW: (0.012, 0.015),
 }
