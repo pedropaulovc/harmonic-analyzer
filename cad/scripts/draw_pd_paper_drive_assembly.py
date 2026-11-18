@@ -2093,10 +2093,11 @@ def _step_text(
         f"UNSCREW THE {n['pd-vn-transgear-pivot-screw']} SCREW.",
         "LIFT THE ARM OFF.",
     )
-    # The pivot's remedy branch, written once at 15L-15S (unscrew, clean,
-    # reseat, else renew screw and spacer) and done from 33 (the step-line
-    # budget); 28's rebuild takes only its unscrew and lift, 15L-15M.
-    pivot_remedied = f"{s('hanger-pivoted', 10)}-{s('hanger-pivoted', 17)}"
+    # The pivot's reseat (15L-15Q: unscrew, clean, reseat, re-check) is
+    # written once and done from 33 (the step-line budget); a repeat
+    # failure there rebuilds the arm as 28Q-28U, whose step 15 carries the
+    # full renewal and inspection. 28's rebuild takes only 15L-15M.
+    pivot_remedied = f"{s('hanger-pivoted', 10)}-{s('hanger-pivoted', 14)}"
     # #2409: the hub is keyed to the sleeve's flat by its MHA-PD-VN-69 pin,
     # pressed along a chord of the hub to its ream's stop before the hub is
     # fitted, its side lying over the flat. The flat runs out at the nose, so
@@ -2360,7 +2361,7 @@ def _step_text(
             "REPLACE A DISC FOUND OUTSIDE THROUGH STEPS "
             f"{steps.step_number('disc-cluster-assembled')}-"
             f"{steps.step_number('disc-taps-transferred')} ON THE SAME HUB, ITS "
-            f"{hub_pin} PIN LEFT IN AND RIDING THE FLAT, AND REPEAT FROM "
+            f"{hub_pin} PIN RIDING THE FLAT, AND REPEAT FROM "
             f"{s('arm-plate-located', 9)}.",
             # The disc is screwed to the hub by then, so it is slackened before
             # it is centred again (codjiflo P3 on 593f4ee).
@@ -2418,7 +2419,7 @@ def _step_text(
             f"DRILL EACH SPOT {TAP_8_32_DRILL_TEXT} THRU {n['pd-transgear-arm']}.",
             # The title block's edge break (.010 max) breaks the tap mouths.
             "TAP EACH HOLE #8-32 UNC THRU.",
-            f"FIT THE {n['pd-transgear-arm-plate']} PLATE ON ITS LOCATING DOWELS, "
+            f"FIT THE {n['pd-transgear-arm-plate']} PLATE ON ITS DOWELS, "
             "MATCH MARKS TOGETHER.",
             f"FIT {TRANSGEAR_QUANTITIES['pd-vn-transgear-arm-plate-screw']} "
             f"{n['pd-vn-transgear-arm-plate-screw']} SCREWS IN THE ARM'S THROUGH "
@@ -2495,7 +2496,7 @@ def _step_text(
             "CHECK: A HEX KEY BY HAND DOES NOT LOOSEN THE SCREW.",
             "CHECK: RAISED AND RELEASED, THE ARM FALLS FREELY.",
             f"IF ALL THREE CHECKS PASS, SKIP {s('hanger-pivoted', 10)}-"
-            f"{s('hanger-pivoted', 18)}.",
+            f"{s('hanger-pivoted', 19)}.",
             # The arm is captured on the shoulder between the head and the
             # pressed spacer, so the remedy takes the screw out first
             # (Codjiflo P3 on 93879abc87).
@@ -2505,21 +2506,31 @@ def _step_text(
             "CLEAN AND DEBURR THE SPACER END, BAR BACK FACE AND TAP MOUTH.",
             f"REPEAT {s('hanger-pivoted', 5)}-{s('hanger-pivoted', 8)}.",
             f"IF ALL THREE CHECKS NOW PASS, SKIP {s('hanger-pivoted', 16)}-"
-            f"{s('hanger-pivoted', 18)}.",
-            # #3107 (Codjiflo P3 on 3e6318a026): the renewal runs once; a
-            # second failure is the bar's or the arm's, sent to their sheets.
+            f"{s('hanger-pivoted', 19)}.",
+            # #3107 (Codjiflo P3 on 3e6318a026, P2s on f92995b8e6): the
+            # renewal runs once; a second failure takes the arm off, sends
+            # the bar and the arm to their sheets and closes every outcome.
             "IF THE SCREW AND SPACER ARE NOT YET RENEWED, DO "
             f"{s('hanger-pivoted', 10)}-{s('hanger-pivoted', 11)} AND REPEAT FROM "
-            f"{s('hanger-pivoted', 0)} WITH A NEW "
-            f"{n['pd-vn-transgear-pivot-screw']} SCREW AND "
-            f"{n['pd-transgear-pivot-spacer']} SPACER.",
-            f"IF THEY ARE RENEWED, INSPECT THE {n['pd-support-bar']} BAR'S PIVOT TAP AND "
-            f"BACK FACE AND THE {n['pd-transgear-arm']} ARM'S PIVOT BORE TO THEIR "
-            "SHEETS.",
-            f"FOR AN ARM FOUND OUTSIDE, DO {s('hanger-pivoted', 10)}-"
-            f"{s('hanger-pivoted', 11)} AND REPEAT FROM STEP "
-            f"{steps.step_number('latch-pin-pressed')} WITH THE NEW PARTS "
-            f"{s('fitup-mesh-remedied', 17)} NAMES.",
+            f"{s('hanger-pivoted', 0)} WITH A NEW SCREW AND SPACER.",
+            f"IF THEY ARE RENEWED, DO {s('hanger-pivoted', 10)}-"
+            f"{s('hanger-pivoted', 11)} AND INSPECT THE {n['pd-support-bar']} BAR'S "
+            f"TAP AND BACK FACE AND THE {n['pd-transgear-arm']} ARM'S BORE "
+            "TO THEIR SHEETS.",
+            f"FOR A BAR FOUND OUTSIDE, REMOVE THE LOCKS AND THE PLATEN, FIT A NEW "
+            f"{n['pd-support-bar']} BAR PER STEP {steps.step_number('bar-clamped')}, "
+            f"REFIT PER {s('platen-hung', 9)}-{s('guide-locks-set', 3)} AND REPEAT STEP "
+            f"{steps.step_number('lock-seats-faced')} AND FROM {s('hanger-pivoted', 0)}.",
+            "FOR AN ARM FOUND OUTSIDE, OR IF ALL ARE INSIDE, REPEAT FROM STEP "
+            f"{steps.step_number('latch-pin-pressed')} WITH A NEW "
+            f"{n['pd-transgear-arm']} ARM, {n['pd-transgear-arm-plate']} PLATE, "
+            f"{n['pd-transgear-pin']} PIN, {n['pd-transgear-pivot-spacer']} SPACER, "
+            f"{n['pd-vn-transgear-latch-pin']} DOWEL, "
+            f"{TRANSGEAR_QUANTITIES['pd-vn-transgear-arm-plate-locating-pin']} "
+            f"{n['pd-vn-transgear-arm-plate-locating-pin']} DOWELS, "
+            f"{TRANSGEAR_QUANTITIES['pd-vn-transgear-arm-plate-screw']} "
+            f"{n['pd-vn-transgear-arm-plate-screw']} SCREWS AND "
+            f"{n['pd-vn-transgear-pivot-screw']} SCREW.",
         ),
         "disc-cluster-assembled": (
             f"PRESS THE {hub_pin} PIN INTO THE {n['pd-transgear-disc-hub']} HUB'S "
@@ -2921,7 +2932,7 @@ def _step_text(
             f"OF THE {crank_short}'S FRONT FACE {row_cite('offset-set')}.",
             "BREAK THE COLLAR'S REAR BORE MOUTH 45° TO ITS SHEET'S SIZE, THROUGH THE "
             f"{n['pd-vn-transgear-collar-flat-pin']} PIN'S CREST WITH IT.",
-            f"CHECK: THE FINISHED COLLAR BODY IS IN "
+            f"CHECK: THE COLLAR BODY IS IN "
             f"{n['pd-transgear-drive-collar']}'S FITTED LIMITS.",
             f"IF NOT, OR IF THE {s('collar-rear-faced-to-fit', 1)} READING WAS "
             f"ALREADY BEHIND {s('collar-rear-faced-to-fit', 3)}'S WINDOW, MAKE A NEW "
@@ -3049,6 +3060,8 @@ def _step_text(
             f"IF {s('fitup-accepted', 2)} FAILS, REPEAT FROM STEP "
             f"{steps.step_number('collar-shoulder-seated')}.",
             f"IF {s('fitup-accepted', 5)} FAILS, ARM UNLATCHED, DO {pivot_remedied}.",
+            f"IF A {s('hanger-pivoted', 6)}-{s('hanger-pivoted', 8)} CHECK THEN FAILS, DO "
+            f"{s('fitup-mesh-remedied', 14)}-{s('fitup-mesh-remedied', 18)}.",
             f"FOR {s('fitup-accepted', 5)}, REPEAT {s('hook-pin-hole-match-drilled', 9)}-"
             f"{s('hook-pin-hole-match-drilled', 11)}, THEN FROM STEP {pose}.",
             f"IF {s('fitup-accepted', 7)} OR {s('fitup-accepted', 8)} FAILS, REPEAT "
@@ -3086,8 +3099,8 @@ def _step_text(
             # 2026-11-07 (Main), no precedent; owner review #2144; pending
             # owner confirmation).
             "LEAVE THE ARM LATCHED FOR SHIPPING.",
-            f"CHECK: THE {n['pd-vn-transgear-latch-pin']} PIN STANDS THROUGH THE "
-            "HOOK'S PIN HOLE.",
+            f"CHECK: THE {n['pd-vn-transgear-latch-pin']} PIN IS THROUGH THE "
+            f"{n['pd-latch-hook']} HOOK.",
             "CHECK: THE FEED IS IN MESH.",
         ),
     }

@@ -2411,30 +2411,44 @@ def test_every_screwed_setting_has_a_holding_check() -> None:
     assert pivot[6] == "CHECK: NO DAYLIGHT BETWEEN THE SPACER AND THE BAR'S BACK FACE."
     assert pivot[7] == "CHECK: A HEX KEY BY HAND DOES NOT LOOSEN THE SCREW."
     assert pivot[8] == "CHECK: RAISED AND RELEASED, THE ARM FALLS FREELY."
-    assert pivot[9] == "IF ALL THREE CHECKS PASS, SKIP 15L-15U."
+    assert pivot[9] == "IF ALL THREE CHECKS PASS, SKIP 15L-15V."
     # The remedy takes the captured arm off before anything is cleaned.
     assert pivot[10].startswith("UNSCREW ") and pivot[11] == "LIFT THE ARM OFF."
     assert pivot[12].startswith("FLUSH OIL INTO THE ARM'S BORE")
     assert "BAR BACK FACE" in pivot[13]
     assert pivot[14] == "REPEAT 15F-15J."
-    assert pivot[15] == "IF ALL THREE CHECKS NOW PASS, SKIP 15S-15U."
-    # #3107: the screw and spacer are renewed once; a second failure sends
-    # the bar and the arm to their sheets, and an arm outside is rebuilt.
-    assert pivot[16].startswith(
-        "IF THE SCREW AND SPACER ARE NOT YET RENEWED, DO 15L-15M AND REPEAT FROM 15A WITH A NEW "
+    assert pivot[15] == "IF ALL THREE CHECKS NOW PASS, SKIP 15S-15V."
+    # #3107: the screw and spacer are renewed once; a second failure takes
+    # the arm off, sends the bar and the arm to their sheets, and every
+    # outcome has a route: a bar outside, an arm outside or all inside.
+    assert pivot[16] == (
+        "IF THE SCREW AND SPACER ARE NOT YET RENEWED, DO 15L-15M AND REPEAT FROM 15A "
+        "WITH A NEW SCREW AND SPACER."
     )
-    assert pivot[17].startswith("IF THEY ARE RENEWED, INSPECT THE ")
-    assert pivot[17].endswith(" ARM'S PIVOT BORE TO THEIR SHEETS.")
-    rebuild = drawing.sub_step("fitup-mesh-remedied", 17)
+    assert pivot[17].startswith("IF THEY ARE RENEWED, DO 15L-15M AND INSPECT THE ")
+    assert pivot[17].endswith(" ARM'S BORE TO THEIR SHEETS.")
+    bar = _number("pd-support-bar")
     assert pivot[18] == (
-        f"FOR AN ARM FOUND OUTSIDE, DO 15L-15M AND REPEAT FROM STEP "
-        f"{steps.step_number('latch-pin-pressed')} WITH THE NEW PARTS {rebuild} NAMES."
+        f"FOR A BAR FOUND OUTSIDE, REMOVE THE LOCKS AND THE PLATEN, FIT A NEW {bar} BAR PER STEP "
+        f"{steps.step_number('bar-clamped')}, REFIT PER 5K-6D AND REPEAT STEP "
+        f"{steps.step_number('lock-seats-faced')} AND FROM 15A."
     )
-    assert texts["fitup-mesh-remedied"][17].startswith("FOR THE ARM SETTING, REBUILD FROM STEP ")
-    assert len(pivot) == 19
+    assert pivot[19].startswith(
+        "FOR AN ARM FOUND OUTSIDE, OR IF ALL ARE INSIDE, REPEAT FROM STEP "
+        f"{steps.step_number('latch-pin-pressed')} WITH A NEW {_number('pd-transgear-arm')} ARM,"
+    )
+    # Only the parts fitted by step 15 are renewed (Codjiflo P3 on f92995b8e6).
+    for later in ("pd-transgear-knob-shaft", "pd-transgear-knob-cup", "pd-latch-hook"):
+        assert _number(later) not in pivot[19]
+    assert len(pivot) == 20
     assert not any("STAKE" in line for line in pivot)
     accepted = texts["fitup-accepted"]
-    assert "ARM UNLATCHED, DO 15L-15T." in " ".join(accepted)
+    # From 33 the reseat runs; a repeat failure rebuilds the arm as 28Q-28U,
+    # whose step 15 carries the renewal and the inspection.
+    assert "IF 33F FAILS, ARM UNLATCHED, DO 15L-15Q." in accepted
+    assert "IF A 15G-15J CHECK THEN FAILS, DO 28Q-28U." in accepted
+    assert texts["fitup-mesh-remedied"][14].startswith("FOR A FAULT ALL ROUND (ARM SETTING)")
+    assert texts["fitup-mesh-remedied"][18].startswith("SKIP STEPS ")
     hook = texts["hook-pin-hole-match-drilled"]
     assert hook[5] == "TIGHTEN THE HOOK SCREWS."
     assert hook[6] == "CHECK: PUSHED FIRMLY BY HAND, THE HOOK DOES NOT MOVE ON THE BAR."
@@ -2899,7 +2913,7 @@ def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
         "REPLACE A DISC FOUND OUTSIDE THROUGH STEPS "
         f"{steps.step_number('disc-cluster-assembled')}-"
         f"{steps.step_number('disc-taps-transferred')} ON THE SAME HUB, ITS "
-        f"{_number('pd-vn-transgear-hub-key-pin')} PIN LEFT IN AND RIDING THE FLAT, "
+        f"{_number('pd-vn-transgear-hub-key-pin')} PIN RIDING THE FLAT, "
         f"AND REPEAT FROM {trial}.",
         "SLIDE THE HUB AND DISC AS ONE OFF A "
         f"{_number('pd-transgear-feed-pinion')} FOUND OUTSIDE, THE PIN RIDING THE FLAT.",
