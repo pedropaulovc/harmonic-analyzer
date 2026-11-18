@@ -828,6 +828,8 @@ def test_feature_export_names_every_requirement_the_plate_program_reads() -> Non
         "stop_face",
         "front_edge",
         "back_edge",
+        "left_end",
+        "right_end",
         "fence_notch_left",
         "fence_notch_right",
         "hub_counterbore",
@@ -838,6 +840,10 @@ def test_feature_export_names_every_requirement_the_plate_program_reads() -> Non
     assert set(features) == expected
     assert manifest["material"]["thickness"] == spec.PLATE_THICKNESS
     assert manifest["volume_mm3"] == spec.V_FINISHED
+    assert features["right_end"]["plane"]["value"] - features["left_end"]["plane"][
+        "value"
+    ] == pytest.approx(spec.PLATE_LENGTH)
+    assert {"x", "y"} <= set(features["hub_counterbore"]["requirements"])
     assert features["faced_top"]["height"] == pytest.approx(
         [spec.FENCE_HEIGHT - XXX, spec.FENCE_HEIGHT + XXX]
     )

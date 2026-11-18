@@ -416,6 +416,28 @@ requirement(
     },
     precision={"y": _P["FenceWidth"]},
 )
+# The sawn ends: the stock length a traveler's stock fit reads.
+requirement(
+    "left_end",
+    kind="face",
+    faces=(PlanarFace((-1.0, 0.0, 0.0), -spec.LEFT_END_X),),
+    requirements=("plane",),
+    fields={"plane": (_plane("x", spec.LEFT_END_X), ("LEFT_END_X",))},
+)
+requirement(
+    "right_end",
+    kind="face",
+    faces=(PlanarFace((1.0, 0.0, 0.0), spec.RIGHT_END_X),),
+    requirements=("length",),
+    fields={
+        "plane": (_plane("x", spec.RIGHT_END_X), ("RIGHT_END_X",)),
+        "length": (
+            limits(spec.PLATE_LENGTH, _P["PlateLength"], unit=UNIT),
+            ("PLATE_LENGTH", _TOP),
+        ),
+    },
+    precision={"length": _P["PlateLength"]},
+)
 for _name, _x_range, _end, _end_name, _inside_x in (
     (
         "fence_notch_left",
@@ -531,7 +553,7 @@ requirement(
     "hub_counterbore",
     kind="counterbore",
     faces=(CylinderFace(spec.HUB_CBORE_DIA),),
-    requirements=("at", "dia", "depth"),
+    requirements=("at", "x", "y", "dia", "depth"),
     fields={
         "at": ([spec.HUB_X, spec.HUB_Y, spec.PLATE_TOP_Z], ("HUB_X", "HUB_Y", _TOP)),
         "axis": ((0.0, 0.0, 1.0), ("__frame__",)),
