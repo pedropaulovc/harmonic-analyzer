@@ -261,7 +261,7 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "Wrench check before the first tap file: the T-handle tap wrench holding the 4-40 tap must have a centre hole in its top, the seat for the dead centre's point. None: stop; do not tap on the mill."
+instruction = "The 4-40 tap goes in the T-handle tap wrench with the centre hole in its top: the dead centre's point seats in that hole."
 feed = "hand"
 
 [[setups.operations]]

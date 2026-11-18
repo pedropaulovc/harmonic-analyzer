@@ -1661,7 +1661,8 @@ M12 = { tap = "M12 x 1.75", tap_drill_mm = 10.20 }
 name = "Small T-handle tap wrench (size range not legible)"
 kind = "tap_wrench"
 present = true
-cite = ["Photo 20250628_224109095_iOS.heic, 2025-06-28, beside the metric tap set", "Owner (Pedro) 2026-11-17: the photo shows owned tools"]
+centre_hole_top = true
+cite = ["Photo 20250628_224109095_iOS.heic, 2025-06-28, beside the metric tap set", "Owner (Pedro) 2026-11-17: the photo shows owned tools", "Owner (Pedro) 2026-11-17, asked whether the T-handle tap wrench he will use for the clamp's 4-40 tap has a centre hole in its top for the dead centre's point: \"y\". Owner-confirmed, not measured; which owned T-handle wrench (this one or the 40-piece set's) was not stated."]
 
 # Photo 20250628_223528049_iOS.heic (2025-06-28): a yellow-bin organiser of
 # loose hand taps and twist drills. Legible markings: "BESLY USA" and
