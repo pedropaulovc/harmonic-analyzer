@@ -293,6 +293,7 @@ def test_budget_closes(report):
         "knife",
         "total_mae",
         "nominal_residual_mae_as_built",
+        "nominal_residual_mae_fixture_common",
         "total_mae_as_built",
         "pair_worst",
         "pair_terms",
@@ -830,6 +831,32 @@ def test_cam_home_phase_is_scored_as_built_and_fails_unless_waived(budget, repor
     bad = eb.budget_closes(eb.build_report(strict))
     assert any(b.startswith("cam home phase") for b in bad), bad
     assert report["nominal"]["cam_home_deg"] == 0.0
+
+
+def test_cam_fixture_common_phase_is_scored_and_not_credited(budget, report):
+    """The cam turning fixture MHA-DT-12-TL-01 turns every lobe by the same
+    angle (its hole stations, register and jaw line): a common cam phase of
+    the same kind as #749's, recorded under reserved.nominal_residual_mae and
+    scored on the lobe-up machine. Its leak is h * sum x_i sin(i theta_k) at
+    that angle, so it scales from the as-built 1.5 deg pro rata; the closure
+    keeps crediting the lobe-up residual (delegated ruling 2026-11-17, #2361)."""
+    import dt_cylinder_gear_tl_cam_fixture_spec as cam_fixture
+
+    home = report["cam_home_phase"]
+    deg = budget["reserved"]["nominal_residual_mae"]["fixture_common_cam_phase_deg"]
+    assert home["fixture_common_deg"] == deg == 0.47
+    assert cam_fixture.PHASE_FIXED_WORST_DEG <= deg
+    x = eb.reference_inputs()["all_ones"]
+    leak = math.radians(deg) * (np.sin(np.outer(eb.THETA_K, eb.HARMONICS)) @ x)
+    assert home["residual_fixture_common"]["all_ones"]["max"] == pytest.approx(
+        100.0 * np.max(np.abs(leak)) / eb.N_ELEMENTS, rel=0.1
+    )
+    cl = report["closure"]
+    assert (
+        cl["nominal_residual_mae"]
+        < cl["nominal_residual_mae_fixture_common"]
+        < cl["nominal_residual_mae_as_built"]
+    )
 
 
 def test_cam_shaft_axis_is_fixed_by_the_frame_not_the_part(nom):
@@ -1711,7 +1738,9 @@ def test_bond_phase_propagates_through_physical_readout(nom):
 def test_drawing_limits_agree_with_the_budget(budget):
     """Manufacturing tolerance values and derived fit limits agree with the budget."""
     import ch_channel_lever_spec
+    import dt_cylinder_gear_phase_band
     import dt_cylinder_gear_spec
+    import dt_cylinder_gear_tl_cam_fixture_spec as cam_fixture
     import ch_rocker_arm_spec
     import sm_summing_lever_spec
 
@@ -1721,7 +1750,17 @@ def test_drawing_limits_agree_with_the_budget(budget):
     ), "cylinder-gear drawing carries a different eccentricity tolerance"
     assert dt_cylinder_gear_spec.CAM_PHASE_TOLERANCE_DEG == pytest.approx(
         feats["cam_phase"]["tolerance"]
-    ), "cylinder-gear drawing carries a different cam-phase tolerance"
+    ), "cylinder-gear spec carries a different gear-to-gear cam-phase tolerance"
+    # MHA-DT-12 prints NotchPhase wider than cam_phase: the cam turning
+    # fixture holds each gear's own phase inside cam_phase (gear to gear) and
+    # adds a phase common to all 20, which the reserved block records; the
+    # print holds every gear's worst total (delegated ruling 2026-11-17, #2361).
+    common = budget["reserved"]["nominal_residual_mae"]["fixture_common_cam_phase_deg"]
+    band = dt_cylinder_gear_phase_band.NOTCH_PHASE_TOLERANCE_DEG
+    assert cam_fixture.PHASE_PER_PART_WORST_DEG <= feats["cam_phase"]["tolerance"]
+    assert cam_fixture.PHASE_FIXED_WORST_DEG <= common
+    assert cam_fixture.PHASE_TOTAL_WORST_DEG <= band
+    assert band <= feats["cam_phase"]["tolerance"] + common
     # every +/- arm tolerance is held by a diametral position zone of twice it
     for feature, spec_module, key in (
         ("summing_hook_arm", sm_summing_lever_spec, "spring-hole pattern position"),

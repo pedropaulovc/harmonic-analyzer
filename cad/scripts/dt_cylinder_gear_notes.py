@@ -25,8 +25,6 @@ BORE_FIT_CALLOUT = "REAM THRU\nRUNNING FIT ON\nSHAFT MHA-DT-13"
 # The worst-case crescent wall to the cam OD is under the .080 in target, so
 # it is stated as a plain fact (rule 20), at its own leader on the thin side.
 CAM_WALL_NOTE = f"WALL {inch_text(spec.CAM_WALL_MIN_MM, 3)} MIN TO BORE"
-# TODO(#744): validate the forked rod and centered channel bank in the native
-# assembly. The drawing requirement below does not certify that integration.
 # The bank is a solid stack preloaded onto its datum (#948 ruling R, PR #1292):
 # no gear interface opens, so a connecting-rod ring never overhangs its cam
 # and the callout no longer states an overhang bound.
@@ -53,7 +51,9 @@ GEAR_DATA = "\n".join(
         f"{spec.CUTTER_REFERENCE_TEETH}T PROFILE)",
         f"PITCH TOOTH THICKNESS (REF):  {inch_text(spec.PITCH_TOOTH_THICKNESS_MM, 4)}",
         f"TOOTH FORM:  {TOOTH_FORM_NOTE}",
-        "TOOTH CUTTING SETUP, ACCEPT AT SETUP:  "
-        f"{inch_text(TOOTH_RUNOUT_TIR_MM, 3)} TIR MAX TO FINISHED BORE",
+        # A finished-part requirement, not a setup check (machinist review of
+        # #2712; the crank drive gear's precedent, PR #2331 round 9). Its
+        # reason is the CUTTER PLUNGE row's, printed once there (rule 7).
+        f"TOOTH RUNOUT TO BORE:  {inch_text(TOOTH_RUNOUT_TIR_MM, 3)} TIR MAX",
     )
 )

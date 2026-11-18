@@ -362,7 +362,10 @@ current report does not discharge the operating assumptions or waivers below.
 - **Summing-lever hole position is the relevant plate gain tolerance** (2.667 %/mm across the
   knife line). Drill the 20 holes from one fixture; the along-knife pitch can be loose.
 - **Phase is cheap if clocks share their datums.** ±0.25° cam-lobe/notch phase
-  is 0.13 mm at the notch. Each keyed cone gear's teeth are indexed from its
+  gear to gear is 0.13 mm at the notch; the cam fixture MHA-DT-12-TL-01 adds
+  up to 0.47° common to all 20 lobes, so MHA-DT-12 prints ±0.7° and the budget
+  records the common part as a common cam phase beside #749's (#2361). Each
+  keyed cone gear's teeth are indexed from its
   +X keyway on one setup, the keyway and the phase-0 tooth sharing the front
   view's drawn centreline at the title block's ±1° (`cone_flat_clock`):
   T030–T120 and the 64T on the land-1 key (owner

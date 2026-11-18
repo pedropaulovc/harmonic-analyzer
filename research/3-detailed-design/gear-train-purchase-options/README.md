@@ -3,8 +3,8 @@
 Decision package for the owner. Status and the ruling live on
 [#2356](https://github.com/pedropaulovc/harmonic-analyzer/issues/2356); this
 folder holds the evidence. Every SKU and price was read live on the vendor's
-own page on 2026-11-12, before shipping and tax. Nobody was contacted and
-nothing was ordered.
+own page on 2026-11-12 (the cam fixture's two press reamers on 2026-11-14),
+before shipping and tax. Nobody was contacted and nothing was ordered.
 
 ![routes](gear-train-routes.png)
 
@@ -55,16 +55,20 @@ they rotate together". The design's 1/16 key (owner decision C1 keyed,
 
 | | route | purchases | what changes |
 |---|---|--:|---|
-| A | Make every gear, as designed | **$2,379** | nothing |
-| B | Buy the 14 catalogue cone gears and 20 cylinder-gear donors; make the rest | **$6,728** | appearance of the cone; a new cam joint on 20 cylinder gears; spacer and hub redesign; mesh checks rerun on generated teeth |
-| C | Route A, plus one Boston Y48120 as a 120T master to roll cut gears against | **$2,550** | nothing in the machine; one more shop gauge |
+| A | Make every gear, as designed | **$2,490** | nothing |
+| B | Buy the 14 catalogue cone gears and 20 cylinder-gear donors; make the rest | **$6,839** | appearance of the cone; a new cam joint on 20 cylinder gears; spacer and hub redesign; mesh checks rerun on generated teeth |
+| C | Route A, plus one Boston Y48120 as a 120T master to roll cut gears against | **$2,661** | nothing in the machine; one more shop gauge |
 
 All three exclude the C67500 rod for T006 to T024 (5/8 in, about 6 in),
 which every mill found sells by quotation only.
 
 **Owner ruling 2026-11-14 (Pedro, #2356): "A: make every gear as designed
-($2,379)".** The purchase list below is to buy; nothing is ordered. Check the
-shelf for a 1 in R8 arbor and a 3/4 in R8 collet before buying either.
+($2,379)".** The purchase list below is to buy, except the arbor press: it is
+a candidate whose ram open height is checked against the broach stack before
+it is bought (`shop-equipment.toml` `tools.arbor-press`). Nothing is ordered.
+Check the shelf for a 1 in R8 arbor and a 3/4 in R8 collet before buying
+either. The totals above have grown since the ruling by the cam fixture's
+kit and reamers.
 
 The recommendation was **A**. It is the cheapest, it keeps the original's
 appearance, and every purchase that replaces a made gear costs more than the
@@ -74,7 +78,7 @@ each gear by its span or over-pins size and by backlash at assembly.
 
 ## Purchase list
 
-Common to every route, $478.69:
+Common to every route, $589.24:
 
 | item | SKU | price |
 |---|---|--:|
@@ -89,9 +93,15 @@ Common to every route, $478.69:
 | 1018 CF round, 3 in x 2 in and 7/8 x 12 in (crank pair) | OnlineMetals 7566, 4796 | $27.36 |
 | O1 drill rod, 1/8 x 36 in (T006 form tool MHA-DT-37-TL-01) | OnlineMetals 4630 | $6.43 |
 | Hex nut, 1/4-28, pack of 100 (keyed arbor kit MHA-DT-03-TL-05) | McMaster 95462A505 | $8.00 |
+| Pull-out dowel pin, 3/8 (cam fixture stub, MHA-DT-12-TL-00) | McMaster 97175A344 | $3.81 |
+| Gauge pin, .0375 (cam fixture clock pin) | McMaster 23065A503 | $7.50 |
+| Socket head screw, 10-32, pack of 50 (cam fixture clamp) | McMaster 91251A337 | $22.41 |
+| Washer, #10, pack of 100 (cam fixture clamp) | McMaster 92141A011 | $3.79 |
+| Chucking reamer, .3740 HSS (cam fixture stub press, read 2026-11-14) | McMaster 3087A55 | $40.24 |
+| Chucking reamer, .0365 HSS (cam fixture clock-pin press, read 2026-11-14) | KBC 5-018-0365 | $32.80 |
 
 The shop-made tools' own bar (5/8 and 3/8 1018 for the arbor and cutter bar,
-collar offcuts) is not priced.
+a 3-1/2 in 1018 round cut over-length for the cam fixture, its Ø3.25 x 1.00 body turned and faced from it, collar offcuts) is not priced.
 
 Route A adds the eleven cutters, $1,379.13, and brass bar, $521.58 (six
 C360 bars for the drive train, $439.04, and the 3-1/4 in bar for the

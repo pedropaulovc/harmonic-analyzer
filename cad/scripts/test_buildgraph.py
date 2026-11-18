@@ -147,6 +147,9 @@ _INSERTED_SOURCES = {
     "ch_rocker_strap_tl_fixture": "ch_rocker_strap_tl_sub_plate ch_rocker_strap_tl_hub_plug "
     "ch_rocker_strap_tl_hub_washer ch_rocker_strap_tl_vn_edge_clamp "
     "ch_rocker_strap_tl_vn_hub_screw",
+    "dt_cylinder_gear_tl_cam_turning": "dt_cylinder_gear_tl_cam_fixture "
+    "dt_cylinder_gear_tl_vn_cam_stub dt_cylinder_gear_tl_vn_cam_clock_pin "
+    "dt_cylinder_gear_tl_vn_cam_clamp_screw dt_cylinder_gear_tl_vn_cam_clamp_washer",
     "ha_harmonic_analyzer": "fr_frame dt_drive_train ch_channel sm_summing mg_magnifier pn_pen "
     "pd_paper_drive ms_measuring_stick",
 }

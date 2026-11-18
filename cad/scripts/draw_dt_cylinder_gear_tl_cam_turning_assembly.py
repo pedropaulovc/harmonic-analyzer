@@ -1,0 +1,848 @@
+r"""Create the cylinder gears' cam turning fixture kit's fitter sheets (MHA-DT-12-TL-00).
+
+The kit is the fixture body (item 1, MHA-DT-12-TL-01) with its pressed stub
+(item 2) and clock pin (item 3), and the clamp washer (item 4) and screw
+(item 5) that hold each MHA-DT-12 gear while its cam is turned in the lathe
+(issue #2361). The gear is the workpiece: never placed in the model, drawn
+in phantom on the exploded sheet only.
+
+Sheet 1: the top view and the front view projected under it, both 1:1 with
+items 4 and 5 off, items 1 and 2 ballooned in the front view, the shaded
+isometric with items 3-5 ballooned, the BOM and one numbered sequence: the
+kit's one-time presses, the register and throw set-up with its check and
+remedy, then the steps for each gear (the gear is turned CLOCKWISE in the top
+view onto item 3 before item 5 is tightened: the cut then pushes it harder
+onto the pin).
+Sheet 2: the exploded right view, items 4 and 5 and the phantom gear drawn
+off the stub's axis in fitting order. Numbers come from
+``dt_cylinder_gear_tl_cam_fixture_spec``; this recipe never edits the source
+assembly.
+
+Run only through the supervised farm launcher:
+``drawing:dt_cylinder_gear_tl_cam_turning_assembly``.
+"""
+
+from __future__ import annotations
+
+import argparse
+import math
+import sys
+import textwrap
+from collections.abc import Callable
+from typing import Any
+
+import _config
+import _telemetry
+import dt_cylinder_gear_spec as gear
+import dt_cylinder_gear_tl_cam_fixture_spec as fixture
+from _assembly_contract import assembly_contract
+from _check import check
+from _com import _early_bound
+from _drawing_balloon_display import rendered_balloon_circle
+from _drawing_balloons import (
+    BalloonAnchor,
+    add_component_bom_balloons,
+    assert_balloon_landings,
+    isolate_drawing_view_components,
+)
+from _drawing_common import (
+    DrawingOutputs,
+    finalize_drawing,
+    new_project_drawing,
+    read_required_properties,
+    rebuild_drawing,
+    set_high_quality_shaded_with_edges,
+)
+from _drawing_leader_notes import add_leader_note
+from _drawing_projection import model_points_in_view
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_sheets import create_blank_drawing_sheets
+from _drawing_tables import insert_bom_table
+from _drawing_types import DRAWING_TEMPLATES, DrawingLayout
+from _drawing_view_configuration import (
+    ViewRole,
+    apply_view_configuration,
+    assert_full_detail_view,
+)
+from _drawing_view_display import set_hidden_lines_removed
+from _general_table import insert_general_table, table_column_widths
+from _machinist_review_mode import MachinistReviewMode
+from _mcmaster_91251a337 import DIMS as SCREW
+from _session import run_build
+from _transgear_zone_line import require_placed, sketch_lines
+from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
+SPEC = DRAWINGS_BY_NAME["dt_cylinder_gear_tl_cam_turning_assembly"]
+ARTIFACT_STEM = SPEC.artifact_stem
+SOURCE = SPEC.source
+OUTPUTS = DrawingOutputs(
+    slddrw=SPEC.outputs["slddrw"],
+    pdf=SPEC.outputs["pdf"],
+    png=SPEC.outputs["png"],
+)
+if SPEC.layout is not DrawingLayout.LANDSCAPE:
+    raise AssertionError("the cam turning kit sheets must remain landscape")
+
+CONTRACT = assembly_contract("dt-cylinder-gear-tl-cam-turning")
+DRAWING_NUMBER = CONTRACT.number
+SHEET_SCALE = (1.0, 1.0)
+DETAIL_SCALE = (2.0, 1.0)
+ISO_SCALE = (1.0, 2.0)
+SHEET_NAMES = ("ASSEMBLY", "EXPLODED VIEW")
+SHEET_LAYOUTS = {name: DrawingLayout.LANDSCAPE for name in SHEET_NAMES}
+SHEET_SCALES = {SHEET_NAMES[0]: SHEET_SCALE, SHEET_NAMES[1]: DETAIL_SCALE}
+_TEMPLATE = DRAWING_TEMPLATES[DrawingLayout.LANDSCAPE]
+SHEET_INNER_BORDER = (
+    0.0127,
+    0.0127,
+    _TEMPLATE.width_m - 0.0127,
+    _TEMPLATE.height_m - 0.0127,
+)
+
+BODY = fixture.PART_NAME
+STUB = "dt-cylinder-gear-tl-vn-cam-stub"
+CLOCK_PIN = "dt-cylinder-gear-tl-vn-cam-clock-pin"
+WASHER = "dt-cylinder-gear-tl-vn-cam-clamp-washer"
+SCREW_STEM = "dt-cylinder-gear-tl-vn-cam-clamp-screw"
+# The kit's insertion order, which the BOM numbers its items by.
+BOM_COMPONENTS = (BODY, STUB, CLOCK_PIN, WASHER, SCREW_STEM)
+BOM_ITEMS = {stem: str(index + 1) for index, stem in enumerate(BOM_COMPONENTS)}
+# Each item's drawing Number, the BOM's PART NUMBER cell.
+BOM_PART_NUMBERS = {
+    BODY: fixture.PART_NUMBER,
+    STUB: fixture.STUB_NUMBER,
+    CLOCK_PIN: fixture.CLOCK_PIN_NUMBER,
+    WASHER: str(_config.parts("dt-cylinder-gear-tl-vn-cam-clamp-washer")["number"]),
+    SCREW_STEM: str(_config.parts("dt-cylinder-gear-tl-vn-cam-clamp-screw")["number"]),
+}
+BOM_DESCRIPTIONS = {
+    BODY: "CAM TURNING FIXTURE BODY",
+    STUB: "STUB, 3/8 X 3/4 PULL-OUT DOWEL, 10-32 TAPPED",
+    CLOCK_PIN: "CLOCK PIN, .0375 GAUGE PIN CUT TO LENGTH",
+    WASHER: "NO. 10 FLAT WASHER",
+    SCREW_STEM: "10-32 X 5/16 SHCS",
+}
+BOM_COMPONENT_IDENTITIES: dict[str, tuple[str, str | None]] = {
+    stem: (stem, None) for stem in BOM_COMPONENTS
+}
+# Items 1 and 2 balloon in the front view, items 3-5 in the shaded
+# isometric, each walking its own body (no computed anchor). A side view
+# sees every round item's rims edge-on, each drawn as one line across the
+# item's axis, and on a short line no computed anchor held: frozen points
+# on those rims probed as no edge at all (run 20261113T012650242Z, item 5's
+# head top; run 20261113T042822797Z, item 2's top rim .025 short of the
+# line's end). Item 1's walked point landed where asked in every side view
+# since. Item 2 walked in the isometric landed on the washer's rim beside
+# item 4 (run 20261114T221042598Z's review), so it walks in the front view
+# at 1:1 with items 4 and 5 hidden there, as in the top view, so nothing
+# stands on its top end; run 20261114T225432834Z's walk landed it on that
+# end (then under the washer) and the ring put its circle on the top view's
+# Ø3.25 outline (balloon box x 96.8-107.2, y 159.7-170.2 mm), so its circle
+# is moved to STUB_BALLOON_XY, its leader left on the walked landing. The
+# isometric draws items 3-5's rims as ellipses
+# (run 20261113T085510850Z placed all four bought items there), as the fly
+# cutter's set screw does on its end-on bottom view
+# (draw_dt_cone_tip_gear_tl_cutter_assembly).
+BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in BOM_COMPONENTS}
+FRONT_ITEMS = (BODY, STUB)
+ISO_ITEMS = (CLOCK_PIN, WASHER, SCREW_STEM)
+if FRONT_ITEMS + ISO_ITEMS != BOM_COMPONENTS:
+    raise AssertionError("every BOM row is ballooned once")
+BALLOON_MARGIN = 0.012
+
+
+def _kit(body_xyz: tuple[float, float, float]) -> tuple[float, float, float]:
+    """A body-frame point (mm) in the kit frame, metres for the projection."""
+    return tuple(value / 1000.0 for value in fixture.kit_point(body_xyz))
+
+
+# Sheet metres, sheet 1. The top view and the front view are one third-angle
+# pair at the sheet's 1:1: each is placed by the register's face centre at
+# the same x, so the top view projects straight up off the front view (run
+# 20261113T085510850Z's review: a 1:1 top view over a 2:1 right view turned
+# 90 deg is no projected pair). The front view shows the clock pin behind
+# the stub; sheet 2's exploded right view shows it. The isometric sits
+# under them with its balloon ring inside the left border and clear of the
+# title block (x >= 0.216 m, y <= 0.066 m): run 20261113T085510850Z rang
+# items 2 and 4 outside the border from x .045; run 20261113T171903296Z,
+# from (.060, .052), still put item 2's circle 1.67 mm over it (left edge
+# x 11.0 mm) and item 5's 1.38 mm from the front view's item 1. The
+# isometric moved 14 mm right and 5 mm down (item 2's edge at about 25 mm,
+# 12 mm inside) and the front view 15 mm up (items 1 and 5 about 15 mm apart,
+# centre to centre), every view and balloon translating with its view. The
+# front view's caption sits under it, right of item 1's leader. The BOM and
+# the one numbered sequence fill the right half, the steps under the BOM's
+# two-line rows (run 20261113T085510850Z printed them over rows 4 and 5 from
+# y .214) and above the title block.
+TOP_CENTER = (0.090, 0.200)
+FRONT_CENTER = (TOP_CENTER[0], 0.135)
+ISO_CENTER = (0.074, 0.047)
+TOP_CAPTION_XY = (0.140, 0.255)
+FRONT_CAPTION_XY = (0.095, 0.106)
+# Item 2's balloon circle: right of the stub, above item 1's face (.135) and
+# under the top view's Ø3.25 outline (y .178 at x .125), clear of both by
+# more than its 5 mm radius.
+STUB_BALLOON_XY = (0.125, 0.150)
+ISO_NOTE_XY = (0.119, 0.035)
+BOM_ANCHOR = (0.219, 0.262)
+STEPS_XY = (0.219, 0.184)
+# The view placing point: the register axis on the body's front face.
+REGISTER_FACE_MM = (0.0, 0.0, fixture.THICKNESS)
+TOP_CAPTION = "TOP VIEW\nITEMS 4 AND 5 OFF"
+FRONT_CAPTION = "FRONT VIEW\nITEMS 4 AND 5 OFF"
+ISO_NOTE = f"ISOMETRIC VIEW SCALE {ISO_SCALE[0]:g}:{ISO_SCALE[1]:g}"
+
+# Kit-frame radii and heights the exploded view and its labels use. The top
+# view carries no dimensions: the throw and pin station are item 1's own
+# geometry, printed on its sheet, and the throw is set on item 2 by indicator
+# (run 20261113T204849556Z's review: over-specification).
+_R = fixture.BODY_DIA / 2.0
+_STUB_R = fixture.DOWEL_DIA / 2.0
+_STUB_TOP = fixture.THICKNESS + fixture.STUB_STAND
+_PIN_TOP = fixture.THICKNESS + fixture.PIN_STAND
+
+# One numbered sequence (rule 22; the arbor kit's dt_cone_gear_tl_arbor_
+# assembly_spec): the kit's one-time presses and set-up, then the steps for
+# each gear, each check straight after the work it verifies (run
+# 20261114T231845023Z's review: a separate CHECKS block was out of step with
+# the work). Each press has its slip-fit branch (rule 23): a press that
+# slides in by hand means item 1's ream misses its callout's press fit, so
+# item 1 is rejected and the kit restarted (run 20261114T234325728Z's review:
+# a fallback bond lacked rule 23's bonded-joint items). The throw is set on
+# item 2 before any gear goes on, by the jaws in line with it, and its remedy
+# is the same adjustment: no rework loop. The turning direction before
+# clamping is CUT_TURNS_GEAR_CLOCKWISE's (spec).
+
+
+def _slip_reject(item: int, pressed: str) -> str:
+    """The slip branch of the press of ``item``: the words of item 1's
+    callout for the hole (``PRESS FIT ON <pressed>``), then the rejection."""
+    return (
+        f"IF ITEM {item} SLID IN BY HAND, ITEM 1 FAILS ITS PRESS FIT ON "
+        f"{fixture.kit_short_form(pressed)}: REJECT IT, MAKE A NEW ONE AND "
+        "REPEAT FROM STEP 1."
+    )
+
+
+_KIT: tuple[str, ...] = (
+    "PRESS ITEM 2 INTO ITEM 1 FROM THE FACE SEEN IN THE TOP VIEW, TAPPED END "
+    f"OUT, TO STAND {fixture.STUB_STAND_TEXT} ABOVE THE FACE (SETTING TABLE, SHEET 2).",
+    _slip_reject(2, fixture.STUB_NUMBER),
+    "CHECK: ITEM 2 DOES NOT MOVE BY HAND.",
+    "PRESS ITEM 3 TO THE FLOOR OF ITS HOLE.",
+    _slip_reject(3, fixture.CLOCK_PIN_NUMBER),
+    "CHECK: ITEM 3 DOES NOT MOVE BY HAND.",
+    "GRIP ITEM 1 IN THE 4-JAW, ITEM 2 OUT AND IN LINE WITH ONE PAIR OF JAWS; "
+    "LEAVE IT THERE FOR ALL 20 GEARS.",
+    f"INDICATE ITEM 1'S Ø{fixture.BODY_DIA_TEXT} OD TO {fixture.REGISTER_TIR_TEXT} "
+    "TIR WITH A DIAL TEST INDICATOR.",
+    "SET A DIAL TEST INDICATOR ON THE SIDE OF ITEM 2, AT CENTRE HEIGHT, WITH "
+    "ITEM 2 TURNED TOWARD IT.",
+    "ROCK THE CHUCK; ZERO THE INDICATOR WHERE ITS READING TURNS BACK.",
+)
+THROW_ZERO_STEP = len(_KIT)
+_KIT += (
+    "TURN THE CHUCK HALF A TURN.",
+    f"HOLD WRUNG GAUGE BLOCKS {fixture.THROW_STACK_TEXT} "
+    f"({fixture.THROW_STACK_TOTAL_TEXT}) BETWEEN ITEM 2 AND THE INDICATOR'S STYLUS.",
+    "CHECK: ROCKING THE CHUCK AND THE BLOCKS, THE READING TURNS BACK WITHIN "
+    f"{fixture.THROW_READING_BAND_TEXT} OF ZERO (SETTING TABLE, SHEET 2).",
+)
+THROW_CHECK_STEP = len(_KIT)
+# Moving the pair leaves all four jaws tight, so the check that follows is
+# the check of the fixture as it is left. The repeat starts where item 2 is
+# turned back toward the indicator, not at the zero (Codjiflo, #2712).
+_KIT += (
+    f"IF STEP {THROW_CHECK_STEP} FAILS, LOOSEN ONE JAW OF THE PAIR IN LINE WITH "
+    f"ITEM 2, TIGHTEN THE OTHER, AND REPEAT FROM STEP {THROW_ZERO_STEP - 1}.",
+)
+_GEAR: tuple[str, ...] = (
+    "SLIDE THE GEAR'S BORE ONTO ITEM 2, CAM BOSS AWAY FROM ITEM 1, ITS NOTCHED "
+    "TOOTH SPACE OVER ITEM 3.",
+    "CHECK: THE GEAR LIES FLAT ON ITEM 1 WITH ITEM 3 IN ITS NOTCHED SPACE.",
+    "TURN THE GEAR CLOCKWISE IN THE TOP VIEW (SHEET 1) UNTIL ITS NOTCHED SPACE "
+    "STOPS ON ITEM 3, AND HOLD IT THERE.",
+    "FIT ITEM 5 THROUGH ITEM 4 INTO ITEM 2; TIGHTEN SNUG BY HAND, 5/32 HEX KEY "
+    f"BY ITS SHORT ARM. ITEM 5 ENGAGES ITEM 2'S FULL THREAD {fixture.SCREW_ENGAGEMENT_TEXT}.",
+    "CHECK: THE GEAR DOES NOT TURN BY HAND.",
+)
+FIRST_GEAR_STEP = len(_KIT) + 1
+STEPS: tuple[str, ...] = (*_KIT, *_GEAR)
+# Characters a printed line: about 2.45 mm each from x .219 (run
+# 20261113T171903296Z's render), 78 ending some 8 mm inside the right border.
+STEP_WIDTH = 78
+
+
+def _numbered(steps: tuple[str, ...]) -> tuple[str, ...]:
+    lines: list[str] = []
+    for number, step in enumerate(steps, start=1):
+        head = f"{number}. "
+        lines += textwrap.wrap(
+            step, STEP_WIDTH, initial_indent=head, subsequent_indent=" " * len(head)
+        )
+    return tuple(lines)
+
+
+# One numbered sequence on two sheets: the steps done once under sheet 1's
+# BOM, the steps for each gear beside sheet 2's exploded view, which shows
+# them (the whole sequence is six lines too long for sheet 1).
+_LINES = _numbered(STEPS)
+_SPLIT = next(
+    i for i, line in enumerate(_LINES) if line.startswith(f"{FIRST_GEAR_STEP}. ")
+)
+ONCE_HEADING = (
+    f"FITTING STEPS 1-{len(_KIT)}, DONE ONCE "
+    f"(STEPS {FIRST_GEAR_STEP}-{len(STEPS)}, FOR EACH GEAR, ON SHEET 2)"
+)
+GEAR_HEADING = (
+    f"FITTING STEPS {FIRST_GEAR_STEP}-{len(STEPS)}, FOR EACH GEAR "
+    f"(STEPS 1-{len(_KIT)} ON SHEET 1)"
+)
+ONCE_STEPS = "\n".join((ONCE_HEADING, *_LINES[:_SPLIT]))
+GEAR_STEPS = "\n".join((GEAR_HEADING, *_LINES[_SPLIT:]))
+# The sequence whole, as the package checks read it.
+ASSEMBLY_STEPS = "\n".join((ONCE_HEADING, *_LINES))
+if not fixture.CUT_TURNS_GEAR_CLOCKWISE or not any(
+    "CLOCKWISE IN THE TOP VIEW" in step for step in _GEAR
+):
+    raise AssertionError("the gear must be turned the way the cut pushes it")
+
+# --- sheet 2: the exploded view ----------------------------------------------
+# The kit's right view at 2:1 with items 1-3 seated; the phantom gear, item 4
+# and item 5 drawn off item 2's axis in fitting order, each GAP above the
+# last. Kit-frame millimetres: the right view's horizontal is kit Z, its
+# vertical kit Y; item 2's axis stands at kit z = +STUB_OFFSET.
+EXPLODED_CENTER = (0.120, 0.100)
+GAP = 8.0
+AXIS_Z = fixture.STUB_OFFSET
+GEAR_Y0 = _STUB_TOP + GAP
+GEAR_DISC_TOP = GEAR_Y0 + gear.FACE_WIDTH
+GEAR_TOP = GEAR_Y0 + gear.OVERALL_THICKNESS
+GEAR_TIP_R = gear.OUTSIDE_DIA / 2.0
+CAM_R = gear.CAM_DIA / 2.0
+WASHER_Y0 = GEAR_TOP + GAP
+WASHER_TOP = WASHER_Y0 + fixture.WASHER_MODEL_THICKNESS
+SCREW_SEAT_Y = WASHER_TOP + GAP
+SCREW_TIP_Y = SCREW_SEAT_Y - SCREW.length
+SCREW_TOP_Y = SCREW_SEAT_Y + SCREW.head_h
+AXIS_OVERRUN = 3.0
+# Line fonts (swLineStyles_e / swLineWeights_e): the gear in thin phantom,
+# the loose items as visible outlines, the axis a thin centre line.
+PHANTOM_STYLE, PHANTOM_WIDTH = 2, 0
+ITEM_STYLE, ITEM_WIDTH = 0, 1
+AXIS_STYLE, AXIS_WIDTH = 4, 0
+
+Point3 = tuple[float, float, float]
+
+
+def _yz(y: float, z: float) -> Point3:
+    return (0.0, y, z)
+
+
+def _box(
+    name: str, y0: float, y1: float, z0: float, z1: float
+) -> dict[str, tuple[Point3, Point3]]:
+    return {
+        f"{name} bottom": (_yz(y0, z0), _yz(y0, z1)),
+        f"{name} top": (_yz(y1, z0), _yz(y1, z1)),
+        f"{name} side 1": (_yz(y0, z0), _yz(y1, z0)),
+        f"{name} side 2": (_yz(y0, z1), _yz(y1, z1)),
+    }
+
+
+def exploded_lines() -> dict[str, dict[str, tuple[Point3, Point3]]]:
+    """Every line the exploded view adds, by font, kit mm (x, y, z)."""
+    # The gear: its disc about item 2's axis (its bore), its cam boss about
+    # the lathe axis (kit z = 0), as turned.
+    phantom = {
+        **_box(
+            "gear disc",
+            GEAR_Y0,
+            GEAR_DISC_TOP,
+            AXIS_Z - GEAR_TIP_R,
+            AXIS_Z + GEAR_TIP_R,
+        ),
+        **_box("gear cam", GEAR_DISC_TOP, GEAR_TOP, -CAM_R, CAM_R),
+    }
+    washer_r = fixture.WASHER_OD / 2.0
+    head_r = SCREW.head_dia / 2.0
+    major_r = SCREW.major_dia / 2.0
+    items = {
+        **_box("washer", WASHER_Y0, WASHER_TOP, AXIS_Z - washer_r, AXIS_Z + washer_r),
+        **_box(
+            "screw head", SCREW_SEAT_Y, SCREW_TOP_Y, AXIS_Z - head_r, AXIS_Z + head_r
+        ),
+        "screw tip": (
+            _yz(SCREW_TIP_Y, AXIS_Z - major_r),
+            _yz(SCREW_TIP_Y, AXIS_Z + major_r),
+        ),
+        "screw shank 1": (
+            _yz(SCREW_TIP_Y, AXIS_Z - major_r),
+            _yz(SCREW_SEAT_Y, AXIS_Z - major_r),
+        ),
+        "screw shank 2": (
+            _yz(SCREW_TIP_Y, AXIS_Z + major_r),
+            _yz(SCREW_SEAT_Y, AXIS_Z + major_r),
+        ),
+    }
+    axes = {
+        "stub axis": (
+            _yz(fixture.THICKNESS - AXIS_OVERRUN, AXIS_Z),
+            _yz(SCREW_TOP_Y + AXIS_OVERRUN, AXIS_Z),
+        )
+    }
+    return {"phantom": phantom, "item": items, "axis": axes}
+
+
+# Labels: what each leader names and the kit-frame point its tip lands on.
+GEAR_LABEL = "MHA-DT-12 GEAR (THE WORKPIECE)\nCAM BOSS AWAY FROM ITEM 1"
+SCREW_LABEL = "ITEM 5"
+WASHER_LABEL = "ITEM 4"
+STUB_LABEL = "ITEM 2, TAPPED END OUT"
+PIN_LABEL = "ITEM 3, IN THE GEAR'S\nNOTCHED TOOTH SPACE"
+BODY_LABEL = "ITEM 1, IN THE 4-JAW"
+EXPLODED_CAPTION = "EXPLODED RIGHT VIEW"
+LABEL_TIPS: dict[str, Point3] = {
+    SCREW_LABEL: _yz((SCREW_SEAT_Y + SCREW_TOP_Y) / 2.0, AXIS_Z - SCREW.head_dia / 2.0),
+    WASHER_LABEL: _yz((WASHER_Y0 + WASHER_TOP) / 2.0, AXIS_Z - fixture.WASHER_OD / 2.0),
+    GEAR_LABEL: _yz((GEAR_Y0 + GEAR_DISC_TOP) / 2.0, AXIS_Z - GEAR_TIP_R),
+    STUB_LABEL: _yz(fixture.THICKNESS + fixture.STUB_STAND / 2.0, AXIS_Z - _STUB_R),
+    PIN_LABEL: _yz(_PIN_TOP, -fixture.PIN_Y),
+    BODY_LABEL: _yz(fixture.THICKNESS / 2.0, -_R),
+}
+# Sheet metres: every label stands in one column right of the view, its
+# rows in the tips' top-to-bottom order, at least a label's height apart;
+# the caption top-left, the steps for each gear under it, both above the
+# view (item 5's head stands at about y .185, run 20261115T062946929Z).
+LABEL_COLUMN_X = 0.300
+CAPTION_XY = (0.030, 0.255)
+GEAR_STEPS_XY = (0.030, 0.244)
+LABEL_GAP = 0.006
+CHAR_WIDTH = 0.00255  # default-format note text, per character
+LINE_PITCH = 0.0046
+
+# Rule 22: the two measurable kit settings, item 2's stand (step 1) and its
+# throw (steps 9-14), print in a setting table as well as in the steps
+# (run 20261118T083019774Z's review: printed only in step text). Sheet 1 is
+# full, so the table stands at sheet 2's top right: right of the steps for
+# each gear (78 characters from x .030 end by about x .221), above the label
+# column (item 5's label at about y .19), inside the right border. The
+# helper cuts each column to its longest cell at 2.8 mm a character; a cell
+# that prints wider wraps onto a taller row, which this table's 60 mm of
+# free height absorbs, and the read-back box is checked.
+SETTING_TABLE_XY = (0.228, 0.262)
+SETTING_TABLE_FLOOR = 0.200
+SETTING_TABLE_CLEARANCE = 0.003
+GEAR_STEPS_RIGHT = GEAR_STEPS_XY[0] + STEP_WIDTH * 0.00245
+SETTING_TABLE_TITLE = (
+    f"SETTINGS FOR STEPS 1 AND {THROW_ZERO_STEP - 1}-{THROW_CHECK_STEP + 1} (SHEET 1)"
+)
+SETTING_TABLE_HEADER = (
+    "SETTING",
+    "ITEM 2 STAND (STEP 1)",
+    f"ITEM 2 THROW (STEPS {THROW_ZERO_STEP - 1}-{THROW_CHECK_STEP + 1})",
+)
+SETTING_TABLE_ROWS = (
+    (
+        "VALUE",
+        f"{fixture.STUB_STAND_TEXT} ABOVE ITEM 1",
+        f"{fixture.inch_text(fixture.STUB_OFFSET, 4)} FROM SPINDLE AXIS",
+    ),
+    (
+        "CHECK",
+        "CALIPER DEPTH ROD",
+        f"DTI WITHIN {fixture.THROW_READING_BAND_TEXT} ON "
+        f"{fixture.THROW_STACK_TOTAL_TEXT} BLOCKS",
+    ),
+)
+_table_right = SETTING_TABLE_XY[0] + sum(
+    table_column_widths(SETTING_TABLE_HEADER, SETTING_TABLE_ROWS)
+)
+if _table_right > SHEET_INNER_BORDER[2] - SETTING_TABLE_CLEARANCE:
+    raise AssertionError("the setting table runs past the right border")
+if SETTING_TABLE_XY[0] < GEAR_STEPS_RIGHT + SETTING_TABLE_CLEARANCE:
+    raise AssertionError("the setting table runs into the steps for each gear")
+
+
+def _add_note(adapter: Any, text: str, xy: tuple[float, float], *, label: str) -> None:
+    note = add_note(adapter, text, *xy)
+    if note is None:
+        raise RuntimeError(f"failed to place the cam turning kit {label}")
+    printed = (
+        str(_early_bound(note, "INote").GetText() or "")
+        .replace("\r\n", "\n")
+        .replace("\r", "\n")
+    )
+    if printed != text:
+        raise RuntimeError(f"cam turning kit {label} printed as {printed!r}")
+
+
+def _bom_items(adapter: Any, table: Any) -> dict[str, str]:
+    """Each part's ITEM NO. as the BOM prints it, read off its PART NUMBER
+    row; the steps cite items 1-5 in insertion order."""
+    table = _early_bound(table, "ITableAnnotation")
+
+    def cell(row: int, column: int) -> str:
+        return str(
+            adapter._attempt(lambda: table.DisplayedText2(row, column, True)) or ""
+        ).strip()
+
+    header = [cell(0, column).upper() for column in range(int(table.ColumnCount))]
+    items = [index for index, text in enumerate(header) if text.startswith("ITEM NO")]
+    numbers = [index for index, text in enumerate(header) if text == "PART NUMBER"]
+    if (
+        int(table.RowCount) != 1 + len(BOM_COMPONENTS)
+        or len(items) != 1
+        or len(numbers) != 1
+    ):
+        raise RuntimeError(
+            f"cam turning kit BOM is not {len(BOM_COMPONENTS)} item rows: {header!r}"
+        )
+    stems = {number: stem for stem, number in BOM_PART_NUMBERS.items()}
+    printed = {
+        stems.get(cell(row, numbers[0]), cell(row, numbers[0])): cell(row, items[0])
+        for row in range(1, int(table.RowCount))
+    }
+    if printed != BOM_ITEMS:
+        raise RuntimeError(
+            f"cam turning kit BOM numbers its parts {printed!r}, not {BOM_ITEMS!r}"
+        )
+    return printed
+
+
+def _move_model_point(
+    adapter: Any,
+    view: Any,
+    point_m: tuple[float, float, float],
+    target: tuple[float, float],
+    *,
+    label: str,
+) -> None:
+    """Move ``view`` so the kit point lands on ``target`` (sheet m), by the
+    register, not by the view's box (draw_dt_cone_gear_tl_indexing_assembly)."""
+    view = _early_bound(view, "IView")
+    here = model_points_in_view(adapter, view, [point_m], label=label)[0]
+    position = tuple(float(value) for value in view.Position)
+    moved = [position[i] + target[i] - here[i] for i in range(2)]
+    if not view.SetViewPosition(double_array(moved), False):
+        raise RuntimeError(f"failed to move the {label}")
+    rebuild_drawing(adapter, label=f"place {label}")
+    here = model_points_in_view(adapter, view, [point_m], label=label)[0]
+    if math.dist(here, target) > 1e-4:
+        raise RuntimeError(f"{label}: register sits at {here!r}, not {target!r}")
+
+
+def _kit_view(
+    adapter: Any,
+    name: str,
+    center: tuple[float, float],
+    scale: tuple[float, float],
+    stems: frozenset[str],
+) -> Any:
+    """One view of ``stems``, the register's face centre on ``center``."""
+    label = f"cam turning kit {name}"
+    view = place_view(adapter, str(SOURCE), name, *center, scale=scale)
+    view = isolate_drawing_view_components(
+        adapter, view, visible_stems=stems, label=label
+    )
+    _move_model_point(adapter, view, _kit(REGISTER_FACE_MM), center, label=label)
+    return view
+
+
+def _move_stub_balloon(adapter: Any, landing: Any) -> None:
+    """Put item 2's balloon circle at STUB_BALLOON_XY, its leader still on
+    its proven landing (draw_mg_magnifier_assembly's wire balloon move)."""
+    label = "cam turning kit item 2 balloon"
+    note = _early_bound(landing.note, "INote")
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    circle_x, circle_y, _radius = rendered_balloon_circle(note, label=label)
+    anchor = annotation.GetPosition()
+    if anchor is None or len(anchor) < 2:
+        raise RuntimeError(f"{label} has no position")
+    offset = (float(anchor[0]) - circle_x, float(anchor[1]) - circle_y)
+    target = STUB_BALLOON_XY
+    if not annotation.SetPosition(target[0] + offset[0], target[1] + offset[1], 0.0):
+        raise RuntimeError(f"failed to move the {label}")
+    rebuild_drawing(adapter, label=f"move {label}")
+    moved_x, moved_y, _radius = rendered_balloon_circle(note, label=label)
+    if math.dist((moved_x, moved_y), target) > 0.0005:
+        raise RuntimeError(
+            f"{label} centred at ({moved_x * 1000.0:.1f}, {moved_y * 1000.0:.1f}) "
+            f"mm, not {tuple(value * 1000.0 for value in target)}"
+        )
+
+
+def _place_sheet(adapter: Any) -> Callable[[], None]:
+    fixture_only = frozenset({BODY, STUB, CLOCK_PIN})
+    top = _kit_view(adapter, "*Top", TOP_CENTER, SHEET_SCALE, fixture_only)
+    front = _kit_view(adapter, "*Front", FRONT_CENTER, SHEET_SCALE, fixture_only)
+    for view, name in ((top, "*Top"), (front, "*Front")):
+        set_hidden_lines_removed(adapter, view)
+        apply_view_configuration(adapter, view, label=f"cam turning kit {name}")
+    iso = _kit_view(
+        adapter, "*Isometric", ISO_CENTER, ISO_SCALE, frozenset(BOM_COMPONENTS)
+    )
+    set_high_quality_shaded_with_edges(adapter, iso, label="cam turning kit isometric")
+    apply_view_configuration(
+        adapter, iso, role=ViewRole.FULL_DETAIL, label="cam turning kit *Isometric"
+    )
+    assert_full_detail_view(adapter, label="cam turning kit")
+
+    # The isometric shows every item; the top and front views hide 4 and 5.
+    table = insert_bom_table(
+        adapter,
+        iso,
+        anchor_xy=BOM_ANCHOR,
+        expected_components=BOM_COMPONENTS,
+        descriptions=BOM_DESCRIPTIONS,
+        component_identities=BOM_COMPONENT_IDENTITIES,
+        part_number_property="Number",
+        label="cam turning kit",
+    )
+    items = _bom_items(adapter, table)
+    landings = []
+    for view, stems, label in (
+        (front, FRONT_ITEMS, "cam turning kit front balloons"),
+        (iso, ISO_ITEMS, "cam turning kit isometric balloons"),
+    ):
+        landings += add_component_bom_balloons(
+            adapter,
+            view,
+            items=tuple((stem, items[stem]) for stem in stems),
+            anchors=BALLOON_ANCHORS,
+            label=label,
+            margin=BALLOON_MARGIN,
+            explode_offsets={},
+        )
+    if len(landings) != len(BOM_COMPONENTS):
+        raise RuntimeError(
+            f"cam turning kit carries {len(landings)} balloons, "
+            f"expected {len(BOM_COMPONENTS)}"
+        )
+    _move_stub_balloon(
+        adapter, next(landing for landing in landings if landing.stem == STUB)
+    )
+    for text, xy, label in (
+        (ONCE_STEPS, STEPS_XY, "steps done once"),
+        (TOP_CAPTION, TOP_CAPTION_XY, "top view caption"),
+        (FRONT_CAPTION, FRONT_CAPTION_XY, "front view caption"),
+        (ISO_NOTE, ISO_NOTE_XY, "isometric scale note"),
+    ):
+        _add_note(adapter, text, xy, label=label)
+
+    return lambda: assert_balloon_landings(adapter, landings)
+
+
+def _activate_sheet(adapter: Any, name: str) -> None:
+    ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
+    if not ddoc.ActivateSheet(name):
+        raise RuntimeError(f"failed to activate cam turning kit sheet {name!r}")
+    actual = str(_early_bound(ddoc.GetCurrentSheet(), "ISheet").GetName() or "")
+    if actual != name:
+        raise RuntimeError(f"cam turning kit sheet is {actual!r}, expected {name!r}")
+
+
+Box = tuple[float, float, float, float]
+
+
+def _text_size(text: str) -> tuple[float, float]:
+    lines = text.splitlines()
+    return max(map(len, lines)) * CHAR_WIDTH, len(lines) * LINE_PITCH
+
+
+def exploded_label_positions(
+    tips: dict[str, tuple[float, float]],
+) -> dict[str, tuple[float, float]]:
+    """Each label's upper-left corner (sheet metres): one column right of the
+    view, in the tips' top-to-bottom order, each starting level with its tip
+    or lower so no two overlap; the caption top-left."""
+    positions: dict[str, tuple[float, float]] = {}
+    floor = math.inf
+    for text in sorted(tips, key=lambda key: -tips[key][1]):
+        top = min(tips[text][1] + LINE_PITCH / 2.0, floor)
+        positions[text] = (LABEL_COLUMN_X, top)
+        floor = top - _text_size(text)[1] - LABEL_GAP
+    positions[EXPLODED_CAPTION] = CAPTION_XY
+    return positions
+
+
+def label_boxes(positions: dict[str, tuple[float, float]]) -> dict[str, Box]:
+    """Each label's estimated box (x0, y0, x1, y1) from its upper-left."""
+    boxes = {}
+    for text, (x, y) in positions.items():
+        width, height = _text_size(text)
+        boxes[text] = (x, y - height, x + width, y)
+    return boxes
+
+
+def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
+    """Sheet 2: items 1-3 seated in the right view, the phantom gear and
+    items 4 and 5 drawn off item 2's axis in fitting order, labelled
+    (rule 22)."""
+    label = "cam turning kit exploded view"
+    _activate_sheet(adapter, SHEET_NAMES[1])
+    view = _kit_view(
+        adapter,
+        "*Right",
+        EXPLODED_CENTER,
+        DETAIL_SCALE,
+        frozenset({BODY, STUB, CLOCK_PIN}),
+    )
+    set_hidden_lines_removed(adapter, view)
+    apply_view_configuration(adapter, view, label=label)
+    groups = exploded_lines()
+    fonts = {
+        "phantom": (PHANTOM_STYLE, PHANTOM_WIDTH),
+        "item": (ITEM_STYLE, ITEM_WIDTH),
+        "axis": (AXIS_STYLE, AXIS_WIDTH),
+    }
+    sketched = {}
+    for group, lines in groups.items():
+        keys = list(lines)
+        sheet = model_points_in_view(
+            adapter,
+            view,
+            [
+                tuple(value / 1000.0 for value in point)
+                for key in keys
+                for point in lines[key]
+            ],
+            label=f"{label} {group}",
+        )
+        style, width = fonts[group]
+        sketched[group] = sketch_lines(
+            adapter,
+            view,
+            {key: (sheet[2 * i], sheet[2 * i + 1]) for i, key in enumerate(keys)},
+            style=style,
+            width=width,
+            label=f"{label} {group}",
+        )
+    rebuild_drawing(adapter, label=label)
+
+    def assert_lines(stage: str) -> None:
+        for group, lines in sketched.items():
+            style, width = fonts[group]
+            require_placed(
+                adapter,
+                lines,
+                style=style,
+                width=width,
+                label=f"{label} {group}",
+                stage=stage,
+            )
+
+    assert_lines("drawn")
+    texts = list(LABEL_TIPS)
+    points = model_points_in_view(
+        adapter,
+        view,
+        [tuple(value / 1000.0 for value in LABEL_TIPS[text]) for text in texts],
+        label=f"{label} label tips",
+    )
+    tips = dict(zip(texts, points, strict=True))
+    positions = exploded_label_positions(tips)
+    for text, (x0, y0, x1, y1) in label_boxes(positions).items():
+        if (
+            x0 < SHEET_INNER_BORDER[0]
+            or x1 > SHEET_INNER_BORDER[2]
+            or y0 < SHEET_INNER_BORDER[1]
+            or y1 > SHEET_INNER_BORDER[3]
+        ):
+            raise RuntimeError(f"{label}: {text!r} would leave the border")
+    for text in texts:
+        add_leader_note(
+            adapter,
+            text,
+            text_xy=positions[text],
+            attach_xy=tips[text],
+            label=f"{label}: {text.splitlines()[0]}",
+            view=view,
+        )
+    _activate_sheet(adapter, SHEET_NAMES[1])
+    _add_note(adapter, EXPLODED_CAPTION, positions[EXPLODED_CAPTION], label="caption")
+    _add_note(adapter, GEAR_STEPS, GEAR_STEPS_XY, label="steps for each gear")
+    _place_setting_table(adapter)
+    return lambda: assert_lines("settled")
+
+
+def _place_setting_table(adapter: Any) -> None:
+    """Sheet 2's setting table, its read-back box inside the border, right of
+    the steps for each gear and above the label column."""
+    label = "cam turning kit setting table"
+    _activate_sheet(adapter, SHEET_NAMES[1])
+    box = insert_general_table(
+        adapter,
+        title=SETTING_TABLE_TITLE,
+        header=SETTING_TABLE_HEADER,
+        rows=SETTING_TABLE_ROWS,
+        top_left=SETTING_TABLE_XY,
+        label=label,
+    )
+    if box[2] > SHEET_INNER_BORDER[2] - SETTING_TABLE_CLEARANCE:
+        raise RuntimeError(f"{label}: runs past the right border at {box!r}")
+    if box[1] < SETTING_TABLE_FLOOR:
+        raise RuntimeError(f"{label}: runs down into the labels at {box!r}")
+    if box[0] < GEAR_STEPS_RIGHT + SETTING_TABLE_CLEARANCE:
+        raise RuntimeError(f"{label}: runs into the steps for each gear at {box!r}")
+
+
+@_telemetry.traced("drawing.dt_cylinder_gear_tl_cam_turning_assembly")
+def build(adapter: Any) -> dict[str, str]:
+    if not SOURCE.is_file():
+        raise FileNotFoundError(f"source assembly is missing: {SOURCE}")
+
+    check("open cam turning kit drawing source", adapter.open_model(str(SOURCE)))
+    properties = read_required_properties(
+        _early_bound(adapter.currentModel, "IModelDoc2"),
+        ("Number", "Revision", "Title", "Material Specification", "Finish", "Quantity"),
+        required=("Number", "Revision", "Material Specification", "Finish", "Quantity"),
+    )
+    if properties["Number"] != DRAWING_NUMBER:
+        raise RuntimeError(
+            f"cam turning kit source Number {properties['Number']!r} != {DRAWING_NUMBER!r}"
+        )
+    new_project_drawing(
+        adapter, layout=SPEC.layout, scale=SHEET_SCALE, unit=CONTRACT.drawing_unit
+    )
+    create_blank_drawing_sheets(adapter, SHEET_NAMES, label="cam turning kit package")
+    ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
+    for name in SHEET_NAMES:
+        _activate_sheet(adapter, name)
+        sheet = _early_bound(ddoc.GetCurrentSheet(), "ISheet")
+        if not sheet.SetScale(*SHEET_SCALES[name], False, False):
+            raise RuntimeError(f"failed to set cam turning kit sheet scale: {name}")
+    _activate_sheet(adapter, SHEET_NAMES[0])
+    sheet_settled = _place_sheet(adapter)
+    exploded_settled = _place_exploded_sheet(adapter)
+
+    def settled() -> None:
+        sheet_settled()
+        exploded_settled()
+
+    return finalize_drawing(
+        adapter,
+        OUTPUTS,
+        layout=SPEC.layout,
+        pdf_title="Cylinder Gear Cam Turning Fixture Kit Assembly Drawing",
+        scale=SHEET_SCALE,
+        expected_sheet_names=SHEET_NAMES,
+        sheet_layouts=SHEET_LAYOUTS,
+        sheet_scales=SHEET_SCALES,
+        settled_checks=(settled,),
+    )
+
+
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("part", choices=[ARTIFACT_STEM])
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
+    _parse_args()
+    _telemetry.set_service("drawing-export")
+    sys.exit(run_build(build))

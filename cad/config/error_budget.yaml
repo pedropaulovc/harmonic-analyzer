@@ -70,6 +70,17 @@ reserved:
     # one; this waiver is the record that the closure credits the latter.
     # TODO(#749): cut the cam lobe half a pitch from the crest, then drop this waiver.
     waive_cam_home_phase: true
+    # The cam turning fixture MHA-DT-12-TL-01 adds a common cam phase of the
+    # same kind: its hole stations at the shop's +/-.002 row, its register's
+    # indication and the jaw pair's line turn every lobe it cuts by the same
+    # angle, up to this (dt_cylinder_gear_tl_cam_fixture_spec.PHASE_FIXED_WORST_DEG,
+    # .466 deg). Like #749's it is beyond every procedure step; the report
+    # scores it on the lobe-up machine (cam_home_phase.residual_fixture_common)
+    # and the closure does not credit it. Accepted with MHA-DT-12's NotchPhase
+    # band widened to 1.5 +/-.7 deg, which holds every gear's worst total (.677,
+    # this and each gear's own .13 together; cam_phase's gear-to-gear +/-.25 books the .13)
+    # (delegated ruling 2026-11-17, #2361 option 1; owner review on #2144).
+    fixture_common_cam_phase_deg: 0.47
   readout:                         # ordinate reading at the pen. The stroke is the CAD's
                                    # output.yaml pen_trace_half_mm (15, verify:kinematics), NOT set here
     reading_uncertainty_mm: 0.075  # half a 0.15 mm technical-pen line, read against the grid
@@ -153,7 +164,7 @@ critical_features:
     nominal: dt_cylinder_gear_spec.ECCENTRICITY
     quantity: gain
     class: channel
-    holds: "offset-turn the cam in a 4-jaw, indicate the throw to 0.01"
+    holds: "the cam turned last on the lathe fixture MHA-DT-12-TL-01, its throw set on the fixture's stub by gauge blocks at a dial test indicator's zero (MHA-DT-12-TL-00); worst .0013 in with each gear's bore float (dt_cylinder_gear_tl_cam_fixture_spec.THROW_ERROR_MAX_MM)"
   rocker_rod_pin_radius:
     tolerance: 0.1778  # +/-.007 in, half the inch print's .014 position zone (delegated ruling 2026-11-07, owner review #2144)
     nominal: _rocker_interface.ROD_HOLE_X
@@ -193,12 +204,12 @@ critical_features:
     class: channel
     holds: "Catalog initial-tension variation is +/-0.06 lbf (0.267 N), bounded here by +/-0.27 N; SET QC records each force-curve intercept. Mean-line zero removes DC, not the small geometric gain contribution."
   cam_phase:
-    tolerance: 0.25
+    tolerance: 0.25  # gear to gear; MHA-DT-12 prints +/-.7 with the fixture's common phase (reserved.nominal_residual_mae)
     unit: deg
     nominal: null
     quantity: phase
     class: channel
-    holds: "cam-lobe direction vs the alignment-notch centreline, both on the cylinder gear: index on the same setup (rotary table/dividing head)"
+    holds: "cam-lobe direction vs the alignment-notch centreline, gear to gear: each gear turned on MHA-DT-12-TL-01 with its bore on the stub and its notched tooth space seated on the clock pin, .13 deg worst (bore float and tooth form, dt_cylinder_gear_tl_cam_fixture_spec.PHASE_PER_PART_WORST_DEG); the phase common to all 20 is under reserved.nominal_residual_mae"
   mesh_lag_spread:
     tolerance: 0.14
     unit: deg
