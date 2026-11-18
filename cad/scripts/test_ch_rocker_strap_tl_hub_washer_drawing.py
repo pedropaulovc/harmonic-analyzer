@@ -48,7 +48,9 @@ def test_registry_row_is_inch_shop_tooling_with_a_learn_sheet() -> None:
     assert row["drawing_unit"] == spec.UNIT == "in"
     assert row["tolerance_class"] == "machined_block"
     assert int(row["quantity"]) == 1
-    assert "LOW-CARBON STEEL" in str(row["material"])
+    # One material: the MATERIAL cell holds one line (LEARN review r5).
+    assert row["material"] == "LOW-CARBON STEEL"
+    assert str(row["material_specification"]).startswith("low-carbon steel round")
     assert part.MATERIAL == "Plain Carbon Steel"
     entry = DRAWINGS_BY_NAME[STEM]
     assert entry.artifact_stem == spec.PART_NAME == part.PART_NAME

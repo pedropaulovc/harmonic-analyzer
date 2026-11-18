@@ -54,7 +54,7 @@ import ch_rocker_strap_tl_hub_plug_spec as spec
 PART_NAME = "ch-rocker-strap-tl-hub-plug"
 if PART_NAME != spec.PART_NAME:
     raise AssertionError("the builder's PART_NAME and its spec disagree")
-# The registry row: 6061 aluminum or low-carbon steel round, as on hand.
+# The registry row: 6061 aluminum round.
 MATERIAL = "6061 Alloy"
 _SAVED_DRAWING_PROPERTIES = (
     "Number",

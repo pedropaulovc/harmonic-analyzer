@@ -11,9 +11,12 @@ manual lathe in one chucking.
   (TL-01, Ø.500 at the title block's .XXX) and the body is turned to it, so
   its Ø.499 is a reference nominal and the stated diametral clearance is the
   requirement (drawing-guidelines.md rule 4, matched pairs).
-- Pilot: explicit limits .3990-.3995, a locating fit in the strap's reamed
-  .4000-.4005 hub hole (``ch_rocker_hub_fit.STRAP_HOLE_BAND``): every one of
-  the strap blanks goes over the one plug, so the pilot is not matched.
+- Pilot: explicit limits .3985-.3995, a locating fit in the strap's reamed
+  .4000-.4005 hub hole (``ch_rocker_hub_fit.STRAP_HOLE_BAND``), clearance
+  .0005-.0020. Every strap blank goes over the one plug, so the pilot cannot
+  be matched to a hole; its band is the shop's turned-diameter row (.001
+  wide), which LEARN machinist review r5 required (.3990-.3995 was .0005
+  wide). The play it adds to the outline's position is checked below.
 - Body length .170 and overall length .272 at the title block's .XXX: seated
   on the counterbore floor the shoulder stays below the plate's Z0 floor and
   the pilot's top below the strap's top (so the washer clamps the strap, not
@@ -83,6 +86,11 @@ STRAP_HOLE_LIMITS = (
 )
 # MHA-CH-13's finished thickness .098 +/-.001, at its thinnest.
 STRAP_THICKNESS_MIN = 2.4638
+# MHA-CH-13's edges: half the surface-profile band (ch_rocker_arm_spec
+# ``_PROFILE_HALF``, +/-.010), the outline's whole positional allowance.
+STRAP_PROFILE_HALF = 0.254
+# drawing-guidelines.md, What the shop holds: a turned diameter +/-.0005.
+TURNED_DIA_ROW = 0.0127
 # Plan tape_thickness_mm (3M VHB 5906, .006 in) and its +/-15 % (the plan's
 # outline_breakthrough_mm comment: "the tape's least thickness, .006 in -15 %").
 TAPE_THICKNESS = 0.15
@@ -98,7 +106,7 @@ BODY_DIA = 12.6746  # .499 REF, turned to the measured counterbore
 BODY_CLEARANCE = (0.0127, 0.0381)  # .0005-.0015
 BODY_LENGTH = 4.318  # .170
 OVERALL_LENGTH = 6.9088  # .272
-PILOT_LIMITS = (10.1346, 10.1473)  # .3990-.3995
+PILOT_LIMITS = (10.1219, 10.1473)  # .3985-.3995
 # The model sits mid-band; the sheet prints the two limits (swTolLIMIT).
 PILOT_DIA = (PILOT_LIMITS[0] + PILOT_LIMITS[1]) / 2.0
 BORE_DIA = 6.7564  # .266, letter H drill
@@ -152,6 +160,25 @@ if not PILOT_CLEARANCE[0] > 0.0:
     raise AssertionError(f"the pilot can bind in the hub hole: {PILOT_CLEARANCE}")
 if not PILOT_LIMITS[1] < BODY_DIA - 2.0 * XXX:
     raise AssertionError("the pilot does not step down from the body")
+# The pilot's band is one the lathe holds by cutting to a number: no
+# narrower than the shop's turned-diameter row (drawing-guidelines.md, What
+# the shop holds: +/-.0005, .001 wide). LEARN machinist review r5 refused
+# .3990-.3995 (.0005 wide): a band under the row needs a fit route, and a
+# matched pilot cannot serve every strap blank.
+if PILOT_LIMITS[1] - PILOT_LIMITS[0] < 2.0 * TURNED_DIA_ROW - 1e-9:
+    raise AssertionError("the pilot's band is narrower than the shop's turned row")
+# What the plug's play costs the strap's outline: the hub hole's centre can
+# sit off the counterbore's by half the pilot's largest clearance plus half
+# the body's in the counterbore, at most .00175 (0.044 mm). Held to a fifth
+# of the strap edges' profile half-band (+/-.010), so the outline program's
+# own error keeps the rest.
+HUB_LOCATING_ERROR_MAX = (PILOT_CLEARANCE[1] + BODY_CLEARANCE[1]) / 2.0
+HUB_LOCATING_BUDGET = 0.2 * STRAP_PROFILE_HALF
+if HUB_LOCATING_ERROR_MAX > HUB_LOCATING_BUDGET:
+    raise AssertionError(
+        f"the plug lets the strap shift {HUB_LOCATING_ERROR_MAX:.3f} mm, over "
+        f"its {HUB_LOCATING_BUDGET:.3f} mm share of the outline's profile band"
+    )
 
 # Seated on the counterbore floor (plate frame: Z0 the floor the tape lies
 # on, +Z up), at the worst case of the printed bands.

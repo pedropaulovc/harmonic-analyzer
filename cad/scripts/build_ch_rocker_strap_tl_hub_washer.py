@@ -42,7 +42,7 @@ import ch_rocker_strap_tl_hub_washer_spec as spec
 PART_NAME = "ch-rocker-strap-tl-hub-washer"
 if PART_NAME != spec.PART_NAME:
     raise AssertionError("the builder's PART_NAME and its spec disagree")
-# The registry row: low-carbon steel or 6061 aluminum round, as on hand.
+# The registry row: low-carbon steel round.
 MATERIAL = "Plain Carbon Steel"
 _SAVED_DRAWING_PROPERTIES = (
     "Number",

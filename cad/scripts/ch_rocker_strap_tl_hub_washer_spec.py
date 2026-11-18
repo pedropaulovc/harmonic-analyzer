@@ -21,7 +21,7 @@ Printed at the title block's .XXX (+/-.005) those sizes broke the plan's
 keep-out of the time (13.9 mm flange, 6.2 mm stack): the largest .547
 washer is 14.02 mm, and .084 under a .166 head stacks 6.35 mm. The owner
 accepted .53 x .06 at .XX (2026-11-17), kept under the 1/4-20 screw
-(ruling 2); the record now states these sizes.
+(ruling 2); the strap traveler's PR brings the record to these sizes.
 
 Frame: axis +Z, centred; z = 0 the face on the strap (the Front Plane), the
 face under the screw head at z = THICKNESS.

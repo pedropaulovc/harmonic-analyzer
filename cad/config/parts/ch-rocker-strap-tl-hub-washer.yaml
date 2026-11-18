@@ -5,8 +5,11 @@ ch-rocker-strap-tl-hub-washer:
   # inside the strap programs' hub keep-out (plan bushing_flange_dia_mm and
   # bushing_stack_height_mm).
   number: MHA-CH-13-TL-03
-  material: LOW-CARBON STEEL OR 6061 ALUMINUM
-  material_specification: low-carbon steel or 6061 aluminum round, 9/16 in or over, as on hand
+  # One material, so the title block's MATERIAL cell holds one line (LEARN
+  # machinist review r5): steel under the screw head, which would brinell
+  # an aluminum washer.
+  material: LOW-CARBON STEEL
+  material_specification: low-carbon steel round, 9/16 in or over
   finish: as machined
   quantity: 1
   tolerance_class: machined_block

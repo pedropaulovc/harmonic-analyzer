@@ -4,8 +4,11 @@ ch-rocker-strap-tl-hub-plug:
   # 2026-11-17: stepped plug seated in MHA-CH-13-TL-01's counterbore; its pilot
   # locates the strap blank's reamed hub hole before the hub screw clamps it.
   number: MHA-CH-13-TL-02
-  material: 6061 ALUMINUM OR LOW-CARBON STEEL
-  material_specification: 6061 aluminum or low-carbon steel round, 9/16 in or over, as on hand
+  # One material, so the title block's MATERIAL cell holds one line (LEARN
+  # machinist review r5): 6061, as the plug only locates and carries no clamp
+  # load (its pilot top stands below the strap's top under the washer).
+  material: 6061 ALUMINUM
+  material_specification: 6061 aluminum round, 9/16 in or over
   finish: as machined
   quantity: 1
   tolerance_class: machined_block

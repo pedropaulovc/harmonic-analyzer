@@ -50,7 +50,9 @@ def test_registry_row_is_inch_shop_tooling_with_a_learn_sheet() -> None:
     assert row["drawing_unit"] == spec.UNIT == "in"
     assert row["tolerance_class"] == "machined_block"
     assert int(row["quantity"]) == 1
-    assert "6061" in str(row["material"]) and part.MATERIAL == "6061 Alloy"
+    # One material: the MATERIAL cell holds one line (LEARN review r5).
+    assert row["material"] == "6061 ALUMINUM" and part.MATERIAL == "6061 Alloy"
+    assert str(row["material_specification"]).startswith("6061 aluminum round")
     entry = DRAWINGS_BY_NAME[STEM]
     assert entry.artifact_stem == spec.PART_NAME == part.PART_NAME
     assert entry.layout is DrawingLayout.LANDSCAPE
@@ -76,6 +78,15 @@ def test_mirrored_mates_match_the_strap_and_the_plan() -> None:
     assert spec.STRAP_THICKNESS_MIN == pytest.approx(
         arm.ARM_THICKNESS + arm.ARM_THICKNESS_BAND[1]
     )
+    assert spec.STRAP_PROFILE_HALF == arm._PROFILE_HALF
+    assert (
+        arm.TOP_EDGE_BAND
+        == arm.BOTTOM_EDGE_BAND
+        == (
+            spec.STRAP_PROFILE_HALF,
+            -spec.STRAP_PROFILE_HALF,
+        )
+    )
     plan = _plan()
     assert spec.TAPE_THICKNESS == plan["tape_thickness_mm"]
     assert spec.COUNTERBORE_DIA >= plan["hub_relief_dia_mm"]
@@ -97,7 +108,8 @@ def test_sizes_are_the_contract_and_its_ruled_changes() -> None:
         0.170 * INCH
     )  # StrapFixtureCad: .177 -> .170
     assert spec.OVERALL_LENGTH == pytest.approx(0.272 * INCH)
-    assert spec.PILOT_LIMITS == pytest.approx((0.3990 * INCH, 0.3995 * INCH))
+    # LEARN machinist review r5: widened from .3990-.3995 to the turned row.
+    assert spec.PILOT_LIMITS == pytest.approx((0.3985 * INCH, 0.3995 * INCH))
     assert spec.BORE_DIA == pytest.approx(
         0.266 * INCH
     )  # owner ruling 2: 1/4-20, H drill
@@ -113,8 +125,24 @@ def test_the_body_is_a_matched_slip_fit_and_the_pilot_a_locating_fit() -> None:
     least = hole[0] - spec.PILOT_LIMITS[1]
     greatest = hole[1] - spec.PILOT_LIMITS[0]
     assert (least, greatest) == pytest.approx(spec.PILOT_CLEARANCE)
-    assert spec.PILOT_CLEARANCE == pytest.approx((0.0005 * INCH, 0.0015 * INCH))
+    assert spec.PILOT_CLEARANCE == pytest.approx((0.0005 * INCH, 0.0020 * INCH))
     assert least > 0.0
+
+
+def test_the_pilot_band_is_one_the_lathe_holds_and_its_play_fits_the_outline() -> None:
+    """LEARN machinist review r5: .3990-.3995 was narrower than the shop's
+    turned-diameter row (+/-.0005) with no fit route, and one plug serves
+    every strap blank, so it cannot be matched to a hole. The pilot takes the
+    row's .001; the play that adds stays within a fifth of the strap edges'
+    +/-.010 profile band."""
+    assert spec.PILOT_LIMITS[1] - spec.PILOT_LIMITS[0] == pytest.approx(0.001 * INCH)
+    assert spec.TURNED_DIA_ROW == pytest.approx(0.0005 * INCH)
+    shift = (spec.PILOT_CLEARANCE[1] + spec.BODY_CLEARANCE[1]) / 2.0
+    assert shift == pytest.approx(spec.HUB_LOCATING_ERROR_MAX)
+    assert shift == pytest.approx(0.00175 * INCH)
+    assert shift <= 0.2 * arm._PROFILE_HALF
+    # The wider band keeps the wall over the floor and its stated value.
+    assert spec.WALL_TEXT == "WALL .064 MIN"
 
 
 def test_seated_on_the_floor_the_plug_stays_inside_the_strap_at_the_worst_case() -> (
@@ -157,7 +185,7 @@ def test_callouts_name_each_fit_and_mate() -> None:
         ".0005-.0015 DIAMETRAL CLEARANCE ON MHA-CH-13-TL-01"
     )
     assert callouts["PilotDia"] == (
-        "LOCATING FIT IN MHA-CH-13 HUB HOLE\n(CLEARANCE .0005-.0015 REF)"
+        "LOCATING FIT IN MHA-CH-13 HUB HOLE\n(CLEARANCE .0005-.0020 REF)"
     )
     assert callouts["BodyLength"] == "SHOULDER BELOW\nMHA-CH-13-TL-01 FLOOR"
     assert callouts["OverallLength"] == "PILOT TOP BELOW\nMHA-CH-13 TOP FACE"
