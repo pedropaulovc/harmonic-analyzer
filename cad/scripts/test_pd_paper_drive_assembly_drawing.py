@@ -4717,3 +4717,78 @@ def test_every_setting_detail_is_cited_by_its_steps() -> None:
         for key in detail.step_keys:
             body = " ".join(texts[key])
             assert f"({detail.view_name}, SHEET {sheet})" in body, (detail.letter, key)
+
+
+def test_setting_reference_views_are_lettered_details_of_sheet_1() -> None:
+    """#3110 (rule 9): each SETTING DETAILS reference view is a lettered
+    DETAIL whose boundary sits on sheet 1's view in its orientation, with a
+    letter that no other view or point on the package uses."""
+    taken = {
+        "A", drawing.PIVOT_LOCATOR_LETTER,
+        drawing.KNOB_SETTING_VIEW_NAME[-1], drawing.CLUSTER_FLOAT_VIEW_NAME[-1],
+        *drawing.KNOB_SETTING_LETTER_GAPS,  # DETAIL K's points S, T and N
+        *drawing.SETTING_DETAILS_BY_LETTER,
+    }
+    letters = [parent.letter for parent in drawing.SETTING_PARENTS]
+    assert len(set(letters)) == len(letters)
+    assert not taken & set(letters)
+    assert not {"I", "O", "Q"} & set(letters)
+    for parent in drawing.SETTING_PARENTS:
+        caption = drawing.SETTING_PARENT_CAPTIONS[parent.name]
+        assert caption.startswith(f"DETAIL {parent.letter} "), caption
+
+
+def test_sheet_1_boundary_letters_stand_clear_of_every_boundary() -> None:
+    """#3110 (rule 14; Codjiflo P2/P3 on 608e0de509): on each sheet-1 view
+    every boundary's letter and leader tip stands outside every other
+    boundary circle, and its letter outside its own.
+
+    Sheet x runs along machine -x on the front view and machine +z on the
+    right view. Run 20261118T121458665Z-76e060f0f3284d3793c99307368ab0ea
+    shows this: VIEW B's pivot (x -58) prints right of DETAIL K (x -21), and
+    DETAIL M (z -136) prints right of DETAIL E (z -163)."""
+    m_per_mm = drawing._ASSEMBLED_M_PER_MM
+
+    def on_sheet(orientation: str, point: tuple[float, float, float]) -> tuple[float, float]:
+        across = -point[0] if orientation == "*Front" else point[2]
+        return (across * m_per_mm, point[1] * m_per_mm)
+
+    boundaries = [
+        (
+            drawing.KNOB_SETTING_VIEW_NAME[-1], "*Front",
+            drawing.KNOB_SETTING_MODEL_CENTRE, drawing.KNOB_SETTING_PARENT_RADIUS,
+            drawing.KNOB_SETTING_LETTER_OFFSET,
+        ),
+        (
+            drawing.CLUSTER_FLOAT_VIEW_NAME[-1], "*Right",
+            drawing.CLUSTER_FLOAT_MODEL_CENTRE, drawing.CLUSTER_FLOAT_PARENT_RADIUS,
+            drawing.CLUSTER_FLOAT_LETTER_OFFSET,
+        ),
+        *(
+            (
+                parent.letter, parent.orientation, parent.model_centre,
+                drawing.setting_parent_sheet1_radius(parent), parent.sheet1_letter_offset,
+            )
+            for parent in drawing.SETTING_PARENTS
+        ),
+    ]
+    glyph = math.hypot(*drawing.KNOB_SETTING_LETTER_HALF) * 2.0
+    for letter, orientation, model_mm, radius, offset in boundaries:
+        centre = on_sheet(orientation, model_mm)
+        text, tip = drawing.detail_letter_pointer(centre, radius, offset)
+        assert math.dist(text, centre) > radius + glyph, letter
+        for other, other_orientation, other_mm, other_radius, _ in boundaries:
+            if other == letter or other_orientation != orientation:
+                continue
+            other_centre = on_sheet(other_orientation, other_mm)
+            assert math.dist(text, other_centre) > other_radius + glyph, (letter, other)
+            assert math.dist(tip, other_centre) > other_radius, (letter, other)
+
+
+def test_detail_h_text_stands_clear_of_its_extension_lines() -> None:
+    """#3110 (rule 14): DETAIL H's .067 stands past the dowel's end, so
+    neither the arm's rear-face line nor the dowel-end line runs through it
+    (half an .067 at 5:1 is under 5 mm on the sheet, 1 mm of model)."""
+    line = drawing.SETTING_DETAILS_BY_LETTER["H"].lines[0]
+    assert line.end[2] > line.start[2]
+    assert line.text[2] - line.end[2] >= 1.0 + 1.0
