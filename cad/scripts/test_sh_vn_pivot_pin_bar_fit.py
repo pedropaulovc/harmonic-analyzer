@@ -78,8 +78,9 @@ def test_worst_case_joint_budget() -> None:
     # 7.62 - 6.35 - (3.3274 - 2.9464) - 0.1016 - 0.1016.
     assert b["neighbour_clearance_min"] == pytest.approx(0.6858, abs=1e-6)
     assert b["neighbour_clearance_min"] >= pin.RUNNING_FLOOR
-    # The .55 roof under the .43 lever turned the full relative swing.
-    assert b["notch_roof_clearance_min"] == pytest.approx(0.9907, abs=1e-4)
+    # The .55 roof under the .37 lever (#3113; full depth at the pin) turned
+    # the full relative swing.
+    assert b["notch_roof_clearance_min"] == pytest.approx(1.7405, abs=1e-4)
     assert b["notch_roof_clearance_min"] >= pin.RUNNING_FLOOR
     # The far face, the offset at its long limit on the narrowest stock: .079,
     # under the .080 target and over the .060 floor (MHA-CH-01 RV-06).

@@ -10,12 +10,19 @@ re-key on a drawing edit.
 
 from __future__ import annotations
 
+import math
+
 import _config
 from _gtol_cylinder import CylinderFace
 from _hole_spec import HoleSpec, blind_cut_dia_mm
-from _inch_wall_limits import WALL_TARGET_MM
+from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _package_units import drawing_unit
-from _printed_tolerance import drilled_oversize_mm, printed_band_mm
+from _printed_tolerance import (
+    drilled_oversize_mm,
+    edge_break_chamfer_mm,
+    edge_break_radius_mm,
+    printed_band_mm,
+)
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 # #290: the sheet prints decimal inch (the row's ``drawing_unit``). Lengths
@@ -35,14 +42,13 @@ UNIT = drawing_unit("parts/ch-channel-lever", _config.parts("ch-channel-lever"))
 # below the +/-0.127 hook-arm allocation (error_budget.yaml), hence the flat
 # nominal.  Was 177.8 (7"), which left the spring leaning 2.75 mm off plumb.
 LEVER_SPRING_X = 175.05  # fulcrum -> spring-hole c2c, plumb over the anchor
-# Bar height, full length; the end carries the spring hole. The arm was
-# deepened in its own plane from 9.5 for strength under the 2026-10-15 gray
-# iron ruling, and keeps that depth in the 1018 steel that superseded it
-# (owner ruling 2026-11-03), staying under the Ø.47 hub. Its lower edge clears
+# Bar height from the hub out to the taper start; the end carries the spring hole.
+# Owner ruling 2026-11-18 (#3113): the original's depth, the 9.5 photo read
+# (dimensions.yaml ch. 17), at the sheet's two places. The 10.9 deepening for
+# the retired gray-iron ruling (2026-10-15) is undone. Its lower edge clears
 # the bar's top-notch roof (sh_vn_pivot_pin_bar_spec notch_roof_clearance_min)
-# and the spring's coil under the full-round tip
-# (build_ch_channel_assembly._assert_spring_mount).
-BAR_TALL = 10.922  # .43
+# and the spring's coil under the tip (build_ch_channel_assembly._assert_spring_mount).
+BAR_TALL = 9.398  # .37
 # .118: ch_amplitude_bar_spec restates it for the top notch (it follows when
 # the bar converts).
 LEVER_THICKNESS = 2.9972  # .118
@@ -52,18 +58,40 @@ BAR_PIN_X = 127.0  # fulcrum -> bar-pin c2c, 5"
 BAR_PIN_HOLE_SPEC = HoleSpec("drilled_number", "#47")
 SPRING_EYE_HOLE_SPEC = HoleSpec("drilled_number", "#21")
 
-# The end is the full-height bar with a full-round tip about the spring hole
-# (ch17 p.39 close-up, page001_img01: the bar runs full height to a rounded
-# end with the hook hole in it).  The former 6.0-tall stepped tab left
-# (6.0 - 4.04) / 2 = 0.98 of wall beside the #21 hole (baseline machinist
-# review, drawing-guidelines.md rule 17); concentric with the full round the
-# wall is BAR_TALL / 2 - r all the way round.
+# The end tapers, as the original's does (#3113; ch17 page001_img01 and the
+# squarer page001_img02 side view read the tip at about 0.8 of the depth at
+# the bar pin). The bar keeps full depth through the bar pin, where the
+# bending moment of this third-class lever peaks, and past the amplitude
+# bar's top notch; from the taper start both edges run straight to tangency
+# with a full-round tip concentric with the spring hole, as the moment falls
+# linearly to nothing at the spring. The taper starts at its own printed
+# station (.XX from the fulcrum bore), not on the bar pin's centreline: a
+# kink on the hole line could only be named in words (#3113 machinist
+# review, 3/3 runs). Owner ruling 2026-11-18 (#3113): the tip radius holds
+# the #21 hole's finished wall (both .010 edge breaks charged) at the .060
+# floor, under the .080 target (MHA-CH-02 RV-04). The photo ratio (~0.8)
+# would have left that wall under the floor; the owner chose the blunter
+# R.167. It prints at three places because .17 at two would take the wall
+# below the target, and the sheet states the wall it holds.
+TAPER_START_X = 139.7  # 5.50: full depth inboard of it
 TIP_ARC_CX = LEVER_SPRING_X
-TIP_RADIUS = BAR_TALL / 2.0  # 5.461: full round, tangent to both bar edges
+TIP_RADIUS = 4.2418  # R.167: tip depth 8.48, 0.90 of BAR_TALL
+
+
+def taper_tangent_point() -> tuple[float, float]:
+    """Upper tangent point of the taper edge on the tip circle (the lower one
+    is its mirror): the edge runs from (TAPER_START_X, BAR_TALL / 2)."""
+    vx, vy = TAPER_START_X - TIP_ARC_CX, BAR_TALL / 2.0
+    reach = math.hypot(vx, vy)
+    angle = math.atan2(vy, vx) - math.acos(TIP_RADIUS / reach)
+    return TIP_ARC_CX + TIP_RADIUS * math.cos(angle), TIP_RADIUS * math.sin(angle)
+
 
 # --- Derived spans. ---
-NOSE_RADIUS = BAR_TALL / 2.0  # 5.461 fulcrum nose (inside the hub)
-TIP_END_X = TIP_ARC_CX + TIP_RADIUS  # 180.511 tip from the fulcrum axis
+NOSE_RADIUS = BAR_TALL / 2.0  # 4.699 fulcrum nose (inside the hub)
+TIP_END_X = TIP_ARC_CX + TIP_RADIUS  # 179.29 tip from the fulcrum axis
+if not TIP_RADIUS < BAR_TALL / 2.0:
+    raise AssertionError("the end must taper toward the tip")
 
 # Integral fulcrum hub (2026-09-02 photo re-derive, ch17 p.40 page002_img03):
 # the levers stack hub-to-hub on the fulcrum shaft at the station pitch; the
@@ -109,21 +137,36 @@ PLATE_OFFSET_TOLERANCE = 0.0508  # +/-.002
 
 # drawing-guidelines.md rule 17 (walls and webs): every wall the holes leave,
 # at the worst case of the printed bands (the bar height and the hub both
-# print .XX; drilled holes +.004/0; the reamed bore at its top), against the
-# .080 target.
+# print .XX; drilled holes +.004/0; the reamed bore at its top), less the
+# title block's edge break at each of its two edges (the hole mouth and the
+# outside edge), against the .080 target.
 _LINEAR_2PL = printed_band_mm(2, unit=UNIT)
+_LINEAR_3PL = printed_band_mm(3, unit=UNIT)
 _DRILL_PLUS = drilled_oversize_mm(unit=UNIT)
+_EDGE_BREAK = max(edge_break_radius_mm(unit=UNIT), edge_break_chamfer_mm(unit=UNIT))
 _SPRING_HOLE_R_MAX = (blind_cut_dia_mm(SPRING_EYE_HOLE_SPEC) + _DRILL_PLUS) / 2.0
 _BAR_PIN_HOLE_R_MAX = (blind_cut_dia_mm(BAR_PIN_HOLE_SPEC) + _DRILL_PLUS) / 2.0
 WALL_MIN = {
-    "spring hole to tip and edges": (BAR_TALL - _LINEAR_2PL) / 2.0 - _SPRING_HOLE_R_MAX,
-    "bar-pin hole to edges": (BAR_TALL - _LINEAR_2PL) / 2.0 - _BAR_PIN_HOLE_R_MAX,
-    "fulcrum bore to hub": (HUB_DIA - _LINEAR_2PL) / 2.0
-    - (PIVOT_HOLE_DIA + PIVOT_HOLE_BAND[0]) / 2.0,
+    wall: printed - 2.0 * _EDGE_BREAK
+    for wall, printed in {
+        "spring hole to tip and edges": TIP_RADIUS - _LINEAR_3PL - _SPRING_HOLE_R_MAX,
+        "bar-pin hole to edges": (BAR_TALL - _LINEAR_2PL) / 2.0 - _BAR_PIN_HOLE_R_MAX,
+        "fulcrum bore to hub": (HUB_DIA - _LINEAR_2PL) / 2.0
+        - (PIVOT_HOLE_DIA + PIVOT_HOLE_BAND[0]) / 2.0,
+    }.items()
 }
+# The tapered tip's finished wall is owner-accepted between the floor and the
+# target (#3113, MHA-CH-02 RV-04); every other wall meets the target.
+WALL_SHORTFALL_ACCEPTED = frozenset({"spring hole to tip and edges"})
 for _wall, _value in WALL_MIN.items():
-    if _value < WALL_TARGET_MM:
-        raise AssertionError(f"{_wall} wall {_value:.3f} < {WALL_TARGET_MM} target")
+    _limit = WALL_FLOOR_MM if _wall in WALL_SHORTFALL_ACCEPTED else WALL_TARGET_MM
+    if _value < _limit - 1e-9:
+        raise AssertionError(f"{_wall} wall {_value:.3f} < {_limit} limit")
+# Rules 3 and 20: the three-place tip radius states, once, the wall it holds.
+_TIP_WALL_IN = (
+    math.floor(round(WALL_MIN["spring hole to tip and edges"] / 25.4, 4) * 1000) / 1000
+)
+TIP_WALL_TEXT = f"HOLDS WALL {_TIP_WALL_IN:.3f}".replace(" 0.", " .") + " MIN"
 
 # drawing-guidelines.md rule 6: the fulcrum bore is the one running surface.
 SURFACE_FINISHES = (

@@ -5,12 +5,13 @@ pivot at one end (Ø6.5 hole riding the common Ø6.35 fulcrum shaft - the
 p.40 ball clevis is the shaft's END mount, mirroring the rocker-pivot
 design), channel-spring pull from its rounded end (Ø4 hook hole at
 175.05), driven in between by its amplitude bar pinned Ø2 at 127
-(5"). Section 11.0 tall x 3.0 thick: 20 levers at the 7.62 (.300) channel
+(5"). Section 9.4 tall x 3.0 thick: 20 levers at the 7.62 (.300) channel
 pitch cap the thickness (the M2 12.5 "width" violated the pitch), and
 3.0 lets the bar's 3.15 top slot straddle the lever at the pin. The
-height was 9.5; the owner ruled the lever gray cast iron and its arm
-deepened in-plane while staying under the O12 hub (2026-10-15); the
-2026-11-03 ruling makes it 1018 steel from 5/16 x 1 in flat at that depth.
+owner's 2026-10-15 gray-iron ruling deepened the arm to 10.9; the
+2026-11-03 ruling made it 1018 steel from 5/16 x 1 in flat, and the
+2026-11-18 ruling (#3113) returns it to the original's 9.5 photo read
+(.37) with the original's taper toward the spring tip, from a 5.50 station.
 
 The earlier 254 (10", "clean 2:1") length is REFUTED by the calibrated
 ch. 30 front view: the lever bank ends at x ~ -30 (not +54), the
@@ -23,11 +24,11 @@ solver frame's mirror of this paragraph's photo signs), so c2c = 175.05
 from the |x| 199.9 fulcrum (motion ratio 175.05/127 = 1.378). The
 photo-read 7" (177.8) left the spring 2.75 mm off plumb at neutral.
 The p.39 close-up also shows the bar pin only ~4-5 bar-heights from the
-tip (50.8/9.5 = 5.3 fits; 127/9.5 = 13 does not; the read predates the
-deepened 11.0 arm). The p.39 close-up also
-shows the bar running full height to its rounded end with the hook hole in
-it: the bar ends in a full round about the spring hole (the former 6.0
-stepped tab left 0.98 of wall beside the hole).
+tip (50.8/9.5 = 5.3 fits; 127/9.5 = 13 does not). The p.39 close-up also
+shows the bar running to a rounded end with the hook hole in it: the end
+is a full round about the spring hole (the former 6.0 stepped tab left 0.98
+of wall beside the hole), reached by straight edges tapering from the 5.50
+taper start, outboard of the bar pin (#3113).
 
 Dimensions: cad/DIMENSIONS.md "Chapter 17" - lengths/section derived in
 M6.3/M6.4 (med), hole diameters low.
@@ -107,8 +108,11 @@ from ch_channel_lever_spec import (
     PLATE_OFFSET_TOLERANCE,
     SPRING_EYE_HOLE_SPEC,
     SURFACE_FINISHES,
+    TAPER_START_X,
     TIP_ARC_CX,
+    TIP_RADIUS,
     UNIT,
+    taper_tangent_point,
 )
 
 PART_NAME = "ch-channel-lever"
@@ -127,6 +131,23 @@ HALF_BAR = BAR_TALL / 2.0
 THROUGH_CUT_DEPTH = 40.0  # mid-plane total; > extrude width
 if TIP_ARC_CX != LEVER_SPRING_X:
     raise AssertionError("the full-round tip must be concentric with the spring hole")
+
+
+def outline_area() -> float:
+    """Profile area: the nose half-disc, the full-depth bar to the taper
+    start, the trapezoid to the tip tangents and the tip circle's segment
+    beyond the tangent chord."""
+    tangent_x, tangent_y = taper_tangent_point()
+    chord_offset = tangent_x - TIP_ARC_CX
+    segment = TIP_RADIUS**2 * math.acos(chord_offset / TIP_RADIUS) - chord_offset * math.sqrt(
+        TIP_RADIUS**2 - chord_offset**2
+    )
+    return (
+        math.pi * HALF_BAR**2 / 2.0
+        + TAPER_START_X * BAR_TALL
+        + (HALF_BAR + tangent_y) * (tangent_x - TAPER_START_X)
+        + segment
+    )
 
 
 # The plate's location from one hub face prints from a hidden reference line
@@ -238,6 +259,8 @@ def build(adapter) -> dict[str, str]:
     # the full-round end stays concentric with the spring hole.
     set_global(adapter, "LeverSpringX", f"{LEVER_SPRING_X}mm")
     set_global(adapter, "BarTall", f"{BAR_TALL}mm")
+    set_global(adapter, "TipRadius", f"{TIP_RADIUS}mm")
+    set_global(adapter, "TaperStartX", f"{TAPER_START_X}mm")
     set_global(adapter, "LeverThickness", f"{LEVER_THICKNESS}mm")
     set_global(adapter, "PivotHoleDia", f"{PIVOT_HOLE_DIA}mm")
     set_global(adapter, "BarPinX", f"{BAR_PIN_X}mm")
@@ -251,10 +274,12 @@ def build(adapter) -> dict[str, str]:
     # resolve against the finished model + a rebuild).
     drive_jobs: list[tuple[str, str]] = []
 
-    # Side profile: round fulcrum nose, full-height bar, full-round tip about
-    # the spring hole (two arcs + two lines). The manual constraints/dims below
-    # define the sketch; each driving dim is record()ed into ``outline`` in the
-    # exact order it is added so naming/driving land structurally.
+    # Side profile: round fulcrum nose, full-depth bar to the taper start, straight
+    # taper edges tangent to a full-round tip about the spring hole (two arcs
+    # + four lines). The manual constraints/dims below define the sketch; each
+    # driving dim is record()ed into ``outline`` in the exact order it is
+    # added so naming/driving land structurally.
+    tangent_x, tangent_y = taper_tangent_point()
     outline = SketchDims()
     check("create_sketch outline", adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
@@ -262,27 +287,30 @@ def build(adapter) -> dict[str, str]:
         "add_arc fulcrum nose",
         adapter.add_arc(0.0, 0.0, 0.0, HALF_BAR, 0.0, -HALF_BAR),
     )
-    (lower_bar,) = add_line_chain(
-        adapter, [(0.0, -HALF_BAR), (TIP_ARC_CX, -HALF_BAR)], close=False
+    lower_bar, lower_taper = add_line_chain(
+        adapter,
+        [(0.0, -HALF_BAR), (TAPER_START_X, -HALF_BAR), (tangent_x, -tangent_y)],
+        close=False,
     )
     tip = check(
         "add_arc full-round tip",
         adapter.add_arc(
-            TIP_ARC_CX, 0.0, TIP_ARC_CX, -HALF_BAR, TIP_ARC_CX, HALF_BAR
+            TIP_ARC_CX, 0.0, tangent_x, -tangent_y, tangent_x, tangent_y
         ),
     )
-    add_line_chain(adapter, [(TIP_ARC_CX, HALF_BAR), (0.0, HALF_BAR)], close=False)
+    upper_taper, upper_bar = add_line_chain(
+        adapter,
+        [(tangent_x, tangent_y), (TAPER_START_X, HALF_BAR), (0.0, HALF_BAR)],
+        close=False,
+    )
     set_sketch_direct_db(adapter, False)
     # Semantic scheme: the nose semicircle is pinned by its centre at the
-    # origin and both ends on the Y axis; the tip arc by its centre on the X
-    # axis at TIP_ARC_CX and both ends plumb with that centre, so it is a full
-    # round tangent to the bar edges. The lower edge is horizontal; the upper
-    # one follows from the two arcs (a relation there would be redundant). The
-    # bar height spans the tip's ends.
-    check(
-        f"horizontal {lower_bar}",
-        adapter.add_sketch_constraint(lower_bar, None, "horizontal"),
-    )
+    # origin and both ends on the Y axis, so the two horizontal bar edges sit
+    # symmetric about the X axis. The taper starts are plumb with each other;
+    # each taper edge is tangent to the tip arc, whose centre sits on the X
+    # axis at TIP_ARC_CX. The bar height spans the two taper starts.
+    for line in (lower_bar, upper_bar):
+        check(f"horizontal {line}", adapter.add_sketch_constraint(line, None, "horizontal"))
     check(
         "nose centre -> origin",
         adapter.add_sketch_constraint(f"{nose}.center", "origin", "coincident"),
@@ -297,16 +325,33 @@ def build(adapter) -> dict[str, str]:
     # hole's own global: the tip stays concentric with the hole.
     anchor_point_to_origin(adapter, f"{tip}.center", TIP_ARC_CX, 0.0, "tip centre")
     outline.record("TipCentreX", '"LeverSpringX"')
-    for point in (f"{tip}.start", f"{tip}.end"):
-        check(
-            f"{point} above/below tip centre",
-            adapter.add_sketch_constraint(point, f"{tip}.center", "vertical_points"),
-        )
-    # Dim 2: bar height, across the tip's two ends.
+    for taper in (lower_taper, upper_taper):
+        check(f"{taper} tangent to tip", adapter.add_sketch_constraint(taper, tip, "tangent"))
+    check(
+        "taper starts plumb",
+        adapter.add_sketch_constraint(
+            f"{lower_taper}.start", f"{upper_taper}.end", "vertical_points"
+        ),
+    )
+    # Dim 2: the taper start from the fulcrum axis, its own printed station
+    # outboard of the bar pin.
     dimension_between(
-        adapter, f"{tip}.start", f"{tip}.end", "vertical_distance", BAR_TALL, "bar height"
+        adapter, f"{lower_taper}.start", "origin", "horizontal_distance",
+        TAPER_START_X, "taper start",
+    )
+    outline.record("TaperStartX", '"TaperStartX"')
+    # Dim 3: bar height, across the two taper starts.
+    dimension_between(
+        adapter, f"{lower_taper}.start", f"{upper_taper}.end", "vertical_distance",
+        BAR_TALL, "bar height",
     )
     outline.record("BarHeight", '"BarTall"')
+    # Dim 4: the full-round tip's radius.
+    check(
+        "radial tip radius",
+        adapter.add_sketch_dimension(tip, None, "radial", TIP_RADIUS),
+    )
+    outline.record("TipRadius", '"TipRadius"')
     ensure_fully_defined(adapter, "lever outline")
     check("exit_sketch outline", adapter.exit_sketch())
     name_last_feature(adapter, "LeverOutline")
@@ -320,9 +365,7 @@ def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "LeverBody")
     (lever_thick_dim,) = name_dimensions(adapter, "LeverBody", ["LeverThick"])
     drive_jobs.append((lever_thick_dim, '"LeverThickness"'))
-    # Bar plus the two half-discs: the nose and the full-round tip.
-    area = TIP_ARC_CX * BAR_TALL + math.pi * HALF_BAR**2
-    expected = area * LEVER_THICKNESS
+    expected = outline_area() * LEVER_THICKNESS
     volume_check(adapter, "lever outline", expected, 0.005 * expected)
 
     # Integral fulcrum hub (2026-09-02, ch17 p.40): O12 boss on the origin,
