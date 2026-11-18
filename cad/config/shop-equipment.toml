@@ -773,6 +773,21 @@ make = "Precision Matthews"
 sku = "VISE-6in-HIGHPREC"
 source = "https://www.precisionmatthews.com/products/vise-6in-highprec"
 
+# The PM-1127VF-LB lathe's rests. Owner (Pedro) 2026-11-17: "already have
+# follow and steady rests for the lathe". Owner-stated, not measured: make,
+# capacity (largest and smallest work diameter) and mounting are unrecorded.
+[fixtures.steady-rest-pm-1127]
+name = "Steady rest for the PM-1127VF-LB lathe"
+kind = "steady_rest"
+present = true
+cite = ["Owner (Pedro) 2026-11-17: \"already have follow and steady rests for the lathe\""]
+
+[fixtures.follow-rest-pm-1127]
+name = "Follow rest for the PM-1127VF-LB lathe"
+kind = "follow_rest"
+present = true
+cite = ["Owner (Pedro) 2026-11-17: \"already have follow and steady rests for the lathe\""]
+
 # Holds MHA-FR-01 and MHA-FR-02 on a long edge for the cross-screw paths
 # (#2387): the faced underside is clamped to its face, square to the table,
 # and the drill thrust bears down through the part into the table.
@@ -816,12 +831,13 @@ use = "Op 30 and A4: under the overhanging end"
 [[stock]]
 form = "flat_bar"
 material = "1018 cold-finish carbon steel"
-note = "Ordered 2026-11-03 (OnlineMetals order 1021751700): 1/8 x 1-1/2 in 1018 CF flat, 4 pieces x 72 in (standard length). Allocation: ch-rocker-strap (MHA-CH-13) and the oblique-trammel jig strap blank (BLANK_WIDTH 38.1)."
+note = "Bought (Online Metals order 1021751700, PO harmonic-analyzer-02, 2026-11-03): part 4807, 1/8 x 1-1/2 in rectangle 1018 CF, 4 x 72 in (standard length), $61.84. Item notes: Drawing Number: MHA-CH-13 | Custom Part: ch-rocker-strap. Earlier allocation, as first recorded: ch-rocker-strap (MHA-CH-13) and the oblique-trammel jig strap blank (BLANK_WIDTH 38.1); the jig is deleted (owner 2026-11-17)."
 # OnlineMetals 4807 catalogue nominal .125 x 1.5 in = [38.1, 3.175] mm and 72 x 25.4 = 1828.8 mm; not metrology.
 section_mm = [38.1, 3.175]
 length_mm = 1828.8
+pieces = 4
 on_hand = true
-cite = ["OnlineMetals part 4807 https://www.onlinemetals.com/en/buy/x/pid/4807 ordered 2026-11-03"]
+cite = ["Online Metals order 1021751700 confirmation (PO harmonic-analyzer-02, 2026-11-03), part 4807, 72 in x 4, $15.46 each", "OnlineMetals part 4807 https://www.onlinemetals.com/en/buy/x/pid/4807 ordered 2026-11-03"]
 
 # Oblique-trammel stock: owner-reported purchase (2026-10-23), not metrology.
 # Owner (Pedro) 2026-11-17: the jig is no longer made, so its stock, less the
@@ -832,11 +848,30 @@ cite = ["OnlineMetals part 4807 https://www.onlinemetals.com/en/buy/x/pid/4807 o
 [[stock]]
 form = "flat_bar"
 material = "6061-T6511 aluminium"
-note = "Owned OnlineMetals 1173, 1/2 x 6 in, 54 in left of the original 72 in (owner-reported 2026-11-02): allocate the TL-21 carrier and one TL-20 base bar (owner ruling #2083, 2026-10-30: mill the owned bar to width, no bandsaw rip; about 39 of the 54 in). TL-21: a 21.3 in length for the 20.5 x 5.1 x .47 carrier; its route is cad/process/ch_rocker_arm_tl_oblique_carrier/plan.toml (table-clamped, not on edge in the vise). TL-20: a 17.44 in blank for the 17.32 in (439.928 mm) bar, the long edges milled on edge in the vise to 5.50 wide, both faces faced to .47; the second base bar comes from the 18 in 1173 cut ordered 2026-11-03. The bar length is unchanged by the Amazon rail kit (owner option B, 2026-11-04: the uncut 450 rail overhangs the bar's far end by 10.07 mm), so no further stock is bought. Purchased nominal dimensions are not receipt measurements."
+note = "Bought (Online Metals order 1021704672, 2026-10-23): part 1173, 1/2 x 6 in rectangle 6061-T6511, 1 x 72 in, $201.74; no item notes on that order. Owned OnlineMetals 1173, 1/2 x 6 in, 54 in left of the original 72 in (owner-reported 2026-11-02): allocate the TL-21 carrier and one TL-20 base bar (owner ruling #2083, 2026-10-30: mill the owned bar to width, no bandsaw rip; about 39 of the 54 in). TL-21: a 21.3 in length for the 20.5 x 5.1 x .47 carrier; its route is cad/process/ch_rocker_arm_tl_oblique_carrier/plan.toml (table-clamped, not on edge in the vise). TL-20: a 17.44 in blank for the 17.32 in (439.928 mm) bar, the long edges milled on edge in the vise to 5.50 wide, both faces faced to .47; the second base bar comes from the 18 in 1173 cut ordered 2026-11-03. The bar length is unchanged by the Amazon rail kit (owner option B, 2026-11-04: the uncut 450 rail overhangs the bar's far end by 10.07 mm), so no further stock is bought. Purchased nominal dimensions are not receipt measurements."
 section_mm = [152.4, 12.7]
+# length_mm: the 54 in left (owner-reported 2026-11-02); 72 in was bought.
 length_mm = 1371.6
 on_hand = true
-cite = ["Owner-reported purchased stock and allocation, oblique jig simplification 2026-10-23; OnlineMetals 1173", "https://github.com/pedropaulovc/harmonic-analyzer/issues/2083"]
+cite = ["Online Metals order 1021704672 confirmation (2026-10-23), part 1173, 72 in x 1, $201.74", "Owner-reported purchased stock and allocation, oblique jig simplification 2026-10-23; OnlineMetals 1173", "https://github.com/pedropaulovc/harmonic-analyzer/issues/2083"]
+
+[[stock]]
+form = "flat_bar"
+material = "6061-T6511 aluminium"
+note = "Bought (Online Metals order 1021704672, 2026-10-23, with the 1173 bar above): part 1165, 1/2 x 1 in rectangle 6061-T6511, 1 x 24 in, $16.96. The order prints no item notes, so no allocation is recorded."
+section_mm = [25.4, 12.7]
+length_mm = 609.6
+on_hand = true
+cite = ["Online Metals order 1021704672 confirmation (2026-10-23), part 1165, 24 in x 1, $16.96"]
+
+[[stock]]
+form = "flat_bar"
+material = "6061-T6511 aluminium"
+note = "Bought (Online Metals order 1021704672, 2026-10-23, with the 1173 bar above): part 1164, 1/2 x 3/4 in rectangle 6061-T6511, 1 x 12 in, $7.31. The order prints no item notes, so no allocation is recorded."
+section_mm = [19.05, 12.7]
+length_mm = 304.8
+on_hand = true
+cite = ["Online Metals order 1021704672 confirmation (2026-10-23), part 1164, 12 in x 1, $7.31"]
 
 [[stock]]
 form = "rectangular_blank"
@@ -851,12 +886,328 @@ cite = ["McMaster-Carr 8663K55 https://www.mcmaster.com/8663K55/ ordered 2026-11
 [[stock]]
 form = "flat_bar"
 material = "6061-T6511 aluminium"
-note = "Ordered 2026-11-03: 1 x 3 in 6061-T6511 flat, 12 in (standard length). Allocation: ch-rocker-arm-tl-oblique-feed-block (MHA-CH-06-TL-32) and ch-rocker-arm-tl-oblique-pivot-block (MHA-CH-06-TL-22), each from its own blank sawn off the bar end with its 3.47 or 1.58 in Y length along the bar and its 1.64 in length milled from the 3 in width (cad/process/ch_rocker_arm_tl_oblique_{feed,pivot}_block/plan.toml). Restored here: the record was lost when the shop inventory split (02fdd651e0)."
+note = "Bought (Online Metals order 1021751700, PO harmonic-analyzer-02, 2026-11-03): part 1187, 1 x 3 in rectangle 6061-T6511, 1 x 12 in (standard length), $50.28. Item notes: Drawing Number: MHA-CH-06-TL-32, MHA-CH-06-TL-22 | Custom Part: ch-ra-tl-feed-block, ch-ra-tl-pivot-block. Freed: both blocks are deleted with the oblique jig (owner 2026-11-17); as first planned, each from its own blank sawn off the bar end with its 3.47 or 1.58 in Y length along the bar and its 1.64 in length milled from the 3 in width (cad/process/ch_rocker_arm_tl_oblique_{feed,pivot}_block/plan.toml, since deleted). Restored here: the record was lost when the shop inventory split (02fdd651e0)."
 # Catalogue nominals 1 x 3 in x 12 in = [76.2, 25.4] x 304.8 mm. Not metrology.
 section_mm = [76.2, 25.4]
 length_mm = 304.8
 on_hand = true
-cite = ["OnlineMetals part 1187 https://www.onlinemetals.com/en/buy/x/pid/1187 ordered 2026-11-03"]
+cite = ["Online Metals order 1021751700 confirmation (PO harmonic-analyzer-02, 2026-11-03), part 1187, 12 in x 1, $50.28", "OnlineMetals part 1187 https://www.onlinemetals.com/en/buy/x/pid/1187 ordered 2026-11-03"]
+
+# Online Metals order 1021751700 (PO harmonic-analyzer-02, 2026-11-03,
+# pick-up, Seattle): 36 lines, 51 items, $996.55 before tax, reconciled line
+# by line against the confirmation (read as page images). Its 4807 and 1187
+# lines are the rows above. Each row quotes the line's Item Notes; where the
+# document truncates a part list ("+1", "+2") the row says so. Lines for parts
+# since deleted (ch-ra-tl-*, MHA-CH-06-TL-*; MHA-CH-14) are marked freed.
+# Confirmation nominals, not metrology.
+[[stock]]
+form = "flat_bar"
+material = "1018 cold-finish carbon steel"
+note = "Bought (Online Metals order 1021751700, PO harmonic-analyzer-02, 2026-11-03): part 7506, 1/2 x 2-1/4 in rectangle 1018 CF, 1 x 19 in, $45.26. Item notes: Drawing Number: MHA-DT-18, MHA-DT-21, MHA-DT-16, MHA-MG-01 | Custom Part: dt-pinion-pivot-block, dt-cone-tip-block, dt-pinion-lever, mg-magnifying-bracket."
+section_mm = [57.15, 12.7]
+length_mm = 482.6
+on_hand = true
+cite = ["Online Metals order 1021751700 confirmation (PO harmonic-analyzer-02, 2026-11-03), part 7506, 19 in x 1, $45.26 each"]
+
+[[stock]]
+form = "flat_bar"
+material = "1018 cold-finish carbon steel"
+note = "Bought (Online Metals order 1021751700, PO harmonic-analyzer-02, 2026-11-03): part 7471, 1/4 x 2-1/2 in rectangle 1018 CF, 1 x 36 in, $35.37. Item notes: Drawing Number: MHA-DT-20, MHA-PD-11 | Custom Part: dt-cone-swing-platform, pd-platen-guide. The pd-platen-guide (MHA-PD-11) share is superseded: the rail is .29 tall and this bar cannot yield it (#2408); it is planned from the 3/8 x 1/2 bar still to order, below."
+section_mm = [63.5, 6.35]
+length_mm = 914.4
+on_hand = true
+cite = ["Online Metals order 1021751700 confirmation (PO harmonic-analyzer-02, 2026-11-03), part 7471, 36 in x 1, $35.37 each"]
+
+[[stock]]
+form = "flat_bar"
+material = "1018 cold-finish carbon steel"
+note = "Bought (Online Metals order 1021751700, PO harmonic-analyzer-02, 2026-11-03): part 4804, 1/8 x 3/4 in rectangle 1018 CF, 1 x 24 in, $4.86. Item notes: Drawing Number: MHA-PN-02 | Custom Part: pn-pen-hanger."
+section_mm = [19.05, 3.175]
+length_mm = 609.6
+on_hand = true
+cite = ["Online Metals order 1021751700 confirmation (PO harmonic-analyzer-02, 2026-11-03), part 4804, 24 in x 1, $4.86 each"]
+
+[[stock]]
+form = "flat_bar"
+material = "1018 cold-finish carbon steel"
+note = "Bought (Online Metals order 1021751700, PO harmonic-analyzer-02, 2026-11-03): part 22236, 1 x 1-1/4 in rectangle 1018 CF, 1 x 8 in, $21.79. Item notes: Drawing Number: MHA-DT-02 | Custom Part: dt-arbor-pedestal."
+section_mm = [31.75, 25.4]
+length_mm = 203.2
+on_hand = true
+cite = ["Online Metals order 1021751700 confirmation (PO harmonic-analyzer-02, 2026-11-03), part 22236, 8 in x 1, $21.79 each"]
+
+[[stock]]
+form = "flat_bar"
+material = "1018 cold-finish carbon steel"
+note = "Bought (Online Metals order 1021751700, PO harmonic-analyzer-02, 2026-11-03): part 7487, 3/8 x 1-1/4 in rectangle 1018 CF, 1 x 72 in, $40.42. Item notes: Drawing Number: MHA-PD-07, MHA-DT-06, MHA-DT-14, MHA-MG-08 | Custom Part: pd-support-bar, dt-crank-arm, dt-pinion-bracket, mg-wheel-bar."
+section_mm = [31.75, 9.525]
+length_mm = 1828.8
+on_hand = true
+cite = ["Online Metals order 1021751700 confirmation (PO harmonic-analyzer-02, 2026-11-03), part 7487, 72 in x 1, $40.42 each"]
+
+[[stock]]
+form = "flat_bar"
+material = "1018 cold-finish carbon steel"
+note = "Bought (Online Metals order 1021751700, PO harmonic-analyzer-02, 2026-11-03): part 19714, 5/16 x 1 in rectangle 1018 CF, 1 x 12 in, $6.92. Item notes: Drawing Number: MHA-PD-18 | Custom Part: pd-transgear-arm."
+section_mm = [25.4, 7.9375]
+length_mm = 304.8
+on_hand = true
+cite = ["Online Metals order 1021751700 confirmation (PO harmonic-analyzer-02, 2026-11-03), part 19714, 12 in x 1, $6.92 each"]
+
+[[stock]]
+form = "round_bar"
+material = "1018 cold-finish carbon steel"
+note = "Bought (Online Metals order 1021751700, PO harmonic-analyzer-02, 2026-11-03): part 4797, 1 in round 1018 CF, 1 x 24 in, $21.32. Item notes: Drawing Number: MHA-DT-11, MHA-DT-31 | Custom Part: dt-crankshaft, dt-crank-hub."
+dia_in = [1]
+length_in = [24]
+on_hand = true
+cite = ["Online Metals order 1021751700 confirmation (PO harmonic-analyzer-02, 2026-11-03), part 4797, 24 in x 1, $21.32 each"]
+
+[[stock]]
+form = "round_bar"
+material = "1018 cold-finish carbon steel"
+note = "Bought (Online Metals order 1021751700, PO harmonic-analyzer-02, 2026-11-03): part 4793, 1/2 in round 1018 CF, 1 x 24 in, $5.57. Item notes: Drawing Number: MHA-CH-12, MHA-DT-35 | Custom Part: ch-rocker-hub, dt-crank-handle-butt-cup."
+dia_in = [0.5]
+length_in = [24]
+on_hand = true
+cite = ["Online Metals order 1021751700 confirmation (PO harmonic-analyzer-02, 2026-11-03), part 4793, 24 in x 1, $5.57 each"]
+
+[[stock]]
+form = "round_bar"
+material = "1018 cold-finish carbon steel"
+note = "Bought (Online Metals order 1021751700, PO harmonic-analyzer-02, 2026-11-03): part 4791, 1/4 in round 1018 CF, 1 x 72 in, $4.75. Item notes: Drawing Number: MHA-CH-04, MHA-DT-17, MHA-DT-19, MHA-DT-15, MHA-DT-09, MHA-PD-23, MHA-DT-32 | Custom Part: ch-fulcrum-shaft, dt-pinion-lift-rod, dt-pinion-pivot-shaft, dt-pinion-handle, dt-crank-pin +2. The printed part list is truncated in the document itself."
+dia_in = [0.25]
+length_in = [72]
+on_hand = true
+cite = ["Online Metals order 1021751700 confirmation (PO harmonic-analyzer-02, 2026-11-03), part 4791, 72 in x 1, $4.75 each"]
+
+[[stock]]
+form = "round_bar"
+material = "1018 cold-finish carbon steel"
+note = "Bought (Online Metals order 1021751700, PO harmonic-analyzer-02, 2026-11-03): part 4792, 3/8 in round 1018 CF, 1 x 36 in, $4.60. Item notes: Drawing Number: MHA-DT-13, MHA-CH-05 | Custom Part: dt-cylinder-gear-shaft, ch-pivot-shaft."
+dia_in = [0.375]
+length_in = [36]
+on_hand = true
+cite = ["Online Metals order 1021751700 confirmation (PO harmonic-analyzer-02, 2026-11-03), part 4792, 36 in x 1, $4.60 each"]
+
+[[stock]]
+form = "round_bar"
+material = "1018 cold-finish carbon steel"
+note = "Bought (Online Metals order 1021751700, PO harmonic-analyzer-02, 2026-11-03): part 4794, 5/8 in round 1018 CF, 1 x 48 in, $14.47. Item notes: Drawing Number: MHA-DT-04, MHA-DT-22, MHA-DT-33, MHA-DT-23 | Custom Part: dt-cone-gear-shaft, dt-pinion-arbor, dt-pinion-arbor-collar, dt-pinion-cam."
+dia_in = [0.625]
+length_in = [48]
+on_hand = true
+cite = ["Online Metals order 1021751700 confirmation (PO harmonic-analyzer-02, 2026-11-03), part 4794, 48 in x 1, $14.47 each"]
+
+[[stock]]
+form = "square_bar"
+material = "1018 cold-finish carbon steel"
+note = "Bought (Online Metals order 1021751700, PO harmonic-analyzer-02, 2026-11-03): part 7088, 1/4 in square 1018 CF, 11 x 72 in, $68.42. Item notes: Drawing Number: MHA-CH-01 | Custom Part: ch-amplitude-bar."
+section_mm = [6.35, 6.35]
+length_mm = 1828.8
+pieces = 11
+on_hand = true
+cite = ["Online Metals order 1021751700 confirmation (PO harmonic-analyzer-02, 2026-11-03), part 7088, 72 in x 11, $6.22 each"]
+
+[[stock]]
+form = "square_bar"
+material = "1018 cold-finish carbon steel"
+note = "Bought (Online Metals order 1021751700, PO harmonic-analyzer-02, 2026-11-03): part 7177, 3/4 in square 1018 CF, 1 x 36 in, $23.97. Item notes: Drawing Number: MHA-CH-08, MHA-CH-07, MHA-SH-01, MHA-SH-02 | Custom Part: ch-pivot-bracket, ch-fulcrum-keeper, sh-column-clamp-front, sh-column-clamp-back."
+section_mm = [19.05, 19.05]
+length_mm = 914.4
+on_hand = true
+cite = ["Online Metals order 1021751700 confirmation (PO harmonic-analyzer-02, 2026-11-03), part 7177, 36 in x 1, $23.97 each"]
+
+[[stock]]
+form = "flat_bar"
+material = "6061-T6511 aluminium"
+note = "Bought (Online Metals order 1021751700, PO harmonic-analyzer-02, 2026-11-03): part 1165, 1/2 x 1 in rectangle 6061, 1 x 12 in, $8.86. Item notes: Drawing Number: MHA-CH-06-TL-26 | Custom Part: ch-ra-tl-feed-lever. Freed: the part is deleted (oblique trammel jig, owner 2026-11-17); the allocation records what it was bought for."
+section_mm = [25.4, 12.7]
+length_mm = 304.8
+on_hand = true
+cite = ["Online Metals order 1021751700 confirmation (PO harmonic-analyzer-02, 2026-11-03), part 1165, 12 in x 1, $8.86 each"]
+
+[[stock]]
+form = "flat_bar"
+material = "C36000 free-machining brass (360-H02, extruded)"
+note = "Bought (Online Metals order 1021751700, PO harmonic-analyzer-02, 2026-11-03): part 1372, 1/8 x 2-1/2 in rectangle C360, 1 x 5 in, $15.78. Item notes: Drawing Number: MHA-DT-26 | Custom Part: dt-cylinder-end-disc."
+section_mm = [63.5, 3.175]
+length_mm = 127
+on_hand = true
+cite = ["Online Metals order 1021751700 confirmation (PO harmonic-analyzer-02, 2026-11-03), part 1372, 5 in x 1, $15.78 each"]
+
+[[stock]]
+form = "flat_bar"
+material = "C36000 free-machining brass (360-H02, extruded)"
+note = "Bought (Online Metals order 1021751700, PO harmonic-analyzer-02, 2026-11-03): part 1358, 1/8 x 3/8 in rectangle C360, 1 x 24 in, $8.05. Item notes: Drawing Number: MHA-MS-01 | Custom Part: ms-stick."
+section_mm = [9.525, 3.175]
+length_mm = 609.6
+on_hand = true
+cite = ["Online Metals order 1021751700 confirmation (PO harmonic-analyzer-02, 2026-11-03), part 1358, 24 in x 1, $8.05 each"]
+
+[[stock]]
+form = "flat_bar"
+material = "C36000 free-machining brass (360-H02, extruded)"
+note = "Bought (Online Metals order 1021751700, PO harmonic-analyzer-02, 2026-11-03): part 1454, 3/8 x 1-1/4 in rectangle C360, 1 x 4 in, $19.73. Item notes: Drawing Number: MHA-PN-01 | Custom Part: pn-pen-frame."
+section_mm = [31.75, 9.525]
+length_mm = 101.6
+on_hand = true
+cite = ["Online Metals order 1021751700 confirmation (PO harmonic-analyzer-02, 2026-11-03), part 1454, 4 in x 1, $19.73 each"]
+
+[[stock]]
+form = "hex_bar"
+material = "C36000 free-machining brass (360-H02, extruded)"
+note = "Bought (Online Metals order 1021751700, PO harmonic-analyzer-02, 2026-11-03): part 1312, 1/2 in hex C360, 1 x 3 in, $9.87. Item notes: Drawing Number: MHA-MG-02 | Custom Part: mg-magnifying-clamp."
+across_flats_mm = 12.7
+length_mm = 76.2
+on_hand = true
+cite = ["Online Metals order 1021751700 confirmation (PO harmonic-analyzer-02, 2026-11-03), part 1312, 3 in x 1, $9.87 each"]
+
+[[stock]]
+form = "hex_bar"
+material = "C36000 free-machining brass (360-H02, extruded)"
+note = "Bought (Online Metals order 1021751700, PO harmonic-analyzer-02, 2026-11-03): part 7546, 7/16 in hex C360, 1 x 4 in, $9.37. Item notes: Drawing Number: MHA-MG-06 | Custom Part: mg-output-fixture."
+across_flats_mm = 11.1125
+length_mm = 101.6
+on_hand = true
+cite = ["Online Metals order 1021751700 confirmation (PO harmonic-analyzer-02, 2026-11-03), part 7546, 4 in x 1, $9.37 each"]
+
+[[stock]]
+form = "round_bar"
+material = "C36000 free-machining brass (360-H02, extruded)"
+note = "Bought (Online Metals order 1021751700, PO harmonic-analyzer-02, 2026-11-03): part 7568, 1-1/8 in round C360, 1 x 3 in, $24.77. Item notes: Drawing Number: MHA-PD-17 | Custom Part: pd-transgear-disc-hub."
+dia_in = [1.125]
+length_in = [3]
+on_hand = true
+cite = ["Online Metals order 1021751700 confirmation (PO harmonic-analyzer-02, 2026-11-03), part 7568, 3 in x 1, $24.77 each"]
+
+[[stock]]
+form = "round_bar"
+material = "C36000 free-machining brass (360-H02, extruded)"
+note = "Bought (Online Metals order 1021751700, PO harmonic-analyzer-02, 2026-11-03): part 1261, 1/2 in round C360, 1 x 12 in, $14.93. Item notes: Drawing Number: MHA-PD-25, MHA-PD-24, MHA-PD-20, MHA-MG-11 | Custom Part: pd-transgear-front-bushing, pd-transgear-rear-bushing, pd-transgear-pivot-spacer +1. The printed part list is truncated in the document itself."
+dia_in = [0.5]
+length_in = [12]
+on_hand = true
+cite = ["Online Metals order 1021751700 confirmation (PO harmonic-analyzer-02, 2026-11-03), part 1261, 12 in x 1, $14.93 each"]
+
+[[stock]]
+form = "round_bar"
+material = "C36000 free-machining brass (360-H02, extruded)"
+note = "Bought (Online Metals order 1021751700, PO harmonic-analyzer-02, 2026-11-03): part 1257, 1/4 in round C360, 1 x 48 in, $12.73. Item notes: Drawing Number: MHA-MG-03, MHA-MG-04, MHA-PN-07 | Custom Part: mg-magnifying-lever, mg-magnifying-vertical-rod, pn-pen-adjust-screw."
+dia_in = [0.25]
+length_in = [48]
+on_hand = true
+cite = ["Online Metals order 1021751700 confirmation (PO harmonic-analyzer-02, 2026-11-03), part 1257, 48 in x 1, $12.73 each"]
+
+[[stock]]
+form = "round_bar"
+material = "C36000 free-machining brass (360-H02, extruded)"
+note = "Bought (Online Metals order 1021751700, PO harmonic-analyzer-02, 2026-11-03): part 6848, 5/16 in round C360, 1 x 12 in, $6.31. Item notes: Drawing Number: MHA-CH-14 | Custom Part: ch-anchor-jam-nut. ch-anchor-jam-nut (MHA-CH-14) is retired (fb0fd42de1): the bar is freed."
+dia_in = [0.3125]
+length_in = [12]
+on_hand = true
+cite = ["Online Metals order 1021751700 confirmation (PO harmonic-analyzer-02, 2026-11-03), part 6848, 12 in x 1, $6.31 each"]
+
+[[stock]]
+form = "round_bar"
+material = "C36000 free-machining brass (360-H02, extruded)"
+note = "Bought (Online Metals order 1021751700, PO harmonic-analyzer-02, 2026-11-03): part 1264, 5/8 in round C360, 1 x 4 in, $12.74. Item notes: Drawing Number: MHA-DT-34, MHA-PD-15 | Custom Part: dt-crank-handle-ferrule, pd-transgear-knob-thrust-ring."
+dia_in = [0.625]
+length_in = [4]
+on_hand = true
+cite = ["Online Metals order 1021751700 confirmation (PO harmonic-analyzer-02, 2026-11-03), part 1264, 4 in x 1, $12.74 each"]
+
+[[stock]]
+form = "round_bar"
+material = "C36000 free-machining brass (360-H02, extruded)"
+note = "Bought (Online Metals order 1021751700, PO harmonic-analyzer-02, 2026-11-03): part 1268, 7/8 in round C360, 1 x 7 in, $29.13. Item notes: Drawing Number: MHA-PD-16, MHA-MG-10, MHA-PD-22, MHA-PD-13 | Custom Part: pd-transgear-knob-cup, mg-wheel-drum, pd-transgear-drive-collar, pd-transgear-thumbnut."
+dia_in = [0.875]
+length_in = [7]
+on_hand = true
+cite = ["Online Metals order 1021751700 confirmation (PO harmonic-analyzer-02, 2026-11-03), part 1268, 7 in x 1, $29.13 each"]
+
+[[stock]]
+form = "square_bar"
+material = "C36000 free-machining brass (360-H02, extruded)"
+note = "Bought (Online Metals order 1021751700, PO harmonic-analyzer-02, 2026-11-03): part 1338, 1/4 in square C360, 1 x 12 in, $5.43. Item notes: Drawing Number: MHA-PN-04 | Custom Part: pn-pen-rod."
+section_mm = [6.35, 6.35]
+length_mm = 304.8
+on_hand = true
+cite = ["Online Metals order 1021751700 confirmation (PO harmonic-analyzer-02, 2026-11-03), part 1338, 12 in x 1, $5.43 each"]
+
+[[stock]]
+form = "round_bar"
+material = "1018 cold-finish carbon steel"
+note = "Bought (Online Metals order 1021751700, PO harmonic-analyzer-02, 2026-11-03): part 13570, 4 in round 1018 CF, 1 x 3 in, $55.72. Item notes: Drawing Number: MHA-MG-05 | Custom Part: mg-magnifying-wheel. Superseded and free: mg-magnifying-wheel is now a gray-iron casting (cad/config/parts/mg-magnifying-wheel.yaml process), not cut from this bar."
+dia_in = [4]
+length_in = [3]
+on_hand = true
+cite = ["Online Metals order 1021751700 confirmation (PO harmonic-analyzer-02, 2026-11-03), part 13570, 3 in x 1, $55.72 each"]
+
+[[stock]]
+form = "flat_bar"
+material = "6061-T6511 aluminium"
+note = "Bought (Online Metals order 1021751700, PO harmonic-analyzer-02, 2026-11-03): part 1173, 1/2 x 6 in rectangle 6061, 1 x 18 in, $94.88. Item notes: Drawing Number: MHA-CH-06-TL-20 | Custom Part: ch-ra-tl-base-bar. Freed: the part is deleted (oblique trammel jig, owner 2026-11-17); the allocation records what it was bought for."
+section_mm = [152.4, 12.7]
+length_mm = 457.2
+on_hand = true
+cite = ["Online Metals order 1021751700 confirmation (PO harmonic-analyzer-02, 2026-11-03), part 1173, 18 in x 1, $94.88 each"]
+
+[[stock]]
+form = "flat_bar"
+material = "6061-T6511 aluminium"
+note = "Bought (Online Metals order 1021751700, PO harmonic-analyzer-02, 2026-11-03): part 1148, 1/4 x 5 in rectangle 6061, 1 x 12 in, $22.34. Item notes: Drawing Number: MHA-DT-03-TL-01 | Custom Part: dt-cone-gear-tl-index-plate."
+section_mm = [127, 6.35]
+length_mm = 304.8
+on_hand = true
+cite = ["Online Metals order 1021751700 confirmation (PO harmonic-analyzer-02, 2026-11-03), part 1148, 12 in x 1, $22.34 each"]
+
+[[stock]]
+form = "flat_bar"
+material = "1018 cold-finish carbon steel"
+note = "Bought (Online Metals order 1021751700, PO harmonic-analyzer-02, 2026-11-03): part 19714, 5/16 x 1 in rectangle 1018 CF, 2 x 72 in, $50.28. Item notes: Drawing Number: (no drawing number printed) | Custom Part: ch-channel-lever."
+section_mm = [25.4, 7.9375]
+length_mm = 1828.8
+pieces = 2
+on_hand = true
+cite = ["Online Metals order 1021751700 confirmation (PO harmonic-analyzer-02, 2026-11-03), part 19714, 72 in x 2, $25.14 each"]
+
+[[stock]]
+form = "flat_bar"
+material = "1018 cold-finish carbon steel"
+note = "Bought (Online Metals order 1021751700, PO harmonic-analyzer-02, 2026-11-03): part 19714, 5/16 x 1 in rectangle 1018 CF, 1 x 36 in, $18.40. Item notes: Drawing Number: MHA-CH-02 | Custom Part: ch-channel-lever."
+section_mm = [25.4, 7.9375]
+length_mm = 914.4
+on_hand = true
+cite = ["Online Metals order 1021751700 confirmation (PO harmonic-analyzer-02, 2026-11-03), part 19714, 36 in x 1, $18.40 each"]
+
+[[stock]]
+form = "flat_bar"
+material = "C36000 free-machining brass (360-H02, extruded)"
+note = "Bought (Online Metals order 1021751700, PO harmonic-analyzer-02, 2026-11-03): part 1500, 3/4 x 1-1/4 in rectangle C360, 1 x 7 in, $54.22. Item notes: Drawing Number: MHA-CH-06-TL-27, MHA-MS-02, MHA-PN-05 | Custom Part: ch-ra-tl-feed-nut, ms-stop-block, pn-pen-v-block. ch-ra-tl-feed-nut (MHA-CH-06-TL-27) is deleted with the oblique jig (owner 2026-11-17): its share is freed."
+section_mm = [31.75, 19.05]
+length_mm = 177.8
+on_hand = true
+cite = ["Online Metals order 1021751700 confirmation (PO harmonic-analyzer-02, 2026-11-03), part 1500, 7 in x 1, $54.22 each"]
+
+[[stock]]
+form = "flat_bar"
+material = "1018 cold-finish carbon steel"
+note = "Bought (Online Metals order 1021751700, PO harmonic-analyzer-02, 2026-11-03): part 7469, 1/4 x 2 in rectangle 1018 CF, 2 x 72 in, $82.84. Item notes: Drawing Number: MHA-CH-03 | Custom Part: ch-connecting-rod."
+section_mm = [50.8, 6.35]
+length_mm = 1828.8
+pieces = 2
+on_hand = true
+cite = ["Online Metals order 1021751700 confirmation (PO harmonic-analyzer-02, 2026-11-03), part 7469, 72 in x 2, $41.42 each"]
+
+[[stock]]
+form = "flat_bar"
+material = "1018 cold-finish carbon steel"
+note = "Bought (Online Metals order 1021751700, PO harmonic-analyzer-02, 2026-11-03): part 7469, 1/4 x 2 in rectangle 1018 CF, 1 x 36 in, $30.33. Item notes: Drawing Number: MHA-CH-03 | Custom Part: ch-connecting-rod."
+section_mm = [50.8, 6.35]
+length_mm = 914.4
+on_hand = true
+cite = ["Online Metals order 1021751700 confirmation (PO harmonic-analyzer-02, 2026-11-03), part 7469, 36 in x 1, $30.33 each"]
 
 # Metal Supermarkets Kent invoice EC234347, ordered 2026-11-03, pick-up (PDF
 # in the owner's Downloads). Job comment on the invoice: "C360 0.250x6.000 x
@@ -879,6 +1230,7 @@ note = "Bought (Metal Supermarkets invoice EC234347): mild steel round tube 1020
 od_mm = 25.4
 wall_mm = 3.048
 length_mm = 1041.4
+pieces = 5
 on_hand = true
 cite = ["Metal Supermarkets Kent invoice EC234347, date ordered 03 Nov 2026, line Mild Steel Round Tube 1020 (DOM) 1.000 X 0.120, qty 5 @ 41.000 in"]
 
@@ -890,6 +1242,64 @@ dia_in = [0.5]
 length_in = [4.0]
 on_hand = true
 cite = ["Metal Supermarkets Kent invoice EC234347, date ordered 03 Nov 2026, line Alloy Steel Round Bar 4140 CD Heat Treated 0.500, qty 1 @ 4.000 in"]
+
+# McMaster-Carr PO 0803PCAMPOS (packing list 1616317-01, 08/04/2025; all
+# shipped as ordered): its raw stock lines. Owner (Pedro) 2026-11-17: "there
+# should be some hex brass from mcmaster too". No registry or spec names
+# these SKUs or sizes (searched 2026-11-17), so no allocation is recorded.
+[[stock]]
+form = "hex_bar"
+material = "C36000 ultra-machinable 360 brass"
+note = "Bought (McMaster-Carr PO 0803PCAMPOS, packing list line 38): 8952K24 ultra-machinable 360 brass hex bar, 5/16 in wide, 1/2 ft, 1 each."
+across_flats_mm = 7.9375
+length_mm = 152.4
+on_hand = true
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 38: \"Ultra-Machinable 360 Brass Hex Bar, 5/16\" Wide, 1/2 Feet Long\", 1 each shipped"]
+
+[[stock]]
+form = "square_bar"
+material = "C36000 ultra-machinable 360 brass"
+note = "Bought (McMaster-Carr PO 0803PCAMPOS, packing list line 39): 8951K73 ultra-machinable 360 brass bar, 5/8 x 5/8 in, 1/2 ft, 1 each."
+section_mm = [15.875, 15.875]
+length_mm = 152.4
+on_hand = true
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 39: \"Ultra-Machinable 360 Brass Bar, 5/8\" Thick, 5/8\" Wide, 1/2 Feet Long\", 1 each shipped"]
+
+[[stock]]
+form = "round_bar"
+material = "12L14 carbon steel, ultra-machinable, tight tolerance"
+note = "Bought (McMaster-Carr PO 0803PCAMPOS, packing list line 36): 5227T42 tight-tolerance 12L14 carbon steel rod, 3/32 in diameter, 3 ft, 1 each."
+dia_in = [0.09375]
+length_in = [36.0]
+on_hand = true
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 36: \"Tight-Tolerance 12L14 Carbon Steel Rod, Ultra-Machinable, 3/32\" Diameter, 3 Feet Long\", 1 each shipped"]
+
+[[stock]]
+form = "ball"
+material = "260 brass"
+note = "Bought (McMaster-Carr PO 0803PCAMPOS, packing list line 37): 9617K35 260 brass balls, 7/32 in diameter, 1 pack of 100."
+dia_in = [0.21875]
+pieces = 100
+on_hand = true
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 37: \"260 Brass Balls, 7/32\" Diameter, Packs of 100\", 1 pack shipped"]
+
+[[stock]]
+form = "wire"
+material = "1080 spring steel, lubricated"
+note = "Bought (McMaster-Carr PO 0803PCAMPOS, packing list line 23): 9666K129 lubricated 1080 spring steel wire, .187 in diameter, 1 lb coil, 10 ft, 1 each."
+dia_in = [0.187]
+length_in = [120.0]
+on_hand = true
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 23: \"Lubricated 1080 Spring Steel Wire, 1 lb. Coil, 0.187\" Diameter, 10 Feet Long\", 1 each shipped"]
+
+[[stock]]
+form = "wire"
+material = "304 stainless steel, spring-back"
+note = "Bought (McMaster-Carr PO 0803PCAMPOS, packing list line 22): 9495K113 spring-back 304 stainless steel wire, .008 in diameter, 1445 ft, 1 each."
+dia_in = [0.008]
+length_in = [17340.0]
+on_hand = true
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 22: \"Spring-Back 304 Stainless Steel Wire, 0.008\" Diameter, 1445 Feet Long\", 1 each shipped"]
 
 # Not ordered: stock still to buy.
 
@@ -1116,10 +1526,11 @@ use = "Leadscrew kit (MHA-CH-06-TL-VN-84) feed nut: the four countersinks beside
 # 1616317-01, 08/04/2025), all shipped; owner (Pedro) 2026-11-17: "add to
 # inventory ... already owned". Names, sizes and quantities are the packing
 # list's descriptions; nothing it does not state is recorded (the McMaster
-# product pages returned no product text, read 2026-11-17). Its fasteners,
-# wire, brass and 12L14 stock and brass balls are consumable stock, not
-# recorded here. Where an older record may be the same object (noted at the
-# record), neither is merged: the packing list does not say.
+# product pages returned no product text, read 2026-11-17). Its fasteners are
+# not recorded; its wire, brass and 12L14 stock and brass balls are [[stock]]
+# rows (McMaster-Carr PO 0803PCAMPOS block). Where an older record may be the
+# same object (noted at the record), neither is merged: the packing list does
+# not say.
 
 [gauges.telescoping-gauges-starrett-s579gz]
 name = "Starrett S579Gz telescoping bore gauge set, 4 pieces"
