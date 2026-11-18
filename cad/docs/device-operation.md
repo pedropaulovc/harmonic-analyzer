@@ -88,7 +88,11 @@ Overview: Analysis"; p. 8):
    station (the rocker pin rides an arc, the bar's foot rides another), and
    Michelson's answer was to stamp the stick where the machine actually reads each
    ordinate. This reconstruction keeps the stick linear (14.20 mm per division, so it
-   can be inspected against a rule) and moves the same correction into a table.
+   can be inspected against a rule) and moves the same correction into a table. It
+   sets a bar Michelson's way (MHA-MS-00 steps 11–13A: the stop on the rocker arm's
+   outer tip, the bar slid out to the stick's 10 end), so the stick's zero lies about
+   2.7 mm from the pivot; the table's stick-reading column carries that offset and
+   zero is the stop on the 0.2 tick (#2434).
 
 So the analysis mode has always been: set, crank, **read, normalise**. The
 reconstruction adds two small **corrections** after the normalisation, both of which
@@ -103,7 +107,7 @@ Full procedure with the numbers: `READOUT.md` in the release bundle (or
 | step | what | why | provenance |
 |---|---|---|---|
 | 0 | **choose the ordinate scale** from the current release's `READOUT.md`: its capacity uses the conservative **component operating minimum**, not nominal model travel or extra travel admitted by as-made inspection. Keep $P(f)=\sum_i t_i(1+\kappa_i)$ no greater than the generated capacity rounded **down** to two decimals, with each $t_i$ read at the scaled station before division by $f$. Solve a broader input's scale from the table, not by proportion (idle bars retain a fixed read ordinate), then use the clamp-station table to fill the stroke, **no farther than the built 165 mm**. A sparse input may need scaling up within capacity and bar travel; otherwise reading errors grow by $15/r_0$. | the full one-sided clamp envelope must remain on cylindrical plain stock, clear of runout/thread, bracket and the free hemisphere. Check the as-made sliding bore and fit-up as described below; only the built pose is CAD-gated (#748). | book p. 99 ("scaled by adjusting the magnifying lever"); `error_budget.py` derives capacity from `operating_clamp_radius_band()`, not historical collar dimensions; [#748](https://github.com/pedropaulovc/harmonic-analyzer/issues/748) |
-| 1 | set bar $i$ to the linear station $f\,x_i \cdot 88$ mm; **record the ordinate it reads** from the station table, divided by $f$ so steps 3–4 use the function's own units | a bar at the stick zero still moves (≈ 0.028 of full scale: the null lies behind the pivot); the ordinate-per-mm slope changes by +4.1 % across the range | Michelson's unevenly-stamped stick (book p. 34); here a linear stick + table |
+| 1 | set bar $i$ to the linear station $f\,x_i \cdot 88$ mm; **record the ordinate it reads** from the station table, divided by $f$ so steps 3–4 use the function's own units | a bar at zero still moves (≈ 0.028 of full scale: the null lies behind the pivot); the ordinate-per-mm slope changes by +4.1 % across the range | Michelson's unevenly-stamped stick (book p. 34); here a linear stick + table |
 | 2 | crank in one direction; read the pen height $r_k$ (mm) off the trace's own mean line at $\theta_k$, i.e. with the crank on its index after $2k$ turns | the coefficients are the ordinates at those divisions | 1898 p. 10; book p. 8 |
 | 3 | **normalise**: $s = r_0 / (S + C_2)$ with $S = \sum x^{read}_i$, $C_2 = \sum x^{read}_i \kappa_i$; then $O'_k = r_k / s$ | the pen scale is unknown; the $k = 0$ reading is the greatest term and fixes it | 1898 pp. 10–11 (`obs.` $n = 0$ ≡ 100); book p. 99 |
 | 4a | subtract $\sum_i x^{read}_i \kappa_i \cos(2i\theta_k)$, $\kappa_i$ from the table | a slider-crank is not a cosine: the rod adds a 2nd harmonic of $e/4L$ ≈ 1.4 % per channel, which aliases onto every readout point | design property of the eccentric-and-rod drive; not in the paper, *inside* its 0.7 % |

@@ -91,7 +91,7 @@ def test_every_toleranced_nominal_is_the_cad_constant(budget, nom):
             assert key in (
                 "cam_phase", "mesh_lag_spread", "cone_flat_clock",
                 "cone_tip_bond_clock", "cone_key_play",
-                "station_setting",
+                "rocker_tip_land", "stop_face_square", "station_setting",
             ), key
             continue
         assert key in NOMINAL_FIELD, f"{key}: no Nominal field mapped"
@@ -480,6 +480,33 @@ def test_readout_procedure_publishes_operating_bounds_and_capacity(report, nom):
     assert "waive_minimum_pose" in procedure and "#748" in procedure
 
 
+def test_readout_stick_reading_carries_the_registration_offset(report, nom):
+    """#2434 (delegated ruling 2026-11-17, option 2): the stick sets a bar
+    Michelson's way, as drawn, so its zero is not at the pivot; READOUT's
+    stick-reading column is the stop reading for each station, about
+    (station + 2.7 mm)/14.2, and zero is the stop on the 0.2 tick."""
+    import ms_stick_registration as registration
+
+    procedure = eb.readout_procedure(report)
+    assert "0 tick sits at the rocker pivot" not in procedure
+    assert "stick's 0 tick does NOT sit at the pivot" in procedure
+    assert f"stop on the\n{registration.ZERO_TICK_TEXT} tick" in procedure
+    assert f"$(d_i + {registration.MEAN_OFFSET_MM:.2f})/14.2$" in procedure
+    table = procedure.split("| station (mm) | stick reading (div) |", 1)[1]
+    rows = [
+        [cell.strip() for cell in line.strip("|").split("|")]
+        for line in table.split("\n\n", 1)[0].splitlines()[2:]
+    ]
+    assert float(rows[-1][0]) == pytest.approx(nom.d_max)
+    for station, reading, *_ in rows:
+        d, r = float(station), float(reading)
+        assert r == pytest.approx(registration.stick_reading(d), abs=5e-4)
+        assert 14.2 * r - d == pytest.approx(
+            registration.MEAN_OFFSET_MM, abs=registration.OFFSET_SPREAD_MM + 0.01
+        )
+    assert float(rows[0][1]) == pytest.approx(float(registration.ZERO_TICK_TEXT), abs=0.005)
+
+
 def test_magnifier_setup_fits_reference_inputs_to_reachable_stroke(report, nom):
     """Classify each reference input from its peak and conservative wire-arm
     capacities, not from which regimes a particular drum happened to realise.
@@ -712,6 +739,30 @@ def test_station_setting_scatter_never_goes_below_the_pivot(nom):
     # only the 3rd harmonic and the table interpolation are left (< 0.005 % FS)
     assert np.max(np.abs(read(mean))) < 5e-3
     assert np.max(np.abs(read(zero))) > 0.5  # the residual scatter is real, at odd k
+
+
+def test_registration_terms_shift_stations_per_arm_and_common_to_the_stop(nom):
+    """#2434: the arm's tip land moves its own bar's every station; the stop's
+    end face moves every bar alike (one stop sets all 20), so its draw is one
+    column per machine, whatever the other 19 columns hold."""
+    x = eb.reference_inputs()["rect_half"]
+    sens = eb.gain_sensitivities(nom)
+    rng = np.random.default_rng(2434)
+    v = rng.uniform(-0.05, 0.05, size=(3, eb.N_ELEMENTS))
+    common = np.broadcast_to(v[:, :1], v.shape)
+
+    def read(key: str, dev: np.ndarray) -> np.ndarray:
+        return eb._channel_model(x, nom, {key: dev}, sens)
+
+    assert np.array_equal(read("stop_face_square", v), read("rocker_tip_land", common))
+    assert not np.allclose(read("rocker_tip_land", v), read("rocker_tip_land", common))
+    budget = eb.load_budget()["critical_features"]
+    assert budget["rocker_tip_land"]["class"] == budget["stop_face_square"]["class"] == "channel"
+    # The fit-up check's .002 feeler is the booked half-width.
+    import ms_measuring_stick_assembly_sheet as ms_sheet
+
+    assert budget["stop_face_square"]["tolerance"] == pytest.approx(
+        float(ms_sheet.STOP_FACE_FEELER) * 25.4)
 
 
 def test_counter_spring_catalog_range_gates_every_station_case(

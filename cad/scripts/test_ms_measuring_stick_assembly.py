@@ -120,7 +120,7 @@ def test_clamped_setting_authors_its_globals_and_drives(monkeypatch) -> None:
         f"SettingContactY@{feature}": '-"SettingContact"',
         f"{spec.SETTING_DIMENSION}@{feature}": '"SettingBlockFace" - "SettingStickLeft"',
     }
-    # A parenthesized, unbanded reference: "(2.923)", not "2.923 ±.004".
+    # A parenthesized, unbanded reference: "(2.9)", not "2.923 ±.004".
     assert tolerance.Type == 0
     assert reference_text == {1: "(", 2: ")"}
     assert display.ShowParenthesis is False
@@ -208,8 +208,8 @@ def test_stop_mark_division_sits_on_the_thumbscrew_axis() -> None:
     assert spec.STICK_ORIGIN[0] == pytest.approx(-74.232)
     assert spec.STICK_X_MIN == pytest.approx(-74.232)
     assert spec.SETTING_NEAR_FACE_MM == pytest.approx(74.232)
-    # Printed at its three inch places as the "(2.923)" reference.
-    assert f"{spec.SETTING_NEAR_FACE_MM / 25.4:.{spec.SETTING_PRECISION}f}" == "2.923"
+    # Printed at one place as the "(2.9)" reference: the pose is an example.
+    assert f"{spec.SETTING_NEAR_FACE_MM / 25.4:.{spec.SETTING_PRECISION}f}" == "2.9"
     assert spec.STICK_X_MAX == pytest.approx(127.698)  # 7.95 bar, stations fixed
     assert spec.STICK_X_MIN < 0.0 and spec.STICK_X_MAX > stop.BLOCK_LENGTH
 
@@ -367,11 +367,13 @@ def test_fitter_package_covers_rule_9() -> None:
         "ASSEMBLED + CLAMPED SETUP",
         "EXPLODED VIEW + BOM",
         "FINISHED ASSEMBLY",
+        "IN USE: SETTING A BAR",
     )
     assert drawing.SPEC.layout is drawing.DrawingLayout.LANDSCAPE
     assert tuple(drawing.SHEET_LAYOUTS[name] for name in drawing.SHEET_NAMES) == (
         drawing.DrawingLayout.LANDSCAPE,
         drawing.DrawingLayout.PORTRAIT,
+        drawing.DrawingLayout.LANDSCAPE,
         drawing.DrawingLayout.LANDSCAPE,
     )
     assert all(scale == (1.0, 1.0) for scale in drawing.SHEET_SCALES.values())
@@ -388,7 +390,7 @@ def test_fitter_package_covers_rule_9() -> None:
         assert len(textwrap.wrap(step, width=100, subsequent_indent="   ")) <= 6, step
     # Owner ruling 2026-11-06 (option C): no as-shipped setting. The clamp
     # step sets no position, and sheet 1 labels its drawn pose an example.
-    clamp = sheet.ASSEMBLY_STEPS[-1]
+    clamp = sheet.ASSEMBLY_STEPS[10]
     assert clamp.startswith("10. WITH ITEM 1 AT ANY POSITION ALONG ITEM 3")
     assert "THUMBSCREW" in clamp
     for gone in ("NEAR_FACE_MARK", "NEAR_FACE_WINDOW"):
@@ -397,7 +399,15 @@ def test_fitter_package_covers_rule_9() -> None:
         assert "GRADUATION" not in text and "±" not in text
     assert "EXAMPLE POSITION" in sheet.EXAMPLE_POSE_NOTE
     assert "(ASSEMBLY.MD STEP 10)" in sheet.EXAMPLE_POSE_NOTE
-    assert "CLAMP" in sheet.ASSEMBLY_STEPS[9] and sheet.ASSEMBLY_STEPS[9].startswith("10. ")
+    assert "CLAMP" in sheet.ASSEMBLY_STEPS[10] and sheet.ASSEMBLY_STEPS[10].startswith("10. ")
+    # Rule 22: one action a step, so the plate's fit and its screws are two.
+    assert [step.split(".")[0] for step in sheet.ASSEMBLY_STEPS[8:10]] == ["9", "9A"]
+    # #2434: the stop's end face is fitted square at assembly (delegated
+    # choice, owner fit-at-assembly precedent), the check then its remedy.
+    check, remedy = sheet.ASSEMBLY_STEPS[11:]
+    assert check.startswith("10A. CHECK: WITH A MACHINIST'S SQUARE")
+    assert f"A {sheet.STOP_FACE_FEELER} FEELER DOES NOT ENTER" in check
+    assert remedy.startswith("10B. IF IT ENTERS, STONE") and remedy.endswith("REPEAT 10A.")
     assert all(
         len(line) <= drawing.EXAMPLE_NOTE_WIDTH for line in drawing.EXAMPLE_NOTE.splitlines()
     )
@@ -423,6 +433,65 @@ def test_fitter_package_covers_rule_9() -> None:
     assert not any("BLACKEN" in step or "FINISH" in step for step in sheet.ASSEMBLY_STEPS)
     for obsolete in ("FINISH_NOTE", "FINISH_NOTE_TEXT", "FINISH_NOTE_XY", "_BLOCK_FINISH"):
         assert not hasattr(drawing, obsolete)
+
+
+def test_in_use_sheet_registers_the_drawn_stop_on_a_rocker_arm() -> None:
+    """#2434 (delegated ruling 2026-11-17, option 2): sheet 4 lays the drawn
+    stop on a rocker arm Michelson's way; the phantom arm and bar stand where
+    the drawn reading puts them, and the in-use steps cite that sheet."""
+    import ms_stick_registration as registration
+
+    assert drawing.SHEET_NAMES[sheet.IN_USE_SHEET - 1] == "IN USE: SETTING A BAR"
+    # The drawn stop's end face nearer the 10 end reads between 2 and 3 and
+    # sets a bar about 36 mm out; it stands on the arm's tip land.
+    assert 2.0 < drawing.IN_USE_READING < 3.0
+    assert drawing.IN_USE_STATION_MM == pytest.approx(
+        stick.DIVISION_SPACING * drawing.IN_USE_READING - registration.MEAN_OFFSET_MM,
+        abs=registration.OFFSET_SPREAD_MM,
+    )
+    assert drawing.in_use_point(registration.LAND_BOTTOM)[0] == pytest.approx(stop.BLOCK_LENGTH)
+    g = registration.register(drawing.IN_USE_STATION_MM)
+    corner = drawing.in_use_point(g.ten_end_top)
+    assert corner[:2] == pytest.approx((spec.STICK_X_MAX, spec.STICK_BOTTOM_Y))
+    # The arm's top edge runs from the tip corner (under the stick's resting
+    # face) inboard past the pivot; the stick rests on it at both ends.
+    tip = drawing.in_use_point(registration.TIP_CORNER)
+    assert tip[1] == pytest.approx(spec.STICK_TOP_Y)
+    assert drawing.in_use_point(g.ten_end_bottom)[:2] == pytest.approx(
+        (spec.STICK_X_MAX, spec.STICK_TOP_Y))
+    arc = [key for key in drawing.IN_USE_PHANTOM if key.startswith("arm top edge")]
+    assert len(arc) == drawing.IN_USE_ARC_SEGMENTS
+    assert drawing.IN_USE_PHANTOM[arc[-1]][1][0] < registration.PIVOT[0]
+    assert set(drawing.IN_USE_LABEL_TIPS) | {"reading"} == set(sheet.IN_USE_LABELS)
+    crank = sheet.USE_STEPS[4]
+    assert crank.startswith("12. ")
+    for text in sheet.USE_STEPS[:4] + sheet.USE_STEPS[5:]:
+        assert "ITEM " in text, text
+    view_b = f"VIEW {sheet.IN_USE_VIEW_LETTER}, SHEET {sheet.IN_USE_SHEET}"
+    assert sum(view_b in step for step in sheet.USE_STEPS) == 3
+    assert f"(FOR A BAR AT ZERO, GRADUATION {registration.ZERO_TICK_TEXT})" in sheet.USE_STEPS[2]
+    assert f"FOR A BAR AT ZERO THE STOP STANDS ON GRADUATION {registration.ZERO_TICK_TEXT}" in (
+        " ".join(sheet.IN_USE_CAPTION.split())
+    )
+    # Rule 22: one action a step; no step chains two with ';' or 'AND SLIDE'.
+    for step in sheet.USE_STEPS:
+        assert "; SLIDE" not in step and "AND SLIDE" not in step, step
+    # The stick and stop overbalance outboard past about 36 mm, so the 10 end
+    # is held down on the arm before the bar comes out against it.
+    heads = [step.split(".")[0] for step in sheet.USE_STEPS]
+    hold = sheet.USE_STEPS[heads.index("12C")]
+    assert "HOLD THE 10 END" in hold and heads.index("12C") + 1 == heads.index("13")
+    # Rules 9 and 26: a letter label, a viewing arrow on sheet 1's bottom
+    # view, the rotation stated; the caption keeps only what the view can't.
+    assert sheet.IN_USE_VIEW_LETTER != drawing.CLAMP_SECTION_LABEL
+    assert sheet.IN_USE_VIEW_LABEL == "VIEW B\nROTATED 180°"
+    assert "ROTATED" not in sheet.IN_USE_CAPTION and "GRADUATIONS UP" not in sheet.IN_USE_CAPTION
+    assert not any("10-END" in text for text in (*sheet.USE_STEPS, *sheet.IN_USE_LABELS.values()))
+    assert all(
+        len(line) <= drawing.IN_USE_CAPTION_WIDTH for line in drawing.IN_USE_CAPTION.splitlines()
+    )
+    for step in sheet.USE_STEPS:
+        assert len(textwrap.wrap(step, width=100, subsequent_indent="   ")) <= 6, step
 
 
 def test_bom_prints_registry_identity_and_vendor_sku_only() -> None:
@@ -715,7 +784,7 @@ def test_mixed_sheets_copy_real_templates_and_close_donors(monkeypatch, defect) 
         assert tuple(target.GetSheetNames()) == drawing.SHEET_NAMES
         assert tuple(sheet.layout for sheet in target.sheets) == (
             drawing.DrawingLayout.LANDSCAPE, drawing.DrawingLayout.PORTRAIT,
-            drawing.DrawingLayout.LANDSCAPE,
+            drawing.DrawingLayout.LANDSCAPE, drawing.DrawingLayout.LANDSCAPE,
         )
     else:
         message = {
@@ -806,6 +875,10 @@ def test_clamped_sheet_places_section_clear_of_setting(monkeypatch, defect) -> N
     monkeypatch.setattr(drawing, "model_point_in_view", project)
     monkeypatch.setattr(drawing, "create_section_view", create)
     monkeypatch.setattr(drawing, "_add_assembly_dimensions", lambda *a: settled)
+    arrows = []
+    monkeypatch.setattr(drawing, "_add_view_b_arrow", lambda adapter, view: arrows.append(view))
+    face_notes = []
+    monkeypatch.setattr(drawing, "_add_stop_face_note", lambda adapter, view: face_notes.append(view))
     if defect is not None:
         message = {
             "style-set": "failed to set connected",
@@ -824,6 +897,91 @@ def test_clamped_sheet_places_section_clear_of_setting(monkeypatch, defect) -> N
     assert cut["line_end"] == pytest.approx((0.1199, 0.1699245))
     assert cut["view_xy"] == drawing.CLAMP_SECTION_CENTER
     assert cut["scale"] == drawing.CLAMP_SECTION_SCALE
+    assert arrows == [underside]
+    assert face_notes == [front]
+
+
+@pytest.mark.parametrize("defect", (None, "mirrored", "upward"))
+def test_view_b_arrow_points_down_onto_the_bottom_views_front_edge(monkeypatch, defect) -> None:
+    """Rules 9 and 26: VIEW B (sheet 4) is named by a letter arrow on the
+    bottom view, square down onto the stick's front face (+Z), so it looks
+    the way the front view does."""
+    underside, note = object(), object()
+    calls = {}
+
+    def project(adapter, view, points, **kwargs):
+        assert view is underside
+        (x, y, z_front), (_x, _y, z_back) = points
+        assert (x, y) == pytest.approx((drawing.VIEW_B_ARROW_MODEL_X_MM / 1000.0,
+                                        spec.STICK_BOTTOM_Y / 1000.0))
+        assert (z_front, z_back) == pytest.approx((spec.STICK_Z_MAX / 1000.0,
+                                                   spec.STICK_Z_MIN / 1000.0))
+        front_y, back_y = (0.130, 0.137) if defect == "mirrored" else (0.137, 0.130)
+        return [(0.200, front_y), (0.200, back_y)]
+
+    def leader(adapter, text, **kwargs):
+        calls["leader"] = (text, kwargs)
+        return note
+
+    def square(adapter, placed, **kwargs):
+        assert placed is note
+        calls["square"] = kwargs
+        tip = kwargs["tip_xy"]
+        start_y = tip[1] - 0.001 if defect == "upward" else tip[1] + drawing.VIEW_B_ARROW_LENGTH
+        return [tip[0], start_y, 0.0, tip[0], tip[1], 0.0]
+
+    monkeypatch.setattr(drawing, "model_points_in_view", project)
+    monkeypatch.setattr(drawing, "add_leader_note", leader)
+    monkeypatch.setattr(drawing, "square_view_arrow", square)
+    if defect is not None:
+        with pytest.raises(RuntimeError, match="front edge"):
+            drawing._add_view_b_arrow(object(), underside)
+        return
+    drawing._add_view_b_arrow(object(), underside)
+    text, kwargs = calls["leader"]
+    assert text == sheet.IN_USE_VIEW_LETTER and kwargs["view"] is underside
+    tip = (0.200, 0.137 + drawing.VIEW_B_ARROW_TIP_GAP)
+    assert kwargs["attach_xy"] == pytest.approx(tip)
+    assert kwargs["text_xy"][1] > tip[1] + drawing.VIEW_B_ARROW_LENGTH
+    assert calls["square"]["axis"] == 0
+    assert calls["square"]["letter_height"] == drawing.VIEW_B_LETTER_HEIGHT
+    # Over the bare stick, clear of the clamp the section cuts.
+    assert drawing.VIEW_B_ARROW_MODEL_X_MM > stop.BLOCK_LENGTH + 20.0
+
+
+def test_stop_face_check_prints_at_the_end_face_nearer_the_10(monkeypatch) -> None:
+    """Rule 22: step 10A's acceptance prints on sheet 1 at the stop's end face
+    nearer the 10, above the stick, its text up and to the right."""
+    front, calls = object(), {}
+
+    def project(adapter, view, point, **kwargs):
+        assert view is front
+        calls["point"] = point
+        return (0.1294, 0.1867)
+
+    monkeypatch.setattr(drawing, "model_point_in_view", project)
+    monkeypatch.setattr(
+        drawing, "add_leader_note", lambda adapter, text, **kw: calls.update(text=text, kw=kw)
+    )
+    drawing._add_stop_face_note(object(), front)
+    x, y, _z = calls["point"]
+    assert x == pytest.approx(stop.BLOCK_LENGTH / 1000.0)
+    assert spec.STICK_TOP_Y / 1000.0 < y < 0.0  # on the block, above the stick
+    assert calls["text"] == sheet.STOP_FACE_NOTE and calls["kw"]["view"] is front
+    assert calls["kw"]["attach_xy"] == pytest.approx((0.1294, 0.1867))
+    tx, ty = calls["kw"]["text_xy"]
+    assert tx > 0.1294 and ty > 0.1867
+    assert f"{sheet.STOP_FACE_FEELER} FEELER DOES NOT ENTER" in sheet.STOP_FACE_NOTE
+    assert "(ASSEMBLY.MD STEP 10A)" in sheet.STOP_FACE_NOTE
+    # Rule 14: the lines end left of the (8.0) right extension line (the
+    # 33-character first line of run 20261118T102641481Z-bfd27b57 crossed it).
+    assert max(len(line) for line in sheet.STOP_FACE_NOTE.splitlines()) <= 26
+    assert sheet.ASSEMBLY_STEPS[11].endswith("NEARER THE 10 (SHEET 1).")
+    # The square stands on the face item 4 clamps, so its blade spans the
+    # floor side of the end face, the side that bears on the land (Codjiflo r2).
+    assert "SQUARE ON THE TOP FACE OF ITEM 3" in sheet.ASSEMBLY_STEPS[11]
+    assert "TOP FACE OF ITEM 3" in sheet.STOP_FACE_NOTE
+    assert "TOP FACE OF ITEM 3" in sheet.ASSEMBLY_STEPS[10]  # step 10 names it
 
 
 @pytest.mark.parametrize(

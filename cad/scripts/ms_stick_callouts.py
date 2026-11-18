@@ -28,9 +28,9 @@ SUFFIX = 2  # swDimensionTextSuffix
 RULED_FACE_ISOMETRIC_OCTANT = (1, -1, -1)
 
 # Sheet 1's numbered notes (rule 7). The bar section's two sizes share one
-# fit, and scale zero and the graduation stations share one function: each
-# names its mate once, in the note its dimensions and the station table link
-# (rule 4). The table on sheet 2 links the sheet 1 note by sheet.
+# fit, and the graduation stations share one function: each names its mate
+# once, in the note its dimensions and the station table link (rule 4). The
+# table on sheet 2 links the sheet 1 note by sheet.
 REBATE_NOTE_NUMBER = 1
 STATION_NOTE_NUMBER = 2
 DRAWING_NOTES = (
@@ -60,7 +60,8 @@ SECTION_PARENT_VIEW_NOTE = "FRONT VIEW ROTATED 180°"
 CALLOUTS: dict[str, str] = {
     "BodyWidth": REBATE_LINK,
     "BodyThickness": REBATE_LINK,
-    "ScaleStartX": STATION_LINK,
+    # The station table locates the 10 tick with every other graduation;
+    # sheet 1 shows its distance from the datum face as a reference.
     "Tick0Width": f"ALL GRADUATIONS\n{part.GRADUATION_WIDTH_CALLOUT}",
     # Delegated ruling 2026-11-11 (#2433, pending owner confirmation, #2144):
     # the graduations' V angle prints from the spec as NumeralDepth's does,
@@ -82,35 +83,41 @@ CALLOUTS: dict[str, str] = {
 # they hold for every numeral beside its tick: the tick-edge gap for 0-9 on
 # the +X side (the 10 has its own detail), the tick-end gap for all eleven.
 PREFIXES: dict[str, str] = {
+    "Tick10FromEnd": "(",
     "FullTickPitch": "(",
     "MinorTickPitch": "(",
     "NumeralXGap": f"{part.DIVISION_COUNT - 1}X ",
     "NumeralYGap": f"{part.DIVISION_COUNT}X ",
 }
-# Detail A's pitches show the pattern as references (rule 10: the station
-# table, not a chain of pitches, locates every graduation from zero).
-SUFFIXES: dict[str, str] = {"FullTickPitch": ")", "MinorTickPitch": ")"}
+# Detail A's pitches and the 10 tick's land show as references (rule 10: the
+# station table, not a chain from the 10 tick, locates every graduation from
+# the end face).
+SUFFIXES: dict[str, str] = {"Tick10FromEnd": ")", "FullTickPitch": ")", "MinorTickPitch": ")"}
 # Each native text lane and the text the part authors in it.
 LANES: tuple[tuple[int, dict[str, str]], ...] = (
     (CALLOUT_BELOW, CALLOUTS), (PREFIX, PREFIXES), (SUFFIX, SUFFIXES),
 )
 
 # Sheet 2's graduation station table (rules 10 and 26: a location is a table
-# row, baseline from the zero tick that 2.224 locates from the end face).
-# Graduation k (0 at scale zero) sits k minor pitches from zero; a row is a
-# numeral's full tick, a column the minor ticks past it, so every cell is
-# one station's printed X.
+# row, baseline from one datum). The datum is the end face nearest the 10,
+# the face that bears on the bar (#2434). Graduation k (0 at scale zero) sits
+# k minor pitches from zero, so the 10 tick's land plus (100 - k) pitches
+# from that face; a row is a numeral's full tick, a column the minor ticks
+# past it, so every cell is one station's printed distance.
 STATION_TABLE_TITLE = (
-    "GRADUATION STATIONS: X FROM ZERO TICK, EACH ±.002\n"
+    "GRADUATION STATIONS FROM END FACE NEAREST 10, EACH ±.002\n"
     "ROW = NUMERAL'S TICK; COLUMN = MINOR TICKS PAST IT\n"
     f"{STATION_LINK_FROM_SHEET_2}"
 )
 STATION_ROW_HEADING = "NUMERAL"
+LAST_GRADUATION = (part.DIVISION_COUNT - 1) * part.MINOR_PER_DIVISION
 
 
 def station_x_text(index: int) -> str:
-    """Graduation ``index``'s printed X from the zero tick (.XXX inch)."""
-    return part.inch_text(index * part.MINOR_SPACING, 3)
+    """Graduation ``index``'s printed distance from the end face nearest the
+    10 (.XXX inch)."""
+    return part.inch_text(
+        part.SCALE_END_MARGIN + (LAST_GRADUATION - index) * part.MINOR_SPACING, 3)
 
 
 def station_table_columns() -> tuple[str, ...]:
@@ -119,11 +126,10 @@ def station_table_columns() -> tuple[str, ...]:
     numerals = range(part.DIVISION_COUNT)
     columns = ["\n".join([STATION_ROW_HEADING, *(str(numeral) for numeral in numerals)])]
     for minor in range(part.MINOR_PER_DIVISION):
-        last = (part.DIVISION_COUNT - 1) * part.MINOR_PER_DIVISION
         cells = [
             station_x_text(index)
             for numeral in numerals
-            if (index := numeral * part.MINOR_PER_DIVISION + minor) <= last
+            if (index := numeral * part.MINOR_PER_DIVISION + minor) <= LAST_GRADUATION
         ]
         columns.append("\n".join([f"+{minor}", *cells]))
     return tuple(columns)

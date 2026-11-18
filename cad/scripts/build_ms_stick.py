@@ -597,7 +597,8 @@ def _manufacturing_chords(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     last_tick_x = f'{scale_x} + {DIVISION_COUNT - 1} * "DivisionSpacing"'
     glyph_10_x = SCALE_START_X + (DIVISION_COUNT - 1) * DIVISION_SPACING - TICK_WIDTH / 2.0 - NUMERAL_GAP_MM
     bindings = {
-        "ScaleStartReference": (scale_x, None, edge_y),
+        # The 10 tick from the 10-end face: the graduations' datum (#2434).
+        "ScaleEndReference": ('"ScaleEndMargin"', last_tick_x, edge_y),
         "FullLengthReference": ('"TickLength"', scale_x, '"BodyWidth" - "TickLength"'),
         "MinorLengthReference": (
             '"MinorTickLength"',

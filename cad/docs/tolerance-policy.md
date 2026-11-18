@@ -453,12 +453,17 @@ flowchart LR
 $S = \sum_i x^\text{read}_i$ and $C_2 = \sum_i x^\text{read}_i\kappa_i$ are the two sums the
 operator forms from step 1; the table is the only data the procedure needs beyond the readings.
 
-1. **Zero the measuring stick at the pivot** (every station ≥ 0, the only side the CAD builds)
-   and **set each bar to its linear station** $x_i \cdot 88$ mm on the engraved 14.20 mm/division
-   scale, then **record the ordinate it actually reads** from the station table in the shipped
+1. **Set each bar to its linear station** $x_i \cdot 88$ mm from the rocker pivot (every
+   station ≥ 0, the only side the CAD builds) with the measuring stick, Michelson's way
+   (MHA-MS-00 steps 11–13A: the stop clamped at the station's stick reading, its end face on
+   the rocker arm's outer tip, the bar slid out to the stick's 10 end; #2434, delegated ruling
+   2026-11-17, no precedent, option 2, owner review on #2144). The stick's zero is not at the
+   pivot: `READOUT.md`'s stick-reading
+   column carries its ≈2.7 mm offset (`ms_stick_registration`), and zero is the stop on the
+   0.2 tick. Then **record the ordinate it actually reads** from the station table in the shipped
    `READOUT.md` (verify the table on the assembled machine from single-channel runs: one bar
    alone at each station, its k = 0 amplitude as a fraction of a full-scale bar's). The read
-   ordinate differs from the set one — an idle bar at the stick zero reads $\ell$ = 0.029, not
+   ordinate differs from the set one — an idle bar at zero reads $\ell$ = 0.029, not
    0 — and that difference is what the correction subtracts. Every trial then carries the read-vs-set vector
    $\sum_i (x^{read}_i - x^{set}_i)\cos(ik\pi/20)$ — for idle bars $20\ell$ at k = 0, $-\ell$ at
    odd k, 0 at even k ≥ 2 — subtracted from every reading (in ordinate units, after

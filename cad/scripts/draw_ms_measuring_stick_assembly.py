@@ -1,17 +1,23 @@
-r"""Create the three-sheet measuring-stick fitter package (MHA-MS-00).
+r"""Create the four-sheet measuring-stick fitter package (MHA-MS-00).
 
 Sheet 1 shows the stick clamped at its stop mark (upright elevation and its
-projected third-angle bottom view below it, both at full size), a reference
-overall and the near-face setting dimension, and an upright clamp section;
+projected third-angle bottom view below it, both at full size, the bottom
+view carrying VIEW B's viewing arrow), a reference overall and the near-face
+setting dimension, and an upright clamp section;
 sheet 2 the builder-owned ``MS_EXPLODED``
 presentation with
 the BOM (numbers, descriptions, vendor SKU, quantity) and a balloon on every
-component, both plate screws included; sheet 3 the finished isometric. The
-fit-up steps and checks print in the release's ASSEMBLY.md (#2889). Every
-text, pose and reference value comes from
+component, both plate screws included; sheet 3 the finished isometric;
+sheet 4 the stick in use (#2434), VIEW B: the front elevation turned over,
+graduations up, laid on a MHA-CH-06 rocker arm's top edge with the stop on
+its outer tip land and the MHA-CH-01 bar against the 10 end, the arm and the
+bar in phantom where ``ms_stick_registration`` puts them for the drawn stop.
+The fit-up and in-use steps and checks print in the release's ASSEMBLY.md
+(#2889). Every text, pose and reference value comes from
 ``ms_measuring_stick_assembly_spec``, ``ms_measuring_stick_assembly_sheet``,
-``ms_measuring_stick_explode_spec`` or the part registry; this recipe only
-lays the sheets out. It never edits the source assembly or its explodes.
+``ms_measuring_stick_explode_spec``, ``ms_stick_registration`` or the part
+registry; this recipe only lays the sheets out. It never edits the source
+assembly or its explodes.
 """
 
 from __future__ import annotations
@@ -27,9 +33,11 @@ from typing import Any, Callable
 import _config
 from _machinist_review_mode import MachinistReviewMode
 import _telemetry
+import ch_amplitude_bar_spec as amplitude_bar
 import ms_measuring_stick_assembly_sheet as sheet
 import ms_measuring_stick_assembly_spec as spec
 import ms_measuring_stick_explode_spec as explode
+import ms_stick_registration as registration
 import ms_stick_spec as stick
 import ms_stop_spec as stop
 from _assembly_contract import assembly_contract
@@ -42,6 +50,7 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     set_high_quality_shaded_with_edges,
 )
 from _drawing_balloons import (
@@ -51,6 +60,8 @@ from _drawing_balloons import (
 )
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import set_reference_dimension
+from _drawing_leader_notes import add_leader_note
+from _drawing_view_arrow import square_view_arrow
 from _drawing_edge_dimensions import add_edge_dimension
 from _drawing_edges import _edge_endpoint_key
 from _drawing_projection import model_point_in_view, model_points_in_view
@@ -70,6 +81,13 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_types import DRAWING_TEMPLATES, DrawingLayout
 from _drawing_hidden_sketches import _show_base_view_sketches
 from _simplified_names import simplified_name
+from _transgear_zone_line import (
+    CENTER_LINE_STYLE,
+    CENTER_LINE_WEIGHT,
+    SketchedLine,
+    require_placed,
+    sketch_lines,
+)
 from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
@@ -94,12 +112,16 @@ SHEET_NAMES = (
     "ASSEMBLED + CLAMPED SETUP",
     "EXPLODED VIEW + BOM",
     "FINISHED ASSEMBLY",
+    "IN USE: SETTING A BAR",
 )
 if SPEC.layout is not DrawingLayout.LANDSCAPE:
     raise AssertionError("the measuring-stick primary sheet must remain landscape")
 SHEET_LAYOUTS = dict(zip(SHEET_NAMES, (
-    DrawingLayout.LANDSCAPE, DrawingLayout.PORTRAIT, DrawingLayout.LANDSCAPE
+    DrawingLayout.LANDSCAPE, DrawingLayout.PORTRAIT, DrawingLayout.LANDSCAPE,
+    DrawingLayout.LANDSCAPE,
 )))
+if SHEET_NAMES.index("IN USE: SETTING A BAR") + 1 != sheet.IN_USE_SHEET:
+    raise AssertionError("the in-use steps cite the in-use sheet by number")
 SHEET_SCALE = (1.0, 1.0)
 SHEET_SCALES = {name: SHEET_SCALE for name in SHEET_NAMES}
 
@@ -129,6 +151,15 @@ CLAMP_SECTION_SCALE = (4.0, 1.0)
 CLAMP_SECTION_LABEL = "A"
 CLAMP_SECTION_TOP_CLEARANCE = 0.018
 CLAMP_SECTION_BOTTOM_CLEARANCE = 0.004
+# VIEW B's viewing arrow (rules 9 and 26): on the projected bottom view,
+# square down onto its front edge (third angle: the edge toward the front
+# view), so VIEW B looks the way the front view does. It stands over the
+# bare stick between the 7 and 8, clear of the clamp and its section line;
+# the letter sits at the tail.
+VIEW_B_LETTER_HEIGHT = 0.005
+VIEW_B_ARROW_TIP_GAP = 0.0035
+VIEW_B_ARROW_LENGTH = 0.010
+VIEW_B_ARROW_MODEL_X_MM = spec.STICK_X_MAX - 40.0
 SECTION_SETTING_CLEARANCE = 0.002
 STOP_POSITION_TEXT_Y = 0.220
 # Fraction of the setting span from the stick end: left of centre, so the
@@ -139,6 +170,11 @@ OVERALL_LENGTH_TEXT_Y = 0.257
 # The note sits under the bottom view, where the deleted setup note stood.
 EXAMPLE_NOTE_XY = (0.030, 0.100)
 EXAMPLE_NOTE_WIDTH = 52  # characters; default-format note text
+# Rule 22: step 10A's acceptance prints on the sheet too, a leader note at the
+# stop's end face nearer the 10 (#2434): its tip on that face above the stick,
+# its text right of the block, clear of the stick and of section A's marker.
+STOP_FACE_NOTE_TIP_MM = (stop.BLOCK_LENGTH, -4.0, 0.0)
+STOP_FACE_NOTE_OFFSET = (0.025, 0.030)
 
 # Sheet 2 alone is portrait: the native full-size exploded outline plus its
 # unchanged 24 mm balloon ring is 202.0739 mm high; landscape has 200.7 mm
@@ -186,6 +222,95 @@ EXPLODED_CAPTION_XY = (BOM_ANCHOR[0], 0.415 + EXPLODED_GROUP_SHIFT_Y)
 # Sheet 3: the finished isometric, centred on the sheet. The fit-up
 # steps and checks print in the release's ASSEMBLY.md (#2889).
 ASSEMBLY_ISO_CENTER = ((SHEET_INNER_BORDER[0] + SHEET_INNER_BORDER[2]) / 2.0, 0.170)
+
+# Sheet 4 (#2434): the clamped Front turned half a turn in the sheet plane,
+# so the graduated face is up, item 4 below and the 10 end at the left,
+# toward the rocker pivot. The drawn stop is sheet 1's example pose: its end
+# face nearer the 10 end stands on IN_USE_READING, which sets a bar at
+# IN_USE_STATION_MM; the rocker arm's top edge and outer tip land, the bar's
+# lower end and the pivot are drawn in phantom where that registration puts
+# them (machine rocker plane, mapped into the stick's frame below).
+IN_USE_CENTER = (0.240, 0.170)
+IN_USE_READING = (
+    stop.BLOCK_LENGTH - spec.STICK_X_MIN - stick.SCALE_START_X
+) / stick.DIVISION_SPACING
+IN_USE_STATION_MM = registration.station_for_reading(IN_USE_READING)
+_IN_USE = registration.register(IN_USE_STATION_MM)
+_IN_USE_Z = (spec.STICK_Z_MIN + spec.STICK_Z_MAX) / 2.0
+PHANTOM_STYLE, PHANTOM_WIDTH = 2, 0  # swLinePHANTOM, swLW_THIN
+# The arm's top edge from its outer tip corner inboard past the pivot, as
+# chords short enough to read as the R799.746 arc at full size.
+IN_USE_ARC_SEGMENTS = 24
+IN_USE_ARC_PAST_PIVOT_MM = 12.0
+# The bar's lower end, as far up its outboard face as reads as the bar.
+IN_USE_BAR_SHOWN_MM = 32.0
+IN_USE_PIVOT_MARK_M = 0.004  # half-length of each centre-mark line
+
+
+def in_use_point(machine_xy: tuple[float, float]) -> tuple[float, float, float]:
+    """A rocker-plane point (machine mm) in the assembly frame (mm): the
+    stick's resting 10-end corner is (STICK_X_MAX, STICK_TOP_Y), out along
+    the stick is -X and up from it -Y (the turned-over stop)."""
+    ex, ey = _IN_USE.ten_end_bottom
+    slope = math.radians(_IN_USE.slope_deg)
+    ux, uy = math.cos(slope), math.sin(slope)
+    dx, dy = machine_xy[0] - ex, machine_xy[1] - ey
+    along, up = dx * ux + dy * uy, -dx * uy + dy * ux
+    return (spec.STICK_X_MAX - along, spec.STICK_TOP_Y - up, _IN_USE_Z)
+
+
+def _in_use_phantom() -> dict[str, tuple[tuple[float, float], tuple[float, float]]]:
+    """Each phantom segment's two ends, machine mm."""
+    pivot_x = registration.PIVOT[0]
+    tip_x = registration.TIP_CORNER[0]
+    end_x = pivot_x - IN_USE_ARC_PAST_PIVOT_MM
+    xs = [tip_x + (end_x - tip_x) * i / IN_USE_ARC_SEGMENTS for i in range(IN_USE_ARC_SEGMENTS + 1)]
+    arc = [(x, registration.top_edge_y(x)) for x in xs]
+    segments = {f"arm top edge {i}": (arc[i], arc[i + 1]) for i in range(IN_USE_ARC_SEGMENTS)}
+    segments["arm tip land"] = (registration.TIP_CORNER, registration.LAND_BOTTOM)
+    (fx, fy), (ux, uy) = _IN_USE.bar_face_bottom, _IN_USE.bar_face_up
+    inward = (-uy, ux)  # square to the face, toward the pivot
+    width = amplitude_bar.BAR_WIDTH
+    inner = (fx + width * inward[0], fy + width * inward[1])
+    rise = IN_USE_BAR_SHOWN_MM
+    segments["bar outboard face"] = ((fx, fy), (fx + rise * ux, fy + rise * uy))
+    segments["bar inboard face"] = (inner, (inner[0] + rise * ux, inner[1] + rise * uy))
+    segments["bar foot"] = ((fx, fy), inner)
+    return segments
+
+
+IN_USE_PHANTOM = _in_use_phantom()
+# Leader tips (machine mm) and each label's text offset from its tip (sheet
+# metres): every label stands clear of the stick, the stop and the bar.
+_ARM_LABEL_X = (_IN_USE.ten_end_bottom[0] + registration.TIP_CORNER[0]) / 2.0
+_BAR_LABEL_RISE = 24.0
+IN_USE_LABEL_TIPS = {
+    "rocker": ((_ARM_LABEL_X, registration.top_edge_y(_ARM_LABEL_X)), (-0.075, -0.025)),
+    # Below and left of the land, so the leader clears item 1 and item 4.
+    "tip": (registration.LAND_BOTTOM, (-0.090, -0.040)),
+    "ten_end": (_IN_USE.ten_end_top, (0.012, 0.034)),
+    "bar": (
+        (
+            _IN_USE.bar_face_bottom[0] - amplitude_bar.BAR_WIDTH * _IN_USE.bar_face_up[1]
+            + _BAR_LABEL_RISE * _IN_USE.bar_face_up[0],
+            _IN_USE.bar_face_bottom[1] + amplitude_bar.BAR_WIDTH * _IN_USE.bar_face_up[0]
+            + _BAR_LABEL_RISE * _IN_USE.bar_face_up[1],
+        ),
+        (-0.060, 0.012),
+    ),
+    "pivot": (registration.PIVOT, (-0.050, -0.022)),
+}
+# The reading edge: the stop's end face where it meets the graduated face
+# (assembly frame, mm), labelled above the stop.
+IN_USE_READING_EDGE = (stop.BLOCK_LENGTH, spec.STICK_BOTTOM_Y, _IN_USE_Z)
+IN_USE_READING_LABEL_OFFSET = (0.012, 0.030)
+IN_USE_CAPTION_XY = (0.020, 0.062)
+# VIEW B's label under the view, below the tip-land label's line, centred on
+# the view (rule 9: a rotated view says so under its label).
+IN_USE_VIEW_LABEL_XY = (0.226, 0.115)
+IN_USE_CAPTION_WIDTH = 70  # characters, left of the title block
+if abs(in_use_point(registration.LAND_BOTTOM)[0] - stop.BLOCK_LENGTH) > 1e-6:
+    raise AssertionError("the drawn stop face does not stand on the tip land")
 
 BOM_QUANTITIES = {stem: spec.QUANTITIES[stem] for stem in sheet.BOM_ORDER}
 BOM_COMPONENTS = tuple(BOM_QUANTITIES)
@@ -254,6 +379,9 @@ if explode.SOURCE_CONFIGURATION != ASSEMBLY_VIEW_CONFIGURATION:
 
 EXAMPLE_NOTE = "\n".join(
     textwrap.wrap(sheet.EXAMPLE_POSE_NOTE, width=EXAMPLE_NOTE_WIDTH, subsequent_indent="   ")
+)
+IN_USE_CAPTION = "\n".join(
+    textwrap.wrap(sheet.IN_USE_CAPTION, width=IN_USE_CAPTION_WIDTH, subsequent_indent="   ")
 )
 
 
@@ -913,10 +1041,58 @@ def _place_clamped_sheet(adapter: Any) -> Callable[[], None]:
     apply_view_configuration(adapter, section, label="thumbscrew clamp section")
     _assert_view_on_sheet(section, label="thumbscrew clamp section")
     settled = _add_assembly_dimensions(adapter, front)
+    _add_view_b_arrow(adapter, underside)
+    _add_stop_face_note(adapter, front)
     _add_note_block(
         adapter, SHEET_NAMES[0], EXAMPLE_NOTE, EXAMPLE_NOTE_XY, label="example-pose note"
     )
     return settled
+
+
+def _add_stop_face_note(adapter: Any, front: Any) -> None:
+    """Step 10A's acceptance at the stop's end face nearer the 10 (rule 22:
+    a measurable acceptance prints on the sheets as well as in ASSEMBLY.md)."""
+    label = "stop end face check note"
+    tip = model_point_in_view(
+        adapter, front, tuple(value / 1000.0 for value in STOP_FACE_NOTE_TIP_MM), label=label,
+    )
+    tip_xy = (float(tip[0]), float(tip[1]))
+    add_leader_note(
+        adapter, sheet.STOP_FACE_NOTE,
+        text_xy=(tip_xy[0] + STOP_FACE_NOTE_OFFSET[0], tip_xy[1] + STOP_FACE_NOTE_OFFSET[1]),
+        attach_xy=tip_xy, view=front, label=label,
+    )
+
+
+def _add_view_b_arrow(adapter: Any, underside: Any) -> None:
+    """VIEW B's letter arrow on the bottom view, square down onto its front
+    edge: the view on sheet 4 looks the way the front view does."""
+    label = f"view {sheet.IN_USE_VIEW_LETTER} viewing arrow"
+    x, y = VIEW_B_ARROW_MODEL_X_MM / 1000.0, spec.STICK_BOTTOM_Y / 1000.0
+    near, far = model_points_in_view(
+        adapter, underside,
+        [(x, y, spec.STICK_Z_MAX / 1000.0), (x, y, spec.STICK_Z_MIN / 1000.0)],
+        label=f"{label} station",
+    )
+    # Third angle: the bottom view's top edge is the face toward the viewer
+    # of the front view (+Z), so an arrow down onto it looks along -Z.
+    if near[1] <= far[1]:
+        raise RuntimeError(f"{label}: the bottom view's front edge is not on top: {near}, {far}")
+    tip_xy = (near[0], near[1] + VIEW_B_ARROW_TIP_GAP)
+    text_xy = (
+        tip_xy[0] - VIEW_B_LETTER_HEIGHT * 0.3,
+        tip_xy[1] + VIEW_B_ARROW_LENGTH + VIEW_B_LETTER_HEIGHT,
+    )
+    note = add_leader_note(
+        adapter, sheet.IN_USE_VIEW_LETTER, text_xy=text_xy, attach_xy=tip_xy,
+        view=underside, label=label,
+    )
+    points = square_view_arrow(
+        adapter, note, text_xy=text_xy, tip_xy=tip_xy, axis=0, label=label,
+        letter_height=VIEW_B_LETTER_HEIGHT,
+    )
+    if points[1] <= tip_xy[1]:
+        raise RuntimeError(f"{label} does not run down onto the front edge: leader {points}")
 
 
 def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
@@ -1014,6 +1190,77 @@ def _place_finished_sheet(adapter: Any) -> None:
     assert_full_detail_view(adapter, label="measuring-stick assembly")
 
 
+@_telemetry.traced("drawing.ms_measuring_stick_assembly.in_use")
+def _place_in_use_sheet(adapter: Any) -> Callable[[], None]:
+    """Sheet 4 (#2434): the clamped Front turned over on the sheet, the rocker
+    arm, bar and pivot it registers on in phantom, each surface named; returns
+    the check that proves every phantom line again after the last rebuild."""
+    label = "measuring stick in use"
+    _activate_sheet(adapter, SHEET_NAMES[3])
+    view = place_view(adapter, str(SOURCE), "*Front", *IN_USE_CENTER, scale=SHEET_SCALE)
+    turned = _early_bound(view, "IView")
+    turned.Angle = math.pi
+    if abs(abs(float(turned.Angle)) - math.pi) > 1e-9:
+        raise RuntimeError(f"{label}: failed to turn the front view over")
+    rebuild_drawing(adapter, label=f"{label} turned")
+    set_hidden_lines_removed(adapter, view)
+    apply_view_configuration(adapter, view, label=label)
+    _assert_view_on_sheet(view, label=label)
+
+    keys = list(IN_USE_PHANTOM)
+    tips = list(IN_USE_LABEL_TIPS)
+    machine = [point for key in keys for point in IN_USE_PHANTOM[key]]
+    machine += [IN_USE_LABEL_TIPS[key][0] for key in tips]
+    model = [tuple(value / 1000.0 for value in in_use_point(point)) for point in machine]
+    checks = (
+        (spec.STICK_X_MAX, spec.STICK_BOTTOM_Y, _IN_USE_Z),  # graduated 10-end corner
+        (spec.STICK_X_MAX, spec.STICK_TOP_Y, _IN_USE_Z),  # resting 10-end corner
+        IN_USE_READING_EDGE,
+    )
+    model += [tuple(value / 1000.0 for value in point) for point in checks]
+    projected = model_points_in_view(adapter, view, model, label=f"{label} registration points")
+    graduated, resting, reading = projected[-3:]
+    if not (graduated[1] > resting[1] and graduated[0] < reading[0]):
+        raise RuntimeError(
+            f"{label}: expected the graduated face up and the 10 end left; "
+            f"graduated {graduated!r}, resting {resting!r}, reading edge {reading!r}"
+        )
+    ends = {key: (projected[2 * i], projected[2 * i + 1]) for i, key in enumerate(keys)}
+    tip_xy = dict(zip(tips, projected[2 * len(keys):2 * len(keys) + len(tips)], strict=True))
+    phantom = sketch_lines(adapter, view, ends, style=PHANTOM_STYLE, width=PHANTOM_WIDTH,
+                           label=f"{label} phantom")
+    px, py = tip_xy["pivot"]
+    mark = {
+        "pivot across": ((px - IN_USE_PIVOT_MARK_M, py), (px + IN_USE_PIVOT_MARK_M, py)),
+        "pivot up": ((px, py - IN_USE_PIVOT_MARK_M), (px, py + IN_USE_PIVOT_MARK_M)),
+    }
+    centre = sketch_lines(adapter, view, mark, style=CENTER_LINE_STYLE,
+                          width=CENTER_LINE_WEIGHT, label=f"{label} pivot mark")
+    rebuild_drawing(adapter, label=f"{label} phantom")
+
+    def placed(stage: str, lines: dict[str, SketchedLine] = phantom,
+               marks: dict[str, SketchedLine] = centre) -> None:
+        require_placed(adapter, lines, style=PHANTOM_STYLE, width=PHANTOM_WIDTH,
+                       label=f"{label} phantom", stage=stage)
+        require_placed(adapter, marks, style=CENTER_LINE_STYLE, width=CENTER_LINE_WEIGHT,
+                       label=f"{label} pivot mark", stage=stage)
+
+    placed("drawn")
+    leaders = [(key, tip_xy[key], IN_USE_LABEL_TIPS[key][1]) for key in tips]
+    leaders.append(("reading", reading, IN_USE_READING_LABEL_OFFSET))
+    for key, tip, offset in leaders:
+        add_leader_note(
+            adapter, sheet.IN_USE_LABELS[key],
+            text_xy=(tip[0] + offset[0], tip[1] + offset[1]), attach_xy=tip,
+            label=f"{label} {key} label", view=view,
+        )
+    _add_note_block(adapter, SHEET_NAMES[3], sheet.IN_USE_VIEW_LABEL, IN_USE_VIEW_LABEL_XY,
+                    label="view B label")
+    _add_note_block(adapter, SHEET_NAMES[3], IN_USE_CAPTION, IN_USE_CAPTION_XY,
+                    label="in-use caption")
+    return lambda: placed("settled")
+
+
 def _activate_package(adapter: Any, target: Any) -> None:
     title = str(target.GetTitle() or "")
     if not title:
@@ -1107,10 +1354,12 @@ def _place_package(adapter: Any) -> Callable[[], None]:
     clamped_settled = _place_clamped_sheet(adapter)
     exploded_settled = _place_exploded_sheet(adapter)
     _place_finished_sheet(adapter)
+    in_use_settled = _place_in_use_sheet(adapter)
 
     def settled() -> None:
         clamped_settled()
         exploded_settled()
+        in_use_settled()
 
     return settled
 

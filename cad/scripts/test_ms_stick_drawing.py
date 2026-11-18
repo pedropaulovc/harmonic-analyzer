@@ -82,10 +82,12 @@ def test_dimension_links_name_notes_that_print_on_sheet_one() -> None:
         assert link == f"SEE NOTE {number}"
         assert sum(line.startswith(f"{number}. ") for line in notes) == 1
     linked = {name for name, text in callouts.CALLOUTS.items() if "SEE NOTE" in text}
-    assert linked == {"BodyWidth", "BodyThickness", "ScaleStartX"}
+    assert linked == {"BodyWidth", "BodyThickness"}
     # The station table on sheet 2 links note 2 by sheet.
     assert callouts.STATION_TABLE_TITLE.splitlines()[-1] == callouts.STATION_LINK_FROM_SHEET_2
     assert "MHA-MS-02" in notes[0] and "MHA-CH-01" in notes[1]
+    # Rule 7: a note gives the mate, not a method or a coined face name.
+    assert notes[1] == "2. SETS MHA-CH-01 AMPLITUDE BAR STATIONS"
 
 
 def test_current_identity_and_drawing_paths() -> None:
@@ -142,12 +144,12 @@ def test_every_printed_size_is_owned_and_precisioned_by_model() -> None:
     # except the minor pitch's .XXXX; both pitches print as references.
     assert {name: places for name, places in spec.DRAWING_PRECISION_BY_NAME.items() if places != 2} == (
         {**dict.fromkeys(("BodyWidth", "BodyThickness", "Tick0Width", "TickDepth", "NumeralDepth",
-                         "ScaleStartX", "FullTickPitch"), 3), "MinorTickPitch": 4}
+                         "Tick10FromEnd", "FullTickPitch"), 3), "MinorTickPitch": 4}
     )
     assert spec.DRAWING_PRECISION_BY_NAME["BodyLength"] == 2
-    # Only the zero tick carries its own band; the station table prints the
-    # same band for every other graduation; the rest ride the title block.
-    assert set(spec.DRAWING_TOLERANCES) == {"ScaleStartX"}
+    # No dimension carries its own band: the station table prints +/-.002 for
+    # every graduation from one datum; the rest ride the title block.
+    assert spec.DRAWING_TOLERANCES == {}
     assert {"BodyThickness", "TickDepth", "FullTickLength", "MinorTickLength",
             "HalfTickLength", "FullTickPitch", "MinorTickPitch", "NumeralHeight",
             "NumeralXGap", "NumeralYGap", "NumeralDepth"} <= marked
@@ -173,52 +175,47 @@ def test_reference_chords_measure_real_sizes_not_profile_overhangs() -> None:
         assert 0.0 <= min(start[0], end[0]) <= max(start[0], end[0]) <= spec.BODY_LENGTH
         assert 0.0 <= min(start[1], end[1]) <= max(start[1], end[1]) <= spec.BODY_WIDTH
 
-def test_scale_has_one_printed_origin_without_closing_chain() -> None:
-    assert drawing.FRONT_KEEP.keys() == {"BodyLength", "BodyWidth", "ScaleStartX"}
-    assert "ScaleEndMargin" not in spec.DRAWING_VALUES_BY_NAME
-    assert "ScaleEndMargin" not in spec.DRAWING_TOLERANCES
-    assert "ScaleEndReference" not in spec.REFERENCE_DIMENSIONS
-    start = spec.REFERENCE_DIMENSIONS["ScaleStartReference"]
-    assert start[1] == (0.0, spec.BODY_WIDTH)
-    assert start[2] == (spec.SCALE_START_X, spec.BODY_WIDTH)
+
+def test_scale_has_one_printed_origin_at_the_ten_end_face() -> None:
+    """#2434: the end face nearest the 10 bears on the amplitude bar, so the
+    graduations run from it; nothing locates a graduation from the 0 end."""
+    assert drawing.FRONT_KEEP.keys() == {"BodyLength", "BodyWidth", "Tick10FromEnd"}
+    assert "ScaleStartX" not in spec.DRAWING_VALUES_BY_NAME
+    assert "ScaleStartReference" not in spec.REFERENCE_DIMENSIONS
+    end = spec.REFERENCE_DIMENSIONS["ScaleEndReference"]
+    assert end[1] == (spec.SCALE_START_X + spec.SCALE_SPAN, spec.BODY_WIDTH)
+    assert end[2] == (spec.BODY_LENGTH, spec.BODY_WIDTH)
+    assert spec.DRAWING_VALUES_BY_NAME["Tick10FromEnd"] == pytest.approx(spec.SCALE_END_MARGIN)
+    assert spec.inch_text(spec.SCALE_END_MARGIN, 3) == ".135"
 
 
 def test_last_graduation_is_complete_at_printed_band_extremes() -> None:
-    """Noncumulative pitch allows one station error, not ten chained errors.
-
-    The overall length takes the title block's .XX because this land reads
-    it; the graduation width is a MIN limit, so the land bounds the widest
-    groove that still leaves the last graduation whole, at the .080 rule-17
-    target."""
+    """The station table locates the 10 tick from the end face nearest the 10
+    at +/-.002, so the length's band never reaches the land past it; the
+    graduation width is a MIN limit, so the land bounds the widest groove
+    that still leaves the last graduation whole, at the .080 rule-17 target."""
     values, bands = spec.DRAWING_VALUES_BY_NAME, spec.DRAWING_TOLERANCES
     station_band = spec.GRADUATION_POSITION_TOLERANCE_MM
     assert "BodyLength" not in bands
     assert spec.DRAWING_PRECISION_BY_NAME["BodyLength"] == 2
-    assert spec.BODY_LENGTH_TOLERANCE_MM == pytest.approx(0.254)
-    assert bands["ScaleStartX"] == station_band == pytest.approx(0.0508)
-    stock_min = values["BodyLength"] - spec.BODY_LENGTH_TOLERANCE_MM
-    last_center_max = (
-        values["ScaleStartX"] + bands["ScaleStartX"]
-        + (spec.DIVISION_COUNT - 1) * values["FullTickPitch"] + station_band
-    )
-    assert stock_min == pytest.approx(201.676)
-    assert last_center_max == pytest.approx(198.6016)
+    assert station_band == pytest.approx(0.0508)
     # Rule 17 at the worst case: the widest stated groove keeps .080+ to the end.
-    end_land = stock_min - (last_center_max + spec.GRADUATION_WIDTH_MAX_MM / 2.0)
-    assert end_land == pytest.approx(2.7696)
+    end_land = values["Tick10FromEnd"] - station_band - spec.GRADUATION_WIDTH_MAX_MM / 2.0
+    assert end_land == pytest.approx(3.0744)
     assert end_land >= spec.WALL_TARGET_MM == 2.032
-    # The title block's .X (+/-.1) would break that land: the length is .XX.
-    assert end_land + spec.BODY_LENGTH_TOLERANCE_MM - 0.1 * 25.4 < spec.WALL_TARGET_MM
     # The stated .024 MAX keeps neighbours apart on the .0559 minor pitch even
     # with both stations at their band.
     land_min = spec.MINOR_SPACING - 2.0 * spec.GRADUATION_POSITION_TOLERANCE_MM - spec.GRADUATION_WIDTH_MAX_MM
     assert land_min == pytest.approx(0.7088)
     assert callouts.CALLOUTS["Tick0Width"].endswith(spec.GRADUATION_WIDTH_CALLOUT)
-    last_edge_nominal = (
-        values["ScaleStartX"] + (spec.DIVISION_COUNT - 1) * values["FullTickPitch"]
-        + values["Tick0Width"] / 2.0
-    )
-    assert values["BodyLength"] - last_edge_nominal == pytest.approx(3.2268)
+    assert values["Tick10FromEnd"] - values["Tick0Width"] / 2.0 == pytest.approx(3.2268)
+    # The 0-end land is the rest of the bar: the length's .XX band is far
+    # inside it.
+    zero_land_min = (values["BodyLength"] - spec.BODY_LENGTH_TOLERANCE_MM
+                     - values["Tick10FromEnd"] - station_band
+                     - (spec.DIVISION_COUNT - 1) * values["FullTickPitch"] - station_band
+                     - spec.GRADUATION_WIDTH_MAX_MM / 2.0)
+    assert zero_land_min > 50.0
 
 
 def test_printed_pitches_agree_across_all_calibrated_subdivisions() -> None:
@@ -236,11 +233,12 @@ def test_printed_pitches_agree_across_all_calibrated_subdivisions() -> None:
     assert (spec.DIVISION_SPACING, spec.MINOR_SPACING) == (14.2, 1.42)
     for index in range((spec.DIVISION_COUNT - 1) * spec.MINOR_PER_DIVISION + 1):
         assert abs(index * spec.MINOR_SPACING / 25.4 - index * minor) <= band, index
-    # Rules 10 and 26: the pitches print as references; the station table
-    # locates every graduation from the zero tick, each cell inside its band.
-    assert (callouts.PREFIXES["FullTickPitch"], callouts.SUFFIXES["FullTickPitch"]) == ("(", ")")
-    assert (callouts.PREFIXES["MinorTickPitch"], callouts.SUFFIXES["MinorTickPitch"]) == ("(", ")")
-    assert not {"FullTickPitch", "MinorTickPitch"} & set(callouts.CALLOUTS)
+    # Rules 10 and 26: the pitches and the 10 tick's land print as
+    # references; the station table locates every graduation from one datum,
+    # the end face nearest the 10 (#2434), each cell inside its band.
+    for name in ("FullTickPitch", "MinorTickPitch", "Tick10FromEnd"):
+        assert (callouts.PREFIXES[name], callouts.SUFFIXES[name]) == ("(", ")"), name
+    assert not {"FullTickPitch", "MinorTickPitch", "Tick10FromEnd"} & set(callouts.CALLOUTS)
     columns = [column.splitlines() for column in callouts.station_table_columns()]
     assert columns[0] == [callouts.STATION_ROW_HEADING, *(str(n) for n in range(spec.DIVISION_COUNT))]
     assert [column[0] for column in columns[1:]] == [f"+{m}" for m in range(spec.MINOR_PER_DIVISION)]
@@ -252,8 +250,12 @@ def test_printed_pitches_agree_across_all_calibrated_subdivisions() -> None:
     last = (spec.DIVISION_COUNT - 1) * spec.MINOR_PER_DIVISION
     assert sorted(cells) == list(range(last + 1))
     for index, text in cells.items():
-        assert abs(index * spec.MINOR_SPACING / 25.4 - float(text)) <= 0.0005, index
-    assert (cells[0], cells[spec.MINOR_PER_DIVISION], cells[last]) == (".000", ".559", "5.591")
+        from_face = spec.BODY_LENGTH - (spec.SCALE_START_X + index * spec.MINOR_SPACING)
+        assert abs(from_face / 25.4 - float(text)) <= 0.0005, index
+    assert (cells[0], cells[last - spec.MINOR_PER_DIVISION], cells[last]) == ("5.726", ".694", ".135")
+    # The 10 tick's row is the same .135 sheet 1 shows as a reference.
+    assert cells[last] == spec.inch_text(spec.DRAWING_VALUES_BY_NAME["Tick10FromEnd"], 3)
+    assert callouts.STATION_TABLE_TITLE.startswith("GRADUATION STATIONS FROM END FACE NEAREST 10")
     assert "EACH ±.002" in callouts.STATION_TABLE_TITLE
 
 
@@ -302,14 +304,15 @@ def test_part_names_the_ruled_face_isometric_before_saving() -> None:
 
 
 def test_graduation_location_chords_terminate_at_groove_centres() -> None:
-    zero = spec.REFERENCE_DIMENSIONS["ScaleStartReference"]
-    assert zero[2] == (spec.SCALE_START_X, spec.BODY_WIDTH)
+    zero = (spec.SCALE_START_X, spec.BODY_WIDTH)
+    assert spec.REFERENCE_DIMENSIONS["ScaleEndReference"][1] == (
+        spec.SCALE_START_X + spec.SCALE_SPAN, spec.BODY_WIDTH)
     for feature, spacing in (
         ("FullPitchReference", spec.DIVISION_SPACING),
         ("MinorPitchReference", spec.MINOR_SPACING),
     ):
         _, start, end = spec.REFERENCE_DIMENSIONS[feature]
-        assert start == zero[2]
+        assert start == zero
         assert end == (spec.SCALE_START_X + spacing, spec.BODY_WIDTH)
 
 
@@ -382,9 +385,8 @@ def test_every_tight_band_states_its_function() -> None:
     """Rule 4: a band tighter than the title block names its mate or purpose;
     the .XXX fit sizes that ride the title block name their mate too. Each
     mate is named once, in the numbered note its dimensions link."""
-    assert set(spec.DRAWING_TOLERANCES) == {"ScaleStartX"}
-    assert callouts.CALLOUTS["ScaleStartX"] == callouts.STATION_LINK
-    # The station table's band links the same note.
+    assert spec.DRAWING_TOLERANCES == {}
+    # The station table's band links the stations' note.
     assert callouts.STATION_LINK in callouts.STATION_TABLE_TITLE
     # The bar's section slides in the stop rebate: .XXX (+/-.005) from the
     # title block, and each links that fit's note.
