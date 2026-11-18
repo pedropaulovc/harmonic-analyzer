@@ -303,25 +303,35 @@ def test_top_view_stacks_x_above_and_below_and_y_to_the_left() -> None:
     assert right < drawing.ISO_CENTER[0] - 0.06
 
 
-def test_tap_callouts_read_drill_then_thread_with_the_count_and_engagement() -> None:
+def test_tap_callouts_open_with_the_count_then_thread_then_drill() -> None:
+    """The native THRU tap layout (farm run 20261118T000009756Z): the thread
+    in part 5, the drill in part 7 carrying the native count."""
     native = {
-        5: "<MOD-DIAM><hw-thrutapdrldia> <hw-thru>",
-        6: "<NUM_INST>X <hw-tapsize> - <hw-threadclass> <hw-thru>",
-        7: "",
+        5: "<hw-threaddesc> - <hw-threadclass> <hw-thru>",
+        6: "",
+        7: "<NUM_INST>X <MOD-DIAM><hw-thrutapdrldia> <hw-thru>",
         8: "",
     }
     clamp = drawing.clamp_tap_definitions(native)
-    assert clamp[5] == "<MOD-DIAM><hw-thrutapdrldia> DRILL <hw-thru>"
-    assert clamp[6] == "4X <hw-tapsize> <hw-thru>"
+    assert clamp == {
+        5: "4X <hw-threaddesc> <hw-thru>",
+        6: "",
+        7: "<MOD-DIAM><hw-thrutapdrldia> DRILL <hw-thru>",
+        8: "",
+    }
     hub = drawing.hub_tap_definitions(native)
-    assert hub[6] == "<hw-tapsize> <hw-thru>"
+    assert hub[5] == "<hw-threaddesc> <hw-thru>"
+    assert hub[7] == "<MOD-DIAM><hw-thrutapdrldia> DRILL <hw-thru>"
     assert hub[8] == spec.HUB_ENGAGEMENT_STATEMENT
-    countless = {**native, 6: "<hw-tapsize> - <hw-threadclass> <hw-thru>"}
-    assert drawing.clamp_tap_definitions(countless)[5].startswith("4X <MOD-DIAM>")
+    countless = {**native, 7: "<MOD-DIAM><hw-thrutapdrldia> <hw-thru>"}
+    assert drawing.clamp_tap_definitions(countless) == clamp
+    assert "<NUM_INST>" not in "".join(drawing.hub_tap_definitions(countless).values())
     with pytest.raises(RuntimeError):
         drawing.clamp_tap_definitions(clamp)
     with pytest.raises(RuntimeError):
         drawing.tap_callout_definitions({5: "", 6: "", 7: "", 8: ""})
+    with pytest.raises(RuntimeError):
+        drawing.clamp_tap_definitions({**native, 5: "<NUM_INST>X " + native[5]})
 
 
 def test_drawing_owns_no_manufacturing_literals() -> None:

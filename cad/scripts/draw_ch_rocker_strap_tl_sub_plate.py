@@ -203,10 +203,11 @@ if sorted(name for keep in _KEEPS for name in keep) != sorted(sheet_dimension_na
     raise AssertionError("every marked sub-plate dimension prints once, in one view")
 
 # --- Hole callouts -----------------------------------------------------------------
-# Native Hole Wizard rows, rewritten to the shop's order: the drill's Ø then
-# DRILL, the thread without its class (the title block states 2B), the
-# clamp set's count as one nX (rule 10), the hub tap's engagement as its last
-# row (rule 20: the worst case as a plain fact).
+# Native Hole Wizard THRU tap rows (draw_ch_fulcrum_keeper's layout: the
+# thread in part 5, the drill in part 7) kept in their order: the thread
+# without its class (the title block states 2B), then the drill's Ø and
+# DRILL. The clamp set's count opens the callout as one nX (rule 10); the hub
+# tap's engagement is its last row (rule 20: the worst case as a plain fact).
 DRILL_PROCESS = "DRILL"
 _DRILL_TOKENS = ("<hw-tapdrldia>", "<hw-thrutapdrldia>")
 _NATIVE_COUNT = re.compile(r"<NUM_INST>\s*X\s*")
@@ -222,7 +223,9 @@ def tap_callout_definitions(
 ) -> dict[int, str]:
     """A native THRU tap callout's definition parts (5..8) in the shop's form:
     DRILL after the drill's Ø, the thread class dropped, the native instance
-    count written as ``count`` (or removed when ``count`` is None) and
+    count dropped from whichever row SolidWorks put it on (a THRU tap's drill
+    row: farm run 20261118T000009756Z read "4-40 UNC THRU ALL / 4X Ø.09
+    DRILL THRU ALL") and ``count`` opening the first row instead, and
     ``last_row`` appended under the native rows."""
     if set(definitions) != {5, 6, 7, 8}:
         raise RuntimeError(f"unexpected tap callout parts: {definitions!r}")
@@ -247,13 +250,11 @@ def tap_callout_definitions(
     owners = [key for key, text in updated.items() if _NATIVE_COUNT.search(text)]
     if len(owners) > 1:
         raise RuntimeError(f"tap callout carries more than one count: {updated!r}")
-    replacement = f"{count} " if count else ""
-    if owners:
-        (owner,) = owners
-        updated[owner] = _NATIVE_COUNT.sub(replacement, updated[owner], count=1)
-    elif count:
+    for owner in owners:
+        updated[owner] = _NATIVE_COUNT.sub("", updated[owner], count=1)
+    if count:
         first = next(key for key in (5, 6, 7, 8) if updated[key].strip())
-        updated[first] = f"{replacement}{updated[first].lstrip()}"
+        updated[first] = f"{count} {updated[first].lstrip()}"
     if last_row:
         below = updated[8].rstrip()
         updated[8] = f"{below}\n{last_row}" if below else last_row
