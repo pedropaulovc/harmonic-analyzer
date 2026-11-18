@@ -1,9 +1,9 @@
 r"""Four-sheet manufacturing package for the unchanged graduated brass stick.
 
-BAR gives the envelope, the 10 tick's station from the 10-end face (the
-face that bears on the amplitude bar, #2434) and the numbered notes its
-dimensions link. GRADUATIONS tables every graduation's station from the
-10 tick and enlarges a decade with its pitches as references; TICK LENGTHS
+BAR gives the envelope, the 10 tick's land from the end face nearest the 10
+as a reference (that face bears on the amplitude bar, #2434) and the
+numbered notes its dimensions link. GRADUATIONS tables every graduation's
+station from that face and enlarges a decade with its pitches as references; TICK LENGTHS
 gives groove width and each length a local detail without cross-strip
 extension lines. ENGRAVING separates numeral dimensions (detail F at the 0,
 detail H at the 10) from the open-edge Top detail for the V graduations'
@@ -148,8 +148,9 @@ NUMERAL_SECTION_X = (_MINOR_TICK_FAR_WALL + _ZERO_SIDE_END) / 2.0
 # lower G 1.5 mm clear of the bar's edge.
 NUMERAL_SECTION_OVERSHOOT_MM = 4.0
 NUMERAL_SECTION_FOOT_OVERSHOOT_MM = 6.5
-# The 10 tick's land from the 10-end face: arrows outside the 3.4 mm span,
-# the text right of them, between the bar's end and the isometric.
+# The 10 tick's land (reference) from the end face nearest the 10: arrows
+# outside the 3.4 mm span, the text right of them, between the bar's end and
+# the isometric.
 FRONT_KEEP = {
     "BodyLength": (0.155, 0.205), "BodyWidth": (0.305, 0.215),
     "Tick10FromEnd": (0.274, 0.150),

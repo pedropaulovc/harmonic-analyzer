@@ -399,7 +399,9 @@ def test_fitter_package_covers_rule_9() -> None:
         assert "GRADUATION" not in text and "±" not in text
     assert "EXAMPLE POSITION" in sheet.EXAMPLE_POSE_NOTE
     assert "(ASSEMBLY.MD STEP 10)" in sheet.EXAMPLE_POSE_NOTE
-    assert "CLAMP" in sheet.ASSEMBLY_STEPS[9] and sheet.ASSEMBLY_STEPS[9].startswith("10. ")
+    assert "CLAMP" in sheet.ASSEMBLY_STEPS[10] and sheet.ASSEMBLY_STEPS[10].startswith("10. ")
+    # Rule 22: one action a step, so the plate's fit and its screws are two.
+    assert [step.split(".")[0] for step in sheet.ASSEMBLY_STEPS[8:10]] == ["9", "9A"]
     assert all(
         len(line) <= drawing.EXAMPLE_NOTE_WIDTH for line in drawing.EXAMPLE_NOTE.splitlines()
     )
@@ -455,10 +457,17 @@ def test_in_use_sheet_registers_the_drawn_stop_on_a_rocker_arm() -> None:
     assert len(arc) == drawing.IN_USE_ARC_SEGMENTS
     assert drawing.IN_USE_PHANTOM[arc[-1]][1][0] < registration.PIVOT[0]
     assert set(drawing.IN_USE_LABEL_TIPS) | {"reading"} == set(sheet.IN_USE_LABELS)
-    for text in sheet.USE_STEPS[:3] + sheet.USE_STEPS[4:]:
+    crank = sheet.USE_STEPS[4]
+    assert crank.startswith("12. ")
+    for text in sheet.USE_STEPS[:4] + sheet.USE_STEPS[5:]:
         assert "ITEM " in text, text
     assert sum(f"SHEET {sheet.IN_USE_SHEET}" in step for step in sheet.USE_STEPS) == 3
-    assert f"ZERO IS THE {registration.ZERO_TICK_TEXT} TICK" in sheet.USE_STEPS[1]
+    assert f"ZERO IS THE {registration.ZERO_TICK_TEXT} TICK" in sheet.USE_STEPS[2]
+    # Rule 22: one action a step; no step chains two with ';' or 'AND SLIDE'.
+    for step in sheet.USE_STEPS:
+        assert "; SLIDE" not in step and "AND SLIDE" not in step, step
+    assert sheet.IN_USE_CAPTION.startswith("FRONT VIEW ROTATED 180°")
+    assert not any("10-END" in text for text in (*sheet.USE_STEPS, *sheet.IN_USE_LABELS.values()))
     assert all(
         len(line) <= drawing.IN_USE_CAPTION_WIDTH for line in drawing.IN_USE_CAPTION.splitlines()
     )

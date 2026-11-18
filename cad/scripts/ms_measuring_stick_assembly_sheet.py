@@ -134,8 +134,8 @@ ASSEMBLY_STEPS = (
     "KEEP ITS TIP CLEAR OF THE WINDOW.",
     f"8. WITH {_ref(spec.THUMB_SCREW)} ON TOP, LAY {_STICK} IN THE OPEN "
     f"WINDOW OF {_ref(spec.BLOCK)}, GRADUATED FACE DOWN.",
-    f"9. FIT {_PLATE} OVER THE WINDOW, PAIR MARKS TOGETHER; DRIVE BOTH "
-    f"{_SCREWS} UNTIL THEIR HEADS SEAT.",
+    f"9. FIT {_PLATE} OVER THE WINDOW, PAIR MARKS TOGETHER.",
+    f"9A. DRIVE BOTH {_SCREWS} UNTIL THEIR HEADS SEAT.",
     f"10. WITH {_ref(spec.BLOCK)} AT ANY POSITION ALONG {_ref(spec.STICK)}, "
     f"TURN THE {_THUMB} IN BY HAND UNTIL ITS TIP CLAMPS THE TOP FACE OF "
     f"{_ref(spec.STICK)}.",
@@ -143,27 +143,31 @@ ASSEMBLY_STEPS = (
 # At MHA-HA-00: setting a bar (#2434). The stop is turned over from the
 # fitted pose (item 4 below, the graduated face up), its end face nearer the
 # stick's 10 end both reads the stick and bears on the rocker arm's tip.
+# One action a step (rule 22).
 _ROCKER_ARM = str(_config.parts("ch-rocker-arm")["number"])
 _AMPLITUDE_BAR = str(_config.parts("ch-amplitude-bar")["number"])
 IN_USE_SHEET = 4
 _IN_USE_VIEW = f"SHEET {IN_USE_SHEET}"
 ZERO_TICK_TEXT = registration.ZERO_TICK_TEXT
+_TEN_END_FACE = f"END FACE OF {_ref(spec.STICK)} NEAREST ITS 10"
 USE_STEPS = (
     f"11. TO SET AN {_AMPLITUDE_BAR} AMPLITUDE BAR, HOLD THE STOP WITH "
     f"{_ref(spec.THUMB_SCREW)} BELOW AND THE GRADUATIONS OF {_ref(spec.STICK)} "
     f"UP ({_IN_USE_VIEW}).",
-    f"11A. SLACKEN {_ref(spec.THUMB_SCREW)}; SLIDE {_BLOCK} UNTIL ITS END FACE "
-    f"NEARER THE 10 END OF {_ref(spec.STICK)} STANDS ON THE STICK READING FOR "
-    f"THE BAR'S STATION (READOUT.MD STEP 1; ZERO IS THE {ZERO_TICK_TEXT} TICK).",
-    f"11B. TIGHTEN {_ref(spec.THUMB_SCREW)} BY HAND.",
+    f"11A. SLACKEN {_ref(spec.THUMB_SCREW)}.",
+    f"11B. SLIDE {_BLOCK} UNTIL ITS END FACE NEARER THE 10 OF {_ref(spec.STICK)} "
+    "STANDS ON THE STICK READING FOR THE BAR'S STATION (READOUT.MD STEP 1; "
+    f"ZERO IS THE {ZERO_TICK_TEXT} TICK).",
+    f"11C. TIGHTEN {_ref(spec.THUMB_SCREW)} BY HAND.",
     "12. TURN THE MHA-HA-00 CRANK UNTIL THE OUTER TIPS OF ALL 20 "
     f"{_ROCKER_ARM} ROCKER ARMS (THE ENDS AWAY FROM THE CONNECTING RODS) "
     "LINE UP.",
     f"12A. LAY {_STICK} ON THE TOP EDGE OF THAT BAR'S {_ROCKER_ARM} ROCKER "
-    "ARM, 10 END TOWARD THE PIVOT, AND SLIDE IT OUT UNTIL THE END FACE OF "
+    "ARM, ITS 10 TOWARD THE PIVOT.",
+    f"12B. SLIDE {_ref(spec.STICK)} OUT UNTIL THE END FACE OF "
     f"{_ref(spec.BLOCK)} BEARS ON THE ARM'S OUTER TIP ({_IN_USE_VIEW}).",
     f"13. SLIDE THE {_AMPLITUDE_BAR} BAR OUT UNTIL ITS OUTBOARD FACE TOUCHES "
-    f"THE 10-END FACE OF {_ref(spec.STICK)} ({_IN_USE_VIEW}).",
+    f"THE {_TEN_END_FACE} ({_IN_USE_VIEW}).",
     f"13A. LIFT {_ref(spec.STICK)} OFF WITHOUT MOVING THE BAR.",
 )
 STEP_SECTIONS = (
@@ -183,20 +187,21 @@ EXAMPLE_POSE_NOTE = (
     f"STOP SHOWN CLAMPED AT AN EXAMPLE POSITION. {_ref(spec.BLOCK)} CLAMPS "
     f"AT ANY POSITION ALONG {_ref(spec.STICK)} (ASSEMBLY.MD STEP 10)."
 )
-# Sheet 4: the stop turned over and laid on a rocker arm (steps 11-13), the
+# Sheet 4: the stop turned over and laid on a rocker arm (steps 11-13A), the
 # arm and the bar in phantom. The drawn stop is the sheet-1 example pose, so
-# the arm and bar stand where that reading puts them.
+# the arm and bar stand where that reading puts them. The view is the sheet-1
+# front view turned over, and its label says so (rules 9 and 26).
 IN_USE_CAPTION = (
-    f"IN USE AT MHA-HA-00 (ASSEMBLY.MD STEPS 11-13): {_ref(spec.STICK)} "
-    f"GRADUATIONS UP, {_ref(spec.THUMB_SCREW)} BELOW. ROCKER ARM AND "
-    "AMPLITUDE BAR IN PHANTOM. STOP SHOWN AT AN EXAMPLE READING; ZERO IS "
-    f"THE STOP ON THE {ZERO_TICK_TEXT} TICK."
+    f"FRONT VIEW ROTATED 180°, IN USE AT MHA-HA-00 (ASSEMBLY.MD STEPS 11-13A): "
+    f"{_ref(spec.STICK)} GRADUATIONS UP, {_ref(spec.THUMB_SCREW)} BELOW. ROCKER "
+    "ARM AND AMPLITUDE BAR IN PHANTOM. STOP SHOWN AT AN EXAMPLE READING; ZERO "
+    f"IS THE STOP ON THE {ZERO_TICK_TEXT} TICK."
 )
 IN_USE_LABELS = {
     "rocker": f"{_ROCKER_ARM} ROCKER ARM TOP EDGE",
     "tip": f"{_ref(spec.BLOCK)} END FACE ON THE ARM'S OUTER TIP LAND",
     "reading": f"READ {_ref(spec.STICK)} AT THIS END FACE",
-    "ten_end": f"10-END FACE OF {_ref(spec.STICK)} ON THE BAR'S OUTBOARD FACE",
+    "ten_end": f"{_ref(spec.STICK)} END FACE ON THE BAR'S OUTBOARD FACE",
     "bar": f"{_AMPLITUDE_BAR} AMPLITUDE BAR",
     "pivot": "ROCKER PIVOT AXIS",
 }
