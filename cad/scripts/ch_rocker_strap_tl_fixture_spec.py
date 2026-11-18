@@ -111,15 +111,18 @@ FENCE_READING_IN = 0.001
 
 SCREW_TABLE_TITLE = "SCREW SCHEDULE"
 SCREW_TABLE_HEADER = ("ITEM", "NUMBER", "DESCRIPTION", "QTY", "THREAD", "TORQUE")
-BLANK_LABEL = "MHA-CH-13 BLANK ON TAPE, NOT IN FIXTURE"
+BLANK_LABEL = "MHA-CH-13 BLANK, NOT PART OF THE FIXTURE"
+# The tape the strap traveler bonds each blank with for its outline
+# (shop-equipment consumables.tape-3m-vhb-5906; plan tape_thickness_mm).
+TAPE_NAME = "3M VHB 5906 TAPE (.006 THICK)"
 
 STEP_WIDTH = 62  # characters a printed line, inside the sheet's right border
 
 
-def numbered(steps: tuple[str, ...]) -> tuple[str, ...]:
+def numbered(steps: tuple[str, ...], start: int = 1) -> tuple[str, ...]:
     """Each step wrapped under its number, the number's indent kept."""
     lines: list[str] = []
-    for number, step in enumerate(steps, start=1):
+    for number, step in enumerate(steps, start=start):
         head = f"{number}. "
         lines += textwrap.wrap(
             step, STEP_WIDTH, initial_indent=head, subsequent_indent=" " * len(head)
@@ -160,12 +163,14 @@ SCREW_TABLE_ROWS: tuple[tuple[str, ...], ...] = (
     ),
 )
 
-# --- Fitting steps (sheet 1) ---------------------------------------------------
-# One action each, each check followed by its remedy (rules 22, 23): the
-# fixture into the vise, the fence indicated along X, the work zero, the
-# clamps; each blank's own sequence (faces, hub hole, tape, outline) is the
-# strap traveler's, which these steps follow for the hub stack. Parallels
-# mirror the strap plan's vise_parallel_height (1 in).
+# --- Fitting steps -------------------------------------------------------------
+# One action each, each check followed by its remedy (rules 22, 23). Sheet
+# 1: the fixture into the vise once, the fence indicated along X, the work
+# zero, the clamps. Sheet 2: each blank, in the order of the MHA-CH-13
+# traveler's setups (plan.toml: setup 1 saws, setups 2-4 face and make the
+# hub hole under the edge clamps, setup 5 cuts the outline on tape over the
+# plug, screwed down through the washer). Parallels mirror the strap
+# plan's vise_parallel_height (1 in).
 _P, _G, _W, _C, _S = (BOM_ITEMS[s] for s in BOM_ORDER)
 _READING = f"{FENCE_READING_IN:.3f}".removeprefix("0")
 _STEPS: tuple[str, ...] = (
@@ -180,19 +185,51 @@ _CHECK_STEP = len(_STEPS)
 _STEPS += (
     f"IF STEP {_CHECK_STEP} FAILS, LOOSEN THE VISE, TAP ITEM {_P} ROUND AND "
     "REPEAT FROM STEP 2.",
-    "SET G54: X0 ON THE END-STOP FACE, Y0 ON THE FENCE FACE, Z0 ON THE PLATE TOP.",
+    "SET THE WORK ZERO (G54): X0 ON THE END-STOP FACE, Y0 ON THE FENCE FACE, "
+    "Z0 ON THE PLATE TOP.",
     f"SET EACH ITEM {_C} IN ITS POCKET, KNIFE TOWARD THE FENCE, HEEL ON THE "
-    "POCKET'S BACK WALL; RUN ITS SCREW IN FINGER TIGHT.",
-    "PER THE STRAP TRAVELER, SEAT EACH BLANK ON THE PLATE TOP AGAINST THE FENCE "
-    "AND THE END STOP.",
-    f"TIGHTEN EVERY ITEM {_C} SCREW TO {CLAMP_TORQUE_FT_LB:g} FT-LB (SCREW SCHEDULE, "
-    "SHEET 2).",
-    "CHECK: THE BLANK DOES NOT MOVE BY HAND.",
-    f"FOR THE OUTLINE, DROP ITEM {_G} INTO THE COUNTERBORE, PILOT UP, BEFORE THE "
-    "TAPED BLANK GOES ON OVER IT.",
-    f"PUT ITEM {_W} ON THE BLANK OVER ITS HUB HOLE AND RUN ITEM {_S} THROUGH IT "
-    f"INTO ITEM {_P}, SNUG.",
-    f"CHECK: THE BLANK DOES NOT TURN BY HAND ABOUT ITEM {_S}.",
-    f"BACK EVERY ITEM {_C} OFF CLEAR OF THE BLANK.",
+    "POCKET WALL FARTHEST FROM THE FENCE.",
+    f"RUN EACH ITEM {_C} SCREW IN FINGER TIGHT.",
 )
-ASSEMBLY_STEPS = "\n".join(("FITTING STEPS", *numbered(_STEPS)))
+ASSEMBLY_STEPS = "\n".join(
+    ("FITTING STEPS, ONCE (EACH BLANK: SHEET 2)", *numbered(_STEPS))
+)
+
+_CLAMPED: tuple[str, ...] = (
+    "SEAT THE BLANK ON THE PLATE TOP AGAINST THE FENCE AND THE END STOP.",
+    f"TIGHTEN EVERY ITEM {_C} SCREW TO {CLAMP_TORQUE_FT_LB:g} FT-LB (SCREW SCHEDULE).",
+    "CHECK: THE BLANK DOES NOT MOVE BY HAND.",
+)
+_FIRST = len(_STEPS) + 1
+_CLAMP_CHECK = _FIRST + len(_CLAMPED) - 1
+_CLAMPED += (
+    f"IF STEP {_CLAMP_CHECK} FAILS, RESEAT THE BLANK AND REPEAT FROM STEP {_FIRST}.",
+)
+_TAPED: tuple[str, ...] = (
+    f"BACK EVERY ITEM {_C} OFF CLEAR OF THE BLANK.",
+    "LIFT THE BLANK OFF THE PLATE.",
+    f"LAY {TAPE_NAME} ON THE PLATE OVER THE BLANK'S PLACE, CUT AWAY AT THE "
+    "COUNTERBORE.",
+    f"DROP ITEM {_G} INTO THE COUNTERBORE, PILOT UP.",
+    f"LOWER THE BLANK ONTO THE TAPE, ITS HUB HOLE OVER ITEM {_G}'S PILOT, ITS "
+    "LONG EDGE AGAINST THE FENCE.",
+    "PRESS THE BLANK DOWN OVER ITS WHOLE FACE.",
+    f"PUT ITEM {_W} ON THE BLANK OVER ITS HUB HOLE.",
+    f"RUN ITEM {_S} THROUGH ITEM {_W} INTO ITEM {_P}, SNUG.",
+    f"CHECK: THE BLANK DOES NOT TURN BY HAND ABOUT ITEM {_S}.",
+)
+_TAPE_FIRST = _CLAMP_CHECK + 2
+_TURN_CHECK = _TAPE_FIRST + len(_TAPED) - 1
+_TAPED += (
+    f"IF STEP {_TURN_CHECK} FAILS, TAKE ITEMS {_S} AND {_W} OFF, RENEW THE TAPE "
+    f"AND REPEAT FROM STEP {_TAPE_FIRST + 2}.",
+)
+BLANK_STEPS = "\n".join(
+    (
+        "EACH BLANK, WITH THE MHA-CH-13 TRAVELER",
+        f"SETUPS 2-4 (FACES, HUB HOLE), UNDER ITEM {_C}:",
+        *numbered(_CLAMPED, start=_FIRST),
+        "SETUP 5 (OUTLINE), ON TAPE:",
+        *numbered(_TAPED, start=_TAPE_FIRST),
+    )
+)

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import ast
 import math
+import re
 import tomllib
 from pathlib import Path
 
@@ -96,25 +97,47 @@ def test_sheet_words_cite_real_items() -> None:
     for row in spec.SCREW_TABLE_ROWS:
         assert len(row) == len(spec.SCREW_TABLE_HEADER)
         assert row[0] in spec.BOM_ITEMS.values()
+    sheets = (spec.ASSEMBLY_STEPS, spec.BLANK_STEPS)
     cited = {
         word.rstrip(".,;:'S")
-        for line in spec.ASSEMBLY_STEPS.splitlines()
+        for steps in sheets
+        for line in steps.splitlines()
         for word in line.split("ITEM ")[1:]
     }
     assert {c.split()[0].rstrip(".,;:'S") for c in cited} <= set(
         spec.BOM_ITEMS.values()
     )
-    for line in spec.ASSEMBLY_STEPS.splitlines():
-        assert len(line) <= spec.STEP_WIDTH
+    for steps in sheets:
+        for line in steps.splitlines():
+            assert len(line) <= spec.STEP_WIDTH
+
+
+def _step_numbers(steps: str) -> list[int]:
+    return [
+        int(line.split(".")[0]) for line in steps.splitlines() if line[:1].isdigit()
+    ]
+
+
+def test_steps_number_on_from_sheet_one_and_each_check_has_its_remedy() -> None:
+    numbers = _step_numbers(spec.ASSEMBLY_STEPS) + _step_numbers(spec.BLANK_STEPS)
+    assert numbers == list(range(1, len(numbers) + 1))
+    text = " ".join((spec.ASSEMBLY_STEPS + "\n" + spec.BLANK_STEPS).split())
+    checks = [int(n) for n in re.findall(r"(?<!\d)(\d+)\. CHECK:", text)]
+    assert checks
+    for number in checks:
+        assert re.search(rf"(?<!\d){number + 1}\. IF STEP {number} FAILS", text), number
+    assert spec.TAPE_NAME in text and "MHA-CH-13 TRAVELER" in text
+    assert "STRAP TRAVELER" not in text
 
 
 def test_every_step_prints_in_at_most_six_lines() -> None:
     steps: list[int] = []
-    for line in spec.ASSEMBLY_STEPS.splitlines()[1:]:
-        if line[:1].isdigit():
-            steps.append(1)
-        else:
-            steps[-1] += 1
+    for sheet in (spec.ASSEMBLY_STEPS, spec.BLANK_STEPS):
+        for line in sheet.splitlines():
+            if line[:1].isdigit():
+                steps.append(1)
+            elif line.startswith(" "):
+                steps[-1] += 1
     assert steps and max(steps) <= 6
 
 

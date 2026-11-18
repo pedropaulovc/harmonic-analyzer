@@ -333,10 +333,21 @@ LABEL_OFFSETS: dict[str, tuple[float, float]] = {
 EXPLODED_CAPTION = "\n".join(
     (
         "EXPLODED FRONT VIEW",
-        "FITTING STEPS ON SHEET 1; THE STRAP TRAVELER LAYS EACH BLANK",
+        "FIXTURE STEPS ON SHEET 1; EACH BLANK'S STEPS AT RIGHT",
     )
 )
 CAPTION_XY = (0.020, 0.255)
+# Each blank's steps top right, right of the hub stack's labels (item 5's
+# ends near x 0.230) and over the clamps' band (its outline top 0.141).
+BLANK_STEPS_XY = (0.240, 0.262)
+_blank_steps_bottom = (
+    BLANK_STEPS_XY[1] - len(spec.BLANK_STEPS.splitlines()) * LINE_PITCH
+)
+_clamp_band_top = (
+    EXPLODED_ORIGIN[1] + (_CLAMP_TOP_Z + VIEW_PAD_MM + BAND_AIR_MM) / 1000.0
+)
+if _blank_steps_bottom < _clamp_band_top:
+    raise AssertionError("each blank's steps run into the exploded clamps")
 
 Box = tuple[float, float, float, float]
 
@@ -707,6 +718,7 @@ def _place_exploded_sheet(
         )
     _activate_sheet(adapter, SHEET_NAMES[1])
     _add_note(adapter, EXPLODED_CAPTION, CAPTION_XY, label="exploded view caption")
+    _add_note(adapter, spec.BLANK_STEPS, BLANK_STEPS_XY, label="each blank's steps")
     _place_screw_table(adapter)
 
     def settled() -> None:
