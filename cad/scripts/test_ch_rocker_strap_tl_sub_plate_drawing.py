@@ -933,13 +933,22 @@ def test_each_three_place_section_size_names_the_strap_feature_it_serves() -> No
     """Machinist review mr5: "CLEARS MHA-CH-13 FACE CUT" and "... DRILL AND
     REAMER" named no part feature. Each now names the strap (MHA-CH-13) and
     its feature, and its third place is what holds its limit (the spec's
-    checks: .XX's band would break it)."""
+    checks: .XX's band would break it). mr6: one line of six words or fewer
+    besides the drawing number, in rule 3's "CLEARS ..." form; the clamp is
+    named once, its 1.875 location bare (rule 7)."""
+    assert "PocketBackWallY" not in spec.DIMENSION_CALLOUTS
+    assert (
+        sum(spec.CLAMP_NUMBER in words for words in spec.DIMENSION_CALLOUTS.values())
+        == 1
+    )
     for name, feature in (
         ("FenceHeight", "TOP FACE"),
         ("HubCboreDepth", "HUB HOLE"),
     ):
         words = spec.DIMENSION_CALLOUTS[name]
-        assert f"{spec.STRAP_NUMBER} STRAP" in words and feature in words, name
+        assert spec.STRAP_NUMBER in words and feature in words, name
+        assert words.startswith("CLEARS ") and "\n" not in words, name
+        assert len(words.replace(spec.STRAP_NUMBER, "").split()) <= 6, name
         assert "FACE CUT" not in words and spec.DRAWING_PRECISION_BY_NAME[name] == 3
     assert spec.FENCE_HEIGHT + spec.XX > spec.FENCE_TOP_LIMIT
     assert (

@@ -488,14 +488,13 @@ if (
     >= PLAN_RELIEF_FLOOR_CLEARANCE
 ):
     raise AssertionError("the counterbore depth's third place is not needed")
+# The clamp is named once, on the pocket's depth; its 1.875 location stays
+# bare (rule 7).
 DIMENSION_CALLOUTS: dict[str, str] = {
-    "PocketBackWallY": f"SEATS {CLAMP_NUMBER} HEEL",
     "PocketDepth": f"{CLAMP_NUMBER} SEAT",
-    "FenceHeight": f"UNDER {STRAP_NUMBER} STRAP TOP FACE",
+    "FenceHeight": f"CLEARS {STRAP_NUMBER} STRAP TOP FACE",
     "HubCboreDia": f"LOCATES {PLUG_NUMBER}",
-    "HubCboreDepth": (
-        f"CLEARS DRILL AND REAMER POINTS\nTHRU {STRAP_NUMBER} STRAP HUB HOLE"
-    ),
+    "HubCboreDepth": f"CLEARS TOOLS THRU {STRAP_NUMBER} HUB HOLE",
 }
 # The taps' native callouts: DRILL after the drill's Ø, the clamp taps' count,
 # the hub tap's stated shortfall as its last row.

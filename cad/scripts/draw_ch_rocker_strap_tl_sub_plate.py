@@ -212,7 +212,7 @@ SECTION_A_KEEP: dict[str, tuple[float, float]] = {
         section_a_xy(0.0, (spec.FENCE_HEIGHT + spec.UNDERSIDE_Z) / 2.0)[1],
     ),
 }
-# Section B-B: the counterbore depth's three rows over the fence's top,
+# Section B-B: the counterbore depth's two rows over the fence's top,
 # beside its line in the counterbore's mouth, 2 mm off its back wall, clear
 # of the tap's thread, running right inside the border; the fence height's
 # two rows above those, beside its line right of the fence face, the line
