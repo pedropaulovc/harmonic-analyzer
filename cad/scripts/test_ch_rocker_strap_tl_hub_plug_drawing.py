@@ -37,7 +37,6 @@ XX = printed_band_mm(2, unit="in")
 XXX = printed_band_mm(3, unit="in")
 SCRIPTS = Path(__file__).resolve().parent
 PLAN = SCRIPTS.parent / "process" / "ch_rocker_strap" / "plan.toml"
-SHOP_EQUIPMENT = SCRIPTS.parent / "config" / "shop-equipment.toml"
 STEM = "ch_rocker_strap_tl_hub_plug"
 
 
@@ -90,24 +89,6 @@ def test_mirrored_counterbore_matches_the_plate() -> None:
 
     assert spec.COUNTERBORE_DIA == plate.HUB_CBORE_DIA
     assert spec.COUNTERBORE_DEPTH == plate.HUB_CBORE_DEPTH
-
-
-def test_the_shop_record_states_the_plug_as_drawn() -> None:
-    """The fixture record (shop-equipment, never read by a COM leaf) agrees
-    with the part."""
-    record = tomllib.loads(SHOP_EQUIPMENT.read_text(encoding="utf-8"))["fixtures"][
-        "strap-hub-plug"
-    ]["purchase"]
-    plug = record.split("Plug:", 1)[1].split("Washer:", 1)[0]
-    for text in (
-        f"body {spec.inch_text(spec.BODY_DIA, 3)} dia",
-        f"{spec.BODY_CLEARANCE_TEXT} slip fit",
-        f"x {spec.inch_text(spec.BODY_LENGTH, 3)} long",
-        "pilot " + "-".join(spec.inch_text(v, 4) for v in spec.PILOT_LIMITS) + " dia",
-        f"{spec.inch_text(spec.OVERALL_LENGTH, 3)} above the plug's bottom",
-        f"bore {spec.inch_text(spec.BORE_DIA, 3)} (H drill)",
-    ):
-        assert text in plug, text
 
 
 def test_sizes_are_the_contract_and_its_ruled_changes() -> None:

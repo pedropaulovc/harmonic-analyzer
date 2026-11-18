@@ -1056,6 +1056,17 @@ present = true
 source = "owner 2026-11-13"
 use = "MHA-CH-06-TL-21 carrier L1, L2; TL-22/TL-32 5/16-18 hole under the pivot seat"
 
+# The MHA-CH-13-TL-01 sub-plate's 1/4-20 hub hole (owner ruling 2026-11-17:
+# the hub screw is 1/4-20); no 1/4-20 tap is on record as owned. Its tap
+# drill (#7) is in the owned 115-piece index; sizing data is
+# cad/process/shop.toml tools.jig-drill-7 and tools.jig-tap-1-4-20-plug.
+[tools.jig-tap-1-4-20-plug]
+name = "1/4-20 UNC plug hand tap"
+kind = "tap"
+present = false
+status = "not owned: to buy (or confirm one is owned)"
+use = "MHA-CH-13-TL-01 sub-plate: the hub screw's 1/4-20 hole through the counterbore floor"
+
 # --- MHA-CH-06-TL-24 riser (prechips plan, #2447) ---------------------------
 
 # The riser traveler (cad/process/ch_rocker_arm_tl_oblique_riser/plan.toml)

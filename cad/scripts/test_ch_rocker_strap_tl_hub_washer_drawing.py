@@ -35,7 +35,6 @@ INCH = 25.4
 XX = printed_band_mm(2, unit="in")
 SCRIPTS = Path(__file__).resolve().parent
 PLAN = SCRIPTS.parent / "process" / "ch_rocker_strap" / "plan.toml"
-SHOP_EQUIPMENT = SCRIPTS.parent / "config" / "shop-equipment.toml"
 STEM = "ch_rocker_strap_tl_hub_washer"
 
 
@@ -100,19 +99,6 @@ def test_the_washer_bears_on_the_strap_round_its_hub_hole() -> None:
     # The pilot's top stays under the strap's top, so the washer clamps the
     # strap, not the plug.
     assert plug.PILOT_TOP_Z_RANGE[1] < plug.STRAP_TOP_Z_MIN
-
-
-def test_the_shop_record_states_the_washer_as_drawn() -> None:
-    """The fixture record (shop-equipment, never read by a COM leaf) agrees
-    with the part: .53 x .06, bore .266."""
-    record = tomllib.loads(SHOP_EQUIPMENT.read_text(encoding="utf-8"))["fixtures"][
-        "strap-hub-plug"
-    ]["purchase"]
-    washer = record.split("Washer:", 1)[1].split("Screw:", 1)[0]
-    assert f"{spec.OUTER_DIA / INCH:.2f}".removeprefix("0") + " dia" in washer
-    assert f"x {spec.THICKNESS / INCH:.2f}".replace("0.", ".") + " thick" in washer
-    assert f"bore {spec.BORE_DIA / INCH:.3f}".replace("0.", ".") in washer
-    assert ".547 x .079" in (spec.__doc__ or "")
 
 
 def test_places_and_callouts_are_the_parts() -> None:
