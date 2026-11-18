@@ -1,13 +1,14 @@
 r"""Create the four-sheet measuring-stick fitter package (MHA-MS-00).
 
 Sheet 1 shows the stick clamped at its stop mark (upright elevation and its
-projected third-angle bottom view below it, both at full size), a reference
-overall and the near-face setting dimension, and an upright clamp section;
+projected third-angle bottom view below it, both at full size, the bottom
+view carrying VIEW B's viewing arrow), a reference overall and the near-face
+setting dimension, and an upright clamp section;
 sheet 2 the builder-owned ``MS_EXPLODED``
 presentation with
 the BOM (numbers, descriptions, vendor SKU, quantity) and a balloon on every
 component, both plate screws included; sheet 3 the finished isometric;
-sheet 4 the stick in use (#2434): the same front elevation turned over,
+sheet 4 the stick in use (#2434), VIEW B: the front elevation turned over,
 graduations up, laid on a MHA-CH-06 rocker arm's top edge with the stop on
 its outer tip land and the MHA-CH-01 bar against the 10 end, the arm and the
 bar in phantom where ``ms_stick_registration`` puts them for the drawn stop.
@@ -60,6 +61,7 @@ from _drawing_balloons import (
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import set_reference_dimension
 from _drawing_leader_notes import add_leader_note
+from _drawing_view_arrow import square_view_arrow
 from _drawing_edge_dimensions import add_edge_dimension
 from _drawing_edges import _edge_endpoint_key
 from _drawing_projection import model_point_in_view, model_points_in_view
@@ -149,6 +151,15 @@ CLAMP_SECTION_SCALE = (4.0, 1.0)
 CLAMP_SECTION_LABEL = "A"
 CLAMP_SECTION_TOP_CLEARANCE = 0.018
 CLAMP_SECTION_BOTTOM_CLEARANCE = 0.004
+# VIEW B's viewing arrow (rules 9 and 26): on the projected bottom view,
+# square down onto its front edge (third angle: the edge toward the front
+# view), so VIEW B looks the way the front view does. It stands over the
+# bare stick between the 7 and 8, clear of the clamp and its section line;
+# the letter sits at the tail.
+VIEW_B_LETTER_HEIGHT = 0.005
+VIEW_B_ARROW_TIP_GAP = 0.0035
+VIEW_B_ARROW_LENGTH = 0.010
+VIEW_B_ARROW_MODEL_X_MM = spec.STICK_X_MAX - 40.0
 SECTION_SETTING_CLEARANCE = 0.002
 STOP_POSITION_TEXT_Y = 0.220
 # Fraction of the setting span from the stick end: left of centre, so the
@@ -289,6 +300,9 @@ IN_USE_LABEL_TIPS = {
 IN_USE_READING_EDGE = (stop.BLOCK_LENGTH, spec.STICK_BOTTOM_Y, _IN_USE_Z)
 IN_USE_READING_LABEL_OFFSET = (0.012, 0.030)
 IN_USE_CAPTION_XY = (0.020, 0.062)
+# VIEW B's label under the view, below the tip-land label's line, centred on
+# the view (rule 9: a rotated view says so under its label).
+IN_USE_VIEW_LABEL_XY = (0.226, 0.115)
 IN_USE_CAPTION_WIDTH = 70  # characters, left of the title block
 if abs(in_use_point(registration.LAND_BOTTOM)[0] - stop.BLOCK_LENGTH) > 1e-6:
     raise AssertionError("the drawn stop face does not stand on the tip land")
@@ -1022,10 +1036,42 @@ def _place_clamped_sheet(adapter: Any) -> Callable[[], None]:
     apply_view_configuration(adapter, section, label="thumbscrew clamp section")
     _assert_view_on_sheet(section, label="thumbscrew clamp section")
     settled = _add_assembly_dimensions(adapter, front)
+    _add_view_b_arrow(adapter, underside)
     _add_note_block(
         adapter, SHEET_NAMES[0], EXAMPLE_NOTE, EXAMPLE_NOTE_XY, label="example-pose note"
     )
     return settled
+
+
+def _add_view_b_arrow(adapter: Any, underside: Any) -> None:
+    """VIEW B's letter arrow on the bottom view, square down onto its front
+    edge: the view on sheet 4 looks the way the front view does."""
+    label = f"view {sheet.IN_USE_VIEW_LETTER} viewing arrow"
+    x, y = VIEW_B_ARROW_MODEL_X_MM / 1000.0, spec.STICK_BOTTOM_Y / 1000.0
+    near, far = model_points_in_view(
+        adapter, underside,
+        [(x, y, spec.STICK_Z_MAX / 1000.0), (x, y, spec.STICK_Z_MIN / 1000.0)],
+        label=f"{label} station",
+    )
+    # Third angle: the bottom view's top edge is the face toward the viewer
+    # of the front view (+Z), so an arrow down onto it looks along -Z.
+    if near[1] <= far[1]:
+        raise RuntimeError(f"{label}: the bottom view's front edge is not on top: {near}, {far}")
+    tip_xy = (near[0], near[1] + VIEW_B_ARROW_TIP_GAP)
+    text_xy = (
+        tip_xy[0] - VIEW_B_LETTER_HEIGHT * 0.3,
+        tip_xy[1] + VIEW_B_ARROW_LENGTH + VIEW_B_LETTER_HEIGHT,
+    )
+    note = add_leader_note(
+        adapter, sheet.IN_USE_VIEW_LETTER, text_xy=text_xy, attach_xy=tip_xy,
+        view=underside, label=label,
+    )
+    points = square_view_arrow(
+        adapter, note, text_xy=text_xy, tip_xy=tip_xy, axis=0, label=label,
+        letter_height=VIEW_B_LETTER_HEIGHT,
+    )
+    if points[1] <= tip_xy[1]:
+        raise RuntimeError(f"{label} does not run down onto the front edge: leader {points}")
 
 
 def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
@@ -1187,6 +1233,8 @@ def _place_in_use_sheet(adapter: Any) -> Callable[[], None]:
             text_xy=(tip[0] + offset[0], tip[1] + offset[1]), attach_xy=tip,
             label=f"{label} {key} label", view=view,
         )
+    _add_note_block(adapter, SHEET_NAMES[3], sheet.IN_USE_VIEW_LABEL, IN_USE_VIEW_LABEL_XY,
+                    label="view B label")
     _add_note_block(adapter, SHEET_NAMES[3], IN_USE_CAPTION, IN_USE_CAPTION_XY,
                     label="in-use caption")
     return lambda: placed("settled")

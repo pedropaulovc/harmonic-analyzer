@@ -461,12 +461,17 @@ def test_in_use_sheet_registers_the_drawn_stop_on_a_rocker_arm() -> None:
     assert crank.startswith("12. ")
     for text in sheet.USE_STEPS[:4] + sheet.USE_STEPS[5:]:
         assert "ITEM " in text, text
-    assert sum(f"SHEET {sheet.IN_USE_SHEET}" in step for step in sheet.USE_STEPS) == 3
+    view_b = f"VIEW {sheet.IN_USE_VIEW_LETTER}, SHEET {sheet.IN_USE_SHEET}"
+    assert sum(view_b in step for step in sheet.USE_STEPS) == 3
     assert f"ZERO IS THE {registration.ZERO_TICK_TEXT} TICK" in sheet.USE_STEPS[2]
     # Rule 22: one action a step; no step chains two with ';' or 'AND SLIDE'.
     for step in sheet.USE_STEPS:
         assert "; SLIDE" not in step and "AND SLIDE" not in step, step
-    assert sheet.IN_USE_CAPTION.startswith("FRONT VIEW ROTATED 180°")
+    # Rules 9 and 26: a letter label, a viewing arrow on sheet 1's bottom
+    # view, the rotation stated; the caption keeps only what the view can't.
+    assert sheet.IN_USE_VIEW_LETTER != drawing.CLAMP_SECTION_LABEL
+    assert sheet.IN_USE_VIEW_LABEL == "VIEW B\nROTATED 180°"
+    assert "ROTATED" not in sheet.IN_USE_CAPTION and "GRADUATIONS UP" not in sheet.IN_USE_CAPTION
     assert not any("10-END" in text for text in (*sheet.USE_STEPS, *sheet.IN_USE_LABELS.values()))
     assert all(
         len(line) <= drawing.IN_USE_CAPTION_WIDTH for line in drawing.IN_USE_CAPTION.splitlines()
@@ -856,6 +861,8 @@ def test_clamped_sheet_places_section_clear_of_setting(monkeypatch, defect) -> N
     monkeypatch.setattr(drawing, "model_point_in_view", project)
     monkeypatch.setattr(drawing, "create_section_view", create)
     monkeypatch.setattr(drawing, "_add_assembly_dimensions", lambda *a: settled)
+    arrows = []
+    monkeypatch.setattr(drawing, "_add_view_b_arrow", lambda adapter, view: arrows.append(view))
     if defect is not None:
         message = {
             "style-set": "failed to set connected",
@@ -874,6 +881,55 @@ def test_clamped_sheet_places_section_clear_of_setting(monkeypatch, defect) -> N
     assert cut["line_end"] == pytest.approx((0.1199, 0.1699245))
     assert cut["view_xy"] == drawing.CLAMP_SECTION_CENTER
     assert cut["scale"] == drawing.CLAMP_SECTION_SCALE
+    assert arrows == [underside]
+
+
+@pytest.mark.parametrize("defect", (None, "mirrored", "upward"))
+def test_view_b_arrow_points_down_onto_the_bottom_views_front_edge(monkeypatch, defect) -> None:
+    """Rules 9 and 26: VIEW B (sheet 4) is named by a letter arrow on the
+    bottom view, square down onto the stick's front face (+Z), so it looks
+    the way the front view does."""
+    underside, note = object(), object()
+    calls = {}
+
+    def project(adapter, view, points, **kwargs):
+        assert view is underside
+        (x, y, z_front), (_x, _y, z_back) = points
+        assert (x, y) == pytest.approx((drawing.VIEW_B_ARROW_MODEL_X_MM / 1000.0,
+                                        spec.STICK_BOTTOM_Y / 1000.0))
+        assert (z_front, z_back) == pytest.approx((spec.STICK_Z_MAX / 1000.0,
+                                                   spec.STICK_Z_MIN / 1000.0))
+        front_y, back_y = (0.130, 0.137) if defect == "mirrored" else (0.137, 0.130)
+        return [(0.200, front_y), (0.200, back_y)]
+
+    def leader(adapter, text, **kwargs):
+        calls["leader"] = (text, kwargs)
+        return note
+
+    def square(adapter, placed, **kwargs):
+        assert placed is note
+        calls["square"] = kwargs
+        tip = kwargs["tip_xy"]
+        start_y = tip[1] - 0.001 if defect == "upward" else tip[1] + drawing.VIEW_B_ARROW_LENGTH
+        return [tip[0], start_y, 0.0, tip[0], tip[1], 0.0]
+
+    monkeypatch.setattr(drawing, "model_points_in_view", project)
+    monkeypatch.setattr(drawing, "add_leader_note", leader)
+    monkeypatch.setattr(drawing, "square_view_arrow", square)
+    if defect is not None:
+        with pytest.raises(RuntimeError, match="front edge"):
+            drawing._add_view_b_arrow(object(), underside)
+        return
+    drawing._add_view_b_arrow(object(), underside)
+    text, kwargs = calls["leader"]
+    assert text == sheet.IN_USE_VIEW_LETTER and kwargs["view"] is underside
+    tip = (0.200, 0.137 + drawing.VIEW_B_ARROW_TIP_GAP)
+    assert kwargs["attach_xy"] == pytest.approx(tip)
+    assert kwargs["text_xy"][1] > tip[1] + drawing.VIEW_B_ARROW_LENGTH
+    assert calls["square"]["axis"] == 0
+    assert calls["square"]["letter_height"] == drawing.VIEW_B_LETTER_HEIGHT
+    # Over the bare stick, clear of the clamp the section cuts.
+    assert drawing.VIEW_B_ARROW_MODEL_X_MM > stop.BLOCK_LENGTH + 20.0
 
 
 @pytest.mark.parametrize(

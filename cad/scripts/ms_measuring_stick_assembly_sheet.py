@@ -147,7 +147,12 @@ ASSEMBLY_STEPS = (
 _ROCKER_ARM = str(_config.parts("ch-rocker-arm")["number"])
 _AMPLITUDE_BAR = str(_config.parts("ch-amplitude-bar")["number"])
 IN_USE_SHEET = 4
-_IN_USE_VIEW = f"SHEET {IN_USE_SHEET}"
+# The in-use view looks the way the front view does, turned over: VIEW B,
+# named by a viewing arrow on the sheet-1 bottom view and labelled rotated
+# (rules 9 and 26; machinist review run 20261118T085338138Z-6449eada).
+IN_USE_VIEW_LETTER = "B"
+IN_USE_VIEW_LABEL = f"VIEW {IN_USE_VIEW_LETTER}\nROTATED 180°"
+_IN_USE_VIEW = f"VIEW {IN_USE_VIEW_LETTER}, SHEET {IN_USE_SHEET}"
 ZERO_TICK_TEXT = registration.ZERO_TICK_TEXT
 _TEN_END_FACE = f"END FACE OF {_ref(spec.STICK)} NEAREST ITS 10"
 USE_STEPS = (
@@ -187,15 +192,14 @@ EXAMPLE_POSE_NOTE = (
     f"STOP SHOWN CLAMPED AT AN EXAMPLE POSITION. {_ref(spec.BLOCK)} CLAMPS "
     f"AT ANY POSITION ALONG {_ref(spec.STICK)} (ASSEMBLY.MD STEP 10)."
 )
-# Sheet 4: the stop turned over and laid on a rocker arm (steps 11-13A), the
-# arm and the bar in phantom. The drawn stop is the sheet-1 example pose, so
-# the arm and bar stand where that reading puts them. The view is the sheet-1
-# front view turned over, and its label says so (rules 9 and 26).
+# Sheet 4: VIEW B, the stop turned over and laid on a rocker arm (steps
+# 11-13A), the arm and the bar in phantom. The drawn stop is the sheet-1
+# example pose, so the arm and bar stand where that reading puts them. The
+# caption carries only what the view cannot show.
 IN_USE_CAPTION = (
-    f"FRONT VIEW ROTATED 180°, IN USE AT MHA-HA-00 (ASSEMBLY.MD STEPS 11-13A): "
-    f"{_ref(spec.STICK)} GRADUATIONS UP, {_ref(spec.THUMB_SCREW)} BELOW. ROCKER "
-    "ARM AND AMPLITUDE BAR IN PHANTOM. STOP SHOWN AT AN EXAMPLE READING; ZERO "
-    f"IS THE STOP ON THE {ZERO_TICK_TEXT} TICK."
+    "IN USE AT MHA-HA-00 (ASSEMBLY.MD STEPS 11-13A). ROCKER ARM AND AMPLITUDE "
+    "BAR IN PHANTOM. STOP SHOWN AT AN EXAMPLE READING; ZERO IS THE STOP ON "
+    f"THE {ZERO_TICK_TEXT} TICK."
 )
 IN_USE_LABELS = {
     "rocker": f"{_ROCKER_ARM} ROCKER ARM TOP EDGE",
