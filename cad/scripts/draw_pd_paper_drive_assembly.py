@@ -2310,8 +2310,11 @@ def _step_text(
             f"{KNOB_BORE_LETTER} IS STILL TRUE PER {s('arm-plate-located', 2)} "
             f"(SHEET {SHEET_NAMES.index(KNOB_SETTING_SHEET) + 1}).",
             f"IF NOT, REPEAT {s('arm-plate-located', 5)}-{s('arm-plate-located', 7)}.",
-            f"TRIAL MESH: FIT THE {n['pd-transgear-rear-bushing']} BUSHING ON THE PIN.",
-            f"FIT THE {n['pd-transgear-feed-pinion']} SLEEVE, HUB AND DISC, PINION "
+            # #2629 (machinist rule 22): the pass exit takes its own letter
+            # within the step's 24-letter budget, so the trial stack goes on
+            # in one sub-step, as the lift-off takes it off in one.
+            f"TRIAL MESH: FIT THE {n['pd-transgear-rear-bushing']} BUSHING, THEN THE "
+            f"{n['pd-transgear-feed-pinion']} SLEEVE, HUB AND DISC, PINION "
             "REARWARD, ON THE PIN.",
             f"PASS THE {n['pd-transgear-knob-shaft']} SHAFT THROUGH THE LOOSE "
             f"{n['pd-transgear-knob-thrust-ring']} RING INTO THE PLATE BORE FROM "
@@ -2344,12 +2347,9 @@ def _step_text(
             # a new disc or sleeve is centred again, a new shaft only re-meshes;
             # one sub-step per part (machinist review on 36242bf: one action
             # per step).
-            # #2629 (machinist rule 22): the step is at its 24-letter budget,
-            # so the pass exit leads the inspection's sub-step and each
-            # branch after it carries its condition.
-            f"IF {s('arm-plate-located', 12)} AND {s('arm-plate-located', 13)} "
-            f"PASSED, GO TO STEP {steps.step_number('arm-plate-fitted')}; IF NOT, "
-            f"INSPECT THE {n['pd-transgear-knob-shaft']} {teeth}, "
+            f"IF {s('arm-plate-located', 11)} AND {s('arm-plate-located', 12)} "
+            f"PASSED, GO TO STEP {steps.step_number('arm-plate-fitted')}.",
+            f"IF NOT, INSPECT THE {n['pd-transgear-knob-shaft']} {teeth}, "
             f"{n['pd-rack-pinion']} DISC, {n['pd-transgear-knob-shaft']} JOURNAL AND "
             f"{n['pd-transgear-arm-plate']} AND {n['pd-transgear-feed-pinion']} "
             "BORES TO THEIR SHEETS.",
@@ -2433,9 +2433,9 @@ def _step_text(
             # (test_the_trial_stack_goes_together_at_the_located_step).
             # Machinist review r9 (rule 22): one action; the step is at its
             # 24-letter budget, so the clamp set-up is the repeat's condition.
-            f"REPEAT {s('arm-plate-located', 9)}-{s('arm-plate-located', 11)} WITH "
+            f"REPEAT {s('arm-plate-located', 9)}-{s('arm-plate-located', 10)} WITH "
             "THE ARM CLAMPED FRONT UP ON THE SAME PARALLELS ON THE MILL TABLE.",
-            f"CHECK: AS {s('arm-plate-located', 12)} AND {s('arm-plate-located', 13)}, "
+            f"CHECK: AS {s('arm-plate-located', 11)} AND {s('arm-plate-located', 12)}, "
             "A DIAL INDICATOR ON A MAGNETIC BASE.",
             # A chip from the drilling just done reads as a tight spot or an
             # off reading, so the doweled set is cleaned and read once more
@@ -3140,7 +3140,7 @@ def setting_table_rows(
             f"\u00d8{steps.inch_text(disc.TOOTH_SPACE_GAUGE_PIN_DIA_MM, 3)} PIN",
         ),
         "reducer-shake": (
-            f"{s('arm-plate-located', 13)}, {s('arm-plate-fitted', 20)}, "
+            f"{s('arm-plate-located', 12)}, {s('arm-plate-fitted', 20)}, "
             f"{s('fitup-pose-set', 9)}",
             "DISC SHAKE AT THE TIP OF THE TOOTH IN MESH",
             f"VISIBLY, AT MOST {steps.inch_text(REDUCER_SHAKE_MAX_MM, 3)}",

@@ -2448,9 +2448,11 @@ def test_every_failure_branch_has_a_pass_exit() -> None:
         f"{s('chain-run-accepted', 6)}."
     )
     located = texts["arm-plate-located"]
-    assert located[17].startswith(
-        f"IF {s('arm-plate-located', 12)} AND {s('arm-plate-located', 13)} PASSED, GO TO STEP "
+    assert located[16] == (
+        f"IF {s('arm-plate-located', 11)} AND {s('arm-plate-located', 12)} PASSED, GO TO STEP "
+        f"{steps.step_number('arm-plate-fitted')}."
     )
+    assert located[17].startswith("IF NOT, INSPECT THE ")
 
 
 def test_the_lock_taps_are_the_even_taps_counted_from_either_end() -> None:
@@ -2850,9 +2852,9 @@ def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
     )
     # #2629: the inspection opens on the trial's pass exit.
     assert (
-        f"IF {drawing.sub_step('arm-plate-located', 12)} AND "
-        f"{drawing.sub_step('arm-plate-located', 13)} PASSED, GO TO STEP "
-        f"{steps.step_number('arm-plate-fitted')}; IF NOT, INSPECT" in located
+        f"IF {drawing.sub_step('arm-plate-located', 11)} AND "
+        f"{drawing.sub_step('arm-plate-located', 12)} PASSED, GO TO STEP "
+        f"{steps.step_number('arm-plate-fitted')}. IF NOT, INSPECT" in located
     )
     # The restart follows the part, one sub-step each: a new plate is set
     # again from 12A, a new disc or sleeve is centred again before the trial
@@ -2884,7 +2886,7 @@ def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
         drawing.SUB_STEP_LETTERS
     )
     fitted = _step_body("arm-plate-fitted")
-    assert "AS 12N AND 12P" in fitted
+    assert "AS 12M AND 12N" in fitted
     # The dowel-press remedy renews what is fixed to or reamed to the arm.
     assert (
         f"IF A DOWEL SLIDES IN BY HAND, REPEAT FROM STEP {steps.step_number('latch-pin-pressed')} "
@@ -4632,7 +4634,7 @@ def _sub_step_texts() -> dict[str, str]:
 def test_every_setting_row_is_cited_by_the_steps_its_step_column_names() -> None:
     """Rule 22 (R5 machinist review): each setting-table row's STEP cell names
     the sub-steps that set or check it, and each of them cites that row, or
-    repeats a sub-step that does ("AS 12P")."""
+    repeats a sub-step that does ("AS 12N")."""
     heads = _sub_step_texts()
     rows = drawing.setting_table_rows(operating_domain=_unit_operating_domain())
     assert len(rows) == len(drawing.SETTING_ROW_KEYS)
