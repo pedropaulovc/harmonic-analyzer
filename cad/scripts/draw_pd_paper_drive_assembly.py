@@ -2087,9 +2087,10 @@ def _step_text(
         f"UNSCREW THE {n['pd-vn-transgear-pivot-screw']} SCREW.",
         "LIFT THE ARM OFF.",
     )
-    # The pivot screw's replacement, written once at 15L-15N (its seat's
-    # remedy) and done from 28 and 33 (the step-line budget).
-    pivot_replaced = f"{s('hanger-pivoted', 10)}-{s('hanger-pivoted', 12)}"
+    # The pivot's remedy branch, written once at 15L-15S (unscrew, clean,
+    # reseat, else renew screw and spacer) and done from 33 (the step-line
+    # budget); 28's rebuild takes only its unscrew and lift, 15L-15M.
+    pivot_remedied = f"{s('hanger-pivoted', 10)}-{s('hanger-pivoted', 16)}"
     # #2409: the hub is keyed to the sleeve's flat by its MHA-PD-VN-69 pin,
     # pressed along a chord of the hub to its ream's stop before the hub is
     # fitted, its side lying over the flat. The flat runs out at the nose, so
@@ -2479,14 +2480,25 @@ def _step_text(
             "SEAT THE SCREW, ITS SHOULDER TIGHT ON THE BAR'S BACK FACE "
             f"({PIVOT_VIEW_REF}).",
             "CHECK: NO DAYLIGHT BETWEEN THE SPACER AND THE BAR'S BACK FACE.",
+            # The seat's preload is the joint's only retention (Codjiflo P2
+            # on 93879abc87): a hand-torque acceptance that locks nothing.
+            "CHECK: TURNED BY HAND WITH A HEX KEY TO LOOSEN, THE SCREW DOES NOT "
+            "TURN.",
             "CHECK: RAISED AND RELEASED, THE ARM FALLS FREELY.",
-            "IF A CHECK FAILS, CLEAN THE SHOULDER, THE SPACER AND THE ARM'S BORE, "
-            f"OIL THE BORE AND REPEAT {s('hanger-pivoted', 5)}-"
-            f"{s('hanger-pivoted', 7)}.",
-            f"IF BOTH CHECKS PASS, SKIP {pivot_replaced}.",
+            f"IF ALL THREE CHECKS PASS, SKIP {s('hanger-pivoted', 10)}-"
+            f"{s('hanger-pivoted', 16)}.",
+            # The arm is captured on the shoulder between the head and the
+            # pressed spacer, so the remedy takes the screw out first
+            # (Codjiflo P3 on 93879abc87).
             pivot_unscrewed[0],
             pivot_unscrewed[1],
-            f"REPEAT FROM {s('hanger-pivoted', 0)} WITH A NEW "
+            "FLUSH OIL INTO THE ARM'S BORE, WORKING THE ARM ON THE SHOULDER.",
+            "CLEAN AND DEBURR THE SPACER'S END FACE, THE BAR'S BACK FACE AND THE "
+            "TAP MOUTH.",
+            f"REPEAT {s('hanger-pivoted', 5)}-{s('hanger-pivoted', 8)}.",
+            f"IF ALL THREE CHECKS NOW PASS, SKIP {s('hanger-pivoted', 16)}.",
+            f"DO {s('hanger-pivoted', 10)}-{s('hanger-pivoted', 11)} AND REPEAT FROM "
+            f"{s('hanger-pivoted', 0)} WITH A NEW "
             f"{n['pd-vn-transgear-pivot-screw']} SCREW AND "
             f"{n['pd-transgear-pivot-spacer']} SPACER.",
         ),
@@ -2995,7 +3007,7 @@ def _step_text(
             f"AND {n['pd-vn-transgear-knob-cup-pin']} PIN, THEN FROM STEP {pose}.",
             f"IF {s('fitup-accepted', 2)} FAILS, REPEAT FROM STEP "
             f"{steps.step_number('collar-shoulder-seated')}.",
-            f"IF {s('fitup-accepted', 5)} FAILS, ARM UNLATCHED, DO {pivot_replaced}.",
+            f"IF {s('fitup-accepted', 5)} FAILS, ARM UNLATCHED, DO {pivot_remedied}.",
             f"REPEAT {s('hook-pin-hole-match-drilled', 9)}-"
             f"{s('hook-pin-hole-match-drilled', 11)}, THEN FROM STEP {pose}.",
             f"IF {s('fitup-accepted', 7)} OR {s('fitup-accepted', 8)} FAILS, REPEAT "

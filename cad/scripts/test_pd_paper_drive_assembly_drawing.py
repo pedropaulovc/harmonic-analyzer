@@ -2397,15 +2397,20 @@ def test_every_screwed_setting_has_a_holding_check() -> None:
     pivot = texts["hanger-pivoted"]
     assert pivot[5].startswith("SEAT THE SCREW, ITS SHOULDER TIGHT ON THE BAR'S BACK FACE")
     assert pivot[6] == "CHECK: NO DAYLIGHT BETWEEN THE SPACER AND THE BAR'S BACK FACE."
-    assert pivot[7] == "CHECK: RAISED AND RELEASED, THE ARM FALLS FREELY."
-    assert pivot[8].startswith("IF A CHECK FAILS, ") and pivot[8].endswith("REPEAT 15F-15H.")
-    assert pivot[9] == "IF BOTH CHECKS PASS, SKIP 15L-15N."
+    assert pivot[7] == "CHECK: TURNED BY HAND WITH A HEX KEY TO LOOSEN, THE SCREW DOES NOT TURN."
+    assert pivot[8] == "CHECK: RAISED AND RELEASED, THE ARM FALLS FREELY."
+    assert pivot[9] == "IF ALL THREE CHECKS PASS, SKIP 15L-15S."
+    # The remedy takes the captured arm off before anything is cleaned.
     assert pivot[10].startswith("UNSCREW ") and pivot[11] == "LIFT THE ARM OFF."
-    assert pivot[12].startswith("REPEAT FROM 15A WITH A NEW ")
-    assert len(pivot) == 13
+    assert pivot[12].startswith("FLUSH OIL INTO THE ARM'S BORE")
+    assert "BAR'S BACK FACE" in pivot[13]
+    assert pivot[14] == "REPEAT 15F-15J."
+    assert pivot[15] == "IF ALL THREE CHECKS NOW PASS, SKIP 15S."
+    assert pivot[16].startswith("DO 15L-15M AND REPEAT FROM 15A WITH A NEW ")
+    assert len(pivot) == 17
     assert not any("STAKE" in line for line in pivot)
     accepted = texts["fitup-accepted"]
-    assert "ARM UNLATCHED, DO 15L-15N." in " ".join(accepted)
+    assert "ARM UNLATCHED, DO 15L-15S." in " ".join(accepted)
     hook = texts["hook-pin-hole-match-drilled"]
     assert hook[5] == "TIGHTEN THE HOOK SCREWS."
     assert hook[6] == "CHECK: PUSHED FIRMLY BY HAND, THE HOOK DOES NOT MOVE ON THE BAR."
