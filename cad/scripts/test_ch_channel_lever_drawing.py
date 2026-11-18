@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 import pytest
@@ -15,7 +16,7 @@ import draw_ch_channel_lever as drawing
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import blind_cut_dia_mm
-from _inch_wall_limits import WALL_TARGET_MM
+from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _printed_tolerance import printed_deviations
 
 
@@ -82,12 +83,34 @@ def test_every_tight_band_names_its_mate_or_function() -> None:
 
 def test_walls_clear_the_floor_at_worst_case() -> None:
     assert spec.TIP_ARC_CX == spec.LEVER_SPRING_X
-    assert spec.TIP_RADIUS == spec.BAR_TALL / 2.0
     for wall, value in spec.WALL_MIN.items():
+        if wall in spec.WALL_SHORTFALL_ACCEPTED:
+            assert WALL_FLOOR_MM <= value < WALL_TARGET_MM, wall
+            continue
         assert value >= WALL_TARGET_MM, wall
-    # The concentric full round leaves the same nominal wall to the tip.
-    nominal = spec.TIP_RADIUS - blind_cut_dia_mm(spec.SPRING_EYE_HOLE_SPEC) / 2.0
-    assert nominal == pytest.approx(3.44, abs=0.01)
+    # The tapered tip's wall is the one owner-accepted shortfall (#3113),
+    # and the registry row carries its exception.
+    assert spec.WALL_SHORTFALL_ACCEPTED == {"spring hole to tip and edges"}
+    import _config
+
+    exceptions = _config.parts("ch-channel-lever")["machinist_exceptions"]
+    assert any("#21" in item["where"] and item["kind"] == "minor" for item in exceptions)
+
+
+def test_the_end_tapers_from_the_bar_pin_to_a_tangent_tip() -> None:
+    """#3113: full depth to the bar pin, straight edges tangent to the tip."""
+    assert spec.TAPER_START_X == spec.BAR_PIN_X
+    assert spec.BAR_TALL == pytest.approx(9.398)
+    tip_depth = 2.0 * spec.TIP_RADIUS
+    assert tip_depth / spec.BAR_TALL == pytest.approx(0.81, abs=0.01)
+    x, y = spec.taper_tangent_point()
+    # The edge from the taper start meets the tip circle at right angles to
+    # its radius there.
+    edge = (x - spec.TAPER_START_X, y - spec.BAR_TALL / 2.0)
+    radius = (x - spec.TIP_ARC_CX, y)
+    assert math.hypot(*radius) == pytest.approx(spec.TIP_RADIUS)
+    assert edge[0] * radius[0] + edge[1] * radius[1] == pytest.approx(0.0, abs=1e-9)
+    assert spec.TAPER_START_X < x and y < spec.BAR_TALL / 2.0
 
 
 def test_twenty_long_hubs_still_float_between_the_keepers() -> None:
@@ -122,7 +145,7 @@ def test_plate_is_located_from_one_hub_face() -> None:
 def test_draw_view_math_matches_the_spec() -> None:
     assert drawing._BAR_PIN_DIA == blind_cut_dia_mm(spec.BAR_PIN_HOLE_SPEC)
     assert drawing._SPRING_HOLE_DIA == blind_cut_dia_mm(spec.SPRING_EYE_HOLE_SPEC)
-    assert spec.TIP_END_X == pytest.approx(180.511)
+    assert spec.TIP_END_X == pytest.approx(178.86)
 
 
 def test_sheet_runs_at_1_to_1_with_1_to_2_isometric() -> None:
@@ -139,15 +162,14 @@ def test_hub_diameter_lands_on_its_near_rim() -> None:
     )
 
 
-def test_one_centreline_joins_the_three_holes_along_the_bar() -> None:
+def test_one_centreline_joins_the_holes_along_the_bar() -> None:
     """r5 machinist review (clarity): the bore, the #47 and the #21 holes
     lie on the bar's mid-height axis, so one centreline bisecting the two
-    long edges prints their cross-bar position and the .43 bar symmetric
-    about it. The edges are picked between the two drilled holes, where only
-    the bar's own edges run."""
-    assert spec.BAR_PIN_X < (spec.BAR_PIN_X + spec.LEVER_SPRING_X) / 2.0
-    assert (spec.BAR_PIN_X + spec.LEVER_SPRING_X) / 2.0 < spec.TIP_ARC_CX
-    assert spec.TIP_RADIUS == spec.NOSE_RADIUS == spec.BAR_TALL / 2.0
+    long edges prints their cross-bar position and the .37 bar symmetric
+    about it. The edges are picked inboard of the bar pin, where the
+    full-depth edges run parallel (#3113: outboard they taper)."""
+    assert spec.TAPER_START_X == spec.BAR_PIN_X
+    assert spec.NOSE_RADIUS == spec.BAR_TALL / 2.0
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:

@@ -14,8 +14,9 @@ from __future__ import annotations
 # each tight band names its mate or function on its own callout
 # (drawing-guidelines.md rules 4 and 7), so the sheet needs no note.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    # Full-height bar; its tip is a full round about the spring hole.
-    "LeverOutline": {"BarHeight"},
+    # Full-depth bar to the bar pin, tapering to a full-round tip about the
+    # spring hole.
+    "LeverOutline": {"BarHeight", "TipRadius"},
     "LeverBody": {"LeverThick"},
     "HubProfile": {"HubDia"},
     "Hub": {"HubLength"},
@@ -31,10 +32,11 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 
 # Decimal places ARE the tolerance statement (drawing-simplicity-policy.md),
 # in inches: two on the milled bar height and the turned hub (the walls read
-# them), three on the plate, the plate offset, the hub length (the station
+# them), three on the tip radius (at two the spring-hole wall falls through
+# the floor), the plate, the plate offset, the hub length (the station
 # pitch's .300) and both lever arms, four on the reamed fulcrum bore.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "LeverOutline": {"BarHeight": 2},
+    "LeverOutline": {"BarHeight": 2, "TipRadius": 3},
     "LeverBody": {"LeverThick": 3},
     "HubProfile": {"HubDia": 2},
     "Hub": {"HubLength": 3},

@@ -7,11 +7,12 @@ placement of those dimensions, the function each tight band serves, the hole
 callouts, the bore's roughness and one reference overall length.
 Sheet/template and export behaviour lives in ``_drawing_common``.
 
-The lever is a long thin third-class lever (7.34 in over the hub, .43 in
-tall, .118 in thick); the sheet prints decimal inch (the part's
-``drawing_unit: in``).  The sheet runs at 1:1: the front view carries the
-profile, bore, hub, both arms from the fulcrum bore and the overall length;
-the top view the plate thickness and the hub length; a 1:2 isometric.
+The lever is a long thin third-class lever (7.28 in over the hub, .37 in
+tall to the bar pin and tapering to an R.150 tip, .118 in thick); the sheet
+prints decimal inch (the part's ``drawing_unit: in``).  The sheet runs at
+1:1: the front view carries the profile, bore, hub, both arms from the
+fulcrum bore and the overall length; the top view the plate thickness and
+the hub length; a 1:2 isometric.
 
 Run with SolidWorks open::
 
@@ -139,17 +140,18 @@ def _add_bar_centerline(adapter: Any, view: Any) -> None:
 
     The fulcrum bore, the bar-pin hole and the spring-eye hole lie on the
     bar's mid-height axis; the line through their centre marks prints that,
-    and the .43 bar symmetric about it, so the holes' cross-bar position is
+    and the .37 bar symmetric about it, so the holes' cross-bar position is
     drawn, not implied (r5 machinist review, clarity). draw_dt_crank_arm's
-    recipe: InsertCenterLine2 on the two long edges, picked between the
-    bar-pin and spring-eye holes, bisects them.
+    recipe: InsertCenterLine2 on the two long edges, picked between the hub
+    and the bar-pin hole, where the full-depth edges run parallel (outboard
+    of the bar pin they taper to the tip), bisects them.
     """
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
     if not ddoc.ActivateView(view_name(adapter, view)):
         raise RuntimeError("failed to activate the front view for its centreline")
     draw.ClearSelection2(True)
-    mid_x = (BAR_PIN_X + LEVER_SPRING_X) / 2000.0
+    mid_x = BAR_PIN_X / 2000.0
     for index, side in enumerate((-1.0, 1.0)):
         x, y = model_point_in_view(
             adapter,
@@ -201,7 +203,10 @@ FRONT_CALLOUTS = {
         f"REAM THRU\nRUNNING FIT ON {SHAFT_NUMBER}\n"
         f"(CLEARANCE {_inch(_CLEARANCE_LEAST)}-{_inch(_CLEARANCE_MOST)} REF)"
     ),
-    "BarHeight": "FULL R AT TIP",
+    # Full depth to the bar-pin hole, straight taper from there to the tip
+    # radius, tangent (#3113): the taper start is the bar pin's own location.
+    "BarHeight": "TAPERS FROM\nBAR-PIN HOLE CL",
+    "TipRadius": "TANGENT TO EDGES",
 }
 # What engages each drilled hole rides its own hole callout (machinist r5:
 # on the arm's location it did not say the hole is a running bore).
@@ -239,8 +244,10 @@ FRONT_KEEP = {
     # and of the REAM leader, which lands from the upper right.
     "HubDia": (0.033, 0.165),
     "FulcrumDia": (0.050, 0.190),
-    # Above the bar, so neither dimension line runs into the text.
-    "BarHeight": (0.262, 0.171),
+    # Just outboard of the taper start it measures, above the bar.
+    "BarHeight": (0.205, 0.172),
+    # Below and right of the tip it measures.
+    "TipRadius": (0.262, 0.140),
     "BarPinCx": (_sheet_x(BAR_PIN_X / 2.0), 0.126),
     "SpringCx": (_sheet_x(LEVER_SPRING_X / 2.0 + 25.0), 0.104),
 }

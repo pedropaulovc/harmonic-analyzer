@@ -34,3 +34,8 @@ ch-channel-lever:
       where: "the hub width .300 +.001/.000 (SETS PITCH OF 20X STACK ON MHA-CH-04)"
       finding: "band .001 total, narrower than the milled/turned width row (+/-.001), with no fit route at the callout (rule 4)"
       reason: "the band can neither open nor take a route on this sheet: twenty hubs at +.001 must still float between the MHA-CH-07 keepers on the .010 end-play leaf at the shortest lug span (MHA-CH-00 lever-bank-slides), and +.002 would close that play; at the .300 pitch the bar-to-bar top gap is 0.686 mm at the band (sh_vn_pivot_pin_bar_spec neighbour_clearance_min), so the 20X stack is measured at the channel assembly (RV-02). Delegated ruling 2026-11-07 (Main), no precedent; owner review #2144"
+    - id: "RV-04"
+      kind: "minor"
+      where: "front view, the R.150 tip about the #21 spring-eye hole"
+      finding: "wall from the #21 hole to the tip .0635 at the printed worst case, under the .080 in target (rule 17)"
+      reason: "Owner ruling 2026-11-18 (#3113): the lever tapers from the bar pin to its spring tip at the original's photo ratio, about 0.8 of the .37 depth; the R.150 full-round tip concentric with the #21 hole leaves .150 -.005 - (.159 +.004)/2 = .0635 MIN, above the .060 floor. The radius prints at three places because R.15 at two would fall through the floor. Accepts this wall only, no other band or wall departure."
