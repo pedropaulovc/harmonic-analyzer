@@ -2344,10 +2344,13 @@ def _step_text(
             # a new disc or sleeve is centred again, a new shaft only re-meshes;
             # one sub-step per part (machinist review on 36242bf: one action
             # per step).
-            f"IF {s('arm-plate-located', 12)} OR {s('arm-plate-located', 13)} "
-            f"FAILED, INSPECT THE {n['pd-transgear-knob-shaft']} {teeth} AND "
-            f"{n['pd-rack-pinion']} DISC TO THEIR GEAR DATA AND THE "
-            f"{n['pd-transgear-knob-shaft']} JOURNAL AND "
+            # #2629 (machinist rule 22): the step is at its 24-letter budget,
+            # so the pass exit leads the inspection's sub-step and each
+            # branch after it carries its condition.
+            f"IF {s('arm-plate-located', 12)} AND {s('arm-plate-located', 13)} "
+            f"PASSED, GO TO STEP {steps.step_number('arm-plate-fitted')}; IF NOT, "
+            f"INSPECT THE {n['pd-transgear-knob-shaft']} {teeth}, "
+            f"{n['pd-rack-pinion']} DISC, {n['pd-transgear-knob-shaft']} JOURNAL AND "
             f"{n['pd-transgear-arm-plate']} AND {n['pd-transgear-feed-pinion']} "
             "BORES TO THEIR SHEETS.",
             f"REPLACE A PLATE FOUND OUTSIDE AND REPEAT FROM {s('arm-plate-located', 0)}.",
@@ -2360,7 +2363,8 @@ def _step_text(
             # it is centred again (codjiflo P3 on 593f4ee).
             "SLIDE THE HUB AND DISC AS ONE OFF A "
             f"{n['pd-transgear-feed-pinion']} FOUND OUTSIDE, THE PIN RIDING THE FLAT.",
-            f"WITH THE {n[explode.DISC_SCREW]} SCREWS SLACKENED, REPEAT "
+            f"WITH THEM OFF AND THE {n[explode.DISC_SCREW]} SCREWS SLACKENED, "
+            "REPEAT "
             f"{s('disc-cluster-assembled', 3)}-{s('disc-cluster-assembled', 4)}, "
             f"{s('disc-taps-transferred', 0)}-"
             f"{s('disc-taps-transferred', 2)}, {s('disc-taps-transferred', 9)} AND "
@@ -2485,8 +2489,7 @@ def _step_text(
             "CHECK: NO DAYLIGHT BETWEEN THE SPACER AND THE BAR'S BACK FACE.",
             # The seat's preload is the joint's only retention (Codjiflo P2
             # on 93879abc87): a hand-torque acceptance that locks nothing.
-            "CHECK: TURNED BY HAND WITH A HEX KEY TO LOOSEN, THE SCREW DOES NOT "
-            "TURN.",
+            "CHECK: A HEX KEY BY HAND DOES NOT LOOSEN THE SCREW.",
             "CHECK: RAISED AND RELEASED, THE ARM FALLS FREELY.",
             f"IF ALL THREE CHECKS PASS, SKIP {s('hanger-pivoted', 10)}-"
             f"{s('hanger-pivoted', 16)}.",
@@ -2833,24 +2836,30 @@ def _step_text(
         # spacer and both are renewed. One action per sub-step
         # (machinist review, #2417): the turn only finds the fault's period;
         # each remedy branch names it.
+        # #2629 (machinist rule 22): a pass exit before the branch and again
+        # after its clean-and-repeat, and each fault branch's sub-steps carry
+        # its condition, so a builder whose checks pass, or whose fault is
+        # another branch's, never reads on into a plain command.
         "fitup-mesh-remedied": (
-            f"IF A {s('fitup-pose-set', 7)}-{s('fitup-pose-set', 9)} CHECK FAILS, "
-            "CHECK THAT, PUSHED AND ROCKED BY HAND, THE PLATE HAS NO SHAKE ON ITS "
-            "DOWELS.",
-            "WITH A CHECK FAILED, CHECK THAT THE PLATE'S SCREWS ARE TIGHT.",
-            f"IF THE PLATE IS SOUND, CLEAN THE {teeth} AND THE DISC TEETH AND "
+            f"IF EVERY {s('fitup-pose-set', 7)}-{s('fitup-pose-set', 9)} CHECK "
+            f"PASSES, GO TO STEP {steps.step_number('collar-rear-faced-to-fit')}.",
+            "CHECK: ROCKED BY HAND, THE PLATE HAS NO SHAKE ON ITS DOWELS.",
+            "CHECK: THE PLATE'S SCREWS ARE TIGHT.",
+            f"IF SOUND, CLEAN THE {teeth} AND DISC TEETH AND "
             f"REPEAT {s('fitup-pose-set', 2)}-{s('fitup-pose-set', 9)}.",
-            "IF A CHECK STILL FAILS, TURN THE DISC ONE FULL TURN BY THE COLLAR, "
-            "NOTING WHERE THE FAULT RECURS.",
+            f"IF EVERY {s('fitup-pose-set', 7)}-{s('fitup-pose-set', 9)} CHECK NOW "
+            f"PASSES, GO TO STEP {steps.step_number('collar-rear-faced-to-fit')}.",
+            "TURN THE DISC ONE FULL TURN BY THE COLLAR, NOTING WHERE THE FAULT "
+            "RECURS.",
             knob_stack_off,
             "FOR A FAULT ONCE A DISC TURN (A DISC TOOTH), STRIP THE CLUSTER "
             f"({s('disc-cluster-hung', 4)} BACK TO {s('disc-cluster-hung', 1)}), "
             "KEEPING ITS SHIMS.",
-            hub_slid_off,
+            f"FOR A DISC TOOTH, {hub_slid_off}",
             # A new disc's thickness is its own, so the old screws' cut tips
             # no longer sit in their window under its rear face: new screws,
             # cut again (codjiflo P2 on 27438d7).
-            f"REPEAT STEPS {steps.step_number('disc-cluster-assembled')}-"
+            f"FOR A DISC TOOTH, REPEAT STEPS {steps.step_number('disc-cluster-assembled')}-"
             f"{steps.step_number('disc-taps-transferred')} WITH A NEW "
             f"{n['pd-rack-pinion']} DISC AND NEW {n[explode.DISC_SCREW]} "
             f"SCREWS ON THE SAME HUB, ITS PIN LEFT IN AND RIDING THE FLAT, THEN STEPS "
@@ -2859,17 +2868,19 @@ def _step_text(
             f"{steps.step_number('disc-cluster-shimmed')} AND FROM STEP {pose}.",
             "FOR A LOOSE PLATE OR A FAULT EVERY KNOB TURN (A PINION TOOTH), "
             f"{knob_pin_out[0]}",
-            knob_pin_out[1],
+            f"FOR EITHER, {knob_pin_out[1]}",
             f"REFIT A LOOSE PLATE AS {s('arm-plate-fitted', 18)}.",
-            f"REPEAT STEP {steps.step_number('knob-stack-fitted')} WITH A NEW "
+            f"FOR EITHER, REPEAT STEP {steps.step_number('knob-stack-fitted')} WITH A NEW "
             f"{n['pd-transgear-knob-shaft']} SHAFT, {n['pd-transgear-knob-cup']} CUP "
             f"AND {n['pd-vn-transgear-knob-cup-pin']} PIN, THEN FROM STEP {pose}.",
-            f"FOR A FAULT ALL ROUND (THE ARM'S SETTING), REMOVE THE {n['pd-latch-hook']} "
+            f"FOR A FAULT ALL ROUND (ARM SETTING), REMOVE THE {n['pd-latch-hook']} "
             "HOOK.",
-            f"STRIP THE CLUSTER ({s('disc-cluster-hung', 4)} BACK TO "
-            f"{s('disc-cluster-hung', 1)}), KEEPING ITS SHIMS.",
-            f"DO {s('hanger-pivoted', 10)}-{s('hanger-pivoted', 11)}.",
-            f"REBUILD FROM STEP {steps.step_number('latch-pin-pressed')} WITH A NEW "
+            f"FOR THE ARM SETTING, STRIP THE CLUSTER ({s('disc-cluster-hung', 4)} "
+            f"BACK TO {s('disc-cluster-hung', 1)}), KEEPING ITS SHIMS.",
+            f"FOR THE ARM SETTING, DO {s('hanger-pivoted', 10)}-"
+            f"{s('hanger-pivoted', 11)}.",
+            "FOR THE ARM SETTING, REBUILD FROM STEP "
+            f"{steps.step_number('latch-pin-pressed')} WITH A NEW "
             f"{n['pd-transgear-arm']} ARM, {n['pd-transgear-arm-plate']} PLATE, "
             f"{n['pd-transgear-pin']} PIN, {n['pd-transgear-pivot-spacer']} SPACER, "
             f"{n['pd-transgear-knob-shaft']} SHAFT, {n['pd-transgear-knob-cup']} CUP, "
@@ -2937,9 +2948,12 @@ def _step_text(
             # true air is at least this reading, so facing the step by the
             # minimum less the reading leaves at least the minimum (integration
             # review, run 20261109T062834910Z).
-            "IF SHORT, READ THE THICKEST FEELER THAT ENTERS ALL ROUND THE "
-            "OVERLAP (NONE: READ 0).",
-            f"IF SHORT, {knob_stack_off}",
+            # #2629 (machinist rule 22): a pass exit to the platen's refit, so
+            # the re-face branch after it needs no carried condition.
+            f"IF {s('collar-disc-air-inspected', 2)} PASSES, SKIP "
+            f"{s('collar-disc-air-inspected', 4)}-{s('collar-disc-air-inspected', 14)}.",
+            "READ THE THICKEST FEELER ENTERING ALL ROUND (NONE: READ 0).",
+            knob_stack_off,
             f"STRIP THE CLUSTER ({s('disc-cluster-hung', 4)} BACK TO "
             f"{s('disc-cluster-hung', 1)}), KEEPING ITS SHIMS.",
             f"SLIDE THE HUB AND DISC OFF THE {n['pd-transgear-feed-pinion']} NOSE "
@@ -2962,21 +2976,22 @@ def _step_text(
             "FACED SHOULDER BY THE TAILSTOCK CENTRE IN ITS BORE MOUTH.",
             f"RE-FACE THE {n['pd-transgear-feed-pinion']} STEP FACE SQUARE BY "
             f"{steps.COLLAR_DISC_AIR_TEXT.split()[0]} LESS THE "
-            f"{s('collar-disc-air-inspected', 3)} READING; "
+            f"{s('collar-disc-air-inspected', 4)} READING; "
             f"THE {n['pd-transgear-disc-hub']} SPIGOT END SEATS ON IT, SO HUB AND "
             "DISC SET BACK BY THAT AMOUNT.",
-            "SLIDE THE HUB'S BORE BACK ON THE BOSS FROM THE NOSE, ITS PIN RIDING "
-            "THE FLAT, SPIGOT TO THE STEP FACE, DISC AND HUB MATCH MARKS TOGETHER.",
+            "SLIDE THE HUB'S BORE BACK ON THE BOSS, ITS PIN RIDING THE FLAT, SPIGOT "
+            "TO THE STEP FACE, MATCH MARKS TOGETHER.",
             f"REPEAT {s('disc-taps-transferred', 1)} AND "
             f"{s('disc-taps-transferred', 12)}-{s('disc-taps-transferred', 15)}.",
-            f"RE-DRILL THE OIL HOLE THROUGH THE HUB INTO THE SLEEVE'S HOLE, AS STEP "
+            "RE-DRILL THE HUB'S OIL HOLE INTO THE SLEEVE'S HOLE, AS STEP "
             f"{steps.step_number('oil-hole-drilled')}.",
             f"REPEAT STEPS {steps.step_number('disc-cluster-hung')}-"
             f"{steps.step_number('disc-cluster-shimmed')} AND "
             f"{steps.step_number('collar-shoulder-seated')}.",
-            "REFIT THE PLATEN.",
             f"REPEAT {s('collar-disc-air-inspected', 1)}-"
-            f"{s('collar-disc-air-inspected', 2)} AND "
+            f"{s('collar-disc-air-inspected', 3)}.",
+            "REFIT THE PLATEN.",
+            f"IF {s('collar-disc-air-inspected', 9)} RE-FACED THE STEP, REPEAT "
             f"{s('loaded-rack-geometry-checked', 1)}-"
             f"{s('loaded-rack-geometry-checked', 4)}.",
         ),
@@ -2997,21 +3012,28 @@ def _step_text(
             "CHECK: COLLAR TO DISC CLEARANCE "
             f"{steps.COLLAR_DISC_AIR_TEXT}, AS "
             f"{s('collar-disc-air-inspected', 2)}.",
+            # #2629 (machinist rule 22): a pass exit, then each failure's
+            # follow-on sub-steps carry its check.
+            "IF EVERY CHECK PASSES, GO TO STEP "
+            f"{steps.step_number('chain-closed')}.",
             # A collar refaced at step 29 comes off with the thumbnut and the
             # knob first, and every step it sets is then redone (machinist
             # review of ab77adcbac).
             f"IF {s('fitup-accepted', 0)} FAILS, {knob_stack_off}",
-            f"REPEAT STEPS {steps.step_number('collar-rear-faced-to-fit')}-"
+            f"FOR {s('fitup-accepted', 0)}, REPEAT STEPS "
+            f"{steps.step_number('collar-rear-faced-to-fit')}-"
             f"{steps.step_number('fitup-accepted')}.",
             f"IF {s('fitup-accepted', 1)} FAILS, {knob_stack_off}",
-            *knob_pin_out,
-            f"REPEAT STEP {steps.step_number('knob-stack-fitted')} WITH A NEW "
+            f"FOR {s('fitup-accepted', 1)}, {knob_pin_out[0]}",
+            f"FOR {s('fitup-accepted', 1)}, {knob_pin_out[1]}",
+            f"FOR {s('fitup-accepted', 1)}, REPEAT STEP "
+            f"{steps.step_number('knob-stack-fitted')} WITH A NEW "
             f"{n['pd-transgear-knob-shaft']} SHAFT, {n['pd-transgear-knob-cup']} CUP "
             f"AND {n['pd-vn-transgear-knob-cup-pin']} PIN, THEN FROM STEP {pose}.",
             f"IF {s('fitup-accepted', 2)} FAILS, REPEAT FROM STEP "
             f"{steps.step_number('collar-shoulder-seated')}.",
             f"IF {s('fitup-accepted', 5)} FAILS, ARM UNLATCHED, DO {pivot_remedied}.",
-            f"REPEAT {s('hook-pin-hole-match-drilled', 9)}-"
+            f"FOR {s('fitup-accepted', 5)}, REPEAT {s('hook-pin-hole-match-drilled', 9)}-"
             f"{s('hook-pin-hole-match-drilled', 11)}, THEN FROM STEP {pose}.",
             f"IF {s('fitup-accepted', 7)} OR {s('fitup-accepted', 8)} FAILS, REPEAT "
             f"STEP {steps.step_number('disc-cluster-shimmed')}, THEN FROM STEP "
@@ -3036,8 +3058,11 @@ def _step_text(
             "CHECK: THE CHAIN SEATS ON EVERY TOOTH OF BOTH WHEELS WITHOUT "
             "CLIMBING OR A TIGHT SPOT.",
             "CHECK: THE SLACK RUN TOUCHES NOTHING.",
-            f"IF A CHECK FAILS, OPEN THE {n['pd-vn-chain-connecting-link']} LINK "
-            "AND LIFT THE CHAIN OFF.",
+            # #2629 (machinist rule 22): a pass exit past the remedy.
+            f"IF BOTH CHECKS PASS, SKIP {s('chain-run-accepted', 4)}-"
+            f"{s('chain-run-accepted', 6)}.",
+            f"OPEN THE {n['pd-vn-chain-connecting-link']} LINK AND LIFT THE CHAIN "
+            "OFF.",
             knob_stack_off,
             f"REPEAT STEPS {steps.step_number('collar-rear-faced-to-fit')}-"
             f"{steps.step_number('chain-run-accepted')}.",

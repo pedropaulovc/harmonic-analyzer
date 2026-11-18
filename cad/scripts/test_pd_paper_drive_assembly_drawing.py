@@ -1518,11 +1518,15 @@ def test_the_actual_collar_disc_overlap_is_checked_before_final_platen_installat
     ]
     feeler = steps.COLLAR_DISC_AIR_TEXT.split()[0]
     assert texts[2].startswith(f"CHECK: A {feeler} FEELER ENTERS ")
+    # #2629: a pass exit to the platen's refit leads the re-face branch.
     assert texts[3] == (
-        "IF SHORT, READ THE THICKEST FEELER THAT ENTERS ALL ROUND THE OVERLAP "
-        "(NONE: READ 0)."
+        f"IF {drawing.sub_step('collar-disc-air-inspected', 2)} PASSES, SKIP "
+        f"{drawing.sub_step('collar-disc-air-inspected', 4)}-"
+        f"{drawing.sub_step('collar-disc-air-inspected', 14)}."
     )
-    read = drawing.sub_step("collar-disc-air-inspected", 3)
+    assert texts[4] == "READ THE THICKEST FEELER ENTERING ALL ROUND (NONE: READ 0)."
+    assert texts[15] == "REFIT THE PLATEN."
+    read = drawing.sub_step("collar-disc-air-inspected", 4)
     assert (
         f"RE-FACE THE {_number('pd-transgear-feed-pinion')} STEP FACE SQUARE BY "
         f"{feeler} LESS THE {read} READING;" in flat
@@ -1536,9 +1540,12 @@ def test_the_actual_collar_disc_overlap_is_checked_before_final_platen_installat
     assert setup == sorted(setup)
     assert "BETWEEN CENTRES" not in flat
     assert "READ SHORT" not in flat
-    assert texts[-1].startswith(
+    assert texts[-3] == (
         f"REPEAT {drawing.sub_step('collar-disc-air-inspected', 1)}-"
-        f"{drawing.sub_step('collar-disc-air-inspected', 2)} AND "
+        f"{drawing.sub_step('collar-disc-air-inspected', 3)}."
+    )
+    assert texts[-1].startswith(
+        f"IF {drawing.sub_step('collar-disc-air-inspected', 9)} RE-FACED THE STEP, REPEAT "
     )
     assert steps.COLLAR_DISC_AIR_MIN == collar.COLLAR_DISC_AIR_MIN
     assert steps.COLLAR_DISC_AIR_TEXT in _step_body("fitup-accepted")
@@ -2397,7 +2404,7 @@ def test_every_screwed_setting_has_a_holding_check() -> None:
     pivot = texts["hanger-pivoted"]
     assert pivot[5].startswith("SEAT THE SCREW, ITS SHOULDER TIGHT ON THE BAR'S BACK FACE")
     assert pivot[6] == "CHECK: NO DAYLIGHT BETWEEN THE SPACER AND THE BAR'S BACK FACE."
-    assert pivot[7] == "CHECK: TURNED BY HAND WITH A HEX KEY TO LOOSEN, THE SCREW DOES NOT TURN."
+    assert pivot[7] == "CHECK: A HEX KEY BY HAND DOES NOT LOOSEN THE SCREW."
     assert pivot[8] == "CHECK: RAISED AND RELEASED, THE ARM FALLS FREELY."
     assert pivot[9] == "IF ALL THREE CHECKS PASS, SKIP 15L-15S."
     # The remedy takes the captured arm off before anything is cleaned.
@@ -2414,6 +2421,36 @@ def test_every_screwed_setting_has_a_holding_check() -> None:
     hook = texts["hook-pin-hole-match-drilled"]
     assert hook[5] == "TIGHTEN THE HOOK SCREWS."
     assert hook[6] == "CHECK: PUSHED FIRMLY BY HAND, THE HOOK DOES NOT MOVE ON THE BAR."
+
+
+def test_every_failure_branch_has_a_pass_exit() -> None:
+    """#2629 (machinist rule 22): a builder whose checks pass never reads on
+    into a plain remedy command; each branch after the exit carries its
+    condition."""
+    texts = drawing._step_text(operating_domain=_unit_operating_domain())
+    s = drawing.sub_step
+    mesh = texts["fitup-mesh-remedied"]
+    pose_checks = f"{s('fitup-pose-set', 7)}-{s('fitup-pose-set', 9)}"
+    after = steps.step_number("collar-rear-faced-to-fit")
+    assert mesh[0] == f"IF EVERY {pose_checks} CHECK PASSES, GO TO STEP {after}."
+    assert mesh[4] == f"IF EVERY {pose_checks} CHECK NOW PASSES, GO TO STEP {after}."
+    branches = mesh[mesh.index(next(r for r in mesh if r.startswith("FOR A FAULT ONCE"))):]
+    assert all(
+        row.startswith(("FOR ", "REFIT A LOOSE PLATE", "SKIP STEPS")) for row in branches
+    )
+    accepted = texts["fitup-accepted"]
+    exit_row = f"IF EVERY CHECK PASSES, GO TO STEP {steps.step_number('chain-closed')}."
+    remedies = accepted[accepted.index(exit_row) + 1:]
+    assert remedies and all(row.startswith(("IF ", "FOR ")) for row in remedies)
+    run = texts["chain-run-accepted"]
+    assert run[3] == (
+        f"IF BOTH CHECKS PASS, SKIP {s('chain-run-accepted', 4)}-"
+        f"{s('chain-run-accepted', 6)}."
+    )
+    located = texts["arm-plate-located"]
+    assert located[17].startswith(
+        f"IF {s('arm-plate-located', 12)} AND {s('arm-plate-located', 13)} PASSED, GO TO STEP "
+    )
 
 
 def test_the_lock_taps_are_the_even_taps_counted_from_either_end() -> None:
@@ -2806,10 +2843,16 @@ def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
     # A failed trial inspects the gears and the two running fits the window
     # charges before it blames the arm.
     assert (
-        f"THE {_number('pd-transgear-knob-shaft')} JOURNAL AND "
+        f"{_number('pd-transgear-knob-shaft')} JOURNAL AND "
         f"{_number('pd-transgear-arm-plate')} AND "
         f"{_number('pd-transgear-feed-pinion')} BORES TO THEIR SHEETS."
         in located
+    )
+    # #2629: the inspection opens on the trial's pass exit.
+    assert (
+        f"IF {drawing.sub_step('arm-plate-located', 12)} AND "
+        f"{drawing.sub_step('arm-plate-located', 13)} PASSED, GO TO STEP "
+        f"{steps.step_number('arm-plate-fitted')}; IF NOT, INSPECT" in located
     )
     # The restart follows the part, one sub-step each: a new plate is set
     # again from 12A, a new disc or sleeve is centred again before the trial
@@ -2824,7 +2867,7 @@ def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
         f"AND REPEAT FROM {trial}.",
         "SLIDE THE HUB AND DISC AS ONE OFF A "
         f"{_number('pd-transgear-feed-pinion')} FOUND OUTSIDE, THE PIN RIDING THE FLAT.",
-        f"WITH THE {_number(explode.DISC_SCREW)} SCREWS SLACKENED, REPEAT "
+        f"WITH THEM OFF AND THE {_number(explode.DISC_SCREW)} SCREWS SLACKENED, REPEAT "
         f"{drawing.sub_step('disc-cluster-assembled', 3)}-"
         f"{drawing.sub_step('disc-cluster-assembled', 4)}, "
         f"{drawing.sub_step('disc-taps-transferred', 0)}-"
@@ -2863,7 +2906,7 @@ def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
         "fitup-pose-set"
     )
     assert len(drawing._step_text(operating_domain=_unit_operating_domain())["fitup-pose-set"]) == 10
-    rebuild = pose.index("FOR A FAULT ALL ROUND (THE ARM'S SETTING)")
+    rebuild = pose.index("FOR A FAULT ALL ROUND (ARM SETTING)")
     assert pose.index(f"NEW {_number('pd-transgear-arm')} ARM") > rebuild
     for part, name in (("pd-transgear-arm-plate", "PLATE"), ("pd-latch-hook", "HOOK")):
         assert f"{_number(part)} {name}," in pose[rebuild:]
@@ -2915,7 +2958,7 @@ def test_the_hub_key_pin_and_collar_flat_pin_are_fitted_and_kept() -> None:
     assert len(texts["oil-hole-drilled"]) == 1
     for key in ("fitup-mesh-remedied", "collar-disc-air-inspected"):
         rows = texts[key]
-        slide = next(i for i, row in enumerate(rows) if row.startswith("SLIDE THE HUB AND DISC"))
+        slide = next(i for i, row in enumerate(rows) if "SLIDE THE HUB AND DISC" in row)
         assert "NOSE AS ONE" in rows[slide] and "PIN RIDING THE FLAT" in rows[slide], key
         assert not any("BACK THE" in row or "SET SCREW" in row for row in rows), key
         assert not any("STAKING FRESH METAL AS" in row for row in rows), key
