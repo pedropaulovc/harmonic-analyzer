@@ -123,8 +123,8 @@ def joint_budget() -> dict[str, float]:
     arm's #47 hole at its sheet's DRILLED HOLES row, the arm strap and its
     symmetry to its hub (STRAP_HUB_SYMMETRY), each tine .067 +/-.002, the slot
     .106 +/-.002 (so the fork over the tines, their reference sum, spans
-    FORK_THICKNESS_BAND), the hubs that set the pitch never shorter than
-    nominal; the fork outline and slot depth at the rod sheet's .XX band, the
+    FORK_THICKNESS_BAND), two neighbouring arms closed up hub on hub at the
+    hubs' least length; the fork outline and slot depth at the rod sheet's .XX band, the
     arm radii at the arm sheet's, the arm's top edge at its TOP_EDGE_BAND over
     its pivot; the supplied pin at its shortest length.
     """
@@ -136,14 +136,16 @@ def joint_budget() -> dict[str, float]:
     arm_hole_min = NUMBER_DRILL_MM[_arm.ROD_HOLE_SPEC.size]
     arm_hole_max = arm_hole_min + DRILLED_PLUS
     pin_min, pin_max = PIN_DIA_LIMITS
-    pitch_min = _arm.HUB_LENGTH  # hubs bear face on face; +0.05/0 band
+    # The arms float on the shaft (#3114); two neighbours come no closer than
+    # their hubs, at their shortest.
+    pitch_min = _arm.HUB_LENGTH_MIN
     # Each rod floats on its own arm's strap by the slot's side clearance, and
     # each strap stands off its hub's mid-plane by up to half its symmetry
     # zone: rod j's fork leans north on a strap set north, rod j+1's south on
     # a strap set south. With its slot's trailing wall on the strap, a fork's
     # leading face stands the slot plus a tine, less half the strap, past the
     # strap's mid-plane, each dressed pin end flush. The ring's place on the
-    # plate does not enter: the fork's reach from its strap is bounded by the
+    # rod does not enter: the fork's reach from its strap is bounded by the
     # slot and tine alone, wherever the ring rides in its cam slot.
     side_clearance_max = s_max - t_min
     neighbour = (

@@ -54,7 +54,8 @@ def test_supply_sizes_derive_from_the_finished_rocker() -> None:
     assert spec.SUPPLY_BORE_DIA + spec.DRILLED_PLUS < rocker.PIVOT_HOLE_DIA
     # The length leaves FACE_STOCK at each end over the finished top limit.
     finished_max = rocker.HUB_LENGTH + rocker.HUB_LENGTH_BAND[0]
-    assert spec.SUPPLY_LENGTH_MIN == pytest.approx(0.35 * 25.4)
+    # .278 +.002 finished, .020 a face: .320 exactly, on the two-place grid.
+    assert spec.SUPPLY_LENGTH_MIN == pytest.approx(0.32 * 25.4)
     assert spec.SUPPLY_LENGTH_MIN >= finished_max + 2.0 * spec.FACE_STOCK
     assert spec.SUPPLY_LENGTH_TOL_TYPE == 5  # swTolType_e.swTolMIN
     assert spec.SUPPLY_WALL_MIN >= WALL_FLOOR_MM
@@ -76,6 +77,7 @@ def test_the_sheet_never_repeats_a_finished_size() -> None:
     for value, places in (
         (rocker.PIVOT_HOLE_DIA, 3),
         (rocker.HUB_LENGTH, 2),
+        (rocker.HUB_LENGTH, 3),
         (rocker.HUB_LENGTH, 4),
     ):
         assert f"{value / 25.4:.{places}f}".removeprefix("0") not in printed

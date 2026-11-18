@@ -145,17 +145,25 @@ def test_the_datum_chain_is_mic_compensated() -> None:
 
 
 def test_a_closed_slot_always_holds_the_whole_ring() -> None:
-    # #982: ring and shank one .086 plate, its thickness printed +/-.002 at
-    # the ring (review r1).
+    # #3114 (owner ruling 2026-11-18): the ring is the original's .170,
+    # printed +/-.002 at the ring (#982 review r1), a sliding fit between the
+    # two tooth discs: the slot locates the rod, so its margin is held to the
+    # running floor, not the novice spare. The shank, .13 at the title
+    # block's .XX, passes the same slot and is the thinner.
     upper, _lower = rod.RING_THICKNESS_BAND
     ring_max = rod.RING_THICKNESS + upper
-    assert ring_max == pytest.approx(2.2352)
+    assert ring_max == pytest.approx(4.3688)  # .172
     assert bank.RING_MAX == pytest.approx(ring_max)
-    assert bank.SHANK_MAX == pytest.approx(ring_max)
+    shank_max = rod.SHANK_THICKNESS + rod.SHANK_THICKNESS_BAND[0]
+    assert shank_max == pytest.approx(3.556)  # .14
+    assert bank.SHANK_MAX == pytest.approx(shank_max)
+    assert bank.SHANK_MAX < bank.RING_MAX
     # d': the thinnest in-band gear, .3000 - .0010 in, less FW + .002 in.
     assert bank.SLOT_MIN == pytest.approx(4.5466)
     assert bank.RING_SLOT_MARGIN == pytest.approx(bank.SLOT_MIN - ring_max)
-    assert bank.RING_SLOT_MARGIN >= bank.MARGIN_SPARE
+    assert bank.RING_SLOT_MARGIN == pytest.approx(0.1778)  # .007
+    assert bank.RUNNING_FLOOR == pytest.approx(0.10)
+    assert bank.RING_SLOT_MARGIN >= bank.RUNNING_FLOOR
 
 
 def test_each_gear_is_accepted_on_its_print_band() -> None:

@@ -3,13 +3,16 @@ r"""Create the curated machinist drawing for the connecting rod.
 The SLDPRT remains authoritative.  This recipe supplies only the connecting-rod
 views, dimension layout, callout text, and manufacturing notes;
 sheet/template and export behavior lives in ``_drawing_common``.
-Dimension import and curation live in ``_drawing_dimension_import``.
+Dimension import and curation live in ``_drawing_dimension_import``; the
+side view's reference sketch, which the part saves hidden, is shown there by
+``_drawing_hidden_sketches``.
 
 The rod is a tall thin lollipop (~184 mm ring-bottom to fork crown), so the
 sheet runs at 1:1 with a 1:2 isometric; the fork's side profile (tines, slot
-and the plate's near face located from one fork face) prints in a 3:1 detail
-of the side view, and the side view carries the plate's thickness at the ring
-and the overall length as a reference.
+and the shank's near face located from one fork face, and the shank's
+thickness) prints in a 3:1 detail of the side view, and the side view carries
+the ring's near face from that same fork face, the ring's thickness and the
+overall length as a reference.
 
 Run with SolidWorks open::
 
@@ -44,7 +47,8 @@ from _drawing_common import (
 )
 from _drawing_detail_crop import native_circle_geometry
 from _drawing_detail_projection import settle_detail_projection
-from _drawing_dimension_import import curate_view_dimensions
+# The ring's near face is owned by a reference sketch the part saves hidden.
+from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_dimensions import (
     assert_imported_precision,
     set_arc_endpoints_to_center,
@@ -191,17 +195,26 @@ FRONT_CALLOUTS = {
     "PinHoleDia": f"REAM THRU\nSEE NOTE {PIN_FIT_NOTE_NUMBER}",
 }
 
-# The side view at 1:1: the plate's thickness at the ring (#982 review r1),
-# its value out to the left below the ring so its witnesses drop from the
-# ring's bottom corners.
+# The side view at 1:1, below the ring (#3114: the ring is the sliding fit in
+# the cam slot, so its two bands print at the ring). Nearest the ring, the
+# ring's near face from the fork's datum face: one witness drops from the
+# fork's root corner down the whole shank, the other from the ring's bottom
+# corner. Under it the ring's thickness (#982 review r1), its witnesses
+# dropping from the ring's two bottom corners. Both values stand out to the
+# left, the thickness's further out and lower, so neither text block (value
+# and flag) stands over the other and the thickness's dimension line passes
+# under the offset's flag.
+_RING_BOTTOM_SHEET_Y = _left_xy(0.0, RING_BOTTOM_Y)[1]
 LEFT_KEEP = {
-    "RingThick": (0.045, _left_xy(0.0, RING_BOTTOM_Y)[1] - 0.007),
+    "RingFaceNear": (0.060, _RING_BOTTOM_SHEET_Y - 0.007),
+    "RingThick": (0.032, _RING_BOTTOM_SHEET_Y - 0.017),
 }
-# Two short lines: the plate's name and the flag of the note that gives its
-# fit in the cam slot, shared with the plate face's offset (fan-out round 2;
-# long lines ran into the sheet border, r2).
+# Each band's one short line flags the note that names the cam slot the ring
+# slides in (fan-out round 2: both bands serve that fit; long lines ran into
+# the sheet border, r2).
 LEFT_CALLOUTS = {
-    "RingThick": f"RING AND SHANK\nSEE NOTE {CAM_SLOT_NOTE_NUMBER}",
+    "RingFaceNear": f"SEE NOTE {CAM_SLOT_NOTE_NUMBER}",
+    "RingThick": f"SEE NOTE {CAM_SLOT_NOTE_NUMBER}",
 }
 # The overall length, ring bottom to crown top, as a reference: the side
 # view's ring-bottom silhouette and the far tine's crown-top silhouette,
@@ -218,10 +231,10 @@ OVERALL_FACES = {
 }
 OVERALL_TEXT_XY = (0.100, 0.175)
 
-# DETAIL C: the fork's side profile at 3:1. At 1:1 the tines, slot and ring
-# faces are 1.7-2.7 mm features and their dimensions crowded the side view
+# DETAIL C: the fork's side profile at 3:1. At 1:1 the tines, slot and shank
+# faces are 1.3-2.7 mm features and their dimensions crowded the side view
 # (baseline review). The fence centres on the rod axis midway between the
-# crown top and the ring-face references' lower ends and takes in both.
+# crown top and the shank-face reference's lower end and takes in both.
 DETAIL_SCALE = (3, 1)
 # 12.5: the fence the passing layouts printed (an inferred draw had snapped
 # the authored 11.0 out to ~12.4), clear of the slot depth's text inside it.
@@ -260,7 +273,7 @@ _FACE_X = _detail_xy(-FORK_THICKNESS / 2.0, FORK_TOP_Y)[0]
 _FAR_X = _detail_xy(FORK_THICKNESS / 2.0, FORK_TOP_Y)[0]
 _TINE_TOP_Y = _detail_xy(0.0, FORK_TOP_Y)[1]
 _ROOT_Y = _detail_xy(0.0, FORK_BASE_Y)[1]
-# The ring-face references' lower ends (build_ch_connecting_rod).
+# The shank-face reference's lower end (build_ch_connecting_rod).
 _REF_END_Y = _detail_xy(0.0, FORK_BASE_Y - 2.0)[1]
 DETAIL_KEEP = {
     # Over the tines, nearest first: the near tine (text wholly left of the
@@ -273,30 +286,42 @@ DETAIL_KEEP = {
     # boss length outside.
     "SlotDepth": (_FAR_X + 0.016, (_TINE_TOP_Y + _ROOT_Y) / 2.0 + 0.004),
     "ForkBossLength": (_FAR_X + 0.034, (_TINE_TOP_Y + _ROOT_Y) / 2.0),
-    # Under the fork, from the datum face: the plate's near face, its note's
-    # flag under its band, text left of the datum face.
-    "RingFaceNear": (_FACE_X - 0.036, _REF_END_Y - 0.010),
+    # Under the fork (#3114). Nearer it, from the datum face: the shank's
+    # near face, text left of the datum face. Below that, the shank's
+    # thickness across its two faces, text right of the far face. Two rows,
+    # so the offset's outside arrow never lies on the thickness's line.
+    "ShankFaceNear": (_FACE_X - 0.024, _REF_END_Y - 0.010),
+    "ShankThick": (_FAR_X + 0.013, _REF_END_Y - 0.018),
 }
-# The near tine's band locates the slot from the datum face (the channel's
-# axial budget) and, with the far tine's, holds the gap to the next channel's
-# rod (#982 review r2: a clearance alone would not need it); one short reason
 # Each tight band links the note naming the mate it serves (rule 4; fan-out
 # rounds 1-2: the arm named at both the slot and the tine wall printed twice,
 # named at one the other band had none). The tine wall's printed lower limit
 # is the tines' known shortfall against the .080 wall target, named TINE
 # WALL (rule 20; MHA-CH-03 RV-02). The slot and the walls that locate it link
-# note 2 (running fit on the arm); the plate face's offset, which centres the
-# ring and shank on the fork, links note 3 with the .086 thickness (sliding
-# fit in the cam's slot).
+# note 2 (running fit on the arm). The near tine's band also locates the slot
+# from the datum face and, with the far tine's, holds the gap to the next
+# channel's rod (#982 review r2). The shank's two dimensions take the title
+# block's .XX and fit nothing, so they carry no flag; the ring's two bands
+# link note 3 in the side view (LEFT_CALLOUTS).
 DETAIL_CALLOUTS = {
     "TineNear": f"2X TINE WALL\nSEE NOTE {SLOT_FIT_NOTE_NUMBER}",
     "SlotWidth": f"SEE NOTE {SLOT_FIT_NOTE_NUMBER}",
-    "RingFaceNear": f"SEE NOTE {CAM_SLOT_NOTE_NUMBER}",
 }
+
+
+def _kept_precision(keep: dict[str, tuple[float, float]]) -> dict[str, int]:
+    """The part-authored decimal places of the dimensions a view keeps."""
+    places = {
+        name: digits
+        for by_name in DRAWING_PRECISION.values()
+        for name, digits in by_name.items()
+    }
+    return {name: places[name] for name in keep}
+
 
 BORE_FINISH_EDGE = _sheet_xy(RING_BORE_DIA / 2.0, 0.0)
 # At the plate's 2.5 mm character height (the default printed 5 mm and its
-# roughness text ran into the detail's plate-face callout, r1 and r2).
+# roughness text ran into the detail's lower-left callout, r1 and r2).
 BORE_FINISH_SYMBOL = (BORE_FINISH_EDGE[0] + 0.020, BORE_FINISH_EDGE[1] + 0.015)
 BORE_FINISH_CHAR_HEIGHT = 0.0025
 # Datum A on the strap bore at 5 o'clock, its tag below the ring: at 9
@@ -494,10 +519,10 @@ def build(adapter: Any) -> dict[str, str]:
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 1))
     # The 1:1 left view (third angle: placed LEFT of the front) shows the
-    # stepped thickness -- one .086 plate for ring and shank, and the .240
-    # fork split by its slot into two tines -- and carries DETAIL C's circle.
-    # The right-hand column belongs to the title block, so the side view lives
-    # on the left.
+    # stepped thicknesses -- the .170 ring, the .13 shank inside both its
+    # faces, and the .240 fork split by its slot into two tines -- and carries
+    # DETAIL C's circle. The right-hand column belongs to the title block, so
+    # the side view lives on the left.
     left = place_view(adapter, str(SOURCE), "*Left", *LEFT_CENTER, scale=(1, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 2))
     for view in (front, left, iso):
@@ -510,6 +535,9 @@ def build(adapter: Any) -> dict[str, str]:
         view_label="front",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
+    # Each view imports only features whose marked dimensions it keeps: the
+    # side view the ring's reference sketch (RingFaceReference, shown in this
+    # view alone) and the ring, the detail the fork's and the shank's.
     left_annotations = curate_view_dimensions(
         adapter,
         left,
@@ -533,11 +561,9 @@ def build(adapter: Any) -> dict[str, str]:
         front_annotations,
         DRAWING_PRECISION["PinHoleProfile"],
     )
-    assert_imported_precision(adapter, left_annotations, DRAWING_PRECISION["Plate"])
+    assert_imported_precision(adapter, left_annotations, _kept_precision(LEFT_KEEP))
     assert_imported_precision(
-        adapter,
-        detail_annotations,
-        {**DRAWING_PRECISION["ForkBoss"], **DRAWING_PRECISION["ForkSlotProfile"]},
+        adapter, detail_annotations, _kept_precision(DETAIL_KEEP)
     )
     set_dimension_callouts(adapter, front_annotations, FRONT_CALLOUTS)
     set_dimension_callouts(adapter, left_annotations, LEFT_CALLOUTS)

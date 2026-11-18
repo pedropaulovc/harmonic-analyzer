@@ -119,16 +119,14 @@ from ch_rocker_arm_spec import (
     TOP_EDGE_BAND,
     UNIT,
 )
-import _config
 
 PART_NAME = "ch-rocker-arm"
 MATERIAL = "Plain Carbon Steel"  # see _appearance.apply_material docstring
 
 ARM_THICKNESS = 2.4892  # .098; ch14: p.27 photo callout 2.5 mm (plate thickness, Z)
-# The hub length IS the station pitch: hub faces of neighbouring arms touch.
-if abs(HUB_LENGTH - _config.machine("channels", "station_pitch_mm")) > 1e-6:
-    raise AssertionError("ch_rocker_arm_spec.HUB_LENGTH must equal the channel station pitch")
-HUB_PROUD = (HUB_LENGTH - ARM_THICKNESS) / 2.0  # 2.5654 each face
+# The hub is shorter than the station pitch (#3114): the arms float on the
+# pivot shaft, each located by its own connecting rod (ch_rocker_arm_spec).
+HUB_PROUD = (HUB_LENGTH - ARM_THICKNESS) / 2.0  # 2.286, .090 each face
 if ARM_THICKNESS != SPEC_ARM_THICKNESS:
     raise AssertionError("ch_rocker_arm_spec.ARM_THICKNESS drifted from the build")
 # The lower arc's midpoint below the pivot axis: ArmDepth under the top edge.
@@ -498,8 +496,9 @@ def build(adapter) -> dict[str, str]:
     volume_check(adapter, "strap", v_strap, 0.01 * v_strap)
 
     # Integral pivot hub (2026-09-02, ch14 p.28): a Ø.400 boss coaxial with the
-    # pivot bore, HUB_LENGTH long mid-plane (= the station pitch), so it stands
-    # HUB_PROUD of each strap face and touches the neighbour arms' hubs. The
+    # pivot bore, HUB_LENGTH long mid-plane, so it stands HUB_PROUD of each
+    # strap face. It is shorter than the station pitch (#3114): its end faces
+    # only bound how close the floating neighbour arms can come. The
     # circle (r 5 about (0, ArmDepth/2)) lies inside the 16-deep strap, so the
     # boss only ADDS the two proud discs. Cut BEFORE the pivot hole so the bore
     # runs through hub + strap.
@@ -731,9 +730,13 @@ def build(adapter) -> dict[str, str]:
     set_dimension_symmetric_tolerance(
         adapter, "Strap", "StrapThickness", strap_upper, display_unit=UNIT
     )
-    # The hub length only comes out long (#743 PR2): four places hold it.
-    set_dimension_bilateral_tolerance(
-        adapter, "Hub", "HubLength", *deviations(HUB_LENGTH_BAND), display_unit=UNIT
+    # The hub length's band is symmetric (#3114: the arms float, so no stack
+    # sums it): it prints +/- at three places, like the strap.
+    hub_lower, hub_upper = deviations(HUB_LENGTH_BAND)
+    if hub_lower != -hub_upper:
+        raise AssertionError("ch_rocker_arm_spec.HUB_LENGTH_BAND must be symmetric")
+    set_dimension_symmetric_tolerance(
+        adapter, "Hub", "HubLength", hub_upper, display_unit=UNIT
     )
     # The top edge's arc-system zone, bilateral (ch_rocker_arm_spec.TOP_EDGE_BAND).
     set_dimension_bilateral_tolerance(

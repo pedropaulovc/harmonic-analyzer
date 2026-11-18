@@ -372,23 +372,13 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "Curved Disc Spring",
         "9715K43",
     ),
-    # MHA-DT-VN-68 / MHA-CH-VN-54 (#948 ruling R): one wave disc spring preloading each
-    # bank north on its datum; steel and high-carbon steel, the library's
-    # plain carbon steel.
+    # MHA-DT-VN-68 (#948 ruling R): one wave disc spring preloading the
+    # cylinder bank north on its datum; steel, the library's plain carbon
+    # steel.
     "dt-vn-cylinder-bank-spring": _stock(
         "dt-vn-cylinder-bank-spring",
         "Wave Disc Spring",
         "9714K392",
-    ),
-    "ch-vn-rocker-bank-spring": _stock(
-        "ch-vn-rocker-bank-spring",
-        "Wave Disc Spring",
-        "9714K24",
-    ),
-    "ch-vn-rocker-thrust-washer": _stock(
-        "ch-vn-rocker-thrust-washer",
-        "Carbon Steel Ring Shim, 1/4 ID x 3/8 OD x 0.031",
-        "3088A429",
     ),
     # MHA-MG-VN-52 / MHA-MG-VN-54 / MHA-MG-VN-55 (mg wheel rev 10): the magnifying wheel's
     # brass #4-40 nut and locknut and the two brass washers either side of

@@ -2002,7 +2002,7 @@ END_KEEP = {
     "TipLandAngle": (0.372, 0.082),
 }
 # View F at 3:1 (RIGHT_CENTER; strap faces x 0.0703/0.0777, hub ends
-# 0.0626/0.0854 at the .300 hub, part y 0.151-0.239, hub y 0.160-0.190). Native centres each
+# 0.0634/0.0846 at the .278 hub, part y 0.151-0.239, hub y 0.160-0.190). Native centres each
 # value-plus-three-row block on its request and runs the dimension line under
 # the block (r4: the 2.500 line at the block's bottom, 158 mm, through the
 # hub). Both blocks sit left of the view, clear of the border (0.0125):
@@ -2015,8 +2015,8 @@ END_KEEP = {
 # down-right to the +Z hub-root corner it measures (r3 run: requested right of
 # the view, the leader crossed the strap to that corner).
 STRAP_THICKNESS_TEXT_XY = (0.044, 0.2246)
-# The hub width names the 20-hub stack it sets (rule 4); the stack's fit-up
-# lives in MHA-CH-00's own step (rule 19), so the part sheet adds no
+# The hub width names what it does (rule 4): it keeps the neighbouring arms
+# apart on the shaft they all float on (#3114). The part sheet adds no
 # assembly reference (rule 7).
 HUB_LENGTH_TEXT = rocker_notes.HUB_LENGTH_CALLOUT
 # Two rows under the value: one row lower than the four-row block's seat keeps
@@ -2025,13 +2025,14 @@ HUB_LENGTH_TEXT_XY = (0.039, 0.1519)
 # The value plus two rows (#2136 r3: with three rows its top met the strap's
 # position frame), centred under that frame and left of the hub end.
 HUB_ROOT_TEXT_XY = (0.039, 0.199)
-# Datum G is the hub's -Z end face (#1579 owner ruling, option 1): the face
-# each arm registers on in the 20X stack, one a shop can set up on, where the
+# Datum G is the hub's -Z end face (#1579 owner ruling, option 1): a face
+# that stops the neighbouring arm (#3114), one a shop can set up on, where the
 # hub-width centre plane it replaces could only be derived. The strap frame's
 # ⌖0.10|G holds the strap's centre plane at a BASIC from that face to view
 # F's centreline. Both stand in the view's one free column, right of the -Z
-# face (x ~0.0854: view F stands 1 mm left of 0.075 so the boxed .1500
-# still fits beside the .300 hub, r1 leaf 20261111T225635Z) and short of the front view's 132.8 left witness
+# face (x ~0.0846: view F stands 1 mm left of 0.075, set when the hub was
+# .300 long and the BASIC a boxed .1500, r1 leaf 20261111T225635Z; the .278
+# hub and its .139 leave more room) and short of the front view's 132.8 left witness
 # (FRONT_LEFT_WITNESS_X): G's triangle on the face's lower half, its box
 # straight out right; the BASIC's line above the hub (top ~0.190), its boxed
 # text out right of the face.
@@ -2120,7 +2121,7 @@ part_metadata(
         "G": (
             {
                 "feature": "hub_faces",
-                "surface": "-Z hub end face (20X stack registration)",
+                "surface": "-Z hub end face (stops the neighbouring arm)",
             },
             (("draw_ch_rocker_arm", "_hub_face_datum"),),
         ),
@@ -2840,7 +2841,7 @@ def _strap_centre_plane(adapter: Any, view: Any) -> Any:
 
 
 # G's BASIC: the -Z hub face to the strap's centre plane, both off the face
-# requirements (the half hub length, 3.81, printed at its places: .1500).
+# requirements (the half hub length, 3.5306, printed at its places: .139).
 HUB_FACE_BASIC_MM = (
     STRAP_FACES.fields["upper_z"][0] + STRAP_FACES.fields["lower_z"][0]
 ) / 2.0 - HUB_FACES.fields["lower_z"][0]
@@ -4095,8 +4096,8 @@ def build(adapter: Any) -> dict[str, str]:
             "TipLandAngle": rocker_notes.DRAWING_PRECISION["StrapProfile"]["TipLandAngle"],
         },
     )
-    # Each band names what it serves (Opus #1020): hub length spaces the
-    # pivot-shaft stack; the strap's thickness is the rod fork's side clearance.
+    # Each band names what it serves (Opus #1020): hub length keeps the
+    # neighbouring arms apart; the strap's thickness is the rod fork's side clearance.
     # Both multi-row callouts sit below their values: above-text line breaks
     # print as one run.
     set_dimension_callouts(
@@ -4110,7 +4111,7 @@ def build(adapter: Any) -> dict[str, str]:
         name = dimension_name(adapter, annotation)
         display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
         if name == "HubLength" and str(display.GetText(4) or "") != HUB_LENGTH_TEXT:
-            raise RuntimeError("hub length stack callout did not persist")
+            raise RuntimeError("hub length neighbour callout did not persist")
         if name == "StrapThickness" and str(display.GetText(4) or "") != rocker_notes.STRAP_FIT_CALLOUT:
             raise RuntimeError("strap thickness fork-fit callout did not persist")
     try:

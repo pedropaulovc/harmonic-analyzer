@@ -325,6 +325,14 @@ VIEW_B_KEEP = {
     )
     for name, sign in (("SeatEastStation", 1), ("SeatWestStation", -1))
 }
+# Each REF text then leaves its dimension line on a leader (machinist review
+# of the #3114 sheet: at VIEW_B_KEEP the end face's extension line and the
+# dimension line struck the parentheses). It stands VIEW_B_REF_TEXT_LIFT
+# above the line, over the same x, clear of the extension-line tops.
+VIEW_B_REF_TEXT_LIFT = 0.005
+VIEW_B_REF_TEXT_XY = {
+    name: (x, y + VIEW_B_REF_TEXT_LIFT) for name, (x, y) in VIEW_B_KEEP.items()
+}
 # The letter matches the section's A (~5 mm) and stands square above its
 # tip, clear of the section line (the cone-tip-block pattern). VIEW_B_ARROW
 # is (note upper-left, leader tip) in sheet metres.
@@ -1078,6 +1086,7 @@ def build(adapter: Any) -> dict[str, str]:
     _assert_part_precision(adapter, view_b_dimensions, VIEW_B_KEEP)
     for annotation in view_b_dimensions:
         set_reference_dimension(adapter, annotation, label="VIEW B seat station")
+    offset_dimension_text(adapter, view_b_dimensions, VIEW_B_REF_TEXT_XY)
     if add_note(adapter, VIEW_B_CAPTION, *VIEW_B_CAPTION_XY) is None:
         raise RuntimeError("failed to caption VIEW B")
     _add_view_b_arrow(adapter, front)

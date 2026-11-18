@@ -203,7 +203,7 @@ def test_the_layout_checks_the_flat_at_its_printed_limits() -> None:
 
 def test_each_flat_stays_inside_its_ear() -> None:
     """At its longest, each flat stays inside its ear's thickness, so no hub
-    or the spring runs over a flat's edge."""
+    runs over a flat's edge."""
     ear = ch_pivot_bracket_spec.EAR_T
     half = spec.FLAT_LENGTH_RANGE[1] / 2.0
     south, north = bank.PIVOT_SHAFT_FLAT_STATIONS

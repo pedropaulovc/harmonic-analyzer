@@ -74,15 +74,28 @@ def test_existing_shafts_and_translated_mounts_cover_the_shifted_bank() -> None:
     assert min(channel.KEEPER_HUB_FLOAT) > 0.0
 
 
-def test_pivot_retention_keeps_both_washers_and_the_wave_spring() -> None:
-    # The physical full-bank retention stack remains installed even when
-    # CHANNEL_COUNT reduces the number of authored moving channels.
-    south_ear, north_ear = rocker_bank_layout.PIVOT_BRACKET_Z
-    south_washer = channel.SOUTH_WASHER_Z
-    north_washer = channel.NORTH_WASHER_Z
-    assert south_ear < south_washer[0] < south_washer[1]
-    assert south_washer[1] < north_washer[0] < north_washer[1] < north_ear
-    assert channel.ROCKER_SPRING_Z[1] == pytest.approx(south_washer[0])
-    assert channel.ROCKER_SPRING_Z[0] < channel.ROCKER_SPRING_Z[1]
+def test_the_floating_arms_stand_apart_and_clear_the_ears() -> None:
+    # #3114: each arm floats on the shaft at its station, located by its rod.
+    # Neighbouring hubs stand HUB_GAP apart and each end hub clears its ear,
+    # for the full bank even when CHANNEL_COUNT reduces the authored channels.
+    import ch_rocker_arm_spec as arm
+
+    hub = arm.HUB_LENGTH
+    gaps = [
+        rocker_bank_layout.hub_mid_z(j + 1)
+        - rocker_bank_layout.hub_mid_z(j)
+        - hub
+        for j in range(rocker_bank_layout.COUNT - 1)
+    ]
+    assert gaps == pytest.approx([rocker_bank_layout.HUB_GAP] * len(gaps))
+    assert rocker_bank_layout.HUB_GAP == pytest.approx(0.5588)
+    south_air = (
+        rocker_bank_layout.hub_mid_z(0) - hub / 2.0
+    ) - rocker_bank_layout.SOUTH_EAR_INNER_Z
+    north_air = rocker_bank_layout.NORTH_EAR_INNER_Z - (
+        rocker_bank_layout.hub_mid_z(rocker_bank_layout.COUNT - 1) + hub / 2.0
+    )
+    assert (south_air, north_air) == pytest.approx(rocker_bank_layout.END_FLOAT)
+    assert min(rocker_bank_layout.END_CLEARANCE_MIN) >= rocker_bank_layout.RUNNING_FLOOR
     assert len(channel.BRACKET_SCREW_XZ) == 2
     assert len(channel.PIVOT_SHAFT_FLAT_STATIONS) == 2

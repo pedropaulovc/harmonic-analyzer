@@ -11,8 +11,9 @@ union across its per-view ``keep`` maps -- the offline test
 
 Issue #290: the sheet prints decimal inch (``drawing_unit: in``). Lengths stay
 physical millimetres, each fabricated one the exact decimal of its printed inch
-value; the arc system, the pivot-to-edge height and the hub length (the station
-pitch) are kinematic closures and stay exact.
+value; the arc system and the pivot-to-edge height are kinematic closures and
+stay exact. The hub length is a toleranced size (.278 +/-.002), not the
+station pitch (#3114).
 """
 
 from __future__ import annotations
@@ -164,9 +165,8 @@ BOTTOM_EDGE_BELOW_PIVOT = _rocker_interface.ARM_DEPTH - TOP_EDGE_ABOVE_PIVOT  # 
 
 # Integral pivot hub (2026-09-02 photo re-derive, ch14 p.28 page002_img02 +
 # ch17 p.40): every arm carries its own round boss on both faces at the
-# pivot; neighbouring hubs touch face to face and SET the 7.62 (.300) station
-# pitch -- there are no loose spacer bushings (the 19 `pivot-bushing` parts
-# are retired).
+# pivot -- there are no loose spacer bushings (the 19 `pivot-bushing` parts
+# are retired). The hubs do not space the bank (#3114, HUB_LENGTH below).
 #
 # The OD's floor includes both the largest reamed bore and the bore-to-OD
 # eccentricity (PR #1354, R9 machinist review: the old Ø0.50 coaxiality left
@@ -217,16 +217,24 @@ if HUB_DIA < HUB_DIA_MIN:
         f"hub Ø{inch_text(HUB_DIA, 3)} is under its drawing-guidelines.md rule 17 (walls and webs) "
         f"wall floor Ø{inch_text(HUB_DIA_MIN, 3)}"
     )
-HUB_LENGTH = 7.62  # == machine channels.station_pitch_mm (asserted by the build); .3000
-# (upper, lower) on the printed hub length (#743 PR2): a hub may only come out
-# long, and the 20-arm stack's acceptance (rocker_bank_layout.STACK_L20_ACCEPT)
-# caps the sum, as the cylinder gears' overall thickness does.
-HUB_LENGTH_BAND = (0.0508, 0.0)  # +.0020/.0000
+# The hub is shorter than the station pitch, so the arms float on the pivot
+# shaft and each is located along the bank by its own connecting rod (owner
+# ruling 2026-11-18, #3114; rocker_bank_layout): the rod's ring slides in its
+# cam slot and its fork carries the strap. A hub does not space the stations.
+# It only bounds how close two neighbours can come, which is what the forks
+# and the amplitude bars between them need (sh_vn_pivot_pin_rod_spec,
+# ch_channel_assembly_spec.bar_gap_budget), and its top limit keeps the end
+# arms off the bracket ears and leaves every rod its float
+# (test_channel_axial_budget).
+HUB_LENGTH = 7.0612  # .278
+HUB_LENGTH_BAND = (0.0508, -0.0508)  # +/-.002; (upper, lower) deviations
+HUB_LENGTH_MIN = HUB_LENGTH + HUB_LENGTH_BAND[1]
+HUB_LENGTH_MAX = HUB_LENGTH + HUB_LENGTH_BAND[0]
 # The strap symmetric to the hub within this (total; #948 ruling R, PR #1292):
-# the hub stack places the arm, the strap carries the rod's fork, so a flat
-# rod's float on the arm is measured from the hub's mid-plane. The sheet
-# prints it as a position zone on the strap width to datum G, the hub's -Z
-# end face (the 20X stack registration), at a BASIC to the strap mid-plane.
+# the rod's fork carries the strap and the hub's end faces bound the arm's
+# approach to its neighbours, so both are measured from the hub's mid-plane.
+# The sheet prints it as a position zone on the strap width to datum G, the
+# hub's -Z end face, at a BASIC to the strap mid-plane.
 # Owner ruling 2026-10-19 retains this frame and datum scheme (RV-05).
 STRAP_HUB_SYMMETRY = GEOMETRIC_TOLERANCES_MM["strap position to hub"]
 # The hub-to-strap root fillet (drawing-guidelines rule 16), printed as the

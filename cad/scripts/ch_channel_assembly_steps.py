@@ -21,12 +21,15 @@ DRAWING_NUMBER = "MHA-CH-00"
 # so the pointer follows any renumbering of MHA-DT-00.
 NORTH_BRACKET_SET_KEY = "north-pivot-bracket-set"
 NORTH_BRACKET_SET_REF = dt_drive_train_steps.step_ref(NORTH_BRACKET_SET_KEY)
+# Its printed number, for the sub-steps (10B, 10E, 10F) the left-hub remedy
+# re-runs.
+NORTH_BRACKET_SET_NUMBER = dt_drive_train_steps.step_number(NORTH_BRACKET_SET_KEY)
 # Each rod's ring is captured in its closed cam slot as the cylinder stack goes
 # together (MHA-DT-00 BANK_STEPS), and the rod's fork is pinned to its arm with
 # a pin pressed at the bench, so the rod + arm pair must be pinned BEFORE that
 # step: the pinning step points there by key, and that drive-train step points
-# back at the pinning step (RODS_PINNED_KEY). The hub stack is proved on the
-# shaft first, while the arms are still loose.
+# back at the pinning step (RODS_PINNED_KEY). The arms float on the pivot
+# shaft, each located along it by its rod (#3114).
 CYLINDER_STACK_KEY = "cylinder-stack-accepted"
 CYLINDER_STACK_REF = dt_drive_train_steps.step_ref(CYLINDER_STACK_KEY)
 RODS_PINNED_KEY = "rod-forks-pinned"
@@ -57,43 +60,33 @@ SPRINGS_HOOKED_KEY = "springs-hooked"
 # test_ha_harmonic_analyzer_assembly_drawing proves it against that registry.
 HA_ANCHORS_SET_REF = "MHA-HA-00 STEP 5"
 
-# The spring-back acceptance runs while the south bracket is still only
-# clamped (machinist review, PR #1605), so its remedy re-sets a bracket that
-# can still move; the foot hole is transferred and the bracket screwed down
-# only once that check has passed.
-# The south bracket is set by DRO off an indicator zero taken on its foot end
-# with its ear on the south washer, before the wave spring goes on (#2337: the
-# spring covers the washer face, so no feeler leaf can bear on it beside the
-# spring); the bracket comes off the shaft for the spring, goes back on under
-# a light clamp and is tapped to that zero at the DRO's spring-set offset.
+# The south bracket is set by edge finder and DRO off the north one to the
+# ears' inner-face span while the shaft runs bare through both ears (with the
+# arms on it each inner face is only .05 from its end hub, out of the edge
+# finder's reach). It stays only clamped while the shaft is drawn back, the
+# arms are threaded on and the end hubs are checked clear of the ears
+# (machinist review, PR #1605: a failed check re-sets a bracket that can
+# still move). Each end has its own remedy (rule 22): the left bracket, set
+# and screwed at MHA-DT-00, is reset per its own sub-steps; both remedies
+# return to the bare shaft. The foot hole is transferred and the bracket
+# screwed down only once that check has passed. The arms are checked to
+# slide freely with their rods once the shaft is held.
 ROCKER_SEQUENCE: tuple[str, ...] = (
-    "rocker-stack-accepted",
-    "rocker-stack-measured",
-    "rocker-stack-refaced",
-    "rocker-stack-short",
-    "rockers-kept-in-order",
     RODS_PINNED_KEY,
     "rod-pins-dressed",
     "rod-pins-held",
     "rod-arms-swing",
     "rod-pin-remade",
     "north-bracket-held",
-    "arms-swung-up",
-    "north-ear-datum",
-    "rocker-hubs-threaded",
-    "south-washer-fitted",
-    "south-bracket-on-washer",
-    "south-bracket-zeroed",
-    "south-bracket-dro-zeroed",
-    "south-bracket-slid-off",
-    "bank-spring-checked",
-    "bank-spring-replaced",
-    "bank-spring-fitted",
-    "south-bracket-refitted",
-    "south-bracket-clamped-lightly",
-    "south-bracket-spring-set",
+    "south-bracket-stood",
+    "bare-shaft-through-ears",
+    "south-bracket-span-set",
     "south-bracket-clamped",
-    "spring-back-checked",
+    "shaft-drawn-back",
+    "arms-swung-up",
+    "rocker-hubs-threaded",
+    "end-hubs-clear",
+    "north-bracket-reset",
     "south-bracket-reset",
     "south-foot-transferred",
     "south-foot-tapped",
@@ -104,6 +97,7 @@ ROCKER_SEQUENCE: tuple[str, ...] = (
     "set-screws-driven",
     PIVOT_SET_SCREWS_STAKED_KEY,
     "pivot-shaft-held",
+    "arms-follow-rods",
 )
 LEVER_SEQUENCE: tuple[str, ...] = (
     "keepers-on-frame",

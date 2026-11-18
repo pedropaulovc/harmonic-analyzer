@@ -518,7 +518,7 @@ SOURCE_CHAMFER = 1.27
 # a 45° chamfer's cross-section, so its removal, goes as the leg squared.
 RIM_CHAMFER_REMOVAL = SQUARE_RIM_CHAMFER_REMOVAL * (CHAMFER / SOURCE_CHAMFER) ** 2
 # The two end faces' top edges stay off the chamfer (#1038: at the leg the
-# south bracket seat's thread came 1.51 from the chamfer's top edge, under
+# south bracket seat's thread comes 1.50 from the chamfer's top edge, under
 # the rule-17 floor; rocker_bracket_seat_layout). Each edge spans the top flat (2 x
 # NARROW) and gives back its leg-squared-over-two prism; the corner mitres
 # with the slant faces' end edges are of order CHAMFER**3, inside the check.

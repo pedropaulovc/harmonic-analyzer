@@ -29,8 +29,11 @@ from __future__ import annotations
 # Notes 2 and 3 each name one mate for two tight bands that serve it (fan-out
 # rounds 1-2: named at both callouts it printed twice, named at one the other
 # band had none): the fork slot's width and the tine walls that locate it run
-# on the arm; the ring and shank's thickness and its offset that centres it
-# on the fork slide in the cam's slot.
+# on the arm; the ring's thickness and its near face's offset from the fork's
+# datum face slide in the cam's slot, which locates the rod along the bank
+# (owner ruling 2026-11-18, #3114: the arm floats on its shaft and follows
+# the fork). The shank is stepped inside both ring faces and fits nothing,
+# so its two dimensions link no note.
 PIN_NAME = "ROD PIVOT PIN"
 PIN_NUMBER = "MHA-SH-VN-58"  # its RodPin member
 ARM_NUMBER = "MHA-CH-06"
@@ -45,47 +48,62 @@ DRAWING_NOTES = "\n".join(
         f"    REAM {PIN_FIT_INTERFERENCE[0]}-{PIN_FIT_INTERFERENCE[1]}"
         " UNDER THE MEASURED PIN.",
         f"{SLOT_FIT_NOTE_NUMBER}. FORK SLOT: RUNNING FIT ON ARM {ARM_NUMBER}.",
-        f"{CAM_SLOT_NOTE_NUMBER}. RING AND SHANK: SLIDING FIT IN {CAM_NUMBER} CAM SLOT.",
+        f"{CAM_SLOT_NOTE_NUMBER}. RING: SLIDING FIT IN {CAM_NUMBER} CAM SLOT; LOCATES ROD.",
     )
 )
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
-# print shows.  build_ch_connecting_rod marks exactly these. ---
+# print shows.  build_ch_connecting_rod marks exactly these. Each feature's
+# dimensions print in one view, so a view's import brings nothing it must
+# delete: RingFaceReference is a reference sketch of its own, apart from the
+# fork's ForkSlotProfile, because the side view prints the ring's near face
+# and the fork's detail prints the rest. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "PlateProfile": {"RingOuterDia", "ShankWidthDim"},
-    "Plate": {"RingThick"},
+    "RingProfile": {"RingOuterDia"},
+    "Ring": {"RingThick"},
+    "ShankProfile": {"ShankThick"},
+    "Shank": {"ShankWidthDim"},
     "StrapBoreProfile": {"StrapBoreDia"},
     "ForkProfile": {"ForkWidthDim"},
     "ForkBoss": {"ForkThick"},
     "ForkSlotProfile": {
         "TineNear",
         "SlotWidth",
-        "RingFaceNear",
+        "ShankFaceNear",
         "SlotDepth",
         "ForkBossLength",
     },
+    "RingFaceReference": {"RingFaceNear"},
     "PinHoleProfile": {"PinHoleDia"},
 }
 
-# Decimal-inch places (#290): the tines, slot, the plate's near face and its
-# thickness hold the inter-arm gap and the ring's float in its cam slot, so
+# Decimal-inch places (#290): the tines, slot, the ring's near face and its
+# thickness hold the inter-arm gap and the ring's slide in its cam slot, so
 # they print at three places with their +/-.002 bands; the fork over the tines
-# is their reference sum at the same places. The strap bore prints 1.213 at
-# three with its +.004/.000; the reamed press hole at four. The ring OD, shank
-# width, fork width, slot depth and boss length take the title block's .XX.
+# is their reference sum at the same places. The shank's near face and
+# thickness print at two places (.05 and .13: machinist review found a third
+# place there over-specified) and take the title block's .XX: that band
+# keeps both shank faces inside the ring's
+# (ch_connecting_rod_spec.SHANK_INSIDE_RING_MIN). The strap bore prints 1.213
+# at three with its +.003/.000; the reamed press hole at four. The ring OD,
+# shank width, fork width, slot depth and boss length take the title block's
+# .XX too.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "PlateProfile": {"RingOuterDia": 2, "ShankWidthDim": 2},
-    "Plate": {"RingThick": 3},
+    "RingProfile": {"RingOuterDia": 2},
+    "Ring": {"RingThick": 3},
+    "ShankProfile": {"ShankThick": 2},
+    "Shank": {"ShankWidthDim": 2},
     "StrapBoreProfile": {"StrapBoreDia": 3},
     "ForkProfile": {"ForkWidthDim": 2},
     "ForkBoss": {"ForkThick": 3},
     "ForkSlotProfile": {
         "TineNear": 3,
         "SlotWidth": 3,
-        "RingFaceNear": 3,
+        "ShankFaceNear": 2,
         "SlotDepth": 2,
         "ForkBossLength": 2,
     },
+    "RingFaceReference": {"RingFaceNear": 3},
     "PinHoleProfile": {"PinHoleDia": 4},
 }
 

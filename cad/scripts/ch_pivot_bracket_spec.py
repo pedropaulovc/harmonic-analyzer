@@ -10,9 +10,9 @@ once placed, toward the support's end face); the ear is EAR_W wide (X) by
 EAR_T thick (Z), centred on the origin, rising from the foot top and ARCHED
 with radius EAR_W/2 over the O BORE_DIA cross-bore, its apex EAR_TOP_Y over
 the seat (the arch's centre ARCH_LIFT above the bore axis). The ear is as
-wide as the foot, so their sides are one flat each side. Each ear's inner
-face bears on a MHA-CH-VN-56 thrust washer: hub 19's at the north ear (the
-bank's datum), the preload spring's at the south one (``rocker_bank_layout``).
+wide as the foot, so their sides are one flat each side. Nothing bears on an
+ear's face (#3114): the rocker arms float on the shaft and follow their
+rods, each ear standing clear of its end hub (``rocker_bank_layout``).
 
 One MHA-SH-VN-54 #4-40 cup-point set screw drops through the arch apex, on the
 ear's mid-plane, into the bore and onto the pivot shaft's flat (user,
@@ -77,8 +77,8 @@ HOLE_DIA = blind_cut_dia_mm(HOLD_DOWN_HOLE_SPEC)
 
 # One hold-down hole per bracket, on x = 0 in the foot's free run (from the
 # ear's outboard face to the foot end), its station given from the ear's
-# INBOARD face -- the face fit-up sets (the north datum, the south blade-set
-# face), so the hole lands on the support's transferred seat without the foot
+# INBOARD face -- the face fit-up sets (the north one by DRO, the south one
+# to the ears' span), so the hole lands on the support's transferred seat without the foot
 # length's band (user, 2026-10-10, option ii). Worst case is each term at its
 # OWN band (Codex #936 PRRT_kwDOPHDy386mV3AN). The foot length and the hole
 # station both ride the title block's .XX: the foot is long enough to keep the
@@ -86,8 +86,9 @@ HOLE_DIA = blind_cut_dia_mm(HOLD_DOWN_HOLE_SPEC)
 # seat's end wall at those bands (user ruling 2026-10-14, #954 machinist
 # review: fix the wall with geometry, not a band; #1371 review: the station's
 # own band went the same way; ``ch_pivot_bracket_sides`` checks the support,
-# and so the foot, for it). The ear thickness keeps its +/-.004 for the thrust
-# faces and the tap's walls. Across the foot its sides stay at .XX (the band
+# and so the foot, for it). The ear thickness keeps its +/-.004 for the tap's
+# walls and the pivot shaft's flat under the tap (the shaft is set off the
+# outboard face, the tap stands off the inboard one). Across the foot its sides stay at .XX (the band
 # rocker_bracket_seat_layout carries this foot at) and the hole's centring on
 # x = 0 at .XX; a drilled hole grows by the title block's +.004/0.
 # build_ch_pivot_bracket carries the +/-.004 band on the model's own

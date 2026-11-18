@@ -19,6 +19,7 @@ import dt_cylinder_gear_spec
 from _gtol_cylinder import CylinderFace
 from _inch_wall_limits import WALL_TARGET_MM
 from _package_units import drawing_unit
+from _printed_tolerance import printed_band_mm
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 # #290: the registry row's drawing_unit (in) is this sheet's unit. Lengths
@@ -55,39 +56,44 @@ STRAP_DIAMETRAL_CLEARANCE = (
 # Ring OD 1.61 over the bore: the radial strap wall follows from the two.
 RING_OUTER_DIA = 40.894  # 1.61
 RING_WALL = (RING_OUTER_DIA - RING_BORE_DIA) / 2.0  # radial strap wall
-# Ring and shank: one plate, .086 thick. Both pass between the same two
-# tooth discs of the closed cam slot (cylinder_bank_layout), and a flat rod
-# held by its fork on the arm needs the cam-vs-arm offset inside its float
-# there (test_channel_axial_budget). The plate's near face prints as a
-# location from the fork's datum face (+/-RING_FACE_BAND) and its thickness
-# as a size at the ring (+/-RING_THICKNESS_BAND): .084 at its thinnest
-# (drawing-guidelines.md rule 17). The two bands spend the same axial window
-# the two face ordinates did (#982 review r1: the thickness prints directly).
-# .086 puts the near face on a three-place ordinate from the fork face (.077).
-RING_THICKNESS = 2.1844  # .086
+# Ring and shank at the original's proportions (owner ruling 2026-11-18,
+# #3114; references ch13 page001_img02: the ring nearly fills the gap between
+# neighbouring gears): the ring .170 thick, the shank stepped down to .13 on
+# both faces (the photo reads it about .138; .13 is the two-place size whose
+# title-block band stays inside the ring). Both pass between the same two tooth discs of the closed cam
+# slot (cylinder_bank_layout), and the slot locates the rod along the bank:
+# the ring slides between the two discs, and the fork carries its rocker arm
+# with it (the arm floats on the pivot shaft, test_channel_axial_budget).
+# The ring's near face prints as a location from the fork's datum face
+# (+/-RING_FACE_BAND) and its thickness as a size at the ring
+# (+/-RING_THICKNESS_BAND). .170 puts the near face on a three-place
+# ordinate from the fork face (.035).
+RING_THICKNESS = 4.318  # .170
 # .32 (not the .31 nearest 8.0 mm): the shank's half-width is the two BASIC
 # datum-B offsets, which print .16 exactly at the sheet's two places.
 SHANK_WIDTH = 8.128  # .32
-SHANK_THICKNESS = RING_THICKNESS  # one plate thickness, ring to shank
-# --- Fork (the U-shaped clevis straddling the 2.500 +/-0.025 mm rocker strap). ---
+SHANK_THICKNESS = 3.302  # .13
+# --- Fork (the U-shaped clevis straddling the .098 +/-.001 rocker strap). ---
 # The rod is flat: ring, shank and fork share one mid-plane (z = 0), the cam
 # plane, which is also the arm plane (rocker_bank_layout.ARM_MID_DZ). Two tines
 # straddle the arm; the bridge joining them sits below the arm's bottom edge;
 # the pin hole runs through both tines on the rod axis at CENTER_DISTANCE.
-# Each inter-arm gap (pitch 7.62 - arm 2.500) holds one tine of each
-# neighbouring rod, so both tines and the slot carry explicit bands (Main
-# ruling 2026-10, option b), located from one finished fork face (#982):
-# the near tine prints from that face, the slot as a size, the far tine as
-# the same tine size (2X), and the fork over the tines as a reference.
-# 0.35 mm MIN (running floor plus spare) to the neighbouring fork at the worst case
-# (sh_vn_pivot_pin_rod_spec checks it).
+# Each gap between neighbouring straps holds one tine of each neighbouring
+# rod, so both tines and the slot carry explicit bands (Main ruling 2026-10,
+# option b), located from one finished fork face (#982): the near tine prints
+# from that face, the slot as a size, the far tine as the same tine size
+# (2X), and the fork over the tines as a reference. The arms float on the
+# pivot shaft (#3114), so that gap is judged with two neighbours closed up
+# hub on hub: 0.35 mm MIN (running floor plus spare) to the neighbouring
+# fork at the worst case (sh_vn_pivot_pin_rod_spec checks it).
 FORK_WIDTH = 9.906  # .39 across the fork (X), crown radius FORK_WIDTH / 2 on the pin
 # Slot = the arm's thickest strap + the 0.10 running floor at its least,
 # centred on its band so the ring-to-slot offset stays even.
 FORK_SLOT_WIDTH = 2.6924  # .106
 FORK_SLOT_BAND = (0.0508, -0.0508)  # +/-.002; (upper, lower) deviations
-# Each tine, outer face to slot wall. The pitch fixes the tine below the
-# .080 wall target: .065 at its thinnest (MHA-CH-03 RV-02).
+# Each tine, outer face to slot wall. The gap between neighbouring straps
+# fixes the tine below the .080 wall target: .065 at its thinnest (MHA-CH-03
+# RV-02).
 TINE_THICKNESS = 1.7018  # .067
 TINE_BAND = (0.0508, -0.0508)  # +/-.002; (upper, lower) deviations
 TINE_MIN = TINE_THICKNESS + TINE_BAND[1]
@@ -99,13 +105,30 @@ FORK_THICKNESS_BAND = (
     2.0 * TINE_BAND[0] + FORK_SLOT_BAND[0],
     2.0 * TINE_BAND[1] + FORK_SLOT_BAND[1],
 )
-# The ring and shank's near face from the fork's datum face (the near tine's
-# outer face): the plate centred on the fork.
-RING_FACE_NEAR = (FORK_THICKNESS - RING_THICKNESS) / 2.0  # .077
+# The ring's near face from the fork's datum face (the near tine's outer
+# face): the ring centred on the fork.
+RING_FACE_NEAR = (FORK_THICKNESS - RING_THICKNESS) / 2.0  # .035
 RING_FACE_BAND = (0.0508, -0.0508)  # +/-.002; (upper, lower) deviations
 RING_THICKNESS_BAND = (0.0508, -0.0508)  # +/-.002; (upper, lower), at the ring
-SHANK_THICKNESS_BAND = RING_THICKNESS_BAND
-if RING_THICKNESS + RING_THICKNESS_BAND[1] < WALL_TARGET_MM:
+# The shank's near face from the same datum face, and its thickness: both at
+# the title block's .XX (machinist review: a third place there served no
+# function). .05 and .13 are the two-place pair whose bands leave neither
+# shank face proud of its ring face, so the ring alone meets the tooth
+# discs; the shank's mid-plane then stands .005 off the ring's, toward the
+# datum face.
+SHANK_FACE_NEAR = 1.27  # .05
+_LINEAR_2PL = printed_band_mm(2, unit=UNIT)
+SHANK_FACE_BAND = (_LINEAR_2PL, -_LINEAR_2PL)
+SHANK_THICKNESS_BAND = (_LINEAR_2PL, -_LINEAR_2PL)
+# (near, far) least step from each ring face down to its shank face.
+SHANK_INSIDE_RING_MIN = (
+    SHANK_FACE_NEAR + SHANK_FACE_BAND[1] - (RING_FACE_NEAR + RING_FACE_BAND[0]),
+    RING_FACE_NEAR + RING_FACE_BAND[1] + RING_THICKNESS + RING_THICKNESS_BAND[1]
+    - (SHANK_FACE_NEAR + SHANK_FACE_BAND[0] + SHANK_THICKNESS + SHANK_THICKNESS_BAND[0]),
+)
+if min(SHANK_INSIDE_RING_MIN) <= 0.0:
+    raise AssertionError("a shank face can stand proud of its ring face")
+if SHANK_THICKNESS + SHANK_THICKNESS_BAND[1] < WALL_TARGET_MM:
     raise AssertionError("the rod's thinnest ring/shank section is under drawing-guidelines.md rule 17 (walls and webs)'s .080 in")
 # The flat slot floor (the crotch) below the pin centre. The arm's curved
 # bottom edge dips into the slot as the arm turns on the pin; the floor clears
@@ -124,13 +147,17 @@ FORK_BASE_BELOW_PIN = 18.034 - FORK_WIDTH / 2.0  # ForkBossLength .71
 # straight through each tine, so the tine's whole thickness is the pin's land.
 PIN_HOLE_DIA = 1.9558  # .077 in
 PIN_HOLE_BAND = (0.02286, 0.0127)  # (upper, lower) deviations, reamed; native
-# Every inside corner -- the slot floor's two, the fork's root step onto the
-# shank (four) and the shank onto the ring (two) -- is one modelled fillet,
-# inside the title block's INSIDE CORNERS R.040 MAX, which governs them on the
-# print (machinist review: a tighter all-corners MAX named no function).
-# That ceiling still clears the arm over the slot floor (the offline drawing
-# test checks it against sh_vn_pivot_pin_rod_spec), and stays well inside half
-# the slot.
+# Every inside corner a radius this size can seat in -- the slot floor's two,
+# the fork's root step onto the shank (four) and the shank's flanks onto the
+# ring's OD (two) -- is one modelled fillet, inside the title block's INSIDE
+# CORNERS R.040 MAX, which governs them on the print (machinist review: a
+# tighter all-corners MAX named no function). The two corners where a shank
+# face meets the ring's OD are modelled sharp under the same MAX: the ring
+# stands .015 over the shank's near face, less than this radius, and .025
+# over its far face at nominal only
+# (build_ch_connecting_rod.RING_STEPS). That ceiling still clears the arm over
+# the slot floor (the offline drawing test checks it against
+# sh_vn_pivot_pin_rod_spec), and stays well inside half the slot.
 INSIDE_CORNER_R = 0.5  # model only, never printed
 if 2.0 * INSIDE_CORNER_R >= FORK_SLOT_WIDTH + FORK_SLOT_BAND[1]:
     raise AssertionError("the slot floor's corner radii meet across the slot")

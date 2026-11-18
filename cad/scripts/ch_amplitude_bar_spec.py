@@ -30,12 +30,10 @@ MM_PER_IN = 25.4
 # exact.
 UNIT = drawing_unit("parts/ch-amplitude-bar", _config.parts("ch-amplitude-bar"))
 
-# --- The foot notch's plate, the rocker strap: a conservative envelope over
-# ch_rocker_arm_spec's .098 +/-.001 strap (the former 2.50 at .XX), kept so the
-# foot notch's stack (#1038) does not move; test_ch_amplitude_bar_drawing
-# checks it covers the strap at maximum material. ---
-STRAP_THICKNESS = 2.5
-STRAP_THICKNESS_TOLERANCE = 0.508
+# --- The foot notch's plate, the rocker strap: ch_rocker_arm_spec's .098
+# +/-.001, restated (test_ch_amplitude_bar_drawing checks the two agree). ---
+STRAP_THICKNESS = 2.4892  # .098
+STRAP_THICKNESS_TOLERANCE = 0.0254  # +/-.001
 STRADDLE_RUNNING_FLOOR = 0.10  # rocker_bank_layout.RUNNING_FLOOR, oiled steel faces
 
 
@@ -68,17 +66,18 @@ BAR_STOCK_UNDERSIZE = 0.002 * MM_PER_IN  # 0.051
 # (rocker_bank_layout.MARGIN_SPARE) is deliberately left out.
 # The top notch (owner ruling 2026-10-15, #1038 option 2): the lever plate
 # prints .118 +/-.002, so the notch is .124 +.007/.000. The foot notch is
-# .124 +.010/.000 (the metric +0.30 narrowed so its widest notch and thinnest
-# cheek are no worse than before). At the .300 pitch (owner ruling
-# 2026-11-11) both floats, with both ledges' and both plate offsets' bands,
-# leave the bar-to-bar side gap (pitch 7.62 - bar 6.35 = 1.27) over its
-# running floor at both ends (sh_vn_pivot_pin_bar_spec.joint_budget and
-# ch_channel_assembly_spec.bar_gap_budget).
+# .104 +.006/.000 on the .098 +/-.001 strap (#3114): the rocker arms float
+# on their shaft, each following its own rod, so two neighbouring arms can
+# close to their hubs' least length (ch_rocker_arm_spec.HUB_LENGTH_MIN), and
+# the foot's float is what is left of that for the bars. Both floats, with
+# both ledges' and both plate offsets' bands, leave the bar-to-bar side gap
+# over its running floor at both ends (sh_vn_pivot_pin_bar_spec.joint_budget
+# and ch_channel_assembly_spec.bar_gap_budget).
 BOTTOM_NOTCH_WIDTH = _straddle_minimum(
     STRAP_THICKNESS, STRAP_THICKNESS_TOLERANCE
-)  # 3.1496 (.124)
+)  # 2.6416 (.104)
 BOTTOM_NOTCH_HEIGHT = 0.09375 * MM_PER_IN  # 2.381 (.094), the foot's contact height
-BOTTOM_NOTCH_WIDTH_BAND = (0.254, 0.0)  # +.010/.000 (upper, lower) deviations, native
+BOTTOM_NOTCH_WIDTH_BAND = (0.1524, 0.0)  # +.006/.000 (upper, lower) deviations, native
 TOP_NOTCH_WIDTH = _straddle_minimum(LEVER_THICKNESS, LEVER_THICKNESS_TOLERANCE)  # .124
 TOP_NOTCH_WIDTH_BAND = (0.1778, 0.0)  # +.007/.000 (upper, lower) deviations, native
 # The top notch's depth only clears the lever: its roof must stay below the
@@ -98,7 +97,7 @@ TOP_PIN_HOLE_BAND = (0.02286, 0.0127)  # (upper, lower) deviations, reamed; nati
 # --- Derived. ---
 TOP_PIN_Y = BAR_LENGTH - TOP_PIN_DROP  # 801.9432
 # Each notch is centred on the width, so each end has its own ledge.
-BOTTOM_NOTCH_OFFSET = (BAR_WIDTH - BOTTOM_NOTCH_WIDTH) / 2.0  # 1.6002 (.063)
+BOTTOM_NOTCH_OFFSET = (BAR_WIDTH - BOTTOM_NOTCH_WIDTH) / 2.0  # 1.8542 (.073)
 TOP_NOTCH_OFFSET = (BAR_WIDTH - TOP_NOTCH_WIDTH) / 2.0  # 1.6002 (.063)
 
 

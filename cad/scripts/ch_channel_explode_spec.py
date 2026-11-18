@@ -33,8 +33,6 @@ KEEPER_FOOT_SCREW = "ch-vn-frame-side-screw"
 BRACKET = "ch-pivot-bracket"
 BRACKET_SET_SCREW = "sh-vn-arbor-set-screw"
 BRACKET_HOLD_DOWN = "ch-vn-bracket-hold-down-screw"
-WASHER = "ch-vn-rocker-thrust-washer"
-BANK_SPRING = "ch-vn-rocker-bank-spring"
 ROD = "ch-connecting-rod"
 BAR = "ch-amplitude-bar"
 # The purchased pivot pin's two members (MHA-SH-VN-58) share one file stem;
@@ -88,7 +86,7 @@ _BRACKET_GROUP = (BRACKET, BRACKET_SET_SCREW, BRACKET_HOLD_DOWN)
 # 286 model mm) is left to spend: a step that carries a part past the box
 # spends 1 per mm along x or z and 2 along y.
 #
-# The north bracket's hardware and the north washer (DETAIL B's cluster): at
+# The north bracket's hardware (DETAIL B's cluster): at
 # 60 north alone the bracket sat inside the hanging rocker arms. Leaders 4 and
 # 7 met on it there, and the letter B fell on the arms (r10 machinist review).
 # 30 further north and 570 up lifts the cluster, free (still inside the box),
@@ -96,7 +94,7 @@ _BRACKET_GROUP = (BRACKET, BRACKET_SET_SCREW, BRACKET_HOLD_DOWN)
 # channel. At 60/500 (r14) it sorted round the ring among the channel's lever
 # balloons and leader 4 crossed 14; a replay of the r14 ring (its 19 logged
 # attachments) clears every pair from 540 to 580 up at 10 to 40 further north.
-_NORTH_END_GROUP = (*_BRACKET_GROUP, WASHER)
+_NORTH_END_GROUP = _BRACKET_GROUP
 # One whole channel, pulled north out of the bank off both shafts: closed up,
 # the 20 channels print as one dark mass at 1:7 and the balloons pinned on
 # the north-most instances landed inside it (r11 machinist review). At 300
@@ -134,15 +132,13 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     # isometric), its head inside the box (the north one rides the cluster's
     # 570 up).
     ExplodeStep("bracket hold-downs up", (BRACKET_HOLD_DOWN,), "y", 60.0),
-    ExplodeStep("bank spring out", (BANK_SPRING,), "z", -40.0, "south"),
-    ExplodeStep("south washer out", (WASHER,), "z", -20.0, "south"),
-    ExplodeStep("north washer out", (WASHER,), "z", 20.0, "north"),
     ExplodeStep("north end further out", _NORTH_END_GROUP, "z", 30.0, "north"),
     ExplodeStep("north end up", _NORTH_END_GROUP, "y", 570.0, "north"),
     ExplodeStep("rods down", (ROD,), "y", -50.0),
     # Up, not along x: 50 west put each bar (pin x 72.9) on its own spring's
     # line (lever spring hole x 24.85) and hid the spring (r2 balloon pick);
-    # 50 east put bar 3 over the bank spring (r4 balloon pick, shared edge).
+    # 50 east put bar 3 over the bank's then wave spring (r4 balloon pick,
+    # shared edge).
     ExplodeStep("bars up", (BAR, BAR_PIN), "y", 50.0),
     ExplodeStep("anchors down", (HOOK,), "y", -40.0),
     # Withdrawn past a keeper: in place only its 10 mm tips stand clear of the
@@ -157,9 +153,9 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     # south end (-189.5) is 14 north of where 120 left the 166.6 shaft, and
     # its north end (-11.5) still sits inside the lever bank.
     ExplodeStep("fulcrum shaft out south", (FULCRUM_SHAFT,), "z", -100.0),
-    # Drawn north, the way the fit-up pushes it in (left ear, washer, hubs):
+    # Drawn north, the way the fit-up pushes it in (left ear, hubs):
     # left in the hubs only a stub showed, and balloon 1 landed on that sliver
-    # beside the washers (machinist reviews of R5 and farm run
+    # beside the end hardware (machinist reviews of R5 and farm run
     # 20261117T130021685Z, rule 22). 200
     # carries its south end 38 past hub 19, its north half past the hanging
     # rods onto open paper, its north end 82 short of the pulled channel's hub

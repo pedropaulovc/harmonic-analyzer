@@ -267,8 +267,9 @@ DETAIL_A_FENCE_TEXT_GAP = 0.020
 DETAIL_ROW_GAP = 0.012
 # DETAIL A's width row hangs under its ledge row.
 DETAIL_A_WIDTH_ROW_GAP = 0.032
-# A width's text block (value, +0.3/0.0 stack, two callout lines) prints
-# ~50 mm wide, far wider than the 12.4 mm mouth at 4:1: centred on the mouth it
+# A width's text block (value, its one-sided band stack, two callout lines)
+# prints ~50 mm wide, far wider than a mouth at 4:1 (the top's 12.6 mm, the
+# foot's 10.6 mm since #3114): centred on the mouth it
 # straddled both extension lines, and in DETAIL A the Ra leader ran through it
 # (r743-6b, 64fedd3cc). So each width's text stands west of the bar, its centre
 # this far out from the bar's edge, clear of the bar and its own witnesses, and
@@ -384,13 +385,15 @@ VIEW_C_ARROW = (
 NOTES_XY = (0.075, 0.046)
 
 # The foot notch floor's Ra (Main ruling B, 2026-09-27). The symbol is ~17 mm
-# wide at the fleet's 2.5 mm height, wider than the 12.7 mm mouth, so it
+# wide at the fleet's 2.5 mm height, wider than the 10.6 mm mouth, so it
 # stands under the right cheek, inside the fence, and its bent leader climbs
 # through the mouth to the floor. With the width row hanging under the mouth,
 # a leader out of it must cross a witness or the dimension line; it crosses
 # only the right witness, between the bar's end and the row (an extension
-# line may be crossed; a dimension line should not be).
-FLOOR_FINISH_ATTACH = DETAIL_A.sheet_xy(BAR_WIDTH / 2.0 + 0.5, BOTTOM_NOTCH_HEIGHT)
+# line may be crossed; a dimension line should not be). The leader lands
+# 0.5 mm west of the floor's middle: from the east half of the .104 floor
+# (#3114) it left the mouth within 0.5 mm of the right cheek's corner.
+FLOOR_FINISH_ATTACH = DETAIL_A.sheet_xy(BAR_WIDTH / 2.0 - 0.5, BOTTOM_NOTCH_HEIGHT)
 FLOOR_FINISH_SYMBOL = (
     DETAIL_A.sheet_xy(BAR_WIDTH / 2.0, 0.0)[0] + 0.0163,
     DETAIL_A.sheet_xy(0.0, 0.0)[1] - 0.017,

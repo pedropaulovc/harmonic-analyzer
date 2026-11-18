@@ -51,8 +51,12 @@ def test_restated_floors_are_their_sources() -> None:
     assert pin.ROD_LINEAR_2PL == pytest.approx(
         _config.title_block("linear_2pl", unit=rod.UNIT)["band_in"] * 25.4
     )
-    # The hubs set the pitch the neighbour stack is judged at.
-    assert arm.HUB_LENGTH == bank.PITCH and arm.HUB_LENGTH_BAND[1] == 0.0
+    # #3114: the arms float on the shaft, so the neighbour stack is judged
+    # with two hubs closed up face on face at their least length, which is
+    # under the station pitch.
+    assert arm.HUB_LENGTH_MIN == arm.HUB_LENGTH + arm.HUB_LENGTH_BAND[1]
+    assert arm.HUB_LENGTH_MIN == pytest.approx(7.0104)  # .276
+    assert arm.HUB_LENGTH + arm.HUB_LENGTH_BAND[0] < bank.PITCH
     # FN2's .2-.85 thou, as the bar pin's press.
     assert pin.PRESS_INTERFERENCE_MIN == pytest.approx(0.00508, abs=1e-9)
     assert pin.PRESS_INTERFERENCE_MAX == pytest.approx(0.0215900, abs=1e-9)
@@ -103,8 +107,12 @@ def test_worst_case_joint_budget() -> None:
     assert b["running_clearance_max"] == pytest.approx(0.111225, abs=1e-6)
     assert b["side_clearance_min"] == pytest.approx(0.127, abs=1e-6)
     assert b["side_clearance_max"] == pytest.approx(0.2794, abs=1e-6)
-    assert b["neighbour_clearance_min"] == pytest.approx(0.9906, abs=1e-6)
+    # #3114: two floating neighbours closed up hub on hub leave .015 between
+    # their opposed forks, just over the .014 floor: the tine cannot grow.
+    assert b["neighbour_clearance_min"] == pytest.approx(0.381, abs=1e-6)
     assert b["neighbour_clearance_min"] >= pin.NEIGHBOUR_CLEARANCE_MIN
+    spare_per_tine = (b["neighbour_clearance_min"] - pin.NEIGHBOUR_CLEARANCE_MIN) / 2.0
+    assert spare_per_tine < 0.0254  # under .001: nothing to give the tine wall
     assert b["tine_min"] == pytest.approx(1.651, abs=1e-6)
     assert b["tine_bearing_land_min"] == b["tine_min"]
     assert b["tine_bearing_land_min"] >= pin.RULE12_WALL_FLOOR
@@ -157,10 +165,12 @@ def test_the_pin_bears_on_the_whole_tine() -> None:
 
 
 def test_neighbour_stack_fills_the_inter_arm_gap_exactly() -> None:
-    """The gap (pitch less the thickest arm) holds both side clearances,
-    the thickest fork over its tines, the two straps' offsets from their hubs
-    and the neighbour clearance: the stack closes with nothing left out. The
-    dressed ends are flush, so no pin end stands in it."""
+    """Two neighbouring arms closed up hub on hub at their least hubs
+    (#3114: the arms float on the shaft) stand their straps one least hub
+    apart. That spacing holds both side clearances, the thickest fork over
+    its tines, the two straps' offsets from their hubs and the neighbour
+    clearance: the stack closes with nothing left out. The dressed ends are
+    flush, so no pin end stands in it."""
     b = pin.BUDGET
     w_max = rod.FORK_THICKNESS + rod.FORK_THICKNESS_BAND[0]
     # The fork over the tines is a reference: its limits are the tines' and
@@ -171,9 +181,14 @@ def test_neighbour_stack_fills_the_inter_arm_gap_exactly() -> None:
         + rod.FORK_SLOT_BAND[0]
     )
     float_total = b["side_clearance_max"]
-    assert bank.PITCH - (
+    assert arm.HUB_LENGTH_MIN - (
         w_max + float_total + arm.STRAP_HUB_SYMMETRY
     ) == pytest.approx(b["neighbour_clearance_min"])
+    # Positive control: on the station pitch the same stack left .039, the
+    # budget the hub-on-hub case replaced.
+    assert bank.PITCH - (
+        w_max + float_total + arm.STRAP_HUB_SYMMETRY
+    ) == pytest.approx(0.9906)
 
 
 def _corner_gap(proud: float, strap_offsets: tuple[float, ...]) -> float:
@@ -214,7 +229,7 @@ def test_opposed_neighbour_forks_clear_at_every_band_corner() -> None:
     half_zone = arm.STRAP_HUB_SYMMETRY / 2.0
     gap = _corner_gap(pin.PIN_END_PROUD_MAX, (-half_zone, half_zone))
     assert gap == pytest.approx(pin.BUDGET["neighbour_clearance_min"], abs=1e-9)
-    assert gap == pytest.approx(0.9906, abs=1e-9)
+    assert gap == pytest.approx(0.381, abs=1e-9)
     assert gap >= pin.NEIGHBOUR_CLEARANCE_MIN
     # Positive controls: the strap symmetry is in the corner (centred straps
     # gain its whole zone), and so is each dressed pin end: the withdrawn

@@ -28,7 +28,7 @@ One channel is easy. Twenty identical channels is the actual project. This chapt
 
 ## What will fight you
 
-Hub **length** sets the .300 in (7.62 mm) channel pitch and the error stacks nineteen times: the 20 rocker-arm hubs (`ch-rocker-hub` on the built-up route) and the 20 channel-lever hubs stack face to face on their shafts. The rocker's R800 top edge is a profile, not a pocket. Make all twenty of a part in one session, on one setup, or accept drift.
+The channel-lever hub **length** sets the .300 in (7.62 mm) channel pitch and the error stacks nineteen times: the 20 lever hubs stack face to face on their shaft. The 20 rocker-arm hubs (`ch-rocker-hub` on the built-up route) are shorter than the pitch: each rocker floats on its shaft and takes its place from its connecting rod, whose ring slides between two cylinder gears. The rocker's R800 top edge is a profile, not a pocket. Make all twenty of a part in one session, on one setup, or accept drift.
 
 ## Making each part
 

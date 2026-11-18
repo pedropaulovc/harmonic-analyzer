@@ -124,7 +124,9 @@ def test_seats_run_in_solid_iron_on_the_support() -> None:
         assert abs(x) - radius > support.CAV
         assert abs(x) - radius > support.BIG
         assert abs(x) + radius <= support_spec.SUPPORT_HALF_MACHINE_Z - seats.EDGE_BREAK
-    assert [round(abs(x), 2) for x in seats.SEAT_LOCAL_X] == [90.54, 88.93]
+    # #3114: the north ear stands .008 further north, the south one 0.01 mm
+    # further south (rocker_bank_layout's ear stand-offs).
+    assert [round(abs(x), 2) for x in seats.SEAT_LOCAL_X] == [90.55, 89.13]
 
 
 def test_seat_thread_keeps_the_end_wall_at_the_worst_transferred_position() -> None:
@@ -214,8 +216,8 @@ def test_hold_down_station_is_given_from_the_ears_inboard_face() -> None:
 def test_one_foot_fits_both_ends_of_the_support_and_places_its_hole() -> None:
     """#1341 option A: one bracket on both sides. Its foot ends at the nearer
     (south) support end face, its length on the printed grid so it never
-    overhangs, and 1.75 short of the north one; the free run is too short
-    (.320 ears beside the 1/32 thrust washers) to centre the hole, so its
+    overhangs, and 1.55 short of the north one; the free run beside the .320
+    ear is too short to centre the hole, so its
     .49 station, held fixed on the printed grid, sits inside the window
     between the head-to-ear and seat end-wall limits that both sides share."""
     assert sides.OUTBOARD_SIGN == {"S": -1.0, "N": 1.0}
@@ -233,7 +235,7 @@ def test_one_foot_fits_both_ends_of_the_support_and_places_its_hole() -> None:
         for name in sides.SIDES
     }
     assert 0.0 <= overhang_room["S"] < 0.254
-    assert round(overhang_room["N"], 2) == 1.75
+    assert round(overhang_room["N"], 2) == 1.55
     # The fixed .49 station (#1371 review) stays inside the shared window,
     # whose limits already charge the station and length bands.
     assert sides.HOLE_Z_MIN <= sides.HOLE_Z <= sides.HOLE_Z_MAX
@@ -268,7 +270,7 @@ def test_the_support_is_the_shortest_grid_length_that_keeps_the_bracket_foot() -
     assert sides._foot_fits(7.54 * 25.4) and foot_in(7.54) == 0.69
     assert foot_in(7.56) == 0.70 == round(sides.FOOT_LEN / 25.4, 2)
     assert (foot_in(7.58), foot_in(7.60)) == (0.71, 0.72)
-    assert [round(wall, 2) for wall in seats.END_WALL_MIN] == [3.01, 4.62]
+    assert [round(wall, 2) for wall in seats.END_WALL_MIN] == [3.00, 4.42]
     assert min(seats.END_WALL_MIN) >= seats.RULE12_WEB_TARGET
 
 

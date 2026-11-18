@@ -8,13 +8,17 @@ ch-connecting-rod:
   fit_class: cam_follower_contact
   # #2340: the ring and shank need no flatness control of their own. The
   # ring's near face from the fork's datum face and its thickness, both
-  # +/-.002 (the thickness's MMC envelope bounds the plate's bow), are what the
-  # flat rod's cam-to-arm window spends (test_channel_axial_budget), the ring
-  # floats about .045 a side in its .179 MIN cam slot, and neighbouring
-  # shanks stand .21 apart. The route keeps the bought bar (#2173) and cuts
-  # the plate so it stays flat: equal stock off both faces, a release before
-  # the finish passes, and hand setting (no furnace for stress relief).
-  process: "machined from the bought 1/4 x 2 in 1018 cold-finish flat (OnlineMetals 7469, #2173): the fork faces skimmed to .240, about .005 off each face; the ring and shank come off both faces equally, about .082 each, cut as a pocket inside the blank's uncut edges, which carry the part on its second side: rough the two faces in turns to .020 over, release the part and reseat it, then take the finish passes on both faces; cut the outline free last and bore, slot and ream after it. A rod whose ring face or thickness leaves its band once free is set straight by hand on the surface plate and rechecked, or exchanged"
+  # +/-.002 (the thickness's MMC envelope bounds the ring's bow), set how far
+  # the fork can stand off the ring (test_channel_axial_budget). #3114: the
+  # ring is the original's .170 and slides in its .179 MIN cam slot with .007
+  # MIN to spare, so the slot locates the rod and the floating arm follows the
+  # fork; the shank is .13 (the original's about .138 at two places), its
+  # near face .05 from the fork's datum face, inside both ring faces at the
+  # title block's .XX, and neighbouring shanks stand .17 apart. The route
+  # keeps the bought bar (#2173) and cuts ring and shank so they stay flat:
+  # near-equal stock off both faces, a release before the finish passes, and
+  # hand setting (no furnace for stress relief).
+  process: "machined from the bought 1/4 x 2 in 1018 cold-finish flat (OnlineMetals 7469, #2173): the fork faces skimmed to .240, about .005 off each face; the ring comes off both faces equally, about .040 each, and the shank about .055 off the datum-face side and .065 off the other, cut as a stepped pocket inside the blank's uncut edges, which carry the part on its second side: rough the two faces in turns to .020 over, release the part and reseat it, then take the finish passes on both faces; cut the outline free last and bore, slot and ream after it. A rod whose ring face or thickness leaves its band once free is set straight by hand on the surface plate and rechecked, or exchanged"
   drawing_unit: in
   machinist_exceptions:
     - id: "RV-01"
@@ -26,7 +30,7 @@ ch-connecting-rod:
       kind: "minor"
       where: "DETAIL C, the near tine .067 ±.002 (2X), its callout naming the TINE WALL"
       finding: "fork tine wall .065 at its printed lower limit, below the .080 in target (rules 17, 20)"
-      reason: "Owner ruling 2026-11-01: thin walls above the .060 floor but under the .080 target, with no geometry escape, are accepted as package-specific minor exceptions. each gap between neighbouring .098 rocker arms at the .300 channel pitch holds one tine of each adjacent rod, so the tine is pitch-bound: the opposed-fork budget leaves .039 (0.99) against the .014 (0.35) floor, so each tine could grow at most .0126 to .0776 MIN, still under the .080 target, and the re-pitch keeps the tines as printed (owner ruling 2026-11-11); .065 MIN at the worst printed limits stays above the .060 floor"
+      reason: "Owner ruling 2026-11-01: thin walls above the .060 floor but under the .080 target, with no geometry escape, are accepted as package-specific minor exceptions. each gap between neighbouring .098 rocker arms holds one tine of each adjacent rod, and the arms float on the pivot shaft (owner ruling 2026-11-18, #3114), so two neighbours can close hub on hub at their .276 MIN hubs: the opposed-fork budget then leaves .015 (0.381) against the .014 (0.35) floor, so the tine cannot grow, and the tines stay as printed (owner ruling 2026-11-11); .065 MIN at the worst printed limits stays above the .060 floor"
     - id: "RV-03"
       kind: "accept"
       where: "front view, boxed .16 BASIC from datum A (the bore axis) to datum B (the shank's left flank)"

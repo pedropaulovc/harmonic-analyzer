@@ -101,6 +101,36 @@ def test_analytic_volumes_follow_the_fork_geometry() -> None:
     assert rod.pin_hole_volume() == pytest.approx(
         math.pi * (hole / 2.0) ** 2 * 2.0 * spec.TINE_THICKNESS
     )
+    # #3114: the ring disc at its own thickness, and the shank's run from the
+    # ring's OD to the fork root at the shank's (checked against the area
+    # integrated under the root line and over the OD arc).
+    assert rod.ring_volume() == pytest.approx(
+        math.pi * spec.RING_OUTER_RADIUS**2 * spec.RING_THICKNESS
+    )
+    steps = 20000
+    half = spec.SHANK_WIDTH / 2.0
+    dx = spec.SHANK_WIDTH / steps
+    shank_area = sum(
+        (spec.FORK_BASE_Y - math.sqrt(spec.RING_OUTER_RADIUS**2 - x**2)) * dx
+        for x in (-half + (k + 0.5) * dx for k in range(steps))
+    )
+    assert rod.shank_volume() == pytest.approx(
+        shank_area * spec.SHANK_THICKNESS, rel=1e-8
+    )
+    assert rod.boss_volume() == pytest.approx(
+        rod.ring_volume()
+        + rod.shank_volume()
+        + rod.fork_outline_area(spec.FORK_BASE_Y) * spec.FORK_THICKNESS
+    )
+    assert rod.strap_bore_volume() == pytest.approx(
+        math.pi * (spec.RING_BORE_DIA / 2.0) ** 2 * spec.RING_THICKNESS
+    )
+    # The shank's foot is buried in the ring's wall: outside the bore, inside
+    # the disc, and both shank faces lie inside the ring's, so the foot adds
+    # no volume and leaves no edge on a ring face.
+    assert spec.RING_BORE_DIA / 2.0 < rod.SHANK_FOOT_Y
+    assert math.hypot(half, rod.SHANK_FOOT_Y) < spec.RING_OUTER_RADIUS
+    assert min(rod.RING_STEPS) > 0.0
     assert rod.finished_volume() == pytest.approx(
         rod.boss_volume()
         - rod.slot_volume()
@@ -122,6 +152,29 @@ def test_inside_corner_volume_is_the_fillets_closed_form() -> None:
     edges = 2.0 * spec.FORK_WIDTH + 2.0 * spec.SHANK_WIDTH + 2.0 * spec.SHANK_THICKNESS
     ring = rod._fillet_area(r, rod.SHANK_RING_OPENING) * 2.0 * spec.SHANK_THICKNESS
     assert rod.inside_corner_volume() == pytest.approx(square * edges + ring)
+    # #3114: the flank fillets run through the shank's thickness, not the
+    # ring's. The two corners where a shank face meets the ring's OD stay
+    # sharp: the ring stands .015 over the shank's near face, less than the
+    # radius, and .025 over its far face, which the printed bands take down
+    # to .001.
+    near_step, far_step = rod.RING_STEPS
+    assert near_step == pytest.approx(spec.SHANK_FACE_NEAR - spec.RING_FACE_NEAR)
+    assert near_step == pytest.approx(0.381)  # .015
+    assert far_step == pytest.approx(
+        spec.RING_FACE_NEAR
+        + spec.RING_THICKNESS
+        - spec.SHANK_FACE_NEAR
+        - spec.SHANK_THICKNESS
+    )
+    assert far_step == pytest.approx(0.635)  # .025
+    assert near_step < r
+    assert spec.SHANK_INSIDE_RING_MIN[1] == pytest.approx(0.0254)
+    assert spec.SHANK_INSIDE_RING_MIN[1] < r
+    # The shank's two faces in the build's Right-plane sketch, the datum face
+    # at +FORK_THICKNESS / 2.
+    assert rod.SHANK_NEAR_X == pytest.approx(1.778)
+    assert rod.SHANK_FAR_X == pytest.approx(-1.524)
+    assert rod.SHANK_NEAR_X - rod.SHANK_FAR_X == pytest.approx(spec.SHANK_THICKNESS)
 
 
 def test_pin_hole_is_the_reamed_press_hole_for_the_rod_pivot_pin() -> None:
@@ -172,14 +225,13 @@ def test_the_pin_bears_on_the_whole_tine() -> None:
 def test_sheet_runs_at_1_to_1_with_1_to_2_isometric() -> None:
     assert drawing.SHEET_SCALE == (1.0, 1.0)
     # The left view stands level with the front (third-angle alignment) and
-    # carries the fork detail's circle; every side-view dimension prints in
-    # the detail.
+    # carries the fork detail's circle and the ring's two bands.
     assert drawing.LEFT_CENTER == (0.080, drawing.FRONT_CENTER[1])
     assert ch_connecting_rod_notes.DRAWING_NOTES.splitlines() == [
         "1. MATCHED PRESS FIT ON ROD PIVOT PIN MHA-SH-VN-58:",
         "    REAM .0002-.0008 UNDER THE MEASURED PIN.",
         "2. FORK SLOT: RUNNING FIT ON ARM MHA-CH-06.",
-        "3. RING AND SHANK: SLIDING FIT IN MHA-DT-12 CAM SLOT.",
+        "3. RING: SLIDING FIT IN MHA-DT-12 CAM SLOT; LOCATES ROD.",
     ]
     assert ch_connecting_rod_notes.CAM_NUMBER == drawing.CAM_NUMBER
     assert max(y for _, y in drawing.DETAIL_KEEP.values()) < 0.260
@@ -212,14 +264,23 @@ def test_every_tight_band_names_its_mate() -> None:
     )
     # Fan-out rounds 1-2 (rule 4): two tight bands serving one mate link one
     # note naming it, so the mate prints once and each band reaches it: the
-    # slot and the tine walls that locate it (note 2, the arm), the ring and
-    # shank's thickness and its centring offset (note 3, the cam's slot).
+    # slot and the tine walls that locate it (note 2, the arm), the ring's
+    # thickness and its offset from the fork's datum face (note 3, the cam's
+    # slot; #3114: the ring is the sliding fit, the shank fits nothing).
     assert drawing.DETAIL_CALLOUTS == {
         "TineNear": "2X TINE WALL\nSEE NOTE 2",
         "SlotWidth": "SEE NOTE 2",
-        "RingFaceNear": "SEE NOTE 3",
     }
-    assert drawing.LEFT_CALLOUTS["RingThick"] == "RING AND SHANK\nSEE NOTE 3"
+    assert drawing.LEFT_CALLOUTS == {
+        "RingFaceNear": "SEE NOTE 3",
+        "RingThick": "SEE NOTE 3",
+    }
+    callouts = {
+        *drawing.FRONT_CALLOUTS,
+        *drawing.LEFT_CALLOUTS,
+        *drawing.DETAIL_CALLOUTS,
+    }
+    assert not callouts & {"ShankThick", "ShankFaceNear"}
     assert set(drawing.DETAIL_CALLOUTS) <= set(drawing.DETAIL_KEEP)
     assert set(drawing.LEFT_CALLOUTS) <= set(drawing.LEFT_KEEP)
     assert set(drawing.FRONT_CALLOUTS) <= set(drawing.FRONT_KEEP)
@@ -268,33 +329,77 @@ def test_datum_b_leader_clears_the_shank_width_text() -> None:
     assert ring_top < leader_y < fork_root
 
 
-def test_plate_locates_from_the_fork_face_and_prints_its_thickness() -> None:
-    """#982: the ring/shank plate's near face prints as a native ordinate
-    from the fork's datum face (its near face, where the near tine is
-    measured), and review r1 asked for the plate's thickness at the ring, not
-    a second ordinate in a detail that does not show the ring: one locator,
-    one size."""
+def test_ring_and_shank_locate_from_the_fork_face_and_print_their_thickness() -> None:
+    """#982: a face off the fork's plane prints as a native ordinate from the
+    fork's datum face (its near face, where the near tine is measured) and
+    its thickness as a size, one locator and one size. #3114 (owner ruling
+    2026-11-18): the ring is the original's .170, centred on the fork, and
+    the shank .13 with its near face .05 from the datum face, so each prints
+    its own pair: the ring's at the ring with its +/-.002 bands, the shank's
+    under the fork at the title block's .XX (machinist review: a third place
+    there was over-specified)."""
+    import _config
+
     spec = ch_connecting_rod_spec
+    assert spec.RING_THICKNESS == pytest.approx(4.318)  # .170
+    assert spec.SHANK_THICKNESS == pytest.approx(3.302)  # .13
     assert spec.RING_FACE_NEAR == pytest.approx(
         (spec.FORK_THICKNESS - spec.RING_THICKNESS) / 2.0
     )
-    assert spec.RING_FACE_NEAR == pytest.approx(1.9558)  # .077
+    assert spec.RING_FACE_NEAR == pytest.approx(0.889)  # .035
+    assert spec.SHANK_FACE_NEAR == pytest.approx(1.27)  # .05
     assert not hasattr(spec, "RING_FACE_FAR")
-    # Three-place inch ordinates and sizes, as the bands are written.
-    for value in (spec.RING_FACE_NEAR, spec.RING_THICKNESS, spec.TINE_THICKNESS):
-        assert round(value / 25.4, 3) == pytest.approx(value / 25.4, abs=1e-12)
-    assert spec.SHANK_THICKNESS == spec.RING_THICKNESS
-    assert spec.SHANK_THICKNESS_BAND == spec.RING_THICKNESS_BAND
-    assert spec.RING_THICKNESS + spec.RING_THICKNESS_BAND[1] >= WALL_TARGET_MM
-    assert set(drawing.LEFT_KEEP) == {"RingThick"}
-    # The thickness stands below the ring, its text out to the left.
+    # Three-place inch ordinates and sizes for the ring and tine, two-place
+    # for the shank, as they print.
+    precision = ch_connecting_rod_notes.DRAWING_PRECISION
+    for value, places in (
+        (spec.RING_FACE_NEAR, precision["RingFaceReference"]["RingFaceNear"]),
+        (spec.RING_THICKNESS, precision["Ring"]["RingThick"]),
+        (spec.TINE_THICKNESS, precision["ForkSlotProfile"]["TineNear"]),
+        (spec.SHANK_FACE_NEAR, precision["ForkSlotProfile"]["ShankFaceNear"]),
+        (spec.SHANK_THICKNESS, precision["ShankProfile"]["ShankThick"]),
+    ):
+        assert round(value / 25.4, places) == pytest.approx(value / 25.4, abs=1e-12)
+    assert precision["ForkSlotProfile"]["ShankFaceNear"] == 2
+    assert precision["ShankProfile"]["ShankThick"] == 2
+    # The ring's two bands are model bands; the shank's two are the title
+    # block's .XX and carry no model band.
+    assert spec.RING_FACE_BAND == spec.RING_THICKNESS_BAND == (0.0508, -0.0508)
+    two_place = _config.title_block("linear_2pl", unit=spec.UNIT)["band_in"] * 25.4
+    for band in (spec.SHANK_FACE_BAND, spec.SHANK_THICKNESS_BAND):
+        assert band == pytest.approx((two_place, -two_place))
+    toleranced = model_toleranced_dimensions(rod)
+    assert ("ShankProfile", "ShankThick") not in toleranced
+    assert ("ForkSlotProfile", "ShankFaceNear") not in toleranced
+    # At those bands neither shank face stands proud of its ring face, and
+    # the thinnest shank holds the wall target.
+    assert spec.SHANK_INSIDE_RING_MIN == pytest.approx((0.0762, 0.0254))
+    assert spec.SHANK_THICKNESS + spec.SHANK_THICKNESS_BAND[1] >= WALL_TARGET_MM
+    assert set(drawing.LEFT_KEEP) == {"RingFaceNear", "RingThick"}
+    assert {"ShankFaceNear", "ShankThick"} <= set(drawing.DETAIL_KEEP)
+    # Both ring bands stand below the ring, the offset nearer it, their texts
+    # out to the left of the datum face's witness (which drops from the
+    # fork's root down the shank).
     ring_bottom = drawing._left_xy(0.0, spec.RING_BOTTOM_Y)
-    text_x, text_y = drawing.LEFT_KEEP["RingThick"]
-    assert text_y < ring_bottom[1] and text_x < ring_bottom[0] - 0.020
-    # r2: two long lines ran into the sheet border; centred on the keep at
-    # ~2.5 mm a character, the widest line stays 5 mm inside it (x 0.013).
-    widest = max(len(line) for line in drawing.LEFT_CALLOUTS["RingThick"].splitlines())
-    assert text_x - widest * 0.0025 / 2.0 > 0.013 + 0.005
+    datum_x = drawing._left_xy(-spec.FORK_THICKNESS / 2.0, 0.0)[0]
+    face_x, face_y = drawing.LEFT_KEEP["RingFaceNear"]
+    thick_x, thick_y = drawing.LEFT_KEEP["RingThick"]
+    assert thick_y < face_y < ring_bottom[1]
+    # Centred on its keep at ~2.5 mm a character, a ten-character value and
+    # its flag are 25 mm wide: the offset's block ends short of the datum
+    # witness, the thickness's short of the offset's, and (r2: long lines ran
+    # into the sheet border) 5 mm inside the border (x 0.013).
+    half_block = 10 * 0.0025 / 2.0
+    for text in drawing.LEFT_CALLOUTS.values():
+        assert max(len(line) for line in text.splitlines()) <= 10
+    assert face_x + half_block < datum_x - 0.002
+    assert thick_x + half_block < face_x - half_block
+    assert thick_x - half_block > 0.013 + 0.005
+    # A value and its one flag line hang ~6.5 mm below the keep: the
+    # thickness's dimension line passes under the offset's flag, and its own
+    # flag stays above the border (y 0.013).
+    assert face_y - thick_y >= 0.0065 + 0.003
+    assert thick_y - 0.0065 > 0.013 + 0.005
 
 
 def test_inside_corners_are_one_modelled_radius_under_the_title_block() -> None:
@@ -420,14 +525,64 @@ def test_fork_print_is_three_place_and_model_owned() -> None:
     assert marked["ForkSlotProfile"] == {
         "TineNear",
         "SlotWidth",
-        "RingFaceNear",
+        "ShankFaceNear",
         "SlotDepth",
         "ForkBossLength",
     }
-    assert marked["Plate"] == {"RingThick"}
-    assert marked["PlateProfile"] == {"RingOuterDia", "ShankWidthDim"}
+    assert marked["RingFaceReference"] == {"RingFaceNear"}
+    # #3114: ring and shank are two bosses, each owning its size.
+    assert marked["RingProfile"] == {"RingOuterDia"}
+    assert marked["Ring"] == {"RingThick"}
+    assert marked["ShankProfile"] == {"ShankThick"}
+    assert marked["Shank"] == {"ShankWidthDim"}
     assert marked["ForkProfile"] == {"ForkWidthDim"}
     assert rod.DRAWING_PRECISION is ch_connecting_rod_notes.DRAWING_PRECISION
+    # Every marked dimension has part-authored places, and the build names
+    # every marked feature and dimension.
+    precision = ch_connecting_rod_notes.DRAWING_PRECISION
+    assert {feature: set(names) for feature, names in precision.items()} == marked
+    for name, places in (
+        ("RingThick", 3),
+        ("RingFaceNear", 3),
+        ("ShankThick", 2),
+        ("ShankFaceNear", 2),
+    ):
+        assert drawing._kept_precision({name: (0.0, 0.0)}) == {name: places}
+    source = Path(rod.__file__).read_text(encoding="utf-8")
+    for feature, names in marked.items():
+        assert f'name_last_feature(adapter, "{feature}")' in source
+        for name in names:
+            assert f'"{name}"' in source
+
+
+def test_each_view_imports_only_the_features_it_dimensions() -> None:
+    """Codjiflo review P3 (#3114): a targeted import brings a whole feature's
+    marked dimensions. With the ring's near face in the fork's slot sketch,
+    the side view imported the fork's five other ordinates, deleted them and
+    left the detail to import them again. Every feature's marked dimensions
+    now print in one view: the ring's near face is a reference sketch of its
+    own, which the part saves hidden (#880) and the side view shows."""
+    marked = ch_connecting_rod_notes.DRAWING_DIMENSIONS
+    views = {
+        "front": set(drawing.FRONT_KEEP),
+        "side": set(drawing.LEFT_KEEP),
+        "detail": set(drawing.DETAIL_KEEP),
+    }
+    for feature, names in marked.items():
+        owners = [label for label, keep in views.items() if names & keep]
+        assert len(owners) == 1, (feature, owners)
+        assert names <= views[owners[0]], feature
+    assert marked["RingFaceReference"] <= views["side"]
+    assert marked["ForkSlotProfile"] <= views["detail"]
+    # The side view shows the hidden sketch through the hidden-sketch import.
+    assert drawing.curate_view_dimensions.__module__ == "_drawing_hidden_sketches"
+    source = Path(rod.__file__).read_text(encoding="utf-8")
+    named = source.index('name_last_feature(adapter, "RingFaceReference")')
+    blanked = source.index('blank_reference_sketches(adapter, ("RingFaceReference",))')
+    assert named < blanked < source.index("save_part_and_images(adapter")
+    # The datum line stays on the fork's datum face.
+    spec = ch_connecting_rod_spec
+    assert 0.0 < rod.DATUM_FACE_REF_RUN < spec.FORK_TOP_Y - spec.FORK_BASE_Y
 
 
 def test_reamed_pin_hole_is_a_native_four_place_dimension() -> None:
@@ -468,10 +623,10 @@ def test_reamed_pin_hole_is_a_native_four_place_dimension() -> None:
     assert text_x < drawing.DETAIL_KEEP["TineNear"][0] - 0.040
 
 
-def test_fork_detail_takes_in_the_crown_and_the_ring_faces() -> None:
+def test_fork_detail_takes_in_the_crown_and_the_shank_faces() -> None:
     """#982: the side view's fork dimensions crowded a 6 mm fork at 1:1, so a
     native 3:1 detail carries them. Its fence takes in the crown top and the
-    ring-face references below the root step, and stands clear of the front
+    shank-face reference below the root step, and stands clear of the front
     view, the title block and the isometric."""
     d = drawing
     spec = ch_connecting_rod_spec
@@ -480,8 +635,8 @@ def test_fork_detail_takes_in_the_crown_and_the_ring_faces() -> None:
     for z, y in (
         (half, spec.FORK_TOP_Y),
         (-half, spec.FORK_TOP_Y),
-        (half, spec.FORK_BASE_Y - rod.RING_FACE_REF_RUN),
-        (-half, spec.FORK_BASE_Y - rod.RING_FACE_REF_RUN),
+        (half, spec.FORK_BASE_Y - rod.SHANK_FACE_REF_RUN),
+        (-half, spec.FORK_BASE_Y - rod.SHANK_FACE_REF_RUN),
     ):
         assert math.hypot(z, y - d.DETAIL_FENCE_Y_MM) < d.DETAIL_RADIUS_MM
     fence = d.DETAIL_RADIUS_MM * d.DETAIL_SCALE[0] / 1000.0
@@ -497,9 +652,10 @@ def test_fork_detail_takes_in_the_crown_and_the_ring_faces() -> None:
 
 
 def test_detail_texts_stand_outside_their_witness_lines() -> None:
-    """The near tine's and the plate's near face's text stand left of the
+    """The near tine's and the shank's near face's text stand left of the
     datum face's witness, the slot's right of the fork, the reference
-    thickness over both tine texts."""
+    thickness over both tine texts; under the fork the shank's thickness
+    stands a row below its near face's ordinate, text right of the shank."""
     d = drawing
     spec = ch_connecting_rod_spec
     face_x = d._detail_xy(-spec.FORK_THICKNESS / 2.0, 0.0)[0]
@@ -508,11 +664,27 @@ def test_detail_texts_stand_outside_their_witness_lines() -> None:
     root = d._detail_xy(0.0, spec.FORK_BASE_Y)[1]
     keep = d.DETAIL_KEEP
     assert keep["TineNear"][0] < face_x - 0.020
-    assert keep["RingFaceNear"][0] < face_x - 0.020
+    assert keep["ShankFaceNear"][0] < face_x - 0.020
     assert keep["SlotWidth"][0] > far_x + 0.020
     assert top < keep["TineNear"][1] < keep["SlotWidth"][1] < keep["ForkThick"][1]
-    assert keep["RingFaceNear"][1] < root
     assert keep["SlotDepth"][0] < keep["ForkBossLength"][0]
+    # Both shank rows stand below the reference's lower end, outside the
+    # fence, the smaller dimension nearer the fork and a full row apart.
+    ref_end = d._detail_xy(0.0, spec.FORK_BASE_Y - rod.SHANK_FACE_REF_RUN)[1]
+    fence_bottom = d.DETAIL_CENTER[1] - d.DETAIL_RADIUS_MM * d.DETAIL_SCALE[0] / 1000.0
+    assert keep["ShankFaceNear"][1] < min(ref_end, fence_bottom) < root
+    assert keep["ShankFaceNear"][1] - keep["ShankThick"][1] >= 0.007
+    # The thickness's three characters end clear right of the far shank face.
+    shank_far_x = d._detail_xy(-rod.SHANK_FAR_X, 0.0)[0]
+    assert shank_far_x == pytest.approx(
+        d._detail_xy(
+            -spec.FORK_THICKNESS / 2.0 + spec.SHANK_FACE_NEAR + spec.SHANK_THICKNESS,
+            0.0,
+        )[0]
+    )
+    assert keep["ShankThick"][0] - 3 * 0.0025 / 2.0 > shank_far_x + 0.008
+    # Above the title block.
+    assert keep["ShankThick"][1] > 0.065 + 0.015
 
 
 def test_model_bands_are_owned_by_named_model_dimensions() -> None:
@@ -525,8 +697,8 @@ def test_model_bands_are_owned_by_named_model_dimensions() -> None:
         ("StrapBoreProfile", "StrapBoreDia"): "*deviations(RING_BORE_DIA_BAND)",
         ("ForkSlotProfile", "TineNear"): "tine_upper",
         ("ForkSlotProfile", "SlotWidth"): "slot_upper",
-        ("ForkSlotProfile", "RingFaceNear"): "face_upper",
-        ("Plate", "RingThick"): "thick_upper",
+        ("RingFaceReference", "RingFaceNear"): "face_upper",
+        ("Ring", "RingThick"): "thick_upper",
         ("PinHoleProfile", "PinHoleDia"): "*deviations(PIN_HOLE_BAND)",
     }
 
@@ -542,7 +714,8 @@ def test_bore_finish_is_routed_clear_of_the_lower_dimension_stack() -> None:
     # plate-face callout; 2.5 mm text ends well left of it.
     assert drawing.BORE_FINISH_CHAR_HEIGHT == 0.0025
     ra_end = symbol_x + 0.006 + 6 * drawing.BORE_FINISH_CHAR_HEIGHT
-    face_callout_left = drawing.DETAIL_KEEP["RingFaceNear"][0] - 0.030
+    # The shank face's three-character value is the detail's lowest-left text.
+    face_callout_left = drawing.DETAIL_KEEP["ShankFaceNear"][0] - 3 * 0.0025 / 2.0
     assert ra_end < face_callout_left - 0.005
 
 
@@ -563,8 +736,8 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
 
 
 def test_the_ring_and_shank_stay_flat_by_their_route_not_by_a_frame() -> None:
-    """#2340: the plate's bow is bounded by its thickness and near-face bands
-    (the cam-to-arm window spends exactly those), so the sheet's one frame
+    """#2340: the ring's bow is bounded by its thickness and near-face bands
+    (the fork's stand-off from the ring spends exactly those), so the sheet's one frame
     stays the pin hole's position (test_native_gdt_and_finish_present); the
     registry route takes equal stock off both faces of the bought 1/4 flat,
     and the figures it states are the model's."""
@@ -581,3 +754,11 @@ def test_the_ring_and_shank_stay_flat_by_their_route_not_by_a_frame() -> None:
     ):
         per_face = (bar - finished) / 2.0 / 25.4
         assert f"{per_face:.3f}".lstrip("0") in process
+    # The shank's faces are located from the fork's datum face, not centred:
+    # the stock off its datum-face side and off the other.
+    skim = (bar - ch_connecting_rod_spec.FORK_THICKNESS) / 2.0
+    near = skim + ch_connecting_rod_spec.SHANK_FACE_NEAR
+    far = bar - near - ch_connecting_rod_spec.SHANK_THICKNESS
+    assert (near / 25.4, far / 25.4) == pytest.approx((0.055, 0.065))
+    for per_face in (near, far):
+        assert f"{per_face / 25.4:.3f}".lstrip("0") in process

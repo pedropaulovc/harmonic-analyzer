@@ -70,7 +70,11 @@ the same task names select the same closure.
 Cylinder-bank retention is proved analytically only, over all phases and
 tolerance extremes, in `cylinder_bank_layout`: `SOUTH_DISC_CLEARANCE` (south disc
 air to the 64T and the engaged alignment pinion, and the disc's retaining land)
-and `RING_SLOT_MARGIN` (the thickest rod ring or shank in the thinnest cam slot).
+and `RING_SLOT_MARGIN` (the thickest rod ring in the thinnest cam slot: the
+ring slides there and locates its rod). The rocker bank is not retained
+axially (#3114): each arm floats on the pivot shaft and follows its rod, and
+`test_channel_axial_budget.py` holds the hub gaps and the ear clearances of
+`rocker_bank_layout` over both banks' tolerance stacks.
 No gate reads that air from the saved bodies: `interference-free` catches
 overlap of the saved assembly, whose alignment pinion is parked DISENGAGED.
 

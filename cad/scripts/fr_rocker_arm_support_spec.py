@@ -31,7 +31,7 @@ SUPPORT_WORLD_Z = ROCKER_SUPPORT_Z
 # 2026-11-11, bank centred) set the brackets 5.64 further out each end, so
 # the length grew 7.12 -> 7.56: the least .02 in length that keeps the
 # MHA-CH-08 foot at its .70 (7.54 shortens it to .69, 7.60 lengthens it to
-# .72), with the seat end walls at 3.01 / 4.62 against the 2.0 target. The
+# .72), with the seat end walls at 3.00 / 4.42 against the 2.0 target. The
 # centred 5.00 cavity and 6.50 pockets then locate at .XX off the end faces
 # (1.28, .53).
 SUPPORT_HALF_MACHINE_Z = 96.012  # 3.78

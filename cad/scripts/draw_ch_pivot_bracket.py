@@ -92,7 +92,6 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 PIVOT_SHAFT_NUMBER = str(_config.parts("ch-pivot-shaft")["number"])
-THRUST_WASHER_NUMBER = str(_config.parts("ch-vn-rocker-thrust-washer")["number"])
 HOLD_DOWN_SCREW_NUMBER = str(_config.parts("ch-vn-bracket-hold-down-screw")["number"])
 
 # 35 mm tall: 2:1 keeps the bore and the tap legible and lets the right view
@@ -125,7 +124,7 @@ _WEST_X = FRONT_CENTER[0] - FOOT_W / 2.0 * _S
 _EAST_X = FRONT_CENTER[0] + FOOT_W / 2.0 * _S
 # The right view (*Right: +Z runs LEFT, +Y up) shows the foot-to-ear inside
 # corner in profile, the one view where its radius is an arc, and the ear's
-# two thrust faces as true vertical lines, so the ear thickness prints there,
+# two faces as true vertical lines, so the ear thickness prints there,
 # over the ear's top (machinist review FIX: on the plan its column stood 77 mm
 # east of the view). Projected off the elevation at the sheet scale, it stands
 # level with it (the same seat and apex lines), right of the bore callout,
@@ -231,14 +230,17 @@ TOP_KEEP = {
 # The ear thickness's text centre on the right view, in sheet metres along the
 # view's +Z and +Y off the ear's outboard face at its top: out past that face
 # (over the foot, under the plan's bottom edge) and just over the apex, so the
-# dimension line runs out under the ~73 mm two-line block (value, then the
-# washer it holds) and neither extension line rises into its letters (r1
+# dimension line runs out under the two-line block (value, then the shaft
+# flat it locates) and neither extension line rises into its letters (r1
 # machinist review FIX: centred over the 8 mm span, both struck the callout).
 EAR_THICK_TEXT_OFFSET = (0.042, 0.010)
 # REAM marks a fit bore, so the callout names its mate and its standard fit
 # (drawing-guidelines.md rule 4); the drilled hold-down hole says drill and
-# through. The ear thickness carries its own band and says what it holds: its
-# faces bear on the bank's thrust washers. The tap's station from the inboard
+# through. The ear thickness carries its own band and says what it holds:
+# fit-up sets the pivot shaft's tip off the ear's outboard face and the apex
+# tap stands off the inboard one, so the thickness locates the shaft's flat
+# under the tap (rocker_bank_layout.SET_SCREW_TO_FLAT_BAND; #3114: nothing
+# bears on an ear's face). The tap's station from the inboard
 # face is a location, so it carries its value and band only (rule 7); the
 # set screw it places on the pivot shaft's flat rides the tap's own callout
 # (SET_SCREW_MATE). The foot length and the hold-down station ride the title
@@ -249,7 +251,7 @@ EAR_THICK_TEXT_OFFSET = (0.042, 0.010)
 DIMENSION_CALLOUTS = {
     "ShaftBoreDia": f"REAM THRU\nSLIDING FIT ON {PIVOT_SHAFT_NUMBER}",
     "HoleDia": "DRILL THRU",
-    "EarThick": f"THRUST FACES ON {THRUST_WASHER_NUMBER}",
+    "EarThick": f"LOCATES FLAT OF {PIVOT_SHAFT_NUMBER}",
     "CornerRadius": f"CLEARS HEAD OF\n{HOLD_DOWN_SCREW_NUMBER}",
 }
 # The right view prints the corner radius and the ear thickness.
@@ -687,7 +689,7 @@ def build(adapter: Any) -> dict[str, str]:
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=_VIEW_SCALE)
     # No view needs hidden lines: the elevation shows the bore in true circle,
     # both holes are fully defined by their callouts in the plan, and the
-    # right view is there for the corner's outline and the ear's thrust faces.
+    # right view is there for the corner's outline and the ear's two faces.
     for view in (front, top, iso, right):
         set_hidden_lines_removed(adapter, view)
 

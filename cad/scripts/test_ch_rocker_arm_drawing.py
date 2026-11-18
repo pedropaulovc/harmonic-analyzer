@@ -521,18 +521,20 @@ def test_every_view_keep_map_is_curated_on_its_own_view() -> None:
     assert drawing.DRAWING_DIMENSIONS is ch_rocker_arm_notes.DRAWING_DIMENSIONS
 
 
-def test_hub_length_prints_its_one_sided_band() -> None:
-    """#743 PR2: the hubs are a solid stack whose north end is the rocker
-    bank's datum, so each hub may only come out long and the print says so
-    natively; rocker_bank_layout's L20 acceptance caps the sum."""
+def test_hub_length_prints_its_symmetric_band() -> None:
+    """#3114: the arms float on the pivot shaft, each located by its rod, so
+    no stack sums the hubs and the length is not the station pitch; it prints
+    .278 +/-.002 at three places, natively."""
+    import _config
     from _drawing_contract import model_toleranced_dimensions
 
     assert ch_rocker_arm_notes.DRAWING_DIMENSIONS["Hub"] == {"HubLength"}
     assert "HubLength" in drawing.RIGHT_KEEP
-    assert model_toleranced_dimensions(arm)[("Hub", "HubLength")] == (
-        "*deviations(HUB_LENGTH_BAND)"
-    )
-    assert ch_rocker_arm_spec.HUB_LENGTH_BAND == (0.0508, 0.0)
+    assert model_toleranced_dimensions(arm)[("Hub", "HubLength")] == "hub_upper"
+    assert ch_rocker_arm_spec.HUB_LENGTH_BAND == (0.0508, -0.0508)
+    assert ch_rocker_arm_notes.DRAWING_PRECISION["Hub"]["HubLength"] == 3
+    assert ch_rocker_arm_spec.inch_text(ch_rocker_arm_spec.HUB_LENGTH, 3) == ".278"
+    assert ch_rocker_arm_spec.HUB_LENGTH_MAX < _config.machine("channels", "station_pitch_mm")
     assert f"{ch_rocker_arm_spec.HUB_LENGTH:.2f}" not in ch_rocker_arm_notes.DRAWING_NOTES
 
 
@@ -884,8 +886,9 @@ def test_new_measured_quantities_follow_the_source_geometry_equations() -> None:
     assert spec.TIP_FACE == pytest.approx(5.706195, abs=1e-6)
     assert (spec.TOP_ARC_LEN, spec.BOT_ARC_LEN) == pytest.approx((291.499258, 266.459732), abs=1e-6)
     assert spec.HUB_DIA == pytest.approx(10.16)
-    # (7.62 - 2.4892) / 2 at the .300 pitch (#1038).
-    assert (spec.HUB_LENGTH - spec.ARM_THICKNESS) / 2.0 == pytest.approx(2.5654)
+    # (7.0612 - 2.4892) / 2: the .278 hub stands .090 off each strap face (#3114).
+    assert (spec.HUB_LENGTH - spec.ARM_THICKNESS) / 2.0 == pytest.approx(2.286)
+    assert arm.HUB_PROUD == pytest.approx(2.286)
 
 
 def test_rod_hole_keeps_its_normal_wall_to_the_real_k_taper_at_printed_bands():
@@ -1271,7 +1274,7 @@ def test_datum_g_basic_is_the_half_hub_length_off_the_face_requirements() -> Non
         ch_rocker_arm_spec.HUB_LENGTH / 2.0
     )
     places = drawing.HUB_FACES.precision["length"]
-    assert ch_rocker_arm_spec.inch_text(drawing.HUB_FACE_BASIC_MM, places) == ".1500"
+    assert ch_rocker_arm_spec.inch_text(drawing.HUB_FACE_BASIC_MM, places) == ".139"
     assert drawing.HUB_FACES.fields["datum"] == (
         "G",
         (("draw_ch_rocker_arm", "_hub_face_datum"),),
@@ -1281,7 +1284,7 @@ def test_datum_g_basic_is_the_half_hub_length_off_the_face_requirements() -> Non
     ]
     assert g[0] == {
         "feature": "hub_faces",
-        "surface": "-Z hub end face (20X stack registration)",
+        "surface": "-Z hub end face (stops the neighbouring arm)",
     }
     assert g[1] == (("draw_ch_rocker_arm", "_hub_face_datum"),)
     assert drawing.STRAP_FACES.fields["position_datums"][0] == ["G"]
@@ -1500,7 +1503,7 @@ def native_annotation_binding(monkeypatch):
 @pytest.mark.parametrize("defect", [
     None, "missing", "null-display", "ignored", "strap-missing", "strap-ignored", "root-missing",
 ])
-def test_hub_length_stack_callout_is_below_and_preserves_native_size(
+def test_hub_length_neighbour_callout_is_below_and_preserves_native_size(
     monkeypatch, defect,
 ):
     adapter, _imported = _imported_native_quantities(monkeypatch)
@@ -1585,10 +1588,10 @@ def test_hub_length_stack_callout_is_below_and_preserves_native_size(
     code = compile(ast.fix_missing_locations(module), drawing.__file__, "exec")
     if defect is None:
         exec(code, namespace)
-        # Hub length names its stack mate and the strap its fork fit, both in
-        # below rows (above-text line breaks print as one run).
+        # Hub length names the neighbour it stops and the strap its fork fit,
+        # both in below rows (above-text line breaks print as one run).
         assert hub.writes == [(4, drawing.HUB_LENGTH_TEXT)]
-        assert "MHA-CH-05" in drawing.HUB_LENGTH_TEXT
+        assert "MHA-CH-06" in drawing.HUB_LENGTH_TEXT
         assert strap.writes == [(4, ch_rocker_arm_notes.STRAP_FIT_CALLOUT)]
         assert "MHA-CH-03" in ch_rocker_arm_notes.STRAP_FIT_CALLOUT
         # The position frame hangs on the strap width, then the centre plane

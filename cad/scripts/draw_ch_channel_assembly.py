@@ -7,13 +7,13 @@ r"""Create the MHA-CH-00 channel assembly fitter package (six sheets).
    (ch_channel_explode_spec), the native BOM with the registry's part
    numbers, vendor SKUs and ch_channel_assembly_sheet's descriptions, and one
    balloon per BOM row.
-3. ROCKER BANK FIT-UP: view D, the bank isolated at 1:1 with the stack
-   length and the shaft's tip set, and the first rocker-bank steps. The
-   right bracket is set off a wave disc spring that preloads the bank left,
-   and the plain pivot shaft is held by a set screw in each ear (#948
-   ruling R, PR #1292; user, 2026-10-10).
-4. ROCKER BANK FIT-UP (CONT.): detail A, the cropped 4:1 right end with the
-   spring set, and the rest of the rocker-bank steps.
+3. ROCKER BANK FIT-UP: view D, the bank isolated at 1:1 with the ears'
+   inner-face span and the shaft's tip set, and the first rocker-bank steps.
+   The arms float on the plain pivot shaft between the ears, each located by
+   its own rod (#3114), and the shaft is held by a set screw in each ear
+   (PR #1292; user, 2026-10-10).
+4. ROCKER BANK FIT-UP (CONT.): detail A, the cropped 4:1 right end (the end
+   hub clear of its ear), and the rest of the rocker-bank steps.
 5. LEVER BANK FIT-UP: view E, the keepers, fulcrum shaft and levers isolated
    at 1:1 with the keeper lug span, view F, the 1:2 keeper plan with the
    keepers' three settings off the top frame's datums, and the first
@@ -102,7 +102,6 @@ from _session import run_build
 from _simplified_names import simplified_name
 from _general_table import TABLE_TITLE_DROP, insert_general_table, table_column_widths
 import _telemetry
-from _printed_tolerance import printed_deviations
 import ch_channel_assembly_sheet as notes
 import ch_channel_assembly_spec as asm
 from fr_top_frame_spec import BORE_DIA as SOCKET_BORE_DIA
@@ -134,17 +133,13 @@ from ch_pivot_shaft_spec import (
     FLAT_DEPTH as PIVOT_FLAT_DEPTH,
     SHAFT_DIA as PIVOT_SHAFT_DIA,
 )
-from ch_rocker_arm_notes import DRAWING_PRECISION as ARM_DRAWING_PRECISION
-from ch_rocker_arm_spec import HUB_LENGTH, HUB_LENGTH_BAND
-from ch_rocker_arm_spec import UNIT as ARM_UNIT
 from channel_frame_geom import LEVER_FULCRUM_XY, ROCKER_PIVOT_XY
 from frame_column_stations import COLUMN_X
 from rocker_bank_layout import (
     COUNT,
+    HUB0_SOUTH_FACE_Z,
     PIVOT_BRACKET_Z,
     PIVOT_SHAFT_FLAT_STATIONS,
-    ROCKER_SPRING_SET_BAND,
-    STACK_L20_ACCEPT,
     STACK_MID_Z,
 )
 
@@ -257,7 +252,7 @@ BRACKET_BALLOON_POINT_MM = (
     BRACKET_FOOT_Z1,
 )
 # Balloon 1 (the rocker pivot shaft): left in the hubs only a stub of it
-# showed and the balloon landed on that sliver beside the washers (#1895 and
+# showed and the balloon landed on that sliver beside the end hardware (#1895 and
 # R5 machinist reviews). The shaft is drawn north out of the bank
 # (ch_channel_explode_spec), its north half past the hanging rods onto open
 # paper; the landing is the north flat's edge on the eye's side, at the
@@ -353,8 +348,6 @@ BOM_QUANTITIES = {
     "ch-fulcrum-shaft": 1,
     explode.BRACKET: 2,
     explode.BRACKET_SET_SCREW: 2,
-    explode.WASHER: 2,
-    explode.BANK_SPRING: 1,
     explode.BRACKET_HOLD_DOWN: 2,
     explode.KEEPER: 2,
     explode.KEEPER_FOOT_SCREW: 2,
@@ -383,8 +376,6 @@ PART_ROWS = {
     "ch-fulcrum-shaft": _config.parts("ch-fulcrum-shaft"),
     "ch-pivot-bracket": _config.parts("ch-pivot-bracket"),
     "sh-vn-arbor-set-screw": _config.parts("sh-vn-arbor-set-screw"),
-    "ch-vn-rocker-thrust-washer": _config.parts("ch-vn-rocker-thrust-washer"),
-    "ch-vn-rocker-bank-spring": _config.parts("ch-vn-rocker-bank-spring"),
     "ch-vn-bracket-hold-down-screw": _config.parts("ch-vn-bracket-hold-down-screw"),
     "ch-fulcrum-keeper": _config.parts("ch-fulcrum-keeper"),
     "ch-vn-frame-side-screw": _config.parts("ch-vn-frame-side-screw"),
@@ -565,19 +556,18 @@ ROCKER_BANK = BankView(
             explode.BRACKET,
             explode.BRACKET_SET_SCREW,
             explode.BRACKET_HOLD_DOWN,
-            explode.WASHER,
-            explode.BANK_SPRING,
             "ch-rocker-arm",
         }
     ),
     parts="ROCKER BANK",
 )
-# The right end at 4:1: the ear's inner face, the spring, the washer and the
-# end hub about the circle's centre on the pivot axis. It prints on sheet 4,
-# right of that sheet's step column; its boundary is on view D (sheet 3).
+# The right end at 4:1: the ear's inner face and the end hub, the air between
+# them centred in the circle on the pivot axis (the end hub clears its ear,
+# #3114). It prints on sheet 4, right of that sheet's step column; its
+# boundary is on view D (sheet 3).
 DETAIL_LETTER = "A"
 DETAIL_SHEET = SHEET_NAMES[3]
-_DETAIL_CENTRE_Z = (asm.PIVOT_CHAIN_Z[0] + asm.PIVOT_CHAIN_Z[2]) / 2.0
+_DETAIL_CENTRE_Z = (asm.PIVOT_CHAIN_Z[0] + HUB0_SOUTH_FACE_Z) / 2.0
 SOUTH_END = BankView(
     f"DETAIL {DETAIL_LETTER}",
     (4, 1),
@@ -588,8 +578,6 @@ SOUTH_END = BankView(
             "ch-pivot-shaft",
             explode.BRACKET,
             explode.BRACKET_SET_SCREW,
-            explode.WASHER,
-            explode.BANK_SPRING,
             "ch-rocker-arm",
         }
     ),
@@ -598,7 +586,7 @@ SOUTH_END = BankView(
     letter=DETAIL_LETTER,
 )
 # The letter sits this far (sheet m) outside the parent's boundary circle, up
-# and to the south, clear of the ear (its outer face 8.7 mm south of centre)
+# and to the south, clear of the ear (its outer face 9.0 mm south of centre)
 # and above the shaft end.
 DETAIL_LETTER_OFFSET = 0.002
 
@@ -792,9 +780,8 @@ def _exploded(
 # out channel's end hardware (the instances the balloons pin) is enlarged,
 # exploded, beside the BOM.
 # Each detail is centred on its exploded bore centre; the radii hold the
-# exploded set screw, hold-down or foot screw and (the bracket's) the north
-# washer, 29 to 40 mm from those centres in the isometric (estimated from the
-# spec dimensions, with margin).
+# exploded set screw, hold-down or foot screw, 29 to 40 mm from those centres
+# in the isometric (estimated from the spec dimensions, with margin).
 EXPLODED_DETAIL_SCALE = (1, 2)
 EXPLODED_DETAIL_X = 0.392  # the column between the BOM and the right border
 NORTH_BRACKET_DETAIL = BankView(
@@ -807,12 +794,11 @@ NORTH_BRACKET_DETAIL = BankView(
             explode.BRACKET,
             explode.BRACKET_SET_SCREW,
             explode.BRACKET_HOLD_DOWN,
-            explode.WASHER,
         }
     ),
     crop_radius_mm=44.0,
     parts=items_text(
-        (explode.BRACKET, explode.BRACKET_SET_SCREW, explode.BRACKET_HOLD_DOWN, explode.WASHER),
+        (explode.BRACKET, explode.BRACKET_SET_SCREW, explode.BRACKET_HOLD_DOWN),
         compact=True,
     ),
     sheet_scale=(1, 7),
@@ -886,44 +872,29 @@ BALLOON_POINTS_MM = {
 # ties it back to the MHA-CH-05 north end (draw_pn_pen_assembly's trails).
 TRAIL_LINE_STYLE = 2  # swLineStyles_e.swLinePHANTOM
 TRAIL_COLOR = 0  # COLORREF black, the views' outline colour
-_STACK_MID = (asm.PIVOT_CHAIN_Z[2] + asm.PIVOT_CHAIN_Z[3]) / 2.0
-_SPRING_MID = (asm.PIVOT_CHAIN_Z[0] + asm.PIVOT_CHAIN_Z[1]) / 2.0
+_EAR_SPAN_MID = (asm.PIVOT_CHAIN_Z[0] + asm.PIVOT_CHAIN_Z[1]) / 2.0
 _LUG_MID = sum(asm.LUG_INNER_FACE_Z) / 2.0
-STACK_KEEP = {
-    asm.STACK_LENGTH_DIMENSION: ROCKER_BANK.sheet_xy(_STACK_MID, _PIVOT_Y + 40.0)
+EAR_SPAN_KEEP = {
+    asm.EAR_SPAN_DIMENSION: ROCKER_BANK.sheet_xy(_EAR_SPAN_MID, _PIVOT_Y + 40.0)
 }
 # The left tip's set proud of the left ear's outer face (R5 machinist review,
 # rule 22: printed in the shaft-set step only). Its two extension lines stand
-# 1.5 mm apart left of the stack's, so its text rides above the stack
+# 1.5 mm apart left of the ear span's, so its text rides above the span
 # callout. Not between them: centred on the gap, both lines ran up into the
 # '6' and '0' of .060 (farm run 20261117T130021685Z machinist review, rule
 # 14); 19 mm right of the gap the text stands wholly right of the ear-face
-# line, as detail A's spring set does, its dimension line carried to it.
-_TIP_MID = (asm.PIVOT_CHAIN_Z[4] + asm.PIVOT_CHAIN_Z[5]) / 2.0
+# line, its dimension line carried to it.
+_TIP_MID = (asm.PIVOT_CHAIN_Z[2] + asm.PIVOT_CHAIN_Z[3]) / 2.0
 TIP_KEEP = {
     asm.TIP_PROUD_DIMENSION: ROCKER_BANK.sheet_xy(_TIP_MID - 19.0, _PIVOT_Y + 62.0)
 }
-ROCKER_KEEP = {**STACK_KEEP, **TIP_KEEP}
-# Above the 8 mm crop circle: at +6 the circle's arc crossed the callout
-# text (r7 layout audit, text-on-line). South of the ear-side extension line,
-# not between the two: centred on the 0.60 gap the text sat on its own
-# dimension line and the washer-side extension line rose into it (b9ae
-# machinist review). 6.5 mm south of the ear face puts the callout's ~40 mm
-# block wholly south of that line.
-SPRING_KEEP = {
-    asm.SPRING_SET_DIMENSION: SOUTH_END.sheet_xy(
-        asm.PIVOT_CHAIN_Z[0] - 6.5, _PIVOT_Y + 9.5
-    )
-}
-# Detail A names the four bodies the spring set is read against (b9ae machinist
-# review: the caption listed them, nothing in the view said which outline was
-# which): (text, text upper-left as an offset from the detail's centre, pointer
-# tip in the detail's plane as machine (z, y)). The hub to the left of the
-# circle, above the axis; the washer, spring and ear to the right, under the
-# set dimension's text, rows in their tips' top-to-bottom order so no two
-# leaders cross, each tip below the axis so no leader crosses the set
-# dimension's extension lines (they run from the axis up).
-_WASHER_MID = sum(asm.SOUTH_WASHER_Z) / 2.0
+ROCKER_KEEP = {**EAR_SPAN_KEEP, **TIP_KEEP}
+# Detail A names the two bodies the end-hub check is read between (b9ae
+# machinist review: the caption listed them, nothing in the view said which
+# outline was which): (text, text upper-left as an offset from the detail's
+# centre, pointer tip in the detail's plane as machine (z, y)). The hub to
+# the left of the circle, above the axis; the ear to the right, its tip
+# below the axis.
 DETAIL_POINTERS = tuple(
     (
         text,
@@ -934,20 +905,8 @@ DETAIL_POINTERS = tuple(
         (
             f"{BOM_PART_NUMBERS['ch-rocker-arm']}\nHUB",
             (-0.054, 0.033),
-            asm.PIVOT_CHAIN_Z[2] + 1.0,
+            HUB0_SOUTH_FACE_Z + 1.0,
             3.0,
-        ),
-        (
-            f"{BOM_PART_NUMBERS[explode.WASHER]} WASHER",
-            (0.038, 0.023),
-            _WASHER_MID,
-            -1.5,
-        ),
-        (
-            f"{BOM_PART_NUMBERS[explode.BANK_SPRING]} SPRING",
-            (0.038, 0.010),
-            _SPRING_MID,
-            -3.0,
         ),
         (
             f"{BOM_PART_NUMBERS[explode.BRACKET]} EAR",
@@ -1033,12 +992,15 @@ _BORDER_FOOT = BORDER + STEPS_FOOT_CLEARANCE
 # Sheet 3: right of view D. Sheet 4: the full-height left column, detail A
 # right of it. Sheet 5: right of views E and F. Sheet 6: the full-height left
 # column, then the setting table under view G's label on the right (round 1
-# review: balanced sheets, no lone step in an empty half).
+# review: balanced sheets, no lone step in an empty half). Sheet 3's column
+# stops well above the title block so the rocker bank's steps, fewer since
+# the arms float (#3114), split about evenly with sheet 4's.
+_ROCKER_RIGHT_FOOT = 0.108
 _HOOKUP_LABEL_FOOT = (
     HOOKUP_BOTTOM_Y - 0.004 - len(HOOKUP.label_text.splitlines()) * NOTE_LINE_PITCH
 )
 ROCKER_COLUMNS = (
-    StepColumn(SHEET_NAMES[2], (STEPS_RIGHT_X, STEPS_TOP_Y), _RIGHT_FOOT),
+    StepColumn(SHEET_NAMES[2], (STEPS_RIGHT_X, STEPS_TOP_Y), _ROCKER_RIGHT_FOOT),
     StepColumn(SHEET_NAMES[3], (STEPS_LEFT_X, STEPS_TOP_Y), _BORDER_FOOT),
 )
 LEVER_COLUMNS = (
@@ -1135,31 +1097,13 @@ if _planned[1] < _TEMPLATE.title_block_top_m + 0.003:
     raise AssertionError("the setting table runs into the title block")
 
 
-# The right bracket is set by DRO off a test-indicator zero on its own foot
-# end, taken with its ear on the right washer before the wave spring goes on
-# (#2337: the spring covers all but .004 of the washer face, so no feeler leaf
-# can bear on it beside the spring). The washer, the hub stack, the ear and
-# the left ear all cancel: the gap's set error is the two indicator nulls on
-# that one face, half a division each of the shop's 1 um lever indicator
-# (shop.toml gauges.dti, owner 2026-11-17), and the DRO over the move,
-# which must stay inside the detail A band (the band, at the spring-back
-# check, is the acceptance).
-INDICATOR_DIVISION_MM = 0.001  # the shop's dial test indicator
-DRO_ACCURACY_MM = 0.00508  # .0002: the PM-30MV DRO, vendor-stated (shop inventory)
-SPRING_SET_ERROR_MM = 2.0 * INDICATOR_DIVISION_MM / 2.0 + DRO_ACCURACY_MM
-if SPRING_SET_ERROR_MM > ROCKER_SPRING_SET_BAND:
-    raise AssertionError("the DRO indicator set misses the detail A spring-set band")
-
-
 def _fitup_text() -> dict[str, str]:
     """Every step's text, keyed as ``ch_channel_assembly_steps.SEQUENCE``."""
     # Literal stems, so the config-dependency analysis reads exactly these rows.
-    arm_number = _config.parts("ch-rocker-arm")["number"]
     support = _config.parts("fr-rocker-arm-support")["number"]
     top_frame = _config.parts("fr-top-frame")["number"]
     shaft, fulcrum_shaft = item("ch-pivot-shaft"), item("ch-fulcrum-shaft")
     bracket, pivot_set_screw = item(explode.BRACKET), item(explode.BRACKET_SET_SCREW)
-    washer, spring = item(explode.WASHER), item(explode.BANK_SPRING)
     hold_down, keeper = item(explode.BRACKET_HOLD_DOWN), item(explode.KEEPER)
     foot_screw = item(explode.KEEPER_FOOT_SCREW)
     fulcrum_set_screw = item(explode.KEEPER_SET_SCREW)
@@ -1174,33 +1118,6 @@ def _fitup_text() -> dict[str, str]:
     def n(key: str) -> int:
         return steps.step_number(key)
 
-    # Every hub comes at or over its print length (its band is upper-only),
-    # so the shortest stack the part band allows still meets the acceptance's
-    # low limit: the stack can only be long, and the re-face step covers that.
-    # It faces the longest hubs on the end away from datum G, the face each
-    # arm registers on in the stack (draw_ch_rocker_arm), keeping each at or
-    # over its print. Checked on the PRINTED limits, as a fitter reads both
-    # sheets (#2330): twenty .3000 hubs at their low limit make exactly the
-    # stack's printed 6.000 low limit.
-    hub_low_dev, _ = printed_deviations(
-        HUB_LENGTH,
-        ARM_DRAWING_PRECISION["Hub"]["HubLength"],
-        (HUB_LENGTH_BAND[1], HUB_LENGTH_BAND[0]),
-        unit=ARM_UNIT,
-    )
-    stack_low_dev, _ = printed_deviations(
-        STACK_L20_ACCEPT[0],
-        asm.DRAWING_PRECISION[asm.PIVOT_FEATURE][asm.STACK_LENGTH_DIMENSION],
-        asm.DIMENSION_TOLERANCES[asm.STACK_LENGTH_DIMENSION],
-        unit=asm.UNIT,
-    )
-    hub_low = HUB_LENGTH + hub_low_dev
-    stack_low = STACK_L20_ACCEPT[0] + stack_low_dev
-    if COUNT * hub_low < stack_low - 1e-9:
-        raise AssertionError(
-            "the re-face step covers only a long stack, but twenty hubs at "
-            "their printed low limit fall under the stack's printed low limit"
-        )
     # Each keeper lug is set off the top-frame rail web under it (its column's
     # socket axis) in X and off the frame's hole-station origin line, the
     # upper socket centres, in Z (Main's ruling): the lug centre on the
@@ -1215,31 +1132,10 @@ def _fitup_text() -> dict[str, str]:
     if abs(rear_face - front_face - KEEPER_INNER_FACE_SPAN_MM) > 1e-9:
         raise AssertionError("the view E lug span is not the fit-up span")
     return {
-        # The hub stack is proved on the shaft first, while the arms are
-        # loose; each rod + arm pair is then pinned at the bench, before the
-        # drive-train cylinder stack captures the rod rings in their cams.
-        "rocker-stack-accepted": (
-            f"STACK {COUNT} {arm} ON {shaft} AS {rocker_view} SHOWS, HUBS TOUCHING."
-        ),
-        "rocker-stack-measured": (
-            "MEASURE THE STACK OVER ITS END HUB FACES WITH A CALIPER: IT MUST "
-            f"MEET THE {rocker_view} STACK DIMENSION."
-        ),
-        "rocker-stack-refaced": (
-            "IF IT IS LONG, FACE THE LONGEST HUBS ON THEIR ENDS AWAY FROM DATUM "
-            f"G ({arm_number} DRAWING), NONE BELOW ITS PRINTED LENGTH, AND "
-            f"RETURN TO STEP {n('rocker-stack-measured')}."
-        ),
-        # A short stack has a hub under its printed length: the band is
-        # upper-only, so twenty conforming hubs meet the low limit (#2338
-        # review: the short case had no procedure).
-        "rocker-stack-short": (
-            f"IF IT IS SHORT, REPLACE EACH {arm} WHOSE HUB IS UNDER ITS PRINTED "
-            f"LENGTH AND RETURN TO STEP {n('rocker-stack-measured')}."
-        ),
-        "rockers-kept-in-order": (
-            f"SLIDE THE ROCKERS OFF {shaft} IN ORDER AND KEEP THAT ORDER."
-        ),
+        # Each rod + arm pair is pinned at the bench, before the drive-train
+        # cylinder stack captures the rod rings in their cams; the arms float
+        # on the shaft, each located by its rod (#3114), so they go on in any
+        # order.
         steps.RODS_PINNED_KEY: (
             f"BEFORE {steps.CYLINDER_STACK_REF}, AT THE BENCH: PRESS ONE {pin} "
             f"PIN THROUGH EACH {rod} ROD FORK AND THE PIVOT HOLE OF ONE {arm}, "
@@ -1266,69 +1162,58 @@ def _fitup_text() -> dict[str, str]:
             f"CHECK THE LEFT {bracket} OF {rocker_view}, SET THERE, DOES NOT TURN "
             "BY HAND."
         ),
-        "arms-swung-up": f"SWING EACH {arm} UP ON ITS {rod}.",
-        "north-ear-datum": (
-            f"PUSH {shaft}, FLATS UP, THROUGH THE LEFT {bracket} EAR, THEN THROUGH "
-            f"THE {washer} WASHER MEASURED AT {steps.NORTH_BRACKET_SET_REF}."
-        ),
-        "rocker-hubs-threaded": (
-            f"PUSH {shaft} ON THROUGH THE {arm} HUBS, LEFT TO RIGHT IN THE ORDER "
-            f"KEPT AT STEP {n('rockers-kept-in-order')}."
-        ),
-        "south-washer-fitted": (
-            f"SLIP THE OTHER {washer} ONTO {shaft} AGAINST THE RIGHT HUB."
-        ),
-        # #2337: the right bracket is zeroed on its foot end with the ear on
-        # the washer before the spring covers it, on the mill the left ear was
-        # set on; it comes off for the spring, goes back on under a light clamp
-        # and is tapped to that zero at the spring set's DRO offset.
-        "south-bracket-on-washer": (
+        # The right bracket is set off the left one, set at the drive train's
+        # north-bracket step on the same mill, to the ears' inner-face span
+        # view D prints (rocker_bank_layout.EAR_INNER_SPAN, #3114), while the
+        # shaft runs bare through both ears: with the arms on it each inner
+        # face is only .05 from its end hub, out of an edge finder's reach.
+        "south-bracket-stood": (
             f"WITH THE BASE ON THE MILL AS AT {steps.NORTH_BRACKET_SET_REF}, "
-            f"STAND THE RIGHT {bracket} ON {support} WITH {shaft} IN ITS EAR AND "
-            f"THE EAR PUSHING {washer} AND THE BANK LEFT."
+            f"STAND THE RIGHT {bracket} ON {support}."
         ),
-        "south-bracket-zeroed": (
-            f"ZERO A SPINDLE TEST INDICATOR ON THE RIGHT {bracket} FOOT END."
+        "bare-shaft-through-ears": (
+            f"PUSH {shaft}, FLATS UP, THROUGH THE LEFT {bracket} EAR AND ON THROUGH "
+            f"THE RIGHT {bracket} EAR, CLEAR OF THE HANGING {arm}."
         ),
-        "south-bracket-dro-zeroed": f"ZERO THE DRO ALONG {shaft} THERE.",
-        "south-bracket-slid-off": (
-            f"WITH THE INDICATOR CLEAR, SLIDE THE RIGHT {bracket} OFF {shaft}, "
-            "BASE UNMOVED ON THE TABLE."
+        "south-bracket-span-set": (
+            f"WITH AN EDGE FINDER, BY DRO, SET THE RIGHT {bracket} EAR INNER FACE "
+            f"OFF THE LEFT EAR INNER FACE, TO THE {rocker_view} EAR SPAN."
         ),
-        # Machinist review (#2108): the BOM carries one spring, so its run
-        # along the shaft is a check, with its own remedy.
-        "bank-spring-checked": (
-            f"CHECK THE {spring} WAVE SPRING SLIDES FREE ALONG {shaft}."
+        "south-bracket-clamped": f"CLAMP THE RIGHT {bracket} TO {support}.",
+        "shaft-drawn-back": (
+            f"DRAW {shaft} BACK TO THE LEFT UNTIL ITS RIGHT END IS IN THE LEFT "
+            f"{bracket} EAR."
         ),
-        "bank-spring-replaced": (
-            f"IF IT BINDS, REPLACE THAT {spring} AND REPEAT STEP "
-            f"{n('bank-spring-checked')}."
+        "arms-swung-up": f"SWING EACH {arm} UP ON ITS {rod}.",
+        "rocker-hubs-threaded": (
+            f"PUSH {shaft} ON THROUGH THE {arm} HUBS, LEFT TO RIGHT, AND INTO THE "
+            f"RIGHT {bracket} EAR."
         ),
-        "bank-spring-fitted": f"FIT {spring} ON {shaft} AGAINST THAT {washer}.",
-        # The light clamp holds the bracket against the spring while it is
-        # tapped to the indicator (Codjiflo r1 on #2489: the spring alone
-        # leaves nothing holding it at the target).
-        "south-bracket-refitted": (
-            f"STAND THE RIGHT {bracket} BACK ON {support}, {shaft} IN ITS EAR."
-        ),
-        "south-bracket-clamped-lightly": "CLAMP IT LIGHTLY.",
-        # The spring-back check runs while the bracket is only clamped, so a
+        # The end-hub check runs while the right bracket is only clamped, so a
         # failed check is re-set before anything is drilled, tapped or staked
-        # (machinist review, PR #1605).
-        "south-bracket-spring-set": (
-            f"WITH THE DRO AT THE SPRING SET OF {detail}, RIGHT OF THE STEP "
-            f"{n('south-bracket-dro-zeroed')} ZERO, TAP THE FOOT END UNTIL THE "
-            "INDICATOR READS ZERO ON IT."
+        # (machinist review, PR #1605). The rods are in their cams, so each end
+        # arm stands where its rod puts it.
+        "end-hubs-clear": (
+            f"CHECK THE FEELER LEAF OF {notes.setting_row('end-hubs-clear')} "
+            f"PASSES BETWEEN EACH END {arm} HUB AND ITS {bracket} EAR ({detail})."
         ),
-        "south-bracket-clamped": (
-            f"TIGHTEN THE RIGHT {bracket} CLAMP, INDICATOR STILL AT ZERO."
-        ),
-        "spring-back-checked": (
-            f"CHECK THE PUSHED-RIGHT BANK SPRINGS BACK TO THE LEFT {washer}."
+        # Each end its own remedy (rule 22), both back to the bare shaft. The
+        # left bracket was set and screwed at MHA-DT-00 (its Ø.180 foot hole
+        # gives the #8 screw room to shift), so it is reset by that sheet's
+        # set, screw and recheck sub-steps; the right bracket, re-spanned off
+        # it, follows.
+        "north-bracket-reset": (
+            f"IF IT DOES NOT PASS AT THE LEFT HUB, DRAW {shaft} BACK AS AT STEP "
+            f"{n('shaft-drawn-back')}, SWING THE ARMS DOWN, EASE THE RIGHT CLAMP, "
+            f"LOOSEN THE LEFT {hold_down}, RESET THE LEFT {bracket} PER "
+            f"{steps.NORTH_BRACKET_SET_REF}B, {steps.NORTH_BRACKET_SET_NUMBER}E AND "
+            f"{steps.NORTH_BRACKET_SET_NUMBER}F AND RETURN TO STEP "
+            f"{n('bare-shaft-through-ears')}."
         ),
         "south-bracket-reset": (
-            "IF IT DOES NOT, EASE THE CLAMP AND RETURN TO STEP "
-            f"{n('south-bracket-spring-set')}."
+            f"IF IT DOES NOT PASS AT THE RIGHT HUB, DRAW {shaft} BACK AS AT STEP "
+            f"{n('shaft-drawn-back')}, SWING THE ARMS DOWN, EASE THE CLAMP AND "
+            f"RETURN TO STEP {n('bare-shaft-through-ears')}."
         ),
         "south-foot-transferred": (
             f"STILL CLAMPED, TRANSFER-DRILL THE RIGHT {bracket} FOOT HOLE INTO "
@@ -1356,6 +1241,9 @@ def _fitup_text() -> dict[str, str]:
             f"{stake_points('ch-pivot-shaft')} ({ROCKER_BANK.title})."
         ),
         "pivot-shaft-held": f"CHECK {shaft} DOES NOT TURN OR SLIDE BY HAND.",
+        "arms-follow-rods": (
+            f"CHECK EACH {arm} SLIDES FREELY ON {shaft}, FOLLOWING ITS {rod}."
+        ),
         "keepers-on-frame": (
             f"WITH {top_frame} ON THE MILL, STAND BOTH {keeper} ON ITS RAIL AS "
             f"{plan_view} SHOWS, FEET OUTWARD, {fulcrum_shaft} THROUGH BOTH BORES."
@@ -2314,14 +2202,15 @@ def _dimensioned_bank(
     ] = (),
 ) -> list[Any]:
     """Place ``bank``, show its own settings sketch in it (the other bank's
-    lies off the sheet), import ``keep``, crop it if it is a detail, prove the
-    kept dimensions survived, and label it. ``detail``, a detail taken from
-    ``bank``, gets its boundary circle and letter drawn in ``bank``; each of
-    ``pointers`` (text, text point, tip) names a body with a view-owned
-    leader."""
+    lies off the sheet) when it keeps any of its dimensions, import ``keep``,
+    crop it if it is a detail, prove the kept dimensions survived, and label
+    it. ``detail``, a detail taken from ``bank``, gets its boundary circle and
+    letter drawn in ``bank``; each of ``pointers`` (text, text point, tip)
+    names a body with a view-owned leader."""
     view = _placed_bank_view(adapter, bank)
     features = tuple(dict.fromkeys(asm.DIMENSION_FEATURE[name] for name in keep))
-    _show_base_view_sketches(adapter, view, features, label=bank.title)
+    if features:
+        _show_base_view_sketches(adapter, view, features, label=bank.title)
     annotations = curate_view_dimensions(
         adapter,
         view,
@@ -2423,7 +2312,7 @@ def _place_fitup_sheets(adapter: Any) -> Callable[[], None]:
 
     _activate_sheet(adapter, DETAIL_SHEET)
     annotations += _dimensioned_bank(
-        adapter, SOUTH_END, SPRING_KEEP, pointers=DETAIL_POINTERS
+        adapter, SOUTH_END, {}, pointers=DETAIL_POINTERS
     )
     _place_steps(adapter, DETAIL_SHEET)
 

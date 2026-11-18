@@ -1,11 +1,10 @@
 r"""Reproduction script: rocker pivot shaft (MHA-CH-05; book ch. 14 / ch. 17; 1 used).
 
 The Ø.250 steel shaft that carries the 20 rocker arms at machine
-(x, y) = (72.9, 253.8), held by the two pivot brackets and preloaded north by
-the MHA-CH-VN-54 spring (#948 ruling R, PR #1292). It is a PLAIN rod: rocker
-19's hub bears through a MHA-CH-VN-56 thrust washer on the north ear's inner
-face, and the spring pushes on a second washer at hub 0's south face from the
-south ear (``rocker_bank_layout``). The
+(x, y) = (72.9, 253.8), held by the two pivot brackets. It is a PLAIN rod:
+the arms float on it, each located along the bank by its own connecting rod
+(#3114), so no hub bears on an ear and nothing preloads the bank
+(``rocker_bank_layout``). The
 cylinder spans both ears' outer faces and each end is domed .06 proud, like
 the cylinder arbor's ends (ch14 page002_img07 shows the near-flush domed end
 on the ear). One MHA-CH-VN-53 #4-40 cup-point set screw drops through each

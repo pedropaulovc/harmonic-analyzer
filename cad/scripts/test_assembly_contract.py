@@ -117,17 +117,17 @@ def channel_reference_band_expression():
 
 
 @pytest.mark.parametrize("channel_count", (1, 3, 20))
-def test_channel_reference_band_tracks_the_full_retention_stack(
+def test_channel_reference_band_tracks_the_fixed_channel_hardware(
     channel_count, channel_reference_band_expression
 ):
     actual = eval(
         channel_reference_band_expression,
         {"__builtins__": {}, "_N_CH": channel_count},
     )
-    # Two shafts, two washers, two brackets, two bracket foot screws,
-    # two pivot-arbor screws, two keepers, two keeper foot screws,
-    # two keeper crown screws and one wave spring.
-    fixed_count = 2 + 2 + 2 + 2 + 2 + 2 + 2 + 2 + 1
+    # Two shafts, two brackets, two bracket foot screws, two pivot-arbor
+    # screws, two keepers, two keeper foot screws and two keeper crown
+    # screws (#3114: no thrust washers, no bank spring).
+    fixed_count = 2 + 2 + 2 + 2 + 2 + 2 + 2
     expected = 8 * channel_count + fixed_count
     assert actual == (expected - 6, expected + 6)
 

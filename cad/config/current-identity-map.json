@@ -828,28 +828,6 @@
       ]
     },
     {
-      "old_stem": "vn-rocker-bank-spring",
-      "old_number": "MHA-VN-053",
-      "new_identities": [
-        {
-          "parent": "ch-channel",
-          "stem": "ch-vn-rocker-bank-spring",
-          "number": "MHA-CH-VN-54"
-        }
-      ]
-    },
-    {
-      "old_stem": "vn-rocker-thrust-washer",
-      "old_number": "MHA-VN-070",
-      "new_identities": [
-        {
-          "parent": "ch-channel",
-          "stem": "ch-vn-rocker-thrust-washer",
-          "number": "MHA-CH-VN-56"
-        }
-      ]
-    },
-    {
       "old_stem": "vn-slotted-screw",
       "old_number": "MHA-VN-019",
       "new_identities": [
@@ -3200,6 +3178,30 @@
           "parent": "pd-paper-drive",
           "stem": "pd-vn-transgear-disc-screw",
           "number": "MHA-PD-VN-55"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "vn-rocker-bank-spring",
+      "old_number": "MHA-VN-053",
+      "new_identities": [
+        {
+          "parent": "ch-channel",
+          "stem": "ch-vn-rocker-bank-spring",
+          "number": "MHA-CH-VN-54"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "vn-rocker-thrust-washer",
+      "old_number": "MHA-VN-070",
+      "new_identities": [
+        {
+          "parent": "ch-channel",
+          "stem": "ch-vn-rocker-thrust-washer",
+          "number": "MHA-CH-VN-56"
         }
       ],
       "status": "retired"
