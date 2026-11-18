@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 450" font-family="sans-serif" font-size="13">
+  <rect class="paper" x="0" y="0" width="760" height="450"/>
+  <text class="title" x="20" y="18">SP02, plan (fixed jaw at the top): everything on the top in one clamping</text>
+  <!-- Vise jaws, the plate centred on them. -->
+  <rect class="fixture-vise" x="211.5" y="30" width="317.4" height="30"/>
+  <rect class="fixture-vise" x="211.5" y="212.4" width="317.4" height="30"/>
+  <!-- The plate; this setup removes the plate top round the fence and stop,
+       the notches, pockets, counterbore and holes. -->
+  <rect class="part-kept" x="40" y="60" width="660" height="152.4"/>
+  <rect class="part-removed" x="65.4" y="85.4" width="634.6" height="127"/>
+  <rect class="part-removed" x="65.4" y="76.76" width="46.74" height="8.64"/>
+  <rect class="part-removed" x="628.26" y="76.76" width="71.74" height="8.64"/>
+  <rect class="holes" x="101.98" y="161.6" width="28.44" height="19.05"/>
+  <rect class="holes" x="267.08" y="161.6" width="28.44" height="19.05"/>
+  <rect class="holes" x="444.88" y="161.6" width="28.44" height="19.05"/>
+  <rect class="holes" x="609.98" y="161.6" width="28.44" height="19.05"/>
+  <circle class="part-threads" cx="116.2" cy="169.22" r="2.3"/>
+  <circle class="part-threads" cx="281.3" cy="169.22" r="2.3"/>
+  <circle class="part-threads" cx="459.1" cy="169.22" r="2.3"/>
+  <circle class="part-threads" cx="624.2" cy="169.22" r="2.3"/>
+  <circle class="holes" cx="370.2" cy="136.2" r="12.7"/>
+  <circle class="part-threads" cx="370.2" cy="136.2" r="5.1"/>
+  <circle class="cutter" cx="719" cy="205" r="12.7"/>
+  <line class="arrow" x1="700" y1="190" x2="90" y2="190"/>
+  <line class="datum" x1="65.4" y1="72" x2="65.4" y2="100"/>
+  <line class="datum" x1="52" y1="85.4" x2="80" y2="85.4"/>
+  <text class="datum-label" x="70" y="104">X0 Y0</text>
+  <text class="label-halo" x="150" y="76">fence, .074 above Z0</text>
+  <text class="label-halo" x="42" y="140">stop</text>
+  <text class="label-halo" x="400" y="140">counterbore .500 × .185, 1/4-20 thru</text>
+  <text class="label-halo" x="300" y="205">4 clamp pockets, 4-40 thru</text>
+  <text class="label-halo" x="66" y="74">notch</text>
+  <text class="label-halo" x="640" y="74">notch</text>
+  <!-- Section across the jaws: the plate on the stacked parallels. -->
+  <text class="title" x="20" y="290">Section across the jaws (front at the left)</text>
+  <rect class="fixture-vise" x="200" y="330.1" width="40" height="89.9"/>
+  <rect class="fixture-vise" x="392.4" y="330.1" width="40" height="89.9"/>
+  <rect class="fixture-support" x="240" y="343.8" width="12" height="76.2"/>
+  <rect class="fixture-support" x="380.4" y="343.8" width="12" height="76.2"/>
+  <polygon class="part-kept" points="240,343.8 240,322.67 367,322.67 367,318.91 392.4,318.91 392.4,343.8"/>
+  <polygon class="part-removed" points="240,318.15 392.4,318.15 392.4,318.91 367,318.91 367,322.67 240,322.67"/>
+  <line class="fixture-table" x1="180" y1="420" x2="460" y2="420"/>
+  <text class="label" x="450" y="330">Z0 .146 above the jaws</text>
+  <text class="label" x="450" y="350">1 in + 1/2 in parallels stacked</text>
+  <text class="label" x="450" y="370">plate gripped on its milled edges, .27 in the jaws</text>
+</svg>
