@@ -486,11 +486,16 @@ MAX_SUFFIX = " MAX"
 # places each (HUB_CALLOUT_PLACES).
 POCKET_COUNT = len(CLAMP_STATIONS)
 NOTCH_CORNER_COUNT = 3
+# Both fence notches share one back wall (the sketch's collinear back
+# walls), so their one depth is a 2X (machinist review r26: the right
+# notch's depth was given nowhere).
+NOTCH_COUNT = 2
 DIMENSION_PREFIXES: dict[tuple[str, str], str] = {
     ("PocketProfile", "PocketLength"): f"{POCKET_COUNT}X ",
     (SECTION_A_REFERENCE, "PocketDepth"): f"{POCKET_COUNT}X ",
     ("PocketCorners", "PocketCornerR"): f"{4 * POCKET_COUNT}X R",
     ("NotchCorners", "NotchCornerR"): f"{NOTCH_CORNER_COUNT}X R",
+    ("NotchProfile", "NotchDepth"): f"{NOTCH_COUNT}X ",
 }
 HUB_CALLOUT_PLACES = 3
 CLAMP_NUMBER = "TL-VN-50"

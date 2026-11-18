@@ -155,30 +155,33 @@ _RIGHT_X = top_xy(spec.RIGHT_END_X, 0.0)[0]
 _STATIONS = spec.CLAMP_STATIONS
 _FENCE_TOP_A = section_a_xy(0.0, spec.FENCE_HEIGHT)[1]
 _FENCE_TOP_B = section_b_xy(0.0, spec.FENCE_HEIGHT)[1]
-# Top view: X sizes from X0 in rows at least 8 mm apart, above (the left end
-# 12 mm over the back edge, the notch's end 20 mm, clear of the left end's
-# outside arrow at X0, beside the hub hole's callout; over its four rows the
-# notch start and the overall length) and below (clamp 1's text right of its
-# span, which is narrower than it; under the cutting lines' letters). Y sizes
-# from Y0 to the left in five lanes, a span inner to every span holding one
-# of its extension lines so no extension line crosses another's dimension
-# line: the notch depth innermost, 2 mm off the plate's left end, its text
-# under its span (over it the fence width's and overall width's extension
-# lines from the back corner); the fence width, its outside arrows clear of
-# the notch depth's and the hub's texts; the hub, its text centred in its
-# span; clamp 1's tap, its text high in its span, under the hub's text and
-# clear of its own lower arrow (machinist review mr5: centred between the
-# hub's and the tap's levels, the arrow ran through its '6'); the overall
-# width outermost, its text low in its span, under clamp 1's. The pocket
-# length on pocket 2 over the back edge, its text left of its span under
-# the hub hole's callout (machinist review r24: inside the outline over
-# pocket 1 it was text on the part by convenience, rule 14); the radii
-# right of the plate, each leader running out level from its feature.
+# Top view: X sizes from X0 in rows at least 8 mm apart, above (the notch's
+# end 12 mm over the back edge, beside the hub hole's callout; over its four
+# rows the notch start and the overall length) and below (the left end 5 mm
+# under the front edge, its text left of its span, room the notch depth's 2X
+# text took from it over the back corner (machinist review r26); clamp 1's
+# text right of its span, which is narrower than it; under the cutting
+# lines' letters). Y sizes from Y0 to the left in five lanes, a span inner
+# to every span holding one of its extension lines so no extension line
+# crosses another's dimension line: the notch depth innermost, 2 mm off the
+# plate's left end, its text (2X: both notches) over its span above the
+# back corner's extension lines, where the hub's text leaves it room; the
+# fence width, its outside
+# arrows clear of the notch depth's and the hub's texts; the hub, its text
+# centred in its span; clamp 1's tap, its text high in its span, under the
+# hub's text and clear of its own lower arrow (machinist review mr5:
+# centred between the hub's and the tap's levels, the arrow ran through its
+# '6'); the overall width outermost, its text low in its span, under clamp
+# 1's. The pocket length on pocket 2 over the back edge, its text left of
+# its span under the hub hole's callout (machinist review r24: inside the
+# outline over pocket 1 it was text on the part by convenience, rule 14);
+# the radii right of the plate, each leader running out level from its
+# feature.
 TOP_KEEP: dict[str, tuple[float, float]] = {
     # Farm run r21: the notch start's (.92) outside dimension line ran into
     # the hub callout's drill row; it and the stock end drop under the
     # callout, and the callout and the two long rows rise over it.
-    "LeftEnd": (_LEFT_X - 0.007, _BACK_Y + 0.006),
+    "LeftEnd": (_LEFT_X - 0.008, _FRONT_Y - 0.005),
     "NotchLeftEnd": (top_xy(spec.NOTCH_LEFT_END / 2.0, 0.0)[0], _BACK_Y + 0.0122),
     "NotchRightStart": (top_xy(spec.NOTCH_RIGHT_START / 2.0, 0.0)[0], _BACK_Y + 0.039),
     "PlateLength": (
@@ -193,7 +196,7 @@ TOP_KEEP: dict[str, tuple[float, float]] = {
     "HubY": (_LEFT_X - 0.0275, top_xy(0.0, spec.HUB_Y / 2.0)[1]),
     "FenceWidth": (_LEFT_X - 0.013, top_xy(0.0, spec.BACK_EDGE_Y / 2.0)[1]),
     "ClampTapY": (_LEFT_X - 0.045, top_xy(0.0, spec.HUB_Y)[1] - 0.0013),
-    "NotchDepth": (_LEFT_X - 0.002, top_xy(0.0, 0.0)[1] - 0.0045),
+    "NotchDepth": (_LEFT_X - 0.002, _BACK_Y + 0.0076),
     "PlateWidth": (_LEFT_X - 0.055, _FRONT_Y + 0.00675),
     "PocketLength": (
         top_xy(_STATIONS[1] - spec.POCKET_LENGTH / 2.0, 0.0)[0] - 0.0113,

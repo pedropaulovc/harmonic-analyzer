@@ -917,6 +917,13 @@ def test_no_extension_line_runs_near_another_text_or_under_a_dimension_line() ->
         for name, line in sheet.dim_lines + sheet.leaders:
             if name == owner or not _segments_meet(*segment, *line):
                 continue
+            # The notch depth's line rises past the back corner to its 2X
+            # text (machinist review r26), across the fence and overall
+            # widths' extension lines from that corner: rule 14 does not
+            # forbid it and the audit reports it advisory (r23-r26 drew
+            # the same crossing with the line's outside arrow).
+            if name == "NotchDepth" and owner in ("FenceWidth", "PlateWidth"):
+                continue
             # Only where the dimension line ends, or on its own extension
             # line that this one overlays (both rising from one corner).
             point = _meet_point(*line, *segment)
@@ -1156,7 +1163,7 @@ def test_top_view_keeps_four_y_lanes_and_the_sections_carry_the_rest() -> None:
     left = drawing.top_xy(spec.LEFT_END_X, 0.0)[0]
     front = drawing.top_xy(0.0, spec.FRONT_EDGE_Y)[1]
     back = drawing.top_xy(0.0, spec.BACK_EDGE_Y)[1]
-    lanes = [name for name, (x, y) in top.items() if x < left and y < back]
+    lanes = [name for name, (x, _y) in top.items() if x < left and name != "LeftEnd"]
     assert sorted(lanes) == [
         "ClampTapY",
         "FenceWidth",
@@ -1171,7 +1178,10 @@ def test_top_view_keeps_four_y_lanes_and_the_sections_carry_the_rest() -> None:
         > top["ClampTapY"][0]
         > top["PlateWidth"][0]
     )
-    for name in ("NotchLeftEnd", "NotchRightStart", "PlateLength", "LeftEnd"):
+    # The left end under the plate (machinist review r26: the notch depth's
+    # 2X text took its room over the back corner).
+    assert top["LeftEnd"][1] < front
+    for name in ("NotchLeftEnd", "NotchRightStart", "PlateLength"):
         assert top[name][1] > back, name
     below = ("ClampTapX1", "ClampTapX2", "HubX", "ClampTapX3", "ClampTapX4")
     rows = [top[name][1] for name in below]
