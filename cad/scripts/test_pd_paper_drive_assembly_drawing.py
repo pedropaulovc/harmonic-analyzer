@@ -1619,7 +1619,7 @@ def test_the_fitted_collar_rear_face_reacts_on_the_actual_gear_shoulder() -> Non
     ) in faced
     seated = _step_body("collar-shoulder-seated")
     assert "COLLAR ON THE SHAFT, ITS PIN ON THE D-FLAT" in seated
-    assert f"{_number('pd-transgear-knob-shaft')} 15T FRONT FACE" in seated
+    assert f"{_number('pd-transgear-knob-shaft')} PINION'S FRONT FACE" in seated
     assert "ON THE DRIVE DOWELS" in seated
     assert collar.BODY_REAR_FACE_FROM_F == 0.0
     assert collar.LENGTH_FITTED_MIN <= collar.LENGTH <= collar.LENGTH_FITTED_MAX

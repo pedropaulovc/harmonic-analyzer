@@ -630,9 +630,8 @@ KNOB_SETTING_PIVOT_LINES = (
 # Rule 4: the S-N band is the knob pinion's centre distance on the disc, so
 # the key names that mesh (two lines, to stay left of the circle).
 KNOB_SETTING_MESH_LINES = (
-    f"S-{KNOB_BORE_LETTER} SETS {_config.parts('pd-transgear-knob-shaft')['number']} "
-    f"{knob_shaft.TEETH}T",
-    f"TO {_config.parts('pd-rack-pinion')['number']} {disc.TEETH}T MESH",
+    f"S-{KNOB_BORE_LETTER} SETS {_config.parts('pd-transgear-knob-shaft')['number']} TO",
+    f"{_config.parts('pd-rack-pinion')['number']} DISC MESH",
 )
 # The caption is the detail's own label, scale and step (rule 9); a DETAIL
 # enlarges its parent's circle as that view sees it (the sheet 1 front view's
@@ -1709,6 +1708,10 @@ def _scale_text(scale: tuple[float, float]) -> str:
 # --- sheet wording ---------------------------------------------------------------
 _N = BOM_PART_NUMBERS
 KNOB_TEETH = knob_shaft.TEETH
+# The knob shaft's gear named in words (rule 26): a coined "15T" read as
+# Detail K's tap label T (machinist review of 7d151d7f13, r1 and r3). The
+# sleeve is the BOM's feed part, so PINION alone is the knob shaft's gear.
+KNOB_PINION = "PINION"
 # The knob's end float: the cup set on a feeler END_FLOAT behind the plate's
 # boss and pinned there (R9-70, K-1), accepted at the feeler's own band.
 KNOB_END_FLOAT_RANGE = (
@@ -1800,8 +1803,8 @@ def reducer_dial_check(held: str) -> str:
         f"CHECK: {held} PRESSED LIGHTLY TOWARD THE DISC AND HELD, THE DISC "
         "PRESSED LIGHTLY TOWARD IT AND ROCKED BY HAND SHAKES "
         f"{REDUCER_BACKLASH_DIAL_TEXT} ON A DIAL INDICATOR ON A MAGNETIC BASE, ITS PLUNGER TANGENT "
-        "ON THE FLANK, AT THE TIP, OF THE DISC TOOTH NEXT TO THE "
-        f"{knob_shaft.TEETH}T, AT {REDUCER_DIAL_STATIONS} PLACES "
+        "ON THE FLANK, AT THE TIP, OF THE DISC TOOTH IN MESH, "
+        f"AT {REDUCER_DIAL_STATIONS} PLACES "
         f"{360 // REDUCER_DIAL_STATIONS}\u00b0 APART ROUND THE DISC "
         f"{row_cite('reducer-shake')}."
     )
@@ -2039,7 +2042,7 @@ def _step_text(
     # the window) is replaced.
     lock_gap_target = steps.inch_text(sum(platen_guide.LOCK_GAP_FIT) / 2.0, 3)
     after_lock_seats = steps.SEQUENCE[steps.SEQUENCE.index("lock-seats-faced") + 1]
-    teeth = f"{KNOB_TEETH}T"
+    teeth = KNOB_PINION
     knob = sprocket_name(sprocket.KNOB_CONFIG)
     crank = sprocket_name(sprocket.CRANK_CONFIG)
     knob_short = sprocket_name(sprocket.KNOB_CONFIG, numbered=False)
@@ -2312,7 +2315,7 @@ def _step_text(
             "REARWARD, ON THE PIN.",
             f"PASS THE {n['pd-transgear-knob-shaft']} SHAFT THROUGH THE LOOSE "
             f"{n['pd-transgear-knob-thrust-ring']} RING INTO THE PLATE BORE FROM "
-            f"THE FRONT, ITS {teeth} IN MESH WITH THE DISC.",
+            "THE FRONT, MESHING WITH THE DISC.",
             "CHECK: TURNED BY THE SHAFT, THE DISC RUNS ONE FULL TURN WITH NO TIGHT "
             "SPOT.",
             reducer_dial_check("SHAFT"),
@@ -2804,7 +2807,7 @@ def _step_text(
             f"FIT THE {knob}, HELD BACK ON ITS SEAT.",
             f"FIT THE {n['pd-transgear-thumbnut']} THUMBNUT FINGER-TIGHT.",
             "TURN THE DISC UNTIL, ON THE LINE THROUGH THE KNOB AND DISC AXES, "
-            f"A {disc.TEETH}T TOOTH STANDS CENTRED IN A {teeth} GAP WITHIN {clock} "
+            f"A DISC TOOTH STANDS CENTRED IN A {teeth} GAP WITHIN {clock} "
             "AT THE PITCH CIRCLE, READ WITH A TEST INDICATOR ON A GAUGE PIN IN "
             f"THE GAP {row_cite('tooth-centred')}.",
             "CHECK: TURNED BY THE COLLAR, THE KNOB RUNS WITH NO TIGHT SPOT.",
@@ -2854,7 +2857,7 @@ def _step_text(
             f"{steps.step_number('disc-screws-cut')}, "
             f"{steps.step_number('disc-cluster-hung')}-"
             f"{steps.step_number('disc-cluster-shimmed')} AND FROM STEP {pose}.",
-            f"FOR A LOOSE PLATE OR A FAULT EVERY KNOB TURN (A {teeth} TOOTH), "
+            "FOR A LOOSE PLATE OR A FAULT EVERY KNOB TURN (A PINION TOOTH), "
             f"{knob_pin_out[0]}",
             knob_pin_out[1],
             f"REFIT A LOOSE PLATE AS {s('arm-plate-fitted', 18)}.",
@@ -2886,7 +2889,7 @@ def _step_text(
         ),
         "collar-rear-faced-to-fit": (
             f"IN STEP {pose}'S POSE, {held_back}, FIT THE COLLAR, ITS REAR FACE ON "
-            f"THE {n['pd-transgear-knob-shaft']} {teeth} FRONT FACE.",
+            f"THE {n['pd-transgear-knob-shaft']} {teeth}'S FRONT FACE.",
             f"READ THE {knob_short}'S FRONT FACE AGAINST THE {crank}'S FRONT FACE WITH A "
             "STRAIGHTEDGE ACROSS BOTH AND FEELERS.",
             "REMOVE THE COLLAR.",
@@ -2905,7 +2908,7 @@ def _step_text(
         "collar-shoulder-seated": (
             f"SEAT THE {n['pd-transgear-drive-collar']} COLLAR ON THE SHAFT, ITS PIN ON "
             "THE D-FLAT, "
-            f"ITS REAR FACE ON THE {n['pd-transgear-knob-shaft']} {teeth} FRONT "
+            f"ITS REAR FACE ON THE {n['pd-transgear-knob-shaft']} {teeth}'S FRONT "
             "FACE.",
             f"FIT THE {knob} ON THE DRIVE DOWELS.",
             f"TIGHTEN THE {n['pd-transgear-thumbnut']} THUMBNUT BY HAND ON THE "
@@ -3114,7 +3117,7 @@ def setting_table_rows(
         "reducer-shake": (
             f"{s('arm-plate-located', 13)}, {s('arm-plate-fitted', 20)}, "
             f"{s('fitup-pose-set', 9)}",
-            f"DISC SHAKE AT THE TOOTH TIP NEXT TO THE {KNOB_TEETH}T",
+            "DISC SHAKE AT THE TIP OF THE TOOTH IN MESH",
             f"VISIBLY, AT MOST {steps.inch_text(REDUCER_SHAKE_MAX_MM, 3)}",
             f"DIAL INDICATOR, {REDUCER_DIAL_STATIONS} PLACES",
         ),
@@ -3168,7 +3171,7 @@ def setting_table_rows(
         ),
         "tooth-centred": (
             s("fitup-pose-set", 6),
-            f"{disc.TEETH}T TOOTH IN A {KNOB_TEETH}T GAP, AT THE PITCH CIRCLE",
+            f"DISC TOOTH IN A {KNOB_PINION} GAP, AT THE PITCH CIRCLE",
             f"CENTRED WITHIN {REDUCER_CLOCK_TEXT}",
             "TEST INDICATOR, GAUGE PIN",
         ),
