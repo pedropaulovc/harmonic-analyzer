@@ -334,6 +334,11 @@ feed = "hand"
 [[setups.operations]]
 steps = [
   { kind = "action", text = "First blank only, before it goes in: prove RS01–RS04 in air. Edge finder out; console M6 T1 (measured on the tool setter); on the .200 block: G10 L20 P1 Z-.800 (Z0 1.000 high). Run each file single block through its first plunges. Then M6 T1 and G10 L20 P1 Z.200 on the block again." },
+]
+feed = "hand"
+
+[[setups.operations]]
+steps = [
   { kind = "check", text = "Calipers' depth rod: clamp noses, fence and end-stop tops each ≤ {{process.fence_height_mm:in.3dot}} above the plate." },
   { kind = "stop", text = "Over: no blank goes in. Reseat the clamp, or bring the fence or end stop to its drawing height, and check again." },
 ]
