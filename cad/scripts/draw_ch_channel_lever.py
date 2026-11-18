@@ -55,6 +55,7 @@ from _drawing_dimensions import (
     set_reference_dimension,
 )
 from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
+from _drawing_edges import visible_view_entities
 from _drawing_finish import add_surface_finish
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_leaders import set_near_side_diameter
@@ -80,7 +81,9 @@ from ch_channel_lever_spec import (
     PIVOT_HOLE_DIA,
     SPRING_EYE_HOLE_SPEC,
     SURFACE_FINISHES,
+    TIP_ARC_CX,
     TIP_END_X,
+    TIP_RADIUS,
 )
 from ch_fulcrum_shaft_spec import SHAFT_DIA, SHAFT_DIA_BAND
 
@@ -171,6 +174,38 @@ def _add_bar_centerline(adapter: Any, view: Any) -> None:
     count = int(_early_bound(view, "IView").GetCenterLineCount())
     if count != 1:
         raise RuntimeError(f"front view carries {count} centrelines, expected 1")
+
+
+@_telemetry.traced("drawing.channel_lever.tip_arc_edge")
+def _tip_arc_edge(view: Any) -> Any:
+    """The front view's full-round tip arc, as a part edge.
+
+    Matched on the part's own geometry (centre and radius, part millimetres),
+    not a sheet pick: the tapered tip is concentric with the #21 hole and only
+    1.79 mm outside its rim, so a pick on the tip's extreme hit-tests the hole
+    (#3113 first farm run: 183.038 for 184.829). The plate's two faces each
+    carry the arc; the near face's (largest z) is taken.
+    """
+    matches: list[tuple[float, Any]] = []
+    for raw_edge in visible_view_entities(view, 1, label="channel lever front arcs"):
+        curve = _early_bound(raw_edge, "IEdge").GetCurve()
+        if curve is None:
+            continue
+        curve = _early_bound(curve, "ICurve")
+        if not curve.IsCircle():
+            continue
+        params = tuple(float(value) for value in curve.CircleParams)
+        cx, cy, cz = (value * 1000.0 for value in params[:3])
+        radius = params[6] * 1000.0
+        if (
+            abs(cx - TIP_ARC_CX) <= 1e-3
+            and abs(cy) <= 1e-3
+            and abs(radius - TIP_RADIUS) <= 1e-3
+        ):
+            matches.append((cz, raw_edge))
+    if not matches:
+        raise RuntimeError("front view shows no full-round tip arc")
+    return max(matches, key=lambda item: item[0])[1]
 
 
 def _sheet_x(mx: float) -> float:
@@ -372,9 +407,10 @@ def build(adapter: Any) -> dict[str, str]:
 
     # Overall length over the hub and the full-round tip, for the stock cut:
     # a reference (the hub, the spring-hole location and the bar's full round
-    # set it).  Both ends are arcs in the front view, each picked on its
-    # extreme and re-anchored to it (a horizontal arc pick resolves to the
-    # centre by default and would read the 175.05 spring arm).
+    # set it).  Both ends are arcs in the front view, each re-anchored to its
+    # extreme (a horizontal arc pick resolves to the centre by default and
+    # would read the 175.05 spring arm). The hub is picked on its extreme; the
+    # tip is selected as its own edge (see _tip_arc_edge).
     hub_end, tip_end = (
         model_point_in_view(adapter, front, (x / 1000.0, 0.0, 0.0), label=label)
         for x, label in ((-_HUB_R, "hub extreme"), (TIP_END_X, "tip extreme"))
@@ -387,11 +423,12 @@ def build(adapter: Any) -> dict[str, str]:
         text_xy=OVERALL_TEXT_XY,
         label="overall length",
         orientation="horizontal",
+        entities=(None, _tip_arc_edge(front)),
     )
     set_arc_endpoints_to_max(adapter, overall, label="overall length")
-    # Value-only: both picks are arcs the recipe locates by coordinate, and
-    # the far-extreme sum is the one value either centre-anchored mistake
-    # (175.05, 181.05, 180.55) cannot produce.
+    # Value-only: the far-extreme sum is the one value a centre-anchored
+    # mistake (175.05, 181.02, 178.86) or the concentric #21 hole's rim
+    # (183.04) cannot produce.
     assert_dimension_measures(
         adapter, overall, expected_mm=_HUB_R + TIP_END_X, label="overall length"
     )
