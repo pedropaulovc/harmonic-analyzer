@@ -275,6 +275,109 @@ def test_every_marked_dimension_prints_once_on_the_sheet_in_bounds() -> None:
         assert not (x > TITLE_BLOCK[0] and y < TITLE_BLOCK[1] + 0.006), (x, y)
 
 
+# Farm run 20261118T000915664Z's layout audit, in sheet mm relative to what
+# placed each item (the sections and the callout points have not moved since):
+# each section caption's box from its section's origin; each hole callout's
+# leader end from its callout point (the text's lower left, about half the
+# text's width left of the point); NotchCornerR's shoulder from its text point.
+_CAPTION_A = ((4.6, 50.0), (-31.4, -25.0))
+_CAPTION_B = ((-21.9, 21.8), (-31.4, -24.9))
+_CLAMP_LEADER_END = (-26.6, -5.6)
+_HUB_LEADER_END = (-34.0, -8.4)
+_NOTCH_R_SHOULDER = (-15.7, 14.0)
+
+
+def _mm(point: tuple[float, float]) -> tuple[float, float]:
+    return (point[0] * 1000.0, point[1] * 1000.0)
+
+
+def _box(origin_m, offsets):
+    (x0, x1), (y0, y1) = offsets
+    ox, oy = _mm(origin_m)
+    return (ox + x0, oy + y0, ox + x1, oy + y1)
+
+
+def _segment_hits_box(a, b, box, margin=1.0) -> bool:
+    """Whether segment a-b enters ``box`` (x0, y0, x1, y1) grown by ``margin``."""
+    x0, y0, x1, y1 = box[0] - margin, box[1] - margin, box[2] + margin, box[3] + margin
+    steps = 400
+    for i in range(steps + 1):
+        t = i / steps
+        x, y = a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t
+        if x0 <= x <= x1 and y0 <= y <= y1:
+            return True
+    return False
+
+
+def _leader(wall_xy_m, callout_xy_m, end_offset):
+    end = _mm(callout_xy_m)
+    return _mm(wall_xy_m), (end[0] + end_offset[0], end[1] + end_offset[1])
+
+
+def test_tap_callout_leaders_run_clear_of_the_section_captions() -> None:
+    """r5: both leaders ran through their section's caption."""
+    clamp_wall = drawing.section_a_xy(drawing.CLAMP_TAP_EDGE_MODEL[0], spec.UNDERSIDE_Z)
+    hub_wall = drawing.section_b_xy(drawing.HUB_TAP_EDGE_MODEL[0], spec.UNDERSIDE_Z)
+    caption_a = _box(drawing.SECTION_A_ORIGIN, _CAPTION_A)
+    caption_b = _box(drawing.SECTION_B_ORIGIN, _CAPTION_B)
+    # The r5 placements reproduce the audit's findings (the check bites).
+    assert _segment_hits_box(
+        *_leader(clamp_wall, (0.150, 0.078), _CLAMP_LEADER_END), caption_a
+    )
+    assert _segment_hits_box(
+        *_leader(hub_wall, (0.360, 0.088), _HUB_LEADER_END), caption_b
+    )
+    clamp = _leader(clamp_wall, drawing.CLAMP_TAP_CALLOUT_XY, _CLAMP_LEADER_END)
+    hub = _leader(hub_wall, drawing.HUB_TAP_CALLOUT_XY, _HUB_LEADER_END)
+    for leader in (clamp, hub):
+        for caption in (caption_a, caption_b):
+            assert not _segment_hits_box(*leader, caption), (leader, caption)
+    # Each text (about twice its half width) stays inside the border and off
+    # the title block, and starts right of its drill wall.
+    for (start, end), half in (
+        (clamp, -_CLAMP_LEADER_END[0]),
+        (hub, -_HUB_LEADER_END[0]),
+    ):
+        assert end[0] > start[0]
+        assert end[0] + 2.0 * half < BORDER[2] * 1000.0 - 2.0
+        assert (
+            end[1] > TITLE_BLOCK[1] * 1000.0
+            or end[0] + 2.0 * half < TITLE_BLOCK[0] * 1000.0
+        )
+    # The clamp text's top (as far above its point as the leader end is
+    # below) stays under section A-A; the hub text starts right of B-B.
+    section_a_bottom = drawing.section_a_xy(0.0, spec.UNDERSIDE_Z)[1] * 1000.0
+    assert (
+        drawing.CLAMP_TAP_CALLOUT_XY[1] * 1000.0 - _CLAMP_LEADER_END[1]
+        < section_a_bottom
+    )
+    section_b_right = drawing.section_b_xy(drawing.SECTION_B_SPAN[1], 0.0)[0] * 1000.0
+    assert hub[1][0] > section_b_right + 5.0
+
+
+def test_notch_radius_shoulder_clears_the_overall_length_extension() -> None:
+    """r5: the shoulder at the back edge +4 mm crossed PlateLength's
+    extension line, which rises from the plate's right end at the back edge."""
+    right = drawing.top_xy(spec.RIGHT_END_X, 0.0)[0] * 1000.0
+    back = drawing.top_xy(0.0, spec.BACK_EDGE_Y)[1] * 1000.0
+
+    def crosses(text_xy_m) -> bool:
+        x, y = _mm(text_xy_m)
+        left, right_end = x + _NOTCH_R_SHOULDER[0], x + _NOTCH_R_SHOULDER[1]
+        return left - 1.0 <= right <= right_end + 1.0 and y >= back - 1.0
+
+    assert crosses(
+        (drawing.top_xy(spec.RIGHT_END_X, 0.0)[0] + 0.014, back / 1000.0 + 0.004)
+    )
+    keep = drawing.TOP_KEEP["NotchCornerR"]
+    assert not crosses(keep)
+    # The text sits in the open right notch's band, right of the plate's end.
+    assert (
+        drawing.top_xy(0.0, 0.0)[1] < keep[1] < drawing.top_xy(0.0, spec.NOTCH_DEPTH)[1]
+    )
+    assert keep[0] * 1000.0 + _NOTCH_R_SHOULDER[0] > right
+
+
 def test_top_view_stacks_x_above_and_below_and_y_to_the_left() -> None:
     top = drawing.TOP_KEEP
     left = drawing.top_xy(spec.LEFT_END_X, 0.0)[0]

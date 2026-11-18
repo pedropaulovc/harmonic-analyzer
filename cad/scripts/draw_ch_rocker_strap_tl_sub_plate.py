@@ -151,7 +151,11 @@ TOP_KEEP: dict[str, tuple[float, float]] = {
     ),
     "PocketLength": (top_xy(_STATIONS[3], 0.0)[0] + 0.012, _FRONT_Y - 0.004),
     "PocketCornerR": (top_xy(_STATIONS[0], 0.0)[0] + 0.012, _FRONT_Y - 0.004),
-    "NotchCornerR": (_RIGHT_X + 0.014, _BACK_Y + 0.004),
+    # In the open right notch's band, right of the plate's end: the leader
+    # leaves the corner through the notch and the shoulder stays below where
+    # PlateLength's extension line starts (the back edge). Farm run
+    # 20261118T000915664Z: at the back edge +4 mm the shoulder crossed it.
+    "NotchCornerR": (_RIGHT_X + 0.022, top_xy(0.0, spec.NOTCH_DEPTH / 2.0)[1]),
     "HubCboreDia": (top_xy(spec.HUB_X, 0.0)[0] + 0.025, _FRONT_Y - 0.004),
 }
 # Section A-A: the fence height right of the stop face over the floor, the
@@ -179,19 +183,24 @@ SECTION_B_KEEP: dict[str, tuple[float, float]] = {
         section_b_xy(0.0, spec.COUNTERBORE_FLOOR_Z / 2.0)[1],
     ),
 }
-# The taps' callouts below right of each section, clear of the title block.
+# The taps' callouts right of their drill walls, so each leader runs away
+# from its section's caption (centred under the view): farm run
+# 20261118T000915664Z put both texts left of or over the caption and both
+# leaders ran through "SECTION A-A" / "SECTION B-B". The clamp callout's text
+# starts right of the wall below section A-A; the hub callout's rises from
+# the wall's foot to the right of section B-B, above its caption.
 CLAMP_TAP_EDGE_MODEL = (
     _STATIONS[0] + spec.CLAMP_TAP_DRILL / 2.0,
     spec.CLAMP_SCREW_Y,
     (spec.POCKET_FLOOR_Z + spec.UNDERSIDE_Z) / 2.0,
 )
-CLAMP_TAP_CALLOUT_XY = (0.150, 0.078)
+CLAMP_TAP_CALLOUT_XY = (0.180, 0.074)
 HUB_TAP_EDGE_MODEL = (
     spec.HUB_X + spec.HUB_TAP_DRILL / 2.0,
     spec.HUB_Y,
     (spec.COUNTERBORE_FLOOR_Z + spec.UNDERSIDE_Z) / 2.0,
 )
-HUB_TAP_CALLOUT_XY = (0.360, 0.088)
+HUB_TAP_CALLOUT_XY = (0.372, 0.100)
 
 
 def sheet_dimension_names() -> set[str]:
