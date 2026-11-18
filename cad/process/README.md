@@ -118,9 +118,10 @@ Facts prechips has no field for, but which CAD specs and tests read, live in
   cut for now (empty when its part is retired or none was named).
   `uv run --frozen python cad/scripts/stock_bom.py [--format md|csv]` joins
   these rows to the part registry: one line per made part with its stock and
-  status (`no_stock_record` when no row serves it, `vendor_sku` for reworked
-  bought hardware), then the unallocated rows. It exits 2 when a row names an
-  unknown or purchased stem;
+  the worst status of its rows (`no_stock_record` when no row serves it,
+  `vendor_sku` for reworked bought hardware), then the unallocated rows. It
+  exits 2 when a row names an unknown or purchased stem, and
+  `test_stock_bom.py` (`check:recipe`) runs that check on every change;
 - the MHA-FR-02 top-frame casting to buy (owner ruling 2026-11-10 (Pedro),
   #2333): a gray-iron ASTM A48 class 25B `[[stock]]` row of form `casting`,
   with its pattern, datum-target and as-cast mass notes; not quoted or ordered;

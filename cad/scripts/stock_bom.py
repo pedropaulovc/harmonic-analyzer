@@ -5,9 +5,10 @@ A part is made in the shop when its registry row's ``process`` does not start
 with ``purchased`` (cad/config/parts/*.yaml through ``_config.parts``). A
 ``[[stock]]`` row serves the parts named in its ``allocated_to``; its ``status``
 says whether that stock is on hand, bought but not received, or still to
-order. A made part with no allocated row reads ``vendor_sku`` when its registry
-row names supplier SKUs (bought hardware reworked in the shop), otherwise
-``no_stock_record``.
+order. Rows allocated to one part are complementary (a cone gear takes brass
+and bronze), so the part reads the worst of their statuses. A made part with no
+allocated row reads ``vendor_sku`` when its registry row names supplier SKUs
+(bought hardware reworked in the shop), otherwise ``no_stock_record``.
 
 Usage:
     uv run --frozen python cad/scripts/stock_bom.py [--format md|csv] [--out PATH]
@@ -30,6 +31,7 @@ from fractions import Fraction
 from pathlib import Path
 
 import _config
+import _telemetry
 from _paths import CAD_ROOT
 
 SHOP_EQUIPMENT = CAD_ROOT / "config" / "shop-equipment.toml"
@@ -43,7 +45,7 @@ class StockStatus(enum.Enum):
 
 
 class PartStockStatus(enum.Enum):
-    """A part's stock state; declaration order is precedence (best first)."""
+    """A part's stock state; declaration order runs from complete to missing."""
 
     ON_HAND = "on_hand"
     NOT_RECEIVED = "not_received"
@@ -150,7 +152,7 @@ def _part_status(
 ) -> PartStockStatus:
     if stock:
         statuses = (PartStockStatus(row.status.value) for row in stock)
-        return min(statuses, key=list(PartStockStatus).index)
+        return max(statuses, key=list(PartStockStatus).index)
     if supplier_skus:
         return PartStockStatus.VENDOR_SKU
     return PartStockStatus.NO_STOCK_RECORD
@@ -249,7 +251,8 @@ def render_markdown(lines: list[BomLine], stock: list[StockRow]) -> str:
     return out.getvalue()
 
 
-def render_csv(lines: list[BomLine]) -> str:
+def render_csv(lines: list[BomLine], stock: list[StockRow]) -> str:
+    """Part lines, then each unallocated row with an empty part column."""
     out = io.StringIO()
     writer = csv.writer(out, lineterminator="\n")
     writer.writerow(
@@ -267,6 +270,12 @@ def render_csv(lines: list[BomLine]) -> str:
                 _stock_cell(line),
             ]
         )
+    for row in stock:
+        if row.allocated_to:
+            continue
+        writer.writerow(
+            ["", "", "", "", row.status.value, "", f"#{row.index} {row.description}"]
+        )
     return out.getvalue()
 
 
@@ -280,10 +289,13 @@ def main(argv: list[str] | None = None) -> int:
         stock = load_stock()
         lines = build_bom(_config.parts(), stock)
     except InventoryError as exc:
-        print(f"stock_bom: {exc}", file=sys.stderr)
+        _telemetry.error(f"stock_bom: {exc}")
         return 2
 
-    text = render_markdown(lines, stock) if args.format == "md" else render_csv(lines)
+    if args.format == "md":
+        text = render_markdown(lines, stock)
+    else:
+        text = render_csv(lines, stock)
     if args.out is None:
         sys.stdout.write(text)
         return 0

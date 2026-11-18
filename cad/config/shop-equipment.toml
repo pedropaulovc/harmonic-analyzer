@@ -884,12 +884,12 @@ cite = ["Online Metals order 1021751700 confirmation (PO harmonic-analyzer-02, 2
 [[stock]]
 form = "flat_bar"
 material = "6061-T6511 aluminium"
-note = "Bought (Online Metals order 1021704672, 2026-10-23): part 1173, 1/2 x 6 in rectangle 6061-T6511, 1 x 72 in, $201.74; no item notes on that order. Owned OnlineMetals 1173, 1/2 x 6 in, 54 in left of the original 72 in (owner-reported 2026-11-02). It was allocated to the TL-21 carrier and one TL-20 base bar (owner ruling #2083, 2026-10-30); both are deleted with the oblique jig (owner 2026-11-17), so the bar is free. Purchased nominal dimensions are not receipt measurements."
+note = "Bought (Online Metals order 1021704672, 2026-10-23): part 1173, 1/2 x 6 in rectangle 6061-T6511, 1 x 72 in, $201.74; no item notes on that order. Owned OnlineMetals 1173, 1/2 x 6 in, 54 in left of the original 72 in (owner-reported 2026-11-02). It was allocated to the TL-21 carrier and one TL-20 base bar (owner ruling #2083, 2026-10-30); both are deleted with the oblique jig (owner 2026-11-17). Now allocated to MHA-CH-13-TL-01 ch-rocker-strap-tl-sub-plate, one 13 in length (its registry process); the rest is free. Purchased nominal dimensions are not receipt measurements."
 section_mm = [152.4, 12.7]
 # length_mm: the 54 in left (owner-reported 2026-11-02); 72 in was bought.
 length_mm = 1371.6
 status = "on_hand"
-allocated_to = []
+allocated_to = ["ch-rocker-strap-tl-sub-plate"]
 cite = ["Online Metals order 1021704672 confirmation (2026-10-23), part 1173, 72 in x 1, $201.74", "Owner-reported purchased stock and allocation, oblique jig simplification 2026-10-23; OnlineMetals 1173", "https://github.com/pedropaulovc/harmonic-analyzer/issues/2083"]
 
 [[stock]]
@@ -994,11 +994,11 @@ cite = ["Online Metals order 1021751700 confirmation (PO harmonic-analyzer-02, 2
 [[stock]]
 form = "flat_bar"
 material = "1018 cold-finish carbon steel"
-note = "Bought (Online Metals order 1021751700, PO harmonic-analyzer-02, 2026-11-03): part 19714, 5/16 x 1 in rectangle 1018 CF, 1 x 12 in, $6.92. Item notes: Drawing Number: MHA-PD-18 | Custom Part: pd-transgear-arm."
+note = "Bought (Online Metals order 1021751700, PO harmonic-analyzer-02, 2026-11-03): part 19714, 5/16 x 1 in rectangle 1018 CF, 1 x 12 in, $6.92. Item notes: Drawing Number: MHA-PD-18 | Custom Part: pd-transgear-arm. Not the arm's stock now: pd-transgear-arm is sawn from McMaster 9517K466 precision-ground flat with its faces as supplied (registry process, pd_transgear_arm_geometry.STOCK_SKU), a row below; this CF bar is free."
 section_mm = [25.4, 7.9375]
 length_mm = 304.8
 status = "on_hand"
-allocated_to = ["pd-transgear-arm"]
+allocated_to = []
 cite = ["Online Metals order 1021751700 confirmation (PO harmonic-analyzer-02, 2026-11-03), part 19714, 12 in x 1, $6.92 each"]
 
 [[stock]]
@@ -1034,11 +1034,11 @@ cite = ["Online Metals order 1021751700 confirmation (PO harmonic-analyzer-02, 2
 [[stock]]
 form = "round_bar"
 material = "1018 cold-finish carbon steel"
-note = "Bought (Online Metals order 1021751700, PO harmonic-analyzer-02, 2026-11-03): part 4792, 3/8 in round 1018 CF, 1 x 36 in, $4.60. Item notes: Drawing Number: MHA-DT-13, MHA-CH-05 | Custom Part: dt-cylinder-gear-shaft, ch-pivot-shaft."
+note = "Bought (Online Metals order 1021751700, PO harmonic-analyzer-02, 2026-11-03): part 4792, 3/8 in round 1018 CF, 1 x 36 in, $4.60. Item notes: Drawing Number: MHA-DT-13, MHA-CH-05 | Custom Part: dt-cylinder-gear-shaft, ch-pivot-shaft. ch-pivot-shaft (MHA-CH-05) is now turned from Ø5/16 bar (registry process), so its share is not allocated here."
 dia_in = [0.375]
 length_in = [36]
 status = "on_hand"
-allocated_to = ["dt-cylinder-gear-shaft", "ch-pivot-shaft"]
+allocated_to = ["dt-cylinder-gear-shaft"]
 cite = ["Online Metals order 1021751700 confirmation (PO harmonic-analyzer-02, 2026-11-03), part 4792, 36 in x 1, $4.60 each"]
 
 [[stock]]
@@ -1175,11 +1175,11 @@ cite = ["Online Metals order 1021751700 confirmation (PO harmonic-analyzer-02, 2
 [[stock]]
 form = "round_bar"
 material = "C36000 free-machining brass (360-H02, extruded)"
-note = "Bought (Online Metals order 1021751700, PO harmonic-analyzer-02, 2026-11-03): part 1264, 5/8 in round C360, 1 x 4 in, $12.74. Item notes: Drawing Number: MHA-DT-34, MHA-PD-15 | Custom Part: dt-crank-handle-ferrule, pd-transgear-knob-thrust-ring."
+note = "Bought (Online Metals order 1021751700, PO harmonic-analyzer-02, 2026-11-03): part 1264, 5/8 in round C360, 1 x 4 in, $12.74. Item notes: Drawing Number: MHA-DT-34, MHA-PD-15 | Custom Part: dt-crank-handle-ferrule, pd-transgear-knob-thrust-ring. dt-crank-handle-ferrule (MHA-DT-34) now takes its OD as supplied from 9/16 rod (registry process, dt_crank_handle_ferrule_spec.STOCK_DIA), so its share is not allocated here."
 dia_in = [0.625]
 length_in = [4]
 status = "on_hand"
-allocated_to = ["dt-crank-handle-ferrule", "pd-transgear-knob-thrust-ring"]
+allocated_to = ["pd-transgear-knob-thrust-ring"]
 cite = ["Online Metals order 1021751700 confirmation (PO harmonic-analyzer-02, 2026-11-03), part 1264, 4 in x 1, $12.74 each"]
 
 [[stock]]
@@ -1389,6 +1389,15 @@ cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), li
 
 [[stock]]
 form = "flat_bar"
+material = "AISI 1018 cold-finished steel, precision ground"
+note = "To order: McMaster 9517K466, 5/16 x 1 in precision-ground flat, thickness +/-.001 as supplied; the faces are not machined (pd-transgear-arm registry process; pd_transgear_arm_geometry.STOCK_SKU and THICKNESS_BAND). Allocation: pd-transgear-arm (MHA-PD-18). Length and price not read. Not owned."
+section_mm = [25.4, 7.9375]
+status = "to_order"
+allocated_to = ["pd-transgear-arm"]
+cite = ["cad/config/parts/pd-transgear-arm.yaml process", "cad/scripts/pd_transgear_arm_geometry.py STOCK_SKU = \"9517K466\""]
+
+[[stock]]
+form = "flat_bar"
 material = "1018 cold-finish carbon steel"
 note = "To order: 3/8 x 1/2 in 1018 CF flat, 2 pieces x 12 in (standard length). Allocation: pd-platen-guide (MHA-PD-11), one rail per piece (10.62 long, both rails of the platen). The rail is .29 ±.01 tall (3/8 stock) by .40/.39 deep (1/2 stock): skim .042 off each of the top and bottom faces and .052 off each of the front and back faces, so opposite faces lose equal metal and the long thin rail does not bow from one-sided stress relief. The bottom face (the Ra 63 µin slide on MHA-PD-07) is cut in that skim. The nearer 5/16 x 1/2 section is not in OnlineMetals' 1018 CF rectangle-bar range (listing read 2026-11-10); the 1/4 x 2-1/2 bar cannot yield the section (#2408). Not owned."
 section_mm = [12.7, 9.525]
@@ -1571,20 +1580,6 @@ source = "owner 2026-11-17"
 use = "MHA-CH-13-TL-01 sub-plate: the hub screw's 1/4-20 hole through the counterbore floor"
 
 # --- MHA-CH-06-TL-24 riser (prechips plan, #2447) ---------------------------
-
-# The riser traveler (cad/process/ch_rocker_arm_tl_oblique_riser/plan.toml)
-# saws a 14.00 in blank from 1/4 x 1-3/4 in 6061 bar. TL-00 step 18F makes a
-# new riser if a groove is cut too deep, so two blanks are allowed for.
-[[stock]]
-form = "flat_bar"
-material = "6061-T6511 aluminium"
-note = "To order: 1/4 x 1-3/4 in 6061-T6511 extruded flat bar, at least 28.25 in. Allocation: MHA-CH-06-TL-24 riser, two 14.00 in blanks (the riser and a TL-00 step 18F replacement) with a 1/8 in kerf. The traveler calipers the bar and faces the top to .240 only when it is over .250 (stock .242-.258 by the cited tolerance), then mills the edges to 1.690. Vendor not chosen. Not owned."
-# Catalogue nominals 1/4 x 1-3/4 in = [44.45, 6.35] mm and 28.25 x 25.4 = 717.55 mm; not metrology.
-section_mm = [44.45, 6.35]
-length_mm = 717.55
-status = "to_order"
-allocated_to = []
-cite = ["thyssenkrupp Materials NA (materialsplus.com) ALREC00231 https://materialsplus.com/products/aluminum/6061/rectangular/0-250/1-750/buy/ALREC00231: 6061 rectangle .250 x 1.750, ASTM B221, thickness ±.008, width ±.014 (tolerance reference only; no vendor chosen)"]
 
 # Riser Setup 5 tools the shop has no record of owning: the HUB's 12 mm drill
 # and the 82° countersink for R1-R4's Ø.25 x 82° seats. Same keys as their
