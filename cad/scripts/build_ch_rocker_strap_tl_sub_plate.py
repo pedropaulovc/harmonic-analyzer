@@ -575,14 +575,14 @@ def _hub(adapter: Any, drive_jobs: list[tuple[str, str]], volume: float) -> floa
         raise RuntimeError(f"hub thread {created_name!r} not found")
     thread.Name = "HubThread"
     definition = _early_bound(thread.GetDefinition(), "ICosmeticThreadFeatureData")
-    # swCosmeticEndConditions_e.swEndConditionThrough = 2.
-    if (
-        spec.HUB_TAP_THREAD not in str(definition.Size)
-        or int(definition.EndCondition) != 2
-    ):
+    # swCosmeticEndConditions_e.swEndConditionThrough = 2. Size reads back
+    # empty on a seat (farm run r20), so the thread's identity is gated where
+    # it prints: the drawing checks the hub callout's resolved 1/4-20 row.
+    if int(definition.EndCondition) != 2:
         raise RuntimeError(
-            "hub thread did not read back as 1/4-20 THRU: "
-            f"{definition.Size!r}, {definition.EndCondition!r}"
+            "hub thread did not read back THRU: "
+            f"EndCondition {definition.EndCondition!r}, callout "
+            f"{definition.ThreadCallout!r}, diameter {definition.Diameter!r}"
         )
     return volume_check(adapter, "hub thread (cosmetic)", volume, _V_TOL)
 
