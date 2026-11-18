@@ -2496,7 +2496,7 @@ def _step_text(
             "CHECK: A HEX KEY BY HAND DOES NOT LOOSEN THE SCREW.",
             "CHECK: RAISED AND RELEASED, THE ARM FALLS FREELY.",
             f"IF ALL THREE CHECKS PASS, SKIP {s('hanger-pivoted', 10)}-"
-            f"{s('hanger-pivoted', 22)}.",
+            f"{s('hanger-pivoted', 20)}.",
             # The arm is captured on the shoulder between the head and the
             # pressed spacer, so the remedy takes the screw out first
             # (Codjiflo P3 on 93879abc87).
@@ -2506,23 +2506,24 @@ def _step_text(
             "CLEAN AND DEBURR THE SPACER END, BAR BACK FACE AND TAP MOUTH.",
             f"REPEAT {s('hanger-pivoted', 5)}-{s('hanger-pivoted', 8)}.",
             f"IF ALL THREE CHECKS NOW PASS, SKIP {s('hanger-pivoted', 16)}-"
-            f"{s('hanger-pivoted', 22)}.",
+            f"{s('hanger-pivoted', 20)}.",
             # #3107 (Codjiflo P3 on 3e6318a026, P2s on f92995b8e6): the
             # renewal runs once; a second failure sends the bar and the arm
             # to their sheets and closes every outcome, one action a step
             # (machinist review of 17c29c2192, rule 22).
             f"DO {s('hanger-pivoted', 10)}-{s('hanger-pivoted', 11)}.",
             "IF NOT YET RENEWED, REPEAT FROM "
-            f"{s('hanger-pivoted', 0)} WITH NEW SCREW AND SPACER.",
+            f"{s('hanger-pivoted', 0)} WITH A NEW {n['pd-vn-transgear-pivot-screw']} "
+            f"SCREW AND {n['pd-transgear-pivot-spacer']} SPACER.",
             f"IF ALREADY RENEWED, INSPECT THE {n['pd-support-bar']} BAR'S "
             f"TAP AND BACK FACE AND THE {n['pd-transgear-arm']} ARM'S BORE "
             "TO THEIR SHEETS.",
-            "FOR A BAR FOUND OUTSIDE, REMOVE THE LOCKS AND THE PLATEN.",
-            f"FOR THAT BAR, FIT A NEW {n['pd-support-bar']} BAR PER STEP "
-            f"{steps.step_number('bar-clamped')}.",
-            f"FOR THAT BAR, REPEAT {s('platen-hung', 9)}-{s('guide-locks-set', 3)} AND "
-            f"STEP {steps.step_number('lock-seats-faced')}, THEN FROM "
-            f"{s('hanger-pivoted', 0)}.",
+            # Codjiflo r2 on e8b4e199aa: a new bar renews everything built on
+            # it, so its route is the whole paper drive (Main's ruling), and
+            # an arm found outside with it is renewed in that rebuild.
+            f"FOR A BAR FOUND OUTSIDE, MAKE A NEW {n['pd-support-bar']} BAR AND "
+            f"REBUILD FROM STEP {steps.step_number('bar-clamped')}, WITH "
+            f"{s('hanger-pivoted', 20)}'S PARTS IF THE ARM IS ALSO OUTSIDE.",
             "FOR AN ARM FOUND OUTSIDE, OR IF ALL ARE INSIDE, REPEAT FROM STEP "
             f"{steps.step_number('latch-pin-pressed')} WITH A NEW "
             f"{n['pd-transgear-arm']} ARM, {n['pd-transgear-arm-plate']} PLATE, "
@@ -3063,7 +3064,8 @@ def _step_text(
             f"{steps.step_number('collar-shoulder-seated')}.",
             f"IF {s('fitup-accepted', 5)} FAILS, ARM UNLATCHED, DO {pivot_remedied}.",
             f"IF A {s('hanger-pivoted', 6)}-{s('hanger-pivoted', 8)} CHECK THEN FAILS, DO "
-            f"{s('fitup-mesh-remedied', 14)}-{s('fitup-mesh-remedied', 18)}.",
+            f"{s('fitup-mesh-remedied', 6)} AND {s('fitup-mesh-remedied', 14)}-"
+            f"{s('fitup-mesh-remedied', 18)}.",
             f"FOR {s('fitup-accepted', 5)}, REPEAT {s('hook-pin-hole-match-drilled', 9)}-"
             f"{s('hook-pin-hole-match-drilled', 11)}, THEN FROM STEP {pose}.",
             f"IF {s('fitup-accepted', 7)} OR {s('fitup-accepted', 8)} FAILS, REPEAT "
