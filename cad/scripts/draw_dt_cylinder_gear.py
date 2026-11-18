@@ -108,8 +108,13 @@ NOTCH_DETAIL_RADIUS_MM = 4.0
 # that crossed it above the circle (r1 layout audit, text-on-line), and of
 # the teeth (top y 318.3), whichever corner SolidWorks anchors.
 NOTCH_DETAIL_LETTER_XY = (0.093, 0.326)
+# NotchWidth's three rows (74 mm wide at 2.75 mm a character) stand right of
+# the notch's extension lines (x 66.1 and 68.2): centred at x 107.5 they
+# start 3 mm clear of the right one and end at 143.5, 2 mm up and left of the
+# isometric's top teeth (machinist review of #2712: centred at 92 the lines
+# struck "SETS CAM", text-on-line).
 NOTCH_DETAIL_DIMENSIONS = {
-    "NotchWidth": (0.092, 0.199),
+    "NotchWidth": (0.1075, 0.201),
     "NotchDepth": (0.027, 0.155),
 }
 
