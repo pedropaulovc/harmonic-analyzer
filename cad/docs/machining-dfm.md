@@ -973,7 +973,7 @@ farm validation of the route is claimed here.
 
 | part | stock / form | key features | machinability hazards | setups | route |
 |---|---|---|---|---|---|
-| **`dt-cylinder-gear`** ×20 | round brass bar ~65; toothed disc OD64.41×3 + integral eccentric cam OD30.6×4.6228 (offset +Y 8.64); total H 7.62 (.3000, the channel pitch) | Ø9.550 (.3760 +.0005/0) reamed through bore on the Ø9.525 (3/8") arbor — **rides free on arbor, no keyway**; 120T involute 48DP PA20 (2.5D through-cut, patterned → **DXF/2.5D-machinable**); cam = plain eccentric circle (2.5D); **0.4 mm alignment notch** = the +Y co-phased timing datum | cam thin-side wall **1.80 mm** (.071 MIN, RV-01); notch kerf **0.4 mm** (.014 in screw-slotting saw on a 1 in saw arbor, fragile crests; the saw is to buy, `tools.cylinder-notch-saw`, [#2364](https://github.com/pedropaulovc/harmonic-analyzer/issues/2364)); 3 mm slender disc; **double-sided** (teeth+notch front / cam boss far face) | **≥2** (flip for cam boss) | **manual** — lathe bore+OD, teeth with a stock 48DP PA20 #2 cutter indexed on the BS-0 (see [Cutter plan](#cutter-plan); wire-EDM = outsource); the cam turned last on the lathe fixture MHA-DT-12-TL-01 (fitting sheet MHA-DT-12-TL-00), its throw set on the fixture's stub by indicator and its phase clocked by the pin in the notched tooth space (see [Cylinder-gear cam](#cylinder-gear-cam); the phase does not yet close inside the print, [#2361](https://github.com/pedropaulovc/harmonic-analyzer/issues/2361)); **hold the +Y phasing identical on all 20** |
+| **`dt-cylinder-gear`** ×20 | round brass bar ~65; toothed disc OD64.41×3 + integral eccentric cam OD30.6×4.6228 (offset +Y 8.64); total H 7.62 (.3000, the channel pitch) | Ø9.550 (.3760 +.0005/0) reamed through bore on the Ø9.525 (3/8") arbor — **rides free on arbor, no keyway**; 120T involute 48DP PA20 (2.5D through-cut, patterned → **DXF/2.5D-machinable**); cam = plain eccentric circle (2.5D); **0.4 mm alignment notch** = the +Y co-phased timing datum | cam thin-side wall **1.80 mm** (.071 MIN, RV-01); notch kerf **0.4 mm** (.014 in screw-slotting saw on a 1 in saw arbor, fragile crests; the saw is to buy, `tools.cylinder-notch-saw`, [#2364](https://github.com/pedropaulovc/harmonic-analyzer/issues/2364)); 3 mm slender disc; **double-sided** (teeth+notch front / cam boss far face) | **≥2** (flip for cam boss) | **manual** — lathe bore+OD, teeth with a stock 48DP PA20 #2 cutter indexed on the BS-0 (see [Cutter plan](#cutter-plan); wire-EDM = outsource); the cam turned last on the lathe fixture MHA-DT-12-TL-01 (fitting sheet MHA-DT-12-TL-00), its throw set on the fixture's stub by indicator and its phase clocked by the pin in the notched tooth space (see [Cylinder-gear cam](#cylinder-gear-cam); .68° worst inside the print's ±.7°, [#2361](https://github.com/pedropaulovc/harmonic-analyzer/issues/2361)); **hold the +Y phasing identical on all 20** |
 | **`ch-connecting-rod`** ×20 | 1/4 x 2 1018 CF flat, faced to .240; 2D outline ~7.4×1.61; ring and shank .086, both faces at .077 / .163 ±.002 from the fork's datum face, fork .240 REF, all on one mid-plane; black finish | Ø1.213 +.003/0 strap bore (rides the Ø30.6 mm MHA-DT-12 cam); fork .390 wide, full R.195 crown on the pin, .710 long from the crown; tine .067 ±.002 from the datum face, slot .106 ±.002, .580 deep from the crown (#982); Ø.077 +.0009/+.0005 pin hole reamed through both tines (bought pin MHA-SH-VN-58 pressed in at assembly, ends dressed flush; user ruling 2026-10-09, PR #1292) | tines **.067** (.065 MIN, owner-accepted RV-02) beside a .106 slot — slitting saw or a 3/32 end mill in two passes, hold the 3-place band; both faces stepped (thin .086 shank ~6 long faced from the 1/4 flat — chatter/curl); the ream must hold its .0004 band for the press | **2** (flip to face the second side; slot, drill and ream in the second) | **manual** (no CNC program yet); the outline (ring, shank, fork) is **route not selected** ([#2340](https://github.com/pedropaulovc/harmonic-analyzer/issues/2340)); face both sides to the two levels, slit the fork, drill + ream |
 
 ### Cone gears + shaft (T1 — the 48DP PA20 train, tip gears fragile)
@@ -1271,9 +1271,10 @@ the stub and the stylus (step 12). Rocking the chuck and the blocks, the reading
 within .001 of zero (step 13); if not, one jaw of the pair in line with the stub is loosened and
 the other tightened, and the work repeats from step 9 (step 14), which leaves all four jaws
 tight at the check. The gap's errors, each added to the next, are the check's .001, a division
-of reading (.0005), three turn-backs of half a division (.00075) and the stack (.00009): .00234,
-half of it on the throw. With the stack's .00004 rounding and each gear's bore float on the stub
-(.0007) that is .0019 in worst case, inside MHA-DT-12's ±.0020; the stub hole's ±.002 station
+of the shop's 0.001 mm lever indicator (.00004), three turn-backs of half a division (.00006) and
+the stack (.00009): .00119, half of it on the throw. With the stack's .00004 rounding and each
+gear's bore float on the stub (.0007) that is .0013 in worst case, inside MHA-DT-12's ±.0020; the
+stub hole's ±.002 station
 drops out. Steps 1 to 14 are on sheet 1 and are done once; steps 15 to 19, for each gear, are on
 sheet 2 beside the exploded view. Each gear goes on the stub by its reamed bore, with the notched
 tooth space over the clock pin, is turned against the pin in the direction the cut pushes it
@@ -1283,12 +1284,18 @@ screw in the stub's end, tightened snug by hand with a 5/32 hex key turned by it
 up, so rough each cam close to size before it goes on the fixture and take light finishing cuts
 there.
 
-The phase is not set. The fixture's holes are located at the shop's ±.002 row, so the stations,
-the register and the jaw pair's line give every gear the same error of up to .47°, and each gear
-adds .13° of its own (bore float and tooth form): .68° worst against the print's ±.25°. A reading
-on the set fixture would find the throw line through the stub, whose baseline is the .34 throw,
-so a .001 reading error moves the phase .17°; that is too coarse to set it. The phase is open on
-[#2361](https://github.com/pedropaulovc/harmonic-analyzer/issues/2361).
+The phase is clocked by the pin, not set by reading. The fixture's holes are located at the shop's
+±.002 row, so the stations, the register and the jaw pair's line give every gear the same error of
+up to .47°, and each gear adds .13° of its own (bore float and tooth form): .68° worst, inside
+MHA-DT-12's 1.5° ±.7°. The print was widened from ±.25° to cover the common part (delegated
+ruling 2026-11-17 on [#2361](https://github.com/pedropaulovc/harmonic-analyzer/issues/2361#issuecomment-6970972769),
+for the owner's review on [#2144](https://github.com/pedropaulovc/harmonic-analyzer/issues/2144)):
+the gear-to-gear .13° stays inside the error budget's ±.25° `cam_phase`, and the common .47° is a
+common cam phase like [#749](https://github.com/pedropaulovc/harmonic-analyzer/issues/749)'s,
+recorded and scored in `error_budget.yaml` (`fixture_common_cam_phase_deg`; about .1% of the
+greatest term, mean). A reading on the set fixture would find the throw line through the stub,
+whose baseline is the .34 throw, so a .001 reading error moves the phase .17°; that is too coarse
+to set it.
 
 The stub hole is reamed .3740 for .0006-.0013 interference, so the least press holds the clamp
 screw's pull more than five times over. The clamp screw's full-thread engagement, .12-.21 in

@@ -52,8 +52,9 @@ seats its notch on the phase. Every number of the gear is imported from
 ``dt_cylinder_gear_spec``.
 
 Accuracy (this module asserts only what is true). MHA-DT-12 prints throw
-.3402 +/-.0020 and cam phase 1.5 +/-.25 deg; every gear is held to that print
-(owner ruling 2026-11-08, #2144 item 8.2).
+.3402 +/-.0020 (owner ruling 2026-11-08, #2144 item 8.2) and cam phase
+1.5 +/-.7 deg (``dt_cylinder_gear_phase_band``, delegated ruling 2026-11-17 on
+#2361); every gear is held to that print.
 
 * Throw is set, not cut to a number: a dial test indicator is zeroed on the
   stub where the stub stands nearest it, the chuck is turned half a turn, and
@@ -65,17 +66,20 @@ Accuracy (this module asserts only what is true). MHA-DT-12 prints throw
   is left is ``THROW_GAP_TERMS`` (``THROW_SET_MAX_MM``) plus each gear's
   bore floating on the stub (``BORE_FLOAT``); ``THROW_ERROR_MAX_MM`` is
   asserted inside the print.
-* Phase is not set: the pin hole and stub hole stations (+/-.002 each), the
-  register's indication and the jaw pair's line put a fixed error of up to
-  ``PHASE_FIXED_WORST_DEG`` (.47 deg) on all 20 gears, and each gear adds its
-  bore float and tooth form (``PHASE_PER_PART_WORST_DEG``, .13 deg). The
-  total, ``PHASE_TOTAL_WORST_DEG`` (.68 deg), exceeds the print's +/-.25 deg
-  and is recorded, not asserted: open on #2361. A reading of the phase on the
-  set fixture was weighed and rejected: its baseline is the .34 throw, so a
-  .001 reading moves the phase about .17 deg (``PHASE_PER_THOU_READING_DEG``).
-  Every gear seats on the same flank of the pin (TL-00 step 17), so the pin
-  stands its mean half-play (``SEATED_HALF_PLAY_DEG``, .19 deg)
-  counter-clockwise of the phase and a nominal fixture's common error is nil.
+* Phase is not set by reading: the pin hole and stub hole stations (+/-.002
+  each), the register's indication and the jaw pair's line put a fixed error
+  of up to ``PHASE_FIXED_WORST_DEG`` (.47 deg) on all 20 gears, and each gear
+  adds its bore float and tooth form (``PHASE_PER_PART_WORST_DEG``, .13 deg).
+  The gear-to-gear part is asserted inside the error budget's per-channel
+  ``cam_phase`` (+/-.25 deg) and the total, ``PHASE_TOTAL_WORST_DEG``
+  (.68 deg), inside the print's +/-.7 deg; the common part is a common cam
+  phase like #749's, which error_budget.yaml records and scores. A reading of
+  the phase on the set fixture was weighed and rejected: its baseline is the
+  .34 throw, so a .001 reading moves the phase about .17 deg
+  (``PHASE_PER_THOU_READING_DEG``). Every gear seats on the same flank of the
+  pin (TL-00 step 17), so the pin stands its mean half-play
+  (``SEATED_HALF_PLAY_DEG``, .19 deg) counter-clockwise of the phase and a
+  nominal fixture's common error is nil.
 
 The hole stations carry the shop table's +/-.002 for a reamed hole from its
 datum and nothing tighter: one tool made once, cut to a number.
@@ -88,6 +92,7 @@ from functools import cache
 
 import _config
 import dt_cylinder_gear_spec as gear
+from dt_cylinder_gear_phase_band import NOTCH_PHASE_TOLERANCE_DEG
 from _fit_ream_h7 import REAM_H7
 from _inch_wall_limits import WALL_TARGET_MM
 from _mcmaster_23065a503 import (
@@ -135,7 +140,9 @@ GEAR_THICKNESS_MAX = gear.OVERALL_THICKNESS + gear.OVERALL_THICKNESS_BAND[0]
 FACE_WIDTH_MIN = gear.FACE_WIDTH - gear.FACE_WIDTH_TOLERANCE_MM
 GEAR_TIP_RADIUS = gear.OUTSIDE_DIA / 2.0
 PHASE_DEG = gear.NOTCH_PHASE_DEG
-PHASE_TOLERANCE_DEG = gear.CAM_PHASE_TOLERANCE_DEG
+# The budget's per-channel (gear-to-gear) phase and the printed NotchPhase band.
+PHASE_SCATTER_TOLERANCE_DEG = gear.CAM_PHASE_TOLERANCE_DEG
+PHASE_TOLERANCE_DEG = NOTCH_PHASE_TOLERANCE_DEG
 
 # --- Body ----------------------------------------------------------------------------
 # The register is the OD: indicated true once, its diameter only has to be
@@ -238,10 +245,11 @@ THROW_STACK_BLOCKS_IN = (0.1004, 0.130, 0.450)
 THROW_STACK = sum(THROW_STACK_BLOCKS_IN) * INCH
 if abs(THROW_STACK - 2.0 * STUB_OFFSET) > 1e-9:
     raise AssertionError("the gauge-block stack is not twice the printed throw")
-# The dial test indicator's division (cad/process/shop.toml gauges.dti,
-# resolution_mm .0127, range .030 in).
-THROW_INDICATOR_DIVISION = 0.0005 * INCH
-# The check's band on the gap: two divisions either side of zero.
+# The dial test indicator's division (cad/process/shop.toml gauges.dti: the
+# shop's lever indicator, graduation 0.001 mm, range 0.14 mm, owner
+# 2026-11-17).
+THROW_INDICATOR_DIVISION = 0.001
+# The check's band on the gap: .001 in either side of zero.
 THROW_READING_BAND = 0.001 * INCH
 # Every error in the gap, worst case, each added to the next:
 # * band: the check's own window.
@@ -267,7 +275,7 @@ THROW_PER_PART_MAX_MM = BORE_FLOAT
 # The gap is twice the throw, so half its error is the setting's; the stack
 # is twice the printed .3402, .00004 off the model's throw.
 THROW_SET_MAX_MM = THROW_GAP_ERROR_MAX / 2.0 + abs(STUB_OFFSET - THROW)
-# .00117 gap + .00004 rounding + .00070 float = .00191 in +/-.0020: .00009 left.
+# .00060 gap + .00004 rounding + .00070 float = .00134 in +/-.0020: .00066 left.
 THROW_ERROR_MAX_MM = THROW_SET_MAX_MM + THROW_PER_PART_MAX_MM
 if THROW_ERROR_MAX_MM > THROW_TOLERANCE:
     raise AssertionError("a gear's throw can leave MHA-DT-12's printed band")
@@ -599,11 +607,11 @@ def phase_budget_deg() -> dict[str, float]:
 _BUDGET = phase_budget_deg()
 PHASE_FIXED_WORST_DEG = _BUDGET["fixed"]  # (a), common to all 20 gears
 PHASE_PER_PART_WORST_DEG = _BUDGET["per_part"]  # (b), gear-to-gear scatter
-if PHASE_PER_PART_WORST_DEG > PHASE_TOLERANCE_DEG:
-    raise AssertionError("the 20 gears' phase scatter exceeds the printed band")
-# Recorded, not asserted: the total exceeds the print's +/-.25 deg; phase is
-# not set on the fixture and is open on #2361 (module docstring).
+if PHASE_PER_PART_WORST_DEG > PHASE_SCATTER_TOLERANCE_DEG:
+    raise AssertionError("the 20 gears' phase scatter exceeds the budget's cam_phase")
 PHASE_TOTAL_WORST_DEG = _BUDGET["total"]
+if PHASE_TOTAL_WORST_DEG > PHASE_TOLERANCE_DEG:
+    raise AssertionError("a gear's worst phase exceeds MHA-DT-12's printed band")
 # A reading that would set phase on the fixture finds the throw line through
 # the stub, whose baseline is the throw: .001 read wrong turns it this much.
 PHASE_PER_THOU_READING_DEG = math.degrees(0.001 * INCH / STUB_OFFSET)
@@ -702,11 +710,12 @@ def inch_text(value_mm: float, places: int) -> str:
 
 
 # Each REAM callout names its pressed pin by its short form (a member of this
-# sheet's MHA-DT-12-TL-00 kit) and, once, what its stations' +/-.002 sets on
-# the gear (rules 4 and 7); the location dimensions carry value and band
-# only. The clock pin's blind press is permanent: no knockout behind a .0375
-# pin (rule 16's permanent pair). Rows short enough to stand between the
-# register and the edge view.
+# sheet's MHA-DT-12-TL-00 kit) and, once, what it does for the gear: the stub
+# locates the bore (TL-00 sets the throw by gauge blocks, so the stub's station
+# drops out of it) and the pin sets the phase (rules 4, 7 and 25); the
+# location dimensions carry value and band only. The clock pin's blind press
+# is permanent: no knockout behind a .0375 pin (rule 16's permanent pair).
+# Rows short enough to stand between the register and the edge view.
 STUB_NUMBER = str(_config.parts("dt-cylinder-gear-tl-vn-cam-stub")["number"])
 CLOCK_PIN_NUMBER = str(_config.parts("dt-cylinder-gear-tl-vn-cam-clock-pin")["number"])
 GEAR_NUMBER = str(_config.parts("dt-cylinder-gear")["number"])
@@ -724,7 +733,7 @@ PIN_HOLE_DEPTH_TEXT = inch_text(PIN_HOLE_DEPTH, PIN_HOLE_DEPTH_PLACES)
 CALLOUTS_BELOW: dict[str, str] = {
     "StubHoleDia": (
         f"REAM THRU\nPRESS FIT ON {kit_short_form(STUB_NUMBER)}\n"
-        f"SETS {GEAR_NUMBER} CAM THROW"
+        f"LOCATES {GEAR_NUMBER} BORE"
     ),
     "PinHoleDia": (
         f"REAM <HOLE-DEPTH> {PIN_HOLE_DEPTH_TEXT}\n"

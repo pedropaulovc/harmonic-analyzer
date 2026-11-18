@@ -25,8 +25,6 @@ BORE_FIT_CALLOUT = "REAM THRU\nRUNNING FIT ON\nSHAFT MHA-DT-13"
 # The worst-case crescent wall to the cam OD is under the .080 in target, so
 # it is stated as a plain fact (rule 20), at its own leader on the thin side.
 CAM_WALL_NOTE = f"WALL {inch_text(spec.CAM_WALL_MIN_MM, 3)} MIN TO BORE"
-# TODO(#744): validate the forked rod and centered channel bank in the native
-# assembly. The drawing requirement below does not certify that integration.
 # The bank is a solid stack preloaded onto its datum (#948 ruling R, PR #1292):
 # no gear interface opens, so a connecting-rod ring never overhangs its cam
 # and the callout no longer states an overhang bound.

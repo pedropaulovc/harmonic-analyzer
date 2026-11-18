@@ -11,6 +11,7 @@ import _buildgraph as bg
 import _config
 import build_dt_cylinder_gear_tl_cam_fixture as part
 import draw_dt_cylinder_gear_tl_cam_fixture as drawing
+import dt_cylinder_gear_phase_band as phase_band
 import dt_cylinder_gear_spec as gear
 import dt_cylinder_gear_tl_cam_fixture_spec as spec
 from _drawing_contract import model_toleranced_dimensions
@@ -105,18 +106,21 @@ def test_the_clock_pin_stands_at_the_notch_phase() -> None:
                 assert play is not None and play > 0.0
 
 
-def test_phase_is_recorded_open_not_asserted() -> None:
-    # Per gear: the bore's float and tooth form, inside the band on its own.
-    assert 0.0 < spec.PHASE_PER_PART_WORST_DEG <= gear.CAM_PHASE_TOLERANCE_DEG
-    # Fixed: the hole stations, the register and the jaw pair's line. The
-    # total exceeds the print (open on #2361); a reading on the fixture would
-    # move the phase .17 deg per .001 read, too coarse to set it.
+def test_phase_holds_the_widened_print_and_the_budgets_scatter() -> None:
+    # Per gear: the bore's float and tooth form, inside the error budget's
+    # per-channel cam_phase (gear to gear).
+    assert spec.PHASE_SCATTER_TOLERANCE_DEG == gear.CAM_PHASE_TOLERANCE_DEG == 0.25
+    assert 0.0 < spec.PHASE_PER_PART_WORST_DEG <= spec.PHASE_SCATTER_TOLERANCE_DEG
+    # Fixed: the hole stations, the register and the jaw pair's line, common
+    # to all 20 gears. The total sits inside MHA-DT-12's printed band, widened
+    # to +/-.7 deg for it (delegated ruling 2026-11-17, #2361); a reading on
+    # the fixture would move the phase .17 deg per .001 read, too coarse to
+    # set it.
+    assert spec.PHASE_TOLERANCE_DEG == phase_band.NOTCH_PHASE_TOLERANCE_DEG == 0.7
     assert spec.PHASE_FIXED_WORST_DEG == pytest.approx(0.466, abs=0.001)
     assert spec.PHASE_TOTAL_WORST_DEG == pytest.approx(0.677, abs=0.001)
-    assert spec.PHASE_TOTAL_WORST_DEG > gear.CAM_PHASE_TOLERANCE_DEG
+    assert spec.PHASE_TOTAL_WORST_DEG <= spec.PHASE_TOLERANCE_DEG
     assert spec.PHASE_PER_THOU_READING_DEG == pytest.approx(0.168, abs=0.001)
-    assert "delegated" not in (spec.__doc__ or "").lower()
-    assert "gear-to-gear" not in (spec.__doc__ or "")
 
 
 def test_every_gear_seats_on_one_flank_so_the_play_is_not_scatter() -> None:

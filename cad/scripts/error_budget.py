@@ -1941,6 +1941,9 @@ def build_report(budget: dict[str, Any] | None = None) -> dict[str, Any]:
     home_waived = bool(
         budget["reserved"]["nominal_residual_mae"].get("waive_cam_home_phase", False)
     )
+    fixture_deg = float(
+        budget["reserved"]["nominal_residual_mae"]["fixture_common_cam_phase_deg"]
+    )
     nom = credited_nominal(budget)
     d0 = null_station(nom)
     stations = [nom.d_max, nom.d_max / 2, nom.d_max / 4, 10.0]  # lifting side only
@@ -1991,6 +1994,15 @@ def build_report(budget: dict[str, Any] | None = None) -> dict[str, Any]:
             ),
             "residual_lobe_up": nominal_design_errors(
                 replace(as_built, cam_home_deg=0.0),
+                correct_second_harmonic=True,
+                calibrated_stick=True,
+            ),
+            # The cam turning fixture's phase common to all 20 lobes
+            # (MHA-DT-12-TL-01, #2361): a common cam phase of the same kind,
+            # scored on the lobe-up machine and accepted, not credited.
+            "fixture_common_deg": fixture_deg,
+            "residual_fixture_common": nominal_design_errors(
+                replace(as_built, cam_home_deg=fixture_deg),
                 correct_second_harmonic=True,
                 calibrated_stick=True,
             ),
@@ -2151,6 +2163,9 @@ def closure(r: dict[str, Any], budget: dict[str, Any]) -> dict[str, Any]:
         "nominal_residual_mae": max(nde[n]["mae"] for n in broad),
         "nominal_residual_mae_as_built": max(
             home["residual_as_built"][n]["mae"] for n in broad
+        ),
+        "nominal_residual_mae_fixture_common": max(
+            home["residual_fixture_common"][n]["mae"] for n in broad
         ),
         "scatter_mae": r["monte_carlo"]["combined"]["mae"],
         "readout": cf["readout"]["pct_fs"],
@@ -2629,6 +2644,13 @@ def _main() -> int:
                 f"{r['closure']['nominal_residual_mae']:.3f} with the lobe cut "
                 "half a pitch from the crest -- closure is conditional on #749"
             )
+        print(
+            f"ACCEPTED: cam fixture common phase {home['fixture_common_deg']:g} deg -- "
+            "MHA-DT-12-TL-01 turns every cam lobe by the same angle, a common phase "
+            "like the one above: residual "
+            f"{r['closure']['nominal_residual_mae_fixture_common']:.3f} % MAE on the "
+            "lobe-up machine, not credited (delegated ruling 2026-11-17, #2361)"
+        )
         mag = r["closed_form"]["mg-magnifier"]
         # TODO(#748): CAD-gate the magnifier's minimum pose, then drop this
         # waiver.

@@ -339,7 +339,13 @@ def test_assembly_recipes_exclude_cylinder_drawing_prose(
         for path in module_deps_of(Path(__file__).with_name(assembly_script))
     }
     assert ("dt_cylinder_gear_spec.py" in dependencies) is reads_cylinder_spec
-    assert dependencies.isdisjoint({"build_dt_cylinder_gear.py", "dt_cylinder_gear_notes.py"})
+    assert dependencies.isdisjoint(
+        {
+            "build_dt_cylinder_gear.py",
+            "dt_cylinder_gear_notes.py",
+            "dt_cylinder_gear_phase_band.py",
+        }
+    )
 
 
 def test_stacking_thickness_is_the_held_marked_dimension() -> None:
@@ -364,7 +370,10 @@ def test_pattern_notch_reference_uses_the_actual_seed_gap() -> None:
         spec.PATTERN_NOTCH_REF_ANGLE_DEG
     )
     assert spec.PATTERN_NOTCH_REF_ANGLE_DEG == 90.0
+    # NotchPhase prints the widened band (delegated ruling 2026-11-17, #2361):
+    # the budget's gear-to-gear +/-.25 plus the cam fixture's common phase.
     assert spec.CAM_PHASE_TOLERANCE_DEG == 0.25
+    assert part.NOTCH_PHASE_TOLERANCE_DEG == 0.7
     assert spec.DRAWING_PRECISION["NotchProfile"]["NotchPhase"] == 1
     assert spec.DRAWING_PRECISION["NotchProfile"]["PatternNotchPhase"] == 0
     assert "PatternNotchPhase" in drawing.FRONT_KEEP

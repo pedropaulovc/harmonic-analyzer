@@ -107,12 +107,12 @@ from _fit_deviations import deviations
 from _gear import build_stock_form_gear, volume_check
 from _part_pmi import author_part_pmi
 from dt_cylinder_gear_notes import GEAR_DATA
+from dt_cylinder_gear_phase_band import NOTCH_PHASE_TOLERANCE_DEG
 from dt_cylinder_gear_spec import (
     BORE_DIA as BORE_DIAMETER,
     BORE_DIA_BAND,
     CAM_DIA as CAM_DIAMETER,
     CAM_DIA_BAND,
-    CAM_PHASE_TOLERANCE_DEG,
     CAM_THICKNESS,
     CAM_ROOT_WEB_MIN_MM,
     DRAWING_DIMENSIONS,
@@ -538,7 +538,9 @@ def build(adapter) -> dict[str, str]:
     # direction CamCy offsets the cam) and the notch radial (origin -> the kerf
     # centreline x = NOTCH_X at the mean notch radius) meet at NOTCH_PHASE_DEG,
     # half a circular pitch. A DRIVEN angular dimension between them carries
-    # the error budget's cam_phase tolerance (drawing-guidelines.md rule 3 (decimal places carry the tolerance): the
+    # the printed phase band, the budget's gear-to-gear cam_phase plus the cam
+    # fixture's common phase (dt_cylinder_gear_phase_band; drawing-guidelines.md
+    # rule 3 (decimal places carry the tolerance): the
     # band goes on the dimension, not in a note); the kerf stays located by
     # NotchCenterX, so its geometry is unchanged and the sketch fully defined.
     set_sketch_direct_db(adapter, True)
@@ -769,7 +771,7 @@ def build(adapter) -> dict[str, str]:
         adapter,
         "NotchProfile",
         "NotchPhase",
-        CAM_PHASE_TOLERANCE_DEG,
+        NOTCH_PHASE_TOLERANCE_DEG,
         require_driven=True,
     )
     volume = volume_check(
