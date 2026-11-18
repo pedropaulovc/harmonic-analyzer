@@ -2317,7 +2317,7 @@ def _step_text(
             # #2629 (machinist rule 22): the pass exit takes its own letter
             # within the step's 24-letter budget, so the trial stack goes on
             # in one sub-step, as the lift-off takes it off in one.
-            f"TRIAL MESH: FIT THE {n['pd-transgear-rear-bushing']} BUSHING, THEN THE "
+            f"TRIAL MESH: FIT THE {n['pd-transgear-rear-bushing']} BUSHING AND THE "
             f"{n['pd-transgear-feed-pinion']} SLEEVE, HUB AND DISC, {FEED_PINION} "
             "REARWARD, ON THE PIN.",
             f"PASS THE {n['pd-transgear-knob-shaft']} SHAFT THROUGH THE LOOSE "
@@ -2496,7 +2496,7 @@ def _step_text(
             "CHECK: A HEX KEY BY HAND DOES NOT LOOSEN THE SCREW.",
             "CHECK: RAISED AND RELEASED, THE ARM FALLS FREELY.",
             f"IF ALL THREE CHECKS PASS, SKIP {s('hanger-pivoted', 10)}-"
-            f"{s('hanger-pivoted', 19)}.",
+            f"{s('hanger-pivoted', 22)}.",
             # The arm is captured on the shoulder between the head and the
             # pressed spacer, so the remedy takes the screw out first
             # (Codjiflo P3 on 93879abc87).
@@ -2506,21 +2506,23 @@ def _step_text(
             "CLEAN AND DEBURR THE SPACER END, BAR BACK FACE AND TAP MOUTH.",
             f"REPEAT {s('hanger-pivoted', 5)}-{s('hanger-pivoted', 8)}.",
             f"IF ALL THREE CHECKS NOW PASS, SKIP {s('hanger-pivoted', 16)}-"
-            f"{s('hanger-pivoted', 19)}.",
+            f"{s('hanger-pivoted', 22)}.",
             # #3107 (Codjiflo P3 on 3e6318a026, P2s on f92995b8e6): the
-            # renewal runs once; a second failure takes the arm off, sends
-            # the bar and the arm to their sheets and closes every outcome.
-            "IF THE SCREW AND SPACER ARE NOT YET RENEWED, DO "
-            f"{s('hanger-pivoted', 10)}-{s('hanger-pivoted', 11)} AND REPEAT FROM "
-            f"{s('hanger-pivoted', 0)} WITH A NEW SCREW AND SPACER.",
-            f"IF THEY ARE RENEWED, DO {s('hanger-pivoted', 10)}-"
-            f"{s('hanger-pivoted', 11)} AND INSPECT THE {n['pd-support-bar']} BAR'S "
+            # renewal runs once; a second failure sends the bar and the arm
+            # to their sheets and closes every outcome, one action a step
+            # (machinist review of 17c29c2192, rule 22).
+            f"DO {s('hanger-pivoted', 10)}-{s('hanger-pivoted', 11)}.",
+            "IF NOT YET RENEWED, REPEAT FROM "
+            f"{s('hanger-pivoted', 0)} WITH NEW SCREW AND SPACER.",
+            f"IF ALREADY RENEWED, INSPECT THE {n['pd-support-bar']} BAR'S "
             f"TAP AND BACK FACE AND THE {n['pd-transgear-arm']} ARM'S BORE "
             "TO THEIR SHEETS.",
-            f"FOR A BAR FOUND OUTSIDE, REMOVE THE LOCKS AND THE PLATEN, FIT A NEW "
-            f"{n['pd-support-bar']} BAR PER STEP {steps.step_number('bar-clamped')}, "
-            f"REFIT PER {s('platen-hung', 9)}-{s('guide-locks-set', 3)} AND REPEAT STEP "
-            f"{steps.step_number('lock-seats-faced')} AND FROM {s('hanger-pivoted', 0)}.",
+            "FOR A BAR FOUND OUTSIDE, REMOVE THE LOCKS AND THE PLATEN.",
+            f"FOR THAT BAR, FIT A NEW {n['pd-support-bar']} BAR PER STEP "
+            f"{steps.step_number('bar-clamped')}.",
+            f"FOR THAT BAR, REPEAT {s('platen-hung', 9)}-{s('guide-locks-set', 3)} AND "
+            f"STEP {steps.step_number('lock-seats-faced')}, THEN FROM "
+            f"{s('hanger-pivoted', 0)}.",
             "FOR AN ARM FOUND OUTSIDE, OR IF ALL ARE INSIDE, REPEAT FROM STEP "
             f"{steps.step_number('latch-pin-pressed')} WITH A NEW "
             f"{n['pd-transgear-arm']} ARM, {n['pd-transgear-arm-plate']} PLATE, "

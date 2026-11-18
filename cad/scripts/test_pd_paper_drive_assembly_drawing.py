@@ -2411,36 +2411,35 @@ def test_every_screwed_setting_has_a_holding_check() -> None:
     assert pivot[6] == "CHECK: NO DAYLIGHT BETWEEN THE SPACER AND THE BAR'S BACK FACE."
     assert pivot[7] == "CHECK: A HEX KEY BY HAND DOES NOT LOOSEN THE SCREW."
     assert pivot[8] == "CHECK: RAISED AND RELEASED, THE ARM FALLS FREELY."
-    assert pivot[9] == "IF ALL THREE CHECKS PASS, SKIP 15L-15V."
+    assert pivot[9] == "IF ALL THREE CHECKS PASS, SKIP 15L-15Y."
     # The remedy takes the captured arm off before anything is cleaned.
     assert pivot[10].startswith("UNSCREW ") and pivot[11] == "LIFT THE ARM OFF."
     assert pivot[12].startswith("FLUSH OIL INTO THE ARM'S BORE")
     assert "BAR BACK FACE" in pivot[13]
     assert pivot[14] == "REPEAT 15F-15J."
-    assert pivot[15] == "IF ALL THREE CHECKS NOW PASS, SKIP 15S-15V."
-    # #3107: the screw and spacer are renewed once; a second failure takes
-    # the arm off, sends the bar and the arm to their sheets, and every
-    # outcome has a route: a bar outside, an arm outside or all inside.
-    assert pivot[16] == (
-        "IF THE SCREW AND SPACER ARE NOT YET RENEWED, DO 15L-15M AND REPEAT FROM 15A "
-        "WITH A NEW SCREW AND SPACER."
-    )
-    assert pivot[17].startswith("IF THEY ARE RENEWED, DO 15L-15M AND INSPECT THE ")
-    assert pivot[17].endswith(" ARM'S BORE TO THEIR SHEETS.")
+    assert pivot[15] == "IF ALL THREE CHECKS NOW PASS, SKIP 15S-15Y."
+    # #3107: the screw and spacer are renewed once; a second failure sends
+    # the bar and the arm to their sheets, and every outcome has a route: a
+    # bar outside, an arm outside or all inside, one action a step (rule 22).
     bar = _number("pd-support-bar")
-    assert pivot[18] == (
-        f"FOR A BAR FOUND OUTSIDE, REMOVE THE LOCKS AND THE PLATEN, FIT A NEW {bar} BAR PER STEP "
-        f"{steps.step_number('bar-clamped')}, REFIT PER 5K-6D AND REPEAT STEP "
-        f"{steps.step_number('lock-seats-faced')} AND FROM 15A."
+    assert pivot[16:22] == (
+        "DO 15L-15M.",
+        "IF NOT YET RENEWED, REPEAT FROM 15A WITH NEW SCREW AND SPACER.",
+        f"IF ALREADY RENEWED, INSPECT THE {bar} BAR'S TAP AND BACK FACE AND THE "
+        f"{_number('pd-transgear-arm')} ARM'S BORE TO THEIR SHEETS.",
+        "FOR A BAR FOUND OUTSIDE, REMOVE THE LOCKS AND THE PLATEN.",
+        f"FOR THAT BAR, FIT A NEW {bar} BAR PER STEP {steps.step_number('bar-clamped')}.",
+        f"FOR THAT BAR, REPEAT 5K-6D AND STEP {steps.step_number('lock-seats-faced')}, "
+        "THEN FROM 15A.",
     )
-    assert pivot[19].startswith(
+    assert pivot[22].startswith(
         "FOR AN ARM FOUND OUTSIDE, OR IF ALL ARE INSIDE, REPEAT FROM STEP "
         f"{steps.step_number('latch-pin-pressed')} WITH A NEW {_number('pd-transgear-arm')} ARM,"
     )
     # Only the parts fitted by step 15 are renewed (Codjiflo P3 on f92995b8e6).
     for later in ("pd-transgear-knob-shaft", "pd-transgear-knob-cup", "pd-latch-hook"):
-        assert _number(later) not in pivot[19]
-    assert len(pivot) == 20
+        assert _number(later) not in pivot[22]
+    assert len(pivot) == 23
     assert not any("STAKE" in line for line in pivot)
     accepted = texts["fitup-accepted"]
     # From 33 the reseat runs; a repeat failure rebuilds the arm as 28Q-28U,
