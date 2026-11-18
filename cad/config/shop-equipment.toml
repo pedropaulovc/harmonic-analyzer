@@ -426,16 +426,17 @@ flute_len_in = { value = 0.75, measured = { status = "measured", by = "placehold
 # Owner (Pedro) 2026-11-17, verbatim: "it was a mt3 dead center that had a
 # straight part at the end i gripped with a 3/4 collet". Used in the PM-30MV
 # as a tap guide, held by its straight end in the 3/4 in collet of
-# holders.r8-collets-south-bend-sb1280. About 7.5 in tip to collet face
-# (owner, relayed by Main), not measured. Its prechips description is
+# holders.r8-collets-south-bend-sb1280. Its stickout (tip to collet face) is
+# not measured: the 7.5 in first relayed was a guess (owner, 2026-11-17: "7.5
+# is a guess dead center had plenty of space with wrench"), so no length is
+# recorded; the tool setter measures it at M6. Its prechips description is
 # cad/process/shop.toml, same key.
 [tools.mill-dead-centre-mt3]
 name = "MT3 dead centre with a straight end, held in the 3/4 in R8 collet"
 kind = "dead_centre"
 present = true
 use = "Tap guide in the PM-30MV spindle"
-tip_to_collet_face_in = 7.5
-cite = ["Owner (Pedro) 2026-11-17: \"it was a mt3 dead center that had a straight part at the end i gripped with a 3/4 collet\"; about 7.5 in tip to holder face (owner, relayed by Main)"]
+cite = ["Owner (Pedro) 2026-11-17: \"it was a mt3 dead center that had a straight part at the end i gripped with a 3/4 collet\"; stickout unmeasured (\"7.5 is a guess dead center had plenty of space with wrench\")"]
 
 # Owner ruling 2026-11-16 (Pedro), #2837: "Require a spring tap guide in the
 # spindle (tap squared to the quill), and add a squareness term to the
