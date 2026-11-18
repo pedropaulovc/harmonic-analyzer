@@ -988,7 +988,7 @@ name = "MHA-PD-06 disc cutting arbor with two Ø3.00 backing discs, shop-made"
 kind = "gear_blank_arbor"
 present = false
 shop_made = true
-purchase = "Make from 1018 CF or 12L14 round (arbor) and 1/4 in 6061 plate (two discs). Arbor: Ø.75 body held in the BS-0 chuck, a square shoulder, then a Ø.501 journal .60 long turned in one setup with the shoulder and slid into a trial ream of the owned .501 reamer (a slide fit with no shake), then 1/2-20 UNF thread .50 long and a 60° centre in the end for the tailstock. Backing discs: Ø3.00 x .25, bored with the .501 reamer, both faces faced in one setup per disc. One 1/2-20 hex nut and flat washer clamp the stack."
+purchase = "Make from 1018 CF or 12L14 round (arbor) and 1/4 in 6061 plate (two discs). Arbor: Ø.75 body held in the BS-0 chuck, a square shoulder, then a Ø.501 journal .60 long turned in one setup with the shoulder and slid into a trial ream of a .501 reamer (a slide fit with no shake), then 1/2-20 UNF thread .50 long and a 60° centre in the end for the tailstock. Backing discs: Ø3.00 x .25, bored with the .501 reamer, both faces faced in one setup per disc. One 1/2-20 hex nut and flat washer clamp the stack. The .501 reamer is not owned (owner inventory 2026-11-17: the shop's only reamers are tools.reamers-adjustable-lms-5948, .250-.375 in, and tools.reamer-0376); to buy, #3073."
 note = "Workholding for cutting the MHA-PD-06 teeth (pd-rack-pinion.yaml process; machining-dfm.md, Paper drive): backing disc, disc blank, backing disc and nut on the journal, the arbor in the BS-0 chuck with the tailstock centre in its end. Indicate the backing disc rim within .001 TIR before cutting. The Ø3.00 discs stop .036 under the disc's least root Ø3.0719 (radius), so the #1 cutter reaches whole depth without touching them; they back the .118 web to within .036 of the tooth spaces on both faces."
 pieces = 3
 backing_disc_dia_in = 3.00
@@ -1039,7 +1039,7 @@ use = "MHA-CH-06-TL-21 carrier and TL-20 base bar table setups"
 name = ".3760 in over reamer (3/8 in, REAM_SLIDE)"
 kind = "reamer"
 present = true
-use = "MHA-CH-06-TL-21 carrier A1, B1, A2, B2 .3760-.3770 REAM THRU (owner ruling 2026-11-13: checked .376 GO / .377 NO-GO with the owned pin-gauge set)"
+use = "MHA-CH-06-TL-21 carrier A1, B1, A2, B2 .3760-.3770 REAM THRU (owner ruling 2026-11-13: checked .376 GO / .377 NO-GO with pin gauges; the pin-gauge set is not owned, owner inventory 2026-11-17, gauges.pin-gauges)"
 
 # Plug taps the carrier plan names besides the 8-32 (tools.taps-unc-hand).
 [tools.jig-tap-4-40-plug]
