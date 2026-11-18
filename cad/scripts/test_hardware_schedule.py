@@ -7,7 +7,23 @@ from __future__ import annotations
 import _config
 import cut_release
 import error_budget
+import ha_harmonic_analyzer_assembly_steps as ha_steps
 import hardware_schedule as schedule
+import mg_magnifier_assembly_steps as mg_steps
+from _assembly_contract import assembly_contract
+
+
+def test_music_wire_row_cites_every_assembly_that_cuts_and_forms_it():
+    # The wire is bought as coil and cut and formed in the assembly steps
+    # (hardware.yaml beside the row), so its row names each assembly drawing
+    # that does it: the two that use it, and MHA-HA-00, which ties the pen
+    # wire to the wheel rim.
+    assert {mg_steps.WIRE_HOOKED_KEY, mg_steps.WIRE_TIED_KEY} <= set(mg_steps.SEQUENCE)
+    assert "pen-wire-tied" in ha_steps.SEQUENCE
+    designation = schedule.SCHEDULE["sh-vn-music-wire"]["designation"]
+    for assembly in schedule.used_in()["sh-vn-music-wire"]:
+        assert assembly_contract(assembly).number in designation, assembly
+    assert ha_steps.DRAWING_NUMBER in designation
 
 
 def test_every_purchased_part_has_a_tier_and_every_tier_names_a_part():

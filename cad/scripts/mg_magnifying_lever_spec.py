@@ -20,9 +20,10 @@ DRAWING_DIMENSIONS = {
 }
 # Inch places; the rod diameter prints as its stock fraction (REF), so its
 # places only govern the model before the sheet dresses it. The free-end SR
-# (half the stock) is a plain dome: the profile's .XX grade, as on MHA-MG-04.
+# is a reference, (SR.125): the tangent hemisphere follows from the stock, so
+# its three places state the half-diameter, not a tolerance.
 DRAWING_PRECISION = {
-    "RodProfile": {"OverallLength": ROD_LENGTH_PLACES, "RodDia": 2, "DomeR": 2},
+    "RodProfile": {"OverallLength": ROD_LENGTH_PLACES, "RodDia": 2, "DomeR": 3},
     "ThreadExtent": {"ThreadLength": THREAD_LENGTH_PLACES, "IncompleteLength": 3},
 }
 SINGLE_LIMITS = {("ThreadExtent", "IncompleteLength"): (INCOMPLETE_THREAD_MAX, 6)}
