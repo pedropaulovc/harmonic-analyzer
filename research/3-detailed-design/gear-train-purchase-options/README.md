@@ -101,7 +101,7 @@ Common to every route, $589.24:
 | Chucking reamer, .0365 HSS (cam fixture clock-pin press, read 2026-11-14) | KBC 5-018-0365 | $32.80 |
 
 The shop-made tools' own bar (5/8 and 3/8 1018 for the arbor and cutter bar,
-a Ø3.25 x 1 in 1018 slug for the cam fixture, collar offcuts) is not priced.
+a 3-1/2 in 1018 round cut over-length for the cam fixture, its Ø3.25 x 1.00 body turned and faced from it, collar offcuts) is not priced.
 
 Route A adds the eleven cutters, $1,379.13, and brass bar, $521.58 (six
 C360 bars for the drive train, $439.04, and the 3-1/4 in bar for the

@@ -164,7 +164,7 @@ critical_features:
     nominal: dt_cylinder_gear_spec.ECCENTRICITY
     quantity: gain
     class: channel
-    holds: "the cam turned last on the lathe fixture MHA-DT-12-TL-01, its throw set on the fixture's stub by gauge blocks at a dial test indicator's zero (MHA-DT-12-TL-00); worst .0019 in with each gear's bore float (dt_cylinder_gear_tl_cam_fixture_spec.THROW_ERROR_MAX_MM)"
+    holds: "the cam turned last on the lathe fixture MHA-DT-12-TL-01, its throw set on the fixture's stub by gauge blocks at a dial test indicator's zero (MHA-DT-12-TL-00); worst .0013 in with each gear's bore float (dt_cylinder_gear_tl_cam_fixture_spec.THROW_ERROR_MAX_MM)"
   rocker_rod_pin_radius:
     tolerance: 0.1778  # +/-.007 in, half the inch print's .014 position zone (delegated ruling 2026-11-07, owner review #2144)
     nominal: _rocker_interface.ROD_HOLE_X

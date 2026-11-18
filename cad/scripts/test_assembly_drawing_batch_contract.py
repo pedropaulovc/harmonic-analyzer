@@ -277,6 +277,7 @@ def test_registry_task_names_outputs_and_assembly_dependencies_are_preserved() -
             # The fixture spec whose BOM order, poses, screw schedule and
             # steps the sheets print.
             assert str(scripts_dir / "ch_rocker_strap_tl_fixture_spec.py") in deps
+            assert str(Path(_assembly_drawing.__file__).resolve()) not in deps
         elif drawing is draw_dt_cylinder_gear_tl_cam_turning_assembly:
             scripts_dir = Path(drawing.__file__).resolve().parent
             # The fixture spec whose stand, runout and engagement the steps print.
