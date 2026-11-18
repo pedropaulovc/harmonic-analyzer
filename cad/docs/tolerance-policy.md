@@ -137,9 +137,13 @@ own thin-only bands (thickness +0/−0.04, OD +0/−0.02) for its relief. Gates:
   the loosest running centre, so it never holds the swing out; its contact
   ratio (≈ 0.77) and its backlash where the swing locks (0.036 mm) are REF.
   The feeler set's 0.02 mm backlash has no counterpart under the feel set.
-- **Crank 16T:64T** (fixed bore, no adjustment): contact ratio ≥ 1.0 at the
-  nominal centre, positive backlash and no interference at the worst corner;
-  the open-corner contact ratio is REF.
+- **Crank 16T:64T** (fixed bore, no centre adjustment): contact ratio ≥ 1.0
+  at the nominal centre, positive backlash and no interference at the worst
+  mid-face corner (`crank_mesh_stack.standard_check`); the open-corner contact
+  ratio and the per-station figures are REF. The pair is accepted by hand at
+  assembly (MHA-DT-00 step 4N); if the teeth bind, the still-unpinned 16T is
+  recut, every tooth gap .004 in wider at the same depth (delegated ruling
+  2026-11-17, #2481 option B, owner review on #2144; see gear-standard.md).
 
 ### The chain, and where each error enters
 

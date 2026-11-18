@@ -1594,3 +1594,43 @@ STACKS = (
 @pytest.mark.parametrize("stack", STACKS, ids=lambda stack: stack.__name__.lstrip("_"))
 def test_stack_closes(stack) -> None:
     stack(build_dt_drive_train_assembly)
+
+
+def test_pinion_clears_t120_and_covers_the_64t_row_up_to_the_seat_gap_ceiling(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """#1145: MHA-DT-00 step 4F sets MHA-DT-10 on a feeler at the seat gap's
+    floor, and the stacks above prove the T120 air and the 64T row there and
+    run south onto the boss (PINION_END_PLAY).  PINION_BOSS_NORTH_GAP_RANGE
+    runs on to SEAT_GAP_MAX_MM, which the crankshaft's seat-step standoff and
+    crank_mesh_stack's overhang and lever book, so the same gates and the
+    16T sheet's stated T120 worst hold with the 16T anywhere up to it."""
+    drive = build_dt_drive_train_assembly
+    floor, ceiling = drive.PINION_BOSS_NORTH_GAP_RANGE
+    assert floor == drive.PINION_SEAT_FEELER == dt_crank_pinion_spec.SEAT_FEELER_MM
+    assert ceiling == dt_crank_pinion_spec.SEAT_GAP_MAX_MM
+    north = ceiling - floor
+    plays = (*drive.PINION_END_PLAY, north / 2.0, north)
+    concentric = drive.pinion_t120_clearances(end_plays=plays, pose_radial=0.0, pose_axial=0.0)
+    assert concentric["shoulder air"] >= drive.T120_PINION_AIR_FLOOR
+    assert concentric["turned band radial"] >= drive.T120_TURNED_BAND_RADIAL_FLOOR
+    worst = drive.pinion_t120_clearances(end_plays=plays)
+    assert worst["shoulder air"] >= dt_crank_pinion_spec.T120_SHOULDER_AIR_WORST
+    assert worst["turned band radial"] >= dt_crank_pinion_spec.T120_TURNED_BAND_RADIAL_WORST
+    # Control: north is the opening direction for T120; a 16T run far north
+    # of the ceiling stands further off the rim, so the end play is live here.
+    assert (
+        drive.pinion_t120_clearances(end_plays=(north + 4.0,))["turned band radial"]
+        > worst["turned band radial"]
+    )
+    monkeypatch.setattr(drive, "PINION_END_PLAY", plays)
+    assert (
+        drive.crank_row_engagement(drive.CONE_FLOAT_NORTH)
+        >= drive.CRANK_ROW_ENGAGEMENT_FLOOR
+    )
+    # Negative control: 5 mm north of its feeler set the 16T leaves the 64T row.
+    monkeypatch.setattr(drive, "PINION_END_PLAY", (5.0,))
+    assert (
+        drive.crank_row_engagement(drive.CONE_FLOAT_NORTH)
+        < drive.CRANK_ROW_ENGAGEMENT_FLOOR
+    )

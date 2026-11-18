@@ -148,8 +148,19 @@ a feel set leaves (`cone_set_stack`, `dt_mesh_checks`,
   2026-10-10 feeler set has no counterpart once the swing locks wherever no
   gear binds.
 - The crank pair has a fixed centre. It must reach a contact ratio of at least
-  1.0 at the nominal centre (1.088) and must not bind at any tolerance corner.
-  Its open-corner ratio is reference only.
+  1.0 at the nominal centre (1.088), and it is accepted by hand at assembly:
+  MHA-DT-00 step 4N turns MHA-DT-07 a full revolution before the 16T is
+  pinned, and if the teeth bind the 16T is recut, every tooth gap .004 in
+  wider with the cutter moved sideways at the same depth (delegated ruling
+  2026-11-17 on
+  [#2481](https://github.com/pedropaulovc/harmonic-analyzer/issues/2481#issuecomment-6970972065),
+  option B; precedent #2365 and #2416; the owner reviews it after the fact on
+  [#2144](https://github.com/pedropaulovc/harmonic-analyzer/issues/2144);
+  machinist exception DT-10 on MHA-DT-00). The mid-face closed form
+  (`crank_mesh_stack.standard_check`) is
+  still gated against binding at every printed corner; the per-station
+  figures, which close by about 0.08 mm at the tightest whole-face corner,
+  are reference. Its open-corner ratio is reference only.
 
 Everything else these drive-train checks print is reference (REF): the
 printed-corner contact ratios and the backlash at the loosest centre. A gear
@@ -421,9 +432,10 @@ The pitch change from 49.82 to 48 scales every standard diameter by +3.79%.
   helix's, one way at the tip and the other at the root; with drive and coast
   contact at different radii that takes 0.014 mm more backlash at the south
   face and 0.033 mm at the north face in the plane model. `station_checks`
-  reports it beside the backlash and does not gate it (#2481). The ruling is
-  conditional on the straight model
-  passing the drive-train interference and soundness gates.
+  reports it beside the backlash and does not gate it: the pair is accepted
+  by hand at assembly (#2481, option B, above). The ruling is conditional on
+  the straight model passing the drive-train interference and soundness
+  gates.
 - The meshes are not conjugate. Drawing each gear as its cutter's form removes
   the earlier mismatch between range cutters and ideal profiles, at the price
   of some transmission error in each mesh, which the model does not quantify.

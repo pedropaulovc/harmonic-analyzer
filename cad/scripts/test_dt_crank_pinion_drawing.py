@@ -193,7 +193,7 @@ def test_pin_hole_callout_links_the_pins_drive_fit_note() -> None:
     for text in (notes.DRAWING_NOTES, *drawing.DIMENSION_CALLOUTS.values()):
         assert "LIGHT HAMMER FIT" not in text and "FLUSH" not in text
     assert "FLUSH BOTH SIDES" in spec.PIN_FIT_LINES[1]
-    # MHA-DT-00's 4S-4U: tapped in flush, then the hand check its remedy needs.
+    # MHA-DT-00's 4U-4W: tapped in flush, then the hand check its remedy needs.
     assert f"TAP {spec.PIN_NUMBER} IN FLUSH BOTH SIDES." in assembly.CONE_CRANK_STEPS
     assert f"CHECK THAT {spec.PIN_NUMBER} IS NOT REMOVABLE BY HAND." in assembly.CONE_CRANK_STEPS
     assert drawing.REFERENCE_DIMENSIONS == ("PinHoleDia",)
@@ -394,6 +394,21 @@ def test_tooth_system_and_pair_acceptance_match_current_geometry() -> None:
     )
     mate_label = notes.BACKLASH_LABEL.replace(spec.MESH_GEAR_NUMBER, spec.PINION_NUMBER)
     assert mate_data[mate_label].strip() == backlash
+    # Delegated ruling 2026-11-17 on #2481 (option B): the mesh is accepted by
+    # hand at assembly, stated as a plain REF fact on the mate row, the last
+    # (rule 20: no governance word such as ACCEPTED; machinist review of
+    # #3090: no separate row naming the mate again).
+    assert rows[-1] == (
+        f"MATES WITH:  CRANK DRIVE GEAR {spec.MESH_GEAR_NUMBER}, 64T; TURNS FREE BY HAND (REF)"
+    )
+    assert not any(label.startswith("MESH WITH") for label in labels)
+    # The tooth runout is a finished-part requirement worded as the 64T's
+    # row, never a setup (rule 25; machinist review of #3090).
+    assert "ACCEPT AT SETUP" not in notes.GEAR_DATA
+    mate_runout = mate_data["TOOTH RUNOUT TO BORE"].strip()
+    assert data["TOOTH RUNOUT TO BORE"].strip() == mate_runout.replace(
+        spec.PINION_NUMBER, spec.MESH_GEAR_NUMBER
+    )
     assert not any("ACCEPT ON THIS PART" in row for row in rows)
     width_row = next(line for line in notes.GEAR_DATA.splitlines() if "CIRCULAR PITCH THICKNESS" in line)
     assert "REF" in width_row and "ACCEPT" not in width_row

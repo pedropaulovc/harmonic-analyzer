@@ -92,7 +92,7 @@ ACCEPTANCES = (
     ),
     (
         "crank-end-proud",
-        _step_ref("crank-mesh-checked", "W"),
+        _step_ref("crank-mesh-checked", "Y"),
         "MHA-DT-11 END PROUD OF MHA-DT-10",
         # A stack result, not a set window: rounded outward (Codjiflo, #2194).
         inch_envelope(
