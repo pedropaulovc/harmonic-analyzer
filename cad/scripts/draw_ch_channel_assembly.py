@@ -992,15 +992,15 @@ _BORDER_FOOT = BORDER + STEPS_FOOT_CLEARANCE
 # Sheet 3: right of view D. Sheet 4: the full-height left column, detail A
 # right of it. Sheet 5: right of views E and F. Sheet 6: the full-height left
 # column, then the setting table under view G's label on the right (round 1
-# review: balanced sheets, no lone step in an empty half). Sheet 3's column
-# stops well above the title block so the rocker bank's steps, fewer since
-# the arms float (#3114), split about evenly with sheet 4's.
-_ROCKER_RIGHT_FOOT = 0.108
+# review: balanced sheets, no lone step in an empty half). Each right column
+# runs down to the title block: with every remedy one action a step (rule
+# 22) the rocker bank needs both of its columns' full height, and the
+# end-hub check and its remedy blocks print together beside detail A.
 _HOOKUP_LABEL_FOOT = (
     HOOKUP_BOTTOM_Y - 0.004 - len(HOOKUP.label_text.splitlines()) * NOTE_LINE_PITCH
 )
 ROCKER_COLUMNS = (
-    StepColumn(SHEET_NAMES[2], (STEPS_RIGHT_X, STEPS_TOP_Y), _ROCKER_RIGHT_FOOT),
+    StepColumn(SHEET_NAMES[2], (STEPS_RIGHT_X, STEPS_TOP_Y), _RIGHT_FOOT),
     StepColumn(SHEET_NAMES[3], (STEPS_LEFT_X, STEPS_TOP_Y), _BORDER_FOOT),
 )
 LEVER_COLUMNS = (
@@ -1148,11 +1148,15 @@ def _fitup_text() -> dict[str, str]:
         ),
         # A press whose part slides in by hand is a slip fit (rule 23). The pin
         # is bought (sh_vn_pivot_pin_rod_spec), so the press-fit ruling is kept
-        # by a new rod, its fork hole reamed to the measured pin.
-        "rod-pin-remade": (
-            f"IF AN {pin} SLID IN BY HAND, ITS FORK HOLE IS OVER SIZE: PRESS THE "
-            f"PIN OUT, REPLACE THE {rod} AND RETURN TO STEP "
-            f"{n(steps.RODS_PINNED_KEY)}."
+        # by a new rod, its fork hole reamed to the measured pin. One action a
+        # step (rule 22): "THAT" ties each later step to the condition.
+        "rod-pin-pressed-out": (
+            f"IF AN {pin} SLID IN BY HAND, ITS FORK HOLE IS OVER SIZE: PRESS "
+            "THAT PIN OUT."
+        ),
+        "rod-replaced": f"REPLACE THAT {rod}.",
+        "rod-pin-return": (
+            f"RETURN TO STEP {n(steps.RODS_PINNED_KEY)} WITH THE NEW {rod}."
         ),
         # The fitter leaves this list after the rod pins for the drive train's
         # cylinder stack through its north-bracket set, then comes back here
@@ -1197,23 +1201,40 @@ def _fitup_text() -> dict[str, str]:
             f"CHECK THE FEELER LEAF OF {notes.setting_row('end-hubs-clear')} "
             f"PASSES BETWEEN EACH END {arm} HUB AND ITS {bracket} EAR ({detail})."
         ),
-        # Each end its own remedy (rule 22), both back to the bare shaft. The
-        # left bracket was set and screwed at MHA-DT-00 (its Ø.180 foot hole
-        # gives the #8 screw room to shift), so it is reset by that sheet's
-        # set, screw and recheck sub-steps; the right bracket, re-spanned off
-        # it, follows.
-        "north-bracket-reset": (
-            f"IF IT DOES NOT PASS AT THE LEFT HUB, DRAW {shaft} BACK AS AT STEP "
-            f"{n('shaft-drawn-back')}, SWING THE ARMS DOWN, EASE THE RIGHT CLAMP, "
-            f"LOOSEN THE LEFT {hold_down}, RESET THE LEFT {bracket} PER "
-            f"{steps.NORTH_BRACKET_SET_REF}B, {steps.NORTH_BRACKET_SET_NUMBER}E AND "
-            f"{steps.NORTH_BRACKET_SET_NUMBER}F AND RETURN TO STEP "
-            f"{n('bare-shaft-through-ears')}."
+        # Each end its own remedy block (rule 22: one action a step), both
+        # back to the bare shaft; the block opens with its condition and every
+        # later step carries the block's prefix, so none reads as main flow.
+        # Drawn out of the hubs, the shaft lets the arms drop and hang on
+        # their rods by themselves. The left bracket was set and screwed at
+        # MHA-DT-00 (its Ø.180 foot hole gives the #8 screw room to shift), so
+        # it is reset by that sheet's set, screw and recheck sub-steps; the
+        # right bracket, re-spanned off it, follows.
+        "left-hub-shaft-drawn-back": (
+            f"LEFT HUB, IF THE LEAF DID NOT PASS THERE: DRAW {shaft} BACK AS AT "
+            f"STEP {n('shaft-drawn-back')}."
         ),
-        "south-bracket-reset": (
-            f"IF IT DOES NOT PASS AT THE RIGHT HUB, DRAW {shaft} BACK AS AT STEP "
-            f"{n('shaft-drawn-back')}, SWING THE ARMS DOWN, EASE THE CLAMP AND "
-            f"RETURN TO STEP {n('bare-shaft-through-ears')}."
+        "left-hub-clamp-eased": f"LEFT HUB: EASE THE CLAMP ON THE RIGHT {bracket}.",
+        "left-hub-hold-down-loosened": f"LEFT HUB: LOOSEN THE LEFT {hold_down}.",
+        "left-hub-bracket-reset": (
+            f"LEFT HUB: RESET THE LEFT {bracket} PER {steps.NORTH_BRACKET_SET_REF}B."
+        ),
+        "left-hub-hold-down-tightened": (
+            f"LEFT HUB: TIGHTEN THE LEFT {hold_down} PER "
+            f"{steps.NORTH_BRACKET_SET_REF}E."
+        ),
+        "left-hub-bracket-rechecked": (
+            f"LEFT HUB: RECHECK PER {steps.NORTH_BRACKET_SET_REF}F."
+        ),
+        "left-hub-return": (
+            f"LEFT HUB: RETURN TO STEP {n('bare-shaft-through-ears')}."
+        ),
+        "right-hub-shaft-drawn-back": (
+            f"RIGHT HUB, IF THE LEAF DID NOT PASS THERE: DRAW {shaft} BACK AS AT "
+            f"STEP {n('shaft-drawn-back')}."
+        ),
+        "right-hub-clamp-eased": f"RIGHT HUB: EASE THE CLAMP ON THE RIGHT {bracket}.",
+        "right-hub-return": (
+            f"RIGHT HUB: RETURN TO STEP {n('bare-shaft-through-ears')}."
         ),
         "south-foot-transferred": (
             f"STILL CLAMPED, TRANSFER-DRILL THE RIGHT {bracket} FOOT HOLE INTO "
@@ -1246,7 +1267,10 @@ def _fitup_text() -> dict[str, str]:
         ),
         "keepers-on-frame": (
             f"WITH {top_frame} ON THE MILL, STAND BOTH {keeper} ON ITS RAIL AS "
-            f"{plan_view} SHOWS, FEET OUTWARD, {fulcrum_shaft} THROUGH BOTH BORES."
+            f"{plan_view} SHOWS, FEET OUTWARD."
+        ),
+        "fulcrum-shaft-through-keepers": (
+            f"PUSH {fulcrum_shaft} THROUGH BOTH {keeper} BORES."
         ),
         steps.KEEPERS_SET_KEY: (
             f"BY DRO, SET EACH LUG CENTRE OFF THE RAIL WEB CENTRE, TO {plan_view}."
@@ -1277,8 +1301,11 @@ def _fitup_text() -> dict[str, str]:
             "UNDER IT."
         ),
         "bar-straightened": (
-            f"STRAIGHTEN BY HAND, OR EXCHANGE, ANY {bar} BAR THE LEAF ENTERED AND "
-            f"RETURN TO STEP {n('bars-straight')}."
+            f"STRAIGHTEN BY HAND, OR EXCHANGE, ANY {bar} BAR THE LEAF ENTERED."
+        ),
+        "bar-straightened-return": (
+            f"RETURN TO STEP {n('bars-straight')} WITH EACH {bar} BAR "
+            "STRAIGHTENED OR EXCHANGED."
         ),
         "bar-notches-set": (
             f"AT THE BENCH, SET THE TOP NOTCH OF EACH {bar} BAR ASTRIDE ONE "
@@ -1293,11 +1320,12 @@ def _fitup_text() -> dict[str, str]:
         ),
         "bar-pins-held": f"CHECK EACH {bar_pin} DOES NOT SLIDE IN ITS BAR BY HAND.",
         "bars-swing": f"CHECK EACH {bar} SWINGS FREE ON ITS PIN UNDER ITS OWN WEIGHT.",
-        "bar-pin-remade": (
+        "bar-pin-pressed-out": (
             f"IF AN {bar_pin} SLID IN BY HAND, ITS CHEEK HOLE IS OVER SIZE: PRESS "
-            f"THE PIN OUT, REPLACE THE {bar} AND RETURN TO STEP "
-            f"{n('bars-straight')}."
+            "THAT PIN OUT."
         ),
+        "bar-replaced": f"REPLACE THAT {bar}.",
+        "bar-pin-return": f"RETURN TO STEP {n('bars-straight')} WITH THE NEW {bar}.",
         "fulcrum-shaft-withdrawn": (
             f"DRAW {fulcrum_shaft} OUT OF BOTH {keeper} TO THE LEFT ({lever_view})."
         ),

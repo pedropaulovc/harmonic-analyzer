@@ -66,17 +66,43 @@ HA_ANCHORS_SET_REF = "MHA-HA-00 STEP 5"
 # finder's reach). It stays only clamped while the shaft is drawn back, the
 # arms are threaded on and the end hubs are checked clear of the ears
 # (machinist review, PR #1605: a failed check re-sets a bracket that can
-# still move). Each end has its own remedy (rule 22): the left bracket, set
-# and screwed at MHA-DT-00, is reset per its own sub-steps; both remedies
-# return to the bare shaft. The foot hole is transferred and the bracket
-# screwed down only once that check has passed. The arms are checked to
-# slide freely with their rods once the shaft is held.
+# still move). Each end has its own remedy block, one action a step (rule
+# 22): the left bracket, set and screwed at MHA-DT-00, is reset per its own
+# sub-steps; both blocks return to the bare shaft. The foot hole is
+# transferred and the bracket screwed down only once that check has passed.
+# The arms are checked to slide freely with their rods once the shaft is held.
+LEFT_HUB_REMEDY: tuple[str, ...] = (
+    "left-hub-shaft-drawn-back",
+    "left-hub-clamp-eased",
+    "left-hub-hold-down-loosened",
+    "left-hub-bracket-reset",
+    "left-hub-hold-down-tightened",
+    "left-hub-bracket-rechecked",
+    "left-hub-return",
+)
+RIGHT_HUB_REMEDY: tuple[str, ...] = (
+    "right-hub-shaft-drawn-back",
+    "right-hub-clamp-eased",
+    "right-hub-return",
+)
+# A pin that slid in by hand: pressed out, its host replaced, back to the
+# step named, one action a step (rule 22).
+ROD_PIN_REMEDY: tuple[str, ...] = (
+    "rod-pin-pressed-out",
+    "rod-replaced",
+    "rod-pin-return",
+)
+BAR_PIN_REMEDY: tuple[str, ...] = (
+    "bar-pin-pressed-out",
+    "bar-replaced",
+    "bar-pin-return",
+)
 ROCKER_SEQUENCE: tuple[str, ...] = (
     RODS_PINNED_KEY,
     "rod-pins-dressed",
     "rod-pins-held",
     "rod-arms-swing",
-    "rod-pin-remade",
+    *ROD_PIN_REMEDY,
     "north-bracket-held",
     "south-bracket-stood",
     "bare-shaft-through-ears",
@@ -86,8 +112,8 @@ ROCKER_SEQUENCE: tuple[str, ...] = (
     "arms-swung-up",
     "rocker-hubs-threaded",
     "end-hubs-clear",
-    "north-bracket-reset",
-    "south-bracket-reset",
+    *LEFT_HUB_REMEDY,
+    *RIGHT_HUB_REMEDY,
     "south-foot-transferred",
     "south-foot-tapped",
     "south-bracket-screwed",
@@ -101,6 +127,7 @@ ROCKER_SEQUENCE: tuple[str, ...] = (
 )
 LEVER_SEQUENCE: tuple[str, ...] = (
     "keepers-on-frame",
+    "fulcrum-shaft-through-keepers",
     KEEPERS_SET_KEY,
     "keeper-faces-set",
     "keepers-clamped-on-frame",
@@ -112,12 +139,13 @@ LEVER_SEQUENCE: tuple[str, ...] = (
     "keeper-bores-checked",
     "bars-straight",
     "bar-straightened",
+    "bar-straightened-return",
     "bar-notches-set",
     BARS_PINNED_KEY,
     "bar-pins-dressed",
     "bar-pins-held",
     "bars-swing",
-    "bar-pin-remade",
+    *BAR_PIN_REMEDY,
     "fulcrum-shaft-withdrawn",
     LEVER_BANK_THREADED_KEY,
     "bar-feet-seated",

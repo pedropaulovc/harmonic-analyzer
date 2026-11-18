@@ -123,8 +123,10 @@ def test_every_cross_sheet_step_pointer_lands_on_the_step_it_names() -> None:
         # bench-pinned rod + arm pairs must exist by then.
         (channel_number, stack_ref): "AS EACH GEAR GOES ON",
         # The left-hub remedy resets the left bracket by the drive train's own
-        # ear-setting sub-step (then its screw and recheck sub-steps).
+        # ear-setting sub-step, then its screw and recheck sub-steps.
         (channel_number, f"{north_ref}B"): "SET THE EAR INNER FACE TO ITS Y",
+        (channel_number, f"{north_ref}E"): f"SCREW THE {bracket} DOWN",
+        (channel_number, f"{north_ref}F"): "RECHECK Y",
         # ... and that drive-train step names the pinning step it relies on.
         (fitup_number, steps.RODS_PINNED_REF): "ROD FORK",
         # The support is screwed down before the north bracket is set on it.
@@ -210,18 +212,49 @@ def test_the_printed_step_heads_are_the_registry_in_order() -> None:
 
 def test_every_step_is_one_action_of_at_most_six_lines() -> None:
     """drawing-guidelines.md rule 22: one action per step, at most six
-    printed lines; every remedy loops back to the step it repeats."""
+    printed lines; every remedy block ends on a step of its own that loops
+    back to the step it repeats (machinist review of PR #3116: no step joins
+    actions with commas or AND, none ends "... AND RETURN TO STEP n")."""
     for key in steps.SEQUENCE:
         assert len(drawing._wrapped_step(key, drawing.FITUP_TEXT[key])) <= 6
-    for key, target in (
-        ("rod-pin-remade", steps.RODS_PINNED_KEY),
-        ("north-bracket-reset", "bare-shaft-through-ears"),
-        ("south-bracket-reset", "bare-shaft-through-ears"),
-        ("bar-pin-remade", "bars-straight"),
-        ("bar-straightened", "bars-straight"),
-    ):
+    returns = {
+        "rod-pin-return": steps.RODS_PINNED_KEY,
+        "left-hub-return": "bare-shaft-through-ears",
+        "right-hub-return": "bare-shaft-through-ears",
+        "bar-pin-return": "bars-straight",
+        "bar-straightened-return": "bars-straight",
+    }
+    for key, target in returns.items():
         assert steps.step_number(target) < steps.step_number(key)
-        assert f"STEP {steps.step_number(target)}." in _step_body(key)
+        body = _step_body(key)
+        assert re.search(rf"RETURN TO STEP {steps.step_number(target)}\b", body), key
+        # The return is the whole step: nothing but its block prefix before it.
+        assert re.fullmatch(r"((LEFT|RIGHT) HUB: )?RETURN TO STEP .*", body), key
+    for key in steps.SEQUENCE:
+        assert ("RETURN TO STEP" in _step_body(key)) == (key in returns), key
+    # Each remedy block is consecutive, in order, right after its check.
+    for check, block in (
+        ("rod-arms-swing", steps.ROD_PIN_REMEDY),
+        ("end-hubs-clear", steps.LEFT_HUB_REMEDY + steps.RIGHT_HUB_REMEDY),
+        ("bars-straight", ("bar-straightened", "bar-straightened-return")),
+        ("bars-swing", steps.BAR_PIN_REMEDY),
+    ):
+        first = steps.SEQUENCE.index(check) + 1
+        assert steps.SEQUENCE[first : first + len(block)] == block, check
+    # Each hub block opens with its condition; every later step of the block
+    # carries the block's prefix, so none reads as part of the main flow.
+    for side, block in (
+        ("LEFT", steps.LEFT_HUB_REMEDY),
+        ("RIGHT", steps.RIGHT_HUB_REMEDY),
+    ):
+        assert _step_body(block[0]).startswith(
+            f"{side} HUB, IF THE LEAF DID NOT PASS THERE: "
+        )
+        for key in block[1:]:
+            assert _step_body(key).startswith(f"{side} HUB: "), key
+    for prefix in ("rod", "bar"):
+        assert _step_body(f"{prefix}-pin-pressed-out").startswith("IF AN ITEM ")
+        assert _step_body(f"{prefix}-replaced").startswith("REPLACE THAT ITEM ")
 
 
 def test_the_steps_name_parts_by_bom_item() -> None:
@@ -283,7 +316,7 @@ def test_the_right_bracket_is_set_to_the_ear_span_and_the_end_hubs_checked() -> 
     PR #3116: with the arms on, each inner face is .05 from its hub, out of an
     edge finder's reach). The end hubs are then checked clear of their ears
     on a feeler leaf while it is only clamped (machinist review, PR #1605),
-    each end with its own remedy (rule 22), and the arms are checked to slide
+    each end with its own remedy block (rule 22), and the arms are checked to slide
     with their rods once the shaft is held."""
     import draw_dt_drive_train_assembly as drive_train
 
@@ -316,25 +349,35 @@ def test_the_right_bracket_is_set_to_the_ear_span_and_the_end_hubs_checked() -> 
     assert f"EACH END {arm} HUB" in clear
     assert f"({drawing.SOUTH_END.title}, SHEET 4)" in clear
     assert drawing.SHEET_NAMES.index(drawing.DETAIL_SHEET) == 3
-    # One remedy per end, each back to the bare shaft with the right bracket
-    # still only clamped; the left one re-runs the drive train's set, screw
-    # and recheck sub-steps (positive control on their wording).
-    left = _step_body("north-bracket-reset")
-    right = _step_body("south-bracket-reset")
-    assert "AT THE LEFT HUB" in left and "AT THE RIGHT HUB" in right
+    # One remedy block per end, one action a step, each back to the bare
+    # shaft with the right bracket still only clamped; the left one re-runs
+    # the drive train's set, screw and recheck sub-steps (positive control on
+    # their wording). Drawn out of the hubs, the shaft lets the arms hang on
+    # their rods: no step swings them down.
     hold_down = drawing.item(drawing.explode.BRACKET_HOLD_DOWN)
-    assert f"LOOSEN THE LEFT {hold_down}" in left
+    assert f"LOOSEN THE LEFT {hold_down}." in _step_body("left-hub-hold-down-loosened")
     number = steps.NORTH_BRACKET_SET_NUMBER
-    assert f"{steps.NORTH_BRACKET_SET_REF}B, {number}E AND {number}F" in left
+    for key, letter, action in (
+        ("left-hub-bracket-reset", "B", f"RESET THE LEFT {bracket}"),
+        ("left-hub-hold-down-tightened", "E", f"TIGHTEN THE LEFT {hold_down}"),
+        ("left-hub-bracket-rechecked", "F", "RECHECK"),
+    ):
+        assert _step_body(key).endswith(
+            f"{action} PER {steps.NORTH_BRACKET_SET_REF}{letter}."
+        ), key
     dt_steps = _sequence_steps(
         "\n".join((drive_train.CONE_CRANK_STEPS, drive_train.BANK_STEPS))
     )
     assert "SET THE EAR INNER FACE" in dt_steps[f"{number}B"]
     assert "SCREW THE MHA-CH-08 DOWN" in dt_steps[f"{number}E"]
     assert "RECHECK" in dt_steps[f"{number}F"]
-    for body in (left, right):
-        assert f"STEP {steps.step_number('shaft-drawn-back')}," in body
-        assert "EASE THE" in body
+    drawn = f"DRAW {shaft} BACK AS AT STEP {steps.step_number('shaft-drawn-back')}."
+    for side in ("left", "right"):
+        assert _step_body(f"{side}-hub-shaft-drawn-back").endswith(drawn)
+        assert _step_body(f"{side}-hub-clamp-eased").endswith(
+            f"EASE THE CLAMP ON THE RIGHT {bracket}."
+        )
+    assert not re.search(r"SWING [A-Z0-9 ]*DOWN", drawing.FITUP_STEPS)
     follow = _step_body("arms-follow-rods")
     assert arm in follow and drawing.item(drawing.explode.ROD) in follow
     assert "WASHER" not in _step_body("rocker-hubs-threaded")
@@ -348,8 +391,8 @@ def test_the_right_bracket_is_set_to_the_ear_span_and_the_end_hubs_checked() -> 
         "arms-swung-up",
         "rocker-hubs-threaded",
         "end-hubs-clear",
-        "north-bracket-reset",
-        "south-bracket-reset",
+        *steps.LEFT_HUB_REMEDY,
+        *steps.RIGHT_HUB_REMEDY,
         "south-foot-transferred",
         "south-bracket-screwed",
         "south-bracket-held",
@@ -980,6 +1023,7 @@ def test_the_fulcrum_keepers_are_set_by_dro_checked_and_staked() -> None:
     assert steps.LEVER_SEQUENCE[0] == "keepers-on-frame"
     order = [
         "keepers-on-frame",
+        "fulcrum-shaft-through-keepers",
         steps.KEEPERS_SET_KEY,
         "keepers-clamped-on-frame",
         "keeper-feet-transferred",
@@ -1078,7 +1122,7 @@ def test_each_rod_fork_is_pinned_to_its_arm_at_the_bench_first() -> None:
         "rod-pins-dressed",
         "rod-pins-held",
         "rod-arms-swing",
-        "rod-pin-remade",
+        *steps.ROD_PIN_REMEDY,
         "north-bracket-held",
     ]
     assert list(steps.SEQUENCE[: len(order)]) == order
@@ -1093,30 +1137,36 @@ def test_each_rod_fork_is_pinned_to_its_arm_at_the_bench_first() -> None:
         steps.RODS_PINNED_KEY,
         "rod-pins-dressed",
         "rod-pins-held",
-        "rod-pin-remade",
+        "rod-pin-pressed-out",
     }
     pressing = {
         steps.RODS_PINNED_KEY,
         steps.BARS_PINNED_KEY,
-        "rod-pin-remade",
-        "bar-pin-remade",
+        "rod-pin-pressed-out",
+        "bar-pin-pressed-out",
     }
     pin = drawing.item(drawing.explode.ROD_PIN)
     for key in steps.SEQUENCE:
         body = _step_body(key)
         assert (re.search(rf"\b{pin}\b", body) is not None) == (key in pin_steps), key
         assert ("PRESS" in body) == (key in pressing), key
-    # A bought pin cannot be remade: each remedy replaces the part whose
-    # reamed hole let the pin slide, and sends the fitter back to its press;
-    # a replacement bar first passes the straightness check (#2341).
-    for remedy, host, pinned in (
-        ("rod-pin-remade", drawing.explode.ROD, steps.RODS_PINNED_KEY),
-        ("bar-pin-remade", drawing.explode.BAR, "bars-straight"),
+    # A bought pin cannot be remade: each remedy presses the pin out, replaces
+    # the part whose reamed hole let it slide, and sends the fitter back to
+    # its press, one action a step (rule 22); a replacement bar first passes
+    # the straightness check (#2341).
+    for prefix, host_pin, host, pinned in (
+        ("rod", drawing.explode.ROD_PIN, drawing.explode.ROD, steps.RODS_PINNED_KEY),
+        ("bar", drawing.explode.BAR_PIN, drawing.explode.BAR, "bars-straight"),
     ):
-        body = _step_body(remedy)
-        assert f"REPLACE THE {drawing.item(host)} " in body, remedy
-        assert f"RETURN TO STEP {steps.step_number(pinned)}." in body, remedy
-        assert "REMAKE" not in body, remedy
+        out = _step_body(f"{prefix}-pin-pressed-out")
+        assert out.startswith(f"IF AN {drawing.item(host_pin)} SLID IN BY HAND,")
+        assert out.endswith("IS OVER SIZE: PRESS THAT PIN OUT.")
+        assert _step_body(f"{prefix}-replaced") == f"REPLACE THAT {drawing.item(host)}."
+        assert _step_body(f"{prefix}-pin-return") == (
+            f"RETURN TO STEP {steps.step_number(pinned)} WITH THE NEW "
+            f"{drawing.item(host)}."
+        )
+        assert "REMAKE" not in drawing.FITUP_STEPS
 
 
 def test_the_finished_shaft_is_set_by_its_tip_before_the_screws() -> None:
@@ -1279,7 +1329,7 @@ def test_each_bar_is_proved_straight_before_it_is_pinned() -> None:
     neighbours each at that bow keep the mid-span running floor."""
     asm = drawing.asm
     straight = steps.step_number("bars-straight")
-    assert straight == steps.step_number("bar-notches-set") - 2
+    assert straight == steps.step_number("bar-notches-set") - 3
     assert straight < steps.step_number(steps.BARS_PINNED_KEY)
     assert asm.BAR_BOW_MAX_MM == pytest.approx(0.005 * 25.4)
     assert asm.BAR_GAP["mid_span_bowed"] >= asm._BAR_RUNNING_FLOOR
@@ -1288,12 +1338,16 @@ def test_each_bar_is_proved_straight_before_it_is_pinned() -> None:
     cite = drawing.notes.setting_row("bars-straight")
     assert f"THE FEELER LEAF OF {cite} MUST NOT" in body
     assert _setting_table_row("bars-straight")[4:] == (".005 MAX", "FEELER LEAF")
-    # Rule 22: the remedy is its own step and loops back to the check.
+    # Rule 22: the remedy is its own step, and so is the loop back to the check.
     assert "STRAIGHTEN" not in body
     assert steps.step_number("bar-straightened") == straight + 1
     remedy = _step_body("bar-straightened")
     assert "STRAIGHTEN BY HAND, OR EXCHANGE" in remedy
-    assert f"RETURN TO STEP {straight}." in remedy
+    assert "RETURN" not in remedy
+    assert steps.step_number("bar-straightened-return") == straight + 2
+    assert _step_body("bar-straightened-return").startswith(
+        f"RETURN TO STEP {straight} WITH EACH "
+    )
 
 
 def _setting_table_row(key: str) -> tuple[str, ...]:
