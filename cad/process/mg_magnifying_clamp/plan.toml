@@ -341,15 +341,15 @@ peck = "none"
 milling_cuts = [
   { name = "cross drill", kind = "drill", phase = "rough", cutter_dia_mm = 6.5278, flutes = 2, rpm = 2400, feed_mm_min = "{{process.drill_f_feed_per_min_mm}}", stations_mm = "{{cad.bore_height_mm}}" },
 ]
-inspection = "Bore Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}} by drill shanks, before unclamping. Mic the F drill's shank: .2570–.2575 to use it as the GO. Mic the G drill's shank: .2600–.2610 to use it as the NO-GO. The GO enters, the NO-GO does not. An F shank under .2570 cannot be the GO: the lower limit then rests on the F drill alone. If the MHA-MG-03 lever is at hand, its 1/4 in body must slide through."
+inspection = "Bore Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}} by drill shanks, before unclamping (no pin gauges are owned). Mic the F drill's shank: .2570–.2575 to use it as the GO. Mic the G drill's shank: .2600–.2610 to use it as the NO-GO. Accept: the GO enters and the NO-GO does not. As with any fixed gauge, each shank sits inside the band, so it can reject a bore within .0005 (GO) or .0010 (NO-GO) of a limit. An F shank under .2570 cannot be the GO: then accept on the NO-GO alone, the lower limit held by the F drill, and write that on the tag. If the MHA-MG-03 lever is at hand, its 1/4 in body must slide through."
 gauge_checks = [{ gauge = "clamp-bore-drill-shanks", band_mm = "{{cad.bore_dia_band_mm}}" }]
 
 [[setups.operations]]
-instruction = "The GO does not enter: run MC03_cross_bore again, still clamped (same spot, the F drill through again), and re-check. Still not: the bore is under the shank's miked size; that alone is not a rejection; tag it and tell the owner."
+instruction = "The GO does not enter: run MC03_cross_bore again, still clamped (same spot, the F drill through again), and re-check. Still not: reject the clamp."
 feed = "hand"
 
 [[setups.operations]]
-instruction = "The NO-GO enters: a bore over {{cad.bore_dia_max_in:.4dot}} is scrap; if the G shank mics under {{cad.bore_dia_max_in:.4dot}}, the bore is only over that reading, not a rejection on its own: tag it and tell the owner."
+instruction = "The NO-GO enters: reject the clamp."
 feed = "hand"
 
 [[setups]]
@@ -366,8 +366,8 @@ vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.af_mm}}", along_jaws_m
 beam = { axis = "z", hold = "cantilever", extent_mm = [0, "{{process.upright_top_max_mm}}"], clamp_mm = [0, "{{process.upright_grip_mm}}"], section_mm = { diameter = "{{cad.af_mm}}" }, vise_left = "other" }
 
 [[setups.operations]]
-instruction = "Home the mill first ($H). G54 X0 midway between the two corners; Y0 the hex axis, half the miked across flats from the fixed jaw."
-instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm) on the fixed jaw's face: G10 L20 P1 Y(half your across-flats reading in mm − 2.540). On the LEFT corner from the left: G10 L20 P1 X0. On the RIGHT corner from the right: G10 L20 P1 X(half the DRO X reading)."
+instruction = "Home the mill first ($H). G54 X0 midway between the two corners, touched above the cross bore (the bore has cut the corners below .93); Y0 the hex axis, half the miked across flats from the fixed jaw."
+instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm) on the fixed jaw's face: G10 L20 P1 Y(half your across-flats reading in mm − 2.540). The edge finder's tip .10 below the top end, above the bore: on the LEFT corner from the left: G10 L20 P1 X0. On the RIGHT corner from the right: G10 L20 P1 X(half the DRO X reading)."
 feed = "hand"
 
 [[setups.operations]]
@@ -514,5 +514,5 @@ instruction = "Wipe on Barricade oil; leave it overnight, then wipe off the exce
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Fits after blackening. The maker states no dimensional change; the registry and the clamp's spec say nothing about blackening build-up. Check: a 4-40 screw runs into each tapped hole by hand; if the MHA-MG-03 lever is at hand, its 1/4 in body still slides through the bore. Tight: stop and tell the owner; do not re-tap or ream."
+instruction = "Fits after blackening: a 4-40 screw runs into each tapped hole by hand; if the MHA-MG-03 lever is at hand, its 1/4 in body still slides through the bore. Tight: stop and tell the owner; do not re-tap or ream."
 feed = "hand"
