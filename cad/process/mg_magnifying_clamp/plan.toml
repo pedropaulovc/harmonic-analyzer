@@ -308,12 +308,12 @@ vise_hold = "other"
 beam = { axis = "x", hold = "solid", extent_mm = [0, "{{cad.block_height_mm}}"], seat = "gripped full length in the vise jaws, the bottom end on the parallels' edges", seat_mm = [0, "{{cad.block_height_mm}}"] }
 
 [[setups.operations]]
-instruction = "Bore gauges, before the setup: mic the F drill's shank, .2570–.2575 makes it the GO; mic the G drill's shank, .2600–.2610 makes it the NO-GO (each sits inside the band, as fixed gauges do; no pin gauges are owned). F under .2570: no GO; the NO-GO alone gauges the bore, and the tag says so."
+instruction = "Bore gauges, before the setup: mic the F drill's shank, .2570–.2575 makes it the GO; mic the G drill's shank, .2600–.2610 makes it the NO-GO (each sits inside the band, as fixed gauges do; no pin gauges are owned). F under .2570: no GO; write BORE MIN NOT GAUGED on a tag on the clamp now, and gauge with the NO-GO only."
 feed = "hand"
 
 [[setups.operations]]
 instruction = "Home the mill first ($H). G54 X0 the faced bottom end; Y0 the hex axis, half the miked across flats from the fixed jaw."
-instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm) on the fixed jaw's face: G10 L20 P1 Y(half your across-flats reading in mm − 2.540); for .500, Y3.810. On the clamp's faced bottom end from the left: G10 L20 P1 X-2.540."
+instruction_detailed = "Home the mill first ($H). Edge finder (900 rpm) on the fixed jaw's face: G10 L20 P1 Y(half your across-flats reading in mm − 2.540); for .500, Y3.810. On the clamp's faced bottom end from the left: G10 L20 P1 X-2.540 (minus: the edge finder's centre is left of the end)."
 feed = "hand"
 
 [[setups.operations]]
@@ -342,14 +342,14 @@ speed_kind = "spindle"
 tool = "drill-f"
 drilling = "twist_drill"
 sizing = { kind = "band", band_mm = "{{cad.bore_dia_band_mm}}" }
-instruction = "Same file, M6 T4: F drill through both corners, no peck, its full diameter {{process.cross_drill_past_mm:in.3dot}} past the lower corner, into the air past the parallels' ends; set 2400. A drop of Tapmatic Gold."
+instruction = "Same file, M6 T4: F drill through both corners, no peck, its full diameter {{process.cross_drill_past_mm:in.3dot}} past the lower corner, into the air past the parallels' ends; set 2400. A drop of Tapmatic Gold. At least 1.10 out of its collet or chuck: it reaches .96 below the jaw tops."
 settings = "clamp-drill-f-brass"
 hole_depth_mm = "{{cad.ac_mm}}"
 peck = "none"
 milling_cuts = [
   { name = "cross drill", kind = "drill", phase = "rough", cutter_dia_mm = 6.5278, flutes = 2, rpm = 2400, feed_mm_min = "{{process.drill_f_feed_per_min_mm}}", stations_mm = "{{cad.bore_height_mm}}" },
 ]
-inspection = "Bore Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}}, before unclamping: the GO shank enters, the NO-GO shank does not. If the MHA-MG-03 lever is at hand, its 1/4 in body slides through."
+inspection = "Bore Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}}, before unclamping: the GO shank (if there is one) enters, the NO-GO shank does not. If the MHA-MG-03 lever is at hand, its 1/4 in body slides through."
 gauge_checks = [{ gauge = "clamp-bore-drill-shanks", band_mm = "{{cad.bore_dia_band_mm}}" }]
 
 [[setups.operations]]
@@ -380,7 +380,7 @@ feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Z0: the parallels' top (the faced bottom end), touched with the #43 drill between the jaws, on the fixed-jaw parallel left of the clamp."
-instruction_detailed = "Console M6 T3 (#43 drill; the tool setter measures it). MDI G0 X-12.700 Y4.763: over the fixed-jaw parallel's top, left of the clamp (the 1/2 in end mill is too wide to go between the jaws). Spindle stopped, its point just dragging a .002 feeler leaf on that parallel: G10 L20 P1 Z0.051."
+instruction_detailed = "Console M6 T3 (#43 drill, at least .90 out of its collet or chuck: it reaches .77 down between the jaws; the tool setter measures it). MDI G0 X-12.700 Y4.763: over the fixed-jaw parallel's top, left of the clamp (the 1/2 in end mill is too wide to go between the jaws). Spindle stopped, its point just dragging a .002 feeler leaf on that parallel: G10 L20 P1 Z0.051."
 feed = "hand"
 
 [[setups.operations]]
