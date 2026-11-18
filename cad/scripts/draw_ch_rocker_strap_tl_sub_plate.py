@@ -164,12 +164,15 @@ _FENCE_TOP_B = section_b_xy(0.0, spec.FENCE_HEIGHT)[1]
 # line and the fence face; the radii right of the plate, each leader running
 # out level from its feature.
 TOP_KEEP: dict[str, tuple[float, float]] = {
-    "LeftEnd": (_LEFT_X - 0.007, _BACK_Y + 0.012),
-    "NotchLeftEnd": (top_xy(spec.NOTCH_LEFT_END / 2.0, 0.0)[0], _BACK_Y + 0.020),
-    "NotchRightStart": (top_xy(spec.NOTCH_RIGHT_START / 2.0, 0.0)[0], _BACK_Y + 0.0355),
+    # Farm run r21: the notch start's (.92) outside dimension line ran into
+    # the hub callout's drill row; it and the stock end drop under the
+    # callout, and the callout and the two long rows rise over it.
+    "LeftEnd": (_LEFT_X - 0.007, _BACK_Y + 0.006),
+    "NotchLeftEnd": (top_xy(spec.NOTCH_LEFT_END / 2.0, 0.0)[0], _BACK_Y + 0.013),
+    "NotchRightStart": (top_xy(spec.NOTCH_RIGHT_START / 2.0, 0.0)[0], _BACK_Y + 0.039),
     "PlateLength": (
         top_xy(spec.LEFT_END_X + spec.PLATE_LENGTH / 2.0, 0.0)[0],
-        _BACK_Y + 0.0435,
+        _BACK_Y + 0.047,
     ),
     "ClampTapX1": (top_xy(_STATIONS[0], 0.0)[0] + 0.008, _FRONT_Y - 0.013),
     "ClampTapX2": (top_xy(_STATIONS[1] / 2.0, 0.0)[0], _FRONT_Y - 0.021),
@@ -230,10 +233,11 @@ SECTION_B_KEEP: dict[str, tuple[float, float]] = {
 # leader rises across the back edge, the hub's shortest way out, right of
 # B-B's line, which runs through the hub's axis (farm run
 # 20261118T001932117Z: led off section B-B, it ran 20 mm over the part).
+# Farm run r21: 3.2 mm higher, clear over the notch start's (.92) row.
 CLAMP_TAP_CENTRE_MM = (_STATIONS[-1], spec.CLAMP_SCREW_Y)
 CLAMP_TAP_CALLOUT_XY = (0.254, 0.165)
 HUB_TAP_CENTRE_MM = (spec.HUB_X, spec.HUB_Y)
-HUB_TAP_CALLOUT_XY = (0.1323, 0.2301)
+HUB_TAP_CALLOUT_XY = (0.1323, 0.2333)
 # A drill circle's centre and radius read back from the view (mm).
 _RIM_CENTRE_TOLERANCE_MM = 0.02
 _RIM_RADIUS_TOLERANCE_MM = 0.01
