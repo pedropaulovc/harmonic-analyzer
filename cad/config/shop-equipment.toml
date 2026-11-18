@@ -786,6 +786,11 @@ use = "Op 30 and A4: under the overhanging end"
 
 # --- stock ------------------------------------------------------------------
 
+# on_hand: owner (Pedro) 2026-11-17, "assume all stock bought is on hand
+# except for platen c360 brass bar": every row below with an order is on
+# hand; rows still to order stay as they were. The platen's C360 brass bar
+# is not on hand (it has no row here).
+
 # Rocker route v3 stock purchase: catalogue nominals, not receipt measurements.
 [[stock]]
 form = "flat_bar"
@@ -794,7 +799,7 @@ note = "Ordered 2026-11-03 (OnlineMetals order 1021751700): 1/8 x 1-1/2 in 1018 
 # OnlineMetals 4807 catalogue nominal .125 x 1.5 in = [38.1, 3.175] mm and 72 x 25.4 = 1828.8 mm; not metrology.
 section_mm = [38.1, 3.175]
 length_mm = 1828.8
-on_hand = false
+on_hand = true
 cite = ["OnlineMetals part 4807 https://www.onlinemetals.com/en/buy/x/pid/4807 ordered 2026-11-03"]
 
 # Oblique-trammel stock: owner-reported purchase (2026-10-23), not metrology.
@@ -819,7 +824,7 @@ note = "Black acetal (Delrin) bar, 1/4 x 1-3/4 in, oversized tolerance, 2 ft (Mc
 # Catalogue nominals 1/4 x 1-3/4 in x 24 in = [44.45, 6.35] x 609.6 mm; oversized tolerance. Not metrology.
 section_mm = [44.45, 6.35]
 length_mm = 609.6
-on_hand = false
+on_hand = true
 cite = ["McMaster-Carr 8663K55 https://www.mcmaster.com/8663K55/ ordered 2026-11-03", "Original requirement: harmonic-analyzer issue 1619 https://github.com/pedropaulovc/harmonic-analyzer/issues/1619"]
 
 [[stock]]
@@ -829,7 +834,7 @@ note = "Ordered 2026-11-03: 1 x 3 in 6061-T6511 flat, 12 in (standard length). A
 # Catalogue nominals 1 x 3 in x 12 in = [76.2, 25.4] x 304.8 mm. Not metrology.
 section_mm = [76.2, 25.4]
 length_mm = 304.8
-on_hand = false
+on_hand = true
 cite = ["OnlineMetals part 1187 https://www.onlinemetals.com/en/buy/x/pid/1187 ordered 2026-11-03"]
 
 # Not ordered: stock still to buy.
