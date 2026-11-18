@@ -198,7 +198,9 @@ def _spot_depth(dia: float) -> float:
     reaches ``dia``; refused unless it is between the pilot and the body."""
     pilot, body = CENTRE_DRILL["pilot_mm"], CENTRE_DRILL["body_mm"]
     if not pilot < dia <= body:
-        raise ValueError(f"spot Ø{dia:.3f} is not between the pilot Ø{pilot:.3f} and the body Ø{body:.3f}")
+        raise ValueError(
+            f"spot Ø{dia:.3f} is not between the pilot Ø{pilot:.3f} and the body Ø{body:.3f}"
+        )
     half = math.radians(CENTRE_DRILL["point_deg"] / 2)
     return CENTRE_DRILL["pilot_length_mm"] + (dia - pilot) / 2 / math.tan(half)
 
@@ -278,7 +280,9 @@ def context(
     height = f["top_face"]["plane"]["value"] - f["bottom_face"]["plane"]["value"]
     band = f["top_face"]["height"]
     if not band[0] <= height <= band[1]:
-        raise ValueError(f"model height {height:.4f} is outside the printed band {band}")
+        raise ValueError(
+            f"model height {height:.4f} is outside the printed band {band}"
+        )
     af, ac = f["hex_flats"]["af_ref"], f["hex_flats"]["ac_nominal"]
     bore, rod, thumb = f["lever_bore"], f["rod_tap"], f["thumb_tap"]
     bore_y, bore_dia = bore["at"][1], bore["nominal_dia"]
@@ -296,17 +300,23 @@ def context(
     upright_top = blank_max - skim
     _agree(plan, "upright_top_max_mm", upright_top)
     if blank_min - skim < height:
-        raise ValueError(f"the shortest blank less the skim, {blank_min - skim:.3f}, is under the height {height:.3f}")
+        raise ValueError(
+            f"the shortest blank less the skim, {blank_min - skim:.3f}, is under the height {height:.3f}"
+        )
 
     em = _shop_tool(plan, shop, "em-half")["diameter_mm"]
     d43 = _shop_tool(plan, shop, "drill-43")["diameter_mm"]
     dF = _shop_tool(plan, shop, "drill-f")["diameter_mm"]
-    if not math.isclose(d43, rod["dia"][0], abs_tol=1e-3) or not math.isclose(d43, thumb["dia"][0], abs_tol=1e-3):
+    if not math.isclose(d43, rod["dia"][0], abs_tol=1e-3) or not math.isclose(
+        d43, thumb["dia"][0], abs_tol=1e-3
+    ):
         raise ValueError(f"#43 Ø{d43} is not the tapped holes' drill {rod['dia']}")
     if not bore["dia"][0] <= dF <= bore["dia"][1]:
         raise ValueError(f"F drill Ø{dF} outside the bore band {bore['dia']}")
     if not math.isclose(em, _cut(plan, "bottom face", "cutter_dia_mm"), abs_tol=1e-6):
-        raise ValueError(f"'bottom face' cutter Ø{_cut(plan, 'bottom face', 'cutter_dia_mm')}, the end mill is Ø{em}")
+        raise ValueError(
+            f"'bottom face' cutter Ø{_cut(plan, 'bottom face', 'cutter_dia_mm')}, the end mill is Ø{em}"
+        )
 
     # Faces: two passes, one each side of the axis a cutter radius out, so
     # each takes half the cutter; together they reach the cutter's radius
@@ -314,7 +324,9 @@ def context(
     woc = em / 2
     for name in ("bottom face", "top face"):
         if not math.isclose(_cut(plan, name, "radial_woc_mm"), woc, abs_tol=1e-3):
-            raise ValueError(f"'{name}' radial_woc_mm {_cut(plan, name, 'radial_woc_mm')}: two passes take {woc:.3f}")
+            raise ValueError(
+                f"'{name}' radial_woc_mm {_cut(plan, name, 'radial_woc_mm')}: two passes take {woc:.3f}"
+            )
     ys = [_r(woc), _r(-woc)]
     if woc + em / 2 < af / 2 + FACE_OVERHANG_MM:
         raise ValueError("the face passes do not reach past the gripped flats")
@@ -340,12 +352,18 @@ def context(
     if _setting(plan, shop, "thumb drill") != (d43_rpm, d43_feed):
         raise ValueError("'thumb drill' runs at another setting than 'rod drill'")
     f_rpm, f_feed = _setting(plan, shop, "cross drill")
-    for name, key in (("rod spot", "end_spot_dia_mm"), ("thumb spot", "end_spot_dia_mm"), ("corner spot", "corner_spot_dia_mm")):
+    for name, key in (
+        ("rod spot", "end_spot_dia_mm"),
+        ("thumb spot", "end_spot_dia_mm"),
+        ("corner spot", "corner_spot_dia_mm"),
+    ):
         if not math.isclose(_cut(plan, name, "cutter_dia_mm"), p[key], abs_tol=1e-6):
             raise ValueError(f"'{name}' cutter_dia_mm is not process.{key}")
     end_spot = _spot_depth(p["end_spot_dia_mm"])
     if p["end_spot_dia_mm"] >= d43:
-        raise ValueError("the end spot is not under the #43 drill: it would chamfer the MG-04 seat")
+        raise ValueError(
+            "the end spot is not under the #43 drill: it would chamfer the MG-04 seat"
+        )
     corner_spot = _spot_depth(p["corner_spot_dia_mm"])
     if p["corner_spot_dia_mm"] >= dF:
         raise ValueError("the corner spot is not under the F drill")
@@ -362,11 +380,15 @@ def context(
     for name, depth in (("rod drill", rod_depth), ("thumb drill", thumb_depth)):
         stated = _op_with_cut(plan, name)[0]["hole_depth_mm"]
         if not math.isclose(stated, depth, abs_tol=1e-3):
-            raise ValueError(f"'{name}' operation hole_depth_mm {stated}, the export's {depth}")
+            raise ValueError(
+                f"'{name}' operation hole_depth_mm {stated}, the export's {depth}"
+            )
     peck = p["peck_43_mm"]
     for name in ("rod drill", "thumb drill"):
         if _op_with_cut(plan, name)[0]["peck"] != {"step_mm": peck, "retract": "full"}:
-            raise ValueError(f"'{name}' peck is not process.peck_43_mm with full retract")
+            raise ValueError(
+                f"'{name}' peck is not process.peck_43_mm with full retract"
+            )
 
     # Cross setup: the corner-down block between the parallels. Its lower
     # diagonal flats (30° from horizontal) rest on the parallels' inner top
@@ -427,8 +449,14 @@ def context(
     }
     # Frames (model point p -> axes · (p - origin)), stocks and tops.
     frames = {
-        "bottom": {"origin": [0.0, 0.0, 0.0], "axes": [[1, 0, 0], [0, 0, 1], [0, -1, 0]]},
-        "cross": {"origin": [ac / 2, 0.0, 0.0], "axes": [[0, 1, 0], [0, 0, 1], [1, 0, 0]]},
+        "bottom": {
+            "origin": [0.0, 0.0, 0.0],
+            "axes": [[1, 0, 0], [0, 0, 1], [0, -1, 0]],
+        },
+        "cross": {
+            "origin": [ac / 2, 0.0, 0.0],
+            "axes": [[0, 1, 0], [0, 0, 1], [1, 0, 0]],
+        },
         "top": {"origin": [0.0, 0.0, 0.0], "axes": [[1, 0, 0], [0, 0, -1], [0, 1, 0]]},
     }
     hx, hy = ac / 2, af / 2
@@ -437,38 +465,111 @@ def context(
     stock_top = ((-hx, hx), (-hy, hy), (0.0, upright_top))
     jobs = [
         {
-            **em_tool, "frame": "bottom", "label": "bottom face", "rpm": face_rpm, "feed": face_feed,
-            "plunge": face_feed, "stock": stock_bottom,
-            "ops": [["bottom_face", "face the bottom end", _face([0.0], skim, x_run, ys)]],
+            **em_tool,
+            "frame": "bottom",
+            "label": "bottom face",
+            "rpm": face_rpm,
+            "feed": face_feed,
+            "plunge": face_feed,
+            "stock": stock_bottom,
+            "ops": [
+                ["bottom_face", "face the bottom end", _face([0.0], skim, x_run, ys)]
+            ],
         },
         {
-            **spot_tool, "frame": "bottom", "label": "rod spot", "stock": stock_bottom,
-            "ops": [["rod_spot", "spot the rod hole", _spot(centre, 0.0, -end_spot, CLEAR_MM)]],
+            **spot_tool,
+            "frame": "bottom",
+            "label": "rod spot",
+            "stock": stock_bottom,
+            "ops": [
+                [
+                    "rod_spot",
+                    "spot the rod hole",
+                    _spot(centre, 0.0, -end_spot, CLEAR_MM),
+                ]
+            ],
         },
         {
-            **d43_tool, "frame": "bottom", "label": "rod drill", "stock": stock_bottom,
-            "ops": [["rod_drill", "drill the rod hole", _pecked(centre, 0.0, rod_tip, peck, CLEAR_MM)]],
+            **d43_tool,
+            "frame": "bottom",
+            "label": "rod drill",
+            "stock": stock_bottom,
+            "ops": [
+                [
+                    "rod_drill",
+                    "drill the rod hole",
+                    _pecked(centre, 0.0, rod_tip, peck, CLEAR_MM),
+                ]
+            ],
         },
         {
-            **spot_tool, "frame": "cross", "label": "corner spot", "rpm": spot_rpm, "stock": stock_cross,
-            "ops": [["corner_spot", "spot the top corner", _spot(bore_xy, 0.0, -corner_spot, cross_clear)]],
+            **spot_tool,
+            "frame": "cross",
+            "label": "corner spot",
+            "rpm": spot_rpm,
+            "stock": stock_cross,
+            "ops": [
+                [
+                    "corner_spot",
+                    "spot the top corner",
+                    _spot(bore_xy, 0.0, -corner_spot, cross_clear),
+                ]
+            ],
         },
         {
-            **f_tool, "frame": "cross", "label": "cross drill", "stock": stock_cross,
-            "ops": [["cross_drill", "drill F through the corners", _pecked(bore_xy, 0.0, cross_tip, None, cross_clear)]],
+            **f_tool,
+            "frame": "cross",
+            "label": "cross drill",
+            "stock": stock_cross,
+            "ops": [
+                [
+                    "cross_drill",
+                    "drill F through the corners",
+                    _pecked(bore_xy, 0.0, cross_tip, None, cross_clear),
+                ]
+            ],
         },
         {
-            **em_tool, "frame": "top", "label": "top face", "rpm": face_rpm, "feed": face_feed,
-            "plunge": face_feed, "stock": stock_top,
-            "ops": [["top_face", "face the top to length", _face(top_levels, upright_top, x_run, ys)]],
+            **em_tool,
+            "frame": "top",
+            "label": "top face",
+            "rpm": face_rpm,
+            "feed": face_feed,
+            "plunge": face_feed,
+            "stock": stock_top,
+            "ops": [
+                [
+                    "top_face",
+                    "face the top to length",
+                    _face(top_levels, upright_top, x_run, ys),
+                ]
+            ],
         },
         {
-            **spot_tool, "frame": "top", "label": "thumb spot", "stock": stock_top,
-            "ops": [["thumb_spot", "spot the thumb hole", _spot(centre, height, height - end_spot, height + CLEAR_MM)]],
+            **spot_tool,
+            "frame": "top",
+            "label": "thumb spot",
+            "stock": stock_top,
+            "ops": [
+                [
+                    "thumb_spot",
+                    "spot the thumb hole",
+                    _spot(centre, height, height - end_spot, height + CLEAR_MM),
+                ]
+            ],
         },
         {
-            **d43_tool, "frame": "top", "label": "thumb drill", "stock": stock_top,
-            "ops": [["thumb_drill", "drill the thumb hole into the bore", _pecked(centre, height, thumb_tip, peck, height + CLEAR_MM)]],
+            **d43_tool,
+            "frame": "top",
+            "label": "thumb drill",
+            "stock": stock_top,
+            "ops": [
+                [
+                    "thumb_drill",
+                    "drill the thumb hole into the bore",
+                    _pecked(centre, height, thumb_tip, peck, height + CLEAR_MM),
+                ]
+            ],
         },
     ]
 
@@ -478,7 +579,10 @@ def context(
     # last tool change or tap), over the hole, M30: the controller ends Idle,
     # so the operator can jog the dead centre down onto the wrench.
     manual = {}
-    for key, what in (("tap_rod", "THE ROD HOLE (BOTTOM END)"), ("tap_thumb", "THE THUMB HOLE (TOP END)")):
+    for key, what in (
+        ("tap_rod", "THE ROD HOLE (BOTTOM END)"),
+        ("tap_thumb", "THE THUMB HOLE (TOP END)"),
+    ):
         manual[key] = {
             "tool": numbers["dead-centre"],
             "label": names["dead-centre"],
@@ -511,11 +615,19 @@ def context(
     # cross_parallel_end_mm in, out to the left; the jaws above them grip the
     # vertical flats to the jaw tops.
     par_top = -corner_top
-    par_x = (p["cross_parallel_end_mm"] - PARALLEL_LENGTH_MM, p["cross_parallel_end_mm"])
+    par_x = (
+        p["cross_parallel_end_mm"] - PARALLEL_LENGTH_MM,
+        p["cross_parallel_end_mm"],
+    )
     cross_boxes = [
         _box("moving-jaw parallel", par_x, (-hy, -gap / 2), par_top),
         _box("fixed-jaw parallel", par_x, (gap / 2, hy), par_top),
-        _box("vise bed", (par_x[0], upright_top), (-hy, hy), par_top - p["parallel_height_mm"]),
+        _box(
+            "vise bed",
+            (par_x[0], upright_top),
+            (-hy, hy),
+            par_top - p["parallel_height_mm"],
+        ),
         # The block centred on the jaws along X.
         *jaws(cross_jaw_top, (jaw_x[0] + upright_top / 2, jaw_x[1] + upright_top / 2)),
     ]
@@ -562,7 +674,9 @@ def context(
             rod_tip,
             [
                 face_checks([0.0], skim, jaws_bottom),
-                hole_checks([centre], 0.0, -end_spot, CENTRE_DRILL["body_mm"] / 2, jaws_bottom),
+                hole_checks(
+                    [centre], 0.0, -end_spot, CENTRE_DRILL["body_mm"] / 2, jaws_bottom
+                ),
                 hole_checks([centre], 0.0, rod_tip, d43 / 2, jaws_bottom),
             ],
         ),
@@ -574,7 +688,13 @@ def context(
             [[spot_rpm], [f_rpm]],
             cross_tip,
             [
-                hole_checks([bore_xy], 0.0, -corner_spot, CENTRE_DRILL["body_mm"] / 2, cross_boxes),
+                hole_checks(
+                    [bore_xy],
+                    0.0,
+                    -corner_spot,
+                    CENTRE_DRILL["body_mm"] / 2,
+                    cross_boxes,
+                ),
                 hole_checks([bore_xy], 0.0, cross_tip, dF / 2, cross_boxes),
             ],
         ),
@@ -585,7 +705,13 @@ def context(
             thumb_tip,
             [
                 face_checks(top_levels, upright_top, jaws_top),
-                hole_checks([centre], height, height - end_spot, CENTRE_DRILL["body_mm"] / 2, jaws_top),
+                hole_checks(
+                    [centre],
+                    height,
+                    height - end_spot,
+                    CENTRE_DRILL["body_mm"] / 2,
+                    jaws_top,
+                ),
                 hole_checks([centre], height, thumb_tip, d43 / 2, jaws_top),
             ],
         ),
@@ -599,12 +725,19 @@ def context(
         ]
         for k, checks in enumerate(sections):
             expect += [[f"{name}@{k}", check, kwargs] for check, kwargs in checks]
-    for name, key, top in (("MC02_rod_tap", "tap_rod", 0.0), ("MC05_thumb_tap", "tap_thumb", height)):
+    for name, key, top in (
+        ("MC02_rod_tap", "tap_rod", 0.0),
+        ("MC05_thumb_tap", "tap_thumb", height),
+    ):
         expect += [
             [
                 name,
                 "tap_stop",
-                {"tool": t["dead-centre"], "at": manual[key]["at"], "machine_top": MACHINE_Z_TOP_MM},
+                {
+                    "tool": t["dead-centre"],
+                    "at": manual[key]["at"],
+                    "machine_top": MACHINE_Z_TOP_MM,
+                },
             ],
             [name, "air_feed", {"z_top": top}],
         ]
@@ -632,12 +765,16 @@ def build(ctx: dict[str, Any], rt: Any) -> dict[str, Any]:
     section; returns {"ops": {operation key: operation or manual section}}."""
     doc = rt.document()
     models = {
-        key: rt.import_step(doc, f"Clamp {key}", ctx["step"], frame["origin"], frame["axes"])
+        key: rt.import_step(
+            doc, f"Clamp {key}", ctx["step"], frame["origin"], frame["axes"]
+        )
         for key, frame in ctx["frames"].items()
     }
     ops: dict[str, Any] = {}
     for section in ctx["jobs"]:
-        target = rt.job(doc, section["label"], [models[section["frame"]]], section["stock"])
+        target = rt.job(
+            doc, section["label"], [models[section["frame"]]], section["stock"]
+        )
         tc = rt.tool_controller(
             doc,
             ctx["names"][section["tool"]],

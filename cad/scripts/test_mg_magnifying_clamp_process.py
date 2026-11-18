@@ -45,12 +45,22 @@ def _post(ctx: dict, out: Path) -> None:
     sections = {op[0]: job for job in ctx["jobs"] for op in job["ops"]}
     lines_of = {op[0]: op[2] for job in ctx["jobs"] for op in job["ops"]}
     for name, groups in RECIPE.PROGRAMS:
-        text = [f"({name})", f"({ctx['comment']})", "(Begin preamble)", "G17 G90", "G21", "G54"]
+        text = [
+            f"({name})",
+            f"({ctx['comment']})",
+            "(Begin preamble)",
+            "G17 G90",
+            "G21",
+            "G54",
+        ]
         keys = [group[0] if isinstance(group, tuple) else group for group in groups]
         for key in keys:
             if key in ctx["manual"]:
                 manual = ctx["manual"][key]
-                text += ["M5", f"%msg TOOL CHANGE: T{manual['tool']} {manual['label']}, {manual['setting']}"]
+                text += [
+                    "M5",
+                    f"%msg TOOL CHANGE: T{manual['tool']} {manual['label']}, {manual['setting']}",
+                ]
                 text += [f"M6 T{manual['tool']}", *manual["gcode"]]
                 continue
             job = sections[key]
@@ -60,7 +70,12 @@ def _post(ctx: dict, out: Path) -> None:
                 f"%msg TOOL CHANGE: T{number} {ctx['names'][job['tool']]}, SET SPINDLE TO {job['rpm']:g} RPM",
                 f"M6 T{number}",
                 f"M3 S{job['rpm']:g}",
-                *(line.format(feed=f"{job['feed']:.3f}", plunge=f"{job['plunge']:.3f}") for line in lines_of[key]),
+                *(
+                    line.format(
+                        feed=f"{job['feed']:.3f}", plunge=f"{job['plunge']:.3f}"
+                    )
+                    for line in lines_of[key]
+                ),
             ]
         if not any(key in ctx["manual"] for key in keys):
             text += ["M5", "G17 G90", "M2"]
@@ -72,7 +87,13 @@ def _findings(ctx: dict, out: Path) -> list:
 
 
 def test_context_accepts_the_plan_and_numbers_the_tools(ctx) -> None:
-    assert ctx["numbers"] == {"em-half": 1, "spot": 2, "drill-43": 3, "drill-f": 4, "dead-centre": 5}
+    assert ctx["numbers"] == {
+        "em-half": 1,
+        "spot": 2,
+        "drill-43": 3,
+        "drill-f": 4,
+        "dead-centre": 5,
+    }
     assert RECIPE.LOAD_FIRST_TOOL == tuple(name for name, _ops in RECIPE.PROGRAMS)
     for key in ("tap_rod", "tap_thumb"):
         stop = ctx["manual"][key]
@@ -117,7 +138,9 @@ def _seed(ctx: dict, key: str, old: str, new: str) -> dict:
     if key in seeded["manual"]:
         lines = seeded["manual"][key]["gcode"]
     else:
-        lines = next(op[2] for job in seeded["jobs"] for op in job["ops"] if op[0] == key)
+        lines = next(
+            op[2] for job in seeded["jobs"] for op in job["ops"] if op[0] == key
+        )
     assert old in lines, (key, old)
     lines[lines.index(old)] = new
     return seeded
@@ -138,7 +161,9 @@ def _seed(ctx: dict, key: str, old: str, new: str) -> dict:
         ("tap_rod", "M30", "M0", "tap_stop"),
     ],
 )
-def test_a_seeded_fault_in_a_program_is_caught(ctx, tmp_path, key, old, new, check) -> None:
+def test_a_seeded_fault_in_a_program_is_caught(
+    ctx, tmp_path, key, old, new, check
+) -> None:
     seeded = _seed(ctx, key, old, new)
     _post(seeded, tmp_path)
     assert {finding.check for finding in _findings(seeded, tmp_path)} >= {check}
