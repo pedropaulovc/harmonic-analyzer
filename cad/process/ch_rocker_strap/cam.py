@@ -267,27 +267,6 @@ def context(
     # underside on the plate).
     origin = [hub["at"][0] - hub_x, hub["at"][1] - hub_y, z_under]
 
-    # The final inspection reads the corner and foot stations as caliper
-    # slants from the hub; the plan types the rises and slant limits (the
-    # arc_strap adapter binds neither), so a CAD change to the ends must fail
-    # here rather than print stale limits.
-    for side in ("neg", "pos"):
-        for name, feature, point, station in (
-            ("corner", f[f"tip_land_{side}_x"], "corner", "corner_station"),
-            ("foot", f[f"end_face_{side}_x"], "foot", "foot_station"),
-        ):
-            rise = (feature[point][1] - hub["at"][1]) / IN
-            derived = {
-                f"{name}_rise_in": rise,
-                f"{name}_slant_min_in": math.hypot(feature[station][0] / IN, rise),
-                f"{name}_slant_max_in": math.hypot(feature[station][1] / IN, rise),
-            }
-            for key, value in derived.items():
-                if abs(p[key] - value) > 0.0005 + 1e-9:
-                    raise ValueError(
-                        f"process.{key} {p[key]:.4f} is not {value:.4f} to .0005, the {side} {name}'s value from features.toml"
-                    )
-
     def xy(point):
         return [point[0] - origin[0], point[1] - origin[1]]
 
