@@ -5,8 +5,8 @@ ask 2026-11-17): the sub-plate MHA-CH-13-TL-01 with its fence and end stop
 milled integral, the hub plug MHA-CH-13-TL-02 in its counterbore, the hub
 washer MHA-CH-13-TL-03, four Mitee-Bite Pitbull 26000 edge clamps
 MHA-CH-13-TL-VN-50 (each with its supplied #4-40 screw) in their pockets and
-the 5/16-18 button-head hub screw MHA-CH-13-TL-VN-51. The ``_tl_`` stem keeps
-the kit out of every machine assembly and BOM
+the 1/4-20 x 5/8 button-head hub screw MHA-CH-13-TL-VN-51. The ``_tl_``
+stem keeps the kit out of every machine assembly and BOM
 (``_buildgraph.is_shop_fixture``). The strap blank and its tape are not kit
 items; the plan view shows the blank in phantom where it lies.
 
@@ -207,9 +207,15 @@ _CLAMP_CHECK = _FIRST + len(_CLAMPED) - 1
 _CLAMPED += (
     f"IF STEP {_CLAMP_CHECK} FAILS, RESEAT THE BLANK AND REPEAT FROM STEP {_FIRST}.",
 )
+# The tape steps carry the traveler's degrease and dwell (cad/process/
+# ch_rocker_strap/plan.toml, setup 5's first operation; rules 22, 25;
+# Codjiflo review of #3056): its bond analysis takes the tape at half
+# strength, which it reaches 20 minutes after pressing on clean faces.
 _TAPED: tuple[str, ...] = (
     f"BACK EVERY ITEM {_C} OFF CLEAR OF THE BLANK.",
     "LIFT THE BLANK OFF THE PLATE.",
+    "DEGREASE THE PLATE TOP AND THE BLANK'S UNDERSIDE WITH ISOPROPYL ALCOHOL "
+    "AND WATER.",
     f"LAY {TAPE_NAME} ON THE PLATE OVER THE BLANK'S PLACE, CUT AWAY AT THE "
     "COUNTERBORE.",
     f"DROP ITEM {_G} INTO THE COUNTERBORE, PILOT UP.",
@@ -225,6 +231,7 @@ _TURN_CHECK = _TAPE_FIRST + len(_TAPED) - 1
 _TAPED += (
     f"IF STEP {_TURN_CHECK} FAILS, TAKE ITEMS {_S} AND {_W} OFF, RENEW THE TAPE "
     f"AND REPEAT FROM STEP {_TAPE_FIRST + 2}.",
+    "WAIT 20 MINUTES BEFORE THE OUTLINE, FOR THE TAPE TO REACH HALF STRENGTH.",
 )
 BLANK_STEPS = "\n".join(
     (

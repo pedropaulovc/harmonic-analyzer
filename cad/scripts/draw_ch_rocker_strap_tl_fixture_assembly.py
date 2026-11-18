@@ -4,14 +4,14 @@ Shop fixture (owner ask 2026-11-17; ``ch_rocker_strap_tl_fixture_spec``).
 Sheet 1: the plan view (looking down on the plate top, the fence at the
 back) in the outline setup, its parts ballooned against the parts list, the
 strap blank (not in the fixture) in phantom where it lies; the shaded
-isometric; the parts list; the screw schedule (thread and torque); the
-fitting steps (vise, fence indicated along X, work zero, clamps, hub
-stack). Sheet 2: the exploded front view (rule 22) at 1:1, one view per item
-family (draw_dt_cone_tip_gear_tl_cutter_assembly's ``_item_view``): the
-plug, the washer and the hub screw drawn up out of the counterbore in
-fitting order, the four clamps up out of their pockets, item 2 ballooned
-(the washer hides it in the plan view), every loose item labelled with its
-facing. Poses, items and the sheet words come from the spec; this recipe
+isometric; the parts list; the fitting steps (vise, fence indicated along X,
+work zero, clamps). Sheet 2: the exploded front view (rule 22) at 1:1, one
+view per item family (draw_dt_cone_tip_gear_tl_cutter_assembly's
+``_item_view``): the plug, the washer and the hub screw drawn up out of the
+counterbore in fitting order, the four clamps up out of their pockets, item
+2 ballooned (the washer hides it in the plan view), every loose item
+labelled with its facing; the screw schedule (thread and torque) and each
+blank's steps. Poses, items and the sheet words come from the spec; this recipe
 only lays the sheets out and never edits the source assembly.
 """
 
@@ -587,8 +587,8 @@ def _draw_blank(adapter: Any, view: Any) -> Callable[[], None]:
 
 def _place_sheet(adapter: Any) -> tuple[Callable[[], None], list[BalloonLanding], str]:
     """Sheet 1: the plan view and the isometric, the parts list, the
-    balloons, the screw schedule and the steps. Returns its settled check,
-    its balloons and the BOM's feature name."""
+    balloons and the fitting steps (the screw schedule is sheet 2's).
+    Returns its settled check, its balloons and the BOM's feature name."""
     plan = place_view(adapter, str(SOURCE), "*Front", *PLAN_ORIGIN, scale=PLAN_SCALE)
     set_hidden_lines_removed(adapter, plan)
     configuration = apply_view_configuration(adapter, plan, label="strap fixture plan")

@@ -124,14 +124,20 @@ def test_the_clamp_seats_on_its_pocket_and_its_tap() -> None:
 
 def test_the_hub_tap_states_its_worst_case_engagement() -> None:
     """Owner ruling 2026-11-17: 1/4-20 through from the counterbore floor,
-    .23 nominal (.92D), .21 at the worst case (.84D), stated as a fact."""
+    the .23 in of thread accepted; full thread after the .010 edge break at
+    both tap mouths (Codjiflo review of #3056) is .21 nominal (.84D), .19 at
+    the worst case (.76D), stated as a fact."""
     assert spec.HUB_TAP_THREAD == "1/4-20"
     assert spec.HUB_TAP_DRILL == TAP_DRILL_MM["1/4-20"]
     assert spec.HUB_THREAD_LENGTH == pytest.approx(0.231 * INCH)
+    assert spec.TAP_MOUTH_BREAK == pytest.approx(0.010 * INCH)
     assert spec.HUB_THREAD_LENGTH_MIN == pytest.approx(
-        spec.HUB_THREAD_LENGTH - XX - XXX - XXX
+        spec.HUB_THREAD_LENGTH - XX - XXX - XXX - 2.0 * spec.TAP_MOUTH_BREAK
     )
-    assert spec.HUB_ENGAGEMENT_STATEMENT == "ENGAGEMENT .21 MIN (.84D)"
+    assert spec.CLAMP_THREAD_LENGTH_MIN == pytest.approx(
+        spec.CLAMP_THREAD_LENGTH - XX - XXX - XXX - 2.0 * spec.TAP_MOUTH_BREAK
+    )
+    assert spec.HUB_ENGAGEMENT_STATEMENT == "ENGAGEMENT .19 MIN (.76D)"
     for word in ("ACCEPT", "RULING", "RULE", "OWNER"):
         assert word not in spec.HUB_ENGAGEMENT_STATEMENT
     # The drill and reamer tips stop the plan's clearance above the floor.
@@ -1219,7 +1225,7 @@ def test_the_hub_hole_callout_prints_drill_thread_counterbore_and_shortfall() ->
         "Ø.201 DRILL THRU ALL",
         "1/4-20 UNC THRU ALL",
         "⌴Ø.500 ↧.185 LOCATES TL-02",
-        "ENGAGEMENT .21 MIN (.84D)",
+        "ENGAGEMENT .19 MIN (.76D)",
     ]
     assert len(_hub_callout_rows()) <= TEXT_ROW_LIMIT
     assert drawing.hub_hole_precision(hub) == {

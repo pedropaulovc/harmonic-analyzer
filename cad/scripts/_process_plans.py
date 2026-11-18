@@ -16,7 +16,8 @@ from pathlib import Path
 
 from export_features import OUT as CAD_OUT
 
-# The parts with a traveler, enrolled by the CNC migration. The rocker strap
+# The parts with a traveler, enrolled by the CNC migration: the rocker strap
+# first (2026-11-17), then the magnifying clamp and the strap's sub-plate.
 TRAVELER_STEMS: tuple[str, ...] = (
     "ch_rocker_strap",
     "mg_magnifying_clamp",

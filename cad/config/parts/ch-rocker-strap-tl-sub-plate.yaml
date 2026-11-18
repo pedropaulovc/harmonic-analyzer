@@ -19,5 +19,5 @@ ch-rocker-strap-tl-sub-plate:
     - id: "RV-01"
       kind: "accept"
       where: "the 1/4-20 UNC-2B THRU hole below the hub counterbore"
-      finding: "thread engagement .23 in nominal (.92D), .21 in at the worst case of the printed bands (.84D), short of 1.5D (.38 in) in aluminum (rule 18)"
+      finding: "thread engagement in the .23 in of plate under the counterbore: .21 in of full thread nominal (.84D) and .19 in at the worst case of the printed bands (.76D), after the title block's .010 edge break at both tap mouths, short of 1.5D (.38 in) in aluminum (rule 18)"
       reason: "Owner ruling 2026-11-17 (Pedro): \"Use a 1/4-20 hub screw. The .23 in of thread in the 6061 plate is accepted: the screw only snugs the strap during the outline.\""

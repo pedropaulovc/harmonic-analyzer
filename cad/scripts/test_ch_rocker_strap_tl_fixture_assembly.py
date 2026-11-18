@@ -53,18 +53,16 @@ def test_kit_poses_put_the_hub_and_the_clamps_on_the_plan_stations(plan: dict) -
 
 def test_builder_inserts_the_parts_in_bom_order() -> None:
     tree = ast.parse(BUILDER.read_text(encoding="utf-8"))
-    inserted = [
-        node.args[1].value
+    calls = sorted(
+        (node.lineno, node.args[1].value)
         for node in ast.walk(tree)
         if isinstance(node, ast.Call)
         and getattr(node.func, "id", None) == "place_component"
         and isinstance(node.args[1], ast.Constant)
-    ]
-    # ast.walk visits in breadth-first order within one function body, which
-    # keeps source order for these sibling statements (the loop's call last
-    # among them is the clamp's).
-    assert sorted(inserted, key=spec.BOM_ORDER.index) == list(spec.BOM_ORDER)
-    assert set(inserted) == set(spec.BOM_ORDER)
+    )
+    # Source order (the clamp's one call sits in its loop); Codjiflo review
+    # of #3056: sorting by BOM order first made this hold for any order.
+    assert [stem for _line, stem in calls] == list(spec.BOM_ORDER)
 
 
 def test_interference_literals_match_the_parts() -> None:

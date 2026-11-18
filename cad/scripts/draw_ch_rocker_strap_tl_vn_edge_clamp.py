@@ -5,8 +5,9 @@ head cap screw it is supplied with (tier 2, ASME Y14.24 specification
 control): the shared purchased-part sheet's Front/Top/Right/Isometric views
 of the installed clamp, the catalogue's lettered sizes A, B, C, D and F and
 the screw's 4-40 major as native reference dimensions from the part's hidden
-supplier references, and the catalogue's operating data (torque, holding
-force, throw, package, O-ring) in the footer. The catalogue governs; the
+supplier references, and the spec's SUPPLIER_DATA in the footer (the
+governing catalogue row, the screw's torque limit and the O-ring; no holding
+force, throw or package count, r8 LEARN review). The catalogue governs; the
 views are reference.
 
 Front is the plan (part Z toward the viewer: A and C on the side faces, F

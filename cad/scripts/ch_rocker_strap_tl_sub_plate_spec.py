@@ -27,7 +27,11 @@ import math
 import _config
 from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM, HoleSpec
 from _package_units import drawing_unit
-from _printed_tolerance import printed_band_mm
+from _printed_tolerance import (
+    edge_break_chamfer_mm,
+    edge_break_radius_mm,
+    printed_band_mm,
+)
 
 PART_NAME = "ch-rocker-strap-tl-sub-plate"
 _ROW = _config.parts("ch-rocker-strap-tl-sub-plate")
@@ -244,19 +248,25 @@ if POCKET_DEPTH != CLAMP_B:
 
 # Thread engagement (rule 18: 1.5D of full thread), each tap through the plate
 # from its floor, at nominal and at the worst case of the printed bands
-# (overall -.01, fence height +.005, the floor's depth +.005).
+# (overall -.01, fence height +.005, the floor's depth +.005), less the title
+# block's edge break at both tap mouths: only full thread counts (Codjiflo
+# review of #3056; pd_platen_spec's SOCKET_THREAD_ENGAGEMENT_MIN).
+TAP_MOUTH_BREAK = max(edge_break_radius_mm(unit=UNIT), edge_break_chamfer_mm(unit=UNIT))
 CLAMP_THREAD_LENGTH = POCKET_FLOOR_Z - UNDERSIDE_Z  # 7.0104, .276
-CLAMP_THREAD_LENGTH_MIN = CLAMP_THREAD_LENGTH - XX - XXX - XXX
+CLAMP_THREAD_LENGTH_MIN = CLAMP_THREAD_LENGTH - XX - XXX - XXX - 2.0 * TAP_MOUTH_BREAK
 CLAMP_THREAD_REQUIRED = 1.5 * THREAD_MAJOR_MM[CLAMP_TAP_THREAD]
 if CLAMP_THREAD_LENGTH_MIN < CLAMP_THREAD_REQUIRED:
     raise AssertionError("the clamp tap is short of 1.5D of thread")
 HUB_THREAD_LENGTH = COUNTERBORE_FLOOR_Z - UNDERSIDE_Z  # 5.8674, .231
-HUB_THREAD_LENGTH_MIN = HUB_THREAD_LENGTH - XX - XXX - XXX  # 5.3594, .211
+HUB_THREAD_LENGTH_MIN = (
+    HUB_THREAD_LENGTH - XX - XXX - XXX - 2.0 * TAP_MOUTH_BREAK
+)  # 4.8514, .191
 HUB_THREAD_MAJOR = THREAD_MAJOR_MM[HUB_TAP_THREAD]
 HUB_THREAD_REQUIRED = 1.5 * HUB_THREAD_MAJOR  # .375
-# Owner ruling 2026-11-17 (registry RV-01) accepts the shortfall: .23 nominal
-# (.92D), .21 at the worst case (.84D). The sheet states the worst case as a
-# plain fact (rule 20), on the tap's callout.
+# Owner ruling 2026-11-17 (registry RV-01) accepts the .23 in of thread in
+# the plate: .21 of full thread nominal (.84D), .19 at the worst case (.76D).
+# The sheet states the worst case as a plain fact (rule 20), on the tap's
+# callout.
 HUB_ENGAGEMENT_DIAMETERS = HUB_THREAD_LENGTH_MIN / HUB_THREAD_MAJOR
 if not HUB_THREAD_LENGTH_MIN < HUB_THREAD_REQUIRED:
     raise AssertionError("the hub tap now meets 1.5D: drop the shortfall statement")
