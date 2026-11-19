@@ -1,0 +1,48 @@
+"""The CAD-owned shop inventory, cad/config/shop-equipment/*.toml, as one document.
+
+The records are split across files by topic; ``load`` merges every file's
+top-level sections (gauges, tools, fixtures, holders, consumables, stock, dro,
+cnc), so a reader sees one table per section whichever file holds a record. A
+record key in two files is refused, naming both. Every reader of the inventory
+goes through here; none opens a file by path.
+
+No COM leaf's cache key holds these files, so no part, assembly, drawing,
+soundness, feature or export closure may import this module (check:recipe,
+test_shop_file_readers_stay_outside_every_com_leaf).
+"""
+
+from __future__ import annotations
+
+import tomllib
+from pathlib import Path
+
+from _paths import CAD_ROOT
+
+DIRECTORY = CAD_ROOT / "config" / "shop-equipment"
+
+
+class DuplicateRecordError(ValueError):
+    pass
+
+
+def files(directory: Path = DIRECTORY) -> tuple[Path, ...]:
+    """The inventory's TOML files, in name order."""
+    return tuple(sorted(directory.glob("*.toml")))
+
+
+def load(directory: Path = DIRECTORY) -> dict:
+    """Section -> record key -> record, merged over every file."""
+    merged: dict[str, dict] = {}
+    found_in: dict[tuple[str, str], Path] = {}
+    for path in files(directory):
+        document = tomllib.loads(path.read_text(encoding="utf-8"))
+        for section, records in document.items():
+            table = merged.setdefault(section, {})
+            for key, record in records.items():
+                first = found_in.setdefault((section, key), path)
+                if first != path:
+                    raise DuplicateRecordError(
+                        f"{section}.{key} is in both {first.name} and {path.name}"
+                    )
+                table[key] = record
+    return merged

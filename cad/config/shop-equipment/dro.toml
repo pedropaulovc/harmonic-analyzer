@@ -1,0 +1,25 @@
+# CAD-owned shop-equipment records: facts the CAD specs and their tests read,
+# and workholding a process plan names, that the prechips shop schema cannot
+# express. Each fact lives in exactly one
+# file: anything prechips can hold (machines, chucks, measuring ranges and
+# resolutions, tools' sizing data, cutting settings) is in cad/process/shop.toml,
+# and no field here repeats one there. An object may appear in both files with
+# disjoint fields (gauges.dti, gauges.pin-gauges).
+#
+# TOML, deliberately not YAML: a *.yaml file in cad/config joins
+# _buildgraph.all_config_files() and would re-key every whole-config consumer.
+# No COM build closure reads it: it is in no leaf's cache key.
+#
+# Records moved verbatim from cad/process/shop/inventory.toml (last at
+# 45952b66bc); "#1413 placeholder" values are realistic estimates still to be
+# remeasured, as they were there.
+
+# --- measuring equipment on the mill -------------------------------------
+
+# The PM-30MV's installed DRO; the mill's own capacity is cad/process/shop.toml
+# machines.pm-30mv, and its scale resolution is shop.toml gauges.mill-x-dro.
+[dro.pm-30mv]
+make = "MagXact MX-100M"
+cite = [
+  "DRO accuracy, vendor-stated: MagXact MX-100M product page (https://www.precisionmatthews.com/products/dro-mag-m-3ax-18x36x20), read 2026-10-27: \"Magnetic Scales and encoders, .0002” Accuracy\"; the X, Y and Z scales are each listed at .0002 in. Installed DRO and 0.0002 in precision confirmed by the owner 2026-10-27.",
+]

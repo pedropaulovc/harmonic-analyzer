@@ -1,0 +1,210 @@
+# CAD-owned shop-equipment records: facts the CAD specs and their tests read,
+# and workholding a process plan names, that the prechips shop schema cannot
+# express. Each fact lives in exactly one
+# file: anything prechips can hold (machines, chucks, measuring ranges and
+# resolutions, tools' sizing data, cutting settings) is in cad/process/shop.toml,
+# and no field here repeats one there. An object may appear in both files with
+# disjoint fields (gauges.dti, gauges.pin-gauges).
+#
+# TOML, deliberately not YAML: a *.yaml file in cad/config joins
+# _buildgraph.all_config_files() and would re-key every whole-config consumer.
+# No COM build closure reads it: it is in no leaf's cache key.
+#
+# Records moved verbatim from cad/process/shop/inventory.toml (last at
+# 45952b66bc); "#1413 placeholder" values are realistic estimates still to be
+# remeasured, as they were there.
+
+# --- gauges ---------------------------------------------------------------
+
+# Kind only; its range and resolution are cad/process/shop.toml gauges.dti.
+# Make unrecorded: the archived LittleMachineShop entry was a .0005 in DTI,
+# not the owner's 1 um lever indicator (2026-11-17).
+[gauges.dti]
+kind = "dial_test_indicator"
+
+# Grade only; its range and resolution are cad/process/shop.toml gauges.pin-gauges.
+# Not owned (owner, Pedro, 2026-11-17, answering what is physically in the
+# shop: the pin-gauge set was not ticked): a candidate to buy.
+[gauges.pin-gauges]
+note = "illustrative example item: class ZZ minus pin gauges (three boxes)"
+status = "to_order"
+
+# Owned by the shop (Pedro, 2026-11-08): a Mitutoyo shop-grade 81-piece inch gauge
+# block set, for setting DRO stations and indicator zeros against a wrung stack.
+# Standard 81-piece inch composition: .1001-.1009 by .0001 (9); .101-.149 by .001 (49);
+# .050-.950 by .050 (19); 1, 2, 3, 4 (4). Model number not yet recorded.
+[gauges.gauge-blocks-mitutoyo]
+name = "Mitutoyo 81-piece inch gauge block set, shop grade"
+kind = "gauge_block_set"
+make = "Mitutoyo"
+status = "on_hand"
+note = "owner-confirmed 2026-11-08: 81-piece inch set, shop grade; largest block 4 in; model number to be recorded"
+
+# MHA-SM-00 step 5B / check 5 knife-mount gauge bar (owner ruling 2026-11-10 (Pedro),
+# #2334, S2): a 2 in class ZZ pin cannot pass both knife mounts, whose outer faces
+# stand 7.67 in apart at worst. To make: not owned, no receipt metrology.
+[gauges.gauge-bar-0472x8]
+name = "Gauge bar, (Ø.4720) x 8.0 in, matched to the bores it gauges"
+kind = "gauge_bar"
+status = "to_make"
+supply = "shop_made"
+purchase = "Make from one 12 mm ground and hardened linear shaft (g6 or h6; 11.983-12.000 mm, .4718-.4724 in) cut to 8.0 in (203 mm), ends chamfered, or from ground drill rod: measure both finished MHA-SM-02 bores and accept the bar only if it mikes .0002-.0017 in under each bore over its whole length; turn or lap a larger one down to that."
+note = "Tool, not a BOM part: MHA-SM-00 step 5B passes it through both MHA-SM-02 bores to set the front mount's yaw before its hanger bolt is tightened (the rear mount is set by the rock gauge at step 6G); check 5 withdraws it. Its matched fit, .0002-.0017 diametral clearance in each bore, is made here (purchase); step 5B states only the fitter's hand check, that it slides with no perceptible shake (PR #2717). The .0017 maximum is the clearance the knife rock budget and the hanger-bolt stack charge (sm_knife_mount_spec KNIFE_GAUGE_BAR_CLEARANCE_IN, KNIFE_GAUGE_BAR_LENGTH)."
+pieces = 1
+
+# --- assembly tools, gauges and consumables (#2392) ------------------------
+
+# Every tool the machine's assembly sheets name has one record, so the release's
+# ASSEMBLY.md tool list (cad/scripts/ha_assembly_package.py TOOLS) marks it
+# OWNED, TO BUY or TO MAKE from here. Records marked "archived inventory" carry
+# identity fields moved from cad/process/shop/inventory.toml at 45952b66bc.
+# They are owned only where that inventory recorded possession: the gauges of
+# the shop's first inventory, the parallels it sourced by photo and LMS
+# package, the bench and hand tools Pedro listed as kept
+# (2026-10-15, #1550), and the Loctite 638 of his adhesive rulings. A tool it
+# recorded only as approved to buy, as a trial assumption or as an
+# illustrative example is status = "to_order", as is every new record: nothing
+# recorded the shop owning it, so it is to buy (or to record, if the shop has
+# one). No vendor or SKU is asserted for a tool to buy.
+
+# Make only; its range and resolution are cad/process/shop.toml gauges.micrometers.
+[gauges.micrometers]
+name = "Outside micrometers, 0-1, 1-2 and 2-3 in (archived inventory)"
+kind = "micrometer_set"
+make = "LittleMachineShop"
+status = "on_hand"
+
+# Owner inventory 2026-11-17 (Pedro, PR #2874): "2 0.001'' dial indicators,
+# one 1um lever indicator and one digital 0.000'' indicator". The lever
+# indicator is gauges.dti. Resolutions are cad/process/shop.toml, same keys;
+# no make, model or travel was stated (the archived inventory's one Mitutoyo
+# 1 in-travel dial indicator carried #1413 placeholder values).
+[gauges.dial-indicators]
+name = "Dial indicators"
+kind = "dial_indicator"
+status = "on_hand"
+pieces = 2
+
+[gauges.digital-indicator]
+name = "Digital indicator"
+kind = "digital_indicator"
+status = "on_hand"
+
+# Three magnetic indicator bases (owner, Pedro, 2026-11-17: "3 magnetic
+# indicator bases"). MHA-DT-00 step 4B, the most any sheet sets up at once,
+# zeroes an indicator on each pedestal and one more across them: three.
+[gauges.mag-base]
+name = "Magnetic indicator bases"
+kind = "magnetic_base"
+status = "on_hand"
+pieces = 3
+
+[gauges.surface-plate]
+name = "Surface plate"
+kind = "surface_plate"
+status = "on_hand"
+note = "Owned (Pedro, 2026-11-17, PR #2874: \"I do have surface plate, and feeler gauges\"). Size, material and grade unrecorded."
+
+[gauges.depth-micrometer]
+name = "Depth micrometer (or depth gauge)"
+kind = "depth_micrometer"
+status = "to_order"
+
+[gauges.feeler-gauges]
+name = "Feeler gauge leaves, inch"
+kind = "feeler_gauge_set"
+status = "on_hand"
+note = "Owned (Pedro, 2026-11-17, PR #2874), superseding the archived inventory's 2026-10-11 \"feeler gauges are not owned\". Inch leaves only (owner, Pedro, 2026-11-17): the metric set is gauges.feeler-gauges-metric."
+
+# MHA-DT-00 builds every set feeler and shim from this metric gage
+# (pinion_rig_fitup.FEELER_GAGE). The shop owns inch leaves only (owner,
+# Pedro, 2026-11-17), so it is to buy until #3042 moves the stacks to inch.
+[gauges.feeler-gauges-metric]
+name = "Starrett 66MA metric thickness gage (EDP 55974)"
+kind = "feeler_gauge_set"
+status = "to_order"
+
+[gauges.digital-angle-gauge]
+name = "Digital angle gauge"
+kind = "angle_gauge"
+status = "to_order"
+
+[gauges.protractor]
+name = "Protractor"
+kind = "protractor"
+status = "to_order"
+
+# --- measuring equipment on the mill -------------------------------------
+
+[gauges.touch-probe-diy0-tp05]
+name = "DIY0 TP05 3D touch probe"
+kind = "touch_probe"
+status = "on_hand"
+source = "https://www.aliexpress.us/item/3256803280100804.html"
+purchase = "AliExpress item 3256803280100804, $9.57 on sale (owner 2026-11-16)"
+shank_mm = 6.0
+holder = "6 mm R8 collet, to buy (owner 2026-11-16)"
+power = "DC 5-24 V; run at 5 V"
+repeatability = "<0.01 mm (listing claim, unverified: base-bar plan Setup 3 ten-touch test)"
+cable = "USB-C: red +5-24 V, black GND, yellow signal; the signal is low when tripped (wiki.fluidnc.com/en/config/probe)"
+wiring = "signal to gpio.5 through a Schottky diode, cathode at the probe signal, anode at gpio.5; FluidNC probe pin gpio.5:low:pu (owner's config change); never the idle-high signal straight into the 3.3 V input"
+note = "Ball diameter not on the owner's listing; TP05-class listings give 2 mm, which the base-bar plan's probe_ball_radius_mm assumes until the Setup 3 calibration measures it. Never spun: every M6 to it reads SPINDLE OFF - PROBE IN."
+
+# --- McMaster-Carr PO 0803PCAMPOS (owned) ------------------------------------
+
+# Every tool, gauge, cutter, insert, holder, saw and shop fluid on the owner's
+# McMaster-Carr packing list for PO 0803PCAMPOS (McMaster-Carr number
+# 1616317-01, 08/04/2025), all shipped; owner (Pedro) 2026-11-17: "add to
+# inventory ... already owned". Names, sizes and quantities are the packing
+# list's descriptions; nothing it does not state is recorded (the McMaster
+# product pages returned no product text, read 2026-11-17). Its fasteners are
+# not recorded; its wire, brass and 12L14 stock and brass balls are [[stock]]
+# rows (McMaster-Carr PO 0803PCAMPOS block). Where an older record may be the
+# same object (noted at the record), neither is merged: the packing list does
+# not say.
+
+[gauges.telescoping-gauges-starrett-s579gz]
+name = "Starrett S579Gz telescoping bore gauge set, 4 pieces"
+kind = "telescoping_gauge_set"
+make = "Starrett"
+sku = "2081A8"
+status = "on_hand"
+pieces = 1
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 1: \"Starrett Telescoping Bore Gauge, 4-Piece Set, Model S579Gz\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+# Range and resolution: cad/process/shop.toml gauges.height-gauge (its 0-12 in
+# range agrees with this gauge; its .001 in resolution is not on the list).
+[gauges.height-gauge]
+name = "Dial height gauge, 0-12 in"
+kind = "height_gauge"
+sku = "19765A72"
+status = "on_hand"
+pieces = 1
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 9: \"Dial Height Gauge with 0 to 12\" Measuring Range\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[gauges.lathe-alignment-bar]
+name = "Precision lathe alignment bar"
+kind = "alignment_bar"
+sku = "9244N111"
+status = "on_hand"
+pieces = 1
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 51: \"Precision Lathe Alignment Bar\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+# --- MHA-CH-13 rocker strap on the CNC (cad/process/ch_rocker_strap) ---------
+
+# Hub-hole acceptance for MHA-CH-13, Ø.4000-.4005 (codjiflo PR #3049): a
+# fixed-limit pair, .4000 GO and .4005 NO-GO. Vermont Gage's standard Class X
+# pin/plug gages: .004-1.000 in by .0001 in, tolerance .000040 in up to
+# .8250 in, GO plus and NO-GO minus, so a GO that enters proves the hole at or
+# over .4000 and a NO-GO that does not proves it at or under .4005. The pair
+# gives up .00008 in (16 %) of the .0005 in band; Vermont's 10 % rule would
+# take class XX (.000020 in, a quoted custom gage). Range and tolerance:
+# cad/process/shop.toml gauges.plug-gauges-4000-4005.
+[gauges.plug-gauges-4000-4005]
+name = "Plug gauge pair, .4000 GO and .4005 NO-GO, Class X"
+kind = "plug_gauge_pair"
+make = "Vermont Gage"
+status = "to_order"
+purchase = "Two Vermont Gage standard Class X steel pin/plug gages, .4000 in GO (plus tolerance) and .4005 in NO-GO (minus tolerance), each +/- .000040 in; no part number, price or stock read."
+note = "Not owned: to buy. MHA-CH-13 Setup 4 (RS03, after the ream): the first hole gauged before the lot, then every hole; GO enters, NO-GO does not."
+cite = ["Vermont Gage, Standard Class X pin/plug gages (read 2026-11-17): range .004-1.000 in, increments .0001 in, tolerance +/- .000040 in up to .8250 in, Go: plus tolerance, NoGo: minus tolerance: https://www.vermontgage.com/gaging-products/standard-pin-gages-and-sets/class-x-standard-pin-plug-gages", "Vermont Gage, Gage Tolerance Selection (read 2026-11-17): the 10% rule, GO at the hole's minimum with the tolerance plus, NO-GO at its maximum with the tolerance minus; ASME B89.1.5 chart, .010-.825 in: XX .000020, X .000040 in: https://vermontgage.com/support/detail/gage-tolerance-selection"]

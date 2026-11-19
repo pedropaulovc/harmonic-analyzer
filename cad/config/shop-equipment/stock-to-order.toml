@@ -1,0 +1,119 @@
+# CAD-owned shop-equipment records: facts the CAD specs and their tests read,
+# and workholding a process plan names, that the prechips shop schema cannot
+# express. Each fact lives in exactly one
+# file: anything prechips can hold (machines, chucks, measuring ranges and
+# resolutions, tools' sizing data, cutting settings) is in cad/process/shop.toml,
+# and no field here repeats one there. An object may appear in both files with
+# disjoint fields (gauges.dti, gauges.pin-gauges).
+#
+# TOML, deliberately not YAML: a *.yaml file in cad/config joins
+# _buildgraph.all_config_files() and would re-key every whole-config consumer.
+# No COM build closure reads it: it is in no leaf's cache key.
+#
+# Records moved verbatim from cad/process/shop/inventory.toml (last at
+# 45952b66bc); "#1413 placeholder" values are realistic estimates still to be
+# remeasured, as they were there.
+
+# --- stock ------------------------------------------------------------------
+
+# status: on_hand, not_received (bought, not in the shop) or to_order. Owner
+# (Pedro) 2026-11-17, "assume all stock bought is on hand except for platen
+# c360 brass bar": every bought row is on_hand except the platen's C360 brass
+# bar (Metal Supermarkets invoice EC234347, below).
+# Each row is keyed by material, form and size (with length where two rows
+# share a size). Parts point at stock from their process plans, never the
+# other way round: a plan's stock reference names the row's key.
+
+# Not ordered: stock still to buy.
+
+[stock.1018-ground-flat-5-16x1]
+form = "flat_bar"
+material = "AISI 1018 cold-finished steel, precision ground"
+note = "To order: McMaster 9517K466, 5/16 x 1 in precision-ground flat, thickness +/-.001 as supplied; the faces are not machined (pd-transgear-arm registry process; pd_transgear_arm_geometry.STOCK_SKU and THICKNESS_BAND). Allocation: pd-transgear-arm (MHA-PD-18). Length and price not read. Not owned."
+section_mm = [25.4, 7.9375]
+status = "to_order"
+cite = ["cad/config/parts/pd-transgear-arm.yaml process", "cad/scripts/pd_transgear_arm_geometry.py STOCK_SKU = \"9517K466\""]
+
+[stock.1018-flat-3-8x1-2]
+form = "flat_bar"
+material = "1018 cold-finish carbon steel"
+note = "To order: 3/8 x 1/2 in 1018 CF flat, 2 pieces x 12 in (standard length). Allocation: pd-platen-guide (MHA-PD-11), one rail per piece (10.62 long, both rails of the platen). The rail is .29 ±.01 tall (3/8 stock) by .40/.39 deep (1/2 stock): skim .042 off each of the top and bottom faces and .052 off each of the front and back faces, so opposite faces lose equal metal and the long thin rail does not bow from one-sided stress relief. The bottom face (the Ra 63 µin slide on MHA-PD-07) is cut in that skim. The nearer 5/16 x 1/2 section is not in OnlineMetals' 1018 CF rectangle-bar range (listing read 2026-11-10); the 1/4 x 2-1/2 bar cannot yield the section (#2408). Not owned."
+section_mm = [12.7, 9.525]
+length_mm = 304.8
+status = "to_order"
+cite = ["OnlineMetals part 7482 https://www.onlinemetals.com/en/buy/carbon-steel/0-375-x-0-5-carbon-steel-rectangle-bar-1018-cold-finish/pid/7482 read live 2026-11-10: 3/8 x 1/2 1018 cold finish, ASTM A108, 12 in $4.80", "MHA-PD-11 sheet and pd_platen_guide_spec: GUIDE_HEIGHT .29 at .XX, GUIDE_DEPTH .40 +.00/-.01, length 10.62, quantity 2"]
+
+# Gear blanks (#2356): the make route's bar, to buy, not ordered (route A,
+# owner ruling 2026-11-14). Lengths: each blank's length plus .14 in to part and
+# face, plus about 1 in to hold the last one. OnlineMetals C360-H02 round,
+# catalogue nominals; prices read live 2026-11-12, $439.04 for the six
+# brass bars. The pd-rack-pinion disc's bar has its own row (#2412).
+[stock.c360-round-gear-blanks]
+form = "round_bar"
+material = "C36000 free-cutting brass, H02"
+note = "To order, six bars: 2-5/8 x 12 in (T108, T114, T120 and the 20 dt-cylinder-gear blanks, $239.15, pid 21928); 2-1/4 x 3 in (T084-T102, $70.25, pid 19930); 1-3/4 x 3 in (T072, T078, $41.36, pid 1277); 1-1/2 x 3 in (T054-T066, $36.22, pid 1274); 1-1/8 x 3 in (T036-T048, $24.97, pid 7568); 3/4 x 12 in (T030 and the dt-alignment-pinion drum, $27.09, pid 1266). Not owned."
+dia_in = [2.625, 2.25, 1.75, 1.5, 1.125, 0.75]
+length_in = [12.0, 3.0, 3.0, 3.0, 3.0, 12.0]
+status = "to_order"
+cite = ["OnlineMetals C360 round bar, standard lengths and the Custom Cut calculator, read live 2026-11-12", "https://github.com/pedropaulovc/harmonic-analyzer/issues/2356"]
+
+[stock.c675-round-5-8]
+form = "round_bar"
+material = "C67500 manganese bronze"
+note = "To order: 5/8 in round, at least 6 in. Allocation: dt-cone-gear T012, T018, T024 and dt-cone-tip-gear (MHA-DT-37). Neither McMaster-Carr nor OnlineMetals lists C67500 rod (read 2026-11-12); Atlas Bronze lists Ø.625 as 6750S-5 with no online price, and the other mills found sell it by quotation, so no price is recorded. Not owned."
+dia_in = [0.625]
+length_in = [6.0]
+status = "to_order"
+cite = ["https://www.atlasbronze.com/C67500-Product-Sheet-s/1934.htm read 2026-11-12", "https://github.com/pedropaulovc/harmonic-analyzer/issues/2356"]
+
+[stock.1018-round-3-and-7-8]
+form = "round_bar"
+material = "1018 cold-finish carbon steel"
+note = "To order: 3 in x 2 in (dt-crank-drive-gear 64T, $18.22, pid 7566) and 7/8 x 12 in (dt-crank-pinion 16T, $9.14, pid 4796). Not owned."
+dia_in = [3.0, 0.875]
+length_in = [2.0, 12.0]
+status = "to_order"
+cite = ["OnlineMetals 1018 cold-finish round, read live 2026-11-12", "https://github.com/pedropaulovc/harmonic-analyzer/issues/2356"]
+
+# MHA-SM-02 knife mounts (owner ruling 2026-11-10 (Pedro), #2334 option B1).
+[stock.4140-ht-flat-5-8x1-1-4]
+form = "flat_bar"
+material = "4140/4142 HT alloy steel, pre-hardened 28-32 HRC as supplied"
+note = "To order: 5/8 x 1-1/4 in 4140/4142 HT (pre-hardened, 28-32 HRC) flat bar, 4 in. Allocation: the two MHA-SM-02 knife mounts (each 1.00 x 1.17 x .55 finished, cut from the bar with facing stock). No heat treatment in the shop; both fits and the tap are cut in the supplied condition. Not owned."
+section_mm = [31.75, 15.875]
+length_mm = 101.6
+status = "to_order"
+cite = ["Owner ruling 2026-11-10 (Pedro), https://github.com/pedropaulovc/harmonic-analyzer/issues/2334"]
+
+# MHA-SM-01 gooseneck tube (owner rulings 2026-10-27 (Pedro), #1951; 2026-11-08, #2315;
+# 2026-11-14, #2401: a 36 in cut, leaving about 11 in for a trial bend).
+[stock.4130n-tube-1-2x0065]
+form = "round_tube"
+material = "4130-N seamless alloy steel tube"
+note = "To order: 1/2 in OD x .065 in wall 4130-N seamless round tube, one 36 in cut (owner ruling 2026-11-14, #2401). Allocation: MHA-SM-01 (sm-gooseneck), developed length 21.58 in (16.4 leg, the R3.0 x 90 degree bend's 4.71 centreline arc, .47 arm straight) plus the owner's ~2 in tail at the arm end (#2315) and ~1 in at the foot, both ends sawn and faced after the bend: 24.6 in; the rest, about 11 in, is a trial bend on the form (fixtures.sm-gooseneck-bend-form). Bonded at MHA-SM-00 with the owned LOCTITE 638 (consumables.loctite-638); no braze, solder, flux or plating (#2315). Finish: polished bare, oiled or waxed. Not owned."
+od_mm = 12.7
+wall_mm = 1.651
+length_mm = 914.4
+status = "to_order"
+cite = ["OnlineMetals part 7322 https://www.onlinemetals.com/en/buy/alloy-steel/0-5-od-x-0-065-wall-x-0-37-id-alloy-steel-round-tube-4130-cond-n-seamless/pid/7322 read live 2026-11-14: 1/2 OD x .065 wall 4130 Cond. N seamless, 36 in $76.61; length tolerance +/-1/8 in", "Owner rulings 2026-10-27 (Pedro), https://github.com/pedropaulovc/harmonic-analyzer/issues/1951, 2026-11-08, https://github.com/pedropaulovc/harmonic-analyzer/issues/2315 and 2026-11-14, https://github.com/pedropaulovc/harmonic-analyzer/issues/2401"]
+
+# MHA-FR-02 top-frame casting (owner rulings 2026-11-10 (Pedro), #2333).
+[stock.gray-iron-a48-25b-casting]
+form = "casting"
+material = "gray iron, ASTM A48 class 25B (a class 30B heat also conforms)"
+note = "Owner ruling 2026-11-10 (#2333, option a): a one-off gray-iron sand casting, ASTM A48 class 25B, poured by an outside jobbing foundry (a candidate service: none chosen, contacted or quoted) from a pattern the shop 3D-prints in sections from the finished-part model. The pattern carries the 2 degree draft as the model has it (owner rulings B1 and D1: added on the webs, crossbar, gussets, lands, hub rib and set-screw boss sides; taken out of the corner and hub boss barrels, the flange rims and the set-screw boss face), the machining stock and the foundry's shrink allowance (about 1/8 in per ft for gray iron), and parts on the faced top plane with the four boss tops in the cope. No cores or loose pieces: the sockets, bores and holes are cast solid. As-cast dimensions print +/-.03 (B2), and the first machining setup stands on six cast datum targets (B6: E1-E3 on three boss bottoms, F1-F2 on the two rear boss barrels, G1 on the rear-west boss barrel). The foundry stress relieves the casting and returns it cleaned, risers and gates removed. The shop machines the seats listed in the part's registry row (cad/config/parts/fr-top-frame.yaml). Allocation: fr-top-frame (MHA-FR-02). About 24.2 lb as cast (18.0 lb finished); envelope 17.35 x 10.59 x 1.93 in finished and 17.35 x 10.59 x 2.09 in as cast before the shrink allowance. Both masses are estimated from the finished model at 7.2 g/cm3, the as-cast one with every machined feature cast solid and .16 in stock on the faced top and boss tops, .12 in on the faced underside; neither is a foundry figure. Not quoted or ordered."
+status = "to_order"
+cite = ["https://github.com/pedropaulovc/harmonic-analyzer/issues/2333"]
+
+# --- MHA-PD-06 disc cutting arbor (#2412) -----------------------------------
+
+# MHA-PD-06 disc blank (#2412): the Ø3.1655 disc needs at least 3.25 in of
+# width; the 1/8 in thickness leaves .007 to face to the .118 print.
+[stock.c360-flat-1-8x4]
+form = "flat_bar"
+material = "C36000 free-machining brass (360-H02, extruded)"
+note = "To order: 1/8 x 4 in C360 brass flat, 12 in (the shortest standard length). Allocation: pd-rack-pinion (MHA-PD-06), one Ø3.25 blank face-skimmed .0035 a side to .118, with stock left for a trial disc. Not owned."
+section_mm = [101.6, 3.175]
+length_mm = 304.8
+status = "to_order"
+cite = ["OnlineMetals part 1376 https://www.onlinemetals.com/en/buy/brass/0-125-x-4-brass-rectangle-bar-360-h02-extruded/pid/1376 read live 2026-11-12: 1/8 x 4 brass rectangle bar 360-H02, ASTM B16, 12 in $65.37"]

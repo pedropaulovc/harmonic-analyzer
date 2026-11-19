@@ -11,7 +11,7 @@ that package's): every module-level string as evaluated (whole printed blocks,
 sizes filled in) and every string literal in the source (the pieces of text a
 function assembles at draw time), never a comment or docstring. Each row of
 ``TOOLS`` names a tool by the words the sheets use for it and points at its
-record in cad/process/shop.toml or cad/config/shop-equipment.toml, so the
+record in cad/process/shop.toml or cad/config/shop-equipment/, so the
 list carries only tools some sheet still names, says where, and marks each
 OWNED, TO BUY or TO MAKE from the record. test_ha_assembly_package fails when
 a sheet names an instrument, gauge or consumable no row covers.
@@ -38,6 +38,7 @@ from pathlib import Path
 from typing import Any
 
 import ha_build_sequence as build
+import _shop_equipment
 from _assembly_contract import assembly_contract
 from _buildgraph import module_deps_of
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -45,10 +46,7 @@ from ha_harmonic_analyzer_assembly_spec import ASM_NAME, BOM_ORDER
 
 SCRIPTS_DIR = Path(__file__).resolve().parent
 CAD_ROOT = SCRIPTS_DIR.parent
-SHOP_FILES = {
-    "shop.toml": CAD_ROOT / "process" / "shop.toml",
-    "shop-equipment.toml": CAD_ROOT / "config" / "shop-equipment.toml",
-}
+SHOP_TOML = CAD_ROOT / "process" / "shop.toml"
 DOCUMENT_NAME = "ASSEMBLY.md"
 
 # The machine's assembly packages: every row of the complete machine's BOM,
@@ -215,26 +213,22 @@ TOOLS: tuple[Tool, ...] = (
         r"\bLATHE\b|\bTAILSTOCK\b",
         ("shop.toml:machines.pm-1127vf-lb",),
     ),
-    Tool(
-        "Edge finder", r"\bEDGE[- ]FIND\w*", ("shop-equipment.toml:tools.edge-finder",)
-    ),
-    Tool(
-        "Surface plate", r"SURFACE PLATE", ("shop-equipment.toml:gauges.surface-plate",)
-    ),
+    Tool("Edge finder", r"\bEDGE[- ]FIND\w*", ("shop-equipment:tools.edge-finder",)),
+    Tool("Surface plate", r"SURFACE PLATE", ("shop-equipment:gauges.surface-plate",)),
     Tool(
         "Parallels",
         r"\bPARALLELS\b",
-        ("shop-equipment.toml:fixtures.parallels-lms-6745",),
+        ("shop-equipment:fixtures.parallels-lms-6745",),
     ),
     Tool(
         "V-blocks",
         r"\b(?:ON A|ONTO) V-BLOCKS?\b",
-        ("shop-equipment.toml:fixtures.v-blocks",),
+        ("shop-equipment:fixtures.v-blocks",),
     ),
     Tool(
         "3/8 ground setting mandrel",
         r"\d+/\d+ GROUND SETTING MANDREL|\bMANDREL(?:'S)?\b",
-        ("shop-equipment.toml:tools.setting-mandrel-375",),
+        ("shop-equipment:tools.setting-mandrel-375",),
         packages=("dt-drive-train",),
     ),
     # The verb, wherever it stands; not a fit class ("PRESS FIT", "(PRESS)"),
@@ -242,31 +236,31 @@ TOOLS: tuple[Tool, ...] = (
     Tool(
         "Arbor press",
         r"(?<!\()\bPRESS(?:ED)?\b(?![- ]FIT|\)| SIZE| LIGHTLY)",
-        ("shop-equipment.toml:tools.arbor-press",),
+        ("shop-equipment:tools.arbor-press",),
     ),
     # --- measuring --------------------------------------------------------
     Tool(
         "Gauge bar (MHA-SM-00)",
         r"GAUGE BAR",
-        ("shop-equipment.toml:gauges.gauge-bar-0472x8",),
+        ("shop-equipment:gauges.gauge-bar-0472x8",),
     ),
     Tool(
         "Gauge blocks",
         r"GAUGE BLOCKS?|\bBLOCKS ON THAT STOP",
-        ("shop-equipment.toml:gauges.gauge-blocks-mitutoyo",),
+        ("shop-equipment:gauges.gauge-blocks-mitutoyo",),
     ),
     # Presence is the shop-equipment record's (not owned, owner 2026-11-17);
     # the range and resolution are shop.toml's.
     Tool(
         "Pin gauges",
         r"GAUGE PINS?|PIN GAUGES?",
-        ("shop.toml:gauges.pin-gauges", "shop-equipment.toml:gauges.pin-gauges"),
+        ("shop.toml:gauges.pin-gauges", "shop-equipment:gauges.pin-gauges"),
     ),
     Tool("Height gauge", r"HEIGHT GAUGE", ("shop.toml:gauges.height-gauge",)),
     Tool(
         "Depth micrometer or depth gauge",
         r"DEPTH (?:MICROMETER|GAUGE)",
-        ("shop-equipment.toml:gauges.depth-micrometer",),
+        ("shop-equipment:gauges.depth-micrometer",),
     ),
     Tool(
         "Calipers, 6 in, with depth rod",
@@ -276,22 +270,22 @@ TOOLS: tuple[Tool, ...] = (
     Tool(
         "Outside micrometers, 0-3 in",
         r"\bMIC(?:ED)?\b|\bMICROMETERS?\b",
-        ("shop-equipment.toml:gauges.micrometers",),
+        ("shop-equipment:gauges.micrometers",),
     ),
     Tool(
         "Dial test indicator on a magnetic base",
         r"TEST INDICATOR(?: ON A MAGNETIC BASE)?|MAGNETIC BASE",
-        ("shop.toml:gauges.dti", "shop-equipment.toml:gauges.mag-base"),
+        ("shop.toml:gauges.dti", "shop-equipment:gauges.mag-base"),
     ),
     Tool(
         "Dial indicators on magnetic bases, three at once",
         r"(?:DIAL )?\bINDICATORS?\b",
         (
-            "shop-equipment.toml:gauges.dial-indicators",
+            "shop-equipment:gauges.dial-indicators",
             "shop.toml:gauges.dial-indicators",
-            "shop-equipment.toml:gauges.digital-indicator",
+            "shop-equipment:gauges.digital-indicator",
             "shop.toml:gauges.digital-indicator",
-            "shop-equipment.toml:gauges.mag-base",
+            "shop-equipment:gauges.mag-base",
         ),
     ),
     # MHA-DT-00's metric leaf stacks (#3042): ahead of the inch row so the
@@ -299,108 +293,102 @@ TOOLS: tuple[Tool, ...] = (
     Tool(
         "Feeler gauge, metric (Starrett 66MA)",
         r"STARRETT 66MA(?: METRIC THICKNESS GAGE| LEAF STACKS| LEAVES)?",
-        ("shop-equipment.toml:gauges.feeler-gauges-metric",),
+        ("shop-equipment:gauges.feeler-gauges-metric",),
     ),
     Tool(
         "Feeler gauge leaves, inch",
         r"(?:\.\d+ )?FEELERS?(?: GAUGES?| GAUGE LEAF| LEAVES| STACKS?)?\b|THICKNESS GAGE",
-        ("shop-equipment.toml:gauges.feeler-gauges",),
+        ("shop-equipment:gauges.feeler-gauges",),
     ),
     Tool(
         "Digital angle gauge",
         r"DIGITAL ANGLE GAUGE",
-        ("shop-equipment.toml:gauges.digital-angle-gauge",),
+        ("shop-equipment:gauges.digital-angle-gauge",),
     ),
-    Tool("Protractor", r"\bPROTRACTOR\b", ("shop-equipment.toml:gauges.protractor",)),
+    Tool("Protractor", r"\bPROTRACTOR\b", ("shop-equipment:gauges.protractor",)),
     Tool(
         "Steel rule, 48 in",
         r"\bRULE\b",
-        ("shop-equipment.toml:tools.steel-rule-48",),
+        ("shop-equipment:tools.steel-rule-48",),
     ),
-    Tool("Tape measure", r"TAPE MEASURE", ("shop-equipment.toml:tools.tape-measure",)),
+    Tool("Tape measure", r"TAPE MEASURE", ("shop-equipment:tools.tape-measure",)),
     Tool(
         "Combination square",
         r"\b(?:A|THE) SQUARE (?:STANDING |ON )",
-        ("shop-equipment.toml:tools.combination-square-starrett-c11h-12",),
+        ("shop-equipment:tools.combination-square-starrett-c11h-12",),
     ),
-    Tool(
-        "Straightedge", r"\bSTRAIGHTEDGE\b", ("shop-equipment.toml:tools.straightedge",)
-    ),
+    Tool("Straightedge", r"\bSTRAIGHTEDGE\b", ("shop-equipment:tools.straightedge",)),
     # --- hand tools -------------------------------------------------------
     Tool(
         "Transfer punches",
         r"(?:\d+/\d+ )?TRANSFER[- ]PUNCH(?:ES)?",
-        ("shop-equipment.toml:tools.transfer-punches",),
+        ("shop-equipment:tools.transfer-punches",),
     ),
     Tool(
         "Taper-pin reamer, 1:48",
         r"TAPER-REAM(?: 1:48)?",
-        ("shop-equipment.toml:tools.taper-pin-reamer",),
+        ("shop-equipment:tools.taper-pin-reamer",),
     ),
     # The owned #10-32 bottoming taps (Zoro order WB7365521946, owner
     # 2026-11-17) claim their size before the general row below.
     Tool(
         "#10-32 bottoming taps",
         r"#10-32 BOTTOMING TAPS?",
-        ("shop-equipment.toml:tools.taps-zoro-wb7365521946",),
+        ("shop-equipment:tools.taps-zoro-wb7365521946",),
     ),
     Tool(
         "Bottoming taps",
         r"(?:#?\d+-\d+ )?BOTTOMING TAPS?",
-        ("shop-equipment.toml:tools.bottoming-taps",),
+        ("shop-equipment:tools.bottoming-taps",),
     ),
     Tool(
         "Combination wrenches, 1/4-1 in",
         r"\b(?:1/4|5/16|11/32|3/8|7/16|1/2|9/16|5/8|11/16|3/4|13/16|7/8|15/16) WRENCH\b",
-        ("shop-equipment.toml:tools.combination-wrenches-tekton-wcb90302",),
+        ("shop-equipment:tools.combination-wrenches-tekton-wcb90302",),
     ),
     Tool(
         "Small open-end wrench under 1/4 in",
         r"\b\d+/\d+ WRENCH\b",
-        ("shop-equipment.toml:tools.ignition-wrenches",),
+        ("shop-equipment:tools.ignition-wrenches",),
     ),
-    Tool("Hex keys", r"HEX KEY", ("shop-equipment.toml:tools.hex-keys-bondhus-10937",)),
+    Tool("Hex keys", r"HEX KEY", ("shop-equipment:tools.hex-keys-bondhus-10937",)),
     Tool(
         "Torque screwdriver, in-lb",
         r"\d+(?:\.\d+)? IN-LB",
-        ("shop-equipment.toml:tools.torque-screwdriver",),
+        ("shop-equipment:tools.torque-screwdriver",),
     ),
-    Tool("Pliers", r"\bPLIERS\b", ("shop-equipment.toml:tools.pliers",)),
+    Tool("Pliers", r"\bPLIERS\b", ("shop-equipment:tools.pliers",)),
     Tool(
         "Hammer and centre punch (staking, peening)",
         r"\bSTAKE\b|\bPEEN\b",
         (
-            "shop-equipment.toml:tools.ball-peen-hammer-16oz",
-            "shop-equipment.toml:tools.centre-punch-starrett-18a",
+            "shop-equipment:tools.ball-peen-hammer-16oz",
+            "shop-equipment:tools.centre-punch-starrett-18a",
         ),
     ),
     Tool(
         "File",
         r"\b(?:ROUND )?FILE\b",
-        ("shop-equipment.toml:tools.file-nicholson-10-second-cut",),
+        ("shop-equipment:tools.file-nicholson-10-second-cut",),
     ),
-    Tool(
-        "Sharpening stone", r"\bSTONE\b", ("shop-equipment.toml:tools.india-stone-ib8",)
-    ),
+    Tool("Sharpening stone", r"\bSTONE\b", ("shop-equipment:tools.india-stone-ib8",)),
     # --- consumables ------------------------------------------------------
     Tool(
         "Loctite 638 retaining compound",
         r"LOCTITE 638",
-        ("shop-equipment.toml:consumables.loctite-638",),
+        ("shop-equipment:consumables.loctite-638",),
     ),
     Tool(
         "30-minute epoxy",
         r"(?:30-MINUTE )?EPOXY",
-        ("shop-equipment.toml:consumables.epoxy-30-minute",),
+        ("shop-equipment:consumables.epoxy-30-minute",),
     ),
-    Tool(
-        "Paste wax", r"(?:PASTE )?WAX\b", ("shop-equipment.toml:consumables.paste-wax",)
-    ),
-    Tool("Degreaser", r"DEGREASE", ("shop-equipment.toml:consumables.degreaser",)),
+    Tool("Paste wax", r"(?:PASTE )?WAX\b", ("shop-equipment:consumables.paste-wax",)),
+    Tool("Degreaser", r"DEGREASE", ("shop-equipment:consumables.degreaser",)),
     Tool(
         "Machine oil (ISO VG 32 and light)",
         r"(?:ISO VG 32 |LIGHT )?MACHINE OIL|\bOIL(?:ED)?\b(?! HOLE)",
-        ("shop-equipment.toml:consumables.oil-iso-vg32",),
+        ("shop-equipment:consumables.oil-iso-vg32",),
     ),
 )
 if len({tool.name for tool in TOOLS}) != len(TOOLS):
@@ -410,8 +398,8 @@ if len({tool.name for tool in TOOLS}) != len(TOOLS):
 @cache
 def shop_records() -> dict[str, dict[str, Any]]:
     return {
-        name: tomllib.loads(path.read_text(encoding="utf-8"))
-        for name, path in SHOP_FILES.items()
+        "shop.toml": tomllib.loads(SHOP_TOML.read_text(encoding="utf-8")),
+        "shop-equipment": _shop_equipment.load(),
     }
 
 
@@ -429,9 +417,9 @@ def status(tool: Tool) -> str:
     if not tool.records:
         return "TO MAKE"
     records = [shop_record(ref) for ref in tool.records]
-    if any(record.get("shop_made") for record in records):
+    if any(record.get("supply") == "shop_made" for record in records):
         return "TO MAKE"
-    if all(record.get("present", True) is not False for record in records):
+    if all(record.get("status", "on_hand") == "on_hand" for record in records):
         return "OWNED"
     return "TO BUY"
 
@@ -614,9 +602,9 @@ def markdown() -> str:
         "",
         "Every tool the assembly sheets or the fit-up steps above name (Named on: "
         "the package whose sheets or steps name it), reconciled with cad/process/shop.toml "
-        "and cad/config/shop-equipment.toml. OWNED: its shop record says so. "
-        "TO BUY: its record has `present = false`. TO MAKE: a drawn shop tool, "
-        "made in the step that names it, or its record says `shop_made`. Drills, "
+        "and cad/config/shop-equipment/. OWNED: its shop record says so. "
+        "TO BUY: its record's `status` is not `on_hand`. TO MAKE: a drawn shop tool, "
+        'made in the step that names it, or its record says `supply = "shop_made"`. Drills, '
         "taps and reamers a step names only by a part's callout are that part's, "
         "not listed here.",
         "",

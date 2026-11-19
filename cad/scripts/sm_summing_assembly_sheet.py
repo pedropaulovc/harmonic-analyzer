@@ -108,7 +108,7 @@ HUB_SET_SCREW_TORQUE = (
 # faces 7.67 apart), not a 2 in class ZZ pin.  No gauge class comes that
 # long, so the bar is made to the mounts it gauges: its .0002-.0017
 # diametral clearance in each bore (the maximum the rock budget charges) is
-# the bar's own make record, shop-equipment.toml gauges.gauge-bar-0472x8, the
+# the bar's own make record, shop-equipment gauges.gauge-bar-0472x8, the
 # tool list's TO MAKE row.  The step states no number that needs an
 # instrument, only the fitter's hand check (rule 22; Main on PR #2717's
 # gating clarity finding, 2026-11-13: no gauge ceremony for a setting bar).

@@ -1,0 +1,211 @@
+# CAD-owned shop-equipment records: facts the CAD specs and their tests read,
+# and workholding a process plan names, that the prechips shop schema cannot
+# express. Each fact lives in exactly one
+# file: anything prechips can hold (machines, chucks, measuring ranges and
+# resolutions, tools' sizing data, cutting settings) is in cad/process/shop.toml,
+# and no field here repeats one there. An object may appear in both files with
+# disjoint fields (gauges.dti, gauges.pin-gauges).
+#
+# TOML, deliberately not YAML: a *.yaml file in cad/config joins
+# _buildgraph.all_config_files() and would re-key every whole-config consumer.
+# No COM build closure reads it: it is in no leaf's cache key.
+#
+# Records moved verbatim from cad/process/shop/inventory.toml (last at
+# 45952b66bc); "#1413 placeholder" values are realistic estimates still to be
+# remeasured, as they were there.
+
+# --- assembly tools, gauges and consumables (#2392) ------------------------
+
+# Every tool the machine's assembly sheets name has one record, so the release's
+# ASSEMBLY.md tool list (cad/scripts/ha_assembly_package.py TOOLS) marks it
+# OWNED, TO BUY or TO MAKE from here. Records marked "archived inventory" carry
+# identity fields moved from cad/process/shop/inventory.toml at 45952b66bc.
+# They are owned only where that inventory recorded possession: the gauges of
+# the shop's first inventory, the parallels it sourced by photo and LMS
+# package, the bench and hand tools Pedro listed as kept
+# (2026-10-15, #1550), and the Loctite 638 of his adhesive rulings. A tool it
+# recorded only as approved to buy, as a trial assumption or as an
+# illustrative example is status = "to_order", as is every new record: nothing
+# recorded the shop owning it, so it is to buy (or to record, if the shop has
+# one). No vendor or SKU is asserted for a tool to buy.
+
+[consumables.loctite-638]
+name = "Loctite 638 retaining compound (archived inventory)"
+kind = "retaining_compound"
+status = "on_hand"
+
+[consumables.epoxy-30-minute]
+name = "30-minute epoxy"
+kind = "adhesive"
+status = "to_order"
+
+[consumables.solder-60-40]
+name = "60/40 tin-lead soft solder and rosin flux"
+kind = "solder"
+status = "to_order"
+
+[consumables.paste-wax]
+name = "Paste wax"
+kind = "release_agent"
+status = "to_order"
+
+[consumables.degreaser]
+name = "Degreaser"
+kind = "solvent"
+status = "to_order"
+
+[consumables.oil-iso-vg32]
+name = "ISO VG 32 machine oil"
+kind = "oil"
+status = "to_order"
+note = "The archived inventory listed it only as an illustrative example item."
+
+# --- McMaster-Carr PO 0803PCAMPOS (owned) ------------------------------------
+
+# Every tool, gauge, cutter, insert, holder, saw and shop fluid on the owner's
+# McMaster-Carr packing list for PO 0803PCAMPOS (McMaster-Carr number
+# 1616317-01, 08/04/2025), all shipped; owner (Pedro) 2026-11-17: "add to
+# inventory ... already owned". Names, sizes and quantities are the packing
+# list's descriptions; nothing it does not state is recorded (the McMaster
+# product pages returned no product text, read 2026-11-17). Its fasteners are
+# not recorded; its wire, brass and 12L14 stock and brass balls are [[stock]]
+# rows (McMaster-Carr PO 0803PCAMPOS block). Where an older record may be the
+# same object (noted at the record), neither is merged: the packing list does
+# not say.
+
+[consumables.tapmatic-gold]
+name = "LPS Tapmatic #1 Gold milling, turning and sawing lubricant, 16 fl oz"
+kind = "cutting_fluid"
+make = "LPS"
+sku = "2008K13"
+status = "on_hand"
+pieces = 1
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 17: \"Milling, Turning, and Sawing Lubricant, LPS Tapmatic #1 Gold, 16 FL. oz Squeeze Bottle\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[consumables.anchorlube]
+name = "Anchorlube milling, drilling and turning coolant, 16 fl oz"
+kind = "cutting_fluid"
+make = "Anchorlube"
+sku = "10705K49"
+status = "on_hand"
+pieces = 1
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 26: \"Milling, Drilling, and Turning Coolant, Anchorlube, 16 FL. oz Squeeze Bottle\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[consumables.marking-fluid-blue]
+name = "Scribe-enhancing marking fluid, blue, 2 fl oz felt-tip bottle"
+kind = "layout_fluid"
+sku = "2131A74"
+status = "on_hand"
+pieces = 1
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 24: \"Marking Fluid, Scribe-Enhancing, 2 FL. oz Felt-Tip Bottle, Blue\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[consumables.stone-lubricant]
+name = "Lubricant for polishing and sharpening stones, 4.5 fl oz"
+kind = "honing_oil"
+sku = "1386K41"
+status = "on_hand"
+pieces = 1
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 47: \"Lubricant for Polishing and Sharpening Stones, 4.5 FL. oz. Bottle\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[consumables.sanding-roll-soft-metals-220]
+name = "Clog- and water-resistant sanding roll for aluminum, soft metals and nonmetals, 2 in wide, 220 grit"
+kind = "abrasive_roll"
+sku = "8230A32"
+status = "on_hand"
+pieces = 1
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 48: \"Clog- and Water-Resistant Sanding Roll for Aluminum, Soft Metals and Nonmetals, 2\" Wide, 220 Grit\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[consumables.sanding-roll-220]
+name = "Sanding roll for smooth finish, 2 in wide, 220 grit, 30 ft"
+kind = "abrasive_roll"
+sku = "4687A223"
+status = "on_hand"
+pieces = 1
+cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 49: \"Sanding Roll for Smooth Finish, 2\" Wide, 220 Grit, 30 Feet Long\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+# --- MHA-CH-13 rocker strap on the CNC (cad/process/ch_rocker_strap) ---------
+
+# Tape for the MHA-CH-13 outline hold. Chosen because its data sheet states
+# both a normal tensile and a shear strength; the thin transfer tapes read
+# (3M 468MP, Nitto P-02) state peel and, for 468MP, lap shear only. It is a
+# permanent tape: freeing the strap and cleaning both faces is part of the
+# route (plan Setup 6).
+[consumables.tape-3m-vhb-5906]
+name = "3M VHB tape 5906, .006 in (0.15 mm), black"
+kind = "double_sided_tape"
+make = "3M"
+sku = "5906"
+status = "to_order"
+thickness_mm = 0.15
+normal_tensile_kpa = 690
+dynamic_shear_kpa = 690
+purchase = "One roll, 1-1/2 in wide or two 3/4 in strips side by side: 12 in per strap, 20 ft for the lot of 20. No price or stock read."
+note = "Not owned: to buy. MHA-CH-13 Setup 5: bonds the faced blank to the sub-plate under its whole face while the outline is cut."
+cite = ["3M VHB Tapes Technical Data, November 2015, Typical Performance Characteristics, 5906: thickness .006 in (0.15 mm); 90 degree peel 9 lb/in (16 N/cm); normal tensile (ASTM D-897, to aluminium, 72 h dwell) 100 lb/in2 (690 kPa); dynamic overlap shear (ASTM D-1002, to stainless steel, 72 h dwell) 100 lb/in2 (690 kPa); Application Techniques: clean with 50:50 isopropyl alcohol and water, about 15 psi application pressure, about 50% of ultimate bond strength after 20 minutes, 90% after 24 hours, 100% after 72 hours. Read 2026-11-17 from a distributor's copy (3M's own link refused the fetch): https://www.tspinc.com/pdf/3M-VHB-Tapes-Technical-Data.pdf"]
+
+# --- MHA-MG-02 magnifying clamp: brass black (owner ruling 2026-11-17) -------
+
+# Owner (Pedro) 2026-11-17, relayed by Main: the clamp is blackened as the
+# registry says; buy a brass-black solution (no product preference). "The
+# clamp is machined now and blackened later. The traveler may end at bare
+# machined with the part tagged awaiting brass black." The traveler's
+# blackening setup (cad/process/mg_magnifying_clamp) is gated on these
+# records. Birchwood Casey's own site (birchwoodcasey.com) refused the fetch
+# (Incapsula bot wall, 2026-11-17); its directions are read from the brand's
+# EU site, which names D-TOC GmbH as the EU responsible person.
+[consumables.brass-black-birchwood-casey]
+name = "Birchwood Casey Brass Black metal finish, 3 fl oz"
+kind = "blackening_solution"
+make = "Birchwood Casey"
+sku = "15225"
+source = "https://www.micro-tools.com/products/15225-f"
+status = "to_order"
+purchase = "Micro-Tools 15225-F (MPN 15208), $9.70, read 2026-11-17; ships by ground only, US 48 states. Also Brownells #167-005-200."
+note = "Not owned: to buy. MHA-MG-02 magnifying clamp: chemical blackening, its last setup."
+cite = [
+  "Birchwood Casey Deutschland, Brass Black Brünierung, Artikelnummer 15225, read 2026-11-17 (https://www.birchwoodcasey-deutschland.de/bruenierung-fuer-messing-kupfer-bronze.html), directions translated: 1. clean the parts with Birchwood Casey Cleaner-Degreaser; 3. treat the surfaces lightly with steel wool (grade 00) or abrasive paper; 4. clean again with the degreaser and rinse with clear water; 5. apply with a suitable applicator and let it act about one minute, then rinse the parts with cold water and carefully pat them dry; 6.-7. for a deeper colour polish lightly with fine steel wool (0000) and repeat steps 4-6; 8. preserve the surface with Birchwood Casey Barricade oil, leave it overnight, then wipe off excess oil. Step 2 (remove an old finish and rust) does not apply to fresh brass. 'causes no material change' (verursacht keine Materialveränderungen); FAQ: for brass, copper and bronze. Hazard: H302, H314 (severe skin burns and eye damage), H410; P280 wear protective gloves, clothing, eye and face protection.",
+  "Micro-Tools 15225-F listing, read 2026-11-17: 'chemically reacts with the metal surface to create a darkened finish without dimensional change'; colour deep grey to black depending on the alloy; room temperature.",
+  "Brownells Bluing Supplies booklet 076-200-040 (https://feeds.brownells.com/userdocs/learn/076-200-040_Bluing_Booklet.pdf), Birchwood Casey metal finishing products: 'BRASS BLACK - Use for touch-up or complete refinishing. For sights, screws, swivels - copper or brass.'",
+]
+
+[consumables.cleaner-degreaser-birchwood-casey]
+name = "Birchwood Casey Cleaner-Degreaser"
+kind = "solvent"
+make = "Birchwood Casey"
+status = "to_order"
+purchase = "The degreaser Brass Black's directions name; no size, price or stock read."
+note = "Not owned: to buy. MHA-MG-02 blackening: degrease before and after the light abrading."
+cite = ["Birchwood Casey Deutschland, Brass Black directions steps 1 and 4 (see consumables.brass-black-birchwood-casey)"]
+
+[consumables.barricade-birchwood-casey]
+name = "Birchwood Casey Barricade rust protection oil"
+kind = "oil"
+make = "Birchwood Casey"
+status = "to_order"
+purchase = "The oil Brass Black's directions name to preserve the finish; no size, price or stock read."
+note = "Not owned: to buy. MHA-MG-02 blackening: preserve the blackened surface, overnight."
+cite = ["Birchwood Casey Deutschland, Brass Black directions step 8 (see consumables.brass-black-birchwood-casey)"]
+
+[consumables.chemical-gloves-eye-protection]
+name = "Chemical-resistant gloves and safety glasses"
+kind = "ppe"
+status = "to_order"
+note = "Not owned: to buy (none on record). Handling Brass Black (H314: severe skin burns and eye damage)."
+cite = ["Birchwood Casey Deutschland, Brass Black hazard labelling: P280 wear protective gloves, protective clothing, eye protection, face protection"]
+
+# Owner (Pedro) 2026-11-17: "i have oxpho blue". A cold blue for steel: the
+# maker's instructions and catalogue name guns, tools and steel, never brass,
+# and the same catalogue sells Brass Black for brass. Not used on the brass
+# clamp. Brownells' product page refused the fetch (HTTP 403, Cloudflare,
+# 2026-11-17); the size owned is not recorded.
+[consumables.oxpho-blue]
+name = "Brownells Oxpho-Blue liquid gun blue (cold blue)"
+kind = "cold_blue"
+make = "Brownells"
+status = "on_hand"
+note = "Steel parts only; not the brass clamp"
+cite = [
+  "Owner (Pedro) 2026-11-17: \"i have oxpho blue\"",
+  "Brownells instruction sheet 076-200-546 (https://feeds.brownells.com/userdocs/learn/Inst-546forWeb.pdf), read 2026-11-17: 'Oxpho-Blue is an easily applied, highly rust resistant, bright phosphatizing chemical for touching-up or bluing guns, tools and instruments.' Contains phosphoric acid, cupric sulfate and selenious acid. No metal other than the gun is named.",
+  "Brownells Bluing Supplies booklet 076-200-040, read 2026-11-17: 'The chemical goes through the oil on the gun, removes thin rust and blues the steel underneath.' Oxpho-Blue Creme: 'use Oxpho Creme anywhere you need to give steel a quick, uniform, blue/black finish'.",
+]

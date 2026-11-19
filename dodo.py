@@ -3865,6 +3865,7 @@ def _collected_tests() -> list[Path]:
 
 def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
     import _cam_programs
+    import _shop_equipment
 
     review_bench = REPO_ROOT / "tools" / "machinist-review-evals" / "machinist_review_bench.py"
     owned = {SCRIPTS_DIR / test for tests in _GATE_TESTS.values() for test in tests}
@@ -3933,7 +3934,7 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
             ),
             # Shop-equipment contracts read the tracked shop records at runtime.
             str((REPO_ROOT / "cad" / "process" / "shop.toml").resolve()),
-            str((REPO_ROOT / "cad" / "config" / "shop-equipment.toml").resolve()),
+            *(str(path.resolve()) for path in _shop_equipment.files()),
             # test_cam_nc loads each CAM recipe by path (importlib, outside
             # cad/scripts) and reads its plan's milling cuts at runtime.
             *(

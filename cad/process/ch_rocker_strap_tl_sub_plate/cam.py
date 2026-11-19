@@ -112,7 +112,7 @@ CENTRE_DRILL = {
 DRILL_POINT_DEG = 118.0
 # A tap file's first motion: G53 G0 to machine Z0, the homed top. FluidNC
 # sets an axis's machine position to its homing mpos_mm (default 0) after
-# homing, and Z homes up (cad/config/shop-equipment.toml
+# homing, and Z homes up (cad/config/shop-equipment/
 # cnc.pm-30mv-controller: switches on all three axes) [INFERENCE: the
 # owner's config's Z mpos_mm is not on record].
 MACHINE_Z_TOP_MM = 0.0

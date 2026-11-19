@@ -1,0 +1,44 @@
+# CAD-owned shop-equipment records: facts the CAD specs and their tests read,
+# and workholding a process plan names, that the prechips shop schema cannot
+# express. Each fact lives in exactly one
+# file: anything prechips can hold (machines, chucks, measuring ranges and
+# resolutions, tools' sizing data, cutting settings) is in cad/process/shop.toml,
+# and no field here repeats one there. An object may appear in both files with
+# disjoint fields (gauges.dti, gauges.pin-gauges).
+#
+# TOML, deliberately not YAML: a *.yaml file in cad/config joins
+# _buildgraph.all_config_files() and would re-key every whole-config consumer.
+# No COM build closure reads it: it is in no leaf's cache key.
+#
+# Records moved verbatim from cad/process/shop/inventory.toml (last at
+# 45952b66bc); "#1413 placeholder" values are realistic estimates still to be
+# remeasured, as they were there.
+
+# --- measuring equipment on the mill -------------------------------------
+
+[holders.r8-collets-south-bend-sb1280]
+name = "South Bend SB1280 precision R-8 collet set of 12"
+status = "on_hand"
+source = "https://www.grizzly.com/products/south-bend-precision-r-8-collet-set-of-12/sb1280"
+purchase = "$99.95 (read live 2026-11-16)"
+sizes_in = ["1/8", "3/16", "1/4", "5/16", "3/8", "7/16", "1/2", "9/16", "5/8", "11/16", "3/4", "7/8"]
+runout_tir_in = 0.00059
+drawbar = "7/16-20"
+note = "Owned (owner 2026-11-16). No metric size: the touch probe's 6 mm shank needs a 6 mm R8 collet (to buy). Gauge length unmeasured; the base-bar plan's r8_collet_gauge_mm still cites the archived LMS 4860 set."
+
+# --- Owner inventory 2026-11-17: Zoro order, shop photos, reamers ----------
+
+[holders.die-stock-13-16]
+name = "Die stock for 13/16 in round dies (Drillco 3000DS1)"
+kind = "die_stock"
+make = "Drillco"
+sku = "G910373383"
+status = "on_hand"
+cite = ["Owner (Pedro) 2026-11-17: \"everything in the zoro order that should be recorded\"", "Zoro order WB7365521946 as recorded at commit a6e95cece9 (PR #2222): Drillco 3000DS1, quantity 1"]
+
+[holders.tap-wrench-t-small]
+name = "Small T-handle tap wrench (size range not legible)"
+kind = "tap_wrench"
+status = "on_hand"
+note = "One of the owned T-handle tap wrenches, this one or the 40-piece set's (tools.tap-die-set-40), has a centre hole in its top for a dead centre's point; the owner did not say which."
+cite = ["Photo 20250628_224109095_iOS.heic, 2025-06-28, beside the metric tap set", "Owner (Pedro) 2026-11-17: the photo shows owned tools", "Owner (Pedro) 2026-11-17, asked whether the T-handle tap wrench he will use for the clamp's 4-40 tap has a centre hole in its top for the dead centre's point: \"y\". Owner-confirmed, not measured."]

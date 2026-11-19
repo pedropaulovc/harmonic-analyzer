@@ -5,32 +5,35 @@ A part is made in the shop when its registry row's ``process`` does not start
 with ``purchased`` (cad/config/parts/*.yaml through ``_config.parts``). Parts
 point at what they need from their process plans, never the other way round:
 each enrolled plan (``_process_plans.TRAVELER_STEMS``) names its stock in
-``stock_refs`` (keys of cad/config/shop-equipment.toml ``[stock.<key>]``) and
+``stock_refs`` (keys of the cad/config/shop-equipment/ ``[stock.<key>]`` rows) and
 its tools in ``[[tools]]``, whose ``ref`` is a cad/process/shop.toml ``tools``
 key. A stock row's ``status`` says whether it is on hand, bought but not
-received, or still to order; rows one plan names are complementary (a cone gear
-takes brass and bronze), so the part reads the worst of their statuses. Tool
-ownership reads the same key in shop-equipment.toml's ``tools`` table:
-``present = true`` is ``on_hand``, ``present = false`` ``to_buy``, and no record
-(or a plan tool with no ``ref``) ``unrecorded``. A made part whose registry row
-names supplier SKUs (bought hardware reworked in the shop) and whose plan names
-no stock reads ``vendor_sku``; any other part with a plan but no stock
-``no_stock_record``; a part without a plan ``no_traveler``.
+received, or still to order. Tool ownership reads the same key in the
+inventory's ``tools`` table (``_shop_equipment.load``): its ``status``
+(``on_hand``, ``not_received``, ``to_order`` or ``to_make``), or
+``unrecorded`` when there is no record, the record has no status, or the plan
+tool has no ``ref``. A part without stock reads one placeholder stock row:
+``vendor_sku`` when its registry row names supplier SKUs (bought hardware
+reworked in the shop) and its plan names no stock, ``no_stock_record`` for any
+other part with a plan but no stock, ``no_traveler`` for a part without a plan.
 
 The output is normalized: one row per part and requirement, ``type`` ``stock``
 (``ref`` the stock key) or ``tool`` (``ref`` the shop.toml key), with that
 requirement's own ``status``. A part without stock reads one stock row with its
-part status, a part without a plan one ``no_traveler`` tool row, and stock no
-plan names closes the table with its part columns empty.
+placeholder status, a part without a plan one ``no_traveler`` tool row, and
+stock no plan names closes the table with its part columns empty. The md
+summary line counts the parts ``ready``, ``missing`` and ``no_traveler``
+(``readiness``).
 
 Usage:
     uv run --frozen python cad/scripts/stock_bom.py [--format md|csv|xlsx] [--out PATH]
 
 ``xlsx`` writes a Readiness sheet and the table and needs ``--out``.
 
-Exits 2 when a stock row carries an unknown status, or a plan names an unknown
-or purchased part, an unknown stock key or a tool ``ref`` missing from
-shop.toml: the plans must not point at a retired or bought identity.
+Exits 2 when a stock row or a tool record carries an unknown status, or a plan
+names an unknown or purchased part, an unknown stock key or a tool ``ref``
+missing from shop.toml: the plans must not point at a retired or bought
+identity.
 """
 
 from __future__ import annotations
@@ -49,10 +52,9 @@ import xlsxwriter
 
 import _config
 import _process_plans
+import _shop_equipment
 import _telemetry
-from _paths import CAD_ROOT
 
-SHOP_EQUIPMENT = CAD_ROOT / "config" / "shop-equipment.toml"
 NO_TRAVELER = "no_traveler"
 MM_PER_IN = 25.4
 REQUIREMENT_COLUMNS = (
@@ -76,12 +78,9 @@ class StockStatus(enum.Enum):
     TO_ORDER = "to_order"
 
 
-class PartStockStatus(enum.Enum):
-    """A part's stock state; declaration order runs from complete to missing."""
+class StockPlaceholder(enum.Enum):
+    """The status of the one stock row a part with no stock row reads."""
 
-    ON_HAND = "on_hand"
-    NOT_RECEIVED = "not_received"
-    TO_ORDER = "to_order"
     VENDOR_SKU = "vendor_sku"
     NO_STOCK_RECORD = "no_stock_record"
     NO_TRAVELER = "no_traveler"
@@ -89,7 +88,9 @@ class PartStockStatus(enum.Enum):
 
 class ToolStatus(enum.Enum):
     ON_HAND = "on_hand"
-    TO_BUY = "to_buy"
+    NOT_RECEIVED = "not_received"
+    TO_ORDER = "to_order"
+    TO_MAKE = "to_make"
     UNRECORDED = "unrecorded"
 
 
@@ -124,7 +125,8 @@ class BomLine:
     material: str
     stock: tuple[StockRow, ...]
     supplier_skus: tuple[str, ...]
-    status: PartStockStatus
+    # None when the part has stock rows; else the status its one stock row reads.
+    placeholder: StockPlaceholder | None
     # None: the part has no process plan, so its tools are not recorded.
     tools: tuple[ToolLine, ...] | None
 
@@ -177,10 +179,9 @@ def _describe(row: dict) -> str:
     return ", ".join(part for part in parts if part)
 
 
-def load_stock(path: Path = SHOP_EQUIPMENT) -> dict[str, StockRow]:
-    document = tomllib.loads(path.read_text(encoding="utf-8"))
+def load_stock(directory: Path = _shop_equipment.DIRECTORY) -> dict[str, StockRow]:
     rows = {}
-    for key, row in document["stock"].items():
+    for key, row in _shop_equipment.load(directory)["stock"].items():
         try:
             status = StockStatus(row["status"])
         except (KeyError, ValueError) as exc:
@@ -192,21 +193,22 @@ def load_stock(path: Path = SHOP_EQUIPMENT) -> dict[str, StockRow]:
 
 
 def _tool_status(record: dict | None) -> ToolStatus:
-    if record is None or "present" not in record:
+    if record is None or "status" not in record:
         return ToolStatus.UNRECORDED
-    if record["present"] is True:
-        return ToolStatus.ON_HAND
-    return ToolStatus.TO_BUY
+    status = ToolStatus(record["status"])
+    if status is ToolStatus.UNRECORDED:
+        raise ValueError(record["status"])
+    return status
 
 
 def load_plans(
     stems: tuple[str, ...] = _process_plans.TRAVELER_STEMS,
     shop_path: Path = _process_plans.SHOP_PATH,
-    equipment_path: Path = SHOP_EQUIPMENT,
+    equipment_dir: Path = _shop_equipment.DIRECTORY,
 ) -> dict[str, PlanRefs]:
     """Registry stem -> the stock keys and tools its process plan names."""
     shop_tools = tomllib.loads(shop_path.read_text(encoding="utf-8"))["tools"]
-    owned = tomllib.loads(equipment_path.read_text(encoding="utf-8"))["tools"]
+    owned = _shop_equipment.load(equipment_dir)["tools"]
     errors = []
     by_part = {}
     for stem in stems:
@@ -221,9 +223,12 @@ def load_plans(
                 )
                 continue
             record = owned.get(ref) if ref else None
-            tools.append(
-                ToolLine(ref=ref, name=tool["name"], status=_tool_status(record))
-            )
+            try:
+                status = _tool_status(record)
+            except ValueError:
+                errors.append(f"tools.{ref}: bad status {record['status']!r}")
+                continue
+            tools.append(ToolLine(ref=ref, name=tool["name"], status=status))
         by_part[plan["cad"]["part"]] = PlanRefs(
             stock_keys=tuple(plan.get("stock_refs", ())), tools=tuple(tools)
         )
@@ -236,19 +241,18 @@ def _is_made(row: dict) -> bool:
     return not str(row.get("process", "")).startswith("purchased")
 
 
-def _part_status(
+def _placeholder(
     plan: PlanRefs | None,
     stock: tuple[StockRow, ...],
     supplier_skus: tuple[str, ...],
-) -> PartStockStatus:
+) -> StockPlaceholder | None:
     if stock:
-        statuses = (PartStockStatus(row.status.value) for row in stock)
-        return max(statuses, key=list(PartStockStatus).index)
+        return None
     if supplier_skus:
-        return PartStockStatus.VENDOR_SKU
+        return StockPlaceholder.VENDOR_SKU
     if plan is None:
-        return PartStockStatus.NO_TRAVELER
-    return PartStockStatus.NO_STOCK_RECORD
+        return StockPlaceholder.NO_TRAVELER
+    return StockPlaceholder.NO_STOCK_RECORD
 
 
 def build_bom(
@@ -289,7 +293,7 @@ def build_bom(
                 ),
                 stock=rows,
                 supplier_skus=skus,
-                status=_part_status(plan, rows, skus),
+                placeholder=_placeholder(plan, rows, skus),
                 tools=plan.tools if plan else None,
             )
         )
@@ -343,10 +347,10 @@ def requirements(lines: list[BomLine], stock: dict[str, StockRow]) -> list[Requi
         stock_items = [
             (row.key, row.description, row.status.value) for row in line.stock
         ]
-        if not stock_items:
+        if line.placeholder is not None:
             skus = ", ".join(line.supplier_skus)
             stock_items = [
-                ("", f"supplier SKU {skus}" if skus else "", line.status.value)
+                ("", f"supplier SKU {skus}" if skus else "", line.placeholder.value)
             ]
         out += [
             Requirement(*part, RequirementType.STOCK, *item) for item in stock_items
@@ -385,18 +389,17 @@ def _md_escape(text: str) -> str:
 
 def render_markdown(lines: list[BomLine], stock: dict[str, StockRow]) -> str:
     out = io.StringIO()
-    counts = {status: 0 for status in PartStockStatus}
-    for line in lines:
-        counts[line.status] += 1
+    rows = requirements(lines, stock)
+    states = [entry.state for entry in readiness(rows)]
     out.write("# Stock BOM\n\n")
-    out.write(f"{len(lines)} made parts. Part stock status: ")
+    out.write(f"{len(lines)} made parts. Readiness: ")
     out.write(
-        ", ".join(f"{status.value}: {count}" for status, count in counts.items())
+        ", ".join(f"{state.value}: {states.count(state)}" for state in ReadinessState)
         + ".\n\n"
     )
     out.write("|" + "|".join(REQUIREMENT_COLUMNS) + "|\n")
     out.write("|" + "---|" * len(REQUIREMENT_COLUMNS) + "\n")
-    for row in requirements(lines, stock):
+    for row in rows:
         out.write("|" + "|".join(_md_escape(cell) for cell in row.cells()) + "|\n")
     return out.getvalue()
 
@@ -418,11 +421,13 @@ class ReadinessState(enum.Enum):
 # Statuses that keep a part from being made now. An ``unrecorded`` tool counts:
 # the shop's ownership of it is not on record.
 MISSING_STOCK = (
-    PartStockStatus.NOT_RECEIVED.value,
-    PartStockStatus.TO_ORDER.value,
-    PartStockStatus.NO_STOCK_RECORD.value,
+    StockStatus.NOT_RECEIVED.value,
+    StockStatus.TO_ORDER.value,
+    StockPlaceholder.NO_STOCK_RECORD.value,
 )
-MISSING_TOOLS = (ToolStatus.TO_BUY.value, ToolStatus.UNRECORDED.value)
+MISSING_TOOLS = tuple(
+    status.value for status in ToolStatus if status is not ToolStatus.ON_HAND
+)
 READINESS_COLUMNS = ("number", "part", "missing_stock", "missing_tools", "state")
 
 

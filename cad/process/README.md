@@ -93,7 +93,14 @@ one-third of the part's height (a rule of thumb, not a standard), and a
 one-third of the half jaw width (Pedro's house rule). Each is cited beside it.
 
 Facts prechips has no field for, but which CAD specs and tests read, live in
-[`cad/config/shop-equipment.toml`](../config/shop-equipment.toml):
+the TOML files under [`cad/config/shop-equipment/`](../config/shop-equipment/),
+split by topic and read only through `cad/scripts/_shop_equipment.py`, whose
+`load()` merges them by section and refuses a record key found in two files.
+Ownership is one `status`: `on_hand`, `not_received` (bought, not in the
+shop), `to_order` or `to_make`; a record the shop makes carries
+`supply = "shop_made"`. No record names the parts it serves as data (that is
+prose in its `note`): parts point at what they need from their process plans.
+They hold:
 
 - gauges: the DTI's kind, the pin-gauge note, the Mitutoyo gauge-block set
   and the indicators' ownership;
@@ -113,24 +120,27 @@ Facts prechips has no field for, but which CAD specs and tests read, live in
   its order line and allocation: Online Metals orders 1021704672 and
   1021751700, Metal Supermarkets invoice EC234347, McMaster-Carr PO
   0803PCAMPOS and McMaster 8663K55 acetal (owner 2026-11-17: all on hand but
-  the platen's C360 plate). Every row carries `status` (`on_hand`,
-  `not_received` or `to_order`) and `allocated_to`, the registry stems it is
-  cut for now (empty when its part is retired or none was named).
+  the platen's C360 plate), and the stock still to order. Every row carries
+  `status` (`on_hand`, `not_received` or `to_order`); a process plan names the
+  rows it is cut from in `stock_refs`.
   `uv run --frozen python cad/scripts/stock_bom.py [--format md|csv|xlsx]` joins
-  these rows to the part registry, normalized to one row per part and
-  requirement: `type` `stock` (each allocated row with its status; one
-  `vendor_sku` or `no_stock_record` row when none serves the part) or `tool`
-  (each `[[tools]]` entry of the part's process plan, ownership read from this
-  file's `tools.<ref>` `present`: `on_hand`, `to_buy` or `unrecorded`; one
-  `no_traveler` row for a part without a plan), then the unallocated rows with
-  the part columns empty. `--format xlsx --out PATH` adds a Readiness sheet
-  first: per part, its missing stock rows (`not_received`, `to_order`,
-  `no_stock_record`), missing tools (`to_buy`, `unrecorded`) and state
-  (`ready`, `missing`, `no_traveler`), as COUNTIFS formulas over the BOM sheet
-  (xlsxwriter cannot write a native PivotTable). Tools point from the plan,
-  never from this inventory. It exits 2 when a row or plan names an unknown or purchased
-  stem, or a plan's tool `ref` is not in `shop.toml`, and
-  `test_stock_bom.py` (`check:recipe`) runs that check on every change;
+  the part registry's made parts to their plans, normalized to one row per part
+  and requirement: `type` `stock` (each row the plan names, with its status;
+  one `vendor_sku`, `no_stock_record` or `no_traveler` row when it names none)
+  or `tool` (each `[[tools]]` entry of the part's process plan, ownership read
+  from the inventory's `tools.<ref>` `status`, or `unrecorded` with no record
+  or no status; one `no_traveler` row for a part without a plan), then the
+  stock rows no plan names with the part columns empty. The md summary line
+  counts the parts `ready`, `missing` and `no_traveler`. `--format xlsx --out
+  PATH` adds a Readiness sheet first: per part, its missing stock rows
+  (`not_received`, `to_order`, `no_stock_record`), missing tools (every status
+  but `on_hand`) and state (`ready`, `missing`, `no_traveler`), as COUNTIFS
+  formulas over the BOM sheet (xlsxwriter cannot write a native PivotTable).
+  Tools point from the plan, never from this inventory. It exits 2 when a
+  stock row or tool carries an unknown status, a plan names an unknown or
+  purchased stem or unknown stock, or a plan's tool `ref` is not in
+  `shop.toml`, and `test_stock_bom.py` (`check:recipe`) runs that check on
+  every change;
 - the MHA-FR-02 top-frame casting to buy (owner ruling 2026-11-10 (Pedro),
   #2333): a gray-iron ASTM A48 class 25B `[[stock]]` row of form `casting`,
   with its pattern, datum-target and as-cast mass notes; not quoted or ordered;

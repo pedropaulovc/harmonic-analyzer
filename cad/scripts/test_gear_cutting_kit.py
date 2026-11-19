@@ -6,8 +6,6 @@ width."""
 
 from __future__ import annotations
 
-import tomllib
-
 import pytest
 
 import cone_land_key
@@ -19,12 +17,10 @@ import dt_cylinder_gear_spec
 import pd_rack_pinion_spec
 import pd_transgear_feed_pinion_spec
 import pd_transgear_knob_shaft_spec
-from _paths import CAD_ROOT
+import _shop_equipment
 
 MM_PER_IN = 25.4
-TOOLS = tomllib.loads(
-    (CAD_ROOT / "config" / "shop-equipment.toml").read_text(encoding="utf-8")
-)["tools"]
+TOOLS = _shop_equipment.load()["tools"]
 
 
 def _stock_cutters() -> set[tuple[int, int, int]]:

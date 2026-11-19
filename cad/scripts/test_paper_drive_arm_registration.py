@@ -254,15 +254,11 @@ def test_a_full_division_setting_lands_k_in_the_band_and_the_circle() -> None:
     and K within half that sweep each; the pivot-and-pin tram turns K about S
     by its lever. Along S-K, the dialled mid-band aim plus that error stays
     inside the mesh's set band; in all, K stays inside its setting circle."""
-    import tomllib
-
-    from _paths import CAD_ROOT
+    import _shop_equipment
     import pd_paper_drive_knob_setting_spec as knob_setting
     import pd_rack_pinion_spec as disc
 
-    equipment = tomllib.loads(
-        (CAD_ROOT / "config" / "shop-equipment.toml").read_text(encoding="utf-8")
-    )
+    equipment = _shop_equipment.load()
     dro_accuracy = 0.0002 * 25.4
     assert any(
         cite.startswith("DRO accuracy") and ".0002” Accuracy" in cite

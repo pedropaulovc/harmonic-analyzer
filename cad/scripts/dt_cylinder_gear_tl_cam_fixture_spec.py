@@ -236,7 +236,7 @@ REGISTER_OFFSET = REGISTER_TIR / 2.0
 # The throw is read as a gap, not as a travel. Item 2 orbits the lathe axis,
 # so in half a turn it stands twice the throw farther from an indicator
 # zeroed on it at its nearest; the shop's gauge blocks wrung to that length
-# (cad/config/shop-equipment.toml gauges.gauge-blocks-mitutoyo, the 81-piece
+# (cad/config/shop-equipment/ gauges.gauge-blocks-mitutoyo, the 81-piece
 # inch set: .1001-.1009 by .0001, .101-.149 by .001, .050-.950 by .050) must
 # bring the indicator back to zero. A 1 in dial indicator swept over the .68
 # is not used: its error over that many turns of its hand is not known to

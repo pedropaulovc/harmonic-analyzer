@@ -3,6 +3,8 @@ parts and inventory keys."""
 
 from __future__ import annotations
 
+import pytest
+
 import _config
 import stock_bom
 
@@ -25,7 +27,7 @@ def test_complementary_rows_report_the_missing_stock() -> None:
     }
     plan = stock_bom.PlanRefs(stock_keys=("brass", "bronze"), tools=())
     (line,) = stock_bom.build_bom(REGISTRY, stock, {"gear": plan})
-    assert line.status is stock_bom.PartStockStatus.TO_ORDER
+    assert line.placeholder is None
     rows = stock_bom.requirements([line], stock)
     assert [(row.part, row.type.value, row.ref, row.status) for row in rows] == [
         ("gear", "stock", "brass", "on_hand"),
@@ -39,7 +41,7 @@ def test_complementary_rows_report_the_missing_stock() -> None:
 
 def test_a_part_without_a_plan_reads_no_traveler() -> None:
     (line,) = stock_bom.build_bom(REGISTRY, {}, {})
-    assert line.status is stock_bom.PartStockStatus.NO_TRAVELER
+    assert line.placeholder is stock_bom.StockPlaceholder.NO_TRAVELER
     (entry,) = stock_bom.readiness(stock_bom.requirements([line], {}))
     assert entry.state is stock_bom.ReadinessState.NO_TRAVELER
 
@@ -81,16 +83,20 @@ def test_tool_ownership_follows_the_shared_equipment_key(tmp_path, monkeypatch) 
         '[[tools]]\nid = "a"\nname = "owned"\nref = "t-owned"\n'
         '[[tools]]\nid = "b"\nname = "to buy"\nref = "t-buy"\n'
         '[[tools]]\nid = "c"\nname = "shop only"\nref = "t-shop"\n'
-        '[[tools]]\nid = "d"\nname = "described"\ndescription = "x"\n',
+        '[[tools]]\nid = "d"\nname = "described"\ndescription = "x"\n'
+        '[[tools]]\nid = "e"\nname = "to make"\nref = "t-make"\n',
         encoding="utf-8",
     )
     shop = tmp_path / "shop.toml"
     shop.write_text(
-        "[tools.t-owned]\n[tools.t-buy]\n[tools.t-shop]\n", encoding="utf-8"
+        "[tools.t-owned]\n[tools.t-buy]\n[tools.t-shop]\n[tools.t-make]\n",
+        encoding="utf-8",
     )
-    equipment = tmp_path / "equipment.toml"
-    equipment.write_text(
-        "[tools.t-owned]\npresent = true\n[tools.t-buy]\npresent = false\n",
+    equipment = tmp_path / "equipment"
+    equipment.mkdir()
+    (equipment / "tools.toml").write_text(
+        '[tools.t-owned]\nstatus = "on_hand"\n[tools.t-buy]\nstatus = "to_order"\n'
+        '[tools.t-make]\nstatus = "to_make"\nsupply = "shop_made"\n',
         encoding="utf-8",
     )
     monkeypatch.setattr(stock_bom._process_plans, "PROCESS_ROOT", tmp_path)
@@ -99,7 +105,31 @@ def test_tool_ownership_follows_the_shared_equipment_key(tmp_path, monkeypatch) 
     statuses = [tool.status for tool in plans["part-a"].tools]
     assert statuses == [
         stock_bom.ToolStatus.ON_HAND,
-        stock_bom.ToolStatus.TO_BUY,
+        stock_bom.ToolStatus.TO_ORDER,
         stock_bom.ToolStatus.UNRECORDED,
         stock_bom.ToolStatus.UNRECORDED,
+        stock_bom.ToolStatus.TO_MAKE,
     ]
+    # Every status but on_hand keeps the part from being made.
+    assert set(stock_bom.MISSING_TOOLS) == {
+        status.value for status in stock_bom.ToolStatus
+    } - {"on_hand"}
+
+
+def test_an_unknown_tool_status_is_refused(tmp_path, monkeypatch) -> None:
+    plan_dir = tmp_path / "part_a"
+    plan_dir.mkdir()
+    (plan_dir / "plan.toml").write_text(
+        '[cad]\npart = "part-a"\n[[tools]]\nid = "a"\nname = "x"\nref = "t"\n',
+        encoding="utf-8",
+    )
+    shop = tmp_path / "shop.toml"
+    shop.write_text("[tools.t]\n", encoding="utf-8")
+    equipment = tmp_path / "equipment"
+    equipment.mkdir()
+    (equipment / "tools.toml").write_text(
+        '[tools.t]\nstatus = "to_buy"\n', encoding="utf-8"
+    )
+    monkeypatch.setattr(stock_bom._process_plans, "PROCESS_ROOT", tmp_path)
+    with pytest.raises(stock_bom.InventoryError, match="to_buy"):
+        stock_bom.load_plans(("part_a",), shop, equipment)

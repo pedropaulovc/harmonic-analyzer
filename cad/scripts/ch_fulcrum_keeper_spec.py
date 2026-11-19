@@ -106,7 +106,7 @@ CROWN_TOP_Y = SHAFT_AXIS_H + CROWN_R  # 32.185: the set-screw tap's entry
 # at-assembly pair ream needed a made-to-order 12 in reamer and an undrawn
 # setup). Two bores reamed apart sit out of line by their bore-height bands
 # and each bore's own tilt to its seat, so the bore is a stock .2550
-# chucking reamer's size (shop-equipment.toml tools.reamer-2550),
+# chucking reamer's size (shop-equipment tools.reamer-2550),
 # BORE_DIA_BAND +.0010/.0000: its least clearance on the shaft covers the
 # slip minimum plus BORE_ALIGNMENT_ALLOWANCE_MM below.
 # The crown is a full round tangent to both side faces, centred on the bore

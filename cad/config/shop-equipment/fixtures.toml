@@ -1,0 +1,232 @@
+# CAD-owned shop-equipment records: facts the CAD specs and their tests read,
+# and workholding a process plan names, that the prechips shop schema cannot
+# express. Each fact lives in exactly one
+# file: anything prechips can hold (machines, chucks, measuring ranges and
+# resolutions, tools' sizing data, cutting settings) is in cad/process/shop.toml,
+# and no field here repeats one there. An object may appear in both files with
+# disjoint fields (gauges.dti, gauges.pin-gauges).
+#
+# TOML, deliberately not YAML: a *.yaml file in cad/config joins
+# _buildgraph.all_config_files() and would re-key every whole-config consumer.
+# No COM build closure reads it: it is in no leaf's cache key.
+#
+# Records moved verbatim from cad/process/shop/inventory.toml (last at
+# 45952b66bc); "#1413 placeholder" values are realistic estimates still to be
+# remeasured, as they were there.
+
+# --- assembly tools, gauges and consumables (#2392) ------------------------
+
+# Every tool the machine's assembly sheets name has one record, so the release's
+# ASSEMBLY.md tool list (cad/scripts/ha_assembly_package.py TOOLS) marks it
+# OWNED, TO BUY or TO MAKE from here. Records marked "archived inventory" carry
+# identity fields moved from cad/process/shop/inventory.toml at 45952b66bc.
+# They are owned only where that inventory recorded possession: the gauges of
+# the shop's first inventory, the parallels it sourced by photo and LMS
+# package, the bench and hand tools Pedro listed as kept
+# (2026-10-15, #1550), and the Loctite 638 of his adhesive rulings. A tool it
+# recorded only as approved to buy, as a trial assumption or as an
+# illustrative example is status = "to_order", as is every new record: nothing
+# recorded the shop owning it, so it is to buy (or to record, if the shop has
+# one). No vendor or SKU is asserted for a tool to buy.
+
+[fixtures.parallels-lms-6745]
+name = "Parallel set, 1/2-1 in (archived inventory)"
+kind = "parallels_set"
+make = "LittleMachineShop"
+sku = "6745"
+status = "on_hand"
+note = "Possession: photo and LittleMachineShop package (archived inventory source.by)."
+
+[fixtures.v-blocks]
+name = "Matched V-block pair with clamps"
+kind = "v_blocks"
+status = "to_order"
+note = "The archived inventory recorded the pair only as a trial ownership assumption (#1413), not as owned."
+
+# --- measuring equipment on the mill -------------------------------------
+
+[fixtures.tool-setter-ets]
+name = "Electronic tool setter, Tormach PCNC pattern (BobberCycle, ETS only)"
+kind = "tool_setter"
+status = "on_hand"
+contact = "normally open, dry contact"
+repeatability_mm = 0.002
+plate_dia_mm = 20.0
+sealing = "IP67"
+wiring = "to the controller's toolsetter_pin gpio.21 and GND"
+source = "https://bobbercycle.com/products/ets-electronic-tool-setter-fits-tormach-1100mx-770mx-1100m-770m-pcnc-1100-770-440"
+note = "Height and trigger travel not published. Tools probed on it must land on the 20 mm plate: the 2 in Tri Fly cannot and is touched off by hand (base-bar plan Setup 3)."
+
+# --- workholding ------------------------------------------------------------
+
+# Make, SKU and source only: the vise's jaw width, opening, jaw height and bed
+# height are prechips shop facts in cad/process/shop.toml workholding.vise-pm-6.
+[fixtures.vise-pm-6]
+make = "Precision Matthews"
+sku = "VISE-6in-HIGHPREC"
+source = "https://www.precisionmatthews.com/products/vise-6in-highprec"
+
+# The PM-1127VF-LB lathe's rests. Owner (Pedro) 2026-11-17: "already have
+# follow and steady rests for the lathe". Owner-stated, not measured: make,
+# capacity (largest and smallest work diameter) and mounting are unrecorded.
+[fixtures.steady-rest-pm-1127]
+name = "Steady rest for the PM-1127VF-LB lathe"
+kind = "steady_rest"
+status = "on_hand"
+cite = ["Owner (Pedro) 2026-11-17: \"already have follow and steady rests for the lathe\""]
+
+[fixtures.follow-rest-pm-1127]
+name = "Follow rest for the PM-1127VF-LB lathe"
+kind = "follow_rest"
+status = "on_hand"
+cite = ["Owner (Pedro) 2026-11-17: \"already have follow and steady rests for the lathe\""]
+
+# Holds MHA-FR-01 and MHA-FR-02 on a long edge for the cross-screw paths
+# (#2387): the faced underside is clamped to its face, square to the table,
+# and the drill thrust bears down through the part into the table.
+[fixtures.angle-plate-4]
+name = "LittleMachineShop 5386 angle plate, 4 x 4 x 4 in, webbed end, cast iron"
+make = "LittleMachineShop"
+sku = "5386"
+source = "https://littlemachineshop.com/products/angle-plate-4-webbed-end"
+purchase = "LittleMachineShop 5386, $29.95 sale (regular $34.95), low stock (listing read live 2026-11-12)"
+status = "to_order"
+note = "Not owned: to buy. MHA-FR-01 and MHA-FR-02 on edge for the cross-screw paths."
+
+# Base-bar (MHA-CH-06-TL-20) vise workholding the base-bar plan's face and hole
+# setups name (plan text and diagrams; prechips has no parallel or jack record).
+# Source and status: Pedro (2026-11-05, PR #2218 tool list). Status is as he
+# stated it on 2026-11-05; no dimension beyond that is recorded.
+[fixtures.parallels-1-3-8in]
+name = "1-3/8 in parallels, matched pair"
+status = "to_order"
+note = "Not owned: your set stops at 1 in. Op 30 and Setup A: lift the bar above the jaw tops."
+
+[fixtures.jack-hhip-3901-0079]
+name = "HHIP 3901-0079 screw jack"
+make = "HHIP"
+sku = "3901-0079"
+range = "about 3.9–5.5 in"
+status = "to_order"
+note = "Not owned. Op 30 and A4: under the overhanging end."
+
+# The MHA-SM-01 bend form (owner ruling 2026-11-14 (Pedro), #2401: "bend on a simple
+# form"; the radius is a reference, so the form carries no toleranced size). To make:
+# not owned, no drawing.
+[fixtures.sm-gooseneck-bend-form]
+name = "Gooseneck bend form, shop-made"
+kind = "bend_form"
+status = "to_make"
+supply = "shop_made"
+purchase = "Make from any scrap the shop has (hardwood, 6061 or steel plate, about 1 in thick): a disc or segment about 6 in across with a snug half-round groove round its edge that the 1/2 in tube sits in, a pin or bolt beside the groove to hold the tube's tail, and a short block grooved the same to press the tube into the form as it wraps. Pull the leg round the form by hand; no sand or filler: the groove holds the tube round."
+note = "Workholding for the one MHA-SM-01 bend (sm-gooseneck.yaml process). Try it on the spare tube first (the 36 in stock row). The sheet controls only where the tube's two ends finish (overall height and reach, both ends sawn and faced after the bend) and NO KINKS at the bend; the R3.0 is a reference."
+pieces = 1
+
+# --- MHA-PD-06 disc cutting arbor (#2412) -----------------------------------
+
+# The reducer disc (MHA-PD-06, 150T 48DP, .118 thick at Ø3.1655) cannot take
+# 150 form-cutter gashes on its own stiffness. To make: special to this part,
+# not owned. Sizes read from pd_rack_pinion_spec (bore Ø.501 REAM_H7, least
+# root Ø3.0719): the backing discs stop .036 under the least root radius, so
+# the #1 cutter's rim clears them at full depth.
+[fixtures.pd-rack-pinion-cutting-arbor]
+name = "MHA-PD-06 disc cutting arbor with two Ø3.00 backing discs, shop-made"
+kind = "gear_blank_arbor"
+status = "to_make"
+supply = "shop_made"
+purchase = "Make from 1018 CF or 12L14 round (arbor) and 1/4 in 6061 plate (two discs). Arbor: Ø.75 body held in the BS-0 chuck, a square shoulder, then a Ø.501 journal .60 long turned in one setup with the shoulder and slid into a trial ream of a .501 reamer (a slide fit with no shake), then 1/2-20 UNF thread .50 long and a 60° centre in the end for the tailstock. Backing discs: Ø3.00 x .25, bored with the .501 reamer, both faces faced in one setup per disc. One 1/2-20 hex nut and flat washer clamp the stack. The .501 reamer is not owned (owner inventory 2026-11-17: the shop's only reamers are tools.reamers-adjustable-lms-5948, .250-.375 in, and tools.reamer-0376); to buy, #3073."
+note = "Workholding for cutting the MHA-PD-06 teeth (pd-rack-pinion.yaml process; machining-dfm.md, Paper drive): backing disc, disc blank, backing disc and nut on the journal, the arbor in the BS-0 chuck with the tailstock centre in its end. Indicate the backing disc rim within .001 TIR before cutting. The Ø3.00 discs stop .036 under the disc's least root Ø3.0719 (radius), so the #1 cutter reaches whole depth without touching them; they back the .118 web to within .036 of the tooth spaces on both faces."
+pieces = 3
+backing_disc_dia_in = 3.00
+journal_dia_in = 0.501
+
+# --- carrier (MHA-CH-06-TL-21) plan workholding, tools and gauges ---------
+
+# The carrier plan's table setups (cad/process/ch_rocker_arm_tl_oblique_carrier):
+# the plate lies flat on four of these blocks under the kit's step clamps.
+# Possession: logbook 2026-11-05 ("all five 1-2-3 blocks I have: the two new
+# Taytools blocks, and three from the makerspace") and 2026-11-06 (joined with
+# the Taytools attachment hardware).
+[fixtures.blocks-123]
+name = "1-2-3 blocks (five: two Taytools, three makerspace)"
+kind = "setup_blocks"
+status = "on_hand"
+pieces = 5
+
+# Possession: logbook 2026-11-05 and 2026-11-06 ("strap clamps on step blocks
+# from the small clamping kit (Little Machine Shop 1268)"). Contents from the
+# LMS 1268 listing (Amazon B01EUF8J94, read 2026-11-13): 24 3/8-16 studs, 12
+# step blocks, 6 T-slot nuts, 6 flange nuts, 4 coupling nuts, 6 step clamps.
+[fixtures.clamping-kit-lms-1268]
+name = "LittleMachineShop 1268 clamping kit, 1/2 in T-slot"
+kind = "clamping_kit"
+make = "LittleMachineShop"
+sku = "1268"
+status = "on_hand"
+note = "MHA-CH-06-TL-21 carrier and TL-20 base bar table setups"
+
+# --- MHA-CH-13 rocker strap on the CNC (cad/process/ch_rocker_strap) ---------
+# Owner-chosen route (2026-11-17, relayed by Main): a shop-made sub-plate in
+# the PM vise, the blank against its fence under four low-profile edge clamps.
+# The fixture is drawn as MHA-CH-13-TL-00 (drawing
+# ch_rocker_strap_tl_fixture_assembly; parts TL-01 sub-plate, TL-02 hub plug,
+# TL-03 hub washer, TL-VN-50 edge clamp, TL-VN-51 hub screw). The plan's
+# [parameters] carry the sizes prechips reads (plate_*, fence_*,
+# clamp_height_mm, hub_relief_dia_mm, bushing_*); they are not repeated here.
+[fixtures.strap-sub-plate]
+name = "MHA-CH-13-TL-01 rocker-strap sub-plate, 6061, 13 x 3 x .49 in, integral fence and end stop"
+kind = "fixture_plate"
+status = "to_make"
+supply = "shop_made"
+purchase = "Make to drawing MHA-CH-13-TL-01 (ch_rocker_strap_tl_sub_plate) from the owned 1/2 x 6 in 6061-T6511 flat (OnlineMetals 1173, bought for the oblique trammel jig and freed, owner 2026-11-17): saw one 13 in length and mill a 3.00 in wide strip off it (the rest, about 2.8 x 13 in, stays as fixture stock). The drawing holds the interfaces the strap's setups use: .490 overall; the top (the plan's Z0) with the fence along the back edge and the end stop at the blank's left end standing .074 +/-.005 above it, so .416 of plate under Z0; under the hub hole, at X 6.000 from the stop face and Y 1.000 in front of the fence face, a counterbore .500 dia x .185 deep with a 1/4-20 tapped hole through its floor, .231 of thread (owner ruling 2026-11-17: \"Use a 1/4-20 hub screw. The .23 in of thread in the 6061 plate is accepted: the screw only snugs the strap during the outline.\"); the fence notched .17 deep at both ends (X 0-.92 and 11.08 on), where the outline cutter mills away the strip of blank under the strap's tips; four Pitbull clamp pockets with 4-40 holes along the front at the plan's clamp stations (fixtures.edge-clamps-low-profile)."
+note = "Not made: shop-made from owned stock. MHA-CH-13 Setups 2-5: seats the 1/8 x 1-1/2 in blank for facing and the hub hole (edge clamps), and for the outline (bonded with consumables.tape-3m-vhb-5906, screwed down at the hub)."
+
+# Model picked from Mitee-Bite's Pitbull table (read 2026-11-17): the 4-40 size
+# is the only one whose minimum clamped height D (.075 in) is under the
+# strap's finished .098 in; the 8-32 size needs .100 in. The clamp sits in a
+# slot milled into the plate and, on the maker's installation section, its
+# nose stands about D above the plate. That height is read off a drawing, not
+# a dimension: measure the installed clamp against the .098 in face cut before
+# the first finish pass. Knife edge because the gripped edge is waste.
+[fixtures.edge-clamps-low-profile]
+name = "MHA-CH-13-TL-VN-50 Mitee-Bite Pitbull clamps 26000, tool steel knife edge, 4-40, pack of 8"
+kind = "edge_clamp"
+status = "to_order"
+sku = "Mitee-Bite 26000"
+pieces = 8
+min_clamp_height_mm = 1.905
+slot_depth_mm = 3.556
+slot_width_mm = 9.525
+screw_from_work_edge_mm = 3.81
+holding_force_lbf = 650
+max_torque_ft_lb = 1.3
+purchase = "One pack of 8 (4 used, 4 spare). Price not read for 26000; the same-size blunt-edge 26010 was $83.99 at Shars, read 2026-11-17 (https://www.shars.com/mitee-bite-26010-4-40-blunt-edge-pitbull-clamp-8-pcs-set). Each clamp needs a .375 in wide x .140 in deep slot in the sub-plate and a 4-40 tapped hole .150 in from the blank's edge."
+note = "Not owned: to buy (owner approved, 2026-11-17). MHA-CH-13 Setups 2-4, at the plan's clamp stations: pushes the blank's edge toward the fence and down onto the plate."
+cite = ["Mitee-Bite Pitbull Clamp inch instructions 0426, table row 26000 (A .150, B .140, C .375, D* .075 minimum clamp height, 4-40 SHCS, 1.30 ft-lb, 650 lb, throw .0075, 8 per package) and its installation section: https://www.miteebite.com/wp-content/uploads/2026/04/PITBULL-INST-0426.pdf"]
+
+# Outline hold-down for MHA-CH-13 (owner decision 2026-11-17: no tabs; tape
+# under the strap and a screw through the reamed hub hole). Sizes follow the
+# hub hole's .4000-.4005 band and the sub-plate's .500 x .185 counterbore.
+[fixtures.strap-hub-plug]
+name = "MHA-CH-13-TL-02 rocker-strap hub plug, shop-made"
+kind = "locating_plug"
+status = "to_make"
+supply = "shop_made"
+purchase = "Turn to drawing MHA-CH-13-TL-02 (ch_rocker_strap_tl_hub_plug) from 6061 aluminium round bar on hand, 9/16 in or over (no stock is allocated here). Body .499 REF dia x .170 long, a .0005-.0015 diametral slip fit in the sub-plate's .500 counterbore; pilot .3985-.3995 dia x .102 (.0005-.0020 clearance in the strap's .4000-.4005 hub hole), standing .087 above the plate top when seated, under the strap's .098 plus tape; .272 overall; bore .266 through for the screw."
+note = "Not made: shop-made on the lathe. MHA-CH-13 Setup 5: the pilot locates the reamed hub hole over the counterbore. Out of the plate for Setup 4, where the drill and reamer run into the counterbore."
+
+[fixtures.strap-hub-washer]
+name = "MHA-CH-13-TL-03 rocker-strap hub washer, shop-made"
+kind = "washer"
+status = "to_make"
+supply = "shop_made"
+purchase = "Make to drawing MHA-CH-13-TL-03 (ch_rocker_strap_tl_hub_washer) from low-carbon steel: .53 dia x .06 thick, bore .266 (H drill). At its largest (.54 dia, title-block .XX band) the outline cutter passes .025 in from it."
+note = "Not made: shop-made. MHA-CH-13 Setup 5: under the hub screw's head, on the strap round the hub hole."
+
+[fixtures.strap-hub-screw]
+name = "MHA-CH-13-TL-VN-51 1/4-20 x 5/8 in alloy steel button-head socket cap screw"
+kind = "fastener"
+status = "to_order"
+sku = "McMaster 91255A539"
+purchase = "One (a box is the usual pack). Button head .437 in dia x .132 in high. 5/8 long: through the .06 washer, the strap and tape and the .185 counterbore it engages the sub-plate's whole .231 of 1/4-20 thread and stands about .045 out under the plate, between the parallels. Owner ruling 2026-11-17: \"Use a 1/4-20 hub screw. The .23 in of thread in the 6061 plate is accepted: the screw only snugs the strap during the outline.\""
+note = "Not owned: to buy. MHA-CH-13 Setup 5: hub hold-down through fixtures.strap-hub-washer and fixtures.strap-hub-plug."

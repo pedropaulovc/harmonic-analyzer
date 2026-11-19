@@ -2134,7 +2134,12 @@ def test_shop_file_readers_stay_outside_every_com_leaf():
     dodo = _load_dodo()
     readers = {
         str((dodo.SCRIPTS_DIR / name).resolve())
-        for name in ("_process_plans.py", "cam_nc.py", "ha_assembly_package.py")
+        for name in (
+            "_process_plans.py",
+            "_shop_equipment.py",
+            "cam_nc.py",
+            "ha_assembly_package.py",
+        )
     }
     roots = [
         *dodo.part_scripts(),
@@ -4264,10 +4269,11 @@ def test_recipe_enrolls_strict_traveler_tests():
     assert "test_prechips_traveler.py" in command
     assert "test_process_plans.py" not in command
     assert "test_process_shop.py" not in command
-    for path in (
-        dodo.REPO_ROOT / "cad" / "process" / "shop.toml",
-        dodo.REPO_ROOT / "cad" / "config" / "shop-equipment.toml",
-    ):
+    equipment = sorted(
+        (dodo.REPO_ROOT / "cad" / "config" / "shop-equipment").glob("*.toml")
+    )
+    assert equipment
+    for path in (dodo.REPO_ROOT / "cad" / "process" / "shop.toml", *equipment):
         assert str(path.resolve()) in recipe["file_dep"], path
 
 
