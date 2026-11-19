@@ -65,6 +65,8 @@ note = "Height and trigger travel not published. Tools probed on it must land on
 make = "Precision Matthews"
 sku = "VISE-6in-HIGHPREC"
 source = "https://www.precisionmatthews.com/products/vise-6in-highprec"
+status = "on_hand"
+note = "owner confirmed on hand 2026-11-19"
 
 # The PM-1127VF-LB lathe's rests. Owner (Pedro) 2026-11-17: "already have
 # follow and steady rests for the lathe". Owner-stated, not measured: make,

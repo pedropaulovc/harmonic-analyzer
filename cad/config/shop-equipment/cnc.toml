@@ -25,6 +25,8 @@
 control = "GRBL"
 drive = "ballscrews on X and Y"
 repeatability_mm = 0.02
+status = "on_hand"
+note = "owner confirmed on hand 2026-11-19"
 cite = [
   "Owner (Pedro) 2026-11-16, relayed by Main: PM-30MV CNC-converted, GRBL, ballscrews on X/Y; positioning repeatability ±0.02 mm (owner value).",
 ]
@@ -41,7 +43,8 @@ homing = "switches on all three axes"
 probe_pin = "gpio.5:high:pd, nothing wired (2026-11-16); gpio.5:low:pu once the touch probe is wired"
 toolsetter_pin = "gpio.21:low:pu, the tool setter"
 sender = "CNCjs 1.11.5, Manual Tool Change (Custom Probing)"
-note = "FluidNC 3.7.8 has no manual tool change of its own (atc_manual arrives in 3.8), no expressions, variables or flow control, and no canned cycles (GCode.cpp 'Not supported'); CNCjs expands M6 and FreeCAD's post translates drill cycles to G0/G1."
+status = "on_hand"
+note = "FluidNC 3.7.8 has no manual tool change of its own (atc_manual arrives in 3.8), no expressions, variables or flow control, and no canned cycles (GCode.cpp 'Not supported'); CNCjs expands M6 and FreeCAD's post translates drill cycles to G0/G1. Owner confirmed on hand 2026-11-19."
 cite = [
   "Owner (Pedro) 2026-11-16, relayed by Main: FluidNC config (board, homing, probe and toolsetter pins), CNCjs 1.11.5.",
   "FluidNC v3.7.8 source: Probe.cpp tripped() ORs the probe and toolsetter pins; MotionControl.cpp mc_probe_cycle alarms ProbeFailInitial on a tripped start; GCode.cpp G10 L20 = MPos - G92 - TLO - value, saved to NVS (Settings.cpp Coordinates::set).",

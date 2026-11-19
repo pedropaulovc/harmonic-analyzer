@@ -21,6 +21,8 @@
 # not the owner's 1 um lever indicator (2026-11-17).
 [gauges.dti]
 kind = "dial_test_indicator"
+status = "on_hand"
+note = "owner confirmed on hand 2026-11-19"
 
 # Grade only; its range and resolution are cad/process/shop.toml gauges.pin-gauges.
 # Not owned (owner, Pedro, 2026-11-17, answering what is physically in the
