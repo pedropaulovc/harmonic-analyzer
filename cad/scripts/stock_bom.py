@@ -1,5 +1,5 @@
-"""Stock bill of materials: every part the shop makes, with the stock and tools
-its process plan names.
+"""Stock bill of materials: every part the shop makes, with the stock, tools
+and gauges its process plan names.
 
 A part is made in the shop when its registry row's ``process`` does not start
 with ``purchased`` (cad/config/parts/*.yaml through ``_config.parts``). Parts
@@ -7,33 +7,37 @@ point at what they need from their process plans, never the other way round:
 each enrolled plan (``_process_plans.TRAVELER_STEMS``) names its stock in
 ``stock_refs`` (keys of the cad/config/shop-equipment/ ``[stock.<key>]`` rows) and
 its tools in ``[[tools]]``, whose ``ref`` is a cad/process/shop.toml ``tools``
-key. A stock row's ``status`` says whether it is on hand, bought but not
-received, or still to order. Tool ownership reads the same key in the
-inventory's ``tools`` table (``_shop_equipment.load``): its ``status``
-(``on_hand``, ``not_received``, ``to_order`` or ``to_make``), or
-``unrecorded`` when there is no record, the record has no status, or the plan
-tool has no ``ref``. A part without stock reads one placeholder stock row:
+key, and its gauges in the setups' and operations' ``gauge_checks``, whose
+``gauge`` is a shop.toml ``gauges`` key. A stock row's ``status`` says whether
+it is on hand, bought but not received, or still to order. A tool's or gauge's
+ownership reads the same key in the inventory (``_shop_equipment.load``),
+in whichever of its ``tools``, ``fixtures``, ``consumables`` and ``gauges``
+sections holds it: its ``status`` (``on_hand``, ``not_received``,
+``to_order`` or ``to_make``), or ``unrecorded`` when there is no record, the
+record has no status, or the plan tool has no ``ref``. A part without stock
+reads one placeholder stock row:
 ``vendor_sku`` when its registry row names supplier SKUs (bought hardware
 reworked in the shop) and its plan names no stock, ``no_stock_record`` for any
 other part with a plan but no stock, ``no_traveler`` for a part without a plan.
 
 The output is normalized: one row per part and requirement, ``type`` ``stock``
-(``ref`` the stock key) or ``tool`` (``ref`` the shop.toml key), with that
-requirement's own ``status``. A part without stock reads one stock row with its
-placeholder status, a part without a plan one ``no_traveler`` tool row, and
-stock no plan names closes the table with its part columns empty. The md
-summary line counts the parts ``ready``, ``missing`` and ``no_traveler``
-(``readiness``).
+(``ref`` the stock key), ``tool`` or ``gauge`` (``ref`` the shop.toml key),
+with that requirement's own ``status``. A part without stock reads one stock
+row with its placeholder status, a part without a plan one ``no_traveler``
+tool row, and stock no plan names closes the table with its part columns
+empty. The md summary line counts the parts ``ready``, ``missing`` and
+``no_traveler`` (``readiness``): a part is ready only with no stock, tool or
+gauge missing.
 
 Usage:
     uv run --frozen python cad/scripts/stock_bom.py [--format md|csv|xlsx] [--out PATH]
 
 ``xlsx`` writes a Readiness sheet and the table and needs ``--out``.
 
-Exits 2 when a stock row or a tool record carries an unknown status, or a plan
-names an unknown or purchased part, an unknown stock key or a tool ``ref``
-missing from shop.toml: the plans must not point at a retired or bought
-identity.
+Exits 2 when a stock row or an inventory record carries an unknown status, an
+inventory key sits in two ownership sections, or a plan names an unknown or
+purchased part, an unknown stock key, or a tool ``ref`` or gauge missing from
+shop.toml: the plans must not point at a retired or bought identity.
 """
 
 from __future__ import annotations
@@ -114,6 +118,7 @@ class PlanRefs:
 
     stock_keys: tuple[str, ...]
     tools: tuple[ToolLine, ...]
+    gauges: tuple[ToolLine, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -129,6 +134,8 @@ class BomLine:
     placeholder: StockPlaceholder | None
     # None: the part has no process plan, so its tools are not recorded.
     tools: tuple[ToolLine, ...] | None
+    # The gauges its plan's operations check with; empty without a plan.
+    gauges: tuple[ToolLine, ...] = ()
 
 
 class InventoryError(ValueError):
@@ -201,36 +208,71 @@ def _tool_status(record: dict | None) -> ToolStatus:
     return status
 
 
+# Inventory sections a plan tool or gauge's key is owned under: a plan's fixture
+# or tape is a shop ``tools`` record to prechips but a fixtures or consumables
+# record here.
+OWNERSHIP_SECTIONS = ("tools", "fixtures", "consumables", "gauges")
+
+
+def _owned_record(inventory: dict, key: str) -> dict | None:
+    """The one inventory record under ``key`` in ``OWNERSHIP_SECTIONS``."""
+    found = [s for s in OWNERSHIP_SECTIONS if key in inventory.get(s, {})]
+    if len(found) > 1:
+        raise ValueError(f"{key!r} is in {' and '.join(found)}")
+    return inventory[found[0]][key] if found else None
+
+
+def _gauge_refs(plan: dict) -> list[str]:
+    """The gauges a plan's setups and operations check with, in plan order,
+    once each."""
+    refs = [
+        check["gauge"]
+        for setup in plan.get("setups", ())
+        for checker in (setup, *setup.get("operations", ()))
+        for check in checker.get("gauge_checks", ())
+    ]
+    return list(dict.fromkeys(refs))
+
+
 def load_plans(
     stems: tuple[str, ...] = _process_plans.TRAVELER_STEMS,
     shop_path: Path = _process_plans.SHOP_PATH,
     equipment_dir: Path = _shop_equipment.DIRECTORY,
 ) -> dict[str, PlanRefs]:
-    """Registry stem -> the stock keys and tools its process plan names."""
-    shop_tools = tomllib.loads(shop_path.read_text(encoding="utf-8"))["tools"]
-    owned = _shop_equipment.load(equipment_dir)["tools"]
+    """Registry stem -> the stock keys, tools and gauges its process plan names.
+
+    A tool's or gauge's ownership is the inventory record under its shop key in
+    any of ``OWNERSHIP_SECTIONS``; a tool without a ``ref`` has none.
+    """
+    shop = tomllib.loads(shop_path.read_text(encoding="utf-8"))
+    inventory = _shop_equipment.load(equipment_dir)
     errors = []
     by_part = {}
+
+    def line(plan_name: str, kind: str, ref: str, name: str) -> ToolLine | None:
+        if ref and ref not in shop.get(kind, {}):
+            errors.append(f"{plan_name}: {kind[:-1]} ref {ref!r} not in shop.toml")
+            return None
+        try:
+            status = _tool_status(_owned_record(inventory, ref) if ref else None)
+        except ValueError as exc:
+            errors.append(f"{plan_name}: {kind[:-1]} {ref!r}: {exc}")
+            return None
+        return ToolLine(ref=ref, name=name, status=status)
+
     for stem in stems:
         plan_file = _process_plans.plan_path(stem)
         plan = tomllib.loads(plan_file.read_text(encoding="utf-8"))
-        tools = []
-        for tool in plan.get("tools", ()):
-            ref = tool.get("ref", "")
-            if ref and ref not in shop_tools:
-                errors.append(
-                    f"{plan_file.parent.name}: tool ref {ref!r} not in shop.toml"
-                )
-                continue
-            record = owned.get(ref) if ref else None
-            try:
-                status = _tool_status(record)
-            except ValueError:
-                errors.append(f"tools.{ref}: bad status {record['status']!r}")
-                continue
-            tools.append(ToolLine(ref=ref, name=tool["name"], status=status))
+        name = plan_file.parent.name
+        tools = [
+            line(name, "tools", tool.get("ref", ""), tool["name"])
+            for tool in plan.get("tools", ())
+        ]
+        gauges = [line(name, "gauges", ref, ref) for ref in _gauge_refs(plan)]
         by_part[plan["cad"]["part"]] = PlanRefs(
-            stock_keys=tuple(plan.get("stock_refs", ())), tools=tuple(tools)
+            stock_keys=tuple(plan.get("stock_refs", ())),
+            tools=tuple(t for t in tools if t is not None),
+            gauges=tuple(g for g in gauges if g is not None),
         )
     if errors:
         raise InventoryError("; ".join(errors))
@@ -295,6 +337,7 @@ def build_bom(
                 supplier_skus=skus,
                 placeholder=_placeholder(plan, rows, skus),
                 tools=plan.tools if plan else None,
+                gauges=plan.gauges if plan else (),
             )
         )
     return lines
@@ -303,11 +346,12 @@ def build_bom(
 class RequirementType(enum.Enum):
     STOCK = "stock"
     TOOL = "tool"
+    GAUGE = "gauge"
 
 
 @dataclass(frozen=True)
 class Requirement:
-    """One stock row or tool a part needs; part fields empty for spare stock."""
+    """One stock row, tool or gauge a part needs; part fields empty for spare stock."""
 
     number: str
     part: str
@@ -334,12 +378,13 @@ class Requirement:
 
 
 def requirements(lines: list[BomLine], stock: dict[str, StockRow]) -> list[Requirement]:
-    """One row per part and stock row or tool, then the stock no plan names.
+    """One row per part and stock row, tool or gauge, then the stock no plan names.
 
     A part with no stock row still gets one stock line (``vendor_sku`` naming
     its supplier SKUs, or an empty ``no_stock_record`` / ``no_traveler``), and
     a part with no process plan one empty ``no_traveler`` tool line, so every
-    made part appears under both types.
+    made part appears under the stock and tool types. Gauge lines come only
+    from a plan's ``gauge_checks``.
     """
     out = []
     for line in lines:
@@ -359,10 +404,12 @@ def requirements(lines: list[BomLine], stock: dict[str, StockRow]) -> list[Requi
             out.append(Requirement(*part, RequirementType.TOOL, "", "", NO_TRAVELER))
             continue
         out += [
-            Requirement(
-                *part, RequirementType.TOOL, tool.ref, tool.name, tool.status.value
+            Requirement(*part, kind, tool.ref, tool.name, tool.status.value)
+            for kind, tools in (
+                (RequirementType.TOOL, line.tools),
+                (RequirementType.GAUGE, line.gauges),
             )
-            for tool in line.tools
+            for tool in tools
         ]
     named = {row.key for line in lines for row in line.stock}
     out += [
@@ -418,8 +465,8 @@ class ReadinessState(enum.Enum):
     NO_TRAVELER = "no_traveler"
 
 
-# Statuses that keep a part from being made now. An ``unrecorded`` tool counts:
-# the shop's ownership of it is not on record.
+# Statuses that keep a part from being made now. An ``unrecorded`` tool or
+# gauge counts: the shop's ownership of it is not on record.
 MISSING_STOCK = (
     StockStatus.NOT_RECEIVED.value,
     StockStatus.TO_ORDER.value,
@@ -428,7 +475,15 @@ MISSING_STOCK = (
 MISSING_TOOLS = tuple(
     status.value for status in ToolStatus if status is not ToolStatus.ON_HAND
 )
-READINESS_COLUMNS = ("number", "part", "missing_stock", "missing_tools", "state")
+MISSING_GAUGES = MISSING_TOOLS
+READINESS_COLUMNS = (
+    "number",
+    "part",
+    "missing_stock",
+    "missing_tools",
+    "missing_gauges",
+    "state",
+)
 
 
 @dataclass(frozen=True)
@@ -437,11 +492,12 @@ class PartReadiness:
     part: str
     missing_stock: int
     missing_tools: int
+    missing_gauges: int
     state: ReadinessState
 
 
 def readiness(rows: list[Requirement]) -> list[PartReadiness]:
-    """Per part, in BOM order: missing stock rows, missing tools and its state.
+    """Per part, in BOM order: missing stock, tools and gauges, and its state.
 
     A part without a process plan reads ``no_traveler`` whatever its counts:
     its tools are not known. Otherwise it is ``ready`` only with nothing missing.
@@ -452,18 +508,20 @@ def readiness(rows: list[Requirement]) -> list[PartReadiness]:
             by_part.setdefault(row.part, []).append(row)
     out = []
     for part, reqs in by_part.items():
-        stock = sum(
-            r.type is RequirementType.STOCK and r.status in MISSING_STOCK for r in reqs
-        )
-        tools = sum(
-            r.type is RequirementType.TOOL and r.status in MISSING_TOOLS for r in reqs
-        )
+        missing = [
+            sum(r.type is kind and r.status in statuses for r in reqs)
+            for kind, statuses in (
+                (RequirementType.STOCK, MISSING_STOCK),
+                (RequirementType.TOOL, MISSING_TOOLS),
+                (RequirementType.GAUGE, MISSING_GAUGES),
+            )
+        ]
         state = ReadinessState.READY
-        if stock or tools:
+        if any(missing):
             state = ReadinessState.MISSING
         if any(r.status == NO_TRAVELER for r in reqs):
             state = ReadinessState.NO_TRAVELER
-        out.append(PartReadiness(reqs[0].number, part, stock, tools, state))
+        out.append(PartReadiness(reqs[0].number, part, *missing, state))
     return out
 
 
@@ -508,47 +566,49 @@ def write_xlsx(lines: list[BomLine], stock: dict[str, StockRow], path: Path) -> 
         excel_row = index + 1
         match = f"{part},$B{excel_row}"
         summary.write_row(index, 0, (entry.number, entry.part))
+        for column, (type_, statuses, value) in enumerate(
+            (
+                (RequirementType.STOCK, MISSING_STOCK, entry.missing_stock),
+                (RequirementType.TOOL, MISSING_TOOLS, entry.missing_tools),
+                (RequirementType.GAUGE, MISSING_GAUGES, entry.missing_gauges),
+            ),
+            start=2,
+        ):
+            summary.write_formula(
+                index,
+                column,
+                f'=SUM(COUNTIFS({match},{kind},"{type_.value}",'
+                f"{status},{_xlsx_list(statuses)}))",
+                None,
+                value,
+            )
         summary.write_formula(
             index,
-            2,
-            f'=SUM(COUNTIFS({match},{kind},"stock",{status},{_xlsx_list(MISSING_STOCK)}))',
-            None,
-            entry.missing_stock,
-        )
-        summary.write_formula(
-            index,
-            3,
-            f'=SUM(COUNTIFS({match},{kind},"tool",{status},{_xlsx_list(MISSING_TOOLS)}))',
-            None,
-            entry.missing_tools,
-        )
-        summary.write_formula(
-            index,
-            4,
+            5,
             f'=IF(COUNTIFS({match},{status},"{NO_TRAVELER}")>0,"{NO_TRAVELER}",'
-            f'IF(C{excel_row}+D{excel_row}>0,"{ReadinessState.MISSING.value}",'
-            f'"{ReadinessState.READY.value}"))',
+            f"IF(C{excel_row}+D{excel_row}+E{excel_row}>0,"
+            f'"{ReadinessState.MISSING.value}","{ReadinessState.READY.value}"))',
             None,
             entry.state.value,
         )
-    for column, width in enumerate((18, 34, 14, 14, 12)):
+    for column, width in enumerate((18, 34, 14, 14, 14, 12)):
         summary.set_column(column, column, width)
     summary.freeze_panes(1, 0)
     summary.autofilter(0, 0, len(parts), len(READINESS_COLUMNS) - 1)
 
     # Parts per state beside the table.
-    summary.write_row(0, 6, ("state", "parts"), header)
+    summary.write_row(0, 7, ("state", "parts"), header)
     states = [entry.state for entry in parts]
     for index, state in enumerate(ReadinessState, start=1):
-        summary.write(index, 6, state.value)
+        summary.write(index, 7, state.value)
         summary.write_formula(
             index,
-            7,
-            f"=COUNTIF($E$2:$E${len(parts) + 1},G{index + 1})",
+            8,
+            f"=COUNTIF($F$2:$F${len(parts) + 1},H{index + 1})",
             None,
             states.count(state),
         )
-    summary.set_column(6, 6, 14)
+    summary.set_column(7, 7, 14)
     workbook.close()
 
 

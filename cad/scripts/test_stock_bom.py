@@ -3,6 +3,8 @@ parts and inventory keys."""
 
 from __future__ import annotations
 
+import zipfile
+
 import pytest
 
 import _config
@@ -133,3 +135,104 @@ def test_an_unknown_tool_status_is_refused(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(stock_bom._process_plans, "PROCESS_ROOT", tmp_path)
     with pytest.raises(stock_bom.InventoryError, match="to_buy"):
         stock_bom.load_plans(("part_a",), shop, equipment)
+
+
+def _plan_dir(tmp_path, monkeypatch, plan: str, shop: str, equipment: str):
+    (tmp_path / "part_a").mkdir()
+    (tmp_path / "part_a" / "plan.toml").write_text(plan, encoding="utf-8")
+    (tmp_path / "shop.toml").write_text(shop, encoding="utf-8")
+    (tmp_path / "equipment").mkdir()
+    (tmp_path / "equipment" / "inventory.toml").write_text(equipment, encoding="utf-8")
+    monkeypatch.setattr(stock_bom._process_plans, "PROCESS_ROOT", tmp_path)
+    return tmp_path / "shop.toml", tmp_path / "equipment"
+
+
+def test_tools_and_gauges_read_ownership_from_any_inventory_section(
+    tmp_path, monkeypatch
+) -> None:
+    shop, equipment = _plan_dir(
+        tmp_path,
+        monkeypatch,
+        '[cad]\npart = "gear"\n'
+        '[[tools]]\nid = "a"\nname = "fixture"\nref = "t-fixture"\n'
+        '[[tools]]\nid = "b"\nname = "tape"\nref = "t-tape"\n'
+        '[[setups]]\ngauge_checks = [{ gauge = "g-owned" }]\n'
+        "[[setups.operations]]\n"
+        'gauge_checks = [{ gauge = "g-buy" }, { gauge = "g-owned" }]\n'
+        "[[setups.operations]]\n"
+        'gauge_checks = [{ gauge = "g-shop" }]\n',
+        "[tools.t-fixture]\n[tools.t-tape]\n"
+        "[gauges.g-owned]\n[gauges.g-buy]\n[gauges.g-shop]\n",
+        '[fixtures.t-fixture]\nstatus = "to_make"\n'
+        '[consumables.t-tape]\nstatus = "on_hand"\n'
+        '[gauges.g-owned]\nstatus = "on_hand"\n'
+        '[gauges.g-buy]\nstatus = "to_order"\n',
+    )
+    plan = stock_bom.load_plans(("part_a",), shop, equipment)["gear"]
+    assert [(t.ref, t.status.value) for t in plan.tools] == [
+        ("t-fixture", "to_make"),
+        ("t-tape", "on_hand"),
+    ]
+    # Setup and operation checks, in plan order, each gauge once; a shop.toml
+    # gauge with no inventory record is unrecorded.
+    assert [(g.ref, g.status.value) for g in plan.gauges] == [
+        ("g-owned", "on_hand"),
+        ("g-buy", "to_order"),
+        ("g-shop", "unrecorded"),
+    ]
+    stock = {"brass": stock_bom.StockRow("brass", "brass bar", ON_HAND)}
+    plan = stock_bom.PlanRefs(("brass",), (), plan.gauges)
+    rows = stock_bom.requirements(
+        stock_bom.build_bom(REGISTRY, stock, {"gear": plan}), stock
+    )
+    assert [(r.type.value, r.ref) for r in rows][1:] == [
+        ("gauge", "g-owned"),
+        ("gauge", "g-buy"),
+        ("gauge", "g-shop"),
+    ]
+    (entry,) = stock_bom.readiness(rows)
+    assert (entry.missing_stock, entry.missing_tools, entry.missing_gauges) == (0, 0, 2)
+    assert entry.state is stock_bom.ReadinessState.MISSING
+
+
+@pytest.mark.parametrize(
+    ("shop", "equipment", "message"),
+    [
+        ("[tools.t]\n", "", "gauge ref 'g' not in shop.toml"),
+        (
+            "[tools.t]\n[gauges.g]\n",
+            '[tools.g]\nstatus = "on_hand"\n[gauges.g]\nstatus = "on_hand"\n',
+            "'g' is in tools and gauges",
+        ),
+    ],
+)
+def test_an_unknown_gauge_or_a_key_owned_twice_is_refused(
+    tmp_path, monkeypatch, shop, equipment, message
+) -> None:
+    paths = _plan_dir(
+        tmp_path,
+        monkeypatch,
+        '[cad]\npart = "gear"\n[[setups]]\ngauge_checks = [{ gauge = "g" }]\n',
+        shop,
+        equipment,
+    )
+    with pytest.raises(stock_bom.InventoryError, match=message):
+        stock_bom.load_plans(("part_a",), *paths)
+
+
+def test_the_readiness_sheet_counts_missing_gauges(tmp_path) -> None:
+    stock = {"brass": stock_bom.StockRow("brass", "brass bar", ON_HAND)}
+    gauge = stock_bom.ToolLine("g", "g", stock_bom.ToolStatus.TO_ORDER)
+    lines = stock_bom.build_bom(
+        REGISTRY, stock, {"gear": stock_bom.PlanRefs(("brass",), (), (gauge,))}
+    )
+    path = tmp_path / "bom.xlsx"
+    stock_bom.write_xlsx(lines, stock, path)
+    with zipfile.ZipFile(path) as book:
+        sheet = book.read("xl/worksheets/sheet1.xml").decode("utf-8")
+    # The gauge count (E2) is a COUNTIFS over the BOM's gauge rows, and it
+    # feeds the state (F2).
+    assert ',"gauge",' in sheet
+    assert '<c r="E2"><f>' in sheet and "<v>1</v></c>" in sheet
+    assert "C2+D2+E2&gt;0" in sheet
+    assert "<v>missing</v>" in sheet

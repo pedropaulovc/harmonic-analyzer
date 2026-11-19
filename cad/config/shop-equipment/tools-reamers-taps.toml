@@ -42,6 +42,10 @@ note = "The archived inventory's plug-and-bottoming hand taps were an illustrati
 
 # --- tools ----------------------------------------------------------------
 
+[tools.taps-unc-hand]
+status = "on_hand"
+note = "Explicit on_hand preserves the pre-split record, which had no present key and so read as owned."
+
 # Thread length only; the tap's description and tap drill are cad/process/shop.toml
 # tools.basebar-tap. Tap America T/A54278 (drillsandcutters.com).
 [tools.taps-unc-hand.members.8-32-plug]

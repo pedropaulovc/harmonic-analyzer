@@ -144,6 +144,8 @@ note = "The archived inventory listed it only as an illustrative example item."
 [tools.rocker-trammel]
 name = "Trial shop-made rocker template trammel, 1018 quarter-inch square bar"
 kind = "trammel"
+status = "on_hand"
+note = "Explicit on_hand preserves the pre-split record, which had no present key and so read as owned."
 supply = "shop_made"
 
 [tools.rocker-trammel.members."R800"]
@@ -162,10 +164,10 @@ length_mm = { value = 816, measured = { status = "measured", by = "placeholder (
 # inventory ... already owned". Names, sizes and quantities are the packing
 # list's descriptions; nothing it does not state is recorded (the McMaster
 # product pages returned no product text, read 2026-11-17). Its fasteners are
-# not recorded; its wire, brass and 12L14 stock and brass balls are [[stock]]
-# rows (McMaster-Carr PO 0803PCAMPOS block). Where an older record may be the
-# same object (noted at the record), neither is merged: the packing list does
-# not say.
+# not recorded; its wire, brass and 12L14 stock and brass balls are stock
+# rows (stock-bought.toml, McMaster-Carr PO 0803PCAMPOS block). Where an
+# older record may be the same object (noted at the record), neither is
+# merged: the packing list does not say.
 
 [tools.centre-punch-spring-impact]
 name = "Spring-impact centre punch, aluminum handle, 1/16 in point"

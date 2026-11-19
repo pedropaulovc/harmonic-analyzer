@@ -32,13 +32,28 @@ def test_a_record_in_two_files_is_refused(tmp_path) -> None:
         _shop_equipment.load(tmp_path)
 
 
+@pytest.mark.parametrize(
+    ("text", "section"),
+    [('[[stock]]\nform = "flat_bar"\n', "stock"), ('note = "loose"\n', "note")],
+)
+def test_a_top_level_value_that_is_not_a_table_is_refused(
+    tmp_path, text, section
+) -> None:
+    (tmp_path / "a.toml").write_text(text, encoding="utf-8")
+    with pytest.raises(ValueError, match=f"a.toml: {section} is a"):
+        _shop_equipment.load(tmp_path)
+
+
 def test_ownership_is_the_status_enum() -> None:
+    # A record without ``status`` is unrecorded in every reader; one with it
+    # carries an enum value.
     inventory = _shop_equipment.load()
     for section, records in inventory.items():
         allowed = STOCK_STATUSES if section == "stock" else STATUSES
         for key, record in records.items():
             assert not {"present", "shop_made", "use"} & set(record), (section, key)
-            assert record.get("status", "on_hand") in allowed, (section, key)
+            if "status" in record:
+                assert record["status"] in allowed, (section, key)
             assert record.get("supply", "shop_made") == "shop_made", (section, key)
             if record.get("status") == "to_make":
                 assert record.get("supply") == "shop_made", (section, key)

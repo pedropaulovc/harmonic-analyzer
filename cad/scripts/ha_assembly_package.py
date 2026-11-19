@@ -11,10 +11,11 @@ that package's): every module-level string as evaluated (whole printed blocks,
 sizes filled in) and every string literal in the source (the pieces of text a
 function assembles at draw time), never a comment or docstring. Each row of
 ``TOOLS`` names a tool by the words the sheets use for it and points at its
-record in cad/process/shop.toml or cad/config/shop-equipment/, so the
+records in cad/process/shop.toml and cad/config/shop-equipment/, so the
 list carries only tools some sheet still names, says where, and marks each
-OWNED, TO BUY or TO MAKE from the record. test_ha_assembly_package fails when
-a sheet names an instrument, gauge or consumable no row covers.
+from its shop-equipment records' ``status`` (``status()``).
+test_ha_assembly_package fails when a sheet names an instrument, gauge or
+consumable no row covers.
 
 A package in ``STEPS_IN_DOCUMENT`` prints its numbered fit-up steps and checks
 here instead of on its sheets: its ``*_assembly_sheet`` module's
@@ -206,12 +207,12 @@ TOOLS: tuple[Tool, ...] = (
     Tool(
         "Mill with DRO (PM-30MV)",
         r"\bMILL\b|\bDRO(?:'S)?\b",
-        ("shop.toml:machines.pm-30mv",),
+        ("shop.toml:machines.pm-30mv", "shop-equipment:machines.pm-30mv"),
     ),
     Tool(
         "Lathe (PM-1127VF-LB)",
         r"\bLATHE\b|\bTAILSTOCK\b",
-        ("shop.toml:machines.pm-1127vf-lb",),
+        ("shop.toml:machines.pm-1127vf-lb", "shop-equipment:machines.pm-1127vf-lb"),
     ),
     Tool("Edge finder", r"\bEDGE[- ]FIND\w*", ("shop-equipment:tools.edge-finder",)),
     Tool("Surface plate", r"SURFACE PLATE", ("shop-equipment:gauges.surface-plate",)),
@@ -256,7 +257,11 @@ TOOLS: tuple[Tool, ...] = (
         r"GAUGE PINS?|PIN GAUGES?",
         ("shop.toml:gauges.pin-gauges", "shop-equipment:gauges.pin-gauges"),
     ),
-    Tool("Height gauge", r"HEIGHT GAUGE", ("shop.toml:gauges.height-gauge",)),
+    Tool(
+        "Height gauge",
+        r"HEIGHT GAUGE",
+        ("shop.toml:gauges.height-gauge", "shop-equipment:gauges.height-gauge"),
+    ),
     Tool(
         "Depth micrometer or depth gauge",
         r"DEPTH (?:MICROMETER|GAUGE)",
@@ -265,7 +270,7 @@ TOOLS: tuple[Tool, ...] = (
     Tool(
         "Calipers, 6 in, with depth rod",
         r"\bCALIPERS?(?: DEPTH ROD)?\b",
-        ("shop.toml:gauges.calipers",),
+        ("shop.toml:gauges.calipers", "shop-equipment:gauges.calipers"),
     ),
     Tool(
         "Outside micrometers, 0-3 in",
@@ -412,16 +417,37 @@ def shop_record(ref: str) -> dict[str, Any]:
     return record
 
 
+# The label each inventory ``status`` prints, best to worst; a row with records
+# that disagree prints the worst. No inventory record, or one without a
+# ``status``, is ``UNRECORDED``, as stock_bom reads it.
+STATUS_LABELS = {
+    "on_hand": "OWNED",
+    "not_received": "ORDERED",
+    "to_make": "TO MAKE",
+    "to_order": "TO BUY",
+}
+UNRECORDED = "UNRECORDED"
+_LABEL_ORDER = (*STATUS_LABELS.values(), UNRECORDED)
+
+
 def status(tool: Tool) -> str:
-    """OWNED, TO BUY or TO MAKE, from the tool's shop records."""
+    """The tool's label from the ``status`` of its shop-equipment records alone.
+
+    shop.toml (prechips) records hold no ownership and ``supply`` is
+    provenance, so neither counts. A row with no records at all is a drawn shop
+    tool or one made in the step that names it: TO MAKE.
+    """
     if not tool.records:
         return "TO MAKE"
-    records = [shop_record(ref) for ref in tool.records]
-    if any(record.get("supply") == "shop_made" for record in records):
-        return "TO MAKE"
-    if all(record.get("status", "on_hand") == "on_hand" for record in records):
-        return "OWNED"
-    return "TO BUY"
+    labels = [
+        STATUS_LABELS[record["status"]] if "status" in record else UNRECORDED
+        for record in (
+            shop_record(ref)
+            for ref in tool.records
+            if ref.startswith("shop-equipment:")
+        )
+    ]
+    return max(labels, key=_LABEL_ORDER.index, default=UNRECORDED)
 
 
 @dataclass(frozen=True)
@@ -602,9 +628,11 @@ def markdown() -> str:
         "",
         "Every tool the assembly sheets or the fit-up steps above name (Named on: "
         "the package whose sheets or steps name it), reconciled with cad/process/shop.toml "
-        "and cad/config/shop-equipment/. OWNED: its shop record says so. "
-        "TO BUY: its record's `status` is not `on_hand`. TO MAKE: a drawn shop tool, "
-        'made in the step that names it, or its record says `supply = "shop_made"`. Drills, '
+        "and cad/config/shop-equipment/; the status is read from the shop-equipment "
+        "records alone (shop.toml holds no ownership). OWNED: `status` `on_hand`. "
+        "ORDERED: `not_received` (bought, not yet in the shop). TO BUY: `to_order`. "
+        "TO MAKE: `to_make`, or a drawn shop tool or one made in the step that names "
+        "it. UNRECORDED: no shop-equipment record, or one without a `status`. Drills, "
         "taps and reamers a step names only by a part's callout are that part's, "
         "not listed here.",
         "",

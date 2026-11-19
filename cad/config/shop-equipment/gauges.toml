@@ -74,6 +74,25 @@ kind = "micrometer_set"
 make = "LittleMachineShop"
 status = "on_hand"
 
+[gauges.calipers]
+kind = "caliper"
+status = "on_hand"
+note = "Ownership only; its facts are cad/process/shop.toml, same key. Explicit on_hand preserves the pre-split ASSEMBLY.md OWNED, which read a shop.toml record with no present key as owned."
+
+# Gauges the plans' gauge_checks name that no record above holds. Ownership
+# only; their ranges and resolutions are cad/process/shop.toml, same keys.
+[gauges.mill-x-dro]
+status = "on_hand"
+note = "The installed PM-30MV DRO's X scale (dro.pm-30mv: installed DRO confirmed by the owner 2026-10-27)."
+
+[gauges.mill-y-dro]
+status = "on_hand"
+note = "The installed PM-30MV DRO's Y scale (dro.pm-30mv: installed DRO confirmed by the owner 2026-10-27)."
+
+[gauges.clamp-bore-drill-shanks]
+status = "on_hand"
+note = "The F and G drill shanks of the owned 115-piece index (tools.jig-drill-f, owner 2026-11-19; G per cad/process/shop.toml tools.clamp-drill-g, owner 2026-11-17)."
+
 # Owner inventory 2026-11-17 (Pedro, PR #2874): "2 0.001'' dial indicators,
 # one 1um lever indicator and one digital 0.000'' indicator". The lever
 # indicator is gauges.dti. Resolutions are cad/process/shop.toml, same keys;
@@ -158,10 +177,10 @@ note = "Ball diameter not on the owner's listing; TP05-class listings give 2 mm,
 # inventory ... already owned". Names, sizes and quantities are the packing
 # list's descriptions; nothing it does not state is recorded (the McMaster
 # product pages returned no product text, read 2026-11-17). Its fasteners are
-# not recorded; its wire, brass and 12L14 stock and brass balls are [[stock]]
-# rows (McMaster-Carr PO 0803PCAMPOS block). Where an older record may be the
-# same object (noted at the record), neither is merged: the packing list does
-# not say.
+# not recorded; its wire, brass and 12L14 stock and brass balls are stock
+# rows (stock-bought.toml, McMaster-Carr PO 0803PCAMPOS block). Where an
+# older record may be the same object (noted at the record), neither is
+# merged: the packing list does not say.
 
 [gauges.telescoping-gauges-starrett-s579gz]
 name = "Starrett S579Gz telescoping bore gauge set, 4 pieces"

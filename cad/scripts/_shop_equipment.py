@@ -1,10 +1,10 @@
 """The CAD-owned shop inventory, cad/config/shop-equipment/*.toml, as one document.
 
 The records are split across files by topic; ``load`` merges every file's
-top-level sections (gauges, tools, fixtures, holders, consumables, stock, dro,
-cnc), so a reader sees one table per section whichever file holds a record. A
-record key in two files is refused, naming both. Every reader of the inventory
-goes through here; none opens a file by path.
+top-level sections (machines, gauges, tools, fixtures, holders, consumables,
+stock, dro, cnc), so a reader sees one table per section whichever file holds
+a record. A record key in two files is refused, naming both. Every reader of
+the inventory goes through here; none opens a file by path.
 
 No COM leaf's cache key holds these files, so no part, assembly, drawing,
 soundness, feature or export closure may import this module (check:recipe,
@@ -31,12 +31,21 @@ def files(directory: Path = DIRECTORY) -> tuple[Path, ...]:
 
 
 def load(directory: Path = DIRECTORY) -> dict:
-    """Section -> record key -> record, merged over every file."""
+    """Section -> record key -> record, merged over every file.
+
+    A top-level value that is not a table of records (an array of tables such
+    as ``[[stock]]``, or a scalar) is refused, naming its file and section.
+    """
     merged: dict[str, dict] = {}
     found_in: dict[tuple[str, str], Path] = {}
     for path in files(directory):
         document = tomllib.loads(path.read_text(encoding="utf-8"))
         for section, records in document.items():
+            if not isinstance(records, dict):
+                raise ValueError(
+                    f"{path.name}: {section} is a {type(records).__name__}, "
+                    "not a table of records"
+                )
             table = merged.setdefault(section, {})
             for key, record in records.items():
                 first = found_in.setdefault((section, key), path)
