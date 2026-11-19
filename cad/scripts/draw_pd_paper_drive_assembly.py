@@ -2266,13 +2266,18 @@ def _step_text(
             f"REFIT PER {s('platen-hung', 9)}-{s('guide-locks-set', 3)}.",
             f"REPEAT FROM STEP {steps.step_number('lock-seats-faced')}.",
         ),
+        # #3124: the arm's hole runs past the deepest insertion to a drill
+        # point, so the proud is set as the dowel goes in, not by a floor;
+        # the press is permanent (MHA-PD-18 RV-03), so an over-pressed dowel
+        # costs the arm, as a slip fit does.
         "latch-pin-pressed": (
             f"PRESS THE {n['pd-vn-transgear-latch-pin']} DOWEL, CHAMFERED END FIRST, "
-            f"INTO THE {n['pd-transgear-arm']} ARM'S REAMED HOLE TO ITS FLOOR, "
-            f"{pin_window} PROUD {detail_cite('latch-pin-pressed')}.",
-            _press_remedy(
-                "DOWEL", f"{n['pd-transgear-arm']} ARM", "latch-pin-pressed"
-            ),
+            f"INTO THE {n['pd-transgear-arm']} ARM'S REAMED HOLE, {pin_window} PROUD, "
+            f"CALIPER DEPTH ROD {detail_cite('latch-pin-pressed')}.",
+            f"IF THE DOWEL SLIDES IN BY HAND OR STANDS UNDER "
+            f"{pin_window.split(' TO ')[0]} PROUD, MAKE A NEW "
+            f"{n['pd-transgear-arm']} ARM AND REPEAT FROM STEP "
+            f"{steps.step_number('latch-pin-pressed')}.",
         ),
         "pin-pressed": (
             f"PRESS THE {n['pd-transgear-pin']} PIN INTO THE {n['pd-transgear-arm']} "

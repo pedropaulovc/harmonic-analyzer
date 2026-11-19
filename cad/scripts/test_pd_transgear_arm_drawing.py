@@ -16,6 +16,7 @@ import _drawing_dimensions
 import build_pd_transgear_arm as part
 import draw_pd_transgear_arm as drawing
 import pd_transgear_arm_notes as arm_notes
+import pd_paper_drive_assembly_steps as steps
 import pd_latch_hook_geometry as hook
 import pd_latch_hook_spec as hook_spec
 import pd_rack_pinion_spec as disc
@@ -127,11 +128,25 @@ def test_the_walls_were_judged_at_no_less_than_the_printed_title_block_band() ->
     """The geometry module's wall and fit arithmetic uses printed reaches; each
     must cover the title-block row the printed places actually invoke."""
     precision = spec.DRAWING_PRECISION_BY_NAME
-    for name, judged in (
-        ("TipStation", geometry.TIP_STATION_BAND),
-        ("PinHoleDepth", geometry.PIN_HOLE_DEPTH_BAND),
-    ):
-        assert judged >= _band(precision[name]), name
+    assert geometry.TIP_STATION_BAND >= _band(precision["TipStation"])
+
+
+def test_the_latch_pin_hole_depth_is_a_min_over_a_drill_point() -> None:
+    """#3124: drilled and reamed to a drill point, the full-diameter depth a
+    MIN (the model carries the MIN, on the .XX grid) past the deepest-set
+    pin; the pin is set proud at assembly, so the callout says MIN and note 3
+    names the step that sets it."""
+    depth_in = geometry.PIN_HOLE_DEPTH / 25.4
+    assert depth_in == pytest.approx(round(depth_in, spec.PIN_HOLE_DEPTH_PLACES))
+    assert geometry.PIN_HOLE_DEPTH > max(pin.INSERTION_LIMITS)
+    assert geometry.PIN_HOLE_POINT_LENGTH == pytest.approx(
+        geometry.PIN_HOLE_DIA / 2.0 / math.tan(math.radians(59.0)), abs=1e-4
+    )
+    callout = arm_notes.PIN_HOLE_CALLOUT.splitlines()[0]
+    assert callout == f"REAM <HOLE-DEPTH> {depth_in:.2f} MIN".replace("0.", ".", 1)
+    assert "FLAT" not in arm_notes.PIN_HOLE_CALLOUT
+    note = " ".join(arm_notes.NOTES[arm_notes.LATCH_PIN_NOTE - 1].split())
+    assert f"PIN SET PROUD AT ASSEMBLY, MHA-PD-00 STEP {steps.step_number('latch-pin-pressed')}." in note
 
 
 def test_the_thickness_prints_as_the_ground_stock_reference() -> None:
@@ -162,30 +177,33 @@ _ARM_ANGLE_PLAY = 0.00305
 
 # The dowel family's length grade, +/-0.010 in (the 98381A catalogue rows).
 _PIN_LENGTH_GRADE = 0.010 * 25.4
+# The retired pressed-to-floor hole's depth row: the 8.50 model printed .33,
+# reaching 0.372 (the negative controls below restate the retired pins).
+_FLOOR_DEPTH_REACH = 8.50 - (0.33 - 0.01) * 25.4
 
 
-def _printed_proud_range(pin_length: float, hole_depth: float) -> tuple[float, float]:
-    """The pin pressed to the hole floor: its length at either end of the
-    family's grade less the depth at either end of its printed row's reach
-    (the mm model printed rounded to inches)."""
-    depth_band = geometry.PIN_HOLE_DEPTH_BAND
-    assert depth_band >= _band(spec.DRAWING_PRECISION_BY_NAME["PinHoleDepth"])
+def _floor_pressed_proud_range(pin_length: float, hole_depth: float) -> tuple[float, float]:
+    """A pin pressed to a flat floor (the retired design): its length at
+    either end of the family's grade less the depth at either end of its
+    printed .XX row's reach."""
     return (
-        pin_length - _PIN_LENGTH_GRADE - (hole_depth + depth_band),
-        pin_length + _PIN_LENGTH_GRADE - (hole_depth - depth_band),
+        pin_length - _PIN_LENGTH_GRADE - (hole_depth + _FLOOR_DEPTH_REACH),
+        pin_length + _PIN_LENGTH_GRADE - (hole_depth - _FLOOR_DEPTH_REACH),
     )
 
 
 # The worst far-face margin this test's restatement finds at the printed
 # reaches, and the retired 3/4 pin's: it stops short of the face in a 6.20
-# hole and further short 0.05 deeper.  #290: the tip station and the hole
-# depth print rounded to .XX inch (reach 0.376 / 0.372), the hook its formed
-# .XX ±.02 (FORMED_BAND .024 with the rounding, MHA-PD-14).  The hook's
-# screw holes take the title block's ±.005 (delegated ruling 2026-11-07, the
-# bar's taps spotted through them), so the hook's screw drift grew; MHA-PD-20
-# faces at ⊥ .001 (delegated ruling 2026-11-07) open the pivot fit; #2413's
-# .1940 +.0010/0 ream floats the pivot .0085 at most (was .0072).
-_PINNED_FAR_FACE_MARGIN = 0.629
+# hole and further short 0.05 deeper.  #290: the tip station prints rounded
+# to .XX inch (reach 0.376), the hook its formed .XX ±.02 (FORMED_BAND .024
+# with the rounding, MHA-PD-14).  The hook's screw holes take the title
+# block's ±.005 (delegated ruling 2026-11-07, the bar's taps spotted through
+# them), so the hook's screw drift grew; MHA-PD-20 faces at ⊥ .001
+# (delegated ruling 2026-11-07) open the pivot fit; #2413's .1940 +.0010/0
+# ream floats the pivot .0085 at most (was .0072).  #3124: the 7/8 pin is set
+# .516-.565 proud at assembly (owner decision 2026-11-19).
+_SET_PROUD_WINDOW = (0.516 * 25.4, 0.565 * 25.4)
+_PINNED_FAR_FACE_MARGIN = 0.636
 _PINNED_OLD_PIN_MARGIN = -0.246
 _PINNED_DEEPER_OLD_PIN_MARGIN = -0.296
 
@@ -204,7 +222,7 @@ def _worst_far_face_margin(
     hole's far station, moved along U by the hook's screw drift
     (``joints.HOOK_DRIFT_ALONG_U``), its formed band and the sheet's band."""
     if proud_range is None:
-        proud_range = _printed_proud_range(pin.LENGTH, geometry.PIN_HOLE_DEPTH)
+        proud_range = _SET_PROUD_WINDOW
     if bend_deg is None:
         bend_deg = _config.title_block("angular")["value_deg"]
     pivot = (bar.PIVOT_TAP_X, hook.BAR_CENTRE_Y + bar.HANGER_TAP_Y)
@@ -269,10 +287,10 @@ def _worst_far_face_margin(
 def test_the_latch_pin_full_diameter_passes_the_hook_at_the_printed_tip_band() -> None:
     """R9-23 / R9-50: the hook's pin hole is match-drilled across the pin, so
     nothing takes up the pin's reach along its axis: the tip station's band,
-    the pin's length grade, the hole depth's row, the hook's screw drift and
-    formed band, and the ear's bend all reach the pin's grip on the strip; the
-    7/8 pin in the 8.50 hole keeps the full diameter through the strip at
-    every corner of the printed rows."""
+    the pin's set proud window, the hook's screw drift and formed band, and
+    the ear's bend all reach the pin's grip on the strip; the 7/8 pin set
+    .516-.565 proud keeps the full diameter through the strip at every
+    corner of the printed rows."""
     printed = geometry.TIP_STATION_BAND  # the 128.9 model printed 5.07 ±.01
     assert printed >= _band(spec.DRAWING_PRECISION_BY_NAME["TipStation"])
     margin = _worst_far_face_margin(printed)
@@ -286,13 +304,15 @@ def test_the_latch_pin_full_diameter_passes_the_hook_at_the_printed_tip_band() -
     # The screws' float turns the hook about the pin as well as sliding it,
     # so the drift along U at the hole exceeds the pure slide.
     assert joints.HOOK_DRIFT_ALONG_U > joints.HOOK_SCREW_SHIFT
-    # Negative control: the 3/4 pin stops short in a 6.20 hole, and further
-    # short 0.05 deeper, with the bends and the grade; without them it cleared.
-    old = _printed_proud_range(0.75 * 25.4, 6.20)
+    assert joints.LATCH_PIN_PROUD_RANGE == pytest.approx(_SET_PROUD_WINDOW)
+    # Negative control: the retired 3/4 pin pressed to a floor stops short in
+    # a 6.20 hole, and further short 0.05 deeper, with the bends and the
+    # grade; without them it cleared.
+    old = _floor_pressed_proud_range(0.75 * 25.4, 6.20)
     assert _worst_far_face_margin(printed, old) == pytest.approx(
         _PINNED_OLD_PIN_MARGIN, abs=1e-3
     )
-    deeper = _printed_proud_range(0.75 * 25.4, 6.25)
+    deeper = _floor_pressed_proud_range(0.75 * 25.4, 6.25)
     assert _worst_far_face_margin(printed, deeper) == pytest.approx(
         _PINNED_DEEPER_OLD_PIN_MARGIN, abs=1e-3
     )

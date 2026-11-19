@@ -15,7 +15,8 @@ face (the pivot head's end play), the latch-pin hole's depth and the pin
 bore's position and perpendicularity frames print on solid cut edges.  The
 end view (``*Right``, the square end) carries the thickness (the ground
 stock's, printed as a reference to it) and the latch-pin hole's reamed size,
-its height and the press of the pin to the hole floor.  The matched locating
+its height and its full-diameter depth MIN (the pin is set proud at
+assembly, not pressed to a floor).  The matched locating
 holes run through from the rear face the front view looks at, so their
 stations and size print there, and section B-B, which cuts them on their
 axes, carries one position frame for the 2X group.  No frame carries a
@@ -398,7 +399,7 @@ PLATE_CALLOUT_XY = (0.160, _CALLOUT_Y)
 # Their stations print as references: the plate's holes set them.
 TAP_STATION_REFERENCES = ("PlateTapStation1", "PlateTapStation2")
 # The latch-pin hole's depth is its callout's (round 2: a depth is never
-# deferred to a view); section A-A keeps the .33 as a reference.
+# deferred to a view); section A-A keeps the modelled MIN as a reference.
 LINEAR_REFERENCES = (*TAP_STATION_REFERENCES, "PinHoleDepth")
 TAP_CALLOUTS = (
     (

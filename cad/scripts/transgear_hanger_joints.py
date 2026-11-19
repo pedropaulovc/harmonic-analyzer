@@ -21,11 +21,13 @@ paper-drive assembly may import it; no part build does.
   spring's room under the head: shoulder - spacer - spot-face floor (from
   the arm's front face).  The spring holds the arm on the spacer, so the
   hanger's tilt is the spacer's face squareness, fixed in the bar's frame.
-* The MHA-PD-VN-58 latch pin pressed to the floor of the arm's blind end-face
-  hole (R9-12): the hole's reamed band keeps the press, its depth band and
-  the dowel's length grade set the proud range, the shallowest hole still
-  grips the pin 1.5 D, and the pin's full diameter passes the MHA-PD-14
-  hook strip's far face at every corner of the latch stack (R9-23, R9-50).
+* The MHA-PD-VN-58 latch pin pressed to its proud height in the arm's blind
+  end-face hole, set at assembly (owner decision 2026-11-19, #3124): the
+  hole's reamed band keeps the press, the set window and the dowel's length
+  grade bound the insertion, the shallowest still grips the pin 1.5 D and
+  the deepest stops short of the hole's drill point, and the pin's full
+  diameter passes the MHA-PD-14 hook strip's far face at every corner of the
+  latch stack (R9-23, R9-50).
   The hook sheet prints that face's X and Y only as references, so this
   margin rests on the fit-up step (its note 3): the annealed arm is set
   square on the pin with the face at its drawn station, within the formed
@@ -359,7 +361,7 @@ if NOTCH_REFERENCE_AIR_WORST_MM <= 0.0:
         f"{NOTCH_REFERENCE_AIR_WORST_MM:.3f}"
     )
 
-# --- MHA-PD-VN-58 latch pin pressed to the floor of the arm's end-face hole ---------
+# --- MHA-PD-VN-58 latch pin pressed to its proud height in the arm's end-face hole
 if abs(LATCH_PIN.DIA - ARM.PIN_HOLE_DIA) > 1e-9:
     raise AssertionError("the arm's press hole is not the latch pin's Ø")
 # The reamed band against the dowel's catalogue band: interference at both
@@ -374,25 +376,24 @@ LATCH_PIN_PRESS_INTERFERENCE = (
 )  # 0.0152 / 0.0330
 if min(LATCH_PIN_PRESS_INTERFERENCE) <= 0.0:
     raise AssertionError("the arm's pin-hole band loses the latch pin's press")
-if abs(LATCH_PIN.proud_length(ARM.PIN_HOLE_DEPTH) - LATCH_PIN.PROUD) > 1e-9:
-    raise AssertionError("the arm's hole depth does not leave the latch pin PROUD")
-# The depth's printed .XX reach and the dowel's length grade move the pressed
-# pin's tip by as much.
-LATCH_PIN_PROUD_RANGE = (
-    LATCH_PIN.proud_length(
-        ARM.PIN_HOLE_DEPTH + ARM.PIN_HOLE_DEPTH_BAND, -LATCH_PIN.LENGTH_GRADE
-    ),
-    LATCH_PIN.proud_length(
-        ARM.PIN_HOLE_DEPTH - ARM.PIN_HOLE_DEPTH_BAND, LATCH_PIN.LENGTH_GRADE
-    ),
-)
-# The shallowest hole, at the depth's printed .XX reach.
+# The proud is set at assembly to the pin spec's window, whatever the hole's
+# depth or the pin's length grade.
+LATCH_PIN_PROUD_RANGE = LATCH_PIN.PROUD_LIMITS
+# The longest pin set lowest reaches deepest: its pressed end stops short of
+# the hole's full-diameter MIN depth, clear of the drill point.
+LATCH_PIN_POINT_CLEARANCE_MIN = ARM.PIN_HOLE_DEPTH - max(LATCH_PIN.INSERTION_LIMITS)
+if LATCH_PIN_POINT_CLEARANCE_MIN <= 0.0:
+    raise AssertionError(
+        f"the deepest-set latch pin runs {-LATCH_PIN_POINT_CLEARANCE_MIN:.3f} into"
+        " the arm hole's drill point"
+    )
+# The shortest pin set highest grips least.
 LATCH_PIN_ENGAGEMENT_WORST_D = LATCH_PIN.press_engagement_d(
-    ARM.PIN_HOLE_DEPTH - ARM.PIN_HOLE_DEPTH_BAND
+    min(LATCH_PIN.INSERTION_LIMITS)
 )
 if LATCH_PIN_ENGAGEMENT_WORST_D < LATCH_PIN.PRESS_ENGAGEMENT_MIN_D:
     raise AssertionError(
-        f"the shallowest arm hole grips the latch pin"
+        f"the shallowest-set latch pin grips"
         f" {LATCH_PIN_ENGAGEMENT_WORST_D:.2f} D, under"
         f" {LATCH_PIN.PRESS_ENGAGEMENT_MIN_D} D"
     )

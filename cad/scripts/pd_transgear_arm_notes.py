@@ -12,7 +12,7 @@ import _config
 import _transgear_arm_plate_locating_interface as LOCATING_PIN
 import pd_transgear_pin_spec as PIN
 import pd_vn_transgear_arm_plate_locating_pin_spec as LOCATOR_PIN
-from pd_paper_drive_assembly_steps import knob_setting_ref
+from pd_paper_drive_assembly_steps import DRAWING_NUMBER, knob_setting_ref, step_number
 from pd_transgear_arm_geometry import (
     PIN_HOLE_DEPTH,
     PIN_HOLE_DEPTH_PLACES,
@@ -72,7 +72,11 @@ NOTES = (
     f"   AT ASSEMBLY, {knob_setting_ref()}.",
     f"{LATCH_PIN_NOTE}. LATCH-PIN HOLE: PRESS FIT ON LATCH PIN {LATCH_PIN_NUMBER}\n"
     f"   (INTERFERENCE {_inch_range(LATCH_PIN_PRESS_PRINTED)})."
-    f" PIN HOLE TO FACES {inch_text(LATCH_PIN_WALL_PRINTED, 3)} MIN.",
+    f" PIN HOLE TO FACES {inch_text(LATCH_PIN_WALL_PRINTED, 3)} MIN.\n"
+    # #3124: the pin is set to its proud height at assembly, so the hole's
+    # depth is only a minimum (the step that sets it, not its value).
+    f"   PIN SET PROUD AT ASSEMBLY, {DRAWING_NUMBER} STEP"
+    f" {step_number('latch-pin-pressed')}.",
     f"{SPRING_NOTE}. COUNTERBORE Ø AND FLOOR: SEAT AND PRELOAD\n"
     f"   PIVOT SPRING {_SPRING['number']}.",
     # The arm is reamed first; the pin's land is turned to the measured ream
@@ -93,9 +97,10 @@ LOCATOR_CALLOUT_TEXT = f"2X REAM THRU, {see_note(LOCATOR_NOTE)}"
 # to a view; section A-A keeps it as a reference); note 3 names the latch
 # pin.  Round 3's "BLIND FLAT-BOTTOM REAM" row was so wide its leader cut the
 # "B" of BLIND; the shorter row lets the text stand right of the hole, so the
-# leader leaves its left end straight up.
+# leader leaves its left end straight up.  #3124: the full-diameter depth is
+# a MIN over a drill point, the pin set proud at assembly (note 3).
 PIN_HOLE_CALLOUT = "\n".join((
-    f"REAM <HOLE-DEPTH> {inch_text(PIN_HOLE_DEPTH, PIN_HOLE_DEPTH_PLACES)} FLAT BOTTOM",
+    f"REAM <HOLE-DEPTH> {inch_text(PIN_HOLE_DEPTH, PIN_HOLE_DEPTH_PLACES)} MIN",
     see_note(LATCH_PIN_NOTE),
 ))
 SPRING_CALLOUT = see_note(SPRING_NOTE)

@@ -51,8 +51,9 @@ from pd_transgear_arm_geometry import (
 # assembly (``pd_transgear_arm_geometry.PLATE_TAP_LOCATION_RADIUS_MM``); the
 # end-face latch-hole height is an ordinary .XXX row the title block governs
 # (coordinator ruling (a), #2019: no tightened band); the pin-hole depth is
-# .XX.  The geometry module judges the walls and the hanger joints at each
-# print's reach.
+# a .XX MIN over a drill point (#3124), the model carrying the MIN.  The
+# geometry module judges the walls and the hanger joints at each print's
+# reach.
 OUTLINE_PLACES = ARM.OUTLINE_PLACES
 TIP_STATION_PLACES = ARM.TIP_STATION_PLACES
 THICKNESS_PLACES = 4

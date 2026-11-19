@@ -25,8 +25,12 @@ face, +X to the square end, +Z to the rear face):
   so they carry no frame and their stations print as references.
 * ``SpotFace``: the rear spot face, a revolved cut whose profile (Top plane,
   the arm's centreline section) dimensions its floor from the FRONT face.
-* ``PinHole``: the blind, flat-floored latch-pin hole (reamed for the dowel's
-  press, which bottoms on the floor), sketched on the square end face.
+* ``PinHole``: the blind latch-pin hole, reamed for the dowel's press,
+  sketched on the square end face to its full-diameter depth, printed as a
+  MIN; ``PinHolePoint`` revolves its 118-degree drill point on the floor
+  (profile ``PinHolePointProfile`` on the Top plane, the hole's axial
+  section). The dowel is pressed to its proud height at assembly, short of
+  the point.
 * ``StationReference`` (blanked): the printed stations of the pin bore and
   the plate taps from P; the Hole Wizard placement sketches that drive the
   taps are not importable.
@@ -83,7 +87,7 @@ from _drawing_tolerances import (
 )
 from _document_units import apply_package_model_units
 from _fit_deviations import deviations
-from _hole_spec import blind_cut_dia_mm
+from _hole_spec import DRILL_POINT_H, blind_cut_dia_mm
 from _holes import find_planar_face, wizard_holes
 from _part_pmi import author_part_pmi
 from _part_properties import part_drawing_unit
@@ -100,6 +104,7 @@ from pd_transgear_arm_geometry import (
     PIN_MOUTH_CHAMFER,
     PIN_MOUTH_CHAMFER_TOLERANCE,
     PIN_HOLE_DEPTH,
+    PIN_HOLE_POINT_LENGTH,
     PIN_HOLE_DIA,
     PIN_HOLE_DIA_BAND,
     PIN_HOLE_Z,
@@ -192,6 +197,7 @@ V_PLATE_EDGE_BREAKS = len(PLATE_TAP_STATIONS) * (
 )
 V_SPOT = math.pi * (_R_SPOT**2 - _R_BORE**2) * SPOT_FACE_DEPTH
 V_PIN = math.pi * _R_PIN**2 * PIN_HOLE_DEPTH
+V_PIN_POINT = math.pi * _R_PIN**2 * PIN_HOLE_POINT_LENGTH / 3.0
 
 
 def _mass(adapter: Any) -> tuple[float, list[float]]:
@@ -710,8 +716,9 @@ def build(adapter: Any) -> dict[str, str]:
     volume_check(adapter, "arm with rear spot face", expected, 0.02 * V_SPOT)
 
     # --- Latch-pin hole: blind along -X from the square end face -------------
-    # A plain cut-extrude, so the floor is flat: the dowel is pressed onto it
-    # (a wizard drill point would leave a cone under the pressed end).
+    # A cut-extrude to the full-diameter depth (the printed MIN), then the
+    # drill point revolved on its floor below: the dowel is pressed to its
+    # proud height at assembly, short of the point (#3124).
     before, com_before = _mass(adapter)
     pin = SketchDims()
     u, v, normal_out = _open_end_face_sketch(adapter)
@@ -766,6 +773,96 @@ def build(adapter: Any) -> dict[str, str]:
     _telemetry.success(
         f"latch-pin hole (end-face sketch {u:+g}, {v:+g}) removed "
         f"{before - after:.2f} mm^3 (analytic {V_PIN:.2f})"
+    )
+
+    # --- Latch-pin hole's drill point: a 118-degree cone on the floor --------
+    # Revolved about the hole's axis from its axial section on the Top plane
+    # (y = 0; sketch u, v = model X, -Z, as the spot face's profile), so the
+    # section A-A that cuts the arm on that plane shows it.  The triangle
+    # runs from the floor's centre out to its rim, then in to the tip on the
+    # axis; its radial leg is the hole's and its axial leg the point's.
+    before, com_before = _mass(adapter)
+    point = SketchDims()
+    check("create_sketch latch-pin drill point", adapter.create_sketch("Top"))
+    floor_x = TIP_STATION - PIN_HOLE_DEPTH
+    point_profile = [
+        (floor_x, -PIN_HOLE_Z),
+        (floor_x, -PIN_HOLE_Z + _R_PIN),
+        (floor_x - PIN_HOLE_POINT_LENGTH, -PIN_HOLE_Z),
+    ]
+    set_sketch_direct_db(adapter, True)
+    point_axis = check(
+        "latch-pin drill point axis",
+        adapter.add_centerline(floor_x, -PIN_HOLE_Z, floor_x + 1.0, -PIN_HOLE_Z),
+    )
+    point_floor, _point_flank, point_axis_side = add_line_chain(adapter, point_profile)
+    set_sketch_direct_db(adapter, False)
+    for line, relation in (
+        (point_floor, "vertical"),
+        (point_axis_side, "horizontal"),
+        (point_axis, "horizontal"),
+    ):
+        check(
+            f"latch-pin drill point {relation} {line}",
+            adapter.add_sketch_constraint(line, None, relation),
+        )
+    check(
+        "latch-pin drill point axis on the floor centre",
+        adapter.add_sketch_constraint(
+            f"{point_axis}.start", f"{point_floor}.start", "coincident"
+        ),
+    )
+    check(
+        "latch-pin drill point axis length",
+        adapter.add_sketch_dimension(point_axis, None, "linear", 1.0),
+    )
+    point.record("PinHolePointAxisLength")
+    dimension_between(
+        adapter, "origin", f"{point_floor}.start", "horizontal_distance", floor_x,
+        "latch-pin drill point floor station",
+    )
+    point.record("PinHolePointFloorX", '"TipStation" - "PinHoleDepth"')
+    dimension_between(
+        adapter, "origin", f"{point_floor}.start", "vertical_distance", PIN_HOLE_Z,
+        "latch-pin drill point on the hole axis",
+    )
+    point.record("PinHolePointZ", '"PinHoleZ"')
+    check(
+        "latch-pin drill point radius",
+        adapter.add_sketch_dimension(point_floor, None, "linear", _R_PIN),
+    )
+    point.record("PinHolePointR", '"PinHoleDia" / 2')
+    check(
+        "latch-pin drill point length",
+        adapter.add_sketch_dimension(
+            point_axis_side, None, "linear", PIN_HOLE_POINT_LENGTH
+        ),
+    )
+    point.record("PinHolePointLength", f'"PinHoleDia" / 2 * {DRILL_POINT_H}')
+    ensure_fully_defined(adapter, "latch-pin drill point profile")
+    check("exit_sketch latch-pin drill point", adapter.exit_sketch())
+    name_last_feature(adapter, "PinHolePointProfile")
+    drive_jobs += point.apply(adapter, "PinHolePointProfile")
+    check(
+        "revolve-cut latch-pin drill point",
+        adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
+    )
+    name_last_feature(adapter, "PinHolePoint")
+    expected -= V_PIN_POINT
+    after, com_after = _mass(adapter)
+    if abs((before - after) - V_PIN_POINT) > 0.03 * V_PIN_POINT:
+        raise RuntimeError(
+            f"latch-pin drill point removed {before - after:.3f} mm^3, expected "
+            f"{V_PIN_POINT:.3f}: profile misplaced"
+        )
+    if com_after[0] >= com_before[0]:
+        raise RuntimeError(
+            f"latch-pin drill point missed the hole's floor (COM x "
+            f"{com_before[0]:.5f} -> {com_after[0]:.5f})"
+        )
+    _telemetry.success(
+        f"latch-pin drill point removed {before - after:.3f} mm^3 "
+        f"(analytic {V_PIN_POINT:.3f})"
     )
 
     # --- REFERENCE sketch: the printed hole stations from P ------------------
