@@ -705,6 +705,9 @@ tap_drill_mm = 5.1054
 [tools.drill-60]  # Drills #60
 description = "#60 (.0400 in) drill, 115-piece index"
 diameter_mm = 1.016
+[tools.drill-65]  # Codjiflo round 1: pre-drill for the dt-cylinder-gear-tl-cam-fixture .0365 clock-pin ream
+description = "#65 (.0350 in) drill"
+diameter_mm = 0.889
 [tools.drill-57]  # Drills #57
 description = "#57 (.0430 in) drill, 115-piece index"
 diameter_mm = 1.0922
@@ -954,12 +957,8 @@ description = "1/16 keyway broach, style A"
 description = "Depth micrometer, inch"
 [tools.digital-angle-gauge]  # F-digital-angle-gauge
 description = "Digital angle gauge"
-[tools.feeler-gauges-metric]  # F-feeler-66MA
-description = "Starrett 66MA metric thickness gage (EDP 55974)"
-[tools.pin-gauges-011-060]  # A1-pin-set-011-060
-description = "Pin gauge set .011-.060 in by .001 in, class ZZ minus"
-[tools.pin-gauges-061-500]  # A1-pin-set-061-500-combined, bought for the A1-pin-set-061-250 and A1-pin-set-251-500 rows
-description = "Pin gauge set .061-.500 in combined, class ZZ minus"
+[tools.pin-gauges]  # A1-pin-set-011-060, A1-pin-set-061-500-combined; ownership: inventory gauges.pin-gauges
+description = "Pin gauge sets .011-.500 in, class ZZ minus (.011-.060 by .001 and .061-.500 combined)"
 [tools.protractor]  # F-protractor
 description = "Protractor"
 [tools.angle-plate-4]  # F-angle-plate-LMS-5386
@@ -1030,8 +1029,6 @@ description = "Shop-made fly cutter bar MHA-DT-37-TL-02 for the cone tip gear fo
 description = "Shop-made form cutter MHA-DT-37-TL-01 for the MHA-DT-37 tooth space"
 [tools.dt-cylinder-gear-cam-fixture]  # MHA-DT-12 cam throw .3402 ±.0020
 description = "Shop-made cam turning fixture MHA-DT-12-TL-01 (stub, clamp, clock pin) for the MHA-DT-12 cams"
-[tools.dti]  # inventory gauges.dti
-description = "Dial test indicator, 1 µm lever (range and resolution: gauges.dti)"
 [tools.endmill-5-64-long]  # MHA-PN-01 window corners R.040 max
 description = "5/64 in 2-flute end mill, 5/16 in or more of reach"
 diameter_mm = 1.984375
@@ -1072,8 +1069,6 @@ description = "Hardness test files, 55 and 65 HRC"
 description = "Lathe knurling holder with straight 25 TPI wheel"
 [tools.lathe-tool-sharp-nose]  # MHA-PD-08 R.004 max. corners, .016 neck; MHA-PD-17 SPIGOT ROOT R.004 MAX; MHA-PD-23 R.005 MAX land-to-head corner; MHA-PN-04 R.008 max. shoulder
 description = "Lathe turning tool, nose radius .004 in or less, tip under .016 wide"
-[tools.micrometers]  # inventory gauges.micrometers
-description = "Outside micrometers, 0-1, 1-2 and 2-3 in"
 [tools.needle-files-swiss]  # MHA-DT-37-TL-01 file the tooth-space form (.0114-.0323)
 description = "Swiss-pattern needle file set"
 [tools.number-stamps]  # MHA-FR-01 STAMP "2" .14 HIGH
@@ -1130,9 +1125,6 @@ description = "Sine bar, 5 in centres"
 [tools.slitting-saw-1-032]  # inventory tools.slitting-saw-1-032
 description = "Smooth-finish slitting saw, 1 in diameter, .032 in thick, 3/8 in arbor hole (McMaster 3044A23)"
 diameter_mm = 25.4
-[tools.slitting-saw-2-75-064]  # inventory tools.slitting-saw-2-75-064
-description = "HSS slitting saw, 2-3/4 in diameter, .064 in thick, 72 teeth (McMaster 3062A21)"
-diameter_mm = 69.85
 [tools.sm-gooseneck-bend-form]  # inventory fixtures.sm-gooseneck-bend-form
 description = "Shop-made grooved bend form with a tail for the MHA-SM-01 gooseneck tube"
 [tools.steady-rest-pm-1127]  # inventory fixtures.steady-rest-pm-1127
@@ -1177,6 +1169,8 @@ description = "1018 cold-finish carbon steel, flat bar, 5/16 x 1 in, 72 in lengt
 description = "AISI 1018 cold-finished steel, precision ground, flat bar, 5/16 x 1 in"
 [stock.1018-round-1]
 description = "1018 cold-finish carbon steel, round bar, 1 in"
+[stock.1018-round-1-3-4]
+description = "1018 cold-finish carbon steel, round bar, 1-3/4 in"
 [stock.1018-round-1-2]
 description = "1018 cold-finish carbon steel, round bar, 1/2 in"
 [stock.1018-round-1-4]

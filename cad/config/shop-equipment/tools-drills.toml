@@ -290,3 +290,8 @@ note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-FR-02 #51 DRILL 2
 kind = "drill"
 status = "to_order"
 note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-DT-24 #30 DRILL .129 THRU in 17-7 PH Cond C. The 115-piece index is HSS; the cobalt drill is for the hard 17-7 PH (not verified)."
+
+[tools.drill-65]
+kind = "drill"
+status = "to_order"
+note = "Not owned: to buy (the 115-piece index stops at #60). Codjiflo round 1 (#3122): pre-drill for the MHA-DT-12-TL-01 clock-pin ream, .0365 +.0005 REAM .20 (dt_cylinder_gear_tl_cam_fixture_spec PIN_HOLE_DIA, PIN_HOLE_DEPTH, read by tools.reamer-0365). #65 (.0350) leaves .0015 on the diameter for the reamer, the author's allowance for a reamer under 1/16 in, no source; #66 (.0330) would leave .0035."

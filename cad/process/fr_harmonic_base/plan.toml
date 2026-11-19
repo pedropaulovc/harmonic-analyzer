@@ -104,11 +104,6 @@ name = "Telescoping gauges"
 ref = "telescoping-gauges-starrett-s579gz"  # drawing cross-check 2026-11-19: gauges the bore
 
 [[tools]]
-id = "micrometers"
-name = "Micrometers 0-3 in"
-ref = "micrometers"  # drawing cross-check 2026-11-19: reads the telescoping gauge
-
-[[tools]]
 id = "number-stamps"
 name = "Number stamps"
 ref = "number-stamps"  # drawing cross-check 2026-11-19: STAMP "2" .14 HIGH

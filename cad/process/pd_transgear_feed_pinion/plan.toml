@@ -30,9 +30,9 @@ name = "32DP 20PA gear cutter #8"
 ref = "gear-cutters-32dp-20pa"  # F-gear-cutter-10-289-328
 
 [[tools]]
-id = "pin-gauges-061-500"
-name = "Pin gauges .061-.500"
-ref = "pin-gauges-061-500"  # A1-pin-set-061-250, A1-pin-set-061-500-combined
+id = "pin-gauges"
+name = "Pin gauges .011-.500"
+ref = "pin-gauges"  # A1-pin-set-061-250, A1-pin-set-061-500-combined
 
 [[tools]]
 id = "drill-32"

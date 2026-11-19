@@ -34,9 +34,9 @@ name = ".4835 reamer"
 ref = "reamer-4835"  # B-reamer-.4835
 
 [[tools]]
-id = "pin-gauges-061-500"
-name = "Pin gauges .061-.500"
-ref = "pin-gauges-061-500"  # A1-pin-set-061-500-combined, A1-pin-set-251-500
+id = "pin-gauges"
+name = "Pin gauges .011-.500"
+ref = "pin-gauges"  # A1-pin-set-061-500-combined, A1-pin-set-251-500
 
 [[tools]]
 id = "endmill-carbide-3fl-1-4"

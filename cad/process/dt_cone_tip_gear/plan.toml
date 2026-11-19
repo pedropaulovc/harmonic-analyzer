@@ -10,9 +10,9 @@ shop = "../shop.toml"
 stock_refs = ["c675-round-5-8"]
 
 [[tools]]
-id = "pin-gauges-011-060"
-name = "Pin gauges .011-.060"
-ref = "pin-gauges-011-060"  # A1-pin-set-011-060
+id = "pin-gauges"
+name = "Pin gauges .011-.500"
+ref = "pin-gauges"  # A1-pin-set-011-060
 
 [[tools]]
 id = "dt-cone-tip-form-cutter"

@@ -318,7 +318,7 @@ def build_bom(
 ) -> list[BomLine]:
     made = {stem: row for stem, row in registry.items() if _is_made(stem)}
     errors = [
-        f"process plan for {'unknown' if stem not in registry else 'purchased'} part {stem!r}"
+        f"process plan for {'unknown' if stem not in registry else 'vendor (-vn-)'} part {stem!r}"
         for stem in plans
         if stem not in made
     ]

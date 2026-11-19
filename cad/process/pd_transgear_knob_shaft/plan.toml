@@ -20,9 +20,9 @@ name = "48DP 20PA gear cutter #7"
 ref = "gear-cutters-48dp-20pa"  # F-gear-cutter-10-289-487
 
 [[tools]]
-id = "pin-gauges-011-060"
-name = "Pin gauges .011-.060"
-ref = "pin-gauges-011-060"  # A1-pin-set-011-060
+id = "pin-gauges"
+name = "Pin gauges .011-.500"
+ref = "pin-gauges"  # A1-pin-set-011-060
 
 [[tools]]
 id = "threading-bits-lms-6685"

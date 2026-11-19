@@ -30,9 +30,9 @@ name = "#4-40 plug tap"
 ref = "jig-tap-4-40-plug"  # Tap coverage #4-40 UNC
 
 [[tools]]
-id = "pin-gauges-061-500"
-name = "Pin gauges .061-.500"
-ref = "pin-gauges-061-500"  # A1-pin-set-061-250, A1-pin-set-061-500-combined
+id = "pin-gauges"
+name = "Pin gauges .011-.500"
+ref = "pin-gauges"  # A1-pin-set-061-250, A1-pin-set-061-500-combined
 
 [[tools]]
 id = "protractor"

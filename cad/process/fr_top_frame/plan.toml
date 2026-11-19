@@ -80,9 +80,9 @@ name = "11/32 end mill"
 ref = "frame-spotface-endmill"  # F-spotface-endmill-11-32
 
 [[tools]]
-id = "pin-gauges-061-500"
-name = "Pin gauges .061-.500"
-ref = "pin-gauges-061-500"  # A1-pin-set-061-250, A1-pin-set-061-500-combined
+id = "pin-gauges"
+name = "Pin gauges .011-.500"
+ref = "pin-gauges"  # A1-pin-set-061-250, A1-pin-set-061-500-combined
 
 [[tools]]
 id = "angle-plate-4"
@@ -108,11 +108,6 @@ ref = "endmill-carbide-3fl-1-2"  # drawing cross-check 2026-11-19: 1 in-class bo
 id = "telescoping-gauges-starrett-s579gz"
 name = "Telescoping gauges"
 ref = "telescoping-gauges-starrett-s579gz"  # drawing cross-check 2026-11-19: gauges the bore
-
-[[tools]]
-id = "micrometers"
-name = "Micrometers 0-3 in"
-ref = "micrometers"  # drawing cross-check 2026-11-19: reads the telescoping gauge
 
 [[tools]]
 id = "tap-10-32-bottoming-pulley"

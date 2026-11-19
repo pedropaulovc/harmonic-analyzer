@@ -156,3 +156,12 @@ dia_in = [0.5625]
 length_in = [1.5]
 status = "to_order"
 cite = ["cad/config/parts/dt-crank-handle-ferrule.yaml material_specification, process", "cad/scripts/dt_crank_handle_ferrule_spec.py LENGTH"]
+
+[stock.1018-round-1-3-4]
+form = "round_bar"
+material = "1018 cold-finish carbon steel"
+note = "To order: 1-3/4 in round 1018 (or 12L14) CF, at least 1.5 in (one .33 in collar, dt_cone_gear_tl_keyed_arbor_spec.COLLAR_LENGTH, plus the stock assignment audit's .14 in cut and facing allowance and 1 in to hold). Source: the dt-cone-gear-tl-arbor-collar (MHA-DT-03-TL-04) registry row, default configuration C175, 1-3/4 in left at stock diameter (dt_cone_gear_tl_arbor_collar_spec.OD_BY_CONFIGURATION[\"C175\"]); no 1-3/4 in steel round is owned. Supplier and price not read. Not owned."
+dia_in = [1.75]
+length_in = [1.5]
+status = "to_order"
+cite = ["cad/config/parts/dt-cone-gear-tl-arbor-collar.yaml material_specification, default_configuration, configuration_quantities", "cad/scripts/dt_cone_gear_tl_arbor_collar_spec.py OD_BY_CONFIGURATION", "cad/scripts/dt_cone_gear_tl_keyed_arbor_spec.py COLLAR_LENGTH"]

@@ -290,7 +290,6 @@ sku = "5948"
 source = "https://littlemachineshop.com/products/reamer-set-adjustable-4-piece-8-5"
 status = "on_hand"
 pieces = 4
-range_in = [0.25, 0.375]
 cite = ["LittleMachineShop listing read 2026-11-17: SKU 5948, \"Reamers in this set are adjustable from 0.250\" to 0.375\"\", \"4 Piece Set Sizes #8 - #5\", HSS, black oxide, wooden storage box, $69.95", "Owner (Pedro) 2026-11-17: owned; with the .3760 reamer, the only reamers"]
 
 # --- Placeholder process plans' reamers (quotes-2026-11-17-rev3.xlsx) -------

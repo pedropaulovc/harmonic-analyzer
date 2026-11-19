@@ -28,7 +28,7 @@ note = "owner confirmed on hand 2026-11-19"
 # Not owned (owner, Pedro, 2026-11-17, answering what is physically in the
 # shop: the pin-gauge set was not ticked): a candidate to buy.
 [gauges.pin-gauges]
-note = "illustrative example item: class ZZ minus pin gauges (three boxes)"
+note = "Class ZZ minus pin gauges: the .011-.060 set (quotes-2026-11-17-rev3.xlsx A1-pin-set-011-060, recommended Shars 303-4501M0) and the combined .061-.500 set (A1-pin-set-061-500-combined, recommended Shars 303-4516M1+2, covering the A1-pin-set-061-250 and A1-pin-set-251-500 boxes). The placeholder process plans name it as cad/process/shop.toml tools.pin-gauges."
 status = "to_order"
 
 # Owned by the shop (Pedro, 2026-11-08): a Mitutoyo shop-grade 81-piece inch gauge
@@ -232,20 +232,6 @@ status = "to_order"
 purchase = "Two Vermont Gage standard Class X steel pin/plug gages, .4000 in GO (plus tolerance) and .4005 in NO-GO (minus tolerance), each +/- .000040 in; no part number, price or stock read."
 note = "Not owned: to buy. MHA-CH-13 Setup 4 (RS03, after the ream): the first hole gauged before the lot, then every hole; GO enters, NO-GO does not."
 cite = ["Vermont Gage, Standard Class X pin/plug gages (read 2026-11-17): range .004-1.000 in, increments .0001 in, tolerance +/- .000040 in up to .8250 in, Go: plus tolerance, NoGo: minus tolerance: https://www.vermontgage.com/gaging-products/standard-pin-gages-and-sets/class-x-standard-pin-plug-gages", "Vermont Gage, Gage Tolerance Selection (read 2026-11-17): the 10% rule, GO at the hole's minimum with the tolerance plus, NO-GO at its maximum with the tolerance minus; ASME B89.1.5 chart, .010-.825 in: XX .000020, X .000040 in: https://vermontgage.com/support/detail/gage-tolerance-selection"]
-
-# --- Placeholder process plans' pin gauges (quotes-2026-11-17-rev3.xlsx) ----
-# The two pin-gauge boxes the owner's quote workbook recommends (owner
-# 2026-11-19), named by the placeholder plans; their descriptions are
-# cad/process/shop.toml tools.pin-gauges-011-060 and tools.pin-gauges-061-500.
-[gauges.pin-gauges-011-060]
-kind = "pin_gauge_set"
-status = "to_order"
-note = "quotes-2026-11-17-rev3.xlsx A1-pin-set-011-060: recommended Shars 303-4501M0."
-
-[gauges.pin-gauges-061-500]
-kind = "pin_gauge_set"
-status = "to_order"
-note = "quotes-2026-11-17-rev3.xlsx A1-pin-set-061-500-combined: recommended Shars 303-4516M1+2; it covers the A1-pin-set-061-250 (Shars 303-4503M1) and A1-pin-set-251-500 (KBC 1-812-595) boxes, bought through it."
 
 [gauges.gauge-pin-0625]
 kind = "gauge_pin"

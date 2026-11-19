@@ -20,6 +20,11 @@ name = ".3740 reamer"
 ref = "reamer-3740"  # drawing cross-check 2026-11-19: stub hole Ø.3740 +.0005 REAM (spec)
 
 [[tools]]
+id = "drill-65"
+name = "#65 drill"
+ref = "drill-65"  # Codjiflo round 1: pre-drill for the .0365 clock-pin ream (spec PIN_HOLE)
+
+[[tools]]
 id = "reamer-0365"
 name = ".0365 reamer"
 ref = "reamer-0365"  # drawing cross-check 2026-11-19: clock-pin hole Ø.0365 +.0005 REAM .20 (spec)
@@ -28,11 +33,6 @@ ref = "reamer-0365"  # drawing cross-check 2026-11-19: clock-pin hole Ø.0365 +.
 id = "gauge-blocks-mitutoyo"
 name = "Gauge blocks"
 ref = "gauge-blocks-mitutoyo"  # drawing cross-check 2026-11-19: throw set .1004 + .130 + .450 (spec)
-
-[[tools]]
-id = "dti"
-name = "Dial test indicator"
-ref = "dti"  # drawing cross-check 2026-11-19: throw check (spec)
 
 [[setups]]
 machine_kind = "other"

@@ -15,9 +15,9 @@ name = "#53 drill"
 ref = "drill-53"  # Drills #53
 
 [[tools]]
-id = "pin-gauges-061-500"
-name = "Pin gauges .061-.500"
-ref = "pin-gauges-061-500"  # A1-pin-set-061-250, A1-pin-set-061-500-combined
+id = "pin-gauges"
+name = "Pin gauges .011-.500"
+ref = "pin-gauges"  # A1-pin-set-061-250, A1-pin-set-061-500-combined
 
 [[tools]]
 id = "arbor-press"

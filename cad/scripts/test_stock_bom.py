@@ -16,7 +16,7 @@ REGISTRY = {"gear": {"number": "MHA-XX-01", "process": "turned"}}
 
 
 def test_every_plan_names_a_live_made_part_and_known_stock() -> None:
-    # A retired or purchased stem, an unknown stock key, or a tool ref missing
+    # A retired or vendor (-vn-) stem, an unknown stock key, or a tool ref missing
     # from shop.toml raises InventoryError.
     stock_bom.build_bom(_config.parts(), stock_bom.load_stock(), stock_bom.load_plans())
 
@@ -71,7 +71,9 @@ def test_a_part_is_bought_by_vendor_identity_not_process_text() -> None:
     (line,) = stock_bom.build_bom(registry, {}, {})
     assert line.stem == "xx-reworked-screw"
     plan = stock_bom.PlanRefs(stock_keys=(), tools=())
-    with pytest.raises(stock_bom.InventoryError, match="purchased part 'xx-vn-pin'"):
+    with pytest.raises(
+        stock_bom.InventoryError, match=r"vendor \(-vn-\) part 'xx-vn-pin'"
+    ):
         stock_bom.build_bom(registry, {}, {"xx-vn-pin": plan})
 
 

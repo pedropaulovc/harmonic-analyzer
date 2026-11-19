@@ -20,9 +20,9 @@ name = "1/8 carbide end mill"
 ref = "endmill-carbide-3fl-1-8"  # drawing cross-check 2026-11-19: .200 +.002 slots, R.08 max. ends, interpolated
 
 [[tools]]
-id = "pin-gauges-061-500"
-name = "Pin gauges .061-.500"
-ref = "pin-gauges-061-500"  # drawing cross-check 2026-11-19: .200 GO / .202 NO-GO
+id = "pin-gauges"
+name = "Pin gauges .011-.500"
+ref = "pin-gauges"  # drawing cross-check 2026-11-19: .200 GO / .202 NO-GO
 
 [[setups]]
 machine_kind = "other"

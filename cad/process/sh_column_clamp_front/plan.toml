@@ -24,11 +24,6 @@ id = "telescoping-gauges-starrett-s579gz"
 name = "Telescoping gauges"
 ref = "telescoping-gauges-starrett-s579gz"  # drawing cross-check 2026-11-19: gauges the bore
 
-[[tools]]
-id = "micrometers"
-name = "Micrometers 0-3 in"
-ref = "micrometers"  # drawing cross-check 2026-11-19: reads the telescoping gauge
-
 [[setups]]
 machine_kind = "other"
 machine = "To be written"

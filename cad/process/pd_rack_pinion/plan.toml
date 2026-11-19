@@ -40,9 +40,9 @@ name = "48DP 20PA gear cutter #1"
 ref = "gear-cutters-48dp-20pa"  # F-gear-cutter-10-289-481
 
 [[tools]]
-id = "pin-gauges-011-060"
-name = "Pin gauges .011-.060"
-ref = "pin-gauges-011-060"  # A1-pin-set-011-060
+id = "pin-gauges"
+name = "Pin gauges .011-.500"
+ref = "pin-gauges"  # A1-pin-set-011-060
 
 [[tools]]
 id = "straightedge"
@@ -58,11 +58,6 @@ ref = "pd-rack-pinion-cutting-arbor"  # drawing cross-check 2026-11-19: tooth cu
 id = "telescoping-gauges-starrett-s579gz"
 name = "Telescoping gauges"
 ref = "telescoping-gauges-starrett-s579gz"  # drawing cross-check 2026-11-19: Ø.5010 +.0005/.0000 REAM THRU (no pin reaches .501)
-
-[[tools]]
-id = "micrometers"
-name = "Micrometers 0-3 in"
-ref = "micrometers"  # drawing cross-check 2026-11-19: reads the telescoping gauge
 
 [[tools]]
 id = "feeler-gauges"
