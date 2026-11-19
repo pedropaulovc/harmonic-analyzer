@@ -146,7 +146,7 @@ def _pin_hole_wall_min() -> float:
     location = printed_band_mm(
         DRAWING_PRECISION["TopPinProfile"]["TopPinX"], unit=bar.UNIT
     )
-    hole_max = bar.TOP_PIN_HOLE_DIA + bar.TOP_PIN_HOLE_BAND[0]
+    hole_max = bar.TOP_PIN_HOLE_LIMITS[1]
     near = bar.BAR_DEPTH / 2.0 - location
     far = (bar.BAR_DEPTH - bar.BAR_STOCK_UNDERSIZE) - (bar.BAR_DEPTH / 2.0 + location)
     wall = min(near, far) - hole_max / 2.0
@@ -163,12 +163,13 @@ if PIN_HOLE_WALL_MIN < WALL_FLOOR_MM:
 # sheet, rounded down): it limits the cutter's corner at an unmodelled root,
 # so it rides each notch's depth.
 ROOT_CALLOUT = "ROOTS R.015 MAX"
-# The reamed press hole's band (.0004 wide) is narrower than the shop's
+# The reamed press hole's limits (.0004 apart) are narrower than the shop's
 # reamer row, so the hole is made to its pin: a matched press fit, stated
 # once in the numbered sheet note its callout links (drawing-guidelines.md
 # rules 4 and 7). The acceptance is the ANSI FN2 window the pin budget is
 # held to (sh_vn_pivot_pin_bar_spec.PRESS_INTERFERENCE_MAX), rounded inward.
-# Pending owner confirmation (fan-out Q1, delegated ruling 2026-11-07, #2144).
+# Owner decision 2026-11-19 (#3124 item 5): this note, a first-article press
+# and the MHA-CH-00 slide-by-hand check are the hole's controls; no gauge.
 TOP_PIN_NAME = "BAR PIVOT PIN"
 PIN_FIT_NOTE_NUMBER = 1
 PIN_FIT_INTERFERENCE = (".0002", ".0008")

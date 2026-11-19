@@ -64,7 +64,7 @@ PIN_END_PROUD_MAX = 0.0
 # --- The bar's reamed press hole (the bar spec owns it; restated here so the
 # budget reads one place). ---
 BAR_HOLE_DIA = _bar.TOP_PIN_HOLE_DIA
-BAR_HOLE_BAND = _bar.TOP_PIN_HOLE_BAND
+BAR_HOLE_LIMITS = _bar.TOP_PIN_HOLE_LIMITS
 # 1/4 in cold-finished square bar (the bar spec owns the stock band). The
 # bar's section prints only as the stock's reference size, so the stock band,
 # not the title block's .XX, bounds it.
@@ -107,7 +107,7 @@ def joint_budget() -> dict[str, float]:
 
     Every term is at the worst case of its printed band (drawing-guidelines.md rule 17 (walls and webs)): the
     purchased pin's 0/+.0002 in, the reamed cheek hole (the bar's
-    TOP_PIN_HOLE_BAND), the lever's #47 hole at the lever sheet's DRILLED
+    TOP_PIN_HOLE_LIMITS), the lever's #47 hole at the lever sheet's DRILLED
     HOLES row, the lever thickness and plate offset at their bands, the top
     notch and its ledge, the bar stock +0/-0.051, the hole's offset from the
     back face at the bar sheet's .XXX band, the hubs that set the pitch never
@@ -116,7 +116,7 @@ def joint_budget() -> dict[str, float]:
     at either end of its length grade.
     """
     pin_min, pin_max = PIN_DIA_LIMITS
-    hole_min, hole_max = _band(BAR_HOLE_DIA, BAR_HOLE_BAND)
+    hole_min, hole_max = BAR_HOLE_LIMITS
     lever_hole_min = NUMBER_DRILL_MM[_lever.BAR_PIN_HOLE_SPEC.size]
     lever_hole_max = lever_hole_min + DRILLED_PLUS
     lever_min = _lever.LEVER_THICKNESS - _lever.LEVER_THICKNESS_TOLERANCE

@@ -1243,8 +1243,8 @@ Catalog specifications checked on September 10, 2026:
   assumes the ASME B18.8.2 dowel length grade, ±.010 in), chamfered both
   ends, passivated, hardness "Not Rated", material certificate, $10.80 per
   pack of 5. It replaces the shop-made MHA-CH-10/MHA-CH-11 drill-rod pins:
-  its band presses .000225 to .000825 in into the owner-ruled Ø.0770
-  +.0009/+.0005 fork and cheek reams, inside ANSI FN2, and each pin is
+  its band presses .000225 to .000825 in into the owner-ruled Ø.0779/.0775
+  (limits) fork and cheek reams, inside ANSI FN2, and each pin is
   pressed through and dressed flush at MHA-CH-00, which takes the chamfers
   off. `_mcmaster_90145a299.py` holds the catalogue data and
   `build_sh_vn_pivot_pin.py` models each member as the plain installed

@@ -142,11 +142,16 @@ FORK_BASE_BELOW_PIN = 18.034 - FORK_WIDTH / 2.0  # ForkBossLength .71
 # The MHA-SH-VN-58 rod pivot pin presses into this hole through both tines and
 # runs in the arm's #47 rod hole (user ruling 2026-10-09, PR #1292 review F1,
 # press fit as the bar pin; sh_vn_pivot_pin_rod_spec holds the fit budget).
-# Reamed .077 +.0009/+.0005 in under the 5/64 dowel: a purchased .0775
-# chucking reamer cuts inside it. No countersink: the reamed hole runs
-# straight through each tine, so the tine's whole thickness is the pin's land.
-PIN_HOLE_DIA = 1.9558  # .077 in
-PIN_HOLE_BAND = (0.02286, 0.0127)  # (upper, lower) deviations, reamed; native
+# Reamed .0775-.0779 in under the 5/64 dowel, the limits the pin budget holds,
+# printed as the two limits (swTolLIMIT), so no deviation step reads as a
+# converted millimetre value (owner decision 2026-11-19, #3124 item 5, and its
+# limit-form follow-up the same day); the model sits mid-band. No countersink:
+# the reamed hole runs straight through each tine, so the tine's whole
+# thickness is the pin's land.
+PIN_HOLE_LIMITS = (1.9685, 1.97866)  # .0775-.0779 in, reamed; native
+PIN_HOLE_DIA = 1.97358  # .0777 in
+if abs(PIN_HOLE_DIA - sum(PIN_HOLE_LIMITS) / 2.0) > 1e-9:
+    raise AssertionError("the pin hole's model must sit mid-band")
 # Every inside corner a radius this size can seat in -- the slot floor's two,
 # the fork's root step onto the shank (four) and the shank's flanks onto the
 # ring's OD (two) -- is one modelled fillet, inside the title block's INSIDE

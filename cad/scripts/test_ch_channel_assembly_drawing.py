@@ -1417,3 +1417,18 @@ def test_the_feeler_acceptances_are_setting_table_rows_their_steps_cite() -> Non
     body = _step_body("lever-bank-slides")
     assert f"{leaf_in:.3f}".removeprefix("0") not in body
     assert drawing.SETTING_TABLE_SHEET == drawing.SHEET_NAMES[5]
+
+
+def test_view_e_caption_stands_with_its_own_view() -> None:
+    """Machinist review r1/r2 (2026-11-19): view E's caption sat nearer view
+    F's LUG CENTRE callout than its own view. It now sits just under view E's
+    lowest ink (the keeper foot screws' tips, y 0.172 on the farm sheet), with
+    far more air above view F's topmost callout than under view E."""
+    view = drawing.LEVER_BANK
+    x, top = view.label_xy
+    foot = top - len(view.label_text.splitlines()) * NOTE_LINE_PITCH
+    view_ink_bottom = 0.172
+    view_f_top_text = drawing.PLAN_KEEP[drawing.asm.KEEPER_X_DIMENSION][1]
+    assert x == pytest.approx(view.centre[0] - 0.016)
+    assert 0.002 <= view_ink_bottom - top <= 0.006
+    assert foot - view_f_top_text > 3.0 * (view_ink_bottom - top)

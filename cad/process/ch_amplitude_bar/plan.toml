@@ -19,10 +19,10 @@ id = "reamer-0775"
 name = ".0775 reamer"
 ref = "reamer-0775"  # B-reamer-.0775
 
-[[tools]]
-id = "pin-gauges"
-name = "Pin gauges .011-.500"
-ref = "pin-gauges"  # A1-pin-set-061-250, A1-pin-set-061-500-combined
+# No pin gauges (owner decision 2026-11-19, #3124 item 5): the workbook named
+# them only for the .0775-.0779 pin ream, which is made to the measured pin
+# (sheet note 1) and checked by a first-article press and the MHA-CH-00
+# slide-by-hand check.
 
 [[tools]]
 id = "arbor-press"

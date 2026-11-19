@@ -77,6 +77,7 @@ from _drawing_precision import apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from _drawing_tolerances import set_dimension_bilateral_tolerance, set_dimension_symmetric_tolerance
 from _fit_deviations import deviations
+from _limit_tolerance import set_limits
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from ch_connecting_rod_notes import ISOMETRIC_VIEW_NOTE
@@ -94,8 +95,8 @@ from ch_connecting_rod_spec import (
     FORK_TOP_Y,
     FORK_WIDTH,
     INSIDE_CORNER_R,
-    PIN_HOLE_BAND,
     PIN_HOLE_DIA,
+    PIN_HOLE_LIMITS,
     RING_BORE_DIA,
     RING_BORE_DIA_BAND,
     RING_FACE_BAND,
@@ -842,14 +843,15 @@ def build(adapter) -> dict[str, str]:
     set_dimension_symmetric_tolerance(
         adapter, "Ring", "RingThick", thick_upper, display_unit=UNIT
     )
-    # The reamed press hole's band rides natively on its diameter; the front
-    # view imports the .077 nominal at four places (DRAWING_PRECISION), its
-    # +.0009/+.0005 at the same four.
-    set_dimension_bilateral_tolerance(
+    # The reamed press hole prints its two limits natively on its diameter
+    # (swTolLIMIT); the front view imports Ø.0779/.0775 at the four places
+    # DRAWING_PRECISION gives PinHoleDia.
+    set_limits(
         adapter,
         "PinHoleProfile",
         "PinHoleDia",
-        *deviations(PIN_HOLE_BAND),
+        limits=PIN_HOLE_LIMITS,
+        places=DRAWING_PRECISION["PinHoleProfile"]["PinHoleDia"],
         display_unit=UNIT,
     )
     apply_drawing_precision(adapter, DRAWING_PRECISION)

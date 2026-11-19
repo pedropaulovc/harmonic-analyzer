@@ -160,3 +160,12 @@ def test_part_registry_row() -> None:
     assert int(config["quantity"]) == 1
     assert "brass wire" in str(config["material_specification"]).lower()
     assert len(str(config["material_specification"])) <= 36
+    # Owner ruling 2026-11-08 (#2144 item 9.2, D6; #3124 item 6): the process
+    # row states the butt joint with the spec's wire and gap, never solder.
+    process = str(config["process"])
+    assert spec.WIRE_DIA == pytest.approx(0.040 * 25.4)
+    assert ".040 C26000 brass wire" in process
+    assert spec.BUTT_GAP_BAND == pytest.approx((0.0, 0.010 * 25.4))
+    assert "ends cut square and butted (gap 0-.010)" in process
+    assert process.endswith("not soldered")
+    assert "solder" not in process.removesuffix("not soldered")

@@ -21,10 +21,12 @@ from __future__ import annotations
 # never restated here (rule 2).
 #
 # Note 1 is the reamed pin hole's matched press fit, linked from its
-# callout: its .0004 band is narrower than the shop's reamer row, so the hole
-# is reamed to its pin. The acceptance is the ANSI FN2 window the pin budget
-# is held to (sh_vn_pivot_pin_rod_spec.PRESS_INTERFERENCE_MAX), rounded inward.
-# Pending owner confirmation (fan-out Q1, delegated ruling 2026-11-07, #2144).
+# callout: its limits, .0004 apart, are narrower than the shop's reamer row,
+# so the hole is reamed to its pin. The acceptance is the ANSI FN2 window the
+# pin budget is held to (sh_vn_pivot_pin_rod_spec.PRESS_INTERFERENCE_MAX),
+# rounded inward.
+# Owner decision 2026-11-19 (#3124 item 5): this note, a first-article press
+# and the MHA-CH-00 slide-by-hand check are the hole's controls; no gauge.
 #
 # Notes 2 and 3 each name one mate for two tight bands that serve it (fan-out
 # rounds 1-2: named at both callouts it printed twice, named at one the other

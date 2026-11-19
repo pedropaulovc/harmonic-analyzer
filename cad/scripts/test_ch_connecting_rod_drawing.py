@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import math
 from pathlib import Path
 
@@ -186,14 +187,25 @@ def test_pin_hole_is_the_reamed_press_hole_for_the_rod_pivot_pin() -> None:
 
     spec = ch_connecting_rod_spec
     assert rod.PIN_HOLE_DIA is spec.PIN_HOLE_DIA
-    assert rod.PIN_HOLE_BAND is spec.PIN_HOLE_BAND
+    assert rod.PIN_HOLE_LIMITS is spec.PIN_HOLE_LIMITS
     assert drawing._PIN_HOLE_DIA is spec.PIN_HOLE_DIA
-    assert spec.PIN_HOLE_DIA == 1.9558
-    assert spec.PIN_HOLE_BAND == (0.02286, 0.0127)
-    assert not hasattr(spec, "PIN_HOLE_SPEC")
-    assert model_toleranced_dimensions(rod)[("PinHoleProfile", "PinHoleDia")] == (
-        "*deviations(PIN_HOLE_BAND)"
+    # Owner decision 2026-11-19 (#3124 item 5, limit-form follow-up): the
+    # .0775-.0779 limits the pin budget holds print as the two limits
+    # (swTolLIMIT), with the model mid-band; the delegated acceptance of the
+    # old +.0009/+.0005 step (RV-04) is withdrawn and no exception replaces it.
+    assert tuple(limit / 25.4 for limit in spec.PIN_HOLE_LIMITS) == pytest.approx(
+        (0.0775, 0.0779), abs=1e-12
     )
+    assert spec.PIN_HOLE_DIA == pytest.approx(sum(spec.PIN_HOLE_LIMITS) / 2.0)
+    assert "RV-04" not in {
+        row["id"] for row in _config.parts("ch-connecting-rod")["machinist_exceptions"]
+    }
+    assert not hasattr(spec, "PIN_HOLE_SPEC")
+    assert _pin_hole_limits_call() == {
+        "limits": "PIN_HOLE_LIMITS",
+        "places": "DRAWING_PRECISION['PinHoleProfile']['PinHoleDia']",
+        "display_unit": "UNIT",
+    }
     assert ch_connecting_rod_notes.PIN_NUMBER == _config.parts("sh-vn-pivot-pin")["number"]
     assert ch_connecting_rod_notes.ARM_NUMBER == _config.parts("ch-rocker-arm")["number"]
     assert drawing.CAM_NUMBER == _config.parts("dt-cylinder-gear")["number"]
@@ -258,7 +270,7 @@ def test_every_tight_band_names_its_mate() -> None:
     assert drawing.CAM_NUMBER in bore
     # Fan-out screen 2026-11-07: size, then process (rule 26), and the band
     # narrower than the reamer row links its matched press fit (note 1;
-    # pending owner confirmation, fan-out Q1).
+    # owner decision 2026-11-19, #3124 item 5).
     assert drawing.FRONT_CALLOUTS["PinHoleDia"] == (
         "REAM THRU\nSEE NOTE 1"
     )
@@ -585,23 +597,36 @@ def test_each_view_imports_only_the_features_it_dimensions() -> None:
     assert 0.0 < rod.DATUM_FACE_REF_RUN < spec.FORK_TOP_Y - spec.FORK_BASE_Y
 
 
+def _pin_hole_limits_call() -> dict[str, str]:
+    """The keyword sources of the build's one ``set_limits`` call, which must
+    name PinHoleDia@PinHoleProfile."""
+    tree = ast.parse(Path(rod.__file__).read_text(encoding="utf-8"))
+    (call,) = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call) and getattr(node.func, "id", None) == "set_limits"
+    ]
+    assert [ast.unparse(a) for a in call.args[1:]] == ["'PinHoleProfile'", "'PinHoleDia'"]
+    return {k.arg: ast.unparse(k.value) for k in call.keywords}
+
+
 def test_reamed_pin_hole_is_a_native_four_place_dimension() -> None:
-    """PR #1292 review N1 (drawing-simplicity-policy.md `How the repository implements the guidelines` and drawing-guidelines.md rule 7 (notes: few, flagged, never a method)): the press hole's Ø1.9558
-    +0.02286/+0.0127 is the PinHoleDia model dimension -- marked, authored at
-    four places with its native band -- imported into the front view with the
-    process beneath it, never general-note text."""
+    """PR #1292 review N1 (drawing-simplicity-policy.md `How the repository implements the guidelines` and drawing-guidelines.md rule 7 (notes: few, flagged, never a method)): the press hole's
+    .0775-.0779 limits are the PinHoleDia model dimension's -- marked, printed
+    at four places as its native swTolLIMIT -- imported into the front view
+    with the process beneath it, never general-note text."""
     spec = ch_connecting_rod_spec
     assert ch_connecting_rod_notes.DRAWING_DIMENSIONS["PinHoleProfile"] == {
         "PinHoleDia"
     }
-    # The band is exact at four inch places, as the shared setter prints it.
+    # The limits are exact at four inch places, as set_limits prints them.
     assert all(
         round(d / 25.4, 4) == pytest.approx(d / 25.4, abs=1e-12)
-        for d in spec.PIN_HOLE_BAND
+        for d in spec.PIN_HOLE_LIMITS
     )
-    assert model_toleranced_dimensions(rod)[("PinHoleProfile", "PinHoleDia")] == (
-        "*deviations(PIN_HOLE_BAND)"
-    )
+    assert ch_connecting_rod_notes.DRAWING_PRECISION["PinHoleProfile"] == {"PinHoleDia": 4}
+    assert _pin_hole_limits_call()["limits"] == "PIN_HOLE_LIMITS"
+    assert ("PinHoleProfile", "PinHoleDia") not in model_toleranced_dimensions(rod)
     assert "PinHoleDia" in drawing.FRONT_KEEP
     assert drawing.FRONT_CALLOUTS["PinHoleDia"].startswith("REAM THRU\n")
     source = Path(drawing.__file__).read_text(encoding="utf-8")
@@ -699,8 +724,9 @@ def test_model_bands_are_owned_by_named_model_dimensions() -> None:
         ("ForkSlotProfile", "SlotWidth"): "slot_upper",
         ("RingFaceReference", "RingFaceNear"): "face_upper",
         ("Ring", "RingThick"): "thick_upper",
-        ("PinHoleProfile", "PinHoleDia"): "*deviations(PIN_HOLE_BAND)",
     }
+    # The pin hole prints its two limits (set_limits), not a band.
+    assert _pin_hole_limits_call()["limits"] == "PIN_HOLE_LIMITS"
 
 
 def test_bore_finish_is_routed_clear_of_the_lower_dimension_stack() -> None:

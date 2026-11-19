@@ -74,14 +74,14 @@ def test_the_rod_arm_and_cam_share_one_plane() -> None:
 
 def test_the_pin_is_pressed_in_the_fork_and_runs_in_the_arm() -> None:
     """The bar pin's joint: the same purchased pin pressed into the same
-    Ø1.9558 +0.02286/+0.0127 ream, running in a drilled #47 in the moving
+    .0775-.0779 ream (Ø1.9685-1.97866), running in a drilled #47 in the moving
     member."""
     assert pin.PIN_DIA == bar_pin.PIN_DIA == purchased.PIN_DIA
     assert pin.PIN_DIA_LIMITS == bar_pin.PIN_DIA_LIMITS == purchased.PIN_DIA_LIMITS
     assert pin.CONFIGURATION != bar_pin.CONFIGURATION
     assert {pin.CONFIGURATION, bar_pin.CONFIGURATION} == set(purchased.CONFIGURATIONS)
     assert pin.ROD_HOLE_DIA == rod.PIN_HOLE_DIA == bar.TOP_PIN_HOLE_DIA
-    assert pin.ROD_HOLE_BAND == rod.PIN_HOLE_BAND == bar.TOP_PIN_HOLE_BAND
+    assert pin.ROD_HOLE_LIMITS == rod.PIN_HOLE_LIMITS == bar.TOP_PIN_HOLE_LIMITS
     assert arm.ROD_HOLE_SPEC.kind == "drilled_number"
     assert arm.ROD_HOLE_SPEC.size == "#47"
     assert pin.PIN_END_PROUD_MAX == 0.0
@@ -94,8 +94,8 @@ def test_the_pin_is_pressed_in_the_fork_and_runs_in_the_arm() -> None:
 
 def test_worst_case_joint_budget() -> None:
     b = pin.BUDGET
-    # The press, at the catalogue's 0/+0.00508 against the ream's
-    # +0.02286/+0.0127.
+    # The press, at the catalogue's 0/+0.00508 against the ream's limits
+    # Ø1.9685-1.97866 (.0775-.0779 in).
     assert b["interference_min"] == pytest.approx(0.005715, abs=1e-6)
     assert b["interference_max"] == pytest.approx(0.020955, abs=1e-6)
     assert 0.0 < b["interference_min"] <= b["interference_max"]
