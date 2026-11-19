@@ -1,0 +1,43 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Pen Rod"
+part = "MHA-PN-04 Pen Rod"
+revision = "placeholder"
+material = "C36000 brass key stock, 5 x 5 mm, DIN 6880; McMaster-Carr 90457A730"
+stock = "To be written"
+shop = "../shop.toml"
+stock_refs = ["c360-square-5mm-key"]
+
+[[tools]]
+id = "drill-3-64"
+name = "3/64 drill"
+ref = "drill-3-64"  # Drills 3/64
+
+[[tools]]
+id = "tap-0-80-bottoming"
+name = "#0-80 bottoming tap"
+ref = "tap-0-80-bottoming"  # F-tap-bottoming-0-80, Tap coverage #0-80 UNF
+
+[[tools]]
+id = "tap-0-80-plug"
+name = "#0-80 plug tap"
+ref = "tap-0-80-plug"  # Tap coverage #0-80 UNF
+
+[[tools]]
+id = "ignition-wrenches"
+name = "Ignition wrenches"
+ref = "ignition-wrenches"  # F-ignition-wrenches
+
+[[tools]]
+id = "lathe-tool-sharp-nose"
+name = "Sharp-nose turning tool"
+ref = "lathe-tool-sharp-nose"  # drawing cross-check 2026-11-19: R.008 max. shoulder
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

@@ -1,0 +1,43 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Pinion Pivot Block"
+part = "MHA-DT-18 Pinion Pivot Block"
+revision = "placeholder"
+material = "LOW-CARBON STEEL OR GRAY IRON"
+stock = "To be written"
+shop = "../shop.toml"
+stock_refs = ["1018-flat-1-2x2-1-4"]
+
+[[tools]]
+id = "riser-drill-9"
+name = "#9 drill"
+ref = "riser-drill-9"  # Drills #9
+
+[[tools]]
+id = "reamer-2510"
+name = ".2510 reamer"
+ref = "reamer-2510"  # B-reamer-.2510
+
+[[tools]]
+id = "feeler-gauges"
+name = "Feeler gauges (Pittsburgh 32-pc)"
+ref = "feeler-gauges"  # F-feeler-66MA; repointed from the Starrett 66MA (owner 2026-11-19)
+
+[[tools]]
+id = "pin-gauges"
+name = "Pin gauges .011-.500"
+ref = "pin-gauges"  # A1-pin-set-061-500-combined, A1-pin-set-251-500
+
+[[tools]]
+id = "drill-c"
+name = "C drill"
+ref = "drill-c"  # drawing cross-check 2026-11-19: pre-drill for the .2500/.2510 ream
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

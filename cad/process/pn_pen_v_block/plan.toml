@@ -1,0 +1,53 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Pen V Block"
+part = "MHA-PN-05 Pen V Block"
+revision = "placeholder"
+material = "C360 free-machining brass"
+stock = "To be written"
+shop = "../shop.toml"
+stock_refs = ["c360-flat-3-4x1-1-4"]
+
+[[tools]]
+id = "jig-drill-43"
+name = "#43 drill"
+ref = "jig-drill-43"  # Drills #43
+
+[[tools]]
+id = "drill-32"
+name = "#32 drill"
+ref = "drill-32"  # Drills #32
+
+[[tools]]
+id = "reamer-1260"
+name = ".1260 reamer"
+ref = "reamer-1260"  # B-reamer-.1260
+
+[[tools]]
+id = "jig-tap-4-40-plug"
+name = "#4-40 plug tap"
+ref = "jig-tap-4-40-plug"  # Tap coverage #4-40 UNC
+
+[[tools]]
+id = "pin-gauges"
+name = "Pin gauges .011-.500"
+ref = "pin-gauges"  # A1-pin-set-061-250, A1-pin-set-061-500-combined
+
+[[tools]]
+id = "protractor"
+name = "Protractor"
+ref = "protractor"  # F-protractor
+
+[[tools]]
+id = "chamfer-mill-1-2-90"
+name = "1/2 90° chamfer mill"
+ref = "chamfer-mill-1-2-90"  # drawing cross-check 2026-11-19: 2X 45° V, (.20) deep
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

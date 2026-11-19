@@ -1,0 +1,98 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Transgear Arm"
+part = "MHA-PD-18 Transgear Arm"
+revision = "placeholder"
+material = "AISI 1018 cold-finished steel bar, ASTM A108"
+stock = "To be written"
+shop = "../shop.toml"
+stock_refs = ["1018-ground-flat-5-16x1"]
+
+[[tools]]
+id = "drill-33"
+name = "#33 drill"
+ref = "drill-33"  # Drills #33
+
+[[tools]]
+id = "drill-32"
+name = "#32 drill"
+ref = "drill-32"  # Drills #32
+
+[[tools]]
+id = "jig-drill-29"
+name = "#29 drill"
+ref = "jig-drill-29"  # Drills #29
+
+[[tools]]
+id = "reamer-1240"
+name = ".1240 reamer"
+ref = "reamer-1240"  # B-reamer-.1240
+
+[[tools]]
+id = "reamer-1260"
+name = ".1260 reamer"
+ref = "reamer-1260"  # B-reamer-.1260
+
+[[tools]]
+id = "jig-tap-8-32-plug"
+name = "#8-32 plug tap"
+ref = "jig-tap-8-32-plug"  # Tap coverage #8-32 UNC
+
+[[tools]]
+id = "pin-gauges"
+name = "Pin gauges .011-.500"
+ref = "pin-gauges"  # A1-pin-set-061-250, A1-pin-set-061-500-combined
+
+[[tools]]
+id = "arbor-press"
+name = "Arbor press"
+ref = "arbor-press"  # F-arbor-press
+
+[[tools]]
+id = "straightedge"
+name = "Straightedge"
+ref = "straightedge"  # F-straightedge
+
+[[tools]]
+id = "drill-14"
+name = "#14 drill"
+ref = "drill-14"  # drawing cross-check 2026-11-19: pre-drill for the .1940 ream
+
+[[tools]]
+id = "reamer-1940"
+name = ".1940 reamer"
+ref = "reamer-1940"  # drawing cross-check 2026-11-19: Ø.1940 +.001/.000 REAM THRU
+
+[[tools]]
+id = "drill-44"
+name = "#44 drill"
+ref = "drill-44"  # drawing cross-check 2026-11-19: MATCH-DRILL #44 pilots with MHA-PD-19
+
+[[tools]]
+id = "reamer-0930"
+name = ".0930 reamer"
+ref = "reamer-0930"  # drawing cross-check 2026-11-19: Ø.0930 +.0005/.0000 2X REAM THRU
+
+[[tools]]
+id = "endmill-carbide-3fl-1-4"
+name = "1/4 carbide end mill"
+ref = "endmill-carbide-3fl-1-4"  # drawing cross-check 2026-11-19: Ø.453 +.004/.000 counterbore, interpolated
+
+[[tools]]
+id = "endmill-carbide-3-32"
+name = "3/32 carbide end mill"
+ref = "endmill-carbide-3-32"  # drawing cross-check 2026-11-19: flatten the .33 FLAT BOTTOM floor
+
+[[tools]]
+id = "chamfer-mill-330ch-1-4-90"
+name = "1/4 90° chamfer mill"
+ref = "chamfer-mill-330ch-1-4-90"  # drawing cross-check 2026-11-19: .008 X 45° MOUTH
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

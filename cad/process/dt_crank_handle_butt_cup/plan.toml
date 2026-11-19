@@ -1,0 +1,23 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Crank Handle Butt Cup"
+part = "MHA-DT-35 Crank Handle Butt Cup"
+revision = "placeholder"
+material = "AISI 12L14 or 1018 cold-finished steel rod, 1/2 in"
+stock = "To be written"
+shop = "../shop.toml"
+stock_refs = ["1018-round-1-2"]
+
+[[tools]]
+id = "drill-20"
+name = "#20 drill"
+ref = "drill-20"  # Drills #20
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

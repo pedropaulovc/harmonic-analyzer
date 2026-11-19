@@ -1,0 +1,43 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# the drawing cross-check of 2026-11-19, until its traveler is written. Not
+# enrolled in _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Cylinder Gear Cam Turning Fixture"
+part = "MHA-DT-12-TL-01 Cylinder Gear Cam Turning Fixture"
+revision = "placeholder"
+material = "low-carbon cold-finished steel round, 3-1/2 in, ASTM A108 (1018)"
+stock = "To be written"
+shop = "../shop.toml"
+stock_refs = ["1018-round-4"]
+
+[[tools]]
+id = "jig-drill-23-64"
+name = "23/64 drill"
+ref = "jig-drill-23-64"  # drawing cross-check 2026-11-19: pre-drill for the .3740 ream (spec)
+
+[[tools]]
+id = "reamer-3740"
+name = ".3740 reamer"
+ref = "reamer-3740"  # drawing cross-check 2026-11-19: stub hole Ø.3740 +.0005 REAM (spec)
+
+[[tools]]
+id = "drill-65"
+name = "#65 drill"
+ref = "drill-65"  # Codjiflo round 1: pre-drill for the .0365 clock-pin ream (spec PIN_HOLE)
+
+[[tools]]
+id = "reamer-0365"
+name = ".0365 reamer"
+ref = "reamer-0365"  # drawing cross-check 2026-11-19: clock-pin hole Ø.0365 +.0005 REAM .20 (spec)
+
+[[tools]]
+id = "gauge-blocks-mitutoyo"
+name = "Gauge blocks"
+ref = "gauge-blocks-mitutoyo"  # drawing cross-check 2026-11-19: throw set .1004 + .130 + .450 (spec)
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

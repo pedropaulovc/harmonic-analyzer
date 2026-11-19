@@ -1,0 +1,28 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Gooseneck"
+part = "MHA-SM-01 Gooseneck"
+revision = "placeholder"
+material = "4130-N seamless steel tube, 1/2 in OD x 0.065 in wall (OnlineMetals 7322)"
+stock = "To be written"
+shop = "../shop.toml"
+stock_refs = ["4130n-tube-1-2x0065"]
+
+[[tools]]
+id = "digital-angle-gauge"
+name = "Digital angle gauge"
+ref = "digital-angle-gauge"  # F-digital-angle-gauge
+
+[[tools]]
+id = "sm-gooseneck-bend-form"
+name = "Gooseneck bend form"
+ref = "sm-gooseneck-bend-form"  # drawing cross-check 2026-11-19: (R3.0) TUBE CENTERLINE NO KINKS
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

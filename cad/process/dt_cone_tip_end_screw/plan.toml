@@ -1,0 +1,34 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# its v50 drawing and the drawing cross-check of 2026-11-19, until its traveler
+# is written. Not enrolled in _process_plans.TRAVELER_STEMS; see
+# cad/process/README.md, "Placeholder plans". Bought McMaster-Carr 91794A558
+# screw with one added operation, so a made part (cad/docs/subsystem-identities.md).
+title = "Cone Tip End Screw"
+part = "MHA-DT-39 Cone Tip End Screw"
+revision = "placeholder"
+material = "18-8 stainless steel, McMaster-Carr 91794A558 (1/4-28 x 5/8 in slotted fillister head screw)"
+stock = "To be written"
+shop = "../shop.toml"
+
+[[tools]]
+id = "centre-drills-carbide-60"
+name = "Carbide 60° centre drills"
+ref = "centre-drills-carbide-60"  # drawing cross-check 2026-11-19: spot the hole concentric in the threaded end
+
+[[tools]]
+id = "drill-53"
+name = "#53 drill"
+ref = "drill-53"  # drawing cross-check 2026-11-19: pre-drill for the .0630 ream
+
+[[tools]]
+id = "reamer-0630"
+name = ".0630 reamer"
+ref = "reamer-0630"  # drawing cross-check 2026-11-19: .0630 +.0005/.0000 REAM ↧.12, RUNNING FIT ON MHA-DT-37
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

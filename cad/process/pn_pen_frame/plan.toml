@@ -1,0 +1,33 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Pen Frame"
+part = "MHA-PN-01 Pen Frame"
+revision = "placeholder"
+material = "C36000 free-machining brass"
+stock = "To be written"
+shop = "../shop.toml"
+stock_refs = ["c360-flat-3-8x1-1-4"]
+
+[[tools]]
+id = "jig-drill-43"
+name = "#43 drill"
+ref = "jig-drill-43"  # Drills #43
+
+[[tools]]
+id = "jig-tap-4-40-plug"
+name = "#4-40 plug tap"
+ref = "jig-tap-4-40-plug"  # Tap coverage #4-40 UNC
+
+[[tools]]
+id = "endmill-5-64-long"
+name = "5/64 long end mill"
+ref = "endmill-5-64-long"  # drawing cross-check 2026-11-19: window corners R.040 max
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

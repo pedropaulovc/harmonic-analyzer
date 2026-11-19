@@ -1,0 +1,29 @@
+# Placeholder process plan (owner 2026-11-19): the stock and tools this part
+# needs, from the stock assignment audit and its v50 drawing, until its traveler
+# is written. Not enrolled in _process_plans.TRAVELER_STEMS; see
+# cad/process/README.md, "Placeholder plans".
+title = "Pinion Grip Cross Rod"
+part = "MHA-DT-15 Pinion Grip Cross Rod"
+revision = "placeholder"
+material = "low-carbon cold-finished steel rod, 1/4 in, ASTM A108 (1018, 1020 or 12L14)"
+stock = "To be written"
+shop = "../shop.toml"
+stock_refs = ["1018-round-1-4"]
+
+[[tools]]
+id = "saw-evolution-14"
+name = "14 in metal-cutting saw"
+ref = "saw-evolution-14"  # drawing cross-check 2026-11-19: cut the 2.56 OAL crossrod from the 1/4 bar ("cut and face", registry process)
+
+[[tools]]
+id = "jig-files"
+name = "Files"
+ref = "jig-files"  # drawing cross-check 2026-11-19: face the ends to 2.56 ±.01 and BREAK SHARP EDGES R.010
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

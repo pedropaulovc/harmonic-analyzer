@@ -1,0 +1,58 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Crank Hub"
+part = "MHA-DT-31 Crank Hub"
+revision = "placeholder"
+material = "LOW-CARBON STEEL, E.G. 1018 CF"
+stock = "To be written"
+shop = "../shop.toml"
+stock_refs = ["1018-round-1"]
+
+[[tools]]
+id = "drill-14"
+name = "#14 drill"
+ref = "drill-14"  # Drills #14
+
+[[tools]]
+id = "taper-pin-reamer"
+name = "No. 4 taper-pin reamer"
+ref = "taper-pin-reamer"  # B-reamer-taper-pin
+
+[[tools]]
+id = "pin-gauges"
+name = "Pin gauges .011-.500"
+ref = "pin-gauges"  # A1-pin-set-061-500-combined, A1-pin-set-251-500
+
+[[tools]]
+id = "arbor-press"
+name = "Arbor press"
+ref = "arbor-press"  # F-arbor-press
+
+[[tools]]
+id = "jig-drill-23-64"
+name = "23/64 drill"
+ref = "jig-drill-23-64"  # drawing cross-check 2026-11-19: pre-drill for the .3760 ream
+
+[[tools]]
+id = "reamer-0376"
+name = ".3760 reamer"
+ref = "reamer-0376"  # drawing cross-check 2026-11-19: .3750/.3760 class REAM THRU
+
+[[tools]]
+id = "drill-25"
+name = "#25 drill"
+ref = "drill-25"  # drawing cross-check 2026-11-19: pre-drill for the 5/32 dowel ream
+
+[[tools]]
+id = "reamer-1562"
+name = "5/32 reamer"
+ref = "reamer-1562"  # drawing cross-check 2026-11-19: (Ø.156) REAM .17 at assembly with MHA-DT-06
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

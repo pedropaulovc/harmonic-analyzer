@@ -42,6 +42,7 @@ material = "6061-T6511 aluminium flat, 1/2 × 6 in (OnlineMetals 1173, owned)"
 stock = "{{process.blank_thickness_in:fraction}} × {{process.blank_width_in:g}} in bar; {{process.quantity:d}} × {{process.blank_length_in:.1f}} in length."
 note = "Inches unless mm; G-code and console entries in mm. Finished {{cad.length_in:.1f}} × {{cad.width_in:.2f}} × {{cad.thickness_in:.2dot}}, a fixture for MHA-CH-13. Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Each CNC file is proved once in air, Z0 raised 1.000 in, before it cuts metal (ops 30 and 80). After any controller reset, stall or E-stop, home ($H) and touch off G54 again before Cycle Start: a reset loses home (logbook 2026-11-06)."
 shop = "../shop.toml"
+stock_refs = ["6061-flat-1-2x6-54in"]
 material_key = "6061-t6511"
 milling_material = "aluminum_6061"
 

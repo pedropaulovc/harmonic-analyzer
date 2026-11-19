@@ -1,0 +1,52 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Cone Pivot Post"
+part = "MHA-DT-05 Cone Pivot Post"
+revision = "placeholder"
+material = "LOW-CARBON STEEL OR GRAY IRON"
+stock = "To be written"
+shop = "../shop.toml"
+
+[[tools]]
+id = "drill-m"
+name = "M drill"
+ref = "drill-m"  # Drills M
+
+[[tools]]
+id = "drill-7-16"
+name = "7/16 drill"
+ref = "drill-7-16"  # Drills 7/16
+
+[[tools]]
+id = "drill-15-32"
+name = "15/32 drill"
+ref = "drill-15-32"  # Drills 15/32
+
+[[tools]]
+id = "reamer-4500"
+name = ".4500 reamer"
+ref = "reamer-4500"  # B-reamer-.4500
+
+[[tools]]
+id = "reamer-4835"
+name = ".4835 reamer"
+ref = "reamer-4835"  # B-reamer-.4835
+
+[[tools]]
+id = "pin-gauges"
+name = "Pin gauges .011-.500"
+ref = "pin-gauges"  # A1-pin-set-061-500-combined, A1-pin-set-251-500
+
+[[tools]]
+id = "endmill-carbide-3fl-1-4"
+name = "1/4 carbide end mill"
+ref = "endmill-carbide-3fl-1-4"  # drawing cross-check 2026-11-19: 2X .453 counterbore, interpolated
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

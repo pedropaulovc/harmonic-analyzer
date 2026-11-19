@@ -1,0 +1,48 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Platen Bottom Guide"
+part = "MHA-PD-27 Platen Bottom Guide"
+revision = "placeholder"
+material = "AISI 1018 cold-rolled steel"
+stock = "To be written"
+shop = "../shop.toml"
+stock_refs = ["1018-square-3-4"]
+
+[[tools]]
+id = "drill-51"
+name = "#51 drill"
+ref = "drill-51"  # Drills #51
+
+[[tools]]
+id = "jig-drill-43"
+name = "#43 drill"
+ref = "jig-drill-43"  # Drills #43
+
+[[tools]]
+id = "jig-tap-4-40-plug"
+name = "#4-40 plug tap"
+ref = "jig-tap-4-40-plug"  # Tap coverage #4-40 UNC
+
+[[tools]]
+id = "transfer-punches"
+name = "Transfer punches"
+ref = "transfer-punches"  # F-transfer-punches-fractional
+
+[[tools]]
+id = "drill-35"
+name = "#35 drill"
+ref = "drill-35"  # drawing cross-check 2026-11-19: 4X ⌴ Ø.110 ↧ .469 counterbore
+
+[[tools]]
+id = "endmill-carbide-3-32"
+name = "3/32 carbide end mill"
+ref = "endmill-carbide-3-32"  # drawing cross-check 2026-11-19: flat floor for the Ø.110 counterbore
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

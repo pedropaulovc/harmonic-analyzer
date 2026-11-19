@@ -1,0 +1,38 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Transgear Thumbnut"
+part = "MHA-PD-13 Transgear Thumbnut"
+revision = "placeholder"
+material = "C36000 free-machining brass"
+stock = "To be written"
+shop = "../shop.toml"
+stock_refs = ["c360-round-7-8"]
+
+[[tools]]
+id = "jig-drill-29"
+name = "#29 drill"
+ref = "jig-drill-29"  # Drills #29
+
+[[tools]]
+id = "jig-tap-8-32-plug"
+name = "#8-32 plug tap"
+ref = "jig-tap-8-32-plug"  # Tap coverage #8-32 UNC
+
+[[tools]]
+id = "knurl-straight-25tpi"
+name = "Straight knurl 25 TPI"
+ref = "knurl-straight-25tpi"  # drawing cross-check 2026-11-19: STRAIGHT KNURL 25 TPI
+
+[[tools]]
+id = "chamfer-mill-330ch-1-4-90"
+name = "1/4 90° chamfer mill"
+ref = "chamfer-mill-330ch-1-4-90"  # drawing cross-check 2026-11-19: ⌵ Ø.18 MAX X 90° BOTH ENDS
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

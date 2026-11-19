@@ -1,0 +1,122 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Two-Plate Frame Base"
+part = "MHA-FR-01 Two-Plate Frame Base"
+revision = "placeholder"
+material = "LOW-CARBON STEEL OR GRAY IRON"
+stock = "To be written"
+shop = "../shop.toml"
+
+[[tools]]
+id = "jig-drill-43"
+name = "#43 drill"
+ref = "jig-drill-43"  # Drills #43
+
+[[tools]]
+id = "jig-drill-29"
+name = "#29 drill"
+ref = "jig-drill-29"  # Drills #29
+
+[[tools]]
+id = "drill-25"
+name = "#25 drill"
+ref = "drill-25"  # Drills #25
+
+[[tools]]
+id = "drill-21"
+name = "#21 drill"
+ref = "drill-21"  # Drills #21
+
+[[tools]]
+id = "jig-drill-7"
+name = "#7 drill"
+ref = "jig-drill-7"  # Drills #7
+
+[[tools]]
+id = "frame-clearance-stub-drill"
+name = "#5 stub drill"
+ref = "frame-clearance-stub-drill"  # G-drill-5-stub, Drills #5
+
+[[tools]]
+id = "jig-tap-1-4-20-plug"
+name = "1/4-20 plug tap"
+ref = "jig-tap-1-4-20-plug"  # Tap coverage 1/4-20 UNC
+
+[[tools]]
+id = "jig-tap-4-40-plug"
+name = "#4-40 plug tap"
+ref = "jig-tap-4-40-plug"  # Tap coverage #4-40 UNC
+
+[[tools]]
+id = "jig-tap-8-32-plug"
+name = "#8-32 plug tap"
+ref = "jig-tap-8-32-plug"  # Tap coverage #8-32 UNC
+
+[[tools]]
+id = "tap-10-24-plug"
+name = "#10-24 plug tap"
+ref = "tap-10-24-plug"  # Tap coverage #10-24 UNC
+
+[[tools]]
+id = "tap-10-32-bottoming"
+name = "#10-32 bottoming tap"
+ref = "tap-10-32-bottoming"  # Tap coverage #10-32 UNF
+
+[[tools]]
+id = "tap-10-32-plug"
+name = "#10-32 plug tap"
+ref = "tap-10-32-plug"  # Tap coverage #10-32 UNF
+
+[[tools]]
+id = "frame-spotface-endmill"
+name = "11/32 end mill"
+ref = "frame-spotface-endmill"  # F-spotface-endmill-11-32
+
+[[tools]]
+id = "depth-micrometer"
+name = "Depth micrometer"
+ref = "depth-micrometer"  # F-depth-micrometer
+
+[[tools]]
+id = "angle-plate-4"
+name = "4 in angle plate"
+ref = "angle-plate-4"  # F-angle-plate-LMS-5386
+
+[[tools]]
+id = "transfer-punches"
+name = "Transfer punches"
+ref = "transfer-punches"  # F-transfer-punches-fractional, F-transfer-punches-number
+
+[[tools]]
+id = "v-blocks"
+name = "V-blocks"
+ref = "v-blocks"  # F-v-blocks
+
+[[tools]]
+id = "endmill-carbide-3fl-1-2"
+name = "1/2 carbide end mill"
+ref = "endmill-carbide-3fl-1-2"  # drawing cross-check 2026-11-19: 1 in-class bore, CNC interpolated (owner 2026-11-19)
+
+[[tools]]
+id = "telescoping-gauges-starrett-s579gz"
+name = "Telescoping gauges"
+ref = "telescoping-gauges-starrett-s579gz"  # drawing cross-check 2026-11-19: gauges the bore
+
+[[tools]]
+id = "number-stamps"
+name = "Number stamps"
+ref = "number-stamps"  # drawing cross-check 2026-11-19: STAMP "2" .14 HIGH
+
+[[tools]]
+id = "tap-10-32-bottoming-pulley"
+name = "#10-32 pulley bottoming tap"
+ref = "tap-10-32-bottoming-pulley"  # drawing cross-check 2026-11-19: 10-32 UNF ↧ 1.81 from the spot face
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

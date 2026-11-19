@@ -1,0 +1,78 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Cylinder Gear"
+part = "MHA-DT-12 Cylinder Gear"
+revision = "placeholder"
+material = "C36000 free-machining brass"
+stock = "To be written"
+shop = "../shop.toml"
+stock_refs = ["c360-round-gear-blanks"]
+
+[[tools]]
+id = "jig-drill-23-64"
+name = "23/64 drill"
+ref = "jig-drill-23-64"  # Drills 23/64
+
+[[tools]]
+id = "cylinder-notch-saw"
+name = ".014 slotting saw"
+ref = "cylinder-notch-saw"  # F-notch-saw
+
+[[tools]]
+id = "gear-cutter-arbor-1"
+name = "1 in R8 cutter arbor"
+ref = "gear-cutter-arbor-1"  # F-arbor-1in-R8
+
+[[tools]]
+id = "gear-cutter-arbor-7-8"
+name = "7/8 cutter arbor"
+ref = "gear-cutter-arbor-7-8"  # F-arbor-7-8
+
+[[tools]]
+id = "gear-cutters-48dp-20pa"
+name = "48DP 20PA gear cutter #2"
+ref = "gear-cutters-48dp-20pa"  # F-gear-cutter-10-289-482
+
+[[tools]]
+id = "pin-gauges"
+name = "Pin gauges .011-.500"
+ref = "pin-gauges"  # A1-pin-set-061-500-combined, A1-pin-set-251-500
+
+[[tools]]
+id = "india-stone-ib8"
+name = "India stone"
+ref = "india-stone-ib8"  # F-stone-norton-IB8
+
+[[tools]]
+id = "setting-mandrel-375"
+name = "3/8 setting mandrel"
+ref = "setting-mandrel-375"  # F-setting-mandrel-375
+
+[[tools]]
+id = "v-blocks"
+name = "V-blocks"
+ref = "v-blocks"  # F-v-blocks
+
+[[tools]]
+id = "reamer-0376"
+name = ".3760 reamer"
+ref = "reamer-0376"  # drawing cross-check 2026-11-19: .3760 +.0005/.0000 REAM THRU
+
+[[tools]]
+id = "dt-cylinder-gear-cam-fixture"
+name = "Cam turning fixture MHA-DT-12-TL-01"
+ref = "dt-cylinder-gear-cam-fixture"  # drawing cross-check 2026-11-19: cam throw .3402 ±.0020
+
+[[tools]]
+id = "gauge-blocks-mitutoyo"
+name = "Gauge blocks"
+ref = "gauge-blocks-mitutoyo"  # drawing cross-check 2026-11-19: sets the cam throw on the fixture
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

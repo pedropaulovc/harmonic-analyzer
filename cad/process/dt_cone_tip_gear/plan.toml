@@ -1,0 +1,38 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Cone Tip Gear"
+part = "MHA-DT-37 Cone Tip Gear"
+revision = "placeholder"
+material = "C67500 manganese bronze"
+stock = "To be written"
+shop = "../shop.toml"
+stock_refs = ["c675-round-5-8"]
+
+[[tools]]
+id = "pin-gauges"
+name = "Pin gauges .011-.500"
+ref = "pin-gauges"  # A1-pin-set-011-060
+
+[[tools]]
+id = "dt-cone-tip-form-cutter"
+name = "Form cutter MHA-DT-37-TL-01"
+ref = "dt-cone-tip-form-cutter"  # drawing cross-check 2026-11-19: GEAR DATA CUTTER: MHA-DT-37-TL-01
+
+[[tools]]
+id = "dt-cone-tip-cutter-bar"
+name = "Fly cutter bar MHA-DT-37-TL-02"
+ref = "dt-cone-tip-cutter-bar"  # drawing cross-check 2026-11-19: holder for the form cutter
+
+[[tools]]
+id = "steady-rest-pm-1127"
+name = "Lathe steady rest"
+ref = "steady-rest-pm-1127"  # drawing cross-check 2026-11-19: .0625 x .76 spigot, L/D 12
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

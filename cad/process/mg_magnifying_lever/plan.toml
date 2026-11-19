@@ -1,0 +1,33 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# the drawing cross-check of 2026-11-19, until its traveler is written. Not
+# enrolled in _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Magnifying Lever"
+part = "MHA-MG-03 Magnifying Lever"
+revision = "placeholder"
+material = "Brass"
+stock = "To be written"
+shop = "../shop.toml"
+stock_refs = ["c360-round-1-4"]
+
+[[tools]]
+id = "threading-bits-lms-6685"
+name = "5/16 HSS threading bit"
+ref = "threading-bits-lms-6685"  # drawing cross-check 2026-11-19: 1/4-20 UNC single-pointed (owner 2026-11-19)
+
+[[tools]]
+id = "form-tool-r125"
+name = "R.125 form tool"
+ref = "form-tool-r125"  # drawing cross-check 2026-11-19: SR.13 tip
+
+[[tools]]
+id = "calipers-12"
+name = "12 in calipers"
+ref = "calipers-12"  # drawing cross-check 2026-11-19: 6.59 overall at ±.01
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

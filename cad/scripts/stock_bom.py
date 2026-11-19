@@ -1,18 +1,24 @@
 """Stock bill of materials: every part the shop makes, with the stock, tools
 and gauges its process plan names.
 
-A part is made in the shop when its registry row's ``process`` does not start
-with ``purchased`` (cad/config/parts/*.yaml through ``_config.parts``). Parts
+A part is made in the shop unless its stem names a vendor identity (``-vn-``,
+cad/docs/subsystem-identities.md): a vendor part is bought finished, cut to
+length at most, while bought hardware with added machining is a made part
+whatever its registry ``process`` text says (cad/config/parts/*.yaml through
+``_config.parts``). Parts
 point at what they need from their process plans, never the other way round:
-each enrolled plan (``_process_plans.TRAVELER_STEMS``) names its stock in
-``stock_refs`` (keys of the cad/config/shop-equipment/ ``[stock.<key>]`` rows) and
-its tools in ``[[tools]]``, whose ``ref`` is a cad/process/shop.toml ``tools``
+every plan under cad/process (``<stem>/plan.toml``: the enrolled plans of
+``_process_plans.TRAVELER_STEMS`` and the placeholder plans that only list a
+part's tools until its traveler is written; the directory names the part,
+``<stem>`` with ``_`` for ``-``) names its stock in ``stock_refs`` (keys of the
+cad/config/shop-equipment/ ``[stock.<key>]`` rows) and its tools in
+``[[tools]]``, whose ``ref`` is a cad/process/shop.toml ``tools``
 key, and its gauges in the setups' and operations' ``gauge_checks``, whose
 ``gauge`` is a shop.toml ``gauges`` key. A stock row's ``status`` says whether
 it is on hand, bought but not received, or still to order. A tool's or gauge's
 ownership reads the same key in the inventory (``_shop_equipment.load``),
-in whichever of its ``tools``, ``fixtures``, ``consumables`` and ``gauges``
-sections holds it: its ``status`` (``on_hand``, ``not_received``,
+in whichever of its ``tools``, ``fixtures``, ``consumables``, ``gauges`` and
+``holders`` sections holds it: its ``status`` (``on_hand``, ``not_received``,
 ``to_order`` or ``to_make``), or ``unrecorded`` when there is no record, the
 record has no status, or the plan tool has no ``ref``. A part without stock
 reads one placeholder stock row:
@@ -36,7 +42,7 @@ Usage:
 
 Exits 2 when a stock row or an inventory record carries an unknown status, an
 inventory key sits in two ownership sections, or a plan names an unknown or
-purchased part, an unknown stock key, or a tool ``ref`` or gauge missing from
+vendor (``-vn-``) part, an unknown stock key, or a tool ``ref`` or gauge missing from
 shop.toml: the plans must not point at a retired or bought identity.
 """
 
@@ -208,10 +214,10 @@ def _tool_status(record: dict | None) -> ToolStatus:
     return status
 
 
-# Inventory sections a plan tool or gauge's key is owned under: a plan's fixture
-# or tape is a shop ``tools`` record to prechips but a fixtures or consumables
-# record here.
-OWNERSHIP_SECTIONS = ("tools", "fixtures", "consumables", "gauges")
+# Inventory sections a plan tool or gauge's key is owned under: a plan's fixture,
+# tape or die stock is a shop ``tools`` record to prechips but a fixtures,
+# consumables or holders record here.
+OWNERSHIP_SECTIONS = ("tools", "fixtures", "consumables", "gauges", "holders")
 
 
 def _owned_record(inventory: dict, key: str) -> dict | None:
@@ -234,14 +240,21 @@ def _gauge_refs(plan: dict) -> list[str]:
     return list(dict.fromkeys(refs))
 
 
+def plan_stems() -> tuple[str, ...]:
+    """Every ``cad/process/<stem>/plan.toml``, enrolled or placeholder."""
+    root = _process_plans.PROCESS_ROOT
+    return tuple(sorted(path.parent.name for path in root.glob("*/plan.toml")))
+
+
 def load_plans(
-    stems: tuple[str, ...] = _process_plans.TRAVELER_STEMS,
+    stems: tuple[str, ...] | None = None,
     shop_path: Path = _process_plans.SHOP_PATH,
     equipment_dir: Path = _shop_equipment.DIRECTORY,
 ) -> dict[str, PlanRefs]:
     """Registry stem -> the stock keys, tools and gauges its process plan names.
 
-    A tool's or gauge's ownership is the inventory record under its shop key in
+    ``stems`` defaults to every plan under cad/process (``plan_stems``). A
+    tool's or gauge's ownership is the inventory record under its shop key in
     any of ``OWNERSHIP_SECTIONS``; a tool without a ``ref`` has none.
     """
     shop = tomllib.loads(shop_path.read_text(encoding="utf-8"))
@@ -260,7 +273,7 @@ def load_plans(
             return None
         return ToolLine(ref=ref, name=name, status=status)
 
-    for stem in stems:
+    for stem in plan_stems() if stems is None else stems:
         plan_file = _process_plans.plan_path(stem)
         plan = tomllib.loads(plan_file.read_text(encoding="utf-8"))
         name = plan_file.parent.name
@@ -269,7 +282,7 @@ def load_plans(
             for tool in plan.get("tools", ())
         ]
         gauges = [line(name, "gauges", ref, ref) for ref in _gauge_refs(plan)]
-        by_part[plan["cad"]["part"]] = PlanRefs(
+        by_part[stem.replace("_", "-")] = PlanRefs(
             stock_keys=tuple(plan.get("stock_refs", ())),
             tools=tuple(t for t in tools if t is not None),
             gauges=tuple(g for g in gauges if g is not None),
@@ -279,8 +292,9 @@ def load_plans(
     return by_part
 
 
-def _is_made(row: dict) -> bool:
-    return not str(row.get("process", "")).startswith("purchased")
+def _is_made(stem: str) -> bool:
+    """Made unless ``stem`` is a vendor identity (``-vn-``): bought finished."""
+    return "-vn-" not in stem
 
 
 def _placeholder(
@@ -302,9 +316,9 @@ def build_bom(
     stock: dict[str, StockRow],
     plans: dict[str, PlanRefs],
 ) -> list[BomLine]:
-    made = {stem: row for stem, row in registry.items() if _is_made(row)}
+    made = {stem: row for stem, row in registry.items() if _is_made(stem)}
     errors = [
-        f"process plan for {'unknown' if stem not in registry else 'purchased'} part {stem!r}"
+        f"process plan for {'unknown' if stem not in registry else 'vendor (-vn-)'} part {stem!r}"
         for stem in plans
         if stem not in made
     ]

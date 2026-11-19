@@ -1,0 +1,27 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Cone Tip Gear Fly Cutter Bit"
+part = "MHA-DT-37-TL-01 Cone Tip Gear Fly Cutter Bit"
+revision = "placeholder"
+material = "AISI O1 oil-hardening tool steel drill rod, 1/8 in, ASTM A681"
+stock = "To be written"
+shop = "../shop.toml"
+
+[[tools]]
+id = "pin-gauges"
+name = "Pin gauges .011-.500"
+ref = "pin-gauges"  # A1-pin-set-011-060
+
+[[tools]]
+id = "needle-files-swiss"
+name = "Swiss needle files"
+ref = "needle-files-swiss"  # drawing cross-check 2026-11-19: file the tooth-space form (.0114-.0323)
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

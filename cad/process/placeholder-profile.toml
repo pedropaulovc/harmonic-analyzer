@@ -1,0 +1,4 @@
+# prechips profile that checks nothing: validates the placeholder plans, which have no CAD binding.
+name = "placeholder"
+features = []
+enforce = []

@@ -1,0 +1,23 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Cylinder Bank South End Disc"
+part = "MHA-DT-26 Cylinder Bank South End Disc"
+revision = "placeholder"
+material = "C36000 free-machining brass"
+stock = "To be written"
+shop = "../shop.toml"
+stock_refs = ["c360-flat-1-8x2-1-2"]
+
+[[tools]]
+id = "drill-v"
+name = "V drill"
+ref = "drill-v"  # Drills V
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

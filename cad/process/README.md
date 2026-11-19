@@ -6,7 +6,8 @@ This directory holds the inputs to the `prechips:<stem>` travelers and the
 ```text
 cad/process/
   shop.toml                 prechips shop file, shared by every plan
-  <stem>/plan.toml          one prechips plan per part
+  <stem>/plan.toml          one prechips plan per part (enrolled or placeholder)
+  placeholder-profile.toml  no-check prechips profile for the placeholder plans
   <stem>/diagrams/*.svg     optional setup diagrams the plan names
   <stem>/cam.py             CAM recipe of a part milled on the CNC mill
 ```
@@ -67,6 +68,35 @@ and bed height) repeat `shop.toml` `workholding.vise-pm-6`, because prechips
 plan bindings cannot read shop records; each such parameter names the shop
 field it repeats, and the two must be changed together.
 
+## Placeholder plans
+
+Until its traveler is written, a made part without an enrolled plan has a
+placeholder `<stem>/plan.toml` (owner 2026-11-19): `revision = "placeholder"`, the
+registry number, title and material, `stock = "To be written"`, one
+`[[tools]]` entry per tool the part needs, and one dummy setup ("Traveler to
+come"). Its tools come from the owner's quote workbook
+`quotes-2026-11-17-rev3.xlsx` (its Items, Where used detail, Drills and Tap
+coverage sheets) and from a cross-check of the plans against the drawings
+(2026-11-19), each `ref` a `shop.toml` `tools` record whose header comment
+cites the workbook row, the drawing callout or the inventory record, with the
+tool's ownership in the inventory under the same key. Its `stock_refs` names
+the inventory `[stock.<key>]` rows it is cut from (the stock assignment audit,
+owner 2026-11-19). A placeholder is not in
+`TRAVELER_STEMS`: it has no `prechips:<stem>`
+task, is not rendered by `build` or `release` and ships nothing; it lists a
+part's tools for the stock BOM. It has no `[cad]` binding, so the built-in
+`pro` and `hobby` profiles refuse it (`stock_fit` needs one);
+`placeholder-profile.toml` checks nothing and validates it by hand:
+
+```text
+uv tool run --from prechips==<version> prechips traveler cad/process/<stem>/plan.toml --profile cad/process/placeholder-profile.toml --out <file outside the repo>
+```
+
+prechips refuses a plan with no `[[tools]]`, so a made part neither source names
+a tool for has no placeholder. Enrolling a part means writing its real plan
+over the placeholder (the `[cad]` binding, stock and setups) and adding its
+stem to `_process_plans.TRAVELER_STEMS`.
+
 ## Shop records
 
 `shop.toml` is the prechips shop file: machines, workholding, gauges, limits,
@@ -85,6 +115,12 @@ height). The opening is the owner-reported fit with the stock hard jaws
 3/8 and 1/2 in 3-flute uncoated carbide end mills (`tools.endmill-carbide-3fl-*`)
 carry cutting settings on 1018 within the PM-30MV's 2800 rpm ceiling
 (`settings.endmill-carbide-3fl-*-1018-cf`), each number cited beside it.
+
+Every inventory stock key a plan's `stock_refs` names also has a
+`[stock.<key>]` record here, `description` only, because prechips checks each
+plan's `stock_refs` against its shop. The stock's ownership `status` stays in
+the inventory (`cad/config/shop-equipment/stock-*.toml`), so an enrolled
+traveler prints no stock mark.
 
 The `[limits]` table carries the three `vise_holding` limits: grip at least
 `vise_grip_min_mm` 6 mm (Pedro's house choice) and `vise_grip_fraction_min`
@@ -129,15 +165,17 @@ they need from their process plans. They hold:
   `status` (`on_hand`, `not_received` or `to_order`); a process plan names the
   rows it is cut from in `stock_refs`.
   `uv run --frozen python cad/scripts/stock_bom.py [--format md|csv|xlsx]` joins
-  the part registry's made parts to their plans, normalized to one row per part
-  and requirement: `type` `stock` (each row the plan names, with its status;
+  the part registry's made parts (every stem without `-vn-`: a vendor part is
+  bought finished, bought hardware with added machining is made) to their plans (every `<stem>/plan.toml`,
+  enrolled or placeholder), normalized to one row per part and requirement:
+  `type` `stock` (each row the plan names, with its status;
   one `vendor_sku`, `no_stock_record` or `no_traveler` row when it names none),
   `tool` (each `[[tools]]` entry of the part's process plan; one `no_traveler`
   row for a part without a plan) or `gauge` (each gauge its setups' and
   operations' `gauge_checks` name, once), then the stock rows no plan names
   with the part columns empty. A tool's or gauge's ownership is the `status`
   of the inventory record under its shop.toml key in whichever of `tools`,
-  `fixtures`, `consumables` and `gauges` holds it, or `unrecorded` with no
+  `fixtures`, `consumables`, `gauges` and `holders` holds it, or `unrecorded` with no
   record, no status or (a tool) no `ref`. The md summary line counts the parts
   `ready`, `missing` and `no_traveler`. `--format xlsx --out PATH` adds a
   Readiness sheet first: per part, its missing stock rows (`not_received`,
@@ -147,7 +185,7 @@ they need from their process plans. They hold:
   write a native PivotTable). Tools and gauges point from the plan, never from
   this inventory. It exits 2 when a stock row or inventory record carries an
   unknown status, a key sits in two of those sections, a plan names an unknown
-  or purchased stem or unknown stock, or a plan's tool `ref` or gauge is not
+  or vendor (`-vn-`) stem or unknown stock, or a plan's tool `ref` or gauge is not
   in `shop.toml`, and `test_stock_bom.py` (`check:recipe`) runs that check on
   every change;
 - the MHA-FR-02 top-frame casting to buy (owner ruling 2026-11-10 (Pedro),

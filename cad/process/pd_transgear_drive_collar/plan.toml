@@ -1,0 +1,68 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Transgear Drive Collar"
+part = "MHA-PD-22 Transgear Drive Collar"
+revision = "placeholder"
+material = "C36000 free-machining brass"
+stock = "To be written"
+shop = "../shop.toml"
+stock_refs = ["c360-round-7-8"]
+
+[[tools]]
+id = "drill-53"
+name = "#53 drill"
+ref = "drill-53"  # Drills #53
+
+[[tools]]
+id = "jig-drill-43"
+name = "#43 drill"
+ref = "jig-drill-43"  # Drills #43
+
+[[tools]]
+id = "pin-gauges"
+name = "Pin gauges .011-.500"
+ref = "pin-gauges"  # A1-pin-set-061-250, A1-pin-set-061-500-combined
+
+[[tools]]
+id = "arbor-press"
+name = "Arbor press"
+ref = "arbor-press"  # F-arbor-press
+
+[[tools]]
+id = "straightedge"
+name = "Straightedge"
+ref = "straightedge"  # F-straightedge
+
+[[tools]]
+id = "drill-14"
+name = "#14 drill"
+ref = "drill-14"  # drawing cross-check 2026-11-19: pre-drill for the .1920 ream
+
+[[tools]]
+id = "reamer-1920"
+name = ".1920 reamer"
+ref = "reamer-1920"  # drawing cross-check 2026-11-19: Ø.1920 +.0005/.0000 REAM THRU
+
+[[tools]]
+id = "reamer-0930"
+name = ".0930 reamer"
+ref = "reamer-0930"  # drawing cross-check 2026-11-19: Ø.0930 +.0005/.0000 2X REAM THRU
+
+[[tools]]
+id = "reamer-0615"
+name = ".0615 reamer"
+ref = "reamer-0615"  # drawing cross-check 2026-11-19: Ø.0615 +.0005/.0000 REAM (.163)
+
+[[tools]]
+id = "chamfer-mill-330ch-1-4-90"
+name = "1/4 90° chamfer mill"
+ref = "chamfer-mill-330ch-1-4-90"  # drawing cross-check 2026-11-19: .008 X 45° bore mouth
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

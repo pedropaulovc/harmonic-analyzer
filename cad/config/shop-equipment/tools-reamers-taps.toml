@@ -290,5 +290,138 @@ sku = "5948"
 source = "https://littlemachineshop.com/products/reamer-set-adjustable-4-piece-8-5"
 status = "on_hand"
 pieces = 4
-range_in = [0.25, 0.375]
 cite = ["LittleMachineShop listing read 2026-11-17: SKU 5948, \"Reamers in this set are adjustable from 0.250\" to 0.375\"\", \"4 Piece Set Sizes #8 - #5\", HSS, black oxide, wooden storage box, $69.95", "Owner (Pedro) 2026-11-17: owned; with the .3760 reamer, the only reamers"]
+
+# --- Placeholder process plans' reamers (quotes-2026-11-17-rev3.xlsx) -------
+# The chucking reamers the placeholder plans name, from the owner's quote
+# workbook (owner 2026-11-19), each to buy; description and diameter_mm are
+# cad/process/shop.toml under the same key.
+[tools.reamer-0620]
+kind = "reamer"
+status = "to_order"
+note = "quotes-2026-11-17-rev3.xlsx B-reamer-.0620: recommended McMaster-Carr 8803A141."
+
+[tools.reamer-0630]
+kind = "reamer"
+status = "to_order"
+note = "quotes-2026-11-17-rev3.xlsx B-reamer-.0630: recommended McMaster-Carr 8803A142."
+
+[tools.reamer-0775]
+kind = "reamer"
+status = "to_order"
+note = "quotes-2026-11-17-rev3.xlsx B-reamer-.0775: recommended McMaster-Carr 8803A168."
+
+[tools.reamer-1240]
+kind = "reamer"
+status = "to_order"
+note = "quotes-2026-11-17-rev3.xlsx B-reamer-.1240: recommended Shars 404-7563."
+
+[tools.reamer-1260]
+kind = "reamer"
+status = "to_order"
+note = "quotes-2026-11-17-rev3.xlsx B-reamer-.1260: recommended Shars 404-7564."
+
+[tools.reamer-1865]
+kind = "reamer"
+status = "to_order"
+note = "quotes-2026-11-17-rev3.xlsx B-reamer-.1865: recommended Shars 404-7565."
+
+[tools.reamer-1885]
+kind = "reamer"
+status = "to_order"
+note = "quotes-2026-11-17-rev3.xlsx B-reamer-.1885: recommended Shars 404-7566."
+
+[tools.reamer-2490]
+kind = "reamer"
+status = "to_order"
+note = "quotes-2026-11-17-rev3.xlsx B-reamer-.2490: recommended Shars 404-7567."
+
+[tools.reamer-2510]
+kind = "reamer"
+status = "to_order"
+note = "quotes-2026-11-17-rev3.xlsx B-reamer-.2510 (optional tier, not in the recommended total): recommended Zoro G3924812. The workbook takes it as owned (cad/scripts/_fit_ream_slide.py: the owned over reamers), but the owner's inventory of 2026-11-17 owns only tools.reamers-adjustable-lms-5948 and tools.reamer-0376."
+
+[tools.reamer-2560]
+kind = "reamer"
+status = "to_order"
+note = "quotes-2026-11-17-rev3.xlsx B-reamer-.2560: recommended McMaster-Carr 8803A491. The workbook's B-reamer-.2559 (6.5 mm, optional tier, Drill America DWRR6.5MM) is the alternative for the same three bores."
+
+[tools.reamer-3135]
+kind = "reamer"
+status = "to_order"
+note = "quotes-2026-11-17-rev3.xlsx B-reamer-.3135 (optional tier, not in the recommended total): recommended Zoro G3918887. The workbook takes it as owned (cad/scripts/_fit_ream_slide.py: the owned over reamers), but the owner's inventory of 2026-11-17 owns only tools.reamers-adjustable-lms-5948 and tools.reamer-0376."
+
+[tools.reamer-4500]
+kind = "reamer"
+status = "to_order"
+note = "quotes-2026-11-17-rev3.xlsx B-reamer-.4500: recommended McMaster-Carr 8803A874."
+
+[tools.reamer-4835]
+kind = "reamer"
+status = "to_order"
+note = "quotes-2026-11-17-rev3.xlsx B-reamer-.4835: recommended McMaster-Carr 8803A948."
+
+[tools.reamer-4990]
+kind = "reamer"
+status = "to_order"
+note = "quotes-2026-11-17-rev3.xlsx B-reamer-.4990: recommended Shars 404-7571."
+
+[tools.reamer-5010]
+kind = "reamer"
+status = "to_order"
+note = "quotes-2026-11-17-rev3.xlsx B-reamer-.5010: recommended Shars 404-7572."
+
+[tools.reamer-0615]
+kind = "reamer"
+status = "to_order"
+note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-DT-38 .0615 +.0005/.0000 REAM THRU; MHA-PD-17 Ø.0615 +.0005/.0000 REAM; MHA-PD-22 Ø.0615 +.0005/.0000 REAM (.163)."
+
+[tools.reamer-0625]
+kind = "reamer"
+status = "to_order"
+note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-DT-03 .0625 +.0005/.0000 REAM THRU (T012, T018); MHA-DT-04 .0625 +.0005/.0000 REAM .20."
+
+[tools.reamer-0930]
+kind = "reamer"
+status = "to_order"
+note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-DT-11 2X .0930 +.0005/.0000 REAM .1555; MHA-PD-18 Ø.0930 +.0005/.0000 2X REAM THRU; MHA-PD-22 Ø.0930 +.0005/.0000 2X REAM THRU."
+
+[tools.reamer-0945]
+kind = "reamer"
+status = "to_order"
+note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-19 2X Ø.0945 +.0005/.0000 REAM THRU."
+
+[tools.reamer-1280]
+kind = "reamer"
+status = "to_order"
+note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-SM-02 Ø.1280 ±.0007 REAM (.37) FLAT BOTTOM."
+
+[tools.reamer-1562]
+kind = "reamer"
+status = "to_order"
+note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-DT-31 (Ø.156) REAM .17 at assembly with MHA-DT-06; MHA-DT-06 (Ø.156) REAM .17 for dowel MHA-DT-VN-59."
+
+[tools.reamer-1570]
+kind = "reamer"
+status = "to_order"
+note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-DT-03-TL-01 132X .1570 +.0005/.0000 REAM THRU; MHA-DT-14 .1570 +.0005/.0000 FLAT-BOTTOM REAM."
+
+[tools.reamer-1610]
+kind = "reamer"
+status = "to_order"
+note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-DT-08 (Ø.161) REAM THRU, running fit on MHA-DT-32."
+
+[tools.reamer-1855]
+kind = "reamer"
+status = "to_order"
+note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-20 Ø.1850 +.0010/+.0005 REAM THRU."
+
+[tools.reamer-1920]
+kind = "reamer"
+status = "to_order"
+note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-22 Ø.1920 +.0005/.0000 REAM THRU."
+
+[tools.reamer-1940]
+kind = "reamer"
+status = "to_order"
+note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-18 Ø.1940 +.001/.000 REAM THRU."

@@ -1,0 +1,27 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Pinion Return Leaf Spring"
+part = "MHA-DT-24 Pinion Return Leaf Spring"
+revision = "placeholder"
+material = "17-7 PH stainless (UNS S17700) strip, Condition C, ASTM A693; 0.015 in +/-0.00075 in, sheared 1/4 in wide from McMaster-Carr 2325K19"
+stock = "To be written"
+shop = "../shop.toml"
+
+[[tools]]
+id = "feeler-gauges"
+name = "Feeler gauges (Pittsburgh 32-pc)"
+ref = "feeler-gauges"  # F-feeler-66MA; repointed from the Starrett 66MA (owner 2026-11-19)
+
+[[tools]]
+id = "drill-30-cobalt"
+name = "#30 cobalt drill"
+ref = "drill-30-cobalt"  # drawing cross-check 2026-11-19: #30 DRILL .129 THRU in 17-7 PH Cond C
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

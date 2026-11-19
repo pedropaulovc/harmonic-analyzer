@@ -1,0 +1,33 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Transgear Front Bushing"
+part = "MHA-PD-25 Transgear Front Bushing"
+revision = "placeholder"
+material = "C36000 free-machining brass"
+stock = "To be written"
+shop = "../shop.toml"
+stock_refs = ["c360-round-1-2"]
+
+[[tools]]
+id = "reamer-1260"
+name = ".1260 reamer"
+ref = "reamer-1260"  # B-reamer-.1260
+
+[[tools]]
+id = "pin-gauges"
+name = "Pin gauges .011-.500"
+ref = "pin-gauges"  # A1-pin-set-061-250, A1-pin-set-061-500-combined
+
+[[tools]]
+id = "drill-32"
+name = "#32 drill"
+ref = "drill-32"  # drawing cross-check 2026-11-19: pre-drill for the .1260 ream
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

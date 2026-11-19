@@ -1,0 +1,32 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Latch Hook"
+part = "MHA-PD-14 Latch Hook"
+revision = "placeholder"
+material = "1095 spring steel sheet .032 in +/-.002 in, annealed, ASTM A684; McMaster-Carr 9043K43"
+stock = "To be written"
+shop = "../shop.toml"
+
+[[tools]]
+id = "riser-drill-30"
+name = "#30 drill"
+ref = "riser-drill-30"  # Drills #30
+
+[[tools]]
+id = "hardness-test-files-55-65"
+name = "Hardness test files 55/65 HRC"
+ref = "hardness-test-files-55-65"  # drawing cross-check 2026-11-19: 55-63 HRC after hardening
+
+[[tools]]
+id = "pd-latch-hook-former"
+name = "Latch-hook former (R3.13, R.38)"
+ref = "pd-latch-hook-former"  # drawing cross-check 2026-11-19: R3.13 ±.02, R.38 ±.02
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

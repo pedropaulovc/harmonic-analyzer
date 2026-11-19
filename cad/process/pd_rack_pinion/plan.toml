@@ -1,0 +1,73 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Reducer Disc"
+part = "MHA-PD-06 Reducer Disc"
+revision = "placeholder"
+material = "C36000 free-machining brass"
+stock = "To be written"
+shop = "../shop.toml"
+stock_refs = ["c360-flat-1-8x4"]
+
+[[tools]]
+id = "drill-3-64"
+name = "3/64 drill"
+ref = "drill-3-64"  # Drills 3/64
+
+[[tools]]
+id = "drill-31-64"
+name = "31/64 drill"
+ref = "drill-31-64"  # Drills 31/64
+
+[[tools]]
+id = "reamer-5010"
+name = ".5010 reamer"
+ref = "reamer-5010"  # B-reamer-.5010
+
+[[tools]]
+id = "tap-0-80-plug"
+name = "#0-80 plug tap"
+ref = "tap-0-80-plug"  # Tap coverage #0-80 UNF
+
+[[tools]]
+id = "gear-cutter-arbor-7-8"
+name = "7/8 cutter arbor"
+ref = "gear-cutter-arbor-7-8"  # F-arbor-7-8
+
+[[tools]]
+id = "gear-cutters-48dp-20pa"
+name = "48DP 20PA gear cutter #1"
+ref = "gear-cutters-48dp-20pa"  # F-gear-cutter-10-289-481
+
+[[tools]]
+id = "pin-gauges"
+name = "Pin gauges .011-.500"
+ref = "pin-gauges"  # A1-pin-set-011-060
+
+[[tools]]
+id = "straightedge"
+name = "Straightedge"
+ref = "straightedge"  # F-straightedge
+
+[[tools]]
+id = "pd-rack-pinion-cutting-arbor"
+name = "Work arbor with backing discs"
+ref = "pd-rack-pinion-cutting-arbor"  # drawing cross-check 2026-11-19: tooth cutting on the shop-made arbor
+
+[[tools]]
+id = "telescoping-gauges-starrett-s579gz"
+name = "Telescoping gauges"
+ref = "telescoping-gauges-starrett-s579gz"  # drawing cross-check 2026-11-19: Ø.5010 +.0005/.0000 REAM THRU (no pin reaches .501)
+
+[[tools]]
+id = "feeler-gauges"
+name = "Feeler gauges"
+ref = "feeler-gauges"  # drawing cross-check 2026-11-19: BACKLASH WITH MATE .002-.007, FEELER
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

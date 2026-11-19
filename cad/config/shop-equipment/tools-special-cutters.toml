@@ -1,0 +1,103 @@
+# CAD-owned shop-equipment records (cad/process/README.md, "Shop records"):
+# the ownership of the single-part cutters, form tools and hand tools the
+# placeholder process plans name: from the owner's quote workbook
+# quotes-2026-11-17-rev3.xlsx and from the drawing cross-check of the plans
+# (owner 2026-11-19), whose notes cite the drawing callout.
+# Descriptions are cad/process/shop.toml under the same key; no field here
+# repeats one there. TOML, deliberately not YAML; no COM build closure reads
+# it: it is in no leaf's cache key.
+
+[tools.endmill-7-32]
+kind = "end_mill"
+status = "to_order"
+note = "quotes-2026-11-17-rev3.xlsx C-endmill-7-32: recommended Shars 404-6071."
+
+[tools.form-tool-r160]
+kind = "form_tool"
+status = "to_order"
+note = "quotes-2026-11-17-rev3.xlsx D-form-tool-R160 (not in the recommended total): no in-spec offer found (the workbook's Not priced sheet); nearest standard radii 5/32 (.1563) or 4 mm (.1575)."
+
+[tools.threading-bits-lms-6685]
+kind = "threading_tool_bit"
+status = "on_hand"
+note = "owner confirmed on hand 2026-11-19: LMS 6685, 5/16 in HSS threading tool bit, set of two; single-points MHA-MG-03 1/4-20, MHA-PD-08 #8-32 and MHA-DT-03-TL-03 1/4-28."
+
+[tools.endmill-carbide-3-64]
+kind = "end_mill"
+status = "to_order"
+note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-03 2X .04 SLIT, FULL R END."
+
+[tools.endmill-carbide-3-32]
+kind = "end_mill"
+status = "to_order"
+note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-18 flatten the .33 FLAT BOTTOM floor; MHA-PD-27 flat floor for the Ø.110 counterbore; MHA-CH-03 .106 ±.002 fork slot."
+
+[tools.endmill-5-64-long]
+kind = "end_mill"
+status = "to_order"
+note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PN-01 window corners R.040 max."
+
+[tools.chamfer-mill-1-2-90]
+kind = "chamfer_mill"
+status = "to_order"
+note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PN-05 2X 45° V, (.20) deep."
+
+[tools.knurl-straight-25tpi]
+kind = "knurling_tool"
+status = "to_order"
+note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-13 STRAIGHT KNURL 25 TPI."
+
+[tools.lathe-tool-sharp-nose]
+kind = "turning_tool"
+status = "to_order"
+note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-08 R.004 max. corners, .016 neck; MHA-PD-17 SPIGOT ROOT R.004 MAX; MHA-PD-23 R.005 MAX land-to-head corner; MHA-PN-04 R.008 max. shoulder."
+
+[tools.grooving-tool-020]
+kind = "grooving_tool"
+status = "to_order"
+note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-23 .020 +.002/.000 ring groove; MHA-MG-04 thread relief, corners R.008 max.; MHA-MG-07 thread relief, corners R.008 max.."
+
+[tools.form-tool-r024]
+kind = "form_tool"
+status = "to_order"
+note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-MG-05 R.024 rim wire groove."
+
+[tools.form-tool-r047]
+kind = "form_tool"
+status = "to_order"
+note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-MG-06 R .047/.020 FULL R groove."
+
+[tools.form-tool-r070]
+kind = "form_tool"
+status = "to_order"
+note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-23 R.07 shank-end dome; MHA-MG-07 R.07 tip."
+
+[tools.form-tool-r110]
+kind = "form_tool"
+status = "to_order"
+note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-MG-04 R.11 TANGENT HEMISPHERE."
+
+[tools.form-tool-r125]
+kind = "form_tool"
+status = "to_order"
+note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-CH-04 2X (SR.125) ends; MHA-MG-03 SR.13 tip."
+
+[tools.form-tool-r180]
+kind = "form_tool"
+status = "to_order"
+note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-23 R.18 head dome."
+
+[tools.needle-files-swiss]
+kind = "file_set"
+status = "to_order"
+note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-DT-37-TL-01 file the tooth-space form (.0114-.0323)."
+
+[tools.hardness-test-files-55-65]
+kind = "file_set"
+status = "to_order"
+note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-14 55-63 HRC after hardening."
+
+[tools.number-stamps]
+kind = "stamp_set"
+status = "to_order"
+note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-FR-01 STAMP \"2\" .14 HIGH."

@@ -1,0 +1,68 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Transgear Disc Hub"
+part = "MHA-PD-17 Transgear Disc Hub"
+revision = "placeholder"
+material = "C36000 free-machining brass"
+stock = "To be written"
+shop = "../shop.toml"
+stock_refs = ["c360-round-1-1-8"]
+
+[[tools]]
+id = "drill-57"
+name = "#57 drill"
+ref = "drill-57"  # Drills #57
+
+[[tools]]
+id = "drill-56"
+name = "#56 drill"
+ref = "drill-56"  # Drills #56
+
+[[tools]]
+id = "drill-51"
+name = "#51 drill"
+ref = "drill-51"  # Drills #51
+
+[[tools]]
+id = "drill-n"
+name = "N drill"
+ref = "drill-n"  # Drills N
+
+[[tools]]
+id = "reamer-3135"
+name = ".3135 reamer"
+ref = "reamer-3135"  # B-reamer-.3135
+
+[[tools]]
+id = "pin-gauges"
+name = "Pin gauges .011-.500"
+ref = "pin-gauges"  # A1-pin-set-061-250, A1-pin-set-061-500-combined, A1-pin-set-251-500
+
+[[tools]]
+id = "arbor-press"
+name = "Arbor press"
+ref = "arbor-press"  # F-arbor-press
+
+[[tools]]
+id = "drill-53"
+name = "#53 drill"
+ref = "drill-53"  # drawing cross-check 2026-11-19: pre-drill to the .0615 ream stop
+
+[[tools]]
+id = "reamer-0615"
+name = ".0615 reamer"
+ref = "reamer-0615"  # drawing cross-check 2026-11-19: Ø.0615 +.0005/.0000 REAM
+
+[[tools]]
+id = "lathe-tool-sharp-nose"
+name = "Sharp-nose turning tool"
+ref = "lathe-tool-sharp-nose"  # drawing cross-check 2026-11-19: SPIGOT ROOT R.004 MAX
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

@@ -1,0 +1,37 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Nameplate"
+part = "MHA-FR-04 Nameplate"
+revision = "placeholder"
+material = "Brass sheet, .063 in C260 (C26000 cartridge brass; OnlineMetals 23624)"
+stock = "To be written"
+shop = "../shop.toml"
+
+[[tools]]
+id = "drill-31"
+name = "#31 drill"
+ref = "drill-31"  # Drills #31
+
+[[tools]]
+id = "ms-stick-engraver"
+name = "30° V engraving bit"
+ref = "ms-stick-engraver"  # drawing cross-check 2026-11-19: .028 ALL ENGRAVING
+
+[[tools]]
+id = "endmill-carbide-3fl-1-8"
+name = "1/8 carbide end mill"
+ref = "endmill-carbide-3fl-1-8"  # drawing cross-check 2026-11-19: .016 SUNK FIELD
+
+[[tools]]
+id = "keyseat-endmill-1-16"
+name = "1/16 end mill"
+ref = "keyseat-endmill-1-16"  # drawing cross-check 2026-11-19: sunk-field corners R.040 max
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

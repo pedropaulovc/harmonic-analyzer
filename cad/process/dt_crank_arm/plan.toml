@@ -1,0 +1,58 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Crank Arm"
+part = "MHA-DT-06 Crank Arm"
+revision = "placeholder"
+material = "LOW-CARBON STEEL, E.G. 1018 CF"
+stock = "To be written"
+shop = "../shop.toml"
+stock_refs = ["1018-flat-5-16x1-12in"]
+
+[[tools]]
+id = "drill-50"
+name = "#50 drill"
+ref = "drill-50"  # Drills #50
+
+[[tools]]
+id = "jig-drill-43"
+name = "#43 drill"
+ref = "jig-drill-43"  # Drills #43
+
+[[tools]]
+id = "jig-tap-4-40-plug"
+name = "#4-40 plug tap"
+ref = "jig-tap-4-40-plug"  # Tap coverage #4-40 UNC
+
+[[tools]]
+id = "tap-2-56-plug"
+name = "#2-56 plug tap"
+ref = "tap-2-56-plug"  # Tap coverage #2-56 UNC
+
+[[tools]]
+id = "centre-punch-starrett-18a"
+name = "Automatic centre punch"
+ref = "centre-punch-starrett-18a"  # F-centre-punch-starrett-18A
+
+[[tools]]
+id = "drill-25"
+name = "#25 drill"
+ref = "drill-25"  # drawing cross-check 2026-11-19: pre-drill for the 5/32 dowel ream
+
+[[tools]]
+id = "reamer-1562"
+name = "5/32 reamer"
+ref = "reamer-1562"  # drawing cross-check 2026-11-19: (Ø.156) REAM .17 for dowel MHA-DT-VN-59
+
+[[tools]]
+id = "chamfer-mill-carbide-1-4-90"
+name = "1/4 90° chamfer mill"
+ref = "chamfer-mill-carbide-1-4-90"  # drawing cross-check 2026-11-19: Ø.122 MAX X 90° NEAR SIDE
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

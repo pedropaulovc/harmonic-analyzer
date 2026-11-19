@@ -65,6 +65,8 @@ note = "Height and trigger travel not published. Tools probed on it must land on
 make = "Precision Matthews"
 sku = "VISE-6in-HIGHPREC"
 source = "https://www.precisionmatthews.com/products/vise-6in-highprec"
+status = "on_hand"
+note = "owner confirmed on hand 2026-11-19"
 
 # The PM-1127VF-LB lathe's rests. Owner (Pedro) 2026-11-17: "already have
 # follow and steady rests for the lathe". Owner-stated, not measured: make,
@@ -230,3 +232,45 @@ status = "to_order"
 sku = "McMaster 91255A539"
 purchase = "One (a box is the usual pack). Button head .437 in dia x .132 in high. 5/8 long: through the .06 washer, the strap and tape and the .185 counterbore it engages the sub-plate's whole .231 of 1/4-20 thread and stands about .045 out under the plate, between the parallels. Owner ruling 2026-11-17: \"Use a 1/4-20 hub screw. The .23 in of thread in the 6061 plate is accepted: the screw only snugs the strap during the outline.\""
 note = "Not owned: to buy. MHA-CH-13 Setup 5: hub hold-down through fixtures.strap-hub-washer and fixtures.strap-hub-plug."
+
+[fixtures.dt-cone-gear-cutting-arbor]
+kind = "fixture"
+status = "to_make"
+supply = "shop_made"
+note = "Not made: shop-made. drawing cross-check 2026-11-19: MHA-DT-03 TOOTH CUTTING SETUP .002 TIR TO FINISHED BORE."
+
+[fixtures.dt-cone-gear-index-plate]
+kind = "fixture"
+status = "to_make"
+supply = "shop_made"
+note = "Not made: shop-made. drawing cross-check 2026-11-19: MHA-DT-03 tooth indexing."
+
+[fixtures.dt-cylinder-gear-cam-fixture]
+kind = "fixture"
+status = "to_make"
+supply = "shop_made"
+note = "Not made: shop-made. drawing cross-check 2026-11-19: MHA-DT-12 cam throw .3402 ±.0020."
+
+[fixtures.dt-cone-tip-form-cutter]
+kind = "fixture"
+status = "to_make"
+supply = "shop_made"
+note = "Not made: shop-made. drawing cross-check 2026-11-19: MHA-DT-37 GEAR DATA CUTTER: MHA-DT-37-TL-01."
+
+[fixtures.dt-cone-tip-cutter-bar]
+kind = "fixture"
+status = "to_make"
+supply = "shop_made"
+note = "Not made: shop-made. drawing cross-check 2026-11-19: MHA-DT-37 holder for the form cutter."
+
+[fixtures.pd-latch-hook-former]
+kind = "fixture"
+status = "to_make"
+supply = "shop_made"
+note = "Not made: shop-made. drawing cross-check 2026-11-19: MHA-PD-14 R3.13 ±.02, R.38 ±.02."
+
+[fixtures.pd-platen-clip-bow-former]
+kind = "fixture"
+status = "to_make"
+supply = "shop_made"
+note = "Not made: shop-made. drawing cross-check 2026-11-19: MHA-PD-03 FORMED, 6X (R1.36), .06 BOW RISE."

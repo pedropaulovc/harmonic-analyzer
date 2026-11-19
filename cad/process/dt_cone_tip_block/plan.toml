@@ -1,0 +1,78 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Cone Tip Block"
+part = "MHA-DT-21 Cone Tip Block"
+revision = "placeholder"
+material = "LOW-CARBON STEEL, E.G. 1018 CF"
+stock = "To be written"
+shop = "../shop.toml"
+stock_refs = ["1018-flat-1-2x2-1-4"]
+
+[[tools]]
+id = "drill-53"
+name = "#53 drill"
+ref = "drill-53"  # Drills #53
+
+[[tools]]
+id = "jig-drill-43"
+name = "#43 drill"
+ref = "jig-drill-43"  # Drills #43
+
+[[tools]]
+id = "riser-drill-30"
+name = "#30 drill"
+ref = "riser-drill-30"  # Drills #30
+
+[[tools]]
+id = "drill-3"
+name = "#3 drill"
+ref = "drill-3"  # Drills #3
+
+[[tools]]
+id = "reamer-0620"
+name = ".0620 reamer"
+ref = "reamer-0620"  # B-reamer-.0620
+
+[[tools]]
+id = "jig-tap-4-40-plug"
+name = "#4-40 plug tap"
+ref = "jig-tap-4-40-plug"  # Tap coverage #4-40 UNC
+
+[[tools]]
+id = "tap-1-4-28-plug"
+name = "1/4-28 plug tap"
+ref = "tap-1-4-28-plug"  # Tap coverage 1/4-28 UNF
+
+[[tools]]
+id = "tap-4-40-bottoming"
+name = "#4-40 bottoming tap"
+ref = "tap-4-40-bottoming"  # F-tap-bottoming-4-40, Tap coverage #4-40 UNC
+
+[[tools]]
+id = "pin-gauges"
+name = "Pin gauges .011-.500"
+ref = "pin-gauges"  # A1-pin-set-061-250, A1-pin-set-061-500-combined
+
+[[tools]]
+id = "arbor-press"
+name = "Arbor press"
+ref = "arbor-press"  # F-arbor-press
+
+[[tools]]
+id = "chamfer-mill-carbide-1-4-90"
+name = "1/4 90° chamfer mill"
+ref = "chamfer-mill-carbide-1-4-90"  # drawing cross-check 2026-11-19: .257 X 90° BOTH ENDS
+
+[[tools]]
+id = "slitting-saw-1-032"
+name = ".032 slitting saw"
+ref = "slitting-saw-1-032"  # drawing cross-check 2026-11-19: .05 pinch slit, two passes
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

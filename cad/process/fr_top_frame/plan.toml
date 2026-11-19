@@ -1,0 +1,138 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Top Frame"
+part = "MHA-FR-02 Top Frame"
+revision = "placeholder"
+material = "GRAY IRON, ASTM A48 CLASS 25B"
+stock = "To be written"
+shop = "../shop.toml"
+stock_refs = ["gray-iron-a48-25b-casting"]
+
+[[tools]]
+id = "drill-50"
+name = "#50 drill"
+ref = "drill-50"  # Drills #50
+
+[[tools]]
+id = "drill-21"
+name = "#21 drill"
+ref = "drill-21"  # Drills #21
+
+[[tools]]
+id = "jig-drill-7"
+name = "#7 drill"
+ref = "jig-drill-7"  # Drills #7
+
+[[tools]]
+id = "frame-clearance-stub-drill"
+name = "#5 stub drill"
+ref = "frame-clearance-stub-drill"  # G-drill-5-stub, Drills #5
+
+[[tools]]
+id = "drill-c"
+name = "C drill"
+ref = "drill-c"  # Drills C
+
+[[tools]]
+id = "drill-13mm"
+name = "13 mm drill"
+ref = "drill-13mm"  # G-drill-13mm, Drills 13 mm
+
+[[tools]]
+id = "drill-33-64"
+name = "33/64 drill"
+ref = "drill-33-64"  # G-drill-33-64, Drills 33/64
+
+[[tools]]
+id = "reamer-1240"
+name = ".1240 reamer"
+ref = "reamer-1240"  # B-reamer-.1240
+
+[[tools]]
+id = "jig-tap-1-4-20-plug"
+name = "1/4-20 plug tap"
+ref = "jig-tap-1-4-20-plug"  # Tap coverage 1/4-20 UNC
+
+[[tools]]
+id = "tap-10-32-bottoming"
+name = "#10-32 bottoming tap"
+ref = "tap-10-32-bottoming"  # Tap coverage #10-32 UNF
+
+[[tools]]
+id = "tap-10-32-plug"
+name = "#10-32 plug tap"
+ref = "tap-10-32-plug"  # Tap coverage #10-32 UNF
+
+[[tools]]
+id = "tap-2-56-bottoming"
+name = "#2-56 bottoming tap"
+ref = "tap-2-56-bottoming"  # Tap coverage #2-56 UNC
+
+[[tools]]
+id = "tap-2-56-plug"
+name = "#2-56 plug tap"
+ref = "tap-2-56-plug"  # Tap coverage #2-56 UNC
+
+[[tools]]
+id = "frame-spotface-endmill"
+name = "11/32 end mill"
+ref = "frame-spotface-endmill"  # F-spotface-endmill-11-32
+
+[[tools]]
+id = "pin-gauges"
+name = "Pin gauges .011-.500"
+ref = "pin-gauges"  # A1-pin-set-061-250, A1-pin-set-061-500-combined
+
+[[tools]]
+id = "angle-plate-4"
+name = "4 in angle plate"
+ref = "angle-plate-4"  # F-angle-plate-LMS-5386
+
+[[tools]]
+id = "arbor-press"
+name = "Arbor press"
+ref = "arbor-press"  # F-arbor-press
+
+[[tools]]
+id = "steel-rule-48"
+name = "48 in steel rule"
+ref = "steel-rule-48"  # F-steel-rule-48
+
+[[tools]]
+id = "endmill-carbide-3fl-1-2"
+name = "1/2 carbide end mill"
+ref = "endmill-carbide-3fl-1-2"  # drawing cross-check 2026-11-19: 1 in-class bore, CNC interpolated (owner 2026-11-19)
+
+[[tools]]
+id = "telescoping-gauges-starrett-s579gz"
+name = "Telescoping gauges"
+ref = "telescoping-gauges-starrett-s579gz"  # drawing cross-check 2026-11-19: gauges the bore
+
+[[tools]]
+id = "tap-10-32-bottoming-pulley"
+name = "#10-32 pulley bottoming tap"
+ref = "tap-10-32-bottoming-pulley"  # drawing cross-check 2026-11-19: 10-32 UNF ↧ 1.81 from the spot face
+
+[[tools]]
+id = "drill-51-taper-length"
+name = "#51 taper-length drill"
+ref = "drill-51-taper-length"  # drawing cross-check 2026-11-19: #51 DRILL 2X Ø.067 THRU FROM REAM FLOOR
+
+[[tools]]
+id = "drill-31"
+name = "#31 drill"
+ref = "drill-31"  # drawing cross-check 2026-11-19: pre-drill for the .1240 ream
+
+[[tools]]
+id = "endmill-carbide-3fl-1-4"
+name = "1/4 carbide end mill"
+ref = "endmill-carbide-3fl-1-4"  # drawing cross-check 2026-11-19: Ø.39 ↧ (.09) spot face, interpolated
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

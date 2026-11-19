@@ -1,0 +1,47 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Magnifying Wheel"
+part = "MHA-MG-05 Magnifying Wheel"
+revision = "placeholder"
+material = "LOW-CARBON STEEL OR GRAY IRON"
+stock = "To be written"
+shop = "../shop.toml"
+
+[[tools]]
+id = "drill-60"
+name = "#60 drill"
+ref = "drill-60"  # Drills #60
+
+[[tools]]
+id = "drill-16"
+name = "#16 drill"
+ref = "drill-16"  # Drills #16
+
+[[tools]]
+id = "reamer-1885"
+name = ".1885 reamer"
+ref = "reamer-1885"  # B-reamer-.1885
+
+[[tools]]
+id = "pin-gauges"
+name = "Pin gauges .011-.500"
+ref = "pin-gauges"  # A1-pin-set-061-250, A1-pin-set-061-500-combined
+
+[[tools]]
+id = "protractor"
+name = "Protractor"
+ref = "protractor"  # F-protractor
+
+[[tools]]
+id = "form-tool-r024"
+name = "R.024 grooving form tool"
+ref = "form-tool-r024"  # drawing cross-check 2026-11-19: R.024 rim wire groove
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

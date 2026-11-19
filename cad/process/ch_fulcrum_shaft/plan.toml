@@ -1,0 +1,28 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# the drawing cross-check of 2026-11-19, until its traveler is written. Not
+# enrolled in _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Fulcrum Shaft"
+part = "MHA-CH-04 Fulcrum Shaft"
+revision = "placeholder"
+material = "AISI 1018 cold-finished steel shafting"
+stock = "To be written"
+shop = "../shop.toml"
+stock_refs = ["1018-round-1-4"]  # select bar mic'd .2492-.2500 (CF ±.002; print −.0008)
+
+[[tools]]
+id = "form-tool-r125"
+name = "R.125 form tool"
+ref = "form-tool-r125"  # drawing cross-check 2026-11-19: 2X (SR.125) ends
+
+[[tools]]
+id = "jig-spot"
+name = "#2 centre drill"
+ref = "jig-spot"  # drawing cross-check 2026-11-19: CENTRE MARKS .04 DEEP MAX
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

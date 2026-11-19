@@ -1,0 +1,23 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Rocker Strap Hub Plug"
+part = "MHA-CH-13-TL-02 Rocker Strap Hub Plug"
+revision = "placeholder"
+material = "6061 aluminum round, 9/16 in or over"
+stock = "To be written"
+shop = "../shop.toml"
+stock_refs = ["6061-flat-1x3"]
+
+[[tools]]
+id = "drill-h"
+name = "H drill"
+ref = "drill-h"  # Drills H
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

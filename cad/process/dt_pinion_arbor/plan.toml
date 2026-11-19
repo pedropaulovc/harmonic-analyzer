@@ -1,0 +1,43 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Integral Pinion Arbor and Grip Head"
+part = "MHA-DT-22 Integral Pinion Arbor and Grip Head"
+revision = "placeholder"
+material = "AISI 1018 cold-finished steel bar, ASTM A108"
+stock = "To be written"
+shop = "../shop.toml"
+stock_refs = ["1018-round-5-8"]
+
+[[tools]]
+id = "drill-1-16"
+name = "1/16 drill"
+ref = "drill-1-16"  # Drills 1/16
+
+[[tools]]
+id = "reamer-2510"
+name = ".2510 reamer"
+ref = "reamer-2510"  # B-reamer-.2510
+
+[[tools]]
+id = "pin-gauges"
+name = "Pin gauges .011-.500"
+ref = "pin-gauges"  # A1-pin-set-061-500-combined, A1-pin-set-251-500
+
+[[tools]]
+id = "drill-c"
+name = "C drill"
+ref = "drill-c"  # drawing cross-check 2026-11-19: pre-drill for the .2510 ream
+
+[[tools]]
+id = "follow-rest-pm-1127"
+name = "Lathe follow rest"
+ref = "follow-rest-pm-1127"  # drawing cross-check 2026-11-19: (10.0) long shaft between centres
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

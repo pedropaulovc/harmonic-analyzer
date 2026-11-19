@@ -1,0 +1,43 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Cone Tip Gear Fly Cutter Bar"
+part = "MHA-DT-37-TL-02 Cone Tip Gear Fly Cutter Bar"
+revision = "placeholder"
+material = "low-carbon cold-finished steel round, 3/8 in, ASTM A108 (1018)"
+stock = "To be written"
+shop = "../shop.toml"
+stock_refs = ["1018-round-3-8"]
+
+[[tools]]
+id = "jig-drill-43"
+name = "#43 drill"
+ref = "jig-drill-43"  # Drills #43
+
+[[tools]]
+id = "drill-32"
+name = "#32 drill"
+ref = "drill-32"  # Drills #32
+
+[[tools]]
+id = "reamer-1260"
+name = ".1260 reamer"
+ref = "reamer-1260"  # B-reamer-.1260
+
+[[tools]]
+id = "jig-tap-4-40-plug"
+name = "#4-40 plug tap"
+ref = "jig-tap-4-40-plug"  # Tap coverage #4-40 UNC
+
+[[tools]]
+id = "pin-gauges"
+name = "Pin gauges .011-.500"
+ref = "pin-gauges"  # A1-pin-set-061-250, A1-pin-set-061-500-combined
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

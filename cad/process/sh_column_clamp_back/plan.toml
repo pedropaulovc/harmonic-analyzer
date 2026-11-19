@@ -1,0 +1,38 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Column Clamp Back"
+part = "MHA-SH-02 Column Clamp Back"
+revision = "placeholder"
+material = "LOW-CARBON STEEL OR GRAY IRON"
+stock = "To be written"
+shop = "../shop.toml"
+stock_refs = ["1018-square-3-4"]
+
+[[tools]]
+id = "jig-drill-29"
+name = "#29 drill"
+ref = "jig-drill-29"  # Drills #29
+
+[[tools]]
+id = "jig-tap-8-32-plug"
+name = "#8-32 plug tap"
+ref = "jig-tap-8-32-plug"  # Tap coverage #8-32 UNC
+
+[[tools]]
+id = "endmill-carbide-3fl-1-2"
+name = "1/2 carbide end mill"
+ref = "endmill-carbide-3fl-1-2"  # drawing cross-check 2026-11-19: 1 in-class bore, CNC interpolated (owner 2026-11-19)
+
+[[tools]]
+id = "telescoping-gauges-starrett-s579gz"
+name = "Telescoping gauges"
+ref = "telescoping-gauges-starrett-s579gz"  # drawing cross-check 2026-11-19: gauges the bore
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

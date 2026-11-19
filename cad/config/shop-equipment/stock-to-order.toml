@@ -117,3 +117,51 @@ section_mm = [101.6, 3.175]
 length_mm = 304.8
 status = "to_order"
 cite = ["OnlineMetals part 1376 https://www.onlinemetals.com/en/buy/brass/0-125-x-4-brass-rectangle-bar-360-h02-extruded/pid/1376 read live 2026-11-12: 1/8 x 4 brass rectangle bar 360-H02, ASTM B16, 12 in $65.37"]
+
+# Changed-stock parts (stock assignment audit, owner 2026-11-19): the
+# registry now names a section the 2026-11-03 order did not buy.
+
+[stock.c360-round-7-16]
+form = "round_bar"
+material = "C36000 free-machining brass"
+note = "To order: 7/16 in round C36000, at least 2 in (one .73 in spacer, mg_wheel_axle_spacer_spec.LENGTH 18.60 mm, plus parting, facing and a chucking end). Source: the mg-wheel-axle-spacer (MHA-MG-11) registry row, O.D. as supplied (registry material_specification and process). Supplier and price not read. Not owned."
+dia_in = [0.4375]
+length_in = [2.0]
+status = "to_order"
+cite = ["cad/config/parts/mg-wheel-axle-spacer.yaml material_specification, process", "cad/scripts/mg_wheel_axle_spacer_spec.py LENGTH"]
+
+[stock.c360-round-7-32]
+form = "round_bar"
+material = "C36000 brass"
+note = "To order: MSC Direct 32001166, 7/32 in C36000 brass rod, at least 6.5 in (one 5.22 in rod, v50 envelope 132.47 mm, plus cut, facing and a chucking end for the #4-40 die). Source: the mg-magnifying-vertical-rod (MHA-MG-04) registry row, rod stock as supplied. Catalogue length and price not read. Not owned."
+dia_in = [0.21875]
+length_in = [6.5]
+status = "to_order"
+cite = ["cad/config/parts/mg-magnifying-vertical-rod.yaml material_specification", "cad/scripts/mg_magnifying_vertical_rod_spec.py ROD_DIA_CALLOUT \"ROD STOCK\""]
+
+[stock.c360-square-5mm-key]
+form = "square_bar"
+material = "C36000 brass key stock, DIN 6880 undersized"
+note = "To order: McMaster-Carr 90457A730, 5 x 5 mm 360 brass machine key stock, DIN 6880 (height and width -0.030/0 mm), 305 mm long (-1/+1 mm), $13.23 read live 2026-11-12 (pn_pen_rod_spec). One bar yields the rod (#2438). Source: the pn-pen-rod (MHA-PN-04) registry row, section as supplied. Not owned."
+section_mm = [5.0, 5.0]
+length_mm = 305.0
+status = "to_order"
+cite = ["cad/config/parts/pn-pen-rod.yaml material_specification", "cad/scripts/pn_pen_rod_spec.py STOCK_SKU, STOCK_SECTION_MAX/MIN, STOCK_LENGTH_MIN"]
+
+[stock.c360-round-9-16]
+form = "round_bar"
+material = "C36000 free-machining brass"
+note = "To order: 9/16 in round C36000, at least 1.5 in (one .28 in ferrule, dt_crank_handle_ferrule_spec.LENGTH 7.112 mm, plus parting, facing and a chucking end). Source: the dt-crank-handle-ferrule (MHA-DT-34) registry row, bored and parted, OD as supplied (registry process). Supplier and price not read. Not owned."
+dia_in = [0.5625]
+length_in = [1.5]
+status = "to_order"
+cite = ["cad/config/parts/dt-crank-handle-ferrule.yaml material_specification, process", "cad/scripts/dt_crank_handle_ferrule_spec.py LENGTH"]
+
+[stock.1018-round-1-3-4]
+form = "round_bar"
+material = "1018 cold-finish carbon steel"
+note = "To order: 1-3/4 in round 1018 (or 12L14) CF, at least 1.5 in (one .33 in collar, dt_cone_gear_tl_keyed_arbor_spec.COLLAR_LENGTH, plus the stock assignment audit's .14 in cut and facing allowance and 1 in to hold). Source: the dt-cone-gear-tl-arbor-collar (MHA-DT-03-TL-04) registry row, default configuration C175, 1-3/4 in left at stock diameter (dt_cone_gear_tl_arbor_collar_spec.OD_BY_CONFIGURATION[\"C175\"]); no 1-3/4 in steel round is owned. Supplier and price not read. Not owned."
+dia_in = [1.75]
+length_in = [1.5]
+status = "to_order"
+cite = ["cad/config/parts/dt-cone-gear-tl-arbor-collar.yaml material_specification, default_configuration, configuration_quantities", "cad/scripts/dt_cone_gear_tl_arbor_collar_spec.py OD_BY_CONFIGURATION", "cad/scripts/dt_cone_gear_tl_keyed_arbor_spec.py COLLAR_LENGTH"]

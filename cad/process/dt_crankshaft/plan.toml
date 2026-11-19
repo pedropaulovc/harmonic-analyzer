@@ -1,0 +1,73 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Crankshaft"
+part = "MHA-DT-11 Crankshaft"
+revision = "placeholder"
+material = "LOW-CARBON STEEL, E.G. 1018 CF"
+stock = "To be written"
+shop = "../shop.toml"
+stock_refs = ["1018-round-1"]
+
+[[tools]]
+id = "drill-54"
+name = "#54 drill"
+ref = "drill-54"  # Drills #54
+
+[[tools]]
+id = "jig-drill-43"
+name = "#43 drill"
+ref = "jig-drill-43"  # Drills #43
+
+[[tools]]
+id = "riser-drill-9"
+name = "#9 drill"
+ref = "riser-drill-9"  # Drills #9
+
+[[tools]]
+id = "taper-pin-reamer"
+name = "No. 4 taper-pin reamer"
+ref = "taper-pin-reamer"  # B-reamer-taper-pin
+
+[[tools]]
+id = "depth-micrometer"
+name = "Depth micrometer"
+ref = "depth-micrometer"  # F-depth-micrometer
+
+[[tools]]
+id = "pin-gauges"
+name = "Pin gauges .011-.500"
+ref = "pin-gauges"  # A1-pin-set-061-250, A1-pin-set-061-500-combined
+
+[[tools]]
+id = "arbor-press"
+name = "Arbor press"
+ref = "arbor-press"  # F-arbor-press
+
+[[tools]]
+id = "centre-punch-starrett-18a"
+name = "Automatic centre punch"
+ref = "centre-punch-starrett-18a"  # F-centre-punch-starrett-18A
+
+[[tools]]
+id = "reamer-0930"
+name = ".0930 reamer"
+ref = "reamer-0930"  # drawing cross-check 2026-11-19: 2X .0930 +.0005/.0000 REAM .1555
+
+[[tools]]
+id = "drill-31"
+name = "#31 drill"
+ref = "drill-31"  # drawing cross-check 2026-11-19: pre-drill for the (Ø.125) match ream
+
+[[tools]]
+id = "reamer-1240"
+name = ".1240 reamer"
+ref = "reamer-1240"  # drawing cross-check 2026-11-19: (Ø.125) MATCH-REAM THRU MHA-DT-10
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

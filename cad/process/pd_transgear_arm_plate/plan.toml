@@ -1,0 +1,52 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Transgear Arm Plate"
+part = "MHA-PD-19 Transgear Arm Plate"
+revision = "placeholder"
+material = "AISI 1018 cold-finished steel bar, ASTM A108, 1-1/2 in"
+stock = "To be written"
+shop = "../shop.toml"
+
+[[tools]]
+id = "drill-44"
+name = "#44 drill"
+ref = "drill-44"  # Drills #44
+
+[[tools]]
+id = "drill-1"
+name = "#1 drill"
+ref = "drill-1"  # Drills #1
+
+[[tools]]
+id = "drill-b"
+name = "B drill"
+ref = "drill-b"  # Drills B
+
+[[tools]]
+id = "reamer-2490"
+name = ".2490 reamer"
+ref = "reamer-2490"  # B-reamer-.2490
+
+[[tools]]
+id = "pin-gauges"
+name = "Pin gauges .011-.500"
+ref = "pin-gauges"  # A1-pin-set-061-250, A1-pin-set-061-500-combined
+
+[[tools]]
+id = "reamer-0945"
+name = ".0945 reamer"
+ref = "reamer-0945"  # drawing cross-check 2026-11-19: 2X Ø.0945 +.0005/.0000 REAM THRU
+
+[[tools]]
+id = "riser-countersink"
+name = "3/8 82° countersink"
+ref = "riser-countersink"  # drawing cross-check 2026-11-19: ⌵ Ø.312 X 82°
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."
