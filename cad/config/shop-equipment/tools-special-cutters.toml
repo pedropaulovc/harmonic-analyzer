@@ -30,7 +30,7 @@ note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-03 2X .04 SLIT
 [tools.endmill-carbide-3-32]
 kind = "end_mill"
 status = "to_order"
-note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-18 flatten the .33 FLAT BOTTOM floor; MHA-PD-27 flat floor for the Ø.110 counterbore; MHA-CH-03 .106 ±.002 fork slot."
+note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-27 flat floor for the Ø.110 counterbore; MHA-CH-03 .106 ±.002 fork slot."
 
 [tools.endmill-5-64-long]
 kind = "end_mill"
