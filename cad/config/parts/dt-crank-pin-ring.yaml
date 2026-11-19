@@ -5,5 +5,6 @@ dt-crank-pin-ring:
   finish: "bright"
   tolerance_class: visual_noncritical
   quantity: 1
-  process: "formed brass wire, ends silver-soldered"
+  # Owner ruling 2026-11-08 (#2144 item 9.2, D6; dt_crank_pin_ring_spec), confirmed #3124 item 6.
+  process: "formed from .040 C26000 brass wire; opened, threaded through the crank pin's cross-hole and the keeper chain's far link, closed with pliers, ends cut square and butted (gap 0-.010), not soldered"
   drawing_unit: in
