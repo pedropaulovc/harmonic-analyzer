@@ -212,7 +212,13 @@ def test_setting_drives_reproduce_the_sketch_values() -> None:
     assert g["SmCounterScrewY"] - g["SmKnifeY"] == pytest.approx(
         spec.COUNTER_SCREW_RISE
     )
-    assert notes.DRAWING_DIMENSIONS == {spec.COUNTER_FEATURE: {spec.COUNTER_DIMENSION}}
+    assert g["SmDowelTopY"] - g["SmDowelEndY"] == pytest.approx(
+        spec.knife_dowel.PROUD
+    )
+    assert notes.DRAWING_DIMENSIONS == {
+        spec.COUNTER_FEATURE: {spec.COUNTER_DIMENSION},
+        spec.DOWEL_PROUD_FEATURE: {spec.DOWEL_PROUD_DIMENSION},
+    }
     assert set(drawing.PRECISION) == set(notes.DIMENSION_CALLOUTS)
 
 

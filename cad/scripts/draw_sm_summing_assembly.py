@@ -143,6 +143,11 @@ RIGHT_CENTER = (0.185, 0.168)
 # The screw height's dimension line stands this far outboard of the knife
 # contact, on the side away from the gooseneck.
 COUNTER_TEXT_OFFSET = 0.030
+# DETAIL A's dowel proud (owner decision 2026-11-19, #3124 item 3): its
+# dimension line stands this far right of the front mount's dowel axis, so
+# the value and its three callout rows (~45 mm at the widest, centred on the
+# line) clear the mount's +X face, 5.08 mm right of the axis.
+DOWEL_PROUD_TEXT_OFFSET = 0.032
 NOTES_XY = (0.018, 0.098)
 NOTES_WIDTH = 64  # characters; default-format note text
 
@@ -520,6 +525,45 @@ def _counter_setting(adapter: Any, front: Any) -> Callable[[], None]:
     return settled
 
 
+def _dowel_proud_setting(adapter: Any, detail: Any) -> Callable[[], None]:
+    """Each dowel's free end below the crossbar underside (the knife mount's
+    clamped top seat), the proud MHA-SM-00 step 1 sets: a toleranced setting
+    dimension on DETAIL A, the title block's .XX governing it."""
+    label = "dowel proud"
+    top, end = (
+        model_point_in_view(
+            adapter, detail, (x / 1000.0, y / 1000.0, 0.0), label=f"{label} {name}"
+        )
+        for name, (x, y) in (
+            ("top", spec.DOWEL_PROUD_TOP_POINT),
+            ("end", spec.DOWEL_PROUD_END_POINT),
+        )
+    )
+    text_xy = (top[0] + DOWEL_PROUD_TEXT_OFFSET, (top[1] + end[1]) / 2.0)
+    proud_mm = spec.DOWEL_PROUD_TOP_POINT[1] - spec.DOWEL_PROUD_END_POINT[1]
+    annotation = _imported_setting(
+        adapter,
+        detail,
+        feature=spec.DOWEL_PROUD_FEATURE,
+        dimension=spec.DOWEL_PROUD_DIMENSION,
+        text_xy=text_xy,
+        label=label,
+    )
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+
+    def settled() -> None:
+        if (str(display.GetText(1) or ""), str(display.GetText(2) or "")) != ("", ""):
+            raise RuntimeError(f"{label} must print as a toleranced setting, not a reference")
+        if abs(_dimension_value_mm(display) - proud_mm) > 1e-4:
+            raise RuntimeError(f"{label} reads {_dimension_value_mm(display):g} mm")
+        if int(display.GetPrimaryPrecision2()) != spec.DOWEL_PROUD_PRECISION:
+            raise RuntimeError(f"{label}: precision changed")
+        _assert_callout(display, spec.DOWEL_PROUD_DIMENSION)
+
+    settled()
+    return settled
+
+
 def _activate_view(adapter: Any, view: Any, *, label: str) -> None:
     name = view_name(adapter, view)
     if not _early_bound(adapter.currentModel, "IDrawingDoc").ActivateView(name):
@@ -646,12 +690,13 @@ def _mark_detail_boundary(adapter: Any, front: Any) -> None:
     _telemetry.info(f"summing: {label} centre {centre!r} radius {radius!r}")
 
 
-def _knife_detail(adapter: Any) -> None:
+def _knife_detail(adapter: Any) -> Callable[[], None]:
     """The 1:1 knife-edge detail: the knife contact and the boss face the
-    setting table's rock row is read at."""
+    setting table's rock row is read at, and the dowel's proud."""
     label = notes.DETAIL_TITLE
     view = _placed_detail(adapter)
     _crop_detail(adapter, view)
+    proud_settled = _dowel_proud_setting(adapter, view)
     label_xy = (
         DETAIL_CENTRE[0] - DETAIL_LABEL_INSET,
         DETAIL_CENTRE[1] - DETAIL_CROP_RADIUS - DETAIL_LABEL_GAP,
@@ -660,6 +705,7 @@ def _knife_detail(adapter: Any) -> None:
     if add_note(adapter, DETAIL_LABEL, *label_xy) is None:
         raise RuntimeError(f"failed to label the {label}")
     _assert_view_on_sheet(view, label=label)
+    return proud_settled
 
 
 def _place_setting_table(adapter: Any, views: dict[str, Any]) -> None:
@@ -716,12 +762,17 @@ def _place_assembled_sheet(adapter: Any) -> Callable[[], None]:
         views[name] = view
     counter_settled = _counter_setting(adapter, views["*Front"])
     _mark_detail_boundary(adapter, views["*Front"])
-    _knife_detail(adapter)
+    proud_settled = _knife_detail(adapter)
     _place_setting_table(adapter, views)
     _add_note_block(
         adapter, SHEET_NAMES[0], ASSEMBLED_NOTES, NOTES_XY, label="assembled notes"
     )
-    return counter_settled
+
+    def settled() -> None:
+        counter_settled()
+        proud_settled()
+
+    return settled
 
 
 # --- BOM ------------------------------------------------------------------------

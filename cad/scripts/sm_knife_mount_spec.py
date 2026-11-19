@@ -61,7 +61,6 @@ from _package_units import drawing_unit
 from _printed_tolerance import (
     angular_band_deg,
     drilled_oversize_mm,
-    inside_corner_radius_mm,
     printed_band_mm,
 )
 from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
@@ -457,18 +456,23 @@ TAP_CALLOUT_REASON = f"SETS {BOLT_NUMBER} TIP CLEARANCE"
 # MHA-SM-VN-53 dowel (owner ruling 2026-10-24, T+H3; machinist ENFORCE
 # review of this sheet, rules 16 and 4): the pin presses into the MHA-FR-02
 # crossbar, which carries its knockout, and SLIPS into this block, which so
-# carries no press band of its own: a blind
-# round slip hole, datum B, cut from the top seat to a flat floor.  Owner
-# ruling 2026-11-08 (Pedro), #2144 item 11.3 (scheme S1): one dowel per
-# mount; the -X pin's slot (datum C) is deleted.
+# carries no press band of its own: a blind round slip hole, datum B, cut
+# from the top seat.  Owner ruling 2026-11-08 (Pedro), #2144 item 11.3
+# (scheme S1): one dowel per mount; the -X pin's slot (datum C) is deleted.
+# Owner decision 2026-11-19 (#3124, item 4): nothing seats on its floor, so
+# it ends in a 118° drill point below the full diameter's .37, not FLAT
+# BOTTOM.
 PIN_HOLE_X = DOWEL.HANGER_OFFSET  # 7.62 (.300), datum B's station from the tap axis
 if DOWEL.PER_MOUNT != 1:
     raise AssertionError("the knife mount slips onto one dowel, in datum B")
 PIN_HOLE_DIA = DOWEL.SLIP_HOLE_DIA  # 3.2512 (.1280)
 PIN_HOLE_DIA_BAND = DOWEL.SLIP_HOLE_DIA_BAND
 PIN_HOLE_DIA_PLACES = DOWEL.SLIP_HOLE_DIA_PLACES
-PIN_HOLE_DEPTH = DOWEL.SLIP_DEPTH  # 9.398 (.37), the hole's floor
+PIN_HOLE_DEPTH = DOWEL.SLIP_DEPTH  # 9.398 (.37), the full diameter's depth
 PIN_HOLE_DEPTH_PLACES = DOWEL.SLIP_DEPTH_PLACES
+PIN_HOLE_POINT_DEG = 118.0
+# The model's cone under the nominal hole.
+PIN_HOLE_POINT_H = PIN_HOLE_DIA / 2.0 / math.tan(math.radians(PIN_HOLE_POINT_DEG / 2.0))
 DOWEL_NUMBER = "MHA-SM-VN-53"
 
 # --- Locations and worst-case webs ------------------------------------------
@@ -541,14 +545,47 @@ BORE_BOTTOM_WALL = (
     - KNIFE_BORE_POSITION_TOL / 2.0
     - BORE_R_MAX
 )
-# The floors at their deepest over the bore at its largest and highest.
+# The full diameter at its deepest, the bore at its largest and highest.
 _PIN_FLOOR_Y_MIN = BLK_TOP - (PIN_HOLE_DEPTH + DOWEL.SLIP_DEPTH_TOL)
 _BORE_CY_MAX = BORE_CY + KNIFE_BORE_POSITION_TOL / 2.0
-# B's floor corner, B toward the bore by the bore's zone radius: 6.33.
+# The drill point's cone below it (owner decision 2026-11-19, #3124 item
+# 4): the point is undimensioned, so the title block's angular ±1° governs
+# it and the web charges the sharpest, 117°, over the hole's largest
+# diameter, the tallest cone.  B toward the bore by the bore's zone radius,
+# the hole's section nearest the bore is its wall down to the deepest full
+# diameter, then the cone's flank to its tip on B's axis.  The web is the
+# bore centre's distance to that wall-and-flank, less the bore's largest
+# radius: 6.31 (6.33 to the former flat floor's corner).
+_PIN_POINT_H_MAX = _PIN_R_MAX / math.tan(
+    math.radians(STUD_TAP_POINT_ANGLE_MIN_DEG / 2.0)
+)
+_PIN_AXIS_X_NEAR = PIN_HOLE_X - KNIFE_BORE_POSITION_TOL / 2.0
+
+
+def _distance_to_segment(
+    p: tuple[float, float], a: tuple[float, float], b: tuple[float, float]
+) -> float:
+    """The distance from ``p`` to the segment ``a``-``b`` (sketch mm)."""
+    ab = (b[0] - a[0], b[1] - a[1])
+    t = ((p[0] - a[0]) * ab[0] + (p[1] - a[1]) * ab[1]) / (ab[0] ** 2 + ab[1] ** 2)
+    t = min(max(t, 0.0), 1.0)
+    return math.hypot(p[0] - a[0] - t * ab[0], p[1] - a[1] - t * ab[1])
+
+
+_PIN_WALL_FOOT = (_PIN_AXIS_X_NEAR - _PIN_R_MAX, _PIN_FLOOR_Y_MIN)
 PIN_HOLE_BORE_WEB = (
-    (PIN_HOLE_X - KNIFE_BORE_POSITION_TOL / 2.0 - _PIN_R_MAX) ** 2
-    + (_PIN_FLOOR_Y_MIN - _BORE_CY_MAX) ** 2
-) ** 0.5 - BORE_R_MAX
+    min(
+        _distance_to_segment(
+            (0.0, _BORE_CY_MAX), (_PIN_WALL_FOOT[0], BLK_TOP), _PIN_WALL_FOOT
+        ),
+        _distance_to_segment(
+            (0.0, _BORE_CY_MAX),
+            _PIN_WALL_FOOT,
+            (_PIN_AXIS_X_NEAR, _PIN_FLOOR_Y_MIN - _PIN_POINT_H_MAX),
+        ),
+    )
+    - BORE_R_MAX
+)
 for _label, _web in (
     ("dowel hole B to the +X side face", PIN_HOLE_SIDE_WEB),
     ("dowel hole B to the front/back face", PIN_HOLE_Z_WEB),
@@ -618,38 +655,13 @@ PIN_SLIP_PRINTED = (
     math.floor(DOWEL.SLIP_CLEARANCE_MIN / DOWEL.MM_PER_IN * 1e4 + 1e-6) / 1e4,
     math.ceil(DOWEL.SLIP_CLEARANCE_MAX / DOWEL.MM_PER_IN * 1e4 - 1e-6) / 1e4,
 )  # (.0020, .0036)
-# The hole's floor depth prints its value alone: the slip hole's callout
-# already reads "REAM ↧ (.37) FLAT BOTTOM", so a second "FLAT BOTTOM" under
-# the section's controlling .37 was a note on a location dimension
-# (machinist review, farm run 20261109T083029873Z, rule 7).  Nothing seats on
-# the floor (the longest proud pin stands SLIP_DEPTH_CLEARANCE_MIN off the
-# shallowest), so its corner takes the title block's INSIDE CORNERS R.040
-# MAX and the row prints no limit of its own (machinist review, farm run
-# 20261027T233328148Z: a local CORNER R0.1 MAX named no function, rule 1).
-# The angular-fit proof (build_sm_summing_assembly) charges the hole's
-# straight wall short of that corner, 9.398 - 0.254 - 1.016 - 0.5 = 7.628.
-DOWEL_HOLE_FLOOR_CORNER_R_MAX = inside_corner_radius_mm(unit=UNIT)  # 1.016
-# The longest proud pin's crowned end stays above the shallowest straight
-# wall's end (its crown centre 7.707 deep, the corner's 8.128): pushed against
-# the wall there, the crown meets no corner arc (DOWEL_HOLE_CORNER_RECESS 0),
-# inside half the tightest slip, so the corner neither bottoms nor binds the
-# pin.
-_CROWN_CENTRE_DEPTH = DOWEL.PROUD_MAX - DOWEL.FREE_END_LEN
-_CORNER_CENTRE_DEPTH = (
-    DOWEL.SLIP_DEPTH - DOWEL.SLIP_DEPTH_TOL - DOWEL_HOLE_FLOOR_CORNER_R_MAX
-)
-DOWEL_HOLE_CORNER_RECESS = (
-    math.hypot(
-        DOWEL_HOLE_FLOOR_CORNER_R_MAX - DOWEL.FREE_END_LEN,
-        max(_CROWN_CENTRE_DEPTH - _CORNER_CENTRE_DEPTH, 0.0),
-    )
-    + DOWEL.FREE_END_LEN
-    - DOWEL_HOLE_FLOOR_CORNER_R_MAX
-)
-if DOWEL_HOLE_CORNER_RECESS >= DOWEL.SLIP_CLEARANCE_MIN / 2.0:
-    raise AssertionError(
-        f"the slip hole's floor corner reaches the proud pin's crown "
-        f"({DOWEL_HOLE_CORNER_RECESS:.4f} >= half the tightest slip)"
-    )
+# The hole's full-diameter depth prints its value alone, a location
+# dimension carrying no note (machinist review, farm run
+# 20261109T083029873Z, rule 7).  Nothing seats below it: the longest proud
+# pin's end stands SLIP_DEPTH_CLEARANCE_MIN above the shallowest full
+# diameter, so the pin lies wholly in the straight wall and the drill point
+# under it (owner decision 2026-11-19, #3124 item 4) neither bottoms nor
+# binds it.  The angular-fit proof (build_sm_summing_assembly) charges that
+# straight wall less the reamer's lead, 9.398 - 0.254 - 0.5 = 8.644.
 
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

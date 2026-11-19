@@ -20,24 +20,25 @@ def test_tracked_dxf_matches_the_generator():
     assert dxf.normalize_newlines(base.SERIAL_DXF.read_bytes()) == dxf.normalize_newlines(gen.render())
 
 
-def test_stamp_dimensions_and_removed_volume_are_unchanged():
+def test_stamp_dimensions_and_removed_volume_are_pinned():
     assert base.SERIAL_XZ == (161.0, 124.25)
-    assert base.SERIAL_HEIGHT_MM == 3.5
+    # Owner decision 2026-11-19 (#3124, item 1): a 1/8 figure stamp.
+    assert base.SERIAL_HEIGHT_MM == 3.175
     assert base.SERIAL_DEPTH == 0.3
-    assert base.SERIAL_AREA_MM2 == 3.1029
+    assert base.SERIAL_AREA_MM2 == 2.5534
     entities = dxf.read_lwpolylines(base.SERIAL_DXF.read_text(encoding="ascii"))
     assert len(entities) == 1 and entities[0][1]
     rings = [ring for ring, _closed in entities]
-    # Pin the imported ink envelope too; the nominal 3.5 mm font has optical
+    # Pin the imported ink envelope too; the nominal 1/8 in font has optical
     # overshoot on "2", unchanged by the orientation correction.
-    expected_bbox = (159.889091, -126.031505, 162.110909, -122.468495)
+    expected_bbox = (159.992247, -125.866079, 162.007753, -122.633921)
     assert all(
         math.isclose(actual, expected, abs_tol=1e-6)
         for actual, expected in zip(dxf.bbox(rings), expected_bbox, strict=True)
     )
     area = dxf.net_area(rings)
-    assert math.isclose(area, 3.1029, abs_tol=1e-4)
-    assert math.isclose(area * base.SERIAL_DEPTH, 0.93087, abs_tol=1e-4)
+    assert math.isclose(area, 2.5534, abs_tol=1e-4)
+    assert math.isclose(area * base.SERIAL_DEPTH, 0.76603, abs_tol=1e-4)
 
 
 def test_stamp_is_a_readable_right_handed_two_in_native_top_projection():

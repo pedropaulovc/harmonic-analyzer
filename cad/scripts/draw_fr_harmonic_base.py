@@ -74,6 +74,7 @@ from _drawing_tables import create_view_theoretical_datum, insert_hole_table
 from _drawing_view_display import set_hidden_lines_removed
 from _gtol_face_resolve import resolve_faces
 from _hole_callout_thread_class import omit_title_block_thread_class
+from _inch_fraction import inch_fraction
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
@@ -196,12 +197,15 @@ ISO_CENTER = (0.3425, 0.175)
 # dimensions below the plan and right of it locate the serial from X0 Y0
 # (novice-rubric screen 20261107T081227004Z: "APPROX AS SHOWN" on a DO NOT
 # SCALE sheet located it by words only and gave no character height). The
-# note's two 9-glyph rows (22 mm x 9 mm) stand in the empty band above the
-# X dimension's (15.34) row.
-SERIAL_NOTE_XY = (0.157, 0.1455)
+# height is the purchased set's size, named rather than printed as a decimal
+# (owner decision 2026-11-19, #3124 item 1: a .14 decimal read .13-.15 at
+# .XX, which no standard set meets). The note's rows (the 16-glyph tool row,
+# about 40 mm x 9 mm) stand in the empty band above the X dimension's
+# (15.34) row, ending left of its extension line at the serial.
+SERIAL_NOTE_XY = (0.141, 0.1455)
 SERIAL_NOTE = (
     f'STAMP "{SERIAL_TEXT}"\n'
-    f"{SERIAL_HEIGHT_MM / 25.4:.2f} HIGH".replace("0.", ".", 1)
+    f"{inch_fraction(SERIAL_HEIGHT_MM, what='serial figure stamp')} FIGURE STAMP"
 )
 # Serial location from the table corner, the X on a third baseline row clear
 # below DeckX's line and witness ends, the Y right of the plan with its text

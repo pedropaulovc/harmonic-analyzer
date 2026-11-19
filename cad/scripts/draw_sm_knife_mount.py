@@ -104,6 +104,7 @@ from sm_knife_mount_spec import (
     PIN_HOLE_DEPTH,
     PIN_HOLE_DEPTH_PLACES,
     PIN_HOLE_DIA,
+    PIN_HOLE_POINT_H,
     PIN_HOLE_SIDE_DISTANCE,
     PIN_HOLE_X,
     PIN_SLIP_PRINTED,
@@ -209,9 +210,9 @@ FRONT_KEEP = {
     "BlockHeight": (FRONT_CENTER[0] - 0.091, FRONT_CENTER[1]),
     "BoreDia": (FRONT_CENTER[0] - 0.0565, _front_y(BORE_CY) + BORE_DIA_TEXT_RISE),
 }
-# B's floor depth stands right of the section, its witness lines off the
-# cut top seat and that floor, its value alone (the hole callout says FLAT
-# BOTTOM; sm_knife_mount_spec, DOWEL_HOLE_FLOOR_CORNER_R_MAX).  The
+# B's full-diameter depth stands right of the section, its witness lines off
+# the cut top seat and the full diameter's end over the drill point (owner
+# decision 2026-11-19, #3124 item 4), its value alone.  The
 # dimension line stands at BLK_HALF_X + 12.0, x
 # 349.4 mm (farm run 20261027T175429300Z), 14.9 mm right of the 7.632
 # BASIC's shoulder end (x 334.5 mm, farm run 20261027T133857303Z); its
@@ -260,7 +261,8 @@ DATUM_A_X = FRONT_CENTER[0] + 0.008
 # B's hole together, between two owned axes: the tap's, run on down through
 # the bore's centre so one axis carries both, and B's.  Each starts
 # SECTION_AXIS_OVERRUN_MM above the top seat and ends SECTION_AXIS_TAIL_MM
-# past its feature (the bore's bottom, the hole's floor), inside the block.
+# past its feature (the bore's bottom, the hole's drill-point tip), inside
+# the block.
 SECTION_AXIS_OVERRUN_MM = 2.0
 SECTION_AXIS_TAIL_MM = 1.0
 # The dimension line stands 8 mm over the cut top seat, in the open band
@@ -282,8 +284,9 @@ TOP_HALF_Z = SUPPORT_Z_THICK / 2.0 * SHEET_SCALE[0] / 1000.0
 # shoulder at (146.4, 222.2) mm landed the arrow at -38.6 deg).  The dda9a33a8
 # render measured a 5-row label at 84.5 mm wide, its shoulder 1.6 mm past it
 # and 12.86 mm under the text position; four rows stand a half row (~2.1 mm)
-# less.  The widest row, "REAM ↧ (.37) FLAT BOTTOM", is 24 characters at
-# ~2.52 mm (60 mm).  The shoulder starts 22 mm under the hole row, so the
+# less.  The widest row was "REAM ↧ (.37) FLAT BOTTOM", 24 characters at
+# ~2.52 mm (60 mm); with FLAT BOTTOM gone (owner decision 2026-11-19, #3124
+# item 4) the fit row, "MHA-SM-VN-53 SLIDING FIT", keeps the 24 characters.  The shoulder starts 22 mm under the hole row, so the
 # leader rises at ~-58 deg into the hole across the front-face edge inside
 # the block (x 139.1 mm), under the B row's 7.0 and its witness line.
 PIN_CALLOUT_HALF_WIDTH = 0.030
@@ -344,7 +347,7 @@ _SLIP_FIT = f"{DOWEL_NUMBER} SLIDING FIT"
 _SLIP_CLEARANCE = "CLEARANCE {:.4f}-{:.4f}".format(*PIN_SLIP_PRINTED).replace("0.", ".")
 _PIN_DEPTH_REF = f"{PIN_HOLE_DEPTH / DOWEL.MM_PER_IN:.{PIN_HOLE_DEPTH_PLACES}f}".lstrip("0")
 PIN_HOLE_CALLOUT = "\n".join(
-    (f"REAM <HOLE-DEPTH> ({_PIN_DEPTH_REF}) FLAT BOTTOM", _SLIP_FIT, _SLIP_CLEARANCE)
+    (f"REAM <HOLE-DEPTH> ({_PIN_DEPTH_REF})", _SLIP_FIT, _SLIP_CLEARANCE)
 )
 DIMENSION_CALLOUTS = {
     "BoreDia": BORE_CALLOUT,
@@ -1202,7 +1205,11 @@ def build(adapter: Any) -> dict[str, str]:
             ((0.0, axis_top, 0.0), (0.0, BORE_CY - R_BORE - SECTION_AXIS_TAIL_MM, 0.0)),
             (
                 (PIN_HOLE_X, axis_top, 0.0),
-                (PIN_HOLE_X, BLK_TOP - PIN_HOLE_DEPTH - SECTION_AXIS_TAIL_MM, 0.0),
+                (
+                    PIN_HOLE_X,
+                    BLK_TOP - PIN_HOLE_DEPTH - PIN_HOLE_POINT_H - SECTION_AXIS_TAIL_MM,
+                    0.0,
+                ),
             ),
         ),
     )

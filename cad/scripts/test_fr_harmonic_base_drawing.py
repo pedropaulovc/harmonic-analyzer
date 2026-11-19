@@ -876,7 +876,8 @@ def test_stamped_id_is_located_from_x0_y0_with_a_character_height() -> None:
     # DO NOT SCALE sheet located the stamp by words only, with no height.
     import draw_fr_harmonic_base as sheet
 
-    assert sheet.SERIAL_NOTE == 'STAMP "2"\n.14 HIGH'
+    # Owner decision 2026-11-19 (#3124, item 1): the note names the set.
+    assert sheet.SERIAL_NOTE == 'STAMP "2"\n1/8 FIGURE STAMP'
     rows = sheet.SERIAL_NOTE.split("\n")
     x0, top = sheet.SERIAL_NOTE_XY
     box = (

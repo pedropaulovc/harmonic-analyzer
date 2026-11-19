@@ -313,7 +313,10 @@ PAD_ROOT_R = 0.5  # pad-to-flange root fillet; modelled, never called out
 # The stamp prints APPROX AS SHOWN, so its station stays put (and its DXF
 # unchanged) rather than following the deck's inch edges.
 SERIAL_TEXT = "2"
-SERIAL_HEIGHT_MM = 3.5  # p.70 macro: a small hand stamp
+# Owner decision 2026-11-19 (#3124, item 1): a purchased 1/8 figure stamp
+# set, the nearest standard size to the p.70 macro's small hand stamp; the
+# drawing names the set, not a decimal height.
+SERIAL_HEIGHT_MM = 3.175  # 1/8 in
 SERIAL_DEPTH = 0.3  # a stamp, not an engraving
 SERIAL_XZ = (161.0, 124.25)
 # Top-sketch (sx, sy) maps to model (sx, STACK_HEIGHT, -sy), and native *Top
@@ -321,7 +324,7 @@ SERIAL_XZ = (161.0, 124.25)
 # the native R7 PDF confirmed the former setting vertically reflected the "2".
 SERIAL_MIRROR_Y = True
 SERIAL_DXF = REFERENCES_DIR / "base-serial.dxf"
-SERIAL_AREA_MM2 = 3.1029  # pinned from gen_base_serial_dxf's summary (net glyph area)
+SERIAL_AREA_MM2 = 2.5534  # pinned from gen_base_serial_dxf's summary (net glyph area)
 
 # Cone swing hardware, through-tapped from the TOP face. MACHINE-handed coords.
 # The platform recipe owns the shared lock/stop contact calculation; the base

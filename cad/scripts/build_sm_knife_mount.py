@@ -111,6 +111,7 @@ from sm_knife_mount_spec import (
     PIN_HOLE_DEPTH,
     PIN_HOLE_DIA,
     PIN_HOLE_DIA_BAND,
+    PIN_HOLE_POINT_H,
     PIN_HOLE_X,
     STUD_TAP_DIA,
     STUD_TAP_DRILL_DEPTH,
@@ -192,9 +193,60 @@ if _TAP_WEB_WORST < sm_knife_mount_spec.STUD_TAP_WEB_MIN:
 
 THROUGH_CUT_DEPTH = SUPPORT_Z_THICK + 4.0  # > the block thickness, both directions
 
-# --- the MHA-SM-VN-53 slip seat: blind, flat-floored, in the top seat -------
+# --- the MHA-SM-VN-53 slip seat: blind, to a drill point, in the top seat ---
 _R_PIN = PIN_HOLE_DIA / 2.0
 V_PIN = math.pi * _R_PIN**2 * PIN_HOLE_DEPTH
+V_PIN_POINT = math.pi / 3.0 * _R_PIN**2 * PIN_HOLE_POINT_H
+
+
+def cut_pin_hole_point(adapter) -> None:
+    """Cut the slip hole's 118° drill point under its full diameter.
+
+    Owner decision 2026-11-19 (#3124, item 4): nothing seats on the floor,
+    so the hole ends in a drill point, not FLAT BOTTOM.  The point's
+    half-section (floor centre, hole wall, tip) on the Front plane, which
+    holds B's axis (z = 0), revolved about that axis.
+    """
+    from solidworks_mcp.adapters.base import RevolveParameters
+
+    floor_y = BLK_TOP - PIN_HOLE_DEPTH
+    tip_y = floor_y - PIN_HOLE_POINT_H
+    label = "dowel slip-hole drill point"
+    check(f"create_sketch {label}", adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
+    axis = check(
+        f"{label} axis",
+        adapter.add_centerline(PIN_HOLE_X, tip_y, PIN_HOLE_X, tip_y - PIN_HOLE_POINT_H),
+    )
+    floor, _flank, on_axis = add_line_chain(
+        adapter,
+        [(PIN_HOLE_X, floor_y), (PIN_HOLE_X + _R_PIN, floor_y), (PIN_HOLE_X, tip_y)],
+    )
+    set_sketch_direct_db(adapter, False)
+    for line, relation in ((floor, "horizontal"), (on_axis, "vertical"), (axis, "vertical")):
+        check(f"{label} {relation} {line}", adapter.add_sketch_constraint(line, None, relation))
+    check(
+        f"{label} axis at the tip",
+        adapter.add_sketch_constraint(f"{axis}.start", f"{on_axis}.start", "coincident"),
+    )
+    anchor_point_to_origin(adapter, f"{floor}.start", PIN_HOLE_X, floor_y, f"{label} floor centre")
+    check(f"{label} radius", adapter.add_sketch_dimension(floor, None, "linear", _R_PIN))
+    check(
+        f"{label} height",
+        adapter.add_sketch_dimension(on_axis, None, "linear", PIN_HOLE_POINT_H),
+    )
+    check(
+        f"{label} axis length",
+        adapter.add_sketch_dimension(axis, None, "linear", PIN_HOLE_POINT_H),
+    )
+    ensure_fully_defined(adapter, f"{label} profile")
+    check(f"exit_sketch {label}", adapter.exit_sketch())
+    name_last_feature(adapter, "PinHolePointProfile")
+    check(
+        f"revolve-cut {label}",
+        adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
+    )
+    name_last_feature(adapter, "PinHolePoint")
 
 # B's row from the front face (model +Z) prints from a hidden reference line
 # (the build_ch_channel_lever PlateOffsetReference pattern; no metal): on the
@@ -486,7 +538,8 @@ def build(adapter) -> dict[str, str]:
     # The MHA-SM-VN-53 slip seat (owner ruling 2026-10-24, T+H3: the dowel
     # presses into the crossbar and slips into this block): blind along -Y
     # from the top seat, a round hole PIN_HOLE_X +X of the tap axis (datum B),
-    # flat-floored by a plain cut-extrude.  Owner ruling 2026-11-08 (Pedro),
+    # its full diameter a plain cut-extrude, then a 118° drill point under it
+    # (owner decision 2026-11-19, #3124 item 4).  Owner ruling 2026-11-08 (Pedro),
     # #2144 item 11.3: the -X slot (datum C) is deleted.  A second seat point
     # PIN_HOLE_X -X of the tap axis only orients the face sketch's axes.
     before, com_before = _mass(adapter)
@@ -545,6 +598,14 @@ def build(adapter) -> dict[str, str]:
         f"dowel slip hole (top-seat sketch B {b_uv}) removed "
         f"{before - after:.2f} mm^3 (analytic {V_PIN:.2f})"
     )
+    cut_pin_hole_point(adapter)
+    expected -= V_PIN_POINT
+    vol = _volume(adapter)
+    if abs((after - vol) - V_PIN_POINT) > 0.02 * V_PIN_POINT:
+        raise RuntimeError(
+            f"dowel slip-hole drill point removed {after - vol:.3f} mm^3, expected "
+            f"{V_PIN_POINT:.3f}"
+        )
     drive_jobs += hole_row_reference(adapter)
 
     # Named axis = the knife-edge contact ridge line (part origin, along Z). The

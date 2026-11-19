@@ -30,6 +30,8 @@ from sm_summing_assembly_spec import (
     COUNTER_FEATURE,
     COUNTER_SPRING,
     DOWEL,
+    DOWEL_PROUD_DIMENSION,
+    DOWEL_PROUD_FEATURE,
     END_PLUG,
     GOOSENECK,
     HANGER_BOLT,
@@ -54,6 +56,7 @@ BOM_ORDER = tuple(QUANTITIES)
 # The drawing imports exactly these, each in the one view that dimensions it.
 DRAWING_DIMENSIONS = {
     COUNTER_FEATURE: {COUNTER_DIMENSION},
+    DOWEL_PROUD_FEATURE: {DOWEL_PROUD_DIMENSION},
 }
 # The lever is set level to the title block's general angular tolerance: the
 # operating rock (about 1 deg) then stays well inside the free-rock floor.
@@ -129,6 +132,7 @@ BRACKET_NUMBER = "MHA-MG-01"
 # Callouts print below the value, where line breaks print.
 DIMENSION_CALLOUTS = {
     COUNTER_DIMENSION: "SET AT ASSEMBLY:\nGOOSENECK HEIGHT\nFOR LEVER LEVEL",
+    DOWEL_PROUD_DIMENSION: "SET AT ASSEMBLY:\nDOWEL PROUD OF\nCROSSBAR UNDERSIDE",
 }
 
 # --- Sheet 1 setting table -----------------------------------------------------------
@@ -216,7 +220,7 @@ ASSEMBLED_NOTES = (
 # The bonds' consumable notes print with the checks in ASSEMBLY.md (rule 22).
 BOND_NOTE_A = (
     f"BOND NOTE A, {BOND_GRADE} (STEP 1B): DEGREASE DOWEL AND HOLE; COAT THE "
-    "DOWEL, NEVER THE BLIND HOLE; PRESS IT TO THE HOLE FLOOR; CURE 24 H "
+    "DOWEL, NEVER THE BLIND HOLE; PRESS IT TO ITS PROUD (STEP 1); CURE 24 H "
     "BEFORE STEP 5. ACCEPT: IT DOES NOT TURN OR SLIDE BY HAND."
 )
 BOND_NOTE_B = (
@@ -231,7 +235,9 @@ BOND_NOTE_B = (
 # joint_retention cite (cut at 4 on MHA-SM-VN-52, hanger joint complete at 6,
 # shoulder screw at 8B, level at 10) stay put. Steps 1-8 are done on the top
 # frame, steps 9-10 at final assembly (MHA-HA-00). Owner ruling 2026-10-24
-# (T+H3): the dowels press into the crossbar before the mounts go on. Steps
+# (T+H3): the dowels press into the crossbar before the mounts go on, each
+# to its proud on DETAIL A, not to the ream's drill point (owner decision
+# 2026-11-19, #3124 item 3). Steps
 # 3-3C (sm Q7) transfer the bracket taps through their mate: Delegated
 # ruling 2026-11-07 (Main), no precedent; owner review #2144. They are
 # their own step and the washers seat under step 1 with the dowels (both
@@ -259,7 +265,8 @@ BOND_NOTE_B = (
 ASSEMBLY_STEPS = (
     "1. ON THE TOP FRAME MHA-FR-02, AT EACH HANGER HOLE PRESS ONE MHA-SM-VN-53 "
     "DOWEL (TWO IN ALL), CHAMFER END FIRST, UP INTO THE BLIND HOLE BESIDE IT "
-    "IN THE CROSSBAR UNDERSIDE, TO THE HOLE FLOOR.",
+    "IN THE CROSSBAR UNDERSIDE UNTIL IT STANDS PROUD OF THE UNDERSIDE BY THE "
+    f"DOWEL PROUD SET ON {DETAIL_TITLE}, SHEET 1 (CALIPER DEPTH ROD).",
     "1A. CHECK THAT NO DOWEL TURNS OR SLIDES BY HAND.",
     f"1B. IF ONE DOES, OR ONE SLID IN BY HAND, BOND IT IN WITH {BOND_GRADE} "
     "PER BOND NOTE A.",

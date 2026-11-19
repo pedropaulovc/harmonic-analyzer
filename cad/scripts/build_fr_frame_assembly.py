@@ -343,7 +343,7 @@ if not math.isclose(CAP_MOUTH_Y + CAP_TOTAL_HEIGHT, CAP_TOP_Y, abs_tol=1e-9):
 # local +Y -> -X (rot_z_rows(90), euler [0,0,90]) points the exact stock shank
 # inboard while retaining its cup tip at x -203.56, 0.21 clear (outboard) of
 # the gooseneck's Ø12.70 tube surface at x -203.35 (owner ruling 2026-11-08
-# (Pedro), #2315: the Ø.520 hub bore takes the bare leg). The under-head face
+# (Pedro), #2315: the 33/64 (Ø.5156) hub bore takes the bare leg). The under-head face
 # is the tip less the shank, x -222.61: the head stands 4.5 proud of the spot
 # face, so the cup point reaches the leg before the head could bottom.
 GOOSENECK_HUB_Z = 3.088  # gooseneck bore centreline (unchanged position)
