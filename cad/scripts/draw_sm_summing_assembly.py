@@ -139,9 +139,11 @@ TITLE_BLOCK = (
 
 # --- Sheet 1 ------------------------------------------------------------------
 # Front and right at 1:5 across the upper left, the 1:1 knife-edge detail to
-# their right, the notes under the front view.
-FRONT_CENTER = (0.068, 0.168)
-RIGHT_CENTER = (0.185, 0.168)
+# their right, the notes under the front view. All three stand 4 mm lower
+# than before the setting table's fifth row (the lever level, #3124), so the
+# table keeps SETTING_TABLE_VIEW_GAP over them.
+FRONT_CENTER = (0.068, 0.164)
+RIGHT_CENTER = (0.185, 0.164)
 # The screw height's dimension line stands this far outboard of the knife
 # contact, on the side away from the gooseneck.
 COUNTER_TEXT_OFFSET = 0.030
@@ -154,9 +156,12 @@ COUNTER_TEXT_OFFSET = 0.030
 # leader right of the line (offset_dimension_text, draw_fr_top_frame's
 # HANGER_PIN_DEPTH_OFFSET_XY form): rows centred on the offset x, the value
 # 2.78 mm over the offset y and the rows 5.56 mm apart under it; the widest
-# row ("CROSSBAR UNDERSIDE", ~45 mm) starts 3 mm right of the line.
+# row ("CROSSBAR UNDERSIDE", ~45 mm) starts 6 mm right of the line, about
+# 2.5 mm past the end of either extension line: at 3 mm its 'C' touched the
+# lower (dowel-end) extension line (machinist review, farm run
+# 20261119T233258920Z).
 DOWEL_PROUD_LINE_OFFSET = 0.008
-DOWEL_PROUD_TEXT_DX = 0.0255
+DOWEL_PROUD_TEXT_DX = 0.0285
 DOWEL_PROUD_TEXT_DY = 0.006
 # The proud's free end sits inside the mount's round hole, so a plain view
 # can only draw it hidden (machinist review of the same run, rule 9: never
@@ -175,7 +180,7 @@ NOTES_XY = (0.018, 0.098)
 NOTES_WIDTH = 64  # characters; default-format note text
 
 DETAIL_SCALE = (1, 1)
-DETAIL_CENTRE = (0.305, 0.172)
+DETAIL_CENTRE = (0.305, 0.168)
 # The detail frames the knife contact, the mount, the boss and the eye of the
 # boss hook: model centre between knife and boss axis, just above the knife.
 DETAIL_MODEL_CENTRE_MM = (

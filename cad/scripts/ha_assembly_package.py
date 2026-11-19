@@ -307,7 +307,7 @@ TOOLS: tuple[Tool, ...] = (
     ),
     Tool(
         "Digital angle gauge",
-        r"DIGITAL ANGLE GAUGE",
+        r"(?:DIGITAL )?ANGLE GAUGE",
         ("shop-equipment:gauges.digital-angle-gauge",),
     ),
     Tool("Protractor", r"\bPROTRACTOR\b", ("shop-equipment:gauges.protractor",)),

@@ -161,6 +161,10 @@ BRACKET_ROW = "1"
 CUT_ROW = "2"
 SEAT_ROW = "3"
 ROCK_ROW = "4"
+# The lever-level acceptance is a measured setting like the others, so it
+# prints as a row the step and check cite, not as a sheet note (machinist
+# review, farm run 20261119T233258920Z, gating clarity: step 10 cited no row).
+LEVEL_ROW = "5"
 # The stack step 4 measures at each hanger hole, named in the cut row.
 HANGER_STACK = "S"
 SETTING_TABLE_ROWS = (
@@ -196,6 +200,14 @@ SETTING_TABLE_ROWS = (
         f"{ROCK_TRAVEL_MIN} UP AND DOWN",
         "DIAL INDICATOR",
     ),
+    (
+        LEVEL_ROW,
+        "10 (CHECK 4)",
+        "MHA-SM-03 LEVER PLATE TOP",
+        "-",
+        LEVEL_CRITERION,
+        "ANGLE GAUGE",
+    ),
 )
 
 
@@ -215,7 +227,6 @@ ASSEMBLED_NOTES = (
     "THE GOOSENECK POST STANDS IN THE FRAME'S GOOSENECK HUB.",
     "2. LEVER SHOWN LEVEL, RESTING ON THE KNIFE EDGE (TOP RIDGE OF EACH HEX "
     "TRUNNION) UNDER THE TOP OF EACH MOUNT BORE.",
-    f"3. LEVEL SETTING: {LEVEL_CRITERION} (ASSEMBLY.MD STEP 10).",
 )
 # The bonds' consumable notes print with the checks in ASSEMBLY.md (rule 22).
 BOND_NOTE_A = (
@@ -327,8 +338,8 @@ ASSEMBLY_STEPS = (
     f"{ha_steps.step_number('channel-anchors-set')}) AND EVERY CHANNEL "
     "AMPLITUDE AT ZERO: SLIDE THE GOOSENECK POST IN ITS HUB UNTIL THE "
     f"LEVER PLATE TOP IS {LEVEL_CRITERION} (DIGITAL ANGLE GAUGE ACROSS THE "
-    "PLATE). THE GOOSENECK HEIGHT REFERENCE DIMENSION ON SHEET 1 IS THE "
-    "NOMINAL START.",
+    f"PLATE, {setting_row(LEVEL_ROW)}). THE GOOSENECK HEIGHT REFERENCE "
+    "DIMENSION ON SHEET 1 IS THE NOMINAL START.",
     "10A. TIGHTEN THE HUB SET SCREW MHA-FR-VN-52 ON THE POST, "
     f"{HUB_SET_SCREW_TORQUE}.",
 )
@@ -344,8 +355,9 @@ ASSEMBLY_CHECKS = (
     f"BORE ({setting_row(ROCK_ROW)}).",
     "3. THE UPPER LOOP OF MHA-SM-VN-51 TURNS AND SLIDES FREELY ON THE SHOULDER "
     "OF MHA-SM-VN-56, UNDER ITS HEAD.",
-    f"4. AFTER STEP 10A THE LEVER PLATE TOP READS {LEVEL_CRITERION} AND THE "
-    "GOOSENECK POST DOES NOT TURN OR SLIDE IN ITS HUB.",
+    f"4. AFTER STEP 10A THE LEVER PLATE TOP READS {LEVEL_CRITERION} "
+    f"({setting_row(LEVEL_ROW)}) AND THE GOOSENECK POST DOES NOT TURN OR "
+    "SLIDE IN ITS HUB.",
     "5. AFTER STEP 5 THE GAUGE BAR SLIDES OUT OF BOTH MOUNTS' BORES BY HAND.",
     BOND_NOTE_A,
     BOND_NOTE_B,

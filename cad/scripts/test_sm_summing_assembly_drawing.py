@@ -239,6 +239,7 @@ def test_setting_table_carries_the_settings_no_visible_dimension_does() -> None:
         notes.CUT_ROW,
         notes.SEAT_ROW,
         notes.ROCK_ROW,
+        notes.LEVEL_ROW,
     ]
     band = f"±{notes._length(notes.BRACKET_STATION_TOL_MM, 3)}"
     assert band == "±.005"
@@ -268,6 +269,13 @@ def test_setting_table_carries_the_settings_no_visible_dimension_does() -> None:
     assert notes.setting_row(notes.ROCK_ROW) in step("6G. ")
     rock = next(c for c in notes.ASSEMBLY_CHECKS if c.startswith("2. "))
     assert notes.ROCK_TRAVEL_MIN in rock and notes.setting_row(notes.ROCK_ROW) in rock
+    # The lever level is a row too (#3124 machinist review): step 10 and
+    # check 4 cite it, and no sheet note restates it.
+    assert rows[notes.LEVEL_ROW]["SET TO / ACCEPT"] == notes.LEVEL_CRITERION
+    assert notes.setting_row(notes.LEVEL_ROW) in step("10. ")
+    level = next(c for c in notes.ASSEMBLY_CHECKS if c.startswith("4. "))
+    assert notes.setting_row(notes.LEVEL_ROW) in level
+    assert not any(notes.LEVEL_CRITERION in n for n in notes.ASSEMBLED_NOTES)
     with pytest.raises(KeyError):
         notes.setting_row("9")
 
