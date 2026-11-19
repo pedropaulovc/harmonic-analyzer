@@ -16,7 +16,6 @@ import _drawing_dimensions
 import build_pd_transgear_arm as part
 import draw_pd_transgear_arm as drawing
 import pd_transgear_arm_notes as arm_notes
-import pd_paper_drive_assembly_steps as steps
 import pd_latch_hook_geometry as hook
 import pd_latch_hook_spec as hook_spec
 import pd_rack_pinion_spec as disc
@@ -134,8 +133,9 @@ def test_the_walls_were_judged_at_no_less_than_the_printed_title_block_band() ->
 def test_the_latch_pin_hole_depth_is_a_min_over_a_drill_point() -> None:
     """#3124: drilled and reamed to a drill point, the full-diameter depth a
     MIN (the model carries the MIN, on the .XX grid) past the deepest-set
-    pin; the pin is set proud at assembly, so the callout says MIN and note 3
-    names the step that sets it."""
+    pin; the pin is set proud at MHA-PD-00 step 10, and the part sheet
+    carries no assembly instruction for it (machinist review of run
+    20261119T200330557Z, rule 7)."""
     depth_in = geometry.PIN_HOLE_DEPTH / 25.4
     assert depth_in == pytest.approx(round(depth_in, spec.PIN_HOLE_DEPTH_PLACES))
     assert geometry.PIN_HOLE_DEPTH > max(pin.INSERTION_LIMITS)
@@ -146,7 +146,7 @@ def test_the_latch_pin_hole_depth_is_a_min_over_a_drill_point() -> None:
     assert callout == f"REAM <HOLE-DEPTH> {depth_in:.2f} MIN".replace("0.", ".", 1)
     assert "FLAT" not in arm_notes.PIN_HOLE_CALLOUT
     note = " ".join(arm_notes.NOTES[arm_notes.LATCH_PIN_NOTE - 1].split())
-    assert f"PIN SET PROUD AT ASSEMBLY, MHA-PD-00 STEP {steps.step_number('latch-pin-pressed')}." in note
+    assert "ASSEMBLY" not in note and "MHA-PD-00" not in note
 
 
 def test_the_thickness_prints_as_the_ground_stock_reference() -> None:
