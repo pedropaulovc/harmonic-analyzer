@@ -84,7 +84,8 @@ LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
         " __import__('dt_pinion_cam_spec').THIN_WALL_MIN_BAND,"
         " __import__('pn_pen_rod_spec').TAP_WALL_MIN_BAND,"
         " __import__('dt_crank_handle_pivot_screw_spec').TIP_CHAMFER_BAND,"
-        " __import__('dt_cone_pivot_post_spec').JOURNAL_RIM_BREAK_BAND)",
+        " __import__('dt_cone_pivot_post_spec').JOURNAL_RIM_BREAK_BAND,"
+        " __import__('pd_transgear_arm_spec').PIN_HOLE_DEPTH_BAND)",
         "each",
     ),
     # for configuration, teeth in CONFIGS: band = band_for(teeth); deviations(band)

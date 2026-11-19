@@ -90,6 +90,7 @@ from _fit_deviations import deviations
 from _hole_spec import DRILL_POINT_H, blind_cut_dia_mm
 from _holes import find_planar_face, wizard_holes
 from _part_pmi import author_part_pmi
+from _single_limit_tolerance import SW_TOL_MIN, set_single_limit
 from _part_properties import part_drawing_unit
 from _saved_part_guard import require_saved_drawing_properties
 from _visibility import blank_reference_geometry
@@ -132,6 +133,7 @@ from pd_transgear_arm_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     ISOMETRIC_VIEW_NOTE,
+    PIN_HOLE_DEPTH_BAND,
     SPOT_FACE_DIA_BAND,
     SPOT_FACE_FLOOR_TOLERANCE,
 )
@@ -1040,6 +1042,12 @@ def build(adapter: Any) -> dict[str, str]:
     set_dimension_bilateral_tolerance(
         adapter, "PinHoleProfile", "PinHoleDia", *deviations(PIN_HOLE_DIA_BAND),
         display_unit=UNIT,
+    )
+    # The full-diameter depth is a MIN over the drill point (#3124 item 3):
+    # the model value is the printed limit, read back.
+    set_single_limit(
+        adapter, "PinHole", "PinHoleDepth", limit=PIN_HOLE_DEPTH,
+        band=PIN_HOLE_DEPTH_BAND, tol_type=SW_TOL_MIN,
     )
     set_dimension_bilateral_tolerance(
         adapter, "PivotBoreProfile", "PivotBoreDia", *deviations(PIVOT_BORE_DIA_BAND),

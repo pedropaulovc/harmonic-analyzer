@@ -481,6 +481,14 @@ LATCH_PIN_POS = (
     ARM.PIN_MACHINE_Z,
 )  # (45.543, 237.121, -120.431)
 
+
+def _latch_pin_placed_proud() -> float:
+    """The placed latch dowel's proud of the arm's tip face: its pressed end
+    (``LATCH_PIN_POS``) projected onto U, plus its length."""
+    station = sum((LATCH_PIN_POS[i] - PIVOT_XY[i]) * ARM_U[i] for i in (0, 1))
+    return station + LATCH_PIN.LENGTH - ARM.TIP_STATION
+
+
 # Disc cluster on the pin MHA-PD-23 at S (R9-68).  The pin is pressed into the
 # arm, its head on the arm's rear face (Ry180: its stations run to machine
 # -Z).  On it, rear to front: the MHA-PD-VN-68 shims on the arm's front face,
@@ -1155,14 +1163,13 @@ def _assert_fastener_stacks() -> None:
         raise AssertionError(
             "MHA-PD-VN-56's cut tips are not flush with the arm's front face"
         )
-    latch_pin_proud = LATCH_PIN_PRESSED_STATION + LATCH_PIN.LENGTH - ARM.TIP_STATION
+    # The placed dowel stands inside the set window (MHA-PD-00 step 10A); the
+    # deepest-set dowel's clearance to the drill point is
+    # transgear_hanger_joints.LATCH_PIN_POINT_CLEARANCE_MIN's.
+    latch_pin_proud = _latch_pin_placed_proud()
     low, high = HANGER.LATCH_PIN_PROUD_RANGE
-    if abs(latch_pin_proud - LATCH_PIN.PROUD) > 1e-9 or not (
-        low <= latch_pin_proud <= high
-    ):
+    if not low <= latch_pin_proud <= high:
         raise AssertionError(f"latch pin stands {latch_pin_proud:.3f} proud of the arm")
-    if LATCH_PIN_PRESSED_STATION <= ARM.TIP_STATION - ARM.PIN_HOLE_DEPTH:
-        raise AssertionError("the latch pin's pressed end reaches the arm hole's drill point")
     hook_screw_engagement = HOOK_BRACKET_SCREW.LENGTH - HOOK.SHEET_T
     valid_engagement(
         "latch-hook #4-40 engagement",
@@ -2360,7 +2367,7 @@ def _assert_setting_detail_faces() -> None:
     off = {name: a - b for name, (a, b) in pairs.items() if abs(a - b) > 1e-6}
     if off:
         raise AssertionError(f"setting detail faces off the placed model: {off}")
-    if abs(spec.LATCH_PROUD_MODEL - (LATCH_PIN.LENGTH - LATCH_PIN.PRESS_DEPTH)) > 1e-9:
+    if abs(spec.LATCH_PROUD_MODEL - _latch_pin_placed_proud()) > 1e-6:
         raise AssertionError("the latch dowel's proud is not the placed pin's")
     if abs(spec.COLLAR_DOWELS.lines[0].length_mm - COLLAR.DRIVE_PIN_PROUD) > 0.0127:
         raise AssertionError("the collar dowel's printed proud is off the placed dowel")

@@ -218,6 +218,17 @@ LATCH_PIN_PRESS_PRINTED = (
 # (machinist_exceptions RV-04; #2019 tracks the next stock size up), floored
 # so the sheet never promises more than the budget holds.
 LATCH_PIN_WALL_PRINTED = _floor_mm(ARM.WALLS["pin hole to faces"][1], 3)
+# The depth MIN's native record (#3124; swTolMIN prints only the model value
+# and MIN): its upper deviation is the deepest hole whose drill run-off still
+# holds the ligament note 3 prints (about .108 past the MIN).
+PIN_HOLE_DEPTH_BAND = (
+    round(
+        (ARM.WALLS["pin hole to faces"][1] - LATCH_PIN_WALL_PRINTED)
+        / math.tan(math.radians(ARM.DRILL_RUN_OFF_DEG)),
+        6,
+    ),
+    0.0,
+)
 
 ISO_VIEW_SCALE = (1, 2)
 ISOMETRIC_VIEW_NOTE = f"ISOMETRIC VIEW SCALE {ISO_VIEW_SCALE[0]}:{ISO_VIEW_SCALE[1]}"

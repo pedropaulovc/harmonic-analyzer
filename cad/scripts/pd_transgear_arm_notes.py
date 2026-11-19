@@ -90,14 +90,17 @@ PIN_BORE_CALLOUT = f"REAM THRU, {see_note(PIN_NOTE)}"
 # dowel named on both was named twice for one pattern).
 LOCATOR_CALLOUT_TEXT = f"2X REAM THRU, {see_note(LOCATOR_NOTE)}"
 # Size, process and depth at the callout (round 2: a depth is never deferred
-# to a view; section A-A keeps it as a reference); note 3 names the latch
-# pin.  Round 3's "BLIND FLAT-BOTTOM REAM" row was so wide its leader cut the
-# "B" of BLIND; the shorter row lets the text stand right of the hole, so the
-# leader leaves its left end straight up.  #3124: the full-diameter depth is
-# a MIN over a drill point; MHA-PD-00 step 10 sets the pin's proud (an
-# assembly instruction this part sheet does not repeat, rule 7).
+# to a view); note 3 names the latch pin.  Round 3's "BLIND FLAT-BOTTOM REAM"
+# row was so wide its leader cut the "B" of BLIND; the shorter row lets the
+# text stand right of the hole, so the leader leaves its left end straight
+# up.  #3124: the full-diameter depth is a MIN over a drill point, authored
+# natively on PinHoleDepth@PinHole and printed by section A-A; the callout
+# carries it as REF (drawing-guidelines Holes: "a depth printed as REF in the
+# callout is complete when a controlling dimension on the views locates the
+# floor").  MHA-PD-00 step 10 sets the pin's proud (an assembly instruction
+# this part sheet does not repeat, rule 7).
 PIN_HOLE_CALLOUT = "\n".join((
-    f"REAM <HOLE-DEPTH> {inch_text(PIN_HOLE_DEPTH, PIN_HOLE_DEPTH_PLACES)} MIN",
+    f"REAM <HOLE-DEPTH> ({inch_text(PIN_HOLE_DEPTH, PIN_HOLE_DEPTH_PLACES)})",
     see_note(LATCH_PIN_NOTE),
 ))
 SPRING_CALLOUT = see_note(SPRING_NOTE)

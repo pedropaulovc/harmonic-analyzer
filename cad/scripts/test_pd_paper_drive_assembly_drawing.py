@@ -1696,6 +1696,20 @@ def test_the_cluster_float_and_pin_bands_print_their_spec_ranges() -> None:
         assert f"{steps.inch_window(band, 3, ' TO ')} PROUD" in _step_body(key)
 
 
+def test_an_over_pressed_latch_dowel_is_remade_with_its_arm() -> None:
+    """#3124 / Codjiflo #3127: the dowel is pressed to height and the press
+    is permanent (MHA-PD-18 RV-03), so a dowel set under the window stays in
+    the arm it scraps; the remedy remakes both, as the later restarts do."""
+    body = " ".join(_step_body("latch-pin-pressed").split())
+    low = steps.inch_text(drawing.setting_details.LATCH_PROUD_BAND[0], 3)
+    assert (
+        f"IF THE DOWEL SLIDES IN BY HAND OR READS UNDER {low}, MAKE A NEW "
+        f"{_number('pd-transgear-arm')} ARM AND "
+        f"{_number('pd-vn-transgear-latch-pin')} DOWEL AND REPEAT FROM STEP "
+        f"{steps.step_number('latch-pin-pressed')}."
+    ) in body
+
+
 def test_the_cluster_is_shimmed_to_view_e_after_it_is_hung() -> None:
     """#2124: the ring gap is set with shims under the rear bushing to VIEW
     E's model dimension; the step prints no value, and the window passes

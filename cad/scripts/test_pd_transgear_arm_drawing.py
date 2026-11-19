@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import itertools
 import math
 import runpy
@@ -132,9 +133,11 @@ def test_the_walls_were_judged_at_no_less_than_the_printed_title_block_band() ->
 
 def test_the_latch_pin_hole_depth_is_a_min_over_a_drill_point() -> None:
     """#3124: drilled and reamed to a drill point, the full-diameter depth a
-    MIN (the model carries the MIN, on the .XX grid) past the deepest-set
-    pin; the pin is set proud at MHA-PD-00 step 10, and the part sheet
-    carries no assembly instruction for it (machinist review of run
+    native MIN on the model (swTolMIN, the model value the limit, on the .XX
+    grid) past the deepest-set pin.  Section A-A prints it as the controlling
+    dimension and the callout carries it as REF (Codjiflo #3127 round 1).
+    The pin is set proud at MHA-PD-00 step 10, and the part sheet carries no
+    assembly instruction for it (machinist review of run
     20261119T200330557Z, rule 7)."""
     depth_in = geometry.PIN_HOLE_DEPTH / 25.4
     assert depth_in == pytest.approx(round(depth_in, spec.PIN_HOLE_DEPTH_PLACES))
@@ -142,9 +145,33 @@ def test_the_latch_pin_hole_depth_is_a_min_over_a_drill_point() -> None:
     assert geometry.PIN_HOLE_POINT_LENGTH == pytest.approx(
         geometry.PIN_HOLE_DIA / 2.0 / math.tan(math.radians(59.0)), abs=1e-4
     )
+    calls = [
+        node
+        for node in ast.walk(ast.parse(Path(part.__file__).read_text(encoding="utf-8")))
+        if isinstance(node, ast.Call) and getattr(node.func, "id", None) == "set_single_limit"
+    ]
+    assert len(calls) == 1
+    call = calls[0]
+    assert [ast.unparse(arg) for arg in call.args[1:]] == ["'PinHole'", "'PinHoleDepth'"]
+    assert {kw.arg: ast.unparse(kw.value) for kw in call.keywords} == {
+        "limit": "PIN_HOLE_DEPTH",
+        "band": "PIN_HOLE_DEPTH_BAND",
+        "tol_type": "SW_TOL_MIN",
+    }
+    # The MIN's upper record: the deepest hole whose run-off still holds the
+    # printed ligament to the faces.
+    upper, lower = spec.PIN_HOLE_DEPTH_BAND
+    assert lower == 0.0 and upper > 0.0
+    run_off = math.tan(math.radians(geometry.DRILL_RUN_OFF_DEG))
+    assert geometry.WALLS["pin hole to faces"][1] - upper * run_off == pytest.approx(
+        spec.LATCH_PIN_WALL_PRINTED, abs=1e-6
+    )
+    assert "PinHoleDepth" in drawing.SECTION_KEEP
+    assert "PinHoleDepth" not in drawing.LINEAR_REFERENCES
     callout = arm_notes.PIN_HOLE_CALLOUT.splitlines()[0]
-    assert callout == f"REAM <HOLE-DEPTH> {depth_in:.2f} MIN".replace("0.", ".", 1)
+    assert callout == f"REAM <HOLE-DEPTH> ({depth_in:.2f})".replace("(0.", "(.", 1)
     assert "FLAT" not in arm_notes.PIN_HOLE_CALLOUT
+    assert "MIN" not in arm_notes.PIN_HOLE_CALLOUT
     note = " ".join(arm_notes.NOTES[arm_notes.LATCH_PIN_NOTE - 1].split())
     assert "ASSEMBLY" not in note and "MHA-PD-00" not in note
 
