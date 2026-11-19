@@ -292,3 +292,82 @@ status = "on_hand"
 pieces = 4
 range_in = [0.25, 0.375]
 cite = ["LittleMachineShop listing read 2026-11-17: SKU 5948, \"Reamers in this set are adjustable from 0.250\" to 0.375\"\", \"4 Piece Set Sizes #8 - #5\", HSS, black oxide, wooden storage box, $69.95", "Owner (Pedro) 2026-11-17: owned; with the .3760 reamer, the only reamers"]
+
+# --- Placeholder process plans' reamers (quotes-2026-11-17-rev3.xlsx) -------
+# The chucking reamers the placeholder plans name, from the owner's quote
+# workbook (owner 2026-11-19), each to buy; description and diameter_mm are
+# cad/process/shop.toml under the same key.
+[tools.reamer-0620]
+kind = "reamer"
+status = "to_order"
+note = "quotes-2026-11-17-rev3.xlsx B-reamer-.0620: recommended McMaster-Carr 8803A141."
+
+[tools.reamer-0630]
+kind = "reamer"
+status = "to_order"
+note = "quotes-2026-11-17-rev3.xlsx B-reamer-.0630: recommended McMaster-Carr 8803A142."
+
+[tools.reamer-0775]
+kind = "reamer"
+status = "to_order"
+note = "quotes-2026-11-17-rev3.xlsx B-reamer-.0775: recommended McMaster-Carr 8803A168."
+
+[tools.reamer-1240]
+kind = "reamer"
+status = "to_order"
+note = "quotes-2026-11-17-rev3.xlsx B-reamer-.1240: recommended Shars 404-7563."
+
+[tools.reamer-1260]
+kind = "reamer"
+status = "to_order"
+note = "quotes-2026-11-17-rev3.xlsx B-reamer-.1260: recommended Shars 404-7564."
+
+[tools.reamer-1865]
+kind = "reamer"
+status = "to_order"
+note = "quotes-2026-11-17-rev3.xlsx B-reamer-.1865: recommended Shars 404-7565."
+
+[tools.reamer-1885]
+kind = "reamer"
+status = "to_order"
+note = "quotes-2026-11-17-rev3.xlsx B-reamer-.1885: recommended Shars 404-7566."
+
+[tools.reamer-2490]
+kind = "reamer"
+status = "to_order"
+note = "quotes-2026-11-17-rev3.xlsx B-reamer-.2490: recommended Shars 404-7567."
+
+[tools.reamer-2510]
+kind = "reamer"
+status = "to_order"
+note = "quotes-2026-11-17-rev3.xlsx B-reamer-.2510 (optional tier, not in the recommended total): recommended Zoro G3924812. The workbook takes it as owned (cad/scripts/_fit_ream_slide.py: the owned over reamers), but the owner's inventory of 2026-11-17 owns only tools.reamers-adjustable-lms-5948 and tools.reamer-0376."
+
+[tools.reamer-2560]
+kind = "reamer"
+status = "to_order"
+note = "quotes-2026-11-17-rev3.xlsx B-reamer-.2560: recommended McMaster-Carr 8803A491. The workbook's B-reamer-.2559 (6.5 mm, optional tier, Drill America DWRR6.5MM) is the alternative for the same three bores."
+
+[tools.reamer-3135]
+kind = "reamer"
+status = "to_order"
+note = "quotes-2026-11-17-rev3.xlsx B-reamer-.3135 (optional tier, not in the recommended total): recommended Zoro G3918887. The workbook takes it as owned (cad/scripts/_fit_ream_slide.py: the owned over reamers), but the owner's inventory of 2026-11-17 owns only tools.reamers-adjustable-lms-5948 and tools.reamer-0376."
+
+[tools.reamer-4500]
+kind = "reamer"
+status = "to_order"
+note = "quotes-2026-11-17-rev3.xlsx B-reamer-.4500: recommended McMaster-Carr 8803A874."
+
+[tools.reamer-4835]
+kind = "reamer"
+status = "to_order"
+note = "quotes-2026-11-17-rev3.xlsx B-reamer-.4835: recommended McMaster-Carr 8803A948."
+
+[tools.reamer-4990]
+kind = "reamer"
+status = "to_order"
+note = "quotes-2026-11-17-rev3.xlsx B-reamer-.4990: recommended Shars 404-7571."
+
+[tools.reamer-5010]
+kind = "reamer"
+status = "to_order"
+note = "quotes-2026-11-17-rev3.xlsx B-reamer-.5010: recommended Shars 404-7572."

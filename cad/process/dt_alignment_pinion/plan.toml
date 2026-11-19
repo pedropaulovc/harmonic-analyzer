@@ -1,0 +1,47 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Alignment Pinion Drum"
+part = "MHA-DT-01 Alignment Pinion Drum"
+revision = "placeholder"
+material = "C36000 free-machining brass"
+stock = "To be written"
+shop = "../shop.toml"
+
+[[tools]]
+id = "drill-n"
+name = "N drill"
+ref = "drill-n"  # Drills N
+
+[[tools]]
+id = "reamer-3135"
+name = ".3135 reamer"
+ref = "reamer-3135"  # B-reamer-.3135
+
+[[tools]]
+id = "gear-cutter-arbor-7-8"
+name = "7/8 cutter arbor"
+ref = "gear-cutter-arbor-7-8"  # F-arbor-7-8
+
+[[tools]]
+id = "gear-cutters-48dp-20pa"
+name = "48DP 20PA gear cutter #4"
+ref = "gear-cutters-48dp-20pa"  # F-gear-cutter-10-289-484
+
+[[tools]]
+id = "feeler-gauges-metric"
+name = "Starrett 66MA feelers"
+ref = "feeler-gauges-metric"  # F-feeler-66MA
+
+[[tools]]
+id = "pin-gauges-061-500"
+name = "Pin gauges .061-.500"
+ref = "pin-gauges-061-500"  # A1-pin-set-061-500-combined, A1-pin-set-251-500
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

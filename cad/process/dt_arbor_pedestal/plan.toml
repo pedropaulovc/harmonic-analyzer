@@ -1,0 +1,57 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Arbor Pedestal"
+part = "MHA-DT-02 Arbor Pedestal"
+revision = "placeholder"
+material = "LOW-CARBON STEEL OR GRAY IRON"
+stock = "To be written"
+shop = "../shop.toml"
+
+[[tools]]
+id = "jig-drill-43"
+name = "#43 drill"
+ref = "jig-drill-43"  # Drills #43
+
+[[tools]]
+id = "block-drill-15"
+name = "#15 drill"
+ref = "block-drill-15"  # Drills #15
+
+[[tools]]
+id = "jig-drill-23-64"
+name = "23/64 drill"
+ref = "jig-drill-23-64"  # Drills 23/64
+
+[[tools]]
+id = "jig-tap-4-40-plug"
+name = "#4-40 plug tap"
+ref = "jig-tap-4-40-plug"  # Tap coverage #4-40 UNC
+
+[[tools]]
+id = "feeler-gauges-metric"
+name = "Starrett 66MA feelers"
+ref = "feeler-gauges-metric"  # F-feeler-66MA
+
+[[tools]]
+id = "pin-gauges-061-500"
+name = "Pin gauges .061-.500"
+ref = "pin-gauges-061-500"  # A1-pin-set-061-500-combined, A1-pin-set-251-500
+
+[[tools]]
+id = "setting-mandrel-375"
+name = "3/8 setting mandrel"
+ref = "setting-mandrel-375"  # F-setting-mandrel-375
+
+[[tools]]
+id = "v-blocks"
+name = "V-blocks"
+ref = "v-blocks"  # F-v-blocks
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

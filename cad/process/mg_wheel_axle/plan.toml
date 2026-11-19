@@ -1,0 +1,22 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Wheel Axle"
+part = "MHA-MG-07 Wheel Axle"
+revision = "placeholder"
+material = "AISI O1 or W1 drill rod, 3/16 in, ground, as supplied (annealed)"
+stock = "To be written"
+shop = "../shop.toml"
+
+[[tools]]
+id = "arbor-press"
+name = "Arbor press"
+ref = "arbor-press"  # F-arbor-press
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

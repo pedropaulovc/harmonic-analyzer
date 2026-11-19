@@ -1,0 +1,42 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Rocker Arm Support"
+part = "MHA-FR-05 Rocker Arm Support"
+revision = "placeholder"
+material = "LOW-CARBON STEEL OR GRAY IRON"
+stock = "To be written"
+shop = "../shop.toml"
+
+[[tools]]
+id = "jig-drill-29"
+name = "#29 drill"
+ref = "jig-drill-29"  # Drills #29
+
+[[tools]]
+id = "block-drill-5-16"
+name = "5/16 drill"
+ref = "block-drill-5-16"  # Drills 5/16
+
+[[tools]]
+id = "jig-tap-8-32-bottoming"
+name = "#8-32 bottoming tap"
+ref = "jig-tap-8-32-bottoming"  # Tap coverage #8-32 UNC
+
+[[tools]]
+id = "jig-tap-8-32-plug"
+name = "#8-32 plug tap"
+ref = "jig-tap-8-32-plug"  # Tap coverage #8-32 UNC
+
+[[tools]]
+id = "transfer-punches"
+name = "Transfer punches"
+ref = "transfer-punches"  # F-transfer-punches-fractional
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

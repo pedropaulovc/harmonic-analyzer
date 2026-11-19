@@ -1,0 +1,22 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Keyed Cutting Arbor Backing Collar"
+part = "MHA-DT-03-TL-04 Keyed Cutting Arbor Backing Collar"
+revision = "placeholder"
+material = "low-carbon cold-finished steel round, 1/2, 1 and 1-3/4 in, ASTM A108 (12L14 or 1018)"
+stock = "To be written"
+shop = "../shop.toml"
+
+[[tools]]
+id = "drill-l"
+name = "L drill"
+ref = "drill-l"  # Drills L
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

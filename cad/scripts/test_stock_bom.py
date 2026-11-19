@@ -168,7 +168,7 @@ def test_tools_and_gauges_read_ownership_from_any_inventory_section(
         '[gauges.g-owned]\nstatus = "on_hand"\n'
         '[gauges.g-buy]\nstatus = "to_order"\n',
     )
-    plan = stock_bom.load_plans(("part_a",), shop, equipment)["gear"]
+    plan = stock_bom.load_plans(("part_a",), shop, equipment)["part-a"]
     assert [(t.ref, t.status.value) for t in plan.tools] == [
         ("t-fixture", "to_make"),
         ("t-tape", "on_hand"),
@@ -236,3 +236,20 @@ def test_the_readiness_sheet_counts_missing_gauges(tmp_path) -> None:
     assert '<c r="E2"><f>' in sheet and "<v>1</v></c>" in sheet
     assert "C2+D2+E2&gt;0" in sheet
     assert "<v>missing</v>" in sheet
+
+
+def test_a_placeholder_plans_tools_appear_unenrolled(tmp_path, monkeypatch) -> None:
+    # Every plan under cad/process counts, enrolled or not, named by its
+    # directory.
+    shop, equipment = _plan_dir(
+        tmp_path,
+        monkeypatch,
+        'revision = "placeholder"\n[[tools]]\nid = "pins"\nname = "pins"\nref = "pins"\n',
+        '[tools.pins]\ndescription = "pin gauges"\n',
+        '[gauges.pins]\nstatus = "to_order"\n',
+    )
+    monkeypatch.setattr(stock_bom._process_plans, "TRAVELER_STEMS", ())
+    plans = stock_bom.load_plans(shop_path=shop, equipment_dir=equipment)
+    assert plans["part-a"].tools == (
+        stock_bom.ToolLine("pins", "pins", stock_bom.ToolStatus.TO_ORDER),
+    )

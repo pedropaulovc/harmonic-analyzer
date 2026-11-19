@@ -1,0 +1,27 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Cylinder Gear Shaft"
+part = "MHA-DT-13 Cylinder Gear Shaft"
+revision = "placeholder"
+material = "SAE 1018 CF or 1045 ground bar"
+stock = "To be written"
+shop = "../shop.toml"
+
+[[tools]]
+id = "jig-drill-43"
+name = "#43 drill"
+ref = "jig-drill-43"  # Drills #43
+
+[[tools]]
+id = "setting-mandrel-375"
+name = "3/8 setting mandrel"
+ref = "setting-mandrel-375"  # F-setting-mandrel-375
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

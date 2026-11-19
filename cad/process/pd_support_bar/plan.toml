@@ -1,0 +1,47 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Support Bar"
+part = "MHA-PD-07 Support Bar"
+revision = "placeholder"
+material = "Plain Carbon Steel"
+stock = "To be written"
+shop = "../shop.toml"
+
+[[tools]]
+id = "jig-drill-43"
+name = "#43 drill"
+ref = "jig-drill-43"  # Drills #43
+
+[[tools]]
+id = "riser-drill-9"
+name = "#9 drill"
+ref = "riser-drill-9"  # Drills #9
+
+[[tools]]
+id = "jig-tap-4-40-plug"
+name = "#4-40 plug tap"
+ref = "jig-tap-4-40-plug"  # Tap coverage #4-40 UNC
+
+[[tools]]
+id = "jig-tap-8-32-plug"
+name = "#8-32 plug tap"
+ref = "jig-tap-8-32-plug"  # Tap coverage #8-32 UNC
+
+[[tools]]
+id = "centre-punch-starrett-18a"
+name = "Automatic centre punch"
+ref = "centre-punch-starrett-18a"  # F-centre-punch-starrett-18A
+
+[[tools]]
+id = "transfer-punches"
+name = "Transfer punches"
+ref = "transfer-punches"  # F-transfer-punches-fractional, F-transfer-punches-number
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

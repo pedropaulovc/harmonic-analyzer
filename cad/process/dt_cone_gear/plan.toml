@@ -1,0 +1,62 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Cone Gear"
+part = "MHA-DT-03 Cone Gear"
+revision = "placeholder"
+material = "C36000 free-machining brass"
+stock = "To be written"
+shop = "../shop.toml"
+
+[[tools]]
+id = "reamer-2510"
+name = ".2510 reamer"
+ref = "reamer-2510"  # B-reamer-.2510
+
+[[tools]]
+id = "broach-bushing-3-8-a"
+name = "3/8 A broach bushing"
+ref = "broach-bushing-3-8-a"  # F-broach-bushing
+
+[[tools]]
+id = "gear-cutter-arbor-7-8"
+name = "7/8 cutter arbor"
+ref = "gear-cutter-arbor-7-8"  # F-arbor-7-8
+
+[[tools]]
+id = "gear-cutters-48dp-20pa"
+name = "48DP 20PA gear cutters #2, #3, #4, #5, #6, #8"
+ref = "gear-cutters-48dp-20pa"  # F-gear-cutter-10-289-482, F-gear-cutter-10-289-483, F-gear-cutter-10-289-484, F-gear-cutter-10-289-485, F-gear-cutter-10-289-486, F-gear-cutter-10-289-488
+
+[[tools]]
+id = "keyway-broach-1-16-a"
+name = "1/16 A keyway broach"
+ref = "keyway-broach-1-16-a"  # F-keyway-broach
+
+[[tools]]
+id = "feeler-gauges-metric"
+name = "Starrett 66MA feelers"
+ref = "feeler-gauges-metric"  # F-feeler-66MA
+
+[[tools]]
+id = "pin-gauges-011-060"
+name = "Pin gauges .011-.060"
+ref = "pin-gauges-011-060"  # A1-pin-set-011-060
+
+[[tools]]
+id = "pin-gauges-061-500"
+name = "Pin gauges .061-.500"
+ref = "pin-gauges-061-500"  # A1-pin-set-061-250, A1-pin-set-061-500-combined, A1-pin-set-251-500
+
+[[tools]]
+id = "arbor-press"
+name = "Arbor press"
+ref = "arbor-press"  # F-arbor-press
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

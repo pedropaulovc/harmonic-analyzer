@@ -1,0 +1,27 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Pen Hanger"
+part = "MHA-PN-02 Pen Hanger"
+revision = "placeholder"
+material = "AISI 1018 CF flat, 1/8 x 3/4 REF"
+stock = "To be written"
+shop = "../shop.toml"
+
+[[tools]]
+id = "block-drill-15"
+name = "#15 drill"
+ref = "block-drill-15"  # Drills #15
+
+[[tools]]
+id = "slot-cutter-200"
+name = ".200 slot cutter"
+ref = "slot-cutter-200"  # C-slot-cutter-200
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

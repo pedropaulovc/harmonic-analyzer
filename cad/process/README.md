@@ -6,7 +6,8 @@ This directory holds the inputs to the `prechips:<stem>` travelers and the
 ```text
 cad/process/
   shop.toml                 prechips shop file, shared by every plan
-  <stem>/plan.toml          one prechips plan per part
+  <stem>/plan.toml          one prechips plan per part (enrolled or placeholder)
+  placeholder-profile.toml  no-check prechips profile for the placeholder plans
   <stem>/diagrams/*.svg     optional setup diagrams the plan names
   <stem>/cam.py             CAM recipe of a part milled on the CNC mill
 ```
@@ -66,6 +67,31 @@ Plan parameters that size envelopes and pictures (vise jaw width, jaw height
 and bed height) repeat `shop.toml` `workholding.vise-pm-6`, because prechips
 plan bindings cannot read shop records; each such parameter names the shop
 field it repeats, and the two must be changed together.
+
+## Placeholder plans
+
+Until its traveler is written, a made part without an enrolled plan has a
+placeholder `<stem>/plan.toml` (owner 2026-11-19): `revision = "placeholder"`, the
+registry number, title and material, `stock = "To be written"`, one
+`[[tools]]` entry per tool the part needs, and one dummy setup ("Traveler to
+come"). Its tools come from the owner's quote workbook
+`quotes-2026-11-17-rev3.xlsx` (its Items, Where used detail, Drills and Tap
+coverage sheets), each `ref` a `shop.toml` `tools` record whose header comment
+cites the workbook row, with the tool's ownership in the inventory under the
+same key. A placeholder is not in `TRAVELER_STEMS`: it has no `prechips:<stem>`
+task, is not rendered by `build` or `release` and ships nothing; it lists a
+part's tools for the stock BOM. It has no `[cad]` binding, so the built-in
+`pro` and `hobby` profiles refuse it (`stock_fit` needs one);
+`placeholder-profile.toml` checks nothing and validates it by hand:
+
+```text
+uv tool run --from prechips==<version> prechips traveler cad/process/<stem>/plan.toml --profile cad/process/placeholder-profile.toml --out <file outside the repo>
+```
+
+prechips refuses a plan with no `[[tools]]`, so a made part the workbook names
+no tool for has no placeholder. Enrolling a part means writing its real plan
+over the placeholder (the `[cad]` binding, stock and setups) and adding its
+stem to `_process_plans.TRAVELER_STEMS`.
 
 ## Shop records
 
@@ -129,8 +155,9 @@ they need from their process plans. They hold:
   `status` (`on_hand`, `not_received` or `to_order`); a process plan names the
   rows it is cut from in `stock_refs`.
   `uv run --frozen python cad/scripts/stock_bom.py [--format md|csv|xlsx]` joins
-  the part registry's made parts to their plans, normalized to one row per part
-  and requirement: `type` `stock` (each row the plan names, with its status;
+  the part registry's made parts to their plans (every `<stem>/plan.toml`,
+  enrolled or placeholder), normalized to one row per part and requirement:
+  `type` `stock` (each row the plan names, with its status;
   one `vendor_sku`, `no_stock_record` or `no_traveler` row when it names none),
   `tool` (each `[[tools]]` entry of the part's process plan; one `no_traveler`
   row for a part without a plan) or `gauge` (each gauge its setups' and

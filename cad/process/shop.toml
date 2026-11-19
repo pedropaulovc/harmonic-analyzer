@@ -693,3 +693,298 @@ diameter_mm = 5.1054
 [tools.jig-tap-1-4-20-plug]
 description = "1/4-20 UNC hand tap; T-handle wrench"
 tap_drill_mm = 5.1054
+
+# --- Placeholder process plans' tools (quotes-2026-11-17-rev3.xlsx) ----------
+# The tools the placeholder plans name (cad/process/<stem>/plan.toml with
+# revision = "placeholder", not in _process_plans.TRAVELER_STEMS), from the
+# owner's quote workbook quotes-2026-11-17-rev3.xlsx (owner 2026-11-19). The
+# comment on each header cites its workbook row: an Items item_id, a Drills
+# size or a Tap coverage thread. diameter_mm is the drill or reamer's nominal
+# size. Ownership is the inventory's status under the same key
+# (cad/config/shop-equipment/).
+[tools.drill-60]  # Drills #60
+description = "#60 (.0400 in) drill, 115-piece index"
+diameter_mm = 1.016
+[tools.drill-57]  # Drills #57
+description = "#57 (.0430 in) drill, 115-piece index"
+diameter_mm = 1.0922
+[tools.drill-56]  # Drills #56
+description = "#56 (.0465 in) drill, 115-piece index"
+diameter_mm = 1.1811
+[tools.drill-3-64]  # Drills 3/64
+description = "3/64 (.0469 in) drill, 115-piece index"
+diameter_mm = 1.190625
+[tools.drill-54]  # Drills #54
+description = "#54 (.0550 in) drill, 115-piece index"
+diameter_mm = 1.397
+[tools.drill-53]  # Drills #53
+description = "#53 (.0595 in) drill, 115-piece index"
+diameter_mm = 1.5113
+[tools.drill-1-16]  # Drills 1/16
+description = "1/16 (.0625 in) drill, 115-piece index"
+diameter_mm = 1.5875
+[tools.drill-51]  # Drills #51
+description = "#51 (.0670 in) drill, 115-piece index"
+diameter_mm = 1.7018
+[tools.drill-50]  # Drills #50
+description = "#50 (.0700 in) drill, 115-piece index"
+diameter_mm = 1.778
+[tools.drill-49]  # Drills #49
+description = "#49 (.0730 in) drill, 115-piece index"
+diameter_mm = 1.8542
+[tools.drill-47]  # Drills #47
+description = "#47 (.0785 in) drill, 115-piece index"
+diameter_mm = 1.9939
+[tools.drill-45]  # Drills #45
+description = "#45 (.0820 in) drill, 115-piece index"
+diameter_mm = 2.0828
+[tools.drill-44]  # Drills #44
+description = "#44 (.0860 in) drill, 115-piece index"
+diameter_mm = 2.1844
+[tools.drill-41]  # Drills #41
+description = "#41 (.0960 in) drill, 115-piece index"
+diameter_mm = 2.4384
+[tools.drill-40]  # Drills #40
+description = "#40 (.0980 in) drill, 115-piece index"
+diameter_mm = 2.4892
+[tools.drill-37]  # Drills #37
+description = "#37 (.1040 in) drill, 115-piece index"
+diameter_mm = 2.6416
+[tools.drill-36]  # Drills #36
+description = "#36 (.1065 in) drill, 115-piece index"
+diameter_mm = 2.7051
+[tools.drill-33]  # Drills #33
+description = "#33 (.1130 in) drill, 115-piece index"
+diameter_mm = 2.8702
+[tools.drill-32]  # Drills #32
+description = "#32 (.1160 in) drill, 115-piece index"
+diameter_mm = 2.9464
+[tools.drill-31]  # Drills #31
+description = "#31 (.1200 in) drill, 115-piece index"
+diameter_mm = 3.048
+[tools.drill-1-8]  # Drills 1/8
+description = "1/8 (.1250 in) drill, 115-piece index"
+diameter_mm = 3.175
+[tools.drill-27]  # Drills #27
+description = "#27 (.1440 in) drill, 115-piece index"
+diameter_mm = 3.6576
+[tools.drill-26]  # Drills #26
+description = "#26 (.1470 in) drill, 115-piece index"
+diameter_mm = 3.7338
+[tools.drill-25]  # Drills #25
+description = "#25 (.1495 in) drill, 115-piece index"
+diameter_mm = 3.7973
+[tools.drill-21]  # Drills #21
+description = "#21 (.1590 in) drill, 115-piece index"
+diameter_mm = 4.0386
+[tools.drill-20]  # Drills #20
+description = "#20 (.1610 in) drill, 115-piece index"
+diameter_mm = 4.0894
+[tools.drill-17]  # Drills #17
+description = "#17 (.1730 in) drill, 115-piece index"
+diameter_mm = 4.3942
+[tools.drill-16]  # Drills #16
+description = "#16 (.1770 in) drill, 115-piece index"
+diameter_mm = 4.4958
+[tools.drill-14]  # Drills #14
+description = "#14 (.1820 in) drill, 115-piece index"
+diameter_mm = 4.6228
+[tools.drill-10]  # Drills #10
+description = "#10 (.1935 in) drill, 115-piece index"
+diameter_mm = 4.9149
+[tools.drill-8]  # Drills #8
+description = "#8 (.1990 in) drill, 115-piece index"
+diameter_mm = 5.0546
+[tools.frame-clearance-stub-drill]  # G-drill-5-stub; Drills #5
+description = "#5 (.2055) screw-machine-length drill"
+diameter_mm = 5.2197
+[tools.drill-3]  # Drills #3
+description = "#3 (.2130 in) drill, 115-piece index"
+diameter_mm = 5.4102
+[tools.drill-1]  # Drills #1
+description = "#1 (.2280 in) drill, 115-piece index"
+diameter_mm = 5.7912
+[tools.drill-b]  # Drills B
+description = "B (.2380 in) drill, 115-piece index"
+diameter_mm = 6.0452
+[tools.drill-c]  # Drills C
+description = "C (.2420 in) drill, 115-piece index"
+diameter_mm = 6.1468
+[tools.drill-d]  # Drills D
+description = "D (.2460 in) drill, 115-piece index"
+diameter_mm = 6.2484
+[tools.drill-h]  # Drills H
+description = "H (.2660 in) drill, 115-piece index"
+diameter_mm = 6.7564
+[tools.drill-l]  # Drills L
+description = "L (.2900 in) drill, 115-piece index"
+diameter_mm = 7.366
+[tools.drill-m]  # Drills M
+description = "M (.2950 in) drill, 115-piece index"
+diameter_mm = 7.493
+[tools.drill-n]  # Drills N
+description = "N (.3020 in) drill, 115-piece index"
+diameter_mm = 7.6708
+[tools.drill-v]  # Drills V
+description = "V (.3770 in) drill, 115-piece index"
+diameter_mm = 9.5758
+[tools.drill-13-32]  # Drills 13/32
+description = "13/32 (.4062 in) drill, 115-piece index"
+diameter_mm = 10.31875
+[tools.drill-7-16]  # Drills 7/16
+description = "7/16 (.4375 in) drill, 115-piece index"
+diameter_mm = 11.1125
+[tools.drill-11-8mm]  # G-drill-11.8mm; Drills 11.8 mm
+description = "11.8 mm (or 11.75 mm) pre-drill for 12 mm H7 reamer"
+diameter_mm = 11.8
+[tools.drill-15-32]  # Drills 15/32
+description = "15/32 (.4688 in) drill, 115-piece index"
+diameter_mm = 11.90625
+[tools.drill-31-64]  # Drills 31/64
+description = "31/64 (.4844 in) drill, 115-piece index"
+diameter_mm = 12.303125
+[tools.drill-13mm]  # G-drill-13mm; Drills 13 mm
+description = "13 mm drill, shank <= 1/2 in"
+diameter_mm = 13.0
+[tools.drill-33-64]  # G-drill-33-64; Drills 33/64
+description = "33/64 drill, 1/2 in reduced shank"
+diameter_mm = 13.096875
+[tools.taper-pin-reamer]  # B-reamer-taper-pin
+description = "Taper-pin reamer 1:48 (No. 4) for MHA-DT-09"
+[tools.reamer-0620]  # B-reamer-.0620
+description = ".0620 in HSS chucking reamer"
+diameter_mm = 1.5748
+[tools.reamer-0630]  # B-reamer-.0630
+description = ".0630 in HSS chucking reamer"
+diameter_mm = 1.6002
+[tools.reamer-0775]  # B-reamer-.0775
+description = ".0775 in HSS chucking reamer"
+diameter_mm = 1.9685
+[tools.reamer-1240]  # B-reamer-.1240
+description = ".1240 in HSS chucking reamer"
+diameter_mm = 3.1496
+[tools.reamer-1260]  # B-reamer-.1260
+description = ".1260 in HSS chucking reamer"
+diameter_mm = 3.2004
+[tools.reamer-1865]  # B-reamer-.1865
+description = ".1865 in HSS chucking reamer"
+diameter_mm = 4.7371
+[tools.reamer-1885]  # B-reamer-.1885
+description = ".1885 in HSS chucking reamer"
+diameter_mm = 4.7879
+[tools.reamer-2490]  # B-reamer-.2490
+description = ".2490 in HSS chucking reamer"
+diameter_mm = 6.3246
+[tools.reamer-2510]  # B-reamer-.2510
+description = ".2510 in HSS chucking reamer"
+diameter_mm = 6.3754
+[tools.reamer-2550]  # B-reamer-.2550
+description = ".2550 in HSS chucking reamer"
+diameter_mm = 6.477
+[tools.reamer-2560]  # B-reamer-.2560 (B-reamer-.2559, 6.5 mm, its optional alternative)
+description = ".2560 in HSS chucking reamer"
+diameter_mm = 6.5024
+[tools.reamer-3135]  # B-reamer-.3135
+description = ".3135 in HSS chucking reamer"
+diameter_mm = 7.9629
+[tools.reamer-4500]  # B-reamer-.4500
+description = ".4500 in HSS chucking reamer"
+diameter_mm = 11.43
+[tools.reamer-12mm-h7]  # B-reamer-12mm-h7
+description = "12 mm H7 HSS chucking reamer"
+diameter_mm = 12.0
+[tools.reamer-4835]  # B-reamer-.4835
+description = ".4835 in HSS chucking reamer"
+diameter_mm = 12.2809
+[tools.reamer-4990]  # B-reamer-.4990
+description = ".4990 in HSS chucking reamer"
+diameter_mm = 12.6746
+[tools.reamer-5010]  # B-reamer-.5010
+description = ".5010 in HSS chucking reamer"
+diameter_mm = 12.7254
+[tools.tap-0-80-bottoming]  # F-tap-bottoming-0-80; Tap coverage #0-80 UNF
+description = "Bottoming hand tap #0-80 UNF, HSS"
+[tools.tap-0-80-plug]  # Tap coverage #0-80 UNF
+description = "#0-80 UNF plug hand tap (OSG 1000100)"
+[tools.tap-1-4-28-plug]  # Tap coverage 1/4-28 UNF
+description = "1/4-28 UNF plug hand tap (OSG 1120408)"
+[tools.tap-1-72-plug]  # Tap coverage #1-72 UNF
+description = "#1-72 UNF plug hand tap (OSG 1010700)"
+[tools.tap-10-24-bottoming]  # Tap coverage #10-24 UNC
+description = "#10-24 UNC bottoming hand tap (OSG 1025000)"
+[tools.tap-10-24-plug]  # Tap coverage #10-24 UNC
+description = "#10-24 UNC plug hand tap (OSG 1024901)"
+[tools.tap-10-32-bottoming]  # Tap coverage #10-32 UNF
+description = "#10-32 UNF bottoming hand tap (OSG 1025308)"
+[tools.tap-10-32-plug]  # Tap coverage #10-32 UNF
+description = "#10-32 UNF plug hand tap (OSG 1025200)"
+[tools.tap-2-56-bottoming]  # Tap coverage #2-56 UNC
+description = "#2-56 UNC bottoming hand tap (OSG 1011108)"
+[tools.tap-2-56-plug]  # Tap coverage #2-56 UNC
+description = "#2-56 UNC plug hand tap (OSG 1011008)"
+[tools.tap-4-40-bottoming]  # F-tap-bottoming-4-40; Tap coverage #4-40 UNC
+description = "Bottoming hand tap #4-40 UNC, HSS"
+[tools.tap-6-32-plug]  # Tap coverage #6-32 UNC
+description = "#6-32 UNC plug hand tap (OSG 1023700)"
+[tools.broach-bushing-3-8-a]  # F-broach-bushing
+description = "Broach bushing 3/8 style A collared"
+[tools.cylinder-notch-saw]  # F-notch-saw
+description = "Screw-slotting saw 2-3/4 x .014 x 1"
+[tools.endmill-7-32]  # C-endmill-7-32
+description = "7/32 in (.2188) square end mill, centre cutting"
+[tools.form-tool-r160]  # D-form-tool-R160
+description = "R.160 convex-dome form tool"
+[tools.frame-spotface-endmill]  # F-spotface-endmill-11-32
+description = "11/32 HSS 2-flute end mill"
+[tools.gear-cutter-arbor-1]  # F-arbor-1in-R8
+description = "1 in R8 stub arbor"
+[tools.gear-cutter-arbor-7-8]  # F-arbor-7-8
+description = "7/8 stub arbor, 3/4 straight shank"
+[tools.gear-cutters-24dp-20pa]  # F-gear-cutter-10-289-242, F-gear-cutter-10-289-247
+description = "24DP 20PA involute gear cutters #2 and #7"
+[tools.gear-cutters-32dp-20pa]  # F-gear-cutter-10-289-328
+description = "32DP 20PA involute gear cutter #8"
+[tools.gear-cutters-48dp-20pa]  # F-gear-cutter-10-289-481 to -488
+description = "48DP 20PA involute gear cutters #1 to #8"
+[tools.keyseat-endmill-1-16]  # F-keyseat-endmill
+description = "1/16 HSS 2-flute DE end mill, 0/+.002"
+[tools.keyway-broach-1-16-a]  # F-keyway-broach
+description = "1/16 keyway broach, style A"
+[tools.slot-cutter-200]  # C-slot-cutter-200
+description = "0.200 in / 13/64 slot cutter"
+[tools.depth-micrometer]  # F-depth-micrometer
+description = "Depth micrometer, inch"
+[tools.digital-angle-gauge]  # F-digital-angle-gauge
+description = "Digital angle gauge"
+[tools.feeler-gauges-metric]  # F-feeler-66MA
+description = "Starrett 66MA metric thickness gage (EDP 55974)"
+[tools.pin-gauges-011-060]  # A1-pin-set-011-060
+description = "Pin gauge set .011-.060 in by .001 in, class ZZ minus"
+[tools.pin-gauges-061-500]  # A1-pin-set-061-500-combined, bought for the A1-pin-set-061-250 and A1-pin-set-251-500 rows
+description = "Pin gauge set .061-.500 in combined, class ZZ minus"
+[tools.protractor]  # F-protractor
+description = "Protractor"
+[tools.angle-plate-4]  # F-angle-plate-LMS-5386
+description = "Angle plate 4x4x4 webbed end (LMS 5386)"
+[tools.arbor-press]  # F-arbor-press
+description = "Arbor press, 1 ton"
+[tools.centre-punch-starrett-18a]  # F-centre-punch-starrett-18A
+description = "Starrett 18A automatic centre punch"
+[tools.file-nicholson-10-second-cut]  # F-file-nicholson-10-mill-second-cut
+description = "Nicholson 10 in mill second-cut file"
+[tools.ignition-wrenches]  # F-ignition-wrenches
+description = "Ignition wrenches under 1/4 in"
+[tools.india-stone-ib8]  # F-stone-norton-IB8
+description = "Norton IB8 India combination stone"
+[tools.pliers]  # F-pliers
+description = "Pliers"
+[tools.setting-mandrel-375]  # F-setting-mandrel-375
+description = "3/8 in ground setting mandrel"
+[tools.steel-rule-48]  # F-steel-rule-48
+description = "Steel rule, 48 in"
+[tools.straightedge]  # F-straightedge
+description = "Straightedge"
+[tools.transfer-punches]  # F-transfer-punches-fractional, F-transfer-punches-number
+description = "Transfer punch sets, fractional 3/32-1/2 by 64ths and number sizes #1-#60"
+[tools.v-blocks]  # F-v-blocks
+description = "Matched V-block pair with clamps"

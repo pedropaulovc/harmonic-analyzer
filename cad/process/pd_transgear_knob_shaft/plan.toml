@@ -1,0 +1,32 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Transgear Knob Shaft"
+part = "MHA-PD-08 Transgear Knob Shaft"
+revision = "placeholder"
+material = "LOW-CARBON STEEL, E.G. 1018 CF"
+stock = "To be written"
+shop = "../shop.toml"
+
+[[tools]]
+id = "gear-cutter-arbor-7-8"
+name = "7/8 cutter arbor"
+ref = "gear-cutter-arbor-7-8"  # F-arbor-7-8
+
+[[tools]]
+id = "gear-cutters-48dp-20pa"
+name = "48DP 20PA gear cutter #7"
+ref = "gear-cutters-48dp-20pa"  # F-gear-cutter-10-289-487
+
+[[tools]]
+id = "pin-gauges-011-060"
+name = "Pin gauges .011-.060"
+ref = "pin-gauges-011-060"  # A1-pin-set-011-060
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

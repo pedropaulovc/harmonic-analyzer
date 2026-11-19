@@ -1,0 +1,37 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Connecting Rod"
+part = "MHA-CH-03 Connecting Rod"
+revision = "placeholder"
+material = "AISI 1018 CF flat, 1/4 x 2 REF"
+stock = "To be written"
+shop = "../shop.toml"
+
+[[tools]]
+id = "drill-49"
+name = "#49 drill"
+ref = "drill-49"  # Drills #49
+
+[[tools]]
+id = "reamer-0775"
+name = ".0775 reamer"
+ref = "reamer-0775"  # B-reamer-.0775
+
+[[tools]]
+id = "pin-gauges-061-500"
+name = "Pin gauges .061-.500"
+ref = "pin-gauges-061-500"  # A1-pin-set-061-250, A1-pin-set-061-500-combined
+
+[[tools]]
+id = "arbor-press"
+name = "Arbor press"
+ref = "arbor-press"  # F-arbor-press
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

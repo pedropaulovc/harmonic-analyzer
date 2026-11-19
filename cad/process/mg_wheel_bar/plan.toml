@@ -1,0 +1,47 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Wheel Bar"
+part = "MHA-MG-08 Wheel Bar"
+revision = "placeholder"
+material = "Plain Carbon Steel"
+stock = "To be written"
+shop = "../shop.toml"
+
+[[tools]]
+id = "drill-17"
+name = "#17 drill"
+ref = "drill-17"  # Drills #17
+
+[[tools]]
+id = "block-drill-15"
+name = "#15 drill"
+ref = "block-drill-15"  # Drills #15
+
+[[tools]]
+id = "riser-drill-9"
+name = "#9 drill"
+ref = "riser-drill-9"  # Drills #9
+
+[[tools]]
+id = "reamer-1865"
+name = ".1865 reamer"
+ref = "reamer-1865"  # B-reamer-.1865
+
+[[tools]]
+id = "pin-gauges-061-500"
+name = "Pin gauges .061-.500"
+ref = "pin-gauges-061-500"  # A1-pin-set-061-250, A1-pin-set-061-500-combined
+
+[[tools]]
+id = "steel-rule-48"
+name = "48 in steel rule"
+ref = "steel-rule-48"  # F-steel-rule-48
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

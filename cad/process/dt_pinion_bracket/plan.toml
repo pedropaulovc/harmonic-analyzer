@@ -1,0 +1,47 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Pinion Bracket Strap"
+part = "MHA-DT-14 Pinion Bracket Strap"
+revision = "placeholder"
+material = "AISI 1018 or 12L14 cold-finished steel bar"
+stock = "To be written"
+shop = "../shop.toml"
+
+[[tools]]
+id = "drill-1-16"
+name = "1/16 drill"
+ref = "drill-1-16"  # Drills 1/16
+
+[[tools]]
+id = "drill-26"
+name = "#26 drill"
+ref = "drill-26"  # Drills #26
+
+[[tools]]
+id = "reamer-2510"
+name = ".2510 reamer"
+ref = "reamer-2510"  # B-reamer-.2510
+
+[[tools]]
+id = "reamer-3135"
+name = ".3135 reamer"
+ref = "reamer-3135"  # B-reamer-.3135
+
+[[tools]]
+id = "feeler-gauges-metric"
+name = "Starrett 66MA feelers"
+ref = "feeler-gauges-metric"  # F-feeler-66MA
+
+[[tools]]
+id = "pin-gauges-061-500"
+name = "Pin gauges .061-.500"
+ref = "pin-gauges-061-500"  # A1-pin-set-061-250, A1-pin-set-061-500-combined, A1-pin-set-251-500
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

@@ -4,9 +4,12 @@ and gauges its process plan names.
 A part is made in the shop when its registry row's ``process`` does not start
 with ``purchased`` (cad/config/parts/*.yaml through ``_config.parts``). Parts
 point at what they need from their process plans, never the other way round:
-each enrolled plan (``_process_plans.TRAVELER_STEMS``) names its stock in
-``stock_refs`` (keys of the cad/config/shop-equipment/ ``[stock.<key>]`` rows) and
-its tools in ``[[tools]]``, whose ``ref`` is a cad/process/shop.toml ``tools``
+every plan under cad/process (``<stem>/plan.toml``: the enrolled plans of
+``_process_plans.TRAVELER_STEMS`` and the placeholder plans that only list a
+part's tools until its traveler is written; the directory names the part,
+``<stem>`` with ``_`` for ``-``) names its stock in ``stock_refs`` (keys of the
+cad/config/shop-equipment/ ``[stock.<key>]`` rows) and its tools in
+``[[tools]]``, whose ``ref`` is a cad/process/shop.toml ``tools``
 key, and its gauges in the setups' and operations' ``gauge_checks``, whose
 ``gauge`` is a shop.toml ``gauges`` key. A stock row's ``status`` says whether
 it is on hand, bought but not received, or still to order. A tool's or gauge's
@@ -234,14 +237,21 @@ def _gauge_refs(plan: dict) -> list[str]:
     return list(dict.fromkeys(refs))
 
 
+def plan_stems() -> tuple[str, ...]:
+    """Every ``cad/process/<stem>/plan.toml``, enrolled or placeholder."""
+    root = _process_plans.PROCESS_ROOT
+    return tuple(sorted(path.parent.name for path in root.glob("*/plan.toml")))
+
+
 def load_plans(
-    stems: tuple[str, ...] = _process_plans.TRAVELER_STEMS,
+    stems: tuple[str, ...] | None = None,
     shop_path: Path = _process_plans.SHOP_PATH,
     equipment_dir: Path = _shop_equipment.DIRECTORY,
 ) -> dict[str, PlanRefs]:
     """Registry stem -> the stock keys, tools and gauges its process plan names.
 
-    A tool's or gauge's ownership is the inventory record under its shop key in
+    ``stems`` defaults to every plan under cad/process (``plan_stems``). A
+    tool's or gauge's ownership is the inventory record under its shop key in
     any of ``OWNERSHIP_SECTIONS``; a tool without a ``ref`` has none.
     """
     shop = tomllib.loads(shop_path.read_text(encoding="utf-8"))
@@ -260,7 +270,7 @@ def load_plans(
             return None
         return ToolLine(ref=ref, name=name, status=status)
 
-    for stem in stems:
+    for stem in plan_stems() if stems is None else stems:
         plan_file = _process_plans.plan_path(stem)
         plan = tomllib.loads(plan_file.read_text(encoding="utf-8"))
         name = plan_file.parent.name
@@ -269,7 +279,7 @@ def load_plans(
             for tool in plan.get("tools", ())
         ]
         gauges = [line(name, "gauges", ref, ref) for ref in _gauge_refs(plan)]
-        by_part[plan["cad"]["part"]] = PlanRefs(
+        by_part[stem.replace("_", "-")] = PlanRefs(
             stock_keys=tuple(plan.get("stock_refs", ())),
             tools=tuple(t for t in tools if t is not None),
             gauges=tuple(g for g in gauges if g is not None),

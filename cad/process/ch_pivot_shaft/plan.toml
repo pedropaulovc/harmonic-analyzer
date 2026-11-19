@@ -1,0 +1,22 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Pivot Shaft"
+part = "MHA-CH-05 Pivot Shaft"
+revision = "placeholder"
+material = "AISI 1018 cold-finished steel bar, Ø5/16 in"
+stock = "To be written"
+shop = "../shop.toml"
+
+[[tools]]
+id = "form-tool-r160"
+name = "R.160 dome form tool"
+ref = "form-tool-r160"  # D-form-tool-R160
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

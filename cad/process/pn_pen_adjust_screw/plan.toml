@@ -1,0 +1,27 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Pen Adjust Screw"
+part = "MHA-PN-07 Pen Adjust Screw"
+revision = "placeholder"
+material = "C36000 free-machining brass rod"
+stock = "To be written"
+shop = "../shop.toml"
+
+[[tools]]
+id = "drill-54"
+name = "#54 drill"
+ref = "drill-54"  # Drills #54
+
+[[tools]]
+id = "ignition-wrenches"
+name = "Ignition wrenches"
+ref = "ignition-wrenches"  # F-ignition-wrenches
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

@@ -1,0 +1,22 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Pinion Lift Rod"
+part = "MHA-DT-17 Pinion Lift Rod"
+revision = "placeholder"
+material = "AISI 1018 cold-finished steel shafting"
+stock = "To be written"
+shop = "../shop.toml"
+
+[[tools]]
+id = "depth-micrometer"
+name = "Depth micrometer"
+ref = "depth-micrometer"  # F-depth-micrometer
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

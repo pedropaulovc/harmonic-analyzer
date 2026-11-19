@@ -1,0 +1,27 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Guide Lock"
+part = "MHA-PD-12 Guide Lock"
+revision = "placeholder"
+material = "Low-carbon steel sheet (ASTM A36, AISI 1008/1010 or 1018), 1/16 in, thickness as supplied within +/-.005 in (e.g. McMaster-Carr 1388K196 A36 precision-ground)"
+stock = "To be written"
+shop = "../shop.toml"
+
+[[tools]]
+id = "drill-1-8"
+name = "1/8 drill"
+ref = "drill-1-8"  # Drills 1/8
+
+[[tools]]
+id = "india-stone-ib8"
+name = "India stone"
+ref = "india-stone-ib8"  # F-stone-norton-IB8
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

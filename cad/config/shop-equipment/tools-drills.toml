@@ -1,0 +1,277 @@
+# CAD-owned shop-equipment records (cad/process/README.md, "Shop records"):
+# the ownership of the drills the placeholder process plans name, from the
+# owner's quote workbook quotes-2026-11-17-rev3.xlsx (owner 2026-11-19): its
+# Drills sheet for the 115-piece index members, its Items rows for the drills
+# to buy. Description and diameter_mm are cad/process/shop.toml under the same
+# key; no field here repeats one there. TOML, deliberately not YAML; no COM
+# build closure reads it: it is in no leaf's cache key.
+
+[tools.drill-60]
+kind = "drill"
+status = "on_hand"
+note = "quotes-2026-11-17-rev3.xlsx Drills #60: owned in 115-pc index (quality unverified); spares on the buy list as G-spare-60 (Travers 01-002-060)."
+
+[tools.drill-57]
+kind = "drill"
+status = "on_hand"
+note = "quotes-2026-11-17-rev3.xlsx Drills #57: owned in 115-pc index (quality unverified); spares on the buy list as G-spare-57 (Travers 01-002-057)."
+
+[tools.drill-56]
+kind = "drill"
+status = "on_hand"
+note = "quotes-2026-11-17-rev3.xlsx Drills #56: owned in 115-pc index (quality unverified); spares on the buy list as G-spare-56 (Travers 01-002-056)."
+
+[tools.drill-3-64]
+kind = "drill"
+status = "on_hand"
+note = "quotes-2026-11-17-rev3.xlsx Drills 3/64: owned in 115-pc index (quality unverified); spares on the buy list as G-spare-3-64 (Travers 01-001-003)."
+
+[tools.drill-54]
+kind = "drill"
+status = "on_hand"
+note = "quotes-2026-11-17-rev3.xlsx Drills #54: owned in 115-pc index (quality unverified); spares on the buy list as G-spare-54 (Travers 01-002-054)."
+
+[tools.drill-53]
+kind = "drill"
+status = "on_hand"
+note = "quotes-2026-11-17-rev3.xlsx Drills #53: owned in 115-pc index (quality unverified); spares on the buy list as G-spare-53 (Travers 01-002-053)."
+
+[tools.drill-1-16]
+kind = "drill"
+status = "on_hand"
+note = "quotes-2026-11-17-rev3.xlsx Drills 1/16: owned in 115-pc index (quality unverified); spares on the buy list as G-spare-1-16 (Travers 01-001-004)."
+
+[tools.drill-51]
+kind = "drill"
+status = "on_hand"
+note = "quotes-2026-11-17-rev3.xlsx Drills #51: owned in 115-pc index (quality unverified); not on the buy list."
+
+[tools.drill-50]
+kind = "drill"
+status = "on_hand"
+note = "quotes-2026-11-17-rev3.xlsx Drills #50: owned in 115-pc index (quality unverified); spares on the buy list as G-spare-50 (Travers 01-071-050)."
+
+[tools.drill-49]
+kind = "drill"
+status = "on_hand"
+note = "quotes-2026-11-17-rev3.xlsx Drills #49: owned in 115-pc index (quality unverified); spares on the buy list as G-spare-49 (Travers 01-071-049)."
+
+[tools.drill-47]
+kind = "drill"
+status = "on_hand"
+note = "quotes-2026-11-17-rev3.xlsx Drills #47: owned in 115-pc index (quality unverified); spares on the buy list as G-spare-47 (Travers 01-071-047)."
+
+[tools.drill-45]
+kind = "drill"
+status = "on_hand"
+note = "quotes-2026-11-17-rev3.xlsx Drills #45: owned in 115-pc index (quality unverified); not on the buy list."
+
+[tools.drill-44]
+kind = "drill"
+status = "on_hand"
+note = "quotes-2026-11-17-rev3.xlsx Drills #44: owned in 115-pc index (quality unverified); not on the buy list."
+
+[tools.drill-41]
+kind = "drill"
+status = "on_hand"
+note = "quotes-2026-11-17-rev3.xlsx Drills #41: owned in 115-pc index (quality unverified); not on the buy list."
+
+[tools.drill-40]
+kind = "drill"
+status = "on_hand"
+note = "quotes-2026-11-17-rev3.xlsx Drills #40: owned in 115-pc index (quality unverified); not on the buy list."
+
+[tools.drill-37]
+kind = "drill"
+status = "on_hand"
+note = "quotes-2026-11-17-rev3.xlsx Drills #37: owned in 115-pc index (quality unverified); not on the buy list."
+
+[tools.drill-36]
+kind = "drill"
+status = "on_hand"
+note = "quotes-2026-11-17-rev3.xlsx Drills #36: owned in 115-pc index (quality unverified); not on the buy list."
+
+[tools.drill-33]
+kind = "drill"
+status = "on_hand"
+note = "quotes-2026-11-17-rev3.xlsx Drills #33: owned in 115-pc index (quality unverified); not on the buy list."
+
+[tools.drill-32]
+kind = "drill"
+status = "on_hand"
+note = "quotes-2026-11-17-rev3.xlsx Drills #32: owned in 115-pc index (quality unverified); not on the buy list."
+
+[tools.drill-31]
+kind = "drill"
+status = "on_hand"
+note = "quotes-2026-11-17-rev3.xlsx Drills #31: owned in 115-pc index (quality unverified); not on the buy list."
+
+[tools.drill-1-8]
+kind = "drill"
+status = "on_hand"
+note = "quotes-2026-11-17-rev3.xlsx Drills 1/8: owned in 115-pc index (quality unverified); not on the buy list."
+
+[tools.riser-drill-30]
+kind = "drill"
+status = "on_hand"
+note = "quotes-2026-11-17-rev3.xlsx Drills #30: owned in 115-pc index (quality unverified); not on the buy list."
+
+[tools.jig-drill-29]
+kind = "drill"
+status = "on_hand"
+note = "quotes-2026-11-17-rev3.xlsx Drills #29: owned in 115-pc index (quality unverified); not on the buy list."
+
+[tools.drill-27]
+kind = "drill"
+status = "on_hand"
+note = "quotes-2026-11-17-rev3.xlsx Drills #27: owned in 115-pc index (quality unverified); not on the buy list."
+
+[tools.drill-26]
+kind = "drill"
+status = "on_hand"
+note = "quotes-2026-11-17-rev3.xlsx Drills #26: owned in 115-pc index (quality unverified); not on the buy list."
+
+[tools.drill-25]
+kind = "drill"
+status = "on_hand"
+note = "quotes-2026-11-17-rev3.xlsx Drills #25: owned in 115-pc index (quality unverified); not on the buy list."
+
+[tools.drill-21]
+kind = "drill"
+status = "on_hand"
+note = "quotes-2026-11-17-rev3.xlsx Drills #21: owned in 115-pc index (quality unverified); not on the buy list."
+
+[tools.drill-20]
+kind = "drill"
+status = "on_hand"
+note = "quotes-2026-11-17-rev3.xlsx Drills #20: owned in 115-pc index (quality unverified); not on the buy list."
+
+[tools.drill-17]
+kind = "drill"
+status = "on_hand"
+note = "quotes-2026-11-17-rev3.xlsx Drills #17: owned in 115-pc index (quality unverified); not on the buy list."
+
+[tools.drill-16]
+kind = "drill"
+status = "on_hand"
+note = "quotes-2026-11-17-rev3.xlsx Drills #16: owned in 115-pc index (quality unverified); not on the buy list."
+
+[tools.block-drill-15]
+kind = "drill"
+status = "on_hand"
+note = "quotes-2026-11-17-rev3.xlsx Drills #15: owned in 115-pc index (quality unverified); not on the buy list."
+
+[tools.drill-14]
+kind = "drill"
+status = "on_hand"
+note = "quotes-2026-11-17-rev3.xlsx Drills #14: owned in 115-pc index (quality unverified); not on the buy list."
+
+[tools.drill-10]
+kind = "drill"
+status = "on_hand"
+note = "quotes-2026-11-17-rev3.xlsx Drills #10: owned in 115-pc index (quality unverified); not on the buy list."
+
+[tools.riser-drill-9]
+kind = "drill"
+status = "on_hand"
+note = "quotes-2026-11-17-rev3.xlsx Drills #9: owned in 115-pc index (quality unverified); not on the buy list."
+
+[tools.drill-8]
+kind = "drill"
+status = "on_hand"
+note = "quotes-2026-11-17-rev3.xlsx Drills #8: owned in 115-pc index (quality unverified); not on the buy list."
+
+[tools.drill-3]
+kind = "drill"
+status = "on_hand"
+note = "quotes-2026-11-17-rev3.xlsx Drills #3: owned in 115-pc index (quality unverified); not on the buy list."
+
+[tools.drill-1]
+kind = "drill"
+status = "on_hand"
+note = "quotes-2026-11-17-rev3.xlsx Drills #1: owned in 115-pc index (quality unverified); not on the buy list."
+
+[tools.drill-b]
+kind = "drill"
+status = "on_hand"
+note = "quotes-2026-11-17-rev3.xlsx Drills B: owned in 115-pc index (quality unverified); not on the buy list."
+
+[tools.drill-c]
+kind = "drill"
+status = "on_hand"
+note = "quotes-2026-11-17-rev3.xlsx Drills C: owned in 115-pc index (quality unverified); not on the buy list."
+
+[tools.drill-d]
+kind = "drill"
+status = "on_hand"
+note = "quotes-2026-11-17-rev3.xlsx Drills D: owned in 115-pc index (quality unverified); not on the buy list."
+
+[tools.drill-h]
+kind = "drill"
+status = "on_hand"
+note = "quotes-2026-11-17-rev3.xlsx Drills H: owned in 115-pc index (quality unverified); not on the buy list."
+
+[tools.drill-l]
+kind = "drill"
+status = "on_hand"
+note = "quotes-2026-11-17-rev3.xlsx Drills L: owned in 115-pc index (quality unverified); not on the buy list."
+
+[tools.drill-m]
+kind = "drill"
+status = "on_hand"
+note = "quotes-2026-11-17-rev3.xlsx Drills M: owned in 115-pc index (quality unverified); not on the buy list."
+
+[tools.drill-n]
+kind = "drill"
+status = "on_hand"
+note = "quotes-2026-11-17-rev3.xlsx Drills N: owned in 115-pc index (quality unverified); not on the buy list."
+
+[tools.block-drill-5-16]
+kind = "drill"
+status = "on_hand"
+note = "quotes-2026-11-17-rev3.xlsx Drills 5/16: owned in 115-pc index (quality unverified); not on the buy list."
+
+[tools.jig-drill-23-64]
+kind = "drill"
+status = "on_hand"
+note = "quotes-2026-11-17-rev3.xlsx Drills 23/64: owned in 115-pc index (quality unverified); not on the buy list."
+
+[tools.drill-v]
+kind = "drill"
+status = "on_hand"
+note = "quotes-2026-11-17-rev3.xlsx Drills V: owned in 115-pc index (quality unverified); not on the buy list."
+
+[tools.drill-13-32]
+kind = "drill"
+status = "on_hand"
+note = "quotes-2026-11-17-rev3.xlsx Drills 13/32: owned in 115-pc index (quality unverified); not on the buy list."
+
+[tools.drill-7-16]
+kind = "drill"
+status = "on_hand"
+note = "quotes-2026-11-17-rev3.xlsx Drills 7/16: owned in 115-pc index (quality unverified); not on the buy list."
+
+[tools.drill-11-8mm]
+kind = "drill"
+status = "to_order"
+note = "quotes-2026-11-17-rev3.xlsx G-drill-11.8mm: not owned; recommended Travers 01-041-180."
+
+[tools.drill-15-32]
+kind = "drill"
+status = "on_hand"
+note = "quotes-2026-11-17-rev3.xlsx Drills 15/32: owned in 115-pc index (quality unverified); not on the buy list."
+
+[tools.drill-31-64]
+kind = "drill"
+status = "on_hand"
+note = "quotes-2026-11-17-rev3.xlsx Drills 31/64: owned in 115-pc index (quality unverified); not on the buy list."
+
+[tools.drill-13mm]
+kind = "drill"
+status = "to_order"
+note = "quotes-2026-11-17-rev3.xlsx G-drill-13mm (optional tier, not in the recommended total): not owned; recommended McMaster-Carr 6154N11."
+
+[tools.drill-33-64]
+kind = "drill"
+status = "to_order"
+note = "quotes-2026-11-17-rev3.xlsx G-drill-33-64: not owned; recommended Zoro G910858682."

@@ -1,0 +1,32 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Platen"
+part = "MHA-PD-02 Platen"
+revision = "placeholder"
+material = "C36000 free-machining brass plate, 1/4 in"
+stock = "To be written"
+shop = "../shop.toml"
+
+[[tools]]
+id = "drill-50"
+name = "#50 drill"
+ref = "drill-50"  # Drills #50
+
+[[tools]]
+id = "drill-27"
+name = "#27 drill"
+ref = "drill-27"  # Drills #27
+
+[[tools]]
+id = "tap-2-56-plug"
+name = "#2-56 plug tap"
+ref = "tap-2-56-plug"  # Tap coverage #2-56 UNC
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

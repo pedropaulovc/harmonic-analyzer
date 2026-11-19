@@ -1,0 +1,37 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Pinion Engage Lever"
+part = "MHA-DT-16 Pinion Engage Lever"
+revision = "placeholder"
+material = "LOW-CARBON STEEL, E.G. 1018 CF"
+stock = "To be written"
+shop = "../shop.toml"
+
+[[tools]]
+id = "drill-51"
+name = "#51 drill"
+ref = "drill-51"  # Drills #51
+
+[[tools]]
+id = "reamer-2510"
+name = ".2510 reamer"
+ref = "reamer-2510"  # B-reamer-.2510
+
+[[tools]]
+id = "pin-gauges-061-500"
+name = "Pin gauges .061-.500"
+ref = "pin-gauges-061-500"  # A1-pin-set-061-500-combined, A1-pin-set-251-500
+
+[[tools]]
+id = "centre-punch-starrett-18a"
+name = "Automatic centre punch"
+ref = "centre-punch-starrett-18a"  # F-centre-punch-starrett-18A
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

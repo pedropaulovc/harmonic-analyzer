@@ -1,0 +1,22 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Crank Handle Pivot Screw"
+part = "MHA-DT-32 Crank Handle Pivot Screw"
+revision = "placeholder"
+material = "AISI 1018 or 12L14 cold-finished steel rod, 1/4 in"
+stock = "To be written"
+shop = "../shop.toml"
+
+[[tools]]
+id = "file-nicholson-10-second-cut"
+name = "10 in mill file"
+ref = "file-nicholson-10-second-cut"  # F-file-nicholson-10-mill-second-cut
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

@@ -1,0 +1,27 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Cone Gear Shaft"
+part = "MHA-DT-04 Cone Gear Shaft"
+revision = "placeholder"
+material = "ASTM A108 1018"
+stock = "To be written"
+shop = "../shop.toml"
+
+[[tools]]
+id = "keyseat-endmill-1-16"
+name = "1/16 keyseat end mill"
+ref = "keyseat-endmill-1-16"  # F-keyseat-endmill
+
+[[tools]]
+id = "pin-gauges-061-500"
+name = "Pin gauges .061-.500"
+ref = "pin-gauges-061-500"  # A1-pin-set-061-250, A1-pin-set-061-500-combined
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

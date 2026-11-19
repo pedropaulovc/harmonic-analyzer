@@ -1,0 +1,22 @@
+# CAD-owned shop-equipment records (cad/process/README.md, "Shop records"):
+# the ownership of the single-part cutters the placeholder process plans name
+# (a counterbore end mill, a slot cutter and a dome form tool), from the
+# owner's quote workbook quotes-2026-11-17-rev3.xlsx (owner 2026-11-19).
+# Descriptions are cad/process/shop.toml under the same key; no field here
+# repeats one there. TOML, deliberately not YAML; no COM build closure reads
+# it: it is in no leaf's cache key.
+
+[tools.endmill-7-32]
+kind = "end_mill"
+status = "to_order"
+note = "quotes-2026-11-17-rev3.xlsx C-endmill-7-32: recommended Shars 404-6071."
+
+[tools.form-tool-r160]
+kind = "form_tool"
+status = "to_order"
+note = "quotes-2026-11-17-rev3.xlsx D-form-tool-R160 (not in the recommended total): no in-spec offer found (the workbook's Not priced sheet); nearest standard radii 5/32 (.1563) or 4 mm (.1575)."
+
+[tools.slot-cutter-200]
+kind = "end_mill"
+status = "to_order"
+note = "quotes-2026-11-17-rev3.xlsx C-slot-cutter-200: recommended Travers 08-105-050. Caution (workbook note): a 13/64 (.2031) cutter is over the MHA-PN-02 slot's .202 high limit; only a .200 carbide cutter cuts it in one pass."

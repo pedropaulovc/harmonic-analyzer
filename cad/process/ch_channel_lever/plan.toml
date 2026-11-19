@@ -1,0 +1,42 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Channel Lever"
+part = "MHA-CH-02 Channel Lever"
+revision = "placeholder"
+material = "LOW-CARBON STEEL, E.G. 1018 CF"
+stock = "To be written"
+shop = "../shop.toml"
+
+[[tools]]
+id = "drill-47"
+name = "#47 drill"
+ref = "drill-47"  # Drills #47
+
+[[tools]]
+id = "drill-21"
+name = "#21 drill"
+ref = "drill-21"  # Drills #21
+
+[[tools]]
+id = "drill-d"
+name = "D drill"
+ref = "drill-d"  # Drills D
+
+[[tools]]
+id = "reamer-2560"
+name = ".2560 reamer"
+ref = "reamer-2560"  # B-reamer-.2559, B-reamer-.2560
+
+[[tools]]
+id = "pin-gauges-061-500"
+name = "Pin gauges .061-.500"
+ref = "pin-gauges-061-500"  # A1-pin-set-061-500-combined, A1-pin-set-251-500
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

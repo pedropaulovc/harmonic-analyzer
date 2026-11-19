@@ -1,0 +1,52 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Knife Mount"
+part = "MHA-SM-02 Knife Mount"
+revision = "placeholder"
+material = "AISI 4140/4142 HT, pre-hardened, as supplied"
+stock = "To be written"
+shop = "../shop.toml"
+
+[[tools]]
+id = "drill-32"
+name = "#32 drill"
+ref = "drill-32"  # Drills #32
+
+[[tools]]
+id = "drill-25"
+name = "#25 drill"
+ref = "drill-25"  # Drills #25
+
+[[tools]]
+id = "drill-11-8mm"
+name = "11.8 mm drill"
+ref = "drill-11-8mm"  # G-drill-11.8mm, Drills 11.8 mm
+
+[[tools]]
+id = "reamer-12mm-h7"
+name = "12 mm H7 reamer"
+ref = "reamer-12mm-h7"  # B-reamer-12mm-h7
+
+[[tools]]
+id = "tap-10-24-bottoming"
+name = "#10-24 bottoming tap"
+ref = "tap-10-24-bottoming"  # Tap coverage #10-24 UNC
+
+[[tools]]
+id = "tap-10-24-plug"
+name = "#10-24 plug tap"
+ref = "tap-10-24-plug"  # Tap coverage #10-24 UNC
+
+[[tools]]
+id = "pin-gauges-061-500"
+name = "Pin gauges .061-.500"
+ref = "pin-gauges-061-500"  # A1-pin-set-061-250, A1-pin-set-061-500-combined, A1-pin-set-251-500
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

@@ -1,0 +1,52 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Fulcrum Keeper"
+part = "MHA-CH-07 Fulcrum Keeper"
+revision = "placeholder"
+material = "AISI 1018 cold-finished steel bar"
+stock = "To be written"
+shop = "../shop.toml"
+
+[[tools]]
+id = "drill-53"
+name = "#53 drill"
+ref = "drill-53"  # Drills #53
+
+[[tools]]
+id = "drill-41"
+name = "#41 drill"
+ref = "drill-41"  # Drills #41
+
+[[tools]]
+id = "drill-c"
+name = "C drill"
+ref = "drill-c"  # Drills C
+
+[[tools]]
+id = "reamer-2550"
+name = ".2550 reamer"
+ref = "reamer-2550"  # B-reamer-.2550
+
+[[tools]]
+id = "tap-1-72-plug"
+name = "#1-72 plug tap"
+ref = "tap-1-72-plug"  # Tap coverage #1-72 UNF
+
+[[tools]]
+id = "pin-gauges-061-500"
+name = "Pin gauges .061-.500"
+ref = "pin-gauges-061-500"  # A1-pin-set-061-500-combined, A1-pin-set-251-500
+
+[[tools]]
+id = "centre-punch-starrett-18a"
+name = "Automatic centre punch"
+ref = "centre-punch-starrett-18a"  # F-centre-punch-starrett-18A
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

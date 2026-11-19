@@ -1,0 +1,37 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Output Fixture"
+part = "MHA-MG-06 Output Fixture"
+revision = "placeholder"
+material = "C36000 free-cutting brass"
+stock = "To be written"
+shop = "../shop.toml"
+
+[[tools]]
+id = "jig-drill-43"
+name = "#43 drill"
+ref = "jig-drill-43"  # Drills #43
+
+[[tools]]
+id = "drill-1"
+name = "#1 drill"
+ref = "drill-1"  # Drills #1
+
+[[tools]]
+id = "jig-tap-4-40-plug"
+name = "#4-40 plug tap"
+ref = "jig-tap-4-40-plug"  # Tap coverage #4-40 UNC
+
+[[tools]]
+id = "tap-4-40-bottoming"
+name = "#4-40 bottoming tap"
+ref = "tap-4-40-bottoming"  # F-tap-bottoming-4-40, Tap coverage #4-40 UNC
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."
