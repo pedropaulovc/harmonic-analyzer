@@ -29,7 +29,7 @@ def test_restated_floors_are_their_sources() -> None:
     # The levers' hubs set the pitch the neighbour stack is judged at.
     assert lever.HUB_LENGTH == bank.PITCH
     assert pin.BAR_HOLE_DIA is bar.TOP_PIN_HOLE_DIA
-    assert pin.BAR_HOLE_BAND is bar.TOP_PIN_HOLE_BAND
+    assert pin.BAR_HOLE_LIMITS is bar.TOP_PIN_HOLE_LIMITS
     # ANSI B4.1 FN2, 0-0.12 in: 0.2 to 0.85 thousandths of an inch.
     assert pin.PRESS_INTERFERENCE_MIN == pytest.approx(0.00508, abs=1e-6)
     assert pin.PRESS_INTERFERENCE_MAX == pytest.approx(0.02159, abs=1e-6)

@@ -89,11 +89,15 @@ TOP_NOTCH_HEIGHT = 13.97  # .55
 TOP_PIN_DROP = 0.25 * MM_PER_IN  # 6.35 (.25) hole centre below the bar top
 # The MHA-SH-VN-58 bar pivot pin presses into this hole through both top-notch
 # cheeks and runs in the lever's #47 hole (user ruling 2026-10, press fit;
-# sh_vn_pivot_pin_bar_spec holds the fit budget). Reamed .0775 +.0004/.0000 in
-# under the 5/64 dowel, the .0775-.0779 limits the pin budget holds, printed as
-# a plain inch band (owner decision 2026-11-19, #3124 item 5).
-TOP_PIN_HOLE_DIA = 1.9685  # .0775 in
-TOP_PIN_HOLE_BAND = (0.01016, 0.0)  # (upper, lower) deviations, reamed; native
+# sh_vn_pivot_pin_bar_spec holds the fit budget). Reamed .0775-.0779 in under
+# the 5/64 dowel, the limits the pin budget holds, printed as the two limits
+# (swTolLIMIT), so no deviation step reads as a converted millimetre value
+# (owner decision 2026-11-19, #3124 item 5, and its limit-form follow-up the
+# same day). The model sits mid-band, as every LIMIT dimension does.
+TOP_PIN_HOLE_LIMITS = (1.9685, 1.97866)  # .0775-.0779 in, reamed; native
+TOP_PIN_HOLE_DIA = 1.97358  # .0777 in
+if abs(TOP_PIN_HOLE_DIA - sum(TOP_PIN_HOLE_LIMITS) / 2.0) > 1e-9:
+    raise AssertionError("the top pin hole's model must sit mid-band")
 
 # --- Derived. ---
 TOP_PIN_Y = BAR_LENGTH - TOP_PIN_DROP  # 801.9432

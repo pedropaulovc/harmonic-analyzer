@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import math
 from pathlib import Path
 
@@ -68,7 +69,7 @@ def test_part_geometry_matches_the_spec() -> None:
     assert bar.BAR_LENGTH is ch_amplitude_bar_spec.BAR_LENGTH
     assert ch_amplitude_bar_spec.BAR_WIDTH == bar.BAR_WIDTH
     assert bar.TOP_PIN_HOLE_DIA is ch_amplitude_bar_spec.TOP_PIN_HOLE_DIA
-    assert bar.TOP_PIN_HOLE_BAND is ch_amplitude_bar_spec.TOP_PIN_HOLE_BAND
+    assert bar.TOP_PIN_HOLE_LIMITS is ch_amplitude_bar_spec.TOP_PIN_HOLE_LIMITS
     assert bar.BAR_DEPTH == ch_amplitude_bar_spec.BAR_DEPTH
 
 
@@ -81,22 +82,32 @@ def test_top_pin_hole_is_the_reamed_press_hole_for_the_bar_pivot_pin() -> None:
     from _drawing_contract import model_toleranced_dimensions
 
     notes = ch_amplitude_bar_notes
-    # Owner decision 2026-11-19 (#3124 item 5): the .0775-.0779 limits the pin
-    # budget holds, printed as a plain inch band on a .0775 nominal; the
-    # delegated acceptance of the old +.0009/+.0005 step (RV-07) is withdrawn.
-    assert ch_amplitude_bar_spec.TOP_PIN_HOLE_DIA == 1.9685
-    assert ch_amplitude_bar_spec.TOP_PIN_HOLE_BAND == (0.01016, 0.0)
-    hole_limits = tuple(
-        (ch_amplitude_bar_spec.TOP_PIN_HOLE_DIA + deviation) / 25.4
-        for deviation in reversed(ch_amplitude_bar_spec.TOP_PIN_HOLE_BAND)
+    # Owner decision 2026-11-19 (#3124 item 5, limit-form follow-up): the
+    # .0775-.0779 limits the pin budget holds print as the two limits
+    # (swTolLIMIT), with the model mid-band; the delegated acceptance of the
+    # old +.0009/+.0005 step (RV-07) is withdrawn and no exception replaces it.
+    spec = ch_amplitude_bar_spec
+    assert tuple(limit / 25.4 for limit in spec.TOP_PIN_HOLE_LIMITS) == pytest.approx(
+        (0.0775, 0.0779), abs=1e-12
     )
-    assert hole_limits == pytest.approx((0.0775, 0.0779), abs=1e-12)
+    assert spec.TOP_PIN_HOLE_DIA == pytest.approx(sum(spec.TOP_PIN_HOLE_LIMITS) / 2.0)
     assert "RV-07" not in {
         row["id"] for row in parts("ch-amplitude-bar")["machinist_exceptions"]
     }
-    assert model_toleranced_dimensions(bar)[("TopPinProfile", "TopPinDia")] == (
-        "*deviations(TOP_PIN_HOLE_BAND)"
-    )
+    assert ("TopPinProfile", "TopPinDia") not in model_toleranced_dimensions(bar)
+    tree = ast.parse(Path(bar.__file__).read_text(encoding="utf-8"))
+    limits = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call) and getattr(node.func, "id", None) == "set_limits"
+    ]
+    assert len(limits) == 1
+    assert [ast.unparse(a) for a in limits[0].args[1:]] == ["'TopPinProfile'", "'TopPinDia'"]
+    assert {k.arg: ast.unparse(k.value) for k in limits[0].keywords} == {
+        "limits": "TOP_PIN_HOLE_LIMITS",
+        "places": "DRAWING_PRECISION['TopPinProfile']['TopPinDia']",
+        "display_unit": "UNIT",
+    }
     assert notes.TOP_PIN_NUMBER == parts("sh-vn-pivot-pin")["number"]
     assert notes.DRAWING_DIMENSIONS["TopPinProfile"] == {
         "BarSection",
@@ -847,7 +858,8 @@ def test_every_printed_dimension_reads_its_inch_value() -> None:
         "BarSection": (spec.BAR_DEPTH, 0.25),
         "TopPinX": (spec.BAR_DEPTH / 2.0, 0.125),
         "TopPinDrop": (spec.TOP_PIN_DROP, 0.25),
-        "TopPinDia": (spec.TOP_PIN_HOLE_DIA, 0.0775),
+        # The model sits mid-band; the sheet prints the two limits instead.
+        "TopPinDia": (spec.TOP_PIN_HOLE_DIA, 0.0777),
     }
     assert set(printed) == set(places)
     exact = {"BarLength", "BottomNotchHeight"}
@@ -880,6 +892,9 @@ def test_every_band_is_inch_native() -> None:
         (spec.BOTTOM_NOTCH_WIDTH_BAND, (0.006, 0.0)),
         (spec.BOTTOM_NOTCH_DEPTH_BAND, (0.0, -0.020)),
         ((tol, -tol), (0.002, -0.002)),
-        (spec.TOP_PIN_HOLE_BAND, (0.0004, 0.0)),
+        (
+            tuple(limit - spec.TOP_PIN_HOLE_LIMITS[0] for limit in spec.TOP_PIN_HOLE_LIMITS),
+            (0.0, 0.0004),
+        ),
     ):
         assert tuple(value / 25.4 for value in band) == pytest.approx(inch, abs=1e-12)

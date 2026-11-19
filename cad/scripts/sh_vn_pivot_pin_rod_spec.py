@@ -58,7 +58,7 @@ PIN_END_PROUD_MAX = 0.0
 # --- The fork's reamed press hole (the rod spec owns it; restated here so the
 # budget reads one place). ---
 ROD_HOLE_DIA = _rod.PIN_HOLE_DIA
-ROD_HOLE_BAND = _rod.PIN_HOLE_BAND
+ROD_HOLE_LIMITS = _rod.PIN_HOLE_LIMITS
 
 # --- The joint's limits (the budget test_sh_vn_pivot_pin_rod_fit holds). ---
 # The press the tines take: ANSI B4.1-1967 (R1987) FN2 "medium drive fit,
@@ -119,7 +119,7 @@ def joint_budget() -> dict[str, float]:
     """Worst-case values of every fit the joint must hold (all mm).
 
     Every term is at the worst case of its printed band (drawing-guidelines.md rule 17 (walls and webs)):
-    the purchased pin's 0/+.0002 in, the reamed tine hole .0775 +.0004/.0000, the
+    the purchased pin's 0/+.0002 in, the reamed tine hole .0775-.0779, the
     arm's #47 hole at its sheet's DRILLED HOLES row, the arm strap and its
     symmetry to its hub (STRAP_HUB_SYMMETRY), each tine .067 +/-.002, the slot
     .106 +/-.002 (so the fork over the tines, their reference sum, spans
@@ -132,7 +132,7 @@ def joint_budget() -> dict[str, float]:
     _w_min, w_max = _band(_rod.FORK_THICKNESS, _rod.FORK_THICKNESS_BAND)
     s_min, s_max = _band(_rod.FORK_SLOT_WIDTH, _rod.FORK_SLOT_BAND)
     tine_min, tine_max = _band(_rod.TINE_THICKNESS, _rod.TINE_BAND)
-    hole_min, hole_max = _band(ROD_HOLE_DIA, ROD_HOLE_BAND)
+    hole_min, hole_max = ROD_HOLE_LIMITS
     arm_hole_min = NUMBER_DRILL_MM[_arm.ROD_HOLE_SPEC.size]
     arm_hole_max = arm_hole_min + DRILLED_PLUS
     pin_min, pin_max = PIN_DIA_LIMITS
