@@ -548,10 +548,13 @@ def _counter_setting(adapter: Any, front: Any) -> Callable[[], None]:
     return settled
 
 
-def _dowel_proud_setting(adapter: Any, detail: Any) -> Callable[[], None]:
+def _dowel_proud_setting(
+    adapter: Any, detail: Any
+) -> tuple[Callable[[], None], Callable[[], None]]:
     """Each dowel's free end below the crossbar underside (the knife mount's
     clamped top seat), the proud MHA-SM-00 step 1 sets: a toleranced setting
-    dimension on DETAIL A, the title block's .XX governing it."""
+    dimension on DETAIL A, the title block's .XX governing it. Returns its
+    settled check and the deferred move of its text onto a leader."""
     label = "dowel proud"
     top, end = (
         model_point_in_view(
@@ -573,16 +576,19 @@ def _dowel_proud_setting(adapter: Any, detail: Any) -> Callable[[], None]:
         text_xy=(line_x, mid_y),
         label=label,
     )
-    offset_dimension_text(
-        adapter,
-        [annotation],
-        {
-            spec.DOWEL_PROUD_DIMENSION: (
-                line_x + DOWEL_PROUD_TEXT_DX,
-                mid_y + DOWEL_PROUD_TEXT_DY,
-            )
-        },
-    )
+
+    def offset_text() -> None:
+        offset_dimension_text(
+            adapter,
+            [annotation],
+            {
+                spec.DOWEL_PROUD_DIMENSION: (
+                    line_x + DOWEL_PROUD_TEXT_DX,
+                    mid_y + DOWEL_PROUD_TEXT_DY,
+                )
+            },
+        )
+
     display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
 
     def settled() -> None:
@@ -595,7 +601,7 @@ def _dowel_proud_setting(adapter: Any, detail: Any) -> Callable[[], None]:
         _assert_callout(display, spec.DOWEL_PROUD_DIMENSION)
 
     settled()
-    return settled
+    return settled, offset_text
 
 
 def _break_out_dowel_end(adapter: Any, detail: Any) -> None:
@@ -819,20 +825,18 @@ def _knife_detail(adapter: Any) -> tuple[Callable[[], None], Callable[[], None]]
     """The 1:1 knife-edge detail: the knife contact and the boss face the
     setting table's rock row is read at, and the dowel's proud.
 
-    Returns the proud's settled check and the deferred break-out of the
-    dowel's free end. ``build`` cuts that break-out only after the exploded
-    sheet's balloons are placed: cut first, it left the exploded view's
-    'Default Simplified' reading no explode steps (farm leaves
-    drawing:sm_summing_assembly 20261119T222550Z and 20261119T225826Z)."""
+    Returns the proud's settled check and the deferred finish of DETAIL A:
+    the proud's text onto its leader and the break-out of the dowel's free
+    end. Until then the sheet runs exactly the order farm run
+    20261119T202848942Z proved (crop, then show and import the setting):
+    with the import, text offset and break-out before the crop, the exploded
+    sheet's 'Default Simplified' read no explode steps (farm leaves
+    drawing:sm_summing_assembly 20261119T222550Z, 225826Z and 230558Z), so
+    ``build`` runs the finish only after the exploded sheet's balloons."""
     label = notes.DETAIL_TITLE
     view = _placed_detail(adapter)
-    # Import, then crop; the sketch shows before any break-out
-    # (draw_mg_magnifier_assembly: once a view holds a broken-out section its
-    # sketches no longer select to be shown). The settled check proves the
-    # dimension survives the crop and the break-out.
-    proud_settled = _dowel_proud_setting(adapter, view)
     _crop_detail(adapter, view)
-    proud_settled()
+    proud_settled, offset_proud_text = _dowel_proud_setting(adapter, view)
     label_xy = (
         DETAIL_CENTRE[0] - DETAIL_LABEL_INSET,
         DETAIL_CENTRE[1] - DETAIL_CROP_RADIUS - DETAIL_LABEL_GAP,
@@ -842,14 +846,15 @@ def _knife_detail(adapter: Any) -> tuple[Callable[[], None], Callable[[], None]]
         raise RuntimeError(f"failed to label the {label}")
     _assert_view_on_sheet(view, label=label)
 
-    def break_out() -> None:
+    def finish() -> None:
         _activate_sheet(adapter, SHEET_NAMES[0])
+        offset_proud_text()
         _break_out_dowel_end(adapter, view)
         if not bool(_early_bound(view, "IView").IsCropped()):
             raise RuntimeError(f"the {label} lost its crop to the dowel break-out")
         proud_settled()
 
-    return proud_settled, break_out
+    return proud_settled, finish
 
 
 def _place_setting_table(adapter: Any, views: dict[str, Any]) -> None:
