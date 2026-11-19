@@ -10,12 +10,20 @@ and bronze), so the part reads the worst of their statuses. A made part with no
 allocated row reads ``vendor_sku`` when its registry row names supplier SKUs
 (bought hardware reworked in the shop), otherwise ``no_stock_record``.
 
+Tools come from the part's process plan, never from the inventory: each
+enrolled plan (``_process_plans.TRAVELER_STEMS``) lists its ``[[tools]]``, and a
+tool's ``ref`` names its cad/process/shop.toml ``tools`` key. Ownership reads
+the same key in shop-equipment.toml's ``tools`` table: ``present = true`` is
+``on_hand``, ``present = false`` ``to_buy``, and no record (or a plan tool with
+no ``ref``) ``unrecorded``. A part without a plan reads ``no traveler``.
+
 Usage:
     uv run --frozen python cad/scripts/stock_bom.py [--format md|csv] [--out PATH]
 
 Exits 2 when a row allocates a stem that is not in the registry or is a
-purchased part, or carries an unknown status: the inventory must not point at a
-retired or bought identity.
+purchased part, carries an unknown status, or a plan names an unknown or
+purchased part or a tool ``ref`` missing from shop.toml: the inventory and the
+plans must not point at a retired or bought identity.
 """
 
 from __future__ import annotations
@@ -31,10 +39,12 @@ from fractions import Fraction
 from pathlib import Path
 
 import _config
+import _process_plans
 import _telemetry
 from _paths import CAD_ROOT
 
 SHOP_EQUIPMENT = CAD_ROOT / "config" / "shop-equipment.toml"
+NO_TRAVELER = "no traveler"
 MM_PER_IN = 25.4
 
 
@@ -52,6 +62,19 @@ class PartStockStatus(enum.Enum):
     TO_ORDER = "to_order"
     VENDOR_SKU = "vendor_sku"
     NO_STOCK_RECORD = "no_stock_record"
+
+
+class ToolStatus(enum.Enum):
+    ON_HAND = "on_hand"
+    TO_BUY = "to_buy"
+    UNRECORDED = "unrecorded"
+
+
+@dataclass(frozen=True)
+class ToolLine:
+    ref: str
+    name: str
+    status: ToolStatus
 
 
 @dataclass(frozen=True)
@@ -72,6 +95,8 @@ class BomLine:
     stock: tuple[StockRow, ...]
     supplier_skus: tuple[str, ...]
     status: PartStockStatus
+    # None: the part has no process plan, so its tools are not recorded.
+    tools: tuple[ToolLine, ...] | None
 
 
 class InventoryError(ValueError):
@@ -143,6 +168,45 @@ def load_stock(path: Path = SHOP_EQUIPMENT) -> list[StockRow]:
     return rows
 
 
+def _tool_status(record: dict | None) -> ToolStatus:
+    if record is None or "present" not in record:
+        return ToolStatus.UNRECORDED
+    if record["present"] is True:
+        return ToolStatus.ON_HAND
+    return ToolStatus.TO_BUY
+
+
+def load_tools(
+    stems: tuple[str, ...] = _process_plans.TRAVELER_STEMS,
+    shop_path: Path = _process_plans.SHOP_PATH,
+    equipment_path: Path = SHOP_EQUIPMENT,
+) -> dict[str, tuple[ToolLine, ...]]:
+    """Registry stem -> the tools its process plan lists, in plan order."""
+    shop_tools = tomllib.loads(shop_path.read_text(encoding="utf-8"))["tools"]
+    owned = tomllib.loads(equipment_path.read_text(encoding="utf-8"))["tools"]
+    errors = []
+    by_part = {}
+    for stem in stems:
+        plan_file = _process_plans.plan_path(stem)
+        plan = tomllib.loads(plan_file.read_text(encoding="utf-8"))
+        tools = []
+        for tool in plan.get("tools", ()):
+            ref = tool.get("ref", "")
+            if ref and ref not in shop_tools:
+                errors.append(
+                    f"{plan_file.parent.name}: tool ref {ref!r} not in shop.toml"
+                )
+                continue
+            record = owned.get(ref) if ref else None
+            tools.append(
+                ToolLine(ref=ref, name=tool["name"], status=_tool_status(record))
+            )
+        by_part[plan["cad"]["part"]] = tuple(tools)
+    if errors:
+        raise InventoryError("; ".join(errors))
+    return by_part
+
+
 def _is_made(row: dict) -> bool:
     return not str(row.get("process", "")).startswith("purchased")
 
@@ -158,9 +222,17 @@ def _part_status(
     return PartStockStatus.NO_STOCK_RECORD
 
 
-def build_bom(registry: dict[str, dict], stock: list[StockRow]) -> list[BomLine]:
+def build_bom(
+    registry: dict[str, dict],
+    stock: list[StockRow],
+    tools: dict[str, tuple[ToolLine, ...]],
+) -> list[BomLine]:
     made = {stem: row for stem, row in registry.items() if _is_made(row)}
-    errors = []
+    errors = [
+        f"process plan for {'unknown' if stem not in registry else 'purchased'} part {stem!r}"
+        for stem in tools
+        if stem not in made
+    ]
     by_stem: dict[str, list[StockRow]] = {stem: [] for stem in made}
     for row in stock:
         for stem in row.allocated_to:
@@ -194,6 +266,7 @@ def build_bom(registry: dict[str, dict], stock: list[StockRow]) -> list[BomLine]
                 stock=rows,
                 supplier_skus=skus,
                 status=_part_status(rows, skus),
+                tools=tools.get(stem),
             )
         )
     return lines
@@ -207,6 +280,12 @@ def _stock_cell(line: BomLine) -> str:
     if line.supplier_skus:
         return "supplier SKU " + ", ".join(line.supplier_skus)
     return ""
+
+
+def _tools_cell(line: BomLine) -> str:
+    if line.tools is None:
+        return NO_TRAVELER
+    return "; ".join(f"{tool.name} [{tool.status.value}]" for tool in line.tools)
 
 
 def _md_escape(text: str) -> str:
@@ -225,9 +304,10 @@ def render_markdown(lines: list[BomLine], stock: list[StockRow]) -> str:
         + ".\n\n"
     )
     out.write(
-        "|Number|Part|Kind|Qty|Status|Material (registry)|Stock (shop-equipment.toml)|\n"
+        "|Number|Part|Kind|Qty|Status|Material (registry)|Stock (shop-equipment.toml)"
+        "|Tools (process plan)|\n"
     )
-    out.write("|---|---|---|---|---|---|---|\n")
+    out.write("|---|---|---|---|---|---|---|---|\n")
     for line in lines:
         cells = [
             line.number,
@@ -237,6 +317,7 @@ def render_markdown(lines: list[BomLine], stock: list[StockRow]) -> str:
             line.status.value,
             line.material,
             _stock_cell(line),
+            _tools_cell(line),
         ]
         out.write("|" + "|".join(_md_escape(cell) for cell in cells) + "|\n")
     spare = [row for row in stock if not row.allocated_to]
@@ -256,7 +337,7 @@ def render_csv(lines: list[BomLine], stock: list[StockRow]) -> str:
     out = io.StringIO()
     writer = csv.writer(out, lineterminator="\n")
     writer.writerow(
-        ["number", "part", "kind", "quantity", "status", "material", "stock"]
+        ["number", "part", "kind", "quantity", "status", "material", "stock", "tools"]
     )
     for line in lines:
         writer.writerow(
@@ -268,13 +349,23 @@ def render_csv(lines: list[BomLine], stock: list[StockRow]) -> str:
                 line.status.value,
                 line.material,
                 _stock_cell(line),
+                _tools_cell(line),
             ]
         )
     for row in stock:
         if row.allocated_to:
             continue
         writer.writerow(
-            ["", "", "", "", row.status.value, "", f"#{row.index} {row.description}"]
+            [
+                "",
+                "",
+                "",
+                "",
+                row.status.value,
+                "",
+                f"#{row.index} {row.description}",
+                "",
+            ]
         )
     return out.getvalue()
 
@@ -287,7 +378,7 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         stock = load_stock()
-        lines = build_bom(_config.parts(), stock)
+        lines = build_bom(_config.parts(), stock, load_tools())
     except InventoryError as exc:
         _telemetry.error(f"stock_bom: {exc}")
         return 2

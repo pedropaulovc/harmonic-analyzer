@@ -119,8 +119,12 @@ Facts prechips has no field for, but which CAD specs and tests read, live in
   `uv run --frozen python cad/scripts/stock_bom.py [--format md|csv]` joins
   these rows to the part registry: one line per made part with its stock and
   the worst status of its rows (`no_stock_record` when no row serves it,
-  `vendor_sku` for reworked bought hardware), then the unallocated rows. It
-  exits 2 when a row names an unknown or purchased stem, and
+  `vendor_sku` for reworked bought hardware), the tools its process plan's
+  `[[tools]]` list (ownership read from this file's `tools.<ref>` `present`:
+  `on_hand`, `to_buy` or `unrecorded`; `no traveler` for a part without a
+  plan), then the unallocated rows. Tools point from the plan, never from
+  this inventory. It exits 2 when a row or plan names an unknown or purchased
+  stem, or a plan's tool `ref` is not in `shop.toml`, and
   `test_stock_bom.py` (`check:recipe`) runs that check on every change;
 - the MHA-FR-02 top-frame casting to buy (owner ruling 2026-11-10 (Pedro),
   #2333): a gray-iron ASTM A48 class 25B `[[stock]]` row of form `casting`,
