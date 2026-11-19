@@ -1435,7 +1435,10 @@ LUGS_BASELINE_ROW_M = 0.0057
 # keep the proven positions so their texts remain clear of extension lines.
 # The socket-boss stations (#3124) nest outside them by length: the 1.24
 # nearest, its text left of X0 (its span is shorter than the text and the
-# 1.56 extension line rises just right of it), the 16.76 outermost.
+# 1.56 extension line rises just right of it), the 16.76 outermost. The 1.25
+# is too short for its arrows, whose upper one overruns X0 by about 10 mm,
+# so its column stands left of the 1.24 text (farm leaf
+# drawing:fr_harmonic_base 20261119T225309Z: text-on-line at 14 mm).
 LUGS_X_ROWS = (
     ("SocketBossNearX", -251.0),
     ("Lug1X", -166.5),
@@ -1444,7 +1447,7 @@ LUGS_X_ROWS = (
     ("SocketBossFarX", 100.0),
 )
 LUGS_Y_COLUMNS = (
-    ("SocketBossNearY", 14.0, 8.0),
+    ("SocketBossNearY", 22.0, 8.0),
     ("Lug1Y", 34.25, 28.0),
     ("LongRibY", 54.75, 52.0),
     ("Lug0Y", 76.25, 86.0),

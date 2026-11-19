@@ -815,16 +815,22 @@ def _mark_detail_boundary(adapter: Any, front: Any) -> None:
     _telemetry.info(f"summing: {label} centre {centre!r} radius {radius!r}")
 
 
-def _knife_detail(adapter: Any) -> Callable[[], None]:
+def _knife_detail(adapter: Any) -> tuple[Callable[[], None], Callable[[], None]]:
     """The 1:1 knife-edge detail: the knife contact and the boss face the
-    setting table's rock row is read at, and the dowel's proud."""
+    setting table's rock row is read at, and the dowel's proud.
+
+    Returns the proud's settled check and the deferred break-out of the
+    dowel's free end. ``build`` cuts that break-out only after the exploded
+    sheet's balloons are placed: cut first, it left the exploded view's
+    'Default Simplified' reading no explode steps (farm leaves
+    drawing:sm_summing_assembly 20261119T222550Z and 20261119T225826Z)."""
     label = notes.DETAIL_TITLE
     view = _placed_detail(adapter)
-    # Import, break out, then crop (draw_mg_magnifier_assembly's order: once
-    # a view holds a broken-out section its sketches no longer select to be
-    # shown); the settled check proves the dimension survived both.
+    # Import, then crop; the sketch shows before any break-out
+    # (draw_mg_magnifier_assembly: once a view holds a broken-out section its
+    # sketches no longer select to be shown). The settled check proves the
+    # dimension survives the crop and the break-out.
     proud_settled = _dowel_proud_setting(adapter, view)
-    _break_out_dowel_end(adapter, view)
     _crop_detail(adapter, view)
     proud_settled()
     label_xy = (
@@ -835,7 +841,15 @@ def _knife_detail(adapter: Any) -> Callable[[], None]:
     if add_note(adapter, DETAIL_LABEL, *label_xy) is None:
         raise RuntimeError(f"failed to label the {label}")
     _assert_view_on_sheet(view, label=label)
-    return proud_settled
+
+    def break_out() -> None:
+        _activate_sheet(adapter, SHEET_NAMES[0])
+        _break_out_dowel_end(adapter, view)
+        if not bool(_early_bound(view, "IView").IsCropped()):
+            raise RuntimeError(f"the {label} lost its crop to the dowel break-out")
+        proud_settled()
+
+    return proud_settled, break_out
 
 
 def _place_setting_table(adapter: Any, views: dict[str, Any]) -> None:
@@ -878,9 +892,12 @@ def _place_setting_table(adapter: Any, views: dict[str, Any]) -> None:
         )
 
 
-def _place_assembled_sheet(adapter: Any) -> Callable[[], None]:
+def _place_assembled_sheet(
+    adapter: Any,
+) -> tuple[Callable[[], None], Callable[[], None]]:
     """Front and right at 1:5 (the screw height on the front), the knife-edge
-    detail, the setting table and the notes."""
+    detail, the setting table and the notes; returns the settled check and
+    DETAIL A's deferred dowel break-out."""
     _activate_sheet(adapter, SHEET_NAMES[0])
     views = {}
     for name, centre in (("*Front", FRONT_CENTER), ("*Right", RIGHT_CENTER)):
@@ -892,7 +909,7 @@ def _place_assembled_sheet(adapter: Any) -> Callable[[], None]:
         views[name] = view
     counter_settled = _counter_setting(adapter, views["*Front"])
     _mark_detail_boundary(adapter, views["*Front"])
-    proud_settled = _knife_detail(adapter)
+    proud_settled, break_out_dowel = _knife_detail(adapter)
     _place_setting_table(adapter, views)
     _add_note_block(
         adapter, SHEET_NAMES[0], ASSEMBLED_NOTES, NOTES_XY, label="assembled notes"
@@ -902,7 +919,7 @@ def _place_assembled_sheet(adapter: Any) -> Callable[[], None]:
         counter_settled()
         proud_settled()
 
-    return settled
+    return settled, break_out_dowel
 
 
 # --- BOM ------------------------------------------------------------------------
@@ -1194,9 +1211,10 @@ def build(adapter: Any) -> dict[str, str]:
     _validate_source(source_model)
 
     _create_sheets(adapter)
-    assembled_settled = _place_assembled_sheet(adapter)
+    assembled_settled, break_out_dowel = _place_assembled_sheet(adapter)
     exploded_settled = _place_exploded_sheet(adapter)
     _place_finished_sheet(adapter)
+    break_out_dowel()
 
     def settled() -> None:
         assembled_settled()
