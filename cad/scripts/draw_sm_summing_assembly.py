@@ -506,9 +506,14 @@ def _dimension_value_mm(display: Any) -> float:
     return abs(float(dimension.SystemValue) * 1000.0)
 
 
-def _counter_setting(adapter: Any, front: Any) -> Callable[[], None]:
+def _counter_setting(
+    adapter: Any, front: Any
+) -> tuple[Callable[[], None], Callable[[], None]]:
     """The screw axis height over the knife contact level, a reference
-    dimension on the front view."""
+    dimension on the front view. Returns its settled check and the step that
+    parenthesizes it again after DETAIL A's break-out, which dropped its
+    reference parentheses (farm leaf drawing:sm_summing_assembly
+    20261119T231650Z: settled check 'no longer a reference dimension')."""
     label = "counter screw height"
     knife, screw = (
         model_point_in_view(
@@ -537,15 +542,21 @@ def _counter_setting(adapter: Any, front: Any) -> Callable[[], None]:
     _assert_callout(display, spec.COUNTER_DIMENSION)
 
     def settled() -> None:
-        if (str(display.GetText(1) or ""), str(display.GetText(2) or "")) != ("(", ")"):
-            raise RuntimeError(f"{label} is no longer a reference dimension")
+        texts = (str(display.GetText(1) or ""), str(display.GetText(2) or ""))
+        if texts != ("(", ")"):
+            raise RuntimeError(
+                f"{label} is no longer a reference dimension: prefix/suffix {texts!r}"
+            )
         if abs(_dimension_value_mm(display) - spec.COUNTER_SCREW_RISE) > 1e-4:
             raise RuntimeError(f"{label}: settled nominal changed")
         if int(display.GetPrimaryPrecision2()) != spec.COUNTER_PRECISION:
             raise RuntimeError(f"{label}: settled precision changed")
         _assert_callout(display, spec.COUNTER_DIMENSION)
 
-    return settled
+    def reparenthesize() -> None:
+        set_reference_dimension(adapter, annotation, label=label)
+
+    return settled, reparenthesize
 
 
 def _dowel_proud_setting(
@@ -902,7 +913,8 @@ def _place_assembled_sheet(
 ) -> tuple[Callable[[], None], Callable[[], None]]:
     """Front and right at 1:5 (the screw height on the front), the knife-edge
     detail, the setting table and the notes; returns the settled check and
-    DETAIL A's deferred dowel break-out."""
+    the deferred finish (DETAIL A's text offset and break-out, then the
+    counter's parentheses again)."""
     _activate_sheet(adapter, SHEET_NAMES[0])
     views = {}
     for name, centre in (("*Front", FRONT_CENTER), ("*Right", RIGHT_CENTER)):
@@ -912,9 +924,9 @@ def _place_assembled_sheet(
         apply_view_configuration(adapter, view, role=ViewRole.PLAIN, label=label)
         _assert_view_on_sheet(view, label=label)
         views[name] = view
-    counter_settled = _counter_setting(adapter, views["*Front"])
+    counter_settled, reparenthesize_counter = _counter_setting(adapter, views["*Front"])
     _mark_detail_boundary(adapter, views["*Front"])
-    proud_settled, break_out_dowel = _knife_detail(adapter)
+    proud_settled, finish_detail = _knife_detail(adapter)
     _place_setting_table(adapter, views)
     _add_note_block(
         adapter, SHEET_NAMES[0], ASSEMBLED_NOTES, NOTES_XY, label="assembled notes"
@@ -924,7 +936,12 @@ def _place_assembled_sheet(
         counter_settled()
         proud_settled()
 
-    return settled, break_out_dowel
+    def finish() -> None:
+        finish_detail()
+        reparenthesize_counter()
+        settled()
+
+    return settled, finish
 
 
 # --- BOM ------------------------------------------------------------------------
@@ -1216,10 +1233,10 @@ def build(adapter: Any) -> dict[str, str]:
     _validate_source(source_model)
 
     _create_sheets(adapter)
-    assembled_settled, break_out_dowel = _place_assembled_sheet(adapter)
+    assembled_settled, finish_assembled = _place_assembled_sheet(adapter)
     exploded_settled = _place_exploded_sheet(adapter)
     _place_finished_sheet(adapter)
-    break_out_dowel()
+    finish_assembled()
 
     def settled() -> None:
         assembled_settled()
