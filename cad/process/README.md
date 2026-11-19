@@ -157,7 +157,8 @@ they need from their process plans. They hold:
   `status` (`on_hand`, `not_received` or `to_order`); a process plan names the
   rows it is cut from in `stock_refs`.
   `uv run --frozen python cad/scripts/stock_bom.py [--format md|csv|xlsx]` joins
-  the part registry's made parts to their plans (every `<stem>/plan.toml`,
+  the part registry's made parts (every stem without `-vn-`: a vendor part is
+  bought finished, bought hardware with added machining is made) to their plans (every `<stem>/plan.toml`,
   enrolled or placeholder), normalized to one row per part and requirement:
   `type` `stock` (each row the plan names, with its status;
   one `vendor_sku`, `no_stock_record` or `no_traveler` row when it names none),
@@ -166,7 +167,7 @@ they need from their process plans. They hold:
   operations' `gauge_checks` name, once), then the stock rows no plan names
   with the part columns empty. A tool's or gauge's ownership is the `status`
   of the inventory record under its shop.toml key in whichever of `tools`,
-  `fixtures`, `consumables` and `gauges` holds it, or `unrecorded` with no
+  `fixtures`, `consumables`, `gauges` and `holders` holds it, or `unrecorded` with no
   record, no status or (a tool) no `ref`. The md summary line counts the parts
   `ready`, `missing` and `no_traveler`. `--format xlsx --out PATH` adds a
   Readiness sheet first: per part, its missing stock rows (`not_received`,
@@ -176,7 +177,7 @@ they need from their process plans. They hold:
   write a native PivotTable). Tools and gauges point from the plan, never from
   this inventory. It exits 2 when a stock row or inventory record carries an
   unknown status, a key sits in two of those sections, a plan names an unknown
-  or purchased stem or unknown stock, or a plan's tool `ref` or gauge is not
+  or vendor (`-vn-`) stem or unknown stock, or a plan's tool `ref` or gauge is not
   in `shop.toml`, and `test_stock_bom.py` (`check:recipe`) runs that check on
   every change;
 - the MHA-FR-02 top-frame casting to buy (owner ruling 2026-11-10 (Pedro),

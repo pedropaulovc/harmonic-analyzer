@@ -1084,8 +1084,6 @@ description = "Shop-made latch-hook former: R3.13 roll and R.38 tab form"
 description = "Shop-made platen-clip bow former: R1.36 crown, .06 rise"
 [tools.pd-rack-pinion-cutting-arbor]  # inventory fixtures.pd-rack-pinion-cutting-arbor
 description = "Shop-made work arbor with two backing discs for cutting the MHA-PD-06 teeth"
-[tools.rail-trim-grinder]  # inventory tools.rail-trim-grinder
-description = "4-1/2 in angle grinder with a cut-off disc (BAUER 7 A, Harbor Freight 64856)"
 [tools.reamer-0365]  # inventory tools.reamer-0365
 description = ".0365 in HSS straight-flute chucking reamer (KBC 5-018-0365)"
 diameter_mm = 0.9271

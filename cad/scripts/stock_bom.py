@@ -1,8 +1,11 @@
 """Stock bill of materials: every part the shop makes, with the stock, tools
 and gauges its process plan names.
 
-A part is made in the shop when its registry row's ``process`` does not start
-with ``purchased`` (cad/config/parts/*.yaml through ``_config.parts``). Parts
+A part is made in the shop unless its stem names a vendor identity (``-vn-``,
+cad/docs/subsystem-identities.md): a vendor part is bought finished, cut to
+length at most, while bought hardware with added machining is a made part
+whatever its registry ``process`` text says (cad/config/parts/*.yaml through
+``_config.parts``). Parts
 point at what they need from their process plans, never the other way round:
 every plan under cad/process (``<stem>/plan.toml``: the enrolled plans of
 ``_process_plans.TRAVELER_STEMS`` and the placeholder plans that only list a
@@ -14,8 +17,8 @@ key, and its gauges in the setups' and operations' ``gauge_checks``, whose
 ``gauge`` is a shop.toml ``gauges`` key. A stock row's ``status`` says whether
 it is on hand, bought but not received, or still to order. A tool's or gauge's
 ownership reads the same key in the inventory (``_shop_equipment.load``),
-in whichever of its ``tools``, ``fixtures``, ``consumables`` and ``gauges``
-sections holds it: its ``status`` (``on_hand``, ``not_received``,
+in whichever of its ``tools``, ``fixtures``, ``consumables``, ``gauges`` and
+``holders`` sections holds it: its ``status`` (``on_hand``, ``not_received``,
 ``to_order`` or ``to_make``), or ``unrecorded`` when there is no record, the
 record has no status, or the plan tool has no ``ref``. A part without stock
 reads one placeholder stock row:
@@ -39,7 +42,7 @@ Usage:
 
 Exits 2 when a stock row or an inventory record carries an unknown status, an
 inventory key sits in two ownership sections, or a plan names an unknown or
-purchased part, an unknown stock key, or a tool ``ref`` or gauge missing from
+vendor (``-vn-``) part, an unknown stock key, or a tool ``ref`` or gauge missing from
 shop.toml: the plans must not point at a retired or bought identity.
 """
 
@@ -289,8 +292,9 @@ def load_plans(
     return by_part
 
 
-def _is_made(row: dict) -> bool:
-    return not str(row.get("process", "")).startswith("purchased")
+def _is_made(stem: str) -> bool:
+    """Made unless ``stem`` is a vendor identity (``-vn-``): bought finished."""
+    return "-vn-" not in stem
 
 
 def _placeholder(
@@ -312,7 +316,7 @@ def build_bom(
     stock: dict[str, StockRow],
     plans: dict[str, PlanRefs],
 ) -> list[BomLine]:
-    made = {stem: row for stem, row in registry.items() if _is_made(row)}
+    made = {stem: row for stem, row in registry.items() if _is_made(stem)}
     errors = [
         f"process plan for {'unknown' if stem not in registry else 'purchased'} part {stem!r}"
         for stem in plans

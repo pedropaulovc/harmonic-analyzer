@@ -58,6 +58,23 @@ def test_a_plan_naming_unknown_stock_is_refused() -> None:
         raise AssertionError("unknown stock key accepted")
 
 
+def test_a_part_is_bought_by_vendor_identity_not_process_text() -> None:
+    # Bought hardware with added machining is made; a -vn- stem is bought, so
+    # a plan for it is refused.
+    registry = {
+        "xx-reworked-screw": {
+            "number": "MHA-XX-02",
+            "process": "purchased screw; ream",
+        },
+        "xx-vn-pin": {"number": "MHA-XX-VN-03", "process": "turned"},
+    }
+    (line,) = stock_bom.build_bom(registry, {}, {})
+    assert line.stem == "xx-reworked-screw"
+    plan = stock_bom.PlanRefs(stock_keys=(), tools=())
+    with pytest.raises(stock_bom.InventoryError, match="purchased part 'xx-vn-pin'"):
+        stock_bom.build_bom(registry, {}, {"xx-vn-pin": plan})
+
+
 def test_a_part_is_ready_only_with_its_stock_and_every_tool_on_hand() -> None:
     stock = {"brass": stock_bom.StockRow("brass", "brass bar", ON_HAND)}
     owned = stock_bom.ToolLine("t", "owned", stock_bom.ToolStatus.ON_HAND)
