@@ -1385,14 +1385,15 @@ UNDERSIDE_BOTTOM_KEEP = {
     "CrossRibThickness": (0.128 + CROSS_RIB_CENTER_X * VIEW_SCALE / 1000.0, 0.247),
 }
 UNDERSIDE_BOTTOM_NOTE_XY = (0.030, 0.258)
-# The socket bosses are sketched on the sockets' own ColumnX/ColumnZ
-# stations (build_fr_harmonic_base: both circles driven by the same globals),
-# so the Ø callout states that relation instead of a second set of boss
-# stations: bare, the four boss arcs read as unlocated (machinist review,
-# PR #2702 proof, gating blockers; the sockets are blind from below).
+# The socket bosses stand on the sockets' own ColumnX/ColumnZ stations, and
+# sheet 4 locates their centres from X0 Y0 (2X 1.24/16.76, 2X 1.25/10.07).
+# 'COAXIAL WITH SOCKETS' was the only location before (PR #2702 proof); it
+# left the cast bosses unlocated, the sockets being reference stations
+# transferred from MHA-FR-02 (machinist review, #3124 farm run
+# 20261119T202848942Z), and now would only restate the dimensions.
 UNDERSIDE_BOTTOM_CALLOUTS = {
     "PocketLen": "POCKET",
-    "SocketBossDia": f"{len(SOCKET_BOSS_SHAPES)}X SOCKET BOSSES,\nCOAXIAL WITH SOCKETS",
+    "SocketBossDia": f"{len(SOCKET_BOSS_SHAPES)}X SOCKET BOSSES",
     "PocketFilletRadius": f"{POCKET_FILLET_COUNT}X POCKET\nCORNERS",
     "LongRibThickness": "RIB",
     "CrossRibThickness": "RIB",
@@ -1432,15 +1433,22 @@ LUGS_BASELINE_FIRST_M = 0.0052
 LUGS_BASELINE_ROW_M = 0.0057
 # X rows compact after removing the interior-island dimensions. Y columns
 # keep the proven positions so their texts remain clear of extension lines.
+# The socket-boss stations (#3124) nest outside them by length: the 1.24
+# nearest, its text left of X0 (its span is shorter than the text and the
+# 1.56 extension line rises just right of it), the 16.76 outermost.
 LUGS_X_ROWS = (
+    ("SocketBossNearX", -251.0),
     ("Lug1X", -166.5),
     ("CrossRibX", CROSS_RIB_CENTER_X - 90.0),
     ("Lug3X", -19.8),
+    ("SocketBossFarX", 100.0),
 )
 LUGS_Y_COLUMNS = (
+    ("SocketBossNearY", 14.0, 8.0),
     ("Lug1Y", 34.25, 28.0),
     ("LongRibY", 54.75, 52.0),
     ("Lug0Y", 76.25, 86.0),
+    ("SocketBossFarY", 96.0, 105.0),
 )
 UNDERSIDE_LUGS_KEEP = {
     **{

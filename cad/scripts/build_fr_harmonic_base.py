@@ -117,6 +117,7 @@ from fr_harmonic_base_spec import (
     RIB_RELIEF,
     RIB_THICKNESS,
     SOCKET_BOSS_DIA,
+    SOCKET_BOSS_LOCATIONS,
     SOCKET_BORE_FINISHES,
     SPOTFACE_DEPTH_BAND_MM,
     STACK_HEIGHT,
@@ -1857,45 +1858,9 @@ def build(adapter) -> dict[str, str]:
         adapter, "underside pocket", after - v_pocket, 0.002 * v_pocket + 10.0
     )
 
-    # Full-height bosses round the four sockets, merged into the walls; each
-    # swallows a pocket corner, so the pocket needs no plan-corner radius.
-    socket_bosses = SketchDims()
-    check("create_sketch socket bosses", adapter.create_sketch("Top"))
-    for i, (x, z) in enumerate(COLUMN_SOCKET_XZ):
-        define_circle(
-            adapter,
-            x,
-            -z,
-            SOCKET_BOSS_DIA / 2.0,
-            f"socket boss ({x:+.0f}, {z:+.0f})",
-            dims=socket_bosses,
-            names=(
-                f"SocketBoss{i}X",
-                f"SocketBoss{i}Z",
-                "SocketBossDia" if i == 0 else f"SocketBoss{i}Dia",
-            ),
-            drives=('"ColumnX"', '"ColumnZ"', '"SocketBossDia"'),
-        )
-    ensure_fully_defined(adapter, "socket boss sketch")
-    check("exit_sketch socket bosses", adapter.exit_sketch())
-    name_last_feature(adapter, "SocketBossProfile")
-    drive_jobs += socket_bosses.apply(adapter, "SocketBossProfile")
-    check(
-        "extrude socket bosses",
-        adapter.create_extrusion(ExtrusionParameters(depth=POCKET_CEILING_Y)),
-    )
-    name_last_feature(adapter, "SocketBosses")
-    boss_height_dim = name_dimensions(adapter, "SocketBosses", ["SocketBossHeight"])
-    drive_jobs.append((boss_height_dim[0], '"PocketDepth"'))
-    hung: tuple[PocketShape, ...] = ()
-    v_hang = hanging_volume(SOCKET_BOSS_SHAPES, hung, 0.0)
-    hung += SOCKET_BOSS_SHAPES
-    after = volume_check(
-        adapter, "socket bosses", after + v_hang, 0.005 * v_hang + 10.0
-    )
-
-    # Retained lugs and ribs are located from the hole table's own X0 Y0.
-    # The flange's rear-west theoretical sharp corner remains their datum.
+    # Retained lugs and ribs, and the socket bosses, are located from the
+    # hole table's own X0 Y0.  The flange's rear-west theoretical sharp
+    # corner remains their datum.
     def _table_origin(dims: SketchDims, tag: str) -> str:
         """Add and anchor this sketch's X0 Y0 point; return its entity id."""
         manager = adapter.currentSketchManager
@@ -1922,6 +1887,63 @@ def build(adapter) -> dict[str, str]:
     def _from_origin(x: float, sketch_y: float) -> tuple[float, float]:
         """Hole-table (X, Y) of a Top-plane sketch point (sketch y = -z)."""
         return x + BOTTOM_LENGTH / 2.0, sketch_y + BOTTOM_WIDTH / 2.0
+
+    # Full-height bosses round the four sockets, merged into the walls; each
+    # swallows a pocket corner, so the pocket needs no plan-corner radius.
+    # Each boss centre stands on its socket's ColumnX/ColumnZ station, located
+    # from X0 Y0 (machinist review, farm run 20261119T202848942Z: 'COAXIAL
+    # WITH SOCKETS' alone left the cast bosses unlocated, the sockets being
+    # reference stations transferred from MHA-FR-02).  SOCKET_BOSS_LOCATIONS
+    # names each centre's X and Y; the marked four print as 2X pairs.
+    socket_bosses = SketchDims()
+    check("create_sketch socket bosses", adapter.create_sketch("Top"))
+    boss_origin = _table_origin(socket_bosses, "SocketBoss")
+    for i, (x, z) in enumerate(COLUMN_SOCKET_XZ):
+        label = f"socket boss ({x:+.0f}, {z:+.0f})"
+        manager = adapter.currentSketchManager
+        previous = bool(manager.AddToDB)
+        manager.AddToDB = True
+        try:
+            circle = check(
+                f"add_circle {label}",
+                adapter.add_circle(x, -z, SOCKET_BOSS_DIA / 2.0),
+            )
+        finally:
+            manager.AddToDB = previous
+        anchor_point_to_point(
+            adapter,
+            boss_origin,
+            f"{circle}.center",
+            *_from_origin(x, -z),
+            f"{label} from X0 Y0",
+        )
+        (x_name, x_drive), (y_name, y_drive) = SOCKET_BOSS_LOCATIONS[i]
+        socket_bosses.record(x_name, x_drive)
+        socket_bosses.record(y_name, y_drive)
+        check(
+            f"dimension {label} diameter",
+            adapter.add_sketch_dimension(circle, None, "diameter", SOCKET_BOSS_DIA),
+        )
+        socket_bosses.record(
+            "SocketBossDia" if i == 0 else f"SocketBoss{i}Dia", '"SocketBossDia"'
+        )
+    ensure_fully_defined(adapter, "socket boss sketch")
+    check("exit_sketch socket bosses", adapter.exit_sketch())
+    name_last_feature(adapter, "SocketBossProfile")
+    drive_jobs += socket_bosses.apply(adapter, "SocketBossProfile")
+    check(
+        "extrude socket bosses",
+        adapter.create_extrusion(ExtrusionParameters(depth=POCKET_CEILING_Y)),
+    )
+    name_last_feature(adapter, "SocketBosses")
+    boss_height_dim = name_dimensions(adapter, "SocketBosses", ["SocketBossHeight"])
+    drive_jobs.append((boss_height_dim[0], '"PocketDepth"'))
+    hung: tuple[PocketShape, ...] = ()
+    v_hang = hanging_volume(SOCKET_BOSS_SHAPES, hung, 0.0)
+    hung += SOCKET_BOSS_SHAPES
+    after = volume_check(
+        adapter, "socket bosses", after + v_hang, 0.005 * v_hang + 10.0
+    )
 
     def _pad(
         dims: SketchDims,
