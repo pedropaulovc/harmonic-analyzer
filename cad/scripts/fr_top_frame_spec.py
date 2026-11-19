@@ -385,8 +385,13 @@ HANGER_PIN_HOLE_DIA_MAX = HANGER_PIN_HOLE_DIA + max(HANGER_PIN_HOLE_DIA_BAND)
 HANGER_PIN_HOLE_DEPTH = KNIFE_DOWEL.PRESS_DEPTH  # 12.7 MIN full diameter
 HANGER_PIN_HOLE_DEPTH_PLACES = KNIFE_DOWEL.PRESS_DEPTH_PLACES
 # A single MIN limit (owner decision 2026-11-19, #3124 item 3): the model
-# value is the printed minimum and no deviation is authored.
-HANGER_PIN_HOLE_DEPTH_BAND = (0.0, 0.0)
+# value is the printed minimum.  Open above, its physical bound is the faced
+# top at the grip's far limit, the reach the ream walls charge their drift
+# over (``build_fr_top_frame.HANGER_REAM_DRIFT_MAX``): (23.927, 0).
+HANGER_PIN_HOLE_DEPTH_BAND = (
+    round(HANGER_GRIP + HANGER_GRIP_TOL - HANGER_PIN_HOLE_DEPTH, 6),
+    0.0,
+)
 HANGER_PIN_HOLE_POINT_DEG = KNIFE_DOWEL.PRESS_POINT_DEG
 HANGER_PIN_HOLE_POINT_H = KNIFE_DOWEL.PRESS_POINT_H  # 0.946 on the ream size
 # Each ream stands .XXX HANGER_PIN_X from its own screw axis along the dowel
