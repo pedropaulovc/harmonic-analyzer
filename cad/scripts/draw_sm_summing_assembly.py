@@ -506,14 +506,9 @@ def _dimension_value_mm(display: Any) -> float:
     return abs(float(dimension.SystemValue) * 1000.0)
 
 
-def _counter_setting(
-    adapter: Any, front: Any
-) -> tuple[Callable[[], None], Callable[[], None]]:
+def _counter_setting(adapter: Any, front: Any) -> Callable[[], None]:
     """The screw axis height over the knife contact level, a reference
-    dimension on the front view. Returns its settled check and the step that
-    parenthesizes it again after DETAIL A's break-out, which dropped its
-    reference parentheses (farm leaf drawing:sm_summing_assembly
-    20261119T231650Z: settled check 'no longer a reference dimension')."""
+    dimension on the front view."""
     label = "counter screw height"
     knife, screw = (
         model_point_in_view(
@@ -553,10 +548,7 @@ def _counter_setting(
             raise RuntimeError(f"{label}: settled precision changed")
         _assert_callout(display, spec.COUNTER_DIMENSION)
 
-    def reparenthesize() -> None:
-        set_reference_dimension(adapter, annotation, label=label)
-
-    return settled, reparenthesize
+    return settled
 
 
 def _dowel_proud_setting(
@@ -913,8 +905,11 @@ def _place_assembled_sheet(
 ) -> tuple[Callable[[], None], Callable[[], None]]:
     """Front and right at 1:5 (the screw height on the front), the knife-edge
     detail, the setting table and the notes; returns the settled check and
-    the deferred finish (DETAIL A's text offset and break-out, then the
-    counter's parentheses again)."""
+    the deferred finish: DETAIL A's text offset and break-out, then the
+    screw height. The break-out reset the front view's imported screw
+    height to bare text (farm leaves drawing:sm_summing_assembly
+    20261119T231650Z and 232849Z: its parentheses, then its callout, read
+    empty afterwards), so that setting is authored after it."""
     _activate_sheet(adapter, SHEET_NAMES[0])
     views = {}
     for name, centre in (("*Front", FRONT_CENTER), ("*Right", RIGHT_CENTER)):
@@ -924,7 +919,7 @@ def _place_assembled_sheet(
         apply_view_configuration(adapter, view, role=ViewRole.PLAIN, label=label)
         _assert_view_on_sheet(view, label=label)
         views[name] = view
-    counter_settled, reparenthesize_counter = _counter_setting(adapter, views["*Front"])
+    counter_settled: list[Callable[[], None]] = []
     _mark_detail_boundary(adapter, views["*Front"])
     proud_settled, finish_detail = _knife_detail(adapter)
     _place_setting_table(adapter, views)
@@ -933,12 +928,13 @@ def _place_assembled_sheet(
     )
 
     def settled() -> None:
-        counter_settled()
+        for check_counter in counter_settled:
+            check_counter()
         proud_settled()
 
     def finish() -> None:
         finish_detail()
-        reparenthesize_counter()
+        counter_settled.append(_counter_setting(adapter, views["*Front"]))
         settled()
 
     return settled, finish
