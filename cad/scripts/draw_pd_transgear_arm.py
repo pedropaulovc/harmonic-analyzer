@@ -11,11 +11,13 @@ reducer's knob bore through ``pd_transgear_arm_geometry``; neither their
 imported dimensions nor the annotation picks fix a previous centre.
 Section A-A cuts it on the centreline -- through the pivot, every hole and the
 latch-pin hole -- so the rear spot face's diameter, its floor from the FRONT
-face (the pivot head's end play), the latch-pin hole's depth and the pin
-bore's position and perpendicularity frames print on solid cut edges.  The
-end view (``*Right``, the square end) carries the thickness (the ground
-stock's, printed as a reference to it) and the latch-pin hole's reamed size,
-its height and the press of the pin to the hole floor.  The matched locating
+face (the pivot head's end play), the latch-pin hole's full-diameter depth
+as its native MIN (the pin is set proud at assembly, not pressed to a floor)
+and the pin bore's position and perpendicularity frames print on solid cut
+edges.  The end view (``*Right``, the square end) carries the thickness (the
+ground stock's, printed as a reference to it) and the latch-pin hole's reamed
+size, with its depth as a reference to section A-A's MIN, and its height.
+The matched locating
 holes run through from the rear face the front view looks at, so their
 stations and size print there, and section B-B, which cuts them on their
 axes, carries one position frame for the 2X group.  No frame carries a
@@ -397,9 +399,9 @@ _CALLOUT_Y = _front_y(PIVOT_END_R) + 0.0232
 PLATE_CALLOUT_XY = (0.160, _CALLOUT_Y)
 # Their stations print as references: the plate's holes set them.
 TAP_STATION_REFERENCES = ("PlateTapStation1", "PlateTapStation2")
-# The latch-pin hole's depth is its callout's (round 2: a depth is never
-# deferred to a view); section A-A keeps the .33 as a reference.
-LINEAR_REFERENCES = (*TAP_STATION_REFERENCES, "PinHoleDepth")
+# The latch-pin hole's depth rides its callout as REF (round 2: a depth is
+# never deferred to a view) while section A-A's native MIN controls it.
+LINEAR_REFERENCES = TAP_STATION_REFERENCES
 TAP_CALLOUTS = (
     (
         "plate taps",
@@ -565,11 +567,9 @@ def _set_tap_callout_text(display: Any, qualifier: str, *, label: str) -> None:
 
 
 def _reference_linear_dimensions(adapter: Any, annotations: list[Any]) -> None:
-    """Print the plate-tap stations and the latch-pin hole's depth in
-    parentheses, as references: the taps are transferred from MHA-PD-19's
-    holes, so the stations control nothing, and the depth is the hole
-    callout's.  Linear dimensions, so no diameter glyph
-    (``set_reference_dimension``)."""
+    """Print the plate-tap stations in parentheses, as references: the taps
+    are transferred from MHA-PD-19's holes, so the stations control nothing.
+    Linear dimensions, so no diameter glyph (``set_reference_dimension``)."""
     found = set()
     for annotation in annotations:
         name = dimension_name(adapter, annotation)

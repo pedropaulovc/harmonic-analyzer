@@ -281,35 +281,49 @@ def test_pivot_engagement_starts_below_the_vendor_thread_neck(monkeypatch) -> No
         _reload_joints()
 
 
-def test_the_shallowest_printed_hole_still_grips_the_pressed_pin(monkeypatch) -> None:
+def test_the_shallowest_set_pin_still_grips_the_press(monkeypatch) -> None:
     assert joints.LATCH_PIN_ENGAGEMENT_WORST_D >= latch_pin.PRESS_ENGAGEMENT_MIN_D
-    # A depth band of 3.6 leaves (8.50 - 3.6 - 0.443) / 3.175 = 1.40 D.
-    monkeypatch.setattr(arm, "PIN_HOLE_DEPTH_BAND", 3.6)
-    with pytest.raises(AssertionError, match="grips the latch pin"):
+    # Set to a .750 proud the shortest pin keeps (22.225 - 0.254 - 19.05 -
+    # 0.443) / 3.175 = 0.78 D.
+    monkeypatch.setattr(
+        latch_pin, "INSERTION_LIMITS", (22.225 - 0.254 - 19.05, latch_pin.INSERTION_LIMITS[1])
+    )
+    with pytest.raises(AssertionError, match="shallowest-set latch pin grips"):
         _reload_joints()
 
 
-def test_the_proud_range_counts_the_depth_row_and_the_pin_length_grade() -> None:
-    """R9-50: 22.225 -/+ 0.010 in - (8.50 at its printed .33 reach)."""
+def test_the_proud_is_the_set_window_whatever_the_hole_depth(monkeypatch) -> None:
+    """#3124 (owner decision 2026-11-19): the pin is set .516-.565 proud at
+    assembly; the length grade and the set window bound its insertion."""
+    window = (0.516 * 25.4, 0.565 * 25.4)
+    assert joints.LATCH_PIN_PROUD_RANGE == pytest.approx(window, abs=1e-9)
+    assert window[0] < latch_pin.PROUD < window[1]
     grade = 0.010 * 25.4
-    reach = arm.PIN_HOLE_DEPTH_BAND
-    assert reach == pytest.approx(8.50 - (0.33 - 0.01) * 25.4)
-    low = 7 / 8 * 25.4 - grade - (8.50 + reach)
-    high = 7 / 8 * 25.4 + grade - (8.50 - reach)
-    assert joints.LATCH_PIN_PROUD_RANGE == pytest.approx((low, high), abs=1e-9)
+    assert latch_pin.INSERTION_LIMITS == pytest.approx(
+        (7 / 8 * 25.4 - grade - window[1], 7 / 8 * 25.4 + grade - window[0])
+    )
+    # A deeper hole no longer sinks the pin.
+    monkeypatch.setattr(arm, "PIN_HOLE_DEPTH", arm.PIN_HOLE_DEPTH + 0.5)
+    assert _reload_joints().LATCH_PIN_PROUD_RANGE == pytest.approx(window, abs=1e-9)
 
 
 def test_the_far_face_gate_refuses_the_three_quarter_pin(monkeypatch) -> None:
     """R9-50: the 3/4 dowel stops short of the one-piece hook's far face with
     the ear's 1 deg bend, the screws' drift, the formed band and the length
-    grade; the gate refuses it and accepts the 7/8 pin in the 8.50 hole.
+    grade; the gate refuses it and accepts the 7/8 pin set .516-.565 proud.
     With the hook's screw holes at the title block's ±.005 (delegated ruling
     2026-11-07, pending owner confirmation) the 3/4 dowel falls short even
     in the 6.20 hole that once barely cleared."""
     assert joints.LATCH_PIN_FAR_FACE_MARGIN_WORST > 0.6
-    monkeypatch.setattr(latch_pin, "LENGTH", 0.75 * 25.4)
-    monkeypatch.setattr(latch_pin, "PROUD", 0.75 * 25.4 - 6.20)
-    monkeypatch.setattr(arm, "PIN_HOLE_DEPTH", 6.20)
+    # The retired 3/4 pin bottomed in a 6.20 hole printed .24: its proud
+    # window, length grade and depth reach included.
+    reach = 6.20 - (0.24 - 0.01) * 25.4
+    grade = 0.010 * 25.4
+    monkeypatch.setattr(
+        latch_pin,
+        "PROUD_LIMITS",
+        (0.75 * 25.4 - grade - 6.20 - reach, 0.75 * 25.4 + grade - 6.20 + reach),
+    )
     with pytest.raises(
         AssertionError,
         match=r"MHA-PD-VN-58 pin / MHA-PD-14 strip far face.* 0\.\d+ short",
@@ -317,12 +331,16 @@ def test_the_far_face_gate_refuses_the_three_quarter_pin(monkeypatch) -> None:
         _reload_joints()
 
 
-def test_the_pin_hole_depth_is_what_leaves_the_pin_proud(monkeypatch) -> None:
-    low, high = joints.LATCH_PIN_PROUD_RANGE
-    assert low < latch_pin.PROUD < high
-    # The pin bottoms on the floor: a deeper hole sinks it.
-    monkeypatch.setattr(arm, "PIN_HOLE_DEPTH", arm.PIN_HOLE_DEPTH + 0.5)
-    with pytest.raises(AssertionError, match="does not leave the latch pin PROUD"):
+def test_the_deepest_set_pin_stops_short_of_the_drill_point(monkeypatch) -> None:
+    """#3124: the hole's full-diameter MIN depth runs past the longest pin
+    set lowest, so the pressed end never meets the drill point."""
+    assert joints.LATCH_PIN_POINT_CLEARANCE_MIN > 0.0
+    assert joints.LATCH_PIN_POINT_CLEARANCE_MIN == pytest.approx(
+        arm.PIN_HOLE_DEPTH - (7 / 8 * 25.4 + 0.010 * 25.4 - 0.516 * 25.4)
+    )
+    # At .36 MIN (9.144) the deepest pin (9.373) would run into the point.
+    monkeypatch.setattr(arm, "PIN_HOLE_DEPTH", 0.36 * 25.4)
+    with pytest.raises(AssertionError, match="runs .* into the arm hole's drill point"):
         _reload_joints()
 
 
@@ -354,7 +372,8 @@ def test_the_latch_pin_ligament_is_the_arm_s_one_tracked_shortfall() -> None:
     worst = arm.WALLS["pin hole to faces"][1]
     assert arm.LATCH_PIN_WALL_FLOOR == pytest.approx(0.060 * 25.4)
     assert arm.LATCH_PIN_WALL_FLOOR <= worst < arm.WALL_TARGET
-    assert worst == pytest.approx(1.6744, abs=1e-4)
+    # #3124: run-off charged over the .38 MIN hole to its drill point.
+    assert worst == pytest.approx(1.6653, abs=1e-4)
 
 
 def test_spacer_wall_holds_the_target_with_both_rim_breaks() -> None:

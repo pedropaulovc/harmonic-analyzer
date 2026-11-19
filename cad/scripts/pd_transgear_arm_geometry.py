@@ -48,7 +48,7 @@ from _printed_tolerance import (
 import pd_transgear_pivot_spacer_spec as SPACER
 import _transgear_arm_plate_locating_interface as LOCATING_PIN
 
-from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
+from _hole_spec import DRILL_POINT_H, THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
 
 MM_PER_IN = 25.4
 # #290: the registry row's drawing_unit (in) is this sheet's unit.
@@ -303,23 +303,21 @@ PLATE_TAP_EXIT_LOSS_MAX_MM = PLATE_TAP_EXIT_BREAK_MAX_MM / math.tan(
 # ASME B1.1 #8-32 UNC-2B pitch limits; Thread Check standard-inch table p54.
 PLATE_TAP_PITCH_DIA_LIMITS_MM = tuple(value * 25.4 for value in (0.1437, 0.1475))
 
-# --- Latch pin: reamed press hole along -X into the square end, flat floor --
+# --- Latch pin: reamed press hole along -X into the square end, drill point -
 PIN_HOLE_DIA = 3.175  # .125, the 1/8 dowel's nominal
 # REAM .125 -.0005/-.0010 (#290, owned .1240 reamer): the blind press for the
 # 98381A474 dowel (+.0001/+.0003 over nominal) holds at both limits (R9-12).
 PIN_HOLE_DIA_BAND = (-0.0127, -0.0254)
-# The dowel is pressed to the hole's flat floor (R9-12, the MHA-DT-11 / MHA-DT-VN-67
-# precedent), so the depth sets the pin's proud length: 22.225 - 8.50 = 13.725.
-# R9-50: 8.50 (was 6.05 for the 3/4 pin) keeps the full diameter past the
-# latch hook's far face with the flap's bend and the pin's length grade.
-# #290: it keeps 8.50 (the MHA-PD-VN-58 pin's proud length is fitted to it)
-# and prints .33.
-PIN_HOLE_DEPTH = 8.50
+# Owner decision 2026-11-19 (#3124 item 3): drilled and reamed to a drill
+# point, the full-diameter depth printed as a MIN; the dowel is pressed to
+# its proud height at assembly (MHA-PD-00 DETAIL L), not onto a floor.  The
+# model carries the MIN itself, .38: past the deepest insertion
+# (pd_vn_transgear_latch_pin_spec.INSERTION_LIMITS, 9.373), so the pressed
+# end never reaches the point (transgear_hanger_joints checks it).
+PIN_HOLE_DEPTH = 0.38 * MM_PER_IN  # 9.652
 PIN_HOLE_DEPTH_PLACES = 2
-# The hanger joints judge the pin's full-diameter grip at the shallowest
-# hole, and the latch hook's grip on the pin over the proud range, both at
-# the printed .XX reach.
-PIN_HOLE_DEPTH_BAND = printed_reach_mm(PIN_HOLE_DEPTH, PIN_HOLE_DEPTH_PLACES)
+# The drill point: a 118-degree cone on the reamed diameter beyond the MIN.
+PIN_HOLE_POINT_LENGTH = PIN_HOLE_DIA / 2.0 * DRILL_POINT_H  # 0.954
 PIN_HOLE_Z = THICKNESS / 2.0  # mid-thickness, on y = 0
 # The latch pin's axis in the machine frame; the hook's hole is drilled on it.
 PIN_MACHINE_Z = FRONT_FACE_MACHINE_Z + PIN_HOLE_Z  # -120.43025
@@ -413,14 +411,16 @@ WALLS: dict[str, tuple[float, float]] = {
     ),
     # The hole's height is dimensioned from the FRONT face, so thin stock
     # takes its whole band off the rear ligament. Full budget: the drill's
-    # run-off over the deepest hole, and both title-block breaks at the mouth
-    # (the face edge's and the hole's).
+    # run-off over the hole to its point at the MIN depth, and both
+    # title-block breaks at the mouth (the face edge's and the hole's). A MIN
+    # prints no upper depth: a deeper hole is the shop's choice and must
+    # still hold the ligament note 3 prints.
     "pin hole to faces": (
         (THICKNESS - PIN_HOLE_DIA) / 2.0,
         (THICKNESS - PIN_HOLE_DIA - PIN_HOLE_DIA_BAND[0]) / 2.0
         - THICKNESS_BAND
         - LATCH_PIN_HEIGHT_BAND
-        - (PIN_HOLE_DEPTH + PIN_HOLE_DEPTH_BAND) * math.tan(math.radians(DRILL_RUN_OFF_DEG))
+        - (PIN_HOLE_DEPTH + PIN_HOLE_POINT_LENGTH) * math.tan(math.radians(DRILL_RUN_OFF_DEG))
         - 2.0 * OUTLINE_EDGE_BREAK_MAX_MM,
     ),
     "pin hole to end-face edges": (
@@ -430,14 +430,15 @@ WALLS: dict[str, tuple[float, float]] = {
         - (PIN_HOLE_DIA + PIN_HOLE_DIA_BAND[0]) / 2.0
         - LATCH_PIN_HEIGHT_BAND,
     ),
-    # The latch pin's hole, at its deepest on the shortest tip station, to
-    # the pin bore's far side.
-    "latch-pin hole floor to pin bore": (
-        TIP_STATION - PIN_HOLE_DEPTH - PIN_STATION - PIN_BORE_DIA / 2.0,
+    # The latch pin's hole, its point at the MIN depth on the shortest tip
+    # station, to the pin bore's far side (about 49 mm of metal: no
+    # practical overrun of the MIN reaches it).
+    "latch-pin hole point to pin bore": (
+        TIP_STATION - PIN_HOLE_DEPTH - PIN_HOLE_POINT_LENGTH - PIN_STATION - PIN_BORE_DIA / 2.0,
         TIP_STATION
         - TIP_STATION_BAND
         - PIN_HOLE_DEPTH
-        - PIN_HOLE_DEPTH_BAND
+        - PIN_HOLE_POINT_LENGTH
         - PIN_STATION
         - REDUCER_POSITION_RADIUS
         - PIN_BORE_DIA_MAX / 2.0,
@@ -559,6 +560,12 @@ def material_properties(pivot_bore_mm: float, *, density_kg_m3: float = 7870.0) 
     remove(
         math.pi * (PIN_HOLE_DIA / 2.0)**2 * PIN_HOLE_DEPTH,
         TIP_STATION - PIN_HOLE_DEPTH / 2.0, 0.0, PIN_HOLE_Z,
+    )
+    # The drill point: a cone on the floor, its centroid a quarter of its
+    # length from the base.
+    remove(
+        math.pi * (PIN_HOLE_DIA / 2.0)**2 * PIN_HOLE_POINT_LENGTH / 3.0,
+        TIP_STATION - PIN_HOLE_DEPTH - PIN_HOLE_POINT_LENGTH / 4.0, 0.0, PIN_HOLE_Z,
     )
     for x, y in LOCATOR_SITES_MM:
         remove(

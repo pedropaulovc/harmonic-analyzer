@@ -5,7 +5,7 @@ pd-support-bar:
   finish: machined
   quantity: 1
   tolerance_class: machined_block
-  process: "machined (steel); back face drilled and tapped for the transgear pivot (flat-bottomed blind tap) and the latch hook's base screws (through taps)"
+  process: "machined (steel); from the back face, the transgear pivot tapped #8-32 through and the latch hook's two base-screw holes tapped #4-40 through (spotted through MHA-PD-14 at assembly), each countersunk both faces"
   drawing_unit: in
   machinist_exceptions:
     - id: "RV-01"

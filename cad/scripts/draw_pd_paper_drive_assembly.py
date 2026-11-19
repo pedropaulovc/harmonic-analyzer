@@ -1926,11 +1926,15 @@ def sprocket_name(configuration: str, *, numbered: bool = True) -> str:
     return f"{teeth}-TOOTH SPROCKET"
 
 
-def _press_remedy(item: str, receiver: str, restart_key: str) -> str:
+def _press_remedy(
+    item: str, receiver: str, restart_key: str, *, or_condition: str = ""
+) -> str:
     """Rule 23: a press whose part slides in by hand is a slip fit; the hole
-    is oversize, so the receiving part is remade and the build repeated."""
+    is oversize, so the receiving part is remade and the build repeated.
+    ``or_condition`` names a second failure with the same remedy."""
+    condition = "SLIDES IN BY HAND" + (f" OR {or_condition}" if or_condition else "")
     return (
-        f"IF THE {item} SLIDES IN BY HAND, MAKE A NEW {receiver} AND REPEAT FROM "
+        f"IF THE {item} {condition}, MAKE A NEW {receiver} AND REPEAT FROM "
         f"STEP {steps.step_number(restart_key)}."
     )
 
@@ -2266,12 +2270,19 @@ def _step_text(
             f"REFIT PER {s('platen-hung', 9)}-{s('guide-locks-set', 3)}.",
             f"REPEAT FROM STEP {steps.step_number('lock-seats-faced')}.",
         ),
+        # #3124: the arm's hole runs past the deepest insertion to a drill
+        # point, so the proud is set as the dowel goes in, not by a floor;
+        # the press is permanent (MHA-PD-18 RV-03), so an over-pressed dowel
+        # stays in the arm it costs, and both are remade (Codjiflo #3127).
         "latch-pin-pressed": (
             f"PRESS THE {n['pd-vn-transgear-latch-pin']} DOWEL, CHAMFERED END FIRST, "
-            f"INTO THE {n['pd-transgear-arm']} ARM'S REAMED HOLE TO ITS FLOOR, "
-            f"{pin_window} PROUD {detail_cite('latch-pin-pressed')}.",
+            f"INTO THE {n['pd-transgear-arm']} ARM'S REAMED HOLE, {pin_window} PROUD, "
+            f"CALIPER DEPTH ROD {detail_cite('latch-pin-pressed')}.",
             _press_remedy(
-                "DOWEL", f"{n['pd-transgear-arm']} ARM", "latch-pin-pressed"
+                "DOWEL",
+                f"{n['pd-transgear-arm']} ARM AND {n['pd-vn-transgear-latch-pin']} DOWEL",
+                "latch-pin-pressed",
+                or_condition=f"READS UNDER {pin_window.split(' TO ')[0]}",
             ),
         ),
         "pin-pressed": (

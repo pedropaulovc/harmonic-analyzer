@@ -138,19 +138,20 @@ ARM_REAR_Z = arm.FRONT_FACE_MACHINE_Z + arm.THICKNESS
 
 
 LOCATOR_XY = on_arm(*arm.LOCATOR_SITES_MM[0])
-# The latch dowel: pressed along U to the floor of the arm tip's hole, its
-# proud end past the square tip face at TIP_STATION.
-LATCH_FLOOR_XY = on_arm(arm.TIP_STATION - arm.PIN_HOLE_DEPTH)
+# The latch dowel: pressed along U to its proud height, set at assembly (owner
+# decision 2026-11-19, #3124), its pressed end PRESS_DEPTH inside the square
+# tip face at TIP_STATION and its proud end past it.
+LATCH_PRESSED_END_XY = on_arm(arm.TIP_STATION - latch_pin.PRESS_DEPTH)
 LATCH_MOUTH_XY = on_arm(arm.TIP_STATION)
 LATCH_PROUD_MODEL = latch_pin.PROUD
 
 
 # --- the bands the details and steps print ----------------------------------
-# A press-to-stop or press-to-floor window is the part specs' own window,
+# A press-to-stop or press-to-height window is the part specs' own window,
 # rounded inward to the .001 grid (pd_paper_drive_assembly_steps.inch_window),
 # so the step and the detail read alike and no conforming build is refused
-# (Codjiflo, PR #3029). The proud is not adjustable, so the window is not
-# narrowed to reach a plain step; it prints as its two limits (the review of
+# (Codjiflo, PR #3029). The window is not narrowed to reach a plain step; it
+# prints as its two limits (the review of
 # run 20261117T144118108Z-771678f99db440ccbcec03874c9b1aca found the
 # converted +.004/-.003 form unreadable, rule 4).
 def _inward(limits_mm: tuple[float, float]) -> tuple[float, float]:
@@ -316,7 +317,7 @@ LATCH_DOWEL = SettingDetail(
                 *on_arm(arm.TIP_STATION + _LATCH_LENGTH / 2.0, 9.0),
                 arm.PIN_MACHINE_Z,
             ),
-            via=(*LATCH_FLOOR_XY, arm.PIN_MACHINE_Z),
+            via=(*LATCH_PRESSED_END_XY, arm.PIN_MACHINE_Z),
         ),
     ),
     step_keys=("latch-pin-pressed",),

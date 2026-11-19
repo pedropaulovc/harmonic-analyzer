@@ -51,8 +51,9 @@ from pd_transgear_arm_geometry import (
 # assembly (``pd_transgear_arm_geometry.PLATE_TAP_LOCATION_RADIUS_MM``); the
 # end-face latch-hole height is an ordinary .XXX row the title block governs
 # (coordinator ruling (a), #2019: no tightened band); the pin-hole depth is
-# .XX.  The geometry module judges the walls and the hanger joints at each
-# print's reach.
+# a .XX MIN over a drill point (#3124), the model carrying the MIN.  The
+# geometry module judges the walls and the hanger joints at each print's
+# reach.
 OUTLINE_PLACES = ARM.OUTLINE_PLACES
 TIP_STATION_PLACES = ARM.TIP_STATION_PLACES
 THICKNESS_PLACES = 4
@@ -217,6 +218,17 @@ LATCH_PIN_PRESS_PRINTED = (
 # (machinist_exceptions RV-04; #2019 tracks the next stock size up), floored
 # so the sheet never promises more than the budget holds.
 LATCH_PIN_WALL_PRINTED = _floor_mm(ARM.WALLS["pin hole to faces"][1], 3)
+# The depth MIN's native record (#3124; swTolMIN prints only the model value
+# and MIN): its upper deviation is the deepest hole whose drill run-off still
+# holds the ligament note 3 prints (about .108 past the MIN).
+PIN_HOLE_DEPTH_BAND = (
+    round(
+        (ARM.WALLS["pin hole to faces"][1] - LATCH_PIN_WALL_PRINTED)
+        / math.tan(math.radians(ARM.DRILL_RUN_OFF_DEG)),
+        6,
+    ),
+    0.0,
+)
 
 ISO_VIEW_SCALE = (1, 2)
 ISOMETRIC_VIEW_NOTE = f"ISOMETRIC VIEW SCALE {ISO_VIEW_SCALE[0]}:{ISO_VIEW_SCALE[1]}"

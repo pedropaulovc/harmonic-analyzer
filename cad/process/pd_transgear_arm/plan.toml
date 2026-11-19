@@ -80,11 +80,6 @@ name = "1/4 carbide end mill"
 ref = "endmill-carbide-3fl-1-4"  # drawing cross-check 2026-11-19: Ø.453 +.004/.000 counterbore, interpolated
 
 [[tools]]
-id = "endmill-carbide-3-32"
-name = "3/32 carbide end mill"
-ref = "endmill-carbide-3-32"  # drawing cross-check 2026-11-19: flatten the .33 FLAT BOTTOM floor
-
-[[tools]]
 id = "chamfer-mill-330ch-1-4-90"
 name = "1/4 90° chamfer mill"
 ref = "chamfer-mill-330ch-1-4-90"  # drawing cross-check 2026-11-19: .008 X 45° MOUTH

@@ -2,11 +2,12 @@ r"""MHA-PD-VN-58 transgear-latch-pin: McMaster 98381A474 stock dowel.
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure.  One 1/8 x 7/8 alloy-steel dowel, Round x Chamfer ends, pressed
-chamfer end first to the flat floor of a blind hole in the transgear arm's
-square end face, along the arm's centreline (contract round 9 section 4.1,
-user ruling 7, ruling R9-12).  It stands PROUD out of that face; its proud
-length passes through the latch hook's (MHA-PD-14) pin hole, which holds the
-swung arm until the strip is flexed off it.
+chamfer end first into a blind hole in the transgear arm's square end face,
+along the arm's centreline (contract round 9 section 4.1, user ruling 7),
+to its PROUD height out of that face, set at assembly (owner decision
+2026-11-19, #3124).  Its proud length passes through the latch hook's
+(MHA-PD-14) pin hole, which holds the swung arm until the strip is flexed
+off it.
 
 R9-50: the 3/4 length (98381A473) left the pin's full diameter short of the
 hook's far face at the worst case once the MHA-PD-14 ear's 1 deg bend and the
@@ -56,35 +57,41 @@ CROWN_R = ENDS.crown_r  # 0.406
 # pin's lead end by as much.
 LENGTH_GRADE = 0.010 * MM_PER_IN  # 0.254
 
-# The pin is pressed to the floor of the arm's blind hole (R9-12, the
-# MHA-DT-11 / MHA-DT-VN-67 precedent), so the hole's depth sets its installed length
-# out of the arm's end face (contract 4.1): through the strip plane with the
-# lead end clear past it.
+# Owner decision 2026-11-19 (#3124 item 3): the pin is pressed to its proud
+# height, set at assembly and read with a caliper depth rod (MHA-PD-00 DETAIL
+# L), not to a floor. The arm's blind hole is drilled and reamed to a drill
+# point, its full-diameter depth a MIN past the deepest insertion
+# (``transgear_hanger_joints``), so the hole's depth no longer sets the proud.
+# PROUD_LIMITS is the window the step prints (the window the retired
+# pressed-to-floor stack gave, contract 4.1: through the strip plane with
+# the lead end clear past it); PROUD is the model's placement, inside it.
+PROUD_LIMITS_IN = (0.516, 0.565)
+PROUD_LIMITS = tuple(limit * MM_PER_IN for limit in PROUD_LIMITS_IN)
 PROUD = 13.725
-# The pressed end on the hole floor: the length the press fit grips, and the
-# arm's nominal hole depth.
+if not PROUD_LIMITS[0] < PROUD < PROUD_LIMITS[1]:
+    raise AssertionError("the latch pin's model proud is outside its set window")
+# The modelled insertion: the pressed end PRESS_DEPTH inside the arm's end
+# face, the length the press fit grips.
 PRESS_DEPTH = LENGTH - PROUD  # 8.50
+# Insertion over the length grade and the proud window: the shortest pin
+# set highest grips least, the longest set lowest reaches deepest.
+INSERTION_LIMITS = (
+    LENGTH - LENGTH_GRADE - PROUD_LIMITS[1],
+    LENGTH + LENGTH_GRADE - PROUD_LIMITS[0],
+)  # 7.620 / 9.373
 # A press-fit dowel grips at least 1.5 D (the drawing-guidelines.md rule 18 (thread engagement) engagement floor,
 # applied to the press as the contract does), counted over the full
 # diameter only: the chamfer inside the hole carries no interference.
 PRESS_ENGAGEMENT_MIN_D = 1.5
 
 
-def proud_length(hole_depth: float, length_dev: float = 0.0) -> float:
-    """The pin's length out of the arm's end face when it is pressed to the
-    floor of a blind hole ``hole_depth`` deep, the pin ``length_dev`` off its
-    nominal length.  The arm owns the depth and its band; the hanger joints
-    call this at both ends of it and of LENGTH_GRADE."""
-    return LENGTH + length_dev - hole_depth
+def press_engagement_d(insertion: float) -> float:
+    """Full-diameter press engagement, in D, of the pin pressed ``insertion``
+    into the arm's end face."""
+    return (insertion - CHAMFER_LEN) / DIA
 
 
-def press_engagement_d(hole_depth: float) -> float:
-    """Full-diameter press engagement, in D, of the pin bottomed in a blind
-    hole ``hole_depth`` deep."""
-    return (hole_depth - CHAMFER_LEN) / DIA
-
-
-# (8.50 - 0.443) / 3.175 = 2.54 D at the nominal depth.
+# (8.50 - 0.443) / 3.175 = 2.54 D at the nominal insertion.
 PRESS_ENGAGEMENT_D = press_engagement_d(PRESS_DEPTH)
 if PRESS_ENGAGEMENT_D < PRESS_ENGAGEMENT_MIN_D:
     raise AssertionError(

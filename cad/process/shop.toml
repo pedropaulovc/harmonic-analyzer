@@ -1032,7 +1032,7 @@ description = "Shop-made cam turning fixture MHA-DT-12-TL-01 (stub, clamp, clock
 [tools.endmill-5-64-long]  # MHA-PN-01 window corners R.040 max
 description = "5/64 in 2-flute end mill, 5/16 in or more of reach"
 diameter_mm = 1.984375
-[tools.endmill-carbide-3-32]  # MHA-PD-18 flatten the .33 FLAT BOTTOM floor; MHA-PD-27 flat floor for the Ø.110 counterbore; MHA-CH-03 .106 ±.002 fork slot
+[tools.endmill-carbide-3-32]  # MHA-PD-27 flat floor for the Ø.110 counterbore; MHA-CH-03 .106 ±.002 fork slot
 description = "3/32 in square carbide end mill, .47 in or more of reach"
 diameter_mm = 2.38125
 [tools.endmill-carbide-3-64]  # MHA-PD-03 2X .04 SLIT, FULL R END
