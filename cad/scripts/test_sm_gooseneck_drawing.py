@@ -198,7 +198,7 @@ def test_shop_stock_row_covers_the_bent_tube_and_its_tail() -> None:
     )
     (row,) = [
         row
-        for row in equipment["stock"]
+        for row in equipment["stock"].values()
         if "MHA-SM-01" in row.get("note", "") and row.get("form") == "round_tube"
     ]
     assert "OnlineMetals part 7322" in row["cite"][0]
