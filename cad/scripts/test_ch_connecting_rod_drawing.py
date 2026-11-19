@@ -188,8 +188,18 @@ def test_pin_hole_is_the_reamed_press_hole_for_the_rod_pivot_pin() -> None:
     assert rod.PIN_HOLE_DIA is spec.PIN_HOLE_DIA
     assert rod.PIN_HOLE_BAND is spec.PIN_HOLE_BAND
     assert drawing._PIN_HOLE_DIA is spec.PIN_HOLE_DIA
-    assert spec.PIN_HOLE_DIA == 1.9558
-    assert spec.PIN_HOLE_BAND == (0.02286, 0.0127)
+    # Owner decision 2026-11-19 (#3124 item 5): the .0775-.0779 limits the pin
+    # budget holds, printed as a plain inch band on a .0775 nominal; the
+    # delegated acceptance of the old +.0009/+.0005 step (RV-04) is withdrawn.
+    assert spec.PIN_HOLE_DIA == 1.9685
+    assert spec.PIN_HOLE_BAND == (0.01016, 0.0)
+    hole_limits = tuple(
+        (spec.PIN_HOLE_DIA + deviation) / 25.4 for deviation in reversed(spec.PIN_HOLE_BAND)
+    )
+    assert hole_limits == pytest.approx((0.0775, 0.0779), abs=1e-12)
+    assert "RV-04" not in {
+        row["id"] for row in _config.parts("ch-connecting-rod")["machinist_exceptions"]
+    }
     assert not hasattr(spec, "PIN_HOLE_SPEC")
     assert model_toleranced_dimensions(rod)[("PinHoleProfile", "PinHoleDia")] == (
         "*deviations(PIN_HOLE_BAND)"
@@ -258,7 +268,7 @@ def test_every_tight_band_names_its_mate() -> None:
     assert drawing.CAM_NUMBER in bore
     # Fan-out screen 2026-11-07: size, then process (rule 26), and the band
     # narrower than the reamer row links its matched press fit (note 1;
-    # pending owner confirmation, fan-out Q1).
+    # owner decision 2026-11-19, #3124 item 5).
     assert drawing.FRONT_CALLOUTS["PinHoleDia"] == (
         "REAM THRU\nSEE NOTE 1"
     )
@@ -586,8 +596,8 @@ def test_each_view_imports_only_the_features_it_dimensions() -> None:
 
 
 def test_reamed_pin_hole_is_a_native_four_place_dimension() -> None:
-    """PR #1292 review N1 (drawing-simplicity-policy.md `How the repository implements the guidelines` and drawing-guidelines.md rule 7 (notes: few, flagged, never a method)): the press hole's Ø1.9558
-    +0.02286/+0.0127 is the PinHoleDia model dimension -- marked, authored at
+    """PR #1292 review N1 (drawing-simplicity-policy.md `How the repository implements the guidelines` and drawing-guidelines.md rule 7 (notes: few, flagged, never a method)): the press hole's Ø1.9685
+    +0.01016/0 is the PinHoleDia model dimension -- marked, authored at
     four places with its native band -- imported into the front view with the
     process beneath it, never general-note text."""
     spec = ch_connecting_rod_spec

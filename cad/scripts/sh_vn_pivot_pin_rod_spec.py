@@ -119,7 +119,7 @@ def joint_budget() -> dict[str, float]:
     """Worst-case values of every fit the joint must hold (all mm).
 
     Every term is at the worst case of its printed band (drawing-guidelines.md rule 17 (walls and webs)):
-    the purchased pin's 0/+.0002 in, the reamed tine hole +.0009/+.0005, the
+    the purchased pin's 0/+.0002 in, the reamed tine hole .0775 +.0004/.0000, the
     arm's #47 hole at its sheet's DRILLED HOLES row, the arm strap and its
     symmetry to its hub (STRAP_HUB_SYMMETRY), each tine .067 +/-.002, the slot
     .106 +/-.002 (so the fork over the tines, their reference sum, spans

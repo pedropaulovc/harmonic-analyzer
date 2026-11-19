@@ -19,7 +19,7 @@ in``).
 Profile (on the Front plane, bar length along +Y, origin at bottom-left
 corner) is a single 12-segment chain; both notches are centred slots in the
 end faces. Extruded by the bar depth (+Z, 0..6.35). The top pin hole -- a
-Ø.0770 +.0009/+.0005 reamed press hole for the 5/64 pin -- runs along global X
+Ø.0775 +.0004/.0000 reamed press hole for the 5/64 pin -- runs along global X
 through the top-slot cheeks at .25 below the bar top, mid-depth
 (Z = 3.175): a Right-plane sketch maps local +X -> global -Z, so the circle
 centre sits at sketch_x = -BarDepth/2 to land inside the body, and the
@@ -99,7 +99,7 @@ BOTTOM_NOTCH_HEIGHT = 0.09375 * IN  # 2.381  DIMENSIONS.md ch15: legacy 3/32" (m
 # TOP_NOTCH_HEIGHT (.55, was the legacy 1/2") is the spec's: it clears the
 # lever's lower edge (ch_amplitude_bar_spec).
 # top pin hole: was Ø2.0 drill, then #47 (Ø1.994) Hole Wizard; now the
-# Ø.0770 +.0009/+.0005 reamed press hole for the MHA-SH-VN-58 pin (a sketch cut:
+# Ø.0775 +.0004/.0000 reamed press hole for the MHA-SH-VN-58 pin (a sketch cut:
 # the Hole Wizard has no reamed-size table)
 TOP_PIN_DROP = 0.25 * IN  # 6.35  DIMENSIONS.md ch15: hole centre below bar top (derived)
 THROUGH_CUT_DEPTH = 20.0  # mid-plane total; > the bar width
@@ -430,8 +430,8 @@ def build(adapter) -> dict[str, str]:
         display_unit=UNIT,
     )
     # The reamed press hole's band rides natively on its diameter, printed in
-    # the top end's right side view: the .077 nominal at four places
-    # (DRAWING_PRECISION), its +.0009/+.0005 at the same four.
+    # the top end's right side view: the .0775 nominal at four places
+    # (DRAWING_PRECISION), its +.0004/.0000 at the same four.
     set_dimension_bilateral_tolerance(
         adapter,
         "TopPinProfile",

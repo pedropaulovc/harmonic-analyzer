@@ -843,8 +843,8 @@ def build(adapter) -> dict[str, str]:
         adapter, "Ring", "RingThick", thick_upper, display_unit=UNIT
     )
     # The reamed press hole's band rides natively on its diameter; the front
-    # view imports the .077 nominal at four places (DRAWING_PRECISION), its
-    # +.0009/+.0005 at the same four.
+    # view imports the .0775 nominal at four places (DRAWING_PRECISION), its
+    # +.0004/.0000 at the same four.
     set_dimension_bilateral_tolerance(
         adapter,
         "PinHoleProfile",

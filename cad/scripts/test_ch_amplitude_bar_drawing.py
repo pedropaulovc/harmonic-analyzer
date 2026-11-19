@@ -81,8 +81,19 @@ def test_top_pin_hole_is_the_reamed_press_hole_for_the_bar_pivot_pin() -> None:
     from _drawing_contract import model_toleranced_dimensions
 
     notes = ch_amplitude_bar_notes
-    assert ch_amplitude_bar_spec.TOP_PIN_HOLE_DIA == 1.9558
-    assert ch_amplitude_bar_spec.TOP_PIN_HOLE_BAND == (0.02286, 0.0127)
+    # Owner decision 2026-11-19 (#3124 item 5): the .0775-.0779 limits the pin
+    # budget holds, printed as a plain inch band on a .0775 nominal; the
+    # delegated acceptance of the old +.0009/+.0005 step (RV-07) is withdrawn.
+    assert ch_amplitude_bar_spec.TOP_PIN_HOLE_DIA == 1.9685
+    assert ch_amplitude_bar_spec.TOP_PIN_HOLE_BAND == (0.01016, 0.0)
+    hole_limits = tuple(
+        (ch_amplitude_bar_spec.TOP_PIN_HOLE_DIA + deviation) / 25.4
+        for deviation in reversed(ch_amplitude_bar_spec.TOP_PIN_HOLE_BAND)
+    )
+    assert hole_limits == pytest.approx((0.0775, 0.0779), abs=1e-12)
+    assert "RV-07" not in {
+        row["id"] for row in parts("ch-amplitude-bar")["machinist_exceptions"]
+    }
     assert model_toleranced_dimensions(bar)[("TopPinProfile", "TopPinDia")] == (
         "*deviations(TOP_PIN_HOLE_BAND)"
     )
@@ -97,7 +108,7 @@ def test_top_pin_hole_is_the_reamed_press_hole_for_the_bar_pivot_pin() -> None:
     # Fan-out screen 2026-11-07: size, then process (rule 26); the band is
     # narrower than the reamer row, so the callout links the matched press fit
     # in note 1, which names the pin by name and number with its acceptance
-    # (rules 4 and 7; pending owner confirmation, fan-out Q1).
+    # (rules 4 and 7; owner decision 2026-11-19, #3124 item 5).
     assert notes.DIMENSION_CALLOUTS["TopPinDia"] == (
         "REAM THRU\nSEE NOTE 1"
     )
@@ -836,7 +847,7 @@ def test_every_printed_dimension_reads_its_inch_value() -> None:
         "BarSection": (spec.BAR_DEPTH, 0.25),
         "TopPinX": (spec.BAR_DEPTH / 2.0, 0.125),
         "TopPinDrop": (spec.TOP_PIN_DROP, 0.25),
-        "TopPinDia": (spec.TOP_PIN_HOLE_DIA, 0.077),
+        "TopPinDia": (spec.TOP_PIN_HOLE_DIA, 0.0775),
     }
     assert set(printed) == set(places)
     exact = {"BarLength", "BottomNotchHeight"}
@@ -869,6 +880,6 @@ def test_every_band_is_inch_native() -> None:
         (spec.BOTTOM_NOTCH_WIDTH_BAND, (0.006, 0.0)),
         (spec.BOTTOM_NOTCH_DEPTH_BAND, (0.0, -0.020)),
         ((tol, -tol), (0.002, -0.002)),
-        (spec.TOP_PIN_HOLE_BAND, (0.0009, 0.0005)),
+        (spec.TOP_PIN_HOLE_BAND, (0.0004, 0.0)),
     ):
         assert tuple(value / 25.4 for value in band) == pytest.approx(inch, abs=1e-12)

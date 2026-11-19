@@ -168,7 +168,8 @@ ROOT_CALLOUT = "ROOTS R.015 MAX"
 # once in the numbered sheet note its callout links (drawing-guidelines.md
 # rules 4 and 7). The acceptance is the ANSI FN2 window the pin budget is
 # held to (sh_vn_pivot_pin_bar_spec.PRESS_INTERFERENCE_MAX), rounded inward.
-# Pending owner confirmation (fan-out Q1, delegated ruling 2026-11-07, #2144).
+# Owner decision 2026-11-19 (#3124 item 5): this note, a first-article press
+# and the MHA-CH-00 slide-by-hand check are the hole's controls; no gauge.
 TOP_PIN_NAME = "BAR PIVOT PIN"
 PIN_FIT_NOTE_NUMBER = 1
 PIN_FIT_INTERFERENCE = (".0002", ".0008")
