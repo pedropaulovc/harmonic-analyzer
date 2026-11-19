@@ -76,3 +76,8 @@ note = "quotes-2026-11-17-rev3.xlsx F-tap-bottoming-4-40: bottoming tap not owne
 kind = "tap"
 status = "on_hand"
 note = "quotes-2026-11-17-rev3.xlsx Tap coverage #6-32 UNC: owned plug OSG 1023700 x3 (tools.taps-zoro-wb7365521946)."
+
+[tools.tap-10-32-bottoming-pulley]
+kind = "tap"
+status = "on_hand"
+note = "Owned: member G8337420 of tools.taps-zoro-wb7365521946 (Regal 015326AS, qty 2). drawing cross-check 2026-11-19: MHA-FR-01 10-32 UNF ↧ 1.81 from the spot face; MHA-FR-02 10-32 UNF ↧ 1.81 from the spot face."

@@ -18,6 +18,11 @@ id = "jig-tap-4-40-plug"
 name = "#4-40 plug tap"
 ref = "jig-tap-4-40-plug"  # Tap coverage #4-40 UNC
 
+[[tools]]
+id = "endmill-5-64-long"
+name = "5/64 long end mill"
+ref = "endmill-5-64-long"  # drawing cross-check 2026-11-19: window corners R.040 max
+
 [[setups]]
 machine_kind = "other"
 machine = "To be written"

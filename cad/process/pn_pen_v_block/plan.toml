@@ -38,6 +38,11 @@ id = "protractor"
 name = "Protractor"
 ref = "protractor"  # F-protractor
 
+[[tools]]
+id = "chamfer-mill-1-2-90"
+name = "1/2 90° chamfer mill"
+ref = "chamfer-mill-1-2-90"  # drawing cross-check 2026-11-19: 2X 45° V, (.20) deep
+
 [[setups]]
 machine_kind = "other"
 machine = "To be written"

@@ -23,6 +23,16 @@ id = "tap-10-24-plug"
 name = "#10-24 plug tap"
 ref = "tap-10-24-plug"  # Tap coverage #10-24 UNC
 
+[[tools]]
+id = "telescoping-gauges-starrett-s579gz"
+name = "Telescoping gauges"
+ref = "telescoping-gauges-starrett-s579gz"  # drawing cross-check 2026-11-19: measures the MHA-SM-01 bore for the spigot
+
+[[tools]]
+id = "micrometers"
+name = "Micrometers 0-3 in"
+ref = "micrometers"  # drawing cross-check 2026-11-19: reads the telescoping gauge
+
 [[setups]]
 machine_kind = "other"
 machine = "To be written"

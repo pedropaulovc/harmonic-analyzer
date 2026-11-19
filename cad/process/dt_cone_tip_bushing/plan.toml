@@ -23,6 +23,11 @@ id = "arbor-press"
 name = "Arbor press"
 ref = "arbor-press"  # F-arbor-press
 
+[[tools]]
+id = "reamer-0615"
+name = ".0615 reamer"
+ref = "reamer-0615"  # drawing cross-check 2026-11-19: .0615 +.0005/.0000 REAM THRU
+
 [[setups]]
 machine_kind = "other"
 machine = "To be written"

@@ -28,6 +28,11 @@ id = "arbor-press"
 name = "Arbor press"
 ref = "arbor-press"  # F-arbor-press
 
+[[tools]]
+id = "drill-b"
+name = "B drill"
+ref = "drill-b"  # drawing cross-check 2026-11-19: pre-drill for the .2490 ream
+
 [[setups]]
 machine_kind = "other"
 machine = "To be written"

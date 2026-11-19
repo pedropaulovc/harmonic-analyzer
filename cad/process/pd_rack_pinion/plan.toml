@@ -48,6 +48,26 @@ id = "straightedge"
 name = "Straightedge"
 ref = "straightedge"  # F-straightedge
 
+[[tools]]
+id = "pd-rack-pinion-cutting-arbor"
+name = "Work arbor with backing discs"
+ref = "pd-rack-pinion-cutting-arbor"  # drawing cross-check 2026-11-19: tooth cutting on the shop-made arbor
+
+[[tools]]
+id = "telescoping-gauges-starrett-s579gz"
+name = "Telescoping gauges"
+ref = "telescoping-gauges-starrett-s579gz"  # drawing cross-check 2026-11-19: Ø.5010 +.0005/.0000 REAM THRU (no pin reaches .501)
+
+[[tools]]
+id = "micrometers"
+name = "Micrometers 0-3 in"
+ref = "micrometers"  # drawing cross-check 2026-11-19: reads the telescoping gauge
+
+[[tools]]
+id = "feeler-gauges"
+name = "Feeler gauges"
+ref = "feeler-gauges"  # drawing cross-check 2026-11-19: BACKLASH WITH MATE .002-.007, FEELER
+
 [[setups]]
 machine_kind = "other"
 machine = "To be written"

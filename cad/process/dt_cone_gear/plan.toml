@@ -34,9 +34,9 @@ name = "1/16 A keyway broach"
 ref = "keyway-broach-1-16-a"  # F-keyway-broach
 
 [[tools]]
-id = "feeler-gauges-metric"
-name = "Starrett 66MA feelers"
-ref = "feeler-gauges-metric"  # F-feeler-66MA
+id = "feeler-gauges"
+name = "Feeler gauges (Pittsburgh 32-pc)"
+ref = "feeler-gauges"  # F-feeler-66MA; repointed from the Starrett 66MA (owner 2026-11-19)
 
 [[tools]]
 id = "pin-gauges-011-060"
@@ -52,6 +52,41 @@ ref = "pin-gauges-061-500"  # A1-pin-set-061-250, A1-pin-set-061-500-combined, A
 id = "arbor-press"
 name = "Arbor press"
 ref = "arbor-press"  # F-arbor-press
+
+[[tools]]
+id = "jig-drill-23-64"
+name = "23/64 drill"
+ref = "jig-drill-23-64"  # drawing cross-check 2026-11-19: pre-drill for the .3760 ream
+
+[[tools]]
+id = "reamer-0376"
+name = ".3760 reamer"
+ref = "reamer-0376"  # drawing cross-check 2026-11-19: .3750/.3760 class REAM THRU
+
+[[tools]]
+id = "drill-53"
+name = "#53 drill"
+ref = "drill-53"  # drawing cross-check 2026-11-19: pre-drill for the .0625 ream (T012, T018)
+
+[[tools]]
+id = "reamer-0625"
+name = ".0625 reamer"
+ref = "reamer-0625"  # drawing cross-check 2026-11-19: .0625 +.0005/.0000 REAM THRU (T012, T018)
+
+[[tools]]
+id = "drill-c"
+name = "C drill"
+ref = "drill-c"  # drawing cross-check 2026-11-19: pre-drill for the .2510 ream (T024)
+
+[[tools]]
+id = "dt-cone-gear-cutting-arbor"
+name = "Keyed cutting arbor kit (TL-03/04/06)"
+ref = "dt-cone-gear-cutting-arbor"  # drawing cross-check 2026-11-19: TOOTH CUTTING SETUP .002 TIR TO FINISHED BORE
+
+[[tools]]
+id = "dt-cone-gear-index-plate"
+name = "Index plate MHA-DT-03-TL-01"
+ref = "dt-cone-gear-index-plate"  # drawing cross-check 2026-11-19: tooth indexing
 
 [[setups]]
 machine_kind = "other"

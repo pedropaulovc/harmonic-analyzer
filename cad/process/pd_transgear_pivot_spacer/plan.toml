@@ -18,6 +18,16 @@ id = "arbor-press"
 name = "Arbor press"
 ref = "arbor-press"  # F-arbor-press
 
+[[tools]]
+id = "block-drill-15"
+name = "#15 drill"
+ref = "block-drill-15"  # drawing cross-check 2026-11-19: pre-drill for the .1855 ream
+
+[[tools]]
+id = "reamer-1855"
+name = ".1855 reamer"
+ref = "reamer-1855"  # drawing cross-check 2026-11-19: Ø.1850 +.0010/+.0005 REAM THRU
+
 [[setups]]
 machine_kind = "other"
 machine = "To be written"

@@ -28,6 +28,11 @@ id = "arbor-press"
 name = "Arbor press"
 ref = "arbor-press"  # F-arbor-press
 
+[[tools]]
+id = "endmill-carbide-3fl-1-8"
+name = "1/8 carbide end mill"
+ref = "endmill-carbide-3fl-1-8"  # drawing cross-check 2026-11-19: .124 running-fit slots, ROOTS R.015 MAX
+
 [[setups]]
 machine_kind = "other"
 machine = "To be written"

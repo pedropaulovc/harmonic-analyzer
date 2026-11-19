@@ -13,6 +13,11 @@ id = "digital-angle-gauge"
 name = "Digital angle gauge"
 ref = "digital-angle-gauge"  # F-digital-angle-gauge
 
+[[tools]]
+id = "sm-gooseneck-bend-form"
+name = "Gooseneck bend form"
+ref = "sm-gooseneck-bend-form"  # drawing cross-check 2026-11-19: (R3.0) TUBE CENTERLINE NO KINKS
+
 [[setups]]
 machine_kind = "other"
 machine = "To be written"

@@ -371,3 +371,58 @@ note = "quotes-2026-11-17-rev3.xlsx B-reamer-.4990: recommended Shars 404-7571."
 kind = "reamer"
 status = "to_order"
 note = "quotes-2026-11-17-rev3.xlsx B-reamer-.5010: recommended Shars 404-7572."
+
+[tools.reamer-0615]
+kind = "reamer"
+status = "to_order"
+note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-DT-38 .0615 +.0005/.0000 REAM THRU; MHA-PD-17 Ø.0615 +.0005/.0000 REAM; MHA-PD-22 Ø.0615 +.0005/.0000 REAM (.163)."
+
+[tools.reamer-0625]
+kind = "reamer"
+status = "to_order"
+note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-DT-03 .0625 +.0005/.0000 REAM THRU (T012, T018); MHA-DT-04 .0625 +.0005/.0000 REAM .20."
+
+[tools.reamer-0930]
+kind = "reamer"
+status = "to_order"
+note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-DT-11 2X .0930 +.0005/.0000 REAM .1555; MHA-PD-18 Ø.0930 +.0005/.0000 2X REAM THRU; MHA-PD-22 Ø.0930 +.0005/.0000 2X REAM THRU."
+
+[tools.reamer-0945]
+kind = "reamer"
+status = "to_order"
+note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-19 2X Ø.0945 +.0005/.0000 REAM THRU."
+
+[tools.reamer-1280]
+kind = "reamer"
+status = "to_order"
+note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-SM-02 Ø.1280 ±.0007 REAM (.37) FLAT BOTTOM."
+
+[tools.reamer-1562]
+kind = "reamer"
+status = "to_order"
+note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-DT-31 (Ø.156) REAM .17 at assembly with MHA-DT-06; MHA-DT-06 (Ø.156) REAM .17 for dowel MHA-DT-VN-59."
+
+[tools.reamer-1570]
+kind = "reamer"
+status = "to_order"
+note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-DT-03-TL-01 132X .1570 +.0005/.0000 REAM THRU; MHA-DT-14 .1570 +.0005/.0000 FLAT-BOTTOM REAM."
+
+[tools.reamer-1610]
+kind = "reamer"
+status = "to_order"
+note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-DT-08 (Ø.161) REAM THRU, running fit on MHA-DT-32."
+
+[tools.reamer-1855]
+kind = "reamer"
+status = "to_order"
+note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-20 Ø.1850 +.0010/+.0005 REAM THRU."
+
+[tools.reamer-1920]
+kind = "reamer"
+status = "to_order"
+note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-22 Ø.1920 +.0005/.0000 REAM THRU."
+
+[tools.reamer-1940]
+kind = "reamer"
+status = "to_order"
+note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-18 Ø.1940 +.001/.000 REAM THRU."

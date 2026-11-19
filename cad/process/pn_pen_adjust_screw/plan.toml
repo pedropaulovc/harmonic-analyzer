@@ -18,6 +18,21 @@ id = "ignition-wrenches"
 name = "Ignition wrenches"
 ref = "ignition-wrenches"  # F-ignition-wrenches
 
+[[tools]]
+id = "dies-zoro-wb7365521946"
+name = "#0-80 round die"
+ref = "dies-zoro-wb7365521946"  # drawing cross-check 2026-11-19: die-cut #0-80 UNF thread
+
+[[tools]]
+id = "die-stock-13-16"
+name = "13/16 die stock"
+ref = "die-stock-13-16"  # drawing cross-check 2026-11-19: holds the die
+
+[[tools]]
+id = "centre-drills-carbide-60"
+name = "Carbide 60° centre drills"
+ref = "centre-drills-carbide-60"  # drawing cross-check 2026-11-19: spot the #54 cross hole
+
 [[setups]]
 machine_kind = "other"
 machine = "To be written"

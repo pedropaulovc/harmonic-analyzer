@@ -48,6 +48,16 @@ id = "digital-angle-gauge"
 name = "Digital angle gauge"
 ref = "digital-angle-gauge"  # F-digital-angle-gauge
 
+[[tools]]
+id = "sine-bar-5"
+name = "5 in sine bar"
+ref = "sine-bar-5"  # drawing cross-check 2026-11-19: 122.4° ±.5° knife-edge stubs
+
+[[tools]]
+id = "gauge-blocks-mitutoyo"
+name = "Gauge blocks"
+ref = "gauge-blocks-mitutoyo"  # drawing cross-check 2026-11-19: sine-bar stack
+
 [[setups]]
 machine_kind = "other"
 machine = "To be written"

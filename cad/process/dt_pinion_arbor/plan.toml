@@ -23,6 +23,16 @@ id = "pin-gauges-061-500"
 name = "Pin gauges .061-.500"
 ref = "pin-gauges-061-500"  # A1-pin-set-061-500-combined, A1-pin-set-251-500
 
+[[tools]]
+id = "drill-c"
+name = "C drill"
+ref = "drill-c"  # drawing cross-check 2026-11-19: pre-drill for the .2510 ream
+
+[[tools]]
+id = "follow-rest-pm-1127"
+name = "Lathe follow rest"
+ref = "follow-rest-pm-1127"  # drawing cross-check 2026-11-19: (10.0) long shaft between centres
+
 [[setups]]
 machine_kind = "other"
 machine = "To be written"

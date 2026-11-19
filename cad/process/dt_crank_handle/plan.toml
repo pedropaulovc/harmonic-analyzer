@@ -18,6 +18,16 @@ id = "pin-gauges-061-500"
 name = "Pin gauges .061-.500"
 ref = "pin-gauges-061-500"  # A1-pin-set-061-250, A1-pin-set-061-500-combined
 
+[[tools]]
+id = "reamer-1610"
+name = ".1610 reamer"
+ref = "reamer-1610"  # drawing cross-check 2026-11-19: (Ø.161) REAM THRU, running fit on MHA-DT-32
+
+[[tools]]
+id = "boring-bars-meda-6045000"
+name = "Lathe boring bars"
+ref = "boring-bars-meda-6045000"  # drawing cross-check 2026-11-19: (.426) butt counterbore to the measured mate
+
 [[setups]]
 machine_kind = "other"
 machine = "To be written"

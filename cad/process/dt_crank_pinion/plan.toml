@@ -9,11 +9,6 @@ stock = "To be written"
 shop = "../shop.toml"
 
 [[tools]]
-id = "drill-1-8"
-name = "1/8 drill"
-ref = "drill-1-8"  # Drills 1/8
-
-[[tools]]
 id = "reamer-3135"
 name = ".3135 reamer"
 ref = "reamer-3135"  # B-reamer-.3135
@@ -29,14 +24,29 @@ name = "24DP 20PA gear cutter #7"
 ref = "gear-cutters-24dp-20pa"  # F-gear-cutter-10-289-247
 
 [[tools]]
-id = "feeler-gauges-metric"
-name = "Starrett 66MA feelers"
-ref = "feeler-gauges-metric"  # F-feeler-66MA
+id = "feeler-gauges"
+name = "Feeler gauges (Pittsburgh 32-pc)"
+ref = "feeler-gauges"  # F-feeler-66MA; repointed from the Starrett 66MA (owner 2026-11-19)
 
 [[tools]]
 id = "pin-gauges-061-500"
 name = "Pin gauges .061-.500"
 ref = "pin-gauges-061-500"  # A1-pin-set-061-500-combined, A1-pin-set-251-500
+
+[[tools]]
+id = "drill-n"
+name = "N drill"
+ref = "drill-n"  # drawing cross-check 2026-11-19: pre-drill for the .3135 ream
+
+[[tools]]
+id = "drill-31"
+name = "#31 drill"
+ref = "drill-31"  # drawing cross-check 2026-11-19: pre-drill for the (Ø.125) match ream
+
+[[tools]]
+id = "reamer-1240"
+name = ".1240 reamer"
+ref = "reamer-1240"  # drawing cross-check 2026-11-19: (Ø.125) MATCH DRILL AND REAM, drive fit on MHA-DT-29
 
 [[setups]]
 machine_kind = "other"

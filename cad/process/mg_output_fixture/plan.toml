@@ -28,6 +28,16 @@ id = "tap-4-40-bottoming"
 name = "#4-40 bottoming tap"
 ref = "tap-4-40-bottoming"  # F-tap-bottoming-4-40, Tap coverage #4-40 UNC
 
+[[tools]]
+id = "form-tool-r047"
+name = "R.047 grooving form tool"
+ref = "form-tool-r047"  # drawing cross-check 2026-11-19: R .047/.020 FULL R groove
+
+[[tools]]
+id = "jig-spot"
+name = "#2 centre drill"
+ref = "jig-spot"  # drawing cross-check 2026-11-19: spot the hex corner before the #1
+
 [[setups]]
 machine_kind = "other"
 machine = "To be written"

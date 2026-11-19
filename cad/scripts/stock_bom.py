@@ -211,10 +211,10 @@ def _tool_status(record: dict | None) -> ToolStatus:
     return status
 
 
-# Inventory sections a plan tool or gauge's key is owned under: a plan's fixture
-# or tape is a shop ``tools`` record to prechips but a fixtures or consumables
-# record here.
-OWNERSHIP_SECTIONS = ("tools", "fixtures", "consumables", "gauges")
+# Inventory sections a plan tool or gauge's key is owned under: a plan's fixture,
+# tape or die stock is a shop ``tools`` record to prechips but a fixtures,
+# consumables or holders record here.
+OWNERSHIP_SECTIONS = ("tools", "fixtures", "consumables", "gauges", "holders")
 
 
 def _owned_record(inventory: dict, key: str) -> dict | None:

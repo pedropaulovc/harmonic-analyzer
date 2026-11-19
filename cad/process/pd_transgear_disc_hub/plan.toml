@@ -43,6 +43,21 @@ id = "arbor-press"
 name = "Arbor press"
 ref = "arbor-press"  # F-arbor-press
 
+[[tools]]
+id = "drill-53"
+name = "#53 drill"
+ref = "drill-53"  # drawing cross-check 2026-11-19: pre-drill to the .0615 ream stop
+
+[[tools]]
+id = "reamer-0615"
+name = ".0615 reamer"
+ref = "reamer-0615"  # drawing cross-check 2026-11-19: Ø.0615 +.0005/.0000 REAM
+
+[[tools]]
+id = "lathe-tool-sharp-nose"
+name = "Sharp-nose turning tool"
+ref = "lathe-tool-sharp-nose"  # drawing cross-check 2026-11-19: SPIGOT ROOT R.004 MAX
+
 [[setups]]
 machine_kind = "other"
 machine = "To be written"

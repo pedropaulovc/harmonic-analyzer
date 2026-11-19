@@ -13,6 +13,11 @@ id = "depth-micrometer"
 name = "Depth micrometer"
 ref = "depth-micrometer"  # F-depth-micrometer
 
+[[tools]]
+id = "drill-51"
+name = "#51 drill"
+ref = "drill-51"  # drawing cross-check 2026-11-19: .064 MATCH-DRILL THRU AT ASSEMBLY
+
 [[setups]]
 machine_kind = "other"
 machine = "To be written"

@@ -28,6 +28,16 @@ id = "transfer-punches"
 name = "Transfer punches"
 ref = "transfer-punches"  # F-transfer-punches-fractional
 
+[[tools]]
+id = "drill-35"
+name = "#35 drill"
+ref = "drill-35"  # drawing cross-check 2026-11-19: 4X ⌴ Ø.110 ↧ .469 counterbore
+
+[[tools]]
+id = "endmill-carbide-3-32"
+name = "3/32 carbide end mill"
+ref = "endmill-carbide-3-32"  # drawing cross-check 2026-11-19: flat floor for the Ø.110 counterbore
+
 [[setups]]
 machine_kind = "other"
 machine = "To be written"

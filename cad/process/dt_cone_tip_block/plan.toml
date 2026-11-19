@@ -58,6 +58,16 @@ id = "arbor-press"
 name = "Arbor press"
 ref = "arbor-press"  # F-arbor-press
 
+[[tools]]
+id = "chamfer-mill-carbide-1-4-90"
+name = "1/4 90° chamfer mill"
+ref = "chamfer-mill-carbide-1-4-90"  # drawing cross-check 2026-11-19: .257 X 90° BOTH ENDS
+
+[[tools]]
+id = "slitting-saw-1-032"
+name = ".032 slitting saw"
+ref = "slitting-saw-1-032"  # drawing cross-check 2026-11-19: .05 pinch slit, two passes
+
 [[setups]]
 machine_kind = "other"
 machine = "To be written"

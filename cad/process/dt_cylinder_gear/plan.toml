@@ -53,6 +53,21 @@ id = "v-blocks"
 name = "V-blocks"
 ref = "v-blocks"  # F-v-blocks
 
+[[tools]]
+id = "reamer-0376"
+name = ".3760 reamer"
+ref = "reamer-0376"  # drawing cross-check 2026-11-19: .3760 +.0005/.0000 REAM THRU
+
+[[tools]]
+id = "dt-cylinder-gear-cam-fixture"
+name = "Cam turning fixture MHA-DT-12-TL-01"
+ref = "dt-cylinder-gear-cam-fixture"  # drawing cross-check 2026-11-19: cam throw .3402 ±.0020
+
+[[tools]]
+id = "gauge-blocks-mitutoyo"
+name = "Gauge blocks"
+ref = "gauge-blocks-mitutoyo"  # drawing cross-check 2026-11-19: sets the cam throw on the fixture
+
 [[setups]]
 machine_kind = "other"
 machine = "To be written"

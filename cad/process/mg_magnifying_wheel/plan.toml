@@ -33,6 +33,11 @@ id = "protractor"
 name = "Protractor"
 ref = "protractor"  # F-protractor
 
+[[tools]]
+id = "form-tool-r024"
+name = "R.024 grooving form tool"
+ref = "form-tool-r024"  # drawing cross-check 2026-11-19: R.024 rim wire groove
+
 [[setups]]
 machine_kind = "other"
 machine = "To be written"

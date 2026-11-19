@@ -53,6 +53,11 @@ id = "pin-gauges-061-500"
 name = "Pin gauges .061-.500"
 ref = "pin-gauges-061-500"  # A1-pin-set-061-250, A1-pin-set-061-500-combined, A1-pin-set-251-500
 
+[[tools]]
+id = "reamers-adjustable-lms-5948"
+name = "Adjustable reamers .250-.375"
+ref = "reamers-adjustable-lms-5948"  # drawing cross-check 2026-11-19: .2500 +.0005/.0000 REAM THRU ALL
+
 [[setups]]
 machine_kind = "other"
 machine = "To be written"

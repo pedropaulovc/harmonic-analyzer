@@ -28,6 +28,11 @@ id = "ignition-wrenches"
 name = "Ignition wrenches"
 ref = "ignition-wrenches"  # F-ignition-wrenches
 
+[[tools]]
+id = "lathe-tool-sharp-nose"
+name = "Sharp-nose turning tool"
+ref = "lathe-tool-sharp-nose"  # drawing cross-check 2026-11-19: R.008 max. shoulder
+
 [[setups]]
 machine_kind = "other"
 machine = "To be written"

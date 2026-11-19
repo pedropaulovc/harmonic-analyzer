@@ -9,11 +9,6 @@ stock = "To be written"
 shop = "../shop.toml"
 
 [[tools]]
-id = "drill-51"
-name = "#51 drill"
-ref = "drill-51"  # Drills #51
-
-[[tools]]
 id = "drill-50"
 name = "#50 drill"
 ref = "drill-50"  # Drills #50
@@ -102,6 +97,41 @@ ref = "arbor-press"  # F-arbor-press
 id = "steel-rule-48"
 name = "48 in steel rule"
 ref = "steel-rule-48"  # F-steel-rule-48
+
+[[tools]]
+id = "endmill-carbide-3fl-1-2"
+name = "1/2 carbide end mill"
+ref = "endmill-carbide-3fl-1-2"  # drawing cross-check 2026-11-19: 1 in-class bore, CNC interpolated (owner 2026-11-19)
+
+[[tools]]
+id = "telescoping-gauges-starrett-s579gz"
+name = "Telescoping gauges"
+ref = "telescoping-gauges-starrett-s579gz"  # drawing cross-check 2026-11-19: gauges the bore
+
+[[tools]]
+id = "micrometers"
+name = "Micrometers 0-3 in"
+ref = "micrometers"  # drawing cross-check 2026-11-19: reads the telescoping gauge
+
+[[tools]]
+id = "tap-10-32-bottoming-pulley"
+name = "#10-32 pulley bottoming tap"
+ref = "tap-10-32-bottoming-pulley"  # drawing cross-check 2026-11-19: 10-32 UNF ↧ 1.81 from the spot face
+
+[[tools]]
+id = "drill-51-taper-length"
+name = "#51 taper-length drill"
+ref = "drill-51-taper-length"  # drawing cross-check 2026-11-19: #51 DRILL 2X Ø.067 THRU FROM REAM FLOOR
+
+[[tools]]
+id = "drill-31"
+name = "#31 drill"
+ref = "drill-31"  # drawing cross-check 2026-11-19: pre-drill for the .1240 ream
+
+[[tools]]
+id = "endmill-carbide-3fl-1-4"
+name = "1/4 carbide end mill"
+ref = "endmill-carbide-3fl-1-4"  # drawing cross-check 2026-11-19: Ø.39 ↧ (.09) spot face, interpolated
 
 [[setups]]
 machine_kind = "other"

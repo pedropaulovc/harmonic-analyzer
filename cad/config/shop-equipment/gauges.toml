@@ -75,6 +75,7 @@ name = "Outside micrometers, 0-1, 1-2 and 2-3 in (archived inventory)"
 kind = "micrometer_set"
 make = "LittleMachineShop"
 status = "on_hand"
+note = "Owner confirmed on hand 2026-11-19: the 0-3 in micrometer set."
 
 [gauges.calipers]
 kind = "caliper"
@@ -132,10 +133,10 @@ kind = "depth_micrometer"
 status = "to_order"
 
 [gauges.feeler-gauges]
-name = "Feeler gauge leaves, inch"
+name = "Pittsburgh SAE/metric feeler gauge, 32 pieces"
 kind = "feeler_gauge_set"
 status = "on_hand"
-note = "Owned (Pedro, 2026-11-17, PR #2874), superseding the archived inventory's 2026-10-11 \"feeler gauges are not owned\". Inch leaves only (owner, Pedro, 2026-11-17): the metric set is gauges.feeler-gauges-metric."
+note = "Owner confirmed on hand 2026-11-19: Pittsburgh SAE/metric 32-piece feeler gauge. Owned (Pedro, 2026-11-17, PR #2874), superseding the archived inventory's 2026-10-11 \"feeler gauges are not owned\". The placeholder process plans name this set where the quote workbook named the Starrett 66MA (owner 2026-11-19); MHA-DT-00's metric leaf stacks still name gauges.feeler-gauges-metric."
 
 # MHA-DT-00 builds every set feeler and shim from this metric gage
 # (pinion_rig_fitup.FEELER_GAGE). The shop owns inch leaves only (owner,
@@ -148,12 +149,14 @@ status = "to_order"
 [gauges.digital-angle-gauge]
 name = "Digital angle gauge"
 kind = "angle_gauge"
-status = "to_order"
+status = "on_hand"
+note = "Owner confirmed on hand 2026-11-19."
 
 [gauges.protractor]
-name = "Protractor"
+name = "PEC rectangular-head protractor (LMS 2748)"
 kind = "protractor"
-status = "to_order"
+status = "on_hand"
+note = "Owner confirmed on hand 2026-11-19."
 
 # --- measuring equipment on the mill -------------------------------------
 
@@ -243,3 +246,18 @@ note = "quotes-2026-11-17-rev3.xlsx A1-pin-set-011-060: recommended Shars 303-45
 kind = "pin_gauge_set"
 status = "to_order"
 note = "quotes-2026-11-17-rev3.xlsx A1-pin-set-061-500-combined: recommended Shars 303-4516M1+2; it covers the A1-pin-set-061-250 (Shars 303-4503M1) and A1-pin-set-251-500 (KBC 1-812-595) boxes, bought through it."
+
+[gauges.gauge-pin-0625]
+kind = "gauge_pin"
+status = "to_order"
+note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-10 .002 TIR TO A Ø.0625 PIN."
+
+[gauges.sine-bar-5]
+kind = "sine_bar"
+status = "to_order"
+note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-SM-03 122.4° ±.5° knife-edge stubs."
+
+[gauges.calipers-12]
+kind = "caliper"
+status = "to_order"
+note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-MG-03 6.59 overall at ±.01."

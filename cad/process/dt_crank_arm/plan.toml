@@ -33,6 +33,21 @@ id = "centre-punch-starrett-18a"
 name = "Automatic centre punch"
 ref = "centre-punch-starrett-18a"  # F-centre-punch-starrett-18A
 
+[[tools]]
+id = "drill-25"
+name = "#25 drill"
+ref = "drill-25"  # drawing cross-check 2026-11-19: pre-drill for the 5/32 dowel ream
+
+[[tools]]
+id = "reamer-1562"
+name = "5/32 reamer"
+ref = "reamer-1562"  # drawing cross-check 2026-11-19: (Ø.156) REAM .17 for dowel MHA-DT-VN-59
+
+[[tools]]
+id = "chamfer-mill-carbide-1-4-90"
+name = "1/4 90° chamfer mill"
+ref = "chamfer-mill-carbide-1-4-90"  # drawing cross-check 2026-11-19: Ø.122 MAX X 90° NEAR SIDE
+
 [[setups]]
 machine_kind = "other"
 machine = "To be written"

@@ -29,9 +29,9 @@ name = "48DP 20PA gear cutter #4"
 ref = "gear-cutters-48dp-20pa"  # F-gear-cutter-10-289-484
 
 [[tools]]
-id = "feeler-gauges-metric"
-name = "Starrett 66MA feelers"
-ref = "feeler-gauges-metric"  # F-feeler-66MA
+id = "feeler-gauges"
+name = "Feeler gauges (Pittsburgh 32-pc)"
+ref = "feeler-gauges"  # F-feeler-66MA; repointed from the Starrett 66MA (owner 2026-11-19)
 
 [[tools]]
 id = "pin-gauges-061-500"

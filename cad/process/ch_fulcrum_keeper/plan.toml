@@ -43,6 +43,11 @@ id = "centre-punch-starrett-18a"
 name = "Automatic centre punch"
 ref = "centre-punch-starrett-18a"  # F-centre-punch-starrett-18A
 
+[[tools]]
+id = "endmill-carbide-3fl-1-8"
+name = "1/8 carbide end mill"
+ref = "endmill-carbide-3fl-1-8"  # drawing cross-check 2026-11-19: ⌴ Ø.150 ↧ .083, interpolated
+
 [[setups]]
 machine_kind = "other"
 machine = "To be written"

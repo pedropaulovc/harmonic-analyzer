@@ -950,8 +950,6 @@ description = "48DP 20PA involute gear cutters #1 to #8"
 description = "1/16 HSS 2-flute DE end mill, 0/+.002"
 [tools.keyway-broach-1-16-a]  # F-keyway-broach
 description = "1/16 keyway broach, style A"
-[tools.slot-cutter-200]  # C-slot-cutter-200
-description = "0.200 in / 13/64 slot cutter"
 [tools.depth-micrometer]  # F-depth-micrometer
 description = "Depth micrometer, inch"
 [tools.digital-angle-gauge]  # F-digital-angle-gauge
@@ -988,3 +986,162 @@ description = "Straightedge"
 description = "Transfer punch sets, fractional 3/32-1/2 by 64ths and number sizes #1-#60"
 [tools.v-blocks]  # F-v-blocks
 description = "Matched V-block pair with clamps"
+
+# --- Drawing cross-check additions (2026-11-19) -------------------------------
+# Tools the v50 drawings call for that the quote workbook left out, from the
+# drawing cross-check of the placeholder plans (2026-11-19) and the owner's
+# rulings of that day. The comment cites the drawing callout or the inventory
+# record that holds the tool's ownership.
+[tools.boring-bars-meda-6045000]  # inventory tools.boring-bars-meda-6045000
+description = "MEDA 6045000 double-ended lathe boring bars for tool bits, 3/8 to 1 in"
+[tools.calipers-12]  # MHA-MG-03 6.59 overall at ±.01
+description = "Calipers, 12 in (8 in or longer reads the 6.59 overall)"
+[tools.centre-drills-carbide-60]  # inventory tools.centre-drills-carbide-60
+description = "Carbide 60° centre drills, trade sizes 1, 3 and 6"
+[tools.chamfer-mill-1-2-90]  # MHA-PN-05 2X 45° V, (.20) deep
+description = "1/2 in 90° included chamfer mill"
+diameter_mm = 12.7
+[tools.chamfer-mill-330ch-1-4-90]  # inventory tools.chamfer-mill-330ch-1-4-90
+description = "330CH 1/4 in 90° included 2-flute chamfer mill"
+diameter_mm = 6.35
+[tools.chamfer-mill-carbide-1-4-90]  # inventory tools.chamfer-mill-carbide-1-4-90
+description = "Carbide 1/4 in 90° chamfering end mill, 2-flute (McMaster 3073A46)"
+diameter_mm = 6.35
+[tools.die-stock-13-16]  # inventory holders.die-stock-13-16
+description = "Die stock for 13/16 in round dies (Drillco 3000DS1)"
+[tools.dies-zoro-wb7365521946]  # inventory tools.dies-zoro-wb7365521946
+description = "Round adjustable split dies, HSS, 13/16 in OD: #0-80 UNF and #4-40 UNC (Drill America DWTH1316-080, -440)"
+[tools.drill-30-cobalt]  # MHA-DT-24 #30 DRILL .129 THRU in 17-7 PH Cond C
+description = "#30 (.1285 in) cobalt jobber drill, for 17-7 PH spring steel"
+diameter_mm = 3.2639
+[tools.drill-35]  # MHA-PD-27 4X ⌴ Ø.110 ↧ .469 counterbore
+description = "#35 (.1100 in) drill, 115-piece index"
+diameter_mm = 2.794
+[tools.drill-51-taper-length]  # MHA-FR-02 #51 DRILL 2X Ø.067 THRU FROM REAM FLOOR
+description = "#51 (.0670 in) taper-length HSS drill, 2 in flute, 3-3/4 in overall (MSC 63725519)"
+diameter_mm = 1.7018
+[tools.dt-cone-gear-cutting-arbor]  # MHA-DT-03 TOOTH CUTTING SETUP .002 TIR TO FINISHED BORE
+description = "Shop-made keyed cutting arbor kit for the cone gears: MHA-DT-03-TL-03 arbor, TL-04 backing collars, TL-06 key and arbor nut"
+[tools.dt-cone-gear-index-plate]  # MHA-DT-03 tooth indexing
+description = "Shop-made dividing-head index plate MHA-DT-03-TL-01 for the cone gears"
+[tools.dt-cone-tip-cutter-bar]  # MHA-DT-37 holder for the form cutter
+description = "Shop-made fly cutter bar MHA-DT-37-TL-02 for the cone tip gear form cutter"
+[tools.dt-cone-tip-form-cutter]  # MHA-DT-37 GEAR DATA CUTTER: MHA-DT-37-TL-01
+description = "Shop-made form cutter MHA-DT-37-TL-01 for the MHA-DT-37 tooth space"
+[tools.dt-cylinder-gear-cam-fixture]  # MHA-DT-12 cam throw .3402 ±.0020
+description = "Shop-made cam turning fixture MHA-DT-12-TL-01 (stub, clamp, clock pin) for the MHA-DT-12 cams"
+[tools.dti]  # inventory gauges.dti
+description = "Dial test indicator, 1 µm lever (range and resolution: gauges.dti)"
+[tools.endmill-5-64-long]  # MHA-PN-01 window corners R.040 max
+description = "5/64 in 2-flute end mill, 5/16 in or more of reach"
+diameter_mm = 1.984375
+[tools.endmill-carbide-3-32]  # MHA-PD-18 flatten the .33 FLAT BOTTOM floor; MHA-PD-27 flat floor for the Ø.110 counterbore; MHA-CH-03 .106 ±.002 fork slot
+description = "3/32 in square carbide end mill, .47 in or more of reach"
+diameter_mm = 2.38125
+[tools.endmill-carbide-3-64]  # MHA-PD-03 2X .04 SLIT, FULL R END
+description = "3/64 in square carbide end mill, 2- or 3-flute"
+diameter_mm = 1.190625
+[tools.endmill-hss-2fl-1-4]  # inventory tools.endmill-hss-2fl-1-4
+description = "1/4 in HSS 2-flute square end mill, 5/8 in LOC (McMaster 3051A51)"
+diameter_mm = 6.35
+[tools.feeler-gauges]  # inventory gauges.feeler-gauges
+description = "Pittsburgh SAE/metric feeler gauge set, 32 pieces"
+[tools.follow-rest-pm-1127]  # inventory fixtures.follow-rest-pm-1127
+description = "PM-1127VF-LB follow rest"
+[tools.form-tool-r024]  # MHA-MG-05 R.024 rim wire groove
+description = "HSS lathe grooving bit ground to a full R.024 (.048 wide) nose"
+[tools.form-tool-r047]  # MHA-MG-06 R .047/.020 FULL R groove
+description = "HSS lathe full-radius grooving bit, nose R.020-.047 (e.g. R.047, .094 wide)"
+[tools.form-tool-r070]  # MHA-PD-23 R.07 shank-end dome; MHA-MG-07 R.07 tip
+description = "R.070 convex dome form tool"
+[tools.form-tool-r110]  # MHA-MG-04 R.11 TANGENT HEMISPHERE
+description = "R.110 convex dome form tool"
+[tools.form-tool-r125]  # MHA-CH-04 2X (SR.125) ends; MHA-MG-03 SR.13 tip
+description = "R.125 convex full-radius form tool (hemisphere on 1/4 rod)"
+[tools.form-tool-r180]  # MHA-PD-23 R.18 head dome
+description = "R.180 convex dome form tool"
+[tools.gauge-blocks-mitutoyo]  # inventory gauges.gauge-blocks-mitutoyo
+description = "Mitutoyo 81-piece inch gauge block set, shop grade"
+[tools.gauge-pin-0625]  # MHA-PD-10 .002 TIR TO A Ø.0625 PIN
+description = "Gauge pin .0625 in, class ZZ"
+[tools.grooving-tool-020]  # MHA-PD-23 .020 +.002/.000 ring groove; MHA-MG-04 thread relief, corners R.008 max.; MHA-MG-07 thread relief, corners R.008 max.
+description = "HSS lathe grooving bit, .020 in wide or less, corners R.008 max."
+[tools.hardness-test-files-55-65]  # MHA-PD-14 55-63 HRC after hardening
+description = "Hardness test files, 55 and 65 HRC"
+[tools.knurl-straight-25tpi]  # MHA-PD-13 STRAIGHT KNURL 25 TPI
+description = "Lathe knurling holder with straight 25 TPI wheel"
+[tools.lathe-tool-sharp-nose]  # MHA-PD-08 R.004 max. corners, .016 neck; MHA-PD-17 SPIGOT ROOT R.004 MAX; MHA-PD-23 R.005 MAX land-to-head corner; MHA-PN-04 R.008 max. shoulder
+description = "Lathe turning tool, nose radius .004 in or less, tip under .016 wide"
+[tools.micrometers]  # inventory gauges.micrometers
+description = "Outside micrometers, 0-1, 1-2 and 2-3 in"
+[tools.needle-files-swiss]  # MHA-DT-37-TL-01 file the tooth-space form (.0114-.0323)
+description = "Swiss-pattern needle file set"
+[tools.number-stamps]  # MHA-FR-01 STAMP "2" .14 HIGH
+description = "Steel number stamp set, characters about .14 in high"
+[tools.pd-latch-hook-former]  # MHA-PD-14 R3.13 ±.02, R.38 ±.02
+description = "Shop-made latch-hook former: R3.13 roll and R.38 tab form"
+[tools.pd-platen-clip-bow-former]  # MHA-PD-03 FORMED, 6X (R1.36), .06 BOW RISE
+description = "Shop-made platen-clip bow former: R1.36 crown, .06 rise"
+[tools.pd-rack-pinion-cutting-arbor]  # inventory fixtures.pd-rack-pinion-cutting-arbor
+description = "Shop-made work arbor with two backing discs for cutting the MHA-PD-06 teeth"
+[tools.rail-trim-grinder]  # inventory tools.rail-trim-grinder
+description = "4-1/2 in angle grinder with a cut-off disc (BAUER 7 A, Harbor Freight 64856)"
+[tools.reamer-0365]  # inventory tools.reamer-0365
+description = ".0365 in HSS straight-flute chucking reamer (KBC 5-018-0365)"
+diameter_mm = 0.9271
+[tools.reamer-0615]  # MHA-DT-38 .0615 +.0005/.0000 REAM THRU; MHA-PD-17 Ø.0615 +.0005/.0000 REAM; MHA-PD-22 Ø.0615 +.0005/.0000 REAM (.163)
+description = ".0615 in HSS chucking reamer"
+diameter_mm = 1.5621
+[tools.reamer-0625]  # MHA-DT-03 .0625 +.0005/.0000 REAM THRU (T012, T018); MHA-DT-04 .0625 +.0005/.0000 REAM .20
+description = ".0625 in HSS chucking reamer"
+diameter_mm = 1.5875
+[tools.reamer-0930]  # MHA-DT-11 2X .0930 +.0005/.0000 REAM .1555; MHA-PD-18 Ø.0930 +.0005/.0000 2X REAM THRU; MHA-PD-22 Ø.0930 +.0005/.0000 2X REAM THRU
+description = ".0930 in HSS chucking reamer"
+diameter_mm = 2.3622
+[tools.reamer-0945]  # MHA-PD-19 2X Ø.0945 +.0005/.0000 REAM THRU
+description = ".0945 in HSS chucking reamer"
+diameter_mm = 2.4003
+[tools.reamer-1280]  # MHA-SM-02 Ø.1280 ±.0007 REAM (.37) FLAT BOTTOM
+description = ".1280 in HSS chucking reamer"
+diameter_mm = 3.2512
+[tools.reamer-1562]  # MHA-DT-31 (Ø.156) REAM .17 at assembly with MHA-DT-06; MHA-DT-06 (Ø.156) REAM .17 for dowel MHA-DT-VN-59
+description = "5/32 (.1562 in) HSS chucking reamer"
+diameter_mm = 3.96875
+[tools.reamer-1570]  # MHA-DT-03-TL-01 132X .1570 +.0005/.0000 REAM THRU; MHA-DT-14 .1570 +.0005/.0000 FLAT-BOTTOM REAM
+description = ".1570 in HSS chucking reamer"
+diameter_mm = 3.9878
+[tools.reamer-1610]  # MHA-DT-08 (Ø.161) REAM THRU, running fit on MHA-DT-32
+description = ".1610 in HSS chucking reamer"
+diameter_mm = 4.0894
+[tools.reamer-1855]  # MHA-PD-20 Ø.1850 +.0010/+.0005 REAM THRU
+description = ".1855 in HSS chucking reamer"
+diameter_mm = 4.7117
+[tools.reamer-1920]  # MHA-PD-22 Ø.1920 +.0005/.0000 REAM THRU
+description = ".1920 in HSS chucking reamer"
+diameter_mm = 4.8768
+[tools.reamer-1940]  # MHA-PD-18 Ø.1940 +.001/.000 REAM THRU
+description = ".1940 in HSS chucking reamer"
+diameter_mm = 4.9276
+[tools.reamer-3740]  # inventory tools.reamer-3740
+description = ".3740 in HSS straight-flute chucking reamer (McMaster 3087A55)"
+diameter_mm = 9.4996
+[tools.reamers-adjustable-lms-5948]  # inventory tools.reamers-adjustable-lms-5948
+description = "Adjustable reamer set, .250-.375 in, 4 pieces (LMS 5948)"
+[tools.sine-bar-5]  # MHA-SM-03 122.4° ±.5° knife-edge stubs
+description = "Sine bar, 5 in centres"
+[tools.slitting-saw-1-032]  # inventory tools.slitting-saw-1-032
+description = "Smooth-finish slitting saw, 1 in diameter, .032 in thick, 3/8 in arbor hole (McMaster 3044A23)"
+diameter_mm = 25.4
+[tools.slitting-saw-2-75-064]  # inventory tools.slitting-saw-2-75-064
+description = "HSS slitting saw, 2-3/4 in diameter, .064 in thick, 72 teeth (McMaster 3062A21)"
+diameter_mm = 69.85
+[tools.sm-gooseneck-bend-form]  # inventory fixtures.sm-gooseneck-bend-form
+description = "Shop-made grooved bend form with a tail for the MHA-SM-01 gooseneck tube"
+[tools.steady-rest-pm-1127]  # inventory fixtures.steady-rest-pm-1127
+description = "PM-1127VF-LB steady rest"
+[tools.tap-10-32-bottoming-pulley]  # MHA-FR-01 10-32 UNF ↧ 1.81 from the spot face; MHA-FR-02 10-32 UNF ↧ 1.81 from the spot face
+description = "#10-32 UNF bottoming pulley tap, 6 in overall, 4 flutes (Regal 015326AS)"
+[tools.telescoping-gauges-starrett-s579gz]  # inventory gauges.telescoping-gauges-starrett-s579gz
+description = "Starrett S579Gz telescoping bore gauge set, 4 pieces"
+[tools.threading-bits-lms-6685]  # MHA-DT-03-TL-03 1/4-28 UNF single-pointed (owner 2026-11-19); MHA-PD-08 #8-32 UNC single-pointed (owner 2026-11-19); MHA-MG-03 1/4-20 UNC single-pointed (owner 2026-11-19)
+description = "5/16 in HSS threading tool bit, set of two (LMS 6685)"

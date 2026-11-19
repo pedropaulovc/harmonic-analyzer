@@ -48,6 +48,21 @@ id = "centre-punch-starrett-18a"
 name = "Automatic centre punch"
 ref = "centre-punch-starrett-18a"  # F-centre-punch-starrett-18A
 
+[[tools]]
+id = "reamer-0930"
+name = ".0930 reamer"
+ref = "reamer-0930"  # drawing cross-check 2026-11-19: 2X .0930 +.0005/.0000 REAM .1555
+
+[[tools]]
+id = "drill-31"
+name = "#31 drill"
+ref = "drill-31"  # drawing cross-check 2026-11-19: pre-drill for the (Ø.125) match ream
+
+[[tools]]
+id = "reamer-1240"
+name = ".1240 reamer"
+ref = "reamer-1240"  # drawing cross-check 2026-11-19: (Ø.125) MATCH-REAM THRU MHA-DT-10
+
 [[setups]]
 machine_kind = "other"
 machine = "To be written"

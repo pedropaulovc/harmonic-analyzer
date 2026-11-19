@@ -18,6 +18,11 @@ id = "india-stone-ib8"
 name = "India stone"
 ref = "india-stone-ib8"  # F-stone-norton-IB8
 
+[[tools]]
+id = "jig-files"
+name = "Files"
+ref = "jig-files"  # drawing cross-check 2026-11-19: 4X R.07 filed corners
+
 [[setups]]
 machine_kind = "other"
 machine = "To be written"

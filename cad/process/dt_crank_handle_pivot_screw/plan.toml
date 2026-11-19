@@ -13,6 +13,21 @@ id = "file-nicholson-10-second-cut"
 name = "10 in mill file"
 ref = "file-nicholson-10-second-cut"  # F-file-nicholson-10-mill-second-cut
 
+[[tools]]
+id = "dies-zoro-wb7365521946"
+name = "#4-40 round die"
+ref = "dies-zoro-wb7365521946"  # drawing cross-check 2026-11-19: die-cut #4-40 UNC thread
+
+[[tools]]
+id = "die-stock-13-16"
+name = "13/16 die stock"
+ref = "die-stock-13-16"  # drawing cross-check 2026-11-19: holds the #4-40 die
+
+[[tools]]
+id = "slitting-saw-1-032"
+name = ".032 slitting saw"
+ref = "slitting-saw-1-032"  # drawing cross-check 2026-11-19: .04 ±.01 screwdriver slot
+
 [[setups]]
 machine_kind = "other"
 machine = "To be written"

@@ -13,6 +13,16 @@ id = "drill-32"
 name = "#32 drill"
 ref = "drill-32"  # Drills #32
 
+[[tools]]
+id = "endmill-carbide-3-64"
+name = "3/64 carbide end mill"
+ref = "endmill-carbide-3-64"  # drawing cross-check 2026-11-19: 2X .04 SLIT, FULL R END
+
+[[tools]]
+id = "pd-platen-clip-bow-former"
+name = "Bow former (R1.36, .06 rise)"
+ref = "pd-platen-clip-bow-former"  # drawing cross-check 2026-11-19: FORMED, 6X (R1.36), .06 BOW RISE
+
 [[setups]]
 machine_kind = "other"
 machine = "To be written"

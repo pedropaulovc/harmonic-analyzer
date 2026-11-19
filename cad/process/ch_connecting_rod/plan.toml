@@ -28,6 +28,26 @@ id = "arbor-press"
 name = "Arbor press"
 ref = "arbor-press"  # F-arbor-press
 
+[[tools]]
+id = "endmill-carbide-3fl-1-2"
+name = "1/2 carbide end mill"
+ref = "endmill-carbide-3fl-1-2"  # drawing cross-check 2026-11-19: Ø1.213 +.003/.000 BORE, interpolated (owner 2026-11-19)
+
+[[tools]]
+id = "telescoping-gauges-starrett-s579gz"
+name = "Telescoping gauges"
+ref = "telescoping-gauges-starrett-s579gz"  # drawing cross-check 2026-11-19: gauges the Ø1.213 bore
+
+[[tools]]
+id = "micrometers"
+name = "Micrometers 0-3 in"
+ref = "micrometers"  # drawing cross-check 2026-11-19: reads the telescoping gauge
+
+[[tools]]
+id = "endmill-carbide-3-32"
+name = "3/32 carbide end mill"
+ref = "endmill-carbide-3-32"  # drawing cross-check 2026-11-19: .106 ±.002 fork slot
+
 [[setups]]
 machine_kind = "other"
 machine = "To be written"

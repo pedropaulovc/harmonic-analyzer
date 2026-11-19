@@ -23,6 +23,21 @@ id = "pin-gauges-011-060"
 name = "Pin gauges .011-.060"
 ref = "pin-gauges-011-060"  # A1-pin-set-011-060
 
+[[tools]]
+id = "threading-bits-lms-6685"
+name = "5/16 HSS threading bit"
+ref = "threading-bits-lms-6685"  # drawing cross-check 2026-11-19: #8-32 UNC single-pointed (owner 2026-11-19)
+
+[[tools]]
+id = "lathe-tool-sharp-nose"
+name = "Sharp-nose turning tool"
+ref = "lathe-tool-sharp-nose"  # drawing cross-check 2026-11-19: R.004 max. corners, .016 neck
+
+[[tools]]
+id = "feeler-gauges"
+name = "Feeler gauges"
+ref = "feeler-gauges"  # drawing cross-check 2026-11-19: BACKLASH .002-.007, FEELER
+
 [[setups]]
 machine_kind = "other"
 machine = "To be written"

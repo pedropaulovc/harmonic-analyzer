@@ -41,10 +41,10 @@ kind = "mandrel"
 status = "to_order"
 
 [tools.arbor-press]
-name = "Arbor press"
+name = "Central Machinery 1 ton arbor press"
 kind = "press"
-status = "to_order"
-note = "Also pushes the 1/16-A keyway broach (tools.keyway-broach-1-16-a, #2465): about 100 lbf on a cone gear's face, 390 lbf catalogue at the broach's longest cut, so a 1-ton press is ample. The 5 in broach, a gear and the bushing collar stand about 5.4 in: check the ram's open height before buying. A candidate, not a choice: Harbor Freight 59766, 1 ton, $79.99, maximum height 5-1/2 in (listing read live 2026-11-12), which only just takes that stack."
+status = "on_hand"
+note = "Owner confirmed on hand 2026-11-19 (Central Machinery, 1 ton). Also pushes the 1/16-A keyway broach (tools.keyway-broach-1-16-a, #2465): about 100 lbf on a cone gear's face, 390 lbf catalogue at the broach's longest cut, so a 1-ton press is ample. The 5 in broach, a gear and the bushing collar stand about 5.4 in: check the ram's open height before the cut."
 
 # Long enough for the tallest height an assembly sheet reads with a rule; the 6
 # in rule the archived inventory lists (Starrett C604R-6) cannot read the
@@ -106,7 +106,8 @@ note = "Not owned: to buy. MHA-CH-13 Setups 2-4: the TL-VN-50 edge clamps at 6 i
 [tools.pliers]
 name = "Pliers"
 kind = "pliers"
-status = "to_order"
+status = "on_hand"
+note = "Owner confirmed on hand 2026-11-19."
 
 [tools.ball-peen-hammer-16oz]
 name = "Estwing E3-16BP 16 oz ball peen hammer (archived inventory)"
@@ -120,8 +121,8 @@ name = "Starrett 18A automatic centre punch (archived inventory)"
 kind = "centre_punch"
 make = "Starrett"
 sku = "18A"
-status = "to_order"
-note = "Purchase approved by Pedro 2026-10-11 (archived inventory); not recorded as received."
+status = "on_hand"
+note = "Owner confirmed on hand 2026-11-19 (an automatic centre punch). Purchase approved by Pedro 2026-10-11 (archived inventory)."
 
 [tools.file-nicholson-10-second-cut]
 name = "Nicholson 10 in mill second-cut file (archived inventory)"

@@ -38,6 +38,11 @@ id = "pin-gauges-061-500"
 name = "Pin gauges .061-.500"
 ref = "pin-gauges-061-500"  # A1-pin-set-061-500-combined, A1-pin-set-251-500
 
+[[tools]]
+id = "endmill-carbide-3fl-1-4"
+name = "1/4 carbide end mill"
+ref = "endmill-carbide-3fl-1-4"  # drawing cross-check 2026-11-19: 2X .453 counterbore, interpolated
+
 [[setups]]
 machine_kind = "other"
 machine = "To be written"

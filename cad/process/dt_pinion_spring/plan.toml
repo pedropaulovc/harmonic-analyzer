@@ -9,14 +9,14 @@ stock = "To be written"
 shop = "../shop.toml"
 
 [[tools]]
-id = "riser-drill-30"
-name = "#30 drill"
-ref = "riser-drill-30"  # Drills #30
+id = "feeler-gauges"
+name = "Feeler gauges (Pittsburgh 32-pc)"
+ref = "feeler-gauges"  # F-feeler-66MA; repointed from the Starrett 66MA (owner 2026-11-19)
 
 [[tools]]
-id = "feeler-gauges-metric"
-name = "Starrett 66MA feelers"
-ref = "feeler-gauges-metric"  # F-feeler-66MA
+id = "drill-30-cobalt"
+name = "#30 cobalt drill"
+ref = "drill-30-cobalt"  # drawing cross-check 2026-11-19: #30 DRILL .129 THRU in 17-7 PH Cond C
 
 [[setups]]
 machine_kind = "other"

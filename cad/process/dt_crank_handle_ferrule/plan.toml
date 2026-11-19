@@ -1,0 +1,22 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# the drawing cross-check of 2026-11-19, until its traveler is written. Not
+# enrolled in _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Crank Handle Ferrule"
+part = "MHA-DT-34 Crank Handle Ferrule"
+revision = "placeholder"
+material = "C36000 free-machining brass rod, 9/16 in"
+stock = "To be written"
+shop = "../shop.toml"
+
+[[tools]]
+id = "drill-n"
+name = "N drill"
+ref = "drill-n"  # drawing cross-check 2026-11-19: .303 BORE THRU (N drill .302 inside .XXX)
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

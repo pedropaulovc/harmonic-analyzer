@@ -13,6 +13,16 @@ id = "riser-drill-30"
 name = "#30 drill"
 ref = "riser-drill-30"  # Drills #30
 
+[[tools]]
+id = "hardness-test-files-55-65"
+name = "Hardness test files 55/65 HRC"
+ref = "hardness-test-files-55-65"  # drawing cross-check 2026-11-19: 55-63 HRC after hardening
+
+[[tools]]
+id = "pd-latch-hook-former"
+name = "Latch-hook former (R3.13, R.38)"
+ref = "pd-latch-hook-former"  # drawing cross-check 2026-11-19: R3.13 ±.02, R.38 ±.02
+
 [[setups]]
 machine_kind = "other"
 machine = "To be written"

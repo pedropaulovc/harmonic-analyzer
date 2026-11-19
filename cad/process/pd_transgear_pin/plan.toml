@@ -1,0 +1,42 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# the drawing cross-check of 2026-11-19, until its traveler is written. Not
+# enrolled in _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Transgear Pin"
+part = "MHA-PD-23 Transgear Pin"
+revision = "placeholder"
+material = "12L14 or 1215 cold-finished steel bar, 1/4 in"
+stock = "To be written"
+shop = "../shop.toml"
+
+[[tools]]
+id = "grooving-tool-020"
+name = "Grooving bit .020"
+ref = "grooving-tool-020"  # drawing cross-check 2026-11-19: .020 +.002/.000 ring groove
+
+[[tools]]
+id = "lathe-tool-sharp-nose"
+name = "Sharp-nose turning tool"
+ref = "lathe-tool-sharp-nose"  # drawing cross-check 2026-11-19: R.005 MAX land-to-head corner
+
+[[tools]]
+id = "form-tool-r070"
+name = "R.070 form tool"
+ref = "form-tool-r070"  # drawing cross-check 2026-11-19: R.07 shank-end dome
+
+[[tools]]
+id = "form-tool-r180"
+name = "R.180 form tool"
+ref = "form-tool-r180"  # drawing cross-check 2026-11-19: R.18 head dome
+
+[[tools]]
+id = "feeler-gauges"
+name = "Feeler gauges"
+ref = "feeler-gauges"  # drawing cross-check 2026-11-19: .020 +.002/.000 groove width
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

@@ -13,6 +13,16 @@ id = "keyseat-endmill-1-16"
 name = "1/16 keyseat end mill"
 ref = "keyseat-endmill-1-16"  # F-keyseat-endmill
 
+[[tools]]
+id = "threading-bits-lms-6685"
+name = "5/16 HSS threading bit"
+ref = "threading-bits-lms-6685"  # drawing cross-check 2026-11-19: 1/4-28 UNF single-pointed (owner 2026-11-19)
+
+[[tools]]
+id = "centre-drills-carbide-60"
+name = "Carbide 60° centre drills"
+ref = "centre-drills-carbide-60"  # drawing cross-check 2026-11-19: .11 and .070 X 60° CENTRE HOLES
+
 [[setups]]
 machine_kind = "other"
 machine = "To be written"

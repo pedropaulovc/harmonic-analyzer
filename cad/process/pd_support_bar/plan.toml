@@ -38,6 +38,21 @@ id = "transfer-punches"
 name = "Transfer punches"
 ref = "transfer-punches"  # F-transfer-punches-fractional, F-transfer-punches-number
 
+[[tools]]
+id = "jig-drill-29"
+name = "#29 drill"
+ref = "jig-drill-29"  # drawing cross-check 2026-11-19: TAP #8-32 UNC THRU, tap drill
+
+[[tools]]
+id = "chamfer-mill-330ch-1-4-90"
+name = "1/4 90° chamfer mill"
+ref = "chamfer-mill-330ch-1-4-90"  # drawing cross-check 2026-11-19: ⌵ Ø.169 / Ø.122 MAX X 90° BOTH FACES
+
+[[tools]]
+id = "endmill-carbide-3fl-1-8"
+name = "1/8 carbide end mill"
+ref = "endmill-carbide-3fl-1-8"  # drawing cross-check 2026-11-19: ⌴ Ø.335 ↧ .19 and the .118-centre slots
+
 [[setups]]
 machine_kind = "other"
 machine = "To be written"

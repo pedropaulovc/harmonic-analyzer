@@ -1,0 +1,37 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# the drawing cross-check of 2026-11-19, until its traveler is written. Not
+# enrolled in _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Magnifying Vertical Rod"
+part = "MHA-MG-04 Magnifying Vertical Rod"
+revision = "placeholder"
+material = "C36000 brass rod, 7/32 in; MSC Direct 32001166"
+stock = "To be written"
+shop = "../shop.toml"
+
+[[tools]]
+id = "dies-zoro-wb7365521946"
+name = "#4-40 round die"
+ref = "dies-zoro-wb7365521946"  # drawing cross-check 2026-11-19: die-cut #4-40 UNC thread
+
+[[tools]]
+id = "die-stock-13-16"
+name = "13/16 die stock"
+ref = "die-stock-13-16"  # drawing cross-check 2026-11-19: holds the die
+
+[[tools]]
+id = "grooving-tool-020"
+name = "Grooving bit .020"
+ref = "grooving-tool-020"  # drawing cross-check 2026-11-19: thread relief, corners R.008 max.
+
+[[tools]]
+id = "form-tool-r110"
+name = "R.110 form tool"
+ref = "form-tool-r110"  # drawing cross-check 2026-11-19: R.11 TANGENT HEMISPHERE
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

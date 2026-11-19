@@ -18,6 +18,16 @@ id = "jig-tap-8-32-plug"
 name = "#8-32 plug tap"
 ref = "jig-tap-8-32-plug"  # Tap coverage #8-32 UNC
 
+[[tools]]
+id = "knurl-straight-25tpi"
+name = "Straight knurl 25 TPI"
+ref = "knurl-straight-25tpi"  # drawing cross-check 2026-11-19: STRAIGHT KNURL 25 TPI
+
+[[tools]]
+id = "chamfer-mill-330ch-1-4-90"
+name = "1/4 90° chamfer mill"
+ref = "chamfer-mill-330ch-1-4-90"  # drawing cross-check 2026-11-19: ⌵ Ø.18 MAX X 90° BOTH ENDS
+
 [[setups]]
 machine_kind = "other"
 machine = "To be written"

@@ -29,9 +29,9 @@ name = "#4-40 plug tap"
 ref = "jig-tap-4-40-plug"  # Tap coverage #4-40 UNC
 
 [[tools]]
-id = "feeler-gauges-metric"
-name = "Starrett 66MA feelers"
-ref = "feeler-gauges-metric"  # F-feeler-66MA
+id = "feeler-gauges"
+name = "Feeler gauges (Pittsburgh 32-pc)"
+ref = "feeler-gauges"  # F-feeler-66MA; repointed from the Starrett 66MA (owner 2026-11-19)
 
 [[tools]]
 id = "pin-gauges-061-500"
@@ -47,6 +47,11 @@ ref = "setting-mandrel-375"  # F-setting-mandrel-375
 id = "v-blocks"
 name = "V-blocks"
 ref = "v-blocks"  # F-v-blocks
+
+[[tools]]
+id = "reamer-0376"
+name = ".3760 reamer"
+ref = "reamer-0376"  # drawing cross-check 2026-11-19: .3750 +.0015/+.0010 REAM THRU
 
 [[setups]]
 machine_kind = "other"

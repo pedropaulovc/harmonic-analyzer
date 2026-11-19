@@ -18,6 +18,11 @@ id = "pin-gauges-061-500"
 name = "Pin gauges .061-.500"
 ref = "pin-gauges-061-500"  # A1-pin-set-061-250, A1-pin-set-061-500-combined
 
+[[tools]]
+id = "drill-32"
+name = "#32 drill"
+ref = "drill-32"  # drawing cross-check 2026-11-19: pre-drill for the .1260 ream
+
 [[setups]]
 machine_kind = "other"
 machine = "To be written"

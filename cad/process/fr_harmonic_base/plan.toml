@@ -93,6 +93,31 @@ id = "v-blocks"
 name = "V-blocks"
 ref = "v-blocks"  # F-v-blocks
 
+[[tools]]
+id = "endmill-carbide-3fl-1-2"
+name = "1/2 carbide end mill"
+ref = "endmill-carbide-3fl-1-2"  # drawing cross-check 2026-11-19: 1 in-class bore, CNC interpolated (owner 2026-11-19)
+
+[[tools]]
+id = "telescoping-gauges-starrett-s579gz"
+name = "Telescoping gauges"
+ref = "telescoping-gauges-starrett-s579gz"  # drawing cross-check 2026-11-19: gauges the bore
+
+[[tools]]
+id = "micrometers"
+name = "Micrometers 0-3 in"
+ref = "micrometers"  # drawing cross-check 2026-11-19: reads the telescoping gauge
+
+[[tools]]
+id = "number-stamps"
+name = "Number stamps"
+ref = "number-stamps"  # drawing cross-check 2026-11-19: STAMP "2" .14 HIGH
+
+[[tools]]
+id = "tap-10-32-bottoming-pulley"
+name = "#10-32 pulley bottoming tap"
+ref = "tap-10-32-bottoming-pulley"  # drawing cross-check 2026-11-19: 10-32 UNF ↧ 1.81 from the spot face
+
 [[setups]]
 machine_kind = "other"
 machine = "To be written"

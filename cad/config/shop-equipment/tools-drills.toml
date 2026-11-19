@@ -275,3 +275,18 @@ note = "quotes-2026-11-17-rev3.xlsx G-drill-13mm (optional tier, not in the reco
 kind = "drill"
 status = "to_order"
 note = "quotes-2026-11-17-rev3.xlsx G-drill-33-64: not owned; recommended Zoro G910858682."
+
+[tools.drill-35]
+kind = "drill"
+status = "on_hand"
+note = "#35 is a member of the owned 115-piece index (owner 2026-11-19: index pre-drills on hand). drawing cross-check 2026-11-19: MHA-PD-27 4X ⌴ Ø.110 ↧ .469 counterbore."
+
+[tools.drill-51-taper-length]
+kind = "drill"
+status = "to_order"
+note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-FR-02 #51 DRILL 2X Ø.067 THRU FROM REAM FLOOR. fr_top_frame_spec.py: a jobber #51 falls short; Cleveland HSS taper length, MSC 63725519."
+
+[tools.drill-30-cobalt]
+kind = "drill"
+status = "to_order"
+note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-DT-24 #30 DRILL .129 THRU in 17-7 PH Cond C. The 115-piece index is HSS; the cobalt drill is for the hard 17-7 PH (not verified)."

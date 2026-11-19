@@ -76,9 +76,11 @@ registry number, title and material, `stock = "To be written"`, one
 `[[tools]]` entry per tool the part needs, and one dummy setup ("Traveler to
 come"). Its tools come from the owner's quote workbook
 `quotes-2026-11-17-rev3.xlsx` (its Items, Where used detail, Drills and Tap
-coverage sheets), each `ref` a `shop.toml` `tools` record whose header comment
-cites the workbook row, with the tool's ownership in the inventory under the
-same key. A placeholder is not in `TRAVELER_STEMS`: it has no `prechips:<stem>`
+coverage sheets) and from a cross-check of the plans against the drawings
+(2026-11-19), each `ref` a `shop.toml` `tools` record whose header comment
+cites the workbook row, the drawing callout or the inventory record, with the
+tool's ownership in the inventory under the same key. A placeholder is not in
+`TRAVELER_STEMS`: it has no `prechips:<stem>`
 task, is not rendered by `build` or `release` and ships nothing; it lists a
 part's tools for the stock BOM. It has no `[cad]` binding, so the built-in
 `pro` and `hobby` profiles refuse it (`stock_fit` needs one);
@@ -88,8 +90,8 @@ part's tools for the stock BOM. It has no `[cad]` binding, so the built-in
 uv tool run --from prechips==<version> prechips traveler cad/process/<stem>/plan.toml --profile cad/process/placeholder-profile.toml --out <file outside the repo>
 ```
 
-prechips refuses a plan with no `[[tools]]`, so a made part the workbook names
-no tool for has no placeholder. Enrolling a part means writing its real plan
+prechips refuses a plan with no `[[tools]]`, so a made part neither source names
+a tool for has no placeholder. Enrolling a part means writing its real plan
 over the placeholder (the `[cad]` binding, stock and setups) and adding its
 stem to `_process_plans.TRAVELER_STEMS`.
 

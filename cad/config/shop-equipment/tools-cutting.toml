@@ -456,6 +456,7 @@ dia_in = 1.0
 thickness_in = 0.032
 bore_in = 0.375
 cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 15: \"Smooth-Finish Slitting Saw, 0.032\" Thick, 1\" Diameter with 3/8\" Arbor Hole\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+note = "Owner confirmed on hand 2026-11-19 (McMaster 3044A23, $14.06)."
 
 # Arbor hole not on the packing list.
 [tools.slitting-saw-2-75-064]
@@ -468,6 +469,7 @@ dia_in = 2.75
 thickness_in = 0.064
 teeth = 72
 cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 16: \"High-Speed Steel Slitting Saw, 0.064\" Thick, 2-3/4\" Mill Diameter, 72 Teeth\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+note = "Owner confirmed on hand 2026-11-19 (McMaster 3062A21)."
 
 # Lathe inserts, insert code CCMT-32.51, one each. No holder for them is on
 # the packing list; their fit to tools.boring-bar-s10r-sclcr3 is not asserted.

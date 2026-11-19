@@ -28,6 +28,16 @@ id = "centre-punch-starrett-18a"
 name = "Automatic centre punch"
 ref = "centre-punch-starrett-18a"  # F-centre-punch-starrett-18A
 
+[[tools]]
+id = "drill-c"
+name = "C drill"
+ref = "drill-c"  # drawing cross-check 2026-11-19: pre-drill for the .2500/.2510 ream
+
+[[tools]]
+id = "endmill-hss-2fl-1-4"
+name = "1/4 HSS end mill"
+ref = "endmill-hss-2fl-1-4"  # drawing cross-check 2026-11-19: flatten the blind (.32) floor before reaming
+
 [[setups]]
 machine_kind = "other"
 machine = "To be written"

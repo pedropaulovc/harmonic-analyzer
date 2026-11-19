@@ -23,6 +23,11 @@ id = "tap-2-56-plug"
 name = "#2-56 plug tap"
 ref = "tap-2-56-plug"  # Tap coverage #2-56 UNC
 
+[[tools]]
+id = "endmill-carbide-3fl-1-8"
+name = "1/8 carbide end mill"
+ref = "endmill-carbide-3fl-1-8"  # drawing cross-check 2026-11-19: 10X ⌴ Ø.26 ↧ .115 counterbores, interpolated
+
 [[setups]]
 machine_kind = "other"
 machine = "To be written"
