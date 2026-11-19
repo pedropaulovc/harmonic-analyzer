@@ -7,6 +7,7 @@ revision = "placeholder"
 material = "ASTM A108 1018"
 stock = "To be written"
 shop = "../shop.toml"
+stock_refs = ["1018-round-5-8"]
 
 [[tools]]
 id = "keyseat-endmill-1-16"

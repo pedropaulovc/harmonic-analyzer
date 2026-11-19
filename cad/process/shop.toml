@@ -1143,3 +1143,105 @@ description = "#10-32 UNF bottoming pulley tap, 6 in overall, 4 flutes (Regal 01
 description = "Starrett S579Gz telescoping bore gauge set, 4 pieces"
 [tools.threading-bits-lms-6685]  # MHA-DT-03-TL-03 1/4-28 UNF single-pointed (owner 2026-11-19); MHA-PD-08 #8-32 UNC single-pointed (owner 2026-11-19); MHA-MG-03 1/4-20 UNC single-pointed (owner 2026-11-19)
 description = "5/16 in HSS threading tool bit, set of two (LMS 6685)"
+
+# --- Stock the process plans name (stock_refs) ---------------------------------
+# One record per cad/config/shop-equipment/stock-*.toml key a plan names, so
+# prechips can check each plan's stock_refs. Description only: the ownership
+# status stays in the inventory under the same key (stock assignment audit,
+# owner 2026-11-19).
+[stock.1018-flat-1-2x2-1-4]
+description = "1018 cold-finish carbon steel, flat bar, 1/2 x 2-1/4 in"
+[stock.1018-flat-1-4x2-1-2]
+description = "1018 cold-finish carbon steel, flat bar, 1/4 x 2-1/2 in"
+[stock.1018-flat-1-4x2-36in]
+description = "1018 cold-finish carbon steel, flat bar, 1/4 x 2 in, 36 in length"
+[stock.1018-flat-1-4x2-72in]
+description = "1018 cold-finish carbon steel, flat bar, 1/4 x 2 in, 72 in length"
+[stock.1018-flat-1-8x1-1-2]
+description = "1018 cold-finish carbon steel, flat bar, 1/8 x 1-1/2 in"
+[stock.1018-flat-1-8x3-4]
+description = "1018 cold-finish carbon steel, flat bar, 1/8 x 3/4 in"
+[stock.1018-flat-1x1-1-4]
+description = "1018 cold-finish carbon steel, flat bar, 1 x 1-1/4 in"
+[stock.1018-flat-3-8x1-1-4]
+description = "1018 cold-finish carbon steel, flat bar, 3/8 x 1-1/4 in"
+[stock.1018-flat-3-8x1-2]
+description = "1018 cold-finish carbon steel, flat bar, 3/8 x 1/2 in"
+[stock.1018-flat-5-16x1-12in]
+description = "1018 cold-finish carbon steel, flat bar, 5/16 x 1 in, 12 in length"
+[stock.1018-flat-5-16x1-36in]
+description = "1018 cold-finish carbon steel, flat bar, 5/16 x 1 in, 36 in length"
+[stock.1018-flat-5-16x1-72in]
+description = "1018 cold-finish carbon steel, flat bar, 5/16 x 1 in, 72 in length"
+[stock.1018-ground-flat-5-16x1]
+description = "AISI 1018 cold-finished steel, precision ground, flat bar, 5/16 x 1 in"
+[stock.1018-round-1]
+description = "1018 cold-finish carbon steel, round bar, 1 in"
+[stock.1018-round-1-2]
+description = "1018 cold-finish carbon steel, round bar, 1/2 in"
+[stock.1018-round-1-4]
+description = "1018 cold-finish carbon steel, round bar, 1/4 in"
+[stock.1018-round-3-8]
+description = "1018 cold-finish carbon steel, round bar, 3/8 in"
+[stock.1018-round-3-and-7-8]
+description = "1018 cold-finish carbon steel, round bar, 3 in / 7/8 in"
+[stock.1018-round-4]
+description = "1018 cold-finish carbon steel, round bar, 4 in"
+[stock.1018-round-5-8]
+description = "1018 cold-finish carbon steel, round bar, 5/8 in"
+[stock.1018-square-1-4]
+description = "1018 cold-finish carbon steel, square bar, 1/4 x 1/4 in"
+[stock.1018-square-3-4]
+description = "1018 cold-finish carbon steel, square bar, 3/4 x 3/4 in"
+[stock.1020-dom-tube-1x0120]
+description = "1020 DOM mild steel tube, round tube, 1 in OD x .120 in wall"
+[stock.4130n-tube-1-2x0065]
+description = "4130-N seamless alloy steel tube, round tube, 1/2 in OD x .065 in wall"
+[stock.4140-ht-flat-5-8x1-1-4]
+description = "4140/4142 HT alloy steel, pre-hardened 28-32 HRC as supplied, flat bar, 5/8 x 1-1/4 in"
+[stock.6061-flat-1-2x6-54in]
+description = "6061-T6511 aluminium, flat bar, 1/2 x 6 in, 54 in length"
+[stock.6061-flat-1-4x5]
+description = "6061-T6511 aluminium, flat bar, 1/4 x 5 in"
+[stock.6061-flat-1x3]
+description = "6061-T6511 aluminium, flat bar, 1 x 3 in"
+[stock.c360-flat-1-4x6]
+description = "C360 brass, flat bar, 1/4 x 6 in"
+[stock.c360-flat-1-8x2-1-2]
+description = "C36000 free-machining brass (360-H02, extruded), flat bar, 1/8 x 2-1/2 in"
+[stock.c360-flat-1-8x3-8]
+description = "C36000 free-machining brass (360-H02, extruded), flat bar, 1/8 x 3/8 in"
+[stock.c360-flat-1-8x4]
+description = "C36000 free-machining brass (360-H02, extruded), flat bar, 1/8 x 4 in"
+[stock.c360-flat-3-4x1-1-4]
+description = "C36000 free-machining brass (360-H02, extruded), flat bar, 3/4 x 1-1/4 in"
+[stock.c360-flat-3-8x1-1-4]
+description = "C36000 free-machining brass (360-H02, extruded), flat bar, 3/8 x 1-1/4 in"
+[stock.c360-hex-1-2]
+description = "C36000 free-machining brass (360-H02, extruded), hex bar, 1/2 in across flats"
+[stock.c360-hex-7-16]
+description = "C36000 free-machining brass (360-H02, extruded), hex bar, 7/16 in across flats"
+[stock.c360-round-1-1-8]
+description = "C36000 free-machining brass (360-H02, extruded), round bar, 1-1/8 in"
+[stock.c360-round-1-2]
+description = "C36000 free-machining brass (360-H02, extruded), round bar, 1/2 in"
+[stock.c360-round-1-4]
+description = "C36000 free-machining brass (360-H02, extruded), round bar, 1/4 in"
+[stock.c360-round-5-8]
+description = "C36000 free-machining brass (360-H02, extruded), round bar, 5/8 in"
+[stock.c360-round-7-16]
+description = "C36000 free-machining brass, round bar, 7/16 in"
+[stock.c360-round-7-32]
+description = "C36000 brass, round bar, 7/32 in"
+[stock.c360-round-7-8]
+description = "C36000 free-machining brass (360-H02, extruded), round bar, 7/8 in"
+[stock.c360-round-9-16]
+description = "C36000 free-machining brass, round bar, 9/16 in"
+[stock.c360-round-gear-blanks]
+description = "C36000 free-cutting brass, H02, round bar, 2-5/8 in / 2-1/4 in / 1-3/4 in / 1-1/2 in / 1-1/8 in / 3/4 in"
+[stock.c360-square-5mm-key]
+description = "C36000 brass key stock, DIN 6880 undersized, square bar, 5 x 5 mm"
+[stock.c675-round-5-8]
+description = "C67500 manganese bronze, round bar, 5/8 in"
+[stock.gray-iron-a48-25b-casting]
+description = "gray iron, ASTM A48 class 25B (a class 30B heat also conforms), casting"

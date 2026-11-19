@@ -7,6 +7,7 @@ revision = "placeholder"
 material = "Brass"
 stock = "To be written"
 shop = "../shop.toml"
+stock_refs = ["c360-flat-1-8x3-8"]
 
 [[tools]]
 id = "ms-stick-engraver"

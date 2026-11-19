@@ -7,6 +7,7 @@ revision = "placeholder"
 material = "AISI 1018 cold-finished steel shafting"
 stock = "To be written"
 shop = "../shop.toml"
+stock_refs = ["1018-round-1-4"]  # select bar mic'd .2492-.2500 (CF ±.002; print −.0008)
 
 [[tools]]
 id = "depth-micrometer"

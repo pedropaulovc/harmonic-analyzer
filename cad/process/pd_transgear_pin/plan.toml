@@ -7,6 +7,7 @@ revision = "placeholder"
 material = "12L14 or 1215 cold-finished steel bar, 1/4 in"
 stock = "To be written"
 shop = "../shop.toml"
+stock_refs = ["1018-round-1-4"]  # owner 2026-11-19: the owned 1018 bar (registry alloy text: #3124)
 
 [[tools]]
 id = "grooving-tool-020"

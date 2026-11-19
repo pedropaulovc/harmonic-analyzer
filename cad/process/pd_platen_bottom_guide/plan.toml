@@ -7,6 +7,7 @@ revision = "placeholder"
 material = "AISI 1018 cold-rolled steel"
 stock = "To be written"
 shop = "../shop.toml"
+stock_refs = ["1018-square-3-4"]
 
 [[tools]]
 id = "drill-51"

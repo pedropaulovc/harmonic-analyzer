@@ -7,6 +7,7 @@ revision = "placeholder"
 material = "6061 aluminum round, 9/16 in or over"
 stock = "To be written"
 shop = "../shop.toml"
+stock_refs = ["6061-flat-1x3"]
 
 [[tools]]
 id = "drill-h"

@@ -7,6 +7,7 @@ revision = "placeholder"
 material = "AISI 4140/4142 HT, pre-hardened, as supplied"
 stock = "To be written"
 shop = "../shop.toml"
+stock_refs = ["4140-ht-flat-5-8x1-1-4"]
 
 [[tools]]
 id = "drill-32"

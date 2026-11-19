@@ -7,6 +7,7 @@ revision = "placeholder"
 material = "C36000 free-cutting brass"
 stock = "To be written"
 shop = "../shop.toml"
+stock_refs = ["c360-hex-7-16"]
 
 [[tools]]
 id = "jig-drill-43"

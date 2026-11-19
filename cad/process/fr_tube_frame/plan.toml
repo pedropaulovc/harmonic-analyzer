@@ -7,6 +7,7 @@ revision = "placeholder"
 material = "ASTM A513 T5 SAE1020 DOM 1x.120in"
 stock = "To be written"
 shop = "../shop.toml"
+stock_refs = ["1020-dom-tube-1x0120"]
 
 [[tools]]
 id = "drill-8"

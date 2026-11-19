@@ -7,6 +7,7 @@ revision = "placeholder"
 material = "GRAY IRON, ASTM A48 CLASS 25B"
 stock = "To be written"
 shop = "../shop.toml"
+stock_refs = ["gray-iron-a48-25b-casting"]
 
 [[tools]]
 id = "drill-50"

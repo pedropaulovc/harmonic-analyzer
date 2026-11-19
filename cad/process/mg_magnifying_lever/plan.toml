@@ -7,6 +7,7 @@ revision = "placeholder"
 material = "Brass"
 stock = "To be written"
 shop = "../shop.toml"
+stock_refs = ["c360-round-1-4"]
 
 [[tools]]
 id = "threading-bits-lms-6685"

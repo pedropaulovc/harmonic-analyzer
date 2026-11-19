@@ -7,6 +7,7 @@ revision = "placeholder"
 material = "low-carbon cold-finished steel, 1/4 in sq"
 stock = "To be written"
 shop = "../shop.toml"
+stock_refs = ["1018-square-1-4"]
 
 [[tools]]
 id = "drill-49"

@@ -79,7 +79,9 @@ come"). Its tools come from the owner's quote workbook
 coverage sheets) and from a cross-check of the plans against the drawings
 (2026-11-19), each `ref` a `shop.toml` `tools` record whose header comment
 cites the workbook row, the drawing callout or the inventory record, with the
-tool's ownership in the inventory under the same key. A placeholder is not in
+tool's ownership in the inventory under the same key. Its `stock_refs` names
+the inventory `[stock.<key>]` rows it is cut from (the stock assignment audit,
+owner 2026-11-19). A placeholder is not in
 `TRAVELER_STEMS`: it has no `prechips:<stem>`
 task, is not rendered by `build` or `release` and ships nothing; it lists a
 part's tools for the stock BOM. It has no `[cad]` binding, so the built-in
@@ -113,6 +115,12 @@ height). The opening is the owner-reported fit with the stock hard jaws
 3/8 and 1/2 in 3-flute uncoated carbide end mills (`tools.endmill-carbide-3fl-*`)
 carry cutting settings on 1018 within the PM-30MV's 2800 rpm ceiling
 (`settings.endmill-carbide-3fl-*-1018-cf`), each number cited beside it.
+
+Every inventory stock key a plan's `stock_refs` names also has a
+`[stock.<key>]` record here, `description` only, because prechips checks each
+plan's `stock_refs` against its shop. The stock's ownership `status` stays in
+the inventory (`cad/config/shop-equipment/stock-*.toml`), so an enrolled
+traveler prints no stock mark.
 
 The `[limits]` table carries the three `vise_holding` limits: grip at least
 `vise_grip_min_mm` 6 mm (Pedro's house choice) and `vise_grip_fraction_min`

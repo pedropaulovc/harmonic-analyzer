@@ -7,6 +7,7 @@ revision = "placeholder"
 material = "LOW-CARBON STEEL, E.G. 1018 CF"
 stock = "To be written"
 shop = "../shop.toml"
+stock_refs = ["1018-round-3-and-7-8"]
 
 [[tools]]
 id = "broach-bushing-3-8-a"

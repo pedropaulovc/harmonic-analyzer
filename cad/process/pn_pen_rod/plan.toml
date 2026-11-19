@@ -7,6 +7,7 @@ revision = "placeholder"
 material = "C36000 brass key stock, 5 x 5 mm, DIN 6880; McMaster-Carr 90457A730"
 stock = "To be written"
 shop = "../shop.toml"
+stock_refs = ["c360-square-5mm-key"]
 
 [[tools]]
 id = "drill-3-64"

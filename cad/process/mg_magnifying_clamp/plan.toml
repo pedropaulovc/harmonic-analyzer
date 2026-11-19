@@ -41,6 +41,7 @@ material = "Brass hex, 1/2 in across flats (alloy not on record; a piece at leas
 stock = "{{process.blank_af_in:.3dot}} in hex bar; {{process.quantity:d}} × {{process.blank_length_min_in:.2f}}–{{process.blank_length_max_in:.2f}} in length."
 note = "Inches unless mm; G-code and console entries in mm. Finished {{cad.block_height_min_in:.3dot}}–{{cad.block_height_max_in:.3dot}} long. Speeds on the PM-30MV low belt (100–2800 rpm): no belt change. Home the mill ($H) and touch off G54 at the start of every mill setup: a FluidNC reset loses home (logbook 2026-11-06), so no offset from an earlier session is trusted. After any controller reset, stall or E-stop, home and touch off again before Cycle Start. Every cutting file (MC01, MC03, MC04) is proved in air on its first run; the tap files (MC02, MC05) move only at the machine top and over the hole, spindle off. Finish: brass black, the last setup, once the Brass Black is bought (owner 2026-11-17): machined now, blackened later; until then the clamp is tagged AWAITING BRASS BLACK."
 shop = "../shop.toml"
+stock_refs = ["c360-hex-1-2"]
 material_key = "clamp-brass-hex"
 milling_material = "brass"
 
