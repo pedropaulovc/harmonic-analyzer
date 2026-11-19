@@ -116,7 +116,7 @@ Facts prechips has no field for, but which CAD specs and tests read, live in
   the platen's C360 plate). Every row carries `status` (`on_hand`,
   `not_received` or `to_order`) and `allocated_to`, the registry stems it is
   cut for now (empty when its part is retired or none was named).
-  `uv run --frozen python cad/scripts/stock_bom.py [--format md|csv]` joins
+  `uv run --frozen python cad/scripts/stock_bom.py [--format md|csv|xlsx]` joins
   these rows to the part registry: one line per made part with its stock and
   the worst status of its rows (`no_stock_record` when no row serves it,
   `vendor_sku` for reworked bought hardware), the tools its process plan's

@@ -18,7 +18,10 @@ the same key in shop-equipment.toml's ``tools`` table: ``present = true`` is
 no ``ref``) ``unrecorded``. A part without a plan reads ``no traveler``.
 
 Usage:
-    uv run --frozen python cad/scripts/stock_bom.py [--format md|csv] [--out PATH]
+    uv run --frozen python cad/scripts/stock_bom.py [--format md|csv|xlsx] [--out PATH]
+
+``xlsx`` writes a workbook with a Parts sheet and an Unallocated stock sheet and
+needs ``--out``.
 
 Exits 2 when a row allocates a stem that is not in the registry or is a
 purchased part, carries an unknown status, or a plan names an unknown or
@@ -38,6 +41,8 @@ from dataclasses import dataclass
 from fractions import Fraction
 from pathlib import Path
 
+import xlsxwriter
+
 import _config
 import _process_plans
 import _telemetry
@@ -46,6 +51,18 @@ from _paths import CAD_ROOT
 SHOP_EQUIPMENT = CAD_ROOT / "config" / "shop-equipment.toml"
 NO_TRAVELER = "no traveler"
 MM_PER_IN = 25.4
+PART_COLUMNS = (
+    "number",
+    "part",
+    "kind",
+    "quantity",
+    "status",
+    "material",
+    "stock",
+    "tools",
+)
+# Excel column widths, in characters, for the PART_COLUMNS cells.
+XLSX_PART_WIDTHS = (18, 34, 9, 6, 16, 40, 60, 80)
 
 
 class StockStatus(enum.Enum):
@@ -332,26 +349,26 @@ def render_markdown(lines: list[BomLine], stock: list[StockRow]) -> str:
     return out.getvalue()
 
 
+def _part_row(line: BomLine) -> list[str]:
+    return [
+        line.number,
+        line.stem,
+        line.kind,
+        line.quantity,
+        line.status.value,
+        line.material,
+        _stock_cell(line),
+        _tools_cell(line),
+    ]
+
+
 def render_csv(lines: list[BomLine], stock: list[StockRow]) -> str:
     """Part lines, then each unallocated row with an empty part column."""
     out = io.StringIO()
     writer = csv.writer(out, lineterminator="\n")
-    writer.writerow(
-        ["number", "part", "kind", "quantity", "status", "material", "stock", "tools"]
-    )
+    writer.writerow(PART_COLUMNS)
     for line in lines:
-        writer.writerow(
-            [
-                line.number,
-                line.stem,
-                line.kind,
-                line.quantity,
-                line.status.value,
-                line.material,
-                _stock_cell(line),
-                _tools_cell(line),
-            ]
-        )
+        writer.writerow(_part_row(line))
     for row in stock:
         if row.allocated_to:
             continue
@@ -370,11 +387,47 @@ def render_csv(lines: list[BomLine], stock: list[StockRow]) -> str:
     return out.getvalue()
 
 
+def write_xlsx(lines: list[BomLine], stock: list[StockRow], path: Path) -> None:
+    """Parts sheet, then the rows allocated to no part on their own sheet."""
+    workbook = xlsxwriter.Workbook(str(path))
+    header = workbook.add_format({"bold": True})
+    cell = workbook.add_format({"text_wrap": True, "valign": "top"})
+
+    def add_sheet(
+        name: str, columns: tuple[str, ...], widths: tuple[int, ...], rows: list[list]
+    ) -> None:
+        sheet = workbook.add_worksheet(name)
+        sheet.write_row(0, 0, columns, header)
+        for index, row in enumerate(rows, start=1):
+            sheet.write_row(index, 0, row, cell)
+        for column, width in enumerate(widths):
+            sheet.set_column(column, column, width)
+        sheet.freeze_panes(1, 0)
+        sheet.autofilter(0, 0, len(rows), len(columns) - 1)
+
+    part_rows = []
+    for line in lines:
+        row: list = _part_row(line)
+        if line.quantity.isdigit():
+            row[PART_COLUMNS.index("quantity")] = int(line.quantity)
+        part_rows.append(row)
+    add_sheet("Parts", PART_COLUMNS, XLSX_PART_WIDTHS, part_rows)
+    spare = [
+        [row.index, row.description, row.status.value]
+        for row in stock
+        if not row.allocated_to
+    ]
+    add_sheet("Unallocated stock", ("row", "stock", "status"), (6, 70, 12), spare)
+    workbook.close()
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--format", choices=("md", "csv"), default="md")
+    parser.add_argument("--format", choices=("md", "csv", "xlsx"), default="md")
     parser.add_argument("--out", type=Path, help="write here instead of stdout")
     args = parser.parse_args(argv)
+    if args.format == "xlsx" and args.out is None:
+        parser.error("--format xlsx needs --out")
 
     try:
         stock = load_stock()
@@ -383,6 +436,9 @@ def main(argv: list[str] | None = None) -> int:
         _telemetry.error(f"stock_bom: {exc}")
         return 2
 
+    if args.format == "xlsx":
+        write_xlsx(lines, stock, args.out)
+        return 0
     if args.format == "md":
         text = render_markdown(lines, stock)
     else:

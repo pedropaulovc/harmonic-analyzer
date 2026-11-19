@@ -67,6 +67,8 @@ dependencies = [
     # Farm executor (cad/scripts/_farm.py): dispatches cache-missing part/assembly/
     # drawing leaves as Temporal workflows to the SolidWorks build farm.
     "temporalio>=1.32",
+    # Shop stock BOM workbook (cad/scripts/stock_bom.py --format xlsx).
+    "xlsxwriter>=3.2",
 ]
 
 [dependency-groups]
