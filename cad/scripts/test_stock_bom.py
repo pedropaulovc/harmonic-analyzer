@@ -21,7 +21,31 @@ def test_complementary_rows_report_the_missing_stock() -> None:
     ]
     (line,) = stock_bom.build_bom(registry, stock, {})
     assert line.status is stock_bom.PartStockStatus.TO_ORDER
-    assert line.tools is None
+    rows = stock_bom.requirements([line], stock)
+    assert [(row.type.value, row.ref, row.status) for row in rows] == [
+        ("stock", "#0", "on_hand"),
+        ("stock", "#1", "to_order"),
+        ("tool", "", "no_traveler"),
+    ]
+    (entry,) = stock_bom.readiness(rows)
+    assert (entry.missing_stock, entry.missing_tools) == (1, 0)
+    assert entry.state is stock_bom.ReadinessState.NO_TRAVELER
+
+
+def test_a_part_is_ready_only_with_its_stock_and_every_tool_on_hand() -> None:
+    registry = {"gear": {"number": "MHA-XX-01", "process": "turned"}}
+    stock = [stock_bom.StockRow(0, "brass", stock_bom.StockStatus.ON_HAND, ("gear",))]
+    owned = stock_bom.ToolLine("t", "owned", stock_bom.ToolStatus.ON_HAND)
+    unknown = stock_bom.ToolLine("u", "unknown", stock_bom.ToolStatus.UNRECORDED)
+    ready = stock_bom.build_bom(registry, stock, {"gear": (owned,)})
+    blocked = stock_bom.build_bom(registry, stock, {"gear": (owned, unknown)})
+    (ready_entry,) = stock_bom.readiness(stock_bom.requirements(ready, stock))
+    (blocked_entry,) = stock_bom.readiness(stock_bom.requirements(blocked, stock))
+    assert ready_entry.state is stock_bom.ReadinessState.READY
+    assert (blocked_entry.missing_tools, blocked_entry.state) == (
+        1,
+        stock_bom.ReadinessState.MISSING,
+    )
 
 
 def test_tool_ownership_follows_the_shared_equipment_key(tmp_path, monkeypatch) -> None:

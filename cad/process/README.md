@@ -117,13 +117,18 @@ Facts prechips has no field for, but which CAD specs and tests read, live in
   `not_received` or `to_order`) and `allocated_to`, the registry stems it is
   cut for now (empty when its part is retired or none was named).
   `uv run --frozen python cad/scripts/stock_bom.py [--format md|csv|xlsx]` joins
-  these rows to the part registry: one line per made part with its stock and
-  the worst status of its rows (`no_stock_record` when no row serves it,
-  `vendor_sku` for reworked bought hardware), the tools its process plan's
-  `[[tools]]` list (ownership read from this file's `tools.<ref>` `present`:
-  `on_hand`, `to_buy` or `unrecorded`; `no traveler` for a part without a
-  plan), then the unallocated rows. Tools point from the plan, never from
-  this inventory. It exits 2 when a row or plan names an unknown or purchased
+  these rows to the part registry, normalized to one row per part and
+  requirement: `type` `stock` (each allocated row with its status; one
+  `vendor_sku` or `no_stock_record` row when none serves the part) or `tool`
+  (each `[[tools]]` entry of the part's process plan, ownership read from this
+  file's `tools.<ref>` `present`: `on_hand`, `to_buy` or `unrecorded`; one
+  `no_traveler` row for a part without a plan), then the unallocated rows with
+  the part columns empty. `--format xlsx --out PATH` adds a Readiness sheet
+  first: per part, its missing stock rows (`not_received`, `to_order`,
+  `no_stock_record`), missing tools (`to_buy`, `unrecorded`) and state
+  (`ready`, `missing`, `no_traveler`), as COUNTIFS formulas over the BOM sheet
+  (xlsxwriter cannot write a native PivotTable). Tools point from the plan,
+  never from this inventory. It exits 2 when a row or plan names an unknown or purchased
   stem, or a plan's tool `ref` is not in `shop.toml`, and
   `test_stock_bom.py` (`check:recipe`) runs that check on every change;
 - the MHA-FR-02 top-frame casting to buy (owner ruling 2026-11-10 (Pedro),

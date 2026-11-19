@@ -15,13 +15,19 @@ enrolled plan (``_process_plans.TRAVELER_STEMS``) lists its ``[[tools]]``, and a
 tool's ``ref`` names its cad/process/shop.toml ``tools`` key. Ownership reads
 the same key in shop-equipment.toml's ``tools`` table: ``present = true`` is
 ``on_hand``, ``present = false`` ``to_buy``, and no record (or a plan tool with
-no ``ref``) ``unrecorded``. A part without a plan reads ``no traveler``.
+no ``ref``) ``unrecorded``.
+
+The output is normalized: one row per part and requirement, ``type`` ``stock``
+(a ``[[stock]]`` row, ``ref`` ``#<index>``) or ``tool`` (``ref`` the shop.toml
+key), with that requirement's own ``status``. A part without stock reads one
+``vendor_sku`` or ``no_stock_record`` stock row, a part without a plan one
+``no_traveler`` tool row, and stock allocated to no part closes the table with
+its part columns empty.
 
 Usage:
     uv run --frozen python cad/scripts/stock_bom.py [--format md|csv|xlsx] [--out PATH]
 
-``xlsx`` writes a workbook with a Parts sheet and an Unallocated stock sheet and
-needs ``--out``.
+``xlsx`` writes the same table to one sheet and needs ``--out``.
 
 Exits 2 when a row allocates a stem that is not in the registry or is a
 purchased part, carries an unknown status, or a plan names an unknown or
@@ -49,20 +55,21 @@ import _telemetry
 from _paths import CAD_ROOT
 
 SHOP_EQUIPMENT = CAD_ROOT / "config" / "shop-equipment.toml"
-NO_TRAVELER = "no traveler"
+NO_TRAVELER = "no_traveler"
 MM_PER_IN = 25.4
-PART_COLUMNS = (
+REQUIREMENT_COLUMNS = (
     "number",
     "part",
     "kind",
     "quantity",
-    "status",
     "material",
-    "stock",
-    "tools",
+    "type",
+    "ref",
+    "item",
+    "status",
 )
-# Excel column widths, in characters, for the PART_COLUMNS cells.
-XLSX_PART_WIDTHS = (18, 34, 9, 6, 16, 40, 60, 80)
+# Excel column widths, in characters, for the REQUIREMENT_COLUMNS cells.
+XLSX_WIDTHS = (18, 34, 9, 8, 40, 7, 26, 70, 16)
 
 
 class StockStatus(enum.Enum):
@@ -289,20 +296,86 @@ def build_bom(
     return lines
 
 
-def _stock_cell(line: BomLine) -> str:
-    if line.stock:
-        return "; ".join(
-            f"#{row.index} {row.description} [{row.status.value}]" for row in line.stock
+class RequirementType(enum.Enum):
+    STOCK = "stock"
+    TOOL = "tool"
+
+
+@dataclass(frozen=True)
+class Requirement:
+    """One stock row or tool a part needs; part fields empty for spare stock."""
+
+    number: str
+    part: str
+    kind: str
+    quantity: str
+    material: str
+    type: RequirementType
+    ref: str
+    item: str
+    status: str
+
+    def cells(self) -> list[str]:
+        return [
+            self.number,
+            self.part,
+            self.kind,
+            self.quantity,
+            self.material,
+            self.type.value,
+            self.ref,
+            self.item,
+            self.status,
+        ]
+
+
+def requirements(lines: list[BomLine], stock: list[StockRow]) -> list[Requirement]:
+    """One row per part and stock row or tool, then the stock no part takes.
+
+    A part with no stock row still gets one stock line (``vendor_sku`` naming
+    its supplier SKUs, or an empty ``no_stock_record``), and a part with no
+    process plan one empty ``no_traveler`` tool line, so every made part
+    appears under both types.
+    """
+    out = []
+    for line in lines:
+        part = (line.number, line.stem, line.kind, line.quantity, line.material)
+        stock_items = [
+            (f"#{row.index}", row.description, row.status.value) for row in line.stock
+        ]
+        if not stock_items:
+            skus = ", ".join(line.supplier_skus)
+            stock_items = [
+                ("", f"supplier SKU {skus}" if skus else "", line.status.value)
+            ]
+        out += [
+            Requirement(*part, RequirementType.STOCK, *item) for item in stock_items
+        ]
+        if line.tools is None:
+            out.append(Requirement(*part, RequirementType.TOOL, "", "", NO_TRAVELER))
+            continue
+        out += [
+            Requirement(
+                *part, RequirementType.TOOL, tool.ref, tool.name, tool.status.value
+            )
+            for tool in line.tools
+        ]
+    out += [
+        Requirement(
+            "",
+            "",
+            "",
+            "",
+            "",
+            RequirementType.STOCK,
+            f"#{row.index}",
+            row.description,
+            row.status.value,
         )
-    if line.supplier_skus:
-        return "supplier SKU " + ", ".join(line.supplier_skus)
-    return ""
-
-
-def _tools_cell(line: BomLine) -> str:
-    if line.tools is None:
-        return NO_TRAVELER
-    return "; ".join(f"{tool.name} [{tool.status.value}]" for tool in line.tools)
+        for row in stock
+        if not row.allocated_to
+    ]
+    return out
 
 
 def _md_escape(text: str) -> str:
@@ -315,109 +388,161 @@ def render_markdown(lines: list[BomLine], stock: list[StockRow]) -> str:
     for line in lines:
         counts[line.status] += 1
     out.write("# Stock BOM\n\n")
-    out.write(f"{len(lines)} made parts. ")
+    out.write(f"{len(lines)} made parts. Part stock status: ")
     out.write(
         ", ".join(f"{status.value}: {count}" for status, count in counts.items())
         + ".\n\n"
     )
-    out.write(
-        "|Number|Part|Kind|Qty|Status|Material (registry)|Stock (shop-equipment.toml)"
-        "|Tools (process plan)|\n"
-    )
-    out.write("|---|---|---|---|---|---|---|---|\n")
-    for line in lines:
-        cells = [
-            line.number,
-            line.stem,
-            line.kind,
-            line.quantity,
-            line.status.value,
-            line.material,
-            _stock_cell(line),
-            _tools_cell(line),
-        ]
-        out.write("|" + "|".join(_md_escape(cell) for cell in cells) + "|\n")
-    spare = [row for row in stock if not row.allocated_to]
-    if spare:
-        out.write(
-            "\n## Stock allocated to no part\n\n|Row|Stock|Status|\n|---|---|---|\n"
-        )
-        for row in spare:
-            out.write(
-                f"|#{row.index}|{_md_escape(row.description)}|{row.status.value}|\n"
-            )
+    out.write("|" + "|".join(REQUIREMENT_COLUMNS) + "|\n")
+    out.write("|" + "---|" * len(REQUIREMENT_COLUMNS) + "\n")
+    for row in requirements(lines, stock):
+        out.write("|" + "|".join(_md_escape(cell) for cell in row.cells()) + "|\n")
     return out.getvalue()
-
-
-def _part_row(line: BomLine) -> list[str]:
-    return [
-        line.number,
-        line.stem,
-        line.kind,
-        line.quantity,
-        line.status.value,
-        line.material,
-        _stock_cell(line),
-        _tools_cell(line),
-    ]
 
 
 def render_csv(lines: list[BomLine], stock: list[StockRow]) -> str:
-    """Part lines, then each unallocated row with an empty part column."""
     out = io.StringIO()
     writer = csv.writer(out, lineterminator="\n")
-    writer.writerow(PART_COLUMNS)
-    for line in lines:
-        writer.writerow(_part_row(line))
-    for row in stock:
-        if row.allocated_to:
-            continue
-        writer.writerow(
-            [
-                "",
-                "",
-                "",
-                "",
-                row.status.value,
-                "",
-                f"#{row.index} {row.description}",
-                "",
-            ]
-        )
+    writer.writerow(REQUIREMENT_COLUMNS)
+    writer.writerows(row.cells() for row in requirements(lines, stock))
     return out.getvalue()
 
 
+class ReadinessState(enum.Enum):
+    READY = "ready"
+    MISSING = "missing"
+    NO_TRAVELER = "no_traveler"
+
+
+# Statuses that keep a part from being made now. An ``unrecorded`` tool counts:
+# the shop's ownership of it is not on record.
+MISSING_STOCK = (
+    PartStockStatus.NOT_RECEIVED.value,
+    PartStockStatus.TO_ORDER.value,
+    PartStockStatus.NO_STOCK_RECORD.value,
+)
+MISSING_TOOLS = (ToolStatus.TO_BUY.value, ToolStatus.UNRECORDED.value)
+READINESS_COLUMNS = ("number", "part", "missing_stock", "missing_tools", "state")
+
+
+@dataclass(frozen=True)
+class PartReadiness:
+    number: str
+    part: str
+    missing_stock: int
+    missing_tools: int
+    state: ReadinessState
+
+
+def readiness(rows: list[Requirement]) -> list[PartReadiness]:
+    """Per part, in BOM order: missing stock rows, missing tools and its state.
+
+    A part without a process plan reads ``no_traveler`` whatever its counts:
+    its tools are not known. Otherwise it is ``ready`` only with nothing missing.
+    """
+    by_part: dict[str, list[Requirement]] = {}
+    for row in rows:
+        if row.part:
+            by_part.setdefault(row.part, []).append(row)
+    out = []
+    for part, reqs in by_part.items():
+        stock = sum(
+            r.type is RequirementType.STOCK and r.status in MISSING_STOCK for r in reqs
+        )
+        tools = sum(
+            r.type is RequirementType.TOOL and r.status in MISSING_TOOLS for r in reqs
+        )
+        state = ReadinessState.READY
+        if stock or tools:
+            state = ReadinessState.MISSING
+        if any(r.status == NO_TRAVELER for r in reqs):
+            state = ReadinessState.NO_TRAVELER
+        out.append(PartReadiness(reqs[0].number, part, stock, tools, state))
+    return out
+
+
+def _xlsx_list(values: tuple[str, ...]) -> str:
+    return "{" + ",".join(f'"{value}"' for value in values) + "}"
+
+
 def write_xlsx(lines: list[BomLine], stock: list[StockRow], path: Path) -> None:
-    """Parts sheet, then the rows allocated to no part on their own sheet."""
+    """A Readiness sheet of COUNTIFS formulas over the BOM sheet, then the BOM.
+
+    xlsxwriter cannot author a native PivotTable; the formulas keep the summary
+    live when the BOM sheet is edited, and carry the values computed here.
+    """
     workbook = xlsxwriter.Workbook(str(path))
     header = workbook.add_format({"bold": True})
     cell = workbook.add_format({"text_wrap": True, "valign": "top"})
+    summary = workbook.add_worksheet("Readiness")
+    sheet = workbook.add_worksheet("BOM")
+    sheet.write_row(0, 0, REQUIREMENT_COLUMNS, header)
+    rows = requirements(lines, stock)
+    quantity = REQUIREMENT_COLUMNS.index("quantity")
+    for index, row in enumerate(rows, start=1):
+        cells: list = row.cells()
+        if row.quantity.isdigit():
+            cells[quantity] = int(row.quantity)
+        sheet.write_row(index, 0, cells, cell)
+    for column, width in enumerate(XLSX_WIDTHS):
+        sheet.set_column(column, column, width)
+    sheet.freeze_panes(1, 0)
+    sheet.autofilter(0, 0, len(rows), len(REQUIREMENT_COLUMNS) - 1)
 
-    def add_sheet(
-        name: str, columns: tuple[str, ...], widths: tuple[int, ...], rows: list[list]
-    ) -> None:
-        sheet = workbook.add_worksheet(name)
-        sheet.write_row(0, 0, columns, header)
-        for index, row in enumerate(rows, start=1):
-            sheet.write_row(index, 0, row, cell)
-        for column, width in enumerate(widths):
-            sheet.set_column(column, column, width)
-        sheet.freeze_panes(1, 0)
-        sheet.autofilter(0, 0, len(rows), len(columns) - 1)
+    last = len(rows) + 1
 
-    part_rows = []
-    for line in lines:
-        row: list = _part_row(line)
-        if line.quantity.isdigit():
-            row[PART_COLUMNS.index("quantity")] = int(line.quantity)
-        part_rows.append(row)
-    add_sheet("Parts", PART_COLUMNS, XLSX_PART_WIDTHS, part_rows)
-    spare = [
-        [row.index, row.description, row.status.value]
-        for row in stock
-        if not row.allocated_to
-    ]
-    add_sheet("Unallocated stock", ("row", "stock", "status"), (6, 70, 12), spare)
+    def bom_range(name: str) -> str:
+        letter = chr(ord("A") + REQUIREMENT_COLUMNS.index(name))
+        return f"BOM!${letter}$2:${letter}${last}"
+
+    part, kind, status = bom_range("part"), bom_range("type"), bom_range("status")
+    parts = readiness(rows)
+    summary.write_row(0, 0, READINESS_COLUMNS, header)
+    for index, entry in enumerate(parts, start=1):
+        excel_row = index + 1
+        match = f"{part},$B{excel_row}"
+        summary.write_row(index, 0, (entry.number, entry.part))
+        summary.write_formula(
+            index,
+            2,
+            f'=SUM(COUNTIFS({match},{kind},"stock",{status},{_xlsx_list(MISSING_STOCK)}))',
+            None,
+            entry.missing_stock,
+        )
+        summary.write_formula(
+            index,
+            3,
+            f'=SUM(COUNTIFS({match},{kind},"tool",{status},{_xlsx_list(MISSING_TOOLS)}))',
+            None,
+            entry.missing_tools,
+        )
+        summary.write_formula(
+            index,
+            4,
+            f'=IF(COUNTIFS({match},{status},"{NO_TRAVELER}")>0,"{NO_TRAVELER}",'
+            f'IF(C{excel_row}+D{excel_row}>0,"{ReadinessState.MISSING.value}",'
+            f'"{ReadinessState.READY.value}"))',
+            None,
+            entry.state.value,
+        )
+    for column, width in enumerate((18, 34, 14, 14, 12)):
+        summary.set_column(column, column, width)
+    summary.freeze_panes(1, 0)
+    summary.autofilter(0, 0, len(parts), len(READINESS_COLUMNS) - 1)
+
+    # Parts per state beside the table.
+    summary.write_row(0, 6, ("state", "parts"), header)
+    states = [entry.state for entry in parts]
+    for index, state in enumerate(ReadinessState, start=1):
+        summary.write(index, 6, state.value)
+        summary.write_formula(
+            index,
+            7,
+            f"=COUNTIF($E$2:$E${len(parts) + 1},G{index + 1})",
+            None,
+            states.count(state),
+        )
+    summary.set_column(6, 6, 14)
     workbook.close()
 
 
