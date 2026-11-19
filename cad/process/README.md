@@ -93,8 +93,20 @@ one-third of the part's height (a rule of thumb, not a standard), and a
 one-third of the half jaw width (Pedro's house rule). Each is cited beside it.
 
 Facts prechips has no field for, but which CAD specs and tests read, live in
-[`cad/config/shop-equipment.toml`](../config/shop-equipment.toml):
+the TOML files under [`cad/config/shop-equipment/`](../config/shop-equipment/),
+split by topic and read only through `cad/scripts/_shop_equipment.py`, whose
+`load()` merges them by section and refuses a record key found in two files.
+Ownership is one `status`: `on_hand`, `not_received` (bought, not in the
+shop), `to_order` or `to_make`; a record without one reads `unrecorded` in
+every reader, and a shop.toml record holds no ownership. A record the shop
+makes carries `supply = "shop_made"` (provenance only). No record names the
+parts it serves as data (that is prose in its `note`): parts point at what
+they need from their process plans. They hold:
 
+- ownership-only records, under the shop.toml key, for the PM-30MV mill, the
+  PM-1127VF-LB lathe, the calipers, the DRO scales and the clamp bore's drill
+  shanks read as gauges (`machines.*`, `gauges.calipers`, `gauges.mill-x-dro`,
+  `gauges.mill-y-dro`, `gauges.clamp-bore-drill-shanks`);
 - gauges: the DTI's kind, the pin-gauge note, the Mitutoyo gauge-block set
   and the indicators' ownership;
 - the PM-30MV DRO's make and cited accuracy (read by the paper-drive tests);
@@ -109,27 +121,43 @@ Facts prechips has no field for, but which CAD specs and tests read, live in
   `test_ms_stick_drawing.py` reads both against the printed groove limits
   (#2433);
 - the PM 6-in vise's make, SKU and source;
-- a `[[stock]]` row for every bought bar, tube, wire and ball, each quoting
+- a `[stock.<key>]` row for every bought bar, tube, wire and ball, each quoting
   its order line and allocation: Online Metals orders 1021704672 and
   1021751700, Metal Supermarkets invoice EC234347, McMaster-Carr PO
   0803PCAMPOS and McMaster 8663K55 acetal (owner 2026-11-17: all on hand but
-  the platen's C360 plate). Every row carries `status` (`on_hand`,
-  `not_received` or `to_order`) and `allocated_to`, the registry stems it is
-  cut for now (empty when its part is retired or none was named).
-  `uv run --frozen python cad/scripts/stock_bom.py [--format md|csv]` joins
-  these rows to the part registry: one line per made part with its stock and
-  the worst status of its rows (`no_stock_record` when no row serves it,
-  `vendor_sku` for reworked bought hardware), then the unallocated rows. It
-  exits 2 when a row names an unknown or purchased stem, and
-  `test_stock_bom.py` (`check:recipe`) runs that check on every change;
+  the platen's C360 plate), and the stock still to order. Every row carries
+  `status` (`on_hand`, `not_received` or `to_order`); a process plan names the
+  rows it is cut from in `stock_refs`.
+  `uv run --frozen python cad/scripts/stock_bom.py [--format md|csv|xlsx]` joins
+  the part registry's made parts to their plans, normalized to one row per part
+  and requirement: `type` `stock` (each row the plan names, with its status;
+  one `vendor_sku`, `no_stock_record` or `no_traveler` row when it names none),
+  `tool` (each `[[tools]]` entry of the part's process plan; one `no_traveler`
+  row for a part without a plan) or `gauge` (each gauge its setups' and
+  operations' `gauge_checks` name, once), then the stock rows no plan names
+  with the part columns empty. A tool's or gauge's ownership is the `status`
+  of the inventory record under its shop.toml key in whichever of `tools`,
+  `fixtures`, `consumables` and `gauges` holds it, or `unrecorded` with no
+  record, no status or (a tool) no `ref`. The md summary line counts the parts
+  `ready`, `missing` and `no_traveler`. `--format xlsx --out PATH` adds a
+  Readiness sheet first: per part, its missing stock rows (`not_received`,
+  `to_order`, `no_stock_record`), missing tools and missing gauges (every
+  status but `on_hand`) and state (`ready` only with none missing, `missing`,
+  `no_traveler`), as COUNTIFS formulas over the BOM sheet (xlsxwriter cannot
+  write a native PivotTable). Tools and gauges point from the plan, never from
+  this inventory. It exits 2 when a stock row or inventory record carries an
+  unknown status, a key sits in two of those sections, a plan names an unknown
+  or purchased stem or unknown stock, or a plan's tool `ref` or gauge is not
+  in `shop.toml`, and `test_stock_bom.py` (`check:recipe`) runs that check on
+  every change;
 - the MHA-FR-02 top-frame casting to buy (owner ruling 2026-11-10 (Pedro),
-  #2333): a gray-iron ASTM A48 class 25B `[[stock]]` row of form `casting`,
+  #2333): a gray-iron ASTM A48 class 25B `[stock.<key>]` row of form `casting`,
   with its pattern, datum-target and as-cast mass notes; not quoted or ordered;
 - the MHA-SM-02 knife mount's records to make or buy (owner ruling 2026-11-10
   (Pedro), #2334): the MHA-SM-00 gauge bar (`gauges.gauge-bar-0472x8`), the
-  12 mm H7 reamer (`tools.reamer-12mm-h7`) and a 4140/4142 HT `[[stock]]` row;
+  12 mm H7 reamer (`tools.reamer-12mm-h7`) and a 4140/4142 HT `[stock.<key>]` row;
 - the MHA-SM-01 gooseneck tube to buy (owner rulings 2026-10-27 (Pedro), #1951,
-  2026-11-08, #2315, and 2026-11-14, #2401): a 4130-N `[[stock]]` row of form
+  2026-11-08, #2315, and 2026-11-14, #2401): a 4130-N `[stock.<key>]` row of form
   `round_tube` (OnlineMetals 7322, one 36 in cut with about 11 in for a trial
   bend), read by `test_sm_gooseneck_drawing.py` against the bent tube's
   developed length plus its ~2 in arm-end tail and ~1 in at the foot, and the

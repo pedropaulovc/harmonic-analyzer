@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import math
 import runpy
-import tomllib
 from collections import Counter
 from pathlib import Path
 
@@ -13,7 +12,7 @@ import pytest
 import _config
 from _buildgraph import module_deps_of
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
-from _paths import CAD_ROOT
+import _shop_equipment
 from _gear_fit_limits import gear_tip_band_mm
 import build_dt_cylinder_gear as part
 import dt_cylinder_gear_notes as notes
@@ -152,9 +151,7 @@ def test_the_listed_notch_saw_fits_the_printed_maximum() -> None:
     # #2364: the archived 1/32 saw is wider than the MAX, so the notch is cut
     # with the not-yet-owned saw recorded for it. At or under the MAX the
     # kerf is flank-clear (test_sighted_notch_prints_only_its_flank_clear_maximum).
-    saw = tomllib.loads(
-        (CAD_ROOT / "config" / "shop-equipment.toml").read_text(encoding="utf-8")
-    )["tools"]["cylinder-notch-saw"]
+    saw = _shop_equipment.load()["tools"]["cylinder-notch-saw"]
     assert saw["thickness_in"] * 25.4 <= spec.NOTCH_WIDTH
 
 

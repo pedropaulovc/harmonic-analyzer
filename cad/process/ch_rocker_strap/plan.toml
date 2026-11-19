@@ -4,7 +4,7 @@
 # sub-plate gripped in the PM vise carries a fixed fence (Y0), an end stop (X0)
 # and four Mitee-Bite Pitbull 26000 edge clamps (to buy). The sub-plate, hub
 # plug, washer, clamps and hub screw are the fixture MHA-CH-13-TL-00, made
-# beforehand to its drawings (cad/config/shop-equipment.toml
+# beforehand to its drawings (cad/config/shop-equipment/
 # fixtures.strap-*); this traveler cuts only the strap. Per the part
 # registry's process text (cad/config/parts/ch-rocker-strap.yaml): rough both
 # faces in turns, release and reseat, finish both faces to the thickness band;
@@ -251,10 +251,12 @@ ref = "jig-files"
 [[tools]]
 id = "fixture"
 name = "Fixture MHA-CH-13-TL-00"
+ref = "strap-sub-plate"
 description = "Fixture MHA-CH-13-TL-00, made beforehand to its drawings: sub-plate TL-01, hub plug TL-02, hub washer TL-03 (Ø.53 × .06), 4 Mitee-Bite Pitbull 26000 4-40 edge clamps TL-VN-50, 1/4-20 × 5/8 button-head screw TL-VN-51 (McMaster 91255A539)"
 [[tools]]
 id = "tape"
 name = "3M VHB 5906 tape"
+ref = "tape-3m-vhb-5906"
 description = "3M VHB 5906 double-sided tape, .006 in, 1-1/2 in wide (or two 3/4 in strips)"
 
 [[setups]]

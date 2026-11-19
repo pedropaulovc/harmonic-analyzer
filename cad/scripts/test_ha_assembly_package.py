@@ -15,10 +15,44 @@ def test_every_tool_a_sheet_names_has_a_row():
 
 
 def test_every_row_resolves_to_its_shop_records():
+    # Every live row's label comes from a recorded inventory status (or it is
+    # made in the step): none prints UNRECORDED.
     for tool in package.TOOLS:
         for ref in tool.records:
             assert isinstance(package.shop_record(ref), dict), ref
-        assert package.status(tool) in {"OWNED", "TO BUY", "TO MAKE"}
+        assert package.status(tool) in set(package.STATUS_LABELS.values()), tool.name
+
+
+def test_the_label_is_the_inventory_status_alone(monkeypatch):
+    records = {
+        "shop.toml": {"gauges": {"g": {}}},
+        "shop-equipment": {
+            "tools": {
+                "owned": {"status": "on_hand", "supply": "shop_made"},
+                "ordered": {"status": "not_received"},
+                "buy": {"status": "to_order"},
+                "make": {"status": "to_make"},
+                "bare": {},
+            }
+        },
+    }
+    monkeypatch.setattr(package, "shop_records", lambda: records)
+
+    def label(*refs: str) -> str:
+        return package.status(package.Tool("t", "T", refs))
+
+    # supply is provenance only.
+    assert label("shop-equipment:tools.owned") == "OWNED"
+    assert label("shop-equipment:tools.ordered") == "ORDERED"
+    assert label("shop-equipment:tools.buy") == "TO BUY"
+    assert label("shop-equipment:tools.make") == "TO MAKE"
+    # No status, or only a prechips record: unrecorded, never OWNED.
+    assert label("shop-equipment:tools.bare") == package.UNRECORDED
+    assert label("shop.toml:gauges.g") == package.UNRECORDED
+    assert label("shop.toml:gauges.g", "shop-equipment:tools.owned") == "OWNED"
+    # Records that disagree print the worst.
+    assert label("shop-equipment:tools.owned", "shop-equipment:tools.buy") == "TO BUY"
+    assert label() == "TO MAKE"
 
 
 def test_a_new_tool_word_fails_the_guard(monkeypatch):
@@ -33,7 +67,7 @@ def test_a_new_tool_word_fails_the_guard(monkeypatch):
 
 
 def test_the_listed_rule_reads_the_bar_height():
-    rule = package.shop_record("shop-equipment.toml:tools.steel-rule-48")
+    rule = package.shop_record("shop-equipment:tools.steel-rule-48")
     assert rule["length_in"] * 25.4 >= BAR_HEIGHT_MM
 
 

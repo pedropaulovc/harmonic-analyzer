@@ -25,7 +25,7 @@
 # clamp is machined now and blackened later. The traveler may end at bare
 # machined with the part tagged awaiting brass black." The last setup
 # blackens it with Birchwood Casey Brass Black, by the maker's directions
-# (cad/config/shop-equipment.toml consumables.brass-black-birchwood-casey),
+# (cad/config/shop-equipment/ consumables.brass-black-birchwood-casey),
 # and is gated on that solution and its named degreaser, oil and PPE.
 #
 # NC (cam:mg_magnifying_clamp, cad/process/mg_magnifying_clamp/cam.py):

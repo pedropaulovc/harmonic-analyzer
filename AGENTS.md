@@ -104,7 +104,7 @@ being measured:
 | campaign assets, costs and copy maturity | the relevant file under `kickstarter/` |
 | website implementation coverage | `web/src/` + `web/DESIGN.md` |
 | AI-story structure, post maturity and evidence | `ai-story/outline.md` + `ai-story/posts/` + `ai-story/evidence/` |
-| installed shop equipment | `cad/process/shop.toml` (prechips records) + `cad/config/shop-equipment.toml` (facts prechips has no field for); one fact in one file, never a field in both |
+| installed shop equipment | `cad/process/shop.toml` (prechips records) + `cad/config/shop-equipment/*.toml` (facts prechips has no field for); one fact in one file, never a field in both |
 
 When work changes a domain fact, update its repository source first. Then update
 the issue or project item and link the commit, entry or source file. A project
@@ -1268,11 +1268,14 @@ own the individual fit classes. Geometry imports numerical helpers, and a
 fit-class edit reaches only consumers that import that class. Drawing tolerances
 come from the model/spec, not separate text renderers.
 
-**Shop TOML files.** `cad/config/shop-equipment.toml` and
+**Shop TOML files.** `cad/config/shop-equipment/*.toml` and
 `cad/process/shop.toml` are in no COM leaf's cache key, so no part, assembly or
-drawing closure may read them. Their readers (`ha_assembly_package.py`,
-`_process_plans.py`, `cam_nc.py`) run outside every COM leaf, and `check:recipe`
-fails if one joins a part, assembly, drawing, soundness, feature or export closure
+drawing closure may read them. The inventory directory is read only through
+`_shop_equipment.load()` (it merges the files by section and refuses a record
+key found in two files). The readers (`_shop_equipment.py`,
+`ha_assembly_package.py`, `_process_plans.py`, `cam_nc.py`) run outside every
+COM leaf, and `check:recipe` fails if one joins a part, assembly, drawing,
+soundness, feature or export closure
 (`test_shop_file_readers_stay_outside_every_com_leaf`). A read by path from any
 other module is not caught: add the file to that leaf's deps.
 

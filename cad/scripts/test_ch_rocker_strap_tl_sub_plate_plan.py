@@ -10,15 +10,14 @@ import tomllib
 
 import pytest
 
+import _shop_equipment
 import ch_rocker_strap_tl_sub_plate_spec as spec
 from _paths import CAD_ROOT
 
 PLAN = tomllib.loads(
     (CAD_ROOT / "process" / "ch_rocker_strap" / "plan.toml").read_text(encoding="utf-8")
 )["parameters"]
-SHOP = tomllib.loads(
-    (CAD_ROOT / "config" / "shop-equipment.toml").read_text(encoding="utf-8")
-)
+SHOP = _shop_equipment.load()
 
 
 def test_hub_and_clamp_stations_are_the_plans() -> None:

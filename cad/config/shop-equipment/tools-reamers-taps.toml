@@ -1,0 +1,294 @@
+# CAD-owned shop-equipment records: facts the CAD specs and their tests read,
+# and workholding a process plan names, that the prechips shop schema cannot
+# express. Each fact lives in exactly one
+# file: anything prechips can hold (machines, chucks, measuring ranges and
+# resolutions, tools' sizing data, cutting settings) is in cad/process/shop.toml,
+# and no field here repeats one there. An object may appear in both files with
+# disjoint fields (gauges.dti, gauges.pin-gauges).
+#
+# TOML, deliberately not YAML: a *.yaml file in cad/config joins
+# _buildgraph.all_config_files() and would re-key every whole-config consumer.
+# No COM build closure reads it: it is in no leaf's cache key.
+#
+# Records moved verbatim from cad/process/shop/inventory.toml (last at
+# 45952b66bc); "#1413 placeholder" values are realistic estimates still to be
+# remeasured, as they were there.
+
+# --- assembly tools, gauges and consumables (#2392) ------------------------
+
+# Every tool the machine's assembly sheets name has one record, so the release's
+# ASSEMBLY.md tool list (cad/scripts/ha_assembly_package.py TOOLS) marks it
+# OWNED, TO BUY or TO MAKE from here. Records marked "archived inventory" carry
+# identity fields moved from cad/process/shop/inventory.toml at 45952b66bc.
+# They are owned only where that inventory recorded possession: the gauges of
+# the shop's first inventory, the parallels it sourced by photo and LMS
+# package, the bench and hand tools Pedro listed as kept
+# (2026-10-15, #1550), and the Loctite 638 of his adhesive rulings. A tool it
+# recorded only as approved to buy, as a trial assumption or as an
+# illustrative example is status = "to_order", as is every new record: nothing
+# recorded the shop owning it, so it is to buy (or to record, if the shop has
+# one). No vendor or SKU is asserted for a tool to buy.
+
+[tools.taper-pin-reamer]
+name = "Taper-pin reamer, 1:48, for the MHA-DT-09 pin"
+kind = "reamer"
+status = "to_order"
+
+[tools.bottoming-taps]
+name = "Bottoming taps in the sizes the transfer steps tap"
+kind = "tap_set"
+status = "to_order"
+note = "The archived inventory's plug-and-bottoming hand taps were an illustrative example item."
+
+# --- tools ----------------------------------------------------------------
+
+[tools.taps-unc-hand]
+status = "on_hand"
+note = "Explicit on_hand preserves the pre-split record, which had no present key and so read as owned."
+
+# Thread length only; the tap's description and tap drill are cad/process/shop.toml
+# tools.basebar-tap. Tap America T/A54278 (drillsandcutters.com).
+[tools.taps-unc-hand.members.8-32-plug]
+flute_len_in = { value = 0.75, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers, cutting length from point to flute or countersink boundary" } }
+
+# Owner (Pedro) 2026-11-17, verbatim: "it was a mt3 dead center that had a
+# straight part at the end i gripped with a 3/4 collet". Used in the PM-30MV
+# as a tap guide, held by its straight end in the 3/4 in collet of
+# holders.r8-collets-south-bend-sb1280. Its stickout (tip to collet face) is
+# not measured: the 7.5 in first relayed was a guess (owner, 2026-11-17: "7.5
+# is a guess dead center had plenty of space with wrench"), so no length is
+# recorded; the tool setter measures it at M6. Its prechips description is
+# cad/process/shop.toml, same key.
+[tools.mill-dead-centre-mt3]
+name = "MT3 dead centre with a straight end, held in the 3/4 in R8 collet"
+kind = "dead_centre"
+status = "on_hand"
+note = "Tap guide in the PM-30MV spindle"
+cite = ["Owner (Pedro) 2026-11-17: \"it was a mt3 dead center that had a straight part at the end i gripped with a 3/4 collet\"; stickout unmeasured (\"7.5 is a guess dead center had plenty of space with wrench\")"]
+
+# Owner ruling 2026-11-16 (Pedro), #2837: "Require a spring tap guide in the
+# spindle (tap squared to the quill), and add a squareness term to the
+# stack." The base bar's eight rail taps are cut in it; squareness_deg is the
+# owner's value, charged in the base bar's rail fit stack.
+[tools.spring-tap-guide]
+name = "Spring-loaded tap guide held in the mill spindle, tap squared to the quill"
+kind = "tap_guide"
+# Not owned (owner, Pedro, 2026-11-17, answering what is physically in the
+# shop: not ticked): a candidate to buy; the ruling's 0.05° is its target.
+status = "to_order"
+squareness_deg = 0.05
+cite = [
+  "Owner ruling 2026-11-16 (Pedro), relayed by Main: spring tap guide in the spindle required; tilt 0.05° (owner value).",
+]
+
+# MHA-SM-02 knife-mount bore reamer (owner ruling 2026-11-10 (Pedro), #2334 option
+# B1): the Ø.4720 +.0015/0 trunnion bore is reamed once in 4140/4142 HT as
+# supplied (28-32 HRC). To purchase: not owned, no receipt or cutting size asserted.
+[tools.reamer-12mm-h7]
+name = "12 mm H7 HSS straight-flute chucking reamer"
+kind = "reamer"
+status = "to_order"
+purchase = "One 12 mm H7 HSS (or HSS-Co) straight-flute chucking reamer, DIN 212 proportions; catalogue cutting band 12.004-12.015 mm (.4726-.4730 in), inside the bore's .4720-.4735 band. Order with the knife-mount 4140 HT bar."
+note = "Cuts the MHA-SM-02 knife mount's Ø.4720 +.0015/0 REAM THRU bore in pre-hardened 4140/4142 HT at 28-32 HRC (slow speed, cutting oil). Trial-cut a scrap of the same bar and pin-check before the parts. The bore is the knife-edge bearing seat for the MHA-SM-03 trunnion."
+
+# MHA-CH-07 fulcrum-keeper bore reamer (#2338): each keeper's Ø.2550 +.0010/0
+# bore is reamed on the keeper alone, replacing the retired at-assembly pair
+# ream through both keepers (made-to-order 12 in reamer). To purchase: not owned;
+# price and stock read live on travers.com 2026-11-12 ($33.96, 32 in stock).
+# Cutting band: ANSI B94.2 chucking-reamer diameter tolerance +.0001/+.0005
+# over 1/4 in, so it cuts .2551-.2555, inside the bore's .2550-.2560 band
+# (ch_fulcrum_keeper_spec.BORE_REAMER_DIA_RANGE_MM).
+[tools.reamer-2550]
+name = "TTC PRODUCTION HP 06-002-550 .2550 in HSS straight-flute chucking reamer"
+kind = "reamer"
+make = "TTC"
+sku = "06-002-550"
+source = "https://www.travers.com/product/ttc-production-hp-06-002-550-straight-shank-chucking-reamer-06-002-550"
+status = "to_order"
+purchase = "One TTC 06-002-550 .2550 in HSS straight-flute straight-shank chucking reamer (Travers), $33.96; ANSI B94.2 cutting band .2551-.2555, inside the bore's .2550-.2560 band."
+note = "Cuts both MHA-CH-07 keepers' Ø.2550 +.0010/.0000 REAM THRU bores in 1018, each keeper on its own: a slip fit on the Ø.2500 h ground MHA-CH-04 shaft that also covers both keepers' bore-height bands, each bore's tilt and the rail seats (ch_fulcrum_keeper_spec.BORE_ALIGNMENT_ALLOWANCE_MM). Pin-check the first bore."
+
+# MHA-DT-12-TL-01 (cam turning fixture, #2361) press reams, both REAM_H7's
+# +.0005/0: the stub hole for the 97175A344 pull-out dowel (+.0001/+.0003 over
+# 3/8, so .0006-.0013 interference) and the clock pin's blind hole for the
+# .0375 minus gauge pin. To purchase: not owned; SKU and price read live on
+# each vendor page 2026-11-14 (McMaster's .0365 is not listed; KBC's is).
+[tools.reamer-3740]
+name = "Alvord-Polk .3740 in (3/8 undersized) HSS straight-flute chucking reamer"
+kind = "reamer"
+make = "Alvord-Polk Tool"
+sku = "3087A55"
+source = "https://www.mcmaster.com/3087A55/"
+status = "to_order"
+purchase = "McMaster-Carr 3087A55, $40.24 (listing read live 2026-11-14); catalogue cutting band 0 to +.0002, .3740-.3742, inside the hole's .3740-.3745 band."
+note = "Not owned: to buy. MHA-DT-12-TL-01 stub hole, Ø.3740 +.0005/0 REAM THRU, press fit on TL-VN-50."
+dia_in = [0.3740, 0.3742]
+
+[tools.reamer-0365]
+name = "KBC USA .0365 in HSS straight-flute chucking reamer"
+kind = "reamer"
+make = "KBC - USA"
+sku = "5-018-0365"
+source = "https://www.kbctools.com/itemdetail/5-018-0365"
+status = "to_order"
+purchase = "KBC 5-018-0365, $32.80, 4 in stock (listing read live 2026-11-14); catalogue cutting band +.0002/-.0000, .0365-.0367, inside the hole's .0365-.0370 band."
+note = "Not owned: to buy. MHA-DT-12-TL-01 clock-pin hole, Ø.0365 +.0005/0 REAM .20 deep, press fit on TL-VN-51."
+dia_in = [0.0365, 0.0367]
+
+# --- carrier (MHA-CH-06-TL-21) plan workholding, tools and gauges ---------
+
+# The .3760 over reamer cad/scripts/_fit_ream_slide.py records as owned
+# (REAM_SLIDE: "cut by the owned over reamer (.2510, .3135, .3760)"); its
+# sizing data is cad/process/shop.toml tools.reamer-0376. The archived
+# inventory named the LMS 3066 over/under set only as a #1413 trial identity,
+# so no make or SKU is asserted here.
+[tools.reamer-0376]
+name = ".3760 in over reamer (3/8 in, REAM_SLIDE)"
+kind = "reamer"
+status = "on_hand"
+note = "MHA-CH-06-TL-21 carrier A1, B1, A2, B2 .3760-.3770 REAM THRU (owner ruling 2026-11-13: checked .376 GO / .377 NO-GO with pin gauges; the pin-gauge set is not owned, owner inventory 2026-11-17, gauges.pin-gauges)"
+
+# Plug taps the carrier plan names besides the 8-32 (tools.taps-unc-hand).
+[tools.jig-tap-4-40-plug]
+name = "4-40 UNC plug hand tap"
+kind = "tap"
+status = "on_hand"
+source = "owner 2026-11-13"
+note = "MHA-CH-06-TL-21 carrier R1-R4"
+
+[tools.jig-tap-5-16-18-plug]
+name = "5/16-18 UNC plug hand tap"
+kind = "tap"
+status = "on_hand"
+source = "owner 2026-11-13"
+note = "MHA-CH-06-TL-21 carrier L1, L2; TL-22/TL-32 5/16-18 hole under the pivot seat"
+
+# The MHA-CH-13-TL-01 sub-plate's 1/4-20 hub hole (owner ruling 2026-11-17:
+# the hub screw is 1/4-20). Owned (owner, Pedro, 2026-11-17, relayed by
+# Main: "a 1/4-20 tap"); plug or taper unrecorded. Its tap drill (#7) is in
+# the owned 115-piece index; sizing data is cad/process/shop.toml
+# tools.jig-drill-7 and tools.jig-tap-1-4-20-plug.
+[tools.jig-tap-1-4-20-plug]
+name = "1/4-20 UNC hand tap"
+kind = "tap"
+status = "on_hand"
+source = "owner 2026-11-17"
+note = "MHA-CH-13-TL-01 sub-plate: the hub screw's 1/4-20 hole through the counterbore floor"
+
+# --- MHA-CH-13 rocker strap on the CNC (cad/process/ch_rocker_strap) ---------
+
+# Hub-hole reamer for MHA-CH-13: Ø.4000 +.0005/0 REAM THRU, a press fit on
+# MHA-CH-12. To purchase: not owned; no make, price or stock read. Cutting
+# band: ANSI B94.2 chucking-reamer diameter tolerance +.0001/+.0005 (as
+# tools.reamer-2550), so it cuts .4001-.4005, inside the bore's .4000-.4005
+# band with nothing to spare at the top: gauge the first hole before the lot.
+# Its sizing data is cad/process/shop.toml tools.reamer-4000.
+[tools.reamer-4000]
+name = ".4000 in HSS straight-flute chucking reamer"
+kind = "reamer"
+status = "to_order"
+purchase = "One .4000 in (decimal size) HSS straight-flute straight-shank chucking reamer; ANSI B94.2 cutting band .4001-.4005."
+note = "Cuts the MHA-CH-13 hub hole in 1018 after a 25/64 drill, 400 rpm, cutting oil, fed in and out. Checked with the go/no-go pair gauges.plug-gauges-4000-4005 (first hole before the lot, then every part): the shop owns no pin gauges (owner 2026-11-17), and the owned Starrett telescoping gauges read on the micrometer repeat to about the whole .0005 in band. Not owned: to buy."
+
+# --- Owner inventory 2026-11-17: Zoro order, shop photos, reamers ----------
+
+# Owner (Pedro) 2026-11-17, answering what is physically in the shop:
+# "everything in the zoro order that should be recorded". Zoro order
+# WB7365521946, placed and paid by Pedro 2026-11-06. No order confirmation or
+# invoice document was found on the workstation; the lines are the order as
+# recorded in this repository when it was placed (commit a6e95cece9, PR
+# #2222, "shop: record purchased Zoro taps and dies and owned kit", dropped
+# from the inventory at the shop-file split 02fdd651e0). HSS hand taps,
+# straight flute, square drive, as ordered; flutes, coating and dimensions
+# not verified on receipt. Member keys are the Zoro item numbers.
+[tools.taps-zoro-wb7365521946]
+name = "Hand taps, Zoro order WB7365521946 (OSG and Regal)"
+kind = "tap_set"
+status = "on_hand"
+purchase = "Zoro order WB7365521946, 2026-11-06, merchandise subtotal USD 417.33 (taps, dies and die stock)"
+cite = ["Owner (Pedro) 2026-11-17: \"everything in the zoro order that should be recorded\"", "Zoro order WB7365521946 as recorded at commit a6e95cece9 (PR #2222)"]
+
+[tools.taps-zoro-wb7365521946.members]
+G9665914 = { thread = "#0-80 UNF", style = "plug", make = "OSG", mfr_no = "1000100", qty = 2 }
+G9665652 = { thread = "#1-72 UNF", style = "plug", make = "OSG", mfr_no = "1010700", qty = 2 }
+G9665616 = { thread = "#2-56 UNC", style = "plug", make = "OSG", mfr_no = "1011008", qty = 2 }
+G9665591 = { thread = "#2-56 UNC", style = "bottoming", make = "OSG", mfr_no = "1011108", qty = 2 }
+G9173875 = { thread = "#4-40 UNC", style = "plug", make = "OSG", mfr_no = "1012200", qty = 5 }
+G7511786 = { thread = "#6-32 UNC", style = "plug", make = "OSG", mfr_no = "1023700", qty = 3 }
+G7562843 = { thread = "#8-32 UNC", style = "plug", make = "OSG", mfr_no = "1024300", qty = 4 }
+G7530616 = { thread = "#8-32 UNC", style = "bottoming", make = "OSG", mfr_no = "1024400", qty = 1 }
+G7514683 = { thread = "#10-24 UNC", style = "plug", make = "OSG", mfr_no = "1024901", qty = 1 }
+G7555536 = { thread = "#10-24 UNC", style = "bottoming", make = "OSG", mfr_no = "1025000", qty = 1 }
+G7618432 = { thread = "#10-32 UNF", style = "plug", make = "OSG", mfr_no = "1025200", qty = 1 }
+G2771119 = { thread = "#10-32 UNF", style = "bottoming", make = "OSG", mfr_no = "1025308", qty = 1 }
+G8337420 = { thread = "#10-32 UNF", style = "bottoming pulley tap, 6 in OAL, 4 flutes", make = "Regal Cutting Tools", mfr_no = "015326AS", qty = 2 }
+# The 1/4-20 tap the owner lists as owned (2026-11-17, type not stated).
+G7437939 = { thread = "1/4-20 UNC", style = "plug", make = "Regal", mfr_no = "008320AS", qty = 2 }
+G1960990 = { thread = "1/4-28 UNF", style = "plug", make = "OSG", mfr_no = "1120408", qty = 1 }
+G7559736 = { thread = "1/4-28 UNF", style = "bottoming", make = "OSG", mfr_no = "1120500", qty = 1 }
+G2669703 = { thread = "5/16-18 UNC", style = "plug", make = "OSG", mfr_no = "1120700", qty = 1 }
+
+[tools.dies-zoro-wb7365521946]
+name = "Round adjustable split dies, HSS, 13/16 in OD, Zoro order WB7365521946 (Drill America)"
+kind = "die_set"
+status = "on_hand"
+cite = ["Owner (Pedro) 2026-11-17: \"everything in the zoro order that should be recorded\"", "Zoro order WB7365521946 as recorded at commit a6e95cece9 (PR #2222)"]
+
+[tools.dies-zoro-wb7365521946.members]
+G1809327 = { thread = "#0-80 UNF", make = "Drill America", mfr_no = "DWTH1316-080", qty = 1 }
+G1817508 = { thread = "#4-40 UNC", make = "Drill America", mfr_no = "DWTH1316-440", qty = 1 }
+
+# Photo 20250628_224315797_iOS.heic (owner's camera roll, 2025-06-28): an
+# open steel case, lid label "40 PIECE TAP AND DIE SET", contents as the label
+# lists them; make not shown; some dies stamped JAPAN. Owner ruling
+# 2026-11-06 (PR #2222): its taps and dies are not trusted for project work;
+# its wrenches and die handle are used.
+[tools.tap-die-set-40]
+name = "40-piece tap and die set (make not shown)"
+kind = "tap_die_set"
+status = "on_hand"
+sizes = ["4-36", "6-32", "8-32", "10-32", "10-24", "12-24", "1/4-20", "1/4-28", "5/16-18", "3/8-16", "7/16-20", "7/16-14", "5/16-24", "3/8-24", "1/2-20", "1/2-13"]
+included = ["one tap and one die in each size", "1/8 pipe tap", "long-handle adjustable tap wrench", "T-handle tap wrench", "die handle", "screwdriver", "screw pitch gauge"]
+note = "Taps and dies not trusted for project work (owner ruling 2026-11-06, PR #2222); the wrenches and die handle are used. One of the owned T-handle tap wrenches, this set's or holders.tap-wrench-t-small, has a centre hole in its top for a dead centre's point (owner, 2026-11-17: \"y\"; not measured); the owner did not say which."
+cite = ["Photo 20250628_224315797_iOS.heic, 2025-06-28: lid label \"40 PIECE TAP AND DIE SET / CONTAINING ONE TAP AND DIE IN EACH OF THE FOLLOWING SIZES\" and the PLUS list", "Owner (Pedro) 2026-11-17: the photo shows owned tools"]
+
+# Photo 20250628_224109095_iOS.heic (2025-06-28): a metric tap and drill set
+# in a black steel case, card "TAP SIZE / TAP DRILL ... METRIC I.S.O. 529
+# 1975", make not shown, beside a small T-handle tap wrench.
+[tools.metric-tap-drill-set]
+name = "Metric tap and tap-drill set, M8, M10, M12 (make not shown)"
+kind = "tap_set"
+status = "on_hand"
+pieces = 6
+cite = ["Photo 20250628_224109095_iOS.heic, 2025-06-28: case card \"TAP SIZE M 8.0 x 1.25, M10.0 x 1.50, M12.0 x 1.75 / TAP DRILL 6.70mm, 8.50mm, 10.20mm / METRIC I.S.O. 529 1975\"", "Owner (Pedro) 2026-11-17: the photo shows owned tools"]
+
+[tools.metric-tap-drill-set.members]
+M8 = { tap = "M8 x 1.25", tap_drill_mm = 6.70 }
+M10 = { tap = "M10 x 1.50", tap_drill_mm = 8.50 }
+M12 = { tap = "M12 x 1.75", tap_drill_mm = 10.20 }
+
+# Photo 20250628_223528049_iOS.heic (2025-06-28): a yellow-bin organiser of
+# loose hand taps and twist drills. Legible markings: "BESLY USA" and
+# "X-PRESS" on several taps, and the thread on two, "5/8-18 NF" and
+# "5/8-24 NS". The other taps and the drills show no legible size, so none
+# is recorded.
+[tools.taps-loose-organiser]
+name = "Organiser of assorted loose hand taps (Besly X-Press among them) and twist drills"
+kind = "tap_assortment"
+status = "on_hand"
+legible = ["5/8-18 NF tap", "5/8-24 NS tap", "Besly USA X-Press taps (sizes not legible)"]
+cite = ["Photo 20250628_223528049_iOS.heic, 2025-06-28", "Owner (Pedro) 2026-11-17: the photo shows owned tools"]
+
+# Owner (Pedro) 2026-11-17: this set and tools.reamer-0376 are the shop's only
+# reamers. Per-reamer ranges are not on the listing; the set covers
+# .250-.375 in overall.
+[tools.reamers-adjustable-lms-5948]
+name = "LittleMachineShop 5948 adjustable reamer set, 4 pieces, #8 to #5, HSS black oxide, wooden box"
+kind = "adjustable_reamer_set"
+make = "LittleMachineShop"
+sku = "5948"
+source = "https://littlemachineshop.com/products/reamer-set-adjustable-4-piece-8-5"
+status = "on_hand"
+pieces = 4
+range_in = [0.25, 0.375]
+cite = ["LittleMachineShop listing read 2026-11-17: SKU 5948, \"Reamers in this set are adjustable from 0.250\" to 0.375\"\", \"4 Piece Set Sizes #8 - #5\", HSS, black oxide, wooden storage box, $69.95", "Owner (Pedro) 2026-11-17: owned; with the .3760 reamer, the only reamers"]

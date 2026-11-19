@@ -438,9 +438,10 @@ def test_tick_v_volume_is_the_inward_drafted_groove() -> None:
 def test_listed_engraving_bit_cuts_every_graduation_and_numeral() -> None:
     import tomllib
 
+    import _shop_equipment
+
     root = Path(builder.__file__).resolve().parents[1]
-    bit = tomllib.loads((root / "config" / "shop-equipment.toml").read_text(encoding="utf-8"))[
-        "tools"]["ms-stick-engraver"]
+    bit = _shop_equipment.load()["tools"]["ms-stick-engraver"]
     shop = tomllib.loads((root / "process" / "shop.toml").read_text(encoding="utf-8"))
     # One bit cuts both: its V is the model's.
     assert bit["included_angle_deg"] == spec.ENGRAVING_V_INCLUDED_ANGLE_DEG

@@ -5,7 +5,6 @@ from __future__ import annotations
 import math
 import re
 from pathlib import Path
-import tomllib
 
 import pytest
 
@@ -16,7 +15,7 @@ import sm_summing_assembly_sheet as notes
 import sm_summing_assembly_spec as spec
 import sm_summing_explode_spec as explode
 from _assembly_contract import assembly_contract
-from _paths import CAD_ROOT
+import _shop_equipment
 from _buildgraph import module_deps_of
 from _drawing_registry import DRAWINGS_BY_NAME
 from _general_table import table_column_widths
@@ -416,9 +415,7 @@ def test_step_five_runs_each_hanger_bolt_home_by_hand_then_sets_the_gauge_bar() 
     assert "MADE TO THE MHA-SM-02 BORES" in bar_step
     # No four-place size is left in the step for an instrument to read.
     assert re.search(r"\.\d{4}\b", bar_step.replace(notes.KNIFE_GAUGE_BAR, "")) is None
-    record = tomllib.loads(
-        (CAD_ROOT / "config" / "shop-equipment.toml").read_text(encoding="utf-8")
-    )["gauges"]["gauge-bar-0472x8"]
+    record = _shop_equipment.load()["gauges"]["gauge-bar-0472x8"]
     low, high = builder.knife_mount.KNIFE_GAUGE_BAR_CLEARANCE_IN
     assert f"{low:.4f}".lstrip("0") in record["purchase"]
     assert f"{high:.4f}".lstrip("0") in record["purchase"]

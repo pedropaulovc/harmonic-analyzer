@@ -247,7 +247,8 @@ manifest directly, with no STEP reader, geometry kernel or hash check.
 `cad/process/shop.toml` is the prechips shop file (machines, workholding,
 gauges, limits, tools and settings) and holds every fact its schema can
 express. Facts prechips has no field for live in
-`cad/config/shop-equipment.toml`. An object may appear in both with disjoint
+`cad/config/shop-equipment/*.toml`,
+read through `cad/scripts/_shop_equipment.py`. An object may appear in both with disjoint
 fields; no field is duplicated. No COM build closure reads either file: neither
 is in a leaf's cache key (AGENTS.md, "Fine-grained config deps"). See
 [`cad/process/README.md`](../../process/README.md).

@@ -5,7 +5,7 @@
 # (cad/process/ch_rocker_strap_tl_sub_plate/cam.py); no lathe work.
 #
 # Route. The owned 1/2 x 6 in 6061-T6511 bar (OnlineMetals 1173; shop-equipment
-# [[stock]] and fixtures.strap-sub-plate) is wider than the PM vise opens
+# stock.6061-flat-1-2x6-54in and fixtures.strap-sub-plate) is wider than the PM vise opens
 # (workholding.vise-pm-6 opening 146.05 mm, 5-3/4 in), so the 3.00 in plate is
 # split off a 13 in length on the table first, held as the jig's carrier and
 # base bar were (ebd3bf3b44 plans: 1-2-3 blocks, LMS 1268 strap clamps; owner

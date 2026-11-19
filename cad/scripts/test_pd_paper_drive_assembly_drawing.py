@@ -712,15 +712,14 @@ def test_view_k_frames_the_chain_with_its_settings_outside_the_crop() -> None:
 def test_the_jig_bored_k_lands_in_the_set_band_with_margin_at_both_ends() -> None:
     import tomllib
 
+    import _shop_equipment
     import paper_drive_arm_registration as registration
     from _paths import CAD_ROOT
 
     low, high = disc.CENTRE_DISTANCE_WINDOW
     ux, uy = registration.S_TO_K_UNIT
     shop = tomllib.loads((CAD_ROOT / "process" / "shop.toml").read_text(encoding="utf-8"))
-    equipment = tomllib.loads(
-        (CAD_ROOT / "config" / "shop-equipment.toml").read_text(encoding="utf-8")
-    )
+    equipment = _shop_equipment.load()
     dro_record = equipment["dro"]["pm-30mv"]
     # The installed DRO's vendor-stated accuracy, per axis (its cite).
     (stated,) = [
@@ -3078,7 +3077,7 @@ def test_the_trial_stack_goes_together_at_the_located_step() -> None:
     assert screw_tip + slack < disc_rear
     # The pin's head and the plate's rear end clear the plate and each
     # other; the shaft's rear end, the lowest point, hangs inside the shop's
-    # 1 in parallels (archived parallels-lms-6745; shop-equipment.toml: the set stops at 1 in).
+    # 1 in parallels (archived parallels-lms-6745; shop-equipment: the set stops at 1 in).
     plate_edges = (
         steps_arm.KNOB_BORE_STATION + plate.EDGE_MINUS_X,
         steps_arm.KNOB_BORE_STATION + plate.EDGE_PLUS_X,

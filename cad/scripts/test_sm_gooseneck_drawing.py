@@ -6,13 +6,12 @@ import ast
 import math
 from pathlib import Path
 import re
-import tomllib
 
 import pytest
 
 import _config
 from _machinist_review_mode import MachinistReviewMode
-from _paths import CAD_ROOT
+import _shop_equipment
 import build_sm_gooseneck as part
 import draw_sm_gooseneck as drawing
 import sm_gooseneck_geom as geom
@@ -193,12 +192,10 @@ def test_title_block_material_and_finish_come_from_the_registry_row() -> None:
 
 
 def test_shop_stock_row_covers_the_bent_tube_and_its_tail() -> None:
-    equipment = tomllib.loads(
-        (CAD_ROOT / "config" / "shop-equipment.toml").read_text(encoding="utf-8")
-    )
+    equipment = _shop_equipment.load()
     (row,) = [
         row
-        for row in equipment["stock"]
+        for row in equipment["stock"].values()
         if "MHA-SM-01" in row.get("note", "") and row.get("form") == "round_tube"
     ]
     assert "OnlineMetals part 7322" in row["cite"][0]
@@ -215,7 +212,7 @@ def test_shop_stock_row_covers_the_bent_tube_and_its_tail() -> None:
     assert row["length_mm"] - 3.175 - part_length >= 10.0 * geom.MM_PER_IN
     # The form it is bent on is a shop record, made in the shop, not bought.
     form = equipment["fixtures"]["sm-gooseneck-bend-form"]
-    assert form["shop_made"] and not form["present"]
+    assert form["supply"] == "shop_made" and form["status"] == "to_make"
 
 
 def test_sheet_is_the_elevation_and_isometric_only() -> None:

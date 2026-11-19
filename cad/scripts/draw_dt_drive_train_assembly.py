@@ -1010,7 +1010,7 @@ STACK_WINDOW = inch_window(
 )
 # #2362: the shop owns no 5-6 in micrometer (cad/process/shop.toml gauges),
 # but it owns the Mitutoyo 81-piece inch gauge blocks and a test indicator
-# (shop-equipment.toml): the indicator is zeroed on a wrung stack of the
+# (cad/config/shop-equipment/): the indicator is zeroed on a wrung stack of the
 # bank's nominal length standing on the stop gear 0's cam face sits on, and
 # the stack is the blocks plus its reading at gear 19 (as check 4G adds an
 # indicator reading to a recorded value).  The blocks print at the model leg's own

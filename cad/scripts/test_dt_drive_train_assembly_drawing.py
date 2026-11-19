@@ -1195,7 +1195,7 @@ def test_the_pivot_seat_is_transferred_and_trusted() -> None:
 def test_the_bank_stack_is_measured_with_gauges_the_shop_owns() -> None:
     """#2362: the 20-gear stack is compared on an indicator zeroed on a
     gauge-block stack of its nominal length, which the shop's 81-piece inch
-    set (cad/config/shop-equipment.toml: .1001-.1009, .101-.149, .050-.950,
+    set (cad/config/shop-equipment/: .1001-.1009, .101-.149, .050-.950,
     1-4 in) can wring, and which lies inside the acceptance window."""
     blocks = float(drawing.STACK_GAUGE_BLOCKS)
     low, high = (float(limit) for limit in drawing.STACK_WINDOW.split("-"))

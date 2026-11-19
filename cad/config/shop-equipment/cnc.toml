@@ -1,0 +1,48 @@
+# CAD-owned shop-equipment records: facts the CAD specs and their tests read,
+# and workholding a process plan names, that the prechips shop schema cannot
+# express. Each fact lives in exactly one
+# file: anything prechips can hold (machines, chucks, measuring ranges and
+# resolutions, tools' sizing data, cutting settings) is in cad/process/shop.toml,
+# and no field here repeats one there. An object may appear in both files with
+# disjoint fields (gauges.dti, gauges.pin-gauges).
+#
+# TOML, deliberately not YAML: a *.yaml file in cad/config joins
+# _buildgraph.all_config_files() and would re-key every whole-config consumer.
+# No COM build closure reads it: it is in no leaf's cache key.
+#
+# Records moved verbatim from cad/process/shop/inventory.toml (last at
+# 45952b66bc); "#1413 placeholder" values are realistic estimates still to be
+# remeasured, as they were there.
+
+# --- measuring equipment on the mill -------------------------------------
+
+# The PM-30MV's CNC conversion; the mill's capacity stays cad/process/shop.toml
+# machines.pm-30mv (prechips has no control or repeatability field). Owner
+# (Pedro) 2026-11-16, relayed by Main: "the PM-30MV is CNC-converted and runs
+# GRBL with ballscrews on X/Y. Positioning repeatability is ±0.02 mm" (owner
+# value).
+[cnc.pm-30mv]
+control = "GRBL"
+drive = "ballscrews on X and Y"
+repeatability_mm = 0.02
+cite = [
+  "Owner (Pedro) 2026-11-16, relayed by Main: PM-30MV CNC-converted, GRBL, ballscrews on X/Y; positioning repeatability ±0.02 mm (owner value).",
+]
+
+# PM-30MV controller, sender and tool-length and probing kit. Owner (Pedro)
+# 2026-11-16, relayed by Main: the controller's FluidNC
+# config. Firmware and sender commits as read for the tool-change design:
+# FluidNC v3.7.8 = bdring/FluidNC bc5f3e936a9b4f2c29f0d4b9099d4dcdfffcdc5d,
+# CNCjs v1.11.5 = cncjs/cncjs b56f643a1f178978ba4d416f508ed26ea1db5008.
+[cnc.pm-30mv-controller]
+firmware = "FluidNC v3.7.8"
+board = "generic ESP32 (config board: None), CP210x USB"
+homing = "switches on all three axes"
+probe_pin = "gpio.5:high:pd, nothing wired (2026-11-16); gpio.5:low:pu once the touch probe is wired"
+toolsetter_pin = "gpio.21:low:pu, the tool setter"
+sender = "CNCjs 1.11.5, Manual Tool Change (Custom Probing)"
+note = "FluidNC 3.7.8 has no manual tool change of its own (atc_manual arrives in 3.8), no expressions, variables or flow control, and no canned cycles (GCode.cpp 'Not supported'); CNCjs expands M6 and FreeCAD's post translates drill cycles to G0/G1."
+cite = [
+  "Owner (Pedro) 2026-11-16, relayed by Main: FluidNC config (board, homing, probe and toolsetter pins), CNCjs 1.11.5.",
+  "FluidNC v3.7.8 source: Probe.cpp tripped() ORs the probe and toolsetter pins; MotionControl.cpp mc_probe_cycle alarms ProbeFailInitial on a tripped start; GCode.cpp G10 L20 = MPos - G92 - TLO - value, saved to NVS (Settings.cpp Coordinates::set).",
+]

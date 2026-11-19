@@ -1,0 +1,21 @@
+# CAD-owned shop-equipment records: facts the CAD specs and their tests read,
+# and workholding a process plan names, that the prechips shop schema cannot
+# express. Each fact lives in exactly one
+# file: anything prechips can hold (machines, chucks, measuring ranges and
+# resolutions, tools' sizing data, cutting settings) is in cad/process/shop.toml,
+# and no field here repeats one there. An object may appear in both files with
+# disjoint fields (gauges.dti, gauges.pin-gauges).
+#
+# TOML, deliberately not YAML: a *.yaml file in cad/config joins
+# _buildgraph.all_config_files() and would re-key every whole-config consumer.
+# No COM build closure reads it: it is in no leaf's cache key.
+
+[machines.pm-30mv]
+kind = "mill"
+status = "on_hand"
+note = "Ownership only; its facts are cad/process/shop.toml, same key. Explicit on_hand preserves the pre-split ASSEMBLY.md OWNED, which read a shop.toml record with no present key as owned."
+
+[machines.pm-1127vf-lb]
+kind = "lathe"
+status = "on_hand"
+note = "Ownership only; its facts are cad/process/shop.toml, same key. Explicit on_hand preserves the pre-split ASSEMBLY.md OWNED, which read a shop.toml record with no present key as owned."
