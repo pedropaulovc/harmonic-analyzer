@@ -632,6 +632,12 @@ LEVER_BANK = BankView(
         }
     ),
     parts="LEVER BANK",
+    # The caption sits 4 mm under the view's lowest ink, the keeper foot
+    # screws' tips at y 0.172 (farm sheet at c47b9b6). The default point
+    # (4 mm under the view outline, which runs about 10 mm below that ink)
+    # put it 6 mm over view F's LUG CENTRE callout and 15 mm under its own
+    # view, so it read as view F's (machinist review r1 and r2, 2026-11-19).
+    label_xy=(0.101, 0.168),
 )
 # The keepers on MHA-FR-02 in plan at 1:2, machine front up as the frame's
 # own plan prints it (b9ae machinist review: step 10's settings had no view,
