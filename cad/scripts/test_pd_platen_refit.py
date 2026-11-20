@@ -462,10 +462,12 @@ def test_clip_screw_tips_sweep_clear_of_the_bar_and_hanger(
             printed_deviations(assembly.LOCK_THICK, 1),
             "heads .* into the arm as",
         ),
-        # ...and an arm plate whose notch depth prints .X.
+        # ...and an arm plate whose notch runs 2.5 deep (on the 3/8 arm,
+        # #2019, the plate stands 1.5875 further back, so even a .X notch
+        # row clears; at 2.5 the heads still meet the plate).
         (
             "_NOTCH_DEPTH_DEV",
-            printed_deviations(assembly.ARM_PLATE.NOTCH_DEPTH, 1),
+            (0.0, 2.5),
             "heads .* into the arm plate as",
         ),
         # A rail that may run 0.9 shallow rubs its plates on the bar.
