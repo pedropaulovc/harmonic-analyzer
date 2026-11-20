@@ -1,0 +1,20 @@
+dt-cone-gear-tl-round-arbor:
+  title: Round Cutting Arbor
+  # Shop tooling: the parent MHA-DT-03 Number plus -TL-nn (subsystem-identities.md).
+  # Issue #2356: carries the round-bored T024 (MHA-DT-03) on its reamed Ø.250
+  # bore while its teeth are cut; the keyed arbor MHA-DT-03-TL-03 cannot (its
+  # 1/4-28 nut's corners and smallest collar stand over T024's root). Owner
+  # ruling 2026-11-20 (Pedro), #2356: "Option 2. #8-32 end, Ø.38 collar,
+  # purchased #8-32 nut under the root, no tail centre; the overhung compliance
+  # (1.85-2.59x the 64T setup, estimated 0.65-1.3x its deflection at the
+  # lighter 48 DP cut) is accepted." Gripped on its Ø.62 in the BS-0 3-jaw, no
+  # centre holes. A standalone shop tool (no kit assembly); never in a machine
+  # assembly or BOM.
+  number: MHA-DT-03-TL-07
+  material: LOW-CARBON STEEL, E.G. 12L14 CF
+  material_specification: low-carbon cold-finished steel round, 5/8 in, ASTM A108 (12L14 or 1018)
+  finish: as machined
+  quantity: 1
+  tolerance_class: machined_block
+  drawing_unit: in
+  process: "turn from 5/8 in round in one chucking: the standoff to the shoulder, the seat, pilot and thread relief; single-point or die the #8-32 thread; part off and face the grip end; no centre holes; break edges, not the shoulder root"

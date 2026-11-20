@@ -1,0 +1,23 @@
+# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
+# its drawing's callouts, until its traveler is written. Not enrolled in
+# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
+title = "Round Cutting Arbor"
+part = "MHA-DT-03-TL-07 Round Cutting Arbor"
+revision = "placeholder"
+material = "low-carbon cold-finished steel round, 5/8 in, ASTM A108 (12L14 or 1018)"
+stock = "To be written"
+shop = "../shop.toml"
+stock_refs = ["1018-round-5-8"]
+
+[[tools]]
+id = "threading-bits-lms-6685"
+name = "5/16 HSS threading bit"
+ref = "threading-bits-lms-6685"  # drawing callout 2026-11-20: #8-32 UNC thread end (#2356)
+
+[[setups]]
+machine_kind = "other"
+machine = "To be written"
+title = "Traveler to come"
+
+[[setups.operations]]
+instruction = "Process not written yet."

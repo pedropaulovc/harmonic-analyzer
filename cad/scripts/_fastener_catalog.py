@@ -413,6 +413,14 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "Medium-Strength Zinc-Plated Steel Hex Nut",
         "95462A505",
     ),
+    # Issue #2356 (owner ruling 2026-11-20, Option 2): the round cutting
+    # arbor's #8-32 nut clamps its collar and T024 to the arbor's shoulder
+    # (MHA-DT-03-TL-07), its corners under T024's root.
+    "dt-cone-gear-tl-vn-round-arbor-nut": _stock(
+        "dt-cone-gear-tl-vn-round-arbor-nut",
+        "Low-Strength Zinc-Plated Steel Hex Nut",
+        "90480A009",
+    ),
     # MHA-CH-13-TL-VN-50 (owner, 2026-11-17): the Pitbull edge clamp with the
     # #4-40 x 3/8 SHCS it is supplied with, one part of two bodies; four hold
     # the strap blank on MHA-CH-13-TL-01. Its catalogue says tool steel; the

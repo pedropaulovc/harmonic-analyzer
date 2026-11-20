@@ -54,6 +54,14 @@ dt-cone-gear-tl-vn-arbor-nut:
   envelope:
     "AC": "_mcmaster_95462a505 1.1547005383792515*ACROSS_FLATS"
     "T": "_mcmaster_95462a505 THICKNESS"
+dt-cone-gear-tl-vn-round-arbor-nut:
+  tier: 1
+  why: "ASME B18.6.3 machine screw nut, used as supplied"
+  designation: "#8-32 UNC-2B hex machine screw nut, zinc-plated steel"
+  standard: "ASME B18.6.3"
+  envelope:
+    "AC": "_mcmaster_90480a009 1.1547005383792515*ACROSS_FLATS"
+    "T": "_mcmaster_90480a009 THICKNESS"
 dt-cylinder-gear-tl-vn-cam-clamp-screw:
   tier: 1
   why: "ASME B18.3 socket head cap screw, used as supplied"

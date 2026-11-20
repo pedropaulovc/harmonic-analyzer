@@ -2124,6 +2124,39 @@
       ]
     },
     {
+      "old_stem": "dt-cone-gear-tl-round-arbor",
+      "old_number": null,
+      "introduced": "2026-11-20",
+      "new_identities": [
+        {
+          "stem": "dt-cone-gear-tl-round-arbor",
+          "number": "MHA-DT-03-TL-07"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-cone-gear-tl-round-arbor-collar",
+      "old_number": null,
+      "introduced": "2026-11-20",
+      "new_identities": [
+        {
+          "stem": "dt-cone-gear-tl-round-arbor-collar",
+          "number": "MHA-DT-03-TL-08"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-cone-gear-tl-vn-round-arbor-nut",
+      "old_number": null,
+      "introduced": "2026-11-20",
+      "new_identities": [
+        {
+          "stem": "dt-cone-gear-tl-vn-round-arbor-nut",
+          "number": "MHA-DT-03-TL-VN-51"
+        }
+      ]
+    },
+    {
       "old_stem": "dt-cone-gear-tl-indexing",
       "old_number": null,
       "introduced": "2026-11-02",

@@ -323,6 +323,12 @@ status = "to_make"
 supply = "shop_made"
 note = "Not made: shop-made. drawing cross-check 2026-11-19: MHA-DT-03 TOOTH CUTTING SETUP .002 TIR TO FINISHED BORE."
 
+[fixtures.dt-cone-gear-round-arbor]
+kind = "fixture"
+status = "to_make"
+supply = "shop_made"
+note = "Not made: shop-made. Owner ruling 2026-11-20 (#2356, Option 2): T024 (MHA-DT-03-T024) TOOTH CUTTING SETUP on its round bore, which the keyed arbor cannot carry."
+
 [fixtures.dt-cone-gear-index-plate]
 kind = "fixture"
 status = "to_make"
