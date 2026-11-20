@@ -87,7 +87,14 @@ from _drawing_gdt import add_datum_feature, add_feature_control_frame, add_frame
 # view that imports its dimension.
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
-from _drawing_layout_audit import _DISPLAY_PRIMITIVES, _Reader, _dump_annotation, _dump_display
+from _drawing_layout_audit import (
+    _DISPLAY_PRIMITIVES,
+    _LEADER_LENGTHS,
+    _Reader,
+    _dump_annotation,
+    _dump_display,
+    _row_shape_ok,
+)
 from _drawing_leader_notes import add_leader_note
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -3180,20 +3187,29 @@ def _native_finite_row(values: Any) -> bool:
     return type(values) in (list, tuple) and all(_native_finite_scalar(v) for v in values)
 
 
+def _require_row_shape(key: str, row: Any) -> None:
+    """The collector's documented row schema (``_row_shape_ok``), raised."""
+    if key not in {item[0] for item in _DISPLAY_PRIMITIVES} or _row_shape_ok(key, row):
+        return
+    if key == "polylines":
+        raise ValueError(
+            f"invalid native polylines geometry: header={row[:7]!r}, "
+            f"type={row[0] if row else None!r}, "
+            f"DataSize={row[1] if len(row) > 1 else None!r}, "
+            f"N={row[6] if len(row) > 6 else None!r}, row_length={len(row)}; "
+            f"documented length=7+3*N; type1 GeomData layout unproven; row={row!r}"
+        )
+    raise ValueError(f"invalid native {key} geometry={row!r}")
+
+
 def _validate_center_mark_display(display: Any) -> None:
     """Census-only strict row schemas; downstream callout guards stay independent."""
-    def count(value: float) -> bool:
-        # SAFEARRAY counts become doubles in _dump_display's _round.
-        return value >= 0.0 and value == int(value)
-
     if not isinstance(display, dict):
         raise ValueError(f"invalid native display data={display!r}")
     texts = display.get("texts", ())
     if not isinstance(texts, (list, tuple)):
         raise ValueError(f"invalid native texts collection={texts!r}")
-    # Official IDisplayData rows: both line overloads have ten doubles.
     # Empty primitive sets are omitted by the dump; no class must be present.
-    lengths = {"lines": 10, "arcs": 17, "arrows": 12, "triangles": 11, "ellipses": 19}
     for key, rows in display.items():
         if key == "texts":
             continue
@@ -3204,29 +3220,7 @@ def _validate_center_mark_display(display: Any) -> None:
         for row in rows:
             if not _native_finite_row(row):
                 raise ValueError(f"invalid native {key} geometry={row!r}")
-            if key in lengths and len(row) != lengths[key]:
-                raise ValueError(f"invalid native {key} geometry={row!r}")
-            if key == "polylines":
-                # GetPolylineAtIndex2 lists seven header values, then N XYZs.
-                # DataSize names GeomData but documents no extra payload/offset.
-                if (
-                    len(row) < 7
-                    or row[0] not in (0.0, 1.0)
-                    or not count(row[1])
-                    or (row[0] == 0.0 and row[1] != 0.0)
-                    or not count(row[6])
-                    or len(row) != 7 + 3 * int(row[6])
-                ):
-                    raise ValueError(
-                        f"invalid native polylines geometry: header={row[:7]!r}, "
-                        f"type={row[0] if row else None!r}, "
-                        f"DataSize={row[1] if len(row) > 1 else None!r}, "
-                        f"N={row[6] if len(row) > 6 else None!r}, row_length={len(row)}; "
-                        f"documented length=7+3*N; type1 GeomData layout unproven; row={row!r}"
-                    )
-            elif key == "polygons":
-                if len(row) < 5 or not count(row[4]) or len(row) != 5 + 3 * int(row[4]):
-                    raise ValueError(f"invalid native polygons geometry={row!r}")
+            _require_row_shape(key, row)
 
 
 def _arc_callout_geometry(record: dict[str, Any], advance: float) -> Any:
@@ -3237,10 +3231,6 @@ def _arc_callout_geometry(record: dict[str, Any], advance: float) -> Any:
 
     def finite_row(values: Any) -> bool:
         return isinstance(values, (list, tuple)) and all(finite_scalar(v) for v in values)
-
-    def count(value: float) -> bool:
-        # SAFEARRAY counts become doubles in _dump_display's _round.
-        return value >= 0.0 and value == int(value)
 
     position = record.get("pos", ())
     if not finite_row(position) or len(position) != 3:
@@ -3266,9 +3256,7 @@ def _arc_callout_geometry(record: dict[str, Any], advance: float) -> Any:
             raise ValueError(f"invalid native text geometry={item!r}")
     if not any(item["t"].strip() for item in texts):
         raise ValueError("missing native callout text")
-    # Official IDisplayData rows: both line overloads have ten doubles.
     # Empty primitive sets are omitted by the dump; no class must be present.
-    lengths = {"lines": 10, "arcs": 17, "arrows": 12, "triangles": 11, "ellipses": 19}
     for key, rows in display.items():
         if key == "texts":
             continue
@@ -3277,36 +3265,14 @@ def _arc_callout_geometry(record: dict[str, Any], advance: float) -> Any:
         for row in rows:
             if not finite_row(row):
                 raise ValueError(f"invalid native {key} geometry={row!r}")
-            if key in lengths and len(row) != lengths[key]:
-                raise ValueError(f"invalid native {key} geometry={row!r}")
-            if key == "polylines":
-                # GetPolylineAtIndex2 lists seven header values, then N XYZs.
-                # DataSize names GeomData but documents no extra payload/offset.
-                if (
-                    len(row) < 7
-                    or row[0] not in (0.0, 1.0)
-                    or not count(row[1])
-                    or (row[0] == 0.0 and row[1] != 0.0)
-                    or not count(row[6])
-                    or len(row) != 7 + 3 * int(row[6])
-                ):
-                    raise ValueError(
-                        f"invalid native polylines geometry: header={row[:7]!r}, "
-                        f"type={row[0] if row else None!r}, "
-                        f"DataSize={row[1] if len(row) > 1 else None!r}, "
-                        f"N={row[6] if len(row) > 6 else None!r}, row_length={len(row)}; "
-                        f"documented length=7+3*N; type1 GeomData layout unproven; row={row!r}"
-                    )
-            elif key == "polygons":
-                if len(row) < 5 or not count(row[4]) or len(row) != 5 + 3 * int(row[4]):
-                    raise ValueError(f"invalid native polygons geometry={row!r}")
+            _require_row_shape(key, row)
     leaders = record.get("leaders", ())
     if not isinstance(leaders, (list, tuple)):
         raise ValueError(f"invalid native leader collection={leaders!r}")
     for row in leaders:
         # GetLeaderPointsAtIndex: straight/underlined or bent. The dump omits
         # zero-point/no-leader rows; ordinary leader collections may be empty.
-        if not finite_row(row) or len(row) not in (6, 9):
+        if not finite_row(row) or len(row) not in _LEADER_LENGTHS:
             raise ValueError(f"invalid native leader geometry={row!r}")
     geometry = annotation_geometry(record, owner="front", advance=advance)
     if geometry is None or not geometry.text_boxes:
