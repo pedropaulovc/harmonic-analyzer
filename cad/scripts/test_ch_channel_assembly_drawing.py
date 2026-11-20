@@ -444,18 +444,22 @@ def test_the_end_hub_leaf_is_the_least_worst_case_air_floored() -> None:
 def test_the_shaft_set_screws_are_not_staked() -> None:
     """Owner ruling 2026-11-20 (#2397, option 2): the pivot and fulcrum
     shafts come out to change one channel part, so their set screws hold on
-    the shafts' flats unstaked; the retention table records the rulings."""
+    the shafts' flats unstaked; the channel contract accepts both unlocked
+    joints."""
     from _paths import CAD_ROOT
+    from machinist_exceptions import load_exceptions
 
     assert "STAKE" not in drawing.FITUP_STEPS
     pointers = drawing.DETAIL_POINTERS + drawing.PLAN_POINTERS
     assert not any("STAKE" in text for text, _, _ in pointers)
-    table = (CAD_ROOT / "docs" / "threaded-joint-retention.md").read_text(
-        encoding="utf-8"
-    )
+    entries = {
+        entry.id: entry
+        for entry in load_exceptions(
+            CAD_ROOT / "config", "ch_channel_assembly", "assembly"
+        )
+    }
     for ruling in ("U-MHA-SH-VN-54-in-CH-08-no-lock", "U-MHA-CH-VN-55-no-lock"):
-        assert f"- `{ruling}` (`ch-channel/" in table
-        assert f"none; ruling `{ruling}`" in table
+        assert entries[ruling].kind == "accept"
 
 
 def test_each_step_column_fits_its_field() -> None:

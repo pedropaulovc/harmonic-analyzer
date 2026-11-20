@@ -1242,11 +1242,12 @@ def _fitup_text() -> dict[str, str]:
         # frame stays on the arm's sheet, and the fork clearance is its
         # functional check, made with the rocker bank on the shaft and the
         # rods in their cams, before the bars sit on the arms; a strap that
-        # binds is set by hand.
+        # binds is set by hand: the strap is a flexure (#2343), bent off the
+        # tine it bears on.
         "straps-shake-in-forks": (
             f"CHECK EACH {arm} ARM SHAKES SIDEWAYS IN ITS {rod} FORK."
         ),
-        "strap-set-by-hand": f"IF AN {arm} ARM BINDS, SET THAT ARM BY HAND.",
+        "strap-set-by-hand": f"IF AN {arm} ARM BINDS, BEND IT OFF ITS TINE BY HAND.",
         "strap-set-return": f"RETURN TO STEP {n('straps-shake-in-forks')}.",
         "keepers-on-frame": (
             f"WITH {top_frame} ON THE MILL, STAND BOTH {keeper} ON ITS RAIL AS "
