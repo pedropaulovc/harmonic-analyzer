@@ -1,7 +1,7 @@
 r"""Reproduction script: rocker-arm support (manual feature-tree replay).
 
 Feature-tree replay of ``fr-rocker-arm-support.SLDPRT`` with stock-compatible
-hold-down clearance holes: a thin-walled cast bracket with a trapezoidal wedge
+hold-down clearance holes: a thin-walled bracket from 1018 bar with a trapezoidal wedge
 wall (wide foot, narrow top) stood **Y-up**, lightened by a window that
 opens on the two big front/back faces, with a mounting foot drilled for four
 top-down hex-head screws, the window rim broken by a fillet + chamfer, and a
@@ -1321,7 +1321,7 @@ def build(adapter) -> dict[str, str]:
     apply_material(adapter, MATERIAL)
     apply_color(
         adapter, CASTING_GREEN
-    )  # green-painted casting, like the base/top-frame
+    )  # RAL 6005 green, like the base/top frame
     report_mass_properties(adapter)
     apply_drawing_properties(adapter, PART_NAME)
     return save_part_and_images(adapter, PART_NAME)

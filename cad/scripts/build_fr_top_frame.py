@@ -1012,7 +1012,7 @@ for _label, _value in (
             f"knife-mount dowel press {_label}: {_value:.3f} after drill drift"
         )
 # Crossbar pockets (drawing-guidelines.md rule 17 (walls and webs), print-worst): every hanger hole stays in the
-# full-depth junction beyond the pocket end. The nearer (front) station
+# full-depth junction beyond the pocket end. The nearer (rear) station
 # keeps its wall in z with the station at its .XXX band from the rear
 # sockets' axis (owner ruling D2: the hangers print from the socket axes;
 # owner ruling 2026-11-20 (Pedro), #2628 option (d): the rear pair's), each
