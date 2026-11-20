@@ -434,8 +434,8 @@ def test_rod_travel_prints_on_right_and_the_check_cites_it() -> None:
     nose = carriage.PEN_Z_MID - hanger.GUIDE_NOSE
     assert z < nose
     check = notes.ASSEMBLY_CHECKS[0]
-    assert "OVER ITS ±.59 TRAVEL" in check
-    assert "(RIGHT VIEW: BLOCK TOP 2.74 ±.59 BELOW THE UPPER GUIDE TOP)" in check
+    assert "OVER ITS ±.98 TRAVEL" in check
+    assert "(RIGHT VIEW: BLOCK TOP 3.05 ±.98 BELOW THE UPPER GUIDE TOP)" in check
 
 
 def test_each_detail_title_carries_its_letter_and_any_other_direction() -> None:

@@ -402,7 +402,10 @@ current report does not discharge the operating assumptions or waivers below.
 `check:budget` fails if a scored term or total overruns its allowance. The wire
 moment arm at the conservative minimum clamp station limits ordinate capacity;
 the current report derives every reference input's reduced station scale and
-the resulting readout, scatter and knife terms. A longer pen stroke or a clamp
+the resulting readout, scatter and knife terms. The pen half-stroke is 25 mm
+(`output.pen_trace_half_mm`, owner ruling 2026-11-20 on #748: "B sufficient
+pen travel is critical for device"; it was 15), proved over the full stroke
+by `verify:kinematics` and the hanger's guide-engagement stacks. A clamp
 reaching nearer the knife would be a design proposal requiring native
 operating-pose validation, not a tolerance adjustment. The current minimum
 component station remains waived under #748.

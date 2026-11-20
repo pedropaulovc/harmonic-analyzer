@@ -296,5 +296,5 @@ def test_pen_travel_literals_match_their_source_modules() -> None:
     )
     assert group.PAPER_TOP_Y == pytest.approx(group.PAPER_BOTTOM_Y + paper_height)
     half_trace = float(_config.machine("output", "pen_trace_half_mm"))
-    assert half_trace == 15.0
+    assert half_trace == 25.0
     assert half_trace <= min(group.PEN_DOWN_MAX, group.PEN_UP_MAX)

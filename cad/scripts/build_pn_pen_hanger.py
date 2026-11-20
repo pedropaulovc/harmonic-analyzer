@@ -3,7 +3,7 @@ r"""Reproduction script: pen hanger (book ch. 24, pp. 60-63; engineerguy 4/4
 
 The black tapered strap bolted to the wheel support bar that guides the pen
 rod: a 1/8 flat strap tapering .63 -> .48 wide, lying on the bar's front
-face and running 6.69 down from the bar top to just above the platen, with two
+face and running 6.38 down from the bar top to above the platen, with two
 open U guide plates of the same bar bonded across its front face, both slots
 cut after bonding.  Each plate's
 slot opens forward (-Z), so the square pen rod hangs on its wire inside both

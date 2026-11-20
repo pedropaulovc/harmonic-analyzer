@@ -230,10 +230,10 @@ YAW_TEXT_UV = (
 # in the rest pose, mid-travel. Its band is the pen's travel each way
 # (carriage.PEN_TRAVEL_HALF_MM, the stroke ASSEMBLY.md's first check slides
 # the rod over) at the sheet's two inch places: a band is stored in exact
-# printed inches (_drawing_tolerances._tolerance_places), so .59, the 15 mm
+# printed inches (_drawing_tolerances._tolerance_places), so .98, the 25 mm
 # stroke as printed. The span is the longest guide-to-carriage reference the
 # RIGHT view draws with open paper beside it: the stud's DETAIL A circle
-# grazes the rod top, and the block top to the lower guide (1.05) is too
+# grazes the rod top, and the block top to the lower guide (1.36) is too
 # short a span for the callout to stand between its arrows at 1:2.
 TRAVEL_FEATURE = "TravelSetting"
 TRAVEL_DIMENSION = "BlockTopBelowUpperGuide"

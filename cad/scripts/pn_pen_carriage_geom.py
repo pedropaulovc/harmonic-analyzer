@@ -55,7 +55,7 @@ CLEARANCE = 0.25  # interference-gate margin convention
 # Literal here so the pen assembly recipe does not read machine/output.yaml
 # (test_buildgraph.test_pen_assembly_free_of_pen_driver_closure);
 # test_pn_pen_carriage_geom pins it to pen_driver.stroke_half_mm().
-PEN_TRAVEL_HALF_MM = 15.0
+PEN_TRAVEL_HALF_MM = 25.0
 # Recording paper y 324.5..405 (build_pd_paper_drive_assembly): the marker
 # axis rests at mid-height so the trace stays on the sheet.
 PAPER_MID_Y = 364.75
