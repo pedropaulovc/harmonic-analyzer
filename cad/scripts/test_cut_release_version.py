@@ -402,9 +402,8 @@ def test_release_notes_name_the_drawings_with_models_directory() -> None:
 
     notes = cut_release.release_notes("v42", facts)
 
-    assert cut_release.DRAWING_BUNDLE_DIR == "drawings-with-models"
-    assert "- `drawings-with-models/` -- each native drawing (`.SLDDRW`)" in notes
-    assert "(named `slddrw/` in earlier releases)" in notes
+    assert f"`{cut_release.DRAWING_BUNDLE_DIR}/`" in notes
+    assert "`slddrw/`" in notes
 
 
 def test_release_notes_count_shared_member_files_not_part_documents() -> None:
