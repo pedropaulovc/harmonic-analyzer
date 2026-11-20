@@ -1768,7 +1768,8 @@ scripts that `from _check import log, check` are instrumented unchanged.
   a one-second deadline. Shutdown can make one call per queued batch.
 - **Where it goes.** Console (stderr) by default; full span/log JSON is also
   captured (best-effort, never fatal) under `cad/out/reports/telemetry/`
-  (`traces.jsonl` / `logs.jsonl`, gitignored). Pass `configure(console=False)` to
+  (`traces.jsonl` / `logs.jsonl`, gitignored), or under `HARMONIC_TELEMETRY_DIR`
+  when that is set and non-empty. Pass `configure(console=False)` to
   suppress the console channels without touching capture.
 - **Debug from the capture, not scrollback.** Each line of those two files is one
   OTel record: `traces.jsonl` spans carry `name`, start/end, `status`, the task

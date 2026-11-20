@@ -18,6 +18,7 @@ worker blocks the agent from removing the source root).
 
 from __future__ import annotations
 
+import importlib.util
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -78,6 +79,40 @@ def test_new_crash_pid_is_fatal() -> None:
     with pytest.raises(_Exit):
         dog.tick()
     assert exits == [EXIT_CRASH]
+
+
+def test_default_exit_resolves_the_swappable_hard_exit(monkeypatch) -> None:
+    # Without ``exit_fn`` the watchdog must exit through ``_hard_exit`` at call
+    # time, which the offline gate and the test session replace. A fresh copy
+    # is loaded with ``os._exit`` already faked, so a default captured at
+    # definition time records here instead of ending pytest.
+    captured: list[int] = []
+    monkeypatch.setattr(_watchdog.os, "_exit", captured.append)
+    spec = importlib.util.spec_from_file_location("_watchdog_fresh", _watchdog.__file__)
+    assert spec is not None and spec.loader is not None
+    fresh = importlib.util.module_from_spec(spec)
+    monkeypatch.setitem(sys.modules, spec.name, fresh)
+    spec.loader.exec_module(fresh)
+    exits: list[int] = []
+
+    def _exit(code: int) -> None:
+        exits.append(code)
+        raise _Exit(code)
+
+    monkeypatch.setattr(fresh, "_hard_exit", _exit)
+    crashes: set[int] = set()
+    dog = fresh.Watchdog(
+        crash_pids=lambda: set(crashes),
+        hung_probe=lambda: False,
+        dialog_probe=lambda: None,
+        activity=lambda: 0.0,
+        clock=lambda: 0.0,
+    )
+    crashes.add(4242)
+    with pytest.raises(_Exit):
+        dog.tick()
+    assert exits == [EXIT_CRASH]
+    assert captured == []
 
 
 def test_stale_crash_dialog_is_ignored() -> None:

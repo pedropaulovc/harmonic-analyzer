@@ -164,6 +164,29 @@ def test_console_verbosity_configures_handler_and_spans(monkeypatch):
     assert _telemetry._span_processors == ()
 
 
+def test_telemetry_dir_honours_its_override(tmp_path, monkeypatch):
+    target = tmp_path / "scratch" / "telemetry"
+    monkeypatch.setenv("HARMONIC_TELEMETRY_DIR", str(target))
+    assert _telemetry._telemetry_dir() == target
+    assert target.is_dir()
+
+
+@pytest.mark.parametrize("override", [None, ""])
+def test_telemetry_dir_defaults_to_reports_when_unset_or_empty(
+    tmp_path, monkeypatch, override
+):
+    if override is None:
+        monkeypatch.delenv("HARMONIC_TELEMETRY_DIR", raising=False)
+    else:
+        monkeypatch.setenv("HARMONIC_TELEMETRY_DIR", override)
+    # Relocate the module so the default is created in scratch, not the checkout.
+    module = tmp_path / "scripts" / "_telemetry.py"
+    monkeypatch.setattr(_telemetry, "__file__", str(module))
+    expected = module.resolve().parents[1] / "out" / "reports" / "telemetry"
+    assert _telemetry._telemetry_dir() == expected
+    assert expected.is_dir()
+
+
 def test_span_records_exception_and_sets_error_status(capture):
     spans, _ = capture
     with pytest.raises(RuntimeError):
