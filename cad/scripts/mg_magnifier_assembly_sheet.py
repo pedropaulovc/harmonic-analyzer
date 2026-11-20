@@ -532,9 +532,13 @@ STEP_TEXT = {
         f"CLOCKWISE AS SEEN IN {WHEEL_REST_VIEW_TITLE}."
     ),
     "lever-wire-through-tie": f"PASS THE WIRE END THROUGH {_TIE_HOLE} AND PULL IT TAUT.",
+    # The toggle prints no length (#2796: a step carries no dimension), but it
+    # is bounded by a feature the builder holds: no longer than the drum is
+    # wide, the tail still clears the back washer and spacer (mg_wheel_group
+    # TAIL_STACK_CLEARANCE; test_mg_wheel_axle_spacer_drawing).
     "lever-wire-tie-knotted": (
-        "KNOT THE WIRE TAIL BEHIND THE HOLE ROUND A SHORT OFFCUT OF THE WIRE "
-        "LAID ACROSS THE HOLE."
+        "KNOT THE WIRE TAIL BEHIND THE HOLE ROUND A SHORT OFFCUT OF THE WIRE, "
+        f"SHORTER THAN {_DRUM} IS WIDE, LAID ACROSS THE HOLE."
     ),
     # Each hand-made joint is checked to hold (rule 23). A slipped knot has
     # let the wire run, so the wheel's rest angle is lost with it: the remedy

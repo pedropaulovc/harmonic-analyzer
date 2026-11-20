@@ -92,10 +92,19 @@ def test_length_lands_the_wheel_on_the_pen_line() -> None:
 
 
 def test_spacer_passes_the_pin_and_clears_the_tie_tail() -> None:
+    import mg_magnifier_assembly_sheet as notes
     import mg_wheel_axle_spec as pin
+    import mg_wheel_drum_geom as drum
 
     assert spec.BORE_DIA > pin.PIN_DIA + pin.PIN_DIA_TOL
     assert group.TAIL_STACK_CLEARANCE > 0.0
+    # #2796: MG-00 bounds the toggle by the drum's width, not a number; a
+    # toggle as long as the widest printed drum still clears the stack.
+    assert "IS WIDE" in notes.STEP_TEXT["lever-wire-tie-knotted"]
+    longest = drum.DRUM_LEN + drum.DRUM_LEN_DEVIATIONS[1]
+    envelope = longest / 2.0 + wheel_geom.TIE1_OFFSET_MAX
+    assert wheel_geom.TIE1_R - envelope - group._STACK_OD_MAX / 2.0 > 0.0
+    assert group.TOGGLE_LENGTH < longest
 
 
 def test_each_callout_states_its_need() -> None:
