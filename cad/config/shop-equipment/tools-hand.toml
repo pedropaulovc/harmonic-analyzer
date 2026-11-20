@@ -201,3 +201,9 @@ sku = "10085K36"
 status = "on_hand"
 pieces = 1
 cite = ["McMaster-Carr packing list, PO 0803PCAMPOS (1616317-01, 08/04/2025), line 25: \"Hand-Held Oil Dispenser, 16 FL oz Capacity with Flexible Nozzle\", 1 each", "Owner (Pedro) 2026-11-17: \"add to inventory ... already owned\""]
+
+[tools.figure-stamp-set-1-8]
+name = "Steel figure stamp set, 1/8 in characters, 0-9"
+kind = "figure_stamp_set"
+status = "to_order"
+note = "Stamps the MHA-FR-01 serial (STAMP \"2\" / 1/8 FIGURE STAMP). Owner decision 2026-11-19 (#3124, item 1): the serial's glyph is a 1/8 figure stamp's (3.175 mm) and the shop buys a 1/8 set; it owned no figure stamps."

@@ -173,6 +173,7 @@ from fr_top_frame_spec import (
     RAIL_SECTION_X,
     SIDE_SECTION_Z,
     GEOMETRIC_TOLERANCES_IN,
+    GOOSENECK_DRILL,
     HANGER_CLEARANCE_DIA,
     HANGER_CLEARANCE_DIA_PLACES,
     HANGER_HOLE_DRILL,
@@ -181,6 +182,7 @@ from fr_top_frame_spec import (
     HANGER_KNOCKOUT_CALLOUT_BELOW,
     HANGER_KNOCKOUT_DIA,
     HANGER_KNOCKOUT_DIA_PLACES,
+    HANGER_KNOCKOUT_ENTRY_DEPTH,
     HANGER_PIN_DEPTH_CALLOUT,
     HANGER_PIN_HOLE_CALLOUT,
     HANGER_PIN_HOLE_DEPTH,
@@ -875,7 +877,7 @@ def _hanger_section_xy(x: float, y: float) -> tuple[float, float]:
 # profile and they ran across the whole underside), so on the right they no
 # longer pass under the reams'
 # mouths, where datum A's frame leader enters (HANGER_PERP_FRAME_XY); the
-# depth's extension line at the ream floor crosses the grip's line, as
+# depth's extension line at the full diameter's end crosses the grip's line, as
 # extension lines may.  Above, between the owned axes: the ream's station
 # from the screw axis, its text on a jog to the right.  The linked caption
 # sits directly below the section.  Native inspection establishes the
@@ -891,21 +893,20 @@ PIN_STATION_TEXT_XY = _hanger_section_xy((HANGER_X + PIN_HOLE_X) / 2.0, HALF_H +
 # size callout.
 PIN_STATION_OFFSET_XY = (0.157, 0.1115)
 PIN_STATION_CALLOUT = "2X"
-# The depth's value and its three rows (the flat floor and its corner limit,
-# codjiflo round 4) are four rows, more than its 12 mm between extension
-# lines holds, so they park beside its line on a level stub at the ream's
+# The depth's value parks beside its line on a level stub at the ream's
 # mid-depth.  Farm run 20261027T175429300Z measured the native form: the
 # rows centred on the offset x, the value 2.78 mm above the offset y, the
 # rows 5.56 mm apart under it from 2.78 mm, the last on the underline the
-# stub meets at its near end; "CORNER R0.1 MAX" ran 41.94 mm, so the inch
-# corner limit takes its own row ("CORNER R.003 MAX" would overrun the
-# band).  With the line 34.5 mm right of the gussets' cut end that block
+# stub meets at its near end.  With the line 34.5 mm right of the gussets'
+# cut end the then four-row block (the flat floor and its corner limit)
 # ran to x 230, 14 mm into the title block (layout audit keep-out, the
 # dimension's box reaching down to its floor witness at y 50.4), so the line
 # now stands 19.6 mm right of the cut end, its upper tail 2.1 mm right of
-# the grip's text, and the block starts 2 mm right of it, its last row
-# level with the stub (one row higher for the fourth), and ends short of
-# the title block.
+# the grip's text, and the block starts 2 mm right of it.  Owner decision
+# 2026-11-19 (#3124, item 3): the native value now reads its single MIN
+# limit (".50 MIN") over the count row alone, the flat floor and its
+# corner limit gone with the drill point, so the block is two rows, the
+# value's row where it stood.
 HANGER_PIN_DEPTH_OFFSET_XY = (0.19025, 0.07664)
 HANGER_SECTION_KEEP = {
     "HangerPinHoleDepth": _hanger_section_xy(
@@ -982,12 +983,12 @@ _HUB_BOTTOM_M_PER_MM = HUB_BOTTOM_SCALE[0] / HUB_BOTTOM_SCALE[1] / 1000.0
 # boss leave no leader route to a block beside the plan.
 # Rule 26: a blind ream's callout carries its depth (farm run
 # 20261107T004559647Z, stability repeat 1: "gives size and process but no
-# depth").  F-F's native .47 to the flat floor, with its corner limit, stays
-# the control, so the callout prints it as REF, the rule's own example
-# (`↧ (.235)` with the floor located on a view), between process and mate.
-# FLAT BOTTOM and the corner stay with F-F's .47: the row may grow only 10
-# glyphs before it reaches detail J's fence, and the band leaves no height
-# for a second row.
+# depth").  F-F's native .50 MIN to the full diameter stays the control
+# (owner decision 2026-11-19, #3124 item 3: drilled and reamed to a drill
+# point), so the callout prints it as REF, the rule's own example (`↧
+# (.235)` with the floor located on a view), between process and mate: the
+# row may grow only 10 glyphs before it reaches detail J's fence, and the
+# band leaves no height for a second row.
 HANGER_PIN_DEPTH_REF = f"({HANGER_PIN_HOLE_DEPTH / 25.4:.2f})".replace("(0.", "(.")
 _REAM_PROCESS, _REAM_MATE = HANGER_PIN_HOLE_CALLOUT.split(", ")
 HANGER_PIN_DIA_CALLOUT = (
@@ -1003,17 +1004,18 @@ HANGER_PIN_DIA_TEXT_XY = (
 )
 # The knockouts' native callout (dt_crankshaft's form: the drill above the
 # native "2X" size and extent, the purpose below) on the FRONT ream's
-# knockout circle, seen on its floor through the ream.  Farm run
+# knockout circle, seen through the ream where it breaks into the ream's
+# drill point (HANGER_KNOCKOUT_ENTRY_DEPTH).  Farm run
 # 20261027T030041319Z printed its three rows about the point (43.69, 142.8)
 # mm: rows centred on the point's x, the widest ("MHA-SM-VN-53 KNOCKOUT")
 # 61.3 mm, its underline 62.9 mm from x 13.04 at y 134.44, rows 5.56 mm
 # apart up to the top row's cap line at 149.1, the block centred 1.0 mm
 # under the point.  That underline began 0.34 mm inside the inner border,
 # with no visible air (machinist review, rule 13).  The knockout drills up
-# from the ream floor on the ream's drawn axis (codjiflo, PR #1978), its
-# coaxiality the title block's implied ±0.13, charged in the floor land
-# (0.316, RV-06; owner ruling 2026-10-27); the drill row and a row under
-# the native size state it, so four rows, none
+# from the ream's drill point on the ream's drawn axis (codjiflo, PR
+# #1978), its coaxiality the title block's implied ±0.13, charged in the
+# punch's land on the dowel's end flat; the drill row and a row under the
+# native size state it, so four rows, none
 # wider than 21 glyphs (estimated at the measured row's width): 20.2 mm
 # tall, centred on the same 1.0 mm offset.  The block stands 4.0 mm inside
 # the border in the band under the front rail, 5 mm under the front-left
@@ -1708,9 +1710,12 @@ HUB_LEFT_CALLOUTS = {
 # (drawing-guidelines.md rule 26).
 SET_SPOT_DEPTH_TEXT = f"({render_number(round((HUB_SET_BOSS_FROM_AXIS - SCREW_AXIS_BELOW_RAIL_TOP * DRAFT_T - HUB_SET_SPOT_FROM_AXIS) / IN, HUB_SET_SPOT_PLACES), UNIT, HUB_SET_SPOT_PLACES)})"
 # The bore sits on the left sockets' drawn centreline (rule 26: holes in
-# line share a drawn centreline); its size callout carries the reason its
-# 4.532 station serves (rule 7).
-HUB_TOP_CALLOUTS = {"GnDia": "DRILL THRU\nON MHA-SM-00\nSUMMING AXIS"}
+# line share a drawn centreline); its size callout names the drill whose
+# exact decimal the native Ø prints (owner decision 2026-11-19, #3124 item
+# 2) and carries the reason its 4.532 station serves (rule 7).
+HUB_TOP_CALLOUTS = {
+    "GnDia": f"{GOOSENECK_DRILL} DRILL THRU\nON MHA-SM-00\nSUMMING AXIS"
+}
 # The counterbore's text stands up-left of the right boss, left of A-A's
 # upper arrow, so its leader drops steeply to the rim nearest it, one arrow
 # and no line on through the centre (set_near_side_diameter, as the set-screw
@@ -5854,17 +5859,17 @@ def build(adapter: Any) -> dict[str, str]:
     )
     imported_annotations += locator_dimensions
     # The knockouts' native Hole Wizard callout, on the front ream's
-    # knockout circle where it breaks into the ream's floor.
+    # knockout circle where it breaks into the ream's drill point.
     knockouts = add_native_hole_callout(
         adapter,
         hub_bottom_parent,
         callout_xy=HANGER_KNOCKOUT_CALLOUT_XY,
         label="2X dowel ream knockouts",
         edge=hub_bottom_edges.circle_at(
-            (PIN_HOLE_X, -HALF_H + HANGER_PIN_HOLE_DEPTH, STUD_Z_FRONT),
+            (PIN_HOLE_X, -HALF_H + HANGER_KNOCKOUT_ENTRY_DEPTH, STUD_Z_FRONT),
             HANGER_KNOCKOUT_DIA/2,
             axis=(0.0, 1.0, 0.0),
-            label="underside locator front ream knockout floor",
+            label="underside locator front ream knockout entry",
         ).edge,
     )
     _drop_coaxial_step(knockouts, HANGER_PIN_HOLE_DIA, "2X dowel ream knockouts")

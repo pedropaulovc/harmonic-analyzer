@@ -177,12 +177,58 @@ UNDERSIDE_LOCATION_DIMENSIONS: dict[str, tuple[str, ...]] = {
     "CrossTapLugProfile": ("Lug1X", "Lug3X", "Lug1Y", "Lug0Y"),
     "LongRibProfile": ("LongRibY",),
     "CrossRibProfile": ("CrossRibX",),
+    "SocketBossProfile": (
+        "SocketBossNearX",
+        "SocketBossFarX",
+        "SocketBossNearY",
+        "SocketBossFarY",
+    ),
 }
+
+
+def _socket_boss_location(
+    x: float, z: float, index: int
+) -> tuple[tuple[str, str], ...]:
+    """(name, drive) of one boss centre's X and Y from X0 Y0.
+
+    Each station is shared by two bosses, so only the rear-west boss's X
+    and Y, the rear-east boss's X and the front-west boss's Y are marked:
+    their extension lines reach the sheet-4 baselines without crossing the
+    view (rear edge up, X0 Y0 at its top-left corner).
+    """
+    far_x, rear = x > 0.0, z > 0.0
+    x_drive = f'"BottomLength" / 2 {"+" if far_x else "-"} "ColumnX"'
+    y_drive = f'"BottomWidth" / 2 {"-" if rear else "+"} "ColumnZ"'
+    x_name = (
+        ("SocketBossFarX" if far_x else "SocketBossNearX")
+        if rear
+        else f"SocketBoss{index}X"
+    )
+    y_name = (
+        ("SocketBossNearY" if rear else "SocketBossFarY")
+        if not far_x
+        else f"SocketBoss{index}Y"
+    )
+    return (x_name, x_drive), (y_name, y_drive)
+
+
+SOCKET_BOSS_LOCATIONS = tuple(
+    _socket_boss_location(x, z, i) for i, (x, z) in enumerate(COLUMN_SOCKET_XZ)
+)
+if sorted(
+    name
+    for location in SOCKET_BOSS_LOCATIONS
+    for name, _ in location
+    if not name[len("SocketBoss")].isdigit()
+) != sorted(UNDERSIDE_LOCATION_DIMENSIONS["SocketBossProfile"]):
+    raise AssertionError("each boss X/Y station must be marked exactly once")
 UNDERSIDE_LOCATION_PREFIXES: dict[tuple[str, str], str] = {
     (feature, name): "2X "
     for feature, names in (
         # Each lug station is shared by its opposite-side partner.
         ("CrossTapLugProfile", ("Lug1X", "Lug3X", "Lug1Y", "Lug0Y")),
+        # Each boss station is shared by the boss across the pocket.
+        ("SocketBossProfile", UNDERSIDE_LOCATION_DIMENSIONS["SocketBossProfile"]),
     )
     for name in names
 }
@@ -246,7 +292,10 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BaseSpotFaceRear": {"SpotFaceDepth"},
     "PocketProfile": {"PocketLen", "PocketWid"},
     "Pocket": {"PocketDepth"},
-    "SocketBossProfile": {"SocketBossDia"},
+    "SocketBossProfile": {
+        "SocketBossDia",
+        *UNDERSIDE_LOCATION_DIMENSIONS["SocketBossProfile"],
+    },
     "LongRibProfile": {
         "LongRibThickness",
         *UNDERSIDE_LOCATION_DIMENSIONS["LongRibProfile"],
@@ -264,7 +313,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # Decimal places ARE the tolerance statement (drawing-simplicity-policy.md `How the repository implements the guidelines`), so the MODEL
 # owns them: build_fr_harmonic_base applies this map to the .SLDPRT and
 # draw_fr_harmonic_base only reads it back. Sizes, plain chamfers and the
-# underside lug/rib/pocket stations print the title block's .XX; a dimension
+# underside lug/rib/pocket/boss stations print the title block's .XX; a dimension
 # prints .XXX only where its nominal is a .001-grid frame column station (the
 # cross-tap Xs), where its own band is stated (the spotface depth) or where
 # another subsystem's band reads it (the pivot seat offsets). The spotface
@@ -302,7 +351,10 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BaseSpotFaceRear": {"SpotFaceDepth": 3},
     "PocketProfile": {"PocketLen": 2, "PocketWid": 2},
     "Pocket": {"PocketDepth": 2},
-    "SocketBossProfile": {"SocketBossDia": 2},
+    "SocketBossProfile": {
+        "SocketBossDia": 2,
+        **dict.fromkeys(UNDERSIDE_LOCATION_DIMENSIONS["SocketBossProfile"], 2),
+    },
     "LongRibProfile": {
         "LongRibThickness": 2,
         **dict.fromkeys(UNDERSIDE_LOCATION_DIMENSIONS["LongRibProfile"], 2),

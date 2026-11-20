@@ -117,7 +117,7 @@ ref = "tap-10-32-bottoming-pulley"  # drawing cross-check 2026-11-19: 10-32 UNF 
 [[tools]]
 id = "drill-51-taper-length"
 name = "#51 taper-length drill"
-ref = "drill-51-taper-length"  # drawing cross-check 2026-11-19: #51 DRILL 2X Ø.067 THRU FROM REAM FLOOR
+ref = "drill-51-taper-length"  # drawing cross-check 2026-11-19: #51 DRILL 2X Ø.067 THRU FROM REAM POINT
 
 [[tools]]
 id = "drill-31"

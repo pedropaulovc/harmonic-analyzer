@@ -106,21 +106,21 @@ def test_dowel_hole_depth_is_dimensioned_on_the_section_not_a_hidden_edge() -> N
     assert start[0] < -sm_knife_mount_spec.BLK_HALF_X
     assert end[0] > sm_knife_mount_spec.BLK_HALF_X
     assert start[0] < 0.0 < sm_knife_mount_spec.PIN_HOLE_X < end[0]
-    # One hole, one floor (Owner ruling 2026-11-08 (Pedro), #2144 item
-    # 11.3): the depth prints its value alone, the hole callout states the
-    # flat floor (machinist review, farm run 20261109T083029873Z, rule 7).
-    # Nothing seats on it, so its corner is the title block's (machinist
-    # review, farm run 20261027T233328148Z: a local CORNER R0.1 MAX named no
-    # function).
+    # One hole (Owner ruling 2026-11-08 (Pedro), #2144 item 11.3): the depth
+    # prints its value alone (machinist review, farm run 20261109T083029873Z,
+    # rule 7).  Nothing seats under it, so it ends in a 118° drill point and
+    # the callout no longer says FLAT BOTTOM (owner decision 2026-11-19,
+    # #3124 item 4); the web from the point to the bore holds the floor.
     from _layout_geometry import ARROW_TEXT_CLEARANCE_M
-    from _printed_tolerance import inside_corner_radius_mm
 
     assert not hasattr(sm_knife_mount_spec, "PIN_DEPTH_CALLOUT")
     assert "PinHoleDepth" not in drawing.DIMENSION_CALLOUTS
-    assert "FLAT BOTTOM" in drawing.PIN_HOLE_CALLOUT.splitlines()[0]
-    corner = sm_knife_mount_spec.DOWEL_HOLE_FLOOR_CORNER_R_MAX
-    assert corner == inside_corner_radius_mm(unit=sm_knife_mount_spec.UNIT)
-    assert 0.0 <= sm_knife_mount_spec.DOWEL_HOLE_CORNER_RECESS < 0.001
+    assert drawing.PIN_HOLE_CALLOUT.splitlines()[0] == "REAM <HOLE-DEPTH> (.37)"
+    assert "FLAT BOTTOM" not in drawing.PIN_HOLE_CALLOUT
+    assert not hasattr(sm_knife_mount_spec, "DOWEL_HOLE_FLOOR_CORNER_R_MAX")
+    assert sm_knife_mount_spec.PIN_HOLE_POINT_H == pytest.approx(0.97676, abs=1e-5)
+    assert sm_knife_mount_spec.PIN_HOLE_BORE_WEB == pytest.approx(6.3084, abs=1e-4)
+    assert sm_knife_mount_spec.PIN_HOLE_BORE_WEB >= sm_knife_mount_spec.STUD_TAP_WEB_MIN
     assert drawing.DEPTH_TEXT_ROWS == 1
     assert sm_knife_mount_spec.PIN_HOLE_DEPTH == pytest.approx(9.398)  # .37
     source = Path(drawing.__file__).read_text(encoding="utf-8")

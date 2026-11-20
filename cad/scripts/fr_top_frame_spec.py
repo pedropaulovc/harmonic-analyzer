@@ -85,11 +85,13 @@ from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from _hole_spec import (
     CLEARANCE_MM,
+    DRILL_POINT_H,
     THREAD_MAJOR_MM,
     HoleSpec,
     blind_cut_dia_mm,
     drill_process,
 )
+from _inch_wall_limits import WALL_TARGET_MM
 from _mcmaster_91410a540 import SHANK_LEN as SET_SCREW_LENGTH
 from _surface_finish import SEAT_UM, SurfaceFinishControl, ra
 from _cone_axis_constants import (
@@ -195,11 +197,15 @@ SCREW_AXIS_Y = TOP_SCREW_Y - TOP_FRAME_MID_Y  # -0.0381
 SCREW_AXIS_BELOW_RAIL_TOP = HALF_H - SCREW_AXIS_Y  # 18.288, .72
 GOOSENECK_X = -COLUMN_X  # east rail, -X crank side (summing's post station)
 # Owner ruling 2026-11-08 (Pedro), #2315: the bore takes the gooseneck's
-# bare 1/2 x .065 4130-N leg (MHA-SM-01) directly and prints .520
-# at .XXX: drill 13 mm, then finish 33/64 or bore.  It leaves .008-.032
+# bare 1/2 x .065 4130-N leg (MHA-SM-01) directly.  Owner decision
+# 2026-11-19 (#3124, item 2): it is a 33/64 drill, printed with the drill's
+# exact decimal (drawing-guidelines.md rule 3: `#30 DRILL Ø.1285`), so the
+# title block's DRILLED HOLES row reads .5156-.5196.  It leaves .0086-.0216
 # diametral slip over the tube's mill OD band (sm_gooseneck_geom.TUBE_DIA_MIN
 # ..MAX) so the gooseneck still slides for height setting (checked below).
-GOOSENECK_BORE_DIA = 13.208  # .520
+GOOSENECK_DRILL = "33/64"
+GOOSENECK_BORE_DIA = 33.0 / 64.0 * 25.4  # 13.096875, .5156
+GOOSENECK_BORE_DIA_PLACES = 4
 # The hub's underside boss drops below the rail band around the bore exit, so
 # the bore runs RING_HEIGHT + HUB_BOSS_DROP (build_fr_top_frame's HubBoss).
 HUB_BOSS_DROP = 7.874  # .31 boss bottom local -26.1239
@@ -283,14 +289,16 @@ def _sag(radius: float) -> float:
 # cut-to-length #10-24 plain hex bolt (MHA-SM-VN-52). Its SAE washer bears on
 # the FACED top plane; the block's top seat bears on the FINISHED
 # underside. Owner ruling 2026-10-24 (T+H3): each MHA-SM-VN-53 dowel
-# PRESSES into this soft casting, to the flat floor of a blind ream cut
-# from the faced underside, with a knockout drilled up from that floor on
-# the ream's drawn axis to the faced top, its coaxiality the title block's
-# implied ±.005, charged in the floor land (.0124, machinist exception
-# RV-06, owner ruling 2026-10-27) (drawing-guidelines.md rule 16, a
-# pressed dowel needs a way out; the dt_crankshaft K0 precedent).  The
-# round slip hole is in the hardened MHA-SM-02 block (``sm_knife_mount_spec``).
-# Owner ruling 2026-11-08 (Pedro), #2144 item 11.3: one dowel per station.
+# PRESSES into this soft casting, into a blind ream cut from the faced
+# underside, with a knockout drilled up from the ream's bottom on its drawn
+# axis to the faced top, its coaxiality the title block's implied ±.005
+# (drawing-guidelines.md rule 16, a pressed dowel needs a way out; the
+# dt_crankshaft K0 precedent).  Owner decision 2026-11-19 (#3124, item 3):
+# the ream runs to a drill point, its full-diameter depth a MIN, and the
+# pin is pressed to its proud at MHA-SM-00, not to the floor, so the floor
+# land RV-06 accepted is gone with the flat floor.  The round slip hole is
+# in the hardened MHA-SM-02 block (``sm_knife_mount_spec``).  Owner ruling
+# 2026-11-08 (Pedro), #2144 item 11.3: one dowel per station.
 _XX = printed_band_mm(2, unit=UNIT)
 _XXX = printed_band_mm(3, unit=UNIT)
 # The title block's DRILLED HOLES row: a drilled hole cuts up to this oversize.
@@ -340,12 +348,13 @@ HANGER_WASHER_CONCENTRIC_ANNULUS_MIN = (
 ) / 2.0
 if HANGER_WASHER_CONCENTRIC_ANNULUS_MIN <= 0.0:
     raise AssertionError("knife-hanger washer lacks a bearing annulus round its hole")
-# The dowel press reams: at each hanger station one blind flat-floor ream
-# cut KNIFE_DOWEL.PRESS_DEPTH up from the faced underside to the dowel
-# spec's press band, .1240 +.0005/0 printed .XXXX (press .0006-.0013 on the
-# catalogue pin), two in all.  Owner ruling 2026-11-08 (Pedro), #2144 item
-# 11.3: the -X ream at each station, its position frame, its BASIC span and
-# its knockout are deleted; the +X ream stays.
+# The dowel press reams: at each hanger station one blind ream, drilled and
+# reamed to a drill point, its full diameter KNIFE_DOWEL.PRESS_DEPTH MIN up
+# from the faced underside, to the dowel spec's press band, .1240 +.0005/0
+# printed .XXXX (press .0006-.0013 on the catalogue pin), two in all.  Owner
+# ruling 2026-11-08 (Pedro), #2144 item 11.3: the -X ream at each station,
+# its position frame, its BASIC span and its knockout are deleted; the +X
+# ream stays.
 HANGER_PIN_X = KNIFE_DOWEL.HANGER_OFFSET  # 7.62 (.300) +X of the bolt axis
 # The ream's station from the screw axis, in the dowel spec's order (one).
 HANGER_PIN_XS = (HANGER_PIN_X,)
@@ -375,9 +384,33 @@ HANGER_PIN_HOLE_DIA_BAND = KNIFE_DOWEL.PRESS_HOLE_DIA_BAND  # (0.0127, 0.0)
 HANGER_PIN_HOLE_DIA_PLACES = KNIFE_DOWEL.PRESS_HOLE_DIA_PLACES
 HANGER_PIN_HOLE_DIA_MIN = HANGER_PIN_HOLE_DIA + min(HANGER_PIN_HOLE_DIA_BAND)
 HANGER_PIN_HOLE_DIA_MAX = HANGER_PIN_HOLE_DIA + max(HANGER_PIN_HOLE_DIA_BAND)
-HANGER_PIN_HOLE_DEPTH = KNIFE_DOWEL.PRESS_DEPTH  # 11.938, from the underside
+HANGER_PIN_HOLE_DEPTH = KNIFE_DOWEL.PRESS_DEPTH  # 12.7 MIN full diameter
 HANGER_PIN_HOLE_DEPTH_PLACES = KNIFE_DOWEL.PRESS_DEPTH_PLACES
-HANGER_PIN_HOLE_DEPTH_TOL = KNIFE_DOWEL.PRESS_DEPTH_TOL  # 0.254
+HANGER_PIN_HOLE_POINT_H = KNIFE_DOWEL.PRESS_POINT_H  # 0.946 on the ream size
+# A single MIN limit (owner decision 2026-11-19, #3124 item 3): the model
+# value is the printed minimum.  swTolMIN prints only that value and MIN, so
+# the native record's upper deviation is the deepest ream whose drill point
+# still stops the wall target (.080) below the faced top at the grip's near
+# limit: a THRU ream, which would exit under the MHA-SM-VN-54 washer's rim
+# (sm_vn_knife_mount_dowel_spec), is out of band.  The MHA-PD-18 latch-pin
+# precedent (#3127); build_fr_top_frame.PIN_HOLE_POINT_MARGIN proves it at
+# the band's maximum: (20.694, 0).
+HANGER_PIN_HOLE_POINT_COVER_MIN = WALL_TARGET_MM
+HANGER_PIN_HOLE_DEPTH_BAND = (
+    int(
+        (
+            HANGER_GRIP
+            - HANGER_GRIP_TOL
+            - HANGER_PIN_HOLE_POINT_COVER_MIN
+            - HANGER_PIN_HOLE_POINT_H
+            - HANGER_PIN_HOLE_DEPTH
+        )
+        * 1e6
+    )
+    / 1e6,
+    0.0,
+)
+HANGER_PIN_HOLE_DEPTH_MAX = HANGER_PIN_HOLE_DEPTH + max(HANGER_PIN_HOLE_DEPTH_BAND)
 # Each ream stands .XXX HANGER_PIN_X from its own screw axis along the dowel
 # line (F-F), at the screw's own Z (an implied zero across the line, the
 # same .XXX).  Owner ruling 2026-11-08 (Pedro), #2144 item 11.3: with the
@@ -445,27 +478,18 @@ if not HANGER_PRESS_HOLE_PERPENDICULARITY_TOL < 2.0 * HANGER_PIN_X_TOL:
 # The assembly proves the tap/dowel mismatch plus underside-entry drill
 # drift stays inside that float.
 HANGER_SCREW_FLOAT = (HANGER_CLEARANCE_DIA - HANGER_SCREW.SHANK_DIA) / 2.0
-# Each ream's knockout (rule 16): a #51 drill up from the ream's floor,
-# drawn on the ream's axis, through to the faced top, so a 1/16 in pin
-# punch drives the dowel back out of the underside.  The ream keeps its
-# depth, so the dowel still bottoms on the annular floor the knockout
-# leaves.  It is pressed chamfer end first, so it bears on that end's flat
-# face, at least ASME B18.8.2's smallest point diameter
-# (KNIFE_DOWEL.POINT_DIA_MIN, Ø2.794; codjiflo round 4: the vendor model's
-# Ø2.921 is that band's middle), and never past the floor's flat, which
-# ends at the corner radius the depth's callout limits
-# (HANGER_PIN_FLOOR_CORNER_R_MAX): the smaller of the two, less the largest
-# printed knockout (its three-place size under the DRILLED HOLES row), less
-# the knockout's offset from the ream's axis at the floor
-# (HANGER_KNOCKOUT_FLOOR_ECCENTRICITY, the drawn coaxiality's worst case),
-# is the contacted land (HANGER_PIN_FLOOR_BEARING_LAND_MIN, .0124, under
-# the 0.4 target by owner ruling 2026-10-27); the floor's metal ring, out
-# to the smallest ream, is wider (HANGER_PIN_FLOOR_LAND_MIN).  Drilled from
-# the top, the two holes' opposing wander (0.135 + 0.067) left a #43
+# Each ream's knockout (rule 16): a #51 drill up from the ream's drill
+# point, drawn on the ream's axis, through to the faced top, so a 1/16 in
+# pin punch drives the dowel back out of the underside.  The dowel is
+# pressed to its proud, not to the floor (owner decision 2026-11-19, #3124
+# item 3), so nothing bears on the floor and the floor land RV-06 accepted
+# is gone; what the knockout must still give is the punch a seat on the
+# pressed end's flat face (HANGER_KNOCKOUT_PUNCH_LAND_MIN below).  Drilled
+# from the top, the two holes' opposing wander (0.135 + 0.067) left a #43
 # knockout 0.200 (codjiflo, PR #1978); from the floor a #47 still bore only
 # 0.346 on the vendor flat (codjiflo round 3) and a #50 0.391 on B18.8.2's
 # smallest (round 4), both with the knockout drilled in the ream's setup,
-# so the knockout stepped down to #51.  It runs from the floor at its
+# so the knockout stepped down to #51.  It runs from the ream at its
 # shallowest printed depth to the top at the grip's far limit, its own
 # drift greatest at the top (``build_fr_top_frame``).
 HANGER_KNOCKOUT_SPEC = HoleSpec("drilled_number", "#51")
@@ -484,20 +508,28 @@ if not HANGER_KNOCKOUT_DIA_PRINTED <= HANGER_KNOCKOUT_DIA <= HANGER_KNOCKOUT_DIA
 HANGER_KNOCKOUT_PUNCH_DIA = KNIFE_DOWEL.MM_PER_IN / 16.0  # 1/16 in pin punch, 1.5875
 if HANGER_KNOCKOUT_PUNCH_DIA >= HANGER_KNOCKOUT_DIA_PRINTED:
     raise AssertionError("the 1/16 in pin punch does not pass the knockout")
-HANGER_KNOCKOUT_LENGTH = RING_HEIGHT - HANGER_PIN_HOLE_DEPTH  # 24.5618
-HANGER_KNOCKOUT_LENGTH_MAX = (
-    HANGER_GRIP + HANGER_GRIP_TOL - (HANGER_PIN_HOLE_DEPTH - HANGER_PIN_HOLE_DEPTH_TOL)
-)  # 24.9428
+# From the ream's full-diameter end at its printed minimum to the faced top:
+# the model's cut length, and its longest run, the top at the grip's far
+# limit.  A deeper ream only shortens it.
+HANGER_KNOCKOUT_LENGTH = RING_HEIGHT - HANGER_PIN_HOLE_DEPTH  # 23.7998
+HANGER_KNOCKOUT_LENGTH_MAX = HANGER_GRIP + HANGER_GRIP_TOL - HANGER_PIN_HOLE_DEPTH  # 23.9268
+# Where the knockout's wall meets the ream's drill point, from the faced
+# underside: the cone narrows to the knockout's radius this far past the
+# full diameter.  The model's knockout circle stands there (the underside
+# locator picks it for the knockout callout).
+HANGER_KNOCKOUT_ENTRY_DEPTH = (
+    HANGER_PIN_HOLE_DEPTH + (HANGER_PIN_HOLE_DIA - HANGER_KNOCKOUT_DIA) / 2.0 * DRILL_POINT_H
+)  # 13.135
 # Making it (codjiflo round 6): the #51 reaches its top through the ream's
 # air, from the underside to the faced top at the grip's far limit, 36.63,
-# its cut a ~15 D run from the shallowest floor; a jobber #51 (3/4 in
+# its cut a ~14 D run from the shallowest ream; a jobber #51 (3/4 in
 # flute) falls short, so the shop's tool is a taper-length #51 pecked in
 # the cast iron, 2 in flute and 3-3/4 in overall (Cleveland HSS taper
 # length, MSC Direct 63725519:
 # https://www.mscdirect.com/product/details/63725519), its flutes clearing
 # the whole depth.
 HANGER_KNOCKOUT_DRILL_REACH = HANGER_GRIP + HANGER_GRIP_TOL  # 36.6268 from the underside
-HANGER_KNOCKOUT_DEPTH_D = HANGER_KNOCKOUT_LENGTH_MAX / HANGER_KNOCKOUT_DIA_PRINTED  # 14.7
+HANGER_KNOCKOUT_DEPTH_D = HANGER_KNOCKOUT_LENGTH_MAX / HANGER_KNOCKOUT_DIA_PRINTED  # 14.1
 HANGER_KNOCKOUT_DRILL_FLUTE_LEN = 2.0 * KNIFE_DOWEL.MM_PER_IN  # 50.8, taper-length #51
 if HANGER_KNOCKOUT_DRILL_FLUTE_LEN <= HANGER_KNOCKOUT_DRILL_REACH:
     raise AssertionError("the taper-length #51's flutes do not clear the knockout's depth")
@@ -505,7 +537,7 @@ if HANGER_KNOCKOUT_DRILL_FLUTE_LEN <= HANGER_KNOCKOUT_DRILL_REACH:
 # drives the pin out until its pressed end leaves the underside, so its
 # shank, under the .067 knockout, needs the full top-to-underside reach,
 # 36.63 at the grip's far limit: the knockout's run plus the push-out, which
-# sum to the grip whatever the floor's depth.  A common 1/16 in pin punch
+# sum to the grip whatever the ream's depth.  A common 1/16 in pin punch
 # carries about 25 mm of tip, so the tool is an extra-long 1/16 in pin punch
 # or a 1/16 in drill-rod drift with at least that much free length.
 HANGER_KNOCKOUT_PUNCH_REACH_MIN = HANGER_GRIP + HANGER_GRIP_TOL  # 36.6268, no ream depth
@@ -513,37 +545,32 @@ HANGER_KNOCKOUT_PUNCH_REACH_MIN = HANGER_GRIP + HANGER_GRIP_TOL  # 36.6268, no r
 # rule 4: a REAM names its mate and fit; rule 12: count, process and
 # purpose; the size and its band print natively).  The underside locator
 # carries the ream size, its count, mate and fit on one row under it; F-F
-# the depth both share, to a flat floor.  Where the press stops (each
-# dowel to the ream floor) is MHA-SM-00's step 1, not this part's (rule 7:
-# an assembly instruction on a part sheet; farm run 20261106T234223948Z).
-# The knockouts' native callout reads its drill above the native size and
-# its purpose below (dt_crankshaft_notes.KNOCKOUT_CALLOUT_*).
+# the full-diameter depth both share, a native single MIN limit.  Where the
+# press stops (each dowel to its proud) is MHA-SM-00's step 1 and its
+# setting dimension, not this part's (rule 7: an assembly instruction on a
+# part sheet; farm run 20261106T234223948Z).  The knockouts' native callout
+# reads its drill above the native size and its purpose below
+# (dt_crankshaft_notes.KNOCKOUT_CALLOUT_*).
 HANGER_PIN_HOLE_CALLOUT = "2X REAM, PRESS FIT MHA-SM-VN-53 DOWEL"
-# The flat floor's corner: the title block's inside-corner radius would
-# leave the dowel's end flat bearing on a fillet, so the depth's row limits
-# it (numbers in a native dimension's callout row: the knife mount's
-# ".0020-.0036 DIAMETRAL CLEARANCE" precedent).  The dowel's spec owns the
-# limit with the ream it bounds (codjiflo round 5).
-HANGER_PIN_FLOOR_CORNER_R_MAX = KNIFE_DOWEL.PRESS_FLOOR_CORNER_R_MAX
-# Three rows: one "CORNER R.003 MAX" row overran F-F's band between the
-# depth's line and the title block.
-HANGER_PIN_DEPTH_CALLOUT = (
-    f"2X FLAT BOTTOM,\nCORNER\nR{render_number(HANGER_PIN_FLOOR_CORNER_R_MAX / IN, UNIT, 3)} MAX"
-)
+# The depth's row carries its count only: the drill point below it is the
+# standard form of a drilled-and-reamed blind hole, and nothing seats there.
+HANGER_PIN_DEPTH_CALLOUT = "2X"
 # The knockout's process row names the drill only (machinist review, farm
 # run 20261027T175429300Z: "REAM SETUP" was a method, not a requirement;
 # owner ruling 2026-10-27); the row under the native size names its start,
-# the floor.  The drawn common axis is its only location to the ream.
+# the ream's drill point.  The drawn common axis is its only location to
+# the ream.
 HANGER_KNOCKOUT_CALLOUT_ABOVE = drill_process(HANGER_KNOCKOUT_SPEC)
-HANGER_KNOCKOUT_CALLOUT_BELOW = "FROM REAM FLOOR;\nMHA-SM-VN-53 KNOCKOUT"
+HANGER_KNOCKOUT_CALLOUT_BELOW = "FROM REAM POINT;\nMHA-SM-VN-53 KNOCKOUT"
 
 # Full thread in the hub at the printed worst case (dt_arbor_pedestal_spec's
 # terms): the thread is full only where its major circle lies wholly in metal,
 # so the bore's sag across the hole is lost, and so is the one-pitch entry
 # chamfer; the flat spot face loses none. The spot face sits at the near end
-# of its .XX band, the bore at the larger of a .XX band (wider than its
-# printed .XXX) and the title block's drilled row.
-_GOOSENECK_BORE_RADIUS_MAX = (GOOSENECK_BORE_DIA + max(_XX, DRILL_OVERSIZE)) / 2.0
+# of its .XX band, the 33/64 drill at the title block's DRILLED HOLES limit.
+GOOSENECK_BORE_DIA_MIN = GOOSENECK_BORE_DIA
+GOOSENECK_BORE_DIA_MAX = GOOSENECK_BORE_DIA + DRILL_OVERSIZE  # 13.198, .5196
+_GOOSENECK_BORE_RADIUS_MAX = GOOSENECK_BORE_DIA_MAX / 2.0
 SET_SCREW_THREAD_TERMS = {
     "spot face from bore axis at its minimum": HUB_SET_SPOT_FROM_AXIS
     - printed_band_mm(HUB_SET_SPOT_PLACES, unit=UNIT),
@@ -551,24 +578,24 @@ SET_SCREW_THREAD_TERMS = {
     "bore sag across the thread": -_sag(_GOOSENECK_BORE_RADIUS_MAX),
     "one-pitch entry chamfer": -SET_SCREW_PITCH,
 }
-SET_SCREW_FULL_THREAD_MIN = sum(SET_SCREW_THREAD_TERMS.values())  # 12.03
+SET_SCREW_FULL_THREAD_MIN = sum(SET_SCREW_THREAD_TERMS.values())  # 12.14
 SET_SCREW_FULL_THREAD_NOMINAL = (
     HUB_SET_SPOT_FROM_AXIS
     - GOOSENECK_BORE_DIA / 2.0
     - _sag(GOOSENECK_BORE_DIA / 2.0)
     - SET_SCREW_PITCH
-)  # 12.39
-SET_SCREW_ENGAGEMENT_D = SET_SCREW_FULL_THREAD_MIN / SET_SCREW_MAJOR_DIA  # 1.89D
+)  # 12.44
+SET_SCREW_ENGAGEMENT_D = SET_SCREW_FULL_THREAD_MIN / SET_SCREW_MAJOR_DIA  # 1.91D
 if SET_SCREW_ENGAGEMENT_D < SET_SCREW_MIN_ENGAGEMENT_D:
     raise AssertionError(
         f"hub set screw keeps {SET_SCREW_ENGAGEMENT_D:.2f}D of full thread "
         f"at the printed worst case (< {SET_SCREW_MIN_ENGAGEMENT_D}D)"
     )
-# The bare leg slides through the bore for height setting: the bore's least
-# printed size (.515) clears the tube's largest mill OD (.507), and its
-# largest (.530, as above) leaves .032.
-GOOSENECK_SLIP_MIN = GOOSENECK_BORE_DIA - _XXX - TUBE_DIA_MAX  # 0.203, .008
-GOOSENECK_SLIP_MAX = 2.0 * _GOOSENECK_BORE_RADIUS_MAX - TUBE_DIA_MIN  # 0.813, .032
+# The bare leg slides through the bore for height setting: the drill's
+# least size (.5156) clears the tube's largest mill OD (.507), and its
+# largest (.5196) leaves .0216 over the smallest.
+GOOSENECK_SLIP_MIN = GOOSENECK_BORE_DIA_MIN - TUBE_DIA_MAX  # 0.2191, .0086
+GOOSENECK_SLIP_MAX = GOOSENECK_BORE_DIA_MAX - TUBE_DIA_MIN  # 0.5493, .0216
 if GOOSENECK_SLIP_MIN <= 0.0:
     raise AssertionError(
         f"the gooseneck bore's least printed size leaves {GOOSENECK_SLIP_MIN:.3f} mm "
@@ -582,7 +609,7 @@ SET_SCREW_REACH_MAX = (
     HUB_SET_SPOT_FROM_AXIS
     + printed_band_mm(HUB_SET_SPOT_PLACES, unit=UNIT)
     - (TUBE_DIA_MIN - _GOOSENECK_BORE_RADIUS_MAX)
-)  # 15.42
+)  # 15.29
 if SET_SCREW_REACH_MAX >= SET_SCREW_LENGTH - SET_SCREW_PITCH:
     raise AssertionError(
         f"MHA-FR-VN-52 needs {SET_SCREW_REACH_MAX:.2f} mm from the spot face to "
@@ -762,7 +789,7 @@ DRAFT_ANGLE_DIMENSIONS: dict[str, tuple[str, tuple[float, float]]] = {
 # fit-up-located keeper feet, not independently located to the general band.
 # The cap recess depth carries the bilateral band the build applies, its
 # diameter the title block's .XXX (owner ruling 2026-11-06), the
-# gooseneck bore prints the slip clearance the gooseneck's bare leg slides in, the
+# gooseneck bore prints its 33/64 drill's exact decimal, the
 # finished grip prints .XXX (the rail height, that same thickness, prints its
 # reference at the grip's places), and the dowel press ream holds its own
 # +.0005/0 band at four places.
@@ -799,7 +826,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "RibProfile": {"RibWidth": 2},
     "SetBossProfile": {"SetBossWidth": 2, "SetBossFace": 2},
     "SetSpotProfile": {"SetSpotDia": 2},
-    "GooseneckProfile": {"GnDia": 3},  # a drill diameter: .520
+    "GooseneckProfile": {"GnDia": GOOSENECK_BORE_DIA_PLACES},  # 33/64 drill: .5156
     "CapRecessProfile": {"CapRecessDia": 3},
     "CapRecesses": {"CapRecessDepth": 3},
     "HangerPinProfile": {"HangerPinHoleDia": HANGER_PIN_HOLE_DIA_PLACES},
@@ -921,52 +948,33 @@ KEEPER_TAP_CALLOUT_PRECISION = {
 KEEPER_TAP_DRILL_WANDER_DEG = 0.3
 # The same allowance as a lateral drift per mm from a hole's entry face: the
 # knife-hanger holes and reams, cut from the faced underside, and the
-# knockouts, drilled up from the ream floors, charge it at the depth each
+# knockouts, drilled up from the reams' points, charge it at the depth each
 # wall is judged (``build_fr_top_frame``).
 DRILL_DRIFT_PER_MM = tan(radians(KEEPER_TAP_DRILL_WANDER_DEG))  # 0.00524
-# The knockout floor land (see HANGER_KNOCKOUT_SPEC).  The print locates
-# each knockout on its ream only by the drawn common axis (owner ruling
-# 2026-10-27: no method note, no frame), so its real worst case is the
-# title block's implied zero at the .XXX ±.005, per axis, of the knockout's
-# axis from the ream's: up to hypot(.005, .005) off the ream's floor centre.
-# The ream's own drift moves its floor centre, the pressed dowel's axis and
-# its derived axis together, so it adds nothing here; it does add to where
-# the knockout stands off its station (``build_fr_top_frame``'s walls).
+# The knockout's offset from its ream.  The print locates each knockout on
+# its ream only by the drawn common axis (owner ruling 2026-10-27: no method
+# note, no frame), so its real worst case is the title block's implied zero
+# at the .XXX ±.005, per axis, of the knockout's axis from the ream's: up to
+# hypot(.005, .005) off the ream's axis.  The ream's own drift moves the
+# pressed dowel's axis with it, so it adds nothing here; it does add to
+# where the knockout stands off its station (``build_fr_top_frame``'s
+# walls).
 HANGER_KNOCKOUT_COAXIAL_TOL = _XXX  # per axis, 0.127
-HANGER_KNOCKOUT_FLOOR_ECCENTRICITY = sqrt(2.0) * HANGER_KNOCKOUT_COAXIAL_TOL  # 0.180
-# The floor's metal ring, out to the smallest ream.
-HANGER_PIN_FLOOR_LAND_MIN = (
-    HANGER_PIN_HOLE_DIA_MIN - HANGER_KNOCKOUT_DIA_MAX
-) / 2.0 - HANGER_KNOCKOUT_FLOOR_ECCENTRICITY  # 0.493
-# The land the dowel's end flat bears on: the pressed end's chamfer touches
-# nothing, so the smaller of the flat (B18.8.2's smallest point) and the
-# floor's flat inside its largest corner radius bounds the contact.
-HANGER_PIN_FLOOR_BEARING_R = min(
-    KNIFE_DOWEL.POINT_DIA_MIN / 2.0,
-    HANGER_PIN_HOLE_DIA_MIN / 2.0 - HANGER_PIN_FLOOR_CORNER_R_MAX,
-)  # 1.397, the point
-HANGER_PIN_FLOOR_BEARING_LAND_MIN = (
-    HANGER_PIN_FLOOR_BEARING_R
+HANGER_KNOCKOUT_ECCENTRICITY = sqrt(2.0) * HANGER_KNOCKOUT_COAXIAL_TOL  # 0.180
+# The 1/16 in punch, anywhere in the largest printed knockout at that
+# offset, lands wholly on the pressed end's flat face (B18.8.2's smallest
+# point, KNIFE_DOWEL.POINT_DIA_MIN; the chamfer would deflect it): the flat's
+# radius less the knockout's largest radius and its eccentricity, 0.315.
+HANGER_KNOCKOUT_PUNCH_LAND_MIN = (
+    KNIFE_DOWEL.POINT_DIA_MIN / 2.0
     - HANGER_KNOCKOUT_DIA_MAX / 2.0
-    - HANGER_KNOCKOUT_FLOOR_ECCENTRICITY
-)  # 0.315
-# The contacted-land target (dt_crankshaft DRIVE_PIN_FLOOR_LAND_WORST).  The
-# owner ruling 2026-10-27 accepts the sub-0.4 land this knockout leaves at
-# the drawn coaxiality's worst case (machinist exception RV-06, kind minor,
-# in cad/config/parts/fr-top-frame.yaml): the dowel must still bottom on a
-# continuous land, so only a positive land is required.
-HANGER_PIN_FLOOR_BEARING_LAND_TARGET = 0.4
-if HANGER_PIN_FLOOR_BEARING_LAND_MIN <= 0.0:
+    - HANGER_KNOCKOUT_ECCENTRICITY
+)
+if HANGER_KNOCKOUT_PUNCH_LAND_MIN <= 0.0:
     raise AssertionError(
-        "the knockout leaves the pressed MHA-SM-VN-53's end flat no bearing land"
-        f" ({HANGER_PIN_FLOOR_BEARING_LAND_MIN:.3f})"
+        "the knockout's punch can miss the pressed MHA-SM-VN-53's end flat"
+        f" ({HANGER_KNOCKOUT_PUNCH_LAND_MIN:.3f})"
     )
-
-# B18.8.2's largest point runs past the floor's flat at the smallest ream
-# and largest corner (1.524 > 1.4825): its edge meets the fillet and the end
-# stands off the floor by about 0.009, which the dowel's spec charges to its
-# longest proud length (KNIFE_DOWEL.PROUD_MAX).
-HANGER_PIN_FLOOR_FILLET_LIFT_MAX = KNIFE_DOWEL.PRESS_FLOOR_LIFT_MAX
 
 # The nominal socket geometry stays fixed; the assigned actual tube governs fit
 # (the socket callout names the mate and the acceptance; the frame assembly

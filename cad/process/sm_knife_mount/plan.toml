@@ -47,12 +47,7 @@ ref = "pin-gauges"  # A1-pin-set-061-250, A1-pin-set-061-500-combined, A1-pin-se
 [[tools]]
 id = "reamer-1280"
 name = ".1280 reamer"
-ref = "reamer-1280"  # drawing cross-check 2026-11-19: Ø.1280 ±.0007 REAM (.37) FLAT BOTTOM
-
-[[tools]]
-id = "endmill-carbide-3fl-1-8"
-name = "1/8 carbide end mill"
-ref = "endmill-carbide-3fl-1-8"  # drawing cross-check 2026-11-19: flatten the (.37) floor before the ream
+ref = "reamer-1280"  # drawing cross-check 2026-11-19: Ø.1280 ±.0007 REAM (.37), drill point (#3124)
 
 [[setups]]
 machine_kind = "other"

@@ -49,7 +49,10 @@ def test_recipe_is_the_size_the_registry_names() -> None:
 
 
 def test_pressed_and_proud_lengths_are_the_whole_pin() -> None:
-    assert spec.PRESS_DEPTH + spec.PROUD == pytest.approx(spec.LENGTH)
+    # Pressed to its set proud (owner decision 2026-11-19, #3124 item 3),
+    # short of the ream's drill point at every length grade and proud.
+    assert spec.INSERTION + spec.PROUD == pytest.approx(spec.LENGTH)
+    assert spec.INSERTION_MAX < spec.PRESS_DEPTH
     assert spec.PRESS_ENGAGEMENT_D_MIN >= spec.PRESS_ENGAGEMENT_MIN_D
     assert spec.SLIP_DEPTH_CLEARANCE_MIN > 0.0
     assert min(spec.DIA_BAND) > 0.0  # a press dowel is oversize, never under

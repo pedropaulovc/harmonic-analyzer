@@ -26,7 +26,11 @@ import settled_spring_seats
 import sm_gooseneck_geom
 import sm_gooseneck_spring_joint as spring_joint
 import sm_summing_lever_spec as lever
+import sm_vn_knife_mount_dowel_spec as knife_dowel
+from _assembly_contract import assembly_contract
+from _printed_tolerance import printed_band_mm
 from spring_mount_geom import COUNTER_ANCHOR_XY, KNIFE, KNIFE_CONTACT_Y
+from top_frame_plane import TOP_FRAME_UNDERSIDE_Y
 
 ASM_NAME = "sm-summing"
 
@@ -71,18 +75,34 @@ HANGER_FIT_REACH = 8.9154  # .351
 HANGER_FIT_REACH_TOL = 0.127  # .005, the title block's three-place band
 HANGER_FIT_REACH_PLACES = 3
 
-# --- Assembly setting, as a model dimension -------------------------------------
-# One blanked Front-plane construction sketch in the assembly (sketch x =
-# machine X, sketch y = machine Y), driven from globals and marked for the
-# drawing, which shows it in the one view that dimensions it.
+# --- Assembly settings, as model dimensions -------------------------------------
+# One blanked Front-plane construction sketch per setting in the assembly
+# (sketch x = machine X, sketch y = machine Y), driven from globals and marked
+# for the drawing, which shows it in the one view that dimensions it.
 #
 # CounterSetting: the MHA-SM-VN-56 axis over the counter spring, measured up the
 # spring's own axis from the knife-edge contact level. Sliding the gooseneck's
 # bare leg in the frame hub sets it until the lever is level, so it prints as
 # a reference nominal.
-SETTING_FEATURES = ("CounterSetting",)
-(COUNTER_FEATURE,) = SETTING_FEATURES
+#
+# DowelProudSetting (owner decision 2026-11-19, #3124 item 3): each
+# MHA-SM-VN-53 is pressed into its MHA-FR-02 ream, which ends in a drill
+# point, until it stands PROUD below the crossbar underside, measured down
+# the dowel's own axis from the underside (the knife mount's clamped top
+# seat) to its free end.  The press sets it, so it prints toleranced: the
+# title block's .XX, the band the dowel spec's stacks charge.
+SETTING_FEATURES = ("CounterSetting", "DowelProudSetting")
+COUNTER_FEATURE, DOWEL_PROUD_FEATURE = SETTING_FEATURES
 COUNTER_DIMENSION = "CounterScrewRise"
+DOWEL_PROUD_DIMENSION = "DowelProud"
+# The front mount's dowel axis (+X of the knife by its station; the Front
+# plane sketch sees both mounts' on one line): from the underside down.
+DOWEL_PROUD_TOP_POINT = (KNIFE[0] + knife_dowel.HANGER_OFFSET, TOP_FRAME_UNDERSIDE_Y)
+DOWEL_PROUD_END_POINT = (
+    DOWEL_PROUD_TOP_POINT[0],
+    TOP_FRAME_UNDERSIDE_Y - knife_dowel.PROUD,
+)
+DOWEL_PROUD_PRECISION = knife_dowel.PROUD_PLACES
 
 KNIFE_POINT = (KNIFE[0], KNIFE_CONTACT_Y)
 _COUNTER_SEAT, GOOSENECK_ORIGIN_Y = settled_spring_seats.counter_seat()
@@ -161,7 +181,15 @@ BOSS_ROCK_TRAVEL = round(
 COUNTER_PRECISION = 2
 DRAWING_PRECISION = {
     COUNTER_FEATURE: {COUNTER_DIMENSION: COUNTER_PRECISION},
+    DOWEL_PROUD_FEATURE: {DOWEL_PROUD_DIMENSION: DOWEL_PROUD_PRECISION},
 }
+# The proud prints bare at its places, so the title block's band governs it:
+# that band is the one the dowel spec charges.
+# A literal stem: the build graph narrows the assemblies/* dependency to
+# exactly the contracts a closure names.
+_UNIT = assembly_contract("sm-summing").drawing_unit
+if printed_band_mm(DOWEL_PROUD_PRECISION, unit=_UNIT) != knife_dowel.PROUD_TOL:
+    raise AssertionError("the dowel proud's printed band is not the band its stacks charge")
 
 assert 0.0 < COUNTER_SCREW_RISE, COUNTER_SCREW_RISE
 assert 0.0 < COUNTER_SCREW_OFFSET_X, COUNTER_SCREW_OFFSET_X

@@ -2211,23 +2211,30 @@ def test_hub_set_screw_keeps_one_and_a_half_diameters_of_full_thread() -> None:
     ]
     assert terms["spot face from bore axis at its minimum"] == pytest.approx(20.828)
     assert all(v < 0.0 for k, v in terms.items() if k != "spot face from bore axis at its minimum")
-    assert spec.SET_SCREW_FULL_THREAD_MIN == pytest.approx(12.031, abs=1e-3)
-    assert spec.SET_SCREW_FULL_THREAD_NOMINAL == pytest.approx(12.395, abs=1e-3)
+    assert spec.SET_SCREW_FULL_THREAD_MIN == pytest.approx(12.145, abs=1e-3)
+    assert spec.SET_SCREW_FULL_THREAD_NOMINAL == pytest.approx(12.442, abs=1e-3)
     assert spec.SET_SCREW_MAJOR_DIA == pytest.approx(6.35)
-    assert spec.SET_SCREW_ENGAGEMENT_D == pytest.approx(1.895, abs=1e-3)
+    assert spec.SET_SCREW_ENGAGEMENT_D == pytest.approx(1.913, abs=1e-3)
     assert spec.SET_SCREW_ENGAGEMENT_D >= spec.SET_SCREW_MIN_ENGAGEMENT_D == 1.5
 
 
 def test_gooseneck_bore_slides_on_the_bare_leg_and_the_set_screw_reaches_it() -> None:
     """Owner ruling 2026-11-08 (Pedro), #2315: the hub bore takes the
-    gooseneck's bare 1/2 in leg at .520, .008-.032 diametral slip over the
-    tube's mill OD; the 3/4 in MHA-FR-VN-52 still reaches the leg (15.42 of
-    19.05) and tightens snug, 9 in-lb (1 N·m) max."""
-    assert spec.GOOSENECK_BORE_DIA == pytest.approx(0.520 * 25.4)
-    assert spec.DRAWING_PRECISION["GooseneckProfile"] == {"GnDia": 3}
-    assert spec.GOOSENECK_SLIP_MIN / 25.4 == pytest.approx(0.008, abs=1e-6)
-    assert spec.GOOSENECK_SLIP_MAX / 25.4 == pytest.approx(0.032, abs=1e-6)
-    assert spec.SET_SCREW_REACH_MAX == pytest.approx(15.418, abs=1e-3)
+    gooseneck's bare 1/2 in leg.  Owner decision 2026-11-19 (#3124, item 2):
+    a 33/64 drill printed .5156 under DRILLED HOLES (.5156-.5196), .0086-.0216
+    diametral slip over the tube's mill OD; the 3/4 in MHA-FR-VN-52 still
+    reaches the leg (15.29 of 19.05) and tightens snug, 9 in-lb (1 N·m)
+    max."""
+    assert spec.GOOSENECK_DRILL == "33/64"
+    assert spec.GOOSENECK_BORE_DIA == pytest.approx(33.0 / 64.0 * 25.4)
+    assert spec.GOOSENECK_BORE_DIA_MAX == pytest.approx(
+        spec.GOOSENECK_BORE_DIA + spec.DRILL_OVERSIZE
+    )
+    assert spec.DRAWING_PRECISION["GooseneckProfile"] == {"GnDia": 4}
+    assert spec.GOOSENECK_SLIP_MIN / 25.4 == pytest.approx(0.008625, abs=1e-6)
+    assert spec.GOOSENECK_SLIP_MAX / 25.4 == pytest.approx(0.021625, abs=1e-6)
+    assert drawing.HUB_TOP_CALLOUTS["GnDia"].startswith("33/64 DRILL THRU\n")
+    assert spec.SET_SCREW_REACH_MAX == pytest.approx(15.286, abs=1e-3)
     assert spec.SET_SCREW_REACH_MAX < spec.SET_SCREW_LENGTH - spec.SET_SCREW_PITCH
     assert spec.SET_SCREW_LENGTH == pytest.approx(19.05)
     assert (spec.SET_SCREW_TORQUE_MAX_IN_LB, spec.SET_SCREW_TORQUE_MAX_NM) == (9.0, 1.0)
@@ -3620,22 +3627,21 @@ def test_a_a_witnesses_start_past_the_rear_boss_off_the_cut_face() -> None:
         widen([*recess, recess[0]], (0.1468, 0.1387), start, label="t")
 
 
-def test_knockouts_leave_a_floor_land_and_their_walls() -> None:
-    """Rule 16: each blind press ream gets a #51 knockout drilled up from
-    its floor, drawn on the ream's axis (codjiflo, PR #1978: drilled from
-    the top, the two holes' opposing wander left a #43 0.200 of floor).  The
-    dowel still bottoms on the floor land the knockout leaves; it is pressed
-    chamfer end first, so the land it bears on is its end flat's, not the
-    ream's (codjiflo round 3), at ASME B18.8.2's smallest point and inside
-    the floor's corner limit (round 4).  Owner ruling 2026-10-27 (option c):
-    no "REAM SETUP" and no frame, so the knockout is off its ream by the
-    drawn coaxiality's implied ±0.13 per axis, and the land, 0.313, falls
-    under the 0.4 target, accepted as machinist exception RV-06 (minor).
-    The knockout prints two places, Ø1.70, under the DRILLED HOLES row
-    (machinist review, run 20261027T175429300Z).  It keeps its walls where
-    its shift is greatest, at the top, a land inside the top break and a
-    continuous washer bearing ring inside it, and a 1/16 in punch passes
-    it."""
+def test_knockouts_land_the_punch_and_keep_their_walls() -> None:
+    """Rule 16: each blind press ream gets a #51 knockout drilled up on the
+    ream's axis (codjiflo, PR #1978: drilled from the top, the two holes'
+    opposing wander left a #43 0.200 of floor).  Owner decision 2026-11-19
+    (#3124, item 3): the ream ends in a 118° drill point and the dowel is
+    pressed to its proud, not to a floor, so the knockout starts from the
+    point and the floor land (RV-06) is gone; THRU was rejected, its exit
+    under the washer's rim.  Owner ruling 2026-10-27 (option c): no "REAM
+    SETUP" and no frame, so the knockout is off its ream by the drawn
+    coaxiality's implied ±0.13 per axis; a 1/16 in punch anywhere in the
+    largest knockout still lands on the pressed end's flat.  The knockout
+    prints two places, Ø1.70, under the DRILLED HOLES row (machinist review,
+    run 20261027T175429300Z).  It keeps its walls where its shift is
+    greatest, at the top, a land inside the top break and a continuous
+    washer bearing ring inside it."""
     from pathlib import Path as _Path
 
     from _hole_spec import HoleSpec, NUMBER_DRILL_MM
@@ -3664,124 +3670,93 @@ def test_knockouts_leave_a_floor_land_and_their_walls() -> None:
         spec.RING_HEIGHT - spec.HANGER_PIN_HOLE_DEPTH
     )
     assert spec.HANGER_KNOCKOUT_LENGTH_MAX == pytest.approx(
-        spec.HANGER_GRIP + spec.HANGER_GRIP_TOL
-        - (spec.HANGER_PIN_HOLE_DEPTH - spec.HANGER_PIN_HOLE_DEPTH_TOL)
+        spec.HANGER_GRIP + spec.HANGER_GRIP_TOL - spec.HANGER_PIN_HOLE_DEPTH
     )
-    # Codjiflo round 6: the ~15 D knockout takes a taper-length #51 (2 in
+    # The model's knockout circle where it breaks into the ream's point.
+    assert spec.HANGER_KNOCKOUT_ENTRY_DEPTH == pytest.approx(
+        spec.HANGER_PIN_HOLE_DEPTH
+        + (spec.HANGER_PIN_HOLE_DIA - spec.HANGER_KNOCKOUT_DIA)
+        / 2.0
+        / math.tan(math.radians(59.0))
+    )
+    assert spec.HANGER_PIN_HOLE_POINT_H == pytest.approx(
+        spec.HANGER_PIN_HOLE_DIA / 2.0 / math.tan(math.radians(59.0)), abs=1e-5
+    )
+    # Codjiflo round 6: the ~14 D knockout takes a taper-length #51 (2 in
     # flute, MSC 63725519) reaching the top from the underside, and the
     # punch reaches from the faced top through the knockout and the ream
-    # to the underside, the full grip at its far limit, whatever the floor.
+    # to the underside, the full grip at its far limit, whatever the depth.
     reach = spec.HANGER_GRIP + spec.HANGER_GRIP_TOL
     assert spec.HANGER_KNOCKOUT_DRILL_REACH == pytest.approx(reach)
     assert spec.HANGER_KNOCKOUT_PUNCH_REACH_MIN == pytest.approx(reach)
     assert spec.HANGER_KNOCKOUT_PUNCH_REACH_MIN == pytest.approx(36.6268)
-    # The knockout's longest run plus the push-out from the shallowest floor
+    # The knockout's longest run plus the push-out from the shallowest ream
     # sum to the same reach: the ream's depth cancels.
-    assert spec.HANGER_KNOCKOUT_LENGTH_MAX + (
-        spec.HANGER_PIN_HOLE_DEPTH - spec.HANGER_PIN_HOLE_DEPTH_TOL
-    ) == pytest.approx(spec.HANGER_KNOCKOUT_PUNCH_REACH_MIN)
+    assert spec.HANGER_KNOCKOUT_LENGTH_MAX + spec.HANGER_PIN_HOLE_DEPTH == pytest.approx(
+        spec.HANGER_KNOCKOUT_PUNCH_REACH_MIN
+    )
     assert spec.HANGER_KNOCKOUT_DEPTH_D == pytest.approx(
         spec.HANGER_KNOCKOUT_LENGTH_MAX / spec.HANGER_KNOCKOUT_DIA_PRINTED
     )
-    assert spec.HANGER_KNOCKOUT_DEPTH_D == pytest.approx(14.657, abs=5e-4)
+    assert spec.HANGER_KNOCKOUT_DEPTH_D == pytest.approx(14.060, abs=5e-4)
     assert spec.HANGER_KNOCKOUT_DRILL_FLUTE_LEN == pytest.approx(2.0 * 25.4)
     assert spec.HANGER_KNOCKOUT_DRILL_FLUTE_LEN > spec.HANGER_KNOCKOUT_DRILL_REACH
     per_mm = spec.DRILL_DRIFT_PER_MM
     # The drawn coaxiality's real worst case: the title block's .XXX ±.005
     # on the implied zero, along both axes at once.  The ream's own drift
-    # moves its floor centre and the pressed dowel together, so it adds
-    # nothing at the floor.
+    # moves the pressed dowel with it, so it adds nothing at the dowel.
     assert spec.HANGER_KNOCKOUT_COAXIAL_TOL == pytest.approx(0.127)
     eccentricity = math.hypot(0.127, 0.127)
-    assert spec.HANGER_KNOCKOUT_FLOOR_ECCENTRICITY == pytest.approx(eccentricity)
-    concentric = (spec.HANGER_PIN_HOLE_DIA_MIN - spec.HANGER_KNOCKOUT_DIA_MAX) / 2.0
-    land = concentric - eccentricity
-    assert spec.HANGER_PIN_FLOOR_LAND_MIN == pytest.approx(land)
-    assert land == pytest.approx(0.493494877578617)
-    # The contacted land: the dowel's pressed end flat (inside the chamfer
-    # that touches nothing) at B18.8.2's smallest point, 0.110 in (the
-    # vendor model's 0.115 is the band's middle), or the floor's flat inside
-    # its largest corner if smaller, less the largest knockout, off centre
-    # by the drawn coaxiality.
+    assert spec.HANGER_KNOCKOUT_ECCENTRICITY == pytest.approx(eccentricity)
+    # The punch lands on the dowel's pressed end flat (inside the chamfer)
+    # at B18.8.2's smallest point, 0.110 in (the vendor model's 0.115 is the
+    # band's middle), less the largest knockout off centre by the drawn
+    # coaxiality.
     assert (dowel.POINT_DIA_MIN, dowel.POINT_DIA_MAX) == pytest.approx(
         (0.110 * 25.4, 0.120 * 25.4)
     )
     assert dowel.POINT_DIA_MIN < dowel.ENDS.point_dia < dowel.POINT_DIA_MAX
-    # The dowel's spec owns the corner limit and its lift with the ream
-    # (codjiflo round 5); the crossbar reads them.
-    assert spec.HANGER_PIN_FLOOR_CORNER_R_MAX is dowel.PRESS_FLOOR_CORNER_R_MAX
-    assert spec.HANGER_PIN_FLOOR_FILLET_LIFT_MAX is dowel.PRESS_FLOOR_LIFT_MAX
-    corner = spec.HANGER_PIN_FLOOR_CORNER_R_MAX
-    assert corner == pytest.approx(0.0762)  # .003
-    floor_flat_r = spec.HANGER_PIN_HOLE_DIA_MIN / 2.0 - corner
-    flat = 2.0 * min(dowel.POINT_DIA_MIN / 2.0, floor_flat_r)
-    assert flat == pytest.approx(dowel.POINT_DIA_MIN)
-    assert spec.HANGER_PIN_FLOOR_BEARING_R == pytest.approx(flat / 2.0)
-    bearing = (flat - spec.HANGER_KNOCKOUT_DIA_MAX) / 2.0 - eccentricity
-    assert spec.HANGER_PIN_FLOOR_BEARING_LAND_MIN == pytest.approx(bearing)
-    assert bearing == pytest.approx(0.31569487757861703)
-    # Owner ruling 2026-10-27 accepts the sub-0.4 land: the target stays
-    # named, the spec only demands a positive land, and RV-06 (minor)
-    # quotes the land the proof computes.
-    assert spec.HANGER_PIN_FLOOR_BEARING_LAND_TARGET == 0.4
-    assert 0.0 < bearing < spec.HANGER_PIN_FLOOR_BEARING_LAND_TARGET
+    land = (dowel.POINT_DIA_MIN - spec.HANGER_KNOCKOUT_DIA_MAX) / 2.0 - eccentricity
+    assert spec.HANGER_KNOCKOUT_PUNCH_LAND_MIN == pytest.approx(land)
+    assert land == pytest.approx(0.31569487757861703)
+    # The flat floor, its corner limit, its land and its exception are gone.
+    for retired in (
+        "HANGER_KNOCKOUT_FLOOR_ECCENTRICITY",
+        "HANGER_PIN_FLOOR_LAND_MIN",
+        "HANGER_PIN_FLOOR_CORNER_R_MAX",
+        "HANGER_PIN_FLOOR_FILLET_LIFT_MAX",
+        "HANGER_PIN_FLOOR_BEARING_R",
+        "HANGER_PIN_FLOOR_BEARING_LAND_MIN",
+        "HANGER_PIN_FLOOR_BEARING_LAND_TARGET",
+        "HANGER_PIN_HOLE_DEPTH_TOL",
+    ):
+        assert not hasattr(spec, retired), retired
     exceptions = {
-        entry.id: entry
+        entry.id
         for entry in machinist_exceptions.load_exceptions(
             _Path(spec.__file__).resolve().parents[1] / "config", "fr_top_frame", "part"
         )
     }
-    rv06 = exceptions["RV-06"]
-    assert rv06.kind == "minor"
-    assert "knockout floor land" in rv06.where
-    assert f"{bearing / 25.4:.4f}".lstrip("0") in rv06.finding
-    assert ".016" in rv06.finding
-    assert "owner ruling 2026-10-27" in rv06.reason
-    # B18.8.2's largest point overhangs the floor's flat at the smallest
-    # ream and largest corner, so its edge stands on the fillet: the end
-    # sits off the floor by the fillet's height under that edge (the
-    # chamfer cone at 16 deg to the axis climbs far faster than the fillet
-    # beyond it), a sliver of the press depth's .010 band.
-    overhang = dowel.POINT_DIA_MAX / 2.0 - floor_flat_r
-    assert overhang == pytest.approx(0.0254)
-    edge_rise = corner - (corner**2 - overhang**2) ** 0.5
-    assert spec.HANGER_PIN_FLOOR_FILLET_LIFT_MAX >= edge_rise - 5e-6
-    assert spec.HANGER_PIN_FLOOR_FILLET_LIFT_MAX == pytest.approx(edge_rise, abs=5e-5)
-    assert spec.HANGER_PIN_FLOOR_FILLET_LIFT_MAX < 0.02 * spec.HANGER_PIN_HOLE_DEPTH_TOL
-    # The lifted pin stands that much longer below the underside.
-    assert dowel.PROUD_MAX == pytest.approx(
-        dowel.proud_length(
-            spec.HANGER_PIN_HOLE_DEPTH - spec.HANGER_PIN_HOLE_DEPTH_TOL, dowel.LENGTH_GRADE
-        )
-        + spec.HANGER_PIN_FLOOR_FILLET_LIFT_MAX
-    )
-    # Negative controls: the 0.4 target held only with the knockout started
-    # in the ream's setup (the ream's floor drift, 0.067), which the print
-    # no longer states; at the drawn coaxiality every larger drill leaves
-    # less, a #50 (codjiflo round 4) 0.278.
-    setup_drift = per_mm * (spec.HANGER_PIN_HOLE_DEPTH + spec.HANGER_PIN_HOLE_DEPTH_TOL)
-    assert setup_drift == pytest.approx(part.HANGER_DRIFT_AT_REAM_FLOOR)
-    assert (flat - spec.HANGER_KNOCKOUT_DIA_MAX) / 2.0 - setup_drift >= 0.4
-    assert bearing < 0.4
-    lands = {
-        larger: (flat - larger - spec.PRINTED_DRILLED_HOLE_PLUS_MM) / 2.0 - eccentricity
-        for larger in (0.0700 * 25.4, NUMBER_DRILL_MM["#47"], NUMBER_DRILL_MM["#43"])
-    }
-    assert all(value < bearing for value in lands.values()), lands
-    assert lands[0.0700 * 25.4] == pytest.approx(0.2776, abs=5e-5)
+    assert "RV-06" not in exceptions
+    # THRU rejected: at the .300 station the ream's exit edge would stand
+    # under the washer even at its smallest OD.
+    washer = part.HANGER_WASHER
+    assert spec.HANGER_PIN_X - spec.HANGER_PIN_HOLE_DIA_MAX / 2.0 < washer.OD_MIN / 2.0
     # The process row names the drill only (machinist review: "REAM SETUP"
     # was a method; owner ruling 2026-10-27), the row under the native size
-    # the start: the floor.
+    # the start: the ream's drill point.
     assert spec.HANGER_KNOCKOUT_CALLOUT_ABOVE == "#51 DRILL"
     assert "SETUP" not in spec.HANGER_KNOCKOUT_CALLOUT_BELOW
-    assert spec.HANGER_KNOCKOUT_CALLOUT_BELOW == "FROM REAM FLOOR;\nMHA-SM-VN-53 KNOCKOUT"
+    assert spec.HANGER_KNOCKOUT_CALLOUT_BELOW == "FROM REAM POINT;\nMHA-SM-VN-53 KNOCKOUT"
     drift = per_mm * spec.HANGER_KNOCKOUT_LENGTH_MAX
     assert part.HANGER_KNOCKOUT_DRIFT == pytest.approx(drift)
-    # At the top: the ream's floor drift, the coaxiality's .005 along the
-    # wall's axis, and the knockout's own drift up its run.
+    setup_drift = per_mm * spec.HANGER_PIN_HOLE_DEPTH
+    # At the top: the ream's drift at its full diameter's MIN depth, where
+    # the knockout starts, the coaxiality's .005 along the wall's axis, and
+    # the knockout's own drift up its run.
     shift = setup_drift + spec.HANGER_KNOCKOUT_COAXIAL_TOL + drift
     assert part.HANGER_KNOCKOUT_SHIFT_AT_TOP == pytest.approx(shift)
-    assert shift == pytest.approx(0.3214391350105531)
+    assert shift == pytest.approx(0.318779, abs=5e-6)
     knockout_r = spec.HANGER_KNOCKOUT_DIA_MAX / 2.0
     clearance_r = spec.HANGER_CLEARANCE_DIA_MAX / 2.0
     # The knockout, on its ream's axis, stands at the ream's .XXX band from
@@ -3795,41 +3770,41 @@ def test_knockouts_leave_a_floor_land_and_their_walls() -> None:
     assert part.KNOCKOUT_SCREW_WALL == pytest.approx(
         near - knockout_r - clearance_r - part.HANGER_DRIFT_AT_TOP
     )
-    assert part.KNOCKOUT_BAR_WALL == pytest.approx(3.0948608649894465)
-    assert part.KNOCKOUT_SCREW_WALL == pytest.approx(2.95388163606659)
+    assert part.KNOCKOUT_BAR_WALL == pytest.approx(3.097521, abs=5e-6)
+    assert part.KNOCKOUT_SCREW_WALL == pytest.approx(2.956542, abs=5e-6)
     assert min(part.KNOCKOUT_BAR_WALL, part.KNOCKOUT_SCREW_WALL) >= 2.032
     assert part.KNOCKOUT_TOP_BREAK_LAND == pytest.approx(
         reach - part.EDGE_BREAK_PRINTED_MAX - spec.HANGER_PIN_X
         - spec.HANGER_PIN_X_TOL - knockout_r - shift
     )
-    assert part.KNOCKOUT_TOP_BREAK_LAND == pytest.approx(1.3168608649894467)
+    assert part.KNOCKOUT_TOP_BREAK_LAND == pytest.approx(1.319521, abs=5e-6)
     # The knockout exits under the washer: the washer still bears on a
     # continuous ring inside the knockouts at every printed limit.
-    washer = part.HANGER_WASHER
     offset = part.HANGER_WASHER_OFFSET_MAX
     assert near - knockout_r < washer.OD_MAX / 2.0 + offset
     ring = min(washer.OD_MIN / 2.0, near - knockout_r - offset) - max(
         washer.ID_MAX / 2.0, clearance_r + offset
     )
     assert part.HANGER_WASHER_KNOCKOUT_RING_MIN == pytest.approx(ring)
-    assert part.HANGER_WASHER_KNOCKOUT_RING_MIN == pytest.approx(0.16179812649087388)
+    assert part.HANGER_WASHER_KNOCKOUT_RING_MIN == pytest.approx(0.164458, abs=5e-6)
     assert ring > 0.0
 
 
 def test_hanger_walls_meet_the_target_after_drift() -> None:
     """Q7 option C: the #10 holes are drilled from the faced underside and
     the dowel reams cut from it, each located from the #10 hole's axis
-    there, so each hole's 0.3 deg drift is nil at the seat and largest at
-    the blind floors.  Every wall round a ream, at the print-worst bands
-    and the deepest printed floor, less the drift of each hole either side
-    of it, meets rule 17's .080 target.  Owner ruling 2026-11-08 (Pedro),
-    #2144 item 11.3: one ream per station, +X of its screw at its .XXX
-    band."""
+    there, so each hole's 0.3 deg drift is nil at the seat.  The ream's
+    full diameter is .50 MIN, open above (owner decision 2026-11-19, #3124
+    item 3), so its drift is charged over the whole grip.  Every wall round
+    a ream, at the print-worst bands, less the drift of each hole either
+    side of it, meets rule 17's .080 target.  Owner ruling 2026-11-08
+    (Pedro), #2144 item 11.3: one ream per station, +X of its screw at its
+    .XXX band."""
     per_mm = math.tan(math.radians(spec.KEEPER_TAP_DRILL_WANDER_DEG))
     assert spec.DRILL_DRIFT_PER_MM == pytest.approx(per_mm)
-    drift = per_mm * (spec.HANGER_PIN_HOLE_DEPTH + spec.HANGER_PIN_HOLE_DEPTH_TOL)
-    assert part.HANGER_DRIFT_AT_REAM_FLOOR == pytest.approx(drift)
-    assert drift == pytest.approx(0.0638, abs=1e-4)
+    drift = per_mm * (spec.HANGER_GRIP + spec.HANGER_GRIP_TOL)
+    assert part.HANGER_REAM_DRIFT_MAX == pytest.approx(drift)
+    assert drift == pytest.approx(0.1918, abs=1e-4)
     ream_r = spec.HANGER_PIN_HOLE_DIA_MAX / 2.0
     clearance_r = spec.HANGER_CLEARANCE_DIA_MAX/2
     off = spec.HANGER_PIN_X_TOL
@@ -3853,13 +3828,18 @@ def test_hanger_walls_meet_the_target_after_drift() -> None:
     for label, (print_worst, charged, wall) in walls.items():
         assert wall == pytest.approx(print_worst - charged), label
         assert wall >= 2.032, label
-    assert part.PIN_HOLE_BAR_WALL == pytest.approx(2.673012253895304)
-    assert part.PIN_HOLE_SCREW_WALL == pytest.approx(2.6599745077906083)
-    assert part.PIN_HOLE_FLOOR_MARGIN == pytest.approx(
-        spec.HANGER_GRIP - spec.HANGER_GRIP_TOL - spec.HANGER_PIN_HOLE_DEPTH
-        - spec.HANGER_PIN_HOLE_DEPTH_TOL
+    assert part.PIN_HOLE_BAR_WALL == pytest.approx(2.545071, abs=5e-6)
+    assert part.PIN_HOLE_SCREW_WALL == pytest.approx(2.404092, abs=5e-6)
+    # The band's upper deviation is the deepest ream whose drill point keeps
+    # the wall target under the faced top: a THRU ream is out of band.
+    depth_max = spec.HANGER_PIN_HOLE_DEPTH + max(spec.HANGER_PIN_HOLE_DEPTH_BAND)
+    assert spec.HANGER_PIN_HOLE_DEPTH_MAX == pytest.approx(depth_max)
+    assert part.PIN_HOLE_POINT_MARGIN == pytest.approx(
+        spec.HANGER_GRIP - spec.HANGER_GRIP_TOL - depth_max
+        - spec.HANGER_PIN_HOLE_POINT_H
     )
-    assert part.PIN_HOLE_FLOOR_MARGIN == pytest.approx(24.1808)
+    assert 2.032 <= part.PIN_HOLE_POINT_MARGIN < 2.032 + 1e-5
+    assert depth_max + spec.HANGER_PIN_HOLE_POINT_H < spec.HANGER_GRIP - spec.HANGER_GRIP_TOL
     # Entry wander at the deepest pocket roof and the finished top.  Every
     # ream sits across the line at its implied-zero .XXX off the screw axis.
     # The nearer station (the rear one since #1038 moved the front one .25
@@ -3885,8 +3865,8 @@ def test_hanger_walls_meet_the_target_after_drift() -> None:
         - part.HANGER_KNOCKOUT_SHIFT_AT_TOP
     )
     assert pocket["hanger clearance hole"] == pytest.approx(16.385177189775263)
-    assert pocket["dowel ream"] == pytest.approx(17.89060003432185)
-    assert pocket["dowel knockout"] == pytest.approx(18.312448645415984)
+    assert pocket["dowel ream"] == pytest.approx(17.762659, abs=5e-6)
+    assert pocket["dowel knockout"] == pytest.approx(18.315109, abs=5e-6)
 
 
 def test_washer_support_on_the_faced_top_charges_all_printed_limits() -> None:

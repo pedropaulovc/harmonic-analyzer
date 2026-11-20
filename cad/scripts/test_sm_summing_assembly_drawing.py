@@ -212,7 +212,13 @@ def test_setting_drives_reproduce_the_sketch_values() -> None:
     assert g["SmCounterScrewY"] - g["SmKnifeY"] == pytest.approx(
         spec.COUNTER_SCREW_RISE
     )
-    assert notes.DRAWING_DIMENSIONS == {spec.COUNTER_FEATURE: {spec.COUNTER_DIMENSION}}
+    assert g["SmDowelTopY"] - g["SmDowelEndY"] == pytest.approx(
+        spec.knife_dowel.PROUD
+    )
+    assert notes.DRAWING_DIMENSIONS == {
+        spec.COUNTER_FEATURE: {spec.COUNTER_DIMENSION},
+        spec.DOWEL_PROUD_FEATURE: {spec.DOWEL_PROUD_DIMENSION},
+    }
     assert set(drawing.PRECISION) == set(notes.DIMENSION_CALLOUTS)
 
 
@@ -233,6 +239,7 @@ def test_setting_table_carries_the_settings_no_visible_dimension_does() -> None:
         notes.CUT_ROW,
         notes.SEAT_ROW,
         notes.ROCK_ROW,
+        notes.LEVEL_ROW,
     ]
     band = f"±{notes._length(notes.BRACKET_STATION_TOL_MM, 3)}"
     assert band == "±.005"
@@ -243,7 +250,7 @@ def test_setting_table_carries_the_settings_no_visible_dimension_does() -> None:
     assert cut["MEASURE FIRST"].startswith(f"{notes.HANGER_STACK} = ")
     feeler = notes._length(notes.SEAT_FEELER_MM, 3)
     assert feeler == ".002"
-    assert rows[notes.SEAT_ROW]["SET TO / ACCEPT"].startswith(f"{feeler} FEELER")
+    assert rows[notes.SEAT_ROW]["SET TO / ACCEPT"] == f"NO {feeler} FEELER ENTERS"
     assert notes.ROCK_TRAVEL_MIN == ".295 MIN"
     assert rows[notes.ROCK_ROW]["SET TO / ACCEPT"].startswith(notes.ROCK_TRAVEL_MIN)
 
@@ -262,6 +269,16 @@ def test_setting_table_carries_the_settings_no_visible_dimension_does() -> None:
     assert notes.setting_row(notes.ROCK_ROW) in step("6G. ")
     rock = next(c for c in notes.ASSEMBLY_CHECKS if c.startswith("2. "))
     assert notes.ROCK_TRAVEL_MIN in rock and notes.setting_row(notes.ROCK_ROW) in rock
+    # The lever level is a row too (#3124 machinist review): step 10 and
+    # check 4 cite it, and no sheet note restates it.
+    assert rows[notes.LEVEL_ROW]["SET TO / ACCEPT"] == notes.LEVEL_CRITERION
+    # One name for the instrument in the row and in step 10 (codjiflo #3128).
+    assert rows[notes.LEVEL_ROW]["CHECK WITH"] == "DIGITAL ANGLE GAUGE"
+    assert f"({notes.LEVEL_GAUGE} ACROSS THE PLATE" in step("10. ")
+    assert notes.setting_row(notes.LEVEL_ROW) in step("10. ")
+    level = next(c for c in notes.ASSEMBLY_CHECKS if c.startswith("4. "))
+    assert notes.setting_row(notes.LEVEL_ROW) in level
+    assert not any(notes.LEVEL_CRITERION in n for n in notes.ASSEMBLED_NOTES)
     with pytest.raises(KeyError):
         notes.setting_row("9")
 
@@ -369,6 +386,37 @@ def test_the_shoulder_screw_goes_in_after_the_end_plug_bond() -> None:
     # Bench acceptance, as bond note A's dowel bond (machinist review, run
     # 20261109T142156827Z, rule 23).
     assert bond_note.endswith("ACCEPT: IT DOES NOT TURN OR PULL OUT BY HAND.")
+
+
+def test_a_bonded_loose_dowel_is_held_at_its_proud_and_re_read_after_cure() -> None:
+    # Codjiflo #3128: the ream ends in a drill point, so a dowel that slid in
+    # by hand has no floor to stop it. Steps 1B-1G hold its proud on a named
+    # support (frame upright on parallels, dowel on gauge blocks) while the
+    # bond cures and 1H accepts it, proud re-read. One action a step and only
+    # degrease, apply and cure rules in the note (rules 22-23, r11 and r12
+    # machinist reviews).
+    steps = {step.split(". ", 1)[0]: step for step in notes.ASSEMBLY_STEPS}
+    assert notes.DOWEL_PROUD == ".280"
+    assert "TOP FRAME UPRIGHT" in steps["1B"]
+    assert "FACED UNDERSIDE DOWN ON A PAIR OF EQUAL PARALLELS" in steps["1B"]
+    assert steps["1C"].endswith(
+        f"GAUGE BLOCKS TO THE PARALLELS' HEIGHT LESS {notes.DOWEL_PROUD}."
+    )
+    assert steps["1D"] == "1D. LIFT THE TOP FRAME OFF THE PARALLELS AND TAKE THAT DOWEL OUT."
+    assert steps["1E"] == f"1E. COAT THE DOWEL WITH {notes.BOND_GRADE} PER BOND NOTE A."
+    assert steps["1F"] == "1F. STAND THE COATED DOWEL CHAMFER UP ON ITS GAUGE BLOCKS."
+    assert "LOWER THE TOP FRAME BACK OVER IT ONTO THE PARALLELS" in steps["1G"]
+    assert "DOES NOT TURN OR SLIDE BY HAND" in steps["1H"]
+    assert f"DOWEL PROUD SET ON {notes.DETAIL_TITLE}" in steps["1H"]
+    assert steps["1J"].startswith("1J. AT EACH HANGER HOLE SEAT AN MHA-SM-VN-54")
+    for label in ("1B", "1C", "1D", "1E", "1F", "1G", "1H", "1J"):
+        assert steps[label].count(". ") == 1, steps[label]
+    bond_note = notes.BOND_NOTE_A
+    assert bond_note in notes.ASSEMBLY_CHECKS
+    assert "(STEPS 1E-1G)" in bond_note
+    for action in ("PRESS", "LIFT", "STAND", "LOWER", "GAUGE BLOCKS", "PARALLELS"):
+        assert action not in bond_note, action
+    assert bond_note.endswith("CURE 24 H BEFORE STEP 5. ACCEPT AT STEP 1H.")
 
 
 def _step_group(number: str) -> list[str]:

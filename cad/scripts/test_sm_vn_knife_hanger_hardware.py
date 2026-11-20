@@ -610,6 +610,7 @@ def test_layout_keeps_text_off_the_part_border_and_title_block() -> None:
     (
         "build_fr_top_frame.py",
         "build_sm_knife_mount.py",
+        "_drill_point_cut.py",
         "build_sm_summing_assembly.py",
         "build_ha_harmonic_analyzer_assembly.py",
         "build_sm_vn_knife_hanger_stud.py",

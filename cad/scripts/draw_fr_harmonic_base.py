@@ -74,6 +74,7 @@ from _drawing_tables import create_view_theoretical_datum, insert_hole_table
 from _drawing_view_display import set_hidden_lines_removed
 from _gtol_face_resolve import resolve_faces
 from _hole_callout_thread_class import omit_title_block_thread_class
+from _inch_fraction import inch_fraction
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
@@ -196,12 +197,15 @@ ISO_CENTER = (0.3425, 0.175)
 # dimensions below the plan and right of it locate the serial from X0 Y0
 # (novice-rubric screen 20261107T081227004Z: "APPROX AS SHOWN" on a DO NOT
 # SCALE sheet located it by words only and gave no character height). The
-# note's two 9-glyph rows (22 mm x 9 mm) stand in the empty band above the
-# X dimension's (15.34) row.
-SERIAL_NOTE_XY = (0.157, 0.1455)
+# height is the purchased set's size, named rather than printed as a decimal
+# (owner decision 2026-11-19, #3124 item 1: a .14 decimal read .13-.15 at
+# .XX, which no standard set meets). The note's rows (the 16-glyph tool row,
+# about 40 mm x 9 mm) stand in the empty band above the X dimension's
+# (15.34) row, ending left of its extension line at the serial.
+SERIAL_NOTE_XY = (0.141, 0.1455)
 SERIAL_NOTE = (
     f'STAMP "{SERIAL_TEXT}"\n'
-    f"{SERIAL_HEIGHT_MM / 25.4:.2f} HIGH".replace("0.", ".", 1)
+    f"{inch_fraction(SERIAL_HEIGHT_MM, what='serial figure stamp')} FIGURE STAMP"
 )
 # Serial location from the table corner, the X on a third baseline row clear
 # below DeckX's line and witness ends, the Y right of the plan with its text
@@ -1381,14 +1385,15 @@ UNDERSIDE_BOTTOM_KEEP = {
     "CrossRibThickness": (0.128 + CROSS_RIB_CENTER_X * VIEW_SCALE / 1000.0, 0.247),
 }
 UNDERSIDE_BOTTOM_NOTE_XY = (0.030, 0.258)
-# The socket bosses are sketched on the sockets' own ColumnX/ColumnZ
-# stations (build_fr_harmonic_base: both circles driven by the same globals),
-# so the Ø callout states that relation instead of a second set of boss
-# stations: bare, the four boss arcs read as unlocated (machinist review,
-# PR #2702 proof, gating blockers; the sockets are blind from below).
+# The socket bosses stand on the sockets' own ColumnX/ColumnZ stations, and
+# sheet 4 locates their centres from X0 Y0 (2X 1.24/16.76, 2X 1.25/10.07).
+# 'COAXIAL WITH SOCKETS' was the only location before (PR #2702 proof); it
+# left the cast bosses unlocated, the sockets being reference stations
+# transferred from MHA-FR-02 (machinist review, #3124 farm run
+# 20261119T202848942Z), and now would only restate the dimensions.
 UNDERSIDE_BOTTOM_CALLOUTS = {
     "PocketLen": "POCKET",
-    "SocketBossDia": f"{len(SOCKET_BOSS_SHAPES)}X SOCKET BOSSES,\nCOAXIAL WITH SOCKETS",
+    "SocketBossDia": f"{len(SOCKET_BOSS_SHAPES)}X SOCKET BOSSES",
     "PocketFilletRadius": f"{POCKET_FILLET_COUNT}X POCKET\nCORNERS",
     "LongRibThickness": "RIB",
     "CrossRibThickness": "RIB",
@@ -1428,15 +1433,25 @@ LUGS_BASELINE_FIRST_M = 0.0052
 LUGS_BASELINE_ROW_M = 0.0057
 # X rows compact after removing the interior-island dimensions. Y columns
 # keep the proven positions so their texts remain clear of extension lines.
+# The socket-boss stations (#3124) nest outside them by length: the 1.24
+# nearest, its text left of X0 (its span is shorter than the text and the
+# 1.56 extension line rises just right of it), the 16.76 outermost. The 1.25
+# is too short for its arrows, whose upper one overruns X0 by about 10 mm,
+# so its column stands left of the 1.24 text (farm leaf
+# drawing:fr_harmonic_base 20261119T225309Z: text-on-line at 14 mm).
 LUGS_X_ROWS = (
+    ("SocketBossNearX", -251.0),
     ("Lug1X", -166.5),
     ("CrossRibX", CROSS_RIB_CENTER_X - 90.0),
     ("Lug3X", -19.8),
+    ("SocketBossFarX", 100.0),
 )
 LUGS_Y_COLUMNS = (
+    ("SocketBossNearY", 22.0, 8.0),
     ("Lug1Y", 34.25, 28.0),
     ("LongRibY", 54.75, 52.0),
     ("Lug0Y", 76.25, 86.0),
+    ("SocketBossFarY", 96.0, 105.0),
 )
 UNDERSIDE_LUGS_KEEP = {
     **{

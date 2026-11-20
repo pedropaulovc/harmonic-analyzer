@@ -876,7 +876,8 @@ def test_stamped_id_is_located_from_x0_y0_with_a_character_height() -> None:
     # DO NOT SCALE sheet located the stamp by words only, with no height.
     import draw_fr_harmonic_base as sheet
 
-    assert sheet.SERIAL_NOTE == 'STAMP "2"\n.14 HIGH'
+    # Owner decision 2026-11-19 (#3124, item 1): the note names the set.
+    assert sheet.SERIAL_NOTE == 'STAMP "2"\n1/8 FIGURE STAMP'
     rows = sheet.SERIAL_NOTE.split("\n")
     x0, top = sheet.SERIAL_NOTE_XY
     box = (
@@ -1114,13 +1115,15 @@ def test_retained_underside_callouts_define_socket_bosses_ribs_and_lug_bottoms()
         "PocketLen", "PocketWid", "PocketX", "PocketY", "SocketBossDia",
         "PocketFilletRadius", "LongRibThickness", "CrossRibThickness",
     }
-    # The bosses are cut on the sockets' own stations, so the callout ties
-    # each boss to its socket rather than leaving the arcs unlocated (PR
-    # #2702 proof, machinist review): the coaxiality the sheet states is the
-    # model's.
+    # The bosses stand on the sockets' own stations, and sheet 4 locates
+    # their centres from X0 Y0 (#3124 machinist review: 'COAXIAL WITH
+    # SOCKETS' alone left the cast bosses unlocated, the sockets being
+    # transferred reference stations), so the callout no longer restates it.
     boss_callout = callouts["SocketBossDia"]
-    assert boss_callout.startswith(f"{len(part.SOCKET_BOSS_SHAPES)}X SOCKET BOSSES")
-    assert "COAXIAL WITH SOCKETS" in boss_callout
+    assert boss_callout == f"{len(part.SOCKET_BOSS_SHAPES)}X SOCKET BOSSES"
+    assert set(spec.UNDERSIDE_LOCATION_DIMENSIONS["SocketBossProfile"]) <= set(
+        sheet.UNDERSIDE_LUGS_KEEP
+    )
     assert len(boss_callout.splitlines()) <= 2
     assert [(x, z) for _kind, x, z, _r in part.SOCKET_BOSS_SHAPES] == list(spec.COLUMN_SOCKET_XZ)
     boss_x, _boss_y = sheet.UNDERSIDE_BOTTOM_KEEP["SocketBossDia"]
@@ -1278,13 +1281,20 @@ def _lug_vertices() -> dict[str, tuple[float, float]]:
     """Machine (X, Z) of each retained sheet-4 baseline's endpoint."""
     lug0, lug1, _lug2, lug3 = part.CROSS_TAP_LUG_SHAPES
     long_rib, cross_rib = part.LONG_RIB_SHAPE, part.CROSS_RIB_SHAPE
+    bosses = {
+        (x > 0.0, z > 0.0): (x, z) for _kind, x, z, _r in part.SOCKET_BOSS_SHAPES
+    }
     return {
+        "SocketBossNearX": bosses[False, True],
         "Lug1X": (lug1[2], lug1[3]),
         "CrossRibX": (cross_rib[1], cross_rib[4]),
         "Lug3X": (lug3[1], lug3[3]),
+        "SocketBossFarX": bosses[True, True],
+        "SocketBossNearY": bosses[False, True],
         "Lug1Y": (lug1[2], lug1[3]),
         "LongRibY": (long_rib[1], long_rib[4]),
         "Lug0Y": (lug0[2], lug0[4]),
+        "SocketBossFarY": bosses[False, False],
     }
 
 

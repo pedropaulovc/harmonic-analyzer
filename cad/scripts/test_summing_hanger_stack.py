@@ -207,7 +207,9 @@ def test_hanger_axis_validation_rejects_transverse_or_reversed_axis(
 def test_knife_dowels_hang_pressed_end_up_from_the_crossbar_reams() -> None:
     # Owner ruling 2026-10-24 (T+H3): each dowel is pressed chamfer end
     # first up into its crossbar ream, so the model's pressed end (local
-    # y = 0) sits on the ream floor and its axis points down (Rx180).
+    # y = 0) stands INSERTION up the ream, the pin's set proud below the
+    # underside (owner decision 2026-11-19, #3124 item 3), and its axis
+    # points down (Rx180).
     assert asm.KNIFE_DOWEL_ROWS == [[1.0, 0.0, 0.0], [0.0, -1.0, 0.0], [0.0, 0.0, -1.0]]
     _assert_hanger_axis_positive_y(
         "sm-vn-knife-mount-dowel-1", _transform(asm.KNIFE_DOWEL_ROWS), sense=-1.0
@@ -220,9 +222,9 @@ def test_knife_dowels_hang_pressed_end_up_from_the_crossbar_reams() -> None:
             _assert_hanger_axis_positive_y(
                 "sm-vn-knife-mount-dowel-1", _transform(rotation_rows), sense=-1.0
             )
-    assert asm.KNIFE_DOWEL_Y == pytest.approx(
-        CASTING_UNDERSIDE_Y + top_frame.HANGER_PIN_HOLE_DEPTH
-    )
+    assert asm.KNIFE_DOWEL_Y == pytest.approx(CASTING_UNDERSIDE_Y + asm.knife_dowel.INSERTION)
+    assert asm.KNIFE_DOWEL_Y - asm.KNIFE_DOWEL_END_Y == pytest.approx(asm.knife_dowel.LENGTH)
+    assert CASTING_UNDERSIDE_Y - asm.KNIFE_DOWEL_END_Y == pytest.approx(asm.knife_dowel.PROUD)
     assert asm.KNIFE_DOWEL_Y == pytest.approx(1011.6312)
     assert asm.KNIFE_DOWEL_END_Y == pytest.approx(992.5812)
 

@@ -41,10 +41,11 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
   front extension) and 3.088 + 87.06 (rear), a plain #10 through-hole (C drill) per
   knife mount. The cut-to-length #10-24 hex bolt bears on a 96659A104
   washer on the faced top; each unchanged 98381A473 dowel presses into a
-  blind flat-floor underside ream with a #51 knockout drilled up from its
-  floor on the ream's drawn axis (owner ruling 2026-10-24, T+H3), its
-  coaxiality the title block's implied +/-.005, charged in the floor land
-  (.0124, accepted as RV-06 by owner ruling 2026-10-27). Over its middle
+  blind underside ream, its full diameter .50 MIN over a 118 deg drill point
+  (owner decision 2026-11-19, #3124 item 3), to the proud MHA-SM-00 sets,
+  with a #51 knockout drilled up from the drill point on the ream's drawn
+  axis (owner ruling 2026-10-24, T+H3), its coaxiality the title block's
+  implied +/-.005, charged in the punch's land. Over its middle
   (|z| <= 68.834, short of the knife-mount seats) the bar is a T like the
   rails: the .99-wide, .32-tall top flange over a .51 web centred on the
   knife line through the
@@ -69,7 +70,7 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
   establishes BOTH-face median plane; the hanger axes' linear position zone
   centres them within +/-.005 of it.
 * Gooseneck hub on the east rail (-X) at z +3.088: full-height rib 1.10 wide,
-  O.520 slip bore for the gooseneck's bare 1/2 in leg, underside boss
+  33/64 (O.5156) drilled slip bore for the gooseneck's bare 1/2 in leg, underside boss
   O1.18 x .31 with twin V-gussets (ch30 p004), a square-sided cast boss on
   the rib's outer face, the rail's full height and flush with the faced top
   (ch19 img04; user ruling 2026-10-12; owner ruling B4, #2333), its cast
@@ -171,6 +172,7 @@ from _drafted_extrude import (
     name_feature_dimensions,
     set_draft_angle_tolerance,
 )
+from _drill_point_cut import cut_drill_point, drill_point_volume
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
 from _part_properties import part_drawing_unit
@@ -184,6 +186,7 @@ from _sketch import (
     dimension_between,
     ensure_fully_defined,
 )
+from _single_limit_tolerance import SW_TOL_MIN, set_single_limit
 from _sketch_chains import define_polygon_chain, define_rectilinear_chain
 from _sketch_circle import define_circle
 from _drawing_precision import apply_drawing_precision
@@ -267,11 +270,14 @@ from fr_top_frame_spec import (
     HANGER_KNOCKOUT_COAXIAL_TOL,
     HANGER_KNOCKOUT_DIA,
     HANGER_KNOCKOUT_DIA_MAX,
+    HANGER_KNOCKOUT_ENTRY_DEPTH,
     HANGER_KNOCKOUT_LENGTH,
     HANGER_KNOCKOUT_LENGTH_MAX,
     HANGER_KNOCKOUT_SPEC,
     HANGER_PIN_HOLE_DEPTH,
-    HANGER_PIN_HOLE_DEPTH_TOL,
+    HANGER_PIN_HOLE_DEPTH_BAND,
+    HANGER_PIN_HOLE_DEPTH_MAX,
+    HANGER_PIN_HOLE_POINT_H,
     HANGER_PIN_HOLE_DIA,
     HANGER_PIN_HOLE_DIA_BAND,
     HANGER_PIN_HOLE_DIA_MAX,
@@ -945,15 +951,17 @@ if STUD_Z_REAR + HANGER_WASHER.OD_MAX / 2.0 >= INNER_Z + GUSSET:
 # to the largest drilled screw clearance hole, the ream at its .XXX station
 # limit from its #10 axis (HANGER_PIN_X_TOL; Owner ruling 2026-11-08
 # (Pedro), #2144 item 11.3: the -X ream is gone), the axis within its
-# ⌖.010|D centring of D (owner ruling 2026-11-06).  Its blind floor stays
-# below the finished top (the knockouts' own walls follow the washer stack
-# below).  The #10 holes are drilled from the faced underside and the reams
-# cut from it.  Every hole's drift is greatest at the deepest printed floor;
-# charge both axes toward each other.
+# ⌖.010|D centring of D (owner ruling 2026-11-06).  The #10 holes are
+# drilled from the faced underside and the reams cut from it.  Owner
+# decision 2026-11-19 (#3124, item 3): the ream's full-diameter depth is a
+# MIN, open above, so its drift is charged as if it ran the whole grip to
+# the faced top at the grip's far limit, where the #10 hole's drift is also
+# greatest: every conforming depth then holds the walls; charge both axes
+# toward each other.  The printed minimum's drill point stays below the
+# finished top (the knockouts' own walls follow the washer stack below).
 _PIN_HOLE_MAX_R = HANGER_PIN_HOLE_DIA_MAX / 2.0
 _CLEARANCE_MAX_R = HANGER_CLEARANCE_DIA_MAX / 2.0
-_REAM_FLOOR_DEPTH_MAX = HANGER_PIN_HOLE_DEPTH + HANGER_PIN_HOLE_DEPTH_TOL  # 12.192
-HANGER_DRIFT_AT_REAM_FLOOR = DRILL_DRIFT_PER_MM * _REAM_FLOOR_DEPTH_MAX  # 0.064
+HANGER_REAM_DRIFT_MAX = DRILL_DRIFT_PER_MM * (HANGER_GRIP + HANGER_GRIP_TOL)  # 0.192
 # Datum D is the median plane of BOTH as-cast crossbar side faces (owner
 # ruling B5), so a face stands half the width's least printed size from it,
 # whatever the bar's station; on the underside, where the added draft leaves
@@ -968,26 +976,31 @@ _REAM_BAR_FACE_REACH = (
     - HANGER_PIN_X_TOL
 )  # 4.318
 PIN_HOLE_BAR_WALL = (
-    _REAM_BAR_FACE_REACH - _PIN_HOLE_MAX_R - HANGER_DRIFT_AT_REAM_FLOOR
-)  # 2.673
+    _REAM_BAR_FACE_REACH - _PIN_HOLE_MAX_R - HANGER_REAM_DRIFT_MAX
+)  # 2.545
 PIN_HOLE_SCREW_WALL = (
     HANGER_PIN_X
     - HANGER_PIN_X_TOL
     - _PIN_HOLE_MAX_R
     - _CLEARANCE_MAX_R
-    - 2.0 * HANGER_DRIFT_AT_REAM_FLOOR
-)  # 2.660
+    - 2.0 * HANGER_REAM_DRIFT_MAX
+)  # 2.404
 # At the underside mouth the ream has not drifted, but the crossbar's front
 # side bottom it stands beside takes the title block's break there.
 PIN_HOLE_MOUTH_BAR_WALL = (
     _REAM_BAR_FACE_REACH - _PIN_HOLE_MAX_R - TITLE_BLOCK_EDGE_BREAK_MAX
 )  # 2.483
-PIN_HOLE_FLOOR_MARGIN = HANGER_GRIP - HANGER_GRIP_TOL - _REAM_FLOOR_DEPTH_MAX
+# The deepest in-band ream's drill point (HANGER_PIN_HOLE_DEPTH_BAND's upper
+# deviation, which excludes a THRU ream) below the finished top at the
+# grip's near limit.
+PIN_HOLE_POINT_MARGIN = (
+    HANGER_GRIP - HANGER_GRIP_TOL - HANGER_PIN_HOLE_DEPTH_MAX - HANGER_PIN_HOLE_POINT_H
+)  # 2.032
 for _label, _value in (
     ("ream wall to the crossbar side face", PIN_HOLE_BAR_WALL),
     ("ream mouth wall inside the crossbar side's edge break", PIN_HOLE_MOUTH_BAR_WALL),
     ("ream wall to the screw clearance hole", PIN_HOLE_SCREW_WALL),
-    ("ream floor below the finished top", PIN_HOLE_FLOOR_MARGIN),
+    ("ream drill point below the finished top", PIN_HOLE_POINT_MARGIN),
 ):
     if _value < WALL_TARGET_MM:
         raise AssertionError(
@@ -1106,23 +1119,27 @@ for _label, _value, _minimum in (
     if _value < _minimum:
         raise AssertionError(f"knife-hanger {_label}: {_value:.3f} below {_minimum:g}")
 # The knockouts (fr_top_frame_spec.HANGER_KNOCKOUT_SPEC), drilled up from
-# each ream's floor and drawn on the ream's axis: the ream's floor centre
+# each ream's drill point and drawn on the ream's axis: the ream's bottom
 # stands off its station by the ream's own drift there, the knockout off
-# that centre by the drawn coaxiality's implied ±.005 along each axis
+# that axis by the drawn coaxiality's implied ±.005 along each axis
 # (owner ruling 2026-10-27, no setup note), and it drifts further over its
 # longest printed run, so it stands farthest off its station where it
-# leaves the faced top.  Each wall here is judged along one axis, the ream
-# at its .XXX station limit (HANGER_PIN_X_TOL).  Toward the #10 hole, whose
-# underside-entry drift is also greatest at the top, both holes' maxima are
-# charged at once.
-HANGER_KNOCKOUT_DRIFT = DRILL_DRIFT_PER_MM * HANGER_KNOCKOUT_LENGTH_MAX  # 0.131
+# leaves the faced top.  The ream's drift at its printed minimum depth and
+# the knockout's over the rest of the grip sum to the grip's whole drift
+# (HANGER_REAM_DRIFT_MAX), whatever the ream's open-ended depth.  Each wall
+# here is judged along one axis, the ream at its .XXX station limit
+# (HANGER_PIN_X_TOL).  Toward the #10 hole, whose underside-entry drift is
+# also greatest at the top, both holes' maxima are charged at once.
+HANGER_KNOCKOUT_DRIFT = DRILL_DRIFT_PER_MM * HANGER_KNOCKOUT_LENGTH_MAX  # 0.125
 HANGER_KNOCKOUT_SHIFT_AT_TOP = (
-    HANGER_DRIFT_AT_REAM_FLOOR + HANGER_KNOCKOUT_COAXIAL_TOL + HANGER_KNOCKOUT_DRIFT
-)  # 0.321
+    DRILL_DRIFT_PER_MM * HANGER_PIN_HOLE_DEPTH
+    + HANGER_KNOCKOUT_COAXIAL_TOL
+    + HANGER_KNOCKOUT_DRIFT
+)  # 0.319
 _KNOCKOUT_MAX_R = HANGER_KNOCKOUT_DIA_MAX / 2.0
 _KNOCKOUT_NEAR_AXIS_MIN = (
     HANGER_PIN_X - HANGER_PIN_X_TOL - HANGER_KNOCKOUT_SHIFT_AT_TOP
-)  # 7.172
+)  # 7.174
 KNOCKOUT_BAR_WALL = (
     _REAM_BAR_FACE_REACH - _KNOCKOUT_MAX_R - HANGER_KNOCKOUT_SHIFT_AT_TOP
 )
@@ -1174,10 +1191,10 @@ BAR_POCKET_HOLE_WALLS = {
     "dowel ream": _POCKET_STATION
     - HANGER_PIN_X_TOL  # SAME Z at the ream's general .XXX band
     - _PIN_HOLE_MAX_R
-    - HANGER_DRIFT_AT_REAM_FLOOR
+    - HANGER_REAM_DRIFT_MAX
     - _POCKET_END,
-    # The knockout passes the pocket end above the ream floor, at most its
-    # shift at the top off its ream's station.
+    # The knockout passes the pocket end above the ream, at most its shift
+    # at the top off its ream's station.
     "dowel knockout": _POCKET_STATION
     - HANGER_PIN_X_TOL
     - _KNOCKOUT_MAX_R
@@ -2917,6 +2934,62 @@ def _model_to_sketch(adapter, sketch):
     return to_sketch
 
 
+def _cut_ream_drill_points(
+    adapter,
+    pin_stations: list[tuple[str, float, float]],
+    ref_planes: list[str],
+) -> float:
+    """Cut each dowel ream's 118° drill point past its full-diameter depth.
+
+    Owner decision 2026-11-19 (#3124, item 3): drilled and reamed to a drill
+    point, its full diameter HangerPinHoleDepth a MIN.  One revolve cut per
+    station (``_drill_point_cut``), its profile the point's half-section on a
+    Front-plane offset through the ream's axis.  An offset plane's sketch
+    axes are SolidWorks' choice, so the corners map through
+    ``_model_to_sketch``; sketch u must run along model X and v along Y.
+    Returns the volume the cones remove.
+    """
+    from solidworks_mcp.adapters.base import CreatePlaneParameters
+
+    r = HANGER_PIN_HOLE_DIA / 2.0
+    floor_y = -HALF_H + HANGER_PIN_HOLE_DEPTH
+    tip_y = floor_y + HANGER_PIN_HOLE_POINT_H
+    removed = 0.0
+    for station, x, z in pin_stations:
+        label = f"dowel ream drill point ({station.lower()})"
+        plane = check(
+            f"create_plane {label}",
+            adapter.create_plane(
+                CreatePlaneParameters(mode="offset", base_plane="Front Plane", offset=z)
+            ),
+        )
+        plane_name = str(getattr(plane, "name", plane))
+        ref_planes.append(plane_name)
+        check(f"create_sketch {label}", adapter.create_sketch(plane_name))
+        active = adapter.currentModel.GetActiveSketch2()
+        if active is None:
+            raise RuntimeError(f"{label}: no active sketch")
+        to_sketch = _model_to_sketch(adapter, _early_bound(active, "ISketch"))
+        corners = [to_sketch(p) for p in ((x, floor_y, z), (x + r, floor_y, z), (x, tip_y, z))]
+        if any(abs(w) > 1e-4 for _u, _v, w in corners):
+            raise RuntimeError(f"{label}: profile is off its sketch plane {corners}")
+        (au, av, _), (bu, bv, _), (cu, cv, _) = corners
+        if abs(bv - av) > 1e-6 or abs(cu - au) > 1e-6 or abs(abs(bu - au) - r) > 1e-6:
+            raise RuntimeError(f"{label}: sketch axes are not along X/Y {corners}")
+        cut_drill_point(
+            adapter,
+            label=label,
+            floor_centre=(au, av),
+            radius=r,
+            wall_sign=1 if bu > au else -1,
+            tip_sign=1 if cv > av else -1,
+            profile_name=f"HangerPinPoint{station}Profile",
+            feature_name=f"HangerPinPoint{station}",
+        )
+        removed += drill_point_volume(r)
+    return removed
+
+
 # The finished solid's outermost point along each plan diagonal is its corner
 # boss barrel; a flange corner left outside the barrel reached 345.1 less its
 # vertical edge break. IBody2::GetExtremePoint returns the solid's furthest point.
@@ -4370,13 +4443,15 @@ def build(adapter) -> dict[str, str]:
         adapter, "knife-hanger clearance holes", volume - v_hangers, 10.0
     )
 
-    # 12b. Dowel press reams (owner ruling 2026-10-24, T+H3): blind and
-    #      flat-floored (a plain cut-extrude -- a wizard drill point would
-    #      leave a cone under the pressed dowel's end), cut HangerPinHoleDepth
-    #      up from the crossbar underside, HANGER_PIN_X +X of each screw axis
+    # 12b. Dowel press reams (owner ruling 2026-10-24, T+H3), cut
+    #      HangerPinHoleDepth up from the crossbar underside, the full
+    #      diameter's printed MIN, HANGER_PIN_X +X of each screw axis
     #      (Owner ruling 2026-11-08 (Pedro), #2144 item 11.3: one per
     #      station): two circles, one sketch.  The rear circle owns the
     #      marked HangerPinHoleDia, which the underside locator dimensions.
+    #      Owner decision 2026-11-19 (#3124, item 3): each runs on to a
+    #      118° drill point (12b'), the dowel pressed to its proud, not to
+    #      the floor.
     pins = SketchDims()
     pin_stations = [
         (station, PIN_HOLE_X, z)
@@ -4430,17 +4505,21 @@ def build(adapter) -> dict[str, str]:
         * HANGER_PIN_HOLE_DEPTH
     )
     volume = volume_check(adapter, "dowel reams", volume - v_pins, 0.01 * v_pins)
+    v_points = _cut_ream_drill_points(adapter, pin_stations, ref_planes)
+    volume = volume_check(
+        adapter, "dowel ream drill points", volume - v_points, 0.02 * v_points
+    )
 
     # 12c. The reams' knockouts (fr_top_frame_spec.HANGER_KNOCKOUT_SPEC): ONE
     #      native #51 Hole Wizard feature through-all on each ream's axis
     #      (the dt_crankshaft DrivePinKnockouts precedent).  The shop drills
-    #      it up from the ream's floor on the ream's drawn axis (the print's
-    #      callout; its coaxiality, the title block's implied ±.005, is what
-    #      the floor land (.0124, RV-06) and the walls above charge); the
-    #      model places it on the faced top, where the wizard has a whole
-    #      face, and cuts the same cylinder: below the ream's floor it runs
-    #      in the ream's own air, so it removes only the crossbar between
-    #      the floor and the top.
+    #      it up from the ream's drill point on the ream's drawn axis (the
+    #      print's callout; its coaxiality, the title block's implied ±.005,
+    #      is what the punch's land and the walls above charge); the model
+    #      places it on the faced top, where the wizard has a whole face, and
+    #      cuts the same cylinder: inside the drill point's wider part it
+    #      runs in the ream's own air, so it removes only the crossbar from
+    #      where it meets the point's cone up to the top.
     wizard_holes(
         adapter,
         HANGER_KNOCKOUT_SPEC,
@@ -4454,11 +4533,17 @@ def build(adapter) -> dict[str, str]:
             for station, _x, _z in pin_stations
         ],
     )
-    v_knockouts = (
-        len(pin_stations)
-        * math.pi
-        * (HANGER_KNOCKOUT_DIA / 2.0) ** 2
-        * HANGER_KNOCKOUT_LENGTH
+    # The cylinder from the ream's full diameter to the top, less the part
+    # of it inside the drill point: wholly in air down to where the cone
+    # narrows to the knockout (HANGER_KNOCKOUT_ENTRY_DEPTH), then the cone's
+    # own tip of the knockout's radius.
+    r_k = HANGER_KNOCKOUT_DIA / 2.0
+    tip_h = r_k * HANGER_PIN_HOLE_POINT_H / (HANGER_PIN_HOLE_DIA / 2.0)
+    v_knockouts = len(pin_stations) * (
+        math.pi
+        * r_k**2
+        * (HANGER_KNOCKOUT_LENGTH - (HANGER_KNOCKOUT_ENTRY_DEPTH - HANGER_PIN_HOLE_DEPTH))
+        - math.pi / 3.0 * r_k**2 * tip_h
     )
     volume = volume_check(
         adapter, "dowel ream knockouts", volume - v_knockouts, 0.02 * v_knockouts
@@ -4838,6 +4923,16 @@ def build(adapter) -> dict[str, str]:
             places=HANGER_PIN_HOLE_DIA_PLACES,
             display_unit=UNIT,
         )
+    # The reams' full-diameter depth prints as its single MIN limit (owner
+    # decision 2026-11-19, #3124 item 3): the model value is the minimum.
+    set_single_limit(
+        adapter,
+        "HangerPinHoles",
+        "HangerPinHoleDepth",
+        limit=HANGER_PIN_HOLE_DEPTH,
+        band=HANGER_PIN_HOLE_DEPTH_BAND,
+        tol_type=SW_TOL_MIN,
+    )
     volume = volume_check(
         adapter, "driven casting (equations neutral)", volume, 200.0
     )

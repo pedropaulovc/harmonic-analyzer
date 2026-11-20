@@ -26,7 +26,7 @@ import textwrap
 from pathlib import Path
 from typing import Any, Callable
 
-from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters.com_variant import double_array, null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
     place_view,
@@ -51,11 +51,13 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     set_high_quality_shaded_with_edges,
 )
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import (
     assert_imported_precision,
+    offset_dimension_text,
     set_dimension_callouts,
     set_reference_dimension,
 )
@@ -137,17 +139,49 @@ TITLE_BLOCK = (
 
 # --- Sheet 1 ------------------------------------------------------------------
 # Front and right at 1:5 across the upper left, the 1:1 knife-edge detail to
-# their right, the notes under the front view.
-FRONT_CENTER = (0.068, 0.168)
-RIGHT_CENTER = (0.185, 0.168)
+# their right, the notes under the front view. All three stand 6 mm lower
+# than before the setting table's fifth row (the lever level, #3124), so the
+# table keeps SETTING_TABLE_VIEW_GAP over them (at 4 mm the 5.5 mm row left
+# 3.0 mm: farm leaf 20261120T000055Z).
+FRONT_CENTER = (0.068, 0.162)
+RIGHT_CENTER = (0.185, 0.162)
 # The screw height's dimension line stands this far outboard of the knife
 # contact, on the side away from the gooseneck.
 COUNTER_TEXT_OFFSET = 0.030
+# DETAIL A's dowel proud (owner decision 2026-11-19, #3124 item 3).  Its
+# dimension line stands DOWEL_PROUD_LINE_OFFSET right of the front mount's
+# dowel axis, 2.9 mm clear of the mount's +X face (5.08 right of the axis).
+# Its 7.1 mm span cannot hold the value and its three callout rows, which
+# printed across both extension lines and the dimension line in farm run
+# 20261119T202848942Z (machinist review, rule 14), so the text parks on a
+# leader right of the line (offset_dimension_text, draw_fr_top_frame's
+# HANGER_PIN_DEPTH_OFFSET_XY form): rows centred on the offset x, the value
+# 2.78 mm over the offset y and the rows 5.56 mm apart under it; the widest
+# row ("CROSSBAR UNDERSIDE", ~45 mm) starts 6 mm right of the line, about
+# 2.5 mm past the end of either extension line: at 3 mm its 'C' touched the
+# lower (dowel-end) extension line (machinist review, farm run
+# 20261119T233258920Z).
+DOWEL_PROUD_LINE_OFFSET = 0.008
+DOWEL_PROUD_TEXT_DX = 0.0285
+DOWEL_PROUD_TEXT_DY = 0.006
+# The proud's free end sits inside the mount's round hole, so a plain view
+# can only draw it hidden (machinist review of the same run, rule 9: never
+# dimension to a hidden line).  A broken-out window over the dowel's proud
+# length, inside the mount's +X face and below its top seat, cuts the front
+# mount to its mid-plane, the dowel's axis, so the free end prints as a
+# visible edge.  The window's depth is measured from the view's nearest
+# face, the lever's front trunnion end (HEX_DEPTH / 2 in front of the
+# mount's mid-plane; nothing else in the assembly stands further +Z).
+DOWEL_PROUD_WINDOW_HALF_WIDTH_MM = 3.0
+DOWEL_PROUD_WINDOW_TOP_INSET_MM = 1.2
+DOWEL_PROUD_WINDOW_BOTTOM_OVERRUN_MM = 1.5
+DOWEL_PROUD_BREAK_OUT_DEPTH_MM = spec.lever.HEX_Z_OUTER_PLUS - spec.lever.KNIFE_SEAT_Z_PLUS
+SEL_EDGES = 1  # swSelectType_e.swSelEDGES
 NOTES_XY = (0.018, 0.098)
 NOTES_WIDTH = 64  # characters; default-format note text
 
 DETAIL_SCALE = (1, 1)
-DETAIL_CENTRE = (0.305, 0.172)
+DETAIL_CENTRE = (0.305, 0.166)
 # The detail frames the knife contact, the mount, the boss and the eye of the
 # boss hook: model centre between knife and boss axis, just above the knife.
 DETAIL_MODEL_CENTRE_MM = (
@@ -509,8 +543,11 @@ def _counter_setting(adapter: Any, front: Any) -> Callable[[], None]:
     _assert_callout(display, spec.COUNTER_DIMENSION)
 
     def settled() -> None:
-        if (str(display.GetText(1) or ""), str(display.GetText(2) or "")) != ("(", ")"):
-            raise RuntimeError(f"{label} is no longer a reference dimension")
+        texts = (str(display.GetText(1) or ""), str(display.GetText(2) or ""))
+        if texts != ("(", ")"):
+            raise RuntimeError(
+                f"{label} is no longer a reference dimension: prefix/suffix {texts!r}"
+            )
         if abs(_dimension_value_mm(display) - spec.COUNTER_SCREW_RISE) > 1e-4:
             raise RuntimeError(f"{label}: settled nominal changed")
         if int(display.GetPrimaryPrecision2()) != spec.COUNTER_PRECISION:
@@ -518,6 +555,153 @@ def _counter_setting(adapter: Any, front: Any) -> Callable[[], None]:
         _assert_callout(display, spec.COUNTER_DIMENSION)
 
     return settled
+
+
+def _dowel_proud_setting(
+    adapter: Any, detail: Any
+) -> tuple[Callable[[], None], Callable[[], None]]:
+    """Each dowel's free end below the crossbar underside (the knife mount's
+    clamped top seat), the proud MHA-SM-00 step 1 sets: a toleranced setting
+    dimension on DETAIL A, the title block's .XX governing it. Returns its
+    settled check and the deferred move of its text onto a leader."""
+    label = "dowel proud"
+    top, end = (
+        model_point_in_view(
+            adapter, detail, (x / 1000.0, y / 1000.0, 0.0), label=f"{label} {name}"
+        )
+        for name, (x, y) in (
+            ("top", spec.DOWEL_PROUD_TOP_POINT),
+            ("end", spec.DOWEL_PROUD_END_POINT),
+        )
+    )
+    line_x = top[0] + DOWEL_PROUD_LINE_OFFSET
+    mid_y = (top[1] + end[1]) / 2.0
+    proud_mm = spec.DOWEL_PROUD_TOP_POINT[1] - spec.DOWEL_PROUD_END_POINT[1]
+    annotation = _imported_setting(
+        adapter,
+        detail,
+        feature=spec.DOWEL_PROUD_FEATURE,
+        dimension=spec.DOWEL_PROUD_DIMENSION,
+        text_xy=(line_x, mid_y),
+        label=label,
+    )
+
+    def offset_text() -> None:
+        offset_dimension_text(
+            adapter,
+            [annotation],
+            {
+                spec.DOWEL_PROUD_DIMENSION: (
+                    line_x + DOWEL_PROUD_TEXT_DX,
+                    mid_y + DOWEL_PROUD_TEXT_DY,
+                )
+            },
+        )
+
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+
+    def settled() -> None:
+        if (str(display.GetText(1) or ""), str(display.GetText(2) or "")) != ("", ""):
+            raise RuntimeError(f"{label} must print as a toleranced setting, not a reference")
+        if abs(_dimension_value_mm(display) - proud_mm) > 1e-4:
+            raise RuntimeError(f"{label} reads {_dimension_value_mm(display):g} mm")
+        if int(display.GetPrimaryPrecision2()) != spec.DOWEL_PROUD_PRECISION:
+            raise RuntimeError(f"{label}: precision changed")
+        _assert_callout(display, spec.DOWEL_PROUD_DIMENSION)
+
+    settled()
+    return settled, offset_text
+
+
+def _break_out_dowel_end(adapter: Any, detail: Any) -> None:
+    """Cut DETAIL A's window over the front dowel's proud length to the front
+    mount's mid-plane, so the dowel's free end prints as a visible edge
+    (rule 9: a section or breakout, never a hidden line); read back the
+    section count and pick that edge (draw_mg_magnifier_assembly's
+    _break_out_plain_end)."""
+    label = f"{notes.DETAIL_TITLE} dowel broken-out window"
+    view = _early_bound(detail, "IView")
+    draw = adapter.currentModel
+    x = spec.DOWEL_PROUD_TOP_POINT[0]
+    top = spec.DOWEL_PROUD_TOP_POINT[1] - DOWEL_PROUD_WINDOW_TOP_INSET_MM
+    bottom = spec.DOWEL_PROUD_END_POINT[1] - DOWEL_PROUD_WINDOW_BOTTOM_OVERRUN_MM
+    centre_y, half_h = (top + bottom) / 2.0, (top - bottom) / 2.0
+    model = [
+        (
+            x + DOWEL_PROUD_WINDOW_HALF_WIDTH_MM * math.cos(angle) * wobble,
+            centre_y + half_h * math.sin(angle) * wobble,
+        )
+        for angle, wobble in (
+            (index * math.pi / 4.0, (1.0, 0.92)[index % 2]) for index in range(8)
+        )
+    ]
+    sheet = [
+        model_point_in_view(
+            adapter, view, (mx / 1000.0, my / 1000.0, 0.0), label=f"{label} point"
+        )
+        for mx, my in model
+    ]
+    _activate_view(adapter, view, label=label)
+    sketch = _early_bound(view.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points: list[float] = []
+    for sx, sy in (*sheet, sheet[0]):
+        point = _early_bound(
+            utility.CreatePoint(double_array([sx, sy, 0.0])), "IMathPoint"
+        )
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        points.extend(float(value) for value in projected.ArrayData)
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    previous = bool(manager.AddToDB)
+    manager.AddToDB = True
+    try:
+        segment = manager.CreateSpline(double_array(points))
+    finally:
+        manager.AddToDB = previous
+    if segment is None:
+        raise RuntimeError(f"failed to sketch the {label}")
+    segment = _early_bound(segment, "ISketchSegment")
+    selection = _early_bound(draw.SelectionManager, "ISelectionMgr")
+    data = selection.CreateSelectData()
+    data.View = view
+    if not segment.Select4(False, data):
+        raise RuntimeError(f"failed to select the {label}")
+    if (
+        _early_bound(draw, "IDrawingDoc").CreateBreakOutSection(
+            DOWEL_PROUD_BREAK_OUT_DEPTH_MM / 1000.0
+        )
+        is not True
+    ):
+        raise RuntimeError(f"{label} was refused")
+    draw.ClearSelection2(True)
+    rebuild_drawing(adapter, label=label)
+    count = int(view.GetBreakOutSectionCount())
+    if count != 1:
+        raise RuntimeError(f"{notes.DETAIL_TITLE} holds {count} broken-out sections, not 1")
+    # The free end's edge, a little inside the dowel's radius off its axis.
+    pick = model_point_in_view(
+        adapter,
+        view,
+        ((x + 0.8) / 1000.0, spec.DOWEL_PROUD_END_POINT[1] / 1000.0, 0.0),
+        label=f"{label} dowel end",
+    )
+    _activate_view(adapter, view, label=label)
+    if not draw.Extension.SelectByID2(
+        "", "EDGE", pick[0], pick[1], 0.0, False, 0, null_callout(), 0
+    ):
+        raise RuntimeError(f"{label}: no visible edge at the dowel's free end {pick!r}")
+    kinds = [
+        int(selection.GetSelectedObjectType3(index, -1))
+        for index in range(1, int(selection.GetSelectedObjectCount2(-1)) + 1)
+    ]
+    draw.ClearSelection2(True)
+    if SEL_EDGES not in kinds:
+        raise RuntimeError(f"{label}: the dowel end pick selected {kinds}, no edge")
+    _telemetry.info(
+        f"{label}: broken out {DOWEL_PROUD_BREAK_OUT_DEPTH_MM:.3f} mm deep; the "
+        f"dowel's free end is a visible edge (pick types {kinds})"
+    )
 
 
 def _activate_view(adapter: Any, view: Any, *, label: str) -> None:
@@ -646,12 +830,22 @@ def _mark_detail_boundary(adapter: Any, front: Any) -> None:
     _telemetry.info(f"summing: {label} centre {centre!r} radius {radius!r}")
 
 
-def _knife_detail(adapter: Any) -> None:
+def _knife_detail(adapter: Any) -> tuple[Callable[[], None], Callable[[], None]]:
     """The 1:1 knife-edge detail: the knife contact and the boss face the
-    setting table's rock row is read at."""
+    setting table's rock row is read at, and the dowel's proud.
+
+    Returns the proud's settled check and the deferred finish of DETAIL A:
+    the proud's text onto its leader and the break-out of the dowel's free
+    end. Until then the sheet runs exactly the order farm run
+    20261119T202848942Z proved (crop, then show and import the setting):
+    with the import, text offset and break-out before the crop, the exploded
+    sheet's 'Default Simplified' read no explode steps (farm leaves
+    drawing:sm_summing_assembly 20261119T222550Z, 225826Z and 230558Z), so
+    ``build`` runs the finish only after the exploded sheet's balloons."""
     label = notes.DETAIL_TITLE
     view = _placed_detail(adapter)
     _crop_detail(adapter, view)
+    proud_settled, offset_proud_text = _dowel_proud_setting(adapter, view)
     label_xy = (
         DETAIL_CENTRE[0] - DETAIL_LABEL_INSET,
         DETAIL_CENTRE[1] - DETAIL_CROP_RADIUS - DETAIL_LABEL_GAP,
@@ -660,6 +854,16 @@ def _knife_detail(adapter: Any) -> None:
     if add_note(adapter, DETAIL_LABEL, *label_xy) is None:
         raise RuntimeError(f"failed to label the {label}")
     _assert_view_on_sheet(view, label=label)
+
+    def finish() -> None:
+        _activate_sheet(adapter, SHEET_NAMES[0])
+        offset_proud_text()
+        _break_out_dowel_end(adapter, view)
+        if not bool(_early_bound(view, "IView").IsCropped()):
+            raise RuntimeError(f"the {label} lost its crop to the dowel break-out")
+        proud_settled()
+
+    return proud_settled, finish
 
 
 def _place_setting_table(adapter: Any, views: dict[str, Any]) -> None:
@@ -702,9 +906,16 @@ def _place_setting_table(adapter: Any, views: dict[str, Any]) -> None:
         )
 
 
-def _place_assembled_sheet(adapter: Any) -> Callable[[], None]:
+def _place_assembled_sheet(
+    adapter: Any,
+) -> tuple[Callable[[], None], Callable[[], None]]:
     """Front and right at 1:5 (the screw height on the front), the knife-edge
-    detail, the setting table and the notes."""
+    detail, the setting table and the notes; returns the settled check and
+    the deferred finish: DETAIL A's text offset and break-out, then the
+    screw height. The break-out reset the front view's imported screw
+    height to bare text (farm leaves drawing:sm_summing_assembly
+    20261119T231650Z and 232849Z: its parentheses, then its callout, read
+    empty afterwards), so that setting is authored after it."""
     _activate_sheet(adapter, SHEET_NAMES[0])
     views = {}
     for name, centre in (("*Front", FRONT_CENTER), ("*Right", RIGHT_CENTER)):
@@ -714,14 +925,25 @@ def _place_assembled_sheet(adapter: Any) -> Callable[[], None]:
         apply_view_configuration(adapter, view, role=ViewRole.PLAIN, label=label)
         _assert_view_on_sheet(view, label=label)
         views[name] = view
-    counter_settled = _counter_setting(adapter, views["*Front"])
+    counter_settled: list[Callable[[], None]] = []
     _mark_detail_boundary(adapter, views["*Front"])
-    _knife_detail(adapter)
+    proud_settled, finish_detail = _knife_detail(adapter)
     _place_setting_table(adapter, views)
     _add_note_block(
         adapter, SHEET_NAMES[0], ASSEMBLED_NOTES, NOTES_XY, label="assembled notes"
     )
-    return counter_settled
+
+    def settled() -> None:
+        for check_counter in counter_settled:
+            check_counter()
+        proud_settled()
+
+    def finish() -> None:
+        finish_detail()
+        counter_settled.append(_counter_setting(adapter, views["*Front"]))
+        settled()
+
+    return settled, finish
 
 
 # --- BOM ------------------------------------------------------------------------
@@ -1013,9 +1235,10 @@ def build(adapter: Any) -> dict[str, str]:
     _validate_source(source_model)
 
     _create_sheets(adapter)
-    assembled_settled = _place_assembled_sheet(adapter)
+    assembled_settled, finish_assembled = _place_assembled_sheet(adapter)
     exploded_settled = _place_exploded_sheet(adapter)
     _place_finished_sheet(adapter)
+    finish_assembled()
 
     def settled() -> None:
         assembled_settled()

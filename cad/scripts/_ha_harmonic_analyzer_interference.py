@@ -46,24 +46,26 @@ _CHANNEL_ANCHOR_THREAD_LIMIT = smooth_annulus_limit_mm3(
     blind_cut_dia_mm(sm_summing_lever_spec.HOLE_SPEC),
     sm_summing_lever_spec.COEFFICIENT_T,
 )
-# Each MHA-SM-VN-53 dowel pressed up to the floor of its Ø3.1496 ream in the
-# MHA-FR-02 crossbar's faced underside (owner ruling 2026-10-24, T+H3;
-# sm_vn_knife_mount_dowel_spec.PRESS_HOLE_DIA, .1240 REAM H7 +.0005/0:
-# smallest 3.1496), its largest catalogue diameter 3.18262 over its 11.938
-# press depth (sm_vn_knife_mount_dowel_spec.DIA_MAX, PRESS_DEPTH).  All three are
+# Each MHA-SM-VN-53 dowel pressed into its Ø3.1496 ream in the MHA-FR-02
+# crossbar's faced underside until it stands at its set proud, not to the
+# ream's drill point (owner ruling 2026-10-24, T+H3; owner decision
+# 2026-11-19, #3124 item 3; sm_vn_knife_mount_dowel_spec.PRESS_HOLE_DIA,
+# .1240 REAM H7 +.0005/0: smallest 3.1496), its largest catalogue diameter
+# 3.18262 over its 11.938 insertion, the catalogue length less the proud
+# (sm_vn_knife_mount_dowel_spec.DIA_MAX, INSERTION).  All three are
 # literals, test-pinned to their owners like _sm_summing_interference's
 # _KNIFE_HANGER_REACH, so a crossbar or dowel edit does not re-key this
 # table.  The models are line to line, so this bounds the press at its
-# print-worst: the largest catalogue pin in the smallest ream, the whole
-# depth.  The dowels belong to the summing subassembly and the crossbar to
-# the frame's, so the pairs are checked at the top level (ALLOWED_PAIRS
-# below); in the summing subassembly each pin slips in its knife mount's
-# round hole or slot, with no overlap.
+# print-worst: the largest catalogue pin in the smallest ream, over the
+# modelled insertion.  The dowels belong to the summing subassembly and the
+# crossbar to the frame's, so the pairs are checked at the top level
+# (ALLOWED_PAIRS below); in the summing subassembly each pin slips in its
+# knife mount's round hole or slot, with no overlap.
 _KNIFE_DOWEL_HOLE_MIN = 3.1496
 _KNIFE_DOWEL_DIA_MAX = 3.18262
-_KNIFE_DOWEL_PRESS_DEPTH = 11.938
+_KNIFE_DOWEL_INSERTION = 11.938
 _KNIFE_DOWEL_PRESS_LIMIT = smooth_annulus_limit_mm3(
-    _KNIFE_DOWEL_DIA_MAX, _KNIFE_DOWEL_HOLE_MIN, _KNIFE_DOWEL_PRESS_DEPTH
+    _KNIFE_DOWEL_DIA_MAX, _KNIFE_DOWEL_HOLE_MIN, _KNIFE_DOWEL_INSERTION
 )
 
 # The cone-platform pivot screw now carries its full McMaster #10-24 thread

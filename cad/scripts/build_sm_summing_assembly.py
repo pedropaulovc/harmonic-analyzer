@@ -20,10 +20,10 @@ boss-hook / counter-spring / gooseneck chain.
 * knife-hanger-washer x2 -- new McMaster 96659A104 18-8 SAE washers,
   one beneath each hex head, seated on the crossbar's faced top.
 * knife-mount-dowel x2 -- McMaster 98381A473 1/8 x 3/4 dowels, one per
-  knife mount +X of its screw, each pressed up to the floor of a blind ream
-  in the crossbar's faced underside (knocked out from its faced top; owner
-  ruling 2026-10-24, T+H3); the knife mount's blind round hole slips onto
-  it.  Owner ruling 2026-11-08 (Pedro), #2144 item 11.3 (scheme S1): the
+  knife mount +X of its screw, each pressed into a blind ream in the
+  crossbar's faced underside until it stands its set proud (owner decision
+  2026-11-19, #3124 item 3; knocked out from its faced top; owner ruling
+  2026-10-24, T+H3); the knife mount's blind round hole slips onto it.  Owner ruling 2026-11-08 (Pedro), #2144 item 11.3 (scheme S1): the
   block may turn about its one dowel; a Ø.4720 gauge bar through both
   mounts' bores sets the front mount's yaw at MHA-SM-00 before its screw is
   tightened (step 5); the rock gauge sets the rear mount's (6G) before its
@@ -153,8 +153,10 @@ KNIFE_MOUNT_Z_MINUS = SUMMING_Z + KNIFE_SEAT_Z_MINUS
 # seats on the crossbar's faced top, HANGER_GRIP above the finished underside.
 # The knife mount remains clamped face-to-face to that underside, gap 0,
 # with no bedding allowance. Each dowel (local Y=0 its lower end, axis +Y)
-# is pressed up to the floor of its crossbar ream (owner ruling 2026-10-24,
-# T+H3) and hangs into the knife mount's round slip hole (datum B).
+# is pressed into its crossbar ream (owner ruling 2026-10-24, T+H3) until it
+# stands PROUD below the underside, set at MHA-SM-00 (owner decision
+# 2026-11-19, #3124 item 3), and hangs into the knife mount's round slip hole
+# (datum B).
 KNIFE_MOUNT_TOP_Y = CASTING_UNDERSIDE_Y - MOUNT_GAP  # 999.6932: clamped, gap 0
 CROSSBAR_TOP_Y = CASTING_UNDERSIDE_Y + top_frame.RING_HEIGHT  # 1036.193, faced
 HANGER_WASHER_Y = CASTING_UNDERSIDE_Y + top_frame.HANGER_GRIP  # 1036.193, local Y=0
@@ -197,11 +199,11 @@ HANGER_THREAD_SPARE = (
     hanger_screw.THREAD_LENGTH_MIN - hanger_screw.INCOMPLETE_TIP_LEN_MAX
 ) - HANGER_REACH_MAX
 HANGER_SCREW_CLEARANCE = top_frame.HANGER_CLEARANCE_DIA_MIN - hanger_screw.SHANK_DIA
-# Each dowel's pressed (chamfered) end, its local Y=0, on its crossbar ream
-# floor, 1011.7, its local +Y turned down (Rx 180): its far end 992.65,
-# standing PROUD 7.05 below the underside into the knife mount's round hole
-# (floor 990.2).
-KNIFE_DOWEL_Y = CASTING_UNDERSIDE_Y + top_frame.HANGER_PIN_HOLE_DEPTH
+# Each dowel's pressed (chamfered) end, its local Y=0, INSERTION (11.938)
+# up its crossbar ream, short of the ream's drill point, its local +Y turned
+# down (Rx 180): its far end standing the set PROUD (7.112) below the
+# underside into the knife mount's round hole.
+KNIFE_DOWEL_Y = CASTING_UNDERSIDE_Y + knife_dowel.INSERTION
 KNIFE_DOWEL_END_Y = KNIFE_DOWEL_Y - knife_dowel.LENGTH
 KNIFE_DOWEL_ROWS = [[1.0, 0.0, 0.0], [0.0, -1.0, 0.0], [0.0, 0.0, -1.0]]
 # The one dowel's station from the bolt axis, +X (datum B): 7.62 along X
@@ -345,20 +347,21 @@ KNIFE_FREE_ROCK_FLOOR_DEG = spec.KNIFE_FREE_ROCK_FLOOR_DEG
 # to A (Owner ruling 2026-11-08 (Pedro), #2144 item 11.3: the slot and its
 # ⊥ are gone).  Each
 # zone tilts its axis by at most atan(zone / length) over the hole's
-# straight wall: its shortest printed depth less the floor's corner (the
-# ream's CORNER R.003 MAX, the block's title-block R.040 MAX) and less
-# KNIFE_REAM_LEAD_ALLOWANCE.  The proud pin (PROUD_MAX, which carries the
-# ream floor's corner lift) bears in the hole over its full-diameter length
-# short of its rounded free end, and the tightest slip takes a relative tilt
-# of at most atan(SLIP_CLEARANCE_MIN / that length) before the pin binds.
+# bearing length: in the crossbar the shortest pressed length less its
+# chamfer (the ream's full diameter runs past the deepest pressed end, owner
+# decision 2026-11-19, #3124 item 3); in the block its shortest printed
+# full-diameter depth (both holes end in drill points, #3124 items 3 and 4)
+# less KNIFE_REAM_LEAD_ALLOWANCE.  The proud pin (PROUD_MAX, set at
+# assembly) bears in the hole over its full-diameter length short of its
+# rounded free end, and the tightest slip takes a relative tilt of at most
+# atan(SLIP_CLEARANCE_MIN / that length) before the pin binds.
 #
 # The lead allowance is conservatism beyond the print, not an admission of
-# an undersize tail: the press ream's size band and the block hole's band
-# apply over the full depth, so a conforming hole is full size to its floor
-# corner (a bevel-lead reamer's undersize tail would be non-conforming), the
-# pin bottoms, and PROUD_MAX holds.  The proof simply declines to count the
-# last 0.5 of each wall towards the length that limits the tilt (codjiflo
-# round 6).
+# an undersize tail: the block hole's band applies over its full-diameter
+# depth, so a conforming hole is full size to there (a bevel-lead reamer's
+# undersize tail would be non-conforming).  The proof simply declines to
+# count the last 0.5 of the wall towards the length that limits the tilt
+# (codjiflo round 6).
 KNIFE_REAM_LEAD_ALLOWANCE = 0.5
 # ASSUMPTION, not a drawing control: the crossbar underside under the
 # block's 25.4 x 14 seat and the block's face-milled top seat conform,
@@ -374,17 +377,9 @@ KNIFE_DOWEL_TILT_ALLOWED_DEG = math.degrees(
         / (knife_dowel.PROUD_MAX - knife_dowel.FREE_END_LEN)
     )
 )
-_KNIFE_REAM_TILT_WALL = (
-    knife_dowel.PRESS_DEPTH
-    - knife_dowel.PRESS_DEPTH_TOL
-    - knife_dowel.PRESS_FLOOR_CORNER_R_MAX
-    - KNIFE_REAM_LEAD_ALLOWANCE
-)
+_KNIFE_REAM_TILT_WALL = knife_dowel.INSERTION_MIN - knife_dowel.CHAMFER_LEN
 _KNIFE_HOLE_TILT_WALL = (
-    knife_dowel.SLIP_DEPTH
-    - knife_dowel.SLIP_DEPTH_TOL
-    - knife_mount.DOWEL_HOLE_FLOOR_CORNER_R_MAX
-    - KNIFE_REAM_LEAD_ALLOWANCE
+    knife_dowel.SLIP_DEPTH - knife_dowel.SLIP_DEPTH_TOL - KNIFE_REAM_LEAD_ALLOWANCE
 )
 KNIFE_DOWEL_TILT_REAM_DEG = math.degrees(
     math.atan(top_frame.HANGER_PRESS_HOLE_PERPENDICULARITY_TOL / _KNIFE_REAM_TILT_WALL)
@@ -648,20 +643,31 @@ def _assert_gooseneck_leg_spans_hub_bore(
     )
 
 
-# --- assembly setting as a model dimension (MHA-SM-00 sheet 1) --------------
-# A blanked Front-plane construction sketch (sketch x = machine X, y = machine
-# Y), every vertex driven from a global; the drawing shows it in the one view
-# that dimensions it and imports only its marked dimension.
+# --- assembly settings as model dimensions (MHA-SM-00 sheet 1) -------------
+# Blanked Front-plane construction sketches (sketch x = machine X, y = machine
+# Y), every vertex driven from a global; the drawing shows each in the one
+# view that dimensions it and imports only its marked dimension.
 _SETTING_GLOBALS = {
     "SmKnifeY": spec.KNIFE_POINT[1],
     "SmCounterScrewX": spec.COUNTER_SCREW_POINT[0],
     "SmCounterScrewY": spec.COUNTER_SCREW_POINT[1],
+    "SmDowelX": spec.DOWEL_PROUD_TOP_POINT[0],
+    "SmDowelTopY": spec.DOWEL_PROUD_TOP_POINT[1],
+    "SmDowelEndY": spec.DOWEL_PROUD_END_POINT[1],
 }
 if not (
     spec.KNIFE_POINT[0] < 0.0 < spec.KNIFE_POINT[1]
     and spec.COUNTER_SCREW_POINT[0] < spec.KNIFE_POINT[0]
+    and spec.DOWEL_PROUD_TOP_POINT[0] < 0.0 < spec.DOWEL_PROUD_END_POINT[1]
 ):
     raise AssertionError("summing setting drives assume x < 0 < y, screw left of knife")
+# The proud setting's line is the modelled dowel's own axis and ends.
+if (
+    abs(spec.DOWEL_PROUD_TOP_POINT[1] - KNIFE_MOUNT_TOP_Y) > 1e-9
+    or abs(spec.DOWEL_PROUD_END_POINT[1] - KNIFE_DOWEL_END_Y) > 1e-9
+    or abs(spec.DOWEL_PROUD_TOP_POINT[0] - (KNIFE[0] + KNIFE_DOWEL_X_OFFSETS[0])) > 1e-9
+):
+    raise AssertionError("the dowel proud setting is off the modelled dowel")
 
 
 def _construction_line(
@@ -690,7 +696,9 @@ def _finish_setting(
 
 def _author_settings(adapter) -> None:
     """CounterSetting: the MHA-SM-VN-56 axis above the knife contact level (the
-    gooseneck height the level setting finds)."""
+    gooseneck height the level setting finds).  DowelProudSetting: each
+    MHA-SM-VN-53's free end below the crossbar underside (the proud its press
+    sets, owner decision 2026-11-19, #3124 item 3)."""
     for name, value in _SETTING_GLOBALS.items():
         set_global(adapter, name, f"{value}mm")
 
@@ -717,6 +725,28 @@ def _author_settings(adapter) -> None:
     )
     dims.record(spec.COUNTER_DIMENSION, '"SmCounterScrewY" - "SmKnifeY"')
     _finish_setting(adapter, spec.COUNTER_FEATURE, dims, spec.COUNTER_DIMENSION)
+
+    # The proud line runs down the dowel's own axis, from the underside (the
+    # mount's clamped top seat) to the pin's free end.
+    top, end = spec.DOWEL_PROUD_TOP_POINT, spec.DOWEL_PROUD_END_POINT
+    dims = SketchDims()
+    check("create dowel proud setting sketch", adapter.create_sketch("Front"))
+    line = _construction_line(adapter, top, end, "dowel proud setting line")
+    check(
+        "dowel proud setting vertical",
+        adapter.add_sketch_constraint(line, None, "vertical"),
+    )
+    anchor_point_to_origin(adapter, f"{line}.start", *top, "dowel axis at the underside")
+    dims.record("DowelX", '-"SmDowelX"')
+    dims.record("DowelTopY", '"SmDowelTopY"')
+    dimension_between(
+        adapter, f"{line}.start", f"{line}.end", "vertical_distance",
+        knife_dowel.PROUD, "dowel proud",
+    )
+    dims.record(spec.DOWEL_PROUD_DIMENSION, '"SmDowelTopY" - "SmDowelEndY"')
+    _finish_setting(
+        adapter, spec.DOWEL_PROUD_FEATURE, dims, spec.DOWEL_PROUD_DIMENSION
+    )
 
     apply_drawing_precision(adapter, spec.DRAWING_PRECISION)
     for feature in spec.SETTING_FEATURES:
@@ -799,7 +829,7 @@ def build(adapter) -> dict[str, str]:
     )
     # One cut #10-24 hex bolt and one SAE washer per mount: washer lower
     # face on the crossbar's faced top, bolt under-head on the washer upper face.
-    # The dowel, its pressed end on the crossbar's ream floor, stands proud
+    # The dowel, pressed up the crossbar's ream to its set proud, stands
     # down into the block's round hole (+X, datum B; Owner ruling 2026-11-08
     # (Pedro), #2144 item 11.3). Every hardware instance is independently
     # fixed; no operational DOF is added.
@@ -864,7 +894,7 @@ def build(adapter) -> dict[str, str]:
 
     # Read back both physical stacks: each washer's lower bearing face on
     # the faced top, each bolt's head on its own washer, coaxial at the
-    # intended knife station. Check each dowel's offset and ream-floor seat.
+    # intended knife station. Check each dowel's offset and pressed height.
     per_mount = knife_dowel.PER_MOUNT
     station_dowels = [
         knife_dowels[index : index + per_mount]
@@ -897,8 +927,8 @@ def build(adapter) -> dict[str, str]:
                 )
             if abs(dowel_o[1] - KNIFE_DOWEL_Y) > 1e-6:
                 raise RuntimeError(
-                    f"{dowel}: {dowel_o[1] - KNIFE_DOWEL_Y:.6f} mm off its seat on "
-                    "the crossbar ream floor"
+                    f"{dowel}: {dowel_o[1] - KNIFE_DOWEL_Y:.6f} mm off its pressed "
+                    "height in the crossbar ream"
                 )
     # Summing lever: knife-edge revolute = coincident axis-to-axis on the knife
     # line (the bore-bottom rocking edge) + a Front-plane axial distance,

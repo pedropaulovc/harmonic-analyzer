@@ -64,6 +64,7 @@ from _bore_axis import name_bore_axis
 from _check import check
 from _com import _early_bound
 from _dimensions import drive_dimension, name_dimensions, set_global
+from _drill_point_cut import cut_drill_point, drill_point_volume
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
 from _part_save import save_part_and_images
@@ -192,9 +193,32 @@ if _TAP_WEB_WORST < sm_knife_mount_spec.STUD_TAP_WEB_MIN:
 
 THROUGH_CUT_DEPTH = SUPPORT_Z_THICK + 4.0  # > the block thickness, both directions
 
-# --- the MHA-SM-VN-53 slip seat: blind, flat-floored, in the top seat -------
+# --- the MHA-SM-VN-53 slip seat: blind, to a drill point, in the top seat ---
 _R_PIN = PIN_HOLE_DIA / 2.0
 V_PIN = math.pi * _R_PIN**2 * PIN_HOLE_DEPTH
+V_PIN_POINT = drill_point_volume(_R_PIN)
+
+
+def cut_pin_hole_point(adapter) -> None:
+    """Cut the slip hole's 118° drill point under its full diameter.
+
+    Owner decision 2026-11-19 (#3124, item 4): nothing seats on the floor,
+    so the hole ends in a drill point, not FLAT BOTTOM.  The point's
+    half-section on the Front plane, which holds B's axis (z = 0; sketch
+    u, v = model X, Y), revolved about that axis (``_drill_point_cut``).
+    """
+    label = "dowel slip-hole drill point"
+    check(f"create_sketch {label}", adapter.create_sketch("Front"))
+    cut_drill_point(
+        adapter,
+        label=label,
+        floor_centre=(PIN_HOLE_X, BLK_TOP - PIN_HOLE_DEPTH),
+        radius=_R_PIN,
+        wall_sign=1,
+        tip_sign=-1,
+        profile_name="PinHolePointProfile",
+        feature_name="PinHolePoint",
+    )
 
 # B's row from the front face (model +Z) prints from a hidden reference line
 # (the build_ch_channel_lever PlateOffsetReference pattern; no metal): on the
@@ -486,7 +510,8 @@ def build(adapter) -> dict[str, str]:
     # The MHA-SM-VN-53 slip seat (owner ruling 2026-10-24, T+H3: the dowel
     # presses into the crossbar and slips into this block): blind along -Y
     # from the top seat, a round hole PIN_HOLE_X +X of the tap axis (datum B),
-    # flat-floored by a plain cut-extrude.  Owner ruling 2026-11-08 (Pedro),
+    # its full diameter a plain cut-extrude, then a 118° drill point under it
+    # (owner decision 2026-11-19, #3124 item 4).  Owner ruling 2026-11-08 (Pedro),
     # #2144 item 11.3: the -X slot (datum C) is deleted.  A second seat point
     # PIN_HOLE_X -X of the tap axis only orients the face sketch's axes.
     before, com_before = _mass(adapter)
@@ -545,6 +570,14 @@ def build(adapter) -> dict[str, str]:
         f"dowel slip hole (top-seat sketch B {b_uv}) removed "
         f"{before - after:.2f} mm^3 (analytic {V_PIN:.2f})"
     )
+    cut_pin_hole_point(adapter)
+    expected -= V_PIN_POINT
+    vol = _volume(adapter)
+    if abs((after - vol) - V_PIN_POINT) > 0.02 * V_PIN_POINT:
+        raise RuntimeError(
+            f"dowel slip-hole drill point removed {after - vol:.3f} mm^3, expected "
+            f"{V_PIN_POINT:.3f}"
+        )
     drive_jobs += hole_row_reference(adapter)
 
     # Named axis = the knife-edge contact ridge line (part origin, along Z). The

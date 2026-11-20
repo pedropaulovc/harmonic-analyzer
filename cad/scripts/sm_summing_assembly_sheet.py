@@ -30,6 +30,8 @@ from sm_summing_assembly_spec import (
     COUNTER_FEATURE,
     COUNTER_SPRING,
     DOWEL,
+    DOWEL_PROUD_DIMENSION,
+    DOWEL_PROUD_FEATURE,
     END_PLUG,
     GOOSENECK,
     HANGER_BOLT,
@@ -54,6 +56,7 @@ BOM_ORDER = tuple(QUANTITIES)
 # The drawing imports exactly these, each in the one view that dimensions it.
 DRAWING_DIMENSIONS = {
     COUNTER_FEATURE: {COUNTER_DIMENSION},
+    DOWEL_PROUD_FEATURE: {DOWEL_PROUD_DIMENSION},
 }
 # The lever is set level to the title block's general angular tolerance: the
 # operating rock (about 1 deg) then stays well inside the free-rock floor.
@@ -129,6 +132,7 @@ BRACKET_NUMBER = "MHA-MG-01"
 # Callouts print below the value, where line breaks print.
 DIMENSION_CALLOUTS = {
     COUNTER_DIMENSION: "SET AT ASSEMBLY:\nGOOSENECK HEIGHT\nFOR LEVER LEVEL",
+    DOWEL_PROUD_DIMENSION: "SET AT ASSEMBLY:\nDOWEL PROUD OF\nCROSSBAR UNDERSIDE",
 }
 
 # --- Sheet 1 setting table -----------------------------------------------------------
@@ -157,6 +161,14 @@ BRACKET_ROW = "1"
 CUT_ROW = "2"
 SEAT_ROW = "3"
 ROCK_ROW = "4"
+# The lever-level acceptance is a measured setting like the others, so it
+# prints as a row the step and check cite, not as a sheet note (machinist
+# review, farm run 20261119T233258920Z, gating clarity: step 10 cited no row).
+# Its instrument prints as step 10 names it (codjiflo #3128): the seat row's
+# acceptance reads "NO .002 FEELER ENTERS" so the wider CHECK WITH column
+# still fits the top border.
+LEVEL_ROW = "5"
+LEVEL_GAUGE = "DIGITAL ANGLE GAUGE"
 # The stack step 4 measures at each hanger hole, named in the cut row.
 HANGER_STACK = "S"
 SETTING_TABLE_ROWS = (
@@ -181,7 +193,7 @@ SETTING_TABLE_ROWS = (
         "6H (CHECK 1)",
         "MHA-SM-02 TOP SEAT ON MHA-FR-02",
         "-",
-        f"{_length(SEAT_FEELER_MM, 3)} FEELER ENTERS NOWHERE",
+        f"NO {_length(SEAT_FEELER_MM, 3)} FEELER ENTERS",
         "FEELER GAUGE",
     ),
     (
@@ -191,6 +203,14 @@ SETTING_TABLE_ROWS = (
         "LEVER LEVEL (ZERO)",
         f"{ROCK_TRAVEL_MIN} UP AND DOWN",
         "DIAL INDICATOR",
+    ),
+    (
+        LEVEL_ROW,
+        "10 (CHECK 4)",
+        "MHA-SM-03 LEVER PLATE TOP",
+        "-",
+        LEVEL_CRITERION,
+        LEVEL_GAUGE,
     ),
 )
 
@@ -211,13 +231,22 @@ ASSEMBLED_NOTES = (
     "THE GOOSENECK POST STANDS IN THE FRAME'S GOOSENECK HUB.",
     "2. LEVER SHOWN LEVEL, RESTING ON THE KNIFE EDGE (TOP RIDGE OF EACH HEX "
     "TRUNNION) UNDER THE TOP OF EACH MOUNT BORE.",
-    f"3. LEVEL SETTING: {LEVEL_CRITERION} (ASSEMBLY.MD STEP 10).",
 )
 # The bonds' consumable notes print with the checks in ASSEMBLY.md (rule 22).
+# A bonded dowel slid in by hand has no floor to stop it (the ream ends in a
+# drill point, #3124 item 3), so steps 1B-1G hold it at its proud on a
+# support while it cures and 1H accepts it, proud re-read (codjiflo #3128).
+# One action a step and only degrease, apply and cure rules in the note
+# (rules 22-23: the machinist reviews of farm runs 20261120T004738926Z and
+# 20261120T012147518Z found the support, then the fixture actions, buried
+# in one step and in the note).  Lowered upright onto the parallels, the
+# frame's own weight carries the coated dowel, stood on the gauge blocks,
+# up to the proud.
+DOWEL_PROUD = _length(knife_dowel.PROUD, 3)
 BOND_NOTE_A = (
-    f"BOND NOTE A, {BOND_GRADE} (STEP 1B): DEGREASE DOWEL AND HOLE; COAT THE "
-    "DOWEL, NEVER THE BLIND HOLE; PRESS IT TO THE HOLE FLOOR; CURE 24 H "
-    "BEFORE STEP 5. ACCEPT: IT DOES NOT TURN OR SLIDE BY HAND."
+    f"BOND NOTE A, {BOND_GRADE} (STEPS 1E-1G): DEGREASE DOWEL AND HOLE; COAT "
+    "THE DOWEL, NEVER THE BLIND HOLE; SEAT IT WITHIN THE FIXTURE TIME AND "
+    "LEAVE IT UNDISTURBED; CURE 24 H BEFORE STEP 5. ACCEPT AT STEP 1H."
 )
 BOND_NOTE_B = (
     "BOND NOTE B, LOCTITE 638 (STEP 8): DEGREASE THE MHA-SM-05 SPIGOT AND THE "
@@ -231,7 +260,9 @@ BOND_NOTE_B = (
 # joint_retention cite (cut at 4 on MHA-SM-VN-52, hanger joint complete at 6,
 # shoulder screw at 8B, level at 10) stay put. Steps 1-8 are done on the top
 # frame, steps 9-10 at final assembly (MHA-HA-00). Owner ruling 2026-10-24
-# (T+H3): the dowels press into the crossbar before the mounts go on. Steps
+# (T+H3): the dowels press into the crossbar before the mounts go on, each
+# to its proud on DETAIL A, not to the ream's drill point (owner decision
+# 2026-11-19, #3124 item 3). Steps
 # 3-3C (sm Q7) transfer the bracket taps through their mate: Delegated
 # ruling 2026-11-07 (Main), no precedent; owner review #2144. They are
 # their own step and the washers seat under step 1 with the dowels (both
@@ -259,11 +290,23 @@ BOND_NOTE_B = (
 ASSEMBLY_STEPS = (
     "1. ON THE TOP FRAME MHA-FR-02, AT EACH HANGER HOLE PRESS ONE MHA-SM-VN-53 "
     "DOWEL (TWO IN ALL), CHAMFER END FIRST, UP INTO THE BLIND HOLE BESIDE IT "
-    "IN THE CROSSBAR UNDERSIDE, TO THE HOLE FLOOR.",
+    "IN THE CROSSBAR UNDERSIDE UNTIL IT STANDS PROUD OF THE UNDERSIDE BY THE "
+    f"DOWEL PROUD SET ON {DETAIL_TITLE}, SHEET 1 (CALIPER DEPTH ROD).",
     "1A. CHECK THAT NO DOWEL TURNS OR SLIDES BY HAND.",
-    f"1B. IF ONE DOES, OR ONE SLID IN BY HAND, BOND IT IN WITH {BOND_GRADE} "
-    "PER BOND NOTE A.",
-    "1C. AT EACH HANGER HOLE SEAT AN MHA-SM-VN-54 WASHER ON THE FACED TOP.",
+    "1B. IF ONE DOES, OR ONE SLID IN BY HAND, SET THE TOP FRAME UPRIGHT, ITS "
+    "FACED UNDERSIDE DOWN ON A PAIR OF EQUAL PARALLELS ON THE SURFACE PLATE, "
+    "CLEAR OF THE BOSSES AND HANGER HOLES.",
+    "1C. UNDER THAT DOWEL'S HOLE WRING GAUGE BLOCKS TO THE PARALLELS' HEIGHT "
+    f"LESS {DOWEL_PROUD}.",
+    "1D. LIFT THE TOP FRAME OFF THE PARALLELS AND TAKE THAT DOWEL OUT.",
+    f"1E. COAT THE DOWEL WITH {BOND_GRADE} PER BOND NOTE A.",
+    "1F. STAND THE COATED DOWEL CHAMFER UP ON ITS GAUGE BLOCKS.",
+    "1G. WITHIN THE FIXTURE TIME LOWER THE TOP FRAME BACK OVER IT ONTO THE "
+    "PARALLELS, AND LEAVE IT THERE UNTIL THE BOND CURES (BOND NOTE A).",
+    "1H. AFTER THE CURE, CHECK THAT THE BONDED DOWEL DOES NOT TURN OR SLIDE BY "
+    f"HAND AND STANDS AT THE DOWEL PROUD SET ON {DETAIL_TITLE}, SHEET 1 "
+    "(CALIPER DEPTH ROD).",
+    "1J. AT EACH HANGER HOLE SEAT AN MHA-SM-VN-54 WASHER ON THE FACED TOP.",
     "2. THREAD MHA-SM-VN-50 INTO THE TAPPED BOSS OF MHA-SM-03 UNTIL ITS CUT "
     "END IS WITHIN HALF A TURN OF FLUSH WITH THE BOSS UNDERSIDE, FINISHING "
     "WITH THE EYE OPENING TOWARD THE KNIFE EDGE AND THE EYE PLANE SQUARE TO IT.",
@@ -318,9 +361,9 @@ ASSEMBLY_STEPS = (
     "MHA-CH-VN-50 CHANNEL SPRINGS HOOKED (ITS STEP "
     f"{ha_steps.step_number('channel-anchors-set')}) AND EVERY CHANNEL "
     "AMPLITUDE AT ZERO: SLIDE THE GOOSENECK POST IN ITS HUB UNTIL THE "
-    f"LEVER PLATE TOP IS {LEVEL_CRITERION} (DIGITAL ANGLE GAUGE ACROSS THE "
-    "PLATE). THE GOOSENECK HEIGHT REFERENCE DIMENSION ON SHEET 1 IS THE "
-    "NOMINAL START.",
+    f"LEVER PLATE TOP IS {LEVEL_CRITERION} ({LEVEL_GAUGE} ACROSS THE "
+    f"PLATE, {setting_row(LEVEL_ROW)}). THE GOOSENECK HEIGHT REFERENCE "
+    "DIMENSION ON SHEET 1 IS THE NOMINAL START.",
     "10A. TIGHTEN THE HUB SET SCREW MHA-FR-VN-52 ON THE POST, "
     f"{HUB_SET_SCREW_TORQUE}.",
 )
@@ -336,8 +379,9 @@ ASSEMBLY_CHECKS = (
     f"BORE ({setting_row(ROCK_ROW)}).",
     "3. THE UPPER LOOP OF MHA-SM-VN-51 TURNS AND SLIDES FREELY ON THE SHOULDER "
     "OF MHA-SM-VN-56, UNDER ITS HEAD.",
-    f"4. AFTER STEP 10A THE LEVER PLATE TOP READS {LEVEL_CRITERION} AND THE "
-    "GOOSENECK POST DOES NOT TURN OR SLIDE IN ITS HUB.",
+    f"4. AFTER STEP 10A THE LEVER PLATE TOP READS {LEVEL_CRITERION} "
+    f"({setting_row(LEVEL_ROW)}) AND THE GOOSENECK POST DOES NOT TURN OR "
+    "SLIDE IN ITS HUB.",
     "5. AFTER STEP 5 THE GAUGE BAR SLIDES OUT OF BOTH MOUNTS' BORES BY HAND.",
     BOND_NOTE_A,
     BOND_NOTE_B,
