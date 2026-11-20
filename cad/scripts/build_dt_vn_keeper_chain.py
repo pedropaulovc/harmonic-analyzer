@@ -42,6 +42,7 @@ from _appearance import apply_material
 from _check import check
 from _com import _early_bound
 from _custom_properties import apply_custom_properties
+from _document_units import keep_equation_angles_exact
 from _dimensions import name_dimensions
 from _drawing_marks import apply_drawing_properties, mark_dimensions_for_drawing
 from _feature_tree import name_last_feature
@@ -178,6 +179,7 @@ def _sweep_link(adapter, index: int, link) -> None:
 
 def build(adapter) -> dict[str, str]:
     check("create_part", adapter.create_part())
+    keep_equation_angles_exact(adapter, label=PART_NAME)
     _catalogue_reference(adapter)
     for index, link in enumerate(CHAIN_PART_LINKS):
         _sweep_link(adapter, index, link)
