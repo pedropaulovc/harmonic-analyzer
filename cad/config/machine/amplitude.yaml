@@ -1,6 +1,6 @@
 
 amplitude:                         # ch15 — the amplitude bars set the Fourier coefficients
-  preset: neutral                  # all amplitude bars at rest (a_j = 0) — matches the neutral-state photos
+  preset: square                   # SCRATCH (#1610 proof, do not merge): a_j = 80 / harmonic_n on odd harmonics
   fundamental_station_mm: 80.0     # a_1 bar station; a_j = this / harmonic_n (odd j), 0 (even j)
   max_travel_mm: 88.0              # ±88 mm amplitude-bar seesaw range (ch.15)
   stick_division_spacing_mm: 14.2   # measuring-stick engraved scale: pitch of the 11 full ticks the

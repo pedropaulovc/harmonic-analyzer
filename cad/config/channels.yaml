@@ -53,7 +53,7 @@ channels:
     harmonic_n: 19
     ratio: [114, 120]
     phase_deg: 0.0
-    amplitude_mm: 0.0   # TEMP neutral (square preset would be 80/19 = 4.2105)
+    amplitude_mm: 4.2105263157894735   # square preset 80/19
   - index: 2
     cone_teeth: 108
     cylinder_teeth: 120
@@ -67,7 +67,7 @@ channels:
     harmonic_n: 17
     ratio: [102, 120]
     phase_deg: 0.0
-    amplitude_mm: 0.0   # TEMP neutral (square preset would be 80/17 = 4.7059)
+    amplitude_mm: 4.705882352941177   # square preset 80/17
   - index: 4
     cone_teeth: 96
     cylinder_teeth: 120
@@ -81,7 +81,7 @@ channels:
     harmonic_n: 15
     ratio: [90, 120]
     phase_deg: 0.0
-    amplitude_mm: 0.0   # TEMP neutral (square preset would be 80/15 = 5.3333)
+    amplitude_mm: 5.333333333333333   # square preset 80/15
   - index: 6
     cone_teeth: 84
     cylinder_teeth: 120
@@ -95,7 +95,7 @@ channels:
     harmonic_n: 13
     ratio: [78, 120]
     phase_deg: 0.0
-    amplitude_mm: 0.0   # TEMP neutral (square preset would be 80/13 = 6.1538)
+    amplitude_mm: 6.153846153846154   # square preset 80/13
   - index: 8
     cone_teeth: 72
     cylinder_teeth: 120
@@ -109,7 +109,7 @@ channels:
     harmonic_n: 11
     ratio: [66, 120]
     phase_deg: 0.0
-    amplitude_mm: 0.0   # TEMP neutral (square preset would be 80/11 = 7.2727)
+    amplitude_mm: 7.2727272727272725   # square preset 80/11
   - index: 10
     cone_teeth: 60
     cylinder_teeth: 120
@@ -123,7 +123,7 @@ channels:
     harmonic_n: 9
     ratio: [54, 120]
     phase_deg: 0.0
-    amplitude_mm: 0.0   # TEMP neutral (square preset would be 80/9 = 8.8889)
+    amplitude_mm: 8.88888888888889   # square preset 80/9
   - index: 12
     cone_teeth: 48
     cylinder_teeth: 120
@@ -137,7 +137,7 @@ channels:
     harmonic_n: 7
     ratio: [42, 120]
     phase_deg: 0.0
-    amplitude_mm: 0.0   # TEMP neutral (square preset would be 80/7 = 11.4286)
+    amplitude_mm: 11.428571428571429   # square preset 80/7
   - index: 14
     cone_teeth: 36
     cylinder_teeth: 120
@@ -151,7 +151,7 @@ channels:
     harmonic_n: 5
     ratio: [30, 120]
     phase_deg: 0.0
-    amplitude_mm: 0.0   # TEMP neutral (square preset would be 80/5 = 16.0)
+    amplitude_mm: 16.0   # square preset 80/5
   - index: 16
     cone_teeth: 24
     cylinder_teeth: 120
@@ -165,7 +165,7 @@ channels:
     harmonic_n: 3
     ratio: [18, 120]
     phase_deg: 0.0
-    amplitude_mm: 0.0   # TEMP neutral (square preset would be 80/3 = 26.6667)
+    amplitude_mm: 26.666666666666668   # square preset 80/3
   - index: 18
     cone_teeth: 12
     cylinder_teeth: 120
@@ -179,4 +179,4 @@ channels:
     harmonic_n: 1
     ratio: [6, 120]
     phase_deg: 0.0
-    amplitude_mm: 0.0   # TEMP neutral (square preset would be 80/1 = 80.0)
+    amplitude_mm: 80.0   # square preset 80/1
