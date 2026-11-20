@@ -72,6 +72,11 @@ kind = "tap"
 status = "to_order"
 note = "quotes-2026-11-17-rev3.xlsx F-tap-bottoming-4-40: bottoming tap not owned; recommended Travers 12-111-086."
 
+[tools.tap-4-40-spiral-point]
+kind = "tap"
+status = "to_order"
+note = "Owner ruling 2026-11-20 (Pedro), #2427: MHA-PD-11's #4-40 UNC-2B THRU taps in 1018 stay through, and the shop buys a spiral-point #4-40 tap for them; not owned, source not chosen."
+
 [tools.tap-6-32-plug]
 kind = "tap"
 status = "on_hand"

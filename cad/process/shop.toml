@@ -927,6 +927,8 @@ description = "#2-56 UNC bottoming hand tap (OSG 1011108)"
 description = "#2-56 UNC plug hand tap (OSG 1011008)"
 [tools.tap-4-40-bottoming]  # F-tap-bottoming-4-40; Tap coverage #4-40 UNC
 description = "Bottoming hand tap #4-40 UNC, HSS"
+[tools.tap-4-40-spiral-point]  # Owner ruling 2026-11-20, #2427: MHA-PD-11 #4-40 THRU taps
+description = "Spiral-point (gun) hand tap #4-40 UNC, HSS"
 [tools.tap-6-32-plug]  # Tap coverage #6-32 UNC
 description = "#6-32 UNC plug hand tap (OSG 1023700)"
 [tools.broach-bushing-3-8-a]  # F-broach-bushing
