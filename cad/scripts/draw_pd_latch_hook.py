@@ -27,8 +27,8 @@ edge -- lands where the layout puts it):
   (third angle, so unlabelled): the base length, the ear height and the
   inside bend.
 
-The heat treatment rides the title block's FINISH cell; the fit-up and
-heat-treat sequence is the assembly's (the registry row's process).
+The stock and its temper ride the title block's MATERIAL and FINISH cells;
+the fit-up sequence is the assembly's (the registry row's process).
 """
 
 from __future__ import annotations
@@ -592,7 +592,7 @@ def build(adapter: Any) -> dict[str, str]:
             0: "Latch Hook Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "latch hook; formed spring-steel sheet",
+            3: "latch hook; formed brass sheet",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )

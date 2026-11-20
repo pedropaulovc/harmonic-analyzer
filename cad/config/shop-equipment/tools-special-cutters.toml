@@ -92,11 +92,6 @@ kind = "file_set"
 status = "to_order"
 note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-DT-37-TL-01 file the tooth-space form (.0114-.0323)."
 
-[tools.hardness-test-files-55-65]
-kind = "file_set"
-status = "to_order"
-note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-14 55-63 HRC after hardening."
-
 [tools.number-stamps]
 kind = "stamp_set"
 status = "to_order"

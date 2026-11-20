@@ -135,7 +135,8 @@ status = "on_hand"
 # or tempering, so the heat-treat kit the archived inventory held (torch,
 # quench, 450 °F oven, hardness files; 02fdd651e0^ inventory.toml) is not
 # recorded here: steel that must be hard is bought hardened (as the MHA-SM-02
-# 4140 HT bar is), and the pd-latch-hook redesign is tracked in #2527.
+# 4140 HT bar is), and MHA-PD-14 pd-latch-hook is made from half-hard C26000
+# brass as supplied (#2527, owner's choice 2026-11-20).
 
 [tools.ball-peen-hammer-16oz]
 name = "Estwing E3-16BP 16 oz ball peen hammer (archived inventory)"

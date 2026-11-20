@@ -2465,8 +2465,8 @@ def test_every_screwed_setting_has_a_holding_check() -> None:
     assert texts["fitup-mesh-remedied"][14].startswith("FOR A FAULT ALL ROUND (ARM SETTING)")
     assert texts["fitup-mesh-remedied"][18].startswith("SKIP STEPS ")
     hook = texts["hook-pin-hole-match-drilled"]
-    assert hook[5] == "TIGHTEN THE HOOK SCREWS."
-    assert hook[6] == "CHECK: PUSHED FIRMLY BY HAND, THE HOOK DOES NOT MOVE ON THE BAR."
+    assert hook[4] == "TIGHTEN THE HOOK SCREWS."
+    assert hook[5] == "CHECK: PUSHED FIRMLY BY HAND, THE HOOK DOES NOT MOVE ON THE BAR."
 
 
 def test_no_bare_pinion_names_two_gears() -> None:
@@ -2773,8 +2773,10 @@ def test_the_hook_is_set_on_a_meshed_and_run_hanger() -> None:
     # Codex P1 on b2eb9a0e1: set clear of the pin, the unclamped arm fell
     # through the hole's clearance and opened the feed mesh.
     assert "LOWER EDGE ON THE PIN" in hook
-    # Rule 24: the heat treatment is the hook drawing's.
+    # Rule 24: the pin hole is the hook drawing's. The hook is used as
+    # supplied, with no heat treatment (#2527, owner ruling 2026-11-20).
     assert f"PER {drawing._N['pd-latch-hook']}" in hook
+    assert "HARDEN" not in hook and "TEMPER" not in hook
 
 
 def test_the_feel_set_starts_at_the_worst_corners_first_bind() -> None:

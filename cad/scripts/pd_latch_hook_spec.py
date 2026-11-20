@@ -4,7 +4,7 @@ clearance they hold, and the sheet's marked dimensions.
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure.  Geometry and frame: ``pd_latch_hook_geometry``.
 
-One formed .032 in 1095 spring-steel part: a base on the support
+One formed .032 in half-hard (H02) C26000 brass part: a base on the support
 bar's back face under two #4-40 screws (MHA-SH-VN-52), a 90 deg ear at its +X
 end, and an arm hanging from the ear's lower edge, rolled flatwise to
 lie square to the MHA-PD-VN-58 latch pin, with a pin hole and a finger tab.
@@ -12,12 +12,12 @@ Latching: pull the tab along +U, the arm flexes flatwise and the strip slides
 off the pin; lift the hanger and the pin's crowned end rides up the tab and
 the strip until it snaps into the hole.
 
-Process (the sheet's notes): the blank is the flat pattern; every form is
-made annealed; fit to the bar, clamp the hanger at full feed mesh, set the
-annealed arm square on the pin with the strip's far face at its drawn
-station, transfer the pin's centre to the strip and drill the pin hole on
-the mark; remove, harden and temper, reinstall.  The order of cutting,
-bending and drilling is the shop's.
+Process (the sheet's notes): the blank is the flat pattern, used as
+supplied with no heat treatment; fit to the bar, clamp the hanger at full
+feed mesh, set the arm square on the pin with the strip's far face at its
+drawn station, transfer the pin's centre to the strip; remove, drill the
+pin hole on the mark, reinstall.  The order of cutting, bending and drilling
+is the shop's.
 
 The sheet prints decimal inch (the row's ``drawing_unit: in``); every
 length here stays physical millimetres.  How the sheet locates things:
@@ -100,6 +100,7 @@ from pd_latch_hook_geometry import (
     ARM_Z1,
     BASE_LENGTH,
     BBOX_Y,
+    DEV_HOLE,
     EAR_HEIGHT,
     FAR_FACE_STATION,
     INNER_ROLL_R,
@@ -120,6 +121,8 @@ from pd_latch_hook_geometry import (
     on_arm,
     to_local,
 )
+from pd_transgear_arm_geometry import TIP_STATION as ARM_TIP_STATION
+from pd_vn_transgear_latch_pin_spec import PROUD as LATCH_PIN_PROUD
 from pd_latch_hook_bracket_screw_spec import HEAD_DIA, MAJOR_DIA, MAJOR_DIA_MIN
 
 UNIT = drawing_unit("parts/pd-latch-hook", _config.parts("pd-latch-hook"))
@@ -342,16 +345,53 @@ if HEAD_CLEARANCE_WORST < HEAD_CLEARANCE_FLOOR - 1e-9:
         f"{HEAD_CLEARANCE_FLOOR}: move the screw pair -X"
     )
 
+# --- Release flex (#2527) ------------------------------------------------------
+# Owner ruling 2026-11-20 (Pedro): "no heat treatment for now; pd-latch-hook
+# should be changed to not require heat treatment"; he chose half-hard (H02)
+# C26000 brass, McMaster 8859K86, as supplied.  To release, the tab carries
+# the strip's near face past the latch pin's end, so the arm flexes along the
+# pin by RELEASE_FLEX at the pin hole: a cantilever of its developed length
+# from the ear's lower edge to the hole (DEV_HOLE), loaded at the hole, whose
+# root strain is 3 * flex * t / (2 * L**2).  An overpull of the tab to
+# RELEASE_OVERPULL times that flex must leave the thickest sheet's root under
+# the temper's minimum yield, or the leaf takes a set toward the pin's end
+# and spends the far-face margin (transgear_hanger_joints).
+# MPa: 16,000 ksi (McMaster 8859K86, read live 2026-11-20).
+SHEET_E = 16_000.0 * 6.894757
+# Minimum 0.2 % yield by temper, ASTM B888 (Wieland M30 datasheet); the
+# stock's ASTM B36 and the McMaster page rate none.  H02 is the ordered
+# temper; H01 quarter hard is the next softer one, annealed softer still.
+SHEET_YIELD_MIN = {"H01": 145.0, "H02": 290.0}  # MPa
+SHEET_TEMPER = "H02"
+RELEASE_OVERPULL = 2.0
+RELEASE_FLEX = ARM_TIP_STATION + LATCH_PIN_PROUD - (FAR_FACE_STATION - SHEET_T)
+
+
+def release_flex_to_yield(yield_mpa: float) -> float:
+    """Flex along the pin at the pin hole at which the thickest sheet's arm
+    root first reaches ``yield_mpa``."""
+    thickest = SHEET_T + SHEET_T_PLUS
+    return yield_mpa / SHEET_E * 2.0 * DEV_HOLE**2 / (3.0 * thickest)
+
+
+RELEASE_FLEX_TO_YIELD = release_flex_to_yield(SHEET_YIELD_MIN[SHEET_TEMPER])
+if RELEASE_FLEX_TO_YIELD < RELEASE_OVERPULL * RELEASE_FLEX - 1e-9:
+    raise AssertionError(
+        f"latch hook release: {SHEET_TEMPER} brass yields at {RELEASE_FLEX_TO_YIELD:.2f}"
+        f" of flex, under {RELEASE_OVERPULL:g}x the {RELEASE_FLEX:.2f} release"
+    )
+
 # --- Sheet text --------------------------------------------------------------
-# The title block's MATERIAL cell (the registry row's ``material``, annealed)
-# and FINISH cell (the hardening, after the pin hole is drilled): no note
-# restates either (final review).
-MATERIAL_TITLE = f"{SHEET_T / 25.4:.3f} 1095 sheet, annealed".lstrip("0")
+# The title block's MATERIAL cell (the registry row's ``material``) and FINISH
+# cell (as supplied, no heat treatment, and the tempers the release check
+# excludes): no note restates either (final review).
+_THICKNESS_TEXT = f"{SHEET_T / 25.4:.3f}".lstrip("0")
+MATERIAL_TITLE = f"{_THICKNESS_TEXT} C260 brass, {SHEET_TEMPER} half hard"
 # Part facts only: the fit-up and clamp sequence is the assembly's (the
 # registry row's process).  Note 2 says what the pin hole's centre is
 # transferred from, when, and the bench acceptance (a solid pin guides no
 # drill, so "match-drill on the pin" was no standard form); the hole callout
-# points to it.  The FINISH cell already orders the hardening after drilling.
+# points to it.
 DRAWING_NOTES = "\n".join(
     (
         "1. RADII TO INSIDE SURFACE.",

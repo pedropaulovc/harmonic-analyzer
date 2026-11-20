@@ -1,11 +1,11 @@
-r"""MHA-PD-14 latch hook: one formed spring-steel piece, as pure data.
+r"""MHA-PD-14 latch hook: one formed brass piece, as pure data.
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure.  The part build, its sheet, the paper-drive assembly and the hanger
 joints (``transgear_hanger_joints``) all read the hook from here.
 
-One .032 in 1095 spring-steel blank (McMaster 9043K43, bought annealed),
-formed annealed, then hardened and tempered blue.  It replaces the old
+One .032 in half-hard (H02) C26000 brass blank (McMaster 8859K86), formed
+and used as supplied, with no heat treatment (#2527).  It replaces the old
 edgewise strip, its riveted L bracket and the two rivets:
 
 * the BASE lies flat on the MHA-PD-07 support bar's back face (machine z
@@ -44,9 +44,9 @@ lifts the hanger: the pin's crowned end rides up the tab's curved face and
 the strip face, and the strip snaps over it into the hole.
 
 Process: cut the blank; bend the ear 90 deg; drill the screw holes from the
-formed ear; roll the arm R80 and the tab R10 (annealed); fit to the bar,
-clamp the hanger at full feed mesh and match-drill the pin hole from the
-pin; remove, harden and temper blue, reinstall.
+formed ear; roll the arm R80 and the tab R10; fit to the bar, clamp the
+hanger at full feed mesh and transfer the pin's centre to the strip;
+remove, drill the pin hole on the mark, reinstall.
 
 Part frame (axes parallel to the machine's; the assembly places the part by
 translation only, ``PART_ORIGIN_MACHINE``):
@@ -73,9 +73,9 @@ from pd_transgear_arm_geometry import ARM_ANGLE_DEG, PIN_MACHINE_Z
 from pd_vn_transgear_latch_pin_spec import DIA_MAX as PIN_DIA_MAX
 
 # --- Stock ---------------------------------------------------------------------
-# McMaster 9043K43, formable 1095 spring-steel sheet, annealed, ASTM A684:
-# .032 thick, -.002 to +.002 (live page https://www.mcmaster.com/9043K43/,
-# read 2026-10-31).
+# McMaster 8859K86, 260 brass strip 2 x 12 in, temper H02 (1/2 hard), ASTM
+# B36: .032 thick, -.002 to +.002, modulus 16,000 ksi, yield not rated (live
+# page https://www.mcmaster.com/8859K86/, read 2026-11-20).
 SHEET_T = 0.8128  # .032
 SHEET_T_PLUS = 0.0508  # +.002: the thickest sheet a buyer receives
 SHEET_T_MINUS = 0.0508  # -.002: the thinnest
@@ -127,7 +127,7 @@ WIDTH = 8.128  # .32
 BASE_Y = (SCREW_Y - SCREW_HOLE_Y, SCREW_Y - SCREW_HOLE_Y + WIDTH)
 BASE_LENGTH = 16.764  # .66: the base's -X end to the ear's outer face
 SCREW_HOLE_DIA = 3.2512  # .128 +.004/0: a #30 drill (.1285), #4 clearance
-INSIDE_BEND_R = 1.27  # .05: annealed 1095 at 1.56 T (1.5 T the floor)
+INSIDE_BEND_R = 1.27  # .05: 1.56 T (H02 C26000's published 90 deg minimum is 0 T)
 OUTSIDE_BEND_R = INSIDE_BEND_R + SHEET_T
 # The arm's front edge meets the ear's lower edge in a relief radius: the arm
 # flexes hardest at its root.

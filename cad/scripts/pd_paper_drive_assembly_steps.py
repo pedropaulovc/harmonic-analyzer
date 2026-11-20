@@ -114,7 +114,7 @@ SEQUENCE: tuple[str, ...] = (
     "knob-stack-fitted",
     # Latch (R9-15, R9-24). The hanger is meshed in the rack and run over the
     # platen's travel first; the hook's pin hole is then match-drilled from
-    # the pin to hold that mesh, and the hook hardened and refitted.
+    # the pin to hold that mesh, and the hook refitted.
     "latch-hook-fitted",
     "hanger-meshed",
     "hook-pin-hole-match-drilled",

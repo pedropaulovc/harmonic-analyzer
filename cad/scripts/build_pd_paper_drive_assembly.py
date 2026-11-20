@@ -50,7 +50,7 @@ real receiving and loaded-inspection data remain separately required.
   selected knob removable CHAIN-WRAPPED at the z -155.7 chain plane, and the
   knurled thumbnut on the shaft's front thread, seated on the collar's pilot,
   retains it free (ch23 p.58/59; R9-70).
-* Latch hook: one formed spring-steel piece screwed to the bar's back face;
+* Latch hook: one formed brass piece screwed to the bar's back face;
   the arm's latch pin rides in the round hole in its strip.
 * The ANSI #25 roller chain loops both removables (native connected-linkage
   chain component pattern); the 2.8 sprocket plate fits BETWEEN the chain's
@@ -790,7 +790,7 @@ _chain_inner_wrap_r = KNOB_PITCH_R - CHAIN_PLATE_HALF_H
 # one.
 CHAIN_FRONT_Z_WORST = seat_geometry.SEAT_FACE_Z - seat_geometry.CHAIN_REACH_FRONT  # -160.5865
 
-# Latch hook MHA-PD-14 (contract §4.4): one formed 0.8 spring-steel piece,
+# Latch hook MHA-PD-14 (contract §4.4): one formed 0.8 brass piece,
 # its base on the bar's back face under two MHA-PD-VN-59 screws, its ear bent
 # rearward at the base's +X end and its arm hanging from the ear to the pin.
 # The part frame's axes are the machine's (pd_latch_hook_geometry's
@@ -1581,7 +1581,7 @@ def _assert_lock_station_sweep() -> None:
                 0.0,
             ),
         ),
-        # The one-piece hook: refitted after hardening with its match-drilled
+        # The one-piece hook: refitted after drilling with its match-drilled
         # hole on the pin, it may sit anywhere its two screws' float allows
         # (tap, printed hole position, head float), turning about the pin as
         # well as sliding, so its y drift grows with its x off the screws (up

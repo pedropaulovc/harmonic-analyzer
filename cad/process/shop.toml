@@ -1053,8 +1053,6 @@ description = "Mitutoyo 81-piece inch gauge block set, shop grade"
 description = "Gauge pin .0625 in, class ZZ"
 [tools.grooving-tool-020]  # MHA-PD-23 .020 +.002/.000 ring groove; MHA-MG-04 thread relief, corners R.008 max.; MHA-MG-07 thread relief, corners R.008 max.
 description = "HSS lathe grooving bit, .020 in wide or less, corners R.008 max."
-[tools.hardness-test-files-55-65]  # MHA-PD-14 55-63 HRC after hardening
-description = "Hardness test files, 55 and 65 HRC"
 [tools.knurl-straight-25tpi]  # MHA-PD-13 STRAIGHT KNURL 25 TPI
 description = "Lathe knurling holder with straight 25 TPI wheel"
 [tools.lathe-tool-sharp-nose]  # MHA-PD-08 R.004 max. corners, .016 neck; MHA-PD-17 SPIGOT ROOT R.004 MAX; MHA-PD-23 R.005 MAX land-to-head corner; MHA-PN-04 R.008 max. shoulder

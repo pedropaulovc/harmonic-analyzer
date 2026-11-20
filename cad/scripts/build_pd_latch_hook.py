@@ -1,8 +1,8 @@
 r"""Reproduction script: latch hook (MHA-PD-14; book ch. 23 pp. 58-63; video 4/4).
 
 The "small latch that allows the operator to disengage the gearing from the
-platen" (ch23 text; p.58 "latch" callout): ONE formed .032 in 1095
-spring-steel part.  A base lies on the MHA-PD-07 support bar's back face
+platen" (ch23 text; p.58 "latch" callout): ONE formed .032 in half-hard
+C26000 brass part.  A base lies on the MHA-PD-07 support bar's back face
 under two #4-40 screws (MHA-PD-VN-59); a 90 deg ear rises at its +X end; an arm
 hangs from the ear's lower edge, rolled flatwise until it lies square to
 the MHA-PD-VN-58 latch pin, with the pin hole and a finger tab below it.
@@ -147,7 +147,7 @@ from pd_latch_hook_spec import (
 )
 
 PART_NAME = "pd-latch-hook"
-MATERIAL = "Plain Carbon Steel"  # 1095 spring steel (the registry row names it)
+MATERIAL = "Brass"  # C26000 half hard (the registry row names it)
 DRAWING_PROPERTIES = {
     "Manufacturing Notes": DRAWING_NOTES,
     "Isometric View Note": ISOMETRIC_VIEW_NOTE,
