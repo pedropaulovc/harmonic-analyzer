@@ -43,6 +43,29 @@ length_mm = 304.8
 status = "to_order"
 cite = ["OnlineMetals part 7482 https://www.onlinemetals.com/en/buy/carbon-steel/0-375-x-0-5-carbon-steel-rectangle-bar-1018-cold-finish/pid/7482 read live 2026-11-10: 3/8 x 1/2 1018 cold finish, ASTM A108, 12 in $4.80", "MHA-PD-11 sheet and pd_platen_guide_spec: GUIDE_HEIGHT .29 at .XX, GUIDE_DEPTH .40 +.00/-.01, length 10.62, quantity 2"]
 
+# Ground rod for the five Ø.2500/Ø.3750 +.0000/-.0008 shafts (owner ruling
+# 2026-11-20, #2346: "Buy ground rod; it costs little and leaves the fit
+# stacks alone"). Cold-finished round is about +.000/-.002 as drawn and can
+# miss the -.0008 limit. MHA-CH-04, MHA-CH-05, MHA-DT-13 and MHA-DT-17 read
+# GROUND STOCK OK; MHA-DT-19 does not, and its material (AISI 1018
+# cold-finished steel shafting) is the grade bought here. The grades are the
+# printed ones: 1018 for the 1/4 rows, 1018 or 1045 for MHA-DT-13.
+[stock.1018-ground-round-1-4]
+form = "round_bar"
+material = "AISI 1018 steel, precision ground"
+note = "To order: 1/4 in AISI 1018 precision-ground round whose stated diameter tolerance lies inside +.0000/-.0008; used as supplied on the O.D. Allocation: ch-pivot-shaft (MHA-CH-05), ch-fulcrum-shaft (MHA-CH-04), dt-pinion-lift-rod (MHA-DT-17), dt-pinion-pivot-shaft (MHA-DT-19), cut lengths per each sheet. SKU, length and price not selected. Not owned."
+dia_in = [0.25]
+status = "to_order"
+cite = ["issue #2346 owner ruling 2026-11-20", "ch_pivot_shaft and ch_fulcrum_shaft sheets: 1/4 GROUND STOCK OK; dt_pinion_lift_rod_spec: 1/4 IN GROUND STOCK OK", "registry material_specification: AISI 1018 (CH-04, CH-05, DT-17, DT-19)"]
+
+[stock.1018-or-1045-ground-round-3-8]
+form = "round_bar"
+material = "SAE 1018 or 1045 steel, precision ground"
+note = "To order: 3/8 in SAE 1018 or 1045 precision-ground round whose stated diameter tolerance lies inside +.0000/-.0008; used as supplied on the O.D. Allocation: dt-cylinder-gear-shaft (MHA-DT-13), cut length per its sheet. SKU, length and price not selected. Not owned."
+dia_in = [0.375]
+status = "to_order"
+cite = ["issue #2346 owner ruling 2026-11-20", "dt_cylinder_gear_shaft_notes.SHAFT_DIA_CALLOUT: 3/8 GROUND STOCK OK", "dt-cylinder-gear-shaft registry material_specification: SAE 1018 CF or 1045 ground bar"]
+
 # Gear blanks (#2356): the make route's bar, to buy, not ordered (route A,
 # owner ruling 2026-11-14). Lengths: each blank's length plus .14 in to part and
 # face, plus about 1 in to hold the last one. OnlineMetals C360-H02 round,
