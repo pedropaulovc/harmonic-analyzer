@@ -2273,7 +2273,7 @@ def _step_text(
             "CHECK: PUSHED FIRMLY BY HAND ALONG AND ACROSS ITS TEETH, THE RACK "
             "DOES NOT SHIFT ON THE GUIDE.",
             f"IF IT SHIFTS, REPEAT {s('rack-screwed', 9)}-{s('rack-screwed', 16)} "
-            "WITH NEW RACK SCREWS.",
+            f"WITH NEW {n[explode.RACK_SCREW]}.",
         ),
         # The top guide's taps are tapped to MHA-PD-11's print; the bottom
         # guide's are spotted through the platen with the rack's crests set
@@ -2523,13 +2523,15 @@ def _step_text(
             # slides in is bonded, not scrapped with the arm (owner ruling
             # 2026-11-20 (Pedro), #2497; machinist exception
             # PD-00-press-salvage). The scrap rule stays at every other
-            # press. The cured dowel is read again before the plate goes on.
+            # press. The cured dowel is read again before the plate goes on;
+            # a bond that fails renews the arm's set as 13Y does. The plate
+            # refit and its match mark share a sub-step (24-letter budget).
             "IF A DOWEL SLIDES IN BY HAND, BOND IT WITH LOCTITE 638 AT THE SAME "
-            "PROUD AND CURE 24 H; CHECK: IT DOES NOT MOVE AND READS AS "
+            "PROUD AND CURE 24 H.",
+            "CHECK: PUSHED, A BONDED DOWEL DOES NOT MOVE; IT READS AS "
             f"{s('arm-plate-fitted', 5)}.",
-            "FIT THE PLATE BACK ON THE "
-            f"{n['pd-vn-transgear-arm-plate-locating-pin']} DOWELS.",
-            "MATCH-MARK ARM AND PLATE.",
+            f"IF IT MOVES OR READS OUTSIDE, RENEW AS {s('arm-plate-fitted', 22)}.",
+            "FIT THE PLATE BACK ON ITS DOWELS AND MATCH-MARK ARM AND PLATE.",
             # Delegated ruling 2026-11-07 (Main, L1): the plate's screw holes
             # are the master for the arm's 8-32 taps.
             f"WITH {n['pd-transgear-arm-plate']} DOWELED TO {n['pd-transgear-arm']}, "
@@ -2544,12 +2546,11 @@ def _step_text(
             f"FIT {TRANSGEAR_QUANTITIES['pd-vn-transgear-arm-plate-screw']} "
             f"{n['pd-vn-transgear-arm-plate-screw']} SCREWS IN THE ARM'S THROUGH "
             "TAPS.",
-            "SNUG BOTH SCREWS.",
-            "TIGHTEN THE SCREWS IN TURN.",
+            "SNUG BOTH SCREWS, THEN TIGHTEN THEM IN TURN.",
             "CHECK, AFTER EVERY REFIT: PUSHED AND ROCKED BY HAND, THE PLATE HAS "
             "NO SHAKE ON THE DOWELS AND NO DAYLIGHT UNDER IT.",
             "IF IT SHAKES OR SHOWS DAYLIGHT, CLEAN AND DEBURR THE FACES AND "
-            f"DOWELS AND REPEAT {s('arm-plate-fitted', 13)}-{s('arm-plate-fitted', 17)}.",
+            f"DOWELS AND REPEAT {s('arm-plate-fitted', 14)}-{s('arm-plate-fitted', 17)}.",
             # The doweled plate is read before the pivot spacer is pressed, the cup
             # cross-pinned or the hook drilled, so a setting the dowels lost
             # costs only the arm's own parts. The uncut plate screws stand
@@ -2726,8 +2727,8 @@ def _step_text(
             # machinist review round 6, accept PD-00-disc-hub-shear-clamp).
             "CHECK: WITH THE SLEEVE HELD, FIRM HAND TORQUE AT THE DISC RIM DOES "
             "NOT TURN THE DISC ON THE HUB.",
-            "IF IT TURNS, FIT NEW DISC SCREWS AND "
-            f"REPEAT {s('disc-taps-transferred', 12)}-{s('disc-taps-transferred', 14)}.",
+            f"IF IT TURNS, FIT NEW {n[explode.DISC_SCREW]}, REPEAT "
+            f"{s('disc-taps-transferred', 12)}-{s('disc-taps-transferred', 14)}.",
             "MATCH-MARK DISC AND HUB.",
         ),
         "disc-screws-cut": (
@@ -2824,10 +2825,12 @@ def _step_text(
             f"FRONT {row_cite('cup-pin-hole')}.",
             f"PRESS THE {n['pd-vn-transgear-knob-cup-pin']} PIN IN, CENTRED.",
             # Owner ruling 2026-11-20 (Pedro), #2497: re-pinned once at 90
-            # degrees; a slip after a re-pin, here or at 28P/33R, renews both.
+            # degrees; a slip after a re-pin, here or at 28P/33R, renews both,
+            # the new shaft fitted again from 22A.
             "IF THE PIN SLIDES IN BY HAND, PRESS IT OUT AND REPEAT "
-            f"{s('knob-stack-fitted', 2)}-{s('knob-stack-fitted', 4)} WITH "
-            f"{repinned}.",
+            f"{s('knob-stack-fitted', 2)}-{s('knob-stack-fitted', 4)} WITH A NEW PIN "
+            "AT 90\u00b0; IF RE-PINNED BEFORE, DRAW THE SHAFT OUT AND REPEAT FROM "
+            f"{s('knob-stack-fitted', 0)} WITH A NEW CUP AND SHAFT.",
             f"SLIDE THE {n['pd-transgear-drive-collar']} COLLAR ON THE "
             f"{n['pd-transgear-knob-shaft']} SHAFT, ITS PIN ON THE D-FLAT, ITS DOWELS "
             "FORWARD, NOT YET FIXED TO THE SHAFT.",
@@ -3226,11 +3229,11 @@ def _step_text(
             f"({CHAIN_QUANTITIES['sh-vn-chain-link--InnerLink']} INNER, ITEM "
             f"{SHARED_NUMBER_ITEMS['sh-vn-chain-link--InnerLink']}, AND "
             f"{CHAIN_QUANTITIES['sh-vn-chain-link--OuterLink']} OUTER LINKS, ITEM "
-            f"{SHARED_NUMBER_ITEMS['sh-vn-chain-link--OuterLink']}), CUT OFF THE "
-            f"{CHAIN_ORDER_FEET} FT OF ANSI #25 CHAIN WITH A #25 CHAIN BREAKER OR BY "
-            f"GRINDING OFF A PIN'S TWO HEADS, OVER THE {knob_short} AND THE "
-            f"{crank_short}, SLACK RUN HANGING FREE; NO TENSIONING. THE "
-            f"CONNECTING LINK MAKES IT {chain.LINK_COUNT} PITCHES.",
+            f"{SHARED_NUMBER_ITEMS['sh-vn-chain-link--OuterLink']}), CUT FROM "
+            f"{CHAIN_ORDER_FEET} FT OF ANSI #25 CHAIN WITH A #25 CHAIN BREAKER, OVER "
+            "THE "
+            f"{knob_short} AND THE {crank_short}, SLACK RUN HANGING FREE; NO "
+            f"TENSIONING. THE CONNECTING LINK MAKES IT {chain.LINK_COUNT} PITCHES.",
             f"JOIN THE ENDS WITH THE {n['pd-vn-chain-connecting-link']} #25 "
             f"CONNECTING LINK (MCMASTER {_SKU['pd-vn-chain-connecting-link']}), "
             "ITS CLIP'S CLOSED END LEADING IN THE DIRECTION OF TRAVEL.",

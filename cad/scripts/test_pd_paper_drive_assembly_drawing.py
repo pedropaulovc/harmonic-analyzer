@@ -477,13 +477,28 @@ def test_released_cup_pins_are_renewed_once_at_ninety_degrees() -> None:
     (at 22F, 28P or 33R) are renewed; the arm's slipping dowel is bonded and
     read again once cured."""
     repin = "WITH A NEW PIN AT 90\u00b0 (RE-PINNED BEFORE: NEW CUP AND SHAFT)"
-    for key in ("knob-stack-fitted", "fitup-mesh-remedied", "fitup-accepted"):
+    for key in ("fitup-mesh-remedied", "fitup-accepted"):
         assert repin in " ".join(_step_body(key).split()), key
-    bonded = " ".join(_step_body("arm-plate-fitted").split())
+    fitted = drawing._step_text(operating_domain=_unit_operating_domain())[
+        "knob-stack-fitted"
+    ][5]
     assert (
-        "BOND IT WITH LOCTITE 638 AT THE SAME PROUD AND CURE 24 H; CHECK: IT DOES "
-        f"NOT MOVE AND READS AS {drawing.sub_step('arm-plate-fitted', 5)}."
-    ) in bonded
+        "AT 90\u00b0; IF RE-PINNED BEFORE, DRAW THE SHAFT OUT AND REPEAT FROM "
+        f"{drawing.sub_step('knob-stack-fitted', 0)} WITH A NEW CUP AND SHAFT."
+    ) in fitted
+    # The bond, its check and the check's remedy are separate sub-steps.
+    bond, check, remedy = drawing._step_text(operating_domain=_unit_operating_domain())[
+        "arm-plate-fitted"
+    ][6:9]
+    assert "BOND IT WITH LOCTITE 638 AT THE SAME PROUD AND CURE 24 H." in bond
+    assert check == (
+        "CHECK: PUSHED, A BONDED DOWEL DOES NOT MOVE; IT READS AS "
+        f"{drawing.sub_step('arm-plate-fitted', 5)}."
+    )
+    assert remedy.endswith(f"RENEW AS {drawing.sub_step('arm-plate-fitted', 22)}.")
+    assert drawing._step_text(operating_domain=_unit_operating_domain())[
+        "arm-plate-fitted"
+    ][22].startswith("IF A CHECK STILL FAILS, THE DOWELS HAVE NOT HELD")
 
 
 def test_a_feed_sleeve_found_outside_after_hanging_has_a_renewal_route() -> None:

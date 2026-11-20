@@ -241,4 +241,4 @@ note = "Stamps the MHA-FR-01 serial (STAMP \"2\" / 1/8 FIGURE STAMP). Owner deci
 name = "Roller chain breaker for ANSI #25 chain"
 kind = "chain_breaker"
 status = "to_order"
-note = "Pushes one outer link's pin out to cut the MHA-PD-00 chain loops (step 34); grinding the pin's two heads off and driving it out is the printed alternative. Owner ruling 2026-11-20 (Pedro), #2429, option A."
+note = "Pushes one outer link's pin out to cut the MHA-PD-00 chain loops (step 34). Owner ruling 2026-11-20 (Pedro), #2429, option A."
