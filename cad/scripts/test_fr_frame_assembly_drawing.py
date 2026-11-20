@@ -638,13 +638,15 @@ class _SourceModel:
         return 2  # swDocASSEMBLY
 
 
-def _frame_build(monkeypatch, tmp_path, *, dirty_at: str | None):
+def _frame_build(monkeypatch, tmp_path, *, dirty_at: str | None, entered=None):
     """Run ``drawing.build`` with every native step faked; the source goes
-    dirty during ``dirty_at`` ("placement" or "finalize") if given."""
+    dirty during ``dirty_at`` ("placement" or "finalize") if given.
+    ``entered`` records each start of finalization."""
     source = tmp_path / "fr-frame-assembly.SLDASM"
     source.write_bytes(b"released")
     model = _SourceModel()
     finalized: list[bool] = []
+    entered = [] if entered is None else entered
 
     def place_package(*_args):
         if dirty_at == "placement":
@@ -652,6 +654,7 @@ def _frame_build(monkeypatch, tmp_path, *, dirty_at: str | None):
         return lambda: None
 
     def finalize_drawing(_adapter, _outputs, *, settled_checks, **_kwargs):
+        entered.append(True)
         if dirty_at == "finalize":
             model.dirty = True
         for settled in settled_checks:
@@ -689,6 +692,9 @@ def test_a_dirtied_source_fails_before_the_drawing_saves(
 ) -> None:
     # #1364: a drawing step dirtied the writable released source and the
     # drawing's save rewrote it; the fingerprint only caught it afterwards.
-    # As in drive-train's drawing, a dirty source now fails before the save.
+    # As in drive-train's drawing, a dirty source now fails before the save:
+    # a dirty placement never reaches finalization.
+    entered: list[bool] = []
     with pytest.raises(RuntimeError, match=f"dirtied the released source assembly by {where}"):
-        _frame_build(monkeypatch, tmp_path, dirty_at=dirty_at)
+        _frame_build(monkeypatch, tmp_path, dirty_at=dirty_at, entered=entered)
+    assert entered == ([True] if finalizes else [])
