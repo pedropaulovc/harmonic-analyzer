@@ -726,6 +726,10 @@ The benchmark measures release-package/LLM review regressions; its cases are
 A case whose drawing was renamed after its release names the current registry
 package and the release's PDF basename in `release_pdf`; run and import read
 that PDF.
+A case whose sheet no published release carries yet sets `release` to
+`committed`: its PDF is committed under its registry basename in
+`tools/machinist-review-evals/pdf/`, read there in place, and the case's
+`expected_output` names the build that produced it.
 
 Regression tests defend observable manufacturing contracts and plausible
 failures, not note wording, line counts or mocked API-call sequences. Native

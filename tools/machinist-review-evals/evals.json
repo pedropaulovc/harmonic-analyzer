@@ -4890,6 +4890,27 @@
           "evidence": "MHA-PD-11 sheet 1 table headings: 'TAG', 'X LOC (BASIC)', 'Y LOC (BASIC)', 'SIZE'. Rows A1-A9 give X values '1.062', '2.909', '3.185', '3.461', '5.308', '7.155', '7.431', '7.707', '9.554', each at Y '0.140', with 'Ø.089 THRU ALL / 4-40 UNC - 2B THRU ALL'. The view carries matching A1-A9 tags, X/Y zero marks and the linked pattern note 'MATCHES MHA-PD-02 AND MHA-PD-12 HOLES; WALL .060 MIN, TAPS TO EDGES'."
         }
       ]
+    },
+    {
+      "id": 87,
+      "name": "strap-fixture-load-path-control",
+      "package": "ch_rocker_strap_tl_fixture_assembly",
+      "kind": "assembly",
+      "release": "committed",
+      "prompt": "Blind machinist review of the ch-rocker-strap-tl-fixture assembly package (2 sheets).",
+      "expected_output": "Control for the assembly pass's precision-axis load-path step (#1613). Every location load on the blank goes into the sub-plate's integral fence and end stop or its top, every clamp and the hub screw seat in the plate, and the plate sits on parallels under both long edges in the vise, so no blocker reports an unsupported or cantilevered load path. The committed PDF (SHA-256 ac15a8596c07) is the farm build of b3e8eb216a, PR #3056's merged head, stored in the remote cache on 2026-11-18 as drawing:ch_rocker_strap_tl_fixture_assembly key dd0f0abcfb76; no release carries the fixture yet. The cantilevered TL-00 package of #1613 (de356bb3) was never released and its cache artifacts have expired. Other drawing defects remain reviewable.",
+      "expectations": [
+        {
+          "text": "No blocker says a precision-axis load path is unsupported or cantilevered, or that a joint can rock or open about one fastener row under such a load: the blank seats against the sub-plate's integral fence and end stop on the plate top, each edge clamp sits in a pocket in the plate, the hub screw runs through the washer into the plate, and the plate is set on parallels under its long edges in the vise",
+          "check": {
+            "absent_from": "blockers"
+          },
+          "rule": 23,
+          "polarity": "positive",
+          "confidence": "high",
+          "evidence": "MHA-CH-13-TL-00 sheet 1 BOM item 1 'STRAP SUB-PLATE, FENCE AND END STOP INTEGRAL'; step 1 'SET ITEM 1 ON 1.00 IN PARALLELS UNDER ITS LONG EDGES IN THE 6 IN VISE, CENTRED, THE FENCE TOWARD THE FIXED JAW'; step 7 'SET EACH ITEM 4 IN ITS POCKET'. Sheet 2 step 9 'SEAT THE BLANK ON THE PLATE TOP AGAINST THE FENCE AND THE END STOP'; step 21 'RUN ITEM 5 THROUGH ITEM 3 INTO ITEM 1, SNUG'. No view shows a loaded part, clamp or screw beyond the edge of the member under it; the vise and parallels are named in step 1 but not drawn."
+        }
+      ]
     }
   ]
 }

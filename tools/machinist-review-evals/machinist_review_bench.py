@@ -1,8 +1,10 @@
 """Skill-creator-compatible benchmarks for blind release-package machinist reviews.
 
-The skill is the composed reviewer prompt, not the CAD authoring context. Inputs
-and results live outside Git worktrees. This offline prompt-tuning harness lives
-outside ``cad/scripts``: no CAD build or review leaf imports it.
+The skill is the composed reviewer prompt, not the CAD authoring context.
+Release inputs and all results live outside Git worktrees; only the few PDFs no
+release carries yet are committed beside the bench (``pdf/``). This offline
+prompt-tuning harness lives outside ``cad/scripts``: no CAD build or review leaf
+imports it.
 """
 
 from __future__ import annotations
@@ -38,6 +40,11 @@ import machinist_review as mr  # noqa: E402
 
 REPO_ROOT = mr.CAD_ROOT.parent
 DEFAULT_EVALS = Path(__file__).with_name("evals.json")
+# A case whose sheet no published release carries yet names this "release":
+# its PDF is committed under its registry basename in COMMITTED_PDFS, and the
+# case's evidence records the build that produced it.
+COMMITTED_RELEASE = "committed"
+COMMITTED_PDFS = Path(__file__).with_name("pdf")
 CONFIGURATIONS = ("with_skill", "old_skill")
 DEFAULT_SKILL_CREATOR = Path("C:/src/anthropics-skills/skills/skill-creator")
 
@@ -178,6 +185,12 @@ def load_evals(
             or not re.fullmatch(r"[a-z0-9][a-z0-9-]*\.pdf", release_pdf)
         ):
             raise ValueError(f"{name}: release_pdf must be a PDF basename")
+        if case.get("release") == COMMITTED_RELEASE:
+            if release_pdf is not None:
+                raise ValueError(f"{name}: a committed PDF carries its registry name")
+            committed = COMMITTED_PDFS / release_pdf_name(case)
+            if not committed.is_file():
+                raise ValueError(f"{name}: no committed PDF at {committed}")
         for key in ("release", "prompt", "expected_output"):
             if not isinstance(case.get(key), str) or not case[key].strip():
                 raise ValueError(f"{name}: {key} is required")
@@ -481,7 +494,10 @@ def import_iteration(
 
 
 def release_pdfs(release: str, workspace: Path) -> Path:
-    """Cache only PDFs, downloading and extracting each release bundle once."""
+    """Cache only PDFs, downloading and extracting each release bundle once.
+    The committed PDFs are read in place."""
+    if release == COMMITTED_RELEASE:
+        return COMMITTED_PDFS
     cache = workspace / "cache" / "releases" / _sha(release)[:16]
     pdf_dir = cache / "pdf"
     if (cache / "release.json").is_file():
