@@ -173,22 +173,33 @@ def test_feature_volumes_are_consistent() -> None:
 
 
 def test_tie1_counter_drill_leaves_a_short_60_at_the_back_face() -> None:
-    # Owner ruling on #2406 (A): #50 (.070) from the drum face to .317, so
-    # the #60 is drilled about .10 (2.5 x D), not the whole .417 boss.
+    # Owner ruling on #2406 (A): #50 (.070) from the drum face, leaving about
+    # .10 of #60 (2.5 x D) at the back face, not the whole .417 boss.
     inch = 25.4
     boss = geom.HUB_BACK_Z - geom.HUB_STEP_Z
     assert geom.TIE1_CDRILL_DIA == pytest.approx(0.070 * inch)
-    assert geom.TIE1_CDRILL_DEPTH == pytest.approx(0.317 * inch)
-    assert (boss - geom.TIE1_CDRILL_DEPTH) / inch == pytest.approx(0.10, abs=0.001)
+    assert (boss - geom.TIE1_CDRILL_DEPTH) / inch == pytest.approx(0.10, abs=0.005)
     assert (boss - geom.TIE1_CDRILL_DEPTH) / geom.TIE_HOLE_DIA < 2.6
-    # At the shortest printed boss, the deepest printed shoulder and the
-    # largest drilled #50's 118 deg point, full #60 is still left.
+    # The depth's only function is that land, so it prints at the title
+    # block's .XX: its model value is exact at two places.
+    assert geom.TIE1_CDRILL_DEPTH_PLACES == 2
+    assert round(geom.TIE1_CDRILL_DEPTH / inch, 2) * inch == pytest.approx(
+        geom.TIE1_CDRILL_DEPTH
+    )
+    # At the shortest printed boss, the deepest printed shoulder (+.01) and
+    # the largest drilled #50's 118 deg point, full #60 is still left.
     point = (0.070 + 0.004 - 0.040) * inch / 2.0 / math.tan(math.radians(59.0))
     boss_min = geom.HUB_LEN_LIMITS[0] - geom.SPIGOT_LEN_LIMITS[1]
     assert geom.TIE1_LAND_MIN == pytest.approx(
-        boss_min - (0.317 + 0.005) * inch - point
+        boss_min - geom.TIE1_CDRILL_DEPTH - 0.01 * inch - point
     )
     assert geom.TIE1_LAND_MIN > 0.0
+    # The shallowest printed shoulder (-.01) still stands past the spokes'
+    # front face, so the #50 is the Ø the boss walls are judged on.
+    assert (
+        geom.HUB_STEP_Z + geom.TIE1_CDRILL_DEPTH - 0.01 * inch
+        > -mg_magnifying_wheel_spec.SPOKE_AXIAL / 2.0
+    )
 
 
 def test_tie1_volume_unites_the_60_and_the_counter_drill() -> None:
@@ -216,7 +227,7 @@ def test_tie1_volume_unites_the_60_and_the_counter_drill() -> None:
 
 def test_tie1_name_rides_under_the_counter_drill_row() -> None:
     definitions = {
-        5: "<MOD-DIAM>a DRILL THRU\n<MOD-DIAM>b <HOLE-DEPTH>c FAR SIDE",
+        5: "<MOD-DIAM><a> DRILL THRU\n<MOD-DIAM><b> DRILL <HOLE-DEPTH><c> <far>",
         6: "",
         7: "",
         8: "",
@@ -230,6 +241,33 @@ def test_tie1_name_rides_under_the_counter_drill_row() -> None:
         drawing.tie1_named_definition({**definitions, 5: "x <HOLE-DEPTH>c\ny"})
     with pytest.raises(RuntimeError):
         drawing.tie1_named_definition({**definitions, 8: drawing.TIE1_NAME})
+
+
+def test_tie1_callout_prints_drill_places_and_a_two_place_depth() -> None:
+    definitions = {
+        5: "<MOD-DIAM><a> DRILL THRU\n<MOD-DIAM><b> DRILL <HOLE-DEPTH><c> <far>",
+        6: "",
+        7: "",
+        8: "",
+    }
+    places = drawing.tie1_callout_precision(definitions)
+    assert places == {
+        "a": drawing.TIE1_DIA_PLACES,
+        "b": drawing.TIE1_DIA_PLACES,
+        "c": drawing.TIE1_DEPTH_PLACES,
+    }
+    assert drawing.TIE1_DIA_PLACES == 3 and drawing.TIE1_DEPTH_PLACES == 2
+    # Each element's row states its process (rule 12) before any depth.
+    near, far = part.tie1_callout_strings("<d>", "<h>", "<f>")
+    for row in (near, far):
+        assert row.startswith("<MOD-DIAM><d> DRILL ")
+    assert far.index("<HOLE-DEPTH><h>") > far.index("DRILL")
+    # A missing depth or Ø refuses rather than printing default places.
+    with pytest.raises(RuntimeError):
+        drawing.tie1_callout_precision({**definitions, 5: "<MOD-DIAM><a> DRILL THRU"})
+    dia60, dia50, depth = drawing.tie1_printed_values()
+    assert (dia60, dia50) == (".040", ".070")
+    assert len(depth.split(".")[1]) == 2
 
 
 def test_tie2_profile_runs_radially_and_ends_in_air() -> None:

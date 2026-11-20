@@ -159,11 +159,15 @@ DRILL_WANDER_DEG = 0.3
 # (owner ruling 2026-11-20 on #2406: "A"): a #60 drilled through the whole
 # boss, 10 x D in cast iron, was the likeliest way to scrap a finished wheel.
 # The depth runs to the #50's shoulder; its 118 deg point narrows on to the
-# #60 beyond it.
+# #60 beyond it.  The depth's one function is that land: it prints at the
+# title block's .XX, since its deepest .33 still leaves full #60
+# (TIE1_LAND_MIN) and its shallowest .31 still clears the spokes' plane
+# (mg_magnifying_wheel_spec._TIE1_R_MAX); .32 leaves the ruled .10 (.097).
 TIE1_CDRILL_SIZE = "#50"
 TIE1_CDRILL_DIA = 1.778  # .070, a #50 drill
-TIE1_CDRILL_DEPTH = 8.0518  # .317 from the boss front face
-TIE1_CDRILL_PLACES = 3
+TIE1_CDRILL_PLACES = 3  # the drill's Ø, as the title block's drilled row
+TIE1_CDRILL_DEPTH = 8.128  # .32 from the boss front face
+TIE1_CDRILL_DEPTH_PLACES = 2
 TIE1_PLACES = 2
 TIE1_X = 9.652  # .38
 TIE1_Y = -5.588  # -.22
@@ -207,9 +211,9 @@ TIE1_CDRILL_POINT_TO_TIE = (
 )  # 0.260
 TIE1_LAND_MIN = (
     (HUB_LEN_LIMITS[0] - SPIGOT_LEN_LIMITS[1])
-    - printed_limits(TIE1_CDRILL_DEPTH, TIE1_CDRILL_PLACES)[1]
+    - printed_limits(TIE1_CDRILL_DEPTH, TIE1_CDRILL_DEPTH_PLACES)[1]
     - TIE1_CDRILL_POINT_TO_TIE
-)  # 1.950
+)  # 1.75
 if TIE1_LAND_MIN <= 0.0:
     raise AssertionError(
         f"TIE 1's #50 breaks through the back face: {TIE1_LAND_MIN:.3f}"
