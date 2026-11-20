@@ -21,8 +21,9 @@ What you get, **configured on first use** -- the first log, span or
   silent hole in the trace — and :func:`run_pipeline_span` opens a root span that
   spans an entire process invocation, so every child has a parent.
 * **Structured capture (best-effort).** Full span/log JSON is also written under
-  ``cad/out/reports/telemetry/`` for post-hoc querying; failures there never
-  break a build (same discipline as the cache ``.jsonl`` log).
+  ``cad/out/reports/telemetry/`` (or ``HARMONIC_TELEMETRY_DIR``) for post-hoc
+  querying; failures there never break a build (same discipline as the cache
+  ``.jsonl`` log).
 
 Drop-in for the old helpers: ``progress()`` == the old ``log()``, ``success()``
 == the ``  OK  `` lines, ``warn()`` / ``error()`` == the ``!!`` / ``FAIL`` lines.
@@ -531,13 +532,19 @@ def _compact_span(span: ReadableSpan) -> str:
 
 
 def _telemetry_dir() -> Path | None:
-    """``cad/out/reports/telemetry`` if it can be created, else ``None``.
+    """``HARMONIC_TELEMETRY_DIR``, else ``cad/out/reports/telemetry``, if it can be
+    created; else ``None``. Unset or empty keeps the reports default.
 
     Best-effort, exactly like the cache ``.jsonl`` log: telemetry capture must
     never be the reason a build fails.
     """
     try:
-        out = Path(__file__).resolve().parents[1] / "out" / "reports" / "telemetry"
+        configured = os.environ.get("HARMONIC_TELEMETRY_DIR")
+        out = (
+            Path(configured)
+            if configured
+            else Path(__file__).resolve().parents[1] / "out" / "reports" / "telemetry"
+        )
         out.mkdir(parents=True, exist_ok=True)
         return out
     except Exception:  # noqa: BLE001 - capture is best-effort, never fatal
@@ -1037,7 +1044,8 @@ def _configure(*, console: bool) -> None:
     emits calls it, so the first log, span or :func:`inject_env` configures.
 
     ``console`` toggles the human-readable stderr stream (and the compact span
-    tracer). File capture under ``cad/out/reports/telemetry`` is always attempted
+    tracer). File capture under ``cad/out/reports/telemetry`` (or
+    ``HARMONIC_TELEMETRY_DIR``) is always attempted
     (best-effort). ``force`` re-reads the environment (verbosity, OTLP endpoints)
     and replaces the shared processors, shutting the previous ones down; the
     installed providers, and their resources, stay.

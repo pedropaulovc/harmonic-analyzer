@@ -1,16 +1,72 @@
 """Suite-wide test isolation for the whole repository (``cad/scripts`` and ``tests``)."""
 
+import _thread
+import atexit
 import importlib
 import importlib.util
 import os
 import subprocess
 import sys
 import tempfile
+import threading
 import traceback
 from importlib.machinery import SourceFileLoader
 from pathlib import Path
 
 import pytest
+
+# Isolate the session's environment before anything imports product code:
+# collection imports test modules (and through them dodo, _artifact_cache,
+# _telemetry, _farm), which read these at import or first use, before any
+# autouse fixture runs. Every child a test starts inherits the same settings.
+# Tests of these variables set them explicitly with monkeypatch.
+_SCRATCH = tempfile.TemporaryDirectory(
+    prefix="harmonic-tests-", ignore_cleanup_errors=True
+)
+# Registered before anything imports _telemetry, so it runs after telemetry's
+# own exit hook has closed the capture files it keeps in this directory.
+atexit.register(_SCRATCH.cleanup)
+# Never pull from or publish to the shared remote cache (the default mode is rw).
+os.environ["HARMONIC_REMOTE_CACHE_MODE"] = "off"
+# Never reach the real build farm: no inherited executor or farm run identity,
+# and a pool configuration path that does not exist.
+for _name in [*os.environ]:
+    if _name == "HARMONIC_EXECUTOR" or _name.startswith("HARMONIC_FARM_"):
+        del os.environ[_name]
+os.environ["SOLIDWORKS_POOL_CONFIG"] = str(Path(_SCRATCH.name) / "no-pool-config.json")
+# The pool marks a farm leaf's process with ``farm.execution``; a test never is one.
+_attributes = os.environ.get("OTEL_RESOURCE_ATTRIBUTES")
+if _attributes is not None:
+    os.environ["OTEL_RESOURCE_ATTRIBUTES"] = ",".join(
+        entry
+        for entry in _attributes.split(",")
+        if entry.partition("=")[0].strip() != "farm.execution"
+    )
+os.environ["HARMONIC_SW_AUTOSTART"] = "0"
+# No credentials for the cache or any other Azure resource.
+for _name in (
+    "HARMONIC_CACHE_SAS",
+    "AZURE_CLIENT_ID",
+    "AZURE_CLIENT_SECRET",
+    "AZURE_TENANT_ID",
+    "AZURE_CLIENT_CERTIFICATE_PATH",
+    "AZURE_CLIENT_CERTIFICATE_PASSWORD",
+    "AZURE_FEDERATED_TOKEN_FILE",
+    "AZURE_STORAGE_CONNECTION_STRING",
+    "AZURE_STORAGE_KEY",
+    "AZURE_STORAGE_SAS_TOKEN",
+):
+    os.environ.pop(_name, None)
+# Export no telemetry (an empty endpoint disables its signal), and capture the
+# JSONL files in scratch rather than the checkout's cad/out/reports/telemetry.
+for _name in (
+    "OTEL_EXPORTER_OTLP_ENDPOINT",
+    "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+    "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT",
+    "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT",
+):
+    os.environ[_name] = ""
+os.environ["HARMONIC_TELEMETRY_DIR"] = str(Path(_SCRATCH.name) / "telemetry")
 
 # A test process never starts (or kills) SolidWorks. On amet a start takes the
 # licence farm worker w15 shares; on a worker it takes the seat from the build.
@@ -208,6 +264,51 @@ def _memoize_doit_plugin_entry_points():
     doit.plugin.entry_points_impl = lambda: entry_points
 
 
+class WatchdogExitBlocked(RuntimeError):
+    """A test let the COM watchdog's hard exit fire."""
+
+
+def _refuse_watchdog_exit(code):
+    stack = "".join(traceback.format_stack(limit=25)[:-1])
+    test = os.environ.get("PYTEST_CURRENT_TEST", "<no test>")
+    message = (
+        f"COM watchdog hard exit {code} refused in {test}: a watchdog or "
+        "deadline fired, and the real exit would end pytest. A test that "
+        "exercises an exit injects exit_fn or patches _watchdog._hard_exit.\n"
+        f"Caller stack:\n{stack}"
+    )
+    _refused.append(message)
+    if threading.current_thread() is threading.main_thread():
+        raise WatchdogExitBlocked(message)
+    # A watchdog thread fired, so the main thread may be stuck in the very call
+    # the exit exists to abandon: interrupt it rather than hang the session.
+    _thread.interrupt_main()
+
+
+def _install_watchdog_exit_guard():
+    """Replace the watchdog's one hard exit for the session, collection included.
+
+    ``_watchdog._hard_exit`` is ``os._exit``: a deadline or a default-exit
+    ``Watchdog`` firing in a test would end pytest itself, with no report.
+    The refusal is recorded like a launch, so it fails the test. On the main
+    thread it raises; from a watchdog or deadline thread it interrupts the
+    main thread instead, which a block stuck in Python code cannot ignore.
+    Tests that exercise an exit patch ``_hard_exit`` or inject ``exit_fn``
+    themselves. Importing the module here makes every later ``import
+    _watchdog`` in this process return the guarded one.
+    """
+    scripts = Path(__file__).resolve().parent / "cad" / "scripts"
+    if not (scripts / "_watchdog.py").is_file():
+        return  # A private nested project (a copy of this conftest) has none.
+    if "_watchdog" not in sys.modules:
+        sys.path.insert(0, str(scripts))
+        try:
+            importlib.import_module("_watchdog")
+        finally:
+            sys.path.remove(str(scripts))
+    sys.modules["_watchdog"]._hard_exit = _refuse_watchdog_exit
+
+
 def pytest_configure(config):
     """Isolate the test session from the machine it runs on.
 
@@ -232,7 +333,9 @@ def pytest_configure(config):
     with a real runner. A refusal raises with the caller's stack and fails the
     test even if the code under test swallowed it. Every Python child loads
     the same refusals through ``tests/_child_guard/sitecustomize.py`` and
-    exits on one, which fails the test that started it.
+    exits on one, which fails the test that started it. On every platform,
+    and whatever ``NOSW_GUARD`` says, the watchdog's hard exit is refused the
+    same way instead of ending pytest.
     """
     _memoize_doit_plugin_entry_points()
     if "HARMONIC_BUILDGRAPH_CACHE" not in os.environ:
@@ -257,6 +360,7 @@ def pytest_configure(config):
         _install_launch_guard()
         _install_activation_guard()
         _install_dodo_guard()
+    _install_watchdog_exit_guard()
 
 
 @pytest.fixture

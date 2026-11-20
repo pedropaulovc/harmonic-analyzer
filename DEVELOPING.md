@@ -404,10 +404,21 @@ including offline diagnostic tests.
 Use an isolated worktree at a recorded commit and the same environment for
 before/after runs. JUnit case times include fixture setup and teardown; a shared
 fixture's cost is charged to its first consumer. Collection and session overhead
-remain part of the suite wall time. Telemetry appends to that worktree's ignored
-`cad/out/reports/telemetry`, and the root conftest isolates the buildgraph facts
-cache in a temporary directory. Keep `NOSW_GUARD` enabled and leave
-`HARMONIC_BUILDGRAPH_CACHE` unset. With the guard on (Windows only), a test
+remain part of the suite wall time. Before collection imports any product
+module, the root conftest turns the remote cache off, drops inherited farm run
+settings (`HARMONIC_EXECUTOR`, `HARMONIC_FARM_*`, the `farm.execution` resource
+attribute) and cache/Azure credential variables, points `SOLIDWORKS_POOL_CONFIG`
+at a file that does not exist, sets `HARMONIC_SW_AUTOSTART=0`, blanks the
+OTLP endpoints and redirects telemetry capture (`HARMONIC_TELEMETRY_DIR`) to a
+per-session scratch directory; a test of any of these sets it explicitly. It
+also isolates the buildgraph facts cache in a temporary directory, and refuses
+`_watchdog._hard_exit` like a launch instead of ending pytest. On the main
+thread the refusal fails the test. From a watchdog or deadline thread it also
+interrupts the main thread: a deadline block busy in Python code then fails its
+test, while a block in an untimed C-level wait or an interrupt outside any
+deadline still hangs or aborts the run (#3182). Keep `NOSW_GUARD`
+enabled and leave `HARMONIC_BUILDGRAPH_CACHE` unset. With the guard on
+(Windows only), a test
 fails if it starts SolidWorks or its 3DEXPERIENCE launchers, shell-opens
 anything (`os.startfile`, `ShellExecute(Ex)`, `explorer`/`rundll32`, a `cmd`
 or PowerShell command that starts, opens or evaluates something, or names a
