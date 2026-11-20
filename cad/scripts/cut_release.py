@@ -23,7 +23,8 @@ What it does, in order:
      under ``cad/out/release/native/`` -- ``solidworks/`` + ``slddrw/`` plus
      ``native-package.json``, the sidecar carrying every COM-derived fact (the
      SolidWorks revision, the referenced-document count, the per-drawing
-     members). Here those directories are COPIED in, and the complete
+     members). Here those directories are COPIED in (the second one renamed to
+     ``drawings-with-models/``), and the complete
      recipe-keyed neutral set produced by the prerequisite ``export`` task is
      validated and staged: AP214 STEP for parts, declared shared purchased members
      and feature configurations; fine binary STL for parts and scene configurations;
@@ -38,9 +39,9 @@ What it does, in order:
      path, beside the PDFs; an unresolved or ambiguous name fails the cut.
      Everything is staged and zipped into ONE bundle
      ``cad/out/release/harmonic-analyzer-<version>.zip`` (``solidworks/`` native +
-     ``slddrw/`` + ``step/`` + ``stl/`` + ``gltf/`` + ``boxes/`` + ``png/`` +
-     ``pdf/`` + ``diff/`` + ``features/`` + ``travelers/`` + ``nc/``). Records
-     the SW revision. ``travelers/`` holds each enrolled part's hobby prechips
+     ``drawings-with-models/`` + ``step/`` + ``stl/`` + ``gltf/`` + ``boxes/`` +
+     ``png/`` + ``pdf/`` + ``diff/`` + ``features/`` + ``travelers/`` + ``nc/``).
+     Records the SW revision. ``travelers/`` holds each enrolled part's hobby prechips
      traveler printed to ``<slug>-traveler.pdf`` by its ``prechips:<stem>``
      task, and ``nc/<stem>/`` each enrolled part's NC programs, cycle times and
      CAM manifest posted by its ``cam:<stem>`` task; a missing one fails the cut.
@@ -165,6 +166,14 @@ NATIVE_PACKAGE_DIR = RELEASE_DIR / "native"
 NATIVE_PACKAGE_FILE = NATIVE_PACKAGE_DIR / "native-package.json"
 NATIVE_PACKAGE_SCHEMA = 1
 _NATIVE_PACKAGE_FIX = "uv run python -m doit package:release"
+
+# Stage-relative bundle directories for the prepared tree's two halves. The
+# prepared tree keeps package_native.py's own names (they are part of the cached
+# ``package:release`` output); the bundle names its directories here. The
+# drawing half holds each drawing beside every part and assembly it references,
+# not only ``.SLDDRW`` files, so it ships under a neutral name (#727).
+NATIVE_BUNDLE_DIR = "solidworks"
+DRAWING_BUNDLE_DIR = "drawings-with-models"
 
 
 # --------------------------------------------------------------------------- #
@@ -573,13 +582,13 @@ def load_native_package() -> dict[str, Any]:
 
 
 def _copy_prepared(
-    stage: Path, package: dict[str, Any], dir_key: str, count_key: str
+    stage: Path, package: dict[str, Any], dir_key: str, count_key: str, bundle_dir: str
 ) -> Path:
-    """Copy one prepared directory into the stage, keeping its own name.
+    """Copy one prepared directory into the stage as ``bundle_dir``.
 
-    The prepared tree mirrors the bundle's layout (``solidworks/``, ``slddrw/``),
-    so publishing is a directory copy with no path rewriting. The recorded file
-    count is the guard that the tree restored from the remote cache is whole.
+    The bundle names its own directories, so renaming one changes this copy
+    only, never the cached ``package:release`` tree. The recorded file count is
+    the guard that the tree restored from the remote cache is whole.
     """
     source = REPO_ROOT / package[dir_key]
     if not source.is_dir():
@@ -587,8 +596,7 @@ def _copy_prepared(
             f"!!  prepared native directory missing: {source} -- regenerate the "
             f"tree with `{_NATIVE_PACKAGE_FIX}`"
         )
-    relative = PurePosixPath(package[dir_key]).relative_to(package["out_dir"])
-    target = stage / relative
+    target = stage / bundle_dir
     shutil.copytree(source, target)
     staged = sum(1 for path in target.iterdir() if path.is_file())
     if staged != package[count_key]:
@@ -606,18 +614,18 @@ def stage_native(stage: Path, package: dict[str, Any]) -> dict[str, str]:
     COM-free by construction: ``package_native.py`` already ran the top assembly's
     Pack-and-Go, every drawing's Pack-and-Go and the merge/dedup between them.
     """
-    _copy_prepared(stage, package, "native_dir", "native_files")
-    _copy_prepared(stage, package, "drawing_dir", "drawing_files")
+    _copy_prepared(stage, package, "native_dir", "native_files", NATIVE_BUNDLE_DIR)
+    _copy_prepared(stage, package, "drawing_dir", "drawing_files", DRAWING_BUNDLE_DIR)
 
     staged: dict[str, str] = {}
     for drawing_name, entry in package["drawings"].items():
-        for fact, member_key in (
-            ("solidworks_slddrw", "native_slddrw"),
-            ("slddrw", "portable_slddrw"),
+        for fact, member_key, dir_key, bundle_dir in (
+            ("solidworks_slddrw", "native_slddrw", "native_dir", NATIVE_BUNDLE_DIR),
+            ("slddrw", "portable_slddrw", "drawing_dir", DRAWING_BUNDLE_DIR),
         ):
-            relative = PurePosixPath(entry[member_key]).relative_to(
-                package["out_dir"]
-            )
+            relative = PurePosixPath(bundle_dir) / PurePosixPath(
+                entry[member_key]
+            ).relative_to(package[dir_key])
             member = stage / relative
             if not member.is_file() or member.stat().st_size == 0:
                 raise RuntimeError(
@@ -1169,8 +1177,9 @@ def bundle(
         shutil.rmtree(stage)  # regenerate-don't-repair: stale staging never shipped
     stage.mkdir(parents=True)
 
-    # 1. Copy the prepared native tree (stage/solidworks + stage/slddrw) so the
-    #    native files ride in the one bundle. Two counts, two keys:
+    # 1. Copy the prepared native tree (stage/solidworks +
+    #    stage/drawings-with-models) so the native files ride in the one
+    #    bundle. Two counts, two keys:
     #    ``native_documents`` is the Pack-and-Go referenced set (COM-derived,
     #    from the sidecar); ``documents`` is the neutral export inventory
     #    ``stage_release_neutral`` reports below. They are NOT the same number,
@@ -1181,7 +1190,7 @@ def bundle(
         "sw_revision": revision,
     }
     native_drawings = stage_native(stage, package)
-    sw_dir = stage / "solidworks"
+    sw_dir = stage / NATIVE_BUNDLE_DIR
 
     # 2. Validate + stage the complete export cache.
     facts.update(stage_release_neutral(stage))
@@ -1330,6 +1339,9 @@ def release_notes(version: str, facts: dict[str, Any]) -> str:
         f"rebuilding -- with or without SolidWorks:\n\n"
         f"- `solidworks/` -- native Pack-and-Go ({facts['native_documents']} referenced "
         f"documents, flattened): open `{TOP_ASSEMBLY}.SLDASM` as-is\n"
+        f"- `{DRAWING_BUNDLE_DIR}/` -- each native drawing (`.SLDDRW`) packed with "
+        "the parts and assemblies it references, so it opens standalone "
+        "(named `slddrw/` in earlier releases)\n"
         f"- `step/` -- {facts['steps']} AP214 STEP files, including declared shared "
         f"purchased members and feature configurations; a bare part filename "
         f"represents its default export member, not every member of a shared SKU\n"
