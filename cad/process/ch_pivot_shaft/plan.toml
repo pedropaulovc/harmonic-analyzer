@@ -4,7 +4,7 @@
 title = "Pivot Shaft"
 part = "MHA-CH-05 Pivot Shaft"
 revision = "placeholder"
-material = "AISI 1018 steel, precision-ground rod, Ø1/4 in"  # registry follows in #3162
+material = "AISI 1018 steel, precision-ground rod, Ø1/4 in"
 stock = "To be written"
 shop = "../shop.toml"
 stock_refs = ["1018-ground-round-1-4"]  # 1/4 GROUND STOCK OK (owner ruling 2026-11-20, #2346)
