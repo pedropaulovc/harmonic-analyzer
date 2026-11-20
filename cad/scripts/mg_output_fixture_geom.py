@@ -48,16 +48,20 @@ HEX_CORNER_RADIUS = HEX_AF / math.sqrt(3.0)
 # --- Stations along the hex axis (local x; origin on the rod-bore axis) ----------
 # The free end's and the spigot face's stations, and the groove's station and
 # root Ø below, set the installed hook and the bracket arm's load: they keep
-# their millimetre nominals and print rounded (.50, .15, .30). The free end
-# mates nothing: it stands on the .XX grid at .22, long enough that the wall
+# their millimetre nominals and print rounded (.49, .14, .30). The free end
+# mates nothing: it stands on the .XX grid at .23, long enough that the wall
 # over the drilled bore meets the .080 target at the title-block band (rule
 # 17: geometry, not a tighter band).
-ROD_STATION = 5.588  # .22, free end to the rod-bore axis
+ROD_STATION = 5.842  # .23, free end to the rod-bore axis
 FREE_END_X = -ROD_STATION
 # Spigot face back to the shoulder: the lathe's own length from the faced end.
-SPIGOT_LENGTH = 6.604  # .26
-# The spigot face's station from the bore axis (.500).
-_FACE_STATION = 12.70
+SPIGOT_LENGTH = 6.35  # .25
+# The spigot face's station from the bore axis (.49): .010 nearer the bore
+# than the .500 it was, so the 7/16 thumb screw keeps its reach to the rod
+# even if it comes up .030 short (owner ruling 2026-11-20 on #2403, "B").
+# The spigot and the groove's station shorten with it, so the groove, and
+# the hook on it, stay where they were.
+_FACE_STATION = 12.446
 HEX_LENGTH = ROD_STATION + _FACE_STATION - SPIGOT_LENGTH  # free end to the shoulder
 SHOULDER_X = FREE_END_X + HEX_LENGTH
 SPIGOT_FACE_X = SHOULDER_X + SPIGOT_LENGTH
@@ -79,6 +83,7 @@ _CLEARANCE_DRILLS_IN = {
     "#3": 0.213,
     "#2": 0.221,
     "#1": 0.228,
+    "F": 0.257,
 }
 ROD_BORE_CLEARANCE_MIN = 0.1778  # .007 diametral
 ROD_BORE_DRILL, ROD_BORE_DIA = min(
@@ -105,7 +110,7 @@ SPIGOT_DIA = GROOVE_ROOT_DIA + 2.0 * GROOVE_RADIUS
 SHOULDER_FILLET_R = 0.2032  # .008
 # The groove's station from the spigot face: its face-side lip holds the wall
 # target at the worst case; the shoulder side takes the rest of the spigot.
-GROOVE_STATION = 3.75
+GROOVE_STATION = 3.496
 GROOVE_X = SPIGOT_FACE_X - GROOVE_STATION
 # The groove arc meets the OD at a mouth on each side, GROOVE_HALF_OPENING
 # from GROOVE_X (the full radius: the centre is on the OD).

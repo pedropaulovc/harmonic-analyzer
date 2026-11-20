@@ -15,9 +15,9 @@ name = "#43 drill"
 ref = "jig-drill-43"  # Drills #43
 
 [[tools]]
-id = "drill-1"
-name = "#1 drill"
-ref = "drill-1"  # Drills #1
+id = "jig-drill-f"
+name = "F drill"
+ref = "jig-drill-f"  # Drills F: the Ø.257 rod bore over the 1/4 rod (#2404)
 
 [[tools]]
 id = "jig-tap-4-40-plug"
@@ -37,7 +37,7 @@ ref = "form-tool-r047"  # drawing cross-check 2026-11-19: R .047/.020 FULL R gro
 [[tools]]
 id = "jig-spot"
 name = "#2 centre drill"
-ref = "jig-spot"  # drawing cross-check 2026-11-19: spot the hex corner before the #1
+ref = "jig-spot"  # drawing cross-check 2026-11-19: spot the hex corner before the F
 
 [[setups]]
 machine_kind = "other"

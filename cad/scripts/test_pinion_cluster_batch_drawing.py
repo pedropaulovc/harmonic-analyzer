@@ -576,7 +576,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 4.7625, 4.7371, 9.0
             ),
             frozenset(("sh-vn-thumb-screw-2", "mg-output-fixture-1")): _annulus_limit(
-                2.8448, 2.261, 9.8044
+                2.8448, 2.261, 9.1821
             ),
             frozenset(
                 ("mg-magnifying-lever-1", "mg-magnifying-bracket-1")

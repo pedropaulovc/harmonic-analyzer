@@ -1,6 +1,6 @@
 r"""MHA-MG-04 rod to MHA-MG-02 clamp threaded joint (#1559) -- PURE DATA.
 
-The vertical rod's top end is a #4-40 UNC-2A thread turned down from the 7/32
+The vertical rod's top end is a #4-40 UNC-2A thread turned down from the 1/4
 bar; it screws into a blind #4-40 UNC-2B tap in the clamp's bottom face, on
 the hex axis, until the rod's shoulder seats on that face. The shoulder is
 the joint's datum: the seated shoulder carries the rod square to the block,

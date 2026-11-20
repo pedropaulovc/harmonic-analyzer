@@ -171,15 +171,6 @@ length_in = [2.0]
 status = "to_order"
 cite = ["cad/config/parts/mg-wheel-axle-spacer.yaml material_specification, process", "cad/scripts/mg_wheel_axle_spacer_spec.py LENGTH"]
 
-[stock.c360-round-7-32]
-form = "round_bar"
-material = "C36000 brass"
-note = "To order: MSC Direct 32001166, 7/32 in C36000 brass rod, at least 6.5 in (one 5.22 in rod, v50 envelope 132.47 mm, plus cut, facing and a chucking end for the #4-40 die). Source: the mg-magnifying-vertical-rod (MHA-MG-04) registry row, rod stock as supplied. Catalogue length and price not read. Not owned."
-dia_in = [0.21875]
-length_in = [6.5]
-status = "to_order"
-cite = ["cad/config/parts/mg-magnifying-vertical-rod.yaml material_specification", "cad/scripts/mg_magnifying_vertical_rod_spec.py ROD_DIA_CALLOUT \"ROD STOCK\""]
-
 [stock.c360-square-5mm-key]
 form = "square_bar"
 material = "C36000 brass key stock, DIN 6880 undersized"

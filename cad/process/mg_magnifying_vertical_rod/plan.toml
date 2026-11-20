@@ -4,10 +4,10 @@
 title = "Magnifying Vertical Rod"
 part = "MHA-MG-04 Magnifying Vertical Rod"
 revision = "placeholder"
-material = "C36000 brass rod, 7/32 in; MSC Direct 32001166"
+material = "C36000 brass rod, 1/4 in; Online Metals part 1257"
 stock = "To be written"
 shop = "../shop.toml"
-stock_refs = ["c360-round-7-32"]
+stock_refs = ["c360-round-1-4"]
 
 [[tools]]
 id = "dies-zoro-wb7365521946"

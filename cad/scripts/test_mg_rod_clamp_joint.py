@@ -109,10 +109,10 @@ def test_hex_stock_and_extent_along_the_lever() -> None:
 
 
 def test_shoulder_land_seats_flat_all_round() -> None:
-    # The 7/32 rod at its supplier minimum and the tap mouth at its largest,
+    # The 1/4 rod at its supplier minimum and the tap mouth at its largest,
     # each broken .010.
     edge = 0.254
-    land = ((7.0 / 32.0 * _IN - 0.127 - 2.0 * edge) - (_D + 0.0508 + 2.0 * edge)) / 2.0
+    land = ((1.0 / 4.0 * _IN - 0.127 - 2.0 * edge) - (_D + 0.0508 + 2.0 * edge)) / 2.0
     assert rod.SEAT_LAND_WORST == pytest.approx(land)
     assert land >= rod.SEAT_LAND_MIN
 

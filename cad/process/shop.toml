@@ -1219,8 +1219,6 @@ description = "C36000 free-machining brass (360-H02, extruded), round bar, 1/4 i
 description = "C36000 free-machining brass (360-H02, extruded), round bar, 5/8 in"
 [stock.c360-round-7-16]
 description = "C36000 free-machining brass, round bar, 7/16 in"
-[stock.c360-round-7-32]
-description = "C36000 brass, round bar, 7/32 in"
 [stock.c360-round-7-8]
 description = "C36000 free-machining brass (360-H02, extruded), round bar, 7/8 in"
 [stock.c360-round-9-16]
