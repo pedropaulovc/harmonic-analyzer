@@ -2216,14 +2216,14 @@ def _mark_deck_details(adapter: Any, exploded: Any) -> None:
 def _place_deck_detail(
     adapter: Any,
     detail: DeckDetail,
-    items: dict[str, str],
     step: Callable[[str], None],
     *,
     label: str,
 ) -> Any:
     """One enlarged, exploded base-deck cluster: placed with its exploded
-    centre on its spot, isolated to its families, cropped to its circle and
-    labelled under it (draw_ch_channel_assembly._exploded_detail)."""
+    centre on its spot, isolated to its families and cropped to its circle
+    (draw_ch_channel_assembly._exploded_detail). Its label, which names BOM
+    items, follows the BOM (:func:`_label_deck_detail`)."""
     view = _early_bound(
         place_view(
             adapter, str(SOURCE), "*Isometric", *detail.centre, scale=detail.scale
@@ -2261,12 +2261,38 @@ def _place_deck_detail(
         raise RuntimeError(
             f"{label} is not cropped: Crop2 status {status}, IsCropped {cropped}"
         )
+    return view
+
+
+def _label_deck_detail(
+    adapter: Any, view: Any, detail: DeckDetail, items: dict[str, str], *, label: str
+) -> None:
+    """A placed deck detail's label under it, naming its BOM items."""
     _activate_view(adapter, view, label=label)
     _add_note_block(
         adapter, detail.label_text(items), detail.label_xy, label=f"{label} label"
     )
-    step(f"{label}: label")
-    return view
+
+
+def _place_finished_isometric(adapter: Any) -> None:
+    """The finished assembly, the drawing's full-detail view: every modeled
+    tooth and thread. The fit-up steps print in the release's ASSEMBLY.md."""
+    _activate_sheet(adapter, SHEET_NAMES[2])
+    label = f"{SHEET_NAMES[2]} isometric"
+    finished = place_view(
+        adapter,
+        str(SOURCE),
+        "*Isometric",
+        *ASSEMBLY_ISO_CENTER,
+        scale=ASSEMBLY_ISO_SCALE,
+    )
+    _configure_view(
+        adapter, finished, exploded=False, role=ViewRole.FULL_DETAIL, label=label
+    )
+    assert_full_detail_view(adapter, label="frame assembly")
+    _add_note_block(
+        adapter, ASSEMBLY_ISO_CAPTION, ASSEMBLY_ISO_CAPTION_XY, label=f"{label} caption"
+    )
 
 
 @_telemetry.traced("drawing.frame_setting_table")
@@ -2374,6 +2400,19 @@ def _place_package(adapter: Any, step: Callable[[str], None]) -> Callable[[], No
     )
     # Configuration, then its own explode, then the BOM and balloons bind.
     _configure_view(adapter, exploded, exploded=True, label="exploded isometric")
+    step("exploded configuration")
+    # Every other view is placed, configured, exploded, isolated and cropped
+    # before the BOM exists, as on the drive-train sheet: DETAIL C's exploded
+    # configuration, made after insert_bom_table, dirtied the released source
+    # (#1364, farm run 20261120T205805100Z-5f74988800f64531a1a449cce22dfcd7).
+    details = []
+    for detail in DECK_DETAILS:
+        label = f"frame {detail.title}"
+        details.append((detail, _place_deck_detail(adapter, detail, step, label=label)))
+        _activate_sheet(adapter, SHEET_NAMES[1])
+    _place_finished_isometric(adapter)
+    step("finished isometric")
+    _activate_sheet(adapter, SHEET_NAMES[1])
     table = insert_bom_table(
         adapter,
         exploded,
@@ -2384,7 +2423,7 @@ def _place_package(adapter: Any, step: Callable[[str], None]) -> Callable[[], No
         configuration_grouping="same-part",
         label="frame",
     )
-    step("exploded configuration and BOM")
+    step("BOM")
     balloon_items = _validate_frame_bom(adapter, table)
     landings = add_component_bom_balloons(
         adapter,
@@ -2414,30 +2453,10 @@ def _place_package(adapter: Any, step: Callable[[str], None]) -> Callable[[], No
     step("deck detail boundaries")
     _activate_sheet(adapter, SHEET_NAMES[1])
     items = dict(balloon_items)
-    for detail in DECK_DETAILS:
-        _place_deck_detail(adapter, detail, items, step, label=f"frame {detail.title}")
+    for detail, view in details:
+        _label_deck_detail(adapter, view, detail, items, label=f"frame {detail.title}")
         _activate_sheet(adapter, SHEET_NAMES[1])
-    step("deck details")
-
-    # The finished assembly, the drawing's full-detail view: every modeled
-    # tooth and thread. The fit-up steps print in the release's ASSEMBLY.md.
-    _activate_sheet(adapter, SHEET_NAMES[2])
-    label = f"{SHEET_NAMES[2]} isometric"
-    finished = place_view(
-        adapter,
-        str(SOURCE),
-        "*Isometric",
-        *ASSEMBLY_ISO_CENTER,
-        scale=ASSEMBLY_ISO_SCALE,
-    )
-    _configure_view(
-        adapter, finished, exploded=False, role=ViewRole.FULL_DETAIL, label=label
-    )
-    assert_full_detail_view(adapter, label="frame assembly")
-    _add_note_block(
-        adapter, ASSEMBLY_ISO_CAPTION, ASSEMBLY_ISO_CAPTION_XY, label=f"{label} caption"
-    )
-    step("finished isometric")
+    step("deck detail labels")
 
     def settled() -> None:
         _assert_frame_balloons_settled(adapter, landings, proof)
