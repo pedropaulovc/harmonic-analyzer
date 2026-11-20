@@ -677,7 +677,8 @@ def test_the_end_faces_top_edges_skip_the_rim_chamfer_to_keep_the_seat_end_wall(
     """#1038 review: the .06 leg on an end face's top edge left the bracket
     seat's thread about 1.50 mm from the break's top edge at the worst case
     (under the .060 floor). Neither top edge is chamfered, so the edge keeps
-    the title block's break and the seats keep 2.76 (S) and 4.17 (N)."""
+    the title block's break and the seats keep 2.51 (S) and 3.92 (N) since
+    the .50 hold-down station (#2563) moved each seat .010 outboard."""
     from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
     from _printed_tolerance import edge_break_chamfer_mm
 
@@ -687,11 +688,11 @@ def test_the_end_faces_top_edges_skip_the_rim_chamfer_to_keep_the_seat_end_wall(
         assert [sign * half, 0.0, 0.0] not in support.CHAMFER_FACES
     title_break = edge_break_chamfer_mm(unit=placement.UNIT)
     walls = [_end_wall_past_top_edge_break(w, title_break) for w in seats.END_WALL_MIN]
-    assert walls == pytest.approx([2.759, 4.169], abs=0.001)
+    assert walls == pytest.approx([2.506, 3.916], abs=0.001)
     assert min(walls) >= WALL_TARGET_MM
     south = min(seats.END_WALL_MIN)
     chamfered = _end_wall_past_top_edge_break(south, support.CHAMFER)
-    assert chamfered == pytest.approx(1.499, abs=0.001)
+    assert chamfered == pytest.approx(1.249, abs=0.001)
     assert chamfered < WALL_FLOOR_MM
 
 

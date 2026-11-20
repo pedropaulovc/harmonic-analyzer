@@ -142,7 +142,7 @@ ENGAGEMENT_MIN = SCREW_REACH_MIN - SCREW_TIP_CHAMFER - EDGE_BREAK
 # the hole at its nearest to the flush side (the foot's narrowest, the hole's
 # centring band toward the far side). Toward the far face: the edge at its
 # innermost, the hole at its farthest, the web at its thinnest.
-TRANSFER_PUNCH_DIA = 11.0 / 64.0 * 25.4
+TRANSFER_PUNCH_DIA = _bracket.TRANSFER_PUNCH_DIA
 TOP_FLAT_EDGE_BAND = printed_band_mm(TOP_FLAT_PLACES, unit=SUPPORT_UNIT)
 HOLE_FROM_FOOT_SIDE_MIN = (_bracket.FOOT_W - _bracket.EDGE_BAND) - (
     _bracket.FOOT_W / 2.0 + _bracket.HOLE_X_BAND
@@ -150,7 +150,7 @@ HOLE_FROM_FOOT_SIDE_MIN = (_bracket.FOOT_W - _bracket.EDGE_BAND) - (
 HOLE_FROM_FOOT_SIDE_MAX = (_bracket.FOOT_W + _bracket.EDGE_BAND) - (
     _bracket.FOOT_W / 2.0 - _bracket.HOLE_X_BAND
 )  # 8.64
-PUNCH_FLOAT = (_bracket.HOLE_DIA + _bracket.DRILL_GROWTH - TRANSFER_PUNCH_DIA) / 2.0
+PUNCH_FLOAT = _bracket.PUNCH_FLOAT
 SEAT_FROM_NEAR_FACE_MIN = (
     HOLE_FROM_FOOT_SIDE_MIN
     - (TOP_FLAT_EDGE_FROM_WEB + TOP_FLAT_EDGE_BAND)
@@ -173,15 +173,15 @@ WEB_WALL_MIN = (
 # edges carry only the title block's EDGE_BREAK (the RimChamfer skips them,
 # build_fr_rocker_arm_support.CHAMFER_EDGES). The thread's crest starts below
 # its own mouth break, so at the top the wall runs from that crest point to
-# the break's top edge: hypot(wall - EDGE_BREAK, EDGE_BREAK), S 2.76, N 4.17,
-# both over the target (with the .06 leg there the south one would be 1.50).
+# the break's top edge: hypot(wall - EDGE_BREAK, EDGE_BREAK), S 2.51, N 3.92,
+# both over the target (with the .06 leg there the south one would be 1.25).
 END_WALL_MIN = tuple(
     (SUPPORT_HALF_MACHINE_Z - abs(x))
     - SCREW_MAJOR_DIA / 2.0
     - _bracket.STATION_BAND
     - LINEAR_2PL / 2.0
     for x in SEAT_LOCAL_X
-)  # S 3.00, N 4.42
+)  # S 2.75, N 4.16
 
 if ENGAGEMENT_MIN < 1.5 * SCREW_MAJOR_DIA:
     raise AssertionError(
