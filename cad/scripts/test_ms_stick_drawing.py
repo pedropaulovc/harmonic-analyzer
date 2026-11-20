@@ -106,7 +106,7 @@ def test_inch_grid_blank_and_grooves_keep_the_calibrated_scale() -> None:
     # inch print value; scale zero and the configured pitch stay calibrated.
     assert spec.UNIT == "in"
     inch = {
-        "BODY_LENGTH": 7.95, "BODY_WIDTH": 0.315, "BODY_THICKNESS": 0.118,
+        "BODY_LENGTH": 7.95, "BODY_WIDTH": 0.315, "BODY_THICKNESS": 0.125,
         "TICK_WIDTH": 0.016, "TICK_DEPTH": 0.020, "TICK_LENGTH": 0.12,
         "MINOR_TICK_LENGTH": 0.07, "HALF_TICK_LENGTH": 0.16,
         "NUMERAL_HEIGHT_MM": 0.08, "NUMERAL_GAP_MM": 0.02, "NUMERAL_DEPTH": 0.016,
@@ -280,7 +280,7 @@ def test_engraving_sizes_are_min_limits_and_graduation_depth_keeps_its_stock() -
     # The thickness rides the title block's .XXX (+/-.005).
     assert spec.BODY_FIT_TOLERANCE_MM == pytest.approx(0.127)
     depth_max = values["BodyThickness"] - spec.BODY_FIT_TOLERANCE_MM - spec.GRADUATION_FLOOR_MIN_MM
-    assert depth_max == pytest.approx(0.8382)
+    assert depth_max == pytest.approx(1.016)
     assert values["TickDepth"] == pytest.approx(0.508)
     assert values["TickDepth"] < depth_max and values["NumeralDepth"] < depth_max
 
@@ -545,13 +545,13 @@ def test_numeral_profile_scale_makes_the_v_readable_without_crowding() -> None:
     ratio = drawing.NUMERAL_PROFILE_SCALE[0] / drawing.NUMERAL_PROFILE_SCALE[1]
     assert spec.NUMERAL_DEPTH * ratio >= 4.0
     assert spec.NUMERAL_STROKE_WIDTH_MM * ratio >= 2.4
-    # The full .315 x .118 bar section reads upright: thickness across, width up.
+    # The full .315 x .125 bar section reads upright: thickness across, width up.
     half_width = spec.BODY_THICKNESS * ratio / 2000.0
     half_height = spec.BODY_WIDTH * ratio / 2000.0
     x, y = drawing.NUMERAL_PROFILE_CENTER
     profile = Box(x - half_width, y - half_height, x + half_width, y + half_height)
     assert (profile.xmin, profile.ymin, profile.xmax, profile.ymax) == pytest.approx(
-        (0.268014, 0.084995, 0.297986, 0.165005),
+        (0.267125, 0.084995, 0.298875, 0.165005),
     )
     numeral_right = drawing.NUMERAL_CENTER[0] + drawing.NUMERAL_RADIUS_MM * drawing.DETAIL_SCALE[0] / 1000.0
     depth_left = drawing.DEPTH_CENTER[0] - drawing.DEPTH_RADIUS_MM * drawing.DEPTH_SCALE[0] / 1000.0

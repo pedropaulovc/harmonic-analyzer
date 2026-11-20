@@ -1048,11 +1048,11 @@ sections:
         - scaled
         - med
       - - Body thickness
-        - ~3 mm
-        - ~0.12
-        - pp. 34–35 photo proportion
-        - scaled
-        - low
+        - 3.175 mm (book photo ~3)
+        - '0.125'
+        - 'pp. 34–35 photo proportion reads ~3; owner ruling 2026-11-20 (#2441, option B, "B") keeps the 1/8 C360 flat''s supplied thickness so only the two edges are milled (`ms_stick_spec.py`)'
+        - ruled
+        - high
       - - Stop (re-derived 2026-10-09)
         - 'two-piece brass stop, blackened: a 21 (along the stick) × 11 (across) × 14.1 (thumbscrew axis) block `ms-stop-block` with an 8.4 × 3.4 window milled open into its plate-side face (window 8.6..12.0 above the head face; roof 2.1 between the window and the roof face, 1×45° chamfers on the roof''s two end edges, opposite wall 2.6), closed by a 21 × 14.1 × 1.00 plate `ms-stop-plate` on two #2-56 brass fillister screws (McMaster 90114A124, at 3.5 and 17.5 along the stick, 4.0 above the head face; holes match-drilled through the paired plate and block in one pilot pass, plate opened to Ø2.4 clearance, block bottoming-tapped blind from the mating face, full thread 6.3 / drill 7.8); a #4-40 thumbscrew (91882A221) tapped up from the head face at 10.5 along / 4.2 across (8.6 wall) clamps the 8 × 3 stick against the roof; parked at the 2.0 mark'
         - —
