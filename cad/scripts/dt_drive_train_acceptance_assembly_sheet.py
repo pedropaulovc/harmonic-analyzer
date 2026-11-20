@@ -3,8 +3,8 @@
 R5 machinist review (rule 22, 3/3 runs): every measurable fit and acceptance
 a step or check makes prints in a setting-table row, not only in its step.
 None is a single model dimension a setting view could carry (stack results,
-end plays, gaps, flush and pin-depth limits, the interim spring-foot station
-of known issue #1037, engagements read as the lesser of two records), so each
+end plays, gaps, flush and pin-depth limits, the spring-foot station inside
+#1037's centred window, engagements read as the lesser of two records), so each
 is a row the drawing numbers on from sheet 15's rows and places with the
 shared general-table helper; its step cites the row in place of the number.
 

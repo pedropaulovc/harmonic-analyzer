@@ -1865,8 +1865,8 @@ RIG_SEQUENCE_HEADING = "ASSEMBLY SEQUENCE CONT. - PINION RIG"
 # ruling Q2(2) A): the foot hole where the preload gates put it
 # (pinion_spring_section; model -X, the sheet 1 FRONT view's RIGHT), the crest
 # then bearing on the parked flank.  RIG SET's pad leaf sets the other axis,
-# along the bank.  The window a fitter must hold it in is known issue #1037,
-# which ships this as the interim.
+# along the bank.  Owner ruling 2026-11-20 (#1037, "B") re-formed the blade so
+# the preload and stress window is centred on this station, about +/-0.67 mm.
 SPRING_EAST_WEST = (
     f"FOOT HOLE CENTRE RIGHT OF THE MHA-DT-19 AXIS ({acceptance_ref('spring-foot')})"
 )
