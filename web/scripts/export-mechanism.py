@@ -177,7 +177,7 @@ def build() -> tuple[dict, list]:
             "pivotMm": list(frame.ROCKER_PIVOT_XY),
             "fulcrumMm": list(frame.LEVER_FULCRUM_XY),
             "camShaftMm": list(frame.CAM_SHAFT_XY),
-            "camHomeRad": math.radians(frame.CYLINDER_LOCK_PHASE_DEG),
+            "camHomeRad": math.radians(frame.CAM_HOME_PHASE_DEG),
             "eccentricityMm": cyl.ECCENTRICITY,
             "rodLengthMm": rod.CENTER_DISTANCE,
             "rodPinMm": [-arm.ROD_HOLE_X, arm.ROD_HOLE_Y - arm.PIVOT_MID_Y],

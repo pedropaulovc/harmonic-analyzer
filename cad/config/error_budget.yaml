@@ -69,10 +69,10 @@ reserved:
     # its hole stations at the shop's +/-.002 row, its register's
     # indication and the jaw pair's line turn every lobe it cuts by the same
     # angle, up to this (dt_cylinder_gear_tl_cam_fixture_spec.PHASE_FIXED_WORST_DEG,
-    # .466 deg). The report scores it on top of the CAD's cam home phase
+    # .469 deg). The report scores it on top of the CAD's cam home phase
     # (cam_home_phase.residual_fixture_common)
     # and the closure does not credit it. Accepted with MHA-DT-12's NotchPhase
-    # band widened to +/-.7 deg, which holds every gear's worst total (.677,
+    # band widened to +/-.7 deg, which holds every gear's worst total (.684,
     # this and each gear's own .13 together; cam_phase's gear-to-gear +/-.25 books the .13)
     # (delegated ruling 2026-11-17, #2361 option 1; owner review on #2144).
     fixture_common_cam_phase_deg: 0.47

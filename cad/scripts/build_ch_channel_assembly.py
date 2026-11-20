@@ -346,7 +346,8 @@ RING_CENTER = (
 # VERTICAL rod (ch30): every rod hangs from the arm's rod-side tip onto its
 # cam -- the pin (ROD_HOLE_X out from the mid-seesaw pivot) sits above the cam
 # centre WITH THE ARM LEVEL, the rod leaning channel_kinematics.ROD_LEAN_DEG
-# (0.082 deg: the pin was solved plumb over the 1.5 deg-phased centre, #749)
+# (0.082 deg: the pin was solved plumb over the 1.5 deg-phased centre, #749;
+# delegated ruling 2026-11-20, no precedent, owner review #2144)
 # (arm tilt 0: the ch14
 # end views show the 0-crank tip row flat, and the GT rocker-corner
 # triangulation lands the arm's rod-side end at machine x -60 -- the level-pose

@@ -310,8 +310,9 @@ def rocker_angle(theta: np.ndarray, nom: Nominal) -> np.ndarray:
     ``cam_home_deg`` off vertical at crank home
     (channel_frame_geom.CAM_HOME_PHASE_DEG, build_ch_channel_assembly's
     RING_CENTER) -- and the pin
-    rides its arc about the pivot. As designed the rod hangs plumb from the
-    pin onto the phased home centre, so the nominal rocker is level at home.
+    rides its arc about the pivot. As designed the rod re-closes from the pin
+    onto the lobe-up home centre (leaning channel_kinematics.ROD_LEAN_DEG,
+    #749), so the nominal rocker is level at home.
     """
     p0 = np.array([-nom.pin_x, nom.pin_y])
     lobe = theta - math.radians(nom.cam_home_deg)
@@ -1633,7 +1634,7 @@ def closed_form_terms(
         "pct_fs_per_input": knife_per_input,
         "worst_broad_input": worst_broad,
         "pct_fs": knife_per_input[worst_broad],
-        "note": "all 20 configured CAD stations and every scaled scored reference are statically balanced with catalog force and pose-dependent physical moment arms; knife stall uses each case's conservative sum of spring-force magnitudes (reported beside the smaller resolved vertical load) over the explicitly neutral small-signal transfer; rest/preload only -- no gravity, writing friction, dynamics, or full-crank sweep; match the channel set, zero by sliding the gooseneck, verify measured force curves, and retain #748 minimum-magnifier-pose and #749 cam-phase limitations",
+        "note": "all 20 configured CAD stations and every scaled scored reference are statically balanced with catalog force and pose-dependent physical moment arms; knife stall uses each case's conservative sum of spring-force magnitudes (reported beside the smaller resolved vertical load) over the explicitly neutral small-signal transfer; rest/preload only -- no gravity, writing friction, dynamics, or full-crank sweep; match the channel set, zero by sliding the gooseneck, verify measured force curves, and retain the #748 minimum-magnifier-pose limitation",
     }
     # Lost motion on load reversal: the strap's diametral clearance shifts the
     # rod by c when the ordinate changes sign -- DC for a fixed-sign station.

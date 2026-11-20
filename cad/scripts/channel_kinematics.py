@@ -102,7 +102,7 @@ ARC = arc_geometry()
 # phase; standing the lobes vertical (owner ruling 2026-11-20 on #749, "B":
 # the rod re-closes, the rocker is unchanged) moved that centre
 # ECCENTRICITY * (sin(lock) - sin(home)), 0.226 mm, so the rod leans 0.082 deg
-# (delegated ruling 2026-11-20 on #749, owner review #2144). Any other lean
+# (delegated ruling 2026-11-20 on #749, no precedent, owner review #2144). Any other lean
 # still fails.
 ROD_LEAN_DEG = math.degrees(
     math.asin(

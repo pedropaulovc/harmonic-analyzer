@@ -771,7 +771,7 @@ sections:
       - - Centre distance (cam ring → rocker pin)
         - 158.36622566069354 mm
         - '6.235'
-        - 'Current ch_connecting_rod_spec.CENTER_DISTANCE is the Euclidean distance between the lobe-up cam centre at crank home (owner ruling 2026-11-20 on #749) and the level rocker''s rod pin; the pin was solved plumb over the former 1.5 deg-phased centre, so the rod leans 0.082 deg at crank home (delegated ruling 2026-11-20 on #749, owner review #2144). The common drive-height raise changes the home cam centre while the rocker bank stays fixed; the 8.64 mm eccentricity is unchanged. Former 163.1010 mm and its (−60.167, 99.155) cam-centre arithmetic described the lower drive layout, not the current cut length.'
+        - 'Current ch_connecting_rod_spec.CENTER_DISTANCE is the Euclidean distance between the lobe-up cam centre at crank home (owner ruling 2026-11-20 on #749) and the level rocker''s rod pin; the pin was solved plumb over the former 1.5 deg-phased centre, so the rod leans 0.082 deg at crank home (delegated ruling 2026-11-20 on #749, no precedent, owner review #2144). The common drive-height raise changes the home cam centre while the rocker bank stays fixed; the 8.64 mm eccentricity is unchanged. Former 163.1010 mm and its (−60.167, 99.155) cam-centre arithmetic described the lower drive layout, not the current cut length.'
         - derived
         - high
       - - Cam ring bore
@@ -926,7 +926,7 @@ sections:
       the top (uniform 16 mm depth, R 816/800 arcs). Canonical rest state
       (cylinder-gear notches at +Y = cosine alignment, integral cam lobes +Y):
       arms rest LEVEL (tilt 0 — the ch14 end views show the 0-crank tip row
-      flat at the TOP of the stroke), rods plumb (tilt 0); the ±ecc 8.64 cam
+      flat at the TOP of the stroke), rods leaning 0.082 deg (#749); the ±ecc 8.64 cam
       throw swings each tip ±9.46 about that level line.
       Re-authored as `cad/scripts/build_ch_rocker_arm.py` (supersedes the legacy
       `oscilating-arms` part, which had no surviving source).

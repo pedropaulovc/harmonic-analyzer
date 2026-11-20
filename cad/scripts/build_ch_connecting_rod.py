@@ -120,15 +120,15 @@ PART_NAME = "ch-connecting-rod"
 # _appearance.apply_material.
 MATERIAL = "Plain Carbon Steel"
 
-# Cam ring centre -> rocker pin, VERTICAL rod: the
-# pin rides the arm's rod-pin hole 133.067 out from the pivot -- directly
-# above the phased cam LOBE (shared drive height plus the eccentricity
-# rotated by the configured tooth phase),
-# lobe UP at the cos-mode home; the Ry180 axial flip preserves local +Y;
+# Cam ring centre -> rocker pin: the
+# pin rides the arm's rod-pin hole 133.067 out from the pivot, solved plumb
+# over the cam lobe at the drive train's 1.5 deg lock; the lobe is cut on the
+# tooth space so it stands UP at the cos-mode home (#749; shared drive height
+# plus the eccentricity; the Ry180 axial flip preserves local +Y;
 # ch30 photos + GT rocker-corner triangulation put the arm's rod-side end over
 # the drum). Solved so the rocker rests LEVEL (arm tilt 0 -- the ch14 end views
-# show the 0-crank tip row flat at the TOP of the stroke) with the rod plumb
-# (rod tilt 0 by construction). Supersedes 144.75, the same closure at the
+# show the 0-crank tip row flat at the TOP of the stroke); the rod leans
+# channel_kinematics.ROD_LEAN_DEG (0.082). Supersedes 144.75, the same closure at the
 # pre-ROM-fit lobe-down phase and -7.82 deg tilt. build_ch_channel_assembly
 # imports this as ROD_C2C (imported, NOT copied). Nominal geometry lives in
 # ch_connecting_rod_spec so the part, channel and drawing move as one recipe.

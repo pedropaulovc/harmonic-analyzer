@@ -29,8 +29,8 @@ manually from the ch.30 back view (supersedes the p.29 broadside photo-scaled
 4.5"/9" read and the indirect M6.3 "80 mm bar travel + 8 mm margin" = 88); the
 10.5" bottom arc + 0.22" perpendicular tip face come from the same ch.30 sketch.
 The connecting rod pins at +127.37 on the +X side, just inboard of the rod-side
-tip and LOW in the strap (5.3 above the bottom edge, ch14 fan photo) -- directly
-above the phased cam lobe, so the rod hangs PLUMB with the arm LEVEL (ch30
+tip and LOW in the strap (5.3 above the bottom edge, ch14 fan photo) -- solved
+plumb above the cam lobe at the drive train's 1.5 deg lock, with the arm LEVEL (ch30
 photos + GT rocker-corner triangulation + the ch14 end views' flat 0-crank tip
 row; supersedes M6.3's "1 inch from the pivot", which was tied to the pre-ch30
 arbor-47.5 layout). The amplitude bar rides the top edge either side of the
@@ -133,9 +133,10 @@ if ARM_THICKNESS != SPEC_ARM_THICKNESS:
 BOTTOM_EDGE_BELOW_PIVOT = ARM_DEPTH - TOP_EDGE_ABOVE_PIVOT  # 7.746, .305
 # The rod-pin native drill identity is part-owned by ch_rocker_arm_spec.
 # The interface's rod-pin position follows the bottom-arc end (132.76): solved
-# so the pin sits DIRECTLY ABOVE the phased cam
-# lobe (machine X is DRUM_X + ECC*sin(1.5 deg), lobe UP at the
-# cos-mode home pose) with the pivot at the seesaw mid-span (+72.9) and the arm
+# so the pin sat DIRECTLY ABOVE the cam lobe at the drive train's lock
+# (machine X is DRUM_X + ECC*sin(1.5 deg); the lobe has since been cut on
+# the tooth space so it stands up, and the rod leans 0.082 deg instead, #749)
+# with the pivot at the seesaw mid-span (+72.9) and the arm
 # LEVEL -- the ch30 photos show every connecting rod hanging PLUMB from the arm
 # tip onto its cam, the ch14 end views show the 0-crank tip row dead level, and
 # the GT rocker-corner triangulation puts the rod-side arm end at machine x -60

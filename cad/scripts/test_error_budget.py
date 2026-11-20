@@ -847,6 +847,11 @@ def test_cam_lobes_stand_vertical_at_crank_home(report, nom):
 
     lock = channel_frame_geom.CYLINDER_LOCK_PHASE_DEG
     assert lock == dt_cylinder_gear_phase_band.CAM_LOBE_OFFSET_DEG == 1.5
+    # The channel recipes may not import the gear's phase band (its drawing
+    # prose would re-key them), so the cam home is pinned to it here: moving
+    # the lobe without moving the home fails.
+    home = lock - dt_cylinder_gear_phase_band.CAM_LOBE_OFFSET_DEG
+    assert channel_frame_geom.CAM_HOME_PHASE_DEG == home
     assert nom.cam_home_deg == channel_frame_geom.CAM_HOME_PHASE_DEG == 0.0
     assert report["nominal"]["cam_home_deg"] == report["cam_home_phase"]["deg"] == 0.0
     th = np.arange(360) * 2.0 * math.pi / 360

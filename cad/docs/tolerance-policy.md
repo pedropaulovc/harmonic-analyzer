@@ -285,7 +285,7 @@ of a crest, so the drive train's tooth-in-gap lock (`gear_train.cylinder_lock_ph
 turns it up (owner ruling 2026-11-20 on #749). A lobe left on the crest would sit 1.5° off, a
 common phase whose 0.15–0.30 % MAE / 1.7 % max none of these corrections touch. The rocker was
 left as it was, so each connecting rod re-closes to 158.366 mm and leans 0.082° at crank home
-(`channel_kinematics.ROD_LEAN_DEG`; delegated ruling 2026-11-20 on #749, owner review #2144).
+(`channel_kinematics.ROD_LEAN_DEG`; delegated ruling 2026-11-20 on #749, no precedent, owner review #2144).
 Lengthening the rod would remove it by design but is not photo-faithful; the correction is the
 period-appropriate answer (the machine computes, the operator corrects a known table).
 
