@@ -54,6 +54,7 @@ from mg_magnifying_wheel_geom import (  # noqa: F401 (re-export)
     SPOKE_ROOT_WIDTH,
     SPOKE_TIP_WIDTH,
     TIE1_CDRILL_DEPTH,
+    TIE1_CDRILL_DEPTH_PLACES,
     TIE1_CDRILL_DIA,
     TIE1_CDRILL_PLACES,
     TIE1_CDRILL_SIZE,
@@ -293,13 +294,13 @@ _HUB_DIA = _printed(HUB_DIA, "HubDia")
 # The ties are drilled to the title block's DRILLED HOLES row (+.004/0).
 _TIE_R_MAX = (TIE_HOLE_DIA + drilled_oversize_mm(unit=UNIT)) / 2.0
 # TIE 1's #50 counter-drill runs from the boss front face past the spokes'
-# plane (its shallowest shoulder, .312 in, stands beyond the spokes' front
+# plane (its shallowest shoulder, .31 in, stands beyond the spokes' front
 # face), so it is TIE 1's Ø wherever the boss OD, the hub fillets and the
 # bore are nearest it.
 _TIE1_R_MAX = (TIE1_CDRILL_DIA + drilled_oversize_mm(unit=UNIT)) / 2.0
 if not (
     TIE1_CDRILL_DIA > TIE_HOLE_DIA
-    and HUB_STEP_Z + printed_limits(TIE1_CDRILL_DEPTH, TIE1_CDRILL_PLACES)[0]
+    and HUB_STEP_Z + printed_limits(TIE1_CDRILL_DEPTH, TIE1_CDRILL_DEPTH_PLACES)[0]
     > -SPOKE_AXIAL / 2.0
 ):
     raise AssertionError("TIE 1's walls no longer meet the #50 counter-drill")

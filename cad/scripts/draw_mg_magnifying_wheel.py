@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import argparse
 import math
+import re
 import sys
 from typing import Any
 
@@ -56,7 +57,7 @@ from _drawing_dimensions import (
 from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
 from _drawing_edges import ViewEdges, scan_view_edges
 from _drawing_finish import add_surface_finish
-from _drawing_hole_callout import add_native_hole_callout
+from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_leaders import (
     assert_leaders_clear,
     dimension_segments,
@@ -116,6 +117,9 @@ from mg_magnifying_wheel_spec import (
     SPOKE_AXIAL,
     SPOKE_PITCH_DEG,
     SURFACE_FINISHES,
+    TIE1_CDRILL_DEPTH,
+    TIE1_CDRILL_DEPTH_PLACES,
+    TIE1_CDRILL_DIA,
     TIE1_CDRILL_PLACES,
     TIE1_CLOCK_DEG,
     TIE1_R,
@@ -372,11 +376,13 @@ WIRE_NUMBER = str(_config.parts("sh-vn-music-wire")["number"])
 TIE1_NAME = "WIRE TIE HOLE"
 TIE2_CALLOUT = "DRILL THRU\nRADIAL WIRE TIE HOLE\nFROM GROOVE BOTTOM"
 # TIE 1's block: the #60 row, the counter-drill row and the name; its widest,
-# the counter-drill's ("Ø.nnn ↧ .nnn FAR SIDE"), sets its width at 2.45 mm a
-# character.  Every row's length prints to the drill's three places.
+# the counter-drill's ("Ø.nnn DRILL ↧ .nn FAR SIDE"), sets its width at 2.45
+# mm a character.  Each drill's Ø prints to the title block's drilled-hole
+# three places, the counter-drill's depth to its .XX.
 TIE1_CALLOUT_ROWS = 3
-_TIE1_BLOCK_HALF = 21 * 2.45 / 2.0
-TIE1_CALLOUT_PRECISION = TIE1_CDRILL_PLACES
+_TIE1_BLOCK_HALF = 26 * 2.45 / 2.0
+TIE1_DIA_PLACES = TIE1_CDRILL_PLACES
+TIE1_DEPTH_PLACES = TIE1_CDRILL_DEPTH_PLACES
 
 
 # The bore's matched fit is note BORE_FIT_NOTE (mg_magnifying_wheel_spec):
@@ -442,14 +448,16 @@ FRONT_KEEP = {
     ),
 }
 # TIE 1's native hole callout hangs off the face below the wheel, centred on
-# its point (the text's centre), its top 3.2 mm under the OD and its left
-# end 15 mm right of the bore's centre: its leader runs down-right from the
-# #60's rim, right of the X's extension line, and the block stays left of
-# the section's overall row.  The rim pick lies on the hole's back-face
-# circle down-right of the centre, off the centre mark's arms.
+# its point (the text's centre), its top one text line further under the OD
+# than the old two-row block (its wide counter-drill row then falls below
+# the section's .772 overall row, which ends level with the block's top) and
+# its left end 15 mm right of the bore's centre: its leader runs down-right
+# from the #60's rim, right of the X's extension line.  The rim pick lies on
+# the hole's back-face circle down-right of the centre, off the centre
+# mark's arms.
 TIE1_CALLOUT_XY = _face(
     15.0 + _TIE1_BLOCK_HALF,
-    -RIM_OUTER_DIA / 2.0 - 3.2 - _TEXT_LINE * 1000.0 * TIE1_CALLOUT_ROWS / 2.0,
+    -RIM_OUTER_DIA / 2.0 - 3.2 - _TEXT_LINE * 1000.0 * (1.0 + TIE1_CALLOUT_ROWS / 2.0),
 )
 TIE1_PICK_BEARING = -45.0
 # The spoke root's text hangs off its dimension line on an OffsetText leader
@@ -827,7 +835,6 @@ def _near_side_diameters(
 # A hole callout's format parts (prefix, suffix, callout above, callout below)
 # read back at their definitions 5-8 and are written at 1-4.
 _DEFINITION_TO_WRITABLE = {5: 1, 6: 2, 7: 3, 8: 4}
-_LENGTH_VARIABLE = 1  # swCalloutVariableType_Length
 
 
 def tie1_named_definition(definitions: dict[int, str]) -> tuple[int, str]:
@@ -847,13 +854,41 @@ def tie1_named_definition(definitions: dict[int, str]) -> tuple[int, str]:
     return part, "\n".join((*rows, TIE1_NAME))
 
 
-def _add_tie1_callout(adapter: Any, view: Any, centre: tuple[float, float]) -> Any:
-    """TIE 1's native Advanced Hole callout on the #60's back-face rim: every
-    length to the drill's three places (the hole-callout precision exception,
-    drawing-simplicity-policy.md), the hole's name under the rows.  Returns
-    its annotation."""
-    from win32com.client.dynamic import Dispatch as dynamic_dispatch  # noqa: PLC0415
+_DRILL_VARIABLE = re.compile(r"<(MOD-DIAM|HOLE-DEPTH)><([^<>]+)>")
 
+
+def tie1_callout_precision(definitions: dict[int, str]) -> dict[str, int]:
+    """Places per native length variable: each drill's Ø (the variable after
+    a Ø) and the counter-drill's depth (after the depth symbol)."""
+    pairs = _DRILL_VARIABLE.findall("\n".join(definitions.values()))
+    kinds = [kind for kind, _name in pairs]
+    if sorted(kinds) != ["HOLE-DEPTH", "MOD-DIAM", "MOD-DIAM"]:
+        raise RuntimeError(f"TIE 1 callout variables: {definitions!r}")
+    return {
+        name: TIE1_DEPTH_PLACES if kind == "HOLE-DEPTH" else TIE1_DIA_PLACES
+        for kind, name in pairs
+    }
+
+
+def tie1_printed_values() -> tuple[str, ...]:
+    """The callout's three values as they print: each drill's Ø, then the
+    counter-drill's depth."""
+    return tuple(
+        f"{mm / 25.4:.{places}f}".lstrip("0")
+        for mm, places in (
+            (TIE_HOLE_DIA, TIE1_DIA_PLACES),
+            (TIE1_CDRILL_DIA, TIE1_DIA_PLACES),
+            (TIE1_CDRILL_DEPTH, TIE1_DEPTH_PLACES),
+        )
+    )
+
+
+def _add_tie1_callout(adapter: Any, view: Any, centre: tuple[float, float]) -> Any:
+    """TIE 1's native Advanced Hole callout on the #60's back-face rim: each
+    drill's Ø to three places and the depth to two, set per named variable
+    (the hole-callout precision exception, drawing-simplicity-policy.md), the
+    hole's name under the rows.  Returns its annotation."""
+    label = "wheel TIE 1"
     rim = TIE_HOLE_DIA * SHEET_SCALE[0] / 2000.0
     bearing = math.radians(TIE1_PICK_BEARING)
     display = _early_bound(
@@ -865,35 +900,31 @@ def _add_tie1_callout(adapter: Any, view: Any, centre: tuple[float, float]) -> A
                 centre[1] + rim * math.sin(bearing),
             ),
             callout_xy=TIE1_CALLOUT_XY,
-            label="wheel TIE 1",
+            label=label,
         ),
         "IDisplayDimension",
     )
-    lengths = []
-    for raw in display.GetHoleCalloutVariables() or ():
-        variable = dynamic_dispatch(raw._oleobj_)
-        if int(variable.Type) != _LENGTH_VARIABLE:
-            continue
-        length = _early_bound(raw, "ICalloutLengthVariable")
-        length.Precision = TIE1_CALLOUT_PRECISION
-        if int(length.Precision) != TIE1_CALLOUT_PRECISION:
-            raise RuntimeError(
-                f"TIE 1 callout: {variable.VariableName} precision did not persist"
-            )
-        lengths.append(str(variable.VariableName))
-    # Both drills' Ø and the counter-drill's depth.
-    if len(lengths) < 3:
-        raise RuntimeError(f"TIE 1 callout has length variables {lengths}")
     definitions = {
         part: str(display.GetText(part) or "") for part in _DEFINITION_TO_WRITABLE
     }
-    _telemetry.info(f"TIE 1 callout lengths {lengths}, definitions {definitions!r}")
+    _telemetry.info(f"TIE 1 callout definitions {definitions!r}")
+    set_hole_callout_precision(
+        display, tie1_callout_precision(definitions), label=label
+    )
     part, named = tie1_named_definition(definitions)
     display.SetText(_DEFINITION_TO_WRITABLE[part], named)
     applied = str(display.GetText(part) or "").replace("\r", "")
     if applied != named:
         raise RuntimeError(f"TIE 1 callout name did not persist: {applied!r}")
     rebuild_drawing(adapter, label="wheel TIE 1 callout")
+    resolved = "\n".join(str(display.GetText(part) or "") for part in (1, 2, 3, 4))
+    _telemetry.info(f"TIE 1 callout reads {resolved!r}")
+    depth_at_three = f"{TIE1_CDRILL_DEPTH / 25.4:.3f}".lstrip("0")
+    if (
+        any(value not in resolved for value in tie1_printed_values())
+        or depth_at_three in resolved
+    ):
+        raise RuntimeError(f"TIE 1 callout did not print its places: {resolved!r}")
     return display.GetAnnotation()
 
 

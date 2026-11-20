@@ -663,16 +663,25 @@ _TIE1_RAY_START = 5.0
 _TIE1_RAY_RADIUS = 0.5
 
 
+def tie1_callout_strings(diameter: str, depth: str, far_side: str) -> tuple[str, str]:
+    """TIE 1's two element rows from the native callout variables: each drill's
+    Ø then its process (rule 12), the counter-drill's depth and FAR SIDE after."""
+    return (
+        f"<MOD-DIAM>{diameter} DRILL THRU",
+        f"<MOD-DIAM>{diameter} DRILL <HOLE-DEPTH>{depth} {far_side}",
+    )
+
+
 @_telemetry.traced("feature.advanced_hole", label_param="label")
 def _tie1_advanced_hole(adapter, label: str = "tie 1") -> list[tuple[str, str]]:
     """TIE 1 as ONE native Advanced Hole: the #60 from the boss's back face up
     to the #50 counter-drilled from its front (drum) face to the shoulder, the
     #50's 118 deg point narrowing on to the #60 (owner ruling 2026-11-20 on
     #2406).  Each element prints its own callout row, size then process then
-    depth, the counter-drill's with its native FAR SIDE message, so the face
-    view's callout on the visible #60 reads the whole hole.  The placement
-    point is dimensioned Tie1X/Tie1Y from the origin, driven by the globals;
-    returns those deferred drive jobs."""
+    depth (rule 12), the counter-drill's with its native FAR SIDE message, so
+    the face view's callout on the visible #60 reads the whole hole.  The
+    placement point is dimensioned Tie1X/Tie1Y from the origin, driven by the
+    globals; returns those deferred drive jobs."""
     import pythoncom
     from win32com.client import VARIANT
 
@@ -726,18 +735,9 @@ def _tie1_advanced_hole(adapter, label: str = "tie 1") -> list[tuple[str, str]]:
         element.CalloutString = callout
         return element
 
-    tie = straight(
-        _AH_NEAR_SIDE,
-        TIE_HOLE_SIZE,
-        _END_UP_TO_NEXT,
-        f"<MOD-DIAM>{diameter} DRILL THRU",
-    )
-    cdrill = straight(
-        _AH_FAR_SIDE,
-        TIE1_CDRILL_SIZE,
-        _END_BLIND,
-        f"<MOD-DIAM>{diameter} <HOLE-DEPTH>{depth} {far_side}",
-    )
+    near_callout, far_callout = tie1_callout_strings(diameter, depth, far_side)
+    tie = straight(_AH_NEAR_SIDE, TIE_HOLE_SIZE, _END_UP_TO_NEXT, near_callout)
+    cdrill = straight(_AH_FAR_SIDE, TIE1_CDRILL_SIZE, _END_BLIND, far_callout)
     cdrill.BlindDepth = TIE1_CDRILL_DEPTH / 1000.0
     point = _early_bound(cdrill, "IStraightElementData")
     point.EndShape = _END_SHAPE_DRILL_POINT
