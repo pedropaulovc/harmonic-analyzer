@@ -410,12 +410,16 @@ if max(paper_side_points_printed_worst().values()) >= PAPER_FRONT_Z:
 # --- the set screw in the pivot's relief groove (#2439) ---------------------------
 def groove_landing_spare() -> tuple[float, float]:
     """``(shoulder side, end side)`` mm of groove wall left beyond the set
-    screw's point at the printed worst case.  The screw's axis stands the
-    block height less SetScrewY below the shoulder (both .XX on the v-block
-    sheet); the walls are .XXX from the shoulder on the rod sheet.  The point
-    is the vendor's 45 deg x one-pitch cup-end chamfer, taken where it crosses
-    the pivot-bore wall, .010 above the cup on the floor: wider than the
-    cup's rim, so that is what must pass between the walls."""
+    screw's point with the axial stack at its printed worst case and the
+    diameters nominal.  The screw's axis stands the block height less
+    SetScrewY below the shoulder (both .XX on the v-block sheet); the walls
+    are .XXX from the shoulder on the rod sheet.  The point is the vendor's
+    45 deg x one-pitch cup-end chamfer, taken where it crosses the pivot-bore
+    wall, .010 above the cup on the floor: wider than the cup's rim, so that
+    is what must pass between the walls.  The deepest printed floor in the
+    largest reamed bore lifts that crossing to .01275 and costs about .0027
+    a side; test_pn_pen_carriage_geom proves the spare at that full worst
+    case too."""
     height = _printed_limits(vb, "Height", vb.BLOCK_HEIGHT)
     screw_y = _printed_limits(vb, "SetScrewY", vb.SET_SCREW_Y)
     axis_min, axis_max = height[0] - screw_y[1], height[1] - screw_y[0]

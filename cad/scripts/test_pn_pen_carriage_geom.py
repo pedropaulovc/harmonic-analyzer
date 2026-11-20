@@ -19,7 +19,7 @@ from _hole_spec import THREAD_MAJOR_MM
 from diagnostics import diag_build_91375A106 as set_screw_recipe
 from _mg_wheel_rim_geometry import RIM_WIRE_R
 from mg_wheel_bar_geom import WHEEL_BAR_Y, WHEEL_X
-from _printed_tolerance import printed_band_mm
+from _printed_tolerance import printed_band_mm, printed_deviations
 from _recording_geometry import PAPER_FRONT_Z, PEN_ROD_X, PEN_Z_MID
 
 PAPER_LIMIT_Z = PAPER_FRONT_Z - 2.0 * g.CLEARANCE
@@ -237,3 +237,20 @@ def test_set_screw_point_lands_in_the_relief_groove() -> None:
     shoulder_side, end_side = g.groove_landing_spare()
     assert shoulder_side / 25.4 == pytest.approx(0.009, abs=1e-4)
     assert end_side / 25.4 == pytest.approx(0.009, abs=1e-4)
+    # Full printed worst case (codjiflo P3 on #3152): the deepest .XXX floor
+    # in the largest reamed bore raises the point's crossing of the bore wall
+    # to .01275, widening the chamfer there by twice the extra rise.  The
+    # point must still pass both walls, and the first full thread (one pitch
+    # back from the cup) must stay inside the tap.
+    floor_low, _ = printed_deviations(
+        groove.GROOVE_DIA, groove.GROOVE_PLACES, unit=rod.UNIT
+    )
+    rise_max = (
+        vb.PIVOT_BORE_DIA + vb.PIVOT_BORE_BAND[0] - (groove.GROOVE_DIA + floor_low)
+    ) / 2.0
+    assert rise_max / 25.4 == pytest.approx(0.01275, abs=1e-5)
+    extra = rise_max - (vb.PIVOT_BORE_DIA - groove.GROOVE_DIA) / 2.0
+    for spare in (shoulder_side, end_side):
+        assert (spare - extra) / 25.4 == pytest.approx(0.00625, abs=1e-4)
+        assert spare - extra > 0.0
+    assert rod_set_screw.POINT_LENGTH > rise_max

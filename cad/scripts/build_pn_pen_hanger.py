@@ -18,7 +18,7 @@ Layout: origin at the strap's top-right BACK corner -- on the bar's front
 face, level with the bar top, on the rod line's x (machine ``HANGER_POS``;
 all of the geometry lives in ``pn_pen_hanger_spec``).  The part is authored
 MACHINE-handed and placed IDENTITY, so local axes are machine axes: the strap
-occupies y -169.926..0, z -3.175..0 (mm), its top edge leaning toward machine
+occupies y -162.052..0, z -3.175..0 (mm), its top edge leaning toward machine
 east (-x); the rod axis is local (0, ., ROD_AXIS_Z).
 Dimensions: cad/DIMENSIONS.md ch. 24.
 
