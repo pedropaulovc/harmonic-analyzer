@@ -2229,13 +2229,18 @@ CHECKS = _note_text(
         # Owner ruling 2026-11-20 (Pedro, #1177: no blind plate hole, so no
         # post dowel; #3085 option B): only the two MHA-DT-VN-61 screws'
         # friction holds MHA-DT-05's yaw, which steps 2S-2U set, so the hold
-        # names them beside the pedestals and a loosened post screw re-sets
-        # the post by those steps before the checks are redone.  The 4A-4Z
-        # letters are full and the sheet 13 left field has no line to spare:
-        # the hold and the redo stay one line each.
+        # names them beside the pedestals.  A loosened post screw re-sets the
+        # post by those steps, both screws eased first (2M), and since the
+        # post can shift along the shaft on the screws' float, the shaft end
+        # play is indicated again (3C-3F) before the checks are redone.  The
+        # 4A-4Z letters are full and the sheet 13 left field has no line to
+        # spare: the hold and the redo stay one line each ("A SCREW" is the
+        # only screw 4U names).
         "4U. LEAVE MHA-DT-02 AND MHA-DT-VN-61 AS THEY ARE FROM HERE ON.",
-        "4V. IF ONE IS LOOSENED, REDO CHECKS 4-7 (MHA-DT-VN-61: "
-        f"{_step_ref('post-and-tip-block', 'S')}-{_step_ref('post-and-tip-block', 'U')} FIRST).",
+        "4V. IF ONE LOOSENS, REDO CHECKS 4-7 (A SCREW: "
+        f"{_step_ref('post-and-tip-block', 'M')}, "
+        f"{_step_ref('post-and-tip-block', 'S')}-{_step_ref('post-and-tip-block', 'U')}, "
+        f"{_step_ref('end-play-set', 'C')}-{_step_ref('end-play-set', 'F')} FIRST).",
         "4W. VERIFY MHA-DT-VN-52 FULL-FORM THREAD ENGAGEMENT, THE LESSER READING OF STEPS "
         f"{_step_ref('other-base-mounting', 'H')}-{_step_ref('other-base-mounting', 'J')} "
         f"({acceptance_ref('pivot-screw-engagement')}).",
