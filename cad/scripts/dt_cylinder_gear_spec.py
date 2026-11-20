@@ -184,17 +184,19 @@ NOTCH_DEPTH = 3.048  # .12
 TIP_RADIUS = OUTSIDE_DIA / 2.0
 NOTCH_FLOOR_RADIUS = TIP_RADIUS - NOTCH_DEPTH
 NOTCH_MEAN_RADIUS = (NOTCH_FLOOR_RADIUS + TIP_RADIUS) / 2.0
-# +Y is a tooth crest (the cam lobe direction).  The phase kerf is the first
-# root counter-clockwise from the cam lobe, half a circular pitch away, and is
-# cut as a vertical slot whose centreline crosses the mean notch radius at
-# NOTCH_PHASE_DEG from the lobe axis.
+# +Y is a tooth crest.  The phase kerf is the first root counter-clockwise of
+# it, half a circular pitch away, and is cut as a vertical slot whose
+# centreline crosses the mean notch radius at NOTCH_PHASE_DEG from +Y.  The
+# cam lobe stands the other way, on the root half a pitch clockwise of the
+# crest (dt_cylinder_gear_phase_band, #749), so lobe to notch is a whole pitch.
 NOTCH_PHASE_DEG = 180.0 / TEETH
 NOTCH_CENTER_X = -NOTCH_MEAN_RADIUS * math.sin(math.radians(NOTCH_PHASE_DEG))
 # The native stock profile is patterned with the canonical seed-gap ray at
 # pi/N and the kerf ray is pi/2 + pi/N: thirty pitches, 90 deg. Printed as
 # (90°), a reference: the kerf is sawn into a tooth root the indexing already
 # cut, so it has no separate pattern-to-notch error to inspect. The phase the
-# analyzer reads, cam lobe to notch, is NotchPhase's 1.5 ±0.25 above.
+# analyzer reads, cam lobe to notch, is NotchPhase's 3.0 above
+# (dt_cylinder_gear_phase_band).
 TOOTH_PATTERN_GAP_RAD = math.pi / TEETH
 PATTERN_NOTCH_REF_ANGLE_DEG = 90.0
 

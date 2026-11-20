@@ -54,13 +54,13 @@ from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
 from dt_cylinder_gear_notes import BORE_FIT_CALLOUT, CAM_WALL_NOTE, STACK_FIT_CALLOUT
+from dt_cylinder_gear_phase_band import CAM_CENTER_XY
 from dt_cylinder_gear_spec import (
     BORE_DIA,
     CAM_DIA,
     CAM_THICKNESS,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
-    ECCENTRICITY,
     FACE_WIDTH,
     NOTCH_CENTER_X,
     NOTCH_FLOOR_RADIUS,
@@ -69,6 +69,8 @@ from dt_cylinder_gear_spec import (
     SURFACE_FINISHES,
     TIP_RADIUS,
 )
+
+CAM_X, CAM_Y = CAM_CENTER_XY  # the lobe stands half a pitch clockwise of +Y
 
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -133,14 +135,18 @@ NOTCH_DETAIL_DIMENSIONS = {
 #   words) run under the tips, left of the face-width text (215) and above
 #   the isometric (192).
 # * The eccentricity prints its value and band alone (rule 7), in the free
-#   lane below its extension lines (y 270/283).
+#   lane below its extension lines (y 270/283). It is an aligned dimension
+#   (the lobe stands 1.5 deg off the crest, #749), so its text centres on its
+#   own dimension line with no shoulder: x .172 puts the ~27 mm text's left
+#   end ~7 mm right of the tips at y 257 (machinist r1 of #3150 read the
+#   teeth through it at .157) and its right end ~8 mm inside the (90°) arc.
 # * The notch phase prints its value and band alone inside the (90°) arc
 #   (r 88.6 off the gear centre; r4b: a larger arc reached the side view and
 #   the gear data) with the cam finish symbol moved down out of it.
 FRONT_KEEP = {
     "BoreDia": (0.045, 0.338),
     "CamDia": (0.160, 0.222),
-    "CamCy": (0.157, 0.257),
+    "CamCy": (0.172, 0.257),
     "NotchPhase": (0.131, 0.332),
     "PatternNotchPhase": (0.178, 0.321),
 }
@@ -402,7 +408,7 @@ def _cam_thickness_rims(view: Any) -> dict[float, Any]:
         params = tuple(float(value) for value in curve.CircleParams)
         circles.append(params)
         for station, edges in matches.items():
-            centre = (0.0, ECCENTRICITY / 1000.0, station / 1000.0)
+            centre = (CAM_X / 1000.0, CAM_Y / 1000.0, station / 1000.0)
             if (
                 math.dist(params[:3], centre) <= 1e-7
                 and abs(params[6] - CAM_DIA / 2000.0) <= 1e-7
@@ -464,7 +470,7 @@ def _cam_thickness_reference(adapter: Any, view: Any) -> Any:
         landing = _project_mm(
             adapter,
             view,
-            (0.0, ECCENTRICITY - CAM_DIA / 2.0, station),
+            (CAM_X, CAM_Y - CAM_DIA / 2.0, station),
             label=f"{label} rim landing",
         )
         point_set = manager.SetSelectionPoint2(index, -1, landing[0], landing[1], 0.0)
@@ -719,8 +725,8 @@ def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         (
-            CAM_DIA / (2.0 * math.sqrt(2.0)),
-            ECCENTRICITY + CAM_DIA / (2.0 * math.sqrt(2.0)),
+            CAM_X + CAM_DIA / (2.0 * math.sqrt(2.0)),
+            CAM_Y + CAM_DIA / (2.0 * math.sqrt(2.0)),
             OVERALL_THICKNESS,
         ),
         label="cam follower flank",
@@ -745,8 +751,8 @@ def build(adapter: Any) -> dict[str, str]:
             adapter,
             front,
             (
-                CAM_DIA / 2.0 * math.cos(wall_angle),
-                ECCENTRICITY + CAM_DIA / 2.0 * math.sin(wall_angle),
+                CAM_X + CAM_DIA / 2.0 * math.cos(wall_angle),
+                CAM_Y + CAM_DIA / 2.0 * math.sin(wall_angle),
                 OVERALL_THICKNESS,
             ),
             label="cam thin-side wall",

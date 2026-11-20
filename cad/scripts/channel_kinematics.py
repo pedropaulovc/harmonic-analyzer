@@ -24,10 +24,10 @@ _FULCRUM = channel_frame_geom.LEVER_FULCRUM_XY
 _RING_CENTER = (
     channel_frame_geom.CAM_SHAFT_XY[0]
     + dt_cylinder_gear_spec.ECCENTRICITY
-    * math.sin(math.radians(channel_frame_geom.CYLINDER_LOCK_PHASE_DEG)),
+    * math.sin(math.radians(channel_frame_geom.CAM_HOME_PHASE_DEG)),
     channel_frame_geom.CAM_SHAFT_XY[1]
     + dt_cylinder_gear_spec.ECCENTRICITY
-    * math.cos(math.radians(channel_frame_geom.CYLINDER_LOCK_PHASE_DEG)),
+    * math.cos(math.radians(channel_frame_geom.CAM_HOME_PHASE_DEG)),
 )
 _ROD_C2C = ch_connecting_rod_spec.CENTER_DISTANCE
 _LEVER_DX = rocker_interface.ROD_HOLE_X
@@ -97,12 +97,29 @@ ARC = arc_geometry()
 # RING_CENTER are co-solved so the neutral arm sits flat (ch14 end views,
 # 0-crank tip row). Any drift here means one of those constants moved without
 # re-solving the closure -- fail before SolidWorks bakes the wrong pose in.
-if abs(ARC["arm_tilt"]) > 0.02 or abs(ARC["rod_tilt"]) > 0.02:
+# The rod hangs off plumb by exactly the lean the cam home phase produces:
+# ROD_HOLE_X was solved plumb over the cam centre of the drive train's lock
+# phase; standing the lobes vertical (owner ruling 2026-11-20 on #749, "B":
+# the rod re-closes, the rocker is unchanged) moved that centre
+# ECCENTRICITY * (sin(lock) - sin(home)), 0.226 mm, so the rod leans 0.082 deg
+# (delegated ruling 2026-11-20 on #749, no precedent, owner review #2144). Any other lean
+# still fails.
+ROD_LEAN_DEG = math.degrees(
+    math.asin(
+        dt_cylinder_gear_spec.ECCENTRICITY
+        * (
+            math.sin(math.radians(channel_frame_geom.CYLINDER_LOCK_PHASE_DEG))
+            - math.sin(math.radians(channel_frame_geom.CAM_HOME_PHASE_DEG))
+        )
+        / _ROD_C2C
+    )
+)
+if abs(ARC["arm_tilt"]) > 0.02 or abs(ARC["rod_tilt"] - ROD_LEAN_DEG) > 0.02:
     raise RuntimeError(
         "neutral pose no longer level: arm_tilt=%.4f deg, rod_tilt=%.4f deg "
-        "-- re-solve ROD_HOLE_X (build_rocker_arm) and CENTER_DISTANCE "
-        "(build_connecting_rod) against RING_CENTER"
-        % (ARC["arm_tilt"], ARC["rod_tilt"])
+        "(expected lean %.4f) -- re-solve ROD_HOLE_X (build_rocker_arm) and "
+        "CENTER_DISTANCE (build_connecting_rod) against RING_CENTER"
+        % (ARC["arm_tilt"], ARC["rod_tilt"], ROD_LEAN_DEG)
     )
 
 

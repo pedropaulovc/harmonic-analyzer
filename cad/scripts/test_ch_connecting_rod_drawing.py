@@ -66,7 +66,7 @@ def test_rod_length_closes_the_raised_cam_to_the_level_rocker() -> None:
         frame.ROCKER_PIVOT_XY[0] - rocker_interface.ROD_HOLE_X,
         frame.ROCKER_PIVOT_XY[1] + rocker_interface.ROD_HOLE_Y - rocker_interface.PIVOT_MID_Y,
     )
-    phase = math.radians(frame.CYLINDER_LOCK_PHASE_DEG)
+    phase = math.radians(frame.CAM_HOME_PHASE_DEG)
     cam = (
         frame.CAM_SHAFT_XY[0] + cylinder.ECCENTRICITY * math.sin(phase),
         frame.CAM_SHAFT_XY[1] + cylinder.ECCENTRICITY * math.cos(phase),
@@ -441,7 +441,7 @@ def test_overall_length_is_a_side_view_reference() -> None:
     end is named by its face and a projected model point."""
     spec = ch_connecting_rod_spec
     d = drawing
-    assert d.OVERALL_LENGTH == pytest.approx(183.769, abs=1e-3)
+    assert d.OVERALL_LENGTH == pytest.approx(183.766, abs=1e-3)
     assert d.OVERALL_BOTTOM_MM == (0.0, -spec.RING_OUTER_RADIUS, 0.0)
     assert spec.RING_BOTTOM_Y == -spec.RING_OUTER_RADIUS
     # The top pick lands on the far tine's crown, between the slot and the

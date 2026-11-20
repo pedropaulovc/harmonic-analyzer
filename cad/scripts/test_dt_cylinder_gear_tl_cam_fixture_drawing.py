@@ -89,7 +89,7 @@ def test_the_clock_pin_stands_at_the_notch_phase() -> None:
     assert spec.SEATED_SIDE == -1.0 and spec.CUT_TURNS_GEAR_CLOCKWISE
     assert spec.SEATED_HALF_PLAY_DEG > 0.0
     assert spec.PIN_PHASE_DEG - spec.SEATED_HALF_PLAY_DEG == pytest.approx(
-        gear.NOTCH_PHASE_DEG, abs=0.01
+        phase_band.CAM_NOTCH_PHASE_DEG, abs=0.01
     )
     # Counter-clockwise of the throw line seen from the tailstock (-X).
     assert spec.PIN_X < 0.0 < spec.PIN_Y
@@ -114,8 +114,8 @@ def test_phase_holds_the_widened_print_and_the_budgets_scatter() -> None:
     # the fixture would move the phase .17 deg per .001 read, too coarse to
     # set it.
     assert spec.PHASE_TOLERANCE_DEG == phase_band.NOTCH_PHASE_TOLERANCE_DEG == 0.7
-    assert spec.PHASE_FIXED_WORST_DEG == pytest.approx(0.466, abs=0.001)
-    assert spec.PHASE_TOTAL_WORST_DEG == pytest.approx(0.677, abs=0.001)
+    assert spec.PHASE_FIXED_WORST_DEG == pytest.approx(0.469, abs=0.001)
+    assert spec.PHASE_TOTAL_WORST_DEG == pytest.approx(0.684, abs=0.001)
     assert spec.PHASE_TOTAL_WORST_DEG <= spec.PHASE_TOLERANCE_DEG
     assert spec.PHASE_PER_THOU_READING_DEG == pytest.approx(0.168, abs=0.001)
 

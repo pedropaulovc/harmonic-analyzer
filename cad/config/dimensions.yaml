@@ -565,14 +565,19 @@ sections:
 
       Current build (`build_dt_cylinder_gear.py`): single non-configured custom
       120T 48DP PA20 gear/cam composite with a finite #2 / 55T-reference stock
-      tooth rim, not the custom cone T120 solid. The integral cam lobe is +Y, toward the
-      notch: the ch14 end views show the 0-crank tip row LEVEL at the TOP of the
+      tooth rim, not the custom cone T120 solid. The integral cam lobe points up, on
+      the notch side: the ch14 end views show the 0-crank tip row LEVEL at the TOP of the
       stroke — cos mode reads +1 at notch-up, so the lobe points up; plain bore
-      through gear and cam, alignment notch near +Y. The book states only the notch
+      through gear and cam, alignment notch near +Y. Part +Y is a tooth crest; the
+      lobe is cut on the tooth space half a pitch clockwise of it and the notch in
+      the tooth space half a pitch counter-clockwise, so the drive train's
+      half-pitch tooth-in-gap lock leaves the lobe vertical (owner ruling
+      2026-11-20 on #749; `dt_cylinder_gear_phase_band`). The book states only the notch
       **depth** (3 mm); the p.23 close-up labelled "notch" shows the mark as a thin
       saw **kerf cut between two teeth** — the real gears keep all 120 teeth, they are
       NOT missing one. The selected 0.4 mm-wide, 3 mm-deep saw kerf is placed by
-      `dt_cylinder_gear_spec.NOTCH_PHASE_DEG` relative to the cam, preserving the
+      `dt_cylinder_gear_spec.NOTCH_PHASE_DEG` from the crest, 3.0° from the cam
+      lobe (`dt_cylinder_gear_phase_band.CAM_NOTCH_PHASE_DEG`), preserving the
       physical cam/notch home lock rather than providing an arbitrary TE tare.
       The earlier ideal-tooth construction placed it at 90° + γ/2 because +Y
       was a crest at 120T; its ≈0.60 mm² removal / ≈1.8 mm³ notch volume is a
@@ -764,9 +769,9 @@ sections:
       - confidence
       rows:
       - - Centre distance (cam ring → rocker pin)
-        - 158.369029979535 mm
+        - 158.36622566069354 mm
         - '6.235'
-        - 'Current ch_connecting_rod_spec.CENTER_DISTANCE is the Euclidean distance between the actual phased cam centre and the level rocker''s rod pin. The common drive-height raise changes the home cam centre while the rocker bank stays fixed; cam phase and 8.64 mm eccentricity are unchanged. Former 163.1010 mm and its (−60.167, 99.155) cam-centre arithmetic described the lower drive layout, not the current cut length.'
+        - 'Current ch_connecting_rod_spec.CENTER_DISTANCE is the Euclidean distance between the lobe-up cam centre at crank home (owner ruling 2026-11-20 on #749) and the level rocker''s rod pin; the pin was solved plumb over the former 1.5 deg-phased centre, so the rod leans 0.082 deg at crank home (delegated ruling 2026-11-20 on #749, no precedent, owner review #2144). The common drive-height raise changes the home cam centre while the rocker bank stays fixed; the 8.64 mm eccentricity is unchanged. Former 163.1010 mm and its (−60.167, 99.155) cam-centre arithmetic described the lower drive layout, not the current cut length.'
         - derived
         - high
       - - Cam ring bore
@@ -921,7 +926,7 @@ sections:
       the top (uniform 16 mm depth, R 816/800 arcs). Canonical rest state
       (cylinder-gear notches at +Y = cosine alignment, integral cam lobes +Y):
       arms rest LEVEL (tilt 0 — the ch14 end views show the 0-crank tip row
-      flat at the TOP of the stroke), rods plumb (tilt 0); the ±ecc 8.64 cam
+      flat at the TOP of the stroke), rods leaning 0.082 deg (#749); the ±ecc 8.64 cam
       throw swings each tip ±9.46 about that level line.
       Re-authored as `cad/scripts/build_ch_rocker_arm.py` (supersedes the legacy
       `oscilating-arms` part, which had no surviving source).

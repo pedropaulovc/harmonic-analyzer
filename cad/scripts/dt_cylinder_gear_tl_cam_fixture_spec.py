@@ -43,18 +43,20 @@ the register round in the jaws. The body still weighs under 3 lb.
 Frame (the SolidWorks model): the register axis, which is the lathe axis
 once indicated, is model Z through the origin. The back face (Z0) faces the
 chuck; the front face (Z = THICKNESS) seats the gear's back face. The stub
-stands on -Y so the cam lobe points +Y, as on the gear. The clock pin is
+stands on -Y so the cam lobe points +Y in this frame. The clock pin is
 clocked about the stub (the gear's bore axis), counter-clockwise of the +Y
 line through it seen from +Z (the tailstock), by ``PIN_PHASE_DEG``: the
-gear's own NOTCH_PHASE_DEG plus the seated half-play
-(``SEATED_HALF_PLAY_DEG``), about 1.69 deg, so a gear turned onto the pin
+gear's lobe-to-notch phase (``dt_cylinder_gear_phase_band.CAM_NOTCH_PHASE_DEG``,
+the lobe cut half a pitch clockwise of a crest and the notch half a pitch
+counter-clockwise of it, #749) plus the seated half-play
+(``SEATED_HALF_PLAY_DEG``), about 3.19 deg, so a gear turned onto the pin
 seats its notch on the phase. Every number of the gear is imported from
-``dt_cylinder_gear_spec``.
+``dt_cylinder_gear_spec`` and ``dt_cylinder_gear_phase_band``.
 
 Accuracy (this module asserts only what is true). MHA-DT-12 prints throw
 .3402 +/-.0020 (owner ruling 2026-11-08, #2144 item 8.2) and cam phase
-1.5 +/-.7 deg (``dt_cylinder_gear_phase_band``, delegated ruling 2026-11-17 on
-#2361); every gear is held to that print.
+3.0 +/-.7 deg (``dt_cylinder_gear_phase_band``, band by delegated ruling
+2026-11-17 on #2361); every gear is held to that print.
 
 * Throw is set, not cut to a number: a dial test indicator is zeroed on the
   stub where the stub stands nearest it, the chuck is turned half a turn, and
@@ -73,7 +75,7 @@ Accuracy (this module asserts only what is true). MHA-DT-12 prints throw
   The gear-to-gear part is asserted inside the error budget's per-channel
   ``cam_phase`` (+/-.25 deg) and the total, ``PHASE_TOTAL_WORST_DEG``
   (.68 deg), inside the print's +/-.7 deg; the common part is a common cam
-  phase like #749's, which error_budget.yaml records and scores. A reading of
+  phase, which error_budget.yaml records and scores. A reading of
   the phase on the set fixture was weighed and rejected: its baseline is the
   .34 throw, so a .001 reading moves the phase about .17 deg
   (``PHASE_PER_THOU_READING_DEG``). Every gear seats on the same flank of the
@@ -92,7 +94,7 @@ from functools import cache
 
 import _config
 import dt_cylinder_gear_spec as gear
-from dt_cylinder_gear_phase_band import NOTCH_PHASE_TOLERANCE_DEG
+from dt_cylinder_gear_phase_band import CAM_NOTCH_PHASE_DEG, NOTCH_PHASE_TOLERANCE_DEG
 from _fit_ream_h7 import REAM_H7
 from _inch_wall_limits import WALL_TARGET_MM
 from _mcmaster_23065a503 import (
@@ -139,7 +141,7 @@ GEAR_THICKNESS_MIN = gear.OVERALL_THICKNESS + gear.OVERALL_THICKNESS_BAND[1]
 GEAR_THICKNESS_MAX = gear.OVERALL_THICKNESS + gear.OVERALL_THICKNESS_BAND[0]
 FACE_WIDTH_MIN = gear.FACE_WIDTH - gear.FACE_WIDTH_TOLERANCE_MM
 GEAR_TIP_RADIUS = gear.OUTSIDE_DIA / 2.0
-PHASE_DEG = gear.NOTCH_PHASE_DEG
+PHASE_DEG = CAM_NOTCH_PHASE_DEG
 # The budget's per-channel (gear-to-gear) phase and the printed NotchPhase band.
 PHASE_SCATTER_TOLERANCE_DEG = gear.CAM_PHASE_TOLERANCE_DEG
 PHASE_TOLERANCE_DEG = NOTCH_PHASE_TOLERANCE_DEG
@@ -391,13 +393,13 @@ if not CUT_TURNS_GEAR_CLOCKWISE:
 # --- Clock pin: a class Z gauge pin in the notched tooth space ---------------------
 # Printed coordinates from the register axis, on the .0001 grid. The pin
 # stands at radius PIN_RADIUS from the stub, PIN_PHASE_DEG from the throw
-# line: the gear's NOTCH_PHASE_DEG plus the seated half-play
+# line: the gear's lobe-to-notch phase (PHASE_DEG) plus the seated half-play
 # (``SEATED_HALF_PLAY_DEG``, below). Its radius is a function, not a number:
 # the pin enters a tooth space only from about 1.260 out (``_play_table``),
 # and the stub and pin stations each move it .002, so it stands .004 farther
 # out than the bare entry radius.
-PIN_X = -0.0373 * INCH  # -X: counter-clockwise of +Y seen from the tailstock
-PIN_Y = 0.9260 * INCH
+PIN_X = -0.0704 * INCH  # -X: counter-clockwise of +Y seen from the tailstock
+PIN_Y = 0.9246 * INCH
 PIN_RADIUS = math.hypot(PIN_X, PIN_Y + STUB_OFFSET)
 PIN_PHASE_DEG = math.degrees(math.atan2(-PIN_X, PIN_Y + STUB_OFFSET))
 # Press ream for the .0375 minus pin (the .0365 reamer, REAM_H7).

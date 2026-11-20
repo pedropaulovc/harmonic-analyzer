@@ -4443,11 +4443,13 @@ def build(adapter) -> dict[str, str]:
     # (measured, stable across rebuilds, and uncorrectable -- through the
     # coupling any post-copy spin fix would crank the whole free train), so
     # the mesh is never copied; each station's is authored fresh instead.
-    # Flip the asymmetric gear/cam sandwich about its already-phased local Y
-    # diameter.  Local +Z becomes machine -Z while local +Y (the cam-lobe
-    # phase) is unchanged.  Translating the origin from face centre -1.5 to
+    # Flip the asymmetric gear/cam sandwich about its local Y diameter (a
+    # tooth crest).  Local +Z becomes machine -Z while local +Y is unchanged.
+    # Translating the origin from face centre -1.5 to
     # face centre +1.5 keeps the 3-mm toothed slab centred on station z_j. The
-    # lock phase is gear_train.cylinder_lock_phase_deg via channel_frame_geom.
+    # lock phase is gear_train.cylinder_lock_phase_deg via channel_frame_geom;
+    # it meshes the gear tooth-in-gap and turns its cam lobe, cut that angle
+    # the other way off the crest, vertical (#749).
     cylinder_rows = compose_rows(ROT_Y_180, rot_z_rows(-CYLINDER_LOCK_PHASE_DEG))
     cyl_gears: list[str] = [
         place_component(

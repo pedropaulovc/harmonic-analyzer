@@ -282,7 +282,6 @@ def readout_report(
             budget["critical_features"]["station_setting"]["tolerance"]
         ),
         "cam_home_phase": {"deg": nom.cam_home_deg},
-        "cam_home_phase_waived": False,
         "closure": {"nominal_residual_mae": 0.01},
     }
     monkeypatch.setattr(error_budget, "build_report", lambda: report)

@@ -35,7 +35,7 @@ _HOME_PIN_XY = (
     channel_frame_geom.ROCKER_PIVOT_XY[1]
     + rocker_interface.ROD_HOLE_Y - rocker_interface.PIVOT_MID_Y,
 )
-_CAM_PHASE = math.radians(channel_frame_geom.CYLINDER_LOCK_PHASE_DEG)
+_CAM_PHASE = math.radians(channel_frame_geom.CAM_HOME_PHASE_DEG)
 _HOME_CAM_XY = (
     channel_frame_geom.CAM_SHAFT_XY[0]
     + dt_cylinder_gear_spec.ECCENTRICITY * math.sin(_CAM_PHASE),

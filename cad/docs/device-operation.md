@@ -169,11 +169,11 @@ correction step for perfect parts at this operating-band setup. Use that
 current report and its generated `READOUT.md`, rather than a copied numerical
 error table that can outlive the component interval or output-chain model.
 
-The credited machine has its cam lobes vertical at crank home. The as-built
-CAD's sit 1.5° off — the tooth-in-gap lock,
-[#749](https://github.com/pedropaulovc/harmonic-analyzer/issues/749). That common
-phase adds a sine-transform residual no step here can remove; the current
-report scores the credited and as-built cases separately.
+The CAD's cam lobes stand vertical at crank home: each is cut half a tooth
+pitch clockwise of a crest, so the drive train's tooth-in-gap lock turns it up
+([#749](https://github.com/pedropaulovc/harmonic-analyzer/issues/749)). A phase
+common to all 20 lobes adds a sine-transform residual no step here can remove;
+the report scores the cam fixture's common phase that way, beside the CAD's.
 
 Compare those residuals with the current report's combined part and
 station-setting scatter (`monte_carlo.combined`), not a copied result from a

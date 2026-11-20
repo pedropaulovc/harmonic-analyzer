@@ -21,16 +21,19 @@ Features, in order:
 3. Integral eccentric cam (book ch. 13, pp. 22-25): one of the 20 cams that
    convert each gear's rotation into the near-sinusoidal reciprocation of its
    connecting rod (displacement = ECCENTRICITY x sin(theta)). Disc OD 1.205 in,
-   centre offset +Y by the 8.64 mm eccentricity, boss-extruded from the Front
+   centre offset by the 8.64 mm eccentricity along the lobe axis, boss-extruded
+   from the Front
    plane through the blank to the OVERALL thickness z = 0..7.62 (#743: the
    overall thickness is the station pitch, .300 in since the #1038 re-pitch,
    so the bank stacks cam face on back face and the cam fills the
    connecting-rod slot; the cam's own thickness, 4.6228, is a reference).
-   Cam disc centred on the bore, offset +Y by the
-   eccentricity -- the
-   lobe points +Y, the NOTCH side: the ch14 end views prove the rocker tips sit
-   at the TOP of their stroke at notch-up/0-cranks, so lobe-up is the cos-mode
-   home pose; the pre-ROM-fit build authored it -Y, 180 deg off). The throw is
+   The lobe stands up, on the notch side: the ch14 end views prove the rocker
+   tips sit at the TOP of their stroke at notch-up/0-cranks, so lobe-up is the
+   cos-mode home pose (the pre-ROM-fit build authored it -Y, 180 deg off). It
+   is cut on the tooth space half a pitch clockwise of the +Y crest, away
+   from the notch, so the drive train's half-pitch tooth-in-gap lock turns it
+   vertical (owner ruling 2026-11-20 on #749, "B";
+   ``dt_cylinder_gear_phase_band.CAM_LOBE_OFFSET_DEG``). The throw is
    MEASURED from the ch14 end-view ROM fit (tip half-amplitude 9.458 mm x
    127.37/139.5); the real machine drives the rod with a CUT TEMPLATE cam (the
    p.25 teardrop outline; Michelson 1898 closing note), modeled here as the
@@ -58,7 +61,8 @@ classified by that same finite repeated-tooth profile.
 Dimensions: cad/DIMENSIONS.md "Chapter 13".
 
 Layout: gear axis = Z through the origin, gear z = 0..FACE_WIDTH, cam
-z = FACE_WIDTH..7.62, cam lobe +Y, notch +Y (lobe on the notch side).
+z = FACE_WIDTH..7.62, +Y a tooth crest, cam lobe half a pitch clockwise of it,
+notch half a pitch counter-clockwise of it.
 
 Run (SolidWorks already open)::
 
@@ -107,7 +111,12 @@ from _fit_deviations import deviations
 from _gear import build_stock_form_gear, volume_check
 from _part_pmi import author_part_pmi
 from dt_cylinder_gear_notes import GEAR_DATA
-from dt_cylinder_gear_phase_band import NOTCH_PHASE_TOLERANCE_DEG
+from dt_cylinder_gear_phase_band import (
+    CAM_CENTER_XY,
+    CAM_LOBE_OFFSET_DEG,
+    CAM_NOTCH_PHASE_DEG,
+    NOTCH_PHASE_TOLERANCE_DEG,
+)
 from dt_cylinder_gear_spec import (
     BORE_DIA as BORE_DIAMETER,
     BORE_DIA_BAND,
@@ -311,29 +320,31 @@ def _ref_axis_start_mm(adapter, axis_name: str) -> list[float] | None:
 
 
 def _name_lobe_axis(adapter) -> str:
-    """Named reference axis through the eccentric cam-lobe centre (part-local
-    x 0, y +ECCENTRICITY), along Z, for the motion study's cam->rod coupling.
+    """Named reference axis through the eccentric cam-lobe centre
+    (``CAM_CENTER_XY``), along Z, for the motion study's cam->rod coupling.
 
     The Henrici cam coupling (artifact B) makes each connecting-rod ring
     (Axis1@connecting-rod) coaxial with its drive-train cylinder-gear lobe. A
     face-based concentric on this geared part is catastrophic (walking ~thousands
     of tooth faces) and the lobe face will not select through the nested,
     flexible sub. A *named* axis is fast, mirror-agnostic and selects by name --
-    the same pattern the bore axis already uses. The offset-plane sign for
-    "Top Plane + ECC" is verified against GetRefAxisParams (Y must land at the
-    lobe side, +ECC), so a flipped SW offset convention fails loudly here rather
-    than silently building a wrong-side cam axis.
+    the same pattern the bore axis already uses. The offset-plane signs for
+    "Right Plane + x" and "Top Plane + y" are verified against
+    GetRefAxisParams (the axis must land on the cam centre, clockwise of +Y),
+    so a flipped SW offset convention fails loudly here rather than silently
+    building a wrong-side cam axis.
     """
+    cam_x, cam_y = CAM_CENTER_XY
     axis_name = name_bore_axis(
-        adapter, "Right Plane", 0.0, "Top Plane", ECCENTRICITY, "cam lobe axis"
+        adapter, "Right Plane", cam_x, "Top Plane", cam_y, "cam lobe axis"
     )
     start = _ref_axis_start_mm(adapter, axis_name)
     if start is None:
         raise RuntimeError(f"could not read lobe axis {axis_name} params")
-    if abs(start[0]) > 0.1 or abs(start[1] - ECCENTRICITY) > 0.1:
+    if abs(start[0] - cam_x) > 0.01 or abs(start[1] - cam_y) > 0.01:
         raise RuntimeError(
             f"lobe axis misplaced at (x={start[0]:.3f}, y={start[1]:.3f}); "
-            f"expected (0, {ECCENTRICITY:.3f}) -- Top Plane offset sign flipped"
+            f"expected ({cam_x:.3f}, {cam_y:.3f}) -- plane offset sign flipped"
         )
     _telemetry.success(f"lobe axis {axis_name} at (x {start[0]:.3f}, y {start[1]:.3f})")
     return axis_name
@@ -390,30 +401,47 @@ def build(adapter) -> dict[str, str]:
     volume = v_teeth
 
     # ------------------------------------------------------------------
-    # Integral cam on the far gear face (z = 3..OVERALL), lobe +Y (notch side).
+    # Integral cam on the far gear face (z = 3..OVERALL), its lobe on the
+    # tooth space half a pitch clockwise of the +Y crest (#749).
     # It is extruded from the Front plane THROUGH the blank so its one depth
     # dimension is the overall thickness -- the station pitch the solid bank
     # stacks on (#743), carrying the print band.  The cam lies wholly inside
     # the core's actual minimum root web, proved before creating its profile.
     # Its material inside z = 0..FACE_WIDTH merges into the uncut web.
     # ------------------------------------------------------------------
-    # Cam disc: ordinary auxiliary circle, centred +Y from the bore.  On the
-    # Front plane the on-axis x coordinate drops; record what is emitted and
-    # mark only the Y offset and diameter for the drawing.
+    # Cam disc: its centre is the throw from the bore centre along the lobe
+    # axis (an aligned distance, the printed throw; it keeps the name CamCy
+    # that dt_cylinder_gear_spec.DRAWING_DIMENSIONS marks) and the lobe axis's
+    # turn off +Y, held by the centre's horizontal offset (CamLobeX, not
+    # printed: the sheet states the lobe's turn as NotchPhase, lobe to notch).
     if CAM_ROOT_WEB_MIN_MM <= 0.0:
         raise ValueError("eccentric cam must remain inside the stock-form root web")
+    cam_x, cam_y = CAM_CENTER_XY
     cam = SketchDims()
     check("create_sketch cam on Front", adapter.create_sketch("Front"))
-    define_circle(
-        adapter,
-        0.0,
-        ECCENTRICITY,
-        CAM_DIAMETER / 2.0,
-        "cam disc",
-        dims=cam,
-        names=("CamCx", "CamCy", "CamDia"),
-        drives=(None, '"Eccentricity"', '"CamDiameter"'),
+    set_sketch_direct_db(adapter, True)
+    cam_circle = check(
+        "add_circle cam disc", adapter.add_circle(cam_x, cam_y, CAM_DIAMETER / 2.0)
     )
+    set_sketch_direct_db(adapter, False)
+    dimension_between(
+        adapter,
+        f"{cam_circle}.center",
+        "origin",
+        "horizontal_distance",
+        cam_x,
+        f"cam lobe {CAM_LOBE_OFFSET_DEG:g} deg clockwise of the crest",
+    )
+    cam.record("CamLobeX", None)
+    dimension_between(
+        adapter, "origin", f"{cam_circle}.center", "distance", ECCENTRICITY, "cam throw"
+    )
+    cam.record("CamCy", '"Eccentricity"')
+    check(
+        "dimension cam disc diameter",
+        adapter.add_sketch_dimension(cam_circle, None, "diameter", CAM_DIAMETER),
+    )
+    cam.record("CamDia", '"CamDiameter"')
     ensure_fully_defined(adapter, "cam sketch")
     check("exit_sketch cam", adapter.exit_sketch())
     name_last_feature(adapter, "CamProfile")
@@ -430,7 +458,7 @@ def build(adapter) -> dict[str, str]:
     volume = volume_check(adapter, "cam boss", volume + v_cam, 0.005 * v_cam)
 
     # The extrude direction has an ambiguous sign: assert the cam actually
-    # landed at z > FACE_WIDTH, on +Y.
+    # landed at z > FACE_WIDTH, on the lobe side.
     mass = adapter.get_mass_properties()
     if not mass.is_success:
         raise RuntimeError(f"cam COM check failed: {mass.error}")
@@ -438,7 +466,7 @@ def build(adapter) -> dict[str, str]:
     com_z = (
         v_teeth * FACE_WIDTH / 2.0 + v_cam * (FACE_WIDTH + CAM_THICKNESS / 2.0)
     ) / volume
-    com_y = v_cam * ECCENTRICITY / volume
+    com_y = v_cam * cam_y / volume
     if abs(com[2] - com_z) > 0.1 or abs(com[1] - com_y) > 0.1:
         raise RuntimeError(
             f"cam misplaced: COM {com}, expected y {com_y:.3f} z {com_z:.3f} "
@@ -534,19 +562,24 @@ def build(adapter) -> dict[str, str]:
         "notch depth",
     )
     notch_dims.record("NotchDepth", '"NotchDepth"')
-    # The cam-phase datum, natively: the lobe axis (origin -> the +Y crest, the
-    # direction CamCy offsets the cam) and the notch radial (origin -> the kerf
-    # centreline x = NOTCH_X at the mean notch radius) meet at NOTCH_PHASE_DEG,
-    # half a circular pitch. A DRIVEN angular dimension between them carries
+    # The cam-phase datum, natively: the lobe axis (origin -> the direction
+    # CamCy throws the cam, CAM_LOBE_OFFSET_DEG clockwise of the +Y crest) and
+    # the notch radial (origin -> the kerf centreline x = NOTCH_X at the mean
+    # notch radius) meet at CAM_NOTCH_PHASE_DEG, a whole circular pitch. A
+    # DRIVEN angular dimension between them carries
     # the printed phase band, the budget's gear-to-gear cam_phase plus the cam
     # fixture's common phase (dt_cylinder_gear_phase_band; drawing-guidelines.md
     # rule 3 (decimal places carry the tolerance): the
     # band goes on the dimension, not in a note); the kerf stays located by
     # NotchCenterX, so its geometry is unchanged and the sketch fully defined.
+    lobe_tip = (
+        RA_MM * math.sin(math.radians(CAM_LOBE_OFFSET_DEG)),
+        RA_MM * math.cos(math.radians(CAM_LOBE_OFFSET_DEG)),
+    )
     set_sketch_direct_db(adapter, True)
     lobe_axis = check(
         "notch lobe-axis construction line",
-        adapter.add_centerline(0.0, 0.0, 0.0, RA_MM),
+        adapter.add_centerline(0.0, 0.0, *lobe_tip),
     )
     notch_radial = check(
         "notch radial construction line",
@@ -569,12 +602,11 @@ def build(adapter) -> dict[str, str]:
     )
     set_sketch_direct_db(adapter, False)
     anchor_point_to_origin(adapter, f"{lobe_axis}.start", 0.0, 0.0, "lobe axis")
-    check(
-        "lobe axis ends on the +Y crest",
-        adapter.add_sketch_constraint(
-            f"{lobe_axis}.end", f"{depth_witness}.end", "coincident"
-        ),
-    )
+    # The lobe axis's tip at the tip radius on the cam's own direction: the
+    # same turn off the crest the cam sketch's CamLobeX holds.
+    anchor_point_to_origin(adapter, f"{lobe_axis}.end", *lobe_tip, "lobe axis tip")
+    notch_dims.record("LobeAxisX", None)
+    notch_dims.record("LobeAxisY", None)
     anchor_point_to_origin(
         adapter, f"{notch_radial}.start", 0.0, 0.0, "notch radial"
     )
@@ -596,16 +628,17 @@ def build(adapter) -> dict[str, str]:
         "fix canonical stock-pattern reference ray",
         adapter.add_sketch_constraint(pattern_ray, None, "fix"),
     )
-    # Text point INSIDE the 1.5 deg sector (SolidWorks picks which of the four
-    # angles the text sits in; 0.4 deg off the lobe axis, well clear of the
-    # radial at 1.5 deg) -- a point outside it reads the 178.5 supplement.
+    # Text point INSIDE the lobe-to-notch sector (SolidWorks picks which of
+    # the four angles the text sits in; 0.4 deg counter-clockwise of +Y, well
+    # clear of the lobe axis and the radial 1.5 deg either side of it) -- a
+    # point outside it reads the supplement.
     add_angular_reference_dimension(
         adapter,
         lobe_axis,
         notch_radial,
         (-0.3, RA_MM + 12.0),
         "notch phase",
-        expected_degrees=NOTCH_PHASE_DEG,
+        expected_degrees=CAM_NOTCH_PHASE_DEG,
     )
     notch_dims.record("NotchPhase")
     add_angular_reference_dimension(
