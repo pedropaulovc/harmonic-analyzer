@@ -76,6 +76,13 @@ anyway (a changed sheet, a forced refresh, a bump) see the new text. Editing a
 reviewer prompt re-keys the reviews that read it. This policy file is not a
 review input.
 
+The `PART` name-field bullet of guidelines rule 2 records an owner ruling
+(2026-11-20, #1425, accepting the recommendation "Keep 'PART' and record the
+convention in cad/docs/drawing-guidelines.md, which avoids re-keying every
+assembly sheet for a label"). It went in without a `major_version` bump on
+purpose: cached assembly reviews keep any PART/ASSEMBLY ask they raised until
+their sheet re-keys for another reason.
+
 - **The model owns tolerance and precision (rules 3 and 4).** A band goes on
   the dimension as a native model tolerance
   (`_drawing_tolerances.set_dimension_*_tolerance`). Decimal places are authored

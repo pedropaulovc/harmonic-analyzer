@@ -14,7 +14,7 @@ mirrored across the groove's start meridian, both circular-patterned x90
 Vendor equations: Chamfer1 = P*.75, Chamfer2 = HH/10, Fillet1 = HH*.1,
 root flat D1 = P/8, knurl pattern count = (360/2deg)*.5 = 90.
 
-Per-part entry points: ``diag_build_91882A221.py`` / ``diag_build_91882A425.py``.
+Per-part entry point: ``diag_build_91882A221.py`` (91882A425's was retired).
 """
 
 from __future__ import annotations
