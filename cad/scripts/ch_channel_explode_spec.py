@@ -43,19 +43,12 @@ HOOK = "ch-vn-spring-hook"
 ARM = "ch-rocker-arm"
 ROD_PIN = f"{PIVOT_PIN}--RodPin"
 LEVER = "ch-channel-lever"
-# The installed spring's family: the model holds its built variants
-# (``-stretchNN``, build_ch_channel_assembly), each one family here.
 CHANNEL_SPRING = "ch-vn-channel-spring-installed"
 
 
 def member_family(stem: str, configuration: str) -> str:
     """A component's family key: the pivot pin's per member, else its stem."""
     return f"{stem}--{configuration}" if stem == PIVOT_PIN else stem
-
-
-def family(stem: str) -> str:
-    """The explode family of a model component stem."""
-    return CHANNEL_SPRING if stem.startswith(f"{CHANNEL_SPRING}-stretch") else stem
 
 
 # "north-most": each member family's instance of greatest z only, the one
@@ -200,7 +193,7 @@ def plan_explode(
     Refuses a family the model lacks, a sided step that would move nothing,
     and a sided pair that is not one instance per side.
     """
-    by_family = [(family(instance.stem), instance) for instance in instances]
+    by_family = [(instance.stem, instance) for instance in instances]
     missing = sorted(EXPLODED_STEMS - {stem for stem, _ in by_family})
     if missing:
         raise ValueError(f"explode families absent from the model: {missing!r}")

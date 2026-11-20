@@ -47,7 +47,7 @@ export const BINDINGS: readonly Binding[] = [
   family('rockerArms', channel, 'ch-rocker-arm', 'rocker'),
   family('amplitudeBars', channel, 'ch-amplitude-bar', 'bar'),
   family('channelLevers', channel, 'ch-channel-lever', 'lever'),
-  family('channelSprings', channel, 'ch-vn-channel-spring-installed-stretch00', 'channel-spring'),
+  family('channelSprings', channel, 'ch-vn-channel-spring-installed', 'channel-spring'),
   family('springSupports', channel, 'ch-vn-spring-hook', 'summing'),
   group('summingLever', summing, '(?:sm-summing-lever|sm-vn-boss-hook)-1', 'summing', 2),
   group('gooseneck', summing, '(?:sm-gooseneck|sm-gooseneck-end-plug|sm-vn-gooseneck-shoulder-screw)-1', 'gooseneck', 3),

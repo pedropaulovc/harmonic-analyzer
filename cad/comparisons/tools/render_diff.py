@@ -75,8 +75,9 @@ GHOST = (0.80, 0.80, 0.82)    # unchanged -> light grey
 
 
 def base_part(key):
-    """Group tooth/stretch variants for the summary, not mesh classification."""
-    return re.sub(r"(--t\d+|-stretch\d+)$", "", key)
+    """Group tooth and installed-length configurations (and pre-#1610
+    ``-stretchNN`` spring files) for the summary, not mesh classification."""
+    return re.sub(r"(--t\d+|--installed\d+|-stretch\d+)$", "", key)
 
 
 # --------------------------------------------------------------------------- #

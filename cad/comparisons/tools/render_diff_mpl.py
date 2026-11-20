@@ -36,7 +36,7 @@ FACE_BUDGET = 700  # decimate each red mesh to this many triangles
 
 
 def base_part(key: str) -> str:
-    return re.sub(r"(--t\d+|-stretch\d+)$", "", key)
+    return re.sub(r"(--t\d+|--installed\d+|-stretch\d+)$", "", key)
 
 
 def sw_matrix(xform):

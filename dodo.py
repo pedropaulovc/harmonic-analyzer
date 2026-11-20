@@ -451,8 +451,8 @@ class ContentChecker(MD5Checker):
             # geometry change (a no-op refresh that never reaches a fixpoint;
             # follow-up to #102). Key on the producing task's build INPUTS instead
             # (recipe, transitively), which are churn-immune and flip iff the
-            # geometry's inputs change. None -> not a declared target (e.g. the
-            # channel stretch-spring variants) -> stock byte md5.
+            # geometry's inputs change. None -> not a declared target -> stock
+            # byte md5.
             recipe = _stable_artefact_digest(file_path)
             return recipe if recipe is not None else _canonical_file_md5(file_path)
         if file_path.endswith(".py"):
@@ -1099,9 +1099,10 @@ def _expand_parts_token(stem: str | None, kind: str | None, script: Path) -> lis
 
       * a PART stamps only its OWN row -> parts/<dashed-stem>.yaml + _defaults
         (editing one row rebuilds one part);
-      * an ASSEMBLY that stamps in-script (only build_channel_assembly, for its
-        stretched springs) depends on the rows of the parts it references (a
-        superset of the rows it stamps -- conservative); a non-stamping assembly
+      * an ASSEMBLY that stamps in-script (none since the channel's spring
+        variants became configurations of their part, #1610) depends on the
+        rows of the parts it references (a superset of the rows it stamps --
+        conservative); a non-stamping assembly
         needs NO parts row (a referenced part's row edit rebuilds that PART, whose
         new .SLDPRT triggers the assembly REFRESH);
       * a DRAWING reads its OWN part's row -> parts/<dashed-part>.yaml +
@@ -1515,35 +1516,6 @@ def _stl(stem: str) -> Path:
     return prt.parent.parent / "stl" / f"{prt.stem}.STL"
 
 
-# The measured-length spring variants the channel assembly builds and inserts,
-# each with the STL ``build_spring`` -> ``save_part_and_images`` exports beside
-# it (#2801), as globs under cad/out. Neutral also uses stretch00.
-_CHANNEL_SPRING_VARIANTS = (
-    "sldprt/ch-vn-channel-spring-installed-stretch*.SLDPRT",
-    "stl/ch-vn-channel-spring-installed-stretch*.STL",
-)
-
-
-def _assembly_discovered_outputs(stem: str) -> tuple[str, ...]:
-    """Globs (under cad/out) of an assembly's cache outputs that exist only once
-    its build has made them, so a tree that never built it, as a clean farm
-    worker, holds none at build start."""
-    return _CHANNEL_SPRING_VARIANTS if stem == "ch_channel" else ()
-
-
-def _assembly_discovered_on_disk(stem: str) -> list[Path]:
-    """This tree's files matching :func:`_assembly_discovered_outputs`: for the
-    channel, the spring variants and their STL it last built or restored. They
-    are assembly-owned outputs, not separate task targets; cleanup and cache
-    packing share this inventory so a hit restores every spring component
-    referenced by ch-channel.SLDASM."""
-    return sorted(
-        path
-        for pattern in _assembly_discovered_outputs(stem)
-        for path in CAD_OUT.glob(pattern)
-    )
-
-
 def _part_configuration_outputs(stem: str) -> list[Path]:
     """Exact member STEP/PNG/certificate outputs owned only by this part task."""
     from _part_configuration_exports import part_configuration_outputs
@@ -1582,9 +1554,9 @@ def _part_cache_outputs(stem: str) -> list[Path]:
 
 def _assembly_cache_outputs(stem: str) -> list[Path]:
     """Everything an assembly build emits beyond its file_dep: the .SLDASM + renders,
-    plus the per-stem extras a hit would otherwise leave missing/stale -- the channel
-    stretch-spring components and the top assembly's parts BOM (which
-    export_gallery_and_bom writes into cad/out, OUTSIDE _png_dir).
+    plus the per-stem extras a hit would otherwise leave missing/stale -- the top
+    assembly's parts BOM (which export_gallery_and_bom writes into cad/out,
+    OUTSIDE _png_dir).
 
     Includes the `.<stem>.massprops.sha` fingerprint sidecar (refresh_assembly's
     no-save key): it is machine-independent content (a geometry hash), so it MUST
@@ -1602,7 +1574,6 @@ def _assembly_cache_outputs(stem: str) -> list[Path]:
     # would then find no drive specs to author transiently and fail loud.
     dof = sldasm.parent / f".{sldasm.stem}.dof.json"
     outs = [sldasm, _png_dir(stem), massprops, dof, _input_ledger(stem)]
-    outs += _assembly_discovered_on_disk(stem)
     if stem == "ha_harmonic_analyzer":
         outs.append(CAD_OUT / "ha-harmonic-analyzer-bom.csv")
     return outs
@@ -2373,13 +2344,13 @@ def _recipe_files(stem: str) -> list[str]:
     no longer forces a spurious ~500 s FULL re-insert."""
     asm_script = script_for(stem)
     hooks = [str((SCRIPTS_DIR / h).resolve()) for h in POST_ASSEMBLY.get(stem, ())]
-    # An assembly that GENERATES parts in-script (build_channel_assembly's
-    # stretched springs; detected by the same stamps_part_properties call-graph
-    # predicate the config tokens use) instantiates the part TEMPLATE via
+    # An assembly that GENERATES parts in-script (none today, #1610; detected by
+    # the same stamps_part_properties call-graph predicate the config tokens
+    # use) instantiates the part TEMPLATE via
     # NewPart, so the template is a direct build input: fold it in so a
-    # template edit FULL-rebuilds the generated variants and shifts the
-    # assembly's cache key (codex #289 -- a cached channel would otherwise
-    # keep/restore springs built from the previous template). NON-generating
+    # template edit FULL-rebuilds the generated parts and shifts the
+    # assembly's cache key (codex #289 -- a cached assembly would otherwise
+    # keep/restore parts built from the previous template). NON-generating
     # assemblies must NOT fold it: they get the template transitively through
     # their referenced parts' recipe digests (a template edit re-stamps the
     # parts -> shifted artefact digests -> REFRESH), and a direct fold would
@@ -2706,9 +2677,9 @@ def build_or_refresh(stem, dependencies, changed, targets):
 def _publish_assembly(stem: str, key: str, file_deps: list[str]) -> None:
     """Store an assembly's outputs under ``key`` for other machines OUTSIDE the
     seat (an Azure upload is network, not COM). The output set is computed
-    HERE, not taken from the task's start: the channel stretch parts and the
-    top-level gallery PNGs are glob-discovered and DID NOT EXIST yet on a clean
-    builder then, so the early list would publish an incomplete archive (codex
+    HERE, not taken from the task's start: the top-level gallery PNGs are
+    glob-discovered and DID NOT EXIST yet on a clean builder then, so the
+    early list would publish an incomplete archive (codex
     review). A lost publication adopts the winner's whole archive, re-stamps
     its token and rewrites the input ledger."""
     label = f"assembly:{stem}"
@@ -2764,17 +2735,12 @@ def _force_remove(path: Path) -> None:
 
 
 def _clean_assembly(stem):
-    """Remove the .SLDASM target, its png/<dashed> render dir, and the outputs
-    its build discovers (:func:`_assembly_discovered_on_disk`: the channel's
-    stretched-spring variants, which are not any task's declared target, so a
-    stale stretchNN body would otherwise be reused on the next build; codex
-    review #4)."""
+    """Remove the .SLDASM target, its execution token, input ledger and
+    png/<dashed> render dir."""
     _force_remove(Path(_sldasm(stem)))
     _force_remove(Path(_assembly_execution_token(stem)))
     _force_remove(_input_ledger(stem))
     _force_remove(CAD_OUT / "png" / stem.replace("_", "-"))
-    for variant in _assembly_discovered_on_disk(stem):
-        _force_remove(variant)
 
 
 def _assembly_task(stem: str) -> dict[str, Any]:

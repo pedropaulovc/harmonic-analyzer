@@ -974,7 +974,7 @@ def test_the_explode_plan_moves_every_family_and_only_them() -> None:
     # pulled out of the closed-up bank; every other channel stays in it.
     channel = {
         stem: max(
-            (instance for instance in instances if explode.family(instance.stem) == stem),
+            (instance for instance in instances if instance.stem == stem),
             key=lambda instance: instance.z_mm,
         ).name
         for stem in explode.EXPLODED_STEMS - explode.FULLY_EXPLODED_STEMS
@@ -983,7 +983,7 @@ def test_the_explode_plan_moves_every_family_and_only_them() -> None:
     assert moved == {
         instance.name
         for instance in instances
-        if explode.family(instance.stem) in explode.FULLY_EXPLODED_STEMS
+        if instance.stem in explode.FULLY_EXPLODED_STEMS
     } | set(channel.values())
     (pulled,) = [
         names for step, names in plan if step.label == "north-most channel out"

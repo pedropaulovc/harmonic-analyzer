@@ -1,5 +1,6 @@
 ch-vn-channel-spring-installed:
   number: MHA-CH-VN-50
+  description: "EXTENSION SPRING"
   stock_name: Music-Wire Steel Extension Spring with Hook Ends
   supplier: McMaster-Carr
   supplier_skus: [9432K31]
