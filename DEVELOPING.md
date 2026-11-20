@@ -2041,9 +2041,15 @@ configuration instance paths, the complete machine's spare sprocket) stack
 each level reversed, so they too visit siblings in ascending order.
 Callers use the name it returns instead of reading it again, and an element
 that is `None` or answers no name raises there: an unnamed component is never
-skipped, labelled or ordered under a placeholder. A loop that only collects
-names into a set is left as it is (its requests are the same name reads), and
-a part drawing view's one visible component needs no order
+skipped, labelled or ordered under a placeholder. The pattern gates' loops
+that only collect names into a set go through it too
+(`_assembly_patterns._component_names`, since #2759), so an unnamed component
+fails there as well. `_assembly.check_no_interference` names each
+`IInterferenceDetectionMgr.GetInterferences` result's `IInterference.Components`
+in the report's order, then reads configurations and volumes over the results
+sorted by name pair; results sharing a pair keep the report's order among
+themselves, so their volumes are sorted before they are summed or reported.
+A part drawing view's one visible component needs no order
 (`_drawing_edges.visible_view_entities` sorts only an assembly view's).
 Exempt: scripts no doit task runs (`export_glb`, `diagnostics/`), and `_drawing_tables`'
 failure evidence, whose `collect()` records a failed row's first native

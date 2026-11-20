@@ -2282,7 +2282,9 @@ def check_no_interference(
             interferences = adapter._attempt(
                 lambda: mgr.GetInterferences(), default=None
             )
-        details = []
+        # (natural-key name pair, volume, text): sorted before the failure
+        # text is joined, so results sharing a pair read the same either way.
+        details: list[tuple[list[Any], float, str]] = []
         bounded_contacts = []
         # frozenset(names) -> (names in name order, [body volumes])
         allowed_bodies: dict[frozenset[str], tuple[list[str], list[float]]] = {}
@@ -2290,61 +2292,77 @@ def check_no_interference(
         chain_mesh_contacts = []
         # Each result's components are named first, one read each in the
         # report's order, and every later read follows the results sorted by
-        # their name pair (issue #2759): only the name answers follow the seat.
-        reported = []
-        for interference in list(interferences or []):
-            interference = _early_bound(interference, "IInterference")
-            named = by_name(_read_member(interference, "Components"))
-            names = [name.replace("\\", "/") for name, _component in named]
-            reported.append((names, interference, [component for _, component in named]))
-        reported.sort(key=lambda row: [natural_key(name) for name in row[0]])
-        for names, interference, components in reported:
-            # No flag: ReferencedConfiguration is a property read (issue #87).
-            configs = [
-                str(_read_member(comp, "ReferencedConfiguration") or "")
-                for comp in components
-            ]
-            volume_mm3 = float(_read_member(interference, "Volume") or 0.0) * 1e9
-            pair = frozenset(names)
-            if len(names) == 2 and pair in native_allowed_pairs:
-                allowed_bodies.setdefault(pair, (names, []))[1].append(volume_mm3)
-                continue
-            links = [
-                index
-                for index, component in enumerate(components)
-                if _is_chain_link(component)
-            ]
-            if len(links) == 2 and len(names) == 2:
-                chain_contacts.append(volume_mm3)
-                continue
-            # Tooth selection alone cannot distinguish an active wheel from a
-            # loose spare. Match the real leaf families, then prove exactly one
-            # authored mounted role from the raw component's root-world pose.
-            sprockets = [
-                i
-                for i, name in enumerate(names)
-                if _chain_component_family(name, _CHAIN_SPROCKET_PREFIXES)
-            ]
-            if (
-                len(names) == 2
-                and len(links) == 1
-                and len(sprockets) == 1
-                and _mounted_chain_sprocket(
-                    components[sprockets[0]], configs[sprockets[0]], chain_mounts
+        # their name pair (issue #2759): only the name answers follow the
+        # seat. Results sharing a pair (a thread annulus's slivers, #853)
+        # keep the report's order among themselves; their volumes are sorted
+        # before they are summed or reported.
+        try:
+            reported = []
+            for interference in list(interferences or []):
+                interference = _early_bound(interference, "IInterference")
+                named = by_name(_read_member(interference, "Components"))
+                names = [name.replace("\\", "/") for name, _component in named]
+                reported.append(
+                    (names, interference, [component for _, component in named])
                 )
-            ):
-                chain_mesh_contacts.append(volume_mm3)
-                continue
-            _telemetry.event(
-                "interference.unexpected",
-                components=names,
-                configurations=configs,
-                volume_mm3=volume_mm3,
-            )
-            details.append(f"{' & '.join(names)}: {volume_mm3:.9g} mm^3")
-        adapter._attempt(lambda: mgr.Done(), default=None)
+            reported.sort(key=lambda row: [natural_key(name) for name in row[0]])
+            for names, interference, components in reported:
+                # No flag: ReferencedConfiguration is a property read (issue #87).
+                configs = [
+                    str(_read_member(comp, "ReferencedConfiguration") or "")
+                    for comp in components
+                ]
+                volume_mm3 = float(_read_member(interference, "Volume") or 0.0) * 1e9
+                pair = frozenset(names)
+                if len(names) == 2 and pair in native_allowed_pairs:
+                    allowed_bodies.setdefault(pair, (names, []))[1].append(volume_mm3)
+                    continue
+                links = [
+                    index
+                    for index, component in enumerate(components)
+                    if _is_chain_link(component)
+                ]
+                if len(links) == 2 and len(names) == 2:
+                    chain_contacts.append(volume_mm3)
+                    continue
+                # Tooth selection alone cannot distinguish an active wheel from a
+                # loose spare. Match the real leaf families, then prove exactly one
+                # authored mounted role from the raw component's root-world pose.
+                sprockets = [
+                    i
+                    for i, name in enumerate(names)
+                    if _chain_component_family(name, _CHAIN_SPROCKET_PREFIXES)
+                ]
+                if (
+                    len(names) == 2
+                    and len(links) == 1
+                    and len(sprockets) == 1
+                    and _mounted_chain_sprocket(
+                        components[sprockets[0]], configs[sprockets[0]], chain_mounts
+                    )
+                ):
+                    chain_mesh_contacts.append(volume_mm3)
+                    continue
+                _telemetry.event(
+                    "interference.unexpected",
+                    components=names,
+                    configurations=configs,
+                    volume_mm3=volume_mm3,
+                )
+                details.append(
+                    (
+                        [natural_key(name) for name in names],
+                        volume_mm3,
+                        f"{' & '.join(names)}: {volume_mm3:.9g} mm^3",
+                    )
+                )
+        finally:
+            # The caller must release the manager, also when a result is
+            # unnamed: verify's motion sweep collects the error and runs this
+            # gate again on the same document.
+            adapter._attempt(lambda: mgr.Done(), default=None)
         for pair, (names, bodies) in allowed_bodies.items():
-            total_mm3 = sum(bodies)
+            total_mm3 = sum(sorted(bodies))
             allowed_volume = native_allowed_pairs[pair]
             if total_mm3 <= allowed_volume:
                 bounded_contacts.append((names, total_mm3, len(bodies), allowed_volume))
@@ -2357,9 +2375,14 @@ def check_no_interference(
                 limit_mm3=allowed_volume,
             )
             details.append(
-                f"{' & '.join(names)}: {total_mm3:.9g} mm^3 over {len(bodies)} "
-                f"bodies (limit {allowed_volume:.9g} mm^3)"
+                (
+                    [natural_key(name) for name in names],
+                    total_mm3,
+                    f"{' & '.join(names)}: {total_mm3:.9g} mm^3 over {len(bodies)} "
+                    f"bodies (limit {allowed_volume:.9g} mm^3)",
+                )
             )
+        details.sort(key=lambda row: (row[0], row[1]))
         isp.set_attribute("hits", len(details))
         isp.set_attribute("bounded_contacts", len(bounded_contacts))
         isp.set_attribute("chain_contacts", len(chain_contacts))
@@ -2392,7 +2415,10 @@ def check_no_interference(
                 f"(limit {allowed_volume:.4f} mm^3)"
             )
         if details:
-            raise RuntimeError(f"{len(details)} interference(s): " + "; ".join(details))
+            raise RuntimeError(
+                f"{len(details)} interference(s): "
+                + "; ".join(text for _, _, text in details)
+            )
         _telemetry.success("interference check: none found")
 
 
