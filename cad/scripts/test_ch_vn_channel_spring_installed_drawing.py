@@ -47,3 +47,43 @@ def test_source_gauges_preserve_exact_values_and_supplier_spelling() -> None:
     }
 
 
+def _preset(name: str) -> list[float]:
+    import _config
+
+    return list(_config.machine("springs", "presets")[name]["amplitudes_mm"])
+
+
+def test_neutral_preset_saves_one_default_configuration() -> None:
+    """#1610: one installed length keeps the single native configuration."""
+    import settled_spring_seats
+
+    neutral = _preset("neutral")
+    (only,) = spec.installed_lengths(neutral)
+    assert only.configuration == "Default"
+    assert only.length_mm == settled_spring_seats.channel_seat(0.0).pose.length_mm
+    assert spec.channel_configurations(neutral) == ("Default",) * len(neutral)
+
+
+def test_square_preset_is_one_part_with_a_configuration_per_installed_length() -> None:
+    """#1610 route (a): the square preset's eleven measured lengths are
+    configurations of the one MHA-CH-VN-50 part, first-occurrence order, and
+    every station names its own length's configuration."""
+    import settled_spring_seats
+
+    square = _preset("square")
+    installed = spec.installed_lengths(square)
+    assert len(installed) == len(dict.fromkeys(square)) == 11
+    assert [length.configuration for length in installed] == [
+        "Default",
+        *(f"Installed{index:02d}" for index in range(1, 11)),
+    ]
+    assert len({length.length_mm for length in installed}) == len(installed)
+    by_name = {length.configuration: length.length_mm for length in installed}
+    stations = spec.channel_configurations(square)
+    assert len(stations) == len(square)
+    for amplitude, configuration in zip(square, stations, strict=True):
+        seat = settled_spring_seats.channel_seat(amplitude).pose.length_mm
+        assert by_name[configuration] == seat
+        assert spec.FREE_LENGTH_MM <= seat <= spec.MAX_LENGTH_MM
+        assert channel_force_n(seat) <= spec.MAXIMUM_LOAD_N
+    assert stations.count("Default") == square.count(0)

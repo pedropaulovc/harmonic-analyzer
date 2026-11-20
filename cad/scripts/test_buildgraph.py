@@ -355,14 +355,14 @@ def test_generated_vendor_variant_resolves_only_its_stock_family(
 ):
     source = (
         "place_component(adapter, "
-        "f'ch-vn-channel-spring-installed-stretch{index:02d}', pos, rot, rows)"
+        "f'dt-vn-cylinder-bank-spring-variant{index:02d}', pos, rot, rows)"
     )
     assert _source_references(
         tmp_path,
         monkeypatch,
         source,
         ("ch_vn_channel_spring_installed", "dt_vn_cylinder_bank_spring"),
-    ) == {"ch_vn_channel_spring_installed"}
+    ) == {"dt_vn_cylinder_bank_spring"}
 
 
 @pytest.mark.parametrize(
@@ -2271,12 +2271,15 @@ def test_identical_module_text_resolves_against_its_own_package(tmp_path, monkey
         assert (scripts / other / "helper.py").resolve() not in closures[package]
 
 
-def test_only_channel_generates_parts_in_script():
-    """Assembly identity must not masquerade as in-script part generation."""
+def test_no_assembly_generates_parts_in_script():
+    """Assembly identity must not masquerade as in-script part generation.
+
+    The channel's in-script spring variants are retired: the canonical spring
+    part carries each installed length as a configuration (#1610)."""
     part_stampers = {
         stem for stem in ASSEMBLY_ORDER if stamps_part_properties(script_for(stem))
     }
-    assert part_stampers == {"ch_channel"}
+    assert part_stampers == set()
     assert stamps_part_properties(SCRIPTS_DIR / "build_sh_vn_brass_fillister_screw.py")
 
 

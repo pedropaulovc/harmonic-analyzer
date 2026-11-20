@@ -45,8 +45,8 @@ the M6.8 mirror layer is gone).
   arm's #47 rod hole, lock-mated to the rod, then one BarPin pressed through
   the bar's top-notch cheeks and running in its lever's #47 bar-pin hole,
   lock-mated to the bar),
-  channel-spring-installed x20 (McMaster 9432K31, with fixed measured
-  installed-length variants),
+  channel-spring-installed x20 (McMaster 9432K31, one part whose
+  configurations are its fixed measured installed lengths, #1610),
   spring-hook x20 (McMaster 9489T111 eyebolts, supplied nuts omitted;
   their shanks thread directly into the summing plate)
 
@@ -578,7 +578,7 @@ if abs(FULCRUM_FLAT_PITCH / 2.0 - KEEPER_Z_OFF) > 1e-9:
     raise AssertionError("fulcrum shaft flats are not under the keeper crown taps")
 
 # --- purchased channel springs and retained lower anchors ------------------
-from _spring import build_spring  # noqa: E402
+import ch_vn_channel_spring_installed_spec as spring_part  # noqa: E402
 import ch_channel_lever_spec  # noqa: E402
 import ch_vn_channel_spring_stock_geom as spring_stock  # noqa: E402
 import spring_mount_geom as spring_mounts  # noqa: E402
@@ -1277,45 +1277,26 @@ def _author_settings_reference(adapter) -> None:
             raise RuntimeError(f"{feature} still visible after BlankSketch")
 
 
-def _prepare_native_spring_specs(adapter, amplitudes: list[float]) -> list[dict]:
-    """Load fixed measured seats and build one native variant per amplitude.
+def _prepare_native_spring_specs(amplitudes: list[float]) -> list[dict]:
+    """Each station's fixed measured seat and installed spring configuration.
 
-    Every lookup completes before the first COM build so an unsupported preset
-    fails without placing or rebuilding any spring. Variant indices retain the
-    amplitude preset's first-occurrence order.
+    Every lookup and catalogue check completes before the first COM call, so
+    an unsupported preset fails without placing any spring. The canonical
+    part carries one configuration per distinct installed length
+    (``ch_vn_channel_spring_installed_spec.installed_lengths``).
     """
-    unique_amplitudes = list(dict.fromkeys(amplitudes))
-    seats_by_amplitude = {
-        amplitude: settled_spring_seats.channel_seat(amplitude)
-        for amplitude in unique_amplitudes
-    }
-    by_amplitude: dict[float, dict] = {}
-    for amplitude in unique_amplitudes:
-        seat = seats_by_amplitude[amplitude]
-        pose = seat.pose
-        spring_stock.check_length_mm(pose.length_mm)
-        if spring_mounts.channel_force_n(pose.length_mm) > float(
-            _config.parts("ch-vn-channel-spring-installed")["maximum_load_n"]
-        ):
-            raise RuntimeError("settled channel spring exceeds catalog load")
-        variant_index = len(by_amplitude)
-        part = "ch-vn-channel-spring-installed"
-        variant = f"{part}-stretch{variant_index:02d}"
-        build_spring(adapter, variant, pose.length_mm, views=[])
-        adapter.swApp.CloseDoc(
-            _early_bound(adapter.currentModel, "IModelDoc2").GetTitle()
-        )
-        by_amplitude[amplitude] = {
-            "pose": pose,
-            "variant_index": variant_index,
-        }
+    configurations = spring_part.channel_configurations(amplitudes)
+    specs = []
+    for amplitude, configuration in zip(amplitudes, configurations, strict=True):
+        pose = settled_spring_seats.channel_seat(amplitude).pose
+        specs.append({"pose": pose, "configuration": configuration})
         _telemetry.event(
             "spring.channel_fixed_seat",
             amplitude_mm=amplitude,
             inside_length_mm=pose.length_mm,
-            variant_index=variant_index,
+            configuration=configuration,
         )
-    return [by_amplitude[amplitude] for amplitude in amplitudes]
+    return specs
 
 
 def build(adapter) -> dict[str, str]:
@@ -1324,8 +1305,8 @@ def build(adapter) -> dict[str, str]:
     # The amplitude-bar station per channel IS the Fourier coefficient a_j
     # (channels.yaml amplitude_mm, the square-wave preset). solve_state(a_j)
     # repositions that channel's bar + lever; a_j = 0 is the neutral pose. The
-    # neutral state still anchors the amplitude-independent rocker/rod and uses
-    # the first fixed calibrated spring variant (stretch00).
+    # neutral state still anchors the amplitude-independent rocker/rod; the
+    # springs take their installed configurations of one part.
     amplitudes = _config.amplitudes()
     if any(a < 0.0 for a in amplitudes):
         raise RuntimeError(
@@ -1358,12 +1339,9 @@ def build(adapter) -> dict[str, str]:
     if bar_clearance < 5.5:
         raise RuntimeError(f"bar passes only {bar_clearance:.2f} above the shaft")
 
-    # Fixed measured supplier-surface seats own the installed poses. Build each
-    # calibrated length exactly once, retaining first-occurrence stretch names.
-    spring_specs = _prepare_native_spring_specs(adapter, amplitudes)
-    # Keep the generated variant family explicit for the static build graph.
-    for spec in spring_specs:
-        spec["part"] = f"ch-vn-channel-spring-installed-stretch{spec['variant_index']:02d}"
+    # Fixed measured supplier-surface seats own the installed poses; the
+    # spring part holds each calibrated length as a configuration.
+    spring_specs = _prepare_native_spring_specs(amplitudes)
 
     # Reset the free-DOF manifest buffer before any *_driver(free_dof_key=...)
     # call: each freed DOF is recorded (never authored) and persisted below.
@@ -2307,7 +2285,8 @@ def build(adapter) -> dict[str, str]:
         _assert_spring_mount(pose, amplitudes[j], state="native_seated")
         grounded_specs.append(
             {
-                "part": spec["part"],
+                "part": "ch-vn-channel-spring-installed",
+                "configuration": spec["configuration"],
                 "position": [*pose.centre_xy, z_mid],
                 "rotation": [0.0, 0.0, 0.0],
                 "rows": pose.rotation_rows,

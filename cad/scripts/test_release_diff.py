@@ -1245,6 +1245,24 @@ def test_renamed_variants_keep_independent_geometry_verdicts_and_grouping(tmp_pa
     assert deviations["dt-crank-handle-ferrule"]["crank-handle-ferrule"] == 0
 
 
+@pytest.mark.parametrize(
+    "key,base",
+    [
+        (
+            "ch-vn-channel-spring-installed--installed07",
+            "ch-vn-channel-spring-installed",
+        ),
+        ("ch-vn-channel-spring-installed", "ch-vn-channel-spring-installed"),
+        ("ch-vn-channel-spring-installed-stretch07", "ch-vn-channel-spring-installed"),
+        ("dt-crank-handle-ferrule--installed", "dt-crank-handle-ferrule--installed"),
+    ],
+)
+def test_summary_groups_installed_length_configurations(render_diff, key, base):
+    """#1610: the channel spring's installed lengths are configurations of
+    one part; historical ``-stretchNN`` files still group by their base."""
+    assert render_diff.base_part(key) == base
+
+
 def test_pose_projected_request_requires_complete_zip_when_only_one_alias_is_extracted(
     tmp_path, monkeypatch,
 ):

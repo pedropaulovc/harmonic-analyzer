@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import math
 
+import _config
 import sh_vn_arbor_set_screw_spec as arbor_set_screw
 import ch_vn_bracket_hold_down_screw_spec as hold_down_screw
 import ch_vn_frame_side_screw_spec as frame_side_screw
@@ -182,8 +183,9 @@ def setting_row(key: str) -> str:
 
 
 # Hand-written (components carry no Description property), keyed by family
-# stem (each pivot pin member by stem--member, its configured BOM key); the
-# drawing keys the spring row by its built variant stem.
+# stem (each pivot pin member by stem--member, its configured BOM key). The
+# spring's installed configurations stamp their grouped BOM description, which
+# wins over the written cell, so its text is the registry row's.
 BOM_DESCRIPTIONS = {
     "ch-pivot-shaft": "ROCKER PIVOT SHAFT",
     "ch-fulcrum-shaft": "LEVER FULCRUM SHAFT",
@@ -207,6 +209,6 @@ BOM_DESCRIPTIONS = {
     "ch-channel-lever": "CHANNEL LEVER",
     ROD_PIN: "ROD PIVOT PIN",
     BAR_PIN: "BAR PIVOT PIN",
-    CHANNEL_SPRING: "EXTENSION SPRING",
+    CHANNEL_SPRING: str(_config.parts("ch-vn-channel-spring-installed")["description"]),
     HOOK: "#6-32 EYEBOLT SPRING ANCHOR",
 }

@@ -2398,9 +2398,9 @@ def _stamping_modules() -> frozenset[str]:
     (``build_paper_drive_assembly`` -> ``_gear`` -> ``build_cone_gear.gap_area_in_disc``),
     never reaches a stamping primitive and is correctly NOT a stamper -- so a
     registry-row edit rebuilds the relevant PART and merely REFRESHES the assembly,
-    no FULL (codex review). An assembly that genuinely generates+stamps an in-script
-    part (``build_channel_assembly`` -> ``_spring.build_spring`` ->
-    ``save_part_and_images``) IS a stamper. Stamping is always a by-name call, so
+    no FULL (codex review). An assembly that genuinely generated+stamped an
+    in-script part (``save_part_and_images`` reached from its build) would be a
+    stamper. Stamping is always a by-name call, so
     name-based edges capture every real path (no under-detection). A module that
     fails to read or parse contributes no function but stays an import target."""
     local = _local_modules()
@@ -2458,8 +2458,9 @@ def _stamping_modules() -> frozenset[str]:
 def stamps_part_properties(script: Path) -> bool:
     """True when this script generates and stamps a part-registry-owned part.
 
-    Among assemblies only channel does, for its stretched spring variants. The
-    predicate controls referenced part-row and part-template recipe dependencies.
+    No assembly does since the channel's spring variants became configurations
+    of their part (#1610). The predicate controls referenced part-row and
+    part-template recipe dependencies.
     """
     return script.stem in _stamping_modules()
 

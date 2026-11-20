@@ -2926,24 +2926,26 @@ def test_assembly_artefact_digest_folds_in_refs():
 
 
 def test_unknown_artefact_falls_back_to_byte_md5(tmp_path):
-    """A .SLDPRT that is not a declared part/assembly target (e.g. a channel
-    stretch-spring variant) has no recipe in the graph, so the digest falls back to
-    the stock byte md5 rather than crashing or fabricating one."""
+    """A .SLDPRT that is not a declared part/assembly target (e.g. a native
+    seat-calibration fixture spring) has no recipe in the graph, so the digest
+    falls back to the stock byte md5 rather than crashing or fabricating one."""
     from doit.dependency import get_file_md5
 
     dodo = _load_dodo()
-    orphan = tmp_path / "ch-vn-channel-spring-installed-stretch07.SLDPRT"
+    orphan = tmp_path / "ch-vn-channel-spring-calib07.SLDPRT"
     orphan.write_bytes(b"\x00solidworks-bytes\x01")
     assert dodo._stable_artefact_digest(str(orphan)) is None
     assert dodo.ContentChecker._digest(str(orphan)) == get_file_md5(str(orphan))
 
 
-_SPRING_VARIANT = "ch-vn-channel-spring-installed-stretch"
-
-
-def _channel_tree(dodo, monkeypatch, root: Path) -> Path:
-    """dodo's ch_channel outputs under ``root``/cad/out (returned)."""
-    out = root / "cad" / "out"
+def test_channel_cache_outputs_and_cleanup_leave_spring_files_alone(
+    tmp_path, monkeypatch
+):
+    """The channel no longer builds spring variants (#1610): the spring's
+    SLDPRT/STL belong to its part task, never to the assembly's archive or
+    cleanup."""
+    dodo = _load_dodo()
+    out = tmp_path / "cad" / "out"
     monkeypatch.setattr(dodo, "CAD_OUT", out)
     monkeypatch.setattr(
         dodo, "_sldasm", lambda stem: str(out / "sldasm" / f"{stem}.SLDASM")
@@ -2951,61 +2953,19 @@ def _channel_tree(dodo, monkeypatch, root: Path) -> Path:
     monkeypatch.setattr(
         dodo, "_input_ledger", lambda stem: out / "sldasm" / f".{stem}.inputs.json"
     )
-    for folder in ("sldasm", "sldprt", "stl"):
-        (out / folder).mkdir(parents=True)
-    return out
-
-
-def test_channel_spring_variants_ride_the_cache_with_their_stl(tmp_path, monkeypatch):
-    # #2801: build_spring exports an STL beside each stretched variant it saves;
-    # undeclared, it was never packed or cleaned.
-    dodo = _load_dodo()
-    out = _channel_tree(dodo, monkeypatch, tmp_path)
-    variants = []
-    for index in ("00", "03"):
-        for folder, suffix in (("sldprt", ".SLDPRT"), ("stl", ".STL")):
-            path = out / folder / f"{_SPRING_VARIANT}{index}{suffix}"
-            path.write_bytes(b"geometry")
-            variants.append(path)
-    # The installed spring's own STL is its part task's.
-    (out / "stl" / "ch-vn-channel-spring-installed.STL").write_bytes(b"part")
-    assert dodo._assembly_discovered_on_disk("ch_channel") == sorted(variants)
-    assert not [
-        stem
-        for stem in dodo.ASSEMBLY_ORDER
-        if stem != "ch_channel" and dodo._assembly_discovered_on_disk(stem)
+    spring = [
+        out / "sldprt" / "ch-vn-channel-spring-installed.SLDPRT",
+        out / "stl" / "ch-vn-channel-spring-installed.STL",
     ]
-    assert set(variants) <= set(dodo._assembly_cache_outputs("ch_channel"))
-    # Cleaning the assembly removes them with the rest.
+    for path in spring:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"part")
+    outputs = set(map(Path, dodo._assembly_cache_outputs("ch_channel")))
+    assert not outputs & set(spring)
     removed: list[Path] = []
     monkeypatch.setattr(dodo, "_force_remove", removed.append)
     dodo._clean_assembly("ch_channel")
-    assert set(variants) <= set(map(Path, removed))
-
-
-def test_a_channel_archive_without_the_spring_stl_still_restores(tmp_path, monkeypatch):
-    # Every ch_channel archive stored before #2801 lacks the STL. A HIT on one
-    # restores against the inventory that now declares it: the archive's set is
-    # the build's, so an STL left by an earlier build goes.
-    dodo = _load_dodo()
-    out = _channel_tree(dodo, monkeypatch, tmp_path)
-    monkeypatch.setattr(dodo._cache, "REPO_ROOT", tmp_path)
-    monkeypatch.setattr(dodo._cache, "_CACHE_OUTPUT_ROOT", out)
-    sldasm = Path(dodo._sldasm("ch_channel"))
-    variant = out / "sldprt" / f"{_SPRING_VARIANT}00.SLDPRT"
-    sldasm.write_bytes(b"the archive's assembly")
-    variant.write_bytes(b"the archive's spring")
-    archive = dodo._cache._pack([sldasm, variant])
-    stale = out / "stl" / f"{_SPRING_VARIANT}00.STL"
-    stale.write_bytes(b"an earlier build's STL")
-    variant.write_bytes(b"an earlier build's spring")
-    try:
-        dodo._cache._unpack(archive, dodo._assembly_cache_outputs("ch_channel"))
-    finally:
-        archive.close()
-    assert sldasm.read_bytes() == b"the archive's assembly"
-    assert variant.read_bytes() == b"the archive's spring"
-    assert not stale.exists()
+    assert not set(map(Path, removed)) & set(spring)
 
 
 
@@ -3161,16 +3121,11 @@ def test_config_deps_are_fine_grained():
     assert "parts/ch-vn-channel-spring-installed.yaml" in channel_recipe, channel_recipe
     assert "release.yaml" in channel_recipe, channel_recipe
     assert "title_block.yaml" in channel_recipe, channel_recipe
-    # The part TEMPLATE narrows identically: channel GENERATES its stretch
-    # springs in-script via NewPart (which instantiates the template), so the
-    # PRTDOT is a direct recipe member -- a template edit must FULL-rebuild the
-    # generated variants and shift channel's cache key. A non-generating
-    # assembly (frame) gets the template only transitively (re-stamped parts ->
-    # shifted artefact digests -> REFRESH), never as a direct member.
-    channel_names = {Path(p).name.lower() for p in dodo._recipe_files("ch_channel")}
-    frame_names = {Path(p).name.lower() for p in dodo._recipe_files("fr_frame")}
-    assert "harmonic-analyzer.prtdot" in channel_names, channel_names
-    assert "harmonic-analyzer.prtdot" not in frame_names, frame_names
+    # The part TEMPLATE narrows identically: no assembly generates parts
+    # in-script any more (the channel's springs are configurations of their
+    # part, #1610), so no assembly carries the PRTDOT as a direct recipe
+    # member; each gets it only transitively (re-stamped parts -> shifted
+    # artefact digests -> REFRESH).
     for stem in dodo.ASSEMBLY_ORDER:
         recipe = dodo._recipe_files(stem)
         rel_recipe = _rel(recipe, cfg)
@@ -3178,10 +3133,6 @@ def test_config_deps_are_fine_grained():
         script = dodo.script_for(stem)
         dynamic_part_rows = dodo._expand_parts_token(stem, "assembly", script)
         assert "title_block.yaml" in rel_recipe, stem
-        if stem == "ch_channel":
-            assert dynamic_part_rows, stem
-            assert "harmonic-analyzer.prtdot" in names, stem
-            continue
         assert dynamic_part_rows == [], stem
         assert "harmonic-analyzer.prtdot" not in names, stem
     # ... and every normal part task carries it directly (NewPart instantiates it).
