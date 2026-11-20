@@ -186,10 +186,22 @@ def test_stock_properties_are_written_before_one_save(monkeypatch, with_metadata
         return 0
 
     manager = SimpleNamespace(Add3=add_property)
+    preferences: dict[int, int] = {}
+
+    def set_preference(preference, _option, value):
+        preferences[preference] = value
+        return True
+
     model = SimpleNamespace(
         ClearSelection2=lambda _all: None,
         GetBodies2=lambda _kind, _hidden: tuple(bodies),
-        Extension=SimpleNamespace(CustomPropertyManager=lambda _configuration: manager),
+        # A part document: every part gets its equation places (#889).
+        GetType=lambda: 1,
+        Extension=SimpleNamespace(
+            CustomPropertyManager=lambda _configuration: manager,
+            SetUserPreferenceInteger=set_preference,
+            GetUserPreferenceInteger=lambda preference, _option: preferences[preference],
+        ),
         GetCustomInfoValue=lambda _configuration, name: written.get(name, ""),
     )
 
