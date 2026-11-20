@@ -387,8 +387,11 @@ def test_the_relief_diameter_is_measured_a_short_extension_from_its_line() -> No
     measured, as the journals' are, at a 1 mm witness on the floor, the line
     1 mm aft of it, inside the relief."""
     assert part.RELIEF_DIA_POINT_FROM_FRONT == drawing.RELIEF_DIA_POINT_FROM_FRONT
+    # The witness runs forward from its measuring point, inside the relief.
     assert (
-        part.RELIEF_DIA_POINT_FROM_FRONT + part.JOURNAL_DIA_POINT_LEN
+        0.0
+        < part.RELIEF_DIA_POINT_FROM_FRONT - part.JOURNAL_DIA_POINT_LEN
+        < part.RELIEF_DIA_POINT_FROM_FRONT
         < spec.BOND_RELIEF_LEN
     )
     point_x = drawing._sheet_x(spec.BOND_RELIEF_Z + part.RELIEF_DIA_POINT_FROM_FRONT)

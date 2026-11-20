@@ -244,10 +244,13 @@ FRONT_JOURNAL_FROM_HEAD_REAR, BACK_JOURNAL_FROM_HEAD_REAR = land_stations(JOURNA
 # land's .79 chained off its 8.25) and 703211d (the front land's .79 chained
 # off its 1.82): each land's crown-side end prints as its own station from
 # the head rear face, 2.61 and 9.04.  Delegated rulings (a) and (b) (the
-# relief's back shoulder, below) were made by Repitch1038 as integration
-# owner under the owner's 2026-11-11 re-pitch rulings, with no owner
-# precedent, applying drawing-guidelines rules 10/11 (baseline every axial
-# station from one faced end).  Each land's length is then the difference
+# relief's back shoulder, below): delegated ruling 2026-11-11, no
+# precedent, made by Repitch1038 as integration owner under the owner's
+# 2026-11-11 re-pitch rulings (commits 4a51a72647 and 7c268934d2), applying
+# drawing-guidelines rules 10/11 (baseline every axial station from one
+# faced end); the owner reviews them on #2144
+# (https://github.com/pedropaulovc/harmonic-analyzer/issues/2144).
+# Each land's length is then the difference
 # of two .XX stations, .79 -.02/+.02; every end it bears on reads one band.
 FRONT_JOURNAL_END_FROM_HEAD_REAR = FRONT_JOURNAL_FROM_HEAD_REAR + JOURNAL_LEN
 BACK_JOURNAL_END_FROM_HEAD_REAR = BACK_JOURNAL_FROM_HEAD_REAR + JOURNAL_LEN
