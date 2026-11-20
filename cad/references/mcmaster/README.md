@@ -38,7 +38,7 @@ recipes:
 | 90280A201 | `sh-vn-clamp-screw` (MHA-SH-VN-53; shared by mg and pd) | Steel Narrow Fillister Head Slotted Screw |
 | 90280A203 | `dt-vn-slotted-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A837 | `fr-vn-frame-cross-screw` | Steel Narrow Fillister Head Slotted Screw |
-| 90480A009 | `pn-vn-pen-hanger-nut` and `dt-cone-gear-tl-vn-round-arbor-nut` (MHA-DT-03-TL-VN-51; shop tooling, tier 1, HARDWARE.md row only: not modelled, no assembly places it; not Shared) (catalogue-only; no vendor model) | Low-Strength Zinc-Plated Steel Hex Nut |
+| 90480A009 | `pn-vn-pen-hanger-nut` (catalogue-only; no vendor model) | Low-Strength Zinc-Plated Steel Hex Nut |
 | 90760A009 | `pn-vn-pen-hanger-jam-nut` (catalogue-only; no vendor model) | Zinc-Plated Steel Narrow-Profile Hex Nut |
 | 90760A140 | — (`sm-vn-boss-hook-jam-nut` MHA-SM-VN-55 until 2026-11-09; retired) | Zinc-Plated Steel Narrow-Profile Hex Nut |
 | 91247A720 | — (a former `sm-vn-knife-hanger-stud`; diagnostic recipe removed 2026-11-16, #2886) | Medium-Strength Grade 5 Steel Hex Head Screw |

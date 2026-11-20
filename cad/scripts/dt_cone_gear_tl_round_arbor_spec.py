@@ -12,10 +12,10 @@ tail centre; the overhung compliance (1.85-2.59x the 64T setup, estimated
 
 So the blank slides onto this arbor's seat, bears on the integral shoulder
 and is clamped there by one backing collar (MHA-DT-03-TL-08) and a purchased
-#8-32 hex machine screw nut (MHA-DT-03-TL-VN-51, catalogue-only: no kit
-assembly places it, so its fit is asserted here), every one of them under
-T024's root. No key: a round bore takes no clock, so the teeth are cut
-wherever the head's first index lands.
+#8-32 hex machine screw nut (McMaster 90480A009, bought with the kit and
+given no Number: no kit assembly runs interference against it, so its fit is
+asserted here), every one of them under T024's root. No key: a round bore
+takes no clock, so the teeth are cut wherever the head's first index lands.
 
 One hold, as the keyed arbor's: the BS-0's 3-jaw grips the Ø.62 grip with
 its jaw faces on the grip's step, and the seat is indicated true there within
@@ -284,7 +284,7 @@ ROOT_AIR = ROOT_MIN_MM / 2.0 - max(COLLAR_REACH, SHOULDER_REACH)
 
 # --- The nut ----------------------------------------------------------------------
 # #8-32 hex machine screw nut, ASME B18.6.3, 11/32 across flats
-# (MHA-DT-03-TL-VN-51, McMaster 90480A009; its catalogue sizes are
+# (McMaster 90480A009; its catalogue sizes are
 # _mcmaster_90480a009's): its corners stand under T024's root by AIR_MIN even
 # beside the blank, and its face covers the collar's drilled bore. The stack
 # takes the standard's thickness limit, not the catalogue's 1/8 nominal.

@@ -1012,7 +1012,7 @@ diameter_mm = 1.7018
 [tools.dt-cone-gear-cutting-arbor]  # MHA-DT-03 TOOTH CUTTING SETUP .002 TIR TO FINISHED BORE
 description = "Shop-made keyed cutting arbor kit for the cone gears: MHA-DT-03-TL-03 arbor, TL-04 backing collars, TL-06 key and arbor nut"
 [tools.dt-cone-gear-round-arbor]  # MHA-DT-03 T024 TOOTH CUTTING SETUP; owner ruling 2026-11-20 (#2356, Option 2)
-description = "Shop-made round cutting arbor kit for T024: MHA-DT-03-TL-07 arbor, TL-08 backing collar and TL-VN-51 #8-32 nut"
+description = "Shop-made round cutting arbor kit for T024: MHA-DT-03-TL-07 arbor, TL-08 backing collar and a McMaster 90480A009 #8-32 hex nut"
 [tools.dt-cone-gear-index-plate]  # MHA-DT-03 tooth indexing
 description = "Shop-made dividing-head index plate MHA-DT-03-TL-01 for the cone gears"
 [tools.dt-cone-tip-cutter-bar]  # MHA-DT-37 holder for the form cutter

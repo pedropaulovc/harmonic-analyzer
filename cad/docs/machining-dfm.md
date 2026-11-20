@@ -1267,7 +1267,7 @@ tight; for the 64T the head is tilted and there is no tail centre.
 
 T024 is reamed round Ø.250 for MHA-DT-04's land 2, so the keyed arbor cannot carry it: its 1/4-28
 nut and smallest collar stand over T024's root. It is cut on the round arbor MHA-DT-03-TL-07 with
-its one Ø.38 collar MHA-DT-03-TL-08 and a purchased #8-32 hex nut MHA-DT-03-TL-VN-51, each under
+its one Ø.38 collar MHA-DT-03-TL-08 and a purchased #8-32 hex nut (McMaster 90480A009), each under
 T024's root (owner ruling 2026-11-20 on
 [#2356](https://github.com/pedropaulovc/harmonic-analyzer/issues/2356#issuecomment-7051703304),
 Option 2). The round bore takes no clock: index from wherever the first tooth lands. Grip the

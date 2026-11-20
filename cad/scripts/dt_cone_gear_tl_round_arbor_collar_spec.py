@@ -2,7 +2,7 @@ r"""Pure-data contract for the round arbor's backing collar (MHA-DT-03-TL-08).
 
 Shop tooling (issue #2356; owner ruling 2026-11-20, Option 2: "Ø.38
 collar"). The one collar stands between T024 and the purchased #8-32 nut
-(MHA-DT-03-TL-VN-51, catalogue-only) on the round arbor MHA-DT-03-TL-07's
+(McMaster 90480A009, no Number) on the round arbor MHA-DT-03-TL-07's
 pilot, under T024's root: every number and every assert on it lives with
 the stack in ``dt_cone_gear_tl_round_arbor_spec`` (COLLAR_DIA, COLLAR_LENGTH,
 COLLAR_BORE, COLLAR_WALL_MIN). 3/8 round bar left at stock diameter, faced to
