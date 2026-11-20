@@ -11,6 +11,7 @@ import pytest
 
 import build_pn_pen_rod as part
 import draw_pn_pen_rod as drawing
+import pn_pen_rod_groove_spec as groove
 import pn_pen_rod_spec as spec
 from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -41,19 +42,27 @@ def test_required_drawing_paths() -> None:
 
 
 def test_drawing_keeps_exactly_the_marked_dimensions() -> None:
-    assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
-    assert drawing.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
-    marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    keeps = (drawing.SIDE_KEEP, drawing.END_KEEP)
+    # The sheet's dimensions are the rod spec's plus the groove's (#2439),
+    # one union shared by the part's marks and the drawing's imports.
+    union = {**spec.DRAWING_DIMENSIONS, **groove.DRAWING_DIMENSIONS}
+    assert not set(spec.DRAWING_DIMENSIONS) & set(groove.DRAWING_DIMENSIONS)
+    assert part.DRAWING_DIMENSIONS == union
+    assert drawing.DRAWING_DIMENSIONS == union
+    marked = set().union(*union.values())
+    keeps = (drawing.SIDE_KEEP, drawing.END_KEEP, drawing.DETAIL_KEEP)
     assert sum(len(keep) for keep in keeps) == len(marked)  # no name kept twice
     assert set().union(*keeps) == marked
-    assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
-    assert drawing.DRAWING_PRECISION_BY_NAME is spec.DRAWING_PRECISION_BY_NAME
+    assert set(drawing.DRAWING_PRECISION_BY_NAME) == marked
+    assert part.DRAWING_PRECISION == {
+        **spec.DRAWING_PRECISION,
+        **groove.DRAWING_PRECISION,
+    }
     # The side view carries the turned rod as the lathe reads it: the square's
     # and the pivot's lengths, the pivot's diameter between its flanks and the
     # shoulder's R MAX; the end view the square's SQ size and the stud tap's
-    # stated wall (RV-01).  The square's width (Section) prints nowhere:
-    # Depth's SQ states both flats.
+    # stated wall (RV-01); DETAIL B the groove's walls from the shoulder and
+    # its floor's Ø.  The square's width (Section) prints nowhere: Depth's SQ
+    # states both flats.
     assert set(drawing.SIDE_KEEP) == {
         "Length",
         "PivotLength",
@@ -61,6 +70,7 @@ def test_drawing_keeps_exactly_the_marked_dimensions() -> None:
         "ShoulderRadius",
     }
     assert set(drawing.END_KEEP) == {"Depth", "TapWallMin"}
+    assert set(drawing.DETAIL_KEEP) == set(groove.GROOVE_DIMENSIONS)
     assert "Section" not in marked
 
 
@@ -78,7 +88,13 @@ def test_side_view_is_turned_and_proved_before_any_import() -> None:
     mid = (drawing._sx(-spec.PIVOT_LENGTH) + drawing._sx(spec.SQUARE_LENGTH)) / 2.0
     assert mid == pytest.approx(drawing.SIDE_CENTER[0])
     assert drawing._sy(spec.ROD_SECTION / 2.0) < drawing.SIDE_CENTER[1]
-    assert not hasattr(drawing, "DETAIL_CENTER")
+    # DETAIL B (#2439) is a model view turned the same way, so its groove
+    # reads like the side view, pivot end left.
+    assert (
+        drawing._detail_xy(0.0, 0.0)[0]
+        > drawing._detail_xy(0.0, -groove.GROOVE_FAR_STATION)[0]
+    )
+    assert drawing._detail_xy(1.0, 0.0)[1] < drawing._detail_xy(0.0, 0.0)[1]
 
 
 def test_shoulder_root_is_a_modelled_max_radius() -> None:
@@ -297,7 +313,16 @@ def test_bands_are_model_owned_and_name_their_mates() -> None:
     assert spec.PEN_HANGER_NUMBER in spec.DIMENSION_CALLOUTS["Depth"]
     # The pivot's mate rides note 1, which its SEE NOTE links (rule 7).
     assert spec.PEN_V_BLOCK_NUMBER in spec.DRAWING_NOTES
-    assert drawing.DIMENSION_CALLOUTS is spec.DIMENSION_CALLOUTS
+    assert drawing.DIMENSION_CALLOUTS == {
+        **spec.DIMENSION_CALLOUTS,
+        **groove.DIMENSION_CALLOUTS,
+    }
+    # The groove's three .XXX dimensions name the screw it seats on note 2.
+    assert set(groove.DIMENSION_CALLOUTS) == set(groove.GROOVE_DIMENSIONS)
+    assert set(groove.DIMENSION_CALLOUTS.values()) == {"SEE NOTE 2"}
+    assert groove.GROOVE_NOTE_TEXT.startswith("2. ")
+    assert groove.SET_SCREW_NUMBER in groove.GROOVE_NOTE_TEXT
+    assert part.DRAWING_NOTES.splitlines()[-1] == groove.GROOVE_NOTE_TEXT
     assert "set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)" in (
         _DRAWING_SOURCE
     )

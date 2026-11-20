@@ -1948,7 +1948,7 @@ sections:
         - scaled
         - low
       - - Square rod length
-        - '112 mm square (printed 4.41) + Ø.126 × .41 in turned pivot end (122.414 mm overall, printed (4.82)); #0-80 blind tap .24 deep (.18 full thread) in the top face for the adjuster stud'
+        - '112 mm square (printed 4.41) + Ø.126 × .41 in turned pivot end (122.414 mm overall, printed (4.82)); a .010-deep Ø.106 relief groove .165–.315 below the shoulder under the v-block set screw (owner ruling 2026-11-20, #2439 option B); #0-80 blind tap .24 deep (.18 full thread) in the top face for the adjuster stud'
         - ~4.8
         - 'p.64 inset; 2026-10 re-derive (engineerguy 4/4 t046): the turned pivot end drops into the v-block''s pivot bore and the square''s shoulder seats on the block top (y 384.2); the square runs up through both hanger U guides to y 496.2, staying ≥ 3 inside the upper guide (y 461.574) at the bottom of the ±25 travel (#748 owner ruling 2026-11-20). The old #47 wire cross-hole is gone: the wire ties to the adjuster stud''s eye'
         - scaled + derived
@@ -1972,9 +1972,9 @@ sections:
         - scaled
         - low
       - - Rod set screw (MHA-SH-VN-54, purchased, shared)
-        - '#4-40 × 1/4 cup point (McMaster 91375A106) in the v-block front-face tap, cup on the rod''s pivot end; .206 of full thread engaged (rule 18: 1.5 D is .168)'
+        - '#4-40 × 1/4 cup point (McMaster 91375A106) in the v-block front-face tap, cup seated on the floor of the rod pivot''s Ø.106 × .010-deep relief groove (owner ruling 2026-11-20, #2439 option B: "B"); .206 of full thread engaged (rule 18: 1.5 D is .168)'
         - —
-        - 'p.60 (side set screw pins the block to the rod); tap length .367 (9.3218 mm, body front face to bore wall), screw recessed 2.97 mm (.117) below the face'
+        - 'p.60 (side set screw pins the block to the rod); tap length .367 (9.3218 mm, body front face to bore wall), screw recessed 3.23 mm (.127) below the face with its cup on the groove floor'
         - catalog + derived
         - med
       - - Pen-height adjuster (pn-pen-adjust-screw + MHA-PN-VN-53 jam nut)
@@ -2026,8 +2026,9 @@ sections:
       front, body running out of the free end to (35.29, ., −193.99). Stirrup
       flush on the block's paper end, top rail 0.1 above the block top; thumb
       screw stood on end on its axis, knob outer face y 337.2, tip on the grip
-      underside. Rod set screw cup on the pivot at y 378.14. All carriage parts
-      lock-mated to the rod; the rod's Y travel (±25) is the freed DOF.
+      underside. Rod set screw cup on the pivot's relief-groove floor at y
+      378.14. All carriage parts lock-mated to the rod; the rod's Y travel (±25)
+      is the freed DOF.
 - heading: Chapter 25 — Pinion Gear (pp. 66–69)
   elements:
   - prose: ''

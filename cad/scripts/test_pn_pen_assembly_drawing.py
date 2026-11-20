@@ -239,9 +239,12 @@ def test_rod_set_screw_trail_runs_up_the_tap_axis_to_its_mouth() -> None:
     out = _along(_moves((spec.ROD_SET_SCREW,)), _block_axis(2, -1.0))
     cup, mouth = notes.ROD_SET_SCREW_TRAIL
     trail = [b - a for a, b in zip(cup, mouth)]
-    # Back along the screw's own way out, short of it by the tap's depth.
+    # Back along the screw's own way out, short of it by the cup's depth from
+    # the front face: the tap, plus the pivot groove's .010 (#2439).
     length = _along(trail, _block_axis(2))
-    assert abs(length - (out - v_block.SET_SCREW_TAP_LENGTH)) < 1e-6
+    cup_depth = carriage.ROD_SET_SCREW_CUP_LOCAL_Z - v_block.BODY_Z0
+    assert cup_depth > v_block.SET_SCREW_TAP_LENGTH
+    assert abs(length - (out - cup_depth)) < 1e-6
 
 
 def test_thumb_screw_explodes_down_its_tap_axis_clear_of_the_bottom_rail() -> None:
