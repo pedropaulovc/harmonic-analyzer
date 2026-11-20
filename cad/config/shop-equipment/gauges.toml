@@ -26,9 +26,13 @@ note = "owner confirmed on hand 2026-11-19"
 
 # Grade only; its range and resolution are cad/process/shop.toml gauges.pin-gauges.
 # Not owned (owner, Pedro, 2026-11-17, answering what is physically in the
-# shop: the pin-gauge set was not ticked): a candidate to buy.
+# shop: the pin-gauge set was not ticked): to buy. Owner ruling 2026-11-20
+# (Pedro), #3075, accepting the recommendation: "Buy a plus/minus ZZ pin-gauge
+# set covering the reamed sizes; it keeps the guideline and every existing
+# review valid." A minus pin used as GO passes a hole up to .0002 under its
+# low limit (#3083 row 2), so the GO end of a reamed-hole check is a plus pin.
 [gauges.pin-gauges]
-note = "Class ZZ minus pin gauges: the .011-.060 set (quotes-2026-11-17-rev3.xlsx A1-pin-set-011-060, recommended Shars 303-4501M0) and the combined .061-.500 set (A1-pin-set-061-500-combined, recommended Shars 303-4516M1+2, covering the A1-pin-set-061-250 and A1-pin-set-251-500 boxes). The placeholder process plans name it as cad/process/shop.toml tools.pin-gauges."
+note = "Class ZZ pin gauges, minus and plus, covering the reamed sizes (owner ruling 2026-11-20, #3075). Minus: the .011-.060 set (quotes-2026-11-17-rev3.xlsx A1-pin-set-011-060, recommended Shars 303-4501M0) and the combined .061-.500 set (A1-pin-set-061-500-combined, recommended Shars 303-4516M1+2, covering the A1-pin-set-061-250 and A1-pin-set-251-500 boxes). Plus: the matching plus sets over the same range, not yet quoted. The placeholder process plans name it as cad/process/shop.toml tools.pin-gauges."
 status = "to_order"
 
 # Owned by the shop (Pedro, 2026-11-08): a Mitutoyo shop-grade 81-piece inch gauge
@@ -106,6 +110,7 @@ name = "Dial indicators"
 kind = "dial_indicator"
 status = "on_hand"
 pieces = 2
+note = "One .001 in Grizzly dial indicator was used at the makerspace 2026-11-04 (logbook; #2288); owner's or makerspace's not recorded."
 
 [gauges.digital-indicator]
 name = "Digital indicator"
@@ -145,6 +150,7 @@ note = "Owner confirmed on hand 2026-11-19: Pittsburgh SAE/metric 32-piece feele
 name = "Starrett 66MA metric thickness gage (EDP 55974)"
 kind = "feeler_gauge_set"
 status = "to_order"
+note = "Hold the order until #3042 is ruled: the $94.05 set is not needed if the MHA-DT-00 stacks move to inch leaves (#3083 row 16, owner ruling 2026-11-20)."
 
 [gauges.digital-angle-gauge]
 name = "Digital angle gauge"
@@ -167,7 +173,7 @@ status = "on_hand"
 source = "https://www.aliexpress.us/item/3256803280100804.html"
 purchase = "AliExpress item 3256803280100804, $9.57 on sale (owner 2026-11-16)"
 shank_mm = 6.0
-holder = "6 mm R8 collet, to buy (owner 2026-11-16)"
+holder = "6 mm R8 collet, not owned; off the buy list with the oblique jig, whose base-bar plan was its only use (owner 2026-11-17; #3083 row 20)"
 power = "DC 5-24 V; run at 5 V"
 repeatability = "<0.01 mm (listing claim, unverified: base-bar plan Setup 3 ten-touch test)"
 cable = "USB-C: red +5-24 V, black GND, yellow signal; the signal is low when tripped (wiki.fluidnc.com/en/config/probe)"

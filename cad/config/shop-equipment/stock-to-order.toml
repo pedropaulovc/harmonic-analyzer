@@ -47,15 +47,33 @@ cite = ["OnlineMetals part 7482 https://www.onlinemetals.com/en/buy/carbon-steel
 # owner ruling 2026-11-14). Lengths: each blank's length plus .14 in to part and
 # face, plus about 1 in to hold the last one. OnlineMetals C360-H02 round,
 # catalogue nominals; prices read live 2026-11-12, $439.04 for the six
-# brass bars. The pd-rack-pinion disc's bar has its own row (#2412).
+# brass bars at the 12 in bars' "10-12 in random length" price; a guaranteed
+# 12 in length is $279.41 and $33.52 (#3083 row 13, read 2026-11-17), $485.73
+# for the six. The pd-rack-pinion disc's bar has its own row (#2412).
 [stock.c360-round-gear-blanks]
 form = "round_bar"
 material = "C36000 free-cutting brass, H02"
-note = "To order, six bars: 2-5/8 x 12 in (T108, T114, T120 and the 20 dt-cylinder-gear blanks, $239.15, pid 21928); 2-1/4 x 3 in (T084-T102, $70.25, pid 19930); 1-3/4 x 3 in (T072, T078, $41.36, pid 1277); 1-1/2 x 3 in (T054-T066, $36.22, pid 1274); 1-1/8 x 3 in (T036-T048, $24.97, pid 7568); 3/4 x 12 in (T030 and the dt-alignment-pinion drum, $27.09, pid 1266). Not owned."
+note = "To order, six bars: 2-5/8 x 12 in (T108, T114, T120 and the 20 dt-cylinder-gear blanks, $279.41 guaranteed 12 in, pid 21928); 2-1/4 x 3 in (T084-T102, $70.25, pid 19930); 1-3/4 x 3 in (T072, T078, $41.36, pid 1277); 1-1/2 x 3 in (T054-T066, $36.22, pid 1274); 1-1/8 x 3 in (T036-T048, $24.97, pid 7568); 3/4 x 12 in (T030 and the dt-alignment-pinion drum, $33.52 guaranteed 12 in, pid 1266). The $239.15 and $27.09 first recorded were the 10-12 in random-length option. Not owned."
 dia_in = [2.625, 2.25, 1.75, 1.5, 1.125, 0.75]
 length_in = [12.0, 3.0, 3.0, 3.0, 3.0, 12.0]
 status = "to_order"
 cite = ["OnlineMetals C360 round bar, standard lengths and the Custom Cut calculator, read live 2026-11-12", "https://github.com/pedropaulovc/harmonic-analyzer/issues/2356"]
+
+# MHA-CH-13 strap spares (#2204; owner ruling 2026-11-20, accepting "Buy one
+# more bar; the CNC strap route is first-article and the earlier base bar
+# already scrapped once."). The four bought 72 in bars
+# (stock.1018-flat-1-8x1-1-2) give exactly the 20 straps: 12 in blanks
+# (cad/process/ch_rocker_strap plan blank_length_in), five per bar with saw
+# kerf. One more bar gives five spare blanks for setup and scrap.
+[stock.1018-flat-1-8x1-1-2-spare]
+form = "flat_bar"
+material = "1018 cold-finish carbon steel"
+note = "To order: OnlineMetals part 4807, 1/8 x 1-1/2 in rectangle 1018 CF, 1 x 72 in (standard length), about $15.46 (the 2026-11-03 order's unit price). Allocation: MHA-CH-13 setup and scrap spares, five 12 in blanks. Not owned."
+section_mm = [38.1, 3.175]
+length_mm = 1828.8
+pieces = 1
+status = "to_order"
+cite = ["https://github.com/pedropaulovc/harmonic-analyzer/issues/2204", "Online Metals order 1021751700 confirmation (PO harmonic-analyzer-02, 2026-11-03), part 4807, 72 in, $15.46 each"]
 
 [stock.c675-round-5-8]
 form = "round_bar"

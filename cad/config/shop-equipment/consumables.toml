@@ -139,7 +139,7 @@ status = "to_order"
 thickness_mm = 0.15
 normal_tensile_kpa = 690
 dynamic_shear_kpa = 690
-purchase = "One roll, 1-1/2 in wide or two 3/4 in strips side by side: 12 in per strap, 20 ft for the lot of 20. No price or stock read."
+purchase = "1-1/2 in wide, or two 3/4 in strips side by side: 12 in per strap, 20 ft for the lot of 20. Rolls are 5 yd (15 ft), so two 1-1/2 in rolls or three 3/4 in rolls (#3083 row 11, owner ruling 2026-11-20). No price or stock read."
 note = "Not owned: to buy. MHA-CH-13 Setup 5: bonds the faced blank to the sub-plate under its whole face while the outline is cut."
 cite = ["3M VHB Tapes Technical Data, November 2015, Typical Performance Characteristics, 5906: thickness .006 in (0.15 mm); 90 degree peel 9 lb/in (16 N/cm); normal tensile (ASTM D-897, to aluminium, 72 h dwell) 100 lb/in2 (690 kPa); dynamic overlap shear (ASTM D-1002, to stainless steel, 72 h dwell) 100 lb/in2 (690 kPa); Application Techniques: clean with 50:50 isopropyl alcohol and water, about 15 psi application pressure, about 50% of ultimate bond strength after 20 minutes, 90% after 24 hours, 100% after 72 hours. Read 2026-11-17 from a distributor's copy (3M's own link refused the fetch): https://www.tspinc.com/pdf/3M-VHB-Tapes-Technical-Data.pdf"]
 
@@ -158,9 +158,9 @@ name = "Birchwood Casey Brass Black metal finish, 3 fl oz"
 kind = "blackening_solution"
 make = "Birchwood Casey"
 sku = "15225"
-source = "https://www.micro-tools.com/products/15225-f"
+source = "Brownells 167005200"
 status = "to_order"
-purchase = "Micro-Tools 15225-F (MPN 15208), $9.70, read 2026-11-17; ships by ground only, US 48 states. Also Brownells #167-005-200."
+purchase = "Brownells 167005200, cheaper than and in stock where Micro-Tools 15225-F was sold out (#3083 row 12, owner ruling 2026-11-20; read 2026-11-17). Micro-Tools 15225-F (MPN 15208), $9.70, read 2026-11-17, was the first source recorded."
 note = "Not owned: to buy. MHA-MG-02 magnifying clamp: chemical blackening, its last setup."
 cite = [
   "Birchwood Casey Deutschland, Brass Black Brünierung, Artikelnummer 15225, read 2026-11-17 (https://www.birchwoodcasey-deutschland.de/bruenierung-fuer-messing-kupfer-bronze.html), directions translated: 1. clean the parts with Birchwood Casey Cleaner-Degreaser; 3. treat the surfaces lightly with steel wool (grade 00) or abrasive paper; 4. clean again with the degreaser and rinse with clear water; 5. apply with a suitable applicator and let it act about one minute, then rinse the parts with cold water and carefully pat them dry; 6.-7. for a deeper colour polish lightly with fine steel wool (0000) and repeat steps 4-6; 8. preserve the surface with Birchwood Casey Barricade oil, leave it overnight, then wipe off excess oil. Step 2 (remove an old finish and rust) does not apply to fresh brass. 'causes no material change' (verursacht keine Materialveränderungen); FAQ: for brass, copper and bronze. Hazard: H302, H314 (severe skin burns and eye damage), H410; P280 wear protective gloves, clothing, eye and face protection.",

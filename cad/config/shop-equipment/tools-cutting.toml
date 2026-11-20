@@ -105,39 +105,6 @@ note = "Not owned: to buy. MHA-MS-01 graduations (101 ticks) and numerals 0-10."
 included_angle_deg = 30.0
 tip_width_in = 0.005
 
-# HGR15 rail trim for MHA-CH-06-TL-00 step 1 (#2446). The kit rails are
-# hardened bearing steel; the band saw, hacksaw and the carbide-tipped
-# Evolution miter saw do not cut them, so the shop adds an abrasive cut-off.
-# Owner ruling #2144 item 13.1 A (2026-11-08) keeps the rail ends flush with
-# the base bars: each end is cut long with the cut-off wheel and ground square
-# to its mark with the grinding wheel. Prices read live 2026-11-11, $43.97 for
-# all three before tax. The grinder's Type 27 guard takes both Type 27 wheels;
-# their 13,580 rpm rating is over the grinder's 11,000 rpm.
-[tools.rail-trim-grinder]
-name = "BAUER 7 A, 4-1/2 in slide-switch angle grinder, Type 27 guard, 5/8-11 spindle with 7/8 in adapter"
-kind = "angle_grinder"
-make = "BAUER (Harbor Freight)"
-sku = "64856"
-source = "https://www.harborfreight.com/7-amp-4-12-in-slide-switch-angle-grinder-64856.html"
-purchase = "Harbor Freight 64856, $29.99 (listing read live 2026-11-11)"
-status = "to_order"
-note = "Not owned: to buy. MHA-CH-06-TL-00 steps 1E-1F: cut each HGR15 rail end long on its bar, then grind it flush with the bar's end."
-max_rpm = 11000
-
-[tools.rail-trim-grinder.wheels.cut-off]
-name = "4-1/2 x 1/16 x 7/8 in Type 27/42 metal cut-off wheel"
-sku = "71007"
-source = "https://www.harborfreight.com/4-12-in-x-116-in-x-78-in-type-2742-metal-cut-off-wheels-10-pack-71007.html"
-purchase = "Harbor Freight 71007, BAUER 10-pack, $8.99 (listing read live 2026-11-11)"
-max_rpm = 13580
-
-[tools.rail-trim-grinder.wheels.grinding]
-name = "4-1/2 x 1/4 x 7/8 in Type 27 metal grinding wheel"
-sku = "57245"
-source = "https://www.harborfreight.com/4-12-in-x-14-in-x-78-in-type-27-metal-grinding-wheel-57245.html"
-purchase = "Harbor Freight 57245, HERCULES, $4.99 (listing read live 2026-11-11)"
-max_rpm = 13580
-
 # MHA-FR-01 and MHA-FR-02 cross-screw paths (#2387, cad/docs/machining-dfm.md
 # "Cross-screw setup"). The Ø.35 spotface and counterbore print .34-.36; the
 # owned LMS 6784 set jumps from 5/16 to 3/8, so an 11/32 (.3438) end mill is
@@ -224,40 +191,20 @@ kind = "files"
 status = "on_hand"
 source = "owner 2026-11-19"
 
-# --- MHA-CH-06-TL-24 riser (prechips plan, #2447) ---------------------------
+# --- 82° countersink (riser plan, then the index-plate and arm-plate plans) --
 
-# Riser Setup 5 tools the shop has no record of owning: the HUB's 12 mm drill
-# and the 82° countersink for R1-R4's Ø.25 x 82° seats. Same keys as their
-# prechips records in cad/process/shop.toml, which hold the identity (one fact
-# in one file); these records hold only ownership and use. To buy; no vendor
-# or SKU.
+# Same key as its prechips record in cad/process/shop.toml, which holds the
+# identity (one fact in one file); this record holds only ownership and use.
 # Owner decision 2026-11-13: buy two 82° countersinks, 3/16 in and 3/8 in;
-# the 3/8 in cuts the riser's seats. The owned 330CH 1/4 in 90° chamfer mill
-# is the wrong angle and too small for Ø.25 to full diameter.
-[tools.riser-drill-12mm]
-kind = "drill"
-status = "to_order"
-note = "Not owned. Riser (MHA-CH-06-TL-24) Setup 5: HUB through after the 1/4 in pilot."
-
+# the owned 330CH 1/4 in 90° chamfer mill is the wrong angle. The oblique
+# jig's riser and kit tools (12 mm drill, the 3/16 in kit countersink,
+# hacksaw, rail-trim grinder and wheels, 1-3/8 in parallels, HHIP 3901-0079
+# jack) left the buy list with the jig (owner 2026-11-17; #3083 row 20, owner
+# ruling 2026-11-20) and their records are removed.
 [tools.riser-countersink]
 kind = "countersink"
 status = "to_order"
-note = "Not owned. Riser (MHA-CH-06-TL-24) Setup 5: R1-R4 Ø.25 x 82° seats for #4-40 flat heads."
-
-# --- MHA-CH-06-TL-VN-84 kit rework (prechips plan) ---
-
-# Ownership only; the descriptions are cad/process/shop.toml tools.kit-hacksaw
-# and tools.kit-countersink-82. To buy (or to record, if the shop has one); no
-# vendor or SKU.
-[tools.kit-hacksaw]
-kind = "hacksaw"
-status = "to_order"
-note = "The archived inventory recorded the Starrett K145 frame and blades only as a purchase approved by Pedro on 2026-10-11, not as received. Not owned. Leadscrew kit (MHA-CH-06-TL-VN-84): cut the 600 mm SUS304 screw to length."
-
-[tools.kit-countersink-82]
-kind = "countersink"
-status = "to_order"
-note = "Not owned. Leadscrew kit (MHA-CH-06-TL-VN-84) feed nut: the four countersinks beside the body, at the cutter size the sheet allows."
+note = "Not owned: to buy. The 3/8 in 82° countersink: MHA-DT-03-TL-01 index plate (.35 x 82°) and MHA-PD-19 arm plate (Ø.312 x 82°) plans."
 
 # --- McMaster-Carr PO 0803PCAMPOS (owned) ------------------------------------
 

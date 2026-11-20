@@ -24,7 +24,7 @@ purchase = "$99.95 (read live 2026-11-16)"
 sizes_in = ["1/8", "3/16", "1/4", "5/16", "3/8", "7/16", "1/2", "9/16", "5/8", "11/16", "3/4", "7/8"]
 runout_tir_in = 0.00059
 drawbar = "7/16-20"
-note = "Owned (owner 2026-11-16). No metric size: the touch probe's 6 mm shank needs a 6 mm R8 collet (to buy). Gauge length unmeasured; the base-bar plan's r8_collet_gauge_mm still cites the archived LMS 4860 set."
+note = "Owned (owner 2026-11-16). No metric size: the touch probe's 6 mm shank needs a 6 mm R8 collet, off the buy list with the oblique jig, whose base-bar plan was its only use (owner 2026-11-17; #3083 row 20). Gauge length unmeasured."
 
 # --- Owner inventory 2026-11-17: Zoro order, shop photos, reamers ----------
 
