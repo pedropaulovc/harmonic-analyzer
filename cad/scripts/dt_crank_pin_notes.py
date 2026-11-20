@@ -9,33 +9,38 @@ from __future__ import annotations
 
 from dt_crank_pin_spec import DESIGNATION, SKU, STANDARD
 
-# Notes 1 and 2: the stock, named once (rule 7: no method), in the MHA-DT-39
+# Note 1: the stock, named once (rule 7: no method), in the MHA-DT-39
 # bought-and-reworked form (owner ruling 2026-11-20, #2368: a bought No. 3
-# taper pin, cross-drilled only).
+# taper pin, cross-drilled only).  Rule 7 allows four short lines, so the
+# stock and the reference statement share one note (Codjiflo on #3158: six
+# lines).
 STOCK_NOTE = "\n".join(
     (
-        f"1. MAKE FROM McMASTER-CARR {SKU}, {DESIGNATION}",
-        f"   ({STANDARD}); ADD THE RING HOLE ONLY.",
-        "2. UNDIMENSIONED PURCHASED GEOMETRY IS REFERENCE.",
+        f"1. McMASTER-CARR {SKU}, {DESIGNATION} ({STANDARD}):",
+        "   ADD THE RING HOLE ONLY; UNDIMENSIONED GEOMETRY IS REFERENCE.",
     )
 )
 
+# The ring hole's station runs from the big end's RIM, not the crown's apex
+# (dt_crank_pin_spec: the bought pin's ends are crowned about .03 high;
+# Codjiflo on #3158).  Words over the station's value: below it the rows would
+# run into the pin outline, which the value's text clears by only ~10 mm.
+RING_HOLE_STATION_CALLOUT_ABOVE = "FROM\nEND RIM"
+
 # The taper's leader callout links the fit note (drawing-guidelines.md rule 7:
 # a flagged note, at most two lines of words).
-TAPER_NOTE_NUMBER = 3
+TAPER_NOTE_NUMBER = 2
 TAPER_CALLOUT = f"DRIVE FIT\nSEE NOTE {TAPER_NOTE_NUMBER}"
 
 # The matched fit (rule 4): both mates by name and number, the fit by its
 # standard name (rule 26: DRIVE, not LIGHT DRIVE), the ream at assembly that
-# makes it, and the acceptance that ends the ream.  The acceptance is the
-# crank hub's note 1 for this same joint (#2231: the driven pin's keeper ring
-# MHA-DT-27 still clears the hub; dt_crank_pin_ring_spec.PIN_PROUD books that
-# clearance).
+# makes it, and the acceptance that ends the ream: the driven pin's keeper
+# ring MHA-DT-27 still clears the hub (#2231; the crank hub's note 1 for this
+# same joint; dt_crank_pin_ring_spec.PIN_PROUD books that clearance).
 TAPER_NOTE = "\n".join(
     (
-        f"{TAPER_NOTE_NUMBER}. DRIVE FIT IN CRANK HUB MHA-DT-31 AND CRANKSHAFT MHA-DT-11,",
-        "   TAPER-REAMED 1:48 TOGETHER AT ASSEMBLY. STOP THE REAM WHILE",
-        "   KEEPER RING MHA-DT-27, HUNG FROM THE DRIVEN PIN, STILL CLEARS THE HUB.",
+        f"{TAPER_NOTE_NUMBER}. DRIVE FIT IN CRANK HUB MHA-DT-31 AND CRANKSHAFT MHA-DT-11, REAMED",
+        "   1:48 TOGETHER AT ASSEMBLY; KEEPER RING MHA-DT-27 MUST CLEAR THE HUB.",
     )
 )
 

@@ -47,7 +47,8 @@ def test_cross_hole_prints_natively_not_in_a_note() -> None:
 
 
 def test_cross_hole_station_text_clears_its_extension_lines() -> None:
-    """Rule 14: the 3.70 text must not straddle its 7.4-mm paper span."""
+    """Rule 14: the .15 station text must not straddle its 7.62-mm paper span
+    (budgeted at the template's wider "3.70")."""
     text_x, text_y = drawing.FRONT_KEEP["RingHoleX"]
     # The unchanged template's copied PDF measures 9.051 mm across "3.70".
     text_half_width = 0.0046
@@ -80,7 +81,20 @@ def test_pin_is_the_bought_no_3_taper_pin_cross_drilled_only() -> None:
     stock = " ".join(notes.STOCK_NOTE.split())
     assert f"McMASTER-CARR {spec.SKU}, {spec.DESIGNATION} ({spec.STANDARD})" in stock
     assert "ADD THE RING HOLE ONLY" in stock
-    assert "UNDIMENSIONED PURCHASED GEOMETRY IS REFERENCE" in stock
+    assert "UNDIMENSIONED GEOMETRY IS REFERENCE" in stock
+    # Rule 7: at most four short lines of part-specific notes.
+    assert len(notes.SHEET_NOTES.splitlines()) <= 4
+    assert all(len(row) <= 73 for row in notes.SHEET_NOTES.splitlines())
+
+
+def test_ring_hole_station_runs_from_the_crowned_end_rim() -> None:
+    """Codjiflo on #3158: ASME B18.8.2 ends are crowned about .03 high, more
+    than the station's .XX band, so the station names the rim (the model's
+    flat big end), words only, flagged on the station itself."""
+    callout = notes.RING_HOLE_STATION_CALLOUT_ABOVE
+    assert " ".join(callout.split()) == "FROM END RIM"
+    assert not any(ch.isdigit() for ch in callout)
+    assert len(callout.splitlines()) <= 2
 
 
 def test_matched_taper_fit_names_both_mates() -> None:

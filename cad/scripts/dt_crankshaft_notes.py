@@ -228,12 +228,15 @@ PINION_PIN_CALLOUT = "\n".join(
 )
 
 # Where the shop may drill a lathe centre hole (drawing-guidelines.md rule
-# 11): the plain far end, and the dome end only as note 4 allows (owner
-# ruling 2026-11-20, #2369: a sacrificial stub, the dome formed last).  The
-# leader to the plain end's rim is what names that end (rule 7: flag it where
-# it applies); the unleadered "AT PLAIN END" row named an end the sheet never
+# 11): the plain far end, flagged here, and the dome end only as numbered
+# note 4 allows (owner ruling 2026-11-20, #2369: a sacrificial stub, the dome
+# formed last).  Note 4 names the dome itself, so it stands as a general
+# numbered note; this leadered row names only its own end (rule 7: flag it
+# where it applies; Codjiflo on #3158: a "SEE NOTE 4" here pointed from the
+# plain end at the dome).  The leader to the plain end's rim is what names
+# that end; the unleadered "AT PLAIN END" row named an end the sheet never
 # identified.  The finished dome keeps no centre: its punched witness
 # (FIDUCIAL_NOTE) is a separate, required mark on the finished sphere. Two
 # rows of words at most (rule 7); the drawing identifies the plain end in
 # FRONT, not by the isometric's apparent top/bottom orientation.
-CENTRES_NOTE = f"LATHE CENTRE OK;\nAT DOME SEE NOTE {CENTRE_STUB_NOTE_NUMBER}"
+CENTRES_NOTE = "LATHE CENTRE OK\nAT THIS END"

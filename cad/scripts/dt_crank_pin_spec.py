@@ -40,7 +40,14 @@ BIG_END_DIA_BAND = (0.0013 * MM_PER_IN, -0.0007 * MM_PER_IN)
 # Keeper-ring cross-hole through the big end (ch11 p.14 page002_img01: the
 # brass ring hangs from a hole in the pin's head), perpendicular to the axis.
 # A #45 drill, sized for the round ring's wire arc (dt_crank_pin_ring_spec
-# asserts the air).  Its station prints at .XX from the as-bought big end.
+# asserts the air).  Its station prints at .XX from the as-bought big end's
+# RIM.  ASME B18.8.2 taper pins have crowned ends; No. 3's end crown radius is
+# .209-.229 in (RC Fastener "Commercial & Precision Classes Taper Pins",
+# ASME B18.8.2-2000 table, read 2026-11-20), a crown about .03 in high over
+# the .219 end.  The model's flat big end is that rim plane: the crown lies
+# outboard of it, so it adds metal beyond the hole-to-end ligament and never
+# takes any; measured from the crown's apex instead, the hole would sit .03
+# nearer the end, so the station names the rim (dt_crank_pin_notes).
 RING_HOLE_DIA = 2.0828  # .082
 RING_HOLE_X = 3.81  # .15 from the big end: a ligament over the .080 target
 
