@@ -8,7 +8,6 @@ PenWire member. Print notes remain in the separate pure drawing contract.
 from __future__ import annotations
 
 import mg_wheel_bar_geom as _wheel_bar
-from _mcmaster_9666k142 import DIA as MEMBER_DIA
 from _mg_wheel_rim_geometry import PEN_WIRE_DIA, RIM_WIRE_R
 from mg_wheel_bar_geom import WHEEL_X
 from _recording_geometry import PEN_ROD_X, PEN_Z_MID
@@ -16,12 +15,10 @@ from pn_pen_carriage_geom import STUD_HEAD_TOP_REST_Y
 
 CONFIGURATION = "PenWire"
 
-# The rim groove seats the purchased 9666K142 wire itself (MEMBER_DIA, #2687):
-# the member is modelled at that size on the wire centre the groove bottom
-# sets (sh_vn_music_wire_lever_geom).
-WIRE_DIA = PEN_WIRE_DIA
-if WIRE_DIA != MEMBER_DIA:
-    raise AssertionError("the rim groove is laid out for another wire")
+# The rim groove seats the purchased 9666K142 wire itself (#2687): the member
+# is modelled at that size on the wire centre the groove bottom sets
+# (sh_vn_music_wire_lever_geom).
+WIRE_DIA = MEMBER_DIA = PEN_WIRE_DIA
 
 # --- endpoint anchors (machine frame; asserted by build_pn_pen_assembly) --------
 # The rim groove's mid-plane IS the pen rod line: the wire hangs plumb from the

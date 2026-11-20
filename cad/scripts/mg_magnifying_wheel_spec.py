@@ -379,7 +379,7 @@ if LEVER_WIRE_WEB_GAP < _lever.CLEARANCE:
 # groove is wider than the wire, the shallowest buries it below the rim OD,
 # and the round bottom is never deeper than the groove.
 GROOVE_WIDTH_MIN = 2.0 * _GROOVE_R[0]  # 0.965 (.038)
-GROOVE_DEPTH_MIN = (_RIM_OD[0] - _GROOVE_BOTTOM[1]) / 2.0  # 1.041 (.041)
+GROOVE_DEPTH_MIN = (_RIM_OD[0] - _GROOVE_BOTTOM[1]) / 2.0  # 0.749 (.0295)
 if not GROOVE_WIDTH_MIN > PEN_WIRE_DIA:
     raise AssertionError(f"groove {GROOVE_WIDTH_MIN:.3f} wide pinches the wire")
 if not GROOVE_DEPTH_MIN >= PEN_WIRE_DIA:

@@ -1629,7 +1629,7 @@ Catalog specifications checked on September 10, 2026:
   0.008 in with -0.001/+0.001 in tolerance, 1,450 ft in a 1/4 lb coil, $21.00. It replaces the 0.031 in 9666K56 (#2398,
   owner ruling 2026-11-12: the wire only lifts a pen, so it is a thin single
   wire as on the original, knotted). Wound on the Ø.768 drum it bends to
-  1.2 % strain against the old wire's 4 %. Its breaking load is 13 lbf (10 lbf
+  1.0 % strain (1.2 % at the top of its band) against the old wire's 4 %. Its breaking load is 13 lbf (10 lbf
   at the thin end of the band); taking a knot at half of that, the thin-end
   wire still holds twice the arm check's wire 1 maximum (2.3 lbf) and three
   times the pen's weight through the wheel (1.5 lbf). The drum, the rim groove

@@ -93,12 +93,12 @@ G_STEEL = 79_000.0  # N/mm^2, assumed for the compliance estimate
 
 # --- loads ---------------------------------------------------------------------
 _HEX_AREA = math.sqrt(3.0) / 2.0  # hex area per AF^2
-_CARRIAGE_G = pn_pen_carriage_geom.plan_cg_local()[0]  # 114.2 g
+_CARRIAGE_G = pn_pen_carriage_geom.plan_cg_local()[0]  # 105.6 g
 _PEN_ROD_G = (
     pn_pen_rod_spec.ROD_SECTION**2 * pn_pen_rod_spec.TOTAL_LENGTH * BRASS_G_PER_MM3
 )  # 26.1 g
 _PEN_HARDWARE_G = 5.0  # #0-80 adjust stud + jam nut, generous
-PEN_SIDE_G = _CARRIAGE_G + _PEN_ROD_G + _PEN_HARDWARE_G  # 145.3 g
+PEN_SIDE_G = _CARRIAGE_G + _PEN_ROD_G + _PEN_HARDWARE_G  # 136.7 g
 # U-guide friction reverses with the stroke: bounded at 50 % of the hanging
 # weight (a generous allowance for a brass block on a sliding square rod).
 GUIDE_FRICTION_FRACTION = 0.5

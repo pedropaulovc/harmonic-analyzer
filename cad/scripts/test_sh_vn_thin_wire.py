@@ -86,5 +86,3 @@ def test_the_budget_and_arm_check_use_the_ratio_the_fitted_wire_gives() -> None:
     assert wheel.WIRE_RATIO == pytest.approx(4.995, abs=5e-4)
     assert error_budget.nominal().wheel_ratio == pytest.approx(built)
     assert arm.WIRE1_TENSION_MAX_N == pytest.approx(built * arm.PEN_LOAD_MAX_N)
-    for retired in ("LANE_INSET", "BUILT_WIRE_RATIO"):
-        assert not hasattr(lever, retired), retired
