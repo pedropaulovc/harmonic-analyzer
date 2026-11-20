@@ -25,6 +25,11 @@ name = "#4-40 plug tap"
 ref = "jig-tap-4-40-plug"  # Tap coverage #4-40 UNC
 
 [[tools]]
+id = "tap-4-40-spiral-point"
+name = "#4-40 spiral-point tap"
+ref = "tap-4-40-spiral-point"  # Owner ruling 2026-11-20, #2427: the THRU taps
+
+[[tools]]
 id = "transfer-punches"
 name = "Transfer punches"
 ref = "transfer-punches"  # F-transfer-punches-fractional

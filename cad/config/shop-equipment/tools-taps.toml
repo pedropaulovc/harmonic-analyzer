@@ -3,9 +3,10 @@
 # per thread and style, from the owner's quote workbook
 # quotes-2026-11-17-rev3.xlsx (owner 2026-11-19): its Tap coverage sheet for
 # the owned taps (members of tools.taps-zoro-wb7365521946), its Items rows for
-# the taps to buy. Descriptions are cad/process/shop.toml under the same key;
-# no field here repeats one there. TOML, deliberately not YAML; no COM build
-# closure reads it: it is in no leaf's cache key.
+# the taps to buy; or from an owner ruling, which its note cites. Descriptions
+# are cad/process/shop.toml under the same key; no field here repeats one
+# there. TOML, deliberately not YAML; no COM build closure reads it: it is in
+# no leaf's cache key.
 
 [tools.jig-tap-8-32-bottoming]
 kind = "tap"
@@ -75,7 +76,7 @@ note = "quotes-2026-11-17-rev3.xlsx F-tap-bottoming-4-40: bottoming tap not owne
 [tools.tap-4-40-spiral-point]
 kind = "tap"
 status = "to_order"
-note = "Owner ruling 2026-11-20 (Pedro), #2427: MHA-PD-11's #4-40 UNC-2B THRU taps in 1018 stay through, and the shop buys a spiral-point #4-40 tap for them; not owned, source not chosen."
+note = "Owner ruling 2026-11-20 (Pedro), #2427: the platen rails' #4-40 UNC-2B THRU taps in 1018 (MHA-PD-11 and MHA-PD-27, split from it by #2410, the same .40 section and tap specs) stay through, and the shop buys a spiral-point #4-40 tap for them; not owned, source not chosen."
 
 [tools.tap-6-32-plug]
 kind = "tap"
