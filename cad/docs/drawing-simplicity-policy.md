@@ -142,8 +142,9 @@ their sheet re-keys for another reason.
   sizes, and may print. Tier-2 specification-control sheets (#2886; owner
   rulings 2026-11-17 on #3044) print receiving acceptance limits. A size
   carries its limits on its native diagram dimension, authored in the model
-  (the wave disc springs' ID/OD, `vn_disc_spring_acceptance`, printed bare
-  with `reference=False`). A force (a spring's rate and initial tension), and
+  (the MHA-DT-VN-68 wave disc spring's ID/OD, `vn_disc_spring_acceptance`,
+  printed bare with `reference=False`, its footer general line naming them
+  receiving limits). A force (a spring's rate and initial tension), and
   a size the sheet draws no dimension for (an installed-only extension
   spring's coil OD), prints once in the footer under
   `SUPPLIER CATALOGUE TOLERANCES (ACCEPT):`, formatted from the spec by

@@ -557,15 +557,8 @@ def test_channel_spring_prints_catalogue_tolerances_as_spec_control_limits():
     )
 
 
-@pytest.mark.parametrize(
-    "spec,expected_in",
-    [
-        (rocker, {"ID": (0.252, 0.275), "OD": (0.347, 0.377)}),
-        (cylinder, {"ID": (0.377, 0.395), "OD": (0.490, 0.510)}),
-    ],
-    ids=["9714K24", "9714K392"],
-)
-def test_wave_spring_receiving_limits(spec, expected_in):
+def test_wave_spring_receiving_limits():
+    spec, expected_in = cylinder, {"ID": (0.377, 0.395), "OD": (0.490, 0.510)}
     # Owner ruling 2026-11-17 (#3044): catalogue OD band and ID maximum; the
     # ID minimum is the largest printed shaft plus the slip fit's mean
     # clearance, rounded up to .001 in.

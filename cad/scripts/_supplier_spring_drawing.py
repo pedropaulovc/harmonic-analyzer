@@ -823,6 +823,7 @@ def build_supplier_spring_drawing(
     installed_caption: str = "INSTALLED REPRESENTATION",
     right_caption: str = "SUPPLIER NOMINAL SECTIONS",
     cut_to_suit: bool = False,
+    general_text: str | None = None,
     spring_metadata: bool = False,
     settled_checks: Sequence[Callable[[], None]] = (),
     unit: str = "mm",
@@ -833,7 +834,9 @@ def build_supplier_spring_drawing(
     only, as a Front over an Isometric, and takes no supplier diagram views,
     margins or dimension hooks: the catalogue sizes print as ``supplier_data``
     footer lines (:func:`extension_spring_spec_control_data`). A
-    specification-control sheet passes ``SPEC_CONTROL_HEADING``.
+    specification-control sheet passes ``SPEC_CONTROL_HEADING``. ``general_text``
+    replaces the footer's general line (``add_purchased_footer``), for a sheet
+    whose views carry receiving limits.
     """
     # Footer data and its heading fail here, before the seat opens anything.
     _supplier_data_lines(
@@ -981,7 +984,7 @@ def build_supplier_spring_drawing(
         draw,
         {
             0: title,
-            1: "Purchased identification only; supplier sizes are reference dimensions",
+            1: "Purchased identification only; untoleranced supplier sizes are reference dimensions",
             2: "Harmonic Analyzer Project",
             3: f"{spec.artifact_stem}; {properties['Supplier']}; {properties['Supplier SKUs']}",
             4: "installed front and pictorial; supplier data list"
@@ -1226,6 +1229,7 @@ def build_supplier_spring_drawing(
             item=item,
             notes=notes,
             cut_to_suit=cut_to_suit,
+            general_text=general_text,
             label=spec.artifact_stem,
             supplier_data=supplier_data,
             supplier_data_heading=supplier_data_heading,

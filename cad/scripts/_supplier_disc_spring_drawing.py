@@ -29,7 +29,7 @@ from _supplier_spring_drawing import (
 )
 from _limit_tolerance import SW_TOL_LIMIT
 from _supplier_spring_reference import SUPPLIER_DIAGRAM_CONFIGURATION
-from vn_disc_spring_acceptance import LIMITS
+from vn_disc_spring_acceptance import LIMITS, PLACES as ACCEPTANCE_PLACES
 from vn_disc_spring_supplier_stock import (
     SUPPLIER_DIMENSION_NAMES,
     SUPPLIER_DIMENSIONS_BY_FEATURE,
@@ -273,6 +273,14 @@ def assert_disc_size_band(display: Any, spec: Any, semantic: str) -> None:
     ):
         raise RuntimeError(
             f"{spec.SKU} {semantic}: receiving limits {limits} did not reach the sheet"
+        )
+    # The limits print at the tolerance precision; the drawing-side unit
+    # rewrite must not have reset it to the template's places.
+    places = int(display.GetPrimaryTolPrecision2())
+    if places != ACCEPTANCE_PLACES:
+        raise RuntimeError(
+            f"{spec.SKU} {semantic}: receiving limits print at {places} places, "
+            f"not {ACCEPTANCE_PLACES}"
         )
 
 

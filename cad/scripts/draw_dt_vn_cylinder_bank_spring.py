@@ -75,6 +75,9 @@ MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 SPEC = DRAWINGS_BY_NAME["dt_vn_cylinder_bank_spring"]
 # The footer's ITEM row: the catalogue designation in plain text.
 ITEM = "WAVE DISC SPRING"
+# The footer's general line: the views carry the ID/OD receiving limits, so
+# the default "VIEWS ARE REFERENCE ONLY" would contradict them.
+GENERAL_TEXT = "PURCHASED PART, USED AS SUPPLIED. ID AND OD ARE RECEIVING LIMITS."
 # The drawing's view of the spec: identical except for no application gauges.
 SHEET_SPEC = SimpleNamespace(
     **{**vars(supplier_spec), "SUPPLIER_APPLICATION_DIMENSIONS": ()}
@@ -463,8 +466,10 @@ def build(adapter: Any) -> dict[str, str]:
         prepare_views=prepare_diagrams,
         supplier_reference_features=SHEET_FEATURES,
         include_right=False,
-        # Rules 9 and 26: the projected principal views take no prose name;
-        # the footer note already says the views are reference only.
+        # Rules 9 and 26: the projected principal views take no prose name.
+        # The footer's general line says the ID and OD are receiving limits
+        # (owner ruling 2026-11-17, #3044); the free height stays REF in
+        # parentheses.
         stock_caption="",
         supplier_margins={
             "free_front": (0.035, 0.0, 0.035, 0.0),
@@ -473,6 +478,7 @@ def build(adapter: Any) -> dict[str, str]:
         supplier_dimensions=partial(supplier_dimensions, settled_checks=settled_checks),
         installed_caption="ISOMETRIC",
         settled_checks=settled_checks,
+        general_text=GENERAL_TEXT,
         unit=part_drawing_unit("dt-vn-cylinder-bank-spring"),
     )
 
