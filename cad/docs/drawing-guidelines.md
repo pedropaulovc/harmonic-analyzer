@@ -127,6 +127,10 @@ metric grades until their package is converted.
   symbol) are the sheet format shared by every print, assembly sheets
   included. On an assembly they govern work done at assembly, such as
   match-drilling; they do not call for reinspecting supplied parts.
+- The name field is labelled `PART` on every sheet, assembly sheets included:
+  it is part of the shared sheet format, and on an assembly it holds the
+  assembly's name beside its `-00` drawing number. Do not ask for it to read
+  `ASSEMBLY` (owner ruling 2026-11-20, #1425).
 
 ### Rule 3 — Decimal places carry the tolerance
 

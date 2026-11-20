@@ -7,8 +7,9 @@ downloaded or committed, so none has a replica gate: each standalone run is
 catalog-only (``build_socket_head_catalog``) -- it builds the recipe, checks
 the solid is sane and saves it under cad/out/reference for inspection.
 
-Geometry: the 91255A148 socket-screw laws (``diag_build_91255A148.py``,
-replica-gated against its vendor model) with a cylindrical head -- revolved
+Geometry: the 91255A148 socket-screw laws (once replica-gated against its
+vendor model by ``diag_build_91255A148.py``, deleted in #2896; the laws are
+frozen and catalogue-only, owner ruling 2026-11-20, #2926) with a cylindrical head -- revolved
 head and chamfered shank at the major, a flat-floored hex socket cut blind
 down from the head top, the body split at the thread top so the thread sweep
 scopes to the threaded body, a tip-seeded right-hand helix (threaded length +
@@ -24,8 +25,8 @@ Class 3A is not modelled (nominal UN cutter).
   is ``thread_length`` up from the tip, on an offset ``ThreadTopPlane``; the
   shank above it stays plain at the major.  The split at the thread top, the
   helix of thread_length/P + 1 revs and the runout starting flush at the
-  major are the replica-gated 91247A720 partial thread's
-  (``diag_build_91247A720.py``); the runout itself stays this family's
+  major are the 91247A720 partial thread's (once replica-gated by
+  ``diag_build_91247A720.py``, deleted in #2896); the runout itself stays this family's
   revolved 45 deg cone.  [UNVERIFIED-COM]: no partially threaded size of this
   recipe has been built on a SolidWorks seat yet.
 

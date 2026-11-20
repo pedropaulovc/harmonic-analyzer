@@ -1,4 +1,9 @@
-"""Shared square-head set-screw recipe; explicit SKU sizes isolate its cache inputs."""
+"""Shared square-head set-screw recipe; explicit SKU sizes isolate its cache inputs.
+
+The law was harvested from the vendor 91410A538 model, whose replica recipe
+#2896 deleted: it is frozen and catalogue-only, re-verified against no vendor
+model (owner ruling 2026-11-20, #2926).
+"""
 
 from __future__ import annotations
 

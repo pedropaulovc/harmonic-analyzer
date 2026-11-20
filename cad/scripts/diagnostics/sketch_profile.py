@@ -10,7 +10,7 @@ PREFERENCES (``swSketchInference`` / ``swSketchAutomaticRelations``), and farm
 worker seats are not settings-normalized -- so such a profile extrudes on one
 seat and returns ``None`` on the next.  Observed 2026-09-17 on
 ``swmaker000005`` as ``RuntimeError: logo ring extrude failed`` from
-``diag_build_91247A720.py``, on a part that had published successfully twice
+``diag_build_91247A720.py`` (since deleted, #2896), on a part that had published successfully twice
 the same day from other seats.
 
 Bit-exact input coordinates are not enough by themselves either: SolidWorks
@@ -114,7 +114,7 @@ def minor_arc(center: Vertex, first: Vertex, second: Vertex) -> Arc:
     :func:`endpoint_merges` exact.
 
     This is one of the two OFFLINE gates that catch the failure mode the
-    91247A720 logo ring is exposed to.  Inference's nearest wrong target there
+    91247A720 logo ring was exposed to.  Inference's nearest wrong target there
     is an outer arc's own CENTRE, 0.400 mm from its endpoints, so a snap
     collapses the arc to zero radius; an endpoint that has arrived at the
     centre is refused here, by name, before any COM call.  (The other gate is

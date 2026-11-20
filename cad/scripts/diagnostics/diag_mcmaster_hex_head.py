@@ -1,8 +1,11 @@
 r"""McMaster 93075A* low-strength steel hex head screws: the shared family laws.
 
-The laws are the ones ``diag_build_93075A194.py`` reads off the vendor
-93075A194 model (its equations and solved sketches) and replays against it
-through the replica gate (``diag_build_mcmaster.py 93075A194``).  This module
+The laws were read off the vendor 93075A194 model (its equations and solved
+sketches) by ``diag_build_93075A194.py`` and replayed against it in the
+replica gate.  #2896 deleted that recipe, its replica and its call-for-call
+replay test, so the laws are frozen and catalogue-only: nothing in the repo
+re-verifies them against a vendor model any more (owner ruling 2026-11-20,
+#2926).  This module
 reproduces them for any size of the family from five catalogue dimensions:
 thread major and pitch, length under the head, head width across flats and
 head height.
@@ -21,8 +24,8 @@ head height.
 Frame: the vendor's, axis +Y head up, origin mid-overall, so the underside
 sits at (L - HH)/2 and the tip at -(L + HH)/2.
 
-``test_dt_vn_cone_tip_block_screw_drawing.py`` proves offline that this builder at
-93075A194's dimensions issues exactly the feature calls that recipe issues.
+No offline test replays a vendor recipe against this builder any more (see
+above); the production parts that import it are checked as catalogue parts.
 """
 
 from __future__ import annotations
