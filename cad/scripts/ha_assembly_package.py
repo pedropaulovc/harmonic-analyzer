@@ -352,8 +352,8 @@ TOOLS: tuple[Tool, ...] = (
         ("shop-equipment:tools.combination-wrenches-tekton-wcb90302",),
     ),
     Tool(
-        "Small open-end wrench under 1/4 in",
-        r"\b\d+/\d+ WRENCH\b",
+        "Open-end wrench, 5/32 in",
+        r"\b5/32 WRENCH\b",
         ("shop-equipment:tools.ignition-wrenches",),
     ),
     Tool("Hex keys", r"HEX KEY", ("shop-equipment:tools.hex-keys-bondhus-10937",)),

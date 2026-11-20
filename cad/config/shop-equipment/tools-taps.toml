@@ -20,8 +20,8 @@ note = "quotes-2026-11-17-rev3.xlsx Tap coverage #8-32 UNC: owned plug OSG 10243
 
 [tools.tap-0-80-bottoming]
 kind = "tap"
-status = "to_order"
-note = "quotes-2026-11-17-rev3.xlsx F-tap-bottoming-0-80: bottoming tap not owned; recommended Travers 12-111-008."
+status = "on_hand"
+note = "Owner (Pedro) 2026-11-17, recorded in #3083 (row 22, owner ruling 2026-11-20): the #0-80 bottoming tap is on hand from Zoro order WB7365521946. That order's recorded line G9665914 lists OSG 1000100 plug x2 (tools.taps-zoro-wb7365521946, tools.tap-0-80-plug): which of the two is the bottoming tap is to verify at the bench. quotes-2026-11-17-rev3.xlsx F-tap-bottoming-0-80 had it to buy (Travers 12-111-008)."
 
 [tools.tap-0-80-plug]
 kind = "tap"

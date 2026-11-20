@@ -95,23 +95,6 @@ purchase = "LittleMachineShop 5386, $29.95 sale (regular $34.95), low stock (lis
 status = "to_order"
 note = "Not owned: to buy. MHA-FR-01 and MHA-FR-02 on edge for the cross-screw paths."
 
-# Base-bar (MHA-CH-06-TL-20) vise workholding the base-bar plan's face and hole
-# setups name (plan text and diagrams; prechips has no parallel or jack record).
-# Source and status: Pedro (2026-11-05, PR #2218 tool list). Status is as he
-# stated it on 2026-11-05; no dimension beyond that is recorded.
-[fixtures.parallels-1-3-8in]
-name = "1-3/8 in parallels, matched pair"
-status = "to_order"
-note = "Not owned: your set stops at 1 in. Op 30 and Setup A: lift the bar above the jaw tops."
-
-[fixtures.jack-hhip-3901-0079]
-name = "HHIP 3901-0079 screw jack"
-make = "HHIP"
-sku = "3901-0079"
-range = "about 3.9–5.5 in"
-status = "to_order"
-note = "Not owned. Op 30 and A4: under the overhanging end."
-
 # The MHA-SM-01 bend form (owner ruling 2026-11-14 (Pedro), #2401: "bend on a simple
 # form"; the radius is a reference, so the form carries no toleranced size). To make:
 # not owned, no drawing.
@@ -154,6 +137,107 @@ name = "1-2-3 blocks (five: two Taytools, three makerspace)"
 kind = "setup_blocks"
 status = "on_hand"
 pieces = 5
+note = "The three makerspace blocks are the makerspace's, kept there (location below); the Taytools pair is the owner's."
+
+# --- makerspace equipment (owner ruling 2026-11-20, #2288) -----------------
+
+# Owner ruling 2026-11-20 (Pedro), #2288: "include makerspace tools, they are
+# being used". A record with location = "makerspace" is equipment the
+# makerspace owns and the owner uses there; status reads as for any record
+# (on_hand: available to use). Records without a location are the owner's.
+# Logbook 2026-11-04: "the makerspace has two 4 in milling vises, a Tegara
+# (label reads "440V") and a Precision Matthews with a swivel base"; the
+# Tegara's "base has two removable alignment keys that are exactly the T-slot
+# width"; "Fixed jaw indicated to under 0.001 in across its 4 in length".
+# Model numbers and dimensions are not read off the vises yet, so neither has
+# a cad/process/shop.toml workholding record a plan could size a setup from.
+[fixtures.vise-makerspace-tegara-4]
+name = "Tegara 4 in milling vise (label reads \"440V\"), removable T-slot alignment keys"
+kind = "vise"
+make = "Tegara"
+status = "on_hand"
+location = "makerspace"
+note = "Used for the oblique-jig end brackets (logbook 2026-11-04), small parts the 6 in PM vise is too big for. Model, jaw width, opening and heights not read."
+
+[fixtures.vise-makerspace-pm-4]
+name = "Precision Matthews 4 in milling vise with swivel base"
+kind = "vise"
+make = "Precision Matthews"
+status = "on_hand"
+location = "makerspace"
+note = "Logbook 2026-11-04. Model, jaw width, opening and heights not read."
+
+# --- workholding received 2026-11-05 (logbook; #2288) ----------------------
+
+# JB Tools order of 2026-11-01, received (logbook 2026-11-05: "mark the JB
+# Tools and Taytools orders received (there's one 3900-0070 jack, not two)";
+# Pedro confirmed the quantities on #2288). Identity fields as recorded at
+# 02fdd651e0^ cad/process/shop/inventory.toml; catalogue values, no receipt
+# metrology.
+[fixtures.machinists-jack-hhip-3900-0070]
+name = "HHIP 3900-0070 machinist's jack, 3-4 in"
+kind = "screw_jack"
+make = "HHIP"
+sku = "3900-0070"
+source = "https://www.jbtools.com/hhip-machinists-jack-3900-0070/"
+status = "on_hand"
+pieces = 1
+range_in = [3.0, 4.0]
+note = "Catalogue (read 2026-11-01): 1 in screw adjustment, tilting swivel head, 3/8-16 threads."
+
+[fixtures.jack-screw-set-hhip-3900-0266]
+name = "HHIP 3900-0266 Little Giant style jack screw set, 2-1/4 to 3-3/8 in"
+kind = "jack_screw_set"
+make = "HHIP"
+sku = "3900-0266"
+source = "https://www.jbtools.com/hhip-2-1-4-to-3-3-8-little-giant-style-jack-screw-set-3900-0266/"
+status = "on_hand"
+pieces = 6
+range_in = [2.25, 3.375]
+
+[fixtures.screw-jacks-hhip-3901-0076]
+name = "HHIP 3901-0076 adjustable screw jack, 23-30 mm"
+kind = "screw_jack"
+make = "HHIP"
+sku = "3901-0076"
+source = "https://www.jbtools.com/hhip-23-30mm-adjustable-screw-jack-3901-0076/"
+status = "on_hand"
+pieces = 2
+range_mm = [23.0, 30.0]
+
+[fixtures.work-stop-hhip-3900-2125]
+name = "HHIP 3900-2125 universal work stop"
+kind = "work_stop"
+make = "HHIP"
+sku = "3900-2125"
+source = "https://www.jbtools.com/hhip-universal-work-stop-3900-2125/"
+status = "on_hand"
+note = "Catalogue (read 2026-11-01): base 5/8 x 2 x 4-3/8 in with one 1/2 in hole, column 5/8 x 6-1/4 in, rod 3/8 x 10 in."
+
+# Taytools order of 2026-11-01, received (logbook 2026-11-05 and 2026-11-06:
+# the two Taytools blocks of fixtures.blocks-123 "joined with the Taytools
+# attachment hardware"). Identity as recorded at 02fdd651e0^ inventory.toml.
+[fixtures.blocks-123-hardware-taytools]
+name = "Taytools 1-2-3 block attachment hardware kit"
+kind = "block_joining_kit"
+make = "Taytools"
+sku = "123BlockHardware"
+source = "https://taytools.com/taytools-123-block-attachment-hardware-kit"
+status = "on_hand"
+pieces = 2
+
+# Logbook 2026-11-05: "Bought afterwards: POWERTEC 71476 hardened, ground
+# steel dowel pins, 1/4 x 2 in, 10 pack (Amazon B086DCHYQK), due
+# 2026-11-07"; for squaring rough stock in the vise, between the work and the
+# moving jaw (#2288). No receipt is recorded, so not_received.
+[fixtures.squaring-pins-powertec-71476]
+name = "POWERTEC 71476 hardened ground steel dowel pins, 1/4 x 2 in, 10 pack"
+kind = "squaring_rod"
+make = "POWERTEC"
+sku = "71476"
+source = "Amazon B086DCHYQK"
+status = "not_received"
+pieces = 10
 
 # Possession: logbook 2026-11-05 and 2026-11-06 ("strap clamps on step blocks
 # from the small clamping kit (Little Machine Shop 1268)"). Contents from the

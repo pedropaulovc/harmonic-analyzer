@@ -352,8 +352,10 @@ resolution_mm = 0.005
 # Riser (MHA-CH-06-TL-24) plan: the v49 notes.process names the #30 screw and
 # stop holes, the #9 CL/CR clearances and the 12 mm HUB relief; the 1/4 in
 # drill pilots the 12 mm and the 82° countersink cuts the Ø.25 × 82° seats.
-# Nominal sizes × 25.4 (#30 .1285 in, #9 .1960 in). The 12 mm drill and the
-# countersink are not owned (cad/config/shop-equipment/, same keys).
+# Nominal sizes × 25.4 (#30 .1285 in, #9 .1960 in). The riser's 12 mm drill
+# left the buy list with the oblique jig (owner 2026-11-17; #3083 row 20).
+# The countersink is not owned (cad/config/shop-equipment/, same key); the
+# index-plate and arm-plate plans also name it.
 [tools.riser-drill-30]
 description = "#30 (.1285 in) drill, 115-piece index"
 diameter_mm = 3.2639
@@ -363,9 +365,6 @@ diameter_mm = 4.9784
 [tools.riser-drill-quarter]
 description = "1/4 in drill, 115-piece index"
 diameter_mm = 6.35
-[tools.riser-drill-12mm]
-description = "12 mm jobber drill"
-diameter_mm = 12.0
 [tools.riser-countersink]
 description = "3/8 in 82° countersink"
 
@@ -445,17 +444,6 @@ body_length_mm = 72.0
 # owned, by photo in the 45952b66bc inventory); it faces the kit nut.
 [tools.lathe-ar]
 description = "A R Warner AR carbide turning holder, TCMT insert, R0.4 nose (LMS 4132)"
-
-# Kit tools: a hand hacksaw (not owned, cad/config/shop-equipment/
-# tools.kit-hacksaw), the 1/2 in end mill (jig-em-half) for the cut end, the 5/16 in
-# end mill (basebar-counterbore) for the flats, and an 82° countersink no
-# larger than the 3/16 in cutter the sheet allows (not owned,
-# tools.kit-countersink-82).
-[tools.kit-hacksaw]
-description = "Hacksaw, 12 in 32 TPI bi-metal blade"
-[tools.kit-countersink-82]
-description = "82° countersink, 3/16 in body, in a T-handle"
-diameter_mm = 4.7625
 
 # SUS304 screw, LittleMachineShop "Cutting Speeds" table (read live
 # 2026-11-13), row Stainless steel 304: milling 70 ft/min (low end). Hand feed.
@@ -884,7 +872,7 @@ diameter_mm = 6.3754
 [tools.reamer-2550]  # B-reamer-.2550
 description = ".2550 in HSS chucking reamer"
 diameter_mm = 6.477
-[tools.reamer-2560]  # B-reamer-.2560 (B-reamer-.2559, 6.5 mm, its optional alternative)
+[tools.reamer-2560]  # B-reamer-.2560 (not the 6.5 mm B-reamer-.2559: #3083 row 4)
 description = ".2560 in HSS chucking reamer"
 diameter_mm = 6.5024
 [tools.reamer-3135]  # B-reamer-.3135
@@ -894,7 +882,7 @@ diameter_mm = 7.9629
 description = ".4500 in HSS chucking reamer"
 diameter_mm = 11.43
 [tools.reamer-12mm-h7]  # B-reamer-12mm-h7
-description = "12 mm H7 HSS chucking reamer"
+description = "12 mm HSS chucking reamer, .4724-.4726 in"
 diameter_mm = 12.0
 [tools.reamer-4835]  # B-reamer-.4835
 description = ".4835 in HSS chucking reamer"
@@ -972,7 +960,7 @@ description = "Starrett 18A automatic centre punch"
 [tools.file-nicholson-10-second-cut]  # F-file-nicholson-10-mill-second-cut
 description = "Nicholson 10 in mill second-cut file"
 [tools.ignition-wrenches]  # F-ignition-wrenches
-description = "Ignition wrenches under 1/4 in"
+description = "Open-end wrench, 5/32 in (ignition size)"
 [tools.india-stone-ib8]  # F-stone-norton-IB8
 description = "Norton IB8 India combination stone"
 [tools.pliers]  # F-pliers

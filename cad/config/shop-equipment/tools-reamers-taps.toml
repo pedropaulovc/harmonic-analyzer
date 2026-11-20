@@ -29,16 +29,24 @@
 # recorded the shop owning it, so it is to buy (or to record, if the shop has
 # one). No vendor or SKU is asserted for a tool to buy.
 
+# Size from the pin (#3083 row 6, owner ruling 2026-11-20): MHA-DT-09's ends
+# are Ø5.0 and Ø5.9375 mm (.197-.234 in) on a 1:48 taper (dt_crank_pin_spec
+# SMALL_END_DIA, BIG_END_DIA), inside a No. 4 taper-pin reamer's span.
 [tools.taper-pin-reamer]
-name = "Taper-pin reamer, 1:48, for the MHA-DT-09 pin"
+name = "Taper-pin reamer No. 4, 1:48, for the MHA-DT-09 pin"
 kind = "reamer"
 status = "to_order"
 
+# #3083 row 22 (owner ruling 2026-11-20): of the sizes the transfer steps tap,
+# only #4-40 and #0-80 had no owned bottoming tap; the owner states the #0-80
+# bottoming tap is on hand (2026-11-17). Per-size ownership is the
+# tools-taps.toml records the plans name: tools.tap-4-40-bottoming (to buy)
+# and tools.tap-0-80-bottoming (on hand).
 [tools.bottoming-taps]
 name = "Bottoming taps in the sizes the transfer steps tap"
 kind = "tap_set"
 status = "to_order"
-note = "The archived inventory's plug-and-bottoming hand taps were an illustrative example item."
+note = "To buy: the #4-40 bottoming tap, tools.tap-4-40-bottoming. The archived inventory's plug-and-bottoming hand taps were an illustrative example item."
 
 # --- tools ----------------------------------------------------------------
 
@@ -85,19 +93,21 @@ cite = [
 # B1): the Ø.4720 +.0015/0 trunnion bore is reamed once in 4140/4142 HT as
 # supplied (28-32 HRC). To purchase: not owned, no receipt or cutting size asserted.
 [tools.reamer-12mm-h7]
-name = "12 mm H7 HSS straight-flute chucking reamer"
+name = "12 mm HSS straight-flute chucking reamer (Shars 416-0477)"
 kind = "reamer"
 status = "to_order"
-purchase = "One 12 mm H7 HSS (or HSS-Co) straight-flute chucking reamer, DIN 212 proportions; catalogue cutting band 12.004-12.015 mm (.4726-.4730 in), inside the bore's .4720-.4735 band. Order with the knife-mount 4140 HT bar."
+purchase = "One Shars 416-0477 12 mm chucking reamer, stated .4724-.4726 in, inside the bore's .4720-.4735 band (#3083 row 5, owner ruling 2026-11-20: no US vendor sells a reamer labelled H7/DIN 212, and Garant states 12.008-12.015 mm). Pre-drill 11.8 mm (quoted with it; no owned drill suits). Order with the knife-mount 4140 HT bar."
 note = "Cuts the MHA-SM-02 knife mount's Ø.4720 +.0015/0 REAM THRU bore in pre-hardened 4140/4142 HT at 28-32 HRC (slow speed, cutting oil). Trial-cut a scrap of the same bar and pin-check before the parts. The bore is the knife-edge bearing seat for the MHA-SM-03 trunnion."
 
 # MHA-CH-07 fulcrum-keeper bore reamer (#2338): each keeper's Ø.2550 +.0010/0
 # bore is reamed on the keeper alone, replacing the retired at-assembly pair
 # ream through both keepers (made-to-order 12 in reamer). To purchase: not owned;
 # price and stock read live on travers.com 2026-11-12 ($33.96, 32 in stock).
-# Cutting band: ANSI B94.2 chucking-reamer diameter tolerance +.0001/+.0005
-# over 1/4 in, so it cuts .2551-.2555, inside the bore's .2550-.2560 band
-# (ch_fulcrum_keeper_spec.BORE_REAMER_DIA_RANGE_MM).
+# Cutting band: the vendors read state 0/+.0002 on a chucking reamer's size
+# (#3083 row 3, priced 2026-11-17); no vendor page states the ANSI B94.2
+# +.0001/+.0005 earlier written here. At 0/+.0002 it cuts .2550-.2552, inside
+# the bore's .2550-.2560 band. ch_fulcrum_keeper_spec.BORE_REAMER_DIA_RANGE_MM
+# still carries the ANSI band: a spec row for the native batch (#3083).
 [tools.reamer-2550]
 name = "TTC PRODUCTION HP 06-002-550 .2550 in HSS straight-flute chucking reamer"
 kind = "reamer"
@@ -105,7 +115,7 @@ make = "TTC"
 sku = "06-002-550"
 source = "https://www.travers.com/product/ttc-production-hp-06-002-550-straight-shank-chucking-reamer-06-002-550"
 status = "to_order"
-purchase = "One TTC 06-002-550 .2550 in HSS straight-flute straight-shank chucking reamer (Travers), $33.96; ANSI B94.2 cutting band .2551-.2555, inside the bore's .2550-.2560 band."
+purchase = "One TTC 06-002-550 .2550 in HSS straight-flute straight-shank chucking reamer (Travers), $33.96; stated cutting band 0/+.0002 (.2550-.2552), inside the bore's .2550-.2560 band."
 note = "Cuts both MHA-CH-07 keepers' Ø.2550 +.0010/.0000 REAM THRU bores in 1018, each keeper on its own: a slip fit on the Ø.2500 h ground MHA-CH-04 shaft that also covers both keepers' bore-height bands, each bore's tilt and the rail seats (ch_fulcrum_keeper_spec.BORE_ALIGNMENT_ALLOWANCE_MM). Pin-check the first bore."
 
 # MHA-DT-12-TL-01 (cam turning fixture, #2361) press reams, both REAM_H7's
@@ -179,15 +189,14 @@ note = "MHA-CH-13-TL-01 sub-plate: the hub screw's 1/4-20 hole through the count
 
 # Hub-hole reamer for MHA-CH-13: Ø.4000 +.0005/0 REAM THRU, a press fit on
 # MHA-CH-12. To purchase: not owned; no make, price or stock read. Cutting
-# band: ANSI B94.2 chucking-reamer diameter tolerance +.0001/+.0005 (as
-# tools.reamer-2550), so it cuts .4001-.4005, inside the bore's .4000-.4005
-# band with nothing to spare at the top: gauge the first hole before the lot.
-# Its sizing data is cad/process/shop.toml tools.reamer-4000.
+# band as tools.reamer-2550: the stated 0/+.0002, so it cuts .4000-.4002,
+# inside the bore's .4000-.4005 band (#3083 row 3); gauge the first hole
+# before the lot. Its sizing data is cad/process/shop.toml tools.reamer-4000.
 [tools.reamer-4000]
 name = ".4000 in HSS straight-flute chucking reamer"
 kind = "reamer"
 status = "to_order"
-purchase = "One .4000 in (decimal size) HSS straight-flute straight-shank chucking reamer; ANSI B94.2 cutting band .4001-.4005."
+purchase = "One .4000 in (decimal size) HSS straight-flute straight-shank chucking reamer; stated cutting band 0/+.0002 (.4000-.4002)."
 note = "Cuts the MHA-CH-13 hub hole in 1018 after a 25/64 drill, 400 rpm, cutting oil, fed in and out. Checked with the go/no-go pair gauges.plug-gauges-4000-4005 (first hole before the lot, then every part): the shop owns no pin gauges (owner 2026-11-17), and the owned Starrett telescoping gauges read on the micrometer repeat to about the whole .0005 in band. Not owned: to buy."
 
 # --- Owner inventory 2026-11-17: Zoro order, shop photos, reamers ----------
@@ -209,7 +218,7 @@ purchase = "Zoro order WB7365521946, 2026-11-06, merchandise subtotal USD 417.33
 cite = ["Owner (Pedro) 2026-11-17: \"everything in the zoro order that should be recorded\"", "Zoro order WB7365521946 as recorded at commit a6e95cece9 (PR #2222)"]
 
 [tools.taps-zoro-wb7365521946.members]
-G9665914 = { thread = "#0-80 UNF", style = "plug", make = "OSG", mfr_no = "1000100", qty = 2 }
+G9665914 = { thread = "#0-80 UNF", style = "plug", make = "OSG", mfr_no = "1000100", qty = 2, note = "Owner (2026-11-17, #3083): a #0-80 bottoming tap is on hand from this order; the order record says plug. Style to verify at the bench." }
 G9665652 = { thread = "#1-72 UNF", style = "plug", make = "OSG", mfr_no = "1010700", qty = 2 }
 G9665616 = { thread = "#2-56 UNC", style = "plug", make = "OSG", mfr_no = "1011008", qty = 2 }
 G9665591 = { thread = "#2-56 UNC", style = "bottoming", make = "OSG", mfr_no = "1011108", qty = 2 }
@@ -339,17 +348,17 @@ note = "quotes-2026-11-17-rev3.xlsx B-reamer-.2490: recommended Shars 404-7567."
 [tools.reamer-2510]
 kind = "reamer"
 status = "to_order"
-note = "quotes-2026-11-17-rev3.xlsx B-reamer-.2510 (optional tier, not in the recommended total): recommended Zoro G3924812. The workbook takes it as owned (cad/scripts/_fit_ream_slide.py: the owned over reamers), but the owner's inventory of 2026-11-17 owns only tools.reamers-adjustable-lms-5948 and tools.reamer-0376."
+note = "quotes-2026-11-17-rev3.xlsx B-reamer-.2510 (optional tier there): recommended Zoro G3924812. To buy: owner ruling 2026-11-20 (#3073) buys a fixed reamer for each running/press fit rather than setting the adjustable set; REAM_SLIDE is a running fit. The workbook took it as owned (cad/scripts/_fit_ream_slide.py: the owned over reamers), but the owner's inventory of 2026-11-17 owns only tools.reamers-adjustable-lms-5948 and tools.reamer-0376."
 
 [tools.reamer-2560]
 kind = "reamer"
 status = "to_order"
-note = "quotes-2026-11-17-rev3.xlsx B-reamer-.2560: recommended McMaster-Carr 8803A491. The workbook's B-reamer-.2559 (6.5 mm, optional tier, Drill America DWRR6.5MM) is the alternative for the same three bores."
+note = "quotes-2026-11-17-rev3.xlsx B-reamer-.2560: recommended McMaster-Carr 8803A491. Buy this, not the workbook's B-reamer-.2559 (6.5 mm, Drill America DWRR6.5MM): a 6.5 mm reamer at its stated band can cut .0001 under the .2560 minimum of the MHA-CH lever bore (#3083 row 4, owner ruling 2026-11-20)."
 
 [tools.reamer-3135]
 kind = "reamer"
 status = "to_order"
-note = "quotes-2026-11-17-rev3.xlsx B-reamer-.3135 (optional tier, not in the recommended total): recommended Zoro G3918887. The workbook takes it as owned (cad/scripts/_fit_ream_slide.py: the owned over reamers), but the owner's inventory of 2026-11-17 owns only tools.reamers-adjustable-lms-5948 and tools.reamer-0376."
+note = "quotes-2026-11-17-rev3.xlsx B-reamer-.3135 (optional tier there): recommended Zoro G3918887. To buy: owner ruling 2026-11-20 (#3073) buys a fixed reamer for each running/press fit rather than setting the adjustable set; REAM_SLIDE is a running fit. The workbook took it as owned (cad/scripts/_fit_ream_slide.py: the owned over reamers), but the owner's inventory of 2026-11-17 owns only tools.reamers-adjustable-lms-5948 and tools.reamer-0376."
 
 [tools.reamer-4500]
 kind = "reamer"
