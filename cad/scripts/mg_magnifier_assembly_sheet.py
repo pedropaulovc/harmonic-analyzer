@@ -354,22 +354,21 @@ STEP_TEXT = {
     # Owner ruling 2026-11-11 (#2541, #2523; amends 2026-11-07): a slip axle
     # is bonded, not remade, under NOTE 1 as the drum is: clean, bond, set
     # before it grabs, then the hold check again once cured. The slip clause
-    # names an unbonded axle, so the bonded one passes back through 2A-2B.
-    # Step 3 is the only position acceptance: a bonded axle it moves (3D/3E)
-    # comes back through the hold check, and one that no longer holds is
-    # rebonded where it stood, so the correction is not lost (#2578): its
-    # plain end's depth is read before it comes out, and the bond sets it
-    # back to that reading.
-    "axle-depth-recorded": (
-        f"IF IT DOES, OR AN UNBONDED {_AXLE} SLID IN BY HAND, RECORD THE DEPTH "
-        f"OF ITS PLAIN END BELOW THE FAR FACE OF {_BAR} (CALIPER DEPTH ROD)."
+    # names an unbonded axle, so the bonded one passes back through the hold
+    # check. Step 3 is the only position acceptance: a bonded axle it moves
+    # (3D/3E) has its depth read at once, before it comes back through the
+    # hold check, and one that no longer holds is rebonded to that reading,
+    # so the correction is not lost (#2578); before any re-press the axle
+    # stands at the DETAIL A first setting.
+    "axle-pressed-out": (
+        f"IF IT DOES, OR AN UNBONDED {_AXLE} SLID IN BY HAND, PRESS {_AXLE} OUT."
     ),
-    "axle-pressed-out": f"IF ITS DEPTH WAS RECORDED, PRESS {_AXLE} OUT.",
     "axle-cleaned": f"IF {_AXLE} CAME OUT, CLEAN IT AND THE BORE IN {_BAR} TO BARE METAL.",
     "axle-bonded": f"IF IT WAS CLEANED, BOND IT IN WITH {BOND_GRADE}, {BOND_NOTE_REF}.",
     "axle-bond-set": (
-        "IF IT WAS BONDED, SET IT AT ONCE TO THE DEPTH RECORDED IN "
-        f"{_step('axle-depth-recorded')} (CALIPER DEPTH ROD)."
+        "IF IT WAS BONDED, SET IT AT ONCE TO THE DEPTH LAST RECORDED IN "
+        f"{_step('axle-depth-recorded')}, OR, IF NONE, AS {PRESS_DETAIL_TITLE} "
+        "SETS IT (CALIPER DEPTH ROD)."
     ),
     "axle-bond-cured": (
         f"IF IT WAS BONDED, RETURN TO {_step(_steps.AXLE_HELD_KEY)} ONCE IT HAS "
@@ -395,9 +394,13 @@ STEP_TEXT = {
         f"IF {_step(_steps.AXLE_CHECKED_KEY)} READ UNDER THE MIN, PRESS {_AXLE} "
         "OUT TOWARD ITS THREADED END BY THE SHORTFALL."
     ),
+    "axle-depth-recorded": (
+        f"IF {_AXLE} WAS PRESSED AGAIN, RECORD THE DEPTH OF ITS PLAIN END BELOW "
+        f"THE FAR FACE OF {_BAR} (CALIPER DEPTH ROD)."
+    ),
     # A re-press goes back through the hold check before the trial fit.
     "axle-rechecked": (
-        f"IF {_AXLE} WAS PRESSED AGAIN, RETURN TO {_step(_steps.AXLE_HELD_KEY)}."
+        f"IF ITS DEPTH WAS RECORDED, RETURN TO {_step(_steps.AXLE_HELD_KEY)}."
     ),
     "trial-parts-removed": f"REMOVE THE TRIAL NUTS AND PARTS FROM {_AXLE}.",
     "column-clamps-fitted": (
@@ -510,7 +513,11 @@ STEP_TEXT = {
         "SHEET 1 SHOWS."
     ),
     # A thin wire is tied, not twisted (#2398, owner ruling 2026-11-12).
+    # A knot round the standing wire is a running noose (#3086): it is drawn
+    # closed on the groove here, so the lever's load cannot close it later
+    # and the knot check reads the knot alone.
     "lever-wire-hook-knotted": "KNOT THE WIRE END ROUND THE WIRE BELOW THE GROOVE.",
+    "lever-wire-hook-closed": "SLIDE THE KNOT UP UNTIL THE LOOP CLOSES IN THE GROOVE.",
     "machine-at-rest": (
         "SET MHA-HA-00 AT REST: EVERY CHANNEL AMPLITUDE AT ZERO AND THE "
         "MHA-SM-03 PLATE TOP LEVEL."

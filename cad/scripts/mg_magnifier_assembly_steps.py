@@ -56,7 +56,6 @@ STEPS: tuple[tuple[str, ...], ...] = (
     (
         AXLE_PRESSED_KEY,
         AXLE_HELD_KEY,
-        "axle-depth-recorded",
         "axle-pressed-out",
         "axle-cleaned",
         "axle-bonded",
@@ -70,6 +69,7 @@ STEPS: tuple[tuple[str, ...], ...] = (
         "trial-parts-removed-to-press",
         "axle-pressed-further",
         "axle-pressed-back",
+        "axle-depth-recorded",
         "axle-rechecked",
     ),
     ("trial-parts-removed",),
@@ -96,7 +96,12 @@ STEPS: tuple[tuple[str, ...], ...] = (
     ("rod-seated",),
     (FIXTURE_SET_KEY, "fixture-thumb-screw-tightened", FIXTURE_HELD_KEY, "fixture-reset"),
     # Lever wire, on the machine.
-    (WIRE_HOOKED_KEY, "lever-wire-led-down", "lever-wire-hook-knotted"),
+    (
+        WIRE_HOOKED_KEY,
+        "lever-wire-led-down",
+        "lever-wire-hook-knotted",
+        "lever-wire-hook-closed",
+    ),
     ("machine-at-rest",),
     (WHEEL_TURNED_KEY,),
     (

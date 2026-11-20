@@ -397,13 +397,13 @@ _BENCH_STEPS = (
     f"THE ROD TOP ({STUD_NUT_WRENCH} WRENCH).",
     f"2. PEN WIRE TO STUD EYE: PASS THE LOWER END OF THE PEN WIRE (ITEM "
     f"{ITEM[WIRE]}) THROUGH THE EYE OF THE {_STUD_NAME} (ITEM {ITEM[STUD]}).",
-    # A knot round the standing wire is a running noose (#3086): it is drawn
-    # closed on the eye here, so the pen's weight cannot close it later and
-    # 2B's check reads the knot alone.
-    "2A. KNOT THAT END ROUND THE WIRE ABOVE THE EYE AND SLIDE THE KNOT DOWN "
-    "UNTIL THE LOOP CLOSES ON THE EYE.",
-    "2B. CHECK: THE KNOT DOES NOT SLIP UNDER A LIGHT PULL BY HAND.",
-    "2C. TRIM THE TAIL CLOSE TO THE KNOT; THE UPPER END STAYS LONG.",
+    # A knot round the standing wire is a running noose (#3086): 2B draws it
+    # closed on the eye, so the pen's weight cannot close it later and 2C's
+    # check reads the knot alone.
+    "2A. KNOT THAT END ROUND THE WIRE ABOVE THE EYE.",
+    "2B. SLIDE THE KNOT DOWN UNTIL THE LOOP CLOSES ON THE EYE.",
+    "2C. CHECK: THE KNOT DOES NOT SLIP UNDER A LIGHT PULL BY HAND.",
+    "2D. TRIM THE TAIL CLOSE TO THE KNOT; THE UPPER END STAYS LONG.",
     f"3. STIRRUP: SLIDE THE STIRRUP (ITEM {ITEM[FRAME]}) ONTO THE V-BLOCK "
     f"(ITEM {ITEM[V_BLOCK]}) FLUSH WITH THE BLOCK'S END FACE AT THE NIB END "
     "(VIEW C).",
