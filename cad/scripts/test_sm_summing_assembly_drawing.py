@@ -484,7 +484,9 @@ def test_step_five_runs_each_hanger_bolt_home_by_hand_then_sets_the_gauge_bar() 
     low, high = builder.knife_mount.KNIFE_GAUGE_BAR_CLEARANCE_IN
     assert f"{low:.4f}".lstrip("0") in record["purchase"]
     assert f"{high:.4f}".lstrip("0") in record["purchase"]
-    assert builder.knife_mount.KNIFE_GAUGE_BAR_DIA == pytest.approx(2.0 * builder.knife_mount.BORE_R_MIN)
+    # Every bar so cut, Ø.4679-.4709, rounds to the printed (Ø.47).
+    assert notes.KNIFE_GAUGE_BAR_SIZES_IN == pytest.approx((0.4679, 0.4709))
+    assert "Ø.4679-.4709" in record["purchase"]
     assert max(builder.knife_mount.KNIFE_GAUGE_BAR_CLEARANCE_IN) * 25.4 == pytest.approx(
         builder.KNIFE_BAR_CLEARANCE
     )

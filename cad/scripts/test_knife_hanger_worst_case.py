@@ -563,9 +563,12 @@ def test_one_dowel_and_the_gauge_bar_replace_the_slot_and_datum_c() -> None:
     assert len(top_frame.HANGER_PIN_XS) == 1
     assert len(build_fr_top_frame.HANGER_PIN_CONTOURS) == 2
     assert dowel.QUANTITY == 2
-    # The bar enters every conforming bore and is a gauge pin, not a part.
-    assert knife_mount.KNIFE_GAUGE_BAR_DIA_IN == 0.4720
-    assert knife_mount.KNIFE_GAUGE_BAR_DIA == pytest.approx(2.0 * knife_mount.BORE_R_MIN)
+    # The bar is cut under the bores it gauges and is a gauge pin, not a part:
+    # the largest bar for the smallest bore takes the fit's minimum there.
+    assert knife_mount.KNIFE_GAUGE_BAR_DIA_MIN == pytest.approx(
+        2.0 * knife_mount.BORE_R_MIN - min(knife_mount.KNIFE_GAUGE_BAR_CLEARANCE_IN) * 25.4
+    )
+    assert not hasattr(knife_mount, "KNIFE_GAUGE_BAR_DIA")
     assert not any("gauge" in stem for stem in asm.spec.QUANTITIES)
 
 

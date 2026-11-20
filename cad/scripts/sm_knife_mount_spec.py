@@ -135,25 +135,24 @@ BORE_R_MAX = R_BORE + max(BORE_DIA_BAND) / 2.0  # 6.01345
 # mounts, whose outer faces stand 7.67 apart, so the tool is an 8.0 in bar.
 # A bar that long has no gauge class, so it is made to the measured bores
 # (machinist review of farm build 20261110T204245.238203Z: a bare band
-# names no fit route) at a diametral clearance in each bore, sized from the
-# bore's smallest printed size, Ø.4720 (shop-equipment
-# gauges.gauge-bar-0472x8).  Owner ruling 2026-11-20 (Pedro), #2499:
-# "Follow recommendations unless noted otherwise" -- widen the printed fit
-# to cover the bores' pitch and height and charge its maximum in the stack.
-# The class ZZ pin's .0002-.0017 it kept did not pass two conforming bores:
-# the minimum is the clearance their ∥.002|A pitch and ⌖Ø.008 heights
-# demand of a straight bar (``build_sm_summing_assembly.KNIFE_BAR_FIT_NEED``,
-# .00255, rounded up to the .0001 step), the band keeps its .0015 width,
-# and the rock budget and both hanger-bolt stacks charge the .0041 maximum.
+# names no fit route) at a diametral clearance under each bore
+# (shop-equipment gauges.gauge-bar-0472x8).  Owner ruling 2026-11-20
+# (Pedro), #2499: "Follow recommendations unless noted otherwise" -- widen
+# the printed fit to cover the bores' pitch and height and charge its
+# maximum in the stack.  The class ZZ pin's .0002-.0017 it kept did not pass
+# two conforming bores: the minimum is the clearance their ∥.002|A pitch and
+# ⌖Ø.008 heights demand of a straight bar
+# (``build_sm_summing_assembly.KNIFE_BAR_FIT_NEED``, .00255, rounded up to
+# the .0001 step), the band keeps the bore band's .0015 width, so one bar
+# fits both bores of any conforming pair, and the rock budget and both
+# hanger-bolt stacks charge the .0041 maximum.  A bar so cut is Ø.4679-.4709.
 # The fit lives here, beside the bore it is cut to, so MHA-FR-02's hanger
 # mirror can charge the bar's play without importing the summing spec's
 # config closure (test_dodo_recipe's fine-grained config deps).
-KNIFE_GAUGE_BAR_DIA_IN = 0.4720
 KNIFE_GAUGE_BAR_CLEARANCE_IN = (0.0026, 0.0041)  # (min, max) diametral, each bore
-KNIFE_GAUGE_BAR_DIA = KNIFE_GAUGE_BAR_DIA_IN * 25.4  # 11.9888
 # The bar at the fit's minimum in the smallest conforming bore: its
 # clearance in the largest bore is the fit's maximum.
-KNIFE_GAUGE_BAR_DIA_MIN = (KNIFE_GAUGE_BAR_DIA_IN - KNIFE_GAUGE_BAR_CLEARANCE_IN[0]) * 25.4
+KNIFE_GAUGE_BAR_DIA_MIN = 2.0 * BORE_R_MIN - KNIFE_GAUGE_BAR_CLEARANCE_IN[0] * 25.4
 KNIFE_GAUGE_BAR_LENGTH_IN = 8.0
 
 # The block's overall sizes print two places (.XX): every stack below reads

@@ -1234,7 +1234,7 @@ for _label, _value in BAR_POCKET_HOLE_WALLS.items():
 # hole, its widest .X width, the worse .X row-to-face reach either side;
 # the whole turned through the title-block angle about the round dowel,
 # which also covers the yaw the MHA-SM-00 gauge bar sets
-# (HANGER_BAR_YAW_SHIFT's turn with the bar's play, under 0.5 deg).  Owner ruling 2026-11-08
+# (HANGER_BAR_YAW_SHIFT's turn with the bar's play, under 0.7 deg).  Owner ruling 2026-11-08
 # (Pedro), #2144 item 11.3: one dowel, so the block fits one way round
 # only, its round hole (datum B) on the ream's pin.
 # _external_edge_breaks keeps every finished edge-break band 0.5 off both hulls.

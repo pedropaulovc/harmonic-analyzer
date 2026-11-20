@@ -345,7 +345,10 @@ KNIFE_RIDGE_YAW_OFFSET = (
 # .0020 + .56 x .007 / 7.105 = .00255.  Shifting the bar off a bore's
 # centre costs twice the shift for a slope gain of the shift over S, so no
 # offset helps.  The pitch of the other bore, or less pitch on this one,
-# needs less (d/d∥ = 1 - L / 2S > 0).
+# needs less (d/d∥ = 1 - L / 2S > 0).  Both datum-A seats are taken as one
+# plane, the two ends of MHA-FR-02's one faced underside, which carries no
+# form zone; a relative seat pitch would add itself over L, and the
+# rounding below leaves .00005 for it (#3157).
 KNIFE_BAR_FIT_NEED = (
     knife_mount.KNIFE_BORE_PARALLELISM_TOL
     + _KNIFE_BLOCK_DEPTH_MAX
@@ -536,10 +539,18 @@ def _assert_knife_hanger_stack() -> None:
             f"its dowel inside the bolt float, under the {KNIFE_TAP_YAW_DEG:.3f} deg "
             "the gauge bar's line and play can ask of it"
         )
-    if knife_mount.KNIFE_GAUGE_BAR_DIA > 2.0 * knife_mount.BORE_R_MIN + 1e-9:
+    # One bar fits both bores of any conforming pair: the fit's band is at
+    # least the bore band, so the largest bore less the maximum never
+    # passes the smallest less the minimum.
+    _fit_band = (
+        max(knife_mount.KNIFE_GAUGE_BAR_CLEARANCE_IN)
+        - min(knife_mount.KNIFE_GAUGE_BAR_CLEARANCE_IN)
+    ) * 25.4
+    if _fit_band < max(knife_mount.BORE_DIA_BAND) - 1e-9:
         raise RuntimeError(
-            f"the Ø{knife_mount.KNIFE_GAUGE_BAR_DIA:.4f} gauge bar does not enter the smallest "
-            f"knife bore Ø{2.0 * knife_mount.BORE_R_MIN:.4f}"
+            f"the gauge bar's {_fit_band:.4f} fit band is narrower than the "
+            f"{max(knife_mount.BORE_DIA_BAND):.4f} bore band: no one bar fits "
+            "both bores of every conforming pair"
         )
     if KNIFE_GAUGE_BAR_LENGTH <= KNIFE_MOUNT_OUTER_SPAN_MAX:
         raise RuntimeError(

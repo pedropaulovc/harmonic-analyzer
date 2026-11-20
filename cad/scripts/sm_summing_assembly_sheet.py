@@ -20,9 +20,9 @@ from _assembly_contract import assembly_contract
 from _inch_fraction import inch_fraction
 from _title_block_units import LENGTH_UNITS, render_number
 from sm_knife_mount_spec import (
-    BORE_DIA_BAND as KNIFE_BORE_DIA_BAND,
+    BORE_R_MAX as KNIFE_BORE_R_MAX,
+    BORE_R_MIN as KNIFE_BORE_R_MIN,
     KNIFE_GAUGE_BAR_CLEARANCE_IN,
-    KNIFE_GAUGE_BAR_DIA_IN,
     KNIFE_GAUGE_BAR_LENGTH_IN,
 )
 from sm_summing_assembly_spec import (
@@ -123,14 +123,14 @@ HUB_SET_SCREW_TORQUE = (
 # reference size is the two places every such bar rounds to, and it shakes
 # in the bores: the hand check is that it slides through both, not that it
 # does not shake.
-_KNIFE_GAUGE_BAR_SIZES_IN = (
-    KNIFE_GAUGE_BAR_DIA_IN - max(KNIFE_GAUGE_BAR_CLEARANCE_IN),
-    KNIFE_GAUGE_BAR_DIA_IN + max(KNIFE_BORE_DIA_BAND) / 25.4 - min(KNIFE_GAUGE_BAR_CLEARANCE_IN),
+KNIFE_GAUGE_BAR_SIZES_IN = (
+    2.0 * KNIFE_BORE_R_MIN / 25.4 - max(KNIFE_GAUGE_BAR_CLEARANCE_IN),
+    2.0 * KNIFE_BORE_R_MAX / 25.4 - min(KNIFE_GAUGE_BAR_CLEARANCE_IN),
 )
-KNIFE_GAUGE_BAR_REF_DIA_IN = round(_KNIFE_GAUGE_BAR_SIZES_IN[0], 2)
-if round(_KNIFE_GAUGE_BAR_SIZES_IN[1], 2) != KNIFE_GAUGE_BAR_REF_DIA_IN:
+KNIFE_GAUGE_BAR_REF_DIA_IN = round(KNIFE_GAUGE_BAR_SIZES_IN[0], 2)
+if round(KNIFE_GAUGE_BAR_SIZES_IN[1], 2) != KNIFE_GAUGE_BAR_REF_DIA_IN:
     raise AssertionError(
-        f"gauge bars Ø{_KNIFE_GAUGE_BAR_SIZES_IN[0]:.4f}-{_KNIFE_GAUGE_BAR_SIZES_IN[1]:.4f} "
+        f"gauge bars Ø{KNIFE_GAUGE_BAR_SIZES_IN[0]:.4f}-{KNIFE_GAUGE_BAR_SIZES_IN[1]:.4f} "
         "share no two-place reference size"
     )
 KNIFE_GAUGE_BAR = (
