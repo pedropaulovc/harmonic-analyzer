@@ -1191,6 +1191,8 @@ description = "6061-T6511 aluminium, flat bar, 1/2 x 6 in, 54 in length"
 description = "6061-T6511 aluminium, flat bar, 1/4 x 5 in"
 [stock.6061-flat-1x3]
 description = "6061-T6511 aluminium, flat bar, 1 x 3 in"
+[stock.c260-h02-strip-032x2]
+description = "C26000 cartridge brass, H02 half hard, strip, .032 x 2 x 12 in"
 [stock.c360-flat-1-4x6]
 description = "C360 brass, flat bar, 1/4 x 6 in"
 [stock.c360-flat-1-8x2-1-2]

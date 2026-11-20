@@ -43,7 +43,7 @@ from __future__ import annotations
 import math
 import sys
 
-from _appearance import POLISHED_STEEL, apply_color, apply_material
+from _appearance import apply_material
 from _check import check
 from _document_units import apply_package_model_units
 from _dimensions import drive_dimension, name_dimensions, set_global
@@ -1016,7 +1016,6 @@ def build(adapter) -> dict[str, str]:
     bbox_extent_check(adapter, "hook Z", "z", BBOX_Z[1] - BBOX_Z[0])
 
     apply_material(adapter, MATERIAL)
-    apply_color(adapter, POLISHED_STEEL)
     report_mass_properties(adapter)
     # The drilled holes, the width, the inside bend radius and the screw-hole
     # positions (the bar's taps are spotted through them at assembly) take

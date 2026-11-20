@@ -350,12 +350,16 @@ if HEAD_CLEARANCE_WORST < HEAD_CLEARANCE_FLOOR - 1e-9:
 # should be changed to not require heat treatment"; he chose half-hard (H02)
 # C26000 brass, McMaster 8859K86, as supplied.  To release, the tab carries
 # the strip's near face past the latch pin's end, so the arm flexes along the
-# pin by RELEASE_FLEX at the pin hole: a cantilever of its developed length
-# from the ear's lower edge to the hole (DEV_HOLE), loaded at the hole, whose
-# root strain is 3 * flex * t / (2 * L**2).  An overpull of the tab to
-# RELEASE_OVERPULL times that flex must leave the thickest sheet's root under
-# the temper's minimum yield, or the leaf takes a set toward the pin's end
-# and spends the far-face margin (transgear_hanger_joints).
+# pin by RELEASE_FLEX at the pin hole (the model's nominal pin end and far
+# face): a cantilever of its developed length from the ear's lower edge to
+# the hole (DEV_HOLE), loaded at the hole, whose root strain is
+# 3 * flex * t / (2 * L**2).  The criterion the owner chose option D on is
+# this nominal release overpulled RELEASE_OVERPULL times (10.33 mm): the
+# thickest sheet's root must stay under the temper's minimum yield, or the
+# leaf takes a set toward the pin's end and spends the far-face margin.  The
+# printed worst corner's single release (LATCH_RELEASE_FLEX_WORST, the far-
+# face stack's corners) is checked against the same yield in
+# transgear_hanger_joints, which holds that stack.
 # MPa: 16,000 ksi (McMaster 8859K86, read live 2026-11-20).
 SHEET_E = 16_000.0 * 6.894757
 # Minimum 0.2 % yield by temper, ASTM B888 (Wieland M30 datasheet); the

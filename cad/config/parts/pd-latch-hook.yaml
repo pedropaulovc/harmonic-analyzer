@@ -9,13 +9,15 @@ pd-latch-hook:
   # stocks put to him he chose half-hard C26000 brass, McMaster 8859K86, used
   # as supplied (the geometry and its bands unchanged).
   # Function: releasing the latch flexes the arm 5.2 mm along the pin at the
-  # pin hole. pd_latch_hook_spec asserts that the thickest sheet's arm root
-  # reaches the H02 minimum yield (ASTM B888, 290 MPa) only past twice that
-  # flex (RELEASE_OVERPULL), so a 2x overpull does not set the leaf; H01 (145
-  # MPa) and annealed brass fail that check, hence the temper requirement in
-  # the FINISH cell. The ear's R.05 bend is R/t 1.47-1.56; C26000 H02's
-  # published 90 deg minimum is R/t 0 across and along the rolling direction
-  # (Aurubis C26000 datasheet), so the blank takes either orientation.
+  # pin hole (nominal). pd_latch_hook_spec asserts that the thickest sheet's
+  # arm root reaches the H02 minimum yield (ASTM B888, 290 MPa) only past
+  # twice that nominal flex (RELEASE_OVERPULL, the 10.33 mm criterion of the
+  # ruling), and transgear_hanger_joints that the printed worst corner's
+  # single release (8.46 mm) stays under it; H01 (145 MPa) and annealed brass
+  # fail, hence the temper requirement in the FINISH cell. The ear's R.05
+  # bend is R/t 1.47-1.56; C26000 H02's published 90 deg minimum is R/t 0
+  # across and along the rolling direction (Aurubis C26000 datasheet), so the
+  # blank takes either orientation.
   finish: "bare, as supplied, no heat treatment; quarter-hard or annealed brass not acceptable"
   quantity: 1
   tolerance_class: machined_block
