@@ -76,9 +76,10 @@ registry number, title and material, `stock = "To be written"`, one
 `[[tools]]` entry per tool the part needs, and one dummy setup ("Traveler to
 come"). Its tools come from the owner's quote workbook
 `quotes-2026-11-17-rev3.xlsx` (its Items, Where used detail, Drills and Tap
-coverage sheets) and from a cross-check of the plans against the drawings
-(2026-11-19), each `ref` a `shop.toml` `tools` record whose header comment
-cites the workbook row, the drawing callout or the inventory record, with the
+coverage sheets), from a cross-check of the plans against the drawings
+(2026-11-19) and from owner rulings, each `ref` a `shop.toml` `tools` record
+whose header comment cites the workbook row, the drawing callout, the inventory
+record or the ruling, with the
 tool's ownership in the inventory under the same key. Its `stock_refs` names
 the inventory `[stock.<key>]` rows it is cut from (the stock assignment audit,
 owner 2026-11-19). A placeholder is not in
