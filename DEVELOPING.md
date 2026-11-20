@@ -412,9 +412,11 @@ at a file that does not exist, sets `HARMONIC_SW_AUTOSTART=0`, blanks the
 OTLP endpoints and redirects telemetry capture (`HARMONIC_TELEMETRY_DIR`) to a
 per-session scratch directory; a test of any of these sets it explicitly. It
 also isolates the buildgraph facts cache in a temporary directory, and refuses
-`_watchdog._hard_exit` like a launch: a firing watchdog or deadline fails its
-test instead of ending pytest, and one firing on its own thread interrupts the
-main thread so a stuck block cannot hang the session. Keep `NOSW_GUARD`
+`_watchdog._hard_exit` like a launch instead of ending pytest. On the main
+thread the refusal fails the test. From a watchdog or deadline thread it also
+interrupts the main thread: a deadline block busy in Python code then fails its
+test, while a block in an untimed C-level wait or an interrupt outside any
+deadline still hangs or aborts the run (#3182). Keep `NOSW_GUARD`
 enabled and leave `HARMONIC_BUILDGRAPH_CACHE` unset. With the guard on
 (Windows only), a test
 fails if it starts SolidWorks or its 3DEXPERIENCE launchers, shell-opens

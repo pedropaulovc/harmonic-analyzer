@@ -294,6 +294,9 @@ def test_watchdog_self_logs_do_not_reset_the_idle_clock() -> None:
     # the harmonic logger, whose _ActivityFilter pokes the heartbeat -- so a
     # permanently wedged SolidWorks would reset its own idle clock every 5 min
     # and never hit the op timeout. watchdog_signal=True exempts it.
+    # Configure first: configuring logs the UTC anchor as a real record, which
+    # pokes the heartbeat when this is the first test in its process to log.
+    _telemetry.configure()
     _telemetry._last_activity = 0.0
     _watchdog._warn("hung-window self log")
     _watchdog._error("crash self log")
