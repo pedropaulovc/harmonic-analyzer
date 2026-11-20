@@ -7,6 +7,7 @@ revision = "placeholder"
 material = "LOW-CARBON STEEL OR GRAY IRON"
 stock = "To be written"
 shop = "../shop.toml"
+stock_refs = ["gray-iron-casting-cone-pivot-post"]
 
 [[tools]]
 id = "drill-m"

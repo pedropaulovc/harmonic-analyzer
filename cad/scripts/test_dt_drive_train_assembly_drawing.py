@@ -772,6 +772,33 @@ def test_cone_swing_check_requires_installed_stop_inspection_and_seating() -> No
     )
 
 
+def test_a_loosened_post_screw_re_sets_the_post_before_the_checks() -> None:
+    # Owner ruling 2026-11-20 (#1177 friction-only, #3085 option B).
+    check = " ".join(drawing.CHECKS.split("4. CONE SWING")[1].split("\n5.")[0].split())
+    assert "4U. LEAVE MHA-DT-02 AND MHA-DT-VN-61 AS THEY ARE FROM HERE ON." in check
+    redo = re.search(
+        r"4V\. IF ONE IS LOOSENED, REDO CHECKS 4-7 \(MHA-DT-VN-61: (\d+)([A-Z])-(\d+)([A-Z]) FIRST\)\.",
+        check,
+    )
+    assert redo is not None, check
+    step = drawing.steps.step_number("post-and-tip-block")
+    assert int(redo.group(1)) == int(redo.group(3)) == step
+    bodies: dict[str, str] = {}
+    for line in drawing.CONE_CRANK_STEPS.splitlines():
+        head = re.match(rf"({step}[A-Z])\. ", line)
+        if head:
+            key = head.group(1)
+            bodies[key] = line
+        elif line.startswith(" ") and bodies:
+            bodies[key] += " " + line.strip()
+    keys = list(bodies)
+    first = keys.index(redo.group(1) + redo.group(2))
+    last = keys.index(redo.group(3) + redo.group(4))
+    redone = " ".join(bodies[key] for key in keys[first : last + 1])
+    assert "TURN MHA-DT-05 ON ITS SCREWS" in redone
+    assert "TIGHTEN BOTH MHA-DT-VN-61" in redone
+
+
 def _assert_engagement_cites_its_records(
     check: str, joint: str, seat: str, screw: str, row: str
 ) -> None:
