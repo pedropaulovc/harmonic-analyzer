@@ -7,7 +7,7 @@ revision = "placeholder"
 material = "AISI 1018 cold-finished steel shafting"
 stock = "To be written"
 shop = "../shop.toml"
-stock_refs = ["steel-ground-round-1-4"]  # 1/4 GROUND STOCK OK (owner ruling 2026-11-20, #2346)
+stock_refs = ["1018-ground-round-1-4"]  # 1/4 GROUND STOCK OK (owner ruling 2026-11-20, #2346)
 
 [[tools]]
 id = "form-tool-r125"
