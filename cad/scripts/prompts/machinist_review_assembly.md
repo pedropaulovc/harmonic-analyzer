@@ -48,17 +48,20 @@ Pass 1 — detection. Find every candidate item; classify nothing yet.
    check with a number) is a setting the sheets print. A pair you cannot
    classify from the package is a candidate. Never compute a capacity or
    invent a load.
-5. Trace every load on a precision axis: a feed or leadscrew thrust, a
-   locating force against a fence, stop or datum, or a pivot's working load,
-   on an axis whose position the package sets, locates or checks to a number.
-   Follow it from where it is applied, through each part and joint the views
-   show, to the base or the work holding the steps name. Record each place
-   where the path leaves the support the views show: the loaded part, or a
-   screw or bearing carrying the load, beyond the edge of the member under
-   it; or one row of fasteners with the load's line of action offset across
-   it, so the joint can rock or open about that row. Judge only what the
-   views show; never compute a capacity or invent a load. A load on no
-   precision axis (a handle, cover, guard or stand) is outside this step.
+5. Trace every load on a precision axis (rule 23, "A load on a precision
+   axis stands on its support"): a feed or leadscrew thrust, a locating force
+   against a fence, stop or datum, or a pivot's working load, on an axis
+   whose position the package sets, locates or checks to a number. Follow it
+   from where it is applied, through each part and joint the views show, to
+   the base or to work holding the steps name; the path ends there with no
+   finding, and the views need not draw that work holding. Record each place
+   before that end where the loaded part, or a screw or bearing carrying the
+   load, stands beyond the edge of the member under it, or where the load
+   acts offset from a single row of fasteners with no second row or locating
+   feature on the other side, so the joint can rock or open about that row.
+   Judge only what the views show; never compute a capacity or invent a load.
+   A load on no precision axis (a handle, cover, guard or stand) is outside
+   this step.
 6. Walk rule 22 item by item and record each gap: assembled views where every
    part is identifiable; an exploded view that reads; a parts list with
    balloons for every visible part; every assembly-level dimension, setting
