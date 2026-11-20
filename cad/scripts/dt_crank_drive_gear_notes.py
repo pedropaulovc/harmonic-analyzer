@@ -1,8 +1,9 @@
 """Drawing-only crank-drive gear text, above the shared geometry specs.
 
 The cone-swing platform consumes the tip circle without importing these notes.
-Exact stock tangent-span limits come from the part spec; the crossed mesh's
-standard check lives in crank_mesh_stack.
+Exact stock tangent-span limits come from the part spec, booked at the face
+station a flat-anvil micrometer reads (dt_crank_drive_gear_straight_tooth);
+the crossed mesh's standard check lives in crank_mesh_stack.
 """
 
 from __future__ import annotations
@@ -12,6 +13,7 @@ import math
 import _config
 import dt_crank_drive_gear_spec as spec
 from dt_crank_drive_gear_spec import inch_text
+from dt_crank_drive_gear_straight_tooth import FLAT_ANVIL_SPAN_LIMITS_MM
 
 
 # Keep the part's stock-form geometry independent of assembly diagnostics.
@@ -92,9 +94,12 @@ GEAR_DATA = gear_data_note(
             f"{inch_text(spec.TOOTH_SPACE_CROSSING, spec.TOOTH_SPACE_CROSSING_PLACES)} "
             "FROM CHAMFERED BORE FACE",
         ),
+        # Booked at the north face, where flat anvils across the face seat
+        # on the thickest straight tooth (owner ruling 2026-11-20, #2512
+        # option 1), not at the crossing station the cutter is set to.
         (
             f"BASE TANGENT SPAN OVER {spec.BASE_TANGENT_SPAN_TEETH} TEETH, NORMAL, ACCEPT ON THIS PART",
-            accept_limits_text(spec.BASE_TANGENT_SPAN_LIMITS_MM, 4),
+            accept_limits_text(FLAT_ANVIL_SPAN_LIMITS_MM, 4),
         ),
         (
             "ACTUAL TRANSVERSE CIRCULAR PITCH THICKNESS (REF)",

@@ -32,6 +32,7 @@ import cone_set_stack
 import crank_mesh_stack
 import dt_cone_gear_spec as cone
 import dt_mesh_checks
+import dt_crank_drive_gear_straight_tooth as straight_tooth
 
 EXEMPT_CONE_TEETH = frozenset({6})
 CONE_TEETH = tuple(t for t in cone.CONE_TEETH if t not in EXEMPT_CONE_TEETH)
@@ -100,8 +101,8 @@ def test_crank_mesh_station_report_resolves_the_centre_across_the_face() -> None
         estimate = 2.0 * math.tan(math.radians(gear64.CUTTER_PRESSURE_ANGLE_DEG)) * s * s / gear64.PITCH_DIA
         assert row.tooth_thickening_mm == pytest.approx(estimate, rel=0.1, abs=2e-4)
     crossing = gear64.TOOTH_SPACE_CROSSING - gear64.FACE_WIDTH / 2.0
-    assert crank_mesh_stack.straight_tooth_thickening(crossing) == pytest.approx(0.0, abs=1e-12)
-    assert crank_mesh_stack.straight_root_rise(crossing) == pytest.approx(0.0, abs=1e-12)
+    assert straight_tooth.straight_tooth_thickening(crossing) == pytest.approx(0.0, abs=1e-12)
+    assert straight_tooth.straight_root_rise(crossing) == pytest.approx(0.0, abs=1e-12)
     assert rows[-1].tooth_thickening_mm > rows[0].tooth_thickening_mm > 0.0
     assert "REPORTED, not gated; #2481" in crank_mesh_stack.stack_text()
 

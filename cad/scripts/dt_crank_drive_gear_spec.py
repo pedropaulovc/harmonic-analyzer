@@ -188,12 +188,17 @@ NATIVE_FLANK_BOUND_MM = TOOTH_RUNOUT_TIR_MM / 20.0
 # so the fixed-centre closing corner keeps positive backlash; the part is
 # modelled at the band's maximum-material limit, the 16T's convention.
 #
-# The printed tooth numbers (thickness, span, root, plunge, tip support) are
+# The tooth numbers here (thickness, span, root, plunge, tip support) are
 # read from the cutter's normal-section SCREW model at the inclination
-# (StockFormProfile's helix_angle_deg): at the crossing station the straight
-# tooth space below IS that normal section, and its transverse section there
-# differs from the screw model's by under 3 um (test_straight_gash), inside the
-# span's .0001 in printing grid.
+# (StockFormProfile's helix_angle_deg).  The match holds at the crossing
+# station only: there the straight tooth space below IS that normal section,
+# and its transverse section differs from the screw model's by under 3 um
+# (test_straight_gash), inside the span's .0001 in printing grid.  Away from
+# it the straight tooth is thicker on the pitch circle, most at the north
+# face, so the sheet prints the span where flat anvils seat there
+# (dt_crank_drive_gear_straight_tooth.FLAT_ANVIL_SPAN_LIMITS_MM, owner ruling
+# 2026-11-20, #2512 option 1); BASE_TANGENT_SPAN_LIMITS_MM below stay the
+# crossing station's, which set the cutter's translation corners.
 TOOTH_THICKNESS_DEVIATIONS = tuple(
     _config.fit("crank_mesh", "gear64_tooth_thickness_deviations_mm")
 )
@@ -228,10 +233,10 @@ _RAW_SPANS = tuple(
 BASE_TANGENT_SPAN_MM = _PITCH_PROBE.tangent_span_mm(
     BASE_TANGENT_SPAN_TEETH, normal_plane=True
 )
-# Both ends rounded UP onto the inch grid the sheet prints them at: the
-# lower end inward (an accepted part keeps the source's thinnest tooth), the
-# upper end outward so the modelled nominal -- the source's thickest tooth --
-# stays inside the printed acceptance.
+# Both ends rounded UP onto the .0001 in span grid: the lower end inward (a
+# part cut to it keeps the source's thinnest tooth), the upper end outward so
+# the modelled nominal -- the source's thickest tooth -- stays inside.  The
+# sheet prints the north-face span, rounded the same way (see above).
 BASE_TANGENT_SPAN_LIMITS_MM = tuple(
     math.ceil(round(span / MM_PER_IN * _SPAN_SCALE, 6)) / _SPAN_SCALE * MM_PER_IN
     for span in (min(_RAW_SPANS), max(_RAW_SPANS))

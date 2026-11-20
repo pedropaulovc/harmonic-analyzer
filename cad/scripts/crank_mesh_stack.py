@@ -41,6 +41,7 @@ from cone_line import COS_I, POST_STATION, SIN_I
 from cone_stack_end_play import CONE_FLOAT_NORTH
 from _cone_axis_constants import GEAR_AXIS_SHIFT
 from gear_seat_fit import GEAR_SEAT_CLEARANCE
+from dt_crank_drive_gear_straight_tooth import straight_root_rise, straight_tooth_thickening
 from standard_mesh_checks import (
     MeshCheck,
     backlash,
@@ -159,48 +160,6 @@ def centre_at_station(station_mm: float) -> float:
     """Nominal centre distance at a 64T face station (mm north of mid-face)."""
     plan = (PLAN_CROSSING_TO_MIDFACE + station_mm) * SIN_I / COS_I
     return math.hypot(FRAME_DY, plan)
-
-
-def _gap_arc_on_pitch_circle(shift_mm: float) -> float:
-    """Arc the straight tooth space takes from the pitch circle where its
-    transverse section sits ``shift_mm`` off the radial line (straight_gash:
-    (X, Y/cos(beta) + shift))."""
-    form, cos_beta = gear64.TOOTH_SPACE_FORM, math.cos(_BETA)
-
-    def azimuth(side: int) -> float:
-        def point(u: float) -> tuple[float, float]:
-            x, y = form.flank_point(u, side)
-            return x, y / cos_beta + shift_mm
-
-        low, high = form.flank_parameter_min, form.flank_parameter_max
-        if not math.hypot(*point(low)) < R64 < math.hypot(*point(high)):
-            raise AssertionError("the 64T pitch circle must cross the cutter flank")
-        for _ in range(80):
-            middle = (low + high) / 2.0
-            if math.hypot(*point(middle)) < R64:
-                low = middle
-            else:
-                high = middle
-        x, y = point((low + high) / 2.0)
-        return math.atan2(y, x)
-
-    return R64 * (azimuth(1) - azimuth(-1))
-
-
-def straight_tooth_thickening(station_mm: float) -> float:
-    """Normal circular thickness a straight 64T tooth gains on the pitch
-    circle at a face station (mm north of mid-face), over its thickness at the
-    crossing station that ``standard_check`` books."""
-    height = gear64.FACE_WIDTH / 2.0 + station_mm
-    shift = (height - gear64.TOOTH_SPACE_CROSSING) * math.tan(_BETA)
-    return (_gap_arc_on_pitch_circle(0.0) - _gap_arc_on_pitch_circle(shift)) * math.cos(_BETA)
-
-
-def straight_root_rise(station_mm: float) -> float:
-    """Radial rise of a straight tooth space's root at a face station."""
-    height = gear64.FACE_WIDTH / 2.0 + station_mm
-    shift = (height - gear64.TOOTH_SPACE_CROSSING) * math.tan(_BETA)
-    return math.hypot(gear64.ROOT_DIA / 2.0, shift) - gear64.ROOT_DIA / 2.0
 
 
 # Coarse enough to keep stack_text() near a second (the drive-train build

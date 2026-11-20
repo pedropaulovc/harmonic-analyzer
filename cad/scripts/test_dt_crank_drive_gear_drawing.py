@@ -313,6 +313,30 @@ def test_gear_data_block_is_the_tooth_system_and_nothing_else() -> None:
         assert " +" not in value and " TO " not in value, line
 
 
+def test_the_span_acceptance_is_booked_where_flat_anvils_seat() -> None:
+    """Owner ruling 2026-11-20 (#2512 option 1): flat anvils across the face
+    seat on the thickest straight tooth, at the north face, so both printed
+    limits sit above the crossing station's by that tooth's extra thickness
+    times cos(alpha)."""
+    import dt_crank_drive_gear_straight_tooth as straight
+
+    row = next(line for line in notes.GEAR_DATA.splitlines() if line.startswith("BASE TANGENT SPAN"))
+    low, high = (float(value) * spec.MM_PER_IN for value in row.partition(":  ")[2].split(" TO "))
+    assert (low, high) == pytest.approx(straight.FLAT_ANVIL_SPAN_LIMITS_MM, abs=1e-9)
+    # Independent first-order estimate (#2512): the north face's tooth space
+    # sits s off its radial line, so the pitch circle meets it s^2/2R deeper,
+    # where the normal gap is 2 tan(alpha) narrower per unit depth.
+    alpha = math.radians(spec.CUTTER_PRESSURE_ANGLE_DEG)
+    s = (spec.FACE_WIDTH - spec.TOOTH_SPACE_CROSSING) * math.tan(math.radians(spec.TOOTH_INCLINATION_DEG))
+    estimate = 2.0 * math.tan(alpha) * s * s / spec.PITCH_DIA * math.cos(alpha)
+    assert straight.FLAT_ANVIL_SPAN_GROWTH_MM == pytest.approx(estimate, rel=0.1, abs=2e-4)
+    grid = 0.0001 * spec.MM_PER_IN
+    for printed, crossing in zip((low, high), spec.BASE_TANGENT_SPAN_LIMITS_MM):
+        assert printed - crossing == pytest.approx(straight.FLAT_ANVIL_SPAN_GROWTH_MM, abs=grid)
+    north_nominal = spec.BASE_TANGENT_SPAN_MM + straight.FLAT_ANVIL_SPAN_GROWTH_MM
+    assert low <= north_nominal <= high
+
+
 @pytest.mark.parametrize("part_spec", (spec, pinion_spec))
 def test_exact_stock_span_limits_book_printed_corners_on_the_inch_grid(part_spec) -> None:
     from stock_form_cutter import translation_for_pitch_tooth_thickness
