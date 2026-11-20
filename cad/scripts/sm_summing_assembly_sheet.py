@@ -20,7 +20,9 @@ from _assembly_contract import assembly_contract
 from _inch_fraction import inch_fraction
 from _title_block_units import LENGTH_UNITS, render_number
 from sm_knife_mount_spec import (
-    KNIFE_GAUGE_BAR_DIA,
+    BORE_DIA_BAND as KNIFE_BORE_DIA_BAND,
+    KNIFE_GAUGE_BAR_CLEARANCE_IN,
+    KNIFE_GAUGE_BAR_DIA_IN,
     KNIFE_GAUGE_BAR_LENGTH_IN,
 )
 from sm_summing_assembly_spec import (
@@ -109,17 +111,33 @@ HUB_SET_SCREW_TORQUE = (
 # 11.3): a tool named in the steps, not a BOM part.  Owner ruling 2026-11-10
 # (Pedro), #2334, S2: an 8.0 in bar, long enough to pass both mounts (outer
 # faces 7.67 apart), not a 2 in class ZZ pin.  No gauge class comes that
-# long, so the bar is made to the mounts it gauges: its .0002-.0017
-# diametral clearance in each bore (the maximum the rock budget charges) is
+# long, so the bar is made to the mounts it gauges: its .0026-.0041
+# diametral clearance in each bore (the maximum the rock budget charges,
+# the minimum what two conforming bores need: owner ruling 2026-11-20
+# (Pedro), #2499, "Follow recommendations unless noted otherwise") is
 # the bar's own make record, shop-equipment gauges.gauge-bar-0472x8, the
 # tool list's TO MAKE row.  The step states no number that needs an
 # instrument, only the fitter's hand check (rule 22; Main on PR #2717's
 # gating clarity finding, 2026-11-13: no gauge ceremony for a setting bar).
+# A bar .0026-.0041 under the Ø.4720-.4735 bores is Ø.4679-.4709, so its
+# reference size is the two places every such bar rounds to, and it shakes
+# in the bores: the hand check is that it slides through both, not that it
+# does not shake.
+_KNIFE_GAUGE_BAR_SIZES_IN = (
+    KNIFE_GAUGE_BAR_DIA_IN - max(KNIFE_GAUGE_BAR_CLEARANCE_IN),
+    KNIFE_GAUGE_BAR_DIA_IN + max(KNIFE_BORE_DIA_BAND) / 25.4 - min(KNIFE_GAUGE_BAR_CLEARANCE_IN),
+)
+KNIFE_GAUGE_BAR_REF_DIA_IN = round(_KNIFE_GAUGE_BAR_SIZES_IN[0], 2)
+if round(_KNIFE_GAUGE_BAR_SIZES_IN[1], 2) != KNIFE_GAUGE_BAR_REF_DIA_IN:
+    raise AssertionError(
+        f"gauge bars Ø{_KNIFE_GAUGE_BAR_SIZES_IN[0]:.4f}-{_KNIFE_GAUGE_BAR_SIZES_IN[1]:.4f} "
+        "share no two-place reference size"
+    )
 KNIFE_GAUGE_BAR = (
-    f"(Ø{_length(KNIFE_GAUGE_BAR_DIA, 4)}) X "
+    f"(Ø{_length(KNIFE_GAUGE_BAR_REF_DIA_IN * 25.4, 2)}) X "
     f"{_length(KNIFE_GAUGE_BAR_LENGTH_IN * 25.4, 1)} LONG GAUGE BAR"
 )
-KNIFE_GAUGE_BAR_FEEL = "IT SLIDES BY HAND WITH NO PERCEPTIBLE SHAKE"
+KNIFE_GAUGE_BAR_FEEL = "IT SLIDES BY HAND WITHOUT FORCE"
 # The 1:1 knife-edge view is DETAIL A, circled on the sheet 1 front view
 # (rule 9: a view named only in prose is unlabelled); it shows the knife
 # contact and the boss face the rock acceptance is read at.
