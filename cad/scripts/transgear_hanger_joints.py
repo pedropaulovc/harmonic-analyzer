@@ -492,7 +492,10 @@ def latch_pin_far_face_margin(
     bend_deg: float = HOOK_SPEC.BEND_TOL_DEG,
 ) -> float:
     """Least distance, along the pin, by which the crowned end's full
-    diameter passes the strip's far face over every corner of the stack."""
+    diameter passes the strip's far face over every corner of the stack.
+
+    LATCH_RELEASE_FLEX_WORST below takes the same stack terms at their
+    largest-release corner: a term added or changed here changes there too."""
     signs = (-1.0, 1.0)
     radii = [(LATCH_PIN.DIA + band) / 2.0 for band in LATCH_PIN.DIA_BAND]
     sheet = (-HOOK.SHEET_T_MINUS, HOOK.SHEET_T_PLUS)
