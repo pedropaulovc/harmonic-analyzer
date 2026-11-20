@@ -199,7 +199,7 @@ Why each row is classified so, and how it is held axially:
 
 | Joint | Member → receiver | Thread | Qty | Exposure | Lock | Installed / locked at |
 |---|---|---|---:|---|---|---|
-| `gooseneck-set-screw-in-top-frame` | MHA-FR-VN-52 `fr-vn-gooseneck-set-screw` → MHA-FR-02 `fr-top-frame` | 1/4-20 UNC | 1 | oscillating | none; ruling `U-MHA-FR-VN-52-no-lock` | MHA-FR-00 STEP 51 |
+| `gooseneck-set-screw-in-top-frame` | MHA-FR-VN-52 `fr-vn-gooseneck-set-screw` → MHA-FR-02 `fr-top-frame` | 1/4-20 UNC | 1 | oscillating | none; ruling `U-MHA-FR-VN-52-no-lock` | MHA-FR-00 STEP 54 |
 | `cone-pivot-screw-in-base` | MHA-DT-VN-52 `dt-vn-cone-pivot-screw` → MHA-FR-01 `fr-harmonic-base` | #10-24 UNC | 1 | oscillating | none; **open** #1179, #2312 | MHA-DT-00 STEP 23 |
 | `cone-lock-knob-in-base` | MHA-DT-VN-51 `dt-vn-cone-lock-knob` → MHA-FR-01 `fr-harmonic-base` | 1/4-20 UNC | 1 | static clamp | none | MHA-DT-00 STEP 23 |
 | `swing-stop-screw-in-base` | MHA-SH-VN-52 `sh-vn-fillister-screw-90280a108` → MHA-FR-01 `fr-harmonic-base` | #4-40 | 1 | static clamp | none | MHA-DT-00 STEP 23 |

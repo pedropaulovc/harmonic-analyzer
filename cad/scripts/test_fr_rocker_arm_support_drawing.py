@@ -106,10 +106,13 @@ def test_no_process_callout_on_the_sheet() -> None:
 
 def test_support_finish_masks_both_mating_faces() -> None:
     # #2108 review: the base underside seats on the harmonic base and the
-    # top face under the MHA-CH-08 feet; the finish names both.
+    # top face under the MHA-CH-08 feet; the finish names both.  One RAL on
+    # the three frame sheets (#2394; RAL 6005, delegated ruling 2026-11-20).
     assert _config.parts(support.PART_NAME)["finish"] == (
-        "GREEN ENAMEL; MASK FOOT UNDERSIDE AND TOP FACE; OIL BARE FACES"
+        "RAL 6005 ENAMEL; MASK FOOT UNDERSIDE AND TOP FACE; OIL BARE FACES"
     )
+    for part in ("fr-harmonic-base", "fr-top-frame"):
+        assert "RAL 6005" in _config.parts(part)["finish"]
     assert support.HOLE_SPEC.kind == "drilled_fractional"
     assert support.HOLE_SPEC.size == "5/16"
     assert support.HOLE_DIA == pytest.approx(7.938)

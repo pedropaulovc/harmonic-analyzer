@@ -1,8 +1,13 @@
 fr-rocker-arm-support:
   number: MHA-FR-05
   material_family: ferrous_noncritical
-  finish: GREEN ENAMEL; MASK FOOT UNDERSIDE AND TOP FACE; OIL BARE FACES
+  # One RAL on the three frame sheets: owner ruling 2026-11-20 (Pedro), #2394;
+  # delegated ruling 2026-11-20 (Main), RAL 6005 because it is the stocked
+  # paint and matches MHA-DT-05; owner review #2144.
+  finish: RAL 6005 ENAMEL; MASK FOOT UNDERSIDE AND TOP FACE; OIL BARE FACES
   quantity: 1
   tolerance_class: machined_block
   drawing_unit: in
-  process: "machined from solid stock or casting"
+  # Owner ruling 2026-11-20 (Pedro), #635: from low-carbon bar now
+  # (stock.1018-flat-3x8), not cast with the top frame.
+  process: "machined from low-carbon steel bar"

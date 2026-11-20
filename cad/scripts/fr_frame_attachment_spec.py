@@ -75,6 +75,11 @@ TUBE_CROSS_HOLE_DIAMETER = 5.0038  # .197
 CAP_TOP_Y = 1044.8036  # 41.134
 CAP_MOUTH_Y = CAP_TOP_Y - CAP_HEIGHT
 TUBE_TOP_Y = CAP_TOP_Y - CAP_ROOF
+# 1018.77 (40.11 in).  Owner ruling 2026-11-20 (Pedro), #11 option B: "B but
+# limit frame tube height max to 41 in ; thats the stock length bought" (the
+# 1020 DOM tube, 5 x 41.000 in, cad/config/shop-equipment/stock-bought.toml):
+# the cut and fr_tube_frame_spec's SUPPLY blank stay within one 41 in length
+# (test_fr_tube_frame_drawing.test_tube_supply_fits_the_41_in_stock_bought).
 TUBE_CUT_LENGTH = TUBE_TOP_Y - COLUMN_BOTTOM_Y
 TUBE_TOP_CHAMFER = 0.508  # .02
 CAP_RECESS_DIAMETER = 27.5082  # 1.083

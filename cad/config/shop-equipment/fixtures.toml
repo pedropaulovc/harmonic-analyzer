@@ -43,6 +43,18 @@ kind = "v_blocks"
 status = "to_order"
 note = "The archived inventory recorded the pair only as a trial ownership assumption (#1413), not as owned."
 
+# MHA-FR-00 holds the top frame at its set cross-hole height on these until the
+# cross screws do (owner ruling 2026-11-20 (Pedro), #2324: "Shaft collars under
+# each socket, tightened while the height is held, then recheck the height
+# before drilling"). Two-piece: each clamps on and comes off a column already
+# held in both castings. To buy: not owned, no vendor or SKU asserted.
+[fixtures.shaft-collars-1in-two-piece]
+name = "Two-piece clamp-on shaft collars, 1 in bore"
+kind = "shaft_collar"
+status = "to_order"
+pieces = 4
+note = "Not owned: to buy. One on each MHA-FR-03 column, under its MHA-FR-02 socket, from the top-frame setting step until the cross screws are driven; then removed."
+
 # --- measuring equipment on the mill -------------------------------------
 
 [fixtures.tool-setter-ets]

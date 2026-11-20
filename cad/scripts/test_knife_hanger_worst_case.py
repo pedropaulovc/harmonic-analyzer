@@ -646,12 +646,14 @@ def test_the_crossbar_webs_hold_round_the_press_reams_and_knockouts() -> None:
     # Across the line the ream and knockout sit their implied-zero .XXX off
     # the screw axis's line (SAME Z), so each keeps one pocket-end wall.  The
     # pocket ends are as cast (owner ruling B2, #2333): the rear end, chained
-    # from the front one, stands two ±.03 bands out.
+    # from the front one, stands two ±.03 bands out, and the stations stand
+    # from the rear sockets' axis, the pattern's Ø.010 off the front one
+    # (#2628 (d)).
     pocket = build_fr_top_frame.BAR_POCKET_HOLE_WALLS
     assert set(pocket) == {"hanger clearance hole", "dowel ream", "dowel knockout"}
-    assert pocket["dowel ream"] == pytest.approx(17.762659, abs=5e-6)
-    assert pocket["dowel knockout"] == pytest.approx(18.315109, abs=5e-6)
-    assert pocket["hanger clearance hole"] == pytest.approx(16.385177, abs=5e-6)
+    assert pocket["dowel ream"] == pytest.approx(17.508659, abs=5e-6)
+    assert pocket["dowel knockout"] == pytest.approx(18.061109, abs=5e-6)
+    assert pocket["hanger clearance hole"] == pytest.approx(16.131177, abs=5e-6)
     # Owner ruling 2026-10-27, option (c): the knockout prints plain #51
     # DRILL, Ø.067 at three places (MAX .071 with the drilled-hole band),
     # drawn coaxial to its ream, so it may stand the implied .XXX .005 off
@@ -670,15 +672,16 @@ def test_the_crossbar_webs_hold_round_the_press_reams_and_knockouts() -> None:
     assert build_fr_top_frame.HANGER_KNOCKOUT_SHIFT_AT_TOP == pytest.approx(
         0.318779, abs=5e-6
     )
-    # Shortest finished grip (1.437 - .005) less the deepest in-band ream's
-    # drill point (the depth band's maximum + the point's height): the point
-    # keeps the wall target under the faced top, so a THRU ream is out of band.
+    # Shortest finished grip (1.437 - .005) less the deepest in-band hole's
+    # tallest point (the depth band's maximum + the sharpest accepted point
+    # on the largest diameter, #3130): the point keeps the wall target under
+    # the faced top, so a THRU ream is out of band.
     assert build_fr_top_frame.PIN_HOLE_POINT_MARGIN == pytest.approx(
         top_frame.HANGER_GRIP
         - top_frame.HANGER_GRIP_TOL
         - top_frame.HANGER_PIN_HOLE_DEPTH
         - max(top_frame.HANGER_PIN_HOLE_DEPTH_BAND)
-        - top_frame.HANGER_PIN_HOLE_POINT_H
+        - top_frame.HANGER_PIN_HOLE_POINT_H_MAX
     )
     assert build_fr_top_frame.PIN_HOLE_POINT_MARGIN >= top_frame.HANGER_PIN_HOLE_POINT_COVER_MIN
     assert not hasattr(build_fr_top_frame, "PIN_HOLE_FLOOR_MARGIN")

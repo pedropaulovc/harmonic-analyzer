@@ -226,6 +226,12 @@ TOOLS: tuple[Tool, ...] = (
         r"\b(?:ON A|ONTO) V-BLOCKS?\b",
         ("shop-equipment:fixtures.v-blocks",),
     ),
+    # MHA-FR-00's temporary hold for the top frame at its set height (#2324).
+    Tool(
+        "Two-piece shaft collars, 1 in bore (4)",
+        r"(?:1 IN TWO-PIECE )?SHAFT COLLARS?",
+        ("shop-equipment:fixtures.shaft-collars-1in-two-piece",),
+    ),
     Tool(
         "3/8 ground setting mandrel",
         r"\d+/\d+ GROUND SETTING MANDREL|\bMANDREL(?:'S)?\b",
@@ -503,6 +509,7 @@ TOOL_WORDS = re.compile(
     r"CALIPERS?|PROTRACTOR|TRANSFER[- ]PUNCH(?:ES)?|REAMERS?|TAPER-REAM|"
     r"WRENCH(?:ES)?|HEX KEYS?|PLIERS|MANDREL|V-BLOCKS?|SURFACE PLATE|PARALLELS|"
     r"STRAIGHTEDGE|EPOXY|LOCTITE|SOLDER|FLUX|WAX|DEGREASE|DEGREASER|SCREWDRIVER|"
+    r"SHAFT COLLARS?|"
     r"DRO|MILL|LATHE|TAILSTOCK|EDGE[- ]FIND\w*|IN-LB|TAPE MEASURE|HAMMER|MALLET|"
     r"OIL(?! HOLE))\b"
 )

@@ -356,14 +356,27 @@ def test_keeper_relief_is_a_chord_step_that_leaves_the_cap_recess_its_wall() -> 
     assert part.KEEPER_RELIEF_CAP_RECESS_WALL == pytest.approx(wall)
     assert wall >= part.WALL_TARGET_MM
     # On the boss top the recess's mouth lead-in, at its largest printed
-    # leg, comes off that wall; the land left still meets the target.  The
-    # former .03 lead-in left 1.803 there (codjiflo, PR #2599).
+    # leg, and the step's own title-block .010 break come off that wall.
+    # The land left, .071, is over the .060 floor and under the .080
+    # target: owner ruling 2026-11-20 (Pedro), #2626 option (a), accepts it
+    # as an advisory shortfall (RV-13).  The former .03 lead-in left 1.803
+    # before that break was charged (codjiflo, PR #2599).
     assert part.BORE_CHAMFER / spec.IN == pytest.approx(0.02)
     mouth_places = spec.DRAWING_REFERENCE_PRECISION["top bore mouth chamfer"]
     mouth_max = part.BORE_CHAMFER + spec.PRINTED_LINEAR_BAND_MM[mouth_places]
-    assert part.KEEPER_RELIEF_RECESS_MOUTH_LAND == pytest.approx(wall - mouth_max)
-    assert part.KEEPER_RELIEF_RECESS_MOUTH_LAND == pytest.approx(2.0574, abs=5e-4)
-    assert part.KEEPER_RELIEF_RECESS_MOUTH_LAND >= part.WALL_TARGET_MM
+    assert part.KEEPER_RELIEF_RECESS_MOUTH_LAND == pytest.approx(
+        wall - mouth_max - part.TITLE_BLOCK_EDGE_BREAK_MAX
+    )
+    assert part.KEEPER_RELIEF_RECESS_MOUTH_LAND == pytest.approx(1.8034, abs=5e-4)
+    assert part.WALL_FLOOR_MM <= part.KEEPER_RELIEF_RECESS_MOUTH_LAND
+    assert part.KEEPER_RELIEF_RECESS_MOUTH_LAND < part.WALL_TARGET_MM
+    (exception,) = [
+        entry
+        for entry in _config.parts("fr-top-frame")["machinist_exceptions"]
+        if entry["id"] == "RV-13"
+    ]
+    assert exception["kind"] == "minor"
+    assert "#2626" in exception["reason"] and ".071" in exception["reason"]
     assert wall - (0.03 * spec.IN + spec.PRINTED_LINEAR_BAND_MM[mouth_places]) < (
         part.WALL_TARGET_MM
     )
@@ -1024,8 +1037,8 @@ def test_knife_seat_footprints_cover_every_printed_extreme() -> None:
     )
     slip = dowel.SLIP_CLEARANCE_MAX / 2.0
     for mount_name, station, z_label in (
-        ("front", part.STUD_Z_FRONT, "front hanger z from upper sockets"),
-        ("rear", part.STUD_Z_REAR, "rear hanger z from upper sockets"),
+        ("front", part.STUD_Z_FRONT, "front hanger z from lower sockets"),
+        ("rear", part.STUD_Z_REAR, "rear hanger z from lower sockets"),
     ):
         band = spec.PRINTED_LINEAR_BAND_MM[spec.DRAWING_REFERENCE_PRECISION[z_label]]
         hull = part.KNIFE_SEAT_FOOTPRINTS[mount_name]
@@ -1094,8 +1107,8 @@ def test_knife_seat_footprints_cover_the_one_pin_and_its_yaw() -> None:
     turn = math.radians(angular_band_deg())
     assert spec.HANGER_PIN_XS == (spec.HANGER_PIN_X,)
     for mount_name, station, z_label in (
-        ("front", part.STUD_Z_FRONT, "front hanger z from upper sockets"),
-        ("rear", part.STUD_Z_REAR, "rear hanger z from upper sockets"),
+        ("front", part.STUD_Z_FRONT, "front hanger z from lower sockets"),
+        ("rear", part.STUD_Z_REAR, "rear hanger z from lower sockets"),
     ):
         hull = part.KNIFE_SEAT_FOOTPRINTS[mount_name]
         z_band = (
@@ -2960,14 +2973,16 @@ def test_web_position_frames_stand_under_their_width_rows() -> None:
     assert tail_end - (ty - 0.00278 + 0.0045) >= ink
 
 
-def test_boss_position_frame_stands_between_the_boss_and_socket_callouts() -> None:
+def test_boss_position_frame_stands_under_the_boss_and_socket_callouts() -> None:
     """The bosses' frame block -- the ⌖|Ø.06|A|B box and its 4X row -- stands
-    in the left margin under the Ø1.77 callout's rows and over the socket
-    callout's, on a level leader to the front-east barrel's outboard rim,
-    which lands between those two callouts' own leaders.  Farm run
-    20261111T023438415Z's natives: each callout's leader leaves its
-    underline's end (8.36 mm under the text point; 17.74 mm right of the
-    boss callout's, 29.57 of the socket callout's) radially to its circle."""
+    in the left margin under the Ø1.77 callout's rows, on a level leader to
+    the front-east barrel's outboard rim, under that callout's own leader.
+    The socket callout stands over the boss callout (#2628 (d): under it,
+    its leader crossed the front hanger station's line), its leader landing
+    on the bore rim over the boss callout's.  Farm run 20261111T023438415Z's
+    natives: each callout's leader leaves its underline's end (8.36 mm under
+    the text point; 17.74 mm right of the boss callout's, 29.57 of the
+    socket callout's) radially to its circle."""
     from _layout_geometry import Segment
 
     ink = drawing.INK_CLEARANCE
@@ -2980,7 +2995,8 @@ def test_boss_position_frame_stands_between_the_boss_and_socket_callouts() -> No
     assert len(drawing.DETAIL_CALLOUTS["C0Dia"].splitlines()) == 2
     assert len(drawing.DETAIL_CALLOUTS["B0Dia"].splitlines()) == 2
     assert (boss_y - 0.00836) - block[3] >= ink
-    assert block[1] - (socket_y + 0.0028 + 0.0045) >= ink
+    assert (socket_y - 0.00836) - (boss_y + 0.0028 + 0.0045) >= ink
+    assert socket_y + 0.0028 + 0.0045 <= drawing.SHEET_FRAME[3] - ink
     centre = _plan(-part.COLUMN_X, part.FRONT_COLUMN_Z)
     radius = part.BOSS_DIA / 2.0 * _S
     angle = math.radians(drawing.BOSS_POSITION_LANDING_DEG)
@@ -2996,17 +3012,22 @@ def test_boss_position_frame_stands_between_the_boss_and_socket_callouts() -> No
         tip = tuple(c + (s - c) * circle_r / run for c, s in zip(centre, shoulder))
         return tip, Segment(*shoulder, *tip)
 
-    # The boss callout's leader lands higher on that rim, the socket
-    # callout's on the bore rim under it; neither comes near the level one.
+    # The boss callout's leader lands higher on that rim than the level
+    # one, the socket callout's on the bore rim higher still; none comes
+    # near another, and none reaches down to the front hanger station's
+    # dimension line, whose top end is the front hole's level.
     boss_tip, boss_leader = callout_leader((boss_x + 0.01774, boss_y - 0.00836), radius)
     socket_tip, socket_leader = callout_leader(
         (socket_x + 0.02957, socket_y - 0.00836), part.BORE_DIA / 2.0 * _S
     )
     assert boss_tip[1] - landing[1] >= ink
-    assert landing[1] - socket_tip[1] >= ink
+    assert socket_tip[1] - boss_tip[1] >= ink
+    assert _segment_gap(boss_leader, socket_leader) >= ink
+    front_hole_y = _plan(part.HANGER_X, part.STUD_Z_FRONT)[1]
     for name, other in {"boss callout": boss_leader, "socket callout": socket_leader}.items():
         assert _segment_gap(leader, other) >= ink, name
         assert _box_segment_gap(block, ((other.x0, other.y0), (other.x1, other.y1))) >= ink, name
+        assert min(other.y0, other.y1) - front_hole_y >= ink, name
 
 
 def test_one_draft_angle_prints_for_each_band_on_sheet_sevens_elevation() -> None:
@@ -3830,26 +3851,41 @@ def test_hanger_walls_meet_the_target_after_drift() -> None:
         assert wall >= 2.032, label
     assert part.PIN_HOLE_BAR_WALL == pytest.approx(2.545071, abs=5e-6)
     assert part.PIN_HOLE_SCREW_WALL == pytest.approx(2.404092, abs=5e-6)
-    # The band's upper deviation is the deepest ream whose drill point keeps
-    # the wall target under the faced top: a THRU ream is out of band.
+    # The band's upper deviation is the deepest hole whose tallest point
+    # keeps the wall target under the faced top: a THRU ream is out of band.
+    # The tallest point is the sharpest the title block's ±1° accepts, 117°,
+    # on the ream band's largest diameter; the #31 pilot's at its DRILLED
+    # HOLES limit is shorter (#3130).
+    sharpest = math.radians((118.0 - 1.0) / 2.0)
+    ream_point = spec.HANGER_PIN_HOLE_DIA_MAX / 2.0 / math.tan(sharpest)
+    pilot_point = (0.120 * 25.4 + spec.DRILL_OVERSIZE) / 2.0 / math.tan(sharpest)
+    assert pilot_point < ream_point
+    assert spec.HANGER_PIN_HOLE_POINT_H_MAX == pytest.approx(ream_point)
+    assert spec.HANGER_PIN_HOLE_POINT_H_MAX == pytest.approx(0.969, abs=5e-4)
     depth_max = spec.HANGER_PIN_HOLE_DEPTH + max(spec.HANGER_PIN_HOLE_DEPTH_BAND)
     assert spec.HANGER_PIN_HOLE_DEPTH_MAX == pytest.approx(depth_max)
     assert part.PIN_HOLE_POINT_MARGIN == pytest.approx(
         spec.HANGER_GRIP - spec.HANGER_GRIP_TOL - depth_max
-        - spec.HANGER_PIN_HOLE_POINT_H
+        - spec.HANGER_PIN_HOLE_POINT_H_MAX
     )
     assert 2.032 <= part.PIN_HOLE_POINT_MARGIN < 2.032 + 1e-5
-    assert depth_max + spec.HANGER_PIN_HOLE_POINT_H < spec.HANGER_GRIP - spec.HANGER_GRIP_TOL
+    assert (
+        depth_max + spec.HANGER_PIN_HOLE_POINT_H_MAX
+        < spec.HANGER_GRIP - spec.HANGER_GRIP_TOL
+    )
     # Entry wander at the deepest pocket roof and the finished top.  Every
     # ream sits across the line at its implied-zero .XXX off the screw axis.
     # The nearer station (the rear one since #1038 moved the front one .25
-    # out) stands at its .XXX from the socket axes; a pocket end stands two
-    # as-cast bands out (its station from the front socket and the chained
-    # length).
+    # out) stands at its .XXX from the rear sockets' axis (#2628 (d)); a
+    # pocket end stands two as-cast bands out (its station from the front
+    # socket and the chained length), and the rear axis stands the socket
+    # pattern's Ø.010 refinement off the front one.
     pocket = part.BAR_POCKET_HOLE_WALLS
     cast = spec.AS_CAST_BAND
     assert part._POCKET_STATION == pytest.approx(
-        min(abs(part.STUD_Z_FRONT), abs(part.STUD_Z_REAR)) - spec.PRINTED_LINEAR_BAND_MM[3]
+        min(abs(part.STUD_Z_FRONT), abs(part.STUD_Z_REAR))
+        - spec.PRINTED_LINEAR_BAND_MM[3]
+        - spec.SOCKET_PATTERN_REFINEMENT_ZONE
     )
     assert part._POCKET_END == pytest.approx(part.BAR_POCKET_Z + 2.0 * cast)
     station = part._POCKET_STATION - part._POCKET_END
@@ -3864,9 +3900,9 @@ def test_hanger_walls_meet_the_target_after_drift() -> None:
         station - off - spec.HANGER_KNOCKOUT_DIA_MAX / 2.0
         - part.HANGER_KNOCKOUT_SHIFT_AT_TOP
     )
-    assert pocket["hanger clearance hole"] == pytest.approx(16.385177189775263)
-    assert pocket["dowel ream"] == pytest.approx(17.762659, abs=5e-6)
-    assert pocket["dowel knockout"] == pytest.approx(18.315109, abs=5e-6)
+    assert pocket["hanger clearance hole"] == pytest.approx(16.131177189775258)
+    assert pocket["dowel ream"] == pytest.approx(17.508659, abs=5e-6)
+    assert pocket["dowel knockout"] == pytest.approx(18.061109, abs=5e-6)
 
 
 def test_washer_support_on_the_faced_top_charges_all_printed_limits() -> None:
@@ -3952,19 +3988,20 @@ def test_washer_support_on_the_faced_top_charges_all_printed_limits() -> None:
     assert part.HANGER_WASHER_BAR_TOP_MARGIN == pytest.approx(2.254568630750713)
     # Clear of the outer front/rear rail ends: each washer's Z reach is its
     # station band plus the print-worst reach; the rail's outer face is the
-    # narrowest printed half flange past its socket axis. The rear end binds,
-    # because it also spends the .XX socket-pitch band.
+    # narrowest printed half flange past its socket axis. The stations stand
+    # from the rear sockets' axis (#2628 (d)), so the front end, measured
+    # from the other socket row, also spends the pattern's Ø.010 and binds.
     places = spec.DRAWING_REFERENCE_PRECISION
     half_flange = (part.RAIL_W_FR - spec.AS_CAST_BAND) / 2.0 - spec.AS_CAST_BAND / 2.0
-    z_reach = band[places["rear hanger z from upper sockets"]] + reach
-    front_end_wall = part.STUD_Z_FRONT - part.FRONT_COLUMN_Z + half_flange - z_reach
-    rear_end_wall = (
-        part.REAR_COLUMN_Z - part.STUD_Z_REAR + half_flange
+    z_reach = band[places["front hanger z from lower sockets"]] + reach
+    front_end_wall = (
+        part.STUD_Z_FRONT - part.FRONT_COLUMN_Z + half_flange
         - part.SOCKET_PATTERN_REFINEMENT_ZONE - z_reach
     )
-    assert rear_end_wall < front_end_wall
-    assert part.HANGER_WASHER_OUTER_END_WALL == pytest.approx(rear_end_wall)
-    assert part.HANGER_WASHER_OUTER_END_WALL == pytest.approx(31.740980850324174)
+    rear_end_wall = part.REAR_COLUMN_Z - part.STUD_Z_REAR + half_flange - z_reach
+    assert front_end_wall < rear_end_wall
+    assert part.HANGER_WASHER_OUTER_END_WALL == pytest.approx(front_end_wall)
+    assert part.HANGER_WASHER_OUTER_END_WALL == pytest.approx(31.566156411177243)
     assert part.HANGER_WASHER_BEARING_MIN == pytest.approx(
         spec.HANGER_WASHER_CONCENTRIC_ANNULUS_MIN - part.HANGER_WASHER_OFFSET_MAX
     )
@@ -4731,12 +4768,12 @@ def test_boss_and_socket_diameters_take_one_near_side_arrow() -> None:
     # Machinist review r3 (sheet 3): as full diameters through the shared
     # axis the socket's match-fit leader crossed the Ø45.0 BOSS leader at
     # the socket centre, and the Ø45.0 grazed the 28.0's upper arrow.  Each
-    # now reads off one arrow on its nearest rim; the boss text stands 4 mm
-    # higher, still under the socket block.
+    # now reads off one arrow on its nearest rim.
     assert set(drawing.DETAIL_TOP_KEEP) == {"C0Dia", "B0Dia"}
     assert drawing.DETAIL_TOP_KEEP["C0Dia"] == (0.035, 0.236)
-    # The socket's three rows stand under the boss's leader, left of the rail.
-    assert drawing.DETAIL_TOP_KEEP["C0Dia"][1] - drawing.DETAIL_TOP_KEEP["B0Dia"][1] >= 0.035
+    # The socket's three rows stand over the boss's callout, left of the
+    # rail (#2628 (d)).
+    assert drawing.DETAIL_TOP_KEEP["B0Dia"][1] - drawing.DETAIL_TOP_KEEP["C0Dia"][1] >= 0.015
 
 
 def test_cap_recess_bands_preserve_the_counterbore_ligament() -> None:
@@ -4980,19 +5017,19 @@ def test_sheet_three_tabulates_its_sockets_basic_from_the_cast_datum_corner() ->
     }
     assert x0 - part.COLUMN_X == pytest.approx(part._boss_radius(part.DATUM_TARGET_Y))
     assert drawing.negative_locations((("A1", ".673", ".750", ""), ("B1", "-1.0", "2.0", ""))) == ["-1.0"]
-    # Each hanger hole's station: its own vertical dimension from the front
-    # sockets' drawn axis to the hole, machined to machined, so it prints at
-    # the title block's .XXX with nothing added.
+    # Each hanger hole's station: its own vertical dimension from the rear
+    # sockets' drawn axis to the hole (#2628 (d)), machined to machined, so
+    # it prints at the title block's .XXX with nothing added.
     stations = {
-        "front hanger z from upper sockets": part.STUD_Z_FRONT,
-        "rear hanger z from upper sockets": part.STUD_Z_REAR,
+        "front hanger z from lower sockets": part.STUD_Z_FRONT,
+        "rear hanger z from lower sockets": part.STUD_Z_REAR,
     }
     assert set(drawing.HANGER_Z_TEXT_XY) == set(stations)
     assert not {(part.HANGER_X, z) for z in stations.values()} & set(holes)
     assert [
-        (f"{(z - part.FRONT_COLUMN_Z) / 25.4:.{spec.DRAWING_REFERENCE_PRECISION[label]}f}")
+        (f"{(part.REAR_COLUMN_Z - z) / 25.4:.{spec.DRAWING_REFERENCE_PRECISION[label]}f}")
         for label, z in stations.items()
-    ] == ["0.854", "7.959"]
+    ] == ["7.966", "0.861"]
     # The band left of the title block, under the plan's rear bosses and
     # over the edge-break note, holds the table.
     table = _hole_table_box()
@@ -5061,22 +5098,28 @@ def test_hole_table_locations_drop_the_leading_zero() -> None:
 def test_socket_finish_leader_stays_clear_of_the_table_origin_mark() -> None:
     """Farm run 20261107T084432155Z (leader-crosses-leader): the socket Ra
     leader, level with the A1 axis, ran through the origin mark's Y arrow,
-    then at the plan's lower-left corner.  The leader still climbs from its
+    then at the plan's lower-left corner.  Owner ruling D2 (#2333) moved the
+    origin to the F|G corner at the plan's lower right, so the whole mark
+    stands right of the leader.  Since #2628 (d) the leader rises from its
     tail (the symbol point plus FINISH_LEADER_TAIL) to the rear-east bore's
-    upper-left rim; owner ruling D2 (#2333) moved the origin to the F|G
-    corner at the plan's lower right, so the whole mark stands right of the
-    leader, and the F trace the corner sends under that boss runs below it."""
+    lower-left rim, under the rear sockets' axis line the hanger stations
+    stand from, over the hole table, its row under that axis too."""
     angle = math.radians(drawing.SOCKET_FINISH_LANDING_DEG)
     r = part.BORE_DIA / 2.0 * _S
     bore = _plan(-part.COLUMN_X, part.REAR_COLUMN_Z)
     rim = (bore[0] + r * math.cos(angle), bore[1] + r * math.sin(angle))
     sx, sy = drawing.SOCKET_FINISH_SYMBOL_XY
     leader = ((sx + drawing.FINISH_LEADER_TAIL, sy), rim)
-    (_ox, oy), arrows = _table_origin_mark()
+    ink = drawing.INK_CLEARANCE
+    _origin, arrows = _table_origin_mark()
     for name, box in arrows.items():
-        assert _box_segment_gap(box, leader) >= drawing.INK_CLEARANCE, name
-        assert box[0] - max(leader[0][0], rim[0]) >= drawing.INK_CLEARANCE, name
-    assert min(leader[0][1], rim[1]) - oy >= drawing.INK_CLEARANCE
+        assert _box_segment_gap(box, leader) >= ink, name
+        assert box[0] - max(leader[0][0], rim[0]) >= ink, name
+    assert bore[1] - max(leader[0][1], rim[1]) >= ink
+    # The "TUBE SOCKET BORES, 4X" row, 9 mm over the symbol point and
+    # about 2.5 mm tall, stays under the axis line's extension too.
+    assert bore[1] - (sy + 0.009 + 0.0025) >= ink
+    assert sy - _hole_table_box()[3] >= ink
 
 
 def test_hole_tags_stand_in_the_windows_beside_their_holes() -> None:
@@ -5123,7 +5166,7 @@ def test_socket_callout_leaves_its_leader_a_clear_corridor_to_a2() -> None:
     reviews of farm run 20261107T170344738Z's PDF (above A2 the leader
     crossed datum D's dimension line at its left arrowhead).  The block's
     widest row, 2.58 mm a glyph, stays inside the frame and ends left of the
-    left boss tangent; its radial leader to A2's near rim stays under the
+    left boss tangent; its radial leader to A2's near rim stays over the
     boss leader's landing.  D's station stands on sheet 7 now (owner ruling
     D2, #2333), so no dimension line runs over A2 on this sheet."""
     x, y = drawing.DETAIL_TOP_KEEP["B0Dia"]
@@ -5148,9 +5191,42 @@ def test_socket_callout_leaves_its_leader_a_clear_corridor_to_a2() -> None:
     assert "DStation" not in drawing.DETAIL_TOP_KEEP
     boss_x, boss_y = drawing.DETAIL_TOP_KEEP["C0Dia"]
     boss_landing = landing((boss_x, boss_y), part.BOSS_DIA / 2.0 * _S)
-    assert boss_landing[1] - rim[1] >= 0.005
-    # Under the Ø1.77 boss leader's text point by more than the three rows.
-    assert boss_y - y >= 0.035
+    assert rim[1] - boss_landing[1] >= ink
+    # Over the Ø1.77 boss callout's three rows (#2628 (d)).
+    assert y - boss_y >= 0.015
+
+
+def test_hanger_stations_stand_in_the_left_margin_from_the_rear_axis() -> None:
+    """Owner ruling 2026-11-20 (Pedro), #2628 option (d): both hanger-hole
+    stations stand from the rear sockets' axis with their values in the
+    left margin, off the part (rule 14).  The rear (shorter) station is the
+    inner line, its value left of it over the rear-left boss; the front
+    station's line stands left of that value, its value centred on it; no
+    extension line crosses the other station's dimension line."""
+    ink = drawing.INK_CLEARANCE
+    tangent_x = _plan(-drawing.PLAN_HALF_X, 0.0)[0]
+    axis_y = _plan(-part.COLUMN_X, part.REAR_COLUMN_Z)[1]
+    front_x, front_y = drawing.HANGER_Z_TEXT_XY["front hanger z from lower sockets"]
+    rear_x, rear_y = drawing.HANGER_Z_TEXT_XY["rear hanger z from lower sockets"]
+    front_hole_y = _plan(part.HANGER_X, part.STUD_Z_FRONT)[1]
+    rear_hole_y = _plan(part.HANGER_X, part.STUD_Z_REAR)[1]
+    glyph, half_h = 0.00258, 0.00175
+    # The rear value, four glyphs left of its line, over the rear hole and
+    # the rear-left boss (its top at the axis plus the boss radius).
+    rear_box = (rear_x - 0.001 - 4 * glyph, rear_y - half_h, rear_x - 0.001, rear_y + half_h)
+    assert rear_x <= tangent_x - ink
+    assert rear_box[1] - rear_hole_y >= ink
+    assert rear_box[1] - (axis_y + part.BOSS_DIA / 2.0 * _S) >= ink
+    # The front line stands left of the rear value; its value, centred on
+    # it, between the rear value and the front hole, clear of the boss.
+    front_box = (front_x - 2.5 * glyph, front_y - half_h, front_x + 2.5 * glyph, front_y + half_h)
+    assert rear_box[0] - front_x >= ink
+    assert front_box[2] <= tangent_x - ink
+    assert rear_y + half_h + ink <= front_box[1] and front_box[3] + ink <= front_hole_y
+    # The rear station's extension from its hole ends right of the front
+    # line, so neither crosses the other's dimension line.
+    assert front_x < rear_x - ink and rear_hole_y < front_hole_y
+    assert axis_y < rear_hole_y
 
 
 def test_side_rail_web_text_stands_beside_its_own_section() -> None:

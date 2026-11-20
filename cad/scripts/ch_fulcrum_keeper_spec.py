@@ -134,7 +134,12 @@ KEEPER_INNER_FACE_SPAN_MM = 2.0 * (KEEPER_Z_OFF - LUG_HALF_T)  # 153.416
 # seats can stand that far apart in height and each pitch zone /
 # KEEPER_SEAT_LENGTH_MM along the shaft (a roll across the width only moves
 # a lug sideways, which the fit-up takes up: the pair is set with the shaft
-# through both bores). The fit-up step's slide check accepts the result.
+# through both bores). The fit-up step's slide check accepts the result
+# (MHA-CH-00: the shaft slides freely through both bores; owner ruling
+# 2026-11-20 (Pedro), #1659 option B): the budget is that check's, not a
+# printed control, and the aligned bores still keep 0.0344 of clearance
+# after it, over the 0.010 running minimum
+# (ch_fulcrum_shaft_spec.ALIGNED_MIN_CLEARANCE_MM).
 KEEPER_SEAT_FLATNESS_BUDGET_MM = 0.04
 KEEPER_SEAT_LENGTH_MM = LUG_HALF_T + FOOT_TIP_X  # 16.5: seat along the shaft
 # --- Fit-up on the top frame (MHA-CH-00): the pair goes on with the shaft

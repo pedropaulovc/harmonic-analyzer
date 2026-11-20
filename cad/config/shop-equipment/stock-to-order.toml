@@ -166,6 +166,24 @@ length_mm = 304.8
 status = "to_order"
 cite = ["McMaster-Carr 8859K86 https://www.mcmaster.com/8859K86/ read live 2026-11-20: Ultra-Formable 260 Brass strip 2 x 12 in, 0.032 in thick (-0.002 to 0.002), temper H02 (1/2 hard), ASTM B36, modulus 16,000 ksi, yield not rated, $12.97 each", "cad/config/parts/pd-latch-hook.yaml material_specification"]
 
+# MHA-FR-01 base (#620): owner ruling 2026-11-20 (Pedro), "Follow
+# recommendations unless noted otherwise": the base's route (cast with the
+# top frame, or machined from low-carbon plate) follows the foundry's quote
+# for the casting above. No base stock row until that quote is in.
+
+# MHA-FR-05 rocker-arm support (#635): owner ruling 2026-11-20 (Pedro),
+# "Follow recommendations unless noted otherwise": machined from low-carbon
+# bar now, not cast with the top frame (the registry process and its
+# LOW-CARBON STEEL OR GRAY IRON title block both allow it).
+[stock.1018-flat-3x8]
+form = "flat_bar"
+material = "1018 low-carbon steel"
+note = "To order: 3 x 8 in 1018 flat bar, one 8 in length. Allocation: fr-rocker-arm-support (MHA-FR-05), finished 7.56 long (build_fr_rocker_arm_support.BOSS_DEPTH) x 7.00 high (2 x HALF_Y) x 2.50 at the foot (2 x WIDE): about .25 per face to clean up on the 3 in and 8 in sides and .44 over the length to saw and face. No vendor, price or stock read. Not owned."
+section_mm = [203.2, 76.2]
+length_mm = 203.2
+status = "to_order"
+cite = ["https://github.com/pedropaulovc/harmonic-analyzer/issues/635", "cad/scripts/build_fr_rocker_arm_support.py BOSS_DEPTH, HALF_Y, WIDE"]
+
 # --- MHA-PD-06 disc cutting arbor (#2412) -----------------------------------
 
 # MHA-PD-06 disc blank (#2412): the Ø3.1655 disc needs at least 3.25 in of
