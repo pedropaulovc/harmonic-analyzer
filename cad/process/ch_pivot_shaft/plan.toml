@@ -7,7 +7,7 @@ revision = "placeholder"
 material = "AISI 1018 cold-finished steel bar, Ø5/16 in"
 stock = "To be written"
 shop = "../shop.toml"
-stock_refs = ["1018-round-3-8"]
+stock_refs = ["steel-ground-round-1-4"]  # 1/4 GROUND STOCK OK (owner ruling 2026-11-20, #2346)
 
 [[tools]]
 id = "form-tool-r160"
