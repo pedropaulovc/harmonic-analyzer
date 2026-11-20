@@ -29,7 +29,9 @@ def _assert_requested_corners(
     ``CreateCenterRectangle`` runs sketch inference: a corner near existing
     geometry snaps onto it, the rectangle comes back another size, and the
     width/depth dimensions placed on it later turn driven, which surfaced
-    only at the equation step two features on."""
+    only at the equation step two features on. This catches a snap that
+    moves a corner; a relation inferred onto geometry a corner already lies
+    on exactly moves nothing and is not seen here (#3174)."""
     corners = [(sx * half_x, sz * half_z) for sx in (-1, 1) for sz in (-1, 1)]
     for x, z in ends:
         nearest = min(math.hypot(x - cx, z - cz) for cx, cz in corners)
