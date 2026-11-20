@@ -57,8 +57,8 @@ def test_every_size_carries_its_band_on_the_model() -> None:
         ("RingProfile", "DrumBore"): "*deviations(DRUM_BORE_BAND)",
     }
     # drawing-guidelines.md rule 17 (walls and webs) at the worst printed
-    # corner: the O.D. printed .74 -.01 over the .4990 +.0005 reamed bore.
-    assert mg_wheel_drum_geom.WALL_WORST == pytest.approx((0.73 - 0.4995) * 25.4 / 2.0)
+    # corner: the O.D. printed .77 -.01 over the .4990 +.0005 reamed bore.
+    assert mg_wheel_drum_geom.WALL_WORST == pytest.approx((0.76 - 0.4995) * 25.4 / 2.0)
     assert mg_wheel_drum_geom.WALL_WORST >= mg_wheel_drum_geom.MIN_WALL
 
 

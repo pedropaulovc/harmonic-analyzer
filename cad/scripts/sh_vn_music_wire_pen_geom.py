@@ -16,12 +16,12 @@ from pn_pen_carriage_geom import STUD_HEAD_TOP_REST_Y
 
 CONFIGURATION = "PenWire"
 
-# Ø0.8 is the WIRE LANE the rim groove was laid out for, not the wire: the
-# purchased 9666K142 wire is Ø.008 (MEMBER_DIA), modelled at that size on the
-# lane's centreline (sh_vn_music_wire_lever_geom).
+# The rim groove seats the purchased 9666K142 wire itself (MEMBER_DIA, #2687):
+# the member is modelled at that size on the wire centre the groove bottom
+# sets (sh_vn_music_wire_lever_geom).
 WIRE_DIA = PEN_WIRE_DIA
-if MEMBER_DIA > WIRE_DIA:
-    raise AssertionError("the pen wire is fatter than the lane laid out for it")
+if WIRE_DIA != MEMBER_DIA:
+    raise AssertionError("the rim groove is laid out for another wire")
 
 # --- endpoint anchors (machine frame; asserted by build_pn_pen_assembly) --------
 # The rim groove's mid-plane IS the pen rod line: the wire hangs plumb from the

@@ -1628,15 +1628,14 @@ Catalog specifications checked on September 10, 2026:
   cold drawn, hardened, phosphate coated, 261,000 psi tensile, diameter
   0.008 in with -0.001/+0.001 in tolerance, 1,450 ft in a 1/4 lb coil, $21.00. It replaces the 0.031 in 9666K56 (#2398,
   owner ruling 2026-11-12: the wire only lifts a pen, so it is a thin single
-  wire as on the original, knotted). Wound on the Ø.744 drum it bends to
-  1.1 % strain against the old wire's 4 %. Its breaking load is 13 lbf (10 lbf
+  wire as on the original, knotted). Wound on the Ø.768 drum it bends to
+  1.2 % strain against the old wire's 4 %. Its breaking load is 13 lbf (10 lbf
   at the thin end of the band); taking a knot at half of that, the thin-end
   wire still holds twice the arm check's wire 1 maximum (2.3 lbf) and three
-  times the pen's weight through the wheel (1.5 lbf). The built wheel ratio
-  with this wire is 5.12 (`BUILT_WIRE_RATIO`), which `error_budget` and the
-  arm check use; the modelled lanes stay at 4.995 (#2687). The drum, grooves and tie
-  holes keep the Ø0.8 wire lanes they were laid out for; the members are
-  modelled Ø.2032 on those lanes' centrelines (`_mcmaster_9666k142.py`,
+  times the pen's weight through the wheel (1.5 lbf). The drum, the rim groove
+  and the fixture groove seat this wire on the wire centres the 4.995 wheel
+  ratio is laid out on (owner ruling 2026-11-20 on #2687), so the members are
+  modelled Ø.2032 where the fitted wire runs (`_mcmaster_9666k142.py`,
   `sh_vn_music_wire_lever_geom.py`, `test_sh_vn_thin_wire.py`).
   No vendor solid is used; the wire is a plain cylinder.
   The catalogue's .008-in nominal is also shown as a
