@@ -22,7 +22,7 @@ import math
 
 import _config
 from _package_units import drawing_unit
-from _printed_tolerance import angular_band_deg, printed_deviations
+from _printed_tolerance import angular_band_deg, drilled_oversize_mm, printed_deviations
 from mg_wheel_drum_geom import (
     DRUM_BORE,
     DRUM_BORE_BAND,
@@ -136,7 +136,9 @@ CAST_ROUND_R = 0.762  # .03
 # --- wire ties ---------------------------------------------------------------------
 # Both ties are drilled: the title block's DRILLED HOLES row governs their
 # size (mg_magnifying_wheel_spec takes its plus in every wall).
+TIE_HOLE_SIZE = "#60"
 TIE_HOLE_DIA = 1.016  # .040, a #60 drill
+DRILL_POINT_DEG = 118.0  # a twist drill's point
 # drawing-guidelines.md rule 17 (walls and webs): a drilled axis may wander
 # this far off true over its depth (the fleet's mg_magnifying_clamp_geom and
 # fr_top_frame_spec figure), on top of the title block's angular allowance.
@@ -148,10 +150,20 @@ DRILL_WANDER_DEG = 0.3
 # pressed hard against the boss step, covers that face out to its O.D., so
 # the hole stands outboard of the drum: at the largest printed drum (.XX),
 # the hole's worst printed station and axis offset, the smallest drilled
-# hole still opens a full wire diameter beyond the drum for the wire's end.
-# At 6 o'clock no band let the wire both clear the drum and keep its wrap
-# (mg_wheel_group.LEVER_WIRE_WRAP_LEFT_DEG): the next spoke gap clockwise
-# gives the wrap 60 deg more.
+# drum-side mouth still opens a full wire diameter beyond the drum for the
+# wire's end.  At 6 o'clock no band let the wire both clear the drum and keep
+# its wrap (mg_wheel_group.LEVER_WIRE_WRAP_LEFT_DEG): the next spoke gap
+# clockwise gives the wrap 60 deg more.
+# The #60 runs through, counter-drilled #50 from the boss front (drum) face to
+# leave about .10 of #60 at the back face, where the toggle bears on its exit
+# (owner ruling 2026-11-20 on #2406: "A"): a #60 drilled through the whole
+# boss, 10 x D in cast iron, was the likeliest way to scrap a finished wheel.
+# The depth runs to the #50's shoulder; its 118 deg point narrows on to the
+# #60 beyond it.
+TIE1_CDRILL_SIZE = "#50"
+TIE1_CDRILL_DIA = 1.778  # .070, a #50 drill
+TIE1_CDRILL_DEPTH = 8.0518  # .317 from the boss front face
+TIE1_CDRILL_PLACES = 3
 TIE1_PLACES = 2
 TIE1_X = 9.652  # .38
 TIE1_Y = -5.588  # -.22
@@ -174,15 +186,33 @@ DRUM_WIRE_R_RANGE = (
     (DRUM_OD + DRUM_OD_DEVIATIONS[0]) / 2.0 + LEVER_WIRE_DIA / 2.0,
     (DRUM_OD + DRUM_OD_DEVIATIONS[1]) / 2.0 + LEVER_WIRE_DIA / 2.0,
 )  # 9.754 .. 10.008
+# The wire enters TIE 1 through its drum-side mouth, the #50.
 TIE1_DRUM_OPENING = (
     TIE1_R
     - TIE1_OFFSET_MAX
-    + TIE_HOLE_DIA / 2.0
+    + TIE1_CDRILL_DIA / 2.0
     - (DRUM_WIRE_R_RANGE[1] - LEVER_WIRE_DIA / 2.0)
-)  # 1.150
+)  # 1.531
 if TIE1_DRUM_OPENING < LEVER_WIRE_DIA:
     raise AssertionError(
         f"the drum covers TIE 1: {TIE1_DRUM_OPENING:.3f} open < {LEVER_WIRE_DIA} wire"
+    )
+# The full #60 left at the back face: the shortest printed boss less the
+# deepest printed shoulder and the largest drilled #50's point down to the
+# #60's own Ø.
+TIE1_CDRILL_POINT_TO_TIE = (
+    (TIE1_CDRILL_DIA + drilled_oversize_mm(unit=UNIT) - TIE_HOLE_DIA)
+    / 2.0
+    / math.tan(math.radians(DRILL_POINT_DEG / 2.0))
+)  # 0.260
+TIE1_LAND_MIN = (
+    (HUB_LEN_LIMITS[0] - SPIGOT_LEN_LIMITS[1])
+    - printed_limits(TIE1_CDRILL_DEPTH, TIE1_CDRILL_PLACES)[1]
+    - TIE1_CDRILL_POINT_TO_TIE
+)  # 1.950
+if TIE1_LAND_MIN <= 0.0:
+    raise AssertionError(
+        f"TIE 1's #50 breaks through the back face: {TIE1_LAND_MIN:.3f}"
     )
 # TIE 2 (pen wire): radial hole, groove bottom to rim ID, about 4:30 from the
 # front (photographed); 2 deg short of it so the worst printed casting keeps
