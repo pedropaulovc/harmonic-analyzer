@@ -777,26 +777,38 @@ def test_a_loosened_post_screw_re_sets_the_post_before_the_checks() -> None:
     check = " ".join(drawing.CHECKS.split("4. CONE SWING")[1].split("\n5.")[0].split())
     assert "4U. LEAVE MHA-DT-02 AND MHA-DT-VN-61 AS THEY ARE FROM HERE ON." in check
     redo = re.search(
-        r"4V\. IF ONE IS LOOSENED, REDO CHECKS 4-7 \(MHA-DT-VN-61: (\d+)([A-Z])-(\d+)([A-Z]) FIRST\)\.",
+        r"4V\. IF ONE LOOSENS, REDO CHECKS 4-7 \(A SCREW: (\d+[A-Z]), (\d+[A-Z])-(\d+[A-Z]), "
+        r"(\d+[A-Z])-(\d+[A-Z]) FIRST\)\.",
         check,
     )
     assert redo is not None, check
-    step = drawing.steps.step_number("post-and-tip-block")
-    assert int(redo.group(1)) == int(redo.group(3)) == step
+    post = drawing.steps.step_number("post-and-tip-block")
+    end_play = drawing.steps.step_number("end-play-set")
     bodies: dict[str, str] = {}
     for line in drawing.CONE_CRANK_STEPS.splitlines():
-        head = re.match(rf"({step}[A-Z])\. ", line)
+        head = re.match(rf"((?:{post}|{end_play})[A-Z])\. ", line)
         if head:
             key = head.group(1)
             bodies[key] = line
         elif line.startswith(" ") and bodies:
             bodies[key] += " " + line.strip()
     keys = list(bodies)
-    first = keys.index(redo.group(1) + redo.group(2))
-    last = keys.index(redo.group(3) + redo.group(4))
-    redone = " ".join(bodies[key] for key in keys[first : last + 1])
-    assert "TURN MHA-DT-05 ON ITS SCREWS" in redone
-    assert "TIGHTEN BOTH MHA-DT-VN-61" in redone
+
+    def redone(first: str, last: str) -> str:
+        return " ".join(bodies[key] for key in keys[keys.index(first) : keys.index(last) + 1])
+
+    assert redo.group(1) == f"{post}M"
+    assert "LOOSE ENOUGH TO TURN MHA-DT-05" in bodies[redo.group(1)]
+    assert redo.group(2).startswith(str(post)) and redo.group(3).startswith(str(post))
+    re_set = redone(redo.group(2), redo.group(3))
+    assert "TURN MHA-DT-05 ON ITS SCREWS" in re_set
+    assert "TIGHTEN BOTH MHA-DT-VN-61" in re_set
+    # The post can shift along the shaft on the screws' float: the end play
+    # is indicated again, with its remedy and the pinch lock's check.
+    assert redo.group(4) == f"{end_play}C" and redo.group(5) == f"{end_play}F"
+    end_play_redo = redone(redo.group(4), redo.group(5))
+    assert "INDICATE THE MHA-DT-04 END PLAY" in end_play_redo
+    assert "DOES NOT TURN IN MHA-DT-21" in end_play_redo
 
 
 def _assert_engagement_cites_its_records(

@@ -1233,3 +1233,5 @@ description = "C36000 brass key stock, DIN 6880 undersized, square bar, 5 x 5 mm
 description = "C67500 manganese bronze, round bar, 5/8 in"
 [stock.gray-iron-a48-25b-casting]
 description = "gray iron, ASTM A48 class 25B (a class 30B heat also conforms), casting"
+[stock.gray-iron-casting-cone-pivot-post]
+description = "gray iron, class not ruled, casting for MHA-DT-05 cone pivot post"
