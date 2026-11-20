@@ -167,21 +167,23 @@ WEB_WALL_MIN = (
 )  # 3.10
 # From the thread to the support's end face on its side, at the worst
 # transferred position: the end face moves by half the support length's .XX
-# band, the hole by the bracket's station band from the fit-up-set ear face.
-# The end faces lie SUPPORT_HALF_MACHINE_Z off the casting's centre along
+# band, the hole by the bracket's station band from the fit-up-set ear face,
+# and the seat by the punch float. The end faces lie SUPPORT_HALF_MACHINE_Z
+# off the casting's centre along
 # local X (its length; the height is a different 177.8). The end faces' top
 # edges carry only the title block's EDGE_BREAK (the RimChamfer skips them,
 # build_fr_rocker_arm_support.CHAMFER_EDGES). The thread's crest starts below
 # its own mouth break, so at the top the wall runs from that crest point to
-# the break's top edge: hypot(wall - EDGE_BREAK, EDGE_BREAK), S 2.51, N 3.92,
-# both over the target (with the .06 leg there the south one would be 1.25).
+# the break's top edge: hypot(wall - EDGE_BREAK, EDGE_BREAK), S 2.35, N 3.76,
+# both over the target (with the .06 leg there the south one would be 1.10).
 END_WALL_MIN = tuple(
     (SUPPORT_HALF_MACHINE_Z - abs(x))
     - SCREW_MAJOR_DIA / 2.0
     - _bracket.STATION_BAND
+    - PUNCH_FLOAT
     - LINEAR_2PL / 2.0
     for x in SEAT_LOCAL_X
-)  # S 2.75, N 4.16
+)  # S 2.59, N 4.01
 
 if ENGAGEMENT_MIN < 1.5 * SCREW_MAJOR_DIA:
     raise AssertionError(

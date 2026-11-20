@@ -137,12 +137,14 @@ def test_seat_thread_keeps_the_end_wall_at_the_worst_transferred_position() -> N
     fit-up-set ear face (user, 2026-10-10, option ii), so only the station's
     band moves it -- not the foot length's -- and the end face moves by half
     the support length's .XX band. The end face is the casting's LENGTH end
-    (SUPPORT_HALF_MACHINE_Z off its centre), not its height."""
+    (SUPPORT_HALF_MACHINE_Z off its centre), not its height. The seat also
+    floats by the transfer punch's float either way (#2563 review)."""
     for x, wall in zip(seats.SEAT_LOCAL_X, seats.END_WALL_MIN, strict=True):
         assert wall == pytest.approx(
             (support_spec.SUPPORT_HALF_MACHINE_Z - abs(x))
             - seats.SCREW_MAJOR_DIA / 2.0
             - bracket.STATION_BAND
+            - bracket.PUNCH_FLOAT
             - seats.LINEAR_2PL / 2.0
         )
         assert wall >= seats.RULE12_WEB_TARGET
@@ -273,7 +275,7 @@ def test_the_support_is_the_shortest_grid_length_that_keeps_the_bracket_foot() -
     assert not sides._foot_fits(7.54 * 25.4) and foot_in(7.54) == 0.69
     assert foot_in(7.56) == 0.70 == round(sides.FOOT_LEN / 25.4, 2)
     assert (foot_in(7.58), foot_in(7.60)) == (0.71, 0.72)
-    assert [round(wall, 2) for wall in seats.END_WALL_MIN] == [2.75, 4.16]
+    assert [round(wall, 2) for wall in seats.END_WALL_MIN] == [2.59, 4.01]
     assert min(seats.END_WALL_MIN) >= seats.RULE12_WEB_TARGET
 
 

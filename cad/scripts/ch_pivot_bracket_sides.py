@@ -72,8 +72,8 @@ def _support_end_z(length: float) -> dict[str, float]:
 # the seat's transfer-punch float (``head_to_ear_face_min`` = 0). High limit:
 # the seat's thread keeps the
 # support's end wall when the support's end face moves by half its length's
-# .X band and the hole by its station band, on whichever side that end face
-# is nearer.
+# .X band and the hole by its station band and the seat by the punch float,
+# on whichever side that end face is nearer.
 HOLE_Z_MIN = (
     _bracket.EAR_T / 2.0
     + SCREW_HEAD_DIA / 2.0
@@ -89,6 +89,7 @@ def _hole_z_max(support_end_z: float) -> float:
         - SUPPORT_WALL_TARGET
         - THREAD_MAJOR_MM[SCREW_THREAD] / 2.0
         - _bracket.STATION_BAND
+        - _bracket.PUNCH_FLOAT
         - SUPPORT_LENGTH_BAND / 2.0
     )
 
