@@ -535,7 +535,7 @@ def test_the_slip_fit_takes_the_perpendicularity_tilt() -> None:
 
 def test_one_dowel_and_the_gauge_bar_replace_the_slot_and_datum_c() -> None:
     # Owner ruling 2026-11-08 (Pedro), #2144 item 11.3 (scheme S1): one dowel
-    # + screw per mount, the Ø.4720 gauge bar through both bores at MHA-SM-00;
+    # + screw per mount, the (Ø.47) gauge bar through both bores at MHA-SM-00;
     # slot C, its notch and datum C deleted; the bore ⌖Ø.008|A|B + ∥.002|A;
     # MHA-FR-02 loses the two -X press reams and their frames; VN-53 qty 2.
     for retired in (
