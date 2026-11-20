@@ -120,8 +120,6 @@ def test_crown_radius_is_the_dome_radius_the_part_drives() -> None:
 # crown on the R11 part), True on a radius halves it. A new writer must show
 # its dimension is sheet-made or already the kind it sets, and join this list.
 _DIAMETRIC_WRITERS = {
-    # A sheet-made edge dimension (AddDimension2), not a model dimension.
-    "draw_dt_crank_pin.py": 1,
     # The OD reference is sheet-made; the cross-hole callout is the
     # CrossHoleProfile define_circle DIAMETER.
     "draw_fr_tube_frame.py": 2,
