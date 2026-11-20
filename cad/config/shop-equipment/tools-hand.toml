@@ -110,7 +110,6 @@ status = "on_hand"
 name = "Torque screwdriver reading in-lb"
 kind = "torque_screwdriver"
 status = "to_order"
-setting_in_lb = 6
 note = "Not owned: to buy. MHA-CH-13 Setups 2-4: the TL-VN-50 edge clamps at 6 in-lb. A driver whose range includes 6 in-lb (e.g. 2.5-11.5 in-lb) serves; the 15.6 in-lb clamp maximum is never a setting."
 
 [tools.pliers]

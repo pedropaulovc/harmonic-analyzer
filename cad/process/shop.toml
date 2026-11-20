@@ -872,7 +872,7 @@ diameter_mm = 6.3754
 [tools.reamer-2550]  # B-reamer-.2550
 description = ".2550 in HSS chucking reamer"
 diameter_mm = 6.477
-[tools.reamer-2560]  # B-reamer-.2560 (B-reamer-.2559, 6.5 mm, its optional alternative)
+[tools.reamer-2560]  # B-reamer-.2560 (not the 6.5 mm B-reamer-.2559: #3083 row 4)
 description = ".2560 in HSS chucking reamer"
 diameter_mm = 6.5024
 [tools.reamer-3135]  # B-reamer-.3135
@@ -882,7 +882,7 @@ diameter_mm = 7.9629
 description = ".4500 in HSS chucking reamer"
 diameter_mm = 11.43
 [tools.reamer-12mm-h7]  # B-reamer-12mm-h7
-description = "12 mm H7 HSS chucking reamer"
+description = "12 mm HSS chucking reamer, .4724-.4726 in"
 diameter_mm = 12.0
 [tools.reamer-4835]  # B-reamer-.4835
 description = ".4835 in HSS chucking reamer"

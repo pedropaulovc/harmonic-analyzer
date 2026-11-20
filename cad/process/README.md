@@ -135,8 +135,11 @@ split by topic and read only through `cad/scripts/_shop_equipment.py`, whose
 Ownership is one `status`: `on_hand`, `not_received` (bought, not in the
 shop), `to_order` or `to_make`; a record without one reads `unrecorded` in
 every reader, and a shop.toml record holds no ownership. A record the shop
-makes carries `supply = "shop_made"` (provenance only). No record names the
-parts it serves as data (that is prose in its `note`): parts point at what
+makes carries `supply = "shop_made"` (provenance only). A record with
+`location = "makerspace"` is the makerspace's equipment, used there (owner
+ruling 2026-11-20, #2288); readers label it by its `status` alone, so no plan
+names one until a reader labels makerspace equipment as such. No record names
+the parts it serves as data (that is prose in its `note`): parts point at what
 they need from their process plans. They hold:
 
 - ownership-only records, under the shop.toml key, for the PM-30MV mill, the
