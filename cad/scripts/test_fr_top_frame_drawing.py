@@ -1111,8 +1111,11 @@ def test_knife_seat_footprints_cover_the_one_pin_and_its_yaw() -> None:
         ("rear", part.STUD_Z_REAR, "rear hanger z from lower sockets"),
     ):
         hull = part.KNIFE_SEAT_FOOTPRINTS[mount_name]
+        # The stations stand from the rear socket axis, the edges from the
+        # front socket: the pattern's Ø.010 lies between them (#2628 (d)).
         z_band = (
             spec.PRINTED_LINEAR_BAND_MM[spec.DRAWING_REFERENCE_PRECISION[z_label]]
+            + part.SOCKET_PATTERN_REFINEMENT_ZONE
             + spec.HANGER_PIN_X_TOL
             + slip
         )
@@ -1149,7 +1152,7 @@ def test_edge_breaks_stay_clear_of_both_print_worst_knife_seats() -> None:
     assert clearance == part.KNIFE_SEAT_EDGE_BREAK_CLEARANCE
     assert min(clearance.values()) >= part.KNIFE_SEAT_EDGE_BREAK_MIN_CLEARANCE == 0.5
     assert clearance == pytest.approx(
-        {"front": 3.681334718490888 + 6.35, "rear": 4.263909177049044}
+        {"front": 3.427334718490891 + 6.35, "rear": 4.009909177049053}
     )
     # The printed worst leg, .06 + .01, never the model's 1.524.
     assert part.EDGE_BREAK_PRINTED == pytest.approx(1.524)

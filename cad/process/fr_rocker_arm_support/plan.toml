@@ -4,9 +4,10 @@
 title = "Rocker Arm Support"
 part = "MHA-FR-05 Rocker Arm Support"
 revision = "placeholder"
-material = "LOW-CARBON STEEL OR GRAY IRON"
+material = "AISI 1018 cold-finished steel bar"
 stock = "To be written"
 shop = "../shop.toml"
+stock_refs = ["1018-flat-3x8"]  # from low-carbon bar (owner ruling 2026-11-20, #635)
 
 [[tools]]
 id = "jig-drill-29"

@@ -1268,10 +1268,12 @@ def _knife_seat_footprint(station_z: float) -> list[tuple[float, float]]:
     slip = KNIFE_DOWEL.SLIP_CLEARANCE_MAX / 2.0
     # Along the line: D from the west bosses' tangent (its as-cast band,
     # owner ruling D2), the #10 axis off D by its centring, the ream off that
-    # axis; across it: the screw axis's .XXX station from the socket axes,
-    # the ream off its line.
+    # axis; across it: the screw axis's .XXX station from the rear socket
+    # axis, the pattern's Ø.010 between that axis and the front socket the
+    # underside edges stand from (_EDGE_LOCATION_BAND, #2628 (d)), the ream
+    # off its line.
     x_band = AS_CAST_BAND + HANGER_CROSSBAR_CENTER_TOL + HANGER_PIN_X_TOL + slip
-    z_band = HANGER_STATION_BAND + HANGER_PIN_X_TOL + slip
+    z_band = HANGER_STATION_BAND + SOCKET_PATTERN_REFINEMENT_ZONE + HANGER_PIN_X_TOL + slip
     reach = max(
         KNIFE_MOUNT.HOLE_ROW_FACE_DISTANCE + KNIFE_MOUNT.HOLE_ROW_FACE_TOL,
         (KNIFE_MOUNT.SUPPORT_Z_THICK + KNIFE_MOUNT.BLOCK_SIZE_TOL)

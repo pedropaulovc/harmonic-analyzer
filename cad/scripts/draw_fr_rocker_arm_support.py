@@ -5,7 +5,7 @@ views, dimension layout, hole table, and make-critical annotations;
 sheet/template and export behavior lives in ``_drawing_common``.
 Dimension import and curation live in ``_drawing_dimension_import``.
 
-The support is a painted gray-iron frame with a trapezoidal wall, two opposed
+The support is a painted 1018-bar frame with a trapezoidal wall, two opposed
 pockets leaving a .50 central web, a through cavity, a chamfered window rim,
 four 5/16 clearance holes through its mounting foot, and the rocker brackets'
 two #8-32 seats in its top face, transferred from the set brackets at
@@ -858,7 +858,7 @@ def build(adapter: Any) -> dict[str, str]:
             0: "Rocker-Arm Support Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "rocker-arm support; manufacturing drawing; casting",
+            3: "rocker-arm support; manufacturing drawing; machined from bar",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )

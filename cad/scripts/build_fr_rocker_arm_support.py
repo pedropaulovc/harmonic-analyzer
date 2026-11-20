@@ -156,11 +156,11 @@ from rocker_bracket_seat_layout import (
 )
 
 PART_NAME = "fr-rocker-arm-support"
-# The source repro was authored in steel, but this casting is now the machine's
-# green rocker-arm-support (it replaced rocker-arm-portal): match the other cast
-# structure (harmonic-base, top-frame) and the registry row (Gray Cast Iron,
-# materials.yaml casting_green_parts) so it renders green, not steel-grey.
-MATERIAL = "Gray Cast Iron"
+# Machined from 1018 bar (owner ruling 2026-11-20 (Pedro), #635), so the
+# model's material, and the mass it reports, is plain carbon steel like every
+# other 1018 part; it stays in materials.yaml casting_green_parts because it is
+# painted the frame's RAL 6005 green (#2394), so it renders green.
+MATERIAL = "Plain Carbon Steel"  # see _appearance.apply_material docstring
 
 # Trapezoid (Sketch1) -- wide foot / narrow top: WIDE / NARROW / HALF_Y, the
 # window half BIG and the FOOT_THICKNESS they leave are

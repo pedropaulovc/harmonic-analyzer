@@ -392,7 +392,7 @@ BOM_DESCRIPTIONS = {
     "fr-harmonic-base": "TWO-PLATE FRAME BASE",
     "fr-tube-frame": "OPEN-END TUBULAR FRAME COLUMN",
     "fr-vn-tube-frame-cap": "STEEL PUSH-ON CAP FOR 1 IN OD TUBE",
-    "fr-rocker-arm-support": "ROCKER-ARM SUPPORT CASTING",
+    "fr-rocker-arm-support": "ROCKER-ARM SUPPORT",
     "fr-vn-lag-screw": "1/4-20 X 3/4 HEX-HEAD SCREW, 18-8 SS",
     "fr-top-frame": "TOP-FRAME CASTING",
     "fr-nameplate": "ETCHED BRASS MAKER'S NAMEPLATE",

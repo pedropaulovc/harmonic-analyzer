@@ -107,7 +107,7 @@ def test_no_process_callout_on_the_sheet() -> None:
 def test_support_finish_masks_both_mating_faces() -> None:
     # #2108 review: the base underside seats on the harmonic base and the
     # top face under the MHA-CH-08 feet; the finish names both.  One RAL on
-    # the three frame sheets (#2394; RAL 6005, delegated ruling 2026-11-20).
+    # the three frame sheets, RAL 6005 (owner ruling 2026-11-20, #2394).
     assert _config.parts(support.PART_NAME)["finish"] == (
         "RAL 6005 ENAMEL; MASK FOOT UNDERSIDE AND TOP FACE; OIL BARE FACES"
     )

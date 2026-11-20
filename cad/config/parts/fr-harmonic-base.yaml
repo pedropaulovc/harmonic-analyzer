@@ -2,9 +2,9 @@ fr-harmonic-base:
   title: Two-Plate Frame Base
   number: MHA-FR-01
   material_family: ferrous_noncritical
-  # One RAL on the three frame sheets: owner ruling 2026-11-20 (Pedro), #2394;
-  # delegated ruling 2026-11-20 (Main), RAL 6005 because it is the stocked
-  # paint and matches MHA-DT-05; owner review #2144.
+  # One RAL on the three frame sheets, RAL 6005: owner ruling 2026-11-20
+  # (Pedro), #2394: "RAL 6005 on the base, top frame and rocker support;
+  # deck and column clamps plain black enamel."
   finish: "ALKYD PRIME/ENAMEL: RAL 6005 BODY; BLACK DECK/UNDERSIDE; MASK+OIL BORES/THREADS/ID"
   quantity: 1
   tolerance_class: machined_block
