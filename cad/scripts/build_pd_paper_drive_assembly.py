@@ -373,11 +373,10 @@ BAR_CY = BAR_TOP_Y - BAR_HEIGHT / 2.0  # 305.034
 # The SH column clamps' screw line, below the bar's centre (pd_support_bar_spec).
 CLAMP_Y = BAR_CY + BAR.CLAMP_TAP_Y  # 303.734
 # The bar fills the channel between the rails down to this running clearance
-# over the bottom rail's top edge (pd_support_bar_spec.BAR_HEIGHT). MHA-PD-27's
-# top stands BOTTOM_GUIDE.TOP_RISE above the former .29 bottom rail's, paid
-# from the former 0.98; the 1.00 bar (it was 1.010; owner ruling 2026-11-20,
-# #2421) gives the channel back its 0.254.
-BOTTOM_RAIL_CLEARANCE = 0.98 + 0.254 - BOTTOM_GUIDE.TOP_RISE
+# over the bottom rail's top edge (pd_support_bar_spec.BAR_HEIGHT; 1.022 with
+# the 1.00 bar, owner ruling 2026-11-20, #2421): the bar hangs from the top
+# rail's underside and MHA-PD-27 sits at its own y, so the gap is what is left.
+BOTTOM_RAIL_CLEARANCE = BAR_TOP_Y - BAR_HEIGHT - (GUIDE_Y[0] + GUIDE_HEIGHTS[0])
 LOCK_Z0 = BAR_FRONT_Z + GUIDE_DEPTH  # -128.7: lock plates on the guide backs,
 # 0.7 behind the bar's back face -- they bridge the bar so the platen cannot
 # fall off it.

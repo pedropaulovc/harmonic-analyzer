@@ -224,6 +224,18 @@ def test_clamp_screw_line_wander_shortfall_stays_the_owner_ruled_value() -> None
     shortfall = demand - (geom.CLAMP_HOLE_DIA - SHANK_DIA) / 2.0
     assert shortfall == pytest.approx(0.0527, abs=1e-4)
     assert 0.0 < round(shortfall, 3) <= 0.053
+    # Rule 20: the sheet states it, rounded up, and RV-08 declares that note.
+    import _config
+    from sh_column_clamp_fit import note_text, stated_max
+
+    stated = note_text(stated_max(shortfall))
+    assert f"OFFSET UP TO\n{stated} OVER #8" in drawing.SCREW_LINE_NOTE
+    entries = {
+        entry["id"]: entry
+        for entry in _config.parts("mg-wheel-bar")["machinist_exceptions"]
+    }
+    assert entries["RV-08"]["kind"] == "minor"
+    assert " ".join(drawing.SCREW_LINE_NOTE.split()) in entries["RV-08"]["where"]
 
 
 def test_every_wall_is_stated_at_the_full_worst_case() -> None:
@@ -287,7 +299,11 @@ def test_every_wall_is_an_owner_declared_minor_stated_on_the_sheet() -> None:
     from machinist_exceptions import load_exceptions
 
     declared = load_exceptions(_config.CONFIG_DIR, "mg_wheel_bar", "part")
-    assert len(declared) == len(mg_wheel_bar_spec.MINOR_WALLS) == 4
+    # One minor per wall, plus RV-08, the screw line's stated shortfall
+    # (test_clamp_screw_line_wander_shortfall_stays_the_owner_ruled_value).
+    walls = [entry for entry in declared if entry.id != "RV-08"]
+    assert len(walls) == len(mg_wheel_bar_spec.MINOR_WALLS) == 4
+    declared = walls
     texts = {
         "axle bore": callouts.AXLE_BORE_CALLOUT,
         "hanger hole": callouts.HANGER_HOLE_CALLOUT,

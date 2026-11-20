@@ -96,10 +96,8 @@ if PIVOT_FITTED_LEN_MIN - PIVOT.FULL_THREAD_START < PIVOT.THREAD_LENGTH_MIN:
     raise AssertionError("the shortest fit leaves the gauged tail inside the neck")
 # Every stock length reaches the thinnest bar's recess window, so facing
 # (never adding) fits it there. At the thickest bar the ASME-short stock
-# (-0.020 in) can stop this far deeper than the deepest recess: the fitter
-# sets such a screw aside and fits another (assembly step "hanger-pivoted"),
-# a declared exception (owner ruling 2026-11-20 (Pedro), #1563; pd-paper-drive
-# PD-00-pivot-screw-selected-at-fit-up).
+# (-0.020 in) can stop this far deeper than the deepest recess: the fit-up
+# sets such a screw aside (assembly step "hanger-pivoted").
 if PIVOT.STOCK_THREAD_LEN_MIN < _BAR_THIN - PIVOT.TIP_RECESS[1]:
     raise AssertionError("the shortest stock cannot reach the thinnest bar's recess")
 PIVOT_STOCK_SHORTFALL_AT_THICKEST_BAR = max(

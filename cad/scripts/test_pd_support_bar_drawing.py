@@ -473,7 +473,7 @@ def test_round_counterbores_are_the_5_16_plunge_and_clear_the_head() -> None:
     assert sheet_spec.CLAMP_CBORE_DIA_LIMITS == pytest.approx((0.0, 0.010 * 25.4))
     assert sheet_spec.CLAMP_CBORE_DIA_PLACES == 4
     assert sheet_spec.CLAMP_CALLOUT_PRECISION["hw-cbdia"] == 4
-    assert sheet_spec.CLAMP_CBORE_DIA_LIMIT_PLACES == 3
+    assert sheet_spec.CLAMP_CBORE_DIA_LIMIT_PLACES == 4
     assert (
         part.CLAMP_HOLE_SPEC.overrides_mm["CounterBoreDiameter"] == part.CLAMP_CBORE_DIA
     )
@@ -507,6 +507,18 @@ def test_clamp_screw_line_wander_shortfall_stays_the_owner_ruled_value() -> None
     )
     assert part.CLAMP_SCREW_LINE_SHORTFALL == pytest.approx(0.0506, abs=1e-4)
     assert part.CLAMP_SCREW_LINE_SHORTFALL_RULED == 0.051
+    # Rule 20: the sheet states it, rounded up, and RV-03 declares that note.
+    from sh_column_clamp_fit import note_text, stated_max
+
+    stated = note_text(stated_max(part.CLAMP_SCREW_LINE_SHORTFALL))
+    assert stated == ".002"
+    assert f"OFFSET UP TO {stated} OVER #8" in drawing.SCREW_LINE_NOTE
+    entries = {
+        entry["id"]: entry
+        for entry in _config.parts("pd-support-bar")["machinist_exceptions"]
+    }
+    assert entries["RV-03"]["kind"] == "minor"
+    assert " ".join(drawing.SCREW_LINE_NOTE.split()) in entries["RV-03"]["where"]
 
 
 def test_slot_counterbores_leave_rule_17_walls() -> None:

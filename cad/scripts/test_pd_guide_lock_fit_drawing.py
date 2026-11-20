@@ -301,7 +301,8 @@ def _sweep_gap(monkeypatch, assembly, label: str) -> float:
 
 
 def test_set_locks_clear_the_pivot_spacer_in_the_sweep(monkeypatch) -> None:
-    """R9-61: the bar prints the pivot tap ±.002, and each set plate's far
+    """R9-61: the bar prints the pivot tap at the title block's ±.005 (owner
+    ruling 2026-11-20, #2422), and each set plate's far
     edge stands its skewed reach and its height band toward the bar. The
     .45 plate (user ruling 2026-10-11, grown with the .29 rails) keeps the spacer far off; the 15.65
     plate it replaced needed a +0/-0.50 band to pass it, and at the general

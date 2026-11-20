@@ -103,6 +103,8 @@ from build_pd_support_bar import (
     BAR_LENGTH,
     CLAMP_CBORE_DEPTH,
     CLAMP_CBORE_DIA,
+    CLAMP_SCREW_LINE_SHORTFALL,
+    CLAMP_SLOT_CBORE_WIDTH,
     CLAMP_ROUND_X,
     CLAMP_ROW,
     CLAMP_SLOT_WIDTH,
@@ -110,6 +112,7 @@ from build_pd_support_bar import (
     HANGER_ROW,
     MAX_SUFFIX,
 )
+from sh_column_clamp_fit import note_text, stated_max
 from _column_clamp_interface import BAR_DEPTH
 from pd_support_bar_spec import (
     BACK_FACE_Z,
@@ -173,6 +176,16 @@ BACK_CENTER = (0.170, 0.122)
 SECTION_CENTER = (0.385, 0.200)
 ISO_CENTER = (0.368, 0.097)
 ISO_NOTE_XY = (0.300, 0.076)
+# The clamp screw line's drill-wander shortfall
+# (build_pd_support_bar.CLAMP_SCREW_LINE_SHORTFALL), stated rounded up as a
+# plain fact (rule 20): pd-support-bar RV-03. Over END A's top-left corner,
+# left of the top edge's finish symbol and above the face view.
+SCREW_LINE_NOTE = (
+    "CLAMP HOLE TO MHA-SH-02 TAP\n"
+    f"OFFSET UP TO {note_text(stated_max(CLAMP_SCREW_LINE_SHORTFALL))} OVER #8\n"
+    "SCREW CLEARANCE"
+)
+SCREW_LINE_NOTE_XY = (0.016, 0.262)
 
 LEFT_END = FACE_CENTER[0] - BAR_LENGTH * _S / 2.0
 RIGHT_END = FACE_CENTER[0] + BAR_LENGTH * _S / 2.0
@@ -867,9 +880,11 @@ def _slot_section_material_boxes(
         point(CLAMP_TAP_Y + y)[1]
         for y in (-CLAMP_SLOT_WIDTH / 2.0, CLAMP_SLOT_WIDTH / 2.0)
     )
+    # B-B cuts through a slot, so the step is the slot counterbore's width,
+    # not the round counterbores' Ø (#2422 split them).
     cbore_bottom, cbore_top = sorted(
         point(CLAMP_TAP_Y + y)[1]
-        for y in (-CLAMP_CBORE_DIA / 2.0, CLAMP_CBORE_DIA / 2.0)
+        for y in (-CLAMP_SLOT_CBORE_WIDTH / 2.0, CLAMP_SLOT_CBORE_WIDTH / 2.0)
     )
     return {
         "upper bar": (xmin, cbore_top, xmax, top),
@@ -1391,8 +1406,9 @@ def clamp_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
 def _name_clamp_screws(display: Any) -> None:
     """Write the drill into the counterbores' native through row and hang the
     back-arc taps the holes locate to and the screws' part number under it
-    (clamp_callout_definitions); its sizes print .XXX, its depth the .XX its
-    head clearance takes. Only changed parts are written, each through its
+    (clamp_callout_definitions); its through hole prints .XXX, its depth the
+    .XX its head clearance takes and the counterbore's Ø the four places of
+    its 5/16 plunge and band. Only changed parts are written, each through its
     writable twin (definition 5..8 -> writable 1..4)."""
     label = "clamp-screw counterbores"
     native = _early_bound(display, "IDisplayDimension")
@@ -1423,12 +1439,13 @@ _TOL_BILATERAL = 2  # swTolType_e.swTolBILAT
 
 
 def _band_counterbore_diameter(display: Any) -> None:
-    """Print the round counterbores' Ø as the 5/16 plunge's .3125 +.010/0
-    (owner ruling 2026-11-20, #2422; CLAMP_CBORE_DIA_LIMITS). A hole callout
-    variable carries its OWN tolerance (SW 2016+:
-    ``ICalloutVariable.ToleranceType``), so the band is set and read back on
-    the callout, as draw_sm_knife_mount._band_tap_callout does; the through
-    hole and depth keep no band of their own (DRILLED HOLES and the .XX row)."""
+    """Print the round counterbores' Ø as the 5/16 plunge's .3125 +.0100/.0000
+    (owner ruling 2026-11-20, #2422; CLAMP_CBORE_DIA_LIMITS). The band lives
+    on the part's Hole Wizard feature (build_pd_support_bar
+    ._band_round_counterbores) and the callout's ``<hw-cbdia>`` displays it;
+    this sets only its tolerance places, the nominal's four, as
+    draw_dt_cone_swing_platform._print_pivot_band_exactly does, and reads the
+    displayed band back so a band that did not reach the callout fails here."""
     from win32com.client.dynamic import Dispatch as dynamic_dispatch
 
     lower, upper = CLAMP_CBORE_DIA_LIMITS
@@ -1449,9 +1466,6 @@ def _band_counterbore_diameter(display: Any) -> None:
         raise RuntimeError(
             f"clamp counterbore callout Ø reads {actual:g}, expected {CLAMP_CBORE_DIA:g} mm"
         )
-    variable.ToleranceType = _TOL_BILATERAL
-    variable.ToleranceMin = lower / 1000.0
-    variable.ToleranceMax = upper / 1000.0
     length.TolerancePrecision = CLAMP_CBORE_DIA_LIMIT_PLACES
     if (
         int(variable.ToleranceType) != _TOL_BILATERAL
@@ -1460,8 +1474,11 @@ def _band_counterbore_diameter(display: Any) -> None:
         or int(length.TolerancePrecision) != CLAMP_CBORE_DIA_LIMIT_PLACES
     ):
         raise RuntimeError(
-            "clamp counterbore callout band did not persist: wanted swTolBILAT, "
-            f"deviations {(lower, upper)} mm at {CLAMP_CBORE_DIA_LIMIT_PLACES} places"
+            "clamp counterbore callout does not display the part's band: wanted "
+            f"swTolBILAT, deviations {(lower, upper)} mm at "
+            f"{CLAMP_CBORE_DIA_LIMIT_PLACES} places; read "
+            f"{int(variable.ToleranceType)}, {float(variable.ToleranceMin)!r}, "
+            f"{float(variable.ToleranceMax)!r}, {int(length.TolerancePrecision)}"
         )
     _telemetry.info(
         f"clamp counterbore callout Ø {CLAMP_CBORE_DIA:g} mm, band {(lower, upper)} mm"
@@ -1730,6 +1747,13 @@ def build(adapter: Any) -> dict[str, str]:
     )
 
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    drawing.ActivateView("")
+    if drawing.ActiveDrawingView is not None:
+        raise RuntimeError("cannot leave view context for the screw-line note")
+    # pd-support-bar RV-03 (SCREW_LINE_NOTE).
+    if add_note(adapter, SCREW_LINE_NOTE, *SCREW_LINE_NOTE_XY) is None:
+        raise RuntimeError("screw-line note: InsertNote failed")
 
     # The countersinks' stacked callouts restate the taps, so the Hole
     # Wizard's own "Tapped Hole" note is the one redundant automatic note.

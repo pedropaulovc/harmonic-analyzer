@@ -57,13 +57,15 @@ CLAMP_CBORE_DEPTH_PLACES = 2
 CLAMP_HOLE_CALLOUT_PLACES = 3
 # The round counterbores are a 5/16 end mill's plunge, Ø.3125 +.010/0 (owner
 # ruling 2026-11-20 (Pedro), #2422: "Follow recommendations unless noted
-# otherwise"; it was a Ø.335 no cutter makes). The callout carries that band
-# (draw_pd_support_bar), at four places so its .3125 low limit is the cutter's
-# own size: the .XX row's -.01 would let the MHA-SH-VN-53 head, floated across
-# its hole, meet the wall (build_pd_support_bar.clamp_round_head_clearance).
+# otherwise"; it was a Ø.335 no cutter makes). The part's Hole Wizard feature
+# carries that band and the callout displays it (draw_pd_support_bar), at four
+# places so its .3125 low limit is the cutter's own size, the band at the
+# nominal's places: the .XX row's -.01 would let the MHA-SH-VN-53 head,
+# floated across its hole, meet the wall
+# (build_pd_support_bar.clamp_round_head_clearance).
 CLAMP_CBORE_DIA_PLACES = 4
 CLAMP_CBORE_DIA_LIMITS = (0.0, 0.254)  # 0/+.010
-CLAMP_CBORE_DIA_LIMIT_PLACES = 3
+CLAMP_CBORE_DIA_LIMIT_PLACES = 4
 # By native Hole Wizard variable: the round counterbores' Ø's and depth.
 CLAMP_CALLOUT_PRECISION = {
     "hw-thruholedia": CLAMP_HOLE_CALLOUT_PLACES,

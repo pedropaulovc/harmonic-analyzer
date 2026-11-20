@@ -45,8 +45,13 @@ from dataclasses import dataclass
 
 from _appearance import apply_material
 from _check import check
-from _com import _early_bound
-from _dimensions import drive_dimension, name_dimensions, set_global
+from _com import _com_invoke, _early_bound
+from _dimensions import (
+    _feature_display_dimensions,
+    drive_dimension,
+    name_dimensions,
+    set_global,
+)
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -55,7 +60,7 @@ from _drawing_marks import (
 from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _document_units import apply_package_model_units
-from _feature_tree import name_last_feature
+from _feature_tree import _feature_by_name, name_last_feature
 from _part_pmi import author_part_pmi
 from _part_checks import report_mass_properties, volume_check
 from _part_properties import part_drawing_unit
@@ -407,6 +412,46 @@ if clamp_round_head_clearance() < 0.0:
         "MHA-SH-VN-53 heads reach past the round counterbores' walls by "
         f"{-clamp_round_head_clearance():.3f}"
     )
+
+
+def _band_round_counterbores(adapter) -> None:
+    """Put the round counterbores' Ø.3125 +.010/0 (owner ruling 2026-11-20,
+    #2422; CLAMP_CBORE_DIA_LIMITS) on the ClampHoles Hole Wizard feature's
+    counterbore-diameter dimension IN THE PART, so the sheet's native callout
+    displays the model's band (as _holes._tolerance_hole_diameter does for a
+    hole's own Ø); the drawing sets only its places. The dimension is found
+    by its value, the one Ø on the feature equal to CLAMP_CBORE_DIA, and the
+    band is read back."""
+    feature = _feature_by_name(adapter, "ClampHoles")
+    matches = []
+    for display in _feature_display_dimensions(feature):
+        dimension = _early_bound(
+            _com_invoke(display, "IDisplayDimension", "GetDimension2", 0), "IDimension"
+        )
+        if abs(float(dimension.SystemValue) * 1000.0 - CLAMP_CBORE_DIA) < 1e-4:
+            matches.append(dimension)
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"ClampHoles: {len(matches)} dimensions read the counterbore Ø "
+            f"{CLAMP_CBORE_DIA} mm, not 1"
+        )
+    lower, upper = CLAMP_CBORE_DIA_LIMITS
+    tolerance = _early_bound(matches[0].Tolerance, "IDimensionTolerance")
+    tolerance.Type = 2  # swTolType_e.swTolBILAT
+    if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):
+        raise RuntimeError(
+            f"ClampHoles counterbore Ø: SetValues rejected {lower}/{upper} mm"
+        )
+    if (
+        int(tolerance.Type) != 2
+        or abs(float(tolerance.GetMinValue()) * 1000.0 - lower) > 1e-6
+        or abs(float(tolerance.GetMaxValue()) * 1000.0 - upper) > 1e-6
+    ):
+        raise RuntimeError("ClampHoles counterbore Ø: band did not persist")
+    _telemetry.info(
+        f"ClampHoles counterbore Ø {matches[0].FullName}: band {lower}/{upper} mm"
+    )
+
 
 REFERENCE_SKETCHES = (
     "HangerRowReference",
@@ -1245,6 +1290,10 @@ def build(adapter) -> dict[str, str]:
         places=CLAMP_SLOT_CBORE_WIDTH_PLACES,
         display_unit=UNIT,
     )
+    # The round counterbores' Ø carries the 5/16 plunge's +.010/0 on the
+    # Hole Wizard feature; the callout displays it (draw_pd_support_bar sets
+    # its places).
+    _band_round_counterbores(adapter)
     for (feature_name, dimension_name), prefix in DIMENSION_PREFIXES.items():
         set_dimension_prefix(adapter, feature_name, dimension_name, prefix)
     clear_dimensions_for_drawing(adapter)
