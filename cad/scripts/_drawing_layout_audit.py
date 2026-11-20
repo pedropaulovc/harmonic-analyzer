@@ -76,6 +76,54 @@ _DISPLAY_PRIMITIVES = (
     ("triangles", "GetTriangleCount", ("GetTriangleAtIndex",)),
     ("ellipses", "GetEllipseCount", ("GetEllipseAtIndex2",)),
 )
+# Each primitive row's documented length (``IDisplayData::Get*AtIndex*``
+# remarks), checked before the tolerant parsers in ``_layout_audit`` see it.
+# Polylines and polygons carry their point count: :func:`_row_shape_ok`.
+_ROW_LENGTHS = {"lines": 10, "arcs": 17, "arrows": 12, "triangles": 11, "ellipses": 19}
+# ``IAnnotation::GetLeaderPointsAtIndex``: a straight or underlined leader has
+# two xyz points, a bent one three.
+_LEADER_LENGTHS = frozenset({6, 9})
+
+
+def _row_shape_ok(key: str, values: list[float]) -> bool:
+    """Whether a primitive row has its documented shape (issue #1419)."""
+    if key in _ROW_LENGTHS:
+        return len(values) == _ROW_LENGTHS[key]
+    if key == "polylines":
+        # [type, DataSize, color, font, _, _, n, GeomData[DataSize], xyz * n]
+        if len(values) < 7 or not all(_count(values[i]) for i in (1, 6)):
+            return False
+        return len(values) == 7 + int(values[1]) + 3 * int(values[6])
+    if key == "polygons":
+        # [color, type, _, _, n, xyz * n]
+        return (
+            len(values) >= 5
+            and _count(values[4])
+            and len(values) == 5 + 3 * int(values[4])
+        )
+    raise KeyError(key)
+
+
+def _count(value: float) -> bool:
+    return value >= 0 and float(value).is_integer()
+
+
+def _shaped(
+    reader: _Reader, name: str, raw: Any, ok: Callable[[list[float]], bool]
+) -> list[float] | None:
+    """``raw`` rounded when it has its documented shape; otherwise the read is
+    counted as malformed under ``name`` with the shape it came back in, and
+    nothing is returned. An empty row behind a positive count, or a truncated
+    one, would otherwise drop its ink with com-read-errors clean."""
+    try:
+        values = _round(raw)
+    except (TypeError, ValueError):
+        values = None
+    if values is not None and ok(values):
+        return values
+    shape = f"{len(raw)} values" if hasattr(raw, "__len__") else type(raw).__name__
+    reader.malformed(f"{name} malformed ({shape})")
+    return None
 
 
 def _round(values: Any) -> list[float]:
@@ -117,6 +165,11 @@ class _Reader:
 
     def _count(self, name: str) -> None:
         self.errors[name] = self.errors.get(name, 0) + 1
+
+    def malformed(self, name: str) -> None:
+        """A read that answered, but not in its documented shape: counted like
+        a refusal, since the audit loses its ink or text either way."""
+        self._count(name)
 
     def _spent(self, name: str, started: float) -> None:
         entry = self.cost.get(name)
@@ -239,12 +292,19 @@ def _dump_display(reader: _Reader, data: Any) -> dict[str, Any]:
     for key, count_name, getters in _DISPLAY_PRIMITIVES:
         count = int(reader.need(lambda c=count_name: getattr(data, c)(), 0, name=count_name) or 0)
         rows = []
+        name = "/".join(getters)
         for index in range(count):
             raw = reader.first(
-                [lambda g=getter, i=index: getattr(data, g)(i) for getter in getters], name="/".join(getters)
+                [lambda g=getter, i=index: getattr(data, g)(i) for getter in getters],
+                name=name,
             )
-            if raw:
-                rows.append(_round(raw))
+            if raw is None:
+                continue  # every overload refused: ``first`` counted it
+            row = _shaped(
+                reader, name, raw, lambda values, k=key: _row_shape_ok(k, values)
+            )
+            if row is not None:
+                rows.append(row)
         if rows:
             out[key] = rows
     texts = []
@@ -310,8 +370,13 @@ def _dump_annotation(reader: _Reader, raw: Any) -> dict[str, Any] | None:
     leaders = []
     for index in range(int(reader.need(lambda: annotation.GetLeaderCount(), 0) or 0)):
         points = reader.need(lambda i=index: annotation.GetLeaderPointsAtIndex(i))
-        if points:
-            leaders.append(_round(points))
+        if points is None:
+            continue  # refused: ``need`` counted it
+        leader = _shaped(
+            reader, "GetLeaderPointsAtIndex", points, lambda values: len(values) in _LEADER_LENGTHS
+        )
+        if leader is not None:
+            leaders.append(leader)
     if leaders:
         record["leaders"] = leaders
     record["display"] = _dump_display(reader, reader.need(lambda: annotation.GetDisplayData()))
