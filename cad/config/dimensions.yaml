@@ -769,9 +769,9 @@ sections:
       - confidence
       rows:
       - - Centre distance (cam ring → rocker pin)
-        - 158.369029979535 mm
+        - 158.36622566069354 mm
         - '6.235'
-        - 'Current ch_connecting_rod_spec.CENTER_DISTANCE is the Euclidean distance between the actual phased cam centre and the level rocker''s rod pin. The common drive-height raise changes the home cam centre while the rocker bank stays fixed; cam phase and 8.64 mm eccentricity are unchanged. Former 163.1010 mm and its (−60.167, 99.155) cam-centre arithmetic described the lower drive layout, not the current cut length.'
+        - 'Current ch_connecting_rod_spec.CENTER_DISTANCE is the Euclidean distance between the lobe-up cam centre at crank home (owner ruling 2026-11-20 on #749) and the level rocker''s rod pin; the pin was solved plumb over the former 1.5 deg-phased centre, so the rod leans 0.082 deg at crank home (delegated ruling 2026-11-20 on #749, owner review #2144). The common drive-height raise changes the home cam centre while the rocker bank stays fixed; the 8.64 mm eccentricity is unchanged. Former 163.1010 mm and its (−60.167, 99.155) cam-centre arithmetic described the lower drive layout, not the current cut length.'
         - derived
         - high
       - - Cam ring bore
