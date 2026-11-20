@@ -2690,8 +2690,9 @@ def _step_text(
             "IN ITS FRONT BORE MOUTH.",
             # #2665: centred on the O.D., cut on the teeth's arbor; the
             # tooth spaces are sampled at the re-check.
-            f"WITH A DIAL INDICATOR ON THE {n['pd-rack-pinion']} DISC'S O.D., TAP THE "
-            f"DISC CENTRAL UNTIL THE O.D. READS {tir} TIR MAX {row_cite('disc-tir')}.",
+            f"WITH A DIAL INDICATOR ON THE {n['pd-rack-pinion']} DISC'S O.D. "
+            f"{row_cite('disc-tir')}, TAP THE DISC CENTRAL UNTIL THE O.D. READS {tir} "
+            "TIR MAX.",
             # The flange holes are off the axis, so the spots are taken off the
             # lathe; the trued disc is clamped to the flange first, or the
             # spigot's centring clearance lets it shift before it is spotted

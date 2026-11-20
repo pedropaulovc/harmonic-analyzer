@@ -1957,7 +1957,7 @@ def test_the_disc_is_centred_to_its_running_bore_before_transfer_and_match_mark(
     assert "BETWEEN CENTRES" not in transferred
     # Owner ruling 2026-11-20 (Pedro), #2665: the disc is centred on its
     # O.D., then the pin samples 12 spaces about evenly round it.
-    assert "DISC'S O.D., TAP THE DISC CENTRAL" in " ".join(transferred.split())
+    assert "TAP THE DISC CENTRAL UNTIL THE O.D. READS" in " ".join(transferred.split())
     strides = drawing.DISC_TIR_SAMPLE_STRIDES
     # The two strides go once round all the teeth.
     assert any(
