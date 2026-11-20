@@ -30,7 +30,7 @@ Every chain runs from the arm's REAR face, where the pin's head and the
 MHA-PD-19 plate both seat.  F is the MHA-PD-08 knob shaft's 15T front face (the
 drive collar's seat), knob rearward:
 
-    F       = plate hub face station + thrust ring + 15T face width
+    F       = bush hub face station + thrust ring + 15T face width
     m_fwd   = F - groove station + ring + front bushing + hub - spigot
               (F to the disc front face, cluster, hub and disc forward)
     ring    = groove station - arm thickness - ring - front bushing
@@ -48,7 +48,7 @@ import math
 
 import pd_rack_pinion_spec as DISC
 import pd_transgear_arm_geometry as ARM
-import pd_transgear_arm_plate_geometry as ARM_PLATE
+import pd_transgear_knob_bush_geometry as BUSH
 import pd_transgear_disc_hub_geometry as HUB_JOINT
 import pd_transgear_feed_pinion_spec as SLEEVE
 import pd_transgear_knob_shaft_spec as KNOB_SHAFT
@@ -74,10 +74,12 @@ FRONT_BUSHING_LENGTH = 5.6388  # .222
 REAR_BUSHING_LENGTH = 5.4356  # .214
 
 # --- the stack's terms: (label, nominal, band) ------------------------------------
+# The MHA-PD-28 bush's hub face, HUB_LENGTH forward of its shoulder on face A
+# (#2425); a full press leaves the shoulder at most SHOULDER_SEAT_GAP_MAX off.
 PH = (
-    "MHA-PD-19 hub face station",
-    ARM_PLATE.HUB_FACE_TO_MOUNTING,
-    ARM_PLATE.HUB_FACE_TO_MOUNTING_BAND,
+    "MHA-PD-28 hub face station",
+    BUSH.HUB_LENGTH,
+    BUSH.HUB_LENGTH_BAND + BUSH.SHOULDER_SEAT_GAP_MAX,
 )
 TR = ("MHA-PD-15 thrust ring length", KNOB_RING.LENGTH, KNOB_RING.LENGTH_TOL)
 FW = ("MHA-PD-08 15T face width", KNOB_SHAFT.FACE_WIDTH, KNOB_SHAFT.FACE_WIDTH_BAND)
@@ -103,7 +105,7 @@ def _spread(chain: tuple[tuple[Term, int], ...]) -> float:
 
 
 F_CHAIN = ((PH, 1), (TR, 1), (FW, 1))
-F_FROM_ARM_REAR = _nominal(F_CHAIN)  # 31.6375
+F_FROM_ARM_REAR = _nominal(F_CHAIN)  # 33.2232
 F_BAND = _spread(F_CHAIN)
 # F to the disc's front face, cluster, hub and disc forward (knob rearward):
 # the front bushing on the ring, the hub on the bushing.

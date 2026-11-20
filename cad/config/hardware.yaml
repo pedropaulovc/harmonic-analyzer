@@ -246,11 +246,14 @@ pd-vn-transgear-hub-key-pin:
   why: "ASME B18.8.2 hardened dowel pin, used as supplied"
   designation: "Ø1/16 x 5/16 hardened dowel pin, alloy steel"
   standard: "ASME B18.8.2"
-pd-vn-transgear-knob-cup-pin:
+pd-vn-transgear-knob-cup-screw:
   tier: 1
-  why: "ASME B18.8.2 slotted spring pin, used as supplied"
-  designation: "Ø1/16 x 5/8 slotted spring pin, spring steel"
-  standard: "ASME B18.8.2"
+  why: "ASME B18.6.3 slotted machine screw, used as supplied"
+  designation: "#2-56 UNC-2A x 3/8 slotted fillister head machine screw, 18-8 stainless"
+  standard: "ASME B18.6.3"
+  envelope:
+    "head Ø": "_mcmaster_91794a079 SupplierHeadDiameter"
+    "head H": "_mcmaster_91794a079 SupplierHeadHeight"
 pd-vn-transgear-knob-drive-pin:
   tier: 1
   why: "ASME B18.8.2 hardened dowel pin, used as supplied"

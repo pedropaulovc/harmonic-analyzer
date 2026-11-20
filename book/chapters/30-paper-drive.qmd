@@ -31,6 +31,7 @@ The crank also drives the paper sideways, through a reduction, a chain, and a ra
 | `pd-transgear-thumbnut` | TODO | TODO | TODO |
 | `pd-transgear-knob-thrust-ring` | TODO | TODO | TODO |
 | `pd-transgear-knob-cup` | TODO | TODO | TODO |
+| `pd-transgear-knob-bush` | TODO | TODO | TODO |
 | `pd-transgear-arm` | TODO | TODO | TODO |
 | `pd-transgear-arm-plate` | TODO | TODO | TODO |
 | `pd-transgear-pivot-spacer` | TODO | TODO | TODO |

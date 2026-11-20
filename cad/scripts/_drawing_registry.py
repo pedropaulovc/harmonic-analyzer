@@ -828,6 +828,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="pd_transgear_knob_bush",
+        part="pd_transgear_knob_bush",
+        artifact_stem="pd-transgear-knob-bush",
+        script_name="draw_pd_transgear_knob_bush.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="pd_transgear_disc_hub",
         part="pd_transgear_disc_hub",
         artifact_stem="pd-transgear-disc-hub",

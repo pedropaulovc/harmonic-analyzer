@@ -66,7 +66,8 @@ export const BINDINGS: readonly Binding[] = [
   group('alignmentPinionCam', drive, 'dt-pinion-cam-[12]|dt-pinion-lift-rod-1|dt-pinion-cam-pin-[12]', 'pinion-cam', 5),
   group('alignmentPinionLever', drive, 'dt-pinion-lever-1|dt-pinion-lever-pin-1', 'pinion-lever', 2),
   // Knob shaft hardware turns about the knob axis; feed hardware about the disc stud.
-  group('paperKnob', paper, '(?:pd-transgear-knob-shaft|pd-transgear-thumbnut|pd-transgear-drive-collar|pd-vn-transgear-collar-flat-pin|pd-transgear-knob-cup|pd-vn-transgear-knob-cup-pin|pd-transgear-knob-thrust-ring)-1|pd-vn-transgear-knob-drive-pin-[12]', 'paper-knob', 9),
+  // The arm plate and its pressed MHA-PD-28 knob bush stay static (no binding).
+  group('paperKnob', paper, '(?:pd-transgear-knob-shaft|pd-transgear-thumbnut|pd-transgear-drive-collar|pd-vn-transgear-collar-flat-pin|pd-transgear-knob-cup|pd-vn-transgear-knob-cup-screw|pd-transgear-knob-thrust-ring)-1|pd-vn-transgear-knob-drive-pin-[12]', 'paper-knob', 9),
   group('paperFeed', paper, '(?:pd-rack-pinion|pd-transgear-feed-pinion|pd-transgear-disc-hub|pd-vn-transgear-hub-key-pin)-1|pd-vn-transgear-disc-screw-[123]', 'paper-feed', 7),
   group('paperChain', paper, 'sh-vn-chain-link-\\d+|pd-vn-chain-connecting-link-1', 'chain-link', 66),
   group('paperSprockets', paper, 'pd-transgear-removable-[123]', 'paper-sprocket', 3),

@@ -665,17 +665,6 @@
       ]
     },
     {
-      "old_stem": "vn-transgear-knob-cup-pin",
-      "old_number": "MHA-VN-048",
-      "new_identities": [
-        {
-          "parent": "pd-paper-drive",
-          "stem": "pd-vn-transgear-knob-cup-pin",
-          "number": "MHA-PD-VN-62"
-        }
-      ]
-    },
-    {
       "old_stem": "mg-magnifying-bracket",
       "old_number": "MHA-MG-001",
       "new_identities": [
@@ -2576,6 +2565,29 @@
         }
       ],
       "kind": "assembly"
+    },
+    {
+      "old_stem": "pd-transgear-knob-bush",
+      "old_number": null,
+      "introduced": "2026-11-20",
+      "new_identities": [
+        {
+          "stem": "pd-transgear-knob-bush",
+          "number": "MHA-PD-28"
+        }
+      ]
+    },
+    {
+      "old_stem": "pd-vn-transgear-knob-cup-screw",
+      "old_number": null,
+      "introduced": "2026-11-20",
+      "new_identities": [
+        {
+          "parent": "pd-paper-drive",
+          "stem": "pd-vn-transgear-knob-cup-screw",
+          "number": "MHA-PD-VN-71"
+        }
+      ]
     }
   ],
   "retired_identities": [
@@ -3202,6 +3214,18 @@
           "parent": "ch-channel",
           "stem": "ch-vn-rocker-thrust-washer",
           "number": "MHA-CH-VN-56"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "vn-transgear-knob-cup-pin",
+      "old_number": "MHA-VN-048",
+      "new_identities": [
+        {
+          "parent": "pd-paper-drive",
+          "stem": "pd-vn-transgear-knob-cup-pin",
+          "number": "MHA-PD-VN-62"
         }
       ],
       "status": "retired"

@@ -35,12 +35,12 @@ from dataclasses import dataclass
 
 import paper_drive_arm_registration as REGISTRATION
 import pd_rack_pinion_spec as DISC
-import pd_transgear_arm_plate_geometry as ARM_PLATE
 import pd_transgear_disc_hub_spec as HUB
 import pd_transgear_drive_collar_spec as COLLAR
 import pd_transgear_feed_pinion_spec as SLEEVE
 import pd_transgear_front_bushing_spec as FRONT_BUSHING
 import pd_transgear_knob_shaft_spec as KNOB_SHAFT
+import pd_transgear_knob_bush_geometry as BUSH
 import pd_transgear_knob_thrust_ring_spec as KNOB_RING
 import pd_transgear_pin_spec as PIN
 import transgear_cluster_fit as FIT
@@ -225,7 +225,7 @@ SLEEVE_COCK = math.atan(
     / (SLEEVE.OVERALL_LENGTH - SLEEVE.OVERALL_LENGTH_BAND - 2.0 * EDGE_BREAK_MAX)
 )
 KNOB_JOURNAL_TILT = math.atan(
-    (max(ARM_PLATE.BORE_DIA_LIMITS) - min(KNOB_SHAFT.JOURNAL_DIA_BAND))
+    (max(BUSH.BORE_DIA_LIMITS) - min(KNOB_SHAFT.JOURNAL_DIA_BAND))
     / REGISTRATION.KNOB_JOURNAL_CONTACT_SPAN_MIN_MM
 )
 S_ZONE_TILT = math.atan(

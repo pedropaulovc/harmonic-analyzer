@@ -11,17 +11,29 @@ import pytest
 import _config
 import build_pd_transgear_knob_cup as part
 import draw_pd_transgear_knob_cup as drawing
+import pd_transgear_knob_bush_geometry as bush
 import pd_transgear_knob_cup_spec as spec
-import pd_vn_transgear_knob_cup_pin_spec as pin
 import pd_transgear_knob_shaft_spec as knob_shaft
+import pd_vn_transgear_knob_cup_screw_spec as screw
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
-from _printed_tolerance import printed_band_mm
+from _hole_spec import TAP_DRILL_MM
+from _inch_wall_limits import WALL_TARGET_MM
+from _printed_tolerance import drilled_oversize_mm, printed_band_mm
+
+IN = 25.4
 
 
 def _band(places: int) -> float:
     """The +/- the title block prints for ``places`` (what the shop reads)."""
     return printed_band_mm(places, unit=spec.UNIT)
+
+
+def _fresh_spec():
+    fresh_spec = importlib.util.spec_from_file_location("_cup_perturbed", spec.__file__)
+    fresh = importlib.util.module_from_spec(fresh_spec)
+    fresh_spec.loader.exec_module(fresh)
+    return fresh
 
 
 def test_required_drawing_paths() -> None:
@@ -34,10 +46,24 @@ def test_required_drawing_paths() -> None:
     assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
 
 
-def test_every_marked_dimension_prints_on_the_section_with_model_places() -> None:
-    """Rule 11: the turner reads every diameter and the length on A-A."""
+def test_every_marked_dimension_prints_once_with_model_places() -> None:
+    """Rule 11: the turner reads every turned size and both floor corners on
+    A-A; the web's drill prints on the face view, where it shows round."""
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    assert set(drawing.SECTION_KEEP) == marked == {"CupDia", "CupLength", "BoreDia"}
+    assert set(spec.DRAWING_DIMENSIONS["CupProfile"]) == {
+        "CupDia",
+        "CupLength",
+        "BoreDia",
+        "PilotDepth",
+        "CboreDia",
+        "CboreDepth",
+    }
+    assert spec.DRAWING_DIMENSIONS[spec.PILOT_FLOOR_FILLET] == {"PilotFloorR"}
+    assert spec.DRAWING_DIMENSIONS[spec.POCKET_FLOOR_FILLET] == {"PocketFloorR"}
+    assert set(drawing.SECTION_KEEP) == marked - {"HoleDia"}
+    assert (
+        set(drawing.FACE_KEEP) == set(spec.DRAWING_DIMENSIONS["WebHole"]) == {"HoleDia"}
+    )
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
     assert {
         (feature, name)
@@ -48,7 +74,8 @@ def test_every_marked_dimension_prints_on_the_section_with_model_places() -> Non
         for feature, names in spec.DRAWING_DIMENSIONS.items()
         for name in names
     }
-    assert set(drawing.DIMENSION_CALLOUTS) <= set(drawing.SECTION_KEEP)
+    assert set(drawing.SECTION_CALLOUTS) <= set(drawing.SECTION_KEEP)
+    assert set(drawing.FACE_CALLOUTS) <= set(drawing.FACE_KEEP)
 
 
 def test_the_section_cuts_the_cup_axis_and_lies_level_beside_the_face_view() -> None:
@@ -80,27 +107,32 @@ def _block_half_width(text: str, anchor: tuple[float, float]) -> float:
     return max(halves)
 
 
-def test_bore_callout_names_its_journal_and_stands_clear_below_the_bore() -> None:
-    """Machinist review: the 0.012 band named no mate; eecbf88 review: the
-    bore's Ø sat on the end view, apart from the section's O.D. and length."""
+def test_pilot_callout_names_its_bonded_mate_and_stands_clear_below_the_pilot() -> None:
+    """Rule 23: a bonded fit is a fit; the part sheet gives the mate and the
+    diametral clearance."""
     shaft = _config.parts("pd-transgear-knob-shaft")["number"]
     callout = " ".join(drawing.BORE_CALLOUT.split())
-    assert "REAM THRU" in callout
-    assert shaft in callout
+    assert callout.startswith("FLAT BOTTOM END MILL ")
+    assert "REAM" not in callout
+    assert "THRU" not in callout
+    assert f"BONDED FIT ON {shaft}" in callout
+    assert f"(CLEARANCE {spec.BORE_CLEARANCE_TEXT})" in callout
+    assert spec.BORE_CLEARANCE_TEXT == ".0012-.0025"
     # Every printed row stands a space off the dimension line, and a closing
     # no-break-space row keeps the shelf off the parentheses' tails.
-    printed = drawing.DIMENSION_CALLOUTS["BoreDia"]
+    printed = drawing.SECTION_CALLOUTS["BoreDia"]
     rows = printed.splitlines()
     assert rows[:-1] == [f" {row}" for row in drawing.BORE_CALLOUT.splitlines()]
     assert rows[-1] == "\u00a0"
-    assert "PIN HOLE" not in callout
+    # Rule 7: the process line plus two lines of words, 24 characters each.
+    assert all(len(row) <= 24 for row in drawing.BORE_CALLOUT.splitlines())
 
     anchor = drawing.SECTION_KEEP["BoreDia"]
     half = _block_half_width(printed, anchor)
     # Right of the front face, left of the isometric (about the O.D. wide).
     assert anchor[0] - half > drawing.FRONT_FACE_X + 0.010
     assert anchor[0] + half < drawing.ISO_CENTER[0] - drawing.HALF_OD - 0.010
-    # Wholly below the bore's lower extension line, above the title block.
+    # Wholly below the pilot's lower extension line, above the title block.
     top = anchor[1] + drawing.BORE_BLOCK_HALF_HEIGHT
     assert top + 0.003 < drawing.SECTION_CENTER[1] - drawing.HALF_BORE
     assert anchor[1] - drawing.BORE_BLOCK_HALF_HEIGHT > 0.075
@@ -108,137 +140,274 @@ def test_bore_callout_names_its_journal_and_stands_clear_below_the_bore() -> Non
     assert anchor[0] - half > drawing.CAPTION_XY[0] + 0.0225 + 0.005
 
 
-def test_pin_hole_note_stands_apart_and_cites_the_assembly_step() -> None:
+def test_supply_sizes_cite_note_1_and_the_note_gives_the_fitted_depth() -> None:
+    """Rule 19: a size set at assembly prints its supply size and its fitted
+    range with the step that sets it."""
     import pd_paper_drive_assembly_steps as steps
 
-    note = " ".join(drawing.PIN_HOLE_NOTE.split())
-    assert "NO CROSS HOLE ON THIS PART" in note
-    assert _config.parts("pd-vn-transgear-knob-cup-pin")["number"] in note
+    for name in ("CupLength", "PilotDepth"):
+        assert drawing.SECTION_CALLOUTS[name] == "SEE NOTE 1"
+    note = " ".join(drawing.NOTES.split())
+    assert note.startswith("NOTES: 1. LENGTH AND PILOT DEPTH ARE SUPPLY SIZES.")
     assert steps.step_ref("knob-stack-fitted") in note
-    # Below the face view (and its section labels), inside the left border.
-    assert (
-        drawing.PIN_HOLE_NOTE_XY[1] < drawing.FACE_CENTER[1] - drawing.HALF_OD - 0.010
-    )
-    assert drawing.PIN_HOLE_NOTE_XY[0] > 0.0127 + 0.003
+    assert f"FITTED PILOT DEPTH {spec.PILOT_DEPTH_FITTED_TEXT}" in note
+    assert spec.PILOT_DEPTH_FITTED_TEXT == ".116-.148"
+    assert f".008 END FLOAT ON {drawing.BUSH_NUMBER}" in note
+    # Below the face view, left of the section.
+    assert drawing.NOTES_XY[1] < drawing.FACE_CENTER[1] - drawing.HALF_OD - 0.010
 
 
-def test_front_finish_caption_names_the_plate_boss() -> None:
-    plate = _config.parts("pd-transgear-arm-plate")["number"]
+def test_web_hole_prints_its_drill_on_the_face_view() -> None:
+    assert drawing.FACE_CALLOUTS == {"HoleDia": "#33 DRILL THRU"}
+    x, y = drawing.FACE_KEEP["HoleDia"]
+    assert y > drawing.FACE_CENTER[1] + drawing.HALF_OD
+    assert x < drawing.FACE_CENTER[0]
+
+
+def test_depth_rows_stand_above_the_section_over_their_own_spans() -> None:
+    top = drawing.SECTION_TOP
+    rear, front = drawing.REAR_FACE_X, drawing.FRONT_FACE_X
+    cbore_x, cbore_y = drawing.SECTION_KEEP["CboreDepth"]
+    pilot_x, pilot_y = drawing.SECTION_KEEP["PilotDepth"]
+    length_x, length_y = drawing.SECTION_KEEP["CupLength"]
+    assert cbore_y == pilot_y > top + 0.005
+    assert rear < cbore_x < rear + drawing.CBORE_DEPTH_ON_SHEET
+    assert front - drawing.PILOT_DEPTH_ON_SHEET < pilot_x < front
+    # ".108" and ".152" side by side: 10 mm texts 23 mm apart.
+    assert pilot_x - cbore_x > 0.015
+    # The length a row higher, its NOTE 1 reference clear of the depths.
+    assert length_y - pilot_y > 0.012
+    assert length_x == drawing.SECTION_CENTER[0]
+
+
+def test_front_finish_caption_names_the_bush_rear_face() -> None:
+    bush_number = _config.parts("pd-transgear-knob-bush")["number"]
+    assert bush_number == drawing.BUSH_NUMBER == "MHA-PD-28"
     caption = " ".join(drawing.FRONT_FINISH_CAPTION.split())
     assert "THRUST FACE" in caption
-    assert f"{plate} REAR BOSS" in caption
+    assert f"{bush_number} REAR FACE" in caption
     assert drawing.FRONT_FINISH_CAPTION_XY[1] > drawing.FRONT_FINISH[1][1]
-    # The pick is on the front face's cut edge, above the bore's upper
+    # The pick is on the front face's cut edge, above the pilot's upper
     # extension line; the symbol stands outboard of the length's.
     (pick_x, pick_y), (symbol_x, _) = drawing.FRONT_FINISH
     assert pick_x == drawing.FRONT_FACE_X
     rise = pick_y - drawing.SECTION_CENTER[1]
-    assert drawing.HALF_BORE + 0.005 < rise < drawing.HALF_OD - 0.005
+    assert drawing.HALF_BORE + 0.003 < rise < drawing.HALF_OD - 0.003
     assert symbol_x > drawing.FRONT_FACE_X + 0.010
 
 
-def test_cup_od_stands_between_the_face_view_and_the_section() -> None:
+def test_cup_diameters_stand_between_the_face_view_and_the_section() -> None:
     from _layout_geometry import estimate_text_box
 
-    anchor = drawing.SECTION_KEEP["CupDia"]
-    box = estimate_text_box("Ø19.0", anchor=anchor, height=0.0035, reference=2)
-    assert box is not None
-    # Clear of the face view's centre-mark tail and of the section.
-    assert box.xmin > drawing.FACE_CENTER[0] + drawing.HALF_OD + 0.010
-    assert box.xmax < drawing.SECTION_CENTER[0] - drawing.HALF_LENGTH - 0.005
-    assert anchor[1] == drawing.SECTION_CENTER[1]
-    # The native caption hangs below the section.
-    assert drawing.CAPTION_XY[1] < drawing.SECTION_CENTER[1] - drawing.HALF_OD - 0.005
-    assert drawing.SECTION_KEEP["CupLength"][1] > (
-        drawing.SECTION_CENTER[1] + drawing.HALF_OD + 0.005
+    od_anchor = drawing.SECTION_KEEP["CupDia"]
+    od_box = estimate_text_box("Ø.44", anchor=od_anchor, height=0.0035, reference=2)
+    cbore_anchor = drawing.SECTION_KEEP["CboreDia"]
+    cbore_box = estimate_text_box(
+        "Ø.188", anchor=cbore_anchor, height=0.0035, reference=2
     )
+    assert od_box is not None and cbore_box is not None
+    # Clear of the face view's centre-mark tail and of the section.
+    assert od_box.xmin > drawing.FACE_CENTER[0] + drawing.HALF_OD + 0.010
+    assert cbore_box.xmax < drawing.REAR_FACE_X - 0.003
+    assert od_anchor[1] == drawing.SECTION_CENTER[1]
+    # The pocket's text stands below the O.D.'s, clear of it.
+    assert cbore_box.ymax < od_box.ymin or cbore_box.xmin > od_box.xmax
+    assert cbore_anchor[1] < drawing.SECTION_CENTER[1] - drawing.HALF_CBORE
+    assert cbore_anchor[1] > drawing.SECTION_CENTER[1] - drawing.HALF_OD
+    # The native caption hangs below the section and its corner-radius row.
+    assert drawing.CAPTION_XY[1] < drawing.SECTION_CENTER[1] - drawing.HALF_OD - 0.005
 
 
-def test_only_the_bore_carries_a_model_band() -> None:
+def test_floor_corners_print_their_max_radius_under_their_own_corners() -> None:
+    """Rule 16: each corner's largest acceptable radius, on one row under the
+    section, above the caption and left of the pilot's callout block."""
+    pocket = drawing.SECTION_KEEP["PocketFloorR"]
+    pilot = drawing.SECTION_KEEP["PilotFloorR"]
+    assert pocket[1] == pilot[1] < drawing.SECTION_BOTTOM - 0.005
+    assert drawing.CAPTION_XY[1] < pocket[1] - 0.010
+    assert drawing.REAR_FACE_X - 0.005 < pocket[0] < pilot[0] < drawing.FRONT_FACE_X
+    bore = drawing.SECTION_KEEP["BoreDia"]
+    half = _block_half_width(drawing.SECTION_CALLOUTS["BoreDia"], bore)
+    assert pilot[0] + 0.012 < bore[0] - half
+
+
+def test_floor_corners_are_max_limits_that_clear_their_mates() -> None:
+    """The journal's least .010 rear chamfer clears the pilot's R.005 MAX
+    floor corner, and the head lands inside the pocket's R.010 MAX one."""
+    assert spec.PILOT_FLOOR_R_MAX == pytest.approx(0.005 * IN)
+    assert spec.POCKET_FLOOR_R_MAX == pytest.approx(0.010 * IN)
+    assert spec.CORNER_SUFFIX == " MAX"
+    assert spec.CORNER_TOL_TYPE == 0
+    assert knob_shaft.REAR_CHAMFER_MIN == pytest.approx(0.010 * IN)
+    assert knob_shaft.REAR_CHAMFER_MIN >= spec.PILOT_FLOOR_R_MAX
+    cbore_min = spec.CBORE_DIA - _band(spec.CBORE_PLACES)
+    clearance = cbore_min / 2.0 - spec.POCKET_FLOOR_R_MAX - screw.HEAD_DIA / 2.0
+    assert spec.HEAD_CORNER_CLEARANCE_MIN == pytest.approx(clearance)
+    assert clearance == pytest.approx(0.0115 * IN, abs=1e-9)
+
+
+def test_a_sharper_journal_chamfer_refuses_the_pilot_corner(monkeypatch) -> None:
+    monkeypatch.setattr(knob_shaft, "REAR_CHAMFER_MIN", 0.1)
+    with pytest.raises(AssertionError, match="pilot floor corner"):
+        _fresh_spec()
+
+
+def test_only_the_pilot_carries_a_model_band() -> None:
     assert model_toleranced_dimensions(part) == {
         ("CupProfile", "BoreDia"): "*deviations(BORE_BAND)",
     }
-    assert spec.BORE_DIA == pytest.approx(6.3246)  # .249
-    assert spec.BORE_BAND == pytest.approx((0.0127, 0.0))
-    assert min(spec.BORE_BAND) == 0.0
+    # The 1/4 end mill's own -.000/+.001 Ø band.
+    assert spec.BORE_DIA == pytest.approx(0.250 * IN)
+    assert spec.BORE_BAND == pytest.approx((0.001 * IN, 0.0))
+
+
+def test_owner_sizes_follow_the_bush_stub() -> None:
+    """Owner ruling 2026-11-20 (Pedro), #2425: "pd-16 diameter should also be
+    reduced to match new knob bush"."""
+    assert spec.OD == pytest.approx(0.44 * IN)
+    assert round(bush.PRESS_DIA / IN, spec.OD_PLACES) == pytest.approx(spec.OD / IN)
+    assert spec.LENGTH == pytest.approx(0.36 * IN)
+    assert spec.PILOT_DEPTH == pytest.approx(0.152 * IN)
+    assert spec.CLEAR_HOLE_DIA == pytest.approx(0.113 * IN)  # #33
+    assert spec.CBORE_DIA == pytest.approx(0.188 * IN)
+    assert spec.CBORE_DEPTH == pytest.approx(0.108 * IN)
+    assert spec.WEB == pytest.approx(0.100 * IN)
 
 
 def test_walls_hold_at_the_worst_case_the_sheet_prints() -> None:
-    """Every wall round the assembly-drilled pin hole, recomputed from the
-    printed bands, stays at or above the 2.0 mm floor."""
-    hole_r = (pin.HOLE_DIA + max(pin.HOLE_BAND)) / 2.0  # .0325
-    station = spec.PIN_HOLE_FROM_FRONT + spec.PIN_HOLE_STATION_TOL
+    """Rule 17: the web and both rings, recomputed from the printed rows."""
     od_min = spec.OD - _band(spec.OD_PLACES)
-    length_min = spec.LENGTH - _band(spec.LENGTH_PLACES)
-    bore_max = spec.BORE_DIA + max(spec.BORE_BAND)
-    walls = {
-        "journal": (knob_shaft.JOURNAL_DIA_MIN - 2.0 * hole_r) / 2.0,
-        "front": spec.PIN_HOLE_FROM_FRONT - spec.PIN_HOLE_STATION_TOL - hole_r,
-        # The journal's rear-end rim takes MHA-PD-08's title-block break; the
-        # match-drilled crosshole's mouths stay buried in the cup, unbroken.
-        "end": (
-            knob_shaft.JOURNAL_REAR_EXTENSION_MIN
-            - station
-            - hole_r
-            - knob_shaft.EDGE_BREAK_MAX
-        ),
-        "ring": (od_min - bore_max) / 2.0,
-        "rear": length_min - station - hole_r,
-    }
-    assert walls["journal"] == pytest.approx((6.3119 - 1.651) / 2.0, abs=1e-9)
-    assert walls["front"] == pytest.approx(3.048 - 0.1016 - 0.8255, abs=1e-9)
-    assert walls["ring"] == pytest.approx((18.796 - 6.3373) / 2.0, abs=1e-9)
-    # #2169: the journal (.264 behind the cup's face, its ±.005 station
-    # band) at ±.011 since MHA-PD-08 prints its overall and face width with
-    # the journal REF (fan-out 2026-11-07), less the .010 rear-end break,
-    # leaves the end wall at .0815.
-    assert knob_shaft.EDGE_BREAK_MAX == pytest.approx(0.254, abs=1e-9)
-    assert walls["end"] == pytest.approx(
-        (6.7056 - 0.2794 - 0.127) - 3.048 - 0.1016 - 0.8255 - 0.254, abs=1e-9
+    web_min = (
+        (spec.LENGTH - _band(spec.LENGTH_PLACES))
+        - (spec.PILOT_DEPTH + _band(spec.PILOT_DEPTH_PLACES))
+        - (spec.CBORE_DEPTH + _band(spec.CBORE_PLACES))
     )
-    assert walls["end"] == pytest.approx(0.0815 * 25.4, abs=1e-9)
-    assert {k: w for k, w in walls.items() if w < spec.WALL_FLOOR} == {}
-    assert spec.JOURNAL_PIN_WALL_WORST == pytest.approx(walls["journal"])
-    assert spec.FRONT_PIN_WALL_WORST == pytest.approx(walls["front"])
-    assert spec.END_PIN_WALL_WORST == pytest.approx(walls["end"])
-    assert spec.RADIAL_WALL_WORST == pytest.approx(walls["ring"])
-    assert spec.REAR_PIN_WALL_WORST == pytest.approx(walls["rear"])
+    pilot_wall = (od_min - (spec.BORE_DIA + max(spec.BORE_BAND))) / 2.0
+    cbore_wall = (od_min - (spec.CBORE_DIA + _band(spec.CBORE_PLACES))) / 2.0
+    assert spec.WEB_MIN == pytest.approx(web_min)
+    assert spec.PILOT_WALL_WORST == pytest.approx(pilot_wall)
+    assert spec.CBORE_WALL_WORST == pytest.approx(cbore_wall)
+    # .080 web (exactly the target), .0895 and .1185 rings.
+    assert web_min == pytest.approx(0.080 * IN, abs=1e-9)
+    assert pilot_wall == pytest.approx(0.0895 * IN, abs=1e-9)
+    assert cbore_wall == pytest.approx(0.1185 * IN, abs=1e-9)
+    for wall in (web_min, pilot_wall, cbore_wall):
+        assert wall >= WALL_TARGET_MM - 1e-9
 
 
-def test_the_longest_pin_stays_inside_the_smallest_od() -> None:
-    od_min = spec.OD - _band(spec.OD_PLACES)
-    longest = pin.PIN_LEN + pin.PIN_LEN_BAND
-    assert (od_min - longest) / 2.0 > 0.0
-    assert spec.PIN_END_INSIDE_OD_WORST == pytest.approx((od_min - longest) / 2.0)
-    # The shortest pin still reaches through both cup walls.
-    assert pin.PIN_LEN - pin.PIN_LEN_BAND > spec.BORE_DIA + max(spec.BORE_BAND)
+def test_a_looser_length_row_refuses_the_thin_web(monkeypatch) -> None:
+    assert _fresh_spec().WEB_MIN == pytest.approx(spec.WEB_MIN)
+    import _printed_tolerance
+
+    real = _printed_tolerance.printed_deviations
+
+    def looser_two_place_row(value, places, limits=None, **kwargs):
+        if places == 2:  # the O.D. and the length
+            return (-0.3, 0.3)
+        return real(value, places, limits, **kwargs)
+
+    monkeypatch.setattr(_printed_tolerance, "printed_deviations", looser_two_place_row)
+    with pytest.raises(AssertionError, match="web"):
+        _fresh_spec()
 
 
-def test_the_reamed_bore_slides_on_the_journal_over_the_full_bands() -> None:
+def test_the_bonded_pilot_clears_the_journal_inside_641_gap_fill() -> None:
     tightest = (spec.BORE_DIA + min(spec.BORE_BAND)) - (
         knob_shaft.JOURNAL_DIA + max(knob_shaft.JOURNAL_DIA_BAND)
     )
     loosest = (spec.BORE_DIA + max(spec.BORE_BAND)) - knob_shaft.JOURNAL_DIA_MIN
-    assert 0.0 < tightest <= loosest
+    assert 0.0 < tightest <= loosest <= spec.LOCTITE_641_GAP_MAX == 0.15
     assert spec.BORE_JOURNAL_CLEARANCE == pytest.approx((tightest, loosest))
 
 
 def test_cup_bore_refuses_binding_on_the_actual_journal(monkeypatch) -> None:
-    assert spec.BORE_JOURNAL_CLEARANCE == pytest.approx((0.00508, 0.0254))
-    monkeypatch.setattr(knob_shaft, "JOURNAL_DIA_BAND", (0.020, 0.0))
-    fresh_spec = importlib.util.spec_from_file_location("_cup_perturbed", spec.__file__)
-    fresh = importlib.util.module_from_spec(fresh_spec)
+    assert spec.BORE_JOURNAL_CLEARANCE == pytest.approx((0.03048, 0.0635))
+    monkeypatch.setattr(knob_shaft, "JOURNAL_DIA_BAND", (0.030, 0.0))
     with pytest.raises(AssertionError, match="bore binds"):
-        fresh_spec.loader.exec_module(fresh)
+        _fresh_spec()
 
 
-def test_the_journal_end_stays_inside_the_shortest_cup() -> None:
-    length_min = spec.LENGTH - _band(spec.LENGTH_PLACES)
-    assert length_min - knob_shaft.JOURNAL_REAR_EXTENSION_MAX > 0.0
-    # #2169: the longest 1.62 journal (±.011) at the farthest cup station
-    # stays .030 inside the shortest .32 cup; nominal cover is .056.
-    assert spec.JOURNAL_END_INSET_WORST == pytest.approx(0.030 * 25.4, abs=1e-9)
-    assert spec.JOURNAL_END_INSET == pytest.approx(0.056 * 25.4, abs=1e-9)
+def test_the_front_facing_sets_the_float_on_every_stack() -> None:
+    """Rule 19: the supplied pilot is never shallower than the float needs;
+    the fitter faces .001-.039 off the front and leaves .116-.148."""
+    assert spec.PILOT_DEPTH_FITTED == pytest.approx(
+        knob_shaft.JOURNAL_STANDOUT - knob_shaft.END_FLOAT
+    )
+    assert tuple(v / IN for v in spec.FACING_REMOVAL) == pytest.approx((0.001, 0.039))
+    assert tuple(v / IN for v in spec.PILOT_DEPTH_FITTED_RANGE) == pytest.approx(
+        (0.116, 0.148)
+    )
+    assert spec.PILOT_DEPTH_FITTED_RANGE[0] >= spec.PILOT_DEPTH_FITTED_FLOOR
+
+
+def test_a_shallow_supplied_pilot_refuses(monkeypatch) -> None:
+    # A stand-out stack .040 wider than the supplied pilot can take up.
+    monkeypatch.setattr(
+        knob_shaft,
+        "JOURNAL_STANDOUT_BAND",
+        knob_shaft.JOURNAL_STANDOUT_BAND + 0.040 * IN,
+    )
+    with pytest.raises(AssertionError, match="shallower"):
+        _fresh_spec()
+
+
+def test_the_screw_engages_the_journal_tap_and_never_bottoms() -> None:
+    """Rule 18 at the worst case: the shortest screw through the thickest
+    web, less the tap mouth's first thread and break and the screw's point."""
+    engagement = (
+        screw.LENGTH
+        - screw.LENGTH_MINUS
+        - spec.WEB_MAX
+        - (screw.PITCH + knob_shaft.EDGE_BREAK_MAX)
+        - 2.0 * screw.PITCH
+    )
+    assert spec.SCREW_ENGAGEMENT_MIN == pytest.approx(engagement)
+    assert engagement / screw.MAJOR_DIA >= 1.5
+    assert spec.SCREW_ENGAGEMENT_MIN_D == pytest.approx(1.877, abs=1e-3)
+    reach = screw.LENGTH - spec.WEB_MIN
+    assert reach == pytest.approx(0.295 * IN, abs=1e-9)
+    assert knob_shaft.REAR_TAP_FULL_THREAD_MIN - reach == pytest.approx(
+        0.045 * IN, abs=1e-9
+    )
+
+
+def test_the_head_seats_on_the_web_inside_the_pocket() -> None:
+    hole_min = spec.CLEAR_HOLE_DIA
+    hole_max = spec.CLEAR_HOLE_DIA + drilled_oversize_mm(unit=spec.UNIT)
+    assert hole_min - 1.3 * screw.MAJOR_DIA == pytest.approx(
+        spec.HOLE_FILLET_CLEARANCE_MIN
+    )
+    assert spec.HOLE_FILLET_CLEARANCE_MIN > 0.0
+    assert spec.HEAD_BEARING_LAND == pytest.approx((screw.HEAD_DIA - hole_max) / 2.0)
+    assert spec.HEAD_BEARING_LAND > 0.0
+    cbore_min = spec.CBORE_DIA - _band(spec.CBORE_PLACES)
+    assert (cbore_min - screw.HEAD_DIA) / 2.0 == pytest.approx(0.0215 * IN, abs=1e-9)
+    depth_min = spec.CBORE_DEPTH - _band(spec.CBORE_PLACES)
+    assert depth_min - screw.HEAD_H == pytest.approx(0.020 * IN, abs=1e-9)
+    # The screw's clearance drill is the #2 close fit, never the tap drill.
+    assert spec.CLEAR_HOLE_DIA > TAP_DRILL_MM[knob_shaft.REAR_TAP_THREAD]
+
+
+def test_the_part_volume_is_the_turned_cup_less_the_web_drill() -> None:
+    r = spec.OD / 2.0
+    turned = math.pi * (
+        r**2 * spec.LENGTH
+        - (spec.BORE_DIA / 2.0) ** 2 * spec.PILOT_DEPTH
+        - (spec.CBORE_DIA / 2.0) ** 2 * spec.CBORE_DEPTH
+    )
+    assert part.V_TURNED == pytest.approx(turned)
+    # Each floor fillet's spandrel, by Pappus at its centroid.
+    corners = 0.0
+    for radius, wall_r in (
+        (spec.PILOT_FLOOR_R_MAX, spec.BORE_DIA / 2.0),
+        (spec.POCKET_FLOOR_R_MAX, spec.CBORE_DIA / 2.0),
+    ):
+        centroid = wall_r - radius * (10.0 - 3.0 * math.pi) / (3.0 * (4.0 - math.pi))
+        corners += (1.0 - math.pi / 4.0) * radius**2 * 2.0 * math.pi * centroid
+    assert part.V_CORNERS == pytest.approx(corners)
+    assert part.V_CUP == pytest.approx(
+        turned - math.pi * (spec.CLEAR_HOLE_DIA / 2.0) ** 2 * spec.WEB + corners
+    )
 
 
 def test_registry_row_is_the_turned_brass_mha_157() -> None:
@@ -248,3 +417,6 @@ def test_registry_row_is_the_turned_brass_mha_157() -> None:
     assert "C36000" in row["material_specification"]
     assert row["material"] == part.MATERIAL
     assert row["tolerance_class"] == "machined_block"
+    process = row["process"]
+    assert "#33" in process and "LOCTITE 641" in process
+    assert "spring-pin" not in process

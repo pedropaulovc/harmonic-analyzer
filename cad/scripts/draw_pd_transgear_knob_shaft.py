@@ -14,15 +14,15 @@ end view carries the D-flat's distance from the
 axis, where the flat shows true, and the leadered tooth-edge note.  VIEW C
 carries the gear's native acceptance dimensions: the span over two teeth
 (LIMITS) and the root envelope (MIN).  The rear view identifies the actual
-running journal datum.  The #8-32 thread callout belongs to its real thread
+running journal datum and calls out the rear #2-56 tap natively.  The #8-32 thread callout belongs to its real thread
 blank.  Cutter identity and approved inspection controls are properties of
 the saved source, never values retyped here.
 The source-linked formed-flank callout carries radial TIR, the paid
 pitch-index range at REF pitch diameter, all-space/wrap receiving and the
 certified pin. Neither span thickness nor a pin-centre radius substitutes
 for that independent index control.
-The rear cup remains match-pinned at assembly; the front D-core has no
-crosshole. This script does not certify a native build or release a prototype
+The rear end is tapped #2-56 for the MHA-PD-VN-71 cup screw; the front
+D-core has no crosshole. This script does not certify a native build or release a prototype
 toothspace runout grade.
 """
 
@@ -35,7 +35,12 @@ import textwrap
 from typing import Any
 
 from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.solidworks.drawing import add_note, dimension_name, place_view
+from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
+    dimension_name,
+    place_view,
+    remove_notes_matching,
+)
 
 import _config
 from _check import check
@@ -46,10 +51,13 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     stamp_drawing_summary,
     view_name,
 )
+from _column_clamp_drawing import set_hole_callout_below
 from _drawing_hidden_sketches import curate_view_dimensions
+from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_dimensions import (
     assert_imported_precision,
     set_dimension_callouts,
@@ -63,6 +71,8 @@ from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _gear_drawing_entities import visible_circle_edge
+from _hole_callout_thread_class import omit_title_block_thread_class
+from _holes import DIAMETER_TOLERANCE_MM, _verify_tap_metadata
 from _gtol_face_resolve import resolve_faces
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
@@ -73,8 +83,7 @@ import _telemetry
 import paper_drive_mesh_check as mesh_check
 import pd_rack_pinion_spec as disc
 from paper_drive_stock_drawing import add_toothspace_callout, require_source_control
-from pd_transgear_arm_plate_geometry import BORE_DIA as ARM_PLATE_BORE_DIA
-from pd_transgear_arm_plate_geometry import BORE_DIA_LIMITS as ARM_PLATE_BORE_LIMITS
+import pd_transgear_knob_bush_geometry as BUSH
 from pd_transgear_knob_shaft_spec import (
     CORE_DIA,
     CORE_FRONT_Z,
@@ -97,7 +106,14 @@ from pd_transgear_knob_shaft_spec import (
     GEOMETRIC_TOLERANCES_IN,
     GEOMETRIC_TOLERANCES_MM,
     PART_DATUMS,
+    REAR_CHAMFER_CALLOUT,
     REAR_END_Z,
+    REAR_TAP_DEPTH_PLACES,
+    REAR_TAP_DRILL_DEPTH,
+    REAR_TAP_DRILL_DIA,
+    REAR_TAP_DRILL_DIA_PLACES,
+    REAR_TAP_FULL_THREAD_MIN,
+    REAR_TAP_SPEC,
     PITCH_DIA,
     SURFACE_FINISHES,
     STOCK_PROFILE,
@@ -199,11 +215,11 @@ def _fit_range_text(low_mm: float, high_mm: float) -> str:
     return f"{inch_text(low_mm, 4)}-{inch_text(high_mm, 4)}"
 
 
-# The journal keeps its g6 limits under the arm plate's reamed H7 bore: a
-# matched running fit (rule 4), its clearance from both parts' limits as REF.
+# The journal keeps its g6 limits under the MHA-PD-28 bush's reamed H7 bore:
+# a matched running fit (rule 4), its clearance from both parts' limits as REF.
 JOURNAL_CLEARANCE_MM = (
-    ARM_PLATE_BORE_DIA + min(ARM_PLATE_BORE_LIMITS) - (JOURNAL_DIA + max(JOURNAL_DIA_BAND)),
-    ARM_PLATE_BORE_DIA + max(ARM_PLATE_BORE_LIMITS) - (JOURNAL_DIA + min(JOURNAL_DIA_BAND)),
+    BUSH.BORE_DIA + min(BUSH.BORE_DIA_LIMITS) - (JOURNAL_DIA + max(JOURNAL_DIA_BAND)),
+    BUSH.BORE_DIA + max(BUSH.BORE_DIA_LIMITS) - (JOURNAL_DIA + min(JOURNAL_DIA_BAND)),
 )
 # The numbered notes the bands link by "SEE NOTE n": the journal's running
 # fit; the D-section's one sliding fit, which its Ø and its flat's distance
@@ -212,8 +228,8 @@ JOURNAL_CLEARANCE_MM = (
 # function), one reason each with no values in the text (machinist review
 # r1 of #2019, rule 7); and the neck's mate, which its Ø limits and the
 # flat's end limits link (round 2: the flat end's .005 band named no mate).
-# The overall prints .XXX plain: the title block's ±.005 is the band the
-# knob cup's pin wall needs.  They stand in the open field right of the
+# The overall prints .XXX plain: the title block's ±.005 keeps the knob
+# cup's fit-up facing positive.  They stand in the open field right of the
 # overall's tip witness line, over the title block; at 2.2 mm a line runs
 # ~1.5 mm a character, so no line runs past 70 characters (~105 mm).
 JOURNAL_FIT_NOTE = 1
@@ -226,7 +242,7 @@ _COLLAR = _mate_name(_config.parts("pd-transgear-drive-collar"))
 NOTE_TEXTS = (
     (
         JOURNAL_FIT_NOTE,
-        f"RUNNING FIT IN {_mate_name(_config.parts('pd-transgear-arm-plate'))}: "
+        f"RUNNING FIT IN {_mate_name(_config.parts('pd-transgear-knob-bush'))}: "
         "TURN TO MEASURED "
         f"BORE (CLEARANCE {_fit_range_text(*JOURNAL_CLEARANCE_MM)}).",
     ),
@@ -359,6 +375,10 @@ SIDE_KEEP: dict[str, tuple[float, float]] = {
     # of F ran into the face width's left witness line and arrow, which drop
     # to the overall text's height); OVERALL_TEXT_* below check both ends.
     "OverallLength": ((REAR_X + PINION_REAR_X) / 2.0, _ROW_Y[5]),
+    # #2425: the journal's explicit rear chamfer, over the rear end's top
+    # corner on the journal Ø's row, left of that Ø's text and right of the
+    # rear view's tap callout.
+    "RearChamferSize": (REAR_X + 0.010, _DIA_ROW_Y[0]),
 }
 END_KEEP: dict[str, tuple[float, float]] = {
     # The flat's distance from the axis, where the flat shows true (machinist
@@ -395,6 +415,7 @@ DIMENSION_CALLOUTS_BELOW = {
     "FaceWidth": FACE_WIDTH_CALLOUT,
     "FlatToAxis": D_SECTION_FIT_LINK,
     "ToothSpan": SPAN_CALLOUT,
+    "RearChamferSize": REAR_CHAMFER_CALLOUT,
 }
 # The two D-flat stations link the seat note and the thread's end the thread
 # note, each on its value's line; detail
@@ -413,10 +434,12 @@ DIMENSION_SUFFIXES = {
     # Round 7: the neck width keeps .XXX (at .XX its least, .006, falls
     # under the flat end's .007) and links the neck note like its neighbours.
     "FrontReliefWidth": f" {NECK_LINK}",
-    # Round 6: the overall keeps .XXX (the knob cup's pin wall fails at .XX)
-    # and states that function once, at the dimension, not in a note (r3).
+    # Round 6: the overall keeps .XXX (at .XX the journal's stand-out can
+    # outrun the knob cup's supplied pilot, pd_transgear_knob_cup_spec
+    # FACING_REMOVAL) and states that function once, at the dimension, not
+    # in a note (r3).
     "OverallLength": (
-        f" SETS PIN WALL IN {_config.parts('pd-transgear-knob-cup')['number']}"
+        f" SETS {_config.parts('pd-transgear-knob-cup')['number']} FIT-UP"
     ),
 }
 # The overall's one-line text (~2.75 mm a character, centred on its keep;
@@ -492,6 +515,22 @@ NOTES_XY = (0.300, 0.100)
 TITLE_BLOCK_TOP = 0.0663
 NOTES_CHAR_HEIGHT = GEAR_DATA_CHAR_HEIGHT
 DATUM_A_SYMBOL = (END_CENTER[0] - 0.017, END_CENTER[1] - 0.018)
+# The rear #2-56 tap's native callout on the rear view, up and left of the
+# journal (datum A's symbol hangs lower left), over the side view's rear end:
+# the drill and the full thread at their places (rule 12: the full thread
+# and the deeper drill each print), the screw it takes under the rows.
+REAR_TAP_CALLOUT_XY = (0.020, 0.200)
+REAR_TAP_CALLOUT_PRECISION = {
+    "hw-tapdrldia": REAR_TAP_DRILL_DIA_PLACES,
+    "hw-threaddepth": REAR_TAP_DEPTH_PLACES,
+    "hw-tapdrldepth": REAR_TAP_DEPTH_PLACES,
+}
+REAR_TAP_CALLOUT_BELOW = (
+    f"FOR {_config.parts('pd-vn-transgear-knob-cup-screw')['number']}"
+)
+# SolidWorks pins its own "#2-56 Tapped Hole" note beside a tap's native
+# callout; the callout already states the thread.
+TAPPED_HOLE_NOTE = "Tapped Hole"
 # The edge-break note stands by the front end view, its leader on the
 # feature it names (machinist review r8).  That view is mirrored (sheet
 # angle = 180 deg - model angle).  The note lands on tooth 5's tip (teeth
@@ -1074,11 +1113,81 @@ def _add_sheet_note(
         raise RuntimeError(f"{label} reads back {got!r}")
 
 
+def _require_saved_rear_tap(model: Any) -> None:
+    """Require the saved native rear tap's size, class, blind ends, drill Ø
+    and both depths before the callout reads them."""
+    feature = _early_bound(model, "IPartDoc").FeatureByName("RearTap")
+    if feature is None:
+        raise RuntimeError("saved knob shaft has no native RearTap")
+    feature = _early_bound(feature, "IFeature")
+    if str(feature.GetTypeName2()) != "HoleWzd":
+        raise RuntimeError("saved knob shaft RearTap is not a native Hole Wizard tap")
+    definition = feature.GetDefinition()
+    if definition is None:
+        raise RuntimeError("saved knob shaft RearTap has no hole definition")
+    definition = _early_bound(definition, "IWizardHoleFeatureData2")
+    if str(definition.FastenerSize).strip() != REAR_TAP_SPEC.size:
+        raise RuntimeError("saved knob shaft RearTap has the wrong thread size")
+    _verify_tap_metadata(definition, REAR_TAP_SPEC, "saved knob shaft RearTap")
+    for member, expected, what in (
+        ("TapDrillDiameter", REAR_TAP_DRILL_DIA, "tap drill"),
+        ("TapDrillDepth", REAR_TAP_DRILL_DEPTH, "tap drill depth"),
+        ("ThreadDepth", REAR_TAP_FULL_THREAD_MIN, "thread depth"),
+    ):
+        value = float(getattr(definition, member)) * 1000.0
+        if not math.isfinite(value) or abs(value - expected) > DIAMETER_TOLERANCE_MM:
+            raise RuntimeError(
+                f"saved knob shaft rear tap {what} {value:.3f} != {expected:.3f} mm"
+            )
+
+
+def _print_full_thread_as_min(callout: Any) -> None:
+    """The full thread's depth prints as a MIN (rule 12; the spec's
+    REAR_TAP_FULL_THREAD_MIN): callout variables own their presentation,
+    apart from the source dimension (draw_sm_summing_lever's bracket tap)."""
+    from win32com.client.dynamic import Dispatch as dynamic_dispatch
+
+    for raw in callout.GetHoleCalloutVariables() or ():
+        # Concrete callout interfaces alias the generic metadata DISPIDs.
+        variable = dynamic_dispatch(raw._oleobj_)
+        if str(variable.VariableName) != "hw-threaddepth":
+            continue
+        variable.ToleranceType = 5  # swTolType_e.swTolMIN
+        if int(variable.ToleranceType) != 5:
+            raise RuntimeError("knob shaft rear tap full thread did not persist as MIN")
+        return
+    raise RuntimeError("knob shaft rear tap callout has no hw-threaddepth variable")
+
+
+def _add_rear_tap_callout(adapter: Any, end: Any) -> None:
+    """The rear #2-56 tap, natively called out on the rear view: the title
+    block's THREADS row owns the 2B class (rule 2), the full thread prints as
+    a MIN and the deeper drill at .XX, and the screw it takes prints under
+    the native rows."""
+    callout = add_native_hole_callout(
+        adapter,
+        end,
+        edge=visible_circle_edge(adapter, end, REAR_TAP_DRILL_DIA),
+        callout_xy=REAR_TAP_CALLOUT_XY,
+        label=f"knob shaft rear {REAR_TAP_SPEC.size} blind tap",
+    )
+    omit_title_block_thread_class(callout, label="knob shaft rear tap")
+    set_hole_callout_precision(
+        callout, REAR_TAP_CALLOUT_PRECISION, label="knob shaft rear tap depths"
+    )
+    _print_full_thread_as_min(callout)
+    set_hole_callout_below(
+        callout, REAR_TAP_CALLOUT_BELOW, label="knob shaft rear tap"
+    )
+    rebuild_drawing(adapter, label="knob shaft rear tap callout")
+
+
 def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
     check("open transgear-knob-shaft source", adapter.open_model(str(SOURCE)))
+    _require_saved_rear_tap(adapter.currentModel)
     source_properties = read_required_properties(
         adapter.currentModel,
         (
@@ -1227,6 +1336,7 @@ def build(adapter: Any) -> dict[str, str]:
         datum=journal_datum.letter,
         label="knob running journal datum",
     )
+    _add_rear_tap_callout(adapter, end)
     controls = {control.key: control for control in GEOMETRIC_CONTROLS}
     if set(controls) != set(GEOMETRIC_TOLERANCES_MM):
         raise RuntimeError("knob shaft frames do not cover the spec's geometric controls")
@@ -1279,12 +1389,16 @@ def build(adapter: Any) -> dict[str, str]:
     _add_sheet_note(
         adapter, NOTES, NOTES_XY, char_height=NOTES_CHAR_HEIGHT, label="numbered notes"
     )
+    removed_tap_labels = remove_notes_matching(adapter, TAPPED_HOLE_NOTE)
+    _telemetry.info(f"removed {removed_tap_labels} automatic tapped-hole label(s)")
     return finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Transgear Knob Shaft Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        redundant_note_substrings=(TAPPED_HOLE_NOTE,),
+        expected_redundant_notes=0,
     )
 
 

@@ -1,7 +1,7 @@
 r"""Shared recipe for the McMaster 98296A* slotted spring pins.
 
 Catalogue: each size's own McMaster product page, read live (98296A027 on
-2026-09-25, 98296A026 on 2026-09-30, 98296A031 on 2026-10-02; dt-logs
+2026-09-25, 98296A026 on 2026-09-30; dt-logs
 transgear-evidence mcmaster-skus.md): 1050-1095 spring steel, unplated,
 ASME B18.8.2, chamfered ends, 0.012 in wall, for a 0.062-0.065 in hole; no
 diameter tolerance stated.  No vendor SLDPRT has been harvested for any

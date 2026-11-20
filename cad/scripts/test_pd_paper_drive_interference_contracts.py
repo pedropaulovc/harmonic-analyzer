@@ -15,7 +15,6 @@ from collections.abc import Mapping
 import pytest
 
 import _chain
-import _holes
 import _pd_paper_drive_interference
 import pd_latch_hook_bracket_screw_spec as bracket_screw
 import pd_latch_hook_geometry as hook
@@ -30,8 +29,9 @@ import pd_feed_rack_spec as feed_rack
 import pd_feed_rack_screw_spec as rack_screw
 import pd_platen_bottom_guide_spec as bottom_guide
 import transgear_hanger_joints as joints
-import pd_vn_transgear_knob_cup_pin_spec as cup_pin
+import pd_transgear_knob_bush_geometry as bush
 import pd_transgear_knob_cup_spec as cup
+import pd_vn_transgear_knob_cup_screw_spec as cup_screw
 import pd_vn_transgear_knob_drive_pin_spec as drive_pin
 import pd_transgear_knob_shaft_spec as shaft
 import pd_vn_transgear_latch_pin_spec as latch_pin
@@ -42,7 +42,7 @@ import _sprocket_seat_geometry as removable
 import pd_transgear_pin_spec as pin
 import pd_vn_transgear_retaining_ring_spec as ring
 import pd_transgear_thumbnut_spec as thumbnut
-from _hole_spec import TAP_DRILL_MM
+from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM
 
 
 def _allowed() -> Mapping[frozenset[str], float]:
@@ -154,20 +154,31 @@ def test_ring_row_is_the_free_state_grip_on_its_prong_arcs() -> None:
 
 def test_knob_stack_rows_follow_the_shaft_cup_collar_and_nut() -> None:
     allowed = _allowed()
-    # R9-70 (K-1): MHA-PD-VN-62 across the journal and both walls of the cup ring,
-    # its ends inside the cup's O.D.: the journal takes the diametral chord,
-    # the cup the rest of the tube.
-    tube_d, tube_id = cup_pin.PIN_DIA, cup_pin.PIN_DIA - 2.0 * cup_pin.WALL_T
-    in_journal = _holes.cross_hole_volume_mm3(
-        tube_d, shaft.JOURNAL_DIA
-    ) - _holes.cross_hole_volume_mm3(tube_id, shaft.JOURNAL_DIA)
-    tube = math.pi * (tube_d**2 - tube_id**2) / 4.0 * cup_pin.PIN_LEN
-    assert shaft.JOURNAL_DIA < cup_pin.PIN_LEN < cup.OD
-    assert cup.BORE_DIA == shaft.JOURNAL_DIA
-    pair = _pair("pd-vn-transgear-knob-cup-pin-1", "pd-transgear-knob-shaft-1")
-    assert allowed[pair] == pytest.approx(1.10 * in_journal, rel=1e-4)
-    pair = _pair("pd-vn-transgear-knob-cup-pin-1", "pd-transgear-knob-cup-1")
-    assert allowed[pair] == pytest.approx(1.10 * (tube - in_journal), rel=1e-4)
+    # #2425: MHA-PD-VN-71 seated under its head on the cup web's rear face
+    # (the counterbore floor), its fully threaded shank into the journal's
+    # blind #2-56 tap at its #50 drill from the journal's end, which stands
+    # the fitted pilot depth (stand-out less end float) inside the cup's front.
+    assert cup_screw.THREAD == shaft.REAR_TAP_THREAD == "#2-56"
+    # The table's #2-56 major is the .086 basic major rounded to the micron.
+    assert cup_screw.MAJOR_DIA == pytest.approx(THREAD_MAJOR_MM["#2-56"], abs=1e-3)
+    assert shaft.REAR_TAP_DRILL_DIA == TAP_DRILL_MM["#2-56"]
+    journal_end_in_cup = shaft.JOURNAL_STANDOUT - shaft.END_FLOAT
+    assert journal_end_in_cup == pytest.approx(cup.PILOT_DEPTH_FITTED)
+    under_head_behind_journal_end = cup.LENGTH - cup.CBORE_DEPTH - journal_end_in_cup
+    assert under_head_behind_journal_end == pytest.approx(3.048)
+    engaged = cup_screw.LENGTH - under_head_behind_journal_end
+    assert engaged <= shaft.REAR_TAP_FULL_THREAD_MIN
+    pair = _pair("pd-vn-transgear-knob-cup-screw-1", "pd-transgear-knob-shaft-1")
+    assert allowed[pair] == pytest.approx(
+        _annulus(THREAD_MAJOR_MM["#2-56"], shaft.REAR_TAP_DRILL_DIA, engaged)
+    )
+    # Its shank passes the web's #33 clearance hole: no row with the cup.
+    assert cup_screw.MAJOR_DIA < cup.CLEAR_HOLE_DIA
+    assert (
+        _pair("pd-vn-transgear-knob-cup-screw-1", "pd-transgear-knob-cup-1")
+        not in allowed
+    )
+    assert not any("knob-cup-pin" in name for p in allowed for name in p)
     assert not any("knob-retaining-screw" in name for p in allowed for name in p)
 
     # Stud tip less the nut's pilot seat on the .243 nominal collar, whose
@@ -281,6 +292,14 @@ def test_pressed_and_slip_joints_without_a_row_do_not_overlap() -> None:
     # The modelled pin stands on the hook hole's axis offset by the bearing lift.
     assert hook.PIN_BEARING_LIFT + latch_pin.DIA / 2.0 <= hook.PIN_HOLE_DIA / 2.0
     assert drive_pin.DIA <= removable.PIN_HOLE_DIA
+    # #2425: the MHA-PD-28 bush's FN2 press in the plate is modelled line to
+    # line (its printed limits come from the bands), and the journal runs in
+    # its reamed bore.
+    assert bush.PRESS_DIA == plate.PRESS_HOLE_DIA
+    assert shaft.JOURNAL_DIA <= bush.BORE_DIA
+    allowed = _allowed()
+    for other in ("pd-transgear-arm-plate-1", "pd-transgear-knob-shaft-1"):
+        assert _pair("pd-transgear-knob-bush-1", other) not in allowed
 
 
 def test_retired_parts_have_no_rows() -> None:
@@ -292,6 +311,7 @@ def test_retired_parts_have_no_rows() -> None:
         "pd-latch-hook-bracket",
         "vn-latch-hook-rivet",
         "vn-transgear-collar-cross-pin",
+        "pd-vn-transgear-knob-cup-pin",
     )
     named = {name.rsplit("-", 1)[0] for pair in _allowed() for name in pair}
     assert not named & set(retired)

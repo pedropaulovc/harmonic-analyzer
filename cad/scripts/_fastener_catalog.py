@@ -340,10 +340,11 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "90325A174",
         material="AISI 304",
     ),
-    "pd-vn-transgear-knob-cup-pin": _stock(
-        "pd-vn-transgear-knob-cup-pin",
-        "1050-1095 Spring Steel Slotted Spring Pin",
-        "98296A031",
+    "pd-vn-transgear-knob-cup-screw": _stock(
+        "pd-vn-transgear-knob-cup-screw",
+        "18-8 Stainless Steel Fillister Head Slotted Screw",
+        "91794A079",
+        material="AISI 304",
     ),
     "pd-vn-transgear-latch-pin": _stock(
         "pd-vn-transgear-latch-pin",
