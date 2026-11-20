@@ -16,15 +16,15 @@ from _com import _early_bound
 def volume_check(adapter: Any, label: str, expected: float, tol: float) -> float:
     """Assert the part volume (mm^3) and return it.
 
-    A NaN or infinite volume or expectation fails: ``abs(nan - x) > tol`` is
-    False, so the band alone would pass it and hand NaN to the next chained
-    expectation (issue #2013)."""
+    A NaN or infinite volume, expectation or tolerance fails:
+    ``abs(nan - x) > tol`` is False, so the band alone would pass it and hand
+    NaN to the next chained expectation (issue #2013)."""
     mass = adapter.get_mass_properties()
     if not mass.is_success:
         raise RuntimeError(f"{label}: get_mass_properties failed: {mass.error}")
     volume = float(mass.data.volume)
     if (
-        not (math.isfinite(volume) and math.isfinite(expected))
+        not all(math.isfinite(value) for value in (volume, expected, tol))
         or abs(volume - expected) > tol
     ):
         raise RuntimeError(

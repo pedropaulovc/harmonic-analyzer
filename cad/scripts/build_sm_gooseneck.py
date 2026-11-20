@@ -124,24 +124,17 @@ V_ARM = RING_AREA * TUBE_STRAIGHT
 V_FINAL = V_LEG + V_BEND + V_ARM
 
 
-def _finite(label: str, volume: float) -> float:
-    # NaN passes every |vol - expected| > tol comparison (the shared
-    # volume_check's included), so a non-finite read stops the build
-    # (codjiflo rounds 5 and 6 on #1997).
-    if not math.isfinite(volume):
-        raise RuntimeError(f"{label}: non-finite volume {volume!r}")
-    return volume
-
-
 def _volume(adapter) -> float:
     res = adapter.get_mass_properties()
     if not res.is_success:
         raise RuntimeError(f"mass properties: {res.error}")
-    return _finite("volume", float(res.data.volume))
-
-
-def _volume_check(adapter, label: str, expected: float, tol: float) -> float:
-    return _finite(label, volume_check(adapter, label, expected, tol))
+    volume = float(res.data.volume)
+    # NaN passes every |vol - expected| > tol comparison, so a non-finite
+    # read stops the build (codjiflo rounds 5 and 6 on #1997); the shared
+    # volume_check fails closed on its own since #2013.
+    if not math.isfinite(volume):
+        raise RuntimeError(f"volume: non-finite volume {volume!r}")
+    return volume
 
 
 def _construction(adapter, line: str, label: str) -> None:
@@ -640,9 +633,7 @@ def build(adapter) -> dict[str, str]:
     # The sweep merges onto the leg: the whole tube.
     # 0.02: the annular wall is a small share of the swept section, so the same
     # absolute B-rep slack is larger relative to the expectation.
-    final_vol = _volume_check(
-        adapter, "bend + arm", V_FINAL, 0.02 * V_FINAL
-    )
+    final_vol = volume_check(adapter, "bend + arm", V_FINAL, 0.02 * V_FINAL)
     _telemetry.info(f"gooseneck volume {final_vol:.1f} mm^3 (analytic {V_FINAL:.1f})")
 
     # 3. Drawing-only station reference on the Front plane: two construction
@@ -713,7 +704,7 @@ def build(adapter) -> dict[str, str]:
     for dim_name, expr in drive_jobs:
         drive_dimension(adapter, dim_name, expr)
     force_rebuild(adapter)
-    _volume_check(
+    volume_check(
         adapter, "driven gooseneck (equations neutral)", final_vol, 0.001 * final_vol
     )
     # One body: the bent tube (the end plug is MHA-SM-05, its own part).

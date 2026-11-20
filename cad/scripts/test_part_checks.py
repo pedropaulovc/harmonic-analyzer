@@ -38,3 +38,9 @@ def test_a_non_finite_expectation_fails(expected):
     # A builder chaining a NaN read into its next expectation stops there.
     with pytest.raises(RuntimeError, match="block: volume 1000.0 mm"):
         volume_check(_adapter(1000.0), "block", expected, 0.5)
+
+
+@pytest.mark.parametrize("tol", [math.nan, math.inf])
+def test_a_non_finite_tolerance_fails(tol):
+    with pytest.raises(RuntimeError, match="block: volume 1000.0 mm"):
+        volume_check(_adapter(1000.0), "block", 1000.0, tol)
