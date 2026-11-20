@@ -2288,9 +2288,34 @@ def _place_setting_table(adapter: Any) -> None:
         )
 
 
-def _place_package(adapter: Any) -> Callable[[], None]:
+def _source_dirty_tracer(source_model: Any) -> Callable[[str], None]:
+    """Return ``step(name)``: log the released source's save flag after a step.
+
+    The drawing save writes a dirty source, which the fingerprint guard only
+    sees after the fact (build 20261011T191027.935928Z: the frame drawing
+    rewrote the released source inside drawing.save_drawing, #1364). Each
+    transition is logged with the step that caused it, so a failing leaf
+    names the culprit; drive-train's drawing has carried this since its own
+    run 20261001T035353825Z.
+    """
+    state = {"dirty": bool(source_model.GetSaveFlag())}
+
+    def step(name: str) -> None:
+        dirty = bool(source_model.GetSaveFlag())
+        _telemetry.event("frame.source_save_flag", step=name, dirty=dirty)
+        if dirty == state["dirty"]:
+            return
+        state["dirty"] = dirty
+        report = _telemetry.warn if dirty else _telemetry.info
+        report(f"frame source went {'DIRTY' if dirty else 'clean'} after {name}")
+
+    return step
+
+
+def _place_package(adapter: Any, step: Callable[[str], None]) -> Callable[[], None]:
     """Place every sheet; return the check that proves every balloon again
-    after the last rebuild (:func:`_assert_frame_balloons_settled`)."""
+    after the last rebuild (:func:`_assert_frame_balloons_settled`). ``step``
+    traces the released source's save flag after each stage."""
     _create_mixed_package_sheets(adapter)
     for sheet_name in SHEET_NAMES:
         _activate_sheet(adapter, sheet_name)
@@ -2320,6 +2345,7 @@ def _place_package(adapter: Any) -> Callable[[], None]:
     _, top_section = _create_joint_sections(adapter, front)
     inset = _add_nameplate_inset_dimension(adapter, top_section)
     _place_setting_table(adapter)
+    step("working front, sections and setting table")
 
     _activate_sheet(adapter, SHEET_NAMES[1])
     exploded = place_view(
@@ -2344,6 +2370,7 @@ def _place_package(adapter: Any) -> Callable[[], None]:
         configuration_grouping="same-part",
         label="frame",
     )
+    step("exploded configuration and BOM")
     balloon_items = _validate_frame_bom(adapter, table)
     landings = add_component_bom_balloons(
         adapter,
@@ -2367,6 +2394,7 @@ def _place_package(adapter: Any) -> Callable[[], None]:
     _add_note_block(
         adapter, EXPLODED_CAPTION, (0.045, 0.075), label="exploded-view caption"
     )
+    step("exploded-view balloons")
     # The enlarged deck details, lettered in the 1:8 view after its balloons.
     _mark_deck_details(adapter, exploded)
     _activate_sheet(adapter, SHEET_NAMES[1])
@@ -2374,6 +2402,7 @@ def _place_package(adapter: Any) -> Callable[[], None]:
     for detail in DECK_DETAILS:
         _place_deck_detail(adapter, detail, items, label=f"frame {detail.title}")
         _activate_sheet(adapter, SHEET_NAMES[1])
+    step("deck details")
 
     # The finished assembly, the drawing's full-detail view: every modeled
     # tooth and thread. The fit-up steps print in the release's ASSEMBLY.md.
@@ -2393,6 +2422,7 @@ def _place_package(adapter: Any) -> Callable[[], None]:
     _add_note_block(
         adapter, ASSEMBLY_ISO_CAPTION, ASSEMBLY_ISO_CAPTION_XY, label=f"{label} caption"
     )
+    step("finished isometric")
 
     def settled() -> None:
         _assert_frame_balloons_settled(adapter, landings, proof)
@@ -2504,8 +2534,21 @@ def build(adapter: Any) -> dict[str, str]:
 
     artifacts: dict[str, str] | None = None
     try:
+        step = _source_dirty_tracer(source_model)
         _validate_persisted_explode(source_model)
-        settled = _place_package(adapter)
+        step("validate source")
+        settled = _place_package(adapter, step)
+
+        def assert_source_clean(where: str) -> None:
+            # Saving the drawing would write a dirty released source (#1364).
+            step(where)
+            if bool(source_model.GetSaveFlag()):
+                raise RuntimeError(
+                    f"frame drawing dirtied the released source assembly by "
+                    f"{where}; the per-step trace names the step"
+                )
+
+        assert_source_clean("package placement")
         artifacts = finalize_drawing(
             adapter,
             OUTPUTS,
@@ -2515,7 +2558,7 @@ def build(adapter: Any) -> dict[str, str]:
             expected_sheet_names=SHEET_NAMES,
             sheet_layouts=SHEET_LAYOUTS,
             sheet_scales=SHEET_SCALES,
-            settled_checks=(settled,),
+            settled_checks=(settled, lambda: assert_source_clean("finalize rebuilds")),
         )
     finally:
         primary_error = sys.exception()

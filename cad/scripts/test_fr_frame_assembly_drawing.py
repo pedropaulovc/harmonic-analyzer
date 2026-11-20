@@ -620,3 +620,75 @@ def test_deck_detail_labels_name_their_bom_items() -> None:
         "fr-nameplate",
         "sh-vn-brass-fillister-screw",
     )
+
+
+class _SourceModel:
+    """The released source assembly as the drawing opens it: clean."""
+
+    def __init__(self) -> None:
+        self.dirty = False
+
+    def GetSaveFlag(self) -> bool:
+        return self.dirty
+
+    def GetTitle(self) -> str:
+        return "fr-frame-assembly.SLDASM"
+
+    def GetType(self) -> int:
+        return 2  # swDocASSEMBLY
+
+
+def _frame_build(monkeypatch, tmp_path, *, dirty_at: str | None):
+    """Run ``drawing.build`` with every native step faked; the source goes
+    dirty during ``dirty_at`` ("placement" or "finalize") if given."""
+    source = tmp_path / "fr-frame-assembly.SLDASM"
+    source.write_bytes(b"released")
+    model = _SourceModel()
+    finalized: list[bool] = []
+
+    def place_package(*_args):
+        if dirty_at == "placement":
+            model.dirty = True
+        return lambda: None
+
+    def finalize_drawing(_adapter, _outputs, *, settled_checks, **_kwargs):
+        if dirty_at == "finalize":
+            model.dirty = True
+        for settled in settled_checks:
+            settled()
+        finalized.append(True)
+        return {"pdf": "fr-frame-assembly.pdf"}
+
+    monkeypatch.setattr(drawing, "SOURCE", source)
+    monkeypatch.setattr(drawing, "check", lambda *_args: None)
+    monkeypatch.setattr(drawing, "read_required_properties", lambda *_args, **_kw: {})
+    monkeypatch.setattr(drawing, "_validate_persisted_explode", lambda _model: None)
+    monkeypatch.setattr(drawing, "_place_package", place_package)
+    monkeypatch.setattr(drawing, "finalize_drawing", finalize_drawing)
+    adapter = SimpleNamespace(
+        currentModel=model,
+        open_model=lambda _path: None,
+        swApp=SimpleNamespace(
+            CloseDoc=lambda _title: None, GetOpenDocumentByName=lambda _path: None
+        ),
+    )
+    return drawing.build(adapter), finalized
+
+
+def test_a_clean_source_lets_the_frame_drawing_finalize(monkeypatch, tmp_path) -> None:
+    artifacts, finalized = _frame_build(monkeypatch, tmp_path, dirty_at=None)
+    assert artifacts == {"pdf": "fr-frame-assembly.pdf"} and finalized == [True]
+
+
+@pytest.mark.parametrize(
+    ("dirty_at", "where", "finalizes"),
+    [("placement", "package placement", False), ("finalize", "finalize rebuilds", True)],
+)
+def test_a_dirtied_source_fails_before_the_drawing_saves(
+    monkeypatch, tmp_path, dirty_at, where, finalizes
+) -> None:
+    # #1364: a drawing step dirtied the writable released source and the
+    # drawing's save rewrote it; the fingerprint only caught it afterwards.
+    # As in drive-train's drawing, a dirty source now fails before the save.
+    with pytest.raises(RuntimeError, match=f"dirtied the released source assembly by {where}"):
+        _frame_build(monkeypatch, tmp_path, dirty_at=dirty_at)
