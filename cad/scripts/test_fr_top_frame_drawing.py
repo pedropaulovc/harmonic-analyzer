@@ -5129,7 +5129,8 @@ def test_hole_tags_stand_in_the_windows_beside_their_holes() -> None:
     the rails and the crossbar, clear of the D centreline, of the keeper
     callout and of the table's origin mark (farm run 20261106T210746725Z:
     the mark's X arrow ran through a tag).  Owner ruling D2 (#2333) leaves
-    the table the four sockets only, each tag diagonally inside its own."""
+    the table the four sockets only, each right tag diagonally inside its
+    own; the left ones stand outboard (#2628 (d))."""
     s = drawing.DETAIL_VIEW_SCALE / 1000.0
     cx, cy = drawing.DETAIL_TOP_CENTER
     ink = drawing.INK_CLEARANCE
@@ -5151,11 +5152,17 @@ def test_hole_tags_stand_in_the_windows_beside_their_holes() -> None:
             assert _box_box_gap(box, arrow) >= ink, (x, z)
         hx, hy = cx + x * s, cy - z * s
         assert math.dist((x0 + half_w, y1 - half_h), (hx, hy)) < 0.023
+        if x < 0:
+            # #2628 (d): a left socket's tag stands outboard, down-left of
+            # it, its upper-right corner an ink clearance off the boss.
+            assert x0 + half_w < hx and y1 - half_h < hy, (x, z)
+            corner = math.dist((box[2], box[3]), (hx, hy))
+            assert corner - part.BOSS_DIA / 2.0 * s >= ink, (x, z)
+            continue
         # Inward of its socket on both sheet axes.
-        assert (x0 + half_w > hx) == (x < 0) and (y1 - half_h > hy) == (z > 0), (x, z)
+        assert x0 + half_w < hx and (y1 - half_h > hy) == (z > 0), (x, z)
         d_x = cx + part.HANGER_X * s
-        side = "right" if x > 0 else "left"
-        left, right = windows[side]
+        left, right = windows["right"]
         assert left + ink <= box[0] and box[2] <= right - ink, (x, z)
         assert bottom + ink <= box[1] and box[3] <= top - ink, (x, z)
         assert box[2] <= d_x - ink or box[0] >= d_x + ink, (x, z)
@@ -5227,6 +5234,39 @@ def test_hanger_stations_stand_in_the_left_margin_from_the_rear_axis() -> None:
     # line, so neither crosses the other's dimension line.
     assert front_x < rear_x - ink and rear_hole_y < front_hole_y
     assert axis_y < rear_hole_y
+    # The left sockets' tags stand outboard, each leader landing on its
+    # bore's lower-left rim (farm run 20261120T205313453Z: SolidWorks's fixed
+    # attachment), so no leader crosses an extension line: A1's under the
+    # rear axis line, A2's over the front station's extension line; both
+    # boxes clear of every station line and the socket finish's leader.
+    half_w, half_h = drawing._HOLE_TAG_HALF
+    r = part.BORE_DIA / 2.0 * _S
+    angle = math.radians(drawing.SOCKET_FINISH_LANDING_DEG)
+    a1 = _plan(-part.COLUMN_X, part.REAR_COLUMN_Z)
+    finish = (
+        (drawing.SOCKET_FINISH_SYMBOL_XY[0] + drawing.FINISH_LEADER_TAIL,
+         drawing.SOCKET_FINISH_SYMBOL_XY[1]),
+        (a1[0] + r * math.cos(angle), a1[1] + r * math.sin(angle)),
+    )
+    for z, ext_y, above in (
+        (part.REAR_COLUMN_Z, axis_y, False),
+        (part.FRONT_COLUMN_Z, front_hole_y, True),
+    ):
+        hx, hy = _plan(-part.COLUMN_X, z)
+        x0, y1 = drawing.hole_tag_position(-part.COLUMN_X, z)
+        box = (x0, y1 - 2 * half_h, x0 + 2 * half_w, y1)
+        tip = (hx + r * math.cos(math.radians(225.0)), hy + r * math.sin(math.radians(225.0)))
+        leader = ((box[2], y1 - half_h), tip)
+        if above:
+            assert box[1] - ext_y >= ink and min(leader[0][1], tip[1]) - ext_y >= ink, z
+        else:
+            assert ext_y - box[3] >= ink and ext_y - max(leader[0][1], tip[1]) >= ink, z
+        for line_x, low, high in ((front_x, axis_y, front_hole_y), (rear_x, axis_y, rear_hole_y)):
+            assert _box_segment_gap(box, ((line_x, low), (line_x, high))) >= ink, z
+        assert _box_segment_gap(box, finish) >= ink, z
+        assert _box_box_gap(box, rear_box) >= ink and _box_box_gap(box, front_box) >= ink, z
+    tip = (a1[0] + r * math.cos(math.radians(225.0)), a1[1] + r * math.sin(math.radians(225.0)))
+    assert math.dist(tip, finish[1]) >= 0.004
 
 
 def test_side_rail_web_text_stands_beside_its_own_section() -> None:

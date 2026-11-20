@@ -333,18 +333,20 @@ GEOMETRY_FRONT_CENTER = (0.145, 0.090)
 # 1:2. The Ø25.5 sockets and Ø45 bosses are the setup features; the
 # smaller boss remains 22.5 mm across on paper, the socket 12.75 mm.
 # Its final centre below reserves room for the assembly-transfer callout.
-# The socket Ra symbol reads off the lower-left rim of the rear east socket
-# (225 deg on the sheet, y 104.5 - 4.5 = 100.0 mm), from the left margin
-# 15.5 mm under its axis, so its leader rises across the boss under the
-# rear sockets' axis line and the hanger stations' extension from it
-# (HANGER_Z_TEXT_XY, #2628 (d)); at 135 deg from 22 mm over the axis it
-# crossed the rear station's extension line.  Its "TUBE SOCKET BORES, 4X"
-# row (about 38 mm from 5 mm right of the symbol point, 9 mm above it)
-# stands in the empty margin left of the rail, 4 mm under that axis line's
-# extension.  The band under the plan belongs to the hole table
-# (HOLE_TABLE_ANCHOR).
-SOCKET_FINISH_SYMBOL_XY = (0.020, 0.089)
-SOCKET_FINISH_LANDING_DEG = 225.0
+# The socket Ra symbol reads off the bottom rim of the rear east socket
+# (270 deg on the sheet, y 104.5 - 6.4 = 98.1 mm), from the left margin
+# 20.5 mm under its axis, so its leader rises across the boss under the
+# rear sockets' axis line, the hanger stations' extension from it
+# (HANGER_Z_TEXT_XY, #2628 (d)), and under A1's tag, which now stands
+# outboard left of that boss (hole_tag_position); at 135 deg from 22 mm
+# over the axis it crossed the rear station's extension line, and at 225
+# deg it met A1's tag leader at that rim (farm run 20261120T205313453Z).
+# Its "TUBE SOCKET BORES, 4X" row (about 38 mm from 5 mm right of the
+# symbol point, 9 mm above it) stands in the empty margin left of the
+# rail, 8 mm under that axis line's extension.  The band under the plan
+# belongs to the hole table (HOLE_TABLE_ANCHOR), 2.5 mm under the symbol.
+SOCKET_FINISH_SYMBOL_XY = (0.020, 0.084)
+SOCKET_FINISH_LANDING_DEG = 270.0
 FINISH_LEADER_TAIL = 0.042
 # Owner ruling B3 (#2333): the boss tops are machined seats.  Their one
 # symbol stands in sheet 4's empty band left of A-A, under the cap recess
@@ -1392,11 +1394,20 @@ HOLE_TABLE_MATE_COLUMN = "MATE"
 HOLE_TABLE_MATE_WIDTH = 0.054
 _HOLE_TABLE_SIZE_COLUMN = 3
 EDGE_NOTE_XY = (0.030, 0.033)
-# Each socket's tag stands in the open window beside it on a leader to the
-# axis, 14 mm in from the axis on each sheet axis, past the boss and the
-# rail: the native default parked it up-right of the hole, in the keeper
-# callout's leader (farm run 20261106T204855971Z, leader-through-text).
+# Each right socket's tag stands in the open window beside it on a leader
+# to the axis, 14 mm in from the axis on each sheet axis, past the boss and
+# the rail: the native default parked it up-right of the hole, in the
+# keeper callout's leader (farm run 20261106T204855971Z, leader-through-
+# text).  SolidWorks lands every tag's leader on its bore's fixed lower-left
+# rim (farm run 20261120T205313453Z: A1 and A2 at 225 deg from both an
+# up-right and a down-right tag), so from the left windows the leaders
+# crossed the hanger stations' extension lines (#2628 (d)).  The left
+# sockets' tags stand outboard instead, their box's upper-right corner
+# HOLE_TAG_OUTBOARD (12.25 left, 5.25 down) off the axis: 2.1 mm off the
+# boss, under the rear axis line and over the front station's extension,
+# on a short leader up-right to that rim.
 HOLE_TAG_SOCKET_INSET = 0.014
+HOLE_TAG_OUTBOARD = (0.01225, 0.00525)
 # The tag's printed "A1" box about its centre (2 glyphs at 3.5 mm): the note
 # position SolidWorks takes is the box's upper-left corner.
 _HOLE_TAG_HALF = (0.0025, 0.00175)
@@ -1678,9 +1689,12 @@ def negative_locations(rows: tuple[tuple[str, ...], ...]) -> list[str]:
 
 def hole_tag_position(x: float, z: float) -> tuple[float, float]:
     """The sheet point (the tag box's upper-left corner) for one TABLE_HOLES
-    socket's tag: in the window diagonally inside it."""
+    socket's tag: a right socket's in the window diagonally inside it, a
+    left socket's outboard, down-left of it (HOLE_TAG_OUTBOARD)."""
     s = DETAIL_VIEW_SCALE / 1000.0
     cx, cy = DETAIL_TOP_CENTER[0] + x * s, DETAIL_TOP_CENTER[1] - z * s
+    if x < 0:
+        return (cx - HOLE_TAG_OUTBOARD[0] - 2.0 * _HOLE_TAG_HALF[0], cy - HOLE_TAG_OUTBOARD[1])
     dx = -math.copysign(HOLE_TAG_SOCKET_INSET, x)
     dy = math.copysign(HOLE_TAG_SOCKET_INSET, z)
     return (cx + dx - _HOLE_TAG_HALF[0], cy + dy + _HOLE_TAG_HALF[1])

@@ -1,6 +1,9 @@
 fr-rocker-arm-support:
   number: MHA-FR-05
-  material_family: ferrous_noncritical
+  # Owner ruling 2026-11-20 (Pedro), #635: from low-carbon bar now, so the
+  # sheet no longer offers gray iron.
+  material: LOW-CARBON STEEL, E.G. 1018 CF
+  material_specification: AISI 1018 cold-finished steel bar, 3 x 8 in
   # One RAL on the three frame sheets: owner ruling 2026-11-20 (Pedro), #2394;
   # delegated ruling 2026-11-20 (Main), RAL 6005 because it is the stocked
   # paint and matches MHA-DT-05; owner review #2144.
