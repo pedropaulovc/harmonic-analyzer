@@ -405,9 +405,10 @@ def manual_timer(monkeypatch):
 @pytest.fixture
 def gate_threads(monkeypatch):
     """The threads a deadline test starts, released and joined at teardown
-    BEFORE monkeypatch puts the real ``os._exit`` back: a callback or gate
-    still running then would call it and kill the whole run. Every such thread
-    ends within the (patched, short) exit grace once its events are set."""
+    BEFORE monkeypatch puts the session's ``_hard_exit`` back: a callback or
+    gate still running then would reach that refusal, which interrupts the
+    whole run. Every such thread ends within the (patched, short) exit grace
+    once its events are set."""
     monkeypatch.setattr(_watchdog, "_FIRED_EXIT_GRACE_S", 1.0)
     threads: list[threading.Thread] = []
     releases: list[threading.Event] = []

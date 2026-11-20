@@ -1,11 +1,14 @@
 """Suite-wide test isolation for the whole repository (``cad/scripts`` and ``tests``)."""
 
+import _thread
+import atexit
 import importlib
 import importlib.util
 import os
 import subprocess
 import sys
 import tempfile
+import threading
 import traceback
 from importlib.machinery import SourceFileLoader
 from pathlib import Path
@@ -20,6 +23,9 @@ import pytest
 _SCRATCH = tempfile.TemporaryDirectory(
     prefix="harmonic-tests-", ignore_cleanup_errors=True
 )
+# Registered before anything imports _telemetry, so it runs after telemetry's
+# own exit hook has closed the capture files it keeps in this directory.
+atexit.register(_SCRATCH.cleanup)
 # Never pull from or publish to the shared remote cache (the default mode is rw).
 os.environ["HARMONIC_REMOTE_CACHE_MODE"] = "off"
 # Never reach the real build farm: no inherited executor or farm run identity,
@@ -258,22 +264,38 @@ def _memoize_doit_plugin_entry_points():
     doit.plugin.entry_points_impl = lambda: entry_points
 
 
+class WatchdogExitBlocked(RuntimeError):
+    """A test let the COM watchdog's hard exit fire."""
+
+
 def _refuse_watchdog_exit(code):
-    _refuse(
-        "_watchdog._hard_exit",
-        f"exit {code}: inject exit_fn or patch _watchdog._hard_exit",
+    stack = "".join(traceback.format_stack(limit=25)[:-1])
+    test = os.environ.get("PYTEST_CURRENT_TEST", "<no test>")
+    message = (
+        f"COM watchdog hard exit {code} refused in {test}: a watchdog or "
+        "deadline fired, and the real exit would end pytest. A test that "
+        "exercises an exit injects exit_fn or patches _watchdog._hard_exit.\n"
+        f"Caller stack:\n{stack}"
     )
+    _refused.append(message)
+    if threading.current_thread() is threading.main_thread():
+        raise WatchdogExitBlocked(message)
+    # A watchdog thread fired, so the main thread may be stuck in the very call
+    # the exit exists to abandon: interrupt it rather than hang the session.
+    _thread.interrupt_main()
 
 
 def _install_watchdog_exit_guard():
     """Replace the watchdog's one hard exit for the session, collection included.
 
     ``_watchdog._hard_exit`` is ``os._exit``: a deadline or a default-exit
-    ``Watchdog`` firing in a test would end pytest itself, with no report. Its
-    refusal is recorded like a launch, so it fails the test even when it fires
-    on a watchdog thread. Tests that exercise an exit patch ``_hard_exit`` or
-    inject ``exit_fn`` themselves. Importing the module here makes every later
-    ``import _watchdog`` in this process return the guarded one.
+    ``Watchdog`` firing in a test would end pytest itself, with no report.
+    The refusal is recorded like a launch, so it fails the test. On the main
+    thread it raises; from a watchdog or deadline thread it interrupts the
+    main thread instead, which a block stuck in Python code cannot ignore.
+    Tests that exercise an exit patch ``_hard_exit`` or inject ``exit_fn``
+    themselves. Importing the module here makes every later ``import
+    _watchdog`` in this process return the guarded one.
     """
     scripts = Path(__file__).resolve().parent / "cad" / "scripts"
     if not (scripts / "_watchdog.py").is_file():
@@ -339,10 +361,6 @@ def pytest_configure(config):
         _install_activation_guard()
         _install_dodo_guard()
     _install_watchdog_exit_guard()
-
-
-def pytest_unconfigure(config):
-    _SCRATCH.cleanup()
 
 
 @pytest.fixture

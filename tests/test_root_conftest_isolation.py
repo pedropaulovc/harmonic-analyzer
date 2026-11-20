@@ -9,6 +9,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -100,7 +101,30 @@ def test_a_default_watchdog_exit_is_refused_instead_of_ending_pytest(
         clock=lambda: 0.0,
     )
     crashes.add(4242)
-    with pytest.raises(RuntimeError, match=r"_watchdog\._hard_exit"):
+    with pytest.raises(RuntimeError, match="COM watchdog hard exit 86 refused"):
         dog.tick()
+    assert len(solidworks_launch_refusals) == 1
+    solidworks_launch_refusals.clear()
+
+
+def test_a_deadline_firing_on_its_timer_interrupts_the_stuck_block(
+    solidworks_launch_refusals, monkeypatch
+):
+    watchdog = sys.modules["_watchdog"]
+    assert watchdog._hard_exit is not os._exit
+    monkeypatch.delenv("HARMONIC_COM_WATCHDOG", raising=False)
+    interrupted = False
+    with pytest.raises(SystemExit) as exited:
+        with watchdog.deadline(0.05, reason="stuck", message="never returns", code=91):
+            try:
+                # Bounded, so a regression fails slowly instead of hanging.
+                give_up = time.monotonic() + 30
+                while time.monotonic() < give_up:
+                    time.sleep(0.01)
+            except KeyboardInterrupt:
+                interrupted = True
+                raise
+    assert interrupted
+    assert exited.value.code == 91
     assert len(solidworks_launch_refusals) == 1
     solidworks_launch_refusals.clear()

@@ -1044,7 +1044,8 @@ def _configure(*, console: bool) -> None:
     emits calls it, so the first log, span or :func:`inject_env` configures.
 
     ``console`` toggles the human-readable stderr stream (and the compact span
-    tracer). File capture under ``cad/out/reports/telemetry`` is always attempted
+    tracer). File capture under ``cad/out/reports/telemetry`` (or
+    ``HARMONIC_TELEMETRY_DIR``) is always attempted
     (best-effort). ``force`` re-reads the environment (verbosity, OTLP endpoints)
     and replaces the shared processors, shutting the previous ones down; the
     installed providers, and their resources, stay.
