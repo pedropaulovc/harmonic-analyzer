@@ -473,14 +473,17 @@ def test_shared_numbers_print_the_item_the_native_bom_gives(monkeypatch) -> None
 
 def test_released_cup_pins_are_renewed_once_at_ninety_degrees() -> None:
     """Owner ruling 2026-11-20 (Pedro), #2497: a released or slipping cup pin
-    is re-pinned once at 90 degrees; the arm's slipping dowel is bonded."""
-    fitted = " ".join(_step_body("knob-stack-fitted").split())
-    assert "WITH A NEW PIN AT 90\u00b0; IF AGAIN, A NEW CUP AND SHAFT" in fitted
-    for key in ("fitup-mesh-remedied", "fitup-accepted"):
-        assert "A NEW PIN AT 90\u00b0, ONCE ONLY" in " ".join(
-            _step_body(key).split()
-        ), key
-    assert "LOCTITE 638" in _step_body("arm-plate-fitted")
+    is re-pinned once at 90 degrees, and a cup and shaft re-pinned before
+    (at 22F, 28P or 33R) are renewed; the arm's slipping dowel is bonded and
+    read again once cured."""
+    repin = "WITH A NEW PIN AT 90\u00b0 (RE-PINNED BEFORE: NEW CUP AND SHAFT)"
+    for key in ("knob-stack-fitted", "fitup-mesh-remedied", "fitup-accepted"):
+        assert repin in " ".join(_step_body(key).split()), key
+    bonded = " ".join(_step_body("arm-plate-fitted").split())
+    assert (
+        "BOND IT WITH LOCTITE 638 AT THE SAME PROUD AND CURE 24 H; CHECK: IT DOES "
+        f"NOT MOVE AND READS AS {drawing.sub_step('arm-plate-fitted', 5)}."
+    ) in bonded
 
 
 def test_a_feed_sleeve_found_outside_after_hanging_has_a_renewal_route() -> None:
@@ -495,8 +498,15 @@ def test_a_feed_sleeve_found_outside_after_hanging_has_a_renewal_route() -> None
         f"THEN {steps.step_number('oil-hole-drilled')}-"
         f"{steps.step_number('disc-cluster-shimmed')}"
     ) in meshed
-    assert drawing.sub_step("hanger-meshed", 11) in _step_body(
-        "loaded-rack-geometry-checked"
+    texts = drawing._step_text(operating_domain=_unit_operating_domain())
+    route = next(
+        index
+        for index, text in enumerate(texts["hanger-meshed"])
+        if text.startswith(f"FOR A {_number('pd-transgear-feed-pinion')} FOUND OUTSIDE")
+    )
+    assert (
+        f"OR {drawing.sub_step('hanger-meshed', route)}."
+        in texts["loaded-rack-geometry-checked"][11]
     )
 
 
@@ -1591,7 +1601,9 @@ def test_pivot_section_balloon_columns_keep_order_and_pitch() -> None:
 def test_the_actual_collar_disc_overlap_is_checked_before_final_platen_installation() -> None:
     """A static F-to-disc setting cannot certify all loaded overlapping patches."""
     inspected = _step_body("collar-disc-air-inspected")
-    assert f"REMOVE THE {_number('pd-platen')} PLATEN" in inspected
+    assert (
+        "WITH THE ARM LATCHED, REMOVE THE LOCKS AND LIFT OFF THE PLATEN." in inspected
+    )
     assert "TRIAL PLATEN" not in inspected
     assert f"({disc.TEETH / knob_shaft.TEETH:g} KNOB TURNS)" in inspected
     assert f"CLEARANCE {steps.COLLAR_DISC_AIR_TEXT}" in inspected
@@ -3078,8 +3090,7 @@ def test_the_reducer_mesh_is_tried_before_the_plate_is_doweled() -> None:
     # Owner ruling 2026-11-20 (Pedro), #2497: the arm already carries the
     # DETAIL K jig-boring, so a dowel that slides in is bonded, not scrapped.
     assert (
-        "IF A DOWEL SLIDES IN BY HAND, BOND IT INTO THE ARM WITH LOCTITE 638 AT "
-        f"THE SAME PROUD AND CURE 24 H BEFORE {drawing.sub_step('arm-plate-fitted', 7)}."
+        "IF A DOWEL SLIDES IN BY HAND, BOND IT WITH LOCTITE 638 AT THE SAME PROUD"
     ) in " ".join(fitted.split())
     assert "ARM CLAMPED FRONT UP ON THE SAME PARALLELS" in fitted
     # A failed doweled re-read is cleaned and read again before the set is

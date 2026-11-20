@@ -2199,11 +2199,12 @@ def _step_text(
     )
     # Owner ruling 2026-11-20 (Pedro), #2497: a cup and shaft not otherwise
     # faulty are re-pinned once, the new hole at 90 degrees to the first
-    # (no geometry change); a second release renews them.
-    repinned = "A NEW PIN AT 90\u00b0, ONCE ONLY"
+    # (no geometry change); a cup and shaft re-pinned before are renewed,
+    # since a third through hole at 90 degrees falls on the first's line.
+    repinned = "A NEW PIN AT 90\u00b0 (RE-PINNED BEFORE: NEW CUP AND SHAFT)"
     # #3106: a feed sleeve found outside after the cluster is hung is renewed
     # as 12W-12X renew it, from the stripped cluster: the collar slid on at
-    # 22H comes off first, the hub's oil hole is drilled on into the new
+    # 22G comes off first, the hub's oil hole is drilled on into the new
     # sleeve (step 17) and the collar goes back on. Written once at 24 and
     # pointed to from 26 (the step-line budget).
     sleeve_renewed = (
@@ -2521,10 +2522,11 @@ def _step_text(
             # The arm carries DETAIL K's jig-boring by now, so a dowel that
             # slides in is bonded, not scrapped with the arm (owner ruling
             # 2026-11-20 (Pedro), #2497; machinist exception
-            # PD-00-arm-dowel-bonded). The scrap rule stays at every other
-            # press.
-            "IF A DOWEL SLIDES IN BY HAND, BOND IT INTO THE ARM WITH LOCTITE 638 "
-            f"AT THE SAME PROUD AND CURE 24 H BEFORE {s('arm-plate-fitted', 7)}.",
+            # PD-00-press-salvage). The scrap rule stays at every other
+            # press. The cured dowel is read again before the plate goes on.
+            "IF A DOWEL SLIDES IN BY HAND, BOND IT WITH LOCTITE 638 AT THE SAME "
+            "PROUD AND CURE 24 H; CHECK: IT DOES NOT MOVE AND READS AS "
+            f"{s('arm-plate-fitted', 5)}.",
             "FIT THE PLATE BACK ON THE "
             f"{n['pd-vn-transgear-arm-plate-locating-pin']} DOWELS.",
             "MATCH-MARK ARM AND PLATE.",
@@ -2822,10 +2824,10 @@ def _step_text(
             f"FRONT {row_cite('cup-pin-hole')}.",
             f"PRESS THE {n['pd-vn-transgear-knob-cup-pin']} PIN IN, CENTRED.",
             # Owner ruling 2026-11-20 (Pedro), #2497: re-pinned once at 90
-            # degrees; a second slip renews both parts.
+            # degrees; a slip after a re-pin, here or at 28P/33R, renews both.
             "IF THE PIN SLIDES IN BY HAND, PRESS IT OUT AND REPEAT "
-            f"{s('knob-stack-fitted', 2)}-{s('knob-stack-fitted', 4)} WITH A NEW PIN "
-            f"AT 90\u00b0; IF AGAIN, A NEW CUP AND SHAFT FROM {s('knob-stack-fitted', 0)}.",
+            f"{s('knob-stack-fitted', 2)}-{s('knob-stack-fitted', 4)} WITH "
+            f"{repinned}.",
             f"SLIDE THE {n['pd-transgear-drive-collar']} COLLAR ON THE "
             f"{n['pd-transgear-knob-shaft']} SHAFT, ITS PIN ON THE D-FLAT, ITS DOWELS "
             "FORWARD, NOT YET FIXED TO THE SHAFT.",
@@ -2943,7 +2945,7 @@ def _step_text(
             "WITH THE LOCKS REMOVED, LIFT THE PLATEN OFF THE BAR.",
             "REPLACE ANY PART FOUND OUTSIDE OR LOOSE PER STEP "
             f"{steps.step_number('rack-screwed')}, "
-            f"{steps.step_number('guides-screwed')} OR {s('hanger-meshed', 11)}.",
+            f"{steps.step_number('guides-screwed')} OR {s('hanger-meshed', 10)}.",
             f"IF NONE WAS FOUND, SLACKEN THE {n['pd-platen-bottom-guide']} BOTTOM "
             "GUIDE'S SCREWS.",
             "WITH THE SCREWS SLACK, SET THE GUIDE AGAIN PER "
@@ -3101,9 +3103,7 @@ def _step_text(
             "MINOR.",
         ),
         "collar-disc-air-inspected": (
-            f"WITH THE ARM LATCHED, REMOVE THE {n['pd-platen']} PLATEN AS "
-            f"{s('loaded-rack-geometry-checked', 9)}-"
-            f"{s('loaded-rack-geometry-checked', 10)}.",
+            "WITH THE ARM LATCHED, REMOVE THE LOCKS AND LIFT OFF THE PLATEN.",
             "PUSH THE DISC AND COLLAR TOWARD EACH OTHER AND TURN THE DISC ONE "
             f"FULL TURN ({disc.TEETH / KNOB_TEETH:g} KNOB TURNS).",
             f"CHECK: A {steps.COLLAR_DISC_AIR_TEXT.split()[0]} FEELER ENTERS "
