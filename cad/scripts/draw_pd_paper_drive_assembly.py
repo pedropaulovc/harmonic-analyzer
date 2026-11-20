@@ -248,7 +248,9 @@ BOM_SECOND_ANCHOR = (
 BOM_REFERENCE_SCALE = (1.0, 10.0)
 BOM_REFERENCE_CENTER = (0.060, 0.065)
 BOM_REFERENCE_LIMITS = (0.018, 0.028, 0.095, 0.104)
-BOM_REFERENCE_CAPTION_XY = (0.100, 0.088)
+# The caption's top row stands under the BOM tables' last rows (y ~.117 on
+# the 47-row fill); 18 rows clear the inner border.
+BOM_REFERENCE_CAPTION_XY = (0.100, 0.100)
 BOM_REFERENCE_CAPTION = (
     "REFERENCE\n"
     f"BALLOONS: SHEETS 1-{SHEET_NAMES.index('PLATEN AND SUPPORT') + 1}\n"
@@ -1153,6 +1155,36 @@ CHAIN_QUANTITIES = {
     "sh-vn-chain-link--OuterLink": chain.LINK_COUNT // 2 - 1,
     "pd-vn-chain-connecting-link": 1,
 }
+# MHA-SH-VN-59 numbers two BOM rows (the rack screw and the disc screw) and
+# MHA-SH-VN-50 two more (the chain's inner and outer links), so the sheet
+# wording adds the BOM item to those four (#3106, rule 22: the number alone
+# named either row); _validate_bom reads each item back.
+SHARED_NUMBER_ITEMS = {
+    explode.RACK_SCREW: 9,
+    explode.DISC_SCREW: 33,
+    "sh-vn-chain-link--InnerLink": 45,
+    "sh-vn-chain-link--OuterLink": 46,
+}
+if {
+    stem
+    for stem, number in BOM_PART_NUMBERS.items()
+    if list(BOM_PART_NUMBERS.values()).count(number) > 1
+} != set(SHARED_NUMBER_ITEMS):
+    raise AssertionError("every Number on two BOM rows carries its item in the wording")
+
+
+# The spare 18-tooth sprocket takes its own loop, cut from the same supplier
+# chain and closed by its own connecting link (owner ruling 2026-11-20
+# (Pedro), #2429, option A). paper_drive_chain_fit closes it at the source
+# centres at 62 pitches with the spare on the knob (12-tooth crank) and 68
+# with it on the crank (24-tooth knob); the test solves both. The order
+# length covers the longer.
+SPARE_TEETH = next(
+    teeth
+    for name, teeth in sprocket.CONFIGS
+    if name not in (sprocket.CRANK_CONFIG, sprocket.KNOB_CONFIG)
+)
+SPARE_LOOP_PITCHES = {"knob": 62, "crank": 68}
 # The inner and outer link rows print one purchase Number, one supplier
 # chain's two link kinds, so the BOM sheet says what that Number is and what
 # to order (2026-10-27 ENFORCE review, r1-r3: one Number with two
@@ -1162,13 +1194,24 @@ _CHAIN_CUT_PITCHES = (
     CHAIN_QUANTITIES["sh-vn-chain-link--InnerLink"]
     + CHAIN_QUANTITIES["sh-vn-chain-link--OuterLink"]
 )
+_SPARE_CUT_PITCHES = {
+    where: pitches - 1 for where, pitches in SPARE_LOOP_PITCHES.items()
+}
+CHAIN_ORDER_FEET = math.ceil(
+    (_CHAIN_CUT_PITCHES + max(_SPARE_CUT_PITCHES.values())) * chain.LINK_PITCH / 304.8
+)
 BOM_CHAIN_ORDER_NOTE = (
-    f"{BOM_PART_NUMBERS['sh-vn-chain-link--InnerLink']} IS ONE CHAIN,\n"
-    f"MCMASTER {_config.parts('sh-vn-chain-link')['supplier_skus'][0]}: "
-    f"CUT {_CHAIN_CUT_PITCHES} PITCHES,\n"
+    f"{BOM_PART_NUMBERS['sh-vn-chain-link--InnerLink']}, ITEMS "
+    f"{SHARED_NUMBER_ITEMS['sh-vn-chain-link--InnerLink']} AND "
+    f"{SHARED_NUMBER_ITEMS['sh-vn-chain-link--OuterLink']}, IS\n"
+    f"ONE CHAIN, MCMASTER {_config.parts('sh-vn-chain-link')['supplier_skus'][0]}:\n"
+    f"ORDER {CHAIN_ORDER_FEET} FT. CUT {_CHAIN_CUT_PITCHES} PITCHES,\n"
     f"{CHAIN_QUANTITIES['sh-vn-chain-link--InnerLink']} INNER AND "
     f"{CHAIN_QUANTITIES['sh-vn-chain-link--OuterLink']} OUTER LINKS;\n"
-    f"{BOM_PART_NUMBERS['pd-vn-chain-connecting-link']} CLOSES THE LOOP."
+    f"{BOM_PART_NUMBERS['pd-vn-chain-connecting-link']} CLOSES THE LOOP.\n"
+    f"THE SPARE {SPARE_TEETH}-TOOTH SPROCKET'S LOOP:\n"
+    f"CUT {_SPARE_CUT_PITCHES['knob']} PITCHES (IT ON THE KNOB) OR\n"
+    f"{_SPARE_CUT_PITCHES['crank']} (ON THE CRANK) FROM THE REST."
 )
 if not set(TRANSGEAR_QUANTITIES) <= set(BOM_PART_NUMBERS):
     raise AssertionError("every transgear family is a BOM row")
@@ -1294,10 +1337,20 @@ FEED_SLEEVE_BALLOON_POINT_MM = (
     round(_FEED_TIP_R * math.sin(_FEED_CORNER_ANGLE), 4),
     FEED_SLEEVE_BALLOON_Z,
 )
+# Sheet 3's balloon 37 walked to the collar's lowest point, where the
+# MHA-PD-VN-70 flat pin, drawn just below it, ends, so its arrow read as the
+# pin's beside balloon 39's (#2831, machinist review of #2822's run
+# 20261115T133410689Z). It lands instead on the front face's outer circle at
+# local -X: the collar is placed unrotated about its axis (its flat pin at
+# local -Y draws below it), so -X draws lower right of the axis in the
+# *Isometric (sheet right -0.707 x), on the face the camera sees and clear
+# of the pin, the drive dowels (+-Y) and the knob wheel drawn down-left.
+COLLAR_BALLOON_POINT_MM = (round(-collar.OD / 2.0, 4), 0.0, 0.0)
 _BALLOON_POINTS_MM = {
     "pd-transgear-disc-hub": HUB_BALLOON_POINT_MM,
     "pd-transgear-knob-shaft": KNOB_SHAFT_BALLOON_POINT_MM,
     "pd-transgear-feed-pinion": FEED_SLEEVE_BALLOON_POINT_MM,
+    "pd-transgear-drive-collar": COLLAR_BALLOON_POINT_MM,
 }
 TRANSGEAR_BALLOON_ANCHORS = {
     stem: BalloonAnchor(instance=explode.KNOB_WHEEL_INSTANCE)
@@ -1706,7 +1759,14 @@ def _scale_text(scale: tuple[float, float]) -> str:
 
 
 # --- sheet wording ---------------------------------------------------------------
-_N = BOM_PART_NUMBERS
+# The sheets' part names: the BOM Number, with the item where one Number
+# covers two rows (SHARED_NUMBER_ITEMS).
+_N = {
+    stem: f"{number} (ITEM {SHARED_NUMBER_ITEMS[stem]})"
+    if stem in SHARED_NUMBER_ITEMS
+    else number
+    for stem, number in BOM_PART_NUMBERS.items()
+}
 KNOB_TEETH = knob_shaft.TEETH
 # The knob shaft's gear named in words (rule 26): a coined "15T" read as
 # Detail K's tap label T (machinist review of 7d151d7f13, r1 and r3). The
@@ -1779,7 +1839,8 @@ _DISC_TIP_RADII_MM = [profile.blank_radius_mm for profile in disc.manufactured_p
 # gauges.dial-indicators): the loosest mesh shakes about 0.19 mm at the tip,
 # past the 1 um lever indicator's 0.14 mm range (gauges.dti, owner
 # 2026-11-17). The ceiling prints on the .001 grid, rounded up; the
-# tightest mesh still shakes most of a division, so "visibly" is its floor.
+# tightest mesh still shakes over half a division, which prints as the floor
+# (#2960: "visibly" let a needle twitch pass).
 REDUCER_DIAL_STEP_MM = 0.001 * 25.4
 REDUCER_SHAKE_MIN_MM = (
     _REDUCER_CIRCULAR_BACKLASH_MM[0] * min(_DISC_TIP_RADII_MM) / (disc.PITCH_DIA / 2.0)
@@ -1790,7 +1851,11 @@ REDUCER_SHAKE_MAX_MM = math.ceil(
 ) * REDUCER_DIAL_STEP_MM
 if REDUCER_SHAKE_MIN_MM < REDUCER_DIAL_STEP_MM / 2.0:
     raise AssertionError("the reducer's tightest shake reads under half a division")
-REDUCER_BACKLASH_DIAL_TEXT = f"VISIBLY, AT MOST {steps.inch_text(REDUCER_SHAKE_MAX_MM, 3)},"
+# The floor prints as half a .001 division.
+REDUCER_BACKLASH_DIAL_TEXT = (
+    f"{steps.inch_text(REDUCER_DIAL_STEP_MM / 2.0, 4)} TO "
+    f"{steps.inch_text(REDUCER_SHAKE_MAX_MM, 3)}"
+)
 # The disc is read at stations round one turn: 45 degrees apart sample its
 # once-a-turn tooth-space runout within cos 22.5 (92 %) of its peak. Each
 # move turns the 15T 1.25 turns, so it is read at four phases 90 degrees
@@ -1837,9 +1902,13 @@ GUIDE_SPOT_PUNCH = Fraction(bottom_guide.PLATEN_SPOT_PUNCH_64THS, 64)
 
 
 # The engaged-feed window, measured from the rack's -X cut end. Machine X is
-# drawn on no sheet, so the end is named by the crank, which stands on the
-# drive's -X side (machinist review: "-X CUT END" could not be found on the
-# part).
+# drawn on no sheet, so the end is named by a view: the crank stands on the
+# drive's -X side, at the right of sheet 1's front view (#3106, rule 26: the
+# earlier "CRANK-SIDE CUT END" was a private convention; machinist review
+# before that: "-X CUT END" could not be found on the part).
+RACK_FEED_END_TEXT = "THE RACK'S RIGHT END IN SHEET 1'S FRONT VIEW"
+
+
 def engaged_feed_window(domain: RackOperatingDomain) -> str:
     """The window the meshing step runs, in the title block's inches,
     rounded inward."""
@@ -1851,7 +1920,7 @@ def engaged_feed_window(domain: RackOperatingDomain) -> str:
 def engaged_feed_text(domain: RackOperatingDomain) -> str:
     """The meshing step's engaged-feed window, with what it is measured on."""
     return (
-        f"{engaged_feed_window(domain)} FROM THE RACK'S CRANK-SIDE CUT END TO THE "
+        f"{engaged_feed_window(domain)} FROM {RACK_FEED_END_TEXT} TO THE "
         f"{_N['pd-transgear-pin']} PIN AXIS"
     )
 
@@ -1869,13 +1938,17 @@ def sub_step(key: str, index: int) -> str:
 
 # Rule 22 (machinist review r3, r5): the BOM sheet states what the steps use
 # up beyond the BOM rows: four more MHA-SH-VN-59, cut into the rack's transfer
-# screws, and the #4-40 transfer screws, a bought shop tool, four in each
-# guide's lock taps when the locks are struck.
+# screws, the spare sprocket's connecting link (#2429), and the #4-40
+# transfer screws, a bought shop tool, four in each guide's lock taps when
+# the locks are struck.
 LOCK_TRANSFER_SCREWS = 4 * 2
 BOM_EXPENDABLES_NOTE = (
-    f"ALSO ORDER {RACK_SCREWS} MORE {BOM_PART_NUMBERS[explode.RACK_SCREW]}:\n"
-    f"{sub_step('rack-screwed', 0)}-{sub_step('rack-screwed', 2)} MAKE THEM "
+    f"ALSO ORDER {RACK_SCREWS} MORE {BOM_PART_NUMBERS[explode.RACK_SCREW]}\n"
+    f"(ITEM {SHARED_NUMBER_ITEMS[explode.RACK_SCREW]}): "
+    f"{sub_step('rack-screwed', 0)}-{sub_step('rack-screwed', 2)} MAKE THEM\n"
     "TRANSFER SCREWS.\n"
+    f"ALSO ORDER 1 MORE {BOM_PART_NUMBERS['pd-vn-chain-connecting-link']}\n"
+    "TO CLOSE THE SPARE'S LOOP.\n"
     f"{sub_step('platen-hung', 0)} USES {LOCK_TRANSFER_SCREWS} #4-40 TRANSFER\n"
     "SCREWS, A SHOP TOOL."
 )
@@ -1988,6 +2061,15 @@ REDUCER_CLOCK_TEXT = steps.inch_text(
 DISC_TIR_TEXT = steps.inch_text(
     steps.inch_floor_mm(disc.TOOTH_SPACE_RUNOUT_TIR_MM, 3), 3
 )
+# The disc is centred on its O.D., cut on the same arbor as its teeth, and
+# its tooth-space runout is read in 12 spaces about evenly round it: any
+# evenly spaced sample catches a once-a-turn runout (owner ruling
+# 2026-11-20 (Pedro), #2665; MHA-PD-06 RV-02).
+DISC_TIR_SAMPLE_SPACES = 12
+DISC_TIR_SAMPLE_STRIDES = (
+    disc.TEETH // DISC_TIR_SAMPLE_SPACES,
+    -(-disc.TEETH // DISC_TIR_SAMPLE_SPACES),
+)
 # The setting table's rows, in step order; each step cites its row by number.
 SETTING_ROW_KEYS = (
     "bar-top",
@@ -2056,9 +2138,8 @@ def _step_text(
     crank_short = sprocket_name(sprocket.CRANK_CONFIG, numbered=False)
     # The knob wheel floats collar.KNOB_FLOAT_RANGE forward of its seat (the
     # collar's front face) under the thumbnut; the setting and its acceptance
-    # read it held back on that seat, the pose
+    # read it held back on that seat (27E; 29A refits as 27D-27F), the pose
     # ACCEPTED_CHAIN_OFFSET_IN_SERVICE assumes.
-    held_back = f"{knob_short} HELD BACK ON ITS SEAT"
     float_sheet = SHEET_NAMES.index(CLUSTER_FLOAT_SHEET) + 1
     pose = steps.step_number("fitup-pose-set")
     clock = REDUCER_CLOCK_TEXT
@@ -2069,6 +2150,10 @@ def _step_text(
 
     shim_target = steps.inch_text(sum(cluster_fit.RING_FLOAT_RANGE) / 2.0, 3)
     shim_thickness = steps.inch_text(cluster_fit.SHIM.THICKNESS, 3)
+    if cluster_fit.RING_FLOAT_RANGE[1] - cluster_fit.RING_FLOAT_RANGE[0] < (
+        cluster_fit.SHIM.THICKNESS
+    ):
+        raise AssertionError("a shim count to the nearest shim can miss DETAIL E")
     # The bare stack's ring gap, widened outward to the .001 grid: its floor
     # still holds the window's floor (never under) and the most shims, at
     # their thinnest, still bring its top into the window.
@@ -2112,6 +2197,22 @@ def _step_text(
         f"SLIDE THE HUB AND DISC OFF THE {n['pd-transgear-feed-pinion']} NOSE AS ONE, "
         f"THE {hub_pin} PIN RIDING THE FLAT."
     )
+    # Owner ruling 2026-11-20 (Pedro), #2497: a cup and shaft not otherwise
+    # faulty are re-pinned once, the new hole at 90 degrees to the first
+    # (no geometry change); a second release renews them.
+    repinned = "A NEW PIN AT 90\u00b0, ONCE ONLY"
+    # #3106: a feed sleeve found outside after the cluster is hung is renewed
+    # as 12W-12X renew it, from the stripped cluster: the collar slid on at
+    # 22H comes off first, the hub's oil hole is drilled on into the new
+    # sleeve (step 17) and the collar goes back on. Written once at 24 and
+    # pointed to from 26 (the step-line budget).
+    sleeve_renewed = (
+        f"FOR A {n['pd-transgear-feed-pinion']} FOUND OUTSIDE, SLIDE THE COLLAR OFF, "
+        f"STRIP {s('disc-cluster-hung', 4)}-{s('disc-cluster-hung', 1)}, DO "
+        f"{s('arm-plate-located', 20)}, {s('arm-plate-located', 21)}'S REPEATS ON "
+        f"A NEW ONE, THEN {steps.step_number('oil-hole-drilled')}-"
+        f"{steps.step_number('disc-cluster-shimmed')}, {s('knob-stack-fitted', 6)}."
+    )
 
     return {
         "bar-clamped": (
@@ -2141,7 +2242,9 @@ def _step_text(
         # four points, which lie on its centreline and so stay on the roll
         # axis of any tilt.
         "rack-screwed": (
-            f"SCREW A SPARE {n[explode.RACK_SCREW]} BY FINGERS INTO EACH OF THE "
+            # The BOM sheet's expendables note gives these spares' item.
+            f"SCREW A SPARE {BOM_PART_NUMBERS[explode.RACK_SCREW]} BY FINGERS INTO "
+            "EACH OF THE "
             f"{n['pd-feed-rack']} RACK'S {RACK_SCREWS} TAPS UNTIL IT STOPS TURNING "
             "FREELY, NOT BOTTOMED.",
             "CUT EACH SCREW OFF, LEAVING A PLIERS GRIP PROUD OF THE FLAT TOP.",
@@ -2169,7 +2272,7 @@ def _step_text(
             "CHECK: PUSHED FIRMLY BY HAND ALONG AND ACROSS ITS TEETH, THE RACK "
             "DOES NOT SHIFT ON THE GUIDE.",
             f"IF IT SHIFTS, REPEAT {s('rack-screwed', 9)}-{s('rack-screwed', 16)} "
-            f"WITH NEW {n[explode.RACK_SCREW]} SCREWS.",
+            "WITH NEW RACK SCREWS.",
         ),
         # The top guide's taps are tapped to MHA-PD-11's print; the bottom
         # guide's are spotted through the platen with the rack's crests set
@@ -2306,9 +2409,12 @@ def _step_text(
             "CLAMP THE ARM FRONT UP ON PARALLELS ON THE MILL TABLE, THE PIN HEAD, "
             f"THE PLATE AND ITS CLAMPS CLEAR, WITH ROOM UNDER THE PLATE BORE FOR THE "
             f"{n['pd-transgear-knob-shaft']} SHAFT'S REAR END.",
-            "WITH A TEST INDICATOR IN THE SPINDLE, INDICATE THE ARM'S PIVOT BORE "
-            f"AND THE {n['pd-transgear-pin']} PIN'S SHANK IN ITS PIN BORE S, AT "
-            f"THE HEIGHT THE DISC WILL RUN, TRUE ON ONE DRO AXIS ({KNOB_SETTING_TRUE}).",
+            # #2432: a test indicator's contact cannot sweep the small pivot
+            # bore squarely, so it sweeps a snug gauge pin standing in it.
+            "WITH A TEST INDICATOR IN THE SPINDLE, INDICATE A SNUG GAUGE PIN IN "
+            f"THE ARM'S PIVOT BORE AND THE {n['pd-transgear-pin']} PIN'S "
+            "SHANK IN ITS PIN BORE S, AT THE HEIGHT THE DISC WILL RUN, TRUE ON ONE DRO "
+            f"AXIS ({KNOB_SETTING_TRUE}).",
             "ZERO THE DRO ON S.",
             # 12E can print on the sheet after DETAIL K's key: it points to
             # the key's sheet (review of run
@@ -2369,16 +2475,17 @@ def _step_text(
             f"{n['pd-transgear-arm-plate']} AND {n['pd-transgear-feed-pinion']} "
             "BORES TO THEIR SHEETS.",
             f"REPLACE A PLATE FOUND OUTSIDE AND REPEAT FROM {s('arm-plate-located', 0)}.",
-            "REPLACE A DISC FOUND OUTSIDE THROUGH STEPS "
-            f"{steps.step_number('disc-cluster-assembled')}-"
-            f"{steps.step_number('disc-taps-transferred')} ON THE SAME HUB, ITS "
-            f"{hub_pin} PIN RIDING THE FLAT, AND REPEAT FROM "
+            # #3106: the sub-steps by letter; 8A-8B press the hub's pin, which
+            # stays in.
+            "REPLACE A DISC FOUND OUTSIDE THROUGH "
+            f"{s('disc-cluster-assembled', 2)}-{s('disc-taps-transferred', 16)} ON THE "
+            f"SAME HUB, ITS {hub_pin} PIN RIDING THE FLAT, AND REPEAT FROM "
             f"{s('arm-plate-located', 9)}.",
             # The disc is screwed to the hub by then, so it is slackened before
             # it is centred again (codjiflo P3 on 593f4ee).
             "SLIDE THE HUB AND DISC AS ONE OFF A "
             f"{n['pd-transgear-feed-pinion']} FOUND OUTSIDE, THE PIN RIDING THE FLAT.",
-            f"WITH THEM OFF AND THE {n[explode.DISC_SCREW]} SCREWS SLACKENED, "
+            "WITH THEM OFF AND THE DISC SCREWS SLACKENED, "
             "REPEAT "
             f"{s('disc-cluster-assembled', 3)}-{s('disc-cluster-assembled', 4)}, "
             f"{s('disc-taps-transferred', 0)}-"
@@ -2411,13 +2518,13 @@ def _step_text(
             "FROM THE REAR, "
             f"{steps.inch_window(plate_locating_interface.PROUD_LIMITS_MM, 3, ' TO ')} "
             f"PROUD, CALIPER DEPTH ROD {detail_cite('arm-plate-fitted')}.",
-            # The plate's holes are reamed to this arm and the arm carries its
-            # pressed pin and latch dowel, so all four are renewed (codjiflo
-            # P2 on 593f4ee).
-            "IF A DOWEL SLIDES IN BY HAND, REPEAT FROM STEP "
-            f"{steps.step_number('latch-pin-pressed')} WITH A NEW "
-            f"{n['pd-transgear-arm']} ARM, {n['pd-transgear-arm-plate']} PLATE, "
-            f"{n['pd-transgear-pin']} PIN AND {n['pd-vn-transgear-latch-pin']} DOWEL.",
+            # The arm carries DETAIL K's jig-boring by now, so a dowel that
+            # slides in is bonded, not scrapped with the arm (owner ruling
+            # 2026-11-20 (Pedro), #2497; machinist exception
+            # PD-00-arm-dowel-bonded). The scrap rule stays at every other
+            # press.
+            "IF A DOWEL SLIDES IN BY HAND, BOND IT INTO THE ARM WITH LOCTITE 638 "
+            f"AT THE SAME PROUD AND CURE 24 H BEFORE {s('arm-plate-fitted', 7)}.",
             "FIT THE PLATE BACK ON THE "
             f"{n['pd-vn-transgear-arm-plate-locating-pin']} DOWELS.",
             "MATCH-MARK ARM AND PLATE.",
@@ -2472,7 +2579,8 @@ def _step_text(
             f"{steps.inch_text(joints.PLATE_SCREW_CUT_PROUD_MAX, 3)} PROUD OF THE "
             f"ARM {row_cite('plate-screw-tips')}.",
             "BREAK THE CUT EDGE "
-            f"{steps.inch_max_text(plate_screw.CUT_END_BREAK_MAX, 3)}.",
+            f"{steps.inch_max_text(plate_screw.CUT_END_BREAK_MAX, 3)} TO KEEP THE TAP'S "
+            "LAST THREAD.",
             "REFIT THE SAME SCREWS IN THE SAME HOLES, TIGHT.",
             # A check and its remedy are separate steps (rule 22; r10).
             "CHECK: ROCKED BY HAND, THE PLATE HAS NO SHAKE AND NO DAYLIGHT.",
@@ -2486,19 +2594,24 @@ def _step_text(
         # bar's back face (owner ruling U-MHA-PD-VN-57-no-lock, #1194). The
         # spot-face floor sets the spring room (transgear_hanger_joints).
         "hanger-pivoted": (
-            f"FIT THE {n['pd-vn-transgear-pivot-spring']} SPRING ON THE "
-            f"{n['pd-vn-transgear-pivot-screw']} SHOULDER SCREW THE ARM'S PIVOT BORE "
-            "WAS REAMED TO, FROM THE REAR.",
-            "FIT THE ARM'S PIVOT BORE ON THE SHOULDER, FROM THE REAR.",
+            # #2430: the tip is faced on the bare screw, before the spring,
+            # the arm and the pressed spacer make it captive; it seats the
+            # same bare as finished (the spacer stands flush with the
+            # shoulder's end, both on the bar's back face).
+            f"FACE THE {n['pd-vn-transgear-pivot-screw']} SCREW'S TIP UNTIL, SEATED "
+            f"BARE IN THE {n['pd-support-bar']} BAR'S TAP, IT STANDS "
+            f"{steps.inch_window(pivot_screw.TIP_RECESS, 3, ' TO ')} BELOW THE BAR'S "
+            f"FRONT FACE, CALIPER DEPTH ROD {row_cite('pivot-tip')}.",
+            f"FIT THE {n['pd-vn-transgear-pivot-spring']} SPRING ON ITS SHOULDER, FROM "
+            "THE REAR.",
+            "FIT THE ARM, BORE REAMED TO THIS SCREW, ON IT FROM THE REAR.",
             f"PRESS THE {n['pd-transgear-pivot-spacer']} SPACER, AS MADE, ON THE "
-            "SHOULDER, FLUSH WITH ITS END ON A FLAT PLATE.",
+            "SHOULDER, FLUSH WITH ITS END, BOTH ON A FLAT PLATE WHOSE HOLE CLEARS "
+            f"THE {pivot_screw.THREAD} THREAD, NOT THE "
+            f"\u00d8{steps.inch_text(pivot_screw.SHOULDER_DIA, 4)} SHOULDER.",
             "IF THE SPACER SLIDES ON BY HAND, MAKE A NEW "
             f"{n['pd-transgear-pivot-spacer']} SPACER AND REPEAT "
-            f"{s('hanger-pivoted', 2)}.",
-            f"FACE THE SCREW'S TIP SO THAT, SEATED IN THE {n['pd-support-bar']} "
-            "BAR'S THROUGH TAP, IT STANDS "
-            f"{steps.inch_window(pivot_screw.TIP_RECESS, 3, ' TO ')} BELOW THE "
-            f"BAR'S FRONT FACE, CALIPER DEPTH ROD {row_cite('pivot-tip')}.",
+            f"{s('hanger-pivoted', 3)}.",
             "SEAT THE SCREW, ITS SHOULDER TIGHT ON THE BAR'S BACK FACE "
             f"({PIVOT_VIEW_REF}).",
             "CHECK: NO DAYLIGHT BETWEEN THE SPACER AND THE BAR'S BACK FACE.",
@@ -2575,11 +2688,10 @@ def _step_text(
             f"MOUNT THE {n['pd-transgear-feed-pinion']} SLEEVE, HUB AND DISC ON THE "
             "MANDREL, THE SLEEVE'S REAR FACE ON ITS SHOULDER, THE TAILSTOCK CENTRE "
             "IN ITS FRONT BORE MOUTH.",
-            "WITH A DIAL INDICATOR ON A "
-            f"\u00d8{steps.inch_text(disc.TOOTH_SPACE_GAUGE_PIN_DIA_MM, 3)} GAUGE PIN "
-            f"IN EACH {n['pd-rack-pinion']} TOOTH SPACE IN TURN, TAP THE DISC "
-            f"CENTRAL AND SQUARE UNTIL THE READINGS {row_cite('disc-tir')} SPAN "
-            f"{tir} TIR MAX.",
+            # #2665: centred on the O.D., cut on the teeth's arbor; the
+            # tooth spaces are sampled at the re-check.
+            f"WITH A DIAL INDICATOR ON THE {n['pd-rack-pinion']} DISC'S O.D., TAP THE "
+            f"DISC CENTRAL UNTIL THE O.D. READS {tir} TIR MAX {row_cite('disc-tir')}.",
             # The flange holes are off the axis, so the spots are taken off the
             # lathe; the trued disc is clamped to the flange first, or the
             # spigot's centring clearance lets it shift before it is spotted
@@ -2598,17 +2710,20 @@ def _step_text(
             "REMOVE THE CLAMPS.",
             "REFIT THE SLEEVE, HUB AND DISC ON MANDREL AND TAILSTOCK AS "
             f"{s('disc-taps-transferred', 1)}.",
-            f"CHECK {row_cite('disc-tir')}: ALL {disc.TEETH} SPACES READ {tir} TIR MAX.",
-            f"IF NOT, SLACKEN THE {n[explode.DISC_SCREW]} SCREWS AND REPEAT "
-            f"{s('disc-taps-transferred', 2)}, {s('disc-taps-transferred', 9)}, "
-            f"{s('disc-taps-transferred', 12)}.",
+            f"CHECK {row_cite('disc-tir')}: A "
+            f"\u00d8{steps.inch_text(disc.TOOTH_SPACE_GAUGE_PIN_DIA_MM, 3)} GAUGE PIN "
+            f"IN {DISC_TIR_SAMPLE_SPACES} SPACES, EVERY {DISC_TIR_SAMPLE_STRIDES[0]}TH "
+            f"OR {DISC_TIR_SAMPLE_STRIDES[1]}TH, READS {tir} TIR MAX.",
+            # The O.D. already read true, so the disc is set on the pins.
+            "IF NOT, SLACKEN THE SCREWS, CENTRE ON THE PINS, REPEAT "
+            f"{s('disc-taps-transferred', 9)}, {s('disc-taps-transferred', 12)}.",
             # Rule 23 bench acceptance for the disc screws: they carry the
             # drive torque as shear on the flange's bolt circle
             # (joint_retention 'pd-paper-drive/disc-screws', STATIC_CLAMP;
             # machinist review round 6, accept PD-00-disc-hub-shear-clamp).
             "CHECK: WITH THE SLEEVE HELD, FIRM HAND TORQUE AT THE DISC RIM DOES "
             "NOT TURN THE DISC ON THE HUB.",
-            f"IF IT TURNS, FIT NEW {n[explode.DISC_SCREW]} SCREWS AND "
+            "IF IT TURNS, FIT NEW DISC SCREWS AND "
             f"REPEAT {s('disc-taps-transferred', 12)}-{s('disc-taps-transferred', 14)}.",
             "MATCH-MARK DISC AND HUB.",
         ),
@@ -2659,10 +2774,12 @@ def _step_text(
             "IF NOT, REMOVE THE RING, THE "
             f"{n['pd-transgear-front-bushing']} BUSHING, THE SLEEVE WITH HUB AND DISC, "
             f"AND THE {n['pd-transgear-rear-bushing']} BUSHING.",
-            f"IF IT READ OVER, ADD {n['pd-vn-transgear-cluster-shim']} SHIMS, "
-            f"{shim_thickness} THICK, AT THE "
-            f"ARM FACE TOTALLING THE GAP LESS {shim_target}, UP TO "
-            f"{cluster_fit.SHIM_COUNT_RANGE[1]} IN ALL.",
+            # #3106: the count is stated; to the nearest shim the gap lands
+            # within half a shim of the middle, inside DETAIL E's window
+            # (asserted where shim_target is set).
+            f"IF IT READ OVER, ADD {shim_thickness} {n['pd-vn-transgear-cluster-shim']} "
+            f"SHIMS AT THE ARM FACE, ONE PER {shim_thickness} OVER {shim_target} TO THE "
+            f"NEAREST, UP TO {cluster_fit.SHIM_COUNT_RANGE[1]} IN ALL.",
             "IF IT READ UNDER, TAKE ONE SHIM OFF.",
             f"REFIT PER {s('disc-cluster-hung', 1)}-{s('disc-cluster-hung', 4)}.",
             f"REPEAT FROM {s('disc-cluster-shimmed', 0)}.",
@@ -2703,9 +2820,11 @@ def _step_text(
             f"{steps.inch_text(knob_cup.PIN_HOLE_FROM_FRONT, 3)} FROM THE CUP "
             f"FRONT {row_cite('cup-pin-hole')}.",
             f"PRESS THE {n['pd-vn-transgear-knob-cup-pin']} PIN IN, CENTRED.",
-            f"IF THE PIN SLIDES IN BY HAND, MAKE A NEW {n['pd-transgear-knob-cup']} "
-            f"CUP AND {n['pd-transgear-knob-shaft']} SHAFT AND REPEAT FROM "
-            f"{s('knob-stack-fitted', 0)}.",
+            # Owner ruling 2026-11-20 (Pedro), #2497: re-pinned once at 90
+            # degrees; a second slip renews both parts.
+            "IF THE PIN SLIDES IN BY HAND, PRESS IT OUT AND REPEAT "
+            f"{s('knob-stack-fitted', 2)}-{s('knob-stack-fitted', 4)} WITH A NEW PIN "
+            f"AT 90\u00b0; IF AGAIN, A NEW CUP AND SHAFT FROM {s('knob-stack-fitted', 0)}.",
             f"SLIDE THE {n['pd-transgear-drive-collar']} COLLAR ON THE "
             f"{n['pd-transgear-knob-shaft']} SHAFT, ITS PIN ON THE D-FLAT, ITS DOWELS "
             "FORWARD, NOT YET FIXED TO THE SHAFT.",
@@ -2762,6 +2881,7 @@ def _step_text(
             "IF IT SKIPS, INSPECT THE "
             f"{n['pd-transgear-feed-pinion']} TEETH AND THE {n['pd-feed-rack']} RACK "
             "TO THEIR SHEETS.",
+            sleeve_renewed,
             "IF IT SKIPPED, REPLACE ANY PART FOUND OUTSIDE, REPEAT FROM "
             f"{s('hanger-meshed', 0)}.",
         ),
@@ -2820,9 +2940,9 @@ def _step_text(
             f"AFTER CHECKING, UNSCREW AND REMOVE THE {n['pd-latch-hook']} HOOK.",
             "WITH THE HOOK OFF, REMOVE THE LOCKS.",
             "WITH THE LOCKS REMOVED, LIFT THE PLATEN OFF THE BAR.",
-            "REPLACE ANY PART FOUND OUTSIDE OR LOOSE, PER ITS STEP "
-            f"({steps.step_number('rack-screwed')} OR "
-            f"{steps.step_number('guides-screwed')}).",
+            "REPLACE ANY PART FOUND OUTSIDE OR LOOSE PER STEP "
+            f"{steps.step_number('rack-screwed')}, "
+            f"{steps.step_number('guides-screwed')} OR {s('hanger-meshed', 11)}.",
             f"IF NONE WAS FOUND, SLACKEN THE {n['pd-platen-bottom-guide']} BOTTOM "
             "GUIDE'S SCREWS.",
             "WITH THE SCREWS SLACK, SET THE GUIDE AGAIN PER "
@@ -2854,8 +2974,11 @@ def _step_text(
             "CHECK: THE KNOB HAS SHAKE AT EVERY TOOTH.",
             # The final confirmation reads the doweled reducer as the trial
             # (arm-plate-located) and the doweled re-read (arm-plate-fitted)
-            # did, now on the machine (#2417).
-            reducer_dial_check("KNOB"),
+            # did, now on the machine (#2417), held by the knob; it points
+            # to the trial's full wording (the step-line budget, #3106).
+            f"CHECK: KNOB PRESSED LIGHTLY TOWARD THE DISC AND HELD, THE DISC "
+            f"SHAKES {REDUCER_BACKLASH_DIAL_TEXT} AS {s('arm-plate-located', 12)} "
+            f"{row_cite('reducer-shake')}.",
         ),
         # The mesh was proven before the dowels and re-read on them before
         # anything irreversible, so what usually fails here is the plate's
@@ -2869,7 +2992,9 @@ def _step_text(
         # review #2144; pending owner confirmation), now from the latch
         # pin with the cluster reused. Releasing the cross-pin renews every
         # part it fixes (owner ruling 2026-11-08, pending owner
-        # confirmation, #2144); the pivot screw comes out with its pressed
+        # confirmation, #2144), except that a knob cup and shaft not
+        # otherwise faulty are re-pinned once at 90 degrees (owner ruling
+        # 2026-11-20 (Pedro), #2497); the pivot screw comes out with its pressed
         # spacer and both are renewed. One action per sub-step
         # (machinist review, #2417): the turn only finds the fault's period;
         # each remedy branch names it.
@@ -2895,8 +3020,8 @@ def _step_text(
             # A new disc's thickness is its own, so the old screws' cut tips
             # no longer sit in their window under its rear face: new screws,
             # cut again (codjiflo P2 on 27438d7).
-            f"FOR A DISC TOOTH, REPEAT STEPS {steps.step_number('disc-cluster-assembled')}-"
-            f"{steps.step_number('disc-taps-transferred')} WITH A NEW "
+            f"FOR A DISC TOOTH, REPEAT {s('disc-cluster-assembled', 2)}-"
+            f"{s('disc-taps-transferred', 16)} WITH A NEW "
             f"{n['pd-rack-pinion']} DISC AND NEW {n[explode.DISC_SCREW]} "
             f"SCREWS ON THE SAME HUB, ITS PIN LEFT IN AND RIDING THE FLAT, THEN STEPS "
             f"{steps.step_number('disc-screws-cut')}, "
@@ -2906,9 +3031,9 @@ def _step_text(
             f"{knob_pin_out[0]}",
             f"FOR EITHER, {knob_pin_out[1]}",
             f"REFIT A LOOSE PLATE AS {s('arm-plate-fitted', 18)}.",
-            f"FOR EITHER, REPEAT STEP {steps.step_number('knob-stack-fitted')} WITH A NEW "
-            f"{n['pd-transgear-knob-shaft']} SHAFT, {n['pd-transgear-knob-cup']} CUP "
-            f"AND {n['pd-vn-transgear-knob-cup-pin']} PIN, THEN FROM STEP {pose}.",
+            f"FOR EITHER, REPEAT STEP {steps.step_number('knob-stack-fitted')} WITH "
+            f"{repinned}, AND A NEW SHAFT FOR A {KNOB_PINION} TOOTH, THEN FROM STEP "
+            f"{pose}.",
             f"FOR A FAULT ALL ROUND (ARM SETTING), REMOVE THE {n['pd-latch-hook']} "
             "HOOK.",
             f"FOR THE ARM SETTING, STRIP THE CLUSTER ({s('disc-cluster-hung', 4)} "
@@ -2935,11 +3060,14 @@ def _step_text(
             f"{s('latch-hook-fitted', 1)}-{s('latch-hook-fitted', 4)} IN THE REBUILD.",
         ),
         "collar-rear-faced-to-fit": (
-            f"IN STEP {pose}'S POSE, {held_back}, FIT THE COLLAR, ITS REAR FACE ON "
-            f"THE {n['pd-transgear-knob-shaft']} PINION'S FRONT FACE.",
+            # #3106: step 29 is entered from 28 with the knob stack on (27D-27F)
+            # and from 33 and 35 with it off, so it starts by putting it on and
+            # takes all three off to face the collar.
+            f"IN STEP {pose}'S POSE, REFIT ANY OF THE COLLAR, {knob_short} AND "
+            f"THUMBNUT THAT IS OFF AS {s('fitup-pose-set', 3)}-{s('fitup-pose-set', 5)}.",
             f"READ THE {knob_short}'S FRONT FACE AGAINST THE {crank}'S WITH A "
             "STRAIGHTEDGE AND FEELERS.",
-            "REMOVE THE COLLAR.",
+            knob_stack_off,
             "FACE THE COLLAR'S REAR UNTIL, REFITTED, THE "
             f"{knob_short}'S FRONT FACE STANDS {collar.FIT_UP_OFFSET_SET_TEXT} FORWARD "
             f"OF THE {crank_short}'S FRONT FACE {row_cite('offset-set')}.",
@@ -2972,7 +3100,9 @@ def _step_text(
             "MINOR.",
         ),
         "collar-disc-air-inspected": (
-            f"REMOVE THE {n['pd-platen']} PLATEN, THE ARM HELD LATCHED.",
+            f"WITH THE ARM LATCHED, REMOVE THE {n['pd-platen']} PLATEN AS "
+            f"{s('loaded-rack-geometry-checked', 9)}-"
+            f"{s('loaded-rack-geometry-checked', 10)}.",
             "PUSH THE DISC AND COLLAR TOWARD EACH OTHER AND TURN THE DISC ONE "
             f"FULL TURN ({disc.TEETH / KNOB_TEETH:g} KNOB TURNS).",
             f"CHECK: A {steps.COLLAR_DISC_AIR_TEXT.split()[0]} FEELER ENTERS "
@@ -3030,7 +3160,7 @@ def _step_text(
             # shortfall, so a still-short air is read and re-faced again.
             f"IF {s('collar-disc-air-inspected', 2)} STILL FAILS, REPEAT FROM "
             f"{s('collar-disc-air-inspected', 4)}.",
-            "REFIT THE PLATEN.",
+            f"REFIT THE PLATEN PER {s('platen-hung', 9)}-{s('guide-locks-set', 3)}.",
             f"IF {s('collar-disc-air-inspected', 9)} RE-FACED THE STEP, REPEAT "
             f"{s('loaded-rack-geometry-checked', 1)}-"
             f"{s('loaded-rack-geometry-checked', 4)}.",
@@ -3040,7 +3170,10 @@ def _step_text(
             f"{steps.OFFSET_ACCEPT_TEXT} FORWARD OF THE {crank_short}'S FRONT FACE "
             f"(STRAIGHTEDGE AND FEELERS) {row_cite('offset-accept')}.",
             f"CHECK: KNOB END FLOAT {knob_window} {row_cite('knob-end-float')}.",
-            f"CHECK: THE {knob_short} TURNS FREE UNDER THE NUT.",
+            # #2615: the knob wheel rides the collar's drive dowels and the nut
+            # seats on the collar's pilot, so it shakes along them; it does not
+            # turn free.
+            f"CHECK: THE {knob_short} SHAKES UNDER THE NUT.",
             f"UNLATCH THE ARM: PULL THE {n['pd-latch-hook']} HOOK'S FINGER TAB ALONG "
             "THE ARM UNTIL THE HOOK CLEARS THE PIN.",
             "LOWER THE ARM.",
@@ -3067,9 +3200,8 @@ def _step_text(
             f"FOR {s('fitup-accepted', 1)}, {knob_pin_out[0]}",
             f"FOR {s('fitup-accepted', 1)}, {knob_pin_out[1]}",
             f"FOR {s('fitup-accepted', 1)}, REPEAT STEP "
-            f"{steps.step_number('knob-stack-fitted')} WITH A NEW "
-            f"{n['pd-transgear-knob-shaft']} SHAFT, {n['pd-transgear-knob-cup']} CUP "
-            f"AND {n['pd-vn-transgear-knob-cup-pin']} PIN, THEN FROM STEP {pose}.",
+            f"{steps.step_number('knob-stack-fitted')} WITH {repinned}, THEN FROM "
+            f"STEP {pose}.",
             f"IF {s('fitup-accepted', 2)} FAILS, REPEAT FROM STEP "
             f"{steps.step_number('collar-shoulder-seated')}.",
             f"IF {s('fitup-accepted', 5)} FAILS, ARM UNLATCHED, DO {pivot_remedied}.",
@@ -3085,13 +3217,19 @@ def _step_text(
             f"{steps.step_number('collar-disc-air-inspected')}.",
         ),
         "chain-closed": (
-            f"LOOP {chain.LINK_COUNT - 1} PITCHES OF ANSI #25 CHAIN "
-            f"({CHAIN_QUANTITIES['sh-vn-chain-link--InnerLink']} "
-            f"{n['sh-vn-chain-link--InnerLink']} INNER AND "
-            f"{CHAIN_QUANTITIES['sh-vn-chain-link--OuterLink']} "
-            f"{n['sh-vn-chain-link--OuterLink']} OUTER LINKS) OVER THE {knob_short} AND "
-            f"THE {crank_short}, SLACK RUN HANGING FREE; NO TENSIONING. THE CONNECTING "
-            f"LINK MAKES THE LOOP {chain.LINK_COUNT} PITCHES.",
+            # Owner ruling 2026-11-20 (Pedro), #2429, option A: the 66-pitch
+            # droop stays; the sheet says how the loop is cut. The spare
+            # 18-tooth sprocket's loop is the BOM sheet's (BOM_CHAIN_ORDER_NOTE).
+            # The two link rows share one Number, so the items name them.
+            f"LOOP {chain.LINK_COUNT - 1} PITCHES "
+            f"({CHAIN_QUANTITIES['sh-vn-chain-link--InnerLink']} INNER, ITEM "
+            f"{SHARED_NUMBER_ITEMS['sh-vn-chain-link--InnerLink']}, AND "
+            f"{CHAIN_QUANTITIES['sh-vn-chain-link--OuterLink']} OUTER LINKS, ITEM "
+            f"{SHARED_NUMBER_ITEMS['sh-vn-chain-link--OuterLink']}), CUT OFF THE "
+            f"{CHAIN_ORDER_FEET} FT OF ANSI #25 CHAIN WITH A #25 CHAIN BREAKER OR BY "
+            f"GRINDING OFF A PIN'S TWO HEADS, OVER THE {knob_short} AND THE "
+            f"{crank_short}, SLACK RUN HANGING FREE; NO TENSIONING. THE "
+            f"CONNECTING LINK MAKES IT {chain.LINK_COUNT} PITCHES.",
             f"JOIN THE ENDS WITH THE {n['pd-vn-chain-connecting-link']} #25 "
             f"CONNECTING LINK (MCMASTER {_SKU['pd-vn-chain-connecting-link']}), "
             "ITS CLIP'S CLOSED END LEADING IN THE DIRECTION OF TRAVEL.",
@@ -3177,16 +3315,18 @@ def setting_table_rows(
         ),
         "disc-tir": (
             f"{s('disc-taps-transferred', 2)}, {s('disc-taps-transferred', 12)}",
-            f"{n['pd-rack-pinion']} TOOTH SPACES, ON THE MANDREL",
+            f"{n['pd-rack-pinion']} O.D., THEN {DISC_TIR_SAMPLE_SPACES} SPACES, ON THE "
+            "MANDREL",
             f"{DISC_TIR_TEXT} TIR MAX",
-            "DIAL INDICATOR ON A "
+            "DIAL INDICATOR, "
             f"\u00d8{steps.inch_text(disc.TOOTH_SPACE_GAUGE_PIN_DIA_MM, 3)} PIN",
         ),
         "reducer-shake": (
             f"{s('arm-plate-located', 12)}, {s('arm-plate-fitted', 20)}, "
             f"{s('fitup-pose-set', 9)}",
             "DISC SHAKE AT THE TIP OF THE TOOTH IN MESH",
-            f"VISIBLY, AT MOST {steps.inch_text(REDUCER_SHAKE_MAX_MM, 3)}",
+            f"{steps.inch_text(REDUCER_DIAL_STEP_MM / 2.0, 4)} TO "
+            f"{steps.inch_text(REDUCER_SHAKE_MAX_MM, 3)}",
             f"DIAL INDICATOR, {REDUCER_DIAL_STATIONS} PLACES",
         ),
         "plate-screw-tips": (
@@ -3196,7 +3336,7 @@ def setting_table_rows(
             "STRAIGHTEDGE AND FEELERS",
         ),
         "pivot-tip": (
-            s("hanger-pivoted", 4),
+            s("hanger-pivoted", 0),
             f"{n['pd-vn-transgear-pivot-screw']} TIP BELOW THE BAR FRONT FACE",
             steps.inch_window(pivot_screw.TIP_RECESS, 3, " TO "),
             "CALIPER DEPTH ROD",
@@ -3227,7 +3367,7 @@ def setting_table_rows(
         ),
         "engaged-feed": (
             s("hanger-meshed", 2),
-            f"ENGAGED FEED: RACK CUT END TO {n['pd-transgear-pin']} AXIS",
+            f"ENGAGED FEED: RIGHT RACK END (SHEET 1) TO {n['pd-transgear-pin']} AXIS",
             engaged_feed_window(operating_domain),
             "STEEL RULE",
         ),
@@ -3976,6 +4116,12 @@ def _validate_bom(
         raise RuntimeError(
             f"paper-drive BOM item numbers {sorted(items)!r} are not contiguous"
         )
+    for stem, item in SHARED_NUMBER_ITEMS.items():
+        if actual[stem][1] != str(item):
+            raise RuntimeError(
+                f"paper-drive BOM item for {stem!r} is {actual[stem][1]!r}; the "
+                f"steps print ITEM {item}"
+            )
     for stem, (row_index, _item, description, quantity) in actual.items():
         number = BOM_PART_NUMBERS[stem]
         if contents[row_index][part_column] != number:

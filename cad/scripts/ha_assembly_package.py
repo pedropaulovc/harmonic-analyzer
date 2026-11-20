@@ -364,6 +364,11 @@ TOOLS: tuple[Tool, ...] = (
     ),
     Tool("Pliers", r"\bPLIERS\b", ("shop-equipment:tools.pliers",)),
     Tool(
+        "#25 roller chain breaker",
+        r"#25 CHAIN BREAKER",
+        ("shop-equipment:tools.chain-breaker-25",),
+    ),
+    Tool(
         "Hammer and centre punch (staking, peening)",
         r"\bSTAKE\b|\bPEEN\b",
         (
