@@ -23,9 +23,14 @@ import math
 
 import _config
 from _gtol_planar import PlanarFace
-from _inch_wall_limits import WALL_TARGET_MM
+from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
 from _package_units import drawing_unit
-from _printed_tolerance import printed_deviations
+from _printed_tolerance import (
+    edge_break_chamfer_mm,
+    edge_break_radius_mm,
+    printed_band_mm,
+    printed_deviations,
+)
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from pd_transgear_arm_plate_geometry import BORE_DIA_LIMITS as PLATE_BORE_LIMITS
 from pd_vn_transgear_knob_cup_pin_spec import HOLE_MAX as PIN_HOLE_MAX
@@ -79,19 +84,37 @@ BORE_CLEARANCE_TEXT = (
 )
 
 # --- The pin hole, match-drilled at assembly (R9-70, K-1) ---------------------
-# Its centre stands PIN_HOLE_FROM_FRONT behind the cup's front face, marked
-# out within PIN_HOLE_STATION_TOL; MHA-PD-VN-62's .062 +.003/0 hole.
+# Its centre stands PIN_HOLE_FROM_FRONT behind the cup's front face; the
+# MHA-PD-00 step that drills it prints that station at three places, so it
+# is held to the title block's .XXX band (#2192); MHA-PD-VN-62's .062
+# +.003/0 hole.
 PIN_HOLE_FROM_FRONT = 3.048  # .120
-PIN_HOLE_STATION_TOL = 0.1016  # .004
+PIN_HOLE_STATION_PLACES = 3
+PIN_HOLE_STATION_TOL = printed_band_mm(PIN_HOLE_STATION_PLACES, unit=UNIT)  # .005
 _PIN_HOLE_R_MAX = PIN_HOLE_MAX / 2.0
+# The title block's break on the front face's edges: the hole runs radially
+# from the bore to the O.D., so at either end it loses the full break.
+FRONT_FACE_EDGE_BREAK_MAX = max(edge_break_radius_mm(unit=UNIT), edge_break_chamfer_mm(unit=UNIT))
 
 # --- Walls at the printed worst case (contract §8, drawing-guidelines.md rule 17 (walls and webs)) -------------
 # Journal beside the hole.
 JOURNAL_PIN_WALL = (JOURNAL_DIA - PIN_HOLE_MAX) / 2.0
 JOURNAL_PIN_WALL_WORST = (JOURNAL_DIA_MIN - PIN_HOLE_MAX) / 2.0
-# Cup front face to the hole's edge, less the marking-out tolerance.
+# Cup front face to the hole's edge, less the station band and the front
+# face's break.  Under the .080 target and over the .060 floor: owner
+# ruling 2026-11-20 (#2192), the package's RV-01 minor; the sheet prints it
+# (FRONT_PIN_WALL_TEXT).
 FRONT_PIN_WALL = PIN_HOLE_FROM_FRONT - _PIN_HOLE_R_MAX
-FRONT_PIN_WALL_WORST = PIN_HOLE_FROM_FRONT - PIN_HOLE_STATION_TOL - _PIN_HOLE_R_MAX
+FRONT_PIN_WALL_WORST = (
+    PIN_HOLE_FROM_FRONT
+    - PIN_HOLE_STATION_TOL
+    - _PIN_HOLE_R_MAX
+    - FRONT_FACE_EDGE_BREAK_MAX
+)
+FRONT_PIN_WALL_TEXT = (
+    "HOLE WALL TO THRUST FACE "
+    f"{inch_text(inch_floor_mm(FRONT_PIN_WALL_WORST, 3), 3)} MIN"
+)
 # Hole to the journal's rear end, the journal at its shortest behind the
 # cup's front face (MHA-PD-08's length, the ring and hub-to-boss bands and
 # the feeler setting), less the title-block break on the journal's rear-end
@@ -113,17 +136,17 @@ RADIAL_WALL_WORST = (OD_MIN - BORE_MAX) / 2.0
 REAR_PIN_WALL_WORST = (
     LENGTH_MIN - PIN_HOLE_FROM_FRONT - PIN_HOLE_STATION_TOL - _PIN_HOLE_R_MAX
 )
-for _name, _wall in (
-    ("journal beside the pin hole", JOURNAL_PIN_WALL_WORST),
-    ("front face to the pin hole", FRONT_PIN_WALL_WORST),
-    ("pin hole to the journal's rear end", END_PIN_WALL_WORST),
-    ("ring round the bore", RADIAL_WALL_WORST),
-    ("pin hole to the rear face", REAR_PIN_WALL_WORST),
+for _name, _wall, _floor in (
+    ("journal beside the pin hole", JOURNAL_PIN_WALL_WORST, WALL_FLOOR),
+    ("front face to the pin hole", FRONT_PIN_WALL_WORST, WALL_FLOOR_MM),
+    ("pin hole to the journal's rear end", END_PIN_WALL_WORST, WALL_FLOOR),
+    ("ring round the bore", RADIAL_WALL_WORST, WALL_FLOOR),
+    ("pin hole to the rear face", REAR_PIN_WALL_WORST, WALL_FLOOR),
 ):
-    if _wall < WALL_FLOOR - 1e-9:
+    if _wall < _floor - 1e-9:
         raise AssertionError(
             f"MHA-PD-16 {_name} {_wall:.3f} at the printed worst case is under "
-            f"the {WALL_FLOOR} floor"
+            f"the {_floor} floor"
         )
 
 # The pin's ends stay inside the cup's O.D., for the longest pin in the

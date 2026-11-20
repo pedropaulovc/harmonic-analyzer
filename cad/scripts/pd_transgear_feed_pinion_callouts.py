@@ -102,7 +102,17 @@ OVERALL_CALLOUT = "\n".join((f"SETS {HUB_NUMBER}, {FRONT_BUSHING_NUMBER}", STACK
 FULL_DEPTH_CALLOUT = "\n".join(
     (f"{TEETH}T FULL DEPTH", f"COVERS {RACK_NUMBER} RACK WIDTH")
 )
-CUTTER_RUNOUT_CALLOUT = "CUTTER RUN-OUT"
+# The run-out limit is where the gaps may run out on to the boss, past the
+# step, and the teeth between the full depth and the step may be cut short
+# of full depth.  Owner ruling 2026-11-20 (#2423, option A): stated in
+# product terms, not as a cutter station ("CUTTER RUN-OUT" read as the
+# cutter's own run-out to the O.D.), and with no method words.  The ruling's
+# "ACCEPTED" is a governance word the sheet may not print
+# (test_printed_text_rulings), so the row says ALLOWED; the row above names
+# the gaps, so this one fits left of VIEW C clear of B-B's caption.
+CUTTER_RUNOUT_CALLOUT = "\n".join(
+    ("GAP RUN-OUT ON BOSS", "PARTIAL DEPTH TO STEP ALLOWED")
+)
 # The prefix lane replaces SolidWorks' own diameter symbol, so it carries it
 # (run 20261027T032128736Z printed a bare "ROOT 7.93 min.").  The translated
 # cutter's root arcs are not concentric: the MIN bounds every root point, not

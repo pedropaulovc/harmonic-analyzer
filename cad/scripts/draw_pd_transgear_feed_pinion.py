@@ -257,10 +257,11 @@ RIGHT_KEEP: dict[str, tuple[float, float]] = {
 # (below) and a break line closes the boss stub at the crop (2026-10-28
 # ENFORCE review, r1, r2: without one, the 13.80 MAX's extension line
 # landed past the drawn end and the view read as the whole part).
-# It stands 4 mm higher than the uncropped view did, so the full depth's
-# extra row stays above the title block, and 15 mm farther right than round
-# 2, so the full depth's text, naming the rack, clears the overall's.
-LEFT_CENTER = (0.388, 0.116)
+# It stands 8 mm higher than the uncropped view did, so the full depth's
+# extra row and the run-out's second callout row (#2423) stay above the
+# title block, and 15 mm farther right than round 2, so the full depth's
+# text, naming the rack, clears the overall's.
+LEFT_CENTER = (0.388, 0.120)
 LEFT_CAPTION = f"VIEW {OUTSIDE_VIEW_LETTER}"
 # The caption's estimated width (the drawing test's 3.5 mm text box).
 _LEFT_CAPTION_WIDTH = 0.016
@@ -309,10 +310,10 @@ def _outside_sheet_xy(radial_y: float, axial_z: float) -> tuple[float, float]:
 
 
 _FULL_DEPTH_TEXT_WIDTH = 0.0757
-_CUTTER_TEXT_WIDTH = 0.0418
+_CUTTER_TEXT_WIDTH = 0.0810
 LEFT_KEEP: dict[str, tuple[float, float]] = {
     "FullDepth": (_left_of(_LEFT_REAR_X, _FULL_DEPTH_TEXT_WIDTH), _LEFT_BOTTOM - 0.0100),
-    "CutterRunout": (_left_of(_LEFT_REAR_X, _CUTTER_TEXT_WIDTH), _LEFT_BOTTOM - 0.0250),
+    "CutterRunout": (_left_of(_LEFT_REAR_X, _CUTTER_TEXT_WIDTH), _LEFT_BOTTOM - 0.0275),
 }
 # The caption stands under the cropped view, below the view's NATIVE box and
 # right of the cutter rows' extension lines, the lane there being empty down

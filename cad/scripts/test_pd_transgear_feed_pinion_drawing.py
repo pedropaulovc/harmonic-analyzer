@@ -370,7 +370,11 @@ def test_cutter_stations_are_native_banded_model_dimensions() -> None:
     # Short names, printed under the value, so the text stands left of VIEW
     # C's rear face; the rack's number prints where its width is covered.
     assert callouts.RACK_NUMBER in callouts.FULL_DEPTH_CALLOUT
-    assert "\n" not in callouts.CUTTER_RUNOUT_CALLOUT
+    # #2423 (owner ruling 2026-11-20): the run-out limit names the product,
+    # gaps running out on the boss, not the cutter, and no method word.
+    runout = callouts.CUTTER_RUNOUT_CALLOUT
+    assert "BOSS" in runout and "PARTIAL DEPTH" in runout
+    assert "CUTTER" not in runout and "STOP" not in runout and "STONE" not in runout
     # Their witnesses run along the floor of the gap facing the outside
     # view: model 195°, a gap centre (gap centres at 15° + k·30°).
     assert spec.GAP_FLOOR_WITNESS_Y == pytest.approx(
@@ -1237,6 +1241,8 @@ def test_the_cropped_view_c_has_a_break_on_the_boss() -> None:
 # the anchor it was placed at (sheet m).
 _R3_FENCE = (0.3429663, 0.09474832, 0.3889429, 0.13725168)
 _R3_VIEW_BOX = (0.33718068, 0.08970559, 0.39872856, 0.14228562)
+# VIEW C's centre height when round 3 logged them.
+_R3_LEFT_CENTER_Y = 0.116
 _R3_CAPTION_EXTENT = (0.39699605, 0.11348873, 0.41319938, 0.11777785)
 _R3_CAPTION_ANCHOR = (0.3970429, 0.11775)
 # The final-head PNG (run 20261108T014931710Z, 431.8 mm over 5100 px): the
@@ -1263,8 +1269,12 @@ def test_view_c_caption_stands_under_its_view_clear_of_everything() -> None:
     )
     for margin, seen in zip(margins, measured, strict=True):
         assert seen <= margin < seen + 0.0002, (margin, seen)
-    # The fence the drawing crops at is the one round 3 logged.
-    assert drawing.OUTSIDE_CROP_FENCE == pytest.approx(_R3_FENCE, abs=1e-6)
+    # The fence the drawing crops at is the one round 3 logged, raised with
+    # the view since (#2423: 4 mm, for the run-out's second callout row).
+    raise_y = drawing.LEFT_CENTER[1] - _R3_LEFT_CENTER_Y
+    assert raise_y == pytest.approx(0.004, abs=1e-9)
+    fence = (_R3_FENCE[0], _R3_FENCE[1] + raise_y, _R3_FENCE[2], _R3_FENCE[3] + raise_y)
+    assert drawing.OUTSIDE_CROP_FENCE == pytest.approx(fence, abs=1e-6)
     width, height = drawing.LEFT_CAPTION_EXTENT
     assert _R3_CAPTION_EXTENT[2] - _R3_CAPTION_EXTENT[0] <= width
     assert _R3_CAPTION_EXTENT[3] - _R3_CAPTION_EXTENT[1] <= height
