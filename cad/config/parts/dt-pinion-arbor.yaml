@@ -1,8 +1,12 @@
 dt-pinion-arbor:
   title: Integral Pinion Arbor and Grip Head
   number: MHA-DT-22
-  material: AISI 1018 cold-finished steel
-  material_specification: AISI 1018 cold-finished steel bar, ASTM A108
+  # Owner ruling 2026-11-20 (#2375, "Follow recommendations unless noted
+  # otherwise"; recommendation B): 12L14 as on MHA-DT-23/-33, and 1144
+  # stress-relieved, the usual low-distortion bar for a long slender turned
+  # shaft. No geometry or fit change; Loctite 638 bonds either.
+  material: 1018, 1020, 12L14 or 1144 cold-finished steel
+  material_specification: "cold-finished steel bar: 1018, 1020 or 12L14 (ASTM A108), or 1144 stress-relieved (ASTM A311)"
   finish: bright machined; protect with ISO VG 32 machine-oil film
   quantity: 1
   tolerance_class: machined_block

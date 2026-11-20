@@ -4,7 +4,7 @@
 title = "Integral Pinion Arbor and Grip Head"
 part = "MHA-DT-22 Integral Pinion Arbor and Grip Head"
 revision = "placeholder"
-material = "AISI 1018 cold-finished steel bar, ASTM A108"
+material = "cold-finished steel bar: 1018, 1020 or 12L14 (ASTM A108), or 1144 stress-relieved (ASTM A311)"
 stock = "To be written"
 shop = "../shop"
 stock_refs = ["1018-round-5-8"]

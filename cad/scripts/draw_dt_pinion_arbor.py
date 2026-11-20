@@ -283,7 +283,7 @@ def _sheet_x(model_z: float) -> float:
 RA_ARROW_FROM_HEAD_END = 2.0
 RA_SYMBOL_OFFSET = 0.0033
 RA_SHOULDER = RA_SYMBOL_OFFSET + RA_ARROW_FROM_HEAD_END / 1000.0
-# #1038 ruling (review of 703211d): the front land's crown end prints as its
+# #1038 delegated ruling (a) (review of 703211d): the front land's crown end prints as its
 # own 2.61 station, whose row runs below the shaft between the 1.82 and 4.20
 # rows, where the front symbol hung (y 0.124, x ~0.2529-0.270): its line
 # would cross the symbol and its leader.  Above the shaft the land is open
@@ -348,7 +348,7 @@ SPAN_TAGS = {
 # The collar span's face: the shaft cylinder whose span holds the tag's
 # landing, head side of the pin hole.
 COLLAR_SPAN_FACE = CylinderFace(SHAFT_DIA, contains_z_mm=SPAN_TAGS["collar_span"][0])
-# The back land's 2X diameter (one size for both lands, #1038 ruling) is
+# The back land's 2X diameter (one size for both lands, a #1038 sheet decision) is
 # measured at a short witness JOURNAL_DIA_POINT_FROM_CROWN_END in from its
 # crown-side end (build_pinion_arbor, pinned equal by test), and its line
 # stands 1 mm from that point, so its extensions are ~1 mm rather than a run
@@ -367,7 +367,7 @@ BACK_JOURNAL_DIA_POINT_X = _sheet_x(
 # witnesses ~8 mm left of its crown end, the land's station witness and the
 # Ra leader on its head side), so its diameter hangs ABOVE the shaft, its
 # text right of the line over the land and clear of the back-crown sag
-# witnesses, and its 19.0 length moves below.  The block rides high enough
+# witnesses, and its crown-side end prints below as the 9.04 station.  The block rides high enough
 # that the back Ra symbol fits under it, over the land; at 0.1945 (r1 of
 # #1685) the one-line callout cleared the Ra text by 2.35 mm, so the
 # two-line one rises to keep its shoulder 2.8 mm over it.
@@ -398,7 +398,7 @@ def _diameter_block_size(callout: str) -> tuple[float, float]:
 # A diameter's text hung LEFT of its line overhangs the line by this much
 # (x-0.026 .. x+0.001, measured at 4e97c4d8).
 JOURNAL_DIA_TEXT_OVERHANG = 0.001
-# The bond-zone diameter (#1038 ruling: its witness now on the front bond
+# The bond-zone diameter (#1038 sheet layout: its witness now on the front bond
 # land, BOND_ZONE_DIA_FROM_HEAD_REAR) hangs ABOVE the shaft, its line 1 mm
 # crown side of its measuring point so its text hangs LEFT of the line: in
 # the open run between detail A's label and the front land, 5 mm over the
@@ -487,8 +487,9 @@ DIAMETER_BLOCK_SIZE = (0.027, 0.014)
 # Machinist review r1 of #1685: with the bend over the hole the leader ran
 # down the 38.0 row's hole-end witness.  The bend now stands
 # PIN_HOLE_LEADER_RUN left of the hole, so the leader slopes down-right to
-# it, crossing the 38.0 line 6 mm inside that witness and passing 5 mm
-# right of the 19.0's head-end witness; the underline still starts right of
+# it, crossing the 38.0 line 6 mm inside that witness.  (The front land's .79
+# length, whose head-end witness it once passed 5 mm right of, no longer
+# prints: each land end is its own station below the shaft.)  The underline still starts right of
 # detail A's view box (x 0.1928).
 # The band is ASME B18.8.2's recommended hole for the 1/16 slotted spring
 # pin (.062-.065; the title block's DRILLED HOLES row would open it to
@@ -540,8 +541,11 @@ ARROWS_INSIDE = (
     "BondZoneDia",
     "BackBondDia",
     # #2360 (r1 sheet 7454ba6d): outside, the relief's upper arrow tail rose
-    # through the chained 2.60 line above the shaft; the 7.1 mm relief takes
-    # both arrowheads, as the 8 mm bond zone does.
+    # through the 2.60 length then printed above the shaft (now its own 6.80
+    # station below), and outside the lower tail would hang into those station
+    # rows.  Inside, its two 3.6 mm arrowheads need 7.2 mm and the relief is
+    # 7.1: they meet nose to nose at the axis (run 20261119T193946802Z sheet,
+    # #2613), which still reads as one diameter.
     "BondReliefDia",
 )
 # #2360: the relief between the bond lands.  Its front shoulder's station
@@ -551,13 +555,16 @@ ARROWS_INSIDE = (
 # 8.25's: the line ~2.8 mm under the text position runs at ~0.1185, 6 mm
 # over the 8.25's, its text left of the 2.61 witness in the open run under
 # the front bond land.  Its back
-# shoulder's station (#1038 ruling: the 2.60 length chained off the 4.20,
+# shoulder's station (#1038 delegated ruling (b): the 2.60 length chained off the 4.20,
 # machinist review of 057ffb6) runs in the next row down, where the 8.25
 # stood: above the shaft the collar pin hole's leader crossed it (review of
 # 7c26893, rule 14), so the bond-zone callout moved above instead.  Its
 # plain .XX diameter hangs below the shaft, over the station row, measured
-# from the axis to the station witness's shoulder point, its line in the run
-# between the back shoulder's witness and the front one's.  SolidWorks has
+# from the axis to a 1 mm witness on the relief floor RELIEF_DIA_POINT_FROM_FRONT
+# aft of the front shoulder (build_dt_pinion_arbor, pinned equal by test), its
+# line 1 mm further aft as the journals' are (#2613: from the shoulder point
+# its extension ran 16 mm along the floor), in the run between the back
+# shoulder's witness and the front one's.  SolidWorks has
 # set its text 14.3 mm right of the line (r2, 755e192b) and spread over 25.3
 # mm about it (r5, b6a90da7: x-13.1..+12.2 mm); the line stands where either
 # extent clears both neighbours.
@@ -566,16 +573,17 @@ RELIEF_STATION_TEXT_XY = (0.228, 0.1213)
 RELIEF_FRONT_X = _sheet_x(BOND_RELIEF_Z)
 RELIEF_BACK_X = _sheet_x(BOND_RELIEF_Z + BOND_RELIEF_LEN)
 RELIEF_DIA_TEXT_EXTENT = (-0.0131, 0.0143)
-RELIEF_DIA_LINE_OFFSET = 0.0155
+RELIEF_DIA_POINT_FROM_FRONT = 14.5
+RELIEF_DIA_LINE_OFFSET = RELIEF_DIA_POINT_FROM_FRONT / 1000.0 + JOURNAL_DIA_LINE_OFFSET
 RELIEF_DIA_XY = (RELIEF_FRONT_X - RELIEF_DIA_LINE_OFFSET, 0.127)
 PRINCIPAL_KEEP = {
-    # #1038 ruling (review of 703211d): the front land's crown-side end, its
+    # #1038 delegated ruling (a) (review of 703211d): the front land's crown-side end, its
     # own station from the head rear face, in a row between the 1.82's and
     # the 4.20's (lines ~0.1372 / ~0.1278 / ~0.1185), its text centred on its
     # span right of the 1.82's head-end witness (x ~0.2602, which stops at
     # ~0.1362) and left of the neck-end witness (x 0.296).
     "FrontJournalEndFromHeadRear": (0.273, 0.1306),
-    # #1038 ruling: the back land's crown-side end, its own station from the
+    # #1038 delegated ruling (a): the back land's crown-side end, its own station from the
     # head rear face, in the row under the 8.25 (its line ~0.0996, 2.8 mm
     # over the 9.35 text), its text clear of every witness below the shaft.
     "BackJournalEndFromHeadRear": (0.125, 0.1024),
@@ -744,72 +752,85 @@ JOURNAL_FINISHES = {
 }
 
 
+def _arbor_faces(view: Any) -> dict[str, Any]:
+    """The Ra-controlled land faces and the collar span's face, resolved in one
+    traversal of the part the view references.
+
+    Each key is exactly one model face (:func:`_gtol_face_resolve.resolve_faces`,
+    as the part build's own PMI pass resolved it): a land's face is the one its
+    part-owned control (``SURFACE_FINISHES``) names, and the collar span's is
+    ``COLLAR_SPAN_FACE``.  The front journal's face carries both its Ra symbol
+    and its SPAN_TAGS tag (#2637: one lookup, not one per caller).
+    """
+    document = _early_bound(
+        _early_bound(view, "IView").ReferencedDocument, "IModelDoc2"
+    )
+    return resolve_faces(
+        document,
+        {
+            **{
+                key: surface_finish_by_key(SURFACE_FINISHES, key).face
+                for key in JOURNAL_FINISHES
+            },
+            "collar_span": COLLAR_SPAN_FACE,
+        },
+    )
+
+
+def _flank_landing(
+    adapter: Any, view: Any, station_z: float, flank: str, *, label: str
+) -> tuple[float, float]:
+    """Sheet point on the shaft's ``flank`` outline at model ``station_z``."""
+    land_x, axis_y = model_point_in_view(
+        adapter, view, (0.0, 0.0, station_z / 1000.0), label=label
+    )
+    return (land_x, axis_y + FLANK_SIGN[flank] * SHAFT_DIA / 2000.0)
+
+
 def _journal_finish_picks(
-    adapter: Any, view: Any
+    adapter: Any, view: Any, faces: dict[str, Any]
 ) -> dict[str, tuple[Any, tuple[float, float], tuple[float, float]]]:
     """Each land's Ra target: ``(controlled face, landing, symbol_xy)``.
 
-    The landing is the land's station on its flank; the face is the one model
-    face its part-owned control (``SURFACE_FINISHES``) names, resolved on the
-    part the view references (:func:`_gtol_face_resolve.resolve_faces`, exactly one
-    match per key, as the part build's own PMI pass resolved it) and attached
-    as a FACE at that landing.  Neither a hit test nor a silhouette sweep:
-    SelectByID2 at the front land's flank (0.25355, 0.166) missed on
-    swmaker00000a@10 and hit on swmaker000004@4 with the same key, and on the
-    first cold v39 build (farm run 20261002T180658288Z) the silhouette sweep
-    returned only the land's UPPER flank, y=174 mm, so the lower-flank
-    landing had no silhouette to take.  The face spans both flanks; the
-    leader-landing readback still pins the flank.
+    The landing is the land's station on its flank; the face comes from
+    :func:`_arbor_faces` and is attached as a FACE at that landing.  Neither a
+    hit test nor a silhouette sweep: SelectByID2 at the front land's flank
+    (0.25355, 0.166) missed on swmaker00000a@10 and hit on swmaker000004@4
+    with the same key, and on the first cold v39 build (farm run
+    20261002T180658288Z) the silhouette sweep returned only the land's UPPER
+    flank, y=174 mm, so the lower-flank landing had no silhouette to take.
+    The face spans both flanks; the leader-landing readback still pins the
+    flank.
     """
-    document = _early_bound(
-        _early_bound(view, "IView").ReferencedDocument, "IModelDoc2"
-    )
-    faces = resolve_faces(
-        document,
-        {
-            key: surface_finish_by_key(SURFACE_FINISHES, key).face
-            for key in JOURNAL_FINISHES
-        },
-    )
-    picks = {}
-    for key, (station_z, symbol_xy, flank) in JOURNAL_FINISHES.items():
-        land_x, axis_y = model_point_in_view(
-            adapter,
-            view,
-            (0.0, 0.0, station_z / 1000.0),
-            label=f"arbor {key} finish station",
+    return {
+        key: (
+            faces[key],
+            _flank_landing(
+                adapter, view, station_z, flank, label=f"arbor {key} finish station"
+            ),
+            symbol_xy,
         )
-        landing = (land_x, axis_y + FLANK_SIGN[flank] * SHAFT_DIA / 2000.0)
-        picks[key] = (faces[key], landing, symbol_xy)
-    return picks
+        for key, (station_z, symbol_xy, flank) in JOURNAL_FINISHES.items()
+    }
 
 
 def _span_tag_picks(
-    adapter: Any, view: Any
+    adapter: Any, view: Any, faces: dict[str, Any]
 ) -> dict[str, tuple[Any, tuple[float, float], str, tuple[float, float]]]:
-    """Each SPAN_TAGS target: ``(span face, lower-flank landing, text, xy)``.
-
-    The faces resolve on the part the view references, as the Ra targets do
-    (:func:`_journal_finish_picks`): the front journal's is its Ra control's.
-    """
-    document = _early_bound(
-        _early_bound(view, "IView").ReferencedDocument, "IModelDoc2"
-    )
-    front = surface_finish_by_key(SURFACE_FINISHES, "front_journal").face
-    faces = resolve_faces(
-        document, {"front_journal": front, "collar_span": COLLAR_SPAN_FACE}
-    )
-    picks = {}
-    for key, (station_z, text, note_xy) in SPAN_TAGS.items():
-        land_x, axis_y = model_point_in_view(
-            adapter,
-            view,
-            (0.0, 0.0, station_z / 1000.0),
-            label=f"arbor {key} tag station",
+    """Each SPAN_TAGS target: ``(span face, lower-flank landing, text, xy)``,
+    the faces from :func:`_arbor_faces` (the front journal's is its Ra
+    control's)."""
+    return {
+        key: (
+            faces[key],
+            _flank_landing(
+                adapter, view, station_z, "lower", label=f"arbor {key} tag station"
+            ),
+            text,
+            note_xy,
         )
-        landing = (land_x, axis_y + FLANK_SIGN["lower"] * SHAFT_DIA / 2000.0)
-        picks[key] = (faces[key], landing, text, note_xy)
-    return picks
+        for key, (station_z, text, note_xy) in SPAN_TAGS.items()
+    }
 
 
 def _move_dimension(
@@ -1570,7 +1591,8 @@ def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to add center mark to the detailed grip cross-hole")
     _add_turning_axis(adapter, principal)
     witness_spans = _blacken_reference_witnesses(adapter, principal)
-    finishes = _journal_finish_picks(adapter, principal)
+    faces = _arbor_faces(principal)
+    finishes = _journal_finish_picks(adapter, principal, faces)
     for key, (face, landing, symbol_xy) in finishes.items():
         add_surface_finish(
             adapter,
@@ -1583,7 +1605,7 @@ def build(adapter: Any) -> dict[str, str]:
             entity_type="FACE",
             char_height=0.0025,
         )
-    tags = _span_tag_picks(adapter, principal)
+    tags = _span_tag_picks(adapter, principal, faces)
     for key, (face, landing, text, note_xy) in tags.items():
         # The part's face is not IsSame to its drawing-view selection (r10
         # leaf: "selection changed before landing"); the tag is held to the
