@@ -533,6 +533,16 @@ def test_crown_callout_and_flank_angle_define_the_tapered_flanks() -> None:
     assert drawing.FLANK_ANGLE_XY[1] < drawing._front_y(spec.BORE_HEIGHT)
 
 
+def test_parallel_sides_are_allowed_as_an_option() -> None:
+    """Owner ruling 2026-11-20 on #2372: "Allow parallel sides as an option."
+    The option rides under the reference flank angle, in words only, and the
+    parallel strap tangent to the crown stays inside the foot."""
+    spec = dt_arbor_pedestal_spec
+    assert drawing.FLANK_ANGLE_CALLOUT == "PARALLEL\nSIDES OK"
+    assert not re.search(r"\d", drawing.FLANK_ANGLE_CALLOUT)
+    assert spec.TOP_RADIUS < spec.FOOT_WIDTH / 2.0
+
+
 def test_apex_set_screw_tap_keeps_1_5d_only_at_r11() -> None:
     """#743 Q3 (user: "set screw located at apex of straps"): a #4-40 tap
     through the crown onto the arbor. At the printed worst case (crown radius
