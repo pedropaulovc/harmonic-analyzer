@@ -383,6 +383,29 @@ def test_release_notes_report_native_count() -> None:
     assert "99 referenced documents" not in notes
 
 
+def test_release_notes_name_the_drawings_with_models_directory() -> None:
+    """The drawing half of the native tree holds .SLDPRT/.SLDASM files beside
+    each .SLDDRW, so it ships as ``drawings-with-models/``; the notes announce
+    the rename from ``slddrw/`` (owner ruling on #727)."""
+    facts = {
+        "native_documents": 3,
+        "sw_revision": "35",
+        "parts": 3,
+        "assemblies": 1,
+        "steps": 3,
+        "stls": 3,
+        "config_meshes": 3,
+        "pngs": 3,
+        "comparisons": {"pairs": 0, "mean_score": None},
+        "size_mb": 1.0,
+    }
+
+    notes = cut_release.release_notes("v42", facts)
+
+    assert f"`{cut_release.DRAWING_BUNDLE_DIR}/`" in notes
+    assert "`slddrw/`" in notes
+
+
 def test_release_notes_count_shared_member_files_not_part_documents() -> None:
     # Three shared purchased part documents declare seven members. Their STEP
     # inventory has four extra files, and every STL is member-qualified rather

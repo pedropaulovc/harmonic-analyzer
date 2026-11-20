@@ -135,7 +135,8 @@ def markdown() -> str:
         "use the part; a shop-tooling (`TL`) part lists its fixture instead.",
         "",
         "Non-standard purchased items (tier 2) and shop-altered purchased items "
-        "(tier 3) have their own drawing sheets in `slddrw/`:",
+        "(tier 3) have their own drawing sheets in `pdf/` and "
+        "`drawings-with-models/`:",
         "",
         "| Part | Tier | Why |",
         "|---|---:|---|",

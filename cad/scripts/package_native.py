@@ -67,8 +67,8 @@ TOP_ASSEMBLY = "ha-harmonic-analyzer"
 RELEASE_DIR = CAD_ROOT / "out" / "release"
 # Default prepared-tree location; the whole directory is this task's cached output.
 NATIVE_DIR = RELEASE_DIR / "native"
-# Layout of the prepared tree. These names are ALSO the bundle's stage-relative
-# directories, so the publisher copies them across without rewriting a path.
+# Layout of the prepared tree. cut_release.py copies each directory into the
+# bundle under its own bundle name (``slddrw/`` ships as ``drawings-with-models/``).
 NATIVE_SUBDIR = "solidworks"
 DRAWING_SUBDIR = "slddrw"
 SIDECAR_NAME = "native-package.json"

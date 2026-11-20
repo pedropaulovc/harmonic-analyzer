@@ -525,20 +525,22 @@ def test_release_stages_all_drawing_formats(tmp_path: Path, monkeypatch) -> None
     package_native.write_sidecar(out, "R2026x-test", (), drawings)
 
     # The publisher holds no seat: it copies the prepared tree and rebuilds the
-    # very drawing facts the COM half used to return inline.
+    # very drawing facts the COM half used to return inline. The prepared tree
+    # keeps its cached ``slddrw/`` name; only the bundle renames it (#727).
+    assert (out / "slddrw" / "pd-platen-guide.SLDDRW").is_file()
     native = cut_release.stage_native(stage, cut_release.load_native_package())
     assert native == {
         "pd_platen_guide:solidworks_slddrw": "solidworks/pd-platen-guide.SLDDRW",
-        "pd_platen_guide:slddrw": "slddrw/pd-platen-guide.SLDDRW",
+        "pd_platen_guide:slddrw": "drawings-with-models/pd-platen-guide.SLDDRW",
     }
     assert (stage / "solidworks" / "pd-platen-guide.SLDDRW").read_bytes() == b"slddrw"
     assert (
         stage / "solidworks" / "pd-platen-guide.SLDPRT"
     ).read_bytes() == b"referenced model"
-    assert (stage / "slddrw" / "pd-platen-guide.SLDDRW").read_bytes() == b"slddrw"
-    assert (
-        stage / "slddrw" / "pd-platen-guide.SLDPRT"
-    ).read_bytes() == b"referenced model"
+    portable = stage / "drawings-with-models"
+    assert (portable / "pd-platen-guide.SLDDRW").read_bytes() == b"slddrw"
+    assert (portable / "pd-platen-guide.SLDPRT").read_bytes() == b"referenced model"
+    assert not (stage / "slddrw").exists()
 
 
 def test_release_rejects_a_stale_native_package_schema(
