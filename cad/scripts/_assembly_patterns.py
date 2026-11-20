@@ -154,6 +154,21 @@ def _select_pattern_inputs(
             )
 
 
+def _component_names(model: Any) -> set[str]:
+    """Every component's name, read through :func:`by_name` (issue #2759).
+
+    The names are read in the seat's enumeration order either way; going
+    through ``by_name`` makes those the only answers that follow the seat and
+    fails closed on a component without a name, rather than collecting
+    ``"None"`` into the set."""
+    return {
+        name
+        for name, _component in by_name(
+            _early_bound(model, "IAssemblyDoc").GetComponents(False)
+        )
+    }
+
+
 def _new_pattern_components(model: Any, before: set[str]) -> list[tuple[str, Any]]:
     """The components absent from ``before``, named, in natural name order."""
     components = _early_bound(model, "IAssemblyDoc").GetComponents(False)
@@ -220,14 +235,8 @@ def linear_component_pattern(
         raise ValueError("linear component pattern seeds must be unique")
 
     model = adapter.currentModel
-    asm_h = _early_bound(
-        model, "IAssemblyDoc"
-    )  # IAssemblyDoc for GetComponents; keep `model` for FeatureManager/ClearSelection2
     direction_name = ensure_global_pattern_axis(adapter, axis)
-    before = {
-        str(_read_member(component, "Name2"))
-        for component in (asm_h.GetComponents(False) or [])
-    }
+    before = _component_names(model)
     with _telemetry.span(
         f"pattern {label}",
         kind="linear",
@@ -300,15 +309,9 @@ def grid_component_pattern(
         raise ValueError("grid component pattern seeds must be unique")
 
     model = adapter.currentModel
-    asm_h = _early_bound(
-        model, "IAssemblyDoc"
-    )  # IAssemblyDoc for GetComponents; keep `model` for FeatureManager/ClearSelection2
     direction1_name = ensure_global_pattern_axis(adapter, axis1)
     direction2_name = ensure_global_pattern_axis(adapter, axis2)
-    before = {
-        str(_read_member(component, "Name2"))
-        for component in (asm_h.GetComponents(False) or [])
-    }
+    before = _component_names(model)
     with _telemetry.span(
         f"pattern {label}",
         kind="grid",
@@ -377,13 +380,7 @@ def circular_component_pattern(
         raise ValueError("circular component pattern seeds must be unique")
 
     model = adapter.currentModel
-    asm_h = _early_bound(
-        model, "IAssemblyDoc"
-    )  # IAssemblyDoc for GetComponents; keep `model` for FeatureManager/ClearSelection2
-    before = {
-        str(_read_member(component, "Name2"))
-        for component in (asm_h.GetComponents(False) or [])
-    }
+    before = _component_names(model)
     with _telemetry.span(
         f"pattern {label}",
         kind="circular",

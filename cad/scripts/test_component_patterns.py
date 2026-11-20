@@ -185,6 +185,52 @@ def test_pattern_targets_read_candidates_in_sorted_name_order(
     assert read[:3] == ["pattern-1", "pattern-2", "pattern-3"]
 
 
+class _UnnamedNeighbourModel(_PatternModel):
+    """An assembly already holding a component whose name reads empty."""
+
+    def GetComponents(self, top_level_only: bool) -> list[object]:
+        unnamed = type("_Unnamed", (), {"Name2": None})()
+        return [unnamed, *super().GetComponents(top_level_only)]
+
+
+@pytest.mark.parametrize(
+    "pattern",
+    [
+        lambda adapter: linear_component_pattern(
+            adapter, ["seed-1"], axis="x", spacing_mm=10.0, instances=2
+        ),
+        lambda adapter: grid_component_pattern(
+            adapter,
+            ["seed-1"],
+            axis1="x",
+            spacing1_mm=10.0,
+            instances1=2,
+            axis2="y",
+            spacing2_mm=10.0,
+            instances2=2,
+        ),
+        lambda adapter: circular_component_pattern(
+            adapter, ["seed-1"], axis_name="Axis1", instances=2
+        ),
+    ],
+    ids=["linear", "grid", "circular"],
+)
+def test_the_names_before_a_pattern_are_read_by_name_and_fail_closed(
+    monkeypatch: pytest.MonkeyPatch, pattern
+) -> None:
+    # Issue #2759: the "before" set goes through by_name like every other
+    # component name read, so an unnamed component stops the pattern before
+    # its feature is created instead of entering the set as "None".
+    adapter = _PatternAdapter()
+    adapter.currentModel = _UnnamedNeighbourModel()
+    monkeypatch.setattr(_assembly_patterns, "ensure_global_pattern_axis", lambda *_: "Axis")
+    monkeypatch.setattr(_assembly_patterns, "_select_pattern_inputs", lambda *_: None)
+    monkeypatch.setattr(_assembly_patterns, "_early_bound", lambda obj, *_: obj)
+    with pytest.raises(RuntimeError, match="element 0 of 1 has no Name2"):
+        pattern(adapter)
+    assert adapter.currentModel.created is False
+
+
 @pytest.mark.parametrize(
     "builder",
     [

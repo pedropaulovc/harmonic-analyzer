@@ -21,7 +21,7 @@ from _assembly_contract import AssemblyContract, assembly_contract
 from _bore_axis import _MATE_TOL_MM
 from _check import check, log
 from _com import FULLY_CONSTRAINED, UNDER_CONSTRAINED, _early_bound, _read_member
-from _component_order import by_name
+from _component_order import by_name, natural_key
 from _component_references import (
     bind_component_selectors,
     component_identity,
@@ -2284,19 +2284,26 @@ def check_no_interference(
             )
         details = []
         bounded_contacts = []
-        # frozenset(names) -> (names as first reported, [body volumes])
+        # frozenset(names) -> (names in name order, [body volumes])
         allowed_bodies: dict[frozenset[str], tuple[list[str], list[float]]] = {}
         chain_contacts = []
         chain_mesh_contacts = []
+        # Each result's components are named first, one read each in the
+        # report's order, and every later read follows the results sorted by
+        # their name pair (issue #2759): only the name answers follow the seat.
+        reported = []
         for interference in list(interferences or []):
             interference = _early_bound(interference, "IInterference")
-            names = []
-            configs = []
-            components = list(_read_member(interference, "Components") or [])
-            for comp in components:
-                # No flag: Name2 / ReferencedConfiguration are property reads (issue #87).
-                names.append(str(_read_member(comp, "Name2")).replace("\\", "/"))
-                configs.append(str(_read_member(comp, "ReferencedConfiguration") or ""))
+            named = by_name(_read_member(interference, "Components"))
+            names = [name.replace("\\", "/") for name, _component in named]
+            reported.append((names, interference, [component for _, component in named]))
+        reported.sort(key=lambda row: [natural_key(name) for name in row[0]])
+        for names, interference, components in reported:
+            # No flag: ReferencedConfiguration is a property read (issue #87).
+            configs = [
+                str(_read_member(comp, "ReferencedConfiguration") or "")
+                for comp in components
+            ]
             volume_mm3 = float(_read_member(interference, "Volume") or 0.0) * 1e9
             pair = frozenset(names)
             if len(names) == 2 and pair in native_allowed_pairs:
