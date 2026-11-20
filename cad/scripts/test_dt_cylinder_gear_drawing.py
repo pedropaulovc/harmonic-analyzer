@@ -377,5 +377,21 @@ def test_pattern_notch_reference_uses_the_actual_seed_gap() -> None:
     assert "PatternNotchPhase" in drawing.FRONT_KEEP
 
 
+def test_cam_lobe_stands_on_the_tooth_space_away_from_the_notch() -> None:
+    # Owner ruling 2026-11-20 on #749 ("B"): the lobe is cut the drive train's
+    # half-pitch lock clockwise of the +Y crest, so the lock stands it up; the
+    # notch keeps its tooth space, so NotchPhase is a whole pitch.
+    import dt_cylinder_gear_phase_band as phase_band
+
+    half_pitch = 180.0 / spec.TEETH
+    assert phase_band.CAM_LOBE_OFFSET_DEG == pytest.approx(half_pitch)
+    assert phase_band.CAM_NOTCH_PHASE_DEG == pytest.approx(2.0 * half_pitch)
+    cam_x, cam_y = phase_band.CAM_CENTER_XY
+    assert math.hypot(cam_x, cam_y) == pytest.approx(spec.ECCENTRICITY)
+    assert cam_x > 0.0 > spec.NOTCH_CENTER_X  # opposite sides of the crest
+    assert math.degrees(math.atan2(cam_x, cam_y)) == pytest.approx(half_pitch)
+    assert drawing.CAM_X == cam_x and drawing.CAM_Y == cam_y
+
+
 def test_pattern_notch_drawing_consumes_pure_specification() -> None:
     assert drawing.PATTERN_NOTCH_REF_ANGLE_DEG is spec.PATTERN_NOTCH_REF_ANGLE_DEG

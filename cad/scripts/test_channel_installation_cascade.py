@@ -26,17 +26,21 @@ def test_machine_config_and_channel_interface_share_one_installation_contract() 
     assert channel.CAM_DZ == pytest.approx(cam_plane.CAM_MID_DZ)
     assert channel.CAM_DZ == pytest.approx(-7.62 / 2.0)
 
-    phase = math.radians(channel.GEAR_PHASE_DEG)
+    phase = math.radians(channel.CAM_HOME_PHASE_DEG)
     assert channel.RING_CENTER == (
         DRUM_X + channel.CAM_ECC * math.sin(phase),
         channel.Y_DRIVE + channel.CAM_ECC * math.cos(phase),
     )
 
 
-def test_rocker_and_rod_reclose_the_level_plumb_neutral_pose() -> None:
+def test_rocker_and_rod_reclose_the_level_neutral_pose() -> None:
+    # The rocker is level; the rod leans only by the lean the lobe-up cam
+    # home produces against the pin solved over the 1.5 deg lock (#749).
     assert ch_connecting_rod_spec.CENTER_DISTANCE == channel.ROD_C2C
     assert abs(channel_kinematics.ARC["arm_tilt"]) < 0.02
-    assert abs(channel_kinematics.ARC["rod_tilt"]) < 0.02
+    assert channel_kinematics.ROD_LEAN_DEG == pytest.approx(0.082, abs=0.001)
+    lean = channel_kinematics.ARC["rod_tilt"] - channel_kinematics.ROD_LEAN_DEG
+    assert abs(lean) < 0.02
 
 
 def test_existing_shafts_and_translated_mounts_cover_the_shifted_bank() -> None:

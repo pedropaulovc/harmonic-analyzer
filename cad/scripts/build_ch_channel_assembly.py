@@ -50,8 +50,9 @@ the M6.8 mirror layer is gone).
   spring-hook x20 (McMaster 9489T111 eyebolts, supplied nuts omitted;
   their shanks thread directly into the summing plate)
 
-Crank home retains the drive train's +1.5 degree tooth phase on the integral
-cam lobes; the lobe-up correction remains issue #749. ``channel_kinematics``
+At crank home the integral cam lobes stand vertical: each gear's lobe is cut
+half a tooth pitch clockwise of its crest, so the drive train's +1.5 degree
+tooth-in-gap lock turns it up (#749). ``channel_kinematics``
 solves the rod, rocker, bar and lever poses from that configured geometry.
 The bar rests its foot-notch roof on the tilted arm's top-edge arc
 (contact at the bar's +X edge, machine frame); the bar's top pin height
@@ -248,8 +249,8 @@ from ch_connecting_rod_spec import CENTER_DISTANCE as ROD_C2C  # ring centre ->
 
 # rocker pin (imported, NOT copied -- the part and the assembly must agree on
 # the link length or the J2 revolute drags the ring off the cam). Solved for
-# the LEVEL rest pose: plumb rod from the level arm's pin down to the lobe-up
-# phased cam centre.  Imported from the PURE-DATA spec, not the part builder:
+# the LEVEL rest pose: the rod from the level arm's pin down to the lobe-up
+# cam centre.  Imported from the PURE-DATA spec, not the part builder:
 # the builder's closure carries drawing prose, and pulling it here made every
 # notes edit full-rebuild this assembly (codex #354).
 from ch_connecting_rod_spec import FORK_THICKNESS as ROD_FORK_THICKNESS
@@ -271,9 +272,9 @@ from _rocker_interface import CENTER_Y as ARM_ARC_CENTER_LOCAL_Y  # 816: arm-loc
 
 # centre above the frame origin (the book bottom edge, BOOK_TOP_RADIUS + BOOK_DEPTH), shared with the
 # offline error budget so the slide-arc height is never copied.
-from channel_frame_geom import (  # machine-frame shaft axes + cam lock, shared with error_budget
+from channel_frame_geom import (  # machine-frame shaft axes + cam home, shared with error_budget
+    CAM_HOME_PHASE_DEG,
     CAM_SHAFT_XY,
-    CYLINDER_LOCK_PHASE_DEG,
     LEVER_FULCRUM_XY as FULCRUM,
     ROCKER_PIVOT_XY as PIVOT,
 )
@@ -327,25 +328,26 @@ if abs(_rod_pin.PIN_INSTALLED_LENGTH - ROD_FORK_THICKNESS) > 1e-9:
 # ignoring beta is no longer a 0.4 mm nudge but a 7 mm catastrophe.
 
 # --- drive interface (default state) ----------------------------------------
-# GEAR_PHASE_DEG, X_DRUM, Y_DRIVE: imported from channel_frame_geom (the
-# drive-train's tooth-in-gap lock of every cylinder gear at Rz(+1.5), half the
-# T120 pitch, and the drum shaft axis) -- NOT copied, so the offline error
-# budget and both assemblies read one source. The integral cam (local (0,
-# +CAM_ECC) -- lobe UP at notch-up, the cos-mode top of stroke per the ch14 end
-# views) swings with the gear by GEAR_PHASE_DEG, so the rod ring rides the
-# PHASED cam centre, not a point straight north of the arbor. The end-for-end
-# gear flip reverses local Z only; local +Y and therefore this phased XY centre
-# stay put. CAM_ECC is imported above.
+# CAM_HOME_PHASE_DEG, X_DRUM, Y_DRIVE: imported from channel_frame_geom (the
+# cam lobe's direction off vertical at crank home -- nil: MHA-DT-12 cuts its
+# lobe half a pitch clockwise of the crest, so the drive train's tooth-in-gap
+# lock leaves it up, #749 -- and the drum shaft axis) -- NOT copied, so the
+# offline error budget and both assemblies read one source. The integral cam
+# (lobe UP at notch-up, the cos-mode top of stroke per the ch14 end views)
+# swings with the gear, so the rod ring rides the cam centre CAM_HOME_PHASE_DEG
+# off the arbor's vertical. The end-for-end gear flip reverses local Z only;
+# the lobe and therefore this XY centre stay put. CAM_ECC is imported above.
 X_DRUM, Y_DRIVE = CAM_SHAFT_XY
-GEAR_PHASE_DEG = CYLINDER_LOCK_PHASE_DEG
 RING_CENTER = (
-    X_DRUM + CAM_ECC * math.sin(math.radians(GEAR_PHASE_DEG)),
-    Y_DRIVE + CAM_ECC * math.cos(math.radians(GEAR_PHASE_DEG)),
-)  # Shared cone-line height; the rod length follows this phased cam centre.
+    X_DRUM + CAM_ECC * math.sin(math.radians(CAM_HOME_PHASE_DEG)),
+    Y_DRIVE + CAM_ECC * math.cos(math.radians(CAM_HOME_PHASE_DEG)),
+)  # Shared cone-line height; the rod length follows this cam centre.
 # ROD_C2C is imported from ch_connecting_rod_spec.CENTER_DISTANCE:
-# VERTICAL rod (ch30): every rod hangs PLUMB from the arm's rod-side tip onto
-# its cam -- the pin (ROD_HOLE_X out from the mid-seesaw pivot) sits
-# directly above the phased cam centre WITH THE ARM LEVEL (arm tilt 0: the ch14
+# VERTICAL rod (ch30): every rod hangs from the arm's rod-side tip onto its
+# cam -- the pin (ROD_HOLE_X out from the mid-seesaw pivot) sits above the cam
+# centre WITH THE ARM LEVEL, the rod leaning channel_kinematics.ROD_LEAN_DEG
+# (0.082 deg: the pin was solved plumb over the 1.5 deg-phased centre, #749)
+# (arm tilt 0: the ch14
 # end views show the 0-crank tip row flat, and the GT rocker-corner
 # triangulation lands the arm's rod-side end at machine x -60 -- the level-pose
 # bottom-arc end predicts -59.9). Supersedes the 144.75 lobe-down closure at

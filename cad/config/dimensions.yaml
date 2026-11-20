@@ -565,14 +565,19 @@ sections:
 
       Current build (`build_dt_cylinder_gear.py`): single non-configured custom
       120T 48DP PA20 gear/cam composite with a finite #2 / 55T-reference stock
-      tooth rim, not the custom cone T120 solid. The integral cam lobe is +Y, toward the
-      notch: the ch14 end views show the 0-crank tip row LEVEL at the TOP of the
+      tooth rim, not the custom cone T120 solid. The integral cam lobe points up, on
+      the notch side: the ch14 end views show the 0-crank tip row LEVEL at the TOP of the
       stroke — cos mode reads +1 at notch-up, so the lobe points up; plain bore
-      through gear and cam, alignment notch near +Y. The book states only the notch
+      through gear and cam, alignment notch near +Y. Part +Y is a tooth crest; the
+      lobe is cut on the tooth space half a pitch clockwise of it and the notch in
+      the tooth space half a pitch counter-clockwise, so the drive train's
+      half-pitch tooth-in-gap lock leaves the lobe vertical (owner ruling
+      2026-11-20 on #749; `dt_cylinder_gear_phase_band`). The book states only the notch
       **depth** (3 mm); the p.23 close-up labelled "notch" shows the mark as a thin
       saw **kerf cut between two teeth** — the real gears keep all 120 teeth, they are
       NOT missing one. The selected 0.4 mm-wide, 3 mm-deep saw kerf is placed by
-      `dt_cylinder_gear_spec.NOTCH_PHASE_DEG` relative to the cam, preserving the
+      `dt_cylinder_gear_spec.NOTCH_PHASE_DEG` from the crest, 3.0° from the cam
+      lobe (`dt_cylinder_gear_phase_band.CAM_NOTCH_PHASE_DEG`), preserving the
       physical cam/notch home lock rather than providing an arbitrary TE tare.
       The earlier ideal-tooth construction placed it at 90° + γ/2 because +Y
       was a crest at 120T; its ≈0.60 mm² removal / ≈1.8 mm³ notch volume is a

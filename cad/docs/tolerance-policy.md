@@ -279,10 +279,13 @@ CAD as built and is not budgeted.
 All three are deterministic functions of the design, so they are removed by procedure, not by
 tolerance (readout section below). With the calibrated stick, the read-vs-set vector subtracted
 and the second-harmonic correction applied, the nominal residual falls to ≤ 0.01 % MAE / 0.03 %
-max on every reference input — the "+cal stick" column of the report — **on a machine whose cam
-lobes stand vertical at crank home**. The as-built CAD's do not (1.5° off, the tooth-in-gap lock:
-open item below, #749), and that common phase leaves 0.15–0.30 % MAE / 1.7 % max that none of
-these corrections touch; the closure credits the lobe-up machine under an explicit waiver.
+max on every reference input — the "+cal stick" column of the report — on a machine whose cam
+lobes stand vertical at crank home. The CAD's do: each lobe is cut half a tooth pitch clockwise
+of a crest, so the drive train's tooth-in-gap lock (`gear_train.cylinder_lock_phase_deg`, 1.5°)
+turns it up (owner ruling 2026-11-20 on #749). A lobe left on the crest would sit 1.5° off, a
+common phase whose 0.15–0.30 % MAE / 1.7 % max none of these corrections touch. The rocker was
+left as it was, so each connecting rod re-closes to 158.366 mm and leans 0.082° at crank home
+(`channel_kinematics.ROD_LEAN_DEG`; delegated ruling 2026-11-20 on #749, owner review #2144).
 Lengthening the rod would remove it by design but is not photo-faithful; the correction is the
 period-appropriate answer (the machine computes, the operator corrects a known table).
 
@@ -363,8 +366,8 @@ current report does not discharge the operating assumptions or waivers below.
   knife line). Drill the 20 holes from one fixture; the along-knife pitch can be loose.
 - **Phase is cheap if clocks share their datums.** ±0.25° cam-lobe/notch phase
   gear to gear is 0.13 mm at the notch; the cam fixture MHA-DT-12-TL-01 adds
-  up to 0.47° common to all 20 lobes, so MHA-DT-12 prints ±0.7° and the budget
-  records the common part as a common cam phase beside #749's (#2361). Each
+  up to 0.47° common to all 20 lobes, so MHA-DT-12 prints 3.0° ±0.7° and the budget
+  records the common part as a common cam phase (#2361). Each
   keyed cone gear's teeth are indexed from its
   +X keyway on one setup, the keyway and the phase-0 tooth sharing the front
   view's drawn centreline at the title block's ±1° (`cone_flat_clock`):
@@ -392,11 +395,11 @@ current report does not discharge the operating assumptions or waivers below.
 
 | term | assumption (`error_budget.yaml reserved:`) | value | allowance |
 |---|---|---:|---:|
-| nominal residual after correction | table-lookup setting + read-vs-set vector + 2nd-harmonic correction (all in `READOUT.md`), **on the lobe-up machine** (`reserved.nominal_residual_mae.waive_cam_home_phase`, #749). The as-built common cam phase leaves a residual no step removes; both cases are reported | `closure.nominal_residual_mae` / `.nominal_residual_mae_as_built` | 0.05 |
+| nominal residual after correction | table-lookup setting + read-vs-set vector + 2nd-harmonic correction (all in `READOUT.md`), on the CAD machine, its cam lobes vertical at crank home (#749). The cam fixture's common phase is scored on top of it and not credited | `closure.nominal_residual_mae` / `.nominal_residual_mae_fixture_common` | 0.05 |
 | ordinate readout | ±0.075 mm reading uncertainty assumes a 0.15 mm technical-pen line; the CAD marker does not establish that performance. Gain uses `wire_moment_arm`, including the fixture's signed hook offset and installed wire lean, at the **conservative component operating minimum**, not a collar or nominal travel endpoint. Capacity and each reference input's scale come from `closed_form.mg-magnifier`; every coefficient carries its own reading error and the k=0 normalizer's through its actual stroke fill | `closure.readout` | 0.30 |
 | timebase | stop the crank at 2k turns, repeatable to ±8° (uniform). Evaluate the shifted physical trace through the readout procedure at each input's actual setup, not the ideal Fourier-vector slope | `closure.timebase` | 0.30 |
 | knife-edge hysteresis | rolling-resistance length 0.005 mm at each case's rest/preload force sum. `closed_form.knife` reports the worst case and each scaled station vector's spring loads/counter setting; the configured CAD case is not universal preload. The conservative numerator sums force magnitudes and reports the smaller resolved vertical load. The denominator remains the neutral small-signal loaded lift response, not a station-exact or cycle-peak transfer. Confirm gravity, operating loads, contact material/finish and reversal trace width on hardware | `closure.knife` | 0.45 |
-| **total** | residual + RSS(scatter, readout, timebase, knife), with credited and as-built cam phases reported separately | `closure.total_mae` / `.total_mae_as_built` | **0.7 benchmark** |
+| **total** | residual + RSS(scatter, readout, timebase, knife) | `closure.total_mae` | **0.7 benchmark** |
 | **two-channel worst coefficient** | all sources drawn jointly through the sparse-pair readout; compare expected largest coefficient error, not an ensemble quantile, with the historical benchmark. `pair_joint` also reports quantiles and the fraction exceeding it | `closure.pair_worst` | **2.0 benchmark** |
 
 `check:budget` fails if a scored term or total overruns its allowance. The wire
@@ -632,8 +635,8 @@ are the concrete realizations of the classes above, being lifted into `tolerance
   the conservative gravity check; it includes the pen carriage reflected
   through the wheel, spring/wire weight and wheel imbalance, without helpful
   guide friction. Verify assembly fit and measured force curves before closing
-  #747. The minimum magnifier pose remains #748 and the cam-home phase remains
-  #749; this preload correction changes neither limitation.
+  #747. The minimum magnifier pose remains #748; this preload correction does
+  not change it.
   Lower anchors are **9489T111 #6-32**, supplied hex nuts discarded, shanks
   trimmed to **12.700 mm** (**25.400 mm**, 1.00 in, overall to eye crown, with
   the .03 title-block deburr of #2314) and
@@ -692,20 +695,6 @@ are the concrete realizations of the classes above, being lifted into `tolerance
   lower seating and gooseneck position are resolved. The force budget remains a
   catalog-nominal engineering model, not an elastic-contact simulation; measured
   force curves and assembled zeroing remain required.
-- **The cam lobes stand 1.5° off vertical at crank home** (#749). The drive train locks every
-  cylinder gear at Rz(+1.5°) — half its tooth pitch, tooth-in-gap against the phase-0 cones
-  (`gear_train.cylinder_lock_phase_deg`) — and the cam lobe is a tooth crest, so at crank home
-  every lobe sits 1.5° off. Channel i turns i× faster than the crank, so no crank index zeroes
-  all 20: it is a *common cam phase*, and its error h·Σ xᵢ sin(iθₖ) is the sine transform the
-  machine does not read — no procedure step touches it. The current report's
-  `cam_home_phase` and `closure` score the as-built residual and total beside the
-  credited lobe-up case; do not carry a total over from another capacity range.
-  Cut the lobe half a pitch from the tooth crest without changing the gear mesh
-  phase; reconcile the resulting rod/rocker rest closure before rebuilding.
-  `verify:kinematics` uses a prescribed pen driver, not forces from the cams.
-  `check:budget` scores the as-built residual beside the lobe-up one and fails
-  unless `reserved.nominal_residual_mae.waive_cam_home_phase` is set; the waiver is set, and
-  **the closure above is conditional on that cut**.
 - **Magnifier range / ordinate capacity** (#748): keep three distinct claims.
   **Nominal model travel** is `clamp_radius_band(block_depth)`, for visualization
   and export only. **Published component operating bounds** come from the

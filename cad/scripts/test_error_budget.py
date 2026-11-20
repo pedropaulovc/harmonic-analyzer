@@ -39,9 +39,9 @@ def budget():
 
 @pytest.fixture(scope="module")
 def nom(budget):
-    """The machine the report credits: the spec modules' inputs with the cam
-    lobe vertical at crank home (the as-built 1.5 deg is waived, #749)."""
-    return eb.credited_nominal(budget)
+    """The machine the report models: the spec modules' inputs, the cam lobe
+    vertical at crank home (#749)."""
+    return eb.nominal()
 
 
 @pytest.fixture(scope="module")
@@ -292,9 +292,7 @@ def test_budget_closes(report):
         "timebase",
         "knife",
         "total_mae",
-        "nominal_residual_mae_as_built",
         "nominal_residual_mae_fixture_common",
-        "total_mae_as_built",
         "pair_worst",
         "pair_terms",
     }
@@ -373,7 +371,7 @@ def test_sparse_pair_is_gated_on_the_jointly_drawn_worst_coefficient(budget, rep
 
 
 def test_nominal_consumes_operating_band_not_nominal_model_travel(budget, monkeypatch):
-    """Both real nominal entry points must call the no-argument operating API."""
+    """The nominal entry point must call the no-argument operating API."""
     lever = eb.mg_magnifying_lever_geom
     actual = lever.operating_clamp_radius_band()
     sentinel = (actual[0] + 1.25, actual[1], actual[2] - 2.0)
@@ -388,9 +386,9 @@ def test_nominal_consumes_operating_band_not_nominal_model_travel(budget, monkey
 
     monkeypatch.setattr(lever, "operating_clamp_radius_band", operating_band)
     monkeypatch.setattr(lever, "clamp_radius_band", reject_nominal_band)
-    for machine in (eb.nominal(), eb.credited_nominal(budget)):
-        assert (machine.lever_r_min, machine.lever_r_built, machine.lever_r_max) == sentinel
-    assert len(calls) == 2
+    machine = eb.nominal()
+    assert (machine.lever_r_min, machine.lever_r_built, machine.lever_r_max) == sentinel
+    assert len(calls) == 1
 
 
 def test_report_and_setup_do_not_credit_optimistic_nominal_minimum(report, nom):
@@ -837,21 +835,20 @@ def test_counter_spring_catalog_range_gates_every_station_case(
     assert any("configured_cad" in failure for failure in bad), bad
 
 
-def test_cam_home_phase_is_scored_as_built_and_fails_unless_waived(budget, report, nom):
-    """The CAD locks every cylinder gear half a tooth pitch off vertical
-    (tooth-in-gap), so at crank home every cam lobe -- a tooth crest -- sits
-    1.5 deg off: a COMMON cam phase (channel i turns i x faster, so no crank
-    index zeroes all 20) whose error h * sum x_i sin(i theta_k) no procedure
-    step removes. The model reads it from the CAD (cam_home_deg), the as-built
-    fundamental carries that phase while the lobe-up machine's does not, the
-    residual it leaves is ~6x the allowance and the as-built total misses the
-    benchmark, and the gate fails on it unless the yaml records the waiver
-    (#749)."""
+def test_cam_lobes_stand_vertical_at_crank_home(report, nom):
+    """MHA-DT-12 cuts its cam lobe half a tooth pitch clockwise of the crest,
+    so the drive train's tooth-in-gap lock leaves every lobe vertical at crank
+    home (owner ruling 2026-11-20 on #749, "B"). A lobe on the crest would sit
+    the lock's 1.5 deg off: a COMMON cam phase (channel i turns i x faster, so
+    no crank index zeroes all 20) whose error h * sum x_i sin(i theta_k) no
+    procedure step removes, ~6x the residual's allowance."""
     import channel_frame_geom
+    import dt_cylinder_gear_phase_band
 
-    as_built = eb.nominal()
-    assert as_built.cam_home_deg == channel_frame_geom.CYLINDER_LOCK_PHASE_DEG == 1.5
-    assert nom == dataclasses.replace(as_built, cam_home_deg=0.0)
+    lock = channel_frame_geom.CYLINDER_LOCK_PHASE_DEG
+    assert lock == dt_cylinder_gear_phase_band.CAM_LOBE_OFFSET_DEG == 1.5
+    assert nom.cam_home_deg == channel_frame_geom.CAM_HOME_PHASE_DEG == 0.0
+    assert report["nominal"]["cam_home_deg"] == report["cam_home_phase"]["deg"] == 0.0
     th = np.arange(360) * 2.0 * math.pi / 360
 
     def phase_deg(n):
@@ -859,38 +856,32 @@ def test_cam_home_phase_is_scored_as_built_and_fails_unless_waived(budget, repor
         c1, s1 = 2 * np.mean(u * np.cos(th)), 2 * np.mean(u * np.sin(th))
         return math.degrees(math.atan2(-s1, -c1))  # the hook reads -cos (crank side)
 
-    assert phase_deg(as_built) == pytest.approx(1.5, abs=0.02)
+    on_crest = dataclasses.replace(nom, cam_home_deg=lock)
     assert abs(phase_deg(nom)) < 0.02
-    # the analytic size of the leak: h * sum x sin(i theta_k) on all-ones
+    assert phase_deg(on_crest) == pytest.approx(lock, abs=0.02)
+    # the analytic size of the leak on the crest: h * sum x sin(i theta_k)
     x = eb.reference_inputs()["all_ones"]
-    leak = math.radians(1.5) * (np.sin(np.outer(eb.THETA_K, eb.HARMONICS)) @ x)
-    home = report["cam_home_phase"]
-    assert home["residual_as_built"]["all_ones"]["max"] == pytest.approx(
+    leak = math.radians(lock) * (np.sin(np.outer(eb.THETA_K, eb.HARMONICS)) @ x)
+    crest = eb.nominal_design_errors(
+        on_crest, correct_second_harmonic=True, calibrated_stick=True
+    )
+    assert crest["all_ones"]["max"] == pytest.approx(
         100.0 * np.max(np.abs(leak)) / eb.N_ELEMENTS, rel=0.1
     )
-    cl = report["closure"]
-    assert (
-        cl["nominal_residual_mae_as_built"]
-        > 5 * report["reserved_allowance"]["nominal_residual_mae"]
-    )
-    assert cl["total_mae_as_built"] > report["benchmark"]["mae_fs_pct"]
-    assert (
-        cl["nominal_residual_mae"]
-        < report["reserved_allowance"]["nominal_residual_mae"]
-    )
-    strict = negative(budget, nominal_residual_mae={"waive_cam_home_phase": False})
-    bad = eb.budget_closes(eb.build_report(strict))
-    assert any(b.startswith("cam home phase") for b in bad), bad
-    assert report["nominal"]["cam_home_deg"] == 0.0
+    allowance = report["reserved_allowance"]["nominal_residual_mae"]
+    broad = [n for n in crest if n != "pair_1_20"]
+    assert max(crest[n]["mae"] for n in broad) > 5 * allowance
+    assert report["closure"]["nominal_residual_mae"] < allowance
+    assert report["closure"]["total_mae"] < report["benchmark"]["mae_fs_pct"]
 
 
 def test_cam_fixture_common_phase_is_scored_and_not_credited(budget, report):
     """The cam turning fixture MHA-DT-12-TL-01 turns every lobe by the same
-    angle (its hole stations, register and jaw line): a common cam phase of
-    the same kind as #749's, recorded under reserved.nominal_residual_mae and
-    scored on the lobe-up machine. Its leak is h * sum x_i sin(i theta_k) at
-    that angle, so it scales from the as-built 1.5 deg pro rata; the closure
-    keeps crediting the lobe-up residual (delegated ruling 2026-11-17, #2361)."""
+    angle (its hole stations, register and jaw line): a common cam phase,
+    recorded under reserved.nominal_residual_mae and scored on top of the
+    CAD's lobe-up home. Its leak is h * sum x_i sin(i theta_k) at that angle;
+    the closure keeps crediting the CAD residual (delegated ruling 2026-11-17,
+    #2361)."""
     import dt_cylinder_gear_tl_cam_fixture_spec as cam_fixture
 
     home = report["cam_home_phase"]
@@ -903,19 +894,15 @@ def test_cam_fixture_common_phase_is_scored_and_not_credited(budget, report):
         100.0 * np.max(np.abs(leak)) / eb.N_ELEMENTS, rel=0.1
     )
     cl = report["closure"]
-    assert (
-        cl["nominal_residual_mae"]
-        < cl["nominal_residual_mae_fixture_common"]
-        < cl["nominal_residual_mae_as_built"]
-    )
+    assert cl["nominal_residual_mae"] < cl["nominal_residual_mae_fixture_common"]
 
 
 def test_cam_shaft_axis_is_fixed_by_the_frame_not_the_part(nom):
     """A cam or rod-pin deviation moves the part; the shaft axis stays where
     the frame holds it (CAD: X_DRUM / Y_DRIVE), so the rocker settles at a
     different rest angle instead of the axis following the part (Codex round
-    28). As designed the rod hangs plumb onto the phased home centre, so the
-    nominal rocker is level at home."""
+    28). As designed the rod re-closes from the pin onto the lobe-up home
+    centre, so the nominal rocker is level at home."""
     import channel_frame_geom
 
     assert (nom.axis_dx, nom.axis_dy) == pytest.approx(

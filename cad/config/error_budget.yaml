@@ -57,27 +57,22 @@ reference_inputs: [all_ones, rect_half, gaussian_a0p1, alternating, pair_1_20]
 reserved:
   nominal_residual_mae:            # what survives the null-station zero + 2nd-harmonic correction
     allowance_pct: 0.05
-    # The as-built CAD locks every cylinder gear at Rz(+1.5) -- half its tooth
-    # pitch, tooth-in-gap against the phase-0 cones (gear_train.cylinder_lock_
-    # phase_deg) -- and the cam lobe is a tooth crest, so at crank home every
-    # lobe sits 1.5 deg off vertical. That is a COMMON cam phase: channel i turns
-    # i x faster than the crank, so no crank index zeroes all 20, and the error
-    # it leaves (h * sum x_i sin(i theta_k), the sine transform the machine does
-    # not read) is beyond every procedure step -- ~0.3 % MAE / 1.7 % max on the
-    # broad inputs, 6x this allowance. The fix is in the cylinder gear (cut the
-    # lobe half a pitch from the crest so the lock leaves it up; #749), not in
-    # the budget. The report scores the as-built residual beside the lobe-up
-    # one; this waiver is the record that the closure credits the latter.
-    # TODO(#749): cut the cam lobe half a pitch from the crest, then drop this waiver.
-    waive_cam_home_phase: true
-    # The cam turning fixture MHA-DT-12-TL-01 adds a common cam phase of the
-    # same kind: its hole stations at the shop's +/-.002 row, its register's
+    # Every cam lobe stands vertical at crank home: MHA-DT-12 cuts it half a
+    # tooth pitch clockwise of the crest, so the drive train's tooth-in-gap
+    # lock (gear_train.cylinder_lock_phase_deg) turns it up (owner ruling
+    # 2026-11-20 on #749, "B"; channel_frame_geom.CAM_HOME_PHASE_DEG). A phase
+    # common to all 20 lobes is beyond every procedure step: channel i turns
+    # i x faster than the crank, so no crank index zeroes all 20, and the
+    # error it leaves (h * sum x_i sin(i theta_k), the sine transform the
+    # machine does not read) stays in the residual.
+    # The cam turning fixture MHA-DT-12-TL-01 adds such a common cam phase:
+    # its hole stations at the shop's +/-.002 row, its register's
     # indication and the jaw pair's line turn every lobe it cuts by the same
     # angle, up to this (dt_cylinder_gear_tl_cam_fixture_spec.PHASE_FIXED_WORST_DEG,
-    # .466 deg). Like #749's it is beyond every procedure step; the report
-    # scores it on the lobe-up machine (cam_home_phase.residual_fixture_common)
+    # .466 deg). The report scores it on top of the CAD's cam home phase
+    # (cam_home_phase.residual_fixture_common)
     # and the closure does not credit it. Accepted with MHA-DT-12's NotchPhase
-    # band widened to 1.5 +/-.7 deg, which holds every gear's worst total (.677,
+    # band widened to +/-.7 deg, which holds every gear's worst total (.677,
     # this and each gear's own .13 together; cam_phase's gear-to-gear +/-.25 books the .13)
     # (delegated ruling 2026-11-17, #2361 option 1; owner review on #2144).
     fixture_common_cam_phase_deg: 0.47
