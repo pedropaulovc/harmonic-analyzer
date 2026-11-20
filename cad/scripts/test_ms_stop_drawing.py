@@ -164,10 +164,13 @@ def test_matched_pair_uses_functional_positions_and_a_real_shop_sequence() -> No
 
 def test_window_keeps_functional_clearance_at_printed_size_limits() -> None:
     # The window's own +.004/0 band and the stick's .XXX leave .010 of side
-    # and .011 of face clearance at the tightest limits.
+    # and .004 of face clearance at the tightest limits. Owner ruling
+    # 2026-11-20 (#2441): "B", the stick keeps the 1/8 flat's .125 and the
+    # .330 x .134 rebate stays, so the face clearance drops to .004-.018
+    # (still slides).
     window_lower, _window_upper = spec.WINDOW_SIZE_TOLERANCE_MM
     assert spec.WINDOW_WIDTH + window_lower - (stick.BODY_WIDTH + stick.BODY_FIT_TOLERANCE_MM) == pytest.approx(0.254)
-    assert spec.WINDOW_HEIGHT + window_lower - (stick.BODY_THICKNESS + stick.BODY_FIT_TOLERANCE_MM) == pytest.approx(0.2794)
+    assert spec.WINDOW_HEIGHT + window_lower - (stick.BODY_THICKNESS + stick.BODY_FIT_TOLERANCE_MM) == pytest.approx(0.1016)
     assert spec.PLATE_CLEARANCE_DIA > screw.MAJOR_DIA
 
 
