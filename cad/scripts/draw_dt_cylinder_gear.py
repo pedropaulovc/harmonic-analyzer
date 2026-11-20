@@ -135,14 +135,18 @@ NOTCH_DETAIL_DIMENSIONS = {
 #   words) run under the tips, left of the face-width text (215) and above
 #   the isometric (192).
 # * The eccentricity prints its value and band alone (rule 7), in the free
-#   lane below its extension lines (y 270/283).
+#   lane below its extension lines (y 270/283). It is an aligned dimension
+#   (the lobe stands 1.5 deg off the crest, #749), so its text centres on its
+#   own dimension line with no shoulder: x .172 puts the ~27 mm text's left
+#   end ~7 mm right of the tips at y 257 (machinist r1 of #3150 read the
+#   teeth through it at .157) and its right end ~8 mm inside the (90°) arc.
 # * The notch phase prints its value and band alone inside the (90°) arc
 #   (r 88.6 off the gear centre; r4b: a larger arc reached the side view and
 #   the gear data) with the cam finish symbol moved down out of it.
 FRONT_KEEP = {
     "BoreDia": (0.045, 0.338),
     "CamDia": (0.160, 0.222),
-    "CamCy": (0.157, 0.257),
+    "CamCy": (0.172, 0.257),
     "NotchPhase": (0.131, 0.332),
     "PatternNotchPhase": (0.178, 0.321),
 }
