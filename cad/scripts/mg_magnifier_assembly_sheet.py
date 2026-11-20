@@ -534,10 +534,10 @@ STEP_TEXT = {
     "lever-wire-through-tie": f"PASS THE WIRE END THROUGH {_TIE_HOLE} AND PULL IT TAUT.",
     # The toggle prints no length (#2796: a step carries no dimension), but it
     # is bounded by a feature the builder holds: no longer than the drum's
-    # face width (its axial length), the tail still clears the back washer and
-    # spacer (mg_wheel_group TAIL_STACK_CLEARANCE;
-    # test_mg_wheel_axle_spacer_drawing). It must span the hole it lies
-    # across, which sets its lower bound.
+    # face width (its axial length). test_mg_wheel_axle_spacer_drawing proves
+    # a toggle that long still clears the back washer and spacer;
+    # mg_wheel_group's TAIL_STACK_CLEARANCE proves the modelled 1/8 toggle.
+    # It must span the hole it lies across, which sets its lower bound.
     "lever-wire-tie-knotted": (
         "KNOT THE WIRE TAIL BEHIND THE HOLE ROUND A SHORT OFFCUT OF THE WIRE, "
         f"SHORTER THAN THE FACE WIDTH OF {_DRUM}, LAID ACROSS THE HOLE."
