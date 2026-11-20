@@ -101,10 +101,11 @@ ROD_BORE_DRILL, ROD_BORE_DIA = min(
 # (sh_vn_music_wire_lever_geom asserts the drum carries the same), no wider
 # lane.
 WIRE_DIA = _WIRE_DIA
-# The wire centre's radius in the groove, where the hook is laid out. The
-# root seats the wire there (owner ruling 2026-11-20 on #2687, "A": the seat
-# surfaces move out so the wire centres stay where they were), so the hook
-# and the bracket arm's load stay put.
+# The wire centre's radius in the groove. The root seats the wire there
+# (owner ruling 2026-11-20 on #2687, "A": the seat surfaces move out so the
+# wire centres stay where they were); the hook stands WIRE_CLEARANCE (0.25)
+# outboard of it, as it always has, so the hook and the bracket arm's load
+# stay put.
 _GROOVE_WIRE_R = 4.25
 # The groove arc's centre sits exactly on the spigot OD (OD = root Ø + 2R), so
 # the groove is a true semicircle, as deep as its radius: a centre inside the

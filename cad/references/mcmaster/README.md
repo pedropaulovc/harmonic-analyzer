@@ -1634,8 +1634,8 @@ Catalog specifications checked on September 10, 2026:
   wire still holds twice the arm check's wire 1 maximum (2.3 lbf) and three
   times the pen's weight through the wheel (1.5 lbf). The drum, the rim groove
   and the fixture groove seat this wire on the wire centres the 4.995 wheel
-  ratio is laid out on (owner ruling 2026-11-20 on #2687), so the members are
-  modelled Ø.2032 where the fitted wire runs (`_mcmaster_9666k142.py`,
+  ratio is laid out on (owner ruling 2026-11-20 on #2687); the members are
+  modelled Ø.2032, the lever wire keeping a 0.25 stand-off from its seats (`_mcmaster_9666k142.py`,
   `sh_vn_music_wire_lever_geom.py`, `test_sh_vn_thin_wire.py`).
   No vendor solid is used; the wire is a plain cylinder.
   The catalogue's .008-in nominal is also shown as a

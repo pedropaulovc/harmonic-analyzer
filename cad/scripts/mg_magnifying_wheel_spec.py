@@ -339,7 +339,7 @@ TIE2_SPOKE_WALL = (
 )
 # TIE 2 to the rim's side faces: it breaks into the bore at mid-width, where
 # the faces end at the rim-bore rounds' tangent line (R.03 MAX: 3.810 - 0.762
-# - 0.559 - 0.028 = 2.462).
+# - 0.559 - 0.029 = 2.460).
 TIE2_FACE_WALL = _RIM_AXIAL_MIN / 2.0 - _CAST_ROUND_MAX - _TIE_R_MAX - _TIE2_WANDER
 # Spigot to bore at the smallest finished spigot and the largest finished
 # bore, and the groove floor to the rim ID.

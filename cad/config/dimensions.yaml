@@ -1580,7 +1580,7 @@ sections:
       Effective wire-centre ratio 49.2/9.85 = 4.995, the seats laid out for the Ø.008 wire (#2687).
 
       Wires modeled (2026-07-04, re-derived rev 10): the two amplification wires are
-      geometry — straight rest-pose Ø0.2 rods on the seated wire centres, of purchased
+      geometry — straight rest-pose Ø0.2 rods (the pen wire on its seated centre, the lever wire 0.25 off its seats), of purchased
       McMaster 9666K142 0.008 in music wire (`sh-vn-music-wire` MHA-SH-VN-56, configuration `LeverWire`:
       fixture's derived spigot-groove front tangent → tangent to the drum at about
       2:25 seen from the front, on the pen side, at the drum mid-plane z −173.51;

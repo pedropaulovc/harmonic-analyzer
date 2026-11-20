@@ -154,7 +154,8 @@ def test_the_owner_ruling_numbers_hold() -> None:
     # hook in the plumb plane; #2403 (owner ruling 2026-11-20) moves the face
     # .010 nearer the bore, the groove held on the hook (3.496 from the
     # face).  #290: R.047 MAX, the spigot Ø the root's plus 2R.  #2687 (owner
-    # ruling 2026-11-20): the root seats the Ø.008 wire on the hook's 4.5.
+    # ruling 2026-11-20): the root seats the Ø.008 wire at 4.25, the hook
+    # stands its 0.25 clearance outboard at 4.5.
     lip = spec.WALLS["groove lip to the spigot face"][1]
     root = spec.WALLS["groove root over the thread major"][1]
     assert lip == pytest.approx(2.1082, abs=0.005)

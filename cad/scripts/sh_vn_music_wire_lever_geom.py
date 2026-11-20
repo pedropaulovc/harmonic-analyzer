@@ -47,9 +47,10 @@ assert math.isclose(WIRE_DIA, LEVER_WIRE_DIA, abs_tol=1e-12), (
 )
 
 # The drum, the rim groove and the fixture groove seat the purchased 9666K142
-# wire itself (#2687): the members are modelled at that size on the wire
-# centres the 5:1 ratio is laid out on, so the modelled ratio
-# (mg_magnifying_wheel_geom.WIRE_RATIO) is the built one.
+# wire itself (#2687) on the wire centres the 5:1 ratio is laid out on, so
+# the modelled ratio (mg_magnifying_wheel_geom.WIRE_RATIO) is the built one.
+# The lever-wire member is that wire's size; it keeps the CLEARANCE (0.25)
+# stand-off from the seat at the hook and at the drum (_R_EFF below).
 MEMBER_DIA = WIRE_DIA
 # A knot in a wire this thin is smaller than a tie hole, so each tail is tied
 # round the middle of an offcut of the same wire laid across the hole.

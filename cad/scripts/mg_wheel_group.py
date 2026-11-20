@@ -180,15 +180,15 @@ _TIE1_REACH_MAX = (
 )
 LEVER_WIRE_DEPARTURE_DEG = math.degrees(
     math.acos(_WIRE_R_MIN / _TIE1_REACH_MAX)
-)  # 33.9
+)  # 30.8
 _TIE1_CLOCK_SHIFT_DEG = math.degrees(math.asin(_wheel.TIE1_OFFSET_MAX / _wheel.TIE1_R))
 LEVER_WIRE_WRAP_DEG = (
     _TANGENT_CLOCK_MIN
     - _wheel.TIE1_CLOCK_DEG
     - LEVER_WIRE_DEPARTURE_DEG
     - _TIE1_CLOCK_SHIFT_DEG
-)  # 128.7
-LEVER_WIRE_WRAP_LEFT_DEG = LEVER_WIRE_WRAP_DEG - CCW_MAX_DEG  # 81.7
+)  # 131.8
+LEVER_WIRE_WRAP_LEFT_DEG = LEVER_WIRE_WRAP_DEG - CCW_MAX_DEG  # 84.8
 for _label, _left in (
     ("pen wire", PEN_WIRE_WRAP_LEFT_DEG),
     ("lever wire", LEVER_WIRE_WRAP_LEFT_DEG),
