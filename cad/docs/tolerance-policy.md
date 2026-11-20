@@ -534,9 +534,11 @@ operator forms from step 1; the table is the only data the procedure needs beyon
    alternating readings). Use the **read** ordinate, not the set one: an idle bar still moves
    (its $c_1$ is the null lift), so its second harmonic is $\kappa\,x^\text{read} \neq 0$ — on
    `pair_1_20` the 18 idle channels' $c_2$ is what the correction removes.
-6. **Crank in one direction**, and read coefficient $k$ with the crank stopped on its index at
-   $2k$ turns (the 80-turn period makes $\theta_k = k\pi/20$ exactly two turns apart) rather
-   than at a ruled abscissa on a moving paper.
+6. **Crank in one direction**, and read coefficient $k$ after $2k$ turns (the 80-turn period
+   makes $\theta_k = k\pi/20$ exactly two turns apart) with the crank stopped and its arm
+   pointing straight down, the saved pose, judged by eye or, if needed, with a digital angle
+   gauge on the arm (owner ruling 2026-11-20, #2385), rather than at a ruled abscissa on a
+   moving paper.
 7. Report errors as $e_k = (O_k - C_k)/\max_j|C_j|$ with $C_k$ computed by the **same
    20-sample rule** the machine realises, so quadrature error is never charged to the hardware.
 
