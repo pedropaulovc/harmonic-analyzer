@@ -98,8 +98,8 @@ diameter_mm = 4.9276
 # owner 2026-11-19).
 [stock.1018-flat-3-8x1-2]
 description = "1018 cold-finish carbon steel, flat bar, 3/8 x 1/2 in"
-[stock.1018-ground-flat-5-16x1]
-description = "AISI 1018 cold-finished steel, precision ground, flat bar, 5/16 x 1 in"
+[stock.1018-ground-flat-3-8x1]
+description = "AISI 1018 cold-finished steel, precision ground, flat bar, 3/8 x 1 in"
 [stock.c260-h02-strip-032x2]
 description = "C26000 cartridge brass, H02 half hard, strip, .032 x 2 x 12 in"
 [stock.c360-flat-1-4x6]

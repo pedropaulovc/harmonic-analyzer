@@ -305,10 +305,10 @@ def test_retained_walls_and_axial_stations_need_no_new_waiver():
     assert plate.BORE_DIA_LIMITS == (0.0, 0.0127)
     assert min(cup.BORE_JOURNAL_CLEARANCE) == pytest.approx(0.00508)
     assert max(cup.BORE_JOURNAL_CLEARANCE) == pytest.approx(0.0254)
-    assert ring.LENGTH == 5.207
+    assert ring.LENGTH == 6.7818  # .267, the 3/8 arm (#2019)
     assert plate.HUB_LENGTH == pytest.approx(12.6746)
-    assert shaft.CUP_FACE_Z == pytest.approx(40.3352)
-    assert shaft.REAR_END_Z == pytest.approx(47.0408)
+    assert shaft.CUP_FACE_Z == pytest.approx(41.91)
+    assert shaft.REAR_END_Z == pytest.approx(48.6156)
     assert collar.COLLAR_DISC_AIR_MIN == 0.1016
     assert "ONE FULL TURN" in collar.COLLAR_DISC_AIR_PHRASE
 

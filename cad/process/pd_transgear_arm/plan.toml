@@ -7,7 +7,7 @@ revision = "placeholder"
 material = "AISI 1018 cold-finished steel bar, ASTM A108"
 stock = "To be written"
 shop = "../shop"
-stock_refs = ["1018-ground-flat-5-16x1"]
+stock_refs = ["1018-ground-flat-3-8x1"]
 
 [[tools]]
 id = "drill-33"
@@ -75,9 +75,9 @@ name = ".0930 reamer"
 ref = "reamer-0930"  # drawing cross-check 2026-11-19: Ø.0930 +.0005/.0000 2X REAM THRU
 
 [[tools]]
-id = "endmill-carbide-3fl-1-4"
-name = "1/4 carbide end mill"
-ref = "endmill-carbide-3fl-1-4"  # drawing cross-check 2026-11-19: Ø.453 +.004/.000 counterbore, interpolated
+id = "endmill-carbide-3fl-1-2"
+name = "1/2 carbide end mill"
+ref = "endmill-carbide-3fl-1-2"  # owner ruling 2026-11-20 (#2424 C): Ø.500 +.004/.000 spot face, one plunge
 
 [[tools]]
 id = "chamfer-mill-330ch-1-4-90"

@@ -6,7 +6,7 @@ pd-transgear-arm:
   finish: bright machined; protect with ISO VG 32 machine-oil film
   quantity: 1
   tolerance_class: machined_block
-  process: "saw from 5/16 x 1 precision-ground flat stock (McMaster 9517K466), faces as supplied; mill the outline to the pivot radius and the square end; drill and ream the pivot bore and counterbore the rear spot face; drill and ream the pin bore through, square to the faces, for the MHA-PD-23 press; drill and ream the blind latch-pin hole into the square end to a drill point. At assembly (MHA-PD-00 steps 12-13, DETAIL K), after MHA-PD-23 is pressed: match-drill two #44 pilots with MHA-PD-19 and ream the arm's two holes Ø.0930 +.0005/.0000 (press fit on MHA-PD-VN-64, mouth breaks .002 MAX); spot through MHA-PD-19's screw holes, drill #29 and tap #8-32 UNC through"
+  process: "saw from 3/8 x 1 precision-ground 1018 flat stock (Online Metals 12095), faces as supplied; mill the outline to the pivot radius and the square end; drill and ream the pivot bore and plunge the rear spot face with a 1/2 end mill; drill and ream the pin bore through, square to the faces, for the MHA-PD-23 press; drill and ream the blind latch-pin hole into the square end to a drill point. At assembly (MHA-PD-00 steps 12-13, DETAIL K), after MHA-PD-23 is pressed, MHA-PD-19 set at DETAIL K and the trial mesh read: match-drill two #44 pilots with MHA-PD-19 and ream the arm's two holes Ø.0930 +.0005/.0000 (press fit on MHA-PD-VN-64, mouth breaks .002 MAX); spot through MHA-PD-19's screw holes, drill #29 and tap #8-32 UNC through"
   drawing_unit: in
   installation_notes: |-
     INSTALLATION - MATCHED ARM / ARM PLATE
@@ -16,16 +16,11 @@ pd-transgear-arm:
   machinist_exceptions:
     - id: "RV-01"
       kind: "accept"
-      where: "the locating-pattern and running-axis position controls"
-      finding: "position controls over-specified (rule 5)"
-      reason: "required by the whole-stack stock-form gate including the rigid two-hole registration yaw; stock dowels in reamed holes locate, the screws clamp (owner-accepted)"
+      where: "the feed-stud bore's position (A|B) and perpendicularity (A) frames and the two locator holes' position frames (A|B|C)"
+      finding: "position and perpendicularity controls over-specified (rule 5)"
+      reason: "required by the whole-stack stock-form gate including the rigid two-hole registration yaw; stock dowels in reamed holes locate, the screws clamp (owner-accepted). Owner ruling 2026-11-20 (#1571): \"Follow recommendations unless noted otherwise\": the recommended option 1, the location names every printed frame."
     - id: "RV-03"
       kind: "accept"
       where: "the MHA-PD-VN-58 latch pin's blind press hole"
       finding: "pressed pin has no way out (rule 16)"
       reason: "owner ruling 2026-10-27 (#1379): \"MHA-PD-18 latch pin should never come out.\" A permanent press; it is not removed in service, so rule 16's removal path does not apply (owner-accepted)"
-    - id: "RV-04"
-      kind: "minor"
-      where: "sheet note 3, linked from the end view's latch-pin hole callout: PIN HOLE TO FACES .065 MIN"
-      finding: "latch-pin hole ligament to the front and rear faces below the .080 target (rule 17)"
-      reason: "owner ruling 2026-10-27 (#1379): the .125 MHA-PD-VN-58 hole at mid-thickness of the 5/16 stock leaves .0655 at full budget, printed .065 MIN (stock band ±.001, .XXX height band ±.005 from the title block per coordinator ruling (a), 0.3 deg run-off over the hole to its drill point at the .38 MIN depth (#3124), both .010 breaks at the mouth), above the .060 floor; the next stock size up is tracked in #2019"

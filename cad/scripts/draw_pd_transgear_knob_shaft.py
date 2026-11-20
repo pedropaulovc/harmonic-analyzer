@@ -140,7 +140,10 @@ PNG = OUTPUTS.png
 SHEET_SCALE = (3.0, 1.0)
 VIEW_SCALE = (3, 1)
 _S = SHEET_SCALE[0] / SHEET_SCALE[1]
-SIDE_CENTER = (0.183, 0.160)
+# 2 mm left of 0.183: the 3/8 arm's longer journal (#2019) adds 4.7 mm at
+# 3:1, split between the GEAR DATA block's margin (its backlash row wrapped
+# shorter) and the tip side's chamfer callout and notes.
+SIDE_CENTER = (0.181, 0.160)
 # Third-angle: the rear face is the side view's LEFT end, so the view from
 # the rear stands left of it, on the shaft axis.
 END_CENTER = (0.045, SIDE_CENTER[1])
@@ -298,7 +301,7 @@ GEAR_DATA_ROWS = (
     ("WHOLE DEPTH (REF)", inch_text(WHOLE_DEPTH, 4)),
     ("CUTTER", f"#{CUTTER_NUMBER}, {CUTTER_TOOTH_RANGE[0]}-{CUTTER_TOOTH_RANGE[1]}T"),
     ("MATES WITH", _mate_name(_config.parts("pd-rack-pinion"))),
-    ("SPAN MATCHED FIT", f"BACKLASH WITH MATE\n   {BACKLASH_ACCEPT_TEXT}, FEELER"),
+    ("SPAN MATCHED FIT", f"BACKLASH\n   WITH MATE {BACKLASH_ACCEPT_TEXT}, FEELER"),
 )
 GEAR_DATA_NOTE = "\n".join(
     ("GEAR DATA", *(f"{label}:  {value}" for label, value in GEAR_DATA_ROWS))
@@ -334,9 +337,9 @@ SIDE_KEEP: dict[str, tuple[float, float]] = {
     # chamfer the line stays 9 mm off the thread callout's leader to the
     # chamfer.
     "ThreadBlankDia": (CHAMFER_START_X - 0.009, _ABOVE_Y),
-    # 4 mm left of mid-journal, right of detail B's crop: its one-line run
-    # hangs right of the line and ends 6.7 mm short of the pinion's line.
-    "JournalDia": ((PINION_REAR_X + REAR_X) / 2.0 - 0.004, _DIA_ROW_Y[0]),
+    # 1.5 mm left of mid-journal, right of detail B's crop: its one-line run
+    # hangs right of the line, short of the pinion's line.
+    "JournalDia": ((PINION_REAR_X + REAR_X) / 2.0 - 0.0015, _DIA_ROW_Y[0]),
     # Its three-line block (~58 mm wide with "DISC CLUSTER STACK WITH") is
     # wider than the 17.7 mm between its witness lines, so it stands outside
     # right of F's (217.7): text ~218.6..277 mm, left of the tip's witness
@@ -483,7 +486,7 @@ GEAR_DATA_RIGHT = GEAR_DATA_XY[0] + max(
 if GEAR_DATA_RIGHT > REAR_X - 0.003:
     raise AssertionError("the GEAR DATA block runs under the rear witness line")
 # The numbered notes in the open field right of the overall's tip witness
-# line (289.4) at the gear data's height: their top under the tooth-space
+# line (289.7) at the gear data's height: their top under the tooth-space
 # note (bottom ~0.106), their bottom over the title block (top ~0.0663),
 # their right end inside the border (0.4191 - 0.0127).
 NOTES_XY = (0.300, 0.100)

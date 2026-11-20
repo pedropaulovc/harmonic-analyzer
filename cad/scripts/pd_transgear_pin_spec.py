@@ -13,7 +13,7 @@ length below is the exact millimetre value of its printed inch nominal.  The
 owner ruling of 2026-10-30 took the shank from 3.9 mm to 1/8 in.
 
 Frame: one revolve about local +Z.  Local z = 0 is the head's underside
-(the face that seats on the arm's rear face, machine z -116.4625) and local
+(the face that seats on the arm's rear face, machine z -114.888) and local
 +Z runs toward the machine front, so machine z = ``HEAD_SEAT_MACHINE_Z`` -
 local z.  The head runs z -HEAD_HEIGHT..0, the press land z
 0..PRESS_LAND_LENGTH and the shank on from there to LENGTH.
@@ -53,7 +53,7 @@ FRONT_BUSHING_NUMBER = "MHA-PD-25"
 RUNNING_MATES = ("MHA-PD-10", "MHA-PD-24", FRONT_BUSHING_NUMBER)
 
 # The head seats on the arm's rear face.
-HEAD_SEAT_MACHINE_Z = round(ARM.FRONT_FACE_MACHINE_Z + ARM.THICKNESS, 6)  # -116.4625
+HEAD_SEAT_MACHINE_Z = round(ARM.FRONT_FACE_MACHINE_Z + ARM.THICKNESS, 6)  # -114.888
 
 # --- Shank: the running journal ------------------------------------------------
 # The sleeve and both bushings run on it (their bores .125 REAM_SLIDE, cut by
@@ -141,7 +141,10 @@ SEAT_CONTACT_WIDTH_MIN = round(
 # disc cluster's stack (transgear_cluster_fit).  The shims set the end float
 # (owner ruling 2026-11-01, #2124); the station still sets the collar-to-disc
 # air, so it prints +/-.001.
-GROOVE_STATION = 47.244  # 1.860, head underside to the groove's load wall
+# #2019: the 3/8 arm seats the head .0625 further back, so the station grew
+# from 1.860 by that and a half thousandth onto the grid: the load wall
+# stands .0005 forward of its 5/16-arm station.
+GROOVE_STATION = 48.8442  # 1.923, head underside to the groove's load wall
 GROOVE_STATION_PLACES = 3
 GROOVE_STATION_BAND = FIT_LENGTH_BAND_IN
 GROOVE_DIA = RING.GROOVE_DIA
@@ -159,8 +162,9 @@ GROOVE_REAR_STATION = round(GROOVE_STATION - GROOVE_WIDTH, 6)
 # groove depths (ASSUMPTION from the ring maker's edge-margin guidance:
 # 3 x .015 = .045) at the worst case: the tip at its printed lower limit, the
 # load wall at its upper, and the deepest dome on the shank, a hemisphere.
-# 2.02 leaves .0867 (2.01 would leave .0767).
-TIP_STATION = 51.308  # 2.02, head seat to the tip's apex
+# 2.08 leaves .0835 (2.07 would leave .0735).  #2019: 2.02 plus the 3/8 arm's
+# .0625, on the .XX grid; the apex stands .0025 behind its 5/16-arm station.
+TIP_STATION = 52.832  # 2.08, head seat to the tip's apex
 TIP_STATION_PLACES = 2
 TIP_STATION_BAND = printed_band_mm(TIP_STATION_PLACES, unit=UNIT)
 TIP_DOME_R = 1.778  # .07
@@ -174,10 +178,10 @@ FRONT_LAND_MIN = round(
     - (GROOVE_STATION + GROOVE_STATION_BAND)
     - TIP_DOME_SAG_MAX,
     6,
-)  # .0867
+)  # .0835
 LENGTH = TIP_STATION
 OVERALL_LENGTH = round(LENGTH + HEAD_HEIGHT, 6)  # apex to tip
-TIP_MACHINE_Z = round(HEAD_SEAT_MACHINE_Z - LENGTH, 6)  # -167.7835
+TIP_MACHINE_Z = round(HEAD_SEAT_MACHINE_Z - LENGTH, 6)  # -167.72
 HEAD_APEX_MACHINE_Z = round(HEAD_SEAT_MACHINE_Z + HEAD_HEIGHT, 6)
 GROOVE_LOAD_WALL_MACHINE_Z = round(HEAD_SEAT_MACHINE_Z - GROOVE_STATION, 6)
 

@@ -64,6 +64,10 @@ STATION_PLACES = 4
 PIN_HOLE_DIA_PLACES = 4
 PIN_BORE_DIA_PLACES = 4
 PIN_HOLE_DEPTH_PLACES = ARM.PIN_HOLE_DEPTH_PLACES
+# The flank's lean to the P-T centreline prints as a reference to one place
+# of a degree, 2.4 (owner ruling 2026-11-20 (Pedro), #2424 option B): the
+# vise set-up angle; the outline's printed rows govern the edges.
+FLANK_ANGLE_PLACES = 1
 
 # Explicit model bands, (upper, lower) deviations where one-sided.
 # The counterbore only cuts oversize (drilled-hole row).
@@ -108,7 +112,7 @@ GEOMETRIC_CONTROLS = (
         CylinderFace(PIN_BORE_DIA, contains_x_mm=PIN_STATION),
         ("A",), "diametral",
     ),
-    # No frame on the rear face (machinist review, rule 5): the 9517K466
+    # No frame on the rear face (machinist review, rule 5): the precision-
     # ground stock's thickness band carries its parallelism to A
     # (paper_drive_arm_registration.ARM_OPPOSITE_FACE_PARALLELISM_MM). No
     # frame on the plate taps: spotted and drilled through MHA-PD-19's
@@ -162,7 +166,7 @@ if LOCATOR_PUNCH_AIR_MIN_MM <= 0.0:
     raise AssertionError("the MHA-PD-VN-64 dowel reaches the MHA-PD-18 front face")
 
 # --- Printed text -------------------------------------------------------------
-# The thickness is the stock's: it prints "5/16 (.3125) GROUND STOCK REF",
+# The thickness is the stock's: it prints "3/8 (.3750) GROUND STOCK REF",
 # prefix and suffix around the imported model value, which the parentheses
 # mark as reference, so the title block's rows never apply to it.  A
 # supplier size prints untoleranced and the supplier's catalogue tolerance
@@ -213,18 +217,17 @@ LATCH_PIN_PRESS_PRINTED = (
     _floor_mm(LATCH_PIN_PRESS_INTERFERENCE[0], 4),
     _ceil_mm(LATCH_PIN_PRESS_INTERFERENCE[1], 4),
 )  # .0006, .0013
-# The ligament to the faces, printed in the latch-pin note as a plain fact:
-# .065 MIN at full budget is the owner-accepted shortfall
-# (machinist_exceptions RV-04; #2019 tracks the next stock size up), floored
-# so the sheet never promises more than the budget holds.
-LATCH_PIN_WALL_PRINTED = _floor_mm(ARM.WALLS["pin hole to faces"][1], 3)
 # The depth MIN's native record (#3124; swTolMIN prints only the model value
-# and MIN): its upper deviation is the deepest hole whose drill run-off still
-# holds the ligament note 3 prints (about .108 past the MIN).
+# and MIN): its upper deviation is the deepest hole that still holds the wall
+# target at the faces, its drill run-off charged, and from its point to the
+# pin bore (the latter governs on the 3/8 bar, #2019).
 PIN_HOLE_DEPTH_BAND = (
     round(
-        (ARM.WALLS["pin hole to faces"][1] - LATCH_PIN_WALL_PRINTED)
-        / math.tan(math.radians(ARM.DRILL_RUN_OFF_DEG)),
+        min(
+            (ARM.WALLS["pin hole to faces"][1] - ARM.WALL_TARGET)
+            / math.tan(math.radians(ARM.DRILL_RUN_OFF_DEG)),
+            ARM.WALLS["latch-pin hole point to pin bore"][1] - ARM.WALL_TARGET,
+        ),
         6,
     ),
     0.0,
@@ -238,7 +241,7 @@ ISOMETRIC_VIEW_NOTE = f"ISOMETRIC VIEW SCALE {ISO_VIEW_SCALE[0]}:{ISO_VIEW_SCALE
 # ``StationReference`` sketch: the Hole Wizard placement sketches that drive
 # the taps are not importable, and the pin bore's station prints with them.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "ArmOutline": {"PivotEndR", "TipStation", "EndWidth"},
+    "ArmOutline": {"PivotEndR", "TipStation", "EndWidth", "FlankAngle"},
     "Arm": {"Depth"},
     "PivotBoreProfile": {"PivotBoreDia"},
     "PinBoreProfile": {"PinBoreDia"},
@@ -254,6 +257,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "PivotEndR": OUTLINE_PLACES,
         "TipStation": TIP_STATION_PLACES,
         "EndWidth": OUTLINE_PLACES,
+        "FlankAngle": FLANK_ANGLE_PLACES,
     },
     "Arm": {"Depth": THICKNESS_PLACES},
     "PivotBoreProfile": {"PivotBoreDia": PIVOT_BORE_PLACES},
