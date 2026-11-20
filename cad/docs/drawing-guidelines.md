@@ -762,6 +762,15 @@ one adequate method over another is not a defect.
   unretained joint is a defect of this package.
 - A cap or nut that retains a rotating cluster axially does not retain a
   different interface, such as the stud's own thread in its frame.
+- **A load on a precision axis stands on its support.** A precision axis is
+  one whose position the package sets, locates or checks to a number: a
+  feed, a locating face or stop, a pivot. The part that carries such a load,
+  and the screw or bearing that carries it, sit over the member that
+  supports them. A joint whose load acts offset from a single row of
+  fasteners has a second row or a locating feature on the other side, so it
+  cannot rock or open about that row. The path ends at the base, or at work
+  holding the steps name, which the views need not draw. Loads on no
+  precision axis are outside this item.
 - The reviewer checks what is printed against this table and never computes a
   capacity or invents a load.
 

@@ -48,7 +48,21 @@ Pass 1 — detection. Find every candidate item; classify nothing yet.
    check with a number) is a setting the sheets print. A pair you cannot
    classify from the package is a candidate. Never compute a capacity or
    invent a load.
-5. Walk rule 22 item by item and record each gap: assembled views where every
+5. Trace every load on a precision axis (rule 23, "A load on a precision
+   axis stands on its support"): a feed or leadscrew thrust, a locating force
+   against a fence, stop or datum, or a pivot's working load, on an axis
+   whose position the package sets, locates or checks to a number. Follow it
+   from where it is applied, through each part and joint the views show, to
+   the base or to work holding the steps name; the path ends there with no
+   finding, and the views need not draw that work holding. Record each place
+   before that end where the loaded part, or a screw or bearing carrying the
+   load, stands beyond the edge of the member under it, or where the load
+   acts offset from a single row of fasteners with no second row or locating
+   feature on the other side, so the joint can rock or open about that row.
+   Judge only what the views show; never compute a capacity or invent a load.
+   A load on no precision axis (a handle, cover, guard or stand) is outside
+   this step.
+6. Walk rule 22 item by item and record each gap: assembled views where every
    part is identifiable; an exploded view that reads; a parts list with
    balloons for every visible part; every assembly-level dimension, setting
    and measurable acceptance as a view dimension, setting diagram or setting
@@ -58,12 +72,12 @@ Pass 1 — detection. Find every candidate item; classify nothing yet.
    section, and judge both alike: count each step's printed lines and
    actions and check that every code and direction it uses is defined on a
    sheet.
-6. Read the package as the first-time builder of the guidelines would: every
+7. Read the package as the first-time builder of the guidelines would: every
    part named by item number with its full drawing number in the BOM (rule
    4); every section, detail and enlarged view lettered with its boundary on
    a parent (rule 9); every word, symbol, direction and label one the builder
    can look up, and one unit per view (rule 26).
-7. Sheet views arrive at about 118 dpi. Before reporting a crossing, overprint,
+8. Sheet views arrive at about 118 dpi. Before reporting a crossing, overprint,
    leader landing, symbol, hidden-vs-solid line, small text or contradiction,
    call `crop` on that region and base the finding on what the crop shows.
 Record each candidate with its where, the defect, its evidence (text layer
@@ -83,8 +97,10 @@ DO NOT ASK FOR
 Component fabrication detail, material certs, a production inspection plan, a torque
 value for every screw where a general note covers them, or a production
 routing. Do not reopen fabrication tolerances on unseen part drawings, and do
-not invent a requirement from a mechanism you cannot see. The title block's
-standard rows stay on assembly sheets (rule 2); flag only wrong values or
+not invent a requirement from a mechanism you cannot see; an overhang or a
+fastener row the views show under a precision-axis load (step 5) is a
+mechanism you can see. The title block's standard rows stay on assembly
+sheets (rule 2); flag only wrong values or
 contradictions. The "SOLIDWORKS Maker Product. For Personal Use Only." line
 along the bottom edge is a licence watermark outside the inner border. It
 cannot be moved or removed; do not report it.

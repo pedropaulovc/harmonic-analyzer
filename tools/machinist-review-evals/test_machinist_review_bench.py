@@ -13,6 +13,9 @@ import pytest
 
 import machinist_review_bench as evaluation
 
+# The autouse ``offline_release_pdfs`` fixture replaces this for every test.
+_RELEASE_PDFS = evaluation.release_pdfs
+
 
 def _verdict(value: str = "SHIP") -> dict:
     return {
@@ -581,6 +584,38 @@ def test_eval_filters_do_not_duplicate_cases() -> None:
 def test_unknown_eval_filter_is_rejected() -> None:
     with pytest.raises(ValueError):
         evaluation.load_evals(selectors=("not-a-real-eval",))
+
+
+def test_committed_cases_read_their_committed_pdf_in_place(tmp_path: Path) -> None:
+    """A sheet no release carries yet is committed beside the bench: run and
+    import read it there, without a release download or a cached copy."""
+    _, cases = evaluation.load_evals()
+    committed = [
+        case for case in cases if case["release"] == evaluation.COMMITTED_RELEASE
+    ]
+    assert committed
+    pdfs = _RELEASE_PDFS(evaluation.COMMITTED_RELEASE, tmp_path)
+    assert pdfs == evaluation.COMMITTED_PDFS
+    for case in committed:
+        assert (pdfs / evaluation.release_pdf_name(case)).is_file()
+    assert not any(tmp_path.iterdir())
+
+
+@pytest.mark.parametrize(
+    ("change", "message"),
+    [
+        ({"package": "pn_pen_assembly"}, "no committed PDF"),
+        ({"release_pdf": "ch-rocker-strap-tl-fixture-assembly.pdf"}, "registry name"),
+    ],
+)
+def test_committed_case_needs_its_pdf_under_the_registry_name(
+    tmp_path: Path, change: dict, message: str
+) -> None:
+    _, cases = evaluation.load_evals(selectors=("strap-fixture-load-path-control",))
+    path = tmp_path / "evals.json"
+    path.write_text(json.dumps({"evals": [{**cases[0], **change}]}), encoding="utf-8")
+    with pytest.raises(ValueError, match=message):
+        evaluation.load_evals(path)
 
 
 def test_iteration_layout_and_viewer_metadata(tmp_path: Path) -> None:
