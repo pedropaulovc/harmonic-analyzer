@@ -570,7 +570,7 @@ def test_the_thrust_face_finishes_and_captions_clear_their_face_and_the_diameter
         ("boss_face", geometry.BOSS_FACE_Z, "BossDia", geometry.BOSS_DIA, 1.0),
     ):
         _pick, symbol, caption = drawing.FACE_FINISHES[key]
-        width = max(map(len, drawing.FACE_FINISH_CAPTIONS[key].splitlines()))
+        width = max(map(len, spec.FINISH_CAPTIONS[key].splitlines()))
         caption_near = outward * (caption[2] - face_z)
         if outward < 0.0:
             caption_near -= 2.0 * _half_width_model("X" * width)
@@ -594,7 +594,7 @@ def test_the_thrust_face_finishes_and_captions_clear_their_face_and_the_diameter
         foot = caption[1] - drawing.CAPTION_BLOCK_HEIGHT
         assert 0.0 < foot - symbol_top < text_height, key
         assert -face_dia / 2.0 < symbol[1] and caption[1] < face_dia / 2.0, key
-        width = max(map(len, drawing.FACE_FINISH_CAPTIONS[key].splitlines()))
+        width = max(map(len, spec.FINISH_CAPTIONS[key].splitlines()))
         assert caption[2] < symbol[2] < caption[2] + 2.0 * _half_width_model("X" * width), key
 
 
@@ -608,7 +608,7 @@ def test_each_thrust_face_finish_lands_on_its_own_face_annulus() -> None:
         pick = drawing.FACE_FINISHES[key][0]
         assert pick[2] == face_z, key
         assert geometry.BORE_DIA / 2.0 + 0.5 < abs(pick[1]) < face_dia / 2.0 - 0.5, key
-        caption = drawing.FACE_FINISH_CAPTIONS[key]
+        caption = spec.FINISH_CAPTIONS[key]
         assert caption.startswith("THRUST FACE"), key
         assert caption.endswith(_config.parts(mate)["number"]), key
 
@@ -628,20 +628,16 @@ def _word_lines(text: str) -> list[str]:
 def test_no_callout_or_caption_prints_more_than_two_lines_of_words() -> None:
     """Rule 7: a callout carries at most two lines of words (machinist
     review, run 20261112T153723793Z: the .197 callout and both thrust-face
-    captions printed three).  The spec's three-line strings print re-wrapped,
-    every word and drawing number kept in order."""
+    captions printed three).  The spec holds them as printed (#2657)."""
     printed = {
         **drawing.DIMENSION_CALLOUTS,
-        **{f"{key} caption": text for key, text in drawing.FACE_FINISH_CAPTIONS.items()},
+        **{f"{key} caption": text for key, text in spec.FINISH_CAPTIONS.items()},
     }
     for name, text in printed.items():
         assert 1 <= len(_word_lines(text)) <= 2, name
-    sources = {
-        drawing.SECTION_CALLOUTS["ThicknessOverArm"]: spec.THICKNESS_CALLOUT,
-        **{drawing.FACE_FINISH_CAPTIONS[key]: text for key, text in spec.FINISH_CAPTIONS.items()},
-    }
-    for wrapped, source in sources.items():
-        assert wrapped.split() == source.split(), source
+    assert drawing.SECTION_CALLOUTS["ThicknessOverArm"] is spec.THICKNESS_CALLOUT
+    assert not hasattr(drawing, "two_lines_of_words")
+    assert not hasattr(drawing, "FACE_FINISH_CAPTIONS")
 
 
 def test_the_hole_height_text_stands_right_of_the_edge() -> None:

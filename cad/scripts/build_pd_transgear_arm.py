@@ -73,7 +73,10 @@ from _sketch import (
     set_sketch_direct_db,
 )
 from _sketch_circle import define_circle
-from _drawing_dimension_insert import add_diametric_linear_dimension
+from _drawing_dimension_insert import (
+    add_angular_reference_dimension,
+    add_diametric_linear_dimension,
+)
 from _drawing_precision import apply_drawing_precision
 from _drawing_marks import (
     apply_drawing_properties,
@@ -155,6 +158,10 @@ SPOT_FACE_OVERRUN = SPOT_FACE_DEPTH
 # The rear mouth's profile runs this far past the rear face, and its axis
 # this far again, so the revolved cut clears the face (not printed).
 PIN_MOUTH_OVERRUN = 1.0
+# The flank angle's text in the model sketch: inside the wedge between the
+# P-T centreline and the upper edge, toward the square end (the sheet moves
+# it to its own place).
+FLANK_ANGLE_TEXT_XY = (105.0, 4.0)
 
 _R_BORE = PIVOT_BORE_DIA / 2.0
 _R_SPOT = SPOT_FACE_DIA / 2.0
@@ -424,6 +431,30 @@ def build(adapter: Any) -> dict[str, str]:
         ),
     )
     outline.record("EndWidth", '"EndWidth"')
+    # The flank's lean to the P-T centreline, a driven reference the sheet
+    # prints for the vise set-up (owner ruling 2026-11-20 (Pedro), #2424
+    # option B: "B, C and D together in the #2019 stock-change").  The
+    # centreline runs from P to the square end's midpoint, so the outline
+    # gains no driving constraint.
+    set_sketch_direct_db(adapter, True)
+    centreline = check(
+        "P-T centreline", adapter.add_centerline(0.0, 0.0, TIP_STATION, 0.0)
+    )
+    set_sketch_direct_db(adapter, False)
+    for label, e1, e2, relation in (
+        ("P-T centreline on P", f"{centreline}.start", f"{pivot_round}.center", "coincident"),
+        ("P-T centreline at the square end's middle", f"{centreline}.end", end_face, "midpoint"),
+    ):
+        check(label, adapter.add_sketch_constraint(e1, e2, relation))
+    add_angular_reference_dimension(
+        adapter,
+        centreline,
+        upper,
+        FLANK_ANGLE_TEXT_XY,
+        "flank angle to the P-T centreline",
+        expected_degrees=math.degrees(EDGE_LEAN),
+    )
+    outline.record("FlankAngle")
     ensure_fully_defined(adapter, "arm outline")
     check("exit_sketch arm outline", adapter.exit_sketch())
     name_last_feature(adapter, "ArmOutline")

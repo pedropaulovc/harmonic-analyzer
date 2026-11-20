@@ -145,7 +145,7 @@ cite = ["Online Metals order 1021751700 confirmation (PO harmonic-analyzer-02, 2
 [stock.1018-flat-5-16x1-12in]
 form = "flat_bar"
 material = "1018 cold-finish carbon steel"
-note = "Bought (Online Metals order 1021751700, PO harmonic-analyzer-02, 2026-11-03): part 19714, 5/16 x 1 in rectangle 1018 CF, 1 x 12 in, $6.92. Item notes: Drawing Number: MHA-PD-18 | Custom Part: pd-transgear-arm. Not the arm's stock now: pd-transgear-arm is sawn from McMaster 9517K466 precision-ground flat with its faces as supplied (registry process, pd_transgear_arm_geometry.STOCK_SKU), a row below; this CF bar is free."
+note = "Bought (Online Metals order 1021751700, PO harmonic-analyzer-02, 2026-11-03): part 19714, 5/16 x 1 in rectangle 1018 CF, 1 x 12 in, $6.92. Item notes: Drawing Number: MHA-PD-18 | Custom Part: pd-transgear-arm. Not the arm's stock now: pd-transgear-arm is sawn from Online Metals 12095 3/8 x 1 precision-ground flat with its faces as supplied (registry process, pd_transgear_arm_geometry.STOCK_SKU; #2019); this CF bar is free."
 section_mm = [25.4, 7.9375]
 length_mm = 304.8
 status = "on_hand"

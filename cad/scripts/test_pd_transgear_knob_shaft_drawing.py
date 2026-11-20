@@ -163,7 +163,7 @@ def test_real_d_core_thread_and_inch_g6_source() -> None:
     )
     assert (5.0 - spec.THREAD_BASIC_MINOR) / 2.0 > spec.THREAD_PITCH
     assert spec.TIP_CHAMFER_CALLOUT == "CHAMFER 45 DEG TO MINOR"
-    assert ring.LENGTH == 5.207
+    assert ring.LENGTH == 6.7818  # .267, the 3/8 arm (#2019)
 
 
 def test_single_point_thread_retains_the_functional_relief() -> None:
@@ -194,13 +194,13 @@ def test_the_stud_neck_is_no_longer_the_weak_section_under_the_tool() -> None:
 def test_machine_and_float_stations_are_unchanged() -> None:
     for local, machine in (
         (spec.TIP_Z, -171.976), (spec.THREAD_END_Z, -155.72),
-        (spec.PINION_REAR_Z, -142.2072), (spec.REAR_END_Z, -101.0592),
+        (spec.PINION_REAR_Z, -142.2072), (spec.REAR_END_Z, -99.4844),
     ):
         assert F_MACHINE_Z + local == pytest.approx(machine, abs=0.005)
     assert spec.CUP_FACE_STATION == pytest.approx(ring.LENGTH + plate.HUB_TO_BOSS + spec.END_FLOAT)
     assert spec.END_FLOAT > spec.END_FLOAT_SET_TOL
     assert spec.JOURNAL_LENGTH == pytest.approx(spec.CUP_FACE_STATION + spec.JOURNAL_REAR_EXTENSION)
-    assert spec.OVERALL_LENGTH == pytest.approx(70.9168, abs=0.005)
+    assert spec.OVERALL_LENGTH == pytest.approx(72.4916, abs=0.005)
 
 
 def test_each_chucking_dimensions_from_its_faced_end() -> None:
@@ -248,8 +248,8 @@ def test_each_chucking_dimensions_from_its_faced_end() -> None:
     assert drawing.DIMENSION_SUFFIXES["OverallLength"] == f" SETS PIN WALL IN {cup}"
     assert "OverallLength" not in drawing.DIMENSION_CALLOUTS_BELOW
     assert "OverallLength" not in drawing.DIMENSION_CALLOUTS_ABOVE
-    assert spec.inch_text(spec.OVERALL_LENGTH, 3) == "2.792"
-    assert "2.792" not in drawing.NOTES and cup not in drawing.NOTES
+    assert spec.inch_text(spec.OVERALL_LENGTH, 3) == "2.854"
+    assert "2.854" not in drawing.NOTES and cup not in drawing.NOTES
     # At .XX the journal band would leave the cup's pin-hole end wall under
     # its floor: the third place is the function the suffix states.
     import pd_transgear_knob_cup_spec as cup_spec
@@ -269,7 +269,7 @@ def test_each_chucking_dimensions_from_its_faced_end() -> None:
     # width's left witness line (the pinion's rear face, which drops with its
     # arrow to the text's height) and of the rear witness line.
     x, _y = drawing.SIDE_KEEP["OverallLength"]
-    chars = len("2.792 SETS PIN WALL IN MHA-PD-16")
+    chars = len("2.854 SETS PIN WALL IN MHA-PD-16")
     assert drawing.OVERALL_TEXT_CHARS == chars
     half = chars * 0.00275 / 2
     assert x + half <= drawing.PINION_REAR_X - 0.005

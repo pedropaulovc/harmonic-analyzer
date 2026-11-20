@@ -41,7 +41,12 @@ ID = 6.5278  # .257
 # dimension carries no band of its own (machinist review: a restated row is
 # over-specification).
 ID_BAND = (drilled_oversize_mm(unit=UNIT), 0.0)  # (upper, lower) deviations
-LENGTH = 5.207  # .205
+# #2019: the 3/8 arm's rear face (the plate's seat) stands .0625 further back,
+# and the MHA-PD-19 plate keeps its hub, so the ring takes the .0625, less a
+# half thousandth onto the grid: the knob's F stands .0005 behind its
+# 5/16-arm station, never forward onto the drive collar's knob wheel.
+# .267, was .205.
+LENGTH = 6.7818  # .267
 # The forward stop of the knob's end float (contract §12): explicit ± band.
 # It spaces the knob shaft's pinion (MHA-PD-08) from the arm plate's front hub
 # (MHA-PD-19), so the knob's F datum, chain plane and disc/platen gap stacks

@@ -1155,8 +1155,8 @@ description = "1018 cold-finish carbon steel, flat bar, 5/16 x 1 in, 12 in lengt
 description = "1018 cold-finish carbon steel, flat bar, 5/16 x 1 in, 36 in length"
 [stock.1018-flat-5-16x1-72in]
 description = "1018 cold-finish carbon steel, flat bar, 5/16 x 1 in, 72 in length"
-[stock.1018-ground-flat-5-16x1]
-description = "AISI 1018 cold-finished steel, precision ground, flat bar, 5/16 x 1 in"
+[stock.1018-ground-flat-3-8x1]
+description = "AISI 1018 cold-finished steel, precision ground, flat bar, 3/8 x 1 in"
 [stock.1018-ground-round-1-4]
 description = "AISI 1018 steel, precision ground, round bar, 1/4 in"
 [stock.1018-or-1045-ground-round-3-8]

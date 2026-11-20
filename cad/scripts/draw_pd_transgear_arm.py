@@ -143,7 +143,9 @@ FRONT_CENTER = (0.189, 0.205)
 # Low enough that the counterbore callout's two lines above its value clear
 # the overall-length reference under the station stack.
 SECTION_CENTER = (FRONT_CENTER[0], 0.090)
-END_CENTER = (0.357, FRONT_CENTER[1])
+# #2019: 1 mm further right for the 3/8 arm's wider end view, so the .55
+# keeps its 2 mm to both the A-A arrow and the end view.
+END_CENTER = (0.358, FRONT_CENTER[1])
 # On sheet 2, right of section D-D in its open field, its label over it.
 # On sheet 1 under section A-A it crowded A-A's frames, the floor
 # depth's text and A-A's caption (machinist review of 67d749fb4, run
@@ -215,7 +217,7 @@ FRONT_KEEP = {
     # right of the station stack; the upper band holds the tap and locator
     # callouts.
     "PinBoreDia": (_front_x(PIN_STATION) + 0.056, _UNDER_FRONT - 0.024),
-    "EndWidth": (_front_x(TIP_STATION) + 0.012, FRONT_CENTER[1]),
+    "EndWidth": (_front_x(TIP_STATION) + 0.0115, FRONT_CENTER[1]),
     # Mid-line, or further left: it keeps 12 mm between its centre and the
     # lower 6.850's box, which hangs left of tap 1 (since #2034 moved K, tap 1
     # stands 6.2 nearer the pivot and mid-line came within 7 mm of it).
@@ -239,6 +241,10 @@ FRONT_KEEP = {
     # line frees about 1.4 mm at each end; 0.5 mm lower splits it, about
     # 1.9 mm under the border and 0.9 mm over the edge.
     "LocatorDia1": (0.262, _front_y(PIVOT_END_R) + 0.0144),
+    # #2424 B: the flank's lean to the P-T centreline (section line A-A
+    # draws it), in the open upper half of the arm between the pin bore S
+    # and the square end: the 2.4 degree wedge is over 7 mm deep there.
+    "FlankAngle": (_front_x(105.0), _front_y(4.0)),
 }
 # The true overall (review of 19e33c6c2: the 128.90 from the bore axis read
 # as one), a reference under the stations: picked on the pivot round's upper
@@ -402,6 +408,8 @@ TAP_STATION_REFERENCES = ("PlateTapStation1", "PlateTapStation2")
 # The latch-pin hole's depth rides its callout as REF (round 2: a depth is
 # never deferred to a view) while section A-A's native MIN controls it.
 LINEAR_REFERENCES = TAP_STATION_REFERENCES
+# The flank angle is a driven reference (#2424 B): parenthesized as well.
+REFERENCE_DIMENSIONS = (*LINEAR_REFERENCES, "FlankAngle")
 TAP_CALLOUTS = (
     (
         "plate taps",
@@ -508,7 +516,9 @@ def _wall_point(
 # Each socket keeps a placement (``project_part_pmi`` projects every
 # control); the second's frame is hidden (``_one_frame_per_dowel_group``).
 _LOCATOR_MOUTH_X = LOCATOR_SECTION_CENTER[0] + THICKNESS / 2.0 * _S / 1000.0
-_LOCATOR_FRAME_GAP = 0.006
+# 4.5 mm (was 6): the 3/8 arm's wider section B-B (#2019) keeps the frames
+# inside the right border.
+_LOCATOR_FRAME_GAP = 0.0045
 _LOCATOR_FRAME_RISE = 0.0025
 _FRAME_HALF_HEIGHT = 0.00345
 
@@ -566,19 +576,20 @@ def _set_tap_callout_text(display: Any, qualifier: str, *, label: str) -> None:
         )
 
 
-def _reference_linear_dimensions(adapter: Any, annotations: list[Any]) -> None:
-    """Print the plate-tap stations in parentheses, as references: the taps
-    are transferred from MHA-PD-19's holes, so the stations control nothing.
-    Linear dimensions, so no diameter glyph (``set_reference_dimension``)."""
+def _reference_dimensions(adapter: Any, annotations: list[Any]) -> None:
+    """Print the plate-tap stations and the flank angle in parentheses, as
+    references: the taps are transferred from MHA-PD-19's holes, so the
+    stations control nothing, and the outline's rows govern the flank.  No
+    diameter glyph (``set_reference_dimension``)."""
     found = set()
     for annotation in annotations:
         name = dimension_name(adapter, annotation)
-        if name in LINEAR_REFERENCES:
+        if name in REFERENCE_DIMENSIONS:
             set_reference_dimension(adapter, annotation, label=name)
             found.add(name)
-    missing = set(LINEAR_REFERENCES) - found
+    missing = set(REFERENCE_DIMENSIONS) - found
     if missing:
-        raise RuntimeError(f"linear references never reached the sheet: {sorted(missing)}")
+        raise RuntimeError(f"references never reached the sheet: {sorted(missing)}")
 
 
 @_telemetry.traced("drawing.transgear_arm.dowel_group_frame")
@@ -612,9 +623,9 @@ def _one_frame_per_dowel_group(adapter: Any, frames: dict[str, Any]) -> None:
 
 
 def _set_stock_text(adapter: Any, annotations: list[Any]) -> None:
-    """Print the thickness as the stock's: "5/16 (.3125) GROUND STOCK REF".
+    """Print the thickness as the stock's: "3/8 (.3750) GROUND STOCK REF".
 
-    The arm is cut from 5/16 ground flat stock with its faces as supplied, so
+    The arm is cut from 3/8 ground flat stock with its faces as supplied, so
     the stock's tolerance governs the thickness, not the .XX row.  Prefix and
     suffix, not a whole-text override: the value between them stays the
     model's dimension at its model-owned places, and the parentheses mark it
@@ -914,7 +925,7 @@ def build(adapter: Any) -> dict[str, str]:
     # sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, ARM_SHEET_PRECISION)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
-    _reference_linear_dimensions(adapter, annotations)
+    _reference_dimensions(adapter, annotations)
     _set_stock_text(adapter, annotations)
     _end_radius_to_arc(adapter, annotations)
     offset_dimension_text(adapter, annotations, {"FloorDepth": FLOOR_TEXT_XY})

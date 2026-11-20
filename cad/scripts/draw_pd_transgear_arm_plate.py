@@ -459,26 +459,8 @@ PLAN_CALLOUTS_ABOVE = {
     "LocatorDia1": LOCATOR_COUNT_CALLOUT,
 }
 
-
-def two_lines_of_words(caption: str) -> str:
-    """The spec caption's words, in order, on two lines broken where the
-    longer line is shortest.
-
-    Rule 7 allows a callout at most two lines of words; the spec holds the
-    thickness callout and the thrust-face captions as three (machinist
-    review, run 20261112T153723793Z).  The wrap stays here until the next
-    change that re-keys the part moves it into the spec (#2657).
-    """
-    words = caption.split()
-    cut = min(
-        range(1, len(words)),
-        key=lambda i: max(len(" ".join(words[:i])), len(" ".join(words[i:]))),
-    )
-    return f"{' '.join(words[:cut])}\n{' '.join(words[cut:])}"
-
-
 SECTION_CALLOUTS = {
-    "ThicknessOverArm": two_lines_of_words(THICKNESS_CALLOUT),
+    "ThicknessOverArm": THICKNESS_CALLOUT,
     "HubFaceToMounting": HUB_STATION_CALLOUT,
     "HubToBoss": HUB_TO_BOSS_CALLOUT,
 }
@@ -605,9 +587,6 @@ DATUM_A_MODEL = (0.0, _SCREW_Y, -14.0)
 # run 20261112T165728270Z; that placement was main's).  The hub caption's
 # widest line (the second, 14 characters) ends short of the face.  Each
 # caption's xy is its top-left corner. Model points, mm.
-FACE_FINISH_CAPTIONS = {
-    key: two_lines_of_words(caption) for key, caption in FINISH_CAPTIONS.items()
-}
 _ModelPoint = tuple[float, float, float]
 
 
@@ -1056,7 +1035,7 @@ def build(adapter: Any) -> dict[str, str]:
             char_height=FINISH_CHAR_HEIGHT,
         )
         _add_note(
-            adapter, knob_section, FACE_FINISH_CAPTIONS[key],
+            adapter, knob_section, FINISH_CAPTIONS[key],
             _sheet_xy(adapter, knob_section, caption, f"{label} caption"),
             f"{label} caption",
         )

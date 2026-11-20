@@ -154,12 +154,12 @@ ALLOWED_PAIRS: Mapping[frozenset[str], float] = {
     # MHA-PD-VN-56 #8-32 x 5/8 (pd_vn_transgear_arm_plate_screw_spec; from the top of the
     # oval head's bevel, flush in the plate's countersink) through the 5.0038
     # plate's Ø5.7912 clearance, cut flush with the arm's front face (R9-44): the
-    # cut length 12.9413 - 5.0038 = the arm's 7.9375 in its #29 through tap.
+    # cut length 14.5288 - 5.0038 = the arm's 9.525 in its #29 through tap.
     **numbered_pairs(
         "pd-vn-transgear-arm-plate-screw",
         range(1, 3),
         "pd-transgear-arm",
-        smooth_annulus_limit_mm3(4.1656, 3.454, 12.9413 - 5.0038),
+        smooth_annulus_limit_mm3(4.1656, 3.454, 14.5288 - 5.0038),
     ),
     # MHA-PD-VN-57 (pd_vn_transgear_pivot_screw_spec, 90325A174 faced to fit) in the
     # support bar's THROUGH #8-32 tap: its fitted 9.144 thread less the 1.1938

@@ -700,7 +700,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 "pd-transgear-arm",
                 4.1656,
                 3.454,
-                7.9375,
+                9.525,
             ),
             # MHA-PD-VN-57 through the bar's through tap: the fitted 9.144 thread
             # less the 1.1938 neck flat.

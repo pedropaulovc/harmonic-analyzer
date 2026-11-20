@@ -461,9 +461,9 @@ PIVOT_SCREW_Z0 = BAR_BACK_Z + PIVOT_SCREW.SHOULDER_LEN  # under the head
 PIVOT_SPRING_Z0 = ARM_Z0 + ARM.SPOT_FACE_FLOOR_FROM_FRONT  # the spot-face floor
 # Arm plate (rows Rz(theta): local X along U): its mounting plane on
 # the arm's rear face; hub forward to the thrust ring, boss rearward.
-PLATE_Z0 = ARM_Z0 + ARM.THICKNESS  # -116.4625
+PLATE_Z0 = ARM_Z0 + ARM.THICKNESS  # -114.888
 PLATE_SCREW_XY = tuple(_on_arm(station) for station in ARM.PLATE_TAP_STATIONS)
-PLATE_SCREW_Z0 = PLATE_Z0 + ARM_PLATE.REAR_FACE_Z  # -111.4625: oval heads flush
+PLATE_SCREW_Z0 = PLATE_Z0 + ARM_PLATE.REAR_FACE_Z  # -109.884: oval heads flush
 LOCATING_PIN_XY = tuple(_on_arm(x, y) for x, y in ARM.LOCATOR_SITES_MM)
 # Dowels MHA-PD-VN-64 (Rx-90 rows: local +Y to -Z, into the arm). The origin
 # end is the PROUD end, 1.70 into the plate, so the 6.0 body runs 4.30 into
@@ -499,7 +499,7 @@ def _latch_pin_placed_proud() -> float:
 # at assembly (owner ruling 2026-11-01, #2124): the model carries every
 # printed length at its nominal and the nominal cluster's shim count
 # (transgear_cluster_fit), the cluster rearward with its float open at the ring.
-PIN_Z0 = PIN.HEAD_SEAT_MACHINE_Z  # -116.4625: the head's underside (Ry180)
+PIN_Z0 = PIN.HEAD_SEAT_MACHINE_Z  # -114.888: the head's underside (Ry180)
 # Rx-90 puts each shim's local +Y forward (-Z): shim i's arm-side face at z0.
 CLUSTER_SHIM_Z0S = tuple(
     ARM_Z0 - i * CLUSTER_SHIM.THICKNESS for i in range(CLUSTER.SHIM_COUNT_MODEL)

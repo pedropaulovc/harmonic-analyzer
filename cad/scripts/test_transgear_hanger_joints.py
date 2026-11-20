@@ -113,7 +113,8 @@ def test_arm_and_plate_weight_inputs_are_actual_cut_geometry() -> None:
         assert len(source["centre_of_mass_local_mm"]) == 3
         assert all(math.isfinite(value) for value in source["centre_of_mass_local_mm"])
     # These are two parts, not a substituted scalar whole-hanger certificate.
-    assert arm.nominal_material_properties()["mass_kg"] < 0.2
+    # The 3/8 arm (#2019) weighs about 0.20 kg.
+    assert arm.nominal_material_properties()["mass_kg"] < 0.25
     assert plate.nominal_material_properties()["mass_kg"] < 0.2
 
 
@@ -239,8 +240,9 @@ def test_cut_plate_screws_hold_one_and_a_half_d_in_the_thinnest_arm(
     assert screw.LENGTH == pytest.approx(plate.THICKNESS_OVER_ARM + arm.THICKNESS)
     assert joints.PLATE_SCREW_TIP_INSIDE_NOMINAL == pytest.approx(0.0, abs=1e-9)
     assert joints.PLATE_SCREW_TIP_PROUD_MAX == joints.PLATE_SCREW_CUT_PROUD_MAX
-    # A cut-end break past the arm's 1.5 D margin starves the joint.
-    monkeypatch.setattr(screw, "CUT_END_BREAK_MAX", 1.7)
+    # A cut-end break past the arm's 1.5 D margin starves the joint (the 3/8
+    # arm, #2019, leaves about 1.9 mm of margin).
+    monkeypatch.setattr(screw, "CUT_END_BREAK_MAX", 3.5)
     with pytest.raises(AssertionError, match="MHA-PD-VN-56 worst engagement"):
         _reload_joints()
 
@@ -364,16 +366,15 @@ def test_every_wall_holds_the_target_at_the_printed_worst_case(module) -> None:
         assert worst >= getattr(module, "WALL_FLOORS", {}).get(name, target), name
 
 
-def test_the_latch_pin_ligament_is_the_arm_s_one_tracked_shortfall() -> None:
-    # Owner ruling 2026-10-27 (#1379, tracked in #2019): the full-budget
-    # ligament, at the .XXX height reach (coordinator ruling (a)), stays under
-    # the .080 target until the next stock size up.
-    assert arm.WALL_FLOORS == {"pin hole to faces": arm.LATCH_PIN_WALL_FLOOR}
+def test_the_latch_pin_ligament_holds_the_target_on_the_three_eighths_bar() -> None:
+    # Owner ruling 2026-10-27 (#1379): the next stock size up, 3/8 (#2019).
+    # The full-budget ligament, at the .XXX height reach (coordinator ruling
+    # (a)) and the run-off over the .38 MIN hole to its drill point (#3124),
+    # clears the .080 target the 5/16 bar missed.
+    assert not hasattr(arm, "WALL_FLOORS")
     worst = arm.WALLS["pin hole to faces"][1]
-    assert arm.LATCH_PIN_WALL_FLOOR == pytest.approx(0.060 * 25.4)
-    assert arm.LATCH_PIN_WALL_FLOOR <= worst < arm.WALL_TARGET
-    # #3124: run-off charged over the .38 MIN hole to its drill point.
-    assert worst == pytest.approx(1.6653, abs=1e-4)
+    assert worst >= arm.WALL_TARGET
+    assert worst == pytest.approx(2.4527, abs=1e-4)
 
 
 def test_spacer_wall_holds_the_target_with_both_rim_breaks() -> None:
