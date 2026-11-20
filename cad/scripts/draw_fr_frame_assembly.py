@@ -2214,7 +2214,12 @@ def _mark_deck_details(adapter: Any, exploded: Any) -> None:
 
 @_telemetry.traced("drawing.frame_deck_detail", label_param="label")
 def _place_deck_detail(
-    adapter: Any, detail: DeckDetail, items: dict[str, str], *, label: str
+    adapter: Any,
+    detail: DeckDetail,
+    items: dict[str, str],
+    step: Callable[[str], None],
+    *,
+    label: str,
 ) -> Any:
     """One enlarged, exploded base-deck cluster: placed with its exploded
     centre on its spot, isolated to its families, cropped to its circle and
@@ -2225,22 +2230,30 @@ def _place_deck_detail(
         ),
         "IView",
     )
+    step(f"{label}: view placement")
     set_high_quality_shaded_with_edges(adapter, view, label=label)
     _configure_view(adapter, view, exploded=True, label=label)
+    step(f"{label}: display and exploded configuration")
     centre = model_point_in_view(adapter, view, detail.model_centre_m, label=label)
     position = tuple(float(value) for value in view.Position)
     target = [position[axis] + detail.centre[axis] - centre[axis] for axis in range(2)]
     if not view.SetViewPosition(double_array(target), False):
         raise RuntimeError(f"failed to move {label} onto its spot")
+    step(f"{label}: SetViewPosition")
     adapter.currentModel.EditRebuild3()
+    step(f"{label}: position rebuild")
     centre = model_point_in_view(adapter, view, detail.model_centre_m, label=label)
     if max(abs(a - b) for a, b in zip(centre, detail.centre)) > _VIEW_POSITION_TOL_M:
         raise RuntimeError(f"{label} centre sits at {centre!r}, not {detail.centre!r}")
     view = isolate_drawing_view_components(adapter, view, visible_stems=frozenset(detail.stems), label=label)
+    step(f"{label}: component isolation")
     _sketch_view_circle(adapter, view, detail.centre, detail.radius_m, label=label)
+    step(f"{label}: crop circle")
     status = int(view.Crop2(False, False, 1))
+    step(f"{label}: Crop2")
     adapter.currentModel.ClearSelection2(True)
     adapter.currentModel.EditRebuild3()
+    step(f"{label}: crop rebuild")
     view.UpdateViewDisplayGeometry()
     cropped = bool(view.IsCropped())
     _telemetry.annotate(crop_status=status, cropped=cropped)
@@ -2252,6 +2265,7 @@ def _place_deck_detail(
     _add_note_block(
         adapter, detail.label_text(items), detail.label_xy, label=f"{label} label"
     )
+    step(f"{label}: label")
     return view
 
 
@@ -2397,10 +2411,11 @@ def _place_package(adapter: Any, step: Callable[[str], None]) -> Callable[[], No
     step("exploded-view balloons")
     # The enlarged deck details, lettered in the 1:8 view after its balloons.
     _mark_deck_details(adapter, exploded)
+    step("deck detail boundaries")
     _activate_sheet(adapter, SHEET_NAMES[1])
     items = dict(balloon_items)
     for detail in DECK_DETAILS:
-        _place_deck_detail(adapter, detail, items, label=f"frame {detail.title}")
+        _place_deck_detail(adapter, detail, items, step, label=f"frame {detail.title}")
         _activate_sheet(adapter, SHEET_NAMES[1])
     step("deck details")
 
