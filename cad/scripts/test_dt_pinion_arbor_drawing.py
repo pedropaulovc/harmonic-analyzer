@@ -217,9 +217,10 @@ def test_only_the_two_journal_lands_carry_the_running_band_and_finish() -> None:
     for key, (station_z, _symbol_xy, _flank) in drawing.JOURNAL_FINISHES.items():
         assert lands[key] < station_z < lands[key] + spec.JOURNAL_LEN
     # The journals' .0008 band is narrower than the turned row, so the
-    # callout names a running fit and flags note 1: the matched route (turn
-    # to the measured MHA-DT-14 bore) and the clearance the limits give.
-    assert drawing.JOURNAL_CALLOUT == "RUNNING FIT,\nSEE NOTE 1"
+    # callout flags note 1: the running fit, the matched route (turn to the
+    # measured MHA-DT-14 bore) and the clearance the limits give.  The fit is
+    # named once, in the note (machinist review of 2f918b81c8).
+    assert drawing.JOURNAL_CALLOUT == "SEE NOTE 1"
     # #1038 sheet decision: one 2X diameter on the back land sizes both lands; the
     # front land prints only its two stations.
     assert drawing.DIMENSION_CALLOUTS["BackJournalDia"] is drawing.JOURNAL_CALLOUT

@@ -115,12 +115,14 @@ def _inch(value_mm: float) -> str:
 # The journals' .0008-wide band is narrower than the turned row, so it names
 # its matched-fit route (coordinator policy 1): running in the MHA-DT-14
 # REAM_SLIDE bore, turned to the measured bore, the clearance its limits and
-# the bore's give.
+# the bore's give.  The fit's name is in note 1 only: machinist review of
+# 2f918b81c8 (3 of 3 runs, over-specification) read RUNNING FIT on the
+# callout and again in the note it links as the fit stated twice.
 JOURNAL_CLEARANCE = (
     STRAP_BORE + REAM_SLIDE[1] - (SHAFT_DIA + JOURNAL_DIA_BAND[0]),
     STRAP_BORE + REAM_SLIDE[0] - (SHAFT_DIA + JOURNAL_DIA_BAND[1]),
 )
-JOURNAL_CALLOUT = "RUNNING FIT,\nSEE NOTE 1"
+JOURNAL_CALLOUT = "SEE NOTE 1"
 # Every Ø5/16 span's size is on the view (round 3 of fan-out dt-fab-3).  The
 # drum's two bond lands either side of the relief (#2360; the drum, 2.40-8.04
 # from the head rear face, rests on both journals' inner ends:
