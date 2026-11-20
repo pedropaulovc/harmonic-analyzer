@@ -130,7 +130,7 @@ metric grades until their package is converted.
 - The name field is labelled `PART` on every sheet, assembly sheets included:
   it is part of the shared sheet format, and on an assembly it holds the
   assembly's name beside its `-00` drawing number. Do not ask for it to read
-  `ASSEMBLY` (owner ruling 2026-11-20, #1425).
+  `ASSEMBLY`.
 
 ### Rule 3 — Decimal places carry the tolerance
 
