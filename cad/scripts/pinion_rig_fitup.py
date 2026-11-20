@@ -132,8 +132,9 @@ RIG_SET_STEP = "\n".join(
 )
 TRANSFER_AFTER_RIG_SET = f"AFTER {RIG_SET_NAME};"
 # Rule 23 (#1176): the set screw is each cam's only drive and its torque
-# reverses every engage/park, so the tap mouth is staked over it, as the
-# channel's fulcrum set screws are (fulcrum-set-screws-staked). The tap sits
+# reverses every engage/park, so the tap mouth is staked over it (the
+# channel's fulcrum set screws are not: #2397, their shaft comes out to change
+# a channel part). The tap sits
 # 45 deg or more off the follower contact (test_dt_drive_train_support_layout),
 # so the stakes stay off the follower's track. "CAMS", the BOM's name (machinist
 # review of 82158b1bb).

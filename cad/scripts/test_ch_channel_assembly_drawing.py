@@ -205,8 +205,10 @@ def test_the_printed_step_heads_are_the_registry_in_order() -> None:
     assert steps.SEQUENCE == steps.ROCKER_SEQUENCE + steps.LEVER_SEQUENCE
     assert len(set(steps.SEQUENCE)) == len(steps.SEQUENCE)
     assert tuple(drawing.FITUP_TEXT) == steps.SEQUENCE
-    # The lever bank's steps all follow the rocker bank's.
-    assert steps.LEVER_SEQUENCE[0] == "keepers-on-frame"
+    # The lever bank's steps all follow the rocker bank's; the strap check
+    # (#2343) opens them, the rocker bank's columns being full.
+    assert steps.LEVER_SEQUENCE[0] == "straps-shake-in-forks"
+    assert steps.LEVER_SEQUENCE[len(steps.STRAP_SHAKE_REMEDY) + 1] == "keepers-on-frame"
     assert steps.SEQUENCE[-1] == "spring-bottom-loops-left"
 
 
@@ -223,6 +225,7 @@ def test_every_step_is_one_action_of_at_most_six_lines() -> None:
         "right-hub-return": "bare-shaft-through-ears",
         "bar-pin-return": "bars-straight",
         "bar-straightened-return": "bars-straight",
+        "strap-set-return": "straps-shake-in-forks",
     }
     for key, target in returns.items():
         assert steps.step_number(target) < steps.step_number(key)
@@ -238,6 +241,7 @@ def test_every_step_is_one_action_of_at_most_six_lines() -> None:
         ("end-hubs-clear", steps.LEFT_HUB_REMEDY + steps.RIGHT_HUB_REMEDY),
         ("bars-straight", ("bar-straightened", "bar-straightened-return")),
         ("bars-swing", steps.BAR_PIN_REMEDY),
+        ("straps-shake-in-forks", steps.STRAP_SHAKE_REMEDY),
     ):
         first = steps.SEQUENCE.index(check) + 1
         assert steps.SEQUENCE[first : first + len(block)] == block, check
@@ -437,44 +441,21 @@ def test_the_end_hub_leaf_is_the_least_worst_case_air_floored() -> None:
     )
 
 
-def test_each_stake_step_names_the_view_that_points_at_its_tap_mouth() -> None:
-    """Rule 23 (round 2 reviews): every stake is in a view. Each staking step
-    names the bank view whose pointer lands on a tap mouth and says where its
-    2 points go; the pointer text stands left of the steps column, above the
-    view's settings callout, inside the border."""
-    template = drawing._TEMPLATE
-    for key, view, pointers, keep, shaft in (
-        (
-            steps.PIVOT_SET_SCREWS_STAKED_KEY,
-            drawing.ROCKER_BANK,
-            drawing.ROCKER_POINTERS,
-            drawing.EAR_SPAN_KEEP,
-            "ch-pivot-shaft",
-        ),
-        (
-            steps.SET_SCREWS_STAKED_KEY,
-            drawing.LEVER_BANK,
-            drawing.LEVER_POINTERS,
-            drawing.LUG_KEEP,
-            "ch-fulcrum-shaft",
-        ),
-    ):
-        body = _step_body(key)
-        assert drawing.stake_points(shaft) in body
-        assert f"({view.title})" in body
-        ((text, (tx, ty), (px, py)),) = pointers
-        assert " ".join(text.split()) == (
-            f"STAKE EACH {_step_body(key).split('EACH ')[1].split(' TAP')[0]} TAP "
-            f"MOUTH AT {drawing.stake_points(shaft)}"
-        )
-        lines = text.splitlines()
-        assert tx + max(map(len, lines)) * NOTE_CHAR_WIDTH < drawing.STEPS_RIGHT_X - 0.003
-        assert ty < template.height_m - drawing.BORDER
-        (_, callout_y), = keep.values()
-        assert ty - len(lines) * NOTE_LINE_PITCH > callout_y + 2 * NOTE_LINE_PITCH
-        # The tip is on the right-hand (south) part, below its text.
-        assert tx < px < drawing.STEPS_RIGHT_X - 0.010
-        assert view.centre[1] < py < ty - len(lines) * NOTE_LINE_PITCH
+def test_the_shaft_set_screws_are_not_staked() -> None:
+    """Owner ruling 2026-11-20 (#2397, option 2): the pivot and fulcrum
+    shafts come out to change one channel part, so their set screws hold on
+    the shafts' flats unstaked; the retention table records the rulings."""
+    from _paths import CAD_ROOT
+
+    assert "STAKE" not in drawing.FITUP_STEPS
+    pointers = drawing.DETAIL_POINTERS + drawing.PLAN_POINTERS
+    assert not any("STAKE" in text for text, _, _ in pointers)
+    table = (CAD_ROOT / "docs" / "threaded-joint-retention.md").read_text(
+        encoding="utf-8"
+    )
+    for ruling in ("U-MHA-SH-VN-54-in-CH-08-no-lock", "U-MHA-CH-VN-55-no-lock"):
+        assert f"- `{ruling}` (`ch-channel/" in table
+        assert f"none; ruling `{ruling}`" in table
 
 
 def test_each_step_column_fits_its_field() -> None:
@@ -1026,12 +1007,12 @@ def test_the_explode_plan_moves_every_family_and_only_them() -> None:
     assert explode.FULCRUM_SHAFT in explode.EXPLODED_STEMS
 
 
-def test_the_fulcrum_keepers_are_set_by_dro_checked_and_staked() -> None:
+def test_the_fulcrum_keepers_are_set_by_dro_checked_and_screwed() -> None:
     """#2338: each keeper comes finished to its own print (no pair ream at
     assembly, no made-to-order reamer). The pair is set on the top frame by
     DRO with the shaft through both, screwed down, the shaft checked to slide
-    through both bores, and each set screw's tap mouth staked over it later
-    (drawing-guidelines.md rule 23)."""
+    through both bores, and each set screw driven onto its flat later,
+    unstaked (owner ruling 2026-11-20, #2397)."""
     import ch_fulcrum_keeper_spec as keeper
     from channel_frame_geom import LEVER_FULCRUM_XY
     from frame_column_stations import COLUMN_X
@@ -1039,7 +1020,7 @@ def test_the_fulcrum_keepers_are_set_by_dro_checked_and_staked() -> None:
     assert not hasattr(steps, "KEEPERS_PAIR_REAMED_KEY")
     for retired in ("keepers-clamped", "keeper-tops-finished", "keeper-taps-made"):
         assert retired not in steps.SEQUENCE
-    assert steps.LEVER_SEQUENCE[0] == "keepers-on-frame"
+    assert steps.LEVER_SEQUENCE[len(steps.STRAP_SHAKE_REMEDY) + 1] == "keepers-on-frame"
     order = [
         "keepers-on-frame",
         "fulcrum-shaft-through-keepers",
@@ -1054,7 +1035,6 @@ def test_the_fulcrum_keepers_are_set_by_dro_checked_and_staked() -> None:
         "lever-bank-slides",
         "fulcrum-flats-aligned",
         steps.FULCRUM_SET_SCREWS_DRIVEN_KEY,
-        steps.SET_SCREWS_STAKED_KEY,
         "fulcrum-shaft-held",
         steps.SPRINGS_HOOKED_KEY,
     ]
@@ -1242,15 +1222,14 @@ def test_the_finished_shaft_is_set_by_its_tip_before_the_screws() -> None:
 
 def test_the_set_screws_go_in_after_the_shaft_is_set() -> None:
     """User, 2026-10-10: one MHA-SH-VN-54 down each ear's tap onto the plain
-    shaft's flat, once the shaft is set; each tap mouth is then staked, a
-    step of its own, and the shaft checked held. The end hubs are accepted
-    clear of the ears before (machinist review, PR #1605)."""
+    shaft's flat, once the shaft is set, and the shaft checked held (unstaked:
+    owner ruling 2026-11-20, #2397). The end hubs are accepted clear of the
+    ears before (machinist review, PR #1605)."""
     set_screw = drawing.item(drawing.explode.BRACKET_SET_SCREW)
     order = [
         "end-hubs-clear",
         "shaft-set",
         "set-screws-driven",
-        steps.PIVOT_SET_SCREWS_STAKED_KEY,
         "pivot-shaft-held",
         "keepers-on-frame",
     ]
@@ -1260,9 +1239,7 @@ def test_the_set_screws_go_in_after_the_shaft_is_set() -> None:
     # Positive control: only these steps name the set screws.
     for other in steps.SEQUENCE:
         named = re.search(rf"\b{set_screw}\b", _step_body(other)) is not None
-        assert named == (
-            other in {"set-screws-driven", steps.PIVOT_SET_SCREWS_STAKED_KEY}
-        ), other
+        assert named == (other == "set-screws-driven"), other
 
 
 def test_the_set_screw_engagement_needs_no_declaration() -> None:
