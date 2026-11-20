@@ -315,26 +315,32 @@ def test_gear_data_block_is_the_tooth_system_and_nothing_else() -> None:
 
 def test_the_span_acceptance_is_booked_where_flat_anvils_seat() -> None:
     """Owner ruling 2026-11-20 (#2512 option 1): flat anvils across the face
-    seat on the thickest straight tooth, at the north face, so both printed
-    limits sit above the crossing station's by that tooth's extra thickness
-    times cos(alpha)."""
+    seat on the thickest straight tooth, at the north face, so the printed
+    limits are the crossing station's (the gated cutter corners) shifted by
+    that tooth's extra thickness times cos(alpha), rounded inward."""
     import dt_crank_drive_gear_straight_tooth as straight
 
     row = next(line for line in notes.GEAR_DATA.splitlines() if line.startswith("BASE TANGENT SPAN"))
-    low, high = (float(value) * spec.MM_PER_IN for value in row.partition(":  ")[2].split(" TO "))
-    assert (low, high) == pytest.approx(straight.FLAT_ANVIL_SPAN_LIMITS_MM, abs=1e-9)
+    printed = row.partition(":  ")[2]
+    assert printed == notes.accept_limits_text(straight.FLAT_ANVIL_SPAN_LIMITS_MM, 4)
+    low, high = (float(value) * spec.MM_PER_IN for value in printed.split(" TO "))
     # Independent first-order estimate (#2512): the north face's tooth space
     # sits s off its radial line, so the pitch circle meets it s^2/2R deeper,
     # where the normal gap is 2 tan(alpha) narrower per unit depth.
     alpha = math.radians(spec.CUTTER_PRESSURE_ANGLE_DEG)
     s = (spec.FACE_WIDTH - spec.TOOTH_SPACE_CROSSING) * math.tan(math.radians(spec.TOOTH_INCLINATION_DEG))
     estimate = 2.0 * math.tan(alpha) * s * s / spec.PITCH_DIA * math.cos(alpha)
-    assert straight.FLAT_ANVIL_SPAN_GROWTH_MM == pytest.approx(estimate, rel=0.1, abs=2e-4)
-    grid = 0.0001 * spec.MM_PER_IN
-    for printed, crossing in zip((low, high), spec.BASE_TANGENT_SPAN_LIMITS_MM):
-        assert printed - crossing == pytest.approx(straight.FLAT_ANVIL_SPAN_GROWTH_MM, abs=grid)
-    north_nominal = spec.BASE_TANGENT_SPAN_MM + straight.FLAT_ANVIL_SPAN_GROWTH_MM
-    assert low <= north_nominal <= high
+    growth = straight.FLAT_ANVIL_SPAN_GROWTH_MM
+    assert growth == pytest.approx(estimate, rel=0.1, abs=2e-4)
+    # A part accepted at the north face lies inside the crossing-station
+    # corners the mesh check gates (STOCK_PROFILE_CORNERS) ...
+    crossing_low, crossing_high = spec.BASE_TANGENT_SPAN_LIMITS_MM
+    assert crossing_low <= low - growth and high - growth <= crossing_high
+    for label, corner in spec.STOCK_PROFILE_CORNERS:
+        span = corner.tangent_span_mm(spec.BASE_TANGENT_SPAN_TEETH, normal_plane=True)
+        assert span == pytest.approx(crossing_low if "span lower" in label else crossing_high, abs=1e-9)
+    # ... and the modelled north face is accepted.
+    assert low <= spec.BASE_TANGENT_SPAN_MM + growth <= high
 
 
 @pytest.mark.parametrize("part_spec", (spec, pinion_spec))
@@ -363,9 +369,11 @@ def test_exact_stock_span_limits_book_printed_corners_on_the_inch_grid(part_spec
     )
     scale = 10**part_spec.BASE_TANGENT_SPAN_PLACES
     lower, upper = part_spec.BASE_TANGENT_SPAN_LIMITS_MM
-    # Both ends rounded UP onto the printed inch grid: the lower never admits
-    # a tooth thinner than the source allows, the upper keeps the nominal (the
-    # thickest source tooth) accepted (codjiflo review of a9b4ad8a9).
+    # Both ends rounded UP onto the inch grid: the lower never admits a tooth
+    # thinner than the source allows, the upper keeps the nominal (the
+    # thickest source tooth) accepted (codjiflo review of a9b4ad8a9).  The 16T
+    # prints these limits; the 64T prints them shifted to the north face
+    # (test_the_span_acceptance_is_booked_where_flat_anvils_seat).
     assert (lower, upper) == tuple(
         math.ceil(round(raw / part_spec.MM_PER_IN * scale, 6)) / scale * part_spec.MM_PER_IN
         for raw in (min(raw_spans), max(raw_spans))

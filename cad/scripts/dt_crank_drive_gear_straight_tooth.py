@@ -73,10 +73,13 @@ def straight_root_rise(station_mm: float) -> float:
 # is farthest from it), where each tooth is thicker on the pitch circle than
 # the screw model by straight_tooth_thickening(+FACE_WIDTH/2); a base tangent
 # span grows by a normal thickness change times cos(normal pressure angle).
-# The screw model's span at each end of the thickness band, plus that growth,
-# is rounded up onto the .0001 in grid the way the spec rounds the crossing
-# station's span (BASE_TANGENT_SPAN_LIMITS_MM): the lower end inward, the
-# upper end outward so the modelled north face stays inside.
+# The north-face limits are the crossing station's printed limits
+# (BASE_TANGENT_SPAN_LIMITS_MM, which set the cutter's translation corners the
+# mesh check gates) shifted by that growth, so a part inside them is inside
+# the gated corners.  The sheet prints them rounded inward onto the .0001 in
+# grid (dt_crank_drive_gear_notes.accept_limits_text); the modelled north face
+# (the spec's nominal span plus the growth) must stay inside, which the
+# drawing test checks at the printed precision.
 FLAT_ANVIL_STATION_MM = gear64.FACE_WIDTH / 2.0
 FLAT_ANVIL_SPAN_GROWTH_MM = straight_tooth_thickening(FLAT_ANVIL_STATION_MM) * math.cos(
     math.radians(gear64.CUTTER_PRESSURE_ANGLE_DEG)
@@ -87,18 +90,6 @@ if not FLAT_ANVIL_SPAN_GROWTH_MM >= max(
     for station in (-gear64.FACE_WIDTH / 2.0, 0.0)
 ):
     raise AssertionError("the 64T's north face is no longer its thickest section")
-_SPAN_SCALE = 10**gear64.BASE_TANGENT_SPAN_PLACES
-_SCREW_MODEL_SPANS_MM = tuple(
-    gear64.stock_profile(
-        tooth_thickness_mm=gear64.STANDARD_TRANSVERSE_TOOTH_THICKNESS + deviation
-    ).tangent_span_mm(gear64.BASE_TANGENT_SPAN_TEETH, normal_plane=True)
-    for deviation in gear64.TOOTH_THICKNESS_DEVIATIONS
-)
 FLAT_ANVIL_SPAN_LIMITS_MM = tuple(
-    math.ceil(
-        round((span + FLAT_ANVIL_SPAN_GROWTH_MM) / gear64.MM_PER_IN * _SPAN_SCALE, 6)
-    )
-    / _SPAN_SCALE
-    * gear64.MM_PER_IN
-    for span in (min(_SCREW_MODEL_SPANS_MM), max(_SCREW_MODEL_SPANS_MM))
+    limit + FLAT_ANVIL_SPAN_GROWTH_MM for limit in gear64.BASE_TANGENT_SPAN_LIMITS_MM
 )

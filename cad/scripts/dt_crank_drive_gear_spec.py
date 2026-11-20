@@ -235,14 +235,16 @@ BASE_TANGENT_SPAN_MM = _PITCH_PROBE.tangent_span_mm(
 )
 # Both ends rounded UP onto the .0001 in span grid: the lower end inward (a
 # part cut to it keeps the source's thinnest tooth), the upper end outward so
-# the modelled nominal -- the source's thickest tooth -- stays inside.  The
-# sheet prints the north-face span, rounded the same way (see above).
+# the modelled nominal -- the source's thickest tooth -- stays inside.  These
+# set the cutter's translation corners the mesh check gates; the sheet
+# prints them shifted to the north face (see above), rounded inward.
 BASE_TANGENT_SPAN_LIMITS_MM = tuple(
     math.ceil(round(span / MM_PER_IN * _SPAN_SCALE, 6)) / _SPAN_SCALE * MM_PER_IN
     for span in (min(_RAW_SPANS), max(_RAW_SPANS))
 )
-# The extra search bracket is numerical only; the printed span endpoints,
-# not this bracket, define the actual accepted tool-translation interval.
+# The extra search bracket is numerical only; the span limits above (the
+# printed north-face acceptance less its growth), not this bracket, define
+# the actual accepted tool-translation interval.
 _INVERSE_BRACKET = (
     min(_RAW_TRANSLATIONS) - NORMAL_MODULE_MM / 100.0,
     max(_RAW_TRANSLATIONS) + NORMAL_MODULE_MM / 100.0,

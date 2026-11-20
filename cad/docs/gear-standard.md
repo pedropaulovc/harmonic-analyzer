@@ -424,11 +424,18 @@ The pitch change from 49.82 to 48 scales every standard diameter by +3.79%.
   face. The tilt sense sets the hand
   ([machining-dfm.md](machining-dfm.md#crossed-crank-pair-normal-24dp-pa20)).
   The previous crank pair was also crossed, so the inclined setup is not
-  new. The printed tooth data, the error budget and the mid-face mesh check
-  are unchanged. Away from the station where the cutter crosses the axis a
-  straight tooth is thicker on the pitch circle than the helix was, by up to
-  0.011 mm at the north face; `crank_mesh_stack.station_checks` books it per
-  face station (#2481). Off the pitch circle its flanks also lean against the
+  new. The error budget and the mid-face mesh check are unchanged. Away from
+  the station where the cutter crosses the axis a straight tooth is thicker
+  on the pitch circle than the helix was, by up to 0.011 mm at the north
+  face; `crank_mesh_stack.station_checks` books it per face station (#2481).
+  Flat anvils across the face seat on that thickest section, so the 64T
+  sheet prints its base tangent span acceptance there: the crossing
+  station's span limits (the cutter corners the mesh check gates) plus the
+  north-face growth, rounded inward onto the .0001 in grid, which keeps a
+  part accepted at the north face inside the gated corners
+  (`dt_crank_drive_gear_straight_tooth.FLAT_ANVIL_SPAN_LIMITS_MM`; owner
+  ruling 2026-11-20, [#2512](https://github.com/pedropaulovc/harmonic-analyzer/issues/2512)
+  option 1). Off the pitch circle its flanks also lean against the
   helix's, one way at the tip and the other at the root; with drive and coast
   contact at different radii that takes 0.014 mm more backlash at the south
   face and 0.033 mm at the north face in the plane model. `station_checks`
