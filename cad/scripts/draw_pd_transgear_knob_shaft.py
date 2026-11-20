@@ -342,8 +342,10 @@ SIDE_KEEP: dict[str, tuple[float, float]] = {
     "CoreDia": ((F_X + CORE_END_X) / 2.0, _DIA_ROW_Y[2]),
     # Run 12: from the relief's mid the hung text's shoulder started left of
     # F's witness line (214.4) and ran through the front-neck frame. Four
-    # fifths along the relief it starts right of F, above that frame.
-    "ReliefDia": ((CORE_END_X + 4.0 * THREAD_END_X) / 5.0, _DIA_ROW_Y[3]),
+    # fifths along the relief it started right of F, above that frame;
+    # #2425's shorter journal re-centred the view, so it now stands 19/20
+    # along, its text's left end right of detail B's core frame.
+    "ReliefDia": ((CORE_END_X + 19.0 * THREAD_END_X) / 20.0, _DIA_ROW_Y[3]),
     # A Ø's line stands at its point; right of the view's centre the text
     # hangs LEFT of it (the pinion's and core's, run 20261001T085006647Z), and
     # the blank's banded text and shoulder run 27.5 mm (19e33c6c2: from the
@@ -565,7 +567,7 @@ _DETAIL_FOCUS_M = (0.0, DETAIL_FOCUS_MM[1] / 1000.0, DETAIL_FOCUS_MM[0] / 1000.0
 DETAIL_RADIUS_MM = 2.7
 DETAIL_CROP_RADIUS = DETAIL_RADIUS_MM * _DS / 1000.0
 # Upper left, over the journal: x 0.078-0.132 clears the end view (x <=
-# 0.064) and the journal Ø's witness line (x 0.1364);
+# 0.064) and the journal Ø's witness line (x 0.1348);
 # y 0.1945-0.2485 stands over the journal Ø's text (top 0.193) and leaves the
 # frame row under the border (0.2667).  1.5 mm lower than run
 # 20261101T111116817Z, where the neck Ø's upper limit touched the border.
@@ -610,12 +612,13 @@ NECK_RUNOUT_FRAME = (NECK_RUNOUT_LANDING[0] + _FRAME_SHOULDER, _DETAIL_TOP + 0.0
 # round top 0.8 behind F, inside the crop (2.60 from the focus), right of
 # the neck Ø's line, and stands right of the crop a row under the neck
 # frame's (1.2 mm between the boxes), its box left of the relief's mate
-# callout (x >= 169.8 mm) and its shoulder on the box's left, so the leader
-# descends 5.25 mm over 18.2 mm into the crop, under the neck frame's box.
+# callout (x >= 166.5 mm since #2425's shorter journal re-centred the side
+# view) and its shoulder on the box's left, so the leader descends 5.25 mm
+# over 15.3 mm into the crop, under the neck frame's box.
 CORE_LANDING_Z_MM = -0.8
 CORE_RUNOUT_LANDING = _detail_xy(CORE_LANDING_Z_MM, CORE_DIA / 2.0)
 CORE_RUNOUT_FRAME = (
-    CORE_RUNOUT_LANDING[0] + _FRAME_SHOULDER + 0.0182,
+    CORE_RUNOUT_LANDING[0] + _FRAME_SHOULDER + 0.0153,
     _DETAIL_TOP + 0.007,
 )
 DETAIL_KEEP: dict[str, tuple[float, float]] = {

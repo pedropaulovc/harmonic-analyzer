@@ -87,6 +87,7 @@ IN_SERVICE_CLEARANCES = frozenset(
 )
 _LENGTHS = (
     FIT.PH,
+    FIT.PS,
     FIT.TR,
     FIT.FW,
     FIT.GS,

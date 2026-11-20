@@ -70,7 +70,8 @@ PILOT_DEPTH = 3.8608  # .152 as turned (SUPPLY)
 # The web's #33 drill and the rear pocket the screw head sinks in, cut flat
 # with a 3/16 end mill after the drill (a clearance pocket, .XXX row).
 CLEAR_HOLE_DIA = 2.8702  # #33, .113
-CBORE_DIA = 4.7625  # .188
+# Modelled on the printed .001 grid (the 3/16 cutter's .1875 lies in its band).
+CBORE_DIA = 4.7752  # .188
 CBORE_DEPTH = 2.7432  # .108
 
 # Places each printed dimension carries (drawing-guidelines.md rule 3): the

@@ -689,7 +689,7 @@ def test_view_k_frames_the_chain_with_its_settings_outside_the_crop() -> None:
     # The legend names each lettered circle by its part number.
     for letter, stem in (
         ("S", "pd-transgear-arm"),
-        (drawing.KNOB_BORE_LETTER, "pd-transgear-arm-plate"),
+        (drawing.KNOB_BORE_LETTER, "pd-transgear-knob-bush"),
         ("T", "pd-vn-transgear-arm-plate-screw"),
     ):
         assert f"{letter}: {_number(stem)} " in drawing.KNOB_SETTING_CAPTION

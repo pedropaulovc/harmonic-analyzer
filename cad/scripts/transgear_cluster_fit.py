@@ -75,12 +75,11 @@ REAR_BUSHING_LENGTH = 5.4356  # .214
 
 # --- the stack's terms: (label, nominal, band) ------------------------------------
 # The MHA-PD-28 bush's hub face, HUB_LENGTH forward of its shoulder on face A
-# (#2425); a full press leaves the shoulder at most SHOULDER_SEAT_GAP_MAX off.
-PH = (
-    "MHA-PD-28 hub face station",
-    BUSH.HUB_LENGTH,
-    BUSH.HUB_LENGTH_BAND + BUSH.SHOULDER_SEAT_GAP_MAX,
-)
+# (#2425), at its printed band; a full press leaves the shoulder at most
+# SHOULDER_SEAT_GAP_MAX off face A, its own term (the press acceptance, not a
+# printed length).
+PH = ("MHA-PD-28 hub face station", BUSH.HUB_LENGTH, BUSH.HUB_LENGTH_BAND)
+PS = ("MHA-PD-28 shoulder seat", 0.0, BUSH.SHOULDER_SEAT_GAP_MAX)
 TR = ("MHA-PD-15 thrust ring length", KNOB_RING.LENGTH, KNOB_RING.LENGTH_TOL)
 FW = ("MHA-PD-08 15T face width", KNOB_SHAFT.FACE_WIDTH, KNOB_SHAFT.FACE_WIDTH_BAND)
 GS = ("MHA-PD-23 groove station", PIN.GROOVE_STATION, PIN.GROOVE_STATION_BAND)
@@ -104,7 +103,7 @@ def _spread(chain: tuple[tuple[Term, int], ...]) -> float:
     return round(sum(term[2] for term, _ in chain), 6)
 
 
-F_CHAIN = ((PH, 1), (TR, 1), (FW, 1))
+F_CHAIN = ((PH, 1), (PS, 1), (TR, 1), (FW, 1))
 F_FROM_ARM_REAR = _nominal(F_CHAIN)  # 33.2232
 F_BAND = _spread(F_CHAIN)
 # F to the disc's front face, cluster, hub and disc forward (knob rearward):
