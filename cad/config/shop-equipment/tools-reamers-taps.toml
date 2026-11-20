@@ -394,7 +394,7 @@ note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-PD-19 2X Ø.0945 
 [tools.reamer-1280]
 kind = "reamer"
 status = "to_order"
-note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-SM-02 Ø.1280 ±.0007 REAM (.37) FLAT BOTTOM."
+note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-SM-02 Ø.1280 ±.0007 REAM (.37), ending in a drill point (#3124)."
 
 [tools.reamer-1562]
 kind = "reamer"

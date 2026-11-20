@@ -49,6 +49,7 @@ from _mcmaster_98381a473 import (
 )
 from _package_units import drawing_unit
 from _fit_ream_h7 import REAM_H7
+from _hole_spec import DRILL_POINT_H
 from _printed_tolerance import printed_band_mm
 from _supplier_pin_data import SupplierPinReference
 
@@ -132,15 +133,15 @@ HANGER_OFFSET_TOL = _XXX  # 0.127
 # ring), so the knockout stays.
 PRESS_DEPTH = 12.7  # .50 MIN, full diameter
 PRESS_DEPTH_PLACES = 2
-# The drill point below the full-diameter depth, modelled on the ream size.
-PRESS_POINT_DEG = 118.0
 # The ream's explicit band, printed at four places: its mate and press are
 # the callout's (rule 4), the MHA-PD-18 latch-pin precedent.  The owned
 # .1240 chucking reamer (cad/process/shop/inventory.toml) at REAM_H7.
 PRESS_HOLE_DIA = 3.1496  # .1240
 PRESS_HOLE_DIA_BAND = REAM_H7  # (upper, lower): +.0005/0
 PRESS_HOLE_DIA_PLACES = 4
-PRESS_POINT_H = PRESS_HOLE_DIA / 2.0 / math.tan(math.radians(PRESS_POINT_DEG / 2.0))
+# The 118° drill point past the full-diameter depth, modelled on the ream
+# size (_hole_spec's tip-height ratio, which every drill point shares).
+PRESS_POINT_H = PRESS_HOLE_DIA / 2.0 * DRILL_POINT_H
 # (loosest, tightest) press from the ream band and the catalogue band:
 # 0.01524..0.03302, printed rounded outward to four places.
 PRESS_INTERFERENCE = (

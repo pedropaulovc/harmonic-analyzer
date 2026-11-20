@@ -3679,7 +3679,9 @@ def test_knockouts_land_the_punch_and_keep_their_walls() -> None:
         / 2.0
         / math.tan(math.radians(59.0))
     )
-    assert spec.HANGER_PIN_HOLE_POINT_DEG == 118.0
+    assert spec.HANGER_PIN_HOLE_POINT_H == pytest.approx(
+        spec.HANGER_PIN_HOLE_DIA / 2.0 / math.tan(math.radians(59.0)), abs=1e-5
+    )
     # Codjiflo round 6: the ~14 D knockout takes a taper-length #51 (2 in
     # flute, MSC 63725519) reaching the top from the underside, and the
     # punch reaches from the faced top through the knockout and the ream
@@ -3828,11 +3830,16 @@ def test_hanger_walls_meet_the_target_after_drift() -> None:
         assert wall >= 2.032, label
     assert part.PIN_HOLE_BAR_WALL == pytest.approx(2.545071, abs=5e-6)
     assert part.PIN_HOLE_SCREW_WALL == pytest.approx(2.404092, abs=5e-6)
+    # The band's upper deviation is the deepest ream whose drill point keeps
+    # the wall target under the faced top: a THRU ream is out of band.
+    depth_max = spec.HANGER_PIN_HOLE_DEPTH + max(spec.HANGER_PIN_HOLE_DEPTH_BAND)
+    assert spec.HANGER_PIN_HOLE_DEPTH_MAX == pytest.approx(depth_max)
     assert part.PIN_HOLE_POINT_MARGIN == pytest.approx(
-        spec.HANGER_GRIP - spec.HANGER_GRIP_TOL - spec.HANGER_PIN_HOLE_DEPTH
+        spec.HANGER_GRIP - spec.HANGER_GRIP_TOL - depth_max
         - spec.HANGER_PIN_HOLE_POINT_H
     )
-    assert part.PIN_HOLE_POINT_MARGIN == pytest.approx(22.726565, abs=5e-6)
+    assert 2.032 <= part.PIN_HOLE_POINT_MARGIN < 2.032 + 1e-5
+    assert depth_max + spec.HANGER_PIN_HOLE_POINT_H < spec.HANGER_GRIP - spec.HANGER_GRIP_TOL
     # Entry wander at the deepest pocket roof and the finished top.  Every
     # ream sits across the line at its implied-zero .XXX off the screw axis.
     # The nearer station (the rear one since #1038 moved the front one .25

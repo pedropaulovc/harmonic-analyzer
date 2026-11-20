@@ -85,11 +85,13 @@ from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from _hole_spec import (
     CLEARANCE_MM,
+    DRILL_POINT_H,
     THREAD_MAJOR_MM,
     HoleSpec,
     blind_cut_dia_mm,
     drill_process,
 )
+from _inch_wall_limits import WALL_TARGET_MM
 from _mcmaster_91410a540 import SHANK_LEN as SET_SCREW_LENGTH
 from _surface_finish import SEAT_UM, SurfaceFinishControl, ra
 from _cone_axis_constants import (
@@ -384,16 +386,31 @@ HANGER_PIN_HOLE_DIA_MIN = HANGER_PIN_HOLE_DIA + min(HANGER_PIN_HOLE_DIA_BAND)
 HANGER_PIN_HOLE_DIA_MAX = HANGER_PIN_HOLE_DIA + max(HANGER_PIN_HOLE_DIA_BAND)
 HANGER_PIN_HOLE_DEPTH = KNIFE_DOWEL.PRESS_DEPTH  # 12.7 MIN full diameter
 HANGER_PIN_HOLE_DEPTH_PLACES = KNIFE_DOWEL.PRESS_DEPTH_PLACES
+HANGER_PIN_HOLE_POINT_H = KNIFE_DOWEL.PRESS_POINT_H  # 0.946 on the ream size
 # A single MIN limit (owner decision 2026-11-19, #3124 item 3): the model
-# value is the printed minimum.  Open above, its physical bound is the faced
-# top at the grip's far limit, the reach the ream walls charge their drift
-# over (``build_fr_top_frame.HANGER_REAM_DRIFT_MAX``): (23.927, 0).
+# value is the printed minimum.  swTolMIN prints only that value and MIN, so
+# the native record's upper deviation is the deepest ream whose drill point
+# still stops the wall target (.080) below the faced top at the grip's near
+# limit: a THRU ream, which would exit under the MHA-SM-VN-54 washer's rim
+# (sm_vn_knife_mount_dowel_spec), is out of band.  The MHA-PD-18 latch-pin
+# precedent (#3127); build_fr_top_frame.PIN_HOLE_POINT_MARGIN proves it at
+# the band's maximum: (20.694, 0).
+HANGER_PIN_HOLE_POINT_COVER_MIN = WALL_TARGET_MM
 HANGER_PIN_HOLE_DEPTH_BAND = (
-    round(HANGER_GRIP + HANGER_GRIP_TOL - HANGER_PIN_HOLE_DEPTH, 6),
+    int(
+        (
+            HANGER_GRIP
+            - HANGER_GRIP_TOL
+            - HANGER_PIN_HOLE_POINT_COVER_MIN
+            - HANGER_PIN_HOLE_POINT_H
+            - HANGER_PIN_HOLE_DEPTH
+        )
+        * 1e6
+    )
+    / 1e6,
     0.0,
 )
-HANGER_PIN_HOLE_POINT_DEG = KNIFE_DOWEL.PRESS_POINT_DEG
-HANGER_PIN_HOLE_POINT_H = KNIFE_DOWEL.PRESS_POINT_H  # 0.946 on the ream size
+HANGER_PIN_HOLE_DEPTH_MAX = HANGER_PIN_HOLE_DEPTH + max(HANGER_PIN_HOLE_DEPTH_BAND)
 # Each ream stands .XXX HANGER_PIN_X from its own screw axis along the dowel
 # line (F-F), at the screw's own Z (an implied zero across the line, the
 # same .XXX).  Owner ruling 2026-11-08 (Pedro), #2144 item 11.3: with the
@@ -500,9 +517,9 @@ HANGER_KNOCKOUT_LENGTH_MAX = HANGER_GRIP + HANGER_GRIP_TOL - HANGER_PIN_HOLE_DEP
 # underside: the cone narrows to the knockout's radius this far past the
 # full diameter.  The model's knockout circle stands there (the underside
 # locator picks it for the knockout callout).
-HANGER_KNOCKOUT_ENTRY_DEPTH = HANGER_PIN_HOLE_DEPTH + (
-    HANGER_PIN_HOLE_DIA - HANGER_KNOCKOUT_DIA
-) / 2.0 / tan(radians(HANGER_PIN_HOLE_POINT_DEG / 2.0))  # 13.135
+HANGER_KNOCKOUT_ENTRY_DEPTH = (
+    HANGER_PIN_HOLE_DEPTH + (HANGER_PIN_HOLE_DIA - HANGER_KNOCKOUT_DIA) / 2.0 * DRILL_POINT_H
+)  # 13.135
 # Making it (codjiflo round 6): the #51 reaches its top through the ream's
 # air, from the underside to the faced top at the grip's far limit, 36.63,
 # its cut a ~14 D run from the shallowest ream; a jobber #51 (3/4 in

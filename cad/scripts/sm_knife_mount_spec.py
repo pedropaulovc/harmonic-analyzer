@@ -55,7 +55,7 @@ import _config
 import sm_vn_knife_mount_dowel_spec as DOWEL
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
-from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM, HoleSpec
+from _hole_spec import DRILL_POINT_H, TAP_DRILL_MM, THREAD_MAJOR_MM, HoleSpec
 from _inch_wall_limits import WALL_TARGET_MM
 from _package_units import drawing_unit
 from _printed_tolerance import (
@@ -470,9 +470,9 @@ PIN_HOLE_DIA_BAND = DOWEL.SLIP_HOLE_DIA_BAND
 PIN_HOLE_DIA_PLACES = DOWEL.SLIP_HOLE_DIA_PLACES
 PIN_HOLE_DEPTH = DOWEL.SLIP_DEPTH  # 9.398 (.37), the full diameter's depth
 PIN_HOLE_DEPTH_PLACES = DOWEL.SLIP_DEPTH_PLACES
-PIN_HOLE_POINT_DEG = 118.0
-# The model's cone under the nominal hole.
-PIN_HOLE_POINT_H = PIN_HOLE_DIA / 2.0 / math.tan(math.radians(PIN_HOLE_POINT_DEG / 2.0))
+# The model's 118° drill point under the nominal hole (_hole_spec's tip-height
+# ratio, which every drill point shares).
+PIN_HOLE_POINT_H = PIN_HOLE_DIA / 2.0 * DRILL_POINT_H
 DOWEL_NUMBER = "MHA-SM-VN-53"
 
 # --- Locations and worst-case webs ------------------------------------------

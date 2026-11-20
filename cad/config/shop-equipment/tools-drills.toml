@@ -284,7 +284,7 @@ note = "#35 is a member of the owned 115-piece index (owner 2026-11-19: index pr
 [tools.drill-51-taper-length]
 kind = "drill"
 status = "to_order"
-note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-FR-02 #51 DRILL 2X Ø.067 THRU FROM REAM FLOOR. fr_top_frame_spec.py: a jobber #51 falls short; Cleveland HSS taper length, MSC 63725519."
+note = "Not owned: to buy. drawing cross-check 2026-11-19: MHA-FR-02 #51 DRILL 2X Ø.067 THRU FROM REAM POINT. fr_top_frame_spec.py: a jobber #51 falls short; Cleveland HSS taper length, MSC 63725519."
 
 [tools.drill-30-cobalt]
 kind = "drill"

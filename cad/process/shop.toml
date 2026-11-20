@@ -1016,7 +1016,7 @@ diameter_mm = 3.2639
 [tools.drill-35]  # MHA-PD-27 4X ⌴ Ø.110 ↧ .469 counterbore
 description = "#35 (.1100 in) drill, 115-piece index"
 diameter_mm = 2.794
-[tools.drill-51-taper-length]  # MHA-FR-02 #51 DRILL 2X Ø.067 THRU FROM REAM FLOOR
+[tools.drill-51-taper-length]  # MHA-FR-02 #51 DRILL 2X Ø.067 THRU FROM REAM POINT
 description = "#51 (.0670 in) taper-length HSS drill, 2 in flute, 3-3/4 in overall (MSC 63725519)"
 diameter_mm = 1.7018
 [tools.dt-cone-gear-cutting-arbor]  # MHA-DT-03 TOOTH CUTTING SETUP .002 TIR TO FINISHED BORE
@@ -1094,7 +1094,7 @@ diameter_mm = 2.3622
 [tools.reamer-0945]  # MHA-PD-19 2X Ø.0945 +.0005/.0000 REAM THRU
 description = ".0945 in HSS chucking reamer"
 diameter_mm = 2.4003
-[tools.reamer-1280]  # MHA-SM-02 Ø.1280 ±.0007 REAM (.37) FLAT BOTTOM
+[tools.reamer-1280]  # MHA-SM-02 Ø.1280 ±.0007 REAM (.37), drill point
 description = ".1280 in HSS chucking reamer"
 diameter_mm = 3.2512
 [tools.reamer-1562]  # MHA-DT-31 (Ø.156) REAM .17 at assembly with MHA-DT-06; MHA-DT-06 (Ø.156) REAM .17 for dowel MHA-DT-VN-59

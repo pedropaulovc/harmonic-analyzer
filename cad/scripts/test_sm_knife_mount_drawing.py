@@ -118,7 +118,6 @@ def test_dowel_hole_depth_is_dimensioned_on_the_section_not_a_hidden_edge() -> N
     assert drawing.PIN_HOLE_CALLOUT.splitlines()[0] == "REAM <HOLE-DEPTH> (.37)"
     assert "FLAT BOTTOM" not in drawing.PIN_HOLE_CALLOUT
     assert not hasattr(sm_knife_mount_spec, "DOWEL_HOLE_FLOOR_CORNER_R_MAX")
-    assert sm_knife_mount_spec.PIN_HOLE_POINT_DEG == 118.0
     assert sm_knife_mount_spec.PIN_HOLE_POINT_H == pytest.approx(0.97676, abs=1e-5)
     assert sm_knife_mount_spec.PIN_HOLE_BORE_WEB == pytest.approx(6.3084, abs=1e-4)
     assert sm_knife_mount_spec.PIN_HOLE_BORE_WEB >= sm_knife_mount_spec.STUD_TAP_WEB_MIN

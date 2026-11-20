@@ -172,6 +172,7 @@ from _drafted_extrude import (
     name_feature_dimensions,
     set_draft_angle_tolerance,
 )
+from _drill_point_cut import cut_drill_point, drill_point_volume
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
 from _part_properties import part_drawing_unit
@@ -181,11 +182,9 @@ from _session import run_build
 from _sketch import (
     SketchDims,
     add_line_chain,
-    anchor_point_to_origin,
     anchor_point_to_point,
     dimension_between,
     ensure_fully_defined,
-    set_sketch_direct_db,
 )
 from _single_limit_tolerance import SW_TOL_MIN, set_single_limit
 from _sketch_chains import define_polygon_chain, define_rectilinear_chain
@@ -277,6 +276,7 @@ from fr_top_frame_spec import (
     HANGER_KNOCKOUT_SPEC,
     HANGER_PIN_HOLE_DEPTH,
     HANGER_PIN_HOLE_DEPTH_BAND,
+    HANGER_PIN_HOLE_DEPTH_MAX,
     HANGER_PIN_HOLE_POINT_H,
     HANGER_PIN_HOLE_DIA,
     HANGER_PIN_HOLE_DIA_BAND,
@@ -990,9 +990,12 @@ PIN_HOLE_SCREW_WALL = (
 PIN_HOLE_MOUTH_BAR_WALL = (
     _REAM_BAR_FACE_REACH - _PIN_HOLE_MAX_R - TITLE_BLOCK_EDGE_BREAK_MAX
 )  # 2.483
+# The deepest in-band ream's drill point (HANGER_PIN_HOLE_DEPTH_BAND's upper
+# deviation, which excludes a THRU ream) below the finished top at the
+# grip's near limit.
 PIN_HOLE_POINT_MARGIN = (
-    HANGER_GRIP - HANGER_GRIP_TOL - HANGER_PIN_HOLE_DEPTH - HANGER_PIN_HOLE_POINT_H
-)  # 22.73
+    HANGER_GRIP - HANGER_GRIP_TOL - HANGER_PIN_HOLE_DEPTH_MAX - HANGER_PIN_HOLE_POINT_H
+)  # 2.032
 for _label, _value in (
     ("ream wall to the crossbar side face", PIN_HOLE_BAR_WALL),
     ("ream mouth wall inside the crossbar side's edge break", PIN_HOLE_MOUTH_BAR_WALL),
@@ -2940,13 +2943,13 @@ def _cut_ream_drill_points(
 
     Owner decision 2026-11-19 (#3124, item 3): drilled and reamed to a drill
     point, its full diameter HangerPinHoleDepth a MIN.  One revolve cut per
-    station, its profile the point's half-section (floor centre, ream wall,
-    tip) on a Front-plane offset through the ream's axis, revolved about that
-    axis.  An offset plane's sketch axes are SolidWorks' choice, so the
-    corners map through ``_model_to_sketch``; sketch u must run along model
-    X and v along Y.  Returns the volume the cones remove.
+    station (``_drill_point_cut``), its profile the point's half-section on a
+    Front-plane offset through the ream's axis.  An offset plane's sketch
+    axes are SolidWorks' choice, so the corners map through
+    ``_model_to_sketch``; sketch u must run along model X and v along Y.
+    Returns the volume the cones remove.
     """
-    from solidworks_mcp.adapters.base import CreatePlaneParameters, RevolveParameters
+    from solidworks_mcp.adapters.base import CreatePlaneParameters
 
     r = HANGER_PIN_HOLE_DIA / 2.0
     floor_y = -HALF_H + HANGER_PIN_HOLE_DEPTH
@@ -2973,44 +2976,17 @@ def _cut_ream_drill_points(
         (au, av, _), (bu, bv, _), (cu, cv, _) = corners
         if abs(bv - av) > 1e-6 or abs(cu - au) > 1e-6 or abs(abs(bu - au) - r) > 1e-6:
             raise RuntimeError(f"{label}: sketch axes are not along X/Y {corners}")
-        set_sketch_direct_db(adapter, True)
-        axis = check(
-            f"{label} axis", adapter.add_centerline(cu, cv, cu, cv + (cv - av))
+        cut_drill_point(
+            adapter,
+            label=label,
+            floor_centre=(au, av),
+            radius=r,
+            wall_sign=1 if bu > au else -1,
+            tip_sign=1 if cv > av else -1,
+            profile_name=f"HangerPinPoint{station}Profile",
+            feature_name=f"HangerPinPoint{station}",
         )
-        floor, _flank, on_axis = add_line_chain(adapter, [(au, av), (bu, bv), (cu, cv)])
-        set_sketch_direct_db(adapter, False)
-        for line, relation in (
-            (floor, "horizontal"),
-            (on_axis, "vertical"),
-            (axis, "vertical"),
-        ):
-            check(
-                f"{label} {relation} {line}",
-                adapter.add_sketch_constraint(line, None, relation),
-            )
-        check(
-            f"{label} axis at the tip",
-            adapter.add_sketch_constraint(f"{axis}.start", f"{on_axis}.start", "coincident"),
-        )
-        anchor_point_to_origin(adapter, f"{floor}.start", au, av, f"{label} floor centre")
-        check(f"{label} radius", adapter.add_sketch_dimension(floor, None, "linear", r))
-        check(
-            f"{label} height",
-            adapter.add_sketch_dimension(on_axis, None, "linear", HANGER_PIN_HOLE_POINT_H),
-        )
-        check(
-            f"{label} axis length",
-            adapter.add_sketch_dimension(axis, None, "linear", HANGER_PIN_HOLE_POINT_H),
-        )
-        ensure_fully_defined(adapter, f"{label} profile")
-        check(f"exit_sketch {label}", adapter.exit_sketch())
-        name_last_feature(adapter, f"HangerPinPoint{station}Profile")
-        check(
-            f"revolve-cut {label}",
-            adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
-        )
-        name_last_feature(adapter, f"HangerPinPoint{station}")
-        removed += math.pi / 3.0 * r**2 * HANGER_PIN_HOLE_POINT_H
+        removed += drill_point_volume(r)
     return removed
 
 

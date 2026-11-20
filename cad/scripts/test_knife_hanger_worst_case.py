@@ -670,14 +670,17 @@ def test_the_crossbar_webs_hold_round_the_press_reams_and_knockouts() -> None:
     assert build_fr_top_frame.HANGER_KNOCKOUT_SHIFT_AT_TOP == pytest.approx(
         0.318779, abs=5e-6
     )
-    # Shortest finished grip (1.437 - .005) less the shallowest ream's drill
-    # point (.50 + the point's height): the point stays well inside the bar.
+    # Shortest finished grip (1.437 - .005) less the deepest in-band ream's
+    # drill point (the depth band's maximum + the point's height): the point
+    # keeps the wall target under the faced top, so a THRU ream is out of band.
     assert build_fr_top_frame.PIN_HOLE_POINT_MARGIN == pytest.approx(
         top_frame.HANGER_GRIP
         - top_frame.HANGER_GRIP_TOL
         - top_frame.HANGER_PIN_HOLE_DEPTH
+        - max(top_frame.HANGER_PIN_HOLE_DEPTH_BAND)
         - top_frame.HANGER_PIN_HOLE_POINT_H
     )
+    assert build_fr_top_frame.PIN_HOLE_POINT_MARGIN >= top_frame.HANGER_PIN_HOLE_POINT_COVER_MIN
     assert not hasattr(build_fr_top_frame, "PIN_HOLE_FLOOR_MARGIN")
     # The knockout may sit the coaxial zone's corner off the ream's centre,
     # hypot(0.13, 0.13).  The dowel is pressed to its proud, not to a floor,
@@ -934,8 +937,9 @@ def test_the_summing_interference_rows_match_their_owners() -> None:
         dowel.PRESS_HOLE_DIA + min(dowel.PRESS_HOLE_DIA_BAND)
     )
     assert top_interference._KNIFE_DOWEL_DIA_MAX == pytest.approx(dowel.DIA_MAX)
-    assert top_interference._KNIFE_DOWEL_PRESS_DEPTH == pytest.approx(dowel.INSERTION)
-    assert top_interference._KNIFE_DOWEL_PRESS_DEPTH < top_frame.HANGER_PIN_HOLE_DEPTH
+    assert top_interference._KNIFE_DOWEL_INSERTION == pytest.approx(dowel.INSERTION)
+    assert top_interference._KNIFE_DOWEL_INSERTION < top_frame.HANGER_PIN_HOLE_DEPTH
+    assert not hasattr(top_interference, "_KNIFE_DOWEL_PRESS_DEPTH")
     assert screw.THREAD == knife_mount.STUD_THREAD == "#10-24"
     assert THREAD_MAJOR_MM["#10-24"] == knife_mount.STUD_THREAD_MAJOR
     assert TAP_DRILL_MM["#10-24"] == knife_mount.STUD_TAP_DIA
