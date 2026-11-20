@@ -218,7 +218,7 @@ def test_each_press_is_accepted_at_the_bench_with_a_slip_fit_remedy() -> None:
     each a lettered sub-step of the press (rule 22, the shared step lint)."""
     for pressed, held, taken_out, remedy in (
         (steps.DRUM_PRESSED_KEY, steps.DRUM_HELD_KEY, "drum-pulled-off", "drum-bonded"),
-        (steps.AXLE_PRESSED_KEY, steps.AXLE_HELD_KEY, "axle-pressed-out", "axle-cleaned"),
+        (steps.AXLE_PRESSED_KEY, steps.AXLE_HELD_KEY, "axle-depth-recorded", "axle-pressed-out"),
     ):
         (step,) = (step for step in steps.STEPS if step[0] == pressed)
         assert step[1:4] == (held, taken_out, remedy)
@@ -235,22 +235,36 @@ def test_each_press_is_accepted_at_the_bench_with_a_slip_fit_remedy() -> None:
         return f"STEP {steps.step_number(key)}"
 
     assert not any("REMAKE" in text for text in notes.STEP_TEXT.values())
-    # The slip-axle remedies run in order inside step 2: clean, bond, set,
-    # then back to the hold check once cured.
+    # The slip-axle remedies run in order inside step 2: read where it stood,
+    # press it out, clean, bond, set back to that reading, then back to the
+    # hold check once cured.
     (axle_step,) = (step for step in steps.STEPS if step[0] == steps.AXLE_PRESSED_KEY)
-    assert axle_step[3:] == ("axle-cleaned", "axle-bonded", "axle-bond-set", "axle-bond-cured")
-    # Only an unbonded slip goes back out at 2B; a bonded axle that holds
-    # passes 2A-2B.
-    assert "UNBONDED" in notes.STEP_TEXT["axle-pressed-out"]
+    assert axle_step[2:] == (
+        "axle-depth-recorded",
+        "axle-pressed-out",
+        "axle-cleaned",
+        "axle-bonded",
+        "axle-bond-set",
+        "axle-bond-cured",
+    )
+    # Only an unbonded slip goes back out; a bonded part that holds passes the
+    # hold check, and a bonded drum, like the axle, comes back to it once
+    # cured (#2579).
+    assert "UNBONDED" in notes.STEP_TEXT["axle-depth-recorded"]
+    assert "UNBONDED" in notes.STEP_TEXT["drum-pulled-off"]
     for key in ("axle-bonded", "drum-bonded"):
         assert notes.STEP_TEXT[key].endswith(f"{notes.BOND_GRADE}, {notes.BOND_NOTE_REF}.")
-    # The bond is set inside its fixture time at the press step's setting,
-    # carrying any step 3 correction, so a rebond keeps the position step 3
-    # accepted.
+    (drum_step,) = (step for step in steps.STEPS if step[0] == steps.DRUM_PRESSED_KEY)
+    assert drum_step[-1] == "drum-bond-cured"
+    assert notes.STEP_TEXT["drum-bond-cured"].startswith(
+        f"IF IT WAS BONDED, RETURN TO {ref(steps.DRUM_HELD_KEY)}"
+    )
+    # #2578: the bond is set inside its fixture time to the depth read before
+    # the axle came out, so a rebond keeps any position step 3 corrected.
     bond_set = notes.STEP_TEXT["axle-bond-set"]
     assert "AT ONCE" in bond_set
-    for key in (steps.AXLE_PRESSED_KEY, "axle-pressed-further", "axle-pressed-back"):
-        assert steps.step_number(key) in bond_set
+    assert ref("axle-depth-recorded") in bond_set
+    assert "CALIPER DEPTH ROD" in notes.STEP_TEXT["axle-depth-recorded"]
     assert notes.STEP_TEXT["axle-bond-cured"].startswith(
         f"IF IT WAS BONDED, RETURN TO {ref(steps.AXLE_HELD_KEY)}"
     )

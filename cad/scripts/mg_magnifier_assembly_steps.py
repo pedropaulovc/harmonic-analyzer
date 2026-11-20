@@ -46,10 +46,17 @@ STEPS: tuple[tuple[str, ...], ...] = (
     # Wheel group. Each press is accepted at the bench before anything else
     # goes on it (rule 23): it does not turn or slide by hand, and a slip fit
     # has its own single-action remedies.
-    (DRUM_PRESSED_KEY, DRUM_HELD_KEY, "drum-pulled-off", "drum-bonded"),
+    (
+        DRUM_PRESSED_KEY,
+        DRUM_HELD_KEY,
+        "drum-pulled-off",
+        "drum-bonded",
+        "drum-bond-cured",
+    ),
     (
         AXLE_PRESSED_KEY,
         AXLE_HELD_KEY,
+        "axle-depth-recorded",
         "axle-pressed-out",
         "axle-cleaned",
         "axle-bonded",
@@ -97,6 +104,8 @@ STEPS: tuple[tuple[str, ...], ...] = (
         "lever-wire-through-tie",
         "lever-wire-tie-knotted",
         "lever-wire-knots-held",
+        "lever-wire-cut-off",
+        "lever-wire-renewed",
         WIRE_TIED_KEY,
     ),
 )

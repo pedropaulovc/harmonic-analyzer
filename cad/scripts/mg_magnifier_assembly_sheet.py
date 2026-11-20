@@ -40,7 +40,6 @@ from _printed_tolerance import (
     edge_break_radius_mm,
 )
 from sh_vn_music_wire_lever_spec import BOM_DESCRIPTION as _WIRE_BOM_DESCRIPTION
-from sh_vn_music_wire_lever_geom import TOGGLE_LENGTH as _TOGGLE_LENGTH
 from mg_magnifying_wheel_geom import SPOKE_COUNT as _SPOKE_COUNT
 from mg_magnifying_wheel_geom import TIE1_X as _TIE1_X
 from mg_magnifying_wheel_geom import TIE1_Y as _TIE1_Y
@@ -327,9 +326,15 @@ STEP_TEXT = {
     _steps.DRUM_HELD_KEY: f"CHECK {_DRUM} DOES NOT TURN OR SLIDE BY HAND.",
     # A press that goes on by hand is a slip fit (rule 23). Owner ruling
     # 2026-11-07: a bond equals a press, so a slip drum is bonded rather than
-    # the wheel remade (BOND_NOTE).
-    "drum-pulled-off": f"IF IT DOES, OR {_DRUM} SLID ON BY HAND, PULL {_DRUM} OFF.",
+    # the wheel remade (BOND_NOTE). As the axle's (#2579): the slip clause
+    # names an unbonded drum, and a bonded one comes back through the hold
+    # check once cured, before anything oils or loads it.
+    "drum-pulled-off": f"IF IT DOES, OR AN UNBONDED {_DRUM} SLID ON BY HAND, PULL {_DRUM} OFF.",
     "drum-bonded": f"IF IT CAME OFF, BOND IT ON WITH {BOND_GRADE}, {BOND_NOTE_REF}.",
+    "drum-bond-cured": (
+        f"IF IT WAS BONDED, RETURN TO {_step(_steps.DRUM_HELD_KEY)} ONCE IT HAS "
+        "CURED 24 H."
+    ),
     # The press goes to a first setting: the plain end's window below the
     # bar's far face (the bar's depth stack, which MHA-MG-08 names; the spec
     # proves the window), read with a depth rod where DETAIL A dimensions it.
@@ -351,15 +356,20 @@ STEP_TEXT = {
     # before it grabs, then the hold check again once cured. The slip clause
     # names an unbonded axle, so the bonded one passes back through 2A-2B.
     # Step 3 is the only position acceptance: a bonded axle it moves (3D/3E)
-    # comes back through 2A, and one that no longer holds is rebonded at the
-    # first setting plus that correction, so the correction is not lost.
-    "axle-pressed-out": f"IF IT DOES, OR AN UNBONDED {_AXLE} SLID IN BY HAND, PRESS IT OUT.",
+    # comes back through the hold check, and one that no longer holds is
+    # rebonded where it stood, so the correction is not lost (#2578): its
+    # plain end's depth is read before it comes out, and the bond sets it
+    # back to that reading.
+    "axle-depth-recorded": (
+        f"IF IT DOES, OR AN UNBONDED {_AXLE} SLID IN BY HAND, RECORD THE DEPTH "
+        f"OF ITS PLAIN END BELOW THE FAR FACE OF {_BAR} (CALIPER DEPTH ROD)."
+    ),
+    "axle-pressed-out": f"IF ITS DEPTH WAS RECORDED, PRESS {_AXLE} OUT.",
     "axle-cleaned": f"IF {_AXLE} CAME OUT, CLEAN IT AND THE BORE IN {_BAR} TO BARE METAL.",
     "axle-bonded": f"IF IT WAS CLEANED, BOND IT IN WITH {BOND_GRADE}, {BOND_NOTE_REF}.",
     "axle-bond-set": (
-        f"IF IT WAS BONDED, SET IT AT ONCE TO THE {_step(_steps.AXLE_PRESSED_KEY)} "
-        f"FIRST SETTING PLUS ANY STEP {_steps.step_number('axle-pressed-further')} "
-        f"OR {_steps.step_number('axle-pressed-back')} CORRECTION."
+        "IF IT WAS BONDED, SET IT AT ONCE TO THE DEPTH RECORDED IN "
+        f"{_step('axle-depth-recorded')} (CALIPER DEPTH ROD)."
     ),
     "axle-bond-cured": (
         f"IF IT WAS BONDED, RETURN TO {_step(_steps.AXLE_HELD_KEY)} ONCE IT HAS "
@@ -516,12 +526,18 @@ STEP_TEXT = {
     ),
     "lever-wire-through-tie": f"PASS THE WIRE END THROUGH {_TIE_HOLE} AND PULL IT TAUT.",
     "lever-wire-tie-knotted": (
-        "KNOT THE WIRE TAIL BEHIND THE HOLE ROUND A "
-        f"{inch_fraction(_TOGGLE_LENGTH, what='wire toggle')} LONG OFFCUT OF THE "
-        "WIRE LAID ACROSS THE HOLE."
+        "KNOT THE WIRE TAIL BEHIND THE HOLE ROUND A SHORT OFFCUT OF THE WIRE "
+        "LAID ACROSS THE HOLE."
     ),
-    # Each hand-made joint is checked to hold (rule 23).
+    # Each hand-made joint is checked to hold (rule 23). A slipped knot has
+    # let the wire run, so the wheel's rest angle is lost with it: the remedy
+    # starts the wire again from the hook (#3086).
     "lever-wire-knots-held": "CHECK NEITHER KNOT SLIPS UNDER A LIGHT PULL BY HAND.",
+    "lever-wire-cut-off": "IF ONE SLIPS, CUT THE WIRE OFF.",
+    "lever-wire-renewed": (
+        f"IF IT WAS CUT OFF, RETURN TO {_step(_steps.WIRE_HOOKED_KEY)} WITH A NEW "
+        "LENGTH OF WIRE."
+    ),
     _steps.WIRE_TIED_KEY: "TRIM BOTH WIRE TAILS CLOSE TO THEIR KNOTS.",
 }
 if tuple(STEP_TEXT) != _steps.SEQUENCE:
