@@ -1,12 +1,12 @@
 # Placeholder process plan (owner 2026-11-19): the tools this part needs, from
 # its v50 drawing and the drawing cross-check of 2026-11-19, until its traveler
 # is written. Not enrolled in _process_plans.TRAVELER_STEMS; see
-# cad/process/README.md, "Placeholder plans". Bought McMaster-Carr 91794A558
+# cad/process/README.md, "Placeholder plans". Bought McMaster-Carr 91794A559
 # screw with one added operation, so a made part (cad/docs/subsystem-identities.md).
 title = "Cone Tip End Screw"
 part = "MHA-DT-39 Cone Tip End Screw"
 revision = "placeholder"
-material = "18-8 stainless steel, McMaster-Carr 91794A558 (1/4-28 x 5/8 in slotted fillister head screw)"
+material = "18-8 stainless steel, McMaster-Carr 91794A559 (1/4-28 x 3/4 in slotted fillister head screw)"
 stock = "To be written"
 shop = "../shop.toml"
 

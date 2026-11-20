@@ -6,7 +6,7 @@ from __future__ import annotations
 import pytest
 
 import _config
-import _mcmaster_91794a558 as stock
+import _mcmaster_91794a559 as stock
 import cone_tip_cluster as tip
 import dt_cone_tip_end_screw_spec as spec
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -20,7 +20,7 @@ def test_registry_row_is_the_modified_mcmaster_screw() -> None:
     row = _config.parts(spec.PART_NAME)
     assert row["number"] == "MHA-DT-39"
     assert row["supplier"] == "McMaster-Carr"
-    assert row["supplier_skus"] == [stock.SKU] == ["91794A558"]
+    assert row["supplier_skus"] == [stock.SKU] == ["91794A559"]
     assert row["quantity"] == 1
     assert row["drawing_unit"] == spec.UNIT == "in"
     assert "drill and ream" in row["process"]
@@ -36,13 +36,14 @@ def test_mates_are_named_by_their_registered_numbers() -> None:
 
 
 def test_head_and_thread_are_the_sourced_catalogue_sizes() -> None:
-    assert "https://www.mcmaster.com/91794A558/" in stock.SOURCE
-    assert "2026-11-09" in stock.SOURCE
+    assert "https://www.mcmaster.com/91794A559/" in stock.SOURCE
+    assert "2026-11-20" in stock.SOURCE
     assert stock.THREAD == tip.ADJUSTER_THREAD == "1/4-28"
     assert stock.THREAD_CLASS == "2A"
     assert stock.HEAD_DIA == pytest.approx(0.414 * IN)
     assert stock.HEAD_H == pytest.approx(0.237 * IN)
-    assert stock.SHANK_LEN == pytest.approx(0.625 * IN)
+    # Owner ruling 2026-11-20 (#2726): the 3/4 screw.
+    assert stock.SHANK_LEN == pytest.approx(0.750 * IN)
     assert stock.SHANK_DIA == pytest.approx(0.250 * IN)
     assert stock.PITCH == pytest.approx(IN / 28.0)
     assert stock.FILLISTER_SIZE == (
@@ -63,8 +64,9 @@ def test_hole_is_the_tip_cluster_contract() -> None:
     assert spec.END_HOLE_DIA == pytest.approx(0.0630 * IN)
     assert spec.END_HOLE_BAND == tip.REAM_H7
     assert spec.END_HOLE_DEPTH == pytest.approx(0.12 * IN)
-    assert spec.PIVOT_CLEARANCE[0] / IN == pytest.approx(0.0005)
-    assert spec.PIVOT_CLEARANCE[1] / IN == pytest.approx(0.0013)
+    # The pivot turns on the spigot's band (#2469, #2530).
+    assert spec.PIVOT_CLEARANCE[0] / IN == pytest.approx(0.0008)
+    assert spec.PIVOT_CLEARANCE[1] / IN == pytest.approx(0.0023)
 
 
 def test_hole_wall_to_the_thread_root_is_the_declared_minor() -> None:
@@ -102,7 +104,7 @@ def test_hole_callout_is_process_depth_then_two_lines_of_words() -> None:
         "RUNNING FIT ON MHA-DT-37",
         "WALL .067 MIN",
     ]
-    assert "91794A558" in spec.STOCK_NOTE
+    assert "91794A559" in spec.STOCK_NOTE
     # Rule 2: the material lives in the title block only.
     assert "STAINLESS" not in spec.STOCK_NOTE
 

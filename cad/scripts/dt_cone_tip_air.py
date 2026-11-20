@@ -61,7 +61,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
-import _mcmaster_91794a558 as end_screw_stock
+import _mcmaster_91794a559 as end_screw_stock
 import cone_line
 import cone_set_stack
 import cone_tip_cluster as cluster

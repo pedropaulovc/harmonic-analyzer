@@ -34,21 +34,25 @@ def test_mates_are_named_by_their_registered_numbers() -> None:
 def test_sizes_are_the_tip_cluster_contract() -> None:
     assert spec.OUTER_DIA == pytest.approx(0.228 * IN)
     assert spec.LENGTH == pytest.approx(0.160 * IN)
-    assert spec.BORE_DIA == pytest.approx(0.0615 * IN)
+    # Owner ruling 2026-11-20 (#2469): the shared .0625 reamer, MHA-DT-37's
+    # stem bore.
+    assert spec.BORE_DIA == pytest.approx(0.0625 * IN)
+    assert spec.BORE_DIA == tip.STEM_BORE_DIA_MM
     assert spec.BORE_DIA_BAND == tip.REAM_H7 == (0.0127, 0.0)
 
 
-def test_press_on_the_pivot_interferes_at_every_limit() -> None:
+def test_bond_on_the_pivot_clears_at_every_limit() -> None:
     bore = (spec.BORE_DIA, spec.BORE_DIA + max(spec.BORE_DIA_BAND))
     pivot = (
         tip.STEM_DIA_MM + min(tip.PIVOT_DIA_BAND),
         tip.STEM_DIA_MM + max(tip.PIVOT_DIA_BAND),
     )
-    least, most = pivot[0] - bore[1], pivot[1] - bore[0]
-    assert least > 0.0
-    assert spec.PRESS_INTERFERENCE == pytest.approx((least, most))
-    assert least / IN == pytest.approx(0.0002)
-    assert most / IN == pytest.approx(0.0010)
+    least, most = bore[0] - pivot[1], bore[1] - pivot[0]
+    assert least > 0.0  # never line to line (#2530)
+    assert spec.BOND_CLEARANCE == pytest.approx((least, most))
+    assert least / IN == pytest.approx(0.0003)
+    assert most / IN == pytest.approx(0.0018)
+    assert spec.BOND_CLEARANCE == pytest.approx(tip.SPIGOT_BOND_CLEARANCE_MM)
 
 
 def test_wall_holds_the_rule_17_target_at_the_worst_case() -> None:
@@ -57,11 +61,11 @@ def test_wall_holds_the_rule_17_target_at_the_worst_case() -> None:
     assert spec.WALL_WORST >= WALL_TARGET_MM
 
 
-def test_bore_callout_names_process_fit_mate_and_interference() -> None:
+def test_bore_callout_names_process_fit_compound_and_mate() -> None:
     assert spec.BORE_CALLOUT.splitlines() == [
         "REAM THRU",
-        "PRESS FIT ON MHA-DT-37 PIVOT",
-        "(INTERFERENCE .0002-.0010 REF)",
+        "BONDED FIT, LOCTITE 638,",
+        "ON MHA-DT-37 PIVOT",
     ]
 
 

@@ -213,20 +213,20 @@ def _loosened(tight_mm: float) -> float:
     return block.printed_band_mm(1) - tight_mm
 
 
-def test_cone_boss_length_at_one_place_opens_the_embed_band() -> None:
+def test_cone_boss_length_band_is_booked_in_the_embed_band() -> None:
     """ConeBossLen prints .XXX, the shared 1.654 (user ruling 2026-09-29 put
     it at .XX): the shaft collar bears on the boss's north face, half its band
-    off the post centre, and at .X the end screw's deep extreme bottoms its
-    head on the block."""
+    off the post centre, so the end screw's embed books that half band.  With
+    the 3/4 end screw (#2726) the embed window holds it with room either way."""
     import build_dt_drive_train_assembly as bdt
     import dt_cone_pivot_post_spec as post
     import dt_cone_tip_block_spec as block
 
     places = post.DRAWING_PRECISION["ConeShaftBoss"]["ConeBossLen"]
     assert places == 3
-    grown = (block.printed_band_mm(1) - block.printed_band_mm(places)) / 2.0
-    with pytest.raises(AssertionError, match="end screw embed"):
-        bdt.end_screw_embed_worst_mm(bdt.END_SCREW_EMBED_BAND_MM + grown)
+    half_band = block.printed_band_mm(places) / 2.0
+    _, high = bdt.end_screw_embed_worst_mm(bdt.END_SCREW_EMBED_BAND_MM - half_band)
+    assert high + half_band == pytest.approx(bdt.END_SCREW_EMBED_WORST_MM[1])
 
 
 def test_post_mount_stations_need_their_explicit_band() -> None:
@@ -244,8 +244,7 @@ def test_post_mount_stations_need_their_explicit_band() -> None:
 def test_pushed_post_only_makes_the_embed_shallower() -> None:
     """#2697: MHA-DT-00 holds MHA-DT-05 pushed toward MHA-DT-21 while it is
     turned and tightened, so its screw clearance moves the shaft north only:
-    the shallow extreme carries all of it, the deep one none.  Booked both
-    ways, the letter M holes' clearance would bottom the screw's head."""
+    the shallow extreme carries all of it, the deep one none."""
     import build_dt_drive_train_assembly as bdt
     import dt_cone_tip_block_spec as block
 
@@ -255,23 +254,26 @@ def test_pushed_post_only_makes_the_embed_shallower() -> None:
     low, high = bdt.END_SCREW_EMBED_WORST_MM
     assert block.END_SCREW_EMBED - low == pytest.approx(high - block.END_SCREW_EMBED + push)
     assert bdt.end_screw_embed_worst_mm(band, 0.0)[1] == pytest.approx(high)
-    with pytest.raises(AssertionError, match="end screw embed"):
-        bdt.end_screw_embed_worst_mm(band + push, 0.0)
-    # More clearance than the holes have drops the shallow end's thread.
+    # More clearance than the shallow end's room drops its thread under 1.5 D.
+    shallow_room = low - block.END_SCREW_EMBED_WINDOW[0]
     with pytest.raises(AssertionError, match="end screw full thread"):
-        bdt.end_screw_embed_worst_mm(band, push + 0.05)
+        bdt.end_screw_embed_worst_mm(band, push + shallow_room + 0.01)
 
 
-def test_foot_tap_along_station_needs_three_places() -> None:
-    """FootTapZ at .XX drops the 5/8 end screw's shallow engagement under the
-    owner's 1.39 D (#2697: a longer screw, not a tighter band, is the room)."""
+def test_foot_tap_along_station_prints_two_places() -> None:
+    """Owner ruling 2026-11-20 (#2726): with the 3/4 end screw and the .44
+    block, FootTapZ prints .22 at .XX and the end screw keeps 1.5 D and its
+    head air at every limit of the embed stack, with over 1 mm either side."""
     import build_dt_drive_train_assembly as bdt
     import dt_cone_tip_block_spec as block
 
-    assert block.FOOT_TAP_Z_PLACES == 3
-    grown = block.printed_band_mm(2) - bdt.TIP_FOOT_TAP_Z_TOL_MM
-    with pytest.raises(AssertionError, match="end screw full thread"):
-        bdt.end_screw_embed_worst_mm(bdt.END_SCREW_EMBED_BAND_MM + grown)
+    assert block.FOOT_TAP_Z_PLACES == 2
+    assert bdt.TIP_FOOT_TAP_Z_TOL_MM == pytest.approx(block.printed_band_mm(2))
+    assert block.FOOT_TAP_Z / 25.4 == pytest.approx(0.22)
+    low, high = bdt.END_SCREW_EMBED_WORST_MM
+    window = block.END_SCREW_EMBED_WINDOW
+    assert min(low - window[0], window[1] - high) > 1.0
+    assert bdt.END_SCREW_ENGAGEMENT_WORST_D >= 1.5
 
 
 def test_across_stations_print_two_places_with_room_in_the_post_turn() -> None:

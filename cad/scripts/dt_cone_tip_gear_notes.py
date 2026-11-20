@@ -42,8 +42,8 @@ CUTTER_DETAIL_LINE_CHARS = 108
 # The teeth's do-not-cut (rule 7): flagged to the teeth in note 2.
 TOOTH_EDGE_NOTE = "NO EDGE BREAK ON TEETH."
 
-# Numbered notes (rule 7): note 1 the pivot's matched press fit, linked from
-# the pivot diameter; note 2 the teeth's mesh and fit route, linked from the
+# Numbered notes (rule 7): note 1 the pivot's two fits, linked from the
+# pivot diameter; note 2 the teeth's mesh and fit route, linked from the
 # tip, thickness and root; note 3 the turner's centres.
 PIVOT_NOTE_NUMBER = 1
 TEETH_NOTE_NUMBER = 2
@@ -63,25 +63,19 @@ FACE_STACK_CALLOUT = f"CONE SEAT PITCH\nON {SHAFT_MATE_NUMBER}"
 def sheet_notes() -> str:
     """The sheet's numbered notes.
 
-    Note 1 is the pivot's two fits (rule 4): the bushing presses over its root
-    and the end screw's reamed hole runs on its end, one diameter for both.
-    The window that gives both ranges on the mates' printed limits is .0003
-    wide, under any plain inch step, so the diameter prints REF and the pivot
-    is turned to its measured mates: the two ranges are the requirement
-    (matched pair). Note 2 names the mesh and the fit route of the tip,
-    thickness and root bands, with the teeth's do-not-cut. Note 3: the stems
-    are turned between centres, and a centre hole in either end harms nothing
-    (rule 11).
+    Note 1 is the pivot's two fits (rule 4): the bushing is bonded over its
+    root and the end screw's reamed hole runs on its end, one diameter for
+    both, each fit set by the printed limits (owner ruling 2026-11-20, #2469:
+    a LOCTITE 638 bonded slip fit on the shared .0625 reamer). Note 2 names
+    the mesh and the fit route of the tip, thickness and root bands, with the
+    teeth's do-not-cut. Note 3: the stems are turned between centres, and a
+    centre hole in either end harms nothing (rule 11).
     """
-    interference = spec.inch_range(spec.PIVOT_PRESS_INTERFERENCE_MM)
-    clearance = spec.inch_range(spec.PIVOT_RUNNING_CLEARANCE_MM)
     return "\n".join(
         (
-            f"{PIVOT_NOTE_NUMBER}. PIVOT: TURN TO ITS MEASURED MATES. PRESS FIT IN "
-            f"{BUSHING_MATE_NUMBER} {BUSHING_MATE_TITLE}",
-            f"   (INTERFERENCE {interference} ON ITS BORE); ITS END RUNNING FIT IN "
-            f"{END_SCREW_MATE_NUMBER} {END_SCREW_MATE_TITLE}",
-            f"   (DIAMETRAL CLEARANCE {clearance} IN ITS HOLE).",
+            f"{PIVOT_NOTE_NUMBER}. PIVOT: BONDED FIT, {cone_tip_cluster.RETAINING_COMPOUND}, IN "
+            f"{BUSHING_MATE_NUMBER} {BUSHING_MATE_TITLE};",
+            f"   ITS END RUNNING FIT IN {END_SCREW_MATE_NUMBER} {END_SCREW_MATE_TITLE}.",
             f"{TEETH_NOTE_NUMBER}. TEETH MESH WITH {CYLINDER_MATE_NUMBER}: ACCEPT OVER PINS, "
             "THEN BY FEEL AT ASSEMBLY,",
             f"   PER GEAR DATA. {TOOTH_EDGE_NOTE}",
@@ -101,8 +95,8 @@ DIMENSION_CALLOUTS = {
         f"BONDED FIT, {cone_tip_cluster.RETAINING_COMPOUND}, IN {SHAFT_MATE_NUMBER} SOCKET\n"
         f"AND {STEM_BORE_MATES[0]}, {STEM_BORE_MATES[1]}"
     ),
-    # One REF diameter carries both of note 1's fits.
-    "PivotDia": f"PRESS AND RUNNING FIT\n{PIVOT_NOTE_FLAG}",
+    # One banded diameter carries both of note 1's fits.
+    "PivotDia": f"BONDED AND RUNNING FIT\n{PIVOT_NOTE_FLAG}",
     "ToothThickness": TEETH_NOTE_FLAG,
     # The origin circle is an inspection witness, not the off-centre root arc.
     "FloorDia": f"ROOT ENVELOPE\n{TEETH_NOTE_FLAG}",

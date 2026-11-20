@@ -116,8 +116,13 @@ def gear_data(teeth: int) -> str:
         # The bore's worst ligament (RV-03 on T012, RV-07 on T030).
         ("WEB MIN (REF)", inch(web, 4)),
         # cone_set_stack books each gear's tooth runout about its bore.
+        # T012/T018's Ø.0625 bore cannot carry a cutting load on an arbor,
+        # so their teeth are cut on the bar before boring and the setup is
+        # accepted to the turned OD (owner ruling 2026-11-20, Pedro, #2356
+        # option A); every other gear is cut on an arbor through its bore.
         ("TOOTH CUTTING SETUP, ACCEPT AT SETUP",
-         f"{inch(cone_set_stack.TOOTH_RUNOUT_TIR_MM, 3)} TIR MAX TO FINISHED BORE"),
+         f"{inch(cone_set_stack.TOOTH_RUNOUT_TIR_MM, 3)} TIR MAX TO "
+         + ("TURNED OD" if teeth in spec.SPIGOT_TEETH else "FINISHED BORE")),
         # The measurable acceptance of the circular tooth thickness band
         # (spec.over_pins_limits_mm): every sheet (ENFORCE round 1 of #971).
         (

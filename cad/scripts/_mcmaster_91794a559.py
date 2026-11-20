@@ -1,11 +1,12 @@
-"""Pure 91794A558 fillister dimensions; isolate each SKU's cache inputs.
+"""Pure 91794A559 fillister dimensions; isolate each SKU's cache inputs.
 
-McMaster-Carr 91794A558, 18-8 stainless fillister head slotted screw,
-1/4"-28 x 5/8": the stock of MHA-DT-39, the cone tip end screw.  The product
-page, read live 2026-11-09 (https://www.mcmaster.com/91794A558/), states:
-thread 1/4"-28 UNF, Unified Standard Class 2A, right hand, fully threaded,
-flat tip; fillister head, high narrow profile, height 0.237", diameter
-0.414"; length 5/8"; ASME B18.6.3.  Head height and diameter equal the ASME
+McMaster-Carr 91794A559, 18-8 stainless fillister head slotted screw,
+1/4"-28 x 3/4": the stock of MHA-DT-39, the cone tip end screw (owner ruling
+2026-11-20, #2726: the 3/4 replaces the 5/8 91794A558).  The product page,
+read live 2026-11-20 (https://www.mcmaster.com/91794A559/), states: thread
+1/4"-28 UNF, Unified Standard Class 2A, right hand, fully threaded, flat tip;
+fillister head, high narrow profile, height 0.237", diameter 0.414"; length
+3/4"; ASME B18.6.3.  Head height and diameter equal the ASME
 B18.6.3 1/4 fillister maxima, as on the 1/4-20 MSC 40923906 row.  The driver
 slot follows the shared fillister family law (diag_mcmaster_fillister), not a
 supplier dimension.
@@ -15,10 +16,10 @@ from __future__ import annotations
 
 IN = 25.4
 
-SKU = "91794A558"
+SKU = "91794A559"
 THREAD = "1/4-28"
 THREAD_CLASS = "2A"
-SOURCE = "https://www.mcmaster.com/91794A558/ (live product page, 2026-11-09)"
+SOURCE = "https://www.mcmaster.com/91794A559/ (live product page, 2026-11-20)"
 THREAD_FIT_SOURCE = SOURCE
 THREAD_LIMITS_SOURCE = (
     "https://www.steelmasters.co.nz/wp-content/uploads/2022/03/"
@@ -26,7 +27,7 @@ THREAD_LIMITS_SOURCE = (
 )
 
 SHANK_DIA = 0.250 * IN  # 6.35, "Screw Size Decimal Equivalent 0.250"
-SHANK_LEN = 0.625 * IN  # 15.875, 5/8 under the head
+SHANK_LEN = 0.750 * IN  # 19.05, 3/4 under the head
 HEAD_H = 0.237 * IN  # 6.0198
 HEAD_DIA = 0.414 * IN  # 10.5156
 PITCH = IN / 28.0

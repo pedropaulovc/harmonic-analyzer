@@ -449,11 +449,6 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             # PR 2 drive-train leaf (6fda5a47590f): 34.1729 observed, plus
             # ten percent.
             frozenset(("dt-cone-tip-end-screw-1", "dt-cone-tip-block-1")): 37.59019,
-            # MHA-DT-38's nominal .0615 (1.5621) bore pressed on MHA-DT-37's
-            # nominal .0625 (1.5875) pivot over its .160 (4.064) length.
-            frozenset(("dt-cone-tip-bushing-1", "dt-cone-tip-gear-1")): _annulus_limit(
-                1.5875, 1.5621, 4.064
-            ),
             # MHA-DT-VN-70 #2-56 major 2.184 in the #50 tap drill 1.778: the
             # 6.35 shank less the 1.194 chain wire and 0.02 air, within 5.14.
             frozenset(("dt-vn-keeper-chain-screw-1", "dt-crank-arm-1")): _annulus_limit(

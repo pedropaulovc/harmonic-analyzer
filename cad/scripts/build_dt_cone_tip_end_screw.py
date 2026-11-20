@@ -1,7 +1,7 @@
-r"""Build MHA-DT-39, the cone tip end screw: McMaster 91794A558 plus one hole.
+r"""Build MHA-DT-39, the cone tip end screw: McMaster 91794A559 plus one hole.
 
-The shared catalog recipe (``diag_build_91794A558``) builds the supplied
-1/4-28 x 5/8 slotted fillister screw in its stock frame; this builder then
+The shared catalog recipe (``diag_build_91794A559``) builds the supplied
+1/4-28 x 3/4 slotted fillister screw in its stock frame; this builder then
 adds the one shop operation, the pivot hole drilled and reamed concentric in
 the threaded end (``dt_cone_tip_end_screw_spec``; the MHA-DT-VN-61 post
 mount screw's pattern of a part-owned modification after the stock recipe).
@@ -48,7 +48,7 @@ from _sketch import SketchDims, ensure_fully_defined
 from _sketch_circle import define_circle
 from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener
 from _visibility import blank_reference_geometry
-from diagnostics.diag_build_91794A558 import build_91794A558
+from diagnostics.diag_build_91794A559 import build_91794A559
 from dt_cone_tip_end_screw_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
@@ -181,10 +181,10 @@ def _manufacturing_controls(adapter) -> None:
     )
 
 
-@wraps(build_91794A558)
+@wraps(build_91794A559)
 def _drill_and_ream(adapter, truth=None, **parameters):
     # The shared recipe builds the supplied screw; the hole is this part's.
-    receipt = build_91794A558(adapter, truth, **parameters)
+    receipt = build_91794A559(adapter, truth, **parameters)
     for name, value in (("EndHoleDia", END_HOLE_DIA), ("EndHoleDepth", END_HOLE_DEPTH)):
         set_global(adapter, name, f"{value}mm")
     # TipFace, the assembly's mate datum, is also the hole's sketch plane.

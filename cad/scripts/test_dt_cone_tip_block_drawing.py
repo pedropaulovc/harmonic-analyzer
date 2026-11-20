@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import math
-import re
 from pathlib import Path
 
 import pytest
@@ -42,20 +41,21 @@ def test_adjuster_thread_is_tapped_through_with_no_floor() -> None:
 
 
 def test_end_screw_embed_range_stays_inside_its_engagement_window() -> None:
-    """The window gives the 91794A558 end screw the most full thread the
+    """The window gives the 91794A559 end screw the most full thread the
     shallowest block holds (1.5 D, or the block's own thread past its deepest
     countersinks if that is less), its head clear of the north face, and the
     set end play's whole range stays inside it.  The depth prints .XX (rule
-    19: no band tightened to rescue a thread), which leaves the shallowest
-    block 1.48 D: above the assembly's stated 1.39 D end-screw engagement
-    (owner ruling 2026-11-09), and short of 1.5 D only by its countersinks."""
+    19: no band tightened to rescue a thread); owner ruling 2026-11-20
+    (#2726) deepens the block to .44, so even the shallowest block holds
+    1.52 D past its countersinks and the 1.5 D floor governs."""
     spec = dt_cone_tip_block_spec
     major = spec.end_screw_stock.SHANK_DIA
     assert spec.ADJUSTER_CSK_DIA > major
     assert spec.END_SCREW_MIN_ENGAGEMENT_D == 1.5
     assert spec.DRAWING_PRECISION_BY_NAME["Depth"] == 2
     floor = min(1.5 * major, spec.END_SCREW_ENGAGEMENT_MIN_MM)
-    assert spec.END_SCREW_ENGAGEMENT_MIN_MM / major == pytest.approx(1.484, abs=1e-3)
+    assert floor == pytest.approx(1.5 * major)
+    assert spec.END_SCREW_ENGAGEMENT_MIN_MM / major == pytest.approx(1.524, abs=1e-3)
     low, high = spec.END_SCREW_EMBED_WINDOW
     for edge in (low, high):
         assert spec.end_screw_full_thread_mm(edge) >= floor - 1e-9
@@ -636,7 +636,8 @@ def test_r3_prints_no_two_place_dimension_it_does_not_need() -> None:
     assert grades["AxisHeight"] == 2
     assert "PinchRise" not in grades
     # Nothing prints .X: on the inch sheet its +/-.1 fails every web.  #2697:
-    # the bore's and the tap's stations across the block print .XX too.
+    # the bore's and the tap's stations across the block print .XX too, and
+    # owner ruling 2026-11-20 (#2726) the tap's along-axis station.
     assert {name for name, places in grades.items() if places == 2} == {
         "Width",
         "Depth",
@@ -647,32 +648,30 @@ def test_r3_prints_no_two_place_dimension_it_does_not_need() -> None:
         "AxisHeight",
         "PassageCenter",
         "FootTapX",
+        "FootTapZ",
     }
     # The pinch hole's station sits on the .01 grid (round-2 review of PR 2:
     # .215 printed a third place no function needed).
     assert dt_cone_tip_block_spec.PINCH_DEPTH_CENTER / 25.4 == pytest.approx(0.22)
 
 
-def test_every_three_place_size_names_its_mate_at_its_dimension() -> None:
+def test_no_station_prints_a_third_place_but_the_reference_dowel() -> None:
     """Rules 3/4 (machinist review of d84a42ca7): a three-place size given a
-    function is a tight band, and its dimension names the mate it serves.
-    The tap's along-axis station is named on that hole's callout.  The
-    locating dowel's station (rule-23 retention, owner ruling 2026-11-07)
-    prints as a reference with no band (round 6, #9), so it holds nothing and
-    names nothing.  #2697: the bore's location and the tap's station across
-    the block print .XX."""
+    function is a tight band.  Owner ruling 2026-11-20 (#2726): with the 3/4
+    end screw and the .44 block the tap's along-axis station prints .22 at
+    .XX, so no functional three-place station is left.  The locating dowel's
+    station (rule-23 retention, owner ruling 2026-11-07) prints as a
+    reference with no band (round 6, #9), so it holds nothing and names
+    nothing.  #2697: the bore's location and the tap's station across the
+    block print .XX."""
     grades = dt_cone_tip_block_spec.DRAWING_PRECISION_BY_NAME
     texts = {**drawing.DIMENSION_CALLOUTS, **drawing.DIMENSION_CALLOUTS_ABOVE}
     assert "PassageCenter" not in texts
-    texts["FootTapZ"] = drawing.FOOT_TAP_QUALIFIER
-    three_place = {name for name, places in grades.items() if places == 3}
-    assert three_place == {"FootTapZ", "DowelX"}
-    three_place.discard("DowelX")
+    assert {name for name, places in grades.items() if places == 3} == {"DowelX"}
     assert "DowelX" not in texts
+    assert dt_cone_tip_block_spec.FOOT_TAP_Z / 25.4 == pytest.approx(0.22)
     # The width's band is its own, one-sided; its reason still names the edge.
     assert "MHA-DT-20" in texts["Width"]
-    for name in three_place:
-        assert re.search(r"MHA-(?!VN-)[A-Z]{2}-(?:[0-9]{2}(?:-TL-(?:[0-9]{2}|VN-[5-9][0-9]))?|VN-[5-9][0-9])(?:-T[0-9]{3})?(?![A-Z0-9-])", texts[name]), name
     # SolidWorks drops multi-line text placed above a dimension.
     assert all("\n" not in text for text in drawing.DIMENSION_CALLOUTS_ABOVE.values())
 
@@ -851,33 +850,17 @@ def test_hold_down_tap_keeps_every_limit_at_the_printed_extremes() -> None:
 
 def test_foot_tap_callout_reads_as_a_blind_tap_with_both_depths() -> None:
     """drawing-guidelines.md rule 12 (hole and slot callouts say what to do) on the resolved callout: the thread and its full-thread
-    depth on one line, the tap drill's depth on another, no THRU; rule 4:
-    the mate the stations locate on closes the thread's part."""
+    depth on one line, the tap drill's depth on another, no THRU."""
     spec = dt_cone_tip_block_spec
     places = spec.FOOT_DEPTH_PLACES
     thread = f"{spec.HOLDDOWN_THREAD.lstrip('#')} UNC-2B"
     full = spec.length_text(spec.FOOT_THREAD_DEPTH, places)
     drill = spec.length_text(spec.FOOT_DEPTH, places)
-    mate = f"\n{drawing.FOOT_TAP_QUALIFIER}"
-    good = {1: f"{thread} x {full}{mate}", 2: f"DRILL {spec.FOOT_BORE_DIA:.2f} x {drill}"}
+    good = {1: f"{thread} x {full}", 2: f"DRILL {spec.FOOT_BORE_DIA:.2f} x {drill}"}
     assert drawing._foot_tap_callout_resolved(good)
-    assert not drawing._foot_tap_callout_resolved({**good, 1: f"{thread} x {full}"})
     assert not drawing._foot_tap_callout_resolved({**good, 2: f"DRILL {spec.FOOT_BORE_DIA:.2f} THRU"})
-    assert not drawing._foot_tap_callout_resolved({**good, 1: f"{thread}{mate}"})
+    assert not drawing._foot_tap_callout_resolved({**good, 1: thread})
     assert not drawing._foot_tap_callout_resolved({1: good[1], 2: ""})
-
-
-def test_foot_tap_mate_line_closes_the_native_thread_part() -> None:
-    native = {
-        5: "<MOD-DIAM><hw-tapdrldia> <HOLE-DEPTH> <hw-tapdrldepth>",
-        6: "<hw-threaddesc> <hw-threadclass> <HOLE-DEPTH> <hw-threaddepth>",
-        7: "",
-        8: "",
-    }
-    rewritten = drawing._foot_tap_callout_definitions(native)
-    assert rewritten == {**native, 6: f"{native[6]}\n{drawing.FOOT_TAP_QUALIFIER}"}
-    with pytest.raises(RuntimeError):
-        drawing._foot_tap_callout_definitions({**native, 7: native[6]})
 
 
 def test_drawing_side_callout_precision_is_the_declared_exception() -> None:

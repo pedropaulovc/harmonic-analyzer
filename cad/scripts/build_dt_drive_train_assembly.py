@@ -1025,7 +1025,7 @@ from dt_cone_tip_end_screw_spec import (  # noqa: E402
 from _mcmaster_91794a112 import (  # noqa: E402
     THREAD as PINCH_THREAD,
 )
-from _mcmaster_91794a558 import (  # noqa: E402
+from _mcmaster_91794a559 import (  # noqa: E402
     SHANK_LEN as END_SCREW_SHANK_LEN,
     THREAD as END_SCREW_THREAD,
 )
@@ -2046,12 +2046,11 @@ PIVOT_HEAD_WORST_GAP = tip_pivot_head_worst_gap_mm(TIP_NORTH_FACE_BAND_MM)
 # the end off the model's END_SCREW_MODEL_END_PLAY_MM by up to either limit of
 # SHAFT_END_PLAY.  Reach is functional: at the deepest embed the head must
 # still stand off MHA-DT-21's north face, or the screw cannot be set.  Thread
-# engagement is rule 18: the block's 1.5D window cannot hold the whole stack
-# at the printed limits (the shallow end falls short), so the worst full
-# thread in D is held to END_SCREW_ENGAGEMENT_FLOOR_D, the 1.39D the owner's
-# rule-18 exception accepts (ruling 2026-11-09 via PR #1992: keep 91794A558
-# at this block station; dt-drive-train.yaml DT-07).  Any stack change that
-# cuts deeper fails here and needs a new ruling.
+# engagement is rule 18: the worst full thread in D is held to
+# END_SCREW_ENGAGEMENT_FLOOR_D, 1.5D (owner ruling 2026-11-20, #2726: the 3/4
+# 91794A559 screw and the .44 block re-centre the stack in the window and
+# retire the 1.39D exception DT-07).  Any stack change that cuts the window
+# fails here.
 #
 # The post's screw clearance is one-sided (#2697): MHA-DT-00 holds MHA-DT-05
 # pushed toward MHA-DT-21 along the shaft while it is turned and tightened
@@ -2068,7 +2067,7 @@ END_SCREW_EMBED_BAND_MM = (
     + TIP_NORTH_FACE_BAND_MM
 )
 END_SCREW_POST_PUSH_MM = POST_SCREW_FLOAT_MM
-END_SCREW_ENGAGEMENT_FLOOR_D = 1.39
+END_SCREW_ENGAGEMENT_FLOOR_D = 1.5
 _END_SCREW_MAJOR_MM = THREAD_MAJOR_MM[tip_cluster.ADJUSTER_THREAD]
 
 

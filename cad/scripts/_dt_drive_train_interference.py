@@ -45,11 +45,6 @@ from dt_vn_crank_seat_drive_pin_spec import PRESS_DEPTH as _CRANK_SEAT_PIN_DEPTH
 from dt_cone_tip_block_spec import DOWEL_HOLE_DEPTH as _TIP_DOWEL_PRESS_DEPTH
 from dt_vn_locating_pin_spec import DIA as _LOCATING_PIN_DIA
 from dt_vn_locating_pin_spec import PRESS_HOLE_DIA as _LOCATING_PIN_PRESS_HOLE_DIA
-from cone_tip_cluster import (
-    BUSHING_BORE_DIA_MM as _BUSHING_BORE_DIA,
-    BUSHING_LENGTH_MM as _BUSHING_LENGTH,
-    STEM_DIA_MM as _PIVOT_DIA,
-)
 
 
 # Crank taper pin in its PILOT holes (ch11 p.14): released drawings drill the
@@ -114,11 +109,6 @@ _TIP_HOLDDOWN_GATE_LIMIT_MM3 = _TIP_HOLDDOWN_OBSERVED_MM3 * 1.10
 # annulus bound was 104.31, 3.1x the reading).
 _END_SCREW_OBSERVED_MM3 = 34.1729
 _END_SCREW_GATE_LIMIT_MM3 = _END_SCREW_OBSERVED_MM3 * 1.10
-# MHA-DT-38 pressed on MHA-DT-37's pivot: the modelled press is the nominal
-# pivot in the nominal .0615 bore over the bushing's whole length.
-_BUSHING_PRESS_GATE_LIMIT_MM3 = smooth_annulus_limit_mm3(
-    _PIVOT_DIA, _BUSHING_BORE_DIA, _BUSHING_LENGTH
-)
 
 ALLOWED_PAIRS: Mapping[frozenset[str], float] = {
     frozenset(("dt-crank-pin-1", "dt-crank-hub-1")): 1.10 * _CRANK_PIN_HUB_MM3,
@@ -146,13 +136,9 @@ ALLOWED_PAIRS: Mapping[frozenset[str], float] = {
     frozenset(
         ("dt-vn-cone-tip-block-screw-1", "dt-cone-tip-block-1")
     ): _TIP_HOLDDOWN_GATE_LIMIT_MM3,
-    # The bushing's press on the pivot.  The LOCTITE 638 bonded slip fits
-    # (T024 on land 2, T018/T012 on the spigot, the spigot in MHA-DT-04's
-    # socket) are modelled line-to-line at their nominal sizes and need no
-    # allowance.
-    frozenset(
-        ("dt-cone-tip-bushing-1", "dt-cone-tip-gear-1")
-    ): _BUSHING_PRESS_GATE_LIMIT_MM3,
+    # The LOCTITE 638 bonded slip fits (T024 on land 2, T018/T012 on the
+    # spigot, the spigot in MHA-DT-04's socket, MHA-DT-38 on the pivot, #2469)
+    # are modelled line-to-line at their nominal sizes and need no allowance.
     # U30 (I22): each MHA-DT-VN-61 (1/4-20 MSC 40923906, major 6.35) in its #7
     # (5.105) MHA-DT-20 tap, as deep as the cut length runs past the post's
     # grip (the counterbore floor).  The smooth-annulus upper bound until the

@@ -51,16 +51,16 @@ def test_the_part_is_the_family_t006_on_its_own_identity() -> None:
 def test_stems_are_the_clusters_and_clear_the_tooth_cutter() -> None:
     assert spec.STEM_DIA_MM == cluster.STEM_DIA_MM == pytest.approx(0.0625 * 25.4)
     assert spec.SPIGOT_DIA_BAND == cluster.SPIGOT_DIA_BAND
-    # The pivot is turned to its measured mates (note 1): every in-limit
-    # MHA-DT-38 bore and MHA-DT-39 hole leave it a size, .0617-.0630.
-    low, high = (v / 25.4 for v in spec.PIVOT_MATCHED_LIMITS_MM)
-    assert (low, high) == (pytest.approx(0.0617), pytest.approx(0.0630))
-    assert spec.STEM_MAX_DIA_MM == spec.PIVOT_MATCHED_LIMITS_MM[1]
+    # Owner ruling 2026-11-20 (#2469): the pivot bonds in MHA-DT-38 on the
+    # shared .0625 reamer, so it turns on the spigot's band (#2530: never
+    # line to line) and prints it.
+    assert spec.PIVOT_DIA_BAND == cluster.PIVOT_DIA_BAND == spec.SPIGOT_DIA_BAND
+    assert spec.STEM_MAX_DIA_MM == spec.STEM_DIA_MM + max(spec.SPIGOT_DIA_BAND)
     assert spec.SPIGOT_LENGTH_MM == cluster.SPIGOT_LENGTH_MM
     assert spec.PIVOT_LENGTH_MM == cluster.PIVOT_LENGTH_MM
     # DT6-FORM1 runs off over both stems: every stem limit stands under the
     # smallest root envelope and under every actual cutter corner.
-    assert spec.CUTTER_RUNOFF_MM / 25.4 == pytest.approx(0.0105, abs=1e-5)
+    assert spec.CUTTER_RUNOFF_MM / 25.4 == pytest.approx(0.0109, abs=1e-5)
     corners = family.manufacturing_corner_profiles(6)
     assert min(c.root_radius_min_mm for c in corners) > spec.STEM_MAX_DIA_MM / 2.0
 
@@ -83,10 +83,11 @@ def test_the_fits_the_stems_make() -> None:
     # The spigot's bond: clearance at every limit, inside the compound's gap.
     low, high = spec.SPIGOT_BOND_CLEARANCE_MM
     assert 0.0 <= low < high <= cluster.RETAINING_COMPOUND_MAX_GAP_MM
-    # The bushing's press on the pivot: interference at every limit.
-    assert spec.PIVOT_PRESS_INTERFERENCE_MM[0] / inch == pytest.approx(0.0002, abs=5e-6)
-    assert spec.PIVOT_PRESS_INTERFERENCE_MM[1] / inch == pytest.approx(0.0010, abs=5e-6)
-    assert spec.inch_range(spec.PIVOT_PRESS_INTERFERENCE_MM) == ".0002-.0010"
+    # The bushing's bond on the pivot (#2469): the spigot's clearance, at
+    # every limit.
+    assert spec.PIVOT_BOND_CLEARANCE_MM == pytest.approx(spec.SPIGOT_BOND_CLEARANCE_MM)
+    assert spec.PIVOT_BOND_CLEARANCE_MM[0] / inch == pytest.approx(0.0003, abs=5e-6)
+    assert spec.PIVOT_BOND_CLEARANCE_MM[1] / inch == pytest.approx(0.0018, abs=5e-6)
     # The pivot runs in the end screw: clearance at every limit.
     assert 0.0 < spec.PIVOT_RUNNING_CLEARANCE_MM[0] < spec.PIVOT_RUNNING_CLEARANCE_MM[1]
 
@@ -113,21 +114,19 @@ def test_callouts_and_notes_name_every_mate_once() -> None:
     # Rule 26's fit name: the bond with its compound, the one MHA-DT-04 prints.
     assert spigot.startswith(f"BONDED FIT, {cluster.RETAINING_COMPOUND}, IN")
     pivot = callouts["PivotDia"]
-    assert pivot == f"PRESS AND RUNNING FIT\n{notes.PIVOT_NOTE_FLAG}"
+    assert pivot == f"BONDED AND RUNNING FIT\n{notes.PIVOT_NOTE_FLAG}"
     sheet = notes.sheet_notes().splitlines()
     assert len(sheet) <= 6
-    # One REF pivot diameter turned to its measured mates: pressed in the
-    # bushing, its end running in the end screw's hole; both mates by number
-    # and name, both ranges as the requirement.
-    pivot_note = " ".join(sheet[:3])
+    # One banded pivot diameter: bonded in the bushing, its end running in the
+    # end screw's hole; both mates by number and name.
+    pivot_note = " ".join(sheet[:2])
     assert sheet[0].startswith(
-        f"{notes.PIVOT_NOTE_NUMBER}. PIVOT: TURN TO ITS MEASURED MATES. "
-        "PRESS FIT IN MHA-DT-38"
+        f"{notes.PIVOT_NOTE_NUMBER}. PIVOT: BONDED FIT, "
+        f"{cluster.RETAINING_COMPOUND}, IN MHA-DT-38"
     )
     assert "MHA-DT-39 CONE TIP END SCREW" in pivot_note
-    assert spec.inch_range(spec.PIVOT_PRESS_INTERFERENCE_MM) in pivot_note
-    assert spec.inch_range(spec.PIVOT_RUNNING_CLEARANCE_MM) in pivot_note
-    assert sheet[3].startswith(f"{notes.TEETH_NOTE_NUMBER}. TEETH MESH WITH MHA-DT-12")
+    assert "MEASURED" not in pivot_note
+    assert sheet[2].startswith(f"{notes.TEETH_NOTE_NUMBER}. TEETH MESH WITH MHA-DT-12")
     assert sheet[-1] == "3. CENTRES OK."
     # The width says at the dimension that it is the cone's seat pitch on its
     # shaft (rule 3's pitch-geometry exemption); each line is shorter than the
@@ -153,11 +152,13 @@ def test_callouts_and_notes_name_every_mate_once() -> None:
     assert f"{spec.inch_text(minimum, 4)} TO {spec.inch_text(maximum, 4)}" in gear_data
 
 
-def test_yaml_carries_the_t006_tooth_band_ruling_only() -> None:
+def test_yaml_carries_the_t006_tooth_band_and_face_width_rulings_only() -> None:
     row = _config.parts(spec.PART_NAME)
     rows = row["machinist_exceptions"]
-    assert [entry["id"] for entry in rows] == ["RV-01"]
+    assert [entry["id"] for entry in rows] == ["RV-01", "RV-02"]
     assert "2026-11-09" in str(rows[0]) and "pull/1992" in str(rows[0])
+    # Owner ruling 2026-11-20 (#2631): the shared .2934 face width.
+    assert "#2631" in rows[1]["reason"] and ".2934" in rows[1]["where"]
 
 
 def test_custom_six_detail_reproduces_complete_finite_core_grinding_curves() -> None:
@@ -366,10 +367,10 @@ def test_tooth_space_plot_stands_beside_the_table() -> None:
     assert {1, root_end, junction_row, len(rows)} <= tagged
 
 
-# The lengths, the overall and the REF pivot print with no band of their own
-# (``.25``, ``(1.30)``, ``(Ø.0625)``); every other value carries a stacked
-# band (``.0625 +.0000/-.0010``).
-_UNBANDED = {"PivotLength", "SpigotLength", "overall", "PivotDia"}
+# The lengths and the overall print with no band of their own (``.25``,
+# ``(1.30)``); every other value, the pivot's included (#2469), carries a
+# stacked band (``.0625 +.0000/-.0010``).
+_UNBANDED = {"PivotLength", "SpigotLength", "overall"}
 # A diameter's text hangs beside its vertical dimension line, not across it:
 # left of the line for the pivot and the tip, right of it for the spigot
 # (farm runs 20261111T234611671Z and 20261112T053742990Z: the spigot block

@@ -78,6 +78,7 @@ from dt_cone_tip_gear_spec import (
     MM_PER_IN,
     OVERALL_LENGTH_MM,
     PATTERN_AXIS,
+    PIVOT_DIA_BAND,
     PIVOT_LENGTH_MM,
     PROFILE,
     REFERENCE_SKETCHES,
@@ -361,12 +362,14 @@ def build(adapter: Any) -> dict[str, str]:
 
     # Bands on the model dimensions (millimetres; UNIT prints them in decimal
     # inch at the nominal's places), then the part-owned places.  The pivot
-    # carries none: it prints REF, turned to its measured mates (note 1).
+    # prints the spigot's band (#2469: bonded in MHA-DT-38, running in
+    # MHA-DT-39).
     for feature, name, band in (
         (BLANK_DIA_REFERENCE_SKETCH, "BlankDia", BLANK_DIA_BAND),
         ("Blank", "FaceWidth", FACE_WIDTH_BAND),
         (TOOTH_REFERENCE_SKETCH, "ToothThickness", TOOTH_THICKNESS_BAND),
         ("SpigotProfile", "SpigotDia", SPIGOT_DIA_BAND),
+        ("PivotProfile", "PivotDia", PIVOT_DIA_BAND),
     ):
         set_dimension_bilateral_tolerance(
             adapter,

@@ -103,16 +103,17 @@ def test_the_cone_stack_step_prints_measured_limits() -> None:
 
 def test_the_tip_is_measured_dry_then_bonded_on_the_feeler_in_two_cures() -> None:
     """Owner decision C1 keyed (2026-11-09, PR #1992): the stack is measured
-    dry, MHA-DT-38 is pressed on the loose MHA-DT-37, and only then is T024
-    bonded one STACK_FEELER off T030 with the bonded gears phased to T030 by
-    the MHA-DT-03-TL-02 phasing comb, T030's blade beside the key (owner
-    rulings 2026-11-09 and 2026-11-10).  #2470: T024's joint is degreased,
-    the faces its squeeze-out reaches are waxed, and T024 is bonded, phased,
-    cured and accepted on the comb alone; step 2 then bonds and phases the
-    spigot's joints, the spigot held home in its blind socket, and accepts
-    the cured tip before the post goes on.  Each failed acceptance parts its
-    bonds, cleans the film out and redoes the round, the second from
-    MHA-DT-38's check, which the heat undoes."""
+    dry, MHA-DT-38 is bonded on the loose MHA-DT-37 (owner ruling
+    2026-11-20, #2469), and only then is T024 bonded one STACK_FEELER off
+    T030 with the bonded gears phased to T030 by the MHA-DT-03-TL-02 phasing
+    comb, T030's blade beside the key (owner rulings 2026-11-09 and
+    2026-11-10).  #2470: T024's joint is degreased, the faces its squeeze-out
+    reaches are waxed, and T024 is bonded, phased, cured and accepted on the
+    comb alone; step 2 then bonds and phases the spigot's joints, the spigot
+    held home in its blind socket, and accepts the cured tip before the post
+    goes on.  Each failed acceptance parts its bonds, cleans the film out and
+    redoes the round, the second from MHA-DT-38's bond, which the heat
+    undoes."""
     feeler = sheet.inch_text(cone_stack_end_play.STACK_FEELER, sheet.FEELER_PLACES)
     comb = "CLIP MHA-DT-03-TL-02"
 
@@ -134,7 +135,7 @@ def test_the_tip_is_measured_dry_then_bonded_on_the_feeler_in_two_cures() -> Non
         (
             "DRY, NO FEELER",
             drawing.acceptance_ref("cone-stack"),
-            "PRESS MHA-DT-38 ON THE MHA-DT-37 PIVOT",
+            "BOND MHA-DT-38 ON THE MHA-DT-37 PIVOT",
             "DEGREASE T024",
             "PASTE WAX",
             f"BOND T024 ON THE LAND, {feeler} FEELER ON T030",
@@ -149,7 +150,7 @@ def test_the_tip_is_measured_dry_then_bonded_on_the_feeler_in_two_cures() -> Non
         ),
     )
     assert "NONE ON THE LAND" in stack
-    assert bonds(stack[first[2] : first[6]]) == 1
+    assert bonds(stack[first[3] : first[6]]) == 1
     assert bonds(stack[first[6] :]) == 0
 
     post = _step_body("post-and-tip-block")
@@ -169,9 +170,7 @@ def test_the_tip_is_measured_dry_then_bonded_on_the_feeler_in_two_cures() -> Non
     )
     assert post.startswith("BOND T012")
     assert bonds(post[: second[2]]) == 2
-    assert "1M. CHECK THAT MHA-DT-38 DOES NOT TURN OR SLIDE BY HAND." in "\n".join(
-        SEQUENCE_BLOCKS
-    )
+    assert "1L. BOND MHA-DT-38 ON THE MHA-DT-37 PIVOT" in "\n".join(SEQUENCE_BLOCKS)
 
 
 def test_the_end_screw_sets_the_end_play_after_the_pivot_runs_free() -> None:
@@ -206,27 +205,18 @@ def test_the_end_screw_sets_the_end_play_after_the_pivot_runs_free() -> None:
     positions = [fitup.find(phrase) for phrase in order]
     assert -1 not in positions, positions
     assert positions == sorted(positions)
-    # Rule 20 (Codjiflo review of PR 2): the step that sets MHA-DT-39 prints
-    # DT-07's owner-accepted shortfall, and DT-07 quotes the same fact.
+    # #2726: the 3/4 end screw keeps rule 18's 1.5 D at the print-worst
+    # embed, so step 3A states no shortfall and DT-07 is retired.
     import build_dt_drive_train_assembly as assembly
-    import dt_drive_train_assembly_spec as assembly_spec
-
-    fact = assembly_spec.END_SCREW_ENGAGEMENT_ASSEMBLY_FACT
-    assert f"BACK MHA-DT-39 OFF 1/8 TURN: {fact}" in fitup
-    printed = re.fullmatch(r"ENGAGEMENT (\.\d{3}) MIN \((\d\.\d{2})D\)\.", fact)
-    assert printed is not None
-    printed_in, printed_d = (float(value) for value in printed.groups())
-    assert assembly.END_SCREW_ENGAGEMENT_WORST_MM - 0.0254 < printed_in * 25.4
-    assert printed_in * 25.4 <= assembly.END_SCREW_ENGAGEMENT_WORST_MM
-    assert printed_d <= assembly.END_SCREW_ENGAGEMENT_WORST_D < printed_d + 0.01
     from machinist_exceptions import load_exceptions
 
+    assert assembly.END_SCREW_ENGAGEMENT_WORST_D >= 1.5
+    assert "BACK MHA-DT-39 OFF 1/8 TURN:" not in fitup
     declared = {
-        entry.id: entry
+        entry.id
         for entry in load_exceptions(_config.CONFIG_DIR, "dt_drive_train_assembly", "assembly")
     }
-    assert declared["DT-07"].kind == "minor"
-    assert fact in declared["DT-07"].where
+    assert "DT-07" not in declared
 
 
 def test_the_printed_shaft_end_play_is_the_band_the_stacks_book() -> None:

@@ -89,12 +89,12 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         material="AISI 304",
     ),
     # MHA-DT-39 (owner decision C1 keyed, 2026-11-09, PR #1992): the cone
-    # tip's end screw, 91794A558 stock with its threaded end drilled and
+    # tip's end screw, 91794A559 stock with its threaded end drilled and
     # reamed for MHA-DT-37's pivot (a made part on stock, so no VN Number).
     "dt-cone-tip-end-screw": _stock(
         "dt-cone-tip-end-screw",
         "18-8 Stainless Steel Fillister Head Slotted Screw",
-        "91794A558",
+        "91794A559",
         material="AISI 304",
     ),
     "dt-vn-crank-seat-drive-pin": _stock(
