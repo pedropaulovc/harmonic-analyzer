@@ -15,6 +15,7 @@ import dt_cone_gear_tl_round_arbor_collar_spec as spec
 import dt_cone_gear_tl_round_arbor_spec as arbor
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_types import DrawingLayout
+from _inch_wall_limits import WALL_FLOOR_MM
 from _machinist_review_mode import MachinistReviewMode
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 
@@ -45,12 +46,22 @@ def test_registry_row_is_one_standalone_tooling_part_in_inch() -> None:
 def test_the_collar_is_the_arbors_and_3_8_stock_passes() -> None:
     assert spec.OUTER_DIA == arbor.COLLAR_DIA == pytest.approx(0.38 * INCH)
     assert spec.LENGTH == arbor.COLLAR_LENGTH == pytest.approx(0.30 * INCH)
-    assert spec.BORE == arbor.COLLAR_BORE == pytest.approx(0.250 * INCH)
+    assert spec.BORE == arbor.COLLAR_BORE == pytest.approx(0.228 * INCH)  # #1 drill
     stock = 0.375 * INCH
     assert spec.OUTER_DIA - XX <= stock - 0.002 * INCH
     assert stock <= spec.OUTER_DIA + XX
     assert spec.CALLOUTS_BELOW == {"OuterDia": "STOCK OK", "BoreDia": "DRILL THRU"}
     assert "3/8" in _config.parts(spec.PART_NAME)["material_specification"]
+    assert "#1 (.228) drill" in _config.parts(spec.PART_NAME)["process"]
+
+
+def test_the_collar_wall_holds_rule_17s_floor_at_the_printed_worst_case() -> None:
+    """Smallest OD (.38 - .01) over the largest drilled bore (.228 + .004):
+    (.370 - .232) / 2 = .069 in, over the .060 floor."""
+    wall = ((spec.OUTER_DIA - XX) - (spec.BORE + drilled_oversize_mm(unit="in"))) / 2.0
+    assert wall == pytest.approx(arbor.COLLAR_WALL_MIN)
+    assert wall == pytest.approx(0.069 * INCH)
+    assert wall >= WALL_FLOOR_MM
 
 
 def test_the_collar_slides_over_the_pilot_and_the_thread() -> None:
@@ -68,6 +79,7 @@ def test_the_collar_stands_under_t024s_root_and_backs_over_half_of_it() -> None:
     reach = spec.OUTER_DIA / 2.0 + XX + floating
     assert reach + arbor.AIR_MIN <= root / 2.0
     assert reach == pytest.approx(arbor.COLLAR_REACH)
+    assert reach == pytest.approx(0.2085 * INCH)
     assert spec.OUTER_DIA / root >= arbor.BACKING_SHARE_MIN
 
 

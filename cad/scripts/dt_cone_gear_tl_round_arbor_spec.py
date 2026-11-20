@@ -12,9 +12,10 @@ tail centre; the overhung compliance (1.85-2.59x the 64T setup, estimated
 
 So the blank slides onto this arbor's seat, bears on the integral shoulder
 and is clamped there by one backing collar (MHA-DT-03-TL-08) and a purchased
-#8-32 hex nut (MHA-DT-03-TL-VN-51), every one of them under T024's root. No
-key: a round bore takes no clock, so the teeth are cut wherever the head's
-first index lands.
+#8-32 hex machine screw nut (MHA-DT-03-TL-VN-51, catalogue-only: no kit
+assembly places it, so its fit is asserted here), every one of them under
+T024's root. No key: a round bore takes no clock, so the teeth are cut
+wherever the head's first index lands.
 
 One hold, as the keyed arbor's: the BS-0's 3-jaw grips the Ø.62 grip with
 its jaw faces on the grip's step, and the seat is indicated true there within
@@ -162,7 +163,7 @@ _PAIR = 2.0 * _XX
 GRIP_DIA = 0.62 * INCH
 GRIP_LENGTH = 0.75 * INCH
 STOCK_DIA = 0.625 * INCH
-if not GRIP_DIA - _XX <= STOCK_DIA - 0.002 * INCH and STOCK_DIA <= GRIP_DIA + _XX:
+if not (GRIP_DIA - _XX <= STOCK_DIA - 0.002 * INCH and STOCK_DIA <= GRIP_DIA + _XX):
     raise AssertionError("5/8 stock no longer passes as the grip")
 # Standoff: Ø.40, under T024's root, from the grip's step to the shoulder;
 # its end face is the integral shoulder the blank bears on.
@@ -181,8 +182,9 @@ SEAT_ENGAGEMENT_MIN = SEAT_LENGTH - _PAIR
 # the blank passes over it, over the thread's major so the thread is
 # reduced. A plain clearance size at the title block's .XXX band, never a
 # fit (the keyed arbor's pilot): its largest limit stands under the collar's
-# smallest drilled bore.
-PILOT_DIA = 0.244 * INCH
+# smallest drilled bore. Small enough that the #1-drilled collar keeps rule
+# 17's wall at Ø.38 (below).
+PILOT_DIA = 0.220 * INCH
 PILOT_END = 0.42 * INCH
 if not PILOT_DIA + _XXX < BORE_MIN_MM:
     raise AssertionError("the blank does not pass over the largest pilot")
@@ -199,12 +201,24 @@ THREAD_ROOT_MIN = THREAD_MAJOR_MIN - 1.22687 * THREAD_PITCH
 if not PILOT_DIA - _XXX > THREAD_MAJOR_MAX:
     raise AssertionError("the pilot no longer stands over the thread")
 # Thread relief, at least one pitch wide at its narrowest and under the
-# thread's root (rule 16).
-RELIEF_DIA = 0.10 * INCH
+# thread's root (rule 16), printed at .XXX so its smallest limit stays near
+# the root: it carries the nut's whole clamp tension and thread torque.
+RELIEF_DIA = 0.112 * INCH
 RELIEF_END = 0.48 * INCH
 ARBOR_END = 0.81 * INCH
-if RELIEF_DIA + _XX >= THREAD_ROOT_MIN:
+if RELIEF_DIA + _XXX >= THREAD_ROOT_MIN:
     raise AssertionError("the relief does not clear the thread root")
+# Its smallest section keeps at least the keyed arbor's share of its own
+# thread's tensile stress area: the keyed relief Ø.17 MIN over 1/4-28 UNF's
+# As .0364 in² is pi/4 * .17² / .0364 = .6236 (dt_cone_gear_tl_keyed_arbor_spec
+# RELIEF_DIA, restated so the keyed kit stays out of this closure). ASME B1.1
+# tensile stress area of #8-32 UNC: As = .0140 in².
+THREAD_STRESS_AREA_MM2 = 0.0140 * INCH**2
+RELIEF_AREA_SHARE_MIN = 0.6236
+RELIEF_AREA_MIN_MM2 = math.pi / 4.0 * (RELIEF_DIA - _XXX) ** 2
+RELIEF_AREA_SHARE = RELIEF_AREA_MIN_MM2 / THREAD_STRESS_AREA_MM2
+if RELIEF_AREA_SHARE < RELIEF_AREA_SHARE_MIN:
+    raise AssertionError("the relief's least section is weaker than the keyed arbor's")
 RELIEF_WIDTH_MIN = (RELIEF_END - _XX) - (PILOT_END + _XX)
 if RELIEF_WIDTH_MIN < THREAD_PITCH:
     raise AssertionError("the thread relief is under one pitch (rule 16)")
@@ -236,7 +250,7 @@ SHOULDER_REACH = STANDOFF_DIA / 2.0 + _XX
 if SHOULDER_REACH > ROOT_REACH_MAX + 1e-9:
     raise AssertionError("the cutter meets the shoulder")
 # The collar: 3/8 cold-finished bar left at stock (.373-.375 lies in .38
-# +/-.01), faced to length and drilled through with an E (1/4) drill.
+# +/-.01), faced to length and drilled through with a #1 (.228) drill.
 COLLAR_DIA = 0.38 * INCH
 COLLAR_STOCK_DIA = 0.375 * INCH
 if not (
@@ -245,12 +259,20 @@ if not (
 ):
     raise AssertionError("3/8 stock no longer passes as the collar")
 COLLAR_LENGTH = 0.30 * INCH
-COLLAR_BORE = 0.250 * INCH
+COLLAR_BORE = 0.228 * INCH
 COLLAR_FLOAT = ((COLLAR_BORE + _DRILL_PLUS) - (PILOT_DIA - _XXX)) / 2.0
 if COLLAR_BORE - (PILOT_DIA + _XXX) <= 0.0:
     raise AssertionError("the collar does not slide over the largest pilot")
 if COLLAR_BORE <= THREAD_MAJOR:
     raise AssertionError("the collar does not pass over the thread")
+# The collar's wall at the printed worst case (rule 17): the smallest OD over
+# the largest drilled bore. The OD is left at stock, so drill and OD are not
+# turned together.
+COLLAR_WALL_MIN = ((COLLAR_DIA - _XX) - (COLLAR_BORE + _DRILL_PLUS)) / 2.0
+if COLLAR_WALL_MIN < WALL_FLOOR_MM:
+    raise AssertionError(
+        f"collar wall {COLLAR_WALL_MIN / INCH:.4f} in under rule 17's .060 floor"
+    )
 # Largest radius the collar reaches: its .XX band and its float on the pilot.
 COLLAR_REACH = COLLAR_DIA / 2.0 + _XX + COLLAR_FLOAT
 if COLLAR_REACH > ROOT_REACH_MAX + 1e-9:
@@ -433,7 +455,7 @@ _PLACES_BY_NAME: dict[str, int] = {
     "PilotDia": 3,
     "PilotEnd": 2,
     "ThreadDia": 3,
-    "ReliefDia": 2,
+    "ReliefDia": 3,
     "ReliefEnd": 2,
     "Overall": 2,
     "ShoulderR": 3,

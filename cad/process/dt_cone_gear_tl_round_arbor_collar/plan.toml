@@ -10,9 +10,9 @@ shop = "../shop.toml"
 stock_refs = ["1018-round-3-8"]
 
 [[tools]]
-id = "riser-drill-quarter"
-name = "1/4 (E) drill"
-ref = "riser-drill-quarter"  # drawing callout 2026-11-20: Ø.250 DRILL THRU (#2356)
+id = "drill-1"
+name = "#1 (.228) drill"
+ref = "drill-1"  # drawing callout 2026-11-20: Ø.228 DRILL THRU (#2356)
 
 [[setups]]
 machine_kind = "other"

@@ -2146,17 +2146,6 @@
       ]
     },
     {
-      "old_stem": "dt-cone-gear-tl-vn-round-arbor-nut",
-      "old_number": null,
-      "introduced": "2026-11-20",
-      "new_identities": [
-        {
-          "stem": "dt-cone-gear-tl-vn-round-arbor-nut",
-          "number": "MHA-DT-03-TL-VN-51"
-        }
-      ]
-    },
-    {
       "old_stem": "dt-cone-gear-tl-indexing",
       "old_number": null,
       "introduced": "2026-11-02",

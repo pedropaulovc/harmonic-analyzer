@@ -792,7 +792,7 @@ diameter_mm = 5.2197
 [tools.drill-3]  # Drills #3
 description = "#3 (.2130 in) drill, 115-piece index"
 diameter_mm = 5.4102
-[tools.drill-1]  # Drills #1
+[tools.drill-1]  # Drills #1; MHA-DT-03-TL-08 Ø.228 DRILL THRU (drawing callout 2026-11-20, #2356)
 description = "#1 (.2280 in) drill, 115-piece index"
 diameter_mm = 5.7912
 [tools.drill-b]  # Drills B
@@ -1125,7 +1125,7 @@ description = "PM-1127VF-LB steady rest"
 description = "#10-32 UNF bottoming pulley tap, 6 in overall, 4 flutes (Regal 015326AS)"
 [tools.telescoping-gauges-starrett-s579gz]  # inventory gauges.telescoping-gauges-starrett-s579gz
 description = "Starrett S579Gz telescoping bore gauge set, 4 pieces"
-[tools.threading-bits-lms-6685]  # MHA-DT-03-TL-03 1/4-28 UNF single-pointed (owner 2026-11-19); MHA-PD-08 #8-32 UNC single-pointed (owner 2026-11-19); MHA-MG-03 1/4-20 UNC single-pointed (owner 2026-11-19)
+[tools.threading-bits-lms-6685]  # MHA-DT-03-TL-03 1/4-28 UNF single-pointed (owner 2026-11-19); MHA-PD-08 #8-32 UNC single-pointed (owner 2026-11-19); MHA-MG-03 1/4-20 UNC single-pointed (owner 2026-11-19); MHA-DT-03-TL-07 #8-32 UNC single-pointed (drawing callout 2026-11-20, #2356)
 description = "5/16 in HSS threading tool bit, set of two (LMS 6685)"
 
 # --- Stock the process plans name (stock_refs) ---------------------------------

@@ -11,4 +11,4 @@ dt-cone-gear-tl-round-arbor-collar:
   quantity: 1
   tolerance_class: machined_block
   drawing_unit: in
-  process: "face to length from 3/8 in round bar left at stock diameter; drill the bore through with an E (1/4) drill; break edges"
+  process: "face to length from 3/8 in round bar left at stock diameter; drill the bore through with a #1 (.228) drill; break edges"

@@ -156,6 +156,8 @@ def test_the_shoulder_collar_and_nut_stand_under_t024s_root() -> None:
         spec.COLLAR_BORE + drilled_oversize_mm(unit="in") - (spec.PILOT_DIA - XXX)
     ) / 2.0
     assert spec.COLLAR_FLOAT == pytest.approx(floating)
+    assert spec.COLLAR_FLOAT == pytest.approx(0.0085 * INCH)
+    assert spec.COLLAR_REACH == pytest.approx(0.2085 * INCH)
     assert spec.COLLAR_DIA / 2.0 + XX + floating <= limit
     assert spec.COLLAR_DIA / spec.BLANK.root_min_dia >= spec.BACKING_SHARE_MIN
     corners = spec.NUT_ACROSS_FLATS / math.cos(math.radians(30.0))
@@ -165,12 +167,19 @@ def test_the_shoulder_collar_and_nut_stand_under_t024s_root() -> None:
 
 
 def test_the_collar_slides_on_the_pilot_and_the_blank_passes_over_it() -> None:
+    """Pilot Ø.220 at .XXX (.215-.225) under the #1-drilled collar (.228)."""
+    assert spec.PILOT_DIA == pytest.approx(0.220 * INCH)
     assert spec.PILOT_DIA + XXX < spec.BORE_MIN_MM
     assert spec.COLLAR_BORE - (spec.PILOT_DIA + XXX) > 0.0
-    assert spec.PILOT_DIA - XXX > spec.THREAD_MAJOR_MAX
+    assert spec.PILOT_DIA - XXX > spec.THREAD_MAJOR_MAX + 0.005 * INCH
     assert spec.COLLAR_BORE > spec.THREAD_MAJOR
     assert spec.NUT_ACROSS_FLATS > spec.COLLAR_BORE + drilled_oversize_mm(unit="in")
     assert spec.DRAWING_PRECISION_BY_NAME["PilotDia"] == 3
+    wall = (
+        (spec.COLLAR_DIA - XX) - (spec.COLLAR_BORE + drilled_oversize_mm(unit="in"))
+    ) / 2.0
+    assert wall == pytest.approx(spec.COLLAR_WALL_MIN)
+    assert wall >= WALL_FLOOR_MM
 
 
 def test_the_nut_clamps_on_full_thread_with_thread_to_spare() -> None:
@@ -187,19 +196,36 @@ def test_the_nut_clamps_on_full_thread_with_thread_to_spare() -> None:
     assert nearest_collar_face - (spec.RELIEF_END + 2.0 * XX) > 2.0 * pitch
     assert spec.PILOT_END + 2.0 * XX < nearest_collar_face
     assert (spec.PILOT_END - 2.0 * XX) - spec.BLANK.face[1] >= 0.10 * INCH
+    assert spec.PILOT_ENGAGEMENT_MIN == pytest.approx(0.10458 * INCH, abs=1e-4)
 
 
 def test_the_relief_is_a_pitch_wide_and_under_the_b1_1_root() -> None:
     """ASME B1.1 #8-32 UNC-2A major .1631/.1571; the UNR root stands
-    1.22687 p under the major."""
+    1.22687 p under the major. The relief prints Ø.112 at .XXX (.107-.117)."""
     pitch = INCH / 32.0
     assert spec.THREAD_PITCH == pytest.approx(pitch)
     assert spec.THREAD_MAJOR_MAX == pytest.approx(0.1631 * INCH)
     assert spec.THREAD_MAJOR_MIN == pytest.approx(0.1571 * INCH)
     root = 0.1571 * INCH - 1.22687 * pitch
     assert spec.THREAD_ROOT_MIN == pytest.approx(root)
-    assert spec.RELIEF_DIA + XX < root
+    assert spec.RELIEF_DIA == pytest.approx(0.112 * INCH)
+    assert spec.DRAWING_PRECISION_BY_NAME["ReliefDia"] == 3
+    assert spec.RELIEF_DIA + XXX < root
     assert (spec.RELIEF_END - XX) - (spec.PILOT_END + XX) >= pitch
+
+
+def test_the_relief_keeps_the_keyed_arbors_share_of_the_stress_area() -> None:
+    """ASME B1.1 tensile stress areas: #8-32 UNC .0140 in², 1/4-28 UNF
+    .0364 in². The keyed arbor's relief Ø.18 at .XX leaves Ø.17 MIN; the
+    round arbor's least relief section keeps at least that share."""
+    keyed_share = math.pi / 4.0 * 0.17**2 / 0.0364
+    assert spec.RELIEF_AREA_SHARE_MIN == pytest.approx(keyed_share, abs=1e-4)
+    least = math.pi / 4.0 * (spec.RELIEF_DIA - XXX) ** 2
+    assert least == pytest.approx(spec.RELIEF_AREA_MIN_MM2)
+    assert spec.THREAD_STRESS_AREA_MM2 == pytest.approx(0.0140 * INCH**2)
+    share = least / spec.THREAD_STRESS_AREA_MM2
+    assert share >= keyed_share
+    assert share == pytest.approx(0.642, abs=1e-3)
 
 
 def test_no_centre_hole_and_no_keyseat() -> None:
