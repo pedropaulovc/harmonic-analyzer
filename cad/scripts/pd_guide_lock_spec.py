@@ -54,7 +54,7 @@ HOLE_Y = 3.937  # .155
 # (user ruling 2026-10-11): lip + .29 rail + bar overlap. The bar fills the
 # channel to a running clearance over the bottom rail
 # (pd_support_bar_spec.BAR_HEIGHT), so the plate overlaps the bar ~3.9 at the
-# top rail (which hangs on it) and ~2.7 at the bottom rail. The height
+# top rail (which hangs on it) and ~2.4 at the bottom rail. The height
 # prints .XX: its least size still overlaps the bar over the 0.5 retention
 # floor with the lifted top plates, its largest clears the latch hook and
 # pivot spacer (build_pd_paper_drive_assembly's lock-station sweep).

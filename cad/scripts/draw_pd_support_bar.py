@@ -1,6 +1,6 @@
 r"""Create the curated machinist drawing for the platen support bar (MHA-PD-07).
 
-A 17.8 x 1.010 x .374 steel bar clamped across the frame columns, printed in
+A 17.8 x 1.00 x .374 steel bar clamped across the frame columns, printed in
 decimal inch (#290). Its BACK face
 carries the transgear pivot's #8-32 through tap and the latch hook's two
 #4-40 through taps on one row; its FRONT face, which the platen slides on,
@@ -8,15 +8,16 @@ carries the four clamp screws: two counterbored holes on the east column and
 two counterbored slots on the west one (owner ruling 2026-10-15, option A).
 
 * The principal view looks on the back face (model +Z, ``*Front``), with no
-  label: the length, the hanger row's banded stations from the left end and
+  label: the length, the hanger row's stations from the left end and
   its height from the top face (the part-hidden HangerRowReference sketch),
   both countersinks' MAX Ø (CountersinkReference) each under its tap and
-  over the mate its banded row locates, and the top face's slide roughness.
+  over the mate its row locates, and the top face's slide roughness.
 * VIEW D, below it, looks on the front face (``*Back``, a rear view, so the
   left end is on the sheet's right), its viewing arrow on section A-A: the
-  height, the clamp row's banded stations from the same end and its banded
+  height, the clamp row's stations from the same end and its
   height (ClampRowReference), the round counterbores' native callout (size,
-  drill, counterbore; depth at .XX, sizes at .XXX) naming the back-arc taps
+  drill, counterbore; the counterbore's Ø the 5/16 plunge's .3125 +.010/0,
+  depth at .XX, the drill at .XXX) naming the back-arc taps
   the row locates to, and the front face's slide roughness. Each roughness
   symbol names the part that slides there; the sheet has no general note.
 * Detail C looks face-on at the outer slot: the slot's and its
@@ -122,6 +123,8 @@ from pd_support_bar_spec import (
 from pd_support_bar_drawing_spec import (
     BACK_VIEW_CAPTION,
     CLAMP_CALLOUT_PRECISION,
+    CLAMP_CBORE_DIA_LIMIT_PLACES,
+    CLAMP_CBORE_DIA_LIMITS,
     CLAMP_EAST_HEIGHT_NAME,
     CLAMP_CBORE_CALLOUT,
     CLAMP_HOLE_PROCESS,
@@ -210,7 +213,7 @@ def _back_x(model_x: float) -> float:
 # off its end over END A's half of the bar, its text right of the top slide
 # symbol's leader and under its shelf (round 7 review blocker: that run had
 # no height; VIEW D's END A side carries the round holes' callout and leader,
-# END A, the 1.010 and the stations).
+# END A, the 1.00 and the stations).
 # The section line runs up through the pivot, its arrows and letters left of
 # it. Every location carries its value and band alone (rule 7; the hook
 # taps' stations REF, their callout's spotting route sets them): the mate
@@ -1412,7 +1415,57 @@ def _name_clamp_screws(display: Any) -> None:
             f"expected={updated!r}, resolved={read((1, 2, 3, 4))!r}"
         )
     set_hole_callout_precision(display, CLAMP_CALLOUT_PRECISION, label=label)
+    _band_counterbore_diameter(display)
     _telemetry.info(f"{label} callout: definitions={persisted!r}")
+
+
+_TOL_BILATERAL = 2  # swTolType_e.swTolBILAT
+
+
+def _band_counterbore_diameter(display: Any) -> None:
+    """Print the round counterbores' Ø as the 5/16 plunge's .3125 +.010/0
+    (owner ruling 2026-11-20, #2422; CLAMP_CBORE_DIA_LIMITS). A hole callout
+    variable carries its OWN tolerance (SW 2016+:
+    ``ICalloutVariable.ToleranceType``), so the band is set and read back on
+    the callout, as draw_sm_knife_mount._band_tap_callout does; the through
+    hole and depth keep no band of their own (DRILLED HOLES and the .XX row)."""
+    from win32com.client.dynamic import Dispatch as dynamic_dispatch
+
+    lower, upper = CLAMP_CBORE_DIA_LIMITS
+    matches = []
+    for raw in display.GetHoleCalloutVariables() or ():
+        # Concrete callout interfaces alias the generic metadata DISPIDs.
+        variable = dynamic_dispatch(raw._oleobj_)
+        if str(variable.VariableName) == "hw-cbdia":
+            matches.append((raw, variable))
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"clamp counterbore callout carries {len(matches)} hw-cbdia variables, not 1"
+        )
+    raw, variable = matches[0]
+    length = _early_bound(raw, "ICalloutLengthVariable")
+    actual = float(length.Length) * 1000.0
+    if abs(actual - CLAMP_CBORE_DIA) > 1e-5:
+        raise RuntimeError(
+            f"clamp counterbore callout Ø reads {actual:g}, expected {CLAMP_CBORE_DIA:g} mm"
+        )
+    variable.ToleranceType = _TOL_BILATERAL
+    variable.ToleranceMin = lower / 1000.0
+    variable.ToleranceMax = upper / 1000.0
+    length.TolerancePrecision = CLAMP_CBORE_DIA_LIMIT_PLACES
+    if (
+        int(variable.ToleranceType) != _TOL_BILATERAL
+        or abs(float(variable.ToleranceMin) * 1000.0 - lower) > 1e-5
+        or abs(float(variable.ToleranceMax) * 1000.0 - upper) > 1e-5
+        or int(length.TolerancePrecision) != CLAMP_CBORE_DIA_LIMIT_PLACES
+    ):
+        raise RuntimeError(
+            "clamp counterbore callout band did not persist: wanted swTolBILAT, "
+            f"deviations {(lower, upper)} mm at {CLAMP_CBORE_DIA_LIMIT_PLACES} places"
+        )
+    _telemetry.info(
+        f"clamp counterbore callout Ø {CLAMP_CBORE_DIA:g} mm, band {(lower, upper)} mm"
+    )
 
 
 def _set_countersink_suffixes(adapter: Any, annotations: list[Any]) -> None:

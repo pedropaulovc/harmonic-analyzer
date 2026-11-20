@@ -5,17 +5,19 @@ steel bar clamped across the two front columns by the two-piece column
 clamps (build_sh_column_clamp_front.py and build_sh_column_clamp_back.py), carrying the hanging platen
 (guides + locks on the platen back) and, on its own back face, the ch. 23
 transgear hanger (pivot screw MHA-PD-VN-57) and the latch hook (MHA-PD-14).
-Cross-section 1.010 tall x 9.5 deep (it fills the platen's guide channel to a
+Cross-section 1.00 tall x 9.5 deep (it fills the platen's guide channel to a
 running clearance over the bottom rail; ``pd_support_bar_spec.BAR_HEIGHT``
-carries the photo chain); 17.8 in long so the ends run ~29 past each column
-(ch30 p002). The clamp line and hanger row keep their machine heights under the
-top edge, so they stand below the bar's centre line.
+carries the photo chain), from 3/8 x 1 CF flat with only its top (slide) edge
+skimmed (owner ruling 2026-11-20, #2421); 17.8 in long so the ends run ~29
+past each column (ch30 p002). The clamp line and hanger row keep their machine
+heights under the top edge, so they stand below the bar's centre line.
 The part builds in inch document units and its sheet prints decimal inch
 (#290); the section and stations keep their millimetre interfaces.
 
 Holes (all along local Z, the machine front-back axis):
 * 4x clamp screws flanking each column (x +-197 -+ 17.5): round counterbores
-  on the east column (END A, -X), which locate the bar, and counterbored
+  (a 5/16 end mill's plunge) on the east column (END A, -X), which locate the
+  bar, and counterbored
   slots along the bar on the west one, which take up the column pitch (owner
   ruling 2026-10-15, option A). The screw heads sit sub-flush in the BAR's
   front face so the refitted platen can slide across the east clamp, and
@@ -51,10 +53,7 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _drawing_precision import _named_dimension, apply_drawing_precision
-from _drawing_tolerances import (
-    set_dimension_bilateral_tolerance,
-    set_dimension_symmetric_tolerance,
-)
+from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _document_units import apply_package_model_units
 from _feature_tree import name_last_feature
 from _part_pmi import author_part_pmi
@@ -79,7 +78,8 @@ from _visibility import blank_reference_geometry
 from _drawing_prefix import set_dimension_prefix
 import _telemetry
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm, printed_deviations
-from sh_column_clamp_fit import BORE_DIAMETRAL_CLEARANCE
+from sh_column_clamp_fit import BACK_EAR_WANDER, BORE_DIAMETRAL_CLEARANCE
+from sh_column_clamp_fit import EAR_DRILL_WANDER_DEG
 from sh_column_clamp_fit import EAR_HEIGHT_BAND as BACK_ARC_TAP_HEIGHT_BAND
 from sh_column_clamp_fit import EAR_STATION_BAND as BACK_ARC_TAP_STATION_BAND
 from sh_vn_clamp_screw_spec import HEAD_DIA as CLAMP_HEAD_DIA
@@ -89,23 +89,25 @@ from _column_clamp_interface import BAR_DEPTH
 from frame_column_stations import COLUMN_X  # frame column line (frame assembly)
 from pd_support_bar_spec import (
     BACK_FACE_Z,
-    BAR_BAND_PLACES,
+    BAR_DEPTH_BAND,
+    BAR_DEPTH_PLACES,
     BAR_HEIGHT,
+    BAR_HEIGHT_PLACES,
     BRACKET_TAP_CSK_DIA,
     BRACKET_TAP_SPEC,
     BRACKET_TAP_X,
     CLAMP_TAP_Y,
     HANGER_TAP_Y,
-    HOLE_POSITION_TOL,
     PIVOT_TAP_CSK_DIA,
     PIVOT_TAP_DRILL_DIA,
     PIVOT_TAP_X,
     UNIT,
 )
 from pd_support_bar_drawing_spec import (
-    BANDED_HANGER_NAMES,
     CLAMP_CENTRELINE_OVERRUN,
     CLAMP_EAST_HEIGHT_NAME,
+    CLAMP_CBORE_DIA_LIMITS,
+    CLAMP_CBORE_DIA_PLACES,
     CLAMP_HOLE_CALLOUT_PLACES,
     CLAMP_POSITION_PLACES,
     CLAMP_SLOT_CBORE_WIDTH_LIMITS,
@@ -140,8 +142,11 @@ CLAMP_SCREW_DX = 17.5006  # clamp screws flank each column (.689 clamp ear stati
 # (pd_support_bar_drawing_spec.CLAMP_CBORE_DEPTH_PLACES) and the title block's
 # ±.01 still leaves the head about .024 under the face at the shallowest: a
 # clearance needs only a minimum, so the nominal moves, not the band (Main
-# ruling on the r4 machinist over-specification).
-CLAMP_CBORE_DIA = 8.509  # .335
+# ruling on the r4 machinist over-specification). The round counterbores are
+# a 5/16 end mill's plunge, Ø.3125 +.010/0 (owner ruling 2026-11-20 (Pedro),
+# #2422; pd_support_bar_drawing_spec.CLAMP_CBORE_DIA_LIMITS): their head
+# clearance is clamp_round_head_clearance below.
+CLAMP_CBORE_DIA = 7.9375  # .3125, 5/16
 CLAMP_CBORE_DEPTH = 4.826  # .19
 CLAMP_HEAD_RECESS = CLAMP_CBORE_DEPTH - CLAMP_HEAD_H  # .034
 CLAMP_THROUGH_HOLE_SPEC = HoleSpec("clearance", "#8")
@@ -215,6 +220,33 @@ if clamp_position_zone(CLAMP_POSITION_BAND) + BACK_ARC_TAP_ZONE > CLAMP_HOLE_FLO
         f".XXX title-block clamp-hole position over-runs the {CLAMP_HOLE_FLOAT:.4f} "
         "float"
     )
+# Drill wander on the screw line (#1988): the MHA-SH-02 back-arc tap's own
+# (sh_column_clamp_fit.BACK_EAR_WANDER) and this bar's through hole's over its
+# thickest bar, at the same 0.3 deg, added to both position zones' worst
+# corner, run past the hole's radial float. Owner ruling 2026-11-20 (Pedro),
+# #1988, "Follow recommendations unless noted otherwise"; the recommendation
+# accepted: "Accept the ~0.046 shortfall as ruled, consistent with RV-02
+# (0.053) on the clamp front screw line; the worst case needs every wander
+# term to stack against the band limits." With the stations' rounding to the
+# printed .001 charged (clamp_position_zone) it is 0.0506; it may not grow.
+# The MHA-MG-08 wheel bar's identical screw line is held in
+# test_mg_wheel_bar_drawing.
+CLAMP_BAR_HOLE_WANDER = (BAR_DEPTH + BAR_DEPTH_BAND) * math.tan(
+    math.radians(EAR_DRILL_WANDER_DEG)
+)
+CLAMP_SCREW_LINE_DEMAND = (
+    clamp_position_zone(CLAMP_POSITION_BAND) / 2.0
+    + BACK_ARC_TAP_ZONE / 2.0
+    + BACK_EAR_WANDER
+    + CLAMP_BAR_HOLE_WANDER
+)
+CLAMP_SCREW_LINE_SHORTFALL = CLAMP_SCREW_LINE_DEMAND - CLAMP_HOLE_FLOAT / 2.0
+CLAMP_SCREW_LINE_SHORTFALL_RULED = 0.051
+if not 0.0 < round(CLAMP_SCREW_LINE_SHORTFALL, 3) <= CLAMP_SCREW_LINE_SHORTFALL_RULED:
+    raise AssertionError(
+        f"clamp screw-line shortfall {CLAMP_SCREW_LINE_SHORTFALL:.4f} is not the "
+        f"owner-ruled (0, {CLAMP_SCREW_LINE_SHORTFALL_RULED}]"
+    )
 
 # --- West clamp slots: owner ruling 2026-10-15, option A (PR #1471 r3) -------
 # The bar spans the two columns, whose pitch is not the bar's: the top frame
@@ -238,12 +270,13 @@ COLUMN_PITCH_DEVIATIONS = {
 CLAMP_ROUND_X = tuple(x for x in CLAMP_HOLE_X if x < 0.0)
 CLAMP_SLOT_X = tuple(x for x in CLAMP_HOLE_X if x > 0.0)
 # Each slot is the round hole's width run CLAMP_SLOT_TRAVEL each way along the
-# bar, inside the round counterbore's width run as far and as deep: the east
-# pair's screw, head seat and floor.
+# bar, under a counterbore run as far and as deep: the east pair's screw,
+# head seat and floor. The slot counterbore stays Ø.335 -.005/+.010, a 5/16
+# end mill stepped over (#2422 changed the round counterbores only).
 CLAMP_SLOT_RUN = 2.9972  # .118, straight sides, end centre to end centre
 CLAMP_SLOT_TRAVEL = CLAMP_SLOT_RUN / 2.0
 CLAMP_SLOT_WIDTH = CLAMP_HOLE_DIA
-CLAMP_SLOT_CBORE_WIDTH = CLAMP_CBORE_DIA
+CLAMP_SLOT_CBORE_WIDTH = 8.509  # .335
 CLAMP_SLOT_CBORE_RUN = CLAMP_SLOT_RUN
 # The round holes print under the title block's DRILLED HOLES row; the milled
 # slot carries the same limits on its own width.
@@ -323,6 +356,22 @@ def clamp_slot_head_clearance() -> float:
     return narrowest_cbore / 2.0 - (CLAMP_HEAD_DIA / 2.0 + float_across + overrun)
 
 
+def clamp_round_head_clearance() -> float:
+    """Least gap from a clamp-screw head to its round counterbore's wall: the
+    shank pushed its full float across the widest hole, against the narrowest
+    counterbore (Ø.3125 +.010/0, #2422). The hole and its counterbore are one
+    Hole Wizard feature, cut about one centre; this gap is what their
+    co-location error may spend."""
+    _, widest = _printed_limits(
+        CLAMP_HOLE_DIA, CLAMP_HOLE_CALLOUT_PLACES, DRILLED_HOLE_LIMITS
+    )
+    narrowest_cbore, _ = _printed_limits(
+        CLAMP_CBORE_DIA, CLAMP_CBORE_DIA_PLACES, CLAMP_CBORE_DIA_LIMITS
+    )
+    float_across = (widest - CLAMP_SCREW_MAJOR) / 2.0
+    return narrowest_cbore / 2.0 - (CLAMP_HEAD_DIA / 2.0 + float_across)
+
+
 # The head's least bearing beside a slot is held to the round counterbores'
 # own worst case (the same screw over the same DRILLED HOLES #8 clearance).
 CLAMP_HEAD_BEARING_MIN = clamp_head_bearing(
@@ -352,6 +401,11 @@ if clamp_slot_head_clearance() < 0.0:
     raise AssertionError(
         "MHA-SH-VN-53 heads reach past the slot counterbores' walls by "
         f"{-clamp_slot_head_clearance():.3f}"
+    )
+if clamp_round_head_clearance() < 0.0:
+    raise AssertionError(
+        "MHA-SH-VN-53 heads reach past the round counterbores' walls by "
+        f"{-clamp_round_head_clearance():.3f}"
     )
 
 REFERENCE_SKETCHES = (
@@ -1143,36 +1197,33 @@ def build(adapter) -> dict[str, str]:
     force_rebuild(adapter)
     volume_check(adapter, "driven bar (equations neutral)", expected, 0.005 * expected)
 
-    # The bottom rail's running clearance under the bar spends the height's
-    # band, and the pivot screw's tip recess and the bracket-screw tips the
-    # thickness's (pd_support_bar_spec.BAR_HEIGHT_BAND, BAR_DEPTH_BAND).
-    # Both are the title block's .XXX row, so the model dimensions carry
-    # them as their three places alone: an explicit ±.005 would restate the
-    # title block (drawing-guidelines rule 2; r4 machinist review); each
-    # names the stack it sets on the sheet (rule 4).
+    # The bottom rail's running clearance under the bar and the MHA-PD-12
+    # locks' overlap spend the height's band, and the pivot screw's tip recess
+    # and the bracket-screw tips the thickness's
+    # (pd_support_bar_spec.BAR_HEIGHT_BAND, BAR_DEPTH_BAND). Both are title
+    # block rows, the height's .XX (owner ruling 2026-11-20, #2421) and the
+    # thickness's .XXX, so the model dimensions carry them as their places
+    # alone: an explicit band would restate the title block (drawing-guidelines
+    # rule 2; r4 machinist review); the thickness names the stack it sets on
+    # the sheet (rule 4).
     apply_drawing_precision(
         adapter,
-        {"BarProfile": {"Height": BAR_BAND_PLACES}, "Bar": {"Depth": BAR_BAND_PLACES}},
+        {
+            "BarProfile": {"Height": BAR_HEIGHT_PLACES},
+            "Bar": {"Depth": BAR_DEPTH_PLACES},
+        },
     )
 
     # The rest of the print's places, then its bands and limits: the hanger
-    # row's height and the pivot's station carry the pivot position's ±.002
-    # (HOLE_POSITION_TOL; paper_drive_geom and transgear_hanger_joints read
-    # HOLE_POSITION_BAND, its printed reach, which the hook taps spotted
-    # through MHA-PD-14 still land within); the hook taps' stations print
-    # .XXX alone, as the drawing's REF (HOOK_TAP_REFERENCE_NAMES); the clamp
-    # holes' row and stations print .XXX alone, under the title block's
-    # CLAMP_POSITION_BAND; the countersinks their single MAX limits. The
-    # bands are millimetres; UNIT prints them in inches.
+    # row's height and stations print .XXX alone, under the title block's
+    # ±.005 (owner ruling 2026-11-20, #2422; paper_drive_geom and
+    # transgear_hanger_joints read pd_support_bar_spec.HOLE_POSITION_BAND, its
+    # printed reach), the hook taps' as the drawing's REF
+    # (HOOK_TAP_REFERENCE_NAMES); the clamp holes' row and stations print .XXX
+    # alone, under the title block's CLAMP_POSITION_BAND; the countersinks
+    # their single MAX limits. The bands are millimetres; UNIT prints them in
+    # inches.
     apply_drawing_precision(adapter, SHEET_PRECISION)
-    for name in BANDED_HANGER_NAMES:
-        set_dimension_symmetric_tolerance(
-            adapter,
-            "HangerRowReference",
-            name,
-            HOLE_POSITION_TOL,
-            display_unit=UNIT,
-        )
     _max_limit(adapter, "CountersinkReference", "PivotCskDia", PIVOT_TAP_CSK_DIA)
     _max_limit(adapter, "CountersinkReference", "BracketCskDia", BRACKET_TAP_CSK_DIA)
     # The milled west slots' width carries the drilled holes' limits (it is

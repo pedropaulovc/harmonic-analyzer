@@ -65,7 +65,7 @@ MATERIAL = "Plain Carbon Steel"
 # edge wall) + the .29 rail + the overlap behind the bar. The bar
 # (pd_support_bar_spec) closes the channel to a running clearance over the
 # bottom rail and carries the top rail on its top edge, so the .45 plate
-# overlaps the bar ~2.7 at the bottom stations and ~3.9 at the top
+# overlaps the bar ~2.4 at the bottom stations and ~3.9 at the top
 # (2026-07-07 field report: a 12-tall plate across the old 7 channel topped
 # out AT the bar's bottom edge and retained nothing at the bottom stations;
 # its 15.65 successor stood 9.65 over the bar at the top, toward the latch

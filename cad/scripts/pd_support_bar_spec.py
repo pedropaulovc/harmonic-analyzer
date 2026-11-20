@@ -33,11 +33,14 @@ import _config
 from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM, HoleSpec
 from _inch_wall_limits import WALL_TARGET_MM
 from _package_units import drawing_unit
-from _printed_tolerance import printed_deviations
+from _printed_tolerance import printed_band_mm, printed_deviations
 from _column_clamp_interface import BAR_DEPTH
 
 UNIT = drawing_unit("parts/pd-support-bar", _config.parts("pd-support-bar"))
-BAR_BAND_PLACES = 3  # both bands print .XXX
+# The height prints .XX and the thickness .XXX (owner ruling 2026-11-20,
+# #2421 option B; pd-support-bar.yaml RV-02).
+BAR_HEIGHT_PLACES = 2
+BAR_DEPTH_PLACES = 3
 
 
 def _printed_reach(value: float, places: int) -> float:
@@ -52,16 +55,20 @@ def _printed_reach(value: float, places: int) -> float:
 # width) and so do the rail centres in the ch22 back photo, so the rails'
 # datum faces stay put. Owner ruling 2026-11-01 (B2): the .29 rails grow into
 # the channel (the bottom rail's datum face sits just over the platen's rack
-# backer), so the bar is 1.010 (it was 28.0): the ch30 p002 front view
+# backer), so the bar fills it (it was 28.0): the ch30 p002 front view
 # measures the exposed bar right of the platen at ~25.5 tall and the ch22
 # back photo's bright band between the rails at ~25. One lock plate size
 # serves both rails (the user's 2026-10-11 ruling: lip + rail + bar overlap,
-# top and bottom).
-BAR_HEIGHT = 25.654  # 1.010
-# The bar's .XXX height band: the bottom rail's running clearance under the
-# bar spends it (build_pd_paper_drive_assembly._assert_lock_retention).
+# top and bottom). Owner ruling 2026-11-20 (Pedro), #2421, in his words: "B":
+# 1.00 tall at .XX from 3/8 x 1 CF flat with only the top (slide) edge
+# skimmed, the MHA-PD-12 lock unchanged (it was 1.010 at .XXX, which milled
+# both long edges of the bar off 3/8 x 1-1/4 stock).
+BAR_HEIGHT = 25.4  # 1.00
+# The bar's .XX height band: the bottom rail's running clearance under the
+# bar and the MHA-PD-12 locks' overlap of it spend it
+# (build_pd_paper_drive_assembly._assert_lock_retention).
 # build_pd_support_bar authors it natively on Height@BarProfile.
-BAR_HEIGHT_BAND = _printed_reach(BAR_HEIGHT, BAR_BAND_PLACES)
+BAR_HEIGHT_BAND = _printed_reach(BAR_HEIGHT, BAR_HEIGHT_PLACES)
 # Deep (Z), BAR_DEPTH (_column_clamp_interface, shared with the wheel
 # bar): the back face on the clamp arcs, the front face carrying the platen's
 # back. 9.5 (prints .374), not the 9.0 stock read, so the MHA-PD-VN-57 pivot
@@ -70,7 +77,7 @@ BAR_HEIGHT_BAND = _printed_reach(BAR_HEIGHT, BAR_BAND_PLACES)
 # The pivot screw's tip recess and the latch-hook-bracket-screw (MHA-SH-VN-52)
 # tips spend the bar's .XXX thickness band.
 # build_pd_support_bar authors it natively on Depth@Bar.
-BAR_DEPTH_BAND = _printed_reach(BAR_DEPTH, BAR_BAND_PLACES)
+BAR_DEPTH_BAND = _printed_reach(BAR_DEPTH, BAR_DEPTH_PLACES)
 BACK_FACE_Z = BAR_DEPTH / 2.0
 
 # The column clamps (SH column clamps, machine y 303.734) and the hanger row
@@ -94,12 +101,20 @@ BRACKET_TAP_CSK_DIA = 3.0988  # .122 MAX, both faces
 TAP_CSK_ANGLE_DEG = 90.0
 
 # --- Walls at the printed bands (contract §8) -------------------------------
-# The hanger row prints ±.002 at .XXX; its stations are off the .001 grid, so
-# a hole may stand up to half a step (.0005) further off its model position.
+# The hanger row (the pivot's station and the row's height from the top face)
+# prints .XXX under the title block's ±.005: owner ruling 2026-11-20 (Pedro),
+# #2422, "Follow recommendations unless noted otherwise", loosened from ±.002
+# because the transgear_hanger_joints and paper_drive_geom stacks still close
+# at ±.005 (the mesh is set at the latch). Its stations are off the .001 grid,
+# so a hole may stand up to half a step (.0005) further off its model position.
 HOLE_POSITION_PLACES = 3
-HOLE_POSITION_TOL = 0.0508  # ±.002
-HOLE_POSITION_BAND = HOLE_POSITION_TOL + 0.5 * 10.0**-HOLE_POSITION_PLACES * 25.4
+HOLE_POSITION_BAND = (
+    printed_band_mm(HOLE_POSITION_PLACES, unit=UNIT)
+    + 0.5 * 10.0**-HOLE_POSITION_PLACES * 25.4
+)
 _TAP_OVERSIZE_R = 0.025
+# The rows hang from the top face, so the bar's shortest height (its .XX
+# band) brings the lower edge up to them.
 WALLS: dict[str, tuple[float, float]] = {
     "pivot tap to the lower edge": (
         BAR_HEIGHT / 2.0 + HANGER_TAP_Y - THREAD_MAJOR_MM[PIVOT_TAP_THREAD] / 2.0,
@@ -107,6 +122,7 @@ WALLS: dict[str, tuple[float, float]] = {
         + HANGER_TAP_Y
         - THREAD_MAJOR_MM[PIVOT_TAP_THREAD] / 2.0
         - HOLE_POSITION_BAND
+        - BAR_HEIGHT_BAND
         - _TAP_OVERSIZE_R,
     ),
     "latch-hook taps to the lower edge": (
@@ -115,6 +131,7 @@ WALLS: dict[str, tuple[float, float]] = {
         + HANGER_TAP_Y
         - THREAD_MAJOR_MM[BRACKET_TAP_SPEC.size] / 2.0
         - HOLE_POSITION_BAND
+        - BAR_HEIGHT_BAND
         - _TAP_OVERSIZE_R,
     ),
 }

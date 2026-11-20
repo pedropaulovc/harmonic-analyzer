@@ -283,6 +283,13 @@ diameter_mm = 6.5278
 description = "5/16 in drill, 115-piece index"
 diameter_mm = 7.9375
 
+# The base-bar set's 5/16 in end mill (source as ch.toml's basebar-* records;
+# the ch plans named above use it); MHA-PD-07's plan plunges its round
+# counterbores with it too (#2422).
+[tools.basebar-counterbore]
+description = "5/16 in centre-cutting 2-flute end mill"
+diameter_mm = 7.9375
+
 # --- MHA-CH-06-TL-VN-84 leadscrew kit rework ---
 # Plan: cad/process/ch_rocker_arm_tl_vn_oblique_leadscrew_kit/plan.toml.
 

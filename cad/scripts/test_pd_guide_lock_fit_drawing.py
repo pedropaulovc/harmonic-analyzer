@@ -407,25 +407,26 @@ def _retention(monkeypatch, assembly) -> dict[str, float]:
 
 def test_one_lock_size_retains_the_platen_on_both_rails(monkeypatch) -> None:
     """User ruling 2026-10-11: the bar runs a clearance over the bottom rail and
-    one plate size serves both rails. At the printed worst case (bar 1.010
-    at .XXX, the top rail .29 at .XX, the bottom rail .624 at .XXX anywhere
-    in its y band, plate height .45 at .XX, the set plate's guide-side reach)
-    the bottom rail still clears the bar and each set plate still overlaps it,
-    the top plates with the platen lifted until its bottom rail meets the
-    bar."""
+    one plate size serves both rails. At the printed worst case (bar 1.00
+    at .XX, owner ruling 2026-11-20, #2421; the top rail .29 at .XX, the
+    bottom rail .624 at .XXX anywhere in its y band, plate height .45 at .XX,
+    the set plate's guide-side reach) the bottom rail still clears the bar and
+    each set plate still overlaps it, the top plates with the platen lifted
+    until its bottom rail meets the bar."""
     import build_pd_paper_drive_assembly as assembly
     import pd_support_bar_spec as bar
 
-    bar_height = 1.010 * IN
+    bar_height = 1.00 * IN
     assert bar.BAR_HEIGHT == pytest.approx(bar_height)
     bar_band = bar.BAR_HEIGHT_BAND
+    assert bar_band == pytest.approx(0.010 * IN)
     rail_low, rail_high = printed_deviations(_BOTTOM_RAIL, 3, unit="in")
     height_low, _ = printed_deviations(_HEIGHT, 2, unit="in")
     assert assembly._LOCK_HEIGHT_DEV == pytest.approx((height_low, -height_low))
     bottom_rail, top_rail = assembly.GUIDE_Y
     bar_bottom = top_rail - bar_height
     gap = bar_bottom - (bottom_rail + _BOTTOM_RAIL)
-    assert gap == pytest.approx(0.768, abs=1e-3)
+    assert gap == pytest.approx(1.022, abs=1e-3)
     reach = assembly.LOCK_SET_EDGE_REACH[1] - height_low
     lift = gap + bar_band - rail_low + _BOTTOM_Y_BAND
     bottom_low = bottom_rail + _BOTTOM_ROW - _HOLE_Y
@@ -440,6 +441,11 @@ def test_one_lock_size_retains_the_platen_on_both_rails(monkeypatch) -> None:
         "top": top_rail - top_plate[0] - reach - lift,
     }
     assert _retention(monkeypatch, assembly) == pytest.approx(expected, abs=1e-3)
+    # #2421 option B as put to the owner: rail gap .0172, overlaps .0358
+    # (hanging) and .0488 (lifted) against the .020 floor, the lock unchanged.
+    assert expected == pytest.approx(
+        {"clearance": 0.438, "bottom": 0.910, "top": 1.240}, abs=1e-3
+    )
     assert min(expected.values()) >= assembly.LOCK_SWEEP_FLOOR
     # Top plates just short of the retention floor lose the lifted platen's
     # top rail.

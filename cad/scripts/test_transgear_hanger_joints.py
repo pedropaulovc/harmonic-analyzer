@@ -315,8 +315,10 @@ def test_the_far_face_gate_refuses_the_three_quarter_pin(monkeypatch) -> None:
     grade; the gate refuses it and accepts the 7/8 pin set .516-.565 proud.
     With the hook's screw holes at the title block's ±.005 (delegated ruling
     2026-11-07, pending owner confirmation) the 3/4 dowel falls short even
-    in the 6.20 hole that once barely cleared."""
-    assert joints.LATCH_PIN_FAR_FACE_MARGIN_WORST > 0.6
+    in the 6.20 hole that once barely cleared. The bar's pivot tap at the
+    title block's ±.005 (owner ruling 2026-11-20, #2422; it was ±.002) leaves
+    the 7/8 pin 0.294 past the face."""
+    assert joints.LATCH_PIN_FAR_FACE_MARGIN_WORST == pytest.approx(0.294, abs=1e-3)
     # The retired 3/4 pin bottomed in a 6.20 hole printed .24: its proud
     # window, length grade and depth reach included.
     reach = 6.20 - (0.24 - 0.01) * 25.4

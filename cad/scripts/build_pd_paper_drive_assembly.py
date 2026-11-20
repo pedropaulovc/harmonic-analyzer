@@ -369,14 +369,15 @@ BOTTOM_GUIDE_Y_BAND = (
 # strip's printed screw floor above its flat top.
 RACK_SCREW_FLOOR_Y = GUIDE_Y[0] + BOTTOM_GUIDE.GUIDE_HEIGHT - BOTTOM_GUIDE.SCREW_CBORE_DEPTH
 BAR_TOP_Y = GUIDE_Y[1]
-BAR_CY = BAR_TOP_Y - BAR_HEIGHT / 2.0  # 304.907
+BAR_CY = BAR_TOP_Y - BAR_HEIGHT / 2.0  # 305.034
 # The SH column clamps' screw line, below the bar's centre (pd_support_bar_spec).
 CLAMP_Y = BAR_CY + BAR.CLAMP_TAP_Y  # 303.734
 # The bar fills the channel between the rails down to this running clearance
 # over the bottom rail's top edge (pd_support_bar_spec.BAR_HEIGHT). MHA-PD-27's
 # top stands BOTTOM_GUIDE.TOP_RISE above the former .29 bottom rail's, paid
-# from the former 0.98.
-BOTTOM_RAIL_CLEARANCE = 0.98 - BOTTOM_GUIDE.TOP_RISE
+# from the former 0.98; the 1.00 bar (it was 1.010; owner ruling 2026-11-20,
+# #2421) gives the channel back its 0.254.
+BOTTOM_RAIL_CLEARANCE = 0.98 + 0.254 - BOTTOM_GUIDE.TOP_RISE
 LOCK_Z0 = BAR_FRONT_Z + GUIDE_DEPTH  # -128.7: lock plates on the guide backs,
 # 0.7 behind the bar's back face -- they bridge the bar so the platen cannot
 # fall off it.

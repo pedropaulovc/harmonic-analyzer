@@ -35,8 +35,9 @@ from _gtol_planar import PlanarFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from _column_clamp_interface import BAR_DEPTH
 from pd_support_bar_spec import (
-    BAR_BAND_PLACES,
+    BAR_DEPTH_PLACES,
     BAR_HEIGHT,
+    BAR_HEIGHT_PLACES,
     BRACKET_TAP_SPEC,
     HOLE_POSITION_PLACES,
     PIVOT_TAP_THREAD,
@@ -51,13 +52,22 @@ CLAMP_POSITION_PLACES = 3
 # depth still sinks the clamp-screw head below the front face the platen
 # slides across (build_pd_support_bar.CLAMP_HEAD_RECESS).
 CLAMP_CBORE_DEPTH_PLACES = 2
-# Every native Hole Wizard length (the round counterbores' Ø, depth) prints
-# .XXX, under the title block's DRILLED HOLES row.
+# Every native Hole Wizard length but the round counterbores' Ø prints .XXX,
+# under the title block's DRILLED HOLES row.
 CLAMP_HOLE_CALLOUT_PLACES = 3
+# The round counterbores are a 5/16 end mill's plunge, Ø.3125 +.010/0 (owner
+# ruling 2026-11-20 (Pedro), #2422: "Follow recommendations unless noted
+# otherwise"; it was a Ø.335 no cutter makes). The callout carries that band
+# (draw_pd_support_bar), at four places so its .3125 low limit is the cutter's
+# own size: the .XX row's -.01 would let the MHA-SH-VN-53 head, floated across
+# its hole, meet the wall (build_pd_support_bar.clamp_round_head_clearance).
+CLAMP_CBORE_DIA_PLACES = 4
+CLAMP_CBORE_DIA_LIMITS = (0.0, 0.254)  # 0/+.010
+CLAMP_CBORE_DIA_LIMIT_PLACES = 3
 # By native Hole Wizard variable: the round counterbores' Ø's and depth.
 CLAMP_CALLOUT_PRECISION = {
     "hw-thruholedia": CLAMP_HOLE_CALLOUT_PLACES,
-    "hw-cbdia": CLAMP_HOLE_CALLOUT_PLACES,
+    "hw-cbdia": CLAMP_CBORE_DIA_PLACES,
     "hw-cbdepth": CLAMP_CBORE_DEPTH_PLACES,
 }
 # The west slots' runs need .XXX for the slid head's clearance to the slot
@@ -77,10 +87,9 @@ HANGER_STATION_NAMES = ("PivotTapStation", "BracketTapStation1", "BracketTapStat
 # The hook taps' stations print as REF, "(11.459)": the MHA-PD-14 hook is the
 # master, and SPOT THRU MHA-PD-14 AT ASSEMBLY on their callout sets their
 # position, so a band on them controls nothing (round 3 machinist review of
-# the fan-out). The pivot's station and the row height it shares keep the
-# ±.002 (HOLE_POSITION_TOL; owner exception RV-01 in pd-support-bar.yaml).
+# the fan-out). The pivot's station and the row height it shares print .XXX
+# under the title block's ±.005 (pd_support_bar_spec.HOLE_POSITION_BAND).
 HOOK_TAP_REFERENCE_NAMES = ("BracketTapStation1", "BracketTapStation2")
-BANDED_HANGER_NAMES = ("HangerRowHeight", "PivotTapStation")
 CLAMP_STATION_NAMES = (
     "ClampStation1",
     "ClampStation2",
@@ -91,7 +100,7 @@ CLAMP_STATION_NAMES = (
 # 7 review blocker: the round pair's east run carried no height): the west
 # run's ClampRowHeight off the +X end in VIEW D, the east run's off a stub
 # over its end in the principal view, the end's other side crowded in VIEW D
-# (the round holes' callout and leader, END A, the 1.010 and the stations).
+# (the round holes' callout and leader, END A, the 1.00 and the stations).
 CLAMP_EAST_HEIGHT_NAME = "ClampEastRowHeight"
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
@@ -113,9 +122,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ClampSlotCounterbores": {"ClampSlotCboreDepth"},
 }
 
-# The bar's two .XXX bands are authored first, by the build's own literal
-# (test_pd_guide_lock_fit_drawing pins it); the rest of the print's places
-# follow from here.
+# The bar's height (.XX) and thickness (.XXX) places are authored first, by
+# the build's own literal (test_pd_guide_lock_fit_drawing pins it); the rest
+# of the print's places follow from here.
 SHEET_PRECISION: dict[str, dict[str, int]] = {
     "BarProfile": {"Length": 1},
     "HangerRowReference": {
@@ -139,8 +148,8 @@ SHEET_PRECISION: dict[str, dict[str, int]] = {
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     **SHEET_PRECISION,
-    "BarProfile": {**SHEET_PRECISION["BarProfile"], "Height": BAR_BAND_PLACES},
-    "Bar": {"Depth": BAR_BAND_PLACES},
+    "BarProfile": {**SHEET_PRECISION["BarProfile"], "Height": BAR_HEIGHT_PLACES},
+    "Bar": {"Depth": BAR_DEPTH_PLACES},
 }
 
 # The two hole rows stand .020 apart (the taps .571, the clamp holes .551
@@ -163,34 +172,28 @@ HANGER_HEIGHT_X = 120.0
 # and band alone; the mate a hole's location serves stands once, on that
 # hole's size callout, and a callout carries at most two lines of words.
 DIMENSION_CALLOUTS = {
-    # The height and thickness print .XXX for the stacks they set, so each
-    # names its stack (rule 4: "a width that sets a stack names the stack";
-    # round 4 machinist review): the bottom rail's running clearance under the
-    # bar and the MHA-PD-12 lock's overlap of it
-    # (build_pd_paper_drive_assembly._assert_lock_retention), and the
-    # MHA-PD-VN-57 pivot screw's thread engagement, which at .XX falls under
-    # rule 18's 1.5D at the thinnest bar (transgear_hanger_joints).  Keeping
-    # both bands leaves pd_support_bar_spec, and every part importing it,
-    # unkeyed.
-    # Two short lines each: the height's text stands right of the round
-    # counterbores' callout (draw_pd_support_bar.BACK_KEEP); the thickness's
-    # left of section A-A's left extension line (a 28-character row ran
-    # through it, round 7 of the fan-out; draw_pd_support_bar.SECTION_KEEP).
-    "Height": "SETS MHA-PD-12\nRETENTION",
+    # The thickness prints .XXX for the stack it sets, so it names its stack
+    # (rule 4: "a width that sets a stack names the stack"; round 4 machinist
+    # review): the MHA-PD-VN-57 pivot screw's thread engagement, which at .XX
+    # falls under rule 18's 1.5D at the thinnest bar (transgear_hanger_joints).
+    # The height prints .XX alone (owner ruling 2026-11-20, #2421), so it
+    # carries no reason (rule 7).
+    # Two short lines: the thickness's text stands left of section A-A's left
+    # extension line (a 28-character row ran through it, round 7 of the
+    # fan-out; draw_pd_support_bar.SECTION_KEEP).
     "Depth": "SETS MHA-PD-VN-57\nENGAGEMENT",
     # One stacked callout per hole or pattern, on its countersink's MAX Ø
     # (machinist review round 5: a separate tap callout per hole put two
     # leaders on one small hole, arrowheads stacked): the tap line above, the
     # countersink symbol (DIMENSION_PREFIXES) before the Ø and the included
     # angle after its MAX (draw_pd_support_bar.COUNTERSINK_SUFFIX), the faces
-    # and the mate the hole's banded row height and station serve below. The
+    # and the mate the hole's row height and station serve below. The
     # thread class is the title block's (rule 2). The pivot is one hole
     # countersunk on both faces: no "2X", which on the hook taps' callout
     # counts holes (r6 machinist review, rule 12).
     # The hook taps' route (delegated ruling 2026-11-07, FoPdFab2 Q1):
     # spotted through the MHA-PD-14 base's holes at assembly, which sets
-    # their stations (HOOK_TAP_REFERENCE_NAMES, printed REF). The pivot's
-    # ±.002 is an owner exception (pd-support-bar.yaml RV-01).
+    # their stations (HOOK_TAP_REFERENCE_NAMES, printed REF).
     "PivotCskDia": "BOTH FACES\nLOCATES MHA-PD-VN-57",
     "BracketCskDia": "BOTH FACES\nSPOT THRU MHA-PD-14 AT ASSEMBLY",
     # The slot width's upper limit is the head's: wider, the MHA-SH-VN-53
