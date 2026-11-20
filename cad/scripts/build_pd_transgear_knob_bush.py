@@ -294,8 +294,8 @@ def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
-    # Datums A (shoulder) and B (bore), the bore's frame, and the bore's and
-    # both thrust faces' finishes, resolved by outward normal and offset.
+    # Datum A (shoulder), the bore's frame to it, and the bore's and both
+    # thrust faces' finishes, resolved by outward normal and offset.
     author_part_pmi(
         adapter,
         datums=PART_DATUMS,

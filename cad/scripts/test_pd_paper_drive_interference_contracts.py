@@ -167,6 +167,9 @@ def test_knob_stack_rows_follow_the_shaft_cup_collar_and_nut() -> None:
     under_head_behind_journal_end = cup.LENGTH - cup.CBORE_DEPTH - journal_end_in_cup
     assert under_head_behind_journal_end == pytest.approx(3.048)
     engaged = cup_screw.LENGTH - under_head_behind_journal_end
+    # The table's literal is the placed screw's engagement in the tap.
+    assembly = importlib.import_module("build_pd_paper_drive_assembly")
+    assert engaged == pytest.approx(assembly.KNOB_CUP_SCREW_ENGAGED)
     assert engaged <= shaft.REAR_TAP_FULL_THREAD_MIN
     pair = _pair("pd-vn-transgear-knob-cup-screw-1", "pd-transgear-knob-shaft-1")
     assert allowed[pair] == pytest.approx(

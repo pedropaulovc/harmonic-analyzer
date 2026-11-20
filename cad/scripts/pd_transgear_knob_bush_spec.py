@@ -4,12 +4,13 @@ PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure.  Every number is ``pd_transgear_knob_bush_geometry``'s (the numbers
 authority the bush, the plate it is pressed in, the knob-shaft stack and the
 paper-drive assembly share); this module adds only what the sheet needs: the
-printed places, the datums and the bore's frame, the finishes and the
+printed places, the datum and the bore's frame, the finishes and the
 printed callout text.
 
-Datum A is the shoulder face (it seats on MHA-PD-19's face A), datum B the
-bore.  The bore's perpendicularity to A (RV-02) moved here from the plate
-with the bore (owner ruling 2026-11-20 (Pedro), #2425).
+Datum A is the shoulder face (it seats on MHA-PD-19's face A); the bore
+carries no datum, since no frame references one (rule 5).  The bore's
+perpendicularity to A (RV-02) moved here from the plate with the bore
+(owner ruling 2026-11-20 (Pedro), #2425).
 
 Part frame (``pd_transgear_knob_bush_geometry``): axis local +Y, hub face
 y = 0, shoulder y = HUB_LENGTH, rear face y = LENGTH.
@@ -34,11 +35,8 @@ UNIT = BUSH.UNIT
 BORE_BAND = (max(BUSH.BORE_DIA_LIMITS), min(BUSH.BORE_DIA_LIMITS))
 
 
-# --- Datums and the bore's frame ----------------------------------------------
-PART_DATUMS = (
-    PartDatum("A", PlanarFace((0.0, 1.0, 0.0), BUSH.HUB_LENGTH)),
-    PartDatum("B", CylinderFace(BUSH.BORE_DIA)),
-)
+# --- Datum and the bore's frame -----------------------------------------------
+PART_DATUMS = (PartDatum("A", PlanarFace((0.0, 1.0, 0.0), BUSH.HUB_LENGTH)),)
 # The frame prints in inches (#290), plain (rule 26 bars the projected-zone
 # modifier; owner ruling 2026-11-08 (Pedro), #2144 item 4.1).  The bore's
 # tilt to A, carried to K's projected height
@@ -149,10 +147,12 @@ PRESS_CALLOUT = (
 # transgear_cluster_fit.F_CHAIN): it names both by drawing number, as the
 # plate's hub station did.
 HUB_LENGTH_CALLOUT = f"SETS {KNOB_SHAFT_NUMBER}\nAND {SPROCKET_NUMBER}"
-# The hub-to-rear-face length sets the cup's station on the shaft
-# (pd_transgear_knob_shaft_spec.CUP_FACE_STATION_BAND), as the plate's
-# hub-to-boss length did.
-LENGTH_CALLOUT = f"SETS CUP {KNOB_CUP_NUMBER}\nON SHAFT {KNOB_SHAFT_NUMBER}"
+# The hub-to-rear-face length places the bush's rear face on the knob shaft,
+# so its ±.002 is a term of the journal's stand-out behind it
+# (pd_transgear_knob_shaft_spec.JOURNAL_STANDOUT_BAND), the range the
+# MHA-PD-16 cup's supplied pilot absorbs by facing at fit-up
+# (pd_transgear_knob_cup_spec.FACING_REMOVAL, never negative).
+LENGTH_CALLOUT = f"SETS FACING RANGE\nOF CUP {KNOB_CUP_NUMBER}"
 # Below-text the part build authors on its source dimensions; the drawing
 # imports and reads it back (text set from the drawing writes through to the
 # built part, fleet issue #1942).

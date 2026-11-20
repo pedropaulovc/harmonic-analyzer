@@ -2127,9 +2127,12 @@ def _step_text(
         "COLLAR."
     )
     # Each a pair of sub-steps, one action each (machinist review, #2417).
+    # The cured LOCTITE 641 lets go only hot (rule 23: about 250 °C); the bush
+    # runs in oil, so the heat is kept off it (codjiflo review, #2425).
     knob_cup_off = (
-        f"UNSCREW THE {n['pd-vn-transgear-knob-cup-screw']} SCREW AND PULL THE "
-        f"{n['pd-transgear-knob-cup']} CUP OFF THE JOURNAL.",
+        f"UNSCREW THE {n['pd-vn-transgear-knob-cup-screw']} SCREW, THEN HEAT THE "
+        f"{n['pd-transgear-knob-cup']} CUP TO ABOUT 250\u00b0C, THE HEAT KEPT OFF THE "
+        f"{bush} BUSH'S OIL, AND PULL IT OFF THE JOURNAL.",
         f"DRAW THE {n['pd-transgear-knob-shaft']} SHAFT OUT FORWARD.",
     )
     pivot_unscrewed = (
@@ -2335,8 +2338,10 @@ def _step_text(
             _press_remedy("PIN", f"{n['pd-transgear-arm']} ARM", "latch-pin-pressed"),
             f"PRESS THE {bush} BUSH, STUB FIRST, INTO THE {n['pd-transgear-arm-plate']} "
             "PLATE FROM FACE A UNTIL ITS SHOULDER SEATS.",
-            f"IF IT SLIDES IN BY HAND, MAKE A NEW {n['pd-transgear-arm-plate']} PLATE AND "
-            f"REPEAT {s('pin-pressed', 2)}.",
+            # The bush is turned to the plate's measured hole, so a slip fit
+            # is an undersize bush, not a bad plate (codjiflo review, #2425).
+            f"IF IT SLIDES IN BY HAND, TAKE IT OUT, TURN A NEW {bush} BUSH TO THE "
+            f"PLATE'S MEASURED HOLE AND REPEAT {s('pin-pressed', 2)}.",
             f"CHECK: A {bush_seat_feeler} FEELER DOES NOT ENTER UNDER THE SHOULDER.",
             f"IF IT ENTERS, PRESS AGAIN; IF IT STILL ENTERS, MAKE A NEW "
             f"{n['pd-transgear-arm-plate']} PLATE AND {bush} BUSH AND REPEAT FROM "

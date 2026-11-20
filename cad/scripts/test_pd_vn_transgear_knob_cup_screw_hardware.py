@@ -44,7 +44,8 @@ def test_catalogue_and_recipe_are_the_verified_stock_screw() -> None:
     metadata = discovered_recipes()[spec.SKU]
     assert metadata.module == recipe.__name__
     assert metadata.callable_name == "build_91794A079"
-    assert metadata.threaded is True
+    # #2886: a new purchased SKU models a plain shank at the thread major.
+    assert metadata.threaded is False
 
 
 def test_nominals_are_the_catalogue_size() -> None:
@@ -96,3 +97,5 @@ def test_builder_preserves_the_supplied_frame(monkeypatch: pytest.MonkeyPatch) -
     assert components[0].transform == RigidTransform()
     assert captured["screw_axis_planes"] == ("Front Plane", "Right Plane")
     assert captured["material"] == part.SPEC.material
+    # Unthreaded: no simplified-view saver.
+    assert "save_threaded_part" not in captured

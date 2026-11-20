@@ -68,8 +68,6 @@ from pd_transgear_knob_cup_spec import (
     PILOT_DEPTH_FITTED_TEXT,
     SURFACE_FINISHES,
 )
-from pd_transgear_knob_shaft_spec import END_FLOAT
-from pd_rack_pinion_spec import inch_text
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
@@ -194,14 +192,12 @@ _FRONT_PICK = (
 )
 FRONT_FINISH = (_FRONT_PICK, (_FRONT_PICK[0] + 0.020, _FRONT_PICK[1] + 0.022))
 
-# Rule 19: the supply sizes and the fitted size, with the step that sets it.
-# Below the face view.
+# Rule 19: the supply sizes and the fitted size, with the step that sets it;
+# the float it sets and how are the assembly step's.  Below the face view.
 NOTES = (
     "NOTES:\n"
-    "1. LENGTH AND PILOT DEPTH ARE SUPPLY SIZES. AT\n"
-    f"   {step_ref('knob-stack-fitted')}, FACE THE FRONT FACE TO A FITTED\n"
-    f"   PILOT DEPTH {PILOT_DEPTH_FITTED_TEXT}, FOR {inch_text(END_FLOAT, 3)} END FLOAT\n"
-    f"   ON {BUSH_NUMBER}."
+    "1. LENGTH AND PILOT DEPTH ARE SUPPLY SIZES. FITTED\n"
+    f"   PILOT DEPTH {PILOT_DEPTH_FITTED_TEXT} AT {step_ref('knob-stack-fitted')}."
 )
 NOTES_XY = (0.020, 0.112)
 # The front face's finish caption names the face's function and its mate

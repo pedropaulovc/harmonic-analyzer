@@ -160,8 +160,10 @@ def test_each_tight_callout_names_its_mate_by_drawing_number() -> None:
     assert spec.HUB_LENGTH_CALLOUT == (
         f"SETS {shaft}\nAND {_number('pd-transgear-removable')}"
     )
+    # The ±.002 bounds the journal's stand-out, which the cup's supplied
+    # pilot absorbs by facing at fit-up.
     assert spec.LENGTH_CALLOUT == (
-        f"SETS CUP {_number('pd-transgear-knob-cup')}\nON SHAFT {shaft}"
+        f"SETS FACING RANGE\nOF CUP {_number('pd-transgear-knob-cup')}"
     )
     assert spec.DIMENSION_CALLOUTS == {
         "BushProfile": {
@@ -216,6 +218,28 @@ def test_the_short_wall_is_stated_as_a_plain_fact() -> None:
         assert word not in spec.BORE_CALLOUT
 
 
+def test_the_stated_wall_is_an_owner_minor_exception() -> None:
+    """Rule 20: approval lives off the sheet, as a minor exception naming the
+    stated value, under the 2026-11-01 thin-wall ruling."""
+    (rv03,) = [
+        row
+        for row in _config.parts(part.PART_NAME)["machinist_exceptions"]
+        if row["id"] == "RV-03"
+    ]
+    assert rv03["kind"] == "minor"
+    assert spec.WALL_TEXT in rv03["where"]
+    assert rv03["reason"].startswith(
+        "Owner ruling 2026-11-01: thin walls above the .060 floor but under the"
+        " .080 target, with no geometry escape, are accepted as package-specific"
+        " minor exceptions."
+    )
+    press_min = f"{(BUSH.PRESS_DIA + BUSH.PRESS_DIA_BAND[1]) / 25.4:.4f}"
+    bore_max = f"{(BUSH.BORE_DIA + max(BUSH.BORE_DIA_LIMITS)) / 25.4:.4f}"
+    longest = f"{(BUSH.LENGTH + BUSH.LENGTH_BAND) / 25.4:.3f}"
+    for fact in (press_min, bore_max, longest):
+        assert fact.removeprefix("0") in rv03["reason"], fact
+
+
 def _bush_geometry_fresh():
     fresh_spec = importlib.util.spec_from_file_location(
         "_bush_geometry_perturbed", BUSH.__file__
@@ -249,14 +273,16 @@ def test_the_shoulder_seats_past_the_plate_hole_mouth() -> None:
     assert spec.SHOULDER_ROOT_SUFFIX == " MAX"
 
 
-def test_datums_and_the_bore_frame() -> None:
-    """A is the shoulder face that seats on MHA-PD-19's face A, B the bore;
-    the bore carries ⊥ Ø.002 A, no projected zone (rule 26)."""
+def test_the_shoulder_is_the_one_datum_and_the_bore_frame() -> None:
+    """A is the shoulder face that seats on MHA-PD-19's face A; the bore
+    carries ⊥ Ø.002 A, no projected zone (rule 26), and no datum of its own,
+    since no frame references one (rule 5)."""
     datums = {datum.letter: datum.face for datum in spec.PART_DATUMS}
-    assert datums == {
-        "A": PlanarFace((0.0, 1.0, 0.0), BUSH.HUB_LENGTH),
-        "B": CylinderFace(BUSH.BORE_DIA),
+    assert datums == {"A": PlanarFace((0.0, 1.0, 0.0), BUSH.HUB_LENGTH)}
+    referenced = {
+        letter for control in spec.GEOMETRIC_CONTROLS for letter in control.datums
     }
+    assert referenced == set(datums)
     (control,) = spec.GEOMETRIC_CONTROLS
     assert control.key == "bore_perpendicularity"
     assert control.characteristic == "perpendicularity"

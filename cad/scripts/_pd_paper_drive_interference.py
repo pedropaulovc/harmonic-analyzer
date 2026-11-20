@@ -194,7 +194,7 @@ ALLOWED_PAIRS: Mapping[frozenset[str], float] = {
     frozenset(
         ("pd-vn-transgear-hub-key-pin-1", "pd-transgear-disc-hub-1")
     ): smooth_annulus_limit_mm3(1.5875, 1.5621, 7.9375),
-    # MHA-PD-VN-71 #2-56 x 3/8 fully threaded fillister
+    # MHA-PD-VN-71 #2-56 x 3/8 fillister, modelled plain at the thread major
     # (pd_vn_transgear_knob_cup_screw_spec, 91794A079) under-head on the
     # MHA-PD-16 cup web's rear face, 3.048 (.120)
     # behind the journal's end (the web's .252 from the cup front less the

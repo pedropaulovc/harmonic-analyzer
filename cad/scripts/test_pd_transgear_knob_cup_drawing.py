@@ -149,10 +149,13 @@ def test_supply_sizes_cite_note_1_and_the_note_gives_the_fitted_depth() -> None:
         assert drawing.SECTION_CALLOUTS[name] == "SEE NOTE 1"
     note = " ".join(drawing.NOTES.split())
     assert note.startswith("NOTES: 1. LENGTH AND PILOT DEPTH ARE SUPPLY SIZES.")
-    assert steps.step_ref("knob-stack-fitted") in note
-    assert f"FITTED PILOT DEPTH {spec.PILOT_DEPTH_FITTED_TEXT}" in note
+    assert note.endswith(
+        f"FITTED PILOT DEPTH {spec.PILOT_DEPTH_FITTED_TEXT} AT "
+        f"{steps.step_ref('knob-stack-fitted')}."
+    )
     assert spec.PILOT_DEPTH_FITTED_TEXT == ".116-.148"
-    assert f".008 END FLOAT ON {drawing.BUSH_NUMBER}" in note
+    # The float and the facing action are the assembly step's, not the part's.
+    assert "END FLOAT" not in note and "FACE THE" not in note
     # Below the face view, left of the section.
     assert drawing.NOTES_XY[1] < drawing.FACE_CENTER[1] - drawing.HALF_OD - 0.010
 

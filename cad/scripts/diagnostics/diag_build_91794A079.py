@@ -1,9 +1,10 @@
 r"""McMaster 91794A079 -- #2-56 x 3/8 18-8 stainless fillister screw.
 
 Catalog dimensions were read live on 2026-11-20 from the product page.
-Reuses the native fillister family laws; derived slot, dome, thread/runout
-and vendor-frame mapping are family assumptions, not verified vendor
-geometry. No vendor model has been harvested.
+A new purchased SKU (#2886): the native fillister family's head, slot and
+tip chamfer on a plain shank at the #2-56 basic major; the thread is not
+modelled.  The derived slot and dome are family assumptions, not verified
+vendor geometry. No vendor model has been harvested.
 
 Run standalone (SolidWorks open); without a vendor file this is catalog-only::
 
@@ -22,7 +23,7 @@ from _check import check  # noqa: E402
 from _session import run_build  # noqa: E402
 from _stock_recipe import stock_recipe  # noqa: E402
 from _mcmaster_91794a079 import FILLISTER_SIZE  # noqa: E402
-from diagnostics.diag_mcmaster_fillister import build_fillister  # noqa: E402
+from diagnostics.diag_mcmaster_fillister_plain import build_plain_fillister  # noqa: E402
 from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     OUT_DIR,
     assert_seat_sketch_baseline,
@@ -32,9 +33,9 @@ from diagnostics.diag_mcmaster_lib import (  # noqa: E402
 )
 
 
-@stock_recipe("91794A079", threaded=True)
+@stock_recipe("91794A079", threaded=False)
 def build_91794A079(adapter, truth=None):
-    build_fillister(adapter, "91794A079", FILLISTER_SIZE)
+    build_plain_fillister(adapter, FILLISTER_SIZE)
 
 
 def build_catalog(adapter) -> dict[str, str]:

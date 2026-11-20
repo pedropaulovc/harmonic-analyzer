@@ -7,8 +7,8 @@ diameters, the reamed bore, the hub station and the overall length (both
 from the hub face) and the shoulder root print together on solid cut edges.
 Datum A tags the shoulder face there, and both thrust faces carry their
 finish under a caption naming the part they bear on.  The face view, the
-``*Top`` orientation turned a quarter, carries the cutting plane, datum B on
-the bore, the bore's perpendicularity frame to A and the bore's running
+``*Top`` orientation turned a quarter, carries the cutting plane, the bore's
+perpendicularity frame to A and the bore's running
 finish.  Every callout row is authored on the part; the sheet reads them
 back.
 """
@@ -30,7 +30,6 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 
 from _check import check
 from _com import _early_bound
-from _drawing_attachment import _assert_attached_to
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -167,9 +166,8 @@ FACE_FINISHES = {
 DATUM_A_PICK = (SHOULDER_X, SECTION_CENTER[1] - (HALF_PRESS + HALF_HUB) / 2.0)
 DATUM_A_XY = (SHOULDER_X - 0.012, SECTION_CENTER[1] - HALF_HUB - 0.022)
 
-# The face view's bore: datum B's tag to its right, the perpendicularity
-# frame above the view (its top-left corner), the running finish below right.
-DATUM_B_XY = (FACE_CENTER[0] + HALF_HUB + 0.014, FACE_CENTER[1] + 0.012)
+# The face view's bore: the perpendicularity frame above the view (its
+# top-left corner), the running finish below right.
 FRAME_XY = (FACE_CENTER[0] - 0.030, FACE_CENTER[1] + HALF_HUB + 0.026)
 BORE_FINISH_XY = (FACE_CENTER[0] + HALF_HUB + 0.010, FACE_CENTER[1] - HALF_HUB - 0.008)
 FINISH_CHAR_HEIGHT = 0.0025
@@ -273,8 +271,8 @@ def _bore_landing(
 ) -> tuple[float, float]:
     """The point on the bore's circle in ``view`` facing ``toward`` (sheet m).
 
-    A datum tag on a circle keeps a radial leader through its pick, so the
-    pick must face the tag (draw_pd_transgear_arm_plate._bore_landing).
+    A leader on a circle runs radially through its pick, so the pick must
+    face the symbol (draw_pd_transgear_arm_plate._bore_landing).
     """
     centre = model_point_in_view(
         adapter, view, (0.0, 0.0, 0.0), label="bush bore centre"
@@ -384,40 +382,24 @@ def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, face, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the bush face view")
 
-    # The same native datums and frame authored on the part: A on the
-    # shoulder's cut edge, B and the bore's frame on the face view's bore.
+    # The same native datum and frame authored on the part: A on the
+    # shoulder's cut edge, the bore's frame on the face view's bore.  The
+    # bore carries no datum: no frame references one (rule 5).
     bore_edge = visible_circle_edge(adapter, face, BORE_DIA)
     placements = {
         "datum:A": PmiDrawingPlacement(section, DATUM_A_XY, attachment_xy=DATUM_A_PICK),
-        "datum:B": PmiDrawingPlacement(
-            face,
-            DATUM_B_XY,
-            attachment_xy=_bore_landing(adapter, face, DATUM_B_XY),
-        ),
         "bore_perpendicularity": PmiDrawingPlacement(
             face,
             FRAME_XY,
             edge_entity=bore_edge,
         ),
     }
-    projected = project_part_pmi(
+    project_part_pmi(
         adapter,
         placements=placements,
         datums=PART_DATUMS,
         controls=GEOMETRIC_CONTROLS,
         label="knob bush bore frame",
-    )
-    # B is picked at its landing point, so the helper only proves the tag
-    # sits on what that hit-test returned: prove it is the bore's edge, not
-    # the concentric press or hub outline within the pick aperture.
-    _assert_attached_to(
-        adapter,
-        projected["datum:B"],
-        bore_edge,
-        entity_type="EDGE",
-        what="datum B",
-        label="knob bush bore",
-        expected_leaders=0,
     )
 
     add_surface_finish(

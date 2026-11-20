@@ -1588,7 +1588,11 @@ def test_the_knob_bush_is_pressed_and_reamed_before_the_plate_is_set() -> None:
         f"PRESS THE {bush} BUSH, STUB FIRST, INTO THE {plate} PLATE FROM FACE A UNTIL ITS "
         "SHOULDER SEATS."
     )
-    assert texts[3].startswith("IF IT SLIDES IN BY HAND, MAKE A NEW")
+    # Turned to the measured hole, a bush that slips is undersize (#2425).
+    assert texts[3] == (
+        f"IF IT SLIDES IN BY HAND, TAKE IT OUT, TURN A NEW {bush} BUSH TO THE PLATE'S "
+        f"MEASURED HOLE AND REPEAT {drawing.sub_step('pin-pressed', 2)}."
+    )
     feeler = disc.inch_text(knob_bush.SHOULDER_SEAT_GAP_MAX, 4)
     assert feeler == ".0005"
     assert texts[4] == f"CHECK: A {feeler} FEELER DOES NOT ENTER UNDER THE SHOULDER."
@@ -1651,6 +1655,13 @@ def test_the_rear_cup_is_faced_bonded_and_screwed_and_the_nut_seats_on_the_faced
     assert texts[12] == "CHECK: SHAFT HELD, THE CUP DOES NOT TURN OR SLIDE ON THE JOURNAL BY HAND."
     assert texts[13] == (
         f"IF BOTH CHECKS PASS, SKIP {s('knob-stack-fitted', 14)}-{s('knob-stack-fitted', 16)}."
+    )
+    # The cured bond lets go only hot (rule 23); the heat is kept off the
+    # bush's oil (codjiflo review, #2425).
+    assert texts[14] == (
+        f"UNSCREW THE {_number('pd-vn-transgear-knob-cup-screw')} SCREW, THEN HEAT THE "
+        f"{_number('pd-transgear-knob-cup')} CUP TO ABOUT 250\u00b0C, THE HEAT KEPT OFF THE "
+        f"{_number('pd-transgear-knob-bush')} BUSH'S OIL, AND PULL IT OFF THE JOURNAL."
     )
     for word in ("MATCH-DRILL", "PIN (PRESS FIT)", "FEELER AT THE PLATE"):
         assert word not in knob, word
