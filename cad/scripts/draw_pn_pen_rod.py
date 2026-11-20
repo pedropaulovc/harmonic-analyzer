@@ -382,8 +382,10 @@ DETAIL_KEEP = {
     ),
     "GrooveDia": (_DETAIL_GROOVE_MID_X, DETAIL_CENTER[1] - 0.032),
 }
-# Left of the crop, under the notes, so the label reads with its view.
-DETAIL_LABEL_XY = (0.235, DETAIL_CENTER[1] - 0.005)
+# Left of the crop, its top 16 mm under note 2's line (farm r1 placed it 0.105,
+# 5 mm under, where it read as a third note) and clear over GrooveDia's
+# block (top ~0.083).
+DETAIL_LABEL_XY = (0.235, DETAIL_CENTER[1] - 0.011)
 # The mark's letter on the side view, under-left of the mark circle round
 # the groove (x 0.0863..0.1047, y 0.1608..0.1792), clear of the Ø.1260's
 # outside-arrow tail (x 0.0768, to y ~0.1597).
