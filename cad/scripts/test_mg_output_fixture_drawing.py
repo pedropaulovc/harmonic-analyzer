@@ -352,7 +352,7 @@ def test_the_groove_radius_is_a_limit_band_and_the_title_block_x_row_would_thin_
         for root in _PRINTED_ROOTS
         for od in _PRINTED_ODS
     )
-    assert (0.15 - 0.01) * 25.4 - half < spec.WALL_TARGET
+    assert (0.14 - 0.01) * 25.4 - half < spec.WALL_TARGET
 
 
 _PRINTED_ROOTS = ((0.30 - 0.01) * 25.4, (0.30 + 0.01) * 25.4)

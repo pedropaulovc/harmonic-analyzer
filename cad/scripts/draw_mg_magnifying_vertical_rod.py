@@ -134,7 +134,7 @@ SIDE_KEEP = {
     # rod, clear of detail A's rows and of the body length's text; the
     # as-bought rod's supplier REF fraction, its stock band below it.
     "RodDia": (_sheet_x(0.75 * ROD_LENGTH), SIDE_CENTER[1] + 0.020),
-    # Right of the dome's end, the whole "R.11 / TANGENT HEMISPHERE" block
+    # Right of the dome's end, the whole "R.13 / TANGENT HEMISPHERE" block
     # right of the tip: the leader from its near end runs down-left onto the
     # hemisphere's own upper-right quarter. Centred 12 mm right of the tip,
     # the block's left end stood left of the dome centre and the arrow fell

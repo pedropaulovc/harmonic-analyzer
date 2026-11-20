@@ -25,9 +25,9 @@ name = "Grooving bit .020"
 ref = "grooving-tool-020"  # drawing cross-check 2026-11-19: thread relief, corners R.008 max.
 
 [[tools]]
-id = "form-tool-r110"
-name = "R.110 form tool"
-ref = "form-tool-r110"  # drawing cross-check 2026-11-19: R.11 TANGENT HEMISPHERE
+id = "form-tool-r125"
+name = "R.125 form tool"
+ref = "form-tool-r125"  # 1/4 bar (owner ruling 2026-11-20, #2404): R.13 TANGENT HEMISPHERE
 
 [[setups]]
 machine_kind = "other"
