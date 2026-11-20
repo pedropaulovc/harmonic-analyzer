@@ -167,7 +167,7 @@ flowchart LR
     e6["spring rate ±1.25 %<br/><b>matched, 1 %/%</b>"]:::part -.-> spring
     e7["hole position (2.667 %/mm)<br/>knife term at each input's actual setup"]:::part -.-> summing
     e8["common-mode gain: calibrated out<br/>component range 83.920 / 165 / 193.115 mm<br/>setup capped at built 165 mm<br/><b>capacity from READOUT.md</b>"]:::free -.-> mag
-    e9["reading ±0.075 mm<br/>crank index ±8°<br/>terms from current report"]:::setup -.-> op
+    e9["reading ±0.075 mm<br/>crank arm down ±8°<br/>terms from current report"]:::setup -.-> op
 
     classDef part fill:#fde2e2,stroke:#c0392b
     classDef setup fill:#fff3cd,stroke:#b7791f

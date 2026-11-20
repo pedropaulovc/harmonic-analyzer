@@ -1708,7 +1708,8 @@ def closed_form_terms(
         "note": "MAE over k of |own read - a_k * k=0 read|, uniform +/-reading each, a_k the physical r_k/r_0, one reading = reading/(fill x pen_half) x (S + C_2)/sum x; worst-coefficient ABSOLUTE bound reported, not gated -- the pair gate draws the sources jointly",
     }
     # Timebase: reading at the wrong theta. The budgeted procedure stops the
-    # crank on its index within +/-index_deg (uniform); one fundamental period
+    # crank arm pointing straight down (the saved pose, judged by eye) within
+    # +/-index_deg (uniform); one fundamental period
     # is CRANK_TURNS_PER_PERIOD crank turns (gear k turns k/80 per crank turn).
     # Scored on the PHYSICAL trace through the shipped procedure
     # (NominalTrial.readout with theta_error): the pen is read at theta_k +
