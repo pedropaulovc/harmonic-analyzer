@@ -227,6 +227,13 @@ FLANK_ANGLE_XY = (
     FRONT_CENTER[0] + FOOT_WIDTH * _S / 2.0 + 0.020,
     _front_y(FOOT_HEIGHT) + 0.036,
 )
+# Owner ruling 2026-11-20 on #2372 ("Follow recommendations unless noted
+# otherwise"; the recommendation: "Allow parallel sides as an option."): the
+# flank's 1.47 deg lean is the casting's draft, cosmetic on a part cut from
+# bar, so the reference angle carries the option below it.  Parallel sides
+# stay tangent to the R.43 crown (SIDES TANGENT), so no printed size moves:
+# the strap then rises from the foot top .04 inside each side of the foot.
+FLANK_ANGLE_CALLOUT = "PARALLEL\nSIDES OK"
 # The apex tap runs down to the arbor bore and stops there; the MHA-SH-VN-54 cup
 # point's spot is drilled into the arbor at fit-up through this hole. Both
 # native extents (the tap drill's and the thread's ``<hw-thru>``) say TO BORE,
@@ -687,6 +694,9 @@ def _add_flank_angle(adapter: Any, view: Any, seat: Any, flank: Any) -> Any:
                 f"expected {FLANK_ANGLE_DEG:.4f} deg"
             )
     set_reference_dimension(adapter, display.GetAnnotation(), label="flank angle")
+    display.SetText(4, FLANK_ANGLE_CALLOUT)  # swDimensionTextCalloutBelow
+    if str(display.GetText(4) or "") != FLANK_ANGLE_CALLOUT:
+        raise RuntimeError("flank angle: parallel-sides option text did not persist")
     return display
 
 
