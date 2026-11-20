@@ -36,6 +36,7 @@ from types import ModuleType
 import _mcmaster_99607a213 as thumb
 import pn_pen_adjust_screw_spec as stud
 import pn_pen_frame_spec as frame
+import pn_pen_rod_groove_spec as groove
 import pn_pen_rod_spec as rod
 import pn_pen_v_block_spec as vb
 import pn_vn_pen_marker_spec as marker
@@ -55,7 +56,7 @@ CLEARANCE = 0.25  # interference-gate margin convention
 # Literal here so the pen assembly recipe does not read machine/output.yaml
 # (test_buildgraph.test_pen_assembly_free_of_pen_driver_closure);
 # test_pn_pen_carriage_geom pins it to pen_driver.stroke_half_mm().
-PEN_TRAVEL_HALF_MM = 15.0
+PEN_TRAVEL_HALF_MM = 25.0
 # Recording paper y 324.5..405 (build_pd_paper_drive_assembly): the marker
 # axis rests at mid-height so the trace stays on the sheet.
 PAPER_MID_Y = 364.75
@@ -165,8 +166,9 @@ THUMB_SCREW_POS = block_to_machine(
 
 # --- rod set screw -------------------------------------------------------------
 # Stock local +Y (cup -> socket) points out of the front face (block -Z); the cup
-# sits on the pivot-bore wall.
-ROD_SET_SCREW_CUP_LOCAL_Z = vb.DEPTH_MID_Z - vb.PIVOT_BORE_DIA / 2.0
+# sits on the floor of the pivot's relief groove (#2439), .010 inside the
+# pivot-bore wall.
+ROD_SET_SCREW_CUP_LOCAL_Z = vb.DEPTH_MID_Z - groove.GROOVE_DIA / 2.0
 ROD_SET_SCREW_ROWS = [
     [BLOCK_ROWS[0][0], BLOCK_ROWS[0][1], BLOCK_ROWS[0][2]],
     [-BLOCK_ROWS[2][0], -BLOCK_ROWS[2][1], -BLOCK_ROWS[2][2]],
@@ -403,3 +405,43 @@ if max(paper_side_points().values()) > (PAPER_FRONT_Z - 2.0 * CLEARANCE):
     raise AssertionError("a pen-carriage corner crowds the recording paper")
 if max(paper_side_points_printed_worst().values()) >= PAPER_FRONT_Z:
     raise AssertionError("at the printed worst case the carriage reaches the paper")
+
+
+# --- the set screw in the pivot's relief groove (#2439) ---------------------------
+def groove_landing_spare() -> tuple[float, float]:
+    """``(shoulder side, end side)`` mm of groove wall left beyond the set
+    screw's point with the axial stack at its printed worst case and the
+    diameters nominal.  The screw's axis stands the block height less
+    SetScrewY below the shoulder (both .XX on the v-block sheet); the walls
+    are .XXX from the shoulder on the rod sheet.  The point is the vendor's
+    45 deg x one-pitch cup-end chamfer, taken where it crosses the pivot-bore
+    wall, .010 above the cup on the floor: wider than the cup's rim, so that
+    is what must pass between the walls.  The deepest printed floor in the
+    largest reamed bore lifts that crossing to .01275 and costs about .0027
+    a side; test_pn_pen_carriage_geom proves the spare at that full worst
+    case too."""
+    height = _printed_limits(vb, "Height", vb.BLOCK_HEIGHT)
+    screw_y = _printed_limits(vb, "SetScrewY", vb.SET_SCREW_Y)
+    axis_min, axis_max = height[0] - screw_y[1], height[1] - screw_y[0]
+    rise = (vb.PIVOT_BORE_DIA - groove.GROOVE_DIA) / 2.0
+    point_half = (
+        rod_set_screw.MAJOR_DIA - 2.0 * (rod_set_screw.POINT_LENGTH - rise)
+    ) / 2.0
+    near_low, near_high = printed_deviations(
+        groove.GROOVE_NEAR_STATION, groove.GROOVE_PLACES, unit=rod.UNIT
+    )
+    far_low, far_high = printed_deviations(
+        groove.GROOVE_FAR_STATION, groove.GROOVE_PLACES, unit=rod.UNIT
+    )
+    return (
+        axis_min - point_half - (groove.GROOVE_NEAR_STATION + near_high),
+        groove.GROOVE_FAR_STATION + far_low - (axis_max + point_half),
+    )
+
+
+if min(groove_landing_spare()) <= 0.0:
+    raise AssertionError("the rod set screw's point can land on a groove wall")
+# The cup sits .010 inside the bore wall, the chamfered point there, so the
+# first full thread stays in the tap (rule 18 counts it wholly engaged).
+if rod_set_screw.POINT_LENGTH <= (vb.PIVOT_BORE_DIA - groove.GROOVE_DIA) / 2.0:
+    raise AssertionError("the rod set screw's full thread leaves the tap")

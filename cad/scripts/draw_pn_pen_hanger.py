@@ -8,7 +8,7 @@ live in ``_drawing_dimension_import``; places and bands are authored on the
 part.
 
 The pen hanger is a black tapered steel strap (1/8 flat, .63 -> .48 wide,
-6.69 tall; decimal-inch sheet) with two open U guide plates bonded across its
+6.38 tall; decimal-inch sheet) with two open U guide plates bonded across its
 front face; the pen rod
 hangs in both slots.  The front view (1:1, ``*Back``: looking at the strap's
 front face and the plates from the machine front, as note 1 names it) carries
@@ -107,7 +107,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (1.0, 1.0)  # the 6.69-tall strap fits the sheet at full size
+SHEET_SCALE = (1.0, 1.0)  # the 6.38-tall strap fits the sheet at full size
 FRONT_SCALE = (1, 1)
 SECTION_SCALE = (2, 1)  # the slot's .002 band and its corner radius need room
 # At 1:1 the strap's edges, slots and plates read in the empty right half of
@@ -164,10 +164,11 @@ if round(_OVERHANG_AT_CUT / 25.4, _OVERHANG_PLACES) != round(
     )
 # The cutting line overruns that silhouette so each arrow's letter (5.5 mm
 # wide, 15-20 mm under the line on the 20261014T002650255Z sheet) stands
-# clear of the slanted strap edge below it: about 1.5 mm on the +x side,
-# and on the -x side 1.6 mm from the strap edge and 1.3 mm from the
-# StrapTaperDx extension line beyond it.
-SECTION_LINE_OVERRUN = 3.5
+# clear of the slanted strap edge below it: about 1.3 mm on the +x side,
+# and on the -x side 1.3 mm from the strap edge and 1.3 mm from the
+# StrapTaperDx extension line beyond it (the 6.38 strap of #748 tapers more
+# steeply, so 3.5 would put that letter on the extension line).
+SECTION_LINE_OVERRUN = 3.2
 SECTION_LINE_MODEL_MM = (
     (_SECTION_X[1] + SECTION_LINE_OVERRUN, SECTION_Y, 0.0),
     (_SECTION_X[0] - SECTION_LINE_OVERRUN, SECTION_Y, 0.0),

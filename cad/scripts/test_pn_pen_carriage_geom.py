@@ -10,6 +10,7 @@ import pytest
 import pen_driver
 import pn_pen_carriage_geom as g
 import pn_pen_frame_spec as frame
+import pn_pen_rod_groove_spec as groove
 import pn_pen_rod_spec as rod
 import pn_pen_v_block_spec as vb
 import sh_vn_arbor_set_screw_spec as rod_set_screw
@@ -18,7 +19,7 @@ from _hole_spec import THREAD_MAJOR_MM
 from diagnostics import diag_build_91375A106 as set_screw_recipe
 from _mg_wheel_rim_geometry import RIM_WIRE_R
 from mg_wheel_bar_geom import WHEEL_BAR_Y, WHEEL_X
-from _printed_tolerance import printed_band_mm
+from _printed_tolerance import printed_band_mm, printed_deviations
 from _recording_geometry import PAPER_FRONT_Z, PEN_ROD_X, PEN_Z_MID
 
 PAPER_LIMIT_Z = PAPER_FRONT_Z - 2.0 * g.CLEARANCE
@@ -160,9 +161,9 @@ def test_rod_set_screw_engages_its_full_thread_wholly_in_the_tap() -> None:
     assert vb.ROD_SET_SCREW_FULL_THREAD == pytest.approx(recipe.LENGTH - chamfers)
     assert vb.ROD_SET_SCREW_FULL_THREAD >= need
     assert 3.0 / 16.0 * 25.4 - chamfers < need
-    # Cup on the pivot-bore wall, socket face under the front face.
+    # Cup on the relief groove's floor (#2439), socket face under the front face.
     cup = g.ROD_SET_SCREW_CUP_LOCAL_Z
-    assert cup == pytest.approx(vb.DEPTH_MID_Z - vb.PIVOT_BORE_DIA / 2.0)
+    assert cup == pytest.approx(vb.DEPTH_MID_Z - groove.GROOVE_DIA / 2.0)
     assert cup - rod_set_screw.LENGTH > vb.BODY_Z0
     assert g.ROD_SET_SCREW_MASS_G == pytest.approx(
         recipe.VENDOR_VOLUME_MM3 * g.ALLOY_STEEL_G_PER_MM3
@@ -223,3 +224,33 @@ def test_rider_rows_are_proper_rotations() -> None:
             x[0] * y[1] - x[1] * y[0],
         )
         assert cross == pytest.approx(tuple(z), abs=1e-12)
+
+
+def test_set_screw_point_lands_in_the_relief_groove() -> None:
+    # #2439 option B: the groove centres on the screw's .24 printed station
+    # (.71 block less .47), .010 under the Ø.126 pivot, and the point's
+    # chamfer at the bore wall passes between the walls at every printed limit.
+    assert vb.BLOCK_HEIGHT / 25.4 == pytest.approx(0.71, abs=0.005)
+    station = (groove.GROOVE_NEAR_STATION + groove.GROOVE_FAR_STATION) / 2.0
+    assert station / 25.4 == pytest.approx(0.24)
+    assert groove.GROOVE_DEPTH / 25.4 == pytest.approx(0.010)
+    shoulder_side, end_side = g.groove_landing_spare()
+    assert shoulder_side / 25.4 == pytest.approx(0.009, abs=1e-4)
+    assert end_side / 25.4 == pytest.approx(0.009, abs=1e-4)
+    # Full printed worst case (codjiflo P3 on #3152): the deepest .XXX floor
+    # in the largest reamed bore raises the point's crossing of the bore wall
+    # to .01275, widening the chamfer there by twice the extra rise.  The
+    # point must still pass both walls, and the first full thread (one pitch
+    # back from the cup) must stay inside the tap.
+    floor_low, _ = printed_deviations(
+        groove.GROOVE_DIA, groove.GROOVE_PLACES, unit=rod.UNIT
+    )
+    rise_max = (
+        vb.PIVOT_BORE_DIA + vb.PIVOT_BORE_BAND[0] - (groove.GROOVE_DIA + floor_low)
+    ) / 2.0
+    assert rise_max / 25.4 == pytest.approx(0.01275, abs=1e-5)
+    extra = rise_max - (vb.PIVOT_BORE_DIA - groove.GROOVE_DIA) / 2.0
+    for spare in (shoulder_side, end_side):
+        assert (spare - extra) / 25.4 == pytest.approx(0.00625, abs=1e-4)
+        assert spare - extra > 0.0
+    assert rod_set_screw.POINT_LENGTH > rise_max

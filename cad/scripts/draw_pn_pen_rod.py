@@ -5,7 +5,7 @@ the placement of its imported model dimensions, the stud-tap callout, the
 overall-length reference, VIEW A's viewing arrow and the property-linked
 notes; sheet/template and export behavior lives in ``_drawing_common``.
 Places, bands, mate callouts and the pivot's fit note are authored on the
-part (``pn_pen_rod_spec``).
+part (``pn_pen_rod_spec``, the groove's in ``pn_pen_rod_groove_spec``).
 
 The sheet prints decimal inch (the part's ``drawing_unit: in``).  The side
 view (2:1, the sheet scale) lays the rod axis horizontal, as the bar sits in
@@ -16,8 +16,12 @@ end-to-end reference and VIEW A's lettered arrow onto the tapped top face;
 VIEW A (5:1) under it looks at that face and carries the square's banded SQ
 size, the native Hole Wizard callout of the #0-80 stud tap, its drill Ø at
 .XXX and both depths at .XX, and the tap's .067 MIN wall (RV-01, from the
-part's hidden TapWallReference sketch, shown in that view only); the
-labelled 1:1 isometric sits right, note 1 in the field under the side view.
+part's hidden TapWallReference sketch, shown in that view only).  DETAIL B
+(5:1, a cropped *Front model view turned like the side view: the
+draw_mg_wheel_axle detail-A recipe) carries the set-screw relief groove
+(#2439): both walls from the shoulder and the floor's Ø, each SEE NOTE 2.
+The labelled 1:1 isometric sits right, the notes in the field under the
+side view.
 
 Run with SolidWorks open::
 
@@ -31,7 +35,9 @@ import math
 import sys
 from typing import Any
 
+from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     dimension_name,
     place_view,
@@ -46,7 +52,9 @@ from _drawing_common import (
     read_required_properties,
     rebuild_drawing,
     stamp_drawing_summary,
+    view_name,
 )
+from _drawing_detail_crop import native_circle_geometry
 from _drawing_dimension_import import import_cosmetic_threads
 from _drawing_dimensions import (
     assert_imported_precision,
@@ -61,7 +69,7 @@ from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_prec
 from _drawing_leader_notes import add_leader_note
 from _drawing_view_arrow import square_view_arrow
 from _drawing_notes import add_property_linked_note
-from _drawing_projection import model_points_in_view
+from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_callout_thread_class import omit_title_block_thread_class
@@ -70,10 +78,9 @@ from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
+import pn_pen_rod_groove_spec as groove
+import pn_pen_rod_spec as rod
 from pn_pen_rod_spec import (
-    DIMENSION_CALLOUTS,
-    DRAWING_DIMENSIONS,
-    DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
     END_VIEW_LETTER,
     END_VIEW_NOTE,
@@ -90,6 +97,19 @@ from pn_pen_rod_spec import (
     TAP_WALL_START_R,
     TOTAL_LENGTH,
 )
+
+# The rod's marked dimensions, places and callouts: pn_pen_rod_spec's and
+# the groove's (build_pn_pen_rod marks the same union).
+DRAWING_DIMENSIONS = {**rod.DRAWING_DIMENSIONS, **groove.DRAWING_DIMENSIONS}
+DRAWING_PRECISION_BY_NAME = {
+    **rod.DRAWING_PRECISION_BY_NAME,
+    **{
+        name: places
+        for names in groove.DRAWING_PRECISION.values()
+        for name, places in names.items()
+    },
+}
+DIMENSION_CALLOUTS = {**rod.DIMENSION_CALLOUTS, **groove.DIMENSION_CALLOUTS}
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
@@ -293,12 +313,83 @@ VIEW_A_ARROW = (
     (_VIEW_A_TIP[0] + VIEW_ARROW_RUN, _VIEW_A_TIP[1] + VIEW_LETTER_HEIGHT / 2.0),
     _VIEW_A_TIP,
 )
-# Note 1 (the pivot's mate, two lines of at most ~53 characters, ~125 x 9 mm
-# at ~2.35 mm a character, anchored top-left) in the empty field under the
-# side view: x 0.150..0.275, y ~0.116..0.125, 14 mm under the R MAX block
-# (bottom 0.139), 25 mm right of the stud tap's callout (x <= 0.1248) and
-# left of the isometric's note (x >= 0.35).
-NOTES_XY = (0.150, 0.125)
+# Notes 1 (the pivot's mate, two lines of at most ~53 characters) and 2 (the
+# groove's screw, one ~51-character line), ~125 x 14 mm at ~2.35 mm a
+# character, anchored top-left, in the empty field under the side view:
+# x 0.135..0.260, y ~0.114..0.128, 11 mm under the R MAX block (bottom
+# 0.139), 10 mm right of the stud tap's callout (x <= 0.1248) and 7 mm left
+# of DETAIL B's crop.
+NOTES_XY = (0.135, 0.128)
+
+# --- DETAIL B: the set-screw relief groove at 5:1 (#2439) -------------------
+# Native detail views import no dimensions (draw_mg_wheel_axle detail A), so
+# DETAIL B is a second *Front model view at 5:1, turned like the side view
+# (model +Y to paper right, +X down the paper), moved so the fence's focus
+# lands on DETAIL_CENTER and cropped to the fence circle.  At 2:1 the groove
+# is a 0.5 mm notch; at 5:1 its .010 depth draws 1.3 mm.
+DETAIL_SCALE = (5, 1)
+_DETAIL_K = DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0
+DETAIL_LETTER = "B"
+DETAIL_LABEL_TEXT = (
+    f"DETAIL {DETAIL_LETTER}\nSCALE {DETAIL_SCALE[0]} : {DETAIL_SCALE[1]}"
+)
+# The fence, model mm (x radial, y axial): on the axis midway from the
+# shoulder to the groove's end-side wall.  Radius 4.6 holds the shoulder's
+# pivot corners (4.31 off), both walls and both floors (the far floor corner
+# 4.22 off), so every reference a kept dimension takes survives the crop.
+DETAIL_FOCUS_MM = (0.0, -groove.GROOVE_FAR_STATION / 2.0)
+_DETAIL_FOCUS_M = (DETAIL_FOCUS_MM[0] / 1000.0, DETAIL_FOCUS_MM[1] / 1000.0, 0.0)
+DETAIL_RADIUS_MM = 4.6
+DETAIL_CROP_RADIUS = DETAIL_RADIUS_MM * _DETAIL_K
+# Lower right, between the notes and the isometric's note, over the title
+# block: crop x 0.267..0.313, y 0.087..0.133.
+DETAIL_CENTER = (0.290, 0.110)
+CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
+DETAIL_POSITION_TOL_M = 1e-4
+CIRCLE_TOL_M = 1e-7
+
+
+def _detail_xy(x_mm: float, y_mm: float) -> tuple[float, float]:
+    """Sheet point of model (x, y) mm in DETAIL B (model +Y runs right, +X
+    down)."""
+    return (
+        DETAIL_CENTER[0] + (y_mm - DETAIL_FOCUS_MM[1]) * _DETAIL_K,
+        DETAIL_CENTER[1] - (x_mm - DETAIL_FOCUS_MM[0]) * _DETAIL_K,
+    )
+
+
+_DETAIL_SHOULDER_X = _detail_xy(0.0, 0.0)[0]  # 0.310
+_DETAIL_FAR_WALL_X = _detail_xy(0.0, -groove.GROOVE_FAR_STATION)[0]  # 0.270
+_DETAIL_GROOVE_MID_X = _detail_xy(
+    0.0, -(groove.GROOVE_NEAR_STATION + groove.GROOVE_FAR_STATION) / 2.0
+)[0]  # 0.2795
+# Over the crop, both walls baselined from the shoulder (rule 10), each
+# value over SEE NOTE 2:
+#   GrooveStation (y 0.140): the 21 mm span cannot hold its ~25 mm block, so
+#     the text stands right of the shoulder's extension line (x ~0.315..
+#     0.340), clear of the isometric's note (x >= 0.350);
+#   GrooveEndStation (y 0.152): the 40 mm span holds its block centred
+#     between the far wall's and the shoulder's extension lines, 8 mm under
+#     the side view's square (y 0.165) and over the first row's line.
+# Under the crop, GrooveDia: its line runs between the two floors at
+# mid-groove and drops through the groove's lower mouth to its block
+# (y ~0.073..0.083), over the title block (y 0.0655).
+DETAIL_KEEP = {
+    "GrooveStation": (_DETAIL_SHOULDER_X + 0.017, DETAIL_CENTER[1] + 0.030),
+    "GrooveEndStation": (
+        (_DETAIL_FAR_WALL_X + _DETAIL_SHOULDER_X) / 2.0,
+        DETAIL_CENTER[1] + 0.042,
+    ),
+    "GrooveDia": (_DETAIL_GROOVE_MID_X, DETAIL_CENTER[1] - 0.032),
+}
+# Left of the crop, its top 16 mm under note 2's line (farm r1 placed it 0.105,
+# 5 mm under, where it read as a third note) and clear over GrooveDia's
+# block (top ~0.083).
+DETAIL_LABEL_XY = (0.235, DETAIL_CENTER[1] - 0.011)
+# The mark's letter on the side view, under-left of the mark circle round
+# the groove (x 0.0863..0.1047, y 0.1608..0.1792), clear of the Ø.1260's
+# outside-arrow tail (x 0.0768, to y ~0.1597).
+PARENT_LETTER_XY = (0.087, 0.158)
 # The isometric (1:1 outline 18.2 x 115.3 mm: x 0.3709..0.3891, y
 # 0.1174..0.2327, 43 mm right of the top face's extension lines) takes its
 # ~60 mm scale note 8 mm under it: x 0.350..0.410, y ~0.1050..0.1085.
@@ -360,6 +451,269 @@ def _prove_side_view_frame(adapter: Any, side: Any) -> None:
     if misses:
         raise RuntimeError(f"pen-rod side view is not in its layout frame: {misses}")
     _telemetry.info(f"pen-rod side view frame: {dict(zip(stations, projected))}")
+
+
+def _activate_view(adapter: Any, view: Any, *, label: str) -> str:
+    """Make ``view`` the active view (sketch entities and notes land in it)."""
+    name = view_name(adapter, view)
+    if not _early_bound(adapter.currentModel, "IDrawingDoc").ActivateView(name):
+        raise RuntimeError(f"failed to activate the {label} {name!r}")
+    adapter.currentModel.ClearSelection2(True)
+    return name
+
+
+@_telemetry.traced("pen_rod.exact_circle", label_param="label")
+def _exact_circle(
+    adapter: Any,
+    view: Any,
+    center: tuple[float, float],
+    radius: float,
+    *,
+    label: str,
+) -> Any:
+    """Sketch a circle in the ACTIVE ``view``'s own sketch from sheet points,
+    straight to the sketch database (no inference snapping the centre or rim
+    to view geometry), and read it back (draw_mg_wheel_axle._exact_circle)."""
+    sketch = _early_bound(_early_bound(view, "IView").GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for x, y in (center, (center[0] + radius, center[1])):
+        point = _early_bound(
+            utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
+        )
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        points.append(tuple(float(value) for value in projected.ArrayData))
+    manager = _early_bound(adapter.currentModel.SketchManager, "ISketchManager")
+    previous_add_to_db = bool(manager.AddToDB)
+    manager.AddToDB = True
+    try:
+        circle = manager.CreateCircle(*points[0], *points[1])
+    finally:
+        manager.AddToDB = previous_add_to_db
+    if circle is None:
+        raise RuntimeError(f"failed to sketch the {label} circle")
+    actual_centre, actual_radius = native_circle_geometry(circle, label=label)
+    asked_radius = math.dist(points[0], points[1])
+    _telemetry.info(
+        f"{label} circle: centre {actual_centre} (asked {points[0]}), radius "
+        f"{actual_radius} (asked {asked_radius})"
+    )
+    if (
+        math.dist(actual_centre, points[0]) > CIRCLE_TOL_M
+        or abs(actual_radius - asked_radius) > CIRCLE_TOL_M
+    ):
+        raise RuntimeError(f"the {label} circle moved or changed radius")
+    return circle
+
+
+@_telemetry.traced("pen_rod.detail_place")
+def _placed_detail_view(adapter: Any) -> Any:
+    """DETAIL B, uncropped: a 5:1 *Front model view turned like the side view
+    and moved so the fence's focus lands on DETAIL_CENTER; a groove floor
+    corner is projected too, so a view at another scale or handing than
+    _detail_xy assumes raises."""
+    draw = adapter.currentModel
+    view = _early_bound(
+        place_view(adapter, str(SOURCE), "*Front", *DETAIL_CENTER, scale=DETAIL_SCALE),
+        "IView",
+    )
+    view.Angle = SIDE_ROTATION
+    if abs(math.remainder(float(view.Angle) - SIDE_ROTATION, 2.0 * math.pi)) > 1e-9:
+        raise RuntimeError("failed to rotate the groove detail")
+    draw.EditRebuild3()
+    ratio = tuple(float(value) for value in view.ScaleRatio)
+    if ratio != tuple(float(value) for value in DETAIL_SCALE):
+        raise RuntimeError(f"groove detail scale {ratio!r}, expected {DETAIL_SCALE!r}")
+    center = model_point_in_view(
+        adapter, view, _DETAIL_FOCUS_M, label="groove detail focus"
+    )
+    position = tuple(float(value) for value in view.Position)
+    target = [position[axis] + DETAIL_CENTER[axis] - center[axis] for axis in range(2)]
+    if not view.SetViewPosition(double_array(target), False):
+        raise RuntimeError("failed to move the groove detail onto its sheet position")
+    draw.EditRebuild3()
+    corner_mm = (groove.GROOVE_DIA / 2.0, -groove.GROOVE_NEAR_STATION)
+    for point, expected, label in (
+        (_DETAIL_FOCUS_M, DETAIL_CENTER, "groove detail focus"),
+        (
+            (corner_mm[0] / 1000.0, corner_mm[1] / 1000.0, 0.0),
+            _detail_xy(*corner_mm),
+            "groove floor's shoulder-side corner",
+        ),
+    ):
+        found = model_point_in_view(adapter, view, point, label=label)
+        if math.dist(found, expected) > DETAIL_POSITION_TOL_M:
+            raise RuntimeError(f"{label} sits at {found!r}, not {expected!r}")
+    return view
+
+
+@_telemetry.traced("pen_rod.detail_crop")
+def _crop_detail_view(adapter: Any, view: Any) -> None:
+    """Crop DETAIL B to its exact fence circle round DETAIL_CENTER; status,
+    IsCropped, the outline and its style are read back and raise."""
+    draw = adapter.currentModel
+    view = _early_bound(view, "IView")
+    uncropped = tuple(float(value) for value in view.GetOutline())
+    name = _activate_view(adapter, view, label="groove detail")
+    circle = _exact_circle(
+        adapter, view, DETAIL_CENTER, DETAIL_CROP_RADIUS, label="groove-detail crop"
+    )
+    selection = _early_bound(draw.SelectionManager, "ISelectionMgr")
+    data = _early_bound(selection.CreateSelectData(), "ISelectData")
+    data.View = view
+    if _early_bound(circle, "ISketchSegment").Select4(False, data) is not True:
+        raise RuntimeError("cannot select the groove-detail crop circle")
+    status = int(view.Crop2(False, False, 1))
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    view.UpdateViewDisplayGeometry()
+    cropped = bool(view.IsCropped())
+    outline = tuple(float(value) for value in view.GetOutline())
+    _telemetry.info(
+        f"pen-rod: groove detail {name!r}, Crop2 status {status}, IsCropped "
+        f"{cropped}, outline {tuple(round(value * 1000, 1) for value in outline)} mm",
+        crop_status=status,
+        cropped=cropped,
+    )
+    if status != CROP_NO_ERROR or not cropped:
+        raise RuntimeError(
+            f"groove detail is not cropped: Crop2 status {status}, IsCropped {cropped}"
+        )
+    # Uncropped, the 5:1 view spans the whole 122 rod (~610 mm of sheet), the
+    # crop 46 mm, so a crop that took at least halves the width.
+    if (
+        len(outline) != 4
+        or len(uncropped) != 4
+        or outline[2] - outline[0] > (uncropped[2] - uncropped[0]) / 2.0
+    ):
+        raise RuntimeError(
+            f"groove-detail crop did not take: outline {outline!r}, before {uncropped!r}"
+        )
+    boundary = (bool(view.CropViewJaggedOutline), bool(view.CropViewNoOutline))
+    if boundary != (False, False):
+        raise RuntimeError(
+            f"groove detail's crop boundary is not its plain circle: jagged, "
+            f"no-outline {boundary!r}"
+        )
+
+
+_ANNOTATION_DISPLAY_DIMENSION = 4  # swAnnotationType_e.swDisplayDimension
+
+
+def _view_dimension_names(adapter: Any, view: Any) -> list[str]:
+    """The model-dimension names ``view`` holds, sorted (notes skipped)."""
+    annotations = (
+        _early_bound(annotation, "IAnnotation")
+        for annotation in (_early_bound(view, "IView").GetAnnotations() or ())
+    )
+    return sorted(
+        name
+        for name in (
+            dimension_name(adapter, annotation)
+            for annotation in annotations
+            if int(annotation.GetType()) == _ANNOTATION_DISPLAY_DIMENSION
+        )
+        if name
+    )
+
+
+@_telemetry.traced("pen_rod.detail_dimensions")
+def _dimension_then_crop_detail(adapter: Any, detail: Any) -> list[Any]:
+    """Import and curate DETAIL B's dimensions uncropped, then crop it; any
+    kept dimension the crop drops raises."""
+    annotations = curate_view_dimensions(
+        adapter,
+        detail,
+        keep=DETAIL_KEEP,
+        view_label="groove detail",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    before = _view_dimension_names(adapter, detail)
+    _crop_detail_view(adapter, detail)
+    after = _view_dimension_names(adapter, detail)
+    lost = sorted(set(DETAIL_KEEP) - set(after))
+    _telemetry.event(
+        "groove_detail.crop",
+        dimensions_before=",".join(before),
+        dimensions_after=",".join(after),
+        lost=",".join(lost),
+    )
+    if lost:
+        raise RuntimeError(
+            f"groove detail lost {lost} to its crop; before {before}, after {after}"
+        )
+    return annotations
+
+
+@_telemetry.traced("pen_rod.detail_mark")
+def _mark_detail_on_side(adapter: Any, side: Any) -> None:
+    """Circle DETAIL B's fence on the side view in the outline's black."""
+    _activate_view(adapter, side, label="side view")
+    center = model_point_in_view(
+        adapter, side, _DETAIL_FOCUS_M, label="groove detail mark"
+    )
+    circle = _exact_circle(
+        adapter,
+        side,
+        center,
+        DETAIL_RADIUS_MM * _SIDE_K,
+        label="groove-detail mark",
+    )
+    segment = _early_bound(circle, "ISketchSegment")
+    segment.Color = 0  # COLORREF black, not the under-defined sketch blue.
+    if int(segment.Color) != 0:
+        raise RuntimeError("groove-detail mark circle colour did not persist")
+    adapter.currentModel.ClearSelection2(True)
+    adapter.currentModel.EditRebuild3()
+
+
+def _plain_text(text: str) -> str:
+    """A note's words with its line breaks and spacing folded to single spaces."""
+    return " ".join(str(text).split())
+
+
+_NOTE_POSITION_TOL_M = 1e-5
+
+
+def _add_view_note(
+    adapter: Any, view: Any, text: str, xy: tuple[float, float], *, label: str
+) -> None:
+    """A free note in ``view`` at ``xy`` (its top-left corner); a note that
+    did not land in its view, or did not keep its position, raises."""
+    _activate_view(adapter, view, label=label)
+    note = add_note(adapter, text, *xy)
+    if note is None:
+        raise RuntimeError(f"failed to add the {label} note")
+    annotation = _early_bound(
+        _early_bound(note, "INote").GetAnnotation(), "IAnnotation"
+    )
+    position = tuple(float(value) for value in (annotation.GetPosition() or ()))
+    if len(position) < 2 or math.dist(position[:2], xy) > _NOTE_POSITION_TOL_M:
+        raise RuntimeError(f"{label} note sits at {position!r}, not {xy!r}")
+    texts = [
+        _plain_text(_early_bound(found, "INote").GetText() or "")
+        for found in (_early_bound(view, "IView").GetNotes() or ())
+    ]
+    if texts.count(_plain_text(text)) != 1:
+        raise RuntimeError(f"{label} note did not land in its view: {texts!r}")
+
+
+@_telemetry.traced("pen_rod.detail_label")
+def _label_detail(adapter: Any, detail: Any, side: Any) -> None:
+    """Label DETAIL B beside its crop and letter its mark on the side view."""
+    sheet = _early_bound(
+        _early_bound(adapter.currentModel, "IDrawingDoc").GetCurrentSheet(), "ISheet"
+    )
+    if not sheet.SetScale(*SHEET_SCALE, False, False):
+        raise RuntimeError(
+            "failed to pin sheet scale before labelling the groove detail"
+        )
+    for view, text, xy, label in (
+        (detail, DETAIL_LABEL_TEXT, DETAIL_LABEL_XY, "groove-detail label"),
+        (side, DETAIL_LETTER, PARENT_LETTER_XY, "groove-detail letter"),
+    ):
+        _add_view_note(adapter, view, text, xy, label=label)
 
 
 def _set_arrow_sides(adapter: Any, annotations: list[Any]) -> None:
@@ -616,11 +970,19 @@ def build(adapter: Any) -> dict[str, str]:
     for view in (side, end, iso):
         set_hidden_lines_removed(adapter, view)
 
+    # DETAIL B is placed and dimensioned FIRST: the groove's dimensions live
+    # in a Front-plane sketch the side view would import too, and a dimension
+    # already on the sheet is never imported again (draw_mg_wheel_axle).
+    detail = _placed_detail_view(adapter)
+    set_hidden_lines_removed(adapter, detail)
+    detail_annotations = _dimension_then_crop_detail(adapter, detail)
+
     # PivotDia imports straight into the side view: every farm leaf of the
     # vertical layout logged its targeted *Front import delivering it
     # (unrequested, then deleted), so the turned pivot's banded diameter is
     # dimensioned between its flanks where the lathe reads it (rule 11).
     annotations = [
+        *detail_annotations,
         *curate_view_dimensions(
             adapter,
             side,
@@ -673,6 +1035,10 @@ def build(adapter: Any) -> dict[str, str]:
 
     _overall_reference(adapter, side)
     _add_view_arrow(adapter, side)
+    # The mark and the labels go on once every side-view pick is done, so no
+    # coordinate pick meets the mark circle.
+    _mark_detail_on_side(adapter, side)
+    _label_detail(adapter, detail, side)
 
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "End View Note", *END_NOTE_XY)

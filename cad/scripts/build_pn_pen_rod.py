@@ -4,7 +4,9 @@ The square brass rod of the pen carriage: it slides in the pen hanger's two U
 guides, its turned pivot end drops into the v-block's pivot bore with the
 square shoulder resting on the block top, and the adjuster stud (with its
 #0-80 jam nut and wire eye) threads into the tapped top face. The shoulder's
-internal root carries a modelled tool radius, banded as a single MAX limit.
+internal root carries a modelled tool radius, banded as a single MAX limit,
+and the pivot a .010-deep relief groove under the v-block's set screw
+(``pn_pen_rod_groove_spec``, #2439).
 
 Frame (``pn_pen_rod_spec`` docstring; the assembly places the part by it):
 origin on the rod axis at the SHOULDER. The square runs +Y from the shoulder to
@@ -58,11 +60,11 @@ from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _fit_deviations import deviations
 from _saved_part_guard import require_saved_drawing_properties
 from _holes import blind_hole_volume_mm3, wizard_holes
+from _drawing_dimension_insert import add_diametric_linear_dimension
+import pn_pen_rod_groove_spec as groove
+import pn_pen_rod_spec as rod
 from pn_pen_rod_spec import (
     DRAWING_BANDS,
-    DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
-    DRAWING_PRECISION,
     END_VIEW_NOTE,
     ISOMETRIC_VIEW_NOTE,
     PIVOT_DIA,
@@ -86,6 +88,88 @@ MATERIAL = "Brass"  # see _appearance.apply_material docstring
 # The assembly mates the rod line to ``Axis1@pn-pen-rod-1``: the slide axis
 # must be the first (and only) reference axis the part creates.
 SLIDE_AXIS = "Axis1"
+# The rod's sheet: the pivot, square and tap of pn_pen_rod_spec plus the
+# groove's three dimensions and its note 2.
+DRAWING_DIMENSIONS = {**rod.DRAWING_DIMENSIONS, **groove.DRAWING_DIMENSIONS}
+DRAWING_PRECISION = {**rod.DRAWING_PRECISION, **groove.DRAWING_PRECISION}
+DRAWING_NOTES = f"{rod.DRAWING_NOTES}\n{groove.GROOVE_NOTE_TEXT}"
+
+
+@_telemetry.traced("sketch.pn_pen_rod_relief_groove")
+def _relief_groove(adapter) -> tuple[list[tuple[str, str]], float]:
+    """Revolve-cut the set-screw relief groove round the pivot (#2439): a
+    Front-plane rectangle from the floor (Ø GROOVE_DIA) out past the pivot,
+    between the two walls located from the shoulder, about a centerline on
+    the rod axis from the origin.  Returns its drive jobs and the volume the
+    cut removes."""
+    from solidworks_mcp.adapters.base import RevolveParameters
+
+    r_floor = groove.GROOVE_DIA / 2.0
+    r_out = groove.GROOVE_CUT_DIA / 2.0
+    near, far = -groove.GROOVE_NEAR_STATION, -groove.GROOVE_FAR_STATION
+    dims = SketchDims()
+    check("create_sketch groove", adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
+    axis = check(
+        "groove axis centerline", adapter.add_centerline(0.0, 0.0, 0.0, -PIVOT_LENGTH)
+    )
+    near_wall, outer, far_wall, floor = add_line_chain(
+        adapter, [(r_floor, near), (r_out, near), (r_out, far), (r_floor, far)]
+    )
+    set_sketch_direct_db(adapter, False)
+    for entity, relation in (
+        (axis, "vertical"),
+        (near_wall, "horizontal"),
+        (outer, "vertical"),
+        (far_wall, "horizontal"),
+        (floor, "vertical"),
+    ):
+        check(
+            f"groove {relation} {entity}",
+            adapter.add_sketch_constraint(entity, None, relation),
+        )
+    anchor_point_to_origin(adapter, f"{axis}.start", 0.0, 0.0, "groove axis start")
+    check(
+        "groove axis length",
+        adapter.add_sketch_dimension(axis, None, "linear", PIVOT_LENGTH),
+    )
+    dims.record("GrooveAxisLength", '"PivotLength"')
+    for name, point, value in (
+        ("GrooveStation", f"{near_wall}.start", groove.GROOVE_NEAR_STATION),
+        ("GrooveEndStation", f"{far_wall}.end", groove.GROOVE_FAR_STATION),
+    ):
+        dimension_between(
+            adapter,
+            f"{axis}.start",
+            point,
+            "vertical_distance",
+            value,
+            f"groove {name}",
+        )
+        dims.record(name, f'"{name}"')
+    for name, line, radius, drive in (
+        ("GrooveDia", floor, r_floor, '"GrooveDia"'),
+        ("GrooveCutDia", outer, r_out, '"RodSection"'),
+    ):
+        add_diametric_linear_dimension(
+            adapter, axis, line, (radius + 2.0, (near + far) / 2.0), f"groove {name}"
+        )
+        dims.record(name, drive)
+    ensure_fully_defined(adapter, "groove sketch")
+    check("exit_sketch groove", adapter.exit_sketch())
+    name_last_feature(adapter, groove.GROOVE_FEATURE)
+    drive_jobs = dims.apply(adapter, groove.GROOVE_FEATURE)
+    check(
+        "revolve-cut groove",
+        adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
+    )
+    name_last_feature(adapter, "Groove")
+    removed = (
+        math.pi
+        * ((PIVOT_DIA / 2.0) ** 2 - r_floor**2)
+        * (groove.GROOVE_FAR_STATION - groove.GROOVE_NEAR_STATION)
+    )
+    return drive_jobs, removed
 
 
 def _shoulder_fillet_max_limit(adapter) -> None:
@@ -174,6 +258,9 @@ def build(adapter) -> dict[str, str]:
     set_global(adapter, "PivotDia", f"{PIVOT_DIA}mm")
     set_global(adapter, "PivotLength", f"{PIVOT_LENGTH}mm")
     set_global(adapter, "ShoulderRadius", f"{SHOULDER_FILLET_R}mm")
+    set_global(adapter, "GrooveDia", f"{groove.GROOVE_DIA}mm")
+    set_global(adapter, "GrooveStation", f"{groove.GROOVE_NEAR_STATION}mm")
+    set_global(adapter, "GrooveEndStation", f"{groove.GROOVE_FAR_STATION}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -272,6 +359,14 @@ def build(adapter) -> dict[str, str]:
     v_fillet = 2.0 * math.pi * spandrel_r * spandrel
     volume = volume_check(
         adapter, "shoulder root fillet", volume + v_fillet, 0.005 * v_pivot
+    )
+
+    # 3a. Set-screw relief groove round the pivot (#2439), turned in the same
+    #     setup as the pivot.
+    groove_jobs, v_groove = _relief_groove(adapter)
+    drive_jobs += groove_jobs
+    volume = volume_check(
+        adapter, "pivot relief groove", volume - v_groove, 0.01 * v_groove
     )
 
     # 4. Adjuster stud tap: one blind #0-80 Hole Wizard tap in the top face on

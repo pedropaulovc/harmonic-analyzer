@@ -78,11 +78,15 @@ if not (STRAP_T_STOCK_BAND[1] < 0.0 < STRAP_T_STOCK_BAND[0]):
     raise AssertionError("the strap stock band no longer brackets its bar")
 STRAP_TOP_X = (-16.002, 0.0)  # .63 wide at the bar (low)
 STRAP_BOT_X = (-6.096, 6.096)  # .48 wide at the foot, centred on the rod (low)
-# 6.69 below the bar top: the strap stays flat on the bar plane, which the
+# 6.38 below the bar top: the strap stays flat on the bar plane, which the
 # platen and paper also cross (platen z -142.75..-138.9 mm), so its foot stops
-# just above the platen top instead of running past the paper top (photo
-# ~184 mm below the screw; this is 165, inside the photo's +-15 % parallax).
-STRAP_RISE = 169.926  # 6.69
+# above the platen top instead of running past the paper top (photo ~184 mm
+# below the screw; this is 157, inside the photo's +-15 % parallax).  The
+# foot (the lower plate's bottom) stands where the pen carriage's top, at the
+# top of the +-25 mm pen travel (#748 owner ruling 2026-11-20), stays
+# GUIDE_ENGAGE_MARGIN under it: 6.39 would leave 2.998 mm, 6.38 leaves 3.252
+# (pn_pen_carriage_geom.CARRIAGE_TOP_Y; the hanger test asserts it).
+STRAP_RISE = 162.052  # 6.38
 STRAP_BOT_Y = -STRAP_RISE
 STRAP_OUTLINE = (
     (STRAP_TOP_X[1], 0.0),
@@ -115,8 +119,11 @@ if not GUIDE_PLATE_T_STOCK_RANGE[0] < GUIDE_PLATE_T < GUIDE_PLATE_T_STOCK_RANGE[
 if GUIDE_PLATE_T_STOCK_RANGE[0] < WALL_TARGET_MM:
     raise AssertionError("the thinnest supplied guide plate is under the rule 17 target")
 # The upper plate's top face below the strap top (printed): the plates'
-# pitch follows from it, the rise and the plate stock (photo ~42 mm).
-UPPER_PLATE_DROP = 127.0  # 5.00
+# pitch follows from it, the rise and the plate stock (photo ~42 mm).  It
+# moves up with the foot (6.69 -> 6.38, 5.00 -> 4.69 for #748's +-25 mm
+# travel), so the pitch, and with it the slots' lean (GUIDE_TILT_MAX, which a
+# shorter pitch would take past its 0.25 deg), stays the same.
+UPPER_PLATE_DROP = 119.126  # 4.69
 GUIDE_PLATE_YS = (STRAP_BOT_Y, -(UPPER_PLATE_DROP + GUIDE_PLATE_T))  # bottom faces
 GUIDE_PITCH = GUIDE_PLATE_YS[1] - GUIDE_PLATE_YS[0]  # lower to upper bottom face
 # Each plate's top face below the strap top edge: the extrude's start offset.

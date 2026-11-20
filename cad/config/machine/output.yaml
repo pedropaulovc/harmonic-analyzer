@@ -8,7 +8,9 @@ output:
                                    # operator sets, so this band is what error_budget.py reads
   spring_count_channel: 20         # one return spring per channel
   spring_count_counter: 1          # single counter spring (force-balance datum)
-  pen_trace_half_mm: 15.0          # physical pen half-stroke the computed curve maps onto
+  pen_trace_half_mm: 25.0          # physical pen half-stroke the computed curve maps onto
+                                   # (owner ruling 2026-11-20, #748 option B: "B sufficient
+                                   # pen travel is critical for device"; was 15)
   pen_rest_crank_deg: 90.0         # crank angle the saved/render pose sits at (pen at datum)
   source: "DIMENSIONS.md ch19, ch26-28"
   confidence: med

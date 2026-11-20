@@ -200,8 +200,10 @@ SET_SCREW_TAP_LENGTH = round(
 # The rod set screw is the shared McMaster 91375A106, #4-40 x 1/4 cup point
 # (MHA-SH-VN-54).  Its full-form thread stops one pitch short of the cup and
 # 0.75 pitch short of the socket face (the vendor replica,
-# diagnostics/diag_build_91375A106).  Cup on the bore wall, it lies wholly in
-# the tap, so all of that full thread engages.
+# diagnostics/diag_build_91375A106).  Its cup seats on the floor of the rod
+# pivot's relief groove, .010 inside the bore wall (#2439), so only the
+# unthreaded point leaves the tap and all of that full thread engages
+# (pn_pen_carriage_geom guards both).
 ROD_SET_SCREW_PITCH = 25.4 / 40.0  # #4-40 UNC
 ROD_SET_SCREW_FULL_THREAD = round(
     rod_set_screw.LENGTH - rod_set_screw.POINT_LENGTH - 0.75 * ROD_SET_SCREW_PITCH, 6

@@ -3,7 +3,7 @@ r"""Reproduction script: pen hanger (book ch. 24, pp. 60-63; engineerguy 4/4
 
 The black tapered strap bolted to the wheel support bar that guides the pen
 rod: a 1/8 flat strap tapering .63 -> .48 wide, lying on the bar's front
-face and running 6.69 down from the bar top to just above the platen, with two
+face and running 6.38 down from the bar top to above the platen, with two
 open U guide plates of the same bar bonded across its front face, both slots
 cut after bonding.  Each plate's
 slot opens forward (-Z), so the square pen rod hangs on its wire inside both
@@ -18,7 +18,7 @@ Layout: origin at the strap's top-right BACK corner -- on the bar's front
 face, level with the bar top, on the rod line's x (machine ``HANGER_POS``;
 all of the geometry lives in ``pn_pen_hanger_spec``).  The part is authored
 MACHINE-handed and placed IDENTITY, so local axes are machine axes: the strap
-occupies y -169.926..0, z -3.175..0 (mm), its top edge leaning toward machine
+occupies y -162.052..0, z -3.175..0 (mm), its top edge leaning toward machine
 east (-x); the rod axis is local (0, ., ROD_AXIS_Z).
 Dimensions: cad/DIMENSIONS.md ch. 24.
 
