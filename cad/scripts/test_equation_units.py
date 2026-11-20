@@ -1,5 +1,6 @@
 """A unit literal's global is read back against its intended value, and every
-part gets eight angular places at creation (issue #889). SolidWorks-free."""
+part gets eight angular and eight linear places at creation (issue #889).
+SolidWorks-free."""
 
 from __future__ import annotations
 
@@ -9,7 +10,7 @@ from types import SimpleNamespace
 import pytest
 
 from _dimensions import set_global
-from _document_units import apply_package_model_units, keep_equation_angles_exact
+from _document_units import apply_package_model_units, keep_equation_places_exact
 
 _SW_MM, _SW_INCHES, _SW_FEET_INCHES = 0, 3, 5
 _SW_DEGREES, _SW_RADIANS = 0, 3
@@ -19,7 +20,8 @@ class _Extension:
     """Document preferences: unit codes answer reads, writes are logged."""
 
     def __init__(self, linear: int = _SW_INCHES, angular: int = _SW_DEGREES) -> None:
-        self.values = {47: linear, 51: angular, 52: 2}
+        # A template's places: two angular, three linear.
+        self.values = {47: linear, 49: 3, 51: angular, 52: 2}
         self.writes: list[tuple[int, int]] = []
         self.rejected: set[int] = set()
 
@@ -100,8 +102,17 @@ def test_a_part_gets_eight_angular_places_before_its_length_units(unit):
     apply_package_model_units(_adapter(None, extension), unit, label="part")
     assert extension.writes[0] == (52, 8)
     assert extension.values[52] == 8
-    lengths = [] if unit == "mm" else [(47, 3), (48, 1), (49, 8), (263, 3)]
+    lengths = [(49, 8)] if unit == "mm" else [(47, 3), (48, 1), (49, 8), (263, 3)]
     assert extension.writes[1:] == lengths
+
+
+def test_a_part_without_package_units_gets_eight_places_in_its_template_unit():
+    # Codjiflo P1 on #3149: a millimetre package's literals must not rest on
+    # the template's linear places; its length unit stays the template's.
+    extension = _Extension()
+    keep_equation_places_exact(_adapter(None, extension), label="part")
+    assert extension.writes == [(52, 8), (49, 8)]
+    assert extension.values[47] == _SW_INCHES
 
 
 def test_an_assembly_keeps_its_angular_places():
@@ -110,11 +121,12 @@ def test_an_assembly_keeps_its_angular_places():
     assert extension.writes == []
 
 
-def test_angular_places_that_do_not_read_back_fail():
+@pytest.mark.parametrize("preference", [52, 49])
+def test_equation_places_that_do_not_read_back_fail(preference):
     extension = _Extension()
-    extension.rejected.add(52)
-    with pytest.raises(RuntimeError, match="swUnitsAngularDecimalPlaces = 8 rejected"):
-        keep_equation_angles_exact(_adapter(None, extension), label="part")
+    extension.rejected.add(preference)
+    with pytest.raises(RuntimeError, match="DecimalPlaces = 8 rejected"):
+        keep_equation_places_exact(_adapter(None, extension), label="part")
 
     class Ignoring(_Extension):
         def SetUserPreferenceInteger(self, preference, option, value):
@@ -122,4 +134,4 @@ def test_angular_places_that_do_not_read_back_fail():
             return True
 
     with pytest.raises(RuntimeError, match="model units read"):
-        keep_equation_angles_exact(_adapter(None, Ignoring()), label="part")
+        keep_equation_places_exact(_adapter(None, Ignoring()), label="part")

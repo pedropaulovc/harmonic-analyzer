@@ -7,10 +7,12 @@ evaluates every global at the document's linear places, so the builder calls
 ``create_assembly``, before any global, sketch, feature or check.  Millimetre
 packages keep their template's length units untouched.
 
-Every part also gets eight angular places (:func:`keep_equation_angles_exact`):
-the template's two rounded ``ConeIncline = 12.5182deg`` to 12.52 (#889).  A
-part that never calls :func:`apply_package_model_units` calls that directly.
-Assemblies write no angular global, so their angular places are left alone;
+Every part also gets eight angular and eight linear places in its own
+length unit (:func:`keep_equation_places_exact`): the template's two angular
+places rounded ``ConeIncline = 12.5182deg`` to 12.52 (#889), and a millimetre
+package's literals must not rest on the template's linear places.  A part that
+never calls :func:`apply_package_model_units` calls that directly.  Assemblies
+write no angular global, so their angular places are left alone;
 ``_dimensions.set_global`` fails on any unit literal the document rounds.
 
 IPS is selected LAST: native runs showed IPS-first followed by the explicit
@@ -44,12 +46,13 @@ _Preference = tuple[str, int, int]
 _ANGULAR_PLACES: tuple[_Preference, ...] = (
     ("swUnitsAngularDecimalPlaces", 52, MODEL_ANGLE_DECIMALS),
 )
+_LINEAR_PLACES: _Preference = ("swUnitsLinearDecimalPlaces", 49, MODEL_INCH_DECIMALS)
 
 # (name, swUserPreferenceIntegerValue_e, value) in write order, IPS last.
 _INCH_MODEL_UNITS: tuple[_Preference, ...] = (
     ("swUnitsLinear", 47, 3),  # swINCHES
     ("swUnitsLinearDecimalDisplay", 48, 1),  # swDECIMAL
-    ("swUnitsLinearDecimalPlaces", 49, MODEL_INCH_DECIMALS),
+    _LINEAR_PLACES,
     ("swUnitSystem", 263, 3),  # swUnitSystem_IPS
 )
 
@@ -73,11 +76,15 @@ def _write_and_read_back(
     _telemetry.event(event, label=label, **actual)
 
 
-@_telemetry.traced("document.angle_places", label_param="label")
-def keep_equation_angles_exact(adapter: Any, *, label: str) -> None:
-    """Give the active new part eight angular places, read back."""
+@_telemetry.traced("document.equation_places", label_param="label")
+def keep_equation_places_exact(adapter: Any, *, label: str) -> None:
+    """Give the active new part eight angular and eight linear places in its
+    template's length unit, read back."""
     _write_and_read_back(
-        adapter, _ANGULAR_PLACES, label=label, event="document.angle_places.readback"
+        adapter,
+        _ANGULAR_PLACES + (_LINEAR_PLACES,),
+        label=label,
+        event="document.equation_places.readback",
     )
 
 
@@ -86,16 +93,19 @@ def apply_package_model_units(adapter: Any, unit: DrawingUnit, *, label: str) ->
     """Select ``unit``'s document units on the active new part or assembly.
 
     A part gets its eight angular places first.  ``"in"`` then writes the
-    four inch preferences (IPS last); ``"mm"`` writes no length preference.
+    four inch preferences (IPS last); ``"mm"`` writes a part's eight linear
+    places in the template's length unit and no other length preference.
     Each write must return True, and all are read back together, raising on
     any difference.
     """
     if unit not in ("mm", "in"):
         raise ValueError(f"{label}: unknown model unit {unit!r}")
     is_part = int(_read_member(adapter.currentModel, "GetType")) == _DOC_PART
-    preferences = (_ANGULAR_PLACES if is_part else ()) + (
-        _INCH_MODEL_UNITS if unit == "in" else ()
-    )
+    if unit == "in":
+        lengths = _INCH_MODEL_UNITS
+    else:
+        lengths = (_LINEAR_PLACES,) if is_part else ()
+    preferences = (_ANGULAR_PLACES if is_part else ()) + lengths
     if preferences:
         _write_and_read_back(
             adapter, preferences, label=label, event="document.model_units.readback"

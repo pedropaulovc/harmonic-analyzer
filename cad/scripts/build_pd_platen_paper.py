@@ -29,7 +29,7 @@ import sys
 from _appearance import PAPER_WHITE, apply_color, apply_material
 from _check import check
 from _dimensions import drive_dimension, set_global
-from _document_units import keep_equation_angles_exact
+from _document_units import keep_equation_places_exact
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
 from _part_save import save_part_and_images
@@ -51,7 +51,7 @@ def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", adapter.create_part())
-    keep_equation_angles_exact(adapter, label=PART_NAME)
+    keep_equation_places_exact(adapter, label=PART_NAME)
 
     # Editable knobs (Tools > Equations): the sheet width, height, and the proud
     # thickness (an extrude depth -- a knob, but a feature parameter, so nothing
