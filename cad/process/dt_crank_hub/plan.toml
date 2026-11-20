@@ -16,7 +16,7 @@ ref = "drill-14"  # Drills #14
 
 [[tools]]
 id = "taper-pin-reamer"
-name = "No. 4 taper-pin reamer"
+name = "No. 3 taper-pin reamer"
 ref = "taper-pin-reamer"  # B-reamer-taper-pin
 
 [[tools]]

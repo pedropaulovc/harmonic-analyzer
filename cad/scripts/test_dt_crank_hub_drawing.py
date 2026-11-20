@@ -88,11 +88,12 @@ def test_mha024_ream_ligaments_meet_rule_12_at_the_printed_bands() -> None:
     # seat length is a fit-up reference), at most the thickest 5/16 stock.
     # Behind the ream the relief shoulder is placed from the front face by the
     # .XX overall less the .XX relief.
+    # The bought No. 3 pin's .219 big end bounds the ream (#2368).
     assert geometry.SERVICE_PIN_SHOULDER_LIGAMENT_WORST_MM == pytest.approx(
-        2.200, abs=1e-3
+        2.388, abs=1e-3
     )
-    assert geometry.SERVICE_PIN_REAR_LIGAMENT_WORST_MM == pytest.approx(3.889, abs=1e-3)
-    assert geometry.SERVICE_PIN_BARREL_WALL_WORST_MM == pytest.approx(8.080, abs=1e-3)
+    assert geometry.SERVICE_PIN_REAR_LIGAMENT_WORST_MM == pytest.approx(4.077, abs=1e-3)
+    assert geometry.SERVICE_PIN_BARREL_WALL_WORST_MM == pytest.approx(8.268, abs=1e-3)
     assert min(
         geometry.SERVICE_PIN_SHOULDER_LIGAMENT_WORST_MM,
         geometry.SERVICE_PIN_REAR_LIGAMENT_WORST_MM,

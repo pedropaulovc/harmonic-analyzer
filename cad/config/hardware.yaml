@@ -415,6 +415,9 @@ ch-vn-spring-hook:
 dt-cone-tip-end-screw:
   tier: 3
   why: "fillister screw drilled and reamed (MHA-DT-39)"
+dt-crank-pin:
+  tier: 3
+  why: "taper pin cross-drilled for the keeper ring (MHA-DT-09)"
 dt-cylinder-gear-tl-vn-cam-clock-pin:
   tier: 3
   why: "gauge pin cut to length (MHA-DT-12-TL-VN-51)"

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 import build_dt_crank_pin as part
 import dt_crank_pin_notes as notes
 import dt_crank_pin_spec
@@ -40,7 +42,7 @@ def test_cross_hole_prints_natively_not_in_a_note() -> None:
     for value in (spec.RING_HOLE_DIA, spec.RING_HOLE_X, spec.PIN_LENGTH):
         inch = value / 25.4
         for places in (2, 3):
-            for text in (notes.TAPER_CALLOUT, notes.TAPER_NOTE):
+            for text in (notes.TAPER_CALLOUT, notes.SHEET_NOTES):
                 assert f"{inch:.{places}f}".lstrip("0") not in text
 
 
@@ -62,13 +64,23 @@ def test_cross_hole_station_text_clears_its_extension_lines() -> None:
     assert text_y > pin_top + clearance
 
 
-def test_end_diameters_are_drawing_native_true_diameter_callouts() -> None:
-    """The model's end dims are half-profile radii, so the print measures the
-    projected big-end circle; the length and the 1:48 ratio give the small end."""
-    # Custom 1:48 taper over 45 mm -> 0.9375 on diameter.
-    taper_on_dia = dt_crank_pin_spec.BIG_END_DIA - dt_crank_pin_spec.SMALL_END_DIA
-    assert round(taper_on_dia, 4) == round(dt_crank_pin_spec.PIN_LENGTH / 48.0, 4)
-    assert "1:48" in notes.TAPER_CALLOUT
+def test_pin_is_the_bought_no_3_taper_pin_cross_drilled_only() -> None:
+    """Owner ruling 2026-11-20 (#2368, "B"): a stock ASME B18.8.2 No. 3 x
+    1-3/4 pin; the sheet names it once and dimensions only the cross-hole."""
+    import _config
+
+    spec = dt_crank_pin_spec
+    assert spec.BIG_END_DIA == pytest.approx(0.219 * 25.4)
+    assert spec.PIN_LENGTH == pytest.approx(1.75 * 25.4)
+    # The standard 1:48 on diameter gives the catalogue's .183 small end.
+    assert spec.BIG_END_DIA - spec.SMALL_END_DIA == pytest.approx(spec.PIN_LENGTH / 48.0)
+    assert round(spec.SMALL_END_DIA / 25.4, 3) == 0.183
+    assert set(spec.DRAWING_DIMENSIONS) == {"RingHoleProfile"}
+    assert _config.parts("dt-crank-pin")["supplier_skus"] == [spec.SKU]
+    stock = " ".join(notes.STOCK_NOTE.split())
+    assert f"McMASTER-CARR {spec.SKU}, {spec.DESIGNATION} ({spec.STANDARD})" in stock
+    assert "ADD THE RING HOLE ONLY" in stock
+    assert "UNDIMENSIONED PURCHASED GEOMETRY IS REFERENCE" in stock
 
 
 def test_matched_taper_fit_names_both_mates() -> None:
@@ -115,7 +127,8 @@ def test_part_stamps_make_critical_properties() -> None:
 
     config = _config.parts("dt-crank-pin")
     assert config["number"] == "MHA-DT-09"
-    assert "1018" in str(config["material_specification"])
+    assert dt_crank_pin_spec.SKU in str(config["material_specification"])
+    assert "12L14" in str(config["material_specification"])
     assert config["finish"]
     assert int(config["quantity"]) == 1
 
@@ -145,8 +158,9 @@ def test_crank_keeper_ring_threads_the_pin_hole_clear_of_the_arm() -> None:
     ) / 2.0
     assert worst_web >= WALL_FLOOR_MM
     assert worst_web - 0.0254 < dt_crank_pin_spec.CROSS_HOLE_WEB_MIN <= worst_web
-    # The ligament to the big-end face meets the .080 target at the worst case
-    # of the printed bands (.XX station off the .XX length, DRILLED HOLES).
+    # The ligament to the big-end face meets the .080 target with margin for
+    # twice the .XX station band (the station runs from the as-bought big
+    # end) and the DRILLED HOLES oversize.
     ligament = (
         dt_crank_pin_spec.RING_HOLE_X
         - 2.0 * printed_band_mm(2, unit=unit)

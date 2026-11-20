@@ -1,4 +1,4 @@
-r"""Create the curated machinist drawing for the crank tapered pin."""
+r"""Create the curated machinist drawing for the bought, cross-drilled crank taper pin."""
 
 from __future__ import annotations
 
@@ -6,17 +6,13 @@ import argparse
 import sys
 from typing import Any
 
-from solidworks_mcp.adapters import sw_type_info as _sw_type_info
-from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
     auto_center_marks,
     place_view,
-    view_name,
 )
 
 from _check import check
-from _com import _early_bound
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -35,7 +31,7 @@ from _part_properties import part_drawing_unit
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
-from dt_crank_pin_notes import TAPER_CALLOUT, TAPER_NOTE
+from dt_crank_pin_notes import SHEET_NOTES, TAPER_CALLOUT
 from dt_crank_pin_spec import (
     BIG_END_DIA,
     DIMENSION_CALLOUTS,
@@ -84,13 +80,11 @@ TAPER_SILHOUETTE_PICK = (
     BIG_END_EDGE[0] + TAPER_PICK_X * SHEET_SCALE[0] / 1000.0,
     FRONT_CENTER[1] + _TAPER_PICK_R * SHEET_SCALE[0] / 1000.0,
 )
-# The taper note's top-left corner: above the pin and just right of the
+# The fit callout's top-left corner: above the pin and just right of the
 # leader tip, so the leader leaves the start of the first line down-left,
 # outside the text block (round 2 had it run back through all four lines).
-# The taper callout is two rows now (ratio, SEE NOTE 1), still above the pin.
 TAPER_NOTE_XY = (TAPER_SILHOUETTE_PICK[0] + 0.006, FRONT_CENTER[1] + 0.063)
-# The numbered note: under the side view's length dimension, left of the
-# title block (x 0.218).
+# The numbered notes: under the side view, left of the title block (x 0.218).
 NOTES_XY = (0.020, 0.120)
 
 # The ring cross-hole, seen end-on as a circle on the axis.
@@ -104,66 +98,20 @@ AXIS_FACE_PICK = (FRONT_CENTER[0] + 0.020, FRONT_CENTER[1] + 0.002)
 # The 3.70 station's 9.05-mm-wide text cannot fit between its extension
 # lines, only 7.4 mm apart at 2:1. Put the text outboard right, clear of
 # the outside arrow's 6.35-mm tail and left of the taper-note leader.
-# Below the hole: its Ø callout, then the overall length.
+# Below the hole: its Ø callout.  The bought pin's length and ends are
+# reference (note 2), so nothing else is dimensioned.
 FRONT_KEEP = {
     "RingHoleX": (
         RING_HOLE_CENTER[0] + 0.014,
         FRONT_CENTER[1] + 0.016,
     ),
     "RingHoleDia": (RING_HOLE_CENTER[0] + 0.020, FRONT_CENTER[1] - 0.016),
-    "Length": (FRONT_CENTER[0], FRONT_CENTER[1] - 0.045),
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
     for dimensions in DRAWING_PRECISION.values()
     for name, places in dimensions.items()
 }
-
-
-@_telemetry.traced("drawing.end_diameter", label_param="label")
-def _add_end_diameter(
-    adapter: Any,
-    view: Any,
-    *,
-    edge_xy: tuple[float, float],
-    text_xy: tuple[float, float],
-    below: str,
-    label: str,
-) -> Any:
-    """Dimension one end-face circle seen edge-on in the side view.
-
-    The pin's only model diameter dims are half-profile RADII (the frustum
-    sketch dimensions each vertical line from the axis), which would print as
-    bare 3.00/2.50 linears; dimensioning the projected end-face CIRCLE edge
-    instead yields the true-diameter callout a turned-pin print carries at
-    each end.
-    """
-    draw = adapter.currentModel
-    ddoc = _early_bound(
-        draw, "IDrawingDoc"
-    )  # IDrawingDoc view for drawing-only methods (same dispatch)
-    name = view_name(adapter, view)
-    if not ddoc.ActivateView(name):
-        raise RuntimeError(f"failed to activate drawing view {name!r} ({label})")
-    draw.ClearSelection2(True)
-    if not draw.Extension.SelectByID2(
-        "", "EDGE", edge_xy[0], edge_xy[1], 0.0, False, 0, null_callout(), 0
-    ):
-        raise RuntimeError(
-            f"failed to select {label} end-face edge at sheet "
-            f"({edge_xy[0]:g}, {edge_xy[1]:g})"
-        )
-    display = draw.AddDimension2(text_xy[0], text_xy[1], 0.0)
-    draw.ClearSelection2(True)
-    if display is None:
-        raise RuntimeError(f"failed to add the {label} diameter dimension")
-    display = _sw_type_info.early_bound_or_flag(display, "IDisplayDimension", "SetText")
-    # An edge-on circle can come in as a radial dimension; force the
-    # doubled/diameter display (no-op on dimension types it does not apply to).
-    adapter._attempt(lambda: setattr(display, "Diametric", True))
-    display.SetText(4, below)  # swDimensionTextCalloutBelow
-    draw.EditRebuild3()
-    return display
 
 
 def build(adapter: Any) -> dict[str, str]:
@@ -202,7 +150,7 @@ def build(adapter: Any) -> dict[str, str]:
             0: "Crank Pin Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "crank pin; tapered pin; turned steel",
+            3: "crank pin; purchased No. 3 taper pin; cross-drilled",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
@@ -228,26 +176,16 @@ def build(adapter: Any) -> dict[str, str]:
     add_view_centerline(
         adapter, front, face_xy=AXIS_FACE_PICK, label="crank pin axis centerline"
     )
-    # The big end, the length and the 1:48 ratio define the taper; a printed
-    # small end, rounded to .XX from the mm model, read as a second taper
-    # (#290 machinist review of 29af6f44d), so it is not dimensioned.
-    _add_end_diameter(
-        adapter,
-        front,
-        edge_xy=BIG_END_EDGE,
-        text_xy=(BIG_END_EDGE[0] - 0.028, FRONT_CENTER[1] + 0.030),
-        below="BIG END",
-        label="big end",
-    )
     # SolidWorks classifies a solid circular end silhouette under the same
     # AutoInsertCenterMarks2 "hole" bit as a bored circle; disabling that bit
     # makes the API a guaranteed no-op even though the end view is circular.
     if not auto_center_marks(adapter, right, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to pin end view")
 
-    # The taper's callout (ratio, SEE NOTE 1) is flagged on the taper it
+    # The fit callout (DRIVE FIT, SEE NOTE 3) is flagged on the taper it
     # governs: its leader tip lands on the cone's upper outline, mid-taper and
-    # clear of the ring cross-hole.  Note 1 states the matched fit.
+    # clear of the ring cross-hole.  Notes 1-2 name the bought pin, note 3
+    # states the matched fit.
     add_leader_note(
         adapter,
         TAPER_CALLOUT,
@@ -256,8 +194,8 @@ def build(adapter: Any) -> dict[str, str]:
         label="taper fit callout",
         view=front,
     )
-    if add_note(adapter, TAPER_NOTE, *NOTES_XY) is None:
-        raise RuntimeError("failed to add the crank pin's numbered note")
+    if add_note(adapter, SHEET_NOTES, *NOTES_XY) is None:
+        raise RuntimeError("failed to add the crank pin's numbered notes")
 
     return finalize_drawing(
         adapter,

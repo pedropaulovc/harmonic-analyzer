@@ -124,8 +124,22 @@ FIT_NOTE = "\n".join(
     )
 )
 
+# Note 4: the dome end's centre.  Owner ruling 2026-11-20 (#2369, "Follow
+# recommendations unless noted otherwise"; the recommendation: "Add the
+# sacrificial-stub permission; it costs one note and protects the crank mesh
+# runout"): the shaft may be turned between centres, the dome end's centre in
+# a sacrificial stub that goes when the dome is formed last.  A permission,
+# not a method; the plain end's leadered note links it.
+CENTRE_STUB_NOTE_NUMBER = 4
+CENTRE_STUB_NOTE = "\n".join(
+    (
+        f"{CENTRE_STUB_NOTE_NUMBER}. DOME END: A LATHE CENTRE IS OK ONLY IN A SACRIFICIAL STUB,",
+        "   CUT OFF WHEN THE DOME IS FORMED LAST.",
+    )
+)
+
 # The sheet's numbered notes, in one block under the general note.
-SHEET_NOTES = "\n".join((CROSS_HOLE_NOTE, SPIGOT_NOTE, FIT_NOTE))
+SHEET_NOTES = "\n".join((CROSS_HOLE_NOTE, SPIGOT_NOTE, FIT_NOTE, CENTRE_STUB_NOTE))
 
 # The Depth names its stack on its own row: a callout below would lift the
 # value into the row above.  No AIR (rule 26).  The two three-place far-end
@@ -214,12 +228,12 @@ PINION_PIN_CALLOUT = "\n".join(
 )
 
 # Where the shop may drill a lathe centre hole (drawing-guidelines.md rule
-# 11): the plain far end only, never the dome.  The leader to that
-# end's rim is what names the end (rule 7: flag it where it applies); the
-# unleadered "AT PLAIN END" row named an end the sheet never identified.  The
-# restriction is on the centre hole, a turning location: the dome's punched
-# witness (FIDUCIAL_NOTE) is a separate, required mark on the finished
-# sphere, which a centre hole would destroy. Two rows of words at most (rule
-# 7); the drawing identifies the plain end in FRONT, not by the isometric's
-# apparent top/bottom orientation.
-CENTRES_NOTE = "LATHE CENTRE OK,\nNOT IN DOME"
+# 11): the plain far end, and the dome end only as note 4 allows (owner
+# ruling 2026-11-20, #2369: a sacrificial stub, the dome formed last).  The
+# leader to the plain end's rim is what names that end (rule 7: flag it where
+# it applies); the unleadered "AT PLAIN END" row named an end the sheet never
+# identified.  The finished dome keeps no centre: its punched witness
+# (FIDUCIAL_NOTE) is a separate, required mark on the finished sphere. Two
+# rows of words at most (rule 7); the drawing identifies the plain end in
+# FRONT, not by the isometric's apparent top/bottom orientation.
+CENTRES_NOTE = f"LATHE CENTRE OK;\nAT DOME SEE NOTE {CENTRE_STUB_NOTE_NUMBER}"
