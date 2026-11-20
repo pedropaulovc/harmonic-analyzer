@@ -139,11 +139,12 @@ TITLE_BLOCK = (
 
 # --- Sheet 1 ------------------------------------------------------------------
 # Front and right at 1:5 across the upper left, the 1:1 knife-edge detail to
-# their right, the notes under the front view. All three stand 4 mm lower
+# their right, the notes under the front view. All three stand 6 mm lower
 # than before the setting table's fifth row (the lever level, #3124), so the
-# table keeps SETTING_TABLE_VIEW_GAP over them.
-FRONT_CENTER = (0.068, 0.164)
-RIGHT_CENTER = (0.185, 0.164)
+# table keeps SETTING_TABLE_VIEW_GAP over them (at 4 mm the 5.5 mm row left
+# 3.0 mm: farm leaf 20261120T000055Z).
+FRONT_CENTER = (0.068, 0.162)
+RIGHT_CENTER = (0.185, 0.162)
 # The screw height's dimension line stands this far outboard of the knife
 # contact, on the side away from the gooseneck.
 COUNTER_TEXT_OFFSET = 0.030
@@ -180,7 +181,7 @@ NOTES_XY = (0.018, 0.098)
 NOTES_WIDTH = 64  # characters; default-format note text
 
 DETAIL_SCALE = (1, 1)
-DETAIL_CENTRE = (0.305, 0.168)
+DETAIL_CENTRE = (0.305, 0.166)
 # The detail frames the knife contact, the mount, the boss and the eye of the
 # boss hook: model centre between knife and boss axis, just above the knife.
 DETAIL_MODEL_CENTRE_MM = (
