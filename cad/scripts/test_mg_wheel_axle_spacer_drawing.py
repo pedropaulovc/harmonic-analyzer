@@ -98,9 +98,10 @@ def test_spacer_passes_the_pin_and_clears_the_tie_tail() -> None:
 
     assert spec.BORE_DIA > pin.PIN_DIA + pin.PIN_DIA_TOL
     assert group.TAIL_STACK_CLEARANCE > 0.0
-    # #2796: MG-00 bounds the toggle by the drum's width, not a number; a
-    # toggle as long as the widest printed drum still clears the stack.
-    assert "IS WIDE" in notes.STEP_TEXT["lever-wire-tie-knotted"]
+    # #2796: MG-00 bounds the toggle by the drum's face width (its axial
+    # length), not a number; a toggle as long as the longest printed drum
+    # still clears the stack.
+    assert "FACE WIDTH OF" in notes.STEP_TEXT["lever-wire-tie-knotted"]
     longest = drum.DRUM_LEN + drum.DRUM_LEN_DEVIATIONS[1]
     envelope = longest / 2.0 + wheel_geom.TIE1_OFFSET_MAX
     assert wheel_geom.TIE1_R - envelope - group._STACK_OD_MAX / 2.0 > 0.0

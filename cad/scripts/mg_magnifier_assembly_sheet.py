@@ -400,7 +400,7 @@ STEP_TEXT = {
     ),
     # A re-press goes back through the hold check before the trial fit.
     "axle-rechecked": (
-        f"IF ITS DEPTH WAS RECORDED, RETURN TO {_step(_steps.AXLE_HELD_KEY)}."
+        f"IF {_AXLE} WAS PRESSED AGAIN, RETURN TO {_step(_steps.AXLE_HELD_KEY)}."
     ),
     "trial-parts-removed": f"REMOVE THE TRIAL NUTS AND PARTS FROM {_AXLE}.",
     "column-clamps-fitted": (
@@ -533,12 +533,14 @@ STEP_TEXT = {
     ),
     "lever-wire-through-tie": f"PASS THE WIRE END THROUGH {_TIE_HOLE} AND PULL IT TAUT.",
     # The toggle prints no length (#2796: a step carries no dimension), but it
-    # is bounded by a feature the builder holds: no longer than the drum is
-    # wide, the tail still clears the back washer and spacer (mg_wheel_group
-    # TAIL_STACK_CLEARANCE; test_mg_wheel_axle_spacer_drawing).
+    # is bounded by a feature the builder holds: no longer than the drum's
+    # face width (its axial length), the tail still clears the back washer and
+    # spacer (mg_wheel_group TAIL_STACK_CLEARANCE;
+    # test_mg_wheel_axle_spacer_drawing). It must span the hole it lies
+    # across, which sets its lower bound.
     "lever-wire-tie-knotted": (
         "KNOT THE WIRE TAIL BEHIND THE HOLE ROUND A SHORT OFFCUT OF THE WIRE, "
-        f"SHORTER THAN {_DRUM} IS WIDE, LAID ACROSS THE HOLE."
+        f"SHORTER THAN THE FACE WIDTH OF {_DRUM}, LAID ACROSS THE HOLE."
     ),
     # Each hand-made joint is checked to hold (rule 23). A slipped knot has
     # let the wire run, so the wheel's rest angle is lost with it: the remedy
