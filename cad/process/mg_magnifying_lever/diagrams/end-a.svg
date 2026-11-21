@@ -19,7 +19,9 @@
   <line class="dims" x1="640" y1="278" x2="645" y2="165"/>
   <path class="cutter" d="M680 118 L720 118 L720 182 L680 182 L680 163 A13 13 0 0 0 680 137 Z"/>
   <text class="label" x="640" y="110">R.125 form tool</text>
-  <text class="label" x="20" y="120">end B's thread back in the spindle bore</text>
+  <text class="label" x="20" y="214">end B's thread, back</text>
+  <text class="label" x="20" y="232">in the spindle bore</text>
+  <line class="dims" x1="70" y1="200" x2="70" y2="165"/>
   <text class="label" x="160" y="290">3-jaw over a shim wrap on plain rod</text>
   <line class="dims" x1="240" y1="278" x2="320" y2="208"/>
 </svg>

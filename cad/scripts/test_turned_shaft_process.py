@@ -22,6 +22,7 @@ from pathlib import Path
 import pytest
 
 import _process_plans
+import _shop_equipment
 import export_features
 import mg_wheel_axle_callouts
 
@@ -39,13 +40,7 @@ STEMS = tuple(
 
 
 def _records(*names: str) -> dict:
-    records: dict = {}
-    for name in names:
-        for section, body in tomllib.loads(
-            (EQUIPMENT / name).read_text(encoding="utf-8")
-        ).items():
-            records.setdefault(section, {}).update(body)
-    return records
+    return _shop_equipment.merge(EQUIPMENT / name for name in names)
 
 
 STOCK = _records("stock-bought.toml", "stock-to-order.toml")["stock"]

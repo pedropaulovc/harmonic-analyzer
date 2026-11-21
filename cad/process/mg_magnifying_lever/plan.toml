@@ -86,21 +86,27 @@ thread_start_z_in = 0.4
 end_stickout_in = 0.4
 # Setup 3: end A's .60 in the jaws, the rest out to the dead centre.
 centre_stickout_mm = 167.0
-# Op 190: the 1/16 P1 cutoff blade cuts end B's face at Z0, down to a Ø.06
-# neck that still carries the stub on the dead centre; plunges at Z0, Z+.050
-# and Z+.100 (each under one blade width apart, no web) leave a groove about
-# .16 wide, room for the saw's kerf mid-groove; Setup 4 saws through the neck.
+# Op 190: the 1/16 P1 cutoff blade plunges at Z+.100 and Z+.050 first, then
+# at Z0 (end B's face) last, each down to a Ø.06 neck (each under one blade
+# width apart, no web): every plunge but the last is driven through full rod,
+# and the stub hangs on the neck, on the dead centre, only for the last. The
+# groove is about .16 wide, room for the saw's kerf mid-groove; Setup 4 saws
+# through the neck.
 neck_dia_in = 0.06
 blade_width_in = 0.0625
 # ASME B1.1-2019, 1/4-20 UNC-2A major diameter limits.
 thread_major_min_in = 0.2408
 thread_major_max_in = 0.2489
-# Single-pointing: the cross slide is backed out briskly from Z-.690 and is
-# clear by Z-.715 (at 70 rpm and 20 TPI the carriage runs .058 in/s, so
-# about .4 s), so the run-out ends inside the drawing's .70-.72 and under
-# its .075 maximum.
-thread_retract_start_in = 0.69
-thread_retract_clear_in = 0.715
+# Single-pointing: the compound feeds at 29°, so at full depth (about .035 of
+# compound travel) the point sits about .017 nearer the chuck than the
+# carriage DRO reads (the bit was touched on the stub's end at compound
+# zero). The cross slide is backed out briskly from DRO Z-.673 and is clear
+# by DRO Z-.698 (at 70 rpm and 20 TPI the carriage runs .058 in/s, so about
+# .4 s): on the last, deepest pass the point backs out at about .690 and is
+# clear by about .715, so the run-out ends inside the drawing's .70-.72 and
+# under its .075 maximum.
+thread_retract_start_in = 0.673
+thread_retract_clear_in = 0.698
 # The form tool's feed: straight to Z-.105 (under the R.125 arc's cap height
 # over the smallest rod the stock allows, Ø.248: .109), then in .001 steps
 # until the faced flat at the apex just vanishes; never past the rod's
@@ -263,7 +269,7 @@ speed_kind = "spindle"
 tool = "thread"
 drilling = "none"
 sizing = "other"
-instruction = "Single-point {{cad.thread_designation}}, one pass: from Z+{{process.thread_start_z_in:.3dot}} over the pilot toward the chuck; at Z-{{process.thread_retract_start_in:.3dot}} back the cross slide out briskly, clear by Z-{{process.thread_retract_clear_in:.3dot}}, and stop the spindle, half-nuts closed (the run-out then ends {{cad.thread_length_min_in:.2dot}}–{{cad.thread_length_max_in:.2dot}} from Z0). Bit still backed out, run the spindle in reverse at 70 rpm until the bit is back at Z+{{process.thread_start_z_in:.3dot}}; stop."
+instruction = "Single-point {{cad.thread_designation}}, one pass: from Z+{{process.thread_start_z_in:.3dot}} over the pilot toward the chuck; at DRO Z-{{process.thread_retract_start_in:.3dot}} back the cross slide out briskly, clear by DRO Z-{{process.thread_retract_clear_in:.3dot}} (the 29° compound carries the point about .017 past the DRO at depth), and stop the spindle, half-nuts closed. Bit backed out, reverse at 70 rpm back to Z+{{process.thread_start_z_in:.3dot}}; stop."
 settings = "lathe-thread-c360"
 cut_diameter_mm = "{{cad.stock_dia_mm}}"
 
@@ -281,7 +287,7 @@ instruction = "Only once Op 140 passes: back the cross slide fully off and the t
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "The leaf does not seat (Op 140): the gearbox is off 20 TPI; set it right, scrap the lever and make another from Setup 1. The bracket shakes at Op 150 (the thread cut too deep): scrap the lever and make another from Setup 1."
+instruction = "The leaf rocks on the crests or drifts out of step along the thread at any pass (the pitch is wrong, not the depth): the gearbox is off 20 TPI; set it right, scrap the lever and make another from Setup 1. A leaf that seats but shows light only because the thread is still shallow: keep cutting as Op 130. The bracket shakes at Op 150 (cut too deep): scrap the lever and make another from Setup 1."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -297,7 +303,7 @@ speed_kind = "spindle"
 tool = "part"
 drilling = "none"
 sizing = "other"
-instruction = "The cutoff blade on centre height, square: touch its chuck-side face on the pilot's shoulder, just gripping a cigarette paper, and set DRO Z+.301 (the paper). Plunge at DRO Z0 (its chuck-side face on end B's plane) to a Ø{{process.neck_dia_in:.2dot}} neck, then at Z+.050 and Z+.100 to the same neck: a groove about .16 wide with the {{process.blade_width_in:.4dot}} blade, room for the saw. Back out for chips; the dead centre stays in."
+instruction = "The cutoff blade on centre height, square: touch its chuck-side face on the pilot's shoulder, just gripping a cigarette paper, and set DRO Z+.301 (the paper). Plunge at Z+.100, then at Z+.050, each to a Ø{{process.neck_dia_in:.2dot}} neck; then at DRO Z0 (its chuck-side face on end B's plane) to the same neck, last: a groove about .16 wide with the {{process.blade_width_in:.4dot}} blade, room for the saw. Back out for chips; the dead centre stays in."
 settings = "lathe-part-c360"
 cut_diameter_mm = "{{cad.stock_dia_mm}}"
 
