@@ -126,6 +126,24 @@ def test_the_recipes_programs_pass_every_check_they_declare(ctx, tmp_path) -> No
     assert set(times) == {name for name, _ops in RECIPE.PROGRAMS}
 
 
+def test_the_saw_is_mounted_and_moved_only_where_its_arbor_clears(ctx) -> None:
+    p = PLAN["parameters"]
+    # CR05 leaves T1 parked over the touch-off station: up, then X, then Y.
+    assert _lines(ctx, "bore")[-3:] == [
+        f"G0 Z{p['saw_park_z_mm']:.3f}",
+        f"G0 X{p['saw_touch_x_mm']:.3f}",
+        "G0 Y-25.400",
+    ]
+    # CR06 rises straight up from the touch-off before any X or Y move.
+    assert _lines(ctx, "slot")[0] == f"G0 Z{p['saw_clear_z_mm']:.3f}"
+
+
+def test_a_root_run_short_of_the_eighth_cutters_round_is_refused(monkeypatch) -> None:
+    monkeypatch.setattr(RECIPE, "ROOT_RUN_MM", 0.4)
+    with pytest.raises(ValueError, match="stops short of the 1/8 in cutter's round"):
+        _context()
+
+
 @pytest.mark.parametrize(
     ("changes", "detail"),
     [
@@ -143,6 +161,14 @@ def test_the_recipes_programs_pass_every_check_they_declare(ctx, tmp_path) -> No
         ({"spot_dia_mm": 2.0}, "under the #49"),
         ({"tab_top_3_x_mm": 142.0}, "off the shank's flanks"),
         ({"inside_corner_max_mm": 0.9}, "inside-corner ceiling"),
+        (
+            {"blank_length_in": 7.36, "blank_length_min_mm": 186.944},
+            "right end by its margin",
+        ),
+        ({"saw_below_max_mm": 25.4}, "saw_clear_z_mm"),
+        ({"saw_nut_dia_max_mm": 64.0}, "nut reaches the crown"),
+        ({"saw_arbor_length_mm": 76.2}, "saw_park_z_mm"),
+        ({"root_station_mm": 168.0}, "root_station_mm"),
     ],
 )
 def test_a_plan_number_off_the_model_or_shop_is_refused(changes, detail) -> None:
@@ -165,6 +191,19 @@ def _seed(ctx: dict, key: str, pick, change) -> dict:
 def _shift_y(line: str, by: float) -> str:
     y = float(re.search(r"Y(-?[\d.]+)", line).group(1))
     return re.sub(r"Y-?[\d.]+", f"Y{y + by:.3f}", line)
+
+
+def _nth(text: str, n: int):
+    """A ``pick`` accepting the ``n``-th line equal to ``text``."""
+    seen: list[str] = []
+
+    def pick(line: str) -> bool:
+        if line == text:
+            seen.append(line)
+            return len(seen) == n
+        return False
+
+    return pick
 
 
 @pytest.mark.parametrize(
@@ -218,6 +257,15 @@ def _shift_y(line: str, by: float) -> str:
             lambda line: line.startswith("G1 X") and "Y" in line,
             lambda line: _shift_y(line, -0.3),
             "outline",
+        ),
+        # The saw's return after its first pass at the old clearance, the
+        # stock top plus 5 mm: the nut hanging under it sweeps through the
+        # blanks' ends.
+        (
+            "slot",
+            _nth("G0 Z30.400", 2),
+            lambda line: "G0 Z11.350",
+            "keep_out",
         ),
     ],
 )
