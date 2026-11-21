@@ -199,23 +199,30 @@ requirement(
     },
     precision={"dia": _P["RodDia"]},
 )
-# (feature, rim-side edge, length, their printed dimensions, their spec names)
+# One row per flat: the feature, its rim-side edge and length, their printed
+# dimensions and their spec names (flat rows: the feature export reads a
+# nested pair of names as a (module, symbol) citation).
 _FLATS = (
     (
         "flat_back",
-        (BACK_FLAT_EDGE_FROM_RIM, BACK_FLAT_LEN),
-        ("BackFlatFromRim", "BackFlatLen"),
-        ("BACK_FLAT_EDGE_FROM_RIM", "BACK_FLAT_LEN"),
+        BACK_FLAT_EDGE_FROM_RIM,
+        BACK_FLAT_LEN,
+        "BackFlatFromRim",
+        "BackFlatLen",
+        "BACK_FLAT_EDGE_FROM_RIM",
+        "BACK_FLAT_LEN",
     ),
     (
         "flat_front",
-        (FRONT_FLAT_EDGE_FROM_RIM, FRONT_FLAT_LEN),
-        ("FrontFlatFromRim", "FrontFlatLen"),
-        ("FRONT_FLAT_EDGE_FROM_RIM", "FRONT_FLAT_LEN"),
+        FRONT_FLAT_EDGE_FROM_RIM,
+        FRONT_FLAT_LEN,
+        "FrontFlatFromRim",
+        "FrontFlatLen",
+        "FRONT_FLAT_EDGE_FROM_RIM",
+        "FRONT_FLAT_LEN",
     ),
 )
-for _name, (_edge, _length), (_edge_dim, _length_dim), _sources in _FLATS:
-    _edge_src, _length_src = _sources
+for _name, _edge, _length, _edge_dim, _length_dim, _edge_src, _length_src in _FLATS:
     _centre = ROD_LEN - _edge - _length / 2
     requirement(
         _name,
