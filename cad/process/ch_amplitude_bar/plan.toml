@@ -312,12 +312,17 @@ milling_cuts = [
 ]
 
 [[setups.operations]]
-instruction = "Swap to the saw: the TTC 67-600-016 R8 1 in spacer-type arbor (Travers; TO BUY) in the spindle (drawbar tight), the slitting saw on it between that arbor's own spacers, its teeth cutting with the spindle turning clockwise (M3) seen from above. Before mounting, mic every spacer and the arbor nut that sit below the saw: each must be under {{process.saw_collar_dia_max_mm:in.2dot}} in diameter, or the top notch's end meets it. Over it: stop and tell the owner. Do not move the bars."
+instruction = "Before mounting the saw: mic every spacer and the nut of the TTC 67-600-016 R8 1 in spacer-type arbor (Travers; TO BUY) that will sit below the saw."
+inspection = "Each under {{process.saw_collar_dia_max_mm:in.2dot}} in diameter, or the top notch's end meets it in Setup 4. Over: stop and tell the owner."
+gauge_checks = "other"
+
+[[setups.operations]]
+instruction = "Spindle stopped (M5). Take out the collet and end mill; mount the arbor in the spindle (drawbar tight), the slitting saw on it between the spacers just checked, its teeth cutting with the spindle turning clockwise (M3) seen from above. Do not move the bars."
 feed = "hand"
 
 [[setups.operations]]
 instruction = "G54 Z0 again, from the saw's lower face: spindle stopped (M5), its rim over the top of the bar against the fixed jaw, lowered until a .002 leaf just drags under its lower face."
-instruction_detailed = "Spindle stopped (M5) before any hand comes near the saw. MDI G0 X-31.900 Y-3.000 puts the saw's centre left of the ends with its rim 3 mm over the end of the bar against the fixed jaw. Lower on the handwheel until a .002 feeler leaf just drags under the saw's lower face on that bar's top: G10 L20 P1 Z(that bar's L-to-R reading × 25.4 + 0.051). The saw carries no tool-setter length: CA02 loads no tool."
+instruction_detailed = "Spindle stopped (M5) before any hand comes near the saw. First raise Z on the handwheel until the saw's lower face is clearly above the jaw tops and the bar tops. Then MDI G0 X-31.900 Y-3.000 puts the saw's centre left of the ends with its rim 3 mm over the end of the bar against the fixed jaw. Lower on the handwheel until a .002 feeler leaf just drags under the saw's lower face on that bar's top: G10 L20 P1 Z(that bar's L-to-R reading × 25.4 + 0.051). The saw carries no tool-setter length: CA02 loads no tool."
 feed = "hand"
 
 [[setups.operations]]
@@ -418,8 +423,12 @@ inspection = "Each bar {{cad.top_end_length_min_in:.2f}}–{{cad.top_end_length_
 gauge_checks = [{ gauge = "steel-rule-48", band_mm = "{{cad.top_end_length_band_mm}}" }]
 
 [[setups.operations]]
-instruction = "Swap to the saw as in Setup 2 (spacers under {{process.saw_collar_dia_max_mm:in.2dot}} in), and set G54 Z0 from its lower face on the top of the bar against the fixed jaw: spindle stopped (M5), a .002 leaf just dragging, G10 L20 P1 Z(that bar's reading × 25.4 + 0.051)."
-instruction_detailed = "Spindle stopped (M5) before any hand comes near the saw. MDI G0 X31.900 Y-3.000 puts the saw's centre right of the ends with its rim 3 mm over the end of the bar against the fixed jaw. Lower on the handwheel until a .002 feeler leaf just drags under the saw's lower face: G10 L20 P1 Z(that bar's L-to-R reading × 25.4 + 0.051)."
+instruction = "Spindle stopped (M5). Take out the collet and end mill; mount the arbor and slitting saw as in Setup 2 (the same spacers, checked there), drawbar tight, teeth cutting with M3. Do not move the bars."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "G54 Z0 again, from the saw's lower face on the top of the bar against the fixed jaw: spindle stopped (M5), a .002 leaf just dragging, G10 L20 P1 Z(that bar's reading × 25.4 + 0.051)."
+instruction_detailed = "Spindle stopped (M5) before any hand comes near the saw. First raise Z on the handwheel until the saw's lower face is clearly above the jaw tops and the bar tops. Then MDI G0 X31.900 Y-3.000 puts the saw's centre right of the ends with its rim 3 mm over the end of the bar against the fixed jaw. Lower on the handwheel until a .002 feeler leaf just drags under the saw's lower face: G10 L20 P1 Z(that bar's L-to-R reading × 25.4 + 0.051)."
 feed = "hand"
 
 [[setups.operations]]
