@@ -79,9 +79,14 @@ review input.
 The `PART` name-field bullet of guidelines rule 2 records an owner ruling
 (2026-11-20, #1425, accepting the recommendation "Keep 'PART' and record the
 convention in cad/docs/drawing-guidelines.md, which avoids re-keying every
-assembly sheet for a label"). It went in without a `major_version` bump on
-purpose: cached assembly reviews keep any PART/ASSEMBLY ask they raised until
-their sheet re-keys for another reason.
+assembly sheet for a label"). Its wording was corrected by delegated ruling
+2026-11-21 (Main), recorded on #2144: the field prints the model's dashed
+stem on every sheet, so the earlier "holds the assembly's name" drew asks for
+a descriptive name. It follows the owner's #1425 ruling and the user ruling
+of 2026-09-26 that the PART cell prints the slug on every sheet
+(`_part_properties.part_properties`). Neither change bumped `major_version`,
+on purpose: cached assembly reviews keep any PART-field ask they raised until
+their sheet re-keys for another reason or the review leaf is force-refreshed.
 
 - **The model owns tolerance and precision (rules 3 and 4).** A band goes on
   the dimension as a native model tolerance
