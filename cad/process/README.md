@@ -393,7 +393,12 @@ A recipe has five parts:
   pass positions and directions, zigzag face passes, spindle speeds, no rapid
   below the stock top and no feed move above it. Each file's `air_feed`
   expectation (or each tool section's) also names the stock top its cycle
-  time is split at.
+  time is split at. A tabbed outline declares its tabs to
+  `check_outline(..., tabs=...)`: each tab's box, top, floor and the
+  recipe's thickness. The check proves each tab stands (the passes hop it
+  level at its top, cut nothing below that top inside its box and reach its
+  floor elsewhere) and that every level still covers the outline outside the
+  boxes, so an undeclared gap, a moved tab or a thinner tab fails.
 
 CAM can produce toolpaths that look valid yet are wrong; the expectations
 caught a spot depth measured from the counterbore floor, a feed height below
