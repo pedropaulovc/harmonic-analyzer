@@ -12,8 +12,7 @@ drawing numbers come from the part registry.
 Owner ruling 2026-11-06 (option C): the stop has no as-shipped setting; it
 clamps anywhere along the stick. The saved pose (STOP_MARK on the thumbscrew
 axis) and its sheet-1 near-face reference only show an example position, and
-the sheet-1 note says so. Printed lengths are in the assembly contract's
-``drawing_unit``.
+the sheet-1 note says so.
 
 Issue #2434 (delegated ruling 2026-11-17, no precedent, option 2, for the
 owner's review on #2144; issue comment 6970972423): the stick sets a bar
@@ -33,14 +32,10 @@ import ms_stick_registration as registration
 import ms_stop_spec as stop
 import _mcmaster_90114a124 as plate_screw
 import sh_vn_thumb_screw_spec as thumb
-from _assembly_contract import assembly_contract
 
 DRAWING_NUMBER = "MHA-MS-00"
 PLATE_DRAWING_NUMBER = str(_config.parts("ms-stop-plate")["number"])
 BLOCK_DRAWING_NUMBER = str(_config.parts("ms-stop-block")["number"])
-# A literal stem: the build graph narrows this drawing's assemblies/*
-# dependency to exactly the contracts its closure names.
-UNIT = assembly_contract("ms-measuring-stick").drawing_unit
 
 BOM_ORDER = (spec.STICK, spec.BLOCK, spec.PLATE, spec.PLATE_SCREW, spec.THUMB_SCREW)
 # The native BOM numbers the families in the builder's insertion order (block,
@@ -100,28 +95,31 @@ DRAWING_DIMENSIONS = {spec.SETTING_FEATURE: {spec.SETTING_DIMENSION}}
 # Components own material and finish; no assembly coating operation is required.
 # The fitter's order, one action a step; the explode
 # (ms_measuring_stick_explode_spec) runs steps 7-10 backwards. The block and
-# its cover arrive a match-drilled pair from their part travelers (the
-# MHA-MS-03 plate is pilot-drilled on its finished MHA-MS-02 block, ends and
-# edges flush, then opened; the block is tapped on its return): neither is
-# interchangeable. Steps 1-6 receive the pair and prove it is one.
+# its cover arrive a match-drilled pair (MHA-MS-03's traveler pilot-drills the
+# plate on its finished MHA-MS-02 block, ends and edges flush, and opens it;
+# the block's taps are its own sheet's callout): neither is interchangeable.
+# Steps 1-6 receive the pair and prove it is one; a pair that fails goes back
+# for rework, never opened at assembly.
 _BLOCK, _PLATE, _STICK = _item(spec.BLOCK), _item(spec.PLATE), _item(spec.STICK)
 _THUMB, _SCREWS = _item(spec.THUMB_SCREW), _item(spec.PLATE_SCREW)
 STOP_FACE_FEELER = ".002"
 ASSEMBLY_STEPS = (
-    f"1. {_BLOCK} AND {_PLATE} ARRIVE AS A MATCHED PAIR, MATCH-DRILLED "
-    f"PER {BLOCK_DRAWING_NUMBER} AND {PLATE_DRAWING_NUMBER}, A PAIR MARK "
-    "ACROSS THEIR LOCATING ENDS.",
-    f"2. LAY {_PLATE} ON {_BLOCK}, PAIR MARKS TOGETHER, LEFT ENDS AND TOP "
-    "EDGES FLUSH AS IN THE SHEET 1 FRONT VIEW (TOP OF "
-    f"{_ref(spec.BLOCK)}: ITS {thumb.THREAD} TAPPED FACE). THESE ARE THE "
-    f"{stop.LOCATING_END_NOTE} AND {stop.LOCATING_EDGE_NOTE} ON "
+    f"1. {_BLOCK} AND {_PLATE} ARRIVE MATCH-DRILLED AS A PAIR PER "
     f"{BLOCK_DRAWING_NUMBER} AND {PLATE_DRAWING_NUMBER}.",
-    f"3. CHECK: EACH {plate_screw.THREAD} TAPPED HOLE IN {_ref(spec.BLOCK)} "
-    f"SHOWS CENTRED IN ITS HOLE IN {_ref(spec.PLATE)}.",
-    f"4. IF ONE DOES NOT, {_ref(spec.PLATE)} IS NOT THIS {_ref(spec.BLOCK)}'S: "
-    "FIND ITS OWN BY THE PAIR MARKS, THEN REPEAT 2.",
-    f"5. LIFT {_PLATE} OFF {_ref(spec.BLOCK)}.",
-    f"6. BLOW THE CHIPS OUT OF BOTH TAPPED HOLES IN {_ref(spec.BLOCK)}.",
+    f"2. LAY {_PLATE} ON {_BLOCK}, LEFT ENDS AND TOP EDGES FLUSH AS IN THE "
+    f"SHEET 1 FRONT VIEW (TOP OF {_ref(spec.BLOCK)}: ITS {thumb.THREAD} "
+    f"TAPPED FACE). THESE ARE THE {stop.LOCATING_END_NOTE} AND "
+    f"{stop.LOCATING_EDGE_NOTE} ON {BLOCK_DRAWING_NUMBER} AND "
+    f"{PLATE_DRAWING_NUMBER}.",
+    f"3. CHECK: ONE {_ref(spec.PLATE_SCREW)} SCREW ENTERS FREELY THROUGH EACH "
+    f"HOLE OF {_ref(spec.PLATE)} INTO {_ref(spec.BLOCK)} BY HAND, THEN COMES "
+    "BACK OUT.",
+    f"4. IF ONE DOES NOT, STOP: {_ref(spec.BLOCK)} AND {_ref(spec.PLATE)} DO NOT "
+    f"MEET {BLOCK_DRAWING_NUMBER} AND {PLATE_DRAWING_NUMBER}. RETURN THEM FOR "
+    "REWORK; DO NOT ENLARGE THE HOLES.",
+    f"5. IF THE PAIR ARRIVES UNMARKED, MARK {_BLOCK} AND {_PLATE} AS A MATCHED "
+    "PAIR ACROSS THEIR LOCATING ENDS.",
+    f"6. LIFT {_PLATE} OFF {_ref(spec.BLOCK)}.",
     f"7. START THE {_THUMB} INTO THE TAPPED HOLE IN THE TOP OF {_BLOCK}; "
     "KEEP ITS TIP CLEAR OF THE WINDOW.",
     f"8. WITH {_ref(spec.THUMB_SCREW)} ON TOP, LAY {_STICK} IN THE OPEN "
