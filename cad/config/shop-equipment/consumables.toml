@@ -73,7 +73,7 @@ note = "The archived inventory listed it only as an illustrative example item."
 name = "RAL 6005 moss-green alkyd enamel"
 kind = "paint"
 status = "to_order"
-note = "Not owned: to buy. Body colour of MHA-FR-01, MHA-FR-02 and MHA-FR-05 (each sheet's FINISH), and MHA-DT-05."
+note = "Not owned: to buy. Body colour of MHA-FR-01, MHA-FR-02, MHA-FR-05 and MHA-SM-03 (each sheet's FINISH), and MHA-DT-05."
 
 [consumables.alkyd-primer]
 name = "Alkyd metal primer"

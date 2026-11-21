@@ -355,10 +355,10 @@ ARBOR_FINISH_XY = (0.155, 0.205)
 # each strap; test_dt_pinion_bracket_drawing keeps both numbers in step with
 # the parts registry.  The band is tighter than DRILLED HOLES, so the callout
 # also names the fit (rule 4; r2 review): a slotted spring pin grips its hole
-# by compression.  No line is wider than the former DRILL THRU callout's.
-CROSS_HOLE_CALLOUT = (
-    "MATCH-DRILL THRU WITH\nMHA-DT-19 AT ASSEMBLY\nFOR MHA-DT-VN-63\nSPRING PIN, PRESS FIT"
-)
+# by compression.  Rule 7 allows the process line and two lines of words
+# (machinist review, farm run 20261121T170909507Z: four lines gated), as
+# MHA-DT-19's own pin-hole callout words it.
+CROSS_HOLE_CALLOUT = "MATCH-DRILL THRU\nWITH MHA-DT-19 AT ASSEMBLY\nPRESS FIT ON MHA-DT-VN-63"
 DIMENSION_CALLOUTS = {
     "PivotBoreDia": "REAM THRU\nSLIDING FIT ON\nSHAFT MHA-DT-19",
     "ArborBoreDia": "REAM THRU\nRUNNING FIT ON\nARBOR MHA-DT-22",

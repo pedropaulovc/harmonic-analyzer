@@ -318,10 +318,9 @@ def test_set_pin_cross_hole_is_located_by_model_dimensions() -> None:
     number = _config.parts("dt-vn-pinion-strap-pin")["number"]
     shaft = _config.parts("dt-pinion-pivot-shaft")["number"]
     assert callout.splitlines() == [
-        "MATCH-DRILL THRU WITH",
-        f"{shaft} AT ASSEMBLY",
-        f"FOR {number}",
-        "SPRING PIN, PRESS FIT",
+        "MATCH-DRILL THRU",
+        f"WITH {shaft} AT ASSEMBLY",
+        f"PRESS FIT ON {number}",
     ]
     dims = dt_pinion_bracket_spec.DRAWING_DIMENSIONS
     # Through the thickness the hole shares the seat's centreline, which

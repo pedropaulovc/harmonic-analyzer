@@ -54,7 +54,7 @@ from pinion_rig_layout import (
     RIG_SET_LEAVES,
     SPRING_PAD_LEAF,
 )
-from dt_vn_pinion_strap_pin_spec import HOLE_DIA, HOLE_MAX, PIN_SUB_FLUSH_MAX
+from dt_vn_pinion_strap_pin_spec import HOLE_DIA, PIN_SUB_FLUSH_MAX
 from dt_drive_train_assembly_sheet import FEELER_PLACES, inch_max_text, inch_text
 
 # One purchased set, pinned like any other bought part: Starrett 66MA metric
@@ -183,15 +183,15 @@ STRAP_PIN_NUMBER = "MHA-DT-VN-63"
 # Owner ruling 2026-11-21 (Pedro): "Pinion bracket cross hole: match-drill at
 # assembly; fix the traveler and the sheet."  The straps arrive undrilled, so
 # this step drills each strap at the station its sheet prints and the shaft
-# together.  The 1/16 jobber drill (the rig's one drill for every 1/16 pin,
-# dt_vn_pinion_strap_pin_spec.DRILL_THRU_CALLOUT) must cut inside both
-# prints' .0625-.0650 spring-pin band.
+# together.  It names the drill the pin specification already drills with:
+# dt_vn_pinion_strap_pin_spec's hole is the 1/16 drill's own size, the lower
+# limit of its .0625-.0650 band (B18.8.2's recommended hole, checked there),
+# so the guard keeps this printed size in step with that spec.
 STRAP_PIN_HOLE_DRILL = "1/16"
-_STRAP_PIN_DRILL_MM = 25.4 / 16.0
-if not (HOLE_DIA <= _STRAP_PIN_DRILL_MM <= HOLE_MAX):
+if abs(HOLE_DIA - 25.4 / 16.0) > 1e-9:
     raise AssertionError(
-        f"{SHAFT_DRILL_NAME}'s {STRAP_PIN_HOLE_DRILL} drill cuts outside the strap "
-        "and shaft pin-hole band"
+        f"{SHAFT_DRILL_NAME} prints a {STRAP_PIN_HOLE_DRILL} drill, but the strap "
+        "pin's hole is no longer 1/16"
     )
 # The back stop is the back MHA-DT-18's inner face (pinion_rig_layout
 # BACK_STOP_Z); the drum's shimmed end play is the feeler between its front
