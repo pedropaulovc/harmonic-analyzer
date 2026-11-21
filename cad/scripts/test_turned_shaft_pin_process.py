@@ -6,7 +6,8 @@ supplied on the diameter: a piece is sawn and each end faced in the 3-jaw.
 these tests hold what it cannot see: the sawn piece leaves the facing
 allowances over the drawing's length, and the rod is the drawing's reference
 diameter. The domed parts (``turned_shaft``) are blanks sawn from rod used as
-supplied: each blank leaves a skim on both ends, and the rod lies in the
+supplied: each faced end keeps a skim (the lever's end B is cut at the root of
+its sacrificial stub, so end A alone is faced), and the rod lies in the
 drawing's diameter band.
 """
 

@@ -214,8 +214,8 @@ title = "End B: thread between the chuck and the dead centre"
 machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
-holding = "Turned round: 3-jaw over the shim wrap on the other end's .60 in (end A); the rod out toward the tailstock, the MT3 dead centre in the tailstock, its point oiled, in the stub's centre hole, the quill just snug and locked. Re-oil the point every few passes."
-datum = "Z0 (carriage DRO) end B's plane, {{process.stub_in:.3dot}} in from the stub's faced end: each tool is touched on the stub's end and set to Z+{{process.stub_in:.3dot}} (the AR tool in Op 60, the threading bit in Op 90)."
+holding = "Turned round: 3-jaw over the shim wrap on the other end's .60 in (end A); the rod out toward the tailstock, the MT3 dead centre in the tailstock, its point oiled, in the stub's centre hole, the quill just snug and locked. The centre must seat and lock in the quill's taper; if it does not, stop: a lathe dead centre is to order. Re-oil the point every few passes."
+datum = "Z0 (carriage DRO) end B's plane, {{process.stub_in:.3dot}} in from the stub's faced end: the AR tool (Op 60) and the threading bit (Op 90) are touched on the stub's end and set to Z+{{process.stub_in:.3dot}}; the cutoff blade (Op 170) on the pilot's shoulder, Z+.300."
 diagram = { file = "diagrams/centres.svg", alt = "The rod between the 3-jaw and the dead centre in the stub: end B's thread cut toward the chuck from over the pilot." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{process.centre_stickout_mm}}", minimum_diameter_mm = "{{process.pilot_dia_mm}}", support = "tailstock" }
 
@@ -287,7 +287,7 @@ speed_kind = "spindle"
 tool = "part"
 drilling = "none"
 sizing = "other"
-instruction = "The cutoff blade on centre height, square: touch its tailstock-side face on the stub's faced end and set DRO Z to .500 less the blade's width (calipers on the insert). At DRO Z0 (its chuck-side face on end B's plane) plunge to a Ø{{process.neck_dia_in:.2dot}} neck, backing out for chips; the dead centre stays in."
+instruction = "The cutoff blade on centre height, square: touch its chuck-side face on the pilot's shoulder over a paper shim and set DRO Z+.300. Plunge at DRO Z+.100 to a Ø{{process.neck_dia_in:.2dot}} neck, then at DRO Z0 (its chuck-side face on end B's plane) to the same neck: a groove about .22 wide, room for the saw. Back out for chips; the dead centre stays in."
 settings = "lathe-part-c360"
 cut_diameter_mm = "{{cad.stock_dia_mm}}"
 
@@ -307,7 +307,7 @@ speed_kind = "other"
 tool = "saw"
 drilling = "none"
 sizing = "other"
-instruction = "Saw through the Ø{{process.neck_dia_in:.2dot}} neck in the Op 170 groove, the blade against the groove's stub-side wall so the kerf never touches end B's face; let the stub drop and pick up the lever only after the blade has stopped."
+instruction = "Saw through the Ø{{process.neck_dia_in:.2dot}} neck mid-way along the Op 170 groove, so the kerf clears end B's face on one side and the stub on the other; let the stub drop and pick up the lever only after the blade has stopped."
 feed = "hand"
 
 [[setups]]
@@ -335,7 +335,7 @@ inspection = "Thread length {{cad.thread_length_min_in:.2dot}}–{{cad.thread_le
 gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.thread_length_band_mm}}" }]
 
 [[setups.operations]]
-instruction = "Over {{cad.thread_length_max_in:.2dot}}: a pip is left or the face is not flat; file end B flat and read Op 200 again. Under {{cad.thread_length_min_in:.2dot}}, or the run-out over {{cad.thread_incomplete_max_in:.3dot}}: scrap the lever and make another from Setup 1."
+instruction = "Over {{cad.thread_length_max_in:.2dot}} with end B flat: file end B back a few strokes at a time, square to the rod (the combination square's blade along the rod), reading Op 200 between; end A's allowance takes it up. Under {{cad.thread_length_min_in:.2dot}}, or the run-out over {{cad.thread_incomplete_max_in:.3dot}}: scrap the lever and make another from Setup 1."
 
 [[setups]]
 machine_kind = "lathe"
