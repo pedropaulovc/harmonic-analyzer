@@ -33,8 +33,15 @@ Work frames (G54), each set in its setup:
 The slitting saw runs horizontally on its arbor: its lower face is the
 programmed Z, touched off by hand (it has no tool-setter length, so CA02 and
 CA04 load no tool), and its rim cuts the notch floor while its faces cut the
-walls. Every saw pass runs one way, conventional for an M3 saw: +Y with the
-saw left of the ends, -Y with it right of them.
+walls. Every saw pass runs one way, conventional for an M3 saw: -Y with the
+saw left of the ends, +Y with it right of them (the other way it climbs, and
+a slitting saw climbing grabs and feeds itself in). CA01 and CA03 leave the
+end mill parked over the saw's touch-off station, high enough that the
+arbor mounted in its place hangs clear of the stock: the saw then comes down
+in Z only, and moves in X and Y only with its arbor's spacers and nut clear
+of the bars and the jaws (``keep_out`` checks each part's every move after
+the first rise from the touch-off, which is straight up, both as cut and as
+proved in air with Z0 raised ``saw_proof_raise_mm``).
 
 Toolpath rules (owner rulings 2026-11-16): plunges beside the stock at the
 cutting feed, real G0 above the stock.
@@ -93,6 +100,8 @@ SAW_STEP_MAX_MM = 3.0
 # The arbor spacer by the saw clears the bar's end by this much at the top
 # notch's deepest point.
 COLLAR_CLEAR_MM = 1.0
+# The saw is touched off with its rim this far in over the bar ends.
+TOUCH_IN_MM = 3.0
 # A plan number the recipe recomputes must agree to this (its rounding).
 PLAN_TOL_MM = 0.01
 # Each holder's nose stands at least this far above the jaw tops at its
@@ -229,12 +238,14 @@ def _side(
     zs: list[float],
     y: tuple[float, float],
     top: float,
+    clear: float | None = None,
 ) -> list[str]:
     """Side passes at each Z in ``zs`` and, at each, each cutter-centre X in
     ``xs`` in order, every pass from ``y[0]`` to ``y[1]`` (one direction):
     down to the level at feed beside the load, along Y at feed, up and back
-    above the stock in rapids."""
-    clear, safe = _r(top + CLEAR_MM), _r(top + SAFE_MM)
+    in rapids at ``clear`` (default the stock top plus ``CLEAR_MM``)."""
+    clear = _r(top + CLEAR_MM if clear is None else clear)
+    safe = _r(top + SAFE_MM)
     y0, y1 = _r(y[0]), _r(y[1])
     lines = [f"G0 Z{clear:.3f}"]
     for z in zs:
@@ -430,14 +441,48 @@ def context(
         "saw_collar_dia_max_mm",
         2 * (radius - top["depth"][1] - COLLAR_CLEAR_MM),
     )
-    # The saw's arbor and spacers stay past the jaw side, never over the
-    # jaws: the saw's centre is beyond the ends by its radius less the notch.
+    # The arbor round the saw (tools.gear-cutter-arbor-1, to buy: its sizes
+    # are the plan's assumed limits, checked when it is mounted): by the saw,
+    # spacers no wider than the collar limit; below it, spacers at least
+    # saw_spacer_below_min_mm deep, then the nut, all within saw_below_max_mm
+    # of the saw's lower face and the nut no wider than saw_nut_dia_max_mm.
     collar_r = p["saw_collar_dia_max_mm"] / 2
+    nut_r = p["saw_nut_dia_max_mm"] / 2
+    below = p["saw_below_max_mm"]
+    spacer_below = p["saw_spacer_below_min_mm"]
+    if not 0 < spacer_below < below:
+        raise ValueError("the spacers under the saw are not inside its stack's depth")
+    # The saw's arbor, spacers and nut stay past the jaw side, never over the
+    # jaws: the saw's centre is beyond the ends by its radius less the notch.
     for name, depth in (("foot", foot["depth"][1]), ("top", top["depth"][1])):
-        if protrusion + radius - depth - collar_r <= 0:
+        if protrusion + radius - depth - max(collar_r, nut_r) <= 0:
             raise ValueError(
-                f"the saw arbor's spacers reach over the jaws at the {name} notch"
+                f"the saw arbor's spacers or nut reach over the jaws at the {name} notch"
             )
+    # The saw moves between passes with its stack's lowest point CLEAR_MM over
+    # the bars' top.
+    saw_clear = section + CLEAR_MM + below
+    _agree(plan, "saw_clear_z_mm", saw_clear)
+    # The saw programs' air proof raises Z0 by saw_proof_raise_mm: enough to
+    # lift the whole stack CLEAR_MM over the bars' top at the lowest level
+    # (raised by less, the nut that passes under the top ends would rise
+    # into them).
+    proof_raise = p["saw_proof_raise_mm"]
+    lowest_level = min(foot["ledge_nominal"], top["ledge_nominal"])
+    if proof_raise < below + section - lowest_level + CLEAR_MM - 1e-6:
+        raise ValueError(
+            "process.saw_proof_raise_mm leaves the arbor's stack under the bars' top "
+            "in the saw programs' air proof"
+        )
+    # The touch-off station: the saw's rim TOUCH_IN_MM in over the ends, over
+    # the middle of the bar against the fixed jaw (X mirrored for the top
+    # ends); the spacers and the nut, hanging below the saw as it comes down,
+    # stay past the ends.
+    touch_x = radius - TOUCH_IN_MM
+    _agree(plan, "saw_touch_x_mm", touch_x)
+    _agree(plan, "saw_touch_y_mm", -pitch / 2)
+    if touch_x - max(nut_r, collar_r) < COLLAR_CLEAR_MM:
+        raise ValueError("the arbor's nut reaches the bar ends at the saw's touch-off")
     top_depth = p["top_notch_depth_mm"]
     # Equal steps into the end, the deepest last.
     n_steps = math.ceil(top_depth / SAW_STEP_MAX_MM - 1e-9)
@@ -476,6 +521,18 @@ def context(
                 f"'{name}' axial_doc_mm is under the bar's height and the tip's overrun"
             )
     projection("the end mill", end_z, "half_mill_projection_min_mm", "half_mill_oal_mm")
+    # CA01 and CA03 leave T1 parked over the saw's touch-off station, so high
+    # that the arbor mounted in its place (its lowest point no more than
+    # saw_arbor_length_mm from the nose; T1's tip at least its collet and
+    # projection out) hangs CLEAR_MM over the bars' top: the saw never moves
+    # in X or Y on a height the controller does not know.
+    park_z = (
+        section
+        + CLEAR_MM
+        + p["saw_arbor_length_mm"]
+        - (p["r8_collet_gauge_mm"] + p["half_mill_projection_min_mm"])
+    )
+    _agree(plan, "saw_park_z_mm", park_z)
     top_excess = p["top_excess_max_mm"]
     top_xs = [r + e for e in _levels(top_excess, 0.0, step)]
 
@@ -553,6 +610,10 @@ def context(
 
     # Passes along Y: from beside the moving jaw's side of the load to past
     # the fixed jaw's, or back; the saw starts and ends clear of every bar.
+    # The saw's passes are conventional: with it turning clockwise seen from
+    # above (M3), along -Y left of the foot ends and along +Y right of the
+    # top ends (the other way it climbs, and a slitting saw climbing grabs
+    # and feeds itself in).
     em_y = (-load - r - APPROACH_MM, r + APPROACH_MM)
     saw_y = (-load - radius - APPROACH_MM, radius + APPROACH_MM)
     foot_ledge, top_ledge = foot["ledge_nominal"], top["ledge_nominal"]
@@ -562,9 +623,24 @@ def context(
     top_saw_x = [radius - d for d in top_steps]
     side = {
         "foot_end": ([-r], [end_z], em_y),
-        "foot_notch": (foot_saw_x, foot_zs, saw_y),
+        "foot_notch": (foot_saw_x, foot_zs, saw_y[::-1]),
         "top_end": (top_xs, [end_z], em_y[::-1]),
-        "top_notch": (top_saw_x, top_zs, saw_y[::-1]),
+        "top_notch": (top_saw_x, top_zs, saw_y),
+    }
+    # The end mill's programs end with T1 parked for the saw's mounting and
+    # touch-off: up to the park height, then along X past the ends, then
+    # along Y over the bar against the fixed jaw.
+    park = {
+        "foot_end": [
+            f"G0 Z{_r(park_z):.3f}",
+            f"G0 X{_r(-touch_x):.3f}",
+            f"G0 Y{_r(-pitch / 2):.3f}",
+        ],
+        "top_end": [
+            f"G0 Z{_r(park_z):.3f}",
+            f"G0 X{_r(touch_x):.3f}",
+            f"G0 Y{_r(-pitch / 2):.3f}",
+        ],
     }
     frame_of = {
         "foot_end": "foot",
@@ -593,7 +669,14 @@ def context(
                 "frame": frame_of[key],
                 "label": key.replace("_", " "),
                 "stock": stocks[frame_of[key]],
-                "ops": [[key, key.replace("_", " "), _side(xs, zs, ys, section)]],
+                "ops": [
+                    [
+                        key,
+                        key.replace("_", " "),
+                        _side(xs, zs, ys, section, saw_clear if tool == "saw" else None)
+                        + park.get(key, []),
+                    ]
+                ],
             }
         )
     clear = section + CLEAR_MM
@@ -663,6 +746,44 @@ def context(
         "foot": jaws((protrusion, protrusion + jaw_w)),
         "top": jaws((-(protrusion + jaw_w), -protrusion)),
     }
+    # The arbor round the saw, part by part: its reach from the saw's lower
+    # face (the programmed Z) down (lo) and up (hi), and its radius. No move,
+    # rapid or feed, brings a part into the bars or the jaws: the bars
+    # between the jaws stand on the parallels and the vise; their ends past
+    # the jaw side overhang air from Z0 to their top, which the nut may pass
+    # under while the saw cuts.
+    ends = {"foot": (0.0, protrusion), "top": (-protrusion, 0.0)}
+    gripped = {
+        "foot": (protrusion, protrusion + jaw_w),
+        "top": (-(protrusion + jaw_w), -protrusion),
+    }
+    solids = {
+        frame: keep[frame]
+        + [
+            _box("the bars between the jaws", gripped[frame], (-load, 0.0), section),
+            {
+                **_box("the bars' ends", ends[frame], (-load, 0.0), section),
+                "z_bottom": 0.0,
+            },
+        ]
+        for frame in keep
+    }
+
+    def reach(
+        frame: str, part: str, lo: float, hi: float | None
+    ) -> list[dict[str, Any]]:
+        """``solids[frame]`` as bands of the programmed Z in which a part
+        reaching ``lo`` to ``hi`` from it (``hi`` None: on up) would meet them."""
+        out = []
+        for solid in solids[frame]:
+            moved = {**solid, "name": f"{solid['name']} ({part})"}
+            moved["z_top"] = _r(solid["z_top"] - lo)
+            if "z_bottom" in solid and hi is not None:
+                moved["z_bottom"] = _r(solid["z_bottom"] - hi)
+            else:
+                moved.pop("z_bottom", None)
+            out.append(moved)
+        return out
 
     tn = numbers
     expect: list[list[Any]] = []
@@ -674,7 +795,7 @@ def context(
             foot_saw_x[0],
             -radius,
             p["foot_notch_depth_mm"],
-            1,
+            -1,
             saw_rpm,
             "saw",
             False,
@@ -696,7 +817,7 @@ def context(
             top_saw_x[-1],
             radius,
             top_steps[0],
-            -1,
+            1,
             saw_rpm,
             "saw",
             False,
@@ -734,6 +855,31 @@ def context(
             ],
             [name, "keep_out", {"radius": cutter_r, "boxes": keep[frame_of[key]]}],
         ]
+        if tool == "saw":
+            # Each part as cut, and as proved in air (Z0 raised proof_raise:
+            # every part that much higher over the same shapes).
+            frame = frame_of[key]
+            for lift, when in ((0.0, ""), (proof_raise, ", proved in air")):
+                for part, radius_of, lo, hi in (
+                    ("spacers above the saw", collar_r, thick, None),
+                    ("spacers below the saw", collar_r, -below, 0.0),
+                    ("the arbor's nut", nut_r, -below, -spacer_below),
+                ):
+                    expect.append(
+                        [
+                            name,
+                            "keep_out",
+                            {
+                                "radius": radius_of,
+                                "boxes": reach(
+                                    frame,
+                                    part + when,
+                                    lo + lift,
+                                    None if hi is None else hi + lift,
+                                ),
+                            },
+                        ]
+                    )
     name = "CA05_pin_hole"
     expect += [
         [
