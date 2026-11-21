@@ -27,9 +27,9 @@
 <text class="label" x="20" y="196">foot ends flush, past the table</text>
 <path class="axis" d="M560 370 H610"/><text class="label" x="614" y="374">+X</text>
 <path class="axis" d="M560 370 V320"/><text class="label" x="552" y="316">+Y</text>
-<text class="label" x="20" y="250">End view of the load, from the top end (parallels drawn short)</text>
+<text class="label" x="20" y="250">End view from the top end, fixed jaw on the right (parallels drawn short)</text>
 <rect class="clamp" x="40" y="264" width="30" height="120"/>
-<text class="label" x="22" y="396">fixed jaw</text>
+<text class="label" x="22" y="396">moving jaw</text>
 <rect class="part-kept" x="70" y="270" width="48" height="48"/>
 <rect class="part-removed" x="70" y="281" width="48" height="25"/>
 <rect class="part-kept" x="118" y="270" width="48" height="48"/>
@@ -39,7 +39,7 @@
 <rect class="fixture-support" x="70" y="318" width="24" height="66"/>
 <rect class="fixture-support" x="142" y="318" width="24" height="66"/>
 <rect class="clamp" x="166" y="264" width="30" height="120"/>
-<text class="label" x="150" y="396">moving jaw</text>
+<text class="label" x="150" y="396">fixed jaw</text>
 <line class="active-face" x1="70" y1="318" x2="166" y2="318"/>
 <text class="label" x="210" y="276">pin hole down through both cheeks</text>
 <path class="leader" d="M206 272 L144 268"/>
