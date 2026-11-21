@@ -246,8 +246,8 @@ An undeclared part's key holds no draw module: the exporter, the closure of its
 (the frame citation), registry/config, the release revision and the native part
 identity, so no drawing edit re-keys it.
 Because every key holds the release revision, each release-revision bump
-re-runs all 131 `package:features:<stem>` SolidWorks leaves (113 more than the
-declared-only set): each opens the native part, saves the STEP and closes, about
+re-runs all 131 `package:features:<stem>` SolidWorks leaves (123 more than the
+eight declared parts): each opens the native part, saves the STEP and closes, about
 10 s of seat time plus the per-leaf farm overhead (roughly 2-2.5 worker-hours,
 15-20 min wall at farm parallelism 8 on an idle queue). The full export still
 opens each part again for STL/PNG, so the STEP work moves rather than
