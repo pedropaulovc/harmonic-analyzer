@@ -1926,12 +1926,12 @@ def test_the_cluster_is_shimmed_to_view_e_after_it_is_hung() -> None:
     # bare gap's printed range, the shim's thickness, and that range's floor
     # in the window while its top, less the most shims at their thinnest,
     # reaches the window.
-    assert "(WITH NO SHIMS IT READS .008 TO .031)." in flat
+    assert "(WITH NO SHIMS IT READS .009 TO .031)." in flat
     assert (
         f"ADD {disc.inch_text(cluster_fit.SHIM.THICKNESS, 3)} "
         f"{drawing._N['pd-vn-transgear-cluster-shim']} SHIMS" in flat
     )
-    bare_low, bare_high = 0.008 * 25.4, 0.031 * 25.4
+    bare_low, bare_high = 0.009 * 25.4, 0.031 * 25.4
     assert bare_low <= cluster_fit.UNSHIMMED_FLOAT_RANGE[0]
     assert cluster_fit.UNSHIMMED_FLOAT_RANGE[1] <= bare_high
     assert bare_low >= cluster_fit.RING_FLOAT_RANGE[0] - 1e-9

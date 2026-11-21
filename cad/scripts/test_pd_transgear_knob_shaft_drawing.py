@@ -163,7 +163,7 @@ def test_real_d_core_thread_and_inch_g6_source() -> None:
     )
     assert (5.0 - spec.THREAD_BASIC_MINOR) / 2.0 > spec.THREAD_PITCH
     assert spec.TIP_CHAMFER_CALLOUT == "CHAMFER 45 DEG TO MINOR"
-    assert ring.LENGTH == 5.207
+    assert ring.LENGTH == 6.7818  # .267, the 3/8 arm (#2019)
 
 
 def test_single_point_thread_retains_the_functional_relief() -> None:
@@ -194,13 +194,13 @@ def test_the_stud_neck_is_no_longer_the_weak_section_under_the_tool() -> None:
 def test_machine_and_float_stations_are_unchanged() -> None:
     for local, machine in (
         (spec.TIP_Z, -171.976), (spec.THREAD_END_Z, -155.72),
-        (spec.PINION_REAR_Z, -142.2072), (spec.REAR_END_Z, -101.0592),
+        (spec.PINION_REAR_Z, -142.2072), (spec.REAR_END_Z, -99.4844),
     ):
         assert F_MACHINE_Z + local == pytest.approx(machine, abs=0.005)
     assert spec.CUP_FACE_STATION == pytest.approx(ring.LENGTH + plate.HUB_TO_BOSS + spec.END_FLOAT)
     assert spec.END_FLOAT > spec.END_FLOAT_SET_TOL
     assert spec.JOURNAL_LENGTH == pytest.approx(spec.CUP_FACE_STATION + spec.JOURNAL_REAR_EXTENSION)
-    assert spec.OVERALL_LENGTH == pytest.approx(70.9168, abs=0.005)
+    assert spec.OVERALL_LENGTH == pytest.approx(72.4916, abs=0.005)
 
 
 def test_each_chucking_dimensions_from_its_faced_end() -> None:
@@ -232,24 +232,28 @@ def test_each_chucking_dimensions_from_its_faced_end() -> None:
     assert rows == sorted(rows, reverse=True)
     assert drawing.F_X < drawing.CORE_END_X < drawing.THREAD_END_X < drawing.TIP_X
     # Round 2: each .XXX tip station names what it serves, by its link on the
-    # value's line to the stations note, which quotes the printed values and
-    # names the mates whose stacks need .XXX.  Round 6: the overall keeps
-    # .XXX (the knob cup's pin wall fails at .XX) and states that function
-    # once at the dimension, never in a note (r3).
-    note = dict(drawing.NOTE_TEXTS)[drawing.STATIONS_NOTE]
-    for name, value in (
-        ("TipStation", spec.TIP_STATION),
-        ("CoreFromTip", spec.CORE_FRONT_FROM_TIP),
-        ("ThreadEndFromTip", spec.THREAD_END_FROM_TIP),
+    # value's line to a note naming the mate whose stack needs .XXX.  Machinist
+    # review r1 of #2019 (rule 7): one reason a note, no values in its text.
+    # Round 6: the overall keeps .XXX (the knob cup's pin wall fails at .XX)
+    # and states that function once at the dimension, never in a note (r3).
+    notes = dict(drawing.NOTE_TEXTS)
+    note = notes[drawing.STATIONS_NOTE] + notes[drawing.THREAD_NOTE]
+    for name, link in (
+        ("TipStation", drawing.STATIONS_LINK),
+        ("CoreFromTip", drawing.STATIONS_LINK),
+        ("ThreadEndFromTip", drawing.THREAD_LINK),
     ):
-        assert drawing.DIMENSION_SUFFIXES[name] == f" {drawing.STATIONS_LINK}", name
-        assert spec.inch_text(value, 3) in note, name
+        assert drawing.DIMENSION_SUFFIXES[name] == f" {link}", name
+    for value in (spec.TIP_STATION, spec.CORE_FRONT_FROM_TIP, spec.THREAD_END_FROM_TIP):
+        assert spec.inch_text(value, 3) not in drawing.NOTES
+    assert "D-FLAT SEAT" in notes[drawing.STATIONS_NOTE]
+    assert "FULL THREAD" in notes[drawing.THREAD_NOTE]
     cup = _config.parts("pd-transgear-knob-cup")["number"]
     assert drawing.DIMENSION_SUFFIXES["OverallLength"] == f" SETS PIN WALL IN {cup}"
     assert "OverallLength" not in drawing.DIMENSION_CALLOUTS_BELOW
     assert "OverallLength" not in drawing.DIMENSION_CALLOUTS_ABOVE
-    assert spec.inch_text(spec.OVERALL_LENGTH, 3) == "2.792"
-    assert "2.792" not in drawing.NOTES and cup not in drawing.NOTES
+    assert spec.inch_text(spec.OVERALL_LENGTH, 3) == "2.854"
+    assert "2.854" not in drawing.NOTES and cup not in drawing.NOTES
     # At .XX the journal band would leave the cup's pin-hole end wall under
     # its floor: the third place is the function the suffix states.
     import pd_transgear_knob_cup_spec as cup_spec
@@ -269,7 +273,7 @@ def test_each_chucking_dimensions_from_its_faced_end() -> None:
     # width's left witness line (the pinion's rear face, which drops with its
     # arrow to the text's height) and of the rear witness line.
     x, _y = drawing.SIDE_KEEP["OverallLength"]
-    chars = len("2.792 SETS PIN WALL IN MHA-PD-16")
+    chars = len("2.854 SETS PIN WALL IN MHA-PD-16")
     assert drawing.OVERALL_TEXT_CHARS == chars
     half = chars * 0.00275 / 2
     assert x + half <= drawing.PINION_REAR_X - 0.005
@@ -753,8 +757,10 @@ def test_tight_bands_name_their_mates_once_by_name_and_number() -> None:
     assert callouts["OutsideDia"] == drawing.GEAR_DATA_LINK
     assert callouts["ToothSpan"] == "MATCHED FIT,\nSEE GEAR DATA"
     disc_part = _config.parts("pd-rack-pinion")
-    assert f"MATES WITH:  {disc_part['title'].upper()} {disc_part['number']}" in (
-        drawing.GEAR_DATA_NOTE.splitlines()
+    # The mate's number wraps onto its own continuation line (#2019).
+    assert (
+        f"MATES WITH:  {disc_part['title'].upper()}\n   {disc_part['number']}"
+        in drawing.GEAR_DATA_NOTE
     )
     assert drawing.DIMENSION_SUFFIXES["FrontReliefDia"] == f" {drawing.NECK_LINK}"
     # Vertical Ø callouts go above their text (a below one would sit on the

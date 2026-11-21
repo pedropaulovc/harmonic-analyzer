@@ -36,7 +36,7 @@ import _mcmaster_90325a174 as PIVOT
 from _fit_close_running import measured_close_running_clearance_mm
 from _fit_deviations import deviations
 from _gear_quality import reducer_position_diameter_mm
-from _inch_wall_limits import WALL_FLOOR_MM, WALL_TARGET_MM
+from _inch_wall_limits import WALL_TARGET_MM
 from _package_units import drawing_unit
 from _printed_tolerance import (
     angular_band_deg,
@@ -71,15 +71,20 @@ def printed_reach_mm(
 # arc depth in front of the frame's front column plane): -124.413.
 FRONT_FACE_MACHINE_Z = FRAME_FRONT_COLUMN_Z - ARC_DEPTH + SPACER.LENGTH
 
-# --- Stock: 5/16 x 1 precision-ground flat bar, faces as supplied ------------
-# The arm is cut from McMaster 9517K466 (R9-6, R9-25): its thickness is the
-# stock's, ±0.001 in as supplied (the catalogue tolerance), not a machined
-# band.  The sheet prints it as an untoleranced reference to the stock
-# (#2147); walls, joints and the chain stack read the catalogue limits,
-# THICKNESS_BAND.
-STOCK_SKU = "9517K466"
-STOCK_THICKNESS_IN = Fraction(5, 16)
-THICKNESS = float(STOCK_THICKNESS_IN) * MM_PER_IN  # 7.9375
+# --- Stock: 3/8 x 1 precision-ground flat bar, faces as supplied -------------
+# The arm is cut from Online Metals part 12095, 3/8 x 1 1018 precision ground
+# (R9-6, R9-25; #2019: owner ruling 2026-10-27 (#1379), "pick stock next size
+# up available at onlinemetals.com"; it was 5/16, McMaster 9517K466): its
+# thickness is the stock's, ±0.001 in as supplied (Online Metals' tool-steel
+# tolerance row for precision-ground 1018), not a machined band.  The sheet
+# prints it as an untoleranced reference to the stock (#2147); walls, joints
+# and the chain stack read the catalogue limits, THICKNESS_BAND.  The front
+# face keeps its station on the spacer, so the arm grew rearward: its rear
+# face (the MHA-PD-19 plate's seat and the MHA-PD-23 head's) stands 1.5875
+# further back than on the 5/16 bar.
+STOCK_SKU = "12095"
+STOCK_THICKNESS_IN = Fraction(3, 8)
+THICKNESS = float(STOCK_THICKNESS_IN) * MM_PER_IN  # 9.525
 THICKNESS_BAND = 0.001 * MM_PER_IN  # ±0.0254
 # The pin bore S's perpendicularity to face A, over the bore: ⊥ .001, the
 # shop's reamed-hole row (owner ruling 2026-11-08 (Pedro), #2144 item 4.1).
@@ -136,7 +141,10 @@ OUTLINE_BAND = max(PIVOT_END_R_BAND, END_HALF_WIDTH_BAND)
 
 # The spot face seats the MHA-PD-VN-63 curved disc spring's OD rim (Ø10.744) under
 # the MHA-PD-VN-57 head; the spring's float on the shoulder still clears its rim.
-SPOT_FACE_DIA = 11.5062  # .453
+# Ø.500 (was .453; owner ruling 2026-11-20 (Pedro), #2424 option C: "B, C
+# and D together in the #2019 stock-change"): one plunge of an owned 1/2
+# end mill, where .453 had no cutter but a boring head.
+SPOT_FACE_DIA = 12.7  # .500
 SPOT_FACE_DIA_GROWTH = drilled_oversize_mm(unit=UNIT)  # +.004/0 (drilled row)
 # The floor is dimensioned from the FRONT face so the spring's room never
 # sees the arm's stock thickness (transgear_hanger_joints.SPRING_ROOM_*).
@@ -320,11 +328,11 @@ PIN_HOLE_DEPTH_PLACES = 2
 PIN_HOLE_POINT_LENGTH = PIN_HOLE_DIA / 2.0 * DRILL_POINT_H  # 0.954
 PIN_HOLE_Z = THICKNESS / 2.0  # mid-thickness, on y = 0
 # The latch pin's axis in the machine frame; the hook's hole is drilled on it.
-PIN_MACHINE_Z = FRONT_FACE_MACHINE_Z + PIN_HOLE_Z  # -120.43025
+PIN_MACHINE_Z = FRONT_FACE_MACHINE_Z + PIN_HOLE_Z  # -119.6505
 
 # The end-face latch hole's height is an ordinary .XXX row: the title block
 # governs it, with no tightened band (coordinator ruling (a), #2019).  It
-# prints .156 for the 5/32 model.
+# prints .188 for the 3/16 model.
 LATCH_PIN_HEIGHT_PLACES = 3
 LATCH_PIN_HEIGHT_BAND = printed_reach_mm(PIN_HOLE_Z, LATCH_PIN_HEIGHT_PLACES)
 REDUCER_POSITION_DIAMETER = reducer_position_diameter_mm()
@@ -414,7 +422,7 @@ WALLS: dict[str, tuple[float, float]] = {
     # run-off over the hole to its point at the MIN depth, and both
     # title-block breaks at the mouth (the face edge's and the hole's). A MIN
     # prints no upper depth: a deeper hole is the shop's choice and must
-    # still hold the ligament note 3 prints.
+    # still hold the wall target (pd_transgear_arm_spec.PIN_HOLE_DEPTH_BAND).
     "pin hole to faces": (
         (THICKNESS - PIN_HOLE_DIA) / 2.0,
         (THICKNESS - PIN_HOLE_DIA - PIN_HOLE_DIA_BAND[0]) / 2.0
@@ -462,16 +470,11 @@ for _index, (_x, _y) in enumerate(LOCATOR_SITES_MM, 1):
         - (LOCATING_PIN.PRESS_HOLE_LIMITS_MM[1] + PLATE_TAP_MOUTH_DIA_MAX_MM) / 2.0
         - LOCATING_PIN.HOLE_MOUTH_BREAK_RADIAL_MAX_MM - LOCATOR_RUN_OFF_MM,
     )
-# The latch pin's hole-to-face ligament is about 1.67 (.065) at full budget
-# (the .XXX height reach included), under the .080 target but over the .060
-# floor. #2019 tracks the owner's next stock size up (owner ruling
-# 2026-10-27, #1379); until then it is held at the floor.
-LATCH_PIN_WALL_FLOOR = WALL_FLOOR_MM
-WALL_FLOORS = {"pin hole to faces": LATCH_PIN_WALL_FLOOR}
+# The latch pin's hole-to-face ligament holds the .080 target on the 3/8 bar
+# (#2019; on the 5/16 bar it was the owner-accepted .065 shortfall, #1379).
 for _name, (_nominal, _worst) in WALLS.items():
-    _floor = WALL_FLOORS.get(_name, WALL_TARGET)
-    if _worst < _floor:
-        raise AssertionError(f"arm {_name} wall {_worst:.3f} < {_floor}")
+    if _worst < WALL_TARGET:
+        raise AssertionError(f"arm {_name} wall {_worst:.3f} < {WALL_TARGET}")
 
 def polygon_area_moments(points: tuple[tuple[float, float], ...]) -> tuple[float, float, float]:
     """Exact signed-polygon area and first moments, returned with positive area."""

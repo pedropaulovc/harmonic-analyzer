@@ -68,8 +68,9 @@ ARM_SEAT_WITNESS_MIN_WIDTH_MM = 26.0 * 14.5 / max(
 if ARM_SEAT_WITNESS_MIN_WIDTH_MM < ARM_SEAT_SPAN_MIN_MM:
     raise AssertionError("actual three-indicator support width is below the charged tilt span")
 # The arm's rear face carries no frame (machinist review, rule 5): it is the
-# 9517K466 ground stock's as-supplied face (thickness 5/16 ±0.001", the
-# only face tolerance McMaster lists, page read 2026-10-27). What this bounds
+# Online Metals 12095 ground stock's as-supplied face (thickness 3/8
+# ±0.001", the precision-ground 1018 row of Online Metals' tool-steel
+# tolerances, #2019). What this bounds
 # is the plate seat's tilt relative to the arm's own surface under it, not to
 # a remote datum: any bow bends both faces together and cancels, so over the
 # seat span the relative wedge is the local thickness difference, and the

@@ -78,7 +78,6 @@ from pd_transgear_arm_plate_geometry import BORE_DIA_LIMITS as ARM_PLATE_BORE_LI
 from pd_transgear_knob_shaft_spec import (
     CORE_DIA,
     CORE_FRONT_Z,
-    CORE_FRONT_FROM_TIP,
     CUTTER_NUMBER,
     CUTTER_TOOTH_RANGE,
     FRONT_CORNER_RADIUS,
@@ -108,7 +107,6 @@ from pd_transgear_knob_shaft_spec import (
     TOOTH_SPACE_CALLOUT,
     TOOTH_SPACE_CALLOUT_PROPERTY,
     TEETH,
-    THREAD_END_FROM_TIP,
     THREAD_CALLOUT,
     TIP_CHAMFER,
     TIP_CHAMFER_CALLOUT,
@@ -140,7 +138,10 @@ PNG = OUTPUTS.png
 SHEET_SCALE = (3.0, 1.0)
 VIEW_SCALE = (3, 1)
 _S = SHEET_SCALE[0] / SHEET_SCALE[1]
-SIDE_CENTER = (0.183, 0.160)
+# 2 mm left of 0.183: the 3/8 arm's longer journal (#2019) adds 4.7 mm at
+# 3:1, split between the GEAR DATA block's margin (its backlash row wrapped
+# shorter) and the tip side's chamfer callout and notes.
+SIDE_CENTER = (0.181, 0.160)
 # Third-angle: the rear face is the side view's LEFT end, so the view from
 # the rear stands left of it, on the shaft axis.
 END_CENTER = (0.045, SIDE_CENTER[1])
@@ -206,18 +207,20 @@ JOURNAL_CLEARANCE_MM = (
 )
 # The numbered notes the bands link by "SEE NOTE n": the journal's running
 # fit; the D-section's one sliding fit, which its Ø and its flat's distance
-# from the axis link; the tip stations' stacks (round 2: printed .XXX with
-# no stated function), which those stations link; and the neck's mate,
-# which its Ø limits and the flat's end limits link (round 2: the flat end's
-# .005 band named no mate).  The overall prints .XXX plain: the title
-# block's ±.005 is the band the knob cup's pin wall needs.  They stand in
-# the open field right of the overall's tip witness line, over the title
-# block; at 2.2 mm a line runs ~1.5 mm a character, so no line runs past 70
-# characters (~105 mm).
+# from the axis link; the D-flat seat the two .XXX tip stations locate and
+# the full thread the third bounds (round 2: printed .XXX with no stated
+# function), one reason each with no values in the text (machinist review
+# r1 of #2019, rule 7); and the neck's mate, which its Ø limits and the
+# flat's end limits link (round 2: the flat end's .005 band named no mate).
+# The overall prints .XXX plain: the title block's ±.005 is the band the
+# knob cup's pin wall needs.  They stand in the open field right of the
+# overall's tip witness line, over the title block; at 2.2 mm a line runs
+# ~1.5 mm a character, so no line runs past 70 characters (~105 mm).
 JOURNAL_FIT_NOTE = 1
 D_SECTION_FIT_NOTE = 2
 STATIONS_NOTE = 3
 NECK_NOTE = 4
+THREAD_NOTE = 5
 NOTES_LINE_CHARS_MAX = 70
 _COLLAR = _mate_name(_config.parts("pd-transgear-drive-collar"))
 NOTE_TEXTS = (
@@ -228,13 +231,9 @@ NOTE_TEXTS = (
         f"BORE (CLEARANCE {_fit_range_text(*JOURNAL_CLEARANCE_MM)}).",
     ),
     (D_SECTION_FIT_NOTE, f"SLIDING FIT ON {_COLLAR}: SLIDES IN BY HAND."),
-    (
-        STATIONS_NOTE,
-        f"{inch_text(TIP_STATION, 3)}/{inch_text(CORE_FRONT_FROM_TIP, 3)} LOCATE THE "
-        f"D-FLAT SEAT UNDER {_COLLAR}, {inch_text(THREAD_END_FROM_TIP, 3)} THE FULL "
-        f"THREAD FOR {_mate_name(_config.parts('pd-transgear-thumbnut'))}.",
-    ),
+    (STATIONS_NOTE, f"D-FLAT SEAT UNDER {_COLLAR}."),
     (NECK_NOTE, f"NECK AND D-FLAT END UNDER {_COLLAR}."),
+    (THREAD_NOTE, f"FULL THREAD FOR {_mate_name(_config.parts('pd-transgear-thumbnut'))}."),
 )
 # Rule 7: a note runs to four short lines at most.
 NOTE_LINES_MAX = 4
@@ -253,6 +252,7 @@ JOURNAL_FIT_LINK = f"SEE NOTE {JOURNAL_FIT_NOTE}"
 D_SECTION_FIT_LINK = f"SEE NOTE {D_SECTION_FIT_NOTE}"
 STATIONS_LINK = f"SEE NOTE {STATIONS_NOTE}"
 NECK_LINK = f"SEE NOTE {NECK_NOTE}"
+THREAD_LINK = f"SEE NOTE {THREAD_NOTE}"
 
 
 def reducer_feeler_backlash_mm() -> tuple[float, float]:
@@ -288,8 +288,9 @@ BACKLASH_ACCEPT_TEXT = "-".join(inch_text(value, 3) for value in BACKLASH_ACCEPT
 # What a machinist needs to cut and check the teeth (Main ruling 2026-10-10):
 # the cutting rows, the mate and the backlash acceptance that is the span
 # band's fit route (rule 4).  The span prints in VIEW C with its limits, not
-# again here.  The last row breaks after "MATE" so the block ends left of
-# the overall's rear witness line (REAR_X).
+# again here.  The mate's number and the last row's tail wrap so the block
+# ends left of the overall's rear witness line (REAR_X): on the 3/8 arm's
+# longer shaft (#2019) the one-line mate ran under it (machinist review r1).
 GEAR_DATA_ROWS = (
     ("NUMBER OF TEETH", f"{TEETH}"),
     ("DIAMETRAL PITCH", f"{DIAMETRAL_PITCH:.2f}"),
@@ -297,8 +298,8 @@ GEAR_DATA_ROWS = (
     ("PITCH DIAMETER (REF)", inch_text(PITCH_DIA, 4)),
     ("WHOLE DEPTH (REF)", inch_text(WHOLE_DEPTH, 4)),
     ("CUTTER", f"#{CUTTER_NUMBER}, {CUTTER_TOOTH_RANGE[0]}-{CUTTER_TOOTH_RANGE[1]}T"),
-    ("MATES WITH", _mate_name(_config.parts("pd-rack-pinion"))),
-    ("SPAN MATCHED FIT", f"BACKLASH WITH MATE\n   {BACKLASH_ACCEPT_TEXT}, FEELER"),
+    ("MATES WITH", "\n   ".join(_mate_name(_config.parts("pd-rack-pinion")).rsplit(" ", 1))),
+    ("SPAN MATCHED FIT", f"BACKLASH\n   WITH MATE {BACKLASH_ACCEPT_TEXT}, FEELER"),
 )
 GEAR_DATA_NOTE = "\n".join(
     ("GEAR DATA", *(f"{label}:  {value}" for label, value in GEAR_DATA_ROWS))
@@ -334,9 +335,9 @@ SIDE_KEEP: dict[str, tuple[float, float]] = {
     # chamfer the line stays 9 mm off the thread callout's leader to the
     # chamfer.
     "ThreadBlankDia": (CHAMFER_START_X - 0.009, _ABOVE_Y),
-    # 4 mm left of mid-journal, right of detail B's crop: its one-line run
-    # hangs right of the line and ends 6.7 mm short of the pinion's line.
-    "JournalDia": ((PINION_REAR_X + REAR_X) / 2.0 - 0.004, _DIA_ROW_Y[0]),
+    # 1.5 mm left of mid-journal, right of detail B's crop: its one-line run
+    # hangs right of the line, short of the pinion's line.
+    "JournalDia": ((PINION_REAR_X + REAR_X) / 2.0 - 0.0015, _DIA_ROW_Y[0]),
     # Its three-line block (~58 mm wide with "DISC CLUSTER STACK WITH") is
     # wider than the 17.7 mm between its witness lines, so it stands outside
     # right of F's (217.7): text ~218.6..277 mm, left of the tip's witness
@@ -395,7 +396,8 @@ DIMENSION_CALLOUTS_BELOW = {
     "FlatToAxis": D_SECTION_FIT_LINK,
     "ToothSpan": SPAN_CALLOUT,
 }
-# Each .XXX tip station links the stacks note on its value's line; detail
+# The two D-flat stations link the seat note and the thread's end the thread
+# note, each on its value's line; detail
 # B's neck Ø (LIMITS) and the D-flat end's limits link the neck note, which
 # names both features and MHA-PD-22 once.  At nominal the flat's end stands
 # on the neck corner's R.004 tangent, so the note names the D-flat end in
@@ -403,7 +405,7 @@ DIMENSION_CALLOUTS_BELOW = {
 # read a bare `FLAT END` label as coined and unlinked).  (A row under the
 # neck Ø would top out past the border, and the side rows stand 10 mm apart.)
 DIMENSION_SUFFIXES = {
-    "ThreadEndFromTip": f" {STATIONS_LINK}",
+    "ThreadEndFromTip": f" {THREAD_LINK}",
     "CoreFromTip": f" {STATIONS_LINK}",
     "TipStation": f" {STATIONS_LINK}",
     "FrontReliefDia": f" {NECK_LINK}",
@@ -483,7 +485,7 @@ GEAR_DATA_RIGHT = GEAR_DATA_XY[0] + max(
 if GEAR_DATA_RIGHT > REAR_X - 0.003:
     raise AssertionError("the GEAR DATA block runs under the rear witness line")
 # The numbered notes in the open field right of the overall's tip witness
-# line (289.4) at the gear data's height: their top under the tooth-space
+# line (289.7) at the gear data's height: their top under the tooth-space
 # note (bottom ~0.106), their bottom over the title block (top ~0.0663),
 # their right end inside the border (0.4191 - 0.0127).
 NOTES_XY = (0.300, 0.100)

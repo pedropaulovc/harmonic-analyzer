@@ -215,7 +215,7 @@ SHIMMED_STEP_TERMS = (
 # count, the cluster REARWARD (the sleeve on the rear bushing, its float
 # open between the front bushing and the ring, the ring on the groove's load
 # wall; hub and disc on the step, the recess open).  Machine -Z is forward.
-ARM_REAR_Z = PIN.HEAD_SEAT_MACHINE_Z  # -116.4625
+ARM_REAR_Z = PIN.HEAD_SEAT_MACHINE_Z  # -114.888
 ARM_FRONT_Z = ARM.FRONT_FACE_MACHINE_Z  # -124.4
 SHIM_REAR_Z = ARM_FRONT_Z  # the first shim on the arm's front face
 REAR_BUSHING_REAR_Z = round(ARM_FRONT_Z - SHIM_STACK_MODEL, 6)

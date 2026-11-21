@@ -295,7 +295,8 @@ def test_native_placement_seats_the_collar_rear_on_f() -> None:
         assembly.KNOB_COLLAR_Z0 + collar.LENGTH
     )
     assert assembly.KNOB_COLLAR_SEAT_Z == pytest.approx(removable.SEAT_FACE_Z)
-    assert assembly.KNOB_COLLAR_FRONT_GAP == pytest.approx(0.0039)
+    # #2019: the .267 ring stands F .0005 behind its 5/16-arm station.
+    assert assembly.KNOB_COLLAR_FRONT_GAP == pytest.approx(0.0166)
     assert assembly.KNOB_COLLAR_Z0 - removable.SEAT_FACE_Z == pytest.approx(
         assembly.KNOB_COLLAR_FRONT_GAP
     )

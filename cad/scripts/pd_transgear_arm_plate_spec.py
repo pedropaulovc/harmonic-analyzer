@@ -205,10 +205,11 @@ SURFACE_FINISHES = (
         "boss_face", MACHINED_UM, PlanarFace((0.0, 0.0, 1.0), BOSS_FACE_Z), display_unit=UNIT,
     ),
 )
-# What each thrust face's finish serves, captioned at its symbol.
+# What each thrust face's finish serves, captioned at its symbol: two lines
+# of words (rule 7; #2657).
 FINISH_CAPTIONS = {
-    "hub_face": f"THRUST FACE,\nRING\n{THRUST_RING_NUMBER}",
-    "boss_face": f"THRUST FACE,\nCUP\n{KNOB_CUP_NUMBER}",
+    "hub_face": f"THRUST FACE,\nRING {THRUST_RING_NUMBER}",
+    "boss_face": f"THRUST FACE,\nCUP {KNOB_CUP_NUMBER}",
 }
 
 # The bore is a fit: REAM is the requirement (drawing-guidelines.md rule 12
@@ -232,9 +233,9 @@ SCREW_NUMBER = "MHA-PD-VN-56"
 HUB_TO_BOSS_CALLOUT = f"SETS CUP {KNOB_CUP_NUMBER}\nON SHAFT {KNOB_SHAFT_NUMBER}"
 # The over-arm thickness bounds the countersink floor and the screw's thread
 # reach into the arm (transgear_hanger_joints._PLATE_MIN/_PLATE_MAX): .XXX.
-# Three short lines (12 characters at most), so the block stands clear of
-# the hub-to-boss dimension's boss-face witness line.
-THICKNESS_CALLOUT = f"SETS SCREW\nREACH IN ARM\n{ARM_NUMBER}"
+# Two lines of words (rule 7; #2657), 16 characters at most, so the block
+# stands clear of the hub-to-boss dimension's boss-face witness line.
+THICKNESS_CALLOUT = f"SETS SCREW REACH\nIN ARM {ARM_NUMBER}"
 # The hub face's station sets the knob shaft's integral 15T (and so its mesh
 # with the reducer disc) and, through the drive collar seated on the 15T's
 # front face F, the removable chain sprocket's plane

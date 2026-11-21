@@ -51,6 +51,7 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
         drawing.SECTION_KEEP,
         drawing.END_KEEP,
         drawing.PIN_SECTION_KEEP,
+        drawing.PIN_PLAN_KEEP,
     )
     assert set().union(*views) == marked
     assert sum(len(view) for view in views) == len(marked)
@@ -158,16 +159,18 @@ def test_the_latch_pin_hole_depth_is_a_min_over_a_drill_point() -> None:
         "band": "PIN_HOLE_DEPTH_BAND",
         "tol_type": "SW_TOL_MIN",
     }
-    # The MIN's upper record: the deepest hole whose run-off still holds the
-    # printed ligament to the faces.
+    # The MIN's upper record: the deepest hole that still holds the wall
+    # target at the faces (run-off charged) and from its point to the pin
+    # bore; on the 3/8 bar the pin bore governs (#2019).
     upper, lower = spec.PIN_HOLE_DEPTH_BAND
     assert lower == 0.0 and upper > 0.0
     run_off = math.tan(math.radians(geometry.DRILL_RUN_OFF_DEG))
-    assert geometry.WALLS["pin hole to faces"][1] - upper * run_off == pytest.approx(
-        spec.LATCH_PIN_WALL_PRINTED, abs=1e-6
+    assert geometry.WALLS["pin hole to faces"][1] - upper * run_off >= geometry.WALL_TARGET
+    assert geometry.WALLS["latch-pin hole point to pin bore"][1] - upper == pytest.approx(
+        geometry.WALL_TARGET, abs=1e-6
     )
     assert "PinHoleDepth" in drawing.SECTION_KEEP
-    assert "PinHoleDepth" not in drawing.LINEAR_REFERENCES
+    assert "PinHoleDepth" not in drawing.REFERENCE_DIMENSIONS
     callout = arm_notes.PIN_HOLE_CALLOUT.splitlines()[0]
     assert callout == f"REAM <HOLE-DEPTH> ({depth_in:.2f})".replace("(0.", "(.", 1)
     assert "FLAT" not in arm_notes.PIN_HOLE_CALLOUT
@@ -185,8 +188,8 @@ def test_the_thickness_prints_as_the_ground_stock_reference() -> None:
     (stock,) = prefix.rstrip("( ").split()
     assert float(Fraction(stock)) * 25.4 == pytest.approx(geometry.THICKNESS)
     assert "±" not in prefix + suffix and "REF" in suffix
-    # The seat tilt and the screw engagement are judged at the 9517K466
-    # catalogue tolerance, ±.001 in.
+    # The seat tilt and the screw engagement are judged at the precision-
+    # ground bar's catalogue tolerance, ±.001 in (#2019).
     assert geometry.THICKNESS_BAND == pytest.approx(0.001 * 25.4)
     assert "Depth" in drawing.END_KEEP
     # Machinist review r3 (rule 14): the dimension line ran along the
@@ -228,11 +231,13 @@ def _floor_pressed_proud_range(pin_length: float, hole_depth: float) -> tuple[fl
 # them), so the hook's screw drift grew; MHA-PD-20 faces at ⊥ .001
 # (delegated ruling 2026-11-07) open the pivot fit; #2413's .1940 +.0010/0
 # ream floats the pivot .0085 at most (was .0072).  #3124: the 7/8 pin is set
-# .516-.565 proud at assembly (owner decision 2026-11-19).
+# .516-.565 proud at assembly (owner decision 2026-11-19).  #2019: on the 3/8
+# arm (latch height .188, hook hole on the moved axis) each margin is about
+# 0.011 smaller.
 _SET_PROUD_WINDOW = (0.516 * 25.4, 0.565 * 25.4)
-_PINNED_FAR_FACE_MARGIN = 0.636
-_PINNED_OLD_PIN_MARGIN = -0.246
-_PINNED_DEEPER_OLD_PIN_MARGIN = -0.296
+_PINNED_FAR_FACE_MARGIN = 0.625
+_PINNED_OLD_PIN_MARGIN = -0.258
+_PINNED_DEEPER_OLD_PIN_MARGIN = -0.308
 
 
 def _worst_far_face_margin(
@@ -468,7 +473,7 @@ def test_the_rear_mouth_prints_its_modelled_band_on_its_native_leg_in_d_d() -> N
     assert box[3] < drawing._front_y(-geometry.PIVOT_END_R) - 0.010
 
 
-@pytest.mark.parametrize("dropped", (None, "arm sheet", "section D-D"))
+@pytest.mark.parametrize("dropped", (None, "arm sheet", "section D-D", "sheet-2 plan"))
 def test_each_import_phase_proves_the_precision_of_the_dimensions_it_imports(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, dropped: str | None
 ) -> None:
@@ -482,6 +487,7 @@ def test_each_import_phase_proves_the_precision_of_the_dimensions_it_imports(
         None: None,
         "arm sheet": sheet_one_names[0],
         "section D-D": "PinMouthChamfer",
+        "sheet-2 plan": "FlankAngle",
     }[dropped]
 
     def annotation(name: str) -> SimpleNamespace:
@@ -533,7 +539,7 @@ def test_each_import_phase_proves_the_precision_of_the_dimensions_it_imports(
     for name in (
         "check", "read_required_properties", "create_blank_drawing_sheets",
         "stamp_drawing_summary", "set_hidden_lines_removed", "set_dimension_callouts",
-        "_reference_linear_dimensions", "_set_stock_text",
+        "_reference_dimensions", "_set_stock_text",
         "_end_radius_to_arc", "offset_dimension_text", "project_part_pmi",
         "_one_frame_per_dowel_group", "_overall_reference", "_set_tap_callout_text",
         "set_hole_callout_precision", "_section_captions_without_scale",
@@ -555,10 +561,26 @@ def test_each_import_phase_proves_the_precision_of_the_dimensions_it_imports(
     assert [set(precision) for _names, precision in guarded] == [
         set(sheet_one_names),
         set(drawing.PIN_SECTION_KEEP),
+        set(drawing.PIN_PLAN_KEEP),
     ]
     assert all(names == set(precision) for names, precision in guarded)
-    assert guarded[0][1].keys().isdisjoint(guarded[1][1])
-    assert guarded[0][1] | guarded[1][1] == spec.DRAWING_PRECISION_BY_NAME
+    for first, second in itertools.combinations([p for _n, p in guarded], 2):
+        assert first.keys().isdisjoint(second)
+    assert {k: v for _n, p in guarded for k, v in p.items()} == spec.DRAWING_PRECISION_BY_NAME
+
+
+def test_the_flank_angle_stands_in_its_wedge_over_the_arm() -> None:
+    """#2424 B (machinist review r1): the (2.4°) stands outside the outline,
+    between the upper edge and the horizontal through its tangent point, on
+    sheet 2's plan, short of cutting line D-D, and prints as a reference."""
+    assert "FlankAngle" not in drawing.FRONT_KEEP
+    assert "FlankAngle" in drawing.REFERENCE_DIMENSIONS
+    x, y = drawing.PIN_PLAN_KEEP["FlankAngle"]
+    station = (x - drawing.FRONT_CENTER[0]) * 1000.0 / drawing._S + drawing._BBOX_CENTER_X
+    height = (y - drawing.FRONT_CENTER[1]) * 1000.0 / drawing._S
+    assert geometry.edge_half_width(station) < height < geometry.PIVOT_TANGENT_Y
+    assert station < geometry.PIN_STATION - 10.0
+    assert part.FLANK_ANGLE_TEXT_XY == pytest.approx((station, height))
 
 
 def test_the_latch_pin_hole_names_its_press_on_mha_169() -> None:
@@ -584,16 +606,15 @@ def test_the_latch_pin_hole_names_its_press_on_mha_169() -> None:
     low, high = spec.LATCH_PIN_PRESS_PRINTED
     assert 0.0 < low <= loosest + 1e-9
     assert loosest < tightest <= high + 1e-9 < tightest + 0.00254
-    # The callout links the note that names the pin and carries the press
-    # and the owner-accepted ligament shortfall (RV-04), the wall rounded
-    # down so the sheet never promises more than the budget holds.
+    # The callout links the note that names the pin and carries the press.
+    # On the 3/8 bar the ligament to the faces holds the wall target, so the
+    # note no longer prints the 5/16 bar's owner-accepted shortfall (#2019).
     assert spec.LATCH_PIN_NUMBER in arm_notes.NOTES[arm_notes.LATCH_PIN_NOTE - 1]
     assert f"SEE NOTE {arm_notes.LATCH_PIN_NOTE}" in arm_notes.PIN_HOLE_CALLOUT
     note = " ".join(arm_notes.NOTES[arm_notes.LATCH_PIN_NOTE - 1].split())
     assert ".0006-.0013" in note
-    worst = geometry.WALLS["pin hole to faces"][1]
-    assert spec.LATCH_PIN_WALL_PRINTED <= worst < spec.LATCH_PIN_WALL_PRINTED + 0.0254
-    assert ".065 MIN" in note
+    assert geometry.WALLS["pin hole to faces"][1] >= geometry.WALL_TARGET
+    assert "PIN HOLE TO FACES" not in note
 
 
 def test_the_pivot_bore_is_one_reamer_running_fit_on_any_shoulder() -> None:
@@ -694,7 +715,7 @@ def test_the_section_texts_stand_inside_the_left_border_and_off_the_section() ->
 
 def _counterbore_box() -> tuple[float, ...]:
     return _centred_box(
-        ["+.004", "\u00d8.453 .000", *arm_notes.SPRING_CALLOUT.splitlines()],
+        ["+.004", "\u00d8.500 .000", *arm_notes.SPRING_CALLOUT.splitlines()],
         drawing.SECTION_KEEP["SpotFaceDia"],
     )
 

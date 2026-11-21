@@ -101,7 +101,7 @@ def test_the_length_text_stands_clear_of_its_extension_lines() -> None:
 def test_ring_bore_and_opposed_axial_faces_consume_the_new_interface() -> None:
     assert spec.ID == pytest.approx(6.5278)  # .257
     assert spec.ID_BAND == pytest.approx((0.1016, 0.0))
-    assert spec.LENGTH == pytest.approx(5.207)  # .205
+    assert spec.LENGTH == pytest.approx(6.7818)  # .267, the 3/8 arm (#2019)
     assert spec.LENGTH_TOL == pytest.approx(FIT_LENGTH_BAND_IN)
     assert part.V_RING == pytest.approx(
         math.pi * ((spec.OD / 2.0) ** 2 - (spec.ID / 2.0) ** 2) * spec.LENGTH

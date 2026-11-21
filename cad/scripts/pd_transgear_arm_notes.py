@@ -23,7 +23,6 @@ from pd_rack_pinion_spec import inch_ceil_mm, inch_floor_mm, inch_text
 from pd_transgear_arm_spec import (
     LATCH_PIN_NUMBER,
     LATCH_PIN_PRESS_PRINTED,
-    LATCH_PIN_WALL_PRINTED,
     LOCATOR_PRESS_INTERFERENCE,
     PIN_PRESS_INTERFERENCE,
 )
@@ -71,8 +70,7 @@ NOTES = (
     f" MAX FOR DOWEL GRIP. MATCH-DRILL WITH ARM PLATE {_PLATE['number']}\n"
     f"   AT ASSEMBLY, {knob_setting_ref()}.",
     f"{LATCH_PIN_NOTE}. LATCH-PIN HOLE: PRESS FIT ON LATCH PIN {LATCH_PIN_NUMBER}\n"
-    f"   (INTERFERENCE {_inch_range(LATCH_PIN_PRESS_PRINTED)})."
-    f" PIN HOLE TO FACES {inch_text(LATCH_PIN_WALL_PRINTED, 3)} MIN.",
+    f"   (INTERFERENCE {_inch_range(LATCH_PIN_PRESS_PRINTED)}).",
     f"{SPRING_NOTE}. COUNTERBORE Ø AND FLOOR: SEAT AND PRELOAD\n"
     f"   PIVOT SPRING {_SPRING['number']}.",
     # The arm is reamed first; the pin's land is turned to the measured ream
