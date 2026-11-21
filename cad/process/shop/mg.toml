@@ -77,7 +77,7 @@ diameter_mm = 6.6294
 tool = "form-tool-r125"
 material = "lathe-c360"
 rpm = 300
-feed = "cross slide by hand, a slow steady plunge, dry"
+feed = "carriage handwheel along Z, a slow steady feed, dry"
 [settings.lathe-thread-c360]
 tool = "threading-bits-lms-6685"
 material = "lathe-c360"
