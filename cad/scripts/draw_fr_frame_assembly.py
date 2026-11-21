@@ -2214,33 +2214,46 @@ def _mark_deck_details(adapter: Any, exploded: Any) -> None:
 
 @_telemetry.traced("drawing.frame_deck_detail", label_param="label")
 def _place_deck_detail(
-    adapter: Any, detail: DeckDetail, items: dict[str, str], *, label: str
+    adapter: Any,
+    detail: DeckDetail,
+    step: Callable[[str], None],
+    *,
+    label: str,
 ) -> Any:
     """One enlarged, exploded base-deck cluster: placed with its exploded
-    centre on its spot, isolated to its families, cropped to its circle and
-    labelled under it (draw_ch_channel_assembly._exploded_detail)."""
+    centre on its spot, isolated to its families and cropped to its circle
+    (draw_ch_channel_assembly._exploded_detail). Its label, which names BOM
+    items, follows the BOM (:func:`_label_deck_detail`)."""
     view = _early_bound(
         place_view(
             adapter, str(SOURCE), "*Isometric", *detail.centre, scale=detail.scale
         ),
         "IView",
     )
+    step(f"{label}: view placement")
     set_high_quality_shaded_with_edges(adapter, view, label=label)
     _configure_view(adapter, view, exploded=True, label=label)
+    step(f"{label}: display and exploded configuration")
     centre = model_point_in_view(adapter, view, detail.model_centre_m, label=label)
     position = tuple(float(value) for value in view.Position)
     target = [position[axis] + detail.centre[axis] - centre[axis] for axis in range(2)]
     if not view.SetViewPosition(double_array(target), False):
         raise RuntimeError(f"failed to move {label} onto its spot")
+    step(f"{label}: SetViewPosition")
     adapter.currentModel.EditRebuild3()
+    step(f"{label}: position rebuild")
     centre = model_point_in_view(adapter, view, detail.model_centre_m, label=label)
     if max(abs(a - b) for a, b in zip(centre, detail.centre)) > _VIEW_POSITION_TOL_M:
         raise RuntimeError(f"{label} centre sits at {centre!r}, not {detail.centre!r}")
     view = isolate_drawing_view_components(adapter, view, visible_stems=frozenset(detail.stems), label=label)
+    step(f"{label}: component isolation")
     _sketch_view_circle(adapter, view, detail.centre, detail.radius_m, label=label)
+    step(f"{label}: crop circle")
     status = int(view.Crop2(False, False, 1))
+    step(f"{label}: Crop2")
     adapter.currentModel.ClearSelection2(True)
     adapter.currentModel.EditRebuild3()
+    step(f"{label}: crop rebuild")
     view.UpdateViewDisplayGeometry()
     cropped = bool(view.IsCropped())
     _telemetry.annotate(crop_status=status, cropped=cropped)
@@ -2248,11 +2261,38 @@ def _place_deck_detail(
         raise RuntimeError(
             f"{label} is not cropped: Crop2 status {status}, IsCropped {cropped}"
         )
+    return view
+
+
+def _label_deck_detail(
+    adapter: Any, view: Any, detail: DeckDetail, items: dict[str, str], *, label: str
+) -> None:
+    """A placed deck detail's label under it, naming its BOM items."""
     _activate_view(adapter, view, label=label)
     _add_note_block(
         adapter, detail.label_text(items), detail.label_xy, label=f"{label} label"
     )
-    return view
+
+
+def _place_finished_isometric(adapter: Any) -> None:
+    """The finished assembly, the drawing's full-detail view: every modeled
+    tooth and thread. The fit-up steps print in the release's ASSEMBLY.md."""
+    _activate_sheet(adapter, SHEET_NAMES[2])
+    label = f"{SHEET_NAMES[2]} isometric"
+    finished = place_view(
+        adapter,
+        str(SOURCE),
+        "*Isometric",
+        *ASSEMBLY_ISO_CENTER,
+        scale=ASSEMBLY_ISO_SCALE,
+    )
+    _configure_view(
+        adapter, finished, exploded=False, role=ViewRole.FULL_DETAIL, label=label
+    )
+    assert_full_detail_view(adapter, label="frame assembly")
+    _add_note_block(
+        adapter, ASSEMBLY_ISO_CAPTION, ASSEMBLY_ISO_CAPTION_XY, label=f"{label} caption"
+    )
 
 
 @_telemetry.traced("drawing.frame_setting_table")
@@ -2288,9 +2328,34 @@ def _place_setting_table(adapter: Any) -> None:
         )
 
 
-def _place_package(adapter: Any) -> Callable[[], None]:
+def _source_dirty_tracer(source_model: Any) -> Callable[[str], None]:
+    """Return ``step(name)``: log the released source's save flag after a step.
+
+    The drawing save writes a dirty source, which the fingerprint guard only
+    sees after the fact (build 20261011T191027.935928Z: the frame drawing
+    rewrote the released source inside drawing.save_drawing, #1364). Each
+    transition is logged with the step that caused it, so a failing leaf
+    names the culprit; drive-train's drawing has carried this since its own
+    run 20261001T035353825Z.
+    """
+    state = {"dirty": bool(source_model.GetSaveFlag())}
+
+    def step(name: str) -> None:
+        dirty = bool(source_model.GetSaveFlag())
+        _telemetry.event("frame.source_save_flag", step=name, dirty=dirty)
+        if dirty == state["dirty"]:
+            return
+        state["dirty"] = dirty
+        report = _telemetry.warn if dirty else _telemetry.info
+        report(f"frame source went {'DIRTY' if dirty else 'clean'} after {name}")
+
+    return step
+
+
+def _place_package(adapter: Any, step: Callable[[str], None]) -> Callable[[], None]:
     """Place every sheet; return the check that proves every balloon again
-    after the last rebuild (:func:`_assert_frame_balloons_settled`)."""
+    after the last rebuild (:func:`_assert_frame_balloons_settled`). ``step``
+    traces the released source's save flag after each stage."""
     _create_mixed_package_sheets(adapter)
     for sheet_name in SHEET_NAMES:
         _activate_sheet(adapter, sheet_name)
@@ -2320,6 +2385,7 @@ def _place_package(adapter: Any) -> Callable[[], None]:
     _, top_section = _create_joint_sections(adapter, front)
     inset = _add_nameplate_inset_dimension(adapter, top_section)
     _place_setting_table(adapter)
+    step("working front, sections and setting table")
 
     _activate_sheet(adapter, SHEET_NAMES[1])
     exploded = place_view(
@@ -2334,6 +2400,19 @@ def _place_package(adapter: Any) -> Callable[[], None]:
     )
     # Configuration, then its own explode, then the BOM and balloons bind.
     _configure_view(adapter, exploded, exploded=True, label="exploded isometric")
+    step("exploded configuration")
+    # Every other view is placed, configured, exploded, isolated and cropped
+    # before the BOM exists, as on the drive-train sheet: DETAIL C's exploded
+    # configuration, made after insert_bom_table, dirtied the released source
+    # (#1364, farm run 20261120T205805100Z-5f74988800f64531a1a449cce22dfcd7).
+    details = []
+    for detail in DECK_DETAILS:
+        label = f"frame {detail.title}"
+        details.append((detail, _place_deck_detail(adapter, detail, step, label=label)))
+        _activate_sheet(adapter, SHEET_NAMES[1])
+    _place_finished_isometric(adapter)
+    step("finished isometric")
+    _activate_sheet(adapter, SHEET_NAMES[1])
     table = insert_bom_table(
         adapter,
         exploded,
@@ -2344,6 +2423,7 @@ def _place_package(adapter: Any) -> Callable[[], None]:
         configuration_grouping="same-part",
         label="frame",
     )
+    step("BOM")
     balloon_items = _validate_frame_bom(adapter, table)
     landings = add_component_bom_balloons(
         adapter,
@@ -2367,32 +2447,16 @@ def _place_package(adapter: Any) -> Callable[[], None]:
     _add_note_block(
         adapter, EXPLODED_CAPTION, (0.045, 0.075), label="exploded-view caption"
     )
+    step("exploded-view balloons")
     # The enlarged deck details, lettered in the 1:8 view after its balloons.
     _mark_deck_details(adapter, exploded)
+    step("deck detail boundaries")
     _activate_sheet(adapter, SHEET_NAMES[1])
     items = dict(balloon_items)
-    for detail in DECK_DETAILS:
-        _place_deck_detail(adapter, detail, items, label=f"frame {detail.title}")
+    for detail, view in details:
+        _label_deck_detail(adapter, view, detail, items, label=f"frame {detail.title}")
         _activate_sheet(adapter, SHEET_NAMES[1])
-
-    # The finished assembly, the drawing's full-detail view: every modeled
-    # tooth and thread. The fit-up steps print in the release's ASSEMBLY.md.
-    _activate_sheet(adapter, SHEET_NAMES[2])
-    label = f"{SHEET_NAMES[2]} isometric"
-    finished = place_view(
-        adapter,
-        str(SOURCE),
-        "*Isometric",
-        *ASSEMBLY_ISO_CENTER,
-        scale=ASSEMBLY_ISO_SCALE,
-    )
-    _configure_view(
-        adapter, finished, exploded=False, role=ViewRole.FULL_DETAIL, label=label
-    )
-    assert_full_detail_view(adapter, label="frame assembly")
-    _add_note_block(
-        adapter, ASSEMBLY_ISO_CAPTION, ASSEMBLY_ISO_CAPTION_XY, label=f"{label} caption"
-    )
+    step("deck detail labels")
 
     def settled() -> None:
         _assert_frame_balloons_settled(adapter, landings, proof)
@@ -2504,8 +2568,21 @@ def build(adapter: Any) -> dict[str, str]:
 
     artifacts: dict[str, str] | None = None
     try:
+        step = _source_dirty_tracer(source_model)
         _validate_persisted_explode(source_model)
-        settled = _place_package(adapter)
+        step("validate source")
+        settled = _place_package(adapter, step)
+
+        def assert_source_clean(where: str) -> None:
+            # Saving the drawing would write a dirty released source (#1364).
+            step(where)
+            if bool(source_model.GetSaveFlag()):
+                raise RuntimeError(
+                    f"frame drawing dirtied the released source assembly by "
+                    f"{where}; the per-step trace names the step"
+                )
+
+        assert_source_clean("package placement")
         artifacts = finalize_drawing(
             adapter,
             OUTPUTS,
@@ -2515,7 +2592,7 @@ def build(adapter: Any) -> dict[str, str]:
             expected_sheet_names=SHEET_NAMES,
             sheet_layouts=SHEET_LAYOUTS,
             sheet_scales=SHEET_SCALES,
-            settled_checks=(settled,),
+            settled_checks=(settled, lambda: assert_source_clean("finalize rebuilds")),
         )
     finally:
         primary_error = sys.exception()

@@ -620,3 +620,132 @@ def test_deck_detail_labels_name_their_bom_items() -> None:
         "fr-nameplate",
         "sh-vn-brass-fillister-screw",
     )
+
+
+class _SourceModel:
+    """The released source assembly as the drawing opens it: clean."""
+
+    def __init__(self) -> None:
+        self.dirty = False
+
+    def GetSaveFlag(self) -> bool:
+        return self.dirty
+
+    def GetTitle(self) -> str:
+        return "fr-frame-assembly.SLDASM"
+
+    def GetType(self) -> int:
+        return 2  # swDocASSEMBLY
+
+
+def _frame_build(monkeypatch, tmp_path, *, dirty_at: str | None, entered=None):
+    """Run ``drawing.build`` with every native step faked; the source goes
+    dirty during ``dirty_at`` ("placement" or "finalize") if given.
+    ``entered`` records each start of finalization."""
+    source = tmp_path / "fr-frame-assembly.SLDASM"
+    source.write_bytes(b"released")
+    model = _SourceModel()
+    finalized: list[bool] = []
+    entered = [] if entered is None else entered
+
+    def place_package(*_args):
+        if dirty_at == "placement":
+            model.dirty = True
+        return lambda: None
+
+    def finalize_drawing(_adapter, _outputs, *, settled_checks, **_kwargs):
+        entered.append(True)
+        if dirty_at == "finalize":
+            model.dirty = True
+        for settled in settled_checks:
+            settled()
+        finalized.append(True)
+        return {"pdf": "fr-frame-assembly.pdf"}
+
+    monkeypatch.setattr(drawing, "SOURCE", source)
+    monkeypatch.setattr(drawing, "check", lambda *_args: None)
+    monkeypatch.setattr(drawing, "read_required_properties", lambda *_args, **_kw: {})
+    monkeypatch.setattr(drawing, "_validate_persisted_explode", lambda _model: None)
+    monkeypatch.setattr(drawing, "_place_package", place_package)
+    monkeypatch.setattr(drawing, "finalize_drawing", finalize_drawing)
+    adapter = SimpleNamespace(
+        currentModel=model,
+        open_model=lambda _path: None,
+        swApp=SimpleNamespace(
+            CloseDoc=lambda _title: None, GetOpenDocumentByName=lambda _path: None
+        ),
+    )
+    return drawing.build(adapter), finalized
+
+
+def test_a_clean_source_lets_the_frame_drawing_finalize(monkeypatch, tmp_path) -> None:
+    artifacts, finalized = _frame_build(monkeypatch, tmp_path, dirty_at=None)
+    assert artifacts == {"pdf": "fr-frame-assembly.pdf"} and finalized == [True]
+
+
+@pytest.mark.parametrize(
+    ("dirty_at", "where", "finalizes"),
+    [("placement", "package placement", False), ("finalize", "finalize rebuilds", True)],
+)
+def test_a_dirtied_source_fails_before_the_drawing_saves(
+    monkeypatch, tmp_path, dirty_at, where, finalizes
+) -> None:
+    # #1364: a drawing step dirtied the writable released source and the
+    # drawing's save rewrote it; the fingerprint only caught it afterwards.
+    # As in drive-train's drawing, a dirty source now fails before the save:
+    # a dirty placement never reaches finalization.
+    entered: list[bool] = []
+    with pytest.raises(RuntimeError, match=f"dirtied the released source assembly by {where}"):
+        _frame_build(monkeypatch, tmp_path, dirty_at=dirty_at, entered=entered)
+    assert entered == ([True] if finalizes else [])
+
+
+def test_every_view_is_configured_before_the_bom(monkeypatch) -> None:
+    # #1364, native trace on farm run 20261120T205805100Z-5f74...: DETAIL C's
+    # exploded configuration, made after insert_bom_table, dirtied the
+    # released source. Every view placement and configuration now precedes
+    # the BOM; only the deck details' labels (they name BOM items) follow it.
+    events: list[str] = []
+
+    def record(name, result=None):
+        def call(*_args, **_kwargs):
+            events.append(name)
+            return result
+
+        return call
+
+    sheet = SimpleNamespace(GetCurrentSheet=lambda: sheet, SetScale=lambda *_args: True)
+    landing = SimpleNamespace(note=object())
+    proof = SimpleNamespace(rebound=frozenset(), bound=(), short=())
+    for name, result in {
+        "_create_mixed_package_sheets": None,
+        "_activate_sheet": None,
+        "_early_bound": sheet,
+        "place_view": object(),
+        "set_hidden_lines_removed": None,
+        "_configure_view": "Default",
+        "_add_frame_height_dimensions": None,
+        "_create_joint_sections": (object(), object()),
+        "_add_nameplate_inset_dimension": object(),
+        "_place_setting_table": None,
+        "set_high_quality_shaded_with_edges": None,
+        "_place_deck_detail": object(),
+        "_place_finished_isometric": None,
+        "insert_bom_table": object(),
+        "_validate_frame_bom": [("fr-harmonic-base", "1")],
+        "add_component_bom_balloons": [landing],
+        "_reattach_frame_balloons": proof,
+        "_place_frame_set_screw_balloon": object(),
+        "_assert_frame_bom_balloon_clearance": None,
+        "_add_note_block": None,
+        "_mark_deck_details": None,
+        "_label_deck_detail": None,
+    }.items():
+        monkeypatch.setattr(drawing, name, record(name, result))
+    drawing._place_package(SimpleNamespace(currentModel=object()), lambda _name: None)
+    bom = events.index("insert_bom_table")
+    placing = {"place_view", "_configure_view", "_place_deck_detail", "_place_finished_isometric"}
+    assert not placing & set(events[bom:])
+    assert events.count("_place_deck_detail") == len(drawing.DECK_DETAILS)
+    assert events.count("_label_deck_detail") == len(drawing.DECK_DETAILS)
+    assert events.index("_label_deck_detail") > bom
