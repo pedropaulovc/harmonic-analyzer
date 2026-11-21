@@ -203,7 +203,7 @@ drilling = "none"
 sizing = "other"
 feed = "hand"
 tool = "telescoping-gauges-starrett-s579gz"
-instruction = "Measure the MHA-SM-01 tube's bore at its end with a telescoping gauge and the micrometer and write it on this sheet: the spigot is that bore less {{cad.step_clearance_min_in:.3dot}}–{{cad.step_clearance_max_in:.3dot}} (drawing note 1). Before chucking the plug, mike its length with the spindle on the parted end's outer rim, clear of any parting pip at its centre, and write it on this sheet as L0 (about {{cad.part_off_in:.2dot}})."
+instruction = "Measure the MHA-SM-01 tube's bore at its end with a telescoping gauge and the micrometer and write it on this sheet: the spigot is that bore less {{cad.step_clearance_min_in:.3dot}}–{{cad.step_clearance_max_in:.3dot}} (drawing note 1). Before chucking the plug, mike its length with the micrometer's spindle on the parted end's outer rim, clear of any parting pip at its centre, and write it on this sheet as L0 (about {{cad.part_off_in:.2dot}})."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -256,7 +256,7 @@ gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.length_band_mm}}" }, {
 feed = "hand"
 
 [[setups.operations]]
-instruction = "A plug long overall in Op 120 goes back to Op 90 (a new L0, chucked, touched, preset and faced to Z0; the shoulder is not touched). One short overall or with the head length out of its band in Op 120, or with the spigot under the recorded bore less {{cad.step_clearance_max_in:.3dot}} in Op 100, is scrapped, not reworked: make another from a bar end (Setup 1)."
+instruction = "Long overall (Op 120): back through Op 90 (a new L0; the shoulder untouched), Op 110 (the spigot end's edge broken again) and Op 120. Short overall or head length out (Op 120), or spigot under the recorded bore less {{cad.step_clearance_max_in:.3dot}} (Op 100): scrap; make another from a bar end (Setup 1)."
 feed = "hand"
 
 [[setups.operations]]
