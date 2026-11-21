@@ -20,7 +20,7 @@ part = "{{cad.drawing_number}}"
 revision = "{{cad.revision}}"
 material = "AISI O1 drill rod, precision ground, 5/32 in"
 stock = "Qty {{process.quantity:g}}. Ø{{process.stock_dia_in:.4dot}} ground drill rod (to order, not on hand); one blank {{process.blank_length_in:.2dot}} in long per pin."
-note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); cutting oil. The O.D. is left as supplied: grip it over a brass shim wrap and never cut it."
+note = "Inches unless mm. Lathe PM-1127VF-LB (70–380 and 380–2000 rpm); cutting oil. The O.D. is left as supplied: the ground rod's own surface is the drawing's Ra 63 cam contact, so grip it over a brass shim wrap and never cut, file or stone it."
 shop = "../shop"
 stock_refs = ["o1-drill-rod-5-32"]
 material_key = "lathe-o1-drill-rod"
@@ -128,19 +128,23 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Face end B square in light skims toward {{cad.faced_length_in:.4dot}}, reading the length between them (Op 60); stop inside {{cad.faced_length_min_in:.4dot}}–{{cad.faced_length_max_in:.4dot}}: the crown's root at {{cad.dome_far_root_station_min_in:.2dot}}–{{cad.dome_far_root_station_max_in:.2dot}} from end A plus the crown's {{cad.dome_far_form_height_in:.4dot}} height."
+instruction = "Face end B square in light skims toward {{cad.faced_length_in:.3dot}}, reading the length between them (Op 60); stop inside {{cad.faced_length_min_in:.3dot}}–{{cad.faced_length_max_in:.3dot}} ({{cad.dome_far_root_station_min_in:.2dot}}–{{cad.dome_far_root_station_max_in:.2dot}} root + {{cad.dome_far_form_height_in:.4dot}} crown, rounded inward)."
 settings = "lathe-ar-o1"
 cut_diameter_mm = "{{cad.stock_dia_mm}}"
 
 [[setups.operations]]
 cut_kind = "other"
 instruction = "Between skims, stop the spindle, take the blank out and mike it across both faces, then chuck it again over the shim, end B {{process.end_stickout_in:.2dot}} in out."
-inspection = "Faced length {{cad.faced_length_min_in:.4dot}}–{{cad.faced_length_max_in:.4dot}}."
+inspection = "Faced length {{cad.faced_length_min_in:.3dot}}–{{cad.faced_length_max_in:.3dot}}."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.faced_length_band_mm}}" }]
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Faced under {{cad.faced_length_min_in:.4dot}}: scrap the blank and saw another (Setup 1)."
+instruction = "Faced under {{cad.faced_length_min_in:.3dot}}: scrap the blank and saw another (Setup 1)."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Spindle stopped: set the R.125 form tool (a concave R.125 arc, inside the drawing's R{{cad.dome_far_radius_min_in:.2dot}}–{{cad.dome_far_radius_max_in:.2dot}}) on centre height, the arc facing end B and spanning it. Bring the arc up along Z, adjusting the cross slide, until it touches both corners of end B at once, no light showing at either corner: the arc is then centred on the axis. Zero the DRO Z at that touch."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -148,7 +152,7 @@ speed_kind = "spindle"
 tool = "form"
 drilling = "none"
 sizing = "other"
-instruction = "Form the crown with the R.125 form tool (a concave R.125 arc, inside the drawing's R{{cad.dome_far_radius_min_in:.2dot}}–{{cad.dome_far_radius_max_in:.2dot}}), on centre height, the arc facing end B and spanning it. Spindle stopped: bring the arc up to end B and set the cross slide so it touches end B's corner on both sides together (an even light gap either side): the arc is then centred on the axis. Zero the DRO Z there. Spindle on, feed the carriage along Z to Z−{{cad.dome_far_form_height_in:.4dot}} (the crown's height on the Ø{{process.stock_dia_in:.4dot}}): the arc's deepest point, on the axis, then just reaches the faced plane and the apex stays at the faced length. Never past Z−{{cad.dome_far_form_height_in:.4dot}}."
+instruction = "Spindle on: feed the carriage along Z to Z−{{cad.dome_far_form_height_in:.4dot}}, the crown's height on the Ø{{process.stock_dia_in:.4dot}}. The arc's deepest point, on the axis, then just reaches the faced plane, so the apex stays at the faced length. Never past Z−{{cad.dome_far_form_height_in:.4dot}}."
 settings = "lathe-form-r125-o1"
 cut_diameter_mm = "{{cad.stock_dia_mm}}"
 
@@ -158,17 +162,17 @@ instruction = "Stop the spindle and look at the crown under a loupe: no pip or f
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A pip at the apex: the tool is off centre height; reset it and take one more light pass to the same Z−{{cad.dome_far_form_height_in:.4dot}}, no deeper. A step at the O.D.: the arc is off centre across the pin; reset the cross slide as Op 80 and take one more pass to the same Z."
+instruction = "A pip (tool off centre height) or a step at the O.D. (arc off centre): correct the tool's height or the cross slide, spindle stopped. Then bring the arc up along Z until it just touches the formed crown, zero the DRO Z at that touch, and take one light pass to Z−.002 only; Op 120 then reads the length."
 
 [[setups.operations]]
 cut_kind = "other"
 instruction = "Take the pin out and mike it from the apex to end A."
-inspection = "Length over the crown {{cad.faced_length_min_in:.4dot}}–{{cad.faced_length_max_in:.4dot}}."
+inspection = "Length over the crown {{cad.faced_length_min_in:.3dot}}–{{cad.faced_length_max_in:.3dot}}."
 gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.faced_length_band_mm}}" }]
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Under {{cad.faced_length_min_in:.4dot}}: the form ran past its Z: scrap the pin and make another from Setup 1. Repeat Setup 3 on the second blank."
+instruction = "Under {{cad.faced_length_min_in:.3dot}}: the form ran past its Z: scrap the pin and make another from Setup 1. Repeat Setup 3 on the second blank."
 
 [[setups]]
 machine_kind = "other"
@@ -189,12 +193,10 @@ instruction = "Break end A's edge, and the edge where the crown meets the O.D., 
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Mike the O.D. at both ends and the middle: the jaws must not have marked it."
-inspection = "O.D. Ø{{cad.outer_dia_min_in:.4dot}}–{{cad.outer_dia_max_in:.4dot}}."
-gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.outer_dia_band_mm}}" }]
+instruction = "Look along the O.D. under a light: no jaw mark or scratch on the Ra 63 cam contact (its size is the rod's, accepted in Op 10; nothing here cuts it)."
 
 [[setups.operations]]
-instruction = "O.D. over {{cad.outer_dia_max_in:.4dot}} at a jaw mark: file the raised mark down lightly and mike again. Under {{cad.outer_dia_min_in:.4dot}}: scrap the pin and make another from Setup 1."
+instruction = "A jaw mark or scratch on the O.D.: scrap the pin (the ground surface is not reworked) and make another from Setup 1."
 
 [[setups.operations]]
 instruction = "Wipe both pins with a light ISO VG 32 machine-oil film (FINISH: as-received drill rod, oiled) and bag them with their number."
