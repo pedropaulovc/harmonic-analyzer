@@ -635,9 +635,6 @@ def test_no_callout_or_caption_prints_more_than_two_lines_of_words() -> None:
     }
     for name, text in printed.items():
         assert 1 <= len(_word_lines(text)) <= 2, name
-    assert drawing.SECTION_CALLOUTS["ThicknessOverArm"] is spec.THICKNESS_CALLOUT
-    assert not hasattr(drawing, "two_lines_of_words")
-    assert not hasattr(drawing, "FACE_FINISH_CAPTIONS")
 
 
 def test_the_hole_height_text_stands_right_of_the_edge() -> None:

@@ -8,7 +8,7 @@ bar centred on K leaves the -X countersink under the wall target).  It
 carries the knob shaft's running bore on axis K, a front hub (the thrust
 ring's seat) and a rear boss (the cup runs behind it).  Its rear portion is
 .197 thick where it lies over the arm; below the arm's lower edge it drops
-.31 more, to .0025 behind the arm's front face (5/16 stock), so the step (the
+.31 more, to .065 behind the arm's front face (3/8 stock, #2019), so the step (the
 "notch") wraps that edge, NOTCH_RELIEF clear of it. Two matched stock
 dowels locate; screws clamp.
 
