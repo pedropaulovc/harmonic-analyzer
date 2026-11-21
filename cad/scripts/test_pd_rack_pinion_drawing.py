@@ -491,6 +491,17 @@ def test_single_pin_contacts_every_actual_finite_corner_on_the_running_datum() -
     assert inspection.splitlines()[0] == (
         f"TOOTH SPACE RUNOUT {spec.PART_TOOTH_SPACE_RUNOUT_TIR_TEXT} TIR TO A"
     )
+    # Owner rulings 2026-11-20 and 2026-11-21 (Pedro), #2665: 12 spaces about
+    # evenly round the disc, the strides covering the 150 teeth, the same
+    # sample MHA-PD-00's 9N reads.
+    small, large = spec.TOOTH_SPACE_SAMPLE_STRIDES
+    assert large - small == 1 and small * spec.TOOTH_SPACE_SAMPLE_SPACES <= spec.TEETH
+    assert spec.TEETH <= large * spec.TOOTH_SPACE_SAMPLE_SPACES
+    assert inspection.splitlines()[1] == (
+        f"\u00d8{spec.inch_text(spec.TOOTH_SPACE_GAUGE_PIN_DIA_MM, 3)} PIN IN "
+        f"{spec.TOOTH_SPACE_SAMPLE_SPACES} SPACES, EVERY {small}TH OR {large}TH"
+    )
+    assert "ALL" not in inspection
     # The part's band is the shop row (.001 per inch over the Ø3.17 ring);
     # the assembled limit (MHA-PD-00) prints at three places and never
     # exceeds the booking the mesh stack spends.

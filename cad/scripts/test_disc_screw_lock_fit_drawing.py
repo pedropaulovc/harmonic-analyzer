@@ -117,10 +117,11 @@ def test_platen_float_fitted_to_keep_the_disc_clear_of_the_platen() -> None:
     assert air(0.31) < 0.0
     assert guide.LOCK_GAP_FIT == pytest.approx((0.002 * IN, 0.009 * IN))
     assert air(guide.LOCK_GAP_FIT[1]) == pytest.approx(0.087, abs=1e-3)
-    # As made, the shallowest rail on the deepest bar floats .011: every
-    # rail's seats are faced down into the window, none is short of it.
-    as_made_min = (0.40 - 0.010) * IN - 9.6266
-    assert as_made_min == pytest.approx(0.2794)
+    # As made, the shallowest rail on the deepest bar (.375, the 3/8 CF
+    # flat's as-supplied maximum, #1563 option C) floats .015: every rail's
+    # seats are faced down into the window, none is short of it.
+    as_made_min = (0.40 - 0.010) * IN - 0.375 * IN
+    assert as_made_min == pytest.approx(0.381)
     assert as_made_min >= guide.LOCK_GAP_FIT[1]
 
 

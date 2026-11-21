@@ -31,9 +31,6 @@ diameter_mm = 4.8006
 [tools.basebar-tap]
 description = "8-32 plug tap"
 tap_drill_mm = 3.4544
-[tools.basebar-counterbore]
-description = "5/16 in centre-cutting 2-flute end mill"
-diameter_mm = 7.9375
 # Shrum Solutions Tri Fly fly cutter (owner, 2026-11-16, relayed by Main):
 # 2 in cutting Ø, three TCGT 32.52 carbide inserts, 3/4 in shank held in the
 # 3/4 in R8 collet. https://www.shrumsolutions.com/product-page/tri-fly and

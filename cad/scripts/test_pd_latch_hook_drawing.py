@@ -246,12 +246,14 @@ def test_release_overpull_holds_only_from_half_hard_up() -> None:
     assert spec.release_flex_to_yield(spec.SHEET_YIELD_MIN["H01"]) < need
     assert spec.RELEASE_FLEX == pytest.approx(5.164, abs=0.001)
     # The printed worst corner's single release (the far-face stack, on the
-    # 3/8 arm, #2019) is larger than nominal but still under the H02 yield.
+    # 3/8 arm, #2019, with the MHA-PD-07 pivot row at the title block's
+    # +/-.005, owner ruling 2026-11-20, #2422) is larger than nominal but
+    # still under the H02 yield (11.25).
     import transgear_hanger_joints as joints
 
     worst = joints.LATCH_RELEASE_FLEX_WORST
     assert spec.RELEASE_FLEX < worst < spec.RELEASE_FLEX_TO_YIELD
-    assert worst == pytest.approx(8.469, abs=0.002)
+    assert worst == pytest.approx(8.81, abs=0.002)
 
 
 _TITLE_BLOCK_TEXT = (

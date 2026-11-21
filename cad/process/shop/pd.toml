@@ -96,6 +96,8 @@ diameter_mm = 4.9276
 # prechips can check each plan's stock_refs. Description only: the ownership
 # status stays in the inventory under the same key (stock assignment audit,
 # owner 2026-11-19).
+[stock.1018-flat-3-8x1]
+description = "1018 cold-finish carbon steel, flat bar, 3/8 x 1 in"
 [stock.1018-flat-3-8x1-2]
 description = "1018 cold-finish carbon steel, flat bar, 3/8 x 1/2 in"
 [stock.1018-ground-flat-3-8x1]

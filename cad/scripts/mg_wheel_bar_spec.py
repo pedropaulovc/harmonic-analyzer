@@ -75,7 +75,13 @@ BORE_ROW_PLACES = 3
 # converted-mm +/-.007 (Owner ruling 2026-11-08 (Pedro), #2144 item 11.2).
 # test_mg_wheel_bar_drawing derives the stack from the
 # clamp's own modules, so the clamp's geometry stays out of this part's
-# recipe. Drill wander is not charged, as on the support bar (#1988).
+# recipe. Charging drill wander on that screw line (the back-arc tap's and
+# this bar's through hole's, 0.3 deg) leaves the screw short of its float by
+# 0.053 at the worst corner: owner ruling 2026-11-20 (Pedro), #1988, "Follow
+# recommendations unless noted otherwise"; the recommendation accepted:
+# "Accept the ~0.046 shortfall as ruled, consistent with RV-02 (0.053) on the
+# clamp front screw line" (the same ruling as the support bar's
+# build_pd_support_bar.CLAMP_SCREW_LINE_SHORTFALL_RULED; the test holds it).
 CLAMP_POSITION_PLACES = 3
 CLAMP_POSITION_BAND = printed_band_mm(CLAMP_POSITION_PLACES, unit=UNIT)
 

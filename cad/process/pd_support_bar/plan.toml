@@ -7,7 +7,7 @@ revision = "placeholder"
 material = "Plain Carbon Steel"
 stock = "To be written"
 shop = "../shop"
-stock_refs = ["1018-flat-3-8x1-1-4"]
+stock_refs = ["1018-flat-3-8x1"]
 
 [[tools]]
 id = "jig-drill-43"
@@ -52,7 +52,12 @@ ref = "chamfer-mill-330ch-1-4-90"  # drawing cross-check 2026-11-19: ⌵ Ø.169 
 [[tools]]
 id = "endmill-carbide-3fl-1-8"
 name = "1/8 carbide end mill"
-ref = "endmill-carbide-3fl-1-8"  # drawing cross-check 2026-11-19: ⌴ Ø.335 ↧ .19 and the .118-centre slots
+ref = "endmill-carbide-3fl-1-8"  # drawing cross-check 2026-11-19: the .118-centre slots
+
+[[tools]]
+id = "basebar-counterbore"
+name = "5/16 centre-cutting end mill"
+ref = "basebar-counterbore"  # #2422: ⌴ Ø.3125 +.010/0 ↧ .19, the round counterbores' plunge
 
 [[setups]]
 machine_kind = "other"

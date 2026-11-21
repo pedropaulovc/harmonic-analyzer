@@ -150,7 +150,9 @@ def test_part_authored_callouts_name_each_band_s_mate() -> None:
     assert len(callouts.BAR_DEPTH_CALLOUT.replace(axle, "").split()) <= 6
     assert BACK_END_SUNK_MIN >= 0.0
     assert mg_wheel_bar_spec.BAR_DEPTH_BAND == pytest.approx((0.005 * IN, -0.005 * IN))
-    assert callouts.CLAMP_HOLE_CALLOUT == "CLEARS MHA-SH-02 TAPPED HOLES\nWALL .070 MIN"
+    assert callouts.CLAMP_HOLE_CALLOUT == (
+        "CLEARS MHA-SH-02 TAPS, SEE NOTE 1\nWALL .070 MIN"
+    )
     assert callouts.HANGER_HOLE_CALLOUT == "WALL .076 MIN"
     texts = [*callouts.authored_by_name().values()]
     for lanes in texts:
@@ -195,6 +197,50 @@ def test_clamp_position_band_is_the_mha_sh_02_tap_stack() -> None:
         for deviation in printed_deviations(nominal, 3, (-band, band), unit="in")
     )
     assert bar_zone(worst) + tap_zone <= hole_float
+
+
+def test_clamp_screw_line_wander_shortfall_stays_the_owner_ruled_value() -> None:
+    """Owner ruling 2026-11-20 (#1988): with drill wander charged (the
+    MHA-SH-02 back-arc tap's and this bar's through hole's, 0.3 deg), the
+    clamp screw stands up to 0.053 past its hole's radial float at the worst
+    corner; the shortfall may not grow."""
+    import math
+
+    import mg_wheel_bar_geom as geom
+    from _printed_tolerance import printed_deviations
+    from sh_column_clamp_fit import BACK_EAR_WANDER, EAR_HEIGHT_BAND, EAR_STATION_BAND
+    from sh_vn_clamp_screw_spec import SHANK_DIA
+
+    band = mg_wheel_bar_spec.CLAMP_POSITION_BAND
+    worst = max(
+        abs(deviation)
+        for nominal in (geom.BAR_TOP_ABOVE_ROW, *geom.CLAMP_STATIONS)
+        for deviation in printed_deviations(nominal, 3, (-band, band), unit="in")
+    )
+    demand = (
+        math.hypot(worst, worst)
+        + math.hypot(EAR_STATION_BAND, EAR_HEIGHT_BAND)
+        + BACK_EAR_WANDER
+        + mg_wheel_bar_spec.DRILL_RUNOFF
+    )
+    shortfall = demand - (geom.CLAMP_HOLE_DIA - SHANK_DIA) / 2.0
+    assert shortfall == pytest.approx(0.0527, abs=1e-4)
+    assert 0.0 < round(shortfall, 3) <= 0.053
+    # Rule 20: the sheet states it, rounded up, and RV-08 declares that note.
+    import _config
+    from sh_column_clamp_fit import note_text, stated_max
+
+    stated = note_text(stated_max(shortfall))
+    note = " ".join(drawing.SCREW_LINE_NOTE.split())
+    assert note.startswith("1. ")
+    assert f"OFFSET UP TO {stated} OVER #8" in note
+    assert "SEE NOTE 1" in callouts.callout_rows(callouts.CLAMP_HOLE_CALLOUT)[0]
+    entries = {
+        entry["id"]: entry
+        for entry in _config.parts("mg-wheel-bar")["machinist_exceptions"]
+    }
+    assert entries["RV-08"]["kind"] == "minor"
+    assert note in entries["RV-08"]["where"]
 
 
 def test_every_wall_is_stated_at_the_full_worst_case() -> None:
@@ -258,7 +304,11 @@ def test_every_wall_is_an_owner_declared_minor_stated_on_the_sheet() -> None:
     from machinist_exceptions import load_exceptions
 
     declared = load_exceptions(_config.CONFIG_DIR, "mg_wheel_bar", "part")
-    assert len(declared) == len(mg_wheel_bar_spec.MINOR_WALLS) == 4
+    # One minor per wall, plus RV-08, the screw line's stated shortfall
+    # (test_clamp_screw_line_wander_shortfall_stays_the_owner_ruled_value).
+    walls = [entry for entry in declared if entry.id != "RV-08"]
+    assert len(walls) == len(mg_wheel_bar_spec.MINOR_WALLS) == 4
+    declared = walls
     texts = {
         "axle bore": callouts.AXLE_BORE_CALLOUT,
         "hanger hole": callouts.HANGER_HOLE_CALLOUT,

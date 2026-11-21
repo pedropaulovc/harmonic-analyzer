@@ -66,6 +66,16 @@ dia_in = [0.375]
 status = "to_order"
 cite = ["issue #2346 owner ruling 2026-11-20", "dt_cylinder_gear_shaft_notes.SHAFT_DIA_CALLOUT: 3/8 GROUND STOCK OK", "dt-cylinder-gear-shaft registry material_specification: SAE 1018 CF or 1045 ground bar"]
 
+# MHA-PD-07 support bar (owner ruling 2026-11-20 (Pedro), #2421 option B).
+[stock.1018-flat-3-8x1]
+form = "flat_bar"
+material = "1018 cold-finish carbon steel"
+note = "To order: 3/8 x 1 in 1018 CF flat, one 24 in length. Allocation: pd-support-bar (MHA-PD-07), one 17.8 in bar, 1.00 tall at .XX: only the top (slide) edge is skimmed, the bottom edge stays as supplied (owner ruling 2026-11-20, #2421 option B; the bar was milled from the 3/8 x 1-1/4 bar, 1018-flat-3-8x1-1-4). Price not read. Not owned."
+section_mm = [25.4, 9.525]
+length_mm = 609.6
+status = "to_order"
+cite = ["OnlineMetals part 7486 https://www.onlinemetals.com/en/buy/carbon-steel/0-375-x-1-carbon-steel-rectangle-bar-1018-cold-finish/pid/7486 (3/8 x 1 rectangle bar, 1018 cold finish)", "Owner ruling 2026-11-20 (Pedro), https://github.com/pedropaulovc/harmonic-analyzer/issues/2421", "cad/scripts/pd_support_bar_spec.py BAR_HEIGHT, BAR_HEIGHT_PLACES"]
+
 # Gear blanks (#2356): the make route's bar, to buy, not ordered (route A,
 # owner ruling 2026-11-14). Lengths: each blank's length plus .14 in to part and
 # face, plus about 1 in to hold the last one. OnlineMetals C360-H02 round,

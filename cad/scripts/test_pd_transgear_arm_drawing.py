@@ -233,11 +233,12 @@ def _floor_pressed_proud_range(pin_length: float, hole_depth: float) -> tuple[fl
 # ream floats the pivot .0085 at most (was .0072).  #3124: the 7/8 pin is set
 # .516-.565 proud at assembly (owner decision 2026-11-19).  #2019: on the 3/8
 # arm (latch height .188, hook hole on the moved axis) each margin is about
-# 0.011 smaller.
+# 0.011 smaller.  #2422: the bar's pivot tap prints the title block's ±.005
+# (it was ±.002; owner ruling 2026-11-20), which the pin's reach spends.
 _SET_PROUD_WINDOW = (0.516 * 25.4, 0.565 * 25.4)
-_PINNED_FAR_FACE_MARGIN = 0.625
-_PINNED_OLD_PIN_MARGIN = -0.258
-_PINNED_DEEPER_OLD_PIN_MARGIN = -0.308
+_PINNED_FAR_FACE_MARGIN = 0.285
+_PINNED_OLD_PIN_MARGIN = -0.597
+_PINNED_DEEPER_OLD_PIN_MARGIN = -0.647
 
 
 def _worst_far_face_margin(
@@ -339,7 +340,7 @@ def test_the_latch_pin_full_diameter_passes_the_hook_at_the_printed_tip_band() -
     assert joints.LATCH_PIN_PROUD_RANGE == pytest.approx(_SET_PROUD_WINDOW)
     # Negative control: the retired 3/4 pin pressed to a floor stops short in
     # a 6.20 hole, and further short 0.05 deeper, with the bends and the
-    # grade; without them it cleared.
+    # grade; without them it stops less short.
     old = _floor_pressed_proud_range(0.75 * 25.4, 6.20)
     assert _worst_far_face_margin(printed, old) == pytest.approx(
         _PINNED_OLD_PIN_MARGIN, abs=1e-3
@@ -349,7 +350,9 @@ def test_the_latch_pin_full_diameter_passes_the_hook_at_the_printed_tip_band() -
         _PINNED_DEEPER_OLD_PIN_MARGIN, abs=1e-3
     )
     depth_only = (deeper[0] + _PIN_LENGTH_GRADE, deeper[1] - _PIN_LENGTH_GRADE)
-    assert _worst_far_face_margin(printed, depth_only, bend_deg=0.0) > 0.0
+    assert _worst_far_face_margin(
+        printed, depth_only, bend_deg=0.0
+    ) > _worst_far_face_margin(printed, deeper)
 
 
 def test_the_explicit_bands_are_the_spot_face_and_the_reams() -> None:

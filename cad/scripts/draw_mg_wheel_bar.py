@@ -24,6 +24,7 @@ import sys
 from typing import Any
 
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     dimension_name,
     place_view,
@@ -148,6 +149,17 @@ HANGER_CALLOUT_XY = (_sheet_x(SCREW_HOLE_X) + 0.025, FRONT_CENTER[1] + 0.035)
 CLAMP_CALLOUT_XY = (_sheet_x(CLAMP_HOLE_X[0]) + 0.010, FRONT_CENTER[1] + 0.035)
 # Each clearance hole's native drill size prints .XXX.
 HOLE_CALLOUT_PRECISION = {"hw-diam": 3}
+# The clamp screw line's drill-wander shortfall at the worst corner, 0.0527
+# (test_mg_wheel_bar_drawing derives it from the clamp's own modules, which
+# stay out of this part's recipe), stated rounded up as a plain fact (rule
+# 20): mg-wheel-bar RV-08. Numbered, the clamp holes' callout pointing to it
+# (mg_wheel_bar_callouts.CLAMP_HOLE_CALLOUT). Under the front view's
+# dimensions, left of the title block.
+SCREW_LINE_NOTE = (
+    "1. EACH .196 HOLE TO ITS MHA-SH-02 TAP:\n"
+    "   OFFSET UP TO .003 OVER #8 SCREW CLEARANCE."
+)
+SCREW_LINE_NOTE_XY = (0.040, 0.095)
 # The one native through extent reads DRILL THRU ALL, after the size
 # (rule 26: size, then process, then depth).
 DRILL_EXTENT = "DRILL <hw-thru>"
@@ -388,6 +400,13 @@ def build(adapter: Any) -> dict[str, str]:
     # its upper-left end): clear of the title block below and of the depth's
     # callout above.
     add_property_linked_note(adapter, "Isometric View Note", 0.335, 0.125)
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    drawing.ActivateView("")
+    if drawing.ActiveDrawingView is not None:
+        raise RuntimeError("cannot leave view context for the screw-line note")
+    # mg-wheel-bar RV-08 (SCREW_LINE_NOTE).
+    if add_note(adapter, SCREW_LINE_NOTE, *SCREW_LINE_NOTE_XY) is None:
+        raise RuntimeError("screw-line note: InsertNote failed")
 
     return finalize_drawing(
         adapter,
