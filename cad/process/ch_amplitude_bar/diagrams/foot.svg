@@ -20,8 +20,8 @@
 <circle class="cutter" cx="188" cy="58" r="10"/>
 <text class="label" x="206" y="24">end mill</text>
 <path class="leader" d="M210 28 L194 50"/>
-<path class="arrow" d="M120 222 V192"/>
-<text class="label" x="128" y="214">feed +Y</text>
+<path class="arrow" d="M120 192 V222"/>
+<text class="label" x="128" y="214">feed −Y</text>
 <line class="datum" x1="200" y1="64" x2="200" y2="108"/>
 <text class="label" x="182" y="196">X0</text>
 <path class="dims" d="M200 182 H250"/>
