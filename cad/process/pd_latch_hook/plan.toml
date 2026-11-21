@@ -4,19 +4,15 @@
 title = "Latch Hook"
 part = "MHA-PD-14 Latch Hook"
 revision = "placeholder"
-material = "1095 spring steel sheet .032 in +/-.002 in, annealed, ASTM A684; McMaster-Carr 9043K43"
+material = "C26000 cartridge brass strip .032 in +/-.002 in, H02 half hard, ASTM B36, as supplied; McMaster-Carr 8859K86 (2 x 12 in strip). H01 quarter hard and annealed tempers are not acceptable"
 stock = "To be written"
 shop = "../shop.toml"
+stock_refs = ["c260-h02-strip-032x2"]
 
 [[tools]]
 id = "riser-drill-30"
 name = "#30 drill"
 ref = "riser-drill-30"  # Drills #30
-
-[[tools]]
-id = "hardness-test-files-55-65"
-name = "Hardness test files 55/65 HRC"
-ref = "hardness-test-files-55-65"  # drawing cross-check 2026-11-19: 55-63 HRC after hardening
 
 [[tools]]
 id = "pd-latch-hook-former"

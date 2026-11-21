@@ -84,7 +84,7 @@ stock, setups, operations, inspection, and what went wrong the first time.
 | 27 | The summing lever and knife edge | `sm-summing-lever`, `sm-knife-mount`, `sm-vn-knife-hanger-stud`, `sm-vn-knife-mount-dowel`, `sm-vn-boss-hook`, `sm-vn-counter-spring`. The fabrication decision: cast, fabricate, or hog from solid. |
 | 28 | The magnifier | `mg-magnifying-lever`, `mg-magnifying-wheel` (100 mm rim, ×5 via the pressed brass `mg-wheel-drum`), `mg-wheel-axle` + `mg-wheel-axle-spacer`, bracket, clamp, vertical rod, and the purchased music wire `sh-vn-music-wire` (`LeverWire` configuration; McMaster 9666K142) |
 | 29 | The pen mechanism | `pn-pen-frame`, `pn-pen-v-block`, `pn-pen-rod`, the purchased music wire `sh-vn-music-wire` (`PenWire` configuration; McMaster 9666K142), `mg-output-fixture`, and the purchased Sharpie Fine Point marker `pn-vn-pen-marker`. Note: the original was lost; this follows the 2013 reconstruction. |
-| 30 | The paper drive | `pd-platen`, `pd-feed-rack`, `pd-platen-guide`, `pd-platen-bottom-guide`, `pd-platen-clip`, transgear train, `pd-transgear-removable` sprocket configurations + roller chain, `pd-transgear-arm` hanger, `pd-latch-hook` (one-piece formed spring steel, screwed to the support bar) |
+| 30 | The paper drive | `pd-platen`, `pd-feed-rack`, `pd-platen-guide`, `pd-platen-bottom-guide`, `pd-platen-clip`, transgear train, `pd-transgear-removable` sprocket configurations + roller chain, `pd-transgear-arm` hanger, `pd-latch-hook` (one-piece formed half-hard brass, screwed to the support bar) |
 | 31 | Springs | 20 channel springs + the counter spring: winding your own, or specifying them for a spring house |
 | 32 | Fasteners and small parts | The screw families, period-appropriate heads, and what to substitute |
 

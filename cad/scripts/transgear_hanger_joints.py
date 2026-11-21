@@ -492,7 +492,10 @@ def latch_pin_far_face_margin(
     bend_deg: float = HOOK_SPEC.BEND_TOL_DEG,
 ) -> float:
     """Least distance, along the pin, by which the crowned end's full
-    diameter passes the strip's far face over every corner of the stack."""
+    diameter passes the strip's far face over every corner of the stack.
+
+    LATCH_RELEASE_FLEX_WORST below takes the same stack terms at their
+    largest-release corner: a term added or changed here changes there too."""
     signs = (-1.0, 1.0)
     radii = [(LATCH_PIN.DIA + band) / 2.0 for band in LATCH_PIN.DIA_BAND]
     sheet = (-HOOK.SHEET_T_MINUS, HOOK.SHEET_T_PLUS)
@@ -538,6 +541,33 @@ if LATCH_PIN_FAR_FACE_MARGIN_WORST <= 0.0:
     raise AssertionError(
         "MHA-PD-VN-58 pin / MHA-PD-14 strip far face: the pin's full diameter stops"
         f" {-LATCH_PIN_FAR_FACE_MARGIN_WORST:.3f} short at the printed worst case"
+    )
+
+# --- Releasing the latch at the printed worst corner (#2527) -------------------
+# pd_latch_hook_spec holds the owner-ruled criterion (2026-11-20): twice the
+# nominal release flex stays under the H02 minimum yield.  The printed stack
+# can ask more of one release than nominal: the pin's end at its farthest
+# (the arm's tip station and the proud window at their tops) and the strip's
+# near face at its nearest (the far face pulled back by the hook's screw
+# drift, the formed band, the pivot tap and bore float and the ear's lean,
+# with the thickest sheet).  That one release must still not reach yield.
+_U_SPAN = abs(HOOK.ARM_U[0]) + abs(HOOK.ARM_U[1])
+_EAR_LEAN = EAR_BEND_LEVER * math.tan(math.radians(HOOK_SPEC.BEND_TOL_DEG))
+_FAR_FACE_LOW = (
+    HOOK.FAR_FACE_STATION
+    - HOOK_DRIFT_ALONG_U
+    - HOOK_SPEC.FORMED_BAND
+    - (BAR.HOLE_POSITION_BAND * _U_SPAN + _BORE_FLOAT)
+    - _EAR_LEAN * abs(HOOK.ARM_U[0])
+)
+LATCH_RELEASE_FLEX_WORST = (
+    ARM.TIP_STATION + ARM.TIP_STATION_BAND + max(LATCH_PIN_PROUD_RANGE)
+) - (_FAR_FACE_LOW - (HOOK.SHEET_T + HOOK.SHEET_T_PLUS))
+if HOOK_SPEC.RELEASE_FLEX_TO_YIELD < LATCH_RELEASE_FLEX_WORST:
+    raise AssertionError(
+        f"MHA-PD-14 release at the printed worst corner flexes the arm"
+        f" {LATCH_RELEASE_FLEX_WORST:.2f}, past the {HOOK_SPEC.SHEET_TEMPER} yield"
+        f" at {HOOK_SPEC.RELEASE_FLEX_TO_YIELD:.2f}"
     )
 
 

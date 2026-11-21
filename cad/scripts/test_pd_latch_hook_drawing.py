@@ -215,20 +215,48 @@ def test_the_build_constants_sit_on_the_published_geometry() -> None:
     assert flat["top_rear"][0] == drawing.FLAT_GAP == part.FLAT_GAP
 
 
-def test_registry_row_is_the_formed_spring_steel_hook() -> None:
+def test_registry_row_is_the_formed_half_hard_brass_hook() -> None:
+    """#2527 (owner ruling 2026-11-20): C26000 H02 brass as supplied, no
+    heat treatment; the softer tempers are excluded on the sheet."""
     row = _config.parts(part.PART_NAME)
     assert row["number"] == "MHA-PD-14"
     assert int(row["quantity"]) == 1
-    assert "1095" in row["material_specification"]
-    assert "annealed" in row["material_specification"]
-    assert "temper" in row["finish"]
+    assert part.MATERIAL == "Brass"
+    assert "C26000" in row["material_specification"]
+    assert "H02" in row["material_specification"]
+    assert "8859K86" in row["material_specification"]
+    finish = row["finish"].lower()
+    assert "no heat treatment" in finish
+    assert "quarter-hard or annealed brass not acceptable" in finish
+    for text in (row["finish"], row["process"], row["material_specification"]):
+        for word in ("harden", "quench", "HRC", "1095"):
+            assert word not in text
     # The stock is the title block's MATERIAL cell, so no note restates it;
     # the cell holds 30 characters.
     assert row["material"] == spec.MATERIAL_TITLE
     assert len(spec.MATERIAL_TITLE) <= 30
 
 
-_TITLE_BLOCK_TEXT = ("BREAK SHARP EDGES", "DEBURR", "REMOVE BURRS", "1095", "HRC")
+def test_release_overpull_holds_only_from_half_hard_up() -> None:
+    """#2527: twice the release flex stays under the ordered H02 temper's
+    minimum yield on the thickest sheet; quarter hard (H01) would set."""
+    need = spec.RELEASE_OVERPULL * spec.RELEASE_FLEX
+    assert spec.SHEET_TEMPER == "H02"
+    assert spec.RELEASE_FLEX_TO_YIELD >= need
+    assert spec.release_flex_to_yield(spec.SHEET_YIELD_MIN["H01"]) < need
+    assert spec.RELEASE_FLEX == pytest.approx(5.164, abs=0.001)
+    # The printed worst corner's single release (the far-face stack) is
+    # larger than nominal but still under the H02 yield.
+    import transgear_hanger_joints as joints
+
+    worst = joints.LATCH_RELEASE_FLEX_WORST
+    assert spec.RELEASE_FLEX < worst < spec.RELEASE_FLEX_TO_YIELD
+    assert worst == pytest.approx(8.457, abs=0.002)
+
+
+_TITLE_BLOCK_TEXT = (
+    "BREAK SHARP EDGES", "DEBURR", "REMOVE BURRS", "C260", "BRASS", "HEAT TREAT"
+)
 
 
 def test_the_notes_fit_the_note_field_and_leave_the_title_block_its_own() -> None:

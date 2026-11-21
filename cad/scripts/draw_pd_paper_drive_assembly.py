@@ -2766,7 +2766,7 @@ def _step_text(
             f"{s('hanger-meshed', 0)}.",
         ),
         # The hook's pin hole is match-drilled from the pin at that mesh,
-        # then the hook is hardened and refitted with the hole's lower edge on
+        # then the hook is refitted with the hole's lower edge on
         # the pin before its screws are tightened, so the unclamped arm has no
         # room to fall and open the mesh (rack_setup.LATCH_SLACK_ALONG; Codex P1 on
         # b2eb9a0e1).
@@ -2776,13 +2776,12 @@ def _step_text(
             "END BEARS.",
             "REMOVE THE HOOK.",
             f"DRILL ITS PIN HOLE AT THE MARK PER {n['pd-latch-hook']}.",
-            f"HARDEN AND TEMPER THE HOOK PER {n['pd-latch-hook']}.",
             "REFIT THE HOOK WITH ITS PIN HOLE'S LOWER EDGE ON THE PIN.",
             "TIGHTEN THE HOOK SCREWS.",
             "CHECK: PUSHED FIRMLY BY HAND, THE HOOK DOES NOT MOVE ON THE BAR.",
             f"IF IT MOVES, FIT NEW {n['sh-vn-fillister-screw-90280a108']} SCREWS AND "
-            f"REPEAT {s('hook-pin-hole-match-drilled', 4)}-"
-            f"{s('hook-pin-hole-match-drilled', 6)}.",
+            f"REPEAT {s('hook-pin-hole-match-drilled', 3)}-"
+            f"{s('hook-pin-hole-match-drilled', 5)}.",
             "UNCLAMP THE ARM.",
             f"CHECK: THE ARM STAYS LATCHED, THE {n['pd-vn-transgear-latch-pin']} PIN "
             f"STANDING THROUGH THE {n['pd-latch-hook']} HOOK'S PIN HOLE.",
@@ -2791,7 +2790,7 @@ def _step_text(
             "MIDDLE OF THE ENGAGED FEED, THE PLATEN SKIPS NO TOOTH.",
             f"IF A CHECK FAILS, FIT A NEW UNDRILLED {n['pd-latch-hook']} HOOK PER "
             f"{s('latch-hook-fitted', 5)}-{s('latch-hook-fitted', 9)} AND REPEAT "
-            f"{s('hanger-meshed', 0)}-{s('hook-pin-hole-match-drilled', 11)}.",
+            f"{s('hanger-meshed', 0)}-{s('hook-pin-hole-match-drilled', 10)}.",
         ),
         "loaded-rack-geometry-checked": (
             "LOAD THE PAPER.",
@@ -3077,8 +3076,8 @@ def _step_text(
             f"IF A {s('hanger-pivoted', 6)}-{s('hanger-pivoted', 8)} CHECK THEN FAILS, DO "
             f"{s('fitup-mesh-remedied', 6)} AND {s('fitup-mesh-remedied', 14)}-"
             f"{s('fitup-mesh-remedied', 18)}.",
-            f"FOR {s('fitup-accepted', 5)}, REPEAT {s('hook-pin-hole-match-drilled', 9)}-"
-            f"{s('hook-pin-hole-match-drilled', 11)}, THEN FROM STEP {pose}.",
+            f"FOR {s('fitup-accepted', 5)}, REPEAT {s('hook-pin-hole-match-drilled', 8)}-"
+            f"{s('hook-pin-hole-match-drilled', 10)}, THEN FROM STEP {pose}.",
             f"IF {s('fitup-accepted', 7)} OR {s('fitup-accepted', 8)} FAILS, REPEAT "
             f"STEP {steps.step_number('disc-cluster-shimmed')}, THEN FROM STEP "
             f"{steps.step_number('collar-disc-air-inspected')}.",

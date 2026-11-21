@@ -351,7 +351,7 @@ note = "Not made: shop-made. drawing cross-check 2026-11-19: MHA-DT-37 holder fo
 kind = "fixture"
 status = "to_make"
 supply = "shop_made"
-note = "Not made: shop-made. drawing cross-check 2026-11-19: MHA-PD-14 R3.13 ±.02, R.38 ±.02."
+note = "Not made: shop-made. drawing cross-check 2026-11-19: MHA-PD-14 R3.13 ±.02, R.38 ±.02. Formed in H02 C26000 as supplied (#2527), the roll springs back: elastic-plastic springback (Ri/Rf = 4x^3 - 3x + 1, x = Ri Y/(E t); E 16,000 ksi, Y 290-359 MPa, t .032) puts the roll face near R1.63-R1.79 and the tab face near R.34-R.35 for the printed inside R3.13 and R.38; trial-roll an offcut of the same strip and correct the former to the gauge."
 
 [fixtures.pd-platen-clip-bow-former]
 kind = "fixture"
