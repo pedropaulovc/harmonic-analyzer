@@ -6,7 +6,7 @@ part = "MHA-PD-12 Guide Lock"
 revision = "placeholder"
 material = "Low-carbon steel sheet (ASTM A36, AISI 1008/1010 or 1018), 1/16 in, thickness as supplied within +/-.005 in (e.g. McMaster-Carr 1388K196 A36 precision-ground)"
 stock = "To be written"
-shop = "../shop.toml"
+shop = "../shop"
 
 [[tools]]
 id = "drill-1-8"

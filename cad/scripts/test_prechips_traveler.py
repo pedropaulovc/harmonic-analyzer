@@ -190,3 +190,38 @@ def test_missing_uv_fails_clearly(process, monkeypatch):
     assert wrapper.main(["smoke_part", "--out", str(out)]) == 1
     with pytest.raises(RuntimeError, match="uv was not found"):
         wrapper._uv()
+
+
+def test_enrolment_is_every_plan_that_is_not_a_placeholder(tmp_path):
+    import _cam_programs
+
+    for stem, revision in (
+        ("b_part", "{{cad.revision}}"),
+        ("a_part", "A"),
+        ("c_part", "placeholder"),
+    ):
+        (tmp_path / stem).mkdir()
+        (tmp_path / stem / "plan.toml").write_text(
+            f'revision = "{revision}"\n', encoding="utf-8"
+        )
+    (tmp_path / "b_part" / "cam.py").write_text("", encoding="utf-8")
+    assert plans.enrolled_stems(tmp_path) == ("a_part", "b_part")
+    assert _cam_programs.cam_stems(tmp_path) == ("b_part",)
+
+
+def test_an_unreadable_plan_fails_enrolment_naming_it(tmp_path):
+    (tmp_path / "part").mkdir()
+    (tmp_path / "part" / "plan.toml").write_text("revision = \n", encoding="utf-8")
+    with pytest.raises(ValueError, match="unreadable process plan .*part"):
+        plans.enrolled_stems(tmp_path)
+
+
+def test_shop_files_are_the_directory_tomls_prechips_reads(tmp_path):
+    for name in ("pd.toml", "common.toml", ".draft.toml", "notes.txt"):
+        (tmp_path / name).write_text("", encoding="utf-8")
+    (tmp_path / "nested").mkdir()
+    (tmp_path / "nested" / "x.toml").write_text("", encoding="utf-8")
+    assert [path.name for path in plans.shop_files(tmp_path)] == [
+        "common.toml",
+        "pd.toml",
+    ]

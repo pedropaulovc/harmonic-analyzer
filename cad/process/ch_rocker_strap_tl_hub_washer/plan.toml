@@ -6,7 +6,7 @@ part = "MHA-CH-13-TL-03 Rocker Strap Hub Washer"
 revision = "placeholder"
 material = "low-carbon steel round, 9/16 in or over"
 stock = "To be written"
-shop = "../shop.toml"
+shop = "../shop"
 stock_refs = ["1018-round-5-8"]
 
 [[tools]]

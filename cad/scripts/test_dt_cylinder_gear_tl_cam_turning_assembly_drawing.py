@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 import re
-import tomllib
-from pathlib import Path
 
 import pytest
 
 import _buildgraph as bg
+import _process_plans
 import _shop_equipment
 import _config
 import _dt_cylinder_gear_tl_cam_turning_interference as interference
@@ -252,12 +251,9 @@ def test_the_throw_window_keeps_every_gear_inside_its_print() -> None:
     )
     assert len(in_set) == 81 and len(set(blocks)) == len(blocks)
     assert all(round(block, 4) in in_set for block in blocks)
-    cad = Path(__file__).parents[1]
     shop = _shop_equipment.load()
     assert shop["gauges"]["gauge-blocks-mitutoyo"]["kind"] == "gauge_block_set"
-    dti = tomllib.loads((cad / "process" / "shop.toml").read_text("utf-8"))["gauges"][
-        "dti"
-    ]
+    dti = _process_plans.load_shop()["gauges"]["dti"]
     assert fixture.THROW_INDICATOR_DIVISION == pytest.approx(dti["resolution_mm"])
     # The check reads inside the test indicator's range, at its zero.
     assert fixture.THROW_GAP_ERROR_MAX < (dti["range_mm"][1] - dti["range_mm"][0]) / 2.0

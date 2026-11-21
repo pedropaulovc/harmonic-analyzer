@@ -1,7 +1,8 @@
 """Locate CAM recipes and the NC programs they post.
 
-Each enrolled part has a recipe at ``cad/process/<stem>/cam.py`` beside its
-``plan.toml``. ``cam_nc.py`` runs it in headless FreeCAD (``freecadcmd``,
+Each part milled on the CNC mill has a recipe at ``cad/process/<stem>/cam.py``
+beside its enrolled ``plan.toml``; the recipe file is its enrolment (no list
+names the parts). ``cam_nc.py`` runs it in headless FreeCAD (``freecadcmd``,
 FreeCAD's CAM workbench) and writes one G-code file per recipe program, their
 estimated cycle times (``cycle_times.json``) and a ``manifest.json`` binding
 them to their inputs, under ``cad/out/nc/<stem>/``. FreeCAD is part of the
@@ -20,16 +21,22 @@ from types import ModuleType
 import _process_plans
 from export_features import OUT as CAD_OUT, bundle_paths
 
-# The parts milled on the CNC mill, enrolled by the CNC migration; each one's
-# programs are posted by every build and shipped by every release.
-CAM_STEMS: tuple[str, ...] = (
-    "ch_rocker_strap",
-    "mg_magnifying_clamp",
-    "ch_rocker_strap_tl_sub_plate",
-    "sh_column_clamp_front",
-    "sh_column_clamp_back",
-)
-PROCESS_ROOT = Path(__file__).resolve().parents[1] / "process"
+PROCESS_ROOT = _process_plans.PROCESS_ROOT
+
+
+def cam_stems(root: Path = PROCESS_ROOT) -> tuple[str, ...]:
+    """The parts milled on the CNC mill: each ``<stem>`` under ``root`` with a
+    ``cam.py``, sorted. Each one's programs are posted by every build and
+    shipped by every release."""
+    return tuple(sorted(path.parent.name for path in root.glob("*/cam.py")))
+
+
+CAM_STEMS: tuple[str, ...] = cam_stems()
+# A recipe posts its traveler's milled setups: a part with NC has a traveler.
+if _untraveled := sorted(set(CAM_STEMS) - set(_process_plans.TRAVELER_STEMS)):
+    raise ValueError(
+        f"CAM recipes beside no enrolled (non-placeholder) plan: {_untraveled}"
+    )
 SCRIPTS_DIR = Path(__file__).resolve().parent
 # Executed by freecadcmd, never imported on the host: an input of every cam task.
 RUNTIME_PATH = SCRIPTS_DIR / "_freecad_cam_runtime.py"
@@ -46,14 +53,14 @@ def recipe_path(stem: str) -> Path:
 def cam_inputs(stem: str, out: Path = CAD_OUT) -> dict[str, Path]:
     """Every file a posted set depends on, by the name ``manifest.json``
     records its SHA-256 under: the scoped feature bundle (``features``,
-    ``step``), the part's ``plan``, the ``shop`` record, the ``recipe`` and the
-    FreeCAD ``runtime``."""
+    ``step``), the part's ``plan``, each shop file (``shop/<name>.toml``), the
+    ``recipe`` and the FreeCAD ``runtime``."""
     features, step = bundle_paths(stem, out)
     return {
         "features": features,
         "step": step,
         "plan": _process_plans.plan_path(stem),
-        "shop": _process_plans.SHOP_PATH,
+        **{f"shop/{path.name}": path for path in _process_plans.shop_files()},
         "recipe": recipe_path(stem),
         "runtime": RUNTIME_PATH,
     }

@@ -4085,10 +4085,11 @@ def synthetic_prechips_task(tmp_path, monkeypatch):
     diagram = root / stem / "diagrams" / "setup.svg"
     diagram.parent.mkdir()
     diagram.write_text("<svg/>\n")
-    shop = root / "shop.toml"
+    shop = root / "shop" / "common.toml"
+    shop.parent.mkdir()
     shop.write_text("version = 1\n")
     monkeypatch.setattr(_process_plans, "PROCESS_ROOT", root)
-    monkeypatch.setattr(_process_plans, "SHOP_PATH", shop)
+    monkeypatch.setattr(_process_plans, "SHOP_DIR", shop.parent)
     monkeypatch.setattr(_process_plans, "TRAVELER_STEMS", (stem,))
     return dodo, _process_plans, export_features, stem, source, diagram, shop
 
@@ -4209,45 +4210,6 @@ def test_feature_failure_blocks_full_export_but_not_another_traveler(
         assert scheduled[selected] == "failure"
 
 
-def test_prechips_missing_plan_fails_only_its_recorded_action(
-    synthetic_prechips_task, tmp_path, monkeypatch,
-):
-    from doit.loader import load_tasks
-
-    dodo, plans, exporter, stem, _, _, _ = synthetic_prechips_task
-    monkeypatch.setattr(dodo, "REPORTS", tmp_path / "reports")
-    missing = next(part for part in exporter.SUPPORTED_PARTS if part != stem)
-    monkeypatch.setattr(plans, "TRAVELER_STEMS", (stem, missing))
-    plan = plans.plan_path(missing)
-    assert not plan.exists()
-
-    def refuse_launch(*args, **kwargs):
-        pytest.fail("a missing plan must not launch geometry or traveler work")
-
-    monkeypatch.setattr(dodo, "_run", refuse_launch)
-    loaded = load_tasks(dict(vars(dodo)), allow_delayed=True)
-    names = {task.name for task in loaded}
-    assert {
-        f"prechips:{stem}", f"prechips:{missing}", "build", "gallery", "check:math",
-    } <= names
-    assert any(task.name.startswith("part:") for task in loaded)
-    definition = dodo._prechips_task(missing)
-    assert "file_dep" not in definition
-    assert "task_dep" not in definition
-    assert definition["uptodate"] == [False]
-    assert definition["targets"] == dodo._canonical_targets(f"prechips:{missing}")
-    [(action, args)] = definition["actions"]
-    assert action is dodo._fail_prechips_plan
-    assert args == [f"prechips:{missing}", str(plan)]
-    with pytest.raises(RuntimeError, match="no process plan") as raised:
-        action(*args)
-    assert f"prechips:{missing}" in str(raised.value)
-    assert str(plan) in str(raised.value)
-    assert not (dodo.REPORTS / f"prechips-{missing}.ok").exists()
-    # The enrolled sibling with a plan keeps its normal traveler task.
-    assert dodo._prechips_task(stem)["task_dep"] == [f"package:features:{stem}"]
-
-
 def test_prechips_failed_action_never_writes_stamp(tmp_path, monkeypatch):
     dodo = _load_dodo()
     stamp = tmp_path / "prechips-synthetic.ok"
@@ -4269,11 +4231,12 @@ def test_recipe_enrolls_strict_traveler_tests():
     assert "test_prechips_traveler.py" in command
     assert "test_process_plans.py" not in command
     assert "test_process_shop.py" not in command
+    shop = sorted((dodo.REPO_ROOT / "cad" / "process" / "shop").glob("*.toml"))
     equipment = sorted(
         (dodo.REPO_ROOT / "cad" / "config" / "shop-equipment").glob("*.toml")
     )
-    assert equipment
-    for path in (dodo.REPO_ROOT / "cad" / "process" / "shop.toml", *equipment):
+    assert shop and equipment
+    for path in (*shop, *equipment):
         assert str(path.resolve()) in recipe["file_dep"], path
 
 

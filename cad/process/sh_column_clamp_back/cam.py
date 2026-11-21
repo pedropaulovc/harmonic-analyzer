@@ -8,7 +8,7 @@ from the feature export (its width, height, pre-face depth and grip offset,
 both tapped ear holes and the bore); the blank, the skims, face levels,
 spots, pecks, the riser, the bore's finish stock, helix pitch and run past,
 and the pair's front depth and holding from ``plan.toml`` ``[parameters]``
-and ``milling_cuts``; cutter diameters, speeds and feeds from ``shop.toml``
+and ``milling_cuts``; cutter diameters, speeds and feeds from the shop (``shop/``)
 and the plan's authored drill settings. Every path is written here
 (``rt.custom``). Typed here, because neither record carries them: the #2
 centre drill's catalogue geometry, the twist drills' 118° point, the

@@ -6,7 +6,7 @@ part = "MHA-MG-04 Magnifying Vertical Rod"
 revision = "placeholder"
 material = "C36000 brass rod, 7/32 in; MSC Direct 32001166"
 stock = "To be written"
-shop = "../shop.toml"
+shop = "../shop"
 stock_refs = ["c360-round-7-32"]
 
 [[tools]]

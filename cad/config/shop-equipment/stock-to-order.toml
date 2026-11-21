@@ -2,7 +2,7 @@
 # and workholding a process plan names, that the prechips shop schema cannot
 # express. Each fact lives in exactly one
 # file: anything prechips can hold (machines, chucks, measuring ranges and
-# resolutions, tools' sizing data, cutting settings) is in cad/process/shop.toml,
+# resolutions, tools' sizing data, cutting settings) is in cad/process/shop/,
 # and no field here repeats one there. An object may appear in both files with
 # disjoint fields (gauges.dti, gauges.pin-gauges).
 #

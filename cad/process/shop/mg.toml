@@ -1,0 +1,129 @@
+# Magnifier (mg_*) records of the HA prechips shop directory: the tools,
+# cutting settings and stock only mg_* plans name (or mg specs/tests read).
+# Machines, workholding, limits, gauges and every record more than one family
+# names are in common.toml, with the conventions every file follows; prechips
+# merges the directory's files by section and refuses a key defined twice.
+
+# --- MHA-MG-02 magnifying clamp (cad/process/mg_magnifying_clamp/plan.toml) ---
+# The blank: 1/2 in hex brass, alloy not on record (the part registry says
+# "Brass"; owner 2026-11-17, relayed by Main: a piece at least 1.25 in long is
+# on hand). Its settings below read the sources' generic brass rows, so the
+# material key names this bar and asserts no alloy.
+#
+# Facing, the owned 1/2 in 3-flute carbide end mill: The Carbide End Mill
+# Store "Carbide End Mill Speeds and Feeds, General Purpose, Uncoated"
+# (6gtools.com, PDF read 2026-11-17), row Non-Ferrous N, Brass/Bronze: 400
+# SFM, 1/2 in .0042 in/tooth at chip-load factor 1.0 (50 % radial
+# engagement, the clamp's facing passes). 400 × 3.82 / .5 = 3056 rpm, over
+# the spindle's 2800 (machines.pm-30mv), so 2800 (367 ft/min).
+[settings.clamp-em-half-brass]
+tool = "endmill-carbide-3fl-1-2"
+material = "clamp-brass-hex"
+rpm = 2800
+chip_load_mm_per_tooth = 0.10668  # .0042 in; 2800 × 3 × .0042 = 35.3 in/min
+flutes = 3
+feed_unit = "in/min"
+
+# Holes (HSS), speeds: LittleMachineShop "Cutting Speeds", Drilling &
+# Reaming, row Brass (C35600, C37700, C36000, ...): 160-175 ft/min (read
+# 2026-11-17). Feeds per rev: AutoDrill "Suggested drilling feed rates"
+# (autodrill.com/resources/charts/suggested-drilling-feed-rates, read
+# 2026-11-17), row Brass: 1/16 in .001, 1/8 in .003, 1/4 in .004, 1/2 in
+# .008 in/rev; a size between two columns takes the lower column's feed.
+# - #2 centre drill (5/64 pilot, 3/16 body): 160 ft/min is over 3200 rpm on
+#   the body, so 2800; the pilot is under 1/8 in, .001 in/rev: 2.8 in/min.
+# - #43 (.089 in): 160 ft/min is 6870 rpm, so 2800 (65 ft/min); .089 is
+#   between the 1/16 and 1/8 in columns, .001 in/rev: 2.8 in/min.
+# - F (.257 in): 160-175 ft/min is 2378-2601 rpm: 2400 (161 ft/min); .257 is
+#   between the 1/4 and 1/2 in columns, .004 in/rev: 9.6 in/min.
+[settings.clamp-spot-brass]
+tool = "jig-spot"
+material = "clamp-brass-hex"
+rpm = 2800
+feed = "2.8 in/min"
+[settings.clamp-drill-43-brass]
+tool = "jig-drill-43"
+material = "clamp-brass-hex"
+rpm = 2800
+feed = "2.8 in/min"
+[settings.clamp-drill-f-brass]
+tool = "jig-drill-f"
+material = "clamp-brass-hex"
+rpm = 2400
+feed = "9.6 in/min"
+
+# The bore's Ø.257 +.004/0 has no gauge of its class on record (pin gauges
+# and reamers of the size are not owned, owner 2026-11-17). Owner decision
+# 2026-11-17 (relayed by Main): the F drill's shank is the GO and the G
+# drill's shank the NO-GO, each miked first. G (.261 in) is a member of the
+# owned 115-piece index (letter drills A-Z among its 115, as jig-drill-f);
+# diameter_mm is its nominal × 25.4. The pair reads no scale: its
+# resolution is the micrometers' (gauges.micrometers) reading of each shank;
+# its range is the drawing band: the traveler accepts an F shank of
+# .2570-.2575 as the GO and a G shank of .2600-.2610 as the NO-GO.
+# A shank is not ground to a gauge class; an F shank under .2570 cannot be
+# the GO, and the lower limit then rests on the F drill alone.
+[tools.clamp-drill-g]
+description = "G (.261 in) drill, 115-piece index; its shank the bore's NO-GO"
+diameter_mm = 6.6294
+
+# --- Placeholder process plans' tools (quotes-2026-11-17-rev3.xlsx) ----------
+# The tools the placeholder plans name (cad/process/<stem>/plan.toml with
+# revision = "placeholder", not in _process_plans.TRAVELER_STEMS), from the
+# owner's quote workbook quotes-2026-11-17-rev3.xlsx (owner 2026-11-19). The
+# comment on each header cites its workbook row: an Items item_id, a Drills
+# size or a Tap coverage thread. diameter_mm is the drill or reamer's nominal
+# size. Ownership is the inventory's status under the same key
+# (cad/config/shop-equipment/).
+[tools.drill-60]  # Drills #60
+description = "#60 (.0400 in) drill, 115-piece index"
+diameter_mm = 1.016
+[tools.drill-37]  # Drills #37
+description = "#37 (.1040 in) drill, 115-piece index"
+diameter_mm = 2.6416
+[tools.drill-17]  # Drills #17
+description = "#17 (.1730 in) drill, 115-piece index"
+diameter_mm = 4.3942
+[tools.drill-16]  # Drills #16
+description = "#16 (.1770 in) drill, 115-piece index"
+diameter_mm = 4.4958
+[tools.drill-10]  # Drills #10
+description = "#10 (.1935 in) drill, 115-piece index"
+diameter_mm = 4.9149
+[tools.reamer-1865]  # B-reamer-.1865
+description = ".1865 in HSS chucking reamer"
+diameter_mm = 4.7371
+[tools.reamer-1885]  # B-reamer-.1885
+description = ".1885 in HSS chucking reamer"
+diameter_mm = 4.7879
+[tools.reamer-4990]  # B-reamer-.4990
+description = ".4990 in HSS chucking reamer"
+diameter_mm = 12.6746
+
+# --- Drawing cross-check additions (2026-11-19) -------------------------------
+# Tools the v50 drawings call for that the quote workbook left out, from the
+# drawing cross-check of the placeholder plans (2026-11-19) and the owner's
+# rulings of that day. The comment cites the drawing callout or the inventory
+# record that holds the tool's ownership.
+[tools.calipers-12]  # MHA-MG-03 6.59 overall at ±.01
+description = "Calipers, 12 in (8 in or longer reads the 6.59 overall)"
+[tools.form-tool-r024]  # MHA-MG-05 R.024 rim wire groove
+description = "HSS lathe grooving bit ground to a full R.024 (.048 wide) nose"
+[tools.form-tool-r047]  # MHA-MG-06 R .047/.020 FULL R groove
+description = "HSS lathe full-radius grooving bit, nose R.020-.047 (e.g. R.047, .094 wide)"
+[tools.form-tool-r110]  # MHA-MG-04 R.11 TANGENT HEMISPHERE
+description = "R.110 convex dome form tool"
+
+# --- Stock the process plans name (stock_refs) ---------------------------------
+# One record per cad/config/shop-equipment/stock-*.toml key a plan names, so
+# prechips can check each plan's stock_refs. Description only: the ownership
+# status stays in the inventory under the same key (stock assignment audit,
+# owner 2026-11-19).
+[stock.c360-hex-1-2]
+description = "C36000 free-machining brass (360-H02, extruded), hex bar, 1/2 in across flats"
+[stock.c360-hex-7-16]
+description = "C36000 free-machining brass (360-H02, extruded), hex bar, 7/16 in across flats"
+[stock.c360-round-7-16]
+description = "C36000 free-machining brass, round bar, 7/16 in"
+[stock.c360-round-7-32]
+description = "C36000 brass, round bar, 7/32 in"

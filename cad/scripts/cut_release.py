@@ -808,7 +808,7 @@ def stage_nc_programs(stage: Path) -> list[str]:
     not, so a missing or empty output fails the cut, and so does a stale set:
     the CAM manifest must record exactly the current SHA-256 of every input
     ``_cam_programs.cam_inputs`` names (the feature bundle's ``features.toml``
-    and STEP, the part's ``plan.toml``, ``shop.toml``, the recipe and the
+    and STEP, the part's ``plan.toml``, each ``cad/process/shop/`` file, the recipe and the
     FreeCAD runtime), each program's current bytes and the current
     ``cycle_times.json``. A plan or shop edit since the post would otherwise
     ship programs beside a traveler rendered from the newer plan.

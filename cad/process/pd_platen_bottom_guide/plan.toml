@@ -6,7 +6,7 @@ part = "MHA-PD-27 Platen Bottom Guide"
 revision = "placeholder"
 material = "AISI 1018 cold-rolled steel"
 stock = "To be written"
-shop = "../shop.toml"
+shop = "../shop"
 stock_refs = ["1018-square-3-4"]
 
 [[tools]]

@@ -6,7 +6,7 @@ part = "MHA-CH-06 Rocker Arm"
 revision = "placeholder"
 material = "AISI 1018 low-carbon steel"
 stock = "To be written"
-shop = "../shop.toml"
+shop = "../shop"
 
 [[tools]]
 id = "drill-47"

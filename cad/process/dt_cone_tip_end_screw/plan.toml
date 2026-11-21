@@ -8,7 +8,7 @@ part = "MHA-DT-39 Cone Tip End Screw"
 revision = "placeholder"
 material = "18-8 stainless steel, McMaster-Carr 91794A558 (1/4-28 x 5/8 in slotted fillister head screw)"
 stock = "To be written"
-shop = "../shop.toml"
+shop = "../shop"
 
 [[tools]]
 id = "centre-drills-carbide-60"

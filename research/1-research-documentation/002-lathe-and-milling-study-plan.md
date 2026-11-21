@@ -2,7 +2,7 @@
 
 > **Archived plan.** This file preserves an earlier proposal, including tooling
 > assumptions for the former JET lathe, now replaced by the PM-1127VF-LB. Use the
-> [shop file](../../cad/process/shop.toml) for installed equipment.
+> [shop directory](../../cad/process/shop/) for installed equipment.
 > It is not current status, schedule or implementation guidance; see the
 > [Harmonic Analyzer project](https://github.com/users/pedropaulovc/projects/1).
 

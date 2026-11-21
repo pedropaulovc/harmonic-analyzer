@@ -6,7 +6,7 @@ part = "MHA-FR-02 Top Frame"
 revision = "placeholder"
 material = "GRAY IRON, ASTM A48 CLASS 25B"
 stock = "To be written"
-shop = "../shop.toml"
+shop = "../shop"
 stock_refs = ["gray-iron-a48-25b-casting"]
 
 [[tools]]

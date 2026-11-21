@@ -6,7 +6,7 @@ part = "MHA-FR-01 Two-Plate Frame Base"
 revision = "placeholder"
 material = "LOW-CARBON STEEL OR GRAY IRON"
 stock = "To be written"
-shop = "../shop.toml"
+shop = "../shop"
 
 [[tools]]
 id = "jig-drill-43"

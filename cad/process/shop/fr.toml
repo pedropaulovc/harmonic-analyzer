@@ -1,0 +1,65 @@
+# Frame (fr_*) records of the HA prechips shop directory: the tools,
+# cutting settings and stock only fr_* plans name (or fr specs/tests read).
+# Machines, workholding, limits, gauges and every record more than one family
+# names are in common.toml, with the conventions every file follows; prechips
+# merges the directory's files by section and refuses a key defined twice.
+
+# Source: end-bracket.toml and feed-lever.toml; the 2026-11-02 interim
+# routes (MHA-CH-06-TL-28/TL-26 v47), the v48 manifest notes (#29 tap
+# drill, plug-start then bottoming-finish taps) and the archived
+# taps-unc-hand 8-32 plug/bottoming records.
+[tools.jig-tap-8-32-bottoming]
+description = "8-32 UNC bottoming tap (1–2 chamfered threads); T-handle wrench"
+tap_drill_mm = 3.4544
+
+# --- Placeholder process plans' tools (quotes-2026-11-17-rev3.xlsx) ----------
+# The tools the placeholder plans name (cad/process/<stem>/plan.toml with
+# revision = "placeholder", not in _process_plans.TRAVELER_STEMS), from the
+# owner's quote workbook quotes-2026-11-17-rev3.xlsx (owner 2026-11-19). The
+# comment on each header cites its workbook row: an Items item_id, a Drills
+# size or a Tap coverage thread. diameter_mm is the drill or reamer's nominal
+# size. Ownership is the inventory's status under the same key
+# (cad/config/shop-equipment/).
+[tools.drill-8]  # Drills #8
+description = "#8 (.1990 in) drill, 115-piece index"
+diameter_mm = 5.0546
+[tools.frame-clearance-stub-drill]  # G-drill-5-stub; Drills #5
+description = "#5 (.2055) screw-machine-length drill"
+diameter_mm = 5.2197
+[tools.drill-13mm]  # G-drill-13mm; Drills 13 mm
+description = "13 mm drill, shank <= 1/2 in"
+diameter_mm = 13.0
+[tools.drill-33-64]  # G-drill-33-64; Drills 33/64
+description = "33/64 drill, 1/2 in reduced shank"
+diameter_mm = 13.096875
+[tools.tap-10-32-bottoming]  # Tap coverage #10-32 UNF
+description = "#10-32 UNF bottoming hand tap (OSG 1025308)"
+[tools.tap-10-32-plug]  # Tap coverage #10-32 UNF
+description = "#10-32 UNF plug hand tap (OSG 1025200)"
+[tools.frame-spotface-endmill]  # F-spotface-endmill-11-32
+description = "11/32 HSS 2-flute end mill"
+[tools.angle-plate-4]  # F-angle-plate-LMS-5386
+description = "Angle plate 4x4x4 webbed end (LMS 5386)"
+
+# --- Drawing cross-check additions (2026-11-19) -------------------------------
+# Tools the v50 drawings call for that the quote workbook left out, from the
+# drawing cross-check of the placeholder plans (2026-11-19) and the owner's
+# rulings of that day. The comment cites the drawing callout or the inventory
+# record that holds the tool's ownership.
+[tools.drill-51-taper-length]  # MHA-FR-02 #51 DRILL 2X Ø.067 THRU FROM REAM POINT
+description = "#51 (.0670 in) taper-length HSS drill, 2 in flute, 3-3/4 in overall (MSC 63725519)"
+diameter_mm = 1.7018
+[tools.number-stamps]  # MHA-FR-01 STAMP "2" .14 HIGH
+description = "Steel number stamp set, characters about .14 in high"
+[tools.tap-10-32-bottoming-pulley]  # MHA-FR-01 10-32 UNF ↧ 1.81 from the spot face; MHA-FR-02 10-32 UNF ↧ 1.81 from the spot face
+description = "#10-32 UNF bottoming pulley tap, 6 in overall, 4 flutes (Regal 015326AS)"
+
+# --- Stock the process plans name (stock_refs) ---------------------------------
+# One record per cad/config/shop-equipment/stock-*.toml key a plan names, so
+# prechips can check each plan's stock_refs. Description only: the ownership
+# status stays in the inventory under the same key (stock assignment audit,
+# owner 2026-11-19).
+[stock.1020-dom-tube-1x0120]
+description = "1020 DOM mild steel tube, round tube, 1 in OD x .120 in wall"
+[stock.gray-iron-a48-25b-casting]
+description = "gray iron, ASTM A48 class 25B (a class 30B heat also conforms), casting"

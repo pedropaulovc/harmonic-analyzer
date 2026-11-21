@@ -6,7 +6,7 @@ part = "MHA-DT-34 Crank Handle Ferrule"
 revision = "placeholder"
 material = "C36000 free-machining brass rod, 9/16 in"
 stock = "To be written"
-shop = "../shop.toml"
+shop = "../shop"
 stock_refs = ["c360-round-9-16"]
 
 [[tools]]

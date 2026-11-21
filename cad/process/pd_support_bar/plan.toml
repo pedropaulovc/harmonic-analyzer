@@ -6,7 +6,7 @@ part = "MHA-PD-07 Support Bar"
 revision = "placeholder"
 material = "Plain Carbon Steel"
 stock = "To be written"
-shop = "../shop.toml"
+shop = "../shop"
 stock_refs = ["1018-flat-3-8x1-1-4"]
 
 [[tools]]

@@ -8,7 +8,7 @@ from the feature export (planes, sawn ends, notches, pockets, counterbore,
 holes), the same manifest the traveler's ``fence_plate`` adapter binds; the
 blank, the edge stock, levels, widths of cut, hole depths and the holding
 from ``plan.toml`` ``[parameters]`` and ``milling_cuts``; cutter
-diameters, speeds and feeds from ``shop.toml``. Every path is written here
+diameters, speeds and feeds from the shop (``shop/``). Every path is written here
 (``rt.custom``): straight lines a recipe can state exactly. Typed here,
 because neither record carries them: the #2 centre drill's catalogue geometry
 (it sets the spot depth), the twist drills' 118° point, the machine's Z top

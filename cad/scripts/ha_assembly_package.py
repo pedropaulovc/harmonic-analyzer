@@ -11,7 +11,7 @@ that package's): every module-level string as evaluated (whole printed blocks,
 sizes filled in) and every string literal in the source (the pieces of text a
 function assembles at draw time), never a comment or docstring. Each row of
 ``TOOLS`` names a tool by the words the sheets use for it and points at its
-records in cad/process/shop.toml and cad/config/shop-equipment/, so the
+records in the shop directory cad/process/shop/ and cad/config/shop-equipment/, so the
 list carries only tools some sheet still names, says where, and marks each
 from its shop-equipment records' ``status`` (``status()``).
 test_ha_assembly_package fails when a sheet names an instrument, gauge or
@@ -32,13 +32,13 @@ from __future__ import annotations
 import ast
 import importlib
 import re
-import tomllib
 from dataclasses import dataclass
 from functools import cache
 from pathlib import Path
 from typing import Any
 
 import ha_build_sequence as build
+import _process_plans
 import _shop_equipment
 from _assembly_contract import assembly_contract
 from _buildgraph import module_deps_of
@@ -46,8 +46,6 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from ha_harmonic_analyzer_assembly_spec import ASM_NAME, BOM_ORDER
 
 SCRIPTS_DIR = Path(__file__).resolve().parent
-CAD_ROOT = SCRIPTS_DIR.parent
-SHOP_TOML = CAD_ROOT / "process" / "shop.toml"
 DOCUMENT_NAME = "ASSEMBLY.md"
 
 # The machine's assembly packages: every row of the complete machine's BOM,
@@ -207,12 +205,12 @@ TOOLS: tuple[Tool, ...] = (
     Tool(
         "Mill with DRO (PM-30MV)",
         r"\bMILL\b|\bDRO(?:'S)?\b",
-        ("shop.toml:machines.pm-30mv", "shop-equipment:machines.pm-30mv"),
+        ("shop:machines.pm-30mv", "shop-equipment:machines.pm-30mv"),
     ),
     Tool(
         "Lathe (PM-1127VF-LB)",
         r"\bLATHE\b|\bTAILSTOCK\b",
-        ("shop.toml:machines.pm-1127vf-lb", "shop-equipment:machines.pm-1127vf-lb"),
+        ("shop:machines.pm-1127vf-lb", "shop-equipment:machines.pm-1127vf-lb"),
     ),
     Tool("Edge finder", r"\bEDGE[- ]FIND\w*", ("shop-equipment:tools.edge-finder",)),
     Tool("Surface plate", r"SURFACE PLATE", ("shop-equipment:gauges.surface-plate",)),
@@ -251,16 +249,16 @@ TOOLS: tuple[Tool, ...] = (
         ("shop-equipment:gauges.gauge-blocks-mitutoyo",),
     ),
     # Presence is the shop-equipment record's (not owned, owner 2026-11-17);
-    # the range and resolution are shop.toml's.
+    # the range and resolution are the shop directory's.
     Tool(
         "Pin gauges",
         r"GAUGE PINS?|PIN GAUGES?",
-        ("shop.toml:gauges.pin-gauges", "shop-equipment:gauges.pin-gauges"),
+        ("shop:gauges.pin-gauges", "shop-equipment:gauges.pin-gauges"),
     ),
     Tool(
         "Height gauge",
         r"HEIGHT GAUGE",
-        ("shop.toml:gauges.height-gauge", "shop-equipment:gauges.height-gauge"),
+        ("shop:gauges.height-gauge", "shop-equipment:gauges.height-gauge"),
     ),
     Tool(
         "Depth micrometer or depth gauge",
@@ -270,7 +268,7 @@ TOOLS: tuple[Tool, ...] = (
     Tool(
         "Calipers, 6 in, with depth rod",
         r"\bCALIPERS?(?: DEPTH ROD)?\b",
-        ("shop.toml:gauges.calipers", "shop-equipment:gauges.calipers"),
+        ("shop:gauges.calipers", "shop-equipment:gauges.calipers"),
     ),
     Tool(
         "Outside micrometers, 0-3 in",
@@ -280,16 +278,16 @@ TOOLS: tuple[Tool, ...] = (
     Tool(
         "Dial test indicator on a magnetic base",
         r"TEST INDICATOR(?: ON A MAGNETIC BASE)?|MAGNETIC BASE",
-        ("shop.toml:gauges.dti", "shop-equipment:gauges.mag-base"),
+        ("shop:gauges.dti", "shop-equipment:gauges.mag-base"),
     ),
     Tool(
         "Dial indicators on magnetic bases, three at once",
         r"(?:DIAL )?\bINDICATORS?\b",
         (
             "shop-equipment:gauges.dial-indicators",
-            "shop.toml:gauges.dial-indicators",
+            "shop:gauges.dial-indicators",
             "shop-equipment:gauges.digital-indicator",
-            "shop.toml:gauges.digital-indicator",
+            "shop:gauges.digital-indicator",
             "shop-equipment:gauges.mag-base",
         ),
     ),
@@ -403,7 +401,7 @@ if len({tool.name for tool in TOOLS}) != len(TOOLS):
 @cache
 def shop_records() -> dict[str, dict[str, Any]]:
     return {
-        "shop.toml": tomllib.loads(SHOP_TOML.read_text(encoding="utf-8")),
+        "shop": _process_plans.load_shop(),
         "shop-equipment": _shop_equipment.load(),
     }
 
@@ -433,7 +431,7 @@ _LABEL_ORDER = (*STATUS_LABELS.values(), UNRECORDED)
 def status(tool: Tool) -> str:
     """The tool's label from the ``status`` of its shop-equipment records alone.
 
-    shop.toml (prechips) records hold no ownership and ``supply`` is
+    Shop directory (prechips) records hold no ownership and ``supply`` is
     provenance, so neither counts. A row with no records at all is a drawn shop
     tool or one made in the step that names it: TO MAKE.
     """
@@ -627,9 +625,9 @@ def markdown() -> str:
         "## Assembly tools, gauges and consumables",
         "",
         "Every tool the assembly sheets or the fit-up steps above name (Named on: "
-        "the package whose sheets or steps name it), reconciled with cad/process/shop.toml "
+        "the package whose sheets or steps name it), reconciled with cad/process/shop/ "
         "and cad/config/shop-equipment/; the status is read from the shop-equipment "
-        "records alone (shop.toml holds no ownership). OWNED: `status` `on_hand`. "
+        "records alone (cad/process/shop/ holds no ownership). OWNED: `status` `on_hand`. "
         "ORDERED: `not_received` (bought, not yet in the shop). TO BUY: `to_order`. "
         "TO MAKE: `to_make`, or a drawn shop tool or one made in the step that names "
         "it. UNRECORDED: no shop-equipment record, or one without a `status`. Drills, "

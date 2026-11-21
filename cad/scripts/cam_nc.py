@@ -4,7 +4,7 @@
 
 1. Reads the part's exported feature bundle (``cad/out/features/<stem>/``:
    ``features.toml`` and the STEP it binds), ``cad/process/<stem>/plan.toml``
-   and ``cad/process/shop.toml``, and has the recipe
+   and the shop directory ``cad/process/shop/`` (merged), and has the recipe
    (``cad/process/<stem>/cam.py``) derive every number it needs from them.
 2. Writes that context, the recipe's path and its programs to a JSON job spec
    in a fresh staging directory and runs ``freecadcmd`` on
@@ -45,6 +45,7 @@ from typing import Any
 
 import _cam_programs
 import _gcode
+import _process_plans
 import _telemetry
 
 FREECAD_ENV = "HARMONIC_FREECAD"
@@ -257,7 +258,7 @@ def main(argv: list[str] | None = None) -> int:
             if features["step_sha256"] != sha256(step_path):
                 raise ValueError(f"{step_path.name} does not match features.toml step_sha256")
             with _telemetry.span("cam.context", stem=stem):
-                ctx = recipe.context(features, _load_toml(plan_path), _load_toml(inputs["shop"]), str(step_path.resolve()))
+                ctx = recipe.context(features, _load_toml(plan_path), _process_plans.load_shop(), str(step_path.resolve()))
             with _telemetry.span("cam.freecad", stem=stem) as span:
                 freecadcmd = resolve_freecadcmd()
                 result = run_freecad(recipe_path, ctx, recipe.PROGRAMS, staging, freecadcmd, directory / LOG_NAME)

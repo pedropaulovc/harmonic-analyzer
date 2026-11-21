@@ -9,8 +9,8 @@ part without editing a central exporter list. `package:features` is a seat-free
 aggregator depending on every `package:features:<stem>` leaf, not a COM export action.
 This namespace is interim until `solidworks-pool` admits top-level `features` targets; no pool change is included.
 Each leaf's native dependency is its own part, not assemblies or drawing
-artefacts. Parts in `_process_plans.TRAVELER_STEMS` feed their manifest to a
-prechips traveler, and parts in `_cam_programs.CAM_STEMS` feed it and its STEP
+artefacts. Parts with an enrolled (non-placeholder) plan feed their manifest to a
+prechips traveler, and parts with a CAM recipe feed it and its STEP
 to their NC programs (below). Fixture bundles expose drawing requirements too.
 Each leaf writes only its own self-contained bundle:
 
@@ -237,26 +237,32 @@ including after an edit irrelevant to a requirement.
 (see the [prechips README](https://github.com/pedropaulovc/prechips)). Its
 `[cad]` table names the part's scoped manifest,
 `file = "../../out/features/<stem>/features.toml"`, and the prechips adapter
-that reads it; root `shop = "../shop.toml"` names the shared shop file. Text
+that reads it; root `shop = "../shop"` names the shared shop directory. Text
 and numeric fields bind CAD values as `{{cad.<name>}}` and the plan's own
 `[parameters]` as `{{process.<name>}}`; prechips refuses unknown names. A plan
 directory may also hold `diagrams/*.svg` files that the plan names. HA does not
 rewrite, bind or stamp plans: prechips reads the tracked plan and the exported
 manifest directly, with no STEP reader, geometry kernel or hash check.
 
-`cad/process/shop.toml` is the prechips shop file (machines, workholding,
+`cad/process/shop/` is the prechips shop directory (machines, workholding,
 gauges, limits, tools and settings) and holds every fact its schema can
-express. Facts prechips has no field for live in
-`cad/config/shop-equipment/*.toml`,
+express: `common.toml` holds the machines, workholding, limits and gauges and
+every record plans of more than one subsystem family name, and
+`<prefix>.toml` the records only that family names. prechips (0.11.10 and
+later) merges the files by section and refuses a key defined in two of them;
+HA reads it the same way through `_process_plans.load_shop()`. Facts prechips
+has no field for live in `cad/config/shop-equipment/*.toml`,
 read through `cad/scripts/_shop_equipment.py`. An object may appear in both with disjoint
-fields; no field is duplicated. No COM build closure reads either file: neither
+fields; no field is duplicated. No COM build closure reads either directory: neither
 is in a leaf's cache key (AGENTS.md, "Fine-grained config deps"). See
 [`cad/process/README.md`](../../process/README.md).
 
 ## Travelers
 
-`_process_plans.TRAVELER_STEMS` lists the parts with a
-`prechips:<stem>` task. Parts are enrolled by the CNC migration (owner ruling
+`_process_plans.TRAVELER_STEMS`, derived from the plan files, lists the parts
+with a `prechips:<stem>` task: every `cad/process/<stem>/plan.toml` whose
+`revision` is not `"placeholder"` (a plan that cannot be read fails task
+loading, naming it). Parts are enrolled by the CNC migration (owner ruling
 2026-11-17): the machine premise is a CNC mill, the CNC-converted PM-30MV, and
 a manual lathe, the PM-1127VF-LB, so a milled part's hobby sheet is the CNC
 setup sheet for its NC programs. The oblique trammel jig's eight parts, the
@@ -329,12 +335,11 @@ remote-cache-keyed. Because its generator version floats, it always runs when
 requested (`uptodate: [False]`). Its only task dependency is its own
 `package:features:<stem>` leaf. Its file dependencies are every file in the
 plan directory (including the `diagrams/*.svg` setup pictures the hobby sheet
-embeds), `cad/process/shop.toml`, the scoped `features.toml` and the wrapper's
+embeds), every shop directory file, the scoped `features.toml` and the wrapper's
 script closure. Its targets are the stamp
 `cad/out/reports/prechips-<stem>.ok`, `traveler.html`,
 `traveler-hobby.html` and `<slug>-traveler.pdf`; the stamp is removed before each run so a refusal never
-leaves an old stamp. If `cad/process/<stem>/plan.toml` is missing, the graph
-still loads and only that task fails, naming the missing plan.
+leaves an old stamp.
 
 | exit (either profile) | task | meaning |
 |---|---|---|
@@ -367,7 +372,8 @@ requirements needs a prechips adapter release before its traveler passes again.
 
 ## NC programs
 
-`_cam_programs.CAM_STEMS` lists the parts milled on the CNC mill; each has a
+`_cam_programs.CAM_STEMS`, derived from the recipe files, lists the parts
+milled on the CNC mill (each needs an enrolled plan); each has a
 `cad/process/<stem>/cam.py` CAM recipe and a `cam:<stem>` task that posts its
 G-code with headless FreeCAD CAM (`cad/scripts/cam_nc.py`, FreeCAD 1.1 or
 later). `build` and `release` run every enrolled one and `build_bare` runs
@@ -375,7 +381,7 @@ none (owner ruling 2026-11-17). Like a traveler, the task is SolidWorks-free,
 submitter-only (including under the farm executor: no farm worker has
 FreeCAD) and not remote-cache-keyed, and its only task dependency is its own
 `package:features:<stem>` leaf. Its file dependencies are the recipe, its
-plan, `cad/process/shop.toml`, the scoped `features.toml` and STEP, the
+plan, every shop directory file, the scoped `features.toml` and STEP, the
 FreeCAD runtime script and the driver's script closure, so a CAD change
 re-posts the programs. Its targets are the stamp
 `cad/out/reports/cam-<stem>.ok` and, under `cad/out/nc/<stem>/`, one
@@ -399,7 +405,7 @@ or one older than its part's `features/<stem>/features.toml`, fails the cut
 before anything is zipped; the HTML sheets do not ship. So does a missing or
 empty NC output, a program or `cycle_times.json` whose SHA-256 differs from
 the CAM manifest, or a CAM manifest recording any input other than the
-current one (`features.toml`, the STEP, `plan.toml`, `shop.toml`, the recipe
+current one (`features.toml`, the STEP, `plan.toml`, each shop file, the recipe
 or the FreeCAD runtime; the refusal names the file), so programs posted from
 an older plan never ship beside a traveler rendered from the newer one;
 `freecadcmd.log` does not

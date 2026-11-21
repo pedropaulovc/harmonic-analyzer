@@ -3865,6 +3865,7 @@ def _collected_tests() -> list[Path]:
 
 def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
     import _cam_programs
+    import _process_plans
     import _shop_equipment
 
     review_bench = REPO_ROOT / "tools" / "machinist-review-evals" / "machinist_review_bench.py"
@@ -3933,7 +3934,7 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
                 for path in (SCRIPTS_DIR / "testdata" / "review-carry").glob("*.pdf")
             ),
             # Shop-equipment contracts read the tracked shop records at runtime.
-            str((REPO_ROOT / "cad" / "process" / "shop.toml").resolve()),
+            *(str(path.resolve()) for path in _process_plans.shop_files()),
             *(str(path.resolve()) for path in _shop_equipment.files()),
             # test_cam_nc loads each CAM recipe by path (importlib, outside
             # cad/scripts) and reads its plan's milling cuts at runtime.
@@ -4454,12 +4455,6 @@ def task_check():
     yield from _machinist_review_tasks()
 
 
-def _fail_prechips_plan(label: str, plan: str) -> None:
-    """Fail only the selected traveler whose authored plan is missing."""
-    with _telemetry.span("task", label=label, service=_stage_name(label)):
-        raise RuntimeError(f"{label}: no process plan at {plan}; author it before enrolling")
-
-
 def _prechips_task(stem: str) -> dict[str, Any]:
     import _process_plans
     from export_features import SUPPORTED_PARTS, bundle_paths
@@ -4468,15 +4463,6 @@ def _prechips_task(stem: str) -> dict[str, Any]:
     label = f"prechips:{stem}"
     plan = _process_plans.plan_path(stem)
     targets = _canonical_targets(label)
-    if not plan.is_file():
-        # A missing plan fails this traveler alone, before exporting its geometry.
-        return {
-            "name": stem,
-            "actions": [(_fail_prechips_plan, [label, str(plan)])],
-            "targets": targets,
-            "uptodate": [False],
-            "verbosity": 2,
-        }
     cmd = [
         sys.executable, str(SCRIPTS_DIR / "prechips_traveler.py"),
         stem, "--out", str(CAD_OUT),
@@ -4488,7 +4474,7 @@ def _prechips_task(stem: str) -> dict[str, Any]:
             # The plan directory also holds the diagrams/*.svg setup pictures
             # the hobby traveler embeds.
             *(str(path.resolve()) for path in plan.parent.rglob("*") if path.is_file()),
-            str(_process_plans.SHOP_PATH.resolve()),
+            *(str(path.resolve()) for path in _process_plans.shop_files()),
             str(manifest.resolve()),
             *_executed_closure(cmd),
         }),

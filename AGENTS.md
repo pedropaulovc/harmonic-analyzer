@@ -104,7 +104,7 @@ being measured:
 | campaign assets, costs and copy maturity | the relevant file under `kickstarter/` |
 | website implementation coverage | `web/src/` + `web/DESIGN.md` |
 | AI-story structure, post maturity and evidence | `ai-story/outline.md` + `ai-story/posts/` + `ai-story/evidence/` |
-| installed shop equipment | `cad/process/shop.toml` (prechips records) + `cad/config/shop-equipment/*.toml` (facts prechips has no field for); one fact in one file, never a field in both |
+| installed shop equipment | `cad/process/shop/*.toml` (prechips records: `common.toml` plus one file per subsystem family) + `cad/config/shop-equipment/*.toml` (facts prechips has no field for); one fact in one file, never a field in both |
 
 When work changes a domain fact, update its repository source first. Then update
 the issue or project item and link the commit, entry or source file. A project
@@ -458,9 +458,11 @@ it checks part identity, the adjacent STEP name and sha256, a non-empty features
 table and each feature's face set against that STEP; neither it nor
 `export_features` validates against a prechips schema.
 
-Each part in `_process_plans.TRAVELER_STEMS` (that tuple is the enrolment
-list; the rocker strap, `ch_rocker_strap`, is the first part enrolled under the
-CNC premise) has a `prechips:<stem>` task. Its hobby sheet is the part's CNC
+Each part whose `cad/process/<stem>/plan.toml` is not a placeholder (no
+`revision = "placeholder"`; `_process_plans.TRAVELER_STEMS` is derived from the
+plan files, so enrolling is writing the plan; the rocker strap, `ch_rocker_strap`,
+is the first part enrolled under the CNC premise) has a `prechips:<stem>` task.
+Its hobby sheet is the part's CNC
 setup sheet: the setups, workholding and zeros the NC programs assume.
 `build` runs every one, so each build that
 produces the drawing PDFs also produces the traveler PDFs; `build_bare` runs
@@ -470,7 +472,7 @@ bundle (owner ruling 2026-11-14, superseding the 2026-11-11 ruling that releases
 carry no travelers). prechips still stays out of `uv.lock`
 ([#2502](https://github.com/pedropaulovc/harmonic-analyzer/issues/2502): every
 prechips release changed the lock, which until #2882 re-keyed every `check:machinist_review:*`).
-The plans, `cad/process/shop.toml` and the setup pictures stay in HA. The task runs
+The plans, the shop directory `cad/process/shop/` and the setup pictures stay in HA. The task runs
 `cad/scripts/prechips_traveler.py <stem>`, which runs prechips outside the
 project environment with uv's tool runner, always the latest PyPI release:
 `uv tool run --from prechips@latest` resolves that release (`@latest` revalidates
@@ -494,21 +496,22 @@ hash certificate. The plan reads its CAD values from the part's
 `features.toml`, which must exist under `cad/out/features/<stem>/` (from a
 build's `package:features:<stem>` leaf, the task's only dependency, or copied
 from a release asset's `features/<stem>/`), and its machines, tools, settings
-and gauges from `cad/process/shop.toml`. Run `uv run --frozen python -m doit prechips:<stem>` for
+and gauges from the shop directory `cad/process/shop/` (prechips merges its
+`*.toml` by section and refuses a key defined in two files; HA reads it through
+`_process_plans.load_shop()`). Run `uv run --frozen python -m doit prechips:<stem>` for
 an enrolled part, or by hand
 `uvx --from prechips@latest prechips traveler cad/process/<stem>/plan.toml --profile hobby --out <file>`.
 Owner rulings (Pedro): the prechips cutover is a
 clean cutover that deleted the legacy machinery, including the #1413
 placeholder release refusal and the PROVISIONAL sheet stamp; and for prechips
 shop data, "no pedantism of not measured value inferred; if it is in the
-inputs they will be considered" (2026-11-10). `shop.toml` values are used as
+inputs they will be considered" (2026-11-10). Shop values are used as
 written, with no measured/placeholder provenance, and they are HA's own
 recorded values (the deleted inventory's, where it had one; tool diameters stay
 nominal), not prechips example values. Only exit 0 from both profiles and a printed
 PDF passes; exit 2 from either profile is a prechips refusal (bad input or a failed
 enforced check) and leaves no traveler file nor a stamp. The task is not cache-keyed and always runs when asked
-(`uptodate: [False]`), because its generator version floats. A stem without a
-plan fails only its own task. Each plan's `[cad]` table names a neutral prechips
+(`uptodate: [False]`), because its generator version floats. Each plan's `[cad]` table names a neutral prechips
 adapter and the manifest's `part` id; see `cad/process/README.md` for
 which release brought each binding. prechips adapters are tied to the manifest's
 contents, so a drawing change that alters a part's manifest requirements needs
@@ -516,7 +519,8 @@ a prechips adapter release before that part's traveler passes again.
 A generated traveler is not machining approval.
 See [feature exports and travelers](cad/docs/pipeline/features-travelers.md).
 
-Each part in `_cam_programs.CAM_STEMS` (the enrolment list; the rocker strap
+Each part with a `cad/process/<stem>/cam.py` (`_cam_programs.CAM_STEMS` is
+derived from the recipe files, and each needs an enrolled plan; the rocker strap
 is the first) has a `cam:<stem>` task, run by `cad/scripts/cam_nc.py`.
 `build` and `release` run every one (`build_bare` none), on the submitter
 like `prechips:<stem>` and `gallery`: no farm worker has FreeCAD, so the
@@ -526,7 +530,7 @@ ships each part's outputs under `nc/<stem>/` beside
 stale. Its recipe,
 `cad/process/<stem>/cam.py`, derives every part dimension, cut step, cutter
 diameter, speed and feed from the part's `features.toml`, its `plan.toml` and
-`cad/process/shop.toml`; constants that neither record carries are named in
+the shop directory; constants that neither record carries are named in
 the recipe. The driver writes the recipe's context to a JSON job spec and runs
 headless FreeCAD (`freecadcmd` 1.1+, from `$HARMONIC_FREECAD` or the newest
 discovered `FreeCAD <version>` install; it fails loud when there is none) on
@@ -1269,10 +1273,10 @@ fit-class edit reaches only consumers that import that class. Drawing tolerances
 come from the model/spec, not separate text renderers.
 
 **Shop TOML files.** `cad/config/shop-equipment/*.toml` and
-`cad/process/shop.toml` are in no COM leaf's cache key, so no part, assembly or
-drawing closure may read them. The inventory directory is read only through
-`_shop_equipment.load()` (it merges the files by section and refuses a record
-key found in two files). The readers (`_shop_equipment.py`,
+`cad/process/shop/*.toml` are in no COM leaf's cache key, so no part, assembly or
+drawing closure may read them. Both directories are read only through
+`_shop_equipment.load()` and `_process_plans.load_shop()` (each merges its
+files by section and refuses a record key found in two files). The readers (`_shop_equipment.py`,
 `ha_assembly_package.py`, `_process_plans.py`, `cam_nc.py`) run outside every
 COM leaf, and `check:recipe` fails if one joins a part, assembly, drawing,
 soundness, feature or export closure

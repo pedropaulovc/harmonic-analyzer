@@ -17,8 +17,18 @@ REGISTRY = {"gear": {"number": "MHA-XX-01", "process": "turned"}}
 
 def test_every_plan_names_a_live_made_part_and_known_stock() -> None:
     # A retired or vendor (-vn-) stem, an unknown stock key, or a tool ref missing
-    # from shop.toml raises InventoryError.
+    # from the shop raises InventoryError.
     stock_bom.build_bom(_config.parts(), stock_bom.load_stock(), stock_bom.load_plans())
+
+
+def test_a_shop_key_in_two_files_is_refused(tmp_path) -> None:
+    # prechips refuses it too: one record, one file.
+    (tmp_path / "common.toml").write_text("[tools.t]\n", encoding="utf-8")
+    (tmp_path / "pd.toml").write_text("[tools.t]\n[tools.u]\n", encoding="utf-8")
+    with pytest.raises(
+        stock_bom._shop_equipment.DuplicateRecordError, match="common.toml and pd.toml"
+    ):
+        stock_bom._process_plans.load_shop(tmp_path)
 
 
 def test_complementary_rows_report_the_missing_stock() -> None:
@@ -108,8 +118,9 @@ def test_tool_ownership_follows_the_shared_equipment_key(tmp_path, monkeypatch) 
         '[[tools]]\nid = "e"\nname = "to make"\nref = "t-make"\n',
         encoding="utf-8",
     )
-    shop = tmp_path / "shop.toml"
-    shop.write_text(
+    shop = tmp_path / "shop"
+    shop.mkdir()
+    (shop / "common.toml").write_text(
         "[tools.t-owned]\n[tools.t-buy]\n[tools.t-shop]\n[tools.t-make]\n",
         encoding="utf-8",
     )
@@ -144,8 +155,9 @@ def test_an_unknown_tool_status_is_refused(tmp_path, monkeypatch) -> None:
         '[cad]\npart = "part-a"\n[[tools]]\nid = "a"\nname = "x"\nref = "t"\n',
         encoding="utf-8",
     )
-    shop = tmp_path / "shop.toml"
-    shop.write_text("[tools.t]\n", encoding="utf-8")
+    shop = tmp_path / "shop"
+    shop.mkdir()
+    (shop / "common.toml").write_text("[tools.t]\n", encoding="utf-8")
     equipment = tmp_path / "equipment"
     equipment.mkdir()
     (equipment / "tools.toml").write_text(
@@ -159,11 +171,12 @@ def test_an_unknown_tool_status_is_refused(tmp_path, monkeypatch) -> None:
 def _plan_dir(tmp_path, monkeypatch, plan: str, shop: str, equipment: str):
     (tmp_path / "part_a").mkdir()
     (tmp_path / "part_a" / "plan.toml").write_text(plan, encoding="utf-8")
-    (tmp_path / "shop.toml").write_text(shop, encoding="utf-8")
+    (tmp_path / "shop").mkdir()
+    (tmp_path / "shop" / "common.toml").write_text(shop, encoding="utf-8")
     (tmp_path / "equipment").mkdir()
     (tmp_path / "equipment" / "inventory.toml").write_text(equipment, encoding="utf-8")
     monkeypatch.setattr(stock_bom._process_plans, "PROCESS_ROOT", tmp_path)
-    return tmp_path / "shop.toml", tmp_path / "equipment"
+    return tmp_path / "shop", tmp_path / "equipment"
 
 
 def test_tools_and_gauges_read_ownership_from_any_inventory_section(
@@ -192,7 +205,7 @@ def test_tools_and_gauges_read_ownership_from_any_inventory_section(
         ("t-fixture", "to_make"),
         ("t-tape", "on_hand"),
     ]
-    # Setup and operation checks, in plan order, each gauge once; a shop.toml
+    # Setup and operation checks, in plan order, each gauge once; a shop
     # gauge with no inventory record is unrecorded.
     assert [(g.ref, g.status.value) for g in plan.gauges] == [
         ("g-owned", "on_hand"),
@@ -217,7 +230,7 @@ def test_tools_and_gauges_read_ownership_from_any_inventory_section(
 @pytest.mark.parametrize(
     ("shop", "equipment", "message"),
     [
-        ("[tools.t]\n", "", "gauge ref 'g' not in shop.toml"),
+        ("[tools.t]\n", "", "gauge ref 'g' not in the shop"),
         (
             "[tools.t]\n[gauges.g]\n",
             '[tools.g]\nstatus = "on_hand"\n[gauges.g]\nstatus = "on_hand"\n',
@@ -268,7 +281,7 @@ def test_a_placeholder_plans_tools_appear_unenrolled(tmp_path, monkeypatch) -> N
         '[gauges.pins]\nstatus = "to_order"\n',
     )
     monkeypatch.setattr(stock_bom._process_plans, "TRAVELER_STEMS", ())
-    plans = stock_bom.load_plans(shop_path=shop, equipment_dir=equipment)
+    plans = stock_bom.load_plans(shop_dir=shop, equipment_dir=equipment)
     assert plans["part-a"].tools == (
         stock_bom.ToolLine("pins", "pins", stock_bom.ToolStatus.TO_ORDER),
     )

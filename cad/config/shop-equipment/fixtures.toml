@@ -2,7 +2,7 @@
 # and workholding a process plan names, that the prechips shop schema cannot
 # express. Each fact lives in exactly one
 # file: anything prechips can hold (machines, chucks, measuring ranges and
-# resolutions, tools' sizing data, cutting settings) is in cad/process/shop.toml,
+# resolutions, tools' sizing data, cutting settings) is in cad/process/shop/,
 # and no field here repeats one there. An object may appear in both files with
 # disjoint fields (gauges.dti, gauges.pin-gauges).
 #
@@ -60,7 +60,7 @@ note = "Height and trigger travel not published. Tools probed on it must land on
 # --- workholding ------------------------------------------------------------
 
 # Make, SKU and source only: the vise's jaw width, opening, jaw height and bed
-# height are prechips shop facts in cad/process/shop.toml workholding.vise-pm-6.
+# height are prechips shop facts in cad/process/shop/ workholding.vise-pm-6.
 [fixtures.vise-pm-6]
 make = "Precision Matthews"
 sku = "VISE-6in-HIGHPREC"
@@ -150,7 +150,7 @@ note = "The three makerspace blocks are the makerspace's, kept there (location b
 # Tegara's "base has two removable alignment keys that are exactly the T-slot
 # width"; "Fixed jaw indicated to under 0.001 in across its 4 in length".
 # Model numbers and dimensions are not read off the vises yet, so neither has
-# a cad/process/shop.toml workholding record a plan could size a setup from.
+# a cad/process/shop/ workholding record a plan could size a setup from.
 [fixtures.vise-makerspace-tegara-4]
 name = "Tegara 4 in milling vise (label reads \"440V\"), removable T-slot alignment keys"
 kind = "vise"

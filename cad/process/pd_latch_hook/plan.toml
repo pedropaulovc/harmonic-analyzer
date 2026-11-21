@@ -6,7 +6,7 @@ part = "MHA-PD-14 Latch Hook"
 revision = "placeholder"
 material = "1095 spring steel sheet .032 in +/-.002 in, annealed, ASTM A684; McMaster-Carr 9043K43"
 stock = "To be written"
-shop = "../shop.toml"
+shop = "../shop"
 
 [[tools]]
 id = "riser-drill-30"

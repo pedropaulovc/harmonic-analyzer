@@ -27,7 +27,7 @@ import export_features
 
 STEM = "ch_rocker_strap_tl_sub_plate"
 PLAN = tomllib.loads(_process_plans.plan_path(STEM).read_text(encoding="utf-8"))
-SHOP = tomllib.loads(_process_plans.SHOP_PATH.read_text(encoding="utf-8"))
+SHOP = _process_plans.load_shop()
 P = PLAN["parameters"]
 # prechips stations run from the plate's left sawn end; the model's X0 is the
 # stop face, .5 in in from it.

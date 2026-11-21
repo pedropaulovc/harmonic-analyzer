@@ -6,7 +6,7 @@ part = "MHA-SM-03 Summing Lever"
 revision = "placeholder"
 material = "GRAY IRON, ASTM A48 CLASS 40C"
 stock = "To be written"
-shop = "../shop.toml"
+shop = "../shop"
 
 [[tools]]
 id = "drill-50"

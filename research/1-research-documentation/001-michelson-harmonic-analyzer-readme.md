@@ -1,7 +1,7 @@
 # Michelson Harmonic Analyzer README
 
 > **Historical research.** The JET lathe references below predate its replacement
-> by the PM-1127VF-LB. Use the [shop file](../../cad/process/shop.toml)
+> by the PM-1127VF-LB. Use the [shop directory](../../cad/process/shop/)
 > for installed equipment. This research is not current status or schedule; see
 > the [Harmonic Analyzer project](https://github.com/users/pedropaulovc/projects/1).
 

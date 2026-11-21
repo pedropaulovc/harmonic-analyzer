@@ -6,7 +6,7 @@ part = "MHA-SM-01 Gooseneck"
 revision = "placeholder"
 material = "4130-N seamless steel tube, 1/2 in OD x 0.065 in wall (OnlineMetals 7322)"
 stock = "To be written"
-shop = "../shop.toml"
+shop = "../shop"
 stock_refs = ["4130n-tube-1-2x0065"]
 
 [[tools]]

@@ -6,7 +6,7 @@ part = "MHA-PD-26 Feed Rack"
 revision = "placeholder"
 material = "SDP/SI A 1B12-Y324 brass rack stock, 32DP PA20, 48 in, 3/16 in square"
 stock = "To be written"
-shop = "../shop.toml"
+shop = "../shop"
 
 [[tools]]
 id = "drill-3-64"

@@ -1,0 +1,40 @@
+# Pen (pn_*) records of the HA prechips shop directory: the tools,
+# cutting settings and stock only pn_* plans name (or pn specs/tests read).
+# Machines, workholding, limits, gauges and every record more than one family
+# names are in common.toml, with the conventions every file follows; prechips
+# merges the directory's files by section and refuses a key defined twice.
+
+# --- Placeholder process plans' tools (quotes-2026-11-17-rev3.xlsx) ----------
+# The tools the placeholder plans name (cad/process/<stem>/plan.toml with
+# revision = "placeholder", not in _process_plans.TRAVELER_STEMS), from the
+# owner's quote workbook quotes-2026-11-17-rev3.xlsx (owner 2026-11-19). The
+# comment on each header cites its workbook row: an Items item_id, a Drills
+# size or a Tap coverage thread. diameter_mm is the drill or reamer's nominal
+# size. Ownership is the inventory's status under the same key
+# (cad/config/shop-equipment/).
+[tools.ignition-wrenches]  # F-ignition-wrenches
+description = "Open-end wrench, 5/32 in (ignition size)"
+
+# --- Drawing cross-check additions (2026-11-19) -------------------------------
+# Tools the v50 drawings call for that the quote workbook left out, from the
+# drawing cross-check of the placeholder plans (2026-11-19) and the owner's
+# rulings of that day. The comment cites the drawing callout or the inventory
+# record that holds the tool's ownership.
+[tools.chamfer-mill-1-2-90]  # MHA-PN-05 2X 45° V, (.20) deep
+description = "1/2 in 90° included chamfer mill"
+diameter_mm = 12.7
+[tools.endmill-5-64-long]  # MHA-PN-01 window corners R.040 max
+description = "5/64 in 2-flute end mill, 5/16 in or more of reach"
+diameter_mm = 1.984375
+
+# --- Stock the process plans name (stock_refs) ---------------------------------
+# One record per cad/config/shop-equipment/stock-*.toml key a plan names, so
+# prechips can check each plan's stock_refs. Description only: the ownership
+# status stays in the inventory under the same key (stock assignment audit,
+# owner 2026-11-19).
+[stock.1018-flat-1-8x3-4]
+description = "1018 cold-finish carbon steel, flat bar, 1/8 x 3/4 in"
+[stock.c360-flat-3-8x1-1-4]
+description = "C36000 free-machining brass (360-H02, extruded), flat bar, 3/8 x 1-1/4 in"
+[stock.c360-square-5mm-key]
+description = "C36000 brass key stock, DIN 6880 undersized, square bar, 5 x 5 mm"

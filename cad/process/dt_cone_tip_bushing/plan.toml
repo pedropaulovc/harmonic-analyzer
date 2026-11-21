@@ -6,7 +6,7 @@ part = "MHA-DT-38 Cone Tip Bushing"
 revision = "placeholder"
 material = "C36000 free-machining brass"
 stock = "To be written"
-shop = "../shop.toml"
+shop = "../shop"
 stock_refs = ["c360-round-1-4"]
 
 [[tools]]

@@ -6,7 +6,7 @@ part = "MHA-PD-10 Feed Pinion Sleeve"
 revision = "placeholder"
 material = "SAE 1018 CF bar, ASTM A108-24"
 stock = "To be written"
-shop = "../shop.toml"
+shop = "../shop"
 stock_refs = ["1018-round-1-2"]
 
 [[tools]]

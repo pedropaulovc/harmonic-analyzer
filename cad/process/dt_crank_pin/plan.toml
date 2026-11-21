@@ -6,7 +6,7 @@ part = "MHA-DT-09 Crank Pin"
 revision = "placeholder"
 material = "AISI 1018 cold-finished steel rod"
 stock = "To be written"
-shop = "../shop.toml"
+shop = "../shop"
 stock_refs = ["1018-round-1-4"]
 
 [[tools]]

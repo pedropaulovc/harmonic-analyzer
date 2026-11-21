@@ -8,7 +8,7 @@ typed here: the thickness, hub hole and outline come from the manifest (and
 its STEP, which FreeCAD profiles); the blank, the part's place in it, the
 face stock split, the tape, skin and depth levels, the plate's relief, fence
 notches and the bushing from ``plan.toml`` ``[parameters]`` and
-``milling_cuts``; cutter diameters, speeds and feeds from ``shop.toml``.
+``milling_cuts``; cutter diameters, speeds and feeds from the shop (``shop/``).
 Typed here, because neither record carries them: the #2 centre drill's
 catalogue geometry (it sets the spot depth), the approach clearance, the face
 overhang past the blank's edges, the face-1 least skin, the safe and

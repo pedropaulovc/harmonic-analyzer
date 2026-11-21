@@ -6,7 +6,7 @@ part = "MHA-CH-13-TL-02 Rocker Strap Hub Plug"
 revision = "placeholder"
 material = "6061 aluminum round, 9/16 in or over"
 stock = "To be written"
-shop = "../shop.toml"
+shop = "../shop"
 stock_refs = ["6061-flat-1x3"]
 
 [[tools]]

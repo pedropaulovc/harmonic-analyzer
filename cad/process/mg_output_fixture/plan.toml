@@ -6,7 +6,7 @@ part = "MHA-MG-06 Output Fixture"
 revision = "placeholder"
 material = "C36000 free-cutting brass"
 stock = "To be written"
-shop = "../shop.toml"
+shop = "../shop"
 stock_refs = ["c360-hex-7-16"]
 
 [[tools]]

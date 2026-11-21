@@ -4,7 +4,7 @@
 # quotes-2026-11-17-rev3.xlsx (owner 2026-11-19): its Tap coverage sheet for
 # the owned taps (members of tools.taps-zoro-wb7365521946), its Items rows for
 # the taps to buy; or from an owner ruling, which its note cites. Descriptions
-# are cad/process/shop.toml under the same key; no field here repeats one
+# are cad/process/shop/ under the same key; no field here repeats one
 # there. TOML, deliberately not YAML; no COM build closure reads it: it is in
 # no leaf's cache key.
 
