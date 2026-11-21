@@ -118,7 +118,8 @@ LEVER_THICKNESS_TOLERANCE = 0.0508  # +/-.002
 # The error budget (error_budget.yaml lever_bar_pin_arm /
 # lever_spring_hook_arm) allocates the same band, ~1/6 and ~1/7 of each
 # arm's allowable. Delegated ruling 2026-11-07 (Main), no precedent; owner
-# review #2144 (Q1-A) -- pending owner confirmation.
+# review #2144 (Q1-A); confirmed by owner ruling 2026-11-20 (#2351) with
+# check:budget passing at these bands.
 BAR_PIN_X_TOLERANCE = printed_band_mm(3, unit=UNIT)  # +/-.005
 LEVER_SPRING_X_TOLERANCE = printed_band_mm(3, unit=UNIT)  # +/-.005
 # The 20 hubs stack face to face between the fulcrum keepers.  A hub may only

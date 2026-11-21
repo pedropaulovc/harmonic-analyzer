@@ -1,12 +1,13 @@
 ch-pivot-shaft:
   number: MHA-CH-05
   material: Plain Carbon Steel
-  material_specification: AISI 1018 cold-finished steel bar, Ø5/16 in
+  material_specification: AISI 1018 steel, precision-ground rod, Ø1/4 in
   finish: machined, oiled
   quantity: 1
   tolerance_class: machined_block
   fit_class: shaft_in_bushing
-  process: "turned from Ø5/16 in bar (steel): O.D. turned to the running band over the full length, chuck and tailstock centre with a follow rest; both ends faced to length and domed on the lathe; two set-screw flats milled in line, one side"
+  # Owner ruling 2026-11-20 (#2346): "Buy ground rod; it costs little and leaves the fit stacks alone."
+  process: "cut from Ø1/4 in precision-ground rod (steel), O.D. as supplied; both ends faced to length and domed on the lathe; two set-screw flats milled in line, one side"
   drawing_unit: in
   machinist_exceptions:
     - id: "RV-01"

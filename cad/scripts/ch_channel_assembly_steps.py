@@ -30,23 +30,22 @@ NORTH_BRACKET_SET_REF = dt_drive_train_steps.step_ref(NORTH_BRACKET_SET_KEY)
 CYLINDER_STACK_KEY = "cylinder-stack-accepted"
 CYLINDER_STACK_REF = dt_drive_train_steps.step_ref(CYLINDER_STACK_KEY)
 RODS_PINNED_KEY = "rod-forks-pinned"
-# The pivot shaft's set screws are run onto its flats, then staked.
-PIVOT_SET_SCREWS_STAKED_KEY = "pivot-set-screws-staked"
+# The pivot shaft's set screws are run onto its flats and left unstaked: the
+# shaft comes out to change one channel part (owner ruling 2026-11-20, #2397).
 # The fulcrum shaft's end keepers (MHA-CH-07) come finished to their own
 # print (#2338: no pair ream); the pair is set on the top frame by DRO with
 # the shaft through both (the frame's keeper taps are transferred from the
 # foot holes), the shaft is checked to slide through both once they are
-# screwed down, and the set screws are staked once the shaft carries the
-# lever bank.
+# screwed down, and the set screws are driven onto its flats once the shaft
+# carries the lever bank, unstaked (#2397, as the pivot shaft's).
 KEEPERS_SET_KEY = "fulcrum-keepers-set"
 KEEPERS_SCREWED_KEY = "fulcrum-keepers-screwed"
 FULCRUM_SET_SCREWS_DRIVEN_KEY = "fulcrum-set-screws-driven"
-SET_SCREWS_STAKED_KEY = "fulcrum-set-screws-staked"
 # The lever bank: each amplitude bar is pinned to its lever at the bench (the
 # pin is pressed into the bar's cheeks and runs in the lever), then the levers
 # go onto the fulcrum shaft between the set keepers in channel order, each
 # bar's foot notch dropped over its rocker's arm, before the keeper set
-# screws are staked onto the shaft's flats. The channel springs are hooked
+# screws are driven onto the shaft's flats. The channel springs are hooked
 # last; their anchors are threaded and set at MHA-HA-00.
 BARS_PINNED_KEY = "bars-pinned"
 LEVER_BANK_THREADED_KEY = "lever-bank-threaded"
@@ -96,6 +95,17 @@ BAR_PIN_REMEDY: tuple[str, ...] = (
     "bar-replaced",
     "bar-pin-return",
 )
+# Each arm's strap is accepted where it works, in its rod's fork: once the
+# rocker bank is on the shaft with the rods in their cams, and before the
+# lever bank's bars sit on the arms, the strap must shake sideways between
+# the tines (owner ruling 2026-11-20, #2343: the fork clearance is the
+# functional check of the strap's position); a strap that binds is set by
+# hand and checked again (rule 22: the remedy is its own steps). The rocker
+# bank's two columns are full, so the check opens the lever bank's.
+STRAP_SHAKE_REMEDY: tuple[str, ...] = (
+    "strap-set-by-hand",
+    "strap-set-return",
+)
 ROCKER_SEQUENCE: tuple[str, ...] = (
     RODS_PINNED_KEY,
     "rod-pins-dressed",
@@ -121,11 +131,12 @@ ROCKER_SEQUENCE: tuple[str, ...] = (
     "south-bracket-held",
     "shaft-set",
     "set-screws-driven",
-    PIVOT_SET_SCREWS_STAKED_KEY,
     "pivot-shaft-held",
     "arms-follow-rods",
 )
 LEVER_SEQUENCE: tuple[str, ...] = (
+    "straps-shake-in-forks",
+    *STRAP_SHAKE_REMEDY,
     "keepers-on-frame",
     "fulcrum-shaft-through-keepers",
     KEEPERS_SET_KEY,
@@ -154,7 +165,6 @@ LEVER_SEQUENCE: tuple[str, ...] = (
     "lever-bank-slides",
     "fulcrum-flats-aligned",
     FULCRUM_SET_SCREWS_DRIVEN_KEY,
-    SET_SCREWS_STAKED_KEY,
     "fulcrum-shaft-held",
     SPRINGS_HOOKED_KEY,
     "spring-bottom-loops-left",

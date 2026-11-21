@@ -161,9 +161,9 @@ flowchart LR
 
     e1["eccentricity ±0.025 mm<br/>cam phase ±0.25°<br/><b>gain 11.6 %/mm, phase</b>"]:::part -.-> cam
     e2["2nd harmonic e/4L = 1.3 %<br/><b>design, corrected by table</b>"]:::design -.-> rod
-    e3["rod-pin radius ±0.10<br/>0.75 %/mm"]:::part -.-> rocker
+    e3["rod-pin radius ±0.18<br/>0.75 %/mm"]:::part -.-> rocker
     e4["station setting ±0.25 mm<br/><b>setup</b>; null lift 0.029"]:::setup -.-> bar
-    e5["bar-pin / hook arms ±0.10<br/>0.8 / 0.6 %/mm"]:::part -.-> lever
+    e5["bar-pin / hook arms ±0.13<br/>0.8 / 0.6 %/mm"]:::part -.-> lever
     e6["spring rate ±1.25 %<br/><b>matched, 1 %/%</b>"]:::part -.-> spring
     e7["hole position (2.667 %/mm)<br/>knife term at each input's actual setup"]:::part -.-> summing
     e8["common-mode gain: calibrated out<br/>component range 83.920 / 165 / 193.115 mm<br/>setup capped at built 165 mm<br/><b>capacity from READOUT.md</b>"]:::free -.-> mag
@@ -359,9 +359,15 @@ current report does not discharge the operating assumptions or waivers below.
   indicated offset in a 4-jaw. Compare it with the current report's accuracy-only
   `allowable_tolerance` before proposing a change; the budget pins that tolerance
   to the yaml so they cannot silently diverge.
-- **Lever-arm accuracy and bore fit are different requirements.** Compare the
-  general ±0.10 arm limits with the current report's accuracy allowables; their
-  bores still carry `shaft_in_bushing` for the running fit.
+- **Lever-arm accuracy and bore fit are different requirements.** The arm
+  inputs are the printed bands: the rocker rod-pin radius ±0.18 (half the
+  Ø.014 position zone) and the lever's bar-pin and spring-hook arms ±0.13
+  (the title block's .XXX), `error_budget.yaml` `rocker_rod_pin_radius`,
+  `lever_bar_pin_arm`, `lever_spring_hook_arm`. Owner ruling 2026-11-20
+  (#2351) confirmed the delegated ruling of 2026-11-07 that re-based them,
+  with `check:budget` passing at them (main `a59291dfd8`); no tighter print
+  or extra callout. Compare them with the current report's accuracy
+  allowables; their bores still carry `shaft_in_bushing` for the running fit.
 - **Summing-lever hole position is the relevant plate gain tolerance** (2.667 %/mm across the
   knife line). Drill the 20 holes from one fixture; the along-knife pitch can be loose.
 - **Phase is cheap if clocks share their datums.** ±0.25° cam-lobe/notch phase

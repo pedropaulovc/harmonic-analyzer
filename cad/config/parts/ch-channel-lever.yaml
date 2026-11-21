@@ -19,11 +19,6 @@ ch-channel-lever:
   process: "machined from the bought 5/16 x 1 in 1018 cold-finish flat (#2173): hub and plate faces, the reamed fulcrum bore and the drilled holes; the flat is .3125 +.000/-.004 thick (ASTM A108 cold-drawn flats, the 1 in width governs), so facing the hub to .300 +.001/.000 takes .0075 to .0125 off its two faces. The plate comes off both faces equally, about .097 each, cut as a pocket inside the bar's uncut edges, which carry the part on its second side: rough the two faces in turns to .020 over, release the part and reseat it, then take the finish passes on both faces; cut the outline free last and drill and ream after it. A plate that leaves its thickness or plate-offset band once free is set straight by hand on the surface plate and rechecked, or exchanged"
   drawing_unit: in
   machinist_exceptions:
-    - id: "RV-01"
-      kind: "accept"
-      where: "the one position control carried on this sheet"
-      finding: "position frame over-specified on a channel part (rule 5)"
-      reason: "a coordinate plus/minus would let the 20 channels scatter; at most one control per channel part (owner-accepted channel-consistency class)"
     - id: "RV-02"
       kind: "accept"
       where: "the hub width .300 +.001/.000 (SETS PITCH OF 20X STACK ON MHA-CH-04)"

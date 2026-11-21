@@ -750,14 +750,14 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
 
     spec = _config.parts("ch-connecting-rod")
     # Main ruling 2026-10: machined from 1018, black finish; #2173/#2340: the
-    # stock is the bought cold-finished flat the route names.
+    # stock is the bought cold-finished flat the route names. #2348 (owner
+    # ruling 2026-11-20): black oxide and oil, as the channel lever.
     assert spec["material"] == rod.MATERIAL == "Plain Carbon Steel"
     assert "1018" in spec["material_specification"]
     assert "plate" not in spec["material_specification"].lower()
-    assert spec["finish"] == (
-        "BLACK ENAMEL; MASK BORE, RING AND SHANK FACES, PIN HOLE, FORK SLOT; "
-        "OIL BARE SURFACES"
-    )
+    assert spec["finish"] == _config.parts("ch-channel-lever")["finish"]
+    assert "black oxide" in spec["finish"] and "oil" in spec["finish"]
+    assert "ENAMEL" not in spec["finish"].upper()
     assert int(spec["quantity"]) == 20
 
 

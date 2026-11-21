@@ -16,11 +16,6 @@ ch-amplitude-bar:
   process: "machined (steel); as-supplied 1/4 CF square (bows about .013 over 31.82) straightened or selected to the MHA-CH-00 straightness check"
   drawing_unit: in
   machinist_exceptions:
-    - id: "RV-01"
-      kind: "accept"
-      where: "the one position control carried on this sheet"
-      finding: "position frame over-specified on a channel part (rule 5)"
-      reason: "a coordinate plus/minus would let the 20 channels scatter; at most one control per channel part (owner-accepted channel-consistency class)"
     - id: "RV-02"
       kind: "accept"
       where: "the two notch-centring ledge bands, .073 ±.002 in DETAIL A and .063 ±.002 in DETAIL B"

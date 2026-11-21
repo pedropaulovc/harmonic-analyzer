@@ -182,7 +182,8 @@ BOTTOM_EDGE_BELOW_PIVOT = _rocker_interface.ARM_DEPTH - TOP_EDGE_ABOVE_PIVOT  # 
 # The #47 rod-pin hole is drilled, so its zone is the shop's drilled-hole
 # location row (+/-.005, about Ø.014); error_budget.yaml rocker_rod_pin_radius
 # books half of it. Delegated ruling 2026-11-07 (Main), no precedent; owner
-# review #2144 (Q3-A) -- pending owner confirmation.
+# review #2144 (Q3-A); confirmed by owner ruling 2026-11-20 (#2351) with
+# check:budget passing at this zone.
 GEOMETRIC_TOLERANCES_IN: dict[str, str] = {
     "rod-pin hole position": ".014",
     "strap position to hub": ".004",

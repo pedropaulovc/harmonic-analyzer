@@ -2,7 +2,9 @@ ch-connecting-rod:
   number: MHA-CH-03
   material: Plain Carbon Steel
   material_specification: AISI 1018 CF flat, 1/4 x 2 REF
-  finish: BLACK ENAMEL; MASK BORE, RING AND SHANK FACES, PIN HOLE, FORK SLOT; OIL BARE SURFACES
+  # Owner ruling 2026-11-20 (#2348): "Black oxide and oil", like the channel
+  # lever; the enamel masked both broad faces and was filed at the pins.
+  finish: matte black oxide per MIL-DTL-13924 Class 1, oil sealed
   quantity: 20
   tolerance_class: machined_block
   fit_class: cam_follower_contact
