@@ -111,7 +111,7 @@ ref = "lathe-ar"
 
 [[tools]]
 id = "form"
-name = "R.180 dome form tool (cuts the SR.19 far dome to R.18): HSS, a concave R.180 arc ground across an edge at least .30 wide (both tips past the Ø.250 O.D.), cutting edge at centre height, shank to suit the toolpost"
+name = "R.180 dome form tool (cuts the SR.19 far dome to R.18): a concave R.180 arc .250 across ground into the edge, its two ends the tips, on the end of a 3/8 in square HSS tool blank, cutting edge at centre height"
 ref = "form-tool-r180"
 status = "to_order"
 
