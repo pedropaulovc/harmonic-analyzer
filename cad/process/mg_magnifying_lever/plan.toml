@@ -279,7 +279,7 @@ instruction = "Only once Op 140 passes: back the cross slide fully off and the t
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "The leaf does not seat (Op 140): the gearbox is off 20 TPI; set it right, scrap the lever and make another from Setup 1."
+instruction = "The leaf does not seat (Op 140): the gearbox is off 20 TPI; set it right, scrap the lever and make another from Setup 1. The bracket shakes at Op 150 (the thread cut too deep): scrap the lever and make another from Setup 1."
 
 [[setups.operations]]
 cut_kind = "other"
