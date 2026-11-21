@@ -103,15 +103,15 @@ machine = "PM-1127VF-LB lathe"
 indexing = "none"
 machine_ref = "pm-1127vf-lb"
 holding = "3-jaw on the Ø{{process.stock_dia_in:.2dot}} bar through the spindle; pull {{cad.stickout_in:.2dot}} in out of the jaw fronts each time."
-datum = "Z0 (carriage DRO) the bar end faced in Op 30, set again on the parted end in Op 100."
+datum = "Z0 (carriage DRO) the bar end faced in Op 40, set again on the parted end in Op 110."
 diagram = { file = "diagrams/bar.svg", alt = "The 1/2 in bar in the 3-jaw with two hubs out: the end faced, the land turned over both, the D hole drilled through both past the second parting line, each hub parted off {{cad.part_off_in:.2dot}} from its faced end." }
 lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = "{{cad.stock_dia_mm}}", stock_diameter_mm = "{{cad.stock_dia_mm}}", stickout_mm = "{{cad.stickout_mm}}", minimum_diameter_mm = "{{cad.outer_dia_mm}}", support = "none" }
 turning_support = { kind = "chuck_only", chuck_z_mm = "{{cad.jaw_z_mm}}" }
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "Before the first pull, read the holes the land is turned to (drawing: TURN TO MEASURED STRAP HOLE). Try the six plug gauges .4000–.4005 in every MHA-CH-13 strap's hub hole, smallest first, and write beside each strap the largest that enters: its reading R. The lot's land is Ø(largest R + {{process.land_over_reading_min_in:.4dot}}) to Ø(smallest R + {{cad.outer_interference_max_in:.4dot}}): the hole may be up to .0001 over its R, so every hole then takes the drawing's {{cad.outer_interference_min_in:.4dot}}–{{cad.outer_interference_max_in:.4dot}} diametral interference. Write the land window on this sheet."
-inspection = "Every strap hole .4000–.4005: .4000 enters, .4005 does not; each R written; land window written."
+instruction = "Before the first pull, read the holes the land is turned to (drawing: TURN TO MEASURED STRAP HOLE). Try the six plug gauges .4000–.4005 in every MHA-CH-13 strap's hub hole, smallest first, and write beside each strap the largest that enters: its reading R."
+inspection = "Every strap hole .4000–.4005: .4000 enters, .4005 does not; each R written."
 # The pair gauges the hole's band; the four steps read it inside the pair,
 # .4001-.4004.
 gauge_checks = [{ gauge = "plug-gauges-4000-4005", band_mm = [10.16, 10.1727] }, { gauge = "plug-gauges-4001-4004", band_mm = [10.16254, 10.17016] }]
@@ -119,6 +119,11 @@ gauge_checks = [{ gauge = "plug-gauges-4000-4005", band_mm = [10.16, 10.1727] },
 [[setups.operations]]
 cut_kind = "other"
 instruction = "A strap hole the .4005 enters or the .4000 does not is outside MHA-CH-13's own .4000–.4005 hole band, the strap traveler's hub-hole check: that strap is nonconforming, so leave it out of the readings and make no hub for it. Set it aside and tell the owner: the strap is remade, not fitted with a hub turned to it."
+
+[[setups.operations]]
+cut_kind = "other"
+instruction = "Work out the lot's land window from the readings kept, Ø(largest R + {{process.land_over_reading_min_in:.4dot}}) to Ø(smallest R + {{cad.outer_interference_max_in:.4dot}}), and write it on this sheet: a hole may be up to .0001 over its R, so every hole then takes the drawing's {{cad.outer_interference_min_in:.4dot}}–{{cad.outer_interference_max_in:.4dot}} diametral interference."
+inspection = "Land window written."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -152,15 +157,15 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Finish the land over the same length to the lot's land window (Op 10) in light passes, miking each hub's length of land between passes; over the window, take another pass."
+instruction = "Finish the land over the same length to the lot's land window (Op 30) in light passes, miking each hub's length of land between passes; over the window, take another pass."
 settings = "lathe-ar-1018"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
-inspection = "Land inside the Op 10 window on both hubs, micrometer: the measured land less each hole's R lies within {{process.land_over_reading_min_in:.4dot}}–{{cad.outer_interference_max_in:.4dot}}."
+inspection = "Land inside the Op 30 window on both hubs, micrometer: the measured land less each hole's R lies within {{process.land_over_reading_min_in:.4dot}}–{{cad.outer_interference_max_in:.4dot}}."
 gauge_checks = "other"
 
 [[setups.operations]]
 cut_kind = "other"
-instruction = "A land under the Op 10 window: part both hubs off and scrap them; pull the bar and start the pair again from Op 30."
+instruction = "A land under the Op 30 window: part both hubs off and scrap them; pull the bar and start the pair again from Op 40."
 
 [[setups.operations]]
 cut_kind = "other"
@@ -200,7 +205,7 @@ speed_kind = "spindle"
 tool = "ar"
 drilling = "none"
 sizing = "other"
-instruction = "Face the parted end {{process.face_allowance_in:.2dot}} in with the AR tool; set DRO Z0 on it again. Bring the blade's chuck-side face onto the new faced end and set DRO Z there to the blade's width, as in Op 90: the DRO again reads the blade's tailstock-side face."
+instruction = "Face the parted end {{process.face_allowance_in:.2dot}} in with the AR tool; set DRO Z0 on it again. Bring the blade's chuck-side face onto the new faced end and set DRO Z there to the blade's width, as in Op 100: the DRO again reads the blade's tailstock-side face."
 settings = "lathe-ar-1018"
 cut_diameter_mm = "{{cad.outer_dia_mm}}"
 
@@ -210,7 +215,7 @@ speed_kind = "spindle"
 tool = "cutoff"
 drilling = "none"
 sizing = "other"
-instruction = "Part off the second hub with the blade's tailstock-side face at Z-{{cad.part_off_in:.2dot}}. Catch it. Pull the bar for the next two and repeat from Op 30 until there is a hub for every strap that passed Op 10."
+instruction = "Part off the second hub with the blade's tailstock-side face at Z-{{cad.part_off_in:.2dot}}. Catch it. Pull the bar for the next two and repeat from Op 40 until there is a hub for every strap kept in Op 20."
 settings = "lathe-part-1018"
 cut_diameter_mm = "{{cad.stock_dia_mm}}"
 
@@ -233,11 +238,11 @@ instruction = "Deburr each hub: file the parting burr off the parted face, break
 feed = "hand"
 
 [[setups.operations]]
-instruction = "Each hub: length across the faces at least {{cad.length_min_in:.2dot}}, calipers; land inside the Op 10 window again after deburring, micrometer."
-inspection = "Length {{cad.length_min_in:.2dot}} min; land inside the Op 10 window (largest R + {{process.land_over_reading_min_in:.4dot}} to smallest R + {{cad.outer_interference_max_in:.4dot}})."
+instruction = "Each hub: length across the faces at least {{cad.length_min_in:.2dot}}, calipers; land inside the Op 30 window again after deburring, micrometer."
+inspection = "Length {{cad.length_min_in:.2dot}} min; land inside the Op 30 window (largest R + {{process.land_over_reading_min_in:.4dot}} to smallest R + {{cad.outer_interference_max_in:.4dot}})."
 gauge_checks = [{ gauge = "calipers", band_mm = ["{{cad.length_min_mm}}", "{{cad.part_off_mm}}"] }]
 feed = "hand"
 
 [[setups.operations]]
-instruction = "A hub under the length or outside the land window in Op 130 is scrapped, not reworked: the next pull makes another."
+instruction = "A hub under the length or outside the land window in Op 140 is scrapped, not reworked: the next pull makes another."
 feed = "hand"
