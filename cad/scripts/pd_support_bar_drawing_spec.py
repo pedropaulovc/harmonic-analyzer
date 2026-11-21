@@ -255,6 +255,10 @@ CLAMP_HOLE_PROCESS = "DRILL"
 # slide grade, rule 6.  Each symbol carries its one reason on its own shelf,
 # naming the part that slides there by its drawing number (rules 4 and 7:
 # flagged where it applies), as MHA-PD-11's own slide symbol does.
+# The top edge is skimmed (machining-required symbol); the front face keeps
+# the cold-finished stock's surface, its thickness printed as supplied
+# (#1563 option C), so draw_pd_support_bar turns its symbol to the
+# any-process form.
 # PlanarFace offsets run along the outward normal (point . normal).
 SURFACE_FINISHES = (
     SurfaceFinishControl(

@@ -18,8 +18,10 @@ two counterbored slots on the west one (owner ruling 2026-10-15, option A).
   height (ClampRowReference), the round counterbores' native callout (size,
   drill, counterbore; the counterbore's Ø the 5/16 plunge's .3125 +.010/0,
   depth at .XX, the drill at .XXX) naming the back-arc taps
-  the row locates to, and the front face's slide roughness. Each roughness
-  symbol names the part that slides there; the sheet has no general note.
+  the row locates to and pointing to note 1, and the front face's slide
+  roughness (any process: the thickness is as supplied). Each roughness
+  symbol names the part that slides there; sheet note 1 states the clamp
+  holes' screw-line offset over the #8 screw clearance.
 * Detail C looks face-on at the outer slot: the slot's and its
   counterbore's widths and travels, the slot's width naming the head its
   upper limit seats and the counterbore's the MHA-SH-VN-53 head it clears.
@@ -1547,9 +1549,31 @@ def _place_caption(adapter: Any, text: str, top_centre: tuple[float, float]) -> 
     _telemetry.info(f"caption {text!r}: extent {extent}")
 
 
+# swSFSymType_e.swSFBasic: the any-process symbol (open vee, no bar).
+SF_ANY_PROCESS = 0
+
+
+def _set_any_process_finish(adapter: Any, symbol: Any, *, label: str) -> None:
+    """Turn the front face's finish into the any-process form.
+
+    The bar's thickness prints as supplied (.374 +.001/-.003, owner ruling
+    2026-11-20, #1563 option C), so the cold-finished front face is met by any
+    process: the material-removal-required form asked the shop to face a
+    surface whose band leaves no stock for it (Codjiflo review of #3163, P1;
+    as draw_dt_cone_swing_platform._set_any_process_finish)."""
+    native = _early_bound(symbol, "ISFSymbol")
+    if not native.SetSymbol(SF_ANY_PROCESS, 0, False):
+        raise RuntimeError(f"failed to set the any-process finish symbol ({label})")
+    rebuild_drawing(adapter, label=f"{label} any-process symbol")
+    if int(native.GetSymbol()) != SF_ANY_PROCESS:
+        raise RuntimeError(f"any-process finish symbol did not persist ({label})")
+
+
 def _add_slide_finishes(adapter: Any, face: Any, back: Any) -> None:
     """The platen's two slide faces: the top face on its edge in the back-face
-    view, the front face seen face-on, a leader to a point on it."""
+    view, the front face seen face-on, a leader to a point on it.  The top
+    edge is skimmed (machining required); the front face stays as supplied
+    (any process)."""
     top = _sheet(
         adapter, face, (TOP_FINISH_MODEL_X, BAR_HEIGHT / 2.0, BACK_FACE_Z), "top finish"
     )
@@ -1563,24 +1587,26 @@ def _add_slide_finishes(adapter: Any, face: Any, back: Any) -> None:
         label="top slide finish",
         char_height=FINISH_CHAR_HEIGHT,
     )
-    control = surface_finish_by_key(SURFACE_FINISHES, "front_slide")
-    front_face = resolve_faces(
-        _early_bound(_early_bound(back, "IView").ReferencedDocument, "IModelDoc2"),
-        {control.key: control.face},
-    )[control.key]
-    add_surface_finish(
-        adapter,
-        back,
-        entity=front_face,
-        entity_type="FACE",
-        leader_attach_xy=_sheet(
-            adapter, back, (*FRONT_FINISH_MODEL_XY, -BAR_DEPTH / 2.0), "front finish"
-        ),
-        symbol_xy=FRONT_FINISH_SYMBOL_XY,
-        control=control,
-        label="front slide finish",
-        char_height=FINISH_CHAR_HEIGHT,
-    )
+    with _telemetry.span("drawing.support_bar_front_finish"):
+        control = surface_finish_by_key(SURFACE_FINISHES, "front_slide")
+        front_face = resolve_faces(
+            _early_bound(_early_bound(back, "IView").ReferencedDocument, "IModelDoc2"),
+            {control.key: control.face},
+        )[control.key]
+        front_symbol = add_surface_finish(
+            adapter,
+            back,
+            entity=front_face,
+            entity_type="FACE",
+            leader_attach_xy=_sheet(
+                adapter, back, (*FRONT_FINISH_MODEL_XY, -BAR_DEPTH / 2.0), "front finish"
+            ),
+            symbol_xy=FRONT_FINISH_SYMBOL_XY,
+            control=control,
+            label="front slide finish",
+            char_height=FINISH_CHAR_HEIGHT,
+        )
+        _set_any_process_finish(adapter, front_symbol, label="front slide finish")
 
 
 def build(adapter: Any) -> dict[str, str]:
