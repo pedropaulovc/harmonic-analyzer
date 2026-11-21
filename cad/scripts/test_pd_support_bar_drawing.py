@@ -512,13 +512,16 @@ def test_clamp_screw_line_wander_shortfall_stays_the_owner_ruled_value() -> None
 
     stated = note_text(stated_max(part.CLAMP_SCREW_LINE_SHORTFALL))
     assert stated == ".002"
-    assert f"OFFSET UP TO {stated} OVER #8" in drawing.SCREW_LINE_NOTE
+    note = " ".join(drawing.SCREW_LINE_NOTE.split())
+    assert note.startswith("1. ")
+    assert f"OFFSET UP TO {stated} OVER #8" in note
+    assert sheet_spec.CLAMP_CBORE_CALLOUT.endswith("SEE NOTE 1")
     entries = {
         entry["id"]: entry
         for entry in _config.parts("pd-support-bar")["machinist_exceptions"]
     }
     assert entries["RV-03"]["kind"] == "minor"
-    assert " ".join(drawing.SCREW_LINE_NOTE.split()) in entries["RV-03"]["where"]
+    assert note in entries["RV-03"]["where"]
 
 
 def test_slot_counterbores_leave_rule_17_walls() -> None:

@@ -45,7 +45,7 @@ from dataclasses import dataclass
 
 from _appearance import apply_material
 from _check import check
-from _com import _com_invoke, _early_bound
+from _com import _bind, _com_invoke, _early_bound
 from _dimensions import (
     _feature_display_dimensions,
     drive_dimension,
@@ -424,16 +424,17 @@ def _band_round_counterbores(adapter) -> None:
     band is read back."""
     feature = _feature_by_name(adapter, "ClampHoles")
     matches = []
+    seen = []
     for display in _feature_display_dimensions(feature):
-        dimension = _early_bound(
-            _com_invoke(display, "IDisplayDimension", "GetDimension2", 0), "IDimension"
-        )
-        if abs(float(dimension.SystemValue) * 1000.0 - CLAMP_CBORE_DIA) < 1e-4:
-            matches.append(dimension)
+        raw = _com_invoke(display, "IDisplayDimension", "GetDimension2", 0)
+        value = float(_com_invoke(raw, "IDimension", "SystemValue")) * 1000.0
+        seen.append((str(_com_invoke(raw, "IDimension", "FullName")), value))
+        if abs(value - CLAMP_CBORE_DIA) < 1e-4:
+            matches.append(_bind(raw, "IDimension"))
     if len(matches) != 1:
         raise RuntimeError(
             f"ClampHoles: {len(matches)} dimensions read the counterbore Ø "
-            f"{CLAMP_CBORE_DIA} mm, not 1"
+            f"{CLAMP_CBORE_DIA} mm, not 1; dimensions {seen!r}"
         )
     lower, upper = CLAMP_CBORE_DIA_LIMITS
     tolerance = _early_bound(matches[0].Tolerance, "IDimensionTolerance")

@@ -150,7 +150,9 @@ def test_part_authored_callouts_name_each_band_s_mate() -> None:
     assert len(callouts.BAR_DEPTH_CALLOUT.replace(axle, "").split()) <= 6
     assert BACK_END_SUNK_MIN >= 0.0
     assert mg_wheel_bar_spec.BAR_DEPTH_BAND == pytest.approx((0.005 * IN, -0.005 * IN))
-    assert callouts.CLAMP_HOLE_CALLOUT == "CLEARS MHA-SH-02 TAPPED HOLES\nWALL .070 MIN"
+    assert callouts.CLAMP_HOLE_CALLOUT == (
+        "CLEARS MHA-SH-02 TAPS, SEE NOTE 1\nWALL .070 MIN"
+    )
     assert callouts.HANGER_HOLE_CALLOUT == "WALL .076 MIN"
     texts = [*callouts.authored_by_name().values()]
     for lanes in texts:
@@ -229,13 +231,16 @@ def test_clamp_screw_line_wander_shortfall_stays_the_owner_ruled_value() -> None
     from sh_column_clamp_fit import note_text, stated_max
 
     stated = note_text(stated_max(shortfall))
-    assert f"OFFSET UP TO\n{stated} OVER #8" in drawing.SCREW_LINE_NOTE
+    note = " ".join(drawing.SCREW_LINE_NOTE.split())
+    assert note.startswith("1. ")
+    assert f"OFFSET UP TO {stated} OVER #8" in note
+    assert "SEE NOTE 1" in callouts.callout_rows(callouts.CLAMP_HOLE_CALLOUT)[0]
     entries = {
         entry["id"]: entry
         for entry in _config.parts("mg-wheel-bar")["machinist_exceptions"]
     }
     assert entries["RV-08"]["kind"] == "minor"
-    assert " ".join(drawing.SCREW_LINE_NOTE.split()) in entries["RV-08"]["where"]
+    assert note in entries["RV-08"]["where"]
 
 
 def test_every_wall_is_stated_at_the_full_worst_case() -> None:

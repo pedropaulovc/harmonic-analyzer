@@ -152,10 +152,12 @@ HOLE_CALLOUT_PRECISION = {"hw-diam": 3}
 # The clamp screw line's drill-wander shortfall at the worst corner, 0.0527
 # (test_mg_wheel_bar_drawing derives it from the clamp's own modules, which
 # stay out of this part's recipe), stated rounded up as a plain fact (rule
-# 20): mg-wheel-bar RV-08. Under the front view's dimensions, left of the
-# title block.
+# 20): mg-wheel-bar RV-08. Numbered, the clamp holes' callout pointing to it
+# (mg_wheel_bar_callouts.CLAMP_HOLE_CALLOUT). Under the front view's
+# dimensions, left of the title block.
 SCREW_LINE_NOTE = (
-    "CLAMP HOLE TO MHA-SH-02 TAP OFFSET UP TO\n.003 OVER #8 SCREW CLEARANCE"
+    "1. EACH .196 HOLE TO ITS MHA-SH-02 TAP:\n"
+    "   OFFSET UP TO .003 OVER #8 SCREW CLEARANCE."
 )
 SCREW_LINE_NOTE_XY = (0.040, 0.095)
 # The one native through extent reads DRILL THRU ALL, after the size

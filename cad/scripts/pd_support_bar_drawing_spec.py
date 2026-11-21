@@ -240,8 +240,11 @@ DIMENSION_PREFIXES = {
 # clearance form, the screw and the taps it threads into (round 4 machinist
 # review: "LOCATE TO" read as an instruction). The holes are drilled at the
 # printed row and stations, whose title-block ±.005 closes the MHA-SH-02
-# taps' fixed-fastener stack (build_pd_support_bar.CLAMP_POSITION_BAND).
-CLAMP_CBORE_CALLOUT = "CLEARANCE FOR MHA-SH-VN-53\nINTO MHA-SH-02 TAPS"
+# taps' fixed-fastener stack (build_pd_support_bar.CLAMP_POSITION_BAND); the
+# drill wander left over is note 1's stated shortfall (pd-support-bar RV-03),
+# which the callout points to (r2 machinist review on MHA-MG-08: an unlinked
+# note named no feature).
+CLAMP_CBORE_CALLOUT = "CLEARANCE FOR MHA-SH-VN-53\nINTO MHA-SH-02 TAPS, SEE NOTE 1"
 # The round holes' drill, written after their size in the native THRU row
 # (rule 26: size, then process, then depth; the counterbore is its symbol).
 CLAMP_HOLE_PROCESS = "DRILL"

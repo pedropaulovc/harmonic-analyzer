@@ -178,12 +178,14 @@ ISO_CENTER = (0.368, 0.097)
 ISO_NOTE_XY = (0.300, 0.076)
 # The clamp screw line's drill-wander shortfall
 # (build_pd_support_bar.CLAMP_SCREW_LINE_SHORTFALL), stated rounded up as a
-# plain fact (rule 20): pd-support-bar RV-03. Over END A's top-left corner,
+# plain fact (rule 20): pd-support-bar RV-03. Numbered, the round holes'
+# callout pointing to it (CLAMP_CBORE_CALLOUT). Over END A's top-left corner,
 # left of the top edge's finish symbol and above the face view.
 SCREW_LINE_NOTE = (
-    "CLAMP HOLE TO MHA-SH-02 TAP\n"
-    f"OFFSET UP TO {note_text(stated_max(CLAMP_SCREW_LINE_SHORTFALL))} OVER #8\n"
-    "SCREW CLEARANCE"
+    "1. EACH .196 HOLE TO ITS\n"
+    "   MHA-SH-02 TAP: OFFSET UP\n"
+    f"   TO {note_text(stated_max(CLAMP_SCREW_LINE_SHORTFALL))} OVER #8 SCREW\n"
+    "   CLEARANCE."
 )
 SCREW_LINE_NOTE_XY = (0.016, 0.262)
 
