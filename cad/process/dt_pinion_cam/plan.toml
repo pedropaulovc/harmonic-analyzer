@@ -1,53 +1,483 @@
-# Placeholder process plan (owner 2026-11-19): the tools this part needs, from
-# quotes-2026-11-17-rev3.xlsx, until its traveler is written. Not enrolled in
-# _process_plans.TRAVELER_STEMS; see cad/process/README.md, "Placeholder plans".
-title = "Pinion Eccentric Cam"
-part = "MHA-DT-23 Pinion Eccentric Cam"
-revision = "placeholder"
-material = "1018, 1020 or 12L14 cold-finished steel"
-stock = "To be written"
+# Pinion eccentric cam MHA-DT-23 (qty 2), from 5/8 in round 1018 CF.
+# Route, chosen for speed (owner ruling 2026-11-21: the agent picks the
+# faster route and says why; the owner corrects afterwards):
+# - Setup 1, PM-1127VF-LB lathe, 6 in 3-jaw, manual (turned setups get no NC,
+#   owner 2026-11-21): one chucking makes both cams. Face, turn the Ø.575 O.D.
+#   over both, break the edge, part off to length; face again, part off the
+#   second. Parting to length removes a second facing chucking; the parting
+#   pip sits inside the eccentric bore and is drilled away.
+# - Setup 2, PM-30MV CNC, vise: the cam upright on its faced front face,
+#   gripped on the turned O.D.; the fixed jaw and the edge finder locate the
+#   O.D. axis and CM01 spots, drills C and reams .2510 through at the drawn
+#   offset. The lathe was not chosen for the bore: the shop records only the
+#   3-jaw (workholding.chuck-3jaw-6), so an offset bore there means shimming
+#   a jaw by trial; on the mill the offset is a program coordinate.
+# - Setup 3, PM-30MV, vise: the cam lying, thick side up, oriented by a 1/4
+#   drill shank in the bore and the edge finder; CM02 spots and drills #50
+#   into the bore, CM03 brings the dead centre over it for hand tapping #2-56
+#   (FluidNC cannot rigid-tap; as mg_magnifying_clamp). No drill press is
+#   recorded in the shop.
+# - Setup 4, bench: deburr, inspect (eccentricity over the .2510 GO plug on
+#   the height gauge), oil, bag the set screw.
+# To order before Setup 2 runs: the .2510 reamer (tools.reamer-2510, owner
+# ruling #3073 buys fixed reamers for running fits); the .2510 GO / .2515
+# NO-GO plug gauges for the bore (gauges.plug-gauges-2510-2515). No V-blocks
+# or setting mandrel are used.
+#
+# NC (cam:dt_pinion_cam, cad/process/dt_pinion_cam/cam.py): CM01_bore,
+# CM02_set_screw, CM03_set_screw_tap. Program names, the [parameters] and the
+# milling_cuts names are a contract with that recipe. Tool numbers are the
+# places in the tools list among the mill's tools: T1 centre drill, T2 C
+# drill, T3 .2510 reamer, T4 #50 drill, T5 the dead centre.
+title = "Pinion eccentric cam"
+part = "{{cad.drawing_number}}"
+revision = "{{cad.revision}}"
+material = "1018 cold-finished steel, 5/8 in round (drawing: {{cad.material_spec}})"
+stock = "{{process.bar_dia_in:fraction}} in round bar, one piece at least {{process.bar_length_min_in:.2f}} in long makes both cams ({{process.quantity:d}} off)."
+note = "Inches unless mm; G-code and console entries in mm (the files and the controller run G21). Finished Ø{{cad.cam_od_dia_min_in:.3dot}}–{{cad.cam_od_dia_max_in:.3dot}} × {{cad.cam_od_length_min_in:.3dot}}–{{cad.cam_od_length_max_in:.3dot}} long; the bore Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}} {{cad.bore_eccentricity_min_in:.3dot}}–{{cad.bore_eccentricity_max_in:.3dot}} off the O.D. axis (thin wall {{cad.bore_thin_wall_min_mm:in.4dot}} min); the #2-56 set-screw hole opposite the thin side, {{cad.set_screw_tap_station_min_in:.3dot}}–{{cad.set_screw_tap_station_max_in:.3dot}} from the front face. Mill speeds on the PM-30MV low belt (100–2800 rpm). Home the mill ($H) and touch off G54 at the start of every mill setup; after any controller reset, stall or E-stop, home and touch off again before Cycle Start. Every file is proved in air on the first cam. Edges: R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max."
 shop = "../shop"
 stock_refs = ["1018-round-5-8"]
+material_key = "rocker-1018-cold-finished"
+milling_material = "steel_1018"
+
+[cad]
+file = "../../out/features/dt_pinion_cam/features.toml"
+adapter = "drilled_block"
+part = "dt-pinion-cam"
+
+[parameters]
+quantity = 2
+bar_dia_in = 0.625
+# Both cams from one chucking: two lengths, two parting cuts, a .010 face
+# and the 3-jaw's grip, rounded up.
+bar_length_min_in = 2.0
+# Stick-out for both cams: 2 × .354 + two 1/8 in blade widths + the first
+# face's .010, plus room for the blade to clear the jaws: 1.25 in.
+stickout_mm = 31.75
+turn_length_in = 1.0
+# The blank a cam is cut from (stock_fit: envelope X, Y, Z).
+blank_x_in = 0.625
+blank_y_in = 0.625
+blank_z_in = 0.36
+# Turning (A R Warner AR holder, TCMT insert, R0.4 nose, carbide):
+# LittleMachineShop "Cutting Speeds" (read 2026-11-20), turning plain carbon
+# steels with carbide well over 300 ft/min; 1200 rpm on Ø.625 is 196 ft/min,
+# the author's choice for a hobby lathe. Finish pass .002 in/rev: R.016 nose,
+# theoretical Ra = f²/(32 r) = 8 µin, under the O.D.'s 63.
+turn_rpm = 1200
+part_rpm = 400
+# CM01: the cam upright on its front face on the 1 in and 1/2 in parallels
+# stacked against each jaw (1.5 in), so its rear face stands above the jaw
+# tops; the jaws grip the O.D. over the jaw height less the stack.
+parallel_height_mm = 25.4
+riser_height_mm = 38.1
+parallel_thickness_mm = 3.175
+vise_jaw_height_mm = 44.9453     # Shop workholding.vise-pm-6.jaw_height_mm.
+vise_jaw_width_mm = 158.6738     # Shop workholding.vise-pm-6.jaw_width_mm.
+bore_grip_mm = 6.8453
+# Gap between the two stacks under the cam (O.D. less two parallels): the
+# drill and reamer run out into it.
+bore_parallel_gap_mm = 8.25
+# Bore: spot Ø.160 with the #2 centre drill (under the C drill, no chamfer
+# at the mouth), C (.242) through in one feed (L/D 1.5), its
+# full diameter 1.0 mm past the front face; then the .2510 reamer through,
+# 1.5 mm past it (its 45° lead), fed in and fed out with the spindle running.
+bore_spot_dia_mm = 4.064
+drill_past_mm = 1.0
+ream_past_mm = 1.5
+# Tips below the rear face (Z0): the C drill's 9.0 + 1.0 + its 118° point
+# 1.847; the reamer 9.0 + 1.5. cam.py checks both.
+bore_drill_tip_mm = -11.847
+bore_ream_tip_mm = -10.5
+# CM02: lying, axis along the jaws, the O.D. on the 1 in parallels' inner
+# top edges (gap 8.25): the axis 6.023 above their tops, the jaw tops 6.222
+# above the O.D.'s top line (Z0). The rear face .25 in from the jaws' right
+# ends, so the orienting shank stands out past them.
+cross_axis_height_mm = 6.0228
+cross_jaw_top_mm = 6.2225
+cross_jaw_end_mm = 6.35
+# Set-screw hole: spot Ø.063 with the centre drill's pilot point only (its
+# 5/64 pilot is over the #50), then #50 in pecks of .040 with full retracts,
+# its full diameter to the bore's axis; its point 0.534 below that.
+tap_spot_dia_mm = 1.6002
+peck_50_mm = 1.016
+tap_drill_tip_mm = -9.834
+# That tip below the jaw tops (6.2225 + 9.834): the jobber #50 must stand out
+# of its chuck further than this. cam.py checks it.
+tap_tip_below_jaw_top_mm = 16.057
+# Setup 3 orientation: the set-screw hole is drawn at 180° from the thin
+# side under the title block's ±1°. Turning the cam about its O.D. axis
+# moves the bore's axis sideways by eccentricity × tan(angle), so the shank
+# in the bore may sit at most 2.0 × tan 1° = 0.0349 mm off Y0. cam.py
+# computes it from the export. The shank rests on the bore's bottom under
+# gravity, so its .001–.0015 in clearance goes into Z, not Y; what is left
+# is the edge finder's repeatability (.0002 in, 0.005 mm, the usual figure
+# for a mechanical edge finder at 900 rpm; not measured in this shop), well
+# inside the band.
+orient_band_mm = 0.0349
+# Speeds and feeds, authored in the operations: LittleMachineShop "Cutting
+# Speeds", Drilling & Reaming, Plain carbon steels 1006-1026 (read
+# 2026-11-20): drilling 60-100 ft/min; AutoDrill "Suggested drilling feed
+# rates" (read 2026-11-20), row Stl, Carbon: 1/16 in .001, 1/8 in .003 in/rev,
+# a size between two columns taking the lower one's feed. Centre drill 1800
+# rpm × .001 = 1.8 in/min (the column clamp's spot); C 1000 rpm (63 ft/min) ×
+# .003 = 3.0 in/min; the reamer at 400 rpm (26 ft/min, under half the
+# drilling speed, the author's choice) × .004 = 1.6 in/min; the pilot spot and
+# #50 at the spindle's 2800 (51 ft/min on the #50) × .001 = 2.8 in/min.
+bore_spot_feed_per_min_mm = 45.72
+drill_c_feed_per_min_mm = 76.2
+ream_feed_per_min_mm = 40.64
+tap_spot_feed_per_min_mm = 71.12
+drill_50_feed_per_min_mm = 71.12
+# Tapping on the dead centre (as mg_magnifying_clamp): the dead centre's
+# reach out of its collet plus the tap's reach in the wrench must be at most
+# the spindle-to-table maximum (431.8) less 25.0 to bring the point down, the
+# vise bed (73.304), the 1 in parallels, the cam's top above them (13.323)
+# and the collet gauge (6.3): 288.47, rounded down to .01 in.
+tap_stack_max_mm = 288.29
 
 [[tools]]
-id = "drill-50"
-name = "#50 drill"
-ref = "drill-50"  # Drills #50
-
+id = "turn"
+name = "AR carbide turning tool"
+ref = "lathe-ar"
 [[tools]]
-id = "reamer-2510"
-name = ".2510 reamer"
-ref = "reamer-2510"  # B-reamer-.2510
-
+id = "cutoff"
+name = "Cutoff blade"
+ref = "cutoff-blade-holder"
 [[tools]]
-id = "tap-2-56-plug"
-name = "#2-56 plug tap"
-ref = "tap-2-56-plug"  # Tap coverage #2-56 UNC
-
-[[tools]]
-id = "feeler-gauges"
-name = "Feeler gauges (Pittsburgh 32-pc)"
-ref = "feeler-gauges"  # F-feeler-66MA; repointed from the Starrett 66MA (owner 2026-11-19)
-
-[[tools]]
-id = "pin-gauges"
-name = "Pin gauges .011-.500"
-ref = "pin-gauges"  # A1-pin-set-061-500-combined, A1-pin-set-251-500
-
-[[tools]]
-id = "centre-punch-starrett-18a"
-name = "Automatic centre punch"
-ref = "centre-punch-starrett-18a"  # F-centre-punch-starrett-18A
-
+id = "spot"
+name = "#2 centre drill"
+ref = "jig-spot"
 [[tools]]
 id = "drill-c"
 name = "C drill"
-ref = "drill-c"  # drawing cross-check 2026-11-19: pre-drill for the .2500/.2510 ream
+ref = "drill-c"
+[[tools]]
+id = "reamer"
+name = ".2510 reamer"
+ref = "reamer-2510"
+status = "to_order"
+[[tools]]
+id = "drill-50"
+name = "#50 drill"
+ref = "drill-50"
+[[tools]]
+id = "dead-centre"
+name = "MT3 dead centre"
+ref = "mill-dead-centre-mt3"
+[[tools]]
+id = "tap-2-56"
+name = "#2-56 plug tap"
+ref = "tap-2-56-plug"
+[[tools]]
+id = "feeler"
+name = "Feeler gauges"
+ref = "feeler-gauges"
+[[tools]]
+id = "plugs"
+name = "Plug gauges .2510 GO, .2515 NO-GO"
+ref = "plug-gauges-2510-2515"
+status = "to_order"
+[[tools]]
+id = "files"
+name = "Files"
+ref = "jig-files"
+
+[[setups]]
+machine_kind = "lathe"
+title = "Turn both cams and part them off"
+machine = "PM-1127VF-LB lathe / 6 in 3-jaw"
+indexing = "none"
+machine_ref = "pm-1127vf-lb"
+holding = "The 5/8 bar in the 3-jaw, {{process.stickout_mm:in.2f}} out. Both cams come from this one chucking."
+datum = "The faced end is each cam's FRONT face (the set-screw station is measured from it)."
+diagram = { file = "diagrams/lathe.svg", alt = "The bar in the 3-jaw: the O.D. turned to Ø.575 over both cams, the first cam parted off .354 from the faced end, the second behind it." }
+lathe_hold = { chuck = "chuck-3jaw-6", grip_diameter_mm = 15.875, stock_diameter_mm = 15.875, stickout_mm = "{{process.stickout_mm}}", minimum_diameter_mm = "{{cad.cam_od_dia_mm}}", support = "none" }
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "turn"
+drilling = "none"
+sizing = "other"
+instruction = "Face the end clean, about .010 off; {{process.turn_rpm:d}} rpm. Mark this face F with a marker dot on the face near its edge (not on the rim the O.D. pass removes): it is the first cam's front face."
+rpm = 1200
+feed = "hand"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "turn"
+drilling = "none"
+sizing = "other"
+instruction = "Turn the O.D. {{process.turn_length_in:.2f}} in long: rough to Ø.585, then one finish pass at .002 in/rev power feed to Ø{{cad.cam_od_dia_min_in:.3dot}}–{{cad.cam_od_dia_max_in:.3dot}} (aim {{cad.cam_od_dia_in:.3dot}}); {{process.turn_rpm:d}} rpm, Tapmatic Gold."
+rpm = 1200
+feed = "0.002 in/rev"
+inspection = "O.D. Ø{{cad.cam_od_dia_min_in:.3dot}}–{{cad.cam_od_dia_max_in:.3dot}}, miked at both ends of the turned length; finish smooth to the eye and nail (Ra 63)."
+gauge_checks = [{ gauge = "micrometers", band_mm = "{{cad.cam_od_dia_band_mm}}" }]
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "files"
+drilling = "none"
+sizing = "other"
+instruction = "Break the face-to-O.D. edge with a smooth file held flat, {{cad.chamfer_max_in:.3dot}} max; spindle at the low range."
+rpm = 200
+feed = "hand"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "cutoff"
+drilling = "none"
+sizing = "other"
+instruction = "Part off {{cad.cam_od_length_in:.3dot}} from face F (the blade's near side at {{cad.cam_od_length_in:.3dot}}, set with the calipers' depth rod from the face to the blade); {{process.part_rpm:d}} rpm, Tapmatic Gold, steady hand feed. Catch the cam."
+rpm = 400
+feed = "hand"
+inspection = "Length {{cad.cam_od_length_min_in:.3dot}}–{{cad.cam_od_length_max_in:.3dot}}, calipers. The parted face is the REAR face; its pip is inside the bore to come."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.cam_od_length_band_mm}}" }]
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "turn"
+drilling = "none"
+sizing = "other"
+instruction = "Second cam: face the bar's parted end clean, about .010 off; {{process.turn_rpm:d}} rpm. Mark it F."
+rpm = 1200
+feed = "hand"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "files"
+drilling = "none"
+sizing = "other"
+instruction = "Break its face-to-O.D. edge with the smooth file, {{cad.chamfer_max_in:.3dot}} max; 200 rpm."
+rpm = 200
+feed = "hand"
+
+[[setups.operations]]
+cut_kind = "other"
+speed_kind = "spindle"
+tool = "cutoff"
+drilling = "none"
+sizing = "other"
+instruction = "Part off {{cad.cam_od_length_in:.3dot}} from the new face F as op 40; {{process.part_rpm:d}} rpm, Tapmatic Gold. Catch the cam."
+rpm = 400
+feed = "hand"
+inspection = "Length {{cad.cam_od_length_min_in:.3dot}}–{{cad.cam_od_length_max_in:.3dot}}, calipers."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.cam_od_length_band_mm}}" }]
+
 
 [[setups]]
 machine_kind = "other"
-machine = "To be written"
-title = "Traveler to come"
+title = "Ream the eccentric bore"
+machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "The PM 6 in vise (jaws {{process.vise_jaw_height_mm:in.2f}} tall above its seat; check with the calipers before loading). A 1 in parallel with a 1/2 in parallel on it, both 1/8 in thick, against each jaw (1.5 in stacks). The cam upright on both stacks, face F DOWN, gripped on its O.D., centred on the jaws: its lower {{process.bore_grip_mm:in.3dot}} is in the jaws, its rear face stands above the jaw tops. Tap it down onto both stacks while closing the vise. Under the bore the {{process.bore_parallel_gap_mm:in.3dot}} gap between the stacks: the bore is offset ALONG the jaws, so the drill and reamer run out into that gap. Before Cycle Start look under the cam from the side: both stacks against the jaws, the gap clear."
+datum = "Program CM01_bore (cam:dt_pinion_cam). G54: X0 Y0 the O.D. axis, Z0 the rear face; +Y toward the fixed jaw; the bore at X+{{cad.bore_eccentricity_mm:.3f}} mm ({{cad.bore_eccentricity_in:.3dot}} in). Tool lengths from the tool setter at each M6."
+diagram = { file = "diagrams/bore.svg", alt = "The cam upright on two parallel stacks in the vise; the centre drill, C drill and .2510 reamer go through it {{cad.bore_eccentricity_in:.3dot}} off its axis along the jaws." }
+envelope = "other"
+vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.cam_od_dia_mm}}", along_jaws_mm = "{{cad.cam_od_dia_mm}}", part_height_mm = "{{cad.envelope_z_mm}}", parallel_height_mm = "{{process.riser_height_mm}}", overhang_mm = [-72.0369, "rest"], jaw_offset = "centred", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "rod" }
+beam = { axis = "z", hold = "cantilever", extent_mm = [0, "{{cad.envelope_z_mm}}"], clamp_mm = [0, "{{process.bore_grip_mm}}"], section_mm = { diameter = "{{cad.cam_od_dia_mm}}" }, vise_left = "other" }
 
 [[setups.operations]]
-instruction = "Process not written yet."
+instruction = "Start only with the .2510 reamer and the .2510 GO / .2515 NO-GO plug gauges in hand (both to order). Mike each cam's O.D. and write it on a tag with the cam."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Home the mill ($H). G54 Y0: the O.D. axis, half the miked O.D. from the fixed jaw. X0: the O.D. axis, midway between its left and right sides at Y0."
+instruction_detailed = "Home the mill ($H). Edge finder (900 rpm) on the fixed jaw's face beside the cam: G10 L20 P1 Y(half your O.D. reading in mm − 2.540); for .575, Y4.763. MDI G0 Y0. Edge finder down beside the O.D. between the jaws, on the LEFT side from the left: G10 L20 P1 X0. On the RIGHT side from the right: G10 L20 P1 X(half the DRO X reading)."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "G54 Z0: the rear face, the centre drill's point on a .002 feeler leaf at X-4.000 Y0, clear of the parting pip."
+instruction_detailed = "Console M6 T1 (#2 centre drill; the tool setter measures it). MDI G0 X-4.000 Y0 (on the flat rear face, clear of the parting pip at the axis). Spindle stopped, its point just dragging a .002 leaf there: G10 L20 P1 Z0.051."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "First cam only: prove CM01_bore in air, Z0 raised 1.000 in. Then Z0 back."
+instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400). Run CM01_bore through every M6, watching each move clear the jaws. G10 L2 P1 Z(the noted Z) puts Z0 back."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "spot"
+drilling = "none"
+sizing = "other"
+instruction = "Run CM01_bore (M6 T1, centre drill; set 1800): spot Ø{{process.bore_spot_dia_mm:in.3dot}} at X {{cad.bore_eccentricity_mm:.3f}} mm, under the C drill."
+rpm = 1800
+feed = "{{process.bore_spot_feed_per_min_mm:in.1f}} in/min"
+milling_cuts = [
+  { name = "bore spot", kind = "drill", phase = "rough", cutter_dia_mm = "{{process.bore_spot_dia_mm}}", flutes = 2, rpm = 1800, feed_mm_min = "{{process.bore_spot_feed_per_min_mm}}", stations_mm = "{{cad.bore_eccentricity_mm}}" },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "drill-c"
+drilling = "twist_drill"
+sizing = "other"
+instruction = "Same file, M6 T2: C drill through in one feed (L/D 1.5), its full diameter {{process.drill_past_mm:in.3dot}} past face F; set 1000. Tapmatic Gold."
+rpm = 1000
+feed = "{{process.drill_c_feed_per_min_mm:in.1f}} in/min"
+hole_depth_mm = "{{cad.envelope_z_mm}}"
+peck = "none"
+milling_cuts = [
+  { name = "bore drill", kind = "drill", phase = "rough", cutter_dia_mm = 6.1468, flutes = 2, rpm = 1000, feed_mm_min = "{{process.drill_c_feed_per_min_mm}}", stations_mm = "{{cad.bore_eccentricity_mm}}" },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "reamer"
+drilling = "none"
+sizing = { kind = "band", band_mm = "{{cad.bore_dia_band_mm}}" }
+instruction = "Same file, M6 T3: .2510 reamer through, {{process.ream_past_mm:in.3dot}} past face F, fed in and fed back out with the spindle running; set 400. Plenty of Tapmatic Gold."
+rpm = 400
+feed = "{{process.ream_feed_per_min_mm:in.1f}} in/min"
+milling_cuts = [
+  { name = "bore ream", kind = "drill", phase = "finish", cutter_dia_mm = 6.3754, flutes = 6, rpm = 400, feed_mm_min = "{{process.ream_feed_per_min_mm}}", stations_mm = "{{cad.bore_eccentricity_mm}}" },
+]
+inspection = "Bore Ø{{cad.bore_dia_min_in:.4dot}}–{{cad.bore_dia_max_in:.4dot}} before unclamping: the .2510 GO plug enters, the .2515 NO-GO does not."
+gauge_checks = [{ gauge = "plug-gauges-2510-2515", band_mm = "{{cad.bore_dia_band_mm}}" }]
+
+[[setups.operations]]
+instruction = "The GO does not enter: T3 still in, spindle at 400, MDI G0 X{{cad.bore_eccentricity_mm:.3f}} Y0 Z1, M3 S400, G1 Z{{process.bore_ream_tip_mm:.3f}} F{{process.ream_feed_per_min_mm:.1f}}, G1 Z1, G0 Z5, M5; re-gauge. Still tight, or the NO-GO enters: reject the cam."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Blow out the chips. Second cam: unclamp, load it the same way and repeat Setup 2 from op 90 with its own Y0 (its tagged O.D.) and its own X0 (both sides of its O.D.): the first cam's zero does not locate the second."
+feed = "hand"
+
+[[setups]]
+machine_kind = "other"
+title = "Drill and tap the set-screw hole"
+machine = "PM-30MV CNC (FluidNC, CNCjs with the electronic tool setter) / vise, swivel off"
+indexing = "none"
+machine_ref = "pm-30mv"
+holding = "The PM 6 in vise (jaws {{process.vise_jaw_height_mm:in.2f}} tall above its seat). A 1 in parallel, 1/8 in thick, against each jaw. The cam lying along the jaws, face F to the LEFT, its rear face {{process.cross_jaw_end_mm:in.2f}} in from the jaws' RIGHT ends, its O.D. on the parallels' inner top edges, the bore BELOW the O.D.'s centre (thick wall up). A 1/4 in drill from the 115-piece index, shank first, in the bore from the right, standing out past the jaw ends. The other cam (or, for the second, the finished first) lies the same way at the jaws' LEFT ends as the balance, so the jaws close square. Snug the vise (ops 170–200 orient it)."
+datum = "Programs CM02_set_screw and CM03_set_screw_tap. G54: X0 face F, +X toward the rear face; Y0 the O.D. axis; Z0 the O.D.'s top line. Tool lengths from the tool setter at each M6; every move between holes runs above the jaw tops, which stand {{process.cross_jaw_top_mm:in.3dot}} above Z0."
+diagram = { file = "diagrams/cross.svg", alt = "The cam lying in the vise on the parallels' edges, thick side up, a drill shank in the bore; the #50 drills down from the top {{cad.set_screw_tap_station_in:.2dot}} from face F into the bore." }
+envelope = "other"
+vise_hold = { vise = "vise-pm-6", across_jaws_mm = "{{cad.cam_od_dia_mm}}", along_jaws_mm = "{{cad.envelope_z_mm}}", part_height_mm = "{{cad.cam_od_dia_mm}}", parallel_height_mm = "{{process.parallel_height_mm}}", overhang_mm = [-143.3238, "rest"], jaw_offset = "balanced", balance = "twin_part", fixed_jaw_face = "machined", moving_jaw_face = "machined", moving_jaw_contact = "rod" }
+beam = { axis = "x", hold = "solid", extent_mm = [0, "{{cad.envelope_z_mm}}"], seat = "gripped full length across the O.D. in the vise jaws, on the parallels' edges", seat_mm = [0, "{{cad.envelope_z_mm}}"] }
+
+[[setups.operations]]
+instruction = "Home the mill ($H). G54 Y0: the O.D. axis, half the miked O.D. from the fixed jaw, as Setup 2."
+instruction_detailed = "Home the mill ($H). Edge finder (900 rpm) on the fixed jaw's face: G10 L20 P1 Y(half your O.D. reading in mm − 2.540)."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Orient: the shank resting on the bore's bottom (do not lift it), edge-find its −Y and +Y sides past the jaws' right ends and average the two DRO Y readings."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Average more than {{process.orient_band_mm:.3f}} mm from 0: loosen, turn the cam a touch by the shank (0.035 mm of shank movement is 1° of turn), snug, and repeat op 180."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Average inside: tighten the vise, touch both sides once more, then pull the shank out of the bore."
+inspection = "After tightening: the shank's average Y reading at most {{process.orient_band_mm:.3f}} mm from Y0, either side (the drawn 180° ±1° from the thin side, at the .079 eccentricity)."
+gauge_checks = [{ gauge = "mill-y-dro", band_mm = [0.0, "{{process.orient_band_mm}}"] }]
+feed = "hand"
+
+[[setups.operations]]
+instruction = "G54 X0: face F, the edge finder from the left on the face beside the bore at Y0. Z0: the O.D.'s top line, the centre drill on a .002 leaf at the hole's station."
+instruction_detailed = "Edge finder on face F from the left, at Y0, below the O.D.'s top line: G10 L20 P1 X-2.540. Console M6 T1 (#2 centre drill). MDI G0 X{{cad.set_screw_tap_station_mm:.3f}} Y0. Spindle stopped, its point just dragging a .002 leaf on the O.D.'s top: G10 L20 P1 Z0.051."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "First cam only: prove CM02_set_screw in air, Z0 raised 1.000 in. Then Z0 back."
+instruction_detailed = "Send $# and note the G54 line's Z. G10 L2 P1 Z(that Z + 25.400). Run CM02_set_screw through every M6, watching each move clear the jaw tops. G10 L2 P1 Z(the noted Z) puts Z0 back."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "spot"
+drilling = "none"
+sizing = "other"
+instruction = "Run CM02_set_screw (M6 T1, centre drill; set 2800): spot Ø{{process.tap_spot_dia_mm:in.3dot}} with the pilot's point only, at X {{cad.set_screw_tap_station_mm:.3f}} mm on the top line."
+rpm = 2800
+feed = "{{process.tap_spot_feed_per_min_mm:in.1f}} in/min"
+milling_cuts = [
+  { name = "tap spot", kind = "drill", phase = "rough", cutter_dia_mm = "{{process.tap_spot_dia_mm}}", flutes = 2, rpm = 2800, feed_mm_min = "{{process.tap_spot_feed_per_min_mm}}", stations_mm = "{{cad.set_screw_tap_station_mm}}" },
+]
+
+[[setups.operations]]
+speed_kind = "spindle"
+tool = "drill-50"
+drilling = "twist_drill"
+sizing = { kind = "band", band_mm = "{{cad.set_screw_tap_dia_band_mm}}" }
+instruction = "Same file, M6 T4: #50 down into the bore, its full diameter to the bore's axis ({{cad.set_screw_tap_into_axis_in:.3dot}} below the top line), pecks of {{process.peck_50_mm:in.3dot}} with full retract; set 2800. Tapmatic Gold. At least 1.00 out of the chuck: it reaches {{process.tap_tip_below_jaw_top_mm:in.2dot}} below the jaw tops."
+rpm = 2800
+feed = "{{process.drill_50_feed_per_min_mm:in.1f}} in/min"
+hole_depth_mm = "{{cad.set_screw_tap_into_axis_mm}}"
+peck = { step_mm = 1.016, retract = "full" }
+milling_cuts = [
+  { name = "tap drill", kind = "drill", phase = "rough", cutter_dia_mm = 1.778, flutes = 2, rpm = 2800, feed_mm_min = "{{process.drill_50_feed_per_min_mm}}", stations_mm = "{{cad.set_screw_tap_station_mm}}" },
+]
+
+[[setups.operations]]
+instruction = "Stop check before the tap file: the dead centre from its tip to the collet's face plus the 2-56 tap in the T-handle wrench from its point to the wrench's centre hole must be at most {{process.tap_stack_max_mm:in.2f}} in. Over: stop; do not tap on this setup."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "dead-centre"
+drilling = "none"
+sizing = "other"
+instruction = "Run CM03_set_screw_tap: M6 T5, the dead centre in its 3/4 in collet, spindle off; the file ends Idle at the machine top over the hole."
+diagram = { file = "diagrams/tap.svg", alt = "The cam lying in the vise; the #2-56 tap in the T-handle wrench in the hole, the dead centre in the spindle seated in the wrench's centre hole; the tap's point to reach the bore's axis." }
+
+[[setups.operations]]
+instruction = "Tap depth reference: with the tap's point standing on the top line beside the hole and the dead centre seated in the wrench, note the DRO's work Z (mm)."
+instruction_detailed = "MDI G0 X7.000 (on the top line, beside the hole). Stand the tap in its wrench on its point there; jog Z down until the dead centre sits in the wrench's centre hole, light pressure. Note the DRO's work Z. Jog Z up clear, MDI G0 X{{cad.set_screw_tap_station_mm:.3f}} Y0."
+feed = "hand"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "tap-2-56"
+drilling = "none"
+sizing = "other"
+instruction = "Tap #2-56 by hand on the dead centre, spindle off, Tapmatic Gold, a half turn back each turn, jogging Z down to keep it seated, until the DRO Z reads the noted Z less {{cad.set_screw_tap_into_axis_mm:.3f}} mm ({{cad.set_screw_tap_into_axis_in:.3dot}} in): the point at the bore's axis, full thread through the wall. A #2 tap breaks easily: stop at any rise in effort and back out."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Jog Z up clear, back the tap out, blow out the hole and the bore. Swap the two cams' positions: load the second cam at the jaws' RIGHT ends per Setup 3 Holding (face F LEFT, rear face .25 from the jaw ends, bore below centre, the 1/4 shank back in the bore), the drilled cam at the LEFT ends as the balance; then repeat from op 170: orient it, then its own Y0, X0 and Z0."
+feed = "hand"
+
+[[setups]]
+machine_kind = "other"
+title = "Deburr, inspect, oil"
+machine = "Bench, surface plate"
+indexing = "none"
+diagram = { file = "diagrams/inspect.svg", alt = "The cam lying on the surface plate, thick side down, the .2510 GO plug in the bore; the height gauge reads over the plug to give the eccentricity." }
+envelope = "other"
+vise_hold = "other"
+beam = "other"
+
+[[setups.operations]]
+speed_kind = "other"
+tool = "files"
+drilling = "none"
+sizing = "other"
+instruction = "Deburr both bore mouths, the hole's mouth on the O.D. and the rear face's parted edge (scraper and smooth file), to R{{cad.edge_break_in:.3dot}} or chamfer {{cad.chamfer_max_in:.3dot}} max. Turn the .2510 reamer through the bore by hand in a tap wrench to clear the #50's breakthrough burr. Wash off the oil."
+feed = "hand"
+
+[[setups.operations]]
+instruction = "Length and O.D. were accepted on the lathe. Eccentricity: lay the cam on the surface plate on its O.D. with the .2510 GO plug in the bore (under .0005 shake); hold it on the plate by hand, roll it slowly and read the highest point H over the plug with the height gauge. Eccentricity = H − O.D./2 − .1255, {{cad.bore_eccentricity_min_in:.3dot}}–{{cad.bore_eccentricity_max_in:.3dot}}. Thin wall = O.D./2 − eccentricity − .1258 (half the largest bore), at least {{cad.bore_thin_wall_min_mm:in.4dot}}."
+feed = "hand"
+inspection = "Eccentricity {{cad.bore_eccentricity_min_in:.3dot}}–{{cad.bore_eccentricity_max_in:.3dot}}; thin wall at least {{cad.bore_thin_wall_min_mm:in.4dot}}."
+gauge_checks = [{ gauge = "height-gauge", band_mm = "{{cad.bore_eccentricity_band_mm}}" }]
+
+[[setups.operations]]
+instruction = "Set-screw hole: station from face F {{cad.set_screw_tap_station_min_in:.3dot}}–{{cad.set_screw_tap_station_max_in:.3dot}} (calipers from face F over the #50's shank in the hole, less half the miked shank); the hole on the thick side, opposite the bore offset; a #2-56 screw runs in by hand to the bore."
+feed = "hand"
+inspection = "Station {{cad.set_screw_tap_station_min_in:.3dot}}–{{cad.set_screw_tap_station_max_in:.3dot}} from face F."
+gauge_checks = [{ gauge = "calipers", band_mm = "{{cad.set_screw_tap_station_band_mm}}" }]
+
+[[setups.operations]]
+instruction = "Wipe on ISO VG 32 oil, into the tapped hole. Bag each cam with one ASME B18.3 #2-56 × 3/16 flat-point socket set screw, loose (drawing note 2)."
+feed = "hand"
