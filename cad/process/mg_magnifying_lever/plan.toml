@@ -34,10 +34,9 @@
 # stub's end, where the dead centre's 60° point is still inside the #1
 # centre drill's Ø.09 countersink (its cone reaches Ø.12 there), while the
 # bit's flank stands over .26 off the axis: no half-centre is needed. The
-# dead centre's nose is not measured and the PM-1127VF-LB tailstock taper is
-# not on record: tools.mill-dead-centre-mt3 is the owner's MT3 dead centre
-# used as the mill's tap guide; if it does not seat and lock in the quill, a
-# lathe dead centre is needed (to order). Op 100's dry run proves the
+# dead centre's nose is not measured. The tailstock taper is MT3 and the
+# owner's MT3 dead centre fits it (owner 2026-11-21: machines.pm-1127vf-lb,
+# tools.dead-centre-mt3, no longer the mill's tap guide). Op 100's dry run proves the
 # clearance before the first pass.
 #
 # Flagged: the R.125 form tool (tools-special-cutters.toml form-tool-r125)
