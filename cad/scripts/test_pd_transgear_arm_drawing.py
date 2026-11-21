@@ -236,7 +236,7 @@ def _floor_pressed_proud_range(pin_length: float, hole_depth: float) -> tuple[fl
 # 0.011 smaller.  #2422: the bar's pivot tap prints the title block's ±.005
 # (it was ±.002; owner ruling 2026-11-20), which the pin's reach spends.
 _SET_PROUD_WINDOW = (0.516 * 25.4, 0.565 * 25.4)
-_PINNED_FAR_FACE_MARGIN = 0.286
+_PINNED_FAR_FACE_MARGIN = 0.285
 _PINNED_OLD_PIN_MARGIN = -0.597
 _PINNED_DEEPER_OLD_PIN_MARGIN = -0.647
 
