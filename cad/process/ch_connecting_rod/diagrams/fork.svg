@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Setup 5: same load; the slitting saw slots both forks in one sweep; spot, drill and ream the pin holes. Styles: prechips.palette. -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 470" width="780" height="470" font-family="sans-serif" font-size="12">
-<rect class="paper" width="780" height="470"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 520" width="900" height="520" font-family="sans-serif" font-size="12">
+<rect class="paper" width="900" height="520"/>
 <text class="title" x="20" y="22">Face F up: fork slot and pin hole (top view)</text>
 <rect class="clamp" x="85" y="46" width="460" height="24"/>
 <text class="label" x="270" y="62">fixed jaw</text>
@@ -23,9 +23,9 @@
 <line class="datum" x1="50" y1="36" x2="50" y2="399"/>
 <text class="datum-label" x="10" y="415">X0 left ends</text>
 <text class="label" x="170" y="415">F up; support plate (6061) on two 1 in parallels</text>
-<circle class="cutter" cx="650" cy="359" r="101"/>
-<path class="arrow" d="M760 345 V60"/>
-<text class="label" x="734" y="56">+Y</text>
-<circle class="cutter" cx="684" cy="144" r="101" stroke-dasharray="4 3"/>
-<text class="label" x="170" y="433">touch off over fork 1 (dashed, where CR05 parks); saw along +Y at two heights; spot, #49, ream</text>
+<circle class="cutter" cx="650" cy="359" r="101" style="fill-opacity:0.55"/>
+<path class="arrow" d="M830 345 V60"/>
+<text class="label" x="840" y="66">+Y</text>
+<circle class="cutter" cx="684" cy="144" r="101" style="fill:none" stroke-width="2" stroke-dasharray="6 4"/>
+<text class="label" x="170" y="495">touch off over fork 1 (dashed, where CR05 parks); saw along +Y at two heights; spot, #49, ream</text>
 </svg>
